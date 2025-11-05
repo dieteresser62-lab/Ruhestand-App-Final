@@ -76,15 +76,17 @@ Ruhestand-App-Final/
 - Pflegefall-Szenarien mit Kostenmodellierung
 - Detaillierte Wahrscheinlichkeitsmetriken (P10, P50, P90)
 - Heatmap-Visualisierungen
+- **Parameter Sweep** - Systematische Parametervariation mit Heatmap-Visualisierung
+- **Dev-Mode** - Erweiterte Debug-Funktionen und Parity-Tests
 
 **Technologie:** HTML5, CSS3, ES6-Module (vollständig modularisiert)
 
 **Module:**
-- **simulator-main.js** - Hauptorchestrierung, Monte-Carlo & Backtest
+- **simulator-main.js** - Hauptorchestrierung, Monte-Carlo, Backtest & Parameter Sweep
 - **simulator-engine.js** - Jahres-Simulationslogik, State Management
 - **simulator-results.js** - Ergebnis-Rendering & Visualisierung
 - **simulator-portfolio.js** - Portfolio-Initialisierung & -Verwaltung
-- **simulator-heatmap.js** - Heatmap-Generierung & Canvas-Rendering
+- **simulator-heatmap.js** - Heatmap-Generierung (SVG) & Parameter-Sweep-Visualisierung
 - **simulator-utils.js** - Hilfsfunktionen (RNG, Quantile, Formatierung)
 - **simulator-data.js** - Historische Daten & Konstanten
 
@@ -163,13 +165,52 @@ open Simulator.html
 - Firefox
 - Safari
 
-### Tastaturkürzel (Balance-App)
+### Tastaturkürzel
 
+**Balance-App:**
 - **Alt + J** - Jahresabschluss erstellen
 - **Alt + E** - Export
 - **Alt + I** - Import
 - **Alt + N** - Marktdaten nachrücken
 - **Alt + D** - Dark-Mode umschalten
+- **CTRL + Shift + D** - Debug-Modus umschalten
+
+**Simulator-App:**
+- **CTRL + Shift + D** - Dev-Modus umschalten (zeigt Debug-Funktionen)
+
+### Parameter Sweep (Simulator)
+
+Mit der Parameter-Sweep-Funktion können Sie systematisch verschiedene Parameterkombinationen testen und die Ergebnisse als Heatmap visualisieren:
+
+**Features:**
+- **2D-Parameter-Grid** - Variieren Sie zwei Parameter gleichzeitig (z.B. Floor-Bedarf vs. Flex-Bedarf)
+- **Heatmap-Visualisierung** - Interaktive SVG-Heatmaps zeigen Erfolgswahrscheinlichkeiten
+- **Flexible Ranges** - Definieren Sie Min/Max/Schrittweite für jeden Parameter
+- **Grid-Size-Counter** - Live-Anzeige der Anzahl zu berechnender Simulationen
+- **localStorage-Persistenz** - Sweep-Einstellungen werden automatisch gespeichert
+- **Mehrere Metriken** - Analysieren Sie verschiedene Erfolgsmetriken (Überlebensrate, Endvermögen, etc.)
+
+**Verwendung:**
+1. Wählen Sie zwei Parameter aus (z.B. `startFloorBedarf` und `startFlexBedarf`)
+2. Definieren Sie Min/Max/Schrittweite für jeden Parameter
+3. Klicken Sie auf "Run Sweep"
+4. Analysieren Sie die Heatmap mit verschiedenen Metriken
+
+**Tipp:** Der Grid-Size-Counter zeigt die Anzahl der Simulationen an. Bei großen Grids kann die Berechnung einige Zeit dauern.
+
+### Debug- und Dev-Modus
+
+**Debug-Modus (Balance-App):**
+- Aktivierung mit **CTRL+Shift+D**
+- Zeigt erweiterte Diagnose-Informationen
+- Visualisiert Entscheidungsbäume und interne Berechnungen
+- Für Entwickler und fortgeschrittene Anwender
+
+**Dev-Modus (Simulator-App):**
+- Aktivierung mit **CTRL+Shift+D**
+- Zeigt zusätzliche Debug-Buttons
+- **Parity SmokeTest** - Vergleicht Simulator- und Engine-Berechnungen
+- Hilfreich zur Fehlersuche und Validierung
 
 ## 💾 Datenspeicherung
 
@@ -295,6 +336,24 @@ THRESHOLDS: {
 ```
 
 ## 📝 Versionshistorie
+
+### v5.2 (2025-01-07) - Parameter Sweep Verbesserungen
+- ✅ Sweep-Defaults und Placeholders hinzugefügt
+- ✅ localStorage-Persistenz für Sweep-Einstellungen
+- ✅ Verbesserte Heatmap-Visualisierung mit TDZ-Fehlerkorrektur
+- ✅ Range-Validierung mit Grid-Size-Counter
+
+### v5.1 (2025-01-06) - Debug-Features & Dev-Modus
+- ✅ Debug-Modus mit CTRL+Shift+D für Balance-App
+- ✅ Dev-Modus-Toggle für Simulator mit erweiterten Debug-Funktionen
+- ✅ Parity SmokeTest-Button für Engine-Validierung
+- ✅ Kompakte Debug-Button-Layouts
+
+### v5.0 (2025-01-05) - Parameter Sweep & Heatmap
+- ✅ Parameter-Sweep-Funktion mit 2D-Grid-Exploration
+- ✅ Heatmap-Visualisierung für Sweep-Ergebnisse
+- ✅ Flexible Parameter-Ranges mit Min/Max/Schrittweite
+- ✅ Mehrere Metriken zur Analyse (Überlebensrate, Endvermögen, etc.)
 
 ### v4.0 (2025-01-05) - Balance ES6-Modularisierung
 - ✅ Balance-App auf ES6-Module umgestellt (analog zu Simulator)
