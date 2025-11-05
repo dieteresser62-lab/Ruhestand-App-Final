@@ -295,3 +295,42 @@ export function portfolioTotal(p) {
     : 0;
   return sumTr(p?.depotTranchesAktien) + sumTr(p?.depotTranchesGold) + (Number(p?.liquiditaet) || 0);
 }
+
+/**
+ * Aggregiert Metriken für eine Reihe von Monte-Carlo-Läufen
+ * @param {Array} runOutcomes - Array mit Ergebnissen einzelner Läufe
+ * @returns {Object} Aggregierte Metriken
+ */
+export function aggregateSweepMetrics(runOutcomes) {
+    if (!runOutcomes || runOutcomes.length === 0) {
+        return {
+            successProbFloor: 0,
+            p10EndWealth: 0,
+            worst5Drawdown: 0,
+            minRunwayObserved: 0
+        };
+    }
+
+    const successCount = runOutcomes.filter(r => !r.failed).length;
+    const successProbFloor = (successCount / runOutcomes.length) * 100;
+
+    const endWealths = runOutcomes.map(r => r.finalVermoegen || 0);
+    endWealths.sort((a, b) => a - b);
+    const p10Index = Math.floor(endWealths.length * 0.10);
+    const p10EndWealth = endWealths[p10Index] || 0;
+
+    const drawdowns = runOutcomes.map(r => r.maxDrawdown || 0);
+    drawdowns.sort((a, b) => b - a);
+    const p95Index = Math.floor(drawdowns.length * 0.95);
+    const worst5Drawdown = drawdowns[p95Index] || 0;
+
+    const runways = runOutcomes.map(r => r.minRunway || 0);
+    const minRunwayObserved = Math.min(...runways);
+
+    return {
+        successProbFloor,
+        p10EndWealth,
+        worst5Drawdown,
+        minRunwayObserved
+    };
+}

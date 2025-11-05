@@ -1,6 +1,6 @@
 "use strict";
 
-import { rng, quantile, sum, mean, formatCurrency } from './simulator-utils.js';
+import { rng, quantile, sum, mean, formatCurrency, parseRange, cartesianProduct } from './simulator-utils.js';
 import { ENGINE_VERSION, ENGINE_HASH, STRESS_PRESETS, BREAK_ON_RUIN, MORTALITY_TABLE, HISTORICAL_DATA, annualData } from './simulator-data.js';
 import {
     getCommonInputs, updateStartPortfolioDisplay, initializePortfolio,
@@ -9,9 +9,10 @@ import {
 import {
     simulateOneYear, initMcRunState, makeDefaultCareMeta, sampleNextYearData, computeRunStatsFromSeries, updateCareMeta
 } from './simulator-engine.js';
-import { portfolioTotal, displayMonteCarloResults, renderWorstRunLog } from './simulator-results.js';
+import { portfolioTotal, displayMonteCarloResults, renderWorstRunLog, aggregateSweepMetrics } from './simulator-results.js';
 import { formatCurrencyShortLog } from './simulator-utils.js';
 import { sumDepot } from './simulator-portfolio.js';
+import { renderSweepHeatmapSVG } from './simulator-heatmap.js';
 
 /**
  * Führt die Monte-Carlo-Simulation durch
@@ -551,11 +552,225 @@ window.onload = function() {
     document.getElementById('pflegePanel').style.display = pflegeCheckbox.checked ? 'grid' : 'none';
     document.getElementById('pflegeDauerContainer').style.display = pflegeModellSelect.value === 'akut' ? 'contents' : 'none';
     document.getElementById('pflegeTodesrisikoContainer').style.display = pflegeMortalitaetCheckbox.checked ? 'flex' : 'none';
+
+    const sweepMetricSelect = document.getElementById('sweepMetric');
+    const sweepAxisXSelect = document.getElementById('sweepAxisX');
+    const sweepAxisYSelect = document.getElementById('sweepAxisY');
+
+    if (sweepMetricSelect) {
+        sweepMetricSelect.addEventListener('change', () => {
+            if (window.sweepResults && window.sweepResults.length > 0) {
+                displaySweepResults();
+            }
+        });
+    }
+
+    if (sweepAxisXSelect) {
+        sweepAxisXSelect.addEventListener('change', () => {
+            if (window.sweepResults && window.sweepResults.length > 0) {
+                displaySweepResults();
+            }
+        });
+    }
+
+    if (sweepAxisYSelect) {
+        sweepAxisYSelect.addEventListener('change', () => {
+            if (window.sweepResults && window.sweepResults.length > 0) {
+                displaySweepResults();
+            }
+        });
+    }
 };
+
+/**
+ * Führt einen Parameter-Sweep durch
+ */
+export async function runParameterSweep() {
+    const sweepButton = document.getElementById('sweepButton');
+    sweepButton.disabled = true;
+    const progressBarContainer = document.getElementById('sweep-progress-bar-container');
+    const progressBar = document.getElementById('sweep-progress-bar');
+
+    try {
+        prepareHistoricalData();
+
+        const rangeInputs = {
+            runwayMin: document.getElementById('sweepRunwayMin').value,
+            runwayTarget: document.getElementById('sweepRunwayTarget').value,
+            targetEq: document.getElementById('sweepTargetEq').value,
+            rebalBand: document.getElementById('sweepRebalBand').value,
+            maxSkimPct: document.getElementById('sweepMaxSkimPct').value,
+            maxBearRefillPct: document.getElementById('sweepMaxBearRefillPct').value,
+            goldTargetPct: document.getElementById('sweepGoldTargetPct').value
+        };
+
+        const paramRanges = {};
+        for (const [key, rangeStr] of Object.entries(rangeInputs)) {
+            const values = parseRange(rangeStr);
+            if (values.length === 0) {
+                alert(`Ungültiger Range-String für ${key}: "${rangeStr}"\nErwartet: start:step:end`);
+                return;
+            }
+            paramRanges[key] = values;
+        }
+
+        const paramCombinations = cartesianProduct(paramRanges);
+
+        if (paramCombinations.length > 300) {
+            alert(`Zu viele Kombinationen: ${paramCombinations.length}\n\nMaximum: 300\n\nBitte reduzieren Sie die Anzahl der Parameter-Werte.`);
+            return;
+        }
+
+        if (paramCombinations.length === 0) {
+            alert('Keine Parameter-Kombinationen gefunden.');
+            return;
+        }
+
+        progressBarContainer.style.display = 'block';
+        progressBar.style.width = '0%';
+        progressBar.textContent = '0%';
+
+        const baseInputs = getCommonInputs();
+        const anzahlRuns = parseInt(document.getElementById('mcAnzahl').value) || 100;
+        const maxDauer = parseInt(document.getElementById('mcDauer').value) || 35;
+        const blockSize = parseInt(document.getElementById('mcBlockSize').value) || 5;
+        const baseSeed = parseInt(document.getElementById('mcSeed').value) || 12345;
+        const methode = document.getElementById('mcMethode').value;
+
+        const sweepResults = [];
+
+        for (let comboIdx = 0; comboIdx < paramCombinations.length; comboIdx++) {
+            const params = paramCombinations[comboIdx];
+
+            const inputs = {
+                ...baseInputs,
+                runwayMinMonths: params.runwayMin,
+                runwayTargetMonths: params.runwayTarget,
+                targetEq: params.targetEq,
+                rebalBand: params.rebalBand,
+                maxSkimPctOfEq: params.maxSkimPct,
+                maxBearRefillPctOfEq: params.maxBearRefillPct
+            };
+
+            if (params.goldTargetPct !== undefined) {
+                inputs.goldZielProzent = params.goldTargetPct;
+                inputs.goldAktiv = params.goldTargetPct > 0;
+            }
+
+            const rand = rng(baseSeed + comboIdx);
+            const stressCtxMaster = buildStressContext(inputs.stressPreset, rand);
+
+            const runOutcomes = [];
+
+            for (let i = 0; i < anzahlRuns; i++) {
+                let failed = false;
+                const startYearIndex = Math.floor(rand() * annualData.length);
+                let simState = initMcRunState(inputs, startYearIndex);
+
+                const depotWertHistorie = [portfolioTotal(simState.portfolio)];
+                let careMeta = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren);
+                let stressCtx = stressCtxMaster ? JSON.parse(JSON.stringify(stressCtxMaster)) : null;
+
+                let minRunway = Infinity;
+
+                for (let simulationsJahr = 0; simulationsJahr < maxDauer; simulationsJahr++) {
+                    const currentAge = inputs.startAlter + simulationsJahr;
+
+                    let yearData = sampleNextYearData(simState, methode, blockSize, rand, stressCtx);
+                    yearData = applyStressOverride(yearData, stressCtx, rand);
+
+                    careMeta = updateCareMeta(careMeta, inputs, currentAge, yearData, rand);
+
+                    let qx = MORTALITY_TABLE[inputs.geschlecht][currentAge] || 1;
+                    if (careMeta && careMeta.active && inputs.pflegebeschleunigtMortalitaetAktivieren) {
+                        qx = Math.min(1.0, qx * inputs.pflegeTodesrisikoFaktor);
+                    }
+
+                    if (rand() < qx) break;
+
+                    const result = simulateOneYear(simState, inputs, yearData, simulationsJahr, careMeta);
+
+                    if (result.isRuin) {
+                        failed = true;
+                        if (BREAK_ON_RUIN) break;
+                    } else {
+                        simState = result.newState;
+                        depotWertHistorie.push(portfolioTotal(simState.portfolio));
+
+                        const runway = result.logData.RunwayCoveragePct || 0;
+                        if (runway < minRunway) minRunway = runway;
+                    }
+                }
+
+                const endVermoegen = failed ? 0 : portfolioTotal(simState.portfolio);
+                const { maxDDpct } = computeRunStatsFromSeries(depotWertHistorie);
+
+                runOutcomes.push({
+                    finalVermoegen: endVermoegen,
+                    maxDrawdown: maxDDpct,
+                    minRunway: minRunway === Infinity ? 0 : minRunway,
+                    failed: failed
+                });
+            }
+
+            const metrics = aggregateSweepMetrics(runOutcomes);
+            sweepResults.push({ params, metrics });
+
+            const progress = ((comboIdx + 1) / paramCombinations.length) * 100;
+            progressBar.style.width = `${progress}%`;
+            progressBar.textContent = `${Math.round(progress)}%`;
+
+            if (comboIdx % 5 === 0) {
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
+        }
+
+        window.sweepResults = sweepResults;
+        window.sweepParamRanges = paramRanges;
+
+        displaySweepResults();
+
+        document.getElementById('sweepResults').style.display = 'block';
+
+    } catch (e) {
+        alert("Fehler im Parameter-Sweep:\n\n" + e.message + "\n" + e.stack);
+        console.error(e);
+    } finally {
+        progressBar.style.width = '100%';
+        progressBar.textContent = '100%';
+        setTimeout(() => { progressBarContainer.style.display = 'none'; }, 250);
+        sweepButton.disabled = false;
+    }
+}
+
+/**
+ * Zeigt die Sweep-Ergebnisse als Heatmap an
+ */
+function displaySweepResults() {
+    const metricKey = document.getElementById('sweepMetric').value;
+    const xParam = document.getElementById('sweepAxisX').value;
+    const yParam = document.getElementById('sweepAxisY').value;
+
+    const xValues = window.sweepParamRanges[xParam] || [];
+    const yValues = window.sweepParamRanges[yParam] || [];
+
+    const heatmapHtml = renderSweepHeatmapSVG(
+        window.sweepResults,
+        metricKey,
+        xParam,
+        yParam,
+        xValues,
+        yValues
+    );
+
+    document.getElementById('sweepHeatmap').innerHTML = heatmapHtml;
+}
 
 // Globale Funktionen für HTML onclick-Handler
 window.runMonteCarlo = runMonteCarlo;
 window.runBacktest = runBacktest;
+window.runParameterSweep = runParameterSweep;
+window.displaySweepResults = displaySweepResults;
 window.formatCurrency = formatCurrency;
 
 // Für Parity Smoke Test

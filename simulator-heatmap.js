@@ -313,3 +313,151 @@ export function renderWorstRunToggle(hasCareWorst) {
       ${careBtn}
     </div>`;
 }
+
+/**
+ * Rendert die Parameter-Sweep-Heatmap als SVG
+ */
+export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, xValues, yValues, options = {}) {
+    if (!sweepResults || sweepResults.length === 0) return '<p>Keine Sweep-Ergebnisse vorhanden.</p>';
+
+    const opts = Object.assign({
+        width: 980, height: 500, showLegend: true
+    }, options);
+
+    const paramLabels = {
+        runwayMin: 'Runway Min',
+        runwayTarget: 'Runway Target',
+        targetEq: 'Target Eq',
+        rebalBand: 'Rebal Band',
+        maxSkimPct: 'Max Skim %',
+        maxBearRefillPct: 'Max Bear Refill %',
+        goldTargetPct: 'Gold Target %'
+    };
+
+    const metricLabels = {
+        successProbFloor: 'Success Prob Floor (%)',
+        p10EndWealth: 'P10 End Wealth (€)',
+        worst5Drawdown: 'Worst 5% Drawdown (%)',
+        minRunwayObserved: 'Min Runway Observed (Monate)'
+    };
+
+    const margin = { top: 60, right: 120, bottom: 60, left: 80 };
+    const chartWidth = opts.width - margin.left - margin.right;
+    const chartHeight = opts.height - margin.top - margin.bottom;
+
+    const cellWidth = chartWidth / xValues.length;
+    const cellHeight = chartHeight / yValues.length;
+
+    const heatmapData = new Map();
+    for (const result of sweepResults) {
+        const key = `${result.params[xParam]}_${result.params[yParam]}`;
+        heatmapData.set(key, result.metrics[metricKey] || 0);
+    }
+
+    const allValues = Array.from(heatmapData.values());
+    const minVal = Math.min(...allValues);
+    const maxVal = Math.max(...allValues);
+    const range = maxVal - minVal;
+
+    const getColor = (value) => {
+        if (range === 0) return viridis(0.5);
+        const t = (value - minVal) / range;
+        return viridis(t);
+    };
+
+    const formatValue = (value, metric) => {
+        if (metric === 'p10EndWealth') {
+            return `${(value / 1000).toFixed(0)}k €`;
+        } else if (metric === 'successProbFloor' || metric === 'worst5Drawdown') {
+            return `${value.toFixed(1)}%`;
+        } else {
+            return value.toFixed(1);
+        }
+    };
+
+    let cellsHtml = '';
+    for (let yi = 0; yi < yValues.length; yi++) {
+        for (let xi = 0; xi < xValues.length; xi++) {
+            const xVal = xValues[xi];
+            const yVal = yValues[yValues.length - 1 - yi];
+            const key = `${xVal}_${yVal}`;
+            const value = heatmapData.get(key) || 0;
+
+            const x = xi * cellWidth;
+            const y = yi * cellHeight;
+            const color = getColor(value);
+
+            const result = sweepResults.find(r => r.params[xParam] === xVal && r.params[yParam] === yVal);
+            const tooltipLines = result ? [
+                `${paramLabels[xParam]}: ${xVal}`,
+                `${paramLabels[yParam]}: ${yVal}`,
+                '',
+                `Success Prob: ${result.metrics.successProbFloor.toFixed(1)}%`,
+                `P10 End Wealth: ${(result.metrics.p10EndWealth / 1000).toFixed(0)}k €`,
+                `Worst 5% DD: ${result.metrics.worst5Drawdown.toFixed(1)}%`,
+                `Min Runway: ${result.metrics.minRunwayObserved.toFixed(1)} Mo`
+            ] : [`${paramLabels[xParam]}: ${xVal}`, `${paramLabels[yParam]}: ${yVal}`, 'Keine Daten'];
+
+            const tooltip = tooltipLines.join('&#10;');
+
+            cellsHtml += `<rect x="${x}" y="${y}" width="${cellWidth}" height="${cellHeight}" fill="${color}" stroke="#fff" stroke-width="1"><title>${tooltip}</title></rect>`;
+
+            if (cellWidth >= 40 && cellHeight >= 30) {
+                const textColor = relativeLuminance(parseRgb(color)) > 0.5 ? '#000' : '#fff';
+                cellsHtml += `<text x="${x + cellWidth / 2}" y="${y + cellHeight / 2}" text-anchor="middle" dominant-baseline="middle" fill="${textColor}" font-size="11px" font-weight="600" pointer-events="none">${formatValue(value, metricKey)}</text>`;
+            }
+        }
+    }
+
+    const xAxisLabels = xValues.map((v, i) => `<text x="${i * cellWidth + cellWidth / 2}" y="${chartHeight + 20}" text-anchor="middle" class="tick-label">${v}</text>`).join('');
+    const yAxisLabels = yValues.map((v, i) => `<text x="-8" y="${(yValues.length - 1 - i) * cellHeight + cellHeight / 2}" text-anchor="end" dominant-baseline="middle" class="tick-label">${v}</text>`).join('');
+
+    let legend = '';
+    if (opts.showLegend) {
+        const legendHeight = chartHeight;
+        const legendWidth = 15;
+        const stops = [0, 0.25, 0.5, 0.75, 1];
+        const gradientStops = stops.map(s => `<stop offset="${s * 100}%" stop-color="${viridis(s)}" />`).join('');
+
+        const legendLabels = stops.map(s => {
+            const val = minVal + s * range;
+            return `<text x="${chartWidth + 35 + legendWidth}" y="${legendHeight * (1 - s)}" dominant-baseline="middle" class="legend-text">${formatValue(val, metricKey)}</text>`;
+        }).join('');
+
+        legend = `
+            <g class="legend" transform="translate(${chartWidth + 30}, 0)">
+                <defs><linearGradient id="sweepGradient" x1="0" y1="1" x2="0" y2="0">${gradientStops}</linearGradient></defs>
+                <rect x="0" y="0" width="${legendWidth}" height="${legendHeight}" fill="url(#sweepGradient)"></rect>
+                ${legendLabels}
+            </g>`;
+    }
+
+    const parseRgb = (rgbString) => {
+        const match = rgbString.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+        return match ? [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])] : [0, 0, 0];
+    };
+
+    const relativeLuminance = ([r, g, b]) => {
+        const srgb = [r, g, b].map(v => {
+            v /= 255;
+            return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+        });
+        return 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
+    };
+
+    return `
+        ${HEATMAP_V4_STYLE}
+        <div style="text-align:center;">
+            <h4>Parameter Sweep: ${metricLabels[metricKey] || metricKey}</h4>
+            <svg class="heatmap-v4-svg" viewBox="0 0 ${opts.width} ${opts.height}">
+                <g transform="translate(${margin.left}, ${margin.top})">
+                    <text x="${chartWidth / 2}" y="-35" text-anchor="middle" class="axis-label">${paramLabels[xParam] || xParam}</text>
+                    <text transform="translate(-60, ${chartHeight / 2}) rotate(-90)" text-anchor="middle" class="axis-label">${paramLabels[yParam] || yParam}</text>
+                    ${cellsHtml}
+                    ${xAxisLabels}
+                    ${yAxisLabels}
+                    ${legend}
+                </g>
+            </svg>
+        </div>`;
+}

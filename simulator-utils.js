@@ -144,3 +144,50 @@ export function quantile(arr, q) {
         return v1 + rest * (v2 - v1);
     }
 }
+
+/**
+ * Parse range string in format "start:step:end" to array of numbers
+ * @param {string} rangeStr - Range string (e.g., "18:6:36")
+ * @returns {number[]} Array of numbers
+ */
+export function parseRange(rangeStr) {
+    if (!rangeStr || typeof rangeStr !== 'string') return [];
+    const parts = rangeStr.trim().split(':');
+    if (parts.length !== 3) return [];
+
+    const [start, step, end] = parts.map(p => parseFloat(p.trim()));
+    if (!isFinite(start) || !isFinite(step) || !isFinite(end)) return [];
+    if (step <= 0) return [];
+    if (start > end) return [];
+
+    const result = [];
+    for (let val = start; val <= end + 1e-9; val += step) {
+        result.push(Math.round(val * 1e9) / 1e9);
+    }
+    return result;
+}
+
+/**
+ * Create Cartesian product of parameter arrays
+ * @param {Object} paramRanges - Object with parameter names as keys and arrays as values
+ * @returns {Object[]} Array of parameter combinations
+ */
+export function cartesianProduct(paramRanges) {
+    const keys = Object.keys(paramRanges);
+    if (keys.length === 0) return [];
+
+    const result = [{}];
+    for (const key of keys) {
+        const values = paramRanges[key];
+        if (!Array.isArray(values) || values.length === 0) continue;
+
+        const newResult = [];
+        for (const existing of result) {
+            for (const value of values) {
+                newResult.push({ ...existing, [key]: value });
+            }
+        }
+        result.splice(0, result.length, ...newResult);
+    }
+    return result;
+}
