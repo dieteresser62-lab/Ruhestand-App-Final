@@ -1,6 +1,6 @@
 "use strict";
 
-import { rng, quantile, sum, mean, formatCurrency, parseRange, cartesianProduct } from './simulator-utils.js';
+import { rng, quantile, sum, mean, formatCurrency, parseRange, parseRangeInput, cartesianProduct, cartesianProductLimited } from './simulator-utils.js';
 import { ENGINE_VERSION, ENGINE_HASH, STRESS_PRESETS, BREAK_ON_RUIN, MORTALITY_TABLE, HISTORICAL_DATA, annualData } from './simulator-data.js';
 import {
     getCommonInputs, updateStartPortfolioDisplay, initializePortfolio,
@@ -580,6 +580,69 @@ window.onload = function() {
             }
         });
     }
+
+    // Grid-Size-Counter für Parameter-Sweep
+    function updateSweepGridSize() {
+        const rangeInputs = {
+            runwayMin: document.getElementById('sweepRunwayMin').value,
+            runwayTarget: document.getElementById('sweepRunwayTarget').value,
+            targetEq: document.getElementById('sweepTargetEq').value,
+            rebalBand: document.getElementById('sweepRebalBand').value,
+            maxSkimPct: document.getElementById('sweepMaxSkimPct').value,
+            maxBearRefillPct: document.getElementById('sweepMaxBearRefillPct').value,
+            goldTargetPct: document.getElementById('sweepGoldTargetPct').value
+        };
+
+        let totalSize = 1;
+        let hasError = false;
+
+        try {
+            for (const rangeStr of Object.values(rangeInputs)) {
+                if (!rangeStr || !rangeStr.trim()) {
+                    hasError = true;
+                    break;
+                }
+                const values = parseRangeInput(rangeStr);
+                if (values.length === 0) {
+                    hasError = true;
+                    break;
+                }
+                totalSize *= values.length;
+            }
+        } catch (error) {
+            hasError = true;
+        }
+
+        const gridSizeEl = document.getElementById('sweepGridSize');
+        if (gridSizeEl) {
+            if (hasError) {
+                gridSizeEl.textContent = 'Grid: ? Kombis';
+                gridSizeEl.style.color = '#999';
+            } else if (totalSize > 300) {
+                gridSizeEl.textContent = `Grid: ${totalSize} Kombis (⚠ Max: 300)`;
+                gridSizeEl.style.color = '#d32f2f';
+            } else {
+                gridSizeEl.textContent = `Grid: ${totalSize} Kombis`;
+                gridSizeEl.style.color = 'var(--secondary-color)';
+            }
+        }
+    }
+
+    // Add event listeners to all sweep input fields
+    const sweepInputIds = [
+        'sweepRunwayMin', 'sweepRunwayTarget', 'sweepTargetEq', 'sweepRebalBand',
+        'sweepMaxSkimPct', 'sweepMaxBearRefillPct', 'sweepGoldTargetPct'
+    ];
+
+    sweepInputIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', updateSweepGridSize);
+        }
+    });
+
+    // Initial update
+    updateSweepGridSize();
 };
 
 /**
@@ -604,27 +667,54 @@ export async function runParameterSweep() {
             goldTargetPct: document.getElementById('sweepGoldTargetPct').value
         };
 
+        const paramLabels = {
+            runwayMin: 'Runway Min',
+            runwayTarget: 'Runway Target',
+            targetEq: 'Target Eq',
+            rebalBand: 'Rebal Band',
+            maxSkimPct: 'Max Skim %',
+            maxBearRefillPct: 'Max Bear Refill %',
+            goldTargetPct: 'Gold Target %'
+        };
+
         const paramRanges = {};
-        for (const [key, rangeStr] of Object.entries(rangeInputs)) {
-            const values = parseRange(rangeStr);
-            if (values.length === 0) {
-                alert(`Ungültiger Range-String für ${key}: "${rangeStr}"\nErwartet: start:step:end`);
-                return;
+        try {
+            for (const [key, rangeStr] of Object.entries(rangeInputs)) {
+                const values = parseRangeInput(rangeStr);
+                if (values.length === 0) {
+                    alert(`Leeres Range-Input für ${paramLabels[key] || key}.\n\nBitte geben Sie einen Wert ein:\n- Einzelwert: 24\n- Liste: 24,36,48\n- Range: 24:12:48`);
+                    return;
+                }
+                paramRanges[key] = values;
             }
-            paramRanges[key] = values;
-        }
-
-        const paramCombinations = cartesianProduct(paramRanges);
-
-        if (paramCombinations.length > 300) {
-            alert(`Zu viele Kombinationen: ${paramCombinations.length}\n\nMaximum: 300\n\nBitte reduzieren Sie die Anzahl der Parameter-Werte.`);
+        } catch (error) {
+            alert(`Fehler beim Parsen der Range-Eingaben:\n\n${error.message}\n\nErlaubte Formate:\n- Einzelwert: 24\n- Kommaliste: 50,60,70\n- Range: start:step:end (z.B. 18:6:36)`);
             return;
         }
 
-        if (paramCombinations.length === 0) {
+        // Calculate combinations with limit check
+        const arrays = Object.values(paramRanges);
+        const { combos, tooMany, size } = cartesianProductLimited(arrays, 300);
+
+        if (tooMany) {
+            alert(`Zu viele Kombinationen: ${size} (theoretisch)\n\nMaximum: 300\n\nBitte reduzieren Sie die Anzahl der Parameter-Werte.`);
+            return;
+        }
+
+        if (combos.length === 0) {
             alert('Keine Parameter-Kombinationen gefunden.');
             return;
         }
+
+        // Convert back to object format
+        const paramKeys = Object.keys(paramRanges);
+        const paramCombinations = combos.map(combo => {
+            const obj = {};
+            paramKeys.forEach((key, i) => {
+                obj[key] = combo[i];
+            });
+            return obj;
+        });
 
         progressBarContainer.style.display = 'block';
         progressBar.style.width = '0%';
@@ -733,11 +823,17 @@ export async function runParameterSweep() {
         document.getElementById('sweepResults').style.display = 'block';
 
     } catch (e) {
-        alert("Fehler im Parameter-Sweep:\n\n" + e.message + "\n" + e.stack);
-        console.error(e);
+        alert("Fehler im Parameter-Sweep:\n\n" + e.message);
+        console.error('Parameter-Sweep Fehler:', e);
+
+        // Reset UI on error
+        progressBar.style.width = '0%';
+        progressBar.textContent = '0%';
     } finally {
-        progressBar.style.width = '100%';
-        progressBar.textContent = '100%';
+        if (progressBar.style.width !== '0%') {
+            progressBar.style.width = '100%';
+            progressBar.textContent = '100%';
+        }
         setTimeout(() => { progressBarContainer.style.display = 'none'; }, 250);
         sweepButton.disabled = false;
     }
@@ -747,23 +843,29 @@ export async function runParameterSweep() {
  * Zeigt die Sweep-Ergebnisse als Heatmap an
  */
 function displaySweepResults() {
-    const metricKey = document.getElementById('sweepMetric').value;
-    const xParam = document.getElementById('sweepAxisX').value;
-    const yParam = document.getElementById('sweepAxisY').value;
+    try {
+        const metricKey = document.getElementById('sweepMetric').value;
+        const xParam = document.getElementById('sweepAxisX').value;
+        const yParam = document.getElementById('sweepAxisY').value;
 
-    const xValues = window.sweepParamRanges[xParam] || [];
-    const yValues = window.sweepParamRanges[yParam] || [];
+        const xValues = window.sweepParamRanges[xParam] || [];
+        const yValues = window.sweepParamRanges[yParam] || [];
 
-    const heatmapHtml = renderSweepHeatmapSVG(
-        window.sweepResults,
-        metricKey,
-        xParam,
-        yParam,
-        xValues,
-        yValues
-    );
+        const heatmapHtml = renderSweepHeatmapSVG(
+            window.sweepResults,
+            metricKey,
+            xParam,
+            yParam,
+            xValues,
+            yValues
+        );
 
-    document.getElementById('sweepHeatmap').innerHTML = heatmapHtml;
+        document.getElementById('sweepHeatmap').innerHTML = heatmapHtml;
+    } catch (error) {
+        alert("Fehler beim Rendern der Sweep-Heatmap:\n\n" + error.message);
+        console.error('displaySweepResults Fehler:', error);
+        document.getElementById('sweepHeatmap').innerHTML = '<p style="color: red;">Fehler beim Rendern der Heatmap. Siehe Konsole für Details.</p>';
+    }
 }
 
 // Globale Funktionen für HTML onclick-Handler
