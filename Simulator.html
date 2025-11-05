@@ -267,12 +267,12 @@
                 </div>
                 <div class="form-grid-four-col">
                     <div class="form-group"><label for="sweepRunwayMin">Runway Min (Monate)</label><input type="text" id="sweepRunwayMin" value="18" placeholder="12,18,24" title="Format: start:step:end (z.B. 18:6:36) oder Liste 12,18,24 oder Einzelwert 18"></div>
-                    <div class="form-group"><label for="sweepRunwayTarget">Runway Target (Monate)</label><input type="text" id="sweepRunwayTarget" value="24" placeholder="18:6:36" title="Format: start:step:end (z.B. 18:6:36) oder Liste 18,24,30 oder Einzelwert 24"></div>
-                    <div class="form-group"><label for="sweepTargetEq">Target Eq (%)</label><input type="text" id="sweepTargetEq" value="60" placeholder="50,60,70" title="Format: start:step:end (z.B. 50:10:80) oder Liste 50,60,70 oder Einzelwert 60"></div>
+                    <div class="form-group"><label for="sweepRunwayTarget">Runway Target (Monate)</label><input type="text" id="sweepRunwayTarget" value="24:6:36" placeholder="18:6:36" title="Format: start:step:end (z.B. 18:6:36) oder Liste 18,24,30 oder Einzelwert 24"></div>
+                    <div class="form-group"><label for="sweepTargetEq">Target Eq (%)</label><input type="text" id="sweepTargetEq" value="50,60,70" placeholder="50,60,70" title="Format: start:step:end (z.B. 50:10:80) oder Liste 50,60,70 oder Einzelwert 60"></div>
                     <div class="form-group"><label for="sweepRebalBand">Rebal Band (%)</label><input type="text" id="sweepRebalBand" value="5" placeholder="3,5,7" title="Format: start:step:end (z.B. 3:2:9) oder Liste 3,5,7 oder Einzelwert 5"></div>
                     <div class="form-group"><label for="sweepMaxSkimPct">Max Skim % of Eq</label><input type="text" id="sweepMaxSkimPct" value="2" placeholder="0,2,4" title="Format: start:step:end (z.B. 0:2:6) oder Liste 0,2,4 oder Einzelwert 2"></div>
                     <div class="form-group"><label for="sweepMaxBearRefillPct">Max Bear Refill % of Eq</label><input type="text" id="sweepMaxBearRefillPct" value="2" placeholder="0,2,4" title="Format: start:step:end (z.B. 0:2:8) oder Liste 0,2,4 oder Einzelwert 2"></div>
-                    <div class="form-group"><label for="sweepGoldTargetPct">Gold Target (%)</label><input type="text" id="sweepGoldTargetPct" value="7.5" placeholder="0,2.5,5,7.5" title="Format: start:step:end (z.B. 0:2.5:10) oder Liste 0,2.5,5,7.5 oder Einzelwert 7.5"></div>
+                    <div class="form-group"><label for="sweepGoldTargetPct">Gold Target (%)</label><input type="text" id="sweepGoldTargetPct" value="5,7.5" placeholder="0,2.5,5,7.5" title="Format: start:step:end (z.B. 0:2.5:10) oder Liste 0,2.5,5,7.5 oder Einzelwert 7.5"></div>
                 </div>
             </fieldset>
             <button id="sweepButton" onclick="runParameterSweep()">Run Sweep</button>
