@@ -11,11 +11,16 @@ Ruhestand-App-Final/
 │   └── simulator.css            # Simulator Styles (99 Zeilen)
 │
 ├── js/
-│   ├── balance/
-│   │   └── balance-app.js       # Balance-App Logik (~1.944 Zeilen)
-│   │
 │   └── shared/
-│       └── (für gemeinsame Komponenten)
+│       └── (für gemeinsame Komponenten - geplant)
+│
+├── balance-main.js              # Balance Hauptmodul (224 Zeilen)
+├── balance-config.js            # Balance Konfiguration (54 Zeilen)
+├── balance-storage.js           # Balance Persistierung (233 Zeilen)
+├── balance-reader.js            # Balance Input-Layer (97 Zeilen)
+├── balance-renderer.js          # Balance Output-Layer (494 Zeilen)
+├── balance-binder.js            # Balance Event-Handling (378 Zeilen)
+├── balance-utils.js             # Balance Utilities (32 Zeilen)
 │
 ├── simulator-main.js            # Simulator Hauptmodul (559 Zeilen)
 ├── simulator-engine.js          # Simulations-Engine (411 Zeilen)
@@ -29,6 +34,7 @@ Ruhestand-App-Final/
 ├── Balance.html                 # Balance-App (255 Zeilen - vorher 2.411!)
 ├── Balance.html.backup          # Original-Backup
 ├── Simulator.html               # Monte-Carlo Simulator (242 Zeilen - vorher 2.380!)
+├── BALANCE_MODULES_README.md    # Balance-Module Dokumentation
 └── README.md                    # Diese Datei
 ```
 
@@ -48,7 +54,16 @@ Ruhestand-App-Final/
 - Diagnose-Panel mit detailliertem Entscheidungsbaum
 - Dark-Mode-Unterstützung
 
-**Technologie:** HTML5, CSS3, Vanilla JavaScript (ES6+)
+**Technologie:** HTML5, CSS3, ES6-Module (vollständig modularisiert)
+
+**Module:**
+- **balance-main.js** - Hauptorchestrierung & Update-Loop
+- **balance-config.js** - Konfiguration & Error-Klassen
+- **balance-storage.js** - LocalStorage & File System API
+- **balance-reader.js** - Input-Layer (DOM → Daten)
+- **balance-renderer.js** - Output-Layer (Daten → DOM)
+- **balance-binder.js** - Event-Handling & User-Interaktionen
+- **balance-utils.js** - Formatierungs-Utilities
 
 ### 2. Simulator.html - Monte-Carlo-Ruhestandssimulator
 
@@ -87,10 +102,19 @@ Ruhestand-App-Final/
 
 | Vorher | Nachher | Reduktion |
 |--------|---------|-----------|
-| **2.411 Zeilen** | **255 Zeilen** | **-89%** |
-| Alles in einer Datei | Modular aufgeteilt | ✅ |
-| ~214 Zeilen CSS inline | css/balance.css | ✅ |
-| ~1.946 Zeilen JS inline | js/balance/balance-app.js | ✅ |
+| **2.411 Zeilen** | **255 Zeilen HTML** | **-89%** |
+| Monolithisches JavaScript | 7 ES6-Module | ✅ |
+| Inline CSS | css/balance.css | ✅ |
+| ~1.946 Zeilen JS inline | 1.512 Zeilen verteilt auf Module | ✅ |
+
+**Module-Aufteilung:**
+- balance-renderer.js (494) - Output-Layer
+- balance-binder.js (378) - Event-Handling
+- balance-storage.js (233) - Persistierung
+- balance-main.js (224) - Orchestrierung
+- balance-reader.js (97) - Input-Layer
+- balance-config.js (54) - Konfiguration
+- balance-utils.js (32) - Utilities
 
 ### Simulator.html - Vorher vs. Nachher
 
@@ -160,9 +184,9 @@ Die App speichert Daten im **Browser LocalStorage**:
 
 ### Kurzfristig (Quick Wins)
 - [x] ~~Simulator.html modularisieren~~ (✅ Erledigt!)
+- [x] ~~Balance-App auf ES6-Module umstellen~~ (✅ Erledigt!)
 - [ ] Gemeinsame CSS-Variablen in css/shared.css auslagern
-- [ ] Formatierungsfunktionen in js/shared/formatters.js
-- [ ] Balance-App auf ES6-Module umstellen (analog zu Simulator)
+- [ ] Formatierungsfunktionen in js/shared/formatters.js zusammenführen
 
 ### Mittelfristig
 - [ ] Build-System einführen (Vite/esbuild)
@@ -180,35 +204,39 @@ Die App speichert Daten im **Browser LocalStorage**:
 
 ### Architektur
 
-#### Balance-App (Klassisch)
+#### Balance-App (ES6-Module)
 ```
 ┌─────────────────────────────────────────┐
 │          Balance.html (UI)              │
 ├─────────────────────────────────────────┤
 │  - HTML-Struktur (255 Zeilen)          │
 │  - Lädt: css/balance.css               │
-│  - Lädt: js/balance/balance-app.js     │
+│  - Lädt: balance-main.js (Module)      │
 │  - Lädt: engine.js                     │
 └─────────────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────┐
-│       balance-app.js (Logik)            │
+│      balance-main.js (Entry)            │
 ├─────────────────────────────────────────┤
-│  - App-Orchestrierung                  │
-│  - State Management                    │
-│  - StorageManager                      │
-│  - UI-Layer (Reader/Renderer/Binder)   │
-│  - Test Harness                        │
+│  - Update-Loop Orchestrierung          │
+│  - Engine-Handshake                    │
+│  - Module-Initialisierung              │
 └─────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────┐
-│       engine.js (v31.0 API)             │
-├─────────────────────────────────────────┤
-│  - InputValidator                      │
-│  - MarketAnalyzer (7 Regime)           │
-│  - SpendingPlanner (Guardrails)        │
-│  - TransactionEngine (Steuer-Opt.)     │
-└─────────────────────────────────────────┘
+         ↓              ↓            ↓
+    ┌────────┐   ┌──────────┐  ┌─────────┐
+    │ reader │   │ renderer │  │ binder  │
+    │  (97)  │   │  (494)   │  │  (378)  │
+    └────────┘   └──────────┘  └─────────┘
+         ↓              ↓            ↓
+    ┌────────┐   ┌──────────┐  ┌─────────┐
+    │ utils  │   │ storage  │  │ config  │
+    │  (32)  │   │  (233)   │  │  (54)   │
+    └────────┘   └──────────┘  └─────────┘
+                        ↓
+              ┌────────────────┐
+              │   engine.js    │
+              │  (v31.0 API)   │
+              └────────────────┘
 ```
 
 #### Simulator-App (ES6-Module)
@@ -268,17 +296,23 @@ THRESHOLDS: {
 
 ## 📝 Versionshistorie
 
-### v3.0 (2025-01-XX) - Vollständige Modularisierung
+### v4.0 (2025-01-05) - Balance ES6-Modularisierung
+- ✅ Balance-App auf ES6-Module umgestellt (analog zu Simulator)
+- ✅ Balance-JavaScript in 7 Module aufgeteilt (1.512 Zeilen)
+- ✅ Dependency-Injection-Pattern für bessere Testbarkeit
+- ✅ BALANCE_MODULES_README.md erstellt
+
+### v3.0 (2025-01-04) - Simulator-Modularisierung
 - ✅ Simulator.html modularisiert (2.380 → 242 Zeilen, -90%)
 - ✅ Simulator-JavaScript in 7 ES6-Module aufgeteilt
 - ✅ Simulator-CSS in separate Datei ausgelagert
 - ✅ README.md mit Simulator-Dokumentation aktualisiert
 
-### v2.0 (2025-01-XX) - Balance-Modularisierung
-- ✅ Balance.html modularisiert (2.411 → 255 Zeilen, -89%)
-- ✅ CSS in separate Datei ausgelagert (css/balance.css)
-- ✅ JavaScript in separate Datei ausgelagert (js/balance/balance-app.js)
-- ✅ Ordnerstruktur angelegt (css/, js/balance/, js/simulator/, js/shared/)
+### v2.0 (2025-01-03) - Basis-Modularisierung
+- ✅ Balance.html CSS/JS ausgelagert (2.411 → 255 Zeilen HTML, -89%)
+- ✅ CSS in css/balance.css ausgelagert
+- ✅ JavaScript in js/balance/balance-app.js ausgelagert
+- ✅ Ordnerstruktur angelegt (css/, js/)
 - ✅ README.md erstellt
 
 ### v1.0 (Original)
@@ -288,11 +322,11 @@ THRESHOLDS: {
 
 ## 🤝 Beiträge
 
-Beide Apps wurden vollständig modularisiert, um die Wartbarkeit und Erweiterbarkeit zu verbessern.
+Beide Apps wurden vollständig auf ES6-Module umgestellt!
 
 **Nächste Schritte für Contributors:**
 1. ~~Simulator.html modularisieren~~ (✅ Erledigt!)
-2. Balance-App auf ES6-Module umstellen (analog zu Simulator)
+2. ~~Balance-App auf ES6-Module umstellen~~ (✅ Erledigt!)
 3. Gemeinsame Komponenten in js/shared/ auslagern
 4. Build-System einrichten (Vite/esbuild)
 5. Testing-Framework aufsetzen (Jest/Vitest)
