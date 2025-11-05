@@ -1942,3 +1942,5 @@ handleBedarfAnpassungClick(e) {
     document.addEventListener('DOMContentLoaded', initDevHarness);
 })();
 
+
+})(); // END OF MAIN IIFE
