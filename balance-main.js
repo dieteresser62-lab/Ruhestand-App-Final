@@ -6,7 +6,7 @@
  * ===================================================================================
  */
 
-import { CONFIG, REQUIRED_ENGINE_API_VERSION_PREFIX } from './balance-config.js';
+import { CONFIG, REQUIRED_ENGINE_API_VERSION_PREFIX, DebugUtils } from './balance-config.js';
 import { StorageManager, initStorageManager } from './balance-storage.js';
 import { UIReader, initUIReader } from './balance-reader.js';
 import { UIRenderer, initUIRenderer } from './balance-renderer.js';
@@ -97,6 +97,11 @@ function update() {
         const inputData = UIReader.readAllInputs();
         const persistentState = StorageManager.loadState();
 
+        DebugUtils.log('UPDATE', 'Starting update cycle', {
+            inputs: inputData,
+            persistentState: persistentState
+        });
+
         // 2. Render Bedarfsanpassungs-UI
         UIRenderer.renderBedarfAnpassungUI(inputData, persistentState);
 
@@ -104,6 +109,8 @@ function update() {
 
         // 3. Call Engine
         const modelResult = window.EngineAPI.simulateSingleYear(inputData, persistentState.lastState);
+
+        DebugUtils.log('ENGINE', 'Engine simulation result', modelResult);
 
         // 4. Handle Engine Response
         if (modelResult.error) {
@@ -122,10 +129,15 @@ function update() {
         appState.diagnosisData = UIRenderer.formatDiagnosisPayload(modelResult.diagnosis);
         UIRenderer.renderDiagnosis(appState.diagnosisData);
 
+        DebugUtils.log('DIAGNOSIS', 'Diagnosis data', appState.diagnosisData);
+
         StorageManager.saveState({ ...persistentState, inputs: inputData, lastState: modelResult.newState });
+
+        DebugUtils.log('UPDATE', 'Update cycle completed successfully');
 
     } catch (error) {
         console.error("Update-Fehler:", error);
+        DebugUtils.log('ERROR', 'Update failed', error);
         UIRenderer.handleError(error);
     }
 }
@@ -193,36 +205,48 @@ function init() {
         return;
     }
 
-    // 2. Populate DOM inputs
+    // 2. Initialize Debug Mode
+    const isDebugMode = DebugUtils.initDebugMode();
+
+    // 3. Populate DOM inputs
     document.querySelectorAll('input, select').forEach(el => {
         if(el.id) dom.inputs[el.id] = el;
     });
 
-    // 3. Initialize all modules with their dependencies
+    // 4. Initialize all modules with their dependencies
     initUIReader(dom);
     initStorageManager(dom, appState, UIRenderer);
     initUIRenderer(dom, StorageManager);
     initUIBinder(dom, appState, update, debouncedUpdate);
 
-    // 4. Set version info
+    // 5. Set version info
     dom.outputs.printFooter.textContent = `UI: ${CONFIG.APP.VERSION} | Engine: ${window.EngineAPI.getVersion().api}`;
 
-    // 5. Load and apply saved state
+    // 6. Load and apply saved state
     const persistentState = StorageManager.loadState();
     UIReader.applyStoredInputs(persistentState.inputs);
 
-    // 6. Bind UI events
+    // 7. Bind UI events
     UIBinder.bindUI();
 
-    // 7. Apply theme
+    // 8. Apply theme
     UIRenderer.applyTheme(localStorage.getItem('theme') || 'system');
 
-    // 8. Initialize snapshots
+    // 9. Update Debug UI
+    if (isDebugMode) {
+        const debugIndicator = document.getElementById('debugModeIndicator');
+        if (debugIndicator) {
+            debugIndicator.style.display = 'flex';
+        }
+        DebugUtils.log('INIT', 'Balance App initialized in Debug Mode');
+    }
+
+    // 10. Initialize snapshots
     StorageManager.initSnapshots().then(() => {
         StorageManager.renderSnapshots(dom.outputs.snapshotList, dom.controls.snapshotStatus, appState.snapshotHandle);
     });
 
-    // 9. Initial update
+    // 11. Initial update
     update();
 }
 

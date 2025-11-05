@@ -6,7 +6,7 @@
  * ===================================================================================
  */
 
-import { CONFIG, AppError, StorageError } from './balance-config.js';
+import { CONFIG, AppError, StorageError, DebugUtils } from './balance-config.js';
 import { UIUtils } from './balance-utils.js';
 import { UIReader } from './balance-reader.js';
 import { UIRenderer } from './balance-renderer.js';
@@ -30,6 +30,9 @@ export function initUIBinder(domRefs, state, updateFn, debouncedUpdateFn) {
 
 export const UIBinder = {
     bindUI() {
+        // Keyboard shortcuts
+        document.addEventListener('keydown', this.handleKeyboardShortcuts.bind(this));
+
         dom.containers.form.addEventListener('input', this.handleFormInput.bind(this));
         dom.containers.form.addEventListener('change', this.handleFormChange.bind(this));
         document.querySelectorAll('input.currency').forEach(el => {
@@ -72,6 +75,68 @@ export const UIBinder = {
         dom.diagnosis.filterToggle.addEventListener('change', (e) => {
             dom.diagnosis.content.classList.toggle('filter-inactive', e.target.checked)
         });
+    },
+
+    handleKeyboardShortcuts(e) {
+        // CTRL+Shift+D: Debug-Modus umschalten
+        if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+            e.preventDefault();
+            const newState = DebugUtils.toggleDebugMode();
+
+            // UI-Indikator aktualisieren
+            this.updateDebugModeUI(newState);
+
+            // Wenn aktiviert: Diagnose-Panel öffnen
+            if (newState) {
+                dom.diagnosis.drawer.classList.add('is-open');
+                dom.diagnosis.overlay.classList.add('is-open');
+            }
+
+            UIRenderer.toast(newState ? '🐛 Debug-Modus aktiviert' : '🐛 Debug-Modus deaktiviert');
+            return;
+        }
+
+        // Alt+J: Jahresabschluss
+        if (e.altKey && e.key === 'j') {
+            e.preventDefault();
+            dom.controls.jahresabschlussBtn.click();
+            return;
+        }
+
+        // Alt+E: Export
+        if (e.altKey && e.key === 'e') {
+            e.preventDefault();
+            dom.controls.exportBtn.click();
+            return;
+        }
+
+        // Alt+I: Import
+        if (e.altKey && e.key === 'i') {
+            e.preventDefault();
+            dom.controls.importBtn.click();
+            return;
+        }
+
+        // Alt+N: Marktdaten nachrücken
+        if (e.altKey && e.key === 'n') {
+            e.preventDefault();
+            dom.controls.btnNachruecken.click();
+            return;
+        }
+
+        // Alt+D: Dark-Mode umschalten
+        if (e.altKey && e.key === 'd') {
+            e.preventDefault();
+            this.handleThemeToggle();
+            return;
+        }
+    },
+
+    updateDebugModeUI(isActive) {
+        const debugIndicator = document.getElementById('debugModeIndicator');
+        if (debugIndicator) {
+            debugIndicator.style.display = isActive ? 'flex' : 'none';
+        }
     },
 
     handleFormInput(e) {
