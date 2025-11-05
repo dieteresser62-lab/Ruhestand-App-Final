@@ -1940,5 +1940,7 @@ handleBedarfAnpassungClick(e) {
     window.runPropertyChecks = runPropertyChecks;
     
     document.addEventListener('DOMContentLoaded', initDevHarness);
-})();
+})(); // Ende Developer Test Harness IIFE
+
+})(); // Ende Hauptanwendungs-IIFE
 
