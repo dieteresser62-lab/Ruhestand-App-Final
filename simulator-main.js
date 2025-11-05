@@ -643,7 +643,38 @@ window.onload = function() {
 
     // Initial update
     updateSweepGridSize();
+
+    // Sweep defaults with localStorage persistence
+    initSweepDefaultsWithLocalStorageFallback();
 };
+
+/**
+ * Initialisiert Sweep-Defaults mit localStorage-Fallback
+ */
+function initSweepDefaultsWithLocalStorageFallback() {
+    const map = [
+        ["sweepRunwayMin", "sim.sweep.runwayMin"],
+        ["sweepRunwayTarget", "sim.sweep.runwayTarget"],
+        ["sweepTargetEq", "sim.sweep.targetEq"],
+        ["sweepRebalBand", "sim.sweep.rebalBand"],
+        ["sweepMaxSkimPct", "sim.sweep.maxSkimPct"],
+        ["sweepMaxBearRefillPct", "sim.sweep.maxBearRefillPct"],
+        ["sweepGoldTargetPct", "sim.sweep.goldTarget"]
+    ];
+
+    for (const [id, key] of map) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+
+        const saved = localStorage.getItem(key);
+        if (saved !== null && saved !== undefined && saved !== '') {
+            el.value = saved;
+        }
+
+        el.addEventListener("change", () => localStorage.setItem(key, el.value));
+        el.addEventListener("input", () => localStorage.setItem(key, el.value));
+    }
+}
 
 /**
  * Führt einen Parameter-Sweep durch
