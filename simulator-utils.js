@@ -168,6 +168,79 @@ export function parseRange(rangeStr) {
 }
 
 /**
+ * Parse range input with multiple formats:
+ * - "start:step:end" (e.g., "18:6:36") -> [18, 24, 30, 36]
+ * - "a,b,c" (e.g., "50,60,70") -> [50, 60, 70]
+ * - "x" (e.g., "24") -> [24]
+ * @param {string} str - Range input string
+ * @returns {number[]} Array of numbers
+ * @throws {Error} If input format is invalid
+ */
+export function parseRangeInput(str) {
+    if (!str || typeof str !== 'string') {
+        return [];
+    }
+
+    const trimmed = str.trim();
+    if (!trimmed) {
+        return [];
+    }
+
+    // Format: start:step:end
+    if (trimmed.includes(':')) {
+        const parts = trimmed.split(':');
+        if (parts.length !== 3) {
+            throw new Error(`Ungültiges Range-Format: "${str}". Erwartet: start:step:end (z.B. 18:6:36)`);
+        }
+
+        const [start, step, end] = parts.map(p => parseFloat(p.trim()));
+
+        if (!isFinite(start) || !isFinite(step) || !isFinite(end)) {
+            throw new Error(`Ungültiges Range-Format: "${str}". Alle Werte müssen Zahlen sein.`);
+        }
+
+        if (step <= 0) {
+            throw new Error(`Ungültiges Range-Format: "${str}". Step muss > 0 sein.`);
+        }
+
+        if (start > end) {
+            throw new Error(`Ungültiges Range-Format: "${str}". Start muss <= End sein.`);
+        }
+
+        // Edge case: start == end
+        if (start === end) {
+            return [start];
+        }
+
+        const result = [];
+        for (let val = start; val <= end + 1e-9; val += step) {
+            result.push(Math.round(val * 1e9) / 1e9);
+        }
+        return result;
+    }
+
+    // Format: a,b,c (comma-separated list)
+    if (trimmed.includes(',')) {
+        const parts = trimmed.split(',');
+        const values = parts.map(p => parseFloat(p.trim()));
+
+        if (values.some(v => !isFinite(v))) {
+            throw new Error(`Ungültiges Range-Format: "${str}". Alle Werte müssen Zahlen sein.`);
+        }
+
+        return values;
+    }
+
+    // Format: x (single value)
+    const singleValue = parseFloat(trimmed);
+    if (!isFinite(singleValue)) {
+        throw new Error(`Ungültiges Range-Format: "${str}". Erwartet: Zahl, Kommaliste (a,b,c) oder Range (start:step:end)`);
+    }
+
+    return [singleValue];
+}
+
+/**
  * Create Cartesian product of parameter arrays
  * @param {Object} paramRanges - Object with parameter names as keys and arrays as values
  * @returns {Object[]} Array of parameter combinations
@@ -190,4 +263,46 @@ export function cartesianProduct(paramRanges) {
         result.splice(0, result.length, ...newResult);
     }
     return result;
+}
+
+/**
+ * Create Cartesian product of arrays with limit checking
+ * @param {Array[]} arrays - Arrays to create product from
+ * @param {number} limit - Maximum number of combinations
+ * @returns {Object} { combos: any[][], tooMany: boolean, size: number }
+ */
+export function cartesianProductLimited(arrays, limit) {
+    if (!Array.isArray(arrays) || arrays.length === 0) {
+        return { combos: [], tooMany: false, size: 0 };
+    }
+
+    // Calculate theoretical size
+    let size = 1;
+    for (const arr of arrays) {
+        if (!Array.isArray(arr) || arr.length === 0) {
+            return { combos: [], tooMany: false, size: 0 };
+        }
+        size *= arr.length;
+    }
+
+    const tooMany = size > limit;
+
+    // If too many, return immediately without generating
+    if (tooMany) {
+        return { combos: [], tooMany: true, size };
+    }
+
+    // Generate combinations
+    const result = [[]];
+    for (const arr of arrays) {
+        const newResult = [];
+        for (const existing of result) {
+            for (const value of arr) {
+                newResult.push([...existing, value]);
+            }
+        }
+        result.splice(0, result.length, ...newResult);
+    }
+
+    return { combos: result, tooMany: false, size };
 }

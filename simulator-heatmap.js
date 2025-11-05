@@ -65,6 +65,33 @@ export function viridis(t) {
 }
 
 /**
+ * Parst RGB-String zu Array [r, g, b]
+ */
+function parseRgb(rgbString) {
+    const match = rgbString.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    return match ? [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])] : [0, 0, 0];
+}
+
+/**
+ * Berechnet relative Luminanz für Farbkontrast (WCAG)
+ */
+function relativeLuminance([r, g, b]) {
+    const srgb = [r, g, b].map(v => {
+        v /= 255;
+        return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
+}
+
+/**
+ * Wählt Textfarbe (schwarz oder weiß) basierend auf Hintergrundfarbe für ausreichenden Kontrast
+ */
+function pickTextColorForBg(rgb) {
+    const lum = relativeLuminance(rgb);
+    return lum > 0.5 ? '#000' : '#fff';
+}
+
+/**
  * Berechnet Statistiken für die Heatmap
  */
 export function computeHeatmapStats(heat, bins, totalRuns) {
@@ -145,19 +172,6 @@ export function resolveProfileKey(raw) {
  */
 export function renderHeatmapSVG(heat, bins, totalRuns, extraKPI = {}, options = {}) {
     if (!heat || heat.length === 0) return '';
-
-    const parseRgb = (rgbString) => {
-        const match = rgbString.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-        return match ? [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])] : [0, 0, 0];
-    };
-
-    const relativeLuminance = ([r, g, b]) => {
-        const srgb = [r, g, b].map(v => {
-            v /= 255;
-            return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-        });
-        return 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
-    };
 
     const computeLabelStyles = (cellColor) => {
         const lum = relativeLuminance(parseRgb(cellColor));
@@ -320,6 +334,8 @@ export function renderWorstRunToggle(hasCareWorst) {
 export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, xValues, yValues, options = {}) {
     if (!sweepResults || sweepResults.length === 0) return '<p>Keine Sweep-Ergebnisse vorhanden.</p>';
 
+    try {
+
     const opts = Object.assign({
         width: 980, height: 500, showLegend: true
     }, options);
@@ -403,7 +419,7 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
             cellsHtml += `<rect x="${x}" y="${y}" width="${cellWidth}" height="${cellHeight}" fill="${color}" stroke="#fff" stroke-width="1"><title>${tooltip}</title></rect>`;
 
             if (cellWidth >= 40 && cellHeight >= 30) {
-                const textColor = relativeLuminance(parseRgb(color)) > 0.5 ? '#000' : '#fff';
+                const textColor = pickTextColorForBg(parseRgb(color));
                 cellsHtml += `<text x="${x + cellWidth / 2}" y="${y + cellHeight / 2}" text-anchor="middle" dominant-baseline="middle" fill="${textColor}" font-size="11px" font-weight="600" pointer-events="none">${formatValue(value, metricKey)}</text>`;
             }
         }
@@ -432,19 +448,6 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
             </g>`;
     }
 
-    const parseRgb = (rgbString) => {
-        const match = rgbString.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-        return match ? [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])] : [0, 0, 0];
-    };
-
-    const relativeLuminance = ([r, g, b]) => {
-        const srgb = [r, g, b].map(v => {
-            v /= 255;
-            return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-        });
-        return 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
-    };
-
     return `
         ${HEATMAP_V4_STYLE}
         <div style="text-align:center;">
@@ -460,4 +463,9 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
                 </g>
             </svg>
         </div>`;
+
+    } catch (error) {
+        console.error('Fehler beim Rendern der Sweep-Heatmap:', error);
+        throw error;
+    }
 }

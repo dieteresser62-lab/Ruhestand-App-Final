@@ -251,15 +251,23 @@
         <div class="panel">
             <h2>Parameter-Sweep</h2>
             <fieldset>
-                <legend>Sweep-Ranges (Format: start:step:end)</legend>
+                <legend>Sweep-Ranges</legend>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 0.85rem; color: #555;">
+                    <div>
+                        <strong>Format:</strong> start:step:end (z.B. 24:6:48) oder Liste 50,60,70 oder Einzelwert 24
+                    </div>
+                    <div id="sweepGridSize" style="font-weight: 600; color: var(--secondary-color);">
+                        Grid: 0 Kombis
+                    </div>
+                </div>
                 <div class="form-grid-four-col">
-                    <div class="form-group"><label for="sweepRunwayMin">Runway Min (Monate)</label><input type="text" id="sweepRunwayMin" value="24:24:24" placeholder="18:6:36"></div>
-                    <div class="form-group"><label for="sweepRunwayTarget">Runway Target (Monate)</label><input type="text" id="sweepRunwayTarget" value="24:12:48" placeholder="24:6:48"></div>
-                    <div class="form-group"><label for="sweepTargetEq">Target Eq (%)</label><input type="text" id="sweepTargetEq" value="50:10:80" placeholder="50:5:80"></div>
-                    <div class="form-group"><label for="sweepRebalBand">Rebal Band (%)</label><input type="text" id="sweepRebalBand" value="5:5:5" placeholder="3:1:10"></div>
-                    <div class="form-group"><label for="sweepMaxSkimPct">Max Skim % of Eq</label><input type="text" id="sweepMaxSkimPct" value="5:5:15" placeholder="0:5:20"></div>
-                    <div class="form-group"><label for="sweepMaxBearRefillPct">Max Bear Refill % of Eq</label><input type="text" id="sweepMaxBearRefillPct" value="5:5:5" placeholder="0:5:15"></div>
-                    <div class="form-group"><label for="sweepGoldTargetPct">Gold Target (%)</label><input type="text" id="sweepGoldTargetPct" value="5:5:5" placeholder="0:2.5:10"></div>
+                    <div class="form-group"><label for="sweepRunwayMin">Runway Min (Monate)</label><input type="text" id="sweepRunwayMin" value="24:24:24" placeholder="18:6:36" title="Beispiel: 18:6:36 (Range) oder 24,30,36 (Liste) oder 24 (Einzelwert)"></div>
+                    <div class="form-group"><label for="sweepRunwayTarget">Runway Target (Monate)</label><input type="text" id="sweepRunwayTarget" value="24:12:48" placeholder="24:6:48" title="Beispiel: 24:6:48 (Range) oder 24,36,48 (Liste) oder 36 (Einzelwert)"></div>
+                    <div class="form-group"><label for="sweepTargetEq">Target Eq (%)</label><input type="text" id="sweepTargetEq" value="50:10:80" placeholder="40,50,60,70" title="Beispiel: 40,50,60,70 (Liste) oder 50:10:80 (Range) oder 60 (Einzelwert)"></div>
+                    <div class="form-group"><label for="sweepRebalBand">Rebal Band (%)</label><input type="text" id="sweepRebalBand" value="5:5:5" placeholder="3,5,7" title="Beispiel: 3,5,7 (Liste) oder 3:2:9 (Range) oder 5 (Einzelwert)"></div>
+                    <div class="form-group"><label for="sweepMaxSkimPct">Max Skim % of Eq</label><input type="text" id="sweepMaxSkimPct" value="5:5:15" placeholder="0,2,4" title="Beispiel: 0,2,4 (Liste) oder 0:2:6 (Range) oder 2 (Einzelwert)"></div>
+                    <div class="form-group"><label for="sweepMaxBearRefillPct">Max Bear Refill % of Eq</label><input type="text" id="sweepMaxBearRefillPct" value="5:5:5" placeholder="0,2,4,6" title="Beispiel: 0,2,4,6 (Liste) oder 0:2:8 (Range) oder 4 (Einzelwert)"></div>
+                    <div class="form-group"><label for="sweepGoldTargetPct">Gold Target (%)</label><input type="text" id="sweepGoldTargetPct" value="5:5:5" placeholder="0,2.5,5,7.5,10" title="Beispiel: 0,2.5,5,7.5,10 (Liste) oder 0:2.5:10 (Range) oder 5 (Einzelwert)"></div>
                 </div>
             </fieldset>
             <button id="sweepButton" onclick="runParameterSweep()">Run Sweep</button>
