@@ -1017,36 +1017,36 @@ renderHandlungsanweisung(action, input) { // Signatur bleibt gleich
 
 const UIBinder = {
     bindUI() {
-        dom.containers.form.addEventListener('input', this.handleFormInput);
-        dom.containers.form.addEventListener('change', this.handleFormChange);
+        dom.containers.form.addEventListener('input', this.handleFormInput.bind(this));
+        dom.containers.form.addEventListener('change', this.handleFormChange.bind(this));
         document.querySelectorAll('input.currency').forEach(el => {
             el.addEventListener('blur', (e) => {
                 e.target.value = UIUtils.formatNumber(UIUtils.parseCurrency(e.target.value));
             });
         });
 
-        dom.containers.tabButtons.addEventListener('click', this.handleTabClick);
-        dom.controls.themeToggle.addEventListener('click', this.handleThemeToggle);
-        dom.controls.resetBtn.addEventListener('click', this.handleReset);
+        dom.containers.tabButtons.addEventListener('click', this.handleTabClick.bind(this));
+        dom.controls.themeToggle.addEventListener('click', this.handleThemeToggle.bind(this));
+        dom.controls.resetBtn.addEventListener('click', this.handleReset.bind(this));
         dom.controls.copyAction.addEventListener('click', () => {
             navigator.clipboard.writeText(document.getElementById('handlungContent').innerText.trim())
                 .then(() => UIRenderer.toast('Kopiert.'));
         });
         dom.containers.bedarfAnpassung.addEventListener('click', this.handleBedarfAnpassungClick.bind(this));
-        dom.controls.btnNachruecken.addEventListener('click', this.handleNachruecken);
-        dom.controls.btnUndoNachruecken.addEventListener('click', this.handleUndoNachruecken);
-        dom.controls.exportBtn.addEventListener('click', this.handleExport);
+        dom.controls.btnNachruecken.addEventListener('click', this.handleNachruecken.bind(this));
+        dom.controls.btnUndoNachruecken.addEventListener('click', this.handleUndoNachruecken.bind(this));
+        dom.controls.exportBtn.addEventListener('click', this.handleExport.bind(this));
         dom.controls.importBtn.addEventListener('click', () => dom.controls.importFile.click());
-        dom.controls.importFile.addEventListener('change', this.handleImport);
+        dom.controls.importFile.addEventListener('change', this.handleImport.bind(this));
         dom.controls.btnCsvImport.addEventListener('click', () => dom.controls.csvFileInput.click());
-        dom.controls.csvFileInput.addEventListener('change', this.handleCsvImport);
-        dom.controls.jahresabschlussBtn.addEventListener('click', this.handleJahresabschluss);
+        dom.controls.csvFileInput.addEventListener('change', this.handleCsvImport.bind(this));
+        dom.controls.jahresabschlussBtn.addEventListener('click', this.handleJahresabschluss.bind(this));
         dom.controls.connectFolderBtn.addEventListener('click', () => {
             try { StorageManager.connectFolder(); }
             catch (error) { UIRenderer.handleError(error); }
         });
 
-        dom.outputs.snapshotList.addEventListener('click', this.handleSnapshotActions);
+        dom.outputs.snapshotList.addEventListener('click', this.handleSnapshotActions.bind(this));
 
         const toggleDrawer = (isOpen) => {
             dom.diagnosis.drawer.classList.toggle('is-open', isOpen);
@@ -1055,7 +1055,7 @@ const UIBinder = {
         dom.diagnosis.openBtn.addEventListener('click', () => toggleDrawer(true));
         dom.diagnosis.closeBtn.addEventListener('click', () => toggleDrawer(false));
         dom.diagnosis.overlay.addEventListener('click', () => toggleDrawer(false));
-        dom.diagnosis.copyBtn.addEventListener('click', this.handleCopyDiagnosis);
+        dom.diagnosis.copyBtn.addEventListener('click', this.handleCopyDiagnosis.bind(this));
         dom.diagnosis.filterToggle.addEventListener('change', (e) => {
             dom.diagnosis.content.classList.toggle('filter-inactive', e.target.checked)
         });
