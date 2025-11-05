@@ -1,5 +1,5 @@
 'use strict';
-(function() { // START OF MAIN IIFE
+;(function() { // START OF MAIN IIFE
 
 /**
  * ===================================================================================
