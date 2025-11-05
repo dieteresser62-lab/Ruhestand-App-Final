@@ -232,21 +232,23 @@ function runEngineYear(engineInput, lastState, yearData, simInputs) {
                 engineInput.goldCost -= engineInput.goldCost * anteil;
             }
         });
-        const liqErhöhung = result.ui.action.verwendungen.liquiditaet || 0;
+        const liqErhöhung = result.ui.action.verwendungen?.liquiditaet || 0;
         const liqGesamt = engineInput.tagesgeld + engineInput.geldmarktEtf;
         const split = liqGesamt > 0 ? engineInput.tagesgeld / liqGesamt : 0.5;
         engineInput.tagesgeld += liqErhöhung * split;
         engineInput.geldmarktEtf += liqErhöhung * (1 - split);
     }
 
-    // Wende Käufe an
-    if (result.ui.action.verwendungen.aktien > 0) {
-        engineInput.depotwertNeu += result.ui.action.verwendungen.aktien;
-        engineInput.costBasisNeu += result.ui.action.verwendungen.aktien;
-    }
-    if (result.ui.action.verwendungen.gold > 0) {
-        engineInput.goldWert += result.ui.action.verwendungen.gold;
-        engineInput.goldCost += result.ui.action.verwendungen.gold;
+    // Wende Käufe an (nur bei TRANSACTION)
+    if (result.ui.action.verwendungen) {
+        if (result.ui.action.verwendungen.aktien > 0) {
+            engineInput.depotwertNeu += result.ui.action.verwendungen.aktien;
+            engineInput.costBasisNeu += result.ui.action.verwendungen.aktien;
+        }
+        if (result.ui.action.verwendungen.gold > 0) {
+            engineInput.goldWert += result.ui.action.verwendungen.gold;
+            engineInput.goldCost += result.ui.action.verwendungen.gold;
+        }
     }
 
     // Entnahme
