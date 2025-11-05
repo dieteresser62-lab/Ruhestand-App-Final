@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ruhestandsmodell-Simulator</title>
     <link rel="stylesheet" href="simulator.css">
+    <style>
+.debug-actions{margin-left:auto;display:inline-flex;align-items:center;gap:.5rem}
+.btn-debug{font-size:.8rem;padding:.25rem .5rem;border-radius:.5rem;border:1px solid #3b82f6;background:transparent;color:#1f3b8f;cursor:pointer}
+.btn-debug:hover{background:#eaf2ff}
+    </style>
 </head>
 <body>
 
@@ -233,8 +238,12 @@
              <div id="simulationResults" style="display:none; margin-top: 25px;"><h3>Ergebnis des Backtests</h3><div id="simulationSummary"></div><h4 style="text-align:center; margin-top:20px;">Jahresprotokoll</h4><div id="simulationLog">Keine Daten</div></div>
              <div id="engine-mismatch-footer"></div>
              <fieldset style="margin-top: 25px;">
-                <legend>Parity Smoke Test</legend>
-                <button onclick="runParitySmokeTest({years:3})" style="width: 100%;">Run Parity SmokeTest</button>
+                <div class="section-title" style="display:flex;align-items:center;gap:.75rem">
+                    <h3 style="margin:0">Parity Smoke Test</h3>
+                    <div class="debug-actions">
+                        <button id="runParitySmokeTestBtn" class="btn-debug" onclick="window.runParitySmokeTest({years:3})">Run</button>
+                    </div>
+                </div>
                 <div style="margin-top: 10px; font-size: 0.85rem; color: #666;">Vergleicht Engine und Simulator über 3 Jahre. Ergebnisse in der Browser-Konsole.</div>
             </fieldset>
         </div>
