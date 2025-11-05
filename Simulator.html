@@ -232,11 +232,17 @@
             <button id="btButton" onclick="runBacktest()">Historische Simulation starten</button>
              <div id="simulationResults" style="display:none; margin-top: 25px;"><h3>Ergebnis des Backtests</h3><div id="simulationSummary"></div><h4 style="text-align:center; margin-top:20px;">Jahresprotokoll</h4><div id="simulationLog">Keine Daten</div></div>
              <div id="engine-mismatch-footer"></div>
+             <fieldset style="margin-top: 25px;">
+                <legend>Parity Smoke Test</legend>
+                <button onclick="runParitySmokeTest({years:3})" style="width: 100%;">Run Parity SmokeTest</button>
+                <div style="margin-top: 10px; font-size: 0.85rem; color: #666;">Vergleicht Engine und Simulator über 3 Jahre. Ergebnisse in der Browser-Konsole.</div>
+            </fieldset>
         </div>
     </div>
 
 
 <script src="engine.js" defer></script>
+<script src="sim-parity-smoketest.js" defer></script>
 <script type="module" src="simulator-main.js"></script>
 </body>
 </html>
