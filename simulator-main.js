@@ -557,3 +557,7 @@ window.onload = function() {
 window.runMonteCarlo = runMonteCarlo;
 window.runBacktest = runBacktest;
 window.formatCurrency = formatCurrency;
+
+// Für Parity Smoke Test
+window.simulateOneYear = simulateOneYear;
+window.annualData = annualData;
