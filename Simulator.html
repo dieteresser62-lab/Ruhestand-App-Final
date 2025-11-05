@@ -9,6 +9,11 @@
 .debug-actions{margin-left:auto;display:inline-flex;align-items:center;gap:.5rem}
 .btn-debug{font-size:.8rem;padding:.25rem .5rem;border-radius:.5rem;border:1px solid #3b82f6;background:transparent;color:#1f3b8f;cursor:pointer}
 .btn-debug:hover{background:#eaf2ff}
+.dev-only{display:none}
+.dev-on .dev-only{display:block}
+.debug-link{font-size:.8rem;padding:.1rem .3rem;border:1px solid #d6e6ff;border-radius:.4rem;color:#3b82f6;text-decoration:none}
+.debug-link:hover{background:#f3f8ff}
+.section-title{display:flex;align-items:center;justify-content:space-between}
     </style>
 </head>
 <body>
@@ -237,15 +242,15 @@
             <button id="btButton" onclick="runBacktest()">Historische Simulation starten</button>
              <div id="simulationResults" style="display:none; margin-top: 25px;"><h3>Ergebnis des Backtests</h3><div id="simulationSummary"></div><h4 style="text-align:center; margin-top:20px;">Jahresprotokoll</h4><div id="simulationLog">Keine Daten</div></div>
              <div id="engine-mismatch-footer"></div>
+             <section class="dev-only" id="parity-smoketest-card">
              <fieldset style="margin-top: 25px;">
-                <div class="section-title" style="display:flex;align-items:center;gap:.75rem">
+                <div class="section-title">
                     <h3 style="margin:0">Parity Smoke Test</h3>
-                    <div class="debug-actions">
-                        <button id="runParitySmokeTestBtn" class="btn-debug" onclick="window.runParitySmokeTest({years:3})">Run</button>
-                    </div>
+                    <a id="runParitySmokeTestBtn" class="debug-link" href="javascript:void(0)" onclick="window.runParitySmokeTest({years:3})" aria-label="Run Parity Smoke Test">Run</a>
                 </div>
                 <div style="margin-top: 10px; font-size: 0.85rem; color: #666;">Vergleicht Engine und Simulator über 3 Jahre. Ergebnisse in der Browser-Konsole.</div>
             </fieldset>
+             </section>
         </div>
 
         <div class="panel">
@@ -314,5 +319,26 @@
 <script src="engine.js" defer></script>
 <script src="sim-parity-smoketest.js" defer></script>
 <script type="module" src="simulator-main.js"></script>
+<script>
+  (function(){
+    const DEV_KEY = "sim.devMode";
+    const urlDev = new URLSearchParams(location.search).get("dev") === "1";
+    const saved = localStorage.getItem(DEV_KEY) === "1";
+    const dev = urlDev || saved;
+    const root = document.body;
+    function setDevMode(on){
+      localStorage.setItem(DEV_KEY, on ? "1" : "0");
+      root.classList.toggle("dev-on", !!on);
+    }
+    setDevMode(dev);
+    window.addEventListener("keydown", (e)=>{
+      if(e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "d"){
+        const on = !root.classList.contains("dev-on");
+        setDevMode(on);
+        e.preventDefault();
+      }
+    });
+  })();
+</script>
 </body>
 </html>
