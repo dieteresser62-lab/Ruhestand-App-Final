@@ -247,6 +247,67 @@
                 <div style="margin-top: 10px; font-size: 0.85rem; color: #666;">Vergleicht Engine und Simulator über 3 Jahre. Ergebnisse in der Browser-Konsole.</div>
             </fieldset>
         </div>
+
+        <div class="panel">
+            <h2>Parameter-Sweep</h2>
+            <fieldset>
+                <legend>Sweep-Ranges (Format: start:step:end)</legend>
+                <div class="form-grid-four-col">
+                    <div class="form-group"><label for="sweepRunwayMin">Runway Min (Monate)</label><input type="text" id="sweepRunwayMin" value="24:24:24" placeholder="18:6:36"></div>
+                    <div class="form-group"><label for="sweepRunwayTarget">Runway Target (Monate)</label><input type="text" id="sweepRunwayTarget" value="24:12:48" placeholder="24:6:48"></div>
+                    <div class="form-group"><label for="sweepTargetEq">Target Eq (%)</label><input type="text" id="sweepTargetEq" value="50:10:80" placeholder="50:5:80"></div>
+                    <div class="form-group"><label for="sweepRebalBand">Rebal Band (%)</label><input type="text" id="sweepRebalBand" value="5:5:5" placeholder="3:1:10"></div>
+                    <div class="form-group"><label for="sweepMaxSkimPct">Max Skim % of Eq</label><input type="text" id="sweepMaxSkimPct" value="5:5:15" placeholder="0:5:20"></div>
+                    <div class="form-group"><label for="sweepMaxBearRefillPct">Max Bear Refill % of Eq</label><input type="text" id="sweepMaxBearRefillPct" value="5:5:5" placeholder="0:5:15"></div>
+                    <div class="form-group"><label for="sweepGoldTargetPct">Gold Target (%)</label><input type="text" id="sweepGoldTargetPct" value="5:5:5" placeholder="0:2.5:10"></div>
+                </div>
+            </fieldset>
+            <button id="sweepButton" onclick="runParameterSweep()">Run Sweep</button>
+            <div id="sweep-progress-bar-container" style="display:none; width: 100%; background-color: #e0e0e0; height: 24px; border-radius: 4px; margin-top: 15px; overflow: hidden;">
+                <div id="sweep-progress-bar" style="width: 0%; height: 100%; background-color: var(--secondary-color); transition: width 0.3s; line-height: 24px; text-align: center; color: white; font-size: 0.85rem;"></div>
+            </div>
+            <div id="sweepResults" style="display:none; margin-top: 25px;">
+                <h3>Sweep Ergebnisse</h3>
+                <div id="sweepControls" style="margin-bottom: 15px;">
+                    <div class="form-grid-four-col">
+                        <div class="form-group">
+                            <label for="sweepMetric">Metrik</label>
+                            <select id="sweepMetric">
+                                <option value="successProbFloor" selected>Success Prob Floor</option>
+                                <option value="p10EndWealth">P10 End Wealth</option>
+                                <option value="worst5Drawdown">Worst 5% Drawdown</option>
+                                <option value="minRunwayObserved">Min Runway Observed</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="sweepAxisX">X-Achse Parameter</label>
+                            <select id="sweepAxisX">
+                                <option value="runwayMin">Runway Min</option>
+                                <option value="runwayTarget" selected>Runway Target</option>
+                                <option value="targetEq">Target Eq</option>
+                                <option value="rebalBand">Rebal Band</option>
+                                <option value="maxSkimPct">Max Skim Pct</option>
+                                <option value="maxBearRefillPct">Max Bear Refill Pct</option>
+                                <option value="goldTargetPct">Gold Target Pct</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="sweepAxisY">Y-Achse Parameter</label>
+                            <select id="sweepAxisY">
+                                <option value="runwayMin">Runway Min</option>
+                                <option value="runwayTarget">Runway Target</option>
+                                <option value="targetEq" selected>Target Eq</option>
+                                <option value="rebalBand">Rebal Band</option>
+                                <option value="maxSkimPct">Max Skim Pct</option>
+                                <option value="maxBearRefillPct">Max Bear Refill Pct</option>
+                                <option value="goldTargetPct">Gold Target Pct</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div id="sweepHeatmap"></div>
+            </div>
+        </div>
     </div>
 
 
