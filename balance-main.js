@@ -141,7 +141,7 @@ function debouncedUpdate() {
 function initVersionHandshake() {
     try {
         if (typeof window.EngineAPI === 'undefined' || typeof window.EngineAPI.getVersion !== 'function') {
-            throw new Error("EngineAPI (neu_enginev1.js) konnte nicht geladen werden oder ist ungültig.");
+            throw new Error("EngineAPI (engine.js) konnte nicht geladen werden oder ist ungültig.");
         }
 
         const version = window.EngineAPI.getVersion();
@@ -152,9 +152,18 @@ function initVersionHandshake() {
         // Version Handshake
         if (!version.api.startsWith(REQUIRED_ENGINE_API_VERSION_PREFIX)) {
             const alertBanner = dom.containers.versionAlert;
-            alertBanner.textContent = `WARNUNG: Veraltete Engine-Version erkannt (Geladen: ${version.api}, Erwartet: ${REQUIRED_ENGINE_API_VERSION_PREFIX}x). Die App ist möglicherweise instabil. Bitte aktualisieren Sie die Engine-Datei (neu_enginev1.js).`;
+            alertBanner.textContent = `WARNUNG: Veraltete Engine-Version erkannt (Geladen: ${version.api}, Erwartet: ${REQUIRED_ENGINE_API_VERSION_PREFIX}x). Die App ist möglicherweise instabil. Bitte aktualisieren Sie die Engine-Datei (engine.js).`;
             alertBanner.style.display = 'block';
             alertBanner.tabIndex = -1;
+        }
+
+        // Cache-Busting
+        const scriptTag = document.querySelector('script[src^="engine.js"]');
+        if (scriptTag && version.build) {
+            const newSrc = `engine.js?v=${version.build}`;
+            if (scriptTag.src !== newSrc) {
+                scriptTag.src = newSrc;
+            }
         }
 
         console.log(`Engine Handshake erfolgreich. API v${version.api} (Build: ${version.build}) geladen.`);
