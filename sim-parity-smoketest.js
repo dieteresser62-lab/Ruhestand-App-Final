@@ -47,9 +47,6 @@ window.runParitySmokeTest = function({ years = 3 } = {}) {
         // 4. Update States für nächstes Jahr
         simState = simResult.newState;
         engineState = engineResult.newState;
-
-        // Update Engine-Input mit neuen Marktdaten
-        updateEngineInputForNextYear(engineInput, yearData);
     }
 
     // --- Ergebnis ---
@@ -194,8 +191,9 @@ function runSimulatorYear(state, inputs, yearData, yearIndex) {
 }
 
 function runEngineYear(engineInput, lastState, yearData, simInputs) {
-    // Aktualisiere Inflation im Input
-    engineInput.inflation = yearData.inflation_de || yearData.inflation || 1.7;
+    // Aktualisiere Inflation im Input (annualData has 'inflation', synthetic data has 'inflation_de')
+    const yearInflation = yearData.inflation || yearData.inflation_de || 1.7;
+    engineInput.inflation = yearInflation;
 
     // Wende Marktrenditen an (vor Engine-Call, da Engine nur Entscheidungen trifft)
     const rA = isFinite(yearData.rendite) ? yearData.rendite : 0;
@@ -262,10 +260,18 @@ function runEngineYear(engineInput, lastState, yearData, simInputs) {
     engineInput.tagesgeld *= (1 + rC);
     engineInput.geldmarktEtf *= (1 + rC);
 
-    // Inflationsanpassung des Bedarfs
-    const inflFactor = 1 + (yearData.inflation_de || 1.7) / 100;
+    // Inflationsanpassung des Bedarfs (like simulator does)
+    const inflFactor = 1 + yearInflation / 100;
     engineInput.floorBedarf *= inflFactor;
     engineInput.flexBedarf *= inflFactor;
+
+    // Update market data history (like simulator does at end of year)
+    engineInput.endeVJ_3 = engineInput.endeVJ_2;
+    engineInput.endeVJ_2 = engineInput.endeVJ_1;
+    engineInput.endeVJ_1 = engineInput.endeVJ;
+    engineInput.endeVJ = engineInput.endeVJ * (1 + rA);
+    engineInput.ath = Math.max(engineInput.ath, engineInput.endeVJ);
+    engineInput.jahreSeitAth = engineInput.endeVJ >= engineInput.ath ? 0 : engineInput.jahreSeitAth + 1;
 
     return { newState: result.newState, result, engineInput };
 }
