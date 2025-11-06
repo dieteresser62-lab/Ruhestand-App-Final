@@ -8,7 +8,6 @@ import { HISTORICAL_DATA, STRESS_PRESETS, annualData, REGIME_DATA, REGIME_TRANSI
  */
 export function getCommonInputs() {
     const goldAktiv = document.getElementById('goldAllokationAktiv').checked;
-    const zweiPersonen = document.getElementById('zweiPersonenHaushalt').checked;
     const baseInputs = {
         startVermoegen: parseFloat(document.getElementById('simStartVermoegen').value) || 0,
         depotwertAlt: parseFloat(document.getElementById('depotwertAlt').value) || 0,
@@ -31,14 +30,6 @@ export function getCommonInputs() {
         renteStartOffsetJahre: parseInt(document.getElementById('renteStartOffsetJahre').value) || 0,
         renteIndexierungsart: document.getElementById('renteIndexierungsart').value,
         renteFesterSatz: parseFloat(document.getElementById('renteFesterSatz').value) || 0,
-        zweiPersonenHaushalt: zweiPersonen,
-        partnerStartAlter: zweiPersonen ? (parseInt(document.getElementById('partnerStartAlter').value) || 60) : null,
-        partnerGeschlecht: zweiPersonen ? (document.getElementById('partnerGeschlecht').value || 'w') : null,
-        partnerStartSPB: zweiPersonen ? (parseFloat(document.getElementById('partnerStartSPB').value) || 0) : 0,
-        partnerKirchensteuerSatz: zweiPersonen ? (parseFloat(document.getElementById('partnerKirchensteuerSatz').value) || 0) : 0,
-        partnerRenteMonatlich: zweiPersonen ? (parseFloat(document.getElementById('partnerRenteMonatlich').value) || 0) : 0,
-        partnerRenteStartOffsetJahre: zweiPersonen ? (parseInt(document.getElementById('partnerRenteStartOffsetJahre').value) || 0) : 0,
-        witwenRenteProzent: zweiPersonen ? (parseFloat(document.getElementById('witwenRenteProzent').value) || 55) : 55,
         pflegefallLogikAktivieren: document.getElementById('pflegefallLogikAktivieren').checked,
         pflegeModellTyp: document.getElementById('pflegeModellTyp').value,
         pflegeStufe1Zusatz: parseFloat(document.getElementById('pflegeStufe1Zusatz').value) || 0,
@@ -181,67 +172,6 @@ export function computeYearlyPension({ yearIndex, baseMonthly, startOffset, last
 }
 
 /**
- * Berechnet kombinierte Renten für Zwei-Personen-Haushalt mit Witwenrente
- * @returns {number} Gesamtrente für das Jahr
- */
-export function computeTwoPersonPensions({
-    yearIndex, inputs, lastPensions, personStatus, inflRate, lohnRate
-}) {
-    const { person1Alive, person2Alive } = personStatus;
-    const { renteMonatlich, renteStartOffsetJahre, renteIndexierungsart, renteFesterSatz,
-            partnerRenteMonatlich, partnerRenteStartOffsetJahre, witwenRenteProzent } = inputs;
-
-    let pension1 = 0;
-    let pension2 = 0;
-
-    // Person 1 Rente berechnen
-    if (person1Alive) {
-        pension1 = computeYearlyPension({
-            yearIndex,
-            baseMonthly: renteMonatlich,
-            startOffset: renteStartOffsetJahre,
-            lastAnnualPension: lastPensions.person1,
-            indexierungsArt: renteIndexierungsart,
-            inflRate,
-            lohnRate,
-            festerSatz: renteFesterSatz
-        });
-    } else if (person2Alive && lastPensions.person1 > 0) {
-        // Person 1 verstorben, Person 2 bekommt Witwenrente
-        const witwenRenteP1 = lastPensions.person1 * (witwenRenteProzent / 100);
-        pension1 = witwenRenteP1 * (1 + (renteIndexierungsart === 'inflation' ? inflRate / 100 :
-                                         renteIndexierungsart === 'lohn' ? (lohnRate ?? inflRate) / 100 :
-                                         renteFesterSatz / 100));
-    }
-
-    // Person 2 Rente berechnen
-    if (person2Alive) {
-        pension2 = computeYearlyPension({
-            yearIndex,
-            baseMonthly: partnerRenteMonatlich,
-            startOffset: partnerRenteStartOffsetJahre,
-            lastAnnualPension: lastPensions.person2,
-            indexierungsArt: renteIndexierungsart,
-            inflRate,
-            lohnRate,
-            festerSatz: renteFesterSatz
-        });
-    } else if (person1Alive && lastPensions.person2 > 0) {
-        // Person 2 verstorben, Person 1 bekommt Witwenrente
-        const witwenRenteP2 = lastPensions.person2 * (witwenRenteProzent / 100);
-        pension2 = witwenRenteP2 * (1 + (renteIndexierungsart === 'inflation' ? inflRate / 100 :
-                                         renteIndexierungsart === 'lohn' ? (lohnRate ?? inflRate) / 100 :
-                                         renteFesterSatz / 100));
-    }
-
-    return {
-        total: pension1 + pension2,
-        person1: pension1,
-        person2: pension2
-    };
-}
-
-/**
  * Bereitet den Kontext für ein Stress-Szenario vor
  */
 export function buildStressContext(presetKey, rand) {
@@ -358,30 +288,10 @@ export function summarizeSalesByAsset(saleResult) {
 /**
  * Konvertiert Portfolio-Status zurück in Input-Kontext
  */
-export function buildInputsCtxFromPortfolio(inputs, portfolio, {pensionAnnual, marketData, personStatus = null}) {
+export function buildInputsCtxFromPortfolio(inputs, portfolio, {pensionAnnual, marketData}) {
   const aktAlt = portfolio.depotTranchesAktien.find(t => t.type === 'aktien_alt') || {marketValue:0, costBasis:0};
   const aktNeu = portfolio.depotTranchesAktien.find(t => t.type === 'aktien_neu') || {marketValue:0, costBasis:0};
   const gTr   = portfolio.depotTranchesGold.find(t => t.type === 'gold')       || {marketValue:0, costBasis:0};
-
-  // Bei Zwei-Personen-Haushalt: SPBs addieren (solange beide leben)
-  let totalSPB = inputs.startSPB;
-  let totalKirchensteuer = inputs.kirchensteuerSatz;
-
-  if (inputs.zweiPersonenHaushalt && personStatus) {
-    const { person1Alive, person2Alive } = personStatus;
-    if (person1Alive && person2Alive) {
-      // Beide leben: beide SPBs
-      totalSPB = inputs.startSPB + inputs.partnerStartSPB;
-      // Kirchensteuer: gewichteter Durchschnitt (vereinfacht: höherer Wert)
-      totalKirchensteuer = Math.max(inputs.kirchensteuerSatz, inputs.partnerKirchensteuerSatz);
-    } else if (person1Alive) {
-      totalSPB = inputs.startSPB;
-      totalKirchensteuer = inputs.kirchensteuerSatz;
-    } else if (person2Alive) {
-      totalSPB = inputs.partnerStartSPB;
-      totalKirchensteuer = inputs.partnerKirchensteuerSatz;
-    }
-  }
 
   return {
     ...inputs,
@@ -390,8 +300,7 @@ export function buildInputsCtxFromPortfolio(inputs, portfolio, {pensionAnnual, m
     depotwertNeu: aktNeu.marketValue,  costBasisNeu: aktNeu.costBasis,  tqfNeu: 0.30,
     goldWert: gTr.marketValue,         goldCost:    gTr.costBasis,
     goldSteuerfrei: inputs.goldSteuerfrei,
-    sparerPauschbetrag: totalSPB,
-    kirchensteuerSatz: totalKirchensteuer,
+    sparerPauschbetrag: inputs.startSPB,
     marketData,
     pensionAnnual
   };
