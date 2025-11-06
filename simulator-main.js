@@ -62,6 +62,9 @@ export async function runMonteCarlo() {
         const alterBeiErschoepfung = new Uint8Array(anzahl).fill(255);
         const anteilJahreOhneFlex = new Float32Array(anzahl);
 
+        // Realistischer Schwellenwert für Depot-Erschöpfung: 100 € (vorher 0,000001 €)
+        const DEPOT_DEPLETION_THRESHOLD = 100;
+
         const stress_maxDrawdowns = new Float32Array(anzahl);
         const stress_timeQuoteAbove45 = new Float32Array(anzahl);
         const stress_cutYears = new Float32Array(anzahl);
@@ -138,6 +141,11 @@ export async function runMonteCarlo() {
 
                 if (result.isRuin) {
                     failed = true;
+                    // Bei Ruin ist das Depot definitiv erschöpft - setze Alter
+                    if (!depotErschoepfungAlterGesetzt) {
+                        alterBeiErschoepfung[i] = currentAge;
+                        depotErschoepfungAlterGesetzt = true;
+                    }
                     currentRunLog.push({
                         jahr: simulationsJahr + 1,
                         histJahr: yearData.jahr,
@@ -154,7 +162,7 @@ export async function runMonteCarlo() {
                     const depotOnlyNow = sumDepot(simState.portfolio);
                     depotNurHistorie.push(depotOnlyNow);
 
-                    if (!depotErschoepfungAlterGesetzt && depotOnlyNow <= 1e-6) {
+                    if (!depotErschoepfungAlterGesetzt && depotOnlyNow <= DEPOT_DEPLETION_THRESHOLD) {
                       alterBeiErschoepfung[i] = currentAge;
                       depotErschoepfungAlterGesetzt = true;
                     }
@@ -242,7 +250,8 @@ export async function runMonteCarlo() {
             anteilJahreOhneFlex[i] = lebensdauer > 0 ? (jahreOhneFlex / lebensdauer) * 100 : 0;
             volatilities[i] = volPct;
             maxDrawdowns[i] = maxDDpct;
-            depotErschoepft[i] = depotNurHistorie.some(v => v <= 1e-6) ? 1 : 0;
+            // Depot gilt als erschöpft, wenn es jemals unter den Schwellenwert fiel ODER der Run fehlgeschlagen ist
+            depotErschoepft[i] = (failed || depotNurHistorie.some(v => v <= DEPOT_DEPLETION_THRESHOLD)) ? 1 : 0;
 
             const cumulCareDepotCosts = careMeta?.kumulierteKosten || 0;
             endWealthWithCare[i] = endVermoegen;
