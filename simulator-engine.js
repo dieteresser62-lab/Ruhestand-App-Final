@@ -27,8 +27,13 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const rG = isFinite(yearData.gold_eur_perf) ? yearData.gold_eur_perf / 100 : 0;
     const rC = isFinite(yearData.zinssatz) ? yearData.zinssatz / 100 : 0;
 
-    depotTranchesAktien.forEach(t => { t.marketValue *= (1 + rA); });
-    depotTranchesGold.forEach(t => { t.marketValue *= (1 + rG); });
+    // Optimiert: for-Loop statt forEach für bessere Performance
+    for (let i = 0; i < depotTranchesAktien.length; i++) {
+        depotTranchesAktien[i].marketValue *= (1 + rA);
+    }
+    for (let i = 0; i < depotTranchesGold.length; i++) {
+        depotTranchesGold[i].marketValue *= (1 + rG);
+    }
 
     const marketDataCurrentYear = { ...marketDataHist, inflation: yearData.inflation };
 
