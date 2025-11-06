@@ -35,7 +35,6 @@ export const UIRenderer = {
         // Übergibt ui.action und das notwendige ui.input an renderHandlungsanweisung
         this.renderHandlungsanweisung(ui.action, ui.input);
         this.renderLiquidityBar(ui.liquiditaet.deckungNachher);
-        this.updateDepotMetaUI();
     },
 
     renderBedarfAnpassungUI(inputData, persistentState) {
@@ -313,13 +312,6 @@ export const UIRenderer = {
         bar.style.width = pct + '%';
         bar.classList.add(pct >= 100 ? 'bar-ok' : pct >= 70 ? 'bar-warn' : 'bar-bad');
         dom.outputs.balkenContainer.setAttribute('aria-valuenow', pct.toFixed(0));
-    },
-
-    updateDepotMetaUI() {
-        const state = StorageManager.loadState();
-        const inputs = state.inputs || {};
-        const tsUpd = inputs.depotLastUpdate ? new Date(inputs.depotLastUpdate) : null;
-        dom.controls.depotLastUpdated.textContent = tsUpd ? tsUpd.toLocaleString('de-DE', {dateStyle: 'short', timeStyle: 'short'}) : '—';
     },
 
     toast(msg, isSuccess = true) {

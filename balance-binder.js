@@ -145,7 +145,6 @@ export const UIBinder = {
             const state = StorageManager.loadState();
             state.inputs = { ...(state.inputs || {}), depotLastUpdate: Date.now() };
             StorageManager.saveState(state);
-            UIRenderer.updateDepotMetaUI();
         }
         debouncedUpdate();
     },
