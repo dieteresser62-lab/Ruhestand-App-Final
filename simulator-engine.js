@@ -9,57 +9,6 @@ import {
 import { resolveProfileKey } from './simulator-heatmap.js';
 
 /**
- * Berechnet Haushalts-Renten und SPB für Backtest (ohne Sterblichkeitslogik)
- * @param {Object} params - { yearIndex, yearData, lastAnnualPension, inputs }
- * @returns {Object} { pensionAnnual, nextLastAnnualPension: {a, b}, spbTotal }
- */
-function computeHouseholdPensionAndSPB({ yearIndex, yearData, lastAnnualPension, inputs }) {
-    // Backward-Kompatibilität: lastAnnualPension kann Zahl oder {a, b} sein
-    const lastA = (lastAnnualPension && typeof lastAnnualPension === 'object')
-        ? (lastAnnualPension.a || 0)
-        : (lastAnnualPension || 0);
-    const lastB = (lastAnnualPension && typeof lastAnnualPension === 'object')
-        ? (lastAnnualPension.b || 0)
-        : 0;
-
-    // Person A (Hauptperson)
-    const a = computeYearlyPension({
-        yearIndex,
-        baseMonthly: inputs.renteMonatlich,
-        startOffset: inputs.renteStartOffsetJahre,
-        lastAnnualPension: lastA,
-        indexierungsArt: inputs.renteIndexierungsart,
-        inflRate: yearData.inflation,
-        lohnRate: yearData.lohn,
-        festerSatz: inputs.renteFesterSatz
-    });
-
-    // Person B (Partner) – wenn vorhanden
-    let b = 0;
-    if (inputs.partner) {
-        b = computeYearlyPension({
-            yearIndex,
-            baseMonthly: inputs.partner.renteMonatlich,
-            startOffset: inputs.partner.renteStartOffsetJahre,
-            lastAnnualPension: lastB,
-            indexierungsArt: inputs.partner.renteIndexierungsart,
-            inflRate: yearData.inflation,
-            lohnRate: yearData.lohn,
-            festerSatz: inputs.partner.renteFesterSatz
-        });
-    }
-
-    // Backtest-Phase: beide "leben" immer → SPB addieren
-    const spbTotal = (inputs.startSPB || 0) + (inputs.partner?.startSPB || 0);
-
-    return {
-        pensionAnnual: a + b,
-        nextLastAnnualPension: { a, b },
-        spbTotal
-    };
-}
-
-/**
  * Simuliert ein Jahr des Ruhestandsszenarios
  * @param {Object} currentState - Aktuelles Portfolio und Marktstatus
  * @param {Object} inputs - Benutzereingaben und Konfiguration
@@ -89,13 +38,12 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
     const marketDataCurrentYear = { ...marketDataHist, inflation: yearData.inflation };
 
-    // Berechne Renten und SPB für Ein- oder Zwei-Personen-Haushalt
-    let pensionAnnual, pension1, pension2;
-    let nextLastAnnualPension = currentAnnualPension;
-    let spbToUse = inputs.startSPB;
+    const algoInput = { ...inputs, floorBedarf: baseFloor, flexBedarf: baseFlex, startSPB: inputs.startSPB };
+    const market = window.Ruhestandsmodell_v30.analyzeMarket(marketDataCurrentYear);
 
+    // Berechne Renten für Ein- oder Zwei-Personen-Haushalt
+    let pensionAnnual, pension1, pension2;
     if (inputs.zweiPersonenHaushalt && currentPensions) {
-        // Monte-Carlo mit Sterblichkeit
         const pensionResult = computeTwoPersonPensions({
             yearIndex,
             inputs,
@@ -107,16 +55,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         pensionAnnual = pensionResult.total;
         pension1 = pensionResult.person1;
         pension2 = pensionResult.person2;
-    } else if (inputs.partner) {
-        // Backtest Zwei-Personen-Haushalt (ohne Sterblichkeit)
-        const hh = computeHouseholdPensionAndSPB({ yearIndex, yearData, lastAnnualPension: currentAnnualPension, inputs });
-        pensionAnnual = hh.pensionAnnual;
-        nextLastAnnualPension = hh.nextLastAnnualPension;
-        spbToUse = hh.spbTotal;
-        pension1 = hh.nextLastAnnualPension.a;
-        pension2 = hh.nextLastAnnualPension.b;
     } else {
-        // Single-Person
         pensionAnnual = computeYearlyPension({
             yearIndex,
             baseMonthly: inputs.renteMonatlich,
@@ -130,11 +69,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         pension1 = pensionAnnual;
         pension2 = 0;
     }
-
     const inflatedFloor = Math.max(0, baseFloor - pensionAnnual);
     const inflatedFlex  = baseFlex;
-    const algoInput = { ...inputs, floorBedarf: baseFloor, flexBedarf: baseFlex, startSPB: spbToUse };
-    const market = window.Ruhestandsmodell_v30.analyzeMarket(marketDataCurrentYear);
 
     const jahresbedarfAusPortfolio = inflatedFloor + inflatedFlex;
     const runwayMonths = jahresbedarfAusPortfolio > 0 ? (liquiditaet / (jahresbedarfAusPortfolio / 12)) : Infinity;
@@ -251,7 +187,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         baseFloor: naechsterBaseFloor,
         baseFlex: naechsterBaseFlex,
         lastState: spendingNewState,
-        currentAnnualPension: inputs.partner ? nextLastAnnualPension : pensionAnnual,
+        currentAnnualPension: pensionAnnual,
         marketDataHist: newMarketDataHist,
         samplerState: currentState.samplerState
     };
