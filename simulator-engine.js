@@ -27,13 +27,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const rG = isFinite(yearData.gold_eur_perf) ? yearData.gold_eur_perf / 100 : 0;
     const rC = isFinite(yearData.zinssatz) ? yearData.zinssatz / 100 : 0;
 
-    // Optimiert: for-Loop statt forEach für bessere Performance
-    for (let i = 0; i < depotTranchesAktien.length; i++) {
-        depotTranchesAktien[i].marketValue *= (1 + rA);
-    }
-    for (let i = 0; i < depotTranchesGold.length; i++) {
-        depotTranchesGold[i].marketValue *= (1 + rG);
-    }
+    depotTranchesAktien.forEach(t => { t.marketValue *= (1 + rA); });
+    depotTranchesGold.forEach(t => { t.marketValue *= (1 + rG); });
 
     const marketDataCurrentYear = { ...marketDataHist, inflation: yearData.inflation };
 
@@ -94,18 +89,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
     if (liquiditaet < jahresEntnahme && depotWertVorEntnahme > 0) {
         const shortfall = jahresEntnahme - liquiditaet;
-        // Optimiert: Schnelles manuelles Cloning statt map + spread
-        const clonedAktien = new Array(portfolio.depotTranchesAktien.length);
-        for (let i = 0; i < portfolio.depotTranchesAktien.length; i++) {
-            const t = portfolio.depotTranchesAktien[i];
-            clonedAktien[i] = { marketValue: t.marketValue, einstand: t.einstand, kaufdatum: t.kaufdatum };
-        }
-        const clonedGold = new Array(portfolio.depotTranchesGold.length);
-        for (let i = 0; i < portfolio.depotTranchesGold.length; i++) {
-            const t = portfolio.depotTranchesGold[i];
-            clonedGold[i] = { marketValue: t.marketValue, einstand: t.einstand, kaufdatum: t.kaufdatum };
-        }
-        const emergencyCtx = buildInputsCtxFromPortfolio(algoInput, { depotTranchesAktien: clonedAktien, depotTranchesGold: clonedGold, liquiditaet: liquiditaet}, { pensionAnnual, marketData: marketDataCurrentYear });
+        const emergencyCtx = buildInputsCtxFromPortfolio(algoInput, { depotTranchesAktien: portfolio.depotTranchesAktien.map(t => ({...t})), depotTranchesGold: portfolio.depotTranchesGold.map(t => ({...t})), liquiditaet: liquiditaet}, { pensionAnnual, marketData: marketDataCurrentYear });
         const { saleResult: emergencySale } = window.Ruhestandsmodell_v30.calculateSaleAndTax(shortfall, emergencyCtx, { minGold: results.minGold }, market);
 
         if (emergencySale && emergencySale.achievedRefill > 0) {
@@ -272,25 +256,6 @@ export function makeDefaultCareMeta(enabled) {
 }
 
 /**
- * Schnelles Clonen von Year-Data-Objekten (ersetzt Spread-Operator)
- * @param {Object} src - Quelldaten
- * @returns {Object} Kopierte Year-Data
- */
-function cloneYearData(src) {
-    return {
-        jahr: src.jahr,
-        rendite: src.rendite,
-        gold_eur_perf: src.gold_eur_perf,
-        zinssatz: src.zinssatz,
-        inflation: src.inflation,
-        regime: src.regime,
-        lohn: src.lohn,
-        zinssatz_de: src.zinssatz_de,
-        inflation_de: src.inflation_de
-    };
-}
-
-/**
  * Wählt Marktdaten für das nächste Jahr gemäß der MC-Methode aus
  */
 export function sampleNextYearData(state, methode, blockSize, rand, stressCtx) {
@@ -299,7 +264,7 @@ export function sampleNextYearData(state, methode, blockSize, rand, stressCtx) {
     if (stressCtx && stressCtx.type === 'conditional_bootstrap' && stressCtx.remainingYears > 0) {
         const randomIndex = Math.floor(rand() * stressCtx.pickableIndices.length);
         const chosenYearIndex = stressCtx.pickableIndices[randomIndex];
-        return cloneYearData(annualData[chosenYearIndex]);
+        return { ...annualData[chosenYearIndex] };
     }
 
     if (methode === 'block') {
@@ -310,7 +275,7 @@ export function sampleNextYearData(state, methode, blockSize, rand, stressCtx) {
         }
         const data = annualData[samplerState.blockStartIndex + samplerState.yearInBlock];
         samplerState.yearInBlock++;
-        return cloneYearData(data);
+        return { ...data };
     }
 
     let regime;
@@ -340,7 +305,7 @@ export function sampleNextYearData(state, methode, blockSize, rand, stressCtx) {
 
     const possibleYears = REGIME_DATA[regime];
     const chosenYear = possibleYears[Math.floor(rand() * possibleYears.length)];
-    return cloneYearData(chosenYear);
+    return { ...chosenYear };
 }
 
 /**
