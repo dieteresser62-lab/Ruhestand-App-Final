@@ -15,10 +15,9 @@ import { resolveProfileKey } from './simulator-heatmap.js';
  * @param {Object} yearData - Marktdaten für das Jahr
  * @param {number} yearIndex - Index des Simulationsjahres
  * @param {Object} pflegeMeta - Pflege-Metadata (optional)
- * @param {Object} personStatus - Status der Personen (optional, für Zwei-Personen-Haushalte)
  * @returns {Object} Simulationsergebnisse
  */
-export function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta = null, personStatus = null) {
+export function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta = null) {
     let { portfolio, baseFloor, baseFlex, lastState, currentAnnualPension, marketDataHist } = currentState;
     let { depotTranchesAktien, depotTranchesGold } = portfolio;
     let liquiditaet = portfolio.liquiditaet;
@@ -60,7 +59,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const depotwertGesamt = sumDepot(portfolio);
     const totalWealth     = depotwertGesamt + liquiditaet;
 
-    const inputsCtx = buildInputsCtxFromPortfolio(algoInput, portfolio, {pensionAnnual, marketData: marketDataCurrentYear, personStatus});
+    const inputsCtx = buildInputsCtxFromPortfolio(algoInput, portfolio, {pensionAnnual, marketData: marketDataCurrentYear});
 
     const { spendingResult, newState: spendingNewState } = window.Ruhestandsmodell_v30.determineSpending({
         market, lastState, inflatedFloor, inflatedFlex, round5: algoInput.round5,
@@ -95,7 +94,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
     if (liquiditaet < jahresEntnahme && depotWertVorEntnahme > 0) {
         const shortfall = jahresEntnahme - liquiditaet;
-        const emergencyCtx = buildInputsCtxFromPortfolio(algoInput, { depotTranchesAktien: portfolio.depotTranchesAktien.map(t => ({...t})), depotTranchesGold: portfolio.depotTranchesGold.map(t => ({...t})), liquiditaet: liquiditaet}, { pensionAnnual, marketData: marketDataCurrentYear, personStatus });
+        const emergencyCtx = buildInputsCtxFromPortfolio(algoInput, { depotTranchesAktien: portfolio.depotTranchesAktien.map(t => ({...t})), depotTranchesGold: portfolio.depotTranchesGold.map(t => ({...t})), liquiditaet: liquiditaet}, { pensionAnnual, marketData: marketDataCurrentYear });
         const { saleResult: emergencySale } = window.Ruhestandsmodell_v30.calculateSaleAndTax(shortfall, emergencyCtx, { minGold: results.minGold }, market);
 
         if (emergencySale && emergencySale.achievedRefill > 0) {
@@ -229,7 +228,7 @@ export function initMcRunState(inputs, startYearIndex) {
        marketDataHist.jahreSeitAth = (startJahr - 1) - lastAthYear;
     }
 
-    const initialState = {
+    return {
         portfolio: startPortfolio,
         baseFloor: inputs.startFloorBedarf,
         baseFlex: inputs.startFlexBedarf,
@@ -238,24 +237,14 @@ export function initMcRunState(inputs, startYearIndex) {
         marketDataHist: marketDataHist,
         samplerState: {}
     };
-
-    // Für Zwei-Personen-Haushalte: Separate Rententracking
-    if (inputs.zweiPersonenHaushalt) {
-        initialState.currentPensions = { person1: 0, person2: 0 };
-        initialState.personStatus = { person1Alive: true, person2Alive: true };
-    }
-
-    return initialState;
 }
 
 /**
  * Erstellt ein Standard-Pflege-Metadata-Objekt
- * Für Zwei-Personen-Haushalte werden zwei separate CareMeta-Objekte erstellt
  */
-export function makeDefaultCareMeta(enabled, zweiPersonen = false) {
-    if (!enabled) return zweiPersonen ? { person1: null, person2: null } : null;
-
-    const singleCareMeta = {
+export function makeDefaultCareMeta(enabled) {
+    if (!enabled) return null;
+    return {
         active: false,
         triggered: false,
         startAge: -1,
@@ -269,15 +258,6 @@ export function makeDefaultCareMeta(enabled, zweiPersonen = false) {
         flexAtTrigger: 0,
         maxFloorAtTrigger: 0
     };
-
-    if (zweiPersonen) {
-        return {
-            person1: { ...singleCareMeta },
-            person2: { ...singleCareMeta }
-        };
-    }
-
-    return singleCareMeta;
 }
 
 /**
@@ -362,18 +342,6 @@ export function computeRunStatsFromSeries(series) {
     }
     const maxDDpct = Math.abs(maxDD) * 100;
     return { volPct, maxDDpct };
-}
-
-/**
- * Aktualisiert Pflege-Metadata für Zwei-Personen-Haushalte
- */
-export function updateCareMetaTwoPersons(careObj, inputs, age1, age2, yearData, rand) {
-    if (!inputs.pflegefallLogikAktivieren || !careObj) return careObj;
-
-    careObj.person1 = updateCareMeta(careObj.person1, inputs, age1, yearData, rand);
-    careObj.person2 = updateCareMeta(careObj.person2, inputs, age2, yearData, rand);
-
-    return careObj;
 }
 
 /**
