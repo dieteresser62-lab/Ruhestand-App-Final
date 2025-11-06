@@ -21,6 +21,16 @@
     <div class="main-layout">
         <div class="panel">
             <h1>Ruhestand-Simulator</h1>
+
+            <div class="tab-buttons">
+                <button class="tab-btn active" data-tab="rahmendaten">Rahmendaten</button>
+                <button class="tab-btn" data-tab="montecarlo">Monte-Carlo</button>
+                <button class="tab-btn" data-tab="backtesting">Backtesting</button>
+                <button class="tab-btn" data-tab="sweep">Parameter-Sweep</button>
+            </div>
+
+            <div class="tab-content">
+                <div id="tab-rahmendaten" class="tab-panel active">
             <fieldset>
                 <legend>Startportfolio & Bedarf</legend>
                 <div class="form-grid">
@@ -174,9 +184,9 @@
                     </div>
                 </div>
             </fieldset>
-        </div>
+                </div>
 
-        <div class="panel">
+                <div id="tab-montecarlo" class="tab-panel">
             <h2>Monte-Carlo-Simulation</h2>
             <fieldset>
                 <div class="form-grid-four-col">
@@ -228,9 +238,9 @@
                     <div id="worstRunLog"></div>
                 </div>
              </div>
-        </div>
-        
-        <div class="panel">
+                </div>
+
+                <div id="tab-backtesting" class="tab-panel">
              <h2>Historisches Backtesting</h2>
             <fieldset>
                 <legend>Backtesting-Parameter</legend>
@@ -251,9 +261,9 @@
                 <div style="margin-top: 10px; font-size: 0.85rem; color: #666;">Vergleicht Engine und Simulator über 3 Jahre. Ergebnisse in der Browser-Konsole.</div>
             </fieldset>
              </section>
-        </div>
+                </div>
 
-        <div class="panel">
+                <div id="tab-sweep" class="tab-panel">
             <h2>Parameter-Sweep</h2>
             <fieldset>
                 <legend>Sweep-Ranges</legend>
@@ -319,6 +329,8 @@
                     </div>
                 </div>
                 <div id="sweepHeatmap"></div>
+            </div>
+                </div>
             </div>
         </div>
     </div>
