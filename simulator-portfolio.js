@@ -38,6 +38,8 @@ export function getCommonInputs() {
         partnerKirchensteuerSatz: zweiPersonen ? (parseFloat(document.getElementById('partnerKirchensteuerSatz').value) || 0) : 0,
         partnerRenteMonatlich: zweiPersonen ? (parseFloat(document.getElementById('partnerRenteMonatlich').value) || 0) : 0,
         partnerRenteStartOffsetJahre: zweiPersonen ? (parseInt(document.getElementById('partnerRenteStartOffsetJahre').value) || 0) : 0,
+        partnerRenteIndexierungsart: zweiPersonen ? (document.getElementById('partnerRenteIndexierungsart')?.value || 'lohn') : 'lohn',
+        partnerRenteFesterSatz: zweiPersonen ? (parseFloat(document.getElementById('partnerRenteFesterSatz')?.value) || 0) : 0,
         witwenRenteProzent: zweiPersonen ? (parseFloat(document.getElementById('witwenRenteProzent').value) || 55) : 55,
         pflegefallLogikAktivieren: document.getElementById('pflegefallLogikAktivieren').checked,
         pflegeModellTyp: document.getElementById('pflegeModellTyp').value,

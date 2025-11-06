@@ -95,18 +95,38 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     let spbToUse = inputs.startSPB;
 
     if (inputs.zweiPersonenHaushalt && currentPensions) {
-        // Monte-Carlo mit Sterblichkeit
-        const pensionResult = computeTwoPersonPensions({
+        // Monte-Carlo mit Sterblichkeit - ZWEI separate Renten-Berechnungen
+        const lastP1 = currentAnnualPension1 || currentPensions.person1 || 0;
+        const lastP2 = currentAnnualPension2 || currentPensions.person2 || 0;
+
+        // Person 1 Rente
+        const rent1 = computeYearlyPension({
             yearIndex,
-            inputs,
-            lastPensions: currentPensions,
-            personStatus: personStatus || { person1Alive: true, person2Alive: true },
+            baseMonthly: inputs.renteMonatlich,
+            startOffset: inputs.renteStartOffsetJahre,
+            lastAnnualPension: lastP1,
+            indexierungsArt: inputs.renteIndexierungsart,
             inflRate: yearData.inflation,
-            lohnRate: yearData.lohn
+            lohnRate: yearData.lohn,
+            festerSatz: inputs.renteFesterSatz
         });
-        pensionAnnual = pensionResult.total;
-        pension1 = pensionResult.person1;
-        pension2 = pensionResult.person2;
+
+        // Person 2 Rente
+        const rent2 = computeYearlyPension({
+            yearIndex,
+            baseMonthly: inputs.partnerRenteMonatlich,
+            startOffset: inputs.partnerRenteStartOffsetJahre,
+            lastAnnualPension: lastP2,
+            indexierungsArt: inputs.partnerRenteIndexierungsart || inputs.renteIndexierungsart,
+            inflRate: yearData.inflation,
+            lohnRate: yearData.lohn,
+            festerSatz: inputs.partnerRenteFesterSatz || 0
+        });
+
+        // Gesamt
+        pensionAnnual = (rent1 || 0) + (rent2 || 0);
+        pension1 = rent1;
+        pension2 = rent2;
     } else if (inputs.partner) {
         // Backtest Zwei-Personen-Haushalt (ohne Sterblichkeit)
         const hh = computeHouseholdPensionAndSPB({ yearIndex, yearData, lastAnnualPension: currentAnnualPension, inputs });
@@ -252,6 +272,10 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         baseFlex: naechsterBaseFlex,
         lastState: spendingNewState,
         currentAnnualPension: inputs.partner ? nextLastAnnualPension : pensionAnnual,
+        currentAnnualPension1: pension1 || 0,
+        currentAnnualPension2: pension2 || 0,
+        age1: (currentState.age1 || inputs.startAlter) + 1,
+        age2: (currentState.age2 || inputs.partnerStartAlter || inputs.startAlter) + 1,
         marketDataHist: newMarketDataHist,
         samplerState: currentState.samplerState
     };
@@ -329,12 +353,19 @@ export function initMcRunState(inputs, startYearIndex) {
        marketDataHist.jahreSeitAth = (startJahr - 1) - lastAthYear;
     }
 
+    const startA1 = inputs.startAlter;
+    const startA2 = inputs.partnerStartAlter || inputs.startAlter;
+
     const initialState = {
         portfolio: startPortfolio,
         baseFloor: inputs.startFloorBedarf,
         baseFlex: inputs.startFlexBedarf,
         lastState: null,
         currentAnnualPension: 0,
+        currentAnnualPension1: 0,
+        currentAnnualPension2: 0,
+        age1: startA1,
+        age2: startA2,
         marketDataHist: marketDataHist,
         samplerState: {}
     };
