@@ -15,21 +15,6 @@ import { sumDepot } from './simulator-portfolio.js';
 import { renderSweepHeatmapSVG } from './simulator-heatmap.js';
 
 /**
- * Schnelles strukturiertes Cloning für Stress-Context (ersetzt JSON.parse/stringify)
- * @param {Object} ctx - Stress-Context zum Klonen
- * @returns {Object} Geklonter Context
- */
-function cloneStressContext(ctx) {
-    if (!ctx) return null;
-    return {
-        type: ctx.type,
-        remainingYears: ctx.remainingYears,
-        pickableIndices: ctx.pickableIndices, // Array-Referenz OK (read-only)
-        preset: ctx.preset // Shallow copy OK (read-only)
-    };
-}
-
-/**
  * Führt die Monte-Carlo-Simulation durch
  */
 export async function runMonteCarlo() {
@@ -83,11 +68,8 @@ export async function runMonteCarlo() {
         let totalSimulatedYears = 0, totalYearsQuoteAbove45 = 0;
         const allRealWithdrawalsSample = [];
 
-        // Dynamisches Progress-Update-Intervall: mindestens alle 100 Runs oder 1% der Gesamtzahl
-        const progressUpdateInterval = Math.max(100, Math.floor(anzahl / 100));
-
         for (let i = 0; i < anzahl; i++) {
-            if (i % progressUpdateInterval === 0) {
+            if (i % 50 === 0) {
                 progressBar.style.width = `${(i / anzahl) * 90}%`;
                 await new Promise(resolve => setTimeout(resolve, 0));
             }
@@ -105,7 +87,7 @@ export async function runMonteCarlo() {
             let depotErschoepfungAlterGesetzt = false;
 
             let careMeta = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren);
-            let stressCtx = cloneStressContext(stressCtxMaster);
+            let stressCtx = stressCtxMaster ? JSON.parse(JSON.stringify(stressCtxMaster)) : null;
 
             const stressYears = stressCtxMaster?.preset?.years ?? 0;
             const stressPortfolioValues = [portfolioTotal(simState.portfolio)];
@@ -828,7 +810,7 @@ export async function runParameterSweep() {
 
                 const depotWertHistorie = [portfolioTotal(simState.portfolio)];
                 let careMeta = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren);
-                let stressCtx = cloneStressContext(stressCtxMaster);
+                let stressCtx = stressCtxMaster ? JSON.parse(JSON.stringify(stressCtxMaster)) : null;
 
                 let minRunway = Infinity;
 
