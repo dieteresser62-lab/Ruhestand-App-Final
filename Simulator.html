@@ -127,6 +127,30 @@
                            <input type="number" id="renteFesterSatz" value="2.0" step="0.1">
                        </div>
                 </div>
+                 <div id="zweiPersonenContainer" style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
+                    <div class="form-group" style="justify-content: center; margin-bottom: 15px;">
+                        <label style="flex-direction: row; align-items: center; justify-content: center;">
+                            <input type="checkbox" id="zweiPersonenHaushalt" style="width: auto; margin-right: 8px;">
+                            Zwei-Personen-Haushalt (verheiratet)
+                        </label>
+                    </div>
+                    <div id="partnerPanel" class="form-grid-four-col" style="display: none;">
+                        <div class="form-group"><label for="partnerStartAlter">Partner: Startalter</label><input type="number" id="partnerStartAlter" value="60"></div>
+                        <div class="form-group"><label for="partnerGeschlecht">Partner: Geschlecht</label>
+                           <select id="partnerGeschlecht"><option value="m">Männlich</option><option value="w" selected>Weiblich</option></select>
+                        </div>
+                        <div class="form-group"><label for="partnerStartSPB">Partner: Sparer-Pauschbetrag (€)</label><input type="number" id="partnerStartSPB" value="1000"></div>
+                        <div class="form-group"><label for="partnerKirchensteuerSatz">Partner: Kirchensteuer</label>
+                           <select id="partnerKirchensteuerSatz"><option value="0">0 %</option><option value="0.08">8 %</option><option value="0.09" selected>9 %</option></select>
+                       </div>
+                       <div class="form-group"><label for="partnerRenteMonatlich">Partner: Monatliche Rente (€)</label><input type="number" id="partnerRenteMonatlich" value="800"></div>
+                       <div class="form-group"><label for="partnerRenteStartOffsetJahre">Partner: Start in ... Jahren</label><input type="number" id="partnerRenteStartOffsetJahre" value="7"></div>
+                       <div class="form-group" style="grid-column: span 2;">
+                           <label for="witwenRenteProzent">Witwenrente (% der ursprünglichen Rente)</label>
+                           <input type="number" id="witwenRenteProzent" value="55" step="1" min="0" max="100">
+                       </div>
+                    </div>
+                </div>
                  <div id="pflegePanelContainer" style="grid-column: 1 / -1; border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
                     <div class="form-group" style="justify-content: center; margin-bottom: 15px;">
                         <label style="flex-direction: row; align-items: center; justify-content: center;">
