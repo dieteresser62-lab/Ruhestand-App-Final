@@ -4,10 +4,10 @@ import { rng, quantile, sum, mean, formatCurrency, parseRange, parseRangeInput, 
 import { ENGINE_VERSION, ENGINE_HASH, STRESS_PRESETS, BREAK_ON_RUIN, MORTALITY_TABLE, HISTORICAL_DATA, annualData } from './simulator-data.js';
 import {
     getCommonInputs, updateStartPortfolioDisplay, initializePortfolio,
-    prepareHistoricalData, buildStressContext, applyStressOverride
+    prepareHistoricalData, buildStressContext, applyStressOverride, computeTwoPersonPensions
 } from './simulator-portfolio.js';
 import {
-    simulateOneYear, initMcRunState, makeDefaultCareMeta, sampleNextYearData, computeRunStatsFromSeries, updateCareMeta
+    simulateOneYear, initMcRunState, makeDefaultCareMeta, sampleNextYearData, computeRunStatsFromSeries, updateCareMeta, updateCareMetaTwoPersons
 } from './simulator-engine.js';
 import { portfolioTotal, displayMonteCarloResults, renderWorstRunLog, aggregateSweepMetrics } from './simulator-results.js';
 import { formatCurrencyShortLog } from './simulator-utils.js';
@@ -108,8 +108,13 @@ export async function runMonteCarlo() {
             let depotNurHistorie = [ sumDepot(simState.portfolio) ];
             let depotErschoepfungAlterGesetzt = false;
 
-            let careMeta = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren);
+            let careMeta = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren, inputs.zweiPersonenHaushalt);
             let stressCtx = cloneStressContext(stressCtxMaster);
+
+            // Zwei-Personen-Haushalt: Status-Tracking
+            let personStatus = inputs.zweiPersonenHaushalt ? { person1Alive: true, person2Alive: true } : null;
+            let lastPensions = inputs.zweiPersonenHaushalt ? { person1: 0, person2: 0 } : null;
+            let spendingReductionApplied = false;
 
             const stressYears = stressCtxMaster?.preset?.years ?? 0;
             const stressPortfolioValues = [portfolioTotal(simState.portfolio)];
@@ -125,19 +130,82 @@ export async function runMonteCarlo() {
                 let yearData = sampleNextYearData(simState, methode, blockSize, rand, stressCtx);
                 yearData = applyStressOverride(yearData, stressCtx, rand);
 
-                careMeta = updateCareMeta(careMeta, inputs, currentAge, yearData, rand);
+                // Pflege- und Mortalitätslogik
+                if (inputs.zweiPersonenHaushalt) {
+                    const age1 = inputs.startAlter + simulationsJahr;
+                    const age2 = inputs.partnerStartAlter + simulationsJahr;
 
-                if (careMeta && careMeta.active) careEverActive = true;
-                if (careMeta && careMeta.triggered && triggeredAge === null) triggeredAge = currentAge;
+                    // Pflege für beide Personen updaten
+                    careMeta = updateCareMetaTwoPersons(careMeta, inputs, age1, age2, yearData, rand);
 
-                let qx = MORTALITY_TABLE[inputs.geschlecht][currentAge] || 1;
-                if (careMeta && careMeta.active && inputs.pflegebeschleunigtMortalitaetAktivieren) {
-                    qx = Math.min(1.0, qx * inputs.pflegeTodesrisikoFaktor);
+                    if (careMeta?.person1?.active || careMeta?.person2?.active) careEverActive = true;
+                    if (careMeta?.person1?.triggered && triggeredAge === null) triggeredAge = age1;
+                    if (careMeta?.person2?.triggered && triggeredAge === null) triggeredAge = age2;
+
+                    // Mortalität für Person 1
+                    if (personStatus.person1Alive) {
+                        let qx1 = MORTALITY_TABLE[inputs.geschlecht][age1] || 1;
+                        if (careMeta?.person1?.active && inputs.pflegebeschleunigtMortalitaetAktivieren) {
+                            qx1 = Math.min(1.0, qx1 * inputs.pflegeTodesrisikoFaktor);
+                        }
+                        if (rand() < qx1) {
+                            personStatus.person1Alive = false;
+                            // Ausgaben um 20% reduzieren beim ersten Todesfall
+                            if (!spendingReductionApplied) {
+                                simState.baseFloor *= 0.8;
+                                simState.baseFlex *= 0.8;
+                                spendingReductionApplied = true;
+                            }
+                        }
+                    }
+
+                    // Mortalität für Person 2
+                    if (personStatus.person2Alive) {
+                        let qx2 = MORTALITY_TABLE[inputs.partnerGeschlecht][age2] || 1;
+                        if (careMeta?.person2?.active && inputs.pflegebeschleunigtMortalitaetAktivieren) {
+                            qx2 = Math.min(1.0, qx2 * inputs.pflegeTodesrisikoFaktor);
+                        }
+                        if (rand() < qx2) {
+                            personStatus.person2Alive = false;
+                            // Ausgaben um 20% reduzieren beim ersten Todesfall
+                            if (!spendingReductionApplied) {
+                                simState.baseFloor *= 0.8;
+                                simState.baseFlex *= 0.8;
+                                spendingReductionApplied = true;
+                            }
+                        }
+                    }
+
+                    // Simulation endet, wenn beide verstorben sind
+                    if (!personStatus.person1Alive && !personStatus.person2Alive) break;
+
+                    // Renten für beide Personen berechnen
+                    const pensions = computeTwoPersonPensions({
+                        yearIndex: simulationsJahr,
+                        inputs,
+                        lastPensions,
+                        personStatus,
+                        inflRate: yearData.inflation,
+                        lohnRate: yearData.lohn
+                    });
+                    lastPensions = { person1: pensions.person1, person2: pensions.person2 };
+                    simState.currentAnnualPension = pensions.total;
+                } else {
+                    // Single-Person-Logik (unverändert)
+                    careMeta = updateCareMeta(careMeta, inputs, currentAge, yearData, rand);
+
+                    if (careMeta && careMeta.active) careEverActive = true;
+                    if (careMeta && careMeta.triggered && triggeredAge === null) triggeredAge = currentAge;
+
+                    let qx = MORTALITY_TABLE[inputs.geschlecht][currentAge] || 1;
+                    if (careMeta && careMeta.active && inputs.pflegebeschleunigtMortalitaetAktivieren) {
+                        qx = Math.min(1.0, qx * inputs.pflegeTodesrisikoFaktor);
+                    }
+
+                    if (rand() < qx) break;
                 }
 
-                if (rand() < qx) break;
-
-                const result = simulateOneYear(simState, inputs, yearData, simulationsJahr, careMeta);
+                const result = simulateOneYear(simState, inputs, yearData, simulationsJahr, careMeta, personStatus);
 
                 if (result.isRuin) {
                     failed = true;
@@ -508,6 +576,8 @@ window.onload = function() {
         'goldSteuerfrei', 'startFloorBedarf', 'startFlexBedarf',
         'einstandAlt', 'startAlter', 'geschlecht', 'startSPB', 'kirchensteuerSatz', 'round5',
         'renteMonatlich', 'renteStartOffsetJahre', 'renteIndexierungsart',
+        'zweiPersonenHaushalt', 'partnerStartAlter', 'partnerGeschlecht', 'partnerStartSPB',
+        'partnerKirchensteuerSatz', 'partnerRenteMonatlich', 'partnerRenteStartOffsetJahre', 'witwenRenteProzent',
         'pflegefallLogikAktivieren', 'pflegeModellTyp', 'pflegeStufe1Zusatz', 'pflegeStufe1FlexCut',
         'pflegeMaxFloor', 'pflegeRampUp', 'pflegeMinDauer', 'pflegeMaxDauer', 'pflegeKostenDrift',
         'pflegebeschleunigtMortalitaetAktivieren', 'pflegeTodesrisikoFaktor',
@@ -547,6 +617,9 @@ window.onload = function() {
     const pflegeMortalitaetCheckbox = document.getElementById('pflegebeschleunigtMortalitaetAktivieren');
     pflegeMortalitaetCheckbox.addEventListener('change', () => { document.getElementById('pflegeTodesrisikoContainer').style.display = pflegeMortalitaetCheckbox.checked ? 'flex' : 'none'; });
 
+    const zweiPersonenCheckbox = document.getElementById('zweiPersonenHaushalt');
+    zweiPersonenCheckbox.addEventListener('change', () => { document.getElementById('partnerPanel').style.display = zweiPersonenCheckbox.checked ? 'grid' : 'none'; });
+
     const careDetailsCheckbox = document.getElementById('toggle-care-details');
     if (careDetailsCheckbox) {
         careDetailsCheckbox.checked = localStorage.getItem('showCareDetails') === '1';
@@ -577,6 +650,7 @@ window.onload = function() {
 
     document.getElementById('mcBlockSize').disabled = mcMethodeSelect.value !== 'block';
     document.getElementById('festerSatzContainer').style.display = renteIndexArtSelect.value === 'fest' ? 'block' : 'none';
+    document.getElementById('partnerPanel').style.display = zweiPersonenCheckbox.checked ? 'grid' : 'none';
     document.getElementById('pflegePanel').style.display = pflegeCheckbox.checked ? 'grid' : 'none';
     document.getElementById('pflegeDauerContainer').style.display = pflegeModellSelect.value === 'akut' ? 'contents' : 'none';
     document.getElementById('pflegeTodesrisikoContainer').style.display = pflegeMortalitaetCheckbox.checked ? 'flex' : 'none';
@@ -837,8 +911,12 @@ export async function runParameterSweep() {
                 let simState = initMcRunState(inputs, startYearIndex);
 
                 const depotWertHistorie = [portfolioTotal(simState.portfolio)];
-                let careMeta = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren);
+                let careMeta = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren, inputs.zweiPersonenHaushalt);
                 let stressCtx = cloneStressContext(stressCtxMaster);
+
+                let personStatus = inputs.zweiPersonenHaushalt ? { person1Alive: true, person2Alive: true } : null;
+                let lastPensions = inputs.zweiPersonenHaushalt ? { person1: 0, person2: 0 } : null;
+                let spendingReductionApplied = false;
 
                 let minRunway = Infinity;
 
@@ -848,16 +926,66 @@ export async function runParameterSweep() {
                     let yearData = sampleNextYearData(simState, methode, blockSize, rand, stressCtx);
                     yearData = applyStressOverride(yearData, stressCtx, rand);
 
-                    careMeta = updateCareMeta(careMeta, inputs, currentAge, yearData, rand);
+                    if (inputs.zweiPersonenHaushalt) {
+                        const age1 = inputs.startAlter + simulationsJahr;
+                        const age2 = inputs.partnerStartAlter + simulationsJahr;
 
-                    let qx = MORTALITY_TABLE[inputs.geschlecht][currentAge] || 1;
-                    if (careMeta && careMeta.active && inputs.pflegebeschleunigtMortalitaetAktivieren) {
-                        qx = Math.min(1.0, qx * inputs.pflegeTodesrisikoFaktor);
+                        careMeta = updateCareMetaTwoPersons(careMeta, inputs, age1, age2, yearData, rand);
+
+                        if (personStatus.person1Alive) {
+                            let qx1 = MORTALITY_TABLE[inputs.geschlecht][age1] || 1;
+                            if (careMeta?.person1?.active && inputs.pflegebeschleunigtMortalitaetAktivieren) {
+                                qx1 = Math.min(1.0, qx1 * inputs.pflegeTodesrisikoFaktor);
+                            }
+                            if (rand() < qx1) {
+                                personStatus.person1Alive = false;
+                                if (!spendingReductionApplied) {
+                                    simState.baseFloor *= 0.8;
+                                    simState.baseFlex *= 0.8;
+                                    spendingReductionApplied = true;
+                                }
+                            }
+                        }
+
+                        if (personStatus.person2Alive) {
+                            let qx2 = MORTALITY_TABLE[inputs.partnerGeschlecht][age2] || 1;
+                            if (careMeta?.person2?.active && inputs.pflegebeschleunigtMortalitaetAktivieren) {
+                                qx2 = Math.min(1.0, qx2 * inputs.pflegeTodesrisikoFaktor);
+                            }
+                            if (rand() < qx2) {
+                                personStatus.person2Alive = false;
+                                if (!spendingReductionApplied) {
+                                    simState.baseFloor *= 0.8;
+                                    simState.baseFlex *= 0.8;
+                                    spendingReductionApplied = true;
+                                }
+                            }
+                        }
+
+                        if (!personStatus.person1Alive && !personStatus.person2Alive) break;
+
+                        const pensions = computeTwoPersonPensions({
+                            yearIndex: simulationsJahr,
+                            inputs,
+                            lastPensions,
+                            personStatus,
+                            inflRate: yearData.inflation,
+                            lohnRate: yearData.lohn
+                        });
+                        lastPensions = { person1: pensions.person1, person2: pensions.person2 };
+                        simState.currentAnnualPension = pensions.total;
+                    } else {
+                        careMeta = updateCareMeta(careMeta, inputs, currentAge, yearData, rand);
+
+                        let qx = MORTALITY_TABLE[inputs.geschlecht][currentAge] || 1;
+                        if (careMeta && careMeta.active && inputs.pflegebeschleunigtMortalitaetAktivieren) {
+                            qx = Math.min(1.0, qx * inputs.pflegeTodesrisikoFaktor);
+                        }
+
+                        if (rand() < qx) break;
                     }
 
-                    if (rand() < qx) break;
-
-                    const result = simulateOneYear(simState, inputs, yearData, simulationsJahr, careMeta);
+                    const result = simulateOneYear(simState, inputs, yearData, simulationsJahr, careMeta, personStatus);
 
                     if (result.isRuin) {
                         failed = true;
