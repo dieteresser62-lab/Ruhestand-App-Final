@@ -4,7 +4,7 @@ import { rng, quantile, sum, mean, formatCurrency, parseRange, parseRangeInput, 
 import { ENGINE_VERSION, ENGINE_HASH, STRESS_PRESETS, BREAK_ON_RUIN, MORTALITY_TABLE, HISTORICAL_DATA, annualData } from './simulator-data.js';
 import {
     getCommonInputs, updateStartPortfolioDisplay, initializePortfolio,
-    prepareHistoricalData, buildStressContext, applyStressOverride
+    prepareHistoricalData, buildStressContext, applyStressOverride, computeTwoPersonPensions
 } from './simulator-portfolio.js';
 import {
     simulateOneYear, initMcRunState, makeDefaultCareMeta, sampleNextYearData, computeRunStatsFromSeries, updateCareMeta, updateCareMetaTwoPersons
@@ -27,89 +27,6 @@ function cloneStressContext(ctx) {
         pickableIndices: ctx.pickableIndices, // Read-only Array, Shallow Copy OK
         preset: ctx.preset // Read-only Object, Shallow Copy OK
     };
-}
-
-/**
- * Berechnet die Indexierungsfunktion für eine Rente
- * @param {Object} params - Parameter für die Indexierung
- * @returns {Function} Funktion, die den nächsten Rentenwert berechnet
- */
-function computeIndexedPension({ startMonthly, indexType, fixedRatePct, inflPct, wageProxyPct }) {
-    // indexType: 'inflation' | 'fest' | 'lohn'
-    // Für Monte-Carlo gilt: 'lohn' -> fallback auf inflPct (oder wageProxyPct falls vorhanden)
-    const rate = (indexType === 'fest') ? (fixedRatePct / 100)
-               : (indexType === 'lohn') ? ((isFinite(wageProxyPct) ? wageProxyPct : inflPct) / 100)
-               : (inflPct / 100);
-
-    return (prev) => {
-        const next = prev * (1 + Math.max(-0.0, rate)); // nominal nicht fallend
-        return Math.max(prev, next);
-    };
-}
-
-/**
- * Aktualisiert die Renten für das nächste Jahr
- * @param {Object} state - Simulationsstatus mit _p1 und _p2 Renten-Tracking
- * @param {Object} inputs - Input-Parameter
- * @param {Object} ctx - Kontext mit inflPct und optional wageProxyPct
- */
-function advanceYearPensions(state, inputs, ctx) {
-    // Person 1 initialisieren falls nötig
-    if (!state._p1) {
-        state._p1 = {
-            age: inputs.startAlter,
-            start: inputs.renteMonatlich,
-            y: 0,
-            step: computeIndexedPension({
-                startMonthly: inputs.renteMonatlich,
-                indexType: inputs.renteIndexierungsart,
-                fixedRatePct: inputs.renteFesterSatz,
-                inflPct: ctx.inflPct,
-                wageProxyPct: ctx.wageProxyPct
-            })
-        };
-    }
-
-    // Person 2 initialisieren falls nötig (nur bei Zwei-Personen-Haushalt)
-    if (inputs.zweiPersonenHaushalt && !state._p2) {
-        state._p2 = {
-            age: inputs.partnerStartAlter,
-            start: inputs.partnerRenteMonatlich,
-            y: 0,
-            step: computeIndexedPension({
-                startMonthly: inputs.partnerRenteMonatlich,
-                indexType: inputs.partnerRenteIndexierungsart,
-                fixedRatePct: inputs.partnerRenteFesterSatz,
-                inflPct: ctx.inflPct,
-                wageProxyPct: ctx.wageProxyPct
-            })
-        };
-    }
-
-    // Person 1 Rente berechnen
-    const activeP1 = (state._p1.y >= inputs.renteStartOffsetJahre);
-    if (!state._p1.amt) state._p1.amt = state._p1.start;
-    if (activeP1 && state._p1.y > inputs.renteStartOffsetJahre) {
-        state._p1.amt = state._p1.step(state._p1.amt);
-    }
-    state._p1.y += 1;
-
-    // Person 2 Rente berechnen
-    let p2Amt = 0;
-    if (inputs.zweiPersonenHaushalt) {
-        const activeP2 = (state._p2.y >= inputs.partnerRenteStartOffsetJahre);
-        if (!state._p2.amt) state._p2.amt = state._p2.start;
-        if (activeP2 && state._p2.y > inputs.partnerRenteStartOffsetJahre) {
-            state._p2.amt = state._p2.step(state._p2.amt);
-        }
-        state._p2.y += 1;
-        p2Amt = (activeP2 ? state._p2.amt : 0);
-    }
-
-    const p1Amt = (activeP1 ? state._p1.amt : 0);
-    state.currentAnnualPension1 = p1Amt * 12;
-    state.currentAnnualPension2 = p2Amt * 12;
-    state.currentAnnualPension = state.currentAnnualPension1 + state.currentAnnualPension2;
 }
 
 /**
@@ -213,12 +130,6 @@ export async function runMonteCarlo() {
                 let yearData = sampleNextYearData(simState, methode, blockSize, rand, stressCtx);
                 yearData = applyStressOverride(yearData, stressCtx, rand);
 
-                // Renten für das Jahr berechnen (am Jahresanfang)
-                advanceYearPensions(simState, inputs, {
-                    inflPct: yearData.inflation,
-                    wageProxyPct: yearData.lohn
-                });
-
                 // Pflege- und Mortalitätslogik
                 if (inputs.zweiPersonenHaushalt) {
                     const age1 = inputs.startAlter + simulationsJahr;
@@ -267,8 +178,23 @@ export async function runMonteCarlo() {
 
                     // Simulation endet, wenn beide verstorben sind
                     if (!personStatus.person1Alive && !personStatus.person2Alive) break;
+
+                    // Renten für beide Personen berechnen
+                    const pensions = computeTwoPersonPensions({
+                        yearIndex: simulationsJahr,
+                        inputs,
+                        lastPensions,
+                        personStatus,
+                        inflRate: yearData.inflation,
+                        lohnRate: yearData.lohn
+                    });
+                    lastPensions = { person1: pensions.person1, person2: pensions.person2 };
+                    simState.currentAnnualPension = pensions.total;
+                    simState.currentPensions = { person1: pensions.person1, person2: pensions.person2 };
+                    simState.currentAnnualPension1 = pensions.person1;
+                    simState.currentAnnualPension2 = pensions.person2;
                 } else {
-                    // Single-Person-Logik
+                    // Single-Person-Logik (unverändert)
                     careMeta = updateCareMeta(careMeta, inputs, currentAge, yearData, rand);
 
                     if (careMeta && careMeta.active) careEverActive = true;
@@ -349,8 +275,6 @@ export async function runMonteCarlo() {
 
                     currentRunLog.push({
                         jahr: simulationsJahr + 1, histJahr: yearData.jahr, inflation: yearData.inflation, ...result.logData,
-                        pension_person1: simState.currentAnnualPension1 || 0,
-                        pension_person2: simState.currentAnnualPension2 || 0,
                         pflege_aktiv: !!(careMeta && careMeta.active),
                         pflege_zusatz_floor: careMeta?.zusatzFloorZiel ?? 0,
                         pflege_zusatz_floor_delta: careMeta?.zusatzFloorDelta ?? 0,
@@ -524,16 +448,9 @@ export function runBacktest() {
 
             const jahresrenditeAktien = (HISTORICAL_DATA[jahr].msci_eur - dataVJ.msci_eur) / dataVJ.msci_eur;
             const jahresrenditeGold = (dataVJ.gold_eur_perf || 0) / 100;
-            const yearData = { ...dataVJ, rendite: jahresrenditeAktien, gold_eur_perf: dataVJ.gold_eur_perf, zinssatz: dataVJ.zinssatz_de, inflation: dataVJ.inflation_de, lohn: dataVJ.lohn_de, jahr };
+            const yearData = { ...dataVJ, rendite: jahresrenditeAktien, gold_eur_perf: dataVJ.gold_eur_perf, zinssatz: dataVJ.zinssatz_de, inflation: dataVJ.inflation_de, jahr };
 
             const yearIndex = jahr - startJahr;
-
-            // Renten für das Jahr berechnen (am Jahresanfang)
-            advanceYearPensions(simState, inputs, {
-                inflPct: yearData.inflation,
-                wageProxyPct: yearData.lohn
-            });
-
             const result = simulateOneYear(simState, inputs, yearData, yearIndex);
 
             if (result.isRuin) {
@@ -1021,12 +938,6 @@ export async function runParameterSweep() {
                     let yearData = sampleNextYearData(simState, methode, blockSize, rand, stressCtx);
                     yearData = applyStressOverride(yearData, stressCtx, rand);
 
-                    // Renten für das Jahr berechnen (am Jahresanfang)
-                    advanceYearPensions(simState, inputs, {
-                        inflPct: yearData.inflation,
-                        wageProxyPct: yearData.lohn
-                    });
-
                     if (inputs.zweiPersonenHaushalt) {
                         const age1 = inputs.startAlter + simulationsJahr;
                         const age2 = inputs.partnerStartAlter + simulationsJahr;
@@ -1064,6 +975,20 @@ export async function runParameterSweep() {
                         }
 
                         if (!personStatus.person1Alive && !personStatus.person2Alive) break;
+
+                        const pensions = computeTwoPersonPensions({
+                            yearIndex: simulationsJahr,
+                            inputs,
+                            lastPensions,
+                            personStatus,
+                            inflRate: yearData.inflation,
+                            lohnRate: yearData.lohn
+                        });
+                        lastPensions = { person1: pensions.person1, person2: pensions.person2 };
+                        simState.currentAnnualPension = pensions.total;
+                        simState.currentPensions = { person1: pensions.person1, person2: pensions.person2 };
+                        simState.currentAnnualPension1 = pensions.person1;
+                        simState.currentAnnualPension2 = pensions.person2;
                     } else {
                         careMeta = updateCareMeta(careMeta, inputs, currentAge, yearData, rand);
 
