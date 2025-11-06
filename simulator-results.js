@@ -220,8 +220,8 @@ export function renderWorstRunLog(logRows, caR_Threshold, opts = {}) {
         { key: 'entscheidung.jahresEntnahme', header: 'Entn.', width: 7, fmt: formatCurrencyShortLog },
         { key: 'floor_brutto', header: 'Floor', width: 7, fmt: formatCurrencyShortLog },
         { key: 'pension_annual', header: 'Rente', width: 7, fmt: formatCurrencyShortLog },
-        { key: 'pension_person1', header: 'Rent1', width: 6, fmt: formatCurrencyShortLog },
-        { key: 'pension_person2', header: 'Rent2', width: 6, fmt: formatCurrencyShortLog },
+        { key: 'pension_person1', header: 'Rent1', width: 7, fmt: formatCurrencyShortLog },
+        { key: 'pension_person2', header: 'Rent2', width: 7, fmt: formatCurrencyShortLog },
     ];
 
     const careColsMinimal = [
