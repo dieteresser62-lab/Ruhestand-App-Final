@@ -89,6 +89,59 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
     dashboard.innerHTML = dashboardHtml;
     dashboard.style.display = 'block';
 
+    // Renten-Check Diagnose-Block
+    const existingPensionCheck = document.getElementById('pensionCheckDiagnostics');
+    if (existingPensionCheck) {
+        existingPensionCheck.remove();
+    }
+
+    if (worstRun && worstRun.logDataRows && worstRun.logDataRows.length > 0) {
+        const lastRow = worstRun.logDataRows[worstRun.logDataRows.length - 1];
+        const firstRow = worstRun.logDataRows[0];
+
+        const pensionCheckContainer = document.createElement('div');
+        pensionCheckContainer.id = 'pensionCheckDiagnostics';
+        pensionCheckContainer.style.marginTop = '25px';
+        pensionCheckContainer.style.borderTop = '1px solid var(--border-color)';
+        pensionCheckContainer.style.paddingTop = '25px';
+
+        let pensionHtml = `
+            <h3 style="text-align:center; color: var(--primary-color); margin-bottom: 15px;">Renten-Check (Worst-Run)</h3>
+            <div class="summary-grid">
+                <div class="summary-item"><strong>Person 1: Start-Offset</strong><span>${inputs.renteStartOffsetJahre} Jahre</span></div>
+                <div class="summary-item"><strong>Person 1: Indexierung</strong><span>${inputs.renteIndexierungsart === 'lohn' ? 'Lohnentwicklung' : inputs.renteIndexierungsart === 'fest' ? `Fest (${inputs.renteFesterSatz}% p.a.)` : 'Inflation'}</span></div>
+                <div class="summary-item"><strong>Person 1: Start-Rente</strong><span>${formatCurrency(inputs.renteMonatlich * 12)}</span></div>
+                <div class="summary-item"><strong>Person 1: Finale Rente</strong><span>${formatCurrency(lastRow.pension_person1 || 0)}</span></div>
+        `;
+
+        if (inputs.zweiPersonenHaushalt) {
+            pensionHtml += `
+                <div class="summary-item"><strong>Person 2: Start-Offset</strong><span>${inputs.partnerRenteStartOffsetJahre} Jahre</span></div>
+                <div class="summary-item"><strong>Person 2: Indexierung</strong><span>${inputs.partnerRenteIndexierungsart === 'lohn' ? 'Lohnentwicklung' : inputs.partnerRenteIndexierungsart === 'fest' ? `Fest (${inputs.partnerRenteFesterSatz}% p.a.)` : 'Inflation'}</span></div>
+                <div class="summary-item"><strong>Person 2: Start-Rente</strong><span>${formatCurrency(inputs.partnerRenteMonatlich * 12)}</span></div>
+                <div class="summary-item"><strong>Person 2: Finale Rente</strong><span>${formatCurrency(lastRow.pension_person2 || 0)}</span></div>
+            `;
+        }
+
+        const totalFinal = (lastRow.pension_person1 || 0) + (lastRow.pension_person2 || 0);
+        const totalStart = (inputs.renteMonatlich * 12) + (inputs.zweiPersonenHaushalt ? inputs.partnerRenteMonatlich * 12 : 0);
+        const growthFactor = totalStart > 0 ? ((totalFinal / totalStart) - 1) * 100 : 0;
+
+        pensionHtml += `
+                <div class="summary-item highlight"><strong>Gesamt: Start-Rente</strong><span>${formatCurrency(totalStart)}</span></div>
+                <div class="summary-item highlight"><strong>Gesamt: Finale Rente</strong><span>${formatCurrency(totalFinal)}</span></div>
+                <div class="summary-item"><strong>Gesamt: Wachstum</strong><span>${growthFactor >= 0 ? '+' : ''}${growthFactor.toFixed(1)}%</span></div>
+                <div class="summary-item"><strong>Durchschn. jährl. Anpassung</strong><span>${worstRun.logDataRows.length > 1 ? ((Math.pow(totalFinal / totalStart, 1 / worstRun.logDataRows.length) - 1) * 100).toFixed(2) : '0.00'}% p.a.</span></div>
+            </div>
+            <div style="text-align: center; margin-top: 10px; font-size: 0.85rem; color: #666;">
+                Dieser Block zeigt die Renten-Entwicklung im schlechtesten simulierten Fall (Worst-Run).
+            </div>
+        `;
+
+        pensionCheckContainer.innerHTML = pensionHtml;
+        dashboard.parentNode.insertBefore(pensionCheckContainer, dashboard.nextSibling);
+    }
+
     // Logik zur Anzeige der Stress-KPIs
     const stressKPIs = results.stressKPI;
     const existingStressContainer = document.getElementById('stressKpiResults');
