@@ -77,10 +77,15 @@ const SpendingPlanner = {
         }
 
         // 7. Finale Werte berechnen
-        const finaleKuerzung = inflatedBedarf.flex > 0
-            ? 100 - (Math.max(0, endgueltigeEntnahme - inflatedBedarf.floor) / inflatedBedarf.flex * 100)
-            : 0;
-        const flexRate = 100 - finaleKuerzung;
+        let flexRate;
+        if (inflatedBedarf.flex > 0) {
+            const flexErfuellt = Math.max(0, endgueltigeEntnahme - inflatedBedarf.floor);
+            flexRate = (flexErfuellt / inflatedBedarf.flex) * 100;
+        } else {
+            // Wenn es keinen Flex-Bedarf gibt, ist die Flex-Rate 0%
+            flexRate = 0;
+        }
+        const finaleKuerzung = 100 - flexRate;
 
         // 8. Ergebnisse zusammenstellen
         const { newState, spendingResult } = this._buildResults(
@@ -451,9 +456,8 @@ const SpendingPlanner = {
         const { market, renteJahr, inflatedBedarf } = p;
         const { peakRealVermoegen, currentRealVermoegen, cumulativeInflationFactor } = state.keyParams;
 
-        const finaleKuerzung = inflatedBedarf.flex > 0
-            ? 100 - (Math.max(0, endgueltigeEntnahme - inflatedBedarf.floor) / inflatedBedarf.flex * 100)
-            : 0;
+        // finaleKuerzung ist das Komplement zur flexRate
+        const finaleKuerzung = 100 - flexRate;
         const aktuellesGesamtbudgetFinal = endgueltigeEntnahme + renteJahr;
 
         const newState = {
