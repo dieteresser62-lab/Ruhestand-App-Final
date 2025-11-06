@@ -419,7 +419,7 @@ export function runBacktest() {
             baseFloor: inputs.startFloorBedarf,
             baseFlex: inputs.startFlexBedarf,
             lastState: null,
-            currentAnnualPension: 0,
+            currentAnnualPension: { a: 0, b: 0 },
             marketDataHist: { endeVJ: HISTORICAL_DATA[startJahr-1].msci_eur, endeVJ_1: HISTORICAL_DATA[startJahr-2].msci_eur, endeVJ_2: HISTORICAL_DATA[startJahr-3].msci_eur, endeVJ_3: HISTORICAL_DATA[startJahr-4].msci_eur, ath: 0, jahreSeitAth: 0 }
         };
         simState.marketDataHist.ath = Math.max(...Object.keys(HISTORICAL_DATA).filter(y => y < startJahr).map(y => HISTORICAL_DATA[y].msci_eur));
@@ -575,9 +575,10 @@ window.onload = function() {
         'goldAllokationAktiv', 'goldAllokationProzent', 'goldFloorProzent', 'rebalancingBand',
         'goldSteuerfrei', 'startFloorBedarf', 'startFlexBedarf',
         'einstandAlt', 'startAlter', 'geschlecht', 'startSPB', 'kirchensteuerSatz', 'round5',
-        'renteMonatlich', 'renteStartOffsetJahre', 'renteIndexierungsart',
+        'renteMonatlich', 'renteStartOffsetJahre', 'renteIndexierungsart', 'renteFesterSatz',
         'zweiPersonenHaushalt', 'partnerStartAlter', 'partnerGeschlecht', 'partnerStartSPB',
-        'partnerKirchensteuerSatz', 'partnerRenteMonatlich', 'partnerRenteStartOffsetJahre', 'witwenRenteProzent',
+        'partnerKirchensteuerSatz', 'partnerRenteMonatlich', 'partnerRenteStartOffsetJahre',
+        'partnerRenteIndexierungsart', 'partnerRenteFesterSatz', 'witwenRenteProzent',
         'pflegefallLogikAktivieren', 'pflegeModellTyp', 'pflegeStufe1Zusatz', 'pflegeStufe1FlexCut',
         'pflegeMaxFloor', 'pflegeRampUp', 'pflegeMinDauer', 'pflegeMaxDauer', 'pflegeKostenDrift',
         'pflegebeschleunigtMortalitaetAktivieren', 'pflegeTodesrisikoFaktor',
@@ -607,6 +608,11 @@ window.onload = function() {
 
     const renteIndexArtSelect = document.getElementById('renteIndexierungsart');
     renteIndexArtSelect.addEventListener('change', () => { document.getElementById('festerSatzContainer').style.display = renteIndexArtSelect.value === 'fest' ? 'block' : 'none'; });
+
+    const partnerRenteIndexArtSelect = document.getElementById('partnerRenteIndexierungsart');
+    if (partnerRenteIndexArtSelect) {
+        partnerRenteIndexArtSelect.addEventListener('change', () => { document.getElementById('partnerFesterSatzContainer').style.display = partnerRenteIndexArtSelect.value === 'fest' ? 'block' : 'none'; });
+    }
 
     const pflegeCheckbox = document.getElementById('pflegefallLogikAktivieren');
     pflegeCheckbox.addEventListener('change', () => { document.getElementById('pflegePanel').style.display = pflegeCheckbox.checked ? 'grid' : 'none'; });
@@ -650,6 +656,9 @@ window.onload = function() {
 
     document.getElementById('mcBlockSize').disabled = mcMethodeSelect.value !== 'block';
     document.getElementById('festerSatzContainer').style.display = renteIndexArtSelect.value === 'fest' ? 'block' : 'none';
+    if (partnerRenteIndexArtSelect) {
+        document.getElementById('partnerFesterSatzContainer').style.display = partnerRenteIndexArtSelect.value === 'fest' ? 'block' : 'none';
+    }
     document.getElementById('partnerPanel').style.display = zweiPersonenCheckbox.checked ? 'grid' : 'none';
     document.getElementById('pflegePanel').style.display = pflegeCheckbox.checked ? 'grid' : 'none';
     document.getElementById('pflegeDauerContainer').style.display = pflegeModellSelect.value === 'akut' ? 'contents' : 'none';

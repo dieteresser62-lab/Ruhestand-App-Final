@@ -63,7 +63,20 @@ export function getCommonInputs() {
         maxBearRefillPctOfEq: 5
     };
 
-    return { ...baseInputs, ...strategyConstants };
+    // Partner-Objekt für Backtest (wenn Indexierungs-Felder vorhanden)
+    const partnerIndexArtEl = document.getElementById('partnerRenteIndexierungsart');
+    let partner = null;
+    if (zweiPersonen && partnerIndexArtEl) {
+        partner = {
+            renteMonatlich: parseFloat(document.getElementById('partnerRenteMonatlich').value) || 0,
+            renteStartOffsetJahre: parseInt(document.getElementById('partnerRenteStartOffsetJahre').value) || 0,
+            renteIndexierungsart: partnerIndexArtEl.value || 'lohn',
+            renteFesterSatz: parseFloat(document.getElementById('partnerRenteFesterSatz').value) || 0,
+            startSPB: parseFloat(document.getElementById('partnerStartSPB').value) || 0
+        };
+    }
+
+    return { ...baseInputs, ...strategyConstants, partner };
 }
 
 /**
