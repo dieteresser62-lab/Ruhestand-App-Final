@@ -94,50 +94,39 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     let nextLastAnnualPension = currentAnnualPension;
     let spbToUse = inputs.startSPB;
 
-    // Prüfe ob Renten bereits durch advanceYearPensions() berechnet wurden (erkennbar an _p1/_p2 Objekten im State)
-    const pensionsAlreadyCalculated = currentState._p1 && currentState._p1.amt !== undefined;
-
     if (inputs.zweiPersonenHaushalt && currentPensions) {
         // Monte-Carlo mit Sterblichkeit - ZWEI separate Renten-Berechnungen
-        if (pensionsAlreadyCalculated) {
-            // Renten wurden bereits durch advanceYearPensions() berechnet - direkt verwenden
-            pension1 = currentAnnualPension1 || 0;
-            pension2 = currentAnnualPension2 || 0;
-            pensionAnnual = pension1 + pension2;
-        } else {
-            // Fallback: Legacy-Berechnung für alte Code-Pfade
-            const lastP1 = currentAnnualPension1 || currentPensions.person1 || 0;
-            const lastP2 = currentAnnualPension2 || currentPensions.person2 || 0;
+        const lastP1 = currentAnnualPension1 || currentPensions.person1 || 0;
+        const lastP2 = currentAnnualPension2 || currentPensions.person2 || 0;
 
-            // Person 1 Rente
-            const rent1 = computeYearlyPension({
-                yearIndex,
-                baseMonthly: inputs.renteMonatlich,
-                startOffset: inputs.renteStartOffsetJahre,
-                lastAnnualPension: lastP1,
-                indexierungsArt: inputs.renteIndexierungsart,
-                inflRate: yearData.inflation,
-                lohnRate: yearData.lohn,
-                festerSatz: inputs.renteFesterSatz
-            });
+        // Person 1 Rente
+        const rent1 = computeYearlyPension({
+            yearIndex,
+            baseMonthly: inputs.renteMonatlich,
+            startOffset: inputs.renteStartOffsetJahre,
+            lastAnnualPension: lastP1,
+            indexierungsArt: inputs.renteIndexierungsart,
+            inflRate: yearData.inflation,
+            lohnRate: yearData.lohn,
+            festerSatz: inputs.renteFesterSatz
+        });
 
-            // Person 2 Rente
-            const rent2 = computeYearlyPension({
-                yearIndex,
-                baseMonthly: inputs.partnerRenteMonatlich,
-                startOffset: inputs.partnerRenteStartOffsetJahre,
-                lastAnnualPension: lastP2,
-                indexierungsArt: inputs.partnerRenteIndexierungsart || inputs.renteIndexierungsart,
-                inflRate: yearData.inflation,
-                lohnRate: yearData.lohn,
-                festerSatz: inputs.partnerRenteFesterSatz || 0
-            });
+        // Person 2 Rente
+        const rent2 = computeYearlyPension({
+            yearIndex,
+            baseMonthly: inputs.partnerRenteMonatlich,
+            startOffset: inputs.partnerRenteStartOffsetJahre,
+            lastAnnualPension: lastP2,
+            indexierungsArt: inputs.partnerRenteIndexierungsart || inputs.renteIndexierungsart,
+            inflRate: yearData.inflation,
+            lohnRate: yearData.lohn,
+            festerSatz: inputs.partnerRenteFesterSatz || 0
+        });
 
-            // Gesamt
-            pensionAnnual = (rent1 || 0) + (rent2 || 0);
-            pension1 = rent1;
-            pension2 = rent2;
-        }
+        // Gesamt
+        pensionAnnual = (rent1 || 0) + (rent2 || 0);
+        pension1 = rent1;
+        pension2 = rent2;
     } else if (inputs.partner) {
         // Backtest Zwei-Personen-Haushalt (ohne Sterblichkeit)
         const hh = computeHouseholdPensionAndSPB({ yearIndex, yearData, lastAnnualPension: currentAnnualPension, inputs });
@@ -148,26 +137,18 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         pension2 = hh.nextLastAnnualPension.b;
     } else {
         // Single-Person
-        if (pensionsAlreadyCalculated) {
-            // Renten wurden bereits durch advanceYearPensions() berechnet - direkt verwenden
-            pensionAnnual = currentAnnualPension1 || currentAnnualPension || 0;
-            pension1 = pensionAnnual;
-            pension2 = 0;
-        } else {
-            // Fallback: Legacy-Berechnung für alte Code-Pfade
-            pensionAnnual = computeYearlyPension({
-                yearIndex,
-                baseMonthly: inputs.renteMonatlich,
-                startOffset: inputs.renteStartOffsetJahre,
-                lastAnnualPension: currentAnnualPension,
-                indexierungsArt: inputs.renteIndexierungsart,
-                inflRate: yearData.inflation,
-                lohnRate: yearData.lohn,
-                festerSatz: inputs.renteFesterSatz
-            });
-            pension1 = pensionAnnual;
-            pension2 = 0;
-        }
+        pensionAnnual = computeYearlyPension({
+            yearIndex,
+            baseMonthly: inputs.renteMonatlich,
+            startOffset: inputs.renteStartOffsetJahre,
+            lastAnnualPension: currentAnnualPension,
+            indexierungsArt: inputs.renteIndexierungsart,
+            inflRate: yearData.inflation,
+            lohnRate: yearData.lohn,
+            festerSatz: inputs.renteFesterSatz
+        });
+        pension1 = pensionAnnual;
+        pension2 = 0;
     }
 
     const inflatedFloor = Math.max(0, baseFloor - pensionAnnual);
