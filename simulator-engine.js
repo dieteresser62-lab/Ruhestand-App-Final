@@ -3,7 +3,7 @@
 import { shortenReasonText } from './simulator-utils.js';
 import { HISTORICAL_DATA, PFLEGE_STUFE1_WAHRSCHEINLICHKEIT, annualData, REGIME_DATA, REGIME_TRANSITIONS } from './simulator-data.js';
 import {
-    computeYearlyPension, computeTwoPersonPensions, initializePortfolio, applySaleToPortfolio, summarizeSalesByAsset,
+    computeYearlyPension, initializePortfolio, applySaleToPortfolio, summarizeSalesByAsset,
     buildInputsCtxFromPortfolio, sumDepot, buyGold, buyStocksNeu
 } from './simulator-portfolio.js';
 import { resolveProfileKey } from './simulator-heatmap.js';
@@ -19,7 +19,7 @@ import { resolveProfileKey } from './simulator-heatmap.js';
  * @returns {Object} Simulationsergebnisse
  */
 export function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta = null, personStatus = null) {
-    let { portfolio, baseFloor, baseFlex, lastState, currentAnnualPension, currentPensions, marketDataHist } = currentState;
+    let { portfolio, baseFloor, baseFlex, lastState, currentAnnualPension, marketDataHist } = currentState;
     let { depotTranchesAktien, depotTranchesGold } = portfolio;
     let liquiditaet = portfolio.liquiditaet;
     let totalTaxesThisYear = 0;
@@ -41,34 +41,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const algoInput = { ...inputs, floorBedarf: baseFloor, flexBedarf: baseFlex, startSPB: inputs.startSPB };
     const market = window.Ruhestandsmodell_v30.analyzeMarket(marketDataCurrentYear);
 
-    // Berechne Renten für Ein- oder Zwei-Personen-Haushalt
-    let pensionAnnual, pension1, pension2;
-    if (inputs.zweiPersonenHaushalt && currentPensions) {
-        const pensionResult = computeTwoPersonPensions({
-            yearIndex,
-            inputs,
-            lastPensions: currentPensions,
-            personStatus: personStatus || { person1Alive: true, person2Alive: true },
-            inflRate: yearData.inflation,
-            lohnRate: yearData.lohn
-        });
-        pensionAnnual = pensionResult.total;
-        pension1 = pensionResult.person1;
-        pension2 = pensionResult.person2;
-    } else {
-        pensionAnnual = computeYearlyPension({
-            yearIndex,
-            baseMonthly: inputs.renteMonatlich,
-            startOffset: inputs.renteStartOffsetJahre,
-            lastAnnualPension: currentAnnualPension,
-            indexierungsArt: inputs.renteIndexierungsart,
-            inflRate: yearData.inflation,
-            lohnRate: yearData.lohn,
-            festerSatz: inputs.renteFesterSatz
-        });
-        pension1 = pensionAnnual;
-        pension2 = 0;
-    }
+    const pensionAnnual = computeYearlyPension({ yearIndex, baseMonthly: inputs.renteMonatlich, startOffset: inputs.renteStartOffsetJahre, lastAnnualPension: currentAnnualPension, indexierungsArt: inputs.renteIndexierungsart, inflRate: yearData.inflation, lohnRate: yearData.lohn, festerSatz: inputs.renteFesterSatz });
     const inflatedFloor = Math.max(0, baseFloor - pensionAnnual);
     const inflatedFlex  = baseFlex;
 
@@ -181,24 +154,17 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const naechsterBaseFloor = baseFloor * inflFactorThisYear;
     const naechsterBaseFlex = baseFlex * inflFactorThisYear;
 
-    // Bei Zwei-Personen-Haushalt: Separate Pension-States aktualisieren
-    const newStateBase = {
-        portfolio: { ...portfolio, liquiditaet },
-        baseFloor: naechsterBaseFloor,
-        baseFlex: naechsterBaseFlex,
-        lastState: spendingNewState,
-        currentAnnualPension: pensionAnnual,
-        marketDataHist: newMarketDataHist,
-        samplerState: currentState.samplerState
-    };
-
-    if (inputs.zweiPersonenHaushalt && currentPensions) {
-        newStateBase.currentPensions = { person1: pension1, person2: pension2 };
-    }
-
     return {
         isRuin: false,
-        newState: newStateBase,
+        newState: {
+            portfolio: { ...portfolio, liquiditaet },
+            baseFloor: naechsterBaseFloor,
+            baseFlex: naechsterBaseFlex,
+            lastState: spendingNewState,
+            currentAnnualPension: pensionAnnual,
+            marketDataHist: newMarketDataHist,
+            samplerState: currentState.samplerState
+        },
         logData: {
             entscheidung: { ...spendingResult, jahresEntnahme, runwayMonths, kuerzungProzent: spendingResult.kuerzungProzent },
             FlexRatePct: spendingResult.details.flexRate,
@@ -220,8 +186,6 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             usedSPB: mergedSaleResult ? (mergedSaleResult.pauschbetragVerbraucht || 0) : 0,
             floor_brutto: baseFloor,
             pension_annual: pensionAnnual,
-            pension_person1: pension1,
-            pension_person2: pension2,
             floor_aus_depot: inflatedFloor,
             flex_brutto: baseFlex,
             flex_erfuellt_nominal: jahresEntnahme > inflatedFloor ? jahresEntnahme - inflatedFloor : 0,
