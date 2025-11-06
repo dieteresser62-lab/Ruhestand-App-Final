@@ -70,7 +70,7 @@ function computeHouseholdPensionAndSPB({ yearIndex, yearData, lastAnnualPension,
  * @returns {Object} Simulationsergebnisse
  */
 export function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta = null, personStatus = null) {
-    let { portfolio, baseFloor, baseFlex, lastState, currentAnnualPension, currentPensions, marketDataHist } = currentState;
+    let { portfolio, baseFloor, baseFlex, lastState, currentAnnualPension, currentPensions, currentAnnualPension1, currentAnnualPension2, marketDataHist } = currentState;
     let { depotTranchesAktien, depotTranchesGold } = portfolio;
     let liquiditaet = portfolio.liquiditaet;
     let totalTaxesThisYear = 0;
