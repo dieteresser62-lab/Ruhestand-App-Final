@@ -43,7 +43,6 @@ const dom = {
     },
     inputs: {}, // Wird in init() gefüllt
     controls: {
-        depotLastUpdated: document.getElementById('depotLastUpdated'),
         themeToggle: document.getElementById('themeToggle'),
         exportBtn: document.getElementById('exportBtn'),
         importBtn: document.getElementById('importBtn'),
