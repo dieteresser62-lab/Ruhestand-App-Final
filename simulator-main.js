@@ -190,6 +190,9 @@ export async function runMonteCarlo() {
                     });
                     lastPensions = { person1: pensions.person1, person2: pensions.person2 };
                     simState.currentAnnualPension = pensions.total;
+                    simState.currentPensions = { person1: pensions.person1, person2: pensions.person2 };
+                    simState.currentAnnualPension1 = pensions.person1;
+                    simState.currentAnnualPension2 = pensions.person2;
                 } else {
                     // Single-Person-Logik (unverändert)
                     careMeta = updateCareMeta(careMeta, inputs, currentAge, yearData, rand);
@@ -983,6 +986,9 @@ export async function runParameterSweep() {
                         });
                         lastPensions = { person1: pensions.person1, person2: pensions.person2 };
                         simState.currentAnnualPension = pensions.total;
+                        simState.currentPensions = { person1: pensions.person1, person2: pensions.person2 };
+                        simState.currentAnnualPension1 = pensions.person1;
+                        simState.currentAnnualPension2 = pensions.person2;
                     } else {
                         careMeta = updateCareMeta(careMeta, inputs, currentAge, yearData, rand);
 
