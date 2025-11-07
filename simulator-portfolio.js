@@ -8,6 +8,10 @@ import { HISTORICAL_DATA, STRESS_PRESETS, annualData, REGIME_DATA, REGIME_TRANSI
  */
 export function getCommonInputs() {
     const goldAktiv = document.getElementById('goldAllokationAktiv').checked;
+
+    // Gemeinsame Rentenanpassung (gilt für Person 1 und Partner)
+    const rentAdjPct = parseFloat(document.getElementById('rentAdjPct')?.value) || 0;
+
     const baseInputs = {
         startVermoegen: parseFloat(document.getElementById('simStartVermoegen').value) || 0,
         depotwertAlt: parseFloat(document.getElementById('depotwertAlt').value) || 0,
@@ -28,8 +32,10 @@ export function getCommonInputs() {
         round5: document.getElementById('round5').checked,
         renteMonatlich: parseFloat(document.getElementById('renteMonatlich').value) || 0,
         renteStartOffsetJahre: parseInt(document.getElementById('renteStartOffsetJahre').value) || 0,
-        renteIndexierungsart: document.getElementById('renteIndexierungsart').value,
-        renteFesterSatz: parseFloat(document.getElementById('renteFesterSatz').value) || 0,
+        rentAdjPct: rentAdjPct,
+        // VERALTET: Alte Indexierungsfelder (für Abwärtskompatibilität, werden nicht mehr verwendet)
+        renteIndexierungsart: document.getElementById('renteIndexierungsart')?.value || 'fest',
+        renteFesterSatz: parseFloat(document.getElementById('renteFesterSatz')?.value) || 0,
         pflegefallLogikAktivieren: document.getElementById('pflegefallLogikAktivieren').checked,
         pflegeModellTyp: document.getElementById('pflegeModellTyp').value,
         pflegeStufe1Zusatz: parseFloat(document.getElementById('pflegeStufe1Zusatz').value) || 0,
@@ -48,8 +54,8 @@ export function getCommonInputs() {
             aktiv: document.getElementById('chkPartnerAktiv')?.checked || false,
             startAlter: parseInt(document.getElementById('r2StartAlter')?.value) || 0,
             brutto: parseFloat(document.getElementById('r2Brutto')?.value) || 0,
-            anpassungPct: parseFloat(document.getElementById('r2Anpassung')?.value) || 0,
             steuerquotePct: parseFloat(document.getElementById('r2Steuerquote')?.value) || 0
+            // anpassungPct wird NICHT mehr verwendet - gemeinsame Anpassung via rentAdjPct
         }
     };
 
@@ -165,6 +171,7 @@ export function prepareHistoricalData() {
 
 /**
  * Berechnet jährliche Rente basierend auf Indexierung
+ * VERALTET: Wird durch computePensionNext ersetzt (nur noch für Abwärtskompatibilität)
  */
 export function computeYearlyPension({ yearIndex, baseMonthly, startOffset, lastAnnualPension, indexierungsArt, inflRate, lohnRate, festerSatz }) {
     if (!baseMonthly || yearIndex < startOffset) return 0;
@@ -177,6 +184,20 @@ export function computeYearlyPension({ yearIndex, baseMonthly, startOffset, last
     if (yearIndex === startOffset) return baseMonthly * 12;
     const last = lastAnnualPension > 0 ? lastAnnualPension : baseMonthly * 12;
     return last * (1 + anpassungsSatz);
+}
+
+/**
+ * Berechnet die nächste jährliche Rente mit gemeinsamer Anpassungsrate
+ * @param {number} prev - Vorjahresrente (brutto, vor Steuern)
+ * @param {boolean} isFirstYear - Ist es das erste Auszahlungsjahr?
+ * @param {number} base - Basisrente (brutto p.a.) im ersten Jahr
+ * @param {number} adjPct - Jährliche Anpassungsrate in Prozent (z.B. 2.0 für 2%)
+ * @returns {number} Rentenbrutto für das Jahr (≥ 0)
+ */
+export function computePensionNext(prev, isFirstYear, base, adjPct) {
+    if (isFirstYear) return Math.max(0, base);
+    const val = prev * (1 + adjPct / 100);
+    return Math.max(0, val);
 }
 
 /**

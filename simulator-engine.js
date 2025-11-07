@@ -3,7 +3,7 @@
 import { shortenReasonText } from './simulator-utils.js';
 import { HISTORICAL_DATA, PFLEGE_STUFE1_WAHRSCHEINLICHKEIT, annualData, REGIME_DATA, REGIME_TRANSITIONS } from './simulator-data.js';
 import {
-    computeYearlyPension, initializePortfolio, applySaleToPortfolio, summarizeSalesByAsset,
+    computeYearlyPension, computePensionNext, initializePortfolio, applySaleToPortfolio, summarizeSalesByAsset,
     buildInputsCtxFromPortfolio, sumDepot, buyGold, buyStocksNeu
 } from './simulator-portfolio.js';
 import { resolveProfileKey } from './simulator-heatmap.js';
@@ -41,30 +41,39 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const algoInput = { ...inputs, floorBedarf: baseFloor, flexBedarf: baseFlex, startSPB: inputs.startSPB };
     const market = window.Ruhestandsmodell_v30.analyzeMarket(marketDataCurrentYear);
 
-    // Rente Person 1 (bestehende Logik)
-    const rente1 = computeYearlyPension({ yearIndex, baseMonthly: inputs.renteMonatlich, startOffset: inputs.renteStartOffsetJahre, lastAnnualPension: currentAnnualPension, indexierungsArt: inputs.renteIndexierungsart, inflRate: yearData.inflation, lohnRate: yearData.lohn, festerSatz: inputs.renteFesterSatz });
+    // Gemeinsame Rentenanpassung (% p.a.) für beide Personen
+    const rentAdjPct = inputs.rentAdjPct || 0;
 
-    // Rente Person 2 (Partner) - dynamisch mit Startalter und jährlicher Anpassung
+    // Rente Person 1 - Neue Logik mit gemeinsamer Anpassungsrate
+    const currentAgeP1 = inputs.startAlter + yearIndex;
+    const r1StartAge = inputs.startAlter + inputs.renteStartOffsetJahre;
+    let rente1_brutto = 0;
+
+    if (currentAgeP1 >= r1StartAge) {
+        const isFirstYearR1 = (currentAgeP1 === r1StartAge);
+        const baseR1 = inputs.renteMonatlich * 12;
+        rente1_brutto = computePensionNext(currentAnnualPension, isFirstYearR1, baseR1, rentAdjPct);
+    }
+
+    // Keine zusätzliche Steuer/Berechnung für R1 (wird als Netto betrachtet bzw. extern versteuert)
+    const rente1 = rente1_brutto;
+
+    // Rente Person 2 (Partner) - Neue Logik mit gemeinsamer Anpassungsrate
+    let rente2_brutto = 0;
     let rente2 = 0;
-    if (inputs.partner?.aktiv) {
-        const currentAgeP1 = inputs.startAlter + yearIndex;
-        const currentAgeP2 = currentAgeP1; // Vereinfacht: beide altern synchron; könnte erweitert werden
 
+    if (inputs.partner?.aktiv) {
+        const currentAgeP2 = currentAgeP1; // Vereinfacht: beide altern synchron
         if (currentAgeP2 >= inputs.partner.startAlter) {
-            if (currentAgeP2 === inputs.partner.startAlter) {
-                // Erstes Jahr: Basisrente (brutto)
-                rente2 = inputs.partner.brutto;
-            } else if (currentAnnualPension2 > 0) {
-                // Folgende Jahre: Anpassung auf Basis der Vorjahresrente
-                const anpassungsSatz = inputs.partner.anpassungPct / 100;
-                rente2 = currentAnnualPension2 * (1 + anpassungsSatz);
-            } else {
-                // Fallback falls currentAnnualPension2 nicht gesetzt
-                rente2 = inputs.partner.brutto;
-            }
+            const isFirstYearR2 = (currentAgeP2 === inputs.partner.startAlter);
+            const baseR2 = inputs.partner.brutto;
+            rente2_brutto = computePensionNext(currentAnnualPension2, isFirstYearR2, baseR2, rentAdjPct);
+
             // Steuerquote anwenden (Netto-Berechnung)
             if (inputs.partner.steuerquotePct > 0) {
-                rente2 = rente2 * (1 - inputs.partner.steuerquotePct / 100);
+                rente2 = rente2_brutto * (1 - inputs.partner.steuerquotePct / 100);
+            } else {
+                rente2 = rente2_brutto;
             }
             // Clamp bei 0 (keine negativen Renten)
             rente2 = Math.max(0, rente2);
@@ -194,8 +203,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             baseFloor: naechsterBaseFloor,
             baseFlex: naechsterBaseFlex,
             lastState: spendingNewState,
-            currentAnnualPension: rente1,
-            currentAnnualPension2: rente2,
+            currentAnnualPension: rente1_brutto,
+            currentAnnualPension2: rente2_brutto,
             marketDataHist: newMarketDataHist,
             samplerState: currentState.samplerState
         },
