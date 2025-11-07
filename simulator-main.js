@@ -363,7 +363,7 @@ export function runBacktest() {
         const pfInt = (val, len) => p(`${Math.round(val || 0)}%`, len);
 
         let header = [
-            "Jahr".padEnd(4), "Entn.".padStart(7), "Floor".padStart(7), "Rente".padStart(7), "FloorDep".padStart(8), "Flex%".padStart(5), "Flex€".padStart(7), "Entn_real".padStart(9),
+            "Jahr".padEnd(4), "Entn.".padStart(7), "Floor".padStart(7), "Rente1".padStart(7), "Rente2".padStart(7), "RenteSum".padStart(8), "FloorDep".padStart(8), "Flex%".padStart(5), "Flex€".padStart(7), "Entn_real".padStart(9),
             "Status".padEnd(16), "Quote%".padStart(6), "Runway%".padStart(7),
             "R.Aktien".padStart(8), "R.Gold".padStart(8), "Infl.".padStart(5),
             "Handl.A".padStart(8), "Handl.G".padStart(8), "St.".padStart(6),
@@ -399,7 +399,9 @@ export function runBacktest() {
                 p(jahr, 4),
                 formatCurrencyShortLog(entscheidung.jahresEntnahme).padStart(7),
                 formatCurrencyShortLog(row.floor_brutto).padStart(7),
-                formatCurrencyShortLog(row.pension_annual).padStart(7),
+                formatCurrencyShortLog(row.rente1 || 0).padStart(7),
+                formatCurrencyShortLog(row.rente2 || 0).padStart(7),
+                formatCurrencyShortLog(row.renteSum || 0).padStart(8),
                 formatCurrencyShortLog(row.floor_aus_depot).padStart(8),
                 pfInt(row.FlexRatePct, 5),
                 formatCurrencyShortLog(row.flex_erfuellt_nominal).padStart(7),
@@ -546,6 +548,17 @@ window.onload = function() {
 
     const pflegeMortalitaetCheckbox = document.getElementById('pflegebeschleunigtMortalitaetAktivieren');
     pflegeMortalitaetCheckbox.addEventListener('change', () => { document.getElementById('pflegeTodesrisikoContainer').style.display = pflegeMortalitaetCheckbox.checked ? 'flex' : 'none'; });
+
+    // Partner-Einstellungen: Felder aktivieren/deaktivieren
+    const partnerCheckbox = document.getElementById('partnerEnabled');
+    const partnerFields = ['partnerBirthYear', 'partnerGender', 'partnerChurchTax', 'partnerPensionStartYear', 'partnerGrossPensionPerYear'];
+    partnerCheckbox.addEventListener('change', () => {
+        const enabled = partnerCheckbox.checked;
+        partnerFields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) field.disabled = !enabled;
+        });
+    });
 
     const careDetailsCheckbox = document.getElementById('toggle-care-details');
     if (careDetailsCheckbox) {
@@ -694,7 +707,116 @@ window.onload = function() {
 
     // Sweep defaults with localStorage persistence
     initSweepDefaultsWithLocalStorageFallback();
+
+    // Partner configuration with localStorage persistence
+    initPartnerConfigWithLocalStorage();
 };
+
+/**
+ * Initialisiert Partner-Konfiguration mit localStorage
+ *
+ * Smoke Tests für Zwei-Personen-Haushalt (Partner-UI + Rente2):
+ * 1. Partner aus (partnerEnabled=false):
+ *    - Alle Partner-Felder sind disabled
+ *    - Im Backtest: rente2 === 0, renteSum === rente1
+ *    - Backtest läuft wie bisher (keine Änderungen)
+ *
+ * 2. Partner an (partnerEnabled=true), Rentenstart in Zukunft:
+ *    - Alle Partner-Felder sind enabled und editierbar
+ *    - Vor Startjahr (jahr < pensionStartYear): rente2 === 0
+ *    - Ab Startjahr (jahr >= pensionStartYear): rente2 === grossPensionPerYear
+ *    - renteSum === rente1 + rente2
+ *
+ * 3. Backtest-Logs:
+ *    - Pro Jahr werden rente1, rente2, renteSum in separaten Spalten angezeigt
+ *    - Keine negativen Rentenwerte (rente1 >= 0, rente2 >= 0, renteSum >= 0)
+ *    - renteSum wird vom Floor-Bedarf abgezogen (floor_aus_depot = floor_brutto - renteSum)
+ *
+ * 4. UI-Persistenz (LocalStorage):
+ *    - Werte der Partner-Felder bleiben nach Reload erhalten
+ *    - Beim ersten Laden werden Standardwerte verwendet
+ *    - Änderungen werden automatisch in localStorage gespeichert
+ */
+function initPartnerConfigWithLocalStorage() {
+    // Standardwerte für person2
+    const currentYear = new Date().getFullYear();
+    const defaults = {
+        enabled: false,
+        birthYear: 1964,
+        gender: "f",
+        churchTax: true,
+        pensionStartYear: currentYear + 5,
+        grossPensionPerYear: 18000
+    };
+
+    // LocalStorage-Keys
+    const keys = {
+        enabled: 'sim.person2.enabled',
+        birthYear: 'sim.person2.birthYear',
+        gender: 'sim.person2.gender',
+        churchTax: 'sim.person2.churchTax',
+        pensionStartYear: 'sim.person2.pensionStartYear',
+        grossPensionPerYear: 'sim.person2.grossPensionPerYear'
+    };
+
+    // Lade Werte aus localStorage oder verwende defaults
+    const partnerEnabled = document.getElementById('partnerEnabled');
+    const partnerBirthYear = document.getElementById('partnerBirthYear');
+    const partnerGender = document.getElementById('partnerGender');
+    const partnerChurchTax = document.getElementById('partnerChurchTax');
+    const partnerPensionStartYear = document.getElementById('partnerPensionStartYear');
+    const partnerGrossPensionPerYear = document.getElementById('partnerGrossPensionPerYear');
+
+    // Lade gespeicherte Werte
+    const savedEnabled = localStorage.getItem(keys.enabled);
+    partnerEnabled.checked = savedEnabled === '1';
+
+    const savedBirthYear = localStorage.getItem(keys.birthYear);
+    partnerBirthYear.value = savedBirthYear || defaults.birthYear;
+
+    const savedGender = localStorage.getItem(keys.gender);
+    partnerGender.value = savedGender || defaults.gender;
+
+    const savedChurchTax = localStorage.getItem(keys.churchTax);
+    partnerChurchTax.checked = savedChurchTax === '1' || (savedChurchTax === null && defaults.churchTax);
+
+    const savedPensionStartYear = localStorage.getItem(keys.pensionStartYear);
+    partnerPensionStartYear.value = savedPensionStartYear || defaults.pensionStartYear;
+
+    const savedGrossPensionPerYear = localStorage.getItem(keys.grossPensionPerYear);
+    partnerGrossPensionPerYear.value = savedGrossPensionPerYear || defaults.grossPensionPerYear;
+
+    // Initiale Aktivierung/Deaktivierung der Felder
+    const enabled = partnerEnabled.checked;
+    [partnerBirthYear, partnerGender, partnerChurchTax, partnerPensionStartYear, partnerGrossPensionPerYear].forEach(field => {
+        field.disabled = !enabled;
+    });
+
+    // Event-Listener zum Speichern
+    partnerEnabled.addEventListener('change', () => {
+        localStorage.setItem(keys.enabled, partnerEnabled.checked ? '1' : '0');
+    });
+
+    partnerBirthYear.addEventListener('input', () => {
+        localStorage.setItem(keys.birthYear, partnerBirthYear.value);
+    });
+
+    partnerGender.addEventListener('change', () => {
+        localStorage.setItem(keys.gender, partnerGender.value);
+    });
+
+    partnerChurchTax.addEventListener('change', () => {
+        localStorage.setItem(keys.churchTax, partnerChurchTax.checked ? '1' : '0');
+    });
+
+    partnerPensionStartYear.addEventListener('input', () => {
+        localStorage.setItem(keys.pensionStartYear, partnerPensionStartYear.value);
+    });
+
+    partnerGrossPensionPerYear.addEventListener('input', () => {
+        localStorage.setItem(keys.grossPensionPerYear, partnerGrossPensionPerYear.value);
+    });
+}
 
 /**
  * Initialisiert Sweep-Defaults mit localStorage-Fallback

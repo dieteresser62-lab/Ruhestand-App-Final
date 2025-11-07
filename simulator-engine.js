@@ -40,7 +40,19 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const algoInput = { ...inputs, floorBedarf: baseFloor, flexBedarf: baseFlex, startSPB: inputs.startSPB };
     const market = window.Ruhestandsmodell_v30.analyzeMarket(marketDataCurrentYear);
 
-    const pensionAnnual = computeYearlyPension({ yearIndex, baseMonthly: inputs.renteMonatlich, startOffset: inputs.renteStartOffsetJahre, lastAnnualPension: currentAnnualPension, indexierungsArt: inputs.renteIndexierungsart, inflRate: yearData.inflation, lohnRate: yearData.lohn, festerSatz: inputs.renteFesterSatz });
+    // Rente Person 1 (bestehende Logik)
+    const rente1 = computeYearlyPension({ yearIndex, baseMonthly: inputs.renteMonatlich, startOffset: inputs.renteStartOffsetJahre, lastAnnualPension: currentAnnualPension, indexierungsArt: inputs.renteIndexierungsart, inflRate: yearData.inflation, lohnRate: yearData.lohn, festerSatz: inputs.renteFesterSatz });
+
+    // Rente Person 2 (Partner) - NUR im Backtest
+    // Smoke Test: Bei partnerEnabled=false ist rente2=0
+    // Smoke Test: Vor pensionStartYear ist rente2=0, ab pensionStartYear ist rente2=grossPensionPerYear
+    const actualYear = yearData.jahr;
+    const rente2 = (inputs.person2?.enabled && actualYear >= inputs.person2.pensionStartYear) ? inputs.person2.grossPensionPerYear : 0;
+
+    // Gesamtrente (renteSum)
+    const renteSum = rente1 + rente2;
+    const pensionAnnual = renteSum;
+
     const inflatedFloor = Math.max(0, baseFloor - pensionAnnual);
     const inflatedFlex  = baseFlex;
 
@@ -185,6 +197,9 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             usedSPB: mergedSaleResult ? (mergedSaleResult.pauschbetragVerbraucht || 0) : 0,
             floor_brutto: baseFloor,
             pension_annual: pensionAnnual,
+            rente1: rente1,
+            rente2: rente2,
+            renteSum: renteSum,
             floor_aus_depot: inflatedFloor,
             flex_brutto: baseFlex,
             flex_erfuellt_nominal: jahresEntnahme > inflatedFloor ? jahresEntnahme - inflatedFloor : 0,

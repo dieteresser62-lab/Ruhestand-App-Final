@@ -42,7 +42,16 @@ export function getCommonInputs() {
         pflegebeschleunigtMortalitaetAktivieren: document.getElementById('pflegebeschleunigtMortalitaetAktivieren').checked,
         pflegeTodesrisikoFaktor: parseFloat(document.getElementById('pflegeTodesrisikoFaktor').value) || 1.0,
         decumulation: { mode: document.getElementById('decumulationMode')?.value || 'none' },
-        stressPreset: document.getElementById('stressPreset').value || 'NONE'
+        stressPreset: document.getElementById('stressPreset').value || 'NONE',
+        // Partner-Konfiguration (person2)
+        person2: {
+            enabled: document.getElementById('partnerEnabled')?.checked || false,
+            birthYear: parseInt(document.getElementById('partnerBirthYear')?.value) || 1964,
+            gender: document.getElementById('partnerGender')?.value || 'f',
+            churchTax: document.getElementById('partnerChurchTax')?.checked || false,
+            pensionStartYear: parseInt(document.getElementById('partnerPensionStartYear')?.value) || (new Date().getFullYear() + 5),
+            grossPensionPerYear: parseFloat(document.getElementById('partnerGrossPensionPerYear')?.value) || 0
+        }
     };
 
     const strategyConstants = {

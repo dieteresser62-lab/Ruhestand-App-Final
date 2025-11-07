@@ -184,6 +184,51 @@
                     </div>
                 </div>
             </fieldset>
+
+            <!-- Partner-Einstellungen für Zwei-Personen-Haushalt
+                 Smoke Tests:
+                 1. partnerEnabled=false → Felder disabled, rente2=0 im Backtest
+                 2. partnerEnabled=true → Felder enabled, rente2 ab pensionStartYear aktiv
+                 3. Vor pensionStartYear: rente2=0
+                 4. Ab pensionStartYear: rente2=grossPensionPerYear
+                 5. UI-Persistenz: Werte bleiben nach Reload erhalten (LocalStorage)
+            -->
+            <fieldset>
+                <legend>Partner-Einstellungen</legend>
+                <div class="form-group" style="justify-content: center; margin-bottom: 15px;">
+                    <label style="flex-direction: row; align-items: center;">
+                        <input type="checkbox" id="partnerEnabled" style="width: auto; margin-right: 8px;">
+                        Partner aktiv
+                    </label>
+                </div>
+                <div class="form-grid-four-col">
+                    <div class="form-group">
+                        <label for="partnerBirthYear">Geburtsjahr (Partner)</label>
+                        <input type="number" id="partnerBirthYear" value="1964" disabled>
+                    </div>
+                    <div class="form-group">
+                        <label for="partnerGender">Geschlecht (Partner)</label>
+                        <select id="partnerGender" disabled>
+                            <option value="m">Männlich</option>
+                            <option value="f" selected>Weiblich</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="grid-column: span 2; justify-content: center;">
+                        <label style="flex-direction: row; align-items: center;">
+                            <input type="checkbox" id="partnerChurchTax" checked style="width: auto; margin-right: 8px;" disabled>
+                            Kirchensteuer (Partner)
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="partnerPensionStartYear">Rentenstart (Partner, Jahr)</label>
+                        <input type="number" id="partnerPensionStartYear" value="2030" disabled>
+                    </div>
+                    <div class="form-group">
+                        <label for="partnerGrossPensionPerYear">Jahresbruttorente (Partner, €)</label>
+                        <input type="number" id="partnerGrossPensionPerYear" value="18000" disabled>
+                    </div>
+                </div>
+            </fieldset>
                 </div>
 
                 <div id="tab-montecarlo" class="tab-panel">
