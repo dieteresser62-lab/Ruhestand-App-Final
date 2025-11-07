@@ -510,7 +510,7 @@ window.onload = function() {
         'goldAllokationAktiv', 'goldAllokationProzent', 'goldFloorProzent', 'rebalancingBand',
         'goldSteuerfrei', 'startFloorBedarf', 'startFlexBedarf',
         'einstandAlt', 'startAlter', 'geschlecht', 'startSPB', 'kirchensteuerSatz', 'round5',
-        'renteMonatlich', 'renteStartOffsetJahre', 'renteIndexierungsart',
+        'renteMonatlich', 'renteStartOffsetJahre', 'rentAdjPct',
         'pflegefallLogikAktivieren', 'pflegeModellTyp', 'pflegeStufe1Zusatz', 'pflegeStufe1FlexCut',
         'pflegeMaxFloor', 'pflegeRampUp', 'pflegeMinDauer', 'pflegeMaxDauer', 'pflegeKostenDrift',
         'pflegebeschleunigtMortalitaetAktivieren', 'pflegeTodesrisikoFaktor',
@@ -538,8 +538,9 @@ window.onload = function() {
     const mcMethodeSelect = document.getElementById('mcMethode');
     mcMethodeSelect.addEventListener('change', () => { document.getElementById('mcBlockSize').disabled = mcMethodeSelect.value !== 'block'; });
 
-    const renteIndexArtSelect = document.getElementById('renteIndexierungsart');
-    renteIndexArtSelect.addEventListener('change', () => { document.getElementById('festerSatzContainer').style.display = renteIndexArtSelect.value === 'fest' ? 'block' : 'none'; });
+    // VERALTET: Alte Indexierungs-Logik (deaktiviert, versteckt)
+    // const renteIndexArtSelect = document.getElementById('renteIndexierungsart');
+    // renteIndexArtSelect.addEventListener('change', () => { document.getElementById('festerSatzContainer').style.display = renteIndexArtSelect.value === 'fest' ? 'block' : 'none'; });
 
     const pflegeCheckbox = document.getElementById('pflegefallLogikAktivieren');
     pflegeCheckbox.addEventListener('change', () => { document.getElementById('pflegePanel').style.display = pflegeCheckbox.checked ? 'grid' : 'none'; });
@@ -590,7 +591,7 @@ window.onload = function() {
     }
 
     document.getElementById('mcBlockSize').disabled = mcMethodeSelect.value !== 'block';
-    document.getElementById('festerSatzContainer').style.display = renteIndexArtSelect.value === 'fest' ? 'block' : 'none';
+    // VERALTET: document.getElementById('festerSatzContainer').style.display = renteIndexArtSelect.value === 'fest' ? 'block' : 'none';
     document.getElementById('pflegePanel').style.display = pflegeCheckbox.checked ? 'grid' : 'none';
     document.getElementById('pflegeDauerContainer').style.display = pflegeModellSelect.value === 'akut' ? 'contents' : 'none';
     document.getElementById('pflegeTodesrisikoContainer').style.display = pflegeMortalitaetCheckbox.checked ? 'flex' : 'none';
@@ -714,7 +715,9 @@ window.onload = function() {
 };
 
 /**
- * Initialisiert Rente-2 (Partner) Konfiguration mit localStorage
+ * Initialisiert Rente-Konfiguration (Person 1 + Partner) mit localStorage
+ *
+ * NEU: Gemeinsame Rentenanpassung für beide Personen (rentAdjPct)
  *
  * Smoke Tests für Zwei-Personen-Haushalt:
  * 1. Partner aus (chkPartnerAktiv=false):
@@ -724,7 +727,7 @@ window.onload = function() {
  * 2. Partner an (chkPartnerAktiv=true):
  *    - sectionRente2 ist sichtbar
  *    - Vor Startalter: rente2 === 0
- *    - Ab Startalter: rente2 wächst jährlich um r2Anpassung%
+ *    - Ab Startalter: rente2 wächst jährlich um rentAdjPct%
  *
  * 3. Backtest-Logs:
  *    - Pro Jahr: rente1, rente2, renteSum in separaten Spalten
@@ -739,24 +742,26 @@ function initRente2ConfigWithLocalStorage() {
         aktiv: false,
         startAlter: 60,
         brutto: 18000,
-        anpassung: 2.0,
-        steuerquote: 0
+        steuerquote: 0,
+        rentAdjPct: 2.0
     };
 
     const keys = {
         aktiv: 'sim_partnerAktiv',
         startAlter: 'sim_r2StartAlter',
         brutto: 'sim_r2Brutto',
-        anpassung: 'sim_r2Anpassung',
-        steuerquote: 'sim_r2Steuerquote'
+        steuerquote: 'sim_r2Steuerquote',
+        rentAdjPct: 'sim_rentAdjPct',
+        // VERALTET: Alte Keys für Abwärtskompatibilität
+        anpassung_OLD: 'sim_r2Anpassung'
     };
 
     const chkPartnerAktiv = document.getElementById('chkPartnerAktiv');
     const sectionRente2 = document.getElementById('sectionRente2');
     const r2StartAlter = document.getElementById('r2StartAlter');
     const r2Brutto = document.getElementById('r2Brutto');
-    const r2Anpassung = document.getElementById('r2Anpassung');
     const r2Steuerquote = document.getElementById('r2Steuerquote');
+    const rentAdjPct = document.getElementById('rentAdjPct');
 
     if (!chkPartnerAktiv || !sectionRente2) return;
 
@@ -781,19 +786,30 @@ function initRente2ConfigWithLocalStorage() {
         });
     }
 
-    if (r2Anpassung) {
-        const saved = localStorage.getItem(keys.anpassung);
-        r2Anpassung.value = saved || defaults.anpassung;
-        r2Anpassung.addEventListener('input', () => {
-            localStorage.setItem(keys.anpassung, r2Anpassung.value);
-        });
-    }
-
     if (r2Steuerquote) {
         const saved = localStorage.getItem(keys.steuerquote);
         r2Steuerquote.value = saved || defaults.steuerquote;
         r2Steuerquote.addEventListener('input', () => {
             localStorage.setItem(keys.steuerquote, r2Steuerquote.value);
+        });
+    }
+
+    // Gemeinsame Rentenanpassung (Person 1 + Partner)
+    if (rentAdjPct) {
+        let saved = localStorage.getItem(keys.rentAdjPct);
+
+        // Abwärtskompatibilität: Falls noch nicht gesetzt, versuche alten Wert zu übernehmen
+        if (!saved || saved === '') {
+            const oldR2Anpassung = localStorage.getItem(keys.anpassung_OLD);
+            if (oldR2Anpassung) {
+                saved = oldR2Anpassung;
+                console.log('Migrating old r2Anpassung value to rentAdjPct:', saved);
+            }
+        }
+
+        rentAdjPct.value = saved || defaults.rentAdjPct;
+        rentAdjPct.addEventListener('input', () => {
+            localStorage.setItem(keys.rentAdjPct, rentAdjPct.value);
         });
     }
 }
