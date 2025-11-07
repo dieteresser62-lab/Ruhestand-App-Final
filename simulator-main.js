@@ -510,7 +510,7 @@ window.onload = function() {
         'goldAllokationAktiv', 'goldAllokationProzent', 'goldFloorProzent', 'rebalancingBand',
         'goldSteuerfrei', 'startFloorBedarf', 'startFlexBedarf',
         'einstandAlt', 'startAlter', 'geschlecht', 'startSPB', 'kirchensteuerSatz', 'round5',
-        'renteMonatlich', 'renteStartOffsetJahre', 'rentAdjPct',
+        'renteMonatlich', 'renteStartOffsetJahre', 'rentAdjMode', 'rentAdjPct',
         'pflegefallLogikAktivieren', 'pflegeModellTyp', 'pflegeStufe1Zusatz', 'pflegeStufe1FlexCut',
         'pflegeMaxFloor', 'pflegeRampUp', 'pflegeMinDauer', 'pflegeMaxDauer', 'pflegeKostenDrift',
         'pflegebeschleunigtMortalitaetAktivieren', 'pflegeTodesrisikoFaktor',
@@ -538,9 +538,28 @@ window.onload = function() {
     const mcMethodeSelect = document.getElementById('mcMethode');
     mcMethodeSelect.addEventListener('change', () => { document.getElementById('mcBlockSize').disabled = mcMethodeSelect.value !== 'block'; });
 
-    // VERALTET: Alte Indexierungs-Logik (deaktiviert, versteckt)
-    // const renteIndexArtSelect = document.getElementById('renteIndexierungsart');
-    // renteIndexArtSelect.addEventListener('change', () => { document.getElementById('festerSatzContainer').style.display = renteIndexArtSelect.value === 'fest' ? 'block' : 'none'; });
+    // Rentenanpassungs-Modus: Enable/Disable des Prozentsatz-Felds
+    const rentAdjModeSelect = document.getElementById('rentAdjMode');
+    const rentAdjPctInput = document.getElementById('rentAdjPct');
+    if (rentAdjModeSelect && rentAdjPctInput) {
+        rentAdjModeSelect.addEventListener('change', () => {
+            const mode = rentAdjModeSelect.value;
+            const isFixed = mode === 'fix';
+            rentAdjPctInput.disabled = !isFixed;
+            if (!isFixed) {
+                rentAdjPctInput.title = 'Über Koppelung gesteuert';
+            } else {
+                rentAdjPctInput.title = 'Gemeinsame Rentenanpassung für beide Personen';
+            }
+            localStorage.setItem('sim_rentAdjMode', mode);
+        });
+        // Initial state setzen
+        const initialMode = rentAdjModeSelect.value;
+        rentAdjPctInput.disabled = (initialMode !== 'fix');
+        if (initialMode !== 'fix') {
+            rentAdjPctInput.title = 'Über Koppelung gesteuert';
+        }
+    }
 
     const pflegeCheckbox = document.getElementById('pflegefallLogikAktivieren');
     pflegeCheckbox.addEventListener('change', () => { document.getElementById('pflegePanel').style.display = pflegeCheckbox.checked ? 'grid' : 'none'; });
@@ -743,10 +762,11 @@ function initRente2ConfigWithLocalStorage() {
         geschlecht: 'w',
         startAlter: 60,
         startInJahren: 0,
-        brutto: 18000,
+        monatsrente: 1500,
         sparerPauschbetrag: 0,
         kirchensteuerPct: 0,
         steuerquote: 0,
+        rentAdjMode: 'fix',
         rentAdjPct: 2.0
     };
 
@@ -755,12 +775,14 @@ function initRente2ConfigWithLocalStorage() {
         geschlecht: 'sim_r2Geschlecht',
         startAlter: 'sim_r2StartAlter',
         startInJahren: 'sim_r2StartInJahren',
-        brutto: 'sim_r2Brutto',
+        monatsrente: 'sim_r2Monatsrente',
         sparerPauschbetrag: 'sim_r2SparerPauschbetrag',
         kirchensteuerPct: 'sim_r2KirchensteuerPct',
         steuerquote: 'sim_r2Steuerquote',
+        rentAdjMode: 'sim_rentAdjMode',
         rentAdjPct: 'sim_rentAdjPct',
         // VERALTET: Alte Keys für Abwärtskompatibilität
+        brutto_OLD: 'sim_r2Brutto',
         anpassung_OLD: 'sim_r2Anpassung'
     };
 
@@ -769,10 +791,11 @@ function initRente2ConfigWithLocalStorage() {
     const r2Geschlecht = document.getElementById('r2Geschlecht');
     const r2StartAlter = document.getElementById('r2StartAlter');
     const r2StartInJahren = document.getElementById('r2StartInJahren');
-    const r2Brutto = document.getElementById('r2Brutto');
+    const r2Monatsrente = document.getElementById('r2Monatsrente');
     const r2SparerPauschbetrag = document.getElementById('r2SparerPauschbetrag');
     const r2KirchensteuerPct = document.getElementById('r2KirchensteuerPct');
     const r2Steuerquote = document.getElementById('r2Steuerquote');
+    const rentAdjMode = document.getElementById('rentAdjMode');
     const rentAdjPct = document.getElementById('rentAdjPct');
 
     if (!chkPartnerAktiv || !sectionRente2) return;
@@ -806,11 +829,23 @@ function initRente2ConfigWithLocalStorage() {
         });
     }
 
-    if (r2Brutto) {
-        const saved = localStorage.getItem(keys.brutto);
-        r2Brutto.value = saved || defaults.brutto;
-        r2Brutto.addEventListener('input', () => {
-            localStorage.setItem(keys.brutto, r2Brutto.value);
+    // Migration: Bruttorente p.a. → Monatliche Rente
+    if (r2Monatsrente) {
+        let saved = localStorage.getItem(keys.monatsrente);
+
+        // Migration von r2Brutto zu r2Monatsrente
+        if (!saved || saved === '' || saved === '0') {
+            const oldBrutto = localStorage.getItem(keys.brutto_OLD);
+            if (oldBrutto && parseFloat(oldBrutto) > 0) {
+                saved = Math.round(parseFloat(oldBrutto) / 12).toString();
+                localStorage.setItem(keys.monatsrente, saved);
+                console.log(`Migration: r2Brutto ${oldBrutto} → r2Monatsrente ${saved}`);
+            }
+        }
+
+        r2Monatsrente.value = saved || defaults.monatsrente;
+        r2Monatsrente.addEventListener('input', () => {
+            localStorage.setItem(keys.monatsrente, r2Monatsrente.value);
         });
     }
 
@@ -825,7 +860,7 @@ function initRente2ConfigWithLocalStorage() {
     if (r2KirchensteuerPct) {
         const saved = localStorage.getItem(keys.kirchensteuerPct);
         r2KirchensteuerPct.value = saved || defaults.kirchensteuerPct;
-        r2KirchensteuerPct.addEventListener('input', () => {
+        r2KirchensteuerPct.addEventListener('change', () => {
             localStorage.setItem(keys.kirchensteuerPct, r2KirchensteuerPct.value);
         });
     }
@@ -835,6 +870,15 @@ function initRente2ConfigWithLocalStorage() {
         r2Steuerquote.value = saved || defaults.steuerquote;
         r2Steuerquote.addEventListener('input', () => {
             localStorage.setItem(keys.steuerquote, r2Steuerquote.value);
+        });
+    }
+
+    // Rentenanpassungs-Modus (gemeinsam für Person 1 + Partner)
+    if (rentAdjMode) {
+        const savedMode = localStorage.getItem(keys.rentAdjMode);
+        rentAdjMode.value = savedMode || defaults.rentAdjMode;
+        rentAdjMode.addEventListener('change', () => {
+            localStorage.setItem(keys.rentAdjMode, rentAdjMode.value);
         });
     }
 

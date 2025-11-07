@@ -106,30 +106,25 @@
                  <div class="form-grid-four-col" style="align-items: end;">
                         <div class="form-group"><label for="startAlter">Startalter</label><input type="number" id="startAlter" value="63"></div>
                         <div class="form-group"><label for="geschlecht">Geschlecht</label>
-                           <select id="geschlecht"><option value="m" selected>Männlich</option><option value="w">Weiblich</option></select>
+                           <select id="geschlecht"><option value="m" selected>männlich</option><option value="w">weiblich</option><option value="d">divers</option></select>
                         </div>
                         <div class="form-group"><label for="startSPB">Sparer-Pauschbetrag (€)</label><input type="number" id="startSPB" value="1000"></div>
-                        <div class="form-group"><label for="kirchensteuerSatz">Kirchensteuer</label>
-                           <select id="kirchensteuerSatz"><option value="0">0 %</option><option value="0.08">8 %</option><option value="0.09" selected>9 %</option></select>
+                        <div class="form-group"><label for="kirchensteuerSatz">Kirchensteuer (%)</label>
+                           <select id="kirchensteuerSatz"><option value="0">0</option><option value="0.08">8</option><option value="0.09" selected>9</option></select>
                        </div>
                        <div class="form-group"><label for="renteMonatlich">Monatliche Rente (€)</label><input type="number" id="renteMonatlich" value="500"></div>
                        <div class="form-group"><label for="renteStartOffsetJahre">Start in ... Jahren</label><input type="number" id="renteStartOffsetJahre" value="5"></div>
+                       <div class="form-group" style="grid-column: span 2;">
+                           <label for="rentAdjMode">Rentenanpassung koppeln an</label>
+                           <select id="rentAdjMode">
+                               <option value="fix" selected>Fixer Prozentsatz</option>
+                               <option value="wage">Lohnentwicklung (hist. Daten)</option>
+                               <option value="cpi">Inflation</option>
+                           </select>
+                       </div>
                        <div class="form-group">
                            <label for="rentAdjPct">Rentenanpassung (% p.a.)</label>
                            <input type="number" id="rentAdjPct" step="0.1" value="2.0" placeholder="Gilt für Rente 1 und Rente 2" title="Gemeinsame Rentenanpassung für beide Personen">
-                       </div>
-                       <!-- VERALTET: Alte Indexierungslogik (versteckt, nur für Abwärtskompatibilität) -->
-                       <div class="form-group" id="renteIndexierungsartContainer" style="display: none; grid-column: span 2;">
-                           <label for="renteIndexierungsart">Rentenanpassung koppeln an</label>
-                           <select id="renteIndexierungsart">
-                               <option value="lohn" selected>Lohnentwicklung (hist. Daten)</option>
-                               <option value="inflation">Inflation (VPI)</option>
-                               <option value="fest">Festen Satz p.a.</option>
-                           </select>
-                       </div>
-                       <div class="form-group" id="festerSatzContainer" style="display: none;">
-                           <label for="renteFesterSatz">Fester Satz (% p.a.)</label>
-                           <input type="number" id="renteFesterSatz" value="2.0" step="0.1">
                        </div>
                 </div>
 
@@ -144,24 +139,16 @@
                     <div id="sectionRente2" style="display: none;">
                         <div class="form-grid-four-col">
                             <div class="form-group">
-                                <label for="r2Geschlecht">Geschlecht</label>
-                                <select id="r2Geschlecht">
-                                    <option value="w">weiblich</option>
-                                    <option value="m">männlich</option>
-                                    <option value="d">divers</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
                                 <label for="r2StartAlter">Startalter</label>
                                 <input type="number" id="r2StartAlter" min="0" max="120" value="60">
                             </div>
                             <div class="form-group">
-                                <label for="r2StartInJahren">Start in … Jahren</label>
-                                <input type="number" id="r2StartInJahren" min="0" max="120" value="0">
-                            </div>
-                            <div class="form-group">
-                                <label for="r2Brutto">Bruttorente p.a. (€)</label>
-                                <input type="number" id="r2Brutto" min="0" step="100" value="18000">
+                                <label for="r2Geschlecht">Geschlecht</label>
+                                <select id="r2Geschlecht">
+                                    <option value="w" selected>weiblich</option>
+                                    <option value="m">männlich</option>
+                                    <option value="d">divers</option>
+                                </select>
                             </div>
                             <div class="form-group">
                                 <label for="r2SparerPauschbetrag">Sparer-Pauschbetrag (€)</label>
@@ -169,21 +156,28 @@
                             </div>
                             <div class="form-group">
                                 <label for="r2KirchensteuerPct">Kirchensteuer (%)</label>
-                                <input type="number" id="r2KirchensteuerPct" min="0" max="100" step="0.1" value="0">
+                                <select id="r2KirchensteuerPct">
+                                    <option value="0" selected>0</option>
+                                    <option value="8">8</option>
+                                    <option value="9">9</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="r2Monatsrente">Monatliche Rente (€)</label>
+                                <input type="number" id="r2Monatsrente" min="0" step="10" value="1500">
+                            </div>
+                            <div class="form-group">
+                                <label for="r2StartInJahren">Start in … Jahren</label>
+                                <input type="number" id="r2StartInJahren" min="0" max="120" value="0">
                             </div>
                             <div class="form-group">
                                 <label for="r2Steuerquote">Steuerquote (%)</label>
                                 <input type="number" id="r2Steuerquote" min="0" max="100" step="0.1" value="0">
                             </div>
-                            <!-- VERALTET: Separate Anpassung für R2 (versteckt, nur für Abwärtskompatibilität) -->
-                            <div class="form-group" id="r2AnpassungContainer" style="display: none;">
-                                <label for="r2Anpassung">Rentenanpassung (% p.a.)</label>
-                                <input type="number" id="r2Anpassung" step="0.1" value="2.0">
-                            </div>
                         </div>
                         <div style="margin-top: 10px; padding: 8px; background-color: #f0f7ff; border-left: 3px solid var(--secondary-color); font-size: 0.85rem; color: #555;">
                             <strong>Hinweis:</strong> Wenn "Start in … Jahren" &gt; 0, hat es Vorrang vor "Startalter".<br>
-                            ℹ️ Die Rentenanpassung wird gemeinsam mit Person 1 über das Feld "Rentenanpassung (% p.a.)" gesteuert.
+                            Die Rentenanpassung wird gemeinsam über das Feld "Rentenanpassung koppeln an" bei Person 1 gesteuert.
                         </div>
                     </div>
                  </div>

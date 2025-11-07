@@ -9,6 +9,27 @@ import {
 import { resolveProfileKey } from './simulator-heatmap.js';
 
 /**
+ * Holt die Lohnentwicklung für ein gegebenes Simulationsjahr
+ * @param {number} yearIndex - Index des Simulationsjahres
+ * @param {Object} yearData - Jahresdaten mit Lohninformationen
+ * @returns {number} Lohnwachstum in Prozent p.a.
+ */
+function getWageGrowthPctForYear(yearIndex, yearData) {
+    // Nutzt die vorhandene lohn_de Reihe aus den historischen Daten
+    return yearData?.lohn || 0;
+}
+
+/**
+ * Holt die Inflation für ein gegebenes Simulationsjahr
+ * @param {number} yearIndex - Index des Simulationsjahres
+ * @param {Object} yearData - Jahresdaten mit Inflationsinformationen
+ * @returns {number} Inflation in Prozent p.a.
+ */
+function getInflationPctForYear(yearIndex, yearData) {
+    return yearData?.inflation || 0;
+}
+
+/**
  * Simuliert ein Jahr des Ruhestandsszenarios
  * @param {Object} currentState - Aktuelles Portfolio und Marktstatus
  * @param {Object} inputs - Benutzereingaben und Konfiguration
@@ -42,7 +63,26 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const market = window.Ruhestandsmodell_v30.analyzeMarket(marketDataCurrentYear);
 
     // Gemeinsame Rentenanpassung (% p.a.) für beide Personen
-    const rentAdjPct = inputs.rentAdjPct || 0;
+    // Berechne Anpassungsrate g_t basierend auf Modus
+    let rentAdjPct = 0;
+    const rentAdjMode = inputs.rentAdj?.mode || 'fix';
+
+    switch (rentAdjMode) {
+        case 'fix':
+            rentAdjPct = inputs.rentAdj?.pct || inputs.rentAdjPct || 0;
+            break;
+        case 'wage':
+            rentAdjPct = getWageGrowthPctForYear(yearIndex, yearData);
+            break;
+        case 'cpi':
+            rentAdjPct = getInflationPctForYear(yearIndex, yearData);
+            break;
+        default:
+            rentAdjPct = inputs.rentAdj?.pct || inputs.rentAdjPct || 0;
+    }
+
+    // Clamp: keine negativen Anpassungen unter -100%
+    rentAdjPct = Math.max(-100, rentAdjPct);
 
     // Rente Person 1 - Neue Logik mit gemeinsamer Anpassungsrate
     const currentAgeP1 = inputs.startAlter + yearIndex;
@@ -75,7 +115,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         const currentAgeP2 = currentAgeP1; // Vereinfacht: beide altern synchron
         if (currentAgeP2 >= actualStartAgeP2) {
             const isFirstYearR2 = (currentAgeP2 === actualStartAgeP2);
-            const baseR2 = inputs.partner.brutto;
+            const baseR2 = inputs.partner.monatsrente * 12;
             rente2_brutto = computePensionNext(currentAnnualPension2, isFirstYearR2, baseR2, rentAdjPct);
 
             // Steuerberechnung für Person 2

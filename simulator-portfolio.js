@@ -10,7 +10,21 @@ export function getCommonInputs() {
     const goldAktiv = document.getElementById('goldAllokationAktiv').checked;
 
     // Gemeinsame Rentenanpassung (gilt für Person 1 und Partner)
+    const rentAdjMode = document.getElementById('rentAdjMode')?.value || localStorage.getItem('sim_rentAdjMode') || 'fix';
     const rentAdjPct = parseFloat(document.getElementById('rentAdjPct')?.value) || 0;
+
+    // Partner-Monatsrente: Migration von Bruttorente zu Monatliche Rente
+    let r2Monatsrente = parseFloat(document.getElementById('r2Monatsrente')?.value);
+    if (isNaN(r2Monatsrente) || r2Monatsrente === 0) {
+        // Fallback: Versuche Migration von r2Brutto (falls vorhanden)
+        const r2BruttoOld = parseFloat(localStorage.getItem('sim_r2Brutto'));
+        if (!isNaN(r2BruttoOld) && r2BruttoOld > 0) {
+            r2Monatsrente = Math.round(r2BruttoOld / 12);
+            console.log(`Migration: r2Brutto ${r2BruttoOld} → r2Monatsrente ${r2Monatsrente}`);
+        } else {
+            r2Monatsrente = 0;
+        }
+    }
 
     const baseInputs = {
         startVermoegen: parseFloat(document.getElementById('simStartVermoegen').value) || 0,
@@ -32,10 +46,13 @@ export function getCommonInputs() {
         round5: document.getElementById('round5').checked,
         renteMonatlich: parseFloat(document.getElementById('renteMonatlich').value) || 0,
         renteStartOffsetJahre: parseInt(document.getElementById('renteStartOffsetJahre').value) || 0,
+        // Rentenanpassung: Neue Struktur mit Mode und Prozentsatz
+        rentAdj: {
+            mode: rentAdjMode,
+            pct: rentAdjPct
+        },
+        // VERALTET: Alte Felder für Abwärtskompatibilität
         rentAdjPct: rentAdjPct,
-        // VERALTET: Alte Indexierungsfelder (für Abwärtskompatibilität, werden nicht mehr verwendet)
-        renteIndexierungsart: document.getElementById('renteIndexierungsart')?.value || 'fest',
-        renteFesterSatz: parseFloat(document.getElementById('renteFesterSatz')?.value) || 0,
         pflegefallLogikAktivieren: document.getElementById('pflegefallLogikAktivieren').checked,
         pflegeModellTyp: document.getElementById('pflegeModellTyp').value,
         pflegeStufe1Zusatz: parseFloat(document.getElementById('pflegeStufe1Zusatz').value) || 0,
@@ -55,11 +72,10 @@ export function getCommonInputs() {
             geschlecht: document.getElementById('r2Geschlecht')?.value || 'w',
             startAlter: parseInt(document.getElementById('r2StartAlter')?.value) || 0,
             startInJahren: parseInt(document.getElementById('r2StartInJahren')?.value) || 0,
-            brutto: parseFloat(document.getElementById('r2Brutto')?.value) || 0,
+            monatsrente: r2Monatsrente,
             sparerPauschbetrag: parseFloat(document.getElementById('r2SparerPauschbetrag')?.value) || 0,
             kirchensteuerPct: parseFloat(document.getElementById('r2KirchensteuerPct')?.value) || 0,
             steuerquotePct: parseFloat(document.getElementById('r2Steuerquote')?.value) || 0
-            // anpassungPct wird NICHT mehr verwendet - gemeinsame Anpassung via rentAdjPct
         }
     };
 
