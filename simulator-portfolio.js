@@ -43,14 +43,13 @@ export function getCommonInputs() {
         pflegeTodesrisikoFaktor: parseFloat(document.getElementById('pflegeTodesrisikoFaktor').value) || 1.0,
         decumulation: { mode: document.getElementById('decumulationMode')?.value || 'none' },
         stressPreset: document.getElementById('stressPreset').value || 'NONE',
-        // Partner-Konfiguration (person2)
-        person2: {
-            enabled: document.getElementById('partnerEnabled')?.checked || false,
-            birthYear: parseInt(document.getElementById('partnerBirthYear')?.value) || 1964,
-            gender: document.getElementById('partnerGender')?.value || 'f',
-            churchTax: document.getElementById('partnerChurchTax')?.checked || false,
-            pensionStartYear: parseInt(document.getElementById('partnerPensionStartYear')?.value) || (new Date().getFullYear() + 5),
-            grossPensionPerYear: parseFloat(document.getElementById('partnerGrossPensionPerYear')?.value) || 0
+        // Partner-Konfiguration (Rente 2)
+        partner: {
+            aktiv: document.getElementById('chkPartnerAktiv')?.checked || false,
+            startAlter: parseInt(document.getElementById('r2StartAlter')?.value) || 0,
+            brutto: parseFloat(document.getElementById('r2Brutto')?.value) || 0,
+            anpassungPct: parseFloat(document.getElementById('r2Anpassung')?.value) || 0,
+            steuerquotePct: parseFloat(document.getElementById('r2Steuerquote')?.value) || 0
         }
     };
 

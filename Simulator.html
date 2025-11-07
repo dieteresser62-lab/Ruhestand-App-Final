@@ -127,6 +127,37 @@
                            <input type="number" id="renteFesterSatz" value="2.0" step="0.1">
                        </div>
                 </div>
+
+                 <!-- Partner/Zweite Person (Rente 2) -->
+                 <div style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
+                    <div class="form-group" style="justify-content: center; margin-bottom: 15px;">
+                        <label style="flex-direction: row; align-items: center;">
+                            <input type="checkbox" id="chkPartnerAktiv" style="width: auto; margin-right: 8px;">
+                            Partner aktivieren (zweite Person)
+                        </label>
+                    </div>
+                    <div id="sectionRente2" style="display: none;">
+                        <div class="form-grid-four-col">
+                            <div class="form-group">
+                                <label for="r2StartAlter">Startalter Partner</label>
+                                <input type="number" id="r2StartAlter" min="0" max="120" value="60">
+                            </div>
+                            <div class="form-group">
+                                <label for="r2Brutto">Bruttorente p.a. (€)</label>
+                                <input type="number" id="r2Brutto" min="0" step="100" value="18000">
+                            </div>
+                            <div class="form-group">
+                                <label for="r2Anpassung">Rentenanpassung (% p.a.)</label>
+                                <input type="number" id="r2Anpassung" step="0.1" value="2.0">
+                            </div>
+                            <div class="form-group">
+                                <label for="r2Steuerquote">Steuerquote (%)</label>
+                                <input type="number" id="r2Steuerquote" min="0" max="100" step="0.1" value="0">
+                            </div>
+                        </div>
+                    </div>
+                 </div>
+
                  <div id="pflegePanelContainer" style="grid-column: 1 / -1; border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
                     <div class="form-group" style="justify-content: center; margin-bottom: 15px;">
                         <label style="flex-direction: row; align-items: center; justify-content: center;">
@@ -181,51 +212,6 @@
                             <label for="pflegeTodesrisikoFaktor">Todesrisiko-Faktor bei Max-Pflege</label>
                             <input type="number" id="pflegeTodesrisikoFaktor" value="5.0" step="0.1">
                         </div>
-                    </div>
-                </div>
-            </fieldset>
-
-            <!-- Partner-Einstellungen für Zwei-Personen-Haushalt
-                 Smoke Tests:
-                 1. partnerEnabled=false → Felder disabled, rente2=0 im Backtest
-                 2. partnerEnabled=true → Felder enabled, rente2 ab pensionStartYear aktiv
-                 3. Vor pensionStartYear: rente2=0
-                 4. Ab pensionStartYear: rente2=grossPensionPerYear
-                 5. UI-Persistenz: Werte bleiben nach Reload erhalten (LocalStorage)
-            -->
-            <fieldset>
-                <legend>Partner-Einstellungen</legend>
-                <div class="form-group" style="justify-content: center; margin-bottom: 15px;">
-                    <label style="flex-direction: row; align-items: center;">
-                        <input type="checkbox" id="partnerEnabled" style="width: auto; margin-right: 8px;">
-                        Partner aktiv
-                    </label>
-                </div>
-                <div class="form-grid-four-col">
-                    <div class="form-group">
-                        <label for="partnerBirthYear">Geburtsjahr (Partner)</label>
-                        <input type="number" id="partnerBirthYear" value="1964" disabled>
-                    </div>
-                    <div class="form-group">
-                        <label for="partnerGender">Geschlecht (Partner)</label>
-                        <select id="partnerGender" disabled>
-                            <option value="m">Männlich</option>
-                            <option value="f" selected>Weiblich</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="grid-column: span 2; justify-content: center;">
-                        <label style="flex-direction: row; align-items: center;">
-                            <input type="checkbox" id="partnerChurchTax" checked style="width: auto; margin-right: 8px;" disabled>
-                            Kirchensteuer (Partner)
-                        </label>
-                    </div>
-                    <div class="form-group">
-                        <label for="partnerPensionStartYear">Rentenstart (Partner, Jahr)</label>
-                        <input type="number" id="partnerPensionStartYear" value="2030" disabled>
-                    </div>
-                    <div class="form-group">
-                        <label for="partnerGrossPensionPerYear">Jahresbruttorente (Partner, €)</label>
-                        <input type="number" id="partnerGrossPensionPerYear" value="18000" disabled>
                     </div>
                 </div>
             </fieldset>
