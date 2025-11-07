@@ -30,6 +30,120 @@ function cloneStressContext(ctx) {
 }
 
 /**
+ * Robuste Deep-Clone-Funktion für Sweep-Parameter
+ * Verwendet structuredClone falls verfügbar, sonst JSON-Fallback
+ */
+function deepClone(obj) {
+    if (typeof structuredClone === 'function') {
+        return structuredClone(obj);
+    }
+    return JSON.parse(JSON.stringify(obj));
+}
+
+/**
+ * Setzt verschachtelten Pfad in Objekt (z.B. "partner.monatsrente")
+ * @param {object} obj - Zielobjekt
+ * @param {string} path - Pfad (z.B. "a.b.c" oder "key")
+ * @param {any} value - Wert zum Setzen
+ */
+function setNested(obj, path, value) {
+    const parts = path.split('.');
+    let current = obj;
+    for (let i = 0; i < parts.length - 1; i++) {
+        const key = parts[i];
+        if (!(key in current) || typeof current[key] !== 'object') {
+            current[key] = {};
+        }
+        current = current[key];
+    }
+    current[parts[parts.length - 1]] = value;
+}
+
+/**
+ * Whitelist für erlaubte Sweep-Parameter
+ * Nur diese Parameter dürfen im Sweep variiert werden
+ */
+const SWEEP_ALLOWED_KEYS = new Set([
+    // Strategie-Parameter
+    'targetEq', 'rebalBand', 'maxSkimPctOfEq', 'maxBearRefillPctOfEq',
+    'runwayMinMonths', 'runwayTargetMonths',
+    'goldZielProzent', 'goldFloorProzent', 'goldAktiv',
+    // Basis-Parameter (gemeinsam)
+    'rentAdjMode', 'rentAdjPct',
+    'startFloorBedarf', 'startFlexBedarf',
+    // Weitere erlaubte Parameter können hier hinzugefügt werden
+]);
+
+/**
+ * Blockliste: Regex-Patterns für Person-2-Felder
+ * Diese Felder dürfen NICHT im Sweep überschrieben werden
+ */
+const SWEEP_BLOCK_PATTERNS = [
+    /^partner(\.|$)/i,   // z.B. partner.aktiv, partner.monatsrente, ...
+    /^r2[A-Z_]/,         // z.B. r2Monatsrente, r2StartInJahren, r2Steuerquote, ...
+];
+
+/**
+ * Prüft, ob ein Key auf der Blockliste steht (Person-2-Parameter)
+ * @param {string} key - Parameter-Key
+ * @returns {boolean} true wenn geblockt
+ */
+function isBlockedKey(key) {
+    return SWEEP_BLOCK_PATTERNS.some(rx => rx.test(key));
+}
+
+/**
+ * Extrahiert Rente-2-Serie aus YearLog
+ * @param {Array} yearLog - Array mit Jahr-für-Jahr-Logs
+ * @returns {Array|null} Array mit Rente-2-Werten pro Jahr, oder null
+ */
+function extractR2Series(yearLog) {
+    if (!yearLog || !Array.isArray(yearLog) || yearLog.length === 0) return null;
+
+    // Unterstütze verschiedene mögliche Feldnamen
+    const possibleKeys = ['rente2', 'Rente2', 'Rente_2', 'p2Rente', 'r2'];
+    const key = possibleKeys.find(k => k in (yearLog[0] || {}));
+
+    if (!key) {
+        console.warn('[SWEEP] Konnte kein Rente-2-Feld in YearLog finden. Verfügbare Keys:', Object.keys(yearLog[0] || {}));
+        return null;
+    }
+
+    return yearLog.map(y => Number(y[key]) || 0);
+}
+
+/**
+ * Prüft, ob zwei Rente-2-Serien identisch sind (innerhalb Toleranz)
+ * @param {Array} series1 - Erste Serie
+ * @param {Array} series2 - Zweite Serie
+ * @param {number} tolerance - Maximale Abweichung (Standard: 1e-6)
+ * @returns {boolean} true wenn identisch
+ */
+function areR2SeriesEqual(series1, series2, tolerance = 1e-6) {
+    if (!series1 || !series2) return false;
+    if (series1.length !== series2.length) return false;
+    return series1.every((v, i) => Math.abs(v - series2[i]) < tolerance);
+}
+
+/**
+ * Führt eine Funktion aus, ohne dass localStorage.setItem aufgerufen werden kann
+ * @param {Function} fn - Auszuführende Funktion
+ * @returns {*} Rückgabewert der Funktion
+ */
+function withNoLSWrites(fn) {
+    const _lsSet = localStorage.setItem;
+    localStorage.setItem = function() {
+        // No-op während Sweep - verhindert Side-Effects
+        console.debug('[SWEEP] localStorage.setItem blockiert während Sweep');
+    };
+    try {
+        return fn();
+    } finally {
+        localStorage.setItem = _lsSet;
+    }
+}
+
+/**
  * Berechnet die Rentenanpassungsrate für ein bestimmtes Jahr
  * @param {Object} ctx - Kontext mit inputs, series, simStartYear
  * @param {number} yearIdx - Jahr-Index innerhalb der Simulation (0 = erstes Jahr)
@@ -1169,7 +1283,8 @@ export async function runParameterSweep() {
         progressBar.style.width = '0%';
         progressBar.textContent = '0%';
 
-        const baseInputs = getCommonInputs();
+        // WICHTIG: Basis-Inputs nur EINMAL lesen und einfrieren (Deep Clone)
+        const baseInputs = deepClone(getCommonInputs());
         const anzahlRuns = parseInt(document.getElementById('mcAnzahl').value) || 100;
         const maxDauer = parseInt(document.getElementById('mcDauer').value) || 35;
         const blockSize = parseInt(document.getElementById('mcBlockSize').value) || 5;
@@ -1178,11 +1293,17 @@ export async function runParameterSweep() {
 
         const sweepResults = [];
 
+        // R2-Assertion: Referenz-Serie für Rente 2 (wird beim ersten Case gesetzt)
+        let REF_R2 = null;
+
         for (let comboIdx = 0; comboIdx < paramCombinations.length; comboIdx++) {
             const params = paramCombinations[comboIdx];
 
-            const inputs = {
-                ...baseInputs,
+            // Erstelle Case-spezifische Inputs durch Deep Clone der Basis
+            const inputs = deepClone(baseInputs);
+
+            // Überschreibe nur erlaubte Parameter (Whitelist + Blockliste prüfen)
+            const caseOverrides = {
                 runwayMinMonths: params.runwayMin,
                 runwayTargetMonths: params.runwayTarget,
                 targetEq: params.targetEq,
@@ -1192,14 +1313,29 @@ export async function runParameterSweep() {
             };
 
             if (params.goldTargetPct !== undefined) {
-                inputs.goldZielProzent = params.goldTargetPct;
-                inputs.goldAktiv = params.goldTargetPct > 0;
+                caseOverrides.goldZielProzent = params.goldTargetPct;
+                caseOverrides.goldAktiv = params.goldTargetPct > 0;
+            }
+
+            // Wende Overrides an mit Whitelist/Blockliste-Prüfung
+            for (const [k, v] of Object.entries(caseOverrides)) {
+                if (isBlockedKey(k)) {
+                    console.warn(`[SWEEP] Ignoriere Person-2-Key im Sweep: ${k}`);
+                    continue;
+                }
+                if (SWEEP_ALLOWED_KEYS.size && !SWEEP_ALLOWED_KEYS.has(k)) {
+                    console.warn(`[SWEEP] Key nicht auf Whitelist, übersprungen: ${k}`);
+                    continue;
+                }
+                // Setze erlaubten Parameter
+                inputs[k] = v;
             }
 
             const rand = rng(baseSeed + comboIdx);
             const stressCtxMaster = buildStressContext(inputs.stressPreset, rand);
 
             const runOutcomes = [];
+            let sampleYearLog = null; // Speichert Year-Log vom ersten Run für R2-Prüfung
 
             for (let i = 0; i < anzahlRuns; i++) {
                 let failed = false;
@@ -1211,6 +1347,10 @@ export async function runParameterSweep() {
                 let stressCtx = cloneStressContext(stressCtxMaster);
 
                 let minRunway = Infinity;
+
+                // Nur beim ersten Run: Year-Log sammeln für R2-Prüfung
+                const collectYearLog = (i === 0);
+                const currentRunLog = collectYearLog ? [] : null;
 
                 for (let simulationsJahr = 0; simulationsJahr < maxDauer; simulationsJahr++) {
                     const currentAge = inputs.startAlter + simulationsJahr;
@@ -1235,6 +1375,13 @@ export async function runParameterSweep() {
 
                     if (result.isRuin) {
                         failed = true;
+                        if (collectYearLog && currentRunLog) {
+                            currentRunLog.push({
+                                jahr: simulationsJahr + 1,
+                                rente2: 0,
+                                isRuin: true
+                            });
+                        }
                         if (BREAK_ON_RUIN) break;
                     } else {
                         simState = result.newState;
@@ -1242,6 +1389,15 @@ export async function runParameterSweep() {
 
                         const runway = result.logData.RunwayCoveragePct || 0;
                         if (runway < minRunway) minRunway = runway;
+
+                        // Sammle Year-Log für R2-Prüfung (nur erster Run)
+                        if (collectYearLog && currentRunLog) {
+                            currentRunLog.push({
+                                jahr: simulationsJahr + 1,
+                                rente2: result.logData.rente2 || 0,
+                                Rente2: result.logData.rente2 || 0 // Fallback verschiedene Feldnamen
+                            });
+                        }
                     }
                 }
 
@@ -1254,9 +1410,38 @@ export async function runParameterSweep() {
                     minRunway: minRunway === Infinity ? 0 : minRunway,
                     failed: failed
                 });
+
+                // Speichere Year-Log vom ersten Run für R2-Prüfung
+                if (collectYearLog && currentRunLog && !sampleYearLog) {
+                    sampleYearLog = currentRunLog;
+                }
+            }
+
+            // R2-Assertion: Prüfe ob Rente 2 konstant über Cases bleibt
+            let r2VarianceWarning = false;
+            if (sampleYearLog) {
+                const r2 = extractR2Series(sampleYearLog);
+                if (r2 && r2.length > 0) {
+                    if (REF_R2 === null) {
+                        // Erste Case-Referenz setzen
+                        REF_R2 = r2;
+                        console.log(`[SWEEP] Referenz-R2-Serie gesetzt (Case ${comboIdx}):`, r2.slice(0, 5), '...');
+                    } else {
+                        // Vergleiche mit Referenz
+                        if (!areR2SeriesEqual(r2, REF_R2)) {
+                            console.warn(`[SWEEP][ASSERT] Rente2 variiert im Sweep (Case ${comboIdx}), sollte konstant bleiben.`);
+                            console.warn('[SWEEP] Referenz:', REF_R2.slice(0, 5), '...');
+                            console.warn('[SWEEP] Aktuell:', r2.slice(0, 5), '...');
+                            r2VarianceWarning = true;
+                        }
+                    }
+                } else if (baseInputs.partner && baseInputs.partner.aktiv) {
+                    console.warn('[SWEEP] Konnte Rente2-Serie nicht extrahieren aus Year-Log (Case ' + comboIdx + ').');
+                }
             }
 
             const metrics = aggregateSweepMetrics(runOutcomes);
+            metrics.warningR2Varies = r2VarianceWarning; // Füge Warnung zu Metriken hinzu
             sweepResults.push({ params, metrics });
 
             const progress = ((comboIdx + 1) / paramCombinations.length) * 100;
@@ -1321,12 +1506,125 @@ function displaySweepResults() {
     }
 }
 
+/**
+ * Führt einen Sweep-Selbsttest durch (nur für Debug-Zwecke)
+ * Testet ob Person-2-Rente über Cases konstant bleibt
+ */
+async function runSweepSelfTest() {
+    const resultsDiv = document.getElementById('sweepSelfTestResults');
+    const button = document.getElementById('sweepSelfTestButton');
+
+    button.disabled = true;
+    resultsDiv.style.display = 'block';
+    resultsDiv.innerHTML = '<p style="color: #666;">Test läuft...</p>';
+
+    try {
+        prepareHistoricalData();
+
+        // Mini-Sweep: Nur rebalBand und targetEq variieren
+        const testCases = [
+            { rebalBand: 5, targetEq: 60 },
+            { rebalBand: 10, targetEq: 60 },
+            { rebalBand: 15, targetEq: 60 }
+        ];
+
+        const baseInputs = deepClone(getCommonInputs());
+        const anzahlRuns = 10; // Nur 10 Runs pro Case für schnellen Test
+        const maxDauer = 10; // Nur 10 Jahre
+        const baseSeed = 12345;
+        const methode = 'regime_markov';
+
+        let REF_R2 = null;
+        let allPassed = true;
+        const logMessages = [];
+
+        for (let caseIdx = 0; caseIdx < testCases.length; caseIdx++) {
+            const testCase = testCases[caseIdx];
+            const inputs = deepClone(baseInputs);
+            inputs.rebalBand = testCase.rebalBand;
+            inputs.targetEq = testCase.targetEq;
+
+            const rand = rng(baseSeed + caseIdx);
+            const stressCtxMaster = buildStressContext(inputs.stressPreset, rand);
+
+            // Führe nur ersten Run aus, um R2 zu extrahieren
+            let sampleYearLog = null;
+            const startYearIndex = Math.floor(rand() * annualData.length);
+            let simState = initMcRunState(inputs, startYearIndex);
+            let careMeta = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren);
+            let stressCtx = cloneStressContext(stressCtxMaster);
+            const currentRunLog = [];
+
+            for (let simulationsJahr = 0; simulationsJahr < maxDauer; simulationsJahr++) {
+                const currentAge = inputs.startAlter + simulationsJahr;
+                let yearData = sampleNextYearData(simState, methode, 5, rand, stressCtx);
+                yearData = applyStressOverride(yearData, stressCtx, rand);
+                careMeta = updateCareMeta(careMeta, inputs, currentAge, yearData, rand);
+
+                const effectiveRentAdjPct = computeRentAdjRate(inputs, yearData);
+                const adjustedInputs = { ...inputs, rentAdjPct: effectiveRentAdjPct };
+                const result = simulateOneYear(simState, adjustedInputs, yearData, simulationsJahr, careMeta);
+
+                if (result.isRuin) break;
+
+                simState = result.newState;
+                currentRunLog.push({
+                    jahr: simulationsJahr + 1,
+                    rente2: result.logData.rente2 || 0,
+                    Rente2: result.logData.rente2 || 0
+                });
+            }
+
+            sampleYearLog = currentRunLog;
+
+            // R2-Prüfung
+            const r2 = extractR2Series(sampleYearLog);
+            if (r2 && r2.length > 0) {
+                if (REF_R2 === null) {
+                    REF_R2 = r2;
+                    logMessages.push(`✓ Case ${caseIdx + 1}: Referenz gesetzt (rebalBand=${testCase.rebalBand})`);
+                } else {
+                    if (areR2SeriesEqual(r2, REF_R2)) {
+                        logMessages.push(`✓ Case ${caseIdx + 1}: R2 konstant (rebalBand=${testCase.rebalBand})`);
+                    } else {
+                        allPassed = false;
+                        logMessages.push(`✗ Case ${caseIdx + 1}: R2 variiert! (rebalBand=${testCase.rebalBand})`);
+                        logMessages.push(`  Referenz: [${REF_R2.slice(0, 3).join(', ')}...]`);
+                        logMessages.push(`  Aktuell:  [${r2.slice(0, 3).join(', ')}...]`);
+                    }
+                }
+            } else {
+                logMessages.push(`⚠ Case ${caseIdx + 1}: Konnte R2 nicht extrahieren`);
+            }
+        }
+
+        // Ergebnis anzeigen
+        const statusColor = allPassed ? 'green' : 'red';
+        const statusText = allPassed ? '✓ Test bestanden' : '✗ Test fehlgeschlagen';
+
+        let html = `<div style="padding: 10px; background-color: ${allPassed ? '#e8f5e9' : '#ffebee'}; border-radius: 4px; border: 1px solid ${statusColor};">`;
+        html += `<strong style="color: ${statusColor};">${statusText}</strong><br><br>`;
+        html += `<div style="font-family: monospace; font-size: 0.85rem;">`;
+        html += logMessages.join('<br>');
+        html += `</div></div>`;
+
+        resultsDiv.innerHTML = html;
+
+    } catch (error) {
+        resultsDiv.innerHTML = `<p style="color: red;">Fehler: ${error.message}</p>`;
+        console.error('Sweep-Selbsttest Fehler:', error);
+    } finally {
+        button.disabled = false;
+    }
+}
+
 // Globale Funktionen für HTML onclick-Handler
 window.runMonteCarlo = runMonteCarlo;
 window.runBacktest = runBacktest;
 window.runParameterSweep = runParameterSweep;
 window.displaySweepResults = displaySweepResults;
 window.formatCurrency = formatCurrency;
+window.runSweepSelfTest = runSweepSelfTest;
 
 // Für Parity Smoke Test
 window.simulateOneYear = simulateOneYear;
