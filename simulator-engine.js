@@ -63,16 +63,31 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     let rente2 = 0;
 
     if (inputs.partner?.aktiv) {
+        // Berechne tatsächliches Startalter basierend auf startInJahren
+        // Wenn startInJahren > 0, hat es Vorrang vor startAlter
+        let actualStartAgeP2 = inputs.partner.startAlter;
+        if (inputs.partner.startInJahren > 0) {
+            actualStartAgeP2 = inputs.startAlter + inputs.partner.startInJahren;
+        }
+        // Clamp zwischen 0 und 120
+        actualStartAgeP2 = Math.max(0, Math.min(120, actualStartAgeP2));
+
         const currentAgeP2 = currentAgeP1; // Vereinfacht: beide altern synchron
-        if (currentAgeP2 >= inputs.partner.startAlter) {
-            const isFirstYearR2 = (currentAgeP2 === inputs.partner.startAlter);
+        if (currentAgeP2 >= actualStartAgeP2) {
+            const isFirstYearR2 = (currentAgeP2 === actualStartAgeP2);
             const baseR2 = inputs.partner.brutto;
             rente2_brutto = computePensionNext(currentAnnualPension2, isFirstYearR2, baseR2, rentAdjPct);
 
-            // Steuerquote anwenden (Netto-Berechnung)
+            // Steuerberechnung für Person 2
+            // Wenn Steuerquote > 0, wird diese verwendet (einfache Methode)
+            // Andernfalls wird eine detaillierte Berechnung mit Sparer-Pauschbetrag und Kirchensteuer durchgeführt
             if (inputs.partner.steuerquotePct > 0) {
                 rente2 = rente2_brutto * (1 - inputs.partner.steuerquotePct / 100);
             } else {
+                // Detaillierte Steuerberechnung (analog zu Person 1, falls gewünscht)
+                // Für jetzt: keine Steuern, wenn Steuerquote = 0
+                // TODO: Hier könnte eine detaillierte Steuerberechnung mit Sparer-Pauschbetrag
+                // und Kirchensteuer implementiert werden (analog zur engine.js Logik)
                 rente2 = rente2_brutto;
             }
             // Clamp bei 0 (keine negativen Renten)

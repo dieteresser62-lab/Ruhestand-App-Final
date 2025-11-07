@@ -52,8 +52,12 @@ export function getCommonInputs() {
         // Partner-Konfiguration (Rente 2)
         partner: {
             aktiv: document.getElementById('chkPartnerAktiv')?.checked || false,
+            geschlecht: document.getElementById('r2Geschlecht')?.value || 'w',
             startAlter: parseInt(document.getElementById('r2StartAlter')?.value) || 0,
+            startInJahren: parseInt(document.getElementById('r2StartInJahren')?.value) || 0,
             brutto: parseFloat(document.getElementById('r2Brutto')?.value) || 0,
+            sparerPauschbetrag: parseFloat(document.getElementById('r2SparerPauschbetrag')?.value) || 0,
+            kirchensteuerPct: parseFloat(document.getElementById('r2KirchensteuerPct')?.value) || 0,
             steuerquotePct: parseFloat(document.getElementById('r2Steuerquote')?.value) || 0
             // anpassungPct wird NICHT mehr verwendet - gemeinsame Anpassung via rentAdjPct
         }
