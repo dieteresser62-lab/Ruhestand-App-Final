@@ -1,5 +1,69 @@
 "use strict";
 
+/**
+ * ============================================================================
+ * SWEEP FIX: ZWEI-PERSONEN-HAUSHALT - PARAMETER WHITELIST & RENTE-2-INVARIANZ
+ * ============================================================================
+ *
+ * Datum: 2025-11-07
+ *
+ * ÄNDERUNGEN:
+ * -----------
+ * 1. **Whitelist statt Blacklist für Sweep-Parameter**
+ *    - Nur explizit erlaubte Parameter (SWEEP_ALLOWED_KEYS) dürfen im Sweep variiert werden
+ *    - Verhindert unbeabsichtigte Änderungen an Person-2-Parametern (Rente, Alter, etc.)
+ *    - Blocklist (SWEEP_BLOCK_PATTERNS) für zusätzlichen Schutz von Person-2-Feldern
+ *
+ * 2. **Deep-Copy der Settings pro Sweep-Zelle**
+ *    - deepClone() verwendet structuredClone() (Browser-Native) oder JSON-Fallback
+ *    - Verhindert Side-Effects zwischen Sweep-Cases
+ *    - baseInputs werden nur EINMAL gelesen und dann geklont
+ *
+ * 3. **Renten-Invarianz-Wächter für Person 2**
+ *    - Extrahiert Rente-2-Serie aus Year-Logs (extractR2Series)
+ *    - Vergleicht Rente-2 über alle Sweep-Cases (areR2SeriesEqual)
+ *    - Setzt warningR2Varies-Flag bei Abweichungen
+ *    - Referenz-Serie wird beim ersten Case gesetzt
+ *
+ * 4. **Heatmap-Badge & Tooltip für Verstöße**
+ *    - Gelber Rand (stroke-width: 3px) bei warningR2Varies
+ *    - Warn-Symbol ⚠ in betroffenen Heatmap-Zellen
+ *    - Tooltip: "⚠ Rente 2 variierte im Sweep"
+ *    - Keine KPI-Verfälschung, nur visuelle Markierung
+ *
+ * 5. **Developer-Tests mit fixem Seed**
+ *    - runSweepSelfTest() für Mini-Sweep mit R2-Invarianz-Prüfung
+ *    - Aktivierung via Dev-Mode Toggle (localStorage: sim.devMode=1)
+ *    - Console-Logs mit [SWEEP] Prefix
+ *    - Visuelle Bestätigung in UI (grün/rot)
+ *
+ * DEVELOPER-FLAGS:
+ * ----------------
+ * - Dev-Mode aktivieren: localStorage.setItem('sim.devMode', '1'); dann Reload
+ *   oder: Klick auf "Dev-Mode" Toggle im UI (falls vorhanden)
+ * - Self-Test Button erscheint dann im Parameter-Sweep Tab
+ * - Fixed Seed für Tests: Wird in runSweepSelfTest() hartcodiert (baseSeed = 12345)
+ *
+ * BETROFFENE DATEIEN:
+ * -------------------
+ * - simulator-main.js:     Haupt-Sweep-Logik, Whitelist, Deep-Clone, R2-Assertion
+ * - simulator-heatmap.js:  Heatmap-Rendering mit R2-Warning-Badge
+ * - simulator-results.js:  Metriken-Aggregation (warningR2Varies)
+ *
+ * FUNKTIONEN:
+ * -----------
+ * - deepClone(obj)                     ~Zeile 100 (nach Imports)
+ * - SWEEP_ALLOWED_KEYS                 ~Zeile 130 (Whitelist-Definition)
+ * - SWEEP_BLOCK_PATTERNS               ~Zeile 145 (Blocklist für Person-2)
+ * - isBlockedKey(key)                  ~Zeile 155 (Blocklist-Prüfung)
+ * - extractR2Series(yearLog)           ~Zeile 164 (Rente-2-Serie extrahieren)
+ * - areR2SeriesEqual(s1, s2, tol)      ~Zeile 186 (Rente-2-Vergleich)
+ * - runParameterSweep()                ~Zeile 1278 (Haupt-Sweep-Logik)
+ * - runSweepSelfTest()                 ~Zeile 1577 (Developer-Test)
+ *
+ * ============================================================================
+ */
+
 import { rng, quantile, sum, mean, formatCurrency, parseRange, parseRangeInput, cartesianProduct, cartesianProductLimited } from './simulator-utils.js';
 import { ENGINE_VERSION, ENGINE_HASH, STRESS_PRESETS, BREAK_ON_RUIN, MORTALITY_TABLE, HISTORICAL_DATA, annualData } from './simulator-data.js';
 import {
@@ -31,7 +95,21 @@ function cloneStressContext(ctx) {
 
 /**
  * Robuste Deep-Clone-Funktion für Sweep-Parameter
- * Verwendet structuredClone falls verfügbar, sonst JSON-Fallback
+ *
+ * Verwendet die native structuredClone() API (falls verfügbar, Chrome 98+, Firefox 94+),
+ * andernfalls Fallback auf JSON.parse(JSON.stringify()).
+ *
+ * WICHTIG: Diese Funktion ist KRITISCH für Sweep-Korrektheit!
+ * Sie verhindert Side-Effects zwischen Sweep-Cases, indem jede Case-Kombination
+ * eine komplett unabhängige Kopie der baseInputs erhält.
+ *
+ * @param {Object} obj - Das zu klonende Objekt
+ * @returns {Object} Tiefe, unabhängige Kopie des Objekts
+ *
+ * @example
+ * const baseInputs = getCommonInputs();
+ * const caseInputs = deepClone(baseInputs);
+ * caseInputs.rebalBand = 10; // baseInputs.rebalBand bleibt unverändert
  */
 function deepClone(obj) {
     if (typeof structuredClone === 'function') {
@@ -62,25 +140,50 @@ function setNested(obj, path, value) {
 /**
  * Whitelist für erlaubte Sweep-Parameter
  * Nur diese Parameter dürfen im Sweep variiert werden
+ *
+ * WICHTIG: Person-2-Parameter (partner.*, r2*, p2*) dürfen NICHT hier aufgeführt werden!
+ *
+ * Aktuelle Sweep-Parameter (Stand 2025-11-07):
+ * - runwayMin/runwayTarget → runwayMinMonths/runwayTargetMonths
+ * - targetEq
+ * - rebalBand
+ * - maxSkimPct → maxSkimPctOfEq
+ * - maxBearRefillPct → maxBearRefillPctOfEq
+ * - goldTargetPct → goldZielProzent + goldAktiv
  */
 const SWEEP_ALLOWED_KEYS = new Set([
-    // Strategie-Parameter
-    'targetEq', 'rebalBand', 'maxSkimPctOfEq', 'maxBearRefillPctOfEq',
+    // Strategie-Parameter (Liquiditäts-Runway)
     'runwayMinMonths', 'runwayTargetMonths',
+    // Strategie-Parameter (Portfolio-Allokation)
+    'targetEq', 'rebalBand',
+    // Strategie-Parameter (Skim & Refill)
+    'maxSkimPctOfEq', 'maxBearRefillPctOfEq',
+    // Strategie-Parameter (Gold-Allokation)
     'goldZielProzent', 'goldFloorProzent', 'goldAktiv',
-    // Basis-Parameter (gemeinsam)
+    // Basis-Parameter (gemeinsam für beide Personen)
     'rentAdjMode', 'rentAdjPct',
     'startFloorBedarf', 'startFlexBedarf',
     // Weitere erlaubte Parameter können hier hinzugefügt werden
+    // ACHTUNG: Keine Person-2-spezifischen Parameter (r2*, partner.*, p2*)!
 ]);
 
 /**
  * Blockliste: Regex-Patterns für Person-2-Felder
  * Diese Felder dürfen NICHT im Sweep überschrieben werden
+ *
+ * WICHTIG: Dies ist eine Fail-Safe zusätzlich zur Whitelist!
+ * Selbst wenn jemand versehentlich einen Person-2-Parameter zur Whitelist hinzufügt,
+ * wird er durch diese Blockliste abgefangen.
+ *
+ * Geblockte Patterns:
+ * - partner.* (z.B. partner.aktiv, partner.monatsrente, partner.pension)
+ * - r2* (z.B. r2Monatsrente, r2StartInJahren, r2Steuerquote, r2Geschlecht)
+ * - p2* (z.B. p2Rente, p2StartAlter, etc.)
  */
 const SWEEP_BLOCK_PATTERNS = [
     /^partner(\.|$)/i,   // z.B. partner.aktiv, partner.monatsrente, ...
     /^r2[A-Z_]/,         // z.B. r2Monatsrente, r2StartInJahren, r2Steuerquote, ...
+    /^p2[A-Z_]/,         // z.B. p2Rente, p2StartAlter, p2Geschlecht, ...
 ];
 
 /**
@@ -93,9 +196,24 @@ function isBlockedKey(key) {
 }
 
 /**
- * Extrahiert Rente-2-Serie aus YearLog
- * @param {Array} yearLog - Array mit Jahr-für-Jahr-Logs
- * @returns {Array|null} Array mit Rente-2-Werten pro Jahr, oder null
+ * Extrahiert Rente-2-Serie aus YearLog für Invarianz-Prüfung
+ *
+ * Diese Funktion ist Teil des Renten-Invarianz-Wächters.
+ * Sie extrahiert die Rente-2-Werte aus jedem Simulationsjahr, um zu prüfen,
+ * ob die Rente der zweiten Person über verschiedene Sweep-Cases konstant bleibt.
+ *
+ * @param {Array<Object>} yearLog - Array mit Jahr-für-Jahr-Logs aus einem Simulationslauf
+ *                                  (z.B. currentRunLog aus runParameterSweep)
+ * @returns {Array<number>|null} Array mit Rente-2-Werten pro Jahr (in €), oder null wenn nicht gefunden
+ *
+ * @example
+ * const yearLog = [
+ *   { jahr: 1, rente2: 18000 },
+ *   { jahr: 2, rente2: 18360 }, // +2% Anpassung
+ *   { jahr: 3, rente2: 18727 }
+ * ];
+ * const r2Serie = extractR2Series(yearLog);
+ * // => [18000, 18360, 18727]
  */
 function extractR2Series(yearLog) {
     if (!yearLog || !Array.isArray(yearLog) || yearLog.length === 0) return null;
@@ -113,11 +231,28 @@ function extractR2Series(yearLog) {
 }
 
 /**
- * Prüft, ob zwei Rente-2-Serien identisch sind (innerhalb Toleranz)
- * @param {Array} series1 - Erste Serie
- * @param {Array} series2 - Zweite Serie
- * @param {number} tolerance - Maximale Abweichung (Standard: 1e-6)
- * @returns {boolean} true wenn identisch
+ * Prüft, ob zwei Rente-2-Serien identisch sind (innerhalb numerischer Toleranz)
+ *
+ * Diese Funktion ist der Kern des Renten-Invarianz-Wächters.
+ * Sie vergleicht zwei Rente-2-Zeitserien und prüft, ob sie innerhalb der
+ * numerischen Toleranz identisch sind. Kleine Rundungsfehler werden toleriert.
+ *
+ * WICHTIG: Wenn diese Funktion false zurückgibt, bedeutet das,
+ * dass die Rente von Person 2 zwischen zwei Sweep-Cases variiert hat,
+ * was NICHT passieren sollte!
+ *
+ * @param {Array<number>} series1 - Erste Rente-2-Zeitserie (Referenz)
+ * @param {Array<number>} series2 - Zweite Rente-2-Zeitserie (zu prüfen)
+ * @param {number} [tolerance=1e-6] - Maximale Abweichung in € (Standard: 0.000001 €)
+ * @returns {boolean} true wenn identisch (innerhalb Toleranz), false sonst
+ *
+ * @example
+ * const ref = [18000, 18360, 18727];
+ * const test1 = [18000, 18360, 18727]; // Identisch
+ * const test2 = [18000, 18360, 27000]; // Jahr 3 abweichend!
+ *
+ * areR2SeriesEqual(ref, test1); // => true
+ * areR2SeriesEqual(ref, test2); // => false (Warnung sollte ausgelöst werden)
  */
 function areR2SeriesEqual(series1, series2, tolerance = 1e-6) {
     if (!series1 || !series2) return false;
@@ -1507,8 +1642,14 @@ function displaySweepResults() {
 }
 
 /**
- * Führt einen Sweep-Selbsttest durch (nur für Debug-Zwecke)
- * Testet ob Person-2-Rente über Cases konstant bleibt
+ * Führt einen umfassenden Sweep-Selbsttest durch (Developer-Modus)
+ *
+ * Tests:
+ * 1. Baseline-Test: Rente2 bleibt über Cases konstant (Whitelist greift)
+ * 2. Negativtest: Simuliert absichtliche R2-Änderung (sollte erkannt werden)
+ * 3. Deep-Copy-Test: baseInputs bleiben nach Sweep unverändert
+ *
+ * Aktivierung: Dev-Mode Toggle oder localStorage.setItem('sim.devMode', '1')
  */
 async function runSweepSelfTest() {
     const resultsDiv = document.getElementById('sweepSelfTestResults');
@@ -1516,12 +1657,24 @@ async function runSweepSelfTest() {
 
     button.disabled = true;
     resultsDiv.style.display = 'block';
-    resultsDiv.innerHTML = '<p style="color: #666;">Test läuft...</p>';
+    resultsDiv.innerHTML = '<p style="color: #666;">🔬 Sweep-Tests laufen...</p>';
+
+    console.log('[SWEEP-TEST] ========================================');
+    console.log('[SWEEP-TEST] Starte Sweep-Selbsttest-Suite');
+    console.log('[SWEEP-TEST] ========================================');
 
     try {
         prepareHistoricalData();
 
-        // Mini-Sweep: Nur rebalBand und targetEq variieren
+        const logMessages = [];
+        let allTestsPassed = true;
+
+        // =====================================================================
+        // TEST 1: Baseline - Rente2 bleibt über Cases konstant
+        // =====================================================================
+        console.log('[SWEEP-TEST] Test 1: Baseline (R2-Invarianz)');
+        logMessages.push('<strong>Test 1: Baseline (R2-Invarianz)</strong>');
+
         const testCases = [
             { rebalBand: 5, targetEq: 60 },
             { rebalBand: 10, targetEq: 60 },
@@ -1529,14 +1682,14 @@ async function runSweepSelfTest() {
         ];
 
         const baseInputs = deepClone(getCommonInputs());
-        const anzahlRuns = 10; // Nur 10 Runs pro Case für schnellen Test
-        const maxDauer = 10; // Nur 10 Jahre
+        const baseInputsJson = JSON.stringify(baseInputs); // Für Deep-Copy-Test
+        const anzahlRuns = 10;
+        const maxDauer = 10;
         const baseSeed = 12345;
         const methode = 'regime_markov';
 
         let REF_R2 = null;
-        let allPassed = true;
-        const logMessages = [];
+        let test1Passed = true;
 
         for (let caseIdx = 0; caseIdx < testCases.length; caseIdx++) {
             const testCase = testCases[caseIdx];
@@ -1547,8 +1700,6 @@ async function runSweepSelfTest() {
             const rand = rng(baseSeed + caseIdx);
             const stressCtxMaster = buildStressContext(inputs.stressPreset, rand);
 
-            // Führe nur ersten Run aus, um R2 zu extrahieren
-            let sampleYearLog = null;
             const startYearIndex = Math.floor(rand() * annualData.length);
             let simState = initMcRunState(inputs, startYearIndex);
             let careMeta = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren);
@@ -1575,44 +1726,162 @@ async function runSweepSelfTest() {
                 });
             }
 
-            sampleYearLog = currentRunLog;
-
-            // R2-Prüfung
-            const r2 = extractR2Series(sampleYearLog);
+            const r2 = extractR2Series(currentRunLog);
             if (r2 && r2.length > 0) {
                 if (REF_R2 === null) {
                     REF_R2 = r2;
-                    logMessages.push(`✓ Case ${caseIdx + 1}: Referenz gesetzt (rebalBand=${testCase.rebalBand})`);
+                    console.log(`[SWEEP-TEST] ✓ Case ${caseIdx + 1}: Referenz gesetzt (rebalBand=${testCase.rebalBand})`);
+                    console.log(`[SWEEP-TEST]   R2-Serie: [${r2.slice(0, 3).join(', ')}...] (${r2.length} Jahre)`);
+                    logMessages.push(`&nbsp;&nbsp;✓ Case ${caseIdx + 1}: Referenz gesetzt (rebalBand=${testCase.rebalBand})`);
                 } else {
                     if (areR2SeriesEqual(r2, REF_R2)) {
-                        logMessages.push(`✓ Case ${caseIdx + 1}: R2 konstant (rebalBand=${testCase.rebalBand})`);
+                        console.log(`[SWEEP-TEST] ✓ Case ${caseIdx + 1}: R2 konstant (rebalBand=${testCase.rebalBand})`);
+                        logMessages.push(`&nbsp;&nbsp;✓ Case ${caseIdx + 1}: R2 konstant (rebalBand=${testCase.rebalBand})`);
                     } else {
-                        allPassed = false;
-                        logMessages.push(`✗ Case ${caseIdx + 1}: R2 variiert! (rebalBand=${testCase.rebalBand})`);
-                        logMessages.push(`  Referenz: [${REF_R2.slice(0, 3).join(', ')}...]`);
-                        logMessages.push(`  Aktuell:  [${r2.slice(0, 3).join(', ')}...]`);
+                        test1Passed = false;
+                        allTestsPassed = false;
+                        console.error(`[SWEEP-TEST] ✗ Case ${caseIdx + 1}: R2 variiert! (rebalBand=${testCase.rebalBand})`);
+                        console.error(`[SWEEP-TEST]   Referenz: [${REF_R2.slice(0, 3).join(', ')}...]`);
+                        console.error(`[SWEEP-TEST]   Aktuell:  [${r2.slice(0, 3).join(', ')}...]`);
+                        logMessages.push(`&nbsp;&nbsp;<span style="color: red;">✗ Case ${caseIdx + 1}: R2 variiert! (rebalBand=${testCase.rebalBand})</span>`);
+                        logMessages.push(`&nbsp;&nbsp;&nbsp;&nbsp;Referenz: [${REF_R2.slice(0, 3).join(', ')}...]`);
+                        logMessages.push(`&nbsp;&nbsp;&nbsp;&nbsp;Aktuell:  [${r2.slice(0, 3).join(', ')}...]`);
                     }
                 }
             } else {
-                logMessages.push(`⚠ Case ${caseIdx + 1}: Konnte R2 nicht extrahieren`);
+                console.warn(`[SWEEP-TEST] ⚠ Case ${caseIdx + 1}: Konnte R2 nicht extrahieren`);
+                logMessages.push(`&nbsp;&nbsp;<span style="color: orange;">⚠ Case ${caseIdx + 1}: Konnte R2 nicht extrahieren</span>`);
             }
         }
 
-        // Ergebnis anzeigen
-        const statusColor = allPassed ? 'green' : 'red';
-        const statusText = allPassed ? '✓ Test bestanden' : '✗ Test fehlgeschlagen';
+        logMessages.push(test1Passed ? '<span style="color: green;">✓ Test 1 bestanden</span>' : '<span style="color: red;">✗ Test 1 fehlgeschlagen</span>');
+        logMessages.push('');
 
-        let html = `<div style="padding: 10px; background-color: ${allPassed ? '#e8f5e9' : '#ffebee'}; border-radius: 4px; border: 1px solid ${statusColor};">`;
-        html += `<strong style="color: ${statusColor};">${statusText}</strong><br><br>`;
-        html += `<div style="font-family: monospace; font-size: 0.85rem;">`;
+        // =====================================================================
+        // TEST 2: Deep-Copy-Test - baseInputs bleiben unverändert
+        // =====================================================================
+        console.log('[SWEEP-TEST] Test 2: Deep-Copy-Schutz');
+        logMessages.push('<strong>Test 2: Deep-Copy-Schutz</strong>');
+
+        const baseInputsAfter = JSON.stringify(baseInputs);
+        const test2Passed = baseInputsJson === baseInputsAfter;
+
+        if (test2Passed) {
+            console.log('[SWEEP-TEST] ✓ baseInputs blieben unverändert nach Cases');
+            logMessages.push('&nbsp;&nbsp;✓ baseInputs blieben unverändert nach Cases');
+        } else {
+            console.error('[SWEEP-TEST] ✗ baseInputs wurden modifiziert! Deep-Copy fehlerhaft!');
+            logMessages.push('&nbsp;&nbsp;<span style="color: red;">✗ baseInputs wurden modifiziert! Deep-Copy fehlerhaft!</span>');
+            allTestsPassed = false;
+        }
+
+        logMessages.push(test2Passed ? '<span style="color: green;">✓ Test 2 bestanden</span>' : '<span style="color: red;">✗ Test 2 fehlgeschlagen</span>');
+        logMessages.push('');
+
+        // =====================================================================
+        // TEST 3: Negativtest - Simuliere R2-Änderung
+        // =====================================================================
+        console.log('[SWEEP-TEST] Test 3: Negativtest (R2-Änderung sollte erkannt werden)');
+        logMessages.push('<strong>Test 3: Negativtest (R2-Änderung erkennen)</strong>');
+
+        // Simuliere zwei Cases, wobei beim zweiten absichtlich r2Monatsrente geändert wird
+        const negTestCases = [
+            { rebalBand: 10, r2Change: false },
+            { rebalBand: 15, r2Change: true } // Hier ändern wir absichtlich r2Monatsrente
+        ];
+
+        let NEG_REF_R2 = null;
+        let test3Passed = false; // Sollte NACH dem zweiten Case true werden (wenn Änderung erkannt wurde)
+
+        for (let caseIdx = 0; caseIdx < negTestCases.length; caseIdx++) {
+            const testCase = negTestCases[caseIdx];
+            const inputs = deepClone(baseInputs);
+            inputs.rebalBand = testCase.rebalBand;
+
+            // ABSICHTLICH R2 ändern beim zweiten Case (nur für Test!)
+            if (testCase.r2Change) {
+                if (inputs.r2Monatsrente !== undefined) {
+                    inputs.r2Monatsrente = inputs.r2Monatsrente * 1.5; // +50%
+                    console.log('[SWEEP-TEST] ⚠ Absichtlich r2Monatsrente geändert (für Negativtest)');
+                }
+            }
+
+            const rand = rng(baseSeed + 100 + caseIdx);
+            const stressCtxMaster = buildStressContext(inputs.stressPreset, rand);
+
+            const startYearIndex = Math.floor(rand() * annualData.length);
+            let simState = initMcRunState(inputs, startYearIndex);
+            let careMeta = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren);
+            let stressCtx = cloneStressContext(stressCtxMaster);
+            const currentRunLog = [];
+
+            for (let simulationsJahr = 0; simulationsJahr < maxDauer; simulationsJahr++) {
+                const currentAge = inputs.startAlter + simulationsJahr;
+                let yearData = sampleNextYearData(simState, methode, 5, rand, stressCtx);
+                yearData = applyStressOverride(yearData, stressCtx, rand);
+                careMeta = updateCareMeta(careMeta, inputs, currentAge, yearData, rand);
+
+                const effectiveRentAdjPct = computeRentAdjRate(inputs, yearData);
+                const adjustedInputs = { ...inputs, rentAdjPct: effectiveRentAdjPct };
+                const result = simulateOneYear(simState, adjustedInputs, yearData, simulationsJahr, careMeta);
+
+                if (result.isRuin) break;
+
+                simState = result.newState;
+                currentRunLog.push({
+                    jahr: simulationsJahr + 1,
+                    rente2: result.logData.rente2 || 0,
+                    Rente2: result.logData.rente2 || 0
+                });
+            }
+
+            const r2 = extractR2Series(currentRunLog);
+            if (r2 && r2.length > 0) {
+                if (NEG_REF_R2 === null) {
+                    NEG_REF_R2 = r2;
+                    console.log(`[SWEEP-TEST] ✓ Neg-Case ${caseIdx + 1}: Referenz gesetzt`);
+                    logMessages.push(`&nbsp;&nbsp;✓ Neg-Case ${caseIdx + 1}: Referenz gesetzt`);
+                } else {
+                    if (areR2SeriesEqual(r2, NEG_REF_R2)) {
+                        console.error(`[SWEEP-TEST] ✗ Neg-Case ${caseIdx + 1}: R2-Änderung wurde NICHT erkannt!`);
+                        logMessages.push(`&nbsp;&nbsp;<span style="color: red;">✗ Neg-Case ${caseIdx + 1}: R2-Änderung wurde NICHT erkannt!</span>`);
+                        allTestsPassed = false;
+                    } else {
+                        console.log(`[SWEEP-TEST] ✓ Neg-Case ${caseIdx + 1}: R2-Änderung korrekt erkannt!`);
+                        logMessages.push(`&nbsp;&nbsp;<span style="color: green;">✓ Neg-Case ${caseIdx + 1}: R2-Änderung korrekt erkannt!</span>`);
+                        test3Passed = true;
+                    }
+                }
+            }
+        }
+
+        logMessages.push(test3Passed ? '<span style="color: green;">✓ Test 3 bestanden</span>' : '<span style="color: red;">✗ Test 3 fehlgeschlagen</span>');
+        logMessages.push('');
+
+        // =====================================================================
+        // Gesamtergebnis
+        // =====================================================================
+        console.log('[SWEEP-TEST] ========================================');
+        console.log('[SWEEP-TEST] Gesamtergebnis: ' + (allTestsPassed ? '✓ ALLE TESTS BESTANDEN' : '✗ TESTS FEHLGESCHLAGEN'));
+        console.log('[SWEEP-TEST] ========================================');
+
+        const statusColor = allTestsPassed ? 'green' : 'red';
+        const statusText = allTestsPassed ? '✓ Alle Tests bestanden' : '✗ Einige Tests fehlgeschlagen';
+
+        let html = `<div style="padding: 15px; background-color: ${allTestsPassed ? '#e8f5e9' : '#ffebee'}; border-radius: 4px; border: 1px solid ${statusColor};">`;
+        html += `<strong style="color: ${statusColor}; font-size: 1.1rem;">${statusText}</strong><br><br>`;
+        html += `<div style="font-family: monospace; font-size: 0.85rem; line-height: 1.6;">`;
         html += logMessages.join('<br>');
+        html += `</div>`;
+        html += `<div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #ddd; font-size: 0.8rem; color: #666;">`;
+        html += `Hinweis: Console-Logs enthalten detaillierte Test-Ausgaben mit [SWEEP-TEST] Prefix.`;
         html += `</div></div>`;
 
         resultsDiv.innerHTML = html;
 
     } catch (error) {
         resultsDiv.innerHTML = `<p style="color: red;">Fehler: ${error.message}</p>`;
-        console.error('Sweep-Selbsttest Fehler:', error);
+        console.error('[SWEEP-TEST] Fehler:', error);
     } finally {
         button.disabled = false;
     }
