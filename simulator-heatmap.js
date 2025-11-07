@@ -404,6 +404,8 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
             const color = getColor(value);
 
             const result = sweepResults.find(r => r.params[xParam] === xVal && r.params[yParam] === yVal);
+            const hasR2Warning = result && result.metrics && result.metrics.warningR2Varies;
+
             const tooltipLines = result ? [
                 `${paramLabels[xParam]}: ${xVal}`,
                 `${paramLabels[yParam]}: ${yVal}`,
@@ -411,16 +413,26 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
                 `Success Prob: ${result.metrics.successProbFloor.toFixed(1)}%`,
                 `P10 End Wealth: ${(result.metrics.p10EndWealth / 1000).toFixed(0)}k €`,
                 `Worst 5% DD: ${result.metrics.worst5Drawdown.toFixed(1)}%`,
-                `Min Runway: ${result.metrics.minRunwayObserved.toFixed(1)} Mo`
-            ] : [`${paramLabels[xParam]}: ${xVal}`, `${paramLabels[yParam]}: ${yVal}`, 'Keine Daten'];
+                `Min Runway: ${result.metrics.minRunwayObserved.toFixed(1)} Mo`,
+                hasR2Warning ? '\n⚠ Rente 2 variierte im Sweep' : ''
+            ].filter(Boolean) : [`${paramLabels[xParam]}: ${xVal}`, `${paramLabels[yParam]}: ${yVal}`, 'Keine Daten'];
 
             const tooltip = tooltipLines.join('&#10;');
 
-            cellsHtml += `<rect x="${x}" y="${y}" width="${cellWidth}" height="${cellHeight}" fill="${color}" stroke="#fff" stroke-width="1"><title>${tooltip}</title></rect>`;
+            // Füge gelben Rand hinzu bei R2-Warnung
+            const strokeColor = hasR2Warning ? '#ffc107' : '#fff';
+            const strokeWidth = hasR2Warning ? '3' : '1';
+            cellsHtml += `<rect x="${x}" y="${y}" width="${cellWidth}" height="${cellHeight}" fill="${color}" stroke="${strokeColor}" stroke-width="${strokeWidth}"><title>${tooltip}</title></rect>`;
 
             if (cellWidth >= 40 && cellHeight >= 30) {
                 const textColor = pickTextColorForBg(parseRgb(color));
-                cellsHtml += `<text x="${x + cellWidth / 2}" y="${y + cellHeight / 2}" text-anchor="middle" dominant-baseline="middle" fill="${textColor}" font-size="11px" font-weight="600" pointer-events="none">${formatValue(value, metricKey)}</text>`;
+                const yOffset = hasR2Warning ? -5 : 0;
+                cellsHtml += `<text x="${x + cellWidth / 2}" y="${y + cellHeight / 2 + yOffset}" text-anchor="middle" dominant-baseline="middle" fill="${textColor}" font-size="11px" font-weight="600" pointer-events="none">${formatValue(value, metricKey)}</text>`;
+
+                // Warn-Symbol bei R2-Varianz
+                if (hasR2Warning) {
+                    cellsHtml += `<text x="${x + cellWidth / 2}" y="${y + cellHeight / 2 + 10}" text-anchor="middle" dominant-baseline="middle" font-size="14px" pointer-events="none" title="Rente 2 variierte im Sweep">⚠</text>`;
+                }
             }
         }
     }

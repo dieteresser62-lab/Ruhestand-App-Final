@@ -369,6 +369,16 @@
             <div id="sweep-progress-bar-container" style="display:none; width: 100%; background-color: #e0e0e0; height: 24px; border-radius: 4px; margin-top: 15px; overflow: hidden;">
                 <div id="sweep-progress-bar" style="width: 0%; height: 100%; background-color: var(--secondary-color); transition: width 0.3s; line-height: 24px; text-align: center; color: white; font-size: 0.85rem;"></div>
             </div>
+
+            <!-- Selbsttest-Panel (nur bei ?debug=1 sichtbar) -->
+            <div id="sweepSelfTestPanel" class="dev-only" style="margin-top: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9;">
+                <h4 style="margin-top: 0;">🧪 Sweep-Selbsttest (Debug)</h4>
+                <p style="font-size: 0.85rem; color: #666;">
+                    Führt einen Mini-Sweep mit 3 Fällen aus (nur rebalBand-Variation) und prüft, ob R2 konstant bleibt.
+                </p>
+                <button id="sweepSelfTestButton" onclick="runSweepSelfTest()">Selbsttest ausführen</button>
+                <div id="sweepSelfTestResults" style="margin-top: 10px; display: none;"></div>
+            </div>
             <div id="sweepResults" style="display:none; margin-top: 25px;">
                 <h3>Sweep Ergebnisse</h3>
                 <div id="sweepControls" style="margin-bottom: 15px;">
