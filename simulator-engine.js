@@ -18,7 +18,8 @@ import { resolveProfileKey } from './simulator-heatmap.js';
  * @returns {Object} Simulationsergebnisse
  */
 export function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta = null) {
-    let { portfolio, baseFloor, baseFlex, lastState, currentAnnualPension, marketDataHist } = currentState;
+    let { portfolio, baseFloor, baseFlex, lastState, currentAnnualPension, currentAnnualPension2, marketDataHist } = currentState;
+    currentAnnualPension2 = currentAnnualPension2 || 0;
     let { depotTranchesAktien, depotTranchesGold } = portfolio;
     let liquiditaet = portfolio.liquiditaet;
     let totalTaxesThisYear = 0;
@@ -43,11 +44,32 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     // Rente Person 1 (bestehende Logik)
     const rente1 = computeYearlyPension({ yearIndex, baseMonthly: inputs.renteMonatlich, startOffset: inputs.renteStartOffsetJahre, lastAnnualPension: currentAnnualPension, indexierungsArt: inputs.renteIndexierungsart, inflRate: yearData.inflation, lohnRate: yearData.lohn, festerSatz: inputs.renteFesterSatz });
 
-    // Rente Person 2 (Partner) - NUR im Backtest
-    // Smoke Test: Bei partnerEnabled=false ist rente2=0
-    // Smoke Test: Vor pensionStartYear ist rente2=0, ab pensionStartYear ist rente2=grossPensionPerYear
-    const actualYear = yearData.jahr;
-    const rente2 = (inputs.person2?.enabled && actualYear >= inputs.person2.pensionStartYear) ? inputs.person2.grossPensionPerYear : 0;
+    // Rente Person 2 (Partner) - dynamisch mit Startalter und jährlicher Anpassung
+    let rente2 = 0;
+    if (inputs.partner?.aktiv) {
+        const currentAgeP1 = inputs.startAlter + yearIndex;
+        const currentAgeP2 = currentAgeP1; // Vereinfacht: beide altern synchron; könnte erweitert werden
+
+        if (currentAgeP2 >= inputs.partner.startAlter) {
+            if (currentAgeP2 === inputs.partner.startAlter) {
+                // Erstes Jahr: Basisrente (brutto)
+                rente2 = inputs.partner.brutto;
+            } else if (currentAnnualPension2 > 0) {
+                // Folgende Jahre: Anpassung auf Basis der Vorjahresrente
+                const anpassungsSatz = inputs.partner.anpassungPct / 100;
+                rente2 = currentAnnualPension2 * (1 + anpassungsSatz);
+            } else {
+                // Fallback falls currentAnnualPension2 nicht gesetzt
+                rente2 = inputs.partner.brutto;
+            }
+            // Steuerquote anwenden (Netto-Berechnung)
+            if (inputs.partner.steuerquotePct > 0) {
+                rente2 = rente2 * (1 - inputs.partner.steuerquotePct / 100);
+            }
+            // Clamp bei 0 (keine negativen Renten)
+            rente2 = Math.max(0, rente2);
+        }
+    }
 
     // Gesamtrente (renteSum)
     const renteSum = rente1 + rente2;
@@ -172,7 +194,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             baseFloor: naechsterBaseFloor,
             baseFlex: naechsterBaseFlex,
             lastState: spendingNewState,
-            currentAnnualPension: pensionAnnual,
+            currentAnnualPension: rente1,
+            currentAnnualPension2: rente2,
             marketDataHist: newMarketDataHist,
             samplerState: currentState.samplerState
         },
@@ -249,6 +272,7 @@ export function initMcRunState(inputs, startYearIndex) {
         baseFlex: inputs.startFlexBedarf,
         lastState: null,
         currentAnnualPension: 0,
+        currentAnnualPension2: 0,
         marketDataHist: marketDataHist,
         samplerState: {}
     };

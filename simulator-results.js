@@ -219,7 +219,9 @@ export function renderWorstRunLog(logRows, caR_Threshold, opts = {}) {
         { key: 'histJahr', header: 'Hist', width: 4 },
         { key: 'entscheidung.jahresEntnahme', header: 'Entn.', width: 7, fmt: formatCurrencyShortLog },
         { key: 'floor_brutto', header: 'Floor', width: 7, fmt: formatCurrencyShortLog },
-        { key: 'pension_annual', header: 'Rente', width: 7, fmt: formatCurrencyShortLog },
+        { key: 'rente1', header: 'Rente1', width: 7, fmt: formatCurrencyShortLog },
+        { key: 'rente2', header: 'Rente2', width: 7, fmt: formatCurrencyShortLog },
+        { key: 'renteSum', header: 'RenteSum', width: 8, fmt: formatCurrencyShortLog },
     ];
 
     const careColsMinimal = [
