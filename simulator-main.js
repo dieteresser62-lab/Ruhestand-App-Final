@@ -792,9 +792,15 @@ function initPartnerConfigWithLocalStorage() {
         field.disabled = !enabled;
     });
 
-    // Event-Listener zum Speichern
+    // Event-Listener zum Speichern und Toggle der Felder
     partnerEnabled.addEventListener('change', () => {
-        localStorage.setItem(keys.enabled, partnerEnabled.checked ? '1' : '0');
+        const isEnabled = partnerEnabled.checked;
+        localStorage.setItem(keys.enabled, isEnabled ? '1' : '0');
+
+        // Toggle disabled state of all partner fields
+        [partnerBirthYear, partnerGender, partnerChurchTax, partnerPensionStartYear, partnerGrossPensionPerYear].forEach(field => {
+            field.disabled = !isEnabled;
+        });
     });
 
     partnerBirthYear.addEventListener('input', () => {
