@@ -740,16 +740,24 @@ window.onload = function() {
 function initRente2ConfigWithLocalStorage() {
     const defaults = {
         aktiv: false,
+        geschlecht: 'w',
         startAlter: 60,
+        startInJahren: 0,
         brutto: 18000,
+        sparerPauschbetrag: 0,
+        kirchensteuerPct: 0,
         steuerquote: 0,
         rentAdjPct: 2.0
     };
 
     const keys = {
         aktiv: 'sim_partnerAktiv',
+        geschlecht: 'sim_r2Geschlecht',
         startAlter: 'sim_r2StartAlter',
+        startInJahren: 'sim_r2StartInJahren',
         brutto: 'sim_r2Brutto',
+        sparerPauschbetrag: 'sim_r2SparerPauschbetrag',
+        kirchensteuerPct: 'sim_r2KirchensteuerPct',
         steuerquote: 'sim_r2Steuerquote',
         rentAdjPct: 'sim_rentAdjPct',
         // VERALTET: Alte Keys für Abwärtskompatibilität
@@ -758,8 +766,12 @@ function initRente2ConfigWithLocalStorage() {
 
     const chkPartnerAktiv = document.getElementById('chkPartnerAktiv');
     const sectionRente2 = document.getElementById('sectionRente2');
+    const r2Geschlecht = document.getElementById('r2Geschlecht');
     const r2StartAlter = document.getElementById('r2StartAlter');
+    const r2StartInJahren = document.getElementById('r2StartInJahren');
     const r2Brutto = document.getElementById('r2Brutto');
+    const r2SparerPauschbetrag = document.getElementById('r2SparerPauschbetrag');
+    const r2KirchensteuerPct = document.getElementById('r2KirchensteuerPct');
     const r2Steuerquote = document.getElementById('r2Steuerquote');
     const rentAdjPct = document.getElementById('rentAdjPct');
 
@@ -770,6 +782,14 @@ function initRente2ConfigWithLocalStorage() {
     chkPartnerAktiv.checked = savedAktiv === '1';
     sectionRente2.style.display = chkPartnerAktiv.checked ? 'block' : 'none';
 
+    if (r2Geschlecht) {
+        const saved = localStorage.getItem(keys.geschlecht);
+        r2Geschlecht.value = saved || defaults.geschlecht;
+        r2Geschlecht.addEventListener('change', () => {
+            localStorage.setItem(keys.geschlecht, r2Geschlecht.value);
+        });
+    }
+
     if (r2StartAlter) {
         const saved = localStorage.getItem(keys.startAlter);
         r2StartAlter.value = saved || defaults.startAlter;
@@ -778,11 +798,35 @@ function initRente2ConfigWithLocalStorage() {
         });
     }
 
+    if (r2StartInJahren) {
+        const saved = localStorage.getItem(keys.startInJahren);
+        r2StartInJahren.value = saved || defaults.startInJahren;
+        r2StartInJahren.addEventListener('input', () => {
+            localStorage.setItem(keys.startInJahren, r2StartInJahren.value);
+        });
+    }
+
     if (r2Brutto) {
         const saved = localStorage.getItem(keys.brutto);
         r2Brutto.value = saved || defaults.brutto;
         r2Brutto.addEventListener('input', () => {
             localStorage.setItem(keys.brutto, r2Brutto.value);
+        });
+    }
+
+    if (r2SparerPauschbetrag) {
+        const saved = localStorage.getItem(keys.sparerPauschbetrag);
+        r2SparerPauschbetrag.value = saved || defaults.sparerPauschbetrag;
+        r2SparerPauschbetrag.addEventListener('input', () => {
+            localStorage.setItem(keys.sparerPauschbetrag, r2SparerPauschbetrag.value);
+        });
+    }
+
+    if (r2KirchensteuerPct) {
+        const saved = localStorage.getItem(keys.kirchensteuerPct);
+        r2KirchensteuerPct.value = saved || defaults.kirchensteuerPct;
+        r2KirchensteuerPct.addEventListener('input', () => {
+            localStorage.setItem(keys.kirchensteuerPct, r2KirchensteuerPct.value);
         });
     }
 
