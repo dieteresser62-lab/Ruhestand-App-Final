@@ -443,7 +443,8 @@ export function runBacktest() {
             "Status".padEnd(16), "Quote%".padStart(6), "Runway%".padStart(7),
             "R.Aktien".padStart(8), "R.Gold".padStart(8), "Infl.".padStart(5),
             "Handl.A".padStart(8), "Handl.G".padStart(8), "St.".padStart(6),
-            "Aktien".padStart(8), "Gold".padStart(7), "Liq.".padStart(7)
+            "Aktien".padStart(8), "Gold".padStart(7), "Liq.".padStart(7),
+            "NeedLiq".padStart(8), "GuardG".padStart(7), "GuardA".padStart(7), "GuardNote".padStart(16)
         ].join("  ");
         let log = header + "\n" + "=".repeat(header.length) + "\n";
 
@@ -500,7 +501,11 @@ export function runBacktest() {
                 formatCurrencyShortLog(row.steuern_gesamt || 0).padStart(6),
                 formatCurrencyShortLog(wertAktien).padStart(8),
                 formatCurrencyShortLog(wertGold).padStart(7),
-                formatCurrencyShortLog(liquiditaet).padStart(7)
+                formatCurrencyShortLog(liquiditaet).padStart(7),
+                formatCurrencyShortLog(row.NeedLiq || 0).padStart(8),
+                formatCurrencyShortLog(row.GuardGold || 0).padStart(7),
+                formatCurrencyShortLog(row.GuardEq || 0).padStart(7),
+                String(row.GuardNote || '').substring(0, 16).padStart(16)
             ].join("  ") + "\n";
 
             if (entscheidung.kuerzungProzent >= 10) { jahreMitKuerzung++; kuerzungJahreAmStueck++; }

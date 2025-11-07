@@ -264,8 +264,16 @@ export function renderWorstRunLog(logRows, caR_Threshold, opts = {}) {
         { key: 'liquiditaet', header: 'Liq.', width: 7, fmt: formatCurrencyShortLog },
     ];
 
+    // FAIL-SAFE Guard Debug-Spalten
+    const guardCols = [
+        { key: 'NeedLiq', header: 'NeedLiq', width: 8, fmt: formatCurrencyShortLog, title: 'Benötigte Liquidität für Floor-Runway' },
+        { key: 'GuardGold', header: 'GuardG', width: 7, fmt: formatCurrencyShortLog, title: 'FAIL-SAFE: Gold verkauft' },
+        { key: 'GuardEq', header: 'GuardA', width: 7, fmt: formatCurrencyShortLog, title: 'FAIL-SAFE: Aktien verkauft' },
+        { key: 'GuardNote', header: 'GuardNote', width: 16, fmt: v => (v || '').substring(0, 16), title: 'FAIL-SAFE: Grund/Status' }
+    ];
+
     const activeCareCols = options.showCareDetails ? careColsDetailed : careColsMinimal;
-    const allCols = [...baseCols, ...activeCareCols, ...finalCols];
+    const allCols = [...baseCols, ...activeCareCols, ...finalCols, ...guardCols];
 
     const getNestedValue = (obj, path) => {
         if (!path) return obj;

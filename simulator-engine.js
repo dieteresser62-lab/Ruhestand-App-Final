@@ -9,6 +9,92 @@ import {
 import { resolveProfileKey } from './simulator-heatmap.js';
 
 /**
+ * FAIL-SAFE Liquidity Guard - Hilfsfunktionen
+ */
+
+/**
+ * Stellt sicher, dass ein Wert eine nicht-negative Zahl ist
+ * @param {*} x - Eingabewert
+ * @returns {number} Wert >= 0
+ */
+function euros(x) {
+    return Math.max(0, Number(x) || 0);
+}
+
+/**
+ * Berechnet die benötigte Liquidität für den Floor-Bedarf
+ * @param {Object} ctx - Kontext mit inputs und state
+ * @returns {number} Benötigte Liquidität in €
+ */
+function computeLiqNeedForFloor(ctx) {
+    // Berechne monatlichen Floor-Bedarf (netto nach Rente)
+    const floorMonthlyNet = euros((ctx.inflatedFloor || ctx.inputs.startFloorBedarf) / 12);
+    // Ziel-Runway in Monaten (Standard: 12, kann über runwayTargetMonths konfiguriert werden)
+    const runwayTargetMin = Number(ctx.inputs.runwayTargetMonths ?? 12);
+    return euros(runwayTargetMin * floorMonthlyNet);
+}
+
+/**
+ * Verkauft Assets für Cash ohne Regelprüfungen (FAIL-SAFE Mode)
+ * @param {Object} portfolio - Portfolio-Objekt
+ * @param {Object} inputsCtx - Inputs-Context für Steuerberechnung
+ * @param {Object} market - Marktkontext
+ * @param {string} asset - 'gold' oder 'equity'
+ * @param {number} amountEuros - Zielbetrag in €
+ * @param {number} minGold - Minimaler Gold-Bestand
+ * @returns {Object} { cashGenerated, taxesPaid }
+ */
+function sellAssetForCash(portfolio, inputsCtx, market, asset, amountEuros, minGold) {
+    if (amountEuros <= 0) return { cashGenerated: 0, taxesPaid: 0 };
+
+    let cashGenerated = 0;
+    let taxesPaid = 0;
+
+    if (asset === 'gold') {
+        const goldWert = sumDepot({ depotTranchesGold: portfolio.depotTranchesGold });
+        const availableGold = Math.max(0, goldWert - minGold);
+        const targetSale = Math.min(amountEuros, availableGold);
+
+        if (targetSale > 0) {
+            // Nutze calculateSaleAndTax aus engine.js für Gold-Verkauf
+            const { saleResult } = window.Ruhestandsmodell_v30.calculateSaleAndTax(
+                targetSale,
+                inputsCtx,
+                { minGold: minGold },
+                market
+            );
+
+            if (saleResult && saleResult.achievedRefill > 0) {
+                applySaleToPortfolio(portfolio, saleResult);
+                cashGenerated = saleResult.achievedRefill;
+                taxesPaid = saleResult.steuerGesamt || 0;
+            }
+        }
+    } else if (asset === 'equity') {
+        const equityWert = sumDepot({ depotTranchesAktien: portfolio.depotTranchesAktien });
+        const targetSale = Math.min(amountEuros, equityWert);
+
+        if (targetSale > 0) {
+            // Nutze calculateSaleAndTax aus engine.js für Aktien-Verkauf
+            const { saleResult } = window.Ruhestandsmodell_v30.calculateSaleAndTax(
+                targetSale,
+                inputsCtx,
+                { minGold: minGold },
+                market
+            );
+
+            if (saleResult && saleResult.achievedRefill > 0) {
+                applySaleToPortfolio(portfolio, saleResult);
+                cashGenerated = saleResult.achievedRefill;
+                taxesPaid = saleResult.steuerGesamt || 0;
+            }
+        }
+    }
+
+    return { cashGenerated: euros(cashGenerated), taxesPaid: euros(taxesPaid) };
+}
+
+/**
  * Simuliert ein Jahr des Ruhestandsszenarios
  * @param {Object} currentState - Aktuelles Portfolio und Marktstatus
  * @param {Object} inputs - Benutzereingaben und Konfiguration
@@ -185,6 +271,75 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     liquiditaet *= (1 + rC);
     if (!isFinite(liquiditaet)) liquiditaet = 0;
 
+    // ========== FAIL-SAFE LIQUIDITY GUARD ==========
+    // Prüft nach allen Transaktionen, ob genug Liquidität für Floor vorhanden ist
+    // Falls nicht: Verkauft Assets OHNE Regelprüfungen (Band/ATH/MaxSkim ignoriert)
+    let guardSellGold = 0, guardSellEq = 0, guardReason = "", guardTaxes = 0;
+
+    const guardCtx = {
+        inflatedFloor: inflatedFloor,
+        inputs: algoInput
+    };
+    const need = computeLiqNeedForFloor(guardCtx);
+    let liq = euros(liquiditaet);
+
+    if (liq < need) {
+        let missing = need - liq;
+        const minGold = algoInput.goldAktiv ? (algoInput.goldFloorProzent / 100) * totalWealth : 0;
+
+        // 2a) Gold zuerst bis Minimum verkaufen
+        if (missing > 0) {
+            const goldWert = sumDepot({ depotTranchesGold: portfolio.depotTranchesGold });
+            if (goldWert > minGold) {
+                const result = sellAssetForCash(
+                    portfolio,
+                    inputsCtx,
+                    market,
+                    'gold',
+                    missing,
+                    0 // Im FAIL-SAFE Mode ignorieren wir minGold-Floor temporär
+                );
+                guardSellGold = result.cashGenerated;
+                guardTaxes += result.taxesPaid;
+                liquiditaet += guardSellGold;
+                missing = Math.max(0, missing - guardSellGold);
+            }
+        }
+
+        // 2b) Dann Aktien verkaufen
+        if (missing > 0) {
+            const equityWert = sumDepot({ depotTranchesAktien: portfolio.depotTranchesAktien });
+            if (equityWert > 0) {
+                const result = sellAssetForCash(
+                    portfolio,
+                    inputsCtx,
+                    market,
+                    'equity',
+                    missing,
+                    0
+                );
+                guardSellEq = result.cashGenerated;
+                guardTaxes += result.taxesPaid;
+                liquiditaet += guardSellEq;
+                missing = Math.max(0, missing - guardSellEq);
+            }
+        }
+
+        // Wenn weiterhin missing > 0 → echtes RUIN (Assets wirklich leer)
+        guardReason = (missing > 0) ? "assets_exhausted" : "rules_overridden";
+        totalTaxesThisYear += guardTaxes;
+    }
+
+    // Validierung: Sicherstellen, dass kritische Werte finite sind
+    if (!Number.isFinite(liquiditaet)) {
+        console.warn("FAIL-SAFE: liquiditaet not finite, resetting to 0", liquiditaet);
+        liquiditaet = 0;
+    }
+    if (!Number.isFinite(inflatedFloor)) {
+        console.warn("FAIL-SAFE: inflatedFloor not finite", inflatedFloor);
+    }
+    // ========== ENDE FAIL-SAFE LIQUIDITY GUARD ==========
+
     const newMarketDataHist = {
         endeVJ_3: marketDataHist.endeVJ_2,
         endeVJ_2: marketDataHist.endeVJ_1,
@@ -256,7 +411,12 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             pflege_zusatz_floor: pflegeMeta?.zusatzFloorZiel ?? 0,
             pflege_zusatz_floor_delta: pflegeMeta?.zusatzFloorDelta ?? 0,
             pflege_flex_faktor: pflegeMeta?.flexFactor ?? 1.0,
-            pflege_kumuliert: pflegeMeta?.kumulierteKosten ?? 0
+            pflege_kumuliert: pflegeMeta?.kumulierteKosten ?? 0,
+            // FAIL-SAFE Guard Debug-Spalten
+            NeedLiq: Math.round(need),
+            GuardGold: Math.round(guardSellGold),
+            GuardEq: Math.round(guardSellEq),
+            GuardNote: guardReason
         },
         totalTaxesThisYear
     };
