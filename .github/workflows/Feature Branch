@@ -1,0 +1,35 @@
+name: Pages – Preview für Feature-Branches
+on:
+  push:
+    branches: ["feature/zwei-personen-haushalt"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Für reine Static Sites reicht das:
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: "."   # ggf. auf "docs" setzen
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
