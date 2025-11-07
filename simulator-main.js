@@ -30,6 +30,54 @@ function cloneStressContext(ctx) {
 }
 
 /**
+ * Berechnet die Rentenanpassungsrate für ein bestimmtes Jahr
+ * @param {Object} ctx - Kontext mit inputs, series, simStartYear
+ * @param {number} yearIdx - Jahr-Index innerhalb der Simulation (0 = erstes Jahr)
+ * @returns {number} Anpassungsrate in Prozent (z.B. 2.0 für 2%)
+ */
+function computeAdjPctForYear(ctx, yearIdx) {
+    // ctx.inputs.rentAdj: { mode: "fix"|"wage"|"cpi", pct: number }
+    const mode = ctx.inputs.rentAdj?.mode || "fix";
+    if (mode === "fix") return Number(ctx.inputs.rentAdj?.pct || 0);
+
+    // Stelle sicher, dass ctx.series existiert:
+    // ctx.series = { wageGrowth: number[], inflationPct: number[], startYear: number }
+    // startYear = erstes Jahr der historischen Reihe (z.B. 1970)
+    const s = ctx.series || {};
+    const offsetIdx = (ctx.simStartYear ?? 0) - (s.startYear ?? 0) + yearIdx;
+
+    if (mode === "wage") {
+        const v = Array.isArray(s.wageGrowth) ? s.wageGrowth[offsetIdx] : undefined;
+        return Number.isFinite(v) ? Number(v) : 0;
+    }
+    if (mode === "cpi") {
+        const v = Array.isArray(s.inflationPct) ? s.inflationPct[offsetIdx] : undefined;
+        return Number.isFinite(v) ? Number(v) : 0;
+    }
+    return 0;
+}
+
+/**
+ * Wendet Steuerberechnung auf Rentenbrutto an
+ * @param {number} pensionGross - Bruttorenete p.a.
+ * @param {Object} params - { sparerPauschbetrag, kirchensteuerPct, steuerquotePct }
+ * @returns {number} Nettorente (≥ 0)
+ */
+function applyPensionTax(pensionGross, params) {
+    // Wenn steuerquotePct > 0 → verwende pauschal pensionGross * (1 - steuerquotePct/100)
+    if (params.steuerquotePct > 0) {
+        const netto = pensionGross * (1 - params.steuerquotePct / 100);
+        return Math.max(0, netto);
+    }
+
+    // Sonst: vereinfachte Logik (Sparer-Pauschbetrag, Kirchensteuer etc.)
+    // Für Person 1: keine zusätzliche Steuer (wird extern versteuert)
+    // Für Person 2: detaillierte Berechnung könnte hier implementiert werden
+    // Aktuell: Wenn keine Steuerquote angegeben, wird keine Steuer abgezogen
+    return Math.max(0, pensionGross);
+}
+
+/**
  * Führt die Monte-Carlo-Simulation durch
  */
 export async function runMonteCarlo() {
@@ -350,6 +398,28 @@ export function runBacktest() {
             document.getElementById('btButton').disabled = false; return;
         }
 
+        // Historische Reihen als Arrays aufbauen (1970-2024)
+        const histYears = Object.keys(HISTORICAL_DATA).map(Number).sort((a,b)=>a-b).filter(y => y >= 1970);
+        const wageGrowthArray = histYears.map(y => HISTORICAL_DATA[y].lohn_de || 0);
+        const inflationPctArray = histYears.map(y => HISTORICAL_DATA[y].inflation_de || 0);
+        const HIST_SERIES_START_YEAR = 1970;
+
+        // Backtest-Kontext für Rentenanpassung
+        const backtestCtx = {
+            inputs: {
+                rentAdj: {
+                    mode: inputs.rentAdjMode || 'fix',
+                    pct: inputs.rentAdjPct || 0
+                }
+            },
+            series: {
+                wageGrowth: wageGrowthArray,
+                inflationPct: inflationPctArray,
+                startYear: HIST_SERIES_START_YEAR
+            },
+            simStartYear: startJahr
+        };
+
         let simState = {
             portfolio: initializePortfolio(inputs),
             baseFloor: inputs.startFloorBedarf,
@@ -369,6 +439,7 @@ export function runBacktest() {
 
         let header = [
             "Jahr".padEnd(4), "Entn.".padStart(7), "Floor".padStart(7), "Rente1".padStart(7), "Rente2".padStart(7), "RenteSum".padStart(8), "FloorDep".padStart(8), "Flex%".padStart(5), "Flex€".padStart(7), "Entn_real".padStart(9),
+            "Adj%".padStart(5),
             "Status".padEnd(16), "Quote%".padStart(6), "Runway%".padStart(7),
             "R.Aktien".padStart(8), "R.Gold".padStart(8), "Infl.".padStart(5),
             "Handl.A".padStart(8), "Handl.G".padStart(8), "St.".padStart(6),
@@ -386,10 +457,11 @@ export function runBacktest() {
 
             const yearIndex = jahr - startJahr;
 
-            // Berechne dynamische Rentenanpassung basierend auf Modus (fix/wage/cpi)
-            const effectiveRentAdjPct = computeRentAdjRate(inputs, yearData);
-            const adjustedInputs = { ...inputs, rentAdjPct: effectiveRentAdjPct };
+            // Berechne dynamische Rentenanpassung mit neuer Helper-Funktion
+            const adjPct = computeAdjPctForYear(backtestCtx, yearIndex);
 
+            // Übergebe die berechnete Anpassungsrate an simulateOneYear
+            const adjustedInputs = { ...inputs, rentAdjPct: adjPct };
             const result = simulateOneYear(simState, adjustedInputs, yearData, yearIndex);
 
             if (result.isRuin) {
@@ -416,6 +488,7 @@ export function runBacktest() {
                 pfInt(row.FlexRatePct, 5),
                 formatCurrencyShortLog(row.flex_erfuellt_nominal).padStart(7),
                 formatCurrencyShortLog(row.jahresentnahme_real).padStart(9),
+                pf(adjPct, 5),
                 row.aktionUndGrund.substring(0,15).padEnd(16),
                 pf(row.QuoteEndPct, 6),
                 pfInt(row.RunwayCoveragePct, 7),
@@ -547,18 +620,22 @@ window.onload = function() {
     const mcMethodeSelect = document.getElementById('mcMethode');
     mcMethodeSelect.addEventListener('change', () => { document.getElementById('mcBlockSize').disabled = mcMethodeSelect.value !== 'block'; });
 
-    // Rentenanpassungs-Modus: Enable/Disable Prozentfeld
+    // Rentenanpassungs-Modus: Enable/Disable + Show/Hide Prozentfeld
     const rentAdjModeSelect = document.getElementById('rentAdjMode');
     const rentAdjPctInput = document.getElementById('rentAdjPct');
     if (rentAdjModeSelect && rentAdjPctInput) {
+        const rentAdjPctGroup = rentAdjPctInput.closest('.form-group');
+
         rentAdjModeSelect.addEventListener('change', () => {
             const mode = rentAdjModeSelect.value;
             if (mode === 'fix') {
                 rentAdjPctInput.disabled = false;
                 rentAdjPctInput.title = 'Gemeinsame Rentenanpassung für beide Personen';
+                if (rentAdjPctGroup) rentAdjPctGroup.style.display = 'flex';
             } else {
                 rentAdjPctInput.disabled = true;
                 rentAdjPctInput.title = 'Wird automatisch über Koppelung gesteuert (' + (mode === 'wage' ? 'Lohnentwicklung' : 'Inflation') + ')';
+                if (rentAdjPctGroup) rentAdjPctGroup.style.display = 'none';
             }
         });
         // Initial state
@@ -566,6 +643,10 @@ window.onload = function() {
         rentAdjPctInput.disabled = initialMode !== 'fix';
         if (initialMode !== 'fix') {
             rentAdjPctInput.title = 'Wird automatisch über Koppelung gesteuert (' + (initialMode === 'wage' ? 'Lohnentwicklung' : 'Inflation') + ')';
+            if (rentAdjPctGroup) rentAdjPctGroup.style.display = 'none';
+        } else {
+            rentAdjPctInput.title = 'Gemeinsame Rentenanpassung für beide Personen';
+            if (rentAdjPctGroup) rentAdjPctGroup.style.display = 'flex';
         }
     }
 
@@ -777,7 +858,7 @@ function initRente2ConfigWithLocalStorage() {
         p1KirchensteuerPct: 9,
         p1Monatsrente: 500,
         p1StartInJahren: 5,
-        rentAdjMode: 'fix',
+        rentAdjMode: 'wage',
         rentAdjPct: 2.0,
         // Person 2
         aktiv: false,
