@@ -4,7 +4,7 @@ import { rng, quantile, sum, mean, formatCurrency, parseRange, parseRangeInput, 
 import { ENGINE_VERSION, ENGINE_HASH, STRESS_PRESETS, BREAK_ON_RUIN, MORTALITY_TABLE, HISTORICAL_DATA, annualData } from './simulator-data.js';
 import {
     getCommonInputs, updateStartPortfolioDisplay, initializePortfolio,
-    prepareHistoricalData, buildStressContext, applyStressOverride
+    prepareHistoricalData, buildStressContext, applyStressOverride, computeRentAdjRate
 } from './simulator-portfolio.js';
 import {
     simulateOneYear, initMcRunState, makeDefaultCareMeta, sampleNextYearData, computeRunStatsFromSeries, updateCareMeta
@@ -137,7 +137,11 @@ export async function runMonteCarlo() {
 
                 if (rand() < qx) break;
 
-                const result = simulateOneYear(simState, inputs, yearData, simulationsJahr, careMeta);
+                // Berechne dynamische Rentenanpassung basierend auf Modus (fix/wage/cpi)
+                const effectiveRentAdjPct = computeRentAdjRate(inputs, yearData);
+                const adjustedInputs = { ...inputs, rentAdjPct: effectiveRentAdjPct };
+
+                const result = simulateOneYear(simState, adjustedInputs, yearData, simulationsJahr, careMeta);
 
                 if (result.isRuin) {
                     failed = true;
@@ -381,7 +385,12 @@ export function runBacktest() {
             const yearData = { ...dataVJ, rendite: jahresrenditeAktien, gold_eur_perf: dataVJ.gold_eur_perf, zinssatz: dataVJ.zinssatz_de, inflation: dataVJ.inflation_de, jahr };
 
             const yearIndex = jahr - startJahr;
-            const result = simulateOneYear(simState, inputs, yearData, yearIndex);
+
+            // Berechne dynamische Rentenanpassung basierend auf Modus (fix/wage/cpi)
+            const effectiveRentAdjPct = computeRentAdjRate(inputs, yearData);
+            const adjustedInputs = { ...inputs, rentAdjPct: effectiveRentAdjPct };
+
+            const result = simulateOneYear(simState, adjustedInputs, yearData, yearIndex);
 
             if (result.isRuin) {
                 log += `${String(jahr).padEnd(5)}... RUIN ...\n`; if (BREAK_ON_RUIN) break;
@@ -509,8 +518,8 @@ window.onload = function() {
         'simStartVermoegen', 'depotwertAlt', 'zielLiquiditaet', 'simRisikoprofil',
         'goldAllokationAktiv', 'goldAllokationProzent', 'goldFloorProzent', 'rebalancingBand',
         'goldSteuerfrei', 'startFloorBedarf', 'startFlexBedarf',
-        'einstandAlt', 'startAlter', 'geschlecht', 'startSPB', 'kirchensteuerSatz', 'round5',
-        'renteMonatlich', 'renteStartOffsetJahre', 'rentAdjPct',
+        'einstandAlt', 'p1StartAlter', 'p1Geschlecht', 'p1SparerPauschbetrag', 'p1KirchensteuerPct', 'round5',
+        'p1Monatsrente', 'p1StartInJahren', 'rentAdjMode', 'rentAdjPct',
         'pflegefallLogikAktivieren', 'pflegeModellTyp', 'pflegeStufe1Zusatz', 'pflegeStufe1FlexCut',
         'pflegeMaxFloor', 'pflegeRampUp', 'pflegeMinDauer', 'pflegeMaxDauer', 'pflegeKostenDrift',
         'pflegebeschleunigtMortalitaetAktivieren', 'pflegeTodesrisikoFaktor',
@@ -537,6 +546,28 @@ window.onload = function() {
 
     const mcMethodeSelect = document.getElementById('mcMethode');
     mcMethodeSelect.addEventListener('change', () => { document.getElementById('mcBlockSize').disabled = mcMethodeSelect.value !== 'block'; });
+
+    // Rentenanpassungs-Modus: Enable/Disable Prozentfeld
+    const rentAdjModeSelect = document.getElementById('rentAdjMode');
+    const rentAdjPctInput = document.getElementById('rentAdjPct');
+    if (rentAdjModeSelect && rentAdjPctInput) {
+        rentAdjModeSelect.addEventListener('change', () => {
+            const mode = rentAdjModeSelect.value;
+            if (mode === 'fix') {
+                rentAdjPctInput.disabled = false;
+                rentAdjPctInput.title = 'Gemeinsame Rentenanpassung für beide Personen';
+            } else {
+                rentAdjPctInput.disabled = true;
+                rentAdjPctInput.title = 'Wird automatisch über Koppelung gesteuert (' + (mode === 'wage' ? 'Lohnentwicklung' : 'Inflation') + ')';
+            }
+        });
+        // Initial state
+        const initialMode = rentAdjModeSelect.value || 'fix';
+        rentAdjPctInput.disabled = initialMode !== 'fix';
+        if (initialMode !== 'fix') {
+            rentAdjPctInput.title = 'Wird automatisch über Koppelung gesteuert (' + (initialMode === 'wage' ? 'Lohnentwicklung' : 'Inflation') + ')';
+        }
+    }
 
     // VERALTET: Alte Indexierungs-Logik (deaktiviert, versteckt)
     // const renteIndexArtSelect = document.getElementById('renteIndexierungsart');
@@ -739,42 +770,131 @@ window.onload = function() {
  */
 function initRente2ConfigWithLocalStorage() {
     const defaults = {
+        // Person 1
+        p1StartAlter: 63,
+        p1Geschlecht: 'm',
+        p1SparerPB: 1000,
+        p1KirchensteuerPct: 9,
+        p1Monatsrente: 500,
+        p1StartInJahren: 5,
+        rentAdjMode: 'fix',
+        rentAdjPct: 2.0,
+        // Person 2
         aktiv: false,
-        geschlecht: 'w',
-        startAlter: 60,
-        startInJahren: 0,
-        brutto: 18000,
-        sparerPauschbetrag: 0,
-        kirchensteuerPct: 0,
-        steuerquote: 0,
-        rentAdjPct: 2.0
+        r2Geschlecht: 'w',
+        r2StartAlter: 60,
+        r2StartInJahren: 0,
+        r2Monatsrente: 1500,
+        r2SparerPB: 0,
+        r2KirchensteuerPct: 0,
+        r2Steuerquote: 0
     };
 
     const keys = {
-        aktiv: 'sim_partnerAktiv',
-        geschlecht: 'sim_r2Geschlecht',
-        startAlter: 'sim_r2StartAlter',
-        startInJahren: 'sim_r2StartInJahren',
-        brutto: 'sim_r2Brutto',
-        sparerPauschbetrag: 'sim_r2SparerPauschbetrag',
-        kirchensteuerPct: 'sim_r2KirchensteuerPct',
-        steuerquote: 'sim_r2Steuerquote',
+        // Person 1
+        p1StartAlter: 'sim_p1StartAlter',
+        p1Geschlecht: 'sim_p1Geschlecht',
+        p1SparerPB: 'sim_p1SparerPauschbetrag',
+        p1KirchensteuerPct: 'sim_p1KirchensteuerPct',
+        p1Monatsrente: 'sim_p1Monatsrente',
+        p1StartInJahren: 'sim_p1StartInJahren',
+        rentAdjMode: 'sim_rentAdjMode',
         rentAdjPct: 'sim_rentAdjPct',
+        // Person 2
+        aktiv: 'sim_partnerAktiv',
+        r2Geschlecht: 'sim_r2Geschlecht',
+        r2StartAlter: 'sim_r2StartAlter',
+        r2StartInJahren: 'sim_r2StartInJahren',
+        r2Monatsrente: 'sim_r2Monatsrente',
+        r2SparerPB: 'sim_r2SparerPauschbetrag',
+        r2KirchensteuerPct: 'sim_r2KirchensteuerPct',
+        r2Steuerquote: 'sim_r2Steuerquote',
         // VERALTET: Alte Keys für Abwärtskompatibilität
+        r2Brutto_OLD: 'sim_r2Brutto',
         anpassung_OLD: 'sim_r2Anpassung'
     };
 
+    // Person 1 Felder
+    const p1StartAlter = document.getElementById('p1StartAlter');
+    const p1Geschlecht = document.getElementById('p1Geschlecht');
+    const p1SparerPB = document.getElementById('p1SparerPauschbetrag');
+    const p1KirchensteuerPct = document.getElementById('p1KirchensteuerPct');
+    const p1Monatsrente = document.getElementById('p1Monatsrente');
+    const p1StartInJahren = document.getElementById('p1StartInJahren');
+    const rentAdjMode = document.getElementById('rentAdjMode');
+    const rentAdjPct = document.getElementById('rentAdjPct');
+
+    // Person 2 Felder
     const chkPartnerAktiv = document.getElementById('chkPartnerAktiv');
     const sectionRente2 = document.getElementById('sectionRente2');
     const r2Geschlecht = document.getElementById('r2Geschlecht');
     const r2StartAlter = document.getElementById('r2StartAlter');
     const r2StartInJahren = document.getElementById('r2StartInJahren');
-    const r2Brutto = document.getElementById('r2Brutto');
-    const r2SparerPauschbetrag = document.getElementById('r2SparerPauschbetrag');
+    const r2Monatsrente = document.getElementById('r2Monatsrente');
+    const r2SparerPB = document.getElementById('r2SparerPauschbetrag');
     const r2KirchensteuerPct = document.getElementById('r2KirchensteuerPct');
     const r2Steuerquote = document.getElementById('r2Steuerquote');
-    const rentAdjPct = document.getElementById('rentAdjPct');
 
+    // ========== Person 1 Initialisierung ==========
+    if (p1StartAlter) {
+        const saved = localStorage.getItem(keys.p1StartAlter);
+        p1StartAlter.value = saved || defaults.p1StartAlter;
+        p1StartAlter.addEventListener('input', () => localStorage.setItem(keys.p1StartAlter, p1StartAlter.value));
+    }
+
+    if (p1Geschlecht) {
+        const saved = localStorage.getItem(keys.p1Geschlecht);
+        p1Geschlecht.value = saved || defaults.p1Geschlecht;
+        p1Geschlecht.addEventListener('change', () => localStorage.setItem(keys.p1Geschlecht, p1Geschlecht.value));
+    }
+
+    if (p1SparerPB) {
+        const saved = localStorage.getItem(keys.p1SparerPB);
+        p1SparerPB.value = saved || defaults.p1SparerPB;
+        p1SparerPB.addEventListener('input', () => localStorage.setItem(keys.p1SparerPB, p1SparerPB.value));
+    }
+
+    if (p1KirchensteuerPct) {
+        const saved = localStorage.getItem(keys.p1KirchensteuerPct);
+        p1KirchensteuerPct.value = saved || defaults.p1KirchensteuerPct;
+        p1KirchensteuerPct.addEventListener('change', () => localStorage.setItem(keys.p1KirchensteuerPct, p1KirchensteuerPct.value));
+    }
+
+    if (p1Monatsrente) {
+        const saved = localStorage.getItem(keys.p1Monatsrente);
+        p1Monatsrente.value = saved || defaults.p1Monatsrente;
+        p1Monatsrente.addEventListener('input', () => localStorage.setItem(keys.p1Monatsrente, p1Monatsrente.value));
+    }
+
+    if (p1StartInJahren) {
+        const saved = localStorage.getItem(keys.p1StartInJahren);
+        p1StartInJahren.value = saved || defaults.p1StartInJahren;
+        p1StartInJahren.addEventListener('input', () => localStorage.setItem(keys.p1StartInJahren, p1StartInJahren.value));
+    }
+
+    // Rentenanpassung
+    if (rentAdjMode) {
+        const saved = localStorage.getItem(keys.rentAdjMode);
+        rentAdjMode.value = saved || defaults.rentAdjMode;
+        rentAdjMode.addEventListener('change', () => localStorage.setItem(keys.rentAdjMode, rentAdjMode.value));
+    }
+
+    if (rentAdjPct) {
+        let saved = localStorage.getItem(keys.rentAdjPct);
+        // Abwärtskompatibilität: Falls noch nicht gesetzt, versuche alten Wert zu übernehmen
+        if (!saved || saved === '') {
+            const oldR2Anpassung = localStorage.getItem(keys.anpassung_OLD);
+            if (oldR2Anpassung) {
+                saved = oldR2Anpassung;
+                localStorage.setItem(keys.rentAdjPct, saved);
+                console.log('Migrated old r2Anpassung value to rentAdjPct:', saved);
+            }
+        }
+        rentAdjPct.value = saved || defaults.rentAdjPct;
+        rentAdjPct.addEventListener('input', () => localStorage.setItem(keys.rentAdjPct, rentAdjPct.value));
+    }
+
+    // ========== Person 2 Initialisierung ==========
     if (!chkPartnerAktiv || !sectionRente2) return;
 
     // Lade gespeicherte Werte
@@ -783,79 +903,81 @@ function initRente2ConfigWithLocalStorage() {
     sectionRente2.style.display = chkPartnerAktiv.checked ? 'block' : 'none';
 
     if (r2Geschlecht) {
-        const saved = localStorage.getItem(keys.geschlecht);
-        r2Geschlecht.value = saved || defaults.geschlecht;
-        r2Geschlecht.addEventListener('change', () => {
-            localStorage.setItem(keys.geschlecht, r2Geschlecht.value);
-        });
+        const saved = localStorage.getItem(keys.r2Geschlecht);
+        r2Geschlecht.value = saved || defaults.r2Geschlecht;
+        r2Geschlecht.addEventListener('change', () => localStorage.setItem(keys.r2Geschlecht, r2Geschlecht.value));
     }
 
     if (r2StartAlter) {
-        const saved = localStorage.getItem(keys.startAlter);
-        r2StartAlter.value = saved || defaults.startAlter;
-        r2StartAlter.addEventListener('input', () => {
-            localStorage.setItem(keys.startAlter, r2StartAlter.value);
-        });
+        const saved = localStorage.getItem(keys.r2StartAlter);
+        r2StartAlter.value = saved || defaults.r2StartAlter;
+        r2StartAlter.addEventListener('input', () => localStorage.setItem(keys.r2StartAlter, r2StartAlter.value));
     }
 
     if (r2StartInJahren) {
-        const saved = localStorage.getItem(keys.startInJahren);
-        r2StartInJahren.value = saved || defaults.startInJahren;
-        r2StartInJahren.addEventListener('input', () => {
-            localStorage.setItem(keys.startInJahren, r2StartInJahren.value);
-        });
+        const saved = localStorage.getItem(keys.r2StartInJahren);
+        r2StartInJahren.value = saved || defaults.r2StartInJahren;
+        r2StartInJahren.addEventListener('input', () => localStorage.setItem(keys.r2StartInJahren, r2StartInJahren.value));
     }
 
-    if (r2Brutto) {
-        const saved = localStorage.getItem(keys.brutto);
-        r2Brutto.value = saved || defaults.brutto;
-        r2Brutto.addEventListener('input', () => {
-            localStorage.setItem(keys.brutto, r2Brutto.value);
-        });
+    // Migration: r2Brutto (jährlich) → r2Monatsrente (monatlich)
+    if (r2Monatsrente) {
+        let saved = localStorage.getItem(keys.r2Monatsrente);
+        if (!saved || saved === '' || saved === '0') {
+            const oldBrutto = localStorage.getItem(keys.r2Brutto_OLD);
+            if (oldBrutto && parseFloat(oldBrutto) > 0) {
+                saved = String(Math.round(parseFloat(oldBrutto) / 12));
+                localStorage.setItem(keys.r2Monatsrente, saved);
+                console.log('Migrated r2Brutto (' + oldBrutto + ' €/Jahr) to r2Monatsrente (' + saved + ' €/Monat)');
+            }
+        }
+        r2Monatsrente.value = saved || defaults.r2Monatsrente;
+        r2Monatsrente.addEventListener('input', () => localStorage.setItem(keys.r2Monatsrente, r2Monatsrente.value));
     }
 
-    if (r2SparerPauschbetrag) {
-        const saved = localStorage.getItem(keys.sparerPauschbetrag);
-        r2SparerPauschbetrag.value = saved || defaults.sparerPauschbetrag;
-        r2SparerPauschbetrag.addEventListener('input', () => {
-            localStorage.setItem(keys.sparerPauschbetrag, r2SparerPauschbetrag.value);
-        });
+    if (r2SparerPB) {
+        const saved = localStorage.getItem(keys.r2SparerPB);
+        r2SparerPB.value = saved || defaults.r2SparerPB;
+        r2SparerPB.addEventListener('input', () => localStorage.setItem(keys.r2SparerPB, r2SparerPB.value));
     }
 
     if (r2KirchensteuerPct) {
-        const saved = localStorage.getItem(keys.kirchensteuerPct);
-        r2KirchensteuerPct.value = saved || defaults.kirchensteuerPct;
-        r2KirchensteuerPct.addEventListener('input', () => {
-            localStorage.setItem(keys.kirchensteuerPct, r2KirchensteuerPct.value);
-        });
+        const saved = localStorage.getItem(keys.r2KirchensteuerPct);
+        r2KirchensteuerPct.value = saved || defaults.r2KirchensteuerPct;
+        r2KirchensteuerPct.addEventListener('change', () => localStorage.setItem(keys.r2KirchensteuerPct, r2KirchensteuerPct.value));
     }
 
     if (r2Steuerquote) {
-        const saved = localStorage.getItem(keys.steuerquote);
-        r2Steuerquote.value = saved || defaults.steuerquote;
-        r2Steuerquote.addEventListener('input', () => {
-            localStorage.setItem(keys.steuerquote, r2Steuerquote.value);
-        });
+        const saved = localStorage.getItem(keys.r2Steuerquote);
+        r2Steuerquote.value = saved || defaults.r2Steuerquote;
+        r2Steuerquote.addEventListener('input', () => localStorage.setItem(keys.r2Steuerquote, r2Steuerquote.value));
     }
 
-    // Gemeinsame Rentenanpassung (Person 1 + Partner)
-    if (rentAdjPct) {
-        let saved = localStorage.getItem(keys.rentAdjPct);
+    // Kopiere P1-Werte in versteckte Felder für Abwärtskompatibilität
+    const syncP1ToOld = () => {
+        const startAlterOld = document.getElementById('startAlter');
+        const geschlechtOld = document.getElementById('geschlecht');
+        const startSPBOld = document.getElementById('startSPB');
+        const kirchensteuerSatzOld = document.getElementById('kirchensteuerSatz');
+        const renteMonatlichOld = document.getElementById('renteMonatlich');
+        const renteStartOffsetJahreOld = document.getElementById('renteStartOffsetJahre');
 
-        // Abwärtskompatibilität: Falls noch nicht gesetzt, versuche alten Wert zu übernehmen
-        if (!saved || saved === '') {
-            const oldR2Anpassung = localStorage.getItem(keys.anpassung_OLD);
-            if (oldR2Anpassung) {
-                saved = oldR2Anpassung;
-                console.log('Migrating old r2Anpassung value to rentAdjPct:', saved);
-            }
-        }
+        if (startAlterOld && p1StartAlter) startAlterOld.value = p1StartAlter.value;
+        if (geschlechtOld && p1Geschlecht) geschlechtOld.value = p1Geschlecht.value;
+        if (startSPBOld && p1SparerPB) startSPBOld.value = p1SparerPB.value;
+        if (kirchensteuerSatzOld && p1KirchensteuerPct) kirchensteuerSatzOld.value = (parseFloat(p1KirchensteuerPct.value) / 100).toFixed(2);
+        if (renteMonatlichOld && p1Monatsrente) renteMonatlichOld.value = p1Monatsrente.value;
+        if (renteStartOffsetJahreOld && p1StartInJahren) renteStartOffsetJahreOld.value = p1StartInJahren.value;
+    };
 
-        rentAdjPct.value = saved || defaults.rentAdjPct;
-        rentAdjPct.addEventListener('input', () => {
-            localStorage.setItem(keys.rentAdjPct, rentAdjPct.value);
-        });
-    }
+    // Initial sync
+    syncP1ToOld();
+
+    // Sync bei jedem Input
+    [p1StartAlter, p1Geschlecht, p1SparerPB, p1KirchensteuerPct, p1Monatsrente, p1StartInJahren].forEach(el => {
+        if (el) el.addEventListener('input', syncP1ToOld);
+        if (el) el.addEventListener('change', syncP1ToOld);
+    });
 }
 
 /**
@@ -1019,7 +1141,11 @@ export async function runParameterSweep() {
 
                     if (rand() < qx) break;
 
-                    const result = simulateOneYear(simState, inputs, yearData, simulationsJahr, careMeta);
+                    // Berechne dynamische Rentenanpassung basierend auf Modus (fix/wage/cpi)
+                    const effectiveRentAdjPct = computeRentAdjRate(inputs, yearData);
+                    const adjustedInputs = { ...inputs, rentAdjPct: effectiveRentAdjPct };
+
+                    const result = simulateOneYear(simState, adjustedInputs, yearData, simulationsJahr, careMeta);
 
                     if (result.isRuin) {
                         failed = true;

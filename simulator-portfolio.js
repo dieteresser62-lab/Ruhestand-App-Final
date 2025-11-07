@@ -10,7 +10,26 @@ export function getCommonInputs() {
     const goldAktiv = document.getElementById('goldAllokationAktiv').checked;
 
     // Gemeinsame Rentenanpassung (gilt für Person 1 und Partner)
+    const rentAdjMode = document.getElementById('rentAdjMode')?.value || 'fix';
     const rentAdjPct = parseFloat(document.getElementById('rentAdjPct')?.value) || 0;
+
+    // Person 1 Felder - mit Fallback auf alte IDs für Abwärtskompatibilität
+    const p1StartAlter = parseInt(document.getElementById('p1StartAlter')?.value || document.getElementById('startAlter')?.value) || 65;
+    const p1Geschlecht = document.getElementById('p1Geschlecht')?.value || document.getElementById('geschlecht')?.value || 'w';
+    const p1SparerPB = parseFloat(document.getElementById('p1SparerPauschbetrag')?.value || document.getElementById('startSPB')?.value) || 0;
+    const p1KirchensteuerPct = parseFloat(document.getElementById('p1KirchensteuerPct')?.value || document.getElementById('kirchensteuerSatz')?.value) || 0;
+    const p1Monatsrente = parseFloat(document.getElementById('p1Monatsrente')?.value || document.getElementById('renteMonatlich')?.value) || 0;
+    const p1StartInJahren = parseInt(document.getElementById('p1StartInJahren')?.value || document.getElementById('renteStartOffsetJahre')?.value) || 0;
+
+    // Person 2 Migration: r2Brutto (jährlich) → r2Monatsrente (monatlich)
+    let r2Monatsrente = parseFloat(document.getElementById('r2Monatsrente')?.value) || 0;
+    if (!r2Monatsrente) {
+        const r2BruttoJahr = parseFloat(document.getElementById('r2Brutto')?.value) || 0;
+        if (r2BruttoJahr > 0) {
+            r2Monatsrente = Math.round(r2BruttoJahr / 12);
+            // Migration in localStorage wird später in simulator-main.js durchgeführt
+        }
+    }
 
     const baseInputs = {
         startVermoegen: parseFloat(document.getElementById('simStartVermoegen').value) || 0,
@@ -25,13 +44,14 @@ export function getCommonInputs() {
         goldFloorProzent: (goldAktiv ? parseFloat(document.getElementById('goldFloorProzent').value) : 0),
         rebalancingBand: (goldAktiv ? parseFloat(document.getElementById('rebalancingBand').value) : 25),
         goldSteuerfrei: goldAktiv && document.getElementById('goldSteuerfrei').checked,
-        startAlter: parseInt(document.getElementById('startAlter').value) || 65,
-        geschlecht: document.getElementById('geschlecht').value || 'w',
-        startSPB: parseFloat(document.getElementById('startSPB').value) || 0,
-        kirchensteuerSatz: parseFloat(document.getElementById('kirchensteuerSatz').value) || 0,
+        startAlter: p1StartAlter,
+        geschlecht: p1Geschlecht,
+        startSPB: p1SparerPB,
+        kirchensteuerSatz: p1KirchensteuerPct / 100, // Konvertiere zu Dezimal (9 → 0.09)
         round5: document.getElementById('round5').checked,
-        renteMonatlich: parseFloat(document.getElementById('renteMonatlich').value) || 0,
-        renteStartOffsetJahre: parseInt(document.getElementById('renteStartOffsetJahre').value) || 0,
+        renteMonatlich: p1Monatsrente,
+        renteStartOffsetJahre: p1StartInJahren,
+        rentAdjMode: rentAdjMode,
         rentAdjPct: rentAdjPct,
         // VERALTET: Alte Indexierungsfelder (für Abwärtskompatibilität, werden nicht mehr verwendet)
         renteIndexierungsart: document.getElementById('renteIndexierungsart')?.value || 'fest',
@@ -55,11 +75,12 @@ export function getCommonInputs() {
             geschlecht: document.getElementById('r2Geschlecht')?.value || 'w',
             startAlter: parseInt(document.getElementById('r2StartAlter')?.value) || 0,
             startInJahren: parseInt(document.getElementById('r2StartInJahren')?.value) || 0,
-            brutto: parseFloat(document.getElementById('r2Brutto')?.value) || 0,
+            monatsrente: r2Monatsrente,
             sparerPauschbetrag: parseFloat(document.getElementById('r2SparerPauschbetrag')?.value) || 0,
             kirchensteuerPct: parseFloat(document.getElementById('r2KirchensteuerPct')?.value) || 0,
-            steuerquotePct: parseFloat(document.getElementById('r2Steuerquote')?.value) || 0
-            // anpassungPct wird NICHT mehr verwendet - gemeinsame Anpassung via rentAdjPct
+            steuerquotePct: parseFloat(document.getElementById('r2Steuerquote')?.value) || 0,
+            // VERALTET: brutto wird durch monatsrente ersetzt
+            brutto: r2Monatsrente * 12
         }
     };
 
@@ -202,6 +223,31 @@ export function computePensionNext(prev, isFirstYear, base, adjPct) {
     if (isFirstYear) return Math.max(0, base);
     const val = prev * (1 + adjPct / 100);
     return Math.max(0, val);
+}
+
+/**
+ * Berechnet die effektive Rentenanpassungsrate basierend auf Modus und Jahresdaten
+ * @param {object} inputs - Input-Objekt mit rentAdjMode und rentAdjPct
+ * @param {object} yearData - Jahresdaten mit inflation und lohn
+ * @returns {number} Anpassungsrate in Prozent (z.B. 2.0 für 2%)
+ */
+export function computeRentAdjRate(inputs, yearData) {
+    if (!inputs.rentAdjMode || inputs.rentAdjMode === 'fix') {
+        return inputs.rentAdjPct || 0;
+    }
+
+    if (inputs.rentAdjMode === 'wage') {
+        // Lohnentwicklung aus historischen Daten
+        return yearData.lohn || 0;
+    }
+
+    if (inputs.rentAdjMode === 'cpi') {
+        // Inflation (CPI)
+        return yearData.inflation || 0;
+    }
+
+    // Fallback
+    return inputs.rentAdjPct || 0;
 }
 
 /**
