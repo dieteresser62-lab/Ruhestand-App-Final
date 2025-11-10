@@ -189,7 +189,9 @@ for (let year = 1; year <= 4; year++) {
     updateCareMeta(rampCare, rampInputs, 70 + year, { inflation: 2 }, dummyRand);
     if (rampCare.currentYearInCare !== year) rampOk = false;
     if (!rampCare.active) rampOk = false;
-    const expectedFactor = 1 + ((rampInputs.pflegeTodesrisikoFaktor - 1) * ((year - 1) / Math.max(1, rampInputs.pflegeRampUp - 1)));
+    const rampYears = Math.max(1, rampInputs.pflegeRampUp);
+    const expectedProgress = Math.min(year, rampYears) / rampYears;
+    const expectedFactor = 1 + (rampInputs.pflegeTodesrisikoFaktor - 1) * expectedProgress;
     const actualFactor = computeCareMortalityMultiplier(rampCare, rampInputs);
     if (Math.abs(actualFactor - expectedFactor) > 1e-6) rampOk = false;
 }
