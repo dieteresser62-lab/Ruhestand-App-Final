@@ -412,6 +412,7 @@ const STRESS_PRESETS = {
 
 const ENGINE_VERSION = '31.0';
 const ENGINE_HASH = '2016807894';
+const DEFAULT_RISIKOPROFIL = 'sicherheits-dynamisch';
 
 let annualData = [];
 let REGIME_DATA = { BULL: [], BEAR: [], SIDEWAYS: [], STAGFLATION: [] };
@@ -427,7 +428,7 @@ function getCommonInputs() {
         zielLiquiditaet: parseFloat(document.getElementById('zielLiquiditaet').value) || 0,
         startFloorBedarf: parseFloat(document.getElementById('startFloorBedarf').value) || 0,
         startFlexBedarf: parseFloat(document.getElementById('startFlexBedarf').value) || 0,
-        risikoprofil: document.getElementById('simRisikoprofil').value,
+        risikoprofil: DEFAULT_RISIKOPROFIL,
         goldAktiv: goldAktiv,
         goldZielProzent: (goldAktiv ? parseFloat(document.getElementById('goldAllokationProzent').value) : 0),
         goldFloorProzent: (goldAktiv ? parseFloat(document.getElementById('goldFloorProzent').value) : 0),
@@ -452,7 +453,7 @@ function getCommonInputs() {
         pflegeKostenDrift: (parseFloat(document.getElementById('pflegeKostenDrift').value) || 0) / 100,
         pflegebeschleunigtMortalitaetAktivieren: document.getElementById('pflegebeschleunigtMortalitaetAktivieren').checked,
         pflegeTodesrisikoFaktor: parseFloat(document.getElementById('pflegeTodesrisikoFaktor').value) || 1.0,
-        decumulation: { mode: document.getElementById('decumulationMode')?.value || 'none' },
+        decumulation: { mode: 'none' },
         stressPreset: document.getElementById('stressPreset').value || 'NONE'	
     };
 
@@ -1982,15 +1983,14 @@ window.onload = function() {
     updateStartPortfolioDisplay();
     
     const allInputs = [
-        'simStartVermoegen', 'depotwertAlt', 'zielLiquiditaet', 'simRisikoprofil', 
+        'simStartVermoegen', 'depotwertAlt', 'zielLiquiditaet',
         'goldAllokationAktiv', 'goldAllokationProzent', 'goldFloorProzent', 'rebalancingBand', 
         'goldSteuerfrei', 'startFloorBedarf', 'startFlexBedarf', 
         'einstandAlt', 'startAlter', 'geschlecht', 'startSPB', 'kirchensteuerSatz',
         'renteMonatlich', 'renteStartOffsetJahre', 'renteIndexierungsart', 
         'pflegefallLogikAktivieren', 'pflegeModellTyp', 'pflegeStufe1Zusatz', 'pflegeStufe1FlexCut', 
         'pflegeMaxFloor', 'pflegeRampUp', 'pflegeMinDauer', 'pflegeMaxDauer', 'pflegeKostenDrift', 
-        'pflegebeschleunigtMortalitaetAktivieren', 'pflegeTodesrisikoFaktor',
-        'decumulationMode'
+        'pflegebeschleunigtMortalitaetAktivieren', 'pflegeTodesrisikoFaktor'
     ];
     allInputs.forEach(id => {
         const element = document.getElementById(id);
