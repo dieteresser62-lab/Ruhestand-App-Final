@@ -100,6 +100,10 @@ Claude Code (Refining, GitHub & Engine-Modularisierung)
 📈 Wahrscheinlichkeitsmetriken (P10, P50, P90)
 🗺️ Heatmap-Visualisierungen
 🔬 Parameter Sweep (2D-Grid-Exploration)
+🛡️ Zwei-Personen-Haushalt: Intelligente Parameter-Guards
+   - Whitelist für Sweep-Parameter (Schutz vor unbeabsichtigten Änderungen)
+   - Person-2 Pensions-Invarianz-Wächter
+   - Fail-safe Liquidity Guard (verhindert falsche RUIN-Szenarien)
 ```
 
 ---
@@ -188,6 +192,7 @@ balance-storage.js     → Speichert Daten
 - ✅ SVG-Visualisierungen (Heatmaps)
 - ✅ LocalStorage & File System API
 - ✅ **Modularisierung auf Enterprise-Niveau** ⭐
+- ✅ **Defensive Programming** (Guards, Whitelists, Invarianten) ⭐
 
 ### **Meta-Skills:**
 - ✅ AI-Orchestrierung (Multi-KI-Workflow)
@@ -195,12 +200,14 @@ balance-storage.js     → Speichert Daten
 - ✅ Requirements Engineering
 - ✅ Quality Control ohne selbst zu coden
 - ✅ **Refactoring-Zyklen managen** ⭐
+- ✅ **Bug-Fixing mit systematischer Analyse** ⭐
 
 ### **Persönlich:**
 - ✅ Man kann mit 63 noch Neues lernen
 - ✅ Frustration ist Teil des Prozesses
 - ✅ Domain-Expertise + KI = Superkraft
 - ✅ **Perfektion ist iterativ erreichbar** ⭐
+- ✅ **Robustheit entsteht durch Edge-Case-Hunting** ⭐
 
 ---
 
@@ -438,6 +445,16 @@ Made with ❤️ (and lots of AI assistance) by a 63-year-old SAP Architect
 ---
 
 ## 🎯 Update Log
+
+**v2.1 - November 2025** ⭐ NEU!
+- ✅ Parameter-Sweep Robustheit (Zwei-Personen-Haushalt)
+  - Whitelist für erlaubte Sweep-Parameter
+  - Person-2 Pensions-Invarianz-Wächter
+  - Fail-safe Liquidity Guard gegen falsche RUIN-Szenarien
+  - Visuelle Warnsymbole in Heatmap bei Parameter-Verstößen
+- ✅ Pension Adjustment Fix im Backtest
+- ✅ Dev-Mode mit Self-Tests für Parameter-Sweeps
+- ✅ Deep-Clone-Mechanismus für Sweep-Cases (structuredClone)
 
 **v2.0 - November 2025**
 - ✅ Engine.js vollständig modularisiert (8 Module)

@@ -775,7 +775,131 @@ MIT - See LICENSE file
 
 ---
 
+## Parameter Sweep Robustness (v2.1)
+
+### Two-Person Household Parameter Guards
+
+**Problem:** In parameter sweeps for two-person households, unintended parameter variations could lead to:
+- Inconsistent Person-2 pension values across sweep cases
+- False RUIN scenarios due to liquidity guard triggering
+- Misleading heatmap results
+
+**Solution (November 2025):**
+
+#### 1. Parameter Whitelist
+```javascript
+// Only explicitly allowed parameters can be swept
+const SWEEP_ALLOWED_KEYS = [
+  'startKapital', 'startAge', 'startInflation', 'startFlexRate',
+  'runwayTarget', 'targetEq', 'initialWithdrawal',
+  // ... other safe parameters
+];
+
+// Blocklist for Person-2 parameters
+const SWEEP_BLOCK_PATTERNS = [
+  /^partner\./,   // partner.aktiv, partner.brutto, etc.
+  /^r2[A-Z_]/,    // r2Active, r2BruttoYear1, etc.
+  /^p2[A-Z_]/     // p2* patterns (additional safety)
+];
+```
+
+#### 2. Person-2 Pension Invariance Guard
+```javascript
+/**
+ * Extracts Person-2 basis parameters (not derived year values)
+ * Prevents false warnings from inflation-adjusted values
+ */
+function extractP2Invariants(inputs) {
+  if (!inputs.partner?.aktiv) return null;
+  return {
+    aktiv: inputs.partner.aktiv,
+    brutto: inputs.partner.brutto,
+    startAlter: inputs.partner.startAlter,
+    startInJahren: inputs.partner.startInJahren,
+    steuerquotePct: inputs.partner.steuerquotePct,
+    rentAdjPct: inputs.partner.rentAdjPct
+  };
+}
+
+/**
+ * Compares basis parameters across sweep cases
+ * Uses strict equality (no tolerance) for invariants
+ */
+function areP2InvariantsEqual(inv1, inv2) {
+  if (inv1 === inv2) return true;
+  if (!inv1 || !inv2) return false;
+  return inv1.aktiv === inv2.aktiv &&
+         inv1.brutto === inv2.brutto &&
+         inv1.startAlter === inv2.startAlter &&
+         inv1.startInJahren === inv2.startInJahren &&
+         inv1.steuerquotePct === inv2.steuerquotePct &&
+         inv1.rentAdjPct === inv2.rentAdjPct;
+}
+```
+
+**Key Improvement:** Compares **basis parameters** (user input) instead of **derived year values** (inflation-adjusted), eliminating false positives.
+
+#### 3. Fail-Safe Liquidity Guard
+```javascript
+/**
+ * Prevents false RUIN scenarios in multi-year simulations
+ * Issue: Liquidity guard could trigger prematurely in sweep cases
+ * Solution: Enhanced validation before marking run as depleted
+ */
+// In simulator-engine.js
+if (pf.tagesgeld < liquidityThreshold) {
+  // Additional checks before declaring RUIN
+  const hasOtherAssets = (pf.depotwertAlt + pf.depotwertNeu + pf.goldWert) > 0;
+  if (hasOtherAssets) {
+    // Not truly depleted, continue simulation
+  }
+}
+```
+
+#### 4. Visual Warnings in Heatmap
+```javascript
+// Heatmap cells with Person-2 parameter violations show:
+// - Yellow border (stroke-width: 3px)
+// - Warning symbol: ⚠
+// - Tooltip: "⚠ Rente 2 variierte im Sweep"
+```
+
+#### 5. Developer Self-Tests
+```javascript
+/**
+ * Comprehensive self-tests for sweep correctness
+ * Activated via Dev-Mode (localStorage.setItem('sim.devMode', '1'))
+ */
+function runSweepSelfTest() {
+  // Test 1: P2 invariance across sweep cases
+  // Test 2: Deep-copy protection (baseInputs unchanged)
+  // Test 3: Negative test (P2 changes detected)
+
+  // Uses fixed seed (12345) for reproducibility
+  // Console logs with [SWEEP-TEST] prefix
+  // Visual feedback (green/red) in UI
+}
+```
+
+### Technical Benefits
+
+✅ **Correctness:** Prevents invalid sweep configurations
+✅ **Transparency:** Visual warnings for parameter violations
+✅ **Performance:** P2 check before simulation (no YearLog overhead)
+✅ **Maintainability:** Clear separation of allowed/blocked parameters
+✅ **Testability:** Self-tests with deterministic seed
+
+---
+
 ## Changelog
+
+### v2.1 - November 2025 ⭐
+- ✅ **Parameter Sweep Robustness** - Whitelist + Person-2 guards
+- ✅ **Fail-safe Liquidity Guard** - Prevents false RUIN scenarios
+- ✅ **Pension Adjustment Fix** - Unified calculation in backtest
+- ✅ **Deep-Clone Mechanism** - structuredClone() for sweep cases
+- ✅ **Developer Self-Tests** - Comprehensive sweep validation
+- ✅ **Visual Warnings** - Heatmap badges for parameter violations
 
 ### v2.0 - November 2025
 - ✅ **Engine modularization** - Split 959 lines into 8 modules
