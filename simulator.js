@@ -437,7 +437,6 @@ function getCommonInputs() {
         geschlecht: document.getElementById('geschlecht').value || 'w',
         startSPB: parseFloat(document.getElementById('startSPB').value) || 0,
         kirchensteuerSatz: parseFloat(document.getElementById('kirchensteuerSatz').value) || 0,
-        round5: document.getElementById('round5').checked,
         renteMonatlich: parseFloat(document.getElementById('renteMonatlich').value) || 0,
         renteStartOffsetJahre: parseInt(document.getElementById('renteStartOffsetJahre').value) || 0,
         renteIndexierungsart: document.getElementById('renteIndexierungsart').value,
@@ -823,7 +822,7 @@ function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta =
     const inputsCtx = buildInputsCtxFromPortfolio(algoInput, portfolio, {pensionAnnual, marketData: marketDataCurrentYear});
     
     const { spendingResult, newState: spendingNewState } = Ruhestandsmodell_v30.determineSpending({
-        market, lastState, inflatedFloor, inflatedFlex, round5: algoInput.round5, 
+        market, lastState, inflatedFloor, inflatedFlex,
         runwayMonths, liquidNow: liquiditaet, profile, depotValue: depotwertGesamt, totalWealth, inputsCtx
     });
     
@@ -1986,7 +1985,7 @@ window.onload = function() {
         'simStartVermoegen', 'depotwertAlt', 'zielLiquiditaet', 'simRisikoprofil', 
         'goldAllokationAktiv', 'goldAllokationProzent', 'goldFloorProzent', 'rebalancingBand', 
         'goldSteuerfrei', 'startFloorBedarf', 'startFlexBedarf', 
-        'einstandAlt', 'startAlter', 'geschlecht', 'startSPB', 'kirchensteuerSatz', 'round5',
+        'einstandAlt', 'startAlter', 'geschlecht', 'startSPB', 'kirchensteuerSatz',
         'renteMonatlich', 'renteStartOffsetJahre', 'renteIndexierungsart', 
         'pflegefallLogikAktivieren', 'pflegeModellTyp', 'pflegeStufe1Zusatz', 'pflegeStufe1FlexCut', 
         'pflegeMaxFloor', 'pflegeRampUp', 'pflegeMinDauer', 'pflegeMaxDauer', 'pflegeKostenDrift', 

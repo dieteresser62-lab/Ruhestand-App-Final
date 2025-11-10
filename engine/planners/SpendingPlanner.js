@@ -19,7 +19,7 @@ const SpendingPlanner = {
      */
     determineSpending(p) {
         const {
-            lastState, market, inflatedBedarf, round5, runwayMonate,
+            lastState, market, inflatedBedarf, runwayMonate,
             profil, depotwertGesamt, gesamtwert, renteJahr, input
         } = p;
 
@@ -58,25 +58,7 @@ const SpendingPlanner = {
         let endgueltigeEntnahme = inflatedBedarf.floor +
             (inflatedBedarf.flex * (Math.max(0, Math.min(100, geglätteteFlexRate)) / 100));
 
-        // 6. Optional auf 5%-Schritte runden
-        if (round5) {
-            const ungerundeteFlexRate = inflatedBedarf.flex > 0
-                ? ((endgueltigeEntnahme - inflatedBedarf.floor) / inflatedBedarf.flex * 100)
-                : 0;
-            const gerundeteFlexRate = Math.round(ungerundeteFlexRate / 5) * 5;
-
-            if (Math.abs(ungerundeteFlexRate - gerundeteFlexRate) > 0.1) {
-                endgueltigeEntnahme = inflatedBedarf.floor +
-                    (inflatedBedarf.flex * (gerundeteFlexRate / 100));
-                addDecision(
-                    "Rundung",
-                    `Flex-Rate auf nächsten 5%-Schritt gerundet (${gerundeteFlexRate.toFixed(0)}%).`,
-                    "inactive"
-                );
-            }
-        }
-
-        // 7. Finale Werte berechnen
+        // 6. Finale Werte berechnen
         let flexRate;
         if (inflatedBedarf.flex > 0) {
             const flexErfuellt = Math.max(0, endgueltigeEntnahme - inflatedBedarf.floor);
@@ -87,12 +69,12 @@ const SpendingPlanner = {
         }
         const finaleKuerzung = 100 - flexRate;
 
-        // 8. Ergebnisse zusammenstellen
+        // 7. Ergebnisse zusammenstellen
         const { newState, spendingResult } = this._buildResults(
             state, endgueltigeEntnahme, alarmStatus, flexRate, kuerzungQuelle, p
         );
 
-        // 9. Diagnose vervollständigen
+        // 8. Diagnose vervollständigen
         diagnosis.general = {
             marketSKey: market.sKey,
             marketSzenario: market.szenarioText,

@@ -224,7 +224,7 @@ const ENGINE_BUILD_ID = new Date().toISOString().substring(0, 16).replace('T', '
 
     const SpendingPlanner = {
       determineSpending(p) {
-        const { lastState, market, inflatedBedarf, round5, runwayMonate, profil, depotwertGesamt, gesamtwert, renteJahr, input } = p;
+        const { lastState, market, inflatedBedarf, runwayMonate, profil, depotwertGesamt, gesamtwert, renteJahr, input } = p;
         
         const diagnosis = { decisionTree: [], guardrails: [], keyParams: {}, general: {} };
         const addDecision = (step, impact, status, severity = 'info') => {
@@ -244,15 +244,6 @@ const ENGINE_BUILD_ID = new Date().toISOString().substring(0, 16).replace('T', '
         }
 
         let endgueltigeEntnahme = inflatedBedarf.floor + (inflatedBedarf.flex * (Math.max(0, Math.min(100, geglätteteFlexRate)) / 100));
-
-        if (round5) {
-            const ungerundeteFlexRate = inflatedBedarf.flex > 0 ? ((endgueltigeEntnahme - inflatedBedarf.floor) / inflatedBedarf.flex * 100) : 0;
-            const gerundeteFlexRate = Math.round(ungerundeteFlexRate / 5) * 5;
-            if (Math.abs(ungerundeteFlexRate - gerundeteFlexRate) > 0.1) {
-                 endgueltigeEntnahme = inflatedBedarf.floor + (inflatedBedarf.flex * (gerundeteFlexRate / 100));
-                 addDecision("Rundung", `Flex-Rate auf nächsten 5%-Schritt gerundet (${gerundeteFlexRate.toFixed(0)}%).`, "inactive");
-            }
-        }
 
         const finaleKuerzung = inflatedBedarf.flex > 0 ? 100 - (Math.max(0, endgueltigeEntnahme - inflatedBedarf.floor) / inflatedBedarf.flex * 100) : 0;
         const flexRate = 100 - finaleKuerzung;
@@ -784,7 +775,7 @@ determineAction(p) {
             ? (aktuelleLiquiditaet / ((inflatedBedarf.floor + inflatedBedarf.flex) / 12)) 
             : Infinity;
         
-        const { spendingResult, newState, diagnosis } = SpendingPlanner.determineSpending({ market, lastState, inflatedBedarf, round5: input.round5, runwayMonate: reichweiteMonate, profil, depotwertGesamt, gesamtwert, renteJahr, input });
+        const { spendingResult, newState, diagnosis } = SpendingPlanner.determineSpending({ market, lastState, inflatedBedarf, runwayMonate: reichweiteMonate, profil, depotwertGesamt, gesamtwert, renteJahr, input });
         
         const zielLiquiditaet = TransactionEngine.calculateTargetLiquidity(profil, market, inflatedBedarf);
         
@@ -870,7 +861,7 @@ const Ruhestandsmodell_v30_Adapter = {
         return fullResult;
     },
     
-    determineSpending: function({market, lastState, inflatedFloor, inflatedFlex, round5, runwayMonths, liquidNow, profile, depotValue, inputsCtx, totalWealth}) {
+    determineSpending: function({market, lastState, inflatedFloor, inflatedFlex, runwayMonths, liquidNow, profile, depotValue, inputsCtx, totalWealth}) {
         const fullResult = this._runFullSimulationAndCache(inputsCtx, lastState);
         if (fullResult.error) {
             return { error: fullResult.error, spendingResult: null, newState: lastState };

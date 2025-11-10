@@ -206,7 +206,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const inputsCtx = buildInputsCtxFromPortfolio(algoInput, portfolio, {pensionAnnual, marketData: marketDataCurrentYear});
 
     const { spendingResult, newState: spendingNewState } = window.Ruhestandsmodell_v30.determineSpending({
-        market, lastState, inflatedFloor, inflatedFlex, round5: algoInput.round5,
+        market, lastState, inflatedFloor, inflatedFlex,
         runwayMonths, liquidNow: liquiditaet, profile, depotValue: depotwertGesamt, totalWealth, inputsCtx
     });
 

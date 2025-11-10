@@ -42,7 +42,6 @@ export const UIReader = {
             renteAktiv: val('renteAktiv') === 'ja',
             renteMonatlich: num('renteMonatlich'),
             risikoprofil: 'sicherheits-dynamisch',
-            round5: checked('round5'),
             goldAktiv: checked('goldAktiv'),
             goldZielProzent: parseFloat(val('goldZielProzent')),
             goldFloorProzent: parseFloat(val('goldFloorProzent')),

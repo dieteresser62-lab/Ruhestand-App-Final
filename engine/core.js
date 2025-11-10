@@ -59,7 +59,6 @@ function _internal_calculateModel(input, lastState) {
         market,
         lastState,
         inflatedBedarf,
-        round5: input.round5,
         runwayMonate: reichweiteMonate,
         profil,
         depotwertGesamt,

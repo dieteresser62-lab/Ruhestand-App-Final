@@ -48,7 +48,6 @@ export function getCommonInputs() {
         geschlecht: p1Geschlecht,
         startSPB: p1SparerPB,
         kirchensteuerSatz: p1KirchensteuerPct / 100, // Konvertiere zu Dezimal (9 → 0.09)
-        round5: document.getElementById('round5').checked,
         renteMonatlich: p1Monatsrente,
         renteStartOffsetJahre: p1StartInJahren,
         rentAdjMode: rentAdjMode,
