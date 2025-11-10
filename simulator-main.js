@@ -509,11 +509,13 @@ export async function runMonteCarlo() {
                 if (p2Alive && careMetaP2) {
                     updateCareMeta(careMetaP2, inputs, ageP2, yearData, rngCareP2);
                     if (careMetaP2 && careMetaP2.triggered && triggeredAgeP2 === null) triggeredAgeP2 = ageP2;
+                    if (careMetaP2 && careMetaP2.active) careEverActive = true;
                 }
 
                 // Track care years
                 const p1ActiveThisYear = p1Alive && careMetaP1?.active;
                 const p2ActiveThisYear = p2Alive && careMetaP2?.active;
+                if (p2ActiveThisYear) careEverActive = true;
                 if (p1ActiveThisYear) p1CareYears++;
                 if (p2ActiveThisYear) p2CareYears++;
                 if (p1ActiveThisYear && p2ActiveThisYear) bothCareYears++;
