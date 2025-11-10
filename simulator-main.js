@@ -428,7 +428,8 @@ export async function runMonteCarlo() {
         const bothCareYearsArr = new Uint16Array(anzahl);
         const entryAgesP2 = [];
         let p2TriggeredCount = 0;
-        const maxAnnualCareSpendArr = new Float64Array(anzahl);
+        const maxAnnualCareSpendTriggered = [];
+        const bothCareYearsOverlapTriggered = [];
 
         // Arrays for care years (only for triggered cases)
         const p1CareYearsTriggered = [];
@@ -687,19 +688,26 @@ export async function runMonteCarlo() {
             const cumulCareDepotCosts = (careMetaP1?.kumulierteKosten || 0) + (careMetaP2?.kumulierteKosten || 0);
             endWealthWithCare[i] = endVermoegen;
             endWealthNoCareProxyArr[i] = endVermoegen + cumulCareDepotCosts;
-            if (triggeredAge !== null) {
+            const runHadCareP1 = (triggeredAge !== null);
+            const runHadCareP2 = (triggeredAgeP2 !== null);
+            const runHadAnyCare = runHadCareP1 || runHadCareP2;
+
+            if (runHadCareP1) {
                 pflegeTriggeredCount++; entryAges.push(triggeredAge); careDepotCosts.push(careMetaP1?.kumulierteKosten || 0);
                 if (failed) shortfallWithCareCount++;
                 // Store care years only for triggered cases
                 p1CareYearsTriggered.push(p1CareYears);
             }
-            if (triggeredAgeP2 !== null) {
+            if (runHadCareP2) {
                 p2TriggeredCount++; entryAgesP2.push(triggeredAgeP2);
                 // Store care years only for triggered cases
                 p2CareYearsTriggered.push(p2CareYears);
             }
+            if (bothCareYears > 0) {
+                bothCareYearsOverlapTriggered.push(bothCareYears);
+            }
             // Store bothCareYears only if at least one person had care
-            if (triggeredAge !== null || triggeredAgeP2 !== null) {
+            if (runHadAnyCare) {
                 bothCareYearsTriggered.push(bothCareYears);
             }
             if (endWealthNoCareProxyArr[i] <= 0) shortfallNoCareProxyCount++;
@@ -715,7 +723,9 @@ export async function runMonteCarlo() {
                 const annualSpend = (logRow.CareP1_Cost || 0) + (logRow.CareP2_Cost || 0);
                 maxAnnualSpend = Math.max(maxAnnualSpend, annualSpend);
             }
-            maxAnnualCareSpendArr[i] = maxAnnualSpend;
+            if (runHadAnyCare) {
+                maxAnnualCareSpendTriggered.push(maxAnnualSpend);
+            }
         }
 
         progressBar.style.width = '95%';
@@ -735,10 +745,10 @@ export async function runMonteCarlo() {
           // Dual Care KPIs (only for triggered cases)
           p1CareYears: p1CareYearsTriggered.length ? quantile(p1CareYearsTriggered, 0.5) : 0,
           p2CareYears: p2CareYearsTriggered.length ? quantile(p2CareYearsTriggered, 0.5) : 0,
-          bothCareYears: bothCareYearsTriggered.length ? quantile(bothCareYearsTriggered, 0.5) : 0,
+          bothCareYears: bothCareYearsOverlapTriggered.length ? quantile(bothCareYearsOverlapTriggered, 0.5) : 0,
           p2EntryRatePct: (p2TriggeredCount / anzahl) * 100,
           p2EntryAgeMedian: entryAgesP2.length ? quantile(entryAgesP2, 0.5) : 0,
-          maxAnnualCareSpend: quantile(maxAnnualCareSpendArr, 0.5),
+          maxAnnualCareSpend: maxAnnualCareSpendTriggered.length ? quantile(maxAnnualCareSpendTriggered, 0.5) : 0,
           shortfallDelta_vs_noCare: quantile(endWealthNoCareProxyArr, 0.5) - quantile(endWealthWithCare, 0.5)
         };
 
