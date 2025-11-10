@@ -533,8 +533,8 @@ export async function runMonteCarlo() {
                     }
                 }
 
-                // Simulation ends when P1 dies (main person)
-                if (!p1Alive) break;
+                // Simulation ends when both persons have died
+                if (!p1Alive && !p2Alive) break;
 
                 // Calculate care costs from both persons
                 const { zusatzFloor: careFloorP1, flexFactor: careFlexP1 } = calcCareCost(careMetaP1, null);
