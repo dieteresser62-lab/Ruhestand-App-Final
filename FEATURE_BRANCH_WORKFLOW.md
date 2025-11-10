@@ -1,111 +1,88 @@
-# Feature Branch Workflow: Zwei-Personen-Haushalt
+# Feature-Branch-Workflow
 
-## Branch-Informationen
+Dieser Leitfaden beschreibt den empfohlenen Workflow für umfangreiche Features (z. B. Parameter-Sweep-Verbesserungen oder Pflegefall-Updates). Ziel ist es, Änderungen isoliert zu entwickeln und kontrolliert in `main` zu integrieren.
 
-- **Branch-Name:** `feature/zwei-personen-haushalt`
-- **Erstellt am:** 2025-11-07
-- **Base Branch:** `main` (Commit: 2182ad3)
+---
 
-## Zweck
+## 1. Branch-Strategie
 
-Dieser langlebige Feature-Branch dient zur Entwicklung der Zwei-Personen-Haushalt-Funktionalität. Alle Teil-PRs sollten in diesen Branch gemerged werden, bevor das gesamte Feature in `main` integriert wird.
-
-## Workflow
-
-### 1. Entwicklung einzelner Features
-
-```bash
-# Neues Teil-Feature erstellen
-git checkout feature/zwei-personen-haushalt
-git checkout -b feature/zwei-personen-haushalt-teil-1
-
-# Entwicklung...
-git add .
-git commit -m "Beschreibung"
-git push -u origin feature/zwei-personen-haushalt-teil-1
-```
-
-### 2. Pull Requests erstellen
-
-**Wichtig:** PRs sollten gegen `feature/zwei-personen-haushalt` erstellt werden, NICHT gegen `main`!
-
-```bash
-gh pr create --base feature/zwei-personen-haushalt --head feature/zwei-personen-haushalt-teil-1
-```
-
-### 3. Nach dem Merge eines Teil-PRs
-
-```bash
-# Feature Branch aktualisieren
-git checkout feature/zwei-personen-haushalt
-git pull origin feature/zwei-personen-haushalt
-```
-
-### 4. Integration in Main (erst wenn alles fertig ist)
-
-```bash
-# Sicherstellen dass feature/zwei-personen-haushalt aktuell ist
-git checkout feature/zwei-personen-haushalt
-git pull origin feature/zwei-personen-haushalt
-
-# Main aktualisieren
-git checkout main
-git pull origin main
-
-# Feature in Main mergen MIT Merge-Commit (wichtig für Rollback!)
-git merge --no-ff feature/zwei-personen-haushalt -m "Add Zwei-Personen-Haushalt feature"
-git push origin main
-```
-
-**WICHTIG:** Die `--no-ff` Flag ist essentiell! Sie erstellt einen Merge-Commit, der später mit einem einzigen Revert rückgängig gemacht werden kann.
-
-## Rollback-Strategie
-
-Falls das komplette Feature rückgängig gemacht werden muss:
-
-```bash
-# 1. Merge-Commit Hash finden
-git log --oneline --graph --first-parent main
-
-# 2. Merge rückgängig machen
-git revert -m 1 <merge-commit-hash>
-
-# 3. Pushen
-git push origin main
-```
-
-Der Parameter `-m 1` sagt Git, dass die erste Parent (main) behalten werden soll.
-
-## Vorteile dieser Strategie
-
-✅ Isolierte Entwicklung ohne Main zu beeinflussen
-✅ Mehrere PRs können unabhängig reviewed werden
-✅ Einfacher Rollback des gesamten Features mit einem Befehl
-✅ Klare History: Ein Merge-Commit für das gesamte Feature
-✅ Kontinuierliche Integration innerhalb des Feature-Branches
-
-## Best Practices
-
-1. **Regelmäßig vom Main Branch mergen** um Konflikte zu vermeiden:
+1. Ausgehend von `main` einen dedizierten Feature-Branch erstellen:
    ```bash
-   git checkout feature/zwei-personen-haushalt
-   git merge main
+   git checkout main
+   git pull origin main
+   git checkout -b feature/<kurze-beschreibung>
    ```
+2. Teilaufgaben können auf Unter-Branches entstehen (`feature/...-teil-1`). Diese werden später in den Feature-Branch gemerged.
+3. Der Feature-Branch bleibt solange bestehen, bis das Gesamtfeature abgeschlossen und getestet ist.
 
-2. **Branch Protection** für `feature/zwei-personen-haushalt` einrichten (optional)
+---
 
-3. **Tests** sollten auf dem Feature-Branch laufen vor dem Main-Merge
+## 2. Pull-Requests
 
-4. **Dokumentation** sollte mit entwickelt werden
+* PRs gegen den Feature-Branch stellen, nicht direkt gegen `main`.
+* Kleine, thematisch fokussierte PRs erleichtern Reviews (z. B. „Heatmap-Warnungen“ oder „Storage-Refactor“).
+* Beschreibungen sollten enthalten:
+  - Zweck der Änderung
+  - Relevante Tests/Smoketests (`sim-parity-smoketest.js`, manuelle Checks)
+  - Hinweise auf UI-/Dokumentationsupdates
 
-5. **Nie Squash-Merge verwenden** beim finalen Main-Merge (verhindert sauberen Rollback)
+---
 
-## Status-Tracking
+## 3. Synchronisation mit `main`
 
-- [ ] Feature-Branch erstellt
-- [ ] Feature-Branch gepusht
-- [ ] Teil-Feature 1: _Beschreibung_
-- [ ] Teil-Feature 2: _Beschreibung_
-- [ ] Tests komplett
+* Regelmäßig `main` in den Feature-Branch mergen, um Konflikte gering zu halten:
+  ```bash
+  git checkout feature/<kurze-beschreibung>
+  git fetch origin
+  git merge origin/main
+  ```
+* Alternativ kann `git rebase origin/main` genutzt werden, solange der Branch nur lokal verwendet wird.
+
+---
+
+## 4. Integration in `main`
+
+1. Sicherstellen, dass alle Teilaufgaben abgeschlossen und dokumentiert sind.
+2. Letzte Aktualisierung mit `main` durchführen.
+3. Merge mittels `--no-ff`, um den Feature-Branch als eigenen Knoten zu erhalten:
+   ```bash
+   git checkout main
+   git pull origin main
+   git merge --no-ff feature/<kurze-beschreibung> -m "Add <Feature>"
+   git push origin main
+   ```
+4. Anschließend kann der Feature-Branch entfernt werden (`git branch -d ...`).
+
+---
+
+## 5. Rollback-Strategie
+
+* Der Merge-Commit dient als Rollback-Anker:
+  ```bash
+  git log --oneline --graph --first-parent main   # Merge-Commit identifizieren
+  git revert -m 1 <merge-commit-hash>
+  git push origin main
+  ```
+* Der Parameter `-m 1` stellt sicher, dass der Stand von `main` beibehalten wird.
+
+---
+
+## 6. Best Practices
+
+* Tests/Smoketests vor jedem Merge in den Feature-Branch und vor dem finalen Merge in `main` ausführen.
+* Dokumentation parallel pflegen (README, TECHNICAL.md, Modul-Readmes).
+* Branch-Protection-Regeln für `main` und relevante Feature-Branches verwenden.
+* Keine Squash-Merges für den finalen Merge nach `main`, damit ein vollständiger Rollback möglich bleibt.
+* Commit-Nachrichten mit Kontext (z. B. „Guardrails: neues Regime“).
+
+---
+
+## 7. Checkliste
+
+- [ ] Feature-Branch erstellt und gepusht
+- [ ] Teil-Branches gemerged
+- [ ] Tests/Smoketests durchgeführt
 - [ ] Dokumentation aktualisiert
-- [ ] In Main gemerged (Datum: ___)
+- [ ] Merge in `main` via `--no-ff`
+- [ ] Optional: Branch entfernt
+
