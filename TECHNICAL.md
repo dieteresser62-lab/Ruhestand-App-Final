@@ -1,924 +1,115 @@
-# Ruhestand-App-Final - Technical Documentation
+# Technische Dokumentation – Ruhestand-App-Final
 
-Comprehensive retirement planning toolkit with Monte Carlo simulations and dynamic withdrawal strategies (Guardrails).
-
-![Modular Architecture](https://img.shields.io/badge/modules-22-blue)
-![Lines of Code](https://img.shields.io/badge/LOC-6500%2B-green)
-![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)
+Dieses Dokument beschreibt die Architektur und zentrale Datenflüsse der Ruhestand-App. Die Anwendung besteht aus zwei getrennten Oberflächen (Balance & Simulator) und einer gemeinsam genutzten Engine.
 
 ---
 
-## Architecture Overview
+## Architekturüberblick
 
-### Complete Modular Design (v2.0)
+### Komponenten
 
-```
-Ruhestand-App-Final/
-├── Balance.html (255 lines)
-├── Simulator.html (242 lines)
-│
-├── css/
-│   ├── balance.css (~530 lines)
-│   └── simulator.css (99 lines)
-│
-└── js/
-    ├── balance/                    # Balance App (7 modules)
-    │   ├── balance-main.js         (224 lines) - Orchestration
-    │   ├── balance-config.js       (54 lines)  - Configuration
-    │   ├── balance-storage.js      (233 lines) - Persistence
-    │   ├── balance-reader.js       (97 lines)  - Input Layer
-    │   ├── balance-renderer.js     (494 lines) - Output Layer
-    │   ├── balance-binder.js       (378 lines) - Event Handling
-    │   └── balance-utils.js        (32 lines)  - Utilities
-    │
-    ├── simulator/                  # Simulator App (7 modules)
-    │   ├── simulator-main.js       (559 lines) - Monte Carlo Orchestration
-    │   ├── simulator-engine.js     (411 lines) - Simulation Logic
-    │   ├── simulator-results.js    (297 lines) - Result Rendering
-    │   ├── simulator-portfolio.js  (343 lines) - Portfolio Management
-    │   ├── simulator-heatmap.js    (315 lines) - SVG Visualization
-    │   ├── simulator-utils.js      (146 lines) - Helper Functions
-    │   └── simulator-data.js       (84 lines)  - Historical Data
-    │
-    └── engine/                     # Shared Engine (8 modules) ⭐
-        ├── engine-main.js          - Public API & Orchestration
-        ├── validator.js            - Input Validation & Sanitization
-        ├── market-analyzer.js      - Market Regime Classification
-        ├── spending-planner.js     - Withdrawal Planning Logic
-        ├── transaction-engine.js   - Transaction Optimization
-        ├── portfolio-calculator.js - Portfolio Calculations
-        ├── tax-optimizer.js        - Tax Optimization (German)
-        └── constants.js            - Thresholds & Configuration
-```
+| Komponente | Dateien | Zweck |
+|------------|---------|-------|
+| Balance-App | `Balance.html`, `balance-*.js`, `css/balance.css` | Jahresabschluss, Liquiditäts- und Entnahmeplanung, Diagnosen |
+| Simulator | `Simulator.html`, `simulator-*.js`, `simulator.css` | Monte-Carlo-Simulationen, Parameter-Sweeps, Pflegefall-Szenarien |
+| Engine | `engine/` (Module) → `engine.js` | Validierung, Marktanalyse, Spending- und Transaktionslogik |
 
-**Total:** 22 ES6 Modules, ~6,500 lines of code
+Alle Skripte sind ES6-Module. Die Engine wird zur Laufzeit als IIFE gebündelt und stellt eine globale `EngineAPI` (Balance) sowie `Ruhestandsmodell_v30` (Simulator-Kompatibilität) bereit.
 
 ---
 
-## Architecture Layers
+## Engine
 
-### Layered Architecture Pattern
+Die Engine besteht aus acht Modulen, die von `build-engine.js` zu `engine.js` zusammengeführt werden. Die Reihenfolge entspricht zugleich der internen Verarbeitungskette:
+
+1. **`engine/validators/InputValidator.js`** – prüft sämtliche Eingaben auf Vollständigkeit, Wertebereiche und Konsistenz. Liefert strukturierte Fehlermeldungen.
+2. **`engine/analyzers/MarketAnalyzer.js`** – klassifiziert Marktregime, berechnet Drawdowns und leitet Kennzahlen für Guardrails ab.
+3. **`engine/planners/SpendingPlanner.js`** – steuert Guardrails, Glättung der Flex-Rate, Alarmstatus und erstellt Diagnoseeinträge.
+4. **`engine/transactions/TransactionEngine.js`** – leitet Ziel-Liquidität ab, berücksichtigt Puffer-Schutz und limitiert Verkäufe/Rebalancing.
+5. **`engine/core.js`** – orchestriert die oben genannten Module, exponiert `EngineAPI` (Version 31) und erzeugt Diagnose-/UI-Strukturen.
+6. **`engine/config.js`** – zentrale Konfiguration (Schwellenwerte, Regime-Mapping, Profile). Generiert zur Build-Zeit eine eindeutige Build-ID.
+7. **`engine/errors.js`** – Fehlerklassen (`AppError`, `ValidationError`, `FinancialCalculationError`).
+8. **`engine/adapter.js`** – Kompatibilitätsadapter für ältere Simulator-Schnittstellen.
+
+### Datenfluss innerhalb der Engine
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Presentation Layer                    │
-├─────────────────────────────────────────────────────────┤
-│  balance-renderer.js  │  simulator-results.js          │
-│  balance-binder.js    │  simulator-heatmap.js          │
-└─────────────────────────────────────────────────────────┘
-                           ↓
-┌─────────────────────────────────────────────────────────┐
-│                   Application Layer                      │
-├─────────────────────────────────────────────────────────┤
-│  balance-main.js      │  simulator-main.js             │
-│  balance-reader.js    │  simulator-engine.js           │
-└─────────────────────────────────────────────────────────┘
-                           ↓
-┌─────────────────────────────────────────────────────────┐
-│                    Business Logic Layer                  │
-├─────────────────────────────────────────────────────────┤
-│              engine-main.js (Facade)                    │
-│  ┌───────────────────────────────────────────────────┐ │
-│  │ market-analyzer.js    │ spending-planner.js      │ │
-│  │ transaction-engine.js │ portfolio-calculator.js  │ │
-│  │ tax-optimizer.js      │ validator.js             │ │
-│  └───────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────┘
-                           ↓
-┌─────────────────────────────────────────────────────────┐
-│                   Persistence Layer                      │
-├─────────────────────────────────────────────────────────┤
-│  balance-storage.js   │  LocalStorage API              │
-└─────────────────────────────────────────────────────────┘
+Input → InputValidator.validate
+      → MarketAnalyzer.analyzeMarket
+      → SpendingPlanner.determineSpending
+      → TransactionEngine.calculateTargetLiquidity + determineAction
+      → Ergebnisobjekt (UI-Daten, Diagnose, neuer State)
 ```
+
+Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`ValidationError` transportiert und von den UIs aufgefangen.
 
 ---
 
-## Core Engine Architecture (v2.0)
+## Balance-App
 
-### Module Breakdown
+### Modulübersicht
 
-#### 1. **engine-main.js** - Public API Facade
-```javascript
-export class FinancialEngine {
-  constructor() {
-    this.validator = new InputValidator();
-    this.marketAnalyzer = new MarketAnalyzer();
-    this.spendingPlanner = new SpendingPlanner();
-    this.transactionEngine = new TransactionEngine();
-    this.portfolioCalculator = new PortfolioCalculator();
-    this.taxOptimizer = new TaxOptimizer();
-  }
-  
-  // Public API methods
-  validateInput(data) { /* ... */ }
-  analyzeMarket(marketData) { /* ... */ }
-  planWithdrawal(portfolio, config) { /* ... */ }
-  optimizeTransactions(portfolio, needed) { /* ... */ }
-}
-```
+* `balance-config.js` – Konfiguration, Fehlertypen, Debug-Utilities.
+* `balance-utils.js` – Formatierungs- und Hilfsfunktionen (Währung, Threshold-Zugriff).
+* `balance-storage.js` – Persistenzschicht für `localStorage` und File-System-Snapshots.
+* `balance-reader.js` – liest Benutzerinputs aus dem DOM und setzt UI-Side-Effects.
+* `balance-renderer.js` – Darstellung der Ergebnisse (Summary, Guardrails, Diagnose, Toasts, Themes).
+* `balance-binder.js` – Event-Hub mit Tastenkürzeln, Import/Export, Snapshots, Debug-Modus.
+* `balance-main.js` – Orchestrator: initiiert Module, führt `update()` aus und spricht `EngineAPI` an.
 
-**Responsibilities:**
-- Public API surface
-- Module coordination
-- Error handling & logging
-- Backward compatibility
+### Ablauf einer Aktualisierung
+
+1. `balance-binder.js` reagiert auf Eingaben (Formular, Tastenkürzel, Buttons) und ruft `debouncedUpdate()` auf.
+2. `balance-reader.js` sammelt alle Inputs und gibt ein strukturiertes Objekt zurück.
+3. `balance-main.js` reicht die Inputs an `EngineAPI.simulateSingleYear()` weiter.
+4. Die Engine liefert Ergebnisse/Diagnose/Fehler.
+5. `balance-renderer.js` aktualisiert UI-Komponenten und Statusanzeigen.
+6. `balance-storage.js` persistiert den Zustand und verwaltet Snapshots.
 
 ---
 
-#### 2. **validator.js** - Input Validation
-```javascript
-export class InputValidator {
-  validatePortfolio(portfolio) {
-    // Validate portfolio structure
-    // Check numeric ranges
-    // Ensure consistency
-  }
-  
-  validateMarketData(data) {
-    // Validate market data format
-    // Check year sequences
-    // Detect outliers
-  }
-  
-  sanitizeInput(input) {
-    // Remove dangerous characters
-    // Normalize formats
-    // Apply defaults
-  }
-}
-```
+## Simulator
 
-**Responsibilities:**
-- Input validation
-- Data sanitization
-- Error detection
-- Type checking (runtime)
+### Wichtige Module
+
+* `simulator-main.js` – zentrale Steuerung, Parameter-Sweep-Logik, Dev-Mode-Self-Tests.
+* `simulator-engine.js` – Monte-Carlo-Logik (Jahresfortschreibung, Pflegefallkosten, Zufallssampling).
+* `simulator-portfolio.js` – Initialisierung, Portfolio-Berechnungen, Stress-Kontexte.
+* `simulator-results.js` – Aggregation von Simulationsergebnissen, Kennzahlen und Warnflaggen.
+* `simulator-heatmap.js` – SVG-Rendering für Parameter-Sweeps inkl. Warnhinweise bei Verstößen.
+* `simulator-utils.js` – Zufallszahlengenerator, Statistikfunktionen, Parser, Formatierung.
+* `simulator-data.js` – Historische Daten, Mortalitäts- und Stress-Presets.
+
+### Parameter-Sweep-Schutzmechanismen
+
+* **Whitelist** (`SWEEP_ALLOWED_KEYS`) beschränkt veränderbare Parameter.
+* **Blocklist** verhindert Änderungen an sensiblen Feldern (z. B. Rente Person 2).
+* **Deep-Clones** (`structuredClone`-Fallback) isolieren jeden Sweep-Case.
+* **Rente-2-Wächter** markiert Heatmap-Zellen mit ⚠, wenn die zweite Rente variiert.
+* **Self-Test** (`runSweepSelfTest`) prüft Whitelist/Clone-Mechanismen im Dev-Modus.
+
+### Ergebnisdarstellung
+
+* KPIs (P10/P50/P90) und Worst-Run-Logs.
+* Heatmap mit optionalen Warn-Badges.
+* Pflegefall-Szenarien mit zusätzlichen Kostenverläufen.
 
 ---
 
-#### 3. **market-analyzer.js** - Market Regime Classification
-```javascript
-export class MarketAnalyzer {
-  classifyRegime(currentPrice, ath, returns) {
-    // Classify into 7 regimes:
-    // peak_hot, peak_stable, recovery, 
-    // corr_young, side_long, bear_deep, 
-    // recovery_in_bear
-  }
-  
-  calculateDrawdown(currentPrice, ath) {
-    return (currentPrice - ath) / ath;
-  }
-  
-  detectMomentum(returns, window) {
-    // Calculate momentum indicators
-  }
-}
-```
+## Build- und Laufzeit-Hinweise
 
-**Regimes:**
-```javascript
-{
-  peak_hot: 'ATH with strong momentum (>+10% in 3M)',
-  peak_stable: 'ATH, stable (momentum < +10%)',
-  recovery: 'Strong recovery (>+20% from low)',
-  corr_young: 'Early correction (0% to -10% from ATH)',
-  side_long: 'Sideways (-10% to -20% from ATH)',
-  bear_deep: 'Deep correction (>-20% from ATH)',
-  recovery_in_bear: 'Rally in bear market'
-}
-```
+* Engine anpassen → `node build-engine.js` ausführen, anschließend `engine.js` prüfen.
+* Debug-Modi aktivieren:
+  * Balance: `Ctrl` + `Shift` + `D` oder `localStorage.setItem('balance_debug_mode', 'true')`.
+  * Simulator: UI-Toggle oder `localStorage.setItem('sim.devMode', '1')`.
+* Snapshot-Funktionen benötigen File-System-Access-API (Chromium).
+* Tests/Smoketests: `sim-parity-smoketest.js` enthält ein Skript zum Vergleich von Simulationsergebnissen, `test-dual-care.js` prüft Pflegefall-Logik.
 
 ---
 
-#### 4. **spending-planner.js** - Withdrawal Logic
-```javascript
-export class SpendingPlanner {
-  calculateWithdrawal(portfolio, config, marketState) {
-    // Apply Guardrails strategy
-    // Check thresholds
-    // Adjust for inflation
-    // Return recommendation
-  }
-  
-  applyGuardrails(currentRate, initialRate, config) {
-    const upperGuardrail = initialRate * 0.8; // -20%
-    const lowerGuardrail = initialRate * 1.2; // +20%
-    
-    if (currentRate < upperGuardrail) {
-      return 'INCREASE'; // +10%
-    } else if (currentRate > lowerGuardrail) {
-      return 'DECREASE'; // -10%
-    }
-    return 'MAINTAIN';
-  }
-  
-  checkAlarmThresholds(withdrawalRate, drawdown) {
-    // ALARM: >5.5% or drawdown >25%
-    // CAUTION: >4.5%
-  }
-}
-```
+## Weiterführende Dokumente
 
-**Thresholds:**
-```javascript
-ALARM: {
-  withdrawalRate: 5.5,
-  realDrawdown: 25
-},
-CAUTION: {
-  withdrawalRate: 4.5,
-  inflationCap: 3  // Max 3% inflation adjustment
-}
-```
+* **BALANCE_MODULES_README.md** – Detailtiefe zur Balance-App.
+* **engine/README.md** – Engine-spezifische Informationen inkl. Build-Beschreibung.
+* **TYPESCRIPT_MIGRATION_KONZEPT.md** – Migrationsplan zu TypeScript.
 
----
-
-#### 5. **transaction-engine.js** - Transaction Optimization
-```javascript
-export class TransactionEngine {
-  optimizeTransactions(portfolio, requiredAmount) {
-    // 1. Use Tagesgeld first (tax-free up to Freibetrag)
-    // 2. Sell tax-optimal assets
-    // 3. Minimize tax burden
-    // 4. Rebalance if needed
-  }
-  
-  calculateTaxBurden(transactions) {
-    // German tax rules
-    // Teilfreistellung (30% for equity funds)
-    // Freibetrag (1000€)
-    // Abgeltungssteuer (26.375%)
-  }
-  
-  selectAssetsToSell(portfolio, amount) {
-    // Tax-loss harvesting
-    // Age-based priorities (old vs. new)
-    // Asset class considerations
-  }
-}
-```
-
----
-
-#### 6. **portfolio-calculator.js** - Portfolio Math
-```javascript
-export class PortfolioCalculator {
-  calculateTotalValue(portfolio) {
-    return Object.values(portfolio).reduce((sum, val) => sum + val, 0);
-  }
-  
-  calculateAllocation(portfolio) {
-    const total = this.calculateTotalValue(portfolio);
-    return {
-      tagesgeld: portfolio.tagesgeld / total,
-      etf: (portfolio.etfAlt + portfolio.etfNeu) / total,
-      aktien: (portfolio.aktienAlt + portfolio.aktienNeu) / total,
-      gold: portfolio.gold / total
-    };
-  }
-  
-  calculateRealReturns(nominalReturns, inflation) {
-    return (1 + nominalReturns) / (1 + inflation) - 1;
-  }
-}
-```
-
----
-
-#### 7. **tax-optimizer.js** - German Tax Logic
-```javascript
-export class TaxOptimizer {
-  calculateCapitalGainsTax(gain, assetType) {
-    // Freibetrag: 1000€
-    // Teilfreistellung: 30% for equity funds
-    // Abgeltungssteuer: 25%
-    // Soli: 5.5% on tax
-    // Total: 26.375%
-    
-    const taxableGain = this.applyTeilfreistellung(gain, assetType);
-    const gainAboveFreibetrag = Math.max(0, taxableGain - 1000);
-    return gainAboveFreibetrag * 0.26375;
-  }
-  
-  applyTeilfreistellung(gain, assetType) {
-    if (assetType === 'etf' || assetType === 'aktien') {
-      return gain * 0.7; // 30% tax-free
-    }
-    return gain;
-  }
-  
-  optimizeSaleOrder(assets) {
-    // 1. Tax-loss harvesting candidates
-    // 2. Long-term holdings (lower basis)
-    // 3. Assets with Teilfreistellung
-  }
-}
-```
-
----
-
-#### 8. **constants.js** - Configuration
-```javascript
-export const THRESHOLDS = {
-  ALARM: {
-    withdrawalRate: 5.5,
-    realDrawdown: 25
-  },
-  CAUTION: {
-    withdrawalRate: 4.5,
-    inflationCap: 3
-  }
-};
-
-export const TAX_RATES = {
-  capitalGains: 0.25,
-  soli: 0.055,
-  total: 0.26375,
-  freibetrag: 1000,
-  teilfreistellung: 0.30
-};
-
-export const GUARDRAILS = {
-  upperGuardrail: 0.8,  // -20% from initial
-  lowerGuardrail: 1.2,  // +20% from initial
-  adjustment: 0.1       // ±10% when triggered
-};
-```
-
----
-
-## Module Dependencies
-
-```
-engine-main.js
-  ├─→ validator.js
-  ├─→ market-analyzer.js
-  ├─→ spending-planner.js
-  │    └─→ constants.js
-  ├─→ transaction-engine.js
-  │    └─→ tax-optimizer.js
-  │         └─→ constants.js
-  └─→ portfolio-calculator.js
-
-balance-main.js
-  ├─→ engine-main.js
-  ├─→ balance-reader.js
-  ├─→ balance-renderer.js
-  ├─→ balance-binder.js
-  ├─→ balance-storage.js
-  └─→ balance-utils.js
-
-simulator-main.js
-  ├─→ engine-main.js
-  ├─→ simulator-engine.js
-  │    └─→ simulator-utils.js
-  ├─→ simulator-portfolio.js
-  ├─→ simulator-results.js
-  ├─→ simulator-heatmap.js
-  └─→ simulator-data.js
-```
-
-**Key Properties:**
-- ✅ No circular dependencies
-- ✅ Clear dependency hierarchy
-- ✅ Easy to test (each module in isolation)
-- ✅ Easy to replace (interfaces are clean)
-
----
-
-## Monte Carlo Simulation
-
-### Methods
-
-1. **Regime-Sampling**
-   ```javascript
-   classifyRegime(price, ath, returns);
-   sampleFromRegimeDistribution(regime);
-   ```
-   - Classifies market state into 7 regimes
-   - Samples returns from regime-specific distributions
-   - Accounts for regime persistence
-
-2. **Block-Bootstrap**
-   ```javascript
-   selectRandomBlock(returns, blockSize = 12);
-   ```
-   - Preserves temporal correlation
-   - Samples consecutive sequences
-   - Reduces unrealistic volatility
-
-3. **Historical Backtest**
-   ```javascript
-   getHistoricalSequence(startYear, years);
-   ```
-   - Uses actual historical data
-   - Tests against real market scenarios
-   - Validates other methods
-
-### Metrics
-
-```javascript
-{
-  P10: '10th percentile (worst 10%)',
-  P50: 'Median outcome',
-  P90: '90th percentile (best 10%)',
-  successRate: '% surviving to target year',
-  avgEndValue: 'Mean remaining portfolio',
-  maxDrawdown: 'Worst drawdown across paths',
-  timeToZero: 'Years until depletion (if failed)'
-}
-```
-
----
-
-## Code Quality Metrics
-
-### Overall Statistics
-
-```
-Total Lines of Code:      ~6,500
-Total Modules:            22
-Average Module Size:      ~295 lines
-Max Module Size:          559 lines (simulator-main.js)
-Min Module Size:          32 lines (balance-utils.js)
-
-Code Duplication:         <3%
-Cyclomatic Complexity:    <8 (average)
-Max Function Length:      ~40 lines
-Comment Ratio:            ~15%
-```
-
-### Module Sizes
-
-```
-Balance App:      1,512 lines (7 modules)
-Simulator:        2,155 lines (7 modules)
-Engine:           ~1,200 lines (8 modules)
-CSS:              ~629 lines (2 files)
-HTML:             497 lines (2 files)
-```
-
----
-
-## Testing Strategy (Planned)
-
-### Unit Tests
-
-```javascript
-// test/engine/validator.test.js
-describe('InputValidator', () => {
-  test('validates portfolio structure', () => {
-    const validator = new InputValidator();
-    const result = validator.validatePortfolio({
-      tagesgeld: 100000,
-      etfAlt: 200000,
-      /* ... */
-    });
-    expect(result.isValid).toBe(true);
-  });
-});
-
-// test/engine/market-analyzer.test.js
-describe('MarketAnalyzer', () => {
-  test('classifies peak_hot regime correctly', () => {
-    const analyzer = new MarketAnalyzer();
-    const regime = analyzer.classifyRegime(
-      100, // current price
-      100, // ATH
-      [0.02, 0.03, 0.05] // recent returns
-    );
-    expect(regime).toBe('peak_hot');
-  });
-});
-
-// test/engine/spending-planner.test.js
-describe('SpendingPlanner', () => {
-  test('triggers guardrail adjustment', () => {
-    const planner = new SpendingPlanner();
-    const action = planner.applyGuardrails(
-      6.0,  // current rate (too high!)
-      5.0   // initial rate
-    );
-    expect(action).toBe('DECREASE');
-  });
-});
-```
-
-### Integration Tests
-
-```javascript
-// test/integration/withdrawal-flow.test.js
-describe('Complete Withdrawal Flow', () => {
-  test('calculates withdrawal with guardrails', () => {
-    const engine = new FinancialEngine();
-    const result = engine.planWithdrawal(
-      portfolio,
-      config,
-      marketData
-    );
-    
-    expect(result.amount).toBeGreaterThan(0);
-    expect(result.alarmLevel).toBeDefined();
-    expect(result.transactions).toBeArray();
-  });
-});
-```
-
----
-
-## Performance Characteristics
-
-### Current Performance
-
-| Operation | Complexity | Time (typical) |
-|-----------|-----------|----------------|
-| Single withdrawal calculation | O(1) | <1ms |
-| Market regime classification | O(n) | <5ms |
-| Monte Carlo (1000 runs, 35 years) | O(n×m) | 2-5s |
-| Parameter Sweep (10×10 grid) | O(k×n×m) | 3-30min |
-| Heatmap rendering (SVG) | O(k²) | 100-500ms |
-
-**n** = years, **m** = simulations, **k** = grid size
-
-### Optimization Opportunities
-
-1. **Web Workers**
-   ```javascript
-   // Run Monte Carlo in parallel
-   const worker = new Worker('monte-carlo-worker.js');
-   worker.postMessage({ runs: 1000, years: 35 });
-   ```
-
-2. **Memoization**
-   ```javascript
-   const regimeCache = new Map();
-   if (regimeCache.has(key)) return regimeCache.get(key);
-   ```
-
-3. **Progressive Rendering**
-   ```javascript
-   // Update UI every 100 simulations
-   if (i % 100 === 0) {
-     updateProgress(i / totalRuns);
-   }
-   ```
-
----
-
-## Security Considerations
-
-### Current Status
-
-✅ **Strengths:**
-- All data local (no server communication)
-- No external dependencies (no supply chain attacks)
-- No authentication needed (single-user, local)
-
-⚠️ **Considerations:**
-- LocalStorage unencrypted (XSS risk if mixed content)
-- CSV import (potential injection vectors)
-- File System API (browser-specific, limited to Chromium)
-
-### Recommended Mitigations
-
-```javascript
-// 1. Input Sanitization (validator.js)
-sanitizeCSV(data) {
-  return data.replace(/<script>/gi, '');
-}
-
-// 2. Content Security Policy
-<meta http-equiv="Content-Security-Policy" 
-      content="default-src 'self'; script-src 'self'">
-
-// 3. Data Encryption (future)
-encryptPortfolio(data, userPin) {
-  const encrypted = CryptoJS.AES.encrypt(
-    JSON.stringify(data), 
-    userPin
-  );
-  return encrypted.toString();
-}
-```
-
----
-
-## Browser Compatibility
-
-| Feature | Chrome | Firefox | Safari | Edge |
-|---------|--------|---------|--------|------|
-| ES6 Modules | ✅ 61+ | ✅ 60+ | ✅ 11+ | ✅ 79+ |
-| LocalStorage | ✅ | ✅ | ✅ | ✅ |
-| File System API | ✅ | ⚠️ Partial | ❌ | ✅ |
-| SVG Rendering | ✅ | ✅ | ✅ | ✅ |
-| Native Modules | ✅ | ✅ | ✅ | ✅ |
-
----
-
-## Development Setup
-
-```bash
-# No build step! No npm install!
-git clone https://github.com/dieteresser62-lab/Ruhestand-App-Final.git
-cd Ruhestand-App-Final
-
-# Option 1: Open directly
-open Balance.html
-
-# Option 2: Use local server (recommended for modules)
-python -m http.server 8000
-# Then open: http://localhost:8000/Balance.html
-
-# Option 3: Use VS Code Live Server
-code .
-# Right-click Balance.html → "Open with Live Server"
-```
-
----
-
-## Code Style Guide
-
-```javascript
-// 1. Module Structure
-// - Imports at top
-// - Class/function definitions
-// - Exports at bottom
-
-// 2. Naming Conventions
-// - Classes: PascalCase
-// - Functions: camelCase
-// - Constants: UPPER_SNAKE_CASE
-// - Files: kebab-case.js
-
-// 3. Indentation
-// - 2 spaces (no tabs)
-
-// 4. Comments
-// - JSDoc for public APIs
-// - Inline comments for complex logic
-
-// 5. Error Handling
-// - Throw descriptive errors
-// - Validate inputs early
-// - Log errors for debugging
-```
-
----
-
-## Technical Debt Tracker
-
-### High Priority
-- [ ] TypeScript migration (all 22 modules)
-- [ ] Unit test suite (target: 80% coverage)
-- [ ] Web Workers for Monte Carlo
-- [ ] JSDoc documentation (public APIs)
-
-### Medium Priority
-- [ ] Build tooling (Vite/esbuild)
-- [ ] ESLint/Prettier setup
-- [ ] CI/CD pipeline (GitHub Actions)
-- [ ] Performance profiling
-
-### Low Priority
-- [ ] Chart library integration
-- [ ] PWA features
-- [ ] International tax systems
-- [ ] Backend API (optional)
-
----
-
-## Migration Guide (v1 → v2)
-
-### Breaking Changes
-
-**None!** The engine-main.js maintains backward compatibility.
-
-### New Features
-
-```javascript
-// Old (v1.0)
-import { calculateYear } from './engine.js';
-
-// New (v2.0) - Still works!
-import { calculateYear } from './engine/engine-main.js';
-
-// New (v2.0) - Direct access to sub-modules
-import { MarketAnalyzer } from './engine/market-analyzer.js';
-import { SpendingPlanner } from './engine/spending-planner.js';
-
-const analyzer = new MarketAnalyzer();
-const regime = analyzer.classifyRegime(price, ath, returns);
-```
-
----
-
-## Contribution Guidelines
-
-### Adding a New Module
-
-1. **Create module file**
-   ```bash
-   touch js/engine/my-new-module.js
-   ```
-
-2. **Follow structure**
-   ```javascript
-   // my-new-module.js
-   export class MyNewModule {
-     constructor() { }
-     
-     publicMethod() {
-       return this.#privateMethod();
-     }
-     
-     #privateMethod() { }
-   }
-   ```
-
-3. **Add to engine-main.js**
-   ```javascript
-   import { MyNewModule } from './my-new-module.js';
-   
-   constructor() {
-     this.myNewModule = new MyNewModule();
-   }
-   ```
-
-4. **Write tests**
-   ```javascript
-   // test/engine/my-new-module.test.js
-   describe('MyNewModule', () => {
-     test('does something', () => {
-       // ...
-     });
-   });
-   ```
-
----
-
-## License
-
-MIT - See LICENSE file
-
----
-
-## Documentation
-
-- [Main README](README.md) - Project story & overview
-- [Balance Modules Documentation](BALANCE_MODULES_README.md)
-- [Architecture Overview](docs/architecture.md) *(planned)*
-- [API Reference](docs/api.md) *(planned)*
-- [User Guide](docs/user-guide.md) *(planned)*
-- [Testing Guide](docs/testing.md) *(planned)*
-
----
-
-## Parameter Sweep Robustness (v2.1)
-
-### Two-Person Household Parameter Guards
-
-**Problem:** In parameter sweeps for two-person households, unintended parameter variations could lead to:
-- Inconsistent Person-2 pension values across sweep cases
-- False RUIN scenarios due to liquidity guard triggering
-- Misleading heatmap results
-
-**Solution (November 2025):**
-
-#### 1. Parameter Whitelist
-```javascript
-// Only explicitly allowed parameters can be swept
-const SWEEP_ALLOWED_KEYS = [
-  'startKapital', 'startAge', 'startInflation', 'startFlexRate',
-  'runwayTarget', 'targetEq', 'initialWithdrawal',
-  // ... other safe parameters
-];
-
-// Blocklist for Person-2 parameters
-const SWEEP_BLOCK_PATTERNS = [
-  /^partner\./,   // partner.aktiv, partner.brutto, etc.
-  /^r2[A-Z_]/,    // r2Active, r2BruttoYear1, etc.
-  /^p2[A-Z_]/     // p2* patterns (additional safety)
-];
-```
-
-#### 2. Person-2 Pension Invariance Guard
-```javascript
-/**
- * Extracts Person-2 basis parameters (not derived year values)
- * Prevents false warnings from inflation-adjusted values
- */
-function extractP2Invariants(inputs) {
-  if (!inputs.partner?.aktiv) return null;
-  return {
-    aktiv: inputs.partner.aktiv,
-    brutto: inputs.partner.brutto,
-    startAlter: inputs.partner.startAlter,
-    startInJahren: inputs.partner.startInJahren,
-    steuerquotePct: inputs.partner.steuerquotePct,
-    rentAdjPct: inputs.partner.rentAdjPct
-  };
-}
-
-/**
- * Compares basis parameters across sweep cases
- * Uses strict equality (no tolerance) for invariants
- */
-function areP2InvariantsEqual(inv1, inv2) {
-  if (inv1 === inv2) return true;
-  if (!inv1 || !inv2) return false;
-  return inv1.aktiv === inv2.aktiv &&
-         inv1.brutto === inv2.brutto &&
-         inv1.startAlter === inv2.startAlter &&
-         inv1.startInJahren === inv2.startInJahren &&
-         inv1.steuerquotePct === inv2.steuerquotePct &&
-         inv1.rentAdjPct === inv2.rentAdjPct;
-}
-```
-
-**Key Improvement:** Compares **basis parameters** (user input) instead of **derived year values** (inflation-adjusted), eliminating false positives.
-
-#### 3. Fail-Safe Liquidity Guard
-```javascript
-/**
- * Prevents false RUIN scenarios in multi-year simulations
- * Issue: Liquidity guard could trigger prematurely in sweep cases
- * Solution: Enhanced validation before marking run as depleted
- */
-// In simulator-engine.js
-if (pf.tagesgeld < liquidityThreshold) {
-  // Additional checks before declaring RUIN
-  const hasOtherAssets = (pf.depotwertAlt + pf.depotwertNeu + pf.goldWert) > 0;
-  if (hasOtherAssets) {
-    // Not truly depleted, continue simulation
-  }
-}
-```
-
-#### 4. Visual Warnings in Heatmap
-```javascript
-// Heatmap cells with Person-2 parameter violations show:
-// - Yellow border (stroke-width: 3px)
-// - Warning symbol: ⚠
-// - Tooltip: "⚠ Rente 2 variierte im Sweep"
-```
-
-#### 5. Developer Self-Tests
-```javascript
-/**
- * Comprehensive self-tests for sweep correctness
- * Activated via Dev-Mode (localStorage.setItem('sim.devMode', '1'))
- */
-function runSweepSelfTest() {
-  // Test 1: P2 invariance across sweep cases
-  // Test 2: Deep-copy protection (baseInputs unchanged)
-  // Test 3: Negative test (P2 changes detected)
-
-  // Uses fixed seed (12345) for reproducibility
-  // Console logs with [SWEEP-TEST] prefix
-  // Visual feedback (green/red) in UI
-}
-```
-
-### Technical Benefits
-
-✅ **Correctness:** Prevents invalid sweep configurations
-✅ **Transparency:** Visual warnings for parameter violations
-✅ **Performance:** P2 check before simulation (no YearLog overhead)
-✅ **Maintainability:** Clear separation of allowed/blocked parameters
-✅ **Testability:** Self-tests with deterministic seed
-
----
-
-## Changelog
-
-### v2.1 - November 2025 ⭐
-- ✅ **Parameter Sweep Robustness** - Whitelist + Person-2 guards
-- ✅ **Fail-safe Liquidity Guard** - Prevents false RUIN scenarios
-- ✅ **Pension Adjustment Fix** - Unified calculation in backtest
-- ✅ **Deep-Clone Mechanism** - structuredClone() for sweep cases
-- ✅ **Developer Self-Tests** - Comprehensive sweep validation
-- ✅ **Visual Warnings** - Heatmap badges for parameter violations
-
-### v2.0 - November 2025
-- ✅ **Engine modularization** - Split 959 lines into 8 modules
-- ✅ **100% modular architecture** - 22 ES6 modules total
-- ✅ **Improved testability** - Each module independently testable
-- ✅ **Better maintainability** - Clear separation of concerns
-- ✅ **Enhanced documentation** - Complete technical docs
-
-### v1.0 - October 2025
-- ✅ Balance & Simulator modularization
-- ✅ CSS extraction
-- ✅ 14 ES6 modules
-
-### v0.1 - September 2025
-- ✅ Initial monolithic implementation
-- ✅ Proof of concept
-
----
-
-**Built with AI assistance by a 63-year-old SAP Architect proving that age, experience, and modern tools are a powerful combination.** 🚀
-
-**Technical Excellence:** 22 modules | 6,500+ lines | 0 dependencies | 100% vanilla JavaScript
