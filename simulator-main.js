@@ -556,7 +556,7 @@ export async function runMonteCarlo() {
                     failed = true;
                     // Bei Ruin ist das Depot definitiv erschöpft - setze Alter
                     if (!depotErschoepfungAlterGesetzt) {
-                        alterBeiErschoepfung[i] = currentAge;
+                        alterBeiErschoepfung[i] = ageP1;
                         depotErschoepfungAlterGesetzt = true;
                     }
                     currentRunLog.push({
@@ -576,7 +576,7 @@ export async function runMonteCarlo() {
                     depotNurHistorie.push(depotOnlyNow);
 
                     if (!depotErschoepfungAlterGesetzt && depotOnlyNow <= DEPOT_DEPLETION_THRESHOLD) {
-                      alterBeiErschoepfung[i] = currentAge;
+                      alterBeiErschoepfung[i] = ageP1;
                       depotErschoepfungAlterGesetzt = true;
                     }
 
