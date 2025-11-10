@@ -98,10 +98,22 @@ export const correlation = (arr1, arr2) => {
 
 /**
  * Random Number Generator mit Seed
+ * Supports forking for independent RNG streams
  */
 export function rng(seed=123456789){
     let x=seed|0;
-    return ()=> (x = (x^=(x<<13)), x^=(x>>>17), x^=(x<<5), ((x>>>0)%1e9)/1e9);
+    const generator = ()=> (x = (x^=(x<<13)), x^=(x>>>17), x^=(x<<5), ((x>>>0)%1e9)/1e9);
+
+    // Fork: creates a new independent RNG stream with derived seed
+    generator.fork = (label='') => {
+        let derivedSeed = x;
+        for (let i = 0; i < label.length; i++) {
+            derivedSeed = ((derivedSeed << 5) - derivedSeed + label.charCodeAt(i)) | 0;
+        }
+        return rng(derivedSeed);
+    };
+
+    return generator;
 }
 
 /**

@@ -568,6 +568,29 @@ export function computeRunStatsFromSeries(series) {
 }
 
 /**
+ * Berechnet die Pflege-Zusatzkosten für Floor und Flex
+ * @param {Object} careMetaP1 - Pflege-Meta für Person 1
+ * @param {Object} careMetaP2 - Pflege-Meta für Person 2 (oder null)
+ * @returns {Object} { zusatzFloor, flexFactor }
+ */
+export function calcCareCost(careMetaP1, careMetaP2 = null) {
+    let zusatzFloor = 0;
+    let flexFactor = 1.0;
+
+    if (careMetaP1?.active) {
+        zusatzFloor += careMetaP1.zusatzFloorZiel || 0;
+        flexFactor = Math.min(flexFactor, careMetaP1.flexFactor || 1.0);
+    }
+
+    if (careMetaP2?.active) {
+        zusatzFloor += careMetaP2.zusatzFloorZiel || 0;
+        flexFactor = Math.min(flexFactor, careMetaP2.flexFactor || 1.0);
+    }
+
+    return { zusatzFloor, flexFactor };
+}
+
+/**
  * Aktualisiert Pflege-Metadata basierend auf Wahrscheinlichkeit und Status
  */
 export function updateCareMeta(care, inputs, age, yearData, rand) {

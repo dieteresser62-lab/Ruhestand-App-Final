@@ -142,13 +142,25 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
     if (results.extraKPI?.pflege && inputs.pflegefallLogikAktivieren) {
         const pf = results.extraKPI.pflege;
         const summaryBox = document.getElementById('pflegeKpiSummary');
-        let kpiHtml = createKpiCard('Pflegefall-Eintrittsquote', pf.entryRatePct, '%', 'Anteil der Simulationen, in denen ein Pflegefall eintritt.');
-        kpiHtml += createKpiCard('Median Eintrittsalter', pf.entryAgeMedian > 0 ? pf.entryAgeMedian : null, 'Jahre', 'Typisches Alter bei Eintritt des Pflegefalls (nur betroffene Läufe).');
+        let kpiHtml = createKpiCard('Pflegefall-Eintrittsquote P1', pf.entryRatePct, '%', 'Anteil der Simulationen, in denen Person 1 Pflegefall eintritt.');
+        kpiHtml += createKpiCard('Median Eintrittsalter P1', pf.entryAgeMedian > 0 ? pf.entryAgeMedian : null, 'Jahre', 'Typisches Alter bei Eintritt des Pflegefalls Person 1.');
+        kpiHtml += createKpiCard('Median Pflegejahre P1', pf.p1CareYears > 0 ? pf.p1CareYears : null, 'Jahre', 'Typische Anzahl Jahre in Pflege (Person 1).');
+
+        // P2 Care KPIs (only if partner active)
+        if (inputs.partner?.aktiv) {
+            kpiHtml += createKpiCard('Pflegefall-Eintrittsquote P2', pf.p2EntryRatePct, '%', 'Anteil der Simulationen, in denen Person 2 Pflegefall eintritt.');
+            kpiHtml += createKpiCard('Median Eintrittsalter P2', pf.p2EntryAgeMedian > 0 ? pf.p2EntryAgeMedian : null, 'Jahre', 'Typisches Alter bei Eintritt des Pflegefalls Person 2.');
+            kpiHtml += createKpiCard('Median Pflegejahre P2', pf.p2CareYears > 0 ? pf.p2CareYears : null, 'Jahre', 'Typische Anzahl Jahre in Pflege (Person 2).');
+            kpiHtml += createKpiCard('Median Jahre beide in Pflege', pf.bothCareYears > 0 ? pf.bothCareYears : null, 'Jahre', 'Typische Anzahl Jahre, in denen beide Personen gleichzeitig in Pflege sind.');
+            kpiHtml += createCurrencyKpiCard('Max. jährl. Pflege-Ausgaben', pf.maxAnnualCareSpend, 'Median der maximalen jährlichen Pflege-Gesamtkosten (P1+P2).');
+        }
+
         kpiHtml += createKpiCard('Bedingte Shortfall-Rate', pf.shortfallRate_condCare, '%', 'Anteil der Fehlschläge, WENN ein Pflegefall eingetreten ist.');
         kpiHtml += createKpiCard('Shortfall-Rate (o. Pflege)', pf.shortfallRate_noCareProxy, '%', 'Geschätzte Fehlschlag-Rate der identischen Läufe, wenn kein Pflegefall eingetreten wäre.');
         kpiHtml += createCurrencyKpiCard('Median Endvermögen (m. Pflege)', pf.endwealthWithCare_median, 'Typisches Endvermögen unter Berücksichtigung des Pflegerisikos.');
         kpiHtml += createCurrencyKpiCard('Median Endvermögen (o. Pflege)', pf.endwealthNoCare_median, 'Geschätztes typisches Endvermögen ohne die Last des Pflegefalls.');
         kpiHtml += createCurrencyKpiCard('Median Gesamtkosten (Depot)', pf.depotCosts_median, 'Typische Summe der aus dem Depot finanzierten Pflege-Mehrkosten (nur betroffene Läufe).');
+        kpiHtml += createCurrencyKpiCard('Shortfall-Delta vs. ohne Pflege', pf.shortfallDelta_vs_noCare, 'Unterschied im Median-Endvermögen mit vs. ohne Pflege.');
         summaryBox.innerHTML = kpiHtml;
         pflegeResultsContainer.style.display = 'block';
     } else {
@@ -227,6 +239,11 @@ export function renderWorstRunLog(logRows, caR_Threshold, opts = {}) {
     const careColsMinimal = [
         { key: 'pflege_zusatz_floor', header: 'PflegeZiel', width: 10, fmt: formatCurrencyShortLog, title: "Zusatz-Floor in diesem Jahr (nominal), gecappt durch MaxPflege-Floor – Floor@Eintritt; wächst jährlich mit Inflation/Drift." },
         { key: 'pflege_kumuliert', header: 'PflegeΣ', width: 8, fmt: formatCurrencyShortLog, title: "Kumulierte Pflege-Mehrkosten (Zusatz-Floor-Deltas + Flex-Verlust), nominal." },
+        // Dual Care Columns
+        { key: 'CareP1_Active', header: 'P1', width: 2, fmt: v => v ? '✓' : '—', title: 'Person 1 in Pflege' },
+        { key: 'CareP1_Cost', header: 'P1€', width: 7, fmt: formatCurrencyShortLog, title: 'Zusätzliche Pflege-Kosten P1' },
+        { key: 'CareP2_Active', header: 'P2', width: 2, fmt: v => v ? '✓' : '—', title: 'Person 2 in Pflege' },
+        { key: 'CareP2_Cost', header: 'P2€', width: 7, fmt: formatCurrencyShortLog, title: 'Zusätzliche Pflege-Kosten P2' },
     ];
 
     const careColsDetailed = [

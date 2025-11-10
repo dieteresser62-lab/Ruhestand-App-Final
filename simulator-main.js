@@ -71,7 +71,7 @@ import {
     prepareHistoricalData, buildStressContext, applyStressOverride, computeRentAdjRate
 } from './simulator-portfolio.js';
 import {
-    simulateOneYear, initMcRunState, makeDefaultCareMeta, sampleNextYearData, computeRunStatsFromSeries, updateCareMeta
+    simulateOneYear, initMcRunState, makeDefaultCareMeta, sampleNextYearData, computeRunStatsFromSeries, updateCareMeta, calcCareCost
 } from './simulator-engine.js';
 import { portfolioTotal, displayMonteCarloResults, renderWorstRunLog, aggregateSweepMetrics } from './simulator-results.js';
 import { formatCurrencyShortLog } from './simulator-utils.js';
@@ -415,6 +415,14 @@ export async function runMonteCarlo() {
         const endWealthWithCare = new Float64Array(anzahl);
         const endWealthNoCareProxyArr = new Float64Array(anzahl);
 
+        // Dual Care KPIs
+        const p1CareYearsArr = new Uint16Array(anzahl);
+        const p2CareYearsArr = new Uint16Array(anzahl);
+        const bothCareYearsArr = new Uint16Array(anzahl);
+        const entryAgesP2 = [];
+        let p2TriggeredCount = 0;
+        const maxAnnualCareSpendArr = new Float64Array(anzahl);
+
         const BINS = [0, 3, 3.5, 4, 4.5, 5, 5.5, 6, 7, 8, 10, Infinity];
         const heatmap = Array(10).fill(0).map(() => new Uint32Array(BINS.length - 1));
         let totalSimulatedYears = 0, totalYearsQuoteAbove45 = 0;
@@ -442,7 +450,14 @@ export async function runMonteCarlo() {
             let depotNurHistorie = [ sumDepot(simState.portfolio) ];
             let depotErschoepfungAlterGesetzt = false;
 
-            let careMeta = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren);
+            // Dual Care: P1 + P2 (Partner)
+            const careMetaP1 = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren);
+            const careMetaP2 = (inputs.partner?.aktiv === true) ? makeDefaultCareMeta(inputs.pflegefallLogikAktivieren) : null;
+
+            // Separate RNG streams for independent care events
+            const rngCareP1 = rand.fork('CARE_P1');
+            const rngCareP2 = careMetaP2 ? rand.fork('CARE_P2') : null;
+
             let stressCtx = cloneStressContext(stressCtxMaster);
 
             const stressYears = stressCtxMaster?.preset?.years ?? 0;
@@ -452,30 +467,90 @@ export async function runMonteCarlo() {
             const stressRealWithdrawals = [];
             let postStressRecoveryYears = null;
 
+            // Track dual care activity
+            let p1Alive = true, p2Alive = careMetaP2 !== null;
+            let p1CareYears = 0, p2CareYears = 0, bothCareYears = 0;
+            let triggeredAgeP2 = null;
+
             for (let simulationsJahr = 0; simulationsJahr < maxDauer; simulationsJahr++) {
-                const currentAge = inputs.startAlter + simulationsJahr;
+                const ageP1 = inputs.startAlter + simulationsJahr;
                 lebensdauer = simulationsJahr + 1;
+
+                // Calculate P2 age (based on partner offset)
+                let ageP2 = ageP1;
+                if (inputs.partner?.aktiv && inputs.partner.startInJahren > 0) {
+                    // If partner starts later, they are younger
+                    ageP2 = inputs.partner.startAlter;
+                } else if (inputs.partner?.aktiv) {
+                    ageP2 = inputs.partner.startAlter + simulationsJahr;
+                }
 
                 let yearData = sampleNextYearData(simState, methode, blockSize, rand, stressCtx);
                 yearData = applyStressOverride(yearData, stressCtx, rand);
 
-                careMeta = updateCareMeta(careMeta, inputs, currentAge, yearData, rand);
-
-                if (careMeta && careMeta.active) careEverActive = true;
-                if (careMeta && careMeta.triggered && triggeredAge === null) triggeredAge = currentAge;
-
-                let qx = MORTALITY_TABLE[inputs.geschlecht][currentAge] || 1;
-                if (careMeta && careMeta.active && inputs.pflegebeschleunigtMortalitaetAktivieren) {
-                    qx = Math.min(1.0, qx * inputs.pflegeTodesrisikoFaktor);
+                // Update care for both persons independently
+                if (p1Alive) {
+                    updateCareMeta(careMetaP1, inputs, ageP1, yearData, rngCareP1);
+                    if (careMetaP1 && careMetaP1.active) careEverActive = true;
+                    if (careMetaP1 && careMetaP1.triggered && triggeredAge === null) triggeredAge = ageP1;
                 }
 
-                if (rand() < qx) break;
+                if (p2Alive && careMetaP2) {
+                    updateCareMeta(careMetaP2, inputs, ageP2, yearData, rngCareP2);
+                    if (careMetaP2 && careMetaP2.triggered && triggeredAgeP2 === null) triggeredAgeP2 = ageP2;
+                }
+
+                // Track care years
+                const p1ActiveThisYear = p1Alive && careMetaP1?.active;
+                const p2ActiveThisYear = p2Alive && careMetaP2?.active;
+                if (p1ActiveThisYear) p1CareYears++;
+                if (p2ActiveThisYear) p2CareYears++;
+                if (p1ActiveThisYear && p2ActiveThisYear) bothCareYears++;
+
+                // Separate mortality for P1 and P2
+                if (p1Alive) {
+                    let qx1 = MORTALITY_TABLE[inputs.geschlecht][ageP1] || 1;
+                    if (careMetaP1?.active && inputs.pflegebeschleunigtMortalitaetAktivieren) {
+                        qx1 = Math.min(1.0, qx1 * inputs.pflegeTodesrisikoFaktor);
+                    }
+                    if (rand() < qx1) {
+                        p1Alive = false;
+                    }
+                }
+
+                if (p2Alive && careMetaP2) {
+                    // Partner has opposite gender by default
+                    const p2Gender = inputs.geschlecht === 'm' ? 'w' : 'm';
+                    let qx2 = MORTALITY_TABLE[p2Gender][ageP2] || 1;
+                    if (careMetaP2?.active && inputs.pflegebeschleunigtMortalitaetAktivieren) {
+                        qx2 = Math.min(1.0, qx2 * inputs.pflegeTodesrisikoFaktor);
+                    }
+                    if (rand() < qx2) {
+                        p2Alive = false;
+                    }
+                }
+
+                // Simulation ends when P1 dies (main person)
+                if (!p1Alive) break;
+
+                // Calculate care costs from both persons
+                const { zusatzFloor: careFloorP1, flexFactor: careFlexP1 } = calcCareCost(careMetaP1, null);
+                const { zusatzFloor: careFloorP2 } = careMetaP2 ? calcCareCost(careMetaP2, null) : { zusatzFloor: 0 };
+                const totalCareFloor = careFloorP1 + careFloorP2;
+
+                // Apply care costs to state (temporarily modify for this year)
+                const stateWithCare = {
+                    ...simState,
+                    baseFloor: simState.baseFloor + totalCareFloor,
+                    baseFlex: simState.baseFlex * Math.min(careFlexP1, careMetaP2?.flexFactor ?? 1.0)
+                };
 
                 // Berechne dynamische Rentenanpassung basierend auf Modus (fix/wage/cpi)
                 const effectiveRentAdjPct = computeRentAdjRate(inputs, yearData);
                 const adjustedInputs = { ...inputs, rentAdjPct: effectiveRentAdjPct };
 
-                const result = simulateOneYear(simState, adjustedInputs, yearData, simulationsJahr, careMeta);
+                // Pass careMetaP1 for logging (legacy compatibility)
+                const result = simulateOneYear(stateWithCare, adjustedInputs, yearData, simulationsJahr, careMetaP1);
 
                 if (result.isRuin) {
                     failed = true;
@@ -542,15 +617,21 @@ export async function runMonteCarlo() {
 
                     currentRunLog.push({
                         jahr: simulationsJahr + 1, histJahr: yearData.jahr, inflation: yearData.inflation, ...result.logData,
-                        pflege_aktiv: !!(careMeta && careMeta.active),
-                        pflege_zusatz_floor: careMeta?.zusatzFloorZiel ?? 0,
-                        pflege_zusatz_floor_delta: careMeta?.zusatzFloorDelta ?? 0,
-                        pflege_flex_faktor: careMeta?.flexFactor ?? 1,
-                        pflege_kumuliert: careMeta?.kumulierteKosten ?? 0,
-                        pflege_floor_anchor: careMeta?.log_floor_anchor ?? 0,
-                        pflege_maxfloor_anchor: careMeta?.log_maxfloor_anchor ?? 0,
-                        pflege_cap_zusatz: careMeta?.log_cap_zusatz ?? 0,
-                        pflege_delta_flex: careMeta?.log_delta_flex ?? 0
+                        // P1 Care (legacy compatibility)
+                        pflege_aktiv: !!(careMetaP1 && careMetaP1.active),
+                        pflege_zusatz_floor: careMetaP1?.zusatzFloorZiel ?? 0,
+                        pflege_zusatz_floor_delta: careMetaP1?.zusatzFloorDelta ?? 0,
+                        pflege_flex_faktor: careMetaP1?.flexFactor ?? 1,
+                        pflege_kumuliert: careMetaP1?.kumulierteKosten ?? 0,
+                        pflege_floor_anchor: careMetaP1?.log_floor_anchor ?? 0,
+                        pflege_maxfloor_anchor: careMetaP1?.log_maxfloor_anchor ?? 0,
+                        pflege_cap_zusatz: careMetaP1?.log_cap_zusatz ?? 0,
+                        pflege_delta_flex: careMetaP1?.log_delta_flex ?? 0,
+                        // P2 Care (new dual care support)
+                        CareP1_Active: p1ActiveThisYear ? 1 : 0,
+                        CareP1_Cost: careMetaP1?.zusatzFloorZiel ?? 0,
+                        CareP2_Active: p2ActiveThisYear ? 1 : 0,
+                        CareP2_Cost: careMetaP2?.zusatzFloorZiel ?? 0
                     });
                 }
             }
@@ -591,14 +672,30 @@ export async function runMonteCarlo() {
             // Depot gilt als erschöpft, wenn es jemals unter den Schwellenwert fiel ODER der Run fehlgeschlagen ist
             depotErschoepft[i] = (failed || depotNurHistorie.some(v => v <= DEPOT_DEPLETION_THRESHOLD)) ? 1 : 0;
 
-            const cumulCareDepotCosts = careMeta?.kumulierteKosten || 0;
+            const cumulCareDepotCosts = (careMetaP1?.kumulierteKosten || 0) + (careMetaP2?.kumulierteKosten || 0);
             endWealthWithCare[i] = endVermoegen;
             endWealthNoCareProxyArr[i] = endVermoegen + cumulCareDepotCosts;
             if (triggeredAge !== null) {
-                pflegeTriggeredCount++; entryAges.push(triggeredAge); careDepotCosts.push(cumulCareDepotCosts);
+                pflegeTriggeredCount++; entryAges.push(triggeredAge); careDepotCosts.push(careMetaP1?.kumulierteKosten || 0);
                 if (failed) shortfallWithCareCount++;
             }
+            if (triggeredAgeP2 !== null) {
+                p2TriggeredCount++; entryAgesP2.push(triggeredAgeP2);
+            }
             if (endWealthNoCareProxyArr[i] <= 0) shortfallNoCareProxyCount++;
+
+            // Store dual care metrics
+            p1CareYearsArr[i] = p1CareYears;
+            p2CareYearsArr[i] = p2CareYears;
+            bothCareYearsArr[i] = bothCareYears;
+
+            // Track max annual care spend (sum of both P1 and P2)
+            let maxAnnualSpend = 0;
+            for (const logRow of currentRunLog) {
+                const annualSpend = (logRow.CareP1_Cost || 0) + (logRow.CareP2_Cost || 0);
+                maxAnnualSpend = Math.max(maxAnnualSpend, annualSpend);
+            }
+            maxAnnualCareSpendArr[i] = maxAnnualSpend;
         }
 
         progressBar.style.width = '95%';
@@ -614,7 +711,15 @@ export async function runMonteCarlo() {
           shortfallRate_noCareProxy: (shortfallNoCareProxyCount / anzahl) * 100,
           endwealthWithCare_median: quantile(endWealthWithCare, 0.5),
           endwealthNoCare_median: quantile(endWealthNoCareProxyArr, 0.5),
-          depotCosts_median: careDepotCosts.length ? quantile(careDepotCosts, 0.5) : 0
+          depotCosts_median: careDepotCosts.length ? quantile(careDepotCosts, 0.5) : 0,
+          // Dual Care KPIs
+          p1CareYears: quantile(p1CareYearsArr, 0.5),
+          p2CareYears: quantile(p2CareYearsArr, 0.5),
+          bothCareYears: quantile(bothCareYearsArr, 0.5),
+          p2EntryRatePct: (p2TriggeredCount / anzahl) * 100,
+          p2EntryAgeMedian: entryAgesP2.length ? quantile(entryAgesP2, 0.5) : 0,
+          maxAnnualCareSpend: quantile(maxAnnualCareSpendArr, 0.5),
+          shortfallDelta_vs_noCare: quantile(endWealthNoCareProxyArr, 0.5) - quantile(endWealthWithCare, 0.5)
         };
 
         const stressPresetKey = inputs.stressPreset || 'NONE';
