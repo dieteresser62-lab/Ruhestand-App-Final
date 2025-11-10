@@ -601,15 +601,17 @@ export function computeCareMortalityMultiplier(careMeta, inputs) {
     }
 
     const baseFactor = Math.max(1, Number(inputs.pflegeTodesrisikoFaktor) || 1);
-    if (baseFactor <= 1) return 1;
-
-    const rampYears = Math.max(1, Number(inputs.pflegeRampUp) || 1);
-    if (rampYears === 1) {
-        return baseFactor;
+    if (baseFactor <= 1) {
+        return 1;
     }
 
-    const yearsCompleted = Math.min(Math.max(1, careMeta.currentYearInCare || 0), rampYears);
-    const progress = (yearsCompleted - 1) / (rampYears - 1);
+    const rampYears = Math.max(1, Number(inputs.pflegeRampUp) || 1);
+    const yearsCompleted = Math.min(careMeta.currentYearInCare || 0, rampYears);
+    if (yearsCompleted <= 0) {
+        return 1;
+    }
+
+    const progress = yearsCompleted / rampYears;
     return 1 + (baseFactor - 1) * progress;
 }
 
