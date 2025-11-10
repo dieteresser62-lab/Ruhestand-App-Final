@@ -522,8 +522,8 @@ export async function runMonteCarlo() {
                 }
 
                 if (p2Alive && careMetaP2) {
-                    // Partner has opposite gender by default
-                    const p2Gender = inputs.geschlecht === 'm' ? 'w' : 'm';
+                    // Use partner's gender if specified, otherwise assume opposite gender as fallback
+                    const p2Gender = inputs.partner?.geschlecht || (inputs.geschlecht === 'm' ? 'w' : 'm');
                     let qx2 = MORTALITY_TABLE[p2Gender][ageP2] || 1;
                     if (careMetaP2?.active && inputs.pflegebeschleunigtMortalitaetAktivieren) {
                         qx2 = Math.min(1.0, qx2 * inputs.pflegeTodesrisikoFaktor);
