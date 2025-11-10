@@ -423,6 +423,11 @@ export async function runMonteCarlo() {
         let p2TriggeredCount = 0;
         const maxAnnualCareSpendArr = new Float64Array(anzahl);
 
+        // Arrays for care years (only for triggered cases)
+        const p1CareYearsTriggered = [];
+        const p2CareYearsTriggered = [];
+        const bothCareYearsTriggered = [];
+
         const BINS = [0, 3, 3.5, 4, 4.5, 5, 5.5, 6, 7, 8, 10, Infinity];
         const heatmap = Array(10).fill(0).map(() => new Uint32Array(BINS.length - 1));
         let totalSimulatedYears = 0, totalYearsQuoteAbove45 = 0;
@@ -478,10 +483,8 @@ export async function runMonteCarlo() {
 
                 // Calculate P2 age (based on partner offset)
                 let ageP2 = ageP1;
-                if (inputs.partner?.aktiv && inputs.partner.startInJahren > 0) {
-                    // If partner starts later, they are younger
-                    ageP2 = inputs.partner.startAlter;
-                } else if (inputs.partner?.aktiv) {
+                if (inputs.partner?.aktiv) {
+                    // Use partner's startAlter + simulationsJahr to age them correctly
                     ageP2 = inputs.partner.startAlter + simulationsJahr;
                 }
 
@@ -678,13 +681,21 @@ export async function runMonteCarlo() {
             if (triggeredAge !== null) {
                 pflegeTriggeredCount++; entryAges.push(triggeredAge); careDepotCosts.push(careMetaP1?.kumulierteKosten || 0);
                 if (failed) shortfallWithCareCount++;
+                // Store care years only for triggered cases
+                p1CareYearsTriggered.push(p1CareYears);
             }
             if (triggeredAgeP2 !== null) {
                 p2TriggeredCount++; entryAgesP2.push(triggeredAgeP2);
+                // Store care years only for triggered cases
+                p2CareYearsTriggered.push(p2CareYears);
+            }
+            // Store bothCareYears only if at least one person had care
+            if (triggeredAge !== null || triggeredAgeP2 !== null) {
+                bothCareYearsTriggered.push(bothCareYears);
             }
             if (endWealthNoCareProxyArr[i] <= 0) shortfallNoCareProxyCount++;
 
-            // Store dual care metrics
+            // Store dual care metrics (for all runs, needed for internal tracking)
             p1CareYearsArr[i] = p1CareYears;
             p2CareYearsArr[i] = p2CareYears;
             bothCareYearsArr[i] = bothCareYears;
@@ -712,10 +723,10 @@ export async function runMonteCarlo() {
           endwealthWithCare_median: quantile(endWealthWithCare, 0.5),
           endwealthNoCare_median: quantile(endWealthNoCareProxyArr, 0.5),
           depotCosts_median: careDepotCosts.length ? quantile(careDepotCosts, 0.5) : 0,
-          // Dual Care KPIs
-          p1CareYears: quantile(p1CareYearsArr, 0.5),
-          p2CareYears: quantile(p2CareYearsArr, 0.5),
-          bothCareYears: quantile(bothCareYearsArr, 0.5),
+          // Dual Care KPIs (only for triggered cases)
+          p1CareYears: p1CareYearsTriggered.length ? quantile(p1CareYearsTriggered, 0.5) : 0,
+          p2CareYears: p2CareYearsTriggered.length ? quantile(p2CareYearsTriggered, 0.5) : 0,
+          bothCareYears: bothCareYearsTriggered.length ? quantile(bothCareYearsTriggered, 0.5) : 0,
           p2EntryRatePct: (p2TriggeredCount / anzahl) * 100,
           p2EntryAgeMedian: entryAgesP2.length ? quantile(entryAgesP2, 0.5) : 0,
           maxAnnualCareSpend: quantile(maxAnnualCareSpendArr, 0.5),
