@@ -71,7 +71,14 @@ import {
     prepareHistoricalData, buildStressContext, applyStressOverride, computeRentAdjRate
 } from './simulator-portfolio.js';
 import {
-    simulateOneYear, initMcRunState, makeDefaultCareMeta, sampleNextYearData, computeRunStatsFromSeries, updateCareMeta, calcCareCost
+    simulateOneYear,
+    initMcRunState,
+    makeDefaultCareMeta,
+    sampleNextYearData,
+    computeRunStatsFromSeries,
+    updateCareMeta,
+    calcCareCost,
+    computeCareMortalityMultiplier
 } from './simulator-engine.js';
 import { portfolioTotal, displayMonteCarloResults, renderWorstRunLog, aggregateSweepMetrics } from './simulator-results.js';
 import { formatCurrencyShortLog } from './simulator-utils.js';
@@ -513,8 +520,9 @@ export async function runMonteCarlo() {
                 // Separate mortality for P1 and P2
                 if (p1Alive) {
                     let qx1 = MORTALITY_TABLE[inputs.geschlecht][ageP1] || 1;
-                    if (careMetaP1?.active && inputs.pflegebeschleunigtMortalitaetAktivieren) {
-                        qx1 = Math.min(1.0, qx1 * inputs.pflegeTodesrisikoFaktor);
+                    const careFactorP1 = computeCareMortalityMultiplier(careMetaP1, inputs);
+                    if (careFactorP1 > 1) {
+                        qx1 = Math.min(1.0, qx1 * careFactorP1);
                     }
                     if (rand() < qx1) {
                         p1Alive = false;
@@ -525,8 +533,9 @@ export async function runMonteCarlo() {
                     // Use partner's gender if specified, otherwise assume opposite gender as fallback
                     const p2Gender = inputs.partner?.geschlecht || (inputs.geschlecht === 'm' ? 'w' : 'm');
                     let qx2 = MORTALITY_TABLE[p2Gender][ageP2] || 1;
-                    if (careMetaP2?.active && inputs.pflegebeschleunigtMortalitaetAktivieren) {
-                        qx2 = Math.min(1.0, qx2 * inputs.pflegeTodesrisikoFaktor);
+                    const careFactorP2 = computeCareMortalityMultiplier(careMetaP2, inputs);
+                    if (careFactorP2 > 1) {
+                        qx2 = Math.min(1.0, qx2 * careFactorP2);
                     }
                     if (rand() < qx2) {
                         p2Alive = false;

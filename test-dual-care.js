@@ -9,7 +9,7 @@
  */
 
 import { rng } from './simulator-utils.js';
-import { makeDefaultCareMeta, updateCareMeta, calcCareCost } from './simulator-engine.js';
+import { makeDefaultCareMeta, updateCareMeta, calcCareCost, computeCareMortalityMultiplier } from './simulator-engine.js';
 
 const SEED = 12345;
 
@@ -147,6 +147,59 @@ if (zf5 === 5000 && ff5 === 0.8) {
     console.log('✅ PASS: Null P2 handled correctly');
 } else {
     console.log('❌ FAIL: Null P2 calculation incorrect');
+    process.exit(1);
+}
+
+// Test 8: Pflege-Dauer & Mortalitäts-Ramp
+console.log('\n📊 Test 8: Pflege-Dauer & Mortalitäts-Ramp');
+console.log('-'.repeat(60));
+
+const rampInputs = {
+    pflegefallLogikAktivieren: true,
+    pflegeModellTyp: 'akut',
+    pflegeRampUp: 4,
+    pflegeStufe1Zusatz: 2000,
+    pflegeStufe1FlexCut: 0.6,
+    pflegeMaxFloor: 60000,
+    pflegeKostenDrift: 0,
+    pflegebeschleunigtMortalitaetAktivieren: true,
+    pflegeTodesrisikoFaktor: 4,
+    startFloorBedarf: 40000,
+    startFlexBedarf: 20000,
+    pflegeMinDauer: 4,
+    pflegeMaxDauer: 4
+};
+
+const rampCare = makeDefaultCareMeta(true);
+Object.assign(rampCare, {
+    active: true,
+    triggered: true,
+    durationYears: 4,
+    floorAtTrigger: rampInputs.startFloorBedarf,
+    flexAtTrigger: rampInputs.startFlexBedarf,
+    maxFloorAtTrigger: rampInputs.pflegeMaxFloor,
+    currentYearInCare: 0,
+    zusatzFloorZiel: 0,
+    kumulierteKosten: 0
+});
+
+let rampOk = true;
+const dummyRand = () => 0;
+for (let year = 1; year <= 4; year++) {
+    updateCareMeta(rampCare, rampInputs, 70 + year, { inflation: 2 }, dummyRand);
+    if (rampCare.currentYearInCare !== year) rampOk = false;
+    if (!rampCare.active) rampOk = false;
+    const expectedFactor = 1 + ((rampInputs.pflegeTodesrisikoFaktor - 1) * ((year - 1) / Math.max(1, rampInputs.pflegeRampUp - 1)));
+    const actualFactor = computeCareMortalityMultiplier(rampCare, rampInputs);
+    if (Math.abs(actualFactor - expectedFactor) > 1e-6) rampOk = false;
+}
+updateCareMeta(rampCare, rampInputs, 75, { inflation: 2 }, dummyRand);
+const durationOk = !rampCare.active && rampCare.currentYearInCare === 4;
+
+if (rampOk && durationOk) {
+    console.log('✅ PASS: Pflege-Dauer & Mortalitäts-Ramp stimmen');
+} else {
+    console.log('❌ FAIL: Pflege-Dauer oder Mortalitäts-Ramp fehlerhaft');
     process.exit(1);
 }
 

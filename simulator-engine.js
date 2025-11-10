@@ -591,34 +591,59 @@ export function calcCareCost(careMetaP1, careMetaP2 = null) {
 }
 
 /**
+ * Berechnet den Mortalitäts-Multiplikator während eines Pflegefalls.
+ * Der Multiplikator steigt linear von 1 bis pflegeTodesrisikoFaktor
+ * über die konfigurierte Ramp-Up-Dauer an.
+ */
+export function computeCareMortalityMultiplier(careMeta, inputs) {
+    if (!careMeta?.active || !inputs?.pflegebeschleunigtMortalitaetAktivieren) {
+        return 1;
+    }
+
+    const baseFactor = Math.max(1, Number(inputs.pflegeTodesrisikoFaktor) || 1);
+    if (baseFactor <= 1) return 1;
+
+    const rampYears = Math.max(1, Number(inputs.pflegeRampUp) || 1);
+    if (rampYears === 1) {
+        return baseFactor;
+    }
+
+    const yearsCompleted = Math.min(Math.max(1, careMeta.currentYearInCare || 0), rampYears);
+    const progress = (yearsCompleted - 1) / (rampYears - 1);
+    return 1 + (baseFactor - 1) * progress;
+}
+
+/**
  * Aktualisiert Pflege-Metadata basierend auf Wahrscheinlichkeit und Status
  */
 export function updateCareMeta(care, inputs, age, yearData, rand) {
     if (!inputs.pflegefallLogikAktivieren || !care) return care;
 
     if (care.active) {
-        care.currentYearInCare++;
-        if (inputs.pflegeModellTyp === 'akut' && care.currentYearInCare > care.durationYears) {
+        if (inputs.pflegeModellTyp === 'akut' && care.currentYearInCare >= care.durationYears) {
             care.active = false;
+            care.zusatzFloorDelta = 0;
             return care;
         }
 
-        const yearsSinceStart = care.currentYearInCare -1;
+        const yearsSinceStart = care.currentYearInCare;
+        const yearIndex = yearsSinceStart + 1;
         const inflationsAnpassung = (1 + yearData.inflation/100) * (1 + inputs.pflegeKostenDrift);
 
-        const floorAtTriggerAdjusted = care.floorAtTrigger * Math.pow(1 + yearData.inflation/100, yearsSinceStart + 1);
-        const flexAtTriggerAdjusted = care.flexAtTrigger * Math.pow(1 + yearData.inflation/100, yearsSinceStart + 1);
-        const maxFloorAdjusted = care.maxFloorAtTrigger * inflationsAnpassung;
+        const floorAtTriggerAdjusted = care.floorAtTrigger * Math.pow(1 + yearData.inflation/100, yearIndex);
+        const flexAtTriggerAdjusted = care.flexAtTrigger * Math.pow(1 + yearData.inflation/100, yearIndex);
+        const maxFloorAdjusted = care.maxFloorAtTrigger * Math.pow(inflationsAnpassung, yearIndex);
 
         const capZusatz = Math.max(0, maxFloorAdjusted - floorAtTriggerAdjusted);
 
-        const zielRoh = inputs.pflegeStufe1Zusatz * inflationsAnpassung;
-        const rampUpFactor = Math.min(1.0, care.currentYearInCare / Math.max(1, inputs.pflegeRampUp));
+        const zielRoh = inputs.pflegeStufe1Zusatz * Math.pow(inflationsAnpassung, yearIndex);
+        const rampUpFactor = Math.min(1.0, yearIndex / Math.max(1, inputs.pflegeRampUp));
         const zielMitRampUp = zielRoh * rampUpFactor;
 
         const zusatzFloorZielFinal = Math.min(capZusatz, zielMitRampUp);
 
         const zusatzFloorDelta = Math.max(0, zusatzFloorZielFinal - care.zusatzFloorZiel);
+        care.zusatzFloorDelta = zusatzFloorDelta;
         care.zusatzFloorZiel = zusatzFloorZielFinal;
         care.flexFactor = inputs.pflegeStufe1FlexCut;
 
@@ -629,6 +654,8 @@ export function updateCareMeta(care, inputs, age, yearData, rand) {
         care.log_maxfloor_anchor = maxFloorAdjusted;
         care.log_cap_zusatz = capZusatz;
         care.log_delta_flex = flexVerlust;
+
+        care.currentYearInCare = yearIndex;
 
         return care;
     }
@@ -641,7 +668,7 @@ export function updateCareMeta(care, inputs, age, yearData, rand) {
             care.triggered = true;
             care.active = true;
             care.startAge = age;
-            care.currentYearInCare = 1;
+            care.currentYearInCare = 0;
 
             care.floorAtTrigger = inputs.startFloorBedarf;
             care.flexAtTrigger = inputs.startFlexBedarf;
