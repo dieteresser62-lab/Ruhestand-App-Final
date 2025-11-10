@@ -1019,7 +1019,7 @@ window.onload = function() {
         'simStartVermoegen', 'depotwertAlt', 'zielLiquiditaet', 'simRisikoprofil',
         'goldAllokationAktiv', 'goldAllokationProzent', 'goldFloorProzent', 'rebalancingBand',
         'goldSteuerfrei', 'startFloorBedarf', 'startFlexBedarf',
-        'einstandAlt', 'p1StartAlter', 'p1Geschlecht', 'p1SparerPauschbetrag', 'p1KirchensteuerPct', 'round5',
+        'einstandAlt', 'p1StartAlter', 'p1Geschlecht', 'p1SparerPauschbetrag', 'p1KirchensteuerPct',
         'p1Monatsrente', 'p1StartInJahren', 'rentAdjMode', 'rentAdjPct',
         'pflegefallLogikAktivieren', 'pflegeModellTyp', 'pflegeStufe1Zusatz', 'pflegeStufe1FlexCut',
         'pflegeMaxFloor', 'pflegeRampUp', 'pflegeMinDauer', 'pflegeMaxDauer', 'pflegeKostenDrift',

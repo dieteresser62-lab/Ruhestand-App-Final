@@ -69,7 +69,7 @@ const Ruhestandsmodell_v30_Adapter = {
      */
     determineSpending: function({
         market, lastState, inflatedFloor, inflatedFlex,
-        round5, runwayMonths, liquidNow, profile,
+        runwayMonths, liquidNow, profile,
         depotValue, inputsCtx, totalWealth
     }) {
         const fullResult = this._runFullSimulationAndCache(inputsCtx, lastState);
