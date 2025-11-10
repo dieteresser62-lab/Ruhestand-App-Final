@@ -1124,6 +1124,24 @@ function computeRunStatsFromSeries(series) {
   return { volPct, maxDDpct };
 }
 
+function computeCareMortalityMultiplierLegacy(care, inputs) {
+  if (!care || !care.active || !inputs?.pflegebeschleunigtMortalitaetAktivieren) {
+    return 1;
+  }
+
+  const baseFactor = Math.max(1, Number(inputs.pflegeTodesrisikoFaktor) || 1);
+  if (baseFactor <= 1) return 1;
+
+  const rampYears = Math.max(1, Number(inputs.pflegeRampUp) || 1);
+  if (rampYears === 1) {
+    return baseFactor;
+  }
+
+  const yearsCompleted = Math.min(Math.max(1, care.currentYearInCare || 0), rampYears);
+  const progress = (yearsCompleted - 1) / (rampYears - 1);
+  return 1 + (baseFactor - 1) * progress;
+}
+
 function updateCareMeta(care, inputs, age, yearData, rand) {
     // KORRIGIERT: Die Bedingung prüft jetzt beides und stellt sicher, dass die Funktion bei
     // deaktivierter Logik oder einem null-Objekt sofort und sicher beendet wird.
@@ -1131,33 +1149,35 @@ function updateCareMeta(care, inputs, age, yearData, rand) {
 
     // --- 1. Fortschreibung, falls Pflegefall bereits aktiv ist ---
     if (care.active) {
-        care.currentYearInCare++;
         // Beenden bei akutem Modell nach Ablauf der Dauer
-        if (inputs.pflegeModellTyp === 'akut' && care.currentYearInCare > care.durationYears) {
+        if (inputs.pflegeModellTyp === 'akut' && care.currentYearInCare >= care.durationYears) {
             care.active = false;
+            care.zusatzFloorDelta = 0;
             return care;
         }
 
-        const yearsSinceStart = care.currentYearInCare -1;
+        const yearsSinceStart = care.currentYearInCare;
+        const yearIndex = yearsSinceStart + 1;
         const inflationsAnpassung = (1 + yearData.inflation/100) * (1 + inputs.pflegeKostenDrift);
-        
+
         // inflations- und drift-bereinigte Werte vom Vorjahr nehmen
-        const floorAtTriggerAdjusted = care.floorAtTrigger * Math.pow(1 + yearData.inflation/100, yearsSinceStart + 1);
-        const flexAtTriggerAdjusted = care.flexAtTrigger * Math.pow(1 + yearData.inflation/100, yearsSinceStart + 1);
-        const maxFloorAdjusted = care.maxFloorAtTrigger * inflationsAnpassung;
+        const floorAtTriggerAdjusted = care.floorAtTrigger * Math.pow(1 + yearData.inflation/100, yearIndex);
+        const flexAtTriggerAdjusted = care.flexAtTrigger * Math.pow(1 + yearData.inflation/100, yearIndex);
+        const maxFloorAdjusted = care.maxFloorAtTrigger * Math.pow(inflationsAnpassung, yearIndex);
 
         // Cap für Zusatzkosten berechnen
         const capZusatz = Math.max(0, maxFloorAdjusted - floorAtTriggerAdjusted);
 
         // Roh-Ziel für Zusatzbedarf berechnen (mit Ramp-Up)
-        const zielRoh = inputs.pflegeStufe1Zusatz * inflationsAnpassung;
-        const rampUpFactor = Math.min(1.0, care.currentYearInCare / Math.max(1, inputs.pflegeRampUp));
+        const zielRoh = inputs.pflegeStufe1Zusatz * Math.pow(inflationsAnpassung, yearIndex);
+        const rampUpFactor = Math.min(1.0, yearIndex / Math.max(1, inputs.pflegeRampUp));
         const zielMitRampUp = zielRoh * rampUpFactor;
 
         // Finalen Zusatzbedarf bestimmen (gecappt)
         const zusatzFloorZielFinal = Math.min(capZusatz, zielMitRampUp);
-        
+
         const zusatzFloorDelta = Math.max(0, zusatzFloorZielFinal - care.zusatzFloorZiel);
+        care.zusatzFloorDelta = zusatzFloorDelta;
         care.zusatzFloorZiel = zusatzFloorZielFinal;
         care.flexFactor = inputs.pflegeStufe1FlexCut;
 
@@ -1169,6 +1189,8 @@ function updateCareMeta(care, inputs, age, yearData, rand) {
         care.log_maxfloor_anchor = maxFloorAdjusted;
         care.log_cap_zusatz = capZusatz;
         care.log_delta_flex = flexVerlust;
+
+        care.currentYearInCare = yearIndex;
 
         return care;
     }
@@ -1182,8 +1204,8 @@ function updateCareMeta(care, inputs, age, yearData, rand) {
             care.triggered = true;
             care.active = true;
             care.startAge = age;
-            care.currentYearInCare = 1;
-            
+            care.currentYearInCare = 0;
+
             // Werte zum Zeitpunkt des Eintritts "einfrieren"
             care.floorAtTrigger = inputs.startFloorBedarf; // Vereinfachung: Startwert, wird intern korrekt inflatiert
             care.flexAtTrigger = inputs.startFlexBedarf;
@@ -1296,8 +1318,9 @@ async function runMonteCarlo() {
                 if (careMeta && careMeta.triggered && triggeredAge === null) triggeredAge = currentAge;
 
                 let qx = MORTALITY_TABLE[inputs.geschlecht][currentAge] || 1;
-                if (careMeta && careMeta.active && inputs.pflegebeschleunigtMortalitaetAktivieren) {
-                    qx = Math.min(1.0, qx * inputs.pflegeTodesrisikoFaktor);
+                const careFactorLegacy = computeCareMortalityMultiplierLegacy(careMeta, inputs);
+                if (careFactorLegacy > 1) {
+                    qx = Math.min(1.0, qx * careFactorLegacy);
                 }
                 
                 if (rand() < qx) break;
