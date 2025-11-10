@@ -74,6 +74,7 @@ export const STRESS_PRESETS = {
  */
 export const ENGINE_VERSION = '31.0';
 export const ENGINE_HASH = '2016807894';
+export const DEFAULT_RISIKOPROFIL = 'sicherheits-dynamisch';
 
 /**
  * Globale Daten für die Simulation

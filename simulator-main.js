@@ -1016,15 +1016,14 @@ window.onload = function() {
     updateStartPortfolioDisplay();
 
     const allInputs = [
-        'simStartVermoegen', 'depotwertAlt', 'zielLiquiditaet', 'simRisikoprofil',
+        'simStartVermoegen', 'depotwertAlt', 'zielLiquiditaet',
         'goldAllokationAktiv', 'goldAllokationProzent', 'goldFloorProzent', 'rebalancingBand',
         'goldSteuerfrei', 'startFloorBedarf', 'startFlexBedarf',
         'einstandAlt', 'p1StartAlter', 'p1Geschlecht', 'p1SparerPauschbetrag', 'p1KirchensteuerPct',
         'p1Monatsrente', 'p1StartInJahren', 'rentAdjMode', 'rentAdjPct',
         'pflegefallLogikAktivieren', 'pflegeModellTyp', 'pflegeStufe1Zusatz', 'pflegeStufe1FlexCut',
         'pflegeMaxFloor', 'pflegeRampUp', 'pflegeMinDauer', 'pflegeMaxDauer', 'pflegeKostenDrift',
-        'pflegebeschleunigtMortalitaetAktivieren', 'pflegeTodesrisikoFaktor',
-        'decumulationMode'
+        'pflegebeschleunigtMortalitaetAktivieren', 'pflegeTodesrisikoFaktor'
     ];
     allInputs.forEach(id => {
         const element = document.getElementById(id);

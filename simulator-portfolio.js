@@ -1,7 +1,7 @@
 "use strict";
 
 import { formatCurrency } from './simulator-utils.js';
-import { HISTORICAL_DATA, STRESS_PRESETS, annualData, REGIME_DATA, REGIME_TRANSITIONS } from './simulator-data.js';
+import { HISTORICAL_DATA, STRESS_PRESETS, annualData, REGIME_DATA, REGIME_TRANSITIONS, DEFAULT_RISIKOPROFIL } from './simulator-data.js';
 
 /**
  * Sammelt alle Eingabewerte aus dem UI
@@ -38,7 +38,7 @@ export function getCommonInputs() {
         zielLiquiditaet: parseFloat(document.getElementById('zielLiquiditaet').value) || 0,
         startFloorBedarf: parseFloat(document.getElementById('startFloorBedarf').value) || 0,
         startFlexBedarf: parseFloat(document.getElementById('startFlexBedarf').value) || 0,
-        risikoprofil: document.getElementById('simRisikoprofil').value,
+        risikoprofil: DEFAULT_RISIKOPROFIL,
         goldAktiv: goldAktiv,
         goldZielProzent: (goldAktiv ? parseFloat(document.getElementById('goldAllokationProzent').value) : 0),
         goldFloorProzent: (goldAktiv ? parseFloat(document.getElementById('goldFloorProzent').value) : 0),
@@ -66,7 +66,7 @@ export function getCommonInputs() {
         pflegeKostenDrift: (parseFloat(document.getElementById('pflegeKostenDrift').value) || 0) / 100,
         pflegebeschleunigtMortalitaetAktivieren: document.getElementById('pflegebeschleunigtMortalitaetAktivieren').checked,
         pflegeTodesrisikoFaktor: parseFloat(document.getElementById('pflegeTodesrisikoFaktor').value) || 1.0,
-        decumulation: { mode: document.getElementById('decumulationMode')?.value || 'none' },
+        decumulation: { mode: 'none' },
         stressPreset: document.getElementById('stressPreset').value || 'NONE',
         // Partner-Konfiguration (Rente 2)
         partner: {
