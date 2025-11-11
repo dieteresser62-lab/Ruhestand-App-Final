@@ -54,38 +54,45 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
     const dashboard = document.getElementById('unifiedKpiDashboard');
     let dashboardHtml = '';
 
-    dashboardHtml += '<h3 class="unified-kpi-header">Operative Kennzahlen (Median)</h3><div class="kpi-grid">';
+    // Wichtigste KPIs (immer sichtbar)
+    dashboardHtml += '<h3 class="unified-kpi-header">Wichtigste Kennzahlen</h3><div class="kpi-grid">';
     dashboardHtml += createKpiCard('Ø Lebensdauer', results.kpiLebensdauer?.mean, 'Jahre', 'Die durchschnittliche simulierte Lebensdauer über alle Läufe.');
-    dashboardHtml += createKpiCard('Anteil Kürzungsjahre (>10%)', results.kpiKuerzungsjahre?.p50, '%', 'Medianer Anteil der Jahre, in denen der Flex-Anteil um mehr als 10% gekürzt wurde.');
-    dashboardHtml += createKpiCard('Max. Kürzung (Flex)', results.kpiMaxKuerzung?.p50, '%', 'Die im Median maximal aufgetretene Kürzung des Flex-Anteils in einem einzelnen Jahr.');
-    dashboardHtml += '</div>';
-
-    dashboardHtml += '<h3 class="unified-kpi-header">Qualitäts-Analyse des Ruhestands</h3><div class="kpi-grid">';
     const deQuote = results.depotErschoepfungsQuote;
     const qClass = deQuote > 20 ? 'is-red' : (deQuote > 5 ? 'is-amber' : 'is-green');
     dashboardHtml += createKpiCard('Depot-Erschöpfungs-Quote', deQuote, '%', 'Anteil der Simulationen, in denen das Depot (Aktien/Gold) vollständig aufgebraucht wird.', qClass);
-    const alterErs = (results.alterBeiErschoepfung?.p50 || 0) > 0 ? results.alterBeiErschoepfung.p50 : null;
-    dashboardHtml += createKpiCard('Median-Alter bei Erschöpfung', alterErs, 'Jahre', 'Das Alter, das im Median bei Eintritt der Depot-Erschöpfung erreicht wird (nur für erschöpfte Fälle).');
-    dashboardHtml += createKpiCard('Median-Anteil Jahre ohne Flex', results.anteilJahreOhneFlex?.p50, ' %', 'Medianer Anteil der Jahre, in denen der Flex-Bedarf zu 100% gekürzt werden musste.');
+    dashboardHtml += createKpiCard('Anteil Kürzungsjahre (>10%)', results.kpiKuerzungsjahre?.p50, '%', 'Medianer Anteil der Jahre, in denen der Flex-Anteil um mehr als 10% gekürzt wurde.');
+    if (isFinite(results.maxDrawdowns?.p50)) dashboardHtml += createKpiCard('Max. Drawdown (Median)', results.maxDrawdowns.p50, '%', 'Größter Verlust von Peak-zu-Tief im Depot (Median).', 'is-amber');
+    if (isFinite(results.maxDrawdowns?.p90)) dashboardHtml += createKpiCard('Max. Drawdown (P90)', results.maxDrawdowns.p90, '%', 'Der 90%-Wert: Nur 10% der Läufe hatten einen größeren Drawdown.', 'is-red');
     dashboardHtml += '</div>';
 
-    if (isFinite(results.volatilities?.p50) || isFinite(results.maxDrawdowns?.p50)) {
-        dashboardHtml += '<h3 class="unified-kpi-header">Risiko-Analyse</h3><div class="kpi-grid">';
-        if (isFinite(results.volatilities?.p50)) dashboardHtml += createKpiCard('Median Portfoliovolatilität', results.volatilities.p50, '%', 'Annualisierte Standardabweichung der Portfolio-Renditen (Median).');
-        if (isFinite(results.maxDrawdowns?.p50)) dashboardHtml += createKpiCard('Max. Drawdown (Median)', results.maxDrawdowns.p50, '%', 'Größter Verlust von Peak-zu-Tief im Depot (Median).', 'is-amber');
-        if (isFinite(results.maxDrawdowns?.p90)) dashboardHtml += createKpiCard('Max. Drawdown (P90)', results.maxDrawdowns.p90, '%', 'Der 90%-Wert: Nur 10% der Läufe hatten einen größeren Drawdown.', 'is-red');
-        dashboardHtml += '</div>';
-    }
+    // Detail-KPIs in zusammenklappbarem Bereich
+    dashboardHtml += '<details class="details-card" style="margin-top: 15px; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px;"><summary style="cursor: pointer; font-weight: 600; color: var(--primary-color); font-size: 0.95rem;">📊 Weitere Detail-KPIs anzeigen</summary>';
+    dashboardHtml += '<div style="margin-top: 15px;">';
 
-    if (results.extraKPI) {
-        dashboardHtml += '<h3 class="unified-kpi-header">Weitere Detail-KPIs</h3><div class="kpi-grid">';
-        const timeShare = isFinite(results.extraKPI.timeShareQuoteAbove45) ? (results.extraKPI.timeShareQuoteAbove45 * 100) : null;
-        dashboardHtml += createKpiCard('Zeitanteil Quote > 4.5%', timeShare, '%', 'Anteil aller simulierten Jahre mit einer Entnahmerate über dem kritischen Schwellenwert von 4.5%.');
-        if (isFinite(results.extraKPI.consumptionAtRiskP10Real)) {
-          dashboardHtml += createCurrencyKpiCard('Reale Entnahme (P10)', results.extraKPI.consumptionAtRiskP10Real, 'Worst-Case (10%-Quantil) der inflationsbereinigten Jahresentnahmen.');
+    // Operative Details
+    dashboardHtml += '<h4 style="font-size: 0.9rem; color: var(--primary-color); margin: 10px 0 8px 0; padding-bottom: 5px; border-bottom: 1px solid var(--border-color);">Operative Details</h4><div class="kpi-grid">';
+    dashboardHtml += createKpiCard('Max. Kürzung (Flex)', results.kpiMaxKuerzung?.p50, '%', 'Die im Median maximal aufgetretene Kürzung des Flex-Anteils in einem einzelnen Jahr.');
+    const alterErs = (results.alterBeiErschoepfung?.p50 || 0) > 0 ? results.alterBeiErschoepfung.p50 : null;
+    dashboardHtml += createKpiCard('Median-Alter bei Erschöpfung', alterErs, 'Jahre', 'Das Alter, das im Median bei Eintritt der Depot-Erschöpfung erreicht wird (nur für erschöpfte Fälle).');
+    dashboardHtml += createKpiCard('Median-Anteil Jahre ohne Flex', results.anteilJahreOhneFlex?.p50, '%', 'Medianer Anteil der Jahre, in denen der Flex-Bedarf zu 100% gekürzt werden musste.');
+    dashboardHtml += '</div>';
+
+    // Risiko-Details
+    if (isFinite(results.volatilities?.p50) || results.extraKPI) {
+        dashboardHtml += '<h4 style="font-size: 0.9rem; color: var(--primary-color); margin: 15px 0 8px 0; padding-bottom: 5px; border-bottom: 1px solid var(--border-color);">Risiko-Details</h4><div class="kpi-grid">';
+        if (isFinite(results.volatilities?.p50)) dashboardHtml += createKpiCard('Median Portfoliovolatilität', results.volatilities.p50, '%', 'Annualisierte Standardabweichung der Portfolio-Renditen (Median).');
+        if (results.extraKPI) {
+            const timeShare = isFinite(results.extraKPI.timeShareQuoteAbove45) ? (results.extraKPI.timeShareQuoteAbove45 * 100) : null;
+            dashboardHtml += createKpiCard('Zeitanteil Quote > 4.5%', timeShare, '%', 'Anteil aller simulierten Jahre mit einer Entnahmerate über dem kritischen Schwellenwert von 4.5%.');
+            if (isFinite(results.extraKPI.consumptionAtRiskP10Real)) {
+                dashboardHtml += createCurrencyKpiCard('Reale Entnahme (P10)', results.extraKPI.consumptionAtRiskP10Real, 'Worst-Case (10%-Quantil) der inflationsbereinigten Jahresentnahmen.');
+            }
         }
         dashboardHtml += '</div>';
     }
+
+    dashboardHtml += '</div></details>';
+
     dashboard.innerHTML = dashboardHtml;
     dashboard.style.display = 'block';
 
@@ -193,7 +200,11 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
             const caR = results.extraKPI?.consumptionAtRiskP10Real;
             window.globalWorstRunData = { rows: wr.logDataRows, caR_Threshold: caR };
             const showCareDetails = (localStorage.getItem('showCareDetails') === '1');
-            worstEl.textContent = renderWorstRunLog(wr.logDataRows, caR, { showCareDetails: showCareDetails });
+            const logDetailLevel = (localStorage.getItem('logDetailLevel') || 'normal');
+            worstEl.textContent = renderWorstRunLog(wr.logDataRows, caR, {
+                showCareDetails: showCareDetails,
+                logDetailLevel: logDetailLevel
+            });
             worstContainer.style.display = 'block';
         } else {
             worstContainer.style.display = 'none';
@@ -219,22 +230,28 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
  * Rendert das Worst-Run-Log als Textausgabe
  */
 export function renderWorstRunLog(logRows, caR_Threshold, opts = {}) {
-    const options = { showCareDetails: false, ...opts };
+    const options = { showCareDetails: false, logDetailLevel: 'normal', ...opts };
 
     const formatPctOrDash = (value, fallback = '—') => {
         if (value == null || !isFinite(value)) return fallback;
         return `${Math.round(value * 100)}%`;
     };
 
-    const baseCols = [
-        { key: 'jahr', header: 'J.', width: 2 },
-        { key: 'histJahr', header: 'Hist', width: 4 },
-        { key: 'entscheidung.jahresEntnahme', header: 'Entn.', width: 7, fmt: formatCurrencyShortLog },
-        { key: 'floor_brutto', header: 'Floor', width: 7, fmt: formatCurrencyShortLog },
-        { key: 'rente1', header: 'Rente1', width: 7, fmt: formatCurrencyShortLog },
-        { key: 'rente2', header: 'Rente2', width: 7, fmt: formatCurrencyShortLog },
-        { key: 'renteSum', header: 'RenteSum', width: 8, fmt: formatCurrencyShortLog },
-    ];
+    // Basis-Spalten abhängig vom Detail-Level
+    const baseCols = [];
+    baseCols.push({ key: 'jahr', header: 'Jahr', width: 4 });
+    if (options.logDetailLevel === 'detailed') {
+        baseCols.push({ key: 'histJahr', header: 'Hist', width: 4 });
+    }
+    baseCols.push({ key: 'entscheidung.jahresEntnahme', header: 'Entnahme', width: 8, fmt: formatCurrencyShortLog });
+    baseCols.push({ key: 'floor_brutto', header: 'Floor', width: 7, fmt: formatCurrencyShortLog });
+
+    // Renten-Spalten: Im Normal-Modus nur Summe, im Detail-Modus alle
+    if (options.logDetailLevel === 'detailed' || options.showCareDetails) {
+        baseCols.push({ key: 'rente1', header: 'Rente1', width: 7, fmt: formatCurrencyShortLog });
+        baseCols.push({ key: 'rente2', header: 'Rente2', width: 7, fmt: formatCurrencyShortLog });
+    }
+    baseCols.push({ key: 'renteSum', header: 'RenteSum', width: 8, fmt: formatCurrencyShortLog });
 
     const careColsMinimal = [
         { key: 'pflege_zusatz_floor', header: 'PflegeZiel', width: 10, fmt: formatCurrencyShortLog, title: "Zusatz-Floor in diesem Jahr (nominal), gecappt durch MaxPflege-Floor – Floor@Eintritt; wächst jährlich mit Inflation/Drift." },
@@ -257,9 +274,12 @@ export function renderWorstRunLog(logRows, caR_Threshold, opts = {}) {
         { key: 'pflege_flex_faktor', header: 'FlexPfl%', width: 8, fmt: (v, row) => (row.pflege_aktiv ? formatPctOrDash(v) : '—') },
     ];
 
+    // Pflege-Spalten nur wenn showCareDetails aktiviert ist
+    const activeCareCols = options.showCareDetails ? (options.logDetailLevel === 'detailed' ? careColsDetailed : careColsMinimal) : [];
+
     const finalCols = [
         { key: 'FlexRatePct', header: 'Flex%', width: 5, fmt: v => `${Math.round(v || 0)}%` },
-        { key: 'jahresentnahme_real', header: 'Entn_real', width: 9, fmt: formatCurrencyShortLog },
+        { key: 'flex_erfuellt_nominal', header: 'Flex', width: 7, fmt: formatCurrencyShortLog },
         { key: 'aktionUndGrund', header: 'Status', width: 22, fmt: (v, row) => {
             const alarmMarker = row.Alarm ? '(A) ' : '';
             const regimeShort = shortenText(window.Ruhestandsmodell_v30.CONFIG.SCENARIO_TEXT[row.Regime] || '');
@@ -281,16 +301,21 @@ export function renderWorstRunLog(logRows, caR_Threshold, opts = {}) {
         { key: 'liquiditaet', header: 'Liq.', width: 7, fmt: formatCurrencyShortLog },
     ];
 
-    // FAIL-SAFE Guard Debug-Spalten
-    const guardCols = [
+    // Detail-Spalten nur im detailed-Modus
+    const detailCols = options.logDetailLevel === 'detailed' ? [
+        { key: 'jahresentnahme_real', header: 'Entn_real', width: 9, fmt: formatCurrencyShortLog },
+        { key: 'floor_aus_depot', header: 'FloorDep', width: 8, fmt: formatCurrencyShortLog },
+    ] : [];
+
+    // FAIL-SAFE Guard Debug-Spalten nur im detailed-Modus
+    const guardCols = options.logDetailLevel === 'detailed' ? [
         { key: 'NeedLiq', header: 'NeedLiq', width: 8, fmt: formatCurrencyShortLog, title: 'Benötigte Liquidität für Floor-Runway' },
         { key: 'GuardGold', header: 'GuardG', width: 7, fmt: formatCurrencyShortLog, title: 'FAIL-SAFE: Gold verkauft' },
         { key: 'GuardEq', header: 'GuardA', width: 7, fmt: formatCurrencyShortLog, title: 'FAIL-SAFE: Aktien verkauft' },
         { key: 'GuardNote', header: 'GuardNote', width: 16, fmt: v => (v || '').substring(0, 16), title: 'FAIL-SAFE: Grund/Status' }
-    ];
+    ] : [];
 
-    const activeCareCols = options.showCareDetails ? careColsDetailed : careColsMinimal;
-    const allCols = [...baseCols, ...activeCareCols, ...finalCols, ...guardCols];
+    const allCols = [...baseCols, ...activeCareCols, ...finalCols, ...detailCols, ...guardCols];
 
     const getNestedValue = (obj, path) => {
         if (!path) return obj;

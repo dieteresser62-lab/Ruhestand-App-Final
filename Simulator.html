@@ -286,12 +286,16 @@
                 </div>
                 <div id="worstRunLogContainer" style="display:none; margin-top: 25px;">
                     <h4 style="text-align:center;">Jahresprotokoll des schlechtesten Laufs (Worst Case)</h4>
-					<div id="worst-controls" style="text-align: center; margin-bottom: 10px; font-size: 0.9rem;">
+					<div id="worst-controls" style="text-align: center; margin-bottom: 10px; font-size: 0.9rem; display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
                       <label style="user-select:none; cursor:pointer;" title="Zeige vollständige Pflege-Aufschlüsselung (Anker, Cap, Deltas, Flex-Faktor).">
                         <input type="checkbox" id="toggle-care-details" style="width:auto; vertical-align: middle; margin-right: 4px;">
                         Pflege-Details anzeigen
                       </label>
-                    </div>					
+                      <label style="user-select:none; cursor:pointer;" title="Umschalten zwischen normalem (kompakt) und detailliertem (alle Spalten) Log.">
+                        <input type="checkbox" id="toggle-log-detail" style="width:auto; vertical-align: middle; margin-right: 4px;">
+                        Detailliertes Log anzeigen
+                      </label>
+                    </div>
                     <div id="worstRunLog"></div>
                 </div>
              </div>
@@ -307,7 +311,18 @@
                 </div>
             </fieldset>
             <button id="btButton" onclick="runBacktest()">Historische Simulation starten</button>
-             <div id="simulationResults" style="display:none; margin-top: 25px;"><h3>Ergebnis des Backtests</h3><div id="simulationSummary"></div><h4 style="text-align:center; margin-top:20px;">Jahresprotokoll</h4><div id="simulationLog">Keine Daten</div></div>
+             <div id="simulationResults" style="display:none; margin-top: 25px;">
+                <h3>Ergebnis des Backtests</h3>
+                <div id="simulationSummary"></div>
+                <h4 style="text-align:center; margin-top:20px;">Jahresprotokoll</h4>
+                <div style="text-align: center; margin-bottom: 10px; font-size: 0.9rem;">
+                  <label style="user-select:none; cursor:pointer;" title="Umschalten zwischen normalem (kompakt) und detailliertem (alle Spalten) Log.">
+                    <input type="checkbox" id="toggle-backtest-detail" style="width:auto; vertical-align: middle; margin-right: 4px;">
+                    Detailliertes Log anzeigen
+                  </label>
+                </div>
+                <div id="simulationLog">Keine Daten</div>
+             </div>
              <div id="engine-mismatch-footer"></div>
              <section class="dev-only" id="parity-smoketest-card">
              <fieldset style="margin-top: 25px;">

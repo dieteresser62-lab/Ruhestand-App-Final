@@ -1109,13 +1109,43 @@ window.onload = function() {
             const showDetails = e.currentTarget.checked;
             localStorage.setItem('showCareDetails', showDetails ? '1' : '0');
 
+            const logDetailLevel = localStorage.getItem('logDetailLevel') || 'normal';
             if (window.globalWorstRunData && window.globalWorstRunData.rows.length > 0) {
                  document.getElementById('worstRunLog').textContent = renderWorstRunLog(
                     window.globalWorstRunData.rows,
                     window.globalWorstRunData.caR_Threshold,
-                    { showCareDetails: showDetails }
+                    { showCareDetails: showDetails, logDetailLevel: logDetailLevel }
                 );
             }
+        });
+    }
+
+    const logDetailCheckbox = document.getElementById('toggle-log-detail');
+    if (logDetailCheckbox) {
+        logDetailCheckbox.checked = localStorage.getItem('logDetailLevel') === 'detailed';
+
+        logDetailCheckbox.addEventListener('change', (e) => {
+            const detailLevel = e.currentTarget.checked ? 'detailed' : 'normal';
+            localStorage.setItem('logDetailLevel', detailLevel);
+
+            const showCareDetails = localStorage.getItem('showCareDetails') === '1';
+            if (window.globalWorstRunData && window.globalWorstRunData.rows.length > 0) {
+                 document.getElementById('worstRunLog').textContent = renderWorstRunLog(
+                    window.globalWorstRunData.rows,
+                    window.globalWorstRunData.caR_Threshold,
+                    { showCareDetails: showCareDetails, logDetailLevel: detailLevel }
+                );
+            }
+        });
+    }
+
+    const backtestDetailCheckbox = document.getElementById('toggle-backtest-detail');
+    if (backtestDetailCheckbox) {
+        backtestDetailCheckbox.checked = localStorage.getItem('logDetailLevel') === 'detailed';
+        backtestDetailCheckbox.addEventListener('change', (e) => {
+            const detailLevel = e.currentTarget.checked ? 'detailed' : 'normal';
+            localStorage.setItem('logDetailLevel', detailLevel);
+            // Note: Backtest needs to be re-run to see the changes
         });
     }
 
