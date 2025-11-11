@@ -9,29 +9,49 @@
  */
 
 const InputValidator = {
+    /**
+     * Validiert alle Benutzereingaben auf Plausibilität
+     *
+     * Prüft folgende Kategorien:
+     * - Alter (18-120 Jahre)
+     * - Inflation (-10% bis +50%)
+     * - Vermögenswerte (>= 0)
+     * - Gold-Parameter (bei Aktivierung)
+     * - Runway-Werte (min/target)
+     * - Aktien-Zielquote (20-90%)
+     * - Rebalancing-Parameter
+     *
+     * @param {Object} input - Benutzereingaben mit allen Parametern
+     * @returns {Object} {valid: boolean, errors: Array<{fieldId, message}>}
+     */
     validate(input) {
         const errors = [];
+
+        // Hilfsfunktion für Validierungsprüfungen
         const check = (condition, fieldId, message) => {
             if (condition) {
                 errors.push({ fieldId, message });
             }
         };
 
-        // Altersvalidierung
+        // 1. Altersvalidierung
+        // Plausibilitätsprüfung: 18 (Volljährigkeit) bis 120 Jahre
         check(
             input.aktuellesAlter < 18 || input.aktuellesAlter > 120,
             'aktuellesAlter',
             'Alter muss zwischen 18 und 120 liegen.'
         );
 
-        // Inflationsvalidierung
+        // 2. Inflationsvalidierung
+        // Erlaubt Deflation (-10%) bis extreme Inflation (50%)
         check(
             input.inflation < -10 || input.inflation > 50,
             'inflation',
             'Inflation außerhalb plausibler Grenzen (-10% bis 50%).'
         );
 
-        // Vermögenswerte dürfen nicht negativ sein
+        // 3. Vermögenswerte dürfen nicht negativ sein
+        // Prüft alle Depot- und Kostenbasis-Felder
         ['tagesgeld', 'geldmarktEtf', 'depotwertAlt', 'depotwertNeu', 'goldWert',
          'floorBedarf', 'flexBedarf', 'costBasisAlt', 'costBasisNeu', 'goldCost',
          'sparerPauschbetrag'].forEach(field => {
@@ -43,7 +63,9 @@ const InputValidator = {
             check(input[field] < 0, field, 'Marktdaten dürfen nicht negativ sein.');
         });
 
-        // Gold-spezifische Validierung
+        // 4. Gold-spezifische Validierung (nur wenn Gold aktiv)
+        // Gold-Allokation sollte nicht mehr als 50% des Portfolios sein
+        // Gold-Floor (Mindestbestand) sollte nicht mehr als 20% sein
         if(input.goldAktiv) {
             check(
                 input.goldZielProzent <= 0 || input.goldZielProzent > 50,
@@ -57,7 +79,10 @@ const InputValidator = {
             );
         }
 
-        // Runway-Validierung
+        // 5. Runway-Validierung (Liquiditäts-Reichweite)
+        // Minimum: 12-60 Monate (1-5 Jahre)
+        // Ziel: 18-72 Monate (1.5-6 Jahre)
+        // Ziel muss >= Minimum sein
         check(
             input.runwayMinMonths < 12 || input.runwayMinMonths > 60,
             'runwayMinMonths',

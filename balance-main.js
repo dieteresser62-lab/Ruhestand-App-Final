@@ -86,50 +86,74 @@ const dom = {
 // ==================================================================================
 
 /**
- * Haupt-Update-Funktion: Liest UI, ruft die EXTERNE ENGINE auf, rendert Ergebnis, speichert Zustand.
+ * Haupt-Update-Funktion - Kern der Balance-App
+ *
+ * Diese Funktion orchestriert den kompletten Update-Zyklus:
+ * 1. Liest alle UI-Eingaben (Vermögen, Bedarf, Marktdaten)
+ * 2. Lädt persistenten Zustand (Guardrail-History)
+ * 3. Ruft die externe Engine auf (engine.js)
+ * 4. Rendert alle Ergebnisse in der UI
+ * 5. Speichert den neuen Zustand
+ *
+ * Wird aufgerufen bei:
+ * - Initialisierung der App
+ * - Änderung von Input-Feldern (debounced)
+ * - Import von Daten
+ * - Jahresabschluss
  */
 function update() {
     try {
         UIRenderer.clearError();
 
         // 1. Read Inputs & State
+        // Liest alle Formular-Eingaben und den letzten gespeicherten Zustand
         const inputData = UIReader.readAllInputs();
         const persistentState = StorageManager.loadState();
 
+        // Debug-Logging (nur im Debug-Modus aktiv)
         DebugUtils.log('UPDATE', 'Starting update cycle', {
             inputs: inputData,
             persistentState: persistentState
         });
 
         // 2. Render Bedarfsanpassungs-UI
+        // Zeigt Button für Inflationsanpassung, wenn das Alter sich geändert hat
         UIRenderer.renderBedarfAnpassungUI(inputData, persistentState);
 
         appState.lastUpdateTimestamp = Date.now();
 
         // 3. Call Engine
+        // Die externe Engine (engine.js) berechnet alle Werte
+        // Input: Benutzereingaben + letzter State
+        // Output: {input, newState, diagnosis, ui} oder {error}
         const modelResult = window.EngineAPI.simulateSingleYear(inputData, persistentState.lastState);
 
         DebugUtils.log('ENGINE', 'Engine simulation result', modelResult);
 
         // 4. Handle Engine Response
+        // Bei Fehler: Exception werfen für einheitliches Error-Handling
         if (modelResult.error) {
             throw modelResult.error;
         }
 
         // 5. Prepare data for Renderer
+        // Kombiniert Engine-Output mit Eingaben für vollständige UI-Darstellung
         const uiDataForRenderer = {
             ...modelResult.ui,
             input: inputData
         };
 
         // 6. Render & Save
+        // Rendert alle UI-Komponenten: Summary, Liquiditätsbalken, Handlungsanweisung, etc.
         UIRenderer.render(uiDataForRenderer);
 
+        // Bereitet Diagnose-Daten auf und rendert das Diagnose-Panel
         appState.diagnosisData = UIRenderer.formatDiagnosisPayload(modelResult.diagnosis);
         UIRenderer.renderDiagnosis(appState.diagnosisData);
 
         DebugUtils.log('DIAGNOSIS', 'Diagnosis data', appState.diagnosisData);
 
+        // Speichert Eingaben und neuen Zustand in localStorage
         StorageManager.saveState({ ...persistentState, inputs: inputData, lastState: modelResult.newState });
 
         DebugUtils.log('UPDATE', 'Update cycle completed successfully');
@@ -141,13 +165,27 @@ function update() {
     }
 }
 
+/**
+ * Debounced Update-Funktion
+ *
+ * Verzögert den Update-Aufruf um 250ms, um bei schnellen Eingaben
+ * (z.B. Tippen in Zahlenfeldern) nicht zu viele Updates auszulösen.
+ * Spart Performance und reduziert Flackern.
+ */
 function debouncedUpdate() {
     clearTimeout(appState.debounceTimer);
     appState.debounceTimer = setTimeout(update, 250);
 }
 
 /**
- * Führt den Engine-Handshake beim Start durch.
+ * Führt den Engine-Handshake beim Start durch
+ *
+ * Überprüft:
+ * 1. Ob engine.js geladen wurde
+ * 2. Ob die API-Version kompatibel ist (v31.x erforderlich)
+ * 3. Zeigt ggf. Warnbanner bei Versionsinkompatibilität
+ *
+ * @throws {Error} Wenn Engine nicht geladen oder ungültig
  */
 function initVersionHandshake() {
     try {
@@ -192,11 +230,29 @@ function initVersionHandshake() {
 }
 
 /**
- * Initialisiert die Anwendung: Bindet UI-Events, lädt Daten und führt das erste Update aus.
+ * Initialisiert die Anwendung - Entry Point
+ *
+ * Ablauf:
+ * 1. Engine-Handshake (Versions-Check)
+ * 2. Debug-Modus initialisieren
+ * 3. DOM-Referenzen sammeln
+ * 4. Alle Module initialisieren (mit Dependency Injection)
+ * 5. Gespeicherten Zustand laden und anwenden
+ * 6. Event-Listener binden
+ * 7. Theme anwenden
+ * 8. Snapshot-System initialisieren
+ * 9. Erstes Update durchführen
+ *
+ * Module-Architektur:
+ * - UIReader: Liest DOM-Eingaben
+ * - StorageManager: localStorage + File System API
+ * - UIRenderer: Rendert alle UI-Komponenten
+ * - UIBinder: Event-Handler für alle Interaktionen
  */
 function init() {
     try {
         // 1. Engine Handshake
+        // Prüft ob engine.js geladen ist und die Version kompatibel ist
         initVersionHandshake();
         console.info("Engine ready and handshake successful.", window.EngineAPI.getVersion());
     } catch (e) {
@@ -205,33 +261,41 @@ function init() {
     }
 
     // 2. Initialize Debug Mode
+    // Prüft localStorage: 'balance.debugMode' = '1' oder Query-Parameter ?debug=1
     const isDebugMode = DebugUtils.initDebugMode();
 
     // 3. Populate DOM inputs
+    // Sammelt alle input/select-Elemente mit ID in dom.inputs{}
     document.querySelectorAll('input, select').forEach(el => {
         if(el.id) dom.inputs[el.id] = el;
     });
 
     // 4. Initialize all modules with their dependencies
+    // Dependency Injection Pattern: Jedes Modul erhält seine Abhängigkeiten
     initUIReader(dom);
     initStorageManager(dom, appState, UIRenderer);
     initUIRenderer(dom, StorageManager);
     initUIBinder(dom, appState, update, debouncedUpdate);
 
     // 5. Set version info
+    // Zeigt UI- und Engine-Version im Print-Footer
     dom.outputs.printFooter.textContent = `UI: ${CONFIG.APP.VERSION} | Engine: ${window.EngineAPI.getVersion().api}`;
 
     // 6. Load and apply saved state
+    // Lädt letzten Zustand aus localStorage und wendet ihn auf die Formular-Felder an
     const persistentState = StorageManager.loadState();
     UIReader.applyStoredInputs(persistentState.inputs);
 
     // 7. Bind UI events
+    // Registriert alle Event-Listener (input, change, click, keyboard shortcuts)
     UIBinder.bindUI();
 
     // 8. Apply theme
+    // Wendet gespeichertes Theme an (light/dark/system)
     UIRenderer.applyTheme(localStorage.getItem('theme') || 'system');
 
     // 9. Update Debug UI
+    // Zeigt Debug-Indikator an, wenn Debug-Modus aktiv
     if (isDebugMode) {
         const debugIndicator = document.getElementById('debugModeIndicator');
         if (debugIndicator) {
@@ -241,11 +305,13 @@ function init() {
     }
 
     // 10. Initialize snapshots
+    // Prüft ob File System API verfügbar ist und lädt Snapshot-Liste
     StorageManager.initSnapshots().then(() => {
         StorageManager.renderSnapshots(dom.outputs.snapshotList, dom.controls.snapshotStatus, appState.snapshotHandle);
     });
 
     // 11. Initial update
+    // Führt ersten Berechnungs- und Render-Zyklus durch
     update();
 }
 

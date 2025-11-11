@@ -16,45 +16,73 @@ const SpendingPlanner = require('./planners/SpendingPlanner.js');
 const TransactionEngine = require('./transactions/TransactionEngine.js');
 
 /**
- * Interne Orchestrierungsfunktion
- * Führt alle Module zusammen und berechnet ein Jahresergebnis
+ * Interne Orchestrierungsfunktion - Berechnet ein komplettes Jahresergebnis
+ *
+ * Diese Funktion orchestriert alle Engine-Module und führt die Jahresberechnung durch:
+ * 1. Validiert Eingaben
+ * 2. Berechnet Grundwerte (Portfolio, Liquidität, Bedarf)
+ * 3. Analysiert Marktbedingungen
+ * 4. Bestimmt Ausgabenstrategie (mit Guardrails)
+ * 5. Berechnet notwendige Transaktionen
+ * 6. Erstellt umfassende Diagnose
+ *
  * @private
+ * @param {Object} input - Benutzereingaben mit allen Parametern (Vermögen, Bedarf, Alter, etc.)
+ * @param {Object} lastState - Vorheriger Zustand mit Guardrail-History (flexRate, peakRealVermoegen, etc.)
+ * @returns {Object} Ergebnis mit {input, newState, diagnosis, ui} oder {error} bei Fehler
  */
 function _internal_calculateModel(input, lastState) {
-    // 1. Validierung
+    // 1. Validierung der Eingabedaten
+    // Prüft alle Eingaben auf Plausibilität und Vollständigkeit
     const validationResult = InputValidator.validate(input);
     if (!validationResult.valid) {
         return { error: new ValidationError(validationResult.errors) };
     }
 
     // 2. Grundwerte berechnen
+    // Profil-Konfiguration laden (Runway-Ziele, Allokationsstrategie)
     const profil = CONFIG.PROFIL_MAP[input.risikoprofil];
+
+    // Aktuelle Liquidität = Tagesgeld + Geldmarkt-ETF
     const aktuelleLiquiditaet = input.tagesgeld + input.geldmarktEtf;
+
+    // Gesamtes Depotvermögen (Aktien alt + neu + optional Gold)
     const depotwertGesamt = input.depotwertAlt + input.depotwertNeu +
         (input.goldAktiv ? input.goldWert : 0);
+
+    // Gesamtvermögen = Depot + Liquidität
     const gesamtwert = depotwertGesamt + aktuelleLiquiditaet;
 
-    // 3. Marktanalyse
+    // 3. Marktanalyse durchführen
+    // Bestimmt Marktszenario (Bär, Bulle, Seitwärts, etc.) basierend auf historischen Daten
     const market = MarketAnalyzer.analyzeMarket(input);
 
-    // 4. Gold-Floor berechnen
+    // 4. Gold-Floor berechnen (Mindestbestand)
+    // Definiert minimalen Gold-Bestand als Prozentsatz des Gesamtvermögens
     const goldFloorAbs = (input.goldFloorProzent / 100) * gesamtwert;
     const minGold = input.goldAktiv ? goldFloorAbs : 0;
 
     // 5. Inflationsangepassten Bedarf berechnen
+    // Bedarf wird um Renteneinkünfte reduziert (netto)
     const renteJahr = input.renteAktiv ? (input.renteMonatlich * 12) : 0;
     const inflatedBedarf = {
-        floor: Math.max(0, input.floorBedarf - renteJahr),
-        flex: input.flexBedarf
+        floor: Math.max(0, input.floorBedarf - renteJahr),  // Grundbedarf (essentiell)
+        flex: input.flexBedarf                              // Flexibler Bedarf (optional)
     };
     const neuerBedarf = inflatedBedarf.floor + inflatedBedarf.flex;
 
-    // 6. Runway berechnen
+    // 6. Runway berechnen (Liquiditäts-Reichweite in Monaten)
+    // Wie lange reicht die aktuelle Liquidität bei aktuellem Bedarf?
     const reichweiteMonate = (inflatedBedarf.floor + inflatedBedarf.flex) > 0
         ? (aktuelleLiquiditaet / ((inflatedBedarf.floor + inflatedBedarf.flex) / 12))
         : Infinity;
 
-    // 7. Ausgabenplanung
+    // 7. Ausgabenplanung mit Guardrails
+    // SpendingPlanner bestimmt die optimale Entnahmestrategie basierend auf:
+    // - Marktsituation (Bär vs. Bulle)
+    // - Runway-Status (kritisch, ok, gut)
+    // - Historischem Peak (Drawdown-Berechnung)
+    // - Entnahmequote und Alarmbedingungen
     const { spendingResult, newState, diagnosis } = SpendingPlanner.determineSpending({
         market,
         lastState,
@@ -68,6 +96,9 @@ function _internal_calculateModel(input, lastState) {
     });
 
     // 8. Ziel-Liquidität berechnen
+    // Bestimmt die optimale Liquiditätshöhe basierend auf Profil und Marktsituation
+    // Im Bärenmarkt: höhere Liquidität (z.B. 60 Monate)
+    // Im Bullenmarkt: niedrigere Liquidität (z.B. 36 Monate)
     const zielLiquiditaet = TransactionEngine.calculateTargetLiquidity(
         profil,
         market,
@@ -75,6 +106,10 @@ function _internal_calculateModel(input, lastState) {
     );
 
     // 9. Transaktionsaktion bestimmen
+    // Entscheidet, ob und welche Transaktionen notwendig sind:
+    // - Depot-Verkauf zur Liquiditäts-Auffüllung
+    // - Rebalancing (Aktien/Gold)
+    // - Notfall-Verkäufe bei kritischem Runway
     const action = TransactionEngine.determineAction({
         aktuelleLiquiditaet,
         depotwertGesamt,
@@ -87,18 +122,25 @@ function _internal_calculateModel(input, lastState) {
     });
 
     // Diagnose-Einträge von Transaktion hinzufügen
+    // Transaktionen können eigene Diagnose-Einträge erzeugen (z.B. Caps, Guardrails)
     if (Array.isArray(action.diagnosisEntries) && action.diagnosisEntries.length) {
         diagnosis.decisionTree.push(...action.diagnosisEntries);
     }
 
     // 10. Liquidität nach Transaktion berechnen
+    // Berücksichtigt Depot-Verkäufe zur Liquiditäts-Auffüllung
     const liqNachTransaktion = aktuelleLiquiditaet + (action.verwendungen?.liquiditaet || 0);
     const jahresGesamtbedarf = inflatedBedarf.floor + inflatedBedarf.flex;
+
+    // Neue Runway nach Transaktion berechnen
     const runwayMonths = (jahresGesamtbedarf > 0)
         ? (liqNachTransaktion / (jahresGesamtbedarf / 12))
         : Infinity;
 
-    // 11. Runway-Status
+    // 11. Runway-Status bestimmen
+    // - 'ok': Runway >= Ziel (z.B. 36+ Monate)
+    // - 'warn': Runway >= Minimum aber < Ziel (z.B. 24-36 Monate)
+    // - 'bad': Runway < Minimum (< 24 Monate) - kritisch!
     let runwayStatus = 'bad';
     if (runwayMonths >= input.runwayTargetMonths) {
         runwayStatus = 'ok';
@@ -107,6 +149,7 @@ function _internal_calculateModel(input, lastState) {
     }
 
     // 12. Ergebnis zusammenstellen
+    // Struktur: {input, newState, diagnosis, ui}
     return {
         input,
         newState,
