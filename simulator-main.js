@@ -1145,7 +1145,11 @@ window.onload = function() {
         backtestDetailCheckbox.addEventListener('change', (e) => {
             const detailLevel = e.currentTarget.checked ? 'detailed' : 'normal';
             localStorage.setItem('logDetailLevel', detailLevel);
-            // Note: Backtest needs to be re-run to see the changes
+
+            // Re-render Backtest-Log mit neuem Detail-Level
+            if (typeof window.renderBacktestLog === 'function') {
+                window.renderBacktestLog();
+            }
         });
     }
 
