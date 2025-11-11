@@ -855,20 +855,40 @@ export function runBacktest() {
         simState.marketDataHist.ath = Math.max(...Object.keys(HISTORICAL_DATA).filter(y => y < startJahr).map(y => HISTORICAL_DATA[y].msci_eur));
 
         let totalEntnahme = 0, kuerzungJahreAmStueck = 0, maxKuerzungStreak = 0, jahreMitKuerzung = 0, totalSteuern = 0;
+        const logRows = []; // Speichere Log-Daten für späteres Neu-Rendern
 
         const p = (str, len) => String(str).padStart(len);
         const pf = (val, len) => p(`${(val || 0).toFixed(1)}%`, len);
         const pfInt = (val, len) => p(`${Math.round(val || 0)}%`, len);
 
-        let header = [
-            "Jahr".padEnd(4), "Entn.".padStart(7), "Floor".padStart(7), "Rente1".padStart(7), "Rente2".padStart(7), "RenteSum".padStart(8), "FloorDep".padStart(8), "Flex%".padStart(5), "Flex€".padStart(7), "Entn_real".padStart(9),
-            "Adj%".padStart(5),
+        // Lese Detail-Level aus localStorage
+        const logDetailLevel = localStorage.getItem('logDetailLevel') || 'normal';
+
+        // Header basierend auf Detail-Level
+        let headerCols = [
+            "Jahr".padEnd(4), "Entn.".padStart(7), "Floor".padStart(7)
+        ];
+        if (logDetailLevel === 'detailed') {
+            headerCols.push("Rente1".padStart(7), "Rente2".padStart(7));
+        }
+        headerCols.push("RenteSum".padStart(8));
+        if (logDetailLevel === 'detailed') {
+            headerCols.push("FloorDep".padStart(8));
+        }
+        headerCols.push("Flex%".padStart(5), "Flex€".padStart(7));
+        if (logDetailLevel === 'detailed') {
+            headerCols.push("Entn_real".padStart(9), "Adj%".padStart(5));
+        }
+        headerCols.push(
             "Status".padEnd(16), "Quote%".padStart(6), "Runway%".padStart(7),
             "R.Aktien".padStart(8), "R.Gold".padStart(8), "Infl.".padStart(5),
             "Handl.A".padStart(8), "Handl.G".padStart(8), "St.".padStart(6),
-            "Aktien".padStart(8), "Gold".padStart(7), "Liq.".padStart(7),
-            "NeedLiq".padStart(8), "GuardG".padStart(7), "GuardA".padStart(7), "GuardNote".padStart(16)
-        ].join("  ");
+            "Aktien".padStart(8), "Gold".padStart(7), "Liq.".padStart(7)
+        );
+        if (logDetailLevel === 'detailed') {
+            headerCols.push("NeedLiq".padStart(8), "GuardG".padStart(7), "GuardA".padStart(7), "GuardNote".padStart(16));
+        }
+        let header = headerCols.join("  ");
         let log = header + "\n" + "=".repeat(header.length) + "\n";
 
         for (let jahr = startJahr; jahr <= endJahr; jahr++) {
@@ -901,18 +921,39 @@ export function runBacktest() {
             const netA = (row.vk?.vkAkt || 0) - (row.kaufAkt || 0);
             const netG = (row.vk?.vkGld || 0) - (row.kaufGld || 0);
 
-            log += [
+            // Speichere Log-Daten für späteres Neu-Rendern
+            logRows.push({
+                jahr, row, entscheidung, wertAktien, wertGold, liquiditaet,
+                netA, netG, adjPct, inflationVJ: dataVJ.inflation_de
+            });
+
+            // Log-Zeile basierend auf Detail-Level
+            let logCols = [
                 p(jahr, 4),
                 formatCurrencyShortLog(entscheidung.jahresEntnahme).padStart(7),
-                formatCurrencyShortLog(row.floor_brutto).padStart(7),
-                formatCurrencyShortLog(row.rente1 || 0).padStart(7),
-                formatCurrencyShortLog(row.rente2 || 0).padStart(7),
-                formatCurrencyShortLog(row.renteSum || 0).padStart(8),
-                formatCurrencyShortLog(row.floor_aus_depot).padStart(8),
+                formatCurrencyShortLog(row.floor_brutto).padStart(7)
+            ];
+            if (logDetailLevel === 'detailed') {
+                logCols.push(
+                    formatCurrencyShortLog(row.rente1 || 0).padStart(7),
+                    formatCurrencyShortLog(row.rente2 || 0).padStart(7)
+                );
+            }
+            logCols.push(formatCurrencyShortLog(row.renteSum || 0).padStart(8));
+            if (logDetailLevel === 'detailed') {
+                logCols.push(formatCurrencyShortLog(row.floor_aus_depot).padStart(8));
+            }
+            logCols.push(
                 pfInt(row.FlexRatePct, 5),
-                formatCurrencyShortLog(row.flex_erfuellt_nominal).padStart(7),
-                formatCurrencyShortLog(row.jahresentnahme_real).padStart(9),
-                pf(adjPct, 5),
+                formatCurrencyShortLog(row.flex_erfuellt_nominal).padStart(7)
+            );
+            if (logDetailLevel === 'detailed') {
+                logCols.push(
+                    formatCurrencyShortLog(row.jahresentnahme_real).padStart(9),
+                    pf(adjPct, 5)
+                );
+            }
+            logCols.push(
                 row.aktionUndGrund.substring(0,15).padEnd(16),
                 pf(row.QuoteEndPct, 6),
                 pfInt(row.RunwayCoveragePct, 7),
@@ -924,18 +965,27 @@ export function runBacktest() {
                 formatCurrencyShortLog(row.steuern_gesamt || 0).padStart(6),
                 formatCurrencyShortLog(wertAktien).padStart(8),
                 formatCurrencyShortLog(wertGold).padStart(7),
-                formatCurrencyShortLog(liquiditaet).padStart(7),
-                formatCurrencyShortLog(row.NeedLiq || 0).padStart(8),
-                formatCurrencyShortLog(row.GuardGold || 0).padStart(7),
-                formatCurrencyShortLog(row.GuardEq || 0).padStart(7),
-                String(row.GuardNote || '').substring(0, 16).padStart(16)
-            ].join("  ") + "\n";
+                formatCurrencyShortLog(liquiditaet).padStart(7)
+            );
+            if (logDetailLevel === 'detailed') {
+                logCols.push(
+                    formatCurrencyShortLog(row.NeedLiq || 0).padStart(8),
+                    formatCurrencyShortLog(row.GuardGold || 0).padStart(7),
+                    formatCurrencyShortLog(row.GuardEq || 0).padStart(7),
+                    String(row.GuardNote || '').substring(0, 16).padStart(16)
+                );
+            }
+            log += logCols.join("  ") + "\n";
 
             if (entscheidung.kuerzungProzent >= 10) { jahreMitKuerzung++; kuerzungJahreAmStueck++; }
             else { maxKuerzungStreak = Math.max(maxKuerzungStreak, kuerzungJahreAmStueck); kuerzungJahreAmStueck = 0; }
         }
         maxKuerzungStreak = Math.max(maxKuerzungStreak, kuerzungJahreAmStueck);
         const endVermoegen = portfolioTotal(simState.portfolio);
+
+        // Speichere Log-Daten für späteres Neu-Rendern
+        window.globalBacktestData = { rows: logRows, startJahr };
+
         document.getElementById('simulationResults').style.display = 'block';
         document.getElementById('simulationSummary').innerHTML = `
          <div class="summary-grid">
@@ -952,6 +1002,110 @@ export function runBacktest() {
         console.error("Fehler in runBacktest():", error);
     } finally { document.getElementById('btButton').disabled = false; }
 }
+
+/**
+ * Rendert das Backtest-Log aus den gespeicherten Daten neu
+ * (wird aufgerufen, wenn die Detail-Level-Checkbox geändert wird)
+ */
+function renderBacktestLog() {
+    if (!window.globalBacktestData || !window.globalBacktestData.rows || window.globalBacktestData.rows.length === 0) {
+        return;
+    }
+
+    const logDetailLevel = localStorage.getItem('logDetailLevel') || 'normal';
+    const { rows: logRows, startJahr } = window.globalBacktestData;
+
+    const p = (str, len) => String(str).padStart(len);
+    const pf = (val, len) => p(`${(val || 0).toFixed(1)}%`, len);
+    const pfInt = (val, len) => p(`${Math.round(val || 0)}%`, len);
+
+    // Header basierend auf Detail-Level
+    let headerCols = [
+        "Jahr".padEnd(4), "Entn.".padStart(7), "Floor".padStart(7)
+    ];
+    if (logDetailLevel === 'detailed') {
+        headerCols.push("Rente1".padStart(7), "Rente2".padStart(7));
+    }
+    headerCols.push("RenteSum".padStart(8));
+    if (logDetailLevel === 'detailed') {
+        headerCols.push("FloorDep".padStart(8));
+    }
+    headerCols.push("Flex%".padStart(5), "Flex€".padStart(7));
+    if (logDetailLevel === 'detailed') {
+        headerCols.push("Entn_real".padStart(9), "Adj%".padStart(5));
+    }
+    headerCols.push(
+        "Status".padEnd(16), "Quote%".padStart(6), "Runway%".padStart(7),
+        "R.Aktien".padStart(8), "R.Gold".padStart(8), "Infl.".padStart(5),
+        "Handl.A".padStart(8), "Handl.G".padStart(8), "St.".padStart(6),
+        "Aktien".padStart(8), "Gold".padStart(7), "Liq.".padStart(7)
+    );
+    if (logDetailLevel === 'detailed') {
+        headerCols.push("NeedLiq".padStart(8), "GuardG".padStart(7), "GuardA".padStart(7), "GuardNote".padStart(16));
+    }
+    let header = headerCols.join("  ");
+    let log = header + "\n" + "=".repeat(header.length) + "\n";
+
+    // Rendere jede Zeile
+    for (const logData of logRows) {
+        const { jahr, row, entscheidung, wertAktien, wertGold, liquiditaet, netA, netG, adjPct, inflationVJ } = logData;
+
+        // Log-Zeile basierend auf Detail-Level
+        let logCols = [
+            p(jahr, 4),
+            formatCurrencyShortLog(entscheidung.jahresEntnahme).padStart(7),
+            formatCurrencyShortLog(row.floor_brutto).padStart(7)
+        ];
+        if (logDetailLevel === 'detailed') {
+            logCols.push(
+                formatCurrencyShortLog(row.rente1 || 0).padStart(7),
+                formatCurrencyShortLog(row.rente2 || 0).padStart(7)
+            );
+        }
+        logCols.push(formatCurrencyShortLog(row.renteSum || 0).padStart(8));
+        if (logDetailLevel === 'detailed') {
+            logCols.push(formatCurrencyShortLog(row.floor_aus_depot).padStart(8));
+        }
+        logCols.push(
+            pfInt(row.FlexRatePct, 5),
+            formatCurrencyShortLog(row.flex_erfuellt_nominal).padStart(7)
+        );
+        if (logDetailLevel === 'detailed') {
+            logCols.push(
+                formatCurrencyShortLog(row.jahresentnahme_real).padStart(9),
+                pf(adjPct, 5)
+            );
+        }
+        logCols.push(
+            row.aktionUndGrund.substring(0,15).padEnd(16),
+            pf(row.QuoteEndPct, 6),
+            pfInt(row.RunwayCoveragePct, 7),
+            pf((row.RealReturnEquityPct||0)*100, 8),
+            pf((row.RealReturnGoldPct||0)*100, 8),
+            pf(inflationVJ, 5),
+            formatCurrencyShortLog(netA).padStart(8),
+            formatCurrencyShortLog(netG).padStart(8),
+            formatCurrencyShortLog(row.steuern_gesamt || 0).padStart(6),
+            formatCurrencyShortLog(wertAktien).padStart(8),
+            formatCurrencyShortLog(wertGold).padStart(7),
+            formatCurrencyShortLog(liquiditaet).padStart(7)
+        );
+        if (logDetailLevel === 'detailed') {
+            logCols.push(
+                formatCurrencyShortLog(row.NeedLiq || 0).padStart(8),
+                formatCurrencyShortLog(row.GuardGold || 0).padStart(7),
+                formatCurrencyShortLog(row.GuardEq || 0).padStart(7),
+                String(row.GuardNote || '').substring(0, 16).padStart(16)
+            );
+        }
+        log += logCols.join("  ") + "\n";
+    }
+
+    document.getElementById('simulationLog').textContent = log;
+}
+
+// Mache die Funktion global verfügbar
+window.renderBacktestLog = renderBacktestLog;
 
 /**
  * Prüft Engine-Version und -Hash
