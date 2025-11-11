@@ -1834,14 +1834,28 @@ function runBacktest() {
         const p = (str, len) => String(str).padStart(len);
         const pf = (val, len) => p(`${(val || 0).toFixed(1)}%`, len);
         const pfInt = (val, len) => p(`${Math.round(val || 0)}%`, len);
-        
-        let header = [
-            "Jahr".padEnd(4), "Entn.".padStart(7), "Floor".padStart(7), "Rente".padStart(7), "FloorDep".padStart(8), "Flex%".padStart(5), "Flex€".padStart(7), "Entn_real".padStart(9),
+
+        // Log-Detail-Level aus localStorage lesen
+        const logDetailLevel = localStorage.getItem('logDetailLevel') || 'normal';
+
+        // Header basierend auf Detail-Level
+        let headerCols = [
+            "Jahr".padEnd(4), "Entnahme".padStart(8), "Floor".padStart(7), "RenteSum".padStart(8)
+        ];
+        if (logDetailLevel === 'detailed') {
+            headerCols.push("FloorDep".padStart(8));
+        }
+        headerCols.push("Flex%".padStart(5), "Flex".padStart(7));
+        if (logDetailLevel === 'detailed') {
+            headerCols.push("Entn_real".padStart(9));
+        }
+        headerCols.push(
             "Status".padEnd(16), "Quote%".padStart(6), "Runway%".padStart(7),
             "R.Aktien".padStart(8), "R.Gold".padStart(8), "Infl.".padStart(5),
             "Handl.A".padStart(8), "Handl.G".padStart(8), "St.".padStart(6),
             "Aktien".padStart(8), "Gold".padStart(7), "Liq.".padStart(7)
-        ].join("  ");
+        );
+        let header = headerCols.join("  ");
         let log = header + "\n" + "=".repeat(header.length) + "\n";
         
         for (let jahr = startJahr; jahr <= endJahr; jahr++) {
@@ -1876,17 +1890,25 @@ function runBacktest() {
             const netA = (row.vk?.vkAkt || 0) - (row.kaufAkt || 0);
             const netG = (row.vk?.vkGld || 0) - (row.kaufGld || 0);
 
-            // Die Log-Zeile verwendet jetzt direkt die korrekte Eigenschaft 'row.aktionUndGrund'.
-            log += [
+            // Log-Zeile basierend auf Detail-Level
+            let logCols = [
                 p(jahr, 4),
-                formatCurrencyShortLog(entscheidung.jahresEntnahme).padStart(7),
+                formatCurrencyShortLog(entscheidung.jahresEntnahme).padStart(8),
                 formatCurrencyShortLog(row.floor_brutto).padStart(7),
-                formatCurrencyShortLog(row.pension_annual).padStart(7),
-                formatCurrencyShortLog(row.floor_aus_depot).padStart(8),
+                formatCurrencyShortLog(row.renteSum || row.pension_annual).padStart(8)
+            ];
+            if (logDetailLevel === 'detailed') {
+                logCols.push(formatCurrencyShortLog(row.floor_aus_depot).padStart(8));
+            }
+            logCols.push(
                 pfInt(row.FlexRatePct, 5),
-                formatCurrencyShortLog(row.flex_erfuellt_nominal).padStart(7),
-                formatCurrencyShortLog(row.jahresentnahme_real).padStart(9),
-                row.aktionUndGrund.substring(0,15).padEnd(16), // KORRIGIERTE ZEILE
+                formatCurrencyShortLog(row.flex_erfuellt_nominal).padStart(7)
+            );
+            if (logDetailLevel === 'detailed') {
+                logCols.push(formatCurrencyShortLog(row.jahresentnahme_real).padStart(9));
+            }
+            logCols.push(
+                row.aktionUndGrund.substring(0,15).padEnd(16),
                 pf(row.QuoteEndPct, 6),
                 pfInt(row.RunwayCoveragePct, 7),
                 pf((row.RealReturnEquityPct||0)*100, 8),
@@ -1898,7 +1920,8 @@ function runBacktest() {
                 formatCurrencyShortLog(wertAktien).padStart(8),
                 formatCurrencyShortLog(wertGold).padStart(7),
                 formatCurrencyShortLog(liquiditaet).padStart(7)
-            ].join("  ") + "\n";
+            );
+            log += logCols.join("  ") + "\n";
             // ============================================================================
             // ENDE DER KORREKTUR
             // ============================================================================
