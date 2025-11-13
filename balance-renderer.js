@@ -406,6 +406,31 @@ export const UIRenderer = {
                 status
             };
         });
+            let status = 'ok';
+            if ((g.rule === 'max' && g.value > g.threshold) || (g.rule === 'min' && g.value < g.threshold)) {
+                status = 'danger';
+            } else if ((g.rule === 'max' && g.value > g.threshold * 0.90) || (g.rule === 'min' && g.value < g.threshold * 1.10)) {
+                status = 'warn';
+            }
+            const formatVal = (v, t, sgn) => {
+                let s = (sgn && v > 0) ? '-' : '';
+                if (t === 'percent') return `${s}${(v * 100).toFixed(1)}%`;
+                if (t === 'months') return `${v.toFixed(0)} Mon.`;
+                return v;
+            };
+            return {
+                name: g.name,
+                value: formatVal(g.value, g.type, g.name.includes("Drawdown")),
+                threshold: (g.rule === 'max' ? '< ' : '> ') + formatVal(g.threshold, g.type),
+                status
+            };
+        });
+        const safeKeyParams = { ...(raw.keyParams || {}) };
+        const ensureNumberOrNull = (value) => (typeof value === 'number' && isFinite(value)) ? value : null;
+        safeKeyParams.aktuelleFlexRate = ensureNumberOrNull(safeKeyParams.aktuelleFlexRate);
+        safeKeyParams.kuerzungProzent = ensureNumberOrNull(safeKeyParams.kuerzungProzent);
+        safeKeyParams.jahresentnahme = ensureNumberOrNull(safeKeyParams.jahresentnahme);
+        formatted.keyParams = safeKeyParams;
         return formatted;
     },
 
@@ -506,6 +531,15 @@ export const UIRenderer = {
         createLine('Peak (real): ', UIUtils.formatCurrency(params.peakRealVermoegen));
         createLine('Aktuell (real): ', UIUtils.formatCurrency(params.currentRealVermoegen));
         createLine('Kumulierte Inflation: ', `+${((params.cumulativeInflationFactor - 1) * 100).toFixed(1)}%`);
+        if (typeof params.aktuelleFlexRate === 'number') {
+            createLine('Effektive Flex-Rate: ', `${params.aktuelleFlexRate.toFixed(1)}%`);
+        }
+        if (typeof params.kuerzungProzent === 'number') {
+            createLine('Kürzung ggü. Flex-Bedarf: ', `${params.kuerzungProzent.toFixed(1)}%`);
+        }
+        if (typeof params.jahresentnahme === 'number') {
+            createLine('Jahresentnahme (brutto): ', UIUtils.formatCurrency(params.jahresentnahme));
+        }
         return fragment;
     }
 };

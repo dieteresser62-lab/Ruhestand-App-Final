@@ -72,7 +72,7 @@ const SpendingPlanner = {
         const finaleKuerzung = 100 - flexRate;
 
         // 7. Ergebnisse zusammenstellen
-        const { newState, spendingResult } = this._buildResults(
+        const { newState, spendingResult, diagnosisMetrics } = this._buildResults(
             state, endgueltigeEntnahme, alarmStatus, flexRate, kuerzungQuelle, p
         );
 
@@ -121,6 +121,38 @@ const SpendingPlanner = {
                 ...guardrailDiagnostics.budgetFloor
             });
         }
+        // Diagnose-Key-Parameter stets als Kopie anreichern, damit spätere State-Änderungen
+        // keine Seiteneffekte erzeugen. Die zusätzlichen Werte bieten Transparenz darüber,
+        // welche Entnahme letztlich beschlossen wurde.
+        diagnosis.keyParams = {
+            ...state.keyParams,
+            aktuelleFlexRate: diagnosisMetrics.flexRate,
+            kuerzungProzent: diagnosisMetrics.kuerzungProzent,
+            jahresentnahme: diagnosisMetrics.jahresentnahme
+        };
+        diagnosis.guardrails.push(
+            {
+                name: "Entnahmequote",
+                value: state.keyParams.entnahmequoteDepot,
+                threshold: CONFIG.THRESHOLDS.ALARM.withdrawalRate,
+                type: 'percent',
+                rule: 'max'
+            },
+            {
+                name: "Realer Drawdown (Gesamt)",
+                value: state.keyParams.realerDepotDrawdown,
+                threshold: CONFIG.THRESHOLDS.ALARM.realDrawdown,
+                type: 'percent',
+                rule: 'max'
+            },
+            {
+                name: "Runway (vs. Min)",
+                value: runwayMonate,
+                threshold: profil.minRunwayMonths,
+                type: 'months',
+                rule: 'min'
+            }
+        );
 
         return { spendingResult, newState, diagnosis };
     },
@@ -484,6 +516,12 @@ const SpendingPlanner = {
         const finaleKuerzung = 100 - flexRate;
         const aktuellesGesamtbudgetFinal = endgueltigeEntnahme + renteJahr;
 
+        const diagnosisMetrics = {
+            flexRate,
+            kuerzungProzent: finaleKuerzung,
+            jahresentnahme: endgueltigeEntnahme
+        };
+
         const newState = {
             ...state,
             flexRate,
@@ -504,7 +542,7 @@ const SpendingPlanner = {
             details: { ...state.keyParams, flexRate, endgueltigeEntnahme }
         };
 
-        return { newState, spendingResult };
+        return { newState, spendingResult, diagnosisMetrics };
     }
 };
 
