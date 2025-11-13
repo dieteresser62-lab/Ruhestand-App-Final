@@ -148,6 +148,24 @@ function _internal_calculateModel(input, lastState) {
         runwayStatus = 'warn';
     }
 
+    // Diagnose-Objekt mit finalem Runway-Status und Zielwert anreichern
+    diagnosis.general = diagnosis.general || {};
+    diagnosis.general.runwayStatus = runwayStatus;
+    diagnosis.general.runwayMonate = runwayMonths;
+    if (typeof diagnosis.general.runwayTargetMonate !== 'number' || !isFinite(diagnosis.general.runwayTargetMonate)) {
+        diagnosis.general.runwayTargetMonate = input.runwayTargetMonths;
+        diagnosis.general.runwayTargetQuelle = diagnosis.general.runwayTargetQuelle || 'input';
+    }
+
+    if (Array.isArray(diagnosis.guardrails)) {
+        diagnosis.guardrails = diagnosis.guardrails.map(guardrail => {
+            if (guardrail && guardrail.type === 'months' && guardrail.rule === 'min' && guardrail.name.startsWith('Runway')) {
+                return { ...guardrail, value: runwayMonths };
+            }
+            return guardrail;
+        });
+    }
+
     // 12. Ergebnis zusammenstellen
     // Struktur: {input, newState, diagnosis, ui}
     return {

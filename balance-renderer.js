@@ -395,7 +395,7 @@ export const UIRenderer = {
 
 	buildChips(d) {
         const { entnahmequoteDepot, realerDepotDrawdown } = d.keyParams;
-        const runwayMonate = d.general.runwayMonate;
+        const { runwayMonate, runwayTargetMonate, runwayStatus } = d.general;
 
         // REFACTORING: Hartkodierte Werte durch sicheren Zugriff auf Engine-Config ersetzen
         const ALARM_withdrawalRate = UIUtils.getThreshold('THRESHOLDS.ALARM.withdrawalRate', 0.055);
@@ -405,7 +405,24 @@ export const UIRenderer = {
 
         const qStatus = entnahmequoteDepot > ALARM_withdrawalRate ? 'danger' : entnahmequoteDepot > CAUTION_withdrawalRate ? 'warn' : 'ok';
         const ddStatus = realerDepotDrawdown > ALARM_realDrawdown ? 'danger' : realerDepotDrawdown > 0.15 ? 'warn' : 'ok';
-        const rStatus = runwayMonate > 36 ? 'ok' : runwayMonate >= STRATEGY_runwayThinMonths ? 'warn' : 'danger';
+        const safeRunway = (typeof runwayMonate === 'number' && isFinite(runwayMonate)) ? runwayMonate : 0;
+        const normalizedRunwayStatus = (status) => {
+            if (status === 'bad') return 'danger';
+            if (status === 'warn') return 'warn';
+            return status === 'ok' ? 'ok' : null;
+        };
+        const derivedRunwayStatus = normalizedRunwayStatus(runwayStatus);
+        const fallbackRunwayStatus = safeRunway > 36 ? 'ok' : safeRunway >= STRATEGY_runwayThinMonths ? 'warn' : 'danger';
+        const rStatus = derivedRunwayStatus || fallbackRunwayStatus;
+        const formatMonths = (value) => (typeof value === 'number' && isFinite(value))
+            ? value.toFixed(0)
+            : '∞';
+        const runwayChipValue = (typeof runwayTargetMonate === 'number' && isFinite(runwayTargetMonate))
+            ? `${formatMonths(runwayMonate)} / ${formatMonths(runwayTargetMonate)} Mon.`
+            : `${formatMonths(runwayMonate)} Mon.`;
+        const runwayChipTitle = (typeof runwayTargetMonate === 'number' && isFinite(runwayTargetMonate))
+            ? `Aktuelle Runway vs. Ziel (${runwayTargetMonate.toFixed(0)} Monate).`
+            : 'Aktuelle Runway basierend auf verfügbaren Barmitteln.';
 
         const createChip = (status, label, value, title) => {
             const chip = document.createElement('span');
@@ -423,7 +440,7 @@ export const UIRenderer = {
             createChip(d.general.alarmActive ? 'danger' : 'ok', 'Alarm', d.general.alarmActive ? 'AKTIV' : 'Inaktiv'),
             createChip(qStatus, 'Quote', `${(entnahmequoteDepot * 100).toFixed(1)}%`, 'Entnahmequote = Jährliche Entnahme / Depotwert'),
             createChip(ddStatus, 'Drawdown', `${(realerDepotDrawdown * -100).toFixed(1)}%`, 'Realer Drawdown des Gesamtvermögens seit dem inflationsbereinigten Höchststand'),
-            createChip(rStatus, 'Runway', `${runwayMonate.toFixed(0)} Mon.`, 'Reichweite der Liquidität bei aktueller monatlicher Entnahme')
+            createChip(rStatus, 'Runway', runwayChipValue, runwayChipTitle)
         );
         return fragment;
     },
