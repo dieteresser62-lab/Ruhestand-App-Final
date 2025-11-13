@@ -70,7 +70,7 @@ const SpendingPlanner = {
         const finaleKuerzung = 100 - flexRate;
 
         // 7. Ergebnisse zusammenstellen
-        const { newState, spendingResult } = this._buildResults(
+        const { newState, spendingResult, diagnosisMetrics } = this._buildResults(
             state, endgueltigeEntnahme, alarmStatus, flexRate, kuerzungQuelle, p
         );
 
@@ -81,7 +81,15 @@ const SpendingPlanner = {
             alarmActive: alarmStatus.active,
             runwayMonate: p.runwayMonate
         };
-        diagnosis.keyParams = state.keyParams;
+        // Diagnose-Key-Parameter stets als Kopie anreichern, damit spätere State-Änderungen
+        // keine Seiteneffekte erzeugen. Die zusätzlichen Werte bieten Transparenz darüber,
+        // welche Entnahme letztlich beschlossen wurde.
+        diagnosis.keyParams = {
+            ...state.keyParams,
+            aktuelleFlexRate: diagnosisMetrics.flexRate,
+            kuerzungProzent: diagnosisMetrics.kuerzungProzent,
+            jahresentnahme: diagnosisMetrics.jahresentnahme
+        };
         diagnosis.guardrails.push(
             {
                 name: "Entnahmequote",
@@ -442,6 +450,12 @@ const SpendingPlanner = {
         const finaleKuerzung = 100 - flexRate;
         const aktuellesGesamtbudgetFinal = endgueltigeEntnahme + renteJahr;
 
+        const diagnosisMetrics = {
+            flexRate,
+            kuerzungProzent: finaleKuerzung,
+            jahresentnahme: endgueltigeEntnahme
+        };
+
         const newState = {
             ...state,
             flexRate,
@@ -462,7 +476,7 @@ const SpendingPlanner = {
             details: { ...state.keyParams, flexRate, endgueltigeEntnahme }
         };
 
-        return { newState, spendingResult };
+        return { newState, spendingResult, diagnosisMetrics };
     }
 };
 
