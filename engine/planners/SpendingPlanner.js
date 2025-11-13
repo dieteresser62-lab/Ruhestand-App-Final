@@ -72,6 +72,72 @@ const SpendingPlanner = {
         const finaleKuerzung = 100 - flexRate;
 
         // 7. Ergebnisse zusammenstellen
+        const { newState, spendingResult } = this._buildResults(
+            state, endgueltigeEntnahme, alarmStatus, flexRate, kuerzungQuelle, p
+        );
+
+        // 8. Diagnose vervollständigen
+        const runwayTargetInfo = this._resolveRunwayTarget(profil, market, input);
+
+        diagnosis.general = {
+            marketSKey: market.sKey,
+            marketSzenario: market.szenarioText,
+            alarmActive: alarmStatus.active,
+            runwayMonate: p.runwayMonate,
+            runwayTargetMonate: runwayTargetInfo.targetMonths,
+            runwayTargetQuelle: runwayTargetInfo.source
+        };
+        diagnosis.keyParams = state.keyParams;
+        const guardrailEntries = [
+            {
+                name: "Entnahmequote",
+                value: state.keyParams.entnahmequoteDepot,
+                threshold: CONFIG.THRESHOLDS.ALARM.withdrawalRate,
+                type: 'percent',
+                rule: 'max'
+            },
+            {
+                name: "Realer Drawdown (Gesamt)",
+                value: state.keyParams.realerDepotDrawdown,
+                threshold: CONFIG.THRESHOLDS.ALARM.realDrawdown,
+                type: 'percent',
+                rule: 'max'
+            },
+            {
+                name: "Runway (vs. Min)",
+                value: runwayMonate,
+                threshold: profil.minRunwayMonths,
+                type: 'months',
+                rule: 'min'
+            }
+        ];
+
+        if (runwayTargetInfo.targetMonths && runwayTargetInfo.targetMonths > 0) {
+            guardrailEntries.push({
+                name: "Runway (vs. Ziel)",
+                value: runwayMonate,
+                threshold: runwayTargetInfo.targetMonths,
+                type: 'months',
+                rule: 'min'
+            });
+        }
+
+        diagnosis.guardrails.push(...guardrailEntries);
+
+        return { spendingResult, newState, diagnosis };
+    },
+        // 6. Finale Werte berechnen
+        let flexRate;
+        if (inflatedBedarf.flex > 0) {
+            const flexErfuellt = Math.max(0, endgueltigeEntnahme - inflatedBedarf.floor);
+            flexRate = (flexErfuellt / inflatedBedarf.flex) * 100;
+        } else {
+            // Wenn es keinen Flex-Bedarf gibt, ist die Flex-Rate 0%
+            flexRate = 0;
+        }
+        const finaleKuerzung = 100 - flexRate;
+
+        // 7. Ergebnisse zusammenstellen
         const { newState, spendingResult, diagnosisMetrics } = this._buildResults(
             state, endgueltigeEntnahme, alarmStatus, flexRate, kuerzungQuelle, p
         );
@@ -542,6 +608,42 @@ const SpendingPlanner = {
             details: { ...state.keyParams, flexRate, endgueltigeEntnahme }
         };
 
+        return { newState, spendingResult };
+    },
+
+    /**
+     * Ermittelt das relevante Runway-Ziel (statisch oder dynamisch je Regime)
+     * @param {Object} profil - Aktuelles Risikoprofil inkl. Runway-Konfiguration
+     * @param {Object} market - Marktinformationen mit Szenario-Key
+     * @param {Object} input - Benutzer-Input für statische Zielwerte
+     * @returns {{targetMonths: number|null, source: string}} Ermitteltes Ziel und Quelle
+     */
+    _resolveRunwayTarget(profil, market, input) {
+        if (!profil) {
+            return { targetMonths: input?.runwayTargetMonths || null, source: 'input' };
+        }
+
+        const fallbackMin = profil.minRunwayMonths || input?.runwayMinMonths || null;
+        const inputTarget = (typeof input?.runwayTargetMonths === 'number' && input.runwayTargetMonths > 0)
+            ? input.runwayTargetMonths
+            : null;
+
+        if (!profil.isDynamic) {
+            const resolvedTarget = inputTarget || fallbackMin;
+            return { targetMonths: resolvedTarget || null, source: 'input' };
+        }
+
+        const regimeKey = CONFIG.TEXTS.REGIME_MAP[market?.sKey] || market?.sKey || 'hot_neutral';
+        const dynamicTarget = profil.runway?.[regimeKey]?.total;
+
+        if (typeof dynamicTarget === 'number' && dynamicTarget > 0) {
+            return { targetMonths: dynamicTarget, source: `profil:${regimeKey}` };
+        }
+
+        const resolvedTarget = inputTarget || fallbackMin || null;
+        return { targetMonths: resolvedTarget, source: resolvedTarget ? 'fallback' : 'unknown' };
+    }
+};
         return { newState, spendingResult, diagnosisMetrics };
     }
 };
