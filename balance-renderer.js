@@ -421,6 +421,11 @@ export const UIRenderer = {
         dom.diagnosis.chips.replaceChildren(this.buildChips(diagnosis));
         dom.diagnosis.decisionTree.replaceChildren(this.buildDecisionTree(diagnosis.decisionTree));
         dom.diagnosis.guardrails.replaceChildren(this.buildGuardrails(diagnosis.guardrails));
+        if (dom.diagnosis.transaction) {
+            dom.diagnosis.transaction.replaceChildren(
+                this.buildTransactionDiagnostics(diagnosis.transactionDiagnostics)
+            );
+        }
         dom.diagnosis.keyParams.replaceChildren(this.buildKeyParams(diagnosis.keyParams));
     },
 
@@ -539,6 +544,204 @@ export const UIRenderer = {
             fragment.appendChild(card);
         });
         return fragment;
+    },
+
+    /**
+     * Baut den Diagnoseabschnitt für Transaktions-Diagnostics auf.
+     *
+     * @param {Object|null} transactionDiag - Rohdaten aus der Engine, können fehlen.
+     * @returns {DocumentFragment} – Fertiger DOM-Baum für das Panel.
+     */
+    buildTransactionDiagnostics(transactionDiag) {
+        const fragment = document.createDocumentFragment();
+
+        if (!transactionDiag || typeof transactionDiag !== 'object') {
+            const emptyState = document.createElement('p');
+            emptyState.className = 'diag-empty-state';
+            emptyState.textContent = 'Keine Transaktionsdiagnostik verfügbar.';
+            fragment.appendChild(emptyState);
+            return fragment;
+        }
+
+        const statusMeta = this._determineTransactionStatus(transactionDiag);
+        const summaryRows = [
+            { label: 'Ausgelöst?', value: transactionDiag.wasTriggered ? 'Ja' : 'Nein' },
+            { label: 'Blockgrund', value: statusMeta.label },
+            {
+                label: 'Blockierter Betrag',
+                value: UIUtils.formatCurrency(transactionDiag.blockedAmount || 0)
+            }
+        ];
+
+        if (transactionDiag.potentialTrade && typeof transactionDiag.potentialTrade === 'object') {
+            const trade = transactionDiag.potentialTrade;
+            const descriptor = [trade.direction || trade.kind || 'Unbekannte Aktion'];
+            if (typeof trade.netAmount === 'number') {
+                descriptor.push(UIUtils.formatCurrency(trade.netAmount));
+            } else if (typeof trade.netto === 'number') {
+                descriptor.push(UIUtils.formatCurrency(trade.netto));
+            }
+            summaryRows.push({
+                label: 'Geplante Aktion',
+                value: descriptor.filter(Boolean).join(' · ')
+            });
+        }
+
+        fragment.appendChild(this._createTransactionCard({
+            title: 'Transaktionsstatus',
+            subtitle: statusMeta.subtitle,
+            rows: summaryRows
+        }, statusMeta.status));
+
+        const thresholdCards = [
+            this._describeThresholdGroup('Aktien-Grenzen', transactionDiag.equityThresholds),
+            this._describeThresholdGroup('Gold-Grenzen', transactionDiag.goldThresholds)
+        ].filter(Boolean);
+
+        thresholdCards.forEach(card => fragment.appendChild(card));
+
+        return fragment;
+    },
+
+    /**
+     * Bestimmt Statusfarbe und Beschreibung für die Transaktionsdiagnostik.
+     *
+     * @param {Object} diag - Diagnosewerte aus der Engine.
+     * @returns {{status: string, label: string, subtitle: string}} Statusinformationen.
+     */
+    _determineTransactionStatus(diag) {
+        const reasonKey = (diag.blockReason || 'none').toLowerCase();
+        const statusMap = {
+            none: 'ok',
+            min_trade: 'warn',
+            liquidity_sufficient: 'info',
+            guardrail_block: 'danger',
+            cap_active: 'warn',
+            gold_floor: 'danger'
+        };
+        const labelMap = {
+            none: 'Keine Blockade',
+            min_trade: 'Unter Mindestgröße',
+            liquidity_sufficient: 'Liquidität ausreichend',
+            guardrail_block: 'Guardrail verhindert Verkauf',
+            cap_active: 'Cap begrenzt Trade',
+            gold_floor: 'Gold-Floor aktiv'
+        };
+
+        const status = statusMap[reasonKey] || (diag.wasTriggered ? 'ok' : 'info');
+        const label = labelMap[reasonKey] || reasonKey.replace(/[_-]/g, ' ');
+        const subtitle = (diag.blockReason && diag.blockReason !== 'none')
+            ? `Grundcode: ${diag.blockReason}`
+            : 'Keine Einschränkungen gemeldet';
+
+        return { status, label, subtitle };
+    },
+
+    /**
+     * Baut eine einheitliche Diagnosekarte mit Status.
+     *
+     * @param {{title: string, subtitle?: string, rows: Array<{label: string, value: string}>}} config - Anzeigeparameter.
+     * @param {string} status - status-ok/status-warn/status-danger etc.
+     * @returns {HTMLElement} Fertige Karte.
+     */
+    _createTransactionCard(config, status = 'info') {
+        const card = document.createElement('div');
+        card.className = `guardrail-card status-${status}`;
+        const title = document.createElement('strong');
+        title.textContent = config.title;
+        card.appendChild(title);
+
+        if (config.subtitle) {
+            const subtitle = document.createElement('div');
+            subtitle.className = 'threshold';
+            subtitle.textContent = config.subtitle;
+            card.appendChild(subtitle);
+        }
+
+        config.rows.forEach(row => {
+            const rowEl = document.createElement('div');
+            rowEl.className = 'value-row';
+            const labelEl = document.createElement('span');
+            labelEl.className = 'label';
+            labelEl.textContent = `${row.label}:`;
+            const valueEl = document.createElement('span');
+            valueEl.className = 'value';
+            valueEl.textContent = row.value || 'n/a';
+            rowEl.append(labelEl, valueEl);
+            card.appendChild(rowEl);
+        });
+
+        return card;
+    },
+
+    /**
+     * Erstellt Karten für Schwellenwerte einzelner Asset-Klassen.
+     *
+     * @param {string} label - Titel der Karte.
+     * @param {Object} thresholds - Schwellenwerte laut Engine.
+     * @returns {HTMLElement|null} Karte oder null, falls keine Daten vorhanden.
+     */
+    _describeThresholdGroup(label, thresholds) {
+        if (!thresholds || typeof thresholds !== 'object' || Object.keys(thresholds).length === 0) {
+            return null;
+        }
+
+        const entries = Object.entries(thresholds);
+        const lower = entries.find(([key]) => /lower|min/i.test(key));
+        const upper = entries.find(([key]) => /upper|max/i.test(key));
+        const current = entries.find(([key]) => /current|ist|actual/i.test(key));
+
+        const currentValue = (current && typeof current[1] === 'number') ? current[1] : null;
+        const lowerValue = (lower && typeof lower[1] === 'number') ? lower[1] : null;
+        const upperValue = (upper && typeof upper[1] === 'number') ? upper[1] : null;
+
+        let status = 'info';
+        if (currentValue !== null) {
+            if ((lowerValue !== null && currentValue < lowerValue) ||
+                (upperValue !== null && currentValue > upperValue)) {
+                status = 'danger';
+            } else if (
+                (lowerValue !== null && currentValue < lowerValue * 1.05) ||
+                (upperValue !== null && currentValue > upperValue * 0.95)
+            ) {
+                status = 'warn';
+            } else {
+                status = 'ok';
+            }
+        }
+
+        const rows = entries.map(([key, value]) => ({
+            label: key,
+            value: this._formatThresholdValue(key, value)
+        }));
+
+        return this._createTransactionCard({
+            title: label,
+            rows
+        }, status);
+    },
+
+    /**
+     * Formatiert Schwellenwerte kontextsensitiv.
+     *
+     * @param {string} key - Feldname zur Heuristik.
+     * @param {*} value - Rohwert.
+     * @returns {string} Formatierte Darstellung.
+     */
+    _formatThresholdValue(key, value) {
+        if (typeof value === 'number' && isFinite(value)) {
+            if (/pct|percent|quote|rate/i.test(key)) {
+                return `${value.toFixed(1)}%`;
+            }
+            if (/amount|wert|value|eur|euro|betrag|volume|blocked/i.test(key)) {
+                return UIUtils.formatCurrency(value);
+            }
+            if (/month|monate|runway/i.test(key)) {
+                return `${value.toFixed(0)} Mon.`;
+            }
+            return value.toFixed(2);
+        }
+        return (value ?? 'n/a').toString();
     },
 
     buildKeyParams(params) {

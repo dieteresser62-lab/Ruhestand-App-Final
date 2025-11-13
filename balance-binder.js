@@ -450,6 +450,83 @@ export const UIBinder = {
             if (dom.diagnosis.filterToggle.checked && g.status === 'ok') return;
             text += `${g.name}: ${g.value} (Schwelle: ${g.threshold}) -> Status: ${g.status.toUpperCase()}\n`;
         });
+
+        const txnDiag = diagnosis.transactionDiagnostics;
+        const describeReason = (reason) => {
+            const map = {
+                none: 'Keine Blockade',
+                min_trade: 'Unter Mindestgröße',
+                liquidity_sufficient: 'Liquidität ausreichend',
+                guardrail_block: 'Guardrail verhindert Verkauf',
+                cap_active: 'Cap begrenzt Trade',
+                gold_floor: 'Gold-Floor aktiv'
+            };
+            if (!reason) return map.none;
+            return map[reason.toLowerCase()] || reason.replace(/[_-]/g, ' ');
+        };
+        const determineReasonStatus = (reason, wasTriggered) => {
+            const statusMap = {
+                none: 'OK',
+                min_trade: 'WARN',
+                liquidity_sufficient: 'INFO',
+                guardrail_block: 'DANGER',
+                cap_active: 'WARN',
+                gold_floor: 'DANGER'
+            };
+            return statusMap[reason?.toLowerCase()] || (wasTriggered ? 'OK' : 'INFO');
+        };
+        const formatThresholdValue = (key, value) => {
+            if (typeof value === 'number' && isFinite(value)) {
+                if (/pct|percent|quote|rate/i.test(key)) {
+                    return `${value.toFixed(1)}%`;
+                }
+                if (/amount|wert|value|eur|euro|betrag|volume|blocked/i.test(key)) {
+                    return UIUtils.formatCurrency(value);
+                }
+                if (/month|monate|runway/i.test(key)) {
+                    return `${value.toFixed(0)} Monate`;
+                }
+                return value.toFixed(2);
+            }
+            return (value ?? 'n/a').toString();
+        };
+        const appendThresholdBlock = (label, thresholds) => {
+            if (!thresholds || typeof thresholds !== 'object' || Object.keys(thresholds).length === 0) {
+                text += `${label}: keine Daten\n`;
+                return;
+            }
+            text += `${label}:\n`;
+            Object.entries(thresholds).forEach(([key, value]) => {
+                text += `  - ${key}: ${formatThresholdValue(key, value)}\n`;
+            });
+        };
+
+        if (txnDiag) {
+            text += `\n--- Transaktionsdiagnostik ---\n`;
+            text += `Status: ${determineReasonStatus(txnDiag.blockReason, txnDiag.wasTriggered)} (${describeReason(txnDiag.blockReason)})\n`;
+            text += `Ausgelöst: ${txnDiag.wasTriggered ? 'Ja' : 'Nein'}\n`;
+            text += `Blockierter Betrag: ${UIUtils.formatCurrency(txnDiag.blockedAmount || 0)}\n`;
+            if (txnDiag.blockReason && txnDiag.blockReason !== 'none') {
+                text += `Grundcode: ${txnDiag.blockReason}\n`;
+            }
+            if (txnDiag.potentialTrade && typeof txnDiag.potentialTrade === 'object' && Object.keys(txnDiag.potentialTrade).length > 0) {
+                const trade = txnDiag.potentialTrade;
+                const tradeParts = [];
+                if (trade.direction || trade.kind) {
+                    tradeParts.push(trade.direction || trade.kind);
+                }
+                const tradeValue = [trade.netAmount, trade.netto, trade.amount].find(v => typeof v === 'number' && isFinite(v));
+                if (typeof tradeValue === 'number') {
+                    tradeParts.push(UIUtils.formatCurrency(tradeValue));
+                }
+                if (tradeParts.length > 0) {
+                    text += `Geplante Aktion: ${tradeParts.join(' / ')}\n`;
+                }
+            }
+            appendThresholdBlock('Aktien-Grenzen', txnDiag.equityThresholds);
+            appendThresholdBlock('Gold-Grenzen', txnDiag.goldThresholds);
+        }
+
         text += `\n--- Schlüsselparameter ---\n`;
         text += `Peak (real): ${UIUtils.formatCurrency(diagnosis.keyParams.peakRealVermoegen)}\n`;
         text += `Aktuell (real): ${UIUtils.formatCurrency(diagnosis.keyParams.currentRealVermoegen)}\n`;
