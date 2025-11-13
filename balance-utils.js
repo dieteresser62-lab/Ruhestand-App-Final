@@ -58,5 +58,46 @@ export const UIUtils = {
         }
         const value = path.split('.').reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, config);
         return (typeof value === 'number') ? value : defaultValue;
+    },
+
+    /**
+     * Liefert eine menschenlesbare Beschreibung für die Quelle eines Runway-Ziels.
+     *
+     * @param {string} sourceKey - Maschineller Source-Key (z.B. "input" oder "profil:peak_hot").
+     * @returns {{ label: string, description: string }} Beschreibender Text für UI/Export.
+     */
+    describeRunwayTargetSource(sourceKey) {
+        const fallback = {
+            label: 'Unbekannt (Legacy)',
+            description: 'Quelle konnte nicht bestimmt werden – bitte Zielwerte prüfen.'
+        };
+
+        if (typeof sourceKey !== 'string' || !sourceKey.trim()) {
+            return fallback;
+        }
+
+        const normalized = sourceKey.trim().toLowerCase();
+        const staticMap = {
+            input: {
+                label: 'Manueller Input',
+                description: 'Runway-Ziel wurde direkt in den Profil-Inputs definiert.'
+            },
+            fallback: {
+                label: 'Fallback (Minimum)',
+                description: 'Es wurde auf den minimalen Runway-Wert des Profils zurückgegriffen.'
+            },
+            unknown: fallback,
+            legacy: fallback
+        };
+
+        if (normalized.startsWith('profil:')) {
+            const regime = normalized.split(':')[1] || 'unbekanntes Regime';
+            return {
+                label: `Profil (Regime: ${regime})`,
+                description: 'Dynamisches Profil-Ziel abhängig vom aktuellen Marktregime.'
+            };
+        }
+
+        return staticMap[normalized] || fallback;
     }
 };
