@@ -363,6 +363,49 @@ export const UIRenderer = {
         const formatted = { ...raw };
         const guardrails = Array.isArray(raw.guardrails) ? raw.guardrails : [];
         formatted.guardrails = guardrails.map(g => {
+            const rule = g.rule || 'max';
+            let status = 'ok';
+            if ((rule === 'max' && g.value > g.threshold) || (rule === 'min' && g.value < g.threshold)) {
+                status = 'danger';
+            } else if ((rule === 'max' && g.value > g.threshold * 0.90) || (rule === 'min' && g.value < g.threshold * 1.10)) {
+                status = 'warn';
+            }
+            const formatVal = (value, type, opts = {}) => {
+                const { invertPositive = false } = opts;
+                if (typeof value !== 'number' || !isFinite(value)) {
+                    return 'N/A';
+                }
+                const needsPrefix = invertPositive && value > 0;
+                switch(type) {
+                    case 'percent':
+                        if (needsPrefix) {
+                            return `-${(Math.abs(value) * 100).toFixed(1)}%`;
+                        }
+                        return `${(value * 100).toFixed(1)}%`;
+                    case 'months':
+                        return `${value.toFixed(0)} Mon.`;
+                    case 'currency': {
+                        const formatted = UIUtils.formatCurrency(value);
+                        if (!needsPrefix) return formatted;
+                        const sanitized = formatted.replace(/^[\-–−]/, '').trim();
+                        return `-${sanitized}`;
+                    }
+                    default:
+                        if (needsPrefix) {
+                            return `-${Math.abs(value).toFixed(1)}`;
+                        }
+                        return value.toFixed(1);
+                }
+            };
+            const formattedValue = formatVal(g.value, g.type, { invertPositive: g.name.includes("Drawdown") });
+            const formattedThreshold = `${rule === 'max' ? '< ' : '> '}${formatVal(g.threshold, g.type)}`;
+            return {
+                name: g.name,
+                value: formattedValue,
+                threshold: formattedThreshold,
+                status
+            };
+        });
             let status = 'ok';
             if ((g.rule === 'max' && g.value > g.threshold) || (g.rule === 'min' && g.value < g.threshold)) {
                 status = 'danger';

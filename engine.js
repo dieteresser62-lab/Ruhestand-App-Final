@@ -444,12 +444,14 @@ const SpendingPlanner = {
         );
 
         // 4. Guardrails anwenden (wenn nicht im Alarm-Modus)
+        let guardrailDiagnostics = {};
         if (!alarmStatus.active) {
             const guardrailResult = this._applyGuardrails(
                 geglätteteFlexRate, state, { ...p, kuerzungQuelle }, addDecision
             );
             geglätteteFlexRate = guardrailResult.rate;
             kuerzungQuelle = guardrailResult.source;
+            guardrailDiagnostics = guardrailResult.diagnostics || {};
         }
 
         // 5. Endgültige Entnahme berechnen
@@ -503,6 +505,20 @@ const SpendingPlanner = {
                 rule: 'min'
             }
         );
+
+        if (guardrailDiagnostics.inflationCap) {
+            diagnosis.guardrails.push({
+                name: "Inflations-Cap",
+                ...guardrailDiagnostics.inflationCap
+            });
+        }
+
+        if (guardrailDiagnostics.budgetFloor) {
+            diagnosis.guardrails.push({
+                name: "Budget-Floor Deckung",
+                ...guardrailDiagnostics.budgetFloor
+            });
+        }
 
         return { spendingResult, newState, diagnosis };
     },
@@ -750,6 +766,7 @@ const SpendingPlanner = {
         let kuerzungQuelle = initialSource;
         let geglätteteFlexRate = rate;
         let cautiousRuleApplied = false;
+        const diagnostics = {};
 
         // Recovery-Guardrail
         if (market.sKey === 'recovery_in_bear') {
@@ -789,6 +806,16 @@ const SpendingPlanner = {
             }
             inflationCap = calculatedInflationCap;
             cautiousRuleApplied = true;
+            diagnostics.inflationCap = {
+                rule: 'max',
+                type: 'percent',
+                threshold: Math.max(0, inflationCap) / 100,
+                value: Math.max(0, input.inflation) / 100,
+                details: {
+                    entnahmequoteDepot,
+                    capBinding: calculatedInflationCap < input.inflation
+                }
+            };
         }
 
         // Quelle anpassen wenn vorsichtige Regeln in Recovery/Caution-Kontext
@@ -801,11 +828,20 @@ const SpendingPlanner = {
         const angepasstesMinBudget = state.lastTotalBudget * (1 + inflationCap / 100);
         const geplanteJahresentnahme = inflatedBedarf.floor +
             (inflatedBedarf.flex * (Math.max(0, Math.min(100, geglätteteFlexRate)) / 100));
-        const aktuellesGesamtbudget = geplanteJahresentnahme + renteJahr;
+        let aktuellesGesamtbudget = geplanteJahresentnahme + renteJahr;
         const noNewLowerYearlyCloses = input.endeVJ > Math.min(input.endeVJ_1, input.endeVJ_2);
         const budgetFloorErlaubt = !['bear_deep', 'recovery_in_bear'].includes(market.sKey) ||
             ((market.abstandVomAthProzent || 0) <= 10 && noNewLowerYearlyCloses &&
              runwayMonate >= Math.max(30, profil.minRunwayMonths + 6));
+
+        if (budgetFloorErlaubt) {
+            diagnostics.budgetFloor = {
+                rule: 'min',
+                type: 'currency',
+                threshold: angepasstesMinBudget,
+                value: aktuellesGesamtbudget
+            };
+        }
 
         if (budgetFloorErlaubt && !cautiousRuleApplied && aktuellesGesamtbudget + 1 < angepasstesMinBudget) {
             const benötigteJahresentnahme = Math.max(0, angepasstesMinBudget - renteJahr);
@@ -822,10 +858,16 @@ const SpendingPlanner = {
                     "active",
                     "guardrail"
                 );
+                const aktualisierteEntnahme = inflatedBedarf.floor +
+                    (inflatedBedarf.flex * (Math.max(0, Math.min(100, geglätteteFlexRate)) / 100));
+                aktuellesGesamtbudget = aktualisierteEntnahme + renteJahr;
+                if (diagnostics.budgetFloor) {
+                    diagnostics.budgetFloor.value = aktuellesGesamtbudget;
+                }
             }
         }
 
-        return { rate: geglätteteFlexRate, source: kuerzungQuelle };
+        return { rate: geglätteteFlexRate, source: kuerzungQuelle, diagnostics };
     },
 
     /**
