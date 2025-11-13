@@ -99,69 +99,162 @@ class FinancialCalculationError extends AppError {
  * ===================================================================
  */
 
+// Engine-Versionierung
 const ENGINE_API_VERSION = "31.0";
 const ENGINE_BUILD_ID = new Date().toISOString().substring(0, 16).replace('T', '_');
 
+/**
+ * Zentrale Engine-Konfiguration
+ *
+ * Diese Konfiguration definiert alle kritischen Schwellenwerte und Parameter
+ * für die Ruhestand-Engine. Änderungen an diesen Werten können signifikante
+ * Auswirkungen auf die Ausgaben- und Transaktionsstrategie haben.
+ */
 const CONFIG = {
     APP: {
         VERSION: ENGINE_API_VERSION,
         NAME: 'Ruhestand-Engine-Core'
     },
+
+    /**
+     * Schwellenwerte für verschiedene Entscheidungsregeln
+     */
     THRESHOLDS: {
+        /**
+         * ALARM-Schwellen: Aktivieren den Notfall-Modus bei kritischer Situation
+         * - withdrawalRate: Max. Entnahmequote (5.5% des Depots pro Jahr)
+         * - realDrawdown: Max. realer Vermögensverlust vom Peak (25%)
+         */
         ALARM: {
-            withdrawalRate: 0.055,
-            realDrawdown: 0.25,
+            withdrawalRate: 0.055,      // 5.5% Entnahmequote als kritische Grenze
+            realDrawdown: 0.25,         // 25% realer Drawdown als Alarmsignal
         },
+
+        /**
+         * CAUTION-Schwellen: Aktivieren vorsichtige Strategien
+         * - withdrawalRate: Vorsichts-Entnahmequote (4.5% des Depots pro Jahr)
+         * - inflationCap: Max. Inflationsanpassung in vorsichtigen Phasen (3%)
+         */
         CAUTION: {
-            withdrawalRate: 0.045,
-            inflationCap: 3,
+            withdrawalRate: 0.045,      // 4.5% Entnahmequote für vorsichtige Planung
+            inflationCap: 3,            // 3% max. Inflationsanpassung im Caution-Modus
         },
+        /**
+         * STRATEGIE-Schwellen: Definieren Verhaltensregeln für Transaktionen
+         */
         STRATEGY: {
-            stagflationInflation: 4,
-            runwayThinMonths: 24,
-            liquidityBufferZonePercent: 10,
-            minRefillAmount: 10000,
-            minTradeAmountStatic: 25000,
-            minTradeAmountDynamicFactor: 0.005,
-            cashRebalanceThreshold: 2500,
-            recoveryLiquidityTargetFactor: 0.85
+            stagflationInflation: 4,                    // 4% Inflation als Stagflations-Grenze
+            runwayThinMonths: 24,                       // 24 Monate = kritischer Runway
+            liquidityBufferZonePercent: 10,             // 10% Pufferzone für Liquiditäts-Ziel
+            minRefillAmount: 10000,                     // Min. 10.000€ für Depot-Verkauf
+            minTradeAmountStatic: 25000,                // Min. 25.000€ für Rebalancing-Trades
+            minTradeAmountDynamicFactor: 0.005,         // 0.5% des Portfolios als dynamischer Trade-Mindestbetrag
+            cashRebalanceThreshold: 2500,               // Min. 2.500€ für Cash-Rebalancing
+            recoveryLiquidityTargetFactor: 0.85         // 85% des Ziel-Runway in Recovery-Phasen
         }
     },
+
+    /**
+     * Risikoprofile mit dynamischen Runway-Zielen
+     *
+     * Jedes Profil definiert die Ziel-Liquidität in verschiedenen Marktphasen:
+     * - peak: Markt auf Allzeithoch (48 Monate Runway)
+     * - hot_neutral: Stabiler Markt (36 Monate)
+     * - bear: Bärenmarkt (60 Monate = 5 Jahre!)
+     * - recovery_in_bear: Erholung im Bärenmarkt (48 Monate)
+     */
     PROFIL_MAP: {
         'sicherheits-dynamisch': {
-            isDynamic: true, minRunwayMonths: 24,
+            isDynamic: true,                            // Dynamisches Profil (Runway variiert mit Markt)
+            minRunwayMonths: 24,                        // Min. 24 Monate Runway immer halten
             runway: {
-                'peak': { total: 48 }, 'hot_neutral': { total: 36 }, 'bear': { total: 60 },
-                'stagflation': { total: 60 }, 'recovery_in_bear': { total: 48 }, 'recovery': { total: 48 }
+                'peak': { total: 48 },                  // 4 Jahre bei Peak
+                'hot_neutral': { total: 36 },           // 3 Jahre im Normalfall
+                'bear': { total: 60 },                  // 5 Jahre im Bärenmarkt
+                'stagflation': { total: 60 },           // 5 Jahre bei Stagflation
+                'recovery_in_bear': { total: 48 },      // 4 Jahre in Recovery
+                'recovery': { total: 48 }               // 4 Jahre in normaler Recovery
             }
         }
     },
+    /**
+     * Ausgabenmodell-Parameter
+     *
+     * Steuert die Flex-Rate-Anpassung (= wie viel vom flexiblen Bedarf wird entnommen):
+     * - SMOOTHING_ALPHA: Glättungsfaktor (0.35 = 35% neue Rate, 65% alte Rate)
+     * - MAX_UP_PP: Max. Erhöhung pro Jahr in Prozentpunkten (normal: 2.5pp)
+     * - AGILE_UP_PP: Max. Erhöhung in günstigen Phasen (4.5pp)
+     * - MAX_DOWN_PP: Max. Reduktion pro Jahr (3.5pp)
+     * - MAX_DOWN_IN_BEAR_PP: Max. Reduktion im Bärenmarkt (10pp = drastisch!)
+     */
     SPENDING_MODEL: {
-        FLEX_RATE_SMOOTHING_ALPHA: 0.35, RATE_CHANGE_MAX_UP_PP: 2.5, RATE_CHANGE_AGILE_UP_PP: 4.5,
-        RATE_CHANGE_MAX_DOWN_PP: 3.5, RATE_CHANGE_MAX_DOWN_IN_BEAR_PP: 10.0
+        FLEX_RATE_SMOOTHING_ALPHA: 0.35,                // Glättungsfaktor für Flex-Rate
+        RATE_CHANGE_MAX_UP_PP: 2.5,                     // +2.5pp pro Jahr (konservativ)
+        RATE_CHANGE_AGILE_UP_PP: 4.5,                   // +4.5pp in Peak/Recovery (agiler)
+        RATE_CHANGE_MAX_DOWN_PP: 3.5,                   // -3.5pp pro Jahr (normal)
+        RATE_CHANGE_MAX_DOWN_IN_BEAR_PP: 10.0           // -10pp im Bärenmarkt (drastisch)
     },
+
+    /**
+     * Recovery-Guardrails
+     *
+     * Verhindert zu aggressive Entnahmen während der Markt-Erholung.
+     * Die Flex-Rate wird gekappt basierend auf dem Abstand zum Allzeithoch (ATH).
+     *
+     * Beispiel: Bei 25%+ Abstand vom ATH -> Max. 75% Flex-Rate (25% Kürzung)
+     */
     RECOVERY_GUARDRAILS: {
         description: "Vorsichtige Erhöhung der Flex-Rate während Erholungsphasen, abhängig vom Abstand zum ATH.",
+
+        // Kürzungsregeln basierend auf ATH-Abstand
         CURB_RULES: [
             { minGap: 25, maxGap: Infinity, curbPercent: 25 },
             { minGap: 15, maxGap: 25,       curbPercent: 20 },
             { minGap: 10, maxGap: 15,       curbPercent: 15 },
             { minGap: 0,  maxGap: 10,       curbPercent: 10 }
         ],
+
+        /**
+         * Bestimmt Kürzung basierend auf ATH-Abstand
+         * @param {number} athGapPercent - Abstand vom Allzeithoch in Prozent
+         * @returns {number} Kürzung in Prozentpunkten (10-25%)
+         */
         getCurb(athGapPercent) {
             const rule = this.CURB_RULES.find(c => athGapPercent > c.minGap && athGapPercent <= c.maxGap);
             return rule ? rule.curbPercent : 10;
         }
     },
+
+    /**
+     * Texte und Mappings für UI-Darstellung
+     */
     TEXTS: {
+        /**
+         * Szenario-Beschreibungen für UI
+         * Mapping von Szenario-Key zu lesbarem Text
+         */
         SCENARIO: {
-            peak_hot: "Markt heiß gelaufen", peak_stable: "Stabiler Höchststand", recovery: "Best. Erholung",
-            bear_deep: "Tiefer Bär", corr_young: "Junge Korrektur", side_long: "Seitwärts Lang",
-            recovery_in_bear: "Erholung im Bärenmarkt"
+            peak_hot: "Markt heiß gelaufen",                // Überhitzter Markt
+            peak_stable: "Stabiler Höchststand",            // Stabiles ATH
+            recovery: "Best. Erholung",                     // Bestätigte Erholung
+            bear_deep: "Tiefer Bär",                        // Tiefer Bärenmarkt
+            corr_young: "Junge Korrektur",                  // Kurze Korrektur
+            side_long: "Seitwärts Lang",                    // Lange Seitwärtsbewegung
+            recovery_in_bear: "Erholung im Bärenmarkt"      // Rally im Bärenmarkt
         },
+
+        /**
+         * Regime-Mapping für Runway-Berechnung
+         * Mappt spezifische Szenarien auf allgemeine Markt-Regimes
+         */
         REGIME_MAP: {
-            peak_hot: 'peak', peak_stable: 'hot_neutral', side_long: 'hot_neutral', recovery: 'recovery',
-            corr_young: 'recovery', bear_deep: 'bear', recovery_in_bear: 'recovery_in_bear'
+            peak_hot: 'peak',                               // Überhitzt -> Peak-Regime
+            peak_stable: 'hot_neutral',                     // Stabil -> Hot-Neutral
+            side_long: 'hot_neutral',                       // Seitwärts -> Hot-Neutral
+            recovery: 'recovery',                           // Erholung -> Recovery
+            corr_young: 'recovery',                         // Junge Korrektur -> Recovery
+            bear_deep: 'bear',                              // Tiefer Bär -> Bear
+            recovery_in_bear: 'recovery_in_bear'            // Rally im Bär -> Special Recovery
         }
     }
 };
@@ -183,29 +276,49 @@ const CONFIG = {
  */
 
 const InputValidator = {
+    /**
+     * Validiert alle Benutzereingaben auf Plausibilität
+     *
+     * Prüft folgende Kategorien:
+     * - Alter (18-120 Jahre)
+     * - Inflation (-10% bis +50%)
+     * - Vermögenswerte (>= 0)
+     * - Gold-Parameter (bei Aktivierung)
+     * - Runway-Werte (min/target)
+     * - Aktien-Zielquote (20-90%)
+     * - Rebalancing-Parameter
+     *
+     * @param {Object} input - Benutzereingaben mit allen Parametern
+     * @returns {Object} {valid: boolean, errors: Array<{fieldId, message}>}
+     */
     validate(input) {
         const errors = [];
+
+        // Hilfsfunktion für Validierungsprüfungen
         const check = (condition, fieldId, message) => {
             if (condition) {
                 errors.push({ fieldId, message });
             }
         };
 
-        // Altersvalidierung
+        // 1. Altersvalidierung
+        // Plausibilitätsprüfung: 18 (Volljährigkeit) bis 120 Jahre
         check(
             input.aktuellesAlter < 18 || input.aktuellesAlter > 120,
             'aktuellesAlter',
             'Alter muss zwischen 18 und 120 liegen.'
         );
 
-        // Inflationsvalidierung
+        // 2. Inflationsvalidierung
+        // Erlaubt Deflation (-10%) bis extreme Inflation (50%)
         check(
             input.inflation < -10 || input.inflation > 50,
             'inflation',
             'Inflation außerhalb plausibler Grenzen (-10% bis 50%).'
         );
 
-        // Vermögenswerte dürfen nicht negativ sein
+        // 3. Vermögenswerte dürfen nicht negativ sein
+        // Prüft alle Depot- und Kostenbasis-Felder
         ['tagesgeld', 'geldmarktEtf', 'depotwertAlt', 'depotwertNeu', 'goldWert',
          'floorBedarf', 'flexBedarf', 'costBasisAlt', 'costBasisNeu', 'goldCost',
          'sparerPauschbetrag'].forEach(field => {
@@ -217,7 +330,9 @@ const InputValidator = {
             check(input[field] < 0, field, 'Marktdaten dürfen nicht negativ sein.');
         });
 
-        // Gold-spezifische Validierung
+        // 4. Gold-spezifische Validierung (nur wenn Gold aktiv)
+        // Gold-Allokation sollte nicht mehr als 50% des Portfolios sein
+        // Gold-Floor (Mindestbestand) sollte nicht mehr als 20% sein
         if(input.goldAktiv) {
             check(
                 input.goldZielProzent <= 0 || input.goldZielProzent > 50,
@@ -231,7 +346,10 @@ const InputValidator = {
             );
         }
 
-        // Runway-Validierung
+        // 5. Runway-Validierung (Liquiditäts-Reichweite)
+        // Minimum: 12-60 Monate (1-5 Jahre)
+        // Ziel: 18-72 Monate (1.5-6 Jahre)
+        // Ziel muss >= Minimum sein
         check(
             input.runwayMinMonths < 12 || input.runwayMinMonths > 60,
             'runwayMinMonths',
@@ -411,15 +529,30 @@ const MarketAnalyzer = {
 
 const SpendingPlanner = {
     /**
-     * Bestimmt die Ausgabenstrategie für ein Jahr
-     * @param {Object} p - Parameter-Objekt mit allen notwendigen Daten
-     * @returns {Object} Ergebnis mit Ausgabenplan, neuem State und Diagnose
+     * Bestimmt die Ausgabenstrategie für ein Jahr.
+     *
+     * @param {Object} params - Aggregierte Parameter der Engine-Orchestrierung.
+     * @param {Object} params.lastState - Persistierter Zustand der Vorperiode.
+     * @param {Object} params.market - Aktuelles Marktregime und Metadaten.
+     * @param {Object} params.inflatedBedarf - Inflationsbereinigte Bedarfskomponenten.
+     * @param {number} params.runwayMonate - Aktuelle Liquiditätsreichweite in Monaten.
+     * @param {Object} params.profil - Aktives Risikoprofil inkl. Runway-Logik.
+     * @param {Object} params.input - Roh-Input aus der UI.
+     * @returns {{ spendingResult: Object, newState: Object, diagnosis: Object }}
+     *          Komplettes Ergebnis mit neuer State, Diagnose und Entnahmeplan.
      */
-    determineSpending(p) {
+    determineSpending(params) {
         const {
-            lastState, market, inflatedBedarf, runwayMonate,
-            profil, depotwertGesamt, gesamtwert, renteJahr, input
-        } = p;
+            lastState,
+            market,
+            inflatedBedarf,
+            runwayMonate,
+            profil,
+            depotwertGesamt,
+            gesamtwert,
+            renteJahr,
+            input
+        } = params;
 
         const diagnosis = {
             decisionTree: [],
@@ -432,102 +565,136 @@ const SpendingPlanner = {
             diagnosis.decisionTree.push({ step, impact, status, severity });
         };
 
-        // 1. State initialisieren oder laden
-        const state = this._initializeOrLoadState(lastState, p, addDecision);
+        // 1. State initialisieren oder laden.
+        const state = this._initializeOrLoadState(lastState, params, addDecision);
 
-        // 2. Alarm-Bedingungen evaluieren
-        const alarmStatus = this._evaluateAlarmConditions(state, p, addDecision);
+        // 2. Alarm-Bedingungen evaluieren.
+        const alarmStatus = this._evaluateAlarmConditions(state, params, addDecision);
 
-        // 3. Flex-Rate berechnen
+        // 3. Flex-Rate berechnen (inkl. Glättung/Alarm-Verhalten).
         let { geglätteteFlexRate, kuerzungQuelle } = this._calculateFlexRate(
-            state, alarmStatus, p, addDecision
+            state,
+            alarmStatus,
+            params,
+            addDecision
         );
 
-        // 4. Guardrails anwenden (wenn nicht im Alarm-Modus)
+        // 4. Guardrails anwenden, sobald kein Alarm aktiv ist.
         let guardrailDiagnostics = {};
         if (!alarmStatus.active) {
             const guardrailResult = this._applyGuardrails(
-                geglätteteFlexRate, state, { ...p, kuerzungQuelle }, addDecision
+                geglätteteFlexRate,
+                state,
+                { ...params, kuerzungQuelle },
+                addDecision
             );
             geglätteteFlexRate = guardrailResult.rate;
             kuerzungQuelle = guardrailResult.source;
             guardrailDiagnostics = guardrailResult.diagnostics || {};
         }
 
-        // 5. Endgültige Entnahme berechnen
-        let endgueltigeEntnahme = inflatedBedarf.floor +
+        // 5. Endgültige Entnahme bestimmen.
+        const endgueltigeEntnahme = inflatedBedarf.floor +
             (inflatedBedarf.flex * (Math.max(0, Math.min(100, geglätteteFlexRate)) / 100));
 
-        // 6. Finale Werte berechnen
-        let flexRate;
-        if (inflatedBedarf.flex > 0) {
-            const flexErfuellt = Math.max(0, endgueltigeEntnahme - inflatedBedarf.floor);
-            flexRate = (flexErfuellt / inflatedBedarf.flex) * 100;
-        } else {
-            // Wenn es keinen Flex-Bedarf gibt, ist die Flex-Rate 0%
-            flexRate = 0;
-        }
-        const finaleKuerzung = 100 - flexRate;
+        // 6. Flex-Rate ableiten (Anteil des Flex-Bedarfs, der finanziert werden kann).
+        const flexRate = (inflatedBedarf.flex > 0)
+            ? ((Math.max(0, endgueltigeEntnahme - inflatedBedarf.floor) / inflatedBedarf.flex) * 100)
+            : 0;
 
-        // 7. Ergebnisse zusammenstellen
-        const { newState, spendingResult } = this._buildResults(
-            state, endgueltigeEntnahme, alarmStatus, flexRate, kuerzungQuelle, p
+        // 7. Ergebnisobjekte aufbauen.
+        const { newState, spendingResult, diagnosisMetrics } = this._buildResults(
+            state,
+            endgueltigeEntnahme,
+            alarmStatus,
+            flexRate,
+            kuerzungQuelle,
+            params
         );
 
-        // 8. Diagnose vervollständigen
+        // 8. Diagnose vervollständigen.
+        const runwayTargetInfo = this._resolveRunwayTarget(profil, market, input);
         diagnosis.general = {
             marketSKey: market.sKey,
             marketSzenario: market.szenarioText,
             alarmActive: alarmStatus.active,
-            runwayMonate: p.runwayMonate
+            runwayMonate: runwayMonate,
+            runwayTargetMonate: runwayTargetInfo.targetMonths,
+            runwayTargetQuelle: runwayTargetInfo.source
         };
-        diagnosis.keyParams = state.keyParams;
-        diagnosis.guardrails.push(
+
+        // Guardrail-Überblick zusammenstellen.
+        const guardrailEntries = [
             {
-                name: "Entnahmequote",
+                name: 'Entnahmequote',
                 value: state.keyParams.entnahmequoteDepot,
                 threshold: CONFIG.THRESHOLDS.ALARM.withdrawalRate,
                 type: 'percent',
                 rule: 'max'
             },
             {
-                name: "Realer Drawdown (Gesamt)",
+                name: 'Realer Drawdown (Gesamt)',
                 value: state.keyParams.realerDepotDrawdown,
                 threshold: CONFIG.THRESHOLDS.ALARM.realDrawdown,
                 type: 'percent',
                 rule: 'max'
             },
             {
-                name: "Runway (vs. Min)",
+                name: 'Runway (vs. Min)',
                 value: runwayMonate,
                 threshold: profil.minRunwayMonths,
                 type: 'months',
                 rule: 'min'
             }
-        );
+        ];
+
+        if (runwayTargetInfo.targetMonths && runwayTargetInfo.targetMonths > 0) {
+            guardrailEntries.push({
+                name: 'Runway (vs. Ziel)',
+                value: runwayMonate,
+                threshold: runwayTargetInfo.targetMonths,
+                type: 'months',
+                rule: 'min'
+            });
+        }
 
         if (guardrailDiagnostics.inflationCap) {
-            diagnosis.guardrails.push({
-                name: "Inflations-Cap",
+            guardrailEntries.push({
+                name: 'Inflations-Cap',
                 ...guardrailDiagnostics.inflationCap
             });
         }
 
         if (guardrailDiagnostics.budgetFloor) {
-            diagnosis.guardrails.push({
-                name: "Budget-Floor Deckung",
+            guardrailEntries.push({
+                name: 'Budget-Floor Deckung',
                 ...guardrailDiagnostics.budgetFloor
             });
         }
+
+        diagnosis.guardrails.push(...guardrailEntries);
+
+        // Diagnose-Key-Parameter kopieren, um Seiteneffekte zu vermeiden.
+        diagnosis.keyParams = {
+            ...state.keyParams,
+            aktuelleFlexRate: diagnosisMetrics.flexRate,
+            kuerzungProzent: diagnosisMetrics.kuerzungProzent,
+            jahresentnahme: diagnosisMetrics.jahresentnahme
+        };
 
         return { spendingResult, newState, diagnosis };
     },
 
     /**
-     * Initialisiert einen neuen State oder lädt den bestehenden
-     * @private
+     * Initialisiert den Persistenz-State oder lädt die Vorperioden-Werte.
+     *
+     * @param {Object|null} lastState - Vorheriger State (kann fehlen).
+     * @param {Object} params - Vollständiger Parameter-Datensatz.
+     * @param {Function} addDecision - Callback zum Dokumentieren von Schritten.
+     * @returns {Object} Neuer State mit aktualisierten Key-Parametern.
      */
-    _initializeOrLoadState(lastState, p, addDecision) {
+    _initializeOrLoadState(lastState, params, addDecision) {
+        const p = params;
         if (lastState && lastState.initialized) {
             const cumulativeInflationFactor = lastState.cumulativeInflationFactor || 1;
             const realVermögen = p.gesamtwert / cumulativeInflationFactor;
@@ -554,9 +721,9 @@ const SpendingPlanner = {
         }
 
         addDecision(
-            "System-Initialisierung",
-            "Starte mit 100% Flex-Rate und setze initialen Vermögens-Peak.",
-            "active"
+            'System-Initialisierung',
+            'Starte mit 100% Flex-Rate und setze initialen Vermögens-Peak.',
+            'active'
         );
 
         return {
@@ -579,66 +746,79 @@ const SpendingPlanner = {
     },
 
     /**
-     * Prüft, ob Alarm in Peak-Phase deeskaliert werden kann
-     * @private
+     * Prüft, ob ein aktiver Alarm im Peak-Szenario zurückgefahren werden kann.
+     *
+     * @param {boolean} alarmWarAktiv - Flag aus dem Vorjahr.
+     * @param {Object} state - Persistenter State.
+     * @param {Object} params - Laufzeitdaten (inkl. Marktinformationen).
+     * @returns {boolean} True, wenn eine Deeskalation erfolgen darf.
      */
-    _shouldDeescalateInPeak(alarmWarAktiv, state, p) {
-        if (!alarmWarAktiv || !['peak_hot', 'peak_stable', 'side_long'].includes(p.market.sKey)) {
+    _shouldDeescalateInPeak(alarmWarAktiv, state, params) {
+        const { market } = params;
+        if (!alarmWarAktiv || !['peak_hot', 'peak_stable', 'side_long'].includes(market.sKey)) {
             return false;
         }
         const { entnahmequoteDepot, realerDepotDrawdown } = state.keyParams;
         return entnahmequoteDepot <= CONFIG.THRESHOLDS.ALARM.withdrawalRate ||
-               realerDepotDrawdown <= 0.15;
+            realerDepotDrawdown <= 0.15;
     },
 
     /**
-     * Prüft, ob Alarm in Recovery-Phase deeskaliert werden kann
-     * @private
+     * Prüft, ob ein aktiver Alarm im Recovery-Szenario zurückgefahren werden kann.
+     *
+     * @param {boolean} alarmWarAktiv - Flag aus dem Vorjahr.
+     * @param {Object} state - Persistenter State.
+     * @param {Object} params - Laufzeitdaten.
+     * @returns {boolean} True, wenn eine Deeskalation erfolgen darf.
      */
-    _shouldDeescalateInRecovery(alarmWarAktiv, state, p) {
-        if (!alarmWarAktiv || p.market.sKey !== 'recovery_in_bear') {
+    _shouldDeescalateInRecovery(alarmWarAktiv, state, params) {
+        if (!alarmWarAktiv || params.market.sKey !== 'recovery_in_bear') {
             return false;
         }
-        const { runwayMonate, profil, input } = p;
+        const { runwayMonate, profil, input } = params;
         const { entnahmequoteDepot, realerDepotDrawdown } = state.keyParams;
         const okRunway = runwayMonate >= (profil.minRunwayMonths + 6);
         const okDrawdnRecovery = realerDepotDrawdown <= (CONFIG.THRESHOLDS.ALARM.realDrawdown - 0.05);
         const noNewLowerYearlyCloses = input.endeVJ > Math.min(input.endeVJ_1, input.endeVJ_2);
 
         return (entnahmequoteDepot <= CONFIG.THRESHOLDS.ALARM.withdrawalRate ||
-                okRunway || okDrawdnRecovery) && noNewLowerYearlyCloses;
+            okRunway || okDrawdnRecovery) && noNewLowerYearlyCloses;
     },
 
     /**
-     * Evaluiert Alarm-Bedingungen
-     * @private
+     * Bewertet sämtliche Alarmbedingungen.
+     *
+     * @param {Object} state - Persistenter State.
+     * @param {Object} params - Laufzeitdaten.
+     * @param {Function} addDecision - Protokollierungs-Hook.
+     * @returns {{active: boolean, newlyTriggered: boolean}} Alarmstatus.
      */
-    _evaluateAlarmConditions(state, p, addDecision) {
-        const { market, runwayMonate, profil } = p;
+    _evaluateAlarmConditions(state, params, addDecision) {
+        const { market, runwayMonate, profil } = params;
         const { entnahmequoteDepot, realerDepotDrawdown } = state.keyParams;
 
         let alarmWarAktiv = state.alarmActive;
 
-        // Deeskalation prüfen
-        if (this._shouldDeescalateInPeak(alarmWarAktiv, state, p)) {
+        // Deeskalation prüfen.
+        if (this._shouldDeescalateInPeak(alarmWarAktiv, state, params)) {
             alarmWarAktiv = false;
             addDecision(
-                "Alarm-Deeskalation (Peak)",
-                "Markt erholt, Drawdown/Quote unkritisch. Alarm wird beendet.",
-                "active",
-                "guardrail"
+                'Alarm-Deeskalation (Peak)',
+                'Markt erholt, Drawdown/Quote unkritisch. Alarm wird beendet.',
+                'active',
+                'guardrail'
             );
-        } else if (this._shouldDeescalateInRecovery(alarmWarAktiv, state, p)) {
+        } else if (this._shouldDeescalateInRecovery(alarmWarAktiv, state, params)) {
             alarmWarAktiv = false;
             addDecision(
-                "Alarm-Deeskalation (Recovery)",
-                "Bedingungen für Entspannung sind erfüllt. Alarm wird beendet.",
-                "active",
-                "guardrail"
+                'Alarm-Deeskalation (Recovery)',
+                'Bedingungen für Entspannung sind erfüllt. Alarm wird beendet.',
+                'active',
+                'guardrail'
             );
         }
 
-        // Alarm-Aktivierung prüfen
+        // Alarm-Aktivierung prüfen.
         const isCrisis = market.sKey === 'bear_deep';
         const isRunwayThin = runwayMonate < CONFIG.THRESHOLDS.STRATEGY.runwayThinMonths;
         const isQuoteCritical = entnahmequoteDepot > CONFIG.THRESHOLDS.ALARM.withdrawalRate;
@@ -649,10 +829,10 @@ const SpendingPlanner = {
 
         if (alarmAktivInDieserRunde) {
             addDecision(
-                "Alarm-Aktivierung!",
-                `Bärenmarkt und kritische Schwelle überschritten. Alarm-Modus AN.`,
-                "active",
-                "alarm"
+                'Alarm-Aktivierung!',
+                'Bärenmarkt und kritische Schwelle überschritten. Alarm-Modus AN.',
+                'active',
+                'alarm'
             );
         }
 
@@ -663,13 +843,18 @@ const SpendingPlanner = {
     },
 
     /**
-     * Berechnet die Flex-Rate
-     * @private
+     * Berechnet die Flex-Rate unter Berücksichtigung von Alarmstatus und Glättung.
+     *
+     * @param {Object} state - Persistenter State.
+     * @param {Object} alarmStatus - Struktur aus _evaluateAlarmConditions.
+     * @param {Object} params - Laufzeitdaten.
+     * @param {Function} addDecision - Logging-Hook.
+     * @returns {{ geglätteteFlexRate: number, kuerzungQuelle: string }}
      */
-    _calculateFlexRate(state, alarmStatus, p, addDecision) {
-        // Im Alarm-Modus: Drastische Kürzung
+    _calculateFlexRate(state, alarmStatus, params, addDecision) {
+        const p = params;
         if (alarmStatus.active) {
-            const kuerzungQuelle = "Guardrail (Alarm)";
+            const kuerzungQuelle = 'Guardrail (Alarm)';
             let geglätteteFlexRate = state.flexRate;
 
             if (alarmStatus.newlyTriggered) {
@@ -680,23 +865,23 @@ const SpendingPlanner = {
                 const zielCut = Math.min(10, Math.round(10 + 20 * shortfallRatio));
                 geglätteteFlexRate = Math.max(35, state.flexRate - zielCut);
                 addDecision(
-                    "Anpassung im Alarm-Modus",
+                    'Anpassung im Alarm-Modus',
                     `Flex-Rate wird auf ${geglätteteFlexRate.toFixed(1)}% gesetzt.`,
-                    "active",
-                    "alarm"
+                    'active',
+                    'alarm'
                 );
             } else {
                 addDecision(
-                    "Anpassung im Alarm-Modus",
+                    'Anpassung im Alarm-Modus',
                     `Alarm-Modus ist weiterhin aktiv, Rate bleibt bei ${geglätteteFlexRate.toFixed(1)}%.`,
-                    "active",
-                    "alarm"
+                    'active',
+                    'alarm'
                 );
             }
             return { geglätteteFlexRate, kuerzungQuelle };
         }
 
-        // Normale Berechnung
+        // Normale Berechnung.
         const { market } = p;
         const {
             FLEX_RATE_SMOOTHING_ALPHA,
@@ -706,12 +891,12 @@ const SpendingPlanner = {
             RATE_CHANGE_MAX_DOWN_IN_BEAR_PP
         } = CONFIG.SPENDING_MODEL;
 
-        let kuerzungQuelle = "Profil";
+        let kuerzungQuelle = 'Profil';
         let roheKuerzungProzent = 0;
 
-        if (market.sKey === "bear_deep") {
+        if (market.sKey === 'bear_deep') {
             roheKuerzungProzent = 50 + Math.max(0, market.abstandVomAthProzent - 20);
-            kuerzungQuelle = "Tiefer Bär";
+            kuerzungQuelle = 'Tiefer Bär';
         }
 
         const roheFlexRate = 100 - roheKuerzungProzent;
@@ -719,7 +904,7 @@ const SpendingPlanner = {
         let geglätteteFlexRate = FLEX_RATE_SMOOTHING_ALPHA * roheFlexRate +
             (1 - FLEX_RATE_SMOOTHING_ALPHA) * prevFlexRate;
 
-        // Veränderungsraten begrenzen
+        // Veränderungsraten begrenzen.
         const delta = geglätteteFlexRate - prevFlexRate;
         const regime = CONFIG.TEXTS.REGIME_MAP[market.sKey];
         const maxUp = (regime === 'peak' || regime === 'hot_neutral' || regime === 'recovery_in_bear')
@@ -731,17 +916,17 @@ const SpendingPlanner = {
 
         if (delta > maxUp) {
             geglätteteFlexRate = prevFlexRate + maxUp;
-            kuerzungQuelle = "Glättung (Anstieg)";
+            kuerzungQuelle = 'Glättung (Anstieg)';
         } else if (delta < -MAX_DOWN) {
             geglätteteFlexRate = prevFlexRate - MAX_DOWN;
-            kuerzungQuelle = "Glättung (Abfall)";
+            kuerzungQuelle = 'Glättung (Abfall)';
         }
 
-        if (kuerzungQuelle.startsWith("Glättung")) {
+        if (kuerzungQuelle.startsWith('Glättung')) {
             addDecision(
-                "Glättung der Rate",
+                'Glättung der Rate',
                 `Veränderung auf max. ${delta > 0 ? maxUp : MAX_DOWN} pp begrenzt.`,
-                "active"
+                'active'
             );
         }
 
@@ -749,14 +934,19 @@ const SpendingPlanner = {
     },
 
     /**
-     * Wendet Guardrails an
-     * @private
+     * Wendet Guardrails auf die Flex-Rate an und liefert Diagnosedaten.
+     *
+     * @param {number} rate - Vorläufige Flex-Rate.
+     * @param {Object} state - Persistenter State.
+     * @param {Object} params - Laufzeitdaten.
+     * @param {Function} addDecision - Logging-Hook.
+     * @returns {{ rate: number, source: string, diagnostics: Object }} Ergebnis.
      */
-    _applyGuardrails(rate, state, p, addDecision) {
+    _applyGuardrails(rate, state, params, addDecision) {
         const {
             market, inflatedBedarf, renteJahr, input,
             runwayMonate, profil, kuerzungQuelle: initialSource
-        } = p;
+        } = params;
         const { entnahmequoteDepot } = state.keyParams;
 
         const isRecoveryContext = (market.sKey === 'recovery_in_bear') ||
@@ -768,7 +958,7 @@ const SpendingPlanner = {
         let cautiousRuleApplied = false;
         const diagnostics = {};
 
-        // Recovery-Guardrail
+        // Recovery-Guardrail.
         if (market.sKey === 'recovery_in_bear') {
             const gap = market.abstandVomAthProzent || 0;
             let curb = CONFIG.RECOVERY_GUARDRAILS.getCurb(gap);
@@ -777,18 +967,18 @@ const SpendingPlanner = {
 
             if (geglätteteFlexRate > maxFlexRate) {
                 geglätteteFlexRate = maxFlexRate;
-                kuerzungQuelle = "Guardrail (Vorsicht)";
+                kuerzungQuelle = 'Guardrail (Vorsicht)';
                 addDecision(
-                    "Guardrail (Vorsicht)",
+                    'Guardrail (Vorsicht)',
                     `Recovery-Cap: Flex-Rate auf ${maxFlexRate.toFixed(1)}% gekappt.`,
-                    "active",
-                    "guardrail"
+                    'active',
+                    'guardrail'
                 );
                 cautiousRuleApplied = true;
             }
         }
 
-        // Inflations-Cap bei hoher Entnahmequote
+        // Inflations-Cap bei hoher Entnahmequote.
         let inflationCap = input.inflation;
         if (entnahmequoteDepot >= CONFIG.THRESHOLDS.CAUTION.withdrawalRate) {
             const calculatedInflationCap = Math.min(
@@ -796,12 +986,12 @@ const SpendingPlanner = {
                 CONFIG.THRESHOLDS.CAUTION.inflationCap
             );
             if (calculatedInflationCap < input.inflation) {
-                kuerzungQuelle = "Guardrail (Vorsicht)";
+                kuerzungQuelle = 'Guardrail (Vorsicht)';
                 addDecision(
-                    "Guardrail (Vorsicht)",
+                    'Guardrail (Vorsicht)',
                     `Caution-Cap: Inflationsanpassung auf ${calculatedInflationCap}% begrenzt.`,
-                    "active",
-                    "guardrail"
+                    'active',
+                    'guardrail'
                 );
             }
             inflationCap = calculatedInflationCap;
@@ -818,21 +1008,26 @@ const SpendingPlanner = {
             };
         }
 
-        // Quelle anpassen wenn vorsichtige Regeln in Recovery/Caution-Kontext
-        const isWeakSource = ["Profil", "Glättung (Anstieg)", "Glättung (Abfall)"].includes(kuerzungQuelle);
-        if (isWeakSource && (isRecoveryContext || (isCautionContext && market.sKey !== 'bear_deep'))) {
-            kuerzungQuelle = "Guardrail (Vorsicht)";
+        // Quelle anpassen, wenn vorsichtige Regeln greifen.
+        const isWeakSource = ['Profil', 'Glättung (Anstieg)', 'Glättung (Abfall)'].includes(kuerzungQuelle);
+        if ((isRecoveryContext || isCautionContext) && cautiousRuleApplied && isWeakSource) {
+            kuerzungQuelle = 'Guardrail (Vorsicht)';
         }
 
-        // Budget-Floor Guardrail
-        const angepasstesMinBudget = state.lastTotalBudget * (1 + inflationCap / 100);
-        const geplanteJahresentnahme = inflatedBedarf.floor +
+        // Budget-Floor sichern.
+        const inflationsFaktor = 1 + Math.max(0, inflationCap) / 100;
+        const inflationsAnhebung = Math.max(0, Math.min(100, input.budgetInflationBoost || 0));
+        const inflationsBoost = inflationsAnhebung / 100;
+        const floorBedarfNachInflation = (inflatedBedarf.floor / inflationsFaktor) * (1 + inflationsBoost);
+        const flexBedarfNachInflation = inflatedBedarf.flex / inflationsFaktor;
+        const angepasstesMinBudget = floorBedarfNachInflation + flexBedarfNachInflation + renteJahr;
+        let geplanteJahresentnahme = inflatedBedarf.floor +
             (inflatedBedarf.flex * (Math.max(0, Math.min(100, geglätteteFlexRate)) / 100));
         let aktuellesGesamtbudget = geplanteJahresentnahme + renteJahr;
         const noNewLowerYearlyCloses = input.endeVJ > Math.min(input.endeVJ_1, input.endeVJ_2);
         const budgetFloorErlaubt = !['bear_deep', 'recovery_in_bear'].includes(market.sKey) ||
             ((market.abstandVomAthProzent || 0) <= 10 && noNewLowerYearlyCloses &&
-             runwayMonate >= Math.max(30, profil.minRunwayMonths + 6));
+                runwayMonate >= Math.max(30, profil.minRunwayMonths + 6));
 
         if (budgetFloorErlaubt) {
             diagnostics.budgetFloor = {
@@ -851,12 +1046,12 @@ const SpendingPlanner = {
 
             if (nötigeFlexRate > geglätteteFlexRate) {
                 geglätteteFlexRate = nötigeFlexRate;
-                kuerzungQuelle = "Budget-Floor";
+                kuerzungQuelle = 'Budget-Floor';
                 addDecision(
                     kuerzungQuelle,
                     `Um realen Kaufkraftverlust zu vermeiden, wird Rate auf ${geglätteteFlexRate.toFixed(1)}% angehoben.`,
-                    "active",
-                    "guardrail"
+                    'active',
+                    'guardrail'
                 );
                 const aktualisierteEntnahme = inflatedBedarf.floor +
                     (inflatedBedarf.flex * (Math.max(0, Math.min(100, geglätteteFlexRate)) / 100));
@@ -871,16 +1066,28 @@ const SpendingPlanner = {
     },
 
     /**
-     * Baut die finalen Ergebnisse zusammen
-     * @private
+     * Baut finale Ergebnisobjekte inklusive Diagnosemetriken.
+     *
+     * @param {Object} state - Persistenter State.
+     * @param {number} endgueltigeEntnahme - Jahresentnahme nach Kürzungen.
+     * @param {Object} alarmStatus - Struktur aus _evaluateAlarmConditions.
+     * @param {number} flexRate - Effektive Flex-Rate in %.
+     * @param {string} kuerzungQuelle - Hauptgrund für Kürzungen.
+     * @param {Object} params - Laufzeitdaten.
+     * @returns {{ newState: Object, spendingResult: Object, diagnosisMetrics: Object }}
      */
-    _buildResults(state, endgueltigeEntnahme, alarmStatus, flexRate, kuerzungQuelle, p) {
-        const { market, renteJahr, inflatedBedarf } = p;
+    _buildResults(state, endgueltigeEntnahme, alarmStatus, flexRate, kuerzungQuelle, params) {
+        const { market, renteJahr } = params;
         const { peakRealVermoegen, currentRealVermoegen, cumulativeInflationFactor } = state.keyParams;
 
-        // finaleKuerzung ist das Komplement zur flexRate
         const finaleKuerzung = 100 - flexRate;
         const aktuellesGesamtbudgetFinal = endgueltigeEntnahme + renteJahr;
+
+        const diagnosisMetrics = {
+            flexRate,
+            kuerzungProzent: finaleKuerzung,
+            jahresentnahme: endgueltigeEntnahme
+        };
 
         const newState = {
             ...state,
@@ -902,7 +1109,41 @@ const SpendingPlanner = {
             details: { ...state.keyParams, flexRate, endgueltigeEntnahme }
         };
 
-        return { newState, spendingResult };
+        return { newState, spendingResult, diagnosisMetrics };
+    },
+
+    /**
+     * Ermittelt das relevante Runway-Ziel (statisch oder dynamisch je Regime).
+     *
+     * @param {Object} profil - Aktuelles Risikoprofil inkl. Runway-Konfiguration.
+     * @param {Object} market - Marktinformationen mit Szenario-Key.
+     * @param {Object} input - Benutzer-Input für statische Zielwerte.
+     * @returns {{ targetMonths: number|null, source: string }} Zielwert und Quelle.
+     */
+    _resolveRunwayTarget(profil, market, input) {
+        if (!profil) {
+            return { targetMonths: input?.runwayTargetMonths || null, source: 'input' };
+        }
+
+        const fallbackMin = profil.minRunwayMonths || input?.runwayMinMonths || null;
+        const inputTarget = (typeof input?.runwayTargetMonths === 'number' && input.runwayTargetMonths > 0)
+            ? input.runwayTargetMonths
+            : null;
+
+        if (!profil.isDynamic) {
+            const resolvedTarget = inputTarget || fallbackMin;
+            return { targetMonths: resolvedTarget || null, source: 'input' };
+        }
+
+        const regimeKey = CONFIG.TEXTS.REGIME_MAP[market?.sKey] || market?.sKey || 'hot_neutral';
+        const dynamicTarget = profil.runway?.[regimeKey]?.total;
+
+        if (typeof dynamicTarget === 'number' && dynamicTarget > 0) {
+            return { targetMonths: dynamicTarget, source: `profil:${regimeKey}` };
+        }
+
+        const resolvedTarget = inputTarget || fallbackMin || null;
+        return { targetMonths: resolvedTarget, source: resolvedTarget ? 'fallback' : 'unknown' };
     }
 };
 
@@ -1029,9 +1270,27 @@ const TransactionEngine = {
             wasTriggered: false,
             blockReason: 'none',
             blockedAmount: 0,
-            equityThresholds: {},
-            goldThresholds: {},
+            equityThresholds: {
+                targetAllocationPct: input.targetEq,
+                rebalancingBandPct: input.rebalancingBand ?? input.rebalBand ?? 35,
+                maxSkimPctOfEq: input.maxSkimPctOfEq
+            },
+            goldThresholds: {
+                minGoldReserve: minGold,
+                targetPct: input.goldZielProzent || 0,
+                maxBearRefillPctOfEq: input.maxBearRefillPctOfEq
+            },
             potentialTrade: {}
+        };
+        const markAsBlocked = (reason, blockedAmount = 0, overrides = {}) => {
+            transactionDiagnostics.blockReason = reason;
+            transactionDiagnostics.blockedAmount = Math.max(0, blockedAmount);
+            if (overrides && typeof overrides === 'object') {
+                transactionDiagnostics.potentialTrade = {
+                    ...transactionDiagnostics.potentialTrade,
+                    ...overrides
+                };
+            }
         };
         const saleContext = { minGold, saleBudgets: {} };
 
@@ -1120,6 +1379,11 @@ const TransactionEngine = {
                         }
                     }
                     saleContext.saleBudgets.gold = maxSellableFromGold;
+                    transactionDiagnostics.goldThresholds = {
+                        ...transactionDiagnostics.goldThresholds,
+                        saleBudgetGold: maxSellableFromGold,
+                        rebalancingBandPct: input.rebalancingBand ?? input.rebalBand ?? 35
+                    };
 
                     // Aktien-Verkaufsbudget berechnen
                     const aktienZielwert = investiertesKapital * (input.targetEq / 100);
@@ -1137,6 +1401,11 @@ const TransactionEngine = {
                         saleContext.saleBudgets.aktien_neu =
                             maxSellableFromEquity * (input.depotwertNeu / totalEquityValue);
                     }
+                    transactionDiagnostics.equityThresholds = {
+                        ...transactionDiagnostics.equityThresholds,
+                        saleBudgetAktienAlt: saleContext.saleBudgets.aktien_alt || 0,
+                        saleBudgetAktienNeu: saleContext.saleBudgets.aktien_neu || 0
+                    };
 
                     actionDetails.bedarf = totalerBedarf;
                     actionDetails.title = "Opportunistisches Rebalancing & Liquidität auffüllen";
@@ -1149,6 +1418,11 @@ const TransactionEngine = {
         // Verkauf berechnen
         const gesamterNettoBedarf = actionDetails.bedarf;
         if (gesamterNettoBedarf <= 0) {
+            markAsBlocked('liquidity_sufficient', 0, {
+                direction: 'Keine Aktion',
+                title: actionDetails.title || 'Keine Aktion',
+                netAmount: 0
+            });
             return {
                 type: 'NONE',
                 anweisungKlasse: 'anweisung-gruen',
@@ -1172,6 +1446,12 @@ const TransactionEngine = {
         );
 
         if (!saleResult || saleResult.achievedRefill < minTradeResult) {
+            const achieved = saleResult?.achievedRefill || 0;
+            markAsBlocked('min_trade', Math.max(0, minTradeResult - achieved), {
+                direction: actionDetails.title || 'Verkauf',
+                title: actionDetails.title || 'Verkauf',
+                netAmount: gesamterNettoBedarf
+            });
             return {
                 type: 'NONE',
                 anweisungKlasse: 'anweisung-gruen',
@@ -1197,6 +1477,18 @@ const TransactionEngine = {
         erloesUebrig -= finalGold;
 
         const finalAktien = Math.min(erloesUebrig, verwendungen.aktien);
+
+        transactionDiagnostics.wasTriggered = true;
+        transactionDiagnostics.blockReason = 'none';
+        transactionDiagnostics.blockedAmount = 0;
+        transactionDiagnostics.potentialTrade = {
+            direction: 'Verkauf',
+            title: actionDetails.title,
+            netAmount: effektiverNettoerloes,
+            liquidityUse: finalLiq,
+            goldUse: finalGold,
+            equityUse: finalAktien
+        };
 
         return {
             type: 'TRANSACTION',
@@ -1432,45 +1724,73 @@ const TransactionEngine = {
 // Imported from ./transactions/TransactionEngine.js: TransactionEngine
 
 /**
- * Interne Orchestrierungsfunktion
- * Führt alle Module zusammen und berechnet ein Jahresergebnis
+ * Interne Orchestrierungsfunktion - Berechnet ein komplettes Jahresergebnis
+ *
+ * Diese Funktion orchestriert alle Engine-Module und führt die Jahresberechnung durch:
+ * 1. Validiert Eingaben
+ * 2. Berechnet Grundwerte (Portfolio, Liquidität, Bedarf)
+ * 3. Analysiert Marktbedingungen
+ * 4. Bestimmt Ausgabenstrategie (mit Guardrails)
+ * 5. Berechnet notwendige Transaktionen
+ * 6. Erstellt umfassende Diagnose
+ *
  * @private
+ * @param {Object} input - Benutzereingaben mit allen Parametern (Vermögen, Bedarf, Alter, etc.)
+ * @param {Object} lastState - Vorheriger Zustand mit Guardrail-History (flexRate, peakRealVermoegen, etc.)
+ * @returns {Object} Ergebnis mit {input, newState, diagnosis, ui} oder {error} bei Fehler
  */
 function _internal_calculateModel(input, lastState) {
-    // 1. Validierung
+    // 1. Validierung der Eingabedaten
+    // Prüft alle Eingaben auf Plausibilität und Vollständigkeit
     const validationResult = InputValidator.validate(input);
     if (!validationResult.valid) {
         return { error: new ValidationError(validationResult.errors) };
     }
 
     // 2. Grundwerte berechnen
+    // Profil-Konfiguration laden (Runway-Ziele, Allokationsstrategie)
     const profil = CONFIG.PROFIL_MAP[input.risikoprofil];
+
+    // Aktuelle Liquidität = Tagesgeld + Geldmarkt-ETF
     const aktuelleLiquiditaet = input.tagesgeld + input.geldmarktEtf;
+
+    // Gesamtes Depotvermögen (Aktien alt + neu + optional Gold)
     const depotwertGesamt = input.depotwertAlt + input.depotwertNeu +
         (input.goldAktiv ? input.goldWert : 0);
+
+    // Gesamtvermögen = Depot + Liquidität
     const gesamtwert = depotwertGesamt + aktuelleLiquiditaet;
 
-    // 3. Marktanalyse
+    // 3. Marktanalyse durchführen
+    // Bestimmt Marktszenario (Bär, Bulle, Seitwärts, etc.) basierend auf historischen Daten
     const market = MarketAnalyzer.analyzeMarket(input);
 
-    // 4. Gold-Floor berechnen
+    // 4. Gold-Floor berechnen (Mindestbestand)
+    // Definiert minimalen Gold-Bestand als Prozentsatz des Gesamtvermögens
     const goldFloorAbs = (input.goldFloorProzent / 100) * gesamtwert;
     const minGold = input.goldAktiv ? goldFloorAbs : 0;
 
     // 5. Inflationsangepassten Bedarf berechnen
+    // Bedarf wird um Renteneinkünfte reduziert (netto)
     const renteJahr = input.renteAktiv ? (input.renteMonatlich * 12) : 0;
     const inflatedBedarf = {
-        floor: Math.max(0, input.floorBedarf - renteJahr),
-        flex: input.flexBedarf
+        floor: Math.max(0, input.floorBedarf - renteJahr),  // Grundbedarf (essentiell)
+        flex: input.flexBedarf                              // Flexibler Bedarf (optional)
     };
     const neuerBedarf = inflatedBedarf.floor + inflatedBedarf.flex;
 
-    // 6. Runway berechnen
+    // 6. Runway berechnen (Liquiditäts-Reichweite in Monaten)
+    // Wie lange reicht die aktuelle Liquidität bei aktuellem Bedarf?
     const reichweiteMonate = (inflatedBedarf.floor + inflatedBedarf.flex) > 0
         ? (aktuelleLiquiditaet / ((inflatedBedarf.floor + inflatedBedarf.flex) / 12))
         : Infinity;
 
-    // 7. Ausgabenplanung
+    // 7. Ausgabenplanung mit Guardrails
+    // SpendingPlanner bestimmt die optimale Entnahmestrategie basierend auf:
+    // - Marktsituation (Bär vs. Bulle)
+    // - Runway-Status (kritisch, ok, gut)
+    // - Historischem Peak (Drawdown-Berechnung)
+    // - Entnahmequote und Alarmbedingungen
     const { spendingResult, newState, diagnosis } = SpendingPlanner.determineSpending({
         market,
         lastState,
@@ -1484,6 +1804,9 @@ function _internal_calculateModel(input, lastState) {
     });
 
     // 8. Ziel-Liquidität berechnen
+    // Bestimmt die optimale Liquiditätshöhe basierend auf Profil und Marktsituation
+    // Im Bärenmarkt: höhere Liquidität (z.B. 60 Monate)
+    // Im Bullenmarkt: niedrigere Liquidität (z.B. 36 Monate)
     const zielLiquiditaet = TransactionEngine.calculateTargetLiquidity(
         profil,
         market,
@@ -1491,6 +1814,10 @@ function _internal_calculateModel(input, lastState) {
     );
 
     // 9. Transaktionsaktion bestimmen
+    // Entscheidet, ob und welche Transaktionen notwendig sind:
+    // - Depot-Verkauf zur Liquiditäts-Auffüllung
+    // - Rebalancing (Aktien/Gold)
+    // - Notfall-Verkäufe bei kritischem Runway
     const action = TransactionEngine.determineAction({
         aktuelleLiquiditaet,
         depotwertGesamt,
@@ -1503,36 +1830,68 @@ function _internal_calculateModel(input, lastState) {
     });
 
     // Diagnose-Einträge von Transaktion hinzufügen
+    // Transaktionen können eigene Diagnose-Einträge erzeugen (z.B. Caps, Guardrails)
     if (Array.isArray(action.diagnosisEntries) && action.diagnosisEntries.length) {
         diagnosis.decisionTree.push(...action.diagnosisEntries);
     }
 
     // 10. Liquidität nach Transaktion berechnen
+    // Berücksichtigt Depot-Verkäufe zur Liquiditäts-Auffüllung
     const liqNachTransaktion = aktuelleLiquiditaet + (action.verwendungen?.liquiditaet || 0);
     const jahresGesamtbedarf = inflatedBedarf.floor + inflatedBedarf.flex;
+
+    // KPI: Liquiditätsdeckung relativ zum Zielwert vor/nach Transaktion
+    // Wird als Diagnose-KPI und für die UI wiederverwendet, deshalb einmalig berechnet
     const computeCoverage = (liquiditaetWert) => (zielLiquiditaet > 0)
         ? (liquiditaetWert / zielLiquiditaet) * 100
         : 100;
     const deckungVorher = computeCoverage(aktuelleLiquiditaet);
     const deckungNachher = computeCoverage(liqNachTransaktion);
+
+    // Neue Runway nach Transaktion berechnen
     const runwayMonths = (jahresGesamtbedarf > 0)
         ? (liqNachTransaktion / (jahresGesamtbedarf / 12))
         : Infinity;
 
-    // 11. Runway-Status
+    // 11. Runway-Status bestimmen
+    // - 'ok': Runway >= Ziel (z.B. 36+ Monate)
+    // - 'warn': Runway >= Minimum aber < Ziel (z.B. 24-36 Monate)
+    // - 'bad': Runway < Minimum (< 24 Monate) - kritisch!
     let runwayStatus = 'bad';
     if (runwayMonths >= input.runwayTargetMonths) {
         runwayStatus = 'ok';
     } else if (runwayMonths >= input.runwayMinMonths) {
         runwayStatus = 'warn';
     }
+
+    // Diagnose-Objekt mit finalem Runway-Status und Zielwert anreichern
     diagnosis.general = diagnosis.general || {};
     diagnosis.general.runwayStatus = runwayStatus;
     diagnosis.general.runwayMonate = runwayMonths;
     diagnosis.general.deckungVorher = deckungVorher;
     diagnosis.general.deckungNachher = deckungNachher;
+    const validInputRunwayTarget = (typeof input.runwayTargetMonths === 'number' && isFinite(input.runwayTargetMonths) && input.runwayTargetMonths > 0)
+        ? input.runwayTargetMonths
+        : null;
+    const hasValidTarget = (typeof diagnosis.general.runwayTargetMonate === 'number' && isFinite(diagnosis.general.runwayTargetMonate));
+    if (!hasValidTarget && validInputRunwayTarget) {
+        diagnosis.general.runwayTargetMonate = validInputRunwayTarget;
+    }
+    if (typeof diagnosis.general.runwayTargetQuelle !== 'string' || !diagnosis.general.runwayTargetQuelle.trim()) {
+        diagnosis.general.runwayTargetQuelle = validInputRunwayTarget ? 'input' : 'legacy';
+    }
+
+    if (Array.isArray(diagnosis.guardrails)) {
+        diagnosis.guardrails = diagnosis.guardrails.map(guardrail => {
+            if (guardrail && guardrail.type === 'months' && guardrail.rule === 'min' && guardrail.name.startsWith('Runway')) {
+                return { ...guardrail, value: runwayMonths };
+            }
+            return guardrail;
+        });
+    }
 
     // 12. Ergebnis zusammenstellen
+    // Struktur: {input, newState, diagnosis, ui}
     return {
         input,
         newState,
