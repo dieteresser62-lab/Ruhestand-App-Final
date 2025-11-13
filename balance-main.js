@@ -77,6 +77,7 @@ const dom = {
         chips: document.getElementById('diag-chips'),
         decisionTree: document.getElementById('diag-decision-tree'),
         guardrails: document.getElementById('diag-guardrails'),
+        transaction: document.getElementById('diag-transaction'),
         keyParams: document.getElementById('diag-key-params')
     }
 };
@@ -148,7 +149,15 @@ function update() {
         UIRenderer.render(uiDataForRenderer);
 
         // Bereitet Diagnose-Daten auf und rendert das Diagnose-Panel
-        appState.diagnosisData = UIRenderer.formatDiagnosisPayload(modelResult.diagnosis);
+        const formattedDiagnosis = UIRenderer.formatDiagnosisPayload(modelResult.diagnosis);
+
+        // Design-Note: Die Transaktionsdiagnostik wird unverändert aus der Engine übernommen,
+        // damit UI und Export dieselben Kennzahlen nutzen können.
+        if (formattedDiagnosis && modelResult.ui?.action?.transactionDiagnostics) {
+            formattedDiagnosis.transactionDiagnostics = modelResult.ui.action.transactionDiagnostics;
+        }
+
+        appState.diagnosisData = formattedDiagnosis;
         UIRenderer.renderDiagnosis(appState.diagnosisData);
 
         DebugUtils.log('DIAGNOSIS', 'Diagnosis data', appState.diagnosisData);
