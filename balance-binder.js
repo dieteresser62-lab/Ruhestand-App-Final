@@ -422,6 +422,11 @@ export const UIBinder = {
         text += `Alarm-Modus: ${diagnosis.general.alarmActive ? 'AKTIV' : 'Inaktiv'}\n`;
         text += `Entnahmequote: ${(diagnosis.keyParams.entnahmequoteDepot * 100).toFixed(2)}%\n`;
         text += `Realer Drawdown: ${(diagnosis.keyParams.realerDepotDrawdown * -100).toFixed(1)}%\n`;
+        const formatCoverage = (value) => (typeof value === 'number' && isFinite(value))
+            ? `${value.toFixed(0)}%`
+            : 'n/a';
+        const coverageLine = `Liquiditätsdeckung: ${formatCoverage(diagnosis.general.deckungVorher)} → ${formatCoverage(diagnosis.general.deckungNachher)} (Ziel: 100%)`;
+        text += `${coverageLine}\n`;
         const runwayMonate = diagnosis.general.runwayMonate;
         const runwayTarget = diagnosis.general.runwayTargetMonate;
         const runwaySourceInfo = UIUtils.describeRunwayTargetSource(diagnosis.general.runwayTargetQuelle);

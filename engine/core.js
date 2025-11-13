@@ -132,6 +132,14 @@ function _internal_calculateModel(input, lastState) {
     const liqNachTransaktion = aktuelleLiquiditaet + (action.verwendungen?.liquiditaet || 0);
     const jahresGesamtbedarf = inflatedBedarf.floor + inflatedBedarf.flex;
 
+    // KPI: Liquiditätsdeckung relativ zum Zielwert vor/nach Transaktion
+    // Wird als Diagnose-KPI und für die UI wiederverwendet, deshalb einmalig berechnet
+    const computeCoverage = (liquiditaetWert) => (zielLiquiditaet > 0)
+        ? (liquiditaetWert / zielLiquiditaet) * 100
+        : 100;
+    const deckungVorher = computeCoverage(aktuelleLiquiditaet);
+    const deckungNachher = computeCoverage(liqNachTransaktion);
+
     // Neue Runway nach Transaktion berechnen
     const runwayMonths = (jahresGesamtbedarf > 0)
         ? (liqNachTransaktion / (jahresGesamtbedarf / 12))
@@ -152,6 +160,8 @@ function _internal_calculateModel(input, lastState) {
     diagnosis.general = diagnosis.general || {};
     diagnosis.general.runwayStatus = runwayStatus;
     diagnosis.general.runwayMonate = runwayMonths;
+    diagnosis.general.deckungVorher = deckungVorher;
+    diagnosis.general.deckungNachher = deckungNachher;
     const validInputRunwayTarget = (typeof input.runwayTargetMonths === 'number' && isFinite(input.runwayTargetMonths) && input.runwayTargetMonths > 0)
         ? input.runwayTargetMonths
         : null;
@@ -187,12 +197,8 @@ function _internal_calculateModel(input, lastState) {
             spending: spendingResult,
             action,
             liquiditaet: {
-                deckungVorher: zielLiquiditaet > 0
-                    ? (aktuelleLiquiditaet / zielLiquiditaet) * 100
-                    : 100,
-                deckungNachher: zielLiquiditaet > 0
-                    ? (liqNachTransaktion / zielLiquiditaet) * 100
-                    : 100,
+                deckungVorher,
+                deckungNachher
             },
             runway: { months: runwayMonths, status: runwayStatus }
         }
