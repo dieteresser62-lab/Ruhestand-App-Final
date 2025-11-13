@@ -115,9 +115,27 @@ const TransactionEngine = {
             wasTriggered: false,
             blockReason: 'none',
             blockedAmount: 0,
-            equityThresholds: {},
-            goldThresholds: {},
+            equityThresholds: {
+                targetAllocationPct: input.targetEq,
+                rebalancingBandPct: input.rebalancingBand ?? input.rebalBand ?? 35,
+                maxSkimPctOfEq: input.maxSkimPctOfEq
+            },
+            goldThresholds: {
+                minGoldReserve: minGold,
+                targetPct: input.goldZielProzent || 0,
+                maxBearRefillPctOfEq: input.maxBearRefillPctOfEq
+            },
             potentialTrade: {}
+        };
+        const markAsBlocked = (reason, blockedAmount = 0, overrides = {}) => {
+            transactionDiagnostics.blockReason = reason;
+            transactionDiagnostics.blockedAmount = Math.max(0, blockedAmount);
+            if (overrides && typeof overrides === 'object') {
+                transactionDiagnostics.potentialTrade = {
+                    ...transactionDiagnostics.potentialTrade,
+                    ...overrides
+                };
+            }
         };
         const saleContext = { minGold, saleBudgets: {} };
 
@@ -206,6 +224,11 @@ const TransactionEngine = {
                         }
                     }
                     saleContext.saleBudgets.gold = maxSellableFromGold;
+                    transactionDiagnostics.goldThresholds = {
+                        ...transactionDiagnostics.goldThresholds,
+                        saleBudgetGold: maxSellableFromGold,
+                        rebalancingBandPct: input.rebalancingBand ?? input.rebalBand ?? 35
+                    };
 
                     // Aktien-Verkaufsbudget berechnen
                     const aktienZielwert = investiertesKapital * (input.targetEq / 100);
@@ -223,6 +246,11 @@ const TransactionEngine = {
                         saleContext.saleBudgets.aktien_neu =
                             maxSellableFromEquity * (input.depotwertNeu / totalEquityValue);
                     }
+                    transactionDiagnostics.equityThresholds = {
+                        ...transactionDiagnostics.equityThresholds,
+                        saleBudgetAktienAlt: saleContext.saleBudgets.aktien_alt || 0,
+                        saleBudgetAktienNeu: saleContext.saleBudgets.aktien_neu || 0
+                    };
 
                     actionDetails.bedarf = totalerBedarf;
                     actionDetails.title = "Opportunistisches Rebalancing & Liquidität auffüllen";
@@ -235,6 +263,11 @@ const TransactionEngine = {
         // Verkauf berechnen
         const gesamterNettoBedarf = actionDetails.bedarf;
         if (gesamterNettoBedarf <= 0) {
+            markAsBlocked('liquidity_sufficient', 0, {
+                direction: 'Keine Aktion',
+                title: actionDetails.title || 'Keine Aktion',
+                netAmount: 0
+            });
             return {
                 type: 'NONE',
                 anweisungKlasse: 'anweisung-gruen',
@@ -258,6 +291,12 @@ const TransactionEngine = {
         );
 
         if (!saleResult || saleResult.achievedRefill < minTradeResult) {
+            const achieved = saleResult?.achievedRefill || 0;
+            markAsBlocked('min_trade', Math.max(0, minTradeResult - achieved), {
+                direction: actionDetails.title || 'Verkauf',
+                title: actionDetails.title || 'Verkauf',
+                netAmount: gesamterNettoBedarf
+            });
             return {
                 type: 'NONE',
                 anweisungKlasse: 'anweisung-gruen',
@@ -283,6 +322,18 @@ const TransactionEngine = {
         erloesUebrig -= finalGold;
 
         const finalAktien = Math.min(erloesUebrig, verwendungen.aktien);
+
+        transactionDiagnostics.wasTriggered = true;
+        transactionDiagnostics.blockReason = 'none';
+        transactionDiagnostics.blockedAmount = 0;
+        transactionDiagnostics.potentialTrade = {
+            direction: 'Verkauf',
+            title: actionDetails.title,
+            netAmount: effektiverNettoerloes,
+            liquidityUse: finalLiq,
+            goldUse: finalGold,
+            equityUse: finalAktien
+        };
 
         return {
             type: 'TRANSACTION',
