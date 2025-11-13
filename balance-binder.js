@@ -429,6 +429,11 @@ export const UIBinder = {
             : '∞';
         const runwayLine = `Runway: ${formatRunwayValue(runwayMonate)} (Ziel: ${typeof runwayTarget === 'number' && isFinite(runwayTarget) ? `${runwayTarget.toFixed(0)} Monate` : 'n/a'}) -> Status: ${(diagnosis.general.runwayStatus || 'unbekannt').toUpperCase()}`;
         text += `${runwayLine}\n\n`;
+        text += `--- Status-Übersicht ---\n`;
+        text += `Marktregime: ${diagnosis.general.marketSzenario}\n`;
+        text += `Alarm-Modus: ${diagnosis.general.alarmActive ? 'AKTIV' : 'Inaktiv'}\n`;
+        text += `Entnahmequote: ${(diagnosis.keyParams.entnahmequoteDepot * 100).toFixed(2)}%\n`;
+        text += `Realer Drawdown: ${(diagnosis.keyParams.realerDepotDrawdown * -100).toFixed(1)}%\n\n`;
         text += `--- Entscheidungsbaum (Warum?) ---\n`;
         diagnosis.decisionTree.forEach(item => {
             if (dom.diagnosis.filterToggle.checked && item.status === 'inactive') return;
@@ -443,6 +448,15 @@ export const UIBinder = {
         text += `Peak (real): ${UIUtils.formatCurrency(diagnosis.keyParams.peakRealVermoegen)}\n`;
         text += `Aktuell (real): ${UIUtils.formatCurrency(diagnosis.keyParams.currentRealVermoegen)}\n`;
         text += `Kumulierte Inflation: +${((diagnosis.keyParams.cumulativeInflationFactor - 1) * 100).toFixed(1)}%\n`;
+        if (typeof diagnosis.keyParams.aktuelleFlexRate === 'number') {
+            text += `Effektive Flex-Rate: ${diagnosis.keyParams.aktuelleFlexRate.toFixed(1)}%\n`;
+        }
+        if (typeof diagnosis.keyParams.kuerzungProzent === 'number') {
+            text += `Kürzung ggü. Flex-Bedarf: ${diagnosis.keyParams.kuerzungProzent.toFixed(1)}%\n`;
+        }
+        if (typeof diagnosis.keyParams.jahresentnahme === 'number') {
+            text += `Jahresentnahme (brutto): ${UIUtils.formatCurrency(diagnosis.keyParams.jahresentnahme)}\n`;
+        }
         text += `\n===== Ende der Diagnose =====`;
         return text;
     }

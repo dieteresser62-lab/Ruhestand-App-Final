@@ -361,7 +361,51 @@ export const UIRenderer = {
     formatDiagnosisPayload(raw) {
         if(!raw) return null;
         const formatted = { ...raw };
-        formatted.guardrails = raw.guardrails.map(g => {
+        const guardrails = Array.isArray(raw.guardrails) ? raw.guardrails : [];
+        formatted.guardrails = guardrails.map(g => {
+            const rule = g.rule || 'max';
+            let status = 'ok';
+            if ((rule === 'max' && g.value > g.threshold) || (rule === 'min' && g.value < g.threshold)) {
+                status = 'danger';
+            } else if ((rule === 'max' && g.value > g.threshold * 0.90) || (rule === 'min' && g.value < g.threshold * 1.10)) {
+                status = 'warn';
+            }
+            const formatVal = (value, type, opts = {}) => {
+                const { invertPositive = false } = opts;
+                if (typeof value !== 'number' || !isFinite(value)) {
+                    return 'N/A';
+                }
+                const needsPrefix = invertPositive && value > 0;
+                switch(type) {
+                    case 'percent':
+                        if (needsPrefix) {
+                            return `-${(Math.abs(value) * 100).toFixed(1)}%`;
+                        }
+                        return `${(value * 100).toFixed(1)}%`;
+                    case 'months':
+                        return `${value.toFixed(0)} Mon.`;
+                    case 'currency': {
+                        const formatted = UIUtils.formatCurrency(value);
+                        if (!needsPrefix) return formatted;
+                        const sanitized = formatted.replace(/^[\-–−]/, '').trim();
+                        return `-${sanitized}`;
+                    }
+                    default:
+                        if (needsPrefix) {
+                            return `-${Math.abs(value).toFixed(1)}`;
+                        }
+                        return value.toFixed(1);
+                }
+            };
+            const formattedValue = formatVal(g.value, g.type, { invertPositive: g.name.includes("Drawdown") });
+            const formattedThreshold = `${rule === 'max' ? '< ' : '> '}${formatVal(g.threshold, g.type)}`;
+            return {
+                name: g.name,
+                value: formattedValue,
+                threshold: formattedThreshold,
+                status
+            };
+        });
             let status = 'ok';
             if ((g.rule === 'max' && g.value > g.threshold) || (g.rule === 'min' && g.value < g.threshold)) {
                 status = 'danger';
@@ -381,6 +425,12 @@ export const UIRenderer = {
                 status
             };
         });
+        const safeKeyParams = { ...(raw.keyParams || {}) };
+        const ensureNumberOrNull = (value) => (typeof value === 'number' && isFinite(value)) ? value : null;
+        safeKeyParams.aktuelleFlexRate = ensureNumberOrNull(safeKeyParams.aktuelleFlexRate);
+        safeKeyParams.kuerzungProzent = ensureNumberOrNull(safeKeyParams.kuerzungProzent);
+        safeKeyParams.jahresentnahme = ensureNumberOrNull(safeKeyParams.jahresentnahme);
+        formatted.keyParams = safeKeyParams;
         return formatted;
     },
 
@@ -498,6 +548,15 @@ export const UIRenderer = {
         createLine('Peak (real): ', UIUtils.formatCurrency(params.peakRealVermoegen));
         createLine('Aktuell (real): ', UIUtils.formatCurrency(params.currentRealVermoegen));
         createLine('Kumulierte Inflation: ', `+${((params.cumulativeInflationFactor - 1) * 100).toFixed(1)}%`);
+        if (typeof params.aktuelleFlexRate === 'number') {
+            createLine('Effektive Flex-Rate: ', `${params.aktuelleFlexRate.toFixed(1)}%`);
+        }
+        if (typeof params.kuerzungProzent === 'number') {
+            createLine('Kürzung ggü. Flex-Bedarf: ', `${params.kuerzungProzent.toFixed(1)}%`);
+        }
+        if (typeof params.jahresentnahme === 'number') {
+            createLine('Jahresentnahme (brutto): ', UIUtils.formatCurrency(params.jahresentnahme));
+        }
         return fragment;
     }
 };
