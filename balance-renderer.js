@@ -426,7 +426,7 @@ export const UIRenderer = {
 
 	buildChips(d) {
         const { entnahmequoteDepot, realerDepotDrawdown } = d.keyParams;
-        const { runwayMonate, runwayTargetMonate, runwayStatus } = d.general;
+        const { runwayMonate, runwayTargetMonate, runwayStatus, runwayTargetQuelle } = d.general;
 
         // REFACTORING: Hartkodierte Werte durch sicheren Zugriff auf Engine-Config ersetzen
         const ALARM_withdrawalRate = UIUtils.getThreshold('THRESHOLDS.ALARM.withdrawalRate', 0.055);
@@ -448,12 +448,13 @@ export const UIRenderer = {
         const formatMonths = (value) => (typeof value === 'number' && isFinite(value))
             ? value.toFixed(0)
             : '∞';
+        const runwaySourceInfo = UIUtils.describeRunwayTargetSource(runwayTargetQuelle);
         const runwayChipValue = (typeof runwayTargetMonate === 'number' && isFinite(runwayTargetMonate))
             ? `${formatMonths(runwayMonate)} / ${formatMonths(runwayTargetMonate)} Mon.`
             : `${formatMonths(runwayMonate)} Mon.`;
         const runwayChipTitle = (typeof runwayTargetMonate === 'number' && isFinite(runwayTargetMonate))
-            ? `Aktuelle Runway vs. Ziel (${runwayTargetMonate.toFixed(0)} Monate).`
-            : 'Aktuelle Runway basierend auf verfügbaren Barmitteln.';
+            ? `Aktuelle Runway vs. Ziel (${runwayTargetMonate.toFixed(0)} Monate).\nQuelle: ${runwaySourceInfo.description}`
+            : `Aktuelle Runway basierend auf verfügbaren Barmitteln.\nQuelle: ${runwaySourceInfo.description}`;
 
         const createChip = (status, label, value, title) => {
             const chip = document.createElement('span');
@@ -473,6 +474,13 @@ export const UIRenderer = {
             createChip(ddStatus, 'Drawdown', `${(realerDepotDrawdown * -100).toFixed(1)}%`, 'Realer Drawdown des Gesamtvermögens seit dem inflationsbereinigten Höchststand'),
             createChip(rStatus, 'Runway', runwayChipValue, runwayChipTitle)
         );
+
+        if (runwaySourceInfo?.label) {
+            const runwaySourceNote = document.createElement('small');
+            runwaySourceNote.className = 'chip-note runway-source-note';
+            runwaySourceNote.textContent = `Runway-Ziel basiert auf: ${runwaySourceInfo.label}`;
+            fragment.appendChild(runwaySourceNote);
+        }
         return fragment;
     },
 

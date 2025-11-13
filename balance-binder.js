@@ -424,11 +424,12 @@ export const UIBinder = {
         text += `Realer Drawdown: ${(diagnosis.keyParams.realerDepotDrawdown * -100).toFixed(1)}%\n`;
         const runwayMonate = diagnosis.general.runwayMonate;
         const runwayTarget = diagnosis.general.runwayTargetMonate;
+        const runwaySourceInfo = UIUtils.describeRunwayTargetSource(diagnosis.general.runwayTargetQuelle);
         const formatRunwayValue = (value) => (typeof value === 'number' && isFinite(value))
             ? `${value.toFixed(1)} Monate`
             : '∞';
-        const runwayLine = `Runway: ${formatRunwayValue(runwayMonate)} (Ziel: ${typeof runwayTarget === 'number' && isFinite(runwayTarget) ? `${runwayTarget.toFixed(0)} Monate` : 'n/a'}) -> Status: ${(diagnosis.general.runwayStatus || 'unbekannt').toUpperCase()}`;
-        text += `${runwayLine}\n\n`;
+        const runwayLine = `Runway: ${formatRunwayValue(runwayMonate)} (Ziel: ${typeof runwayTarget === 'number' && isFinite(runwayTarget) ? `${runwayTarget.toFixed(0)} Monate` : 'n/a'}) -> Status: ${(diagnosis.general.runwayStatus || 'unbekannt').toUpperCase()} | Quelle: ${runwaySourceInfo.label}`;
+        text += `${runwayLine}\nQuelle-Details: ${runwaySourceInfo.description}\n\n`;
         text += `--- Status-Übersicht ---\n`;
         text += `Marktregime: ${diagnosis.general.marketSzenario}\n`;
         text += `Alarm-Modus: ${diagnosis.general.alarmActive ? 'AKTIV' : 'Inaktiv'}\n`;

@@ -152,9 +152,15 @@ function _internal_calculateModel(input, lastState) {
     diagnosis.general = diagnosis.general || {};
     diagnosis.general.runwayStatus = runwayStatus;
     diagnosis.general.runwayMonate = runwayMonths;
-    if (typeof diagnosis.general.runwayTargetMonate !== 'number' || !isFinite(diagnosis.general.runwayTargetMonate)) {
-        diagnosis.general.runwayTargetMonate = input.runwayTargetMonths;
-        diagnosis.general.runwayTargetQuelle = diagnosis.general.runwayTargetQuelle || 'input';
+    const validInputRunwayTarget = (typeof input.runwayTargetMonths === 'number' && isFinite(input.runwayTargetMonths) && input.runwayTargetMonths > 0)
+        ? input.runwayTargetMonths
+        : null;
+    const hasValidTarget = (typeof diagnosis.general.runwayTargetMonate === 'number' && isFinite(diagnosis.general.runwayTargetMonate));
+    if (!hasValidTarget && validInputRunwayTarget) {
+        diagnosis.general.runwayTargetMonate = validInputRunwayTarget;
+    }
+    if (typeof diagnosis.general.runwayTargetQuelle !== 'string' || !diagnosis.general.runwayTargetQuelle.trim()) {
+        diagnosis.general.runwayTargetQuelle = validInputRunwayTarget ? 'input' : 'legacy';
     }
 
     if (Array.isArray(diagnosis.guardrails)) {
