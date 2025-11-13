@@ -1510,6 +1510,11 @@ function _internal_calculateModel(input, lastState) {
     // 10. Liquidität nach Transaktion berechnen
     const liqNachTransaktion = aktuelleLiquiditaet + (action.verwendungen?.liquiditaet || 0);
     const jahresGesamtbedarf = inflatedBedarf.floor + inflatedBedarf.flex;
+    const computeCoverage = (liquiditaetWert) => (zielLiquiditaet > 0)
+        ? (liquiditaetWert / zielLiquiditaet) * 100
+        : 100;
+    const deckungVorher = computeCoverage(aktuelleLiquiditaet);
+    const deckungNachher = computeCoverage(liqNachTransaktion);
     const runwayMonths = (jahresGesamtbedarf > 0)
         ? (liqNachTransaktion / (jahresGesamtbedarf / 12))
         : Infinity;
@@ -1521,6 +1526,11 @@ function _internal_calculateModel(input, lastState) {
     } else if (runwayMonths >= input.runwayMinMonths) {
         runwayStatus = 'warn';
     }
+    diagnosis.general = diagnosis.general || {};
+    diagnosis.general.runwayStatus = runwayStatus;
+    diagnosis.general.runwayMonate = runwayMonths;
+    diagnosis.general.deckungVorher = deckungVorher;
+    diagnosis.general.deckungNachher = deckungNachher;
 
     // 12. Ergebnis zusammenstellen
     return {
@@ -1536,12 +1546,8 @@ function _internal_calculateModel(input, lastState) {
             spending: spendingResult,
             action,
             liquiditaet: {
-                deckungVorher: zielLiquiditaet > 0
-                    ? (aktuelleLiquiditaet / zielLiquiditaet) * 100
-                    : 100,
-                deckungNachher: zielLiquiditaet > 0
-                    ? (liqNachTransaktion / zielLiquiditaet) * 100
-                    : 100,
+                deckungVorher,
+                deckungNachher
             },
             runway: { months: runwayMonths, status: runwayStatus }
         }

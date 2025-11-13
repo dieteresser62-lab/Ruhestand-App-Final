@@ -426,7 +426,14 @@ export const UIRenderer = {
 
 	buildChips(d) {
         const { entnahmequoteDepot, realerDepotDrawdown } = d.keyParams;
-        const { runwayMonate, runwayTargetMonate, runwayStatus, runwayTargetQuelle } = d.general;
+        const {
+            runwayMonate,
+            runwayTargetMonate,
+            runwayStatus,
+            runwayTargetQuelle,
+            deckungVorher,
+            deckungNachher
+        } = d.general;
 
         // REFACTORING: Hartkodierte Werte durch sicheren Zugriff auf Engine-Config ersetzen
         const ALARM_withdrawalRate = UIUtils.getThreshold('THRESHOLDS.ALARM.withdrawalRate', 0.055);
@@ -467,11 +474,22 @@ export const UIRenderer = {
             return chip;
         };
         const fragment = document.createDocumentFragment();
+        // Liquiditäts-KPI: zeigt Deckung vor/nach dem Handlungsvorschlag sowie qualitative Einstufung
+        const formatPercentValue = (value) => (typeof value === 'number' && isFinite(value))
+            ? `${value.toFixed(0)}%`
+            : 'n/a';
+        const liquidityChipValue = `${formatPercentValue(deckungVorher)} → ${formatPercentValue(deckungNachher)}`;
+        const liquidityChipTitle = 'Liquiditätsdeckung vor und nach der empfohlenen Transaktion relativ zum Zielpuffer.';
+        const normalizedCoverage = (typeof deckungNachher === 'number' && isFinite(deckungNachher)) ? deckungNachher : 0;
+        const liquidityStatus = normalizedCoverage >= 100 ? 'ok'
+            : normalizedCoverage >= UIUtils.getThreshold('THRESHOLDS.STRATEGY.runwayThinPercent', 80) ? 'warn'
+            : 'danger';
         fragment.append(
             createChip('info', 'Regime', d.general.marketSzenario),
             createChip(d.general.alarmActive ? 'danger' : 'ok', 'Alarm', d.general.alarmActive ? 'AKTIV' : 'Inaktiv'),
             createChip(qStatus, 'Quote', `${(entnahmequoteDepot * 100).toFixed(1)}%`, 'Entnahmequote = Jährliche Entnahme / Depotwert'),
             createChip(ddStatus, 'Drawdown', `${(realerDepotDrawdown * -100).toFixed(1)}%`, 'Realer Drawdown des Gesamtvermögens seit dem inflationsbereinigten Höchststand'),
+            createChip(liquidityStatus, 'Liquidität', liquidityChipValue, liquidityChipTitle),
             createChip(rStatus, 'Runway', runwayChipValue, runwayChipTitle)
         );
 
