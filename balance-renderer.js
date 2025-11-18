@@ -658,6 +658,10 @@ export const UIRenderer = {
             card.appendChild(subtitle);
         }
 
+        // Design-Entscheidung: Die Value-Rows nutzen bewusst ein flexibles Layout,
+        // damit Labels und Werte in den Diagnosekarten unabhängig von der Textlänge
+        // sauber zweispaltig bleiben. Dadurch lässt sich die Transaktionsdiagnostik
+        // schneller scannen.
         config.rows.forEach(row => {
             const rowEl = document.createElement('div');
             rowEl.className = 'value-row';
@@ -711,7 +715,7 @@ export const UIRenderer = {
         }
 
         const rows = entries.map(([key, value]) => ({
-            label: key,
+            label: this._formatThresholdLabel(key),
             value: this._formatThresholdValue(key, value)
         }));
 
@@ -719,6 +723,47 @@ export const UIRenderer = {
             title: label,
             rows
         }, status);
+    },
+
+    /**
+     * Formatiert technische Feldnamen zu sprechenden Beschriftungen.
+     *
+     * @param {string} key - Originalschlüssel.
+     * @returns {string} Lesbare Beschriftung.
+     */
+    _formatThresholdLabel(key) {
+        if (!key) return 'Wert';
+
+        const normalized = key.toString().trim();
+        const lowerKey = normalized.toLowerCase();
+        const labelMap = {
+            targetallocationpct: 'Ziel-Allokation',
+            maxallocationpct: 'Max. Allokation',
+            maxallocpctofeq: 'Max. Allokation (Eq)',
+            rebalancingbandpct: 'Rebalancing-Band',
+            minallocationpct: 'Min. Allokation',
+            targetgoldvalue: 'Zielwert Gold',
+            mingoldreserve: 'Min. Goldreserve',
+            maxbearrellicofeq: 'Max. Drawdown Eq',
+            blockedamount: 'Blockierter Betrag',
+            minrunwaymonate: 'Min. Runway (Monate)',
+            targetrunwaymonate: 'Ziel-Runway (Monate)',
+            minsoldreserve: 'Min. Reserve'
+        };
+
+        if (labelMap[lowerKey]) {
+            return labelMap[lowerKey];
+        }
+
+        const beautified = normalized
+            .replace(/([a-z])([A-Z])/g, '$1 $2')
+            .replace(/[_-]+/g, ' ')
+            .replace(/pct/gi, '%')
+            .replace(/([A-Za-z])(Eq)/g, '$1 Eq')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        return beautified.charAt(0).toUpperCase() + beautified.slice(1);
     },
 
     /**
