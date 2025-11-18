@@ -1318,6 +1318,9 @@ window.onload = function() {
     const pflegeModellSelect = document.getElementById('pflegeModellTyp');
     pflegeModellSelect.addEventListener('change', () => { document.getElementById('pflegeDauerContainer').style.display = pflegeModellSelect.value === 'akut' ? 'contents' : 'none'; });
 
+    // Legacy Hook: Checkbox wurde im UI entfernt, darf aber kein ReferenceError mehr auslösen
+    const pflegeMortalitaetCheckbox = document.getElementById('pflegeMortalitaetOverride');
+
     // Partner/Rente-2-Einstellungen: Toggle Show/Hide
     const chkPartnerAktiv = document.getElementById('chkPartnerAktiv');
     const sectionRente2 = document.getElementById('sectionRente2');
@@ -1395,9 +1398,7 @@ window.onload = function() {
     // VERALTET: document.getElementById('festerSatzContainer').style.display = renteIndexArtSelect.value === 'fest' ? 'block' : 'none';
     document.getElementById('pflegePanel').style.display = pflegeCheckbox.checked ? 'grid' : 'none';
     document.getElementById('pflegeDauerContainer').style.display = pflegeModellSelect.value === 'akut' ? 'contents' : 'none';
-    if (pflegeMortalitaetCheckbox) {
-        syncMortalityToggle();
-    }
+    initializeLegacyMortalityToggleIfPresent(pflegeMortalitaetCheckbox);
 
     const sweepMetricSelect = document.getElementById('sweepMetric');
     const sweepAxisXSelect = document.getElementById('sweepAxisX');
@@ -1516,6 +1517,38 @@ window.onload = function() {
     // Partner/Rente-2 configuration with localStorage persistence
     initRente2ConfigWithLocalStorage();
 };
+
+/**
+ * Initialisiert (falls vorhanden) den alten Pflege-Mortalitäts-Toggle.
+ *
+ * Einige Historienstände erwarten weiterhin eine Checkbox mit der ID
+ * "pflegeMortalitaetOverride" sowie eine Funktion `syncMortalityToggle`.
+ * Die aktuelle UI stellt diesen Schalter nicht mehr dar, weshalb die Referenzen
+ * bislang zu einem ReferenceError führten und die komplette onload-Routine
+ * (inkl. Tab-Handlern) gestoppt wurde. Die Defensive Guards sorgen dafür, dass
+ * wir den Toggle nur dann benutzen, wenn er wirklich existiert und ein Sync-
+ * Callback verfügbar ist.
+ *
+ * @param {HTMLInputElement|null} checkbox - Optionaler Legacy-Toggle.
+ * @returns {void}
+ */
+function initializeLegacyMortalityToggleIfPresent(checkbox) {
+    if (!checkbox) {
+        return; // Keine Legacy-Checkbox – frühzeitig aussteigen.
+    }
+
+    const invokeSyncIfAvailable = () => {
+        if (typeof window.syncMortalityToggle === 'function') {
+            window.syncMortalityToggle();
+        }
+    };
+
+    // Initiale Synchronisierung nach dem DOM-Load.
+    invokeSyncIfAvailable();
+
+    // Re-Sync sobald der (Legacy-)Toggle verändert wird.
+    checkbox.addEventListener('change', invokeSyncIfAvailable);
+}
 
 /**
  * Initialisiert Rente-Konfiguration (Person 1 + Partner) mit localStorage
