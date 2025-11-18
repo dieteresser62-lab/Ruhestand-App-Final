@@ -1,7 +1,7 @@
 "use strict";
 
 import { shortenReasonText } from './simulator-utils.js';
-import { HISTORICAL_DATA, PFLEGE_GRADE_PROBABILITIES, PFLEGE_GRADE_LABELS, SUPPORTED_PFLEGE_GRADES, annualData, REGIME_DATA, REGIME_TRANSITIONS, MORTALITY_TABLE } from './simulator-data.js';
+import { HISTORICAL_DATA, PFLEGE_GRADE_PROBABILITIES, PFLEGE_GRADE_LABELS, PFLEGE_GRADE_PROGRESSION_PROBABILITIES, SUPPORTED_PFLEGE_GRADES, annualData, REGIME_DATA, REGIME_TRANSITIONS, MORTALITY_TABLE } from './simulator-data.js';
 import {
     computeYearlyPension, computePensionNext, initializePortfolio, applySaleToPortfolio, summarizeSalesByAsset,
     buildInputsCtxFromPortfolio, sumDepot, buyGold, buyStocksNeu
@@ -765,6 +765,20 @@ export function updateCareMeta(care, inputs, age, yearData, rand) {
         if (!care.grade) {
             care.grade = SUPPORTED_PFLEGE_GRADES[0];
             care.gradeLabel = PFLEGE_GRADE_LABELS[care.grade] || `Pflegegrad ${care.grade}`;
+        }
+
+        // Pflegegrad-Progression: Prüfe ob sich der Pflegegrad verschlechtert
+        const currentGrade = care.grade;
+        const progressionProb = PFLEGE_GRADE_PROGRESSION_PROBABILITIES[currentGrade] || 0;
+
+        // Prüfe ob Verschlechterung eintritt (nur wenn nicht bereits PG5)
+        if (currentGrade < 5 && rand() < progressionProb) {
+            const newGrade = currentGrade + 1;
+            care.grade = newGrade;
+            care.gradeLabel = PFLEGE_GRADE_LABELS[newGrade] || `Pflegegrad ${newGrade}`;
+            // Aktualisiere Mortalitätsfaktor für neuen Grad
+            const newGradeConfig = resolveGradeConfig(inputs, newGrade);
+            care.mortalityFactor = newGradeConfig.mortalityFactor || 0;
         }
 
         const gradeConfig = resolveGradeConfig(inputs, care.grade);

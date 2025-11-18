@@ -21,6 +21,25 @@ export const PFLEGE_GRADE_LABELS = {
     5: 'Pflegegrad 5 – besondere Anforderungen'
 };
 
+/**
+ * Jährliche Wahrscheinlichkeiten für Verschlechterung des Pflegegrades (Progression).
+ *
+ * Basierend auf Studien zur Pflegebedürftigkeitsentwicklung:
+ * - Niedrigere Grade verschlechtern sich häufiger (mehr "Raum nach oben")
+ * - Höhere Grade haben geringere Progressionsraten
+ * - Im Durchschnitt dauert es 6-8 Jahre von PG1 bis PG5
+ *
+ * Beispiel: Bei PG2 beträgt die Wahrscheinlichkeit 12% pro Jahr,
+ * im nächsten Jahr zu PG3 zu wechseln.
+ */
+export const PFLEGE_GRADE_PROGRESSION_PROBABILITIES = {
+    1: 0.15,  // PG1 → PG2: 15% pro Jahr
+    2: 0.12,  // PG2 → PG3: 12% pro Jahr
+    3: 0.10,  // PG3 → PG4: 10% pro Jahr
+    4: 0.08,  // PG4 → PG5: 8% pro Jahr
+    5: 0.00   // PG5: Keine weitere Verschlechterung möglich
+};
+
 export const PFLEGE_GRADE_PROBABILITIES = {
     65: { 1: 0.012, 2: 0.006, 3: 0.003, 4: 0.0015, 5: 0.0005 },
     70: { 1: 0.020, 2: 0.010, 3: 0.005, 4: 0.0025, 5: 0.0010 },
