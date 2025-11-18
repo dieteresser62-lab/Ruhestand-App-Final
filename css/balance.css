@@ -497,7 +497,7 @@ html[data-theme=dark] .diag-chip.status-info { background-color: #273446; color:
     color: var(--primary-text);
     text-align: right;
     font-variant-numeric: tabular-nums;
-    word-break: break-word;
+    overflow-wrap: break-word;
 }
 
 html[data-theme=dark] .guardrail-card .value-row {
