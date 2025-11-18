@@ -401,6 +401,23 @@ const PFLEGE_GRADE_LABELS = {
     4: 'Pflegegrad 4 – schwerste Beeinträchtigung',
     5: 'Pflegegrad 5 – besondere Anforderungen'
 };
+const PFLEGE_COST_PRESETS = Object.freeze({
+    custom: {
+        label: 'Individuelle Werte',
+        description: 'Keine Automatik – behalte deine manuellen Eingaben bei.'
+    },
+    ambulant: {
+        label: 'Ambulant (ab 36 Tsd. €)',
+        description: 'Ambulante Versorgung inkl. Haushaltshilfen (PG1 36k → PG5 78k).',
+        values: { 1: 36000, 2: 42000, 3: 54000, 4: 66000, 5: 78000 }
+    },
+    stationaer: {
+        label: 'Stationär (Premium)',
+        description: 'Pflegeheim inkl. Unterkunft (PG1 45k → PG5 105k).',
+        values: { 1: 45000, 2: 60000, 3: 75000, 4: 90000, 5: 105000 }
+    }
+});
+const DEFAULT_PFLEGE_DRIFT_PCT = 3.5; // Quelle: Statistisches Bundesamt (Pflegekosten wachsen ≈3–4 % real p.a.)
 const PFLEGE_GRADE_PROBABILITIES = {
     65: { 1: 0.012, 2: 0.006, 3: 0.003, 4: 0.0015, 5: 0.0005 },
     70: { 1: 0.020, 2: 0.010, 3: 0.005, 4: 0.0025, 5: 0.0010 },
@@ -541,7 +558,15 @@ function getCommonInputs() {
         pflegeRampUp: parseInt(document.getElementById('pflegeRampUp').value) || 5,
         pflegeMinDauer: normalizedCareDuration.minYears,
         pflegeMaxDauer: normalizedCareDuration.maxYears,
-        pflegeKostenDrift: (parseFloat(document.getElementById('pflegeKostenDrift').value) || 0) / 100,
+        pflegeKostenDrift: (() => {
+            const driftPctRaw = parseFloat(document.getElementById('pflegeKostenDrift').value);
+            const driftPct = Number.isFinite(driftPctRaw) ? driftPctRaw : DEFAULT_PFLEGE_DRIFT_PCT;
+            return Math.max(0, driftPct) / 100;
+        })(),
+        pflegeRegionalZuschlag: (() => {
+            const raw = parseFloat(document.getElementById('pflegeRegionalZuschlag')?.value);
+            return Math.max(0, Number.isFinite(raw) ? raw : 0) / 100;
+        })(),
         pflegebeschleunigtMortalitaetAktivieren: document.getElementById('pflegebeschleunigtMortalitaetAktivieren').checked,
         pflegeTodesrisikoFaktor: parseFloat(document.getElementById('pflegeTodesrisikoFaktor').value) || 1.0,
         decumulation: { mode: 'none' },
@@ -2192,6 +2217,69 @@ function runBacktest() {
     } finally { document.getElementById('btButton').disabled = false; }
 }
 
+function applyPflegeKostenPreset(presetKey) {
+    const preset = PFLEGE_COST_PRESETS[presetKey];
+    if (!preset || !preset.values) return;
+
+    let didChange = false;
+    SUPPORTED_PFLEGE_GRADES.forEach(grade => {
+        const value = preset.values[grade];
+        if (typeof value !== 'number') return;
+        const field = document.getElementById(`pflegeStufe${grade}Zusatz`);
+        if (field) {
+            field.value = value;
+            field.dispatchEvent(new Event('input', { bubbles: true }));
+            didChange = true;
+        }
+    });
+
+    if (didChange) {
+        updatePflegeUIInfo();
+    }
+}
+
+function updatePflegePresetHint(selectEl, hintEl) {
+    if (!hintEl || !selectEl) return;
+    const preset = PFLEGE_COST_PRESETS[selectEl.value] || PFLEGE_COST_PRESETS.custom;
+    hintEl.textContent = preset.description;
+}
+
+function updatePflegeUIInfo() {
+    const pflegeMaxFloorInput = document.getElementById('pflegeMaxFloor');
+    if (!pflegeMaxFloorInput) return;
+
+    let infoBadge = document.getElementById('pflegeInfoBadge');
+    if (!infoBadge && pflegeMaxFloorInput.parentElement?.parentElement) {
+        infoBadge = document.createElement('div');
+        infoBadge.id = 'pflegeInfoBadge';
+        infoBadge.style.fontSize = '0.8rem';
+        infoBadge.style.color = '#555';
+        infoBadge.style.textAlign = 'center';
+        infoBadge.style.marginTop = '10px';
+        infoBadge.style.padding = '5px';
+        infoBadge.style.background = 'var(--background-color)';
+        infoBadge.style.borderRadius = '4px';
+        pflegeMaxFloorInput.parentElement.parentElement.appendChild(infoBadge);
+    }
+
+    const startFloor = parseFloat(document.getElementById('startFloorBedarf').value) || 0;
+    const maxFloor = parseFloat(pflegeMaxFloorInput.value) || 0;
+    const capHeute = Math.max(0, maxFloor - startFloor);
+    const regionalMultiplier = 1 + (Math.max(0, parseFloat(document.getElementById('pflegeRegionalZuschlag')?.value) || 0) / 100);
+
+    const gradeNeeds = SUPPORTED_PFLEGE_GRADES.map(grade => {
+        const value = (parseFloat(document.getElementById(`pflegeStufe${grade}Zusatz`)?.value) || 0) * regionalMultiplier;
+        return { grade, value };
+    });
+    const maxEntry = gradeNeeds.reduce((best, entry) => entry.value > best.value ? entry : best, { grade: null, value: 0 });
+    const gradeLabel = maxEntry.grade ? (PFLEGE_GRADE_LABELS[maxEntry.grade] || `Pflegegrad ${maxEntry.grade}`) : 'Pflegegrad n/a';
+
+    if (infoBadge) {
+        infoBadge.innerHTML = `Heutiger Cap für Zusatzkosten: <strong>${formatCurrency(capHeute)}</strong><br>` +
+            `Höchster Bedarf (inkl. Zuschlag): <strong>${formatCurrency(maxEntry.value)}</strong> (${gradeLabel})`;
+    }
+}
+
 function selfCheckEngine() {
     if (typeof Ruhestandsmodell_v30 === 'undefined') {
         const footer = document.getElementById('engine-mismatch-footer');
@@ -2221,39 +2309,7 @@ function selfCheckEngine() {
 window.onload = function() {
     selfCheckEngine();
     prepareHistoricalData();
-    
-    // UI-Hilfsfunktion für Pflege-Cap
-    function updatePflegeUIInfo() {
-        const pflegeMaxFloorInput = document.getElementById('pflegeMaxFloor');
-        let infoBadge = document.getElementById('pflegeInfoBadge');
-        if (!infoBadge) {
-            infoBadge = document.createElement('div');
-            infoBadge.id = 'pflegeInfoBadge';
-            infoBadge.style.fontSize = '0.8rem';
-            infoBadge.style.color = '#555';
-            infoBadge.style.textAlign = 'center';
-            infoBadge.style.marginTop = '10px';
-            infoBadge.style.padding = '5px';
-            infoBadge.style.background = 'var(--background-color)';
-            infoBadge.style.borderRadius = '4px';
-            pflegeMaxFloorInput.parentElement.parentElement.appendChild(infoBadge);
-        }
 
-        const startFloor = parseFloat(document.getElementById('startFloorBedarf').value) || 0;
-        const maxFloor = parseFloat(pflegeMaxFloorInput.value) || 0;
-        const capHeute = Math.max(0, maxFloor - startFloor);
-
-        const gradeNeeds = SUPPORTED_PFLEGE_GRADES.map(grade => {
-            const value = parseFloat(document.getElementById(`pflegeStufe${grade}Zusatz`)?.value) || 0;
-            return { grade, value };
-        });
-        const maxEntry = gradeNeeds.reduce((best, entry) => entry.value > best.value ? entry : best, { grade: null, value: 0 });
-        const gradeLabel = maxEntry.grade ? (PFLEGE_GRADE_LABELS[maxEntry.grade] || `Pflegegrad ${maxEntry.grade}`) : 'Pflegegrad n/a';
-
-        infoBadge.innerHTML = `Heutiger Cap für Zusatzkosten: <strong>${formatCurrency(capHeute)}</strong><br>` +
-            `Höchster Bedarf: <strong>${formatCurrency(maxEntry.value)}</strong> (${gradeLabel})`;
-    }
-    
     updateStartPortfolioDisplay();
     
     const allInputs = [
@@ -2264,6 +2320,7 @@ window.onload = function() {
         'renteMonatlich', 'renteStartOffsetJahre', 'renteIndexierungsart',
         'pflegefallLogikAktivieren', 'pflegeModellTyp', ...CARE_GRADE_FIELD_IDS,
         'pflegeMaxFloor', 'pflegeRampUp', 'pflegeMinDauer', 'pflegeMaxDauer', 'pflegeKostenDrift',
+        'pflegeRegionalZuschlag', 'pflegeKostenStaffelPreset',
         'pflegebeschleunigtMortalitaetAktivieren', 'pflegeTodesrisikoFaktor'
     ];
     allInputs.forEach(id => {
@@ -2274,12 +2331,12 @@ window.onload = function() {
         }
     });
 
-    const pflegeInfoFields = ['startFloorBedarf', 'pflegeMaxFloor', ...CARE_GRADE_FIELD_IDS];
+    const pflegeInfoFields = ['startFloorBedarf', 'pflegeMaxFloor', 'pflegeRegionalZuschlag', ...CARE_GRADE_FIELD_IDS];
     pflegeInfoFields.forEach(id => {
         const el = document.getElementById(id);
         if(el) el.addEventListener('input', updatePflegeUIInfo);
     });
-    
+
     const pflegeMaxFloorInput = document.getElementById('pflegeMaxFloor');
     if(pflegeMaxFloorInput) {
         pflegeMaxFloorInput.title = 'Gesamt-Floor inkl. Pflege. Der maximal mögliche Zusatzbedarf ergibt sich aus diesem Wert abzüglich des Basis-Floor-Bedarfs zum Zeitpunkt des Pflegeeintritts.';
@@ -2296,6 +2353,17 @@ window.onload = function() {
     pflegeModellSelect.addEventListener('change', () => { document.getElementById('pflegeDauerContainer').style.display = pflegeModellSelect.value === 'akut' ? 'contents' : 'none'; });
     const pflegeMortalitaetCheckbox = document.getElementById('pflegebeschleunigtMortalitaetAktivieren');
     pflegeMortalitaetCheckbox.addEventListener('change', () => { document.getElementById('pflegeTodesrisikoContainer').style.display = pflegeMortalitaetCheckbox.checked ? 'flex' : 'none'; });
+    const pflegeStaffelSelect = document.getElementById('pflegeKostenStaffelPreset');
+    const pflegePresetHint = document.getElementById('pflegeStaffelPresetHint');
+    if (pflegeStaffelSelect) {
+        pflegeStaffelSelect.addEventListener('change', (event) => {
+            updatePflegePresetHint(pflegeStaffelSelect, pflegePresetHint);
+            if (event.target.value !== 'custom') {
+                applyPflegeKostenPreset(event.target.value);
+            }
+        });
+        updatePflegePresetHint(pflegeStaffelSelect, pflegePresetHint);
+    }
     
     // --- NEU: Listener und Initialisierung für die Pflege-Details-Checkbox ---
     const careDetailsCheckbox = document.getElementById('toggle-care-details');

@@ -761,7 +761,10 @@ export function updateCareMeta(care, inputs, age, yearData, rand) {
         const gradeConfig = resolveGradeConfig(inputs, care.grade);
         const yearsSinceStart = care.currentYearInCare;
         const yearIndex = yearsSinceStart + 1;
-        const inflationsAnpassung = (1 + yearData.inflation/100) * (1 + inputs.pflegeKostenDrift);
+        // Pflegekosten steigen historisch schneller als die CPI, daher modellieren wir Inflation * Drift.
+        const inflationsAnpassung = (1 + yearData.inflation/100) * (1 + (inputs.pflegeKostenDrift || 0));
+        // Regionale Aufschläge (z.B. Ballungsräume) skalieren alle Grade linear.
+        const regionalMultiplier = 1 + Math.max(0, inputs?.pflegeRegionalZuschlag || 0);
 
         const floorAtTriggerAdjusted = care.floorAtTrigger * Math.pow(1 + yearData.inflation/100, yearIndex);
         const flexAtTriggerAdjusted = care.flexAtTrigger * Math.pow(1 + yearData.inflation/100, yearIndex);
@@ -769,7 +772,7 @@ export function updateCareMeta(care, inputs, age, yearData, rand) {
 
         const capZusatz = Math.max(0, maxFloorAdjusted - floorAtTriggerAdjusted);
 
-        const zielRoh = gradeConfig.zusatz * Math.pow(inflationsAnpassung, yearIndex);
+        const zielRoh = gradeConfig.zusatz * Math.pow(inflationsAnpassung, yearIndex) * regionalMultiplier;
         const rampUpFactor = Math.min(1.0, yearIndex / Math.max(1, inputs.pflegeRampUp));
         const zielMitRampUp = zielRoh * rampUpFactor;
 
