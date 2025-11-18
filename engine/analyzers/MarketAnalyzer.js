@@ -10,6 +10,49 @@
 
 const { CONFIG } = require('../config.js');
 
+/**
+ * Normalisiert den übergebenen CAPE-Wert und fällt auf die Konfiguration zurück.
+ * @param {number} rawCapeRatio - Optionaler CAPE-Wert aus den Eingaben.
+ * @returns {number} Bereinigter CAPE-Wert (> 0).
+ */
+function normalizeCapeRatio(rawCapeRatio) {
+    const fallbackCape = CONFIG.MARKET_VALUATION.DEFAULT_CAPE;
+    if (typeof rawCapeRatio === 'number' && Number.isFinite(rawCapeRatio) && rawCapeRatio > 0) {
+        return rawCapeRatio;
+    }
+    return fallbackCape;
+}
+
+/**
+ * Leitet basierend auf dem CAPE-Wert ein Bewertungssignal und die erwartete Rendite ab.
+ * @param {number} rawCapeRatio - Optionaler CAPE-Wert.
+ * @returns {Object} Bewertungskontext mit Signal-Key, CAPE und Erwartungswert.
+ */
+function deriveCapeAssessment(rawCapeRatio) {
+    const normalizedCape = normalizeCapeRatio(rawCapeRatio);
+    const valuationCfg = CONFIG.MARKET_VALUATION;
+
+    let signalKey = 'fair';
+    if (normalizedCape >= valuationCfg.EXTREME_OVERVALUED_CAPE) {
+        signalKey = 'extreme_overvalued';
+    } else if (normalizedCape >= valuationCfg.OVERVALUED_CAPE) {
+        signalKey = 'overvalued';
+    } else if (normalizedCape <= valuationCfg.UNDERVALUED_CAPE) {
+        signalKey = 'undervalued';
+    }
+
+    const expectedReturn = valuationCfg.EXPECTED_RETURN_BY_SIGNAL[signalKey] ||
+        valuationCfg.EXPECTED_RETURN_BY_SIGNAL.fair;
+    const valuationText = CONFIG.TEXTS.VALUATION_SIGNAL[signalKey] || 'Bewertungs-Signal';
+
+    return {
+        capeRatio: normalizedCape,
+        signalKey,
+        expectedReturn,
+        reasonText: `${valuationText} (CAPE ${normalizedCape.toFixed(1)}, exp. Rendite ${(expectedReturn * 100).toFixed(1)}%)`
+    };
+}
+
 const MarketAnalyzer = {
     /**
      * Analysiert den Markt basierend auf historischen Daten
@@ -17,7 +60,7 @@ const MarketAnalyzer = {
      * @returns {Object} Marktanalyseergebnis mit Szenario und Metriken
      */
     analyzeMarket(input) {
-        const { endeVJ, endeVJ_1, endeVJ_2, endeVJ_3, ath, jahreSeitAth, inflation } = input;
+        const { endeVJ, endeVJ_1, endeVJ_2, endeVJ_3, ath, jahreSeitAth, inflation, capeRatio } = input;
 
         // Abstand vom ATH berechnen
         const abstandVomAthProzent = (ath > 0 && endeVJ > 0)
@@ -87,6 +130,12 @@ const MarketAnalyzer = {
             );
         }
 
+        // CAPE-basierte Bewertungsdiagnose
+        const valuationContext = deriveCapeAssessment(capeRatio);
+        if (valuationContext.reasonText) {
+            reasons.push(valuationContext.reasonText);
+        }
+
         // Szenariotext erstellen
         const szenarioText = (CONFIG.TEXTS.SCENARIO[sKey] || "Unbekannt") +
             (isStagflation ? " (Stagflation)" : "");
@@ -97,7 +146,10 @@ const MarketAnalyzer = {
             sKey,
             isStagflation,
             szenarioText,
-            reasons
+            reasons,
+            capeRatio: valuationContext.capeRatio,
+            valuationSignal: valuationContext.signalKey,
+            expectedReturnCape: valuationContext.expectedReturn
         };
     }
 };

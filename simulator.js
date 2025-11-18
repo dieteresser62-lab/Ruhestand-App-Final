@@ -46,6 +46,27 @@ const shortenReasonText = (reason, szenario) => {
 };
 const lerp = (x, x0, x1, y0, y1) => y0 + (Math.min(Math.max(x, x0), x1) - x0) * (y1 - y0) / (x1 - x0);
 
+/**
+ * Bestimmt den zu verwendenden CAPE-Wert.
+ * Priorität: Jahresdaten > Benutzereingabe > historischer Zustand > 0.
+ * @param {number} yearSpecificCape - CAPE aus dem aktuellen Jahres-Datensatz.
+ * @param {number} inputCape - CAPE-Wert aus dem Formular.
+ * @param {number} historicalCape - CAPE aus dem Marktstatus des Vorjahres.
+ * @returns {number} Gültiger CAPE-Wert (>= 0).
+ */
+function resolveCapeRatio(yearSpecificCape, inputCape, historicalCape) {
+    if (typeof yearSpecificCape === 'number' && Number.isFinite(yearSpecificCape) && yearSpecificCape > 0) {
+        return yearSpecificCape;
+    }
+    if (typeof inputCape === 'number' && Number.isFinite(inputCape) && inputCape > 0) {
+        return inputCape;
+    }
+    if (typeof historicalCape === 'number' && Number.isFinite(historicalCape) && historicalCape > 0) {
+        return historicalCape;
+    }
+    return 0;
+}
+
 // Globale Variable für Backtest-Log Re-Rendering
 window.globalBacktestData = { rows: [], startJahr: null };
 
@@ -431,6 +452,7 @@ function getCommonInputs() {
         zielLiquiditaet: parseFloat(document.getElementById('zielLiquiditaet').value) || 0,
         startFloorBedarf: parseFloat(document.getElementById('startFloorBedarf').value) || 0,
         startFlexBedarf: parseFloat(document.getElementById('startFlexBedarf').value) || 0,
+        marketCapeRatio: parseFloat(document.getElementById('marketCapeRatio').value) || 0,
         risikoprofil: DEFAULT_RISIKOPROFIL,
         goldAktiv: goldAktiv,
         goldZielProzent: (goldAktiv ? parseFloat(document.getElementById('goldAllokationProzent').value) : 0),
@@ -788,7 +810,8 @@ function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta =
     depotTranchesAktien.forEach(t => { t.marketValue *= (1 + rA); });
     depotTranchesGold.forEach(t => { t.marketValue *= (1 + rG); });
 
-    const marketDataCurrentYear = { ...marketDataHist, inflation: yearData.inflation };
+    const resolvedCapeRatio = resolveCapeRatio(yearData.capeRatio, inputs.marketCapeRatio, marketDataHist.capeRatio);
+    const marketDataCurrentYear = { ...marketDataHist, inflation: yearData.inflation, capeRatio: resolvedCapeRatio };
 
     const algoInput = { ...inputs, floorBedarf: baseFloor, flexBedarf: baseFlex, startSPB: inputs.startSPB };
     const market = Ruhestandsmodell_v30.analyzeMarket(marketDataCurrentYear);
@@ -909,6 +932,7 @@ function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta =
         endeVJ: marketDataHist.endeVJ * (1 + rA),
         ath: Math.max(marketDataHist.ath, marketDataHist.endeVJ * (1 + rA)),
         jahreSeitAth: (marketDataHist.endeVJ * (1 + rA) >= marketDataHist.ath) ? 0 : marketDataHist.jahreSeitAth + 1,
+        capeRatio: resolvedCapeRatio,
         inflation: yearData.inflation
     };
     
@@ -995,7 +1019,8 @@ function initMcRunState(inputs, startYearIndex) {
         endeVJ_3: HISTORICAL_DATA[startJahr - 4]?.msci_eur || 1000,
         ath: 0,
         jahreSeitAth: 0,
-        inflation: HISTORICAL_DATA[startJahr - 1]?.inflation_de || 2.0
+        inflation: HISTORICAL_DATA[startJahr - 1]?.inflation_de || 2.0,
+        capeRatio: resolveCapeRatio(undefined, inputs.marketCapeRatio, 0)
     };
 
     const pastValues = histYears.filter(y => y < startJahr).map(y => HISTORICAL_DATA[y].msci_eur);
@@ -1922,7 +1947,7 @@ function runBacktest() {
             baseFlex: inputs.startFlexBedarf,
             lastState: null,
             currentAnnualPension: 0,
-            marketDataHist: { endeVJ: HISTORICAL_DATA[startJahr-1].msci_eur, endeVJ_1: HISTORICAL_DATA[startJahr-2].msci_eur, endeVJ_2: HISTORICAL_DATA[startJahr-3].msci_eur, endeVJ_3: HISTORICAL_DATA[startJahr-4].msci_eur, ath: 0, jahreSeitAth: 0 }
+            marketDataHist: { endeVJ: HISTORICAL_DATA[startJahr-1].msci_eur, endeVJ_1: HISTORICAL_DATA[startJahr-2].msci_eur, endeVJ_2: HISTORICAL_DATA[startJahr-3].msci_eur, endeVJ_3: HISTORICAL_DATA[startJahr-4].msci_eur, ath: 0, jahreSeitAth: 0, capeRatio: inputs.marketCapeRatio || 0 }
         };
         simState.marketDataHist.ath = Math.max(...Object.keys(HISTORICAL_DATA).filter(y => y < startJahr).map(y => HISTORICAL_DATA[y].msci_eur));
 
