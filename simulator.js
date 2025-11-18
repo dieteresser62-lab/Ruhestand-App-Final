@@ -1399,11 +1399,29 @@ function updateCareMeta(care, inputs, age, yearData, rand) {
             care.gradeLabel = PFLEGE_GRADE_LABELS[care.grade] || `Pflegegrad ${care.grade}`;
         }
 
+        // Pflegegrad-Progression: Prüfe ob sich der Pflegegrad verschlechtert
+        const currentGrade = care.grade;
+        const progressionProb = PFLEGE_GRADE_PROGRESSION_PROBABILITIES[currentGrade] || 0;
+
+        let gradeChanged = false;
+        // Prüfe ob Verschlechterung eintritt (nur wenn nicht bereits PG5)
+        if (currentGrade < 5 && rand() < progressionProb) {
+            const newGrade = currentGrade + 1;
+            care.grade = newGrade;
+            care.gradeLabel = PFLEGE_GRADE_LABELS[newGrade] || `Pflegegrad ${newGrade}`;
+            // Aktualisiere Mortalitätsfaktor für neuen Grad
+            const newGradeConfig = resolveGradeConfig(inputs, newGrade);
+            care.mortalityFactor = newGradeConfig.mortalityFactor || 0;
+            gradeChanged = true;
+        }
+
         const gradeConfig = resolveGradeConfig(inputs, care.grade);
         const yearsSinceStart = care.currentYearInCare;
         const yearIndex = yearsSinceStart + 1;
         care.mortalityFactor = gradeConfig.mortalityFactor || 0;
         const inflationsAnpassung = (1 + yearData.inflation/100) * (1 + inputs.pflegeKostenDrift);
+        // Regionale Aufschläge (z.B. Ballungsräume) skalieren alle Grade linear.
+        const regionalMultiplier = 1 + Math.max(0, inputs?.pflegeRegionalZuschlag || 0);
 
         const floorAtTriggerAdjusted = care.floorAtTrigger * Math.pow(1 + yearData.inflation/100, yearIndex);
         const flexAtTriggerAdjusted = care.flexAtTrigger * Math.pow(1 + yearData.inflation/100, yearIndex);
@@ -1411,7 +1429,16 @@ function updateCareMeta(care, inputs, age, yearData, rand) {
 
         const capZusatz = Math.max(0, maxFloorAdjusted - floorAtTriggerAdjusted);
 
-        const zielRoh = gradeConfig.zusatz * Math.pow(inflationsAnpassung, yearIndex);
+        // FIX: Pflegekosten korrekt berechnen - Jahr-für-Jahr mit Inflation, nicht kumulativ über alle Pflegejahre
+        let zielRoh;
+        if (gradeChanged || !care.previousZielRoh) {
+            // Bei Gradwechsel oder erstem Jahr: Basiskosten mit aktueller Inflation
+            zielRoh = gradeConfig.zusatz * inflationsAnpassung * regionalMultiplier;
+        } else {
+            // In Folgejahren: Vorjahreskosten mit aktueller Inflation
+            zielRoh = care.previousZielRoh * inflationsAnpassung;
+        }
+        care.previousZielRoh = zielRoh;
         const rampUpFactor = Math.min(1.0, yearIndex / Math.max(1, inputs.pflegeRampUp));
         const zielMitRampUp = zielRoh * rampUpFactor;
 
