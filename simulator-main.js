@@ -668,13 +668,13 @@ export async function runMonteCarlo() {
                         pflege_delta_flex: careMetaP1?.log_delta_flex ?? 0,
                         // P2 Care (new dual care support)
                         CareP1_Active: p1ActiveThisYear ? 1 : 0,
-                        CareP1_Cost: careMetaP1?.zusatzFloorZiel ?? 0,
-                        CareP1_Grade: careMetaP1?.grade ?? null,
-                        CareP1_GradeLabel: careMetaP1?.gradeLabel ?? '',
+                        CareP1_Cost: p1ActiveThisYear ? (careMetaP1?.zusatzFloorZiel ?? 0) : 0,
+                        CareP1_Grade: p1ActiveThisYear ? (careMetaP1?.grade ?? null) : null,
+                        CareP1_GradeLabel: p1ActiveThisYear ? (careMetaP1?.gradeLabel ?? '') : '',
                         CareP2_Active: p2ActiveThisYear ? 1 : 0,
-                        CareP2_Cost: careMetaP2?.zusatzFloorZiel ?? 0,
-                        CareP2_Grade: careMetaP2?.grade ?? null,
-                        CareP2_GradeLabel: careMetaP2?.gradeLabel ?? ''
+                        CareP2_Cost: p2ActiveThisYear ? (careMetaP2?.zusatzFloorZiel ?? 0) : 0,
+                        CareP2_Grade: p2ActiveThisYear ? (careMetaP2?.grade ?? null) : null,
+                        CareP2_GradeLabel: p2ActiveThisYear ? (careMetaP2?.gradeLabel ?? '') : ''
                     });
                 }
             }
