@@ -695,7 +695,13 @@ function sampleCareGrade(age, rand) {
     const probabilities = PFLEGE_GRADE_PROBABILITIES[bucket];
     if (!probabilities) return null;
 
-    const totalProbability = SUPPORTED_PFLEGE_GRADES.reduce((sum, grade) => sum + (probabilities[grade] || 0), 0);
+    // WICHTIG: PG4 und PG5 sind NICHT als initiale Einstiegsgrade möglich.
+    // Sie können nur durch Progression aus niedrigeren Graden erreicht werden.
+    // Dies ist medizinisch realistischer: Menschen entwickeln normalerweise nicht
+    // sofort schwerste Pflegebedürftigkeit, sondern beginnen mit leichteren Graden.
+    const INITIAL_ENTRY_GRADES = [1, 2, 3];  // Nur PG1-3 für initialen Eintritt
+
+    const totalProbability = INITIAL_ENTRY_GRADES.reduce((sum, grade) => sum + (probabilities[grade] || 0), 0);
     if (totalProbability <= 0) return null;
 
     const roll = rand();
@@ -704,7 +710,7 @@ function sampleCareGrade(age, rand) {
     }
 
     let cumulative = 0;
-    for (const grade of SUPPORTED_PFLEGE_GRADES) {
+    for (const grade of INITIAL_ENTRY_GRADES) {
         const gradeProbability = probabilities[grade] || 0;
         cumulative += gradeProbability;
         if (roll <= cumulative) {
