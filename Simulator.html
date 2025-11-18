@@ -179,7 +179,35 @@
                             </div>
                         </div>
                     </div>
-                 </div>
+                </div>
+
+                <div id="widowPensionSection" style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
+                    <h4 style="margin-bottom: 10px;">Hinterbliebenenrente</h4>
+                    <div class="form-grid-four-col">
+                        <div class="form-group">
+                            <label for="widowPensionMode">Verhalten bei Todesfall</label>
+                            <select id="widowPensionMode">
+                                <option value="stop" selected>Rente endet vollständig</option>
+                                <option value="percent">Witwen-/Witwerrente (Prozent)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="widowPensionPct">Prozentsatz der Witwenrente (%)</label>
+                            <input type="number" id="widowPensionPct" min="0" max="100" step="5" value="55">
+                        </div>
+                        <div class="form-group">
+                            <label for="widowMarriageOffsetYears">Eheschließung in … Jahren</label>
+                            <input type="number" id="widowMarriageOffsetYears" min="0" max="120" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="widowMinMarriageYears">Mindest-Ehedauer für Anspruch (Jahre)</label>
+                            <input type="number" id="widowMinMarriageYears" min="0" max="120" value="1">
+                        </div>
+                    </div>
+                    <p class="form-hint" style="grid-column: span 4; margin-top: 10px;">
+                        Hinweis: Die Witwen-/Witwerrente wird nur gezahlt, wenn die Eheschließung erfolgt ist und die Mindestdauer erreicht wurde.
+                    </p>
+                </div>
 
                 <div id="pflegePanelContainer" class="care-panel">
                     <div class="care-panel-toggle">

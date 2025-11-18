@@ -58,6 +58,21 @@ export function getCommonInputs() {
     const rentAdjMode = document.getElementById('rentAdjMode')?.value || 'fix';
     const rentAdjPct = parseFloat(document.getElementById('rentAdjPct')?.value) || 0;
 
+    // Hinterbliebenen-Rente Konfiguration
+    const widowModeRaw = document.getElementById('widowPensionMode')?.value || 'stop';
+    const widowPctRaw = parseFloat(document.getElementById('widowPensionPct')?.value);
+    const widowMarriageOffsetRaw = parseInt(document.getElementById('widowMarriageOffsetYears')?.value);
+    const widowMinMarriageYearsRaw = parseInt(document.getElementById('widowMinMarriageYears')?.value);
+    const widowOptions = {
+        mode: widowModeRaw,
+        percent: (() => {
+            const pct = Number.isFinite(widowPctRaw) ? widowPctRaw : 0;
+            return Math.max(0, Math.min(100, pct)) / 100;
+        })(),
+        marriageOffsetYears: Math.max(0, Number.isFinite(widowMarriageOffsetRaw) ? widowMarriageOffsetRaw : 0),
+        minMarriageYears: Math.max(0, Number.isFinite(widowMinMarriageYearsRaw) ? widowMinMarriageYearsRaw : 0)
+    };
+
     const pflegeGradeConfigs = {};
     SUPPORTED_PFLEGE_GRADES.forEach(grade => {
         const zusatzInput = document.getElementById(`pflegeStufe${grade}Zusatz`);
@@ -152,7 +167,8 @@ export function getCommonInputs() {
             steuerquotePct: parseFloat(document.getElementById('r2Steuerquote')?.value) || 0,
             // VERALTET: brutto wird durch monatsrente ersetzt
             brutto: r2Monatsrente * 12
-        }
+        },
+        widowOptions
     };
 
     const strategyConstants = {

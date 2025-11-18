@@ -35,6 +35,31 @@ function computeLiqNeedForFloor(ctx) {
 }
 
 /**
+ * Stellt sicher, dass simulateOneYear immer valide Haushaltsdaten erhält.
+ * @param {object|null} context - Rohdaten zum Haushaltsstatus (kann null sein).
+ * @returns {{p1Alive:boolean,p2Alive:boolean,widowBenefits:{p1FromP2:boolean,p2FromP1:boolean}}}
+ */
+function normalizeHouseholdContext(context) {
+    const defaultContext = {
+        p1Alive: true,
+        p2Alive: true,
+        widowBenefits: {
+            p1FromP2: false,
+            p2FromP1: false
+        }
+    };
+    if (!context) return defaultContext;
+    return {
+        p1Alive: context.p1Alive !== false,
+        p2Alive: context.p2Alive !== false,
+        widowBenefits: {
+            p1FromP2: !!context?.widowBenefits?.p1FromP2,
+            p2FromP1: !!context?.widowBenefits?.p2FromP1
+        }
+    };
+}
+
+/**
  * Verkauft Assets für Cash ohne Regelprüfungen (FAIL-SAFE Mode)
  * @param {Object} portfolio - Portfolio-Objekt
  * @param {Object} inputsCtx - Inputs-Context für Steuerberechnung
@@ -102,15 +127,31 @@ function sellAssetForCash(portfolio, inputsCtx, market, asset, amountEuros, minG
  * @param {number} yearIndex - Index des Simulationsjahres
  * @param {Object} pflegeMeta - Pflege-Metadata (optional)
  * @param {number} careFloorAddition - Zusätzlicher Floor-Bedarf durch Pflege (optional, wird nicht inflationsangepasst)
+ * @param {Object|null} householdContext - Haushaltsstatus (wer lebt noch, Witwenrenten-Flags)
  * @returns {Object} Simulationsergebnisse
  */
-export function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta = null, careFloorAddition = 0) {
-    let { portfolio, baseFloor, baseFlex, lastState, currentAnnualPension, currentAnnualPension2, marketDataHist } = currentState;
+export function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta = null, careFloorAddition = 0, householdContext = null) {
+    let {
+        portfolio,
+        baseFloor,
+        baseFlex,
+        lastState,
+        currentAnnualPension,
+        currentAnnualPension2,
+        marketDataHist,
+        widowPensionP1 = 0,
+        widowPensionP2 = 0
+    } = currentState;
 
     // WICHTIG: Pflegekosten werden nur für die Jahresberechnung zum Floor addiert,
     // aber NICHT in den persistenten baseFloor eingerechnet, der mit Inflation angepasst wird
     const effectiveBaseFloor = baseFloor + careFloorAddition;
     currentAnnualPension2 = currentAnnualPension2 || 0;
+    widowPensionP1 = Math.max(0, widowPensionP1 || 0);
+    widowPensionP2 = Math.max(0, widowPensionP2 || 0);
+    const householdCtx = normalizeHouseholdContext(householdContext);
+    const { p1Alive, p2Alive, widowBenefits } = householdCtx;
+
     let { depotTranchesAktien, depotTranchesGold } = portfolio;
     let liquiditaet = portfolio.liquiditaet;
     let totalTaxesThisYear = 0;
@@ -142,10 +183,12 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const r1StartOffsetYears = Math.max(0, Number(inputs.renteStartOffsetJahre) || 0);
     let rente1_brutto = 0;
 
-    if (yearIndex >= r1StartOffsetYears) {
+    if (p1Alive && yearIndex >= r1StartOffsetYears) {
         const isFirstYearR1 = (yearIndex === r1StartOffsetYears);
         const baseR1 = inputs.renteMonatlich * 12;
         rente1_brutto = computePensionNext(currentAnnualPension, isFirstYearR1, baseR1, rentAdjPct);
+    } else if (!p1Alive && widowBenefits.p1FromP2) {
+        rente1_brutto = widowPensionP1;
     }
 
     // Keine zusätzliche Steuer/Berechnung für R1 (wird als Netto betrachtet bzw. extern versteuert)
@@ -155,7 +198,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     let rente2_brutto = 0;
     let rente2 = 0;
 
-    if (inputs.partner?.aktiv) {
+    if (inputs.partner?.aktiv && p2Alive) {
         // Für Person 2 gilt dieselbe Regel: das Startalter beeinflusst nur Sterbe-/Pflegewahrscheinlichkeiten,
         // der Rentenbeginn richtet sich ausschließlich nach "Start in ... Jahren".
         const partnerStartOffsetYears = Math.max(0, Number(inputs.partner.startInJahren) || 0);
@@ -179,6 +222,9 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             // Clamp bei 0 (keine negativen Renten)
             rente2 = Math.max(0, rente2);
         }
+    } else if (!p2Alive && widowBenefits.p2FromP1) {
+        rente2_brutto = widowPensionP2;
+        rente2 = rente2_brutto;
     }
 
     // Gesamtrente (renteSum)
@@ -400,6 +446,10 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const naechsterBaseFloor = baseFloor * inflFactorThisYear;
     const naechsterBaseFlex = baseFlex * inflFactorThisYear;
 
+    const widowAdjFactor = 1 + (rentAdjPct / 100);
+    const nextWidowPensionP1 = widowBenefits.p1FromP2 ? Math.max(0, widowPensionP1 * widowAdjFactor) : 0;
+    const nextWidowPensionP2 = widowBenefits.p2FromP1 ? Math.max(0, widowPensionP2 * widowAdjFactor) : 0;
+
     return {
         isRuin: false,
         newState: {
@@ -410,7 +460,9 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             currentAnnualPension: rente1_brutto,
             currentAnnualPension2: rente2_brutto,
             marketDataHist: newMarketDataHist,
-            samplerState: currentState.samplerState
+            samplerState: currentState.samplerState,
+            widowPensionP1: nextWidowPensionP1,
+            widowPensionP2: nextWidowPensionP2
         },
         logData: {
             entscheidung: { ...spendingResult, jahresEntnahme, runwayMonths, kuerzungProzent: spendingResult.kuerzungProzent },
@@ -448,6 +500,9 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             pflege_kumuliert: pflegeMeta?.kumulierteKosten ?? 0,
             pflege_grade: pflegeMeta?.grade ?? null,
             pflege_grade_label: pflegeMeta?.gradeLabel ?? '',
+            pflege_delta_flex: pflegeMeta?.log_delta_flex ?? 0,
+            WidowBenefitP1: widowBenefits.p1FromP2 ? widowPensionP1 : 0,
+            WidowBenefitP2: widowBenefits.p2FromP1 ? widowPensionP2 : 0,
             // FAIL-SAFE Guard Debug-Spalten
             NeedLiq: Math.round(need),
             GuardGold: Math.round(guardSellGold),
@@ -495,7 +550,9 @@ export function initMcRunState(inputs, startYearIndex) {
         currentAnnualPension: 0,
         currentAnnualPension2: 0,
         marketDataHist: marketDataHist,
-        samplerState: {}
+        samplerState: {},
+        widowPensionP1: 0,
+        widowPensionP2: 0
     };
 }
 
