@@ -155,9 +155,9 @@ console.log('\n📊 Test 8: Pflege-Dauer & Mortalitäts-Ramp');
 console.log('-'.repeat(60));
 
 const rampGradeConfigs = {
-    1: { zusatz: 2000, flexCut: 0.6 },
-    2: { zusatz: 4000, flexCut: 0.55 },
-    3: { zusatz: 6000, flexCut: 0.5 }
+    1: { zusatz: 2000, flexCut: 0.6, mortalityFactor: 1 },
+    2: { zusatz: 4000, flexCut: 0.55, mortalityFactor: 2 },
+    3: { zusatz: 6000, flexCut: 0.5, mortalityFactor: 4 }
 };
 
 const rampInputs = {
@@ -170,7 +170,6 @@ const rampInputs = {
     pflegeMaxFloor: 60000,
     pflegeKostenDrift: 0,
     pflegebeschleunigtMortalitaetAktivieren: true,
-    pflegeTodesrisikoFaktor: 4,
     startFloorBedarf: 40000,
     startFlexBedarf: 20000,
     pflegeMinDauer: 4,
@@ -181,13 +180,16 @@ const rampCare = makeDefaultCareMeta(true);
 Object.assign(rampCare, {
     active: true,
     triggered: true,
+    grade: 3,
+    gradeLabel: 'Pflegegrad 3',
     durationYears: 4,
     floorAtTrigger: rampInputs.startFloorBedarf,
     flexAtTrigger: rampInputs.startFlexBedarf,
     maxFloorAtTrigger: rampInputs.pflegeMaxFloor,
     currentYearInCare: 0,
     zusatzFloorZiel: 0,
-    kumulierteKosten: 0
+    kumulierteKosten: 0,
+    mortalityFactor: rampGradeConfigs[3].mortalityFactor
 });
 
 let rampOk = true;
@@ -198,7 +200,8 @@ for (let year = 1; year <= 4; year++) {
     if (!rampCare.active) rampOk = false;
     const rampYears = Math.max(1, rampInputs.pflegeRampUp);
     const expectedProgress = Math.min(year, rampYears) / rampYears;
-    const expectedFactor = 1 + (rampInputs.pflegeTodesrisikoFaktor - 1) * expectedProgress;
+    const targetFactor = rampInputs.pflegeGradeConfigs[3].mortalityFactor;
+    const expectedFactor = 1 + (targetFactor - 1) * expectedProgress;
     const actualFactor = computeCareMortalityMultiplier(rampCare, rampInputs);
     if (Math.abs(actualFactor - expectedFactor) > 1e-6) rampOk = false;
 }
@@ -220,8 +223,8 @@ const gradeInputs = {
     ...rampInputs,
     pflegeModellTyp: 'chronisch',
     pflegeGradeConfigs: {
-        1: { zusatz: 1000, flexCut: 0.7 },
-        3: { zusatz: 8000, flexCut: 0.4 }
+        1: { zusatz: 1000, flexCut: 0.7, mortalityFactor: 0 },
+        3: { zusatz: 8000, flexCut: 0.4, mortalityFactor: 2 }
     }
 };
 

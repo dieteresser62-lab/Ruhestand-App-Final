@@ -62,10 +62,13 @@ export function getCommonInputs() {
     SUPPORTED_PFLEGE_GRADES.forEach(grade => {
         const zusatzInput = document.getElementById(`pflegeStufe${grade}Zusatz`);
         const flexInput = document.getElementById(`pflegeStufe${grade}FlexCut`);
+        const mortalityInput = document.getElementById(`pflegeStufe${grade}Mortality`);
         const zusatz = parseFloat(zusatzInput?.value) || 0;
         const flexPercent = parseFloat(flexInput?.value);
         const flexCut = Math.min(1, Math.max(0, ((Number.isFinite(flexPercent) ? flexPercent : 100) / 100)));
-        pflegeGradeConfigs[grade] = { zusatz, flexCut };
+        const mortalityRaw = parseFloat(mortalityInput?.value);
+        const mortalityFactor = Math.max(0, Number.isFinite(mortalityRaw) ? mortalityRaw : 0);
+        pflegeGradeConfigs[grade] = { zusatz, flexCut, mortalityFactor };
     });
     const grade1Config = pflegeGradeConfigs[1] || { zusatz: 0, flexCut: 1 };
 
@@ -136,7 +139,6 @@ export function getCommonInputs() {
             return Math.max(0, Number.isFinite(raw) ? raw : 0) / 100;
         })(),
         pflegebeschleunigtMortalitaetAktivieren: document.getElementById('pflegebeschleunigtMortalitaetAktivieren').checked,
-        pflegeTodesrisikoFaktor: parseFloat(document.getElementById('pflegeTodesrisikoFaktor').value) || 1.0,
         decumulation: { mode: 'none' },
         stressPreset: document.getElementById('stressPreset').value || 'NONE',
         // Partner-Konfiguration (Rente 2)
