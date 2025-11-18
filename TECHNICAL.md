@@ -94,6 +94,28 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 * Heatmap mit optionalen Warn-Badges.
 * Pflegefall-Szenarien mit zusätzlichen Kostenverläufen.
 
+### Rentensteuerung & Witwenlogik
+
+* `getCommonInputs()` bündelt sämtliche Rentenfelder inklusive gemeinsamer Indexierung, Hinterbliebenen-Optionen (Modus, Prozentsatz,
+  Mindest-Ehejahre) und Partner:innen-spezifischer Parameter. Ältere Felder wie `r2Brutto` werden automatisch migriert, Pflege-
+  Konfigurationen parallel gelesen und als strukturierte Inputs zurückgegeben.【F:simulator-portfolio.js†L57-L174】
+* `computeRentAdjRate()` und `computePensionNext()` sorgen dafür, dass beide Rentenstränge dieselbe Anpassungslogik (fix, Lohn,
+  CPI) nutzen und dass Erstjahre sauber von Folgejahren getrennt bleiben.【F:simulator-portfolio.js†L285-L332】
+* Das UI schaltet Prozentfelder je nach Modus frei/aus, blendet Partner-Sektionen dynamisch ein und speichert Präferenzen im
+  `localStorage`. Dadurch wird verhindert, dass Sweep-Cases heimlich Person-2-Werte überschreiben.【F:simulator-main.js†L1563-L1614】
+* Sweep-Schutz: Whitelist/Blocklist und der Rente-2-Invarianz-Wächter markieren Verstöße direkt in der Heatmap, inklusive Dev-
+  Self-Test für reproduzierbare Diagnosen.【F:simulator-main.js†L3-L64】
+
+### Pflege-Pipeline
+
+* Alters- und gradabhängige Eintrittswahrscheinlichkeiten basieren auf dem BARMER-Pflegereport und werden in `simulator.js` gepflegt.
+  Die Tabelle liefert grade-spezifische Labels sowie Drift-Annahmen.【F:simulator.js†L433-L470】
+* Das UI bietet für jeden Pflegegrad Zusatzkosten-, Flex-Cut- und Mortalitätsfelder, Staffel-Presets (ambulant/stationär), regionalen
+  Zuschlag, Info-Badges zum Maximal-Floor sowie Event-Listener, die Änderungen live in Tooltips und Badges spiegeln.【F:simulator-main.js†L89-L1506】
+* KPI-Dashboard: Zusätzlich zu klassischen Monte-Carlo-Kennzahlen rendert der Simulator Eintrittsquoten, Eintrittsalter, Pflegejahre
+  pro Person sowie Kosten-/Shortfall-Deltas. Sobald Pflege-Worst-Runs vorliegen, lässt sich über einen Toggle zwischen Gesamt-
+  und Pflege-Extremlauf wechseln – inklusive separatem Log-Auszug.【F:simulator-results.js†L191-L250】【F:simulator.js†L366-L429】
+
 ---
 
 ## Build- und Laufzeit-Hinweise
