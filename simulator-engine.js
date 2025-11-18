@@ -131,12 +131,13 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const rentAdjPct = inputs.rentAdjPct || 0;
 
     // Rente Person 1 - Neue Logik mit gemeinsamer Anpassungsrate
-    const currentAgeP1 = inputs.startAlter + yearIndex;
-    const r1StartAge = inputs.startAlter + inputs.renteStartOffsetJahre;
+    const currentAgeP1 = inputs.startAlter + yearIndex; // bleibt für Mortalität/Pflege relevant
+    // Rente Person 1 wird ausschließlich über den Zeitversatz "Start in ... Jahren" gesteuert.
+    const r1StartOffsetYears = Math.max(0, Number(inputs.renteStartOffsetJahre) || 0);
     let rente1_brutto = 0;
 
-    if (currentAgeP1 >= r1StartAge) {
-        const isFirstYearR1 = (currentAgeP1 === r1StartAge);
+    if (yearIndex >= r1StartOffsetYears) {
+        const isFirstYearR1 = (yearIndex === r1StartOffsetYears);
         const baseR1 = inputs.renteMonatlich * 12;
         rente1_brutto = computePensionNext(currentAnnualPension, isFirstYearR1, baseR1, rentAdjPct);
     }
@@ -149,18 +150,11 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     let rente2 = 0;
 
     if (inputs.partner?.aktiv) {
-        // Berechne tatsächliches Startalter basierend auf startInJahren
-        // Wenn startInJahren > 0, hat es Vorrang vor startAlter
-        let actualStartAgeP2 = inputs.partner.startAlter;
-        if (inputs.partner.startInJahren > 0) {
-            actualStartAgeP2 = inputs.startAlter + inputs.partner.startInJahren;
-        }
-        // Clamp zwischen 0 und 120
-        actualStartAgeP2 = Math.max(0, Math.min(120, actualStartAgeP2));
-
-        const currentAgeP2 = currentAgeP1; // Vereinfacht: beide altern synchron
-        if (currentAgeP2 >= actualStartAgeP2) {
-            const isFirstYearR2 = (currentAgeP2 === actualStartAgeP2);
+        // Für Person 2 gilt dieselbe Regel: das Startalter beeinflusst nur Sterbe-/Pflegewahrscheinlichkeiten,
+        // der Rentenbeginn richtet sich ausschließlich nach "Start in ... Jahren".
+        const partnerStartOffsetYears = Math.max(0, Number(inputs.partner.startInJahren) || 0);
+        if (yearIndex >= partnerStartOffsetYears) {
+            const isFirstYearR2 = (yearIndex === partnerStartOffsetYears);
             const baseR2 = inputs.partner.brutto;
             rente2_brutto = computePensionNext(currentAnnualPension2, isFirstYearR2, baseR2, rentAdjPct);
 

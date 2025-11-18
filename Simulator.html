@@ -91,6 +91,10 @@
                        </div>
                        <div class="form-group"><label for="p1Monatsrente">Monatliche Rente (€)</label><input type="number" id="p1Monatsrente" value="500"></div>
                        <div class="form-group"><label for="p1StartInJahren">Start in ... Jahren</label><input type="number" id="p1StartInJahren" value="5"></div>
+                       <div class="form-group" style="grid-column: span 2; font-size: 0.8rem; color: #555;">
+                           <strong>Hinweis:</strong> Das Startalter steuert nur Mortalitäts- und Pflegewahrscheinlichkeiten.
+                           Der Rentenbeginn richtet sich ausschließlich nach "Start in ... Jahren" – für beide Personen.
+                       </div>
                        <div class="form-group" style="grid-column: span 2;">
                            <label for="rentAdjMode">Rentenanpassung koppeln an</label>
                            <select id="rentAdjMode">
@@ -178,8 +182,8 @@
                             </div>
                         </div>
                         <div style="margin-top: 10px; padding: 8px; background-color: #f0f7ff; border-left: 3px solid var(--secondary-color); font-size: 0.85rem; color: #555;">
-                            <strong>Hinweis:</strong> Wenn "Start in … Jahren" &gt; 0, hat es Vorrang vor "Startalter".<br>
-                            ℹ️ Die Rentenanpassung wird gemeinsam über das Feld "Rentenanpassung koppeln an" bei Person 1 gesteuert.
+                            <strong>Hinweis:</strong> Für Person&nbsp;2 gilt dieselbe Regel: Das Startalter beeinflusst ausschließlich Mortalität und Pflege, der Rentenbeginn wird nur durch "Start in … Jahren" festgelegt.<br>
+                            ℹ️ Die Rentenanpassung wird gemeinsam über das Feld "Rentenanpassung koppeln an" bei Person&nbsp;1 gesteuert.
                         </div>
                     </div>
                  </div>
