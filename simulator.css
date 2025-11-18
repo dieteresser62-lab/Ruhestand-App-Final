@@ -85,24 +85,53 @@ input:disabled { background-color: #e9ecef; cursor: not-allowed; }
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 15px;
 }
-.care-grade-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 12px;
-}
-.care-grade-card {
+.care-grade-matrix {
     border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 12px;
-    background-color: #fff;
+    border-radius: 10px;
+    overflow-x: auto;
+}
+.care-grade-row {
+    display: grid;
+    grid-template-columns: minmax(150px, 1.2fr) repeat(3, minmax(140px, 1fr));
+    gap: 12px;
+    padding: 12px 16px;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+}
+.care-grade-row:last-child {
+    border-bottom: none;
+}
+.care-grade-header {
+    background-color: #eef4ff;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+}
+.care-grade-header div {
+    color: var(--primary-color);
+}
+.care-grade-label {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 2px;
 }
-.care-grade-card h5 {
-    margin: 0;
+.care-grade-label strong {
     font-size: 0.95rem;
     color: var(--primary-color);
+}
+.care-grade-label small {
+    color: #6c757d;
+    font-size: 0.8rem;
+}
+.care-grade-row input {
+    width: 100%;
+}
+.care-grade-note {
+    display: block;
+    margin-top: 8px;
+    font-size: 0.8rem;
+    color: #666;
 }
 .care-duration-group {
     display: grid;

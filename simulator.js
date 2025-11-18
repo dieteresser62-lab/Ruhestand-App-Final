@@ -429,7 +429,8 @@ const PFLEGE_GRADE_PROBABILITIES = {
 };
 const CARE_GRADE_FIELD_IDS = SUPPORTED_PFLEGE_GRADES.flatMap(grade => [
     `pflegeStufe${grade}Zusatz`,
-    `pflegeStufe${grade}FlexCut`
+    `pflegeStufe${grade}FlexCut`,
+    `pflegeStufe${grade}Mortality`
 ]);
 const HISTORICAL_DATA = {
 	1969: { msci_eur: 60.8, inflation_de: 1.9, zinssatz_de:6, lohn_de: 9.8, gold_eur_perf: -8.5},1970: { msci_eur: 60.9, inflation_de: 3.4, zinssatz_de: 7.5, lohn_de: 12.6, gold_eur_perf: 4.3 },1971: { msci_eur: 72.4, inflation_de: 5.3, zinssatz_de: 5, lohn_de: 10.5, gold_eur_perf: 19.8 },1972: { msci_eur: 88.4, inflation_de: 5.5, zinssatz_de: 4, lohn_de: 9.1, gold_eur_perf: 47.2 },1973: { msci_eur: 74.4, inflation_de: 7.1, zinssatz_de: 7, lohn_de: 10.2, gold_eur_perf: 68.5 },1974: { msci_eur: 53.6, inflation_de: 7, zinssatz_de: 6, lohn_de: 10.8, gold_eur_perf: 70.1 },1975: { msci_eur: 71, inflation_de: 6, zinssatz_de: 4.5, lohn_de: 7.2, gold_eur_perf: -25.8 },1976: { msci_eur: 72.6, inflation_de: 4.3, zinssatz_de: 3.5, lohn_de: 7.3, gold_eur_perf: -1.5 },1977: { msci_eur: 67.1, inflation_de: 3.7, zinssatz_de: 3, lohn_de: 7.1, gold_eur_perf: 22.4 },1978: { msci_eur: 77.7, inflation_de: 2.7, zinssatz_de: 3, lohn_de: 5.4, gold_eur_perf: 35.7 },1979: { msci_eur: 79.2, inflation_de: 4.1, zinssatz_de: 5, lohn_de: 6.2, gold_eur_perf: 126.3 },1980: { msci_eur: 97.8, inflation_de: 5.5, zinssatz_de: 8.5, lohn_de: 6.6, gold_eur_perf: -6.2 },1981: { msci_eur: 91.2, inflation_de: 6.3, zinssatz_de: 10.5, lohn_de: 4.8, gold_eur_perf: -20.8 },1982: { msci_eur: 90.7, inflation_de: 5.3, zinssatz_de: 7.5, lohn_de: 4.2, gold_eur_perf: 18.9 },1983: { msci_eur: 110.8, inflation_de: 3.3, zinssatz_de: 5.5, lohn_de: 3.7, gold_eur_perf: -18.9 },1984: { msci_eur: 114.5, inflation_de: 2.4, zinssatz_de: 5.5, lohn_de: 3.4, gold_eur_perf: -15.4 },1985: { msci_eur: 164.3, inflation_de: 2.2, zinssatz_de: 5.5, lohn_de: 3.7, gold_eur_perf: 12.7 },1986: { msci_eur: 206.5, inflation_de: -0.1, zinssatz_de: 4.5, lohn_de: 4.1, gold_eur_perf: 24.1 },1987: { msci_eur: 227.1, inflation_de: 0.2, zinssatz_de: 3.5, lohn_de: 3.2, gold_eur_perf: 1.8 },1988: { msci_eur: 274.6, inflation_de: 1.3, zinssatz_de: 4, lohn_de: 3.8, gold_eur_perf: -12.4 },1989: { msci_eur: 326.8, inflation_de: 2.8, zinssatz_de: 7, lohn_de: 3.9, gold_eur_perf: -2.4 },1990: { msci_eur: 274, inflation_de: 2.7, zinssatz_de: 8, lohn_de: 5.8, gold_eur_perf: -7.8 },1991: { msci_eur: 317.9, inflation_de: 3.5, zinssatz_de: 8.5, lohn_de: 6.7, gold_eur_perf: -6.1 },1992: { msci_eur: 300, inflation_de: 5.1, zinssatz_de: 9.5, lohn_de: 5.7, gold_eur_perf: -5.8 },1993: { msci_eur: 376.1, inflation_de: 4.5, zinssatz_de: 7.25, lohn_de: 3.3, gold_eur_perf: 20.1 },1994: { msci_eur: 382.7, inflation_de: 2.7, zinssatz_de: 5, lohn_de: 2.4, gold_eur_perf: -2.3 },1995: { msci_eur: 450.4, inflation_de: 1.7, zinssatz_de: 4, lohn_de: 3.5, gold_eur_perf: 0.6 },1996: { msci_eur: 505.7, inflation_de: 1.4, zinssatz_de: 3, lohn_de: 2.2, gold_eur_perf: -6.9 },1997: { msci_eur: 590, inflation_de: 1.9, zinssatz_de: 3, lohn_de: 1.9, gold_eur_perf: -20.7 },1998: { msci_eur: 758.3, inflation_de: 0.9, zinssatz_de: 3, lohn_de: 2.8, gold_eur_perf: 0.9 },1999: { msci_eur: 958.4, inflation_de: 0.6, zinssatz_de: 2.5, lohn_de: 2.7, gold_eur_perf: -0.6 },
@@ -516,10 +517,13 @@ function getCommonInputs() {
     SUPPORTED_PFLEGE_GRADES.forEach(grade => {
         const zusatzInput = document.getElementById(`pflegeStufe${grade}Zusatz`);
         const flexInput = document.getElementById(`pflegeStufe${grade}FlexCut`);
+        const mortalityInput = document.getElementById(`pflegeStufe${grade}Mortality`);
         const zusatz = parseFloat(zusatzInput?.value) || 0;
         const flexPercent = parseFloat(flexInput?.value);
         const flexCut = Math.min(1, Math.max(0, ((Number.isFinite(flexPercent) ? flexPercent : 100) / 100)));
-        pflegeGradeConfigs[grade] = { zusatz, flexCut };
+        const mortalityRaw = parseFloat(mortalityInput?.value);
+        const mortalityFactor = Math.max(0, Number.isFinite(mortalityRaw) ? mortalityRaw : 0);
+        pflegeGradeConfigs[grade] = { zusatz, flexCut, mortalityFactor };
     });
     const grade1Config = pflegeGradeConfigs[1] || { zusatz: 0, flexCut: 1 };
     const rawPflegeMin = parseInt(document.getElementById('pflegeMinDauer').value);
@@ -568,7 +572,6 @@ function getCommonInputs() {
             return Math.max(0, Number.isFinite(raw) ? raw : 0) / 100;
         })(),
         pflegebeschleunigtMortalitaetAktivieren: document.getElementById('pflegebeschleunigtMortalitaetAktivieren').checked,
-        pflegeTodesrisikoFaktor: parseFloat(document.getElementById('pflegeTodesrisikoFaktor').value) || 1.0,
         decumulation: { mode: 'none' },
         stressPreset: document.getElementById('stressPreset').value || 'NONE'	
     };
@@ -1185,6 +1188,7 @@ function makeDefaultCareMeta(enabled, personGender = 'm') {
         maxFloorAtTrigger: 0,
         grade: null,
         gradeLabel: '',
+        mortalityFactor: 0,
         personGender
     };
 }
@@ -1281,16 +1285,14 @@ function computeCareMortalityMultiplierLegacy(care, inputs) {
     return 1;
   }
 
-  const baseFactor = Math.max(1, Number(inputs.pflegeTodesrisikoFaktor) || 1);
+  const baseFactor = Math.max(1, Number(care?.mortalityFactor) || 0);
   if (baseFactor <= 1) return 1;
 
   const rampYears = Math.max(1, Number(inputs.pflegeRampUp) || 1);
-  if (rampYears === 1) {
-    return baseFactor;
-  }
+  const yearsCompleted = Math.min(care.currentYearInCare || 0, rampYears);
+  if (yearsCompleted <= 0) return 1;
 
-  const yearsCompleted = Math.min(Math.max(1, care.currentYearInCare || 0), rampYears);
-  const progress = (yearsCompleted - 1) / (rampYears - 1);
+  const progress = yearsCompleted / rampYears;
   return 1 + (baseFactor - 1) * progress;
 }
 
@@ -1339,7 +1341,9 @@ function normalizeGradeConfig(config) {
     const zusatz = Math.max(0, Number(config?.zusatz) || 0);
     const rawFlex = config?.flexCut;
     const flexCut = Math.min(1, Math.max(0, Number.isFinite(rawFlex) ? rawFlex : 1));
-    return { zusatz, flexCut };
+    const rawMortality = Number(config?.mortalityFactor);
+    const mortalityFactor = Math.max(0, Number.isFinite(rawMortality) ? rawMortality : 0);
+    return { zusatz, flexCut, mortalityFactor };
 }
 
 function resolveGradeConfig(inputs, grade) {
@@ -1356,7 +1360,8 @@ function resolveGradeConfig(inputs, grade) {
     }
     return normalizeGradeConfig({
         zusatz: inputs?.pflegeStufe1Zusatz,
-        flexCut: inputs?.pflegeStufe1FlexCut
+        flexCut: inputs?.pflegeStufe1FlexCut,
+        mortalityFactor: inputs?.pflegeStufe1Mortality
     });
 }
 
@@ -1387,6 +1392,7 @@ function updateCareMeta(care, inputs, age, yearData, rand) {
         const gradeConfig = resolveGradeConfig(inputs, care.grade);
         const yearsSinceStart = care.currentYearInCare;
         const yearIndex = yearsSinceStart + 1;
+        care.mortalityFactor = gradeConfig.mortalityFactor || 0;
         const inflationsAnpassung = (1 + yearData.inflation/100) * (1 + inputs.pflegeKostenDrift);
 
         const floorAtTriggerAdjusted = care.floorAtTrigger * Math.pow(1 + yearData.inflation/100, yearIndex);
@@ -1431,6 +1437,8 @@ function updateCareMeta(care, inputs, age, yearData, rand) {
             care.currentYearInCare = 0;
             care.grade = sampledGrade.grade;
             care.gradeLabel = PFLEGE_GRADE_LABELS[sampledGrade.grade] || `Pflegegrad ${sampledGrade.grade}`;
+            const gradeConfig = resolveGradeConfig(inputs, care.grade);
+            care.mortalityFactor = gradeConfig.mortalityFactor || 0;
 
             care.floorAtTrigger = inputs.startFloorBedarf;
             care.flexAtTrigger = inputs.startFlexBedarf;
@@ -2280,6 +2288,19 @@ function updatePflegeUIInfo() {
     }
 }
 
+function setMortalityInputsDisabled(disabled) {
+    SUPPORTED_PFLEGE_GRADES.forEach(grade => {
+        const field = document.getElementById(`pflegeStufe${grade}Mortality`);
+        if (field) {
+            field.disabled = disabled;
+        }
+    });
+    const note = document.querySelector('.care-grade-note');
+    if (note) {
+        note.style.opacity = disabled ? 0.5 : 1;
+    }
+}
+
 function selfCheckEngine() {
     if (typeof Ruhestandsmodell_v30 === 'undefined') {
         const footer = document.getElementById('engine-mismatch-footer');
@@ -2321,7 +2342,7 @@ window.onload = function() {
         'pflegefallLogikAktivieren', 'pflegeModellTyp', ...CARE_GRADE_FIELD_IDS,
         'pflegeMaxFloor', 'pflegeRampUp', 'pflegeMinDauer', 'pflegeMaxDauer', 'pflegeKostenDrift',
         'pflegeRegionalZuschlag', 'pflegeKostenStaffelPreset',
-        'pflegebeschleunigtMortalitaetAktivieren', 'pflegeTodesrisikoFaktor'
+        'pflegebeschleunigtMortalitaetAktivieren'
     ];
     allInputs.forEach(id => {
         const element = document.getElementById(id);
@@ -2352,7 +2373,13 @@ window.onload = function() {
     const pflegeModellSelect = document.getElementById('pflegeModellTyp');
     pflegeModellSelect.addEventListener('change', () => { document.getElementById('pflegeDauerContainer').style.display = pflegeModellSelect.value === 'akut' ? 'contents' : 'none'; });
     const pflegeMortalitaetCheckbox = document.getElementById('pflegebeschleunigtMortalitaetAktivieren');
-    pflegeMortalitaetCheckbox.addEventListener('change', () => { document.getElementById('pflegeTodesrisikoContainer').style.display = pflegeMortalitaetCheckbox.checked ? 'flex' : 'none'; });
+    const syncMortalityToggle = () => {
+        if (!pflegeMortalitaetCheckbox) return;
+        setMortalityInputsDisabled(!pflegeMortalitaetCheckbox.checked);
+    };
+    if (pflegeMortalitaetCheckbox) {
+        pflegeMortalitaetCheckbox.addEventListener('change', syncMortalityToggle);
+    }
     const pflegeStaffelSelect = document.getElementById('pflegeKostenStaffelPreset');
     const pflegePresetHint = document.getElementById('pflegeStaffelPresetHint');
     if (pflegeStaffelSelect) {
@@ -2398,6 +2425,8 @@ window.onload = function() {
     document.getElementById('mcBlockSize').disabled = mcMethodeSelect.value !== 'block';
     document.getElementById('festerSatzContainer').style.display = renteIndexArtSelect.value === 'fest' ? 'block' : 'none';
     document.getElementById('pflegePanel').style.display = pflegeCheckbox.checked ? 'grid' : 'none';
+    if (pflegeMortalitaetCheckbox) {
+        syncMortalityToggle();
+    }
     document.getElementById('pflegeDauerContainer').style.display = pflegeModellSelect.value === 'akut' ? 'contents' : 'none';
-    document.getElementById('pflegeTodesrisikoContainer').style.display = pflegeMortalitaetCheckbox.checked ? 'flex' : 'none';
 };

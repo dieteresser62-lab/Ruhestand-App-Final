@@ -227,43 +227,60 @@
                                 <p>Bestimme Zusatzbedarf, Flex-Verlust und den Floor-Cap.</p>
                             </div>
                             <div class="care-section-grid">
-                                <div class="care-grade-grid">
-                                    <div class="care-grade-card">
-                                        <h5>Pflegegrad 1</h5>
-                                        <label for="pflegeStufe1Zusatz">Zusatzbedarf (€ p.a.)</label>
-                                        <input type="number" id="pflegeStufe1Zusatz" value="36000">
-                                        <label for="pflegeStufe1FlexCut">Flex-Level (%)</label>
-                                        <input type="number" id="pflegeStufe1FlexCut" value="50">
+                                <div class="care-grade-matrix" aria-label="Einstellungen pro Pflegegrad">
+                                    <div class="care-grade-row care-grade-header">
+                                        <div>Pflegegrad</div>
+                                        <div>Zusatzbedarf (€ p.a.)</div>
+                                        <div>Flex-Level (%)</div>
+                                        <div>Max. Mortalitäts-Faktor*</div>
                                     </div>
-                                    <div class="care-grade-card">
-                                        <h5>Pflegegrad 2</h5>
-                                        <label for="pflegeStufe2Zusatz">Zusatzbedarf (€ p.a.)</label>
-                                        <input type="number" id="pflegeStufe2Zusatz" value="42000">
-                                        <label for="pflegeStufe2FlexCut">Flex-Level (%)</label>
-                                        <input type="number" id="pflegeStufe2FlexCut" value="45">
+                                    <div class="care-grade-row">
+                                        <div class="care-grade-label">
+                                            <strong>Pflegegrad 1</strong>
+                                            <small>Leichte Beeinträchtigung, Einstieg</small>
+                                        </div>
+                                        <div><input type="number" id="pflegeStufe1Zusatz" value="6000" min="0" step="500"></div>
+                                        <div><input type="number" id="pflegeStufe1FlexCut" value="75" min="0" max="100"></div>
+                                        <div><input type="number" id="pflegeStufe1Mortality" value="0" min="0" step="0.1"></div>
                                     </div>
-                                    <div class="care-grade-card">
-                                        <h5>Pflegegrad 3</h5>
-                                        <label for="pflegeStufe3Zusatz">Zusatzbedarf (€ p.a.)</label>
-                                        <input type="number" id="pflegeStufe3Zusatz" value="54000">
-                                        <label for="pflegeStufe3FlexCut">Flex-Level (%)</label>
-                                        <input type="number" id="pflegeStufe3FlexCut" value="40">
+                                    <div class="care-grade-row">
+                                        <div class="care-grade-label">
+                                            <strong>Pflegegrad 2</strong>
+                                            <small>Erhebliche Beeinträchtigung</small>
+                                        </div>
+                                        <div><input type="number" id="pflegeStufe2Zusatz" value="12000" min="0" step="500"></div>
+                                        <div><input type="number" id="pflegeStufe2FlexCut" value="25" min="0" max="100"></div>
+                                        <div><input type="number" id="pflegeStufe2Mortality" value="0" min="0" step="0.1"></div>
                                     </div>
-                                    <div class="care-grade-card">
-                                        <h5>Pflegegrad 4</h5>
-                                        <label for="pflegeStufe4Zusatz">Zusatzbedarf (€ p.a.)</label>
-                                        <input type="number" id="pflegeStufe4Zusatz" value="66000">
-                                        <label for="pflegeStufe4FlexCut">Flex-Level (%)</label>
-                                        <input type="number" id="pflegeStufe4FlexCut" value="35">
+                                    <div class="care-grade-row">
+                                        <div class="care-grade-label">
+                                            <strong>Pflegegrad 3</strong>
+                                            <small>Schwere Beeinträchtigung</small>
+                                        </div>
+                                        <div><input type="number" id="pflegeStufe3Zusatz" value="18000" min="0" step="500"></div>
+                                        <div><input type="number" id="pflegeStufe3FlexCut" value="10" min="0" max="100"></div>
+                                        <div><input type="number" id="pflegeStufe3Mortality" value="3" min="0" step="0.1"></div>
                                     </div>
-                                    <div class="care-grade-card">
-                                        <h5>Pflegegrad 5</h5>
-                                        <label for="pflegeStufe5Zusatz">Zusatzbedarf (€ p.a.)</label>
-                                        <input type="number" id="pflegeStufe5Zusatz" value="78000">
-                                        <label for="pflegeStufe5FlexCut">Flex-Level (%)</label>
-                                        <input type="number" id="pflegeStufe5FlexCut" value="30">
+                                    <div class="care-grade-row">
+                                        <div class="care-grade-label">
+                                            <strong>Pflegegrad 4</strong>
+                                            <small>Schwerste Beeinträchtigung</small>
+                                        </div>
+                                        <div><input type="number" id="pflegeStufe4Zusatz" value="32000" min="0" step="500"></div>
+                                        <div><input type="number" id="pflegeStufe4FlexCut" value="0" min="0" max="100"></div>
+                                        <div><input type="number" id="pflegeStufe4Mortality" value="5" min="0" step="0.1"></div>
+                                    </div>
+                                    <div class="care-grade-row">
+                                        <div class="care-grade-label">
+                                            <strong>Pflegegrad 5</strong>
+                                            <small>Schwerste + besondere Anforderungen</small>
+                                        </div>
+                                        <div><input type="number" id="pflegeStufe5Zusatz" value="60000" min="0" step="500"></div>
+                                        <div><input type="number" id="pflegeStufe5FlexCut" value="0" min="0" max="100"></div>
+                                        <div><input type="number" id="pflegeStufe5Mortality" value="5" min="0" step="0.1"></div>
                                     </div>
                                 </div>
+                                <small class="care-grade-note">*0 = keine Erhöhung, Werte &gt; 1 multiplizieren das Basismortalitätsrisiko nach Ablauf der Ramp-Up-Dauer.</small>
                                 <div class="form-group" style="grid-column: span 2;">
                                     <label for="pflegeKostenStaffelPreset">Kostenstaffel je Pflegegrad</label>
                                     <select id="pflegeKostenStaffelPreset">
@@ -302,9 +319,8 @@
                                         Beschleunigte Mortalität bei Max-Pflege
                                     </label>
                                 </div>
-                                <div class="form-group" id="pflegeTodesrisikoContainer">
-                                    <label for="pflegeTodesrisikoFaktor">Todesrisiko-Faktor bei Max-Pflege</label>
-                                    <input type="number" id="pflegeTodesrisikoFaktor" value="5.0" step="0.1">
+                                <div class="form-group">
+                                    <p style="margin:0; font-size:0.85rem; color:#555;">Die Mortalitätsfaktoren stellst du pro Pflegegrad direkt in der Tabelle oben ein.</p>
                                 </div>
                             </div>
                         </section>

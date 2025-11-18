@@ -508,6 +508,7 @@ export function makeDefaultCareMeta(enabled, personGender = 'm') {
         maxFloorAtTrigger: 0,
         grade: null,
         gradeLabel: '',
+        mortalityFactor: 0,
         personGender
     };
 }
@@ -644,15 +645,15 @@ const CARE_PROBABILITY_BUCKETS = Object.keys(PFLEGE_GRADE_PROBABILITIES).map(Num
 
 /**
  * Berechnet den Mortalitäts-Multiplikator während eines Pflegefalls.
- * Der Multiplikator steigt linear von 1 bis pflegeTodesrisikoFaktor
- * über die konfigurierte Ramp-Up-Dauer an.
+ * Der Multiplikator steigt linear vom Basiswert 1 bis zum grad-spezifischen
+ * Mortalitätsfaktor über die konfigurierte Ramp-Up-Dauer an.
  */
 export function computeCareMortalityMultiplier(careMeta, inputs) {
     if (!careMeta?.active || !inputs?.pflegebeschleunigtMortalitaetAktivieren) {
         return 1;
     }
 
-    const baseFactor = Math.max(1, Number(inputs.pflegeTodesrisikoFaktor) || 1);
+    const baseFactor = Math.max(1, Number(careMeta?.mortalityFactor) || 0);
     if (baseFactor <= 1) {
         return 1;
     }
@@ -712,7 +713,9 @@ function normalizeGradeConfig(config) {
     const zusatz = Math.max(0, Number(config?.zusatz) || 0);
     const rawFlex = config?.flexCut;
     const flexCut = Math.min(1, Math.max(0, Number.isFinite(rawFlex) ? rawFlex : 1));
-    return { zusatz, flexCut };
+    const rawMortality = Number(config?.mortalityFactor);
+    const mortalityFactor = Math.max(0, Number.isFinite(rawMortality) ? rawMortality : 0);
+    return { zusatz, flexCut, mortalityFactor };
 }
 
 function resolveGradeConfig(inputs, grade) {
@@ -729,7 +732,8 @@ function resolveGradeConfig(inputs, grade) {
     }
     return normalizeGradeConfig({
         zusatz: inputs?.pflegeStufe1Zusatz,
-        flexCut: inputs?.pflegeStufe1FlexCut
+        flexCut: inputs?.pflegeStufe1FlexCut,
+        mortalityFactor: inputs?.pflegeStufe1Mortality
     });
 }
 
@@ -761,6 +765,7 @@ export function updateCareMeta(care, inputs, age, yearData, rand) {
         const gradeConfig = resolveGradeConfig(inputs, care.grade);
         const yearsSinceStart = care.currentYearInCare;
         const yearIndex = yearsSinceStart + 1;
+        care.mortalityFactor = gradeConfig.mortalityFactor || 0;
         // Pflegekosten steigen historisch schneller als die CPI, daher modellieren wir Inflation * Drift.
         const inflationsAnpassung = (1 + yearData.inflation/100) * (1 + (inputs.pflegeKostenDrift || 0));
         // Regionale Aufschläge (z.B. Ballungsräume) skalieren alle Grade linear.
@@ -808,6 +813,8 @@ export function updateCareMeta(care, inputs, age, yearData, rand) {
             care.currentYearInCare = 0;
             care.grade = sampledGrade.grade;
             care.gradeLabel = PFLEGE_GRADE_LABELS[sampledGrade.grade] || `Pflegegrad ${sampledGrade.grade}`;
+            const gradeConfig = resolveGradeConfig(inputs, care.grade);
+            care.mortalityFactor = gradeConfig.mortalityFactor || 0;
 
             care.floorAtTrigger = inputs.startFloorBedarf;
             care.flexAtTrigger = inputs.startFlexBedarf;
