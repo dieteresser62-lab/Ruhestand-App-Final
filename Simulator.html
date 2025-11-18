@@ -180,60 +180,89 @@
                     </div>
                  </div>
 
-                 <div id="pflegePanelContainer" style="grid-column: 1 / -1; border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
-                    <div class="form-group" style="justify-content: center; margin-bottom: 15px;">
-                        <label style="flex-direction: row; align-items: center; justify-content: center;">
-                            <input type="checkbox" id="pflegefallLogikAktivieren" checked style="width: auto; margin-right: 8px;">
+                <div id="pflegePanelContainer" class="care-panel">
+                    <div class="care-panel-toggle">
+                        <label class="care-inline-toggle">
+                            <input type="checkbox" id="pflegefallLogikAktivieren" checked>
                             Pflegefall-Logik aktiv
                         </label>
+                        <p class="care-panel-subtitle">Definiere Kostenverlauf, Pflegedauer und Mortalitätsanpassungen klar getrennt.</p>
                     </div>
-                    <div id="pflegePanel" class="form-grid-four-col">
-                        <div class="form-group" style="grid-column: 1 / span 2;">
-                            <label for="pflegeModellTyp">Pflegemodell-Typ</label>
-                            <select id="pflegeModellTyp">
-                                <option value="chronisch" selected>Chronisch (bis Lebensende)</option>
-                                <option value="akut">Akut (begrenzte Dauer)</option>
-                            </select>
-                        </div>
-                        <div class="form-group" style="grid-column: 3 / span 2; justify-content: center;">
-                                <label style="flex-direction: row; align-items: center; justify-content: center; height: 100%;"><input type="checkbox" id="pflegebeschleunigtMortalitaetAktivieren" checked style="width: auto; margin-right: 8px;">Beschleunigte Mortalität bei Max-Pflege</label>
-                        </div>
-                        <div class="form-group">
-                            <label for="pflegeStufe1Zusatz">Zusatzbedarf Stufe 1 (€ p.a.)</label>
-                            <input type="number" id="pflegeStufe1Zusatz" value="12000">
-                        </div>
-                        <div class="form-group">
-                            <label for="pflegeStufe1FlexCut">Flex-Reduktion auf (%)</label>
-                            <input type="number" id="pflegeStufe1FlexCut" value="50">
-                        </div>
-                            <div class="form-group">
-                            <label for="pflegeMaxFloor">Maximaler Pflege-Floor (€ p.a.)</label>
-                            <input type="number" id="pflegeMaxFloor" value="60000">
-                        </div>
-                        <div class="form-group">
-                            <label for="pflegeRampUp">Anstiegsdauer (Jahre)</label>
-                            <input type="number" id="pflegeRampUp" value="5">
-                        </div>
-                        <div id="pflegeDauerContainer" style="grid-column: 1 / -1; display: contents;">
-                            <div class="form-grid-four-col" style="grid-column: 1 / -1; gap: 20px;">
+                    <!-- Die Sektionen strukturieren die Pflegekonfiguration in überschaubare Teilbereiche -->
+                    <div id="pflegePanel" class="care-sections">
+                        <section class="care-section">
+                            <div class="care-section-header">
+                                <h4>Pflegemodell &amp; Verlauf</h4>
+                                <p>Lege fest, wie lange die Pflege dauert und wie schnell der Bedarf ansteigt.</p>
+                            </div>
+                            <div class="care-section-grid">
                                 <div class="form-group">
-                                    <label for="pflegeMinDauer">Min. Pflegedauer (Jahre)</label>
-                                    <input type="number" id="pflegeMinDauer" value="3">
+                                    <label for="pflegeModellTyp">Pflegemodell-Typ</label>
+                                    <select id="pflegeModellTyp">
+                                        <option value="chronisch" selected>Chronisch (bis Lebensende)</option>
+                                        <option value="akut">Akut (begrenzte Dauer)</option>
+                                    </select>
                                 </div>
                                 <div class="form-group">
-                                    <label for="pflegeMaxDauer">Max. Pflegedauer (Jahre)</label>
-                                    <input type="number" id="pflegeMaxDauer" value="8">
+                                    <label for="pflegeRampUp">Anstiegsdauer (Jahre)</label>
+                                    <input type="number" id="pflegeRampUp" value="5">
+                                </div>
+                                <div id="pflegeDauerContainer" class="care-duration-group">
+                                    <div class="form-group">
+                                        <label for="pflegeMinDauer">Min. Pflegedauer (Jahre)</label>
+                                        <input type="number" id="pflegeMinDauer" value="3">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="pflegeMaxDauer">Max. Pflegedauer (Jahre)</label>
+                                        <input type="number" id="pflegeMaxDauer" value="8">
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="pflegeKostenDrift">Zusätzl. Kostenanstieg p.a. (%)</label>
-                            <input type="number" id="pflegeKostenDrift" value="1.5">
-                        </div>
-                        <div class="form-group" id="pflegeTodesrisikoContainer">
-                            <label for="pflegeTodesrisikoFaktor">Todesrisiko-Faktor bei Max-Pflege</label>
-                            <input type="number" id="pflegeTodesrisikoFaktor" value="5.0" step="0.1">
-                        </div>
+                        </section>
+
+                        <section class="care-section">
+                            <div class="care-section-header">
+                                <h4>Kostenprofil &amp; Flex</h4>
+                                <p>Bestimme Zusatzbedarf, Flex-Verlust und den Floor-Cap.</p>
+                            </div>
+                            <div class="care-section-grid">
+                                <div class="form-group">
+                                    <label for="pflegeStufe1Zusatz">Zusatzbedarf Stufe 1 (€ p.a.)</label>
+                                    <input type="number" id="pflegeStufe1Zusatz" value="12000">
+                                </div>
+                                <div class="form-group">
+                                    <label for="pflegeStufe1FlexCut">Flex-Reduktion auf (%)</label>
+                                    <input type="number" id="pflegeStufe1FlexCut" value="50">
+                                </div>
+                                <div class="form-group">
+                                    <label for="pflegeMaxFloor">Maximaler Pflege-Floor (€ p.a.)</label>
+                                    <input type="number" id="pflegeMaxFloor" value="60000">
+                                </div>
+                                <div class="form-group">
+                                    <label for="pflegeKostenDrift">Zusätzl. Kostenanstieg p.a. (%)</label>
+                                    <input type="number" id="pflegeKostenDrift" value="1.5">
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="care-section">
+                            <div class="care-section-header">
+                                <h4>Risiko-Anpassungen</h4>
+                                <p>Steuere Mortalitätseffekte, sobald die Pflege am Cap läuft.</p>
+                            </div>
+                            <div class="care-section-grid">
+                                <div class="form-group">
+                                    <label class="care-inline-toggle" for="pflegebeschleunigtMortalitaetAktivieren">
+                                        <input type="checkbox" id="pflegebeschleunigtMortalitaetAktivieren" checked>
+                                        Beschleunigte Mortalität bei Max-Pflege
+                                    </label>
+                                </div>
+                                <div class="form-group" id="pflegeTodesrisikoContainer">
+                                    <label for="pflegeTodesrisikoFaktor">Todesrisiko-Faktor bei Max-Pflege</label>
+                                    <input type="number" id="pflegeTodesrisikoFaktor" value="5.0" step="0.1">
+                                </div>
+                            </div>
+                        </section>
                     </div>
                 </div>
             </fieldset>
