@@ -4,6 +4,7 @@ import { formatCurrency } from './simulator-utils.js';
 import { HISTORICAL_DATA, STRESS_PRESETS, annualData, REGIME_DATA, REGIME_TRANSITIONS, SUPPORTED_PFLEGE_GRADES } from './simulator-data.js';
 
 const DEFAULT_RISIKOPROFIL = 'sicherheits-dynamisch';
+const DEFAULT_PFLEGE_DRIFT_PCT = 3.5; // Realistische Langfrist-Annahme (3–4 % über VPI)
 
 /**
  * Geschlechtsspezifische Default-Annahmen für die Dauer eines akuten Pflegefalls.
@@ -125,7 +126,15 @@ export function getCommonInputs() {
         // Defensive Defaults: greifen auf geschlechtsspezifische Annahmen zurück.
         pflegeMinDauer: normalizedCareDuration.minYears,
         pflegeMaxDauer: normalizedCareDuration.maxYears,
-        pflegeKostenDrift: (parseFloat(document.getElementById('pflegeKostenDrift').value) || 0) / 100,
+        pflegeKostenDrift: (() => {
+            const driftPctRaw = parseFloat(document.getElementById('pflegeKostenDrift')?.value);
+            const driftPct = Number.isFinite(driftPctRaw) ? driftPctRaw : DEFAULT_PFLEGE_DRIFT_PCT;
+            return Math.max(0, driftPct) / 100;
+        })(),
+        pflegeRegionalZuschlag: (() => {
+            const raw = parseFloat(document.getElementById('pflegeRegionalZuschlag')?.value);
+            return Math.max(0, Number.isFinite(raw) ? raw : 0) / 100;
+        })(),
         pflegebeschleunigtMortalitaetAktivieren: document.getElementById('pflegebeschleunigtMortalitaetAktivieren').checked,
         pflegeTodesrisikoFaktor: parseFloat(document.getElementById('pflegeTodesrisikoFaktor').value) || 1.0,
         decumulation: { mode: 'none' },

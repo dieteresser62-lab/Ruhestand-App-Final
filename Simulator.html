@@ -39,7 +39,7 @@
                     <div class="form-group"><label for="zielLiquiditaet">davon Ziel-Liquidität (€)</label><input type="number" id="zielLiquiditaet" value="180000"></div>
                 </div>
                  <div class="form-grid" style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
-                    <div class="form-group"><label for="startFloorBedarf">Start Floor-Bedarf p.a. (€)</label><input type="number" id="startFloorBedarf" value="24000"></div>
+                    <div class="form-group"><label for="startFloorBedarf">Start Floor-Bedarf p.a. (€)</label><input type="number" id="startFloorBedarf" value="36000"></div>
                     <div class="form-group"><label for="startFlexBedarf">Start Flex-Bedarf p.a. (€)</label><input type="number" id="startFlexBedarf" value="28000"></div>
                     <div class="form-group"><label for="marketCapeRatio">Aktueller CAPE (Shiller)</label><input type="number" id="marketCapeRatio" value="32" step="0.1" min="0"></div>
                     <div class="form-group"><label for="einstandAlt">Einstand Depot Alt (€)</label><input type="number" id="einstandAlt" value="700000"></div>
@@ -231,46 +231,61 @@
                                     <div class="care-grade-card">
                                         <h5>Pflegegrad 1</h5>
                                         <label for="pflegeStufe1Zusatz">Zusatzbedarf (€ p.a.)</label>
-                                        <input type="number" id="pflegeStufe1Zusatz" value="12000">
+                                        <input type="number" id="pflegeStufe1Zusatz" value="36000">
                                         <label for="pflegeStufe1FlexCut">Flex-Level (%)</label>
                                         <input type="number" id="pflegeStufe1FlexCut" value="50">
                                     </div>
                                     <div class="care-grade-card">
                                         <h5>Pflegegrad 2</h5>
                                         <label for="pflegeStufe2Zusatz">Zusatzbedarf (€ p.a.)</label>
-                                        <input type="number" id="pflegeStufe2Zusatz" value="18000">
+                                        <input type="number" id="pflegeStufe2Zusatz" value="42000">
                                         <label for="pflegeStufe2FlexCut">Flex-Level (%)</label>
                                         <input type="number" id="pflegeStufe2FlexCut" value="45">
                                     </div>
                                     <div class="care-grade-card">
                                         <h5>Pflegegrad 3</h5>
                                         <label for="pflegeStufe3Zusatz">Zusatzbedarf (€ p.a.)</label>
-                                        <input type="number" id="pflegeStufe3Zusatz" value="28000">
+                                        <input type="number" id="pflegeStufe3Zusatz" value="54000">
                                         <label for="pflegeStufe3FlexCut">Flex-Level (%)</label>
                                         <input type="number" id="pflegeStufe3FlexCut" value="40">
                                     </div>
                                     <div class="care-grade-card">
                                         <h5>Pflegegrad 4</h5>
                                         <label for="pflegeStufe4Zusatz">Zusatzbedarf (€ p.a.)</label>
-                                        <input type="number" id="pflegeStufe4Zusatz" value="36000">
+                                        <input type="number" id="pflegeStufe4Zusatz" value="66000">
                                         <label for="pflegeStufe4FlexCut">Flex-Level (%)</label>
                                         <input type="number" id="pflegeStufe4FlexCut" value="35">
                                     </div>
                                     <div class="care-grade-card">
                                         <h5>Pflegegrad 5</h5>
                                         <label for="pflegeStufe5Zusatz">Zusatzbedarf (€ p.a.)</label>
-                                        <input type="number" id="pflegeStufe5Zusatz" value="44000">
+                                        <input type="number" id="pflegeStufe5Zusatz" value="78000">
                                         <label for="pflegeStufe5FlexCut">Flex-Level (%)</label>
                                         <input type="number" id="pflegeStufe5FlexCut" value="30">
                                     </div>
                                 </div>
+                                <div class="form-group" style="grid-column: span 2;">
+                                    <label for="pflegeKostenStaffelPreset">Kostenstaffel je Pflegegrad</label>
+                                    <select id="pflegeKostenStaffelPreset">
+                                        <option value="custom" selected>Individuelle Werte</option>
+                                        <option value="ambulant">Ambulant (ab 36 Tsd. €)</option>
+                                        <option value="stationaer">Stationär (Premium)</option>
+                                    </select>
+                                    <small id="pflegeStaffelPresetHint">Wähle ein Preset, um typische Staffelungen zu übernehmen.</small>
+                                </div>
                                 <div class="form-group">
                                     <label for="pflegeMaxFloor">Maximaler Pflege-Floor (€ p.a.)</label>
-                                    <input type="number" id="pflegeMaxFloor" value="60000">
+                                    <input type="number" id="pflegeMaxFloor" value="120000">
+                                </div>
+                                <div class="form-group">
+                                    <label for="pflegeRegionalZuschlag">Regionaler Zuschlag (%)</label>
+                                    <input type="number" id="pflegeRegionalZuschlag" value="0" step="0.5" min="0">
+                                    <small>Multipliziert alle Pflegegrade z.&nbsp;B. für Metropol-Zuschläge.</small>
                                 </div>
                                 <div class="form-group">
                                     <label for="pflegeKostenDrift">Zusätzl. Kostenanstieg p.a. (%)</label>
-                                    <input type="number" id="pflegeKostenDrift" value="1.5">
+                                    <input type="number" id="pflegeKostenDrift" value="3.5" step="0.1" min="0">
+                                    <small>Konservativer Aufschlag (Default: 3,5&nbsp;%) zusätzlich zur Inflation.</small>
                                 </div>
                             </div>
                         </section>
