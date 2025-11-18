@@ -810,6 +810,7 @@ export function updateCareMeta(care, inputs, age, yearData, rand) {
         const currentGrade = care.grade;
         const progressionProb = PFLEGE_GRADE_PROGRESSION_PROBABILITIES[currentGrade] || 0;
 
+        let gradeChanged = false;
         // Prüfe ob Verschlechterung eintritt (nur wenn nicht bereits PG5)
         if (currentGrade < 5 && rand() < progressionProb) {
             const newGrade = currentGrade + 1;
@@ -818,6 +819,7 @@ export function updateCareMeta(care, inputs, age, yearData, rand) {
             // Aktualisiere Mortalitätsfaktor für neuen Grad
             const newGradeConfig = resolveGradeConfig(inputs, newGrade);
             care.mortalityFactor = newGradeConfig.mortalityFactor || 0;
+            gradeChanged = true;
         }
 
         const gradeConfig = resolveGradeConfig(inputs, care.grade);
@@ -835,7 +837,16 @@ export function updateCareMeta(care, inputs, age, yearData, rand) {
 
         const capZusatz = Math.max(0, maxFloorAdjusted - floorAtTriggerAdjusted);
 
-        const zielRoh = gradeConfig.zusatz * Math.pow(inflationsAnpassung, yearIndex) * regionalMultiplier;
+        // FIX: Pflegekosten korrekt berechnen - Jahr-für-Jahr mit Inflation, nicht kumulativ über alle Pflegejahre
+        let zielRoh;
+        if (gradeChanged || !care.previousZielRoh) {
+            // Bei Gradwechsel oder erstem Jahr: Basiskosten mit aktueller Inflation
+            zielRoh = gradeConfig.zusatz * inflationsAnpassung * regionalMultiplier;
+        } else {
+            // In Folgejahren: Vorjahreskosten mit aktueller Inflation
+            zielRoh = care.previousZielRoh * inflationsAnpassung;
+        }
+        care.previousZielRoh = zielRoh;
         const rampUpFactor = Math.min(1.0, yearIndex / Math.max(1, inputs.pflegeRampUp));
         const zielMitRampUp = zielRoh * rampUpFactor;
 
