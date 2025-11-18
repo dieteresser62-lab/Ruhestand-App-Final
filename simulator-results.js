@@ -4,6 +4,50 @@ import { formatCurrency, formatCurrencyShortLog, shortenText } from './simulator
 import { STRESS_PRESETS } from './simulator-data.js';
 import { renderHeatmapSVG, renderWorstRunToggle } from './simulator-heatmap.js';
 
+/**
+ * Stellt sicher, dass die Worst-Run-Toggle-Buttons existieren und
+ * zur aktuellen Datenlage passen (Pflege-Button nur, wenn Daten vorhanden sind).
+ *
+ * @param {HTMLElement|null} controlsContainer - Container, der die Toggle-Buttons aufnimmt.
+ * @param {boolean} hasCareWorst - Flag, ob ein spezifischer Pflege-Worst-Run existiert.
+ * @returns {{ allButton: HTMLElement|null, careButton: HTMLElement|null }}
+ *          Referenzen auf die (ggf. neu erzeugten) Buttons.
+ */
+function ensureWorstRunToggleButtons(controlsContainer, hasCareWorst) {
+    // Kein Container vorhanden -> Buttons können nicht verwaltet werden.
+    if (!controlsContainer) {
+        return { allButton: null, careButton: null };
+    }
+
+    let toggleWrapper = controlsContainer.querySelector('.worst-run-toggle');
+
+    // Erstinitialisierung: vollständiges Toggle-Markup einfügen.
+    if (!toggleWrapper) {
+        controlsContainer.insertAdjacentHTML('afterbegin', renderWorstRunToggle(hasCareWorst));
+        toggleWrapper = controlsContainer.querySelector('.worst-run-toggle');
+    } else {
+        const existingCareButton = document.getElementById('btnWorstCare');
+
+        if (hasCareWorst && !existingCareButton) {
+            // Es gibt nun Pflege-Daten, daher Button dynamisch ergänzen.
+            const careButton = document.createElement('button');
+            careButton.id = 'btnWorstCare';
+            careButton.className = 'toggle-btn';
+            careButton.type = 'button';
+            careButton.textContent = 'Schlechtester Pflege-Lauf';
+            toggleWrapper.appendChild(careButton);
+        } else if (!hasCareWorst && existingCareButton) {
+            // Keine Pflege-Daten mehr -> Button entfernen, um veraltete Aktionen zu vermeiden.
+            existingCareButton.remove();
+        }
+    }
+
+    return {
+        allButton: document.getElementById('btnWorstAll'),
+        careButton: document.getElementById('btnWorstCare')
+    };
+}
+
 // Globale Variable für Worst-Run Re-Rendering
 window.globalWorstRunData = { rows: [], caR_Threshold: undefined };
 
@@ -181,9 +225,7 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
 
     const hasCareWorst = !!(worstRunCare && worstRunCare.hasCare && Array.isArray(worstRunCare.logDataRows) && worstRunCare.logDataRows.length > 0);
 
-    if (controlsContainer && !document.getElementById('btnWorstAll')) {
-        controlsContainer.insertAdjacentHTML('afterbegin', renderWorstRunToggle(hasCareWorst));
-    }
+    const { allButton: btnAll, careButton: btnCare } = ensureWorstRunToggleButtons(controlsContainer, hasCareWorst);
 
     let view = localStorage.getItem('worstRunView') || 'all';
     if (view === 'care' && !hasCareWorst) view = 'all';
@@ -211,13 +253,27 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
         }
     };
 
-    const btnAll = document.getElementById('btnWorstAll');
-    const btnCare = document.getElementById('btnWorstCare');
-    if (btnAll && !btnAll.onclick) {
-        btnAll.onclick = () => { view = 'all'; localStorage.setItem('worstRunView', 'all'); paintWorst(); };
+    if (btnAll) {
+        btnAll.onclick = () => {
+            view = 'all';
+            localStorage.setItem('worstRunView', 'all');
+            paintWorst();
+        };
     }
-    if (btnCare && !btnCare.onclick && hasCareWorst) {
-        btnCare.onclick = () => { view = 'care'; localStorage.setItem('worstRunView', 'care'); paintWorst(); };
+    if (btnCare) {
+        if (hasCareWorst) {
+            btnCare.disabled = false;
+            btnCare.onclick = () => {
+                view = 'care';
+                localStorage.setItem('worstRunView', 'care');
+                paintWorst();
+            };
+        } else {
+            // Button wird deaktiviert, falls er aus einem früheren Lauf stammt.
+            btnCare.classList.remove('active');
+            btnCare.disabled = true;
+            btnCare.onclick = null;
+        }
     }
 
     paintWorst();
