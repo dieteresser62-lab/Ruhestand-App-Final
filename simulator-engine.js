@@ -122,7 +122,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         depotTranchesGold[i].marketValue *= (1 + rG);
     }
 
-    const marketDataCurrentYear = { ...marketDataHist, inflation: yearData.inflation };
+    const resolvedCapeRatio = resolveCapeRatio(yearData.capeRatio, inputs.marketCapeRatio, marketDataHist.capeRatio);
+    const marketDataCurrentYear = { ...marketDataHist, inflation: yearData.inflation, capeRatio: resolvedCapeRatio };
 
     const algoInput = { ...inputs, floorBedarf: baseFloor, flexBedarf: baseFlex, startSPB: inputs.startSPB };
     const market = window.Ruhestandsmodell_v30.analyzeMarket(marketDataCurrentYear);
@@ -341,6 +342,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         endeVJ: marketDataHist.endeVJ * (1 + rA),
         ath: Math.max(marketDataHist.ath, marketDataHist.endeVJ * (1 + rA)),
         jahreSeitAth: (marketDataHist.endeVJ * (1 + rA) >= marketDataHist.ath) ? 0 : marketDataHist.jahreSeitAth + 1,
+        capeRatio: resolvedCapeRatio,
         inflation: yearData.inflation
     };
 
@@ -434,7 +436,8 @@ export function initMcRunState(inputs, startYearIndex) {
         endeVJ_3: HISTORICAL_DATA[startJahr - 4]?.msci_eur || 1000,
         ath: 0,
         jahreSeitAth: 0,
-        inflation: HISTORICAL_DATA[startJahr - 1]?.inflation_de || 2.0
+        inflation: HISTORICAL_DATA[startJahr - 1]?.inflation_de || 2.0,
+        capeRatio: resolveCapeRatio(undefined, inputs.marketCapeRatio, 0)
     };
 
     const pastValues = histYears.filter(y => y < startJahr).map(y => HISTORICAL_DATA[y].msci_eur);
@@ -582,6 +585,27 @@ export function calcCareCost(careMetaP1, careMetaP2 = null) {
     }
 
     return { zusatzFloor, flexFactor };
+}
+
+/**
+ * Bestimmt den CAPE-Wert für das aktuelle Jahr.
+ * Priorität: Jahresdaten > Benutzereingabe > historischer Zustand > 0.
+ * @param {number} yearSpecificCape - CAPE-Wert aus den Jahresdaten.
+ * @param {number} inputCape - Vom Nutzer gesetzter CAPE-Wert.
+ * @param {number} historicalCape - CAPE-Wert aus dem Vorjahr.
+ * @returns {number} Gültiger CAPE-Wert (>= 0).
+ */
+function resolveCapeRatio(yearSpecificCape, inputCape, historicalCape) {
+    if (typeof yearSpecificCape === 'number' && Number.isFinite(yearSpecificCape) && yearSpecificCape > 0) {
+        return yearSpecificCape;
+    }
+    if (typeof inputCape === 'number' && Number.isFinite(inputCape) && inputCape > 0) {
+        return inputCape;
+    }
+    if (typeof historicalCape === 'number' && Number.isFinite(historicalCape) && historicalCape > 0) {
+        return historicalCape;
+    }
+    return 0;
 }
 
 /**

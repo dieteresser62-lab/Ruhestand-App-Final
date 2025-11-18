@@ -40,6 +40,7 @@ export function getCommonInputs() {
         zielLiquiditaet: parseFloat(document.getElementById('zielLiquiditaet').value) || 0,
         startFloorBedarf: parseFloat(document.getElementById('startFloorBedarf').value) || 0,
         startFlexBedarf: parseFloat(document.getElementById('startFlexBedarf').value) || 0,
+        marketCapeRatio: parseFloat(document.getElementById('marketCapeRatio')?.value) || 0,
         risikoprofil: DEFAULT_RISIKOPROFIL,
         goldAktiv: goldAktiv,
         goldZielProzent: (goldAktiv ? parseFloat(document.getElementById('goldAllokationProzent').value) : 0),

@@ -109,7 +109,8 @@ function buildInitialStates(simInputs) {
 
     const marketDataHist = {
         endeVJ: 2318, endeVJ_1: 1960, endeVJ_2: 1850, endeVJ_3: 1706,
-        ath: 2318, jahreSeitAth: 0, inflation: 1.7
+        ath: 2318, jahreSeitAth: 0, inflation: 1.7,
+        capeRatio: simInputs.marketCapeRatio || 0
     };
 
     const initialState = {

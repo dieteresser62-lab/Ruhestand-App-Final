@@ -136,6 +136,24 @@ const CONFIG = {
     },
 
     /**
+     * Bewertungsparameter für CAPE-basierte Marktanalysen.
+     * Diese Werte werden für diagnostische Hinweise und erwartete Renditen genutzt.
+     */
+    MARKET_VALUATION: {
+        DEFAULT_CAPE: 20,
+        UNDERVALUED_CAPE: 15,
+        FAIR_VALUE_CAPE: 25,
+        OVERVALUED_CAPE: 30,
+        EXTREME_OVERVALUED_CAPE: 35,
+        EXPECTED_RETURN_BY_SIGNAL: {
+            undervalued: 0.08,
+            fair: 0.07,
+            overvalued: 0.05,
+            extreme_overvalued: 0.04
+        }
+    },
+
+    /**
      * Texte und Mappings für UI-Darstellung
      */
     TEXTS: {
@@ -165,6 +183,16 @@ const CONFIG = {
             corr_young: 'recovery',                         // Junge Korrektur -> Recovery
             bear_deep: 'bear',                              // Tiefer Bär -> Bear
             recovery_in_bear: 'recovery_in_bear'            // Rally im Bär -> Special Recovery
+        },
+
+        /**
+         * Bewertungstexte für CAPE-Signale
+         */
+        VALUATION_SIGNAL: {
+            undervalued: 'Bewertung attraktiv',
+            fair: 'Bewertung moderat',
+            overvalued: 'Bewertung angespannt',
+            extreme_overvalued: 'Bewertung extrem angespannt'
         }
     }
 };
