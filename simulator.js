@@ -364,8 +364,8 @@ function renderHeatmapSVG(heat, bins, totalRuns, extraKPI = {}, options = {}) {
 }
 
 function renderWorstRunToggle(hasCareWorst) {
-  const careBtn = hasCareWorst 
-    ? `<button id="btnWorstCare" class="toggle-btn">Schlechtester Pflege-Lauf</button>` 
+  const careBtn = hasCareWorst
+    ? `<button id="btnWorstCare" class="toggle-btn">Schlechtester Pflege-Lauf</button>`
     : '';
   
   const style = `
@@ -385,6 +385,47 @@ function renderWorstRunToggle(hasCareWorst) {
       <button id="btnWorstAll" class="toggle-btn active">Schlechtester Lauf (alle)</button>
       ${careBtn}
     </div>`;
+}
+
+/**
+ * Synchronisiert die Worst-Run-Toggle-Buttons mit der aktuellen Datenlage.
+ * Fügt den Pflege-Button nur bei Bedarf hinzu bzw. entfernt ihn wieder.
+ *
+ * @param {HTMLElement|null} controlsContainer - Zielcontainer für die Buttons.
+ * @param {boolean} hasCareWorst - Ob ein Pflege-Worst-Run zur Verfügung steht.
+ * @returns {{ allButton: HTMLElement|null, careButton: HTMLElement|null }} Referenzen auf die Buttons.
+ */
+function ensureWorstRunToggleButtons(controlsContainer, hasCareWorst) {
+    if (!controlsContainer) {
+        return { allButton: null, careButton: null };
+    }
+
+    let toggleWrapper = controlsContainer.querySelector('.worst-run-toggle');
+    if (!toggleWrapper) {
+        // Erster Aufbau: gesamtes Toggle-Konstrukt einfügen.
+        controlsContainer.insertAdjacentHTML('afterbegin', renderWorstRunToggle(hasCareWorst));
+        toggleWrapper = controlsContainer.querySelector('.worst-run-toggle');
+    } else {
+        const existingCareButton = document.getElementById('btnWorstCare');
+
+        if (hasCareWorst && !existingCareButton) {
+            // Pflege-Button on-the-fly ergänzen.
+            const careButton = document.createElement('button');
+            careButton.id = 'btnWorstCare';
+            careButton.className = 'toggle-btn';
+            careButton.type = 'button';
+            careButton.textContent = 'Schlechtester Pflege-Lauf';
+            toggleWrapper.appendChild(careButton);
+        } else if (!hasCareWorst && existingCareButton) {
+            // Pflege-Button entfernen, wenn keine Daten mehr vorhanden sind.
+            existingCareButton.remove();
+        }
+    }
+
+    return {
+        allButton: document.getElementById('btnWorstAll'),
+        careButton: document.getElementById('btnWorstCare')
+    };
 }
 
 // --- DATA & CONFIG ---
@@ -1959,14 +2000,10 @@ function displayMonteCarloResults(results, anzahl, failCount, worstRun, resultsM
     const worstContainer = document.getElementById('worstRunLogContainer');
     const worstEl = document.getElementById('worstRunLog');
     const controlsContainer = document.getElementById('worst-controls');
-    
+
     const hasCareWorst = !!(worstRunCare && worstRunCare.hasCare && Array.isArray(worstRunCare.logDataRows) && worstRunCare.logDataRows.length > 0);
-    
-    // Toggle-Buttons nur einfügen, wenn sie noch nicht existieren
-    if (controlsContainer && !document.getElementById('btnWorstAll')) {
-        // Die Checkbox für Pflege-Details bleibt, die Buttons kommen davor
-        controlsContainer.insertAdjacentHTML('afterbegin', renderWorstRunToggle(hasCareWorst));
-    }
+
+    const { allButton: btnAll, careButton: btnCare } = ensureWorstRunToggleButtons(controlsContainer, hasCareWorst);
 
     let view = localStorage.getItem('worstRunView') || 'all';
     if (view === 'care' && !hasCareWorst) view = 'all'; // Fallback
@@ -1990,15 +2027,28 @@ function displayMonteCarloResults(results, anzahl, failCount, worstRun, resultsM
         }
     };
 
-    const btnAll = document.getElementById('btnWorstAll');
-    const btnCare = document.getElementById('btnWorstCare');
-    if (btnAll && !btnAll.onclick) {
-        btnAll.onclick = () => { view = 'all'; localStorage.setItem('worstRunView', 'all'); paintWorst(); };
+    if (btnAll) {
+        btnAll.onclick = () => {
+            view = 'all';
+            localStorage.setItem('worstRunView', 'all');
+            paintWorst();
+        };
     }
-    if (btnCare && !btnCare.onclick && hasCareWorst) {
-        btnCare.onclick = () => { view = 'care'; localStorage.setItem('worstRunView', 'care'); paintWorst(); };
+    if (btnCare) {
+        if (hasCareWorst) {
+            btnCare.disabled = false;
+            btnCare.onclick = () => {
+                view = 'care';
+                localStorage.setItem('worstRunView', 'care');
+                paintWorst();
+            };
+        } else {
+            btnCare.classList.remove('active');
+            btnCare.disabled = true;
+            btnCare.onclick = null;
+        }
     }
-    
+
     paintWorst(); // Initiales Rendern
 
     // 6. Gesamten Ergebnis-Container sichtbar machen
