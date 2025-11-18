@@ -181,20 +181,28 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const currentAgeP1 = inputs.startAlter + yearIndex; // bleibt für Mortalität/Pflege relevant
     // Rente Person 1 wird ausschließlich über den Zeitversatz "Start in ... Jahren" gesteuert.
     const r1StartOffsetYears = Math.max(0, Number(inputs.renteStartOffsetJahre) || 0);
-    let rente1_brutto = 0;
+    let rente1BruttoEigen = 0; // Eigene Rente von Person 1
+    let widowBenefitP1ThisYear = 0; // Zusätzliche Witwen-/Witwerrente aus Person 2
 
     if (p1Alive && yearIndex >= r1StartOffsetYears) {
         const isFirstYearR1 = (yearIndex === r1StartOffsetYears);
         const baseR1 = inputs.renteMonatlich * 12;
-        rente1_brutto = computePensionNext(currentAnnualPension, isFirstYearR1, baseR1, rentAdjPct);
-    } else if (!p1Alive && widowBenefits.p1FromP2) {
-        rente1_brutto = widowPensionP1;
+        rente1BruttoEigen = computePensionNext(currentAnnualPension, isFirstYearR1, baseR1, rentAdjPct);
     }
+
+    if (p1Alive && widowBenefits.p1FromP2) {
+        // Hinterbliebenenrente additiv zur eigenen Rente auszahlen
+        widowBenefitP1ThisYear = widowPensionP1;
+    }
+
+    const rente1_brutto = rente1BruttoEigen + widowBenefitP1ThisYear;
 
     // Keine zusätzliche Steuer/Berechnung für R1 (wird als Netto betrachtet bzw. extern versteuert)
     const rente1 = rente1_brutto;
 
     // Rente Person 2 (Partner) - Neue Logik mit gemeinsamer Anpassungsrate
+    let rente2BruttoEigen = 0;
+    let widowBenefitP2ThisYear = 0;
     let rente2_brutto = 0;
     let rente2 = 0;
 
@@ -205,26 +213,32 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         if (yearIndex >= partnerStartOffsetYears) {
             const isFirstYearR2 = (yearIndex === partnerStartOffsetYears);
             const baseR2 = inputs.partner.brutto;
-            rente2_brutto = computePensionNext(currentAnnualPension2, isFirstYearR2, baseR2, rentAdjPct);
+            rente2BruttoEigen = computePensionNext(currentAnnualPension2, isFirstYearR2, baseR2, rentAdjPct);
 
             // Steuerberechnung für Person 2
             // Wenn Steuerquote > 0, wird diese verwendet (einfache Methode)
             // Andernfalls wird eine detaillierte Berechnung mit Sparer-Pauschbetrag und Kirchensteuer durchgeführt
             if (inputs.partner.steuerquotePct > 0) {
-                rente2 = rente2_brutto * (1 - inputs.partner.steuerquotePct / 100);
+                rente2 = rente2BruttoEigen * (1 - inputs.partner.steuerquotePct / 100);
             } else {
                 // Detaillierte Steuerberechnung (analog zu Person 1, falls gewünscht)
                 // Für jetzt: keine Steuern, wenn Steuerquote = 0
                 // TODO: Hier könnte eine detaillierte Steuerberechnung mit Sparer-Pauschbetrag
                 // und Kirchensteuer implementiert werden (analog zur engine.js Logik)
-                rente2 = rente2_brutto;
+                rente2 = rente2BruttoEigen;
             }
             // Clamp bei 0 (keine negativen Renten)
             rente2 = Math.max(0, rente2);
         }
-    } else if (!p2Alive && widowBenefits.p2FromP1) {
-        rente2_brutto = widowPensionP2;
-        rente2 = rente2_brutto;
+    }
+
+    if (p2Alive && widowBenefits.p2FromP1) {
+        widowBenefitP2ThisYear = widowPensionP2;
+    }
+
+    rente2_brutto = rente2BruttoEigen + widowBenefitP2ThisYear;
+    if (widowBenefitP2ThisYear > 0) {
+        rente2 += widowBenefitP2ThisYear;
     }
 
     // Gesamtrente (renteSum)
@@ -457,8 +471,9 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             baseFloor: naechsterBaseFloor,
             baseFlex: naechsterBaseFlex,
             lastState: spendingNewState,
-            currentAnnualPension: rente1_brutto,
-            currentAnnualPension2: rente2_brutto,
+            // WICHTIG: Nur die eigene Rente persistent speichern, damit Witwenanteile nicht doppelt re-inflationiert werden
+            currentAnnualPension: rente1BruttoEigen,
+            currentAnnualPension2: rente2BruttoEigen,
             marketDataHist: newMarketDataHist,
             samplerState: currentState.samplerState,
             widowPensionP1: nextWidowPensionP1,
