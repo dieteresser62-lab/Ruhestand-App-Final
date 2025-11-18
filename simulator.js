@@ -463,6 +463,30 @@ const ENGINE_VERSION = '31.0';
 const ENGINE_HASH = '2016807894';
 const DEFAULT_RISIKOPROFIL = 'sicherheits-dynamisch';
 
+// Geschlechtsspezifische Default-Annahmen für eine akute Pflegedauer.
+const CARE_DURATION_DEFAULTS = Object.freeze({
+    m: { minYears: 5, maxYears: 10 },
+    w: { minYears: 6, maxYears: 12 },
+    d: { minYears: 5, maxYears: 11 },
+    default: { minYears: 5, maxYears: 10 }
+});
+
+function getCareDurationDefaults(gender) {
+    return CARE_DURATION_DEFAULTS[gender] || CARE_DURATION_DEFAULTS.default;
+}
+
+function normalizeCareDurationRange(minYearsRaw, maxYearsRaw, gender) {
+    const defaults = getCareDurationDefaults(gender);
+    let minYears = Number.isFinite(minYearsRaw) && minYearsRaw > 0 ? minYearsRaw : defaults.minYears;
+    let maxYears = Number.isFinite(maxYearsRaw) && maxYearsRaw > 0 ? maxYearsRaw : defaults.maxYears;
+
+    if (minYears > maxYears) {
+        maxYears = minYears;
+    }
+
+    return { minYears, maxYears };
+}
+
 let annualData = [];
 let REGIME_DATA = { BULL: [], BEAR: [], SIDEWAYS: [], STAGFLATION: [] };
 let REGIME_TRANSITIONS = {};
@@ -481,6 +505,11 @@ function getCommonInputs() {
         pflegeGradeConfigs[grade] = { zusatz, flexCut };
     });
     const grade1Config = pflegeGradeConfigs[1] || { zusatz: 0, flexCut: 1 };
+    const rawPflegeMin = parseInt(document.getElementById('pflegeMinDauer').value);
+    const rawPflegeMax = parseInt(document.getElementById('pflegeMaxDauer').value);
+    const genderField = document.getElementById('geschlecht') || document.getElementById('p1Geschlecht');
+    const normalizedCareDuration = normalizeCareDurationRange(rawPflegeMin, rawPflegeMax, genderField?.value || 'w');
+
     const baseInputs = {
         startVermoegen: parseFloat(document.getElementById('simStartVermoegen').value) || 0,
         depotwertAlt: parseFloat(document.getElementById('depotwertAlt').value) || 0,
@@ -510,8 +539,8 @@ function getCommonInputs() {
         pflegeStufe1FlexCut: grade1Config.flexCut,
         pflegeMaxFloor: parseFloat(document.getElementById('pflegeMaxFloor').value) || 0,
         pflegeRampUp: parseInt(document.getElementById('pflegeRampUp').value) || 5,
-        pflegeMinDauer: parseInt(document.getElementById('pflegeMinDauer').value) || 3,
-        pflegeMaxDauer: parseInt(document.getElementById('pflegeMaxDauer').value) || 8,
+        pflegeMinDauer: normalizedCareDuration.minYears,
+        pflegeMaxDauer: normalizedCareDuration.maxYears,
         pflegeKostenDrift: (parseFloat(document.getElementById('pflegeKostenDrift').value) || 0) / 100,
         pflegebeschleunigtMortalitaetAktivieren: document.getElementById('pflegebeschleunigtMortalitaetAktivieren').checked,
         pflegeTodesrisikoFaktor: parseFloat(document.getElementById('pflegeTodesrisikoFaktor').value) || 1.0,
@@ -1081,10 +1110,38 @@ function initMcRunState(inputs, startYearIndex) {
 }
 
 /**
+ * Schätzt die verbleibende Pflegezeit über Sterbewahrscheinlichkeiten.
+ * @param {string} gender - 'm', 'w' oder 'd'.
+ * @param {number} currentAge - Alter zum Zeitpunkt des Pflegeeintritts.
+ * @returns {number} Erwartete Restjahre (mind. 1).
+ */
+function estimateRemainingLifeYears(gender, currentAge) {
+    const table = MORTALITY_TABLE[gender] || MORTALITY_TABLE.m;
+    const ages = Object.keys(table).map(Number).sort((a, b) => a - b);
+    const minAge = ages[0] ?? currentAge;
+    const maxAge = ages[ages.length - 1] ?? currentAge;
+    let survivalProbability = 1;
+    let expectedYears = 0;
+
+    for (let age = Math.max(currentAge, minAge); age <= maxAge; age++) {
+        const qxRaw = table[age] ?? 1;
+        const qx = Math.min(1, Math.max(0, qxRaw));
+        expectedYears += survivalProbability;
+        survivalProbability *= (1 - qx);
+        if (survivalProbability < 0.0001) break;
+    }
+
+    return Math.max(1, Math.round(expectedYears));
+}
+
+/**
  * Erzeugt ein Default-Objekt für die Pflege-Metadaten.
  * Wird verwendet, um `simulateOneYear` immer ein definiertes Objekt zu übergeben.
+ * @param {boolean} enabled - Ob die Pflege-Logik aktiv ist.
+ * @param {string} personGender - Geschlecht für Mortalitätsannahmen.
+ * @returns {?Object} Pflege-Metadaten oder null.
  */
-function makeDefaultCareMeta(enabled) {
+function makeDefaultCareMeta(enabled, personGender = 'm') {
     if (!enabled) return null;
     return {
         active: false,
@@ -1102,7 +1159,8 @@ function makeDefaultCareMeta(enabled) {
         flexAtTrigger: 0,
         maxFloorAtTrigger: 0,
         grade: null,
-        gradeLabel: ''
+        gradeLabel: '',
+        personGender
     };
 }
 
@@ -1357,7 +1415,8 @@ function updateCareMeta(care, inputs, age, yearData, rand) {
                 const min = inputs.pflegeMinDauer, max = inputs.pflegeMaxDauer;
                 care.durationYears = Math.floor(rand() * (max - min + 1)) + min;
             } else {
-                care.durationYears = 999;
+                const genderForCalc = care.personGender || inputs?.geschlecht || 'm';
+                care.durationYears = estimateRemainingLifeYears(genderForCalc, age);
             }
 
             care.log_grade_bucket = sampledGrade.bucket;
@@ -1440,7 +1499,7 @@ async function runMonteCarlo() {
             let depotNurHistorie = [ sumDepot(simState.portfolio) ];
             let depotErschoepfungAlterGesetzt = false;
             
-            let careMeta = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren);
+            let careMeta = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren, inputs.geschlecht);
             let stressCtx = stressCtxMaster ? JSON.parse(JSON.stringify(stressCtxMaster)) : null;
 
             const stressYears = stressCtxMaster?.preset?.years ?? 0;

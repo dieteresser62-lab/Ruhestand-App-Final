@@ -6,6 +6,48 @@ import { HISTORICAL_DATA, STRESS_PRESETS, annualData, REGIME_DATA, REGIME_TRANSI
 const DEFAULT_RISIKOPROFIL = 'sicherheits-dynamisch';
 
 /**
+ * Geschlechtsspezifische Default-Annahmen für die Dauer eines akuten Pflegefalls.
+ * Männer verbringen im Schnitt etwas weniger Jahre in intensiver Pflege als Frauen,
+ * daher wählen wir 5–10 Jahre vs. 6–12 Jahre als konservative Spanne.
+ */
+const CARE_DURATION_DEFAULTS = Object.freeze({
+    m: { minYears: 5, maxYears: 10 },
+    w: { minYears: 6, maxYears: 12 },
+    d: { minYears: 5, maxYears: 11 },
+    default: { minYears: 5, maxYears: 10 }
+});
+
+/**
+ * Liefert das Default-Intervall für die Pflegedauer auf Basis des Geschlechts.
+ * @param {string} gender - 'm', 'w' oder 'd'.
+ * @returns {{minYears:number,maxYears:number}} - Standardwerte für min/max.
+ */
+function getCareDurationDefaults(gender) {
+    return CARE_DURATION_DEFAULTS[gender] || CARE_DURATION_DEFAULTS.default;
+}
+
+/**
+ * Normalisiert das Benutzerintervall und stellt sicher, dass min ≤ max bleibt.
+ * Werte <= 0 oder NaN werden durch Geschlechts-Defaults ersetzt.
+ * @param {number} minYearsRaw - User-Eingabe für Mindestdauer.
+ * @param {number} maxYearsRaw - User-Eingabe für Höchstdauer.
+ * @param {string} gender - Geschlecht der betrachteten Person.
+ * @returns {{minYears:number,maxYears:number}} - Bereinigtes Intervall.
+ */
+function normalizeCareDurationRange(minYearsRaw, maxYearsRaw, gender) {
+    const defaults = getCareDurationDefaults(gender);
+    let minYears = Number.isFinite(minYearsRaw) && minYearsRaw > 0 ? minYearsRaw : defaults.minYears;
+    let maxYears = Number.isFinite(maxYearsRaw) && maxYearsRaw > 0 ? maxYearsRaw : defaults.maxYears;
+
+    if (minYears > maxYears) {
+        // Dokumentierte Annahme: Wir lassen den größeren Wert dominieren, statt still zu vertauschen.
+        maxYears = minYears;
+    }
+
+    return { minYears, maxYears };
+}
+
+/**
  * Sammelt alle Eingabewerte aus dem UI
  */
 export function getCommonInputs() {
@@ -44,6 +86,10 @@ export function getCommonInputs() {
         }
     }
 
+    const rawPflegeMin = parseInt(document.getElementById('pflegeMinDauer')?.value);
+    const rawPflegeMax = parseInt(document.getElementById('pflegeMaxDauer')?.value);
+    const normalizedCareDuration = normalizeCareDurationRange(rawPflegeMin, rawPflegeMax, p1Geschlecht);
+
     const baseInputs = {
         startVermoegen: parseFloat(document.getElementById('simStartVermoegen').value) || 0,
         depotwertAlt: parseFloat(document.getElementById('depotwertAlt').value) || 0,
@@ -76,8 +122,9 @@ export function getCommonInputs() {
         pflegeStufe1FlexCut: grade1Config.flexCut,
         pflegeMaxFloor: parseFloat(document.getElementById('pflegeMaxFloor').value) || 0,
         pflegeRampUp: parseInt(document.getElementById('pflegeRampUp').value) || 5,
-        pflegeMinDauer: parseInt(document.getElementById('pflegeMinDauer').value) || 3,
-        pflegeMaxDauer: parseInt(document.getElementById('pflegeMaxDauer').value) || 8,
+        // Defensive Defaults: greifen auf geschlechtsspezifische Annahmen zurück.
+        pflegeMinDauer: normalizedCareDuration.minYears,
+        pflegeMaxDauer: normalizedCareDuration.maxYears,
         pflegeKostenDrift: (parseFloat(document.getElementById('pflegeKostenDrift').value) || 0) / 100,
         pflegebeschleunigtMortalitaetAktivieren: document.getElementById('pflegebeschleunigtMortalitaetAktivieren').checked,
         pflegeTodesrisikoFaktor: parseFloat(document.getElementById('pflegeTodesrisikoFaktor').value) || 1.0,

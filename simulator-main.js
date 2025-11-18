@@ -469,8 +469,11 @@ export async function runMonteCarlo() {
             let depotErschoepfungAlterGesetzt = false;
 
             // Dual Care: P1 + P2 (Partner)
-            const careMetaP1 = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren);
-            const careMetaP2 = (inputs.partner?.aktiv === true) ? makeDefaultCareMeta(inputs.pflegefallLogikAktivieren) : null;
+            const careMetaP1 = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren, inputs.geschlecht);
+            const partnerGenderFallback = inputs.geschlecht === 'm' ? 'w' : 'm';
+            const careMetaP2 = (inputs.partner?.aktiv === true)
+                ? makeDefaultCareMeta(inputs.pflegefallLogikAktivieren, inputs.partner?.geschlecht || partnerGenderFallback)
+                : null;
 
             // Separate RNG streams for independent care events
             const rngCareP1 = rand.fork('CARE_P1');
@@ -1869,7 +1872,7 @@ export async function runParameterSweep() {
                 let simState = initMcRunState(inputs, startYearIndex);
 
                 const depotWertHistorie = [portfolioTotal(simState.portfolio)];
-                let careMeta = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren);
+                let careMeta = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren, inputs.geschlecht);
                 let stressCtx = cloneStressContext(stressCtxMaster);
 
                 let minRunway = Infinity;
