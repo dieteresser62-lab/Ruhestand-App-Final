@@ -192,7 +192,7 @@ Object.assign(rampCare, {
 });
 
 let rampOk = true;
-const dummyRand = () => 0;
+const dummyRand = () => 0.99;
 for (let year = 1; year <= 4; year++) {
     updateCareMeta(rampCare, rampInputs, 70 + year, { inflation: 2 }, dummyRand);
     if (rampCare.currentYearInCare !== year) rampOk = false;
@@ -243,12 +243,122 @@ Object.assign(gradeCare, {
 
 updateCareMeta(gradeCare, gradeInputs, 82, { inflation: 2 }, () => 0);
 const expectedFlex = gradeInputs.pflegeGradeConfigs[3].flexCut;
-const gradeOk = Math.abs(gradeCare.flexFactor - expectedFlex) < 1e-9 && gradeCare.zusatzFloorZiel > 0;
+const inflationPct = 2;
+const expectedZusatz = gradeInputs.pflegeGradeConfigs[3].zusatz * (1 + inflationPct / 100);
+const tol = 1e-6;
+const gradeOk = Math.abs(gradeCare.flexFactor - expectedFlex) < tol && Math.abs(gradeCare.zusatzFloorZiel - expectedZusatz) < tol;
 
 if (gradeOk) {
     console.log('✅ PASS: Pflegegrad 3 verwendet eigene Konfiguration.');
 } else {
     console.log('❌ FAIL: Pflegegrad-Konfiguration wurde nicht angewandt.');
+    process.exit(1);
+}
+
+// Test 10: Drift-Prozent und Ramp nur bei Cap-Überschreitung
+console.log('\n📊 Test 10: Drift als Prozentwert & Ramp bei Cap-Überschreitung');
+console.log('-'.repeat(60));
+
+const driftInputs = {
+    pflegefallLogikAktivieren: true,
+    pflegeModellTyp: 'chronisch',
+    pflegeRampUp: 4,
+    pflegeGradeConfigs: {
+        2: { zusatz: 40000, flexCut: 0.5, mortalityFactor: 1.2 },
+        4: { zusatz: 120000, flexCut: 0.2, mortalityFactor: 3.5 }
+    },
+    pflegeMaxFloor: 70000,
+    pflegeKostenDrift: 3.5,
+    startFloorBedarf: 20000,
+    startFlexBedarf: 10000
+};
+
+const driftCare = makeDefaultCareMeta(true);
+Object.assign(driftCare, {
+    active: true,
+    triggered: true,
+    grade: 2,
+    gradeLabel: 'Pflegegrad 2',
+    floorAtTrigger: driftInputs.startFloorBedarf,
+    flexAtTrigger: driftInputs.startFlexBedarf,
+    maxFloorAtTrigger: driftInputs.pflegeMaxFloor,
+    currentYearInCare: 0,
+    zusatzFloorZiel: 0,
+    kumulierteKosten: 0
+});
+
+updateCareMeta(driftCare, driftInputs, 80, { inflation: 2 }, () => 0.5);
+const expectedMultiplier = (1 + 2/100) * (1 + 3.5/100);
+const expectedFirstYearZusatz = driftInputs.pflegeGradeConfigs[2].zusatz * expectedMultiplier;
+const driftOk = Math.abs(driftCare.zusatzFloorZiel - expectedFirstYearZusatz) < tol;
+
+const driftRampCare = makeDefaultCareMeta(true);
+Object.assign(driftRampCare, {
+    active: true,
+    triggered: true,
+    grade: 4,
+    gradeLabel: 'Pflegegrad 4',
+    floorAtTrigger: driftInputs.startFloorBedarf,
+    flexAtTrigger: driftInputs.startFlexBedarf,
+    maxFloorAtTrigger: driftInputs.pflegeMaxFloor,
+    currentYearInCare: 0,
+    zusatzFloorZiel: 0,
+    kumulierteKosten: 0
+});
+
+updateCareMeta(driftRampCare, driftInputs, 80, { inflation: 2 }, () => 0.25);
+const capFirstYear = Math.max(0,
+    driftInputs.pflegeMaxFloor * expectedMultiplier - driftInputs.startFloorBedarf * (1 + 2/100)
+);
+const expectedRampTarget = Math.min(capFirstYear,
+    driftInputs.pflegeGradeConfigs[4].zusatz * expectedMultiplier / driftInputs.pflegeRampUp
+);
+const driftRampOk = Math.abs(driftRampCare.zusatzFloorZiel - expectedRampTarget) < tol;
+
+if (driftOk && driftRampOk) {
+    console.log('✅ PASS: Drift wird korrekt als Prozent verarbeitet und Ramp greift nur wenn nötig.');
+} else {
+    console.log('❌ FAIL: Drift- oder Ramp-Logik fehlerhaft.');
+    process.exit(1);
+}
+
+// Test 11: Einstiegsgrade & keine Progression im Eintrittsjahr
+console.log('\n📊 Test 11: Einstieg nur in PG1/PG2 & keine Progression im Eintrittsjahr');
+console.log('-'.repeat(60));
+
+const entryInputs = {
+    pflegefallLogikAktivieren: true,
+    pflegeModellTyp: 'chronisch',
+    pflegeRampUp: 5,
+    pflegeGradeConfigs: {
+        1: { zusatz: 5000, flexCut: 0.8, mortalityFactor: 0 },
+        2: { zusatz: 10000, flexCut: 0.6, mortalityFactor: 1 }
+    },
+    pflegeMaxFloor: 80000,
+    pflegeKostenDrift: 0,
+    startFloorBedarf: 30000,
+    startFlexBedarf: 15000,
+    pflegeMinDauer: 5,
+    pflegeMaxDauer: 5
+};
+
+const entryCare = makeDefaultCareMeta(true);
+const scriptedRolls = [0.025, 0];
+let rollIndex = 0;
+const scriptedRand = () => {
+    const value = typeof scriptedRolls[rollIndex] === 'number' ? scriptedRolls[rollIndex] : 1;
+    rollIndex += 1;
+    return value;
+};
+
+updateCareMeta(entryCare, entryInputs, 72, { inflation: 2 }, scriptedRand);
+
+const entryOk = entryCare.grade === 2 && entryCare.currentYearInCare === 1;
+
+if (entryOk) {
+    console.log('✅ PASS: Einstieg erfolgt maximal in PG2 und es gibt keine Sofort-Progression.');
+} else {
+    console.log('❌ FAIL: Einstiegsgrade oder Progressions-Gate fehlerhaft.');
     process.exit(1);
 }
 

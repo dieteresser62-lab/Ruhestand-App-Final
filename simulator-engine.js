@@ -732,7 +732,8 @@ function sampleCareGrade(age, rand) {
     // Sie können nur durch Progression aus niedrigeren Graden erreicht werden.
     // Dies ist medizinisch realistischer: Menschen entwickeln normalerweise nicht
     // sofort schwerste Pflegebedürftigkeit, sondern beginnen mit leichteren Graden.
-    const INITIAL_ENTRY_GRADES = [1, 2, 3];  // Nur PG1-3 für initialen Eintritt
+    // Stand heute erlauben wir nur Einstiege in PG1 und PG2.
+    const INITIAL_ENTRY_GRADES = [1, 2];  // Nur PG1-2 für initialen Eintritt
 
     const totalProbability = INITIAL_ENTRY_GRADES.reduce((sum, grade) => sum + (probabilities[grade] || 0), 0);
     if (totalProbability <= 0) return null;
@@ -811,8 +812,9 @@ export function updateCareMeta(care, inputs, age, yearData, rand) {
         const progressionProb = PFLEGE_GRADE_PROGRESSION_PROBABILITIES[currentGrade] || 0;
 
         let gradeChanged = false;
+        const canProgressThisYear = (care.currentYearInCare || 0) >= 1;
         // Prüfe ob Verschlechterung eintritt (nur wenn nicht bereits PG5)
-        if (currentGrade < 5 && rand() < progressionProb) {
+        if (canProgressThisYear && currentGrade < 5 && rand() < progressionProb) {
             const newGrade = currentGrade + 1;
             care.grade = newGrade;
             care.gradeLabel = PFLEGE_GRADE_LABELS[newGrade] || `Pflegegrad ${newGrade}`;
@@ -827,7 +829,9 @@ export function updateCareMeta(care, inputs, age, yearData, rand) {
         const yearIndex = yearsSinceStart + 1;
         care.mortalityFactor = gradeConfig.mortalityFactor || 0;
         // Pflegekosten steigen historisch schneller als die CPI, daher modellieren wir Inflation * Drift.
-        const inflationsAnpassung = (1 + yearData.inflation/100) * (1 + (inputs.pflegeKostenDrift || 0));
+        const rawDriftPct = Number(inputs.pflegeKostenDrift);
+        const driftFactor = Number.isFinite(rawDriftPct) ? Math.max(0, rawDriftPct) / 100 : 0;
+        const inflationsAnpassung = (1 + yearData.inflation/100) * (1 + driftFactor);
         // Regionale Aufschläge (z.B. Ballungsräume) skalieren alle Grade linear.
         const regionalMultiplier = 1 + Math.max(0, inputs?.pflegeRegionalZuschlag || 0);
 
@@ -847,10 +851,15 @@ export function updateCareMeta(care, inputs, age, yearData, rand) {
             zielRoh = care.previousZielRoh * inflationsAnpassung;
         }
         care.previousZielRoh = zielRoh;
-        const rampUpFactor = Math.min(1.0, yearIndex / Math.max(1, inputs.pflegeRampUp));
-        const zielMitRampUp = zielRoh * rampUpFactor;
-
-        const zusatzFloorZielFinal = Math.min(capZusatz, zielMitRampUp);
+        const cappedZiel = Math.min(capZusatz, zielRoh);
+        const needsRamp = (zielRoh > capZusatz) && capZusatz > 0;
+        let zusatzFloorZielFinal = cappedZiel;
+        if (needsRamp) {
+            const rampYears = Math.max(1, inputs.pflegeRampUp);
+            const rampUpFactor = Math.min(1.0, yearIndex / rampYears);
+            const rampedTarget = Math.min(capZusatz, zielRoh * rampUpFactor);
+            zusatzFloorZielFinal = rampedTarget;
+        }
 
         const zusatzFloorDelta = Math.max(0, zusatzFloorZielFinal - care.zusatzFloorZiel);
         care.zusatzFloorDelta = zusatzFloorDelta;
