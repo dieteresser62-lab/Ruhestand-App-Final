@@ -1224,19 +1224,6 @@ function updatePflegeUIInfo() {
     }
 }
 
-function setMortalityInputsDisabled(disabled) {
-    SUPPORTED_PFLEGE_GRADES.forEach(grade => {
-        const field = document.getElementById(`pflegeStufe${grade}Mortality`);
-        if (field) {
-            field.disabled = disabled;
-        }
-    });
-    const note = document.querySelector('.care-grade-note');
-    if (note) {
-        note.style.opacity = disabled ? 0.5 : 1;
-    }
-}
-
 /**
  * DOM-Initialisierung und Event-Handler
  */
@@ -1254,8 +1241,7 @@ window.onload = function() {
         'p1Monatsrente', 'p1StartInJahren', 'rentAdjMode', 'rentAdjPct',
         'pflegefallLogikAktivieren', 'pflegeModellTyp', ...CARE_GRADE_FIELD_IDS,
         'pflegeMaxFloor', 'pflegeRampUp', 'pflegeMinDauer', 'pflegeMaxDauer', 'pflegeKostenDrift',
-        'pflegeRegionalZuschlag', 'pflegeKostenStaffelPreset',
-        'pflegebeschleunigtMortalitaetAktivieren'
+        'pflegeRegionalZuschlag', 'pflegeKostenStaffelPreset'
     ];
     allInputs.forEach(id => {
         const element = document.getElementById(id);
@@ -1331,15 +1317,6 @@ window.onload = function() {
 
     const pflegeModellSelect = document.getElementById('pflegeModellTyp');
     pflegeModellSelect.addEventListener('change', () => { document.getElementById('pflegeDauerContainer').style.display = pflegeModellSelect.value === 'akut' ? 'contents' : 'none'; });
-
-    const pflegeMortalitaetCheckbox = document.getElementById('pflegebeschleunigtMortalitaetAktivieren');
-    const syncMortalityToggle = () => {
-        if (!pflegeMortalitaetCheckbox) return;
-        setMortalityInputsDisabled(!pflegeMortalitaetCheckbox.checked);
-    };
-    if (pflegeMortalitaetCheckbox) {
-        pflegeMortalitaetCheckbox.addEventListener('change', syncMortalityToggle);
-    }
 
     // Partner/Rente-2-Einstellungen: Toggle Show/Hide
     const chkPartnerAktiv = document.getElementById('chkPartnerAktiv');
