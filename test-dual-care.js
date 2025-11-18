@@ -9,7 +9,13 @@
  */
 
 import { rng } from './simulator-utils.js';
-import { makeDefaultCareMeta, updateCareMeta, calcCareCost, computeCareMortalityMultiplier } from './simulator-engine.js';
+import {
+    makeDefaultCareMeta,
+    updateCareMeta,
+    calcCareCost,
+    computeCareMortalityMultiplier,
+    computeHouseholdFlexFactor
+} from './simulator-engine.js';
 
 const SEED = 12345;
 
@@ -362,6 +368,39 @@ if (entryOk) {
     process.exit(1);
 }
 
+// Test 12: Flexanteile personenbasiert gewichten
+console.log('\n📊 Test 12: Flexanteile werden pro Person separat gekürzt');
+console.log('-'.repeat(60));
+
+const shareMetaP1 = { flexFactor: 0.25, active: true };
+const shareMetaP2 = { flexFactor: 0.9, active: false };
+
+const bothAliveFactor = computeHouseholdFlexFactor({
+    p1Alive: true,
+    careMetaP1: shareMetaP1,
+    p2Alive: true,
+    careMetaP2: shareMetaP2
+});
+const singleAliveFactor = computeHouseholdFlexFactor({
+    p1Alive: true,
+    careMetaP1: shareMetaP1,
+    p2Alive: false,
+    careMetaP2: shareMetaP2
+});
+
+const expectedBothAlive = 0.5 * shareMetaP1.flexFactor + 0.5 * shareMetaP2.flexFactor;
+const expectedSingle = shareMetaP1.flexFactor;
+
+console.log(`Beide leben → Faktor: ${bothAliveFactor.toFixed(3)} (erwartet ${expectedBothAlive.toFixed(3)})`);
+console.log(`Nur P1 lebt → Faktor: ${singleAliveFactor.toFixed(3)} (erwartet ${expectedSingle.toFixed(3)})`);
+
+if (Math.abs(bothAliveFactor - expectedBothAlive) < 1e-6 && Math.abs(singleAliveFactor - expectedSingle) < 1e-6) {
+    console.log('✅ PASS: Flexanteile werden personenbasiert verteilt.');
+} else {
+    console.log('❌ FAIL: Flexanteile werden nicht korrekt pro Person gewichtet.');
+    process.exit(1);
+}
+
 // Summary
 console.log('\n' + '='.repeat(60));
 console.log('🎉 All Tests Passed!');
@@ -374,4 +413,5 @@ console.log('  ✓ Cost calculation handles single active care');
 console.log('  ✓ Cost calculation handles dual active care (additive)');
 console.log('  ✓ Cost calculation handles P2-only active care');
 console.log('  ✓ Cost calculation handles null P2 (no partner)');
+console.log('  ✓ Flex-Anteile werden pro Person gewichtet gekürzt');
 console.log('\n✅ Ready for integration testing\n');
