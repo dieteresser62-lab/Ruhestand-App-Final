@@ -80,7 +80,7 @@ import {
     calcCareCost,
     computeCareMortalityMultiplier
 } from './simulator-engine.js';
-import { portfolioTotal, displayMonteCarloResults, renderWorstRunLog, aggregateSweepMetrics } from './simulator-results.js';
+import { portfolioTotal, displayMonteCarloResults, renderWorstRunLog, aggregateSweepMetrics, getWorstRunColumnDefinitions } from './simulator-results.js';
 import { formatCurrencyShortLog } from './simulator-utils.js';
 import { sumDepot } from './simulator-portfolio.js';
 import { renderSweepHeatmapSVG } from './simulator-heatmap.js';
@@ -1028,109 +1028,234 @@ export function runBacktest() {
     } finally { document.getElementById('btButton').disabled = false; }
 }
 
-/**
- * Rendert das Backtest-Log aus den gespeicherten Daten neu
- * (wird aufgerufen, wenn die Detail-Level-Checkbox geändert wird)
- */
+const CSV_DELIMITER = ';';
+
+function getNestedValue(obj, path) {
+    if (!path) return obj;
+    return path.split('.').reduce((acc, key) => (acc && acc[key] != null ? acc[key] : undefined), obj);
+}
+
+function resolveColumnRawValue(column, row) {
+    if (typeof column.extractor === 'function') {
+        return column.extractor(row);
+    }
+    if (column.key) {
+        return getNestedValue(row, column.key);
+    }
+    return undefined;
+}
+
+function formatColumnValue(column, row) {
+    const rawValue = resolveColumnRawValue(column, row);
+    if (typeof column.valueFormatter === 'function') {
+        return column.valueFormatter(rawValue, row);
+    }
+    if (typeof column.fmt === 'function') {
+        return column.fmt(rawValue, row);
+    }
+    return rawValue == null ? '' : String(rawValue);
+}
+
+function formatCellForDisplay(column, row) {
+    const value = formatColumnValue(column, row);
+    const align = column.align === 'left' ? 'left' : 'right';
+    return align === 'left'
+        ? String(value).padEnd(column.width)
+        : String(value).padStart(column.width);
+}
+
+function prepareRowsForExport(rows, columns) {
+    return rows.map(row => {
+        const prepared = {};
+        for (const column of columns) {
+            const header = column.exportHeader || column.header;
+            prepared[header] = formatColumnValue(column, row);
+        }
+        return prepared;
+    });
+}
+
+function convertRowsToCsv(rows, columns) {
+    const escapeCell = (value) => {
+        const safeValue = value == null ? '' : String(value);
+        return /["\n;]/.test(safeValue)
+            ? `"${safeValue.replace(/"/g, '""')}"`
+            : safeValue;
+    };
+
+    const headerLine = columns.map(col => escapeCell(col.exportHeader || col.header)).join(CSV_DELIMITER);
+    const dataLines = rows.map(row =>
+        columns.map(col => escapeCell(formatColumnValue(col, row))).join(CSV_DELIMITER)
+    );
+    return [headerLine, ...dataLines].join('\n');
+}
+
+function buildBacktestColumnDefinitions(detailLevel = 'normal') {
+    const isDetailed = detailLevel === 'detailed';
+    const formatPercent = (value, decimals = 1) => `${(Number(value) || 0).toFixed(decimals)}%`;
+    const formatPercentInt = (value) => `${Math.round(Number(value) || 0)}%`;
+
+    const columns = [
+        { header: 'Jahr', width: 4, key: 'jahr', valueFormatter: v => v ?? '', align: 'right' },
+        { header: 'Entn.', width: 7, key: 'entscheidung.jahresEntnahme', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+        { header: 'Floor', width: 7, key: 'row.floor_brutto', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' }
+    ];
+
+    if (isDetailed) {
+        columns.push(
+            { header: 'Rente1', width: 7, key: 'row.rente1', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'Rente2', width: 7, key: 'row.rente2', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' }
+        );
+    }
+
+    columns.push({ header: 'RenteSum', width: 8, key: 'row.renteSum', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' });
+
+    if (isDetailed) {
+        columns.push({ header: 'FloorDep', width: 8, key: 'row.floor_aus_depot', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' });
+    }
+
+    columns.push(
+        { header: 'Flex%', width: 5, key: 'row.FlexRatePct', valueFormatter: v => formatPercentInt(v), align: 'right' },
+        { header: 'Flex€', width: 7, key: 'row.flex_erfuellt_nominal', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' }
+    );
+
+    if (isDetailed) {
+        columns.push(
+            { header: 'Entn_real', width: 9, key: 'row.jahresentnahme_real', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'Adj%', width: 5, key: 'adjPct', valueFormatter: v => formatPercent(v), align: 'right' }
+        );
+    }
+
+    columns.push(
+        { header: 'Status', width: 16, key: 'row.aktionUndGrund', valueFormatter: v => (v || '').substring(0, 15), align: 'left' },
+        { header: 'Quote%', width: 6, key: 'row.QuoteEndPct', valueFormatter: v => formatPercent(v), align: 'right' },
+        { header: 'Runway%', width: 7, key: 'row.RunwayCoveragePct', valueFormatter: v => formatPercentInt(v), align: 'right' },
+        { header: 'R.Aktien', width: 8, extractor: row => (row.row?.RealReturnEquityPct || 0) * 100, valueFormatter: v => formatPercent(v), align: 'right' },
+        { header: 'R.Gold', width: 8, extractor: row => (row.row?.RealReturnGoldPct || 0) * 100, valueFormatter: v => formatPercent(v), align: 'right' },
+        { header: 'Infl.', width: 5, key: 'inflationVJ', valueFormatter: v => formatPercent(v), align: 'right' },
+        { header: 'Handl.A', width: 8, key: 'netA', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+        { header: 'Handl.G', width: 8, key: 'netG', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+        { header: 'St.', width: 6, key: 'row.steuern_gesamt', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+        { header: 'Aktien', width: 8, key: 'wertAktien', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+        { header: 'Gold', width: 7, key: 'wertGold', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+        { header: 'Liq.', width: 7, key: 'liquiditaet', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' }
+    );
+
+    if (isDetailed) {
+        columns.push(
+            { header: 'NeedLiq', width: 8, key: 'row.NeedLiq', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'GuardG', width: 7, key: 'row.GuardGold', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'GuardA', width: 7, key: 'row.GuardEq', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'GuardNote', width: 16, key: 'row.GuardNote', valueFormatter: v => (v || '').substring(0, 16), align: 'right' }
+        );
+    }
+
+    return columns;
+}
+
 function renderBacktestLog() {
-    if (!window.globalBacktestData || !window.globalBacktestData.rows || window.globalBacktestData.rows.length === 0) {
+    if (!window.globalBacktestData || !Array.isArray(window.globalBacktestData.rows) || window.globalBacktestData.rows.length === 0) {
         return;
     }
 
     const logDetailLevel = localStorage.getItem('logDetailLevel') || 'normal';
-    const { rows: logRows, startJahr } = window.globalBacktestData;
+    const { rows: logRows } = window.globalBacktestData;
+    const columns = buildBacktestColumnDefinitions(logDetailLevel);
 
-    const p = (str, len) => String(str).padStart(len);
-    const pf = (val, len) => p(`${(val || 0).toFixed(1)}%`, len);
-    const pfInt = (val, len) => p(`${Math.round(val || 0)}%`, len);
+    const headerLine = columns.map(col => {
+        const headerText = col.header || '';
+        const align = col.align === 'left' ? 'left' : 'right';
+        return align === 'left'
+            ? headerText.padEnd(col.width)
+            : headerText.padStart(col.width);
+    }).join('  ');
+    let log = headerLine + '\n' + '='.repeat(headerLine.length) + '\n';
 
-    // Header basierend auf Detail-Level
-    let headerCols = [
-        "Jahr".padEnd(4), "Entn.".padStart(7), "Floor".padStart(7)
-    ];
-    if (logDetailLevel === 'detailed') {
-        headerCols.push("Rente1".padStart(7), "Rente2".padStart(7));
-    }
-    headerCols.push("RenteSum".padStart(8));
-    if (logDetailLevel === 'detailed') {
-        headerCols.push("FloorDep".padStart(8));
-    }
-    headerCols.push("Flex%".padStart(5), "Flex€".padStart(7));
-    if (logDetailLevel === 'detailed') {
-        headerCols.push("Entn_real".padStart(9), "Adj%".padStart(5));
-    }
-    headerCols.push(
-        "Status".padEnd(16), "Quote%".padStart(6), "Runway%".padStart(7),
-        "R.Aktien".padStart(8), "R.Gold".padStart(8), "Infl.".padStart(5),
-        "Handl.A".padStart(8), "Handl.G".padStart(8), "St.".padStart(6),
-        "Aktien".padStart(8), "Gold".padStart(7), "Liq.".padStart(7)
-    );
-    if (logDetailLevel === 'detailed') {
-        headerCols.push("NeedLiq".padStart(8), "GuardG".padStart(7), "GuardA".padStart(7), "GuardNote".padStart(16));
-    }
-    let header = headerCols.join("  ");
-    let log = header + "\n" + "=".repeat(header.length) + "\n";
-
-    // Rendere jede Zeile
-    for (const logData of logRows) {
-        const { jahr, row, entscheidung, wertAktien, wertGold, liquiditaet, netA, netG, adjPct, inflationVJ } = logData;
-
-        // Log-Zeile basierend auf Detail-Level
-        let logCols = [
-            p(jahr, 4),
-            formatCurrencyShortLog(entscheidung.jahresEntnahme).padStart(7),
-            formatCurrencyShortLog(row.floor_brutto).padStart(7)
-        ];
-        if (logDetailLevel === 'detailed') {
-            logCols.push(
-                formatCurrencyShortLog(row.rente1 || 0).padStart(7),
-                formatCurrencyShortLog(row.rente2 || 0).padStart(7)
-            );
-        }
-        logCols.push(formatCurrencyShortLog(row.renteSum || 0).padStart(8));
-        if (logDetailLevel === 'detailed') {
-            logCols.push(formatCurrencyShortLog(row.floor_aus_depot).padStart(8));
-        }
-        logCols.push(
-            pfInt(row.FlexRatePct, 5),
-            formatCurrencyShortLog(row.flex_erfuellt_nominal).padStart(7)
-        );
-        if (logDetailLevel === 'detailed') {
-            logCols.push(
-                formatCurrencyShortLog(row.jahresentnahme_real).padStart(9),
-                pf(adjPct, 5)
-            );
-        }
-        logCols.push(
-            row.aktionUndGrund.substring(0,15).padEnd(16),
-            pf(row.QuoteEndPct, 6),
-            pfInt(row.RunwayCoveragePct, 7),
-            pf((row.RealReturnEquityPct||0)*100, 8),
-            pf((row.RealReturnGoldPct||0)*100, 8),
-            pf(inflationVJ, 5),
-            formatCurrencyShortLog(netA).padStart(8),
-            formatCurrencyShortLog(netG).padStart(8),
-            formatCurrencyShortLog(row.steuern_gesamt || 0).padStart(6),
-            formatCurrencyShortLog(wertAktien).padStart(8),
-            formatCurrencyShortLog(wertGold).padStart(7),
-            formatCurrencyShortLog(liquiditaet).padStart(7)
-        );
-        if (logDetailLevel === 'detailed') {
-            logCols.push(
-                formatCurrencyShortLog(row.NeedLiq || 0).padStart(8),
-                formatCurrencyShortLog(row.GuardGold || 0).padStart(7),
-                formatCurrencyShortLog(row.GuardEq || 0).padStart(7),
-                String(row.GuardNote || '').substring(0, 16).padStart(16)
-            );
-        }
-        log += logCols.join("  ") + "\n";
+    for (const row of logRows) {
+        const line = columns.map(col => formatCellForDisplay(col, row)).join('  ');
+        log += line + '\n';
     }
 
     document.getElementById('simulationLog').textContent = log;
 }
 
+/**
+ * Erstellt einen Download-Blob und löst den Speicherdialog aus
+ * @param {string} filename - Empfohlener Dateiname
+ * @param {string} content - Dateiinhalte
+ * @param {string} mimeType - MIME-Type (z.B. application/json)
+ */
+function triggerDownload(filename, content, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+}
+
+function exportWorstRunLogData(format = 'json') {
+    const worstData = window.globalWorstRunData;
+    if (!worstData || !Array.isArray(worstData.rows) || worstData.rows.length === 0) {
+        alert('Es sind keine Worst-Case-Log-Daten zum Export verfügbar. Bitte zuerst eine Monte-Carlo-Simulation durchführen.');
+        return;
+    }
+
+    const showCareDetails = localStorage.getItem('showCareDetails') === '1';
+    const detailLevel = localStorage.getItem('logDetailLevel') || 'normal';
+    const columns = getWorstRunColumnDefinitions({ showCareDetails, logDetailLevel: detailLevel });
+    const timestamp = new Date().toISOString().replace(/[:]/g, '-');
+    const filenameBase = `worst-case-log-${timestamp}`;
+
+    if (format === 'json') {
+        const payload = {
+            exportedAt: new Date().toISOString(),
+            options: { showCareDetails, detailLevel, caR_Threshold: worstData.caR_Threshold ?? null },
+            rows: prepareRowsForExport(worstData.rows, columns)
+        };
+        triggerDownload(`${filenameBase}.json`, JSON.stringify(payload, null, 2), 'application/json');
+    } else if (format === 'csv') {
+        const csvContent = convertRowsToCsv(worstData.rows, columns);
+        triggerDownload(`${filenameBase}.csv`, csvContent, 'text/csv;charset=utf-8');
+    } else {
+        console.warn('Unbekanntes Exportformat:', format);
+    }
+}
+
+function exportBacktestLogData(format = 'json') {
+    const backtestData = window.globalBacktestData;
+    if (!backtestData || !Array.isArray(backtestData.rows) || backtestData.rows.length === 0) {
+        alert('Es sind keine Backtest-Daten zum Export verfügbar. Bitte zuerst einen Backtest ausführen.');
+        return;
+    }
+
+    const detailLevel = localStorage.getItem('logDetailLevel') || 'normal';
+    const columns = buildBacktestColumnDefinitions(detailLevel);
+    const timestamp = new Date().toISOString().replace(/[:]/g, '-');
+    const filenameBase = `backtest-log-${timestamp}`;
+
+    if (format === 'json') {
+        const payload = {
+            exportedAt: new Date().toISOString(),
+            options: { detailLevel, startJahr: backtestData.startJahr ?? null },
+            rows: prepareRowsForExport(backtestData.rows, columns)
+        };
+        triggerDownload(`${filenameBase}.json`, JSON.stringify(payload, null, 2), 'application/json');
+    } else if (format === 'csv') {
+        const csvContent = convertRowsToCsv(backtestData.rows, columns);
+        triggerDownload(`${filenameBase}.csv`, csvContent, 'text/csv;charset=utf-8');
+    } else {
+        console.warn('Unbekanntes Exportformat:', format);
+    }
+}
+
 // Mache die Funktion global verfügbar
 window.renderBacktestLog = renderBacktestLog;
+window.exportWorstRunLogData = exportWorstRunLogData;
+window.exportBacktestLogData = exportBacktestLogData;
 
 /**
  * Prüft Engine-Version und -Hash
@@ -1382,6 +1507,24 @@ window.onload = function() {
                 window.renderBacktestLog();
             }
         });
+    }
+
+    const exportWorstJsonBtn = document.getElementById('exportWorstLogJson');
+    if (exportWorstJsonBtn) {
+        exportWorstJsonBtn.addEventListener('click', () => exportWorstRunLogData('json'));
+    }
+    const exportWorstCsvBtn = document.getElementById('exportWorstLogCsv');
+    if (exportWorstCsvBtn) {
+        exportWorstCsvBtn.addEventListener('click', () => exportWorstRunLogData('csv'));
+    }
+
+    const exportBacktestJsonBtn = document.getElementById('exportBacktestJson');
+    if (exportBacktestJsonBtn) {
+        exportBacktestJsonBtn.addEventListener('click', () => exportBacktestLogData('json'));
+    }
+    const exportBacktestCsvBtn = document.getElementById('exportBacktestCsv');
+    if (exportBacktestCsvBtn) {
+        exportBacktestCsvBtn.addEventListener('click', () => exportBacktestLogData('csv'));
     }
 
     const stressSelect = document.getElementById('stressPreset');

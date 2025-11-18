@@ -363,6 +363,10 @@
                         <input type="checkbox" id="toggle-log-detail" style="width:auto; vertical-align: middle; margin-right: 4px;">
                         Detailliertes Log anzeigen
                       </label>
+                      <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
+                        <button type="button" id="exportWorstLogJson">Worst-Case Log als JSON</button>
+                        <button type="button" id="exportWorstLogCsv">Worst-Case Log als CSV</button>
+                      </div>
                     </div>
                     <div id="worstRunLog"></div>
                 </div>
@@ -388,6 +392,10 @@
                     <input type="checkbox" id="toggle-backtest-detail" style="width:auto; vertical-align: middle; margin-right: 4px;">
                     Detailliertes Log anzeigen
                   </label>
+                  <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:8px;">
+                    <button type="button" id="exportBacktestJson">Backtest-Log als JSON</button>
+                    <button type="button" id="exportBacktestCsv">Backtest-Log als CSV</button>
+                  </div>
                 </div>
                 <div id="simulationLog">Keine Daten</div>
              </div>

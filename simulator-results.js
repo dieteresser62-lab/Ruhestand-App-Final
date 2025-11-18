@@ -229,7 +229,7 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
 /**
  * Rendert das Worst-Run-Log als Textausgabe
  */
-export function renderWorstRunLog(logRows, caR_Threshold, opts = {}) {
+export function getWorstRunColumnDefinitions(opts = {}) {
     const options = { showCareDetails: false, logDetailLevel: 'normal', ...opts };
 
     const formatPctOrDash = (value, fallback = '—') => {
@@ -237,7 +237,6 @@ export function renderWorstRunLog(logRows, caR_Threshold, opts = {}) {
         return `${Math.round(value * 100)}%`;
     };
 
-    // Basis-Spalten abhängig vom Detail-Level
     const baseCols = [];
     baseCols.push({ key: 'jahr', header: 'Jahr', width: 4 });
     if (options.logDetailLevel === 'detailed') {
@@ -246,7 +245,6 @@ export function renderWorstRunLog(logRows, caR_Threshold, opts = {}) {
     baseCols.push({ key: 'entscheidung.jahresEntnahme', header: 'Entnahme', width: 8, fmt: formatCurrencyShortLog });
     baseCols.push({ key: 'floor_brutto', header: 'Floor', width: 7, fmt: formatCurrencyShortLog });
 
-    // Renten-Spalten: Im Normal-Modus nur Summe, im Detail-Modus alle
     if (options.logDetailLevel === 'detailed' || options.showCareDetails) {
         baseCols.push({ key: 'rente1', header: 'Rente1', width: 7, fmt: formatCurrencyShortLog });
         baseCols.push({ key: 'rente2', header: 'Rente2', width: 7, fmt: formatCurrencyShortLog });
@@ -257,7 +255,6 @@ export function renderWorstRunLog(logRows, caR_Threshold, opts = {}) {
         { key: 'pflege_grade', header: 'PG', width: 4, fmt: (v, row) => (row.pflege_aktiv ? `PG${v ?? '—'}` : '—'), title: 'Aktiver Pflegegrad' },
         { key: 'pflege_zusatz_floor', header: 'PflegeZiel', width: 10, fmt: formatCurrencyShortLog, title: "Zusatz-Floor in diesem Jahr (nominal), gecappt durch MaxPflege-Floor – Floor@Eintritt; wächst jährlich mit Inflation/Drift." },
         { key: 'pflege_kumuliert', header: 'PflegeΣ', width: 8, fmt: formatCurrencyShortLog, title: "Kumulierte Pflege-Mehrkosten (Zusatz-Floor-Deltas + Flex-Verlust), nominal." },
-        // Dual Care Columns
         { key: 'CareP1_Active', header: 'P1', width: 2, fmt: v => v ? '✓' : '—', title: 'Person 1 in Pflege' },
         { key: 'CareP1_Cost', header: 'P1€', width: 7, fmt: formatCurrencyShortLog, title: 'Zusätzliche Pflege-Kosten P1' },
         { key: 'CareP2_Active', header: 'P2', width: 2, fmt: v => v ? '✓' : '—', title: 'Person 2 in Pflege' },
@@ -277,7 +274,6 @@ export function renderWorstRunLog(logRows, caR_Threshold, opts = {}) {
         { key: 'pflege_flex_faktor', header: 'FlexPfl%', width: 8, fmt: (v, row) => (row.pflege_aktiv ? formatPctOrDash(v) : '—') },
     ];
 
-    // Pflege-Spalten nur wenn showCareDetails aktiviert ist
     const activeCareCols = options.showCareDetails ? (options.logDetailLevel === 'detailed' ? careColsDetailed : careColsMinimal) : [];
 
     const finalCols = [
@@ -304,13 +300,11 @@ export function renderWorstRunLog(logRows, caR_Threshold, opts = {}) {
         { key: 'liquiditaet', header: 'Liq.', width: 7, fmt: formatCurrencyShortLog },
     ];
 
-    // Detail-Spalten nur im detailed-Modus
     const detailCols = options.logDetailLevel === 'detailed' ? [
         { key: 'jahresentnahme_real', header: 'Entn_real', width: 9, fmt: formatCurrencyShortLog },
         { key: 'floor_aus_depot', header: 'FloorDep', width: 8, fmt: formatCurrencyShortLog },
     ] : [];
 
-    // FAIL-SAFE Guard Debug-Spalten nur im detailed-Modus
     const guardCols = options.logDetailLevel === 'detailed' ? [
         { key: 'NeedLiq', header: 'NeedLiq', width: 8, fmt: formatCurrencyShortLog, title: 'Benötigte Liquidität für Floor-Runway' },
         { key: 'GuardGold', header: 'GuardG', width: 7, fmt: formatCurrencyShortLog, title: 'FAIL-SAFE: Gold verkauft' },
@@ -318,7 +312,12 @@ export function renderWorstRunLog(logRows, caR_Threshold, opts = {}) {
         { key: 'GuardNote', header: 'GuardNote', width: 16, fmt: v => (v || '').substring(0, 16), title: 'FAIL-SAFE: Grund/Status' }
     ] : [];
 
-    const allCols = [...baseCols, ...activeCareCols, ...finalCols, ...detailCols, ...guardCols];
+    return [...baseCols, ...activeCareCols, ...finalCols, ...detailCols, ...guardCols];
+}
+
+export function renderWorstRunLog(logRows, caR_Threshold, opts = {}) {
+    const options = { showCareDetails: false, logDetailLevel: 'normal', ...opts };
+    const allCols = getWorstRunColumnDefinitions(options);
 
     const getNestedValue = (obj, path) => {
         if (!path) return obj;
