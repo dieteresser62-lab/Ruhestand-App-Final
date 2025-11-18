@@ -252,9 +252,22 @@ export function getWorstRunColumnDefinitions(opts = {}) {
     baseCols.push({ key: 'renteSum', header: 'RenteSum', width: 8, fmt: formatCurrencyShortLog });
 
     const careColsMinimal = [
-        { key: 'pflege_grade', header: 'PG', width: 4, fmt: (v, row) => (row.pflege_aktiv ? `PG${v ?? '—'}` : '—'), title: 'Aktiver Pflegegrad' },
+        { key: null, header: 'PG', width: 12,
+          fmt: (v, row) => {
+              const p1Grade = row.CareP1_Active ? `P1:PG${row.CareP1_Grade ?? '?'}` : null;
+              const p2Grade = row.CareP2_Active ? `P2:PG${row.CareP2_Grade ?? '?'}` : null;
+              if (p1Grade && p2Grade) return `${p1Grade} ${p2Grade}`;
+              if (p1Grade) return p1Grade;
+              if (p2Grade) return p2Grade;
+              return '—';
+          },
+          title: 'Aktive Pflegegrade (P1 und/oder P2)'
+        },
         { key: 'pflege_zusatz_floor', header: 'PflegeZiel', width: 10, fmt: formatCurrencyShortLog, title: "Zusatz-Floor in diesem Jahr (nominal), gecappt durch MaxPflege-Floor – Floor@Eintritt; wächst jährlich mit Inflation/Drift." },
-        { key: 'pflege_kumuliert', header: 'PflegeΣ', width: 8, fmt: formatCurrencyShortLog, title: "Kumulierte Pflege-Mehrkosten (Zusatz-Floor-Deltas + Flex-Verlust), nominal." },
+        { key: null, header: 'PflegeΣ', width: 8,
+          fmt: (v, row) => formatCurrencyShortLog((row.CareP1_Cost || 0) + (row.CareP2_Cost || 0)),
+          title: "Gesamte Pflege-Zusatzkosten dieses Jahres (P1 + P2)"
+        },
         { key: 'CareP1_Active', header: 'P1', width: 2, fmt: v => v ? '✓' : '—', title: 'Person 1 in Pflege' },
         { key: 'CareP1_Cost', header: 'P1€', width: 7, fmt: formatCurrencyShortLog, title: 'Zusätzliche Pflege-Kosten P1' },
         { key: 'CareP2_Active', header: 'P2', width: 2, fmt: v => v ? '✓' : '—', title: 'Person 2 in Pflege' },
@@ -270,7 +283,10 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         { key: 'pflege_delta_flex', header: 'PflegeΔ_Flex', width: 12, fmt: formatCurrencyShortLog },
         { key: 'pflege_zusatz_floor', header: 'PflegeZiel', width: 10, fmt: formatCurrencyShortLog, title: "Zusatz-Floor in diesem Jahr (nominal), gecappt durch MaxPflege-Floor – Floor@Eintritt; wächst jährlich mit Inflation/Drift." },
         { key: 'pflege_zusatz_floor_delta', header: 'PflegeΔ', width: 8, fmt: formatCurrencyShortLog },
-        { key: 'pflege_kumuliert', header: 'PflegeΣ', width: 8, fmt: formatCurrencyShortLog, title: "Kumulierte Pflege-Mehrkosten (Zusatz-Floor-Deltas + Flex-Verlust), nominal." },
+        { key: null, header: 'PflegeΣ', width: 8,
+          fmt: (v, row) => formatCurrencyShortLog((row.CareP1_Cost || 0) + (row.CareP2_Cost || 0)),
+          title: "Gesamte Pflege-Zusatzkosten dieses Jahres (P1 + P2)"
+        },
         { key: 'pflege_flex_faktor', header: 'FlexPfl%', width: 8, fmt: (v, row) => (row.pflege_aktiv ? formatPctOrDash(v) : '—') },
         // Dual-person care details
         { key: 'CareP1_Active', header: 'P1', width: 2, fmt: v => v ? '✓' : '—', title: 'Person 1 in Pflege' },
