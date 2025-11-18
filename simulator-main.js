@@ -124,6 +124,39 @@ function cloneStressContext(ctx) {
 }
 
 /**
+ * Normalisiert die Konfiguration der Hinterbliebenenrente.
+ * @param {object|undefined} rawOptions - Ursprüngliche Eingaben aus dem UI.
+ * @returns {{mode:string,percent:number,marriageOffsetYears:number,minMarriageYears:number}}
+ */
+function normalizeWidowOptions(rawOptions) {
+    const defaults = {
+        mode: 'stop',
+        percent: 0,
+        marriageOffsetYears: 0,
+        minMarriageYears: 0
+    };
+    if (!rawOptions) return defaults;
+    return {
+        mode: rawOptions.mode === 'percent' ? 'percent' : 'stop',
+        percent: Math.max(0, Math.min(1, Number(rawOptions.percent) || 0)),
+        marriageOffsetYears: Math.max(0, Math.floor(Number(rawOptions.marriageOffsetYears) || 0)),
+        minMarriageYears: Math.max(0, Math.floor(Number(rawOptions.minMarriageYears) || 0))
+    };
+}
+
+/**
+ * Ermittelt die Anzahl der Ehejahre, die bis zum aktuellen Simulationsjahr vergangen sind.
+ * @param {number} yearIndex - Laufender Jahresindex der Simulation (0-basiert).
+ * @param {{marriageOffsetYears:number}} widowOptions - Normalisierte Witwen-Konfiguration.
+ * @returns {number} Anzahl der absolvierten Ehejahre (0, falls noch nicht verheiratet).
+ */
+function computeMarriageYearsCompleted(yearIndex, widowOptions) {
+    if (!widowOptions) return 0;
+    if (yearIndex < widowOptions.marriageOffsetYears) return 0;
+    return (yearIndex - widowOptions.marriageOffsetYears) + 1;
+}
+
+/**
  * Robuste Deep-Clone-Funktion für Sweep-Parameter
  *
  * Verwendet die native structuredClone() API (falls verfügbar, Chrome 98+, Firefox 94+),
@@ -404,6 +437,7 @@ export async function runMonteCarlo() {
     try {
         prepareHistoricalData();
         const inputs = getCommonInputs();
+        const widowOptions = normalizeWidowOptions(inputs.widowOptions);
 
         progressBarContainer.style.display = 'block'; progressBar.style.width = '0%';
         const anzahl = parseInt(document.getElementById('mcAnzahl').value);
@@ -485,6 +519,8 @@ export async function runMonteCarlo() {
             const currentRunLog = [];
             let depotNurHistorie = [ sumDepot(simState.portfolio) ];
             let depotErschoepfungAlterGesetzt = false;
+            let widowBenefitActiveForP1 = false; // P1 erhält Witwenrente nach P2
+            let widowBenefitActiveForP2 = false; // P2 erhält Witwenrente nach P1
 
             // Dual Care: P1 + P2 (Partner)
             const careMetaP1 = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren, inputs.geschlecht);
@@ -517,6 +553,11 @@ export async function runMonteCarlo() {
             for (let simulationsJahr = 0; simulationsJahr < maxDauer; simulationsJahr++) {
                 const ageP1 = inputs.startAlter + simulationsJahr;
                 lebensdauer = simulationsJahr + 1;
+                const marriageYearsCompleted = computeMarriageYearsCompleted(simulationsJahr, widowOptions);
+                const widowModeEnabled = widowOptions.mode === 'percent' && widowOptions.percent > 0 && hasPartner;
+                const widowEligibleThisYear = widowModeEnabled && marriageYearsCompleted > 0 && marriageYearsCompleted >= widowOptions.minMarriageYears;
+                const p1AliveAtStart = p1Alive;
+                const p2AliveAtStart = p2Alive;
 
                 // Calculate P2 age (based on partner offset)
                 let ageP2 = ageP1;
@@ -574,6 +615,36 @@ export async function runMonteCarlo() {
                     }
                 }
 
+                const p1DiedThisYear = p1AliveAtStart && !p1Alive;
+                const p2DiedThisYear = p2AliveAtStart && !p2Alive;
+
+                if (!p1Alive) {
+                    widowBenefitActiveForP1 = false;
+                }
+                if (!p2Alive) {
+                    widowBenefitActiveForP2 = false;
+                }
+
+                if (p1DiedThisYear) {
+                    if (widowEligibleThisYear && p2Alive) {
+                        widowBenefitActiveForP2 = true;
+                        simState.widowPensionP2 = Math.max(0, (simState.currentAnnualPension || 0) * widowOptions.percent);
+                    } else {
+                        widowBenefitActiveForP2 = false;
+                        simState.widowPensionP2 = 0;
+                    }
+                }
+
+                if (p2DiedThisYear) {
+                    if (widowEligibleThisYear && p1Alive) {
+                        widowBenefitActiveForP1 = true;
+                        simState.widowPensionP1 = Math.max(0, (simState.currentAnnualPension2 || 0) * widowOptions.percent);
+                    } else {
+                        widowBenefitActiveForP1 = false;
+                        simState.widowPensionP1 = 0;
+                    }
+                }
+
                 // Simulation ends when both persons have died
                 if (!p1Alive && !p2Alive) {
                     runEndedBecauseAllDied = true;
@@ -607,9 +678,17 @@ export async function runMonteCarlo() {
                 // Berechne dynamische Rentenanpassung basierend auf Modus (fix/wage/cpi)
                 const effectiveRentAdjPct = computeRentAdjRate(inputs, yearData);
                 const adjustedInputs = { ...inputs, rentAdjPct: effectiveRentAdjPct };
+                const householdContext = {
+                    p1Alive,
+                    p2Alive: hasPartner ? p2Alive : false,
+                    widowBenefits: {
+                        p1FromP2: widowBenefitActiveForP1,
+                        p2FromP1: widowBenefitActiveForP2
+                    }
+                };
 
                 // Pass care floor as separate parameter (NOT added to baseFloor to avoid inflation compounding)
-                const result = simulateOneYear(stateWithCareFlex, adjustedInputs, yearData, simulationsJahr, careMetaP1, totalCareFloor);
+                const result = simulateOneYear(stateWithCareFlex, adjustedInputs, yearData, simulationsJahr, careMetaP1, totalCareFloor, householdContext);
 
                 if (result.isRuin) {
                     failed = true;
