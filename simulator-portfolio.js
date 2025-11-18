@@ -1,7 +1,7 @@
 "use strict";
 
 import { formatCurrency } from './simulator-utils.js';
-import { HISTORICAL_DATA, STRESS_PRESETS, annualData, REGIME_DATA, REGIME_TRANSITIONS } from './simulator-data.js';
+import { HISTORICAL_DATA, STRESS_PRESETS, annualData, REGIME_DATA, REGIME_TRANSITIONS, SUPPORTED_PFLEGE_GRADES } from './simulator-data.js';
 
 const DEFAULT_RISIKOPROFIL = 'sicherheits-dynamisch';
 
@@ -14,6 +14,17 @@ export function getCommonInputs() {
     // Gemeinsame Rentenanpassung (gilt für Person 1 und Partner)
     const rentAdjMode = document.getElementById('rentAdjMode')?.value || 'fix';
     const rentAdjPct = parseFloat(document.getElementById('rentAdjPct')?.value) || 0;
+
+    const pflegeGradeConfigs = {};
+    SUPPORTED_PFLEGE_GRADES.forEach(grade => {
+        const zusatzInput = document.getElementById(`pflegeStufe${grade}Zusatz`);
+        const flexInput = document.getElementById(`pflegeStufe${grade}FlexCut`);
+        const zusatz = parseFloat(zusatzInput?.value) || 0;
+        const flexPercent = parseFloat(flexInput?.value);
+        const flexCut = Math.min(1, Math.max(0, ((Number.isFinite(flexPercent) ? flexPercent : 100) / 100)));
+        pflegeGradeConfigs[grade] = { zusatz, flexCut };
+    });
+    const grade1Config = pflegeGradeConfigs[1] || { zusatz: 0, flexCut: 1 };
 
     // Person 1 Felder - mit Fallback auf alte IDs für Abwärtskompatibilität
     const p1StartAlter = parseInt(document.getElementById('p1StartAlter')?.value || document.getElementById('startAlter')?.value) || 65;
@@ -60,8 +71,9 @@ export function getCommonInputs() {
         renteFesterSatz: parseFloat(document.getElementById('renteFesterSatz')?.value) || 0,
         pflegefallLogikAktivieren: document.getElementById('pflegefallLogikAktivieren').checked,
         pflegeModellTyp: document.getElementById('pflegeModellTyp').value,
-        pflegeStufe1Zusatz: parseFloat(document.getElementById('pflegeStufe1Zusatz').value) || 0,
-        pflegeStufe1FlexCut: (parseFloat(document.getElementById('pflegeStufe1FlexCut').value) || 100) / 100,
+        pflegeGradeConfigs,
+        pflegeStufe1Zusatz: grade1Config.zusatz,
+        pflegeStufe1FlexCut: grade1Config.flexCut,
         pflegeMaxFloor: parseFloat(document.getElementById('pflegeMaxFloor').value) || 0,
         pflegeRampUp: parseInt(document.getElementById('pflegeRampUp').value) || 5,
         pflegeMinDauer: parseInt(document.getElementById('pflegeMinDauer').value) || 3,

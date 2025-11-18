@@ -25,6 +25,26 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 * Stresstests, Pflegefall-Szenarien und Heatmap-Visualisierung inklusive Warnhinweisen.
 * Dev-Modus (per Toggle oder `localStorage.setItem('sim.devMode', '1')`) mit Self-Test (`runSweepSelfTest`).
 
+#### Pflegegrad-Modellierung
+
+Die Pflegefall-Logik nutzt jetzt alters- und gradabhängige Eintrittswahrscheinlichkeiten (BARMER Pflegereport 2024, Kap. 2).
+Die veröffentlichten Prävalenzen wurden auf Jahreswahrscheinlichkeiten heruntergebrochen (Ø-Pflegedauer ~4 Jahre) und in
+5-Jahres-Buckets geglättet. Für jedes ausgeloste Alter wird zunächst die Gesamteintrittswahrscheinlichkeit ermittelt, dann
+per Zufall ein Pflegegrad (1–5) gezogen und anschließend der gradeigene Zusatzbedarf bzw. Flex-Verlust angewandt.
+
+Im UI stehen pro Pflegegrad zwei Felder zur Verfügung:
+
+| Pflegegrad | Default-Zusatzbedarf (€ p.a.) | Flex-Level (%) |
+|------------|------------------------------|-----------------|
+| PG 1       | 12 000                       | 50              |
+| PG 2       | 18 000                       | 45              |
+| PG 3       | 28 000                       | 40              |
+| PG 4       | 36 000                       | 35              |
+| PG 5       | 44 000                       | 30              |
+
+Alle Werte lassen sich situationsgerecht anpassen; die Engine übernimmt die grade-spezifischen Zusatzkosten automatisch,
+berücksichtigt Ramp-Ups, Max-Floor-Caps sowie Flex-Verluste und protokolliert den aktiven Pflegegrad im Worst-Run-Log.
+
 ### Gemeinsame Engine
 * Acht Module (`engine/`) kapseln Validierung, Marktanalyse, Ausgabenplanung und Transaktionslogik.
 * `build-engine.js` bündelt die Module zu `engine.js`, das in beiden Oberflächen als `EngineAPI` bzw. `Ruhestandsmodell_v30` geladen wird.

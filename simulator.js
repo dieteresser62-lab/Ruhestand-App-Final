@@ -388,7 +388,32 @@ function renderWorstRunToggle(hasCareWorst) {
 }
 
 // --- DATA & CONFIG ---
-const PFLEGE_STUFE1_WAHRSCHEINLICHKEIT = { 70: 0.025, 75: 0.04, 80: 0.06, 85: 0.10, 90: 0.15 };
+/**
+ * Altersabhängige Pflegegrade nach BARMER Pflegereport 2024 (Kapitel 2).
+ * Die Prävalenzen wurden auf Jahresinzidenzen heruntergebrochen (Ø-Pflegedauer 4 Jahre)
+ * und auf 5-Jahres-Buckets geglättet.
+ */
+const SUPPORTED_PFLEGE_GRADES = [1, 2, 3, 4, 5];
+const PFLEGE_GRADE_LABELS = {
+    1: 'Pflegegrad 1 – geringe Beeinträchtigung',
+    2: 'Pflegegrad 2 – erhebliche Beeinträchtigung',
+    3: 'Pflegegrad 3 – schwere Beeinträchtigung',
+    4: 'Pflegegrad 4 – schwerste Beeinträchtigung',
+    5: 'Pflegegrad 5 – besondere Anforderungen'
+};
+const PFLEGE_GRADE_PROBABILITIES = {
+    65: { 1: 0.012, 2: 0.006, 3: 0.003, 4: 0.0015, 5: 0.0005 },
+    70: { 1: 0.020, 2: 0.010, 3: 0.005, 4: 0.0025, 5: 0.0010 },
+    75: { 1: 0.035, 2: 0.018, 3: 0.009, 4: 0.0045, 5: 0.0020 },
+    80: { 1: 0.055, 2: 0.032, 3: 0.016, 4: 0.0075, 5: 0.0035 },
+    85: { 1: 0.085, 2: 0.055, 3: 0.032, 4: 0.0150, 5: 0.0070 },
+    90: { 1: 0.120, 2: 0.080, 3: 0.050, 4: 0.0280, 5: 0.0120 },
+    95: { 1: 0.140, 2: 0.090, 3: 0.060, 4: 0.0350, 5: 0.0150 }
+};
+const CARE_GRADE_FIELD_IDS = SUPPORTED_PFLEGE_GRADES.flatMap(grade => [
+    `pflegeStufe${grade}Zusatz`,
+    `pflegeStufe${grade}FlexCut`
+]);
 const HISTORICAL_DATA = {
 	1969: { msci_eur: 60.8, inflation_de: 1.9, zinssatz_de:6, lohn_de: 9.8, gold_eur_perf: -8.5},1970: { msci_eur: 60.9, inflation_de: 3.4, zinssatz_de: 7.5, lohn_de: 12.6, gold_eur_perf: 4.3 },1971: { msci_eur: 72.4, inflation_de: 5.3, zinssatz_de: 5, lohn_de: 10.5, gold_eur_perf: 19.8 },1972: { msci_eur: 88.4, inflation_de: 5.5, zinssatz_de: 4, lohn_de: 9.1, gold_eur_perf: 47.2 },1973: { msci_eur: 74.4, inflation_de: 7.1, zinssatz_de: 7, lohn_de: 10.2, gold_eur_perf: 68.5 },1974: { msci_eur: 53.6, inflation_de: 7, zinssatz_de: 6, lohn_de: 10.8, gold_eur_perf: 70.1 },1975: { msci_eur: 71, inflation_de: 6, zinssatz_de: 4.5, lohn_de: 7.2, gold_eur_perf: -25.8 },1976: { msci_eur: 72.6, inflation_de: 4.3, zinssatz_de: 3.5, lohn_de: 7.3, gold_eur_perf: -1.5 },1977: { msci_eur: 67.1, inflation_de: 3.7, zinssatz_de: 3, lohn_de: 7.1, gold_eur_perf: 22.4 },1978: { msci_eur: 77.7, inflation_de: 2.7, zinssatz_de: 3, lohn_de: 5.4, gold_eur_perf: 35.7 },1979: { msci_eur: 79.2, inflation_de: 4.1, zinssatz_de: 5, lohn_de: 6.2, gold_eur_perf: 126.3 },1980: { msci_eur: 97.8, inflation_de: 5.5, zinssatz_de: 8.5, lohn_de: 6.6, gold_eur_perf: -6.2 },1981: { msci_eur: 91.2, inflation_de: 6.3, zinssatz_de: 10.5, lohn_de: 4.8, gold_eur_perf: -20.8 },1982: { msci_eur: 90.7, inflation_de: 5.3, zinssatz_de: 7.5, lohn_de: 4.2, gold_eur_perf: 18.9 },1983: { msci_eur: 110.8, inflation_de: 3.3, zinssatz_de: 5.5, lohn_de: 3.7, gold_eur_perf: -18.9 },1984: { msci_eur: 114.5, inflation_de: 2.4, zinssatz_de: 5.5, lohn_de: 3.4, gold_eur_perf: -15.4 },1985: { msci_eur: 164.3, inflation_de: 2.2, zinssatz_de: 5.5, lohn_de: 3.7, gold_eur_perf: 12.7 },1986: { msci_eur: 206.5, inflation_de: -0.1, zinssatz_de: 4.5, lohn_de: 4.1, gold_eur_perf: 24.1 },1987: { msci_eur: 227.1, inflation_de: 0.2, zinssatz_de: 3.5, lohn_de: 3.2, gold_eur_perf: 1.8 },1988: { msci_eur: 274.6, inflation_de: 1.3, zinssatz_de: 4, lohn_de: 3.8, gold_eur_perf: -12.4 },1989: { msci_eur: 326.8, inflation_de: 2.8, zinssatz_de: 7, lohn_de: 3.9, gold_eur_perf: -2.4 },1990: { msci_eur: 274, inflation_de: 2.7, zinssatz_de: 8, lohn_de: 5.8, gold_eur_perf: -7.8 },1991: { msci_eur: 317.9, inflation_de: 3.5, zinssatz_de: 8.5, lohn_de: 6.7, gold_eur_perf: -6.1 },1992: { msci_eur: 300, inflation_de: 5.1, zinssatz_de: 9.5, lohn_de: 5.7, gold_eur_perf: -5.8 },1993: { msci_eur: 376.1, inflation_de: 4.5, zinssatz_de: 7.25, lohn_de: 3.3, gold_eur_perf: 20.1 },1994: { msci_eur: 382.7, inflation_de: 2.7, zinssatz_de: 5, lohn_de: 2.4, gold_eur_perf: -2.3 },1995: { msci_eur: 450.4, inflation_de: 1.7, zinssatz_de: 4, lohn_de: 3.5, gold_eur_perf: 0.6 },1996: { msci_eur: 505.7, inflation_de: 1.4, zinssatz_de: 3, lohn_de: 2.2, gold_eur_perf: -6.9 },1997: { msci_eur: 590, inflation_de: 1.9, zinssatz_de: 3, lohn_de: 1.9, gold_eur_perf: -20.7 },1998: { msci_eur: 758.3, inflation_de: 0.9, zinssatz_de: 3, lohn_de: 2.8, gold_eur_perf: 0.9 },1999: { msci_eur: 958.4, inflation_de: 0.6, zinssatz_de: 2.5, lohn_de: 2.7, gold_eur_perf: -0.6 },
     2000: { msci_eur: 823.1, inflation_de: 1.4, zinssatz_de: 4.25, lohn_de: 2.5, gold_eur_perf: -2.7 },2001: { msci_eur: 675.2, inflation_de: 2.1, zinssatz_de: 3.75, lohn_de: 1.9, gold_eur_perf: 4.3 },2002: { msci_eur: 462.8, inflation_de: 1.3, zinssatz_de: 2.75, lohn_de: 2.1, gold_eur_perf: 19.4 },2003: { msci_eur: 511, inflation_de: 1, zinssatz_de: 2, lohn_de: 1.2, gold_eur_perf: 11.7 },2004: { msci_eur: 565.6, inflation_de: 1.7, zinssatz_de: 2, lohn_de: 1.1, gold_eur_perf: 2.2 },2005: { msci_eur: 724, inflation_de: 1.5, zinssatz_de: 2.1, lohn_de: 0.8, gold_eur_perf: 22.3 },2006: { msci_eur: 825, inflation_de: 1.8, zinssatz_de: 3, lohn_de: 1.6, gold_eur_perf: 17.3 },2007: { msci_eur: 842.2, inflation_de: 2.3, zinssatz_de: 4, lohn_de: 2.8, gold_eur_perf: 2.1 },2008: { msci_eur: 462.6, inflation_de: 2.8, zinssatz_de: 3.25, lohn_de: 3.4, gold_eur_perf: 2.7 },2009: { msci_eur: 609.4, inflation_de: 0.2, zinssatz_de: 1, lohn_de: 0.8, gold_eur_perf: 17.2 },2010: { msci_eur: 687.9, inflation_de: 1.1, zinssatz_de: 1, lohn_de: 2.3, gold_eur_perf: 34.9 },2011: { msci_eur: 634.3, inflation_de: 2.5, zinssatz_de: 1.25, lohn_de: 3.9, gold_eur_perf: 7.6 },2012: { msci_eur: 726.6, inflation_de: 2.1, zinssatz_de: 0.75, lohn_de: 2.9, gold_eur_perf: 4 },2013: { msci_eur: 898, inflation_de: 1.6, zinssatz_de: 0.25, lohn_de: 2.4, gold_eur_perf: -22.8 },2014: { msci_eur: 1062.5, inflation_de: 0.9, zinssatz_de: 0.05, lohn_de: 2.8, gold_eur_perf: -0.6 },2015: { msci_eur: 1159.2, inflation_de: 0.7, zinssatz_de: 0.05, lohn_de: 2.9, gold_eur_perf: -10 },2016: { msci_eur: 1248, inflation_de: 0.4, zinssatz_de: 0, lohn_de: 2.5, gold_eur_perf: 11.7 },2017: { msci_eur: 1329.8, inflation_de: 1.7, zinssatz_de: 0, lohn_de: 2.6, gold_eur_perf: -0.4 },2018: { msci_eur: 1268.4, inflation_de: 1.9, zinssatz_de: 0, lohn_de: 3.1, gold_eur_perf: -4.3 },2019: { msci_eur: 1619.5, inflation_de: 1.4, zinssatz_de: 0, lohn_de: 2.8, gold_eur_perf: 19.4 },2020: { msci_eur: 1706.7, inflation_de: 0.5, zinssatz_de: -0.5, lohn_de: 1.2, gold_eur_perf: 13.9 },2021: { msci_eur: 2260.4, inflation_de: 3.1, zinssatz_de: -0.5, lohn_de: 3, gold_eur_perf: -5.2 },2022: { msci_eur: 1960.9, inflation_de: 6.9, zinssatz_de: 1.25, lohn_de: 4, gold_eur_perf: 5.7 },2023: { msci_eur: 2318.9, inflation_de: 5.9, zinssatz_de: 3.5, lohn_de: 6, gold_eur_perf: 12.1 },2024: { msci_eur: 2500, inflation_de: 2.5, zinssatz_de: 3.75, lohn_de: 3, gold_eur_perf: 15 }
@@ -442,9 +467,20 @@ let annualData = [];
 let REGIME_DATA = { BULL: [], BEAR: [], SIDEWAYS: [], STAGFLATION: [] };
 let REGIME_TRANSITIONS = {};
 const BREAK_ON_RUIN = true;
+const CARE_PROBABILITY_BUCKETS = Object.keys(PFLEGE_GRADE_PROBABILITIES).map(Number).sort((a, b) => a - b);
 
 function getCommonInputs() {
     const goldAktiv = document.getElementById('goldAllokationAktiv').checked;
+    const pflegeGradeConfigs = {};
+    SUPPORTED_PFLEGE_GRADES.forEach(grade => {
+        const zusatzInput = document.getElementById(`pflegeStufe${grade}Zusatz`);
+        const flexInput = document.getElementById(`pflegeStufe${grade}FlexCut`);
+        const zusatz = parseFloat(zusatzInput?.value) || 0;
+        const flexPercent = parseFloat(flexInput?.value);
+        const flexCut = Math.min(1, Math.max(0, ((Number.isFinite(flexPercent) ? flexPercent : 100) / 100)));
+        pflegeGradeConfigs[grade] = { zusatz, flexCut };
+    });
+    const grade1Config = pflegeGradeConfigs[1] || { zusatz: 0, flexCut: 1 };
     const baseInputs = {
         startVermoegen: parseFloat(document.getElementById('simStartVermoegen').value) || 0,
         depotwertAlt: parseFloat(document.getElementById('depotwertAlt').value) || 0,
@@ -469,8 +505,9 @@ function getCommonInputs() {
         renteFesterSatz: parseFloat(document.getElementById('renteFesterSatz').value) || 0,
         pflegefallLogikAktivieren: document.getElementById('pflegefallLogikAktivieren').checked,
         pflegeModellTyp: document.getElementById('pflegeModellTyp').value,
-        pflegeStufe1Zusatz: parseFloat(document.getElementById('pflegeStufe1Zusatz').value) || 0,
-        pflegeStufe1FlexCut: (parseFloat(document.getElementById('pflegeStufe1FlexCut').value) || 100) / 100,
+        pflegeGradeConfigs,
+        pflegeStufe1Zusatz: grade1Config.zusatz,
+        pflegeStufe1FlexCut: grade1Config.flexCut,
         pflegeMaxFloor: parseFloat(document.getElementById('pflegeMaxFloor').value) || 0,
         pflegeRampUp: parseInt(document.getElementById('pflegeRampUp').value) || 5,
         pflegeMinDauer: parseInt(document.getElementById('pflegeMinDauer').value) || 3,
@@ -993,7 +1030,9 @@ function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta =
             pflege_zusatz_floor: pflegeMeta?.zusatzFloorZiel ?? 0,
             pflege_zusatz_floor_delta: pflegeMeta?.zusatzFloorDelta ?? 0,
             pflege_flex_faktor: pflegeMeta?.flexFactor ?? 1.0,
-            pflege_kumuliert: pflegeMeta?.kumulierteKosten ?? 0
+            pflege_kumuliert: pflegeMeta?.kumulierteKosten ?? 0,
+            pflege_grade: pflegeMeta?.grade ?? null,
+            pflege_grade_label: pflegeMeta?.gradeLabel ?? ''
         },
         totalTaxesThisYear
     };
@@ -1061,7 +1100,9 @@ function makeDefaultCareMeta(enabled) {
         // Felder zur internen Zustandsverwaltung
         floorAtTrigger: 0,
         flexAtTrigger: 0,
-        maxFloorAtTrigger: 0
+        maxFloorAtTrigger: 0,
+        grade: null,
+        gradeLabel: ''
     };
 }
 
@@ -1170,6 +1211,76 @@ function computeCareMortalityMultiplierLegacy(care, inputs) {
   return 1 + (baseFactor - 1) * progress;
 }
 
+function resolveCareAgeBucket(age) {
+    const numericAge = Number(age);
+    if (!Number.isFinite(numericAge)) {
+        return CARE_PROBABILITY_BUCKETS[0];
+    }
+
+    let bucket = CARE_PROBABILITY_BUCKETS[0];
+    for (const candidate of CARE_PROBABILITY_BUCKETS) {
+        if (numericAge >= candidate) {
+            bucket = candidate;
+        } else {
+            break;
+        }
+    }
+    return bucket;
+}
+
+function sampleCareGrade(age, rand) {
+    const bucket = resolveCareAgeBucket(age);
+    const probabilities = PFLEGE_GRADE_PROBABILITIES[bucket];
+    if (!probabilities) return null;
+
+    const totalProbability = SUPPORTED_PFLEGE_GRADES.reduce((sum, grade) => sum + (probabilities[grade] || 0), 0);
+    if (totalProbability <= 0) return null;
+
+    const roll = rand();
+    if (roll > totalProbability) {
+        return null;
+    }
+
+    let cumulative = 0;
+    for (const grade of SUPPORTED_PFLEGE_GRADES) {
+        const gradeProbability = probabilities[grade] || 0;
+        cumulative += gradeProbability;
+        if (roll <= cumulative) {
+            return { grade, bucket, gradeProbability, totalProbability };
+        }
+    }
+    return null;
+}
+
+function normalizeGradeConfig(config) {
+    const zusatz = Math.max(0, Number(config?.zusatz) || 0);
+    const rawFlex = config?.flexCut;
+    const flexCut = Math.min(1, Math.max(0, Number.isFinite(rawFlex) ? rawFlex : 1));
+    return { zusatz, flexCut };
+}
+
+function resolveGradeConfig(inputs, grade) {
+    const configs = inputs?.pflegeGradeConfigs;
+    if (configs && configs[grade]) {
+        return normalizeGradeConfig(configs[grade]);
+    }
+    if (configs) {
+        for (const fallbackGrade of SUPPORTED_PFLEGE_GRADES) {
+            if (configs[fallbackGrade]) {
+                return normalizeGradeConfig(configs[fallbackGrade]);
+            }
+        }
+    }
+    return normalizeGradeConfig({
+        zusatz: inputs?.pflegeStufe1Zusatz,
+        flexCut: inputs?.pflegeStufe1FlexCut
+    });
+}
+
+/**
+ * Aktualisiert Pflege-Metadaten inkl. grade-spezifischer Kostenannahmen.
+ * Datenbasis: BARMER Pflegereport 2024 (siehe README).
+ */
 function updateCareMeta(care, inputs, age, yearData, rand) {
     // KORRIGIERT: Die Bedingung prüft jetzt beides und stellt sicher, dass die Funktion bei
     // deaktivierter Logik oder einem null-Objekt sofort und sicher beendet wird.
@@ -1177,65 +1288,68 @@ function updateCareMeta(care, inputs, age, yearData, rand) {
 
     // --- 1. Fortschreibung, falls Pflegefall bereits aktiv ist ---
     if (care.active) {
-        // Beenden bei akutem Modell nach Ablauf der Dauer
         if (inputs.pflegeModellTyp === 'akut' && care.currentYearInCare >= care.durationYears) {
             care.active = false;
             care.zusatzFloorDelta = 0;
+            care.grade = null;
+            care.gradeLabel = '';
             return care;
         }
 
+        if (!care.grade) {
+            care.grade = SUPPORTED_PFLEGE_GRADES[0];
+            care.gradeLabel = PFLEGE_GRADE_LABELS[care.grade] || `Pflegegrad ${care.grade}`;
+        }
+
+        const gradeConfig = resolveGradeConfig(inputs, care.grade);
         const yearsSinceStart = care.currentYearInCare;
         const yearIndex = yearsSinceStart + 1;
         const inflationsAnpassung = (1 + yearData.inflation/100) * (1 + inputs.pflegeKostenDrift);
 
-        // inflations- und drift-bereinigte Werte vom Vorjahr nehmen
         const floorAtTriggerAdjusted = care.floorAtTrigger * Math.pow(1 + yearData.inflation/100, yearIndex);
         const flexAtTriggerAdjusted = care.flexAtTrigger * Math.pow(1 + yearData.inflation/100, yearIndex);
         const maxFloorAdjusted = care.maxFloorAtTrigger * Math.pow(inflationsAnpassung, yearIndex);
 
-        // Cap für Zusatzkosten berechnen
         const capZusatz = Math.max(0, maxFloorAdjusted - floorAtTriggerAdjusted);
 
-        // Roh-Ziel für Zusatzbedarf berechnen (mit Ramp-Up)
-        const zielRoh = inputs.pflegeStufe1Zusatz * Math.pow(inflationsAnpassung, yearIndex);
+        const zielRoh = gradeConfig.zusatz * Math.pow(inflationsAnpassung, yearIndex);
         const rampUpFactor = Math.min(1.0, yearIndex / Math.max(1, inputs.pflegeRampUp));
         const zielMitRampUp = zielRoh * rampUpFactor;
 
-        // Finalen Zusatzbedarf bestimmen (gecappt)
         const zusatzFloorZielFinal = Math.min(capZusatz, zielMitRampUp);
 
         const zusatzFloorDelta = Math.max(0, zusatzFloorZielFinal - care.zusatzFloorZiel);
         care.zusatzFloorDelta = zusatzFloorDelta;
         care.zusatzFloorZiel = zusatzFloorZielFinal;
-        care.flexFactor = inputs.pflegeStufe1FlexCut;
+        care.flexFactor = gradeConfig.flexCut;
 
         const flexVerlust = flexAtTriggerAdjusted * (1 - care.flexFactor);
         care.kumulierteKosten += zusatzFloorDelta + flexVerlust;
-        
-        // Log-Daten für Worst-Run befüllen
+
         care.log_floor_anchor = floorAtTriggerAdjusted;
         care.log_maxfloor_anchor = maxFloorAdjusted;
         care.log_cap_zusatz = capZusatz;
         care.log_delta_flex = flexVerlust;
+        care.log_grade = care.grade;
+        care.log_grade_label = care.gradeLabel;
 
         care.currentYearInCare = yearIndex;
 
         return care;
     }
 
-    // --- 2. Prüfung auf erstmaligen Trigger ---
     if (!care.triggered) {
-        const ageBucket = Math.floor(age / 5) * 5;
-        const triggerWahrscheinlichkeit = PFLEGE_STUFE1_WAHRSCHEINLICHKEIT[ageBucket] || 0;
+        const sampledGrade = sampleCareGrade(age, rand);
 
-        if (rand() < triggerWahrscheinlichkeit) {
+        if (sampledGrade) {
             care.triggered = true;
             care.active = true;
             care.startAge = age;
             care.currentYearInCare = 0;
+            care.grade = sampledGrade.grade;
+            care.gradeLabel = PFLEGE_GRADE_LABELS[sampledGrade.grade] || `Pflegegrad ${sampledGrade.grade}`;
 
-            // Werte zum Zeitpunkt des Eintritts "einfrieren"
-            care.floorAtTrigger = inputs.startFloorBedarf; // Vereinfachung: Startwert, wird intern korrekt inflatiert
+            care.floorAtTrigger = inputs.startFloorBedarf;
             care.flexAtTrigger = inputs.startFlexBedarf;
             care.maxFloorAtTrigger = inputs.pflegeMaxFloor;
 
@@ -1243,11 +1357,14 @@ function updateCareMeta(care, inputs, age, yearData, rand) {
                 const min = inputs.pflegeMinDauer, max = inputs.pflegeMaxDauer;
                 care.durationYears = Math.floor(rand() * (max - min + 1)) + min;
             } else {
-                care.durationYears = 999; // Chronisch
+                care.durationYears = 999;
             }
-            
-             // Direkt im ersten Jahr die Kosten berechnen
-             return updateCareMeta(care, inputs, age, yearData, rand);
+
+            care.log_grade_bucket = sampledGrade.bucket;
+            care.log_grade_probability = sampledGrade.gradeProbability;
+            care.log_grade_totalProbability = sampledGrade.totalProbability;
+
+            return updateCareMeta(care, inputs, age, yearData, rand);
         }
     }
 
@@ -1764,11 +1881,14 @@ function renderWorstRunLog(logRows, caR_Threshold, opts = {}) {
     ];
 
     const careColsMinimal = [
+        { key: 'pflege_grade', header: 'PG', width: 4, fmt: (v, row) => (row.pflege_aktiv ? `PG${v ?? '—'}` : '—'), title: 'Aktiver Pflegegrad' },
         { key: 'pflege_zusatz_floor', header: 'PflegeZiel', width: 10, fmt: formatCurrencyShortLog, title: "Zusatz-Floor in diesem Jahr (nominal), gecappt durch MaxPflege-Floor – Floor@Eintritt; wächst jährlich mit Inflation/Drift." },
         { key: 'pflege_kumuliert', header: 'PflegeΣ', width: 8, fmt: formatCurrencyShortLog, title: "Kumulierte Pflege-Mehrkosten (Zusatz-Floor-Deltas + Flex-Verlust), nominal." },
     ];
 
     const careColsDetailed = [
+        { key: 'pflege_grade', header: 'PG', width: 4, fmt: (v, row) => (row.pflege_aktiv ? `PG${v ?? '—'}` : '—') },
+        { key: 'pflege_grade_label', header: 'Grad', width: 16, fmt: (v, row) => (row.pflege_aktiv ? (v || `Pflegegrad ${row.pflege_grade ?? '?'}`) : '—') },
         { key: 'pflege_floor_anchor', header: 'Floor@Eintritt', width: 14, fmt: formatCurrencyShortLog },
         { key: 'pflege_maxfloor_anchor', header: 'MaxPflege@Jahr', width: 15, fmt: formatCurrencyShortLog },
         { key: 'pflege_cap_zusatz', header: 'CapZusatz@Jahr', width: 15, fmt: formatCurrencyShortLog },
@@ -2062,22 +2182,29 @@ window.onload = function() {
 
         const startFloor = parseFloat(document.getElementById('startFloorBedarf').value) || 0;
         const maxFloor = parseFloat(pflegeMaxFloorInput.value) || 0;
-        const stufe1 = parseFloat(document.getElementById('pflegeStufe1Zusatz').value) || 0;
         const capHeute = Math.max(0, maxFloor - startFloor);
-        
-        infoBadge.innerHTML = `Heutiger Cap für Zusatzkosten: <strong>${formatCurrency(capHeute)}</strong> (Stufe 1 Bedarf: ${formatCurrency(stufe1)})`;
+
+        const gradeNeeds = SUPPORTED_PFLEGE_GRADES.map(grade => {
+            const value = parseFloat(document.getElementById(`pflegeStufe${grade}Zusatz`)?.value) || 0;
+            return { grade, value };
+        });
+        const maxEntry = gradeNeeds.reduce((best, entry) => entry.value > best.value ? entry : best, { grade: null, value: 0 });
+        const gradeLabel = maxEntry.grade ? (PFLEGE_GRADE_LABELS[maxEntry.grade] || `Pflegegrad ${maxEntry.grade}`) : 'Pflegegrad n/a';
+
+        infoBadge.innerHTML = `Heutiger Cap für Zusatzkosten: <strong>${formatCurrency(capHeute)}</strong><br>` +
+            `Höchster Bedarf: <strong>${formatCurrency(maxEntry.value)}</strong> (${gradeLabel})`;
     }
     
     updateStartPortfolioDisplay();
     
     const allInputs = [
         'simStartVermoegen', 'depotwertAlt', 'zielLiquiditaet',
-        'goldAllokationAktiv', 'goldAllokationProzent', 'goldFloorProzent', 'rebalancingBand', 
-        'goldSteuerfrei', 'startFloorBedarf', 'startFlexBedarf', 
+        'goldAllokationAktiv', 'goldAllokationProzent', 'goldFloorProzent', 'rebalancingBand',
+        'goldSteuerfrei', 'startFloorBedarf', 'startFlexBedarf',
         'einstandAlt', 'startAlter', 'geschlecht', 'startSPB', 'kirchensteuerSatz',
-        'renteMonatlich', 'renteStartOffsetJahre', 'renteIndexierungsart', 
-        'pflegefallLogikAktivieren', 'pflegeModellTyp', 'pflegeStufe1Zusatz', 'pflegeStufe1FlexCut', 
-        'pflegeMaxFloor', 'pflegeRampUp', 'pflegeMinDauer', 'pflegeMaxDauer', 'pflegeKostenDrift', 
+        'renteMonatlich', 'renteStartOffsetJahre', 'renteIndexierungsart',
+        'pflegefallLogikAktivieren', 'pflegeModellTyp', ...CARE_GRADE_FIELD_IDS,
+        'pflegeMaxFloor', 'pflegeRampUp', 'pflegeMinDauer', 'pflegeMaxDauer', 'pflegeKostenDrift',
         'pflegebeschleunigtMortalitaetAktivieren', 'pflegeTodesrisikoFaktor'
     ];
     allInputs.forEach(id => {
@@ -2088,7 +2215,8 @@ window.onload = function() {
         }
     });
 
-    ['startFloorBedarf', 'pflegeMaxFloor', 'pflegeStufe1Zusatz'].forEach(id => {
+    const pflegeInfoFields = ['startFloorBedarf', 'pflegeMaxFloor', ...CARE_GRADE_FIELD_IDS];
+    pflegeInfoFields.forEach(id => {
         const el = document.getElementById(id);
         if(el) el.addEventListener('input', updatePflegeUIInfo);
     });
