@@ -239,7 +239,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     if (liquiditaet < jahresEntnahme && depotWertVorEntnahme > 0) {
         const shortfall = jahresEntnahme - liquiditaet;
         const emergencyCtx = buildInputsCtxFromPortfolio(algoInput, { depotTranchesAktien: portfolio.depotTranchesAktien.map(t => ({...t})), depotTranchesGold: portfolio.depotTranchesGold.map(t => ({...t})), liquiditaet: liquiditaet}, { pensionAnnual, marketData: marketDataCurrentYear });
-        const { saleResult: emergencySale } = window.Ruhestandsmodell_v30.calculateSaleAndTax(shortfall, emergencyCtx, { minGold: results.minGold }, market);
+        // EMERGENCY REFILL: Ignore minGold floor to prevent false RUIN
+        const { saleResult: emergencySale } = window.Ruhestandsmodell_v30.calculateSaleAndTax(shortfall, emergencyCtx, { minGold: 0 }, market);
 
         if (emergencySale && emergencySale.achievedRefill > 0) {
             liquiditaet += emergencySale.achievedRefill;
@@ -247,10 +248,42 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             applySaleToPortfolio(portfolio, emergencySale);
             mergedSaleResult = mergedSaleResult ? window.Ruhestandsmodell_v30.mergeSaleResults(mergedSaleResult, emergencySale) : emergencySale;
             emergencyRefillHappened = true;
+        } else {
+            // If emergency sale failed and we still have depot, try aggressive asset sale
+            let missing = shortfall - (emergencySale?.achievedRefill || 0);
+            if (missing > 0) {
+                // Try selling Gold first (without minGold constraint)
+                const goldWert = sumDepot({ depotTranchesGold: portfolio.depotTranchesGold });
+                if (goldWert > 0) {
+                    const goldResult = sellAssetForCash(portfolio, emergencyCtx, market, 'gold', missing, 0);
+                    liquiditaet += goldResult.cashGenerated;
+                    totalTaxesThisYear += goldResult.taxesPaid;
+                    missing = Math.max(0, missing - goldResult.cashGenerated);
+                    emergencyRefillHappened = true;
+                }
+                // Then try selling Equity
+                if (missing > 0) {
+                    const equityWert = sumDepot({ depotTranchesAktien: portfolio.depotTranchesAktien });
+                    if (equityWert > 0) {
+                        const eqResult = sellAssetForCash(portfolio, emergencyCtx, market, 'equity', missing, 0);
+                        liquiditaet += eqResult.cashGenerated;
+                        totalTaxesThisYear += eqResult.taxesPaid;
+                        missing = Math.max(0, missing - eqResult.cashGenerated);
+                        emergencyRefillHappened = true;
+                    }
+                }
+            }
         }
     }
 
+    // Only declare RUIN if we truly cannot cover the withdrawal after emergency refill
     if (liquiditaet < jahresEntnahme) {
+        // Last check: do we have ANY depot left?
+        const remainingDepot = sumDepot(portfolio);
+        if (remainingDepot > 0) {
+            // We have depot but couldn't sell - this shouldn't happen. Log warning.
+            console.warn('RUIN declared but depot remaining:', remainingDepot, 'liquiditaet:', liquiditaet, 'need:', jahresEntnahme);
+        }
         return { isRuin: true };
     }
     liquiditaet -= jahresEntnahme;
