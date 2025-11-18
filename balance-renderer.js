@@ -790,28 +790,137 @@ export const UIRenderer = {
     },
 
     buildKeyParams(params) {
-        const fragment = document.createDocumentFragment();
-        const createLine = (label, value) => {
-            const code = document.createElement('code');
-            code.textContent = value;
-            fragment.append(
-                document.createTextNode(label),
-                code,
-                document.createElement('br')
-            );
+        const metrics = [];
+        const formatPercent = (value, opts = {}) => {
+            const { prefixPlus = false, fractionDigits = 1 } = opts;
+            if (typeof value !== 'number' || !isFinite(value)) {
+                return null;
+            }
+            const formatted = `${value.toFixed(fractionDigits)}%`;
+            if (prefixPlus && value > 0) {
+                return `+${formatted}`;
+            }
+            return formatted;
         };
-        createLine('Peak (real): ', UIUtils.formatCurrency(params.peakRealVermoegen));
-        createLine('Aktuell (real): ', UIUtils.formatCurrency(params.currentRealVermoegen));
-        createLine('Kumulierte Inflation: ', `+${((params.cumulativeInflationFactor - 1) * 100).toFixed(1)}%`);
-        if (typeof params.aktuelleFlexRate === 'number') {
-            createLine('Effektive Flex-Rate: ', `${params.aktuelleFlexRate.toFixed(1)}%`);
+        const formatCurrencySafe = (value) => {
+            if (typeof value !== 'number' || !isFinite(value)) {
+                return null;
+            }
+            return UIUtils.formatCurrency(value);
+        };
+
+        const pushMetric = ({ label, value, meta = null, trend = 'neutral' }) => {
+            if (typeof value !== 'string' || !value.trim()) {
+                return;
+            }
+            metrics.push({ label, value, meta, trend });
+        };
+
+        const peakValue = formatCurrencySafe(params.peakRealVermoegen);
+        if (peakValue) {
+            pushMetric({
+                label: 'Peak (real)',
+                value: peakValue,
+                meta: 'Historischer Höchststand'
+            });
         }
-        if (typeof params.kuerzungProzent === 'number') {
-            createLine('Kürzung ggü. Flex-Bedarf: ', `${params.kuerzungProzent.toFixed(1)}%`);
+
+        const currentValue = formatCurrencySafe(params.currentRealVermoegen);
+        if (currentValue) {
+            let deltaMeta = null;
+            let trend = 'neutral';
+            if (typeof params.peakRealVermoegen === 'number' && isFinite(params.peakRealVermoegen) && params.peakRealVermoegen !== 0) {
+                const delta = params.currentRealVermoegen - params.peakRealVermoegen;
+                const deltaAbs = Math.abs(delta);
+                const deltaPercent = (delta / params.peakRealVermoegen) * 100;
+                const sign = delta >= 0 ? '+' : '−';
+                const formattedDelta = UIUtils.formatCurrency(deltaAbs).replace(/^[-–−]/, '').trim();
+                deltaMeta = `${sign}${formattedDelta} vs. Peak (${deltaPercent >= 0 ? '+' : '−'}${Math.abs(deltaPercent).toFixed(1)}%)`;
+                trend = delta > 0 ? 'up' : delta < 0 ? 'down' : 'neutral';
+            }
+            pushMetric({
+                label: 'Aktuell (real)',
+                value: currentValue,
+                meta: deltaMeta,
+                trend
+            });
         }
-        if (typeof params.jahresentnahme === 'number') {
-            createLine('Jahresentnahme (brutto): ', UIUtils.formatCurrency(params.jahresentnahme));
+
+        const inflationPercent = (typeof params.cumulativeInflationFactor === 'number' && isFinite(params.cumulativeInflationFactor))
+            ? ((params.cumulativeInflationFactor - 1) * 100)
+            : null;
+        const formattedInflation = formatPercent(inflationPercent, { prefixPlus: true });
+        if (formattedInflation) {
+            pushMetric({
+                label: 'Kumulierte Inflation',
+                value: formattedInflation,
+                meta: 'Seit Modellstart'
+            });
         }
-        return fragment;
+
+        if (typeof params.aktuelleFlexRate === 'number' && isFinite(params.aktuelleFlexRate)) {
+            pushMetric({
+                label: 'Effektive Flex-Rate',
+                value: formatPercent(params.aktuelleFlexRate, { fractionDigits: 1 }),
+                meta: 'Geplante Entnahmedynamik'
+            });
+        }
+
+        if (typeof params.kuerzungProzent === 'number' && isFinite(params.kuerzungProzent)) {
+            const trend = params.kuerzungProzent > 0 ? 'down' : params.kuerzungProzent < 0 ? 'up' : 'neutral';
+            pushMetric({
+                label: 'Kürzung ggü. Flex-Bedarf',
+                value: formatPercent(params.kuerzungProzent, { fractionDigits: 1 }),
+                meta: 'Abweichung zum Soll',
+                trend
+            });
+        }
+
+        if (typeof params.jahresentnahme === 'number' && isFinite(params.jahresentnahme)) {
+            pushMetric({
+                label: 'Jahresentnahme (brutto)',
+                value: formatCurrencySafe(params.jahresentnahme),
+                meta: 'Geplante Auszahlung'
+            });
+        }
+
+        const grid = document.createElement('div');
+        grid.className = 'key-param-grid';
+
+        if (!metrics.length) {
+            const empty = document.createElement('p');
+            empty.textContent = 'Keine Schlüsselparameter vorhanden.';
+            empty.style.fontSize = '.85rem';
+            empty.style.color = 'var(--secondary-text)';
+            grid.append(empty);
+            return grid;
+        }
+
+        metrics.forEach(metric => {
+            const card = document.createElement('div');
+            card.className = 'key-param-card';
+            card.dataset.trend = metric.trend;
+
+            const label = document.createElement('span');
+            label.className = 'label';
+            label.textContent = metric.label;
+
+            const value = document.createElement('span');
+            value.className = 'value';
+            value.textContent = metric.value;
+
+            card.append(label, value);
+
+            if (metric.meta) {
+                const meta = document.createElement('span');
+                meta.className = 'meta';
+                meta.textContent = metric.meta;
+                card.append(meta);
+            }
+
+            grid.append(card);
+        });
+
+        return grid;
     }
 };

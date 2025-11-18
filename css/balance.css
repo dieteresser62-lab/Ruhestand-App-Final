@@ -504,11 +504,46 @@ html[data-theme=dark] .guardrail-card .value-row {
     border-top-color: #314155;
 }
 
-#diag-key-params { font-size: .85rem; color: var(--secondary-text); line-height: 1.6; }
-
-#diag-key-params code {
-    background: var(--content-bg-color); padding: 2px 5px; border-radius: 4px; font-size: .9em;
+#diag-key-params {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px;
 }
+
+.key-param-card {
+    background: var(--content-bg-color);
+    border: 1px solid var(--content-border-color);
+    border-radius: 10px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    box-shadow: 0 4px 8px rgba(15, 23, 42, 0.04);
+}
+
+.key-param-card .label {
+    font-size: .72rem;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--secondary-text);
+}
+
+.key-param-card .value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--primary-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.key-param-card .meta {
+    font-size: .78rem;
+    color: var(--secondary-text);
+}
+
+.key-param-card[data-trend="up"] .value { color: var(--success-color); }
+.key-param-card[data-trend="down"] .value { color: var(--danger-color); }
+.key-param-card[data-trend="neutral"] .value { color: var(--primary-text); }
 
 /* Snapshots */
 #snapshotList li {
