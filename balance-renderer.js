@@ -9,6 +9,27 @@
 import { UIUtils } from './balance-utils.js';
 import { AppError, ValidationError } from './balance-config.js';
 
+/**
+ * Mappt technische Schwellenwert-Schlüssel auf sprechende Beschriftungen.
+ * DESIGN-HINWEIS: Das Mapping ist modulweit definiert, damit die Struktur nicht
+ * bei jedem Aufruf von _formatThresholdLabel neu erstellt werden muss. So
+ * bleiben wir performant und zentralisieren zugleich die Pflege der Texte.
+ */
+const THRESHOLD_LABEL_MAP = Object.freeze({
+    targetallocationpct: 'Ziel-Allokation',
+    maxallocationpct: 'Max. Allokation',
+    maxallocpctofeq: 'Max. Allokation (Eq)',
+    rebalancingbandpct: 'Rebalancing-Band',
+    minallocationpct: 'Min. Allokation',
+    targetgoldvalue: 'Zielwert Gold',
+    mingoldreserve: 'Min. Goldreserve',
+    maxbearrellicofeq: 'Max. Drawdown Eq',
+    blockedamount: 'Blockierter Betrag',
+    minrunwaymonate: 'Min. Runway (Monate)',
+    targetrunwaymonate: 'Ziel-Runway (Monate)',
+    minsoldreserve: 'Min. Reserve'
+});
+
 // Module-level references
 let dom = null;
 let StorageManager = null;
@@ -736,30 +757,18 @@ export const UIRenderer = {
 
         const normalized = key.toString().trim();
         const lowerKey = normalized.toLowerCase();
-        const labelMap = {
-            targetallocationpct: 'Ziel-Allokation',
-            maxallocationpct: 'Max. Allokation',
-            maxallocpctofeq: 'Max. Allokation (Eq)',
-            rebalancingbandpct: 'Rebalancing-Band',
-            minallocationpct: 'Min. Allokation',
-            targetgoldvalue: 'Zielwert Gold',
-            mingoldreserve: 'Min. Goldreserve',
-            maxbearrellicofeq: 'Max. Drawdown Eq',
-            blockedamount: 'Blockierter Betrag',
-            minrunwaymonate: 'Min. Runway (Monate)',
-            targetrunwaymonate: 'Ziel-Runway (Monate)',
-            minsoldreserve: 'Min. Reserve'
-        };
 
-        if (labelMap[lowerKey]) {
-            return labelMap[lowerKey];
+        if (Object.prototype.hasOwnProperty.call(THRESHOLD_LABEL_MAP, lowerKey)) {
+            return THRESHOLD_LABEL_MAP[lowerKey];
         }
 
         const beautified = normalized
             .replace(/([a-z])([A-Z])/g, '$1 $2')
             .replace(/[_-]+/g, ' ')
             .replace(/pct/gi, '%')
-            .replace(/([A-Za-z])(Eq)/g, '$1 Eq')
+            // DESIGN-HINWEIS: Nur freistehende Eq-Bestandteile werden getrennt,
+            // damit Namen wie "isEqual" nicht zerstückelt werden.
+            .replace(/Eq(?=[A-Z]|$)/g, ' Eq')
             .replace(/\s+/g, ' ')
             .trim();
 
