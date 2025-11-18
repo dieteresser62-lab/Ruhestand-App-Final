@@ -65,7 +65,7 @@
  */
 
 import { rng, quantile, sum, mean, formatCurrency, parseRange, parseRangeInput, cartesianProduct, cartesianProductLimited } from './simulator-utils.js';
-import { ENGINE_VERSION, ENGINE_HASH, STRESS_PRESETS, BREAK_ON_RUIN, MORTALITY_TABLE, HISTORICAL_DATA, annualData } from './simulator-data.js';
+import { ENGINE_VERSION, ENGINE_HASH, STRESS_PRESETS, BREAK_ON_RUIN, MORTALITY_TABLE, HISTORICAL_DATA, annualData, SUPPORTED_PFLEGE_GRADES, PFLEGE_GRADE_LABELS } from './simulator-data.js';
 import {
     getCommonInputs, updateStartPortfolioDisplay, initializePortfolio,
     prepareHistoricalData, buildStressContext, applyStressOverride, computeRentAdjRate
@@ -84,6 +84,11 @@ import { portfolioTotal, displayMonteCarloResults, renderWorstRunLog, aggregateS
 import { formatCurrencyShortLog } from './simulator-utils.js';
 import { sumDepot } from './simulator-portfolio.js';
 import { renderSweepHeatmapSVG } from './simulator-heatmap.js';
+
+const CARE_GRADE_FIELD_IDS = SUPPORTED_PFLEGE_GRADES.flatMap(grade => [
+    `pflegeStufe${grade}Zusatz`,
+    `pflegeStufe${grade}FlexCut`
+]);
 
 /**
  * Schnelles strukturiertes Cloning für Stress-Context
@@ -1161,10 +1166,17 @@ window.onload = function() {
 
         const startFloor = parseFloat(document.getElementById('startFloorBedarf').value) || 0;
         const maxFloor = parseFloat(pflegeMaxFloorInput.value) || 0;
-        const stufe1 = parseFloat(document.getElementById('pflegeStufe1Zusatz').value) || 0;
         const capHeute = Math.max(0, maxFloor - startFloor);
 
-        infoBadge.innerHTML = `Heutiger Cap für Zusatzkosten: <strong>${formatCurrency(capHeute)}</strong> (Stufe 1 Bedarf: ${formatCurrency(stufe1)})`;
+        const gradeNeeds = SUPPORTED_PFLEGE_GRADES.map(grade => {
+            const value = parseFloat(document.getElementById(`pflegeStufe${grade}Zusatz`)?.value) || 0;
+            return { grade, value };
+        });
+        const maxEntry = gradeNeeds.reduce((best, entry) => entry.value > best.value ? entry : best, { grade: null, value: 0 });
+        const gradeLabel = maxEntry.grade ? (PFLEGE_GRADE_LABELS[maxEntry.grade] || `Pflegegrad ${maxEntry.grade}`) : 'Pflegegrad n/a';
+
+        infoBadge.innerHTML = `Heutiger Cap für Zusatzkosten: <strong>${formatCurrency(capHeute)}</strong><br>` +
+            `Höchster Bedarf: <strong>${formatCurrency(maxEntry.value)}</strong> (${gradeLabel})`;
     }
 
     updateStartPortfolioDisplay();
@@ -1175,7 +1187,7 @@ window.onload = function() {
         'goldSteuerfrei', 'startFloorBedarf', 'startFlexBedarf',
         'einstandAlt', 'p1StartAlter', 'p1Geschlecht', 'p1SparerPauschbetrag', 'p1KirchensteuerPct',
         'p1Monatsrente', 'p1StartInJahren', 'rentAdjMode', 'rentAdjPct',
-        'pflegefallLogikAktivieren', 'pflegeModellTyp', 'pflegeStufe1Zusatz', 'pflegeStufe1FlexCut',
+        'pflegefallLogikAktivieren', 'pflegeModellTyp', ...CARE_GRADE_FIELD_IDS,
         'pflegeMaxFloor', 'pflegeRampUp', 'pflegeMinDauer', 'pflegeMaxDauer', 'pflegeKostenDrift',
         'pflegebeschleunigtMortalitaetAktivieren', 'pflegeTodesrisikoFaktor'
     ];
@@ -1187,7 +1199,8 @@ window.onload = function() {
         }
     });
 
-    ['startFloorBedarf', 'pflegeMaxFloor', 'pflegeStufe1Zusatz'].forEach(id => {
+    const pflegeInfoFields = ['startFloorBedarf', 'pflegeMaxFloor', ...CARE_GRADE_FIELD_IDS];
+    pflegeInfoFields.forEach(id => {
         const el = document.getElementById(id);
         if(el) el.addEventListener('input', updatePflegeUIInfo);
     });

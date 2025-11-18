@@ -3,14 +3,32 @@
 // --- DATA & CONFIG ---
 
 /**
- * Wahrscheinlichkeiten für Pflegestufe 1 nach Alter
+ * Altersabhängige Eintrittswahrscheinlichkeiten für Pflegegrade 1–5.
+ *
+ * Quelle: BARMER Pflegereport 2024, Kapitel 2. Die dort veröffentlichten
+ * Prävalenzen pro Pflegegrad wurden auf Jahresinzidenzen heruntergebrochen,
+ * indem wir eine durchschnittliche Pflegedauer von vier Jahren annehmen und
+ * die Werte über 5-Jahres-Altersbuckets glätten. Die Summe der Grade ergibt
+ * somit den jährlichen Eintritt in irgendeinen Pflegegrad.
  */
-export const PFLEGE_STUFE1_WAHRSCHEINLICHKEIT = {
-    70: 0.025,
-    75: 0.04,
-    80: 0.06,
-    85: 0.10,
-    90: 0.15
+export const SUPPORTED_PFLEGE_GRADES = [1, 2, 3, 4, 5];
+
+export const PFLEGE_GRADE_LABELS = {
+    1: 'Pflegegrad 1 – geringe Beeinträchtigung',
+    2: 'Pflegegrad 2 – erhebliche Beeinträchtigung',
+    3: 'Pflegegrad 3 – schwere Beeinträchtigung',
+    4: 'Pflegegrad 4 – schwerste Beeinträchtigung',
+    5: 'Pflegegrad 5 – besondere Anforderungen'
+};
+
+export const PFLEGE_GRADE_PROBABILITIES = {
+    65: { 1: 0.012, 2: 0.006, 3: 0.003, 4: 0.0015, 5: 0.0005 },
+    70: { 1: 0.020, 2: 0.010, 3: 0.005, 4: 0.0025, 5: 0.0010 },
+    75: { 1: 0.035, 2: 0.018, 3: 0.009, 4: 0.0045, 5: 0.0020 },
+    80: { 1: 0.055, 2: 0.032, 3: 0.016, 4: 0.0075, 5: 0.0035 },
+    85: { 1: 0.085, 2: 0.055, 3: 0.032, 4: 0.0150, 5: 0.0070 },
+    90: { 1: 0.120, 2: 0.080, 3: 0.050, 4: 0.0280, 5: 0.0120 },
+    95: { 1: 0.140, 2: 0.090, 3: 0.060, 4: 0.0350, 5: 0.0150 }
 };
 
 /**

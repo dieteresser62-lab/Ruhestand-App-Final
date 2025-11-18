@@ -85,6 +85,25 @@ input:disabled { background-color: #e9ecef; cursor: not-allowed; }
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 15px;
 }
+.care-grade-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+}
+.care-grade-card {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    background-color: #fff;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.care-grade-card h5 {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--primary-color);
+}
 .care-duration-group {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));

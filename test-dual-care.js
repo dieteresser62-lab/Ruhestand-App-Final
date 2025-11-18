@@ -154,12 +154,19 @@ if (zf5 === 5000 && ff5 === 0.8) {
 console.log('\n📊 Test 8: Pflege-Dauer & Mortalitäts-Ramp');
 console.log('-'.repeat(60));
 
+const rampGradeConfigs = {
+    1: { zusatz: 2000, flexCut: 0.6 },
+    2: { zusatz: 4000, flexCut: 0.55 },
+    3: { zusatz: 6000, flexCut: 0.5 }
+};
+
 const rampInputs = {
     pflegefallLogikAktivieren: true,
     pflegeModellTyp: 'akut',
     pflegeRampUp: 4,
-    pflegeStufe1Zusatz: 2000,
-    pflegeStufe1FlexCut: 0.6,
+    pflegeGradeConfigs: rampGradeConfigs,
+    pflegeStufe1Zusatz: rampGradeConfigs[1].zusatz,
+    pflegeStufe1FlexCut: rampGradeConfigs[1].flexCut,
     pflegeMaxFloor: 60000,
     pflegeKostenDrift: 0,
     pflegebeschleunigtMortalitaetAktivieren: true,
@@ -202,6 +209,44 @@ if (rampOk && durationOk) {
     console.log('✅ PASS: Pflege-Dauer & Mortalitäts-Ramp stimmen');
 } else {
     console.log('❌ FAIL: Pflege-Dauer oder Mortalitäts-Ramp fehlerhaft');
+    process.exit(1);
+}
+
+// Test 9: Pflegegrade beeinflussen Zusatzkosten
+console.log('\n📊 Test 9: Pflegegrade steuern Zusatzbedarf & Flex-Faktor');
+console.log('-'.repeat(60));
+
+const gradeInputs = {
+    ...rampInputs,
+    pflegeModellTyp: 'chronisch',
+    pflegeGradeConfigs: {
+        1: { zusatz: 1000, flexCut: 0.7 },
+        3: { zusatz: 8000, flexCut: 0.4 }
+    }
+};
+
+const gradeCare = makeDefaultCareMeta(true);
+Object.assign(gradeCare, {
+    active: true,
+    triggered: true,
+    grade: 3,
+    gradeLabel: 'Pflegegrad 3',
+    floorAtTrigger: gradeInputs.startFloorBedarf,
+    flexAtTrigger: gradeInputs.startFlexBedarf,
+    maxFloorAtTrigger: gradeInputs.pflegeMaxFloor,
+    currentYearInCare: 0,
+    zusatzFloorZiel: 0,
+    kumulierteKosten: 0
+});
+
+updateCareMeta(gradeCare, gradeInputs, 82, { inflation: 2 }, () => 0);
+const expectedFlex = gradeInputs.pflegeGradeConfigs[3].flexCut;
+const gradeOk = Math.abs(gradeCare.flexFactor - expectedFlex) < 1e-9 && gradeCare.zusatzFloorZiel > 0;
+
+if (gradeOk) {
+    console.log('✅ PASS: Pflegegrad 3 verwendet eigene Konfiguration.');
+} else {
+    console.log('❌ FAIL: Pflegegrad-Konfiguration wurde nicht angewandt.');
     process.exit(1);
 }
 

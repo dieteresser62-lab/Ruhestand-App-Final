@@ -254,6 +254,7 @@ export function renderWorstRunLog(logRows, caR_Threshold, opts = {}) {
     baseCols.push({ key: 'renteSum', header: 'RenteSum', width: 8, fmt: formatCurrencyShortLog });
 
     const careColsMinimal = [
+        { key: 'pflege_grade', header: 'PG', width: 4, fmt: (v, row) => (row.pflege_aktiv ? `PG${v ?? '—'}` : '—'), title: 'Aktiver Pflegegrad' },
         { key: 'pflege_zusatz_floor', header: 'PflegeZiel', width: 10, fmt: formatCurrencyShortLog, title: "Zusatz-Floor in diesem Jahr (nominal), gecappt durch MaxPflege-Floor – Floor@Eintritt; wächst jährlich mit Inflation/Drift." },
         { key: 'pflege_kumuliert', header: 'PflegeΣ', width: 8, fmt: formatCurrencyShortLog, title: "Kumulierte Pflege-Mehrkosten (Zusatz-Floor-Deltas + Flex-Verlust), nominal." },
         // Dual Care Columns
@@ -264,6 +265,8 @@ export function renderWorstRunLog(logRows, caR_Threshold, opts = {}) {
     ];
 
     const careColsDetailed = [
+        { key: 'pflege_grade', header: 'PG', width: 4, fmt: (v, row) => (row.pflege_aktiv ? `PG${v ?? '—'}` : '—') },
+        { key: 'pflege_grade_label', header: 'Grad', width: 16, fmt: (v, row) => (row.pflege_aktiv ? (v || `Pflegegrad ${row.pflege_grade ?? '?'}`) : '—') },
         { key: 'pflege_floor_anchor', header: 'Floor@Eintritt', width: 14, fmt: formatCurrencyShortLog },
         { key: 'pflege_maxfloor_anchor', header: 'MaxPflege@Jahr', width: 15, fmt: formatCurrencyShortLog },
         { key: 'pflege_cap_zusatz', header: 'CapZusatz@Jahr', width: 15, fmt: formatCurrencyShortLog },

@@ -1,7 +1,7 @@
 "use strict";
 
 import { shortenReasonText } from './simulator-utils.js';
-import { HISTORICAL_DATA, PFLEGE_STUFE1_WAHRSCHEINLICHKEIT, annualData, REGIME_DATA, REGIME_TRANSITIONS } from './simulator-data.js';
+import { HISTORICAL_DATA, PFLEGE_GRADE_PROBABILITIES, PFLEGE_GRADE_LABELS, SUPPORTED_PFLEGE_GRADES, annualData, REGIME_DATA, REGIME_TRANSITIONS } from './simulator-data.js';
 import {
     computeYearlyPension, computePensionNext, initializePortfolio, applySaleToPortfolio, summarizeSalesByAsset,
     buildInputsCtxFromPortfolio, sumDepot, buyGold, buyStocksNeu
@@ -408,6 +408,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             pflege_zusatz_floor_delta: pflegeMeta?.zusatzFloorDelta ?? 0,
             pflege_flex_faktor: pflegeMeta?.flexFactor ?? 1.0,
             pflege_kumuliert: pflegeMeta?.kumulierteKosten ?? 0,
+            pflege_grade: pflegeMeta?.grade ?? null,
+            pflege_grade_label: pflegeMeta?.gradeLabel ?? '',
             // FAIL-SAFE Guard Debug-Spalten
             NeedLiq: Math.round(need),
             GuardGold: Math.round(guardSellGold),
@@ -476,7 +478,9 @@ export function makeDefaultCareMeta(enabled) {
         kumulierteKosten: 0,
         floorAtTrigger: 0,
         flexAtTrigger: 0,
-        maxFloorAtTrigger: 0
+        maxFloorAtTrigger: 0,
+        grade: null,
+        gradeLabel: ''
     };
 }
 
@@ -608,6 +612,8 @@ function resolveCapeRatio(yearSpecificCape, inputCape, historicalCape) {
     return 0;
 }
 
+const CARE_PROBABILITY_BUCKETS = Object.keys(PFLEGE_GRADE_PROBABILITIES).map(Number).sort((a, b) => a - b);
+
 /**
  * Berechnet den Mortalitäts-Multiplikator während eines Pflegefalls.
  * Der Multiplikator steigt linear von 1 bis pflegeTodesrisikoFaktor
@@ -633,8 +639,79 @@ export function computeCareMortalityMultiplier(careMeta, inputs) {
     return 1 + (baseFactor - 1) * progress;
 }
 
+function resolveCareAgeBucket(age) {
+    const numericAge = Number(age);
+    if (!Number.isFinite(numericAge)) {
+        return CARE_PROBABILITY_BUCKETS[0];
+    }
+
+    let bucket = CARE_PROBABILITY_BUCKETS[0];
+    for (const candidate of CARE_PROBABILITY_BUCKETS) {
+        if (numericAge >= candidate) {
+            bucket = candidate;
+        } else {
+            break;
+        }
+    }
+    return bucket;
+}
+
+function sampleCareGrade(age, rand) {
+    const bucket = resolveCareAgeBucket(age);
+    const probabilities = PFLEGE_GRADE_PROBABILITIES[bucket];
+    if (!probabilities) return null;
+
+    const totalProbability = SUPPORTED_PFLEGE_GRADES.reduce((sum, grade) => sum + (probabilities[grade] || 0), 0);
+    if (totalProbability <= 0) return null;
+
+    const roll = rand();
+    if (roll > totalProbability) {
+        return null;
+    }
+
+    let cumulative = 0;
+    for (const grade of SUPPORTED_PFLEGE_GRADES) {
+        const gradeProbability = probabilities[grade] || 0;
+        cumulative += gradeProbability;
+        if (roll <= cumulative) {
+            return { grade, bucket, gradeProbability, totalProbability };
+        }
+    }
+    return null;
+}
+
+function normalizeGradeConfig(config) {
+    const zusatz = Math.max(0, Number(config?.zusatz) || 0);
+    const rawFlex = config?.flexCut;
+    const flexCut = Math.min(1, Math.max(0, Number.isFinite(rawFlex) ? rawFlex : 1));
+    return { zusatz, flexCut };
+}
+
+function resolveGradeConfig(inputs, grade) {
+    const configs = inputs?.pflegeGradeConfigs;
+    if (configs && configs[grade]) {
+        return normalizeGradeConfig(configs[grade]);
+    }
+    if (configs) {
+        for (const fallbackGrade of SUPPORTED_PFLEGE_GRADES) {
+            if (configs[fallbackGrade]) {
+                return normalizeGradeConfig(configs[fallbackGrade]);
+            }
+        }
+    }
+    return normalizeGradeConfig({
+        zusatz: inputs?.pflegeStufe1Zusatz,
+        flexCut: inputs?.pflegeStufe1FlexCut
+    });
+}
+
 /**
- * Aktualisiert Pflege-Metadata basierend auf Wahrscheinlichkeit und Status
+ * Aktualisiert Pflege-Metadaten inklusive grad-spezifischer Kosten.
+ *
+ * Vorgehen:
+ * 1. Alters-Bucket gemäß Barmer-Pflegereport (2024) bestimmen.
+ * 2. Pflegegrad anhand der Bucket-Verteilung ziehen und dessen Konfiguration anwenden.
+ * 3. Zusatzkosten/Flex-Verlust rampenbasiert auf den Max-Floor capen.
  */
 export function updateCareMeta(care, inputs, age, yearData, rand) {
     if (!inputs.pflegefallLogikAktivieren || !care) return care;
@@ -643,9 +720,17 @@ export function updateCareMeta(care, inputs, age, yearData, rand) {
         if (inputs.pflegeModellTyp === 'akut' && care.currentYearInCare >= care.durationYears) {
             care.active = false;
             care.zusatzFloorDelta = 0;
+            care.grade = null;
+            care.gradeLabel = '';
             return care;
         }
 
+        if (!care.grade) {
+            care.grade = SUPPORTED_PFLEGE_GRADES[0];
+            care.gradeLabel = PFLEGE_GRADE_LABELS[care.grade] || `Pflegegrad ${care.grade}`;
+        }
+
+        const gradeConfig = resolveGradeConfig(inputs, care.grade);
         const yearsSinceStart = care.currentYearInCare;
         const yearIndex = yearsSinceStart + 1;
         const inflationsAnpassung = (1 + yearData.inflation/100) * (1 + inputs.pflegeKostenDrift);
@@ -656,7 +741,7 @@ export function updateCareMeta(care, inputs, age, yearData, rand) {
 
         const capZusatz = Math.max(0, maxFloorAdjusted - floorAtTriggerAdjusted);
 
-        const zielRoh = inputs.pflegeStufe1Zusatz * Math.pow(inflationsAnpassung, yearIndex);
+        const zielRoh = gradeConfig.zusatz * Math.pow(inflationsAnpassung, yearIndex);
         const rampUpFactor = Math.min(1.0, yearIndex / Math.max(1, inputs.pflegeRampUp));
         const zielMitRampUp = zielRoh * rampUpFactor;
 
@@ -665,7 +750,7 @@ export function updateCareMeta(care, inputs, age, yearData, rand) {
         const zusatzFloorDelta = Math.max(0, zusatzFloorZielFinal - care.zusatzFloorZiel);
         care.zusatzFloorDelta = zusatzFloorDelta;
         care.zusatzFloorZiel = zusatzFloorZielFinal;
-        care.flexFactor = inputs.pflegeStufe1FlexCut;
+        care.flexFactor = gradeConfig.flexCut;
 
         const flexVerlust = flexAtTriggerAdjusted * (1 - care.flexFactor);
         care.kumulierteKosten += zusatzFloorDelta + flexVerlust;
@@ -674,6 +759,8 @@ export function updateCareMeta(care, inputs, age, yearData, rand) {
         care.log_maxfloor_anchor = maxFloorAdjusted;
         care.log_cap_zusatz = capZusatz;
         care.log_delta_flex = flexVerlust;
+        care.log_grade = care.grade;
+        care.log_grade_label = care.gradeLabel;
 
         care.currentYearInCare = yearIndex;
 
@@ -681,14 +768,15 @@ export function updateCareMeta(care, inputs, age, yearData, rand) {
     }
 
     if (!care.triggered) {
-        const ageBucket = Math.floor(age / 5) * 5;
-        const triggerWahrscheinlichkeit = PFLEGE_STUFE1_WAHRSCHEINLICHKEIT[ageBucket] || 0;
+        const sampledGrade = sampleCareGrade(age, rand);
 
-        if (rand() < triggerWahrscheinlichkeit) {
+        if (sampledGrade) {
             care.triggered = true;
             care.active = true;
             care.startAge = age;
             care.currentYearInCare = 0;
+            care.grade = sampledGrade.grade;
+            care.gradeLabel = PFLEGE_GRADE_LABELS[sampledGrade.grade] || `Pflegegrad ${sampledGrade.grade}`;
 
             care.floorAtTrigger = inputs.startFloorBedarf;
             care.flexAtTrigger = inputs.startFlexBedarf;
@@ -700,6 +788,10 @@ export function updateCareMeta(care, inputs, age, yearData, rand) {
             } else {
                 care.durationYears = 999;
             }
+
+            care.log_grade_bucket = sampledGrade.bucket;
+            care.log_grade_probability = sampledGrade.gradeProbability;
+            care.log_grade_totalProbability = sampledGrade.totalProbability;
 
             return updateCareMeta(care, inputs, age, yearData, rand);
         }
