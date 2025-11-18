@@ -23,6 +23,8 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 * Monte-Carlo-Simulationen mit unterschiedlichen Renditequellen (historisch, Regime, Block-Bootstrap).
 * Parameter-Sweep mit Whitelist-Ansatz, Deep-Clones und Wächterlogik für Zwei-Personen-Haushalte.
 * Stresstests, Pflegefall-Szenarien und Heatmap-Visualisierung inklusive Warnhinweisen.
+* Sweep-Schutz für Partner:innen-Renten inklusive Rente-2-Invarianz, Heatmap-Badges und Dev-Self-Tests für den Wächter.
+* Kontextsensitiver Worst-Run-Umschalter, der Pflege-spezifische Extremläufe mitsamt Diagnose-Log separat zugänglich macht.
 * Dev-Modus (per Toggle oder `localStorage.setItem('sim.devMode', '1')`) mit Self-Test (`runSweepSelfTest`).
 
 #### Pflegegrad-Modellierung
@@ -44,6 +46,24 @@ Im UI stehen pro Pflegegrad zwei Felder zur Verfügung:
 
 Alle Werte lassen sich situationsgerecht anpassen; die Engine übernimmt die grade-spezifischen Zusatzkosten automatisch,
 berücksichtigt Ramp-Ups, Max-Floor-Caps sowie Flex-Verluste und protokolliert den aktiven Pflegegrad im Worst-Run-Log.
+Zusätzlich gibt es nun Staffel-Presets (ambulant/stationär), einen regionalen Zuschlagsregler, Echtzeit-Badges zum Maximal-
+Floor sowie Listener, die alle Pflegefelder synchron halten – inklusive Info-Hinweis und Tooltips im UI.【F:simulator-main.js†L89-L1506】
+
+Das Simulator-Dashboard erweitert die Pflegeanalyse um KPI-Karten pro Person, Eintrittsalter, Pflegedauer, simultane Pflegejahre
+und Kosten- sowie Shortfall-Deltas. Ein Worst-Run-Toggle macht auf Wunsch den pflegespezifischen Extremlauf inkl. Log und zusätz-
+lichen Details sichtbar, sobald entsprechende Daten vorhanden sind.【F:simulator-results.js†L191-L250】【F:simulator.js†L366-L429】
+
+#### Rentenlogik
+
+Die Simulator-Eingaben bündeln nun beide Rentenstränge: eine gemeinsame Indexierungslogik (fix, Lohn oder CPI), Hinterbliebenen-
+optionen mit Mindest-Ehezeiten, Partner-Konfiguration (inkl. Migration älterer Felder) sowie geschützte Einstellungen für Rente 2.
+Alle Werte landen gesammelt in `getCommonInputs()`, das Rentenstart, Anpassungsmodus und Witwenlogik normalisiert und persistente
+Defaults (z. B. Steuerquoten) berücksichtigt.【F:simulator-portfolio.js†L57-L174】 Die Anpassungsrate wird zentral über `computeRentAdjRate`
+berechnet und für beide Personen angewandt, wodurch erste Auszahlungsjahre und spätere Indexierungen konsistent bleiben.【F:simulator-portfolio.js†L285-L332】
+
+Das UI blendet Partner- und Rentenfelder dynamisch ein, deaktiviert Prozentfelder automatisch bei lohn- oder inflationsgekoppelter
+Anpassung und merkt sich den Aktivierungsstatus im `localStorage`. Gleichzeitig schützt der Sweep-Wächter alle Person-2-Felder über
+Whitelist, Blocklist und Rente-2-Invarianz-Checks, markiert Verstöße in der Heatmap und lässt sich über einen Dev-Self-Test prüfen.【F:simulator-main.js†L3-L64】【F:simulator-main.js†L1563-L1614】
 
 ### Gemeinsame Engine
 * Acht Module (`engine/`) kapseln Validierung, Marktanalyse, Ausgabenplanung und Transaktionslogik.
