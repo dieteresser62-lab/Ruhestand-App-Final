@@ -1,7 +1,7 @@
 "use strict";
 
 import { shortenReasonText } from './simulator-utils.js';
-import { HISTORICAL_DATA, PFLEGE_GRADE_PROBABILITIES, PFLEGE_GRADE_LABELS, SUPPORTED_PFLEGE_GRADES, annualData, REGIME_DATA, REGIME_TRANSITIONS } from './simulator-data.js';
+import { HISTORICAL_DATA, PFLEGE_GRADE_PROBABILITIES, PFLEGE_GRADE_LABELS, SUPPORTED_PFLEGE_GRADES, annualData, REGIME_DATA, REGIME_TRANSITIONS, MORTALITY_TABLE } from './simulator-data.js';
 import {
     computeYearlyPension, computePensionNext, initializePortfolio, applySaleToPortfolio, summarizeSalesByAsset,
     buildInputsCtxFromPortfolio, sumDepot, buyGold, buyStocksNeu
@@ -462,9 +462,36 @@ export function initMcRunState(inputs, startYearIndex) {
 }
 
 /**
- * Erstellt ein Standard-Pflege-Metadata-Objekt
+ * Schätzt die verbleibende Lebenserwartung anhand der Sterbetafel.
+ * @param {string} gender - 'm', 'w' oder 'd'.
+ * @param {number} currentAge - Alter beim Eintritt in die Pflege.
+ * @returns {number} Erwartete verbleibende Jahre (≥ 1).
  */
-export function makeDefaultCareMeta(enabled) {
+function estimateRemainingLifeYears(gender, currentAge) {
+    const table = MORTALITY_TABLE[gender] || MORTALITY_TABLE.m;
+    const ages = Object.keys(table).map(Number).sort((a, b) => a - b);
+    const minAge = ages[0] ?? currentAge;
+    const maxAge = ages[ages.length - 1] ?? currentAge;
+    let survivalProbability = 1;
+    let expectedYears = 0;
+
+    for (let age = Math.max(currentAge, minAge); age <= maxAge; age++) {
+        const qxRaw = table[age] ?? 1;
+        const qx = Math.min(1, Math.max(0, qxRaw));
+        expectedYears += survivalProbability;
+        survivalProbability *= (1 - qx);
+        if (survivalProbability < 0.0001) break;
+    }
+
+    return Math.max(1, Math.round(expectedYears));
+}
+
+/**
+ * Erstellt ein Standard-Pflege-Metadata-Objekt
+ * @param {boolean} enabled - Schaltet die Logik ein/aus.
+ * @param {string} personGender - Geschlecht für Mortalitätsannahmen.
+ */
+export function makeDefaultCareMeta(enabled, personGender = 'm') {
     if (!enabled) return null;
     return {
         active: false,
@@ -480,7 +507,8 @@ export function makeDefaultCareMeta(enabled) {
         flexAtTrigger: 0,
         maxFloorAtTrigger: 0,
         grade: null,
-        gradeLabel: ''
+        gradeLabel: '',
+        personGender
     };
 }
 
@@ -786,7 +814,8 @@ export function updateCareMeta(care, inputs, age, yearData, rand) {
                 const min = inputs.pflegeMinDauer, max = inputs.pflegeMaxDauer;
                 care.durationYears = Math.floor(rand() * (max - min + 1)) + min;
             } else {
-                care.durationYears = 999;
+                const genderForCalc = care.personGender || inputs?.geschlecht || 'm';
+                care.durationYears = estimateRemainingLifeYears(genderForCalc, age);
             }
 
             care.log_grade_bucket = sampledGrade.bucket;
