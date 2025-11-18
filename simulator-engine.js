@@ -659,6 +659,55 @@ export function calcCareCost(careMetaP1, careMetaP2 = null) {
 }
 
 /**
+ * Computes the effective household flex factor by splitting the flex budget across
+ * all living persons and only cutting the portion that belongs to the person in care.
+ *
+ * Example: Two living persons share the flex need 50/50. If person A suffers a
+ * 80% flex cut (factor 0.2) while person B remains healthy (factor 1.0), the
+ * household factor becomes 0.5 * 0.2 + 0.5 * 1.0 = 0.6. Only the affected share
+ * is reduced.
+ *
+ * @param {Object} params - Calculation context.
+ * @param {boolean} params.p1Alive - True if person 1 still needs flex spending.
+ * @param {Object|null} params.careMetaP1 - Care meta data for person 1.
+ * @param {boolean} params.p2Alive - True if person 2 still needs flex spending.
+ * @param {Object|null} params.careMetaP2 - Care meta data for person 2.
+ * @returns {number} Household flex factor in [0, 1]. Defaults to 1 if nobody is alive.
+ */
+export function computeHouseholdFlexFactor({ p1Alive, careMetaP1, p2Alive, careMetaP2 }) {
+    const aliveFactors = [];
+
+    if (p1Alive) {
+        aliveFactors.push(resolveIndividualFlexFactor(careMetaP1));
+    }
+
+    if (p2Alive && careMetaP2) {
+        aliveFactors.push(resolveIndividualFlexFactor(careMetaP2));
+    }
+
+    if (aliveFactors.length === 0) {
+        // Fail-safe: no living person should reach this branch, but keep flex intact.
+        return 1;
+    }
+
+    const equalShare = 1 / aliveFactors.length;
+    return aliveFactors.reduce((sum, factor) => sum + equalShare * factor, 0);
+}
+
+/**
+ * Normalizes an individual's flex factor to [0, 1] and defaults to 1 for invalid values.
+ * @param {Object|null} careMeta - Care metadata for the person.
+ * @returns {number} Clamped flex factor.
+ */
+function resolveIndividualFlexFactor(careMeta) {
+    const rawFactor = careMeta?.flexFactor;
+    if (typeof rawFactor !== 'number' || !Number.isFinite(rawFactor)) {
+        return 1;
+    }
+    return Math.min(1, Math.max(0, rawFactor));
+}
+
+/**
  * Bestimmt den CAPE-Wert für das aktuelle Jahr.
  * Priorität: Jahresdaten > Benutzereingabe > historischer Zustand > 0.
  * @param {number} yearSpecificCape - CAPE-Wert aus den Jahresdaten.

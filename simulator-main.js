@@ -78,7 +78,8 @@ import {
     computeRunStatsFromSeries,
     updateCareMeta,
     calcCareCost,
-    computeCareMortalityMultiplier
+    computeCareMortalityMultiplier,
+    computeHouseholdFlexFactor
 } from './simulator-engine.js';
 import { portfolioTotal, displayMonteCarloResults, renderWorstRunLog, aggregateSweepMetrics, getWorstRunColumnDefinitions } from './simulator-results.js';
 import { formatCurrencyShortLog } from './simulator-utils.js';
@@ -574,14 +575,22 @@ export async function runMonteCarlo() {
                 if (!p1Alive && !p2Alive) break;
 
                 // Calculate care costs from both persons
-                const { zusatzFloor: careFloorP1, flexFactor: careFlexP1 } = calcCareCost(careMetaP1, null);
+                const { zusatzFloor: careFloorP1 } = calcCareCost(careMetaP1, null);
                 const { zusatzFloor: careFloorP2 } = careMetaP2 ? calcCareCost(careMetaP2, null) : { zusatzFloor: 0 };
                 const totalCareFloor = careFloorP1 + careFloorP2;
 
-                // Apply flex reduction from care (choose the more conservative factor)
+                // Apply flex reduction by splitting the household flex share between living persons
+                // so that nur der Pflegeanteil gekürzt wird.
+                const effectiveFlexFactor = computeHouseholdFlexFactor({
+                    p1Alive,
+                    careMetaP1,
+                    p2Alive,
+                    careMetaP2
+                });
+
                 const stateWithCareFlex = {
                     ...simState,
-                    baseFlex: simState.baseFlex * Math.min(careFlexP1, careMetaP2?.flexFactor ?? 1.0)
+                    baseFlex: simState.baseFlex * effectiveFlexFactor
                 };
 
                 // Berechne dynamische Rentenanpassung basierend auf Modus (fix/wage/cpi)
