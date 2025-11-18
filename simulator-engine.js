@@ -101,10 +101,15 @@ function sellAssetForCash(portfolio, inputsCtx, market, asset, amountEuros, minG
  * @param {Object} yearData - Marktdaten für das Jahr
  * @param {number} yearIndex - Index des Simulationsjahres
  * @param {Object} pflegeMeta - Pflege-Metadata (optional)
+ * @param {number} careFloorAddition - Zusätzlicher Floor-Bedarf durch Pflege (optional, wird nicht inflationsangepasst)
  * @returns {Object} Simulationsergebnisse
  */
-export function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta = null) {
+export function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta = null, careFloorAddition = 0) {
     let { portfolio, baseFloor, baseFlex, lastState, currentAnnualPension, currentAnnualPension2, marketDataHist } = currentState;
+
+    // WICHTIG: Pflegekosten werden nur für die Jahresberechnung zum Floor addiert,
+    // aber NICHT in den persistenten baseFloor eingerechnet, der mit Inflation angepasst wird
+    const effectiveBaseFloor = baseFloor + careFloorAddition;
     currentAnnualPension2 = currentAnnualPension2 || 0;
     let { depotTranchesAktien, depotTranchesGold } = portfolio;
     let liquiditaet = portfolio.liquiditaet;
@@ -125,7 +130,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const resolvedCapeRatio = resolveCapeRatio(yearData.capeRatio, inputs.marketCapeRatio, marketDataHist.capeRatio);
     const marketDataCurrentYear = { ...marketDataHist, inflation: yearData.inflation, capeRatio: resolvedCapeRatio };
 
-    const algoInput = { ...inputs, floorBedarf: baseFloor, flexBedarf: baseFlex, startSPB: inputs.startSPB };
+    const algoInput = { ...inputs, floorBedarf: effectiveBaseFloor, flexBedarf: baseFlex, startSPB: inputs.startSPB };
     const market = window.Ruhestandsmodell_v30.analyzeMarket(marketDataCurrentYear);
 
     // Gemeinsame Rentenanpassung (% p.a.) für beide Personen
@@ -180,7 +185,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const renteSum = rente1 + rente2;
     const pensionAnnual = renteSum;
 
-    const inflatedFloor = Math.max(0, baseFloor - pensionAnnual);
+    const inflatedFloor = Math.max(0, effectiveBaseFloor - pensionAnnual);
     const inflatedFlex  = baseFlex;
 
     const jahresbedarfAusPortfolio = inflatedFloor + inflatedFlex;
@@ -393,7 +398,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             wertGold: sumDepot({depotTranchesGold: portfolio.depotTranchesGold}),
             liquiditaet, aktionUndGrund: aktionText,
             usedSPB: mergedSaleResult ? (mergedSaleResult.pauschbetragVerbraucht || 0) : 0,
-            floor_brutto: baseFloor,
+            floor_brutto: effectiveBaseFloor,
             pension_annual: pensionAnnual,
             rente1: rente1,
             rente2: rente2,

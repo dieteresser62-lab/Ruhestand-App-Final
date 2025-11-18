@@ -890,8 +890,13 @@ function buyStocksNeu(portfolio, amount) {
     }
 }
 
-function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta = null) {
+function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta = null, careFloorAddition = 0) {
     let { portfolio, baseFloor, baseFlex, lastState, currentAnnualPension, marketDataHist } = currentState;
+
+    // WICHTIG: Pflegekosten werden nur für die Jahresberechnung zum Floor addiert,
+    // aber NICHT in den persistenten baseFloor eingerechnet, der mit Inflation angepasst wird
+    const effectiveBaseFloor = baseFloor + careFloorAddition;
+
     let { depotTranchesAktien, depotTranchesGold } = portfolio;
     let liquiditaet = portfolio.liquiditaet;
     let totalTaxesThisYear = 0;
@@ -906,11 +911,11 @@ function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta =
     const resolvedCapeRatio = resolveCapeRatio(yearData.capeRatio, inputs.marketCapeRatio, marketDataHist.capeRatio);
     const marketDataCurrentYear = { ...marketDataHist, inflation: yearData.inflation, capeRatio: resolvedCapeRatio };
 
-    const algoInput = { ...inputs, floorBedarf: baseFloor, flexBedarf: baseFlex, startSPB: inputs.startSPB };
+    const algoInput = { ...inputs, floorBedarf: effectiveBaseFloor, flexBedarf: baseFlex, startSPB: inputs.startSPB };
     const market = Ruhestandsmodell_v30.analyzeMarket(marketDataCurrentYear);
-    
+
     const pensionAnnual = computeYearlyPension({ yearIndex, baseMonthly: inputs.renteMonatlich, startOffset: inputs.renteStartOffsetJahre, lastAnnualPension: currentAnnualPension, indexierungsArt: inputs.renteIndexierungsart, inflRate: yearData.inflation, lohnRate: yearData.lohn, festerSatz: inputs.renteFesterSatz });
-    const inflatedFloor = Math.max(0, baseFloor - pensionAnnual);
+    const inflatedFloor = Math.max(0, effectiveBaseFloor - pensionAnnual);
     const inflatedFlex  = baseFlex;
     
     // ============================================================================
@@ -1075,7 +1080,7 @@ function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta =
             wertGold: sumDepot({depotTranchesGold: portfolio.depotTranchesGold}),
             liquiditaet, aktionUndGrund: aktionText,
             usedSPB: mergedSaleResult ? (mergedSaleResult.pauschbetragVerbraucht || 0) : 0,
-            floor_brutto: baseFloor,
+            floor_brutto: effectiveBaseFloor,
             pension_annual: pensionAnnual,
             floor_aus_depot: inflatedFloor,
             flex_brutto: baseFlex,
@@ -1561,7 +1566,10 @@ async function runMonteCarlo() {
                 
                 if (rand() < qx) break;
 
-                const result = simulateOneYear(simState, inputs, yearData, simulationsJahr, careMeta);
+                // Calculate care floor addition (if active) - use legacy function for compatibility
+                const careFloor = (careMeta?.active && careMeta?.zusatzFloorZiel) ? careMeta.zusatzFloorZiel : 0;
+
+                const result = simulateOneYear(simState, inputs, yearData, simulationsJahr, careMeta, careFloor);
 
                 if (result.isRuin) {
                     failed = true;

@@ -578,10 +578,9 @@ export async function runMonteCarlo() {
                 const { zusatzFloor: careFloorP2 } = careMetaP2 ? calcCareCost(careMetaP2, null) : { zusatzFloor: 0 };
                 const totalCareFloor = careFloorP1 + careFloorP2;
 
-                // Apply care costs to state (temporarily modify for this year)
-                const stateWithCare = {
+                // Apply flex reduction from care (choose the more conservative factor)
+                const stateWithCareFlex = {
                     ...simState,
-                    baseFloor: simState.baseFloor + totalCareFloor,
                     baseFlex: simState.baseFlex * Math.min(careFlexP1, careMetaP2?.flexFactor ?? 1.0)
                 };
 
@@ -589,8 +588,8 @@ export async function runMonteCarlo() {
                 const effectiveRentAdjPct = computeRentAdjRate(inputs, yearData);
                 const adjustedInputs = { ...inputs, rentAdjPct: effectiveRentAdjPct };
 
-                // Pass careMetaP1 for logging (legacy compatibility)
-                const result = simulateOneYear(stateWithCare, adjustedInputs, yearData, simulationsJahr, careMetaP1);
+                // Pass care floor as separate parameter (NOT added to baseFloor to avoid inflation compounding)
+                const result = simulateOneYear(stateWithCareFlex, adjustedInputs, yearData, simulationsJahr, careMetaP1, totalCareFloor);
 
                 if (result.isRuin) {
                     failed = true;
@@ -2133,7 +2132,10 @@ export async function runParameterSweep() {
                     const effectiveRentAdjPct = computeRentAdjRate(inputs, yearData);
                     const adjustedInputs = { ...inputs, rentAdjPct: effectiveRentAdjPct };
 
-                    const result = simulateOneYear(simState, adjustedInputs, yearData, simulationsJahr, careMeta);
+                    // Calculate care floor addition (if active)
+                    const { zusatzFloor: careFloor } = calcCareCost(careMeta, null);
+
+                    const result = simulateOneYear(simState, adjustedInputs, yearData, simulationsJahr, careMeta, careFloor);
 
                     if (result.isRuin) {
                         failed = true;
