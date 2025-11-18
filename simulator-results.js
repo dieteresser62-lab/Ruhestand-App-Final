@@ -272,6 +272,13 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         { key: 'pflege_zusatz_floor_delta', header: 'PflegeΔ', width: 8, fmt: formatCurrencyShortLog },
         { key: 'pflege_kumuliert', header: 'PflegeΣ', width: 8, fmt: formatCurrencyShortLog, title: "Kumulierte Pflege-Mehrkosten (Zusatz-Floor-Deltas + Flex-Verlust), nominal." },
         { key: 'pflege_flex_faktor', header: 'FlexPfl%', width: 8, fmt: (v, row) => (row.pflege_aktiv ? formatPctOrDash(v) : '—') },
+        // Dual-person care details
+        { key: 'CareP1_Active', header: 'P1', width: 2, fmt: v => v ? '✓' : '—', title: 'Person 1 in Pflege' },
+        { key: 'CareP1_Grade', header: 'P1_PG', width: 5, fmt: (v, row) => (row.CareP1_Active ? `PG${v ?? '—'}` : '—'), title: 'Pflegegrad Person 1' },
+        { key: 'CareP1_Cost', header: 'P1€', width: 7, fmt: formatCurrencyShortLog, title: 'Zusätzliche Pflege-Kosten P1' },
+        { key: 'CareP2_Active', header: 'P2', width: 2, fmt: v => v ? '✓' : '—', title: 'Person 2 in Pflege' },
+        { key: 'CareP2_Grade', header: 'P2_PG', width: 5, fmt: (v, row) => (row.CareP2_Active ? `PG${v ?? '—'}` : '—'), title: 'Pflegegrad Person 2' },
+        { key: 'CareP2_Cost', header: 'P2€', width: 7, fmt: formatCurrencyShortLog, title: 'Zusätzliche Pflege-Kosten P2' },
     ];
 
     const activeCareCols = options.showCareDetails ? (options.logDetailLevel === 'detailed' ? careColsDetailed : careColsMinimal) : [];

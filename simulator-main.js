@@ -669,8 +669,12 @@ export async function runMonteCarlo() {
                         // P2 Care (new dual care support)
                         CareP1_Active: p1ActiveThisYear ? 1 : 0,
                         CareP1_Cost: careMetaP1?.zusatzFloorZiel ?? 0,
+                        CareP1_Grade: careMetaP1?.grade ?? null,
+                        CareP1_GradeLabel: careMetaP1?.gradeLabel ?? '',
                         CareP2_Active: p2ActiveThisYear ? 1 : 0,
-                        CareP2_Cost: careMetaP2?.zusatzFloorZiel ?? 0
+                        CareP2_Cost: careMetaP2?.zusatzFloorZiel ?? 0,
+                        CareP2_Grade: careMetaP2?.grade ?? null,
+                        CareP2_GradeLabel: careMetaP2?.gradeLabel ?? ''
                     });
                 }
             }
