@@ -491,6 +491,7 @@ export async function runMonteCarlo() {
             const careMetaP2 = (inputs.partner?.aktiv === true)
                 ? makeDefaultCareMeta(inputs.pflegefallLogikAktivieren, inputs.partner?.geschlecht || partnerGenderFallback)
                 : null;
+            const hasPartner = careMetaP2 !== null;
 
             // Separate RNG streams for independent care events
             const rngCareP1 = rand.fork('CARE_P1');
@@ -506,9 +507,11 @@ export async function runMonteCarlo() {
             let postStressRecoveryYears = null;
 
             // Track dual care activity
-            let p1Alive = true, p2Alive = careMetaP2 !== null;
+            let p1Alive = true, p2Alive = hasPartner;
             let p1CareYears = 0, p2CareYears = 0, bothCareYears = 0;
             let triggeredAgeP2 = null;
+            let runEndedBecauseAllDied = false;
+            let deathLogContext = null;
 
             for (let simulationsJahr = 0; simulationsJahr < maxDauer; simulationsJahr++) {
                 const ageP1 = inputs.startAlter + simulationsJahr;
@@ -571,7 +574,15 @@ export async function runMonteCarlo() {
                 }
 
                 // Simulation ends when both persons have died
-                if (!p1Alive && !p2Alive) break;
+                if (!p1Alive && !p2Alive) {
+                    runEndedBecauseAllDied = true;
+                    deathLogContext = {
+                        jahr: simulationsJahr + 1,
+                        histJahr: yearData.jahr,
+                        inflation: yearData.inflation
+                    };
+                    break;
+                }
 
                 // Calculate care costs from both persons
                 const { zusatzFloor: careFloorP1, flexFactor: careFlexP1 } = calcCareCost(careMetaP1, null);
@@ -616,6 +627,8 @@ export async function runMonteCarlo() {
                         RealReturnEquityPct: 0,
                         RealReturnGoldPct: 0,
                         jahresentnahme_real: 0,
+                        Person1Alive: p1Alive ? 1 : 0,
+                        Person2Alive: hasPartner ? (p2Alive ? 1 : 0) : null,
                         // P1 Care (legacy compatibility)
                         pflege_aktiv: !!(careMetaP1 && careMetaP1.active),
                         pflege_grade: careMetaP1?.grade ?? null,
@@ -690,6 +703,8 @@ export async function runMonteCarlo() {
 
                     currentRunLog.push({
                         jahr: simulationsJahr + 1, histJahr: yearData.jahr, inflation: yearData.inflation, ...result.logData,
+                        Person1Alive: p1Alive ? 1 : 0,
+                        Person2Alive: hasPartner ? (p2Alive ? 1 : 0) : null,
                         // P1 Care (legacy compatibility)
                         pflege_aktiv: !!(careMetaP1 && careMetaP1.active),
                         pflege_zusatz_floor: careMetaP1?.zusatzFloorZiel ?? 0,
@@ -711,6 +726,23 @@ export async function runMonteCarlo() {
                         CareP2_GradeLabel: p2ActiveThisYear ? (careMetaP2?.gradeLabel ?? '') : ''
                     });
                 }
+            }
+
+            if (runEndedBecauseAllDied) {
+                // Ergänze einen letzten Log-Eintrag, damit klar ersichtlich ist, dass alle Personen verstorben sind.
+                const portfolioSnapshot = simState?.portfolio || {};
+                currentRunLog.push({
+                    jahr: deathLogContext?.jahr ?? (currentRunLog.length + 1),
+                    histJahr: deathLogContext?.histJahr ?? null,
+                    inflation: deathLogContext?.inflation ?? null,
+                    aktionUndGrund: '>>> ENDE: Alle Personen verstorben <<<',
+                    wertAktien: sumDepot({ depotTranchesAktien: portfolioSnapshot.depotTranchesAktien }),
+                    wertGold: sumDepot({ depotTranchesGold: portfolioSnapshot.depotTranchesGold }),
+                    liquiditaet: portfolioSnapshot.liquiditaet ?? 0,
+                    Person1Alive: 0,
+                    Person2Alive: hasPartner ? 0 : null,
+                    terminationReason: 'all_participants_deceased'
+                });
             }
 
             if (stressYears > 0) {

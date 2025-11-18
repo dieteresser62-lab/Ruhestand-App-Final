@@ -298,6 +298,20 @@ export function getWorstRunColumnDefinitions(opts = {}) {
     if (options.logDetailLevel === 'detailed') {
         baseCols.push({ key: 'histJahr', header: 'Hist', width: 4 });
     }
+    baseCols.push({
+        key: 'Person1Alive',
+        header: 'P1L',
+        width: 4,
+        fmt: formatAliveStatus,
+        title: 'Lebt Person 1 noch (✓) oder ist sie bereits verstorben (✗)?'
+    });
+    baseCols.push({
+        key: 'Person2Alive',
+        header: 'P2L',
+        width: 4,
+        fmt: formatAliveStatus,
+        title: 'Lebt Person 2 noch? (— = kein Partner)' 
+    });
     baseCols.push({ key: 'entscheidung.jahresEntnahme', header: 'Entnahme', width: 8, fmt: formatCurrencyShortLog });
     baseCols.push({ key: 'floor_brutto', header: 'Floor', width: 7, fmt: formatCurrencyShortLog });
 
@@ -392,6 +406,16 @@ export function getWorstRunColumnDefinitions(opts = {}) {
     ] : [];
 
     return [...baseCols, ...activeCareCols, ...finalCols, ...detailCols, ...guardCols];
+}
+
+/**
+ * Formatiert den Lebensstatus einer Person für das Worst-Run-Log.
+ * @param {number|null|undefined} value - 1, 0 oder null/undefined
+ * @returns {string} "✓" für lebend, "✗" für verstorben, "—" wenn nicht vorhanden
+ */
+function formatAliveStatus(value) {
+    if (value == null) return '—';
+    return value ? '✓' : '✗';
 }
 
 export function renderWorstRunLog(logRows, caR_Threshold, opts = {}) {
