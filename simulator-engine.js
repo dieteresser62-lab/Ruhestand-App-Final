@@ -649,7 +649,7 @@ const CARE_PROBABILITY_BUCKETS = Object.keys(PFLEGE_GRADE_PROBABILITIES).map(Num
  * Mortalitätsfaktor über die konfigurierte Ramp-Up-Dauer an.
  */
 export function computeCareMortalityMultiplier(careMeta, inputs) {
-    if (!careMeta?.active || !inputs?.pflegebeschleunigtMortalitaetAktivieren) {
+    if (!careMeta?.active) {
         return 1;
     }
 

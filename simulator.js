@@ -571,9 +571,8 @@ function getCommonInputs() {
             const raw = parseFloat(document.getElementById('pflegeRegionalZuschlag')?.value);
             return Math.max(0, Number.isFinite(raw) ? raw : 0) / 100;
         })(),
-        pflegebeschleunigtMortalitaetAktivieren: document.getElementById('pflegebeschleunigtMortalitaetAktivieren').checked,
         decumulation: { mode: 'none' },
-        stressPreset: document.getElementById('stressPreset').value || 'NONE'	
+        stressPreset: document.getElementById('stressPreset').value || 'NONE'
     };
 
     // NEU: Harte Verdrahtung der fehlenden Strategie-Parameter für die v31 Engine
@@ -1281,7 +1280,7 @@ function computeRunStatsFromSeries(series) {
 }
 
 function computeCareMortalityMultiplierLegacy(care, inputs) {
-  if (!care || !care.active || !inputs?.pflegebeschleunigtMortalitaetAktivieren) {
+  if (!care || !care.active) {
     return 1;
   }
 
@@ -2288,19 +2287,6 @@ function updatePflegeUIInfo() {
     }
 }
 
-function setMortalityInputsDisabled(disabled) {
-    SUPPORTED_PFLEGE_GRADES.forEach(grade => {
-        const field = document.getElementById(`pflegeStufe${grade}Mortality`);
-        if (field) {
-            field.disabled = disabled;
-        }
-    });
-    const note = document.querySelector('.care-grade-note');
-    if (note) {
-        note.style.opacity = disabled ? 0.5 : 1;
-    }
-}
-
 function selfCheckEngine() {
     if (typeof Ruhestandsmodell_v30 === 'undefined') {
         const footer = document.getElementById('engine-mismatch-footer');
@@ -2341,8 +2327,7 @@ window.onload = function() {
         'renteMonatlich', 'renteStartOffsetJahre', 'renteIndexierungsart',
         'pflegefallLogikAktivieren', 'pflegeModellTyp', ...CARE_GRADE_FIELD_IDS,
         'pflegeMaxFloor', 'pflegeRampUp', 'pflegeMinDauer', 'pflegeMaxDauer', 'pflegeKostenDrift',
-        'pflegeRegionalZuschlag', 'pflegeKostenStaffelPreset',
-        'pflegebeschleunigtMortalitaetAktivieren'
+        'pflegeRegionalZuschlag', 'pflegeKostenStaffelPreset'
     ];
     allInputs.forEach(id => {
         const element = document.getElementById(id);
@@ -2372,14 +2357,6 @@ window.onload = function() {
     pflegeCheckbox.addEventListener('change', () => { document.getElementById('pflegePanel').style.display = pflegeCheckbox.checked ? 'grid' : 'none'; });
     const pflegeModellSelect = document.getElementById('pflegeModellTyp');
     pflegeModellSelect.addEventListener('change', () => { document.getElementById('pflegeDauerContainer').style.display = pflegeModellSelect.value === 'akut' ? 'contents' : 'none'; });
-    const pflegeMortalitaetCheckbox = document.getElementById('pflegebeschleunigtMortalitaetAktivieren');
-    const syncMortalityToggle = () => {
-        if (!pflegeMortalitaetCheckbox) return;
-        setMortalityInputsDisabled(!pflegeMortalitaetCheckbox.checked);
-    };
-    if (pflegeMortalitaetCheckbox) {
-        pflegeMortalitaetCheckbox.addEventListener('change', syncMortalityToggle);
-    }
     const pflegeStaffelSelect = document.getElementById('pflegeKostenStaffelPreset');
     const pflegePresetHint = document.getElementById('pflegeStaffelPresetHint');
     if (pflegeStaffelSelect) {

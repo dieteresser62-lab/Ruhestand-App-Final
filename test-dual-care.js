@@ -169,7 +169,6 @@ const rampInputs = {
     pflegeStufe1FlexCut: rampGradeConfigs[1].flexCut,
     pflegeMaxFloor: 60000,
     pflegeKostenDrift: 0,
-    pflegebeschleunigtMortalitaetAktivieren: true,
     startFloorBedarf: 40000,
     startFlexBedarf: 20000,
     pflegeMinDauer: 4,

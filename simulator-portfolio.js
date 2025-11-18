@@ -138,7 +138,6 @@ export function getCommonInputs() {
             const raw = parseFloat(document.getElementById('pflegeRegionalZuschlag')?.value);
             return Math.max(0, Number.isFinite(raw) ? raw : 0) / 100;
         })(),
-        pflegebeschleunigtMortalitaetAktivieren: document.getElementById('pflegebeschleunigtMortalitaetAktivieren').checked,
         decumulation: { mode: 'none' },
         stressPreset: document.getElementById('stressPreset').value || 'NONE',
         // Partner-Konfiguration (Rente 2)
