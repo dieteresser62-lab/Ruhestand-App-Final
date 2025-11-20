@@ -53,7 +53,7 @@ const TransactionEngine = {
      * Berechnet begrenztes Auffüllen (mit Cap)
      * @private
      */
-    _computeCappedRefill({ isBearContext, liquiditaetsbedarf, aktienwert, input }) {
+    _computeCappedRefill({ isBearContext, liquiditaetsbedarf, aktienwert, input, isCriticalLiquidity = false }) {
         const capConfig = isBearContext
             ? {
                 pct: input.maxBearRefillPctOfEq,
@@ -67,11 +67,20 @@ const TransactionEngine = {
             };
 
         const maxCapEuro = (capConfig.pct / 100) * aktienwert;
-        const nettoBedarf = Math.min(liquiditaetsbedarf, maxCapEuro);
+        // Bei kritischer Liquidität: erhöhtes Cap erlauben (10% des Aktienwerts)
+        const effectiveMaxCap = isCriticalLiquidity
+            ? Math.max(maxCapEuro, aktienwert * 0.10)
+            : maxCapEuro;
+        const nettoBedarf = Math.min(liquiditaetsbedarf, effectiveMaxCap);
         const isCapped = nettoBedarf < liquiditaetsbedarf;
 
-        if (nettoBedarf < CONFIG.THRESHOLDS.STRATEGY.minRefillAmount) {
-            if (liquiditaetsbedarf >= CONFIG.THRESHOLDS.STRATEGY.minRefillAmount) {
+        // Bei kritischer Liquidität: stark reduzierte Mindestschwelle verwenden
+        const effectiveMinRefill = isCriticalLiquidity
+            ? Math.min(CONFIG.THRESHOLDS.STRATEGY.minRefillAmount, CONFIG.THRESHOLDS.STRATEGY.cashRebalanceThreshold || 2500)
+            : CONFIG.THRESHOLDS.STRATEGY.minRefillAmount;
+
+        if (nettoBedarf < effectiveMinRefill) {
+            if (liquiditaetsbedarf >= effectiveMinRefill) {
                 return {
                     bedarf: 0,
                     title: '',
@@ -245,6 +254,9 @@ const TransactionEngine = {
                 const zielDeckungBedarf = Math.max(0, (runwayCoverageThreshold * zielLiquiditaet) - aktuelleLiquiditaet);
                 const liquiditaetsBedarf = Math.max(runwayBedarfEuro, zielDeckungBedarf);
 
+                // Kritische Liquidität wenn unter 75% des Ziels
+                const isCriticalLiquidityFailsafe = zielLiquiditaetsdeckung < runwayCoverageThreshold;
+
                 const minTradeGateResult = this._computeAppliedMinTradeGate({
                     investiertesKapital,
                     liquiditaetsBedarf,
@@ -259,7 +271,8 @@ const TransactionEngine = {
                     isBearContext: false,
                     liquiditaetsbedarf: liquiditaetsBedarf,
                     aktienwert,
-                    input
+                    input,
+                    isCriticalLiquidity: isCriticalLiquidityFailsafe
                 });
 
                 if (neutralRefill.bedarf > 0) {
