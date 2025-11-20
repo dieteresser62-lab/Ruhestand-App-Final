@@ -278,6 +278,14 @@ const TransactionEngine = {
             // Nicht-Bärenmarkt: Opportunistisches Rebalancing
             } else if (!isBearRegimeProxy) {
                 const liquiditaetsBedarf = Math.max(0, zielLiquiditaet - aktuelleLiquiditaet);
+
+                // Prüfe ob kritische Liquiditätssituation vorliegt
+                const zielLiquiditaetsdeckungLocal = (zielLiquiditaet > 0)
+                    ? (aktuelleLiquiditaet / zielLiquiditaet)
+                    : 1;
+                const runwayCoverageThresholdLocal = CONFIG.THRESHOLDS.STRATEGY.runwayCoverageMinPct || 0.75;
+                const isCriticalLiquidity = zielLiquiditaetsdeckungLocal < runwayCoverageThresholdLocal;
+
                 let goldKaufBedarf = 0;
 
                 // Gold-Rebalancing prüfen
@@ -292,15 +300,25 @@ const TransactionEngine = {
                 }
 
                 const totalerBedarf = liquiditaetsBedarf + goldKaufBedarf;
-                const minTradeGateResult = this._computeAppliedMinTradeGate({
-                    investiertesKapital,
-                    liquiditaetsBedarf,
-                    totalerBedarf
-                });
-                const appliedMinTradeGate = minTradeGateResult.appliedMinTradeGate;
-                minTradeResultOverride = minTradeGateResult.minTradeResultOverride;
-                if (minTradeGateResult.diagnosisEntry) {
-                    actionDetails.diagnosisEntries.push(minTradeGateResult.diagnosisEntry);
+
+                // Bei kritischer Liquidität: niedrigere Mindestschwelle verwenden
+                let appliedMinTradeGate;
+                if (isCriticalLiquidity) {
+                    appliedMinTradeGate = Math.max(
+                        CONFIG.THRESHOLDS.STRATEGY.minRefillAmount || 2500,
+                        CONFIG.THRESHOLDS.STRATEGY.cashRebalanceThreshold || 2500
+                    );
+                } else {
+                    const minTradeGateResult = this._computeAppliedMinTradeGate({
+                        investiertesKapital,
+                        liquiditaetsBedarf,
+                        totalerBedarf
+                    });
+                    appliedMinTradeGate = minTradeGateResult.appliedMinTradeGate;
+                    minTradeResultOverride = minTradeGateResult.minTradeResultOverride;
+                    if (minTradeGateResult.diagnosisEntry) {
+                        actionDetails.diagnosisEntries.push(minTradeGateResult.diagnosisEntry);
+                    }
                 }
 
                 if (totalerBedarf >= appliedMinTradeGate) {
@@ -325,11 +343,23 @@ const TransactionEngine = {
                     // Aktien-Verkaufsbudget berechnen
                     const aktienZielwert = investiertesKapital * (input.targetEq / 100);
                     const aktienObergrenze = aktienZielwert * (1 + (input.rebalBand / 100));
-                    const aktienUeberschuss = (aktienwert > aktienObergrenze)
+                    let aktienUeberschuss = (aktienwert > aktienObergrenze)
                         ? (aktienwert - aktienZielwert)
                         : 0;
+
+                    // Bei kritischer Liquidität: Verkauf auch unter Obergrenze/Zielwert erlauben
+                    // um RUIN durch Liquiditätsmangel zu verhindern
+                    if (isCriticalLiquidity && aktienUeberschuss < liquiditaetsBedarf) {
+                        // Erlaube Verkauf bis zum Liquiditätsbedarf, begrenzt durch verfügbare Aktien
+                        aktienUeberschuss = Math.min(liquiditaetsBedarf, aktienwert);
+                    }
+
                     const maxSkimCapEuro = (input.maxSkimPctOfEq / 100) * aktienwert;
-                    const maxSellableFromEquity = Math.min(aktienUeberschuss, maxSkimCapEuro);
+                    // Bei kritischer Liquidität: Cap auf 10% des Aktienwerts erhöhen
+                    const effectiveSkimCap = isCriticalLiquidity
+                        ? Math.max(maxSkimCapEuro, aktienwert * 0.10)
+                        : maxSkimCapEuro;
+                    const maxSellableFromEquity = Math.min(aktienUeberschuss, effectiveSkimCap);
 
                     const totalEquityValue = input.depotwertAlt + input.depotwertNeu;
                     if (totalEquityValue > 0) {
@@ -377,12 +407,15 @@ const TransactionEngine = {
             isPufferSchutzAktiv
         );
 
-        const minTradeResult = minTradeResultOverride ?? Math.max(
-            CONFIG.THRESHOLDS.STRATEGY.minTradeAmountStatic,
-            (depotwertGesamt + aktuelleLiquiditaet) * CONFIG.THRESHOLDS.STRATEGY.minTradeAmountDynamicFactor
-        );
+        // Bei Notfall-Verkäufen (Puffer-Schutz) keine minTrade-Schwelle anwenden
+        const minTradeResult = isPufferSchutzAktiv
+            ? 0
+            : (minTradeResultOverride ?? Math.max(
+                CONFIG.THRESHOLDS.STRATEGY.minTradeAmountStatic,
+                (depotwertGesamt + aktuelleLiquiditaet) * CONFIG.THRESHOLDS.STRATEGY.minTradeAmountDynamicFactor
+            ));
 
-        if (!saleResult || saleResult.achievedRefill < minTradeResult) {
+        if (!saleResult || (saleResult.achievedRefill < minTradeResult && !isPufferSchutzAktiv)) {
             const achieved = saleResult?.achievedRefill || 0;
             markAsBlocked('min_trade', Math.max(0, minTradeResult - achieved), {
                 direction: actionDetails.title || 'Verkauf',
