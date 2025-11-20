@@ -349,16 +349,46 @@ export function getWorstRunColumnDefinitions(opts = {}) {
     baseCols.push({
         key: 'Person1Alive',
         header: 'P1L',
-        width: 4,
+        width: 3,
         fmt: formatAliveStatus,
         title: 'Lebt Person 1 noch (✓) oder ist sie bereits verstorben (✗)?'
+    });
+    // Care status for Person 1 (always visible if care data exists)
+    baseCols.push({
+        key: 'CareP1_Active',
+        header: 'P1',
+        width: 2,
+        fmt: v => v ? '✓' : '—',
+        title: 'Person 1 in Pflege'
+    });
+    baseCols.push({
+        key: 'CareP1_Grade',
+        header: 'P1_PG',
+        width: 5,
+        fmt: (v, row) => (row.CareP1_Active ? `PG${v ?? '—'}` : '—'),
+        title: 'Pflegegrad Person 1'
     });
     baseCols.push({
         key: 'Person2Alive',
         header: 'P2L',
-        width: 4,
+        width: 3,
         fmt: formatAliveStatus,
-        title: 'Lebt Person 2 noch? (— = kein Partner)' 
+        title: 'Lebt Person 2 noch? (— = kein Partner)'
+    });
+    // Care status for Person 2 (always visible if care data exists)
+    baseCols.push({
+        key: 'CareP2_Active',
+        header: 'P2',
+        width: 2,
+        fmt: v => v ? '✓' : '—',
+        title: 'Person 2 in Pflege'
+    });
+    baseCols.push({
+        key: 'CareP2_Grade',
+        header: 'P2_PG',
+        width: 5,
+        fmt: (v, row) => (row.CareP2_Active ? `PG${v ?? '—'}` : '—'),
+        title: 'Pflegegrad Person 2'
     });
     baseCols.push({ key: 'entscheidung.jahresEntnahme', header: 'Entnahme', width: 8, fmt: formatCurrencyShortLog });
     baseCols.push({ key: 'floor_brutto', header: 'Floor', width: 7, fmt: formatCurrencyShortLog });
@@ -370,48 +400,30 @@ export function getWorstRunColumnDefinitions(opts = {}) {
     baseCols.push({ key: 'renteSum', header: 'RenteSum', width: 8, fmt: formatCurrencyShortLog });
 
     const careColsMinimal = [
-        { key: null, header: 'PG', width: 12,
-          fmt: (v, row) => {
-              const p1Grade = row.CareP1_Active ? `P1:PG${row.CareP1_Grade ?? '?'}` : null;
-              const p2Grade = row.CareP2_Active ? `P2:PG${row.CareP2_Grade ?? '?'}` : null;
-              if (p1Grade && p2Grade) return `${p1Grade} ${p2Grade}`;
-              if (p1Grade) return p1Grade;
-              if (p2Grade) return p2Grade;
-              return '—';
-          },
-          title: 'Aktive Pflegegrade (P1 und/oder P2)'
-        },
         { key: 'pflege_zusatz_floor', header: 'PflegeZiel', width: 10, fmt: formatCurrencyShortLog, title: "Zusatz-Floor in diesem Jahr (nominal), gecappt durch MaxPflege-Floor – Floor@Eintritt; wächst jährlich mit Inflation/Drift." },
-        { key: null, header: 'PflegeΣ', width: 8,
-          fmt: (v, row) => formatCurrencyShortLog((row.CareP1_Cost || 0) + (row.CareP2_Cost || 0)),
-          title: "Gesamte Pflege-Zusatzkosten dieses Jahres (P1 + P2)"
+        {
+            key: null, header: 'PflegeΣ', width: 8,
+            fmt: (v, row) => formatCurrencyShortLog((row.CareP1_Cost || 0) + (row.CareP2_Cost || 0)),
+            title: "Gesamte Pflege-Zusatzkosten dieses Jahres (P1 + P2)"
         },
-        { key: 'CareP1_Active', header: 'P1', width: 2, fmt: v => v ? '✓' : '—', title: 'Person 1 in Pflege' },
         { key: 'CareP1_Cost', header: 'P1€', width: 7, fmt: formatCurrencyShortLog, title: 'Zusätzliche Pflege-Kosten P1' },
-        { key: 'CareP2_Active', header: 'P2', width: 2, fmt: v => v ? '✓' : '—', title: 'Person 2 in Pflege' },
         { key: 'CareP2_Cost', header: 'P2€', width: 7, fmt: formatCurrencyShortLog, title: 'Zusätzliche Pflege-Kosten P2' },
     ];
 
     const careColsDetailed = [
-        { key: 'pflege_grade', header: 'PG', width: 4, fmt: (v, row) => (row.pflege_aktiv ? `PG${v ?? '—'}` : '—') },
-        { key: 'pflege_grade_label', header: 'Grad', width: 16, fmt: (v, row) => (row.pflege_aktiv ? (v || `Pflegegrad ${row.pflege_grade ?? '?'}`) : '—') },
         { key: 'pflege_floor_anchor', header: 'Floor@Eintritt', width: 14, fmt: formatCurrencyShortLog },
         { key: 'pflege_maxfloor_anchor', header: 'MaxPflege@Jahr', width: 15, fmt: formatCurrencyShortLog },
         { key: 'pflege_cap_zusatz', header: 'CapZusatz@Jahr', width: 15, fmt: formatCurrencyShortLog },
         { key: 'pflege_delta_flex', header: 'PflegeΔ_Flex', width: 12, fmt: formatCurrencyShortLog },
         { key: 'pflege_zusatz_floor', header: 'PflegeZiel', width: 10, fmt: formatCurrencyShortLog, title: "Zusatz-Floor in diesem Jahr (nominal), gecappt durch MaxPflege-Floor – Floor@Eintritt; wächst jährlich mit Inflation/Drift." },
         { key: 'pflege_zusatz_floor_delta', header: 'PflegeΔ', width: 8, fmt: formatCurrencyShortLog },
-        { key: null, header: 'PflegeΣ', width: 8,
-          fmt: (v, row) => formatCurrencyShortLog((row.CareP1_Cost || 0) + (row.CareP2_Cost || 0)),
-          title: "Gesamte Pflege-Zusatzkosten dieses Jahres (P1 + P2)"
+        {
+            key: null, header: 'PflegeΣ', width: 8,
+            fmt: (v, row) => formatCurrencyShortLog((row.CareP1_Cost || 0) + (row.CareP2_Cost || 0)),
+            title: "Gesamte Pflege-Zusatzkosten dieses Jahres (P1 + P2)"
         },
         { key: 'pflege_flex_faktor', header: 'FlexPfl%', width: 8, fmt: (v, row) => (row.pflege_aktiv ? formatPctOrDash(v) : '—') },
-        // Dual-person care details
-        { key: 'CareP1_Active', header: 'P1', width: 2, fmt: v => v ? '✓' : '—', title: 'Person 1 in Pflege' },
-        { key: 'CareP1_Grade', header: 'P1_PG', width: 5, fmt: (v, row) => (row.CareP1_Active ? `PG${v ?? '—'}` : '—'), title: 'Pflegegrad Person 1' },
         { key: 'CareP1_Cost', header: 'P1€', width: 7, fmt: formatCurrencyShortLog, title: 'Zusätzliche Pflege-Kosten P1' },
-        { key: 'CareP2_Active', header: 'P2', width: 2, fmt: v => v ? '✓' : '—', title: 'Person 2 in Pflege' },
-        { key: 'CareP2_Grade', header: 'P2_PG', width: 5, fmt: (v, row) => (row.CareP2_Active ? `PG${v ?? '—'}` : '—'), title: 'Pflegegrad Person 2' },
         { key: 'CareP2_Cost', header: 'P2€', width: 7, fmt: formatCurrencyShortLog, title: 'Zusätzliche Pflege-Kosten P2' },
     ];
 
@@ -420,21 +432,27 @@ export function getWorstRunColumnDefinitions(opts = {}) {
     const finalCols = [
         { key: 'FlexRatePct', header: 'Flex%', width: 5, fmt: v => `${Math.round(v || 0)}%` },
         { key: 'flex_erfuellt_nominal', header: 'Flex', width: 7, fmt: formatCurrencyShortLog },
-        { key: 'aktionUndGrund', header: 'Status', width: 22, fmt: (v, row) => {
-            const alarmMarker = row.Alarm ? '(A) ' : '';
-            const regimeShort = shortenText(window.Ruhestandsmodell_v30.CONFIG.SCENARIO_TEXT[row.Regime] || '');
-            const status = `${alarmMarker}${row.CutReason || 'NONE'}/${regimeShort}`;
-            return (v || status).substring(0, 21);
-        }},
+        {
+            key: 'aktionUndGrund', header: 'Status', width: 22, fmt: (v, row) => {
+                const alarmMarker = row.Alarm ? '(A) ' : '';
+                const regimeShort = shortenText(window.Ruhestandsmodell_v30.CONFIG.SCENARIO_TEXT[row.Regime] || '');
+                const status = `${alarmMarker}${row.CutReason || 'NONE'}/${regimeShort}`;
+                return (v || status).substring(0, 21);
+            }
+        },
         { key: 'QuoteEndPct', header: 'Quote%', width: 6, fmt: v => `${(v || 0).toFixed(1)}%` },
         { key: 'RunwayCoveragePct', header: 'Runway%', width: 7, fmt: v => `${Math.round(v || 0)}%` },
-        { key: 'RealReturnEquityPct', header: 'R.Aktien', width: 8, fmt: v => `${((v||0)*100).toFixed(1)}%` },
-        { key: 'RealReturnGoldPct', header: 'R.Gold', width: 8, fmt: v => `${((v||0)*100).toFixed(1)}%` },
+        { key: 'RealReturnEquityPct', header: 'R.Aktien', width: 8, fmt: v => `${((v || 0) * 100).toFixed(1)}%` },
+        { key: 'RealReturnGoldPct', header: 'R.Gold', width: 8, fmt: v => `${((v || 0) * 100).toFixed(1)}%` },
         { key: 'inflation', header: 'Infl.', width: 5, fmt: v => `${(v || 0).toFixed(1)}%` },
-        { key: null, header: 'Handl.A', width: 8,
-          fmt: (v, row) => formatCurrencyShortLog((row.vk?.vkAkt || 0) - (row.kaufAkt || 0)) },
-        { key: null, header: 'Handl.G', width: 8,
-          fmt: (v, row) => formatCurrencyShortLog((row.vk?.vkGld || 0) - (row.kaufGld || 0)) },
+        {
+            key: null, header: 'Handl.A', width: 8,
+            fmt: (v, row) => formatCurrencyShortLog((row.vk?.vkAkt || 0) - (row.kaufAkt || 0))
+        },
+        {
+            key: null, header: 'Handl.G', width: 8,
+            fmt: (v, row) => formatCurrencyShortLog((row.vk?.vkGld || 0) - (row.kaufGld || 0))
+        },
         { key: 'steuern_gesamt', header: 'St.', width: 6, fmt: formatCurrencyShortLog },
         { key: 'wertAktien', header: 'Aktien', width: 8, fmt: formatCurrencyShortLog },
         { key: 'wertGold', header: 'Gold', width: 7, fmt: formatCurrencyShortLog },
@@ -495,10 +513,10 @@ export function renderWorstRunLog(logRows, caR_Threshold, opts = {}) {
  * Berechnet das Gesamtvermögen eines Portfolios
  */
 export function portfolioTotal(p) {
-  const sumTr = (arr) => Array.isArray(arr)
-    ? arr.reduce((s, t) => s + (Number(t?.marketValue) || 0), 0)
-    : 0;
-  return sumTr(p?.depotTranchesAktien) + sumTr(p?.depotTranchesGold) + (Number(p?.liquiditaet) || 0);
+    const sumTr = (arr) => Array.isArray(arr)
+        ? arr.reduce((s, t) => s + (Number(t?.marketValue) || 0), 0)
+        : 0;
+    return sumTr(p?.depotTranchesAktien) + sumTr(p?.depotTranchesGold) + (Number(p?.liquiditaet) || 0);
 }
 
 /**

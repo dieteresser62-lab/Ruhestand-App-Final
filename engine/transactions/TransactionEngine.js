@@ -195,7 +195,11 @@ const TransactionEngine = {
         const renteJahr = input.renteAktiv ? input.renteMonatlich * 12 : 0;
         const floorBedarfNetto = Math.max(0, input.floorBedarf - renteJahr);
         const krisenMindestLiquiditaet = (floorBedarfNetto / 12) * input.runwayMinMonths;
-        const sicherheitsPuffer = krisenMindestLiquiditaet;
+        // Sicherheits-Puffer: Entweder rechnerischer Bedarf oder absolutes Minimum (für ruhiges Schlafen)
+        const sicherheitsPuffer = Math.max(
+            krisenMindestLiquiditaet,
+            CONFIG.THRESHOLDS.STRATEGY.absoluteMinLiquidity || 10000
+        );
         const isBearRegimeProxy = market.sKey === 'bear_deep' || market.sKey === 'recovery_in_bear';
         const investiertesKapital = depotwertGesamt + aktuelleLiquiditaet;
 
@@ -245,7 +249,7 @@ const TransactionEngine = {
                 });
                 verwendungen.liquiditaet = actionDetails.bedarf;
 
-            // Universeller Runway-Failsafe (neutral)
+                // Universeller Runway-Failsafe (neutral)
             } else if (currentRunwayMonths < input.runwayMinMonths || zielLiquiditaetsdeckung < runwayCoverageThreshold) {
                 const runwayBedarfEuro = Math.max(
                     0,
@@ -288,7 +292,7 @@ const TransactionEngine = {
                     verwendungen.liquiditaet = actionDetails.bedarf;
                 }
 
-            // Nicht-Bärenmarkt: Opportunistisches Rebalancing
+                // Nicht-Bärenmarkt: Opportunistisches Rebalancing
             } else if (!isBearRegimeProxy) {
                 const liquiditaetsBedarf = Math.max(0, zielLiquiditaet - aktuelleLiquiditaet);
 
