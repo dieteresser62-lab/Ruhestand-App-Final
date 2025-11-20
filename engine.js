@@ -1434,10 +1434,24 @@
                     // Nicht-Bärenmarkt: Opportunistisches Rebalancing
                 } else if (!isBearRegimeProxy) {
                     const investiertesKapital = depotwertGesamt + aktuelleLiquiditaet;
-                    const minTrade = Math.max(
-                        CONFIG.THRESHOLDS.STRATEGY.minTradeAmountStatic,
-                        investiertesKapital * CONFIG.THRESHOLDS.STRATEGY.minTradeAmountDynamicFactor
-                    );
+
+                    // Prüfe ob kritische Liquiditätssituation vorliegt
+                    const zielLiquiditaetsdeckung = (zielLiquiditaet > 0)
+                        ? (aktuelleLiquiditaet / zielLiquiditaet)
+                        : 1;
+                    const runwayCoverageThreshold = CONFIG.THRESHOLDS.STRATEGY.runwayCoverageMinPct || 0.75;
+                    const isCriticalLiquidity = zielLiquiditaetsdeckung < runwayCoverageThreshold;
+
+                    // Bei kritischer Liquidität: niedrigere Mindestschwelle verwenden
+                    const minTrade = isCriticalLiquidity
+                        ? Math.max(
+                            CONFIG.THRESHOLDS.STRATEGY.minRefillAmount || 2500,
+                            CONFIG.THRESHOLDS.STRATEGY.cashRebalanceThreshold || 2500
+                        )
+                        : Math.max(
+                            CONFIG.THRESHOLDS.STRATEGY.minTradeAmountStatic,
+                            investiertesKapital * CONFIG.THRESHOLDS.STRATEGY.minTradeAmountDynamicFactor
+                        );
 
                     const liquiditaetsBedarf = Math.max(0, zielLiquiditaet - aktuelleLiquiditaet);
                     let goldKaufBedarf = 0;
@@ -1481,12 +1495,23 @@
                         // FIX: Für Liquiditätsaufbau erlauben wir Verkauf bereits ab Zielwert (Skimming),
                         // nicht erst ab Obergrenze. Das Rebalancing-Band gilt primär für Umschichtung in Gold/Bonds,
                         // aber Liquidität hat Vorrang, wenn wir unter dem Ziel sind.
-                        const aktienUeberschuss = (aktienwert > aktienZielwert)
+                        let aktienUeberschuss = (aktienwert > aktienZielwert)
                             ? (aktienwert - aktienZielwert)
                             : 0;
 
+                        // Bei kritischer Liquidität: Verkauf auch unter Zielwert erlauben
+                        // um RUIN durch Liquiditätsmangel zu verhindern
+                        if (isCriticalLiquidity && aktienUeberschuss < liquiditaetsBedarf) {
+                            // Erlaube Verkauf bis zum Liquiditätsbedarf, begrenzt durch verfügbare Aktien
+                            aktienUeberschuss = Math.min(liquiditaetsBedarf, aktienwert);
+                        }
+
                         const maxSkimCapEuro = (input.maxSkimPctOfEq / 100) * aktienwert;
-                        const maxSellableFromEquity = Math.min(aktienUeberschuss, maxSkimCapEuro);
+                        // Bei kritischer Liquidität: Cap auf 10% des Aktienwerts erhöhen
+                        const effectiveSkimCap = isCriticalLiquidity
+                            ? Math.max(maxSkimCapEuro, aktienwert * 0.10)
+                            : maxSkimCapEuro;
+                        const maxSellableFromEquity = Math.min(aktienUeberschuss, effectiveSkimCap);
 
                         const totalEquityValue = input.depotwertAlt + input.depotwertNeu;
                         if (totalEquityValue > 0) {
@@ -1534,12 +1559,15 @@
                 isPufferSchutzAktiv
             );
 
-            const minTradeResult = Math.max(
-                CONFIG.THRESHOLDS.STRATEGY.minTradeAmountStatic,
-                (depotwertGesamt + aktuelleLiquiditaet) * CONFIG.THRESHOLDS.STRATEGY.minTradeAmountDynamicFactor
-            );
+            // Bei Notfall-Verkäufen (Puffer-Schutz) keine minTrade-Schwelle anwenden
+            const minTradeResult = isPufferSchutzAktiv
+                ? 0
+                : Math.max(
+                    CONFIG.THRESHOLDS.STRATEGY.minTradeAmountStatic,
+                    (depotwertGesamt + aktuelleLiquiditaet) * CONFIG.THRESHOLDS.STRATEGY.minTradeAmountDynamicFactor
+                );
 
-            if (!saleResult || saleResult.achievedRefill < minTradeResult) {
+            if (!saleResult || (saleResult.achievedRefill < minTradeResult && !isPufferSchutzAktiv)) {
                 const achieved = saleResult?.achievedRefill || 0;
                 markAsBlocked('min_trade', Math.max(0, minTradeResult - achieved), {
                     direction: actionDetails.title || 'Verkauf',
