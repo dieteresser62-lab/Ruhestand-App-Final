@@ -1,21 +1,62 @@
 <!DOCTYPE html>
 <html lang="de">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ruhestandsmodell-Simulator</title>
     <link rel="stylesheet" href="simulator.css">
     <style>
-.debug-actions{margin-left:auto;display:inline-flex;align-items:center;gap:.5rem}
-.btn-debug{font-size:.8rem;padding:.25rem .5rem;border-radius:.5rem;border:1px solid #3b82f6;background:transparent;color:#1f3b8f;cursor:pointer}
-.btn-debug:hover{background:#eaf2ff}
-.dev-only{display:none}
-.dev-on .dev-only{display:block}
-.debug-link{font-size:.8rem;padding:.1rem .3rem;border:1px solid #d6e6ff;border-radius:.4rem;color:#3b82f6;text-decoration:none}
-.debug-link:hover{background:#f3f8ff}
-.section-title{display:flex;align-items:center;justify-content:space-between}
+        .debug-actions {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem
+        }
+
+        .btn-debug {
+            font-size: .8rem;
+            padding: .25rem .5rem;
+            border-radius: .5rem;
+            border: 1px solid #3b82f6;
+            background: transparent;
+            color: #1f3b8f;
+            cursor: pointer
+        }
+
+        .btn-debug:hover {
+            background: #eaf2ff
+        }
+
+        .dev-only {
+            display: none
+        }
+
+        .dev-on .dev-only {
+            display: block
+        }
+
+        .debug-link {
+            font-size: .8rem;
+            padding: .1rem .3rem;
+            border: 1px solid #d6e6ff;
+            border-radius: .4rem;
+            color: #3b82f6;
+            text-decoration: none
+        }
+
+        .debug-link:hover {
+            background: #f3f8ff
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between
+        }
     </style>
 </head>
+
 <body>
 
     <div class="main-layout">
@@ -31,526 +72,631 @@
 
             <div class="tab-content">
                 <div id="tab-rahmendaten" class="tab-panel active">
-            <fieldset>
-                <legend>Startportfolio & Bedarf</legend>
-                <div class="form-grid">
-                    <div class="form-group"><label for="simStartVermoegen">Gesamtvermögen (€)</label><input type="number" id="simStartVermoegen" value="2500000"></div>
-                    <div class="form-group"><label for="depotwertAlt">davon Depotwert Alt (€)</label><input type="number" id="depotwertAlt" value="1250000"></div>
-                    <div class="form-group"><label for="zielLiquiditaet">davon Ziel-Liquidität (€)</label><input type="number" id="zielLiquiditaet" value="180000"></div>
-                </div>
-                 <div class="form-grid" style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
-                    <div class="form-group"><label for="startFloorBedarf">Start Floor-Bedarf p.a. (€)</label><input type="number" id="startFloorBedarf" value="36000"></div>
-                    <div class="form-group"><label for="startFlexBedarf">Start Flex-Bedarf p.a. (€)</label><input type="number" id="startFlexBedarf" value="28000"></div>
-                    <div class="form-group"><label for="marketCapeRatio">Aktueller CAPE (Shiller)</label><input type="number" id="marketCapeRatio" value="32" step="0.1" min="0"></div>
-                    <div class="form-group"><label for="einstandAlt">Einstand Depot Alt (€)</label><input type="number" id="einstandAlt" value="700000"></div>
-                    <div class="form-group"><label>Einstand Depot Neu (€)</label><input type="number" id="einstandNeu" placeholder="wird berechnet" disabled></div>
-                 </div>
-                 <div id="displayPortfolioBreakdown" style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;"></div>
-            </fieldset>
+                    <fieldset>
+                        <legend>Startportfolio & Bedarf</legend>
+                        <div class="form-grid">
+                            <div class="form-group"><label for="simStartVermoegen">Gesamtvermögen (€)</label><input
+                                    type="number" id="simStartVermoegen" value="2500000"></div>
+                            <div class="form-group"><label for="depotwertAlt">davon Depotwert Alt (€)</label><input
+                                    type="number" id="depotwertAlt" value="1250000"></div>
+                            <div class="form-group"><label for="zielLiquiditaet">davon Ziel-Liquidität (€)</label><input
+                                    type="number" id="zielLiquiditaet" value="180000"></div>
+                        </div>
+                        <div class="form-grid"
+                            style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
+                            <div class="form-group"><label for="startFloorBedarf">Start Floor-Bedarf p.a.
+                                    (€)</label><input type="number" id="startFloorBedarf" value="24000"></div>
+                            <div class="form-group"><label for="startFlexBedarf">Start Flex-Bedarf p.a.
+                                    (€)</label><input type="number" id="startFlexBedarf" value="28000"></div>
+                            <div class="form-group"><label for="marketCapeRatio">Aktueller CAPE (Shiller)</label><input
+                                    type="number" id="marketCapeRatio" value="32" step="0.1" min="0"></div>
+                            <div class="form-group"><label for="einstandAlt">Einstand Depot Alt (€)</label><input
+                                    type="number" id="einstandAlt" value="700000"></div>
+                            <div class="form-group"><label>Einstand Depot Neu (€)</label><input type="number"
+                                    id="einstandNeu" placeholder="wird berechnet" disabled></div>
+                        </div>
+                        <div id="displayPortfolioBreakdown"
+                            style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                        </div>
+                    </fieldset>
 
-            <fieldset>
-                <legend>Strategie-Parameter</legend>
-                <div class="form-group" style="justify-content: center;">
-                    <label style="flex-direction: row; align-items: center;">
-                        <input type="checkbox" id="goldAllokationAktiv" style="width: auto; margin-right: 8px;" checked>
-                        Gold-Allokation aktiv
-                    </label>
-                </div>
-                <div id="goldStrategyPanel" style="display: none;">
-                    <div class="form-grid-four-col">
-                        <div class="form-group">
-                            <label for="goldAllokationProzent">Ziel-Allokation (% v. Depot)</label>
-                            <input type="number" id="goldAllokationProzent" value="7.5" step="1">
-                        </div>
-                        <div class="form-group">
-                            <label for="goldFloorProzent">Gold-Floor (% v. Gesamt)</label>
-                            <input type="number" id="goldFloorProzent" value="1" step="0.5">
-                        </div>
-                         <div class="form-group">
-                            <label for="rebalancingBand">Rebalancing-Band (± %)</label>
-                            <input type="number" id="rebalancingBand" value="25" step="5">
-                        </div>
-                        <div class="form-group" style="grid-column: span 2; justify-content: center;">
+                    <fieldset>
+                        <legend>Strategie-Parameter</legend>
+                        <div class="form-group" style="justify-content: center;">
                             <label style="flex-direction: row; align-items: center;">
-                                <input type="checkbox" id="goldSteuerfrei" style="width: auto; margin-right: 8px;" checked> Gold-Verkäufe steuerfrei (simuliert >1J Haltefrist)
+                                <input type="checkbox" id="goldAllokationAktiv" style="width: auto; margin-right: 8px;"
+                                    checked>
+                                Gold-Allokation aktiv
                             </label>
                         </div>
-                    </div>
-                </div>
-            </fieldset>
-            
-            <fieldset>
-                <legend>Allgemeine & Externe Parameter</legend>
-                 <div class="form-grid-four-col" style="align-items: end;">
-                        <div class="form-group"><label for="p1StartAlter">Startalter</label><input type="number" id="p1StartAlter" value="63"></div>
-                        <div class="form-group"><label for="p1Geschlecht">Geschlecht</label>
-                           <select id="p1Geschlecht"><option value="m" selected>Männlich</option><option value="w">Weiblich</option><option value="d">Divers</option></select>
-                        </div>
-                        <div class="form-group"><label for="p1SparerPauschbetrag">Sparer-Pauschbetrag (€)</label><input type="number" id="p1SparerPauschbetrag" value="1000"></div>
-                        <div class="form-group"><label for="p1KirchensteuerPct">Kirchensteuer</label>
-                           <select id="p1KirchensteuerPct"><option value="0">0 %</option><option value="8">8 %</option><option value="9" selected>9 %</option></select>
-                       </div>
-                       <div class="form-group"><label for="p1Monatsrente">Monatliche Rente (€)</label><input type="number" id="p1Monatsrente" value="500"></div>
-                       <div class="form-group"><label for="p1StartInJahren">Start in ... Jahren</label><input type="number" id="p1StartInJahren" value="5"></div>
-                       <div class="form-group" style="grid-column: span 2;">
-                           <label for="rentAdjMode">Rentenanpassung koppeln an</label>
-                           <select id="rentAdjMode">
-                               <option value="fix">Fixer Prozentsatz</option>
-                               <option value="wage" selected>Lohnentwicklung (hist. Daten)</option>
-                               <option value="cpi">Inflation</option>
-                           </select>
-                       </div>
-                       <div class="form-group">
-                           <label for="rentAdjPct">Rentenanpassung (% p.a.)</label>
-                           <input type="number" id="rentAdjPct" step="0.1" value="2.0" title="Gemeinsame Rentenanpassung für beide Personen">
-                       </div>
-                       <!-- VERALTET: Alte Felder (versteckt, nur für Abwärtskompatibilität) -->
-                       <input type="hidden" id="startAlter">
-                       <input type="hidden" id="geschlecht">
-                       <input type="hidden" id="startSPB">
-                       <input type="hidden" id="kirchensteuerSatz">
-                       <input type="hidden" id="renteMonatlich">
-                       <input type="hidden" id="renteStartOffsetJahre">
-                       <div class="form-group" id="renteIndexierungsartContainer" style="display: none; grid-column: span 2;">
-                           <label for="renteIndexierungsart">Rentenanpassung koppeln an</label>
-                           <select id="renteIndexierungsart">
-                               <option value="lohn" selected>Lohnentwicklung (hist. Daten)</option>
-                               <option value="inflation">Inflation (VPI)</option>
-                               <option value="fest">Festen Satz p.a.</option>
-                           </select>
-                       </div>
-                       <div class="form-group" id="festerSatzContainer" style="display: none;">
-                           <label for="renteFesterSatz">Fester Satz (% p.a.)</label>
-                           <input type="number" id="renteFesterSatz" value="2.0" step="0.1">
-                       </div>
-                </div>
-
-                 <!-- Partner/Zweite Person (Rente 2) -->
-                 <div style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
-                    <div class="form-group" style="justify-content: center; margin-bottom: 15px;">
-                        <label style="flex-direction: row; align-items: center;">
-                            <input type="checkbox" id="chkPartnerAktiv" style="width: auto; margin-right: 8px;">
-                            Partner aktivieren (zweite Person)
-                        </label>
-                    </div>
-                    <div id="sectionRente2" style="display: none;">
-                        <div class="form-grid-four-col">
-                            <div class="form-group">
-                                <label for="r2StartAlter">Startalter</label>
-                                <input type="number" id="r2StartAlter" min="0" max="120" value="60">
+                        <div id="goldStrategyPanel" style="display: none;">
+                            <div class="form-grid-four-col">
+                                <div class="form-group">
+                                    <label for="goldAllokationProzent">Ziel-Allokation (% v. Depot)</label>
+                                    <input type="number" id="goldAllokationProzent" value="7.5" step="1">
+                                </div>
+                                <div class="form-group">
+                                    <label for="goldFloorProzent">Gold-Floor (% v. Gesamt)</label>
+                                    <input type="number" id="goldFloorProzent" value="1" step="0.5">
+                                </div>
+                                <div class="form-group">
+                                    <label for="rebalancingBand">Rebalancing-Band (± %)</label>
+                                    <input type="number" id="rebalancingBand" value="25" step="5">
+                                </div>
+                                <div class="form-group" style="grid-column: span 2; justify-content: center;">
+                                    <label style="flex-direction: row; align-items: center;">
+                                        <input type="checkbox" id="goldSteuerfrei"
+                                            style="width: auto; margin-right: 8px;" checked> Gold-Verkäufe steuerfrei
+                                        (simuliert >1J Haltefrist)
+                                    </label>
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label for="r2Geschlecht">Geschlecht</label>
-                                <select id="r2Geschlecht">
-                                    <option value="w" selected>Weiblich</option>
-                                    <option value="m">Männlich</option>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Allgemeine & Externe Parameter</legend>
+                        <div class="form-grid-four-col" style="align-items: end;">
+                            <div class="form-group"><label for="p1StartAlter">Startalter</label><input type="number"
+                                    id="p1StartAlter" value="63"></div>
+                            <div class="form-group"><label for="p1Geschlecht">Geschlecht</label>
+                                <select id="p1Geschlecht">
+                                    <option value="m" selected>Männlich</option>
+                                    <option value="w">Weiblich</option>
                                     <option value="d">Divers</option>
                                 </select>
                             </div>
-                            <div class="form-group">
-                                <label for="r2SparerPauschbetrag">Sparer-Pauschbetrag (€)</label>
-                                <input type="number" id="r2SparerPauschbetrag" min="0" step="50" value="0">
-                            </div>
-                            <div class="form-group">
-                                <label for="r2KirchensteuerPct">Kirchensteuer</label>
-                                <select id="r2KirchensteuerPct">
-                                    <option value="0" selected>0 %</option>
+                            <div class="form-group"><label for="p1SparerPauschbetrag">Sparer-Pauschbetrag
+                                    (€)</label><input type="number" id="p1SparerPauschbetrag" value="1000"></div>
+                            <div class="form-group"><label for="p1KirchensteuerPct">Kirchensteuer</label>
+                                <select id="p1KirchensteuerPct">
+                                    <option value="0">0 %</option>
                                     <option value="8">8 %</option>
-                                    <option value="9">9 %</option>
+                                    <option value="9" selected>9 %</option>
+                                </select>
+                            </div>
+                            <div class="form-group"><label for="p1Monatsrente">Monatliche Rente (€)</label><input
+                                    type="number" id="p1Monatsrente" value="500"></div>
+                            <div class="form-group"><label for="p1StartInJahren">Start in ... Jahren</label><input
+                                    type="number" id="p1StartInJahren" value="5"></div>
+                            <div class="form-group" style="grid-column: span 2;">
+                                <label for="rentAdjMode">Rentenanpassung koppeln an</label>
+                                <select id="rentAdjMode">
+                                    <option value="fix">Fixer Prozentsatz</option>
+                                    <option value="wage" selected>Lohnentwicklung (hist. Daten)</option>
+                                    <option value="cpi">Inflation</option>
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label for="r2Monatsrente">Monatliche Rente (€)</label>
-                                <input type="number" id="r2Monatsrente" min="0" step="10" value="1500">
-                            </div>
-                            <div class="form-group">
-                                <label for="r2StartInJahren">Start in … Jahren</label>
-                                <input type="number" id="r2StartInJahren" min="0" max="120" value="0">
-                            </div>
-                            <div class="form-group">
-                                <label for="r2Steuerquote">Steuerquote (%)</label>
-                                <input type="number" id="r2Steuerquote" min="0" max="100" step="0.1" value="0" title="Optionaler Pauschalsatz. 0 = keine Pauschalsteuer.">
+                                <label for="rentAdjPct">Rentenanpassung (% p.a.)</label>
+                                <input type="number" id="rentAdjPct" step="0.1" value="2.0"
+                                    title="Gemeinsame Rentenanpassung für beide Personen">
                             </div>
                             <!-- VERALTET: Alte Felder (versteckt, nur für Abwärtskompatibilität) -->
-                            <input type="hidden" id="r2Brutto">
-                            <div class="form-group" id="r2AnpassungContainer" style="display: none;">
-                                <label for="r2Anpassung">Rentenanpassung (% p.a.)</label>
-                                <input type="number" id="r2Anpassung" step="0.1" value="2.0">
+                            <input type="hidden" id="startAlter">
+                            <input type="hidden" id="geschlecht">
+                            <input type="hidden" id="startSPB">
+                            <input type="hidden" id="kirchensteuerSatz">
+                            <input type="hidden" id="renteMonatlich">
+                            <input type="hidden" id="renteStartOffsetJahre">
+                            <div class="form-group" id="renteIndexierungsartContainer"
+                                style="display: none; grid-column: span 2;">
+                                <label for="renteIndexierungsart">Rentenanpassung koppeln an</label>
+                                <select id="renteIndexierungsart">
+                                    <option value="lohn" selected>Lohnentwicklung (hist. Daten)</option>
+                                    <option value="inflation">Inflation (VPI)</option>
+                                    <option value="fest">Festen Satz p.a.</option>
+                                </select>
+                            </div>
+                            <div class="form-group" id="festerSatzContainer" style="display: none;">
+                                <label for="renteFesterSatz">Fester Satz (% p.a.)</label>
+                                <input type="number" id="renteFesterSatz" value="2.0" step="0.1">
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                <div id="widowPensionSection" style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
-                    <h4 style="margin-bottom: 10px;">Hinterbliebenenrente</h4>
-                    <div class="form-grid-four-col">
-                        <div class="form-group">
-                            <label for="widowPensionMode">Verhalten bei Todesfall</label>
-                            <select id="widowPensionMode">
-                                <option value="stop" selected>Rente endet vollständig</option>
-                                <option value="percent">Witwen-/Witwerrente (Prozent)</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="widowPensionPct">Prozentsatz der Witwenrente (%)</label>
-                            <input type="number" id="widowPensionPct" min="0" max="100" step="5" value="55">
-                        </div>
-                        <div class="form-group">
-                            <label for="widowMarriageOffsetYears">Eheschließung in … Jahren</label>
-                            <input type="number" id="widowMarriageOffsetYears" min="0" max="120" value="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="widowMinMarriageYears">Mindest-Ehedauer für Anspruch (Jahre)</label>
-                            <input type="number" id="widowMinMarriageYears" min="0" max="120" value="1">
-                        </div>
-                    </div>
-                    <p class="form-hint" style="grid-column: span 4; margin-top: 10px;">
-                        Hinweis: Die Witwen-/Witwerrente wird nur gezahlt, wenn die Eheschließung erfolgt ist und die Mindestdauer erreicht wurde.
-                    </p>
-                </div>
-
-                <div id="pflegePanelContainer" class="care-panel">
-                    <div class="care-panel-toggle">
-                        <label class="care-inline-toggle">
-                            <input type="checkbox" id="pflegefallLogikAktivieren" checked>
-                            Pflegefall-Logik aktiv
-                        </label>
-                        <p class="care-panel-subtitle">Definiere Kostenverlauf, Pflegedauer und Mortalitätsanpassungen klar getrennt.</p>
-                    </div>
-                    <!-- Die Sektionen strukturieren die Pflegekonfiguration in überschaubare Teilbereiche -->
-                    <div id="pflegePanel" class="care-sections">
-                        <section class="care-section">
-                            <div class="care-section-header">
-                                <h4>Pflegemodell &amp; Verlauf</h4>
-                                <p>Lege fest, wie lange die Pflege dauert und wie schnell der Bedarf ansteigt.</p>
+                        <!-- Partner/Zweite Person (Rente 2) -->
+                        <div style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
+                            <div class="form-group" style="justify-content: center; margin-bottom: 15px;">
+                                <label style="flex-direction: row; align-items: center;">
+                                    <input type="checkbox" id="chkPartnerAktiv" style="width: auto; margin-right: 8px;">
+                                    Partner aktivieren (zweite Person)
+                                </label>
                             </div>
-                            <div class="care-section-grid">
+                            <div id="sectionRente2" style="display: none;">
+                                <div class="form-grid-four-col">
+                                    <div class="form-group">
+                                        <label for="r2StartAlter">Startalter</label>
+                                        <input type="number" id="r2StartAlter" min="0" max="120" value="60">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="r2Geschlecht">Geschlecht</label>
+                                        <select id="r2Geschlecht">
+                                            <option value="w" selected>Weiblich</option>
+                                            <option value="m">Männlich</option>
+                                            <option value="d">Divers</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="r2SparerPauschbetrag">Sparer-Pauschbetrag (€)</label>
+                                        <input type="number" id="r2SparerPauschbetrag" min="0" step="50" value="0">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="r2KirchensteuerPct">Kirchensteuer</label>
+                                        <select id="r2KirchensteuerPct">
+                                            <option value="0" selected>0 %</option>
+                                            <option value="8">8 %</option>
+                                            <option value="9">9 %</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="r2Monatsrente">Monatliche Rente (€)</label>
+                                        <input type="number" id="r2Monatsrente" min="0" step="10" value="1500">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="r2StartInJahren">Start in … Jahren</label>
+                                        <input type="number" id="r2StartInJahren" min="0" max="120" value="0">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="r2Steuerquote">Steuerquote (%)</label>
+                                        <input type="number" id="r2Steuerquote" min="0" max="100" step="0.1" value="0"
+                                            title="Optionaler Pauschalsatz. 0 = keine Pauschalsteuer.">
+                                    </div>
+                                    <!-- VERALTET: Alte Felder (versteckt, nur für Abwärtskompatibilität) -->
+                                    <input type="hidden" id="r2Brutto">
+                                    <div class="form-group" id="r2AnpassungContainer" style="display: none;">
+                                        <label for="r2Anpassung">Rentenanpassung (% p.a.)</label>
+                                        <input type="number" id="r2Anpassung" step="0.1" value="2.0">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="widowPensionSection"
+                            style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
+                            <h4 style="margin-bottom: 10px;">Hinterbliebenenrente</h4>
+                            <div class="form-grid-four-col">
                                 <div class="form-group">
-                                    <label for="pflegeModellTyp">Pflegemodell-Typ</label>
-                                    <select id="pflegeModellTyp">
-                                        <option value="chronisch" selected>Chronisch (bis Lebensende)</option>
-                                        <option value="akut">Akut (begrenzte Dauer)</option>
+                                    <label for="widowPensionMode">Verhalten bei Todesfall</label>
+                                    <select id="widowPensionMode">
+                                        <option value="stop" selected>Rente endet vollständig</option>
+                                        <option value="percent">Witwen-/Witwerrente (Prozent)</option>
                                     </select>
                                 </div>
                                 <div class="form-group">
-                                    <label for="pflegeRampUp">Anstiegsdauer (Jahre)</label>
-                                    <input type="number" id="pflegeRampUp" value="5">
+                                    <label for="widowPensionPct">Prozentsatz der Witwenrente (%)</label>
+                                    <input type="number" id="widowPensionPct" min="0" max="100" step="5" value="55">
                                 </div>
-                                <div id="pflegeDauerContainer" class="care-duration-group">
-                                    <div class="form-group">
-                                        <label for="pflegeMinDauer">Min. Pflegedauer (Jahre)</label>
-                                        <input type="number" id="pflegeMinDauer" value="5" min="1" step="1">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="pflegeMaxDauer">Max. Pflegedauer (Jahre)</label>
-                                        <input type="number" id="pflegeMaxDauer" value="10" min="1" step="1">
-                                    </div>
+                                <div class="form-group">
+                                    <label for="widowMarriageOffsetYears">Eheschließung in … Jahren</label>
+                                    <input type="number" id="widowMarriageOffsetYears" min="0" max="120" value="0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="widowMinMarriageYears">Mindest-Ehedauer für Anspruch (Jahre)</label>
+                                    <input type="number" id="widowMinMarriageYears" min="0" max="120" value="1">
                                 </div>
                             </div>
-                        </section>
+                            <p class="form-hint" style="grid-column: span 4; margin-top: 10px;">
+                                Hinweis: Die Witwen-/Witwerrente wird nur gezahlt, wenn die Eheschließung erfolgt ist
+                                und die Mindestdauer erreicht wurde.
+                            </p>
+                        </div>
 
-                        <section class="care-section">
-                            <div class="care-section-header">
-                                <h4>Kostenprofil &amp; Flex</h4>
-                                <p>Bestimme Zusatzbedarf, Flex-Verlust und den Floor-Cap.</p>
+                        <div id="pflegePanelContainer" class="care-panel">
+                            <div class="care-panel-toggle">
+                                <label class="care-inline-toggle">
+                                    <input type="checkbox" id="pflegefallLogikAktivieren" checked>
+                                    Pflegefall-Logik aktiv
+                                </label>
+                                <p class="care-panel-subtitle">Definiere Kostenverlauf, Pflegedauer und
+                                    Mortalitätsanpassungen klar getrennt.</p>
                             </div>
-                            <div class="care-section-grid care-config-grid">
-                                <div class="form-group" style="grid-column: span 2;">
-                                    <label for="pflegeKostenStaffelPreset">Kostenstaffel je Pflegegrad</label>
-                                    <select id="pflegeKostenStaffelPreset">
-                                        <option value="custom" selected>Individuelle Werte</option>
-                                        <option value="ambulant">Ambulant (ab 36 Tsd. €)</option>
-                                        <option value="stationaer">Stationär (Premium)</option>
-                                    </select>
-                                    <small id="pflegeStaffelPresetHint">Wähle ein Preset, um typische Staffelungen zu übernehmen.</small>
-                                </div>
-                                <div class="form-group">
-                                    <label for="pflegeMaxFloor">Maximaler Pflege-Floor (€ p.a.)</label>
-                                    <input type="number" id="pflegeMaxFloor" value="120000">
-                                </div>
-                                <div class="form-group">
-                                    <label for="pflegeRegionalZuschlag">Regionaler Zuschlag (%)</label>
-                                    <input type="number" id="pflegeRegionalZuschlag" value="0" step="0.5" min="0">
-                                    <small>Multipliziert alle Pflegegrade z.&nbsp;B. für Metropol-Zuschläge.</small>
-                                </div>
-                                <div class="form-group">
-                                    <label for="pflegeKostenDrift">Zusätzl. Kostenanstieg p.a. (%)</label>
-                                    <input type="number" id="pflegeKostenDrift" value="3.5" step="0.1" min="0">
-                                    <small>Konservativer Aufschlag (Default: 3,5&nbsp;%) zusätzlich zur Inflation.</small>
-                                </div>
+                            <!-- Die Sektionen strukturieren die Pflegekonfiguration in überschaubare Teilbereiche -->
+                            <div id="pflegePanel" class="care-sections">
+                                <section class="care-section">
+                                    <div class="care-section-header">
+                                        <h4>Pflegemodell &amp; Verlauf</h4>
+                                        <p>Lege fest, wie lange die Pflege dauert und wie schnell der Bedarf ansteigt.
+                                        </p>
+                                    </div>
+                                    <div class="care-section-grid">
+                                        <div class="form-group">
+                                            <label for="pflegeModellTyp">Pflegemodell-Typ</label>
+                                            <select id="pflegeModellTyp">
+                                                <option value="chronisch" selected>Chronisch (bis Lebensende)</option>
+                                                <option value="akut">Akut (begrenzte Dauer)</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="pflegeRampUp">Anstiegsdauer (Jahre)</label>
+                                            <input type="number" id="pflegeRampUp" value="5">
+                                        </div>
+                                        <div id="pflegeDauerContainer" class="care-duration-group">
+                                            <div class="form-group">
+                                                <label for="pflegeMinDauer">Min. Pflegedauer (Jahre)</label>
+                                                <input type="number" id="pflegeMinDauer" value="5" min="1" step="1">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="pflegeMaxDauer">Max. Pflegedauer (Jahre)</label>
+                                                <input type="number" id="pflegeMaxDauer" value="10" min="1" step="1">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                <section class="care-section">
+                                    <div class="care-section-header">
+                                        <h4>Kostenprofil &amp; Flex</h4>
+                                        <p>Bestimme Zusatzbedarf, Flex-Verlust und den Floor-Cap.</p>
+                                    </div>
+                                    <div class="care-section-grid care-config-grid">
+                                        <div class="form-group" style="grid-column: span 2;">
+                                            <label for="pflegeKostenStaffelPreset">Kostenstaffel je Pflegegrad</label>
+                                            <select id="pflegeKostenStaffelPreset">
+                                                <option value="custom" selected>Individuelle Werte</option>
+                                                <option value="ambulant">Ambulant (ab 36 Tsd. €)</option>
+                                                <option value="stationaer">Stationär (Premium)</option>
+                                            </select>
+                                            <small id="pflegeStaffelPresetHint">Wähle ein Preset, um typische
+                                                Staffelungen zu übernehmen.</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="pflegeMaxFloor">Maximaler Pflege-Floor (€ p.a.)</label>
+                                            <input type="number" id="pflegeMaxFloor" value="120000">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="pflegeRegionalZuschlag">Regionaler Zuschlag (%)</label>
+                                            <input type="number" id="pflegeRegionalZuschlag" value="0" step="0.5"
+                                                min="0">
+                                            <small>Multipliziert alle Pflegegrade z.&nbsp;B. für
+                                                Metropol-Zuschläge.</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="pflegeKostenDrift">Zusätzl. Kostenanstieg p.a. (%)</label>
+                                            <input type="number" id="pflegeKostenDrift" value="3.5" step="0.1" min="0">
+                                            <small>Konservativer Aufschlag (Default: 3,5&nbsp;%) zusätzlich zur
+                                                Inflation.</small>
+                                        </div>
+                                    </div>
+                                    <div class="care-grade-matrix" aria-label="Einstellungen pro Pflegegrad">
+                                        <div class="care-grade-row care-grade-header">
+                                            <div>Pflegegrad</div>
+                                            <div>Zusatzbedarf (€ p.a.)</div>
+                                            <div>Flex-Level (%)</div>
+                                            <div>Max. Mortalitäts-Faktor*</div>
+                                        </div>
+                                        <div class="care-grade-row">
+                                            <div class="care-grade-label">
+                                                <strong>Pflegegrad 1</strong>
+                                                <small>Leichte Beeinträchtigung, Einstieg</small>
+                                            </div>
+                                            <div><input type="number" id="pflegeStufe1Zusatz" value="6000" min="0"
+                                                    step="500"></div>
+                                            <div><input type="number" id="pflegeStufe1FlexCut" value="75" min="0"
+                                                    max="100"></div>
+                                            <div><input type="number" id="pflegeStufe1Mortality" value="0" min="0"
+                                                    step="0.1"></div>
+                                        </div>
+                                        <div class="care-grade-row">
+                                            <div class="care-grade-label">
+                                                <strong>Pflegegrad 2</strong>
+                                                <small>Erhebliche Beeinträchtigung</small>
+                                            </div>
+                                            <div><input type="number" id="pflegeStufe2Zusatz" value="12000" min="0"
+                                                    step="500"></div>
+                                            <div><input type="number" id="pflegeStufe2FlexCut" value="25" min="0"
+                                                    max="100"></div>
+                                            <div><input type="number" id="pflegeStufe2Mortality" value="0" min="0"
+                                                    step="0.1"></div>
+                                        </div>
+                                        <div class="care-grade-row">
+                                            <div class="care-grade-label">
+                                                <strong>Pflegegrad 3</strong>
+                                                <small>Schwere Beeinträchtigung</small>
+                                            </div>
+                                            <div><input type="number" id="pflegeStufe3Zusatz" value="18000" min="0"
+                                                    step="500"></div>
+                                            <div><input type="number" id="pflegeStufe3FlexCut" value="10" min="0"
+                                                    max="100"></div>
+                                            <div><input type="number" id="pflegeStufe3Mortality" value="3" min="0"
+                                                    step="0.1"></div>
+                                        </div>
+                                        <div class="care-grade-row">
+                                            <div class="care-grade-label">
+                                                <strong>Pflegegrad 4</strong>
+                                                <small>Schwerste Beeinträchtigung</small>
+                                            </div>
+                                            <div><input type="number" id="pflegeStufe4Zusatz" value="32000" min="0"
+                                                    step="500"></div>
+                                            <div><input type="number" id="pflegeStufe4FlexCut" value="0" min="0"
+                                                    max="100"></div>
+                                            <div><input type="number" id="pflegeStufe4Mortality" value="5" min="0"
+                                                    step="0.1"></div>
+                                        </div>
+                                        <div class="care-grade-row">
+                                            <div class="care-grade-label">
+                                                <strong>Pflegegrad 5</strong>
+                                                <small>Schwerste + besondere Anforderungen</small>
+                                            </div>
+                                            <div><input type="number" id="pflegeStufe5Zusatz" value="60000" min="0"
+                                                    step="500"></div>
+                                            <div><input type="number" id="pflegeStufe5FlexCut" value="0" min="0"
+                                                    max="100"></div>
+                                            <div><input type="number" id="pflegeStufe5Mortality" value="5" min="0"
+                                                    step="0.1"></div>
+                                        </div>
+                                    </div>
+                                    <small class="care-grade-note">*0 = keine Erhöhung, Werte &gt; 1 multiplizieren das
+                                        Basismortalitätsrisiko nach Ablauf der Ramp-Up-Dauer. Mortalitätsfaktoren
+                                        pflegestufen-spezifisch hier im Panel einstellen.</small>
+                                </section>
                             </div>
-                            <div class="care-grade-matrix" aria-label="Einstellungen pro Pflegegrad">
-                                <div class="care-grade-row care-grade-header">
-                                    <div>Pflegegrad</div>
-                                    <div>Zusatzbedarf (€ p.a.)</div>
-                                    <div>Flex-Level (%)</div>
-                                    <div>Max. Mortalitäts-Faktor*</div>
-                                </div>
-                                <div class="care-grade-row">
-                                    <div class="care-grade-label">
-                                        <strong>Pflegegrad 1</strong>
-                                        <small>Leichte Beeinträchtigung, Einstieg</small>
-                                    </div>
-                                    <div><input type="number" id="pflegeStufe1Zusatz" value="6000" min="0" step="500"></div>
-                                    <div><input type="number" id="pflegeStufe1FlexCut" value="75" min="0" max="100"></div>
-                                    <div><input type="number" id="pflegeStufe1Mortality" value="0" min="0" step="0.1"></div>
-                                </div>
-                                <div class="care-grade-row">
-                                    <div class="care-grade-label">
-                                        <strong>Pflegegrad 2</strong>
-                                        <small>Erhebliche Beeinträchtigung</small>
-                                    </div>
-                                    <div><input type="number" id="pflegeStufe2Zusatz" value="12000" min="0" step="500"></div>
-                                    <div><input type="number" id="pflegeStufe2FlexCut" value="25" min="0" max="100"></div>
-                                    <div><input type="number" id="pflegeStufe2Mortality" value="0" min="0" step="0.1"></div>
-                                </div>
-                                <div class="care-grade-row">
-                                    <div class="care-grade-label">
-                                        <strong>Pflegegrad 3</strong>
-                                        <small>Schwere Beeinträchtigung</small>
-                                    </div>
-                                    <div><input type="number" id="pflegeStufe3Zusatz" value="18000" min="0" step="500"></div>
-                                    <div><input type="number" id="pflegeStufe3FlexCut" value="10" min="0" max="100"></div>
-                                    <div><input type="number" id="pflegeStufe3Mortality" value="3" min="0" step="0.1"></div>
-                                </div>
-                                <div class="care-grade-row">
-                                    <div class="care-grade-label">
-                                        <strong>Pflegegrad 4</strong>
-                                        <small>Schwerste Beeinträchtigung</small>
-                                    </div>
-                                    <div><input type="number" id="pflegeStufe4Zusatz" value="32000" min="0" step="500"></div>
-                                    <div><input type="number" id="pflegeStufe4FlexCut" value="0" min="0" max="100"></div>
-                                    <div><input type="number" id="pflegeStufe4Mortality" value="5" min="0" step="0.1"></div>
-                                </div>
-                                <div class="care-grade-row">
-                                    <div class="care-grade-label">
-                                        <strong>Pflegegrad 5</strong>
-                                        <small>Schwerste + besondere Anforderungen</small>
-                                    </div>
-                                    <div><input type="number" id="pflegeStufe5Zusatz" value="60000" min="0" step="500"></div>
-                                    <div><input type="number" id="pflegeStufe5FlexCut" value="0" min="0" max="100"></div>
-                                    <div><input type="number" id="pflegeStufe5Mortality" value="5" min="0" step="0.1"></div>
-                                </div>
-                            </div>
-                            <small class="care-grade-note">*0 = keine Erhöhung, Werte &gt; 1 multiplizieren das Basismortalitätsrisiko nach Ablauf der Ramp-Up-Dauer. Mortalitätsfaktoren pflegestufen-spezifisch hier im Panel einstellen.</small>
-                        </section>
-                    </div>
-                </div>
-            </fieldset>
+                        </div>
+                    </fieldset>
                 </div>
 
                 <div id="tab-montecarlo" class="tab-panel">
-            <h2>Monte-Carlo-Simulation</h2>
-            <fieldset>
-                <div class="form-grid-four-col">
-                    <div class="form-group"><label for="mcAnzahl">Anzahl Simulationen</label><input type="number" id="mcAnzahl" value="1000"></div>
-                    <div class="form-group"><label for="mcDauer">Maximale Dauer (Jahre)</label><input type="number" id="mcDauer" value="35"></div>
-                    <div class="form-group"><label for="mcBlockSize">Blockgröße (Jahre)</label><input type="number" id="mcBlockSize" value="5"></div>
-                    <div class="form-group"><label for="mcSeed">Seed</label><input type="number" id="mcSeed" value="12345"></div>
-                </div>
-                <div class="form-group" style="margin-top: 20px;">
-                    <label for="mcMethode">Simulationsmethode</label>
-                    <select id="mcMethode">
-                        <option value="regime_markov" selected>Regime-Sampling (Markov-Chain)</option>
-                        <option value="regime_iid">Regime-Sampling (iid)</option>
-                        <option value="block">Block-Bootstrap (Stresstest)</option>
-                    </select>
-                </div>
-                <div class="form-group" style="justify-content: center; margin-top: 10px;">
-                    <label style="flex-direction: row; align-items: center;" title="Wenn aktiv, werden Startjahre bevorzugt, deren historisches CAPE dem aktuellen Eingabewert ähnelt (+/- 20%).">
-                        <input type="checkbox" id="useCapeSampling" style="width: auto; margin-right: 8px;">
-                        CAPE-basiertes Sampling verwenden
-                    </label>
-                </div>
-            </fieldset>
-			<fieldset>
-                <legend>Stressmodus</legend>
-                <div class="form-group">
-                    <label for="stressPreset">Szenario für die ersten Simulationsjahre</label>
-                    <select id="stressPreset">
-                        <!-- Wird per JavaScript befüllt -->
-                    </select>
-                </div>
-            </fieldset>
-            <button id="mcButton" onclick="runMonteCarlo()">Monte-Carlo-Simulation starten</button>
-            <div id="mc-progress-bar-container"><div id="mc-progress-bar"></div></div>
-             <div id="monteCarloResults" style="display:none; margin-top: 25px;">
-                <h3>Ergebnisse der Monte-Carlo-Analyse</h3>
-                <div id="monteCarloSummary"></div>
-                
-                <div id="unifiedKpiDashboard" style="display:none;"></div>
-                <div id="advancedKpiDashboard" style="display:none;"></div>
-                <div id="withdrawalRateChartContainer"></div>
-                
-                <div id="pflegeKpiResults" style="display:none;">
-                    <h3 style="border-top: 1px solid var(--border-color); padding-top: 25px;">Analyse des Pflegerisikos</h3>
-                    <div id="pflegeKpiSummary" class="summary-grid"></div>
-                </div>
-                <div id="worstRunLogContainer" style="display:none; margin-top: 25px;">
-                    <h4 style="text-align:center;">Jahresprotokoll des schlechtesten Laufs (Worst Case)</h4>
-					<div id="worst-controls" style="text-align: center; margin-bottom: 10px; font-size: 0.9rem; display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
-                      <label style="user-select:none; cursor:pointer;" title="Zeige vollständige Pflege-Aufschlüsselung (Anker, Cap, Deltas, Flex-Faktor).">
-                        <input type="checkbox" id="toggle-care-details" style="width:auto; vertical-align: middle; margin-right: 4px;">
-                        Pflege-Details anzeigen
-                      </label>
-                      <label style="user-select:none; cursor:pointer;" title="Umschalten zwischen normalem (kompakt) und detailliertem (alle Spalten) Log.">
-                        <input type="checkbox" id="toggle-log-detail" style="width:auto; vertical-align: middle; margin-right: 4px;">
-                        Detailliertes Log anzeigen
-                      </label>
-                      <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
-                        <button type="button" id="exportWorstLogJson">Worst-Case Log als JSON</button>
-                        <button type="button" id="exportWorstLogCsv">Worst-Case Log als CSV</button>
-                      </div>
+                    <h2>Monte-Carlo-Simulation</h2>
+                    <fieldset>
+                        <div class="form-grid-four-col">
+                            <div class="form-group"><label for="mcAnzahl">Anzahl Simulationen</label><input
+                                    type="number" id="mcAnzahl" value="1000"></div>
+                            <div class="form-group"><label for="mcDauer">Maximale Dauer (Jahre)</label><input
+                                    type="number" id="mcDauer" value="35"></div>
+                            <div class="form-group"><label for="mcBlockSize">Blockgröße (Jahre)</label><input
+                                    type="number" id="mcBlockSize" value="5"></div>
+                            <div class="form-group"><label for="mcSeed">Seed</label><input type="number" id="mcSeed"
+                                    value="12345"></div>
+                        </div>
+                        <div class="form-group" style="margin-top: 20px;">
+                            <label for="mcMethode">Simulationsmethode</label>
+                            <select id="mcMethode">
+                                <option value="regime_markov" selected>Regime-Sampling (Markov-Chain)</option>
+                                <option value="regime_iid">Regime-Sampling (iid)</option>
+                                <option value="block">Block-Bootstrap (Stresstest)</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="justify-content: center; margin-top: 10px;">
+                            <label style="flex-direction: row; align-items: center;"
+                                title="Wenn aktiv, werden Startjahre bevorzugt, deren historisches CAPE dem aktuellen Eingabewert ähnelt (+/- 20%).">
+                                <input type="checkbox" id="useCapeSampling" style="width: auto; margin-right: 8px;">
+                                CAPE-basiertes Sampling verwenden
+                            </label>
+                        </div>
+                    </fieldset>
+                    <fieldset>
+                        <legend>Stressmodus</legend>
+                        <div class="form-group">
+                            <label for="stressPreset">Szenario für die ersten Simulationsjahre</label>
+                            <select id="stressPreset">
+                                <!-- Wird per JavaScript befüllt -->
+                            </select>
+                        </div>
+                    </fieldset>
+                    <button id="mcButton" onclick="runMonteCarlo()">Monte-Carlo-Simulation starten</button>
+                    <div id="mc-progress-bar-container">
+                        <div id="mc-progress-bar"></div>
                     </div>
-                    <div id="worstRunLog"></div>
-                </div>
-             </div>
+                    <div id="monteCarloResults" style="display:none; margin-top: 25px;">
+                        <h3>Ergebnisse der Monte-Carlo-Analyse</h3>
+                        <div id="monteCarloSummary"></div>
+
+                        <div id="unifiedKpiDashboard" style="display:none;"></div>
+                        <div id="advancedKpiDashboard" style="display:none;"></div>
+                        <div id="withdrawalRateChartContainer"></div>
+
+                        <div id="pflegeKpiResults" style="display:none;">
+                            <h3 style="border-top: 1px solid var(--border-color); padding-top: 25px;">Analyse des
+                                Pflegerisikos</h3>
+                            <div id="pflegeKpiSummary" class="summary-grid"></div>
+                        </div>
+                        <div id="worstRunLogContainer" style="display:none; margin-top: 25px;">
+                            <h4 style="text-align:center;">Jahresprotokoll des schlechtesten Laufs (Worst Case)</h4>
+                            <div id="worst-controls"
+                                style="text-align: center; margin-bottom: 10px; font-size: 0.9rem; display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                                <label style="user-select:none; cursor:pointer;"
+                                    title="Zeige vollständige Pflege-Aufschlüsselung (Anker, Cap, Deltas, Flex-Faktor).">
+                                    <input type="checkbox" id="toggle-care-details"
+                                        style="width:auto; vertical-align: middle; margin-right: 4px;">
+                                    Pflege-Details anzeigen
+                                </label>
+                                <label style="user-select:none; cursor:pointer;"
+                                    title="Umschalten zwischen normalem (kompakt) und detailliertem (alle Spalten) Log.">
+                                    <input type="checkbox" id="toggle-log-detail"
+                                        style="width:auto; vertical-align: middle; margin-right: 4px;">
+                                    Detailliertes Log anzeigen
+                                </label>
+                                <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
+                                    <button type="button" id="exportWorstLogJson">Worst-Case Log als JSON</button>
+                                    <button type="button" id="exportWorstLogCsv">Worst-Case Log als CSV</button>
+                                </div>
+                            </div>
+                            <div id="worstRunLog"></div>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="tab-backtesting" class="tab-panel">
-             <h2>Historisches Backtesting</h2>
-            <fieldset>
-                <legend>Backtesting-Parameter</legend>
-                <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
-                    <div class="form-group"><label for="simStartJahr">Startjahr</label><input type="number" id="simStartJahr" value="2000"></div>
-                    <div class="form-group"><label for="simEndJahr">Endjahr</label><input type="number" id="simEndJahr" value="2023"></div>
-                </div>
-            </fieldset>
-            <button id="btButton" onclick="runBacktest()">Historische Simulation starten</button>
-             <div id="simulationResults" style="display:none; margin-top: 25px;">
-                <h3>Ergebnis des Backtests</h3>
-                <div id="simulationSummary"></div>
-                <h4 style="text-align:center; margin-top:20px;">Jahresprotokoll</h4>
-                <div style="text-align: center; margin-bottom: 10px; font-size: 0.9rem;">
-                  <label style="user-select:none; cursor:pointer;" title="Umschalten zwischen normalem (kompakt) und detailliertem (alle Spalten) Log.">
-                    <input type="checkbox" id="toggle-backtest-detail" style="width:auto; vertical-align: middle; margin-right: 4px;">
-                    Detailliertes Log anzeigen
-                  </label>
-                  <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:8px;">
-                    <button type="button" id="exportBacktestJson">Backtest-Log als JSON</button>
-                    <button type="button" id="exportBacktestCsv">Backtest-Log als CSV</button>
-                  </div>
-                </div>
-                <div id="simulationLog">Keine Daten</div>
-             </div>
-             <div id="engine-mismatch-footer"></div>
-             <section class="dev-only" id="parity-smoketest-card">
-             <fieldset style="margin-top: 25px;">
-                <div class="section-title">
-                    <h3 style="margin:0">Parity Smoke Test</h3>
-                    <a id="runParitySmokeTestBtn" class="debug-link" href="javascript:void(0)" onclick="window.runParitySmokeTest({years:3})" aria-label="Run Parity Smoke Test">Run</a>
-                </div>
-                <div style="margin-top: 10px; font-size: 0.85rem; color: #666;">Vergleicht Engine und Simulator über 3 Jahre. Ergebnisse in der Browser-Konsole.</div>
-            </fieldset>
-             </section>
+                    <h2>Historisches Backtesting</h2>
+                    <fieldset>
+                        <legend>Backtesting-Parameter</legend>
+                        <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+                            <div class="form-group"><label for="simStartJahr">Startjahr</label><input type="number"
+                                    id="simStartJahr" value="2000"></div>
+                            <div class="form-group"><label for="simEndJahr">Endjahr</label><input type="number"
+                                    id="simEndJahr" value="2023"></div>
+                        </div>
+                    </fieldset>
+                    <button id="btButton" onclick="runBacktest()">Historische Simulation starten</button>
+                    <div id="simulationResults" style="display:none; margin-top: 25px;">
+                        <h3>Ergebnis des Backtests</h3>
+                        <div id="simulationSummary"></div>
+                        <h4 style="text-align:center; margin-top:20px;">Jahresprotokoll</h4>
+                        <div style="text-align: center; margin-bottom: 10px; font-size: 0.9rem;">
+                            <label style="user-select:none; cursor:pointer;"
+                                title="Umschalten zwischen normalem (kompakt) und detailliertem (alle Spalten) Log.">
+                                <input type="checkbox" id="toggle-backtest-detail"
+                                    style="width:auto; vertical-align: middle; margin-right: 4px;">
+                                Detailliertes Log anzeigen
+                            </label>
+                            <div
+                                style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:8px;">
+                                <button type="button" id="exportBacktestJson">Backtest-Log als JSON</button>
+                                <button type="button" id="exportBacktestCsv">Backtest-Log als CSV</button>
+                            </div>
+                        </div>
+                        <div id="simulationLog">Keine Daten</div>
+                    </div>
+                    <div id="engine-mismatch-footer"></div>
+                    <section class="dev-only" id="parity-smoketest-card">
+                        <fieldset style="margin-top: 25px;">
+                            <div class="section-title">
+                                <h3 style="margin:0">Parity Smoke Test</h3>
+                                <a id="runParitySmokeTestBtn" class="debug-link" href="javascript:void(0)"
+                                    onclick="window.runParitySmokeTest({years:3})"
+                                    aria-label="Run Parity Smoke Test">Run</a>
+                            </div>
+                            <div style="margin-top: 10px; font-size: 0.85rem; color: #666;">Vergleicht Engine und
+                                Simulator über 3 Jahre. Ergebnisse in der Browser-Konsole.</div>
+                        </fieldset>
+                    </section>
                 </div>
 
                 <div id="tab-sweep" class="tab-panel">
-            <h2>Parameter-Sweep</h2>
-            <fieldset>
-                <legend>Sweep-Ranges</legend>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 0.85rem; color: #555;">
-                    <div>
-                        <strong>Format:</strong> start:step:end (z.B. 24:6:48) oder Liste 50,60,70 oder Einzelwert 24
+                    <h2>Parameter-Sweep</h2>
+                    <fieldset>
+                        <legend>Sweep-Ranges</legend>
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 0.85rem; color: #555;">
+                            <div>
+                                <strong>Format:</strong> start:step:end (z.B. 24:6:48) oder Liste 50,60,70 oder
+                                Einzelwert 24
+                            </div>
+                            <div id="sweepGridSize" style="font-weight: 600; color: var(--secondary-color);">
+                                Grid: 0 Kombis
+                            </div>
+                        </div>
+                        <div class="form-grid-four-col">
+                            <div class="form-group"><label for="sweepRunwayMin">Runway Min (Monate)</label><input
+                                    type="text" id="sweepRunwayMin" value="18" placeholder="12,18,24"
+                                    title="Format: start:step:end (z.B. 18:6:36) oder Liste 12,18,24 oder Einzelwert 18">
+                            </div>
+                            <div class="form-group"><label for="sweepRunwayTarget">Runway Target (Monate)</label><input
+                                    type="text" id="sweepRunwayTarget" value="24:6:36" placeholder="18:6:36"
+                                    title="Format: start:step:end (z.B. 18:6:36) oder Liste 18,24,30 oder Einzelwert 24">
+                            </div>
+                            <div class="form-group"><label for="sweepTargetEq">Target Eq (%)</label><input type="text"
+                                    id="sweepTargetEq" value="50,60,70" placeholder="50,60,70"
+                                    title="Format: start:step:end (z.B. 50:10:80) oder Liste 50,60,70 oder Einzelwert 60">
+                            </div>
+                            <div class="form-group"><label for="sweepRebalBand">Rebal Band (%)</label><input type="text"
+                                    id="sweepRebalBand" value="5" placeholder="3,5,7"
+                                    title="Format: start:step:end (z.B. 3:2:9) oder Liste 3,5,7 oder Einzelwert 5">
+                            </div>
+                            <div class="form-group"><label for="sweepMaxSkimPct">Max Skim % of Eq</label><input
+                                    type="text" id="sweepMaxSkimPct" value="2" placeholder="0,2,4"
+                                    title="Format: start:step:end (z.B. 0:2:6) oder Liste 0,2,4 oder Einzelwert 2">
+                            </div>
+                            <div class="form-group"><label for="sweepMaxBearRefillPct">Max Bear Refill % of
+                                    Eq</label><input type="text" id="sweepMaxBearRefillPct" value="2"
+                                    placeholder="0,2,4"
+                                    title="Format: start:step:end (z.B. 0:2:8) oder Liste 0,2,4 oder Einzelwert 2">
+                            </div>
+                            <div class="form-group"><label for="sweepGoldTargetPct">Gold Target (%)</label><input
+                                    type="text" id="sweepGoldTargetPct" value="5,7.5" placeholder="0,2.5,5,7.5"
+                                    title="Format: start:step:end (z.B. 0:2.5:10) oder Liste 0,2.5,5,7.5 oder Einzelwert 7.5">
+                            </div>
+                        </div>
+                    </fieldset>
+                    <button id="sweepButton" onclick="runParameterSweep()">Run Sweep</button>
+                    <div id="sweep-progress-bar-container"
+                        style="display:none; width: 100%; background-color: #e0e0e0; height: 24px; border-radius: 4px; margin-top: 15px; overflow: hidden;">
+                        <div id="sweep-progress-bar"
+                            style="width: 0%; height: 100%; background-color: var(--secondary-color); transition: width 0.3s; line-height: 24px; text-align: center; color: white; font-size: 0.85rem;">
+                        </div>
                     </div>
-                    <div id="sweepGridSize" style="font-weight: 600; color: var(--secondary-color);">
-                        Grid: 0 Kombis
-                    </div>
-                </div>
-                <div class="form-grid-four-col">
-                    <div class="form-group"><label for="sweepRunwayMin">Runway Min (Monate)</label><input type="text" id="sweepRunwayMin" value="18" placeholder="12,18,24" title="Format: start:step:end (z.B. 18:6:36) oder Liste 12,18,24 oder Einzelwert 18"></div>
-                    <div class="form-group"><label for="sweepRunwayTarget">Runway Target (Monate)</label><input type="text" id="sweepRunwayTarget" value="24:6:36" placeholder="18:6:36" title="Format: start:step:end (z.B. 18:6:36) oder Liste 18,24,30 oder Einzelwert 24"></div>
-                    <div class="form-group"><label for="sweepTargetEq">Target Eq (%)</label><input type="text" id="sweepTargetEq" value="50,60,70" placeholder="50,60,70" title="Format: start:step:end (z.B. 50:10:80) oder Liste 50,60,70 oder Einzelwert 60"></div>
-                    <div class="form-group"><label for="sweepRebalBand">Rebal Band (%)</label><input type="text" id="sweepRebalBand" value="5" placeholder="3,5,7" title="Format: start:step:end (z.B. 3:2:9) oder Liste 3,5,7 oder Einzelwert 5"></div>
-                    <div class="form-group"><label for="sweepMaxSkimPct">Max Skim % of Eq</label><input type="text" id="sweepMaxSkimPct" value="2" placeholder="0,2,4" title="Format: start:step:end (z.B. 0:2:6) oder Liste 0,2,4 oder Einzelwert 2"></div>
-                    <div class="form-group"><label for="sweepMaxBearRefillPct">Max Bear Refill % of Eq</label><input type="text" id="sweepMaxBearRefillPct" value="2" placeholder="0,2,4" title="Format: start:step:end (z.B. 0:2:8) oder Liste 0,2,4 oder Einzelwert 2"></div>
-                    <div class="form-group"><label for="sweepGoldTargetPct">Gold Target (%)</label><input type="text" id="sweepGoldTargetPct" value="5,7.5" placeholder="0,2.5,5,7.5" title="Format: start:step:end (z.B. 0:2.5:10) oder Liste 0,2.5,5,7.5 oder Einzelwert 7.5"></div>
-                </div>
-            </fieldset>
-            <button id="sweepButton" onclick="runParameterSweep()">Run Sweep</button>
-            <div id="sweep-progress-bar-container" style="display:none; width: 100%; background-color: #e0e0e0; height: 24px; border-radius: 4px; margin-top: 15px; overflow: hidden;">
-                <div id="sweep-progress-bar" style="width: 0%; height: 100%; background-color: var(--secondary-color); transition: width 0.3s; line-height: 24px; text-align: center; color: white; font-size: 0.85rem;"></div>
-            </div>
 
-            <!-- Selbsttest-Panel (nur bei ?debug=1 sichtbar) -->
-            <div id="sweepSelfTestPanel" class="dev-only" style="margin-top: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9;">
-                <h4 style="margin-top: 0;">🧪 Sweep-Selbsttest (Debug)</h4>
-                <p style="font-size: 0.85rem; color: #666;">
-                    Führt einen Mini-Sweep mit 3 Fällen aus (nur rebalBand-Variation) und prüft, ob R2 konstant bleibt.
-                </p>
-                <button id="sweepSelfTestButton" onclick="runSweepSelfTest()">Selbsttest ausführen</button>
-                <div id="sweepSelfTestResults" style="margin-top: 10px; display: none;"></div>
-            </div>
-            <div id="sweepResults" style="display:none; margin-top: 25px;">
-                <h3>Sweep Ergebnisse</h3>
-                <div id="sweepControls" style="margin-bottom: 15px;">
-                    <div class="form-grid-four-col">
-                        <div class="form-group">
-                            <label for="sweepMetric">Metrik</label>
-                            <select id="sweepMetric">
-                                <option value="successProbFloor" selected>Success Prob Floor</option>
-                                <option value="p10EndWealth">P10 End Wealth</option>
-                                <option value="worst5Drawdown">Worst 5% Drawdown</option>
-                                <option value="minRunwayObserved">Min Runway Observed</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="sweepAxisX">X-Achse Parameter</label>
-                            <select id="sweepAxisX">
-                                <option value="runwayMin">Runway Min</option>
-                                <option value="runwayTarget" selected>Runway Target</option>
-                                <option value="targetEq">Target Eq</option>
-                                <option value="rebalBand">Rebal Band</option>
-                                <option value="maxSkimPct">Max Skim Pct</option>
-                                <option value="maxBearRefillPct">Max Bear Refill Pct</option>
-                                <option value="goldTargetPct">Gold Target Pct</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="sweepAxisY">Y-Achse Parameter</label>
-                            <select id="sweepAxisY">
-                                <option value="runwayMin">Runway Min</option>
-                                <option value="runwayTarget">Runway Target</option>
-                                <option value="targetEq" selected>Target Eq</option>
-                                <option value="rebalBand">Rebal Band</option>
-                                <option value="maxSkimPct">Max Skim Pct</option>
-                                <option value="maxBearRefillPct">Max Bear Refill Pct</option>
-                                <option value="goldTargetPct">Gold Target Pct</option>
-                            </select>
-                        </div>
+                    <!-- Selbsttest-Panel (nur bei ?debug=1 sichtbar) -->
+                    <div id="sweepSelfTestPanel" class="dev-only"
+                        style="margin-top: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9;">
+                        <h4 style="margin-top: 0;">🧪 Sweep-Selbsttest (Debug)</h4>
+                        <p style="font-size: 0.85rem; color: #666;">
+                            Führt einen Mini-Sweep mit 3 Fällen aus (nur rebalBand-Variation) und prüft, ob R2 konstant
+                            bleibt.
+                        </p>
+                        <button id="sweepSelfTestButton" onclick="runSweepSelfTest()">Selbsttest ausführen</button>
+                        <div id="sweepSelfTestResults" style="margin-top: 10px; display: none;"></div>
                     </div>
-                </div>
-                <div id="sweepHeatmap"></div>
-            </div>
+                    <div id="sweepResults" style="display:none; margin-top: 25px;">
+                        <h3>Sweep Ergebnisse</h3>
+                        <div id="sweepControls" style="margin-bottom: 15px;">
+                            <div class="form-grid-four-col">
+                                <div class="form-group">
+                                    <label for="sweepMetric">Metrik</label>
+                                    <select id="sweepMetric">
+                                        <option value="successProbFloor" selected>Success Prob Floor</option>
+                                        <option value="p10EndWealth">P10 End Wealth</option>
+                                        <option value="worst5Drawdown">Worst 5% Drawdown</option>
+                                        <option value="minRunwayObserved">Min Runway Observed</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="sweepAxisX">X-Achse Parameter</label>
+                                    <select id="sweepAxisX">
+                                        <option value="runwayMin">Runway Min</option>
+                                        <option value="runwayTarget" selected>Runway Target</option>
+                                        <option value="targetEq">Target Eq</option>
+                                        <option value="rebalBand">Rebal Band</option>
+                                        <option value="maxSkimPct">Max Skim Pct</option>
+                                        <option value="maxBearRefillPct">Max Bear Refill Pct</option>
+                                        <option value="goldTargetPct">Gold Target Pct</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="sweepAxisY">Y-Achse Parameter</label>
+                                    <select id="sweepAxisY">
+                                        <option value="runwayMin">Runway Min</option>
+                                        <option value="runwayTarget">Runway Target</option>
+                                        <option value="targetEq" selected>Target Eq</option>
+                                        <option value="rebalBand">Rebal Band</option>
+                                        <option value="maxSkimPct">Max Skim Pct</option>
+                                        <option value="maxBearRefillPct">Max Bear Refill Pct</option>
+                                        <option value="goldTargetPct">Gold Target Pct</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="sweepHeatmap"></div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
 
-<script src="engine.js" defer></script>
-<script src="sim-parity-smoketest.js" defer></script>
-<script type="module" src="simulator-main.js"></script>
-<script>
-  (function(){
-    const DEV_KEY = "sim.devMode";
-    const urlDev = new URLSearchParams(location.search).get("dev") === "1";
-    const saved = localStorage.getItem(DEV_KEY) === "1";
-    const dev = urlDev || saved;
-    const root = document.body;
-    function setDevMode(on){
-      localStorage.setItem(DEV_KEY, on ? "1" : "0");
-      root.classList.toggle("dev-on", !!on);
-    }
-    setDevMode(dev);
-    window.addEventListener("keydown", (e)=>{
-      if(e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "d"){
-        const on = !root.classList.contains("dev-on");
-        setDevMode(on);
-        e.preventDefault();
-      }
-    });
-  })();
-</script>
+    <script src="engine.js" defer></script>
+    <script src="sim-parity-smoketest.js" defer></script>
+    <script type="module" src="simulator-main.js"></script>
+    <script>
+        (function () {
+            const DEV_KEY = "sim.devMode";
+            const urlDev = new URLSearchParams(location.search).get("dev") === "1";
+            const saved = localStorage.getItem(DEV_KEY) === "1";
+            const dev = urlDev || saved;
+            const root = document.body;
+            function setDevMode(on) {
+                localStorage.setItem(DEV_KEY, on ? "1" : "0");
+                root.classList.toggle("dev-on", !!on);
+            }
+            setDevMode(dev);
+            window.addEventListener("keydown", (e) => {
+                if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "d") {
+                    const on = !root.classList.contains("dev-on");
+                    setDevMode(on);
+                    e.preventDefault();
+                }
+            });
+        })();
+    </script>
 </body>
+
 </html>

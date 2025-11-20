@@ -1015,16 +1015,16 @@ export function runBacktest() {
         document.getElementById('btButton').disabled = true;
         const inputs = getCommonInputs();
         const startJahr = parseInt(document.getElementById('simStartJahr').value); const endJahr = parseInt(document.getElementById('simEndJahr').value);
-        if (startJahr < 1973 || endJahr > 2024 || startJahr >= endJahr) {
-            alert(`Fehler: Bitte einen gültigen Zeitraum eingeben.\n- Der Zeitraum muss zwischen 1973 und 2024 liegen.`);
+        if (startJahr < 1950 || endJahr > 2024 || startJahr >= endJahr) {
+            alert(`Fehler: Bitte einen gültigen Zeitraum eingeben.\n- Der Zeitraum muss zwischen 1950 und 2024 liegen.`);
             document.getElementById('btButton').disabled = false; return;
         }
 
         // Historische Reihen als Arrays aufbauen (1970-2024)
-        const histYears = Object.keys(HISTORICAL_DATA).map(Number).sort((a, b) => a - b).filter(y => y >= 1970);
+        const histYears = Object.keys(HISTORICAL_DATA).map(Number).sort((a, b) => a - b).filter(y => y >= 1950);
         const wageGrowthArray = histYears.map(y => HISTORICAL_DATA[y].lohn_de || 0);
         const inflationPctArray = histYears.map(y => HISTORICAL_DATA[y].inflation_de || 0);
-        const HIST_SERIES_START_YEAR = 1970;
+        const HIST_SERIES_START_YEAR = 1950;
 
         // Backtest-Kontext für Rentenanpassung
         const backtestCtx = {
