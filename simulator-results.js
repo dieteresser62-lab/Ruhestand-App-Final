@@ -5,6 +5,54 @@ import { STRESS_PRESETS } from './simulator-data.js';
 import { renderHeatmapSVG, renderWorstRunToggle } from './simulator-heatmap.js';
 
 /**
+ * Storage keys for log detail preferences.
+ * Separate keys prevent the backtest log checkbox from leaking into the
+ * worst-case log (and vice versa). A legacy key is still understood to avoid
+ * breaking existing localStorage data when users upgrade.
+ */
+export const LEGACY_LOG_DETAIL_KEY = 'logDetailLevel';
+export const WORST_LOG_DETAIL_KEY = 'worstLogDetailLevel';
+export const BACKTEST_LOG_DETAIL_KEY = 'backtestLogDetailLevel';
+
+/**
+ * Reads the persisted detail level with a defensive fallback.
+ *
+ * @param {string} storageKey - Primary localStorage key for the preference.
+ * @param {string|null} legacyKey - Optional legacy key to read for backward compatibility.
+ * @returns {('normal'|'detailed')} Sanitized detail level, defaults to 'normal'.
+ */
+export function loadDetailLevel(storageKey, legacyKey = LEGACY_LOG_DETAIL_KEY) {
+    const stored = localStorage.getItem(storageKey);
+    if (stored === 'detailed' || stored === 'normal') {
+        return stored;
+    }
+
+    if (legacyKey) {
+        const legacy = localStorage.getItem(legacyKey);
+        if (legacy === 'detailed') return 'detailed';
+    }
+
+    return 'normal';
+}
+
+/**
+ * Persists a detail level and removes the legacy key to avoid cross-contamination
+ * between different log UIs.
+ *
+ * @param {string} storageKey - Primary localStorage key for the preference.
+ * @param {string} level - Desired level, anything but 'detailed' collapses to 'normal'.
+ * @returns {('normal'|'detailed')} The sanitized value that was stored.
+ */
+export function persistDetailLevel(storageKey, level) {
+    const sanitizedLevel = level === 'detailed' ? 'detailed' : 'normal';
+    localStorage.setItem(storageKey, sanitizedLevel);
+    if (storageKey !== LEGACY_LOG_DETAIL_KEY) {
+        localStorage.removeItem(LEGACY_LOG_DETAIL_KEY);
+    }
+    return sanitizedLevel;
+}
+
+/**
  * Stellt sicher, dass die Worst-Run-Toggle-Buttons existieren und
  * zur aktuellen Datenlage passen (Pflege-Button nur, wenn Daten vorhanden sind).
  *
@@ -242,7 +290,7 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
             const caR = results.extraKPI?.consumptionAtRiskP10Real;
             window.globalWorstRunData = { rows: wr.logDataRows, caR_Threshold: caR };
             const showCareDetails = (localStorage.getItem('showCareDetails') === '1');
-            const logDetailLevel = (localStorage.getItem('logDetailLevel') || 'normal');
+            const logDetailLevel = loadDetailLevel(WORST_LOG_DETAIL_KEY);
             worstEl.textContent = renderWorstRunLog(wr.logDataRows, caR, {
                 showCareDetails: showCareDetails,
                 logDetailLevel: logDetailLevel

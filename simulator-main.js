@@ -82,7 +82,18 @@ import {
     computeCareMortalityMultiplier,
     computeHouseholdFlexFactor
 } from './simulator-engine.js';
-import { portfolioTotal, displayMonteCarloResults, renderWorstRunLog, aggregateSweepMetrics, getWorstRunColumnDefinitions } from './simulator-results.js';
+import {
+    portfolioTotal,
+    displayMonteCarloResults,
+    renderWorstRunLog,
+    aggregateSweepMetrics,
+    getWorstRunColumnDefinitions,
+    loadDetailLevel,
+    persistDetailLevel,
+    WORST_LOG_DETAIL_KEY,
+    BACKTEST_LOG_DETAIL_KEY,
+    LEGACY_LOG_DETAIL_KEY
+} from './simulator-results.js';
 import { formatCurrencyShortLog } from './simulator-utils.js';
 import { sumDepot } from './simulator-portfolio.js';
 import { renderSweepHeatmapSVG } from './simulator-heatmap.js';
@@ -1075,8 +1086,8 @@ export function runBacktest() {
         const pf = (val, len) => p(`${(val || 0).toFixed(1)}%`, len);
         const pfInt = (val, len) => p(`${Math.round(val || 0)}%`, len);
 
-        // Lese Detail-Level aus localStorage
-        const logDetailLevel = localStorage.getItem('logDetailLevel') || 'normal';
+        // Lese Detail-Level für Backtests aus localStorage (entkoppelt vom Worst-Log)
+        const logDetailLevel = loadDetailLevel(BACKTEST_LOG_DETAIL_KEY, LEGACY_LOG_DETAIL_KEY);
 
         // Header basierend auf Detail-Level
         let headerCols = [
@@ -1347,7 +1358,7 @@ function renderBacktestLog() {
         return;
     }
 
-    const logDetailLevel = localStorage.getItem('logDetailLevel') || 'normal';
+    const logDetailLevel = loadDetailLevel(BACKTEST_LOG_DETAIL_KEY, LEGACY_LOG_DETAIL_KEY);
     const { rows: logRows } = window.globalBacktestData;
     const columns = buildBacktestColumnDefinitions(logDetailLevel);
 
@@ -1394,7 +1405,7 @@ function exportWorstRunLogData(format = 'json') {
     }
 
     const showCareDetails = localStorage.getItem('showCareDetails') === '1';
-    const detailLevel = localStorage.getItem('logDetailLevel') || 'normal';
+    const detailLevel = loadDetailLevel(WORST_LOG_DETAIL_KEY, LEGACY_LOG_DETAIL_KEY);
     const columns = getWorstRunColumnDefinitions({ showCareDetails, logDetailLevel: detailLevel });
     const timestamp = new Date().toISOString().replace(/[:]/g, '-');
     const filenameBase = `worst-case-log-${timestamp}`;
@@ -1421,7 +1432,7 @@ function exportBacktestLogData(format = 'json') {
         return;
     }
 
-    const detailLevel = localStorage.getItem('logDetailLevel') || 'normal';
+    const detailLevel = loadDetailLevel(BACKTEST_LOG_DETAIL_KEY, LEGACY_LOG_DETAIL_KEY);
     const columns = buildBacktestColumnDefinitions(detailLevel);
     const timestamp = new Date().toISOString().replace(/[:]/g, '-');
     const filenameBase = `backtest-log-${timestamp}`;
@@ -1654,7 +1665,7 @@ window.onload = function () {
             const showDetails = e.currentTarget.checked;
             localStorage.setItem('showCareDetails', showDetails ? '1' : '0');
 
-            const logDetailLevel = localStorage.getItem('logDetailLevel') || 'normal';
+            const logDetailLevel = loadDetailLevel(WORST_LOG_DETAIL_KEY, LEGACY_LOG_DETAIL_KEY);
             if (window.globalWorstRunData && window.globalWorstRunData.rows.length > 0) {
                 document.getElementById('worstRunLog').textContent = renderWorstRunLog(
                     window.globalWorstRunData.rows,
@@ -1667,11 +1678,12 @@ window.onload = function () {
 
     const logDetailCheckbox = document.getElementById('toggle-log-detail');
     if (logDetailCheckbox) {
-        logDetailCheckbox.checked = localStorage.getItem('logDetailLevel') === 'detailed';
+        logDetailCheckbox.checked = loadDetailLevel(WORST_LOG_DETAIL_KEY, LEGACY_LOG_DETAIL_KEY) === 'detailed';
 
         logDetailCheckbox.addEventListener('change', (e) => {
             const detailLevel = e.currentTarget.checked ? 'detailed' : 'normal';
-            localStorage.setItem('logDetailLevel', detailLevel);
+            // Separate storage key to avoid leaking the backtest toggle into the worst-log columns.
+            persistDetailLevel(WORST_LOG_DETAIL_KEY, detailLevel);
 
             const showCareDetails = localStorage.getItem('showCareDetails') === '1';
             if (window.globalWorstRunData && window.globalWorstRunData.rows.length > 0) {
@@ -1686,10 +1698,11 @@ window.onload = function () {
 
     const backtestDetailCheckbox = document.getElementById('toggle-backtest-detail');
     if (backtestDetailCheckbox) {
-        backtestDetailCheckbox.checked = localStorage.getItem('logDetailLevel') === 'detailed';
+        backtestDetailCheckbox.checked = loadDetailLevel(BACKTEST_LOG_DETAIL_KEY, LEGACY_LOG_DETAIL_KEY) === 'detailed';
         backtestDetailCheckbox.addEventListener('change', (e) => {
             const detailLevel = e.currentTarget.checked ? 'detailed' : 'normal';
-            localStorage.setItem('logDetailLevel', detailLevel);
+            // Backtest detail level is isolated to keep the worst-case log unchanged.
+            persistDetailLevel(BACKTEST_LOG_DETAIL_KEY, detailLevel);
 
             // Re-render Backtest-Log mit neuem Detail-Level
             if (typeof window.renderBacktestLog === 'function') {
