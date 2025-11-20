@@ -100,6 +100,49 @@ const TransactionEngine = {
     },
 
     /**
+     * Ermittelt die anwendbare Mindest-Trade-Schwelle für liquiditätsgetriebene Aktionen.
+     *
+     * @param {Object} params - Parameterobjekt
+     * @param {number} params.investiertesKapital - Gesamtwert des Portfolios inkl. Liquidität
+     * @param {number} params.liquiditaetsBedarf - Geplanter Liquiditätszufluss (ohne Gold)
+     * @param {number} params.totalerBedarf - Gesamter Zielzufluss (inklusive etwaiger Gold-Beschaffungen)
+     * @returns {{ appliedMinTradeGate: number, minTradeResultOverride: (number|null), diagnosisEntry: (Object|null) }}
+     */
+    _computeAppliedMinTradeGate({ investiertesKapital, liquiditaetsBedarf, totalerBedarf }) {
+        const basisMinTrade = Math.max(
+            CONFIG.THRESHOLDS.STRATEGY.minTradeAmountStatic,
+            investiertesKapital * CONFIG.THRESHOLDS.STRATEGY.minTradeAmountDynamicFactor
+        );
+        const liquidityEmergencyGate = Math.max(
+            CONFIG.THRESHOLDS.STRATEGY.minRefillAmount || 0,
+            CONFIG.THRESHOLDS.STRATEGY.cashRebalanceThreshold || 0
+        );
+
+        let appliedMinTradeGate = basisMinTrade;
+        let minTradeResultOverride = null;
+        let diagnosisEntry = null;
+
+        const shouldRelaxMinTradeGate =
+            liquiditaetsBedarf > 0 && totalerBedarf > 0 && totalerBedarf < basisMinTrade;
+
+        if (shouldRelaxMinTradeGate) {
+            appliedMinTradeGate = Math.min(basisMinTrade, liquidityEmergencyGate);
+
+            if (appliedMinTradeGate < basisMinTrade) {
+                minTradeResultOverride = appliedMinTradeGate;
+                diagnosisEntry = {
+                    step: 'Liquiditäts-Priorität',
+                    impact: `Mindestschwelle temporär auf ${appliedMinTradeGate.toFixed(0)}€ gesenkt (statt ${basisMinTrade.toFixed(0)}€).`,
+                    status: 'active',
+                    severity: 'info'
+                };
+            }
+        }
+
+        return { appliedMinTradeGate, minTradeResultOverride, diagnosisEntry };
+    },
+
+    /**
      * Bestimmt notwendige Transaktionsaktion
      */
     determineAction(p) {
@@ -145,6 +188,7 @@ const TransactionEngine = {
         const krisenMindestLiquiditaet = (floorBedarfNetto / 12) * input.runwayMinMonths;
         const sicherheitsPuffer = krisenMindestLiquiditaet;
         const isBearRegimeProxy = market.sKey === 'bear_deep' || market.sKey === 'recovery_in_bear';
+        const investiertesKapital = depotwertGesamt + aktuelleLiquiditaet;
 
         // Puffer-Schutz im Bärenmarkt
         if (aktuelleLiquiditaet <= sicherheitsPuffer && isBearRegimeProxy) {
@@ -175,6 +219,10 @@ const TransactionEngine = {
                 ? (aktuelleLiquiditaet / (gesamtjahresbedarf / 12))
                 : Infinity;
             const aktienwert = input.depotwertAlt + input.depotwertNeu;
+            const zielLiquiditaetsdeckung = (zielLiquiditaet > 0)
+                ? (aktuelleLiquiditaet / zielLiquiditaet)
+                : 1;
+            const runwayCoverageThreshold = CONFIG.THRESHOLDS.STRATEGY.runwayCoverageMinPct || 0;
 
             // Bärenmarkt: Runway auffüllen
             if (isBearRegimeProxy && currentRunwayMonths < input.runwayMinMonths) {
@@ -188,19 +236,47 @@ const TransactionEngine = {
                 });
                 verwendungen.liquiditaet = actionDetails.bedarf;
 
+            // Universeller Runway-Failsafe (neutral)
+            } else if (currentRunwayMonths < input.runwayMinMonths || zielLiquiditaetsdeckung < runwayCoverageThreshold) {
+                const runwayBedarfEuro = Math.max(
+                    0,
+                    (input.runwayMinMonths - currentRunwayMonths) * (gesamtjahresbedarf / 12)
+                );
+                const zielDeckungBedarf = Math.max(0, (runwayCoverageThreshold * zielLiquiditaet) - aktuelleLiquiditaet);
+                const liquiditaetsBedarf = Math.max(runwayBedarfEuro, zielDeckungBedarf);
+
+                const minTradeGateResult = this._computeAppliedMinTradeGate({
+                    investiertesKapital,
+                    liquiditaetsBedarf,
+                    totalerBedarf: liquiditaetsBedarf
+                });
+                minTradeResultOverride = minTradeGateResult.minTradeResultOverride;
+                if (minTradeGateResult.diagnosisEntry) {
+                    actionDetails.diagnosisEntries.push(minTradeGateResult.diagnosisEntry);
+                }
+
+                const neutralRefill = this._computeCappedRefill({
+                    isBearContext: false,
+                    liquiditaetsbedarf: liquiditaetsBedarf,
+                    aktienwert,
+                    input
+                });
+
+                if (neutralRefill.bedarf > 0) {
+                    actionDetails = neutralRefill;
+                    const hasCap = neutralRefill.title.includes('(Cap aktiv)');
+                    actionDetails.title = `Runway-Notfüllung (neutral)${hasCap ? ' (Cap aktiv)' : ''}`;
+                    actionDetails.diagnosisEntries.unshift({
+                        step: 'Runway-Notfüllung (neutral)',
+                        impact: `Runway-Deckung auf mindestens ${input.runwayMinMonths} Monate bzw. ${(runwayCoverageThreshold * 100).toFixed(0)}% Ziel-Liquidität anheben.`,
+                        status: 'active',
+                        severity: 'warning'
+                    });
+                    verwendungen.liquiditaet = actionDetails.bedarf;
+                }
+
             // Nicht-Bärenmarkt: Opportunistisches Rebalancing
             } else if (!isBearRegimeProxy) {
-                const investiertesKapital = depotwertGesamt + aktuelleLiquiditaet;
-                const basisMinTrade = Math.max(
-                    CONFIG.THRESHOLDS.STRATEGY.minTradeAmountStatic,
-                    investiertesKapital * CONFIG.THRESHOLDS.STRATEGY.minTradeAmountDynamicFactor
-                );
-                const liquidityEmergencyGate = Math.max(
-                    CONFIG.THRESHOLDS.STRATEGY.minRefillAmount || 0,
-                    CONFIG.THRESHOLDS.STRATEGY.cashRebalanceThreshold || 0
-                );
-                let appliedMinTradeGate = basisMinTrade;
-
                 const liquiditaetsBedarf = Math.max(0, zielLiquiditaet - aktuelleLiquiditaet);
                 let goldKaufBedarf = 0;
 
@@ -216,23 +292,15 @@ const TransactionEngine = {
                 }
 
                 const totalerBedarf = liquiditaetsBedarf + goldKaufBedarf;
-                const shouldRelaxMinTradeGate =
-                    liquiditaetsBedarf > 0 && totalerBedarf > 0 && totalerBedarf < basisMinTrade;
-
-                // Bei reinen Liquiditätsbedarfen die Mindestschwelle absenken,
-                // damit kleine, aber notwendige Auffüllungen nicht blockiert werden.
-                if (shouldRelaxMinTradeGate) {
-                    appliedMinTradeGate = Math.min(basisMinTrade, liquidityEmergencyGate);
-
-                    if (appliedMinTradeGate < basisMinTrade) {
-                        minTradeResultOverride = appliedMinTradeGate;
-                        actionDetails.diagnosisEntries.push({
-                            step: 'Liquiditäts-Priorität',
-                            impact: `Mindestschwelle temporär auf ${appliedMinTradeGate.toFixed(0)}€ gesenkt (statt ${basisMinTrade.toFixed(0)}€).`,
-                            status: 'active',
-                            severity: 'info'
-                        });
-                    }
+                const minTradeGateResult = this._computeAppliedMinTradeGate({
+                    investiertesKapital,
+                    liquiditaetsBedarf,
+                    totalerBedarf
+                });
+                const appliedMinTradeGate = minTradeGateResult.appliedMinTradeGate;
+                minTradeResultOverride = minTradeGateResult.minTradeResultOverride;
+                if (minTradeGateResult.diagnosisEntry) {
+                    actionDetails.diagnosisEntries.push(minTradeGateResult.diagnosisEntry);
                 }
 
                 if (totalerBedarf >= appliedMinTradeGate) {

@@ -60,7 +60,8 @@ const CONFIG = {
             minTradeAmountStatic: 25000,                // Min. 25.000€ für Rebalancing-Trades
             minTradeAmountDynamicFactor: 0.005,         // 0.5% des Portfolios als dynamischer Trade-Mindestbetrag
             cashRebalanceThreshold: 2500,               // Min. 2.500€ für Cash-Rebalancing
-            recoveryLiquidityTargetFactor: 0.85         // 85% des Ziel-Runway in Recovery-Phasen
+            recoveryLiquidityTargetFactor: 0.85,        // 85% des Ziel-Runway in Recovery-Phasen
+            runwayCoverageMinPct: 0.75                  // Mindestens 75% Liquiditätsdeckung des Ziels, bevor Failsafe greift
         }
     },
 
