@@ -1032,7 +1032,9 @@ function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta =
     if (liquiditaet < jahresEntnahme && depotWertVorEntnahme > 0) {
         const shortfall = jahresEntnahme - liquiditaet;
         const emergencyCtx = buildInputsCtxFromPortfolio(algoInput, { depotTranchesAktien: portfolio.depotTranchesAktien.map(t => ({...t})), depotTranchesGold: portfolio.depotTranchesGold.map(t => ({...t})), liquiditaet: liquiditaet}, { pensionAnnual, marketData: marketDataCurrentYear });
-        const { saleResult: emergencySale } = Ruhestandsmodell_v30.calculateSaleAndTax(shortfall, emergencyCtx, { minGold: results.minGold }, market);
+        // CRITICAL: Use minGold: 0 for emergency refill to prevent false RUIN
+        // When liquidity is insufficient, we must allow selling ANY asset including gold
+        const { saleResult: emergencySale } = Ruhestandsmodell_v30.calculateSaleAndTax(shortfall, emergencyCtx, { minGold: 0 }, market);
 
         if (emergencySale && emergencySale.achievedRefill > 0) {
             liquiditaet += emergencySale.achievedRefill;
