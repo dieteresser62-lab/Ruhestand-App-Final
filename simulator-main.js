@@ -1015,8 +1015,8 @@ export function runBacktest() {
         document.getElementById('btButton').disabled = true;
         const inputs = getCommonInputs();
         const startJahr = parseInt(document.getElementById('simStartJahr').value); const endJahr = parseInt(document.getElementById('simEndJahr').value);
-        if (startJahr < 1950 || endJahr > 2024 || startJahr >= endJahr) {
-            alert(`Fehler: Bitte einen gültigen Zeitraum eingeben.\n- Der Zeitraum muss zwischen 1950 und 2024 liegen.`);
+        if (startJahr < 1951 || endJahr > 2024 || startJahr >= endJahr) {
+            alert(`Fehler: Bitte einen gültigen Zeitraum eingeben.\n- Der Zeitraum muss zwischen 1951 und 2024 liegen.`);
             document.getElementById('btButton').disabled = false; return;
         }
 
@@ -1042,6 +1042,9 @@ export function runBacktest() {
             simStartYear: startJahr
         };
 
+        // Helper to safely get historical data
+        const getHistVal = (y, prop) => (HISTORICAL_DATA[y] ? HISTORICAL_DATA[y][prop] : 0);
+
         let simState = {
             portfolio: initializePortfolio(inputs),
             baseFloor: inputs.startFloorBedarf,
@@ -1049,9 +1052,21 @@ export function runBacktest() {
             lastState: null,
             currentAnnualPension: 0,
             currentAnnualPension2: 0,
-            marketDataHist: { endeVJ: HISTORICAL_DATA[startJahr - 1].msci_eur, endeVJ_1: HISTORICAL_DATA[startJahr - 2].msci_eur, endeVJ_2: HISTORICAL_DATA[startJahr - 3].msci_eur, endeVJ_3: HISTORICAL_DATA[startJahr - 4].msci_eur, ath: 0, jahreSeitAth: 0, capeRatio: inputs.marketCapeRatio || 0 }
+            marketDataHist: {
+                endeVJ: getHistVal(startJahr - 1, 'msci_eur'),
+                endeVJ_1: getHistVal(startJahr - 2, 'msci_eur'),
+                endeVJ_2: getHistVal(startJahr - 3, 'msci_eur'),
+                endeVJ_3: getHistVal(startJahr - 4, 'msci_eur'),
+                ath: 0,
+                jahreSeitAth: 0,
+                capeRatio: inputs.marketCapeRatio || 0
+            }
         };
-        simState.marketDataHist.ath = Math.max(...Object.keys(HISTORICAL_DATA).filter(y => y < startJahr).map(y => HISTORICAL_DATA[y].msci_eur));
+
+        const prevYearsVals = Object.keys(HISTORICAL_DATA)
+            .filter(y => y < startJahr)
+            .map(y => HISTORICAL_DATA[y].msci_eur);
+        simState.marketDataHist.ath = prevYearsVals.length > 0 ? Math.max(...prevYearsVals) : (simState.marketDataHist.endeVJ || 0);
 
         let totalEntnahme = 0, kuerzungJahreAmStueck = 0, maxKuerzungStreak = 0, jahreMitKuerzung = 0, totalSteuern = 0;
         const logRows = []; // Speichere Log-Daten für späteres Neu-Rendern
