@@ -65,6 +65,7 @@
  */
 
 import { rng, quantile, sum, mean, formatCurrency, parseRange, parseRangeInput, cartesianProduct, cartesianProductLimited } from './simulator-utils.js';
+import { getStartYearCandidates } from './cape-utils.js';
 import { ENGINE_VERSION, ENGINE_HASH, STRESS_PRESETS, BREAK_ON_RUIN, MORTALITY_TABLE, HISTORICAL_DATA, annualData, SUPPORTED_PFLEGE_GRADES, PFLEGE_GRADE_LABELS } from './simulator-data.js';
 import {
     getCommonInputs, updateStartPortfolioDisplay, initializePortfolio,
@@ -367,7 +368,7 @@ function areR2SeriesEqual(series1, series2, tolerance = 1e-6) {
  */
 function withNoLSWrites(fn) {
     const _lsSet = localStorage.setItem;
-    localStorage.setItem = function() {
+    localStorage.setItem = function () {
         // No-op während Sweep - verhindert Side-Effects
         console.debug('[SWEEP] localStorage.setItem blockiert während Sweep');
     };
@@ -507,17 +508,33 @@ export async function runMonteCarlo() {
                 progressBar.style.width = `${(i / anzahl) * 90}%`;
                 await new Promise(resolve => setTimeout(resolve, 0));
             }
-
             let failed = false, totalTaxesThisRun = 0, kpiJahreMitKuerzungDieserLauf = 0, kpiMaxKuerzungDieserLauf = 0;
             let lebensdauer = 0, jahreOhneFlex = 0, triggeredAge = null;
             let careEverActive = false;
 
-            const startYearIndex = Math.floor(rand() * annualData.length);
+            // --- CAPE-SAMPLING LOGIC START ---
+            let startYearIndex;
+            const useCapeSampling = document.getElementById('useCapeSampling')?.checked;
+
+            if (useCapeSampling && inputs.marketCapeRatio > 0) {
+                const candidates = getStartYearCandidates(inputs.marketCapeRatio, annualData);
+                if (candidates.length > 0) {
+                    const chosenYear = candidates[Math.floor(rand() * candidates.length)];
+                    startYearIndex = annualData.findIndex(d => d.jahr === chosenYear);
+                    if (startYearIndex === -1) startYearIndex = Math.floor(rand() * annualData.length);
+                } else {
+                    startYearIndex = Math.floor(rand() * annualData.length);
+                }
+            } else {
+                startYearIndex = Math.floor(rand() * annualData.length);
+            }
+            // --- CAPE-SAMPLING LOGIC END ---
+
             let simState = initMcRunState(inputs, startYearIndex);
 
             const depotWertHistorie = [portfolioTotal(simState.portfolio)];
             const currentRunLog = [];
-            let depotNurHistorie = [ sumDepot(simState.portfolio) ];
+            let depotNurHistorie = [sumDepot(simState.portfolio)];
             let depotErschoepfungAlterGesetzt = false;
             let widowBenefitActiveForP1 = false; // P1 erhält Witwenrente nach P2
             let widowBenefitActiveForP2 = false; // P2 erhält Witwenrente nach P1
@@ -750,8 +767,8 @@ export async function runMonteCarlo() {
                     depotNurHistorie.push(depotOnlyNow);
 
                     if (!depotErschoepfungAlterGesetzt && depotOnlyNow <= DEPOT_DEPLETION_THRESHOLD) {
-                      alterBeiErschoepfung[i] = ageP1;
-                      depotErschoepfungAlterGesetzt = true;
+                        alterBeiErschoepfung[i] = ageP1;
+                        depotErschoepfungAlterGesetzt = true;
                     }
 
                     if (result.logData.FlexRatePct <= 0.1) {
@@ -916,24 +933,24 @@ export async function runMonteCarlo() {
         await new Promise(resolve => setTimeout(resolve, 0));
 
         const successfulOutcomes = [];
-        for(let i=0; i<anzahl; ++i) { if(finalOutcomes[i] > 0) successfulOutcomes.push(finalOutcomes[i]); }
+        for (let i = 0; i < anzahl; ++i) { if (finalOutcomes[i] > 0) successfulOutcomes.push(finalOutcomes[i]); }
 
         const pflegeResults = {
-          entryRatePct: (pflegeTriggeredCount / anzahl) * 100,
-          entryAgeMedian: entryAges.length ? quantile(entryAges, 0.5) : 0,
-          shortfallRate_condCare: pflegeTriggeredCount > 0 ? (shortfallWithCareCount / pflegeTriggeredCount) * 100 : 0,
-          shortfallRate_noCareProxy: (shortfallNoCareProxyCount / anzahl) * 100,
-          endwealthWithCare_median: quantile(endWealthWithCare, 0.5),
-          endwealthNoCare_median: quantile(endWealthNoCareProxyArr, 0.5),
-          depotCosts_median: careDepotCosts.length ? quantile(careDepotCosts, 0.5) : 0,
-          // Dual Care KPIs (only for triggered cases)
-          p1CareYears: p1CareYearsTriggered.length ? quantile(p1CareYearsTriggered, 0.5) : 0,
-          p2CareYears: p2CareYearsTriggered.length ? quantile(p2CareYearsTriggered, 0.5) : 0,
-          bothCareYears: bothCareYearsOverlapTriggered.length ? quantile(bothCareYearsOverlapTriggered, 0.5) : 0,
-          p2EntryRatePct: (p2TriggeredCount / anzahl) * 100,
-          p2EntryAgeMedian: entryAgesP2.length ? quantile(entryAgesP2, 0.5) : 0,
-          maxAnnualCareSpend: maxAnnualCareSpendTriggered.length ? quantile(maxAnnualCareSpendTriggered, 0.5) : 0,
-          shortfallDelta_vs_noCare: quantile(endWealthNoCareProxyArr, 0.5) - quantile(endWealthWithCare, 0.5)
+            entryRatePct: (pflegeTriggeredCount / anzahl) * 100,
+            entryAgeMedian: entryAges.length ? quantile(entryAges, 0.5) : 0,
+            shortfallRate_condCare: pflegeTriggeredCount > 0 ? (shortfallWithCareCount / pflegeTriggeredCount) * 100 : 0,
+            shortfallRate_noCareProxy: (shortfallNoCareProxyCount / anzahl) * 100,
+            endwealthWithCare_median: quantile(endWealthWithCare, 0.5),
+            endwealthNoCare_median: quantile(endWealthNoCareProxyArr, 0.5),
+            depotCosts_median: careDepotCosts.length ? quantile(careDepotCosts, 0.5) : 0,
+            // Dual Care KPIs (only for triggered cases)
+            p1CareYears: p1CareYearsTriggered.length ? quantile(p1CareYearsTriggered, 0.5) : 0,
+            p2CareYears: p2CareYearsTriggered.length ? quantile(p2CareYearsTriggered, 0.5) : 0,
+            bothCareYears: bothCareYearsOverlapTriggered.length ? quantile(bothCareYearsOverlapTriggered, 0.5) : 0,
+            p2EntryRatePct: (p2TriggeredCount / anzahl) * 100,
+            p2EntryAgeMedian: entryAgesP2.length ? quantile(entryAgesP2, 0.5) : 0,
+            maxAnnualCareSpend: maxAnnualCareSpendTriggered.length ? quantile(maxAnnualCareSpendTriggered, 0.5) : 0,
+            shortfallDelta_vs_noCare: quantile(endWealthNoCareProxyArr, 0.5) - quantile(endWealthWithCare, 0.5)
         };
 
         const stressPresetKey = inputs.stressPreset || 'NONE';
@@ -993,7 +1010,7 @@ export async function runMonteCarlo() {
  * Führt einen historischen Backtest durch
  */
 export function runBacktest() {
-     try {
+    try {
         const extraKPI = document.getElementById('monteCarloResults').style.display === 'block' ? (window.lastMcRunExtraKPI || {}) : {};
         document.getElementById('btButton').disabled = true;
         const inputs = getCommonInputs();
@@ -1004,7 +1021,7 @@ export function runBacktest() {
         }
 
         // Historische Reihen als Arrays aufbauen (1970-2024)
-        const histYears = Object.keys(HISTORICAL_DATA).map(Number).sort((a,b)=>a-b).filter(y => y >= 1970);
+        const histYears = Object.keys(HISTORICAL_DATA).map(Number).sort((a, b) => a - b).filter(y => y >= 1970);
         const wageGrowthArray = histYears.map(y => HISTORICAL_DATA[y].lohn_de || 0);
         const inflationPctArray = histYears.map(y => HISTORICAL_DATA[y].inflation_de || 0);
         const HIST_SERIES_START_YEAR = 1970;
@@ -1032,7 +1049,7 @@ export function runBacktest() {
             lastState: null,
             currentAnnualPension: 0,
             currentAnnualPension2: 0,
-            marketDataHist: { endeVJ: HISTORICAL_DATA[startJahr-1].msci_eur, endeVJ_1: HISTORICAL_DATA[startJahr-2].msci_eur, endeVJ_2: HISTORICAL_DATA[startJahr-3].msci_eur, endeVJ_3: HISTORICAL_DATA[startJahr-4].msci_eur, ath: 0, jahreSeitAth: 0, capeRatio: inputs.marketCapeRatio || 0 }
+            marketDataHist: { endeVJ: HISTORICAL_DATA[startJahr - 1].msci_eur, endeVJ_1: HISTORICAL_DATA[startJahr - 2].msci_eur, endeVJ_2: HISTORICAL_DATA[startJahr - 3].msci_eur, endeVJ_3: HISTORICAL_DATA[startJahr - 4].msci_eur, ath: 0, jahreSeitAth: 0, capeRatio: inputs.marketCapeRatio || 0 }
         };
         simState.marketDataHist.ath = Math.max(...Object.keys(HISTORICAL_DATA).filter(y => y < startJahr).map(y => HISTORICAL_DATA[y].msci_eur));
 
@@ -1136,11 +1153,11 @@ export function runBacktest() {
                 );
             }
             logCols.push(
-                row.aktionUndGrund.substring(0,15).padEnd(16),
+                row.aktionUndGrund.substring(0, 15).padEnd(16),
                 pf(row.QuoteEndPct, 6),
                 pfInt(row.RunwayCoveragePct, 7),
-                pf((row.RealReturnEquityPct||0)*100, 8),
-                pf((row.RealReturnGoldPct||0)*100, 8),
+                pf((row.RealReturnEquityPct || 0) * 100, 8),
+                pf((row.RealReturnGoldPct || 0) * 100, 8),
                 pf(dataVJ.inflation_de, 5),
                 formatCurrencyShortLog(netA).padStart(8),
                 formatCurrencyShortLog(netG).padStart(8),
@@ -1509,7 +1526,7 @@ function updatePflegeUIInfo() {
 /**
  * DOM-Initialisierung und Event-Handler
  */
-window.onload = function() {
+window.onload = function () {
     selfCheckEngine();
     prepareHistoricalData();
 
@@ -1536,11 +1553,11 @@ window.onload = function() {
     const pflegeInfoFields = ['startFloorBedarf', 'pflegeMaxFloor', 'pflegeRegionalZuschlag', ...CARE_GRADE_FIELD_IDS];
     pflegeInfoFields.forEach(id => {
         const el = document.getElementById(id);
-        if(el) el.addEventListener('input', updatePflegeUIInfo);
+        if (el) el.addEventListener('input', updatePflegeUIInfo);
     });
 
     const pflegeMaxFloorInput = document.getElementById('pflegeMaxFloor');
-    if(pflegeMaxFloorInput) {
+    if (pflegeMaxFloorInput) {
         pflegeMaxFloorInput.title = 'Gesamt-Floor inkl. Pflege. Der maximal mögliche Zusatzbedarf ergibt sich aus diesem Wert abzüglich des Basis-Floor-Bedarfs zum Zeitpunkt des Pflegeeintritts.';
     }
     updatePflegeUIInfo();
@@ -1624,7 +1641,7 @@ window.onload = function() {
 
             const logDetailLevel = localStorage.getItem('logDetailLevel') || 'normal';
             if (window.globalWorstRunData && window.globalWorstRunData.rows.length > 0) {
-                 document.getElementById('worstRunLog').textContent = renderWorstRunLog(
+                document.getElementById('worstRunLog').textContent = renderWorstRunLog(
                     window.globalWorstRunData.rows,
                     window.globalWorstRunData.caR_Threshold,
                     { showCareDetails: showDetails, logDetailLevel: logDetailLevel }
@@ -1643,7 +1660,7 @@ window.onload = function() {
 
             const showCareDetails = localStorage.getItem('showCareDetails') === '1';
             if (window.globalWorstRunData && window.globalWorstRunData.rows.length > 0) {
-                 document.getElementById('worstRunLog').textContent = renderWorstRunLog(
+                document.getElementById('worstRunLog').textContent = renderWorstRunLog(
                     window.globalWorstRunData.rows,
                     window.globalWorstRunData.caR_Threshold,
                     { showCareDetails: showCareDetails, logDetailLevel: detailLevel }
