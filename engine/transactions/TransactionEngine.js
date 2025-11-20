@@ -75,8 +75,10 @@ const TransactionEngine = {
         const isCapped = nettoBedarf < liquiditaetsbedarf;
 
         // Bei kritischer Liquidität: stark reduzierte Mindestschwelle verwenden
+        // Wenn isCriticalLiquidity true ist, setzen wir das Limit auf 0, um JEDE notwendige Auffüllung zu erlauben
+        // und so den "Notfall-Verkauf" im Folgejahr zu verhindern.
         const effectiveMinRefill = isCriticalLiquidity
-            ? Math.min(CONFIG.THRESHOLDS.STRATEGY.minRefillAmount, CONFIG.THRESHOLDS.STRATEGY.cashRebalanceThreshold || 2500)
+            ? 0
             : CONFIG.THRESHOLDS.STRATEGY.minRefillAmount;
 
         if (nettoBedarf < effectiveMinRefill) {
@@ -241,11 +243,17 @@ const TransactionEngine = {
             if (isBearRegimeProxy && currentRunwayMonths < input.runwayMinMonths) {
                 const runwayBedarfEuro = (input.runwayMinMonths - currentRunwayMonths) *
                     (gesamtjahresbedarf / 12);
+
+                // Kritisch, wenn wir uns dem absoluten Puffer nähern (z.B. < 150% des Puffers)
+                // Beispiel: Puffer 10k. Aktuell 13k. 13k < 15k -> Kritisch -> Erlaube auch kleine Auffüllung (2k)
+                const isCriticalLiquidityBear = aktuelleLiquiditaet < (sicherheitsPuffer * 1.5);
+
                 actionDetails = this._computeCappedRefill({
                     isBearContext: true,
                     liquiditaetsbedarf: runwayBedarfEuro,
                     aktienwert,
-                    input
+                    input,
+                    isCriticalLiquidity: isCriticalLiquidityBear
                 });
                 verwendungen.liquiditaet = actionDetails.bedarf;
 
