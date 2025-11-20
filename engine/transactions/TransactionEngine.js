@@ -111,6 +111,7 @@ const TransactionEngine = {
         let actionDetails = { bedarf: 0, title: '', diagnosisEntries: [] };
         let isPufferSchutzAktiv = false;
         let verwendungen = { liquiditaet: 0, gold: 0, aktien: 0 };
+        let minTradeResultOverride = null;
         const transactionDiagnostics = {
             wasTriggered: false,
             blockReason: 'none',
@@ -190,10 +191,15 @@ const TransactionEngine = {
             // Nicht-Bärenmarkt: Opportunistisches Rebalancing
             } else if (!isBearRegimeProxy) {
                 const investiertesKapital = depotwertGesamt + aktuelleLiquiditaet;
-                const minTrade = Math.max(
+                const basisMinTrade = Math.max(
                     CONFIG.THRESHOLDS.STRATEGY.minTradeAmountStatic,
                     investiertesKapital * CONFIG.THRESHOLDS.STRATEGY.minTradeAmountDynamicFactor
                 );
+                const liquidityEmergencyGate = Math.max(
+                    CONFIG.THRESHOLDS.STRATEGY.minRefillAmount || 0,
+                    CONFIG.THRESHOLDS.STRATEGY.cashRebalanceThreshold || 0
+                );
+                let appliedMinTradeGate = basisMinTrade;
 
                 const liquiditaetsBedarf = Math.max(0, zielLiquiditaet - aktuelleLiquiditaet);
                 let goldKaufBedarf = 0;
@@ -210,8 +216,26 @@ const TransactionEngine = {
                 }
 
                 const totalerBedarf = liquiditaetsBedarf + goldKaufBedarf;
+                const shouldRelaxMinTradeGate =
+                    liquiditaetsBedarf > 0 && totalerBedarf > 0 && totalerBedarf < basisMinTrade;
 
-                if (totalerBedarf >= minTrade) {
+                // Bei reinen Liquiditätsbedarfen die Mindestschwelle absenken,
+                // damit kleine, aber notwendige Auffüllungen nicht blockiert werden.
+                if (shouldRelaxMinTradeGate) {
+                    appliedMinTradeGate = Math.min(basisMinTrade, liquidityEmergencyGate);
+
+                    if (appliedMinTradeGate < basisMinTrade) {
+                        minTradeResultOverride = appliedMinTradeGate;
+                        actionDetails.diagnosisEntries.push({
+                            step: 'Liquiditäts-Priorität',
+                            impact: `Mindestschwelle temporär auf ${appliedMinTradeGate.toFixed(0)}€ gesenkt (statt ${basisMinTrade.toFixed(0)}€).`,
+                            status: 'active',
+                            severity: 'info'
+                        });
+                    }
+                }
+
+                if (totalerBedarf >= appliedMinTradeGate) {
                     // Gold-Verkaufsbudget berechnen
                     let maxSellableFromGold = 0;
                     if (input.goldAktiv && input.goldZielProzent > 0) {
@@ -285,7 +309,7 @@ const TransactionEngine = {
             isPufferSchutzAktiv
         );
 
-        const minTradeResult = Math.max(
+        const minTradeResult = minTradeResultOverride ?? Math.max(
             CONFIG.THRESHOLDS.STRATEGY.minTradeAmountStatic,
             (depotwertGesamt + aktuelleLiquiditaet) * CONFIG.THRESHOLDS.STRATEGY.minTradeAmountDynamicFactor
         );

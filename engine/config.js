@@ -56,7 +56,7 @@ const CONFIG = {
             stagflationInflation: 4,                    // 4% Inflation als Stagflations-Grenze
             runwayThinMonths: 24,                       // 24 Monate = kritischer Runway
             liquidityBufferZonePercent: 10,             // 10% Pufferzone für Liquiditäts-Ziel
-            minRefillAmount: 10000,                     // Min. 10.000€ für Depot-Verkauf
+            minRefillAmount: 10000,                     // Min. 10.000€ für Depot-Verkauf und reduziertes Liquiditäts-Gate
             minTradeAmountStatic: 25000,                // Min. 25.000€ für Rebalancing-Trades
             minTradeAmountDynamicFactor: 0.005,         // 0.5% des Portfolios als dynamischer Trade-Mindestbetrag
             cashRebalanceThreshold: 2500,               // Min. 2.500€ für Cash-Rebalancing
