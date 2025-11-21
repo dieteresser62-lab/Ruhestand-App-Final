@@ -1539,41 +1539,7 @@ const TransactionEngine = {
                     verwendungen.liquiditaet = actionDetails.bedarf;
                 }
 
-                // Universeller Runway-Failsafe: gilt in allen Nicht-Bären-Regimes
-            } else if (hasGuardrailGap) {
-                const isCriticalLiquidityFailsafe = zielLiquiditaetsdeckung < runwayCoverageThreshold || hasRunwayGap;
-
-                const minTradeGateResult = this._computeAppliedMinTradeGate({
-                    investiertesKapital,
-                    liquiditaetsBedarf: guardrailGapEuro,
-                    totalerBedarf: guardrailGapEuro
-                });
-                minTradeResultOverride = minTradeGateResult.minTradeResultOverride;
-                if (minTradeGateResult.diagnosisEntry) {
-                    actionDetails.diagnosisEntries.push(minTradeGateResult.diagnosisEntry);
-                }
-
-                const neutralRefill = this._computeCappedRefill({
-                    isBearContext: false,
-                    liquiditaetsbedarf: guardrailGapEuro,
-                    aktienwert,
-                    input,
-                    isCriticalLiquidity: isCriticalLiquidityFailsafe
-                });
-
-                if (neutralRefill.bedarf > 0) {
-                    actionDetails = neutralRefill;
-                    actionDetails.title = `Runway-Notfüllung (neutral)${neutralRefill.isCapped ? ' (Cap aktiv)' : ''}`;
-                    actionDetails.diagnosisEntries.unshift({
-                        step: 'Runway-Notfüllung (neutral)',
-                        impact: `Liquidität auf mindestens ${guardrailTargetMonths.toFixed(1)} Monate bzw. ${(runwayCoverageThreshold * 100).toFixed(0)}% des Ziels anheben (Ziel: ${guardrailTargetEuro.toFixed(0)}€).`,
-                        status: 'active',
-                        severity: 'warning'
-                    });
-                    verwendungen.liquiditaet = actionDetails.bedarf;
-                }
-
-                // Nicht-Bärenmarkt: Opportunistisches Rebalancing
+                // Nicht-Bärenmarkt: Immer bis zur vollen Ziel-Liquidität auffüllen
             } else if (!isBearRegimeProxy) {
                 const liquiditaetsBedarf = Math.max(0, zielLiquiditaet - aktuelleLiquiditaet);
 
@@ -1608,25 +1574,12 @@ const TransactionEngine = {
                     aktuelleLiquiditaet
                 });
 
-                // Bei kritischer Liquidität: niedrigere Mindestschwelle verwenden
-                let appliedMinTradeGate;
-                if (isCriticalLiquidity) {
-                    appliedMinTradeGate = Math.max(
-                        CONFIG.THRESHOLDS.STRATEGY.minRefillAmount || 2500,
-                        CONFIG.THRESHOLDS.STRATEGY.cashRebalanceThreshold || 2500
-                    );
-                } else {
-                    const minTradeGateResult = this._computeAppliedMinTradeGate({
-                        investiertesKapital,
-                        liquiditaetsBedarf,
-                        totalerBedarf
-                    });
-                    appliedMinTradeGate = minTradeGateResult.appliedMinTradeGate;
-                    minTradeResultOverride = minTradeGateResult.minTradeResultOverride;
-                    if (minTradeGateResult.diagnosisEntry) {
-                        actionDetails.diagnosisEntries.push(minTradeGateResult.diagnosisEntry);
-                    }
-                }
+                // Im Nicht-Bärenmarkt: niedrigere Mindestschwelle um Ziel-Liquidität zu erreichen
+                // Die hohe Schwelle (25.000€) macht hier keinen Sinn, da wir proaktiv auffüllen wollen
+                const appliedMinTradeGate = Math.max(
+                    CONFIG.THRESHOLDS.STRATEGY.minRefillAmount || 2500,
+                    CONFIG.THRESHOLDS.STRATEGY.cashRebalanceThreshold || 2500
+                );
 
                 if (totalerBedarf >= appliedMinTradeGate) {
                     // Gold-Verkaufsbudget berechnen
@@ -1654,18 +1607,16 @@ const TransactionEngine = {
                         ? (aktienwert - aktienZielwert)
                         : 0;
 
-                    // Bei kritischer Liquidität: Verkauf auch unter Obergrenze/Zielwert erlauben
-                    // um RUIN durch Liquiditätsmangel zu verhindern
-                    if (isCriticalLiquidity && aktienUeberschuss < liquiditaetsBedarf) {
+                    // Im Nicht-Bärenmarkt: Verkauf immer erlauben um Ziel-Liquidität zu erreichen
+                    // Dies nutzt hohe Kurse aus, um sich auf den nächsten Bärenmarkt vorzubereiten
+                    if (aktienUeberschuss < liquiditaetsBedarf) {
                         // Erlaube Verkauf bis zum Liquiditätsbedarf, begrenzt durch verfügbare Aktien
                         aktienUeberschuss = Math.min(liquiditaetsBedarf, aktienwert);
                     }
 
                     const maxSkimCapEuro = (input.maxSkimPctOfEq / 100) * aktienwert;
-                    // Bei kritischer Liquidität: Cap auf 10% des Aktienwerts erhöhen
-                    const effectiveSkimCap = isCriticalLiquidity
-                        ? Math.max(maxSkimCapEuro, aktienwert * 0.10)
-                        : maxSkimCapEuro;
+                    // Im Nicht-Bärenmarkt: höheres Cap erlauben um Ziel zu erreichen
+                    const effectiveSkimCap = Math.max(maxSkimCapEuro, aktienwert * 0.10);
                     const maxSellableFromEquity = Math.min(aktienUeberschuss, effectiveSkimCap);
 
                     const totalEquityValue = input.depotwertAlt + input.depotwertNeu;
