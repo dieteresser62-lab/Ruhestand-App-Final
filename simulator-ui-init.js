@@ -20,13 +20,6 @@ import { parseRangeInput } from './simulator-utils.js';
 import { SUPPORTED_PFLEGE_GRADES, PFLEGE_GRADE_LABELS } from './simulator-data.js';
 import { initSweepDefaultsWithLocalStorageFallback } from './simulator-sweep.js';
 import { updateStartPortfolioDisplay } from './simulator-portfolio.js';
-import {
-    loadDetailLevel,
-    persistDetailLevel,
-    rerenderWorstRunLogFromState,
-    WORST_LOG_DETAIL_KEY
-} from './simulator-results.js';
-import { exportWorstRunLogData } from './simulator-persistence.js';
 
 const CARE_GRADE_FIELD_IDS = SUPPORTED_PFLEGE_GRADES.flatMap(grade => [
     `pflegeStufe${grade}Zusatz`,
@@ -93,48 +86,6 @@ export function updatePflegeUIInfo() {
     if (selectEl && hintEl) {
         updatePflegePresetHint(selectEl, hintEl);
     }
-}
-
-/**
- * Initialisiert die Steuerelemente rund um das Worst-Run-Log (Detail-Toggles, Exporte).
- *
- * Die Funktion liest persistierte Nutzerpräferenzen aus dem localStorage aus, setzt den
- * anfänglichen UI-Zustand entsprechend und sorgt dafür, dass Änderungen sofort das
- * bereits berechnete Worst-Run-Log neu rendern. Export-Buttons werden mit den
- * jeweiligen Export-Funktionen verdrahtet.
- */
-function initializeWorstRunControls() {
-    const careDetailsCheckbox = document.getElementById('toggle-care-details');
-    const logDetailCheckbox = document.getElementById('toggle-log-detail');
-
-    if (careDetailsCheckbox) {
-        careDetailsCheckbox.checked = localStorage.getItem('showCareDetails') === '1';
-        careDetailsCheckbox.addEventListener('change', () => {
-            // Präferenz speichern und bestehendes Log mit Pflege-Spalten neu rendern.
-            localStorage.setItem('showCareDetails', careDetailsCheckbox.checked ? '1' : '0');
-            rerenderWorstRunLogFromState();
-        });
-    }
-
-    if (logDetailCheckbox) {
-        logDetailCheckbox.checked = loadDetailLevel(WORST_LOG_DETAIL_KEY) === 'detailed';
-        logDetailCheckbox.addEventListener('change', () => {
-            // Persistieren und direkt neu zeichnen; defensive Normalisierung hält den Zustand konsistent.
-            const storedLevel = persistDetailLevel(WORST_LOG_DETAIL_KEY, logDetailCheckbox.checked ? 'detailed' : 'normal');
-            logDetailCheckbox.checked = storedLevel === 'detailed';
-            rerenderWorstRunLogFromState();
-        });
-    }
-
-    const wireExportButton = (buttonId, format) => {
-        const button = document.getElementById(buttonId);
-        if (!button) return;
-
-        button.addEventListener('click', () => exportWorstRunLogData(format));
-    };
-
-    wireExportButton('exportWorstLogJson', 'json');
-    wireExportButton('exportWorstLogCsv', 'csv');
 }
 
 /**
@@ -370,9 +321,6 @@ export function initSimulatorUI() {
         });
         updatePflegePresetHint(pflegePresetSelect, pflegeHintEl);
     }
-
-    // Worst-Run-Log Controls
-    initializeWorstRunControls();
 
     // Partner-Toggle
     const chkPartnerAktiv = document.getElementById('chkPartnerAktiv');

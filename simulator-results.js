@@ -514,32 +514,6 @@ export function renderWorstRunLog(logRows, caR_Threshold, opts = {}) {
 }
 
 /**
- * Rendert das gespeicherte Worst-Run-Log erneut anhand der aktuellen UI-Präferenzen.
- *
- * Diese Funktion ermöglicht es, das bereits berechnete Worst-Run-Log ohne erneute
- * Simulation nach Änderungen der Detail-Toggles (Pflege-Details, Detaillierungsgrad)
- * neu zu zeichnen. Sie greift defensiv auf die global gespeicherten Worst-Run-Daten
- * zu und beendet sich still, falls keine Daten vorliegen oder das Ziel-Element fehlt.
- *
- * @param {HTMLElement|null} [targetElement=document.getElementById('worstRunLog')]
- *        Das Ziel-Element, in dem das Log angezeigt werden soll.
- */
-export function rerenderWorstRunLogFromState(targetElement = document.getElementById('worstRunLog')) {
-    const worstData = window.globalWorstRunData;
-    if (!targetElement || !worstData || !Array.isArray(worstData.rows) || worstData.rows.length === 0) {
-        return;
-    }
-
-    const showCareDetails = localStorage.getItem('showCareDetails') === '1';
-    const logDetailLevel = loadDetailLevel(WORST_LOG_DETAIL_KEY);
-
-    targetElement.textContent = renderWorstRunLog(worstData.rows, worstData.caR_Threshold, {
-        showCareDetails,
-        logDetailLevel
-    });
-}
-
-/**
  * Berechnet das Gesamtvermögen eines Portfolios
  */
 export function portfolioTotal(p) {
