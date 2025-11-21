@@ -1327,10 +1327,11 @@ const TransactionEngine = {
                         impact: `Geplanter Verkauf (${nettoBedarf.toFixed(0)}€) unter Mindestgröße nach Capping.`,
                         status: 'inactive',
                         severity: 'guardrail'
-                    }]
+                    }],
+                    isCapped
                 };
             }
-            return { bedarf: 0, title: '', diagnosisEntries: [] };
+            return { bedarf: 0, title: '', diagnosisEntries: [], isCapped };
         }
 
         const title = isCapped ? `${capConfig.title} (Cap aktiv)` : capConfig.title;
@@ -1343,7 +1344,7 @@ const TransactionEngine = {
             }]
             : [];
 
-        return { bedarf: nettoBedarf, title, diagnosisEntries };
+        return { bedarf: nettoBedarf, title, diagnosisEntries, isCapped };
     },
 
     /**
@@ -1398,7 +1399,7 @@ const TransactionEngine = {
             market, spending, minGold, profil, input
         } = p;
 
-        let actionDetails = { bedarf: 0, title: '', diagnosisEntries: [] };
+        let actionDetails = { bedarf: 0, title: '', diagnosisEntries: [], isCapped: false };
         let isPufferSchutzAktiv = false;
         let verwendungen = { liquiditaet: 0, gold: 0, aktien: 0 };
         let minTradeResultOverride = null;
@@ -1483,47 +1484,50 @@ const TransactionEngine = {
                 ? (aktuelleLiquiditaet / zielLiquiditaet)
                 : 1;
             const runwayCoverageThreshold = CONFIG.THRESHOLDS.STRATEGY.runwayCoverageMinPct || 0;
-            const marketRegime = CONFIG.TEXTS.REGIME_MAP[market.sKey] || market.sKey;
-            // Runway-Failsafe nur aktivieren, wenn echte Stress-Signale vorliegen (Runway-Lücke oder Bär/Recovery).
-            const isRecoveryRegime = marketRegime === 'recovery' || marketRegime === 'recovery_in_bear';
-            const isStressRegime = isBearRegimeProxy || isRecoveryRegime;
-            const hasRunwayGap = currentRunwayMonths < input.runwayMinMonths;
-            const shouldRunNeutralFailsafe = hasRunwayGap || (isStressRegime && zielLiquiditaetsdeckung < runwayCoverageThreshold);
+            const hasRunwayGap = currentRunwayMonths < runwayMinThresholdMonths;
+            const monthlyBaselineNeed = (gesamtjahresbedarf / 12);
+            const guardrailTargetEuro = Math.max(
+                runwayMinThresholdMonths * monthlyBaselineNeed,
+                runwayCoverageThreshold * zielLiquiditaet
+            );
+            const guardrailTargetMonths = (monthlyBaselineNeed > 0)
+                ? (guardrailTargetEuro / monthlyBaselineNeed)
+                : 0;
+            const guardrailGapEuro = Math.max(0, guardrailTargetEuro - aktuelleLiquiditaet);
+            const hasGuardrailGap = guardrailGapEuro > 1; // kleine Toleranz gegen Rundungsartefakte
 
-            // Bärenmarkt: Runway auffüllen
-            if (isBearRegimeProxy && hasRunwayGap) {
-                const runwayBedarfEuro = (input.runwayMinMonths - currentRunwayMonths) *
-                    (gesamtjahresbedarf / 12);
-
-                // Kritisch, wenn wir uns dem absoluten Puffer nähern (z.B. < 150% des Puffers)
-                // Beispiel: Puffer 10k. Aktuell 13k. 13k < 15k -> Kritisch -> Erlaube auch kleine Auffüllung (2k)
+            // Bärenmarkt: Runway auffüllen, sobald Guardrail unterschritten wird
+            if (isBearRegimeProxy && hasGuardrailGap) {
                 const isCriticalLiquidityBear = aktuelleLiquiditaet < (sicherheitsPuffer * 1.5);
 
-                actionDetails = this._computeCappedRefill({
+                const bearRefill = this._computeCappedRefill({
                     isBearContext: true,
-                    liquiditaetsbedarf: runwayBedarfEuro,
+                    liquiditaetsbedarf: guardrailGapEuro,
                     aktienwert,
                     input,
                     isCriticalLiquidity: isCriticalLiquidityBear
                 });
-                verwendungen.liquiditaet = actionDetails.bedarf;
 
-                // Universeller Runway-Failsafe (neutral) nur in Stresslagen
-            } else if (shouldRunNeutralFailsafe) {
-                const runwayBedarfEuro = Math.max(
-                    0,
-                    (runwayMinThresholdMonths - currentRunwayMonths) * (gesamtjahresbedarf / 12)
-                );
-                const zielDeckungBedarf = Math.max(0, (runwayCoverageThreshold * zielLiquiditaet) - aktuelleLiquiditaet);
-                const liquiditaetsBedarf = Math.max(runwayBedarfEuro, zielDeckungBedarf);
+                if (bearRefill.bedarf > 0) {
+                    actionDetails = bearRefill;
+                    actionDetails.title = `Runway-Notfüllung (Bär)${bearRefill.isCapped ? ' (Cap aktiv)' : ''}`;
+                    actionDetails.diagnosisEntries.unshift({
+                        step: 'Runway-Notfüllung (Bär)',
+                        impact: `Liquidität auf mindestens ${guardrailTargetMonths.toFixed(1)} Monate bzw. ${(runwayCoverageThreshold * 100).toFixed(0)}% des Ziels anheben (Ziel: ${guardrailTargetEuro.toFixed(0)}€).`,
+                    status: 'active',
+                        severity: 'warning'
+                    });
+                    verwendungen.liquiditaet = actionDetails.bedarf;
+                }
 
-                // Kritische Liquidität wenn unter 75% des Ziels
-                const isCriticalLiquidityFailsafe = zielLiquiditaetsdeckung < runwayCoverageThreshold;
+                // Universeller Runway-Failsafe: gilt in allen Nicht-Bären-Regimes
+            } else if (hasGuardrailGap) {
+                const isCriticalLiquidityFailsafe = zielLiquiditaetsdeckung < runwayCoverageThreshold || hasRunwayGap;
 
                 const minTradeGateResult = this._computeAppliedMinTradeGate({
                     investiertesKapital,
-                    liquiditaetsBedarf,
-                    totalerBedarf: liquiditaetsBedarf
+                    liquiditaetsBedarf: guardrailGapEuro,
+                    totalerBedarf: guardrailGapEuro
                 });
                 minTradeResultOverride = minTradeGateResult.minTradeResultOverride;
                 if (minTradeGateResult.diagnosisEntry) {
@@ -1532,7 +1536,7 @@ const TransactionEngine = {
 
                 const neutralRefill = this._computeCappedRefill({
                     isBearContext: false,
-                    liquiditaetsbedarf: liquiditaetsBedarf,
+                    liquiditaetsbedarf: guardrailGapEuro,
                     aktienwert,
                     input,
                     isCriticalLiquidity: isCriticalLiquidityFailsafe
@@ -1540,11 +1544,10 @@ const TransactionEngine = {
 
                 if (neutralRefill.bedarf > 0) {
                     actionDetails = neutralRefill;
-                    const hasCap = neutralRefill.title.includes('(Cap aktiv)');
-                    actionDetails.title = `Runway-Notfüllung (neutral)${hasCap ? ' (Cap aktiv)' : ''}`;
+                    actionDetails.title = `Runway-Notfüllung (neutral)${neutralRefill.isCapped ? ' (Cap aktiv)' : ''}`;
                     actionDetails.diagnosisEntries.unshift({
                         step: 'Runway-Notfüllung (neutral)',
-                        impact: `Runway-Deckung auf mindestens ${runwayMinThresholdMonths} Monate bzw. ${(runwayCoverageThreshold * 100).toFixed(0)}% Ziel-Liquidität anheben.`,
+                        impact: `Liquidität auf mindestens ${guardrailTargetMonths.toFixed(1)} Monate bzw. ${(runwayCoverageThreshold * 100).toFixed(0)}% des Ziels anheben (Ziel: ${guardrailTargetEuro.toFixed(0)}€).`,
                         status: 'active',
                         severity: 'warning'
                     });
@@ -1709,8 +1712,9 @@ const TransactionEngine = {
 
         const effektiverNettoerloes = saleResult.achievedRefill;
 
-        if (gesamterNettoBedarf > effektiverNettoerloes + 1 && !actionDetails.title.includes('(Cap aktiv)')) {
+        if (gesamterNettoBedarf > effektiverNettoerloes + 1 && !actionDetails.isCapped) {
             actionDetails.title += ' (Cap aktiv)';
+            actionDetails.isCapped = true;
         }
 
         // Erlös verteilen: Priorität 1: Liquidität, 2: Gold, 3: Aktien
