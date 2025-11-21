@@ -131,7 +131,6 @@ function sellAssetForCash(portfolio, inputsCtx, market, asset, amountEuros, minG
  * @returns {Object} Simulationsergebnisse
  */
 export function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta = null, careFloorAddition = 0, householdContext = null) {
-    // ========== SEKTION 1: STATE-INITIALISIERUNG ==========
     let {
         portfolio,
         baseFloor,
@@ -157,7 +156,6 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     let liquiditaet = portfolio.liquiditaet;
     let totalTaxesThisYear = 0;
 
-    // ========== SEKTION 2: ASSET-RENDITE-BERECHNUNG ==========
     const rA = isFinite(yearData.rendite) ? yearData.rendite : 0;
     const rG = isFinite(yearData.gold_eur_perf) ? yearData.gold_eur_perf / 100 : 0;
     const rC = isFinite(yearData.zinssatz) ? yearData.zinssatz / 100 : 0;
@@ -170,14 +168,12 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         depotTranchesGold[i].marketValue *= (1 + rG);
     }
 
-    // ========== SEKTION 3: MARKT-ANALYSE & KONFIGURATION ==========
     const resolvedCapeRatio = resolveCapeRatio(yearData.capeRatio, inputs.marketCapeRatio, marketDataHist.capeRatio);
     const marketDataCurrentYear = { ...marketDataHist, inflation: yearData.inflation, capeRatio: resolvedCapeRatio };
 
     const algoInput = { ...inputs, floorBedarf: effectiveBaseFloor, flexBedarf: baseFlex, startSPB: inputs.startSPB };
     const market = window.Ruhestandsmodell_v30.analyzeMarket(marketDataCurrentYear);
 
-    // ========== SEKTION 4: RENTEN-BERECHNUNG ==========
     // Gemeinsame Rentenanpassung (% p.a.) für beide Personen
     const rentAdjPct = inputs.rentAdjPct || 0;
 
@@ -249,7 +245,6 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const renteSum = rente1 + rente2;
     const pensionAnnual = renteSum;
 
-    // ========== SEKTION 5: PORTFOLIO-ANALYSE & TRANSAKTIONEN ==========
     const inflatedFloor = Math.max(0, effectiveBaseFloor - pensionAnnual);
     const inflatedFlex  = baseFlex;
 
@@ -297,7 +292,6 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         buyStocksNeu(portfolio, actionResult.kaufAktien);
     }
 
-    // ========== SEKTION 6: EMERGENCY REFILL ==========
     const depotWertVorEntnahme = sumDepot(portfolio);
     let emergencyRefillHappened = false;
     const jahresEntnahme = spendingResult.monatlicheEntnahme * 12;
@@ -342,7 +336,6 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         }
     }
 
-    // ========== SEKTION 7: RUIN-CHECK & ENTNAHME ==========
     // Only declare RUIN if we truly cannot cover the withdrawal after emergency refill
     if (liquiditaet < jahresEntnahme) {
         // Last check: do we have ANY depot left?
@@ -355,7 +348,6 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     }
     liquiditaet -= jahresEntnahme;
 
-    // ========== SEKTION 8: ÜBERSCHUSS-REINVESTITION ==========
     let kaufAkt = 0, kaufGld = 0;
     const ueberschuss = liquiditaet - zielLiquiditaet;
     if (ueberschuss > 500) {
@@ -441,7 +433,6 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     }
     // ========== ENDE FAIL-SAFE LIQUIDITY GUARD ==========
 
-    // ========== SEKTION 9: STATE-UPDATE & RETURN ==========
     const newMarketDataHist = {
         endeVJ_3: marketDataHist.endeVJ_2,
         endeVJ_2: marketDataHist.endeVJ_1,
@@ -539,16 +530,6 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
 /**
  * Initialisiert den Startzustand für einen Monte-Carlo-Lauf
- *
- * Erstellt das Start-Portfolio und berechnet historische Marktdaten basierend
- * auf dem gewählten Startjahr-Index.
- *
- * @param {Object} inputs - Simulationseingaben mit Portfolio-Konfiguration
- * @param {number} inputs.startFloorBedarf - Anfänglicher Floor-Bedarf
- * @param {number} inputs.startFlexBedarf - Anfänglicher Flex-Bedarf
- * @param {number} inputs.marketCapeRatio - CAPE-Ratio für Marktbewertung
- * @param {number} startYearIndex - Index des Startjahres im historischen Datensatz
- * @returns {Object} Initialisierter MC-Zustand mit Portfolio, Floor/Flex, Marktdaten
  */
 export function initMcRunState(inputs, startYearIndex) {
     const startPortfolio = initializePortfolio(inputs);
@@ -617,18 +598,8 @@ function estimateRemainingLifeYears(gender, currentAge) {
 
 /**
  * Erstellt ein Standard-Pflege-Metadata-Objekt
- *
- * Initialisiert alle Felder für die Pflege-Simulation mit Standardwerten.
- * Wird zu Beginn eines MC-Laufs für jede Person erstellt.
- *
- * @param {boolean} enabled - Schaltet die Pflege-Logik ein/aus
- * @param {string} [personGender='m'] - Geschlecht für Mortalitätsannahmen ('m', 'w', 'd')
- * @returns {Object|null} Pflege-Metadata-Objekt oder null wenn deaktiviert
- * @returns {boolean} returns.active - Ist aktuell in Pflege
- * @returns {boolean} returns.triggered - Wurde Pflege bereits ausgelöst
- * @returns {number} returns.startAge - Alter bei Pflegebeginn
- * @returns {number} returns.durationYears - Geplante Pflegedauer
- * @returns {number} returns.grade - Aktueller Pflegegrad (1-5)
+ * @param {boolean} enabled - Schaltet die Logik ein/aus.
+ * @param {string} personGender - Geschlecht für Mortalitätsannahmen.
  */
 export function makeDefaultCareMeta(enabled, personGender = 'm') {
     if (!enabled) return null;
@@ -654,20 +625,6 @@ export function makeDefaultCareMeta(enabled, personGender = 'm') {
 
 /**
  * Wählt Marktdaten für das nächste Jahr gemäß der MC-Methode aus
- *
- * Unterstützt verschiedene Sampling-Methoden:
- * - 'block': Block-Bootstrap mit zusammenhängenden Jahren
- * - 'regime_iid': Unabhängiges Regime-basiertes Sampling
- * - 'regime_markov': Markov-Chain Regime-Übergänge
- *
- * Bei aktivem Stress-Kontext wird conditional Bootstrap verwendet.
- *
- * @param {Object} state - Aktueller MC-Zustand mit samplerState
- * @param {string} methode - Sampling-Methode ('block', 'regime_iid', 'regime_markov')
- * @param {number} blockSize - Block-Größe für Block-Bootstrap
- * @param {Function} rand - Seeded Random-Number-Generator
- * @param {Object|null} stressCtx - Stress-Test-Kontext für conditional Bootstrap
- * @returns {Object} Marktdaten für das gewählte Jahr (rendite, inflation, etc.)
  */
 export function sampleNextYearData(state, methode, blockSize, rand, stressCtx) {
     const samplerState = state.samplerState;
