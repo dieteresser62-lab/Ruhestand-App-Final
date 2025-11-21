@@ -1539,9 +1539,19 @@ const TransactionEngine = {
                     verwendungen.liquiditaet = actionDetails.bedarf;
                 }
 
-                // Nicht-Bärenmarkt: Immer bis zur vollen Ziel-Liquidität auffüllen
+                // Nicht-Bärenmarkt: Auffüllen mit ATH-basierter Skalierung
+                // Je weiter vom ATH entfernt, desto konservativer (weniger verkaufen zu niedrigen Kursen)
             } else if (!isBearRegimeProxy) {
-                const liquiditaetsBedarf = Math.max(0, zielLiquiditaet - aktuelleLiquiditaet);
+                // ATH-basierte lineare Skalierung des Auffüllziels
+                // Bei ATH (0% Abstand): 100% des Ziels
+                // Bei 20% Abstand: 75% des Ziels (linear interpoliert)
+                const athAbstand = market.abstandVomAthProzent || 0;
+                const maxAbstandFuerSkalierung = 20;  // Ab 20% Abstand gilt das Minimum
+                const minZielPct = CONFIG.THRESHOLDS.STRATEGY.runwayCoverageMinPct || 0.75;
+                const athSkalierungsfaktor = 1.0 - Math.min(athAbstand / maxAbstandFuerSkalierung, 1) * (1.0 - minZielPct);
+
+                const effectiveZielLiquiditaet = zielLiquiditaet * athSkalierungsfaktor;
+                const liquiditaetsBedarf = Math.max(0, effectiveZielLiquiditaet - aktuelleLiquiditaet);
 
                 // Prüfe ob kritische Liquiditätssituation vorliegt
                 const zielLiquiditaetsdeckungLocal = (zielLiquiditaet > 0)
@@ -1566,12 +1576,15 @@ const TransactionEngine = {
                 const totalerBedarf = liquiditaetsBedarf + goldKaufBedarf;
 
                 console.log('DEBUG Rebalancing:', {
+                    athAbstand: athAbstand.toFixed(1) + '%',
+                    athSkalierungsfaktor: (athSkalierungsfaktor * 100).toFixed(1) + '%',
+                    zielLiquiditaet,
+                    effectiveZielLiquiditaet: effectiveZielLiquiditaet.toFixed(0),
+                    aktuelleLiquiditaet,
                     liquiditaetsBedarf,
                     goldKaufBedarf,
                     totalerBedarf,
-                    isCriticalLiquidity,
-                    zielLiquiditaet,
-                    aktuelleLiquiditaet
+                    isCriticalLiquidity
                 });
 
                 // Im Nicht-Bärenmarkt: niedrigere Mindestschwelle um Ziel-Liquidität zu erreichen
