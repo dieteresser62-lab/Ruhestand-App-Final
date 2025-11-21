@@ -1537,6 +1537,10 @@ const TransactionEngine = {
                         severity: 'warning'
                     });
                     verwendungen.liquiditaet = actionDetails.bedarf;
+
+                    // Im Bärenmarkt: Gold-Floor auf 0 setzen, da Gold als Krisenreserve
+                    // vollständig verfügbar sein soll (analog zur ATH-Logik bei -20% Abstand)
+                    saleContext.minGold = 0;
                 }
 
                 // Nicht-Bärenmarkt: Auffüllen mit ATH-basierter Skalierung
