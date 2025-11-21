@@ -1917,6 +1917,15 @@ const TransactionEngine = {
             return order.filter(k => tranches[k]);
         }
 
+        // ATH-basierte Aufteilung: Je weiter vom ATH, desto mehr Gold zuerst
+        // Bei >10% ATH-Abstand: Gold bevorzugen (goldAnteil > 50%)
+        const athAbstand = market.abstandVomAthProzent || 0;
+        if (athAbstand >= 10 && input.goldAktiv && tranches.gold) {
+            // Gold zuerst, dann Aktien (wie im Bären, aber mit Budgets begrenzt)
+            const order = ['gold', ...equityKeys];
+            return order.filter(k => tranches[k]);
+        }
+
         // Gold über Obergrenze? Gold zuerst verkaufen
         if (input.goldAktiv && tranches.gold) {
             const depotwertGesamt = (input.depotwertAlt || 0) +
