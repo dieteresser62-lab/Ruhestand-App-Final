@@ -488,17 +488,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             widowPensionP1: nextWidowPensionP1,
             widowPensionP2: nextWidowPensionP2
         },
-        // Log-Daten erweitern, damit das Worst-Case-Log alle Spalten befüllen kann
-        // (Jahr, Lebensstatus, Pflege-Infos). Dadurch bleibt die Ausgabe konsistent
-        // mit den Spalten-Definitionen in simulator-results.js.
         logData: {
-            jahr: yearData?.jahr ?? (inputs.startJahr ?? (yearIndex + 1)),
-            Person1Alive: householdCtx.p1Alive ? 1 : 0,
-            Person2Alive: (inputs.partner?.aktiv ? (householdCtx.p2Alive ? 1 : 0) : null),
-            CareP1_Active: !!pflegeMeta?.active,
-            CareP1_Grade: pflegeMeta?.grade ?? null,
-            CareP2_Active: false,
-            CareP2_Grade: null,
             entscheidung: { ...spendingResult, jahresEntnahme, runwayMonths, kuerzungProzent: spendingResult.kuerzungProzent },
             FlexRatePct: spendingResult.details.flexRate,
             CutReason: spendingResult.kuerzungQuelle,
