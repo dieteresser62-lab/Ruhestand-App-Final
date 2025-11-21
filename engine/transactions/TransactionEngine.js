@@ -317,6 +317,20 @@ const TransactionEngine = {
                     // vollständig verfügbar sein soll (analog zur ATH-Logik bei -20% Abstand)
                     saleContext.minGold = 0;
 
+                    // Sale-Budgets setzen um Aktien-Verkauf zu ermöglichen
+                    const totalEquityValue = input.depotwertAlt + input.depotwertNeu;
+                    if (totalEquityValue > 0) {
+                        const requiredEquitySale = Math.min(actionDetails.bedarf, totalEquityValue);
+                        saleContext.saleBudgets.aktien_alt =
+                            requiredEquitySale * (input.depotwertAlt / totalEquityValue);
+                        saleContext.saleBudgets.aktien_neu =
+                            requiredEquitySale * (input.depotwertNeu / totalEquityValue);
+                    }
+                    // Gold-Budget: Im Bärenmarkt alles verfügbar (minGold = 0)
+                    if (input.goldAktiv && input.goldWert > 0) {
+                        saleContext.saleBudgets.gold = input.goldWert;
+                    }
+
                     // Bei Guardrail-Aktivierung: Mindestschwelle deaktivieren
                     minTradeResultOverride = 0;
                 }
@@ -360,6 +374,23 @@ const TransactionEngine = {
                         severity: 'warning'
                     });
                     verwendungen.liquiditaet = actionDetails.bedarf;
+
+                    // Sale-Budgets setzen um Aktien-Verkauf zu ermöglichen
+                    // Bei Guardrail-Aktivierung muss genug verkauft werden können
+                    const totalEquityValue = input.depotwertAlt + input.depotwertNeu;
+                    if (totalEquityValue > 0) {
+                        // Erlaube Verkauf bis zum Bedarf, verteilt auf beide Aktien-Tranchen
+                        const requiredEquitySale = Math.min(actionDetails.bedarf, totalEquityValue);
+                        saleContext.saleBudgets.aktien_alt =
+                            requiredEquitySale * (input.depotwertAlt / totalEquityValue);
+                        saleContext.saleBudgets.aktien_neu =
+                            requiredEquitySale * (input.depotwertNeu / totalEquityValue);
+                    }
+                    // Gold-Budget auf verfügbaren Wert setzen (über dem Floor)
+                    if (input.goldAktiv && input.goldWert > 0) {
+                        const availableGold = Math.max(0, input.goldWert - (minGold || 0));
+                        saleContext.saleBudgets.gold = availableGold;
+                    }
                 }
 
                 // Nicht-Bärenmarkt: Opportunistisches Rebalancing
