@@ -1584,7 +1584,7 @@ const TransactionEngine = {
                     liquiditaetsBedarf,
                     goldKaufBedarf,
                     totalerBedarf,
-                    isCriticalLiquidity
+                    verkaufsAufteilung: `Gold ${(Math.min(athAbstand / 20, 1) * 100).toFixed(0)}% / Aktien ${((1 - Math.min(athAbstand / 20, 1)) * 100).toFixed(0)}%`
                 });
 
                 // Im Nicht-Bärenmarkt: niedrigere Mindestschwelle um Ziel-Liquidität zu erreichen
@@ -1595,21 +1595,30 @@ const TransactionEngine = {
                 );
 
                 if (totalerBedarf >= appliedMinTradeGate) {
-                    // Gold-Verkaufsbudget berechnen
+                    // ATH-basierte Aufteilung zwischen Gold und Aktien
+                    // Bei ATH: 100% Aktien, 0% Gold
+                    // Bei -10%: 50% Aktien, 50% Gold
+                    // Bei -20%+: 0% Aktien, 100% Gold
+                    const goldAnteil = Math.min(athAbstand / 20, 1);
+                    const aktienAnteil = 1 - goldAnteil;
+
+                    // Gold-Verkaufsbudget berechnen (auch unter Obergrenze erlaubt, aber nicht unter Ziel)
                     let maxSellableFromGold = 0;
                     if (input.goldAktiv && input.goldZielProzent > 0) {
                         const goldZielwert = investiertesKapital * (input.goldZielProzent / 100);
-                        const bandPct = (input.rebalancingBand ?? input.rebalBand ?? 35) / 100;
-                        const goldObergrenze = goldZielwert * (1 + bandPct);
-
-                        if (input.goldWert > goldObergrenze) {
-                            maxSellableFromGold = input.goldWert - goldZielwert;
-                        }
+                        // Erlaube Verkauf bis zum Zielwert (nicht nur bei Überschuss)
+                        maxSellableFromGold = Math.max(0, input.goldWert - goldZielwert);
                     }
-                    saleContext.saleBudgets.gold = maxSellableFromGold;
+
+                    // Ziel-Goldverkauf basierend auf ATH-Anteil
+                    const zielGoldVerkauf = liquiditaetsBedarf * goldAnteil;
+                    const actualGoldVerkauf = Math.min(zielGoldVerkauf, maxSellableFromGold);
+
+                    saleContext.saleBudgets.gold = actualGoldVerkauf;
                     transactionDiagnostics.goldThresholds = {
                         ...transactionDiagnostics.goldThresholds,
-                        saleBudgetGold: maxSellableFromGold,
+                        saleBudgetGold: actualGoldVerkauf,
+                        goldAnteil: (goldAnteil * 100).toFixed(0) + '%',
                         rebalancingBandPct: input.rebalancingBand ?? input.rebalBand ?? 35
                     };
 
@@ -1620,11 +1629,12 @@ const TransactionEngine = {
                         ? (aktienwert - aktienZielwert)
                         : 0;
 
-                    // Im Nicht-Bärenmarkt: Verkauf immer erlauben um Ziel-Liquidität zu erreichen
-                    // Dies nutzt hohe Kurse aus, um sich auf den nächsten Bärenmarkt vorzubereiten
-                    if (aktienUeberschuss < liquiditaetsBedarf) {
-                        // Erlaube Verkauf bis zum Liquiditätsbedarf, begrenzt durch verfügbare Aktien
-                        aktienUeberschuss = Math.min(liquiditaetsBedarf, aktienwert);
+                    // Rest nach Goldverkauf muss aus Aktien kommen
+                    const restNachGold = liquiditaetsBedarf - actualGoldVerkauf;
+
+                    // Erlaube Aktienverkauf für den Rest (begrenzt durch verfügbare Aktien)
+                    if (aktienUeberschuss < restNachGold) {
+                        aktienUeberschuss = Math.min(restNachGold, aktienwert);
                     }
 
                     const maxSkimCapEuro = (input.maxSkimPctOfEq / 100) * aktienwert;
