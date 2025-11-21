@@ -181,7 +181,10 @@ export async function runMonteCarlo() {
             let simState = initMcRunState(inputs, startYearIndex);
 
             const depotWertHistorie = [portfolioTotal(simState.portfolio)];
-            let careMeta = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren, inputs.geschlecht);
+            let careMeta = {
+                p1: makeDefaultCareMeta(inputs.pflegefallLogikAktivieren, inputs.geschlecht),
+                p2: null // Zweite Person nicht simuliert
+            };
             let stressCtx = cloneStressContext(stressCtxMaster);
 
             let kuerzungsJahre = 0, maxKuerzung = 0, jahreMitKuerzung = 0;
@@ -204,10 +207,10 @@ export async function runMonteCarlo() {
                 let yearData = sampleNextYearData(simState, methode, blockSize, rand, stressCtx);
                 yearData = applyStressOverride(yearData, stressCtx, rand);
 
-                careMeta = updateCareMeta(careMeta, inputs, currentAge, yearData, rand);
+                careMeta.p1 = updateCareMeta(careMeta.p1, inputs, currentAge, yearData, rand);
 
                 let qx = MORTALITY_TABLE[inputs.geschlecht][currentAge] || 1;
-                const careFactor = computeCareMortalityMultiplier(careMeta, inputs);
+                const careFactor = computeCareMortalityMultiplier(careMeta.p1, inputs);
                 if (careFactor > 1) {
                     qx = Math.min(1.0, qx * careFactor);
                 }
@@ -218,15 +221,15 @@ export async function runMonteCarlo() {
                 const effectiveRentAdjPct = computeRentAdjRate(inputs, yearData);
                 const adjustedInputs = { ...inputs, rentAdjPct: effectiveRentAdjPct };
 
-                const { zusatzFloor: careFloor, p1Cost, p2Cost } = calcCareCost(careMeta, null);
-                const annualCareCost = (p1Cost || 0) + (p2Cost || 0);
+                const { zusatzFloor: careFloor } = calcCareCost(careMeta.p1, careMeta.p2);
+                const annualCareCost = careFloor;
                 if (annualCareCost > maxAnnualCareThisRun) maxAnnualCareThisRun = annualCareCost;
 
-                if (careMeta.p1.active) { p1CareYears++; if (!p1CareTrig) p1CareTrig = true; }
-                if (careMeta.p2.active) { p2CareYears++; if (!p2CareTrig) p2CareTrig = true; }
-                if (careMeta.p1.active && careMeta.p2.active) bothCareYears++;
+                if (careMeta.p1?.active) { p1CareYears++; if (!p1CareTrig) p1CareTrig = true; }
+                if (careMeta.p2?.active) { p2CareYears++; if (!p2CareTrig) p2CareTrig = true; }
+                if (careMeta.p1?.active && careMeta.p2?.active) bothCareYears++;
 
-                const result = simulateOneYear(simState, adjustedInputs, yearData, simulationsJahr, careMeta, careFloor);
+                const result = simulateOneYear(simState, adjustedInputs, yearData, simulationsJahr, careMeta.p1, careFloor);
 
                 if (result.isRuin) {
                     failed = true;
