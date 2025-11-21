@@ -248,7 +248,14 @@ const TransactionEngine = {
                 ? (aktuelleLiquiditaet / zielLiquiditaet)
                 : 1;
             const runwayCoverageThreshold = CONFIG.THRESHOLDS.STRATEGY.runwayCoverageMinPct || 0;
+            const guardrailActivationThreshold =
+                CONFIG.THRESHOLDS.STRATEGY.runwayGuardrailActivationPct
+                ?? runwayCoverageThreshold
+                ?? 0;
+            // Design-Entscheidung: Guardrail greift nur bei echten Lücken (unter Aktivierungsschwelle oder Mindest-Runway),
+            // damit moderate Unterdeckungen über die reguläre Rebalancing-Logik aufgefüllt werden können.
             const hasRunwayGap = currentRunwayMonths < runwayMinThresholdMonths;
+            const hasCoverageGap = zielLiquiditaetsdeckung < guardrailActivationThreshold;
             const monthlyBaselineNeed = (gesamtjahresbedarf / 12);
             const guardrailTargetEuro = Math.max(
                 runwayMinThresholdMonths * monthlyBaselineNeed,
@@ -258,7 +265,7 @@ const TransactionEngine = {
                 ? (guardrailTargetEuro / monthlyBaselineNeed)
                 : 0;
             const guardrailGapEuro = Math.max(0, guardrailTargetEuro - aktuelleLiquiditaet);
-            const hasGuardrailGap = guardrailGapEuro > 1; // kleine Toleranz gegen Rundungsartefakte
+            const hasGuardrailGap = (hasCoverageGap || hasRunwayGap) && guardrailGapEuro > 1; // kleine Toleranz gegen Rundungsartefakte
 
             // Bärenmarkt: Runway auffüllen, sobald Guardrail unterschritten wird
             if (isBearRegimeProxy && hasGuardrailGap) {
