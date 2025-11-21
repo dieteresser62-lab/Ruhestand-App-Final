@@ -152,6 +152,7 @@ const CONFIG = {
             cashRebalanceThreshold: 2500,               // Min. 2.500€ für Cash-Rebalancing
             recoveryLiquidityTargetFactor: 0.85,        // 85% des Ziel-Runway in Recovery-Phasen
             absoluteMinLiquidity: 10000,                // Min. 10.000€ absolute Liquidität (für ruhiges Schlafen)
+            runwayGuardrailActivationPct: 0.69,         // Guardrail wird erst bei <69% Ziel-Deckung oder Min-Runway aktiviert
             runwayCoverageMinPct: 0.75                  // Mindestens 75% Liquiditätsdeckung des Ziels, bevor Failsafe greift
         }
     },
