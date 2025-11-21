@@ -316,6 +316,23 @@ const TransactionEngine = {
                     // Im Bärenmarkt: Gold-Floor auf 0 setzen, da Gold als Krisenreserve
                     // vollständig verfügbar sein soll (analog zur ATH-Logik bei -20% Abstand)
                     saleContext.minGold = 0;
+
+                    // Sale-Budgets setzen um Aktien-Verkauf zu ermöglichen
+                    const totalEquityValue = input.depotwertAlt + input.depotwertNeu;
+                    if (totalEquityValue > 0) {
+                        const requiredEquitySale = Math.min(actionDetails.bedarf, totalEquityValue);
+                        saleContext.saleBudgets.aktien_alt =
+                            requiredEquitySale * (input.depotwertAlt / totalEquityValue);
+                        saleContext.saleBudgets.aktien_neu =
+                            requiredEquitySale * (input.depotwertNeu / totalEquityValue);
+                    }
+                    // Gold-Budget: Im Bärenmarkt alles verfügbar (minGold = 0)
+                    if (input.goldAktiv && input.goldWert > 0) {
+                        saleContext.saleBudgets.gold = input.goldWert;
+                    }
+
+                    // Bei Guardrail-Aktivierung: Mindestschwelle deaktivieren
+                    minTradeResultOverride = 0;
                 }
 
                 // Universeller Runway-Failsafe: gilt in allen Nicht-Bären-Regimes
@@ -330,6 +347,13 @@ const TransactionEngine = {
                 minTradeResultOverride = minTradeGateResult.minTradeResultOverride;
                 if (minTradeGateResult.diagnosisEntry) {
                     actionDetails.diagnosisEntries.push(minTradeGateResult.diagnosisEntry);
+                }
+
+                // Bei kritischer Liquidität: Mindestschwelle deaktivieren, um RUIN durch
+                // Liquiditätsmangel zu verhindern. Bei Guardrail-Aktivierung MUSS die
+                // Auffüllung erfolgen, auch wenn der Betrag unter dem normalen Minimum liegt.
+                if (isCriticalLiquidityFailsafe) {
+                    minTradeResultOverride = 0;
                 }
 
                 const neutralRefill = this._computeCappedRefill({
@@ -350,6 +374,23 @@ const TransactionEngine = {
                         severity: 'warning'
                     });
                     verwendungen.liquiditaet = actionDetails.bedarf;
+
+                    // Sale-Budgets setzen um Aktien-Verkauf zu ermöglichen
+                    // Bei Guardrail-Aktivierung muss genug verkauft werden können
+                    const totalEquityValue = input.depotwertAlt + input.depotwertNeu;
+                    if (totalEquityValue > 0) {
+                        // Erlaube Verkauf bis zum Bedarf, verteilt auf beide Aktien-Tranchen
+                        const requiredEquitySale = Math.min(actionDetails.bedarf, totalEquityValue);
+                        saleContext.saleBudgets.aktien_alt =
+                            requiredEquitySale * (input.depotwertAlt / totalEquityValue);
+                        saleContext.saleBudgets.aktien_neu =
+                            requiredEquitySale * (input.depotwertNeu / totalEquityValue);
+                    }
+                    // Gold-Budget auf verfügbaren Wert setzen (über dem Floor)
+                    if (input.goldAktiv && input.goldWert > 0) {
+                        const availableGold = Math.max(0, input.goldWert - (minGold || 0));
+                        saleContext.saleBudgets.gold = availableGold;
+                    }
                 }
 
                 // Nicht-Bärenmarkt: Opportunistisches Rebalancing

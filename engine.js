@@ -1545,7 +1545,7 @@ const TransactionEngine = {
                     actionDetails.diagnosisEntries.unshift({
                         step: 'Runway-Notfüllung (Bär)',
                         impact: `Liquidität auf mindestens ${guardrailTargetMonths.toFixed(1)} Monate bzw. ${(runwayCoverageThreshold * 100).toFixed(0)}% des Ziels anheben (Ziel: ${guardrailTargetEuro.toFixed(0)}€).`,
-                    status: 'active',
+                        status: 'active',
                         severity: 'warning'
                     });
                     verwendungen.liquiditaet = actionDetails.bedarf;
@@ -1553,21 +1553,86 @@ const TransactionEngine = {
                     // Im Bärenmarkt: Gold-Floor auf 0 setzen, da Gold als Krisenreserve
                     // vollständig verfügbar sein soll (analog zur ATH-Logik bei -20% Abstand)
                     saleContext.minGold = 0;
+
+                    // Sale-Budgets setzen um Aktien-Verkauf zu ermöglichen
+                    const totalEquityValue = input.depotwertAlt + input.depotwertNeu;
+                    if (totalEquityValue > 0) {
+                        const requiredEquitySale = Math.min(actionDetails.bedarf, totalEquityValue);
+                        saleContext.saleBudgets.aktien_alt =
+                            requiredEquitySale * (input.depotwertAlt / totalEquityValue);
+                        saleContext.saleBudgets.aktien_neu =
+                            requiredEquitySale * (input.depotwertNeu / totalEquityValue);
+                    }
+                    // Gold-Budget: Im Bärenmarkt alles verfügbar (minGold = 0)
+                    if (input.goldAktiv && input.goldWert > 0) {
+                        saleContext.saleBudgets.gold = input.goldWert;
+                    }
+
+                    // Bei Guardrail-Aktivierung: Mindestschwelle deaktivieren
+                    minTradeResultOverride = 0;
                 }
 
-                // Nicht-Bärenmarkt: Auffüllen mit ATH-basierter Skalierung
-                // Je weiter vom ATH entfernt, desto konservativer (weniger verkaufen zu niedrigen Kursen)
-            } else if (!isBearRegimeProxy) {
-                // ATH-basierte lineare Skalierung des Auffüllziels
-                // Bei ATH (0% Abstand): 100% des Ziels
-                // Bei 20% Abstand: 75% des Ziels (linear interpoliert)
-                const athAbstand = market.abstandVomAthProzent || 0;
-                const maxAbstandFuerSkalierung = 20;  // Ab 20% Abstand gilt das Minimum
-                const minZielPct = CONFIG.THRESHOLDS.STRATEGY.runwayCoverageMinPct || 0.75;
-                const athSkalierungsfaktor = 1.0 - Math.min(athAbstand / maxAbstandFuerSkalierung, 1) * (1.0 - minZielPct);
+                // Universeller Runway-Failsafe: gilt in allen Nicht-Bären-Regimes
+            } else if (hasGuardrailGap) {
+                const isCriticalLiquidityFailsafe = zielLiquiditaetsdeckung < runwayCoverageThreshold || hasRunwayGap;
 
-                const effectiveZielLiquiditaet = zielLiquiditaet * athSkalierungsfaktor;
-                const liquiditaetsBedarf = Math.max(0, effectiveZielLiquiditaet - aktuelleLiquiditaet);
+                const minTradeGateResult = this._computeAppliedMinTradeGate({
+                    investiertesKapital,
+                    liquiditaetsBedarf: guardrailGapEuro,
+                    totalerBedarf: guardrailGapEuro
+                });
+                minTradeResultOverride = minTradeGateResult.minTradeResultOverride;
+                if (minTradeGateResult.diagnosisEntry) {
+                    actionDetails.diagnosisEntries.push(minTradeGateResult.diagnosisEntry);
+                }
+
+                // Bei kritischer Liquidität: Mindestschwelle deaktivieren, um RUIN durch
+                // Liquiditätsmangel zu verhindern. Bei Guardrail-Aktivierung MUSS die
+                // Auffüllung erfolgen, auch wenn der Betrag unter dem normalen Minimum liegt.
+                if (isCriticalLiquidityFailsafe) {
+                    minTradeResultOverride = 0;
+                }
+
+                const neutralRefill = this._computeCappedRefill({
+                    isBearContext: false,
+                    liquiditaetsbedarf: guardrailGapEuro,
+                    aktienwert,
+                    input,
+                    isCriticalLiquidity: isCriticalLiquidityFailsafe
+                });
+
+                if (neutralRefill.bedarf > 0) {
+                    actionDetails = neutralRefill;
+                    actionDetails.title = `Runway-Notfüllung (neutral)${neutralRefill.isCapped ? ' (Cap aktiv)' : ''}`;
+                    actionDetails.diagnosisEntries.unshift({
+                        step: 'Runway-Notfüllung (neutral)',
+                        impact: `Liquidität auf mindestens ${guardrailTargetMonths.toFixed(1)} Monate bzw. ${(runwayCoverageThreshold * 100).toFixed(0)}% des Ziels anheben (Ziel: ${guardrailTargetEuro.toFixed(0)}€).`,
+                        status: 'active',
+                        severity: 'warning'
+                    });
+                    verwendungen.liquiditaet = actionDetails.bedarf;
+
+                    // Sale-Budgets setzen um Aktien-Verkauf zu ermöglichen
+                    // Bei Guardrail-Aktivierung muss genug verkauft werden können
+                    const totalEquityValue = input.depotwertAlt + input.depotwertNeu;
+                    if (totalEquityValue > 0) {
+                        // Erlaube Verkauf bis zum Bedarf, verteilt auf beide Aktien-Tranchen
+                        const requiredEquitySale = Math.min(actionDetails.bedarf, totalEquityValue);
+                        saleContext.saleBudgets.aktien_alt =
+                            requiredEquitySale * (input.depotwertAlt / totalEquityValue);
+                        saleContext.saleBudgets.aktien_neu =
+                            requiredEquitySale * (input.depotwertNeu / totalEquityValue);
+                    }
+                    // Gold-Budget auf verfügbaren Wert setzen (über dem Floor)
+                    if (input.goldAktiv && input.goldWert > 0) {
+                        const availableGold = Math.max(0, input.goldWert - (minGold || 0));
+                        saleContext.saleBudgets.gold = availableGold;
+                    }
+                }
+
+                // Nicht-Bärenmarkt: Opportunistisches Rebalancing
+            } else if (!isBearRegimeProxy) {
+                const liquiditaetsBedarf = Math.max(0, zielLiquiditaet - aktuelleLiquiditaet);
 
                 // Prüfe ob kritische Liquiditätssituation vorliegt
                 const zielLiquiditaetsdeckungLocal = (zielLiquiditaet > 0)
@@ -1592,52 +1657,50 @@ const TransactionEngine = {
                 const totalerBedarf = liquiditaetsBedarf + goldKaufBedarf;
 
                 console.log('DEBUG Rebalancing:', {
-                    athAbstand: athAbstand.toFixed(1) + '%',
-                    athSkalierungsfaktor: (athSkalierungsfaktor * 100).toFixed(1) + '%',
-                    zielLiquiditaet,
-                    effectiveZielLiquiditaet: effectiveZielLiquiditaet.toFixed(0),
-                    aktuelleLiquiditaet,
                     liquiditaetsBedarf,
                     goldKaufBedarf,
                     totalerBedarf,
-                    verkaufsAufteilung: `Gold ${(Math.min(athAbstand / 20, 1) * 100).toFixed(0)}% / Aktien ${((1 - Math.min(athAbstand / 20, 1)) * 100).toFixed(0)}%`
+                    isCriticalLiquidity,
+                    zielLiquiditaet,
+                    aktuelleLiquiditaet
                 });
 
-                // Im Nicht-Bärenmarkt: niedrigere Mindestschwelle um Ziel-Liquidität zu erreichen
-                // Die hohe Schwelle (25.000€) macht hier keinen Sinn, da wir proaktiv auffüllen wollen
-                const appliedMinTradeGate = Math.max(
-                    CONFIG.THRESHOLDS.STRATEGY.minRefillAmount || 2500,
-                    CONFIG.THRESHOLDS.STRATEGY.cashRebalanceThreshold || 2500
-                );
+                // Bei kritischer Liquidität: niedrigere Mindestschwelle verwenden
+                let appliedMinTradeGate;
+                if (isCriticalLiquidity) {
+                    appliedMinTradeGate = Math.max(
+                        CONFIG.THRESHOLDS.STRATEGY.minRefillAmount || 2500,
+                        CONFIG.THRESHOLDS.STRATEGY.cashRebalanceThreshold || 2500
+                    );
+                } else {
+                    const minTradeGateResult = this._computeAppliedMinTradeGate({
+                        investiertesKapital,
+                        liquiditaetsBedarf,
+                        totalerBedarf
+                    });
+                    appliedMinTradeGate = minTradeGateResult.appliedMinTradeGate;
+                    minTradeResultOverride = minTradeGateResult.minTradeResultOverride;
+                    if (minTradeGateResult.diagnosisEntry) {
+                        actionDetails.diagnosisEntries.push(minTradeGateResult.diagnosisEntry);
+                    }
+                }
 
                 if (totalerBedarf >= appliedMinTradeGate) {
-                    // ATH-basierte Aufteilung zwischen Gold und Aktien
-                    // Bei ATH: 100% Aktien, 0% Gold
-                    // Bei -10%: 50% Aktien, 50% Gold
-                    // Bei -20%+: 0% Aktien, 100% Gold
-                    const goldAnteil = Math.min(athAbstand / 20, 1);
-                    const aktienAnteil = 1 - goldAnteil;
-
                     // Gold-Verkaufsbudget berechnen
-                    // Bei ATH: nur Überschuss verkaufen (goldWert - goldZielwert)
-                    // Bei -20%: gesamten Bestand verkaufen (wie im Bären)
                     let maxSellableFromGold = 0;
                     if (input.goldAktiv && input.goldZielProzent > 0) {
                         const goldZielwert = investiertesKapital * (input.goldZielProzent / 100);
-                        // Minimum-Reserve sinkt proportional zum ATH-Abstand
-                        const minGoldReserve = goldZielwert * aktienAnteil;
-                        maxSellableFromGold = Math.max(0, input.goldWert - minGoldReserve);
+                        const bandPct = (input.rebalancingBand ?? input.rebalBand ?? 35) / 100;
+                        const goldObergrenze = goldZielwert * (1 + bandPct);
+
+                        if (input.goldWert > goldObergrenze) {
+                            maxSellableFromGold = input.goldWert - goldZielwert;
+                        }
                     }
-
-                    // Ziel-Goldverkauf basierend auf ATH-Anteil
-                    const zielGoldVerkauf = liquiditaetsBedarf * goldAnteil;
-                    const actualGoldVerkauf = Math.min(zielGoldVerkauf, maxSellableFromGold);
-
-                    saleContext.saleBudgets.gold = actualGoldVerkauf;
+                    saleContext.saleBudgets.gold = maxSellableFromGold;
                     transactionDiagnostics.goldThresholds = {
                         ...transactionDiagnostics.goldThresholds,
-                        saleBudgetGold: actualGoldVerkauf,
-                        goldAnteil: (goldAnteil * 100).toFixed(0) + '%',
+                        saleBudgetGold: maxSellableFromGold,
                         rebalancingBandPct: input.rebalancingBand ?? input.rebalBand ?? 35
                     };
 
@@ -1648,17 +1711,18 @@ const TransactionEngine = {
                         ? (aktienwert - aktienZielwert)
                         : 0;
 
-                    // Rest nach Goldverkauf muss aus Aktien kommen
-                    const restNachGold = liquiditaetsBedarf - actualGoldVerkauf;
-
-                    // Erlaube Aktienverkauf für den Rest (begrenzt durch verfügbare Aktien)
-                    if (aktienUeberschuss < restNachGold) {
-                        aktienUeberschuss = Math.min(restNachGold, aktienwert);
+                    // Bei kritischer Liquidität: Verkauf auch unter Obergrenze/Zielwert erlauben
+                    // um RUIN durch Liquiditätsmangel zu verhindern
+                    if (isCriticalLiquidity && aktienUeberschuss < liquiditaetsBedarf) {
+                        // Erlaube Verkauf bis zum Liquiditätsbedarf, begrenzt durch verfügbare Aktien
+                        aktienUeberschuss = Math.min(liquiditaetsBedarf, aktienwert);
                     }
 
                     const maxSkimCapEuro = (input.maxSkimPctOfEq / 100) * aktienwert;
-                    // Im Nicht-Bärenmarkt: höheres Cap erlauben um Ziel zu erreichen
-                    const effectiveSkimCap = Math.max(maxSkimCapEuro, aktienwert * 0.10);
+                    // Bei kritischer Liquidität: Cap auf 10% des Aktienwerts erhöhen
+                    const effectiveSkimCap = isCriticalLiquidity
+                        ? Math.max(maxSkimCapEuro, aktienwert * 0.10)
+                        : maxSkimCapEuro;
                     const maxSellableFromEquity = Math.min(aktienUeberschuss, effectiveSkimCap);
 
                     const totalEquityValue = input.depotwertAlt + input.depotwertNeu;
@@ -1929,15 +1993,6 @@ const TransactionEngine = {
 
         // Im defensiven Kontext: Gold zuerst
         if (isDefensiveContext) {
-            const order = ['gold', ...equityKeys];
-            return order.filter(k => tranches[k]);
-        }
-
-        // ATH-basierte Aufteilung: Je weiter vom ATH, desto mehr Gold zuerst
-        // Bei >10% ATH-Abstand: Gold bevorzugen (goldAnteil > 50%)
-        const athAbstand = market.abstandVomAthProzent || 0;
-        if (athAbstand >= 10 && input.goldAktiv && tranches.gold) {
-            // Gold zuerst, dann Aktien (wie im Bären, aber mit Budgets begrenzt)
             const order = ['gold', ...equityKeys];
             return order.filter(k => tranches[k]);
         }
