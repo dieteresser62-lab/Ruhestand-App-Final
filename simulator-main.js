@@ -310,38 +310,52 @@ export async function runMonteCarlo() {
             }
         }
 
+        // Calculate mean for kpiLebensdauer
+        const lebensdauerArr = Array.from(kpiLebensdauer);
+        const lebensdauerMean = lebensdauerArr.reduce((a, b) => a + b, 0) / lebensdauerArr.length;
+
+        // Calculate depotErschoepfungsQuote
+        const depotErschoepfungsQuote = (failCount / anzahl) * 100;
+
         const aggregatedResults = {
-            finalVermoegen: {
+            finalOutcomes: {
                 p10: quantile(finalOutcomes, 0.10),
                 p50: quantile(finalOutcomes, 0.50),
-                p90: quantile(finalOutcomes, 0.90)
+                p90: quantile(finalOutcomes, 0.90),
+                p50_successful: quantile(finalOutcomes.filter(v => v > 0), 0.50)
             },
-            totalTax: {
+            taxOutcomes: {
                 p50: quantile(taxOutcomes, 0.50)
             },
-            lebensdauer: {
-                p50: quantile(Array.from(kpiLebensdauer), 0.50)
+            kpiLebensdauer: {
+                mean: lebensdauerMean,
+                p50: quantile(lebensdauerArr, 0.50)
             },
-            kuerzungsJahre: {
+            depotErschoepfungsQuote: depotErschoepfungsQuote,
+            kpiKuerzungsjahre: {
                 p50: quantile(Array.from(kpiKuerzungsjahre), 0.50)
             },
-            maxKuerzung: {
+            kpiMaxKuerzung: {
                 p50: quantile(Array.from(kpiMaxKuerzung), 0.50)
             },
-            volatility: {
-                p50: quantile(volatilities, 0.50)
+            maxDrawdowns: {
+                p50: quantile(maxDrawdowns, 0.50),
+                p90: quantile(maxDrawdowns, 0.90)
             },
-            maxDrawdown: {
-                p50: quantile(maxDrawdowns, 0.50)
+            volatilities: {
+                p50: quantile(volatilities, 0.50)
             },
             anteilJahreOhneFlex: {
                 p50: quantile(anteilJahreOhneFlex, 0.50) * 100
             },
-            stressMetrics: {
-                maxDrawdown: {
-                    p50: quantile(stress_maxDrawdowns, 0.50)
+            stressKPI: {
+                years: inputs.stressYears || 0,
+                presetKey: inputs.stressPreset || 'NONE',
+                maxDD: {
+                    p50: quantile(stress_maxDrawdowns, 0.50),
+                    p90: quantile(stress_maxDrawdowns, 0.90)
                 },
-                timeQuoteAbove45: {
+                timeShareAbove45: {
                     p50: quantile(stress_timeQuoteAbove45, 0.50)
                 },
                 cutYears: {
