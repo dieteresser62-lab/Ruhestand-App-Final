@@ -1501,6 +1501,11 @@ const TransactionEngine = {
                 CONFIG.THRESHOLDS.STRATEGY.runwayGuardrailActivationPct
                 ?? runwayCoverageThreshold
                 ?? 0;
+
+            // Regime-Prüfung für konditionierte Guardrail-Aktivierung
+            const marketRegime = CONFIG.TEXTS.REGIME_MAP[market.sKey] || market.sKey;
+            const isPeakRegime = marketRegime === 'peak' || marketRegime === 'hot_neutral';
+
             // Design-Entscheidung: Guardrail greift nur bei echten Lücken (unter Aktivierungsschwelle oder Mindest-Runway),
             // damit moderate Unterdeckungen über die reguläre Rebalancing-Logik aufgefüllt werden können.
             const hasRunwayGap = currentRunwayMonths < runwayMinThresholdMonths;
@@ -1514,7 +1519,10 @@ const TransactionEngine = {
                 ? (guardrailTargetEuro / monthlyBaselineNeed)
                 : 0;
             const guardrailGapEuro = Math.max(0, guardrailTargetEuro - aktuelleLiquiditaet);
-            const hasGuardrailGap = (hasCoverageGap || hasRunwayGap) && guardrailGapEuro > 1; // kleine Toleranz gegen Rundungsartefakte
+            // Bei Peak-Regimes (ATH) nur echte Runway-Lücke, da dort opportunistisches Rebalancing greifen soll
+            const hasGuardrailGap = isPeakRegime
+                ? (hasRunwayGap && guardrailGapEuro > 1)
+                : ((hasCoverageGap || hasRunwayGap) && guardrailGapEuro > 1);
 
             console.log('DEBUG determineAction:', {
                 currentRunwayMonths,
