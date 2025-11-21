@@ -267,6 +267,17 @@ const TransactionEngine = {
             const guardrailGapEuro = Math.max(0, guardrailTargetEuro - aktuelleLiquiditaet);
             const hasGuardrailGap = (hasCoverageGap || hasRunwayGap) && guardrailGapEuro > 1; // kleine Toleranz gegen Rundungsartefakte
 
+            console.log('DEBUG determineAction:', {
+                currentRunwayMonths,
+                runwayMinThresholdMonths,
+                zielLiquiditaetsdeckung: (zielLiquiditaetsdeckung * 100).toFixed(1) + '%',
+                guardrailActivationThreshold,
+                hasCoverageGap,
+                hasRunwayGap,
+                hasGuardrailGap,
+                isBearRegimeProxy
+            });
+
             // Bärenmarkt: Runway auffüllen, sobald Guardrail unterschritten wird
             if (isBearRegimeProxy && hasGuardrailGap) {
                 const isCriticalLiquidityBear = aktuelleLiquiditaet < (sicherheitsPuffer * 1.5);
@@ -350,6 +361,15 @@ const TransactionEngine = {
                 }
 
                 const totalerBedarf = liquiditaetsBedarf + goldKaufBedarf;
+
+                console.log('DEBUG Rebalancing:', {
+                    liquiditaetsBedarf,
+                    goldKaufBedarf,
+                    totalerBedarf,
+                    isCriticalLiquidity,
+                    zielLiquiditaet,
+                    aktuelleLiquiditaet
+                });
 
                 // Bei kritischer Liquidität: niedrigere Mindestschwelle verwenden
                 let appliedMinTradeGate;
