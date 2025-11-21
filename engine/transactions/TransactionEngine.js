@@ -316,6 +316,9 @@ const TransactionEngine = {
                     // Im Bärenmarkt: Gold-Floor auf 0 setzen, da Gold als Krisenreserve
                     // vollständig verfügbar sein soll (analog zur ATH-Logik bei -20% Abstand)
                     saleContext.minGold = 0;
+
+                    // Bei Guardrail-Aktivierung: Mindestschwelle deaktivieren
+                    minTradeResultOverride = 0;
                 }
 
                 // Universeller Runway-Failsafe: gilt in allen Nicht-Bären-Regimes
@@ -330,6 +333,13 @@ const TransactionEngine = {
                 minTradeResultOverride = minTradeGateResult.minTradeResultOverride;
                 if (minTradeGateResult.diagnosisEntry) {
                     actionDetails.diagnosisEntries.push(minTradeGateResult.diagnosisEntry);
+                }
+
+                // Bei kritischer Liquidität: Mindestschwelle deaktivieren, um RUIN durch
+                // Liquiditätsmangel zu verhindern. Bei Guardrail-Aktivierung MUSS die
+                // Auffüllung erfolgen, auch wenn der Betrag unter dem normalen Minimum liegt.
+                if (isCriticalLiquidityFailsafe) {
+                    minTradeResultOverride = 0;
                 }
 
                 const neutralRefill = this._computeCappedRefill({
