@@ -196,7 +196,15 @@ const TransactionEngine = {
 
         const renteJahr = input.renteAktiv ? input.renteMonatlich * 12 : 0;
         const floorBedarfNetto = Math.max(0, input.floorBedarf - renteJahr);
-        const krisenMindestLiquiditaet = (floorBedarfNetto / 12) * input.runwayMinMonths;
+
+        // Strukturales Runway-Mindestmaß ableiten: Bevorzugt das Profil-Minimum, fällt sonst auf Input/Strategie zurück.
+        // Design-Entscheidung: Die neutrale Notfüllung soll nur bei echter Runway-Unterschreitung auslösen –
+        // daher orientieren wir uns an der harten Untergrenze (Profil), nicht an höheren Zielwerten.
+        const runwayMinThresholdMonths = profil?.minRunwayMonths
+            ?? CONFIG.THRESHOLDS.STRATEGY.runwayThinMonths
+            ?? input.runwayMinMonths;
+
+        const krisenMindestLiquiditaet = (floorBedarfNetto / 12) * runwayMinThresholdMonths;
         // Sicherheits-Puffer: Entweder rechnerischer Bedarf oder absolutes Minimum (für ruhiges Schlafen)
         const sicherheitsPuffer = Math.max(
             krisenMindestLiquiditaet,
@@ -239,10 +247,16 @@ const TransactionEngine = {
                 ? (aktuelleLiquiditaet / zielLiquiditaet)
                 : 1;
             const runwayCoverageThreshold = CONFIG.THRESHOLDS.STRATEGY.runwayCoverageMinPct || 0;
+            const marketRegime = CONFIG.TEXTS.REGIME_MAP[market.sKey] || market.sKey;
+            // Runway-Failsafe nur aktivieren, wenn echte Stress-Signale vorliegen (Runway-Lücke oder Bär/Recovery).
+            const isRecoveryRegime = marketRegime === 'recovery' || marketRegime === 'recovery_in_bear';
+            const isStressRegime = isBearRegimeProxy || isRecoveryRegime;
+            const hasRunwayGap = currentRunwayMonths < runwayMinThresholdMonths;
+            const shouldRunNeutralFailsafe = hasRunwayGap || (isStressRegime && zielLiquiditaetsdeckung < runwayCoverageThreshold);
 
             // Bärenmarkt: Runway auffüllen
-            if (isBearRegimeProxy && currentRunwayMonths < input.runwayMinMonths) {
-                const runwayBedarfEuro = (input.runwayMinMonths - currentRunwayMonths) *
+            if (isBearRegimeProxy && hasRunwayGap) {
+                const runwayBedarfEuro = (runwayMinThresholdMonths - currentRunwayMonths) *
                     (gesamtjahresbedarf / 12);
 
                 // Kritisch, wenn wir uns dem absoluten Puffer nähern (z.B. < 150% des Puffers)
@@ -258,11 +272,11 @@ const TransactionEngine = {
                 });
                 verwendungen.liquiditaet = actionDetails.bedarf;
 
-                // Universeller Runway-Failsafe (neutral)
-            } else if (currentRunwayMonths < input.runwayMinMonths || zielLiquiditaetsdeckung < runwayCoverageThreshold) {
+                // Universeller Runway-Failsafe (neutral) nur in Stresslagen
+            } else if (shouldRunNeutralFailsafe) {
                 const runwayBedarfEuro = Math.max(
                     0,
-                    (input.runwayMinMonths - currentRunwayMonths) * (gesamtjahresbedarf / 12)
+                    (runwayMinThresholdMonths - currentRunwayMonths) * (gesamtjahresbedarf / 12)
                 );
                 const zielDeckungBedarf = Math.max(0, (runwayCoverageThreshold * zielLiquiditaet) - aktuelleLiquiditaet);
                 const liquiditaetsBedarf = Math.max(runwayBedarfEuro, zielDeckungBedarf);
@@ -294,7 +308,7 @@ const TransactionEngine = {
                     actionDetails.title = `Runway-Notfüllung (neutral)${hasCap ? ' (Cap aktiv)' : ''}`;
                     actionDetails.diagnosisEntries.unshift({
                         step: 'Runway-Notfüllung (neutral)',
-                        impact: `Runway-Deckung auf mindestens ${input.runwayMinMonths} Monate bzw. ${(runwayCoverageThreshold * 100).toFixed(0)}% Ziel-Liquidität anheben.`,
+                        impact: `Runway-Deckung auf mindestens ${runwayMinThresholdMonths} Monate bzw. ${(runwayCoverageThreshold * 100).toFixed(0)}% Ziel-Liquidität anheben.`,
                         status: 'active',
                         severity: 'warning'
                     });
