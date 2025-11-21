@@ -24,9 +24,10 @@ const TransactionEngine = {
 
         // ATH-basierte Skalierung: Je weiter vom ATH, desto konservativer
         // Bei ATH (0%): Volles Regime-Ziel
-        // Bei -20%+: Minimum-Runway (nicht zu niedrigen Kursen aufstocken)
+        // Bei -20%: Mittelpunkt (30 Monate bei 36er Ziel)
+        // Bei -40%+: Minimum-Runway (nicht zu niedrigen Kursen aufstocken)
         const athAbstand = market.abstandVomAthProzent || 0;
-        const maxAbstandFuerSkalierung = 20;
+        const maxAbstandFuerSkalierung = 40;
         const skalierungsfaktor = Math.min(athAbstand / maxAbstandFuerSkalierung, 1);
 
         // Lineare Interpolation zwischen Regime-Ziel und Minimum
