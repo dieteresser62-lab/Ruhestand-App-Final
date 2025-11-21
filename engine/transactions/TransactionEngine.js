@@ -20,7 +20,19 @@ const TransactionEngine = {
         }
 
         const regime = CONFIG.TEXTS.REGIME_MAP[market.sKey];
-        const zielMonate = profil.runway[regime]?.total || profil.runway.hot_neutral.total;
+        const regimeZielMonate = profil.runway[regime]?.total || profil.runway.hot_neutral.total;
+
+        // ATH-basierte Skalierung: Je weiter vom ATH, desto konservativer
+        // Bei ATH (0%): Volles Regime-Ziel
+        // Bei -20%: Mittelpunkt (30 Monate bei 36er Ziel)
+        // Bei -40%+: Minimum-Runway (nicht zu niedrigen Kursen aufstocken)
+        const athAbstand = market.abstandVomAthProzent || 0;
+        const maxAbstandFuerSkalierung = 40;
+        const skalierungsfaktor = Math.min(athAbstand / maxAbstandFuerSkalierung, 1);
+
+        // Lineare Interpolation zwischen Regime-Ziel und Minimum
+        const zielMonate = regimeZielMonate - skalierungsfaktor * (regimeZielMonate - profil.minRunwayMonths);
+
         const useFullFlex = (regime === 'peak' || regime === 'hot_neutral');
         const anpassbarerBedarf = useFullFlex
             ? (inflatedBedarf.floor + inflatedBedarf.flex)
@@ -300,6 +312,10 @@ const TransactionEngine = {
                         severity: 'warning'
                     });
                     verwendungen.liquiditaet = actionDetails.bedarf;
+
+                    // Im Bärenmarkt: Gold-Floor auf 0 setzen, da Gold als Krisenreserve
+                    // vollständig verfügbar sein soll (analog zur ATH-Logik bei -20% Abstand)
+                    saleContext.minGold = 0;
                 }
 
                 // Universeller Runway-Failsafe: gilt in allen Nicht-Bären-Regimes
