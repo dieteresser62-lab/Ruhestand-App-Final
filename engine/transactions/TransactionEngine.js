@@ -20,7 +20,14 @@ const TransactionEngine = {
         }
 
         const regime = CONFIG.TEXTS.REGIME_MAP[market.sKey];
-        const zielMonate = profil.runway[regime]?.total || profil.runway.hot_neutral.total;
+        const isBearRegime = regime === 'bear' || regime === 'recovery_in_bear';
+
+        // Im Bärenmarkt: Nur Minimum-Runway als Ziel (nicht zu niedrigen Kursen aufstocken)
+        // Die hohe Liquidität sollte VORHER bei hohen Kursen aufgebaut werden
+        const zielMonate = isBearRegime
+            ? profil.minRunwayMonths
+            : (profil.runway[regime]?.total || profil.runway.hot_neutral.total);
+
         const useFullFlex = (regime === 'peak' || regime === 'hot_neutral');
         const anpassbarerBedarf = useFullFlex
             ? (inflatedBedarf.floor + inflatedBedarf.flex)
