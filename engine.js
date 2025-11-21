@@ -1602,12 +1602,15 @@ const TransactionEngine = {
                     const goldAnteil = Math.min(athAbstand / 20, 1);
                     const aktienAnteil = 1 - goldAnteil;
 
-                    // Gold-Verkaufsbudget berechnen (auch unter Obergrenze erlaubt, aber nicht unter Ziel)
+                    // Gold-Verkaufsbudget berechnen
+                    // Bei ATH: nur Überschuss verkaufen (goldWert - goldZielwert)
+                    // Bei -20%: gesamten Bestand verkaufen (wie im Bären)
                     let maxSellableFromGold = 0;
                     if (input.goldAktiv && input.goldZielProzent > 0) {
                         const goldZielwert = investiertesKapital * (input.goldZielProzent / 100);
-                        // Erlaube Verkauf bis zum Zielwert (nicht nur bei Überschuss)
-                        maxSellableFromGold = Math.max(0, input.goldWert - goldZielwert);
+                        // Minimum-Reserve sinkt proportional zum ATH-Abstand
+                        const minGoldReserve = goldZielwert * aktienAnteil;
+                        maxSellableFromGold = Math.max(0, input.goldWert - minGoldReserve);
                     }
 
                     // Ziel-Goldverkauf basierend auf ATH-Anteil
