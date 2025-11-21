@@ -1475,9 +1475,15 @@ const TransactionEngine = {
                 ? (aktuelleLiquiditaet / zielLiquiditaet)
                 : 1;
             const runwayCoverageThreshold = CONFIG.THRESHOLDS.STRATEGY.runwayCoverageMinPct || 0;
+            const marketRegime = CONFIG.TEXTS.REGIME_MAP[market.sKey] || market.sKey;
+            // Runway-Failsafe nur aktivieren, wenn echte Stress-Signale vorliegen (Runway-Lücke oder Bär/Recovery).
+            const isRecoveryRegime = marketRegime === 'recovery' || marketRegime === 'recovery_in_bear';
+            const isStressRegime = isBearRegimeProxy || isRecoveryRegime;
+            const hasRunwayGap = currentRunwayMonths < input.runwayMinMonths;
+            const shouldRunNeutralFailsafe = hasRunwayGap || (isStressRegime && zielLiquiditaetsdeckung < runwayCoverageThreshold);
 
             // Bärenmarkt: Runway auffüllen
-            if (isBearRegimeProxy && currentRunwayMonths < input.runwayMinMonths) {
+            if (isBearRegimeProxy && hasRunwayGap) {
                 const runwayBedarfEuro = (input.runwayMinMonths - currentRunwayMonths) *
                     (gesamtjahresbedarf / 12);
 
@@ -1494,8 +1500,8 @@ const TransactionEngine = {
                 });
                 verwendungen.liquiditaet = actionDetails.bedarf;
 
-                // Universeller Runway-Failsafe (neutral)
-            } else if (currentRunwayMonths < input.runwayMinMonths || zielLiquiditaetsdeckung < runwayCoverageThreshold) {
+                // Universeller Runway-Failsafe (neutral) nur in Stresslagen
+            } else if (shouldRunNeutralFailsafe) {
                 const runwayBedarfEuro = Math.max(
                     0,
                     (input.runwayMinMonths - currentRunwayMonths) * (gesamtjahresbedarf / 12)
