@@ -216,21 +216,21 @@ const EngineAPI = {
     /**
      * Gibt Versionsinformationen zurück
      */
-    getVersion: function() {
+    getVersion: function () {
         return { api: ENGINE_API_VERSION, build: ENGINE_BUILD_ID };
     },
 
     /**
      * Gibt Konfiguration zurück
      */
-    getConfig: function() {
+    getConfig: function () {
         return CONFIG;
     },
 
     /**
      * Analysiert Marktbedingungen
      */
-    analyzeMarket: function(input) {
+    analyzeMarket: function (input) {
         try {
             return MarketAnalyzer.analyzeMarket(input);
         } catch (e) {
@@ -241,14 +241,14 @@ const EngineAPI = {
     /**
      * Berechnet Ziel-Liquidität
      */
-    calculateTargetLiquidity: function(profil, market, inflatedBedarf) {
+    calculateTargetLiquidity: function (profil, market, inflatedBedarf) {
         return TransactionEngine.calculateTargetLiquidity(profil, market, inflatedBedarf);
     },
 
     /**
      * Simuliert ein einzelnes Jahr
      */
-    simulateSingleYear: function(input, lastState) {
+    simulateSingleYear: function (input, lastState) {
         try {
             return _internal_calculateModel(input, lastState);
         } catch (e) {
@@ -267,19 +267,19 @@ const EngineAPI = {
     /**
      * @deprecated Veraltete Methode
      */
-    addDecision: function(step, impact, status, severity) {
+    addDecision: function (step, impact, status, severity) {
         console.warn("EngineAPI.addDecision ist veraltet.");
     },
 
     /**
      * @deprecated Veraltete Methode
      */
-    updateDecision: function() {},
+    updateDecision: function () { },
 
     /**
      * @deprecated Veraltete Methode
      */
-    removeDecision: function() {}
+    removeDecision: function () { }
 };
 
 // Exporte

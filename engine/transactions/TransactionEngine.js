@@ -203,6 +203,7 @@ const TransactionEngine = {
             CONFIG.THRESHOLDS.STRATEGY.absoluteMinLiquidity || 10000
         );
         const isBearRegimeProxy = market.sKey === 'bear_deep' || market.sKey === 'recovery_in_bear';
+        console.log('DEBUG TransactionEngine: isBearRegimeProxy', isBearRegimeProxy, 'market.sKey', market.sKey, 'aktuelleLiquiditaet', aktuelleLiquiditaet, 'sicherheitsPuffer', sicherheitsPuffer);
         const investiertesKapital = depotwertGesamt + aktuelleLiquiditaet;
 
         // Puffer-Schutz im Bärenmarkt
