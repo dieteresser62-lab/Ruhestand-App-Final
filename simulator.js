@@ -1875,16 +1875,20 @@ function createCurrencyKpiCard(title, value, description, colorClass = '') {
 }
 
 function displayMonteCarloResults(results, anzahl, failCount, worstRun, resultsMitPflege, resultsOhnePflege, pflegefallEingetretenCount, inputs, worstRunCare) {
-    
+
+    // Defensive Prüfungen für fehlende Daten
+    const finalOutcomes = results.finalOutcomes || { p10: 0, p50: 0, p90: 0, p50_successful: 0 };
+    const taxOutcomes = results.taxOutcomes || { p50: 0 };
+
     // 1. Haupt-Zusammenfassung (Summary)
     document.getElementById('monteCarloSummary').innerHTML = `
         <div class="summary-grid">
           <div class="summary-item"><strong>Erfolgsquote</strong><span style="color:var(--success-color);">${(((anzahl - failCount) / anzahl) * 100).toFixed(1)}%</span></div>
           <div class="summary-item"><strong>Shortfalls</strong><span>${failCount} von ${anzahl}</span></div>
-          <div class="summary-item"><strong>Median (alle)</strong><span>${formatCurrency(results.finalOutcomes.p50)}</span></div>
-          <div class="summary-item"><strong>Median (erfolgreiche)</strong><span>${formatCurrency(results.finalOutcomes.p50_successful)}</span></div>
-          <div class="summary-item"><strong>10%/90% Perzentil</strong><span>${formatCurrency(results.finalOutcomes.p10)} / ${formatCurrency(results.finalOutcomes.p90)}</span></div>
-          <div class="summary-item tax"><strong>Median Steuern</strong><span>${formatCurrency(results.taxOutcomes.p50)}</span></div>
+          <div class="summary-item"><strong>Median (alle)</strong><span>${formatCurrency(finalOutcomes.p50)}</span></div>
+          <div class="summary-item"><strong>Median (erfolgreiche)</strong><span>${formatCurrency(finalOutcomes.p50_successful)}</span></div>
+          <div class="summary-item"><strong>10%/90% Perzentil</strong><span>${formatCurrency(finalOutcomes.p10)} / ${formatCurrency(finalOutcomes.p90)}</span></div>
+          <div class="summary-item tax"><strong>Median Steuern</strong><span>${formatCurrency(taxOutcomes.p50)}</span></div>
         </div>`;
 
     // 2. KPI Dashboards
