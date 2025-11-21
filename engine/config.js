@@ -11,7 +11,7 @@
 
 // Engine-Versionierung
 const ENGINE_API_VERSION = "31.0";
-const ENGINE_BUILD_ID = new Date().toISOString().substring(0, 16).replace('T', '_');
+const ENGINE_BUILD_ID = "2025-11-20_16-20";
 
 /**
  * Zentrale Engine-Konfiguration
