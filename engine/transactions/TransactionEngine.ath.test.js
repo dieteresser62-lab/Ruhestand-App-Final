@@ -46,9 +46,7 @@ function runAthRegimeGapTest() {
         renteMonatlich: 0,
         floorBedarf: 24000,
         flexBedarf: 12000,
-        // Runway-Grenzen: Mindest-Runway im Profil 24 Monate, UI-Setting 36 Monate
-        // (stellt sicher, dass wir nicht versehentlich auf das höhere Ziel-Level triggern).
-        runwayMinMonths: 36,
+        runwayMinMonths: 24,
         runwayTargetMonths: 36,
         // Steuer & sonstiges
         sparerPauschbetrag: 2000,

@@ -1487,12 +1487,12 @@ const TransactionEngine = {
             // Runway-Failsafe nur aktivieren, wenn echte Stress-Signale vorliegen (Runway-Lücke oder Bär/Recovery).
             const isRecoveryRegime = marketRegime === 'recovery' || marketRegime === 'recovery_in_bear';
             const isStressRegime = isBearRegimeProxy || isRecoveryRegime;
-            const hasRunwayGap = currentRunwayMonths < runwayMinThresholdMonths;
+            const hasRunwayGap = currentRunwayMonths < input.runwayMinMonths;
             const shouldRunNeutralFailsafe = hasRunwayGap || (isStressRegime && zielLiquiditaetsdeckung < runwayCoverageThreshold);
 
             // Bärenmarkt: Runway auffüllen
             if (isBearRegimeProxy && hasRunwayGap) {
-                const runwayBedarfEuro = (runwayMinThresholdMonths - currentRunwayMonths) *
+                const runwayBedarfEuro = (input.runwayMinMonths - currentRunwayMonths) *
                     (gesamtjahresbedarf / 12);
 
                 // Kritisch, wenn wir uns dem absoluten Puffer nähern (z.B. < 150% des Puffers)
