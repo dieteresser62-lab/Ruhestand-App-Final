@@ -20,13 +20,17 @@ const TransactionEngine = {
         }
 
         const regime = CONFIG.TEXTS.REGIME_MAP[market.sKey];
-        const isBearRegime = regime === 'bear' || regime === 'recovery_in_bear';
+        const regimeZielMonate = profil.runway[regime]?.total || profil.runway.hot_neutral.total;
 
-        // Im Bärenmarkt: Nur Minimum-Runway als Ziel (nicht zu niedrigen Kursen aufstocken)
-        // Die hohe Liquidität sollte VORHER bei hohen Kursen aufgebaut werden
-        const zielMonate = isBearRegime
-            ? profil.minRunwayMonths
-            : (profil.runway[regime]?.total || profil.runway.hot_neutral.total);
+        // ATH-basierte Skalierung: Je weiter vom ATH, desto konservativer
+        // Bei ATH (0%): Volles Regime-Ziel
+        // Bei -20%+: Minimum-Runway (nicht zu niedrigen Kursen aufstocken)
+        const athAbstand = market.abstandVomAthProzent || 0;
+        const maxAbstandFuerSkalierung = 20;
+        const skalierungsfaktor = Math.min(athAbstand / maxAbstandFuerSkalierung, 1);
+
+        // Lineare Interpolation zwischen Regime-Ziel und Minimum
+        const zielMonate = regimeZielMonate - skalierungsfaktor * (regimeZielMonate - profil.minRunwayMonths);
 
         const useFullFlex = (regime === 'peak' || regime === 'hot_neutral');
         const anpassbarerBedarf = useFullFlex
