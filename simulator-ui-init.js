@@ -19,6 +19,7 @@
 import { parseRangeInput } from './simulator-utils.js';
 import { SUPPORTED_PFLEGE_GRADES, PFLEGE_GRADE_LABELS } from './simulator-data.js';
 import { initSweepDefaultsWithLocalStorageFallback } from './simulator-sweep.js';
+import { updateStartPortfolioDisplay } from './simulator-portfolio.js';
 
 const CARE_GRADE_FIELD_IDS = SUPPORTED_PFLEGE_GRADES.flatMap(grade => [
     `pflegeStufe${grade}Zusatz`,
@@ -409,4 +410,23 @@ export function initSimulatorUI() {
     // Sweep- und Rente-Defaults
     initSweepDefaultsWithLocalStorageFallback();
     initRente2ConfigWithLocalStorage();
+
+    // Portfolio-Felder Event-Listener für berechnete Felder
+    const portfolioInputIds = [
+        'simStartVermoegen', 'depotwertAlt', 'zielLiquiditaet',
+        'goldAllokationAktiv', 'goldAllokationProzent', 'goldFloorProzent',
+        'rebalancingBand', 'goldSteuerfrei', 'einstandAlt'
+    ];
+
+    portfolioInputIds.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            const eventType = (element.type === 'radio' || element.type === 'checkbox')
+                ? 'change' : 'input';
+            element.addEventListener(eventType, updateStartPortfolioDisplay);
+        }
+    });
+
+    // Initiale Berechnung der abhängigen Felder
+    updateStartPortfolioDisplay();
 }
