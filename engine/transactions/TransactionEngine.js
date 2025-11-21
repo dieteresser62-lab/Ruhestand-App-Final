@@ -255,6 +255,10 @@ const TransactionEngine = {
             const currentRunwayMonths = (gesamtjahresbedarf > 0)
                 ? (aktuelleLiquiditaet / (gesamtjahresbedarf / 12))
                 : Infinity;
+            // Floor-basierter Runway für Guardrail-Prüfung (konsistent mit UI-Anzeige)
+            const currentFloorRunwayMonths = (floorBedarfNetto > 0)
+                ? (aktuelleLiquiditaet / (floorBedarfNetto / 12))
+                : Infinity;
             const aktienwert = input.depotwertAlt + input.depotwertNeu;
             const zielLiquiditaetsdeckung = (zielLiquiditaet > 0)
                 ? (aktuelleLiquiditaet / zielLiquiditaet)
@@ -271,7 +275,8 @@ const TransactionEngine = {
 
             // Design-Entscheidung: Guardrail greift nur bei echten Lücken (unter Aktivierungsschwelle oder Mindest-Runway),
             // damit moderate Unterdeckungen über die reguläre Rebalancing-Logik aufgefüllt werden können.
-            const hasRunwayGap = currentRunwayMonths < runwayMinThresholdMonths;
+            // Verwende Floor-Runway für Guardrail (konsistent mit UI und minRunwayMonths-Definition)
+            const hasRunwayGap = currentFloorRunwayMonths < runwayMinThresholdMonths;
             const hasCoverageGap = zielLiquiditaetsdeckung < guardrailActivationThreshold;
             const monthlyBaselineNeed = (gesamtjahresbedarf / 12);
             const guardrailTargetEuro = Math.max(
