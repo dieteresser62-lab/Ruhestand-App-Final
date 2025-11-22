@@ -1251,13 +1251,19 @@ const TransactionEngine = {
     /**
      * Berechnet Ziel-Liquidität basierend auf Profil und Markt
      */
-    calculateTargetLiquidity: (profil, market, inflatedBedarf) => {
+    calculateTargetLiquidity: (profil, market, inflatedBedarf, input = null) => {
         if (!profil.isDynamic) {
             return (inflatedBedarf.floor + inflatedBedarf.flex) * 2;
         }
 
         const regime = CONFIG.TEXTS.REGIME_MAP[market.sKey];
-        const regimeZielMonate = profil.runway[regime]?.total || profil.runway.hot_neutral.total;
+        const profilZielMonate = profil.runway[regime]?.total || profil.runway.hot_neutral.total;
+
+        // User-Einstellung begrenzt Profil-Wert (wenn vorhanden)
+        const userTargetMonths = input?.runwayTargetMonths;
+        const regimeZielMonate = (userTargetMonths && userTargetMonths > 0)
+            ? Math.min(profilZielMonate, userTargetMonths)
+            : profilZielMonate;
 
         // ATH-basierte Skalierung: Je weiter vom ATH, desto konservativer
         // Bei ATH (0%): Volles Regime-Ziel
@@ -1268,7 +1274,8 @@ const TransactionEngine = {
         const skalierungsfaktor = Math.min(athAbstand / maxAbstandFuerSkalierung, 1);
 
         // Lineare Interpolation zwischen Regime-Ziel und Minimum
-        const zielMonate = regimeZielMonate - skalierungsfaktor * (regimeZielMonate - profil.minRunwayMonths);
+        const minMonths = input?.runwayMinMonths || profil.minRunwayMonths;
+        const zielMonate = regimeZielMonate - skalierungsfaktor * (regimeZielMonate - minMonths);
 
         const useFullFlex = (regime === 'peak' || regime === 'hot_neutral');
         const anpassbarerBedarf = useFullFlex
@@ -2158,7 +2165,8 @@ function _internal_calculateModel(input, lastState) {
     const zielLiquiditaet = TransactionEngine.calculateTargetLiquidity(
         profil,
         market,
-        inflatedBedarf
+        inflatedBedarf,
+        input
     );
 
     // 9. Transaktionsaktion bestimmen
@@ -2297,8 +2305,8 @@ const EngineAPI = {
     /**
      * Berechnet Ziel-Liquidität
      */
-    calculateTargetLiquidity: function (profil, market, inflatedBedarf) {
-        return TransactionEngine.calculateTargetLiquidity(profil, market, inflatedBedarf);
+    calculateTargetLiquidity: function (profil, market, inflatedBedarf, input = null) {
+        return TransactionEngine.calculateTargetLiquidity(profil, market, inflatedBedarf, input);
     },
 
     /**
@@ -2376,12 +2384,12 @@ const Ruhestandsmodell_v30_Adapter = {
     /**
      * Berechnet Ziel-Liquidität (alte Signatur)
      */
-    calculateTargetLiquidity: function(profil, market, annualNeedOrInflated, inflatedFloor, inflatedFlex) {
+    calculateTargetLiquidity: function(profil, market, annualNeedOrInflated, inflatedFloor, inflatedFlex, input = null) {
         const inflated = (annualNeedOrInflated && typeof annualNeedOrInflated === 'object')
             ? annualNeedOrInflated
             : { floor: Number(inflatedFloor) || 0, flex: Number(inflatedFlex) || 0 };
 
-        return EngineAPI.calculateTargetLiquidity(profil, market, inflated);
+        return EngineAPI.calculateTargetLiquidity(profil, market, inflated, input);
     },
 
     mergeSaleResults: TransactionEngine.mergeSaleResults,
