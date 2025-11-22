@@ -297,10 +297,15 @@ const TransactionEngine = {
                 ? (guardrailTargetEuro / monthlyBaselineNeed)
                 : 0;
             const guardrailGapEuro = Math.max(0, guardrailTargetEuro - aktuelleLiquiditaet);
-            // Guardrail aktivieren bei Runway-Lücke ODER Coverage-Lücke
-            // Auch in Peak-Regimes muss Coverage geprüft werden, da hohe Renten
-            // den Floor-Runway künstlich aufblähen können
-            const hasGuardrailGap = ((hasCoverageGap || hasRunwayGap) && guardrailGapEuro > 1);
+            // Kritische Coverage-Schwelle für Peak-Regimes (unter 50% = Notfall)
+            const criticalCoverageThreshold = 0.50;
+            const hasCriticalCoverageGap = zielLiquiditaetsdeckung < criticalCoverageThreshold;
+            // Peak-Regimes: Guardrail nur bei Runway-Lücke ODER kritisch niedriger Coverage
+            // Moderate Unterdeckung (50-75%) wird durch opportunistisches Rebalancing gefüllt
+            // Nicht-Peak: Guardrail bei jeder Coverage-Lücke oder Runway-Lücke
+            const hasGuardrailGap = isPeakRegime
+                ? ((hasRunwayGap || hasCriticalCoverageGap) && guardrailGapEuro > 1)
+                : ((hasCoverageGap || hasRunwayGap) && guardrailGapEuro > 1);
 
             console.log('DEBUG determineAction:', {
                 currentRunwayMonths,
