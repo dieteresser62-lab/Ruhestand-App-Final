@@ -1258,25 +1258,28 @@ const TransactionEngine = {
         }
 
         const regime = CONFIG.TEXTS.REGIME_MAP[market.sKey];
-        const profilZielMonate = profil.runway[regime]?.total || profil.runway.hot_neutral.total;
-
-        // User-Einstellung begrenzt Profil-Wert (wenn vorhanden)
-        const userTargetMonths = input?.runwayTargetMonths;
-        const regimeZielMonate = (userTargetMonths && userTargetMonths > 0)
-            ? Math.min(profilZielMonate, userTargetMonths)
-            : profilZielMonate;
-
-        // ATH-basierte Skalierung: Je weiter vom ATH, desto konservativer
-        // Bei ATH (0%): Volles Regime-Ziel
-        // Bei -20%: Mittelpunkt (30 Monate bei 36er Ziel)
-        // Bei -40%+: Minimum-Runway (nicht zu niedrigen Kursen aufstocken)
-        const athAbstand = market.abstandVomAthProzent || 0;
-        const maxAbstandFuerSkalierung = 40;
-        const skalierungsfaktor = Math.min(athAbstand / maxAbstandFuerSkalierung, 1);
-
-        // Lineare Interpolation zwischen Regime-Ziel und Minimum
+        const profilMax = profil.runway[regime]?.total || profil.runway.hot_neutral.total;
         const minMonths = input?.runwayMinMonths || profil.minRunwayMonths;
-        const zielMonate = regimeZielMonate - skalierungsfaktor * (regimeZielMonate - minMonths);
+        const userTarget = input?.runwayTargetMonths || profilMax;
+
+        // Bidirektionale ATH-Skalierung:
+        // seiATH = 1.0 (am ATH): User-Target (z.B. 36 Monate)
+        // seiATH > 1.0 (über ATH): nach oben skalieren bis Profil-Max (z.B. 48)
+        // seiATH < 1.0 (unter ATH): nach unten skalieren bis Minimum (z.B. 24)
+        const seiATH = market.seiATH || 1;
+
+        let zielMonate;
+        if (seiATH >= 1) {
+            // Über ATH: von userTarget hoch zu profilMax
+            // 20% über ATH → volles profilMax
+            const aboveAthFactor = Math.min((seiATH - 1) * 5, 1);
+            zielMonate = userTarget + aboveAthFactor * (profilMax - userTarget);
+        } else {
+            // Unter ATH: von userTarget runter zu minMonths
+            // 40% unter ATH → minMonths
+            const belowAthFactor = Math.min((1 - seiATH) * 2.5, 1);
+            zielMonate = userTarget - belowAthFactor * (userTarget - minMonths);
+        }
 
         const useFullFlex = (regime === 'peak' || regime === 'hot_neutral');
         const anpassbarerBedarf = useFullFlex
