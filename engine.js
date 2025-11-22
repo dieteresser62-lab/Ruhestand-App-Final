@@ -1535,10 +1535,10 @@ const TransactionEngine = {
                 ? (guardrailTargetEuro / monthlyBaselineNeed)
                 : 0;
             const guardrailGapEuro = Math.max(0, guardrailTargetEuro - aktuelleLiquiditaet);
-            // Bei Peak-Regimes (ATH) nur echte Runway-Lücke, da dort opportunistisches Rebalancing greifen soll
-            const hasGuardrailGap = isPeakRegime
-                ? (hasRunwayGap && guardrailGapEuro > 1)
-                : ((hasCoverageGap || hasRunwayGap) && guardrailGapEuro > 1);
+            // Guardrail aktivieren bei Runway-Lücke ODER Coverage-Lücke
+            // Auch in Peak-Regimes muss Coverage geprüft werden, da hohe Renten
+            // den Floor-Runway künstlich aufblähen können
+            const hasGuardrailGap = ((hasCoverageGap || hasRunwayGap) && guardrailGapEuro > 1);
 
             console.log('DEBUG determineAction:', {
                 currentFloorRunwayMonths,
