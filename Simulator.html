@@ -135,6 +135,42 @@
                     </fieldset>
 
                     <fieldset>
+                        <legend>Runway-Steuerung</legend>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="runwayMinMonths">Runway Minimum (Monate)</label>
+                                <input type="number" id="runwayMinMonths" value="24" min="12" max="60">
+                            </div>
+                            <div class="form-group">
+                                <label for="runwayTargetMonths">Runway Ziel (Monate)</label>
+                                <input type="number" id="runwayTargetMonths" value="36" min="18" max="72">
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Rebalancing-Strategie</legend>
+                        <div class="form-grid-four-col">
+                            <div class="form-group">
+                                <label for="targetEq">Aktien-Zielquote (%)</label>
+                                <input type="number" id="targetEq" value="60" min="0" max="100">
+                            </div>
+                            <div class="form-group">
+                                <label for="rebalBand">Rebalancing-Band (±%)</label>
+                                <input type="number" id="rebalBand" value="5" min="1" max="50">
+                            </div>
+                            <div class="form-group">
+                                <label for="maxSkimPctOfEq">Max. Abschöpfen p.a. (%)</label>
+                                <input type="number" id="maxSkimPctOfEq" value="10" min="0" max="100">
+                            </div>
+                            <div class="form-group">
+                                <label for="maxBearRefillPctOfEq">Max. Auffüllen (Bär) (%)</label>
+                                <input type="number" id="maxBearRefillPctOfEq" value="5" min="0" max="100">
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
                         <legend>Allgemeine & Externe Parameter</legend>
                         <div class="form-grid-four-col" style="align-items: end;">
                             <div class="form-group"><label for="p1StartAlter">Startalter</label><input type="number"
