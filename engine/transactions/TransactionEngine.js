@@ -14,24 +14,34 @@ const TransactionEngine = {
     /**
      * Berechnet Ziel-Liquidität basierend auf Profil und Markt
      */
-    calculateTargetLiquidity: (profil, market, inflatedBedarf) => {
+    calculateTargetLiquidity: (profil, market, inflatedBedarf, input = null) => {
         if (!profil.isDynamic) {
             return (inflatedBedarf.floor + inflatedBedarf.flex) * 2;
         }
 
         const regime = CONFIG.TEXTS.REGIME_MAP[market.sKey];
-        const regimeZielMonate = profil.runway[regime]?.total || profil.runway.hot_neutral.total;
+        const profilMax = profil.runway[regime]?.total || profil.runway.hot_neutral.total;
+        const minMonths = input?.runwayMinMonths || profil.minRunwayMonths;
+        const userTarget = input?.runwayTargetMonths || profilMax;
 
-        // ATH-basierte Skalierung: Je weiter vom ATH, desto konservativer
-        // Bei ATH (0%): Volles Regime-Ziel
-        // Bei -20%: Mittelpunkt (30 Monate bei 36er Ziel)
-        // Bei -40%+: Minimum-Runway (nicht zu niedrigen Kursen aufstocken)
-        const athAbstand = market.abstandVomAthProzent || 0;
-        const maxAbstandFuerSkalierung = 40;
-        const skalierungsfaktor = Math.min(athAbstand / maxAbstandFuerSkalierung, 1);
+        // Bidirektionale ATH-Skalierung:
+        // seiATH = 1.0 (am ATH): User-Target (z.B. 36 Monate)
+        // seiATH > 1.0 (über ATH): nach oben skalieren bis Profil-Max (z.B. 48)
+        // seiATH < 1.0 (unter ATH): nach unten skalieren bis Minimum (z.B. 24)
+        const seiATH = market.seiATH || 1;
 
-        // Lineare Interpolation zwischen Regime-Ziel und Minimum
-        const zielMonate = regimeZielMonate - skalierungsfaktor * (regimeZielMonate - profil.minRunwayMonths);
+        let zielMonate;
+        if (seiATH >= 1) {
+            // Über ATH: von userTarget hoch zu profilMax
+            // 20% über ATH → volles profilMax
+            const aboveAthFactor = Math.min((seiATH - 1) * 5, 1);
+            zielMonate = userTarget + aboveAthFactor * (profilMax - userTarget);
+        } else {
+            // Unter ATH: von userTarget runter zu minMonths
+            // 40% unter ATH → minMonths
+            const belowAthFactor = Math.min((1 - seiATH) * 2.5, 1);
+            zielMonate = userTarget - belowAthFactor * (userTarget - minMonths);
+        }
 
         const useFullFlex = (regime === 'peak' || regime === 'hot_neutral');
         const anpassbarerBedarf = useFullFlex
@@ -287,9 +297,14 @@ const TransactionEngine = {
                 ? (guardrailTargetEuro / monthlyBaselineNeed)
                 : 0;
             const guardrailGapEuro = Math.max(0, guardrailTargetEuro - aktuelleLiquiditaet);
-            // Bei Peak-Regimes (ATH) nur echte Runway-Lücke, da dort opportunistisches Rebalancing greifen soll
+            // Kritische Coverage-Schwelle für Peak-Regimes (unter 50% = Notfall)
+            const criticalCoverageThreshold = 0.50;
+            const hasCriticalCoverageGap = zielLiquiditaetsdeckung < criticalCoverageThreshold;
+            // Peak-Regimes: Guardrail nur bei Runway-Lücke ODER kritisch niedriger Coverage
+            // Moderate Unterdeckung (50-75%) wird durch opportunistisches Rebalancing gefüllt
+            // Nicht-Peak: Guardrail bei jeder Coverage-Lücke oder Runway-Lücke
             const hasGuardrailGap = isPeakRegime
-                ? (hasRunwayGap && guardrailGapEuro > 1)
+                ? ((hasRunwayGap || hasCriticalCoverageGap) && guardrailGapEuro > 1)
                 : ((hasCoverageGap || hasRunwayGap) && guardrailGapEuro > 1);
 
             console.log('DEBUG determineAction:', {

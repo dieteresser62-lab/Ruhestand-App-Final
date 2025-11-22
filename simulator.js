@@ -980,7 +980,7 @@ function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta =
         const fallbackKey = Object.keys(Ruhestandsmodell_v30.CONFIG.PROFIL_MAP)[0];
         profile = Ruhestandsmodell_v30.CONFIG.PROFIL_MAP[fallbackKey];
     }
-    const zielLiquiditaet = Ruhestandsmodell_v30.calculateTargetLiquidity(profile, market, {floor: inflatedFloor, flex: inflatedFlex});
+    const zielLiquiditaet = Ruhestandsmodell_v30.calculateTargetLiquidity(profile, market, {floor: inflatedFloor, flex: inflatedFlex}, null, null, inputs);
 
     const depotwertGesamt = sumDepot(portfolio);
     const totalWealth     = depotwertGesamt + liquiditaet;

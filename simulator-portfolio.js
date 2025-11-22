@@ -171,16 +171,16 @@ export function getCommonInputs() {
         widowOptions
     };
 
-    const strategyConstants = {
-        runwayMinMonths: 24,
-        runwayTargetMonths: 36,
-        targetEq: 60,
-        rebalBand: 5,
-        maxSkimPctOfEq: 10,
-        maxBearRefillPctOfEq: 5
+    const strategyInputs = {
+        runwayMinMonths: parseInt(document.getElementById('runwayMinMonths')?.value) || 24,
+        runwayTargetMonths: parseInt(document.getElementById('runwayTargetMonths')?.value) || 36,
+        targetEq: parseInt(document.getElementById('targetEq')?.value) || 60,
+        rebalBand: parseInt(document.getElementById('rebalBand')?.value) || 5,
+        maxSkimPctOfEq: parseInt(document.getElementById('maxSkimPctOfEq')?.value) || 10,
+        maxBearRefillPctOfEq: parseInt(document.getElementById('maxBearRefillPctOfEq')?.value) || 5
     };
 
-    return { ...baseInputs, ...strategyConstants };
+    return { ...baseInputs, ...strategyInputs };
 }
 
 /**
