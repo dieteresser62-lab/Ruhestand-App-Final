@@ -143,6 +143,7 @@ const MarketAnalyzer = {
         return {
             perf1Y,
             abstandVomAthProzent,
+            seiATH: (100 - abstandVomAthProzent) / 100,
             sKey,
             isStagflation,
             szenarioText,
