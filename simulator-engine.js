@@ -81,10 +81,18 @@ function sellAssetForCash(portfolio, inputsCtx, market, asset, amountEuros, minG
         const targetSale = Math.min(amountEuros, availableGold);
 
         if (targetSale > 0) {
-            // Nutze calculateSaleAndTax aus engine.js für Gold-Verkauf
+            // Create modified context that only allows gold sales
+            // by setting equity values to 0
+            const goldOnlyCtx = {
+                ...inputsCtx,
+                depotwertAlt: 0,
+                depotwertNeu: 0,
+                costBasisAlt: 0,
+                costBasisNeu: 0
+            };
             const { saleResult } = window.Ruhestandsmodell_v30.calculateSaleAndTax(
                 targetSale,
-                inputsCtx,
+                goldOnlyCtx,
                 { minGold: minGold },
                 market
             );
@@ -100,11 +108,17 @@ function sellAssetForCash(portfolio, inputsCtx, market, asset, amountEuros, minG
         const targetSale = Math.min(amountEuros, equityWert);
 
         if (targetSale > 0) {
-            // Nutze calculateSaleAndTax aus engine.js für Aktien-Verkauf
+            // Create modified context that only allows equity sales
+            // by setting gold values to 0
+            const equityOnlyCtx = {
+                ...inputsCtx,
+                goldWert: 0,
+                goldCost: 0
+            };
             const { saleResult } = window.Ruhestandsmodell_v30.calculateSaleAndTax(
                 targetSale,
-                inputsCtx,
-                { minGold: minGold },
+                equityOnlyCtx,
+                { minGold: 0 },
                 market
             );
 
@@ -299,8 +313,18 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     if (liquiditaet < jahresEntnahme && depotWertVorEntnahme > 0) {
         const shortfall = jahresEntnahme - liquiditaet;
         const emergencyCtx = buildInputsCtxFromPortfolio(algoInput, { depotTranchesAktien: portfolio.depotTranchesAktien.map(t => ({...t})), depotTranchesGold: portfolio.depotTranchesGold.map(t => ({...t})), liquiditaet: liquiditaet}, { pensionAnnual, marketData: marketDataCurrentYear });
+
+        // DEBUG: Log emergency refill context
+        console.warn('EMERGENCY REFILL: shortfall=', shortfall, 'liq=', liquiditaet, 'need=', jahresEntnahme,
+            'goldAktiv=', emergencyCtx.goldAktiv, 'goldWert=', emergencyCtx.goldWert,
+            'depotwertAlt=', emergencyCtx.depotwertAlt, 'depotwertNeu=', emergencyCtx.depotwertNeu);
+
         // EMERGENCY REFILL: Ignore minGold floor to prevent false RUIN
         const { saleResult: emergencySale } = window.Ruhestandsmodell_v30.calculateSaleAndTax(shortfall, emergencyCtx, { minGold: 0 }, market);
+
+        // DEBUG: Log first emergency sale result
+        console.warn('EMERGENCY SALE RESULT: achievedRefill=', emergencySale?.achievedRefill,
+            'breakdown=', emergencySale?.breakdown?.map(b => `${b.kind}:${b.brutto}`).join(', '));
 
         if (emergencySale && emergencySale.achievedRefill > 0) {
             liquiditaet += emergencySale.achievedRefill;
@@ -308,29 +332,41 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             applySaleToPortfolio(portfolio, emergencySale);
             mergedSaleResult = mergedSaleResult ? window.Ruhestandsmodell_v30.mergeSaleResults(mergedSaleResult, emergencySale) : emergencySale;
             emergencyRefillHappened = true;
-        } else {
-            // If emergency sale failed and we still have depot, try aggressive asset sale
-            let missing = shortfall - (emergencySale?.achievedRefill || 0);
+        }
+
+        // If still insufficient after first sale (partial success), try aggressive asset sale
+        // This handles both complete failure (achievedRefill=0) and partial success
+        if (liquiditaet < jahresEntnahme && sumDepot(portfolio) > 0) {
+            let missing = jahresEntnahme - liquiditaet;
+            console.warn('AGGRESSIVE SALE NEEDED: missing=', missing, 'depotRemaining=', sumDepot(portfolio));
+
+            // Try selling Gold first (without minGold constraint)
+            const goldWert = sumDepot({ depotTranchesGold: portfolio.depotTranchesGold });
+            if (goldWert > 0 && missing > 0) {
+                // Rebuild context to get current asset values after any prior sales
+                const goldCtx = buildInputsCtxFromPortfolio(algoInput, portfolio, { pensionAnnual, marketData: marketDataCurrentYear });
+                console.warn('AGGRESSIVE GOLD SALE: goldWert=', goldWert, 'ctxGoldWert=', goldCtx.goldWert, 'goldAktiv=', goldCtx.goldAktiv);
+                const goldResult = sellAssetForCash(portfolio, goldCtx, market, 'gold', missing, 0);
+                console.warn('GOLD RESULT: cashGenerated=', goldResult.cashGenerated);
+                liquiditaet += goldResult.cashGenerated;
+                totalTaxesThisYear += goldResult.taxesPaid;
+                missing = Math.max(0, missing - goldResult.cashGenerated);
+                emergencyRefillHappened = true;
+            }
+            // Then try selling Equity
             if (missing > 0) {
-                // Try selling Gold first (without minGold constraint)
-                const goldWert = sumDepot({ depotTranchesGold: portfolio.depotTranchesGold });
-                if (goldWert > 0) {
-                    const goldResult = sellAssetForCash(portfolio, emergencyCtx, market, 'gold', missing, 0);
-                    liquiditaet += goldResult.cashGenerated;
-                    totalTaxesThisYear += goldResult.taxesPaid;
-                    missing = Math.max(0, missing - goldResult.cashGenerated);
+                const equityWert = sumDepot({ depotTranchesAktien: portfolio.depotTranchesAktien });
+                if (equityWert > 0) {
+                    // CRITICAL: Rebuild context after gold sale to prevent stale asset values
+                    // This ensures calculateSaleAndTax sees the actual remaining assets
+                    const updatedCtx = buildInputsCtxFromPortfolio(algoInput, portfolio, { pensionAnnual, marketData: marketDataCurrentYear });
+                    console.warn('AGGRESSIVE EQUITY SALE: equityWert=', equityWert, 'ctxDepotwert=', updatedCtx.depotwertAlt + updatedCtx.depotwertNeu);
+                    const eqResult = sellAssetForCash(portfolio, updatedCtx, market, 'equity', missing, 0);
+                    console.warn('EQUITY RESULT: cashGenerated=', eqResult.cashGenerated);
+                    liquiditaet += eqResult.cashGenerated;
+                    totalTaxesThisYear += eqResult.taxesPaid;
+                    missing = Math.max(0, missing - eqResult.cashGenerated);
                     emergencyRefillHappened = true;
-                }
-                // Then try selling Equity
-                if (missing > 0) {
-                    const equityWert = sumDepot({ depotTranchesAktien: portfolio.depotTranchesAktien });
-                    if (equityWert > 0) {
-                        const eqResult = sellAssetForCash(portfolio, emergencyCtx, market, 'equity', missing, 0);
-                        liquiditaet += eqResult.cashGenerated;
-                        totalTaxesThisYear += eqResult.taxesPaid;
-                        missing = Math.max(0, missing - eqResult.cashGenerated);
-                        emergencyRefillHappened = true;
-                    }
                 }
             }
         }
