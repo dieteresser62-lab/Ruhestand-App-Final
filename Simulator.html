@@ -105,8 +105,8 @@
                         </div>
                     </fieldset>
 
-                    <fieldset class="collapsible collapsed">
-                        <legend><span class="section-icon">🥇</span>Strategie-Parameter</legend>
+                    <fieldset class="collapsible">
+                        <legend><span class="section-icon">🥇</span>Gold-Strategie</legend>
                         <div class="fieldset-content">
                             <div class="form-group" style="justify-content: center;">
                                 <label style="flex-direction: row; align-items: center;">
@@ -142,9 +142,10 @@
                     </fieldset>
 
                     <fieldset class="collapsible collapsed">
-                        <legend><span class="section-icon">🛤️</span>Runway-Steuerung</legend>
+                        <legend><span class="section-icon">⚖️</span>Runway & Rebalancing</legend>
                         <div class="fieldset-content">
-                            <div class="form-grid">
+                            <h4 style="margin-top: 0; margin-bottom: 12px; font-size: 0.95rem;">Runway-Steuerung</h4>
+                            <div class="form-grid" style="margin-bottom: 20px;">
                                 <div class="form-group">
                                     <label for="runwayMinMonths">Runway Minimum (Monate)</label>
                                     <input type="number" id="runwayMinMonths" value="24" min="12" max="60">
@@ -154,12 +155,7 @@
                                     <input type="number" id="runwayTargetMonths" value="36" min="18" max="72">
                                 </div>
                             </div>
-                        </div>
-                    </fieldset>
-
-                    <fieldset class="collapsible collapsed">
-                        <legend><span class="section-icon">⚖️</span>Rebalancing-Strategie</legend>
-                        <div class="fieldset-content">
+                            <h4 style="margin-bottom: 12px; font-size: 0.95rem; padding-top: 15px; border-top: 1px solid var(--border-color);">Rebalancing-Strategie</h4>
                             <div class="form-grid-four-col">
                                 <div class="form-group">
                                     <label for="targetEq">Aktien-Zielquote (%)</label>
@@ -181,8 +177,8 @@
                         </div>
                     </fieldset>
 
-                    <fieldset class="collapsible">
-                        <legend><span class="section-icon">👤</span>Allgemeine & Externe Parameter</legend>
+                    <fieldset class="collapsible collapsed">
+                        <legend><span class="section-icon">👤</span>Personen & Rente</legend>
                         <div class="fieldset-content">
                             <div class="form-grid-four-col" style="align-items: end;">
                             <div class="form-group"><label for="p1StartAlter">Startalter</label><input type="number"
@@ -328,8 +324,13 @@
                                 und die Mindestdauer erreicht wurde.
                             </p>
                         </div>
+                        </div>
+                    </fieldset>
 
-                        <div id="pflegePanelContainer" class="care-panel">
+                    <fieldset class="collapsible collapsed">
+                        <legend><span class="section-icon">🏥</span>Pflegefall-Absicherung</legend>
+                        <div class="fieldset-content">
+                        <div id="pflegePanelContainer" class="care-panel" style="border-top: none; margin-top: 0; padding-top: 0;">
                             <div class="care-panel-toggle">
                                 <label class="care-inline-toggle">
                                     <input type="checkbox" id="pflegefallLogikAktivieren" checked>
