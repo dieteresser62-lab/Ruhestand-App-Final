@@ -75,107 +75,116 @@
 
             <div class="tab-content">
                 <div id="tab-rahmendaten" class="tab-panel active">
-                    <fieldset>
-                        <legend>Startportfolio & Bedarf</legend>
-                        <div class="form-grid">
-                            <div class="form-group"><label for="simStartVermoegen">Gesamtvermögen (€)</label><input
-                                    type="number" id="simStartVermoegen" value="2500000"></div>
-                            <div class="form-group"><label for="depotwertAlt">davon Depotwert Alt (€)</label><input
-                                    type="number" id="depotwertAlt" value="1250000"></div>
-                            <div class="form-group"><label for="zielLiquiditaet">davon Ziel-Liquidität (€)</label><input
-                                    type="number" id="zielLiquiditaet" value="180000"></div>
-                        </div>
-                        <div class="form-grid"
-                            style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
-                            <div class="form-group"><label for="startFloorBedarf">Start Floor-Bedarf p.a.
-                                    (€)</label><input type="number" id="startFloorBedarf" value="24000"></div>
-                            <div class="form-group"><label for="startFlexBedarf">Start Flex-Bedarf p.a.
-                                    (€)</label><input type="number" id="startFlexBedarf" value="28000"></div>
-                            <div class="form-group"><label for="marketCapeRatio">Aktueller CAPE (Shiller)</label><input
-                                    type="number" id="marketCapeRatio" value="32" step="0.1" min="0"></div>
-                            <div class="form-group"><label for="einstandAlt">Einstand Depot Alt (€)</label><input
-                                    type="number" id="einstandAlt" value="700000"></div>
-                            <div class="form-group"><label>Einstand Depot Neu (€)</label><input type="number"
-                                    id="einstandNeu" placeholder="wird berechnet" disabled></div>
-                        </div>
-                        <div id="displayPortfolioBreakdown"
-                            style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                    <fieldset class="collapsible">
+                        <legend><span class="section-icon">💰</span>Startportfolio & Bedarf</legend>
+                        <div class="fieldset-content">
+                            <div class="form-grid">
+                                <div class="form-group"><label for="simStartVermoegen">Gesamtvermögen (€)</label><input
+                                        type="number" id="simStartVermoegen" value="2500000"></div>
+                                <div class="form-group"><label for="depotwertAlt">davon Depotwert Alt (€)</label><input
+                                        type="number" id="depotwertAlt" value="1250000"></div>
+                                <div class="form-group"><label for="zielLiquiditaet">davon Ziel-Liquidität (€)</label><input
+                                        type="number" id="zielLiquiditaet" value="180000"></div>
+                            </div>
+                            <div class="form-grid"
+                                style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
+                                <div class="form-group"><label for="startFloorBedarf">Start Floor-Bedarf p.a.
+                                        (€)</label><input type="number" id="startFloorBedarf" value="24000"></div>
+                                <div class="form-group"><label for="startFlexBedarf">Start Flex-Bedarf p.a.
+                                        (€)</label><input type="number" id="startFlexBedarf" value="28000"></div>
+                                <div class="form-group"><label for="marketCapeRatio">Aktueller CAPE (Shiller)</label><input
+                                        type="number" id="marketCapeRatio" value="32" step="0.1" min="0"></div>
+                                <div class="form-group"><label for="einstandAlt">Einstand Depot Alt (€)</label><input
+                                        type="number" id="einstandAlt" value="700000"></div>
+                                <div class="form-group"><label>Einstand Depot Neu (€)</label><input type="number"
+                                        id="einstandNeu" placeholder="wird berechnet" disabled></div>
+                            </div>
+                            <div id="displayPortfolioBreakdown"
+                                style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                            </div>
                         </div>
                     </fieldset>
 
-                    <fieldset>
-                        <legend>Strategie-Parameter</legend>
-                        <div class="form-group" style="justify-content: center;">
-                            <label style="flex-direction: row; align-items: center;">
-                                <input type="checkbox" id="goldAllokationAktiv" style="width: auto; margin-right: 8px;"
-                                    checked>
-                                Gold-Allokation aktiv
-                            </label>
+                    <fieldset class="collapsible collapsed">
+                        <legend><span class="section-icon">🥇</span>Strategie-Parameter</legend>
+                        <div class="fieldset-content">
+                            <div class="form-group" style="justify-content: center;">
+                                <label style="flex-direction: row; align-items: center;">
+                                    <input type="checkbox" id="goldAllokationAktiv" style="width: auto; margin-right: 8px;"
+                                        checked>
+                                    Gold-Allokation aktiv
+                                </label>
+                            </div>
+                            <div id="goldStrategyPanel" style="display: none;">
+                                <div class="form-grid-four-col">
+                                    <div class="form-group">
+                                        <label for="goldAllokationProzent">Ziel-Allokation (% v. Depot)</label>
+                                        <input type="number" id="goldAllokationProzent" value="7.5" step="1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="goldFloorProzent">Gold-Floor (% v. Gesamt)</label>
+                                        <input type="number" id="goldFloorProzent" value="1" step="0.5">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="rebalancingBand">Rebalancing-Band (± %)</label>
+                                        <input type="number" id="rebalancingBand" value="25" step="5">
+                                    </div>
+                                    <div class="form-group" style="grid-column: span 2; justify-content: center;">
+                                        <label style="flex-direction: row; align-items: center;">
+                                            <input type="checkbox" id="goldSteuerfrei"
+                                                style="width: auto; margin-right: 8px;" checked> Gold-Verkäufe steuerfrei
+                                            (simuliert >1J Haltefrist)
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div id="goldStrategyPanel" style="display: none;">
+                    </fieldset>
+
+                    <fieldset class="collapsible collapsed">
+                        <legend><span class="section-icon">🛤️</span>Runway-Steuerung</legend>
+                        <div class="fieldset-content">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="runwayMinMonths">Runway Minimum (Monate)</label>
+                                    <input type="number" id="runwayMinMonths" value="24" min="12" max="60">
+                                </div>
+                                <div class="form-group">
+                                    <label for="runwayTargetMonths">Runway Ziel (Monate)</label>
+                                    <input type="number" id="runwayTargetMonths" value="36" min="18" max="72">
+                                </div>
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="collapsible collapsed">
+                        <legend><span class="section-icon">⚖️</span>Rebalancing-Strategie</legend>
+                        <div class="fieldset-content">
                             <div class="form-grid-four-col">
                                 <div class="form-group">
-                                    <label for="goldAllokationProzent">Ziel-Allokation (% v. Depot)</label>
-                                    <input type="number" id="goldAllokationProzent" value="7.5" step="1">
+                                    <label for="targetEq">Aktien-Zielquote (%)</label>
+                                    <input type="number" id="targetEq" value="60" min="0" max="100">
                                 </div>
                                 <div class="form-group">
-                                    <label for="goldFloorProzent">Gold-Floor (% v. Gesamt)</label>
-                                    <input type="number" id="goldFloorProzent" value="1" step="0.5">
+                                    <label for="rebalBand">Rebalancing-Band (±%)</label>
+                                    <input type="number" id="rebalBand" value="5" min="1" max="50">
                                 </div>
                                 <div class="form-group">
-                                    <label for="rebalancingBand">Rebalancing-Band (± %)</label>
-                                    <input type="number" id="rebalancingBand" value="25" step="5">
+                                    <label for="maxSkimPctOfEq">Max. Abschöpfen p.a. (%)</label>
+                                    <input type="number" id="maxSkimPctOfEq" value="10" min="0" max="100">
                                 </div>
-                                <div class="form-group" style="grid-column: span 2; justify-content: center;">
-                                    <label style="flex-direction: row; align-items: center;">
-                                        <input type="checkbox" id="goldSteuerfrei"
-                                            style="width: auto; margin-right: 8px;" checked> Gold-Verkäufe steuerfrei
-                                        (simuliert >1J Haltefrist)
-                                    </label>
+                                <div class="form-group">
+                                    <label for="maxBearRefillPctOfEq">Max. Auffüllen (Bär) (%)</label>
+                                    <input type="number" id="maxBearRefillPctOfEq" value="5" min="0" max="100">
                                 </div>
                             </div>
                         </div>
                     </fieldset>
 
-                    <fieldset>
-                        <legend>Runway-Steuerung</legend>
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label for="runwayMinMonths">Runway Minimum (Monate)</label>
-                                <input type="number" id="runwayMinMonths" value="24" min="12" max="60">
-                            </div>
-                            <div class="form-group">
-                                <label for="runwayTargetMonths">Runway Ziel (Monate)</label>
-                                <input type="number" id="runwayTargetMonths" value="36" min="18" max="72">
-                            </div>
-                        </div>
-                    </fieldset>
-
-                    <fieldset>
-                        <legend>Rebalancing-Strategie</legend>
-                        <div class="form-grid-four-col">
-                            <div class="form-group">
-                                <label for="targetEq">Aktien-Zielquote (%)</label>
-                                <input type="number" id="targetEq" value="60" min="0" max="100">
-                            </div>
-                            <div class="form-group">
-                                <label for="rebalBand">Rebalancing-Band (±%)</label>
-                                <input type="number" id="rebalBand" value="5" min="1" max="50">
-                            </div>
-                            <div class="form-group">
-                                <label for="maxSkimPctOfEq">Max. Abschöpfen p.a. (%)</label>
-                                <input type="number" id="maxSkimPctOfEq" value="10" min="0" max="100">
-                            </div>
-                            <div class="form-group">
-                                <label for="maxBearRefillPctOfEq">Max. Auffüllen (Bär) (%)</label>
-                                <input type="number" id="maxBearRefillPctOfEq" value="5" min="0" max="100">
-                            </div>
-                        </div>
-                    </fieldset>
-
-                    <fieldset>
-                        <legend>Allgemeine & Externe Parameter</legend>
-                        <div class="form-grid-four-col" style="align-items: end;">
+                    <fieldset class="collapsible">
+                        <legend><span class="section-icon">👤</span>Allgemeine & Externe Parameter</legend>
+                        <div class="fieldset-content">
+                            <div class="form-grid-four-col" style="align-items: end;">
                             <div class="form-group"><label for="p1StartAlter">Startalter</label><input type="number"
                                     id="p1StartAlter" value="63"></div>
                             <div class="form-group"><label for="p1Geschlecht">Geschlecht</label>
@@ -470,6 +479,7 @@
                                 </section>
                             </div>
                         </div>
+                        </div>
                     </fieldset>
                 </div>
 
@@ -715,6 +725,19 @@
     <script src="engine.js" defer></script>
     <script src="sim-parity-smoketest.js" defer></script>
     <script type="module" src="simulator-main.js"></script>
+
+    <!-- Accordion Toggle Functionality -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('fieldset.collapsible legend').forEach(legend => {
+                legend.addEventListener('click', function() {
+                    const fieldset = this.closest('fieldset');
+                    fieldset.classList.toggle('collapsed');
+                });
+            });
+        });
+    </script>
+
     <script>
         (function () {
             const DEV_KEY = "sim.devMode";
