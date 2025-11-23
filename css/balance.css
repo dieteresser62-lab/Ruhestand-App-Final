@@ -5,19 +5,25 @@
  * Enthält alle Balance-spezifischen und gemeinsamen Styles
  * =================================================================== */
 
-/* CSS Variables (Theme) */
+/* CSS Variables (Theme) - Harmonized with Landing Page */
 :root {
-    --primary-text: #1a202c; --secondary-text: #4a5568; --accent-color: #3182ce;
-    --background-color: #edf2f7; --surface-color: #ffffff; --border-color: #e2e8f0;
-    --success-color: #38a169; --warning-color: #dd6b20; --danger-color: #e53e3e;
-    --content-bg-color: #f0f9ff; --content-border-color: #e0f2fe;
+    --primary-color: #1a2530;
+    --secondary-color: #c5a059; /* Premium Gold */
+    --primary-text: #1a2530; --secondary-text: #4a5568; --accent-color: #3498db;
+    --background-color: #f8f9fa; --surface-color: #ffffff; --border-color: #e2e8f0;
+    --success-color: #2ecc71; --warning-color: #f39c12; --danger-color: #e74c3c;
+    --content-bg-color: rgba(248, 249, 250, 0.8); --content-border-color: #e2e8f0;
     --info-text-color: #4a5568;
 }
 
 /* Base Layout */
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background-color: var(--background-color); color: var(--primary-text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--background-color);
+    background-image:
+        radial-gradient(at 0% 0%, rgba(197, 160, 89, 0.08) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(52, 152, 219, 0.08) 0px, transparent 50%);
+    color: var(--primary-text);
     margin: 0; padding: 20px; display: flex; justify-content: center;
     align-items: flex-start; min-height: 100vh;
 }
@@ -28,8 +34,9 @@ body {
 }
 
 .panel {
-    background-color: var(--surface-color); padding: 20px; border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid var(--border-color);
+    background-color: rgba(255, 255, 255, 0.95); padding: 20px; border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); border: 1px solid rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(10px);
 }
 
 .form-column {
@@ -53,7 +60,12 @@ body {
 }
 
 /* Typography */
-h1 { font-size: 1.8rem; margin: 0; color: var(--primary-text); text-align: left; }
+h1 {
+    font-size: 1.8rem; margin: 0; text-align: left; font-weight: 700;
+    background: linear-gradient(135deg, var(--primary-color) 0%, #34495e 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
 
 h2 {
     font-size: 1.3rem; text-align:center; margin: 0 0 15px 0;
@@ -122,8 +134,8 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
 }
 
 .btn:not(:disabled):hover {
-    border-color: var(--accent-color); color: var(--accent-color);
-    transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    border-color: var(--secondary-color); color: var(--secondary-color);
+    transform: translateY(-2px); box-shadow: 0 4px 12px rgba(197, 160, 89, 0.15);
 }
 
 .btn:disabled { cursor: not-allowed; opacity: .5; }
@@ -249,9 +261,9 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
     transition: color 0.2s, border-color 0.2s;
 }
 
-.tab-btn:hover { color: var(--primary-text); }
+.tab-btn:hover { color: var(--primary-color); }
 
-.tab-btn.active { color: var(--accent-color); border-bottom-color: var(--accent-color); }
+.tab-btn.active { color: var(--secondary-color); border-bottom-color: var(--secondary-color); }
 
 .tab-panel { display: none; }
 
