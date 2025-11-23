@@ -14,13 +14,6 @@
     --info-text-color: #4a5568;
 }
 
-html[data-theme=dark] {
-    --primary-text: #e2e8f0; --secondary-text: #a0aec0; --accent-color: #63b3ed;
-    --background-color: #1a202c; --surface-color: #2d3748; --border-color: #4a5568;
-    --content-bg-color: #273446; --content-border-color: #314155;
-    --info-text-color: #a0aec0;
-}
-
 /* Base Layout */
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -105,10 +98,6 @@ input:focus, select:focus {
     box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.3);
 }
 
-html[data-theme=dark] input:focus, html[data-theme=dark] select:focus {
-    box-shadow: 0 0 0 3px rgba(99, 179, 237, 0.3);
-}
-
 input:disabled { background-color: #e9ecef; cursor: not-allowed; }
 
 input[type=number] { -moz-appearance: textfield; }
@@ -168,19 +157,9 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
     opacity: 0.9; display: inline-block; vertical-align: middle;
 }
 
-html[data-theme=dark] .badge-warn { background: #4a3a1f; color: #f6e05e; border-color: #b7791f;}
-
-html[data-theme=dark] .badge-ok { background: #2c4238; color: #9ae6b4; border-color: #48bb78; }
-
-html[data-theme=dark] .strategy-badge { color: #f6e05e; border-color: #b7791f; }
-
 .badge-row-ok    { background:#f0fff4; border:1px solid #9ae6b4; }
 .badge-row-warn  { background:#fffaf0; border:1px solid #f6e05e; }
 .badge-row-bad   { background:#fff5f5; border:1px solid #feb2b2; }
-
-html[data-theme=dark] .badge-row-ok   { background:#2c4238; border-color:#48bb78; }
-html[data-theme=dark] .badge-row-warn { background:#4a3a1f; border-color:#b7791f; }
-html[data-theme=dark] .badge-row-bad  { background:#4c2b2b; border-color:#c53030; }
 
 .badge-hint { margin-left:.5rem; font-size:.9em; opacity:.9 }
 
@@ -229,8 +208,6 @@ html[data-theme=dark] .badge-row-bad  { background:#4c2b2b; border-color:#c53030
 
 .result-item .before-after strong { color: var(--success-color); }
 
-html[data-theme=dark] .result-item .before-after strong { color: #9ae6b4; }
-
 #marktstatusText { text-align: right; flex-grow: 1; }
 
 /* Action Instructions */
@@ -252,13 +229,6 @@ html[data-theme=dark] .result-item .before-after strong { color: #9ae6b4; }
 .anweisung-rot { background-color: #fff5f5; color: #c53030; border-color: #feb2b2; }
 .anweisung-grau { background-color: #f0f9ff; color: #4a5568; border-color: #e0f2fe; }
 
-html[data-theme=dark] .anweisung-gruen { background-color: #2c4238; color: #9ae6b4; border-color: #48bb78; }
-html[data-theme=dark] .anweisung-gelb { background-color: #4a3a1f; color: #f6e05e; border-color: #b7791f; }
-html[data-theme=dark] .anweisung-rot { background-color: #4c2b2b; color: #feb2b2; border-color: #c53030; }
-html[data-theme=dark] .anweisung-grau { background-color: #273446; color: #a0aec0; border-color: #314155; }
-
-html[data-theme=dark] #handlungsanweisung small { color: var(--secondary-text); }
-
 /* Error Container */
 #error-container {
     font-weight: 700; margin-top: 15px; text-align: left; line-height: 1.5;
@@ -266,8 +236,6 @@ html[data-theme=dark] #handlungsanweisung small { color: var(--secondary-text); 
 }
 
 .error-warn { background-color: #fff5f5; color: #c53030; border: 1px solid #feb2b2; }
-
-html[data-theme=dark] .error-warn { background-color: #4c2b2b; color: #feb2b2; border-color: #c53030; }
 
 #error-container ul { padding-left: 20px; margin: 5px 0 0 0; }
 
@@ -326,8 +294,6 @@ html[data-theme=dark] .error-warn { background-color: #4c2b2b; color: #feb2b2; b
 
 .summary-item .value strong { color: var(--success-color); }
 
-html[data-theme=dark] .summary-item .value strong { color: #9ae6b4; }
-
 /* Summary KPI Cards */
 .summary-kpi {
     padding: 6px 12px; border-radius: 8px;
@@ -347,10 +313,6 @@ html[data-theme=dark] .summary-item .value strong { color: #9ae6b4; }
 .summary-kpi.status-ok { background-color: #f0fff4; color: #2f855a; border-color: #9ae6b4; }
 .summary-kpi.status-warn { background-color: #fffaf0; color: #b7791f; border-color: #f6e05e; }
 .summary-kpi.status-danger { background-color: #fff5f5; color: #c53030; border-color: #feb2b2; }
-
-html[data-theme=dark] .summary-kpi.status-ok { background-color: #2c4238; color: #9ae6b4; border-color: #48bb78; }
-html[data-theme=dark] .summary-kpi.status-warn { background-color: #4a3a1f; color: #f6e05e; border-color: #b7791f; }
-html[data-theme=dark] .summary-kpi.status-danger { background-color: #4c2b2b; color: #feb2b2; border-color: #c53030; }
 
 /* Diagnosis Drawer */
 .drawer-overlay {
@@ -403,11 +365,6 @@ html[data-theme=dark] .summary-kpi.status-danger { background-color: #4c2b2b; co
 .diag-chip.status-warn { background-color: #fffaf0; color: #b7791f; border-color: #f6e05e; }
 .diag-chip.status-danger { background-color: #fff5f5; color: #c53030; border-color: #feb2b2; }
 .diag-chip.status-info { background-color: var(--content-bg-color); color: var(--primary-text); border-color: var(--content-border-color); }
-
-html[data-theme=dark] .diag-chip.status-ok { background-color: #2c4238; color: #9ae6b4; border-color: #48bb78; }
-html[data-theme=dark] .diag-chip.status-warn { background-color: #4a3a1f; color: #f6e05e; border-color: #b7791f; }
-html[data-theme=dark] .diag-chip.status-danger { background-color: #4c2b2b; color: #feb2b2; border-color: #c53030; }
-html[data-theme=dark] .diag-chip.status-info { background-color: #273446; color: #e2e8f0; border-color: #314155; }
 
 #diag-decision-tree { list-style: none; padding-left: 15px; margin: 0; font-size: .9rem; }
 
@@ -500,10 +457,6 @@ html[data-theme=dark] .diag-chip.status-info { background-color: #273446; color:
     overflow-wrap: break-word;
 }
 
-html[data-theme=dark] .guardrail-card .value-row {
-    border-top-color: #314155;
-}
-
 #diag-key-params {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -568,8 +521,6 @@ hr { border: none; border-top: 1px solid var(--border-color); margin: 15px 0; }
 .mt-10 { margin-top: 10px; }
 
 .einstand-hinweis { font-size: .8rem; color: var(--info-text-color); margin: 5px 0 10px 0; }
-
-#themeToggleContainer { align-self: end; }
 
 /* Compact Density Mode */
 html[data-density=compact] .panel { padding: 20px; }
