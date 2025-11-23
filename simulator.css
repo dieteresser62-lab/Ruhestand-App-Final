@@ -431,3 +431,78 @@ fieldset.collapsible legend .section-icon {
     margin-right: 8px;
     font-size: 1.1rem;
 }
+
+/* Visual Indicator - Progress Dot */
+fieldset.collapsible legend .progress-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--border-color);
+    margin-left: auto;
+    margin-right: 8px;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+}
+
+fieldset.collapsible.has-data legend .progress-indicator {
+    background-color: var(--success-color);
+    box-shadow: 0 0 6px rgba(46, 204, 113, 0.4);
+}
+
+/* Improved Checkbox Styling */
+input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--secondary-color);
+    cursor: pointer;
+}
+
+/* Form Hints */
+.form-hint {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    margin-top: 8px;
+    line-height: 1.4;
+    font-style: italic;
+}
+
+/* Improved spacing for inline labels */
+label[style*="flex-direction: row"] {
+    font-weight: 500;
+    color: var(--text-color);
+    cursor: pointer;
+}
+
+/* Section dividers within fieldsets */
+.section-divider {
+    border-top: 1px solid var(--border-color);
+    margin: 20px 0;
+    padding-top: 20px;
+}
+
+/* Better disabled field styling */
+input:disabled::placeholder {
+    color: var(--text-light);
+}
+
+/* Subsection headers in fieldsets */
+fieldset h4 {
+    color: var(--secondary-color);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 15px;
+}
+
+/* Compact form grid for small fieldsets */
+.form-grid-compact {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+}
+
+/* Legend text wrapper for flex alignment */
+fieldset.collapsible legend .legend-text {
+    display: flex;
+    align-items: center;
+}

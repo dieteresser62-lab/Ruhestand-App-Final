@@ -75,8 +75,8 @@
 
             <div class="tab-content">
                 <div id="tab-rahmendaten" class="tab-panel active">
-                    <fieldset class="collapsible">
-                        <legend><span class="section-icon">💰</span>Startportfolio & Bedarf</legend>
+                    <fieldset class="collapsible" data-fieldset="portfolio">
+                        <legend><span class="section-icon">💰</span>Startportfolio & Bedarf<span class="progress-indicator"></span></legend>
                         <div class="fieldset-content">
                             <div class="form-grid">
                                 <div class="form-group"><label for="simStartVermoegen">Gesamtvermögen (€)</label><input
@@ -105,8 +105,8 @@
                         </div>
                     </fieldset>
 
-                    <fieldset class="collapsible">
-                        <legend><span class="section-icon">🥇</span>Gold-Strategie</legend>
+                    <fieldset class="collapsible" data-fieldset="gold">
+                        <legend><span class="section-icon">🥇</span>Gold-Strategie<span class="progress-indicator"></span></legend>
                         <div class="fieldset-content">
                             <div class="form-group" style="justify-content: center;">
                                 <label style="flex-direction: row; align-items: center;">
@@ -141,8 +141,8 @@
                         </div>
                     </fieldset>
 
-                    <fieldset class="collapsible collapsed">
-                        <legend><span class="section-icon">⚖️</span>Runway & Rebalancing</legend>
+                    <fieldset class="collapsible collapsed" data-fieldset="rebalancing">
+                        <legend><span class="section-icon">⚖️</span>Runway & Rebalancing<span class="progress-indicator"></span></legend>
                         <div class="fieldset-content">
                             <h4 style="margin-top: 0; margin-bottom: 12px; font-size: 0.95rem;">Runway-Steuerung</h4>
                             <div class="form-grid" style="margin-bottom: 20px;">
@@ -177,8 +177,8 @@
                         </div>
                     </fieldset>
 
-                    <fieldset class="collapsible collapsed">
-                        <legend><span class="section-icon">👤</span>Personen & Rente</legend>
+                    <fieldset class="collapsible collapsed" data-fieldset="personen">
+                        <legend><span class="section-icon">👤</span>Personen & Rente<span class="progress-indicator"></span></legend>
                         <div class="fieldset-content">
                             <div class="form-grid-four-col" style="align-items: end;">
                             <div class="form-group"><label for="p1StartAlter">Startalter</label><input type="number"
@@ -327,8 +327,8 @@
                         </div>
                     </fieldset>
 
-                    <fieldset class="collapsible collapsed">
-                        <legend><span class="section-icon">🏥</span>Pflegefall-Absicherung</legend>
+                    <fieldset class="collapsible collapsed" data-fieldset="pflege">
+                        <legend><span class="section-icon">🏥</span>Pflegefall-Absicherung<span class="progress-indicator"></span></legend>
                         <div class="fieldset-content">
                         <div id="pflegePanelContainer" class="care-panel" style="border-top: none; margin-top: 0; padding-top: 0;">
                             <div class="care-panel-toggle">
@@ -727,14 +727,52 @@
     <script src="sim-parity-smoketest.js" defer></script>
     <script type="module" src="simulator-main.js"></script>
 
-    <!-- Accordion Toggle Functionality -->
+    <!-- Accordion Toggle & Progress Indicator Functionality -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Accordion toggle
             document.querySelectorAll('fieldset.collapsible legend').forEach(legend => {
-                legend.addEventListener('click', function() {
+                legend.addEventListener('click', function(e) {
+                    // Don't toggle if clicking on the indicator
+                    if (e.target.classList.contains('progress-indicator')) return;
                     const fieldset = this.closest('fieldset');
                     fieldset.classList.toggle('collapsed');
                 });
+            });
+
+            // Progress indicator update function
+            function updateProgressIndicators() {
+                document.querySelectorAll('fieldset.collapsible[data-fieldset]').forEach(fieldset => {
+                    const inputs = fieldset.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"]), select');
+                    let hasData = false;
+
+                    inputs.forEach(input => {
+                        if (input.disabled) return;
+                        const value = input.value;
+                        const defaultValue = input.defaultValue;
+
+                        // Check if value differs from default or has meaningful data
+                        if (value && value !== '' && value !== '0') {
+                            hasData = true;
+                        }
+                    });
+
+                    // Always show as filled if there are any inputs with values
+                    if (hasData) {
+                        fieldset.classList.add('has-data');
+                    } else {
+                        fieldset.classList.remove('has-data');
+                    }
+                });
+            }
+
+            // Initial check
+            updateProgressIndicators();
+
+            // Update on input changes
+            document.querySelectorAll('#tab-rahmendaten input, #tab-rahmendaten select').forEach(input => {
+                input.addEventListener('change', updateProgressIndicators);
+                input.addEventListener('input', updateProgressIndicators);
             });
         });
     </script>
