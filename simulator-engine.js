@@ -81,10 +81,18 @@ function sellAssetForCash(portfolio, inputsCtx, market, asset, amountEuros, minG
         const targetSale = Math.min(amountEuros, availableGold);
 
         if (targetSale > 0) {
-            // Nutze calculateSaleAndTax aus engine.js für Gold-Verkauf
+            // Create modified context that only allows gold sales
+            // by setting equity values to 0
+            const goldOnlyCtx = {
+                ...inputsCtx,
+                depotwertAlt: 0,
+                depotwertNeu: 0,
+                costBasisAlt: 0,
+                costBasisNeu: 0
+            };
             const { saleResult } = window.Ruhestandsmodell_v30.calculateSaleAndTax(
                 targetSale,
-                inputsCtx,
+                goldOnlyCtx,
                 { minGold: minGold },
                 market
             );
@@ -100,11 +108,17 @@ function sellAssetForCash(portfolio, inputsCtx, market, asset, amountEuros, minG
         const targetSale = Math.min(amountEuros, equityWert);
 
         if (targetSale > 0) {
-            // Nutze calculateSaleAndTax aus engine.js für Aktien-Verkauf
+            // Create modified context that only allows equity sales
+            // by setting gold values to 0
+            const equityOnlyCtx = {
+                ...inputsCtx,
+                goldWert: 0,
+                goldCost: 0
+            };
             const { saleResult } = window.Ruhestandsmodell_v30.calculateSaleAndTax(
                 targetSale,
-                inputsCtx,
-                { minGold: minGold },
+                equityOnlyCtx,
+                { minGold: 0 },
                 market
             );
 
