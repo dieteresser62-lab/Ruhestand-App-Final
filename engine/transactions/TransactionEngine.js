@@ -423,6 +423,11 @@ const TransactionEngine = {
             } else if (!isBearRegimeProxy) {
                 const liquiditaetsBedarf = Math.max(0, zielLiquiditaet - aktuelleLiquiditaet);
 
+                // ATH-basierte Skalierung: Bei -20% ATH-Abstand kein Rebalancing mehr
+                // seiATH = 1.0 (am ATH) → Faktor = 1.0, seiATH = 0.8 (-20%) → Faktor = 0.0
+                const seiATH = market.seiATH || 1;
+                const athRebalancingFaktor = Math.max(0, Math.min(1, (seiATH - 0.8) / 0.2));
+
                 // Prüfe ob kritische Liquiditätssituation vorliegt
                 const zielLiquiditaetsdeckungLocal = (zielLiquiditaet > 0)
                     ? (aktuelleLiquiditaet / zielLiquiditaet)
@@ -507,11 +512,13 @@ const TransactionEngine = {
                         aktienUeberschuss = Math.min(liquiditaetsBedarf, aktienwert);
                     }
 
-                    const maxSkimCapEuro = (input.maxSkimPctOfEq / 100) * aktienwert;
-                    // Bei kritischer Liquidität: Cap auf 10% des Aktienwerts erhöhen
+                    // ATH-skaliertes Cap: Bei -20% ATH-Abstand kein Rebalancing mehr
+                    const baseMaxSkimCapEuro = (input.maxSkimPctOfEq / 100) * aktienwert;
+                    const athScaledSkimCap = baseMaxSkimCapEuro * athRebalancingFaktor;
+                    // Bei kritischer Liquidität: Cap auf 10% des Aktienwerts erhöhen (unabhängig von ATH)
                     const effectiveSkimCap = isCriticalLiquidity
-                        ? Math.max(maxSkimCapEuro, aktienwert * 0.10)
-                        : maxSkimCapEuro;
+                        ? Math.max(athScaledSkimCap, aktienwert * 0.10)
+                        : athScaledSkimCap;
                     const maxSellableFromEquity = Math.min(aktienUeberschuss, effectiveSkimCap);
 
                     const totalEquityValue = input.depotwertAlt + input.depotwertNeu;
