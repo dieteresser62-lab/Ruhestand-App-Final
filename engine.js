@@ -1694,7 +1694,10 @@ const TransactionEngine = {
                     totalerBedarf,
                     isCriticalLiquidity,
                     zielLiquiditaet,
-                    aktuelleLiquiditaet
+                    aktuelleLiquiditaet,
+                    seiATH,
+                    athRebalancingFaktor,
+                    marketSKey: market.sKey
                 });
 
                 // Bei kritischer Liquidität: niedrigere Mindestschwelle verwenden
