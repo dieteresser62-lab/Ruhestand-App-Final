@@ -2,7 +2,7 @@
 
 import { formatCurrency, formatCurrencyShortLog, shortenText } from './simulator-utils.js';
 import { STRESS_PRESETS } from './simulator-data.js';
-import { renderHeatmapSVG, renderWorstRunToggle } from './simulator-heatmap.js';
+import { renderHeatmapSVG } from './simulator-heatmap.js';
 
 /**
  * Storage keys for log detail preferences.
@@ -51,53 +51,6 @@ export function persistDetailLevel(storageKey, level) {
     }
     return sanitizedLevel;
 }
-
-/**
- * Stellt sicher, dass die Worst-Run-Toggle-Buttons existieren und
- * zur aktuellen Datenlage passen (Pflege-Button nur, wenn Daten vorhanden sind).
- *
- * @param {HTMLElement|null} controlsContainer - Container, der die Toggle-Buttons aufnimmt.
- * @param {boolean} hasCareWorst - Flag, ob ein spezifischer Pflege-Worst-Run existiert.
- * @returns {{ allButton: HTMLElement|null, careButton: HTMLElement|null }}
- *          Referenzen auf die (ggf. neu erzeugten) Buttons.
- */
-function ensureWorstRunToggleButtons(controlsContainer, hasCareWorst) {
-    // Kein Container vorhanden -> Buttons können nicht verwaltet werden.
-    if (!controlsContainer) {
-        return { allButton: null, careButton: null };
-    }
-
-    let toggleWrapper = controlsContainer.querySelector('.worst-run-toggle');
-
-    // Erstinitialisierung: vollständiges Toggle-Markup einfügen.
-    if (!toggleWrapper) {
-        controlsContainer.insertAdjacentHTML('afterbegin', renderWorstRunToggle(hasCareWorst));
-        toggleWrapper = controlsContainer.querySelector('.worst-run-toggle');
-    } else {
-        const existingCareButton = document.getElementById('btnWorstCare');
-
-        if (hasCareWorst && !existingCareButton) {
-            // Es gibt nun Pflege-Daten, daher Button dynamisch ergänzen.
-            const careButton = document.createElement('button');
-            careButton.id = 'btnWorstCare';
-            careButton.className = 'toggle-btn';
-            careButton.type = 'button';
-            careButton.textContent = 'Schlechtester Pflege-Lauf';
-            toggleWrapper.appendChild(careButton);
-        } else if (!hasCareWorst && existingCareButton) {
-            // Keine Pflege-Daten mehr -> Button entfernen, um veraltete Aktionen zu vermeiden.
-            existingCareButton.remove();
-        }
-    }
-
-    return {
-        allButton: document.getElementById('btnWorstAll'),
-        careButton: document.getElementById('btnWorstCare')
-    };
-}
-
-// Globale Variable für Worst-Run Re-Rendering
-window.globalWorstRunData = { rows: [], caR_Threshold: undefined };
 
 /**
  * Erstellt eine KPI-Karte mit Zahlenwert

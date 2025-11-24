@@ -1521,34 +1521,6 @@ function triggerDownload(filename, content, mimeType) {
     URL.revokeObjectURL(url);
 }
 
-function exportWorstRunLogData(format = 'json') {
-    const worstData = window.globalWorstRunData;
-    if (!worstData || !Array.isArray(worstData.rows) || worstData.rows.length === 0) {
-        alert('Es sind keine Worst-Case-Log-Daten zum Export verfügbar. Bitte zuerst eine Monte-Carlo-Simulation durchführen.');
-        return;
-    }
-
-    const showCareDetails = localStorage.getItem('showCareDetails') === '1';
-    const detailLevel = loadDetailLevel(WORST_LOG_DETAIL_KEY, LEGACY_LOG_DETAIL_KEY);
-    const columns = getWorstRunColumnDefinitions({ showCareDetails, logDetailLevel: detailLevel });
-    const timestamp = new Date().toISOString().replace(/[:]/g, '-');
-    const filenameBase = `worst-case-log-${timestamp}`;
-
-    if (format === 'json') {
-        const payload = {
-            exportedAt: new Date().toISOString(),
-            options: { showCareDetails, detailLevel, caR_Threshold: worstData.caR_Threshold ?? null },
-            rows: prepareRowsForExport(worstData.rows, columns)
-        };
-        triggerDownload(`${filenameBase}.json`, JSON.stringify(payload, null, 2), 'application/json');
-    } else if (format === 'csv') {
-        const csvContent = convertRowsToCsv(worstData.rows, columns);
-        triggerDownload(`${filenameBase}.csv`, csvContent, 'text/csv;charset=utf-8');
-    } else {
-        console.warn('Unbekanntes Exportformat:', format);
-    }
-}
-
 function exportBacktestLogData(format = 'json') {
     const backtestData = window.globalBacktestData;
     if (!backtestData || !Array.isArray(backtestData.rows) || backtestData.rows.length === 0) {
@@ -1578,7 +1550,6 @@ function exportBacktestLogData(format = 'json') {
 
 // Mache die Funktion global verfügbar
 window.renderBacktestLog = renderBacktestLog;
-window.exportWorstRunLogData = exportWorstRunLogData;
 window.exportBacktestLogData = exportBacktestLogData;
 
 /**
@@ -1782,43 +1753,7 @@ window.onload = function () {
     }
 
     const careDetailsCheckbox = document.getElementById('toggle-care-details');
-    if (careDetailsCheckbox) {
-        careDetailsCheckbox.checked = localStorage.getItem('showCareDetails') === '1';
-
-        careDetailsCheckbox.addEventListener('change', (e) => {
-            const showDetails = e.currentTarget.checked;
-            localStorage.setItem('showCareDetails', showDetails ? '1' : '0');
-
-            const logDetailLevel = loadDetailLevel(WORST_LOG_DETAIL_KEY, LEGACY_LOG_DETAIL_KEY);
-            if (window.globalWorstRunData && window.globalWorstRunData.rows.length > 0) {
-                document.getElementById('worstRunLog').innerHTML = renderWorstRunLog(
-                    window.globalWorstRunData.rows,
-                    window.globalWorstRunData.caR_Threshold,
-                    { showCareDetails: showDetails, logDetailLevel: logDetailLevel }
-                );
-            }
-        });
-    }
-
-    const logDetailCheckbox = document.getElementById('toggle-log-detail');
-    if (logDetailCheckbox) {
-        logDetailCheckbox.checked = loadDetailLevel(WORST_LOG_DETAIL_KEY, LEGACY_LOG_DETAIL_KEY) === 'detailed';
-
-        logDetailCheckbox.addEventListener('change', (e) => {
-            const detailLevel = e.currentTarget.checked ? 'detailed' : 'normal';
-            // Separate storage key to avoid leaking the backtest toggle into the worst-log columns.
-            persistDetailLevel(WORST_LOG_DETAIL_KEY, detailLevel);
-
-            const showCareDetails = localStorage.getItem('showCareDetails') === '1';
-            if (window.globalWorstRunData && window.globalWorstRunData.rows.length > 0) {
-                document.getElementById('worstRunLog').innerHTML = renderWorstRunLog(
-                    window.globalWorstRunData.rows,
-                    window.globalWorstRunData.caR_Threshold,
-                    { showCareDetails: showCareDetails, logDetailLevel: detailLevel }
-                );
-            }
-        });
-    }
+    // Checkbox-Handler für Szenario-Logs werden in displayMonteCarloResults registriert
 
     const backtestDetailCheckbox = document.getElementById('toggle-backtest-detail');
     if (backtestDetailCheckbox) {
