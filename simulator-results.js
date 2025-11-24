@@ -129,7 +129,7 @@ export function createCurrencyKpiCard(title, value, description, colorClass = ''
 /**
  * Zeigt die Monte-Carlo-Ergebnisse an
  */
-export function displayMonteCarloResults(results, anzahl, failCount, worstRun, resultsMitPflege, resultsOhnePflege, pflegefallEingetretenCount, inputs, worstRunCare) {
+export function displayMonteCarloResults(results, anzahl, failCount, worstRun, resultsMitPflege, resultsOhnePflege, pflegefallEingetretenCount, inputs, worstRunCare, scenarioLogs = null) {
 
     // 1. Haupt-Zusammenfassung (Summary)
     document.getElementById('monteCarloSummary').innerHTML = `
@@ -326,7 +326,84 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
 
     paintWorst();
 
-    // 6. Gesamten Ergebnis-Container sichtbar machen
+    // 6. Szenario-Log Auswahl (wenn scenarioLogs vorhanden)
+    const scenarioContainer = document.getElementById('scenarioLogContainer');
+    if (scenarioLogs && scenarioContainer) {
+        const caR = results.extraKPI?.consumptionAtRiskP10Real;
+        window.globalScenarioLogs = scenarioLogs;
+        window.globalScenarioCarThreshold = caR;
+
+        // Dropdown erstellen
+        let dropdownHtml = `
+            <div class="scenario-selector" style="margin-bottom: 15px;">
+                <label for="scenarioSelect" style="font-weight: 600; margin-right: 10px;">Szenario-Log anzeigen:</label>
+                <select id="scenarioSelect" style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); min-width: 300px; font-size: 0.9rem;">
+                    <option value="">— Szenario auswählen —</option>
+                    <optgroup label="📊 Charakteristische Szenarien">`;
+
+        // Charakteristische Szenarien mit Endvermögen
+        for (const s of scenarioLogs.characteristic) {
+            const vermLabel = s.failed ? '⚠️ FAILED' : formatCurrency(s.endVermoegen);
+            const careLabel = s.careEverActive ? ' 🏥' : '';
+            dropdownHtml += `<option value="char_${s.key}">${s.label} (${vermLabel})${careLabel}</option>`;
+        }
+
+        dropdownHtml += `</optgroup>
+                    <optgroup label="🎲 Zufällige Szenarien">`;
+
+        // Zufällige Szenarien
+        for (const s of scenarioLogs.random) {
+            const vermLabel = s.failed ? '⚠️ FAILED' : formatCurrency(s.endVermoegen);
+            const careLabel = s.careEverActive ? ' 🏥' : '';
+            dropdownHtml += `<option value="rand_${s.key}">${s.label} (${vermLabel})${careLabel}</option>`;
+        }
+
+        dropdownHtml += `</optgroup>
+                </select>
+            </div>
+            <div id="scenarioLogOutput" style="display: none;"></div>`;
+
+        scenarioContainer.innerHTML = dropdownHtml;
+        scenarioContainer.style.display = 'block';
+
+        // Event-Handler für Dropdown
+        const select = document.getElementById('scenarioSelect');
+        const output = document.getElementById('scenarioLogOutput');
+
+        select.addEventListener('change', () => {
+            const val = select.value;
+            if (!val) {
+                output.style.display = 'none';
+                return;
+            }
+
+            let scenario = null;
+            if (val.startsWith('char_')) {
+                const key = val.replace('char_', '');
+                scenario = scenarioLogs.characteristic.find(s => s.key === key);
+            } else if (val.startsWith('rand_')) {
+                const key = val.replace('rand_', '');
+                scenario = scenarioLogs.random.find(s => s.key === key);
+            }
+
+            if (scenario && scenario.logDataRows && scenario.logDataRows.length > 0) {
+                const showCareDetails = (localStorage.getItem('showCareDetails') === '1');
+                const logDetailLevel = loadDetailLevel(WORST_LOG_DETAIL_KEY);
+                output.innerHTML = renderWorstRunLog(scenario.logDataRows, caR, {
+                    showCareDetails: showCareDetails,
+                    logDetailLevel: logDetailLevel
+                });
+                output.style.display = 'block';
+            } else {
+                output.innerHTML = '<p style="color: var(--text-muted); padding: 10px;">Keine Log-Daten für dieses Szenario verfügbar.</p>';
+                output.style.display = 'block';
+            }
+        });
+    } else if (scenarioContainer) {
+        scenarioContainer.style.display = 'none';
+    }
+
+    // 7. Gesamten Ergebnis-Container sichtbar machen
     document.getElementById('monteCarloResults').style.display = 'block';
 }
 

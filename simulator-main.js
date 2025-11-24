@@ -484,6 +484,15 @@ export async function runMonteCarlo() {
         let worstRun = { finalVermoegen: Infinity, logDataRows: [], failed: false };
         let worstRunCare = { finalVermoegen: Infinity, logDataRows: [], failed: false, hasCare: false };
 
+        // Szenario-Logging: Speichere alle Runs mit Metadaten für spätere Auswahl
+        const allScenarioMeta = [];
+        // Für zufällige Szenarien: Sample-Indizes berechnen (15 gleichmäßig verteilt)
+        const randomSampleIndices = new Set();
+        const sampleStep = Math.max(1, Math.floor(anzahl / 15));
+        for (let s = 0; s < 15 && s * sampleStep < anzahl; s++) {
+            randomSampleIndices.add(s * sampleStep + Math.floor(sampleStep / 2));
+        }
+
         let failCount = 0;
         let pflegeTriggeredCount = 0;
         const entryAges = [], careDepotCosts = [];
@@ -938,6 +947,25 @@ export async function runMonteCarlo() {
             if (runHadAnyCare) {
                 maxAnnualCareSpendTriggered.push(maxAnnualSpend);
             }
+
+            // Szenario-Metadaten speichern für spätere Auswahl
+            const totalCareYears = p1CareYears + p2CareYears;
+            const totalCareCosts = (careMetaP1?.kumulierteKosten || 0) + (careMetaP2?.kumulierteKosten || 0);
+            allScenarioMeta.push({
+                index: i,
+                endVermoegen: endVermoegen,
+                failed: failed,
+                lebensdauer: lebensdauer,
+                careEverActive: careEverActive,
+                triggeredAge: triggeredAge,
+                totalCareYears: totalCareYears,
+                totalCareCosts: totalCareCosts,
+                maxKuerzung: kpiMaxKuerzungDieserLauf,
+                jahreOhneFlex: jahreOhneFlex,
+                // Alle Logs temporär speichern für spätere Auswahl der charakteristischen Szenarien
+                logDataRows: [...currentRunLog],
+                isRandomSample: randomSampleIndices.has(i)
+            });
         }
 
         progressBar.style.width = '95%';
@@ -1008,7 +1036,97 @@ export async function runMonteCarlo() {
             }
         };
 
-        displayMonteCarloResults(aggregatedResults, anzahl, failCount, worstRun, {}, {}, pflegeTriggeredCount, inputs, worstRunCare);
+        // ===== Charakteristische Szenarien identifizieren =====
+        // Sortiere nach Endvermögen für Perzentil-Berechnung
+        const sortedByWealth = [...allScenarioMeta].sort((a, b) => a.endVermoegen - b.endVermoegen);
+
+        // Hilfsfunktion für Perzentil-Index
+        const percentileIndex = (arr, p) => Math.min(Math.floor(arr.length * p), arr.length - 1);
+
+        // 1. Vermögensbasierte Perzentile (9 Szenarien)
+        const wealthPercentiles = [
+            { key: 'worst', label: 'Worst Case', scenario: sortedByWealth[0] },
+            { key: 'p5', label: 'P5', scenario: sortedByWealth[percentileIndex(sortedByWealth, 0.05)] },
+            { key: 'p10', label: 'P10', scenario: sortedByWealth[percentileIndex(sortedByWealth, 0.10)] },
+            { key: 'p25', label: 'P25', scenario: sortedByWealth[percentileIndex(sortedByWealth, 0.25)] },
+            { key: 'p50', label: 'Median', scenario: sortedByWealth[percentileIndex(sortedByWealth, 0.50)] },
+            { key: 'p75', label: 'P75', scenario: sortedByWealth[percentileIndex(sortedByWealth, 0.75)] },
+            { key: 'p90', label: 'P90', scenario: sortedByWealth[percentileIndex(sortedByWealth, 0.90)] },
+            { key: 'p95', label: 'P95', scenario: sortedByWealth[percentileIndex(sortedByWealth, 0.95)] },
+            { key: 'best', label: 'Best Case', scenario: sortedByWealth[sortedByWealth.length - 1] }
+        ];
+
+        // 2. Pflege-spezifische Szenarien (4 Szenarien)
+        const careScenarios = allScenarioMeta.filter(s => s.careEverActive);
+        const careSpecific = [];
+
+        if (careScenarios.length > 0) {
+            // Worst mit Pflege
+            const worstWithCare = careScenarios.reduce((a, b) => a.endVermoegen < b.endVermoegen ? a : b);
+            careSpecific.push({ key: 'worstCare', label: 'Worst MIT Pflege', scenario: worstWithCare });
+
+            // Längste Pflegedauer
+            const longestCare = careScenarios.reduce((a, b) => a.totalCareYears > b.totalCareYears ? a : b);
+            careSpecific.push({ key: 'longestCare', label: 'Längste Pflegedauer', scenario: longestCare });
+
+            // Höchste Pflegekosten
+            const highestCareCost = careScenarios.reduce((a, b) => a.totalCareCosts > b.totalCareCosts ? a : b);
+            careSpecific.push({ key: 'highestCareCost', label: 'Höchste Pflegekosten', scenario: highestCareCost });
+
+            // Frühester Pflegeeintritt
+            const earliestCare = careScenarios.filter(s => s.triggeredAge !== null)
+                .reduce((a, b) => (a.triggeredAge < b.triggeredAge ? a : b), careScenarios[0]);
+            careSpecific.push({ key: 'earliestCare', label: 'Frühester Pflegeeintritt', scenario: earliestCare });
+        }
+
+        // 3. Risiko-Szenarien (2 Szenarien)
+        const longestLife = allScenarioMeta.reduce((a, b) => a.lebensdauer > b.lebensdauer ? a : b);
+        const maxCut = allScenarioMeta.reduce((a, b) => a.maxKuerzung > b.maxKuerzung ? a : b);
+        const riskScenarios = [
+            { key: 'longestLife', label: 'Längste Lebensdauer', scenario: longestLife },
+            { key: 'maxCut', label: 'Maximale Kürzung', scenario: maxCut }
+        ];
+
+        // 4. Zufällige Szenarien (15 Szenarien)
+        const randomScenarios = allScenarioMeta
+            .filter(s => s.isRandomSample)
+            .map((s, idx) => ({
+                key: `random_${s.index}`,
+                label: `Zufällig #${s.index + 1}`,
+                scenario: s
+            }));
+
+        // Alle charakteristischen Szenarien zusammenstellen
+        const characteristicScenarios = [...wealthPercentiles, ...careSpecific, ...riskScenarios];
+
+        // Szenarien-Objekt für UI erstellen
+        const scenarioLogs = {
+            characteristic: characteristicScenarios.map(s => ({
+                key: s.key,
+                label: s.label,
+                endVermoegen: s.scenario.endVermoegen,
+                failed: s.scenario.failed,
+                lebensdauer: s.scenario.lebensdauer,
+                careEverActive: s.scenario.careEverActive,
+                totalCareYears: s.scenario.totalCareYears,
+                logDataRows: s.scenario.logDataRows
+            })),
+            random: randomScenarios.map(s => ({
+                key: s.key,
+                label: s.label,
+                endVermoegen: s.scenario.endVermoegen,
+                failed: s.scenario.failed,
+                lebensdauer: s.scenario.lebensdauer,
+                careEverActive: s.scenario.careEverActive,
+                totalCareYears: s.scenario.totalCareYears,
+                logDataRows: s.scenario.logDataRows
+            }))
+        };
+
+        // Speicher freigeben - nur die ausgewählten Logs behalten
+        allScenarioMeta.length = 0;
+
+        displayMonteCarloResults(aggregatedResults, anzahl, failCount, worstRun, {}, {}, pflegeTriggeredCount, inputs, worstRunCare, scenarioLogs);
 
     } catch (e) {
         alert("Fehler in der Monte-Carlo-Simulation:\n\n" + e.message + "\n" + e.stack); console.error(e);
