@@ -1523,8 +1523,11 @@ const TransactionEngine = {
 
             // Design-Entscheidung: Guardrail greift nur bei echten Lücken (unter Aktivierungsschwelle oder Mindest-Runway),
             // damit moderate Unterdeckungen über die reguläre Rebalancing-Logik aufgefüllt werden können.
-            // Verwende Floor-Runway für Guardrail (konsistent mit UI und minRunwayMonths-Definition)
-            const hasRunwayGap = currentFloorRunwayMonths < runwayMinThresholdMonths;
+            // Prüfe BEIDE Runways: Floor-Runway UND Gesamt-Runway
+            // Floor-Runway kann irreführend hoch sein wenn Pension den Großteil des Floors deckt
+            const hasFloorRunwayGap = currentFloorRunwayMonths < runwayMinThresholdMonths;
+            const hasTotalRunwayGap = currentRunwayMonths < runwayMinThresholdMonths;
+            const hasRunwayGap = hasFloorRunwayGap || hasTotalRunwayGap;
             const hasCoverageGap = zielLiquiditaetsdeckung < guardrailActivationThreshold;
             const monthlyBaselineNeed = (gesamtjahresbedarf / 12);
             const guardrailTargetEuro = Math.max(
