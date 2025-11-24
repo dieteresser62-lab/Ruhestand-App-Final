@@ -257,9 +257,10 @@ input:disabled {
     padding: 15px;
 }
 #simulationLog table, #worstRunLog table {
-    width: 100%;
+    width: auto;
     border-collapse: collapse;
     color: #000000;
+    font-size: 0.75rem;
 }
 #simulationLog tr:nth-child(even), #worstRunLog tr:nth-child(even) {
     background-color: #f3f4f6;
@@ -276,14 +277,16 @@ input:disabled {
     color: #000000;
     position: sticky;
     top: 0;
-    padding: 8px 10px;
+    padding: 4px 6px;
     border-bottom: 2px solid #d1d5db;
     text-align: left;
+    white-space: nowrap;
 }
 #simulationLog td, #worstRunLog td {
-    padding: 6px 10px;
+    padding: 3px 6px;
     border-bottom: 1px solid #e5e7eb;
     color: #000000;
+    white-space: nowrap;
 }
 button {
     background-color: var(--primary-color);
