@@ -518,9 +518,10 @@ const TransactionEngine = {
                     // ATH-skaliertes Cap: Bei -20% ATH-Abstand kein Rebalancing mehr
                     const baseMaxSkimCapEuro = (input.maxSkimPctOfEq / 100) * aktienwert;
                     const athScaledSkimCap = baseMaxSkimCapEuro * athRebalancingFaktor;
-                    // Bei kritischer Liquidität: Cap auf 10% des Aktienwerts erhöhen (unabhängig von ATH)
+                    // Bei kritischer Liquidität: Cap auf Liquiditätsbedarf + 20% Puffer begrenzen
+                    // Das stellt sicher, dass die Liquidität aufgefüllt wird, aber nicht unbegrenzt für Gold
                     const effectiveSkimCap = isCriticalLiquidity
-                        ? Math.max(athScaledSkimCap, aktienwert * 0.10)
+                        ? Math.max(athScaledSkimCap, liquiditaetsBedarf * 1.2)
                         : athScaledSkimCap;
                     const maxSellableFromEquity = Math.min(aktienUeberschuss, effectiveSkimCap);
 
