@@ -251,11 +251,6 @@ input:disabled {
     border: 1px solid #d1d5db;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
-/* Text-based log (Backtest) needs pre and padding */
-#simulationLog {
-    white-space: pre;
-    padding: 15px;
-}
 #simulationLog table, #worstRunLog table {
     width: auto;
     border-collapse: collapse;
