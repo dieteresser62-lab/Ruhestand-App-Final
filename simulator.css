@@ -237,7 +237,52 @@ input:disabled {
     }
 }
 .calculated-display { padding: 9px; background-color: #e9ecef; border-radius: 6px; font-size: 1rem; color: var(--primary-color); font-weight: bold; text-align: right; }
-#simulationLog, #worstRunLog { font-family: 'Courier New', Courier, monospace; font-size: 0.8rem; white-space: pre; background-color: #2d3436; color: #dfe6e9; border-radius: 8px; padding: 15px; max-height: 500px; overflow-y: auto; line-height: 1.4; }
+#simulationLog, #worstRunLog {
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
+    font-size: 0.8rem;
+    background-color: #ffffff;
+    color: #000000;
+    border-radius: 8px;
+    padding: 0;
+    max-height: 500px;
+    overflow-y: auto;
+    overflow-x: auto;
+    line-height: 1.4;
+    border: 1px solid #d1d5db;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+#simulationLog table, #worstRunLog table {
+    width: auto;
+    border-collapse: collapse;
+    color: #000000;
+    font-size: 0.75rem;
+}
+#simulationLog tr:nth-child(even), #worstRunLog tr:nth-child(even) {
+    background-color: #f3f4f6;
+}
+#simulationLog tr:nth-child(odd), #worstRunLog tr:nth-child(odd) {
+    background-color: #ffffff;
+}
+#simulationLog tr:hover, #worstRunLog tr:hover {
+    background-color: #e5e7eb;
+}
+#simulationLog th, #worstRunLog th {
+    background-color: #e5e7eb;
+    font-weight: 600;
+    color: #000000;
+    position: sticky;
+    top: 0;
+    padding: 4px 6px;
+    border-bottom: 2px solid #d1d5db;
+    text-align: left;
+    white-space: nowrap;
+}
+#simulationLog td, #worstRunLog td {
+    padding: 3px 6px;
+    border-bottom: 1px solid #e5e7eb;
+    color: #000000;
+    white-space: nowrap;
+}
 button {
     background-color: var(--primary-color);
     color: white;

@@ -1221,7 +1221,7 @@ export function runBacktest() {
             <div class="summary-item"><strong>Jahre mit Kürzung (>10%)</strong><span>${jahreMitKuerzung} von ${endJahr - startJahr + 1}</span></div>
             <div class="summary-item tax"><strong>Gezahlte Steuern</strong><span>${formatCurrency(totalSteuern)}</span></div>
         </div>`;
-        document.getElementById('simulationLog').textContent = log;
+        renderBacktestLog();
     } catch (error) {
         alert("Ein Fehler ist im Backtest aufgetreten:\n\n" + error.message + "\n" + error.stack);
         console.error("Fehler in runBacktest():", error);
@@ -1362,21 +1362,27 @@ function renderBacktestLog() {
     const { rows: logRows } = window.globalBacktestData;
     const columns = buildBacktestColumnDefinitions(logDetailLevel);
 
-    const headerLine = columns.map(col => {
-        const headerText = col.header || '';
-        const align = col.align === 'left' ? 'left' : 'right';
-        return align === 'left'
-            ? headerText.padEnd(col.width)
-            : headerText.padStart(col.width);
-    }).join('  ');
-    let log = headerLine + '\n' + '='.repeat(headerLine.length) + '\n';
-
-    for (const row of logRows) {
-        const line = columns.map(col => formatCellForDisplay(col, row)).join('  ');
-        log += line + '\n';
+    // Generate HTML table
+    let html = '<table><thead><tr>';
+    for (const col of columns) {
+        html += `<th>${col.header || ''}</th>`;
     }
+    html += '</tr></thead><tbody>';
 
-    document.getElementById('simulationLog').textContent = log;
+    for (let i = 0; i < logRows.length; i++) {
+        const row = logRows[i];
+        const rowClass = i % 2 === 0 ? 'even' : 'odd';
+        html += `<tr class="${rowClass}">`;
+
+        for (const col of columns) {
+            const value = formatColumnValue(col, row);
+            html += `<td>${value}</td>`;
+        }
+        html += '</tr>';
+    }
+    html += '</tbody></table>';
+
+    document.getElementById('simulationLog').innerHTML = html;
 }
 
 /**
@@ -1667,7 +1673,7 @@ window.onload = function () {
 
             const logDetailLevel = loadDetailLevel(WORST_LOG_DETAIL_KEY, LEGACY_LOG_DETAIL_KEY);
             if (window.globalWorstRunData && window.globalWorstRunData.rows.length > 0) {
-                document.getElementById('worstRunLog').textContent = renderWorstRunLog(
+                document.getElementById('worstRunLog').innerHTML = renderWorstRunLog(
                     window.globalWorstRunData.rows,
                     window.globalWorstRunData.caR_Threshold,
                     { showCareDetails: showDetails, logDetailLevel: logDetailLevel }
@@ -1687,7 +1693,7 @@ window.onload = function () {
 
             const showCareDetails = localStorage.getItem('showCareDetails') === '1';
             if (window.globalWorstRunData && window.globalWorstRunData.rows.length > 0) {
-                document.getElementById('worstRunLog').textContent = renderWorstRunLog(
+                document.getElementById('worstRunLog').innerHTML = renderWorstRunLog(
                     window.globalWorstRunData.rows,
                     window.globalWorstRunData.caR_Threshold,
                     { showCareDetails: showCareDetails, logDetailLevel: detailLevel }

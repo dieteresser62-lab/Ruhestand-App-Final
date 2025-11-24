@@ -2022,7 +2022,7 @@ function displayMonteCarloResults(results, anzahl, failCount, worstRun, resultsM
             const caR = results.extraKPI?.consumptionAtRiskP10Real;
             window.globalWorstRunData = { rows: wr.logDataRows, caR_Threshold: caR };
             const showCareDetails = (localStorage.getItem('showCareDetails') === '1');
-            worstEl.textContent = renderWorstRunLog(wr.logDataRows, caR, { showCareDetails: showCareDetails });
+            worstEl.innerHTML = renderWorstRunLog(wr.logDataRows, caR, { showCareDetails: showCareDetails });
             worstContainer.style.display = 'block';
         } else {
             worstContainer.style.display = 'none';
@@ -2142,20 +2142,28 @@ function renderWorstRunLog(logRows, caR_Threshold, opts = {}) {
         return path.split('.').reduce((o, k) => (o && o[k] != null) ? o[k] : undefined, obj);
     };
 
-    let textHeader = allCols.map(c => c.header.padStart(c.width)).join("  ");
-    let log = textHeader + "\n" + "=".repeat(textHeader.length) + "\n";
-
-    for (const row of logRows) {
-        const rowValues = allCols.map(col => {
-            const rawValue = col.key === null ? null : getNestedValue(row, col.key); // Für berechnete Spalten null übergeben
-            const formattedValue = col.fmt ? col.fmt(rawValue, row) : String(rawValue || '');
-            return String(formattedValue).padStart(col.width);
-        });
-        
-        const isBelowCaR = caR_Threshold !== undefined && row.jahresentnahme_real < caR_Threshold;
-        log += rowValues.join("  ") + (isBelowCaR ? " <CaR!" : "") + "\n";
+    // Generate HTML table
+    let html = '<table><thead><tr>';
+    for (const col of allCols) {
+        html += `<th>${col.header}</th>`;
     }
-    return log;
+    html += '</tr></thead><tbody>';
+
+    for (let i = 0; i < logRows.length; i++) {
+        const row = logRows[i];
+        const isBelowCaR = caR_Threshold !== undefined && row.jahresentnahme_real < caR_Threshold;
+        const rowClass = i % 2 === 0 ? 'even' : 'odd';
+        html += `<tr class="${rowClass}${isBelowCaR ? ' below-car' : ''}">`;
+
+        for (const col of allCols) {
+            const rawValue = col.key === null ? null : getNestedValue(row, col.key);
+            const formattedValue = col.fmt ? col.fmt(rawValue, row) : String(rawValue || '');
+            html += `<td>${formattedValue}${col === allCols[allCols.length - 1] && isBelowCaR ? ' <CaR!' : ''}</td>`;
+        }
+        html += '</tr>';
+    }
+    html += '</tbody></table>';
+    return html;
 }
 
 function portfolioTotal(p) {
@@ -2498,7 +2506,7 @@ window.onload = function() {
             
             // Re-render worst-run log if data is available
             if (window.globalWorstRunData && window.globalWorstRunData.rows.length > 0) {
-                 document.getElementById('worstRunLog').textContent = renderWorstRunLog(
+                 document.getElementById('worstRunLog').innerHTML = renderWorstRunLog(
                     window.globalWorstRunData.rows,
                     window.globalWorstRunData.caR_Threshold,
                     { showCareDetails: showDetails }

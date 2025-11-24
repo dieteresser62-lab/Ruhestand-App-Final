@@ -291,7 +291,7 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
             window.globalWorstRunData = { rows: wr.logDataRows, caR_Threshold: caR };
             const showCareDetails = (localStorage.getItem('showCareDetails') === '1');
             const logDetailLevel = loadDetailLevel(WORST_LOG_DETAIL_KEY);
-            worstEl.textContent = renderWorstRunLog(wr.logDataRows, caR, {
+            worstEl.innerHTML = renderWorstRunLog(wr.logDataRows, caR, {
                 showCareDetails: showCareDetails,
                 logDetailLevel: logDetailLevel
             });
@@ -493,20 +493,28 @@ export function renderWorstRunLog(logRows, caR_Threshold, opts = {}) {
         return path.split('.').reduce((o, k) => (o && o[k] != null) ? o[k] : undefined, obj);
     };
 
-    let textHeader = allCols.map(c => c.header.padStart(c.width)).join("  ");
-    let log = textHeader + "\n" + "=".repeat(textHeader.length) + "\n";
+    // Generate HTML table
+    let html = '<table><thead><tr>';
+    for (const col of allCols) {
+        html += `<th>${col.header}</th>`;
+    }
+    html += '</tr></thead><tbody>';
 
-    for (const row of logRows) {
-        const rowValues = allCols.map(col => {
+    for (let i = 0; i < logRows.length; i++) {
+        const row = logRows[i];
+        const isBelowCaR = caR_Threshold !== undefined && row.jahresentnahme_real < caR_Threshold;
+        const rowClass = i % 2 === 0 ? 'even' : 'odd';
+        html += `<tr class="${rowClass}${isBelowCaR ? ' below-car' : ''}">`;
+
+        for (const col of allCols) {
             const rawValue = col.key === null ? null : getNestedValue(row, col.key);
             const formattedValue = col.fmt ? col.fmt(rawValue, row) : String(rawValue || '');
-            return String(formattedValue).padStart(col.width);
-        });
-
-        const isBelowCaR = caR_Threshold !== undefined && row.jahresentnahme_real < caR_Threshold;
-        log += rowValues.join("  ") + (isBelowCaR ? " <CaR!" : "") + "\n";
+            html += `<td>${formattedValue}${col === allCols[allCols.length - 1] && isBelowCaR ? ' <CaR!' : ''}</td>`;
+        }
+        html += '</tr>';
     }
-    return log;
+    html += '</tbody></table>';
+    return html;
 }
 
 /**
