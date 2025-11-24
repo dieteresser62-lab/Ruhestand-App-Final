@@ -108,13 +108,20 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 
 ### Pflege-Pipeline
 
-* Alters- und gradabhängige Eintrittswahrscheinlichkeiten basieren auf dem BARMER-Pflegereport und werden in `simulator.js` gepflegt.
-  Die Tabelle liefert grade-spezifische Labels sowie Drift-Annahmen.【F:simulator.js†L433-L470】
+* Alters- und gradabhängige Eintrittswahrscheinlichkeiten basieren auf dem BARMER-Pflegereport und werden in `simulator-data.js` gepflegt.
+  Die Tabelle liefert grade-spezifische Labels sowie Drift-Annahmen.【F:simulator-data.js】
 * Das UI bietet für jeden Pflegegrad Zusatzkosten-, Flex-Cut- und Mortalitätsfelder, Staffel-Presets (ambulant/stationär), regionalen
   Zuschlag, Info-Badges zum Maximal-Floor sowie Event-Listener, die Änderungen live in Tooltips und Badges spiegeln.【F:simulator-main.js†L89-L1506】
 * KPI-Dashboard: Zusätzlich zu klassischen Monte-Carlo-Kennzahlen rendert der Simulator Eintrittsquoten, Eintrittsalter, Pflegejahre
-  pro Person sowie Kosten-/Shortfall-Deltas. Sobald Pflege-Worst-Runs vorliegen, lässt sich über einen Toggle zwischen Gesamt-
-  und Pflege-Extremlauf wechseln – inklusive separatem Log-Auszug.【F:simulator-results.js†L191-L250】【F:simulator.js†L366-L429】
+  pro Person sowie Kosten-/Shortfall-Deltas.【F:simulator-results.js†L132-L267】
+
+### Szenario-Log-Analyse
+
+* Nach jeder Monte-Carlo-Simulation werden 30 Szenarien für detaillierte Analyse gespeichert:
+  - 15 charakteristische Szenarien: Vermögens-Perzentile (Worst, P5-P95, Best), Pflege-Extremfälle (längste Dauer, höchste Kosten, frühester Eintritt), Risiko-Szenarien (längste Lebensdauer, maximale Kürzung)
+  - 15 zufällige Szenarien: gleichmäßig über alle Runs verteilt für typisches Verhalten
+* Dropdown-Auswahl mit Endvermögen und Pflege-Status pro Szenario
+* Checkboxen für Pflege-Details und detailliertes Log, JSON/CSV-Export【F:simulator-results.js†L269-L427】【F:simulator-main.js†L1039-L1129】
 
 ---
 
