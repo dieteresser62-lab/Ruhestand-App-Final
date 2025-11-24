@@ -498,8 +498,8 @@ export function getWorstRunColumnDefinitions(opts = {}) {
             fmt: (v, row) => {
                 const val = (row.vk?.vkAkt || 0) - (row.kaufAkt || 0);
                 const formatted = formatCurrencyShortLog(val);
-                if (val > 0) return `<span style="color: darkblue">${formatted}</span>`;
-                if (val < 0) return `<span style="color: darkred">${formatted}</span>`;
+                if (val > 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
+                if (val < 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
                 return formatted;
             }
         },
@@ -508,8 +508,8 @@ export function getWorstRunColumnDefinitions(opts = {}) {
             fmt: (v, row) => {
                 const val = (row.vk?.vkGld || 0) - (row.kaufGld || 0);
                 const formatted = formatCurrencyShortLog(val);
-                if (val > 0) return `<span style="color: darkblue">${formatted}</span>`;
-                if (val < 0) return `<span style="color: darkred">${formatted}</span>`;
+                if (val > 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
+                if (val < 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
                 return formatted;
             }
         },
