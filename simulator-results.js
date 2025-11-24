@@ -481,6 +481,14 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         { key: 'FlexRatePct', header: 'Flex%', width: 5, fmt: v => `${Math.round(v || 0)}%` },
         { key: 'flex_erfuellt_nominal', header: 'Flex', width: 7, fmt: formatCurrencyShortLog },
         {
+            key: 'Regime', header: 'Markt', width: 12,
+            fmt: (v, row) => {
+                const regimeText = window.Ruhestandsmodell_v30.CONFIG.SCENARIO_TEXT[row.Regime] || row.Regime || '';
+                return regimeText.substring(0, 12);
+            },
+            title: 'Marktsituation/Regime'
+        },
+        {
             key: 'aktionUndGrund', header: 'Status', width: 22, fmt: (v, row) => {
                 const alarmMarker = row.Alarm ? '(A) ' : '';
                 const regimeShort = shortenText(window.Ruhestandsmodell_v30.CONFIG.SCENARIO_TEXT[row.Regime] || '');
@@ -495,11 +503,29 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         { key: 'inflation', header: 'Infl.', width: 5, fmt: v => `${(v || 0).toFixed(1)}%` },
         {
             key: null, header: 'Handl.A', width: 8,
-            fmt: (v, row) => formatCurrencyShortLog((row.vk?.vkAkt || 0) - (row.kaufAkt || 0))
+            fmt: (v, row) => {
+                const value = (row.vk?.vkAkt || 0) - (row.kaufAkt || 0);
+                const formatted = formatCurrencyShortLog(value);
+                if (value > 0) {
+                    return `<span style="color: darkblue; font-weight: bold;">${formatted}</span>`;
+                } else if (value < 0) {
+                    return `<span style="color: darkred; font-weight: bold;">${formatted}</span>`;
+                }
+                return formatted;
+            }
         },
         {
             key: null, header: 'Handl.G', width: 8,
-            fmt: (v, row) => formatCurrencyShortLog((row.vk?.vkGld || 0) - (row.kaufGld || 0))
+            fmt: (v, row) => {
+                const value = (row.vk?.vkGld || 0) - (row.kaufGld || 0);
+                const formatted = formatCurrencyShortLog(value);
+                if (value > 0) {
+                    return `<span style="color: darkblue; font-weight: bold;">${formatted}</span>`;
+                } else if (value < 0) {
+                    return `<span style="color: darkred; font-weight: bold;">${formatted}</span>`;
+                }
+                return formatted;
+            }
         },
         { key: 'steuern_gesamt', header: 'St.', width: 6, fmt: formatCurrencyShortLog },
         { key: 'wertAktien', header: 'Aktien', width: 8, fmt: formatCurrencyShortLog },
