@@ -373,12 +373,6 @@ export const UIRenderer = {
         Object.values(dom.inputs).forEach(el => el.classList.remove('input-error'));
     },
 
-    applyTheme(mode) {
-        const effectiveTheme = (mode === 'system') ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : mode;
-        document.documentElement.setAttribute('data-theme', effectiveTheme);
-        dom.controls.themeToggle.textContent = (mode === 'dark') ? '☀️' : (mode === 'light') ? '🌙' : '🖥️';
-    },
-
     formatDiagnosisPayload(raw) {
         if(!raw) return null;
         const formatted = { ...raw };

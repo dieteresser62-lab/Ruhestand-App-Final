@@ -42,7 +42,6 @@ export const UIBinder = {
         });
 
         dom.containers.tabButtons.addEventListener('click', this.handleTabClick.bind(this));
-        dom.controls.themeToggle.addEventListener('click', this.handleThemeToggle.bind(this));
         dom.controls.resetBtn.addEventListener('click', this.handleReset.bind(this));
         dom.controls.copyAction.addEventListener('click', () => {
             navigator.clipboard.writeText(document.getElementById('handlungContent').innerText.trim())
@@ -161,14 +160,6 @@ export const UIBinder = {
         clickedButton.classList.add('active');
         dom.containers.tabPanels.forEach(panel => panel.classList.remove('active'));
         document.getElementById('tab-' + clickedButton.dataset.tab).classList.add('active');
-    },
-
-    handleThemeToggle() {
-        const modes = ['light', 'dark', 'system'];
-        const current = localStorage.getItem('theme') || 'system';
-        const next = modes[(modes.indexOf(current) + 1) % modes.length];
-        localStorage.setItem('theme', next);
-        UIRenderer.applyTheme(next);
     },
 
     handleReset() {

@@ -43,7 +43,6 @@ const dom = {
     },
     inputs: {}, // Wird in init() gefüllt
     controls: {
-        themeToggle: document.getElementById('themeToggle'),
         exportBtn: document.getElementById('exportBtn'),
         importBtn: document.getElementById('importBtn'),
         importFile: document.getElementById('importFile'),
@@ -299,11 +298,7 @@ function init() {
     // Registriert alle Event-Listener (input, change, click, keyboard shortcuts)
     UIBinder.bindUI();
 
-    // 8. Apply theme
-    // Wendet gespeichertes Theme an (light/dark/system)
-    UIRenderer.applyTheme(localStorage.getItem('theme') || 'system');
-
-    // 9. Update Debug UI
+    // 8. Update Debug UI
     // Zeigt Debug-Indikator an, wenn Debug-Modus aktiv
     if (isDebugMode) {
         const debugIndicator = document.getElementById('debugModeIndicator');
