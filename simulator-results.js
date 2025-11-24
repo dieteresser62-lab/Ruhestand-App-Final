@@ -495,11 +495,23 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         { key: 'inflation', header: 'Infl.', width: 5, fmt: v => `${(v || 0).toFixed(1)}%` },
         {
             key: null, header: 'Handl.A', width: 8,
-            fmt: (v, row) => formatCurrencyShortLog((row.vk?.vkAkt || 0) - (row.kaufAkt || 0))
+            fmt: (v, row) => {
+                const val = (row.vk?.vkAkt || 0) - (row.kaufAkt || 0);
+                const formatted = formatCurrencyShortLog(val);
+                if (val > 0) return `<span style="color: darkblue">${formatted}</span>`;
+                if (val < 0) return `<span style="color: darkred">${formatted}</span>`;
+                return formatted;
+            }
         },
         {
             key: null, header: 'Handl.G', width: 8,
-            fmt: (v, row) => formatCurrencyShortLog((row.vk?.vkGld || 0) - (row.kaufGld || 0))
+            fmt: (v, row) => {
+                const val = (row.vk?.vkGld || 0) - (row.kaufGld || 0);
+                const formatted = formatCurrencyShortLog(val);
+                if (val > 0) return `<span style="color: darkblue">${formatted}</span>`;
+                if (val < 0) return `<span style="color: darkred">${formatted}</span>`;
+                return formatted;
+            }
         },
         { key: 'steuern_gesamt', header: 'St.', width: 6, fmt: formatCurrencyShortLog },
         { key: 'wertAktien', header: 'Aktien', width: 8, fmt: formatCurrencyShortLog },
