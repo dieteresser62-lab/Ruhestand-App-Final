@@ -393,9 +393,7 @@ export function getWorstRunColumnDefinitions(opts = {}) {
 
     const baseCols = [];
     baseCols.push({ key: 'jahr', header: 'Jahr', width: 4 });
-    if (options.logDetailLevel === 'detailed') {
-        baseCols.push({ key: 'histJahr', header: 'Hist', width: 4 });
-    }
+    baseCols.push({ key: 'histJahr', header: 'Hist', width: 4, title: 'Historisches Jahr (Quelle der Marktdaten)' });
     baseCols.push({
         key: 'Person1Alive',
         header: 'P1L',
