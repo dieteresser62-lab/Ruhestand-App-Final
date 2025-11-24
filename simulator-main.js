@@ -484,6 +484,15 @@ export async function runMonteCarlo() {
         let worstRun = { finalVermoegen: Infinity, logDataRows: [], failed: false };
         let worstRunCare = { finalVermoegen: Infinity, logDataRows: [], failed: false, hasCare: false };
 
+        // Szenario-Logging: Speichere alle Runs mit Metadaten für spätere Auswahl
+        const allScenarioMeta = [];
+        // Für zufällige Szenarien: Sample-Indizes berechnen (15 gleichmäßig verteilt)
+        const randomSampleIndices = new Set();
+        const sampleStep = Math.max(1, Math.floor(anzahl / 15));
+        for (let s = 0; s < 15 && s * sampleStep < anzahl; s++) {
+            randomSampleIndices.add(s * sampleStep + Math.floor(sampleStep / 2));
+        }
+
         let failCount = 0;
         let pflegeTriggeredCount = 0;
         const entryAges = [], careDepotCosts = [];
@@ -938,6 +947,25 @@ export async function runMonteCarlo() {
             if (runHadAnyCare) {
                 maxAnnualCareSpendTriggered.push(maxAnnualSpend);
             }
+
+            // Szenario-Metadaten speichern für spätere Auswahl
+            const totalCareYears = p1CareYears + p2CareYears;
+            const totalCareCosts = (careMetaP1?.kumulierteKosten || 0) + (careMetaP2?.kumulierteKosten || 0);
+            allScenarioMeta.push({
+                index: i,
+                endVermoegen: endVermoegen,
+                failed: failed,
+                lebensdauer: lebensdauer,
+                careEverActive: careEverActive,
+                triggeredAge: triggeredAge,
+                totalCareYears: totalCareYears,
+                totalCareCosts: totalCareCosts,
+                maxKuerzung: kpiMaxKuerzungDieserLauf,
+                jahreOhneFlex: jahreOhneFlex,
+                // Alle Logs temporär speichern für spätere Auswahl der charakteristischen Szenarien
+                logDataRows: [...currentRunLog],
+                isRandomSample: randomSampleIndices.has(i)
+            });
         }
 
         progressBar.style.width = '95%';
@@ -1008,7 +1036,97 @@ export async function runMonteCarlo() {
             }
         };
 
-        displayMonteCarloResults(aggregatedResults, anzahl, failCount, worstRun, {}, {}, pflegeTriggeredCount, inputs, worstRunCare);
+        // ===== Charakteristische Szenarien identifizieren =====
+        // Sortiere nach Endvermögen für Perzentil-Berechnung
+        const sortedByWealth = [...allScenarioMeta].sort((a, b) => a.endVermoegen - b.endVermoegen);
+
+        // Hilfsfunktion für Perzentil-Index
+        const percentileIndex = (arr, p) => Math.min(Math.floor(arr.length * p), arr.length - 1);
+
+        // 1. Vermögensbasierte Perzentile (9 Szenarien)
+        const wealthPercentiles = [
+            { key: 'worst', label: 'Worst Case', scenario: sortedByWealth[0] },
+            { key: 'p5', label: 'P5', scenario: sortedByWealth[percentileIndex(sortedByWealth, 0.05)] },
+            { key: 'p10', label: 'P10', scenario: sortedByWealth[percentileIndex(sortedByWealth, 0.10)] },
+            { key: 'p25', label: 'P25', scenario: sortedByWealth[percentileIndex(sortedByWealth, 0.25)] },
+            { key: 'p50', label: 'Median', scenario: sortedByWealth[percentileIndex(sortedByWealth, 0.50)] },
+            { key: 'p75', label: 'P75', scenario: sortedByWealth[percentileIndex(sortedByWealth, 0.75)] },
+            { key: 'p90', label: 'P90', scenario: sortedByWealth[percentileIndex(sortedByWealth, 0.90)] },
+            { key: 'p95', label: 'P95', scenario: sortedByWealth[percentileIndex(sortedByWealth, 0.95)] },
+            { key: 'best', label: 'Best Case', scenario: sortedByWealth[sortedByWealth.length - 1] }
+        ];
+
+        // 2. Pflege-spezifische Szenarien (4 Szenarien)
+        const careScenarios = allScenarioMeta.filter(s => s.careEverActive);
+        const careSpecific = [];
+
+        if (careScenarios.length > 0) {
+            // Worst mit Pflege
+            const worstWithCare = careScenarios.reduce((a, b) => a.endVermoegen < b.endVermoegen ? a : b);
+            careSpecific.push({ key: 'worstCare', label: 'Worst MIT Pflege', scenario: worstWithCare });
+
+            // Längste Pflegedauer
+            const longestCare = careScenarios.reduce((a, b) => a.totalCareYears > b.totalCareYears ? a : b);
+            careSpecific.push({ key: 'longestCare', label: 'Längste Pflegedauer', scenario: longestCare });
+
+            // Höchste Pflegekosten
+            const highestCareCost = careScenarios.reduce((a, b) => a.totalCareCosts > b.totalCareCosts ? a : b);
+            careSpecific.push({ key: 'highestCareCost', label: 'Höchste Pflegekosten', scenario: highestCareCost });
+
+            // Frühester Pflegeeintritt
+            const earliestCare = careScenarios.filter(s => s.triggeredAge !== null)
+                .reduce((a, b) => (a.triggeredAge < b.triggeredAge ? a : b), careScenarios[0]);
+            careSpecific.push({ key: 'earliestCare', label: 'Frühester Pflegeeintritt', scenario: earliestCare });
+        }
+
+        // 3. Risiko-Szenarien (2 Szenarien)
+        const longestLife = allScenarioMeta.reduce((a, b) => a.lebensdauer > b.lebensdauer ? a : b);
+        const maxCut = allScenarioMeta.reduce((a, b) => a.maxKuerzung > b.maxKuerzung ? a : b);
+        const riskScenarios = [
+            { key: 'longestLife', label: 'Längste Lebensdauer', scenario: longestLife },
+            { key: 'maxCut', label: 'Maximale Kürzung', scenario: maxCut }
+        ];
+
+        // 4. Zufällige Szenarien (15 Szenarien)
+        const randomScenarios = allScenarioMeta
+            .filter(s => s.isRandomSample)
+            .map((s, idx) => ({
+                key: `random_${s.index}`,
+                label: `Zufällig #${s.index + 1}`,
+                scenario: s
+            }));
+
+        // Alle charakteristischen Szenarien zusammenstellen
+        const characteristicScenarios = [...wealthPercentiles, ...careSpecific, ...riskScenarios];
+
+        // Szenarien-Objekt für UI erstellen
+        const scenarioLogs = {
+            characteristic: characteristicScenarios.map(s => ({
+                key: s.key,
+                label: s.label,
+                endVermoegen: s.scenario.endVermoegen,
+                failed: s.scenario.failed,
+                lebensdauer: s.scenario.lebensdauer,
+                careEverActive: s.scenario.careEverActive,
+                totalCareYears: s.scenario.totalCareYears,
+                logDataRows: s.scenario.logDataRows
+            })),
+            random: randomScenarios.map(s => ({
+                key: s.key,
+                label: s.label,
+                endVermoegen: s.scenario.endVermoegen,
+                failed: s.scenario.failed,
+                lebensdauer: s.scenario.lebensdauer,
+                careEverActive: s.scenario.careEverActive,
+                totalCareYears: s.scenario.totalCareYears,
+                logDataRows: s.scenario.logDataRows
+            }))
+        };
+
+        // Speicher freigeben - nur die ausgewählten Logs behalten
+        allScenarioMeta.length = 0;
+
+        displayMonteCarloResults(aggregatedResults, anzahl, failCount, worstRun, {}, {}, pflegeTriggeredCount, inputs, worstRunCare, scenarioLogs);
 
     } catch (e) {
         alert("Fehler in der Monte-Carlo-Simulation:\n\n" + e.message + "\n" + e.stack); console.error(e);
@@ -1403,34 +1521,6 @@ function triggerDownload(filename, content, mimeType) {
     URL.revokeObjectURL(url);
 }
 
-function exportWorstRunLogData(format = 'json') {
-    const worstData = window.globalWorstRunData;
-    if (!worstData || !Array.isArray(worstData.rows) || worstData.rows.length === 0) {
-        alert('Es sind keine Worst-Case-Log-Daten zum Export verfügbar. Bitte zuerst eine Monte-Carlo-Simulation durchführen.');
-        return;
-    }
-
-    const showCareDetails = localStorage.getItem('showCareDetails') === '1';
-    const detailLevel = loadDetailLevel(WORST_LOG_DETAIL_KEY, LEGACY_LOG_DETAIL_KEY);
-    const columns = getWorstRunColumnDefinitions({ showCareDetails, logDetailLevel: detailLevel });
-    const timestamp = new Date().toISOString().replace(/[:]/g, '-');
-    const filenameBase = `worst-case-log-${timestamp}`;
-
-    if (format === 'json') {
-        const payload = {
-            exportedAt: new Date().toISOString(),
-            options: { showCareDetails, detailLevel, caR_Threshold: worstData.caR_Threshold ?? null },
-            rows: prepareRowsForExport(worstData.rows, columns)
-        };
-        triggerDownload(`${filenameBase}.json`, JSON.stringify(payload, null, 2), 'application/json');
-    } else if (format === 'csv') {
-        const csvContent = convertRowsToCsv(worstData.rows, columns);
-        triggerDownload(`${filenameBase}.csv`, csvContent, 'text/csv;charset=utf-8');
-    } else {
-        console.warn('Unbekanntes Exportformat:', format);
-    }
-}
-
 function exportBacktestLogData(format = 'json') {
     const backtestData = window.globalBacktestData;
     if (!backtestData || !Array.isArray(backtestData.rows) || backtestData.rows.length === 0) {
@@ -1460,7 +1550,6 @@ function exportBacktestLogData(format = 'json') {
 
 // Mache die Funktion global verfügbar
 window.renderBacktestLog = renderBacktestLog;
-window.exportWorstRunLogData = exportWorstRunLogData;
 window.exportBacktestLogData = exportBacktestLogData;
 
 /**
@@ -1664,43 +1753,7 @@ window.onload = function () {
     }
 
     const careDetailsCheckbox = document.getElementById('toggle-care-details');
-    if (careDetailsCheckbox) {
-        careDetailsCheckbox.checked = localStorage.getItem('showCareDetails') === '1';
-
-        careDetailsCheckbox.addEventListener('change', (e) => {
-            const showDetails = e.currentTarget.checked;
-            localStorage.setItem('showCareDetails', showDetails ? '1' : '0');
-
-            const logDetailLevel = loadDetailLevel(WORST_LOG_DETAIL_KEY, LEGACY_LOG_DETAIL_KEY);
-            if (window.globalWorstRunData && window.globalWorstRunData.rows.length > 0) {
-                document.getElementById('worstRunLog').innerHTML = renderWorstRunLog(
-                    window.globalWorstRunData.rows,
-                    window.globalWorstRunData.caR_Threshold,
-                    { showCareDetails: showDetails, logDetailLevel: logDetailLevel }
-                );
-            }
-        });
-    }
-
-    const logDetailCheckbox = document.getElementById('toggle-log-detail');
-    if (logDetailCheckbox) {
-        logDetailCheckbox.checked = loadDetailLevel(WORST_LOG_DETAIL_KEY, LEGACY_LOG_DETAIL_KEY) === 'detailed';
-
-        logDetailCheckbox.addEventListener('change', (e) => {
-            const detailLevel = e.currentTarget.checked ? 'detailed' : 'normal';
-            // Separate storage key to avoid leaking the backtest toggle into the worst-log columns.
-            persistDetailLevel(WORST_LOG_DETAIL_KEY, detailLevel);
-
-            const showCareDetails = localStorage.getItem('showCareDetails') === '1';
-            if (window.globalWorstRunData && window.globalWorstRunData.rows.length > 0) {
-                document.getElementById('worstRunLog').innerHTML = renderWorstRunLog(
-                    window.globalWorstRunData.rows,
-                    window.globalWorstRunData.caR_Threshold,
-                    { showCareDetails: showCareDetails, logDetailLevel: detailLevel }
-                );
-            }
-        });
-    }
+    // Checkbox-Handler für Szenario-Logs werden in displayMonteCarloResults registriert
 
     const backtestDetailCheckbox = document.getElementById('toggle-backtest-detail');
     if (backtestDetailCheckbox) {
@@ -1715,15 +1768,6 @@ window.onload = function () {
                 window.renderBacktestLog();
             }
         });
-    }
-
-    const exportWorstJsonBtn = document.getElementById('exportWorstLogJson');
-    if (exportWorstJsonBtn) {
-        exportWorstJsonBtn.addEventListener('click', () => exportWorstRunLogData('json'));
-    }
-    const exportWorstCsvBtn = document.getElementById('exportWorstLogCsv');
-    if (exportWorstCsvBtn) {
-        exportWorstCsvBtn.addEventListener('click', () => exportWorstRunLogData('csv'));
     }
 
     const exportBacktestJsonBtn = document.getElementById('exportBacktestJson');

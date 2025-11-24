@@ -2,7 +2,7 @@
 
 import { formatCurrency, formatCurrencyShortLog, shortenText } from './simulator-utils.js';
 import { STRESS_PRESETS } from './simulator-data.js';
-import { renderHeatmapSVG, renderWorstRunToggle } from './simulator-heatmap.js';
+import { renderHeatmapSVG } from './simulator-heatmap.js';
 
 /**
  * Storage keys for log detail preferences.
@@ -53,53 +53,6 @@ export function persistDetailLevel(storageKey, level) {
 }
 
 /**
- * Stellt sicher, dass die Worst-Run-Toggle-Buttons existieren und
- * zur aktuellen Datenlage passen (Pflege-Button nur, wenn Daten vorhanden sind).
- *
- * @param {HTMLElement|null} controlsContainer - Container, der die Toggle-Buttons aufnimmt.
- * @param {boolean} hasCareWorst - Flag, ob ein spezifischer Pflege-Worst-Run existiert.
- * @returns {{ allButton: HTMLElement|null, careButton: HTMLElement|null }}
- *          Referenzen auf die (ggf. neu erzeugten) Buttons.
- */
-function ensureWorstRunToggleButtons(controlsContainer, hasCareWorst) {
-    // Kein Container vorhanden -> Buttons können nicht verwaltet werden.
-    if (!controlsContainer) {
-        return { allButton: null, careButton: null };
-    }
-
-    let toggleWrapper = controlsContainer.querySelector('.worst-run-toggle');
-
-    // Erstinitialisierung: vollständiges Toggle-Markup einfügen.
-    if (!toggleWrapper) {
-        controlsContainer.insertAdjacentHTML('afterbegin', renderWorstRunToggle(hasCareWorst));
-        toggleWrapper = controlsContainer.querySelector('.worst-run-toggle');
-    } else {
-        const existingCareButton = document.getElementById('btnWorstCare');
-
-        if (hasCareWorst && !existingCareButton) {
-            // Es gibt nun Pflege-Daten, daher Button dynamisch ergänzen.
-            const careButton = document.createElement('button');
-            careButton.id = 'btnWorstCare';
-            careButton.className = 'toggle-btn';
-            careButton.type = 'button';
-            careButton.textContent = 'Schlechtester Pflege-Lauf';
-            toggleWrapper.appendChild(careButton);
-        } else if (!hasCareWorst && existingCareButton) {
-            // Keine Pflege-Daten mehr -> Button entfernen, um veraltete Aktionen zu vermeiden.
-            existingCareButton.remove();
-        }
-    }
-
-    return {
-        allButton: document.getElementById('btnWorstAll'),
-        careButton: document.getElementById('btnWorstCare')
-    };
-}
-
-// Globale Variable für Worst-Run Re-Rendering
-window.globalWorstRunData = { rows: [], caR_Threshold: undefined };
-
-/**
  * Erstellt eine KPI-Karte mit Zahlenwert
  */
 export function createKpiCard(title, value, unit, description, colorClass = '') {
@@ -129,7 +82,7 @@ export function createCurrencyKpiCard(title, value, description, colorClass = ''
 /**
  * Zeigt die Monte-Carlo-Ergebnisse an
  */
-export function displayMonteCarloResults(results, anzahl, failCount, worstRun, resultsMitPflege, resultsOhnePflege, pflegefallEingetretenCount, inputs, worstRunCare) {
+export function displayMonteCarloResults(results, anzahl, failCount, worstRun, resultsMitPflege, resultsOhnePflege, pflegefallEingetretenCount, inputs, worstRunCare, scenarioLogs = null) {
 
     // 1. Haupt-Zusammenfassung (Summary)
     document.getElementById('monteCarloSummary').innerHTML = `
@@ -266,65 +219,162 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
         pflegeResultsContainer.style.display = 'none';
     }
 
-    // 5. Worst-Run-Log mit Umschalter
-    const worstContainer = document.getElementById('worstRunLogContainer');
-    const worstEl = document.getElementById('worstRunLog');
-    const controlsContainer = document.getElementById('worst-controls');
+    // 5. Szenario-Log Auswahl (ersetzt den alten Worst-Run-Log)
+    const scenarioContainer = document.getElementById('scenarioLogContainer');
+    if (scenarioLogs && scenarioContainer) {
+        const caR = results.extraKPI?.consumptionAtRiskP10Real;
+        window.globalScenarioLogs = scenarioLogs;
+        window.globalScenarioCarThreshold = caR;
+        window.globalCurrentScenarioData = null;
 
-    const hasCareWorst = !!(worstRunCare && worstRunCare.hasCare && Array.isArray(worstRunCare.logDataRows) && worstRunCare.logDataRows.length > 0);
+        // Dropdown erstellen im scenarioSelector
+        const selectorDiv = document.getElementById('scenarioSelector');
+        let dropdownHtml = `
+            <div class="scenario-selector" style="margin-bottom: 15px; text-align: center;">
+                <label for="scenarioSelect" style="font-weight: 600; margin-right: 10px;">Szenario-Log anzeigen:</label>
+                <select id="scenarioSelect" style="padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); min-width: 300px; font-size: 0.9rem;">
+                    <option value="">— Szenario auswählen —</option>
+                    <optgroup label="📊 Charakteristische Szenarien">`;
 
-    const { allButton: btnAll, careButton: btnCare } = ensureWorstRunToggleButtons(controlsContainer, hasCareWorst);
-
-    let view = localStorage.getItem('worstRunView') || 'all';
-    if (view === 'care' && !hasCareWorst) view = 'all';
-
-    const paintWorst = () => {
-        const wr = (view === 'care' && hasCareWorst) ? worstRunCare : worstRun;
-
-        const btnAll = document.getElementById('btnWorstAll');
-        const btnCare = document.getElementById('btnWorstCare');
-        if (btnAll) btnAll.classList.toggle('active', view === 'all');
-        if (btnCare) btnCare.classList.toggle('active', view === 'care');
-
-        if (wr && Array.isArray(wr.logDataRows) && wr.logDataRows.length > 0) {
-            const caR = results.extraKPI?.consumptionAtRiskP10Real;
-            window.globalWorstRunData = { rows: wr.logDataRows, caR_Threshold: caR };
-            const showCareDetails = (localStorage.getItem('showCareDetails') === '1');
-            const logDetailLevel = loadDetailLevel(WORST_LOG_DETAIL_KEY);
-            worstEl.innerHTML = renderWorstRunLog(wr.logDataRows, caR, {
-                showCareDetails: showCareDetails,
-                logDetailLevel: logDetailLevel
-            });
-            worstContainer.style.display = 'block';
-        } else {
-            worstContainer.style.display = 'none';
+        // Charakteristische Szenarien mit Endvermögen
+        for (const s of scenarioLogs.characteristic) {
+            const vermLabel = s.failed ? '⚠️ FAILED' : formatCurrency(s.endVermoegen);
+            const careLabel = s.careEverActive ? ' 🏥' : '';
+            dropdownHtml += `<option value="char_${s.key}">${s.label} (${vermLabel})${careLabel}</option>`;
         }
-    };
 
-    if (btnAll) {
-        btnAll.onclick = () => {
-            view = 'all';
-            localStorage.setItem('worstRunView', 'all');
-            paintWorst();
+        dropdownHtml += `</optgroup>
+                    <optgroup label="🎲 Zufällige Szenarien">`;
+
+        // Zufällige Szenarien
+        for (const s of scenarioLogs.random) {
+            const vermLabel = s.failed ? '⚠️ FAILED' : formatCurrency(s.endVermoegen);
+            const careLabel = s.careEverActive ? ' 🏥' : '';
+            dropdownHtml += `<option value="rand_${s.key}">${s.label} (${vermLabel})${careLabel}</option>`;
+        }
+
+        dropdownHtml += `</optgroup>
+                </select>
+            </div>`;
+
+        selectorDiv.innerHTML = dropdownHtml;
+        scenarioContainer.style.display = 'block';
+
+        const select = document.getElementById('scenarioSelect');
+        const output = document.getElementById('scenarioLogOutput');
+        const exportButtons = document.getElementById('scenarioExportButtons');
+
+        // Funktion zum Rendern des ausgewählten Szenarios
+        const renderSelectedScenario = () => {
+            const val = select.value;
+            if (!val) {
+                output.style.display = 'none';
+                exportButtons.style.display = 'none';
+                window.globalCurrentScenarioData = null;
+                return;
+            }
+
+            let scenario = null;
+            if (val.startsWith('char_')) {
+                const key = val.replace('char_', '');
+                scenario = scenarioLogs.characteristic.find(s => s.key === key);
+            } else if (val.startsWith('rand_')) {
+                const key = val.replace('rand_', '');
+                scenario = scenarioLogs.random.find(s => s.key === key);
+            }
+
+            if (scenario && scenario.logDataRows && scenario.logDataRows.length > 0) {
+                const showCareDetails = (localStorage.getItem('showCareDetails') === '1');
+                const logDetailLevel = loadDetailLevel(WORST_LOG_DETAIL_KEY);
+                output.innerHTML = renderWorstRunLog(scenario.logDataRows, caR, {
+                    showCareDetails: showCareDetails,
+                    logDetailLevel: logDetailLevel
+                });
+                output.style.display = 'block';
+                exportButtons.style.display = 'flex';
+                window.globalCurrentScenarioData = { rows: scenario.logDataRows, caR_Threshold: caR };
+            } else {
+                output.innerHTML = '<p style="color: var(--text-muted); padding: 10px;">Keine Log-Daten für dieses Szenario verfügbar.</p>';
+                output.style.display = 'block';
+                exportButtons.style.display = 'none';
+                window.globalCurrentScenarioData = null;
+            }
         };
-    }
-    if (btnCare) {
-        if (hasCareWorst) {
-            btnCare.disabled = false;
-            btnCare.onclick = () => {
-                view = 'care';
-                localStorage.setItem('worstRunView', 'care');
-                paintWorst();
-            };
-        } else {
-            // Button wird deaktiviert, falls er aus einem früheren Lauf stammt.
-            btnCare.classList.remove('active');
-            btnCare.disabled = true;
-            btnCare.onclick = null;
-        }
-    }
 
-    paintWorst();
+        // Event-Handler für Dropdown
+        select.addEventListener('change', renderSelectedScenario);
+
+        // Event-Handler für Checkboxen (re-render bei Änderung)
+        const careDetailsCheckbox = document.getElementById('toggle-care-details');
+        const logDetailCheckbox = document.getElementById('toggle-log-detail');
+
+        if (careDetailsCheckbox) {
+            careDetailsCheckbox.checked = (localStorage.getItem('showCareDetails') === '1');
+            careDetailsCheckbox.addEventListener('change', () => {
+                localStorage.setItem('showCareDetails', careDetailsCheckbox.checked ? '1' : '0');
+                renderSelectedScenario();
+            });
+        }
+
+        if (logDetailCheckbox) {
+            logDetailCheckbox.checked = (loadDetailLevel(WORST_LOG_DETAIL_KEY) === 'detailed');
+            logDetailCheckbox.addEventListener('change', () => {
+                const newLevel = logDetailCheckbox.checked ? 'detailed' : 'normal';
+                persistDetailLevel(WORST_LOG_DETAIL_KEY, newLevel);
+                renderSelectedScenario();
+            });
+        }
+
+        // Export-Buttons Event-Handler
+        const jsonBtn = document.getElementById('exportScenarioLogJson');
+        const csvBtn = document.getElementById('exportScenarioLogCsv');
+
+        if (jsonBtn) {
+            jsonBtn.onclick = () => {
+                if (window.globalCurrentScenarioData?.rows) {
+                    const blob = new Blob([JSON.stringify(window.globalCurrentScenarioData.rows, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'scenario-log.json';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                }
+            };
+        }
+
+        if (csvBtn) {
+            csvBtn.onclick = () => {
+                if (window.globalCurrentScenarioData?.rows && window.globalCurrentScenarioData.rows.length > 0) {
+                    const rows = window.globalCurrentScenarioData.rows;
+                    const headers = Object.keys(rows[0]);
+                    const csvContent = [
+                        headers.join(';'),
+                        ...rows.map(row => headers.map(h => {
+                            const val = row[h];
+                            if (val === null || val === undefined) return '';
+                            if (typeof val === 'object') return JSON.stringify(val);
+                            return String(val);
+                        }).join(';'))
+                    ].join('\n');
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'scenario-log.csv';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                }
+            };
+        }
+
+        // Worst Case standardmäßig auswählen
+        select.value = 'char_worst';
+        renderSelectedScenario();
+
+    } else if (scenarioContainer) {
+        scenarioContainer.style.display = 'none';
+    }
 
     // 6. Gesamten Ergebnis-Container sichtbar machen
     document.getElementById('monteCarloResults').style.display = 'block';
@@ -343,9 +393,7 @@ export function getWorstRunColumnDefinitions(opts = {}) {
 
     const baseCols = [];
     baseCols.push({ key: 'jahr', header: 'Jahr', width: 4 });
-    if (options.logDetailLevel === 'detailed') {
-        baseCols.push({ key: 'histJahr', header: 'Hist', width: 4 });
-    }
+    baseCols.push({ key: 'histJahr', header: 'Hist', width: 4, title: 'Historisches Jahr (Quelle der Marktdaten)' });
     baseCols.push({
         key: 'Person1Alive',
         header: 'P1L',

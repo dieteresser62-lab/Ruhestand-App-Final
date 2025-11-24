@@ -1,23 +1,19 @@
 # QUICK REFERENCE: Ruhestand-App Codebase Structure
 
 ## At a Glance
-- **Total Code:** ~18,700 lines
+- **Total Code:** ~16,000 lines
 - **Architecture:** Dual-app system (Balance + Simulator) + shared Engine
-- **Status:** Stable but needs modularization
-- **Main Issues:** 2 files >2000 lines, 4 files >500 lines
+- **Status:** Stable, modular structure
+- **Main Files:** simulator-main.js (~3,100 lines), engine.js (~2,400 lines auto-generated)
 
-## Critical Files (Need Refactoring)
+## Critical Files
 
-### CRITICAL - >2000 lines
-1. **simulator.js** (2,527 lines) - Main simulator UI
-   - **Issue:** Mixed UI, logic, event handling
-   - **Action:** Split into 5 sub-modules
-   
-2. **simulator-main.js** (2,629 lines) - Orchestration & control
-   - **Issue:** Monte Carlo + sweeps + backtest + exports all in one file
-   - **Action:** Split into 6 feature-based modules
+### LARGE - >2000 lines
+1. **simulator-main.js** (~3,100 lines) - Main simulator orchestration
+   - Contains: Monte Carlo, sweeps, backtest, exports, UI handling
+   - **Status:** Functional, could be split further
 
-3. **engine.js** (2,422 lines) - Auto-generated
+2. **engine.js** (~2,400 lines) - Auto-generated
    - **Status:** DO NOT EDIT - modify engine/ source files instead
    - **Action:** Run `node build-engine.js` after engine changes
 
@@ -50,28 +46,23 @@ Ruhestand-App-Final/
 
 | File | Functions | Status |
 |------|-----------|--------|
-| simulator.js | 47 | TOO MANY |
-| simulator-main.js | 33 | TOO MANY |
+| simulator-main.js | 50+ | LARGE but organized |
 | simulator-engine.js | 20+ | ACCEPTABLE |
-| balance-renderer.js | ~30+ (methods) | TOO MANY |
+| simulator-results.js | 15+ | GOOD |
+| balance-renderer.js | ~30+ (methods) | ACCEPTABLE |
 | balance-binder.js | 20+ | ACCEPTABLE |
 | engine files | 5-20 ea | GOOD |
 
-## Top 5 Refactoring Priorities
+## Potential Refactoring
 
-### P0 - Critical (Do These First)
-1. **Document simulator.js** - Add JSDoc to all 47 functions
+### P1 - Would be helpful
+1. **Split simulator-main.js** - Could be 4-5 feature modules
 2. **Extract utilities** - Create `/utils` directory
 3. **Create `/config`** - Centralize all configuration
 
-### P1 - Important (Next Quarter)
-4. **Split simulator.js** - 5 focused modules
-5. **Split simulator-main.js** - 6 feature modules
-
-### P2 - Helpful (After P1)
-6. **Modularize balance-renderer.js** - 5-6 feature modules
-7. **Split simulator-engine.js** - 4 logic modules
-8. **Split balance-binder.js** - 4 concern modules
+### P2 - Nice to have
+4. **Modularize balance-renderer.js** - 5-6 feature modules
+5. **Split simulator-engine.js** - 4 logic modules
 
 ## Code Quality Metrics
 
@@ -79,16 +70,15 @@ Ruhestand-App-Final/
 - ✓ Dual-app design (Balance + Simulator) works well
 - ✓ Engine is well-modularized (8 focused modules)
 - ✓ Balance app structure is clean (6 modules)
+- ✓ Simulator modules well-organized (main, engine, results, heatmap, portfolio, utils, data)
 - ✓ No external dependencies (vanilla ES6)
-- ✓ Decent documentation (README, TECHNICAL.md)
+- ✓ Good documentation (README, TECHNICAL.md)
+- ✓ Monte Carlo with 30 selectable scenario logs
 
-### What Needs Work
-- ✗ Simulator has 2 monolithic files (2500+ lines each)
-- ✗ UI logic mixed with business logic
-- ✗ No clear component architecture
-- ✗ Configuration scattered across files
-- ✗ Tests in root directory
-- ✗ No JSDoc in large files
+### What Could Improve
+- ○ simulator-main.js is large (~3100 lines) - could be split
+- ○ Configuration scattered across files
+- ○ Tests in root directory
 
 ## Quick Commands
 
@@ -123,21 +113,20 @@ grep -c "^function\|^const.*=.*function\|^export" filename.js
 5. Store → `balance-storage.js`
 
 ### Data Flow - Simulator App
-1. User input → `simulator.html` form
+1. User input → `Simulator.html` form
 2. Monte Carlo setup → `simulator-main.js`
 3. Year-by-year → `simulator-engine.js`
-4. Results → `simulator-results.js`
-5. Display → `simulator.js`
-6. Sweep → `simulator-heatmap.js`
+4. Results aggregation → `simulator-results.js`
+5. Sweep visualization → `simulator-heatmap.js`
 
 ## File Size Distribution
 
 ```
-2000+ lines: 3 files (simulator.js, simulator-main.js, engine.js)
+2000+ lines: 2 files (simulator-main.js, engine.js)
 1000-2000:  1 file  (simulator-engine.js)
 500-1000:   4 files (balance-renderer, balance-binder, simulator-results, simulator-portfolio)
 200-500:    6 files (heatmap, utils, data, core, config, adapter)
-<200:       19 files (all in good shape)
+<200:       15 files (all in good shape)
 ```
 
 ## Common Issues & Solutions
@@ -148,13 +137,14 @@ grep -c "^function\|^const.*=.*function\|^export" filename.js
 grep -r "functionName" --include="*.js" .
 ```
 
-### Issue: Understanding simulator.js
-**Solution:** It's 2,527 lines - break it into concerns:
-- UI rendering (600 lines)
-- Event handling (400 lines)
-- State management (300 lines)
-- Care UI (400 lines)
-- Results display (400 lines)
+### Issue: Understanding simulator-main.js
+**Solution:** It's ~3,100 lines organized by feature:
+- Monte Carlo simulation
+- Parameter sweeps
+- Backtest logic
+- UI event handling
+- Export functions
+- Scenario log generation
 
 ### Issue: Engine changes not showing
 **Solution:** Run `node build-engine.js` after editing `engine/` files
@@ -166,23 +156,19 @@ grep -r "functionName" --include="*.js" .
 - `simulator-data.js`
 - Should consolidate to `/config` folder
 
-## Next Steps
+## Next Steps (Optional Improvements)
 
-1. **Week 1:** Read CODEBASE_ANALYSIS.md (in project root)
-2. **Week 2:** Document large files with JSDoc
-3. **Week 3:** Create `/config`, `/utils`, `/data` directories
-4. **Week 4:** Start splitting simulator.js (most beneficial)
-5. **Week 5+:** Continue modularization per timeline
+1. Create `/config`, `/utils`, `/data` directories
+2. Add more JSDoc to large files
+3. Consider splitting simulator-main.js into feature modules
 
 ## References
 
-- **CODEBASE_ANALYSIS.md** - Full analysis (771 lines)
 - **TECHNICAL.md** - Architecture overview
 - **BALANCE_MODULES_README.md** - Balance app details
 - **README.md** - Project overview
-- **engine/README.md** - Engine build details (if exists)
+- **engine/README.md** - Engine build details
 
 ---
 
-**Analysis Generated:** 2025-11-21
-**Total Analysis Size:** 771 lines in CODEBASE_ANALYSIS.md
+**Last Updated:** 2025-11-24

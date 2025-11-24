@@ -24,7 +24,8 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 * Parameter-Sweep mit Whitelist-Ansatz, Deep-Clones und Wächterlogik für Zwei-Personen-Haushalte.
 * Stresstests, Pflegefall-Szenarien und Heatmap-Visualisierung inklusive Warnhinweisen.
 * Sweep-Schutz für Partner:innen-Renten inklusive Rente-2-Invarianz, Heatmap-Badges und Dev-Self-Tests für den Wächter.
-* Kontextsensitiver Worst-Run-Umschalter, der Pflege-spezifische Extremläufe mitsamt Diagnose-Log separat zugänglich macht.
+* Szenario-Log-Analyse mit 30 auswählbaren Szenarien: 15 charakteristische (Perzentile, Pflege-Extremfälle, Risiko-Szenarien) und 15 zufällige Samples für typisches Verhalten.
+* Checkboxen für Pflege-Details und detailliertes Log, JSON/CSV-Export für ausgewählte Szenarien.
 * Dev-Modus (per Toggle oder `localStorage.setItem('sim.devMode', '1')`) mit Self-Test (`runSweepSelfTest`).
 
 #### Pflegegrad-Modellierung
@@ -50,8 +51,8 @@ Zusätzlich gibt es nun Staffel-Presets (ambulant/stationär), einen regionalen 
 Floor sowie Listener, die alle Pflegefelder synchron halten – inklusive Info-Hinweis und Tooltips im UI.【F:simulator-main.js†L89-L1506】
 
 Das Simulator-Dashboard erweitert die Pflegeanalyse um KPI-Karten pro Person, Eintrittsalter, Pflegedauer, simultane Pflegejahre
-und Kosten- sowie Shortfall-Deltas. Ein Worst-Run-Toggle macht auf Wunsch den pflegespezifischen Extremlauf inkl. Log und zusätz-
-lichen Details sichtbar, sobald entsprechende Daten vorhanden sind.【F:simulator-results.js†L191-L250】【F:simulator.js†L366-L429】
+und Kosten- sowie Shortfall-Deltas. Die Szenario-Log-Auswahl ermöglicht die Analyse von 30 verschiedenen Simulationsläufen inkl.
+Pflege-Details und Export-Funktion.【F:simulator-results.js†L269-L427】【F:simulator-main.js†L1039-L1129】
 
 #### Rentenlogik
 
