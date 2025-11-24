@@ -1459,32 +1459,18 @@ function buildBacktestColumnDefinitions(detailLevel = 'normal') {
         { header: 'R.Aktien', width: 8, extractor: row => (row.row?.RealReturnEquityPct || 0) * 100, valueFormatter: v => formatPercent(v), align: 'right' },
         { header: 'R.Gold', width: 8, extractor: row => (row.row?.RealReturnGoldPct || 0) * 100, valueFormatter: v => formatPercent(v), align: 'right' },
         { header: 'Infl.', width: 5, key: 'inflationVJ', valueFormatter: v => formatPercent(v), align: 'right' },
-        {
-            header: 'Handl.A', width: 8, key: 'netA',
-            valueFormatter: v => {
-                const formatted = formatCurrencyShortLog(v);
-                if (v > 0) {
-                    return `<span style="color: darkblue; font-weight: bold;">${formatted}</span>`;
-                } else if (v < 0) {
-                    return `<span style="color: darkred; font-weight: bold;">${formatted}</span>`;
-                }
-                return formatted;
-            },
-            align: 'right'
-        },
-        {
-            header: 'Handl.G', width: 8, key: 'netG',
-            valueFormatter: v => {
-                const formatted = formatCurrencyShortLog(v);
-                if (v > 0) {
-                    return `<span style="color: darkblue; font-weight: bold;">${formatted}</span>`;
-                } else if (v < 0) {
-                    return `<span style="color: darkred; font-weight: bold;">${formatted}</span>`;
-                }
-                return formatted;
-            },
-            align: 'right'
-        },
+        { header: 'Handl.A', width: 8, key: 'netA', valueFormatter: v => {
+            const formatted = formatCurrencyShortLog(v);
+            if (v > 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
+            if (v < 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
+            return formatted;
+        }, align: 'right' },
+        { header: 'Handl.G', width: 8, key: 'netG', valueFormatter: v => {
+            const formatted = formatCurrencyShortLog(v);
+            if (v > 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
+            if (v < 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
+            return formatted;
+        }, align: 'right' },
         { header: 'St.', width: 6, key: 'row.steuern_gesamt', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
         { header: 'Aktien', width: 8, key: 'wertAktien', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
         { header: 'Gold', width: 7, key: 'wertGold', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },

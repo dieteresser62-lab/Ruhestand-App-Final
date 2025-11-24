@@ -504,26 +504,20 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         {
             key: null, header: 'Handl.A', width: 8,
             fmt: (v, row) => {
-                const value = (row.vk?.vkAkt || 0) - (row.kaufAkt || 0);
-                const formatted = formatCurrencyShortLog(value);
-                if (value > 0) {
-                    return `<span style="color: darkblue; font-weight: bold;">${formatted}</span>`;
-                } else if (value < 0) {
-                    return `<span style="color: darkred; font-weight: bold;">${formatted}</span>`;
-                }
+                const val = (row.vk?.vkAkt || 0) - (row.kaufAkt || 0);
+                const formatted = formatCurrencyShortLog(val);
+                if (val > 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
+                if (val < 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
                 return formatted;
             }
         },
         {
             key: null, header: 'Handl.G', width: 8,
             fmt: (v, row) => {
-                const value = (row.vk?.vkGld || 0) - (row.kaufGld || 0);
-                const formatted = formatCurrencyShortLog(value);
-                if (value > 0) {
-                    return `<span style="color: darkblue; font-weight: bold;">${formatted}</span>`;
-                } else if (value < 0) {
-                    return `<span style="color: darkred; font-weight: bold;">${formatted}</span>`;
-                }
+                const val = (row.vk?.vkGld || 0) - (row.kaufGld || 0);
+                const formatted = formatCurrencyShortLog(val);
+                if (val > 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
+                if (val < 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
                 return formatted;
             }
         },
