@@ -1701,12 +1701,15 @@ const TransactionEngine = {
                 });
 
                 // Bei kritischer Liquidität: niedrigere Mindestschwelle verwenden
+                // WICHTIG: minTradeResultOverride auf 0 setzen, um RUIN zu verhindern
+                // Sonst würde der dynamische minTradeResult bei großen Portfolios die Transaktion blockieren
                 let appliedMinTradeGate;
                 if (isCriticalLiquidity) {
                     appliedMinTradeGate = Math.max(
                         CONFIG.THRESHOLDS.STRATEGY.minRefillAmount || 2500,
                         CONFIG.THRESHOLDS.STRATEGY.cashRebalanceThreshold || 2500
                     );
+                    minTradeResultOverride = 0;
                 } else {
                     const minTradeGateResult = this._computeAppliedMinTradeGate({
                         investiertesKapital,
