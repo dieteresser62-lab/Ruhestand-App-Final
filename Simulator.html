@@ -57,6 +57,74 @@
             align-items: center;
             justify-content: space-between
         }
+
+        /* Log Export Buttons - kompakt */
+        .log-export-buttons {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+            margin-top: 12px;
+        }
+
+        .log-export-buttons button {
+            font-size: 0.7rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #d1d5db;
+            background: #f9fafb;
+            color: #374151;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .log-export-buttons button:hover {
+            background: #e5e7eb;
+            border-color: #9ca3af;
+        }
+
+        /* Log Container - Option A: Moderne Card-Style */
+        #worstRunLog,
+        #simulationLog {
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e5e7eb;
+            overflow: hidden;
+            font-size: 0.8rem;
+        }
+
+        #worstRunLog table,
+        #simulationLog table {
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+            font-size: 0.75rem;
+        }
+
+        #worstRunLog tr:nth-child(even),
+        #simulationLog tr:nth-child(even) {
+            background: #f9fafb;
+        }
+
+        #worstRunLog tr:hover,
+        #simulationLog tr:hover {
+            background: #f3f4f6;
+        }
+
+        #worstRunLog th,
+        #simulationLog th {
+            background: #f3f4f6;
+            font-weight: 600;
+            color: #374151;
+            position: sticky;
+            top: 0;
+        }
+
+        #worstRunLog td,
+        #simulationLog td,
+        #worstRunLog th,
+        #simulationLog th {
+            padding: 6px 8px;
+            border-bottom: 1px solid #e5e7eb;
+        }
     </style>
 </head>
 
@@ -555,12 +623,12 @@
                                         style="width:auto; vertical-align: middle; margin-right: 4px;">
                                     Detailliertes Log anzeigen
                                 </label>
-                                <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
-                                    <button type="button" id="exportWorstLogJson">Worst-Case Log als JSON</button>
-                                    <button type="button" id="exportWorstLogCsv">Worst-Case Log als CSV</button>
-                                </div>
                             </div>
                             <div id="worstRunLog"></div>
+                            <div class="log-export-buttons">
+                                <button type="button" id="exportWorstLogJson">JSON</button>
+                                <button type="button" id="exportWorstLogCsv">CSV</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -587,13 +655,12 @@
                                     style="width:auto; vertical-align: middle; margin-right: 4px;">
                                 Detailliertes Log anzeigen
                             </label>
-                            <div
-                                style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:8px;">
-                                <button type="button" id="exportBacktestJson">Backtest-Log als JSON</button>
-                                <button type="button" id="exportBacktestCsv">Backtest-Log als CSV</button>
-                            </div>
                         </div>
                         <div id="simulationLog">Keine Daten</div>
+                        <div class="log-export-buttons">
+                            <button type="button" id="exportBacktestJson">JSON</button>
+                            <button type="button" id="exportBacktestCsv">CSV</button>
+                        </div>
                     </div>
                     <div id="engine-mismatch-footer"></div>
                     <section class="dev-only" id="parity-smoketest-card">
