@@ -297,14 +297,12 @@ const TransactionEngine = {
                 ? (guardrailTargetEuro / monthlyBaselineNeed)
                 : 0;
             const guardrailGapEuro = Math.max(0, guardrailTargetEuro - aktuelleLiquiditaet);
-            // Kritische Coverage-Schwelle für Peak-Regimes (unter 50% = Notfall)
-            const criticalCoverageThreshold = 0.50;
-            const hasCriticalCoverageGap = zielLiquiditaetsdeckung < criticalCoverageThreshold;
-            // Peak-Regimes: Guardrail nur bei Runway-Lücke ODER kritisch niedriger Coverage
-            // Moderate Unterdeckung (50-75%) wird durch opportunistisches Rebalancing gefüllt
-            // Nicht-Peak: Guardrail bei jeder Coverage-Lücke oder Runway-Lücke
+            // Peak-Regimes: KEIN Guardrail - immer Opportunistisches Rebalancing verwenden.
+            // Im Peak wollen wir die gute Marktlage nutzen, um BEIDES aufzufüllen (Liquidität + Gold).
+            // Gold aufschieben ist riskant, da der nächste Bär jederzeit kommen kann.
+            // Nicht-Peak: Guardrail bei Coverage-Lücke oder Runway-Lücke
             const hasGuardrailGap = isPeakRegime
-                ? ((hasRunwayGap || hasCriticalCoverageGap) && guardrailGapEuro > 1)
+                ? false
                 : ((hasCoverageGap || hasRunwayGap) && guardrailGapEuro > 1);
 
             console.log('DEBUG determineAction:', {
