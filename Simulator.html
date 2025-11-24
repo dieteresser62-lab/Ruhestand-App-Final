@@ -566,9 +566,10 @@
                                 Pflegerisikos</h3>
                             <div id="pflegeKpiSummary" class="summary-grid"></div>
                         </div>
-                        <div id="worstRunLogContainer" style="display:none; margin-top: 25px;">
-                            <h4 style="text-align:center;">Jahresprotokoll des schlechtesten Laufs (Worst Case)</h4>
-                            <div id="worst-controls"
+                        <!-- Szenario-Log Auswahl -->
+                        <div id="scenarioLogContainer" style="display:none; margin-top: 25px;">
+                            <h4 style="text-align:center;">Szenario-Logs analysieren</h4>
+                            <div id="scenario-controls"
                                 style="text-align: center; margin-bottom: 10px; font-size: 0.9rem; display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
                                 <label style="user-select:none; cursor:pointer;"
                                     title="Zeige vollständige Pflege-Aufschlüsselung (Anker, Cap, Deltas, Flex-Faktor).">
@@ -583,17 +584,12 @@
                                     Detailliertes Log anzeigen
                                 </label>
                             </div>
-                            <div id="worstRunLog"></div>
-                            <div class="log-export-buttons">
-                                <button type="button" id="exportWorstLogJson">JSON</button>
-                                <button type="button" id="exportWorstLogCsv">CSV</button>
+                            <div id="scenarioSelector"></div>
+                            <div id="scenarioLogOutput"></div>
+                            <div class="log-export-buttons" id="scenarioExportButtons" style="display:none;">
+                                <button type="button" id="exportScenarioLogJson">JSON</button>
+                                <button type="button" id="exportScenarioLogCsv">CSV</button>
                             </div>
-                        </div>
-
-                        <!-- Szenario-Log Auswahl -->
-                        <div id="scenarioLogContainer" style="display:none; margin-top: 25px;">
-                            <h4 style="text-align:center;">Einzelne Szenarien analysieren</h4>
-                            <!-- Dropdown und Log werden dynamisch eingefügt -->
                         </div>
                     </div>
                 </div>

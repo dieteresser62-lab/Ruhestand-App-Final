@@ -1835,15 +1835,6 @@ window.onload = function () {
         });
     }
 
-    const exportWorstJsonBtn = document.getElementById('exportWorstLogJson');
-    if (exportWorstJsonBtn) {
-        exportWorstJsonBtn.addEventListener('click', () => exportWorstRunLogData('json'));
-    }
-    const exportWorstCsvBtn = document.getElementById('exportWorstLogCsv');
-    if (exportWorstCsvBtn) {
-        exportWorstCsvBtn.addEventListener('click', () => exportWorstRunLogData('csv'));
-    }
-
     const exportBacktestJsonBtn = document.getElementById('exportBacktestJson');
     if (exportBacktestJsonBtn) {
         exportBacktestJsonBtn.addEventListener('click', () => exportBacktestLogData('json'));
