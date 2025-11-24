@@ -237,7 +237,7 @@ input:disabled {
     }
 }
 .calculated-display { padding: 9px; background-color: #e9ecef; border-radius: 6px; font-size: 1rem; color: var(--primary-color); font-weight: bold; text-align: right; }
-#simulationLog, #worstRunLog {
+#simulationLog, #scenarioLogOutput {
     font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Courier New', monospace;
     font-size: 0.8rem;
     background-color: #ffffff;
@@ -251,22 +251,22 @@ input:disabled {
     border: 1px solid #d1d5db;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
-#simulationLog table, #worstRunLog table {
+#simulationLog table, #scenarioLogOutput table {
     width: auto;
     border-collapse: collapse;
     color: #000000;
     font-size: 0.75rem;
 }
-#simulationLog tr:nth-child(even), #worstRunLog tr:nth-child(even) {
+#simulationLog tr:nth-child(even), #scenarioLogOutput tr:nth-child(even) {
     background-color: #f3f4f6;
 }
-#simulationLog tr:nth-child(odd), #worstRunLog tr:nth-child(odd) {
+#simulationLog tr:nth-child(odd), #scenarioLogOutput tr:nth-child(odd) {
     background-color: #ffffff;
 }
-#simulationLog tr:hover, #worstRunLog tr:hover {
+#simulationLog tr:hover, #scenarioLogOutput tr:hover {
     background-color: #e5e7eb;
 }
-#simulationLog th, #worstRunLog th {
+#simulationLog th, #scenarioLogOutput th {
     background-color: #e5e7eb;
     font-weight: 600;
     color: #000000;
@@ -277,7 +277,7 @@ input:disabled {
     text-align: left;
     white-space: nowrap;
 }
-#simulationLog td, #worstRunLog td {
+#simulationLog td, #scenarioLogOutput td {
     padding: 3px 6px;
     border-bottom: 1px solid #e5e7eb;
     color: #000000;
