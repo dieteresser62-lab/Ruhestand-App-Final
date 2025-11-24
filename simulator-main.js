@@ -1667,7 +1667,7 @@ window.onload = function () {
 
             const logDetailLevel = loadDetailLevel(WORST_LOG_DETAIL_KEY, LEGACY_LOG_DETAIL_KEY);
             if (window.globalWorstRunData && window.globalWorstRunData.rows.length > 0) {
-                document.getElementById('worstRunLog').textContent = renderWorstRunLog(
+                document.getElementById('worstRunLog').innerHTML = renderWorstRunLog(
                     window.globalWorstRunData.rows,
                     window.globalWorstRunData.caR_Threshold,
                     { showCareDetails: showDetails, logDetailLevel: logDetailLevel }
@@ -1687,7 +1687,7 @@ window.onload = function () {
 
             const showCareDetails = localStorage.getItem('showCareDetails') === '1';
             if (window.globalWorstRunData && window.globalWorstRunData.rows.length > 0) {
-                document.getElementById('worstRunLog').textContent = renderWorstRunLog(
+                document.getElementById('worstRunLog').innerHTML = renderWorstRunLog(
                     window.globalWorstRunData.rows,
                     window.globalWorstRunData.caR_Threshold,
                     { showCareDetails: showCareDetails, logDetailLevel: detailLevel }

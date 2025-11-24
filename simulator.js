@@ -2506,7 +2506,7 @@ window.onload = function() {
             
             // Re-render worst-run log if data is available
             if (window.globalWorstRunData && window.globalWorstRunData.rows.length > 0) {
-                 document.getElementById('worstRunLog').textContent = renderWorstRunLog(
+                 document.getElementById('worstRunLog').innerHTML = renderWorstRunLog(
                     window.globalWorstRunData.rows,
                     window.globalWorstRunData.caR_Threshold,
                     { showCareDetails: showDetails }
