@@ -1523,8 +1523,11 @@ const TransactionEngine = {
 
             // Design-Entscheidung: Guardrail greift nur bei echten Lücken (unter Aktivierungsschwelle oder Mindest-Runway),
             // damit moderate Unterdeckungen über die reguläre Rebalancing-Logik aufgefüllt werden können.
-            // Verwende Floor-Runway für Guardrail (konsistent mit UI und minRunwayMonths-Definition)
-            const hasRunwayGap = currentFloorRunwayMonths < runwayMinThresholdMonths;
+            // Prüfe BEIDE Runways: Floor-Runway UND Gesamt-Runway
+            // Floor-Runway kann irreführend hoch sein wenn Pension den Großteil des Floors deckt
+            const hasFloorRunwayGap = currentFloorRunwayMonths < runwayMinThresholdMonths;
+            const hasTotalRunwayGap = currentRunwayMonths < runwayMinThresholdMonths;
+            const hasRunwayGap = hasFloorRunwayGap || hasTotalRunwayGap;
             const hasCoverageGap = zielLiquiditaetsdeckung < guardrailActivationThreshold;
             const monthlyBaselineNeed = (gesamtjahresbedarf / 12);
             const guardrailTargetEuro = Math.max(
@@ -1535,14 +1538,12 @@ const TransactionEngine = {
                 ? (guardrailTargetEuro / monthlyBaselineNeed)
                 : 0;
             const guardrailGapEuro = Math.max(0, guardrailTargetEuro - aktuelleLiquiditaet);
-            // Kritische Coverage-Schwelle für Peak-Regimes (unter 50% = Notfall)
-            const criticalCoverageThreshold = 0.50;
-            const hasCriticalCoverageGap = zielLiquiditaetsdeckung < criticalCoverageThreshold;
-            // Peak-Regimes: Guardrail nur bei Runway-Lücke ODER kritisch niedriger Coverage
-            // Moderate Unterdeckung (50-75%) wird durch opportunistisches Rebalancing gefüllt
-            // Nicht-Peak: Guardrail bei jeder Coverage-Lücke oder Runway-Lücke
+            // Peak-Regimes: KEIN Guardrail - immer Opportunistisches Rebalancing verwenden.
+            // Im Peak wollen wir die gute Marktlage nutzen, um BEIDES aufzufüllen (Liquidität + Gold).
+            // Gold aufschieben ist riskant, da der nächste Bär jederzeit kommen kann.
+            // Nicht-Peak: Guardrail bei Coverage-Lücke oder Runway-Lücke
             const hasGuardrailGap = isPeakRegime
-                ? ((hasRunwayGap || hasCriticalCoverageGap) && guardrailGapEuro > 1)
+                ? false
                 : ((hasCoverageGap || hasRunwayGap) && guardrailGapEuro > 1);
 
             console.log('DEBUG determineAction:', {
@@ -1663,6 +1664,11 @@ const TransactionEngine = {
             } else if (!isBearRegimeProxy) {
                 const liquiditaetsBedarf = Math.max(0, zielLiquiditaet - aktuelleLiquiditaet);
 
+                // ATH-basierte Skalierung: Bei -20% ATH-Abstand kein Rebalancing mehr
+                // seiATH = 1.0 (am ATH) → Faktor = 1.0, seiATH = 0.8 (-20%) → Faktor = 0.0
+                const seiATH = market.seiATH || 1;
+                const athRebalancingFaktor = Math.max(0, Math.min(1, (seiATH - 0.8) / 0.2));
+
                 // Prüfe ob kritische Liquiditätssituation vorliegt
                 const zielLiquiditaetsdeckungLocal = (zielLiquiditaet > 0)
                     ? (aktuelleLiquiditaet / zielLiquiditaet)
@@ -1691,16 +1697,22 @@ const TransactionEngine = {
                     totalerBedarf,
                     isCriticalLiquidity,
                     zielLiquiditaet,
-                    aktuelleLiquiditaet
+                    aktuelleLiquiditaet,
+                    seiATH,
+                    athRebalancingFaktor,
+                    marketSKey: market.sKey
                 });
 
                 // Bei kritischer Liquidität: niedrigere Mindestschwelle verwenden
+                // WICHTIG: minTradeResultOverride auf 0 setzen, um RUIN zu verhindern
+                // Sonst würde der dynamische minTradeResult bei großen Portfolios die Transaktion blockieren
                 let appliedMinTradeGate;
                 if (isCriticalLiquidity) {
                     appliedMinTradeGate = Math.max(
                         CONFIG.THRESHOLDS.STRATEGY.minRefillAmount || 2500,
                         CONFIG.THRESHOLDS.STRATEGY.cashRebalanceThreshold || 2500
                     );
+                    minTradeResultOverride = 0;
                 } else {
                     const minTradeGateResult = this._computeAppliedMinTradeGate({
                         investiertesKapital,
@@ -1747,11 +1759,14 @@ const TransactionEngine = {
                         aktienUeberschuss = Math.min(liquiditaetsBedarf, aktienwert);
                     }
 
-                    const maxSkimCapEuro = (input.maxSkimPctOfEq / 100) * aktienwert;
-                    // Bei kritischer Liquidität: Cap auf 10% des Aktienwerts erhöhen
+                    // ATH-skaliertes Cap: Bei -20% ATH-Abstand kein Rebalancing mehr
+                    const baseMaxSkimCapEuro = (input.maxSkimPctOfEq / 100) * aktienwert;
+                    const athScaledSkimCap = baseMaxSkimCapEuro * athRebalancingFaktor;
+                    // Bei kritischer Liquidität: Cap auf Liquiditätsbedarf + 20% Puffer begrenzen
+                    // Das stellt sicher, dass die Liquidität aufgefüllt wird, aber nicht unbegrenzt für Gold
                     const effectiveSkimCap = isCriticalLiquidity
-                        ? Math.max(maxSkimCapEuro, aktienwert * 0.10)
-                        : maxSkimCapEuro;
+                        ? Math.max(athScaledSkimCap, liquiditaetsBedarf * 1.2)
+                        : athScaledSkimCap;
                     const maxSellableFromEquity = Math.min(aktienUeberschuss, effectiveSkimCap);
 
                     const totalEquityValue = input.depotwertAlt + input.depotwertNeu;

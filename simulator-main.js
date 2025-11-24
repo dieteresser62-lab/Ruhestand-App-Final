@@ -1445,6 +1445,14 @@ function buildBacktestColumnDefinitions(detailLevel = 'normal') {
     }
 
     columns.push(
+        {
+            header: 'Markt', width: 12, key: 'row.Regime',
+            valueFormatter: (v, row) => {
+                const regimeText = window.Ruhestandsmodell_v30?.CONFIG?.SCENARIO_TEXT?.[v] || v || '';
+                return regimeText.substring(0, 12);
+            },
+            align: 'left'
+        },
         { header: 'Status', width: 16, key: 'row.aktionUndGrund', valueFormatter: v => (v || '').substring(0, 15), align: 'left' },
         { header: 'Quote%', width: 6, key: 'row.QuoteEndPct', valueFormatter: v => formatPercent(v), align: 'right' },
         { header: 'Runway%', width: 7, key: 'row.RunwayCoveragePct', valueFormatter: v => formatPercentInt(v), align: 'right' },

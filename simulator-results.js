@@ -481,6 +481,14 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         { key: 'FlexRatePct', header: 'Flex%', width: 5, fmt: v => `${Math.round(v || 0)}%` },
         { key: 'flex_erfuellt_nominal', header: 'Flex', width: 7, fmt: formatCurrencyShortLog },
         {
+            key: 'Regime', header: 'Markt', width: 12,
+            fmt: (v, row) => {
+                const regimeText = window.Ruhestandsmodell_v30.CONFIG.SCENARIO_TEXT[row.Regime] || row.Regime || '';
+                return regimeText.substring(0, 12);
+            },
+            title: 'Marktsituation/Regime'
+        },
+        {
             key: 'aktionUndGrund', header: 'Status', width: 22, fmt: (v, row) => {
                 const alarmMarker = row.Alarm ? '(A) ' : '';
                 const regimeShort = shortenText(window.Ruhestandsmodell_v30.CONFIG.SCENARIO_TEXT[row.Regime] || '');
