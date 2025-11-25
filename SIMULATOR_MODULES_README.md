@@ -4,7 +4,7 @@ Die Simulator-App ist inzwischen in mehrere spezialisierte ES6-Module zerlegt. D
 
 ---
 
-## 1. `simulator-main.js` (~2.400 Zeilen)
+## 1. `simulator-main.js` (~600 Zeilen)
 UI-Orchestrierung und Klammer um die ausgelagerten Feature-Module. Registriert Event-Handler, lädt/persistiert Eingaben und ruft die spezialisierten Startpunkte auf.
 
 **Hauptaufgaben / Exporte:**
@@ -16,7 +16,7 @@ UI-Orchestrierung und Klammer um die ausgelagerten Feature-Module. Registriert E
 
 ---
 
-## 2. `simulator-monte-carlo.js` (~1.400 Zeilen)
+## 2. `simulator-monte-carlo.js` (~780 Zeilen)
 Ausgelagerter Startpunkt für Monte-Carlo-Simulationen inkl. Szenario-Logging.
 
 **Hauptfunktionen / Exporte:**
@@ -29,7 +29,7 @@ Ausgelagerter Startpunkt für Monte-Carlo-Simulationen inkl. Szenario-Logging.
 
 ---
 
-## 3. `simulator-sweep.js` (~550 Zeilen)
+## 3. `simulator-sweep.js` (~360 Zeilen)
 Sweep-spezifische Logik mit Guardrails für Partner:innen-Felder und Heatmap-Ausgabe.
 
 **Hauptfunktionen / Exporte:**
@@ -43,7 +43,7 @@ Sweep-spezifische Logik mit Guardrails für Partner:innen-Felder und Heatmap-Aus
 
 ---
 
-## 4. `simulator-sweep-utils.js` (~420 Zeilen)
+## 4. `simulator-sweep-utils.js` (~220 Zeilen)
 Gemeinsame Helfer für Sweep, Rente-2-Schutz und Deep-Clones.
 
 **Hauptfunktionen / Exporte:**
@@ -57,7 +57,7 @@ Gemeinsame Helfer für Sweep, Rente-2-Schutz und Deep-Clones.
 
 ---
 
-## 5. `simulator-backtest.js` (~380 Zeilen)
+## 5. `simulator-backtest.js` (~360 Zeilen)
 Historische Backtests inkl. UI-Integration und Log-Export.
 
 **Hauptfunktionen / Exporte:**
@@ -71,7 +71,7 @@ Historische Backtests inkl. UI-Integration und Log-Export.
 
 ---
 
-## 6. `simulator-main-helpers.js` (~330 Zeilen)
+## 6. `simulator-main-helpers.js` (~280 Zeilen)
 Formatierungs- und Export-Helfer, damit Tabellen-/KPI-Aufbereitung nicht in `simulator-main.js` landet.
 
 **Hauptfunktionen / Exporte:**
@@ -85,7 +85,7 @@ Formatierungs- und Export-Helfer, damit Tabellen-/KPI-Aufbereitung nicht in `sim
 
 ---
 
-## 7. `simulator-ui-pflege.js` (~200 Zeilen)
+## 7. `simulator-ui-pflege.js` (~180 Zeilen)
 Pflege-spezifische UI-Initialisierung (Presets, Badges, Toggles).
 
 **Hauptfunktionen / Exporte:**
@@ -98,7 +98,7 @@ Pflege-spezifische UI-Initialisierung (Presets, Badges, Toggles).
 
 ---
 
-## 8. `simulator-ui-rente.js` (~160 Zeilen)
+## 8. `simulator-ui-rente.js` (~240 Zeilen)
 Persistenz und Migration der Renten-Eingaben (Person 1 & 2) inklusive Legacy-Felder.
 
 **Hauptfunktionen / Exporte:**
@@ -110,7 +110,7 @@ Persistenz und Migration der Renten-Eingaben (Person 1 & 2) inklusive Legacy-Fel
 
 ---
 
-## 9. `simulator-engine.js` (~1.200 Zeilen)
+## 9. `simulator-engine.js` (~1.080 Zeilen)
 Kernlogik für Jahr-für-Jahr-Simulation.
 
 **Hauptfunktionen:**
@@ -126,7 +126,7 @@ Kernlogik für Jahr-für-Jahr-Simulation.
 
 ---
 
-## 10. `simulator-results.js` (~800 Zeilen)
+## 10. `simulator-results.js` (~640 Zeilen)
 Aggregation und Darstellung von Simulationsergebnissen.
 
 **Hauptfunktionen:**
@@ -146,7 +146,7 @@ Aggregation und Darstellung von Simulationsergebnissen.
 
 ---
 
-## 11. `simulator-portfolio.js` (~600 Zeilen)
+## 11. `simulator-portfolio.js` (~510 Zeilen)
 Portfolio-Initialisierung, Renten- und Stress-Kontexte.
 
 **Hauptfunktionen:**
@@ -161,7 +161,7 @@ Portfolio-Initialisierung, Renten- und Stress-Kontexte.
 
 ---
 
-## 12. `simulator-heatmap.js` (~550 Zeilen)
+## 12. `simulator-heatmap.js` (~480 Zeilen)
 SVG-Rendering für Parameter-Sweeps und Heatmaps.
 
 **Hauptfunktionen:**
@@ -173,7 +173,7 @@ SVG-Rendering für Parameter-Sweeps und Heatmaps.
 
 ---
 
-## 13. `simulator-utils.js` (~260 Zeilen)
+## 13. `simulator-utils.js` (~320 Zeilen)
 Zufallszahlen, Statistik und Formatierung.
 
 **Hauptfunktionen:**
@@ -186,7 +186,7 @@ Zufallszahlen, Statistik und Formatierung.
 
 ---
 
-## 14. `simulator-data.js` (~330 Zeilen)
+## 14. `simulator-data.js` (~190 Zeilen)
 Historische Daten, Mortalitätstafeln, Stress-Presets.
 
 **Exporte:**
