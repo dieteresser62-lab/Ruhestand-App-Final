@@ -27,11 +27,24 @@ function euros(x) {
  * @returns {number} Benötigte Liquidität in €
  */
 function computeLiqNeedForFloor(ctx) {
-    // Berechne monatlichen Floor-Bedarf (netto nach Rente)
-    const floorMonthlyNet = euros((ctx.inflatedFloor || ctx.inputs.startFloorBedarf) / 12);
-    // Ziel-Runway in Monaten (Standard: 12, kann über runwayTargetMonths konfiguriert werden)
-    const runwayTargetMin = Number(ctx.inputs.runwayTargetMonths ?? 12);
-    return euros(runwayTargetMin * floorMonthlyNet);
+    /**
+     * Design-Entscheidung: `inflatedFloor` kann bewusst 0 sein, wenn die Rente den Floor vollständig deckt.
+     * Wir dürfen diesen Wert nicht per `||` auf den Start-Floor zurücksetzen, sonst erzwingen wir unnötig
+     * Liquidität (Fail-Safe-Guard würde fälschlich verkaufen). Deshalb prüfen wir explizit auf null/undefined
+     * und akzeptieren 0 als gültigen Wert.
+     */
+    const hasInflatedFloor = ctx.inflatedFloor !== undefined && ctx.inflatedFloor !== null;
+    const floorBasis = hasInflatedFloor ? ctx.inflatedFloor : ctx.inputs?.startFloorBedarf;
+
+    // Berechne monatlichen Floor-Bedarf (netto nach Rente) und stelle sicher, dass negative/NaN-Werte abgefangen werden.
+    const floorMonthlyNet = euros(Number(floorBasis) / 12);
+
+    // Ziel-Runway in Monaten (Standard: 12, kann über runwayTargetMonths konfiguriert werden). Fällt bei ungültigen Werten auf 12 zurück.
+    const runwayTargetMonths = Number.isFinite(ctx?.inputs?.runwayTargetMonths) ? ctx.inputs.runwayTargetMonths : 12;
+    const runwayTargetSafe = runwayTargetMonths > 0 ? runwayTargetMonths : 12;
+
+    // Endgültiger Liquiditätsbedarf als nicht-negative Zahl.
+    return euros(runwayTargetSafe * floorMonthlyNet);
 }
 
 /**
