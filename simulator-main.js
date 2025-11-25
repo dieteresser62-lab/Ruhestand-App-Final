@@ -66,7 +66,7 @@
 
 import { rng, quantile, sum, mean, formatCurrency, parseRange, parseRangeInput, cartesianProduct, cartesianProductLimited } from './simulator-utils.js';
 import { getStartYearCandidates } from './cape-utils.js';
-import { ENGINE_VERSION, ENGINE_HASH, STRESS_PRESETS, BREAK_ON_RUIN, MORTALITY_TABLE, HISTORICAL_DATA, annualData, SUPPORTED_PFLEGE_GRADES, PFLEGE_GRADE_LABELS } from './simulator-data.js';
+import { ENGINE_VERSION, ENGINE_HASH, STRESS_PRESETS, BREAK_ON_RUIN, MORTALITY_TABLE, HISTORICAL_DATA, annualData, SUPPORTED_PFLEGE_GRADES } from './simulator-data.js';
 import {
     getCommonInputs,
     updateStartPortfolioDisplay,
@@ -103,6 +103,12 @@ import { formatCurrencyShortLog } from './simulator-utils.js';
 import { sumDepot } from './simulator-portfolio.js';
 import { renderSweepHeatmapSVG } from './simulator-heatmap.js';
 import {
+    applyPflegeKostenPreset,
+    updatePflegePresetHint,
+    updatePflegeUIInfo,
+    initializePflegeUIControls
+} from './simulator-ui-pflege.js';
+import {
     cloneStressContext,
     normalizeWidowOptions,
     computeMarriageYearsCompleted,
@@ -135,22 +141,6 @@ const CARE_GRADE_FIELD_IDS = SUPPORTED_PFLEGE_GRADES.flatMap(grade => [
     `pflegeStufe${grade}FlexCut`,
     `pflegeStufe${grade}Mortality`
 ]);
-const PFLEGE_COST_PRESETS = Object.freeze({
-    custom: {
-        label: 'Individuelle Werte',
-        description: 'Keine Automatik – du behältst deine individuellen Staffelungen.'
-    },
-    ambulant: {
-        label: 'Ambulant (ab 36 Tsd. €)',
-        description: 'Ambulante Leistungen inkl. Haushaltshilfen (PG1 36k → PG5 78k).',
-        values: { 1: 36000, 2: 42000, 3: 54000, 4: 66000, 5: 78000 }
-    },
-    stationaer: {
-        label: 'Stationär (Premium)',
-        description: 'Pflegeheim mit Unterbringung (PG1 45k → PG5 105k).',
-        values: { 1: 45000, 2: 60000, 3: 75000, 4: 90000, 5: 105000 }
-    }
-});
 
 
 /**
@@ -1153,69 +1143,6 @@ export function selfCheckEngine() {
     }
 }
 
-function applyPflegeKostenPreset(presetKey) {
-    const preset = PFLEGE_COST_PRESETS[presetKey];
-    if (!preset || !preset.values) return;
-
-    let didChange = false;
-    SUPPORTED_PFLEGE_GRADES.forEach(grade => {
-        const value = preset.values[grade];
-        if (typeof value !== 'number') return;
-        const field = document.getElementById(`pflegeStufe${grade}Zusatz`);
-        if (field) {
-            field.value = value;
-            field.dispatchEvent(new Event('input', { bubbles: true }));
-            didChange = true;
-        }
-    });
-
-    if (didChange) {
-        updatePflegeUIInfo();
-    }
-}
-
-function updatePflegePresetHint(selectEl, hintEl) {
-    if (!selectEl || !hintEl) return;
-    const preset = PFLEGE_COST_PRESETS[selectEl.value] || PFLEGE_COST_PRESETS.custom;
-    hintEl.textContent = preset.description;
-}
-
-function updatePflegeUIInfo() {
-    const pflegeMaxFloorInput = document.getElementById('pflegeMaxFloor');
-    if (!pflegeMaxFloorInput) return;
-
-    let infoBadge = document.getElementById('pflegeInfoBadge');
-    if (!infoBadge && pflegeMaxFloorInput.parentElement?.parentElement) {
-        infoBadge = document.createElement('div');
-        infoBadge.id = 'pflegeInfoBadge';
-        infoBadge.style.fontSize = '0.8rem';
-        infoBadge.style.color = '#555';
-        infoBadge.style.textAlign = 'center';
-        infoBadge.style.marginTop = '10px';
-        infoBadge.style.padding = '5px';
-        infoBadge.style.background = 'var(--background-color)';
-        infoBadge.style.borderRadius = '4px';
-        pflegeMaxFloorInput.parentElement.parentElement.appendChild(infoBadge);
-    }
-
-    const startFloor = parseFloat(document.getElementById('startFloorBedarf')?.value) || 0;
-    const maxFloor = parseFloat(pflegeMaxFloorInput.value) || 0;
-    const capHeute = Math.max(0, maxFloor - startFloor);
-    const regionalMultiplier = 1 + (Math.max(0, parseFloat(document.getElementById('pflegeRegionalZuschlag')?.value) || 0) / 100);
-
-    const gradeNeeds = SUPPORTED_PFLEGE_GRADES.map(grade => {
-        const value = (parseFloat(document.getElementById(`pflegeStufe${grade}Zusatz`)?.value) || 0) * regionalMultiplier;
-        return { grade, value };
-    });
-    const maxEntry = gradeNeeds.reduce((best, entry) => entry.value > best.value ? entry : best, { grade: null, value: 0 });
-    const gradeLabel = maxEntry.grade ? (PFLEGE_GRADE_LABELS[maxEntry.grade] || `Pflegegrad ${maxEntry.grade}`) : 'Pflegegrad n/a';
-
-    if (infoBadge) {
-        infoBadge.innerHTML = `Heutiger Cap für Zusatzkosten: <strong>${formatCurrency(capHeute)}</strong><br>` +
-            `Höchster Bedarf (inkl. Zuschlag): <strong>${formatCurrency(maxEntry.value)}</strong> (${gradeLabel})`;
-    }
-}
-
 /**
  * DOM-Initialisierung und Event-Handler
  */
@@ -1243,32 +1170,10 @@ window.onload = function () {
         }
     });
 
-    const pflegeInfoFields = ['startFloorBedarf', 'pflegeMaxFloor', 'pflegeRegionalZuschlag', ...CARE_GRADE_FIELD_IDS];
-    pflegeInfoFields.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener('input', updatePflegeUIInfo);
-    });
-
-    const pflegeMaxFloorInput = document.getElementById('pflegeMaxFloor');
-    if (pflegeMaxFloorInput) {
-        pflegeMaxFloorInput.title = 'Gesamt-Floor inkl. Pflege. Der maximal mögliche Zusatzbedarf ergibt sich aus diesem Wert abzüglich des Basis-Floor-Bedarfs zum Zeitpunkt des Pflegeeintritts.';
-    }
-    updatePflegeUIInfo();
+    initializePflegeUIControls();
 
     const mcMethodeSelect = document.getElementById('mcMethode');
     mcMethodeSelect.addEventListener('change', () => { document.getElementById('mcBlockSize').disabled = mcMethodeSelect.value !== 'block'; });
-
-    const pflegeStaffelSelect = document.getElementById('pflegeKostenStaffelPreset');
-    const pflegePresetHint = document.getElementById('pflegeStaffelPresetHint');
-    if (pflegeStaffelSelect) {
-        pflegeStaffelSelect.addEventListener('change', (event) => {
-            updatePflegePresetHint(pflegeStaffelSelect, pflegePresetHint);
-            if (event.target.value !== 'custom') {
-                applyPflegeKostenPreset(event.target.value);
-            }
-        });
-        updatePflegePresetHint(pflegeStaffelSelect, pflegePresetHint);
-    }
 
     // Rentenanpassungs-Modus: Enable/Disable + Show/Hide Prozentfeld
     const rentAdjModeSelect = document.getElementById('rentAdjMode');
@@ -1303,12 +1208,6 @@ window.onload = function () {
     // VERALTET: Alte Indexierungs-Logik (deaktiviert, versteckt)
     // const renteIndexArtSelect = document.getElementById('renteIndexierungsart');
     // renteIndexArtSelect.addEventListener('change', () => { document.getElementById('festerSatzContainer').style.display = renteIndexArtSelect.value === 'fest' ? 'block' : 'none'; });
-
-    const pflegeCheckbox = document.getElementById('pflegefallLogikAktivieren');
-    pflegeCheckbox.addEventListener('change', () => { document.getElementById('pflegePanel').style.display = pflegeCheckbox.checked ? 'grid' : 'none'; });
-
-    const pflegeModellSelect = document.getElementById('pflegeModellTyp');
-    pflegeModellSelect.addEventListener('change', () => { document.getElementById('pflegeDauerContainer').style.display = pflegeModellSelect.value === 'akut' ? 'contents' : 'none'; });
 
     // Legacy Hook: Checkbox wurde im UI entfernt, darf aber kein ReferenceError mehr auslösen
     const pflegeMortalitaetCheckbox = document.getElementById('pflegeMortalitaetOverride');
@@ -1363,8 +1262,6 @@ window.onload = function () {
 
     document.getElementById('mcBlockSize').disabled = mcMethodeSelect.value !== 'block';
     // VERALTET: document.getElementById('festerSatzContainer').style.display = renteIndexArtSelect.value === 'fest' ? 'block' : 'none';
-    document.getElementById('pflegePanel').style.display = pflegeCheckbox.checked ? 'grid' : 'none';
-    document.getElementById('pflegeDauerContainer').style.display = pflegeModellSelect.value === 'akut' ? 'contents' : 'none';
     initializeLegacyMortalityToggleIfPresent(pflegeMortalitaetCheckbox);
 
     const sweepMetricSelect = document.getElementById('sweepMetric');
