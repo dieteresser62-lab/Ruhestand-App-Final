@@ -196,6 +196,12 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
     let { depotTranchesAktien, depotTranchesGold } = portfolio;
     let liquiditaet = portfolio.liquiditaet;
+    // Neue Log-Felder: Wir erfassen den Cash-Stand vor Zinsen, die daraus erzielten Zinsen
+    // sowie den Cash-Stand nach Verzinsung. So lässt sich nachvollziehen, wie Liquidität
+    // ohne Verkäufe anwächst. Alle Werte werden defensiv normalisiert.
+    let liqStartVorZins = euros(liquiditaet);
+    let cashZinsen = 0;
+    let liqNachZins = liqStartVorZins;
     let totalTaxesThisYear = 0;
 
     const rA = isFinite(yearData.rendite) ? yearData.rendite : 0;
@@ -369,44 +375,44 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             console.warn('AGGRESSIVE SALE NEEDED: missing=', missing, 'depotRemaining=', sumDepot(portfolio));
 
             // Try selling Gold first (without minGold constraint)
-            const goldWert = sumDepot({ depotTranchesGold: portfolio.depotTranchesGold });
-            if (goldWert > 0 && missing > 0) {
-                // Rebuild context to get current asset values after any prior sales
-                const goldCtx = buildInputsCtxFromPortfolio(algoInput, portfolio, { pensionAnnual, marketData: marketDataCurrentYear });
-                console.warn('AGGRESSIVE GOLD SALE: goldWert=', goldWert, 'ctxGoldWert=', goldCtx.goldWert, 'goldAktiv=', goldCtx.goldAktiv);
-                const goldResult = sellAssetForCash(portfolio, goldCtx, market, 'gold', missing, 0);
-                console.warn('GOLD RESULT: cashGenerated=', goldResult.cashGenerated);
-                liquiditaet += goldResult.cashGenerated;
-                totalTaxesThisYear += goldResult.taxesPaid;
-                if (goldResult.saleResult) {
-                    mergedSaleResult = mergedSaleResult
-                        ? window.Ruhestandsmodell_v30.mergeSaleResults(mergedSaleResult, goldResult.saleResult)
-                        : goldResult.saleResult;
-                }
-                missing = Math.max(0, missing - goldResult.cashGenerated);
-                emergencyRefillHappened = true;
-            }
-            // Then try selling Equity
-            if (missing > 0) {
-                const equityWert = sumDepot({ depotTranchesAktien: portfolio.depotTranchesAktien });
-                if (equityWert > 0) {
-                    // CRITICAL: Rebuild context after gold sale to prevent stale asset values
-                    // This ensures calculateSaleAndTax sees the actual remaining assets
-                    const updatedCtx = buildInputsCtxFromPortfolio(algoInput, portfolio, { pensionAnnual, marketData: marketDataCurrentYear });
-                    console.warn('AGGRESSIVE EQUITY SALE: equityWert=', equityWert, 'ctxDepotwert=', updatedCtx.depotwertAlt + updatedCtx.depotwertNeu);
-                    const eqResult = sellAssetForCash(portfolio, updatedCtx, market, 'equity', missing, 0);
-                    console.warn('EQUITY RESULT: cashGenerated=', eqResult.cashGenerated);
-                    liquiditaet += eqResult.cashGenerated;
-                    totalTaxesThisYear += eqResult.taxesPaid;
-                    if (eqResult.saleResult) {
+                const goldWert = sumDepot({ depotTranchesGold: portfolio.depotTranchesGold });
+                if (goldWert > 0 && missing > 0) {
+                    // Rebuild context to get current asset values after any prior sales
+                    const goldCtx = buildInputsCtxFromPortfolio(algoInput, portfolio, { pensionAnnual, marketData: marketDataCurrentYear });
+                    console.warn('AGGRESSIVE GOLD SALE: goldWert=', goldWert, 'ctxGoldWert=', goldCtx.goldWert, 'goldAktiv=', goldCtx.goldAktiv);
+                    const goldResult = sellAssetForCash(portfolio, goldCtx, market, 'gold', missing, 0);
+                    console.warn('GOLD RESULT: cashGenerated=', goldResult.cashGenerated);
+                    liquiditaet += goldResult.cashGenerated;
+                    totalTaxesThisYear += goldResult.taxesPaid;
+                    if (goldResult.saleResult) {
                         mergedSaleResult = mergedSaleResult
-                            ? window.Ruhestandsmodell_v30.mergeSaleResults(mergedSaleResult, eqResult.saleResult)
-                            : eqResult.saleResult;
+                            ? window.Ruhestandsmodell_v30.mergeSaleResults(mergedSaleResult, goldResult.saleResult)
+                            : goldResult.saleResult;
                     }
-                    missing = Math.max(0, missing - eqResult.cashGenerated);
+                    missing = Math.max(0, missing - goldResult.cashGenerated);
                     emergencyRefillHappened = true;
                 }
-            }
+                // Then try selling Equity
+                if (missing > 0) {
+                    const equityWert = sumDepot({ depotTranchesAktien: portfolio.depotTranchesAktien });
+                    if (equityWert > 0) {
+                        // CRITICAL: Rebuild context after gold sale to prevent stale asset values
+                        // This ensures calculateSaleAndTax sees the actual remaining assets
+                        const updatedCtx = buildInputsCtxFromPortfolio(algoInput, portfolio, { pensionAnnual, marketData: marketDataCurrentYear });
+                        console.warn('AGGRESSIVE EQUITY SALE: equityWert=', equityWert, 'ctxDepotwert=', updatedCtx.depotwertAlt + updatedCtx.depotwertNeu);
+                        const eqResult = sellAssetForCash(portfolio, updatedCtx, market, 'equity', missing, 0);
+                        console.warn('EQUITY RESULT: cashGenerated=', eqResult.cashGenerated);
+                        liquiditaet += eqResult.cashGenerated;
+                        totalTaxesThisYear += eqResult.taxesPaid;
+                        if (eqResult.saleResult) {
+                            mergedSaleResult = mergedSaleResult
+                                ? window.Ruhestandsmodell_v30.mergeSaleResults(mergedSaleResult, eqResult.saleResult)
+                                : eqResult.saleResult;
+                        }
+                        missing = Math.max(0, missing - eqResult.cashGenerated);
+                        emergencyRefillHappened = true;
+                    }
+                }
         }
     }
 
@@ -435,7 +441,11 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         buyStocksNeu(portfolio, aktienTeil);
     }
 
-    liquiditaet *= (1 + rC);
+    // Cash-Verzinsung separat loggen, um Zuwächse ohne Verkäufe sichtbar zu machen.
+    liqStartVorZins = euros(liquiditaet);
+    cashZinsen = euros(liqStartVorZins * rC);
+    liquiditaet = euros(liqStartVorZins * (1 + rC));
+    liqNachZins = euros(liquiditaet);
     if (!isFinite(liquiditaet)) liquiditaet = 0;
 
     // ========== FAIL-SAFE LIQUIDITY GUARD ==========
@@ -590,7 +600,11 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             kaufGld: totalGoldKauf,
             wertAktien: sumDepot({depotTranchesAktien: portfolio.depotTranchesAktien}),
             wertGold: sumDepot({depotTranchesGold: portfolio.depotTranchesGold}),
-            liquiditaet, aktionUndGrund: aktionText,
+            liquiditaet,
+            liqStart: liqStartVorZins,
+            cashInterestEarned: cashZinsen,
+            liqEnd: liqNachZins,
+            aktionUndGrund: aktionText,
             usedSPB: mergedSaleResult ? (mergedSaleResult.pauschbetragVerbraucht || 0) : 0,
             floor_brutto: effectiveBaseFloor,
             pension_annual: pensionAnnual,
