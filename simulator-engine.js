@@ -81,20 +81,25 @@ function normalizeHouseholdContext(context) {
 }
 
 /**
- * Verkauft Assets für Cash ohne Regelprüfungen (FAIL-SAFE Mode)
- * @param {Object} portfolio - Portfolio-Objekt
- * @param {Object} inputsCtx - Inputs-Context für Steuerberechnung
- * @param {Object} market - Marktkontext
- * @param {string} asset - 'gold' oder 'equity'
- * @param {number} amountEuros - Zielbetrag in €
- * @param {number} minGold - Minimaler Gold-Bestand
- * @returns {Object} { cashGenerated, taxesPaid }
+ * Verkauft Assets für Cash ohne Regelprüfungen (FAIL-SAFE Mode).
+ * Rückgabe enthält zusätzlich das detaillierte SaleResult, damit
+ * Notverkäufe im Jahres-Log erfasst werden können.
+ * @param {Object} portfolio - Portfolio-Objekt.
+ * @param {Object} inputsCtx - Inputs-Context für Steuerberechnung.
+ * @param {Object} market - Marktkontext.
+ * @param {string} asset - 'gold' oder 'equity'.
+ * @param {number} amountEuros - Zielbetrag in €.
+ * @param {number} minGold - Minimaler Gold-Bestand.
+ * @returns {Object} { cashGenerated, taxesPaid, saleResult }
  */
 function sellAssetForCash(portfolio, inputsCtx, market, asset, amountEuros, minGold) {
-    if (amountEuros <= 0) return { cashGenerated: 0, taxesPaid: 0 };
+    if (amountEuros <= 0) {
+        return { cashGenerated: 0, taxesPaid: 0, saleResult: null };
+    }
 
     let cashGenerated = 0;
     let taxesPaid = 0;
+    let saleResult = null;
 
     if (asset === 'gold') {
         const goldWert = sumDepot({ depotTranchesGold: portfolio.depotTranchesGold });
@@ -111,17 +116,18 @@ function sellAssetForCash(portfolio, inputsCtx, market, asset, amountEuros, minG
                 costBasisAlt: 0,
                 costBasisNeu: 0
             };
-            const { saleResult } = window.Ruhestandsmodell_v30.calculateSaleAndTax(
+            const { saleResult: forcedSaleResult } = window.Ruhestandsmodell_v30.calculateSaleAndTax(
                 targetSale,
                 goldOnlyCtx,
                 { minGold: minGold },
                 market
             );
 
-            if (saleResult && saleResult.achievedRefill > 0) {
-                applySaleToPortfolio(portfolio, saleResult);
-                cashGenerated = saleResult.achievedRefill;
-                taxesPaid = saleResult.steuerGesamt || 0;
+            if (forcedSaleResult && forcedSaleResult.achievedRefill > 0) {
+                applySaleToPortfolio(portfolio, forcedSaleResult);
+                cashGenerated = forcedSaleResult.achievedRefill;
+                taxesPaid = forcedSaleResult.steuerGesamt || 0;
+                saleResult = forcedSaleResult;
             }
         }
     } else if (asset === 'equity') {
@@ -136,22 +142,23 @@ function sellAssetForCash(portfolio, inputsCtx, market, asset, amountEuros, minG
                 goldWert: 0,
                 goldCost: 0
             };
-            const { saleResult } = window.Ruhestandsmodell_v30.calculateSaleAndTax(
+            const { saleResult: forcedSaleResult } = window.Ruhestandsmodell_v30.calculateSaleAndTax(
                 targetSale,
                 equityOnlyCtx,
                 { minGold: 0 },
                 market
             );
 
-            if (saleResult && saleResult.achievedRefill > 0) {
-                applySaleToPortfolio(portfolio, saleResult);
-                cashGenerated = saleResult.achievedRefill;
-                taxesPaid = saleResult.steuerGesamt || 0;
+            if (forcedSaleResult && forcedSaleResult.achievedRefill > 0) {
+                applySaleToPortfolio(portfolio, forcedSaleResult);
+                cashGenerated = forcedSaleResult.achievedRefill;
+                taxesPaid = forcedSaleResult.steuerGesamt || 0;
+                saleResult = forcedSaleResult;
             }
         }
     }
 
-    return { cashGenerated: euros(cashGenerated), taxesPaid: euros(taxesPaid) };
+    return { cashGenerated: euros(cashGenerated), taxesPaid: euros(taxesPaid), saleResult };
 }
 
 /**
@@ -371,6 +378,11 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
                 console.warn('GOLD RESULT: cashGenerated=', goldResult.cashGenerated);
                 liquiditaet += goldResult.cashGenerated;
                 totalTaxesThisYear += goldResult.taxesPaid;
+                if (goldResult.saleResult) {
+                    mergedSaleResult = mergedSaleResult
+                        ? window.Ruhestandsmodell_v30.mergeSaleResults(mergedSaleResult, goldResult.saleResult)
+                        : goldResult.saleResult;
+                }
                 missing = Math.max(0, missing - goldResult.cashGenerated);
                 emergencyRefillHappened = true;
             }
@@ -386,6 +398,11 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
                     console.warn('EQUITY RESULT: cashGenerated=', eqResult.cashGenerated);
                     liquiditaet += eqResult.cashGenerated;
                     totalTaxesThisYear += eqResult.taxesPaid;
+                    if (eqResult.saleResult) {
+                        mergedSaleResult = mergedSaleResult
+                            ? window.Ruhestandsmodell_v30.mergeSaleResults(mergedSaleResult, eqResult.saleResult)
+                            : eqResult.saleResult;
+                    }
                     missing = Math.max(0, missing - eqResult.cashGenerated);
                     emergencyRefillHappened = true;
                 }
@@ -461,6 +478,11 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
                 );
                 guardSellGold = result.cashGenerated;
                 guardTaxes += result.taxesPaid;
+                if (result.saleResult) {
+                    mergedSaleResult = mergedSaleResult
+                        ? window.Ruhestandsmodell_v30.mergeSaleResults(mergedSaleResult, result.saleResult)
+                        : result.saleResult;
+                }
                 liquiditaet += guardSellGold;
                 missing = Math.max(0, missing - guardSellGold);
             }
@@ -480,6 +502,11 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
                 );
                 guardSellEq = result.cashGenerated;
                 guardTaxes += result.taxesPaid;
+                if (result.saleResult) {
+                    mergedSaleResult = mergedSaleResult
+                        ? window.Ruhestandsmodell_v30.mergeSaleResults(mergedSaleResult, result.saleResult)
+                        : result.saleResult;
+                }
                 liquiditaet += guardSellEq;
                 missing = Math.max(0, missing - guardSellEq);
             }
