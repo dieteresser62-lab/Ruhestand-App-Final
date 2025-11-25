@@ -223,8 +223,6 @@ function initVersionHandshake() {
             }
         }
 
-        console.log(`Engine Handshake erfolgreich. API v${version.api} (Build: ${version.build}) geladen.`);
-
     } catch (e) {
         // Harter Fehler, wenn die Engine fehlt
         const alertBanner = dom.containers.versionAlert;

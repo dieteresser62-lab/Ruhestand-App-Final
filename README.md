@@ -124,6 +124,11 @@ Ruhestand-App-Final/
 * Debug-Modi über Tastenkombinationen oder lokale Storage-Flags aktivieren (`balance_debug_mode`, `sim.devMode`).
 * Für Tests der Parameter-Sweeps steht im Simulator-Dev-Modus `runSweepSelfTest()` bereit.
 
+## Abschluss-Checkliste
+
+* **Dokumentation synchron halten:** Nach Engine-Änderungen oder neuen Simulator-Modulen (z. B. Monte-Carlo-Runner/UI/Analyzer) README, TECHNICAL.md und SIMULATOR_MODULES_README aktualisieren.
+* **Konsole sauber halten:** Vor dem Release auskommentierten Code und obsolet gewordene Debug-Logs entfernen bzw. hinter Dev-Toggles parken, damit Nutzer:innen keine Rauschen im Browser-Log sehen.
+
 ---
 
 ## Weitere Dokumentation

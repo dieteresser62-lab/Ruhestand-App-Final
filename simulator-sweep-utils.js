@@ -209,7 +209,6 @@ export function withNoLSWrites(fn) {
     const _lsSet = localStorage.setItem;
     localStorage.setItem = function () {
         // No-op während Sweep - verhindert Side-Effects
-        console.debug('[SWEEP] localStorage.setItem blockiert während Sweep');
     };
     try {
         return fn();
