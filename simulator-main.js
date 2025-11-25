@@ -191,9 +191,11 @@ function buildEngineInputFromLegacy(currentState, inputs, yearData) {
         goldAktiv: Boolean(inputs?.goldAllokationAktiv ?? inputs?.goldAktiv),
         goldZielProzent: safeNumber(inputs?.goldAllokationProzent ?? inputs?.goldZielProzent, 0),
         goldFloorProzent: safeNumber(inputs?.goldFloorProzent, 0),
-        rebalancingBand: safeNumber(inputs?.rebalancingBand ?? inputs?.rebalBand, 5),
+        // Rebalancing-Band aus Gold-Logik und allgemeines Rebal-Band sind voneinander unabhängig,
+        // deshalb keine Cross-Fallbacks: jedes Feld nutzt nur seinen eigenen Eingabewert.
+        rebalancingBand: safeNumber(inputs?.rebalancingBand, 5),
         targetEq: safeNumber(inputs?.targetEq ?? 60, 60),
-        rebalBand: safeNumber(inputs?.rebalBand ?? inputs?.rebalancingBand, 5),
+        rebalBand: safeNumber(inputs?.rebalBand, 5),
         maxSkimPctOfEq: safeNumber(inputs?.maxSkimPctOfEq, 10),
         maxBearRefillPctOfEq: safeNumber(inputs?.maxBearRefillPctOfEq, 5),
         runwayMinMonths: safeNumber(inputs?.runwayMinMonths ?? 24, 24),
