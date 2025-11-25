@@ -117,6 +117,18 @@ import {
     areR2SeriesEqual,
     withNoLSWrites
 } from './simulator-sweep-utils.js';
+import {
+    applyPensionTax,
+    buildBacktestColumnDefinitions,
+    computeAdjPctForYear,
+    convertRowsToCsv,
+    formatCellForDisplay,
+    formatColumnValue,
+    getNestedValue,
+    prepareRowsForExport,
+    resolveColumnRawValue,
+    triggerDownload
+} from './simulator-main-helpers.js';
 
 const CARE_GRADE_FIELD_IDS = SUPPORTED_PFLEGE_GRADES.flatMap(grade => [
     `pflegeStufe${grade}Zusatz`,
@@ -140,54 +152,6 @@ const PFLEGE_COST_PRESETS = Object.freeze({
     }
 });
 
-
-/**
- * Berechnet die Rentenanpassungsrate für ein bestimmtes Jahr
- * @param {Object} ctx - Kontext mit inputs, series, simStartYear
- * @param {number} yearIdx - Jahr-Index innerhalb der Simulation (0 = erstes Jahr)
- * @returns {number} Anpassungsrate in Prozent (z.B. 2.0 für 2%)
- */
-function computeAdjPctForYear(ctx, yearIdx) {
-    // ctx.inputs.rentAdj: { mode: "fix"|"wage"|"cpi", pct: number }
-    const mode = ctx.inputs.rentAdj?.mode || "fix";
-    if (mode === "fix") return Number(ctx.inputs.rentAdj?.pct || 0);
-
-    // Stelle sicher, dass ctx.series existiert:
-    // ctx.series = { wageGrowth: number[], inflationPct: number[], startYear: number }
-    // startYear = erstes Jahr der historischen Reihe (z.B. 1970)
-    const s = ctx.series || {};
-    const offsetIdx = (ctx.simStartYear ?? 0) - (s.startYear ?? 0) + yearIdx;
-
-    if (mode === "wage") {
-        const v = Array.isArray(s.wageGrowth) ? s.wageGrowth[offsetIdx] : undefined;
-        return Number.isFinite(v) ? Number(v) : 0;
-    }
-    if (mode === "cpi") {
-        const v = Array.isArray(s.inflationPct) ? s.inflationPct[offsetIdx] : undefined;
-        return Number.isFinite(v) ? Number(v) : 0;
-    }
-    return 0;
-}
-
-/**
- * Wendet Steuerberechnung auf Rentenbrutto an
- * @param {number} pensionGross - Bruttorenete p.a.
- * @param {Object} params - { sparerPauschbetrag, kirchensteuerPct, steuerquotePct }
- * @returns {number} Nettorente (≥ 0)
- */
-function applyPensionTax(pensionGross, params) {
-    // Wenn steuerquotePct > 0 → verwende pauschal pensionGross * (1 - steuerquotePct/100)
-    if (params.steuerquotePct > 0) {
-        const netto = pensionGross * (1 - params.steuerquotePct / 100);
-        return Math.max(0, netto);
-    }
-
-    // Sonst: vereinfachte Logik (Sparer-Pauschbetrag, Kirchensteuer etc.)
-    // Für Person 1: keine zusätzliche Steuer (wird extern versteuert)
-    // Für Person 2: detaillierte Berechnung könnte hier implementiert werden
-    // Aktuell: Wenn keine Steuerquote angegeben, wird keine Steuer abgezogen
-    return Math.max(0, pensionGross);
-}
 
 /**
  * Führt die Monte-Carlo-Simulation durch
@@ -1097,149 +1061,6 @@ export function runBacktest() {
     } finally { document.getElementById('btButton').disabled = false; }
 }
 
-const CSV_DELIMITER = ';';
-
-function getNestedValue(obj, path) {
-    if (!path) return obj;
-    return path.split('.').reduce((acc, key) => (acc && acc[key] != null ? acc[key] : undefined), obj);
-}
-
-function resolveColumnRawValue(column, row) {
-    if (typeof column.extractor === 'function') {
-        return column.extractor(row);
-    }
-    if (column.key) {
-        return getNestedValue(row, column.key);
-    }
-    return undefined;
-}
-
-function formatColumnValue(column, row) {
-    const rawValue = resolveColumnRawValue(column, row);
-    if (typeof column.valueFormatter === 'function') {
-        return column.valueFormatter(rawValue, row);
-    }
-    if (typeof column.fmt === 'function') {
-        return column.fmt(rawValue, row);
-    }
-    return rawValue == null ? '' : String(rawValue);
-}
-
-function formatCellForDisplay(column, row) {
-    const value = formatColumnValue(column, row);
-    const align = column.align === 'left' ? 'left' : 'right';
-    return align === 'left'
-        ? String(value).padEnd(column.width)
-        : String(value).padStart(column.width);
-}
-
-function prepareRowsForExport(rows, columns) {
-    return rows.map(row => {
-        const prepared = {};
-        for (const column of columns) {
-            const header = column.exportHeader || column.header;
-            prepared[header] = formatColumnValue(column, row);
-        }
-        return prepared;
-    });
-}
-
-function convertRowsToCsv(rows, columns) {
-    const escapeCell = (value) => {
-        const safeValue = value == null ? '' : String(value);
-        return /["\n;]/.test(safeValue)
-            ? `"${safeValue.replace(/"/g, '""')}"`
-            : safeValue;
-    };
-
-    const headerLine = columns.map(col => escapeCell(col.exportHeader || col.header)).join(CSV_DELIMITER);
-    const dataLines = rows.map(row =>
-        columns.map(col => escapeCell(formatColumnValue(col, row))).join(CSV_DELIMITER)
-    );
-    return [headerLine, ...dataLines].join('\n');
-}
-
-function buildBacktestColumnDefinitions(detailLevel = 'normal') {
-    const isDetailed = detailLevel === 'detailed';
-    const formatPercent = (value, decimals = 1) => `${(Number(value) || 0).toFixed(decimals)}%`;
-    const formatPercentInt = (value) => `${Math.round(Number(value) || 0)}%`;
-
-    const columns = [
-        { header: 'Jahr', width: 4, key: 'jahr', valueFormatter: v => v ?? '', align: 'right' },
-        { header: 'Entn.', width: 7, key: 'entscheidung.jahresEntnahme', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
-        { header: 'Floor', width: 7, key: 'row.floor_brutto', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' }
-    ];
-
-    if (isDetailed) {
-        columns.push(
-            { header: 'Rente1', width: 7, key: 'row.rente1', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
-            { header: 'Rente2', width: 7, key: 'row.rente2', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' }
-        );
-    }
-
-    columns.push({ header: 'RenteSum', width: 8, key: 'row.renteSum', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' });
-
-    if (isDetailed) {
-        columns.push({ header: 'FloorDep', width: 8, key: 'row.floor_aus_depot', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' });
-    }
-
-    columns.push(
-        { header: 'Flex%', width: 5, key: 'row.FlexRatePct', valueFormatter: v => formatPercentInt(v), align: 'right' },
-        { header: 'Flex€', width: 7, key: 'row.flex_erfuellt_nominal', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' }
-    );
-
-    if (isDetailed) {
-        columns.push(
-            { header: 'Entn_real', width: 9, key: 'row.jahresentnahme_real', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
-            { header: 'Adj%', width: 5, key: 'adjPct', valueFormatter: v => formatPercent(v), align: 'right' }
-        );
-    }
-
-    columns.push(
-        {
-            header: 'Markt', width: 12, key: 'row.Regime',
-            valueFormatter: (v, row) => {
-                const regimeText = window.Ruhestandsmodell_v30?.CONFIG?.SCENARIO_TEXT?.[v] || v || '';
-                return regimeText.substring(0, 12);
-            },
-            align: 'left'
-        },
-        { header: 'Status', width: 16, key: 'row.aktionUndGrund', valueFormatter: v => (v || '').substring(0, 15), align: 'left' },
-        { header: 'Quote%', width: 6, key: 'row.QuoteEndPct', valueFormatter: v => formatPercent(v), align: 'right' },
-        { header: 'Runway%', width: 7, key: 'row.RunwayCoveragePct', valueFormatter: v => formatPercentInt(v), align: 'right' },
-        { header: 'R.Aktien', width: 8, extractor: row => (row.row?.RealReturnEquityPct || 0) * 100, valueFormatter: v => formatPercent(v), align: 'right' },
-        { header: 'R.Gold', width: 8, extractor: row => (row.row?.RealReturnGoldPct || 0) * 100, valueFormatter: v => formatPercent(v), align: 'right' },
-        { header: 'Infl.', width: 5, key: 'inflationVJ', valueFormatter: v => formatPercent(v), align: 'right' },
-        { header: 'Handl.A', width: 8, key: 'netA', valueFormatter: v => {
-            const formatted = formatCurrencyShortLog(v);
-            if (v > 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
-            if (v < 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
-            return formatted;
-        }, align: 'right' },
-        { header: 'Handl.G', width: 8, key: 'netG', valueFormatter: v => {
-            const formatted = formatCurrencyShortLog(v);
-            if (v > 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
-            if (v < 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
-            return formatted;
-        }, align: 'right' },
-        { header: 'St.', width: 6, key: 'row.steuern_gesamt', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
-        { header: 'Aktien', width: 8, key: 'wertAktien', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
-        { header: 'Gold', width: 7, key: 'wertGold', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
-        { header: 'Liq.', width: 7, key: 'liquiditaet', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' }
-    );
-
-    if (isDetailed) {
-        columns.push(
-            { header: 'NeedLiq', width: 8, key: 'row.NeedLiq', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
-            { header: 'GuardG', width: 7, key: 'row.GuardGold', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
-            { header: 'GuardA', width: 7, key: 'row.GuardEq', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
-            { header: 'GuardNote', width: 16, key: 'row.GuardNote', valueFormatter: v => (v || '').substring(0, 16), align: 'right' }
-        );
-    }
-
-    return columns;
-}
-
 function renderBacktestLog() {
     if (!window.globalBacktestData || !Array.isArray(window.globalBacktestData.rows) || window.globalBacktestData.rows.length === 0) {
         return;
@@ -1270,24 +1091,6 @@ function renderBacktestLog() {
     html += '</tbody></table>';
 
     document.getElementById('simulationLog').innerHTML = html;
-}
-
-/**
- * Erstellt einen Download-Blob und löst den Speicherdialog aus
- * @param {string} filename - Empfohlener Dateiname
- * @param {string} content - Dateiinhalte
- * @param {string} mimeType - MIME-Type (z.B. application/json)
- */
-function triggerDownload(filename, content, mimeType) {
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = filename;
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-    URL.revokeObjectURL(url);
 }
 
 function exportBacktestLogData(format = 'json') {
