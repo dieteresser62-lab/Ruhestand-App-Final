@@ -134,7 +134,7 @@ Aggregation und Darstellung von Simulationsergebnissen.
 - `renderWorstRunLog()` – rendert Jahresprotokoll als HTML-Tabelle
 - `getWorstRunColumnDefinitions()` – Spaltenkonfiguration für Log-Tabellen
 - `loadDetailLevel()` / `persistDetailLevel()` – Detail-Einstellungen speichern
-- `createKpiCard()` / `createCurrencyKpiCard()` – KPI-Karten erstellen
+- KPI-Berechnung ausgelagert nach `results-metrics.js`, Rendering nach `results-renderers.js`
 
 **Features:**
 - Dropdown für 30 Szenario-Logs (charakteristische + zufällige)
@@ -142,7 +142,7 @@ Aggregation und Darstellung von Simulationsergebnissen.
 - JSON/CSV-Export für ausgewählte Szenarien
 - Pflege-KPI-Dashboard mit Dual-Care-Metriken
 
-**Dependencies:** `simulator-utils.js`, `simulator-heatmap.js`, `simulator-data.js`
+**Dependencies:** `simulator-utils.js`, `simulator-heatmap.js`, `simulator-data.js`, `results-metrics.js`, `results-renderers.js`
 
 ---
 
