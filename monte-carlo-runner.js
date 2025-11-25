@@ -452,8 +452,12 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
         depotErschoepft[i] = ruinOrDepleted ? 1 : 0;
         if (ruinOrDepleted && depotNurHistorie.length > 0) {
             const depletionIdx = depotNurHistorie.findIndex(v => v <= DEPOT_DEPLETION_THRESHOLD);
-            if (depletionIdx >= 0 && alterationCandidate(depletionIdx, alterBeiErschoepfung[i])) {
-                alterBeiErschoepfung[i] = inputs.startAlter + depletionIdx;
+            if (depletionIdx >= 0) {
+                const candidateDepletionAge = inputs.startAlter + depletionIdx; // Absolutes Alter zum Zeitpunkt der Erschöpfung berechnen
+                // Aktualisiere nur, wenn der neu berechnete Zeitpunkt früher als der bisher gespeicherte ist
+                if (candidateDepletionAge < alterBeiErschoepfung[i]) {
+                    alterBeiErschoepfung[i] = candidateDepletionAge;
+                }
             }
         }
 
@@ -591,12 +595,3 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
     return { aggregatedResults, failCount, worstRun, worstRunCare, pflegeTriggeredCount };
 }
 
-/**
- * Hilfsfunktion, um das Alter bei Depot-Erschöpfung defensiv zu aktualisieren.
- * @param {number} candidateIndex - Index der Depot-Historie.
- * @param {number} currentAge - Bisher gesetztes Alter.
- * @returns {boolean} True, wenn der Kandidat das Alter verbessern darf.
- */
-function alterationCandidate(candidateIndex, currentAge) {
-    return candidateIndex >= 0 && candidateIndex < currentAge;
-}
