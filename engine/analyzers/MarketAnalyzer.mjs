@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * ===================================================================
  * MARKET ANALYZER MODULE
@@ -7,8 +5,7 @@
  * Analysiert Marktbedingungen und bestimmt das aktuelle Marktszenario
  * ===================================================================
  */
-
-const { CONFIG } = require('../config.js');
+import { CONFIG } from '../config.mjs';
 
 /**
  * Normalisiert den übergebenen CAPE-Wert und fällt auf die Konfiguration zurück.
@@ -53,7 +50,7 @@ function deriveCapeAssessment(rawCapeRatio) {
     };
 }
 
-const MarketAnalyzer = {
+export const MarketAnalyzer = {
     /**
      * Analysiert den Markt basierend auf historischen Daten
      * @param {Object} input - Eingabedaten mit Marktinformationen
@@ -155,7 +152,4 @@ const MarketAnalyzer = {
     }
 };
 
-// Exporte
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = MarketAnalyzer;
-}
+export default MarketAnalyzer;

@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * ===================================================================
  * ENGINE CONFIGURATION MODULE
@@ -10,8 +8,8 @@
  */
 
 // Engine-Versionierung
-const ENGINE_API_VERSION = "31.0";
-const ENGINE_BUILD_ID = "2025-11-20_16-20";
+export const ENGINE_API_VERSION = "31.0";
+export const ENGINE_BUILD_ID = "2025-11-20_16-20";
 
 /**
  * Zentrale Engine-Konfiguration
@@ -20,7 +18,7 @@ const ENGINE_BUILD_ID = "2025-11-20_16-20";
  * für die Ruhestand-Engine. Änderungen an diesen Werten können signifikante
  * Auswirkungen auf die Ausgaben- und Transaktionsstrategie haben.
  */
-const CONFIG = {
+export const CONFIG = {
     APP: {
         VERSION: ENGINE_API_VERSION,
         NAME: 'Ruhestand-Engine-Core'
@@ -199,7 +197,4 @@ const CONFIG = {
     }
 };
 
-// Exporte
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { ENGINE_API_VERSION, ENGINE_BUILD_ID, CONFIG };
-}
+export default { ENGINE_API_VERSION, ENGINE_BUILD_ID, CONFIG };

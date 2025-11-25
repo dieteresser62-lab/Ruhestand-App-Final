@@ -67,8 +67,8 @@ Anpassung und merkt sich den Aktivierungsstatus im `localStorage`. Gleichzeitig 
 Whitelist, Blocklist und Rente-2-Invarianz-Checks, markiert Verstöße in der Heatmap und lässt sich über einen Dev-Self-Test prüfen.【F:simulator-main.js†L3-L64】【F:simulator-main.js†L1563-L1614】
 
 ### Gemeinsame Engine
-* Acht Module (`engine/`) kapseln Validierung, Marktanalyse, Ausgabenplanung und Transaktionslogik.
-* `build-engine.js` bündelt die Module zu `engine.js`, das in beiden Oberflächen als `EngineAPI` bzw. `Ruhestandsmodell_v30` geladen wird.
+* Acht ES-Module (`engine/`) kapseln Validierung, Marktanalyse, Ausgabenplanung und Transaktionslogik.
+* `build-engine.mjs` bündelt die Module per `esbuild` (oder Modul-Fallback) zu `engine.js`, das in beiden Oberflächen als `EngineAPI` bzw. `Ruhestandsmodell_v30` geladen wird.
 * Konfigurierbare Guardrails, Marktregime-Übersetzungen und Strategien für Liquiditätsziele.
 
 ---
@@ -81,17 +81,17 @@ Ruhestand-App-Final/
 ├── Simulator.html              # Einstiegspunkt Simulator
 ├── balance-*.js                # ES6-Module der Balance-App
 ├── simulator-*.js              # ES6-Module des Simulators
-├── engine/                     # Quellmodule der Berechnungsengine
-│   ├── config.js
-│   ├── core.js
-│   ├── errors.js
-│   ├── adapter.js
-│   ├── analyzers/MarketAnalyzer.js
-│   ├── planners/SpendingPlanner.js
-│   ├── transactions/TransactionEngine.js
-│   └── validators/InputValidator.js
+├── engine/                     # Quellmodule der Berechnungsengine (ESM)
+│   ├── config.mjs
+│   ├── core.mjs
+│   ├── errors.mjs
+│   ├── adapter.mjs
+│   ├── analyzers/MarketAnalyzer.mjs
+│   ├── planners/SpendingPlanner.mjs
+│   ├── transactions/TransactionEngine.mjs
+│   └── validators/InputValidator.mjs
 ├── engine.js                   # Gebündelte Engine (generiert)
-├── build-engine.js             # Node-Skript zum Bundlen der Engine
+├── build-engine.mjs            # Node-Skript zum Bundlen der Engine
 ├── css/
 │   └── balance.css             # Styling der Balance-App
 ├── simulator.css               # Styling der Simulator-Oberfläche
@@ -110,7 +110,7 @@ Ruhestand-App-Final/
 2. `Balance.html` bzw. `Simulator.html` im Browser öffnen.
    * Getestet mit Chromium-basierten Browsern und Firefox.
    * Keine Build-Schritte nötig.
-3. Optional: `node build-engine.js` ausführen, wenn Änderungen in `engine/` vorgenommen wurden. Dadurch wird `engine.js` aktualisiert.
+3. Optional: `npm run build:engine` ausführen, wenn Änderungen in `engine/` vorgenommen wurden. Dadurch wird `engine.js` aktualisiert (esbuild-Bundle oder Modul-Fallback).
 
 > **Hinweis:** Einige Funktionen (Snapshots, Dateiimporte) benötigen Browser mit File-System-Access-Unterstützung.
 
@@ -119,7 +119,8 @@ Ruhestand-App-Final/
 ## Entwicklung
 
 * Die Balance- und Simulator-Module nutzen native ES6-Imports. Änderungen an einzelnen Modulen werden nach dem Speichern direkt beim nächsten Reload geladen.
-* Engine-Anpassungen erfolgen in den Modulen unter `engine/`. Nach Anpassungen das Build-Skript ausführen und die Größe der generierten `engine.js` kontrollieren.
+* Engine-Anpassungen erfolgen in den Modulen unter `engine/`. Nach Anpassungen `npm run build:engine` ausführen und die Größe der generierten `engine.js` kontrollieren.
+* Für schnelle QA bitte den Selftest `node sim-parity-smoketest.js` einmal durchlaufen lassen (entspricht `npm test`).
 * Debug-Modi über Tastenkombinationen oder lokale Storage-Flags aktivieren (`balance_debug_mode`, `sim.devMode`).
 * Für Tests der Parameter-Sweeps steht im Simulator-Dev-Modus `runSweepSelfTest()` bereit.
 

@@ -13,9 +13,9 @@
    - Contains: Monte Carlo, sweeps, backtest, exports, UI handling
    - **Status:** Functional, could be split further
 
-2. **engine.js** (~2,400 lines) - Auto-generated
+2. **engine.js** (~2,400 lines) - Auto-generated Bundle/Modul-Wrapper
    - **Status:** DO NOT EDIT - modify engine/ source files instead
-   - **Action:** Run `node build-engine.js` after engine changes
+   - **Action:** Run `npm run build:engine` after engine changes
 
 ### LARGE - 500-1000 lines (Plan to split)
 - **balance-renderer.js** (935 lines) - Split into 5-6 feature renderers
@@ -31,8 +31,8 @@ Ruhestand-App-Final/
 ├── Balance.html, Simulator.html (entry points mixed with code)
 ├── balance-*.js (good structure)
 ├── simulator-*.js (poor structure - files too large)
-├── engine.js (bundle - edit engine/ folder)
-└── engine/ (well-organized modules)
+├── engine.js (bundle/modul-Wrapper - edit engine/ folder)
+└── engine/ (well-organized ES modules)
 ```
 
 ### What's Missing
@@ -85,7 +85,7 @@ Ruhestand-App-Final/
 ### Build the Engine
 After editing files in `engine/`:
 ```bash
-node build-engine.js
+npm run build:engine
 ```
 
 ### Find Large Files
