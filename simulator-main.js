@@ -46,25 +46,15 @@
  *
  * BETROFFENE DATEIEN:
  * -------------------
- * - simulator-main.js:     Haupt-Sweep-Logik, Whitelist, Deep-Clone, R2-Assertion
+ * - simulator-main.js:     UI-Init, Monte-Carlo und Sweep-Integration (Sweep-Logik ausgelagert)
+ * - simulator-sweep.js:    Sweep-Logik, Range-Parsing, Whitelist/Blocklist-Enforcement
  * - simulator-heatmap.js:  Heatmap-Rendering mit R2-Warning-Badge
  * - simulator-results.js:  Metriken-Aggregation (warningR2Varies)
- *
- * FUNKTIONEN:
- * -----------
- * - deepClone(obj)                     ~Zeile 100 (nach Imports)
- * - SWEEP_ALLOWED_KEYS                 ~Zeile 130 (Whitelist-Definition)
- * - SWEEP_BLOCK_PATTERNS               ~Zeile 145 (Blocklist für Person-2)
- * - isBlockedKey(key)                  ~Zeile 155 (Blocklist-Prüfung)
- * - extractR2Series(yearLog)           ~Zeile 164 (Rente-2-Serie extrahieren)
- * - areR2SeriesEqual(s1, s2, tol)      ~Zeile 186 (Rente-2-Vergleich)
- * - runParameterSweep()                ~Zeile 1278 (Haupt-Sweep-Logik)
- * - runSweepSelfTest()                 ~Zeile 1577 (Developer-Test)
  *
  * ============================================================================
  */
 
-import { rng, quantile, sum, mean, formatCurrency, parseRange, parseRangeInput, cartesianProduct, cartesianProductLimited } from './simulator-utils.js';
+import { quantile, sum, mean, formatCurrency } from './simulator-utils.js';
 import { getStartYearCandidates } from './cape-utils.js';
 import { ENGINE_VERSION, STRESS_PRESETS, BREAK_ON_RUIN, MORTALITY_TABLE, annualData, SUPPORTED_PFLEGE_GRADES } from './simulator-data.js';
 import {
@@ -96,7 +86,6 @@ import {
     WORST_LOG_DETAIL_KEY
 } from './simulator-results.js';
 import { sumDepot } from './simulator-portfolio.js';
-import { renderSweepHeatmapSVG } from './simulator-heatmap.js';
 import {
     applyPflegeKostenPreset,
     updatePflegePresetHint,
@@ -105,19 +94,12 @@ import {
 } from './simulator-ui-pflege.js';
 import { initRente2ConfigWithLocalStorage } from './simulator-ui-rente.js';
 import { runMonteCarlo } from './simulator-monte-carlo.js';
+import { displaySweepResults, initSweepDefaultsWithLocalStorageFallback, runParameterSweep } from './simulator-sweep.js';
 import {
-    cloneStressContext,
     normalizeWidowOptions,
     computeMarriageYearsCompleted,
     deepClone,
     setNested,
-    SWEEP_ALLOWED_KEYS,
-    SWEEP_BLOCK_PATTERNS,
-    isBlockedKey,
-    extractP2Invariants,
-    areP2InvariantsEqual,
-    extractR2Series,
-    areR2SeriesEqual,
     withNoLSWrites
 } from './simulator-sweep-utils.js';
 import {
@@ -415,305 +397,6 @@ function initializeLegacyMortalityToggleIfPresent(checkbox) {
 
     // Re-Sync sobald der (Legacy-)Toggle verändert wird.
     checkbox.addEventListener('change', invokeSyncIfAvailable);
-}
-
-/**
- * Initialisiert Sweep-Defaults mit localStorage-Fallback
- */
-function initSweepDefaultsWithLocalStorageFallback() {
-    const map = [
-        ["sweepRunwayMin", "sim.sweep.runwayMin"],
-        ["sweepRunwayTarget", "sim.sweep.runwayTarget"],
-        ["sweepTargetEq", "sim.sweep.targetEq"],
-        ["sweepRebalBand", "sim.sweep.rebalBand"],
-        ["sweepMaxSkimPct", "sim.sweep.maxSkimPct"],
-        ["sweepMaxBearRefillPct", "sim.sweep.maxBearRefillPct"],
-        ["sweepGoldTargetPct", "sim.sweep.goldTarget"]
-    ];
-
-    for (const [id, key] of map) {
-        const el = document.getElementById(id);
-        if (!el) continue;
-
-        const saved = localStorage.getItem(key);
-        if (saved !== null && saved !== undefined && saved !== '') {
-            el.value = saved;
-        }
-
-        el.addEventListener("change", () => localStorage.setItem(key, el.value));
-        el.addEventListener("input", () => localStorage.setItem(key, el.value));
-    }
-}
-
-/**
- * Führt einen Parameter-Sweep durch
- */
-export async function runParameterSweep() {
-    const sweepButton = document.getElementById('sweepButton');
-    sweepButton.disabled = true;
-    const progressBarContainer = document.getElementById('sweep-progress-bar-container');
-    const progressBar = document.getElementById('sweep-progress-bar');
-
-    try {
-        prepareHistoricalData();
-
-        const rangeInputs = {
-            runwayMin: document.getElementById('sweepRunwayMin').value,
-            runwayTarget: document.getElementById('sweepRunwayTarget').value,
-            targetEq: document.getElementById('sweepTargetEq').value,
-            rebalBand: document.getElementById('sweepRebalBand').value,
-            maxSkimPct: document.getElementById('sweepMaxSkimPct').value,
-            maxBearRefillPct: document.getElementById('sweepMaxBearRefillPct').value,
-            goldTargetPct: document.getElementById('sweepGoldTargetPct').value
-        };
-
-        const paramLabels = {
-            runwayMin: 'Runway Min',
-            runwayTarget: 'Runway Target',
-            targetEq: 'Target Eq',
-            rebalBand: 'Rebal Band',
-            maxSkimPct: 'Max Skim %',
-            maxBearRefillPct: 'Max Bear Refill %',
-            goldTargetPct: 'Gold Target %'
-        };
-
-        const paramRanges = {};
-        try {
-            for (const [key, rangeStr] of Object.entries(rangeInputs)) {
-                const values = parseRangeInput(rangeStr);
-                if (values.length === 0) {
-                    alert(`Leeres Range-Input für ${paramLabels[key] || key}.\n\nBitte geben Sie einen Wert ein:\n- Einzelwert: 24\n- Liste: 24,36,48\n- Range: 24:12:48`);
-                    return;
-                }
-                paramRanges[key] = values;
-            }
-        } catch (error) {
-            alert(`Fehler beim Parsen der Range-Eingaben:\n\n${error.message}\n\nErlaubte Formate:\n- Einzelwert: 24\n- Kommaliste: 50,60,70\n- Range: start:step:end (z.B. 18:6:36)`);
-            return;
-        }
-
-        // Calculate combinations with limit check
-        const arrays = Object.values(paramRanges);
-        const { combos, tooMany, size } = cartesianProductLimited(arrays, 300);
-
-        if (tooMany) {
-            alert(`Zu viele Kombinationen: ${size} (theoretisch)\n\nMaximum: 300\n\nBitte reduzieren Sie die Anzahl der Parameter-Werte.`);
-            return;
-        }
-
-        if (combos.length === 0) {
-            alert('Keine Parameter-Kombinationen gefunden.');
-            return;
-        }
-
-        // Convert back to object format
-        const paramKeys = Object.keys(paramRanges);
-        const paramCombinations = combos.map(combo => {
-            const obj = {};
-            paramKeys.forEach((key, i) => {
-                obj[key] = combo[i];
-            });
-            return obj;
-        });
-
-        progressBarContainer.style.display = 'block';
-        progressBar.style.width = '0%';
-        progressBar.textContent = '0%';
-
-        // WICHTIG: Basis-Inputs nur EINMAL lesen und einfrieren (Deep Clone)
-        const baseInputs = deepClone(getCommonInputs());
-        const anzahlRuns = parseInt(document.getElementById('mcAnzahl').value) || 100;
-        const maxDauer = parseInt(document.getElementById('mcDauer').value) || 35;
-        const blockSize = parseInt(document.getElementById('mcBlockSize').value) || 5;
-        const baseSeed = parseInt(document.getElementById('mcSeed').value) || 12345;
-        const methode = document.getElementById('mcMethode').value;
-
-        const sweepResults = [];
-
-        // P2-Invarianz-Guard: Referenz-Invarianten für Person 2 (wird beim ersten Case gesetzt)
-        let REF_P2_INVARIANTS = null;
-
-        for (let comboIdx = 0; comboIdx < paramCombinations.length; comboIdx++) {
-            const params = paramCombinations[comboIdx];
-
-            // Erstelle Case-spezifische Inputs durch Deep Clone der Basis
-            const inputs = deepClone(baseInputs);
-
-            // Überschreibe nur erlaubte Parameter (Whitelist + Blockliste prüfen)
-            const caseOverrides = {
-                runwayMinMonths: params.runwayMin,
-                runwayTargetMonths: params.runwayTarget,
-                targetEq: params.targetEq,
-                rebalBand: params.rebalBand,
-                maxSkimPctOfEq: params.maxSkimPct,
-                maxBearRefillPctOfEq: params.maxBearRefillPct
-            };
-
-            if (params.goldTargetPct !== undefined) {
-                caseOverrides.goldZielProzent = params.goldTargetPct;
-                caseOverrides.goldAktiv = params.goldTargetPct > 0;
-            }
-
-            // Wende Overrides an mit Whitelist/Blockliste-Prüfung
-            for (const [k, v] of Object.entries(caseOverrides)) {
-                if (isBlockedKey(k)) {
-                    console.warn(`[SWEEP] Ignoriere Person-2-Key im Sweep: ${k}`);
-                    continue;
-                }
-                if (SWEEP_ALLOWED_KEYS.size && !SWEEP_ALLOWED_KEYS.has(k)) {
-                    console.warn(`[SWEEP] Key nicht auf Whitelist, übersprungen: ${k}`);
-                    continue;
-                }
-                // Setze erlaubten Parameter
-                inputs[k] = v;
-            }
-
-            // P2-Invarianz-Guard: Extrahiere Basis-Parameter (NICHT abgeleitete Zeitserien!)
-            const p2Invariants = extractP2Invariants(inputs);
-
-            if (REF_P2_INVARIANTS === null) {
-                // Erste Case-Referenz setzen
-                REF_P2_INVARIANTS = p2Invariants;
-                console.log(`[SWEEP] Referenz-P2-Invarianten gesetzt (Case ${comboIdx}):`, p2Invariants);
-            }
-
-            // Prüfe P2-Invarianz VOR der Simulation (keine YearLogs mehr nötig!)
-            const p2VarianceWarning = !areP2InvariantsEqual(p2Invariants, REF_P2_INVARIANTS);
-
-            if (p2VarianceWarning) {
-                console.warn(`[SWEEP][ASSERT] P2-Basis-Parameter variieren im Sweep (Case ${comboIdx}), sollten konstant bleiben!`);
-                console.warn('[SWEEP] Referenz:', REF_P2_INVARIANTS);
-                console.warn('[SWEEP] Aktuell:', p2Invariants);
-            }
-
-            const rand = rng(baseSeed + comboIdx);
-            const stressCtxMaster = buildStressContext(inputs.stressPreset, rand);
-
-            const runOutcomes = [];
-
-            for (let i = 0; i < anzahlRuns; i++) {
-                let failed = false;
-                const startYearIndex = Math.floor(rand() * annualData.length);
-                let simState = initMcRunState(inputs, startYearIndex);
-
-                const depotWertHistorie = [portfolioTotal(simState.portfolio)];
-                let careMeta = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren, inputs.geschlecht);
-                let stressCtx = cloneStressContext(stressCtxMaster);
-
-                let minRunway = Infinity;
-
-                for (let simulationsJahr = 0; simulationsJahr < maxDauer; simulationsJahr++) {
-                    const currentAge = inputs.startAlter + simulationsJahr;
-
-                    let yearData = sampleNextYearData(simState, methode, blockSize, rand, stressCtx);
-                    yearData = applyStressOverride(yearData, stressCtx, rand);
-
-                    careMeta = updateCareMeta(careMeta, inputs, currentAge, yearData, rand);
-
-                    let qx = MORTALITY_TABLE[inputs.geschlecht][currentAge] || 1;
-                    const careFactor = computeCareMortalityMultiplier(careMeta, inputs);
-                    if (careFactor > 1) {
-                        qx = Math.min(1.0, qx * careFactor);
-                    }
-
-                    if (rand() < qx) break;
-
-                    // Berechne dynamische Rentenanpassung basierend auf Modus (fix/wage/cpi)
-                    const effectiveRentAdjPct = computeRentAdjRate(inputs, yearData);
-                    const adjustedInputs = { ...inputs, rentAdjPct: effectiveRentAdjPct };
-
-                    // Calculate care floor addition (if active)
-                    const { zusatzFloor: careFloor } = calcCareCost(careMeta, null);
-
-                    const result = simulateOneYear(simState, adjustedInputs, yearData, simulationsJahr, careMeta, careFloor);
-
-                    if (result.isRuin) {
-                        failed = true;
-                        if (BREAK_ON_RUIN) break;
-                    } else {
-                        simState = result.newState;
-                        depotWertHistorie.push(portfolioTotal(simState.portfolio));
-
-                        const runway = result.logData.RunwayCoveragePct || 0;
-                        if (runway < minRunway) minRunway = runway;
-                    }
-                }
-
-                const endVermoegen = failed ? 0 : portfolioTotal(simState.portfolio);
-                const { maxDDpct } = computeRunStatsFromSeries(depotWertHistorie);
-
-                runOutcomes.push({
-                    finalVermoegen: endVermoegen,
-                    maxDrawdown: maxDDpct,
-                    minRunway: minRunway === Infinity ? 0 : minRunway,
-                    failed: failed
-                });
-            }
-
-            const metrics = aggregateSweepMetrics(runOutcomes);
-            metrics.warningR2Varies = p2VarianceWarning; // Füge Warnung zu Metriken hinzu
-            sweepResults.push({ params, metrics });
-
-            const progress = ((comboIdx + 1) / paramCombinations.length) * 100;
-            progressBar.style.width = `${progress}%`;
-            progressBar.textContent = `${Math.round(progress)}%`;
-
-            if (comboIdx % 5 === 0) {
-                await new Promise(resolve => setTimeout(resolve, 0));
-            }
-        }
-
-        window.sweepResults = sweepResults;
-        window.sweepParamRanges = paramRanges;
-
-        displaySweepResults();
-
-        document.getElementById('sweepResults').style.display = 'block';
-
-    } catch (e) {
-        alert("Fehler im Parameter-Sweep:\n\n" + e.message);
-        console.error('Parameter-Sweep Fehler:', e);
-
-        // Reset UI on error
-        progressBar.style.width = '0%';
-        progressBar.textContent = '0%';
-    } finally {
-        if (progressBar.style.width !== '0%') {
-            progressBar.style.width = '100%';
-            progressBar.textContent = '100%';
-        }
-        setTimeout(() => { progressBarContainer.style.display = 'none'; }, 250);
-        sweepButton.disabled = false;
-    }
-}
-
-/**
- * Zeigt die Sweep-Ergebnisse als Heatmap an
- */
-function displaySweepResults() {
-    try {
-        const metricKey = document.getElementById('sweepMetric').value;
-        const xParam = document.getElementById('sweepAxisX').value;
-        const yParam = document.getElementById('sweepAxisY').value;
-
-        const xValues = window.sweepParamRanges[xParam] || [];
-        const yValues = window.sweepParamRanges[yParam] || [];
-
-        const heatmapHtml = renderSweepHeatmapSVG(
-            window.sweepResults,
-            metricKey,
-            xParam,
-            yParam,
-            xValues,
-            yValues
-        );
-
-        document.getElementById('sweepHeatmap').innerHTML = heatmapHtml;
-    } catch (error) {
-        alert("Fehler beim Rendern der Sweep-Heatmap:\n\n" + error.message);
-        console.error('displaySweepResults Fehler:', error);
-        document.getElementById('sweepHeatmap').innerHTML = '<p style="color: red;">Fehler beim Rendern der Heatmap. Siehe Konsole für Details.</p>';
-    }
 }
 
 /**
