@@ -128,6 +128,7 @@ Ruhestand-App-Final/
 ## Weitere Dokumentation
 
 * **BALANCE_MODULES_README.md** – detaillierte Beschreibung der Balance-Module.
+* **SIMULATOR_MODULES_README.md** – aktuelle Modulübersicht (Monte-Carlo, Sweep, Backtest, UI-Pfade) inkl. Init-Funktionen und Platzierung neuer Helfer.
 * **TECHNICAL.md** – Architekturübersicht von Engine, Balance- und Simulator-Anwendung.
 * **TYPESCRIPT_MIGRATION_KONZEPT.md** – Plan für eine mögliche Migration auf TypeScript.
 * **FEATURE_BRANCH_WORKFLOW.md** – empfohlener Git-Workflow für umfangreiche Features.
