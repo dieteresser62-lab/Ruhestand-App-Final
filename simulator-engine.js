@@ -189,6 +189,12 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
     let { depotTranchesAktien, depotTranchesGold } = portfolio;
     let liquiditaet = portfolio.liquiditaet;
+    // Neue Log-Felder: Wir erfassen den Cash-Stand vor Zinsen, die daraus erzielten Zinsen
+    // sowie den Cash-Stand nach Verzinsung. So lässt sich nachvollziehen, wie Liquidität
+    // ohne Verkäufe anwächst. Alle Werte werden defensiv normalisiert.
+    let liqStartVorZins = euros(liquiditaet);
+    let cashZinsen = 0;
+    let liqNachZins = liqStartVorZins;
     let totalTaxesThisYear = 0;
 
     const rA = isFinite(yearData.rendite) ? yearData.rendite : 0;
@@ -418,7 +424,11 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         buyStocksNeu(portfolio, aktienTeil);
     }
 
-    liquiditaet *= (1 + rC);
+    // Cash-Verzinsung separat loggen, um Zuwächse ohne Verkäufe sichtbar zu machen.
+    liqStartVorZins = euros(liquiditaet);
+    cashZinsen = euros(liqStartVorZins * rC);
+    liquiditaet = euros(liqStartVorZins * (1 + rC));
+    liqNachZins = euros(liquiditaet);
     if (!isFinite(liquiditaet)) liquiditaet = 0;
 
     // ========== FAIL-SAFE LIQUIDITY GUARD ==========
@@ -563,7 +573,11 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             kaufGld: totalGoldKauf,
             wertAktien: sumDepot({depotTranchesAktien: portfolio.depotTranchesAktien}),
             wertGold: sumDepot({depotTranchesGold: portfolio.depotTranchesGold}),
-            liquiditaet, aktionUndGrund: aktionText,
+            liquiditaet,
+            liqStart: liqStartVorZins,
+            cashInterestEarned: cashZinsen,
+            liqEnd: liqNachZins,
+            aktionUndGrund: aktionText,
             usedSPB: mergedSaleResult ? (mergedSaleResult.pauschbetragVerbraucht || 0) : 0,
             floor_brutto: effectiveBaseFloor,
             pension_annual: pensionAnnual,
