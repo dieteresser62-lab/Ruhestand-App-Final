@@ -111,6 +111,10 @@ Ruhestand-App-Final/
    * Getestet mit Chromium-basierten Browsern und Firefox.
    * Keine Build-Schritte nötig.
 3. Optional: `npm run build:engine` ausführen, wenn Änderungen in `engine/` vorgenommen wurden. Dadurch wird `engine.js` aktualisiert (esbuild-Bundle oder Modul-Fallback).
+4. Für lokale Aufrufe bitte den mitgelieferten Entwicklungsserver nutzen, damit `.mjs`-Module korrekt als JavaScript ausgeliefert werden:
+   * Windows: `index_start.bat` starten (ruft intern `python dev_server.py --port 8000 --bind 127.0.0.1 --directory .` auf).
+   * Manuell: `python dev_server.py --port 8000 --bind 127.0.0.1 --directory .`
+   * Hintergrund: Einige Python-Versionen (z. B. 3.14) geben `engine/index.mjs` sonst mit falschem MIME-Type aus, wodurch die Engine nicht geladen wird.
 
 > **Hinweis:** Einige Funktionen (Snapshots, Dateiimporte) benötigen Browser mit File-System-Access-Unterstützung.
 
