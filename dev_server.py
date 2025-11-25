@@ -21,7 +21,6 @@ from __future__ import annotations
 import argparse
 import contextlib
 import os
-import logging
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 
@@ -36,14 +35,6 @@ class ModuleAwareRequestHandler(SimpleHTTPRequestHandler):
 
     # Fallback-MIME-Type für ES-Module
     MJS_MIME_TYPE: str = "application/javascript"
-
-    # Erweiterte Extension-Map: stellt sicher, dass ``SimpleHTTPRequestHandler``
-    # auch beim Logging stets den korrekten MIME-Type kennt. Die Map wird in
-    # ``guess_type`` ebenfalls genutzt.
-    extensions_map = {
-        **SimpleHTTPRequestHandler.extensions_map,
-        ".mjs": MJS_MIME_TYPE,
-    }
 
     def guess_type(self, path: str) -> str:
         """Gibt den MIME-Type für den angefragten Pfad zurück.
@@ -70,19 +61,6 @@ class ModuleAwareRequestHandler(SimpleHTTPRequestHandler):
         # Standard-Implementierung.
         return super().guess_type(path)
 
-    def log_message(self, format: str, *args) -> None:
-        """Loggt Requests über das zentrale Logging-Setup.
-
-        Parameters
-        ----------
-        format: str
-            Formatstring der Basisklasse.
-        *args:
-            Platzhalter-Werte für den Formatstring.
-        """
-
-        logging.info("%s - - %s", self.client_address[0], format % args)
-
 
 def parse_arguments() -> argparse.Namespace:
     """Parst die CLI-Parameter für den Entwicklungsserver.
@@ -104,20 +82,6 @@ def parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def configure_logging() -> None:
-    """Richtet defensives Logging für den Entwicklungsserver ein.
-
-    Das Logging ersetzt die Standardausgabe des Handlers und sorgt dafür,
-    dass Startmeldungen, Requests und Fehler sowohl interaktiv als auch aus
-    Batch-Skripten nachvollziehbar bleiben.
-    """
-
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-    )
-
-
 def run_server(bind_address: str, port: int, directory: str) -> None:
     """Startet den Entwicklungsserver mit Modul-Unterstützung.
 
@@ -137,13 +101,11 @@ def run_server(bind_address: str, port: int, directory: str) -> None:
         handler = ModuleAwareRequestHandler
         server = ThreadingHTTPServer((bind_address, port), handler)
 
-        # Klare Startmeldung, bewusst geflushed, damit sie auch in Batch-Skripten
-        # sofort sichtbar ist.
-        print(f"Starte Entwicklungsserver auf http://{bind_address}:{port} (root: {directory})", flush=True)
+        print(f"Starte Entwicklungsserver auf http://{bind_address}:{port} (root: {directory})")
         try:
             server.serve_forever()
         except KeyboardInterrupt:
-            print("\nStoppe Server (KeyboardInterrupt)", flush=True)
+            print("\nStoppe Server (KeyboardInterrupt)")
         finally:
             server.server_close()
 
@@ -175,7 +137,6 @@ def change_working_directory(path: str):
 def main() -> None:
     """CLI-Einstiegspunkt für den Entwicklungsserver."""
 
-    configure_logging()
     args = parse_arguments()
     run_server(bind_address=args.bind, port=args.port, directory=args.directory)
 
