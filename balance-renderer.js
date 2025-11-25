@@ -33,59 +33,97 @@ const THRESHOLD_LABEL_MAP = Object.freeze({
 // Module-level references
 let dom = null;
 let StorageManager = null;
+let summaryRenderer = null;
+let actionRenderer = null;
+let diagnosisRenderer = null;
 
 /**
- * Initialisiert den UIRenderer mit den notwendigen Abhängigkeiten
+ * Renderer für die Kern-KPIs und Zusammenfassungen.
+ * Kapselt sämtliche DOM-Zugriffe rund um die Hauptübersicht und validiert Eingaben defensiv.
  */
-export function initUIRenderer(domRefs, storageManager) {
-    dom = domRefs;
-    StorageManager = storageManager;
-}
+class SummaryRenderer {
+    /**
+     * @param {Object} domRefs - Referenzen auf die benötigten DOM-Knoten.
+     * @param {Object} storageManager - Zugriff auf gespeicherte Zustände als Fallback.
+     */
+    constructor(domRefs, storageManager) {
+        this.dom = domRefs;
+        this.storageManager = storageManager;
+    }
 
-export const UIRenderer = {
-    // DOM-SAFE: Nur textContent/DOM-APIs; kein innerHTML für dynamische Inhalte.
-    render(ui) {
-        // HINWEIS: 'ui' enthält jetzt auch 'ui.input' dank des Fixes in update()
+    /**
+     * Orchestriert das Rendering der wichtigsten UI-Kacheln.
+     *
+     * @param {Object} ui - Vorbereitete UI-Daten inklusive Input- und Output-Werten.
+     */
+    renderOverview(ui = {}) {
         this.renderMiniSummary(ui);
-        dom.outputs.depotwert.textContent = UIUtils.formatCurrency(ui.depotwertGesamt);
-        dom.outputs.neuerBedarf.textContent = UIUtils.formatCurrency(ui.neuerBedarf);
-        dom.outputs.minGoldDisplay.textContent = UIUtils.formatCurrency(ui.minGold);
-        dom.outputs.zielLiquiditaet.textContent = UIUtils.formatCurrency(ui.zielLiquiditaet);
-        this.renderEntnahme(ui.spending);
-        this.renderMarktstatus(ui.market);
-        // Übergibt ui.action und das notwendige ui.input an renderHandlungsanweisung
-        this.renderHandlungsanweisung(ui.action, ui.input);
-        this.renderLiquidityBar(ui.liquiditaet.deckungNachher);
-    },
 
-    renderBedarfAnpassungUI(inputData, persistentState) {
-        const container = dom.containers.bedarfAnpassung;
+        // Defensiver Zugriff: Jeder Bereich wird nur befüllt, wenn die Daten vorhanden sind.
+        if (this.dom?.outputs?.depotwert && typeof ui.depotwertGesamt === 'number') {
+            this.dom.outputs.depotwert.textContent = UIUtils.formatCurrency(ui.depotwertGesamt);
+        }
+        if (this.dom?.outputs?.neuerBedarf && typeof ui.neuerBedarf === 'number') {
+            this.dom.outputs.neuerBedarf.textContent = UIUtils.formatCurrency(ui.neuerBedarf);
+        }
+        if (this.dom?.outputs?.minGoldDisplay && typeof ui.minGold === 'number') {
+            this.dom.outputs.minGoldDisplay.textContent = UIUtils.formatCurrency(ui.minGold);
+        }
+        if (this.dom?.outputs?.zielLiquiditaet && typeof ui.zielLiquiditaet === 'number') {
+            this.dom.outputs.zielLiquiditaet.textContent = UIUtils.formatCurrency(ui.zielLiquiditaet);
+        }
+
+        // Detail-Abschnitte in eigene Render-Schritte ausgelagert.
+        this.renderEntnahme(ui.spending || {});
+        this.renderMarktstatus(ui.market || {});
+        this.renderLiquidityBar(ui.liquiditaet?.deckungNachher);
+    }
+
+    /**
+     * Rendert die UI zur Inflationsanpassung der Bedarfe.
+     *
+     * @param {Object} inputData - Aktuelle Eingabedaten.
+     * @param {Object} persistentState - Persistenter Zustand aus dem Storage.
+     */
+    renderBedarfAnpassungUI(inputData = {}, persistentState = {}) {
+        const container = this.dom?.containers?.bedarfAnpassung;
+        if (!container) return;
+
         const currentAge = inputData.aktuellesAlter;
         const lastAdjustedAge = persistentState.ageAdjustedForInflation || 0;
         const inflation = inputData.inflation;
 
         let content = '';
-        if (currentAge > lastAdjustedAge) {
+        if (typeof currentAge === 'number' && typeof inflation === 'number' && currentAge > lastAdjustedAge) {
             // Ein neues Jahr, eine Anpassung steht an
             content = `<button type="button" class="btn btn-sm btn-utility btn-apply-inflation">Bedarfe um ${inflation.toFixed(1)} % erhöhen</button>`;
-        } else if (currentAge === lastAdjustedAge && lastAdjustedAge > 0) {
+        } else if (typeof currentAge === 'number' && currentAge === lastAdjustedAge && lastAdjustedAge > 0) {
             // Anpassung für dieses Alter ist bereits erfolgt
             content = `<small style="color: var(--success-color);">✓ Bedarfe für Alter ${currentAge} sind aktuell.</small>`;
         }
-        // Wenn currentAge < lastAdjustedAge, wird nichts angezeigt (z.B. bei Korrektur des Alters)
 
         container.innerHTML = content;
-    },
+    }
 
-    renderMiniSummary(ui) {
+    /**
+     * Erzeugt die kompakte Zusammenfassung inkl. KPI-Badges und Reichweiten.
+     *
+     * @param {Object} ui - Gesamte UI-Datenstruktur inklusive Input/Action.
+     */
+    renderMiniSummary(ui = {}) {
         let currentInput = ui.input;
         if (!currentInput) {
-            console.warn("UIRenderer.renderMiniSummary: ui.input fehlt, versuche Fallback.");
-            currentInput = StorageManager.loadState()?.inputs || UIReader.readAllInputs();
+            // Defensive Fallbacks: Storage bevorzugt, danach optionaler UIReader (falls vorhanden).
+            currentInput = this.storageManager?.loadState?.()?.inputs;
+            if (!currentInput && typeof UIReader !== 'undefined' && typeof UIReader.readAllInputs === 'function') {
+                currentInput = UIReader.readAllInputs();
+            }
         }
         if (!currentInput) {
             console.error("UIRenderer.renderMiniSummary: Konnte keine Input-Daten laden!");
-            dom.outputs.miniSummary.textContent = 'Fehler beim Laden der Input-Daten für Mini-Summary.';
+            if (this.dom?.outputs?.miniSummary) {
+                this.dom.outputs.miniSummary.textContent = 'Fehler beim Laden der Input-Daten für Mini-Summary.';
+            }
             return;
         }
 
@@ -149,27 +187,49 @@ export const UIRenderer = {
         fragment.appendChild(createItem('Liquid.-Deckung', ui.liquiditaet.deckungVorher, ui.liquiditaet.deckungNachher, '%'));
         fragment.appendChild(createItem('Reichweite (Floor)', reichweite.floorVorher, reichweite.floorNachher, ' J'));
 
-        dom.outputs.miniSummary.replaceChildren(fragment);
-    },
+        if (this.dom?.outputs?.miniSummary) {
+            this.dom.outputs.miniSummary.replaceChildren(fragment);
+        }
+    }
 
-    renderEntnahme(spending) {
-        dom.outputs.monatlicheEntnahme.replaceChildren(document.createTextNode(UIUtils.formatCurrency(spending.monatlicheEntnahme)));
+    /**
+     * Stellt Entnahme-Informationen dar und blendet optionale Details ein.
+     *
+     * @param {Object} spending - Daten zur geplanten Entnahme.
+     */
+    renderEntnahme(spending = {}) {
+        if (!this.dom?.outputs?.monatlicheEntnahme) return;
+
+        const monatlicheEntnahme = spending.monatlicheEntnahme;
+        if (typeof monatlicheEntnahme === 'number' && isFinite(monatlicheEntnahme)) {
+            this.dom.outputs.monatlicheEntnahme.replaceChildren(document.createTextNode(UIUtils.formatCurrency(monatlicheEntnahme)));
+        }
+
         const small1 = document.createElement('small');
         small1.style.cssText = 'display:block; font-size:0.85em; opacity:0.8; margin-top: 4px;';
-        small1.textContent = `(${UIUtils.formatCurrency(spending.monatlicheEntnahme * 12)} / Jahr)`;
+        if (typeof monatlicheEntnahme === 'number' && isFinite(monatlicheEntnahme)) {
+            small1.textContent = `(${UIUtils.formatCurrency(monatlicheEntnahme * 12)} / Jahr)`;
+        }
         const small2 = document.createElement('small');
         small2.style.cssText = 'display:block; opacity:.8;';
-        small2.textContent = spending.anmerkung.trim();
-        dom.outputs.monatlicheEntnahme.append(small1, small2);
+        small2.textContent = (spending.anmerkung || '').trim();
+        this.dom.outputs.monatlicheEntnahme.append(small1, small2);
 
-        if (spending.details) {
-            dom.outputs.entnahmeDetailsContent.replaceChildren(this.buildEntnahmeDetails(spending.details, spending.kuerzungQuelle));
-            dom.outputs.entnahmeBreakdown.style.display = 'block';
-        } else {
-            dom.outputs.entnahmeBreakdown.style.display = 'none';
+        if (spending.details && this.dom?.outputs?.entnahmeDetailsContent && this.dom?.outputs?.entnahmeBreakdown) {
+            this.dom.outputs.entnahmeDetailsContent.replaceChildren(this.buildEntnahmeDetails(spending.details, spending.kuerzungQuelle));
+            this.dom.outputs.entnahmeBreakdown.style.display = 'block';
+        } else if (this.dom?.outputs?.entnahmeBreakdown) {
+            this.dom.outputs.entnahmeBreakdown.style.display = 'none';
         }
-    },
+    }
 
+    /**
+     * Baut die Detailzeilen zur Entnahme auf.
+     *
+     * @param {Object} details - Berechnete Kennzahlen zur Entnahme.
+     * @param {string} kuerzungQuelle - Begründung für Anpassungen.
+     * @returns {DocumentFragment} DOM-Fragment mit den Detailzeilen.
+     */
     buildEntnahmeDetails(details, kuerzungQuelle) {
         const fragment = document.createDocumentFragment();
         const createLine = (label, value) => {
@@ -186,24 +246,122 @@ export const UIRenderer = {
         fragment.appendChild(strong);
 
         return fragment;
-    },
+    }
 
-    renderMarktstatus(market) {
-        dom.outputs.marktstatusText.replaceChildren(document.createTextNode(market.szenarioText + ' '));
+    /**
+     * Rendert den Marktstatus inklusive Tooltip.
+     *
+     * @param {Object} market - Szenario-Informationen des aktuellen Marktregimes.
+     */
+    renderMarktstatus(market = {}) {
+        if (!this.dom?.outputs?.marktstatusText || !market.szenarioText) return;
+        this.dom.outputs.marktstatusText.replaceChildren(document.createTextNode(`${market.szenarioText} `));
         const info = document.createElement('span');
         info.style.cssText = 'cursor:help; opacity:0.7;';
-        info.title = market.reasons.join(', ');
+        info.title = Array.isArray(market.reasons) ? market.reasons.join(', ') : '';
         info.textContent = 'ⓘ';
-        dom.outputs.marktstatusText.appendChild(info);
-    },
+        this.dom.outputs.marktstatusText.appendChild(info);
+    }
 
-	determineInternalCashRebalance(input, liqNachTransaktion, jahresentnahme) {
-        // Robustheits-Check: Nur mit validen Zahlen arbeiten
-        if (!input || !isFinite(liqNachTransaktion) || !isFinite(jahresentnahme)) {
+    /**
+     * Visualisiert die Liquiditätsdeckung über den Fortschrittsbalken.
+     *
+     * @param {number} percent - Deckung in Prozent.
+     */
+    renderLiquidityBar(percent) {
+        if (!this.dom?.outputs?.liquiditaetBalken || !this.dom?.outputs?.balkenContainer) return;
+        if (typeof percent !== 'number' || !isFinite(percent)) return;
+
+        const pct = Math.min(100, Math.max(0, percent));
+        const bar = this.dom.outputs.liquiditaetBalken;
+        bar.className = 'progress-bar';
+        bar.style.width = pct + '%';
+        bar.classList.add(pct >= 100 ? 'bar-ok' : pct >= 70 ? 'bar-warn' : 'bar-bad');
+        this.dom.outputs.balkenContainer.setAttribute('aria-valuenow', pct.toFixed(0));
+    }
+}
+
+/**
+ * Renderer für Handlungsempfehlungen und interne Rebalancing-Hinweise.
+ * Trägt die Verantwortung für die Aktions-Karte inklusive defensiver Plausibilitätsprüfungen.
+ */
+class ActionRenderer {
+    /**
+     * @param {Object} domRefs - DOM-Referenzen für die Aktionskarten.
+     */
+    constructor(domRefs) {
+        this.dom = domRefs;
+    }
+
+    /**
+     * Rendert die Handlungsempfehlung und optional interne Liquiditäts-Umschichtungen.
+     *
+     * @param {Object} action - Beschriebene Handlungsempfehlung aus der Engine.
+     * @param {Object} input - Ursprüngliche Input-Daten (zur Berechnung von Rebalancing-Vorschlägen).
+     * @param {Object} spending - Entnahmeinformationen zur Ableitung der Jahresentnahme.
+     */
+    renderAction(action = {}, input = null, spending = {}) {
+        const container = this.dom?.outputs?.handlungsanweisung;
+        if (!container) return;
+        [...container.children].filter(n => n.id !== 'copyAction').forEach(n => n.remove());
+        container.className = action.anweisungKlasse || 'anweisung-grau';
+
+        const content = document.createElement('div');
+        content.id = 'handlungContent';
+
+        if (action.type === 'TRANSACTION') {
+            // Strukturierter Aufbau der Handlungskarte.
+            this._buildTransactionContent(action, content);
+        } else if (action.title) {
+            content.textContent = action.title;
+        }
+
+        const internalRebalance = this.determineInternalCashRebalance(
+            input,
+            action,
+            spending
+        );
+
+        if (internalRebalance) {
+            if (content.childNodes.length > 0) {
+                const hr = document.createElement('hr');
+                hr.style.cssText = 'margin: 15px -10px; border-color: rgba(127,127,127,0.2);';
+                content.appendChild(hr);
+            }
+            content.appendChild(this.buildInternalRebalance(internalRebalance));
+        }
+
+        container.appendChild(content);
+    }
+
+    /**
+     * Berechnet interne Cash-Umschichtungen nach einer Transaktion.
+     *
+     * @param {Object|null} input - Originale Eingabedaten des Nutzers.
+     * @param {Object} action - Handlungsempfehlung, insbesondere Verwendungsströme.
+     * @param {Object} spending - Entnahmedaten zur Ableitung der Jahresentnahme.
+     * @returns {Object|null} Handlungsvorschlag für ein internes Rebalancing.
+     */
+    determineInternalCashRebalance(input, action, spending) {
+        if (!input || typeof input.tagesgeld !== 'number' || typeof input.geldmarktEtf !== 'number') {
+            console.warn('ActionRenderer.determineInternalCashRebalance: Input-Daten fehlen oder sind unvollständig.');
             return null;
         }
 
-        const zielTagesgeld = jahresentnahme;
+        const annualWithdrawal = (typeof spending.monatlicheEntnahme === 'number' && isFinite(spending.monatlicheEntnahme))
+            ? spending.monatlicheEntnahme * 12
+            : null;
+        if (!isFinite(annualWithdrawal)) {
+            console.warn('ActionRenderer.determineInternalCashRebalance: Jahresentnahme nicht berechenbar, überspringe Vorschlag.');
+            return null;
+        }
+
+        const liqNachTransaktion = (input.tagesgeld + input.geldmarktEtf) + (action.verwendungen?.liquiditaet || 0);
+        if (!isFinite(liqNachTransaktion)) {
+            return null;
+        }
+
+        const zielTagesgeld = annualWithdrawal;
         const tagesgeldVorTransaktion = input.tagesgeld;
         const liqZufluss = liqNachTransaktion - (tagesgeldVorTransaktion + input.geldmarktEtf);
         const tagesgeldNachTransaktion = tagesgeldVorTransaktion + liqZufluss;
@@ -211,7 +369,6 @@ export const UIRenderer = {
 
         const umschichtungsbetrag = tagesgeldNachTransaktion - zielTagesgeld;
 
-        // FEHLERBEHEBUNG: Sicherer Zugriff auf den Schwellenwert via Helper
         const schwelle = UIUtils.getThreshold('THRESHOLDS.STRATEGY.cashRebalanceThreshold', 2500);
 
         if (umschichtungsbetrag > schwelle) {
@@ -223,8 +380,14 @@ export const UIRenderer = {
             }
         }
         return null;
-    },
+    }
 
+    /**
+     * Baut ein visuelles Highlight für interne Umschichtungen.
+     *
+     * @param {Object} data - Berechneter Rebalancing-Vorschlag.
+     * @returns {HTMLDivElement} DOM-Knoten mit formatierter Nachricht.
+     */
     buildInternalRebalance(data) {
         const div = document.createElement('div');
         div.style.cssText = 'font-size: 1rem; text-align: center; line-height: 1.5; font-weight: 500;';
@@ -232,149 +395,91 @@ export const UIRenderer = {
         strong.textContent = UIUtils.formatCurrency(data.amount);
         div.append(document.createTextNode(`${data.from} → ${data.to}: `), strong);
         return div;
-    },
+    }
 
-    // DOM-SAFE: Nur textContent/DOM-APIs; kein innerHTML für dynamische Inhalte.
-    renderHandlungsanweisung(action, input) {
-        const container = dom.outputs.handlungsanweisung;
-        [...container.children].filter(n => n.id !== 'copyAction').forEach(n => n.remove());
-        container.className = action.anweisungKlasse || 'anweisung-grau';
+    /**
+     * Baut die Inhaltsstruktur für Transaktions-Empfehlungen auf.
+     *
+     * @param {Object} action - Handlungsempfehlung mit Quellen und Verwendungen.
+     * @param {HTMLElement} content - Container, der befüllt werden soll.
+     */
+    _buildTransactionContent(action, content) {
+        const title = document.createElement('strong');
+        title.style.cssText = 'display: block; font-size: 1.1rem; margin-bottom: 8px; text-align:center;';
+        title.textContent = action.title;
+        if (action.isPufferSchutzAktiv) {
+            const badge = document.createElement('span');
+            badge.className = 'strategy-badge';
+            badge.textContent = 'PUFFER-SCHUTZ';
+            title.append(document.createTextNode(' '), badge);
+        }
 
-        const content = document.createElement('div');
-        content.id = 'handlungContent';
-
-        if (action.type === 'TRANSACTION') {
-            const title = document.createElement('strong');
-            title.style.cssText = 'display: block; font-size: 1.1rem; margin-bottom: 8px; text-align:center;';
-            title.textContent = action.title;
-            if (action.isPufferSchutzAktiv) {
-                const badge = document.createElement('span');
-                badge.className = 'strategy-badge';
-                badge.textContent = 'PUFFER-SCHUTZ';
-                title.append(document.createTextNode(' '), badge);
-            }
-            const createSection = (titleText, items) => {
-                const wrapper = document.createElement('div');
-                wrapper.style.cssText = 'border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; margin-bottom: 12px;';
-                const head = document.createElement('strong');
-                head.style.cssText = 'display:block; border-bottom: 1px solid var(--border-color); padding-bottom: 5px; margin-bottom: 8px;';
-                head.textContent = titleText;
-                wrapper.appendChild(head);
-                items.forEach(item => wrapper.appendChild(item));
-                return wrapper;
-            };
-            const createRow = (label, value) => {
-                const row = document.createElement('div');
-                row.style.cssText = 'display:flex; justify-content:space-between;';
-                const labelSpan = document.createElement('span');
-                labelSpan.textContent = label;
-                const valueSpan = document.createElement('span');
-                valueSpan.textContent = value;
-                row.append(labelSpan, valueSpan);
-                return row;
-            };
-            const quellenMap = { 'gold': 'Gold', 'aktien_neu': 'Aktien (neu)', 'aktien_alt': 'Aktien (alt)'};
-            const quellenItems = action.quellen.map(q => createRow(`- ${quellenMap[q.kind]}`, UIUtils.formatCurrency(q.brutto)));
-            const steuerRow = createRow('- Steuern (geschätzt)', UIUtils.formatCurrency(action.steuer));
-            steuerRow.style.cssText += 'border-top: 1px solid var(--border-color); margin-top: 5px; padding-top: 5px;';
-            quellenItems.push(steuerRow);
-
-            const verwendungenItems = [];
-            if (action.verwendungen.liquiditaet > 0) verwendungenItems.push(createRow('Liquidität auffüllen:', UIUtils.formatCurrency(action.verwendungen.liquiditaet)));
-            if (action.verwendungen.gold > 0) verwendungenItems.push(createRow('Kauf von Gold:', UIUtils.formatCurrency(action.verwendungen.gold)));
-            if (action.verwendungen.aktien > 0) verwendungenItems.push(createRow('Kauf von Aktien:', UIUtils.formatCurrency(action.verwendungen.aktien)));
-
+        const createSection = (titleText, items) => {
             const wrapper = document.createElement('div');
-            wrapper.style.cssText = 'text-align: left; font-size: 1rem; line-height: 1.6;';
-            wrapper.append(title, createSection(`A. Quellen (Netto: ${UIUtils.formatCurrency(action.nettoErlös)})`, quellenItems), createSection('B. Verwendungen', verwendungenItems));
-            content.appendChild(wrapper);
-        } else {
-            content.textContent = action.title;
-        }
+            wrapper.style.cssText = 'border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; margin-bottom: 12px;';
+            const head = document.createElement('strong');
+            head.style.cssText = 'display:block; border-bottom: 1px solid var(--border-color); padding-bottom: 5px; margin-bottom: 8px;';
+            head.textContent = titleText;
+            wrapper.appendChild(head);
+            items.forEach(item => wrapper.appendChild(item));
+            return wrapper;
+        };
 
-        // --- Interne Rebalancing-Logik ---
-        let internalRebalance = null;
-        if (input) {
-            const liqNachTransaktion = (input.tagesgeld + input.geldmarktEtf) + (action.verwendungen?.liquiditaet || 0);
-            let jahresentnahme = 0;
-            try {
-                const entnahmeText = dom.outputs.monatlicheEntnahme?.firstChild?.textContent || "0";
-                const monatlich = UIUtils.parseCurrency(entnahmeText);
-                if (isFinite(monatlich)) {
-                    jahresentnahme = monatlich * 12;
-                } else {
-                   console.warn("Konnte monatliche Entnahme für internes Rebalancing nicht parsen:", entnahmeText);
-                }
-            } catch (e) {
-                console.warn("Fehler beim Lesen der monatlichen Entnahme für internes Rebalancing:", e);
-            }
-            if (isFinite(jahresentnahme)) {
-                internalRebalance = this.determineInternalCashRebalance(input, liqNachTransaktion, jahresentnahme);
-            }
-        } else {
-            console.warn("UIRenderer.renderHandlungsanweisung: 'input'-Parameter fehlt, internes Rebalancing übersprungen.");
-        }
+        const createRow = (label, value) => {
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex; justify-content:space-between;';
+            const labelSpan = document.createElement('span');
+            labelSpan.textContent = label;
+            const valueSpan = document.createElement('span');
+            valueSpan.textContent = value;
+            row.append(labelSpan, valueSpan);
+            return row;
+        };
 
-        if (internalRebalance) {
-            if (content.childNodes.length > 0) {
-                const hr = document.createElement('hr');
-                hr.style.cssText = 'margin: 15px -10px; border-color: rgba(127,127,127,0.2);';
-                content.appendChild(hr);
-            }
-            content.appendChild(this.buildInternalRebalance(internalRebalance));
-        }
-        container.appendChild(content);
-    },
+        const quellenMap = { 'gold': 'Gold', 'aktien_neu': 'Aktien (neu)', 'aktien_alt': 'Aktien (alt)' };
+        const quellenList = Array.isArray(action.quellen) ? action.quellen : [];
+        const quellenItems = quellenList.map(q => createRow(`- ${quellenMap[q.kind] || q.kind || 'Quelle'}`, UIUtils.formatCurrency(q.brutto || 0)));
+        const steuerRow = createRow('- Steuern (geschätzt)', UIUtils.formatCurrency(action.steuer || 0));
+        steuerRow.style.cssText += 'border-top: 1px solid var(--border-color); margin-top: 5px; padding-top: 5px;';
+        quellenItems.push(steuerRow);
 
-    renderLiquidityBar(percent) {
-        const pct = Math.min(100, Math.max(0, percent));
-        const bar = dom.outputs.liquiditaetBalken;
-        bar.className = 'progress-bar';
-        bar.style.width = pct + '%';
-        bar.classList.add(pct >= 100 ? 'bar-ok' : pct >= 70 ? 'bar-warn' : 'bar-bad');
-        dom.outputs.balkenContainer.setAttribute('aria-valuenow', pct.toFixed(0));
-    },
+        const verwendungenItems = [];
+        if (action.verwendungen?.liquiditaet > 0) verwendungenItems.push(createRow('Liquidität auffüllen:', UIUtils.formatCurrency(action.verwendungen.liquiditaet)));
+        if (action.verwendungen?.gold > 0) verwendungenItems.push(createRow('Kauf von Gold:', UIUtils.formatCurrency(action.verwendungen.gold)));
+        if (action.verwendungen?.aktien > 0) verwendungenItems.push(createRow('Kauf von Aktien:', UIUtils.formatCurrency(action.verwendungen.aktien)));
 
-    toast(msg, isSuccess = true) {
-        const container = dom.containers.error;
-        container.classList.remove('error-warn');
-        container.style.color = isSuccess ? 'var(--success-color)' : 'var(--danger-color)';
-        container.textContent = msg;
-        setTimeout(() => { container.textContent = ''; }, 3500);
-    },
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'text-align: left; font-size: 1rem; line-height: 1.6;';
+        wrapper.append(
+            title,
+            createSection(`A. Quellen (Netto: ${UIUtils.formatCurrency(action.nettoErlös || 0)})`, quellenItems),
+            createSection('B. Verwendungen', verwendungenItems)
+        );
+        content.appendChild(wrapper);
+    }
+}
 
-    handleError(error) {
-        const container = dom.containers.error;
-        container.className = 'error-warn';
 
-        if (error instanceof ValidationError) {
-            container.textContent = error.message;
-            const ul = document.createElement('ul');
-            error.errors.forEach(({ fieldId, message }) => {
-                const li = document.createElement('li');
-                li.textContent = message;
-                ul.appendChild(li);
-                const inputEl = dom.inputs[fieldId];
-                if (inputEl) {
-                    inputEl.classList.add('input-error');
-                }
-            });
-            container.appendChild(ul);
-        } else if (error instanceof AppError) {
-            container.textContent = `Ein interner Fehler ist aufgetreten: ${error.message}`;
-        } else {
-            container.textContent = `Ein unerwarteter Anwendungsfehler ist aufgetreten: ${error.message || 'Unbekannter Fehler'}`;
-        }
-    },
+/**
+ * Renderer für Diagnoseansichten (Chips, Entscheidungsbaum, Kennzahlen).
+ * Bündelt alle Diagnose-spezifischen Formatierungen und DOM-Schreiboperationen.
+ */
+class DiagnosisRenderer {
+    /**
+     * @param {Object} domRefs - DOM-Referenzen für Diagnosebereiche.
+     */
+    constructor(domRefs) {
+        this.dom = domRefs;
+    }
 
-    clearError() {
-        dom.containers.error.textContent = "";
-        dom.containers.error.className = "";
-        Object.values(dom.inputs).forEach(el => el.classList.remove('input-error'));
-    },
-
-    formatDiagnosisPayload(raw) {
-        if(!raw) return null;
+    /**
+     * Formatiert die Rohdaten aus der Engine für die Diagnoseansicht.
+     *
+     * @param {Object|null} raw - Unformatierte Diagnose.
+     * @returns {Object|null} Formatierte Diagnose oder null.
+     */
+    formatPayload(raw) {
+        if (!raw) return null;
         const formatted = { ...raw };
         const guardrails = Array.isArray(raw.guardrails) ? raw.guardrails : [];
         formatted.guardrails = guardrails.map(g => {
@@ -391,7 +496,7 @@ export const UIRenderer = {
                     return 'N/A';
                 }
                 const needsPrefix = invertPositive && value > 0;
-                switch(type) {
+                switch (type) {
                     case 'percent':
                         if (needsPrefix) {
                             return `-${(Math.abs(value) * 100).toFixed(1)}%`;
@@ -400,9 +505,9 @@ export const UIRenderer = {
                     case 'months':
                         return `${value.toFixed(0)} Mon.`;
                     case 'currency': {
-                        const formatted = UIUtils.formatCurrency(value);
-                        if (!needsPrefix) return formatted;
-                        const sanitized = formatted.replace(/^[\-–−]/, '').trim();
+                        const formattedCurrency = UIUtils.formatCurrency(value);
+                        if (!needsPrefix) return formattedCurrency;
+                        const sanitized = formattedCurrency.replace(/^[\-–−]/, '').trim();
                         return `-${sanitized}`;
                     }
                     default:
@@ -412,7 +517,7 @@ export const UIRenderer = {
                         return value.toFixed(1);
                 }
             };
-            const formattedValue = formatVal(g.value, g.type, { invertPositive: g.name.includes("Drawdown") });
+            const formattedValue = formatVal(g.value, g.type, { invertPositive: g.name.includes('Drawdown') });
             const formattedThreshold = `${rule === 'max' ? '< ' : '> '}${formatVal(g.threshold, g.type)}`;
             return {
                 name: g.name,
@@ -428,23 +533,33 @@ export const UIRenderer = {
         safeKeyParams.jahresentnahme = ensureNumberOrNull(safeKeyParams.jahresentnahme);
         formatted.keyParams = safeKeyParams;
         return formatted;
-    },
+    }
 
-    // DOM-SAFE: Nur textContent/DOM-APIs; kein innerHTML für dynamische Inhalte.
+    /**
+     * Rendert die Diagnosebereiche in den jeweiligen Containern.
+     *
+     * @param {Object} diagnosis - Formatierte Diagnose-Daten.
+     */
     renderDiagnosis(diagnosis) {
-        if (!diagnosis) return;
-        dom.diagnosis.chips.replaceChildren(this.buildChips(diagnosis));
-        dom.diagnosis.decisionTree.replaceChildren(this.buildDecisionTree(diagnosis.decisionTree));
-        dom.diagnosis.guardrails.replaceChildren(this.buildGuardrails(diagnosis.guardrails));
-        if (dom.diagnosis.transaction) {
-            dom.diagnosis.transaction.replaceChildren(
+        if (!diagnosis || !this.dom?.diagnosis) return;
+        this.dom.diagnosis.chips?.replaceChildren(this.buildChips(diagnosis));
+        this.dom.diagnosis.decisionTree?.replaceChildren(this.buildDecisionTree(diagnosis.decisionTree));
+        this.dom.diagnosis.guardrails?.replaceChildren(this.buildGuardrails(diagnosis.guardrails));
+        if (this.dom.diagnosis.transaction) {
+            this.dom.diagnosis.transaction.replaceChildren(
                 this.buildTransactionDiagnostics(diagnosis.transactionDiagnostics)
             );
         }
-        dom.diagnosis.keyParams.replaceChildren(this.buildKeyParams(diagnosis.keyParams));
-    },
+        this.dom.diagnosis.keyParams?.replaceChildren(this.buildKeyParams(diagnosis.keyParams));
+    }
 
-	buildChips(d) {
+    /**
+     * Baut Diagnose-Chips basierend auf den Kennzahlen.
+     *
+     * @param {Object} d - Diagnose-Daten.
+     * @returns {DocumentFragment} Fragment mit Chip-Elementen.
+     */
+    buildChips(d) {
         const { entnahmequoteDepot, realerDepotDrawdown } = d.keyParams;
         const {
             runwayMonate,
@@ -455,7 +570,6 @@ export const UIRenderer = {
             deckungNachher
         } = d.general;
 
-        // REFACTORING: Hartkodierte Werte durch sicheren Zugriff auf Engine-Config ersetzen
         const ALARM_withdrawalRate = UIUtils.getThreshold('THRESHOLDS.ALARM.withdrawalRate', 0.055);
         const CAUTION_withdrawalRate = UIUtils.getThreshold('THRESHOLDS.CAUTION.withdrawalRate', 0.045);
         const ALARM_realDrawdown = UIUtils.getThreshold('THRESHOLDS.ALARM.realDrawdown', 0.25);
@@ -480,8 +594,10 @@ export const UIRenderer = {
             ? `${formatMonths(runwayMonate)} / ${formatMonths(runwayTargetMonate)} Mon.`
             : `${formatMonths(runwayMonate)} Mon.`;
         const runwayChipTitle = (typeof runwayTargetMonate === 'number' && isFinite(runwayTargetMonate))
-            ? `Aktuelle Runway vs. Ziel (${runwayTargetMonate.toFixed(0)} Monate).\nQuelle: ${runwaySourceInfo.description}`
-            : `Aktuelle Runway basierend auf verfügbaren Barmitteln.\nQuelle: ${runwaySourceInfo.description}`;
+            ? `Aktuelle Runway vs. Ziel (${runwayTargetMonate.toFixed(0)} Monate).
+Quelle: ${runwaySourceInfo.description}`
+            : `Aktuelle Runway basierend auf verfügbaren Barmitteln.
+Quelle: ${runwaySourceInfo.description}`;
 
         const createChip = (status, label, value, title) => {
             const chip = document.createElement('span');
@@ -494,7 +610,6 @@ export const UIRenderer = {
             return chip;
         };
         const fragment = document.createDocumentFragment();
-        // Liquiditäts-KPI: zeigt Deckung vor/nach dem Handlungsvorschlag sowie qualitative Einstufung
         const formatPercentValue = (value) => (typeof value === 'number' && isFinite(value))
             ? `${value.toFixed(0)}%`
             : 'n/a';
@@ -503,7 +618,7 @@ export const UIRenderer = {
         const normalizedCoverage = (typeof deckungNachher === 'number' && isFinite(deckungNachher)) ? deckungNachher : 0;
         const liquidityStatus = normalizedCoverage >= 100 ? 'ok'
             : normalizedCoverage >= UIUtils.getThreshold('THRESHOLDS.STRATEGY.runwayThinPercent', 80) ? 'warn'
-            : 'danger';
+                : 'danger';
         fragment.append(
             createChip('info', 'Regime', d.general.marketSzenario),
             createChip(d.general.alarmActive ? 'danger' : 'ok', 'Alarm', d.general.alarmActive ? 'AKTIV' : 'Inaktiv'),
@@ -520,9 +635,15 @@ export const UIRenderer = {
             fragment.appendChild(runwaySourceNote);
         }
         return fragment;
-    },
+    }
 
-	buildDecisionTree(treeData) {
+    /**
+     * Erstellt den Entscheidungsbaum für die Diagnose.
+     *
+     * @param {Array} treeData - Schritte des Entscheidungsbaums.
+     * @returns {DocumentFragment} Fragment mit Listenelementen.
+     */
+    buildDecisionTree(treeData = []) {
         const fragment = document.createDocumentFragment();
         treeData.forEach(item => {
             const li = document.createElement('li');
@@ -540,9 +661,15 @@ export const UIRenderer = {
             fragment.appendChild(li);
         });
         return fragment;
-    },
+    }
 
-    buildGuardrails(guardrailData) {
+    /**
+     * Baut die Guardrail-Karten auf Basis der Schwellenwerte.
+     *
+     * @param {Array} guardrailData - Guardrail-Liste.
+     * @returns {DocumentFragment} Fragment mit Karten.
+     */
+    buildGuardrails(guardrailData = []) {
         const fragment = document.createDocumentFragment();
         guardrailData.forEach(g => {
             const card = document.createElement('div');
@@ -559,7 +686,7 @@ export const UIRenderer = {
             fragment.appendChild(card);
         });
         return fragment;
-    },
+    }
 
     /**
      * Baut den Diagnoseabschnitt für Transaktions-Diagnostics auf.
@@ -616,7 +743,7 @@ export const UIRenderer = {
         thresholdCards.forEach(card => fragment.appendChild(card));
 
         return fragment;
-    },
+    }
 
     /**
      * Bestimmt Statusfarbe und Beschreibung für die Transaktionsdiagnostik.
@@ -650,7 +777,7 @@ export const UIRenderer = {
             : 'Keine Einschränkungen gemeldet';
 
         return { status, label, subtitle };
-    },
+    }
 
     /**
      * Baut eine einheitliche Diagnosekarte mit Status.
@@ -673,10 +800,6 @@ export const UIRenderer = {
             card.appendChild(subtitle);
         }
 
-        // Design-Entscheidung: Die Value-Rows nutzen bewusst ein flexibles Layout,
-        // damit Labels und Werte in den Diagnosekarten unabhängig von der Textlänge
-        // sauber zweispaltig bleiben. Dadurch lässt sich die Transaktionsdiagnostik
-        // schneller scannen.
         config.rows.forEach(row => {
             const rowEl = document.createElement('div');
             rowEl.className = 'value-row';
@@ -691,7 +814,7 @@ export const UIRenderer = {
         });
 
         return card;
-    },
+    }
 
     /**
      * Erstellt Karten für Schwellenwerte einzelner Asset-Klassen.
@@ -738,7 +861,7 @@ export const UIRenderer = {
             title: label,
             rows
         }, status);
-    },
+    }
 
     /**
      * Formatiert technische Feldnamen zu sprechenden Beschriftungen.
@@ -747,64 +870,47 @@ export const UIRenderer = {
      * @returns {string} Lesbare Beschriftung.
      */
     _formatThresholdLabel(key) {
-        if (!key) return 'Wert';
-
-        const normalized = key.toString().trim();
-        const lowerKey = normalized.toLowerCase();
-
-        if (Object.prototype.hasOwnProperty.call(THRESHOLD_LABEL_MAP, lowerKey)) {
-            return THRESHOLD_LABEL_MAP[lowerKey];
-        }
-
-        const beautified = normalized
-            .replace(/([a-z])([A-Z])/g, '$1 $2')
-            .replace(/[_-]+/g, ' ')
-            .replace(/pct/gi, '%')
-            // DESIGN-HINWEIS: Nur freistehende Eq-Bestandteile werden getrennt,
-            // damit Namen wie "isEqual" nicht zerstückelt werden.
-            .replace(/Eq(?=[A-Z]|$)/g, ' Eq')
-            .replace(/\s+/g, ' ')
-            .trim();
-
-        return beautified.charAt(0).toUpperCase() + beautified.slice(1);
-    },
+        const normalized = (key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        return THRESHOLD_LABEL_MAP[normalized] || key || '—';
+    }
 
     /**
-     * Formatiert Schwellenwerte kontextsensitiv.
+     * Formatiert numerische Schwellenwerte abhängig von Typ und Kontext.
      *
-     * @param {string} key - Feldname zur Heuristik.
-     * @param {*} value - Rohwert.
-     * @returns {string} Formatierte Darstellung.
+     * @param {string} key - Schwellenwertschlüssel.
+     * @param {number} value - Zahlenwert.
+     * @returns {string} Formatiertes Label.
      */
     _formatThresholdValue(key, value) {
-        if (typeof value === 'number' && isFinite(value)) {
-            if (/pct|percent|quote|rate/i.test(key)) {
-                return `${value.toFixed(1)}%`;
-            }
-            if (/amount|wert|value|eur|euro|betrag|volume|blocked/i.test(key)) {
-                return UIUtils.formatCurrency(value);
-            }
-            if (/month|monate|runway/i.test(key)) {
-                return `${value.toFixed(0)} Mon.`;
-            }
-            return value.toFixed(2);
+        if (typeof value !== 'number' || !isFinite(value)) {
+            return 'n/a';
         }
-        return (value ?? 'n/a').toString();
-    },
+        if (/pct|percent/i.test(key)) {
+            return `${(value * 100).toFixed(1)}%`;
+        }
+        if (/monate|months|mon/i.test(key)) {
+            return `${value.toFixed(0)} Mon.`;
+        }
+        return UIUtils.formatCurrency(value);
+    }
 
-    buildKeyParams(params) {
+    /**
+     * Baut die Sektion mit Schlüsselparametern (Kennzahlen) auf.
+     *
+     * @param {Object} params - Schlüsselparameter aus der Diagnose.
+     * @returns {HTMLElement} Grid mit den Kennzahlen.
+     */
+    buildKeyParams(params = {}) {
         const metrics = [];
-        const formatPercent = (value, opts = {}) => {
-            const { prefixPlus = false, fractionDigits = 1 } = opts;
+
+        const formatPercent = (value, { fractionDigits = 1, prefixPlus = false } = {}) => {
             if (typeof value !== 'number' || !isFinite(value)) {
                 return null;
             }
-            const formatted = `${value.toFixed(fractionDigits)}%`;
-            if (prefixPlus && value > 0) {
-                return `+${formatted}`;
-            }
-            return formatted;
+            const sign = value > 0 ? '+' : '';
+            return `${prefixPlus ? sign : ''}${(value * 100).toFixed(fractionDigits)}%`;
         };
+
         const formatCurrencySafe = (value) => {
             if (typeof value !== 'number' || !isFinite(value)) {
                 return null;
@@ -925,5 +1031,123 @@ export const UIRenderer = {
         });
 
         return grid;
+    }
+}
+
+/**
+ * Initialisiert den UIRenderer mit den notwendigen Abhängigkeiten.
+ *
+ * @param {Object} domRefs - Zentraler DOM-Baum.
+ * @param {Object} storageManager - Storage-Adapter für Fallbacks.
+ */
+export function initUIRenderer(domRefs, storageManager) {
+    dom = domRefs;
+    StorageManager = storageManager;
+    summaryRenderer = new SummaryRenderer(domRefs, storageManager);
+    actionRenderer = new ActionRenderer(domRefs);
+    diagnosisRenderer = new DiagnosisRenderer(domRefs);
+}
+
+/**
+ * Fassade für alle UI-Render-Aufgaben. Orchestriert spezialisierte Renderer
+ * und kapselt generische Utility-Funktionen (Fehler, Toasts).
+ */
+export const UIRenderer = {
+    /**
+     * Orchestriert das Rendering der Gesamtoberfläche.
+     *
+     * @param {Object} ui - Aufbereitete UI-Daten (inkl. input, action, spending, liquiditaet).
+     */
+    render(ui) {
+        if (!summaryRenderer || !actionRenderer) {
+            console.warn('UIRenderer.render: Renderer nicht initialisiert.');
+            return;
+        }
+        summaryRenderer.renderOverview(ui);
+        actionRenderer.renderAction(ui?.action, ui?.input, ui?.spending);
+    },
+
+    /**
+     * Delegiert die UI zur Bedarfsanpassung.
+     *
+     * @param {Object} inputData - Eingaben des Nutzers.
+     * @param {Object} persistentState - Persistenter Zustand.
+     */
+    renderBedarfAnpassungUI(inputData, persistentState) {
+        summaryRenderer?.renderBedarfAnpassungUI(inputData, persistentState);
+    },
+
+    /**
+     * Reicht formatierte Diagnose-Daten an den DiagnosisRenderer durch.
+     *
+     * @param {Object} diagnosis - Diagnose-Struktur aus der Engine.
+     */
+    renderDiagnosis(diagnosis) {
+        diagnosisRenderer?.renderDiagnosis(diagnosis);
+    },
+
+    /**
+     * Formatiert Diagnose-Rohdaten über den DiagnosisRenderer.
+     *
+     * @param {Object|null} raw - Unformatierte Diagnose.
+     * @returns {Object|null} Formatierte Diagnose.
+     */
+    formatDiagnosisPayload(raw) {
+        return diagnosisRenderer?.formatPayload(raw);
+    },
+
+    /**
+     * Zeigt Nutzerfeedback an.
+     *
+     * @param {string} msg - Meldungstext.
+     * @param {boolean} [isSuccess=true] - Farbe/Typ der Meldung.
+     */
+    toast(msg, isSuccess = true) {
+        const container = dom?.containers?.error;
+        if (!container) return;
+        container.classList.remove('error-warn');
+        container.style.color = isSuccess ? 'var(--success-color)' : 'var(--danger-color)';
+        container.textContent = msg;
+        setTimeout(() => { container.textContent = ''; }, 3500);
+    },
+
+    /**
+     * Zentrale Fehlerbehandlung für Validierungs- und Laufzeitfehler.
+     *
+     * @param {Error} error - Aufgetretener Fehler.
+     */
+    handleError(error) {
+        const container = dom?.containers?.error;
+        if (!container) return;
+        container.className = 'error-warn';
+
+        if (error instanceof ValidationError) {
+            container.textContent = error.message;
+            const ul = document.createElement('ul');
+            error.errors.forEach(({ fieldId, message }) => {
+                const li = document.createElement('li');
+                li.textContent = message;
+                ul.appendChild(li);
+                const inputEl = dom.inputs[fieldId];
+                if (inputEl) {
+                    inputEl.classList.add('input-error');
+                }
+            });
+            container.appendChild(ul);
+        } else if (error instanceof AppError) {
+            container.textContent = `Ein interner Fehler ist aufgetreten: ${error.message}`;
+        } else {
+            container.textContent = `Ein unerwarteter Anwendungsfehler ist aufgetreten: ${error.message || 'Unbekannter Fehler'}`;
+        }
+    },
+
+    /**
+     * Setzt die Fehleranzeige zurück und entfernt Feldmarkierungen.
+     */
+    clearError() {
+        if (!dom?.containers?.error) return;
+        dom.containers.error.textContent = '';
+        dom.containers.error.className = '';
+        Object.values(dom.inputs || {}).forEach(el => el.classList.remove('input-error'));
     }
 };

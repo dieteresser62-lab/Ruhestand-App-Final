@@ -244,7 +244,6 @@ export async function runParameterSweep() {
             if (REF_P2_INVARIANTS === null) {
                 // Erste Case-Referenz setzen
                 REF_P2_INVARIANTS = p2Invariants;
-                console.log(`[SWEEP] Referenz-P2-Invarianten gesetzt (Case ${comboIdx}):`, p2Invariants);
             }
 
             // Prüfe P2-Invarianz VOR der Simulation (keine YearLogs mehr nötig!)

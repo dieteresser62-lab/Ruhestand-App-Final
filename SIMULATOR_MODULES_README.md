@@ -16,20 +16,52 @@ UI-Orchestrierung und Klammer um die ausgelagerten Feature-Module. Registriert E
 
 ---
 
-## 2. `simulator-monte-carlo.js` (~780 Zeilen)
-Ausgelagerter Startpunkt für Monte-Carlo-Simulationen inkl. Szenario-Logging.
+## 2. `simulator-monte-carlo.js` (~220 Zeilen)
+Koordiniert die Monte-Carlo-Simulation und verbindet DOM-Interaktion mit der reinen Simulationslogik.
 
 **Hauptfunktionen / Exporte:**
-- `runMonteCarlo()` – validiert UI-Parameter (Seed, Dauer, Methode), baut Stress-Kontext und startet die Simulation.
-- `readMonteCarloParameters()` – defensives Auslesen der UI-Inputs.
+- `runMonteCarlo()` – liest UI-Parameter, bereitet Inputs auf, orchestriert `monte-carlo-runner.js` und aktualisiert Progress/UI.
 
 **Einbindung:** Wird von `simulator-main.js` importiert und im UI-Bootstrap an den Start-Button (`#mcButton`) gekoppelt. Alle Monte-Carlo-spezifischen Anpassungen sollten hier erfolgen, damit `simulator-main.js` schlank bleibt.
 
-**Dependencies:** `simulator-engine.js`, `simulator-portfolio.js`, `simulator-results.js`, `simulator-sweep-utils.js`, `simulator-utils.js`, `simulator-data.js`, `cape-utils.js`.
+**Dependencies:** `monte-carlo-runner.js`, `monte-carlo-ui.js`, `scenario-analyzer.js`, `simulator-portfolio.js`, `simulator-results.js`, `simulator-sweep-utils.js`, `simulator-utils.js`, `simulator-data.js`, `cape-utils.js`.
 
 ---
 
-## 3. `simulator-sweep.js` (~360 Zeilen)
+## 3. `monte-carlo-runner.js` (~420 Zeilen)
+DOM-freie Simulation, die alle Runs, KPI-Arrays und Pflegemetriken berechnet.
+
+**Hauptfunktionen / Exporte:**
+- `runMonteCarloSimulation()` – führt die komplette Simulation aus, sammelt Worst-Run-Logs, Pflege-KPIs und aggregierte Kennzahlen.
+
+**Einbindung:** Wird ausschließlich aus `simulator-monte-carlo.js` aufgerufen. Erwartet fertige Eingaben und Callbacks (Progress, Szenario-Analyzer) und nutzt `simulator-engine.js` für die Jahr-für-Jahr-Logik.
+
+**Dependencies:** `simulator-engine.js`, `simulator-portfolio.js`, `simulator-results.js` (Portfolio-Helpers), `simulator-sweep-utils.js`, `simulator-utils.js`, `simulator-data.js`, `cape-utils.js`.
+
+---
+
+## 4. `monte-carlo-ui.js` (~150 Zeilen)
+Kapselt DOM-Zugriffe für Monte-Carlo (Progressbar, Checkboxen, Parameter-Inputs) und liefert eine UI-Fassade zurück.
+
+**Hauptfunktionen / Exporte:**
+- `createMonteCarloUI()` – erzeugt ein UI-Objekt mit Methoden `disableStart()`, `showProgress()`, `updateProgress()`, `finishProgress()`, `readUseCapeSampling()`.
+- `readMonteCarloParameters()` – defensives Auslesen der Eingabefelder (Anzahl, Dauer, Blocksize, Seed, Methode).
+
+**Einbindung:** Von `simulator-monte-carlo.js` genutzt. UI-bezogene Änderungen sollten hier gebündelt werden.
+
+---
+
+## 5. `scenario-analyzer.js` (~140 Zeilen)
+Sammelt und sortiert Szenarien (Worst, Perzentile, Pflege, Zufalls-Samples) während der Simulation.
+
+**Hauptfunktionen / Exporte:**
+- `ScenarioAnalyzer` – Klasse mit `trackScenario()`/`buildScenarioLogs()`, die Metadaten und Logzeilen für 30 Szenarien zurückliefert.
+
+**Einbindung:** Von `simulator-monte-carlo.js` instanziiert und als Callback an den Runner übergeben.
+
+---
+
+## 6. `simulator-sweep.js` (~360 Zeilen)
 Sweep-spezifische Logik mit Guardrails für Partner:innen-Felder und Heatmap-Ausgabe.
 
 **Hauptfunktionen / Exporte:**
@@ -39,11 +71,11 @@ Sweep-spezifische Logik mit Guardrails für Partner:innen-Felder und Heatmap-Aus
 
 **Einbindung:** Button-Hooks in `initializeUI()` (Sweep-Tab). Nutzt `simulator-sweep-utils.js` für Whitelist/Clone-Logik und `simulator-heatmap.js` für das Rendering.
 
-**Dependencies:** `simulator-monte-carlo.js` (Mini-Läufe), `simulator-heatmap.js`, `simulator-results.js`, `simulator-sweep-utils.js`, `simulator-utils.js`.
+**Dependencies:** `monte-carlo-runner.js` (Mini-Läufe), `simulator-heatmap.js`, `simulator-results.js`, `simulator-sweep-utils.js`, `simulator-utils.js`, `simulator-data.js`.
 
 ---
 
-## 4. `simulator-sweep-utils.js` (~220 Zeilen)
+## 7. `simulator-sweep-utils.js` (~220 Zeilen)
 Gemeinsame Helfer für Sweep, Rente-2-Schutz und Deep-Clones.
 
 **Hauptfunktionen / Exporte:**
@@ -57,7 +89,7 @@ Gemeinsame Helfer für Sweep, Rente-2-Schutz und Deep-Clones.
 
 ---
 
-## 5. `simulator-backtest.js` (~360 Zeilen)
+## 8. `simulator-backtest.js` (~360 Zeilen)
 Historische Backtests inkl. UI-Integration und Log-Export.
 
 **Hauptfunktionen / Exporte:**
@@ -71,7 +103,7 @@ Historische Backtests inkl. UI-Integration und Log-Export.
 
 ---
 
-## 6. `simulator-main-helpers.js` (~280 Zeilen)
+## 9. `simulator-main-helpers.js` (~280 Zeilen)
 Formatierungs- und Export-Helfer, damit Tabellen-/KPI-Aufbereitung nicht in `simulator-main.js` landet.
 
 **Hauptfunktionen / Exporte:**
@@ -85,7 +117,7 @@ Formatierungs- und Export-Helfer, damit Tabellen-/KPI-Aufbereitung nicht in `sim
 
 ---
 
-## 7. `simulator-ui-pflege.js` (~180 Zeilen)
+## 10. `simulator-ui-pflege.js` (~180 Zeilen)
 Pflege-spezifische UI-Initialisierung (Presets, Badges, Toggles).
 
 **Hauptfunktionen / Exporte:**
@@ -98,7 +130,7 @@ Pflege-spezifische UI-Initialisierung (Presets, Badges, Toggles).
 
 ---
 
-## 8. `simulator-ui-rente.js` (~240 Zeilen)
+## 11. `simulator-ui-rente.js` (~240 Zeilen)
 Persistenz und Migration der Renten-Eingaben (Person 1 & 2) inklusive Legacy-Felder.
 
 **Hauptfunktionen / Exporte:**
@@ -110,7 +142,7 @@ Persistenz und Migration der Renten-Eingaben (Person 1 & 2) inklusive Legacy-Fel
 
 ---
 
-## 9. `simulator-engine.js` (~1.080 Zeilen)
+## 12. `simulator-engine.js` (~1.080 Zeilen)
 Kernlogik für Jahr-für-Jahr-Simulation.
 
 **Hauptfunktionen:**
@@ -126,15 +158,15 @@ Kernlogik für Jahr-für-Jahr-Simulation.
 
 ---
 
-## 10. `simulator-results.js` (~640 Zeilen)
-Aggregation und Darstellung von Simulationsergebnissen.
+## 13. `simulator-results.js` (~320 Zeilen)
+Aggregation der Monte-Carlo-Ausgabe, Orchestrierung von KPI-Berechnung und Rendering.
 
 **Hauptfunktionen:**
 - `displayMonteCarloResults()` – zeigt MC-Ergebnisse mit Szenario-Log-Auswahl
 - `renderWorstRunLog()` – rendert Jahresprotokoll als HTML-Tabelle
 - `getWorstRunColumnDefinitions()` – Spaltenkonfiguration für Log-Tabellen
 - `loadDetailLevel()` / `persistDetailLevel()` – Detail-Einstellungen speichern
-- `createKpiCard()` / `createCurrencyKpiCard()` – KPI-Karten erstellen
+- leitet an `results-metrics.js` (Berechnungen) und `results-renderers.js` (DOM)
 
 **Features:**
 - Dropdown für 30 Szenario-Logs (charakteristische + zufällige)
@@ -142,11 +174,42 @@ Aggregation und Darstellung von Simulationsergebnissen.
 - JSON/CSV-Export für ausgewählte Szenarien
 - Pflege-KPI-Dashboard mit Dual-Care-Metriken
 
-**Dependencies:** `simulator-utils.js`, `simulator-heatmap.js`, `simulator-data.js`
+**Dependencies:** `simulator-utils.js`, `simulator-heatmap.js`, `simulator-data.js`, `results-metrics.js`, `results-renderers.js`, `results-formatting.js`.
 
 ---
 
-## 11. `simulator-portfolio.js` (~510 Zeilen)
+## 14. `results-metrics.js` (~200 Zeilen)
+Berechnet alle KPIs (Perzentile, Quoten, Pflege-Kosten/Overlap, Shortfall-Deltas) ohne DOM-Zugriffe.
+
+**Hauptfunktionen:**
+- `computeKpiCards()` / `computeScenarioSummary()` – strukturierte KPI-Objekte für Renderer.
+
+**Dependencies:** `results-formatting.js`, `simulator-utils.js`.
+
+---
+
+## 15. `results-renderers.js` (~240 Zeilen)
+Rendering-Layer für KPI-Karten, Tabellen und Badges.
+
+**Hauptfunktionen:**
+- `renderKpiCards()` – erzeugt HTML für KPI-Dashboard.
+- `renderScenarioSelector()` – baut die Szenario-Dropdowns auf.
+
+**Dependencies:** `results-formatting.js`, `simulator-utils.js`.
+
+---
+
+## 16. `results-formatting.js` (~160 Zeilen)
+Hält Formatierungs-Utilities und kleine Adapter, um Renderer und Metriken von DOM-Details zu entkoppeln.
+
+**Hauptfunktionen / Exporte:**
+- `formatKpiValue()` / `formatPct()` / `formatCurrency()` – zentrale Formatter für KPI-Ausgaben.
+
+**Dependencies:** `simulator-utils.js`.
+
+---
+
+## 17. `simulator-portfolio.js` (~510 Zeilen)
 Portfolio-Initialisierung, Renten- und Stress-Kontexte.
 
 **Hauptfunktionen:**
@@ -161,7 +224,7 @@ Portfolio-Initialisierung, Renten- und Stress-Kontexte.
 
 ---
 
-## 12. `simulator-heatmap.js` (~480 Zeilen)
+## 18. `simulator-heatmap.js` (~480 Zeilen)
 SVG-Rendering für Parameter-Sweeps und Heatmaps.
 
 **Hauptfunktionen:**
@@ -173,7 +236,7 @@ SVG-Rendering für Parameter-Sweeps und Heatmaps.
 
 ---
 
-## 13. `simulator-utils.js` (~320 Zeilen)
+## 19. `simulator-utils.js` (~320 Zeilen)
 Zufallszahlen, Statistik und Formatierung.
 
 **Hauptfunktionen:**
@@ -186,7 +249,7 @@ Zufallszahlen, Statistik und Formatierung.
 
 ---
 
-## 14. `simulator-data.js` (~190 Zeilen)
+## 20. `simulator-data.js` (~190 Zeilen)
 Historische Daten, Mortalitätstafeln, Stress-Presets.
 
 **Exporte:**
@@ -204,19 +267,25 @@ Historische Daten, Mortalitätstafeln, Stress-Presets.
 ```
 simulator-main.js
   ├─ simulator-monte-carlo.js
-  │    ├─ simulator-engine.js
+  │    ├─ monte-carlo-ui.js
+  │    ├─ monte-carlo-runner.js
+  │    │    ├─ simulator-engine.js
+  │    │    │    ├─ simulator-utils.js
+  │    │    │    └─ simulator-data.js
+  │    │    ├─ simulator-portfolio.js
+  │    │    │    └─ simulator-data.js
+  │    │    ├─ simulator-results.js
+  │    │    │    ├─ results-metrics.js
+  │    │    │    ├─ results-renderers.js
+  │    │    │    ├─ results-formatting.js
+  │    │    │    └─ simulator-utils.js
+  │    │    ├─ simulator-sweep-utils.js
   │    │    ├─ simulator-utils.js
   │    │    └─ simulator-data.js
-  │    ├─ simulator-portfolio.js
-  │    │    └─ simulator-data.js
-  │    ├─ simulator-results.js
-  │    │    ├─ simulator-heatmap.js
-  │    │    └─ simulator-utils.js
-  │    ├─ simulator-sweep-utils.js
-  │    ├─ simulator-utils.js
-  │    └─ simulator-data.js
+  │    ├─ scenario-analyzer.js
+  │    └─ cape-utils.js
   ├─ simulator-sweep.js
-  │    ├─ simulator-monte-carlo.js (Mini-Läufe)
+  │    ├─ monte-carlo-runner.js (Mini-Läufe)
   │    ├─ simulator-heatmap.js
   │    ├─ simulator-results.js
   │    ├─ simulator-sweep-utils.js
@@ -241,14 +310,14 @@ simulator-main.js
 
 ### Monte-Carlo-Simulation
 1. `simulator-main.js`: UI-Bootstrap ruft `runMonteCarlo` aus `simulator-monte-carlo.js` auf.
-2. `simulator-portfolio.js`: `initializePortfolio()` erstellt Anfangszustand / Stress-Kontext.
-3. `simulator-engine.js`: Jahr-für-Jahr-Simulation mit Pflegefall-Logik.
-4. `simulator-monte-carlo.js`: Aggregiert Ergebnisse, identifiziert charakteristische Szenarien.
-5. `simulator-results.js`: `displayMonteCarloResults()` zeigt Ergebnisse und Szenario-Logs.
+2. `simulator-monte-carlo.js`: Erstellt die UI-Fassade, normalisiert Eingaben/Witwen-Optionen und delegiert an den Runner.
+3. `monte-carlo-runner.js`: Führt die reinen Simulationen durch (inkl. Pflege-KPIs) und nutzt `simulator-engine.js` für die Jahresschleifen.
+4. `scenario-analyzer.js`: Zeichnet Worst/Perzentil-/Pflege-/Zufalls-Szenarien während der Runs auf.
+5. `simulator-results.js`: `displayMonteCarloResults()` zeigt Aggregationen und Szenario-Logs an.
 
 ### Parameter-Sweep
 1. `simulator-main.js`: Sweep-Button bindet `runParameterSweep()` aus `simulator-sweep.js`.
-2. `simulator-sweep.js`: Iteriert über Whitelist-Parameter, ruft Mini-Monte-Carlo aus `simulator-monte-carlo.js`.
+2. `simulator-sweep.js`: Iteriert über Whitelist-Parameter, ruft Mini-Monte-Carlo aus `monte-carlo-runner.js`.
 3. `simulator-heatmap.js`: `renderHeatmapSVG()` visualisiert Ergebnisse.
 
 ### Backtest
@@ -310,4 +379,4 @@ Nach jeder Monte-Carlo-Simulation werden 30 Szenarien gespeichert:
 
 ---
 
-**Last Updated:** 2025-12-04
+**Last Updated:** 2025-12-06

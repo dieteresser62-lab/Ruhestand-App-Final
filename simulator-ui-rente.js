@@ -174,7 +174,6 @@ function migrateRentAdjustmentIfNeeded(rentAdjustmentInput, storageKeys) {
 
     // Wert direkt übernehmen, da es sich ebenfalls um einen Prozentwert handelt.
     localStorage.setItem(storageKeys.rentAdjPct, oldAdjustment);
-    console.log("Migrated old r2Anpassung value to rentAdjPct:", oldAdjustment);
 }
 
 /**
@@ -203,7 +202,6 @@ function migrateMonthlyPensionIfNeeded(monthlyPensionInput, storageKeys) {
     // Legacy-Wert von Jahres- auf Monatsbetrag umrechnen und runden.
     savedMonthly = String(Math.round(legacyValue / 12));
     localStorage.setItem(storageKeys.r2Monatsrente, savedMonthly);
-    console.log("Migrated r2Brutto (" + legacyAnnual + " €/Jahr) to r2Monatsrente (" + savedMonthly + " €/Monat)");
 }
 
 /**
