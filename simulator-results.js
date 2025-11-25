@@ -384,6 +384,9 @@ export function getWorstRunColumnDefinitions(opts = {}) {
     const detailCols = options.logDetailLevel === 'detailed' ? [
         { key: 'jahresentnahme_real', header: 'Entn_real', width: 9, fmt: formatCurrencyShortLog },
         { key: 'floor_aus_depot', header: 'FloorDep', width: 8, fmt: formatCurrencyShortLog },
+        { key: 'liqStart', header: 'Liq@rC-', width: 9, fmt: formatCurrencyShortLog },
+        { key: 'cashInterestEarned', header: 'Zins€', width: 7, fmt: formatCurrencyShortLog },
+        { key: 'liqEnd', header: 'Liq@rC+', width: 9, fmt: formatCurrencyShortLog },
     ] : [];
 
     const guardCols = options.logDetailLevel === 'detailed' ? [
