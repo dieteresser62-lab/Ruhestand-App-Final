@@ -1,15 +1,14 @@
 # Simulator-App – Modulübersicht
 
-Die Simulator-App besteht aus sieben ES6-Modulen für Monte-Carlo-Simulationen, Parameter-Sweeps und Pflegefall-Szenarien. Das folgende Dokument fasst Verantwortung, Hauptfunktionen und Abhängigkeiten zusammen.
+Die Simulator-App besteht aus acht ES6-Modulen für Monte-Carlo-Simulationen, Parameter-Sweeps und Pflegefall-Szenarien. Das folgende Dokument fasst Verantwortung, Hauptfunktionen und Abhängigkeiten zusammen.
 
 ---
 
 ## 1. `simulator-main.js` (~3.100 Zeilen)
-Hauptsteuerung der Simulator-App: Monte-Carlo, Backtests, Sweeps, UI-Handling.
+Hauptsteuerung der Simulator-App: Monte-Carlo, Sweep, UI-Handling.
 
 **Hauptfunktionen:**
 - `runMonteCarlo()` – führt Monte-Carlo-Simulation durch, sammelt 30 Szenario-Logs
-- `runBacktest()` – historischer Backtest über gewählten Zeitraum
 - `runParameterSweep()` – Parameter-Sweep mit Heatmap-Visualisierung
 - `getCommonInputs()` – sammelt alle UI-Eingaben in strukturiertes Objekt
 - `initializeUI()` – registriert Event-Handler, lädt gespeicherte Werte
@@ -20,11 +19,23 @@ Hauptsteuerung der Simulator-App: Monte-Carlo, Backtests, Sweeps, UI-Handling.
 - Pflege-UI mit Staffel-Presets und regionalen Zuschlägen
 - Export-Funktionen für Backtest-Logs
 
-**Dependencies:** `simulator-engine.js`, `simulator-results.js`, `simulator-portfolio.js`, `simulator-heatmap.js`, `simulator-utils.js`, `simulator-data.js`
+**Dependencies:** `simulator-engine.js`, `simulator-results.js`, `simulator-portfolio.js`, `simulator-heatmap.js`, `simulator-utils.js`, `simulator-data.js`, `simulator-backtest.js`
 
 ---
 
-## 2. `simulator-engine.js` (~1.200 Zeilen)
+## 2. `simulator-backtest.js` (~550 Zeilen)
+Backtest-spezifische Logik, Export und Tabellen-Rendering.
+
+**Hauptfunktionen:**
+- `runBacktest()` – historischer Backtest über gewählten Zeitraum
+- `renderBacktestLog()` – rendert Jahresprotokoll als HTML-Tabelle
+- `exportBacktestLogData()` – exportiert Backtest-Logs als JSON/CSV
+
+**Dependencies:** `simulator-utils.js`, `simulator-data.js`, `simulator-portfolio.js`, `simulator-engine.js`, `simulator-results.js`
+
+---
+
+## 3. `simulator-engine.js` (~1.200 Zeilen)
 Kernlogik für Jahr-für-Jahr-Simulation.
 
 **Hauptfunktionen:**
@@ -40,7 +51,7 @@ Kernlogik für Jahr-für-Jahr-Simulation.
 
 ---
 
-## 3. `simulator-results.js` (~800 Zeilen)
+## 4. `simulator-results.js` (~800 Zeilen)
 Aggregation und Darstellung von Simulationsergebnissen.
 
 **Hauptfunktionen:**
@@ -60,7 +71,7 @@ Aggregation und Darstellung von Simulationsergebnissen.
 
 ---
 
-## 4. `simulator-portfolio.js` (~600 Zeilen)
+## 5. `simulator-portfolio.js` (~600 Zeilen)
 Portfolio-Initialisierung, Renten- und Stress-Kontexte.
 
 **Hauptfunktionen:**
@@ -75,7 +86,7 @@ Portfolio-Initialisierung, Renten- und Stress-Kontexte.
 
 ---
 
-## 5. `simulator-heatmap.js` (~550 Zeilen)
+## 6. `simulator-heatmap.js` (~550 Zeilen)
 SVG-Rendering für Parameter-Sweeps und Heatmaps.
 
 **Hauptfunktionen:**
@@ -87,7 +98,7 @@ SVG-Rendering für Parameter-Sweeps und Heatmaps.
 
 ---
 
-## 6. `simulator-utils.js` (~260 Zeilen)
+## 7. `simulator-utils.js` (~260 Zeilen)
 Zufallszahlen, Statistik und Formatierung.
 
 **Hauptfunktionen:**
@@ -100,7 +111,7 @@ Zufallszahlen, Statistik und Formatierung.
 
 ---
 
-## 7. `simulator-data.js` (~330 Zeilen)
+## 8. `simulator-data.js` (~330 Zeilen)
 Historische Daten, Mortalitätstafeln, Stress-Presets.
 
 **Exporte:**
@@ -117,6 +128,12 @@ Historische Daten, Mortalitätstafeln, Stress-Presets.
 
 ```
 simulator-main.js
+  ├─ simulator-backtest.js
+  │    ├─ simulator-utils.js
+  │    ├─ simulator-data.js
+  │    ├─ simulator-portfolio.js
+  │    ├─ simulator-engine.js
+  │    └─ simulator-results.js
   ├─ simulator-engine.js
   │    ├─ simulator-utils.js
   │    └─ simulator-data.js
@@ -149,9 +166,10 @@ simulator-main.js
 3. `simulator-heatmap.js`: `renderHeatmapSVG()` visualisiert Ergebnisse
 
 ### Backtest
-1. `simulator-main.js`: `runBacktest()` über historischen Zeitraum
-2. `simulator-engine.js`: Jahr-für-Jahr mit echten historischen Daten
-3. `simulator-main.js`: `renderBacktestLog()` zeigt Jahresprotokoll
+1. `simulator-main.js`: delegiert Backtests an `simulator-backtest.js`
+2. `simulator-backtest.js`: `runBacktest()` orchestriert Simulation und Log-Aufbereitung
+3. `simulator-engine.js`: Jahr-für-Jahr mit echten historischen Daten
+4. `simulator-backtest.js`: `renderBacktestLog()` zeigt Jahresprotokoll
 
 ---
 
@@ -185,4 +203,4 @@ Nach jeder Monte-Carlo-Simulation werden 30 Szenarien gespeichert:
 
 ---
 
-**Last Updated:** 2025-11-24
+**Last Updated:** 2025-11-25
