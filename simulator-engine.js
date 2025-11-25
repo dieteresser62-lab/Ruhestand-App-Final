@@ -22,7 +22,9 @@ function euros(x) {
 }
 
 /**
- * Berechnet die benötigte Liquidität für den Floor-Bedarf
+ * Berechnet die benötigte Liquidität für den Floor-Bedarf.
+ * Akzeptiert einen explizit auf 0 gesetzten `inflatedFloor` (z. B. wenn Renten den Floor vollständig decken)
+ * und fällt nur bei null/undefined auf den ursprünglichen Startwert zurück.
  * @param {Object} ctx - Kontext mit inputs und state
  * @returns {number} Benötigte Liquidität in €
  */
@@ -31,10 +33,16 @@ function computeLiqNeedForFloor(ctx) {
      * Design-Entscheidung: `inflatedFloor` kann bewusst 0 sein, wenn die Rente den Floor vollständig deckt.
      * Wir dürfen diesen Wert nicht per `||` auf den Start-Floor zurücksetzen, sonst erzwingen wir unnötig
      * Liquidität (Fail-Safe-Guard würde fälschlich verkaufen). Deshalb prüfen wir explizit auf null/undefined
-     * und akzeptieren 0 als gültigen Wert.
+     * und akzeptieren 0 als gültigen Wert. Negative Eingaben werden auf 0 gekappt.
      */
     const hasInflatedFloor = ctx.inflatedFloor !== undefined && ctx.inflatedFloor !== null;
-    const floorBasis = hasInflatedFloor ? ctx.inflatedFloor : ctx.inputs?.startFloorBedarf;
+    const normalizedStartFloor = euros(ctx.inputs?.startFloorBedarf ?? 0);
+    const floorBasis = hasInflatedFloor ? euros(ctx.inflatedFloor) : normalizedStartFloor;
+
+    // Wenn der (netto) Floor bereits vollständig durch Renten gedeckt ist, darf die Guard keinen Bedarf erzeugen.
+    if (hasInflatedFloor && floorBasis === 0) {
+        return 0;
+    }
 
     // Berechne monatlichen Floor-Bedarf (netto nach Rente) und stelle sicher, dass negative/NaN-Werte abgefangen werden.
     const floorMonthlyNet = euros(Number(floorBasis) / 12);
@@ -424,8 +432,18 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     };
     const need = computeLiqNeedForFloor(guardCtx);
     let liq = euros(liquiditaet);
+    const floorCoveredByPension = guardCtx.inflatedFloor === 0;
 
-    if (liq < need) {
+    // Defensive Check: Falls inflatierter Floor 0 ist (vollständig durch Rente gedeckt), darf kein Guard-Verkauf ausgelöst werden.
+    // Zusätzlich warnen, wenn trotzdem ein Bedarf > 0 berechnet würde (sollte durch computeLiqNeedForFloor ausgeschlossen sein).
+    if (floorCoveredByPension) {
+        guardReason = "floor_covered_by_pension";
+        if (need > 0) {
+            console.warn("FAIL-SAFE: Need sollte 0 sein, wenn inflatedFloor 0 ist", { need, inflatedFloor });
+        }
+    }
+
+    if (!floorCoveredByPension && liq < need) {
         let missing = need - liq;
         const minGold = algoInput.goldAktiv ? (algoInput.goldFloorProzent / 100) * totalWealth : 0;
 
