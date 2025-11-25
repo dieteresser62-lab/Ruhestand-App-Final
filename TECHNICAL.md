@@ -12,24 +12,24 @@ Dieses Dokument beschreibt die Architektur und zentrale Datenflüsse der Ruhesta
 |------------|---------|-------|
 | Balance-App | `Balance.html`, `balance-*.js`, `css/balance.css` | Jahresabschluss, Liquiditäts- und Entnahmeplanung, Diagnosen |
 | Simulator | `Simulator.html`, `simulator-*.js`, `simulator.css` | Monte-Carlo-Simulationen, Parameter-Sweeps, Pflegefall-Szenarien |
-| Engine | `engine/` (Module) → `engine.js` | Validierung, Marktanalyse, Spending- und Transaktionslogik |
+| Engine | `engine/` (ESM) → `engine.js` | Validierung, Marktanalyse, Spending- und Transaktionslogik |
 
-Alle Skripte sind ES6-Module. Die Engine wird zur Laufzeit als IIFE gebündelt und stellt eine globale `EngineAPI` (Balance) sowie `Ruhestandsmodell_v30` (Simulator-Kompatibilität) bereit.
+Alle Skripte sind ES6-Module. Die Engine wird per `build-engine.mjs` mit esbuild (oder Modul-Fallback) gebündelt und stellt eine globale `EngineAPI` (Balance) sowie `Ruhestandsmodell_v30` (Simulator-Kompatibilität) bereit.
 
 ---
 
 ## Engine
 
-Die Engine besteht aus acht Modulen, die von `build-engine.js` zu `engine.js` zusammengeführt werden. Die Reihenfolge entspricht zugleich der internen Verarbeitungskette:
+Die Engine besteht aus acht ES-Modulen, die von `build-engine.mjs` zu `engine.js` zusammengeführt werden. Die Reihenfolge entspricht zugleich der internen Verarbeitungskette:
 
-1. **`engine/validators/InputValidator.js`** – prüft sämtliche Eingaben auf Vollständigkeit, Wertebereiche und Konsistenz. Liefert strukturierte Fehlermeldungen.
-2. **`engine/analyzers/MarketAnalyzer.js`** – klassifiziert Marktregime, berechnet Drawdowns und leitet Kennzahlen für Guardrails ab.
-3. **`engine/planners/SpendingPlanner.js`** – steuert Guardrails, Glättung der Flex-Rate, Alarmstatus und erstellt Diagnoseeinträge.
-4. **`engine/transactions/TransactionEngine.js`** – leitet Ziel-Liquidität ab, berücksichtigt Puffer-Schutz und limitiert Verkäufe/Rebalancing.
-5. **`engine/core.js`** – orchestriert die oben genannten Module, exponiert `EngineAPI` (Version 31) und erzeugt Diagnose-/UI-Strukturen.
-6. **`engine/config.js`** – zentrale Konfiguration (Schwellenwerte, Regime-Mapping, Profile). Generiert zur Build-Zeit eine eindeutige Build-ID.
-7. **`engine/errors.js`** – Fehlerklassen (`AppError`, `ValidationError`, `FinancialCalculationError`).
-8. **`engine/adapter.js`** – Kompatibilitätsadapter für ältere Simulator-Schnittstellen.
+1. **`engine/validators/InputValidator.mjs`** – prüft sämtliche Eingaben auf Vollständigkeit, Wertebereiche und Konsistenz. Liefert strukturierte Fehlermeldungen.
+2. **`engine/analyzers/MarketAnalyzer.mjs`** – klassifiziert Marktregime, berechnet Drawdowns und leitet Kennzahlen für Guardrails ab.
+3. **`engine/planners/SpendingPlanner.mjs`** – steuert Guardrails, Glättung der Flex-Rate, Alarmstatus und erstellt Diagnoseeinträge.
+4. **`engine/transactions/TransactionEngine.mjs`** – leitet Ziel-Liquidität ab, berücksichtigt Puffer-Schutz und limitiert Verkäufe/Rebalancing.
+5. **`engine/core.mjs`** – orchestriert die oben genannten Module, exponiert `EngineAPI` (Version 31) und erzeugt Diagnose-/UI-Strukturen.
+6. **`engine/config.mjs`** – zentrale Konfiguration (Schwellenwerte, Regime-Mapping, Profile). Generiert zur Build-Zeit eine eindeutige Build-ID.
+7. **`engine/errors.mjs`** – Fehlerklassen (`AppError`, `ValidationError`, `FinancialCalculationError`).
+8. **`engine/adapter.mjs`** – Kompatibilitätsadapter für ältere Simulator-Schnittstellen.
 
 ### Datenfluss innerhalb der Engine
 

@@ -1,8 +1,6 @@
-'use strict';
-
-const assert = require('assert');
-const TransactionEngine = require('./TransactionEngine.js');
-const { CONFIG } = require('../config.js');
+import assert from 'node:assert';
+import TransactionEngine from './TransactionEngine.mjs';
+import { CONFIG } from '../config.mjs';
 
 /**
  * Prüft das Verhalten der TransactionEngine im ATH/Peak-Stable-Regime.
@@ -157,4 +155,5 @@ if (require.main === module) {
     }
 }
 
-module.exports = { runAthRegimeGapTest, runGuardrailCliffTest };
+export { runAthRegimeGapTest, runGuardrailCliffTest };
+export default { runAthRegimeGapTest, runGuardrailCliffTest };

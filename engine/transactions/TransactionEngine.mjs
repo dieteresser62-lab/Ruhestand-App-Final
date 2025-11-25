@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * ===================================================================
  * TRANSACTION ENGINE MODULE
@@ -7,10 +5,9 @@
  * Bestimmt Transaktionsaktionen und berechnet Verkäufe mit Steuern
  * ===================================================================
  */
+import { CONFIG } from '../config.mjs';
 
-const { CONFIG } = require('../config.js');
-
-const TransactionEngine = {
+export const TransactionEngine = {
     /**
      * Berechnet Ziel-Liquidität basierend auf Profil und Markt
      */
@@ -842,6 +839,4 @@ const TransactionEngine = {
 };
 
 // Exporte
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = TransactionEngine;
-}
+export default TransactionEngine;

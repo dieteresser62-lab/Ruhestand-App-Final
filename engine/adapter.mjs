@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * ===================================================================
  * ENGINE ADAPTER MODULE
@@ -9,9 +7,9 @@
  * ===================================================================
  */
 
-const { ENGINE_API_VERSION, CONFIG } = require('./config.js');
-const { EngineAPI, _internal_calculateModel } = require('./core.js');
-const TransactionEngine = require('./transactions/TransactionEngine.js');
+import { ENGINE_API_VERSION, CONFIG } from './config.mjs';
+import { EngineAPI, _internal_calculateModel } from './core.mjs';
+import TransactionEngine from './transactions/TransactionEngine.mjs';
 
 /**
  * Adapter für Simulator V5
@@ -180,6 +178,5 @@ const Ruhestandsmodell_v30_Adapter = {
 };
 
 // Exporte
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = Ruhestandsmodell_v30_Adapter;
-}
+export const Ruhestandsmodell_v30 = Ruhestandsmodell_v30_Adapter;
+export default Ruhestandsmodell_v30_Adapter;

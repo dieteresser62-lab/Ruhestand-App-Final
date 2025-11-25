@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * ===================================================================
  * INPUT VALIDATOR MODULE
@@ -8,7 +6,7 @@
  * ===================================================================
  */
 
-const InputValidator = {
+export const InputValidator = {
     /**
      * Validiert alle Benutzereingaben auf Plausibilität
      *
@@ -131,7 +129,4 @@ const InputValidator = {
     }
 };
 
-// Exporte
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = InputValidator;
-}
+export default InputValidator;

@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * ===================================================================
  * ENGINE CORE MODULE
@@ -8,12 +6,12 @@
  * ===================================================================
  */
 
-const { ENGINE_API_VERSION, ENGINE_BUILD_ID, CONFIG } = require('./config.js');
-const { AppError, ValidationError } = require('./errors.js');
-const InputValidator = require('./validators/InputValidator.js');
-const MarketAnalyzer = require('./analyzers/MarketAnalyzer.js');
-const SpendingPlanner = require('./planners/SpendingPlanner.js');
-const TransactionEngine = require('./transactions/TransactionEngine.js');
+import { ENGINE_API_VERSION, ENGINE_BUILD_ID, CONFIG } from './config.mjs';
+import { AppError, ValidationError } from './errors.mjs';
+import InputValidator from './validators/InputValidator.mjs';
+import MarketAnalyzer from './analyzers/MarketAnalyzer.mjs';
+import SpendingPlanner from './planners/SpendingPlanner.mjs';
+import TransactionEngine from './transactions/TransactionEngine.mjs';
 
 /**
  * Interne Orchestrierungsfunktion - Berechnet ein komplettes Jahresergebnis
@@ -283,6 +281,5 @@ const EngineAPI = {
 };
 
 // Exporte
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { EngineAPI, _internal_calculateModel };
-}
+export { EngineAPI, _internal_calculateModel };
+export default { EngineAPI, _internal_calculateModel };

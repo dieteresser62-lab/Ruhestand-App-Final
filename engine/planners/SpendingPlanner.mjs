@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * ===================================================================
  * SPENDING PLANNER MODULE
@@ -9,9 +7,9 @@
  * ===================================================================
  */
 
-const { CONFIG } = require('../config.js');
+import { CONFIG } from '../config.mjs';
 
-const SpendingPlanner = {
+export const SpendingPlanner = {
     /**
      * Bestimmt die Ausgabenstrategie für ein Jahr.
      *
@@ -632,6 +630,4 @@ const SpendingPlanner = {
 };
 
 // Exporte
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = SpendingPlanner;
-}
+export default SpendingPlanner;
