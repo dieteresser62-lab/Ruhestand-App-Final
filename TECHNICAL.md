@@ -73,9 +73,14 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 ### Wichtige Module
 
 * `simulator-main.js` – zentrale Steuerung, Parameter-Sweep-Logik, Dev-Mode-Self-Tests.
-* `simulator-engine.js` – Monte-Carlo-Logik (Jahresfortschreibung, Pflegefallkosten, Zufallssampling).
+* `simulator-monte-carlo.js` – UI-Koordinator für Monte-Carlo (liest Inputs, setzt Progress, orchestriert Runner/Analyzer).
+* `monte-carlo-runner.js` – DOM-freie Simulation (Jahresschleife, Pflege-KPIs) auf Basis von `simulator-engine.js`.
+* `monte-carlo-ui.js` – UI-Fassade für Progressbar/Parameter-Lesen; erlaubt Callbacks ohne DOM-Leaks.
+* `scenario-analyzer.js` – wählt während der Simulation 30 Szenarien (Worst, Perzentile, Pflege, Zufall) aus.
+* `simulator-engine.js` – Jahr-für-Jahr-Logik (Sampling, Pflegekosten/-sterblichkeit, Run-States).
 * `simulator-portfolio.js` – Initialisierung, Portfolio-Berechnungen, Stress-Kontexte.
-* `simulator-results.js` – Aggregation von Simulationsergebnissen, Kennzahlen und Warnflaggen.
+* `simulator-results.js` – Aggregiert MC-Ausgaben und delegiert an `results-metrics.js` / `results-renderers.js` / `results-formatting.js`.
+* `simulator-sweep.js` – Sweep-Logik inkl. Whitelist/Blocklist, Mini-Monte-Carlo und Heatmap-Aufruf.
 * `simulator-heatmap.js` – SVG-Rendering für Parameter-Sweeps inkl. Warnhinweise bei Verstößen.
 * `simulator-utils.js` – Zufallszahlengenerator, Statistikfunktionen, Parser, Formatierung.
 * `simulator-data.js` – Historische Daten, Mortalitäts- und Stress-Presets.
