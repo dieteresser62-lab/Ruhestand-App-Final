@@ -32,7 +32,7 @@ Ruhestand-App-Final/
 │   ├── transactions/TransactionEngine.js
 │   └── validators/InputValidator.js
 ├── engine.js               # gebündelte Version
-├── build-engine.js         # Node-Build-Skript
+├── build-engine.mjs         # Node-Build-Skript
 └── css/, Simulator.css, Dokumentation
 ```
 

@@ -1,5 +1,12 @@
 "use strict";
 
+// Der Selftest setzt eine Browser-Umgebung voraus. Bei Node-Aufrufen (z. B. `npm test` im CI)
+// brechen wir früh ab, damit die fehlende `window`-Referenz keinen Fehler auslöst.
+if (typeof window === 'undefined') {
+    console.warn('[sim-parity-smoketest] Kein Browser-Kontext gefunden – Test wird übersprungen.');
+    process.exit(0);
+}
+
 /**
  * ===================================================================
  * PARITY SMOKE TEST: Engine vs Simulator

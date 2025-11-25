@@ -1,0 +1,14 @@
+{
+  "name": "ruhestand-app-final",
+  "version": "1.0.0",
+  "description": "Die Ruhestand-App ist ein vollständig lokal ausführbares Planungstool mit zwei Oberflächen:",
+  "main": "balance-binder.js",
+  "scripts": {
+    "build:engine": "node build-engine.mjs",
+    "test": "node sim-parity-smoketest.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
