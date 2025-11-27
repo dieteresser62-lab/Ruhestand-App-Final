@@ -346,12 +346,14 @@ export const UIBinder = {
     },
 
     async handleFetchInflation() {
-        const btn = dom.controls.btnFetchInflation;
-        const originalText = btn.innerHTML;
+        const btn = dom.controls.btnFetchInflation;  // Kann undefined sein (wenn von Jahres-Update aufgerufen)
+        const originalText = btn?.innerHTML;
 
         try {
-            btn.disabled = true;
-            btn.innerHTML = '⏳ Lade...';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '⏳ Lade...';
+            }
 
             // Berechne das Vorjahr
             const currentYear = new Date().getFullYear();
@@ -477,8 +479,10 @@ export const UIBinder = {
             console.error('Inflation API Fehler:', err);
             UIRenderer.handleError(new AppError('Inflationsdaten-Abruf fehlgeschlagen.', { originalError: err }));
         } finally {
-            btn.disabled = false;
-            btn.innerHTML = originalText;
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
         }
     },
 
@@ -647,12 +651,14 @@ export const UIBinder = {
     },
 
     async handleNachrueckenMitETF() {
-        const btn = dom.controls.btnNachrueckenMitETF;
-        const originalText = btn.innerHTML;
+        const btn = dom.controls.btnNachrueckenMitETF;  // Kann undefined sein (wenn von Jahres-Update aufgerufen)
+        const originalText = btn?.innerHTML;
 
         try {
-            btn.disabled = true;
-            btn.innerHTML = '⏳ ETF...';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '⏳ ETF...';
+            }
 
             // Berechne Zieldatum: 31.01. des aktuellen Jahres
             const currentYear = new Date().getFullYear();
@@ -666,7 +672,9 @@ export const UIBinder = {
             console.log('ETF-Daten abgerufen:', etfData);
 
             // 2. Nachrücken durchführen (bestehende Logik)
-            btn.innerHTML = '⏳ Nachr...';
+            if (btn) {
+                btn.innerHTML = '⏳ Nachr...';
+            }
 
             // Speichere alte Werte für Undo
             appState.lastMarktData = {
@@ -722,8 +730,10 @@ export const UIBinder = {
             console.error('Nachrücken mit ETF fehlgeschlagen:', err);
             UIRenderer.handleError(err);
         } finally {
-            btn.disabled = false;
-            btn.innerHTML = originalText;
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
         }
     },
 
