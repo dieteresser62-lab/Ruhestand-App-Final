@@ -72,7 +72,7 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 
 ### Wichtige Module
 
-* `simulator-main.js` – zentrale Steuerung, Parameter-Sweep-Logik, Dev-Mode-Self-Tests.
+* `simulator-main.js` – zentrale Steuerung, Parameter-Sweep-Logik, Self-Tests.
 * `simulator-monte-carlo.js` – UI-Koordinator für Monte-Carlo (liest Inputs, setzt Progress, orchestriert Runner/Analyzer).
 * `monte-carlo-runner.js` – DOM-freie Simulation (Jahresschleife, Pflege-KPIs) auf Basis von `simulator-engine.js`.
 * `monte-carlo-ui.js` – UI-Fassade für Progressbar/Parameter-Lesen; erlaubt Callbacks ohne DOM-Leaks.
@@ -91,7 +91,7 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 * **Blocklist** verhindert Änderungen an sensiblen Feldern (z. B. Rente Person 2).
 * **Deep-Clones** (`structuredClone`-Fallback) isolieren jeden Sweep-Case.
 * **Rente-2-Wächter** markiert Heatmap-Zellen mit ⚠, wenn die zweite Rente variiert.
-* **Self-Test** (`runSweepSelfTest`) prüft Whitelist/Clone-Mechanismen im Dev-Modus.
+* **Self-Test** (`runSweepSelfTest`) prüft Whitelist/Clone-Mechanismen.
 
 ### Ergebnisdarstellung
 
@@ -108,7 +108,7 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
   CPI) nutzen und dass Erstjahre sauber von Folgejahren getrennt bleiben.【F:simulator-portfolio.js†L285-L332】
 * Das UI schaltet Prozentfelder je nach Modus frei/aus, blendet Partner-Sektionen dynamisch ein und speichert Präferenzen im
   `localStorage`. Dadurch wird verhindert, dass Sweep-Cases heimlich Person-2-Werte überschreiben.【F:simulator-main.js†L1563-L1614】
-* Sweep-Schutz: Whitelist/Blocklist und der Rente-2-Invarianz-Wächter markieren Verstöße direkt in der Heatmap, inklusive Dev-
+* Sweep-Schutz: Whitelist/Blocklist und der Rente-2-Invarianz-Wächter markieren Verstöße direkt in der Heatmap, inklusive
   Self-Test für reproduzierbare Diagnosen.【F:simulator-main.js†L3-L64】
 
 ### Pflege-Pipeline
@@ -133,9 +133,6 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 ## Build- und Laufzeit-Hinweise
 
 * Engine anpassen → `node build-engine.js` ausführen, anschließend `engine.js` prüfen.
-* Debug-Modi aktivieren:
-  * Balance: `Ctrl` + `Shift` + `D` oder `localStorage.setItem('balance_debug_mode', 'true')`.
-  * Simulator: UI-Toggle oder `localStorage.setItem('sim.devMode', '1')`.
 * Snapshot-Funktionen benötigen File-System-Access-API (Chromium).
 * Tests/Smoketests: `sim-parity-smoketest.js` enthält ein Skript zum Vergleich von Simulationsergebnissen, `test-dual-care.js` prüft Pflegefall-Logik.
 
@@ -144,6 +141,6 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 ## Weiterführende Dokumente
 
 * **BALANCE_MODULES_README.md** – Detailtiefe zur Balance-App.
+* **SIMULATOR_MODULES_README.md** – Detaillierte Modulübersicht des Simulators.
 * **engine/README.md** – Engine-spezifische Informationen inkl. Build-Beschreibung.
-* **TYPESCRIPT_MIGRATION_KONZEPT.md** – Migrationsplan zu TypeScript.
 
