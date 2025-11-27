@@ -30,18 +30,6 @@
  *    - Warn-Symbol ⚠ in betroffenen Heatmap-Zellen
  *    - Tooltip: "⚠ Rente 2 variierte im Sweep"
  *    - Keine KPI-Verfälschung, nur visuelle Markierung
- *
- * 5. **Developer-Tests mit fixem Seed**
- *    - runSweepSelfTest() für Mini-Sweep mit R2-Invarianz-Prüfung
- *    - Aktivierung via Dev-Mode Toggle (localStorage: sim.devMode=1)
- *    - Console-Logs mit [SWEEP] Prefix
- *    - Visuelle Bestätigung in UI (grün/rot)
- *
- * DEVELOPER-FLAGS:
- * ----------------
- * - Dev-Mode aktivieren: localStorage.setItem('sim.devMode', '1'); dann Reload
- *   oder: Klick auf "Dev-Mode" Toggle im UI (falls vorhanden)
- * - Self-Test Button erscheint dann im Parameter-Sweep Tab
  * - Fixed Seed für Tests: Wird in runSweepSelfTest() hartcodiert (baseSeed = 12345)
  *
  * BETROFFENE DATEIEN:
@@ -532,8 +520,6 @@ function initializeLegacyMortalityToggleIfPresent(checkbox) {
  * 1. Baseline-Test: Rente2 bleibt über Cases konstant (Whitelist greift)
  * 2. Negativtest: Simuliert absichtliche R2-Änderung (sollte erkannt werden)
  * 3. Deep-Copy-Test: baseInputs bleiben nach Sweep unverändert
- *
- * Aktivierung: Dev-Mode Toggle oder localStorage.setItem('sim.devMode', '1')
  */
 async function runSweepSelfTest() {
     const resultsDiv = document.getElementById('sweepSelfTestResults');

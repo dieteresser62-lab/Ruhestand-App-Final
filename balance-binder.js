@@ -6,7 +6,7 @@
  * ===================================================================================
  */
 
-import { CONFIG, AppError, StorageError, DebugUtils } from './balance-config.js';
+import { CONFIG, AppError, StorageError } from './balance-config.js';
 import { UIUtils } from './balance-utils.js';
 import { UIReader } from './balance-reader.js';
 import { UIRenderer } from './balance-renderer.js';
@@ -82,24 +82,6 @@ export const UIBinder = {
     },
 
     handleKeyboardShortcuts(e) {
-        // CTRL+Shift+D: Debug-Modus umschalten
-        if (e.ctrlKey && e.shiftKey && e.key === 'D') {
-            e.preventDefault();
-            const newState = DebugUtils.toggleDebugMode();
-
-            // UI-Indikator aktualisieren
-            this.updateDebugModeUI(newState);
-
-            // Wenn aktiviert: Diagnose-Panel öffnen
-            if (newState) {
-                dom.diagnosis.drawer.classList.add('is-open');
-                dom.diagnosis.overlay.classList.add('is-open');
-            }
-
-            UIRenderer.toast(newState ? '🐛 Debug-Modus aktiviert' : '🐛 Debug-Modus deaktiviert');
-            return;
-        }
-
         // Alt+J: Jahresabschluss
         if (e.altKey && e.key === 'j') {
             e.preventDefault();
@@ -126,20 +108,6 @@ export const UIBinder = {
             e.preventDefault();
             dom.controls.btnNachruecken.click();
             return;
-        }
-
-        // Alt+D: Dark-Mode umschalten
-        if (e.altKey && e.key === 'd') {
-            e.preventDefault();
-            this.handleThemeToggle();
-            return;
-        }
-    },
-
-    updateDebugModeUI(isActive) {
-        const debugIndicator = document.getElementById('debugModeIndicator');
-        if (debugIndicator) {
-            debugIndicator.style.display = isActive ? 'flex' : 'none';
         }
     },
 
