@@ -317,13 +317,15 @@ export const UIBinder = {
             let jahreSeitAth = 0;
             if (ath.value > lastEntry.close + 0.01 && ath.date) {
                 const timeDiff = lastEntry.date.getTime() - ath.date.getTime();
-                jahreSeitAth = timeDiff / (1000 * 3600 * 24 * 365.25);
+                const yearsDiff = timeDiff / (1000 * 3600 * 24 * 365.25);
+                jahreSeitAth = Math.floor(yearsDiff); // Ganze Jahre ohne Nachkommastellen
             }
 
             const updateField = (id, value) => {
                 const el = dom.inputs[id];
                 if (el) {
-                    el.value = (typeof value === 'number' && isFinite(value)) ? value.toFixed(2) : '';
+                    // Runde auf ganze Zahlen, keine Nachkommastellen
+                    el.value = (typeof value === 'number' && isFinite(value)) ? Math.round(value).toString() : '';
                 }
             };
 
