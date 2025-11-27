@@ -45,14 +45,15 @@
             <div class="tab-content">
                 <div id="tab-update" class="tab-panel active">
                     <fieldset><legend>Basiswerte</legend>
+                        <!-- Jahres-Update Button -->
+                        <div style="margin-bottom: 15px;">
+                            <button id="btnJahresUpdate" type="button" class="btn btn-primary" title="Ruft Inflation (ECB) und ETF-Kurs (VWCE.DE) ab, führt Nachrücken durch und aktualisiert ATH">🌐 Jahres-Update</button>
+                        </div>
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
                             <div class="form-group"><label for="aktuellesAlter">Aktuelles Alter</label><input id="aktuellesAlter" type="number" value="65" min="50"></div>
                             <div class="form-group">
                                 <label for="inflation">Inflation VJ (%)</label>
-                                <div style="display: flex; gap: 6px; align-items: center;">
-                                    <input id="inflation" type="number" value="1.7" step="0.1" style="flex: 1;">
-                                    <button id="btnFetchInflation" type="button" class="btn btn-utility btn-sm" title="Inflation online abrufen">🌐 API</button>
-                                </div>
+                                <input id="inflation" type="number" value="1.7" step="0.1">
                             </div>
                         </div>
 						<!-- NEUER CONTAINER FÜR DEN INTELLIGENTEN HINWEIS -->
@@ -72,7 +73,6 @@
                             <button id="btnCsvImport" type="button" class="btn btn-utility btn-sm" title="Marktdaten aus CSV-Datei importieren">📄 CSV</button>
                             <input type="file" id="csvFileInput" accept=".csv" style="display:none">
                             <button id="btnNachruecken" type="button" class="btn btn-utility btn-sm" title="Marktdaten um ein Jahr verschieben (Alt+N)">🗓️ Nachr.</button>
-                            <button id="btnNachrueckenMitETF" type="button" class="btn btn-utility btn-sm" title="Nachrücken mit automatischem ETF-Abruf (VWCE.DE vom 31.01.)">🌐 Nachr.+ETF</button>
                             <button id="btnUndoNachruecken" type="button" class="btn btn-utility btn-sm" title="Nachrücken rückgängig machen" style="display:none;">↩️</button>
                         </span>
                     </legend>

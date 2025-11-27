@@ -48,15 +48,14 @@ export const UIBinder = {
                 .then(() => UIRenderer.toast('Kopiert.'));
         });
         dom.containers.bedarfAnpassung.addEventListener('click', this.handleBedarfAnpassungClick.bind(this));
+        dom.controls.btnJahresUpdate.addEventListener('click', this.handleJahresUpdate.bind(this));
         dom.controls.btnNachruecken.addEventListener('click', this.handleNachruecken.bind(this));
-        dom.controls.btnNachrueckenMitETF.addEventListener('click', this.handleNachrueckenMitETF.bind(this));
         dom.controls.btnUndoNachruecken.addEventListener('click', this.handleUndoNachruecken.bind(this));
         dom.controls.exportBtn.addEventListener('click', this.handleExport.bind(this));
         dom.controls.importBtn.addEventListener('click', () => dom.controls.importFile.click());
         dom.controls.importFile.addEventListener('change', this.handleImport.bind(this));
         dom.controls.btnCsvImport.addEventListener('click', () => dom.controls.csvFileInput.click());
         dom.controls.csvFileInput.addEventListener('change', this.handleCsvImport.bind(this));
-        dom.controls.btnFetchInflation.addEventListener('click', this.handleFetchInflation.bind(this));
         dom.controls.jahresabschlussBtn.addEventListener('click', this.handleJahresabschluss.bind(this));
         dom.controls.connectFolderBtn.addEventListener('click', () => {
             try { StorageManager.connectFolder(); }
@@ -477,6 +476,38 @@ export const UIBinder = {
         } catch (err) {
             console.error('Inflation API Fehler:', err);
             UIRenderer.handleError(new AppError('Inflationsdaten-Abruf fehlgeschlagen.', { originalError: err }));
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    },
+
+    async handleJahresUpdate() {
+        const btn = dom.controls.btnJahresUpdate;
+        const originalText = btn.innerHTML;
+
+        try {
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Lädt...';
+
+            UIRenderer.toast('Starte Jahres-Update...');
+
+            // Schritt 1: Inflation abrufen
+            btn.innerHTML = '⏳ Inflation...';
+            await this.handleFetchInflation();
+
+            // Kurze Pause für besseres UX
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Schritt 2: ETF-Daten abrufen + Nachrücken + ATH
+            btn.innerHTML = '⏳ ETF...';
+            await this.handleNachrueckenMitETF();
+
+            UIRenderer.toast('✅ Jahres-Update erfolgreich abgeschlossen!');
+
+        } catch (err) {
+            console.error('Jahres-Update fehlgeschlagen:', err);
+            UIRenderer.handleError(new AppError('Jahres-Update fehlgeschlagen.', { originalError: err }));
         } finally {
             btn.disabled = false;
             btn.innerHTML = originalText;
