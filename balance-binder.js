@@ -172,21 +172,25 @@ export const UIBinder = {
 
     handleBedarfAnpassungClick(e) {
         if (e.target.matches('.btn-apply-inflation')) {
-            const inputData = UIReader.readAllInputs();
-            const infl = inputData.inflation;
-            const currentAge = inputData.aktuellesAlter;
-
-            ['floorBedarf', 'flexBedarf'].forEach(id => {
-                const el = dom.inputs[id];
-                el.value = UIUtils.formatNumber(UIUtils.parseCurrency(el.value) * (1 + infl / 100));
-            });
-
-            const state = StorageManager.loadState();
-            state.ageAdjustedForInflation = currentAge;
-            StorageManager.saveState(state);
-
-            update();
+            this._applyInflationToBedarfe();
         }
+    },
+
+    _applyInflationToBedarfe() {
+        const inputData = UIReader.readAllInputs();
+        const infl = inputData.inflation;
+        const currentAge = inputData.aktuellesAlter;
+
+        ['floorBedarf', 'flexBedarf'].forEach(id => {
+            const el = dom.inputs[id];
+            el.value = UIUtils.formatNumber(UIUtils.parseCurrency(el.value) * (1 + infl / 100));
+        });
+
+        const state = StorageManager.loadState();
+        state.ageAdjustedForInflation = currentAge;
+        StorageManager.saveState(state);
+
+        update();
     },
 
     handleNachruecken() {
@@ -458,7 +462,10 @@ export const UIBinder = {
                 dom.inputs.inflation.value = inflationRate.toFixed(1);
                 debouncedUpdate();
 
-                UIRenderer.toast(`✅ Inflation ${previousYear}: ${inflationRate.toFixed(1)}% (Quelle: ${source})`);
+                // Automatisch Bedarfe anpassen
+                this._applyInflationToBedarfe();
+
+                UIRenderer.toast(`✅ Inflation ${previousYear}: ${inflationRate.toFixed(1)}% (Quelle: ${source})\nBedarfe automatisch angepasst`);
             } else {
                 // Keine Daten gefunden - detailliertes Feedback
                 throw new AppError(
