@@ -650,18 +650,18 @@ export const UIBinder = {
             dom.inputs.endeVJ_2.value = dom.inputs.endeVJ_1.value;
             dom.inputs.endeVJ_1.value = dom.inputs.endeVJ.value;
 
-            // 3. Neuen ETF-Wert in Ende VJ eintragen
-            const etfPrice = etfData.price.toFixed(2);
-            dom.inputs.endeVJ.value = etfPrice;
+            // 3. Neuen ETF-Wert in Ende VJ eintragen (ohne Nachkommastellen)
+            const etfPrice = Math.round(etfData.price);
+            dom.inputs.endeVJ.value = etfPrice.toString();
 
             // 4. ATH-Logik anwenden
             const currentATH = parseFloat(dom.inputs.ath.value) || 0;
-            const newValue = parseFloat(etfPrice);
-            const previousJahreSeitAth = parseFloat(dom.inputs.jahreSeitAth.value) || 0;
+            const newValue = etfPrice;
+            const previousJahreSeitAth = parseInt(dom.inputs.jahreSeitAth.value) || 0;
 
             if (newValue > currentATH) {
                 // Neues Allzeithoch!
-                dom.inputs.ath.value = etfPrice;
+                dom.inputs.ath.value = etfPrice.toString();
                 dom.inputs.jahreSeitAth.value = '0';
             } else {
                 // Kein neues ATH → Jahre erhöhen
