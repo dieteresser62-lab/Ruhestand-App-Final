@@ -13,12 +13,59 @@ let dom = null;
 
 /**
  * Initialisiert den UIReader mit DOM-Referenzen
+ *
+ * @param {Object} domRefs - Objekt mit DOM-Elementreferenzen (inputs, controls)
  */
 export function initUIReader(domRefs) {
     dom = domRefs;
 }
 
 export const UIReader = {
+    /**
+     * Liest alle Benutzereingaben aus dem Formular
+     *
+     * Sammelt sämtliche Input-Werte (Alter, Vermögen, Bedarf, Marktdaten,
+     * Steuern, Guardrail-Parameter etc.) und konvertiert sie in die
+     * für die Engine erforderlichen Datentypen.
+     *
+     * @returns {Object} Strukturiertes Eingabeobjekt mit allen Parametern
+     * @property {number} aktuellesAlter - Aktuelles Lebensalter
+     * @property {number} floorBedarf - Jährlicher Grundbedarf (€)
+     * @property {number} flexBedarf - Jährlicher flexibler Zusatzbedarf (€)
+     * @property {number} inflation - Inflationsrate (%)
+     * @property {number} tagesgeld - Tagesgeld-Guthaben (€)
+     * @property {number} geldmarktEtf - Geldmarkt-ETF-Wert (€)
+     * @property {number} depotwertAlt - Wert des Alt-Depots (€)
+     * @property {number} depotwertNeu - Wert des Neu-Depots (€)
+     * @property {number} goldWert - Wert der Goldbestände (€)
+     * @property {number} endeVJ - ETF-Kurs Jahresende (%)
+     * @property {number} endeVJ_1 - ETF-Kurs vor 1 Jahr (%)
+     * @property {number} endeVJ_2 - ETF-Kurs vor 2 Jahren (%)
+     * @property {number} endeVJ_3 - ETF-Kurs vor 3 Jahren (%)
+     * @property {number} ath - All-Time-High des ETF (%)
+     * @property {number} jahreSeitAth - Jahre seit ATH
+     * @property {boolean} renteAktiv - Rente bereits aktiv
+     * @property {number} renteMonatlich - Monatliche Rente (€)
+     * @property {string} risikoprofil - Risikoprofil (immer 'sicherheits-dynamisch')
+     * @property {boolean} goldAktiv - Gold-Modul aktiviert
+     * @property {number} goldZielProzent - Gold-Zielanteil (%)
+     * @property {number} goldFloorProzent - Gold-Floor-Anteil (%)
+     * @property {boolean} goldSteuerfrei - Gold steuerfrei nach 1 Jahr
+     * @property {number} rebalancingBand - Rebalancing-Band (%)
+     * @property {number} costBasisAlt - Kostenbasis Alt-Depot (€)
+     * @property {number} costBasisNeu - Kostenbasis Neu-Depot (€)
+     * @property {number} tqfAlt - Teilfreistellungsquote Alt-Depot (%)
+     * @property {number} tqfNeu - Teilfreistellungsquote Neu-Depot (%)
+     * @property {number} goldCost - Kostenbasis Gold (€)
+     * @property {number} kirchensteuerSatz - Kirchensteuersatz (%)
+     * @property {number} sparerPauschbetrag - Sparerpauschbetrag (€)
+     * @property {number} runwayMinMonths - Minimum Liquiditäts-Runway (Monate)
+     * @property {number} runwayTargetMonths - Ziel Liquiditäts-Runway (Monate)
+     * @property {number} targetEq - Ziel-Aktienquote (%)
+     * @property {number} rebalBand - Rebalancing-Band für Equity (%)
+     * @property {number} maxSkimPctOfEq - Max. Skimming-Prozent von Equity (%)
+     * @property {number} maxBearRefillPctOfEq - Max. Bear-Refill-Prozent von Equity (%)
+     */
     readAllInputs() {
         const num = (id) => UIUtils.parseCurrency(dom.inputs[id].value);
         const val = (id) => dom.inputs[id].value;
@@ -63,6 +110,20 @@ export const UIReader = {
         };
     },
 
+    /**
+     * Wendet gespeicherte Eingabewerte auf das Formular an
+     *
+     * Lädt Werte aus dem übergebenen Objekt und setzt die entsprechenden
+     * DOM-Elemente. Behandelt verschiedene Input-Typen korrekt:
+     * - Checkboxen: checked-Attribut
+     * - Währungsfelder: Formatierung mit Tausendertrennzeichen
+     * - Andere Felder: Direktzuweisung
+     *
+     * Ruft anschließend applySideEffectsFromInputs() auf, um UI-Panels
+     * entsprechend anzuzeigen/zu verbergen.
+     *
+     * @param {Object} [storedInputs={}] - Gespeicherte Eingabewerte
+     */
     applyStoredInputs(storedInputs = {}) {
         Object.keys(dom.inputs).forEach(key => {
             const el = dom.inputs[key];
@@ -79,6 +140,17 @@ export const UIReader = {
         this.applySideEffectsFromInputs();
     },
 
+    /**
+     * Wendet UI-Seiteneffekte basierend auf Eingabewerten an
+     *
+     * Zeigt/verbirgt Panels und aktiviert/deaktiviert Felder abhängig
+     * von bestimmten Eingabewerten:
+     * - Gold-Panel: nur sichtbar wenn goldAktiv aktiviert
+     * - Renten-Feld: nur aktiviert wenn renteAktiv = 'ja'
+     * - Setzt inaktive Felder auf 0 zurück
+     *
+     * Wird automatisch von applyStoredInputs() aufgerufen.
+     */
     applySideEffectsFromInputs() {
         const isGoldActive = dom.inputs.goldAktiv.checked;
         dom.controls.goldPanel.style.display = isGoldActive ? 'block' : 'none';

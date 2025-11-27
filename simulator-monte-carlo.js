@@ -8,9 +8,22 @@ import { ScenarioAnalyzer } from './scenario-analyzer.js';
 import { runMonteCarloSimulation } from './monte-carlo-runner.js';
 
 /**
- * Koordiniert die Monte-Carlo-Simulation, indem UI, Runner und Analyzer zusammengeführt werden.
- * Die Simulation selbst ist DOM-frei; UI-spezifische Aufgaben werden hier gebündelt.
- * @returns {Promise<void>} Promise, das nach Abschluss der Simulation aufgelöst wird.
+ * Koordiniert die Monte-Carlo-Simulation (UI-Orchestrator)
+ *
+ * Diese Funktion ist der zentrale Einstiegspunkt für Monte-Carlo-Simulationen.
+ * Sie orchestriert:
+ * - UI-Vorbereitung (Fortschrittsbalken, Button-States)
+ * - Eingabedaten-Sammlung (Portfolio, Renten, Pflege, MC-Parameter)
+ * - Aufruf der DOM-freien Simulation (monte-carlo-runner.js)
+ * - Szenario-Analyse und Auswahl charakteristischer Runs
+ * - Ergebnis-Darstellung (Perzentile, KPIs, Worst-Run, Pflegefall-Statistik)
+ *
+ * Die eigentliche Simulationslogik ist DOM-frei; UI-spezifische Aufgaben
+ * (Fortschrittsanzeige, Benutzereingaben, Ergebnisdarstellung) werden hier gebündelt.
+ *
+ * @async
+ * @returns {Promise<void>} Promise, das nach Abschluss der Simulation aufgelöst wird
+ * @throws {Error} Bei Validierungs- oder Berechnungsfehlern
  */
 export async function runMonteCarlo() {
     const ui = createMonteCarloUI();

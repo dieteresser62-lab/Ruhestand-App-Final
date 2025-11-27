@@ -263,19 +263,36 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             const baseR2 = inputs.partner.brutto;
             rente2BruttoEigen = computePensionNext(currentAnnualPension2, isFirstYearR2, baseR2, rentAdjPct);
 
-            // Steuerberechnung für Person 2
-            // Wenn Steuerquote > 0, wird diese verwendet (einfache Methode)
-            // Andernfalls wird eine detaillierte Berechnung mit Sparer-Pauschbetrag und Kirchensteuer durchgeführt
+            /**
+             * Steuerberechnung für Person 2 (Partner-Rente)
+             *
+             * Zwei Berechnungsmodi:
+             * 1. Vereinfachte Methode (steuerquotePct > 0):
+             *    Bruttoente wird mit pauschaler Steuerquote reduziert.
+             *    Dies ist der empfohlene Ansatz für die meisten Nutzer:innen.
+             *
+             * 2. Steuerfreie Rente (steuerquotePct = 0):
+             *    Rente wird ohne Steuerabzug ausgezahlt (brutto = netto).
+             *    Dies ist korrekt für bereits extern versteuerte Renten oder
+             *    Konstellationen ohne Steuerlast.
+             *
+             * Design-Hinweis:
+             * Anders als Person 1 (die immer steuerfrei behandelt wird) ermöglicht
+             * Person 2 die optionale Steuerberechnung via steuerquotePct.
+             *
+             * Mögliche zukünftige Erweiterung:
+             * Eine detaillierte Steuerberechnung analog zur Balance-Engine
+             * (mit Sparer-Pauschbetrag, Kirchensteuer, Teilfreistellung etc.)
+             * könnte als dritter Modus hinzugefügt werden. Dies würde allerdings
+             * zusätzliche Input-Parameter erfordern und die Simulator-Komplexität
+             * erhöhen, weshalb aktuell die vereinfachte Steuerquoten-Methode
+             * präferiert wird.
+             */
             if (inputs.partner.steuerquotePct > 0) {
                 rente2 = rente2BruttoEigen * (1 - inputs.partner.steuerquotePct / 100);
             } else {
-                // Detaillierte Steuerberechnung (analog zu Person 1, falls gewünscht)
-                // Für jetzt: keine Steuern, wenn Steuerquote = 0
-                // TODO: Hier könnte eine detaillierte Steuerberechnung mit Sparer-Pauschbetrag
-                // und Kirchensteuer implementiert werden (analog zur engine.js Logik)
                 rente2 = rente2BruttoEigen;
             }
-            // Clamp bei 0 (keine negativen Renten)
             rente2 = Math.max(0, rente2);
         }
     }
