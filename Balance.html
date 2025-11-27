@@ -46,8 +46,9 @@
                 <div id="tab-update" class="tab-panel active">
                     <fieldset><legend>Basiswerte</legend>
                         <!-- Jahres-Update Button -->
-                        <div style="margin-bottom: 15px;">
+                        <div class="update-actions" style="margin-bottom: 15px;">
                             <button id="btnJahresUpdate" type="button" class="btn btn-primary" title="Ruft Inflation (ECB) und ETF-Kurs (VWCE.DE) ab, führt Nachrücken durch und aktualisiert ATH">🌐 Jahres-Update</button>
+                            <button id="btnJahresUpdateLog" type="button" class="btn btn-utility btn-icon" aria-label="Protokoll des letzten Jahres-Updates anzeigen" title="Protokoll des letzten Jahres-Updates anzeigen" disabled>🧾</button>
                         </div>
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
                             <div class="form-group"><label for="aktuellesAlter">Aktuelles Alter</label><input id="aktuellesAlter" type="number" value="65" min="50"></div>
@@ -275,8 +276,6 @@
                 <div id="modalDuration" class="modal-duration"></div>
             </div>
             <div class="modal-footer">
-                <button id="modalCopyBtn" class="btn btn-utility">📋 Details kopieren</button>
-                <button id="modalDetailsBtn" class="btn btn-utility">🔍 Details anzeigen</button>
                 <button id="modalCloseBtn" class="btn btn-primary">OK</button>
             </div>
         </div>

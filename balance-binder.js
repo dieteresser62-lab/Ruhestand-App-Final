@@ -17,6 +17,7 @@ let dom = null;
 let appState = null;
 let update = null;
 let debouncedUpdate = null;
+let lastUpdateResults = null;
 
 /**
  * Initialisiert den UIBinder mit den notwendigen Abhängigkeiten
@@ -49,6 +50,9 @@ export const UIBinder = {
         });
         dom.containers.bedarfAnpassung.addEventListener('click', this.handleBedarfAnpassungClick.bind(this));
         dom.controls.btnJahresUpdate.addEventListener('click', this.handleJahresUpdate.bind(this));
+        if (dom.controls.btnJahresUpdateLog) {
+            dom.controls.btnJahresUpdateLog.addEventListener('click', this.handleShowUpdateLog.bind(this));
+        }
         dom.controls.btnNachruecken.addEventListener('click', this.handleNachruecken.bind(this));
         dom.controls.btnUndoNachruecken.addEventListener('click', this.handleUndoNachruecken.bind(this));
         dom.controls.exportBtn.addEventListener('click', this.handleExport.bind(this));
@@ -505,6 +509,11 @@ export const UIBinder = {
         }
     },
 
+    /**
+     * Führt den vollständigen Jahres-Update-Prozess aus (Inflation abrufen, Marktdaten nachrücken, Alter erhöhen)
+     * und rendert anschließend das Ergebnis-Modal.
+     * @returns {Promise<void>} Kein Rückgabewert; UI wird direkt aktualisiert.
+     */
     async handleJahresUpdate() {
         const btn = dom.controls.btnJahresUpdate;
         const originalText = btn.innerHTML;
@@ -551,6 +560,12 @@ export const UIBinder = {
 
             results.endTime = Date.now();
 
+            // Protokoll für erneute Anzeige speichern und UI-Button aktivieren
+            lastUpdateResults = JSON.parse(JSON.stringify(results));
+            if (dom.controls.btnJahresUpdateLog) {
+                dom.controls.btnJahresUpdateLog.disabled = false;
+            }
+
             // Zeige Modal mit Ergebnissen
             this.showUpdateResultModal(results);
 
@@ -563,18 +578,28 @@ export const UIBinder = {
         }
     },
 
+    /**
+     * Rendert das Ergebnis-Modal für den Jahres-Update-Prozess und bindet Close-Handler.
+     * @param {Object} results Aggregiertes Ergebnisobjekt aus Inflation, ETF-Daten und Altersfortschritt.
+     * @returns {void}
+     */
     showUpdateResultModal(results) {
         const modal = document.getElementById('updateResultModal');
         const modalTitle = document.getElementById('modalTitle');
         const modalResults = document.getElementById('modalResults');
         const modalDuration = document.getElementById('modalDuration');
-        const modalCopyBtn = document.getElementById('modalCopyBtn');
-        const modalDetailsBtn = document.getElementById('modalDetailsBtn');
         const modalCloseBtn = document.getElementById('modalCloseBtn');
         const closeX = modal.querySelector('.modal-close');
+        const modalOverlay = modal.querySelector('.modal-overlay');
 
         if (!modal) {
             console.error('Modal Element nicht gefunden!');
+            return;
+        }
+
+        if (!results || typeof results.startTime !== 'number' || typeof results.endTime !== 'number') {
+            console.error('Ungültiges Ergebnisobjekt für das Jahres-Update-Modul.', results);
+            UIRenderer.toast('Kein gültiges Protokoll verfügbar.');
             return;
         }
 
@@ -674,38 +699,24 @@ export const UIBinder = {
             modal.style.display = 'none';
         };
 
-        // Event Handler für Kopieren
-        const copyResults = () => {
-            const text = this._generateUpdateResultText(results);
-            navigator.clipboard.writeText(text).then(() => {
-                UIRenderer.toast('📋 Details in Zwischenablage kopiert');
-            });
-        };
-
-        // Event Handler für Details (öffnet Diagnose-Panel)
-        const showDetails = () => {
-            closeModal();
-            // Öffne Diagnose-Panel
-            dom.diagnosis.drawer.classList.add('is-open');
-            dom.diagnosis.overlay.classList.add('is-open');
-        };
-
         // Entferne alte Event Listener (falls vorhanden)
         const newCloseBtn = modalCloseBtn.cloneNode(true);
         const newCloseX = closeX.cloneNode(true);
-        const newCopyBtn = modalCopyBtn.cloneNode(true);
-        const newDetailsBtn = modalDetailsBtn.cloneNode(true);
+        const newOverlay = modalOverlay ? modalOverlay.cloneNode(true) : null;
 
         modalCloseBtn.parentNode.replaceChild(newCloseBtn, modalCloseBtn);
         closeX.parentNode.replaceChild(newCloseX, closeX);
-        modalCopyBtn.parentNode.replaceChild(newCopyBtn, modalCopyBtn);
-        modalDetailsBtn.parentNode.replaceChild(newDetailsBtn, modalDetailsBtn);
+        if (newOverlay) {
+            modalOverlay.parentNode.replaceChild(newOverlay, modalOverlay);
+        }
 
         // Neue Event Listener
         newCloseBtn.addEventListener('click', closeModal);
         newCloseX.addEventListener('click', closeModal);
-        newCopyBtn.addEventListener('click', copyResults);
-        newDetailsBtn.addEventListener('click', showDetails);
+        const activeOverlay = modal.querySelector('.modal-overlay');
+        if (activeOverlay) {
+            activeOverlay.addEventListener('click', closeModal);
+        }
 
         // ESC-Taste zum Schließen
         const handleEsc = (e) => {
@@ -720,46 +731,17 @@ export const UIBinder = {
         modal.style.display = 'flex';
     },
 
-    _generateUpdateResultText(results) {
-        const duration = ((results.endTime - results.startTime) / 1000).toFixed(1);
-        let text = '===== Jahres-Update Protokoll =====\n';
-        text += `Zeitstempel: ${new Date(results.startTime).toLocaleString('de-DE')}\n`;
-        text += `Dauer: ${duration} Sekunden\n\n`;
-
-        if (results.inflation) {
-            text += `📊 INFLATION ${results.inflation.year}\n`;
-            text += `  Rate: ${results.inflation.rate.toFixed(1)}%\n`;
-            text += `  Quelle: ${results.inflation.source}\n`;
-            text += `  Status: Bedarfe automatisch angepasst\n\n`;
+    /**
+     * Öffnet das Ergebnis-Modal erneut, um das letzte gespeicherte Protokoll anzuzeigen.
+     * @returns {void}
+     */
+    handleShowUpdateLog() {
+        if (!lastUpdateResults) {
+            UIRenderer.toast('Noch kein Jahres-Update durchgeführt.');
+            return;
         }
 
-        if (results.etf) {
-            text += `📈 ETF-DATEN & MARKTDATEN-NACHRÜCKEN\n`;
-            text += `  Ticker: ${results.etf.ticker}\n`;
-            text += `  Kurs: ${results.etf.price} €\n`;
-            text += `  Datum: ${results.etf.date}\n`;
-            text += `  Quelle: ${results.etf.source}\n`;
-            if (results.etf.ath.isNew) {
-                text += `  🎯 Neues Allzeithoch! (alt: ${results.etf.ath.old} €)\n`;
-            } else {
-                text += `  ATH: ${results.etf.ath.new} € (Jahre seit ATH: ${results.etf.ath.yearsSince})\n`;
-            }
-            text += `  Status: Nachrücken erfolgreich\n\n`;
-        }
-
-        text += `🎂 ALTER\n`;
-        text += `  ${results.age.old} → ${results.age.new} Jahre\n\n`;
-
-        if (results.errors.length > 0) {
-            text += `❌ FEHLER\n`;
-            results.errors.forEach(err => {
-                text += `  ${err.step}: ${err.error}\n`;
-            });
-            text += '\n';
-        }
-
-        text += '===== Ende des Protokolls =====';
-        return text;
+        this.showUpdateResultModal(lastUpdateResults);
     },
 
     async _fetchVanguardETFPrice(targetDate) {
