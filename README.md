@@ -14,19 +14,18 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 ### Balance-App
 * Speichert Eingaben dauerhaft im `localStorage` und erzeugt auf Wunsch Dateisnapshots (File System Access API).
 * Importiert/Exportiert Portfolios als JSON und liest Marktdaten aus CSV-Dateien ein.
+* **Jahres-Update mit Online-Datenabruf:** Automatischer Abruf von Inflationsdaten (ECB, World Bank, OECD) und ETF-Kursen (VWCE.DE via Yahoo Finance/Finnhub), automatisches Nachrücken der Marktdaten und ATH-Update. Detailliertes Update-Protokoll zeigt Datenquellen und abgerufene Werte.
 * Nutzt die Engine v31 zur Marktanalyse, Entnahmeplanung und Liquiditätssteuerung.
 * Diagnoseansicht mit Guardrails, Entscheidungsbaum und Key-Performance-Parametern.
-* Tastenkürzel u. a. für Jahresabschluss (`Alt` + `J`), Import (`Alt` + `I`), Export (`Alt` + `E`) und Dark-Mode (`Alt` + `D`).
-* Debug-Modus (`Ctrl` + `Shift` + `D`) mit erweiterten Logs und Self-Tests.
+* Tastenkürzel u. a. für Jahresabschluss (`Alt` + `J`), Import (`Alt` + `I`), Export (`Alt` + `E`) und Marktdaten nachrücken (`Alt` + `N`).
 
 ### Simulator
 * Monte-Carlo-Simulationen mit unterschiedlichen Renditequellen (historisch, Regime, Block-Bootstrap).
 * Parameter-Sweep mit Whitelist-Ansatz, Deep-Clones und Wächterlogik für Zwei-Personen-Haushalte.
 * Stresstests, Pflegefall-Szenarien und Heatmap-Visualisierung inklusive Warnhinweisen.
-* Sweep-Schutz für Partner:innen-Renten inklusive Rente-2-Invarianz, Heatmap-Badges und Dev-Self-Tests für den Wächter.
+* Sweep-Schutz für Partner:innen-Renten inklusive Rente-2-Invarianz und Heatmap-Badges.
 * Szenario-Log-Analyse mit 30 auswählbaren Szenarien: 15 charakteristische (Perzentile, Pflege-Extremfälle, Risiko-Szenarien) und 15 zufällige Samples für typisches Verhalten.
 * Checkboxen für Pflege-Details und detailliertes Log, JSON/CSV-Export für ausgewählte Szenarien.
-* Dev-Modus (per Toggle oder `localStorage.setItem('sim.devMode', '1')`) mit Self-Test (`runSweepSelfTest`).
 
 #### Pflegegrad-Modellierung
 
@@ -97,8 +96,6 @@ Ruhestand-App-Final/
 ├── simulator.css               # Styling der Simulator-Oberfläche
 ├── TECHNICAL.md                # Technische Details & Architektur
 ├── BALANCE_MODULES_README.md   # Modulübersicht Balance-App
-├── TYPESCRIPT_MIGRATION_KONZEPT.md
-├── FEATURE_BRANCH_WORKFLOW.md
 └── ...                         # Weitere Hilfsdateien und Tests
 ```
 
@@ -125,13 +122,11 @@ Ruhestand-App-Final/
 * Die Balance- und Simulator-Module nutzen native ES6-Imports. Änderungen an einzelnen Modulen werden nach dem Speichern direkt beim nächsten Reload geladen.
 * Engine-Anpassungen erfolgen in den Modulen unter `engine/`. Nach Anpassungen `npm run build:engine` ausführen und die Größe der generierten `engine.js` kontrollieren.
 * Für schnelle QA bitte den Selftest `node sim-parity-smoketest.js` einmal durchlaufen lassen (entspricht `npm test`).
-* Debug-Modi über Tastenkombinationen oder lokale Storage-Flags aktivieren (`balance_debug_mode`, `sim.devMode`).
-* Für Tests der Parameter-Sweeps steht im Simulator-Dev-Modus `runSweepSelfTest()` bereit.
 
 ## Abschluss-Checkliste
 
 * **Dokumentation synchron halten:** Nach Engine-Änderungen oder neuen Simulator-Modulen (z. B. Monte-Carlo-Runner/UI/Analyzer) README, TECHNICAL.md und SIMULATOR_MODULES_README aktualisieren.
-* **Konsole sauber halten:** Vor dem Release auskommentierten Code und obsolet gewordene Debug-Logs entfernen bzw. hinter Dev-Toggles parken, damit Nutzer:innen keine Rauschen im Browser-Log sehen.
+* **Konsole sauber halten:** Vor dem Release auskommentierten Code entfernen, damit Nutzer:innen keine unnötigen Meldungen im Browser-Log sehen.
 
 ---
 
@@ -140,8 +135,6 @@ Ruhestand-App-Final/
 * **BALANCE_MODULES_README.md** – detaillierte Beschreibung der Balance-Module.
 * **SIMULATOR_MODULES_README.md** – aktuelle Modulübersicht (Monte-Carlo, Sweep, Backtest, UI-Pfade) inkl. Init-Funktionen und Platzierung neuer Helfer.
 * **TECHNICAL.md** – Architekturübersicht von Engine, Balance- und Simulator-Anwendung.
-* **TYPESCRIPT_MIGRATION_KONZEPT.md** – Plan für eine mögliche Migration auf TypeScript.
-* **FEATURE_BRANCH_WORKFLOW.md** – empfohlener Git-Workflow für umfangreiche Features.
 * **engine/README.md** – Detaildokumentation der Engine-Module und des Build-Prozesses.
 
 ---

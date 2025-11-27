@@ -20,3 +20,6 @@ Thumbs.db
 
 # Agent files
 .agent/
+
+# Python
+__pycache__/

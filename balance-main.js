@@ -6,7 +6,7 @@
  * ===================================================================================
  */
 
-import { CONFIG, REQUIRED_ENGINE_API_VERSION_PREFIX, DebugUtils } from './balance-config.js';
+import { CONFIG, REQUIRED_ENGINE_API_VERSION_PREFIX } from './balance-config.js';
 import { StorageManager, initStorageManager } from './balance-storage.js';
 import { UIReader, initUIReader } from './balance-reader.js';
 import { UIRenderer, initUIRenderer } from './balance-renderer.js';
@@ -112,12 +112,6 @@ function update() {
         const inputData = UIReader.readAllInputs();
         const persistentState = StorageManager.loadState();
 
-        // Debug-Logging (nur im Debug-Modus aktiv)
-        DebugUtils.log('UPDATE', 'Starting update cycle', {
-            inputs: inputData,
-            persistentState: persistentState
-        });
-
         // 2. Render Bedarfsanpassungs-UI
         // Zeigt Button für Inflationsanpassung, wenn das Alter sich geändert hat
         UIRenderer.renderBedarfAnpassungUI(inputData, persistentState);
@@ -129,8 +123,6 @@ function update() {
         // Input: Benutzereingaben + letzter State
         // Output: {input, newState, diagnosis, ui} oder {error}
         const modelResult = window.EngineAPI.simulateSingleYear(inputData, persistentState.lastState);
-
-        DebugUtils.log('ENGINE', 'Engine simulation result', modelResult);
 
         // 4. Handle Engine Response
         // Bei Fehler: Exception werfen für einheitliches Error-Handling
@@ -161,16 +153,11 @@ function update() {
         appState.diagnosisData = formattedDiagnosis;
         UIRenderer.renderDiagnosis(appState.diagnosisData);
 
-        DebugUtils.log('DIAGNOSIS', 'Diagnosis data', appState.diagnosisData);
-
         // Speichert Eingaben und neuen Zustand in localStorage
         StorageManager.saveState({ ...persistentState, inputs: inputData, lastState: modelResult.newState });
 
-        DebugUtils.log('UPDATE', 'Update cycle completed successfully');
-
     } catch (error) {
         console.error("Update-Fehler:", error);
-        DebugUtils.log('ERROR', 'Update failed', error);
         UIRenderer.handleError(error);
     }
 }
@@ -268,11 +255,7 @@ function init() {
         return;
     }
 
-    // 2. Initialize Debug Mode
-    // Prüft localStorage: 'balance.debugMode' = '1' oder Query-Parameter ?debug=1
-    const isDebugMode = DebugUtils.initDebugMode();
-
-    // 3. Populate DOM inputs
+    // 2. Populate DOM inputs
     // Sammelt alle input/select-Elemente mit ID in dom.inputs{}
     document.querySelectorAll('input, select').forEach(el => {
         if(el.id) dom.inputs[el.id] = el;
@@ -298,23 +281,13 @@ function init() {
     // Registriert alle Event-Listener (input, change, click, keyboard shortcuts)
     UIBinder.bindUI();
 
-    // 8. Update Debug UI
-    // Zeigt Debug-Indikator an, wenn Debug-Modus aktiv
-    if (isDebugMode) {
-        const debugIndicator = document.getElementById('debugModeIndicator');
-        if (debugIndicator) {
-            debugIndicator.style.display = 'flex';
-        }
-        DebugUtils.log('INIT', 'Balance App initialized in Debug Mode');
-    }
-
-    // 10. Initialize snapshots
+    // 8. Initialize snapshots
     // Prüft ob File System API verfügbar ist und lädt Snapshot-Liste
     StorageManager.initSnapshots().then(() => {
         StorageManager.renderSnapshots(dom.outputs.snapshotList, dom.controls.snapshotStatus, appState.snapshotHandle);
     });
 
-    // 11. Initial update
+    // 9. Initial update
     // Führt ersten Berechnungs- und Render-Zyklus durch
     update();
 }
