@@ -514,6 +514,10 @@ export const UIBinder = {
             btn.innerHTML = '⏳ ETF...';
             await this.handleNachrueckenMitETF();
 
+            // Schritt 3: Alter um 1 Jahr erhöhen (ein Jahr ist vergangen)
+            const currentAge = parseInt(dom.inputs.aktuellesAlter.value) || 0;
+            dom.inputs.aktuellesAlter.value = (currentAge + 1).toString();
+
             UIRenderer.toast('✅ Jahres-Update erfolgreich abgeschlossen!');
 
         } catch (err) {
