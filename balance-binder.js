@@ -363,7 +363,9 @@ export const UIBinder = {
             const currentYear = new Date().getFullYear();
             const previousYear = currentYear - 1;
 
-            UIRenderer.toast(`Versuche Inflationsdaten für ${previousYear} abzurufen...`);
+            if (btn) {
+                UIRenderer.toast(`Versuche Inflationsdaten für ${previousYear} abzurufen...`);
+            }
 
             // Versuche verschiedene APIs nacheinander
             let inflationRate = null;
@@ -465,7 +467,16 @@ export const UIBinder = {
                 // Automatisch Bedarfe anpassen
                 this._applyInflationToBedarfe();
 
-                UIRenderer.toast(`✅ Inflation ${previousYear}: ${inflationRate.toFixed(1)}% (Quelle: ${source})\nBedarfe automatisch angepasst`);
+                if (btn) {
+                    UIRenderer.toast(`✅ Inflation ${previousYear}: ${inflationRate.toFixed(1)}% (Quelle: ${source})\nBedarfe automatisch angepasst`);
+                }
+
+                // Rückgabe für Jahres-Update Modal
+                return {
+                    rate: inflationRate,
+                    year: previousYear,
+                    source: source
+                };
             } else {
                 // Keine Daten gefunden - detailliertes Feedback
                 throw new AppError(
@@ -485,6 +496,7 @@ export const UIBinder = {
         } catch (err) {
             console.error('Inflation API Fehler:', err);
             UIRenderer.handleError(new AppError('Inflationsdaten-Abruf fehlgeschlagen.', { originalError: err }));
+            throw err; // Re-throw für Jahres-Update
         } finally {
             if (btn) {
                 btn.disabled = false;
@@ -496,6 +508,16 @@ export const UIBinder = {
     async handleJahresUpdate() {
         const btn = dom.controls.btnJahresUpdate;
         const originalText = btn.innerHTML;
+        const startTime = Date.now();
+
+        // Results-Objekt für Modal
+        const results = {
+            startTime: startTime,
+            inflation: null,
+            etf: null,
+            age: { old: parseInt(dom.inputs.aktuellesAlter.value) || 0, new: 0 },
+            errors: []
+        };
 
         try {
             btn.disabled = true;
@@ -505,20 +527,32 @@ export const UIBinder = {
 
             // Schritt 1: Inflation abrufen
             btn.innerHTML = '⏳ Inflation...';
-            await this.handleFetchInflation();
+            try {
+                results.inflation = await this.handleFetchInflation();
+            } catch (err) {
+                results.errors.push({ step: 'Inflation', error: err.message || 'Unbekannter Fehler' });
+            }
 
             // Kurze Pause für besseres UX
             await new Promise(resolve => setTimeout(resolve, 500));
 
             // Schritt 2: ETF-Daten abrufen + Nachrücken + ATH
             btn.innerHTML = '⏳ ETF...';
-            await this.handleNachrueckenMitETF();
+            try {
+                results.etf = await this.handleNachrueckenMitETF();
+            } catch (err) {
+                results.errors.push({ step: 'ETF & Nachrücken', error: err.message || 'Unbekannter Fehler' });
+            }
 
             // Schritt 3: Alter um 1 Jahr erhöhen (ein Jahr ist vergangen)
             const currentAge = parseInt(dom.inputs.aktuellesAlter.value) || 0;
             dom.inputs.aktuellesAlter.value = (currentAge + 1).toString();
+            results.age.new = currentAge + 1;
 
-            UIRenderer.toast('✅ Jahres-Update erfolgreich abgeschlossen!');
+            results.endTime = Date.now();
+
+            // Zeige Modal mit Ergebnissen
+            this.showUpdateResultModal(results);
 
         } catch (err) {
             console.error('Jahres-Update fehlgeschlagen:', err);
@@ -527,6 +561,205 @@ export const UIBinder = {
             btn.disabled = false;
             btn.innerHTML = originalText;
         }
+    },
+
+    showUpdateResultModal(results) {
+        const modal = document.getElementById('updateResultModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalResults = document.getElementById('modalResults');
+        const modalDuration = document.getElementById('modalDuration');
+        const modalCopyBtn = document.getElementById('modalCopyBtn');
+        const modalDetailsBtn = document.getElementById('modalDetailsBtn');
+        const modalCloseBtn = document.getElementById('modalCloseBtn');
+        const closeX = modal.querySelector('.modal-close');
+
+        if (!modal) {
+            console.error('Modal Element nicht gefunden!');
+            return;
+        }
+
+        // Berechne Dauer
+        const duration = results.endTime - results.startTime;
+        const durationSeconds = (duration / 1000).toFixed(1);
+
+        // Bestimme Titel basierend auf Erfolg/Fehler
+        const hasErrors = results.errors.length > 0;
+        const allFailed = results.errors.length === 2; // Inflation + ETF beide fehlgeschlagen
+
+        if (allFailed) {
+            modalTitle.innerHTML = '❌ Jahres-Update fehlgeschlagen';
+        } else if (hasErrors) {
+            modalTitle.innerHTML = '⚠️ Jahres-Update teilweise erfolgreich';
+        } else {
+            modalTitle.innerHTML = '✅ Jahres-Update erfolgreich';
+        }
+
+        // Baue Ergebnis-HTML
+        let html = '';
+
+        // Inflation
+        if (results.inflation) {
+            html += `
+                <div class="modal-result-item success">
+                    <div class="result-icon">📊</div>
+                    <div class="result-content">
+                        <div class="result-title">Inflation ${results.inflation.year}</div>
+                        <div class="result-value">${results.inflation.rate.toFixed(1)}%</div>
+                        <div class="result-details">Quelle: ${results.inflation.source} • Bedarfe automatisch angepasst</div>
+                    </div>
+                </div>
+            `;
+        } else if (results.errors.find(e => e.step === 'Inflation')) {
+            const error = results.errors.find(e => e.step === 'Inflation');
+            html += `
+                <div class="modal-result-item error">
+                    <div class="result-icon">❌</div>
+                    <div class="result-content">
+                        <div class="result-title">Inflation</div>
+                        <div class="result-value">Fehler</div>
+                        <div class="result-details">${error.error}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ETF & Marktdaten
+        if (results.etf) {
+            const athIcon = results.etf.ath.isNew ? '🎯' : '📈';
+            const athText = results.etf.ath.isNew
+                ? `Neues Allzeithoch! (alt: ${results.etf.ath.old} €)`
+                : `ATH: ${results.etf.ath.new} € • Jahre seit ATH: ${results.etf.ath.yearsSince}`;
+
+            html += `
+                <div class="modal-result-item success">
+                    <div class="result-icon">${athIcon}</div>
+                    <div class="result-content">
+                        <div class="result-title">${results.etf.ticker} • Nachrücken durchgeführt</div>
+                        <div class="result-value">${results.etf.price} €</div>
+                        <div class="result-details">Stand: ${results.etf.date} • Quelle: ${results.etf.source}<br>${athText}</div>
+                    </div>
+                </div>
+            `;
+        } else if (results.errors.find(e => e.step === 'ETF & Nachrücken')) {
+            const error = results.errors.find(e => e.step === 'ETF & Nachrücken');
+            html += `
+                <div class="modal-result-item error">
+                    <div class="result-icon">❌</div>
+                    <div class="result-content">
+                        <div class="result-title">ETF & Nachrücken</div>
+                        <div class="result-value">Fehler</div>
+                        <div class="result-details">${error.error}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Alter
+        html += `
+            <div class="modal-result-item success">
+                <div class="result-icon">🎂</div>
+                <div class="result-content">
+                    <div class="result-title">Aktuelles Alter</div>
+                    <div class="result-value">${results.age.old} → ${results.age.new} Jahre</div>
+                    <div class="result-details">Ein weiteres Jahr ist vergangen</div>
+                </div>
+            </div>
+        `;
+
+        modalResults.innerHTML = html;
+        modalDuration.innerHTML = `⏱️ Dauer: ${durationSeconds} Sekunden`;
+
+        // Event Handler für Schließen
+        const closeModal = () => {
+            modal.style.display = 'none';
+        };
+
+        // Event Handler für Kopieren
+        const copyResults = () => {
+            const text = this._generateUpdateResultText(results);
+            navigator.clipboard.writeText(text).then(() => {
+                UIRenderer.toast('📋 Details in Zwischenablage kopiert');
+            });
+        };
+
+        // Event Handler für Details (öffnet Diagnose-Panel)
+        const showDetails = () => {
+            closeModal();
+            // Öffne Diagnose-Panel
+            dom.diagnosis.drawer.classList.add('is-open');
+            dom.diagnosis.overlay.classList.add('is-open');
+        };
+
+        // Entferne alte Event Listener (falls vorhanden)
+        const newCloseBtn = modalCloseBtn.cloneNode(true);
+        const newCloseX = closeX.cloneNode(true);
+        const newCopyBtn = modalCopyBtn.cloneNode(true);
+        const newDetailsBtn = modalDetailsBtn.cloneNode(true);
+
+        modalCloseBtn.parentNode.replaceChild(newCloseBtn, modalCloseBtn);
+        closeX.parentNode.replaceChild(newCloseX, closeX);
+        modalCopyBtn.parentNode.replaceChild(newCopyBtn, modalCopyBtn);
+        modalDetailsBtn.parentNode.replaceChild(newDetailsBtn, modalDetailsBtn);
+
+        // Neue Event Listener
+        newCloseBtn.addEventListener('click', closeModal);
+        newCloseX.addEventListener('click', closeModal);
+        newCopyBtn.addEventListener('click', copyResults);
+        newDetailsBtn.addEventListener('click', showDetails);
+
+        // ESC-Taste zum Schließen
+        const handleEsc = (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+                document.removeEventListener('keydown', handleEsc);
+            }
+        };
+        document.addEventListener('keydown', handleEsc);
+
+        // Zeige Modal
+        modal.style.display = 'flex';
+    },
+
+    _generateUpdateResultText(results) {
+        const duration = ((results.endTime - results.startTime) / 1000).toFixed(1);
+        let text = '===== Jahres-Update Protokoll =====\n';
+        text += `Zeitstempel: ${new Date(results.startTime).toLocaleString('de-DE')}\n`;
+        text += `Dauer: ${duration} Sekunden\n\n`;
+
+        if (results.inflation) {
+            text += `📊 INFLATION ${results.inflation.year}\n`;
+            text += `  Rate: ${results.inflation.rate.toFixed(1)}%\n`;
+            text += `  Quelle: ${results.inflation.source}\n`;
+            text += `  Status: Bedarfe automatisch angepasst\n\n`;
+        }
+
+        if (results.etf) {
+            text += `📈 ETF-DATEN & MARKTDATEN-NACHRÜCKEN\n`;
+            text += `  Ticker: ${results.etf.ticker}\n`;
+            text += `  Kurs: ${results.etf.price} €\n`;
+            text += `  Datum: ${results.etf.date}\n`;
+            text += `  Quelle: ${results.etf.source}\n`;
+            if (results.etf.ath.isNew) {
+                text += `  🎯 Neues Allzeithoch! (alt: ${results.etf.ath.old} €)\n`;
+            } else {
+                text += `  ATH: ${results.etf.ath.new} € (Jahre seit ATH: ${results.etf.ath.yearsSince})\n`;
+            }
+            text += `  Status: Nachrücken erfolgreich\n\n`;
+        }
+
+        text += `🎂 ALTER\n`;
+        text += `  ${results.age.old} → ${results.age.new} Jahre\n\n`;
+
+        if (results.errors.length > 0) {
+            text += `❌ FEHLER\n`;
+            results.errors.forEach(err => {
+                text += `  ${err.step}: ${err.error}\n`;
+            });
+            text += '\n';
+        }
+
+        text += '===== Ende des Protokolls =====';
+        return text;
     },
 
     async _fetchVanguardETFPrice(targetDate) {
@@ -675,7 +908,9 @@ export const UIBinder = {
             const currentYear = new Date().getFullYear();
             const targetDate = new Date(currentYear, 0, 31); // Monat 0 = Januar
 
-            UIRenderer.toast(`Rufe VWCE.DE Kurs vom 31.01.${currentYear} ab...`);
+            if (btn) {
+                UIRenderer.toast(`Rufe VWCE.DE Kurs vom 31.01.${currentYear} ab...`);
+            }
 
             // 1. ETF-Kurs abrufen
             const etfData = await this._fetchVanguardETFPrice(targetDate);
@@ -687,7 +922,10 @@ export const UIBinder = {
                 btn.innerHTML = '⏳ Nachr...';
             }
 
-            // Speichere alte Werte für Undo
+            // Speichere alte Werte für Undo und Rückgabe
+            const oldATH = parseFloat(dom.inputs.ath.value) || 0;
+            const oldJahreSeitAth = parseInt(dom.inputs.jahreSeitAth.value) || 0;
+
             appState.lastMarktData = {
                 endeVJ: dom.inputs.endeVJ.value,
                 endeVJ_1: dom.inputs.endeVJ_1.value,
@@ -707,17 +945,23 @@ export const UIBinder = {
             dom.inputs.endeVJ.value = etfPrice.toString();
 
             // 4. ATH-Logik anwenden
-            const currentATH = parseFloat(dom.inputs.ath.value) || 0;
+            const currentATH = oldATH;
             const newValue = etfPrice;
-            const previousJahreSeitAth = parseInt(dom.inputs.jahreSeitAth.value) || 0;
+            const previousJahreSeitAth = oldJahreSeitAth;
+
+            let isNewATH = false;
+            let newJahreSeitAth = previousJahreSeitAth;
 
             if (newValue > currentATH) {
                 // Neues Allzeithoch!
                 dom.inputs.ath.value = etfPrice.toString();
                 dom.inputs.jahreSeitAth.value = '0';
+                isNewATH = true;
+                newJahreSeitAth = 0;
             } else {
                 // Kein neues ATH → Jahre erhöhen
-                dom.inputs.jahreSeitAth.value = (previousJahreSeitAth + 1).toString();
+                newJahreSeitAth = previousJahreSeitAth + 1;
+                dom.inputs.jahreSeitAth.value = newJahreSeitAth.toString();
             }
 
             // 5. Inflation anwenden
@@ -728,18 +972,35 @@ export const UIBinder = {
             dom.controls.btnUndoNachruecken.style.display = 'inline-flex';
 
             const usedDate = etfData.date.toLocaleDateString('de-DE');
-            const athStatus = newValue > currentATH ? '🎯 Neues ATH!' : `Jahre seit ATH: ${previousJahreSeitAth + 1}`;
+            const athStatus = isNewATH ? '🎯 Neues ATH!' : `Jahre seit ATH: ${newJahreSeitAth}`;
 
-            UIRenderer.toast(
-                `✅ Nachrücken mit ETF abgeschlossen!\n` +
-                `VWCE.DE: ${etfPrice} € (${usedDate})\n` +
-                `Quelle: ${etfData.source}\n` +
-                `${athStatus}`
-            );
+            if (btn) {
+                UIRenderer.toast(
+                    `✅ Nachrücken mit ETF abgeschlossen!\n` +
+                    `VWCE.DE: ${etfPrice} € (${usedDate})\n` +
+                    `Quelle: ${etfData.source}\n` +
+                    `${athStatus}`
+                );
+            }
+
+            // Rückgabe für Jahres-Update Modal
+            return {
+                price: etfPrice,
+                date: usedDate,
+                ticker: etfData.ticker,
+                source: etfData.source,
+                ath: {
+                    old: oldATH,
+                    new: isNewATH ? etfPrice : oldATH,
+                    isNew: isNewATH,
+                    yearsSince: newJahreSeitAth
+                }
+            };
 
         } catch (err) {
             console.error('Nachrücken mit ETF fehlgeschlagen:', err);
             UIRenderer.handleError(err);
+            throw err; // Re-throw für Jahres-Update
         } finally {
             if (btn) {
                 btn.disabled = false;
