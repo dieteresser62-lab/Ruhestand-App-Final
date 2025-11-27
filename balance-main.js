@@ -47,6 +47,7 @@ const dom = {
         importBtn: document.getElementById('importBtn'),
         importFile: document.getElementById('importFile'),
         btnNachruecken: document.getElementById('btnNachruecken'),
+        btnNachrueckenMitETF: document.getElementById('btnNachrueckenMitETF'),
         btnUndoNachruecken: document.getElementById('btnUndoNachruecken'),
         btnCsvImport: document.getElementById('btnCsvImport'),
         csvFileInput: document.getElementById('csvFileInput'),

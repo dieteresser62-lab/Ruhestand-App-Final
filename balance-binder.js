@@ -49,6 +49,7 @@ export const UIBinder = {
         });
         dom.containers.bedarfAnpassung.addEventListener('click', this.handleBedarfAnpassungClick.bind(this));
         dom.controls.btnNachruecken.addEventListener('click', this.handleNachruecken.bind(this));
+        dom.controls.btnNachrueckenMitETF.addEventListener('click', this.handleNachrueckenMitETF.bind(this));
         dom.controls.btnUndoNachruecken.addEventListener('click', this.handleUndoNachruecken.bind(this));
         dom.controls.exportBtn.addEventListener('click', this.handleExport.bind(this));
         dom.controls.importBtn.addEventListener('click', () => dom.controls.importFile.click());
@@ -474,6 +475,167 @@ export const UIBinder = {
         } catch (err) {
             console.error('Inflation API Fehler:', err);
             UIRenderer.handleError(new AppError('Inflationsdaten-Abruf fehlgeschlagen.', { originalError: err }));
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    },
+
+    async _fetchVanguardETFPrice(targetDate) {
+        // Versuche mehrere Yahoo Finance Endpoints mit Fallback
+        const ticker = 'VWCE.DE'; // Vanguard FTSE All-World in EUR (Xetra)
+
+        // Yahoo Finance API v8 - Historical data
+        const formatDate = (date) => Math.floor(date.getTime() / 1000); // Unix timestamp
+
+        // Starte am Zieldatum und gehe max. 10 Tage zurück (für Wochenenden/Feiertage)
+        const targetTime = formatDate(targetDate);
+        const startDate = new Date(targetDate);
+        startDate.setDate(startDate.getDate() - 10); // 10 Tage zurück als Puffer
+        const startTime = formatDate(startDate);
+
+        try {
+            // Yahoo Finance v8 API - keine CORS-Probleme
+            const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${startTime}&period2=${targetTime}&interval=1d`;
+
+            console.log(`Rufe ETF-Daten ab für ${ticker} bis ${targetDate.toLocaleDateString('de-DE')}...`);
+            console.log('URL:', url);
+
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                throw new Error(`Yahoo Finance API Fehler: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('Yahoo Finance Response:', data);
+
+            if (!data.chart || !data.chart.result || data.chart.result.length === 0) {
+                throw new Error('Keine Daten von Yahoo Finance erhalten');
+            }
+
+            const result = data.chart.result[0];
+            const timestamps = result.timestamp;
+            const quotes = result.indicators.quote[0];
+
+            if (!timestamps || !quotes || !quotes.close) {
+                throw new Error('Ungültige Datenstruktur von Yahoo Finance');
+            }
+
+            // Finde den letzten verfügbaren Schlusskurs (arbeite rückwärts vom Zieldatum)
+            let closestPrice = null;
+            let closestDate = null;
+
+            for (let i = timestamps.length - 1; i >= 0; i--) {
+                const price = quotes.close[i];
+                if (price !== null && !isNaN(price)) {
+                    closestPrice = price;
+                    closestDate = new Date(timestamps[i] * 1000);
+                    break;
+                }
+            }
+
+            if (closestPrice === null) {
+                throw new Error('Keine gültigen Schlusskurse gefunden');
+            }
+
+            return {
+                price: closestPrice,
+                date: closestDate,
+                ticker: ticker
+            };
+
+        } catch (err) {
+            console.error('ETF-Abruf fehlgeschlagen:', err);
+            throw new AppError(
+                `ETF-Daten konnten nicht abgerufen werden.\n\n` +
+                `Ticker: ${ticker}\n` +
+                `Zieldatum: ${targetDate.toLocaleDateString('de-DE')}\n\n` +
+                `Mögliche Ursachen:\n` +
+                `• Netzwerkfehler oder API nicht erreichbar\n` +
+                `• CORS-Blockierung durch Browser\n` +
+                `• Ticker-Symbol falsch oder geändert\n\n` +
+                `Fehler: ${err.message}\n\n` +
+                `💡 Tipp: Öffne die Browser-Konsole (F12) für Details.`,
+                { originalError: err }
+            );
+        }
+    },
+
+    async handleNachrueckenMitETF() {
+        const btn = dom.controls.btnNachrueckenMitETF;
+        const originalText = btn.innerHTML;
+
+        try {
+            btn.disabled = true;
+            btn.innerHTML = '⏳ ETF...';
+
+            // Berechne Zieldatum: 31.01. des aktuellen Jahres
+            const currentYear = new Date().getFullYear();
+            const targetDate = new Date(currentYear, 0, 31); // Monat 0 = Januar
+
+            UIRenderer.toast(`Rufe VWCE.DE Kurs vom 31.01.${currentYear} ab...`);
+
+            // 1. ETF-Kurs abrufen
+            const etfData = await this._fetchVanguardETFPrice(targetDate);
+
+            console.log('ETF-Daten abgerufen:', etfData);
+
+            // 2. Nachrücken durchführen (bestehende Logik)
+            btn.innerHTML = '⏳ Nachr...';
+
+            // Speichere alte Werte für Undo
+            appState.lastMarktData = {
+                endeVJ: dom.inputs.endeVJ.value,
+                endeVJ_1: dom.inputs.endeVJ_1.value,
+                endeVJ_2: dom.inputs.endeVJ_2.value,
+                endeVJ_3: dom.inputs.endeVJ_3.value,
+                ath: dom.inputs.ath.value,
+                jahreSeitAth: dom.inputs.jahreSeitAth.value
+            };
+
+            // Verschiebe die Werte
+            dom.inputs.endeVJ_3.value = dom.inputs.endeVJ_2.value;
+            dom.inputs.endeVJ_2.value = dom.inputs.endeVJ_1.value;
+            dom.inputs.endeVJ_1.value = dom.inputs.endeVJ.value;
+
+            // 3. Neuen ETF-Wert in Ende VJ eintragen
+            const etfPrice = etfData.price.toFixed(2);
+            dom.inputs.endeVJ.value = etfPrice;
+
+            // 4. ATH-Logik anwenden
+            const currentATH = parseFloat(dom.inputs.ath.value) || 0;
+            const newValue = parseFloat(etfPrice);
+            const previousJahreSeitAth = parseFloat(dom.inputs.jahreSeitAth.value) || 0;
+
+            if (newValue > currentATH) {
+                // Neues Allzeithoch!
+                dom.inputs.ath.value = etfPrice;
+                dom.inputs.jahreSeitAth.value = '0';
+            } else {
+                // Kein neues ATH → Jahre erhöhen
+                dom.inputs.jahreSeitAth.value = (previousJahreSeitAth + 1).toString();
+            }
+
+            // 5. Inflation anwenden
+            this._applyAnnualInflation();
+
+            // 6. Update und Feedback
+            debouncedUpdate();
+            dom.controls.btnUndoNachruecken.style.display = 'inline-flex';
+
+            const usedDate = etfData.date.toLocaleDateString('de-DE');
+            const athStatus = newValue > currentATH ? '🎯 Neues ATH!' : `Jahre seit ATH: ${previousJahreSeitAth + 1}`;
+
+            UIRenderer.toast(
+                `✅ Nachrücken mit ETF abgeschlossen!\n` +
+                `VWCE.DE: ${etfPrice} € (${usedDate})\n` +
+                `${athStatus}`
+            );
+
+        } catch (err) {
+            console.error('Nachrücken mit ETF fehlgeschlagen:', err);
+            UIRenderer.handleError(err);
         } finally {
             btn.disabled = false;
             btn.innerHTML = originalText;
