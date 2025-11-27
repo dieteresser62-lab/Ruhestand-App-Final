@@ -50,6 +50,7 @@ const dom = {
         btnUndoNachruecken: document.getElementById('btnUndoNachruecken'),
         btnCsvImport: document.getElementById('btnCsvImport'),
         csvFileInput: document.getElementById('csvFileInput'),
+        btnFetchInflation: document.getElementById('btnFetchInflation'),
         copyAction: document.getElementById('copyAction'),
         resetBtn: document.getElementById('resetBtn'),
         jahresabschlussBtn: document.getElementById('jahresabschlussBtn'),

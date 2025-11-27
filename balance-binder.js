@@ -55,6 +55,7 @@ export const UIBinder = {
         dom.controls.importFile.addEventListener('change', this.handleImport.bind(this));
         dom.controls.btnCsvImport.addEventListener('click', () => dom.controls.csvFileInput.click());
         dom.controls.csvFileInput.addEventListener('change', this.handleCsvImport.bind(this));
+        dom.controls.btnFetchInflation.addEventListener('click', this.handleFetchInflation.bind(this));
         dom.controls.jahresabschlussBtn.addEventListener('click', this.handleJahresabschluss.bind(this));
         dom.controls.connectFolderBtn.addEventListener('click', () => {
             try { StorageManager.connectFolder(); }
@@ -339,6 +340,143 @@ export const UIBinder = {
             UIRenderer.handleError(new AppError('CSV-Import fehlgeschlagen.', { originalError: err }));
         } finally {
             e.target.value = '';
+        }
+    },
+
+    async handleFetchInflation() {
+        const btn = dom.controls.btnFetchInflation;
+        const originalText = btn.innerHTML;
+
+        try {
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Lade...';
+
+            // Berechne das Vorjahr
+            const currentYear = new Date().getFullYear();
+            const previousYear = currentYear - 1;
+
+            UIRenderer.toast(`Versuche Inflationsdaten für ${previousYear} abzurufen...`);
+
+            // Versuche verschiedene APIs nacheinander
+            let inflationRate = null;
+            let source = '';
+
+            // API 1: ECB Statistical Data Warehouse (HICP - Harmonized Index of Consumer Prices)
+            // Deutschland: DEU, HICP All-items, Annual rate of change
+            try {
+                console.log('Versuche ECB API...');
+                const ecbUrl = `https://data-api.ecb.europa.eu/service/data/ICP/M.DE.N.000000.4.ANR`;
+                const ecbResponse = await fetch(ecbUrl, {
+                    headers: { 'Accept': 'application/json' }
+                });
+
+                if (ecbResponse.ok) {
+                    const ecbData = await ecbResponse.json();
+                    console.log('ECB Response:', ecbData);
+
+                    // Durchsuche die Zeitreihe nach dem Vorjahr
+                    if (ecbData.dataSets && ecbData.dataSets[0] && ecbData.dataSets[0].series) {
+                        const series = Object.values(ecbData.dataSets[0].series)[0];
+                        if (series && series.observations) {
+                            // Finde die neuesten verfügbaren Daten
+                            const observations = Object.entries(series.observations);
+                            if (observations.length > 0) {
+                                // Nimm den neuesten Wert
+                                const latestObs = observations[observations.length - 1];
+                                inflationRate = parseFloat(latestObs[1][0]);
+                                source = 'ECB (HICP)';
+                            }
+                        }
+                    }
+                }
+            } catch (ecbErr) {
+                console.warn('ECB API fehlgeschlagen:', ecbErr);
+            }
+
+            // API 2: World Bank API (Alternative)
+            if (inflationRate === null) {
+                try {
+                    console.log('Versuche World Bank API...');
+                    const wbUrl = `https://api.worldbank.org/v2/country/DE/indicator/FP.CPI.TOTL.ZG?format=json&date=${previousYear}`;
+                    const wbResponse = await fetch(wbUrl);
+
+                    if (wbResponse.ok) {
+                        const wbData = await wbResponse.json();
+                        console.log('World Bank Response:', wbData);
+
+                        if (wbData && wbData[1] && wbData[1].length > 0 && wbData[1][0].value !== null) {
+                            inflationRate = parseFloat(wbData[1][0].value);
+                            source = 'World Bank';
+                        }
+                    }
+                } catch (wbErr) {
+                    console.warn('World Bank API fehlgeschlagen:', wbErr);
+                }
+            }
+
+            // API 3: OECD API (Alternative)
+            if (inflationRate === null) {
+                try {
+                    console.log('Versuche OECD API...');
+                    const oecdUrl = `https://stats.oecd.org/sdmx-json/data/DP_LIVE/.CPI.../OECD?contentType=json&detail=code&separator=.&dimensionAtObservation=allDimensions&startPeriod=${previousYear}&endPeriod=${previousYear}`;
+                    const oecdResponse = await fetch(oecdUrl);
+
+                    if (oecdResponse.ok) {
+                        const oecdData = await oecdResponse.json();
+                        console.log('OECD Response:', oecdData);
+
+                        // Suche Deutschland in den Daten
+                        if (oecdData.dataSets && oecdData.dataSets[0] && oecdData.dataSets[0].observations) {
+                            // OECD Datenstruktur ist komplex, durchsuche nach DEU
+                            const observations = oecdData.dataSets[0].observations;
+                            for (const [key, value] of Object.entries(observations)) {
+                                // Prüfe ob das Deutschland ist
+                                const indices = key.split(':');
+                                if (oecdData.structure && oecdData.structure.dimensions) {
+                                    const locationDim = oecdData.structure.dimensions.observation.find(d => d.id === 'LOCATION');
+                                    if (locationDim && locationDim.values[parseInt(indices[0])].id === 'DEU') {
+                                        inflationRate = parseFloat(value[0]);
+                                        source = 'OECD';
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (oecdErr) {
+                    console.warn('OECD API fehlgeschlagen:', oecdErr);
+                }
+            }
+
+            // Ergebnis verarbeiten
+            if (inflationRate !== null && !isNaN(inflationRate) && isFinite(inflationRate)) {
+                // Setze den Wert im Eingabefeld
+                dom.inputs.inflation.value = inflationRate.toFixed(1);
+                debouncedUpdate();
+
+                UIRenderer.toast(`✅ Inflation ${previousYear}: ${inflationRate.toFixed(1)}% (Quelle: ${source})`);
+            } else {
+                // Keine Daten gefunden - detailliertes Feedback
+                throw new AppError(
+                    `Keine Inflationsdaten für ${previousYear} gefunden.\n\n` +
+                    `🔍 Getestete APIs:\n` +
+                    `• ECB Statistical Data Warehouse\n` +
+                    `• World Bank Data API\n` +
+                    `• OECD Statistics API\n\n` +
+                    `Mögliche Ursachen:\n` +
+                    `• CORS-Blockierung durch Browser\n` +
+                    `• Daten für ${previousYear} noch nicht verfügbar\n` +
+                    `• API-Endpoints haben sich geändert\n\n` +
+                    `💡 Tipp: Öffne die Browser-Konsole (F12) für Details.`
+                );
+            }
+
+        } catch (err) {
+            console.error('Inflation API Fehler:', err);
+            UIRenderer.handleError(new AppError('Inflationsdaten-Abruf fehlgeschlagen.', { originalError: err }));
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
         }
     },
 
