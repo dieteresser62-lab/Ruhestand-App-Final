@@ -482,84 +482,135 @@ export const UIBinder = {
     },
 
     async _fetchVanguardETFPrice(targetDate) {
-        // Versuche mehrere Yahoo Finance Endpoints mit Fallback
         const ticker = 'VWCE.DE'; // Vanguard FTSE All-World in EUR (Xetra)
+        const isin = 'IE00BK5BQT80'; // ISIN für alternative APIs
 
-        // Yahoo Finance API v8 - Historical data
         const formatDate = (date) => Math.floor(date.getTime() / 1000); // Unix timestamp
+        const formatDateYMD = (date) => date.toISOString().split('T')[0]; // YYYY-MM-DD
 
         // Starte am Zieldatum und gehe max. 10 Tage zurück (für Wochenenden/Feiertage)
         const targetTime = formatDate(targetDate);
         const startDate = new Date(targetDate);
-        startDate.setDate(startDate.getDate() - 10); // 10 Tage zurück als Puffer
+        startDate.setDate(startDate.getDate() - 10);
         const startTime = formatDate(startDate);
 
+        console.log(`Rufe ETF-Daten ab für ${ticker} bis ${targetDate.toLocaleDateString('de-DE')}...`);
+
+        // Strategie 1: Yahoo Finance über CORS-Proxy (allorigins.win)
         try {
-            // Yahoo Finance v8 API - keine CORS-Probleme
-            const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${startTime}&period2=${targetTime}&interval=1d`;
+            console.log('Versuch 1: Yahoo Finance über CORS-Proxy (allorigins.win)...');
+            const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${startTime}&period2=${targetTime}&interval=1d`;
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`;
 
-            console.log(`Rufe ETF-Daten ab für ${ticker} bis ${targetDate.toLocaleDateString('de-DE')}...`);
-            console.log('URL:', url);
+            console.log('Proxy URL:', proxyUrl);
+            const response = await fetch(proxyUrl);
 
-            const response = await fetch(url);
+            if (response.ok) {
+                const data = await response.json();
+                console.log('Yahoo Finance Response (via Proxy):', data);
 
-            if (!response.ok) {
-                throw new Error(`Yahoo Finance API Fehler: ${response.status}`);
-            }
+                if (data.chart?.result?.[0]) {
+                    const result = data.chart.result[0];
+                    const timestamps = result.timestamp;
+                    const quotes = result.indicators.quote[0];
 
-            const data = await response.json();
-            console.log('Yahoo Finance Response:', data);
-
-            if (!data.chart || !data.chart.result || data.chart.result.length === 0) {
-                throw new Error('Keine Daten von Yahoo Finance erhalten');
-            }
-
-            const result = data.chart.result[0];
-            const timestamps = result.timestamp;
-            const quotes = result.indicators.quote[0];
-
-            if (!timestamps || !quotes || !quotes.close) {
-                throw new Error('Ungültige Datenstruktur von Yahoo Finance');
-            }
-
-            // Finde den letzten verfügbaren Schlusskurs (arbeite rückwärts vom Zieldatum)
-            let closestPrice = null;
-            let closestDate = null;
-
-            for (let i = timestamps.length - 1; i >= 0; i--) {
-                const price = quotes.close[i];
-                if (price !== null && !isNaN(price)) {
-                    closestPrice = price;
-                    closestDate = new Date(timestamps[i] * 1000);
-                    break;
+                    if (timestamps && quotes?.close) {
+                        // Finde den letzten verfügbaren Schlusskurs
+                        for (let i = timestamps.length - 1; i >= 0; i--) {
+                            const price = quotes.close[i];
+                            if (price !== null && !isNaN(price)) {
+                                return {
+                                    price: price,
+                                    date: new Date(timestamps[i] * 1000),
+                                    ticker: ticker,
+                                    source: 'Yahoo Finance (Proxy)'
+                                };
+                            }
+                        }
+                    }
                 }
             }
-
-            if (closestPrice === null) {
-                throw new Error('Keine gültigen Schlusskurse gefunden');
-            }
-
-            return {
-                price: closestPrice,
-                date: closestDate,
-                ticker: ticker
-            };
-
         } catch (err) {
-            console.error('ETF-Abruf fehlgeschlagen:', err);
-            throw new AppError(
-                `ETF-Daten konnten nicht abgerufen werden.\n\n` +
-                `Ticker: ${ticker}\n` +
-                `Zieldatum: ${targetDate.toLocaleDateString('de-DE')}\n\n` +
-                `Mögliche Ursachen:\n` +
-                `• Netzwerkfehler oder API nicht erreichbar\n` +
-                `• CORS-Blockierung durch Browser\n` +
-                `• Ticker-Symbol falsch oder geändert\n\n` +
-                `Fehler: ${err.message}\n\n` +
-                `💡 Tipp: Öffne die Browser-Konsole (F12) für Details.`,
-                { originalError: err }
-            );
+            console.warn('Yahoo Finance via Proxy fehlgeschlagen:', err);
         }
+
+        // Strategie 2: Yahoo Finance über alternativen CORS-Proxy (corsproxy.io)
+        try {
+            console.log('Versuch 2: Yahoo Finance über CORS-Proxy (corsproxy.io)...');
+            const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${startTime}&period2=${targetTime}&interval=1d`;
+            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(yahooUrl)}`;
+
+            console.log('Proxy URL:', proxyUrl);
+            const response = await fetch(proxyUrl);
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('Yahoo Finance Response (via corsproxy.io):', data);
+
+                if (data.chart?.result?.[0]) {
+                    const result = data.chart.result[0];
+                    const timestamps = result.timestamp;
+                    const quotes = result.indicators.quote[0];
+
+                    if (timestamps && quotes?.close) {
+                        for (let i = timestamps.length - 1; i >= 0; i--) {
+                            const price = quotes.close[i];
+                            if (price !== null && !isNaN(price)) {
+                                return {
+                                    price: price,
+                                    date: new Date(timestamps[i] * 1000),
+                                    ticker: ticker,
+                                    source: 'Yahoo Finance (corsproxy.io)'
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn('Yahoo Finance via corsproxy.io fehlgeschlagen:', err);
+        }
+
+        // Strategie 3: Finnhub API (kostenlos, CORS-freundlich, aber braucht Demo-Key)
+        try {
+            console.log('Versuch 3: Finnhub API...');
+            const finnhubKey = 'demo'; // Demo-Key, begrenzt aber funktioniert für Tests
+            const finnhubUrl = `https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${finnhubKey}`;
+
+            const response = await fetch(finnhubUrl);
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('Finnhub Response:', data);
+
+                if (data.c && data.c > 0) { // c = current price
+                    return {
+                        price: data.c,
+                        date: new Date(data.t * 1000), // t = timestamp
+                        ticker: ticker,
+                        source: 'Finnhub (aktueller Kurs)'
+                    };
+                }
+            }
+        } catch (err) {
+            console.warn('Finnhub API fehlgeschlagen:', err);
+        }
+
+        // Alle Strategien fehlgeschlagen
+        throw new AppError(
+            `ETF-Daten konnten nicht abgerufen werden.\n\n` +
+            `Ticker: ${ticker} (ISIN: ${isin})\n` +
+            `Zieldatum: ${targetDate.toLocaleDateString('de-DE')}\n\n` +
+            `Getestete APIs:\n` +
+            `• Yahoo Finance via allorigins.win Proxy\n` +
+            `• Yahoo Finance via corsproxy.io Proxy\n` +
+            `• Finnhub API\n\n` +
+            `Alle CORS-Proxies sind fehlgeschlagen.\n\n` +
+            `💡 Alternativen:\n` +
+            `• Nutze den manuellen "🗓️ Nachr." Button\n` +
+            `• Importiere Daten via "📄 CSV" Button\n` +
+            `• Prüfe die Browser-Konsole (F12) für Details`
+        );
     },
 
     async handleNachrueckenMitETF() {
@@ -630,6 +681,7 @@ export const UIBinder = {
             UIRenderer.toast(
                 `✅ Nachrücken mit ETF abgeschlossen!\n` +
                 `VWCE.DE: ${etfPrice} € (${usedDate})\n` +
+                `Quelle: ${etfData.source}\n` +
                 `${athStatus}`
             );
 
