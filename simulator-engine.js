@@ -348,17 +348,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         const shortfall = jahresEntnahme - liquiditaet;
         const emergencyCtx = buildInputsCtxFromPortfolio(algoInput, { depotTranchesAktien: portfolio.depotTranchesAktien.map(t => ({...t})), depotTranchesGold: portfolio.depotTranchesGold.map(t => ({...t})), liquiditaet: liquiditaet}, { pensionAnnual, marketData: marketDataCurrentYear });
 
-        // DEBUG: Log emergency refill context
-        console.warn('EMERGENCY REFILL: shortfall=', shortfall, 'liq=', liquiditaet, 'need=', jahresEntnahme,
-            'goldAktiv=', emergencyCtx.goldAktiv, 'goldWert=', emergencyCtx.goldWert,
-            'depotwertAlt=', emergencyCtx.depotwertAlt, 'depotwertNeu=', emergencyCtx.depotwertNeu);
-
         // EMERGENCY REFILL: Ignore minGold floor to prevent false RUIN
         const { saleResult: emergencySale } = window.Ruhestandsmodell_v30.calculateSaleAndTax(shortfall, emergencyCtx, { minGold: 0 }, market);
-
-        // DEBUG: Log first emergency sale result
-        console.warn('EMERGENCY SALE RESULT: achievedRefill=', emergencySale?.achievedRefill,
-            'breakdown=', emergencySale?.breakdown?.map(b => `${b.kind}:${b.brutto}`).join(', '));
 
         if (emergencySale && emergencySale.achievedRefill > 0) {
             liquiditaet += emergencySale.achievedRefill;
@@ -372,16 +363,13 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         // This handles both complete failure (achievedRefill=0) and partial success
         if (liquiditaet < jahresEntnahme && sumDepot(portfolio) > 0) {
             let missing = jahresEntnahme - liquiditaet;
-            console.warn('AGGRESSIVE SALE NEEDED: missing=', missing, 'depotRemaining=', sumDepot(portfolio));
 
             // Try selling Gold first (without minGold constraint)
                 const goldWert = sumDepot({ depotTranchesGold: portfolio.depotTranchesGold });
                 if (goldWert > 0 && missing > 0) {
                     // Rebuild context to get current asset values after any prior sales
                     const goldCtx = buildInputsCtxFromPortfolio(algoInput, portfolio, { pensionAnnual, marketData: marketDataCurrentYear });
-                    console.warn('AGGRESSIVE GOLD SALE: goldWert=', goldWert, 'ctxGoldWert=', goldCtx.goldWert, 'goldAktiv=', goldCtx.goldAktiv);
                     const goldResult = sellAssetForCash(portfolio, goldCtx, market, 'gold', missing, 0);
-                    console.warn('GOLD RESULT: cashGenerated=', goldResult.cashGenerated);
                     liquiditaet += goldResult.cashGenerated;
                     totalTaxesThisYear += goldResult.taxesPaid;
                     if (goldResult.saleResult) {
@@ -399,9 +387,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
                         // CRITICAL: Rebuild context after gold sale to prevent stale asset values
                         // This ensures calculateSaleAndTax sees the actual remaining assets
                         const updatedCtx = buildInputsCtxFromPortfolio(algoInput, portfolio, { pensionAnnual, marketData: marketDataCurrentYear });
-                        console.warn('AGGRESSIVE EQUITY SALE: equityWert=', equityWert, 'ctxDepotwert=', updatedCtx.depotwertAlt + updatedCtx.depotwertNeu);
                         const eqResult = sellAssetForCash(portfolio, updatedCtx, market, 'equity', missing, 0);
-                        console.warn('EQUITY RESULT: cashGenerated=', eqResult.cashGenerated);
                         liquiditaet += eqResult.cashGenerated;
                         totalTaxesThisYear += eqResult.taxesPaid;
                         if (eqResult.saleResult) {
@@ -418,12 +404,6 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
     // Only declare RUIN if we truly cannot cover the withdrawal after emergency refill
     if (liquiditaet < jahresEntnahme) {
-        // Last check: do we have ANY depot left?
-        const remainingDepot = sumDepot(portfolio);
-        if (remainingDepot > 0) {
-            // We have depot but couldn't sell - this shouldn't happen. Log warning.
-            console.warn('RUIN declared but depot remaining:', remainingDepot, 'liquiditaet:', liquiditaet, 'need:', jahresEntnahme);
-        }
         return { isRuin: true };
     }
     liquiditaet -= jahresEntnahme;
@@ -462,12 +442,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const floorCoveredByPension = guardCtx.inflatedFloor === 0;
 
     // Defensive Check: Falls inflatierter Floor 0 ist (vollständig durch Rente gedeckt), darf kein Guard-Verkauf ausgelöst werden.
-    // Zusätzlich warnen, wenn trotzdem ein Bedarf > 0 berechnet würde (sollte durch computeLiqNeedForFloor ausgeschlossen sein).
     if (floorCoveredByPension) {
         guardReason = "floor_covered_by_pension";
-        if (need > 0) {
-            console.warn("FAIL-SAFE: Need sollte 0 sein, wenn inflatedFloor 0 ist", { need, inflatedFloor });
-        }
     }
 
     if (!floorCoveredByPension && liq < need) {
@@ -529,11 +505,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
     // Validierung: Sicherstellen, dass kritische Werte finite sind
     if (!Number.isFinite(liquiditaet)) {
-        console.warn("FAIL-SAFE: liquiditaet not finite, resetting to 0", liquiditaet);
         liquiditaet = 0;
-    }
-    if (!Number.isFinite(inflatedFloor)) {
-        console.warn("FAIL-SAFE: inflatedFloor not finite", inflatedFloor);
     }
     // ========== ENDE FAIL-SAFE LIQUIDITY GUARD ==========
 

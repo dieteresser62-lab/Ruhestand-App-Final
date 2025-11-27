@@ -543,10 +543,6 @@ async function runSweepSelfTest() {
     resultsDiv.style.display = 'block';
     resultsDiv.innerHTML = '<p style="color: #666;">🔬 Sweep-Tests laufen...</p>';
 
-    console.log('[SWEEP-TEST] ========================================');
-    console.log('[SWEEP-TEST] Starte Sweep-Selbsttest-Suite');
-    console.log('[SWEEP-TEST] ========================================');
-
     try {
         prepareHistoricalData();
 
@@ -556,7 +552,6 @@ async function runSweepSelfTest() {
         // =====================================================================
         // TEST 1: Baseline - P2-Invarianten bleiben über Cases konstant
         // =====================================================================
-        console.log('[SWEEP-TEST] Test 1: Baseline (P2-Invarianz)');
         logMessages.push('<strong>Test 1: Baseline (P2-Invarianz) - NEUE PRÜFUNG</strong>');
 
         const testCases = [
@@ -586,20 +581,14 @@ async function runSweepSelfTest() {
 
             if (REF_P2_INV === null) {
                 REF_P2_INV = p2Inv;
-                console.log(`[SWEEP-TEST] ✓ Case ${caseIdx + 1}: Referenz gesetzt (rebalBand=${testCase.rebalBand})`);
-                console.log(`[SWEEP-TEST]   P2-Invarianten:`, p2Inv);
                 logMessages.push(`&nbsp;&nbsp;✓ Case ${caseIdx + 1}: Referenz gesetzt (rebalBand=${testCase.rebalBand})`);
                 logMessages.push(`&nbsp;&nbsp;&nbsp;&nbsp;aktiv=${p2Inv.aktiv}, brutto=${p2Inv.brutto}, rentAdjPct=${p2Inv.rentAdjPct}`);
             } else {
                 if (areP2InvariantsEqual(p2Inv, REF_P2_INV)) {
-                    console.log(`[SWEEP-TEST] ✓ Case ${caseIdx + 1}: P2-Invarianten konstant (rebalBand=${testCase.rebalBand})`);
                     logMessages.push(`&nbsp;&nbsp;✓ Case ${caseIdx + 1}: P2-Invarianten konstant (rebalBand=${testCase.rebalBand})`);
                 } else {
                     test1Passed = false;
                     allTestsPassed = false;
-                    console.error(`[SWEEP-TEST] ✗ Case ${caseIdx + 1}: P2-Invarianten variieren! (rebalBand=${testCase.rebalBand})`);
-                    console.error(`[SWEEP-TEST]   Referenz:`, REF_P2_INV);
-                    console.error(`[SWEEP-TEST]   Aktuell:`, p2Inv);
                     logMessages.push(`&nbsp;&nbsp;<span style="color: red;">✗ Case ${caseIdx + 1}: P2-Invarianten variieren! (rebalBand=${testCase.rebalBand})</span>`);
                     logMessages.push(`&nbsp;&nbsp;&nbsp;&nbsp;Referenz: ${JSON.stringify(REF_P2_INV)}`);
                     logMessages.push(`&nbsp;&nbsp;&nbsp;&nbsp;Aktuell: ${JSON.stringify(p2Inv)}`);
@@ -613,17 +602,14 @@ async function runSweepSelfTest() {
         // =====================================================================
         // TEST 2: Deep-Copy-Test - baseInputs bleiben unverändert
         // =====================================================================
-        console.log('[SWEEP-TEST] Test 2: Deep-Copy-Schutz');
         logMessages.push('<strong>Test 2: Deep-Copy-Schutz</strong>');
 
         const baseInputsAfter = JSON.stringify(baseInputs);
         const test2Passed = baseInputsJson === baseInputsAfter;
 
         if (test2Passed) {
-            console.log('[SWEEP-TEST] ✓ baseInputs blieben unverändert nach Cases');
             logMessages.push('&nbsp;&nbsp;✓ baseInputs blieben unverändert nach Cases');
         } else {
-            console.error('[SWEEP-TEST] ✗ baseInputs wurden modifiziert! Deep-Copy fehlerhaft!');
             logMessages.push('&nbsp;&nbsp;<span style="color: red;">✗ baseInputs wurden modifiziert! Deep-Copy fehlerhaft!</span>');
             allTestsPassed = false;
         }
@@ -634,7 +620,6 @@ async function runSweepSelfTest() {
         // =====================================================================
         // TEST 3: Negativtest - P2-Änderung sollte erkannt werden
         // =====================================================================
-        console.log('[SWEEP-TEST] Test 3: Negativtest (P2-Änderung sollte erkannt werden)');
         logMessages.push('<strong>Test 3: Negativtest (P2-Änderung erkennen) - NEUE PRÜFUNG</strong>');
 
         // Simuliere zwei Cases, wobei beim zweiten absichtlich partner.brutto geändert wird
@@ -654,7 +639,6 @@ async function runSweepSelfTest() {
             // ABSICHTLICH P2 ändern beim zweiten Case (nur für Test!)
             if (testCase.p2Change && inputs.partner && inputs.partner.aktiv) {
                 inputs.partner.brutto = inputs.partner.brutto * 1.5; // +50%
-                console.log('[SWEEP-TEST] ⚠ Absichtlich partner.brutto geändert (für Negativtest)');
             }
 
             // NEUE PRÜFUNG: Extrahiere P2-Invarianten (keine Simulation nötig!)
@@ -662,17 +646,12 @@ async function runSweepSelfTest() {
 
             if (NEG_REF_P2_INV === null) {
                 NEG_REF_P2_INV = p2Inv;
-                console.log(`[SWEEP-TEST] ✓ Neg-Case ${caseIdx + 1}: Referenz gesetzt`);
                 logMessages.push(`&nbsp;&nbsp;✓ Neg-Case ${caseIdx + 1}: Referenz gesetzt`);
             } else {
                 if (areP2InvariantsEqual(p2Inv, NEG_REF_P2_INV)) {
-                    console.error(`[SWEEP-TEST] ✗ Neg-Case ${caseIdx + 1}: P2-Änderung wurde NICHT erkannt!`);
                     logMessages.push(`&nbsp;&nbsp;<span style="color: red;">✗ Neg-Case ${caseIdx + 1}: P2-Änderung wurde NICHT erkannt!</span>`);
                     allTestsPassed = false;
                 } else {
-                    console.log(`[SWEEP-TEST] ✓ Neg-Case ${caseIdx + 1}: P2-Änderung korrekt erkannt!`);
-                    console.log(`[SWEEP-TEST]   Referenz:`, NEG_REF_P2_INV);
-                    console.log(`[SWEEP-TEST]   Geändert:`, p2Inv);
                     logMessages.push(`&nbsp;&nbsp;<span style="color: green;">✓ Neg-Case ${caseIdx + 1}: P2-Änderung korrekt erkannt!</span>`);
                     logMessages.push(`&nbsp;&nbsp;&nbsp;&nbsp;brutto: ${NEG_REF_P2_INV.brutto} → ${p2Inv.brutto}`);
                     test3Passed = true;
@@ -686,10 +665,6 @@ async function runSweepSelfTest() {
         // =====================================================================
         // Gesamtergebnis
         // =====================================================================
-        console.log('[SWEEP-TEST] ========================================');
-        console.log('[SWEEP-TEST] Gesamtergebnis: ' + (allTestsPassed ? '✓ ALLE TESTS BESTANDEN' : '✗ TESTS FEHLGESCHLAGEN'));
-        console.log('[SWEEP-TEST] ========================================');
-
         const statusColor = allTestsPassed ? 'green' : 'red';
         const statusText = allTestsPassed ? '✓ Alle Tests bestanden' : '✗ Einige Tests fehlgeschlagen';
 
@@ -697,16 +672,12 @@ async function runSweepSelfTest() {
         html += `<strong style="color: ${statusColor}; font-size: 1.1rem;">${statusText}</strong><br><br>`;
         html += `<div style="font-family: monospace; font-size: 0.85rem; line-height: 1.6;">`;
         html += logMessages.join('<br>');
-        html += `</div>`;
-        html += `<div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #ddd; font-size: 0.8rem; color: #666;">`;
-        html += `Hinweis: Console-Logs enthalten detaillierte Test-Ausgaben mit [SWEEP-TEST] Prefix.`;
         html += `</div></div>`;
 
         resultsDiv.innerHTML = html;
 
     } catch (error) {
         resultsDiv.innerHTML = `<p style="color: red;">Fehler: ${error.message}</p>`;
-        console.error('[SWEEP-TEST] Fehler:', error);
     } finally {
         button.disabled = false;
     }
