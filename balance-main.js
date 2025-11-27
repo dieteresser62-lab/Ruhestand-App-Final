@@ -46,6 +46,7 @@ const dom = {
         exportBtn: document.getElementById('exportBtn'),
         importBtn: document.getElementById('importBtn'),
         importFile: document.getElementById('importFile'),
+        btnJahresUpdate: document.getElementById('btnJahresUpdate'),
         btnNachruecken: document.getElementById('btnNachruecken'),
         btnUndoNachruecken: document.getElementById('btnUndoNachruecken'),
         btnCsvImport: document.getElementById('btnCsvImport'),

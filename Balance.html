@@ -45,9 +45,16 @@
             <div class="tab-content">
                 <div id="tab-update" class="tab-panel active">
                     <fieldset><legend>Basiswerte</legend>
+                        <!-- Jahres-Update Button -->
+                        <div style="margin-bottom: 15px;">
+                            <button id="btnJahresUpdate" type="button" class="btn btn-primary" title="Ruft Inflation (ECB) und ETF-Kurs (VWCE.DE) ab, führt Nachrücken durch und aktualisiert ATH">🌐 Jahres-Update</button>
+                        </div>
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
                             <div class="form-group"><label for="aktuellesAlter">Aktuelles Alter</label><input id="aktuellesAlter" type="number" value="65" min="50"></div>
-                            <div class="form-group"><label for="inflation">Inflation VJ (%)</label><input id="inflation" type="number" value="1.7" step="0.1"></div>
+                            <div class="form-group">
+                                <label for="inflation">Inflation VJ (%)</label>
+                                <input id="inflation" type="number" value="1.7" step="0.1">
+                            </div>
                         </div>
 						<!-- NEUER CONTAINER FÜR DEN INTELLIGENTEN HINWEIS -->
 						<div id="bedarfAnpassungContainer" class="full-width" style="margin-top: 10px; text-align: center;"></div>						
@@ -254,6 +261,26 @@
         </div>
     </div>
 
+    <!-- Modal: Jahres-Update Ergebnis -->
+    <div id="updateResultModal" class="modal" style="display: none;">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">✅ Jahres-Update erfolgreich</h3>
+                <button class="modal-close" aria-label="Schließen">&times;</button>
+            </div>
+            <div class="modal-body">
+                <h4>📊 Durchgeführte Aktionen:</h4>
+                <div id="modalResults" class="modal-results"></div>
+                <div id="modalDuration" class="modal-duration"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="modalCopyBtn" class="btn btn-utility">📋 Details kopieren</button>
+                <button id="modalDetailsBtn" class="btn btn-utility">🔍 Details anzeigen</button>
+                <button id="modalCloseBtn" class="btn btn-primary">OK</button>
+            </div>
+        </div>
+    </div>
 
 </body>
 </html>
