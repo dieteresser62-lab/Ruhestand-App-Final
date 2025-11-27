@@ -14,9 +14,7 @@ Konfiguration, Fehlertypen und Debug-Utilities.
 - `ValidationError`
 - `FinancialCalculationError`
 - `StorageError`
-- `DebugUtils`
 
-**Hinweise:** `DebugUtils` kapselt das Aktivieren/Deaktivieren des Debug-Modus (`Ctrl` + `Shift` + `D`) und synchronisiert den Status mit `localStorage`.
 
 ---
 
@@ -90,18 +88,17 @@ Event-Hub der Anwendung.
 - `initUIBinder(domRefs, state, updateFn, debouncedUpdateFn)`
 - `UIBinder`
   - `bindUI()` – registriert alle Event-Listener
-  - `handleKeyboardShortcuts(e)` – u. a. Jahresabschluss, Import/Export, Debug-Modus, Theme-Toggle
+  - `handleKeyboardShortcuts(e)` – u. a. Jahresabschluss, Import/Export, Marktdaten nachrücken
   - `handleFormInput(e)` / `handleFormChange()` – triggert Debounce-Updates
   - `handleTabClick(e)` – Tab-Navigation
-  - `handleThemeToggle()` – Dark-/Light-Mode
   - `handleReset()` – Reset mit Bestätigung
   - `handleBedarfAnpassungClick(e)` – inflationsbedingte Anpassung
   - `handleNachruecken()` / `handleUndoNachruecken()` – Marktdatenpflege
+  - `handleJahresUpdate()` – **Jahres-Update mit Online-API-Zugriff:** Ruft automatisch Inflationsdaten (ECB → World Bank → OECD Fallback-Kette) und ETF-Kurse (VWCE.DE via Yahoo Finance/Finnhub) ab, führt Nachrücken durch und aktualisiert ATH. Zeigt detailliertes Protokoll mit Datenquellen und Werten.
   - `handleExport()` / `handleImport(e)` / `handleCsvImport(e)` – Datenimporte/-exporte
   - `handleJahresabschluss()` – Snapshot & Jahreswechsel
   - `handleSnapshotActions(e)` – Snapshot verwalten (restore/delete)
   - `handleCopyDiagnosis()` – Diagnose in Zwischenablage
-  - `updateDebugModeUI(isActive)` – zeigt Debug-Indikator
 
 **Dependencies:** `balance-config.js`, `balance-utils.js`, `balance-reader.js`, `balance-renderer.js`, `balance-storage.js`
 
@@ -115,7 +112,6 @@ Einstiegspunkt und Orchestrator.
 - Prüft Engine-Kompatibilität (`initVersionHandshake`).
 - Definiert `update()` / `debouncedUpdate()` und reicht Eingaben an `EngineAPI.simulateSingleYear()` weiter.
 - Übergibt Engine-Ergebnisse an Renderer und Storage.
-- Startet Debug-Modus über `DebugUtils`.
 
 **Dependencies:** alle oben genannten Module sowie die globale `EngineAPI`.
 

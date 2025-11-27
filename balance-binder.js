@@ -6,7 +6,7 @@
  * ===================================================================================
  */
 
-import { CONFIG, AppError, StorageError, DebugUtils } from './balance-config.js';
+import { CONFIG, AppError, StorageError } from './balance-config.js';
 import { UIUtils } from './balance-utils.js';
 import { UIReader } from './balance-reader.js';
 import { UIRenderer } from './balance-renderer.js';
@@ -82,24 +82,6 @@ export const UIBinder = {
     },
 
     handleKeyboardShortcuts(e) {
-        // CTRL+Shift+D: Debug-Modus umschalten
-        if (e.ctrlKey && e.shiftKey && e.key === 'D') {
-            e.preventDefault();
-            const newState = DebugUtils.toggleDebugMode();
-
-            // UI-Indikator aktualisieren
-            this.updateDebugModeUI(newState);
-
-            // Wenn aktiviert: Diagnose-Panel öffnen
-            if (newState) {
-                dom.diagnosis.drawer.classList.add('is-open');
-                dom.diagnosis.overlay.classList.add('is-open');
-            }
-
-            UIRenderer.toast(newState ? '🐛 Debug-Modus aktiviert' : '🐛 Debug-Modus deaktiviert');
-            return;
-        }
-
         // Alt+J: Jahresabschluss
         if (e.altKey && e.key === 'j') {
             e.preventDefault();
@@ -126,20 +108,6 @@ export const UIBinder = {
             e.preventDefault();
             dom.controls.btnNachruecken.click();
             return;
-        }
-
-        // Alt+D: Dark-Mode umschalten
-        if (e.altKey && e.key === 'd') {
-            e.preventDefault();
-            this.handleThemeToggle();
-            return;
-        }
-    },
-
-    updateDebugModeUI(isActive) {
-        const debugIndicator = document.getElementById('debugModeIndicator');
-        if (debugIndicator) {
-            debugIndicator.style.display = isActive ? 'flex' : 'none';
         }
     },
 
@@ -378,7 +346,6 @@ export const UIBinder = {
             // API 1: ECB Statistical Data Warehouse (HICP - Harmonized Index of Consumer Prices)
             // Deutschland: DEU, HICP All-items, Annual rate of change
             try {
-                console.log('Versuche ECB API...');
                 const ecbUrl = `https://data-api.ecb.europa.eu/service/data/ICP/M.DE.N.000000.4.ANR`;
                 const ecbResponse = await fetch(ecbUrl, {
                     headers: { 'Accept': 'application/json' }
@@ -386,7 +353,6 @@ export const UIBinder = {
 
                 if (ecbResponse.ok) {
                     const ecbData = await ecbResponse.json();
-                    console.log('ECB Response:', ecbData);
 
                     // Durchsuche die Zeitreihe nach dem Vorjahr
                     if (ecbData.dataSets && ecbData.dataSets[0] && ecbData.dataSets[0].series) {
@@ -404,19 +370,17 @@ export const UIBinder = {
                     }
                 }
             } catch (ecbErr) {
-                console.warn('ECB API fehlgeschlagen:', ecbErr);
+                // ECB API failed, try next
             }
 
             // API 2: World Bank API (Alternative)
             if (inflationRate === null) {
                 try {
-                    console.log('Versuche World Bank API...');
                     const wbUrl = `https://api.worldbank.org/v2/country/DE/indicator/FP.CPI.TOTL.ZG?format=json&date=${previousYear}`;
                     const wbResponse = await fetch(wbUrl);
 
                     if (wbResponse.ok) {
                         const wbData = await wbResponse.json();
-                        console.log('World Bank Response:', wbData);
 
                         if (wbData && wbData[1] && wbData[1].length > 0 && wbData[1][0].value !== null) {
                             inflationRate = parseFloat(wbData[1][0].value);
@@ -424,20 +388,18 @@ export const UIBinder = {
                         }
                     }
                 } catch (wbErr) {
-                    console.warn('World Bank API fehlgeschlagen:', wbErr);
+                    // World Bank API failed, try next
                 }
             }
 
             // API 3: OECD API (Alternative)
             if (inflationRate === null) {
                 try {
-                    console.log('Versuche OECD API...');
                     const oecdUrl = `https://stats.oecd.org/sdmx-json/data/DP_LIVE/.CPI.../OECD?contentType=json&detail=code&separator=.&dimensionAtObservation=allDimensions&startPeriod=${previousYear}&endPeriod=${previousYear}`;
                     const oecdResponse = await fetch(oecdUrl);
 
                     if (oecdResponse.ok) {
                         const oecdData = await oecdResponse.json();
-                        console.log('OECD Response:', oecdData);
 
                         // Suche Deutschland in den Daten
                         if (oecdData.dataSets && oecdData.dataSets[0] && oecdData.dataSets[0].observations) {
@@ -458,7 +420,7 @@ export const UIBinder = {
                         }
                     }
                 } catch (oecdErr) {
-                    console.warn('OECD API fehlgeschlagen:', oecdErr);
+                    // OECD API failed, try next
                 }
             }
 
@@ -757,20 +719,15 @@ export const UIBinder = {
         startDate.setDate(startDate.getDate() - 10);
         const startTime = formatDate(startDate);
 
-        console.log(`Rufe ETF-Daten ab für ${ticker} bis ${targetDate.toLocaleDateString('de-DE')}...`);
-
         // Strategie 1: Yahoo Finance über CORS-Proxy (allorigins.win)
         try {
-            console.log('Versuch 1: Yahoo Finance über CORS-Proxy (allorigins.win)...');
             const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${startTime}&period2=${targetTime}&interval=1d`;
             const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`;
 
-            console.log('Proxy URL:', proxyUrl);
             const response = await fetch(proxyUrl);
 
             if (response.ok) {
                 const data = await response.json();
-                console.log('Yahoo Finance Response (via Proxy):', data);
 
                 if (data.chart?.result?.[0]) {
                     const result = data.chart.result[0];
@@ -794,21 +751,18 @@ export const UIBinder = {
                 }
             }
         } catch (err) {
-            console.warn('Yahoo Finance via Proxy fehlgeschlagen:', err);
+            // Yahoo Finance via Proxy failed, try next
         }
 
         // Strategie 2: Yahoo Finance über alternativen CORS-Proxy (corsproxy.io)
         try {
-            console.log('Versuch 2: Yahoo Finance über CORS-Proxy (corsproxy.io)...');
             const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${startTime}&period2=${targetTime}&interval=1d`;
             const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(yahooUrl)}`;
 
-            console.log('Proxy URL:', proxyUrl);
             const response = await fetch(proxyUrl);
 
             if (response.ok) {
                 const data = await response.json();
-                console.log('Yahoo Finance Response (via corsproxy.io):', data);
 
                 if (data.chart?.result?.[0]) {
                     const result = data.chart.result[0];
@@ -831,12 +785,11 @@ export const UIBinder = {
                 }
             }
         } catch (err) {
-            console.warn('Yahoo Finance via corsproxy.io fehlgeschlagen:', err);
+            // Yahoo Finance via corsproxy.io failed, try next
         }
 
         // Strategie 3: Finnhub API (kostenlos, CORS-freundlich, aber braucht Demo-Key)
         try {
-            console.log('Versuch 3: Finnhub API...');
             const finnhubKey = 'demo'; // Demo-Key, begrenzt aber funktioniert für Tests
             const finnhubUrl = `https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${finnhubKey}`;
 
@@ -844,7 +797,6 @@ export const UIBinder = {
 
             if (response.ok) {
                 const data = await response.json();
-                console.log('Finnhub Response:', data);
 
                 if (data.c && data.c > 0) { // c = current price
                     return {
@@ -856,7 +808,7 @@ export const UIBinder = {
                 }
             }
         } catch (err) {
-            console.warn('Finnhub API fehlgeschlagen:', err);
+            // Finnhub API failed
         }
 
         // Alle Strategien fehlgeschlagen
@@ -896,8 +848,6 @@ export const UIBinder = {
 
             // 1. ETF-Kurs abrufen
             const etfData = await this._fetchVanguardETFPrice(targetDate);
-
-            console.log('ETF-Daten abgerufen:', etfData);
 
             // 2. Nachrücken durchführen (bestehende Logik)
             if (btn) {

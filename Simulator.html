@@ -802,28 +802,6 @@
             });
         });
     </script>
-
-    <script>
-        (function () {
-            const DEV_KEY = "sim.devMode";
-            const urlDev = new URLSearchParams(location.search).get("dev") === "1";
-            const saved = localStorage.getItem(DEV_KEY) === "1";
-            const dev = urlDev || saved;
-            const root = document.body;
-            function setDevMode(on) {
-                localStorage.setItem(DEV_KEY, on ? "1" : "0");
-                root.classList.toggle("dev-on", !!on);
-            }
-            setDevMode(dev);
-            window.addEventListener("keydown", (e) => {
-                if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "d") {
-                    const on = !root.classList.contains("dev-on");
-                    setDevMode(on);
-                    e.preventDefault();
-                }
-            });
-        })();
-    </script>
 </body>
 
 </html>
