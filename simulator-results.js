@@ -462,6 +462,7 @@ export function aggregateSweepMetrics(runOutcomes) {
         return {
             successProbFloor: 0,
             p10EndWealth: 0,
+            medianEndWealth: 0,
             worst5Drawdown: 0,
             minRunwayObserved: 0
         };
@@ -474,6 +475,8 @@ export function aggregateSweepMetrics(runOutcomes) {
     endWealths.sort((a, b) => a - b);
     const p10Index = Math.floor(endWealths.length * 0.10);
     const p10EndWealth = endWealths[p10Index] || 0;
+    const p50Index = Math.floor(endWealths.length * 0.50);
+    const medianEndWealth = endWealths[p50Index] || 0;
 
     const drawdowns = runOutcomes.map(r => r.maxDrawdown || 0);
     drawdowns.sort((a, b) => b - a);
@@ -486,6 +489,7 @@ export function aggregateSweepMetrics(runOutcomes) {
     return {
         successProbFloor,
         p10EndWealth,
+        medianEndWealth,
         worst5Drawdown,
         minRunwayObserved
     };
