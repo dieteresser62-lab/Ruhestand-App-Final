@@ -15,6 +15,7 @@
 import { rng, parseRangeInput, cartesianProductLimited } from './simulator-utils.js';
 import { prepareHistoricalData, getCommonInputs, buildStressContext, computeRentAdjRate, applyStressOverride } from './simulator-portfolio.js';
 import { MORTALITY_TABLE, annualData, BREAK_ON_RUIN } from './simulator-data.js';
+import { findBestParameters, shouldMaximizeMetric, displayBestParameters, runAdaptiveOptimization, displayOptimizationHistory } from './simulator-optimizer.js';
 import {
     simulateOneYear,
     initMcRunState,
@@ -338,6 +339,10 @@ export async function runParameterSweep() {
         displaySweepResults();
 
         document.getElementById('sweepResults').style.display = 'block';
+
+        // Zeige Optimierungs-Buttons an
+        document.getElementById('findBestButton').style.display = 'inline-block';
+        document.getElementById('autoOptimizeButton').style.display = 'inline-block';
     } catch (error) {
         // Bewusste, knappe Nutzerwarnung – ergänzt mit Hinweis für Entwickler.
         alert("Fehler im Parameter-Sweep:\n\n" + error.message);
@@ -355,3 +360,94 @@ export async function runParameterSweep() {
         sweepButton.disabled = false;
     }
 }
+
+/**
+ * ==========================================================================
+ * Optimierungs-Funktionen (Global für HTML onclick Handler)
+ * ==========================================================================
+ */
+
+/**
+ * Findet und zeigt die besten Parameter aus dem aktuellen Sweep an
+ */
+window.findAndDisplayBest = function() {
+    if (!window.sweepResults || window.sweepResults.length === 0) {
+        alert('Bitte führen Sie zuerst einen Parameter Sweep durch.');
+        return;
+    }
+
+    const metricKey = document.getElementById('sweepMetric').value;
+    const maximize = shouldMaximizeMetric(metricKey);
+    const bestResult = findBestParameters(window.sweepResults, metricKey, maximize);
+
+    if (bestResult) {
+        displayBestParameters(bestResult, metricKey);
+        // Scroll zu den Ergebnissen
+        document.getElementById('optimizationResults').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } else {
+        alert('Keine Ergebnisse zum Optimieren gefunden.');
+    }
+};
+
+/**
+ * Führt adaptive Optimierung durch
+ */
+window.runAutoOptimization = async function() {
+    if (!window.sweepResults || window.sweepResults.length === 0) {
+        alert('Bitte führen Sie zuerst einen Parameter Sweep durch.');
+        return;
+    }
+
+    const metricKey = document.getElementById('sweepMetric').value;
+
+    // Bestätigung vom Nutzer
+    const confirmed = confirm(
+        `Auto-Optimierung für "${metricKey}" starten?\n\n` +
+        `Dies führt 2 zusätzliche Sweep-Durchläufe durch, um die Parameter zu verfeinern.\n` +
+        `Dies kann einige Minuten dauern.`
+    );
+
+    if (!confirmed) return;
+
+    // Deaktiviere Buttons während Optimierung
+    const autoOptButton = document.getElementById('autoOptimizeButton');
+    const findBestButton = document.getElementById('findBestButton');
+    const sweepButton = document.getElementById('sweepButton');
+
+    autoOptButton.disabled = true;
+    findBestButton.disabled = true;
+    sweepButton.disabled = true;
+
+    try {
+        const result = await runAdaptiveOptimization(metricKey, 2, (iter, max, best) => {
+            console.log(`Iteration ${iter}/${max}: Bester Wert = ${best.metricValue}`);
+        });
+
+        if (result) {
+            displayOptimizationHistory(result, metricKey);
+            // Scroll zu den Ergebnissen
+            document.getElementById('optimizationResults').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    } catch (error) {
+        alert(`Fehler bei Auto-Optimierung:\n\n${error.message}`);
+        console.error('Auto-Optimierung Fehler:', error);
+    } finally {
+        autoOptButton.disabled = false;
+        findBestButton.disabled = false;
+        sweepButton.disabled = false;
+    }
+};
+
+// Event-Listener für Metrik-Änderung (um Optimierungsergebnisse zu aktualisieren)
+document.addEventListener('DOMContentLoaded', function() {
+    const metricSelector = document.getElementById('sweepMetric');
+    if (metricSelector) {
+        metricSelector.addEventListener('change', function() {
+            // Verstecke alte Optimierungsergebnisse bei Metrik-Wechsel
+            const optimizationResults = document.getElementById('optimizationResults');
+            if (optimizationResults && optimizationResults.style.display !== 'none') {
+                optimizationResults.style.display = 'none';
+            }
+        });
+    }
+});

@@ -683,13 +683,20 @@
                             </div>
                         </div>
                     </fieldset>
-                    <button id="sweepButton" onclick="runParameterSweep()">Run Sweep</button>
+                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <button id="sweepButton" onclick="runParameterSweep()">Run Sweep</button>
+                        <button id="findBestButton" onclick="findAndDisplayBest()" style="background-color: #4caf50; display: none;">🎯 Beste Parameter finden</button>
+                        <button id="autoOptimizeButton" onclick="runAutoOptimization()" style="background-color: #2196f3; display: none;">🚀 Auto-Optimize</button>
+                    </div>
                     <div id="sweep-progress-bar-container"
                         style="display:none; width: 100%; background-color: #e0e0e0; height: 24px; border-radius: 4px; margin-top: 15px; overflow: hidden;">
                         <div id="sweep-progress-bar"
                             style="width: 0%; height: 100%; background-color: var(--secondary-color); transition: width 0.3s; line-height: 24px; text-align: center; color: white; font-size: 0.85rem;">
                         </div>
                     </div>
+
+                    <!-- Optimization Results Container -->
+                    <div id="optimizationResults" style="display: none; margin-top: 20px;"></div>
 
                     <!-- Selbsttest-Panel (nur bei ?debug=1 sichtbar) -->
                     <div id="sweepSelfTestPanel" class="dev-only"
