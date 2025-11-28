@@ -687,6 +687,8 @@
                         <button id="sweepButton" onclick="runParameterSweep()">Run Sweep</button>
                         <button id="findBestButton" onclick="findAndDisplayBest()" style="background-color: #4caf50; display: none;">🎯 Beste Parameter finden</button>
                         <button id="autoOptimizeButton" onclick="runAutoOptimization()" style="background-color: #2196f3; display: none;">🚀 Auto-Optimize</button>
+                        <button id="sensitivityButton" onclick="showSensitivityAnalysis()" style="background-color: #ff9800; display: none;">📊 Sensitivity Analysis</button>
+                        <button id="paretoButton" onclick="showParetoDialog()" style="background-color: #9c27b0; display: none;">🎯 Pareto Frontier</button>
                     </div>
                     <div id="sweep-progress-bar-container"
                         style="display:none; width: 100%; background-color: #e0e0e0; height: 24px; border-radius: 4px; margin-top: 15px; overflow: hidden;">
@@ -697,6 +699,12 @@
 
                     <!-- Optimization Results Container -->
                     <div id="optimizationResults" style="display: none; margin-top: 20px;"></div>
+
+                    <!-- Sensitivity Analysis Results Container -->
+                    <div id="sensitivityResults" style="display: none; margin-top: 20px;"></div>
+
+                    <!-- Pareto Frontier Results Container -->
+                    <div id="paretoResults" style="display: none; margin-top: 20px;"></div>
 
                     <!-- Selbsttest-Panel (nur bei ?debug=1 sichtbar) -->
                     <div id="sweepSelfTestPanel" class="dev-only"
@@ -718,7 +726,11 @@
                                     <select id="sweepMetric">
                                         <option value="successProbFloor" selected>Success Prob Floor</option>
                                         <option value="p10EndWealth">P10 End Wealth</option>
-                                        <option value="medianEndWealth">Median End Wealth</option>
+                                        <option value="p25EndWealth">P25 End Wealth</option>
+                                        <option value="medianEndWealth">Median End Wealth (P50)</option>
+                                        <option value="p75EndWealth">P75 End Wealth</option>
+                                        <option value="meanEndWealth">Mean End Wealth</option>
+                                        <option value="maxEndWealth">Max End Wealth</option>
                                         <option value="worst5Drawdown">Worst 5% Drawdown</option>
                                         <option value="minRunwayObserved">Min Runway Observed</option>
                                     </select>

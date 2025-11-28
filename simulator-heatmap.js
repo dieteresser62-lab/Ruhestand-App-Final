@@ -353,7 +353,11 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
     const metricLabels = {
         successProbFloor: 'Success Prob Floor (%)',
         p10EndWealth: 'P10 End Wealth (€)',
+        p25EndWealth: 'P25 End Wealth (€)',
         medianEndWealth: 'Median End Wealth (€)',
+        p75EndWealth: 'P75 End Wealth (€)',
+        meanEndWealth: 'Mean End Wealth (€)',
+        maxEndWealth: 'Max End Wealth (€)',
         worst5Drawdown: 'Worst 5% Drawdown (%)',
         minRunwayObserved: 'Min Runway Observed (Monate)'
     };
@@ -383,7 +387,8 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
     };
 
     const formatValue = (value, metric) => {
-        if (metric === 'p10EndWealth' || metric === 'medianEndWealth') {
+        const wealthMetrics = ['p10EndWealth', 'p25EndWealth', 'medianEndWealth', 'p75EndWealth', 'meanEndWealth', 'maxEndWealth'];
+        if (wealthMetrics.includes(metric)) {
             return `${(value / 1000).toFixed(0)}k €`;
         } else if (metric === 'successProbFloor' || metric === 'worst5Drawdown') {
             return `${value.toFixed(1)}%`;
