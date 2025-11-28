@@ -15,6 +15,8 @@
 import { rng, parseRangeInput, cartesianProductLimited } from './simulator-utils.js';
 import { prepareHistoricalData, getCommonInputs, buildStressContext, computeRentAdjRate, applyStressOverride } from './simulator-portfolio.js';
 import { MORTALITY_TABLE, annualData, BREAK_ON_RUIN } from './simulator-data.js';
+import { findBestParameters, shouldMaximizeMetric, displayBestParameters, runAdaptiveOptimization, displayOptimizationHistory, displayMultiObjectiveOptimization, displayConstraintBasedOptimization } from './simulator-optimizer.js';
+import { displaySensitivityAnalysis, displayParetoFrontier } from './simulator-visualization.js';
 import {
     simulateOneYear,
     initMcRunState,
@@ -338,6 +340,12 @@ export async function runParameterSweep() {
         displaySweepResults();
 
         document.getElementById('sweepResults').style.display = 'block';
+
+        // Zeige Optimierungs- und Visualisierungs-Buttons an
+        document.getElementById('findBestButton').style.display = 'inline-block';
+        document.getElementById('autoOptimizeButton').style.display = 'inline-block';
+        document.getElementById('sensitivityButton').style.display = 'inline-block';
+        document.getElementById('paretoButton').style.display = 'inline-block';
     } catch (error) {
         // Bewusste, knappe Nutzerwarnung – ergänzt mit Hinweis für Entwickler.
         alert("Fehler im Parameter-Sweep:\n\n" + error.message);
@@ -355,3 +363,176 @@ export async function runParameterSweep() {
         sweepButton.disabled = false;
     }
 }
+
+/**
+ * ==========================================================================
+ * Optimierungs-Funktionen (Global für HTML onclick Handler)
+ * ==========================================================================
+ */
+
+/**
+ * Findet und zeigt die besten Parameter aus dem aktuellen Sweep an
+ */
+window.findAndDisplayBest = function() {
+    if (!window.sweepResults || window.sweepResults.length === 0) {
+        alert('Bitte führen Sie zuerst einen Parameter Sweep durch.');
+        return;
+    }
+
+    const metricKey = document.getElementById('sweepMetric').value;
+    const maximize = shouldMaximizeMetric(metricKey);
+    const bestResult = findBestParameters(window.sweepResults, metricKey, maximize);
+
+    if (bestResult) {
+        displayBestParameters(bestResult, metricKey);
+        // Scroll zu den Ergebnissen
+        document.getElementById('optimizationResults').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } else {
+        alert('Keine Ergebnisse zum Optimieren gefunden.');
+    }
+};
+
+/**
+ * Führt adaptive Optimierung durch
+ */
+window.runAutoOptimization = async function() {
+    if (!window.sweepResults || window.sweepResults.length === 0) {
+        alert('Bitte führen Sie zuerst einen Parameter Sweep durch.');
+        return;
+    }
+
+    const metricKey = document.getElementById('sweepMetric').value;
+
+    // Bestätigung vom Nutzer
+    const confirmed = confirm(
+        `Auto-Optimierung für "${metricKey}" starten?\n\n` +
+        `Dies führt 2 zusätzliche Sweep-Durchläufe durch, um die Parameter zu verfeinern.\n` +
+        `Dies kann einige Minuten dauern.`
+    );
+
+    if (!confirmed) return;
+
+    // Deaktiviere Buttons während Optimierung
+    const autoOptButton = document.getElementById('autoOptimizeButton');
+    const findBestButton = document.getElementById('findBestButton');
+    const sweepButton = document.getElementById('sweepButton');
+
+    autoOptButton.disabled = true;
+    findBestButton.disabled = true;
+    sweepButton.disabled = true;
+
+    try {
+        const result = await runAdaptiveOptimization(metricKey, 2, (iter, max, best) => {
+            console.log(`Iteration ${iter}/${max}: Bester Wert = ${best.metricValue}`);
+        });
+
+        if (result) {
+            displayOptimizationHistory(result, metricKey);
+            // Scroll zu den Ergebnissen
+            document.getElementById('optimizationResults').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    } catch (error) {
+        alert(`Fehler bei Auto-Optimierung:\n\n${error.message}`);
+        console.error('Auto-Optimierung Fehler:', error);
+    } finally {
+        autoOptButton.disabled = false;
+        findBestButton.disabled = false;
+        sweepButton.disabled = false;
+    }
+};
+
+/**
+ * Zeigt Sensitivity Analysis
+ */
+window.showSensitivityAnalysis = function() {
+    displaySensitivityAnalysis();
+};
+
+/**
+ * Zeigt Dialog für Pareto Frontier
+ */
+window.showParetoDialog = function() {
+    // Erstelle ein einfaches Dialog für Metrik-Auswahl
+    const metric1 = prompt(
+        'Erste Metrik (X-Achse):\n\n' +
+        'Optionen:\n' +
+        '- successProbFloor\n' +
+        '- medianEndWealth (default)\n' +
+        '- p10EndWealth\n' +
+        '- p75EndWealth\n' +
+        '- meanEndWealth\n' +
+        '- maxEndWealth\n' +
+        '- worst5Drawdown\n' +
+        '- minRunwayObserved',
+        'medianEndWealth'
+    );
+
+    if (!metric1) return;
+
+    const metric2 = prompt(
+        'Zweite Metrik (Y-Achse):\n\n' +
+        'Optionen:\n' +
+        '- successProbFloor\n' +
+        '- medianEndWealth\n' +
+        '- p10EndWealth\n' +
+        '- p75EndWealth\n' +
+        '- meanEndWealth\n' +
+        '- maxEndWealth\n' +
+        '- worst5Drawdown (default)\n' +
+        '- minRunwayObserved',
+        'worst5Drawdown'
+    );
+
+    if (!metric2) return;
+
+    // Speichere Auswahl für displayParetoFrontier
+    if (!window.paretoMetrics) window.paretoMetrics = {};
+    window.paretoMetrics.metric1 = metric1;
+    window.paretoMetrics.metric2 = metric2;
+
+    displayParetoFrontier();
+};
+
+/**
+ * Demo: Multi-Objective Optimization
+ * Optimiert für Wealth UND Success Probability gleichzeitig
+ */
+window.runMultiObjectiveDemo = function() {
+    const objectives = [
+        { metricKey: 'medianEndWealth', weight: 0.6, maximize: true },
+        { metricKey: 'successProbFloor', weight: 0.4, maximize: true }
+    ];
+    displayMultiObjectiveOptimization(objectives);
+};
+
+/**
+ * Demo: Constraint-Based Optimization
+ * Maximiere Median Wealth unter Einhaltung von Success Rate >= 95%
+ */
+window.runConstraintBasedDemo = function() {
+    const constraints = [
+        { metricKey: 'successProbFloor', operator: '>=', value: 95 },
+        { metricKey: 'worst5Drawdown', operator: '<=', value: 40 }
+    ];
+    displayConstraintBasedOptimization('medianEndWealth', true, constraints);
+};
+
+// Event-Listener für Metrik-Änderung (um Optimierungsergebnisse zu aktualisieren)
+document.addEventListener('DOMContentLoaded', function() {
+    const metricSelector = document.getElementById('sweepMetric');
+    if (metricSelector) {
+        metricSelector.addEventListener('change', function() {
+            // Verstecke alte Optimierungsergebnisse bei Metrik-Wechsel
+            const optimizationResults = document.getElementById('optimizationResults');
+            if (optimizationResults && optimizationResults.style.display !== 'none') {
+                optimizationResults.style.display = 'none';
+            }
+
+            // Verstecke auch Sensitivity-Ergebnisse
+            const sensitivityResults = document.getElementById('sensitivityResults');
+            if (sensitivityResults && sensitivityResults.style.display !== 'none') {
+                sensitivityResults.style.display = 'none';
+            }
+        });
+    }
+});

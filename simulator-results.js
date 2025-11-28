@@ -462,6 +462,11 @@ export function aggregateSweepMetrics(runOutcomes) {
         return {
             successProbFloor: 0,
             p10EndWealth: 0,
+            p25EndWealth: 0,
+            medianEndWealth: 0,
+            p75EndWealth: 0,
+            meanEndWealth: 0,
+            maxEndWealth: 0,
             worst5Drawdown: 0,
             minRunwayObserved: 0
         };
@@ -472,8 +477,22 @@ export function aggregateSweepMetrics(runOutcomes) {
 
     const endWealths = runOutcomes.map(r => r.finalVermoegen || 0);
     endWealths.sort((a, b) => a - b);
+
+    // Perzentile
     const p10Index = Math.floor(endWealths.length * 0.10);
     const p10EndWealth = endWealths[p10Index] || 0;
+    const p25Index = Math.floor(endWealths.length * 0.25);
+    const p25EndWealth = endWealths[p25Index] || 0;
+    const p50Index = Math.floor(endWealths.length * 0.50);
+    const medianEndWealth = endWealths[p50Index] || 0;
+    const p75Index = Math.floor(endWealths.length * 0.75);
+    const p75EndWealth = endWealths[p75Index] || 0;
+
+    // Mittelwert
+    const meanEndWealth = endWealths.reduce((sum, val) => sum + val, 0) / endWealths.length;
+
+    // Maximum
+    const maxEndWealth = endWealths[endWealths.length - 1] || 0;
 
     const drawdowns = runOutcomes.map(r => r.maxDrawdown || 0);
     drawdowns.sort((a, b) => b - a);
@@ -486,6 +505,11 @@ export function aggregateSweepMetrics(runOutcomes) {
     return {
         successProbFloor,
         p10EndWealth,
+        p25EndWealth,
+        medianEndWealth,
+        p75EndWealth,
+        meanEndWealth,
+        maxEndWealth,
         worst5Drawdown,
         minRunwayObserved
     };
