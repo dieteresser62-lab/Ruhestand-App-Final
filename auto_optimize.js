@@ -534,6 +534,22 @@ export async function runAutoOptimize(config) {
     }
 
     if (evaluated.length === 0) {
+        // DEBUG: Zeige Metriken der Top-3 Kandidaten (vor Constraint-Check)
+        console.log('🔍 DEBUG: Top-3 Kandidaten VOR Constraint-Check:');
+        const allEvaluatedWithMetrics = [];
+        for (const candidate of top50.slice(0, 3)) {
+            const results = cache.get(candidate);
+            if (results) {
+                const sr = (results.successProbFloor ?? 0);
+                const exRate = (results.depletionRate ?? 0);
+                const dd = (results.worst5Drawdown ?? 0);
+                const ts = (results.timeShareWRgt45 ?? 0);
+                console.log(`  Candidate: p1=${candidate.p1Val}, p2=${candidate.p2Val}, p3=${candidate.p3Val}`);
+                console.log(`    SR: ${(sr * 100).toFixed(2)}%, Exhaustion: ${(exRate * 100).toFixed(3)}%, DD: ${(dd * 100).toFixed(1)}%, TS: ${(ts * 100).toFixed(2)}%`);
+                allEvaluatedWithMetrics.push({ candidate, results, sr, exRate, dd, ts });
+            }
+        }
+
         throw new Error('No candidates satisfied constraints after full evaluation');
     }
 
