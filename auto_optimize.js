@@ -455,6 +455,8 @@ export async function runAutoOptimize(config) {
     const quickFilterRuns = Math.min(200, Math.round(runsPerCandidate * 0.1));
     const quickFilterSeeds = trainSeedArray.slice(0, 2);
 
+    // Quick-Filter: KEINE Constraints (zu wenig Runs, zu hohe Varianz)
+    // Constraints werden erst bei voller Evaluation mit allen Runs geprüft
     const BATCH_SIZE = 4; // OPTIMIZATION 3: Parallele Evaluation
     const quickFiltered = [];
 
@@ -470,10 +472,11 @@ export async function runAutoOptimize(config) {
                     quickFilterRuns,
                     maxDauer,
                     quickFilterSeeds,
-                    constraints // Early Exit aktivieren
+                    null // KEIN Early Exit im Quick-Filter (zu wenig Runs für verlässliche Constraints)
                 );
 
-                if (results && checkConstraints(results, constraints)) {
+                if (results) {
+                    // Quick-Filter: Sortiere nur nach Objective, keine harten Constraints
                     const objValue = getObjectiveValue(results, objective);
                     return { candidate, objValue, quickResults: results };
                 }
@@ -486,7 +489,7 @@ export async function runAutoOptimize(config) {
     }
 
     if (quickFiltered.length === 0) {
-        throw new Error('No candidates passed quick filter (constraints too strict)');
+        throw new Error('Quick filter failed: all candidates produced invalid results');
     }
 
     // Sortiere und nimm Top-50
