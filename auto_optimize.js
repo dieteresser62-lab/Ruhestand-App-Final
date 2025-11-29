@@ -558,6 +558,8 @@ export async function runAutoOptimize(config) {
 
     const refineArray = Array.from(refineCandidates).map(s => JSON.parse(s));
 
+    onProgress({ stage: 'refine', progress: 0, total: refineArray.length });
+
     for (let i = 0; i < refineArray.length; i += BATCH_SIZE) {
         const batch = refineArray.slice(i, i + BATCH_SIZE);
 
@@ -585,6 +587,7 @@ export async function runAutoOptimize(config) {
         );
 
         evaluated.push(...batchResults.filter(r => r !== null));
+        onProgress({ stage: 'refine', progress: Math.min(i + BATCH_SIZE, refineArray.length), total: refineArray.length });
     }
 
     // Neu sortieren

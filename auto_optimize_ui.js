@@ -209,7 +209,12 @@ async function handleRunAutoOptimize() {
                 const pct = Math.round((status.progress / status.total) * 100);
                 progressEl.textContent = `🔍 Full evaluation (top candidates): ${status.progress}/${status.total} (${pct}%)`;
             } else if (status.stage === 'refine') {
-                progressEl.textContent = '🎯 Refining top-5 candidates (local search)...';
+                if (status.total) {
+                    const pct = Math.round((status.progress / status.total) * 100);
+                    progressEl.textContent = `🎯 Refining top-5 candidates: ${status.progress}/${status.total} (${pct}%)`;
+                } else {
+                    progressEl.textContent = '🎯 Refining top-5 candidates (local search)...';
+                }
             } else if (status.stage === 'validate') {
                 const pct = Math.round((status.progress / status.total) * 100);
                 progressEl.textContent = `✅ Validating on test seeds: ${status.progress}/${status.total} (${pct}%)`;
