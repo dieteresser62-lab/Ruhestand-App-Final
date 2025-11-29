@@ -120,7 +120,7 @@ function checkConstraints(results, constraints) {
 
     if (constraints.noex) {
         const exhaustionRate = results.depletionRate ?? 0;
-        if (exhaustionRate > 0) return false;
+        if (exhaustionRate > 0.005) return false; // > 0.5% (relaxed from 0% for practicality)
     }
 
     if (constraints.ts45) {
