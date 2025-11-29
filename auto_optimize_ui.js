@@ -202,16 +202,19 @@ async function handleRunAutoOptimize() {
         config.onProgress = (status) => {
             if (status.stage === 'lhs') {
                 progressEl.textContent = 'Generating candidates (Latin Hypercube Sampling)...';
+            } else if (status.stage === 'quick_filter') {
+                const pct = Math.round((status.progress / status.total) * 100);
+                progressEl.textContent = `⚡ Quick-Filter (fast evaluation): ${status.progress}/${status.total} (${pct}%)`;
             } else if (status.stage === 'evaluate_lhs') {
                 const pct = Math.round((status.progress / status.total) * 100);
-                progressEl.textContent = `Evaluating candidates: ${status.progress}/${status.total} (${pct}%)`;
+                progressEl.textContent = `🔍 Full evaluation (top candidates): ${status.progress}/${status.total} (${pct}%)`;
             } else if (status.stage === 'refine') {
-                progressEl.textContent = 'Refining top candidates (local search)...';
+                progressEl.textContent = '🎯 Refining top-5 candidates (local search)...';
             } else if (status.stage === 'validate') {
                 const pct = Math.round((status.progress / status.total) * 100);
-                progressEl.textContent = `Validating on test seeds: ${status.progress}/${status.total} (${pct}%)`;
+                progressEl.textContent = `✅ Validating on test seeds: ${status.progress}/${status.total} (${pct}%)`;
             } else if (status.stage === 'done') {
-                progressEl.textContent = 'Optimization complete!';
+                progressEl.textContent = '✨ Optimization complete!';
             }
         };
 

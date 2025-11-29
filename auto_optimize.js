@@ -216,15 +216,52 @@ function generateNeighbors(candidate, ranges) {
 }
 
 /**
+ * Reduzierte Nachbarschaft für schnellere Verfeinerung
+ * @param {object} candidate - {runwayMinM, runwayTargetM, goldTargetPct}
+ * @param {object} ranges - Original-Ranges
+ * @returns {Array<object>} Nachbarn (nur ±2)
+ */
+function generateNeighborsReduced(candidate, ranges) {
+    const neighbors = [];
+
+    // Runway Min: nur ±2 Monate
+    for (const delta of [-2, 2]) {
+        const val = candidate.runwayMinM + delta;
+        if (val >= ranges.runwayMinM.min && val <= ranges.runwayMinM.max) {
+            neighbors.push({ ...candidate, runwayMinM: val });
+        }
+    }
+
+    // Runway Target: nur ±2 Monate
+    for (const delta of [-2, 2]) {
+        const val = candidate.runwayTargetM + delta;
+        if (val >= ranges.runwayTargetM.min && val <= ranges.runwayTargetM.max) {
+            neighbors.push({ ...candidate, runwayTargetM: val });
+        }
+    }
+
+    // Gold: nur ±1 Prozentpunkt
+    for (const delta of [-1, 1]) {
+        const val = candidate.goldTargetPct + delta;
+        if (val >= ranges.goldTargetPct.min && val <= ranges.goldTargetPct.max) {
+            neighbors.push({ ...candidate, goldTargetPct: val });
+        }
+    }
+
+    return neighbors;
+}
+
+/**
  * Führt eine MC-Simulation für einen Kandidaten aus
  * @param {object} candidate - {runwayMinM, runwayTargetM, goldTargetPct}
  * @param {object} baseInputs - Basis-Config
  * @param {number} runsPerCandidate - Anzahl MC-Runs
  * @param {number} maxDauer - Max. Simulationsdauer in Jahren
  * @param {Array<number>} seeds - Seed-Array
- * @returns {Promise<object>} Aggregierte Ergebnisse
+ * @param {object} constraints - Constraints (optional, für Early Exit)
+ * @returns {Promise<object|null>} Aggregierte Ergebnisse oder null wenn Constraints verletzt
  */
-async function evaluateCandidate(candidate, baseInputs, runsPerCandidate, maxDauer, seeds) {
+async function evaluateCandidate(candidate, baseInputs, runsPerCandidate, maxDauer, seeds, constraints = null) {
     // Deep-clone inputs und Override anwenden
     const inputs = deepClone(baseInputs);
 
@@ -264,6 +301,24 @@ async function evaluateCandidate(candidate, baseInputs, runsPerCandidate, maxDau
         });
 
         allResults.push(aggregatedResults);
+
+        // OPTIMIZATION: Early Exit bei harten Constraint-Verletzungen
+        // Wenn bereits nach 1-2 Seeds klar ist, dass Constraints verletzt werden,
+        // müssen die restlichen Seeds nicht mehr berechnet werden
+        if (constraints && allResults.length >= 2) {
+            const partialAvg = {
+                successProbFloor: mean(allResults.map(r => r.successProbFloor ?? r.successRate ?? 0)),
+                depletionRate: mean(allResults.map(r => r.depletionRate ?? 0)),
+                timeShareWRgt45: mean(allResults.map(r => r.timeShareWRgt45 ?? 0)),
+                drawdown: { p90: mean(allResults.map(r => r.drawdown?.p90 ?? r.worst5Drawdown ?? 0)) }
+            };
+
+            // Harte Constraints: Wenn deutlich verfehlt (>5% Puffer), abbrechen
+            if (constraints.sr99 && partialAvg.successProbFloor < 0.94) return null;
+            if (constraints.noex && partialAvg.depletionRate > 0.05) return null;
+            if (constraints.ts45 && partialAvg.timeShareWRgt45 > 0.05) return null;
+            if (constraints.dd55 && partialAvg.drawdown.p90 > 0.60) return null;
+        }
     }
 
     // Mittelwerte über Seeds bilden
@@ -380,8 +435,8 @@ export async function runAutoOptimize(config) {
 
     onProgress({ stage: 'lhs', progress: 0 });
 
-    // Phase 1: Latin Hypercube Sampling (200 Kandidaten)
-    const lhsSamples = latinHypercubeSample(params, 200, rand);
+    // OPTIMIZATION 1: Reduzierte LHS-Größe (100 statt 200)
+    const lhsSamples = latinHypercubeSample(params, 100, rand);
 
     const validCandidates = [];
     for (const sample of lhsSamples) {
@@ -396,51 +451,104 @@ export async function runAutoOptimize(config) {
         }
     }
 
-    onProgress({ stage: 'evaluate_lhs', progress: 0, total: validCandidates.length });
+    onProgress({ stage: 'quick_filter', progress: 0, total: validCandidates.length });
 
-    // Evaluiere alle validen Kandidaten
+    // OPTIMIZATION 2: Early Pruning - Quick-Filter mit reduzierten Runs
+    // Phase 1a: Quick-Filter mit nur 200 Runs × 2 Seeds
+    const quickFilterRuns = Math.min(200, Math.round(runsPerCandidate * 0.1));
+    const quickFilterSeeds = trainSeedArray.slice(0, 2);
+
+    const BATCH_SIZE = 4; // OPTIMIZATION 3: Parallele Evaluation
+    const quickFiltered = [];
+
+    for (let i = 0; i < validCandidates.length; i += BATCH_SIZE) {
+        const batch = validCandidates.slice(i, i + BATCH_SIZE);
+
+        // Parallel evaluation
+        const batchResults = await Promise.all(
+            batch.map(async (candidate) => {
+                const results = await evaluateCandidate(
+                    candidate,
+                    baseInputs,
+                    quickFilterRuns,
+                    maxDauer,
+                    quickFilterSeeds,
+                    constraints // Early Exit aktivieren
+                );
+
+                if (results && checkConstraints(results, constraints)) {
+                    const objValue = getObjectiveValue(results, objective);
+                    return { candidate, objValue, quickResults: results };
+                }
+                return null;
+            })
+        );
+
+        quickFiltered.push(...batchResults.filter(r => r !== null));
+        onProgress({ stage: 'quick_filter', progress: Math.min(i + BATCH_SIZE, validCandidates.length), total: validCandidates.length });
+    }
+
+    if (quickFiltered.length === 0) {
+        throw new Error('No candidates passed quick filter (constraints too strict)');
+    }
+
+    // Sortiere und nimm Top-50
+    quickFiltered.sort((a, b) => b.objValue - a.objValue);
+    const top50 = quickFiltered.slice(0, Math.min(50, quickFiltered.length));
+
+    onProgress({ stage: 'evaluate_lhs', progress: 0, total: top50.length });
+
+    // Phase 1b: Volle Evaluation der Top-50
     const evaluated = [];
-    for (let i = 0; i < validCandidates.length; i++) {
-        const candidate = validCandidates[i];
 
-        if (!cache.has(candidate)) {
-            const results = await evaluateCandidate(
-                candidate,
-                baseInputs,
-                runsPerCandidate,
-                maxDauer,
-                trainSeedArray
-            );
-            cache.set(candidate, results);
-        }
+    for (let i = 0; i < top50.length; i += BATCH_SIZE) {
+        const batch = top50.slice(i, i + BATCH_SIZE);
 
-        const results = cache.get(candidate);
+        const batchResults = await Promise.all(
+            batch.map(async (entry) => {
+                const candidate = entry.candidate;
 
-        // Constraints prüfen
-        if (checkConstraints(results, constraints)) {
-            const objValue = getObjectiveValue(results, objective);
-            evaluated.push({ candidate, results, objValue });
-        }
+                if (!cache.has(candidate)) {
+                    const results = await evaluateCandidate(
+                        candidate,
+                        baseInputs,
+                        runsPerCandidate,
+                        maxDauer,
+                        trainSeedArray,
+                        constraints
+                    );
+                    if (results) cache.set(candidate, results);
+                }
 
-        onProgress({ stage: 'evaluate_lhs', progress: i + 1, total: validCandidates.length });
+                const results = cache.get(candidate);
+                if (results && checkConstraints(results, constraints)) {
+                    const objValue = getObjectiveValue(results, objective);
+                    return { candidate, results, objValue };
+                }
+                return null;
+            })
+        );
+
+        evaluated.push(...batchResults.filter(r => r !== null));
+        onProgress({ stage: 'evaluate_lhs', progress: Math.min(i + BATCH_SIZE, top50.length), total: top50.length });
     }
 
     if (evaluated.length === 0) {
-        throw new Error('No candidates satisfied constraints');
+        throw new Error('No candidates satisfied constraints after full evaluation');
     }
 
     // Sortiere nach Objective
     evaluated.sort((a, b) => b.objValue - a.objValue);
 
-    // Top-10 für lokale Verfeinerung
-    const top10 = evaluated.slice(0, 10);
+    // Top-5 für lokale Verfeinerung (statt Top-10)
+    const top5 = evaluated.slice(0, 5);
 
     onProgress({ stage: 'refine', progress: 0 });
 
-    // Phase 2: Lokale Verfeinerung
+    // Phase 2: Lokale Verfeinerung (nur ±2 statt ±2/±4)
     const refineCandidates = new Set();
-    for (const entry of top10) {
-        const neighbors = generateNeighbors(entry.candidate, params);
+    for (const entry of top5) {
+        const neighbors = generateNeighborsReduced(entry.candidate, params);
         for (const neighbor of neighbors) {
             if (isValidCandidate(neighbor, goldCap)) {
                 refineCandidates.add(JSON.stringify(neighbor));
@@ -450,26 +558,33 @@ export async function runAutoOptimize(config) {
 
     const refineArray = Array.from(refineCandidates).map(s => JSON.parse(s));
 
-    for (let i = 0; i < refineArray.length; i++) {
-        const candidate = refineArray[i];
+    for (let i = 0; i < refineArray.length; i += BATCH_SIZE) {
+        const batch = refineArray.slice(i, i + BATCH_SIZE);
 
-        if (!cache.has(candidate)) {
-            const results = await evaluateCandidate(
-                candidate,
-                baseInputs,
-                runsPerCandidate,
-                maxDauer,
-                trainSeedArray
-            );
-            cache.set(candidate, results);
-        }
+        const batchResults = await Promise.all(
+            batch.map(async (candidate) => {
+                if (!cache.has(candidate)) {
+                    const results = await evaluateCandidate(
+                        candidate,
+                        baseInputs,
+                        runsPerCandidate,
+                        maxDauer,
+                        trainSeedArray,
+                        constraints
+                    );
+                    if (results) cache.set(candidate, results);
+                }
 
-        const results = cache.get(candidate);
+                const results = cache.get(candidate);
+                if (results && checkConstraints(results, constraints)) {
+                    const objValue = getObjectiveValue(results, objective);
+                    return { candidate, results, objValue };
+                }
+                return null;
+            })
+        );
 
-        if (checkConstraints(results, constraints)) {
-            const objValue = getObjectiveValue(results, objective);
-            evaluated.push({ candidate, results, objValue });
-        }
+        evaluated.push(...batchResults.filter(r => r !== null));
     }
 
     // Neu sortieren
