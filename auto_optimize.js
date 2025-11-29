@@ -319,9 +319,9 @@ async function evaluateCandidate(candidate, baseInputs, runsPerCandidate, maxDau
         if (constraints && allResults.length >= 2) {
             const partialAvg = {
                 successRate: mean(allResults.map(r => (r.anzahl - r.failCount) / r.anzahl)),
-                depletionRate: mean(allResults.map(r => (r.aggregatedResults.depotErschoepfungsQuote ?? 0) / 100)),
+                depletionRate: mean(allResults.map(r => (r.aggregatedResults.depotErschoepfungsQuote ?? 0) / 100)), // % → 0-1
                 timeShareWRgt45: mean(allResults.map(r => r.aggregatedResults.extraKPI?.timeShareQuoteAbove45 ?? 0)),
-                worst5Drawdown: mean(allResults.map(r => r.aggregatedResults.maxDrawdowns?.p90 ?? 0))
+                worst5Drawdown: mean(allResults.map(r => (r.aggregatedResults.maxDrawdowns?.p90 ?? 0) / 100)) // % → 0-1
             };
 
             // Harte Constraints: Wenn deutlich verfehlt (>5% Puffer), abbrechen
@@ -333,14 +333,14 @@ async function evaluateCandidate(candidate, baseInputs, runsPerCandidate, maxDau
     }
 
     // Mittelwerte über Seeds bilden
-    // WICHTIG: aggregatedResults hat VERSCHACHTELTE Struktur (finalOutcomes.p50, nicht p50EndWealth)
+    // WICHTIG: Normalisierung - manche Werte sind bereits in % (→ /100), andere in Dezimal
     const avgResults = {
         successProbFloor: mean(allResults.map(r => (r.anzahl - r.failCount) / r.anzahl)),
-        depletionRate: mean(allResults.map(r => (r.aggregatedResults.depotErschoepfungsQuote ?? 0) / 100)),
-        timeShareWRgt45: mean(allResults.map(r => r.aggregatedResults.extraKPI?.timeShareQuoteAbove45 ?? 0)),
-        p25EndWealth: mean(allResults.map(r => r.aggregatedResults.finalOutcomes?.p10 ?? 0)), // Use p10 as proxy for p25
-        medianEndWealth: mean(allResults.map(r => r.aggregatedResults.finalOutcomes?.p50 ?? 0)),
-        worst5Drawdown: mean(allResults.map(r => r.aggregatedResults.maxDrawdowns?.p90 ?? 0)),
+        depletionRate: mean(allResults.map(r => (r.aggregatedResults.depotErschoepfungsQuote ?? 0) / 100)), // % → 0-1
+        timeShareWRgt45: mean(allResults.map(r => r.aggregatedResults.extraKPI?.timeShareQuoteAbove45 ?? 0)), // already 0-1
+        p25EndWealth: mean(allResults.map(r => r.aggregatedResults.finalOutcomes?.p10 ?? 0)), // absolute €
+        medianEndWealth: mean(allResults.map(r => r.aggregatedResults.finalOutcomes?.p50 ?? 0)), // absolute €
+        worst5Drawdown: mean(allResults.map(r => (r.aggregatedResults.maxDrawdowns?.p90 ?? 0) / 100)), // % → 0-1
         medianWithdrawalRate: 0 // Not available in aggregatedResults
     };
 
