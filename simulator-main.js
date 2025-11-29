@@ -80,6 +80,7 @@ import {
     setNested,
     withNoLSWrites
 } from './simulator-sweep-utils.js';
+import { initAutoOptimizeUI, setAutoOptimizeDefaults } from './auto_optimize_ui.js';
 import {
     applyPensionTax,
     formatCellForDisplay,
@@ -476,6 +477,10 @@ window.onload = function () {
 
     // Sweep defaults with localStorage persistence
     initSweepDefaultsWithLocalStorageFallback();
+
+    // Auto-Optimize UI initialization
+    setAutoOptimizeDefaults();
+    initAutoOptimizeUI();
 
     // Partner/Rente-2 configuration with localStorage persistence
     initRente2ConfigWithLocalStorage();
