@@ -289,11 +289,11 @@ function renderResult(result, objective) {
                     </div>
                     <div>
                         <strong>P90 Drawdown:</strong>
-                        <span style="margin-left: 10px;">${((metricsTest.drawdown?.p90 ?? 0) * 100).toFixed(1)}%</span>
+                        <span style="margin-left: 10px;">${((metricsTest.worst5Drawdown ?? 0) * 100).toFixed(1)}%</span>
                     </div>
                     <div>
                         <strong>End Wealth P50:</strong>
-                        <span style="margin-left: 10px;">${formatCurrency(metricsTest.endWealth?.p50 ?? 0)}</span>
+                        <span style="margin-left: 10px;">${formatCurrency(metricsTest.medianEndWealth ?? 0)}</span>
                     </div>
                     <div>
                         <strong>Time Share WR > 4.5%:</strong>

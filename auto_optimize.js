@@ -71,7 +71,7 @@ function isValidCandidate(candidate, goldCap) {
 
 /**
  * Extrahiert Metriken aus aggregierten MC-Ergebnissen
- * @param {object} results - Aggregierte MC-Ergebnisse
+ * @param {object} results - Aggregierte MC-Ergebnisse (FLACHE Struktur!)
  * @param {object} objective - {metric, direction, quantile}
  * @returns {number} Metrikwert
  */
@@ -81,16 +81,16 @@ export function getObjectiveValue(results, objective) {
 
     switch (metric) {
         case 'EndWealth_P50':
-            value = results.endWealth?.p50 ?? results.medianEndWealth ?? 0;
+            value = results.medianEndWealth ?? 0;
             break;
         case 'EndWealth_P25':
-            value = results.endWealth?.p25 ?? results.p25EndWealth ?? 0;
+            value = results.p25EndWealth ?? 0;
             break;
         case 'SuccessRate':
-            value = results.successProbFloor ?? results.successRate ?? 0;
+            value = results.successProbFloor ?? 0;
             break;
         case 'Drawdown_P90':
-            value = results.drawdown?.p90 ?? results.worst5Drawdown ?? 0;
+            value = results.worst5Drawdown ?? 0;
             break;
         case 'TimeShare_WR_gt_4_5':
             value = results.timeShareWRgt45 ?? 0;
@@ -108,13 +108,13 @@ export function getObjectiveValue(results, objective) {
 
 /**
  * Prüft Constraints
- * @param {object} results - Aggregierte MC-Ergebnisse
+ * @param {object} results - Aggregierte MC-Ergebnisse (FLACHE Struktur!)
  * @param {object} constraints - {sr99, noex, ts45, dd55}
  * @returns {boolean} true wenn alle aktiven Constraints erfüllt
  */
 function checkConstraints(results, constraints) {
     if (constraints.sr99) {
-        const sr = results.successProbFloor ?? results.successRate ?? 0;
+        const sr = results.successProbFloor ?? 0;
         if (sr < 0.99) return false;
     }
 
@@ -129,7 +129,7 @@ function checkConstraints(results, constraints) {
     }
 
     if (constraints.dd55) {
-        const dd = results.drawdown?.p90 ?? results.worst5Drawdown ?? 0;
+        const dd = results.worst5Drawdown ?? 0;
         if (dd > 0.55) return false; // > 55%
     }
 
@@ -307,32 +307,29 @@ async function evaluateCandidate(candidate, baseInputs, runsPerCandidate, maxDau
         // müssen die restlichen Seeds nicht mehr berechnet werden
         if (constraints && allResults.length >= 2) {
             const partialAvg = {
-                successProbFloor: mean(allResults.map(r => r.successProbFloor ?? r.successRate ?? 0)),
+                successProbFloor: mean(allResults.map(r => r.successProbFloor ?? 0)) / 100, // % to 0-1
                 depletionRate: mean(allResults.map(r => r.depletionRate ?? 0)),
                 timeShareWRgt45: mean(allResults.map(r => r.timeShareWRgt45 ?? 0)),
-                drawdown: { p90: mean(allResults.map(r => r.drawdown?.p90 ?? r.worst5Drawdown ?? 0)) }
+                worst5Drawdown: mean(allResults.map(r => r.worst5Drawdown ?? 0))
             };
 
             // Harte Constraints: Wenn deutlich verfehlt (>5% Puffer), abbrechen
             if (constraints.sr99 && partialAvg.successProbFloor < 0.94) return null;
             if (constraints.noex && partialAvg.depletionRate > 0.05) return null;
             if (constraints.ts45 && partialAvg.timeShareWRgt45 > 0.05) return null;
-            if (constraints.dd55 && partialAvg.drawdown.p90 > 0.60) return null;
+            if (constraints.dd55 && partialAvg.worst5Drawdown > 0.60) return null;
         }
     }
 
     // Mittelwerte über Seeds bilden
+    // WICHTIG: aggregatedResults hat FLACHE Struktur (p25EndWealth, nicht endWealth.p25)
     const avgResults = {
-        successProbFloor: mean(allResults.map(r => r.successProbFloor ?? r.successRate ?? 0)),
+        successProbFloor: mean(allResults.map(r => r.successProbFloor ?? 0)) / 100, // Convert % to 0-1
         depletionRate: mean(allResults.map(r => r.depletionRate ?? 0)),
         timeShareWRgt45: mean(allResults.map(r => r.timeShareWRgt45 ?? 0)),
-        endWealth: {
-            p25: mean(allResults.map(r => r.endWealth?.p25 ?? r.p25EndWealth ?? 0)),
-            p50: mean(allResults.map(r => r.endWealth?.p50 ?? r.medianEndWealth ?? 0))
-        },
-        drawdown: {
-            p90: mean(allResults.map(r => r.drawdown?.p90 ?? r.worst5Drawdown ?? 0))
-        },
+        p25EndWealth: mean(allResults.map(r => r.p25EndWealth ?? 0)),
+        medianEndWealth: mean(allResults.map(r => r.medianEndWealth ?? 0)),
+        worst5Drawdown: mean(allResults.map(r => r.worst5Drawdown ?? 0)),
         medianWithdrawalRate: mean(allResults.map(r => r.medianWithdrawalRate ?? 0))
     };
 
@@ -664,8 +661,8 @@ export async function runAutoOptimize(config) {
 
     const delta = {
         successRate: (champion.testResults.successProbFloor ?? 0) - (currentResults.successProbFloor ?? 0),
-        drawdownP90: (champion.testResults.drawdown?.p90 ?? 0) - (currentResults.drawdown?.p90 ?? 0),
-        endWealthP50: (champion.testResults.endWealth?.p50 ?? 0) - (currentResults.endWealth?.p50 ?? 0),
+        drawdownP90: (champion.testResults.worst5Drawdown ?? 0) - (currentResults.worst5Drawdown ?? 0),
+        endWealthP50: (champion.testResults.medianEndWealth ?? 0) - (currentResults.medianEndWealth ?? 0),
         timeShareWRgt45: (champion.testResults.timeShareWRgt45 ?? 0) - (currentResults.timeShareWRgt45 ?? 0)
     };
 
