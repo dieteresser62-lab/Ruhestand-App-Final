@@ -302,6 +302,19 @@ async function evaluateCandidate(candidate, baseInputs, runsPerCandidate, maxDau
 
         allResults.push(aggregatedResults);
 
+        // DEBUG: Log first aggregatedResults structure
+        if (allResults.length === 1) {
+            console.log('🔍 DEBUG evaluateCandidate - First aggregatedResults:', {
+                keys: Object.keys(aggregatedResults),
+                successProbFloor: aggregatedResults.successProbFloor,
+                medianEndWealth: aggregatedResults.medianEndWealth,
+                worst5Drawdown: aggregatedResults.worst5Drawdown,
+                depletionRate: aggregatedResults.depletionRate,
+                timeShareWRgt45: aggregatedResults.timeShareWRgt45,
+                p25EndWealth: aggregatedResults.p25EndWealth
+            });
+        }
+
         // OPTIMIZATION: Early Exit bei harten Constraint-Verletzungen
         // Wenn bereits nach 1-2 Seeds klar ist, dass Constraints verletzt werden,
         // müssen die restlichen Seeds nicht mehr berechnet werden
@@ -537,7 +550,8 @@ export async function runAutoOptimize(config) {
         // DEBUG: Zeige Metriken der Top-3 Kandidaten (vor Constraint-Check)
         console.log('🔍 DEBUG: Top-3 Kandidaten VOR Constraint-Check:');
         const allEvaluatedWithMetrics = [];
-        for (const candidate of top50.slice(0, 3)) {
+        for (const entry of top50.slice(0, Math.min(3, top50.length))) {
+            const candidate = entry.candidate;
             const results = cache.get(candidate);
             if (results) {
                 const sr = (results.successProbFloor ?? 0);
@@ -546,7 +560,10 @@ export async function runAutoOptimize(config) {
                 const ts = (results.timeShareWRgt45 ?? 0);
                 console.log(`  Candidate: p1=${candidate.p1Val}, p2=${candidate.p2Val}, p3=${candidate.p3Val}`);
                 console.log(`    SR: ${(sr * 100).toFixed(2)}%, Exhaustion: ${(exRate * 100).toFixed(3)}%, DD: ${(dd * 100).toFixed(1)}%, TS: ${(ts * 100).toFixed(2)}%`);
+                console.log(`    Constraints: sr99=${constraints.sr99}, noex=${constraints.noex}, ts45=${constraints.ts45}, dd55=${constraints.dd55}`);
                 allEvaluatedWithMetrics.push({ candidate, results, sr, exRate, dd, ts });
+            } else {
+                console.log(`  ⚠️ Candidate p1=${candidate.p1Val}, p2=${candidate.p2Val}, p3=${candidate.p3Val} - NO RESULTS IN CACHE`);
             }
         }
 
