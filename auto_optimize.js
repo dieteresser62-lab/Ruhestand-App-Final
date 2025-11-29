@@ -291,7 +291,7 @@ async function evaluateCandidate(candidate, baseInputs, runsPerCandidate, maxDau
 
         const scenarioAnalyzer = new ScenarioAnalyzer(runsPerCandidate);
 
-        const { aggregatedResults } = await runMonteCarloSimulation({
+        const { aggregatedResults, failCount } = await runMonteCarloSimulation({
             inputs,
             widowOptions,
             monteCarloParams,
@@ -300,16 +300,17 @@ async function evaluateCandidate(candidate, baseInputs, runsPerCandidate, maxDau
             scenarioAnalyzer
         });
 
-        allResults.push(aggregatedResults);
+        allResults.push({ aggregatedResults, failCount, anzahl: runsPerCandidate });
 
         // DEBUG: Log first aggregatedResults structure
         if (allResults.length === 1) {
-            console.log('🔍 DEBUG - aggregatedResults KEYS:', Object.keys(aggregatedResults));
-            console.log('🔍 DEBUG - Full aggregatedResults:', aggregatedResults);
-            console.log('🔍 DEBUG - Trying to access specific keys:');
-            console.log('  successProbFloor:', aggregatedResults.successProbFloor);
-            console.log('  medianEndWealth:', aggregatedResults.medianEndWealth);
-            console.log('  worst5Drawdown:', aggregatedResults.worst5Drawdown);
+            console.log('🔍 DEBUG - aggregatedResults structure:');
+            console.log('  finalOutcomes.p50:', aggregatedResults.finalOutcomes?.p50);
+            console.log('  maxDrawdowns.p90:', aggregatedResults.maxDrawdowns?.p90);
+            console.log('  depotErschoepfungsQuote:', aggregatedResults.depotErschoepfungsQuote);
+            console.log('  extraKPI.timeShareQuoteAbove45:', aggregatedResults.extraKPI?.timeShareQuoteAbove45);
+            console.log('  failCount:', failCount);
+            console.log('  successRate:', ((runsPerCandidate - failCount) / runsPerCandidate * 100).toFixed(2), '%');
         }
 
         // OPTIMIZATION: Early Exit bei harten Constraint-Verletzungen
@@ -317,14 +318,14 @@ async function evaluateCandidate(candidate, baseInputs, runsPerCandidate, maxDau
         // müssen die restlichen Seeds nicht mehr berechnet werden
         if (constraints && allResults.length >= 2) {
             const partialAvg = {
-                successProbFloor: mean(allResults.map(r => r.successProbFloor ?? 0)) / 100, // % to 0-1
-                depletionRate: mean(allResults.map(r => r.depletionRate ?? 0)),
-                timeShareWRgt45: mean(allResults.map(r => r.timeShareWRgt45 ?? 0)),
-                worst5Drawdown: mean(allResults.map(r => r.worst5Drawdown ?? 0))
+                successRate: mean(allResults.map(r => (r.anzahl - r.failCount) / r.anzahl)),
+                depletionRate: mean(allResults.map(r => (r.aggregatedResults.depotErschoepfungsQuote ?? 0) / 100)),
+                timeShareWRgt45: mean(allResults.map(r => r.aggregatedResults.extraKPI?.timeShareQuoteAbove45 ?? 0)),
+                worst5Drawdown: mean(allResults.map(r => r.aggregatedResults.maxDrawdowns?.p90 ?? 0))
             };
 
             // Harte Constraints: Wenn deutlich verfehlt (>5% Puffer), abbrechen
-            if (constraints.sr99 && partialAvg.successProbFloor < 0.94) return null;
+            if (constraints.sr99 && partialAvg.successRate < 0.94) return null;
             if (constraints.noex && partialAvg.depletionRate > 0.05) return null;
             if (constraints.ts45 && partialAvg.timeShareWRgt45 > 0.05) return null;
             if (constraints.dd55 && partialAvg.worst5Drawdown > 0.60) return null;
@@ -332,15 +333,15 @@ async function evaluateCandidate(candidate, baseInputs, runsPerCandidate, maxDau
     }
 
     // Mittelwerte über Seeds bilden
-    // WICHTIG: aggregatedResults hat FLACHE Struktur (p25EndWealth, nicht endWealth.p25)
+    // WICHTIG: aggregatedResults hat VERSCHACHTELTE Struktur (finalOutcomes.p50, nicht p50EndWealth)
     const avgResults = {
-        successProbFloor: mean(allResults.map(r => r.successProbFloor ?? 0)) / 100, // Convert % to 0-1
-        depletionRate: mean(allResults.map(r => r.depletionRate ?? 0)),
-        timeShareWRgt45: mean(allResults.map(r => r.timeShareWRgt45 ?? 0)),
-        p25EndWealth: mean(allResults.map(r => r.p25EndWealth ?? 0)),
-        medianEndWealth: mean(allResults.map(r => r.medianEndWealth ?? 0)),
-        worst5Drawdown: mean(allResults.map(r => r.worst5Drawdown ?? 0)),
-        medianWithdrawalRate: mean(allResults.map(r => r.medianWithdrawalRate ?? 0))
+        successProbFloor: mean(allResults.map(r => (r.anzahl - r.failCount) / r.anzahl)),
+        depletionRate: mean(allResults.map(r => (r.aggregatedResults.depotErschoepfungsQuote ?? 0) / 100)),
+        timeShareWRgt45: mean(allResults.map(r => r.aggregatedResults.extraKPI?.timeShareQuoteAbove45 ?? 0)),
+        p25EndWealth: mean(allResults.map(r => r.aggregatedResults.finalOutcomes?.p10 ?? 0)), // Use p10 as proxy for p25
+        medianEndWealth: mean(allResults.map(r => r.aggregatedResults.finalOutcomes?.p50 ?? 0)),
+        worst5Drawdown: mean(allResults.map(r => r.aggregatedResults.maxDrawdowns?.p90 ?? 0)),
+        medianWithdrawalRate: 0 // Not available in aggregatedResults
     };
 
     return avgResults;
