@@ -304,15 +304,12 @@ async function evaluateCandidate(candidate, baseInputs, runsPerCandidate, maxDau
 
         // DEBUG: Log first aggregatedResults structure
         if (allResults.length === 1) {
-            console.log('🔍 DEBUG evaluateCandidate - First aggregatedResults:', {
-                keys: Object.keys(aggregatedResults),
-                successProbFloor: aggregatedResults.successProbFloor,
-                medianEndWealth: aggregatedResults.medianEndWealth,
-                worst5Drawdown: aggregatedResults.worst5Drawdown,
-                depletionRate: aggregatedResults.depletionRate,
-                timeShareWRgt45: aggregatedResults.timeShareWRgt45,
-                p25EndWealth: aggregatedResults.p25EndWealth
-            });
+            console.log('🔍 DEBUG - aggregatedResults KEYS:', Object.keys(aggregatedResults));
+            console.log('🔍 DEBUG - Full aggregatedResults:', aggregatedResults);
+            console.log('🔍 DEBUG - Trying to access specific keys:');
+            console.log('  successProbFloor:', aggregatedResults.successProbFloor);
+            console.log('  medianEndWealth:', aggregatedResults.medianEndWealth);
+            console.log('  worst5Drawdown:', aggregatedResults.worst5Drawdown);
         }
 
         // OPTIMIZATION: Early Exit bei harten Constraint-Verletzungen
