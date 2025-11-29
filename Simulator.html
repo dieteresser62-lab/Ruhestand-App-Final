@@ -763,6 +763,200 @@
                         </div>
                         <div id="sweepHeatmap"></div>
                     </div>
+
+                    <!-- Auto-Optimize Panel -->
+                    <fieldset style="margin-top: 30px; border: 2px solid var(--secondary-color);">
+                        <legend><span class="section-icon">🚀</span>Auto-Optimize</legend>
+
+                        <!-- Objective -->
+                        <div style="background: #f0f8ff; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                            <h4 style="margin-top: 0; margin-bottom: 15px;">Objective</h4>
+                            <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+                                <div class="form-group">
+                                    <label for="ao_metric">Metrik</label>
+                                    <select id="ao_metric">
+                                        <option value="EndWealth_P50">End Wealth P50</option>
+                                        <option value="EndWealth_P25">End Wealth P25</option>
+                                        <option value="SuccessRate" selected>Success Rate</option>
+                                        <option value="Drawdown_P90">Drawdown P90</option>
+                                        <option value="TimeShare_WR_gt_4_5">Time Share WR > 4.5%</option>
+                                        <option value="Median_WR">Median Withdrawal Rate</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="ao_direction">Optimierungsziel</label>
+                                    <select id="ao_direction">
+                                        <option value="max" selected>Maximize</option>
+                                        <option value="min">Minimize</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div id="ao_quantile_container" class="form-group" style="display: none;">
+                                <label for="ao_quantile">Quantile (%)</label>
+                                <input type="number" id="ao_quantile" value="50" min="1" max="99" step="1">
+                            </div>
+                        </div>
+
+                        <!-- Parameter Picker -->
+                        <div style="background: #fff8f0; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                            <h4 style="margin-top: 0; margin-bottom: 15px;">Parameter (3 erforderlich)</h4>
+
+                            <!-- Parameter 1 -->
+                            <div style="border: 1px solid #ddd; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
+                                <h5 style="margin-top: 0; margin-bottom: 10px;">Parameter 1</h5>
+                                <div class="form-grid-four-col">
+                                    <div class="form-group">
+                                        <label for="ao_p1_key">Key</label>
+                                        <select id="ao_p1_key">
+                                            <option value="runwayMinM" selected>Runway Min (Monate)</option>
+                                            <option value="runwayTargetM">Runway Target (Monate)</option>
+                                            <option value="goldTargetPct">Gold Target (%)</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="ao_p1_min">Min</label>
+                                        <input type="number" id="ao_p1_min" value="18" step="1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="ao_p1_max">Max</label>
+                                        <input type="number" id="ao_p1_max" value="36" step="1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="ao_p1_step">Step</label>
+                                        <input type="number" id="ao_p1_step" value="2" step="0.1" min="0.1">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Parameter 2 -->
+                            <div style="border: 1px solid #ddd; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
+                                <h5 style="margin-top: 0; margin-bottom: 10px;">Parameter 2</h5>
+                                <div class="form-grid-four-col">
+                                    <div class="form-group">
+                                        <label for="ao_p2_key">Key</label>
+                                        <select id="ao_p2_key">
+                                            <option value="runwayMinM">Runway Min (Monate)</option>
+                                            <option value="runwayTargetM" selected>Runway Target (Monate)</option>
+                                            <option value="goldTargetPct">Gold Target (%)</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="ao_p2_min">Min</label>
+                                        <input type="number" id="ao_p2_min" value="24" step="1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="ao_p2_max">Max</label>
+                                        <input type="number" id="ao_p2_max" value="48" step="1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="ao_p2_step">Step</label>
+                                        <input type="number" id="ao_p2_step" value="2" step="0.1" min="0.1">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Parameter 3 -->
+                            <div style="border: 1px solid #ddd; padding: 10px; border-radius: 4px;">
+                                <h5 style="margin-top: 0; margin-bottom: 10px;">Parameter 3</h5>
+                                <div class="form-grid-four-col">
+                                    <div class="form-group">
+                                        <label for="ao_p3_key">Key</label>
+                                        <select id="ao_p3_key">
+                                            <option value="runwayMinM">Runway Min (Monate)</option>
+                                            <option value="runwayTargetM">Runway Target (Monate)</option>
+                                            <option value="goldTargetPct" selected>Gold Target (%)</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="ao_p3_min">Min</label>
+                                        <input type="number" id="ao_p3_min" value="0" step="0.1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="ao_p3_max">Max</label>
+                                        <input type="number" id="ao_p3_max" value="10" step="0.1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="ao_p3_step">Step</label>
+                                        <input type="number" id="ao_p3_step" value="1" step="0.1" min="0.1">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Simulation Scope -->
+                        <div style="background: #f0fff4; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                            <h4 style="margin-top: 0; margin-bottom: 15px;">Simulationsumfang</h4>
+                            <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+                                <div class="form-group">
+                                    <label for="ao_runs_per_candidate">Runs per Candidate</label>
+                                    <input type="number" id="ao_runs_per_candidate" value="2000" min="100" max="10000" step="100">
+                                </div>
+                                <div class="form-group">
+                                    <label for="ao_seeds_train">Train Seeds</label>
+                                    <input type="number" id="ao_seeds_train" value="5" min="1" max="20" step="1">
+                                </div>
+                                <div class="form-group">
+                                    <label for="ao_seeds_test">Test Seeds</label>
+                                    <input type="number" id="ao_seeds_test" value="2" min="1" max="20" step="1">
+                                </div>
+                            </div>
+                            <p style="font-size: 0.85rem; color: #666; margin: 10px 0 0 0;">
+                                Hinweis: Diese Einstellung ist unabhängig von der Monte-Carlo-Konfiguration im Haupt-Tab.
+                            </p>
+                        </div>
+
+                        <!-- Constraints -->
+                        <div style="background: #fff0f0; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                            <h4 style="margin-top: 0; margin-bottom: 15px;">Constraints (optional)</h4>
+                            <div class="form-grid" style="grid-template-columns: repeat(2, 1fr);">
+                                <div class="form-group" style="justify-content: center;">
+                                    <label style="flex-direction: row; align-items: center;">
+                                        <input type="checkbox" id="ao_c_sr99" style="width: auto; margin-right: 8px;" checked>
+                                        Success Rate ≥ 99%
+                                    </label>
+                                </div>
+                                <div class="form-group" style="justify-content: center;">
+                                    <label style="flex-direction: row; align-items: center;">
+                                        <input type="checkbox" id="ao_c_noex" style="width: auto; margin-right: 8px;" checked>
+                                        Depot-Erschöpfung = 0
+                                    </label>
+                                </div>
+                                <div class="form-group" style="justify-content: center;">
+                                    <label style="flex-direction: row; align-items: center;">
+                                        <input type="checkbox" id="ao_c_ts45" style="width: auto; margin-right: 8px;">
+                                        Zeitanteil Quote > 4.5% ≤ 1%
+                                    </label>
+                                </div>
+                                <div class="form-group" style="justify-content: center;">
+                                    <label style="flex-direction: row; align-items: center;">
+                                        <input type="checkbox" id="ao_c_dd55" style="width: auto; margin-right: 8px;">
+                                        P90 Drawdown ≤ 55%
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Actions & Output -->
+                        <div style="text-align: center; margin-bottom: 20px;">
+                            <button id="ao_run_btn" style="background-color: var(--secondary-color); color: white; padding: 12px 24px; font-size: 1rem; border: none; border-radius: 6px; cursor: pointer;">
+                                🚀 Auto-Optimize starten
+                            </button>
+                        </div>
+
+                        <div id="ao_progress" style="display: none; padding: 10px; background: #e3f2fd; border-radius: 6px; margin-bottom: 20px; text-align: center; font-weight: 500;">
+                            <!-- Progress text -->
+                        </div>
+
+                        <div id="ao_result" style="display: none;">
+                            <!-- Result will be rendered here -->
+                        </div>
+
+                        <div style="text-align: center; margin-top: 20px;">
+                            <button id="ao_apply_btn" style="display: none; background-color: #4caf50; color: white; padding: 10px 20px; font-size: 0.95rem; border: none; border-radius: 6px; cursor: pointer;">
+                                ✓ Konfiguration übernehmen
+                            </button>
+                        </div>
+                    </fieldset>
                 </div>
             </div>
         </div>
@@ -771,6 +965,8 @@
 
     <script type="module" src="engine.js"></script>
     <script src="sim-parity-smoketest.js" defer></script>
+    <script type="module" src="auto_optimize.js"></script>
+    <script type="module" src="auto_optimize_ui.js"></script>
     <script type="module" src="simulator-main.js"></script>
 
     <!-- Accordion Toggle & Progress Indicator Functionality -->
