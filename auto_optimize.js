@@ -433,7 +433,9 @@ class CandidateCache {
     }
 
     key(candidate) {
-        return `${candidate.runwayMinM}|${candidate.runwayTargetM}|${candidate.goldTargetPct}`;
+        // Dynamically generate cache key from all parameter keys (sorted for consistency)
+        const keys = Object.keys(candidate).sort();
+        return keys.map(k => `${k}:${candidate[k]}`).join('|');
     }
 
     has(candidate) {
@@ -517,11 +519,8 @@ export async function runAutoOptimize(config) {
 
     const validCandidates = [];
     for (const sample of lhsSamples) {
-        const candidate = {
-            runwayMinM: sample.runwayMinM,
-            runwayTargetM: sample.runwayTargetM,
-            goldTargetPct: sample.goldTargetPct
-        };
+        // Dynamically copy all parameters from sample
+        const candidate = { ...sample };
 
         if (isValidCandidate(candidate, goldCap)) {
             validCandidates.push(candidate);
@@ -749,13 +748,34 @@ export async function runAutoOptimize(config) {
     // Vereinfachte Metrik: Verhältnis Train-Objective zu Test-Objective
     const stability = Math.min(1, champion.trainObjValue / (champion.testObjValue + 0.0001));
 
-    // Delta vs. Current
+    // Delta vs. Current - dynamically build current config from baseInputs
+    const currentConfig = {};
+
+    // Map all possible parameters from baseInputs to candidate format
+    if (params.runwayMinM !== undefined) {
+        currentConfig.runwayMinM = baseInputs.runwayMinMonths || 24;
+    }
+    if (params.runwayTargetM !== undefined) {
+        currentConfig.runwayTargetM = baseInputs.runwayTargetMonths || 36;
+    }
+    if (params.goldTargetPct !== undefined) {
+        currentConfig.goldTargetPct = baseInputs.goldAllokationProzent || 0;
+    }
+    if (params.targetEq !== undefined) {
+        currentConfig.targetEq = baseInputs.targetEq || 60;
+    }
+    if (params.rebalBand !== undefined) {
+        currentConfig.rebalBand = baseInputs.rebalBand || 5;
+    }
+    if (params.maxSkimPct !== undefined) {
+        currentConfig.maxSkimPct = baseInputs.maxSkimPctOfEq || 25;
+    }
+    if (params.maxBearRefillPct !== undefined) {
+        currentConfig.maxBearRefillPct = baseInputs.maxBearRefillPctOfEq || 50;
+    }
+
     const currentResults = await evaluateCandidate(
-        {
-            runwayMinM: baseInputs.runwayMinMonths || 24,
-            runwayTargetM: baseInputs.runwayTargetMonths || 36,
-            goldTargetPct: baseInputs.goldAllokationProzent || 0
-        },
+        currentConfig,
         baseInputs,
         runsPerCandidate,
         maxDauer,
