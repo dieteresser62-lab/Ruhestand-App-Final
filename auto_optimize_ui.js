@@ -17,6 +17,9 @@ import { runAutoOptimize } from './auto_optimize.js';
 import { formatCurrency } from './simulator-utils.js';
 import { updateStartPortfolioDisplay } from './simulator-portfolio.js';
 
+// Global parameter counter
+let aoParamCounter = 0;
+
 /**
  * Initialisiert das Auto-Optimize UI
  */
@@ -56,11 +59,143 @@ export function initAutoOptimizeUI() {
         });
     }
 
-    // Input-Validierung bei Änderungen
-    attachValidationListeners();
+    // Parameter-Management Buttons
+    document.getElementById('ao_add_param_btn').addEventListener('click', () => {
+        addParameter();
+    });
+
+    document.getElementById('ao_remove_param_btn').addEventListener('click', () => {
+        removeParameter();
+    });
+
+    // Initialisiere mit 3 Standard-Parametern
+    initDefaultParameters();
 
     // Initial Validation
     updateRunButtonState();
+}
+
+/**
+ * Initialisiert Standard-Parameter (3 Stück)
+ */
+function initDefaultParameters() {
+    const defaults = [
+        { key: 'runwayMinM', min: 18, max: 36, step: 2 },
+        { key: 'runwayTargetM', min: 24, max: 48, step: 2 },
+        { key: 'goldTargetPct', min: 0, max: 10, step: 1 }
+    ];
+
+    for (const def of defaults) {
+        addParameter(def);
+    }
+}
+
+/**
+ * Fügt einen neuen Parameter hinzu
+ * @param {object} defaults - Optional: Default-Werte {key, min, max, step}
+ */
+function addParameter(defaults = null) {
+    const container = document.getElementById('ao_parameters_container');
+    const paramCount = container.children.length;
+
+    if (paramCount >= 7) {
+        alert('Maximal 7 Parameter erlaubt.');
+        return;
+    }
+
+    const paramId = aoParamCounter++;
+    const paramDiv = document.createElement('div');
+    paramDiv.id = `ao_param_${paramId}`;
+    paramDiv.className = 'ao-parameter-block';
+    paramDiv.style.cssText = 'border: 1px solid #ddd; padding: 10px; border-radius: 4px; margin-bottom: 10px;';
+
+    const paramOptions = `
+        <option value="runwayMinM">Runway Min (Monate)</option>
+        <option value="runwayTargetM">Runway Target (Monate)</option>
+        <option value="goldTargetPct">Gold Target (%)</option>
+        <option value="targetEq">Target Eq (%)</option>
+        <option value="rebalBand">Rebal Band (%)</option>
+        <option value="maxSkimPct">Max Skim (%)</option>
+        <option value="maxBearRefillPct">Max Bear Refill (%)</option>
+    `;
+
+    paramDiv.innerHTML = `
+        <h5 style="margin-top: 0; margin-bottom: 10px;">Parameter ${paramCount + 1}</h5>
+        <div class="form-grid-four-col">
+            <div class="form-group">
+                <label>Key</label>
+                <select class="ao-param-key" data-param-id="${paramId}">
+                    ${paramOptions}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Min</label>
+                <input type="number" class="ao-param-min" data-param-id="${paramId}" value="${defaults?.min ?? 0}" step="0.1">
+            </div>
+            <div class="form-group">
+                <label>Max</label>
+                <input type="number" class="ao-param-max" data-param-id="${paramId}" value="${defaults?.max ?? 100}" step="0.1">
+            </div>
+            <div class="form-group">
+                <label>Step</label>
+                <input type="number" class="ao-param-step" data-param-id="${paramId}" value="${defaults?.step ?? 1}" step="0.1" min="0.1">
+            </div>
+        </div>
+    `;
+
+    container.appendChild(paramDiv);
+
+    // Setze Default-Key wenn vorhanden
+    if (defaults?.key) {
+        const select = paramDiv.querySelector('.ao-param-key');
+        select.value = defaults.key;
+    }
+
+    // Attach validation listeners
+    attachParameterValidationListeners(paramDiv);
+
+    // Update button states
+    updateParameterButtonStates();
+    updateRunButtonState();
+}
+
+/**
+ * Entfernt den letzten Parameter
+ */
+function removeParameter() {
+    const container = document.getElementById('ao_parameters_container');
+    const paramCount = container.children.length;
+
+    if (paramCount <= 1) {
+        alert('Mindestens 1 Parameter erforderlich.');
+        return;
+    }
+
+    container.removeChild(container.lastChild);
+    updateParameterButtonStates();
+    updateRunButtonState();
+}
+
+/**
+ * Updated die Aktivierung der Add/Remove Buttons
+ */
+function updateParameterButtonStates() {
+    const container = document.getElementById('ao_parameters_container');
+    const paramCount = container.children.length;
+
+    document.getElementById('ao_add_param_btn').disabled = paramCount >= 7;
+    document.getElementById('ao_remove_param_btn').disabled = paramCount <= 1;
+}
+
+/**
+ * Hängt Validierungs-Listener an einen Parameter-Block
+ */
+function attachParameterValidationListeners(paramDiv) {
+    const inputs = paramDiv.querySelectorAll('input, select');
+    for (const input of inputs) {
+        input.addEventListener('change', updateRunButtonState);
+        input.addEventListener('input', updateRunButtonState);
+    }
 }
 
 /**
@@ -81,30 +216,16 @@ function updateRunButtonState() {
 function validateInputs() {
     try {
         const config = readConfigFromUI();
+
+        // Mindestens 1 Parameter erforderlich
+        if (Object.keys(config.params).length < 1) {
+            return false;
+        }
+
         return true;
     } catch (e) {
+        console.warn('Validation error:', e);
         return false;
-    }
-}
-
-/**
- * Hängt Validierungs-Listener an alle Inputs
- */
-function attachValidationListeners() {
-    const inputs = [
-        'ao_metric', 'ao_direction',
-        'ao_p1_key', 'ao_p1_min', 'ao_p1_max', 'ao_p1_step',
-        'ao_p2_key', 'ao_p2_min', 'ao_p2_max', 'ao_p2_step',
-        'ao_p3_key', 'ao_p3_min', 'ao_p3_max', 'ao_p3_step',
-        'ao_runs_per_candidate', 'ao_seeds_train', 'ao_seeds_test'
-    ];
-
-    for (const id of inputs) {
-        const el = document.getElementById(id);
-        if (el) {
-            el.addEventListener('change', updateRunButtonState);
-            el.addEventListener('input', updateRunButtonState);
-        }
     }
 }
 
@@ -121,20 +242,37 @@ function readConfigFromUI() {
 
     const objective = { metric, direction, quantile };
 
-    // Parameter
+    // Parameter (dynamisch)
     const params = {};
-    for (let i = 1; i <= 3; i++) {
-        const key = document.getElementById(`ao_p${i}_key`).value;
-        const min = parseFloat(document.getElementById(`ao_p${i}_min`).value);
-        const max = parseFloat(document.getElementById(`ao_p${i}_max`).value);
-        const step = parseFloat(document.getElementById(`ao_p${i}_step`).value);
+    const container = document.getElementById('ao_parameters_container');
+    const paramBlocks = container.querySelectorAll('.ao-parameter-block');
+
+    if (paramBlocks.length === 0) {
+        throw new Error('Mindestens 1 Parameter erforderlich');
+    }
+
+    for (let i = 0; i < paramBlocks.length; i++) {
+        const block = paramBlocks[i];
+        const key = block.querySelector('.ao-param-key').value;
+        const min = parseFloat(block.querySelector('.ao-param-min').value);
+        const max = parseFloat(block.querySelector('.ao-param-max').value);
+        const step = parseFloat(block.querySelector('.ao-param-step').value);
 
         if (!key || isNaN(min) || isNaN(max) || isNaN(step)) {
-            throw new Error(`Parameter ${i} incomplete`);
+            throw new Error(`Parameter ${i + 1} incomplete`);
         }
 
         if (min > max) {
-            throw new Error(`Parameter ${i}: min > max`);
+            throw new Error(`Parameter ${i + 1}: min > max`);
+        }
+
+        if (step <= 0) {
+            throw new Error(`Parameter ${i + 1}: step must be > 0`);
+        }
+
+        // Check for duplicate keys
+        if (params[key]) {
+            throw new Error(`Duplicate parameter: ${key}`);
         }
 
         params[key] = { min, max, step };
@@ -255,29 +393,50 @@ function renderResult(result, objective) {
     const stabilityPct = Math.round(stability * 100);
     const stabilityColor = stabilityPct >= 80 ? '#4caf50' : stabilityPct >= 60 ? '#ff9800' : '#f44336';
 
+    // Parameter-Labels für Anzeige
+    const paramLabels = {
+        runwayMinM: 'Runway Min',
+        runwayTargetM: 'Runway Target',
+        goldTargetPct: 'Gold Target',
+        targetEq: 'Target Eq',
+        rebalBand: 'Rebal Band',
+        maxSkimPct: 'Max Skim',
+        maxBearRefillPct: 'Max Bear Refill'
+    };
+
+    const paramUnits = {
+        runwayMinM: 'Monate',
+        runwayTargetM: 'Monate',
+        goldTargetPct: '%',
+        targetEq: '%',
+        rebalBand: '%',
+        maxSkimPct: '%',
+        maxBearRefillPct: '%'
+    };
+
+    // Generiere Parameter-Cards dynamisch
+    let paramCardsHtml = '';
+    for (const [key, value] of Object.entries(championCfg)) {
+        const label = paramLabels[key] || key;
+        const unit = paramUnits[key] || '';
+        const displayValue = typeof value === 'number' ? value.toFixed(1) : value;
+
+        paramCardsHtml += `
+            <div style="background: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <div style="font-size: 0.85rem; color: #666; margin-bottom: 5px;">${label}</div>
+                <div style="font-size: 1.5rem; font-weight: 600; color: var(--secondary-color);">
+                    ${displayValue} ${unit}
+                </div>
+            </div>
+        `;
+    }
+
     let html = `
         <div style="border: 2px solid var(--secondary-color); border-radius: 8px; padding: 20px; background: #f9f9f9; margin-top: 20px;">
             <h3 style="margin-top: 0; color: var(--secondary-color);">🏆 Champion Configuration</h3>
 
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
-                <div style="background: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                    <div style="font-size: 0.85rem; color: #666; margin-bottom: 5px;">Runway Min</div>
-                    <div style="font-size: 1.5rem; font-weight: 600; color: var(--secondary-color);">
-                        ${championCfg.runwayMinM} Monate
-                    </div>
-                </div>
-                <div style="background: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                    <div style="font-size: 0.85rem; color: #666; margin-bottom: 5px;">Runway Target</div>
-                    <div style="font-size: 1.5rem; font-weight: 600; color: var(--secondary-color);">
-                        ${championCfg.runwayTargetM} Monate
-                    </div>
-                </div>
-                <div style="background: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                    <div style="font-size: 0.85rem; color: #666; margin-bottom: 5px;">Gold Target</div>
-                    <div style="font-size: 1.5rem; font-weight: 600; color: var(--secondary-color);">
-                        ${championCfg.goldTargetPct.toFixed(1)} %
-                    </div>
-                </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                ${paramCardsHtml}
             </div>
 
             <div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
@@ -357,24 +516,27 @@ function applyChampionToConfig() {
 
     const { championCfg } = window.aoChampionResult;
 
-    // Update UI inputs
-    const runwayMinInput = document.getElementById('runwayMinMonths');
-    const runwayTargetInput = document.getElementById('runwayTargetMonths');
-    const goldTargetInput = document.getElementById('goldAllokationProzent');
+    // Mapping von Parameter-Keys zu Form-Input-IDs
+    const paramToFormIdMap = {
+        runwayMinM: 'runwayMinMonths',
+        runwayTargetM: 'runwayTargetMonths',
+        goldTargetPct: 'goldAllokationProzent',
+        targetEq: 'targetEq',
+        rebalBand: 'rebalBand',
+        maxSkimPct: 'maxSkimPctOfEq',
+        maxBearRefillPct: 'maxBearRefillPctOfEq'
+    };
 
-    if (runwayMinInput) {
-        runwayMinInput.value = championCfg.runwayMinM;
-        runwayMinInput.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-
-    if (runwayTargetInput) {
-        runwayTargetInput.value = championCfg.runwayTargetM;
-        runwayTargetInput.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-
-    if (goldTargetInput) {
-        goldTargetInput.value = championCfg.goldTargetPct;
-        goldTargetInput.dispatchEvent(new Event('change', { bubbles: true }));
+    // Übernehme alle Parameter
+    for (const [paramKey, value] of Object.entries(championCfg)) {
+        const formId = paramToFormIdMap[paramKey];
+        if (formId) {
+            const input = document.getElementById(formId);
+            if (input) {
+                input.value = value;
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
     }
 
     // Trigger re-render of portfolio display
@@ -396,6 +558,7 @@ function applyChampionToConfig() {
 
 /**
  * Setzt Default-Werte für das Panel
+ * Parameter werden bereits durch initDefaultParameters() initialisiert
  */
 export function setAutoOptimizeDefaults() {
     // Metric
@@ -410,51 +573,26 @@ export function setAutoOptimizeDefaults() {
         directionSelect.value = 'max';
     }
 
-    // Parameter Keys
-    const p1Key = document.getElementById('ao_p1_key');
-    const p2Key = document.getElementById('ao_p2_key');
-    const p3Key = document.getElementById('ao_p3_key');
-
-    if (p1Key && !p1Key.value) p1Key.value = 'runwayMinM';
-    if (p2Key && !p2Key.value) p2Key.value = 'runwayTargetM';
-    if (p3Key && !p3Key.value) p3Key.value = 'goldTargetPct';
-
-    // Ranges (Defaults aus Spezifikation)
-    if (!document.getElementById('ao_p1_min').value) {
-        document.getElementById('ao_p1_min').value = '18';
-        document.getElementById('ao_p1_max').value = '36';
-        document.getElementById('ao_p1_step').value = '2';
-    }
-
-    if (!document.getElementById('ao_p2_min').value) {
-        document.getElementById('ao_p2_min').value = '24';
-        document.getElementById('ao_p2_max').value = '48';
-        document.getElementById('ao_p2_step').value = '2';
-    }
-
-    if (!document.getElementById('ao_p3_min').value) {
-        document.getElementById('ao_p3_min').value = '0';
-        document.getElementById('ao_p3_max').value = '10';
-        document.getElementById('ao_p3_step').value = '1';
-    }
-
     // Runs & Seeds
-    if (!document.getElementById('ao_runs_per_candidate').value) {
-        document.getElementById('ao_runs_per_candidate').value = '2000';
+    const runsInput = document.getElementById('ao_runs_per_candidate');
+    if (runsInput && !runsInput.value) {
+        runsInput.value = '2000';
     }
 
-    if (!document.getElementById('ao_seeds_train').value) {
-        document.getElementById('ao_seeds_train').value = '5';
+    const seedsTrainInput = document.getElementById('ao_seeds_train');
+    if (seedsTrainInput && !seedsTrainInput.value) {
+        seedsTrainInput.value = '5';
     }
 
-    if (!document.getElementById('ao_seeds_test').value) {
-        document.getElementById('ao_seeds_test').value = '2';
+    const seedsTestInput = document.getElementById('ao_seeds_test');
+    if (seedsTestInput && !seedsTestInput.value) {
+        seedsTestInput.value = '2';
     }
 
     // Constraints (sr99 & noex aktiv per Default)
     const sr99 = document.getElementById('ao_c_sr99');
     const noex = document.getElementById('ao_c_noex');
 
-    if (sr99) sr99.checked = true;
-    if (noex) noex.checked = true;
+    if (sr99 && sr99.checked === false) sr99.checked = true;
+    if (noex && noex.checked === false) noex.checked = true;
 }

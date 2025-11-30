@@ -24,7 +24,15 @@ import { ScenarioAnalyzer } from './scenario-analyzer.js';
 /**
  * Whitelist der erlaubten Parameter-Keys
  */
-const ALLOWED_PARAM_KEYS = ['runwayMinM', 'runwayTargetM', 'goldTargetPct'];
+const ALLOWED_PARAM_KEYS = [
+    'runwayMinM',
+    'runwayTargetM',
+    'goldTargetPct',
+    'targetEq',
+    'rebalBand',
+    'maxSkimPct',
+    'maxBearRefillPct'
+];
 
 /**
  * Mutator-Map: Wie werden die Parameter auf die Config angewendet?
@@ -46,6 +54,22 @@ function applyParameterMutation(cfg, key, value) {
             if (!cfg.alloc) cfg.alloc = {};
             cfg.alloc.goldTarget = Number(value);
             break;
+        case 'targetEq':
+            if (!cfg.alloc) cfg.alloc = {};
+            cfg.alloc.targetEq = Number(value);
+            break;
+        case 'rebalBand':
+            if (!cfg.rebal) cfg.rebal = {};
+            cfg.rebal.band = Number(value);
+            break;
+        case 'maxSkimPct':
+            if (!cfg.skim) cfg.skim = {};
+            cfg.skim.maxPct = Number(value);
+            break;
+        case 'maxBearRefillPct':
+            if (!cfg.bear) cfg.bear = {};
+            cfg.bear.maxRefillPct = Number(value);
+            break;
         default:
             throw new Error(`Unknown parameter key: ${key}`);
     }
@@ -53,18 +77,40 @@ function applyParameterMutation(cfg, key, value) {
 
 /**
  * Prüft harte Invarianten (sofort verwerfen)
- * @param {object} candidate - Kandidat mit {runwayMinM, runwayTargetM, goldTargetPct}
+ * @param {object} candidate - Kandidat mit beliebigen Parametern
  * @param {number} goldCap - Max. erlaubter Gold-Anteil
  * @returns {boolean} true wenn valide
  */
 function isValidCandidate(candidate, goldCap) {
-    const { runwayMinM, runwayTargetM, goldTargetPct } = candidate;
+    // Runway-Invariante: Min <= Target
+    if (candidate.runwayMinM !== undefined && candidate.runwayTargetM !== undefined) {
+        if (candidate.runwayMinM > candidate.runwayTargetM) return false;
+    }
 
-    // Runway Min <= Runway Target
-    if (runwayMinM > runwayTargetM) return false;
+    // Gold-Invariante: 0 <= goldTarget <= goldCap
+    if (candidate.goldTargetPct !== undefined) {
+        if (candidate.goldTargetPct < 0 || candidate.goldTargetPct > goldCap) return false;
+    }
 
-    // Gold innerhalb 0..goldCap
-    if (goldTargetPct < 0 || goldTargetPct > goldCap) return false;
+    // Target Eq: 0 <= targetEq <= 100
+    if (candidate.targetEq !== undefined) {
+        if (candidate.targetEq < 0 || candidate.targetEq > 100) return false;
+    }
+
+    // Rebal Band: 0 <= rebalBand <= 50
+    if (candidate.rebalBand !== undefined) {
+        if (candidate.rebalBand < 0 || candidate.rebalBand > 50) return false;
+    }
+
+    // Max Skim %: 0 <= maxSkimPct <= 100
+    if (candidate.maxSkimPct !== undefined) {
+        if (candidate.maxSkimPct < 0 || candidate.maxSkimPct > 100) return false;
+    }
+
+    // Max Bear Refill %: 0 <= maxBearRefillPct <= 100
+    if (candidate.maxBearRefillPct !== undefined) {
+        if (candidate.maxBearRefillPct < 0 || candidate.maxBearRefillPct > 100) return false;
+    }
 
     return true;
 }
@@ -137,15 +183,18 @@ function checkConstraints(results, constraints) {
 }
 
 /**
- * Latin Hypercube Sampling für 3D-Parameter-Raum
- * @param {object} ranges - {p1: {min, max, step}, p2: {...}, p3: {...}}
+ * Latin Hypercube Sampling für N-dimensionalen Parameter-Raum
+ * @param {object} ranges - {param1: {min, max, step}, param2: {...}, ...}
  * @param {number} n - Anzahl Samples
  * @param {Function} rand - RNG-Funktion
- * @returns {Array<object>} Array von {p1Val, p2Val, p3Val}
+ * @returns {Array<object>} Array von {param1: val, param2: val, ...}
  */
 function latinHypercubeSample(ranges, n, rand) {
     const params = Object.keys(ranges);
-    if (params.length !== 3) throw new Error('Exactly 3 parameters required');
+
+    if (params.length === 0) {
+        throw new Error('At least 1 parameter required');
+    }
 
     const samples = [];
 
@@ -180,35 +229,43 @@ function latinHypercubeSample(ranges, n, rand) {
 }
 
 /**
+ * Gibt Delta-Werte für einen Parameter-Key zurück (für Nachbarschafts-Generierung)
+ * @param {string} key - Parameter-Key
+ * @param {boolean} reduced - Reduzierte Deltas (true) oder volle Deltas (false)
+ * @returns {Array<number>} Delta-Werte
+ */
+function getParameterDeltas(key, reduced = false) {
+    const deltaMap = {
+        runwayMinM: reduced ? [-2, 2] : [-4, -2, 2, 4],
+        runwayTargetM: reduced ? [-2, 2] : [-4, -2, 2, 4],
+        goldTargetPct: reduced ? [-1, 1] : [-2, -1, 1, 2],
+        targetEq: reduced ? [-2, 2] : [-5, -2, 2, 5],
+        rebalBand: reduced ? [-0.5, 0.5] : [-1, -0.5, 0.5, 1],
+        maxSkimPct: reduced ? [-2, 2] : [-5, -2, 2, 5],
+        maxBearRefillPct: reduced ? [-2, 2] : [-5, -2, 2, 5]
+    };
+    return deltaMap[key] || (reduced ? [-1, 1] : [-2, -1, 1, 2]);
+}
+
+/**
  * Lokale Verfeinerung: Nachbarschaft eines Kandidaten generieren
- * @param {object} candidate - {runwayMinM, runwayTargetM, goldTargetPct}
+ * @param {object} candidate - Parameter-Objekt
  * @param {object} ranges - Original-Ranges
  * @returns {Array<object>} Nachbarn
  */
 function generateNeighbors(candidate, ranges) {
     const neighbors = [];
 
-    // Runway Min: ±2, ±4 Monate
-    for (const delta of [-4, -2, 2, 4]) {
-        const val = candidate.runwayMinM + delta;
-        if (val >= ranges.runwayMinM.min && val <= ranges.runwayMinM.max) {
-            neighbors.push({ ...candidate, runwayMinM: val });
-        }
-    }
+    // Für jeden Parameter im Kandidaten
+    for (const [key, value] of Object.entries(candidate)) {
+        if (!ranges[key]) continue; // Überspringe Parameter ohne Range
 
-    // Runway Target: ±2, ±4 Monate
-    for (const delta of [-4, -2, 2, 4]) {
-        const val = candidate.runwayTargetM + delta;
-        if (val >= ranges.runwayTargetM.min && val <= ranges.runwayTargetM.max) {
-            neighbors.push({ ...candidate, runwayTargetM: val });
-        }
-    }
-
-    // Gold: ±1, ±2 Prozentpunkte
-    for (const delta of [-2, -1, 1, 2]) {
-        const val = candidate.goldTargetPct + delta;
-        if (val >= ranges.goldTargetPct.min && val <= ranges.goldTargetPct.max) {
-            neighbors.push({ ...candidate, goldTargetPct: val });
+        const deltas = getParameterDeltas(key, false);
+        for (const delta of deltas) {
+            const newVal = value + delta;
+            if (newVal >= ranges[key].min && newVal <= ranges[key].max) {
+                neighbors.push({ ...candidate, [key]: newVal });
+            }
         }
     }
 
@@ -217,34 +274,23 @@ function generateNeighbors(candidate, ranges) {
 
 /**
  * Reduzierte Nachbarschaft für schnellere Verfeinerung
- * @param {object} candidate - {runwayMinM, runwayTargetM, goldTargetPct}
+ * @param {object} candidate - Parameter-Objekt
  * @param {object} ranges - Original-Ranges
- * @returns {Array<object>} Nachbarn (nur ±2)
+ * @returns {Array<object>} Nachbarn (nur kleinere Deltas)
  */
 function generateNeighborsReduced(candidate, ranges) {
     const neighbors = [];
 
-    // Runway Min: nur ±2 Monate
-    for (const delta of [-2, 2]) {
-        const val = candidate.runwayMinM + delta;
-        if (val >= ranges.runwayMinM.min && val <= ranges.runwayMinM.max) {
-            neighbors.push({ ...candidate, runwayMinM: val });
-        }
-    }
+    // Für jeden Parameter im Kandidaten
+    for (const [key, value] of Object.entries(candidate)) {
+        if (!ranges[key]) continue; // Überspringe Parameter ohne Range
 
-    // Runway Target: nur ±2 Monate
-    for (const delta of [-2, 2]) {
-        const val = candidate.runwayTargetM + delta;
-        if (val >= ranges.runwayTargetM.min && val <= ranges.runwayTargetM.max) {
-            neighbors.push({ ...candidate, runwayTargetM: val });
-        }
-    }
-
-    // Gold: nur ±1 Prozentpunkt
-    for (const delta of [-1, 1]) {
-        const val = candidate.goldTargetPct + delta;
-        if (val >= ranges.goldTargetPct.min && val <= ranges.goldTargetPct.max) {
-            neighbors.push({ ...candidate, goldTargetPct: val });
+        const deltas = getParameterDeltas(key, true);
+        for (const delta of deltas) {
+            const newVal = value + delta;
+            if (newVal >= ranges[key].min && newVal <= ranges[key].max) {
+                neighbors.push({ ...candidate, [key]: newVal });
+            }
         }
     }
 
@@ -253,7 +299,7 @@ function generateNeighborsReduced(candidate, ranges) {
 
 /**
  * Führt eine MC-Simulation für einen Kandidaten aus
- * @param {object} candidate - {runwayMinM, runwayTargetM, goldTargetPct}
+ * @param {object} candidate - Parameter-Objekt mit beliebigen Keys
  * @param {object} baseInputs - Basis-Config
  * @param {number} runsPerCandidate - Anzahl MC-Runs
  * @param {number} maxDauer - Max. Simulationsdauer in Jahren
@@ -265,14 +311,37 @@ async function evaluateCandidate(candidate, baseInputs, runsPerCandidate, maxDau
     // Deep-clone inputs und Override anwenden
     const inputs = deepClone(baseInputs);
 
-    // Mutationen anwenden
+    // Setze Defaults
     if (!inputs.runwayMinMonths) inputs.runwayMinMonths = 24;
     if (!inputs.runwayTargetMonths) inputs.runwayTargetMonths = 36;
     if (!inputs.goldAllokationProzent) inputs.goldAllokationProzent = 0;
+    if (!inputs.targetEq) inputs.targetEq = 60;
+    if (!inputs.rebalBand) inputs.rebalBand = 5;
+    if (!inputs.maxSkimPctOfEq) inputs.maxSkimPctOfEq = 25;
+    if (!inputs.maxBearRefillPctOfEq) inputs.maxBearRefillPctOfEq = 50;
 
-    inputs.runwayMinMonths = candidate.runwayMinM;
-    inputs.runwayTargetMonths = candidate.runwayTargetM;
-    inputs.goldAllokationProzent = candidate.goldTargetPct;
+    // Mutationen für alle vorhandenen Parameter anwenden
+    if (candidate.runwayMinM !== undefined) {
+        inputs.runwayMinMonths = candidate.runwayMinM;
+    }
+    if (candidate.runwayTargetM !== undefined) {
+        inputs.runwayTargetMonths = candidate.runwayTargetM;
+    }
+    if (candidate.goldTargetPct !== undefined) {
+        inputs.goldAllokationProzent = candidate.goldTargetPct;
+    }
+    if (candidate.targetEq !== undefined) {
+        inputs.targetEq = candidate.targetEq;
+    }
+    if (candidate.rebalBand !== undefined) {
+        inputs.rebalBand = candidate.rebalBand;
+    }
+    if (candidate.maxSkimPct !== undefined) {
+        inputs.maxSkimPctOfEq = candidate.maxSkimPct;
+    }
+    if (candidate.maxBearRefillPct !== undefined) {
+        inputs.maxBearRefillPctOfEq = candidate.maxBearRefillPct;
+    }
 
     // Normalisiere Widow Options
     const widowOptions = normalizeWidowOptions(inputs.widowOptions);
