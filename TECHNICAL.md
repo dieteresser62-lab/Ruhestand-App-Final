@@ -81,17 +81,28 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 * `simulator-portfolio.js` – Initialisierung, Portfolio-Berechnungen, Stress-Kontexte.
 * `simulator-results.js` – Aggregiert MC-Ausgaben und delegiert an `results-metrics.js` / `results-renderers.js` / `results-formatting.js`.
 * `simulator-sweep.js` – Sweep-Logik inkl. Whitelist/Blocklist, Mini-Monte-Carlo und Heatmap-Aufruf.
+* `simulator-optimizer.js` – Auto-Optimize-Kernlogik mit 3-stufiger Optimierung (Coarse Grid → Refinement → Final Verification).
+* `auto_optimize.js` / `auto_optimize_ui.js` – Auto-Optimize UI-Integration, Preset-Konfigurationen und Champion-Config-Output (1-7 dynamische Parameter).
 * `simulator-heatmap.js` – SVG-Rendering für Parameter-Sweeps inkl. Warnhinweise bei Verstößen.
 * `simulator-utils.js` – Zufallszahlengenerator, Statistikfunktionen, Parser, Formatierung.
 * `simulator-data.js` – Historische Daten, Mortalitäts- und Stress-Presets.
 
-### Parameter-Sweep-Schutzmechanismen
+### Parameter-Sweep & Auto-Optimize
+
+#### Schutzmechanismen
 
 * **Whitelist** (`SWEEP_ALLOWED_KEYS`) beschränkt veränderbare Parameter.
 * **Blocklist** verhindert Änderungen an sensiblen Feldern (z. B. Rente Person 2).
 * **Deep-Clones** (`structuredClone`-Fallback) isolieren jeden Sweep-Case.
 * **Rente-2-Wächter** markiert Heatmap-Zellen mit ⚠, wenn die zweite Rente variiert.
 * **Self-Test** (`runSweepSelfTest`) prüft Whitelist/Clone-Mechanismen.
+
+#### Auto-Optimize-Funktionen
+* **3-stufige Optimierung:** Coarse Grid (grobe Suche) → Refinement (Verfeinerung um Best-Kandidaten) → Final Verification für ~8-10x Geschwindigkeitsgewinn gegenüber exhaustiven Sweeps.
+* **Dynamische Parameter-UI:** Unterstützt 1-7 frei konfigurierbare Optimierungsparameter mit individuellen Bereichen.
+* **Preset-Konfigurationen:** Vordefinierte Optimierungsszenarien (konservativ, moderat, risikobereit, etc.) für schnellen Einstieg.
+* **Champion-Config-Output:** Detaillierte Ausgabe der optimalen Parameterkombination mit allen relevanten Metriken.
+* **Constraint-basierte Filterung:** Automatische Verwerfung von Konfigurationen, die definierte Mindestanforderungen nicht erfüllen (z.B. Erfolgsquote, Erschöpfungsrate).
 
 ### Ergebnisdarstellung
 
