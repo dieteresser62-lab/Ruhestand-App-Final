@@ -21,14 +21,25 @@ function Stop-ProcessesOnPort {
     catch { return } 
 
     if ($connections) {
-        $pidsToTerminate = $connections | Select-Object -ExpandProperty OwningProcess -Unique
+        $pidsToTerminate = $connections | Select-Object -ExpandProperty OwningProcess -Unique | Where-Object { $_ -gt 4 }
         foreach ($pidVal in $pidsToTerminate) {
             try { 
                 Stop-Process -Id $pidVal -Force -ErrorAction SilentlyContinue
                 Write-Host "Habe Prozess $pidVal auf Port $Port ins Jenseits befördert." -ForegroundColor DarkGray
-            } catch { }
+            }
+            catch { }
         }
     }
+}
+
+function Stop-OldInstances {
+    $currentPid = $PID
+    try {
+        Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*start_webserver.ps1*" -and $_.ProcessId -ne $currentPid } | ForEach-Object {
+            try { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue; Write-Host "Alte Instanz ($($_.ProcessId)) beendet." -ForegroundColor DarkGray } catch {}
+        }
+    }
+    catch {}
 }
 
 function Open-WebBrowser {
@@ -41,6 +52,8 @@ function Open-WebBrowser {
 # --- MAIN LOGIC ---
 
 # 1. Aufräumen
+Write-Host "Räume alte Prozesse auf..." -ForegroundColor Gray
+Stop-OldInstances
 Stop-ProcessesOnPort -Port $Port
 
 # 2. Listener vorbereiten
@@ -68,68 +81,81 @@ Open-WebBrowser -Url "http://localhost:$Port/index.html"
 # 4. Der Server-Loop (blockiert das Skript, hält das Fenster offen)
 $mimeTypes = @{
     ".html" = "text/html"; ".htm" = "text/html"
-    ".js"   = "application/javascript"
-    ".mjs"  = "application/javascript" # Wichtig für ES-Module!
-    ".css"  = "text/css"
+    ".js" = "application/javascript"
+    ".mjs" = "application/javascript" # Wichtig für ES-Module!
+    ".css" = "text/css"
     ".json" = "application/json"
-    ".png"  = "image/png"; ".jpg" = "image/jpeg"; ".ico" = "image/x-icon"
-    ".svg"  = "image/svg+xml"
+    ".png" = "image/png"; ".jpg" = "image/jpeg"; ".ico" = "image/x-icon"
+    ".svg" = "image/svg+xml"
     ".woff" = "font/woff"; ".woff2" = "font/woff2"
 }
 
-while ($listener.IsListening) {
-    # Wartet hier auf den nächsten Request
-    $context = $listener.GetContext()
-    
-    # Asynchrone Verarbeitung simulieren, damit wir schnell wieder lauschen können? 
-    # Nein, keep it simple. Wir arbeiten sequenziell ab.
-    
-    $request = $context.Request
-    $response = $context.Response
-    
-    # URL bereinigen
-    $urlPath = $request.Url.LocalPath.TrimStart('/')
-    if ([string]::IsNullOrEmpty($urlPath)) { $urlPath = "index.html" }
-    
-    # Sicherheit: Verhindern, dass jemand aus dem Ordner ausbricht (Directory Traversal)
-    if ($urlPath -like "*..*") {
-        $response.StatusCode = 403
-        $response.Close()
-        continue
-    }
-
-    $localPath = Join-Path $Root $urlPath.Replace("/", "\")
-    
-    Write-Host "[$($request.HttpMethod)] $urlPath" -NoNewline
-
-    if (Test-Path $localPath -PathType Leaf) {
+try {
+    while ($listener.IsListening) {
+        # Wartet hier auf den nächsten Request
         try {
-            $bytes = [System.IO.File]::ReadAllBytes($localPath)
-            $extension = [System.IO.Path]::GetExtension($localPath).ToLower()
-            
-            if ($mimeTypes.ContainsKey($extension)) {
-                $response.ContentType = $mimeTypes[$extension]
-            } else {
-                $response.ContentType = "application/octet-stream"
-            }
-            
-            # Anti-Caching Header für Entwicklung (optional, aber nützlich)
-            $response.AddHeader("Cache-Control", "no-store, no-cache, must-revalidate")
-            
-            $response.ContentLength64 = $bytes.Length
-            $response.OutputStream.Write($bytes, 0, $bytes.Length)
-            $response.StatusCode = 200
-            Write-Host " -> OK" -ForegroundColor Green
+            $context = $listener.GetContext()
         }
         catch {
-            $response.StatusCode = 500
-            Write-Host " -> ERROR" -ForegroundColor Red
+            # Wenn der Listener gestoppt wird, wirft GetContext eine Exception
+            break
         }
+        
+        $request = $context.Request
+        $response = $context.Response
+        
+        # URL bereinigen
+        $urlPath = $request.Url.LocalPath.TrimStart('/')
+        if ([string]::IsNullOrEmpty($urlPath)) { $urlPath = "index.html" }
+        
+        # Sicherheit: Verhindern, dass jemand aus dem Ordner ausbricht (Directory Traversal)
+        if ($urlPath -like "*..*") {
+            $response.StatusCode = 403
+            $response.Close()
+            continue
+        }
+
+        $localPath = Join-Path $Root $urlPath.Replace("/", "\")
+        
+        Write-Host "[$($request.HttpMethod)] $urlPath" -NoNewline
+
+        if (Test-Path $localPath -PathType Leaf) {
+            try {
+                $bytes = [System.IO.File]::ReadAllBytes($localPath)
+                $extension = [System.IO.Path]::GetExtension($localPath).ToLower()
+                
+                if ($mimeTypes.ContainsKey($extension)) {
+                    $response.ContentType = $mimeTypes[$extension]
+                }
+                else {
+                    $response.ContentType = "application/octet-stream"
+                }
+                
+                # Anti-Caching Header für Entwicklung (optional, aber nützlich)
+                $response.AddHeader("Cache-Control", "no-store, no-cache, must-revalidate")
+                
+                $response.ContentLength64 = $bytes.Length
+                $response.OutputStream.Write($bytes, 0, $bytes.Length)
+                $response.StatusCode = 200
+                Write-Host " -> OK" -ForegroundColor Green
+            }
+            catch {
+                $response.StatusCode = 500
+                Write-Host " -> ERROR" -ForegroundColor Red
+            }
+        }
+        else {
+            $response.StatusCode = 404
+            Write-Host " -> 404" -ForegroundColor Yellow
+        }
+        
+        $response.Close()
     }
-    else {
-        $response.StatusCode = 404
-        Write-Host " -> 404" -ForegroundColor Yellow
+}
+finally {
+    if ($listener.IsListening) {
+        $listener.Stop()
     }
-    
-    $response.Close()
+    $listener.Close()
+    Write-Host "Server gestoppt." -ForegroundColor Yellow
 }
