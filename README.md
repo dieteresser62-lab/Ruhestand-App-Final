@@ -21,7 +21,7 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 
 ### Simulator
 * Monte-Carlo-Simulationen mit unterschiedlichen Renditequellen (historisch, Regime, Block-Bootstrap).
-* Parameter-Sweep mit Whitelist-Ansatz, Deep-Clones und Wächterlogik für Zwei-Personen-Haushalte.
+* **Parameter-Sweep mit Auto-Optimize:** Whitelist-Ansatz, Deep-Clones und Wächterlogik für Zwei-Personen-Haushalte. Neue Auto-Optimize-Funktion mit 3-stufiger Optimierung (~8-10x schneller), dynamischer Parameter-UI (1-7 Parameter), Preset-Konfigurationen und Champion-Config-Output für optimale Strategiefindung.
 * Stresstests, Pflegefall-Szenarien und Heatmap-Visualisierung inklusive Warnhinweisen.
 * Sweep-Schutz für Partner:innen-Renten inklusive Rente-2-Invarianz und Heatmap-Badges.
 * Szenario-Log-Analyse mit 30 auswählbaren Szenarien: 15 charakteristische (Perzentile, Pflege-Extremfälle, Risiko-Szenarien) und 15 zufällige Samples für typisches Verhalten.
@@ -102,6 +102,16 @@ Ruhestand-App-Final/
 ---
 
 ## Nutzung
+
+### Option 1: Standalone-Anwendung (empfohlen)
+
+**RuhestandSuite.exe** – Standalone-Desktop-Anwendung basierend auf Tauri:
+* Keine Installation oder Entwicklungsserver erforderlich
+* Direkt ausführbar unter Windows
+* Beinhaltet beide Apps (Balance & Simulator) in einer nativen Desktop-Umgebung
+* Download aus dem GitHub-Repository
+
+### Option 2: Browser-basierte Nutzung
 
 1. Repository klonen oder herunterladen.
 2. `Balance.html` bzw. `Simulator.html` im Browser öffnen.
