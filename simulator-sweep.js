@@ -15,7 +15,7 @@
 import { rng, parseRangeInput, cartesianProductLimited } from './simulator-utils.js';
 import { prepareHistoricalData, getCommonInputs, buildStressContext, computeRentAdjRate, applyStressOverride } from './simulator-portfolio.js';
 import { MORTALITY_TABLE, annualData, BREAK_ON_RUIN } from './simulator-data.js';
-import { findBestParameters, shouldMaximizeMetric, displayBestParameters, runAdaptiveOptimization, displayOptimizationHistory, displayMultiObjectiveOptimization, displayConstraintBasedOptimization } from './simulator-optimizer.js';
+import { findBestParameters, shouldMaximizeMetric, displayBestParameters, displayMultiObjectiveOptimization, displayConstraintBasedOptimization } from './simulator-optimizer.js';
 import { displaySensitivityAnalysis, displayParetoFrontier } from './simulator-visualization.js';
 import {
     simulateOneYear,
@@ -343,7 +343,6 @@ export async function runParameterSweep() {
 
         // Zeige Optimierungs- und Visualisierungs-Buttons an
         document.getElementById('findBestButton').style.display = 'inline-block';
-        document.getElementById('autoOptimizeButton').style.display = 'inline-block';
         document.getElementById('sensitivityButton').style.display = 'inline-block';
         document.getElementById('paretoButton').style.display = 'inline-block';
     } catch (error) {
@@ -392,54 +391,6 @@ window.findAndDisplayBest = function() {
     }
 };
 
-/**
- * Führt adaptive Optimierung durch
- */
-window.runAutoOptimization = async function() {
-    if (!window.sweepResults || window.sweepResults.length === 0) {
-        alert('Bitte führen Sie zuerst einen Parameter Sweep durch.');
-        return;
-    }
-
-    const metricKey = document.getElementById('sweepMetric').value;
-
-    // Bestätigung vom Nutzer
-    const confirmed = confirm(
-        `Auto-Optimierung für "${metricKey}" starten?\n\n` +
-        `Dies führt 2 zusätzliche Sweep-Durchläufe durch, um die Parameter zu verfeinern.\n` +
-        `Dies kann einige Minuten dauern.`
-    );
-
-    if (!confirmed) return;
-
-    // Deaktiviere Buttons während Optimierung
-    const autoOptButton = document.getElementById('autoOptimizeButton');
-    const findBestButton = document.getElementById('findBestButton');
-    const sweepButton = document.getElementById('sweepButton');
-
-    autoOptButton.disabled = true;
-    findBestButton.disabled = true;
-    sweepButton.disabled = true;
-
-    try {
-        const result = await runAdaptiveOptimization(metricKey, 2, (iter, max, best) => {
-            console.log(`Iteration ${iter}/${max}: Bester Wert = ${best.metricValue}`);
-        });
-
-        if (result) {
-            displayOptimizationHistory(result, metricKey);
-            // Scroll zu den Ergebnissen
-            document.getElementById('optimizationResults').scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-    } catch (error) {
-        alert(`Fehler bei Auto-Optimierung:\n\n${error.message}`);
-        console.error('Auto-Optimierung Fehler:', error);
-    } finally {
-        autoOptButton.disabled = false;
-        findBestButton.disabled = false;
-        sweepButton.disabled = false;
-    }
-};
 
 /**
  * Zeigt Sensitivity Analysis

@@ -639,6 +639,14 @@
                 </div>
 
                 <div id="tab-sweep" class="tab-panel">
+                    <!-- ========== PARAMETER SWEEP (EXPLORATION) ========== -->
+                    <h3 style="margin-top: 0; color: var(--primary-color); border-bottom: 2px solid var(--primary-color); padding-bottom: 8px;">
+                        📊 Parameter Sweep (Exploration)
+                    </h3>
+                    <p style="color: #666; margin-bottom: 20px; font-size: 0.95rem;">
+                        Systematische Exploration des Parameter-Raums über vordefinierte Ranges. Gut für erste Analysen und Heatmaps.
+                    </p>
+
                     <fieldset>
                         <legend><span class="section-icon">🔄</span>Sweep-Ranges</legend>
                         <div
@@ -686,7 +694,6 @@
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                         <button id="sweepButton" onclick="runParameterSweep()">Run Sweep</button>
                         <button id="findBestButton" onclick="findAndDisplayBest()" style="background-color: #4caf50; display: none;">🎯 Beste Parameter finden</button>
-                        <button id="autoOptimizeButton" onclick="runAutoOptimization()" style="background-color: #2196f3; display: none;">🚀 Auto-Optimize</button>
                         <button id="sensitivityButton" onclick="showSensitivityAnalysis()" style="background-color: #ff9800; display: none;">📊 Sensitivity Analysis</button>
                         <button id="paretoButton" onclick="showParetoDialog()" style="background-color: #9c27b0; display: none;">🎯 Pareto Frontier</button>
                     </div>
@@ -764,9 +771,17 @@
                         <div id="sweepHeatmap"></div>
                     </div>
 
-                    <!-- Auto-Optimize Panel -->
-                    <fieldset style="margin-top: 30px; border: 2px solid var(--secondary-color);">
-                        <legend><span class="section-icon">🚀</span>Auto-Optimize</legend>
+                    <!-- ========== AUTO-OPTIMIZE (INTELLIGENT SEARCH) ========== -->
+                    <h3 style="margin-top: 40px; color: var(--secondary-color); border-bottom: 2px solid var(--secondary-color); padding-bottom: 8px;">
+                        🚀 Auto-Optimize (Intelligent Search)
+                    </h3>
+                    <p style="color: #666; margin-bottom: 20px; font-size: 0.95rem;">
+                        Effiziente, KI-gestützte Parameter-Optimierung mit Latin Hypercube Sampling, Quick-Filter und Train/Test-Validierung.
+                        Findet optimale Parameter-Kombinationen schneller und zuverlässiger als brute-force Sweep.
+                    </p>
+
+                    <fieldset style="border: 2px solid var(--secondary-color);">
+                        <legend><span class="section-icon">🎯</span>Optimization Configuration</legend>
 
                         <!-- Objective -->
                         <div style="background: #f0f8ff; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
@@ -811,6 +826,10 @@
                                             <option value="runwayMinM" selected>Runway Min (Monate)</option>
                                             <option value="runwayTargetM">Runway Target (Monate)</option>
                                             <option value="goldTargetPct">Gold Target (%)</option>
+                                            <option value="targetEq">Target Eq (%)</option>
+                                            <option value="rebalBand">Rebal Band (%)</option>
+                                            <option value="maxSkimPct">Max Skim (%)</option>
+                                            <option value="maxBearRefillPct">Max Bear Refill (%)</option>
                                         </select>
                                     </div>
                                     <div class="form-group">
@@ -838,6 +857,10 @@
                                             <option value="runwayMinM">Runway Min (Monate)</option>
                                             <option value="runwayTargetM" selected>Runway Target (Monate)</option>
                                             <option value="goldTargetPct">Gold Target (%)</option>
+                                            <option value="targetEq">Target Eq (%)</option>
+                                            <option value="rebalBand">Rebal Band (%)</option>
+                                            <option value="maxSkimPct">Max Skim (%)</option>
+                                            <option value="maxBearRefillPct">Max Bear Refill (%)</option>
                                         </select>
                                     </div>
                                     <div class="form-group">
@@ -865,6 +888,10 @@
                                             <option value="runwayMinM">Runway Min (Monate)</option>
                                             <option value="runwayTargetM">Runway Target (Monate)</option>
                                             <option value="goldTargetPct" selected>Gold Target (%)</option>
+                                            <option value="targetEq">Target Eq (%)</option>
+                                            <option value="rebalBand">Rebal Band (%)</option>
+                                            <option value="maxSkimPct">Max Skim (%)</option>
+                                            <option value="maxBearRefillPct">Max Bear Refill (%)</option>
                                         </select>
                                     </div>
                                     <div class="form-group">
