@@ -21,6 +21,78 @@ import { updateStartPortfolioDisplay } from './simulator-portfolio.js';
 let aoParamCounter = 0;
 
 /**
+ * Preset-Definitionen für verschiedene Optimierungs-Strategien
+ */
+const PRESETS = {
+    standard: {
+        name: '📊 Standard',
+        description: 'Ausgewogene Optimierung der 3 Haupt-Parameter',
+        objective: { metric: 'SuccessRate', direction: 'max' },
+        constraints: { sr99: true, noex: true, ts45: false, dd55: false },
+        params: [
+            { key: 'runwayMinM', min: 18, max: 36, step: 2 },
+            { key: 'runwayTargetM', min: 24, max: 48, step: 2 },
+            { key: 'goldTargetPct', min: 0, max: 10, step: 1 }
+        ]
+    },
+    runway: {
+        name: '🛫 Runway Optimierung',
+        description: 'Fokus auf optimale Runway-Konfiguration',
+        objective: { metric: 'SuccessRate', direction: 'max' },
+        constraints: { sr99: true, noex: true, ts45: false, dd55: false },
+        params: [
+            { key: 'runwayMinM', min: 12, max: 30, step: 2 },
+            { key: 'runwayTargetM', min: 18, max: 42, step: 2 },
+            { key: 'rebalBand', min: 2, max: 10, step: 1 }
+        ]
+    },
+    allocation: {
+        name: '📈 Asset Allocation',
+        description: 'Optimierung der Vermögensaufteilung',
+        objective: { metric: 'EndWealth_P50', direction: 'max' },
+        constraints: { sr99: true, noex: false, ts45: false, dd55: false },
+        params: [
+            { key: 'goldTargetPct', min: 0, max: 15, step: 1 },
+            { key: 'targetEq', min: 40, max: 80, step: 5 },
+            { key: 'rebalBand', min: 2, max: 10, step: 1 }
+        ]
+    },
+    conservative: {
+        name: '🛡️ Konservativ',
+        description: 'Hohe Sicherheit, minimale Risiken',
+        objective: { metric: 'SuccessRate', direction: 'max' },
+        constraints: { sr99: true, noex: true, ts45: true, dd55: true },
+        params: [
+            { key: 'runwayTargetM', min: 30, max: 60, step: 3 },
+            { key: 'goldTargetPct', min: 5, max: 15, step: 1 },
+            { key: 'maxSkimPct', min: 10, max: 30, step: 2 }
+        ]
+    },
+    aggressive: {
+        name: '🚀 Aggressiv',
+        description: 'Maximales Endvermögen',
+        objective: { metric: 'EndWealth_P50', direction: 'max' },
+        constraints: { sr99: true, noex: false, ts45: false, dd55: false },
+        params: [
+            { key: 'targetEq', min: 60, max: 90, step: 5 },
+            { key: 'maxSkimPct', min: 20, max: 50, step: 5 },
+            { key: 'maxBearRefillPct', min: 30, max: 70, step: 5 }
+        ]
+    },
+    drawdown: {
+        name: '📉 Drawdown-Minimierung',
+        description: 'Minimierung von Verlusten',
+        objective: { metric: 'Drawdown_P90', direction: 'min' },
+        constraints: { sr99: true, noex: true, ts45: false, dd55: true },
+        params: [
+            { key: 'goldTargetPct', min: 5, max: 20, step: 2 },
+            { key: 'targetEq', min: 30, max: 60, step: 5 },
+            { key: 'rebalBand', min: 3, max: 8, step: 1 }
+        ]
+    }
+};
+
+/**
  * Initialisiert das Auto-Optimize UI
  */
 export function initAutoOptimizeUI() {
@@ -68,15 +140,88 @@ export function initAutoOptimizeUI() {
         removeParameter();
     });
 
-    // Initialisiere mit 3 Standard-Parametern
-    initDefaultParameters();
+    // Preset Buttons
+    initPresetButtons();
+
+    // Initialisiere mit Standard-Preset (statt fest 3 Parameter)
+    applyPreset('standard');
 
     // Initial Validation
     updateRunButtonState();
 }
 
 /**
+ * Initialisiert Preset-Buttons
+ */
+function initPresetButtons() {
+    const container = document.getElementById('ao_presets_container');
+    if (!container) {
+        console.warn('Presets container not found');
+        return;
+    }
+
+    // Event-Delegation für Preset-Buttons
+    container.addEventListener('click', (e) => {
+        const button = e.target.closest('.ao-preset-btn');
+        if (button) {
+            const presetKey = button.dataset.preset;
+            applyPreset(presetKey);
+
+            // Visuelles Feedback: Highlight selected preset
+            container.querySelectorAll('.ao-preset-btn').forEach(btn => {
+                btn.style.borderColor = '#ddd';
+                btn.style.borderWidth = '1px';
+            });
+            button.style.borderColor = 'var(--secondary-color)';
+            button.style.borderWidth = '2px';
+        }
+    });
+}
+
+/**
+ * Wendet ein Preset an
+ * @param {string} presetKey - Preset-Schlüssel aus PRESETS
+ */
+function applyPreset(presetKey) {
+    const preset = PRESETS[presetKey];
+    if (!preset) {
+        console.error(`Unknown preset: ${presetKey}`);
+        return;
+    }
+
+    console.log(`Applying preset: ${preset.name}`);
+
+    // 1. Lösche alle vorhandenen Parameter
+    const container = document.getElementById('ao_parameters_container');
+    container.innerHTML = '';
+    aoParamCounter = 0;
+
+    // 2. Setze Objective
+    document.getElementById('ao_metric').value = preset.objective.metric;
+    document.getElementById('ao_direction').value = preset.objective.direction;
+
+    // Trigger metric change event for quantile visibility
+    document.getElementById('ao_metric').dispatchEvent(new Event('change'));
+
+    // 3. Setze Constraints
+    document.getElementById('ao_c_sr99').checked = preset.constraints.sr99;
+    document.getElementById('ao_c_noex').checked = preset.constraints.noex;
+    document.getElementById('ao_c_ts45').checked = preset.constraints.ts45;
+    document.getElementById('ao_c_dd55').checked = preset.constraints.dd55;
+
+    // 4. Füge Parameter hinzu
+    for (const param of preset.params) {
+        addParameter(param);
+    }
+
+    // 5. Update UI
+    updateParameterButtonStates();
+    updateRunButtonState();
+}
+
+/**
  * Initialisiert Standard-Parameter (3 Stück)
+ * DEPRECATED: Wird nicht mehr verwendet, stattdessen applyPreset('standard')
  */
 function initDefaultParameters() {
     const defaults = [
