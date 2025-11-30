@@ -183,15 +183,18 @@ function checkConstraints(results, constraints) {
 }
 
 /**
- * Latin Hypercube Sampling für 3D-Parameter-Raum
- * @param {object} ranges - {p1: {min, max, step}, p2: {...}, p3: {...}}
+ * Latin Hypercube Sampling für N-dimensionalen Parameter-Raum
+ * @param {object} ranges - {param1: {min, max, step}, param2: {...}, ...}
  * @param {number} n - Anzahl Samples
  * @param {Function} rand - RNG-Funktion
- * @returns {Array<object>} Array von {p1Val, p2Val, p3Val}
+ * @returns {Array<object>} Array von {param1: val, param2: val, ...}
  */
 function latinHypercubeSample(ranges, n, rand) {
     const params = Object.keys(ranges);
-    if (params.length !== 3) throw new Error('Exactly 3 parameters required');
+
+    if (params.length === 0) {
+        throw new Error('At least 1 parameter required');
+    }
 
     const samples = [];
 

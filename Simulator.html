@@ -812,101 +812,23 @@
                             </div>
                         </div>
 
-                        <!-- Parameter Picker -->
+                        <!-- Parameter Picker (Dynamic) -->
                         <div style="background: #fff8f0; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
-                            <h4 style="margin-top: 0; margin-bottom: 15px;">Parameter (3 erforderlich)</h4>
-
-                            <!-- Parameter 1 -->
-                            <div style="border: 1px solid #ddd; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
-                                <h5 style="margin-top: 0; margin-bottom: 10px;">Parameter 1</h5>
-                                <div class="form-grid-four-col">
-                                    <div class="form-group">
-                                        <label for="ao_p1_key">Key</label>
-                                        <select id="ao_p1_key">
-                                            <option value="runwayMinM" selected>Runway Min (Monate)</option>
-                                            <option value="runwayTargetM">Runway Target (Monate)</option>
-                                            <option value="goldTargetPct">Gold Target (%)</option>
-                                            <option value="targetEq">Target Eq (%)</option>
-                                            <option value="rebalBand">Rebal Band (%)</option>
-                                            <option value="maxSkimPct">Max Skim (%)</option>
-                                            <option value="maxBearRefillPct">Max Bear Refill (%)</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="ao_p1_min">Min</label>
-                                        <input type="number" id="ao_p1_min" value="18" step="1">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="ao_p1_max">Max</label>
-                                        <input type="number" id="ao_p1_max" value="36" step="1">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="ao_p1_step">Step</label>
-                                        <input type="number" id="ao_p1_step" value="2" step="0.1" min="0.1">
-                                    </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h4 style="margin: 0;">Parameter (1 bis 7)</h4>
+                                <div style="display: flex; gap: 8px;">
+                                    <button type="button" id="ao_add_param_btn" style="padding: 6px 12px; background-color: #4caf50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem;">
+                                        + Parameter hinzufügen
+                                    </button>
+                                    <button type="button" id="ao_remove_param_btn" style="padding: 6px 12px; background-color: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem;">
+                                        - Parameter entfernen
+                                    </button>
                                 </div>
                             </div>
 
-                            <!-- Parameter 2 -->
-                            <div style="border: 1px solid #ddd; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
-                                <h5 style="margin-top: 0; margin-bottom: 10px;">Parameter 2</h5>
-                                <div class="form-grid-four-col">
-                                    <div class="form-group">
-                                        <label for="ao_p2_key">Key</label>
-                                        <select id="ao_p2_key">
-                                            <option value="runwayMinM">Runway Min (Monate)</option>
-                                            <option value="runwayTargetM" selected>Runway Target (Monate)</option>
-                                            <option value="goldTargetPct">Gold Target (%)</option>
-                                            <option value="targetEq">Target Eq (%)</option>
-                                            <option value="rebalBand">Rebal Band (%)</option>
-                                            <option value="maxSkimPct">Max Skim (%)</option>
-                                            <option value="maxBearRefillPct">Max Bear Refill (%)</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="ao_p2_min">Min</label>
-                                        <input type="number" id="ao_p2_min" value="24" step="1">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="ao_p2_max">Max</label>
-                                        <input type="number" id="ao_p2_max" value="48" step="1">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="ao_p2_step">Step</label>
-                                        <input type="number" id="ao_p2_step" value="2" step="0.1" min="0.1">
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Parameter 3 -->
-                            <div style="border: 1px solid #ddd; padding: 10px; border-radius: 4px;">
-                                <h5 style="margin-top: 0; margin-bottom: 10px;">Parameter 3</h5>
-                                <div class="form-grid-four-col">
-                                    <div class="form-group">
-                                        <label for="ao_p3_key">Key</label>
-                                        <select id="ao_p3_key">
-                                            <option value="runwayMinM">Runway Min (Monate)</option>
-                                            <option value="runwayTargetM">Runway Target (Monate)</option>
-                                            <option value="goldTargetPct" selected>Gold Target (%)</option>
-                                            <option value="targetEq">Target Eq (%)</option>
-                                            <option value="rebalBand">Rebal Band (%)</option>
-                                            <option value="maxSkimPct">Max Skim (%)</option>
-                                            <option value="maxBearRefillPct">Max Bear Refill (%)</option>
-                                        </select>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="ao_p3_min">Min</label>
-                                        <input type="number" id="ao_p3_min" value="0" step="0.1">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="ao_p3_max">Max</label>
-                                        <input type="number" id="ao_p3_max" value="10" step="0.1">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="ao_p3_step">Step</label>
-                                        <input type="number" id="ao_p3_step" value="1" step="0.1" min="0.1">
-                                    </div>
-                                </div>
+                            <!-- Dynamic Parameter Container -->
+                            <div id="ao_parameters_container">
+                                <!-- Parameters will be added dynamically via JavaScript -->
                             </div>
                         </div>
 
