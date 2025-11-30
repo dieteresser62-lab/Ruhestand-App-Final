@@ -84,6 +84,17 @@
             border-color: var(--secondary-color, #9ca3af);
             background-color: #e5e5e5;
         }
+
+        /* Auto-Optimize Preset Buttons */
+        .ao-preset-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-color: var(--secondary-color) !important;
+        }
+
+        .ao-preset-btn:active {
+            transform: translateY(0);
+        }
     </style>
 </head>
 
@@ -809,6 +820,40 @@
                             <div id="ao_quantile_container" class="form-group" style="display: none;">
                                 <label for="ao_quantile">Quantile (%)</label>
                                 <input type="number" id="ao_quantile" value="50" min="1" max="99" step="1">
+                            </div>
+                        </div>
+
+                        <!-- Presets -->
+                        <div style="background: #fff9e6; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                            <h4 style="margin-top: 0; margin-bottom: 10px;">🎯 Vorkonfigurierte Presets</h4>
+                            <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">
+                                Wähle ein Preset, um passende Parameter für dein Optimierungsziel vorzufüllen. Du kannst anschließend manuell anpassen.
+                            </p>
+                            <div id="ao_presets_container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                                <button type="button" class="ao-preset-btn" data-preset="standard" style="padding: 10px; border: 2px solid var(--secondary-color); border-radius: 6px; background: white; cursor: pointer; text-align: left; transition: all 0.2s;">
+                                    <div style="font-weight: 600; margin-bottom: 4px;">📊 Standard</div>
+                                    <div style="font-size: 0.8rem; color: #666;">Ausgewogene Optimierung</div>
+                                </button>
+                                <button type="button" class="ao-preset-btn" data-preset="runway" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; text-align: left; transition: all 0.2s;">
+                                    <div style="font-weight: 600; margin-bottom: 4px;">🛫 Runway Optimierung</div>
+                                    <div style="font-size: 0.8rem; color: #666;">Optimale Runway-Konfiguration</div>
+                                </button>
+                                <button type="button" class="ao-preset-btn" data-preset="allocation" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; text-align: left; transition: all 0.2s;">
+                                    <div style="font-weight: 600; margin-bottom: 4px;">📈 Asset Allocation</div>
+                                    <div style="font-size: 0.8rem; color: #666;">Vermögensaufteilung</div>
+                                </button>
+                                <button type="button" class="ao-preset-btn" data-preset="conservative" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; text-align: left; transition: all 0.2s;">
+                                    <div style="font-weight: 600; margin-bottom: 4px;">🛡️ Konservativ</div>
+                                    <div style="font-size: 0.8rem; color: #666;">Hohe Sicherheit</div>
+                                </button>
+                                <button type="button" class="ao-preset-btn" data-preset="aggressive" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; text-align: left; transition: all 0.2s;">
+                                    <div style="font-weight: 600; margin-bottom: 4px;">🚀 Aggressiv</div>
+                                    <div style="font-size: 0.8rem; color: #666;">Maximales Endvermögen</div>
+                                </button>
+                                <button type="button" class="ao-preset-btn" data-preset="drawdown" style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; text-align: left; transition: all 0.2s;">
+                                    <div style="font-weight: 600; margin-bottom: 4px;">📉 Drawdown-Minimierung</div>
+                                    <div style="font-size: 0.8rem; color: #666;">Minimierung von Verlusten</div>
+                                </button>
                             </div>
                         </div>
 
