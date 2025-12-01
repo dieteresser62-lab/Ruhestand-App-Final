@@ -30,6 +30,79 @@ export function initUIBinder(domRefs, state, updateFn, debouncedUpdateFn) {
 }
 
 export const UIBinder = {
+    /**
+     * Helper: Fetch mit Timeout
+     * @param {string} url - URL zum Abrufen
+     * @param {number} timeout - Timeout in Millisekunden (Standard: 10000)
+     * @param {Object} options - Fetch-Optionen
+     * @returns {Promise<Response>}
+     */
+    async _fetchWithTimeout(url, timeout = 10000, options = {}) {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), timeout);
+
+        try {
+            const response = await fetch(url, {
+                ...options,
+                signal: controller.signal
+            });
+            clearTimeout(id);
+            return response;
+        } catch (error) {
+            clearTimeout(id);
+            if (error.name === 'AbortError') {
+                throw new AppError(`Request Timeout nach ${timeout}ms: ${url}`);
+            }
+            throw error;
+        }
+    },
+
+    /**
+     * Helper: Retry-Logik für API-Aufrufe
+     * @param {Function} fn - Async-Funktion zum Ausführen
+     * @param {number} maxRetries - Maximale Anzahl von Wiederholungen (Standard: 3)
+     * @param {number} delayMs - Verzögerung zwischen Versuchen in ms (Standard: 1000)
+     * @returns {Promise<any>}
+     */
+    async _retryWithBackoff(fn, maxRetries = 3, delayMs = 1000) {
+        let lastError;
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                return await fn();
+            } catch (error) {
+                lastError = error;
+                console.warn(`Versuch ${attempt + 1}/${maxRetries} fehlgeschlagen:`, error.message);
+
+                if (attempt < maxRetries - 1) {
+                    // Exponential Backoff: 1s, 2s, 4s
+                    const waitTime = delayMs * Math.pow(2, attempt);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                }
+            }
+        }
+        throw lastError;
+    },
+
+    /**
+     * Validiert einen numerischen Wert in einem plausiblen Bereich
+     * @param {number} value - Zu prüfender Wert
+     * @param {number} min - Minimaler plausibler Wert
+     * @param {number} max - Maximaler plausibler Wert
+     * @param {string} label - Beschreibung für Fehlermeldung
+     * @returns {boolean}
+     */
+    _validateNumericRange(value, min, max, label) {
+        if (!Number.isFinite(value)) {
+            console.warn(`${label}: Wert ist nicht numerisch (${value})`);
+            return false;
+        }
+        if (value < min || value > max) {
+            console.warn(`${label}: Wert ${value} außerhalb des plausiblen Bereichs (${min}-${max})`);
+            return false;
+        }
+        return true;
+    },
+
     bindUI() {
         // Keyboard shortcuts
         document.addEventListener('keydown', this.handleKeyboardShortcuts.bind(this));
@@ -339,93 +412,134 @@ export const UIBinder = {
                 UIRenderer.toast(`Versuche Inflationsdaten für ${previousYear} abzurufen...`);
             }
 
-            // Versuche verschiedene APIs nacheinander
+            // Versuche verschiedene APIs nacheinander mit Retry-Logik
             let inflationRate = null;
             let source = '';
+            let apiErrors = []; // Sammle detaillierte Fehler
 
             // API 1: ECB Statistical Data Warehouse (HICP - Harmonized Index of Consumer Prices)
             // Deutschland: DEU, HICP All-items, Annual rate of change
             try {
-                const ecbUrl = `https://data-api.ecb.europa.eu/service/data/ICP/M.DE.N.000000.4.ANR`;
-                const ecbResponse = await fetch(ecbUrl, {
-                    headers: { 'Accept': 'application/json' }
-                });
+                const result = await this._retryWithBackoff(async () => {
+                    // Neuer Endpoint mit Jahr-Filter für jährliche Daten
+                    const ecbUrl = `https://data-api.ecb.europa.eu/service/data/ICP/A.DE.N.000000.4.ANR?startPeriod=${previousYear}&endPeriod=${previousYear}&format=jsondata`;
+                    const ecbResponse = await this._fetchWithTimeout(ecbUrl, 8000, {
+                        headers: { 'Accept': 'application/json' }
+                    });
 
-                if (ecbResponse.ok) {
+                    if (!ecbResponse.ok) {
+                        throw new Error(`ECB HTTP ${ecbResponse.status}`);
+                    }
+
                     const ecbData = await ecbResponse.json();
 
-                    // Durchsuche die Zeitreihe nach dem Vorjahr
-                    if (ecbData.dataSets && ecbData.dataSets[0] && ecbData.dataSets[0].series) {
+                    // Parse SDMX-JSON Struktur
+                    if (ecbData.dataSets?.[0]?.series) {
                         const series = Object.values(ecbData.dataSets[0].series)[0];
-                        if (series && series.observations) {
-                            // Finde die neuesten verfügbaren Daten
+                        if (series?.observations) {
                             const observations = Object.entries(series.observations);
                             if (observations.length > 0) {
-                                // Nimm den neuesten Wert
-                                const latestObs = observations[observations.length - 1];
-                                inflationRate = parseFloat(latestObs[1][0]);
-                                source = 'ECB (HICP)';
+                                const value = parseFloat(observations[0][1][0]);
+
+                                // Validierung: Inflation sollte zwischen -5% und 20% liegen
+                                if (!this._validateNumericRange(value, -5, 20, 'ECB Inflation')) {
+                                    throw new Error(`Unplausibler ECB-Wert: ${value}%`);
+                                }
+
+                                return { rate: value, source: 'ECB (HICP)' };
                             }
                         }
                     }
-                }
+                    throw new Error('ECB: Keine Daten in erwarteter Struktur');
+                }, 2, 1000);  // Max 2 Versuche, 1s initial delay
+
+                inflationRate = result.rate;
+                source = result.source;
             } catch (ecbErr) {
-                // ECB API failed, try next
+                apiErrors.push({ api: 'ECB', error: ecbErr.message });
+                console.warn('ECB API fehlgeschlagen:', ecbErr);
             }
 
             // API 2: World Bank API (Alternative)
             if (inflationRate === null) {
                 try {
-                    const wbUrl = `https://api.worldbank.org/v2/country/DE/indicator/FP.CPI.TOTL.ZG?format=json&date=${previousYear}`;
-                    const wbResponse = await fetch(wbUrl);
+                    const result = await this._retryWithBackoff(async () => {
+                        const wbUrl = `https://api.worldbank.org/v2/country/DE/indicator/FP.CPI.TOTL.ZG?format=json&date=${previousYear}`;
+                        const wbResponse = await this._fetchWithTimeout(wbUrl, 8000);
 
-                    if (wbResponse.ok) {
+                        if (!wbResponse.ok) {
+                            throw new Error(`World Bank HTTP ${wbResponse.status}`);
+                        }
+
                         const wbData = await wbResponse.json();
 
-                        if (wbData && wbData[1] && wbData[1].length > 0 && wbData[1][0].value !== null) {
-                            inflationRate = parseFloat(wbData[1][0].value);
-                            source = 'World Bank';
+                        if (wbData?.[1]?.[0]?.value !== null && wbData[1][0].date === previousYear.toString()) {
+                            const value = parseFloat(wbData[1][0].value);
+
+                            // Validierung
+                            if (!this._validateNumericRange(value, -5, 20, 'World Bank Inflation')) {
+                                throw new Error(`Unplausibler World Bank-Wert: ${value}%`);
+                            }
+
+                            return { rate: value, source: 'World Bank' };
                         }
-                    }
+                        throw new Error('World Bank: Keine Daten verfügbar');
+                    }, 2, 1000);
+
+                    inflationRate = result.rate;
+                    source = result.source;
                 } catch (wbErr) {
-                    // World Bank API failed, try next
+                    apiErrors.push({ api: 'World Bank', error: wbErr.message });
+                    console.warn('World Bank API fehlgeschlagen:', wbErr);
                 }
             }
 
-            // API 3: OECD API (Alternative)
+            // API 3: OECD API (Alternative) - nur wenn andere fehlschlagen
             if (inflationRate === null) {
                 try {
-                    const oecdUrl = `https://stats.oecd.org/sdmx-json/data/DP_LIVE/.CPI.../OECD?contentType=json&detail=code&separator=.&dimensionAtObservation=allDimensions&startPeriod=${previousYear}&endPeriod=${previousYear}`;
-                    const oecdResponse = await fetch(oecdUrl);
+                    const result = await this._retryWithBackoff(async () => {
+                        const oecdUrl = `https://stats.oecd.org/sdmx-json/data/DP_LIVE/.CPI.../OECD?contentType=json&detail=code&separator=.&dimensionAtObservation=allDimensions&startPeriod=${previousYear}&endPeriod=${previousYear}`;
+                        const oecdResponse = await this._fetchWithTimeout(oecdUrl, 8000);
 
-                    if (oecdResponse.ok) {
+                        if (!oecdResponse.ok) {
+                            throw new Error(`OECD HTTP ${oecdResponse.status}`);
+                        }
+
                         const oecdData = await oecdResponse.json();
 
                         // Suche Deutschland in den Daten
-                        if (oecdData.dataSets && oecdData.dataSets[0] && oecdData.dataSets[0].observations) {
-                            // OECD Datenstruktur ist komplex, durchsuche nach DEU
+                        if (oecdData.dataSets?.[0]?.observations) {
                             const observations = oecdData.dataSets[0].observations;
                             for (const [key, value] of Object.entries(observations)) {
-                                // Prüfe ob das Deutschland ist
                                 const indices = key.split(':');
-                                if (oecdData.structure && oecdData.structure.dimensions) {
-                                    const locationDim = oecdData.structure.dimensions.observation.find(d => d.id === 'LOCATION');
-                                    if (locationDim && locationDim.values[parseInt(indices[0])].id === 'DEU') {
-                                        inflationRate = parseFloat(value[0]);
-                                        source = 'OECD';
-                                        break;
+                                if (oecdData.structure?.dimensions) {
+                                    const locationDim = oecdData.structure.dimensions.observation?.find(d => d.id === 'LOCATION');
+                                    if (locationDim?.values[parseInt(indices[0])]?.id === 'DEU') {
+                                        const rate = parseFloat(value[0]);
+
+                                        // Validierung
+                                        if (!this._validateNumericRange(rate, -5, 20, 'OECD Inflation')) {
+                                            throw new Error(`Unplausibler OECD-Wert: ${rate}%`);
+                                        }
+
+                                        return { rate, source: 'OECD' };
                                     }
                                 }
                             }
                         }
-                    }
+                        throw new Error('OECD: Deutschland nicht in Daten gefunden');
+                    }, 2, 1000);
+
+                    inflationRate = result.rate;
+                    source = result.source;
                 } catch (oecdErr) {
-                    // OECD API failed, try next
+                    apiErrors.push({ api: 'OECD', error: oecdErr.message });
+                    console.warn('OECD API fehlgeschlagen:', oecdErr);
                 }
             }
 
             // Ergebnis verarbeiten
-            if (inflationRate !== null && !isNaN(inflationRate) && isFinite(inflationRate)) {
+            if (inflationRate !== null && Number.isFinite(inflationRate)) {
                 // Setze den Wert im Eingabefeld
                 dom.inputs.inflation.value = inflationRate.toFixed(1);
                 debouncedUpdate();
@@ -444,17 +558,16 @@ export const UIBinder = {
                     source: source
                 };
             } else {
-                // Keine Daten gefunden - detailliertes Feedback
+                // Keine Daten gefunden - detailliertes Feedback mit gesammelten Fehlern
+                const errorDetails = apiErrors.map(e => `• ${e.api}: ${e.error}`).join('\n');
                 throw new AppError(
                     `Keine Inflationsdaten für ${previousYear} gefunden.\n\n` +
-                    `🔍 Getestete APIs:\n` +
-                    `• ECB Statistical Data Warehouse\n` +
-                    `• World Bank Data API\n` +
-                    `• OECD Statistics API\n\n` +
+                    `🔍 Getestete APIs (${apiErrors.length} Fehler):\n${errorDetails}\n\n` +
                     `Mögliche Ursachen:\n` +
                     `• CORS-Blockierung durch Browser\n` +
                     `• Daten für ${previousYear} noch nicht verfügbar\n` +
-                    `• API-Endpoints haben sich geändert\n\n` +
+                    `• API-Endpoints haben sich geändert\n` +
+                    `• Netzwerkprobleme\n\n` +
                     `💡 Tipp: Öffne die Browser-Konsole (F12) für Details.`
                 );
             }
@@ -719,14 +832,38 @@ export const UIBinder = {
         startDate.setDate(startDate.getDate() - 10);
         const startTime = formatDate(startDate);
 
-        // Strategie 1: Yahoo Finance über CORS-Proxy (allorigins.win)
+        let apiErrors = []; // Sammle detaillierte Fehler
+
+        /**
+         * Validiert ETF-Preis und Datum
+         */
+        const validateETFData = (price, date, source) => {
+            // VWCE sollte zwischen 50 und 150 EUR liegen (Stand 2024/2025)
+            if (!this._validateNumericRange(price, 50, 150, `${source} VWCE Preis`)) {
+                throw new Error(`Unplausibler Preis: ${price}€`);
+            }
+
+            // Prüfe, ob Datum im erlaubten Bereich liegt (max. 30 Tage vor Zieldatum)
+            const daysDiff = Math.abs((date.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24));
+            if (daysDiff > 30) {
+                throw new Error(`Datum zu weit entfernt: ${date.toLocaleDateString('de-DE')} (${daysDiff.toFixed(0)} Tage)`);
+            }
+
+            return true;
+        };
+
+        // Strategie 1: Yahoo Finance über CORS-Proxy (allorigins.win) mit Retry
         try {
-            const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${startTime}&period2=${targetTime}&interval=1d`;
-            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`;
+            const result = await this._retryWithBackoff(async () => {
+                const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${startTime}&period2=${targetTime}&interval=1d`;
+                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`;
 
-            const response = await fetch(proxyUrl);
+                const response = await this._fetchWithTimeout(proxyUrl, 12000);
 
-            if (response.ok) {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
                 const data = await response.json();
 
                 if (data.chart?.result?.[0]) {
@@ -739,29 +876,42 @@ export const UIBinder = {
                         for (let i = timestamps.length - 1; i >= 0; i--) {
                             const price = quotes.close[i];
                             if (price !== null && !isNaN(price)) {
+                                const date = new Date(timestamps[i] * 1000);
+
+                                // Validierung
+                                validateETFData(price, date, 'Yahoo Finance (allorigins)');
+
                                 return {
                                     price: price,
-                                    date: new Date(timestamps[i] * 1000),
+                                    date: date,
                                     ticker: ticker,
-                                    source: 'Yahoo Finance (Proxy)'
+                                    source: 'Yahoo Finance (allorigins.win)'
                                 };
                             }
                         }
                     }
                 }
-            }
+                throw new Error('Keine Daten in erwarteter Struktur');
+            }, 2, 1500);  // 2 Versuche, 1.5s initial delay
+
+            return result;
         } catch (err) {
-            // Yahoo Finance via Proxy failed, try next
+            apiErrors.push({ api: 'Yahoo Finance (allorigins.win)', error: err.message });
+            console.warn('Yahoo Finance (allorigins.win) fehlgeschlagen:', err);
         }
 
-        // Strategie 2: Yahoo Finance über alternativen CORS-Proxy (corsproxy.io)
+        // Strategie 2: Yahoo Finance über alternativen CORS-Proxy (corsproxy.io) mit Retry
         try {
-            const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${startTime}&period2=${targetTime}&interval=1d`;
-            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(yahooUrl)}`;
+            const result = await this._retryWithBackoff(async () => {
+                const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${startTime}&period2=${targetTime}&interval=1d`;
+                const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(yahooUrl)}`;
 
-            const response = await fetch(proxyUrl);
+                const response = await this._fetchWithTimeout(proxyUrl, 12000);
 
-            if (response.ok) {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
                 const data = await response.json();
 
                 if (data.chart?.result?.[0]) {
@@ -773,9 +923,14 @@ export const UIBinder = {
                         for (let i = timestamps.length - 1; i >= 0; i--) {
                             const price = quotes.close[i];
                             if (price !== null && !isNaN(price)) {
+                                const date = new Date(timestamps[i] * 1000);
+
+                                // Validierung
+                                validateETFData(price, date, 'Yahoo Finance (corsproxy)');
+
                                 return {
                                     price: price,
-                                    date: new Date(timestamps[i] * 1000),
+                                    date: date,
                                     ticker: ticker,
                                     source: 'Yahoo Finance (corsproxy.io)'
                                 };
@@ -783,44 +938,114 @@ export const UIBinder = {
                         }
                     }
                 }
-            }
+                throw new Error('Keine Daten in erwarteter Struktur');
+            }, 2, 1500);
+
+            return result;
         } catch (err) {
-            // Yahoo Finance via corsproxy.io failed, try next
+            apiErrors.push({ api: 'Yahoo Finance (corsproxy.io)', error: err.message });
+            console.warn('Yahoo Finance (corsproxy.io) fehlgeschlagen:', err);
         }
 
-        // Strategie 3: Finnhub API (kostenlos, CORS-freundlich, aber braucht Demo-Key)
+        // Strategie 3: Direkter Yahoo Finance Versuch (könnte durch CORS blockiert werden, aber versuchen wir es)
         try {
-            const finnhubKey = 'demo'; // Demo-Key, begrenzt aber funktioniert für Tests
-            const finnhubUrl = `https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${finnhubKey}`;
+            const result = await this._retryWithBackoff(async () => {
+                const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${startTime}&period2=${targetTime}&interval=1d`;
 
-            const response = await fetch(finnhubUrl);
+                const response = await this._fetchWithTimeout(yahooUrl, 10000);
 
-            if (response.ok) {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.chart?.result?.[0]) {
+                    const result = data.chart.result[0];
+                    const timestamps = result.timestamp;
+                    const quotes = result.indicators.quote[0];
+
+                    if (timestamps && quotes?.close) {
+                        for (let i = timestamps.length - 1; i >= 0; i--) {
+                            const price = quotes.close[i];
+                            if (price !== null && !isNaN(price)) {
+                                const date = new Date(timestamps[i] * 1000);
+
+                                // Validierung
+                                validateETFData(price, date, 'Yahoo Finance (direkt)');
+
+                                return {
+                                    price: price,
+                                    date: date,
+                                    ticker: ticker,
+                                    source: 'Yahoo Finance (direkt)'
+                                };
+                            }
+                        }
+                    }
+                }
+                throw new Error('Keine Daten in erwarteter Struktur');
+            }, 1, 1000);  // Nur 1 Versuch, da CORS wahrscheinlich blockiert
+
+            return result;
+        } catch (err) {
+            apiErrors.push({ api: 'Yahoo Finance (direkt)', error: err.message });
+            console.warn('Yahoo Finance (direkt) fehlgeschlagen:', err);
+        }
+
+        // Strategie 4: Finnhub API (aktueller Kurs als Fallback)
+        try {
+            const result = await this._retryWithBackoff(async () => {
+                const finnhubKey = 'demo'; // Demo-Key, begrenzt aber funktioniert für Tests
+                const finnhubUrl = `https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${finnhubKey}`;
+
+                const response = await this._fetchWithTimeout(finnhubUrl, 8000);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
                 const data = await response.json();
 
                 if (data.c && data.c > 0) { // c = current price
+                    const price = data.c;
+                    const date = new Date(data.t * 1000); // t = timestamp
+
+                    // Validierung (lockerer für aktuellen Kurs)
+                    if (!this._validateNumericRange(price, 50, 150, 'Finnhub VWCE Preis')) {
+                        throw new Error(`Unplausibler Preis: ${price}€`);
+                    }
+
+                    console.warn('⚠️ Finnhub liefert aktuellen Kurs, nicht historischen für Zieldatum!');
+
                     return {
-                        price: data.c,
-                        date: new Date(data.t * 1000), // t = timestamp
+                        price: price,
+                        date: date,
                         ticker: ticker,
                         source: 'Finnhub (aktueller Kurs)'
                     };
                 }
-            }
+                throw new Error('Keine gültigen Daten');
+            }, 2, 1000);
+
+            return result;
         } catch (err) {
-            // Finnhub API failed
+            apiErrors.push({ api: 'Finnhub', error: err.message });
+            console.warn('Finnhub API fehlgeschlagen:', err);
         }
 
         // Alle Strategien fehlgeschlagen
+        const errorDetails = apiErrors.map(e => `• ${e.api}: ${e.error}`).join('\n');
         throw new AppError(
             `ETF-Daten konnten nicht abgerufen werden.\n\n` +
             `Ticker: ${ticker} (ISIN: ${isin})\n` +
             `Zieldatum: ${targetDate.toLocaleDateString('de-DE')}\n\n` +
-            `Getestete APIs:\n` +
-            `• Yahoo Finance via allorigins.win Proxy\n` +
-            `• Yahoo Finance via corsproxy.io Proxy\n` +
-            `• Finnhub API\n\n` +
-            `Alle CORS-Proxies sind fehlgeschlagen.\n\n` +
+            `🔍 Getestete APIs (${apiErrors.length} Fehler):\n${errorDetails}\n\n` +
+            `Mögliche Ursachen:\n` +
+            `• CORS-Blockierung durch Browser\n` +
+            `• Proxy-Server nicht erreichbar\n` +
+            `• Rate-Limiting der APIs\n` +
+            `• Netzwerkprobleme\n\n` +
             `💡 Alternativen:\n` +
             `• Nutze den manuellen "🗓️ Nachr." Button\n` +
             `• Importiere Daten via "📄 CSV" Button\n` +
