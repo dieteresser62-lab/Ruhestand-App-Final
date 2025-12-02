@@ -105,9 +105,32 @@ const Ruhestandsmodell_v30_Adapter = {
         }
 
         if (fullResult.error) {
+            // Extract current liquidity for safe fallback, even in error case
+            const currentLiq = (v30_inputsCtx.tagesgeld || 0) + (v30_inputsCtx.geldmarktEtf || 0);
             return {
                 error: fullResult.error,
-                title: "Fehler in der Engine"
+                title: "Fehler in der Engine",
+                liqNachTransaktion: {
+                    total: currentLiq
+                },
+                saleResult: null,
+                kaufGold: 0,
+                kaufAktien: 0
+            };
+        }
+
+        // Additional safety check: ensure ui and action exist
+        if (!fullResult.ui || !fullResult.ui.action) {
+            const currentLiq = (v30_inputsCtx.tagesgeld || 0) + (v30_inputsCtx.geldmarktEtf || 0);
+            return {
+                error: new Error("Engine result is missing ui.action structure"),
+                title: "Fehler in der Engine-Struktur",
+                liqNachTransaktion: {
+                    total: currentLiq
+                },
+                saleResult: null,
+                kaufGold: 0,
+                kaufAktien: 0
             };
         }
 
