@@ -118,11 +118,11 @@
                         <div class="fieldset-content">
                             <div class="form-grid">
                                 <div class="form-group"><label for="simStartVermoegen">Gesamtvermögen (€)</label><input
-                                        type="number" id="simStartVermoegen" value="2500000"></div>
+                                        type="number" id="simStartVermoegen" value="2700000"></div>
                                 <div class="form-group"><label for="depotwertAlt">davon Depotwert Alt (€)</label><input
-                                        type="number" id="depotwertAlt" value="1250000"></div>
+                                        type="number" id="depotwertAlt" value="1350000"></div>
                                 <div class="form-group"><label for="zielLiquiditaet">davon Ziel-Liquidität (€)</label><input
-                                        type="number" id="zielLiquiditaet" value="180000"></div>
+                                        type="number" id="zielLiquiditaet" value="200000"></div>
                             </div>
                             <div class="form-grid"
                                 style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
@@ -133,7 +133,7 @@
                                 <div class="form-group"><label for="marketCapeRatio">Aktueller CAPE (Shiller)</label><input
                                         type="number" id="marketCapeRatio" value="32" step="0.1" min="0"></div>
                                 <div class="form-group"><label for="einstandAlt">Einstand Depot Alt (€)</label><input
-                                        type="number" id="einstandAlt" value="700000"></div>
+                                        type="number" id="einstandAlt" value="756000"></div>
                                 <div class="form-group"><label>Einstand Depot Neu (€)</label><input type="number"
                                         id="einstandNeu" placeholder="wird berechnet" disabled></div>
                             </div>
@@ -340,8 +340,8 @@
                                 <div class="form-group">
                                     <label for="widowPensionMode">Verhalten bei Todesfall</label>
                                     <select id="widowPensionMode">
-                                        <option value="stop" selected>Rente endet vollständig</option>
-                                        <option value="percent">Witwen-/Witwerrente (Prozent)</option>
+                                        <option value="stop">Rente endet vollständig</option>
+                                        <option value="percent" selected>Witwen-/Witwerrente (Prozent)</option>
                                     </select>
                                 </div>
                                 <div class="form-group">
@@ -612,7 +612,7 @@
                             <div class="form-group"><label for="simStartJahr">Startjahr</label><input type="number"
                                     id="simStartJahr" value="2000"></div>
                             <div class="form-group"><label for="simEndJahr">Endjahr</label><input type="number"
-                                    id="simEndJahr" value="2023"></div>
+                                    id="simEndJahr" value="2024"></div>
                         </div>
                     </fieldset>
                     <button id="btButton" onclick="runBacktest()">Historische Simulation starten</button>

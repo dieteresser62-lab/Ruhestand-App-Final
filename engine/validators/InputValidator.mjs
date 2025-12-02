@@ -112,17 +112,19 @@ export const InputValidator = {
         );
 
         // Max. Abschöpfen
+        // Erweiterte Grenze für Parameter Sweep (bis 50% statt 25%)
         check(
-            input.maxSkimPctOfEq < 0 || input.maxSkimPctOfEq > 25,
+            input.maxSkimPctOfEq < 0 || input.maxSkimPctOfEq > 50,
             'maxSkimPctOfEq',
-            'Max. Abschöpfen muss zwischen 0% and 25% liegen.'
+            'Max. Abschöpfen muss zwischen 0% and 50% liegen.'
         );
 
         // Max. Auffüllen (Bär)
+        // Erweiterte Grenze für Parameter Sweep (bis 70% statt 15%)
         check(
-            input.maxBearRefillPctOfEq < 0 || input.maxBearRefillPctOfEq > 15,
+            input.maxBearRefillPctOfEq < 0 || input.maxBearRefillPctOfEq > 70,
             'maxBearRefillPctOfEq',
-            'Max. Auffüllen (Bär) muss zwischen 0% und 15% liegen.'
+            'Max. Auffüllen (Bär) muss zwischen 0% und 70% liegen.'
         );
 
         return { valid: errors.length === 0, errors };

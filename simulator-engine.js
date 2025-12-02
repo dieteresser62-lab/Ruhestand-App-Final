@@ -330,10 +330,18 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
     const inputsCtx = buildInputsCtxFromPortfolio(algoInput, portfolio, {pensionAnnual, marketData: marketDataCurrentYear});
 
-    const { spendingResult, newState: spendingNewState } = window.Ruhestandsmodell_v30.determineSpending({
+    const spendingResponse = window.Ruhestandsmodell_v30.determineSpending({
         market, lastState, inflatedFloor, inflatedFlex,
         runwayMonths, liquidNow: liquiditaet, profile, depotValue: depotwertGesamt, totalWealth, inputsCtx
     });
+
+    // FAIL-SAFE: Check if engine returned error or null spendingResult
+    if (spendingResponse.error || !spendingResponse.spendingResult) {
+        console.error('Engine error in determineSpending:', spendingResponse.error);
+        return { isRuin: true, error: spendingResponse.error };
+    }
+
+    const { spendingResult, newState: spendingNewState } = spendingResponse;
 
     const results = {
         aktuelleLiquiditaet: liquiditaet, depotwertGesamt, zielLiquiditaet, gesamtwert: totalWealth,
@@ -341,6 +349,12 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         minGold: algoInput.goldAktiv ? (algoInput.goldFloorProzent/100)*totalWealth : 0
     };
     const actionResult = window.Ruhestandsmodell_v30.determineAction(results, inputsCtx);
+
+    // FAIL-SAFE: Check if engine returned error in action determination
+    if (actionResult.error) {
+        console.error('Engine error in determineAction:', actionResult.error);
+        return { isRuin: true, error: actionResult.error };
+    }
 
     let mergedSaleResult = actionResult.saleResult;
     if (actionResult.saleResult) {
