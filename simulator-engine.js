@@ -231,15 +231,16 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         // In der Ansparphase: Sparrate hinzufügen, keine Entnahmen
         let sparrateThisYear = inputs.accumulationPhase.sparrate * 12;
 
-        // Indexierung der Sparrate
-        if (inputs.accumulationPhase.sparrateIndexing === 'inflation' && yearIndex > 0) {
-            const inflationAdjustment = Math.pow(1 + (yearData.inflation / 100), yearIndex);
-            sparrateThisYear *= inflationAdjustment;
-        } else if (inputs.accumulationPhase.sparrateIndexing === 'wage' && yearIndex > 0) {
-            // Lohnindexierung: verwende historische Lohnentwicklung
+        // Indexierung der Sparrate basierend auf VORJAHRES-Wert (kumulativ)
+        if (inputs.accumulationPhase.sparrateIndexing === 'inflation' && currentState.accumulationState) {
+            // Verwende die Sparrate vom letzten Jahr und indexiere mit aktueller Inflation
+            const lastYearSparrate = currentState.accumulationState.sparrateThisYear || (inputs.accumulationPhase.sparrate * 12);
+            sparrateThisYear = lastYearSparrate * (1 + yearData.inflation / 100);
+        } else if (inputs.accumulationPhase.sparrateIndexing === 'wage' && currentState.accumulationState) {
+            // Verwende die Sparrate vom letzten Jahr und indexiere mit Lohnentwicklung
+            const lastYearSparrate = currentState.accumulationState.sparrateThisYear || (inputs.accumulationPhase.sparrate * 12);
             const wageGrowth = yearData.lohn || 2.0; // Fallback 2%
-            const wageAdjustment = Math.pow(1 + (wageGrowth / 100), yearIndex);
-            sparrateThisYear *= wageAdjustment;
+            sparrateThisYear = lastYearSparrate * (1 + wageGrowth / 100);
         }
 
         // Zinsen auf Liquidität
