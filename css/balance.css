@@ -878,6 +878,11 @@ body.mode-simple .advanced-only {
     display: none !important;
 }
 
+/* Ergebnisse im Einfach-Modus bewusst schlanker halten. */
+body.mode-simple .advanced-result {
+    display: none !important;
+}
+
 /* Smooth transitions for appearing/disappearing elements */
 .advanced-only {
     transition: opacity 0.2s ease-in-out;
@@ -925,6 +930,21 @@ body.mode-simple .progress-bar-container {
 
 body.mode-simple .progress-bar {
     /* Normal size */
+}
+
+/* Untertitel und Jahres-/Anmerkungszeilen bei Entnahme in der Einfach-Ansicht verstecken. */
+body.mode-simple .entnahme-subtext {
+    display: none;
+}
+
+/* Transaktions-Details der Handlungsempfehlung im Einfach-Modus reduzieren. */
+body.mode-simple .action-detail-block,
+body.mode-simple .internal-rebalance {
+    display: none;
+}
+
+body.mode-simple #handlungsanweisung {
+    padding: 12px 14px;
 }
 
 /* Handlungsanweisung: Highlight with background, keep normal size */

@@ -205,17 +205,23 @@ class SummaryRenderer {
             this.dom.outputs.monatlicheEntnahme.replaceChildren(document.createTextNode(UIUtils.formatCurrency(monatlicheEntnahme)));
         }
 
+        // Ergänzende Erläuterungen werden als Subtext markiert, damit der Einfach-Modus sie ausblenden kann
+        // und die rechte Spalte kompakter bleibt.
         const small1 = document.createElement('small');
+        small1.className = 'entnahme-subtext';
         small1.style.cssText = 'display:block; font-size:0.85em; opacity:0.8; margin-top: 4px;';
         if (typeof monatlicheEntnahme === 'number' && isFinite(monatlicheEntnahme)) {
             small1.textContent = `(${UIUtils.formatCurrency(monatlicheEntnahme * 12)} / Jahr)`;
         }
         const small2 = document.createElement('small');
+        small2.className = 'entnahme-subtext';
         small2.style.cssText = 'display:block; opacity:.8;';
         small2.textContent = (spending.anmerkung || '').trim();
         this.dom.outputs.monatlicheEntnahme.append(small1, small2);
 
         if (spending.details && this.dom?.outputs?.entnahmeDetailsContent && this.dom?.outputs?.entnahmeBreakdown) {
+            // Details gelten als vertiefende Information und werden im Einfach-Modus per CSS ausgeblendet.
+            this.dom.outputs.entnahmeBreakdown.classList.add('entnahme-subtext');
             this.dom.outputs.entnahmeDetailsContent.replaceChildren(this.buildEntnahmeDetails(spending.details, spending.kuerzungQuelle));
             this.dom.outputs.entnahmeBreakdown.style.display = 'block';
         } else if (this.dom?.outputs?.entnahmeBreakdown) {
@@ -420,6 +426,7 @@ class ActionRenderer {
      */
     buildInternalRebalance(data) {
         const div = document.createElement('div');
+        div.className = 'internal-rebalance';
         div.style.cssText = 'font-size: 1rem; text-align: center; line-height: 1.5; font-weight: 500;';
         const strong = document.createElement('strong');
         strong.textContent = UIUtils.formatCurrency(data.amount);
@@ -445,8 +452,10 @@ class ActionRenderer {
         }
 
         const createSection = (titleText, items) => {
+            // Detailblöcke lassen sich im Einfach-Modus optisch einklappen, ohne die Advanced-Ansicht zu verlieren.
             const wrapper = document.createElement('div');
             wrapper.style.cssText = 'border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; margin-bottom: 12px;';
+            wrapper.classList.add('action-detail-block');
             const head = document.createElement('strong');
             head.style.cssText = 'display:block; border-bottom: 1px solid var(--border-color); padding-bottom: 5px; margin-bottom: 8px;';
             head.textContent = titleText;
