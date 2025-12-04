@@ -256,32 +256,32 @@ class SummaryRenderer {
     renderMarktstatus(market = {}) {
         if (!this.dom?.outputs?.marktstatusText || !market.szenarioText) return;
 
-        // Determine traffic light status based on scenario
+        // Determine traffic-light status based on scenario.
+        // Design decision: We deliberately avoid additional emojis to prevent the double-icon look that confused users;
+        // the colored dot now serves as the single visual cue.
         const scenario = market.szenarioText || '';
         let statusClass = 'status-amber'; // default
-        let statusEmoji = '🟡';
         let statusLabel = 'Normal';
 
         if (scenario.includes('Erholung') && !scenario.includes('Bärenmarkt') ||
             scenario.includes('Stabiler Höchststand')) {
             statusClass = 'status-green';
-            statusEmoji = '🟢';
             statusLabel = 'Gut';
         } else if (scenario.includes('Tiefer Bär')) {
             statusClass = 'status-red';
-            statusEmoji = '🔴';
             statusLabel = 'Vorsicht';
         }
 
         // Create status indicator with traffic light
         const statusIndicator = document.createElement('span');
         statusIndicator.className = `status-indicator ${statusClass}`;
+        statusIndicator.setAttribute('aria-label', `Marktstatus: ${statusLabel}`);
 
         const dot = document.createElement('span');
         dot.className = 'status-dot';
 
         const statusText = document.createElement('span');
-        statusText.textContent = `${statusEmoji} ${scenario}`;
+        statusText.textContent = scenario;
 
         statusIndicator.appendChild(dot);
         statusIndicator.appendChild(statusText);
