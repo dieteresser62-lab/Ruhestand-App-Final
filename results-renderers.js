@@ -12,8 +12,9 @@ import { renderHeatmapSVG } from './simulator-heatmap.js';
 export function renderKpiCard(kpi) {
     const toneClass = mapToneToClass(kpi.tone);
     const description = kpi.description || '';
+    const tooltip = kpi.tooltip || description || kpi.title;
     return `
-    <div class="kpi-card ${toneClass}">
+    <div class="kpi-card ${toneClass}" title="${tooltip}">
       <strong>${kpi.title}</strong>
       <div class="value-line">${kpi.value}</div>
       <div class="kpi-description">${description}</div>
@@ -35,7 +36,10 @@ export function renderSummary(container, summaryCards) {
 
     const summaryHtml = `
         <div class="summary-grid">
-          ${cardsToShow.map(card => `<div class="summary-item${mapToneToSummaryClass(card.tone)}"><strong>${card.title}</strong><span>${card.value}</span></div>`).join('')}
+          ${cardsToShow.map(card => {
+              const tooltip = card.tooltip || card.description || card.title;
+              return `<div class="summary-item${mapToneToSummaryClass(card.tone)}" title="${tooltip}"><strong>${card.title}</strong><span>${card.value}</span></div>`;
+          }).join('')}
         </div>`;
     container.innerHTML = summaryHtml;
 }

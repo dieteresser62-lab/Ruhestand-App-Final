@@ -56,10 +56,10 @@
                             <button id="btnJahresUpdateLog" type="button" class="btn btn-utility btn-icon" aria-label="Protokoll des letzten Jahres-Updates anzeigen" title="Protokoll des letzten Jahres-Updates anzeigen" disabled>🧾</button>
                         </div>
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
-                            <div class="form-group"><label for="aktuellesAlter">Aktuelles Alter</label><input id="aktuellesAlter" type="number" value="65" min="50"></div>
+                            <div class="form-group"><label for="aktuellesAlter">Aktuelles Alter</label><input id="aktuellesAlter" type="number" value="65" min="50" title="Ihr aktuelles Lebensalter - wichtig für die Berechnung Ihrer Entnahmestrategien und Lebenserwartung"></div>
                             <div class="form-group">
                                 <label for="inflation">Inflation VJ (%)</label>
-                                <input id="inflation" type="number" value="1.7" step="0.1">
+                                <input id="inflation" type="number" value="1.7" step="0.1" title="Inflationsrate des Vorjahres - wird automatisch von der EZB abgerufen und dient zur Anpassung Ihrer Bedarfswerte">
                             </div>
                         </div>
 						<!-- NEUER CONTAINER FÜR DEN INTELLIGENTEN HINWEIS -->
@@ -67,11 +67,11 @@
                     </fieldset>
                     <fieldset><legend>Vermögen</legend>
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
-                            <div class="form-group"><label for="tagesgeld">Tagesgeld (€)</label><input id="tagesgeld" class="currency" type="text" inputmode="numeric" value="60000"></div>
-                            <div class="form-group"><label for="geldmarktEtf">Geldmarkt-ETF (€)</label><input id="geldmarktEtf" class="currency" type="text" inputmode="numeric" value="360000"></div>
-                            <div class="form-group"><label for="depotwertAlt">Depotwert Alt (€)</label><input id="depotwertAlt" class="currency" type="text" inputmode="numeric" placeholder="z. B. 1.200.000"></div>
-                            <div class="form-group"><label for="depotwertNeu">Depotwert Neu (€)</label><input id="depotwertNeu" class="currency" type="text" inputmode="numeric" placeholder="z. B. 750.000"></div>
-                            <div class="form-group" id="goldWertGroup"><label for="goldWert">Gold-Bestand (€)</label><input id="goldWert" class="currency" type="text" inputmode="numeric" value="0"></div>
+                            <div class="form-group"><label for="tagesgeld">Tagesgeld (€)</label><input id="tagesgeld" class="currency" type="text" inputmode="numeric" value="60000" title="Ihr Bargeld auf dem Tagesgeldkonto - sofort verfügbar ohne Verzögerung"></div>
+                            <div class="form-group"><label for="geldmarktEtf">Geldmarkt-ETF (€)</label><input id="geldmarktEtf" class="currency" type="text" inputmode="numeric" value="360000" title="Ihr Geldmarkt-ETF-Bestand - sehr sichere, kurzfristig verfügbare Anlage mit leicht höherer Rendite als Tagesgeld"></div>
+                            <div class="form-group"><label for="depotwertAlt">Depotwert Alt (€)</label><input id="depotwertAlt" class="currency" type="text" inputmode="numeric" placeholder="z. B. 1.200.000" title="Aktueller Wert Ihres 'alten' Depots (vor 2018 angelegt) - profitiert von höherer Teilfreistellung"></div>
+                            <div class="form-group"><label for="depotwertNeu">Depotwert Neu (€)</label><input id="depotwertNeu" class="currency" type="text" inputmode="numeric" placeholder="z. B. 750.000" title="Aktueller Wert Ihres 'neuen' Depots (nach 2018 angelegt) - hat geringere Teilfreistellung"></div>
+                            <div class="form-group" id="goldWertGroup"><label for="goldWert">Gold-Bestand (€)</label><input id="goldWert" class="currency" type="text" inputmode="numeric" value="0" title="Aktueller Wert Ihres physischen Gold-Bestands (optional, wenn Gold-Strategie aktiv)"></div>
                         </div>
                     </fieldset>
                     <fieldset class="advanced-only"><legend style="display: flex; justify-content: space-between; align-items: center; width: 100%;">Marktdaten
@@ -111,42 +111,42 @@
                 <div id="tab-settings" class="tab-panel">
                     <fieldset><legend>Bedarfsplanung</legend>
 						<div class="form-grid" style="grid-template-columns: 1fr 1fr;">
-						    <div class="form-group"><label for="floorBedarf" title="Essenzielle Ausgaben pro Jahr">Floor-Bedarf p.a. (€)</label><input id="floorBedarf" class="currency" type="text" inputmode="numeric" value="24000"></div>
-						    <div class="form-group"><label for="flexBedarf" title="Wünschenswerte, aber kürzbare Ausgaben pro Jahr">Flex-Bedarf p.a. (€)</label><input id="flexBedarf" class="currency" type="text" inputmode="numeric" value="28000"></div>
+						    <div class="form-group"><label for="floorBedarf">Floor-Bedarf p.a. (€)</label><input id="floorBedarf" class="currency" type="text" inputmode="numeric" value="24000" title="Ihre essentiellen jährlichen Ausgaben, die Sie auf jeden Fall benötigen (Miete, Essen, Versicherungen, Gesundheit)"></div>
+						    <div class="form-group"><label for="flexBedarf">Flex-Bedarf p.a. (€)</label><input id="flexBedarf" class="currency" type="text" inputmode="numeric" value="28000" title="Ihre flexiblen jährlichen Ausgaben, auf die Sie im Notfall verzichten können (Urlaub, Hobbys, Luxusausgaben)"></div>
 						</div>
 					</fieldset>
                     <fieldset><legend>Runway-Steuerung</legend>
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
                             <div class="form-group">
-                                <label for="runwayMinMonths" title="Das absolute Minimum an Liquiditätsreichweite, das nicht unterschritten werden soll. Löst im Bärenmarkt ggf. Not-Auffüllungen aus.">Runway Minimum (Monate)</label>
-                                <input id="runwayMinMonths" type="number" value="24" min="12" max="60" step="1">
+                                <label for="runwayMinMonths">Runway Minimum (Monate)</label>
+                                <input id="runwayMinMonths" type="number" value="24" min="12" max="60" step="1" title="Das absolute Minimum an Liquiditätsreichweite, das nicht unterschritten werden soll. Löst im Bärenmarkt ggf. Not-Auffüllungen aus.">
                             </div>
                             <div class="form-group">
-                                <label for="runwayTargetMonths" title="Die angestrebte, komfortable Liquiditätsreichweite. Wird in guten Marktphasen proaktiv aufgefüllt (Skim & Fill).">Runway Ziel (Monate)</label>
-                                <input id="runwayTargetMonths" type="number" value="36" min="18" max="72" step="1">
+                                <label for="runwayTargetMonths">Runway Ziel (Monate)</label>
+                                <input id="runwayTargetMonths" type="number" value="36" min="18" max="72" step="1" title="Die angestrebte, komfortable Liquiditätsreichweite. Wird in guten Marktphasen proaktiv aufgefüllt (Skim & Fill).">
                             </div>
                         </div>
                     </fieldset>
                     <fieldset><legend>Rebalancing-Strategie</legend>
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 15px 20px;">
                             <div class="form-group">
-                                <label for="targetEq" title="Die angestrebte prozentuale Allokation in Aktien. Dient als Anker für das Rebalancing.">Aktien-Zielquote (%)</label>
-                                <input id="targetEq" type="number" value="60" min="20" max="90" step="1">
+                                <label for="targetEq">Aktien-Zielquote (%)</label>
+                                <input id="targetEq" type="number" value="60" min="20" max="90" step="1" title="Die angestrebte prozentuale Allokation in Aktien. Dient als Anker für das Rebalancing.">
                             </div>
                             <div class="form-group">
-                                <label for="rebalBand" title="Die prozentuale Toleranz um die Zielquote, bevor ein Rebalancing ausgelöst wird.">Rebalancing-Band (±%)</label>
-                                <input id="rebalBand" type="number" value="5" min="1" max="20" step="0.5">
+                                <label for="rebalBand">Rebalancing-Band (±%)</label>
+                                <input id="rebalBand" type="number" value="5" min="1" max="20" step="0.5" title="Die prozentuale Toleranz um die Zielquote, bevor ein Rebalancing ausgelöst wird.">
                             </div>
                             <div class="form-group advanced-only">
-                                <label for="maxSkimPctOfEq" title="Der maximal pro Jahr abzuschöpfende Betrag (als Prozentsatz des Aktiendepots), um die Liquidität aufzufüllen.">Max. Abschöpfen p.a. (%)</label>
-                                <input id="maxSkimPctOfEq" type="number" value="10" min="0" max="25" step="1">
+                                <label for="maxSkimPctOfEq">Max. Abschöpfen p.a. (%)</label>
+                                <input id="maxSkimPctOfEq" type="number" value="10" min="0" max="25" step="1" title="Der maximal pro Jahr abzuschöpfende Betrag (als Prozentsatz des Aktiendepots), um die Liquidität aufzufüllen.">
                             </div>
                             <!-- ============================================= -->
                             <!-- NEUES FELD FÜR BEAR-MODE-DRIP                 -->
                             <!-- ============================================= -->
                             <div class="form-group advanced-only">
-                                <label for="maxBearRefillPctOfEq" title="Der maximal pro Jahr zu verkaufende Betrag (als Prozentsatz des Aktiendepots) im Bärenmarkt, um die Runway bis zum Minimum aufzufüllen.">Max. Auffüllen (Bär) (%)</label>
-                                <input id="maxBearRefillPctOfEq" type="number" value="5" min="0" max="15" step="0.5">
+                                <label for="maxBearRefillPctOfEq">Max. Auffüllen (Bär) (%)</label>
+                                <input id="maxBearRefillPctOfEq" type="number" value="5" min="0" max="15" step="0.5" title="Der maximal pro Jahr zu verkaufende Betrag (als Prozentsatz des Aktiendepots) im Bärenmarkt, um die Runway bis zum Minimum aufzufüllen.">
                             </div>
                             <!-- ============================================= -->
                             <!-- ENDE NEUES FELD                               -->
@@ -165,8 +165,8 @@
                         </div>
                         <div id="goldPanel" style="display: none;">
                             <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 15px 20px; align-items: end;">
-                                <div class="form-group"><label for="goldZielProzent">Ziel-Allokation (% v. Depot)</label><input type="number" id="goldZielProzent" value="7.5" step="0.5"></div>
-                                <div class="form-group"><label for="goldFloorProzent">Gold-Floor (% v. Gesamt)</label><input type="number" id="goldFloorProzent" value="1" step="0.5"></div>
+                                <div class="form-group"><label for="goldZielProzent">Ziel-Allokation (%)</label><input type="number" id="goldZielProzent" value="7.5" step="0.5"></div>
+                                <div class="form-group"><label for="goldFloorProzent">Gold-Floor (%)</label><input type="number" id="goldFloorProzent" value="1" step="0.5"></div>
                                 <div class="form-group"><label for="rebalancingBand">Rebalancing-Band (±%)</label><input type="number" id="rebalancingBand" value="25" step="5"></div>
                                 <div class="form-group full-width" style="grid-column: 1 / -1; justify-content:center; margin-top: 5px;"><label style="display:flex; align-items:center; flex-direction: row;"><input type="checkbox" id="goldSteuerfrei" style="width:auto; margin-right:8px;"> Gold-Verkäufe steuerfrei</label></div>
                             </div>
@@ -213,20 +213,20 @@
                 </h2>
                 <div class="mini-summary" id="miniSummary"></div>
                 <div id="error-container" aria-live="polite"></div>
-                <div class="result-item"><strong>Gesamt-Depotwert:</strong><span id="displayDepotwert"></span></div>
-                <div class="result-item"><strong>Gesamtjahresbedarf:</strong><span id="neuerBedarf"></span></div>
-                <div class="result-item" id="minGoldRow"><strong>Gold-Mindestbestand:</strong><span id="minGoldDisplay"></span></div>
+                <div class="result-item"><strong title="Gesamtwert aller Ihrer Aktiendepots (Alt + Neu) ohne Liquidität und Gold">Gesamt-Depotwert:</strong><span id="displayDepotwert"></span></div>
+                <div class="result-item"><strong title="Ihr inflationsangepasster Jahresbedarf (Floor + Flex) für das kommende Jahr">Gesamtjahresbedarf:</strong><span id="neuerBedarf"></span></div>
+                <div class="result-item" id="minGoldRow"><strong title="Mindestbestand an Gold gemäß Ihrer Gold-Strategie (Gold-Floor als % des Gesamtvermögens)">Gold-Mindestbestand:</strong><span id="minGoldDisplay"></span></div>
                 <hr>
-                <div class="result-item"><strong>Ziel-Liquidität:</strong><span id="zielLiquiditaet"></span></div>
+                <div class="result-item"><strong title="Angestrebte Liquiditätsreserve basierend auf Ihrer Runway-Ziel-Einstellung">Ziel-Liquidität:</strong><span id="zielLiquiditaet"></span></div>
                 <div class="progress-bar-container" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"><div id="liquiditaetBalken" class="progress-bar"></div></div>
                 <hr>
-                <div class="result-item" id="marktstatusRow"><strong style="padding-right:10px">Marktsituation:</strong><span id="marktstatusText"></span></div>
-                <div class="result-item"><strong>Monatliche Entnahme:</strong><span id="monatlicheEntnahme"></span></div>
+                <div class="result-item" id="marktstatusRow"><strong style="padding-right:10px" title="Aktuelle Marktphase basierend auf historischen Kursverläufen (Bullenmarkt, Bärenmarkt, Erholung etc.)">Marktsituation:</strong><span id="marktstatusText"></span></div>
+                <div class="result-item"><strong title="Ihre empfohlene monatliche Entnahme aus der Liquidität für das kommende Jahr">Monatliche Entnahme:</strong><span id="monatlicheEntnahme"></span></div>
                 <details class="details-card" id="entnahme-breakdown" style="margin-top: 10px; display: none;"><summary>Details zur Entnahme</summary>
                     <div style="margin-top: 10px; font-size: 0.9rem; line-height: 1.5;" id="entnahmeDetailsContent"></div>
                 </details>
 
-                <div id="handlungsanweisung"><button id="copyAction" type="button" class="btn btn-sm btn-utility" title="Handlung kopieren">📋</button></div>
+                <div id="handlungsanweisung" title="Ihre konkreten Handlungsempfehlungen: Welche Transaktionen Sie durchführen sollten (Rebalancing, Entnahmen, Verkäufe etc.)"><button id="copyAction" type="button" class="btn btn-sm btn-utility" title="Handlung kopieren">📋</button></div>
                 
                 <div id="print-footer"></div>
             </div>

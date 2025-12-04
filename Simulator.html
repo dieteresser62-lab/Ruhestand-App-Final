@@ -128,24 +128,22 @@
                         <div class="fieldset-content">
                             <div class="form-grid">
                                 <div class="form-group"><label for="simStartVermoegen">Gesamtvermögen (€)</label><input
-                                        type="number" id="simStartVermoegen" value="2700000"></div>
-                                <div class="form-group"><label for="depotwertAlt">davon Depotwert Alt (€)</label><input
-                                        type="number" id="depotwertAlt" value="1350000"></div>
-                                <div class="form-group"><label for="zielLiquiditaet">davon Ziel-Liquidität (€)</label><input
-                                        type="number" id="zielLiquiditaet" value="200000"></div>
+                                        type="number" id="simStartVermoegen" value="2700000" title="Ihr gesamtes Vermögen zum Simulationsstart (inkl. Liquidität und alle Depots)"></div>
+                                <div class="form-group"><label for="depotwertAlt">Depotwert Alt (€)</label><input
+                                        type="number" id="depotwertAlt" value="1350000" title="Aktueller Wert Ihres 'alten' Depots (typischerweise vor 2018 angelegt, höhere Teilfreistellung)"></div>
+                                <div class="form-group"><label for="zielLiquiditaet">Ziel-Liquidität (€)</label><input
+                                        type="number" id="zielLiquiditaet" value="200000" title="Gewünschte Liquiditätsreserve in Cash/Geldmarkt-ETF"></div>
                             </div>
                             <div class="form-grid"
                                 style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
-                                <div class="form-group"><label for="startFloorBedarf">Start Floor-Bedarf p.a.
-                                        (€)</label><input type="number" id="startFloorBedarf" value="24000"></div>
-                                <div class="form-group"><label for="startFlexBedarf">Start Flex-Bedarf p.a.
-                                        (€)</label><input type="number" id="startFlexBedarf" value="28000"></div>
-                                <div class="form-group"><label for="marketCapeRatio">Aktueller CAPE (Shiller)</label><input
-                                        type="number" id="marketCapeRatio" value="32" step="0.1" min="0"></div>
-                                <div class="form-group"><label for="einstandAlt">Einstand Depot Alt (€)</label><input
-                                        type="number" id="einstandAlt" value="756000"></div>
-                                <div class="form-group"><label>Einstand Depot Neu (€)</label><input type="number"
-                                        id="einstandNeu" placeholder="wird berechnet" disabled></div>
+                                <div class="form-group"><label for="startFloorBedarf">Floor-Bedarf p.a. (€)</label><input type="number" id="startFloorBedarf" value="24000" title="Essenzielle jährliche Ausgaben, die Sie auf jeden Fall benötigen (Miete, Essen, Versicherungen etc.)"></div>
+                                <div class="form-group"><label for="startFlexBedarf">Flex-Bedarf p.a. (€)</label><input type="number" id="startFlexBedarf" value="28000" title="Wünschenswerte jährliche Ausgaben, auf die Sie im Notfall verzichten können (Urlaub, Hobbys, Luxus)"></div>
+                                <div class="form-group"><label for="marketCapeRatio">CAPE (Shiller)</label><input
+                                        type="number" id="marketCapeRatio" value="32" step="0.1" min="0" title="Aktuelles Shiller-CAPE (Cyclically Adjusted Price-to-Earnings Ratio) - Bewertungskennzahl für den Aktienmarkt"></div>
+                                <div class="form-group"><label for="einstandAlt">Einstand Alt (€)</label><input
+                                        type="number" id="einstandAlt" value="756000" title="Ursprünglicher Einstandswert (Kaufpreis) des alten Depots - wichtig für Steuerberechnung"></div>
+                                <div class="form-group"><label>Einstand Neu (€)</label><input type="number"
+                                        id="einstandNeu" placeholder="wird berechnet" disabled title="Ursprünglicher Einstandswert des neuen Depots - wird automatisch berechnet"></div>
                             </div>
                             <div id="displayPortfolioBreakdown"
                                 style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
@@ -166,16 +164,16 @@
                             <div id="goldStrategyPanel" style="display: none;">
                                 <div class="form-grid-four-col">
                                     <div class="form-group">
-                                        <label for="goldAllokationProzent">Ziel-Allokation (% v. Depot)</label>
-                                        <input type="number" id="goldAllokationProzent" value="7.5" step="1">
+                                        <label for="goldAllokationProzent">Ziel-Allokation (%)</label>
+                                        <input type="number" id="goldAllokationProzent" value="7.5" step="1" title="Angestrebter Gold-Anteil als Prozentsatz des Gesamtdepots">
                                     </div>
                                     <div class="form-group">
-                                        <label for="goldFloorProzent">Gold-Floor (% v. Gesamt)</label>
-                                        <input type="number" id="goldFloorProzent" value="1" step="0.5">
+                                        <label for="goldFloorProzent">Gold-Floor (%)</label>
+                                        <input type="number" id="goldFloorProzent" value="1" step="0.5" title="Mindest-Gold-Bestand als Prozentsatz des Gesamtvermögens">
                                     </div>
                                     <div class="form-group">
                                         <label for="rebalancingBand">Rebalancing-Band (± %)</label>
-                                        <input type="number" id="rebalancingBand" value="25" step="5">
+                                        <input type="number" id="rebalancingBand" value="25" step="5" title="Prozentuale Toleranz um die Ziel-Allokation, bevor Gold rebalanciert wird">
                                     </div>
                                     <div class="form-group" style="grid-column: span 2; justify-content: center;">
                                         <label style="flex-direction: row; align-items: center;">
@@ -196,30 +194,30 @@
                             <div class="form-grid" style="margin-bottom: 20px;">
                                 <div class="form-group">
                                     <label for="runwayMinMonths">Runway Minimum (Monate)</label>
-                                    <input type="number" id="runwayMinMonths" value="24" min="12" max="60">
+                                    <input type="number" id="runwayMinMonths" value="24" min="12" max="60" title="Absolute Mindest-Liquiditätsreichweite in Monaten - löst im Bärenmarkt Not-Verkäufe aus, wenn unterschritten">
                                 </div>
                                 <div class="form-group">
                                     <label for="runwayTargetMonths">Runway Ziel (Monate)</label>
-                                    <input type="number" id="runwayTargetMonths" value="36" min="18" max="72">
+                                    <input type="number" id="runwayTargetMonths" value="36" min="18" max="72" title="Angestrebte komfortable Liquiditätsreichweite in Monaten - wird in guten Marktphasen proaktiv aufgefüllt">
                                 </div>
                             </div>
                             <h4 style="margin-bottom: 12px; font-size: 0.95rem; padding-top: 15px; border-top: 1px solid var(--border-color);">Rebalancing-Strategie</h4>
                             <div class="form-grid-four-col">
                                 <div class="form-group">
                                     <label for="targetEq">Aktien-Zielquote (%)</label>
-                                    <input type="number" id="targetEq" value="60" min="0" max="100">
+                                    <input type="number" id="targetEq" value="60" min="0" max="100" title="Angestrebte prozentuale Allokation in Aktien - dient als Anker für das Rebalancing">
                                 </div>
                                 <div class="form-group">
                                     <label for="rebalBand">Rebalancing-Band (±%)</label>
-                                    <input type="number" id="rebalBand" value="5" min="1" max="50">
+                                    <input type="number" id="rebalBand" value="5" min="1" max="50" title="Prozentuale Toleranz um die Zielquote, bevor ein Rebalancing ausgelöst wird">
                                 </div>
                                 <div class="form-group">
                                     <label for="maxSkimPctOfEq">Max. Abschöpfen p.a. (%)</label>
-                                    <input type="number" id="maxSkimPctOfEq" value="10" min="0" max="100">
+                                    <input type="number" id="maxSkimPctOfEq" value="10" min="0" max="100" title="Maximal pro Jahr abzuschöpfender Betrag vom Aktiendepot (als % des Depot-Werts), um Liquidität aufzufüllen">
                                 </div>
                                 <div class="form-group">
                                     <label for="maxBearRefillPctOfEq">Max. Auffüllen (Bär) (%)</label>
-                                    <input type="number" id="maxBearRefillPctOfEq" value="5" min="0" max="100">
+                                    <input type="number" id="maxBearRefillPctOfEq" value="5" min="0" max="100" title="Maximal pro Jahr verkaufbarer Betrag vom Aktiendepot im Bärenmarkt (als % des Depot-Werts), um Runway-Minimum zu sichern">
                                 </div>
                             </div>
                         </div>
@@ -355,7 +353,7 @@
                                     </select>
                                 </div>
                                 <div class="form-group">
-                                    <label for="widowPensionPct">Prozentsatz der Witwenrente (%)</label>
+                                    <label for="widowPensionPct">Witwenrente (%)</label>
                                     <input type="number" id="widowPensionPct" min="0" max="100" step="5" value="55">
                                 </div>
                                 <div class="form-group">
@@ -363,7 +361,7 @@
                                     <input type="number" id="widowMarriageOffsetYears" min="0" max="120" value="0">
                                 </div>
                                 <div class="form-group">
-                                    <label for="widowMinMarriageYears">Mindest-Ehedauer für Anspruch (Jahre)</label>
+                                    <label for="widowMinMarriageYears">Mindest-Ehedauer (Jahre)</label>
                                     <input type="number" id="widowMinMarriageYears" min="0" max="120" value="1">
                                 </div>
                             </div>
@@ -537,13 +535,13 @@
                         <legend><span class="section-icon">🎲</span>Simulationsparameter</legend>
                         <div class="form-grid-four-col">
                             <div class="form-group"><label for="mcAnzahl">Anzahl Simulationen</label><input
-                                    type="number" id="mcAnzahl" value="1000"></div>
+                                    type="number" id="mcAnzahl" value="1000" title="Wie viele verschiedene Zukunftsszenarien simuliert werden - mehr Simulationen = genauere Ergebnisse"></div>
                             <div class="form-group"><label for="mcDauer">Maximale Dauer (Jahre)</label><input
-                                    type="number" id="mcDauer" value="35"></div>
+                                    type="number" id="mcDauer" value="35" title="Über wie viele Jahre in die Zukunft simuliert wird - sollte mindestens Ihre Lebenserwartung abdecken"></div>
                             <div class="form-group advanced-only"><label for="mcBlockSize">Blockgröße (Jahre)</label><input
-                                    type="number" id="mcBlockSize" value="5"></div>
+                                    type="number" id="mcBlockSize" value="5" title="Länge der historischen Blöcke für Block-Bootstrap (nur bei Block-Bootstrap-Methode relevant)"></div>
                             <div class="form-group advanced-only"><label for="mcSeed">Seed</label><input type="number" id="mcSeed"
-                                    value="12345"></div>
+                                    value="12345" title="Zufallszahlengenerator-Seed für reproduzierbare Simulationen"></div>
                         </div>
                         <div class="form-group advanced-only" style="margin-top: 20px;">
                             <label for="mcMethode">Simulationsmethode</label>
@@ -1090,8 +1088,8 @@
             // Friendlier labels for simple mode
             const labelMappings = {
                 'simStartVermoegen': { original: 'Gesamtvermögen (€)', simple: 'Mein gesamtes Vermögen (€)' },
-                'startFloorBedarf': { original: 'Start Floor-Bedarf p.a. (€)', simple: 'Was ich mindestens pro Jahr brauche (€)' },
-                'startFlexBedarf': { original: 'Start Flex-Bedarf p.a. (€)', simple: 'Was ich gerne pro Jahr hätte (€)' },
+                'startFloorBedarf': { original: 'Floor-Bedarf p.a. (€)', simple: 'Was ich mindestens pro Jahr brauche (€)' },
+                'startFlexBedarf': { original: 'Flex-Bedarf p.a. (€)', simple: 'Was ich gerne pro Jahr hätte (€)' },
                 'mcAnzahl': { original: 'Anzahl Simulationen', simple: 'Wie viele Szenarien?' },
                 'mcDauer': { original: 'Maximale Dauer (Jahre)', simple: 'Über wie viele Jahre?' }
             };
