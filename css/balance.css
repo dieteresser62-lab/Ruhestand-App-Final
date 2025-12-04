@@ -262,8 +262,11 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
 /* Action Instructions */
 #handlungsanweisung {
     font-size: 1.05rem; font-weight: 700; text-align: center; padding: 15px;
-    border-radius: 8px; margin-top: 12px; border: 1px solid; position: relative;
+    border-radius: 12px; margin-top: 12px; border: 1px solid; position: relative;
     transition: background-color 0.3s, border-color 0.3s, color 0.3s;
+    /* Einheitlicher Stil für beide Modi: sanfter Verlauf und dezente Leitplanke am linken Rand. */
+    background: linear-gradient(135deg, rgba(197, 160, 89, 0.08) 0%, rgba(52, 152, 219, 0.08) 100%);
+    border-left: 5px solid var(--secondary-color);
 }
 
 #handlungsanweisung small {
@@ -937,27 +940,7 @@ body.mode-simple .entnahme-subtext {
     display: none;
 }
 
-/* Im Einfach-Modus eine kompakte Kurz-Anweisung anzeigen, die die sichtbaren Detailblöcke ergänzt. */
-.simple-action-summary {
-    display: none;
-}
-
-body.mode-simple .simple-action-summary {
-    display: block;
-}
-
-/* Detaillierte Handlungsschritte bleiben sichtbar, damit die Anweisungen auch im Einfach-Modus nachvollziehbar sind. */
-body.mode-simple #handlungsanweisung {
-    padding: 12px 14px;
-}
-
-/* Handlungsanweisung: Highlight with background, keep normal size */
-body.mode-simple #handlungsanweisung {
-    /* Normal font size */
-    background: linear-gradient(135deg, rgba(197, 160, 89, 0.08) 0%, rgba(52, 152, 219, 0.08) 100%);
-    border-radius: 12px;
-    border-left: 5px solid var(--secondary-color);
-}
+/* Detaillierte Handlungsschritte bleiben in allen Modi sichtbar, damit die Anweisungen jederzeit nachvollziehbar sind. */
 
 /*
  * Primary Action Button (Jahres-Update)
