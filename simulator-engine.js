@@ -339,10 +339,20 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
                 inflation: yearData.inflation,
                 entnahme: 0,
                 jahresRente: 0,
-                kuerzungProzent: 0,
                 entnahmequote: 0,
                 flexRate: 100,
-                cashZinsen: euros(cashZinsen)
+                cashZinsen: euros(cashZinsen),
+                jahresentnahme_real: 0,
+                FlexRatePct: 1.0,
+                // Entscheidung-Objekt für Kompatibilität mit Monte Carlo Runner
+                entscheidung: {
+                    kuerzungProzent: 0,
+                    monatlicheEntnahme: 0,
+                    jahresEntnahme: 0,
+                    kuerzungQuelle: 'none',
+                    flexRate: 1.0,
+                    runwayMonths: Infinity
+                }
             }
         };
     }
