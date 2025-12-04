@@ -40,7 +40,6 @@
                     <span class="mode-toggle-slider"></span>
                     <span class="mode-label">🔧 Fortgeschritten</span>
                 </label>
-                <div id="modeStatusNotice" class="mode-status" aria-live="polite"></div>
             </div>
 
             <div class="tab-buttons">
@@ -335,10 +334,8 @@
                 'targetEq': { original: 'Aktien-Zielquote (%)', simple: 'Aktien-Anteil (%)' },
                 'rebalBand': { original: 'Rebalancing-Band (±%)', simple: 'Toleranz (±%)' }
             },
-            advancedResetSelector: '.advanced-only input, .advanced-only select, .advanced-only textarea',
-            statusContainerId: 'modeStatusNotice',
-            simpleStatusText: 'Fortgeschrittene Einstellungen bleiben aktiv und werden in der Berechnung berücksichtigt. Auf Wunsch kannst du sie auf die Startwerte zurücksetzen.',
-            advancedStatusText: 'Fortgeschritten-Modus aktiv. Alle Detailfelder sind eingeblendet und bearbeitbar.'
+            // Der UI-Toggle bleibt bewusst minimal: keine Statusbox und kein Standard-Reset,
+            // damit die Oberfläche schlank bleibt und erfasste Werte unangetastet bleiben.
         });
     </script>
 
