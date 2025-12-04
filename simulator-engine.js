@@ -255,6 +255,9 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         const zielLiquiditaet = inputs.zielLiquiditaet || 0;
         const ueberschuss = liquiditaet - zielLiquiditaet;
 
+        let kaufAktTotal = 0;
+        let kaufGldTotal = 0;
+
         if (ueberschuss > 500) {
             // Investiere nach Zielallokation
             const targetEq = inputs.targetEq || 60;
@@ -271,10 +274,12 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
                 if (aktienBetrag > 0) {
                     buyStocksNeu(portfolio, aktienBetrag);
                     liquiditaet -= aktienBetrag;
+                    kaufAktTotal = aktienBetrag;
                 }
                 if (goldBetrag > 0 && inputs.goldAktiv) {
                     buyGold(portfolio, goldBetrag);
                     liquiditaet -= goldBetrag;
+                    kaufGldTotal = goldBetrag;
                 }
             }
         }
@@ -310,6 +315,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
         const depotwertGesamt = sumDepot(portfolio);
         const totalWealth = depotwertGesamt + portfolio.liquiditaet;
+        const wertAktien = sumDepot({depotTranchesAktien: portfolio.depotTranchesAktien});
+        const wertGold = sumDepot({depotTranchesGold: portfolio.depotTranchesGold});
 
         return {
             newState: {
@@ -327,25 +334,10 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
                 transitionYear: currentState.transitionYear
             },
             logData: {
-                jahr: yearData.jahr || 0,
+                jahr: yearIndex + 1,  // WICHTIG: Simulationsjahr, nicht historisches Jahr!
+                histJahr: yearData.jahr,
                 alter: inputs.startAlter + yearIndex,
-                phase: 'accumulation',
-                sparrate: euros(sparrateThisYear),
-                vermoegen: euros(totalWealth),
-                depot: euros(depotwertGesamt),
-                liquiditaet: euros(portfolio.liquiditaet),
-                renditeAktien: rA * 100,
-                renditeGold: rG * 100,
-                zinssatz: rC * 100,
                 inflation: yearData.inflation,
-                entnahme: 0,
-                jahresRente: 0,
-                entnahmequote: 0,
-                flexRate: 100,
-                cashZinsen: euros(cashZinsen),
-                jahresentnahme_real: 0,
-                FlexRatePct: 1.0,
-                // Entscheidung-Objekt für Kompatibilität mit Monte Carlo Runner
                 entscheidung: {
                     kuerzungProzent: 0,
                     monatlicheEntnahme: 0,
@@ -353,7 +345,65 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
                     kuerzungQuelle: 'none',
                     flexRate: 1.0,
                     runwayMonths: Infinity
-                }
+                },
+                FlexRatePct: 1.0,
+                CutReason: 'none',
+                Alarm: false,
+                Regime: 'accumulation',
+                QuoteEndPct: 0,
+                RunwayCoveragePct: (zielLiquiditaet > 0 ? (portfolio.liquiditaet / zielLiquiditaet) * 100 : Infinity),
+                RealReturnEquityPct: ((1 + rA) / (1 + yearData.inflation/100) - 1),
+                RealReturnGoldPct: ((1 + rG) / (1 + yearData.inflation/100) - 1),
+                entnahmequote: 0,
+                steuern_gesamt: 0,
+                vk: { vkAkt: 0, vkGld: 0, stAkt: 0, stGld: 0, vkGes: 0, stGes: 0 },
+                kaufAkt: euros(kaufAktTotal),
+                kaufGld: euros(kaufGldTotal),
+                wertAktien: euros(wertAktien),
+                wertGold: euros(wertGold),
+                liquiditaet: euros(portfolio.liquiditaet),
+                liqStart: euros(liqStartVorZins),
+                cashInterestEarned: euros(cashZinsen),
+                liqEnd: euros(liqNachZins),
+                aktionUndGrund: `Sparrate: ${euros(sparrateThisYear)}€ / Kauf A: ${euros(kaufAktTotal)}€ / Kauf G: ${euros(kaufGldTotal)}€`,
+                usedSPB: 0,
+                floor_brutto: 0,
+                pension_annual: 0,
+                rente1: 0,
+                rente2: 0,
+                renteSum: 0,
+                floor_aus_depot: 0,
+                flex_brutto: 0,
+                flex_erfuellt_nominal: 0,
+                inflation_factor_cum: 1,
+                jahresentnahme_real: 0,
+                pflege_aktiv: false,
+                pflege_zusatz_floor: 0,
+                pflege_zusatz_floor_delta: 0,
+                pflege_flex_faktor: 1,
+                pflege_kumuliert: 0,
+                pflege_grade: null,
+                pflege_grade_label: '',
+                pflege_delta_flex: 0,
+                WidowBenefitP1: 0,
+                WidowBenefitP2: 0,
+                NeedLiq: 0,
+                GuardGold: 0,
+                GuardEq: 0,
+                GuardNote: 'accumulation_phase',
+                Person1Alive: householdCtx.p1Alive ? 1 : 0,
+                Person2Alive: householdCtx.p2Alive ? 1 : 0,
+                pflege_floor_anchor: 0,
+                pflege_maxfloor_anchor: 0,
+                pflege_cap_zusatz: 0,
+                CareP1_Active: 0,
+                CareP1_Cost: 0,
+                CareP1_Grade: null,
+                CareP1_GradeLabel: '',
+                CareP2_Active: 0,
+                CareP2_Cost: 0,
+                CareP2_Grade: null,
+                CareP2_GradeLabel: ''
             }
         };
     }
