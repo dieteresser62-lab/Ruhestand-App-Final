@@ -32,16 +32,6 @@
                 </div>
             </div>
 
-            <!-- Mode Toggle -->
-            <div class="mode-toggle-container">
-                <label class="mode-toggle">
-                    <span class="mode-label">🎯 Einfach</span>
-                    <input type="checkbox" id="modeToggle" class="mode-toggle-input">
-                    <span class="mode-toggle-slider"></span>
-                    <span class="mode-label">🔧 Fortgeschritten</span>
-                </label>
-            </div>
-
             <div class="tab-buttons">
                 <button class="tab-btn active" data-tab="update">Jahres-Update</button>
                 <button class="tab-btn" data-tab="settings">Grundeinstellungen & Strategie</button>
@@ -52,8 +42,18 @@
                     <fieldset><legend>Basiswerte</legend>
                         <!-- Jahres-Update Button -->
                         <div class="update-actions" style="margin-bottom: 15px;">
-                            <button id="btnJahresUpdate" type="button" class="btn btn-primary" title="Ruft Inflation (ECB) und ETF-Kurs (VWCE.DE) ab, führt Nachrücken durch und aktualisiert ATH">🌐 Jahres-Update</button>
-                            <button id="btnJahresUpdateLog" type="button" class="btn btn-utility btn-icon" aria-label="Protokoll des letzten Jahres-Updates anzeigen" title="Protokoll des letzten Jahres-Updates anzeigen" disabled>🧾</button>
+                            <div class="update-primary-actions">
+                                <button id="btnJahresUpdate" type="button" class="btn btn-primary" title="Ruft Inflation (ECB) und ETF-Kurs (VWCE.DE) ab, führt Nachrücken durch und aktualisiert ATH">🌐 Jahres-Update</button>
+                                <button id="btnJahresUpdateLog" type="button" class="btn btn-utility btn-icon" aria-label="Protokoll des letzten Jahres-Updates anzeigen" title="Protokoll des letzten Jahres-Updates anzeigen" disabled>🧾</button>
+                            </div>
+                            <div class="mode-toggle-inline" aria-label="Modusauswahl">
+                                <label class="mode-toggle">
+                                    <span class="mode-label">🎯 Einfach</span>
+                                    <input type="checkbox" id="modeToggle" class="mode-toggle-input">
+                                    <span class="mode-toggle-slider"></span>
+                                    <span class="mode-label">🔧 Fortgeschritten</span>
+                                </label>
+                            </div>
                         </div>
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
                             <div class="form-group"><label for="aktuellesAlter">Aktuelles Alter</label><input id="aktuellesAlter" type="number" value="65" min="50" title="Ihr aktuelles Lebensalter - wichtig für die Berechnung Ihrer Entnahmestrategien und Lebenserwartung"></div>

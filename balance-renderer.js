@@ -257,8 +257,8 @@ class SummaryRenderer {
         if (!this.dom?.outputs?.marktstatusText || !market.szenarioText) return;
 
         // Determine traffic-light status based on scenario.
-        // Design decision: We deliberately avoid additional emojis to prevent the double-icon look that confused users;
-        // the colored dot now serves as the single visual cue.
+        // Design decision: We avoid zusätzliche Icons und setzen nur auf den farbigen Rahmen,
+        // damit die Kennzahl ruhiger wirkt und sich in die kompakte UI einfügt.
         const scenario = market.szenarioText || '';
         let statusClass = 'status-amber'; // default
         let statusLabel = 'Normal';
@@ -272,18 +272,14 @@ class SummaryRenderer {
             statusLabel = 'Vorsicht';
         }
 
-        // Create status indicator with traffic light
+        // Create status indicator with simplified framing
         const statusIndicator = document.createElement('span');
         statusIndicator.className = `status-indicator ${statusClass}`;
         statusIndicator.setAttribute('aria-label', `Marktstatus: ${statusLabel}`);
 
-        const dot = document.createElement('span');
-        dot.className = 'status-dot';
-
         const statusText = document.createElement('span');
         statusText.textContent = scenario;
 
-        statusIndicator.appendChild(dot);
         statusIndicator.appendChild(statusText);
 
         // Clear and add new content
