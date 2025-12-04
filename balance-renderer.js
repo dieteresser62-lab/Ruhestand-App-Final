@@ -451,11 +451,11 @@ class ActionRenderer {
             title.append(document.createTextNode(' '), badge);
         }
 
-        // Kompakte Zusammenfassung für den Einfach-Modus: vermittelt die Kernhandlung auch ohne Detailblöcke.
+        // Kompakte Zusammenfassung für den Einfach-Modus: vermittelt die Kernhandlung auf einen Blick und ergänzt die Detailblöcke.
         const simpleSummary = this._buildSimpleActionSummary(action);
 
         const createSection = (titleText, items) => {
-            // Detailblöcke lassen sich im Einfach-Modus optisch einklappen, ohne die Advanced-Ansicht zu verlieren.
+            // Detailblöcke bleiben auch im Einfach-Modus sichtbar und liefern die nachvollziehbaren Schritte.
             const wrapper = document.createElement('div');
             wrapper.style.cssText = 'border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; margin-bottom: 12px;';
             wrapper.classList.add('action-detail-block');
@@ -505,8 +505,8 @@ class ActionRenderer {
 
     /**
      * Erstellt eine kompakte, immer sichtbare Zusammenfassung der Handlung.
-     * Damit bleibt im Einfach-Modus zumindest eine klare Anweisung sichtbar,
-     * selbst wenn Detailblöcke ausgeblendet werden.
+     * Damit bleibt im Einfach-Modus sofort ersichtlich, was zu tun ist,
+     * und die Detailblöcke werden sinnvoll eingerahmt.
      *
      * @param {Object} action - Handlungsempfehlung inklusive Quellen/Verwendungen.
      * @returns {HTMLDivElement|null} Zusammenfassung oder null, wenn keine Daten vorliegen.

@@ -937,7 +937,7 @@ body.mode-simple .entnahme-subtext {
     display: none;
 }
 
-/* Im Einfach-Modus eine kompakte Kurz-Anweisung anzeigen, auch wenn Detailblöcke verborgen sind. */
+/* Im Einfach-Modus eine kompakte Kurz-Anweisung anzeigen, die die sichtbaren Detailblöcke ergänzt. */
 .simple-action-summary {
     display: none;
 }
@@ -946,12 +946,7 @@ body.mode-simple .simple-action-summary {
     display: block;
 }
 
-/* Transaktions-Details der Handlungsempfehlung im Einfach-Modus reduzieren. */
-body.mode-simple .action-detail-block,
-body.mode-simple .internal-rebalance {
-    display: none;
-}
-
+/* Detaillierte Handlungsschritte bleiben sichtbar, damit die Anweisungen auch im Einfach-Modus nachvollziehbar sind. */
 body.mode-simple #handlungsanweisung {
     padding: 12px 14px;
 }
