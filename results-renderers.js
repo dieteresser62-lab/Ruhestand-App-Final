@@ -29,9 +29,13 @@ export function renderKpiCard(kpi) {
 export function renderSummary(container, summaryCards) {
     if (!container || !Array.isArray(summaryCards)) return;
 
+    // In simple mode, show only the 3 most important cards
+    const isSimpleMode = document.body.classList.contains('mode-simple');
+    const cardsToShow = isSimpleMode ? summaryCards.slice(0, 3) : summaryCards;
+
     const summaryHtml = `
         <div class="summary-grid">
-          ${summaryCards.map(card => `<div class="summary-item${mapToneToSummaryClass(card.tone)}"><strong>${card.title}</strong><span>${card.value}</span></div>`).join('')}
+          ${cardsToShow.map(card => `<div class="summary-item${mapToneToSummaryClass(card.tone)}"><strong>${card.title}</strong><span>${card.value}</span></div>`).join('')}
         </div>`;
     container.innerHTML = summaryHtml;
 }
