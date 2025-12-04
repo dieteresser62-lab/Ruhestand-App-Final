@@ -1129,6 +1129,107 @@
             }
         })();
     </script>
+
+    <!-- Tooltip normalization & single-line label safety net -->
+    <script>
+        (function () {
+            /**
+             * Setzt einen Titel auf dem übergebenen Element, sofern noch keiner vorhanden ist.
+             *
+             * @param {HTMLElement|null} element - Zielknoten, der den Tooltip erhalten soll.
+             * @param {string} tooltipText - Text, der als Title-Attribut gesetzt wird.
+             * @returns {void}
+             */
+            function setTitleIfMissing(element, tooltipText) {
+                if (!element || !tooltipText) return;
+                const existingTitle = (element.getAttribute('title') || '').trim();
+                if (!existingTitle) {
+                    element.setAttribute('title', tooltipText);
+                }
+            }
+
+            /**
+             * Leitet einen passenden Tooltip-Text aus vorhandenen Informationen ab.
+             *
+             * @param {HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement} control - Formularelement.
+             * @param {HTMLLabelElement|null} label - Zugehöriges Label zum Formularfeld.
+             * @returns {string|null} Tooltip-Text oder null, falls nichts Geeignetes gefunden wurde.
+             */
+            function resolveTooltipText(control, label) {
+                const explicitTitle = (control.getAttribute('title') || '').trim();
+                if (explicitTitle) return explicitTitle;
+
+                const labelText = (label?.textContent || '').replace(/\s+/g, ' ').trim();
+                if (labelText) return labelText;
+
+                const placeholder = (control.getAttribute('placeholder') || '').trim();
+                return placeholder || null;
+            }
+
+            /**
+             * Sorgt dafür, dass alle Formularfelder (Einfach- und Fortgeschritten-Modus) einen Tooltip besitzen.
+             * Der Tooltip wird am Feld selbst sowie am Label hinterlegt, damit MouseOver immer Details liefert.
+             *
+             * @returns {void}
+             */
+            function enforceFormTooltips() {
+                const controls = document.querySelectorAll('.form-group input, .form-group select, .form-group textarea');
+                controls.forEach(control => {
+                    if (control.type === 'hidden') return;
+                    const label = control.closest('.form-group')?.querySelector('label');
+                    const tooltipText = resolveTooltipText(control, label);
+                    if (!tooltipText) return;
+
+                    setTitleIfMissing(control, tooltipText);
+                    setTitleIfMissing(label, tooltipText);
+                });
+            }
+
+            /**
+             * Ergänzt KPI- und Summary-Kacheln um aussagekräftige Tooltips, falls diese fehlen.
+             * Dadurch bleiben Beschriftungen trotz Einzeiligkeit verständlich.
+             *
+             * @returns {void}
+             */
+            function enforceKpiTooltips() {
+                const kpiNodes = document.querySelectorAll('.kpi-card, .summary-item');
+                kpiNodes.forEach(node => {
+                    const titleFromNode = (node.getAttribute('title') || '').trim();
+                    const headingText = (node.querySelector('strong')?.textContent || node.textContent || '').replace(/\s+/g, ' ').trim();
+                    const tooltipText = titleFromNode || headingText;
+
+                    if (tooltipText) {
+                        setTitleIfMissing(node, tooltipText);
+                        const heading = node.querySelector('strong');
+                        setTitleIfMissing(heading, tooltipText);
+                    }
+                });
+            }
+
+            /**
+             * Initialisiert die Tooltip-Logik und überwacht spätere DOM-Änderungen (z.B. neu gerenderte KPIs).
+             *
+             * @returns {void}
+             */
+            function initializeUnifiedTooltips() {
+                enforceFormTooltips();
+                enforceKpiTooltips();
+
+                const observer = new MutationObserver(() => {
+                    enforceFormTooltips();
+                    enforceKpiTooltips();
+                });
+
+                observer.observe(document.body, { childList: true, subtree: true });
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initializeUnifiedTooltips);
+            } else {
+                initializeUnifiedTooltips();
+            }
+        })();
+    </script>
 </body>
 
 </html>

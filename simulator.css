@@ -86,10 +86,15 @@ legend {
 .form-grid-four-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px; }
 .form-group { display: flex; flex-direction: column; }
 label {
+    display: inline-block;
+    max-width: 100%;
     margin-bottom: 6px;
     font-weight: 500;
     font-size: 0.85rem;
     color: var(--text-light);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 input, select {
     padding: 10px 12px;
@@ -312,7 +317,15 @@ button:disabled {
 }
 .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
 .summary-item { background-color: var(--background-color); padding: 12px; border-radius: 6px; text-align: center; }
-.summary-item strong { display: block; color: var(--primary-color); margin-bottom: 6px; font-size: 0.85rem; }
+.summary-item strong {
+    display: block;
+    color: var(--primary-color);
+    margin-bottom: 6px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 .summary-item span { font-size: 1.15rem; font-weight: bold; color: var(--secondary-color); }
 .summary-item.highlight span { color: var(--success-color); font-size: 1.4rem; }
 .summary-item.tax span { color: var(--danger-color); }
@@ -337,8 +350,15 @@ button:disabled {
     border: 1px solid transparent;
 }
 .kpi-card strong {
-    color: var(--primary-color); margin-bottom: 6px;
-    font-size: 0.82rem; font-weight: 600; display: block; line-height: 1.2;
+    color: var(--primary-color);
+    margin-bottom: 6px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    display: block;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .kpi-card .value-line { font-size: 1.25rem; font-weight: bold; color: var(--secondary-color); margin-bottom: 6px;}
 .kpi-card .value-line small { font-size: 0.75rem; font-weight: normal; color: #7f8c8d; margin-left: 4px; }
