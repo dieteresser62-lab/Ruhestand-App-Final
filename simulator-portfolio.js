@@ -180,7 +180,29 @@ export function getCommonInputs() {
         maxBearRefillPctOfEq: parseInt(document.getElementById('maxBearRefillPctOfEq')?.value) || 5
     };
 
-    return { ...baseInputs, ...strategyInputs };
+    // Ansparphase-Konfiguration
+    const accumulationPhaseEnabled = document.getElementById('enableAccumulationPhase')?.checked || false;
+    const accumulationDurationYears = parseInt(document.getElementById('accumulationDurationYears')?.value) || 0;
+    const accumulationSparrate = parseFloat(document.getElementById('accumulationSparrate')?.value) || 0;
+    const sparrateIndexing = document.getElementById('sparrateIndexing')?.value || 'none';
+
+    const accumulationPhase = {
+        enabled: accumulationPhaseEnabled,
+        durationYears: accumulationDurationYears,
+        sparrate: accumulationSparrate,
+        sparrateIndexing: sparrateIndexing
+    };
+
+    const transitionYear = accumulationPhaseEnabled ? accumulationDurationYears : 0;
+    const transitionAge = p1StartAlter + transitionYear;
+
+    return {
+        ...baseInputs,
+        ...strategyInputs,
+        accumulationPhase,
+        transitionYear,
+        transitionAge
+    };
 }
 
 /**
