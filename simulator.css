@@ -585,6 +585,38 @@ fieldset.collapsible legend .legend-text {
     border-bottom: 1px solid var(--border-color);
 }
 
+/* Status-Hinweis zum aktiven Modus und optionalem Reset */
+.mode-status {
+    margin-top: 8px;
+    width: 100%;
+    max-width: 760px;
+}
+
+.mode-status-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    color: var(--text-color);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.mode-status-card p {
+    margin: 0;
+    line-height: 1.4;
+    flex: 1;
+    font-size: 0.95rem;
+}
+
+.btn-reset-advanced {
+    white-space: nowrap;
+    font-size: 0.9rem;
+}
+
 /* Mode Toggle Label */
 .mode-toggle {
     display: flex;
