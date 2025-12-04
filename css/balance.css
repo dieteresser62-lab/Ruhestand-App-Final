@@ -959,14 +959,20 @@ body.mode-simple #handlungsanweisung {
     border-left: 5px solid var(--secondary-color);
 }
 
-/* Highlight main update button with gradient, keep normal size */
-body.mode-simple #btnJahresUpdate {
+/*
+ * Primary Action Button (Jahres-Update)
+ * - Unified styling across modes to avoid visual jump when toggling.
+ * - Uses the premium gold gradient to highlight the critical update action.
+ */
+#btnJahresUpdate {
     background: linear-gradient(135deg, var(--secondary-color) 0%, #d4af6a 100%);
     box-shadow: 0 4px 12px rgba(197, 160, 89, 0.3);
+    border-color: transparent;
+    color: var(--primary-color);
     transition: all 0.3s ease;
 }
 
-body.mode-simple #btnJahresUpdate:hover {
+#btnJahresUpdate:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 16px rgba(197, 160, 89, 0.4);
 }
