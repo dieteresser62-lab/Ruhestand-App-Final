@@ -112,6 +112,7 @@
                     <span class="mode-toggle-slider"></span>
                     <span class="mode-label">🔧 Fortgeschritten</span>
                 </label>
+                <div id="modeStatusNotice" class="mode-status" aria-live="polite"></div>
             </div>
 
             <div class="tab-buttons">
@@ -1022,112 +1023,29 @@
     </script>
 
     <!-- Mode Toggle Logic -->
-    <script>
-        (function() {
-            const STORAGE_KEY = 'ruhestand-ui-mode';
-            const modeToggle = document.getElementById('modeToggle');
-            const body = document.body;
+    <script type="module">
+        import { initModeToggle } from './mode-toggle.js';
 
-            // Load saved mode from localStorage (default: simple)
-            const savedMode = localStorage.getItem(STORAGE_KEY) || 'simple';
-            const isAdvanced = savedMode === 'advanced';
-
-            // Set initial state
-            modeToggle.checked = isAdvanced;
-            if (!isAdvanced) {
-                body.classList.add('mode-simple');
-            }
-
-            // Toggle handler
-            modeToggle.addEventListener('change', function() {
-                if (this.checked) {
-                    // Advanced mode
-                    body.classList.remove('mode-simple');
-                    localStorage.setItem(STORAGE_KEY, 'advanced');
-                } else {
-                    // Simple mode
-                    body.classList.add('mode-simple');
-                    localStorage.setItem(STORAGE_KEY, 'simple');
-                }
-            });
-
-            // Add helpful tooltips to key fields in simple mode
-            function addTooltips() {
-                const tooltips = {
-                    'simStartVermoegen': 'Ihr gesamtes Vermögen zum Start der Simulation (inkl. Liquidität und Depots)',
-                    'startFloorBedarf': 'Die absolut notwendigen Ausgaben pro Jahr (z.B. Miete, Essen, Versicherungen)',
-                    'startFlexBedarf': 'Wünschenswerte Ausgaben, auf die Sie notfalls verzichten können (z.B. Urlaub, Hobbys)',
-                    'mcAnzahl': 'Wie viele verschiedene Zukunftsszenarien simuliert werden (mehr = genauer)',
-                    'mcDauer': 'Über wie viele Jahre in die Zukunft simuliert wird'
-                };
-
-                Object.keys(tooltips).forEach(fieldId => {
-                    const field = document.getElementById(fieldId);
-                    if (!field) return;
-
-                    const label = field.closest('.form-group')?.querySelector('label');
-                    if (!label || label.querySelector('.help-tooltip')) return;
-
-                    const tooltip = document.createElement('span');
-                    tooltip.className = 'help-tooltip';
-                    tooltip.innerHTML = `
-                        <span class="help-icon">?</span>
-                        <span class="tooltip-text">${tooltips[fieldId]}</span>
-                    `;
-                    label.appendChild(tooltip);
-                });
-            }
-
-            // Add tooltips after DOM is ready
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', addTooltips);
-            } else {
-                addTooltips();
-            }
-
-            // Friendlier labels for simple mode
-            const labelMappings = {
+        initModeToggle({
+            tooltipMap: {
+                'simStartVermoegen': 'Ihr gesamtes Vermögen zum Start der Simulation (inkl. Liquidität und Depots)',
+                'startFloorBedarf': 'Die absolut notwendigen Ausgaben pro Jahr (z.B. Miete, Essen, Versicherungen)',
+                'startFlexBedarf': 'Wünschenswerte Ausgaben, auf die Sie notfalls verzichten können (z.B. Urlaub, Hobbys)',
+                'mcAnzahl': 'Wie viele verschiedene Zukunftsszenarien simuliert werden (mehr = genauer)',
+                'mcDauer': 'Über wie viele Jahre in die Zukunft simuliert wird'
+            },
+            labelMappings: {
                 'simStartVermoegen': { original: 'Gesamtvermögen (€)', simple: 'Mein gesamtes Vermögen (€)' },
                 'startFloorBedarf': { original: 'Floor-Bedarf p.a. (€)', simple: 'Was ich mindestens pro Jahr brauche (€)' },
                 'startFlexBedarf': { original: 'Flex-Bedarf p.a. (€)', simple: 'Was ich gerne pro Jahr hätte (€)' },
                 'mcAnzahl': { original: 'Anzahl Simulationen', simple: 'Wie viele Szenarien?' },
                 'mcDauer': { original: 'Maximale Dauer (Jahre)', simple: 'Über wie viele Jahre?' }
-            };
-
-            function updateLabels() {
-                const isSimple = body.classList.contains('mode-simple');
-                Object.keys(labelMappings).forEach(fieldId => {
-                    const field = document.getElementById(fieldId);
-                    if (!field) return;
-
-                    const label = field.closest('.form-group')?.querySelector('label');
-                    if (!label) return;
-
-                    // Store original if not already stored
-                    if (!label.dataset.originalText) {
-                        label.dataset.originalText = label.childNodes[0]?.textContent || '';
-                    }
-
-                    // Get the text node (first child, before any tooltip)
-                    const textNode = label.childNodes[0];
-                    if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-                        textNode.textContent = isSimple ?
-                            labelMappings[fieldId].simple :
-                            labelMappings[fieldId].original;
-                    }
-                });
-            }
-
-            // Update labels on toggle
-            modeToggle.addEventListener('change', updateLabels);
-
-            // Initial label update
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', updateLabels);
-            } else {
-                updateLabels();
-            }
-        })();
+            },
+            advancedResetSelector: '.advanced-only input, .advanced-only select, .advanced-only textarea',
+            statusContainerId: 'modeStatusNotice',
+            simpleStatusText: 'Fortgeschrittene Einstellungen bleiben aktiv und werden mitgerechnet. Bei Bedarf kannst du sie auf die Startwerte zurücksetzen.',
+            advancedStatusText: 'Fortgeschritten-Modus aktiv. Alle Detailfelder sind eingeblendet und bearbeitbar.'
+        });
     </script>
 
     <!-- Tooltip normalization & single-line label safety net -->

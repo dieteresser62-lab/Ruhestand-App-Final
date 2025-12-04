@@ -40,6 +40,7 @@
                     <span class="mode-toggle-slider"></span>
                     <span class="mode-label">🔧 Fortgeschritten</span>
                 </label>
+                <div id="modeStatusNotice" class="mode-status" aria-live="polite"></div>
             </div>
 
             <div class="tab-buttons">
@@ -287,78 +288,25 @@
     </div>
 
     <!-- Mode Toggle Logic -->
-    <script>
-        (function() {
-            const STORAGE_KEY = 'ruhestand-ui-mode';
-            const modeToggle = document.getElementById('modeToggle');
-            const body = document.body;
+    <script type="module">
+        import { initModeToggle } from './mode-toggle.js';
 
-            // Load saved mode from localStorage (default: simple)
-            const savedMode = localStorage.getItem(STORAGE_KEY) || 'simple';
-            const isAdvanced = savedMode === 'advanced';
-
-            // Set initial state
-            modeToggle.checked = isAdvanced;
-            if (!isAdvanced) {
-                body.classList.add('mode-simple');
-            }
-
-            // Toggle handler
-            modeToggle.addEventListener('change', function() {
-                if (this.checked) {
-                    // Advanced mode
-                    body.classList.remove('mode-simple');
-                    localStorage.setItem(STORAGE_KEY, 'advanced');
-                } else {
-                    // Simple mode
-                    body.classList.add('mode-simple');
-                    localStorage.setItem(STORAGE_KEY, 'simple');
-                }
-            });
-
-            // Add helpful tooltips to key fields in simple mode
-            function addTooltips() {
-                const tooltips = {
-                    'aktuellesAlter': 'Ihr aktuelles Lebensalter - wichtig für die Berechnung Ihrer Entnahmestrategien',
-                    'inflation': 'Die Inflationsrate des letzten Jahres - wird automatisch von der EZB abgerufen',
-                    'tagesgeld': 'Ihr Bargeld auf dem Tagesgeldkonto - sofort verfügbar',
-                    'geldmarktEtf': 'Ihr Geldmarkt-ETF - sehr sichere, kurzfristig verfügbare Anlage',
-                    'depotwertAlt': 'Der aktuelle Wert Ihres "alten" Depots (meist vor 2018 angelegt)',
-                    'depotwertNeu': 'Der aktuelle Wert Ihres "neuen" Depots (meist nach 2018 angelegt)',
-                    'floorBedarf': 'Ihre essentiellen jährlichen Ausgaben, die Sie auf jeden Fall brauchen',
-                    'flexBedarf': 'Ihre flexiblen jährlichen Ausgaben, auf die Sie notfalls verzichten können',
-                    'runwayMinMonths': 'Die Mindestmenge an Liquidität (in Monaten), die Sie immer haben sollten',
-                    'runwayTargetMonths': 'Ihre angestrebte komfortable Liquiditätsreichweite (in Monaten)',
-                    'targetEq': 'Ihr Zielanteil an Aktien im Portfolio (in Prozent)',
-                    'rebalBand': 'Die Toleranz, um die Ihre Aktienquote schwanken darf, bevor umgeschichtet wird'
-                };
-
-                Object.keys(tooltips).forEach(fieldId => {
-                    const field = document.getElementById(fieldId);
-                    if (!field) return;
-
-                    const label = field.closest('.form-group')?.querySelector('label');
-                    if (!label || label.querySelector('.help-tooltip')) return;
-
-                    const tooltip = document.createElement('span');
-                    tooltip.className = 'help-tooltip';
-                    tooltip.innerHTML = `
-                        <span class="help-icon">?</span>
-                        <span class="tooltip-text">${tooltips[fieldId]}</span>
-                    `;
-                    label.appendChild(tooltip);
-                });
-            }
-
-            // Add tooltips after DOM is ready
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', addTooltips);
-            } else {
-                addTooltips();
-            }
-
-            // Friendlier labels for simple mode
-            const labelMappings = {
+        initModeToggle({
+            tooltipMap: {
+                'aktuellesAlter': 'Ihr aktuelles Lebensalter - wichtig für die Berechnung Ihrer Entnahmestrategien',
+                'inflation': 'Die Inflationsrate des letzten Jahres - wird automatisch von der EZB abgerufen',
+                'tagesgeld': 'Ihr Bargeld auf dem Tagesgeldkonto - sofort verfügbar',
+                'geldmarktEtf': 'Ihr Geldmarkt-ETF - sehr sichere, kurzfristig verfügbare Anlage',
+                'depotwertAlt': 'Der aktuelle Wert Ihres "alten" Depots (meist vor 2018 angelegt)',
+                'depotwertNeu': 'Der aktuelle Wert Ihres "neuen" Depots (meist nach 2018 angelegt)',
+                'floorBedarf': 'Ihre essentiellen jährlichen Ausgaben, die Sie auf jeden Fall brauchen',
+                'flexBedarf': 'Ihre flexiblen jährlichen Ausgaben, auf die Sie notfalls verzichten können',
+                'runwayMinMonths': 'Die Mindestmenge an Liquidität (in Monaten), die Sie immer haben sollten',
+                'runwayTargetMonths': 'Ihre angestrebte komfortable Liquiditätsreichweite (in Monaten)',
+                'targetEq': 'Ihr Zielanteil an Aktien im Portfolio (in Prozent)',
+                'rebalBand': 'Die Toleranz, um die Ihre Aktienquote schwanken darf, bevor umgeschichtet wird'
+            },
+            labelMappings: {
                 'aktuellesAlter': { original: 'Aktuelles Alter', simple: 'Mein Alter' },
                 'inflation': { original: 'Inflation VJ (%)', simple: 'Teuerung letztes Jahr (%)' },
                 'tagesgeld': { original: 'Tagesgeld (€)', simple: 'Bargeld / Tagesgeld (€)' },
@@ -371,42 +319,12 @@
                 'runwayTargetMonths': { original: 'Runway Ziel (Monate)', simple: 'Wunsch-Liquidität (Monate)' },
                 'targetEq': { original: 'Aktien-Zielquote (%)', simple: 'Aktien-Anteil (%)' },
                 'rebalBand': { original: 'Rebalancing-Band (±%)', simple: 'Toleranz (±%)' }
-            };
-
-            function updateLabels() {
-                const isSimple = body.classList.contains('mode-simple');
-                Object.keys(labelMappings).forEach(fieldId => {
-                    const field = document.getElementById(fieldId);
-                    if (!field) return;
-
-                    const label = field.closest('.form-group')?.querySelector('label');
-                    if (!label) return;
-
-                    // Store original if not already stored
-                    if (!label.dataset.originalText) {
-                        label.dataset.originalText = label.childNodes[0]?.textContent || '';
-                    }
-
-                    // Get the text node (first child, before any tooltip)
-                    const textNode = label.childNodes[0];
-                    if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-                        textNode.textContent = isSimple ?
-                            labelMappings[fieldId].simple :
-                            labelMappings[fieldId].original;
-                    }
-                });
-            }
-
-            // Update labels on toggle
-            modeToggle.addEventListener('change', updateLabels);
-
-            // Initial label update
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', updateLabels);
-            } else {
-                updateLabels();
-            }
-        })();
+            },
+            advancedResetSelector: '.advanced-only input, .advanced-only select, .advanced-only textarea',
+            statusContainerId: 'modeStatusNotice',
+            simpleStatusText: 'Fortgeschrittene Einstellungen bleiben aktiv und werden in der Berechnung berücksichtigt. Auf Wunsch kannst du sie auf die Startwerte zurücksetzen.',
+            advancedStatusText: 'Fortgeschritten-Modus aktiv. Alle Detailfelder sind eingeblendet und bearbeitbar.'
+        });
     </script>
 
 </body>
