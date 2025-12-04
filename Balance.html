@@ -32,17 +32,6 @@
                 </div>
             </div>
 
-            <!-- Mode Toggle -->
-            <div class="mode-toggle-container">
-                <label class="mode-toggle">
-                    <span class="mode-label">🎯 Einfach</span>
-                    <input type="checkbox" id="modeToggle" class="mode-toggle-input">
-                    <span class="mode-toggle-slider"></span>
-                    <span class="mode-label">🔧 Fortgeschritten</span>
-                </label>
-                <div id="modeStatusNotice" class="mode-status" aria-live="polite"></div>
-            </div>
-
             <div class="tab-buttons">
                 <button class="tab-btn active" data-tab="update">Jahres-Update</button>
                 <button class="tab-btn" data-tab="settings">Grundeinstellungen & Strategie</button>
@@ -53,8 +42,18 @@
                     <fieldset><legend>Basiswerte</legend>
                         <!-- Jahres-Update Button -->
                         <div class="update-actions" style="margin-bottom: 15px;">
-                            <button id="btnJahresUpdate" type="button" class="btn btn-primary" title="Ruft Inflation (ECB) und ETF-Kurs (VWCE.DE) ab, führt Nachrücken durch und aktualisiert ATH">🌐 Jahres-Update</button>
-                            <button id="btnJahresUpdateLog" type="button" class="btn btn-utility btn-icon" aria-label="Protokoll des letzten Jahres-Updates anzeigen" title="Protokoll des letzten Jahres-Updates anzeigen" disabled>🧾</button>
+                            <div class="update-primary-actions">
+                                <button id="btnJahresUpdate" type="button" class="btn btn-primary" title="Ruft Inflation (ECB) und ETF-Kurs (VWCE.DE) ab, führt Nachrücken durch und aktualisiert ATH">🌐 Jahres-Update</button>
+                                <button id="btnJahresUpdateLog" type="button" class="btn btn-utility btn-icon" aria-label="Protokoll des letzten Jahres-Updates anzeigen" title="Protokoll des letzten Jahres-Updates anzeigen" disabled>🧾</button>
+                            </div>
+                            <div class="mode-toggle-inline" aria-label="Modusauswahl">
+                                <label class="mode-toggle">
+                                    <span class="mode-label">🎯 Einfach</span>
+                                    <input type="checkbox" id="modeToggle" class="mode-toggle-input">
+                                    <span class="mode-toggle-slider"></span>
+                                    <span class="mode-label">🔧 Fortgeschritten</span>
+                                </label>
+                            </div>
                         </div>
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
                             <div class="form-group"><label for="aktuellesAlter">Aktuelles Alter</label><input id="aktuellesAlter" type="number" value="65" min="50" title="Ihr aktuelles Lebensalter - wichtig für die Berechnung Ihrer Entnahmestrategien und Lebenserwartung"></div>
@@ -222,10 +221,10 @@
                 <div class="results-kpi-grid" aria-label="Kennzahlenübersicht">
                     <div class="result-item"><strong title="Gesamtwert aller Ihrer Aktiendepots (Alt + Neu) ohne Liquidität und Gold">Gesamt-Depotwert:</strong><span id="displayDepotwert"></span></div>
                     <div class="result-item"><strong title="Ihr inflationsangepasster Jahresbedarf (Floor + Flex) für das kommende Jahr">Gesamtjahresbedarf:</strong><span id="neuerBedarf"></span></div>
-                    <div class="result-item" id="minGoldRow"><strong title="Mindestbestand an Gold gemäß Ihrer Gold-Strategie (Gold-Floor als % des Gesamtvermögens)">Gold-Mindestbestand:</strong><span id="minGoldDisplay"></span></div>
+                    <div class="result-item advanced-result" id="minGoldRow"><strong title="Mindestbestand an Gold gemäß Ihrer Gold-Strategie (Gold-Floor als % des Gesamtvermögens)">Gold-Mindestbestand:</strong><span id="minGoldDisplay"></span></div>
 
                     <!-- Ziel-Liquidität inklusive Fortschrittsbalken als stapelbare Karte, um vertikalen Platz zu sparen. -->
-                    <div class="result-item result-item-stack" aria-live="polite">
+                    <div class="result-item result-item-stack advanced-result" aria-live="polite">
                         <div class="result-item-header">
                             <strong title="Angestrebte Liquiditätsreserve basierend auf Ihrer Runway-Ziel-Einstellung">Ziel-Liquidität:</strong>
                             <span id="zielLiquiditaet"></span>
@@ -235,7 +234,7 @@
                         </div>
                     </div>
 
-                    <div class="result-item" id="marktstatusRow"><strong style="padding-right:10px" title="Aktuelle Marktphase basierend auf historischen Kursverläufen (Bullenmarkt, Bärenmarkt, Erholung etc.)">Marktsituation:</strong><span id="marktstatusText"></span></div>
+                    <div class="result-item advanced-result" id="marktstatusRow"><strong style="padding-right:10px" title="Aktuelle Marktphase basierend auf historischen Kursverläufen (Bullenmarkt, Bärenmarkt, Erholung etc.)">Marktsituation:</strong><span id="marktstatusText"></span></div>
                     <div class="result-item"><strong title="Ihre empfohlene monatliche Entnahme aus der Liquidität für das kommende Jahr">Monatliche Entnahme:</strong><span id="monatlicheEntnahme"></span></div>
                 </div>
                 <details class="details-card" id="entnahme-breakdown" style="margin-top: 10px; display: none;"><summary>Details zur Entnahme</summary>
@@ -335,10 +334,8 @@
                 'targetEq': { original: 'Aktien-Zielquote (%)', simple: 'Aktien-Anteil (%)' },
                 'rebalBand': { original: 'Rebalancing-Band (±%)', simple: 'Toleranz (±%)' }
             },
-            advancedResetSelector: '.advanced-only input, .advanced-only select, .advanced-only textarea',
-            statusContainerId: 'modeStatusNotice',
-            simpleStatusText: 'Fortgeschrittene Einstellungen bleiben aktiv und werden in der Berechnung berücksichtigt. Auf Wunsch kannst du sie auf die Startwerte zurücksetzen.',
-            advancedStatusText: 'Fortgeschritten-Modus aktiv. Alle Detailfelder sind eingeblendet und bearbeitbar.'
+            // Der UI-Toggle bleibt bewusst minimal: keine Statusbox und kein Standard-Reset,
+            // damit die Oberfläche schlank bleibt und erfasste Werte unangetastet bleiben.
         });
     </script>
 

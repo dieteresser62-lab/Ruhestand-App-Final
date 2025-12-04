@@ -262,8 +262,11 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
 /* Action Instructions */
 #handlungsanweisung {
     font-size: 1.05rem; font-weight: 700; text-align: center; padding: 15px;
-    border-radius: 8px; margin-top: 12px; border: 1px solid; position: relative;
+    border-radius: 12px; margin-top: 12px; border: 1px solid; position: relative;
     transition: background-color 0.3s, border-color 0.3s, color 0.3s;
+    /* Einheitlicher Stil für beide Modi: sanfter Verlauf und dezente Leitplanke am linken Rand. */
+    background: linear-gradient(135deg, rgba(197, 160, 89, 0.08) 0%, rgba(52, 152, 219, 0.08) 100%);
+    border-left: 5px solid var(--secondary-color);
 }
 
 #handlungsanweisung small {
@@ -563,7 +566,24 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
 .update-actions {
     display: flex;
     align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.update-primary-actions {
+    display: flex;
+    align-items: center;
     gap: 10px;
+    flex-wrap: wrap;
+}
+
+.mode-toggle-inline {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex: 1;
+    min-width: 240px;
 }
 
 .snapshot-status {
@@ -742,15 +762,6 @@ html[data-density=compact] .result-item { padding: 12px; }
    MODE TOGGLE (Einfach/Fortgeschritten)
    ============================================ */
 
-/* Mode Toggle Container */
-.mode-toggle-container {
-    display: flex;
-    justify-content: center;
-    padding: 15px 0 20px 0;
-    margin-bottom: 10px;
-    border-bottom: 1px solid var(--border-color);
-}
-
 /* Status-Hinweis zum aktiven Modus und optionalem Reset */
 .mode-status {
     margin-top: 8px;
@@ -870,6 +881,11 @@ body.mode-simple .advanced-only {
     display: none !important;
 }
 
+/* Ergebnisse im Einfach-Modus bewusst schlanker halten. */
+body.mode-simple .advanced-result {
+    display: none !important;
+}
+
 /* Smooth transitions for appearing/disappearing elements */
 .advanced-only {
     transition: opacity 0.2s ease-in-out;
@@ -919,22 +935,27 @@ body.mode-simple .progress-bar {
     /* Normal size */
 }
 
-/* Handlungsanweisung: Highlight with background, keep normal size */
-body.mode-simple #handlungsanweisung {
-    /* Normal font size */
-    background: linear-gradient(135deg, rgba(197, 160, 89, 0.08) 0%, rgba(52, 152, 219, 0.08) 100%);
-    border-radius: 12px;
-    border-left: 5px solid var(--secondary-color);
+/* Untertitel und Jahres-/Anmerkungszeilen bei Entnahme in der Einfach-Ansicht verstecken. */
+body.mode-simple .entnahme-subtext {
+    display: none;
 }
 
-/* Highlight main update button with gradient, keep normal size */
-body.mode-simple #btnJahresUpdate {
+/* Detaillierte Handlungsschritte bleiben in allen Modi sichtbar, damit die Anweisungen jederzeit nachvollziehbar sind. */
+
+/*
+ * Primary Action Button (Jahres-Update)
+ * - Unified styling across modes to avoid visual jump when toggling.
+ * - Uses the premium gold gradient to highlight the critical update action.
+ */
+#btnJahresUpdate {
     background: linear-gradient(135deg, var(--secondary-color) 0%, #d4af6a 100%);
     box-shadow: 0 4px 12px rgba(197, 160, 89, 0.3);
+    border-color: transparent;
+    color: var(--primary-color);
     transition: all 0.3s ease;
 }
 
-body.mode-simple #btnJahresUpdate:hover {
+#btnJahresUpdate:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 16px rgba(197, 160, 89, 0.4);
 }
@@ -946,67 +967,31 @@ body.mode-simple #btnJahresUpdate:hover {
 .status-indicator {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 16px;
-    border-radius: 8px;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 10px;
     font-weight: 600;
     font-size: 1rem;
     transition: all 0.3s ease;
-}
-
-.status-indicator .status-dot {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    box-shadow: 0 0 8px currentColor;
-    animation: pulse 2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.7; transform: scale(1.1); }
+    background: transparent;
 }
 
 /* Green (Excellent) */
 .status-indicator.status-green {
-    background: var(--green-bg);
     color: var(--green-text);
     border: 2px solid var(--success-color);
 }
 
-.status-indicator.status-green .status-dot {
-    background-color: var(--success-color);
-}
-
 /* Amber (Caution) */
 .status-indicator.status-amber {
-    background: var(--amber-bg);
     color: var(--amber-text);
     border: 2px solid var(--warning-color);
 }
 
-.status-indicator.status-amber .status-dot {
-    background-color: var(--warning-color);
-}
-
 /* Red (Critical) */
 .status-indicator.status-red {
-    background: var(--red-bg);
     color: var(--red-text);
     border: 2px solid var(--danger-color);
-}
-
-.status-indicator.status-red .status-dot {
-    background-color: var(--danger-color);
-}
-
-/* Keep status indicator at normal size in simple mode */
-body.mode-simple .status-indicator {
-    /* Normal 1rem font size */
-}
-
-body.mode-simple .status-indicator .status-dot {
-    /* Normal 16px size */
 }
 
 /* ============================================
