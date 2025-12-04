@@ -31,7 +31,17 @@
                     <input id="importFile" type="file" accept="application/json,.json" style="display:none">
                 </div>
             </div>
-            
+
+            <!-- Mode Toggle -->
+            <div class="mode-toggle-container">
+                <label class="mode-toggle">
+                    <span class="mode-label">🎯 Einfach</span>
+                    <input type="checkbox" id="modeToggle" class="mode-toggle-input">
+                    <span class="mode-toggle-slider"></span>
+                    <span class="mode-label">🔧 Fortgeschritten</span>
+                </label>
+            </div>
+
             <div class="tab-buttons">
                 <button class="tab-btn active" data-tab="update">Jahres-Update</button>
                 <button class="tab-btn" data-tab="settings">Grundeinstellungen & Strategie</button>
@@ -64,7 +74,7 @@
                             <div class="form-group" id="goldWertGroup"><label for="goldWert">Gold-Bestand (€)</label><input id="goldWert" class="currency" type="text" inputmode="numeric" value="0"></div>
                         </div>
                     </fieldset>
-                    <fieldset><legend style="display: flex; justify-content: space-between; align-items: center; width: 100%;">Marktdaten
+                    <fieldset class="advanced-only"><legend style="display: flex; justify-content: space-between; align-items: center; width: 100%;">Marktdaten
                         <span style="display: flex; gap: 6px;">
                             <button id="btnCsvImport" type="button" class="btn btn-utility btn-sm" title="Marktdaten aus CSV-Datei importieren">📄 CSV</button>
                             <input type="file" id="csvFileInput" accept=".csv" style="display:none">
@@ -127,14 +137,14 @@
                                 <label for="rebalBand" title="Die prozentuale Toleranz um die Zielquote, bevor ein Rebalancing ausgelöst wird.">Rebalancing-Band (±%)</label>
                                 <input id="rebalBand" type="number" value="5" min="1" max="20" step="0.5">
                             </div>
-                            <div class="form-group">
+                            <div class="form-group advanced-only">
                                 <label for="maxSkimPctOfEq" title="Der maximal pro Jahr abzuschöpfende Betrag (als Prozentsatz des Aktiendepots), um die Liquidität aufzufüllen.">Max. Abschöpfen p.a. (%)</label>
                                 <input id="maxSkimPctOfEq" type="number" value="10" min="0" max="25" step="1">
                             </div>
                             <!-- ============================================= -->
                             <!-- NEUES FELD FÜR BEAR-MODE-DRIP                 -->
                             <!-- ============================================= -->
-                            <div class="form-group">
+                            <div class="form-group advanced-only">
                                 <label for="maxBearRefillPctOfEq" title="Der maximal pro Jahr zu verkaufende Betrag (als Prozentsatz des Aktiendepots) im Bärenmarkt, um die Runway bis zum Minimum aufzufüllen.">Max. Auffüllen (Bär) (%)</label>
                                 <input id="maxBearRefillPctOfEq" type="number" value="5" min="0" max="15" step="0.5">
                             </div>
@@ -143,11 +153,11 @@
                             <!-- ============================================= -->
                         </div>
                     </fieldset>
-                    <fieldset><legend>Steuern</legend><div class="form-grid">
+                    <fieldset class="advanced-only"><legend>Steuern</legend><div class="form-grid">
                         <div class="form-group"><label for="kirchensteuerSatz">Kirchensteuer</label><select id="kirchensteuerSatz"><option value="0">0 %</option><option value="0.08">8 %</option><option value="0.09" selected>9 %</option></select></div>
                         <div class="form-group"><label for="sparerPauschbetrag">Sparer-PB (€)</label><input id="sparerPauschbetrag" class="currency" type="text" inputmode="numeric" value="1000"></div>
                     </div></fieldset>
-                    <fieldset><legend>Gold-Strategie</legend>
+                    <fieldset class="advanced-only"><legend>Gold-Strategie</legend>
                         <div class="form-group full-width">
                             <label style="flex-direction: row; align-items: center; justify-content: center; padding: 5px 0;">
                                 <input type="checkbox" id="goldAktiv" class="goldAktiv" style="width: auto; margin-right: 8px;">Gold-Allokation aktiv
@@ -162,7 +172,7 @@
                             </div>
                         </div>
                     </fieldset>
-                    <details id="einstandDetails" class="details-card" aria-label="Einstandswerte"><summary aria-controls="einstandContent">Einstandswerte & Teilfreistellung</summary>
+                    <details id="einstandDetails" class="details-card advanced-only" aria-label="Einstandswerte"><summary aria-controls="einstandContent">Einstandswerte & Teilfreistellung</summary>
                         <div class="einstand-hinweis">Selten ändern – wird automatisch gespeichert.</div>
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 20px; align-items: start;">
                             <div style="display: flex; flex-direction: column; gap: 10px;">
@@ -179,7 +189,7 @@
                         </div>
                     </details>
                     
-                    <details id="snapshot-management" class="details-card" style="margin-top: 25px;">
+                    <details id="snapshot-management" class="details-card advanced-only" style="margin-top: 25px;">
                         <summary>Jahresabschluss-Snapshots</summary>
                         <div style="padding: 10px 0 5px 0;">
                             <button type="button" class="btn btn-sm" id="connectFolderBtn" style="width: 100%;">Lokalen Snapshot-Ordner verbinden</button>
@@ -275,6 +285,38 @@
             </div>
         </div>
     </div>
+
+    <!-- Mode Toggle Logic -->
+    <script>
+        (function() {
+            const STORAGE_KEY = 'ruhestand-ui-mode';
+            const modeToggle = document.getElementById('modeToggle');
+            const body = document.body;
+
+            // Load saved mode from localStorage (default: simple)
+            const savedMode = localStorage.getItem(STORAGE_KEY) || 'simple';
+            const isAdvanced = savedMode === 'advanced';
+
+            // Set initial state
+            modeToggle.checked = isAdvanced;
+            if (!isAdvanced) {
+                body.classList.add('mode-simple');
+            }
+
+            // Toggle handler
+            modeToggle.addEventListener('change', function() {
+                if (this.checked) {
+                    // Advanced mode
+                    body.classList.remove('mode-simple');
+                    localStorage.setItem(STORAGE_KEY, 'advanced');
+                } else {
+                    // Simple mode
+                    body.classList.add('mode-simple');
+                    localStorage.setItem(STORAGE_KEY, 'simple');
+                }
+            });
+        })();
+    </script>
 
 </body>
 </html>
