@@ -249,15 +249,49 @@ class SummaryRenderer {
     }
 
     /**
-     * Rendert den Marktstatus inklusive Tooltip.
+     * Rendert den Marktstatus inklusive Tooltip und Ampel-System.
      *
      * @param {Object} market - Szenario-Informationen des aktuellen Marktregimes.
      */
     renderMarktstatus(market = {}) {
         if (!this.dom?.outputs?.marktstatusText || !market.szenarioText) return;
-        this.dom.outputs.marktstatusText.replaceChildren(document.createTextNode(`${market.szenarioText} `));
+
+        // Determine traffic light status based on scenario
+        const scenario = market.szenarioText || '';
+        let statusClass = 'status-amber'; // default
+        let statusEmoji = '🟡';
+        let statusLabel = 'Normal';
+
+        if (scenario.includes('Erholung') && !scenario.includes('Bärenmarkt') ||
+            scenario.includes('Stabiler Höchststand')) {
+            statusClass = 'status-green';
+            statusEmoji = '🟢';
+            statusLabel = 'Gut';
+        } else if (scenario.includes('Tiefer Bär')) {
+            statusClass = 'status-red';
+            statusEmoji = '🔴';
+            statusLabel = 'Vorsicht';
+        }
+
+        // Create status indicator with traffic light
+        const statusIndicator = document.createElement('span');
+        statusIndicator.className = `status-indicator ${statusClass}`;
+
+        const dot = document.createElement('span');
+        dot.className = 'status-dot';
+
+        const statusText = document.createElement('span');
+        statusText.textContent = `${statusEmoji} ${scenario}`;
+
+        statusIndicator.appendChild(dot);
+        statusIndicator.appendChild(statusText);
+
+        // Clear and add new content
+        this.dom.outputs.marktstatusText.replaceChildren(statusIndicator);
+
+        // Add info icon with tooltip
         const info = document.createElement('span');
-        info.style.cssText = 'cursor:help; opacity:0.7;';
+        info.style.cssText = 'cursor:help; opacity:0.7; margin-left: 8px;';
         info.title = Array.isArray(market.reasons) ? market.reasons.join(', ') : '';
         info.textContent = 'ⓘ';
         this.dom.outputs.marktstatusText.appendChild(info);
