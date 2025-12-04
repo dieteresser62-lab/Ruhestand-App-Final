@@ -213,15 +213,30 @@
                 </h2>
                 <div class="mini-summary" id="miniSummary"></div>
                 <div id="error-container" aria-live="polite"></div>
-                <div class="result-item"><strong title="Gesamtwert aller Ihrer Aktiendepots (Alt + Neu) ohne Liquidität und Gold">Gesamt-Depotwert:</strong><span id="displayDepotwert"></span></div>
-                <div class="result-item"><strong title="Ihr inflationsangepasster Jahresbedarf (Floor + Flex) für das kommende Jahr">Gesamtjahresbedarf:</strong><span id="neuerBedarf"></span></div>
-                <div class="result-item" id="minGoldRow"><strong title="Mindestbestand an Gold gemäß Ihrer Gold-Strategie (Gold-Floor als % des Gesamtvermögens)">Gold-Mindestbestand:</strong><span id="minGoldDisplay"></span></div>
-                <hr>
-                <div class="result-item"><strong title="Angestrebte Liquiditätsreserve basierend auf Ihrer Runway-Ziel-Einstellung">Ziel-Liquidität:</strong><span id="zielLiquiditaet"></span></div>
-                <div class="progress-bar-container" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"><div id="liquiditaetBalken" class="progress-bar"></div></div>
-                <hr>
-                <div class="result-item" id="marktstatusRow"><strong style="padding-right:10px" title="Aktuelle Marktphase basierend auf historischen Kursverläufen (Bullenmarkt, Bärenmarkt, Erholung etc.)">Marktsituation:</strong><span id="marktstatusText"></span></div>
-                <div class="result-item"><strong title="Ihre empfohlene monatliche Entnahme aus der Liquidität für das kommende Jahr">Monatliche Entnahme:</strong><span id="monatlicheEntnahme"></span></div>
+
+                <!--
+                    Kompakte KPI-Übersicht: Durch die Grid-Anordnung stehen Kennzahlen auf einem normalen Monitor ohne Scrollen zur Verfügung.
+                    Die wichtigsten Werte sind gruppiert, Breiten werden automatisch angepasst.
+                -->
+                <div class="results-kpi-grid" aria-label="Kennzahlenübersicht">
+                    <div class="result-item"><strong title="Gesamtwert aller Ihrer Aktiendepots (Alt + Neu) ohne Liquidität und Gold">Gesamt-Depotwert:</strong><span id="displayDepotwert"></span></div>
+                    <div class="result-item"><strong title="Ihr inflationsangepasster Jahresbedarf (Floor + Flex) für das kommende Jahr">Gesamtjahresbedarf:</strong><span id="neuerBedarf"></span></div>
+                    <div class="result-item" id="minGoldRow"><strong title="Mindestbestand an Gold gemäß Ihrer Gold-Strategie (Gold-Floor als % des Gesamtvermögens)">Gold-Mindestbestand:</strong><span id="minGoldDisplay"></span></div>
+
+                    <!-- Ziel-Liquidität inklusive Fortschrittsbalken als stapelbare Karte, um vertikalen Platz zu sparen. -->
+                    <div class="result-item result-item-stack" aria-live="polite">
+                        <div class="result-item-header">
+                            <strong title="Angestrebte Liquiditätsreserve basierend auf Ihrer Runway-Ziel-Einstellung">Ziel-Liquidität:</strong>
+                            <span id="zielLiquiditaet"></span>
+                        </div>
+                        <div class="progress-bar-container compact-progress" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                            <div id="liquiditaetBalken" class="progress-bar"></div>
+                        </div>
+                    </div>
+
+                    <div class="result-item" id="marktstatusRow"><strong style="padding-right:10px" title="Aktuelle Marktphase basierend auf historischen Kursverläufen (Bullenmarkt, Bärenmarkt, Erholung etc.)">Marktsituation:</strong><span id="marktstatusText"></span></div>
+                    <div class="result-item"><strong title="Ihre empfohlene monatliche Entnahme aus der Liquidität für das kommende Jahr">Monatliche Entnahme:</strong><span id="monatlicheEntnahme"></span></div>
+                </div>
                 <details class="details-card" id="entnahme-breakdown" style="margin-top: 10px; display: none;"><summary>Details zur Entnahme</summary>
                     <div style="margin-top: 10px; font-size: 0.9rem; line-height: 1.5;" id="entnahmeDetailsContent"></div>
                 </details>

@@ -218,6 +218,36 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
     transition: background-color 0.3s, border-color 0.3s;
 }
 
+/* Kompakte KPI-Grid: Zwei Spalten wo möglich, um Scrollen zu vermeiden. */
+.results-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+/* Grid-Items sollen den verfügbaren Raum füllen, daher kein zusätzlicher Außenabstand. */
+.results-kpi-grid .result-item {
+    margin: 0;
+}
+
+/* Stapelbare Karte für Ziel-Liquidität: Label/Wert oben, Fortschrittsbalken darunter. */
+.result-item-stack {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+}
+
+.result-item-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.compact-progress {
+    height: 14px;
+}
+
 .result-item strong { color: var(--secondary-text); font-weight: 500; }
 
 .result-item span {
