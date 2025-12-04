@@ -451,6 +451,9 @@ class ActionRenderer {
             title.append(document.createTextNode(' '), badge);
         }
 
+        // Kompakte Zusammenfassung für den Einfach-Modus: vermittelt die Kernhandlung auch ohne Detailblöcke.
+        const simpleSummary = this._buildSimpleActionSummary(action);
+
         const createSection = (titleText, items) => {
             // Detailblöcke lassen sich im Einfach-Modus optisch einklappen, ohne die Advanced-Ansicht zu verlieren.
             const wrapper = document.createElement('div');
@@ -489,12 +492,102 @@ class ActionRenderer {
 
         const wrapper = document.createElement('div');
         wrapper.style.cssText = 'text-align: left; font-size: 1rem; line-height: 1.6;';
+        wrapper.append(title);
+        if (simpleSummary) {
+            wrapper.appendChild(simpleSummary);
+        }
         wrapper.append(
-            title,
             createSection(`A. Quellen (Netto: ${UIUtils.formatCurrency(action.nettoErlös || 0)})`, quellenItems),
             createSection('B. Verwendungen', verwendungenItems)
         );
         content.appendChild(wrapper);
+    }
+
+    /**
+     * Erstellt eine kompakte, immer sichtbare Zusammenfassung der Handlung.
+     * Damit bleibt im Einfach-Modus zumindest eine klare Anweisung sichtbar,
+     * selbst wenn Detailblöcke ausgeblendet werden.
+     *
+     * @param {Object} action - Handlungsempfehlung inklusive Quellen/Verwendungen.
+     * @returns {HTMLDivElement|null} Zusammenfassung oder null, wenn keine Daten vorliegen.
+     */
+    _buildSimpleActionSummary(action) {
+        if (!action || typeof action !== 'object') return null;
+
+        const summary = document.createElement('div');
+        summary.className = 'simple-action-summary';
+        summary.style.cssText = 'margin: 6px 0 10px; padding: 10px 12px; border-radius: 10px; background: rgba(0,0,0,0.02); border: 1px dashed var(--secondary-color);';
+
+        // Kernbotschaft: wie viel bewegt wird und wofür.
+        const amount = (typeof action.nettoErlös === 'number' && isFinite(action.nettoErlös))
+            ? UIUtils.formatCurrency(action.nettoErlös)
+            : null;
+
+        const primaryUse = this._describePrimaryUse(action?.verwendungen);
+        const mainLine = document.createElement('div');
+        mainLine.style.cssText = 'font-weight: 700; margin-bottom: 6px; color: var(--primary-text);';
+        if (amount && primaryUse) {
+            mainLine.textContent = `${amount} bewegen, um ${primaryUse}.`;
+        } else if (primaryUse) {
+            mainLine.textContent = `Empfohlene Aktion: ${primaryUse}.`;
+        } else if (amount) {
+            mainLine.textContent = `${amount} bereitstellen und laut Empfehlungen verteilen.`;
+        } else {
+            mainLine.textContent = 'Empfohlene Handlung ausführen (Details siehe erweiterten Modus).';
+        }
+
+        // Zusatzzeile: wichtigste Quelle oder Steuerpuffer transparent machen.
+        const detailLine = document.createElement('div');
+        detailLine.style.cssText = 'font-size: 0.95rem; color: var(--secondary-text);';
+        const source = this._describePrimarySource(action?.quellen);
+        const hints = [];
+        if (source) hints.push(`Hauptquelle: ${source}`);
+        if (typeof action.steuer === 'number' && action.steuer > 0) {
+            hints.push(`Steuerpuffer: ${UIUtils.formatCurrency(action.steuer)}`);
+        }
+        detailLine.textContent = hints.length ? hints.join(' · ') : 'Details einblenden, um Aufteilung zu sehen.';
+
+        summary.append(mainLine, detailLine);
+        return summary;
+    }
+
+    /**
+     * Beschreibt den dominanten Verwendungszweck für die kompakte Darstellung.
+     *
+     * @param {Object} verwendungen - Verwendungsanteile (liquiditaet, gold, aktien).
+     * @returns {string|null} Klartext-Beschreibung oder null bei fehlenden Daten.
+     */
+    _describePrimaryUse(verwendungen) {
+        if (!verwendungen || typeof verwendungen !== 'object') return null;
+
+        const priorities = [
+            { key: 'liquiditaet', label: 'die Liquidität aufzufüllen' },
+            { key: 'gold', label: 'Gold zu kaufen' },
+            { key: 'aktien', label: 'in Aktien umzuschichten' }
+        ];
+
+        for (const entry of priorities) {
+            if (typeof verwendungen[entry.key] === 'number' && verwendungen[entry.key] > 0) {
+                return `${entry.label} (${UIUtils.formatCurrency(verwendungen[entry.key])})`;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Liefert die wichtigste Finanzierungsquelle als Klartext.
+     *
+     * @param {Array} quellen - Liste der Quellenobjekte.
+     * @returns {string|null} Klartext zur führenden Quelle.
+     */
+    _describePrimarySource(quellen) {
+        if (!Array.isArray(quellen)) return null;
+
+        const labelMap = { gold: 'Gold', aktien_neu: 'Aktien (neu)', aktien_alt: 'Aktien (alt)' };
+        const primary = quellen.find(q => typeof q?.brutto === 'number' && q.brutto > 0);
+        if (!primary) return null;
+        const label = labelMap[primary.kind] || primary.kind || 'Quelle';
+        return `${label} (${UIUtils.formatCurrency(primary.brutto)})`;
     }
 }
 

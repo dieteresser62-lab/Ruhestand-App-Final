@@ -937,6 +937,15 @@ body.mode-simple .entnahme-subtext {
     display: none;
 }
 
+/* Im Einfach-Modus eine kompakte Kurz-Anweisung anzeigen, auch wenn Detailblöcke verborgen sind. */
+.simple-action-summary {
+    display: none;
+}
+
+body.mode-simple .simple-action-summary {
+    display: block;
+}
+
 /* Transaktions-Details der Handlungsempfehlung im Einfach-Modus reduzieren. */
 body.mode-simple .action-detail-block,
 body.mode-simple .internal-rebalance {
