@@ -822,3 +822,220 @@ body.mode-simple .advanced-only {
     padding: 0;
 }
 
+
+/* ============================================
+   EINFACH-MODUS: GRÖSSERE VISUALS & AMPEL
+   ============================================ */
+
+/* Make results panel more prominent in simple mode */
+body.mode-simple .results-column {
+    transform: scale(1.05);
+    transform-origin: top center;
+}
+
+body.mode-simple #results h2 {
+    font-size: 1.5rem;
+    color: var(--primary-color);
+    margin-bottom: 20px;
+}
+
+body.mode-simple .result-item {
+    font-size: 1.15rem;
+    padding: 15px 10px;
+    margin: 12px 0;
+}
+
+body.mode-simple .result-item strong {
+    font-size: 1.05rem;
+    color: var(--primary-color);
+}
+
+body.mode-simple .result-item span {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+/* Bigger progress bars in simple mode */
+body.mode-simple .progress-bar-container {
+    height: 32px;
+    border-radius: 16px;
+    margin: 15px 0;
+}
+
+body.mode-simple .progress-bar {
+    border-radius: 16px;
+    font-size: 1rem;
+    line-height: 32px;
+}
+
+/* Action buttons bigger and more prominent */
+body.mode-simple #handlungsanweisung {
+    font-size: 1.2rem;
+    padding: 20px;
+    margin-top: 25px;
+    background: linear-gradient(135deg, rgba(197, 160, 89, 0.08) 0%, rgba(52, 152, 219, 0.08) 100%);
+    border-radius: 12px;
+    border-left: 5px solid var(--secondary-color);
+}
+
+/* Highlight main update button */
+body.mode-simple #btnJahresUpdate {
+    font-size: 1.1rem;
+    padding: 14px 28px;
+    background: linear-gradient(135deg, var(--secondary-color) 0%, #d4af6a 100%);
+    box-shadow: 0 6px 20px rgba(197, 160, 89, 0.4);
+    transition: all 0.3s ease;
+}
+
+body.mode-simple #btnJahresUpdate:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 30px rgba(197, 160, 89, 0.5);
+}
+
+/* ============================================
+   AMPEL-SYSTEM (Traffic Light Status)
+   ============================================ */
+
+.status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.status-indicator .status-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    box-shadow: 0 0 8px currentColor;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.1); }
+}
+
+/* Green (Excellent) */
+.status-indicator.status-green {
+    background: var(--green-bg);
+    color: var(--green-text);
+    border: 2px solid var(--success-color);
+}
+
+.status-indicator.status-green .status-dot {
+    background-color: var(--success-color);
+}
+
+/* Amber (Caution) */
+.status-indicator.status-amber {
+    background: var(--amber-bg);
+    color: var(--amber-text);
+    border: 2px solid var(--warning-color);
+}
+
+.status-indicator.status-amber .status-dot {
+    background-color: var(--warning-color);
+}
+
+/* Red (Critical) */
+.status-indicator.status-red {
+    background: var(--red-bg);
+    color: var(--red-text);
+    border: 2px solid var(--danger-color);
+}
+
+.status-indicator.status-red .status-dot {
+    background-color: var(--danger-color);
+}
+
+/* Make status more prominent in simple mode */
+body.mode-simple .status-indicator {
+    font-size: 1.2rem;
+    padding: 12px 20px;
+    margin: 15px 0;
+}
+
+body.mode-simple .status-indicator .status-dot {
+    width: 20px;
+    height: 20px;
+}
+
+/* ============================================
+   TOOLTIP SYSTEM (Help Icons)
+   ============================================ */
+
+.help-tooltip {
+    position: relative;
+    display: inline-block;
+    margin-left: 6px;
+    cursor: help;
+}
+
+.help-tooltip .help-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background-color: var(--accent-color);
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    line-height: 1;
+    transition: all 0.2s ease;
+}
+
+.help-tooltip:hover .help-icon {
+    background-color: var(--secondary-color);
+    transform: scale(1.15);
+}
+
+.help-tooltip .tooltip-text {
+    visibility: hidden;
+    opacity: 0;
+    position: absolute;
+    z-index: 1000;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 280px;
+    background-color: rgba(26, 37, 48, 0.95);
+    color: white;
+    text-align: left;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    font-weight: 400;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    pointer-events: none;
+}
+
+.help-tooltip .tooltip-text::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -8px;
+    border-width: 8px;
+    border-style: solid;
+    border-color: rgba(26, 37, 48, 0.95) transparent transparent transparent;
+}
+
+.help-tooltip:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Ensure tooltips are only shown in simple mode for basic fields */
+body:not(.mode-simple) .help-tooltip {
+    display: none;
+}
+

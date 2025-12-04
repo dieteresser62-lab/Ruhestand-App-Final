@@ -666,3 +666,73 @@ body.mode-simple .advanced-only {
     padding: 0;
 }
 
+
+/* ============================================
+   EINFACH-MODUS: GRÖSSERE CHARTS & VISUALS
+   ============================================ */
+
+/* Make result containers bigger and more prominent in simple mode */
+body.mode-simple #monteCarloResults {
+    margin-top: 35px;
+}
+
+body.mode-simple #monteCarloResults h3 {
+    font-size: 1.6rem;
+    color: var(--primary-color);
+    text-align: center;
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 3px solid var(--secondary-color);
+}
+
+body.mode-simple #monteCarloSummary {
+    font-size: 1.1rem;
+    padding: 20px;
+    background: linear-gradient(135deg, rgba(197, 160, 89, 0.08) 0%, rgba(52, 152, 219, 0.08) 100%);
+    border-radius: 12px;
+    margin-bottom: 25px;
+}
+
+body.mode-simple #withdrawalRateChartContainer,
+body.mode-simple #unifiedKpiDashboard,
+body.mode-simple #advancedKpiDashboard {
+    transform: scale(1.1);
+    transform-origin: top center;
+    margin: 30px 0;
+    padding: 20px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Bigger, friendlier success messages */
+body.mode-simple .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+    font-size: 1.15rem;
+}
+
+body.mode-simple .summary-item {
+    padding: 18px;
+    border-radius: 10px;
+    background: var(--green-bg);
+    border-left: 5px solid var(--success-color);
+}
+
+/* Highlight main action button in simple mode */
+body.mode-simple #mcButton,
+body.mode-simple #btButton {
+    font-size: 1.2rem;
+    padding: 16px 32px;
+    background: linear-gradient(135deg, var(--secondary-color) 0%, #d4af6a 100%);
+    box-shadow: 0 6px 20px rgba(197, 160, 89, 0.4);
+    transition: all 0.3s ease;
+}
+
+body.mode-simple #mcButton:hover,
+body.mode-simple #btButton:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 30px rgba(197, 160, 89, 0.5);
+}
+

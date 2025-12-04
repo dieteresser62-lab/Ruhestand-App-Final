@@ -315,6 +315,97 @@
                     localStorage.setItem(STORAGE_KEY, 'simple');
                 }
             });
+
+            // Add helpful tooltips to key fields in simple mode
+            function addTooltips() {
+                const tooltips = {
+                    'aktuellesAlter': 'Ihr aktuelles Lebensalter - wichtig für die Berechnung Ihrer Entnahmestrategien',
+                    'inflation': 'Die Inflationsrate des letzten Jahres - wird automatisch von der EZB abgerufen',
+                    'tagesgeld': 'Ihr Bargeld auf dem Tagesgeldkonto - sofort verfügbar',
+                    'geldmarktEtf': 'Ihr Geldmarkt-ETF - sehr sichere, kurzfristig verfügbare Anlage',
+                    'depotwertAlt': 'Der aktuelle Wert Ihres "alten" Depots (meist vor 2018 angelegt)',
+                    'depotwertNeu': 'Der aktuelle Wert Ihres "neuen" Depots (meist nach 2018 angelegt)',
+                    'floorBedarf': 'Ihre essentiellen jährlichen Ausgaben, die Sie auf jeden Fall brauchen',
+                    'flexBedarf': 'Ihre flexiblen jährlichen Ausgaben, auf die Sie notfalls verzichten können',
+                    'runwayMinMonths': 'Die Mindestmenge an Liquidität (in Monaten), die Sie immer haben sollten',
+                    'runwayTargetMonths': 'Ihre angestrebte komfortable Liquiditätsreichweite (in Monaten)',
+                    'targetEq': 'Ihr Zielanteil an Aktien im Portfolio (in Prozent)',
+                    'rebalBand': 'Die Toleranz, um die Ihre Aktienquote schwanken darf, bevor umgeschichtet wird'
+                };
+
+                Object.keys(tooltips).forEach(fieldId => {
+                    const field = document.getElementById(fieldId);
+                    if (!field) return;
+
+                    const label = field.closest('.form-group')?.querySelector('label');
+                    if (!label || label.querySelector('.help-tooltip')) return;
+
+                    const tooltip = document.createElement('span');
+                    tooltip.className = 'help-tooltip';
+                    tooltip.innerHTML = `
+                        <span class="help-icon">?</span>
+                        <span class="tooltip-text">${tooltips[fieldId]}</span>
+                    `;
+                    label.appendChild(tooltip);
+                });
+            }
+
+            // Add tooltips after DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', addTooltips);
+            } else {
+                addTooltips();
+            }
+
+            // Friendlier labels for simple mode
+            const labelMappings = {
+                'aktuellesAlter': { original: 'Aktuelles Alter', simple: 'Mein Alter' },
+                'inflation': { original: 'Inflation VJ (%)', simple: 'Teuerung letztes Jahr (%)' },
+                'tagesgeld': { original: 'Tagesgeld (€)', simple: 'Bargeld / Tagesgeld (€)' },
+                'geldmarktEtf': { original: 'Geldmarkt-ETF (€)', simple: 'Geldmarkt-Fonds (€)' },
+                'depotwertAlt': { original: 'Depotwert Alt (€)', simple: 'Depot "Alt" (€)' },
+                'depotwertNeu': { original: 'Depotwert Neu (€)', simple: 'Depot "Neu" (€)' },
+                'floorBedarf': { original: 'Floor-Bedarf p.a. (€)', simple: 'Notwendige Ausgaben pro Jahr (€)' },
+                'flexBedarf': { original: 'Flex-Bedarf p.a. (€)', simple: 'Zusätzliche Wünsche pro Jahr (€)' },
+                'runwayMinMonths': { original: 'Runway Minimum (Monate)', simple: 'Mindest-Liquidität (Monate)' },
+                'runwayTargetMonths': { original: 'Runway Ziel (Monate)', simple: 'Wunsch-Liquidität (Monate)' },
+                'targetEq': { original: 'Aktien-Zielquote (%)', simple: 'Aktien-Anteil (%)' },
+                'rebalBand': { original: 'Rebalancing-Band (±%)', simple: 'Toleranz (±%)' }
+            };
+
+            function updateLabels() {
+                const isSimple = body.classList.contains('mode-simple');
+                Object.keys(labelMappings).forEach(fieldId => {
+                    const field = document.getElementById(fieldId);
+                    if (!field) return;
+
+                    const label = field.closest('.form-group')?.querySelector('label');
+                    if (!label) return;
+
+                    // Store original if not already stored
+                    if (!label.dataset.originalText) {
+                        label.dataset.originalText = label.childNodes[0]?.textContent || '';
+                    }
+
+                    // Get the text node (first child, before any tooltip)
+                    const textNode = label.childNodes[0];
+                    if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+                        textNode.textContent = isSimple ?
+                            labelMappings[fieldId].simple :
+                            labelMappings[fieldId].original;
+                    }
+                });
+            }
+
+            // Update labels on toggle
+            modeToggle.addEventListener('change', updateLabels);
+
+            // Initial label update
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', updateLabels);
+            } else {
+                updateLabels();
+            }
         })();
     </script>
 
