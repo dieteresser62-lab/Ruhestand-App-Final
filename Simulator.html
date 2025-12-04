@@ -1172,8 +1172,18 @@
              *
              * @returns {void}
              */
-            function enforceFormTooltips() {
-                const controls = document.querySelectorAll('.form-group input, .form-group select, .form-group textarea');
+            function enforceFormTooltips(root = document) {
+                const selector = '.form-group input, .form-group select, .form-group textarea';
+                const controls = [];
+
+                // Erfasse das Root-Element selbst, falls es ein passendes Formularelement ist.
+                if (root instanceof Element && root.matches(selector)) {
+                    controls.push(root);
+                }
+
+                // Ergänze alle Nachfahren, die Formularelemente sind.
+                root.querySelectorAll?.(selector).forEach(node => controls.push(node));
+
                 controls.forEach(control => {
                     if (control.type === 'hidden') return;
                     const label = control.closest('.form-group')?.querySelector('label');
@@ -1191,8 +1201,18 @@
              *
              * @returns {void}
              */
-            function enforceKpiTooltips() {
-                const kpiNodes = document.querySelectorAll('.kpi-card, .summary-item');
+            function enforceKpiTooltips(root = document) {
+                const selector = '.kpi-card, .summary-item';
+                const kpiNodes = [];
+
+                // Falls das Root selbst ein KPI/Summary ist, zuerst berücksichtigen.
+                if (root instanceof Element && root.matches(selector)) {
+                    kpiNodes.push(root);
+                }
+
+                // Ergänze alle Nachfahren, die KPI/Summary-Karten darstellen.
+                root.querySelectorAll?.(selector).forEach(node => kpiNodes.push(node));
+
                 kpiNodes.forEach(node => {
                     const titleFromNode = (node.getAttribute('title') || '').trim();
                     const headingText = (node.querySelector('strong')?.textContent || node.textContent || '').replace(/\s+/g, ' ').trim();
@@ -1207,17 +1227,36 @@
             }
 
             /**
+             * Bearbeitet einen neu hinzugefügten DOM-Knoten und dessen Kinder, um Tooltips
+             * gezielt nur für veränderte Bereiche zu ergänzen. Dadurch vermeiden wir
+             * kostspielige Ganzseiten-Scans bei jeder Mutation.
+             *
+             * @param {Node} addedNode - Neu in den DOM eingefügter Knoten.
+             * @returns {void}
+             */
+            function processAddedNode(addedNode) {
+                if (!(addedNode instanceof Element)) return;
+
+                // Verarbeite Formularfelder und KPI-Karten innerhalb des neuen Teilbaums.
+                enforceFormTooltips(addedNode);
+                enforceKpiTooltips(addedNode);
+            }
+
+            /**
              * Initialisiert die Tooltip-Logik und überwacht spätere DOM-Änderungen (z.B. neu gerenderte KPIs).
              *
              * @returns {void}
              */
             function initializeUnifiedTooltips() {
+                // Initiale Durchläufe auf dem bestehenden DOM.
                 enforceFormTooltips();
                 enforceKpiTooltips();
 
-                const observer = new MutationObserver(() => {
-                    enforceFormTooltips();
-                    enforceKpiTooltips();
+                const observer = new MutationObserver(mutations => {
+                    // Nur die tatsächlich neu eingefügten Knoten verarbeiten, um Performance zu schonen.
+                    mutations.forEach(mutation => {
+                        mutation.addedNodes.forEach(processAddedNode);
+                    });
                 });
 
                 observer.observe(document.body, { childList: true, subtree: true });
