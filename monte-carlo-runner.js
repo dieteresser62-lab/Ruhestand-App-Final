@@ -188,7 +188,8 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
 
             // Separate mortality for P1 and P2
             if (p1Alive) {
-                let qx1 = MORTALITY_TABLE[inputs.geschlecht][ageP1] || 1;
+                // Fallback für sehr junge Alter (< 18): sehr niedrige Sterbewahrscheinlichkeit statt 100%
+                let qx1 = MORTALITY_TABLE[inputs.geschlecht][ageP1] || 0.0005;
                 const careFactorP1 = computeCareMortalityMultiplier(careMetaP1, inputs);
                 if (careFactorP1 > 1) {
                     qx1 = Math.min(1.0, qx1 * careFactorP1);
@@ -201,7 +202,8 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
             if (p2Alive && careMetaP2) {
                 // Use partner's gender if specified, otherwise assume opposite gender as fallback
                 const p2Gender = inputs.partner?.geschlecht || (inputs.geschlecht === 'm' ? 'w' : 'm');
-                let qx2 = MORTALITY_TABLE[p2Gender][ageP2] || 1;
+                // Fallback für sehr junge Alter (< 18): sehr niedrige Sterbewahrscheinlichkeit statt 100%
+                let qx2 = MORTALITY_TABLE[p2Gender][ageP2] || 0.0005;
                 const careFactorP2 = computeCareMortalityMultiplier(careMetaP2, inputs);
                 if (careFactorP2 > 1) {
                     qx2 = Math.min(1.0, qx2 * careFactorP2);

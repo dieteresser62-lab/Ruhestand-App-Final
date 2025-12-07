@@ -344,6 +344,61 @@ window.onload = function () {
         });
     }
 
+    // Ansparphase: Toggle Show/Hide und Berechnungen
+    const enableAccumulationPhase = document.getElementById('enableAccumulationPhase');
+    const accumulationPhaseDetails = document.getElementById('accumulationPhaseDetails');
+    const accumulationDurationYears = document.getElementById('accumulationDurationYears');
+    const accumulationSparrate = document.getElementById('accumulationSparrate');
+    const sparrateIndexing = document.getElementById('sparrateIndexing');
+    const p1StartAlter = document.getElementById('p1StartAlter');
+
+    function updateAccumulationCalculations() {
+        if (!enableAccumulationPhase || !enableAccumulationPhase.checked) return;
+
+        const startAge = parseInt(p1StartAlter?.value || 40);
+        const duration = parseInt(accumulationDurationYears?.value || 25);
+        const monthlySavings = parseFloat(accumulationSparrate?.value || 2000);
+
+        const transitionAge = startAge + duration;
+        const totalContributions = monthlySavings * 12 * duration;
+
+        const transitionAgeDisplay = document.getElementById('transitionAgeDisplay');
+        const transitionYearDisplay = document.getElementById('transitionYearDisplay');
+        const totalContributionsDisplay = document.getElementById('totalContributionsDisplay');
+
+        if (transitionAgeDisplay) {
+            transitionAgeDisplay.textContent = `${transitionAge} Jahre`;
+        }
+        if (transitionYearDisplay) {
+            transitionYearDisplay.textContent = `Jahr ${duration}`;
+        }
+        if (totalContributionsDisplay) {
+            totalContributionsDisplay.textContent = `${totalContributions.toLocaleString('de-DE')} €`;
+        }
+    }
+
+    if (enableAccumulationPhase && accumulationPhaseDetails) {
+        enableAccumulationPhase.addEventListener('change', () => {
+            const enabled = enableAccumulationPhase.checked;
+            accumulationPhaseDetails.style.display = enabled ? 'block' : 'none';
+            localStorage.setItem('sim_accumulationPhaseEnabled', enabled ? '1' : '0');
+            if (enabled) {
+                updateAccumulationCalculations();
+            }
+        });
+    }
+
+    // Update calculations when input fields change
+    if (accumulationDurationYears) {
+        accumulationDurationYears.addEventListener('input', updateAccumulationCalculations);
+    }
+    if (accumulationSparrate) {
+        accumulationSparrate.addEventListener('input', updateAccumulationCalculations);
+    }
+    if (p1StartAlter) {
+        p1StartAlter.addEventListener('input', updateAccumulationCalculations);
+    }
+
     const careDetailsCheckbox = document.getElementById('toggle-care-details');
     // Checkbox-Handler für Szenario-Logs werden in displayMonteCarloResults registriert
 

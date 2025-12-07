@@ -222,6 +222,196 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const algoInput = { ...inputs, floorBedarf: effectiveBaseFloor, flexBedarf: baseFlex, startSPB: inputs.startSPB };
     const market = window.Ruhestandsmodell_v30.analyzeMarket(marketDataCurrentYear);
 
+    // ==========================================
+    // ANSPARPHASE-LOGIK
+    // ==========================================
+    const isAccumulationYear = inputs.accumulationPhase?.enabled && yearIndex < (inputs.transitionYear || 0);
+
+    if (isAccumulationYear) {
+        // In der Ansparphase: Sparrate hinzufügen, keine Entnahmen
+        let sparrateThisYear = inputs.accumulationPhase.sparrate * 12;
+
+        // Indexierung der Sparrate basierend auf VORJAHRES-Wert (kumulativ)
+        if (inputs.accumulationPhase.sparrateIndexing === 'inflation' && currentState.accumulationState) {
+            // Verwende die Sparrate vom letzten Jahr und indexiere mit aktueller Inflation
+            const lastYearSparrate = currentState.accumulationState.sparrateThisYear || (inputs.accumulationPhase.sparrate * 12);
+            sparrateThisYear = lastYearSparrate * (1 + yearData.inflation / 100);
+        } else if (inputs.accumulationPhase.sparrateIndexing === 'wage' && currentState.accumulationState) {
+            // Verwende die Sparrate vom letzten Jahr und indexiere mit Lohnentwicklung
+            const lastYearSparrate = currentState.accumulationState.sparrateThisYear || (inputs.accumulationPhase.sparrate * 12);
+            const wageGrowth = yearData.lohn || 2.0; // Fallback 2%
+            sparrateThisYear = lastYearSparrate * (1 + wageGrowth / 100);
+        }
+
+        // Zinsen auf Liquidität
+        cashZinsen = euros(liquiditaet * rC);
+        liquiditaet += cashZinsen;
+        liqNachZins = euros(liquiditaet);
+
+        // Sparrate zur Liquidität hinzufügen
+        liquiditaet += sparrateThisYear;
+
+        // Rebalancing: Überschüssige Liquidität investieren
+        const zielLiquiditaet = inputs.zielLiquiditaet || 0;
+        const ueberschuss = liquiditaet - zielLiquiditaet;
+
+        let kaufAktTotal = 0;
+        let kaufGldTotal = 0;
+
+        if (ueberschuss > 500) {
+            // Investiere nach Zielallokation
+            const targetEq = inputs.targetEq || 60;
+            const goldZielProzent = inputs.goldAktiv ? (inputs.goldZielProzent || 0) : 0;
+
+            const aktienAnteil = (targetEq / 100);
+            const goldAnteil = (goldZielProzent / 100);
+            const gesamtAnteil = aktienAnteil + goldAnteil;
+
+            if (gesamtAnteil > 0) {
+                const aktienBetrag = ueberschuss * (aktienAnteil / gesamtAnteil);
+                const goldBetrag = ueberschuss * (goldAnteil / gesamtAnteil);
+
+                if (aktienBetrag > 0) {
+                    buyStocksNeu(portfolio, aktienBetrag);
+                    liquiditaet -= aktienBetrag;
+                    kaufAktTotal = aktienBetrag;
+                }
+                if (goldBetrag > 0 && inputs.goldAktiv) {
+                    buyGold(portfolio, goldBetrag);
+                    liquiditaet -= goldBetrag;
+                    kaufGldTotal = goldBetrag;
+                }
+            }
+        }
+
+        portfolio.liquiditaet = euros(liquiditaet);
+
+        // Update Accumulation State
+        const newAccumulationState = currentState.accumulationState ? {
+            yearsSaved: currentState.accumulationState.yearsSaved + 1,
+            totalContributed: euros(currentState.accumulationState.totalContributed + sparrateThisYear),
+            sparrateThisYear: euros(sparrateThisYear)
+        } : null;
+
+        // Inflation-Anpassung für nächstes Jahr
+        const naechsterBaseFloor = euros(baseFloor * (1 + yearData.inflation / 100));
+        const naechsterBaseFlex = euros(baseFlex * (1 + yearData.inflation / 100));
+
+        // Update Market History für nächstes Jahr
+        const marketEnd = yearData.jahr ? (HISTORICAL_DATA[yearData.jahr]?.msci_eur || marketDataHist.endeVJ) : marketDataHist.endeVJ;
+        const newAth = Math.max(marketDataHist.ath, marketEnd);
+        const jahreSeitAth = (marketEnd < newAth) ? marketDataHist.jahreSeitAth + 1 : 0;
+
+        const newMarketDataHist = {
+            endeVJ: marketEnd,
+            endeVJ_1: marketDataHist.endeVJ,
+            endeVJ_2: marketDataHist.endeVJ_1,
+            endeVJ_3: marketDataHist.endeVJ_2,
+            ath: newAth,
+            jahreSeitAth: jahreSeitAth,
+            inflation: yearData.inflation,
+            capeRatio: resolvedCapeRatio
+        };
+
+        const depotwertGesamt = sumDepot(portfolio);
+        const totalWealth = depotwertGesamt + portfolio.liquiditaet;
+        const wertAktien = sumDepot({depotTranchesAktien: portfolio.depotTranchesAktien});
+        const wertGold = sumDepot({depotTranchesGold: portfolio.depotTranchesGold});
+
+        return {
+            newState: {
+                portfolio,
+                baseFloor: naechsterBaseFloor,
+                baseFlex: naechsterBaseFlex,
+                lastState: null,
+                currentAnnualPension: 0,
+                currentAnnualPension2: 0,
+                marketDataHist: newMarketDataHist,
+                samplerState: currentState.samplerState,
+                widowPensionP1: 0,
+                widowPensionP2: 0,
+                accumulationState: newAccumulationState,
+                transitionYear: currentState.transitionYear
+            },
+            logData: {
+                jahr: yearIndex + 1,  // WICHTIG: Simulationsjahr, nicht historisches Jahr!
+                histJahr: yearData.jahr,
+                alter: inputs.startAlter + yearIndex,
+                inflation: yearData.inflation,
+                entscheidung: {
+                    kuerzungProzent: 0,
+                    monatlicheEntnahme: 0,
+                    jahresEntnahme: 0,
+                    kuerzungQuelle: 'none',
+                    flexRate: 1.0,
+                    runwayMonths: Infinity
+                },
+                FlexRatePct: 1.0,
+                CutReason: 'none',
+                Alarm: false,
+                Regime: 'accumulation',
+                QuoteEndPct: 0,
+                RunwayCoveragePct: (zielLiquiditaet > 0 ? (portfolio.liquiditaet / zielLiquiditaet) * 100 : Infinity),
+                RealReturnEquityPct: ((1 + rA) / (1 + yearData.inflation/100) - 1),
+                RealReturnGoldPct: ((1 + rG) / (1 + yearData.inflation/100) - 1),
+                entnahmequote: 0,
+                steuern_gesamt: 0,
+                vk: { vkAkt: 0, vkGld: 0, stAkt: 0, stGld: 0, vkGes: 0, stGes: 0 },
+                kaufAkt: euros(kaufAktTotal),
+                kaufGld: euros(kaufGldTotal),
+                wertAktien: euros(wertAktien),
+                wertGold: euros(wertGold),
+                liquiditaet: euros(portfolio.liquiditaet),
+                liqStart: euros(liqStartVorZins),
+                cashInterestEarned: euros(cashZinsen),
+                liqEnd: euros(liqNachZins),
+                aktionUndGrund: `Sparrate: ${euros(sparrateThisYear)}€ / Kauf A: ${euros(kaufAktTotal)}€ / Kauf G: ${euros(kaufGldTotal)}€`,
+                usedSPB: 0,
+                floor_brutto: 0,
+                pension_annual: 0,
+                rente1: 0,
+                rente2: 0,
+                renteSum: 0,
+                floor_aus_depot: 0,
+                flex_brutto: 0,
+                flex_erfuellt_nominal: 0,
+                inflation_factor_cum: 1,
+                jahresentnahme_real: 0,
+                pflege_aktiv: false,
+                pflege_zusatz_floor: 0,
+                pflege_zusatz_floor_delta: 0,
+                pflege_flex_faktor: 1,
+                pflege_kumuliert: 0,
+                pflege_grade: null,
+                pflege_grade_label: '',
+                pflege_delta_flex: 0,
+                WidowBenefitP1: 0,
+                WidowBenefitP2: 0,
+                NeedLiq: 0,
+                GuardGold: 0,
+                GuardEq: 0,
+                GuardNote: 'accumulation_phase',
+                Person1Alive: householdCtx.p1Alive ? 1 : 0,
+                Person2Alive: householdCtx.p2Alive ? 1 : 0,
+                pflege_floor_anchor: 0,
+                pflege_maxfloor_anchor: 0,
+                pflege_cap_zusatz: 0,
+                CareP1_Active: 0,
+                CareP1_Cost: 0,
+                CareP1_Grade: null,
+                CareP1_GradeLabel: '',
+                CareP2_Active: 0,
+                CareP2_Cost: 0,
+                CareP2_Grade: null,
+                CareP2_GradeLabel: ''
+            }
+        };
+    }
+
+    // ==========================================
+    // ENTNAHMEPHASE-LOGIK (wie bisher)
+    // ==========================================
+
     // Gemeinsame Rentenanpassung (% p.a.) für beide Personen
     const rentAdjPct = inputs.rentAdjPct || 0;
 
@@ -668,6 +858,13 @@ export function initMcRunState(inputs, startYearIndex) {
        marketDataHist.jahreSeitAth = (startJahr - 1) - lastAthYear;
     }
 
+    // Ansparphase-Tracking
+    const accumulationState = inputs.accumulationPhase?.enabled ? {
+        yearsSaved: 0,
+        totalContributed: 0,
+        sparrateThisYear: 0
+    } : null;
+
     return {
         portfolio: startPortfolio,
         baseFloor: inputs.startFloorBedarf,
@@ -678,7 +875,9 @@ export function initMcRunState(inputs, startYearIndex) {
         marketDataHist: marketDataHist,
         samplerState: {},
         widowPensionP1: 0,
-        widowPensionP2: 0
+        widowPensionP2: 0,
+        accumulationState,
+        transitionYear: inputs.transitionYear || 0
     };
 }
 
