@@ -23,7 +23,7 @@ import { ScenarioAnalyzer } from './scenario-analyzer.js';
  * @param {ScenarioAnalyzer} [options.scenarioAnalyzer] - Externer Analyzer zum Tracking von Szenarien.
  * @returns {Promise<{ aggregatedResults: object, failCount: number, worstRun: object, worstRunCare: object, pflegeTriggeredCount: number }>}
  */
-export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowOptions, useCapeSampling, onProgress = () => {}, scenarioAnalyzer = new ScenarioAnalyzer(monteCarloParams?.anzahl || 0) }) {
+export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowOptions, useCapeSampling, onProgress = () => { }, scenarioAnalyzer = new ScenarioAnalyzer(monteCarloParams?.anzahl || 0) }) {
     const { anzahl, maxDauer, blockSize, seed, methode } = monteCarloParams;
     onProgress(0);
 
@@ -186,30 +186,42 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
             if (p2ActiveThisYear) p2CareYears++;
             if (p1ActiveThisYear && p2ActiveThisYear) bothCareYears++;
 
+            // Start Mortality Check
+            // Check if we are in accumulation phase - if so, NO MORTALITY
+            const isAccumulation = inputs.accumulationPhase?.enabled && simulationsJahr < inputs.transitionYear;
+
             // Separate mortality for P1 and P2
             if (p1Alive) {
-                // Fallback für sehr junge Alter (< 18): sehr niedrige Sterbewahrscheinlichkeit statt 100%
-                let qx1 = MORTALITY_TABLE[inputs.geschlecht][ageP1] || 0.0005;
-                const careFactorP1 = computeCareMortalityMultiplier(careMetaP1, inputs);
-                if (careFactorP1 > 1) {
-                    qx1 = Math.min(1.0, qx1 * careFactorP1);
-                }
-                if (rand() < qx1) {
-                    p1Alive = false;
+                if (isAccumulation) {
+                    // No death in accumulation phase
+                } else {
+                    // Fallback für sehr junge Alter (< 18): sehr niedrige Sterbewahrscheinlichkeit statt 100%
+                    let qx1 = MORTALITY_TABLE[inputs.geschlecht][ageP1] || 0.0005;
+                    const careFactorP1 = computeCareMortalityMultiplier(careMetaP1, inputs);
+                    if (careFactorP1 > 1) {
+                        qx1 = Math.min(1.0, qx1 * careFactorP1);
+                    }
+                    if (rand() < qx1) {
+                        p1Alive = false;
+                    }
                 }
             }
 
             if (p2Alive && careMetaP2) {
-                // Use partner's gender if specified, otherwise assume opposite gender as fallback
-                const p2Gender = inputs.partner?.geschlecht || (inputs.geschlecht === 'm' ? 'w' : 'm');
-                // Fallback für sehr junge Alter (< 18): sehr niedrige Sterbewahrscheinlichkeit statt 100%
-                let qx2 = MORTALITY_TABLE[p2Gender][ageP2] || 0.0005;
-                const careFactorP2 = computeCareMortalityMultiplier(careMetaP2, inputs);
-                if (careFactorP2 > 1) {
-                    qx2 = Math.min(1.0, qx2 * careFactorP2);
-                }
-                if (rand() < qx2) {
-                    p2Alive = false;
+                if (isAccumulation) {
+                    // No death in accumulation phase
+                } else {
+                    // Use partner's gender if specified, otherwise assume opposite gender as fallback
+                    const p2Gender = inputs.partner?.geschlecht || (inputs.geschlecht === 'm' ? 'w' : 'm');
+                    // Fallback für sehr junge Alter (< 18): sehr niedrige Sterbewahrscheinlichkeit statt 100%
+                    let qx2 = MORTALITY_TABLE[p2Gender][ageP2] || 0.0005;
+                    const careFactorP2 = computeCareMortalityMultiplier(careMetaP2, inputs);
+                    if (careFactorP2 > 1) {
+                        qx2 = Math.min(1.0, qx2 * careFactorP2);
+                    }
+                    if (rand() < qx2) {
+                        p2Alive = false;
+                    }
                 }
             }
 
@@ -463,7 +475,7 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
             }
         }
 
-        finalOutcomes[i] = portfolioTotal(simState.portfolio);
+        finalOutcomes[i] = failed ? 0 : portfolioTotal(simState.portfolio);
         taxOutcomes[i] = totalTaxesThisRun;
         kpiLebensdauer[i] = lebensdauer;
         kpiKuerzungsjahre[i] = kpiJahreMitKuerzungDieserLauf;

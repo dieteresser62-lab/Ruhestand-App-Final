@@ -63,10 +63,17 @@ function _internal_calculateModel(input, lastState) {
     // 5. Inflationsangepassten Bedarf berechnen
     // Bedarf wird um Renteneinkünfte reduziert (netto)
     const renteJahr = input.renteAktiv ? (input.renteMonatlich * 12) : 0;
+    // Fix: Überschussrente auf den Flex-Bedarf anrechnen
+    const pensionSurplus = Math.max(0, renteJahr - input.floorBedarf);
+
     const inflatedBedarf = {
         floor: Math.max(0, input.floorBedarf - renteJahr),  // Grundbedarf (essentiell)
         flex: input.flexBedarf                              // Flexibler Bedarf (optional)
     };
+
+    if (pensionSurplus > 0) {
+        inflatedBedarf.flex = Math.max(0, inflatedBedarf.flex - pensionSurplus);
+    }
     const neuerBedarf = inflatedBedarf.floor + inflatedBedarf.flex;
 
     // 6. Runway berechnen (Liquiditäts-Reichweite in Monaten)

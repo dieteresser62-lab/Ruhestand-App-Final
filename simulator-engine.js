@@ -243,6 +243,17 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             sparrateThisYear = lastYearSparrate * (1 + wageGrowth / 100);
         }
 
+        // Shadow Pension Tracking during Accumulation:
+        // Auch in der Ansparphase müssen die Rentenansprüche (Shadow Pensions) indexiert werden,
+        // damit sie zum Renteneintritt die korrekte Kaufkraft/Nominalhöhe haben.
+        const rentAdjPct = inputs.rentAdjPct || 0;
+        const currentP1 = currentState.currentAnnualPension || 0;
+        const currentP2 = currentState.currentAnnualPension2 || 0;
+        // Indexieren für das NÄCHSTE Jahr
+        const nextP1 = currentP1 * (1 + rentAdjPct / 100);
+        const nextP2 = currentP2 * (1 + rentAdjPct / 100);
+
+
         // Zinsen auf Liquidität
         cashZinsen = euros(liquiditaet * rC);
         liquiditaet += cashZinsen;
@@ -315,8 +326,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
         const depotwertGesamt = sumDepot(portfolio);
         const totalWealth = depotwertGesamt + portfolio.liquiditaet;
-        const wertAktien = sumDepot({depotTranchesAktien: portfolio.depotTranchesAktien});
-        const wertGold = sumDepot({depotTranchesGold: portfolio.depotTranchesGold});
+        const wertAktien = sumDepot({ depotTranchesAktien: portfolio.depotTranchesAktien });
+        const wertGold = sumDepot({ depotTranchesGold: portfolio.depotTranchesGold });
 
         return {
             newState: {
@@ -324,8 +335,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
                 baseFloor: naechsterBaseFloor,
                 baseFlex: naechsterBaseFlex,
                 lastState: null,
-                currentAnnualPension: 0,
-                currentAnnualPension2: 0,
+                currentAnnualPension: nextP1,
+                currentAnnualPension2: nextP2,
                 marketDataHist: newMarketDataHist,
                 samplerState: currentState.samplerState,
                 widowPensionP1: 0,
@@ -333,6 +344,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
                 accumulationState: newAccumulationState,
                 transitionYear: currentState.transitionYear
             },
+            totalTaxesThisYear: 0, // Fix für NaN im Backtest: Steuern explizit zurückgeben
             logData: {
                 jahr: yearIndex + 1,  // WICHTIG: Simulationsjahr, nicht historisches Jahr!
                 histJahr: yearData.jahr,
@@ -352,8 +364,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
                 Regime: 'accumulation',
                 QuoteEndPct: 0,
                 RunwayCoveragePct: (zielLiquiditaet > 0 ? (portfolio.liquiditaet / zielLiquiditaet) * 100 : Infinity),
-                RealReturnEquityPct: ((1 + rA) / (1 + yearData.inflation/100) - 1),
-                RealReturnGoldPct: ((1 + rG) / (1 + yearData.inflation/100) - 1),
+                RealReturnEquityPct: ((1 + rA) / (1 + yearData.inflation / 100) - 1),
+                RealReturnGoldPct: ((1 + rG) / (1 + yearData.inflation / 100) - 1),
                 entnahmequote: 0,
                 steuern_gesamt: 0,
                 vk: { vkAkt: 0, vkGld: 0, stAkt: 0, stGld: 0, vkGes: 0, stGes: 0 },
@@ -415,68 +427,39 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     // Gemeinsame Rentenanpassung (% p.a.) für beide Personen
     const rentAdjPct = inputs.rentAdjPct || 0;
 
-    // Rente Person 1 - Neue Logik mit gemeinsamer Anpassungsrate
-    const currentAgeP1 = inputs.startAlter + yearIndex; // bleibt für Mortalität/Pflege relevant
-    // Rente Person 1 wird ausschließlich über den Zeitversatz "Start in ... Jahren" gesteuert.
+    // Rente Person 1 - Neue Logik: Zustandsbasiert (Shadow Pension)
+    const currentAgeP1 = inputs.startAlter + yearIndex;
     const r1StartOffsetYears = Math.max(0, Number(inputs.renteStartOffsetJahre) || 0);
-    let rente1BruttoEigen = 0; // Eigene Rente von Person 1
-    let widowBenefitP1ThisYear = 0; // Zusätzliche Witwen-/Witwerrente aus Person 2
+    let rente1BruttoEigen = 0;
+    let widowBenefitP1ThisYear = 0;
 
+    // Wir nutzen den indexierten Wert aus dem State. 
+    // Falls das aktuelle Jahr >= Startjahr ist, wird ausgezahlt.
     if (p1Alive && yearIndex >= r1StartOffsetYears) {
-        const isFirstYearR1 = (yearIndex === r1StartOffsetYears);
-        const baseR1 = inputs.renteMonatlich * 12;
-        rente1BruttoEigen = computePensionNext(currentAnnualPension, isFirstYearR1, baseR1, rentAdjPct);
+        rente1BruttoEigen = currentAnnualPension;
     }
 
     if (p1Alive && widowBenefits.p1FromP2) {
-        // Hinterbliebenenrente additiv zur eigenen Rente auszahlen
         widowBenefitP1ThisYear = widowPensionP1;
     }
 
     const rente1_brutto = rente1BruttoEigen + widowBenefitP1ThisYear;
-
-    // Keine zusätzliche Steuer/Berechnung für R1 (wird als Netto betrachtet bzw. extern versteuert)
     const rente1 = rente1_brutto;
 
-    // Rente Person 2 (Partner) - Neue Logik mit gemeinsamer Anpassungsrate
+    // Rente Person 2 (Partner)
     let rente2BruttoEigen = 0;
     let widowBenefitP2ThisYear = 0;
     let rente2_brutto = 0;
     let rente2 = 0;
 
     if (inputs.partner?.aktiv && p2Alive) {
-        // Für Person 2 gilt dieselbe Regel: das Startalter beeinflusst nur Sterbe-/Pflegewahrscheinlichkeiten,
-        // der Rentenbeginn richtet sich ausschließlich nach "Start in ... Jahren".
         const partnerStartOffsetYears = Math.max(0, Number(inputs.partner.startInJahren) || 0);
         if (yearIndex >= partnerStartOffsetYears) {
-            const isFirstYearR2 = (yearIndex === partnerStartOffsetYears);
-            const baseR2 = inputs.partner.brutto;
-            rente2BruttoEigen = computePensionNext(currentAnnualPension2, isFirstYearR2, baseR2, rentAdjPct);
+            rente2BruttoEigen = currentAnnualPension2;
 
             /**
              * Steuerberechnung für Person 2 (Partner-Rente)
-             *
-             * Zwei Berechnungsmodi:
-             * 1. Vereinfachte Methode (steuerquotePct > 0):
-             *    Bruttoente wird mit pauschaler Steuerquote reduziert.
-             *    Dies ist der empfohlene Ansatz für die meisten Nutzer:innen.
-             *
-             * 2. Steuerfreie Rente (steuerquotePct = 0):
-             *    Rente wird ohne Steuerabzug ausgezahlt (brutto = netto).
-             *    Dies ist korrekt für bereits extern versteuerte Renten oder
-             *    Konstellationen ohne Steuerlast.
-             *
-             * Design-Hinweis:
-             * Anders als Person 1 (die immer steuerfrei behandelt wird) ermöglicht
-             * Person 2 die optionale Steuerberechnung via steuerquotePct.
-             *
-             * Mögliche zukünftige Erweiterung:
-             * Eine detaillierte Steuerberechnung analog zur Balance-Engine
-             * (mit Sparer-Pauschbetrag, Kirchensteuer, Teilfreistellung etc.)
-             * könnte als dritter Modus hinzugefügt werden. Dies würde allerdings
-             * zusätzliche Input-Parameter erfordern und die Simulator-Komplexität
-             * erhöhen, weshalb aktuell die vereinfachte Steuerquoten-Methode
-             * präferiert wird.
+             * (Vereinfachte Methode via Steuerquote)
              */
             if (inputs.partner.steuerquotePct > 0) {
                 rente2 = rente2BruttoEigen * (1 - inputs.partner.steuerquotePct / 100);
@@ -500,8 +483,10 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const renteSum = rente1 + rente2;
     const pensionAnnual = renteSum;
 
+    const pensionSurplus = Math.max(0, pensionAnnual - effectiveBaseFloor);
     const inflatedFloor = Math.max(0, effectiveBaseFloor - pensionAnnual);
-    const inflatedFlex  = baseFlex;
+    // Apply pension surplus to flex expenses (Re-applied Fix)
+    const inflatedFlex = Math.max(0, baseFlex - pensionSurplus);
 
     const jahresbedarfAusPortfolio = inflatedFloor + inflatedFlex;
     const runwayMonths = jahresbedarfAusPortfolio > 0 ? (liquiditaet / (jahresbedarfAusPortfolio / 12)) : Infinity;
@@ -513,12 +498,22 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         const fallbackKey = Object.keys(window.Ruhestandsmodell_v30.CONFIG.PROFIL_MAP)[0];
         profile = window.Ruhestandsmodell_v30.CONFIG.PROFIL_MAP[fallbackKey];
     }
-    const zielLiquiditaet = window.Ruhestandsmodell_v30.calculateTargetLiquidity(profile, market, {floor: inflatedFloor, flex: inflatedFlex}, null, null, inputs);
+
+    // SAFEGUARE: Ensure target liquidity never drops below 6 months of TARGET GROSS floor (input)
+    // This handles both the "Liquidity Trap" (Low Net Need) and "Accumulation Phase" (0 effective Floor),
+    // ensuring we enter retirement or shocks with a cash buffer.
+    let zielLiquiditaet = window.Ruhestandsmodell_v30.calculateTargetLiquidity(profile, market, { floor: inflatedFloor, flex: inflatedFlex }, null, null, inputs);
+
+    // Use algoInput.floorBedarf because in Accumulation, effectiveBaseFloor is 0.
+    const safeMinLiquidity = (algoInput.floorBedarf / 12) * 6;
+    if (zielLiquiditaet < safeMinLiquidity) {
+        zielLiquiditaet = safeMinLiquidity;
+    }
 
     const depotwertGesamt = sumDepot(portfolio);
-    const totalWealth     = depotwertGesamt + liquiditaet;
+    const totalWealth = depotwertGesamt + liquiditaet;
 
-    const inputsCtx = buildInputsCtxFromPortfolio(algoInput, portfolio, {pensionAnnual, marketData: marketDataCurrentYear});
+    const inputsCtx = buildInputsCtxFromPortfolio(algoInput, portfolio, { pensionAnnual, marketData: marketDataCurrentYear });
 
     const spendingResponse = window.Ruhestandsmodell_v30.determineSpending({
         market, lastState, inflatedFloor, inflatedFlex,
@@ -536,7 +531,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const results = {
         aktuelleLiquiditaet: liquiditaet, depotwertGesamt, zielLiquiditaet, gesamtwert: totalWealth,
         inflatedFloor, grossFloor: baseFloor, spending: spendingResult, market,
-        minGold: algoInput.goldAktiv ? (algoInput.goldFloorProzent/100)*totalWealth : 0
+        minGold: algoInput.goldAktiv ? (algoInput.goldFloorProzent / 100) * totalWealth : 0
     };
     const actionResult = window.Ruhestandsmodell_v30.determineAction(results, inputsCtx);
 
@@ -565,11 +560,18 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     let emergencyRefillHappened = false;
     const jahresEntnahme = spendingResult.monatlicheEntnahme * 12;
 
-    if (liquiditaet < jahresEntnahme && depotWertVorEntnahme > 0) {
-        const shortfall = jahresEntnahme - liquiditaet;
-        const emergencyCtx = buildInputsCtxFromPortfolio(algoInput, { depotTranchesAktien: portfolio.depotTranchesAktien.map(t => ({...t})), depotTranchesGold: portfolio.depotTranchesGold.map(t => ({...t})), liquiditaet: liquiditaet}, { pensionAnnual, marketData: marketDataCurrentYear });
+    // REFILL LOGIC: Ensure we have enough for Expenses AND Target Buffer
+    // We target (jahresEntnahme + zielLiquiditaet) so that after spending, we still hold the buffer.
+    // This fixes the "0 Cash Trap" where we only refilled what we spent, staying perpetually at 0.
+    const liquidityTargetTotal = jahresEntnahme + zielLiquiditaet;
+
+    if (liquiditaet < liquidityTargetTotal && depotWertVorEntnahme > 0) {
+        // Calculate shortfall against the FULL target (Spending + Buffer)
+        const shortfall = liquidityTargetTotal - liquiditaet;
+        const emergencyCtx = buildInputsCtxFromPortfolio(algoInput, { depotTranchesAktien: portfolio.depotTranchesAktien.map(t => ({ ...t })), depotTranchesGold: portfolio.depotTranchesGold.map(t => ({ ...t })), liquiditaet: liquiditaet }, { pensionAnnual, marketData: marketDataCurrentYear });
 
         // EMERGENCY REFILL: Ignore minGold floor to prevent false RUIN
+        // We try to fill the full buffer using standard emergency logic (Tax-efficient / Gold priority)
         const { saleResult: emergencySale } = window.Ruhestandsmodell_v30.calculateSaleAndTax(shortfall, emergencyCtx, { minGold: 0 }, market);
 
         if (emergencySale && emergencySale.achievedRefill > 0) {
@@ -580,46 +582,47 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             emergencyRefillHappened = true;
         }
 
-        // If still insufficient after first sale (partial success), try aggressive asset sale
-        // This handles both complete failure (achievedRefill=0) and partial success
+        // If still insufficient for SURVIVAL (Expenses) after first sale, try aggressive asset sale
+        // Note: We switch check to `jahresEntnahme` (Survival) here, not `liquidityTargetTotal`.
+        // If we missed the Buffer target but covered Expenses, we don't need aggressive panic sales.
         if (liquiditaet < jahresEntnahme && sumDepot(portfolio) > 0) {
             let missing = jahresEntnahme - liquiditaet;
 
             // Try selling Gold first (without minGold constraint)
-                const goldWert = sumDepot({ depotTranchesGold: portfolio.depotTranchesGold });
-                if (goldWert > 0 && missing > 0) {
-                    // Rebuild context to get current asset values after any prior sales
-                    const goldCtx = buildInputsCtxFromPortfolio(algoInput, portfolio, { pensionAnnual, marketData: marketDataCurrentYear });
-                    const goldResult = sellAssetForCash(portfolio, goldCtx, market, 'gold', missing, 0);
-                    liquiditaet += goldResult.cashGenerated;
-                    totalTaxesThisYear += goldResult.taxesPaid;
-                    if (goldResult.saleResult) {
+            const goldWert = sumDepot({ depotTranchesGold: portfolio.depotTranchesGold });
+            if (goldWert > 0 && missing > 0) {
+                // Rebuild context to get current asset values after any prior sales
+                const goldCtx = buildInputsCtxFromPortfolio(algoInput, portfolio, { pensionAnnual, marketData: marketDataCurrentYear });
+                const goldResult = sellAssetForCash(portfolio, goldCtx, market, 'gold', missing, 0);
+                liquiditaet += goldResult.cashGenerated;
+                totalTaxesThisYear += goldResult.taxesPaid;
+                if (goldResult.saleResult) {
+                    mergedSaleResult = mergedSaleResult
+                        ? window.Ruhestandsmodell_v30.mergeSaleResults(mergedSaleResult, goldResult.saleResult)
+                        : goldResult.saleResult;
+                }
+                missing = Math.max(0, missing - goldResult.cashGenerated);
+                emergencyRefillHappened = true;
+            }
+            // Then try selling Equity
+            if (missing > 0) {
+                const equityWert = sumDepot({ depotTranchesAktien: portfolio.depotTranchesAktien });
+                if (equityWert > 0) {
+                    // CRITICAL: Rebuild context after gold sale to prevent stale asset values
+                    // This ensures calculateSaleAndTax sees the actual remaining assets
+                    const updatedCtx = buildInputsCtxFromPortfolio(algoInput, portfolio, { pensionAnnual, marketData: marketDataCurrentYear });
+                    const eqResult = sellAssetForCash(portfolio, updatedCtx, market, 'equity', missing, 0);
+                    liquiditaet += eqResult.cashGenerated;
+                    totalTaxesThisYear += eqResult.taxesPaid;
+                    if (eqResult.saleResult) {
                         mergedSaleResult = mergedSaleResult
-                            ? window.Ruhestandsmodell_v30.mergeSaleResults(mergedSaleResult, goldResult.saleResult)
-                            : goldResult.saleResult;
+                            ? window.Ruhestandsmodell_v30.mergeSaleResults(mergedSaleResult, eqResult.saleResult)
+                            : eqResult.saleResult;
                     }
-                    missing = Math.max(0, missing - goldResult.cashGenerated);
+                    missing = Math.max(0, missing - eqResult.cashGenerated);
                     emergencyRefillHappened = true;
                 }
-                // Then try selling Equity
-                if (missing > 0) {
-                    const equityWert = sumDepot({ depotTranchesAktien: portfolio.depotTranchesAktien });
-                    if (equityWert > 0) {
-                        // CRITICAL: Rebuild context after gold sale to prevent stale asset values
-                        // This ensures calculateSaleAndTax sees the actual remaining assets
-                        const updatedCtx = buildInputsCtxFromPortfolio(algoInput, portfolio, { pensionAnnual, marketData: marketDataCurrentYear });
-                        const eqResult = sellAssetForCash(portfolio, updatedCtx, market, 'equity', missing, 0);
-                        liquiditaet += eqResult.cashGenerated;
-                        totalTaxesThisYear += eqResult.taxesPaid;
-                        if (eqResult.saleResult) {
-                            mergedSaleResult = mergedSaleResult
-                                ? window.Ruhestandsmodell_v30.mergeSaleResults(mergedSaleResult, eqResult.saleResult)
-                                : eqResult.saleResult;
-                        }
-                        missing = Math.max(0, missing - eqResult.cashGenerated);
-                        emergencyRefillHappened = true;
-                    }
-                }
+            }
         }
     }
 
@@ -757,9 +760,17 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const naechsterBaseFloor = baseFloor * inflFactorThisYear;
     const naechsterBaseFlex = baseFlex * inflFactorThisYear;
 
+    // Fix: widowAdjFactor was undefined. Using rentAdjPct for indexation.
     const widowAdjFactor = 1 + (rentAdjPct / 100);
+
+
     const nextWidowPensionP1 = widowBenefits.p1FromP2 ? Math.max(0, widowPensionP1 * widowAdjFactor) : 0;
     const nextWidowPensionP2 = widowBenefits.p2FromP1 ? Math.max(0, widowPensionP2 * widowAdjFactor) : 0;
+
+    // Update der Shadow Pensions für das nächste Jahr
+    // (unabhängig davon, ob ausgezahlt wurde oder nicht, die Basis wächst weiter)
+    const nextAnnualPension = currentAnnualPension * (1 + rentAdjPct / 100);
+    const nextAnnualPension2 = currentAnnualPension2 * (1 + rentAdjPct / 100);
 
     return {
         isRuin: false,
@@ -768,9 +779,9 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             baseFloor: naechsterBaseFloor,
             baseFlex: naechsterBaseFlex,
             lastState: spendingNewState,
-            // WICHTIG: Nur die eigene Rente persistent speichern, damit Witwenanteile nicht doppelt re-inflationiert werden
-            currentAnnualPension: rente1BruttoEigen,
-            currentAnnualPension2: rente2BruttoEigen,
+            // Speichere den indexierten Wert für das nächste Jahr
+            currentAnnualPension: nextAnnualPension,
+            currentAnnualPension2: nextAnnualPension2,
             marketDataHist: newMarketDataHist,
             samplerState: currentState.samplerState,
             widowPensionP1: nextWidowPensionP1,
@@ -784,15 +795,15 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             Regime: spendingNewState.lastMarketSKey,
             QuoteEndPct: spendingResult.details.entnahmequoteDepot * 100,
             RunwayCoveragePct: (zielLiquiditaet > 0 ? (actionResult.liqNachTransaktion.total / zielLiquiditaet) : 1) * 100,
-            RealReturnEquityPct: (1 + rA) / (1 + yearData.inflation/100) - 1,
-            RealReturnGoldPct: (1 + rG) / (1 + yearData.inflation/100) - 1,
+            RealReturnEquityPct: (1 + rA) / (1 + yearData.inflation / 100) - 1,
+            RealReturnGoldPct: (1 + rG) / (1 + yearData.inflation / 100) - 1,
             entnahmequote: depotWertVorEntnahme > 0 ? (jahresEntnahme / depotWertVorEntnahme) : 0,
             steuern_gesamt: totalTaxesThisYear,
             vk,
             kaufAkt: kaufAktTotal,
             kaufGld: totalGoldKauf,
-            wertAktien: sumDepot({depotTranchesAktien: portfolio.depotTranchesAktien}),
-            wertGold: sumDepot({depotTranchesGold: portfolio.depotTranchesGold}),
+            wertAktien: sumDepot({ depotTranchesAktien: portfolio.depotTranchesAktien }),
+            wertGold: sumDepot({ depotTranchesGold: portfolio.depotTranchesGold }),
             liquiditaet,
             liqStart: liqStartVorZins,
             cashInterestEarned: cashZinsen,
@@ -830,18 +841,18 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 }
 
 /**
- * Initialisiert den Startzustand für einen Monte-Carlo-Lauf
- */
+* Initialisiert den Startzustand für einen Monte-Carlo-Lauf
+*/
 export function initMcRunState(inputs, startYearIndex) {
     const startPortfolio = initializePortfolio(inputs);
 
-    const histYears = Object.keys(HISTORICAL_DATA).map(Number).sort((a,b)=>a-b);
+    const histYears = Object.keys(HISTORICAL_DATA).map(Number).sort((a, b) => a - b);
     const validStartIndices = annualData.map((d, i) => i).filter(i => i >= 4);
     const effectiveIndex = validStartIndices[startYearIndex % validStartIndices.length];
     const startJahr = annualData[effectiveIndex].jahr;
 
     const marketDataHist = {
-        endeVJ:   HISTORICAL_DATA[startJahr - 1]?.msci_eur || 1000,
+        endeVJ: HISTORICAL_DATA[startJahr - 1]?.msci_eur || 1000,
         endeVJ_1: HISTORICAL_DATA[startJahr - 2]?.msci_eur || 1000,
         endeVJ_2: HISTORICAL_DATA[startJahr - 3]?.msci_eur || 1000,
         endeVJ_3: HISTORICAL_DATA[startJahr - 4]?.msci_eur || 1000,
@@ -854,8 +865,8 @@ export function initMcRunState(inputs, startYearIndex) {
     const pastValues = histYears.filter(y => y < startJahr).map(y => HISTORICAL_DATA[y].msci_eur);
     marketDataHist.ath = pastValues.length > 0 ? Math.max(...pastValues, marketDataHist.endeVJ) : marketDataHist.endeVJ;
     if (marketDataHist.endeVJ < marketDataHist.ath) {
-       let lastAthYear = Math.max(...histYears.filter(y => y < startJahr && HISTORICAL_DATA[y].msci_eur >= marketDataHist.ath));
-       marketDataHist.jahreSeitAth = (startJahr - 1) - lastAthYear;
+        let lastAthYear = Math.max(...histYears.filter(y => y < startJahr && HISTORICAL_DATA[y].msci_eur >= marketDataHist.ath));
+        marketDataHist.jahreSeitAth = (startJahr - 1) - lastAthYear;
     }
 
     // Ansparphase-Tracking
@@ -870,8 +881,9 @@ export function initMcRunState(inputs, startYearIndex) {
         baseFloor: inputs.startFloorBedarf,
         baseFlex: inputs.startFlexBedarf,
         lastState: null,
-        currentAnnualPension: 0,
-        currentAnnualPension2: 0,
+        // Initialisiere mit Eingabewert (Jahresbasis), damit Indexierung ab Jahr 0 starten kann
+        currentAnnualPension: (inputs.renteMonatlich || 0) * 12,
+        currentAnnualPension2: (inputs.partner?.brutto || 0),
         marketDataHist: marketDataHist,
         samplerState: {},
         widowPensionP1: 0,
@@ -996,12 +1008,12 @@ export function computeRunStatsFromSeries(series) {
     const returns = [];
     for (let i = 1; i < series.length; i++) {
         const prev = series[i - 1] || 0;
-        const cur  = series[i] || 0;
+        const cur = series[i] || 0;
         const r = (prev > 0 && isFinite(prev) && isFinite(cur)) ? (cur / prev - 1) : 0;
         returns.push(r);
     }
-    const mu = returns.length > 0 ? returns.reduce((a,b)=>a+b,0) / returns.length : 0;
-    const variance = returns.length > 1 ? returns.reduce((s,x)=>s + (x-mu)*(x-mu), 0) / (returns.length - 1) : 0;
+    const mu = returns.length > 0 ? returns.reduce((a, b) => a + b, 0) / returns.length : 0;
+    const variance = returns.length > 1 ? returns.reduce((s, x) => s + (x - mu) * (x - mu), 0) / (returns.length - 1) : 0;
     const volPct = Math.sqrt(Math.max(variance, 0)) * 100;
 
     let peak = series[0];
@@ -1262,12 +1274,12 @@ export function updateCareMeta(care, inputs, age, yearData, rand) {
         // Pflegekosten steigen historisch schneller als die CPI, daher modellieren wir Inflation * Drift.
         const rawDriftPct = Number(inputs.pflegeKostenDrift);
         const driftFactor = Number.isFinite(rawDriftPct) ? Math.max(0, rawDriftPct) / 100 : 0;
-        const inflationsAnpassung = (1 + yearData.inflation/100) * (1 + driftFactor);
+        const inflationsAnpassung = (1 + yearData.inflation / 100) * (1 + driftFactor);
         // Regionale Aufschläge (z.B. Ballungsräume) skalieren alle Grade linear.
         const regionalMultiplier = 1 + Math.max(0, inputs?.pflegeRegionalZuschlag || 0);
 
-        const floorAtTriggerAdjusted = care.floorAtTrigger * Math.pow(1 + yearData.inflation/100, yearIndex);
-        const flexAtTriggerAdjusted = care.flexAtTrigger * Math.pow(1 + yearData.inflation/100, yearIndex);
+        const floorAtTriggerAdjusted = care.floorAtTrigger * Math.pow(1 + yearData.inflation / 100, yearIndex);
+        const flexAtTriggerAdjusted = care.flexAtTrigger * Math.pow(1 + yearData.inflation / 100, yearIndex);
         const maxFloorAdjusted = care.maxFloorAtTrigger * Math.pow(inflationsAnpassung, yearIndex);
 
         const capZusatz = Math.max(0, maxFloorAdjusted - floorAtTriggerAdjusted);
