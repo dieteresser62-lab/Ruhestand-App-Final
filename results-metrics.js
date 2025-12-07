@@ -228,7 +228,7 @@ export function buildCareMetrics(results, inputs) {
         buildCareEntryCard('Median Endvermögen (m. Pflege)', care.endwealthWithCare_median, 'Typisches Endvermögen unter Berücksichtigung des Pflegerisikos.', null, true),
         buildCareEntryCard('Median Endvermögen (o. Pflege)', care.endwealthNoCare_median, 'Geschätztes typisches Endvermögen ohne die Last des Pflegefalls.', null, true),
         buildCareEntryCard('Median Gesamtkosten (Depot)', care.depotCosts_median, 'Typische Summe der aus dem Depot finanzierten Pflege-Mehrkosten (betroffene Läufe).', null, true),
-        buildCareEntryCard('Shortfall-Delta vs. ohne Pflege', care.shortfallDelta_vs_noCare, 'Differenz der Shortfall-Wahrscheinlichkeit im Vergleich zu Läufen ohne Pflegefall.', null, true)
+        buildCareEntryCard('Median-Vermögensdifferenz', care.shortfallDelta_vs_noCare, 'Unterschied im medianen Endvermögen (ohne Pflege minus mit Pflege).', null, true)
     );
 
     return { cards };

@@ -22,23 +22,17 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 ### Simulator
 * Monte-Carlo-Simulationen mit unterschiedlichen Renditequellen (historisch, Regime, Block-Bootstrap).
 * **Parameter-Sweep mit Auto-Optimize:** Whitelist-Ansatz, Deep-Clones und Wächterlogik für Zwei-Personen-Haushalte. Neue Auto-Optimize-Funktion mit 3-stufiger Optimierung (~8-10x schneller), dynamischer Parameter-UI (1-7 Parameter), Preset-Konfigurationen und Champion-Config-Output für optimale Strategiefindung.
-* Stresstests, Pflegefall-Szenarien und Heatmap-Visualisierung inklusive Warnhinweisen.
+* Stresstests, Pflegefall-Szenarien und Heatmap-Visualisierung (fokussiert auf Rentenphase).
 * Sweep-Schutz für Partner:innen-Renten inklusive Rente-2-Invarianz und Heatmap-Badges.
 * Szenario-Log-Analyse mit 30 auswählbaren Szenarien: 15 charakteristische (Perzentile, Pflege-Extremfälle, Risiko-Szenarien) und 15 zufällige Samples für typisches Verhalten.
 * Checkboxen für Pflege-Details und detailliertes Log, JSON/CSV-Export für ausgewählte Szenarien.
 
-#### Pflegegrad-Modellierung
+#### Ansparphase (Accumulation Phase)
 
-Die Pflegefall-Logik nutzt jetzt alters- und gradabhängige Eintrittswahrscheinlichkeiten (BARMER Pflegereport 2024, Kap. 2).
-Die veröffentlichten Prävalenzen wurden auf Jahreswahrscheinlichkeiten heruntergebrochen (Ø-Pflegedauer ~4 Jahre) und in
-5-Jahres-Buckets geglättet. Für jedes ausgeloste Alter wird zunächst die Gesamteintrittswahrscheinlichkeit ermittelt, dann
-per Zufall ein Pflegegrad (1–5) gezogen und anschließend der gradeigene Zusatzbedarf bzw. Flex-Verlust angewandt.
-
-Im UI stehen pro Pflegegrad zwei Felder zur Verfügung:
-
-| Pflegegrad | Default-Zusatzbedarf (€ p.a.) | Flex-Level (%) |
-|------------|------------------------------|-----------------|
-| PG 1       | 12 000                       | 50              |
+Der Simulator unterstützt nun optional eine Ansparphase vor dem Renteneintritt:
+* **Startalter & Dauer:** Flexible Definition des Simulationsbeginns (z. B. ab 40) und der Anspardauer.
+* **Sparrate:** Jährliche Sparleistung, die dem Portfolio zugeführt wird (statt Entnahmen).
+* **Übergang:** Automatischer Wechsel in die Entnahmephase nach Ablauf der Dauer.
 | PG 2       | 18 000                       | 45              |
 | PG 3       | 28 000                       | 40              |
 | PG 4       | 36 000                       | 35              |

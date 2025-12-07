@@ -1167,6 +1167,11 @@ function resolveCareAgeBucket(age) {
 }
 
 function sampleCareGrade(age, rand) {
+    const minBucket = CARE_PROBABILITY_BUCKETS[0];
+    if (age < minBucket) {
+        return null;
+    }
+
     const bucket = resolveCareAgeBucket(age);
     const probabilities = PFLEGE_GRADE_PROBABILITIES[bucket];
     if (!probabilities) return null;
