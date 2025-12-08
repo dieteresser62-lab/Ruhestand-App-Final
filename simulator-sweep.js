@@ -273,6 +273,9 @@ export async function runParameterSweep() {
 
                 let minRunway = Infinity;
 
+                // Track dynamic transition year (can be shortened by care event)
+                let effectiveTransitionYear = inputs.transitionYear ?? 0;
+
                 for (let simulationsJahr = 0; simulationsJahr < maxDauer; simulationsJahr++) {
                     const currentAge = inputs.startAlter + simulationsJahr;
 
@@ -281,17 +284,32 @@ export async function runParameterSweep() {
 
                     careMeta = updateCareMeta(careMeta, inputs, currentAge, yearData, rand);
 
-                    let qx = MORTALITY_TABLE[inputs.geschlecht][currentAge] || 1;
-                    const careFactor = computeCareMortalityMultiplier(careMeta, inputs);
-                    if (careFactor > 1) {
-                        qx = Math.min(1.0, qx * careFactor);
+                    // FORCE RETIREMENT if care is active in Accumulation Phase
+                    // If we are currently in accumulation (simulation year < transition year) and care triggers,
+                    // we immediately stop accumulation and switch to retirement mode for this and future years.
+                    if (inputs.accumulationPhase?.enabled && simulationsJahr < effectiveTransitionYear) {
+                        if (careMeta && careMeta.active) {
+                            effectiveTransitionYear = simulationsJahr;
+                        }
                     }
 
-                    if (rand() < qx) break;
+                    // Mortality Check
+                    // Skip mortality during Accumulation Phase to focus on financial outcome
+                    const isAccumulation = inputs.accumulationPhase?.enabled && simulationsJahr < effectiveTransitionYear;
+
+                    if (!isAccumulation) {
+                        let qx = MORTALITY_TABLE[inputs.geschlecht][currentAge] || 1;
+                        const careFactor = computeCareMortalityMultiplier(careMeta, inputs);
+                        if (careFactor > 1) {
+                            qx = Math.min(1.0, qx * careFactor);
+                        }
+
+                        if (rand() < qx) break;
+                    }
 
                     // Berechne dynamische Rentenanpassung basierend auf Modus (fix/wage/cpi)
                     const effectiveRentAdjPct = computeRentAdjRate(inputs, yearData);
-                    const adjustedInputs = { ...inputs, rentAdjPct: effectiveRentAdjPct };
+                    const adjustedInputs = { ...inputs, rentAdjPct: effectiveRentAdjPct, transitionYear: effectiveTransitionYear };
 
                     // Calculate care floor addition (if active)
                     const { zusatzFloor: careFloor } = calcCareCost(careMeta, null);
@@ -372,7 +390,7 @@ export async function runParameterSweep() {
 /**
  * Findet und zeigt die besten Parameter aus dem aktuellen Sweep an
  */
-window.findAndDisplayBest = function() {
+window.findAndDisplayBest = function () {
     if (!window.sweepResults || window.sweepResults.length === 0) {
         alert('Bitte führen Sie zuerst einen Parameter Sweep durch.');
         return;
@@ -395,14 +413,14 @@ window.findAndDisplayBest = function() {
 /**
  * Zeigt Sensitivity Analysis
  */
-window.showSensitivityAnalysis = function() {
+window.showSensitivityAnalysis = function () {
     displaySensitivityAnalysis();
 };
 
 /**
  * Zeigt Dialog für Pareto Frontier
  */
-window.showParetoDialog = function() {
+window.showParetoDialog = function () {
     // Erstelle ein einfaches Dialog für Metrik-Auswahl
     const metric1 = prompt(
         'Erste Metrik (X-Achse):\n\n' +
@@ -448,7 +466,7 @@ window.showParetoDialog = function() {
  * Demo: Multi-Objective Optimization
  * Optimiert für Wealth UND Success Probability gleichzeitig
  */
-window.runMultiObjectiveDemo = function() {
+window.runMultiObjectiveDemo = function () {
     const objectives = [
         { metricKey: 'medianEndWealth', weight: 0.6, maximize: true },
         { metricKey: 'successProbFloor', weight: 0.4, maximize: true }
@@ -460,7 +478,7 @@ window.runMultiObjectiveDemo = function() {
  * Demo: Constraint-Based Optimization
  * Maximiere Median Wealth unter Einhaltung von Success Rate >= 95%
  */
-window.runConstraintBasedDemo = function() {
+window.runConstraintBasedDemo = function () {
     const constraints = [
         { metricKey: 'successProbFloor', operator: '>=', value: 95 },
         { metricKey: 'worst5Drawdown', operator: '<=', value: 40 }
@@ -469,10 +487,10 @@ window.runConstraintBasedDemo = function() {
 };
 
 // Event-Listener für Metrik-Änderung (um Optimierungsergebnisse zu aktualisieren)
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     const metricSelector = document.getElementById('sweepMetric');
     if (metricSelector) {
-        metricSelector.addEventListener('change', function() {
+        metricSelector.addEventListener('change', function () {
             // Verstecke alte Optimierungsergebnisse bei Metrik-Wechsel
             const optimizationResults = document.getElementById('optimizationResults');
             if (optimizationResults && optimizationResults.style.display !== 'none') {

@@ -23,7 +23,7 @@ import { ScenarioAnalyzer } from './scenario-analyzer.js';
  * @param {ScenarioAnalyzer} [options.scenarioAnalyzer] - Externer Analyzer zum Tracking von Szenarien.
  * @returns {Promise<{ aggregatedResults: object, failCount: number, worstRun: object, worstRunCare: object, pflegeTriggeredCount: number }>}
  */
-export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowOptions, useCapeSampling, onProgress = () => {}, scenarioAnalyzer = new ScenarioAnalyzer(monteCarloParams?.anzahl || 0) }) {
+export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowOptions, useCapeSampling, onProgress = () => { }, scenarioAnalyzer = new ScenarioAnalyzer(monteCarloParams?.anzahl || 0) }) {
     const { anzahl, maxDauer, blockSize, seed, methode } = monteCarloParams;
     onProgress(0);
 
@@ -57,8 +57,9 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
     let pflegeTriggeredCount = 0;
     const entryAges = [], careDepotCosts = [];
     let shortfallWithCareCount = 0, shortfallNoCareProxyCount = 0;
-    const endWealthWithCare = new Float64Array(anzahl);
-    const endWealthNoCareProxyArr = new Float64Array(anzahl);
+    // Fix: Use dynamic arrays to separate populations instead of fixed-size arrays with 0s
+    const endWealthWithCareList = [];
+    const endWealthNoCareList = [];
 
     // Dual Care KPIs
     const p1CareYearsArr = new Uint16Array(anzahl);
@@ -118,6 +119,9 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
         let widowBenefitActiveForP1 = false; // P1 erhält Witwenrente nach P2
         let widowBenefitActiveForP2 = false; // P2 erhält Witwenrente nach P1
 
+        // Track dynamic transition year (can be shortened by care event)
+        let effectiveTransitionYear = inputs.transitionYear ?? 0;
+
         // Dual Care: P1 + P2 (Partner)
         const careMetaP1 = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren, inputs.geschlecht);
         const partnerGenderFallback = inputs.geschlecht === 'm' ? 'w' : 'm';
@@ -145,6 +149,7 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
         let triggeredAgeP2 = null;
         let runEndedBecauseAllDied = false;
         let deathLogContext = null;
+        let retirementYearCounter = 0; // Track years in retirement for heatmap alignment
 
         for (let simulationsJahr = 0; simulationsJahr < maxDauer; simulationsJahr++) {
             const ageP1 = inputs.startAlter + simulationsJahr;
@@ -178,6 +183,15 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
                 if (careMetaP2 && careMetaP2.active) careEverActive = true;
             }
 
+            // FORCE RETIREMENT if care is active in Accumulation Phase
+            // If we are currently in accumulation (simulation year < transition year) and care triggers,
+            // we immediately stop accumulation and switch to retirement mode for this and future years.
+            if (inputs.accumulationPhase?.enabled && simulationsJahr < effectiveTransitionYear) {
+                if ((p1Alive && careMetaP1?.active) || (p2Alive && careMetaP2?.active)) {
+                    effectiveTransitionYear = simulationsJahr;
+                }
+            }
+
             // Track care years
             const p1ActiveThisYear = p1Alive && careMetaP1?.active;
             const p2ActiveThisYear = p2Alive && careMetaP2?.active;
@@ -186,30 +200,42 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
             if (p2ActiveThisYear) p2CareYears++;
             if (p1ActiveThisYear && p2ActiveThisYear) bothCareYears++;
 
+            // Start Mortality Check
+            // Check if we are in accumulation phase - if so, NO MORTALITY
+            const isAccumulation = inputs.accumulationPhase?.enabled && simulationsJahr < effectiveTransitionYear;
+
             // Separate mortality for P1 and P2
             if (p1Alive) {
-                // Fallback für sehr junge Alter (< 18): sehr niedrige Sterbewahrscheinlichkeit statt 100%
-                let qx1 = MORTALITY_TABLE[inputs.geschlecht][ageP1] || 0.0005;
-                const careFactorP1 = computeCareMortalityMultiplier(careMetaP1, inputs);
-                if (careFactorP1 > 1) {
-                    qx1 = Math.min(1.0, qx1 * careFactorP1);
-                }
-                if (rand() < qx1) {
-                    p1Alive = false;
+                if (isAccumulation) {
+                    // No death in accumulation phase
+                } else {
+                    // Fallback für sehr junge Alter (< 18): sehr niedrige Sterbewahrscheinlichkeit statt 100%
+                    let qx1 = MORTALITY_TABLE[inputs.geschlecht][ageP1] || 0.0005;
+                    const careFactorP1 = computeCareMortalityMultiplier(careMetaP1, inputs);
+                    if (careFactorP1 > 1) {
+                        qx1 = Math.min(1.0, qx1 * careFactorP1);
+                    }
+                    if (rand() < qx1) {
+                        p1Alive = false;
+                    }
                 }
             }
 
             if (p2Alive && careMetaP2) {
-                // Use partner's gender if specified, otherwise assume opposite gender as fallback
-                const p2Gender = inputs.partner?.geschlecht || (inputs.geschlecht === 'm' ? 'w' : 'm');
-                // Fallback für sehr junge Alter (< 18): sehr niedrige Sterbewahrscheinlichkeit statt 100%
-                let qx2 = MORTALITY_TABLE[p2Gender][ageP2] || 0.0005;
-                const careFactorP2 = computeCareMortalityMultiplier(careMetaP2, inputs);
-                if (careFactorP2 > 1) {
-                    qx2 = Math.min(1.0, qx2 * careFactorP2);
-                }
-                if (rand() < qx2) {
-                    p2Alive = false;
+                if (isAccumulation) {
+                    // No death in accumulation phase
+                } else {
+                    // Use partner's gender if specified, otherwise assume opposite gender as fallback
+                    const p2Gender = inputs.partner?.geschlecht || (inputs.geschlecht === 'm' ? 'w' : 'm');
+                    // Fallback für sehr junge Alter (< 18): sehr niedrige Sterbewahrscheinlichkeit statt 100%
+                    let qx2 = MORTALITY_TABLE[p2Gender][ageP2] || 0.0005;
+                    const careFactorP2 = computeCareMortalityMultiplier(careMetaP2, inputs);
+                    if (careFactorP2 > 1) {
+                        qx2 = Math.min(1.0, qx2 * careFactorP2);
+                    }
+                    if (rand() < qx2) {
+                        p2Alive = false;
+                    }
                 }
             }
 
@@ -275,7 +301,7 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
 
             // Berechne dynamische Rentenanpassung basierend auf Modus (fix/wage/cpi)
             const effectiveRentAdjPct = computeRentAdjRate(inputs, yearData);
-            const adjustedInputs = { ...inputs, rentAdjPct: effectiveRentAdjPct };
+            const adjustedInputs = { ...inputs, rentAdjPct: effectiveRentAdjPct, transitionYear: effectiveTransitionYear };
             const householdContext = {
                 p1Alive,
                 p2Alive: hasPartner ? p2Alive : false,
@@ -360,11 +386,12 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
                 if (result.logData.entnahmequote * 100 > 4.5) totalYearsQuoteAbove45++;
                 if (i % 100 === 0) allRealWithdrawalsSample.push(result.logData.jahresentnahme_real);
 
-                if (simulationsJahr < 10) {
+                if (!isAccumulation && retirementYearCounter < 10) {
                     const quote = result.logData.entnahmequote * 100;
                     for (let b = 0; b < BINS.length - 1; b++) {
-                        if (quote >= BINS[b] && quote < BINS[b + 1]) { heatmap[simulationsJahr][b]++; break; }
+                        if (quote >= BINS[b] && quote < BINS[b + 1]) { heatmap[retirementYearCounter][b]++; break; }
                     }
+                    retirementYearCounter++;
                 }
 
                 depotWertHistorie.push(portfolioTotal(simState.portfolio));
@@ -463,7 +490,7 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
             }
         }
 
-        finalOutcomes[i] = portfolioTotal(simState.portfolio);
+        finalOutcomes[i] = failed ? 0 : portfolioTotal(simState.portfolio);
         taxOutcomes[i] = totalTaxesThisRun;
         kpiLebensdauer[i] = lebensdauer;
         kpiKuerzungsjahre[i] = kpiJahreMitKuerzungDieserLauf;
@@ -474,13 +501,14 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
             pflegeTriggeredCount++;
             entryAges.push(triggeredAge ?? 0);
             shortfallWithCareCount += ruinOrDepleted ? 1 : 0;
-            endWealthWithCare[i] = finalOutcomes[i];
+            endWealthWithCareList.push(finalOutcomes[i]);
             careDepotCosts.push(Math.max(0, depotOnlyStart - depotOnlyEnd));
             p1CareYearsTriggered.push(p1CareYears);
             bothCareYearsTriggered.push(bothCareYears);
             if (hasPartner) {
-                endWealthNoCareProxyArr[i] = depotOnlyStart; // Proxy ohne Pflegekosten
-                shortfallNoCareProxyCount += depotOnlyStart <= DEPOT_DEPLETION_THRESHOLD ? 1 : 0;
+                // Legacy support: We count potential shortfalls if no care happened? 
+                // Currently strictly separating populations is better.
+                // shortfallNoCareProxyCount += depotOnlyStart <= DEPOT_DEPLETION_THRESHOLD ? 1 : 0;
                 p2CareYearsTriggered.push(p2CareYears);
                 entryAgesP2.push(triggeredAgeP2 ?? 0);
             }
@@ -488,8 +516,8 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
             maxAnnualCareSpendTriggered.push(maxAnnualCareCost);
             bothCareYearsOverlapTriggered.push(bothCareYears);
         } else {
-            endWealthWithCare[i] = finalOutcomes[i];
-            endWealthNoCareProxyArr[i] = finalOutcomes[i];
+            endWealthNoCareList.push(finalOutcomes[i]);
+            shortfallNoCareProxyCount += ruinOrDepleted ? 1 : 0;
         }
 
         p1CareYearsArr[i] = p1CareYears;
@@ -530,13 +558,15 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
     const successfulOutcomes = [];
     for (let i = 0; i < anzahl; ++i) { if (finalOutcomes[i] > 0) successfulOutcomes.push(finalOutcomes[i]); }
 
+    const medianWithCare = endWealthWithCareList.length ? quantile(endWealthWithCareList, 0.5) : 0;
+    const medianNoCare = endWealthNoCareList.length ? quantile(endWealthNoCareList, 0.5) : 0;
     const pflegeResults = {
         entryRatePct: (pflegeTriggeredCount / anzahl) * 100,
         entryAgeMedian: entryAges.length ? quantile(entryAges, 0.5) : 0,
         shortfallRate_condCare: pflegeTriggeredCount > 0 ? (shortfallWithCareCount / pflegeTriggeredCount) * 100 : 0,
-        shortfallRate_noCareProxy: (shortfallNoCareProxyCount / anzahl) * 100,
-        endwealthWithCare_median: quantile(endWealthWithCare, 0.5),
-        endwealthNoCare_median: quantile(endWealthNoCareProxyArr, 0.5),
+        shortfallRate_noCareProxy: (anzahl - pflegeTriggeredCount) > 0 ? (shortfallNoCareProxyCount / (anzahl - pflegeTriggeredCount)) * 100 : 0,
+        endwealthWithCare_median: medianWithCare,
+        endwealthNoCare_median: medianNoCare,
         depotCosts_median: careDepotCosts.length ? quantile(careDepotCosts, 0.5) : 0,
         // Dual Care KPIs (only for triggered cases)
         p1CareYears: p1CareYearsTriggered.length ? quantile(p1CareYearsTriggered, 0.5) : 0,
@@ -545,7 +575,9 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
         p2EntryRatePct: (p2TriggeredCount / anzahl) * 100,
         p2EntryAgeMedian: entryAgesP2.length ? quantile(entryAgesP2, 0.5) : 0,
         maxAnnualCareSpend: maxAnnualCareSpendTriggered.length ? quantile(maxAnnualCareSpendTriggered, 0.5) : 0,
-        shortfallDelta_vs_noCare: quantile(endWealthNoCareProxyArr, 0.5) - quantile(endWealthWithCare, 0.5)
+        shortfallDelta_vs_noCare: (endWealthNoCareList.length && endWealthWithCareList.length)
+            ? (medianWithCare - medianNoCare)
+            : 0
     };
 
     const stressPresetKey = inputs.stressPreset || 'NONE';

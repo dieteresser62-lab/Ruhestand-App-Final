@@ -97,8 +97,8 @@ export function runBacktest() {
             baseFloor: inputs.startFloorBedarf,
             baseFlex: inputs.startFlexBedarf,
             lastState: null,
-            currentAnnualPension: 0,
-            currentAnnualPension2: 0,
+            currentAnnualPension: (inputs.renteMonatlich || 0) * 12,
+            currentAnnualPension2: (inputs.partner?.brutto || 0),
             marketDataHist: {
                 endeVJ: getHistVal(startJahr - 1, 'msci_eur'),
                 endeVJ_1: getHistVal(startJahr - 2, 'msci_eur'),

@@ -74,9 +74,10 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 
 * `simulator-main.js` – zentrale Steuerung, Parameter-Sweep-Logik, Self-Tests.
 * `simulator-monte-carlo.js` – UI-Koordinator für Monte-Carlo (liest Inputs, setzt Progress, orchestriert Runner/Analyzer).
-* `monte-carlo-runner.js` – DOM-freie Simulation (Jahresschleife, Pflege-KPIs) auf Basis von `simulator-engine.js`.
+* `monte-carlo-runner.js` – DOM-freie Simulation (Jahresschleife, Pflege-KPIs) auf Basis von `simulator-engine.js`. Unterstützt nun auch eine **Ansparphase** mit dynamischem Übergang in die Rentenphase (via `effectiveTransitionYear`).
 * `monte-carlo-ui.js` – UI-Fassade für Progressbar/Parameter-Lesen; erlaubt Callbacks ohne DOM-Leaks.
 * `scenario-analyzer.js` – wählt während der Simulation 30 Szenarien (Worst, Perzentile, Pflege, Zufall) aus.
+
 * `simulator-engine.js` – Jahr-für-Jahr-Logik (Sampling, Pflegekosten/-sterblichkeit, Run-States).
 * `simulator-portfolio.js` – Initialisierung, Portfolio-Berechnungen, Stress-Kontexte.
 * `simulator-results.js` – Aggregiert MC-Ausgaben und delegiert an `results-metrics.js` / `results-renderers.js` / `results-formatting.js`.
@@ -107,7 +108,7 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 ### Ergebnisdarstellung
 
 * KPIs (P10/P50/P90) und Worst-Run-Logs.
-* Heatmap mit optionalen Warn-Badges.
+* **Heatmap (Renten-Fokus):** Die Heatmap visualisiert die Verteilung der Entnahmeraten. Um bei aktivierter Ansparphase (0% Entnahme) keine leeren Spalten zu zeigen, beginnt die Aufzeichnung der Heatmap erst mit dem ersten Jahr der Rentenphase.
 * Pflegefall-Szenarien mit zusätzlichen Kostenverläufen.
 
 ### Rentensteuerung & Witwenlogik
@@ -117,23 +118,6 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
   Konfigurationen parallel gelesen und als strukturierte Inputs zurückgegeben.【F:simulator-portfolio.js†L57-L174】
 * `computeRentAdjRate()` und `computePensionNext()` sorgen dafür, dass beide Rentenstränge dieselbe Anpassungslogik (fix, Lohn,
   CPI) nutzen und dass Erstjahre sauber von Folgejahren getrennt bleiben.【F:simulator-portfolio.js†L285-L332】
-* Das UI schaltet Prozentfelder je nach Modus frei/aus, blendet Partner-Sektionen dynamisch ein und speichert Präferenzen im
-  `localStorage`. Dadurch wird verhindert, dass Sweep-Cases heimlich Person-2-Werte überschreiben.【F:simulator-main.js†L1563-L1614】
-* Sweep-Schutz: Whitelist/Blocklist und der Rente-2-Invarianz-Wächter markieren Verstöße direkt in der Heatmap, inklusive
-  Self-Test für reproduzierbare Diagnosen.【F:simulator-main.js†L3-L64】
-
-### Pflege-Pipeline
-
-* Alters- und gradabhängige Eintrittswahrscheinlichkeiten basieren auf dem BARMER-Pflegereport und werden in `simulator-data.js` gepflegt.
-  Die Tabelle liefert grade-spezifische Labels sowie Drift-Annahmen.【F:simulator-data.js】
-* Das UI bietet für jeden Pflegegrad Zusatzkosten-, Flex-Cut- und Mortalitätsfelder, Staffel-Presets (ambulant/stationär), regionalen
-  Zuschlag, Info-Badges zum Maximal-Floor sowie Event-Listener, die Änderungen live in Tooltips und Badges spiegeln.【F:simulator-main.js†L89-L1506】
-* KPI-Dashboard: Zusätzlich zu klassischen Monte-Carlo-Kennzahlen rendert der Simulator Eintrittsquoten, Eintrittsalter, Pflegejahre
-  pro Person sowie Kosten-/Shortfall-Deltas.【F:simulator-results.js†L132-L267】
-
-### Szenario-Log-Analyse
-
-* Nach jeder Monte-Carlo-Simulation werden 30 Szenarien für detaillierte Analyse gespeichert:
   - 15 charakteristische Szenarien: Vermögens-Perzentile (Worst, P5-P95, Best), Pflege-Extremfälle (längste Dauer, höchste Kosten, frühester Eintritt), Risiko-Szenarien (längste Lebensdauer, maximale Kürzung)
   - 15 zufällige Szenarien: gleichmäßig über alle Runs verteilt für typisches Verhalten
 * Dropdown-Auswahl mit Endvermögen und Pflege-Status pro Szenario
