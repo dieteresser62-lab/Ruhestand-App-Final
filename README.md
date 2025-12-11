@@ -113,11 +113,18 @@ Ruhestand-App-Final/
 
 ### Option 1: Standalone-Anwendung (empfohlen)
 
-**RuhestandSuite.exe** – Standalone-Desktop-Anwendung basierend auf Tauri:
-* Keine Installation oder Entwicklungsserver erforderlich
-* Direkt ausführbar unter Windows
+**RuhestandSuite.exe** – portable Standalone-Desktop-Anwendung basierend auf Tauri:
+* Keine Installation, kein Installer und keine Administratorrechte erforderlich
+* Direkt ausführbar unter Windows (getestet mit Windows 10/11)
 * Beinhaltet beide Apps (Balance & Simulator) in einer nativen Desktop-Umgebung
-* Download aus dem GitHub-Repository
+* Läuft komplett offline; Internetzugriff wird nur für optionale Live-Daten (Inflation/Kurse) benötigt
+* Download direkt aus dem Repository-Root (`RuhestandSuite.exe`) oder dem GitHub-Release
+
+**So nutzen Sie die portable EXE:**
+1. `RuhestandSuite.exe` aus dem Repository oder Release-Download in einen beliebigen Ordner kopieren.
+2. Per Doppelklick starten; der integrierte Webserver und die Oberfläche öffnen sich automatisch.
+3. Optionale Live-Datenzugriffe funktionieren, wenn eine Internetverbindung besteht; andernfalls läuft die App vollständig lokal weiter.
+4. Eigene Szenarien und Snapshots werden im Benutzerprofil gespeichert; bei Bedarf kann die EXE samt Konfigurationsordner als Backup kopiert werden.
 
 ### Option 2: Browser-basierte Nutzung
 
