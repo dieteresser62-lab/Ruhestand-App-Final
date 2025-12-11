@@ -681,20 +681,42 @@
             <div class="info-card" id="glossar" style="margin-top: 2rem;">
                 <h2>Glossar</h2>
                 <dl class="term-list">
-                    <dt>Erfolgswahrscheinlichkeit</dt>
-                    <dd>Prozentanteil der simulierten Szenarien, in denen das Portfolio bis ans Laufzeitende reicht.</dd>
+                    <dt><a class="toc-link" data-tab-target="manual" href="#simulator-ergebnisse">Erfolgswahrscheinlichkeit</a></dt>
+                    <dd>Prozent der <strong>simulierten Lebensläufe</strong>, in denen Ihr Portfolio bis zum Ende der geplanten
+                        Laufzeit finanzierbar bleibt. Beispiel: <em>93% bei 1.000 Läufen</em> bedeutet, dass 930 Pfade nicht
+                        vorzeitig scheitern. In der Simulator-Ausgabe sehen Sie den Wert oberhalb der
+                        Ergebnis-Grafik.</dd>
 
-                    <dt>Runway</dt>
-                    <dd>Liquiditätspuffer in sicheren Anlagen (Cash/Geldmarkt), aus dem Ausgaben in schwachen
-                        Marktphasen bestritten werden.</dd>
+                    <dt><a class="toc-link" data-tab-target="manual" href="#balance-diagnose">Runway</a></dt>
+                    <dd>Monatspuffer aus Cash/Geldmarkt, der Entnahmen in schwachen Märkten abfedert. Beispiel:
+                        <em>12 Monate Runway</em> = 12 × aktueller Monatsbedarf liegen auf Tagesgeld. Im Diagnose-Panel
+                        (KPIs oben rechts) zeigt die Runway-Anzeige in Monaten, ob der Puffer reicht.</dd>
 
-                    <dt>Skim &amp; Fill</dt>
-                    <dd>Strategie, bei der in guten Börsenphasen Gewinne „abgeschöpft“ und die Liquidität aufgefüllt
-                        werden, während in schwachen Phasen auf Verkäufe verzichtet wird.</dd>
+                    <dt><a class="toc-link" data-tab-target="manual" href="#balance-handlungsschritte">Skim &amp; Fill</a></dt>
+                    <dd>Kapitalfluss-Logik: Gewinne werden in starken Phasen „abgeschöpft“ (Skim) und füllen den
+                        Runway (Fill), während in Schwächephasen keine Verkäufe erfolgen. Beispiel-Sequenz:
+                        <div style="background: var(--card-background); border: 1px solid #e0e6ed; border-radius: 8px; padding: 10px; margin-top: 8px; color: var(--text-light);">
+                            <pre style="margin: 0; white-space: pre-line;">Aktien (über Ziel) → Verkauf 8.000 €
+Geldmarkt +8.000 € → Runway steigt auf 12 Monate
+Ausgabe-Konto erhält Monatsbedarf aus Geldmarkt</pre>
+                        </div>
+                        Die Handlungsschritte im Panel verlinken jede Bewegung zwischen Depot, Geldmarkt und Konto.</dd>
 
-                    <dt>Parameter Sweep</dt>
-                    <dd>Heatmap, die zeigt, wie unterschiedliche Kombinationen aus Sparrate und Rentenbeginn die
-                        Erfolgswahrscheinlichkeit beeinflussen.</dd>
+                    <dt><a class="toc-link" data-tab-target="manual" href="#simulator-ergebnisse">Parameter Sweep</a></dt>
+                    <dd>Heatmap, die zeigt, wie Kombinationen aus Sparrate und Rentenbeginn die
+                        Erfolgswahrscheinlichkeit beeinflussen. Beispiel: Dunkelgrüne Felder markieren hohe
+                        Erfolgswerte bei <em>+200 € Sparrate</em> und <em>Rente ab 66</em>. Öffnen Sie den Sweep unter den
+                        Simulator-Ergebnissen.</dd>
+
+                    <dt><a class="toc-link" data-tab-target="manual" href="#balance-jahresupdate">Floor/Flex-Bedarf</a></dt>
+                    <dd>Fixer Grundbedarf (<strong>Floor</strong>) plus variable Ausgaben (<strong>Flex</strong>). Beide Werte werden im
+                        Jahres-Update indexiert und steuern Runway- und Kapitalfluss-Berechnungen. Beispiel: 1.500 €
+                        Floor + 700 € Flex = 2.200 € Monatsbedarf → 12 Monate Runway = 26.400 € Cash.</dd>
+
+                    <dt><a class="toc-link" data-tab-target="manual" href="#balance-diagnose">Rebalancing-Distanz</a></dt>
+                    <dd>Abstand zwischen aktueller und Ziel-Aktienquote, ab dem das System Umschichten vorschlägt.
+                        Im Entscheidungsbaum wird der Knoten „Aktienquote über Ziel?“ geprüft. Beispiel: Ziel 60%, Ist
+                        66% → Distanz 6 Prozentpunkte, Rebalancing ausgelöst sofern Runway erfüllt ist.</dd>
                 </dl>
             </div>
         </div>
