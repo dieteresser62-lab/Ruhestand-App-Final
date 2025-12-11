@@ -45,7 +45,8 @@
         .hero {
             width: 100%;
             max-width: 1200px;
-            padding: 60px 20px 40px;
+            padding: 20px 20px 10px;
+            /* Reduced padding */
             text-align: center;
             display: flex;
             flex-direction: column;
@@ -55,8 +56,9 @@
 
         .hero-image-container {
             width: 100%;
-            max-width: 800px;
-            margin-bottom: 40px;
+            max-width: 300px;
+            /* Much smaller image */
+            margin-bottom: 20px;
             border-radius: var(--border-radius);
             overflow: hidden;
             box-shadow: var(--card-shadow);
@@ -75,37 +77,45 @@
         }
 
         h1 {
-            font-size: 3.5rem;
+            font-size: 2.5rem;
+            /* Smaller title */
             font-weight: 700;
             color: var(--primary-color);
-            margin-bottom: 16px;
+            margin-bottom: 10px;
             letter-spacing: -0.02em;
             background: linear-gradient(135deg, var(--primary-color) 0%, #34495e 100%);
+            background-clip: text;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
         .subtitle {
-            font-size: 1.25rem;
+            font-size: 1.1rem;
             color: var(--text-light);
             max-width: 600px;
-            line-height: 1.6;
-            margin-bottom: 60px;
+            line-height: 1.5;
+            margin-bottom: 30px;
+            /* Reduced margin */
         }
 
         .apps-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-            gap: 40px;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            /* Slightly narrower col min width */
+            gap: 25px;
+            /* Reduced gap */
             width: 100%;
-            max-width: 1000px;
-            padding: 0 20px 80px;
+            max-width: 900px;
+            /* Tighter grid */
+            padding: 0 20px 40px;
+            /* Reduced bottom padding */
         }
 
         .app-card {
             background: var(--card-bg);
             border-radius: var(--border-radius);
-            padding: 40px;
+            padding: 25px;
+            /* Compact padding */
             text-decoration: none;
             color: inherit;
             transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
@@ -142,16 +152,17 @@
         }
 
         .app-icon-wrapper {
-            width: 80px;
-            height: 80px;
+            width: 60px;
+            /* Smaller icon */
+            height: 60px;
             background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
-            border-radius: 20px;
+            border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-bottom: 24px;
+            margin-bottom: 16px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-            font-size: 2.5rem;
+            font-size: 2rem;
             transition: transform 0.3s ease;
         }
 
@@ -167,16 +178,16 @@
         }
 
         .app-description {
-            font-size: 1rem;
+            font-size: 0.95rem;
             color: var(--text-light);
-            line-height: 1.6;
-            margin-bottom: 30px;
+            line-height: 1.5;
+            margin-bottom: 20px;
             flex-grow: 1;
         }
 
         .features {
             width: 100%;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
             text-align: left;
         }
 
@@ -309,6 +320,30 @@
                 </div>
             </div>
             <button class="cta-button">Simulator starten</button>
+        </a>
+
+        <!-- Manual Card -->
+        <a href="Handbuch.html" class="app-card">
+            <div class="app-icon-wrapper">📖</div>
+            <h2 class="app-title">Benutzerhandbuch</h2>
+            <p class="app-description">
+                Lernen Sie alle Funktionen kennen mit unseren Schnellstart-Guides und detaillierten Erklärungen.
+            </p>
+            <div class="features">
+                <div class="feature-item">
+                    <span class="feature-icon">✓</span>
+                    <span>Schritt-für-Schritt Anleitungen</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">✓</span>
+                    <span>Erklärung aller Parameter</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">✓</span>
+                    <span>Häufig gestellte Fragen</span>
+                </div>
+            </div>
+            <button class="cta-button">Handbuch öffnen</button>
         </a>
     </div>
 

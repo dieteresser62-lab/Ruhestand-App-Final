@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Benutzerhandbuch | Ruhestand-Apps Suite</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #1a2530;
+            --secondary-color: #c5a059;
+            --accent-color: #3498db;
+            --background-color: #f8f9fa;
+            --text-color: #2c3e50;
+            --text-light: #7f8c8d;
+            --card-bg: #ffffff;
+            --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 10px 15px rgba(0, 0, 0, 0.1);
+            --border-radius: 16px;
+            --success-color: #2ecc71;
+            --warning-color: #f1c40f;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        /* Navigation Bar */
+        .navbar {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-brand {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: white;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-brand span {
+            color: var(--secondary-color);
+        }
+
+        .back-link {
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .back-link:hover {
+            color: white;
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 1000px;
+            margin: 2rem auto;
+            padding: 0 20px;
+        }
+
+        /* Header Section */
+        .page-header {
+            text-align: center;
+            margin-bottom: 3rem;
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: var(--text-light);
+            font-size: 1.1rem;
+        }
+
+        /* Tabs */
+        .tabs-container {
+            background: white;
+            padding: 10px;
+            border-radius: 50px;
+            display: inline-flex;
+            box-shadow: var(--card-shadow);
+            margin-bottom: 2rem;
+            position: relative;
+            left: 50%;
+            transform: translateX(-50%);
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .tab-btn {
+            padding: 12px 30px;
+            border-radius: 40px;
+            border: none;
+            background: transparent;
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--text-light);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tab-btn.active {
+            background: var(--primary-color);
+            color: white;
+            box-shadow: 0 4px 10px rgba(26, 37, 48, 0.2);
+        }
+
+        .tab-btn:hover:not(.active) {
+            color: var(--primary-color);
+            background: rgba(0, 0, 0, 0.03);
+        }
+
+        /* Content Sections */
+        .content-section {
+            display: none;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        .content-section.active {
+            display: block;
+        }
+
+        /* Cards */
+        .info-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 2.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--card-shadow);
+            border: 1px solid rgba(0, 0, 0, 0.03);
+        }
+
+        .info-card h2 {
+            font-size: 1.5rem;
+            color: var(--primary-color);
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--secondary-color);
+            display: inline-block;
+        }
+
+        .card-intro {
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+        }
+
+        /* Steps List (Schnellstart) */
+        .steps-list {
+            list-style: none;
+            counter-reset: step-counter;
+        }
+
+        .step-item {
+            margin-bottom: 2rem;
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .step-number {
+            counter-increment: step-counter;
+            background: var(--primary-color);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            flex-shrink: 0;
+            box-shadow: 0 4px 10px rgba(26, 37, 48, 0.2);
+        }
+
+        .step-content h3 {
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+            color: var(--primary-color);
+        }
+
+        .step-content p {
+            color: var(--text-light);
+        }
+
+        /* Detailed Manual Styling */
+        .manual-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .detail-block {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 12px;
+            border-left: 4px solid var(--accent-color);
+        }
+
+        .detail-block h3 {
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .term-list dt {
+            font-weight: 600;
+            margin-top: 1rem;
+            color: var(--primary-color);
+        }
+
+        .term-list dd {
+            margin-left: 0;
+            margin-top: 0.25rem;
+            color: var(--text-light);
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .tip-box {
+            background-color: rgba(197, 160, 89, 0.1);
+            border: 1px solid rgba(197, 160, 89, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1.5rem;
+            display: flex;
+            gap: 1rem;
+            align-items: flex-start;
+        }
+
+        .tip-icon {
+            font-size: 1.2rem;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .page-header h1 {
+                font-size: 2rem;
+            }
+
+            .tabs-container {
+                width: 100%;
+                justify-content: center;
+                border-radius: 12px;
+            }
+
+            .tab-btn {
+                flex: 1;
+                justify-content: center;
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar">
+        <a href="index.html" class="nav-brand">
+            🏛️ <span>Ruhestand-Apps</span>
+        </a>
+        <a href="index.html" class="back-link">
+            ← Zurück zur Übersicht
+        </a>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h1>Benutzerhandbuch</h1>
+            <p class="subtitle">Anleitungen und Hilfestellungen für Ihre Finanzplanung</p>
+        </div>
+
+        <div class="tabs-container">
+            <button class="tab-btn active" onclick="switchTab('quickstart')">
+                🚀 Schnellstart
+            </button>
+            <button class="tab-btn" onclick="switchTab('manual')">
+                📖 Detailliertes Handbuch
+            </button>
+        </div>
+
+        <!-- ============================================= -->
+        <!-- TAB 1: SCHNELLSTART                           -->
+        <!-- ============================================= -->
+        <div id="quickstart" class="content-section active">
+
+            <!-- Simulator Quick Start -->
+            <div class="info-card">
+                <h2>📊 Simulator Schnellstart</h2>
+                <p class="card-intro">In 3 einfachen Schritten zu Ihrer Ruhestandsprognose.</p>
+
+                <ol class="steps-list">
+                    <li class="step-item">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h3>Daten eingeben</h3>
+                            <p>Geben Sie Ihr aktuelles Vermögen, Ihre monatliche Sparrate und das gewünschte
+                                Renteneintrittsalter ein. Ergänzen Sie Ihre erwarteten monatlichen Ausgaben im
+                                Ruhestand.</p>
+                        </div>
+                    </li>
+                    <li class="step-item">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h3>Parameter anpassen (Optional)</h3>
+                            <p>Wählen Sie Ihre Asset-Allokation (Aktienquote) und bestimmen Sie, wie viel Rente Sie
+                                bereits sicher haben (z.B. gesetzliche Rente). Standardwerte sind bereits für Sie
+                                vorausgefüllt.</p>
+                        </div>
+                    </li>
+                    <li class="step-item">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h3>Simulieren und Analysieren</h3>
+                            <p>Klicken Sie auf "Simulation starten". Das System berechnet tausende mögliche
+                                Marktszenarien. Achten Sie auf die <strong>Erfolgswahrscheinlichkeit</strong> – diese
+                                sollte idealerweise über 90-95% liegen.</p>
+                        </div>
+                    </li>
+                </ol>
+                <div class="tip-box">
+                    <span class="tip-icon">💡</span>
+                    <div>
+                        <strong>Tipp:</strong> Nutzen Sie den Parameter-Sweep, um schnell zu sehen, wie sich eine höhere
+                        Sparrate oder ein späterer Renteneintritt auf Ihre Erfolgchancen auswirkt.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Balance App Quick Start -->
+            <div class="info-card">
+                <h2>⚖️ Balance App Schnellstart</h2>
+                <p class="card-intro">Das jährliche Ritual für Ihr Portfolio (Prime Harvesting).</p>
+
+                <ol class="steps-list">
+                    <li class="step-item">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h3>Jahres-Update starten</h3>
+                            <p>Klicken Sie oben auf den Button <strong>"🌐 Jahres-Update"</strong>. Die App ruft
+                                automatisch die aktuelle Inflation (EZB) und ETF-Kurse ab, aktualisiert Ihr Alter und
+                                rückt die Marktdaten (Shiller-CAPE Basis) um ein Jahr weiter.</p>
+                        </div>
+                    </li>
+                    <li class="step-item">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h3>Aktuelle Werte prüfen</h3>
+                            <p>Kontrollieren Sie die aktualisierten Felder. Tragen Sie den <strong>heutigen
+                                    Marktwert</strong> Ihrer Depots und Cash-Konten ein. Die neuen Bedarfswerte
+                                (Floor/Flex) wurden bereits automatisch um die Inflation erhöht.</p>
+                        </div>
+                    </li>
+                    <li class="step-item">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h3>Diagnose & Handlung</h3>
+                            <p>Schauen Sie auf das Panel "Ergebnisse & Handlungsschritte". Folgen Sie genau der
+                                Anweisung (z.B. "Kein Handlungsbedarf" oder "Rebalancing durchführen").</p>
+                        </div>
+                    </li>
+                    <li class="step-item">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <h3>Kapitalfluss</h3>
+                            <p>Führen Sie die angezeigten Transaktionen bei Ihrer Bank durch (z.B. Verkauf von XX € um
+                                Cash aufzufüllen).</p>
+                        </div>
+                    </li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- ============================================= -->
+        <!-- TAB 2: DETAILLIERTES HANDBUCH                 -->
+        <!-- ============================================= -->
+        <div id="manual" class="content-section">
+
+            <div class="info-card">
+                <h2>Einleitung & Philosophie</h2>
+                <p>Diese Suite basiert auf der modernen Portfoliotheorie und historischen Marktdaten (S&P 500 seit
+                    1871). Ziel ist es, nicht mit einer "durchschnittlichen" Rendite zu rechnen, sondern das Risiko von
+                    extremen Marktphasen (Sequence of Returns Risk) transparent zu machen.</p>
+            </div>
+
+            <!-- Balance Deep Dive -->
+            <div class="info-card" style="border-left: 5px solid var(--secondary-color);">
+                <h2>⚖️ Balance App: Konzepte & Details</h2>
+                <p class="card-intro">Die Balance App ist Ihr Cockpit für die Entnahmephase. Sie setzt die Strategie des
+                    "Prime Harvesting" und "Cash Buffer" um.</p>
+
+                <div class="manual-grid" style="margin-top: 2rem;">
+                    <div class="detail-block">
+                        <h3>🌊 Runway & Liquidität</h3>
+                        <p>Die "Runway" ist Ihre Lebensversicherung gegen Börsencrashs.</p>
+                        <dl class="term-list">
+                            <dt>Ziel-Liquidität (Target)</dt>
+                            <dd>Anzustrebender Puffer in sicheren Anlagen (Cash + Geldmarkt). Standard: 36 Monate (3
+                                Jahre) Ausgaben.</dd>
+                            <dt>Minimum Runway</dt>
+                            <dd>Die absolute Untergrenze (z.B. 24 Monate). Fällt die Liquidität darunter (weil der
+                                Aktienmarkt lange schlecht lief), wird auch im Verlust verkauft ("Not-Auffüllung"), um
+                                zahlungsfähig zu bleiben.</dd>
+                        </dl>
+                    </div>
+
+                    <div class="detail-block">
+                        <h3>🔄 Skim & Fill (Abschöpfen & Auffüllen)</h3>
+                        <p>Die intelligente Entnahmestrategie:</p>
+                        <dl class="term-list">
+                            <dt>Gute Börsenphase</dt>
+                            <dd>Ist die Aktienquote zu hoch (> Ziel + Toleranz), wird "abgeschöpft" (Skimming). Aktien
+                                werden verkauft, Gewinne mitgenommen und die Liquidität aufgefüllt.</dd>
+                            <dt>Schlechte Börsenphase</dt>
+                            <dd>Ist die Aktienquote niedrig, werden <strong>keine</strong> Aktien verkauft. Sie leben
+                                von Ihrer Liquidität (Runway). Aktien werden nur im absoluten Notfall (siehe Minimum
+                                Runway) angefasst.</dd>
+                        </dl>
+                    </div>
+
+                    <div class="detail-block">
+                        <h3>🌐 Jahres-Update Funktion</h3>
+                        <p>Ein Klick erledigt komplexe Verwaltungsaufgaben:</p>
+                        <ul
+                            style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Inflation:</strong> Ruft offizielle EZB-Daten ab.</li>
+                            <li><strong>Bedarf:</strong> Passt Floor- und Flex-Ausgaben automatisch an die Inflation an.
+                            </li>
+                            <li><strong>Alter:</strong> Erhöht Ihr Alter um 1 Jahr.</li>
+                            <li><strong>Markt-Kontext:</strong> Rückt historische Vergleichsdaten (CAPE) weiter.</li>
+                        </ul>
+                    </div>
+
+                    <div class="detail-block">
+                        <h3>🤖 KI-Diagnose</h3>
+                        <p>Klicken Sie auf den "Diagnose"-Button im Ergebnis-Panel.</p>
+                        <p style="margin-top: 10px; color: var(--text-light);">
+                            Sie sehen dort genau, <em>warum</em> die App eine Entscheidung getroffen hat. Ein
+                            Entscheidungsbaum zeigt Ihnen Schritt für Schritt die Logik (z.B. "Aktienquote > 65%? JA ->
+                            Skimming aktiv").
+                        </p>
+                    </div>
+
+                    <div class="detail-block">
+                        <h3>🥇 Gold-Strategie (Optional)</h3>
+                        <p>Ein separater Baustein zur Diversifikation.</p>
+                        <dl class="term-list">
+                            <dt>Rebalancing Band</dt>
+                            <dd>Gold wird nur selten gehandelt (breites Band, z.B. +/- 25%), um Transaktionskosten zu
+                                sparen.</dd>
+                            <dt>Steuerfrei</dt>
+                            <dd>Die Simulation kann berücksichtigen, dass physisches Gold nach 1 Jahr Haltedauer
+                                steuerfrei ist.</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-card">
+                <h2>📊 Allgemeine Konzepte</h2>
+                <div class="manual-grid">
+                    <!-- Ansparphase -->
+                    <div class="detail-block">
+                        <h3>📈 Ansparphase</h3>
+                        <p>Dieser Bereich betrifft die Zeit bis zu Ihrem Ruhestand.</p>
+                        <dl class="term-list">
+                            <dt>Sparrate / Dynamik</dt>
+                            <dd>Der Betrag, den Sie monatlich zusätzlich investieren, sowie dessen jährliche Steigerung.
+                            </dd>
+                        </dl>
+                    </div>
+
+                    <!-- Monte Carlo -->
+                    <div class="detail-block">
+                        <h3>🎲 Monte-Carlo Simulation</h3>
+                        <p>Wir simulieren 500+ verschiedene 40-Jahres-Verläufe basierend auf echten historischen Daten
+                            (Shiller Data).</p>
+                        <dl class="term-list">
+                            <dt>Erfolgsquote</dt>
+                            <dd>Der Prozentsatz der Szenarien, in denen Ihr Geld bis zum Ende gereicht hat ( Ziel >
+                                95%).</dd>
+                        </dl>
+                    </div>
+
+                    <!-- Parameter Sweep -->
+                    <div class="detail-block">
+                        <h3>🔍 Parameter Sweep</h3>
+                        <p>Ein mächtiges Werkzeug für "Was-wäre-wenn" Analysen.</p>
+                        <p style="margin-top: 10px; font-size: 0.95rem; color: var(--text-light);">
+                            Zeigt als Heatmap (Grün/Rot), welche Kombinationen aus Sparrate und Renteneintritt sicher
+                            sind.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-card" style="margin-top: 2rem;">
+                <h2>Häufige Fragen (FAQ)</h2>
+                <dl class="term-list">
+                    <dt>Warum reichen durchschnittliche 7% Rendite nicht?</dt>
+                    <dd>Weil Verluste am Anfang der Entnahmephase ("Sequence of Return Risk") das Depot so stark
+                        dezimieren können, dass es sich nicht mehr erholt, selbst wenn die Renditen später gut sind.
+                    </dd>
+
+                    <dt>Wie oft sollte ich Rebalancing machen?</dt>
+                    <dd>Einmal jährlich (z.B. zum Jahreswechsel) hat sich als pragmatisch und effektiv erwiesen. Zu
+                        häufiges Handeln verursacht unnötige Kosten.</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(tabId) {
+            // Hide all sections
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.classList.remove('active');
+            });
+
+            // Deactivate all buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Activate selected section and button
+            document.getElementById(tabId).classList.add('active');
+
+            // Find button that triggers this tabId
+            const buttons = document.querySelectorAll('.tab-btn');
+            if (tabId === 'quickstart') buttons[0].classList.add('active');
+            if (tabId === 'manual') buttons[1].classList.add('active');
+        }
+    </script>
+</body>
+
+</html>
