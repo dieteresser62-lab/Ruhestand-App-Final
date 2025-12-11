@@ -15,23 +15,23 @@
 export function initRente2ConfigWithLocalStorage() {
     const defaults = {
         // Person 1
-        p1StartAlter: 63,
+        p1StartAlter: "",
         p1Geschlecht: "m",
-        p1SparerPB: 1000,
+        p1SparerPB: "",
         p1KirchensteuerPct: 9,
-        p1Monatsrente: 500,
-        p1StartInJahren: 5,
+        p1Monatsrente: "",
+        p1StartInJahren: "",
         rentAdjMode: "wage",
-        rentAdjPct: 2.0,
+        rentAdjPct: "",
         // Person 2
         aktiv: false,
         r2Geschlecht: "w",
-        r2StartAlter: 60,
-        r2StartInJahren: 0,
-        r2Monatsrente: 1500,
-        r2SparerPB: 0,
+        r2StartAlter: "",
+        r2StartInJahren: "",
+        r2Monatsrente: "",
+        r2SparerPB: "",
         r2KirchensteuerPct: 0,
-        r2Steuerquote: 0
+        r2Steuerquote: ""
     };
 
     const storageKeys = {

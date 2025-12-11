@@ -103,9 +103,15 @@
         <div class="panel">
             <div class="section-title">
                 <h1>Ruhestand-Simulator</h1>
-                <a href="Handbuch.html" target="_blank"
-                    style="text-decoration: none; font-size: 1rem; color: var(--primary-color); display: flex; align-items: center; gap: 5px; background: #f0f0f0; padding: 5px 10px; border-radius: 8px;">📖
-                    Hilfe</a>
+                <div style="display: flex; gap: 10px;">
+                    <a href="index.html" class="nav-button"
+                        style="text-decoration: none; font-size: 1rem; color: var(--primary-color); display: flex; align-items: center; gap: 5px; background: #e0f2fe; padding: 5px 10px; border-radius: 8px; border: 1px solid #bae6fd;">
+                        🏠 Startseite
+                    </a>
+                    <a href="Handbuch.html" target="_blank"
+                        style="text-decoration: none; font-size: 1rem; color: var(--primary-color); display: flex; align-items: center; gap: 5px; background: #f0f0f0; padding: 5px 10px; border-radius: 8px;">📖
+                        Hilfe</a>
+                </div>
             </div>
 
             <!-- Mode Toggle -->
@@ -125,25 +131,25 @@
                         <div class="fieldset-content">
                             <div class="form-grid">
                                 <div class="form-group"><label for="simStartVermoegen">Gesamtvermögen (€)</label><input
-                                        type="number" id="simStartVermoegen" value="2700000"
+                                        type="number" id="simStartVermoegen" placeholder="0"
                                         title="Ihr gesamtes Vermögen zum Simulationsstart (inkl. Liquidität und alle Depots)">
                                 </div>
                                 <div class="form-group"><label for="depotwertAlt">Depotwert Alt (€)</label><input
-                                        type="number" id="depotwertAlt" value="1350000"
+                                        type="number" id="depotwertAlt" placeholder="0"
                                         title="Aktueller Wert Ihres 'alten' Depots (typischerweise vor 2018 angelegt, höhere Teilfreistellung)">
                                 </div>
                                 <div class="form-group"><label for="zielLiquiditaet">Ziel-Liquidität (€)</label><input
-                                        type="number" id="zielLiquiditaet" value="200000"
+                                        type="number" id="zielLiquiditaet" placeholder="0"
                                         title="Gewünschte Liquiditätsreserve in Cash/Geldmarkt-ETF"></div>
                             </div>
                             <div class="form-grid"
                                 style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
                                 <div class="form-group"><label for="startFloorBedarf">Floor-Bedarf p.a.
-                                        (€)</label><input type="number" id="startFloorBedarf" value="24000"
+                                        (€)</label><input type="number" id="startFloorBedarf" placeholder="0"
                                         title="Essenzielle jährliche Ausgaben, die Sie auf jeden Fall benötigen (Miete, Essen, Versicherungen etc.)">
                                 </div>
                                 <div class="form-group"><label for="startFlexBedarf">Flex-Bedarf p.a. (€)</label><input
-                                        type="number" id="startFlexBedarf" value="28000"
+                                        type="number" id="startFlexBedarf" placeholder="0"
                                         title="Wünschenswerte jährliche Ausgaben, auf die Sie im Notfall verzichten können (Urlaub, Hobbys, Luxus)">
                                 </div>
                                 <div class="form-group"><label for="marketCapeRatio">CAPE (Shiller)</label><input
@@ -151,7 +157,7 @@
                                         title="Aktuelles Shiller-CAPE (Cyclically Adjusted Price-to-Earnings Ratio) - Bewertungskennzahl für den Aktienmarkt">
                                 </div>
                                 <div class="form-group"><label for="einstandAlt">Einstand Alt (€)</label><input
-                                        type="number" id="einstandAlt" value="756000"
+                                        type="number" id="einstandAlt" placeholder="0"
                                         title="Ursprünglicher Einstandswert (Kaufpreis) des alten Depots - wichtig für Steuerberechnung">
                                 </div>
                                 <div class="form-group"><label>Einstand Neu (€)</label><input type="number"
@@ -240,26 +246,30 @@
                                 class="progress-indicator"></span></legend>
                         <div class="fieldset-content">
                             <div class="form-grid-four-col" style="align-items: end;">
-                                <div class="form-group"><label for="p1StartAlter">Startalter</label><input type="number"
-                                        id="p1StartAlter" value="63"></div>
-                                <div class="form-group"><label for="p1Geschlecht">Geschlecht</label><select
+                                <div class="form-group"> <label for="p1StartAlter">Aktuelles Alter</label> <input
+                                        type="number" id="p1StartAlter" min="50" max="110" placeholder="0"> </div>
+                                <div class="form-group"> <label for="p1Geschlecht">Geschlecht</label> <select
                                         id="p1Geschlecht">
                                         <option value="m" selected>Männlich</option>
                                         <option value="w">Weiblich</option>
                                         <option value="d">Divers</option>
-                                    </select></div>
-                                <div class="form-group"><label for="p1SparerPauschbetrag">Sparer-Pauschbetrag
-                                        (€)</label><input type="number" id="p1SparerPauschbetrag" value="1000"></div>
-                                <div class="form-group"><label for="p1KirchensteuerPct">Kirchensteuer</label><select
-                                        id="p1KirchensteuerPct">
+                                    </select> </div>
+                                <div class="form-group"> <label for="p1SparerPauschbetrag">Sparer-Pauschbetrag
+                                        (€)</label> <input type="number" id="p1SparerPauschbetrag" min="0" step="50"
+                                        placeholder="0"> </div>
+                                <div class="form-group"> <label for="p1KirchensteuerPct">Kirchensteuer</label>
+                                    <select id="p1KirchensteuerPct">
                                         <option value="0">0 %</option>
                                         <option value="8">8 %</option>
                                         <option value="9" selected>9 %</option>
-                                    </select></div>
-                                <div class="form-group"><label for="p1Monatsrente">Monatliche Rente (€)</label><input
-                                        type="number" id="p1Monatsrente" value="500"></div>
-                                <div class="form-group"><label for="p1StartInJahren">Start in … Jahren</label><input
-                                        type="number" id="p1StartInJahren" value="5"></div>
+                                    </select>
+                                </div>
+                                <div class="form-group"> <label for="p1Monatsrente">Monatliche Rente (€)</label>
+                                    <input type="number" id="p1Monatsrente" min="0" step="10" placeholder="0">
+                                </div>
+                                <div class="form-group"> <label for="p1StartInJahren">Start in … Jahren</label>
+                                    <input type="number" id="p1StartInJahren" min="0" max="120" placeholder="0">
+                                </div>
                                 <div class="form-group" style="grid-column: span 2;"><label
                                         for="rentAdjMode">Rentenanpassung koppeln an</label><select id="rentAdjMode">
                                         <option value="fix">Fixer Prozentsatz</option>
@@ -296,7 +306,8 @@
                                 <div id="sectionRente2" style="display: none;">
                                     <div class="form-grid-four-col">
                                         <div class="form-group"> <label for="r2StartAlter">Startalter</label> <input
-                                                type="number" id="r2StartAlter" min="0" max="120" value="60"> </div>
+                                                type="number" id="r2StartAlter" min="0" max="120" placeholder="0">
+                                        </div>
                                         <div class="form-group"> <label for="r2Geschlecht">Geschlecht</label>
                                             <select id="r2Geschlecht">
                                                 <option value="w" selected>Weiblich</option>
@@ -306,7 +317,7 @@
                                         </div>
                                         <div class="form-group"> <label for="r2SparerPauschbetrag">Sparer-Pauschbetrag
                                                 (€)</label> <input type="number" id="r2SparerPauschbetrag" min="0"
-                                                step="50" value="0">
+                                                step="50" placeholder="0">
                                         </div>
                                         <div class="form-group"> <label for="r2KirchensteuerPct">Kirchensteuer</label>
                                             <select id="r2KirchensteuerPct">
@@ -317,10 +328,10 @@
                                         </div>
                                         <div class="form-group"> <label for="r2Monatsrente">Monatliche Rente
                                                 (€)</label> <input type="number" id="r2Monatsrente" min="0" step="10"
-                                                value="1500"> </div>
+                                                placeholder="0"> </div>
                                         <div class="form-group"> <label for="r2StartInJahren">Start in …
                                                 Jahren</label> <input type="number" id="r2StartInJahren" min="0"
-                                                max="120" value="0"> </div>
+                                                max="120" placeholder="0"> </div>
                                         <div class="form-group"> <label for="r2Steuerquote">Steuerquote (%)</label>
                                             <input type="number" id="r2Steuerquote" min="0" max="100" step="0.1"
                                                 value="0" title="Optionaler Pauschalsatz. 0 = keine Pauschalsteuer.">
@@ -374,13 +385,13 @@
                                     wird. Nach der Ansparphase beginnt automatisch die Entnahmephase. </p>
                                 <div class="form-grid-four-col">
                                     <div class="form-group"> <label for="accumulationDurationYears">Dauer Ansparphase
-                                            (Jahre)</label> <input type="number" id="accumulationDurationYears"
-                                            value="25" min="1" max="50"
+                                            (Jahre)</label> <input type="number" id="accumulationDurationYears" min="1"
+                                            max="50" placeholder="0"
                                             title="Wie viele Jahre wird noch gespart, bis der Ruhestand beginnt?">
                                     </div>
                                     <div class="form-group"> <label for="accumulationSparrate">Monatliche Sparrate
-                                            (€)</label> <input type="number" id="accumulationSparrate" value="2000"
-                                            min="0" step="100"
+                                            (€)</label> <input type="number" id="accumulationSparrate" min="0"
+                                            step="100" placeholder="0"
                                             title="Betrag, der jeden Monat ins Portfolio eingezahlt wird"> </div>
                                     <div class="form-group" style="grid-column: span 2;"> <label
                                             for="sparrateIndexing">Sparraten-Anpassung</label> <select
@@ -566,6 +577,12 @@
                             </div>
                         </div>
                     </fieldset>
+                    <div style="margin-top: 20px; text-align: right;">
+                        <button type="button" id="resetBtn" class="btn btn-sm"
+                            style="background-color: transparent; color: var(--text-secondary); border: 1px solid var(--border-color);">
+                            Gespeicherte Werte zurücksetzen
+                        </button>
+                    </div>
                 </div>
                 <div id="tab-montecarlo" class="tab-panel">
                     <fieldset>
@@ -610,6 +627,7 @@
                     <div id="mc-progress-bar-container">
                         <div id="mc-progress-bar"></div>
                     </div>
+                    <div id="print-footer" class="print-footer"></div>
                     <div id="monteCarloResults" style="display:none; margin-top: 25px;">
                         <h3>Ergebnisse der Monte-Carlo-Analyse</h3>
                         <div id="monteCarloSummary"></div>

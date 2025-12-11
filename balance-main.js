@@ -110,6 +110,15 @@ function update() {
         // 1. Read Inputs & State
         // Liest alle Formular-Eingaben und den letzten gespeicherten Zustand
         const inputData = UIReader.readAllInputs();
+
+        // Check for empty/initial state to avoid validation errors
+        if (!inputData.aktuellesAlter || inputData.aktuellesAlter === 0) {
+            UIRenderer.clearError();
+            // Optionally clear results or show specific "Start" message
+            // For now, just return to keep UI clean
+            return;
+        }
+
         const persistentState = StorageManager.loadState();
 
         // 2. Render Bedarfsanpassungs-UI
@@ -258,7 +267,7 @@ function init() {
     // 2. Populate DOM inputs
     // Sammelt alle input/select-Elemente mit ID in dom.inputs{}
     document.querySelectorAll('input, select').forEach(el => {
-        if(el.id) dom.inputs[el.id] = el;
+        if (el.id) dom.inputs[el.id] = el;
     });
 
     // 4. Initialize all modules with their dependencies

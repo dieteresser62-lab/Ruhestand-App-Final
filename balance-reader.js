@@ -71,42 +71,42 @@ export const UIReader = {
         const val = (id) => dom.inputs[id].value;
         const checked = (id) => dom.inputs[id].checked;
         return {
-            aktuellesAlter: parseInt(val('aktuellesAlter')),
+            aktuellesAlter: parseInt(val('aktuellesAlter')) || 0,
             floorBedarf: num('floorBedarf'),
             flexBedarf: num('flexBedarf'),
-            inflation: parseFloat(val('inflation')),
+            inflation: parseFloat(val('inflation')) || 0,
             tagesgeld: num('tagesgeld'),
             geldmarktEtf: num('geldmarktEtf'),
             depotwertAlt: num('depotwertAlt'),
             depotwertNeu: num('depotwertNeu'),
             goldWert: num('goldWert'),
-            endeVJ: parseFloat(val('endeVJ')),
-            endeVJ_1: parseFloat(val('endeVJ_1')),
-            endeVJ_2: parseFloat(val('endeVJ_2')),
-            endeVJ_3: parseFloat(val('endeVJ_3')),
-            ath: parseFloat(val('ath')),
-            jahreSeitAth: parseFloat(val('jahreSeitAth')),
+            endeVJ: parseFloat(val('endeVJ')) || 0,
+            endeVJ_1: parseFloat(val('endeVJ_1')) || 0,
+            endeVJ_2: parseFloat(val('endeVJ_2')) || 0,
+            endeVJ_3: parseFloat(val('endeVJ_3')) || 0,
+            ath: parseFloat(val('ath')) || 0,
+            jahreSeitAth: parseFloat(val('jahreSeitAth')) || 0,
             renteAktiv: val('renteAktiv') === 'ja',
             renteMonatlich: num('renteMonatlich'),
             risikoprofil: 'sicherheits-dynamisch',
             goldAktiv: checked('goldAktiv'),
-            goldZielProzent: parseFloat(val('goldZielProzent')),
-            goldFloorProzent: parseFloat(val('goldFloorProzent')),
+            goldZielProzent: parseFloat(val('goldZielProzent')) || 0,
+            goldFloorProzent: parseFloat(val('goldFloorProzent')) || 0,
             goldSteuerfrei: checked('goldSteuerfrei'),
-            rebalancingBand: parseFloat(val('rebalancingBand')),
+            rebalancingBand: parseFloat(val('rebalancingBand')) || 0,
             costBasisAlt: num('costBasisAlt'),
             costBasisNeu: num('costBasisNeu'),
-            tqfAlt: parseFloat(val('tqfAlt')),
-            tqfNeu: parseFloat(val('tqfNeu')),
+            tqfAlt: parseFloat(val('tqfAlt')) || 0,
+            tqfNeu: parseFloat(val('tqfNeu')) || 0,
             goldCost: num('goldCost'),
-            kirchensteuerSatz: parseFloat(val('kirchensteuerSatz')),
+            kirchensteuerSatz: parseFloat(val('kirchensteuerSatz')) || 0,
             sparerPauschbetrag: num('sparerPauschbetrag'),
-            runwayMinMonths: parseInt(val('runwayMinMonths'), 10),
-            runwayTargetMonths: parseInt(val('runwayTargetMonths'), 10),
-            targetEq: parseFloat(val('targetEq')),
-            rebalBand: parseFloat(val('rebalBand')),
-            maxSkimPctOfEq: parseFloat(val('maxSkimPctOfEq')),
-            maxBearRefillPctOfEq: parseFloat(val('maxBearRefillPctOfEq'))
+            runwayMinMonths: parseInt(val('runwayMinMonths'), 10) || 0,
+            runwayTargetMonths: parseInt(val('runwayTargetMonths'), 10) || 0,
+            targetEq: parseFloat(val('targetEq')) || 0,
+            rebalBand: parseFloat(val('rebalBand')) || 0,
+            maxSkimPctOfEq: parseFloat(val('maxSkimPctOfEq')) || 0,
+            maxBearRefillPctOfEq: parseFloat(val('maxBearRefillPctOfEq')) || 0
         };
     },
 
@@ -128,7 +128,7 @@ export const UIReader = {
         Object.keys(dom.inputs).forEach(key => {
             const el = dom.inputs[key];
             if (el && key in storedInputs) {
-                if(el.type === 'checkbox') {
+                if (el.type === 'checkbox') {
                     el.checked = storedInputs[key];
                 } else if (el.classList.contains('currency')) {
                     el.value = UIUtils.formatNumber(UIUtils.parseCurrency(storedInputs[key]));

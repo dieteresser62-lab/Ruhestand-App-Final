@@ -286,8 +286,34 @@ window.onload = function () {
     allInputs.forEach(id => {
         const element = document.getElementById(id);
         if (element) {
+            // Persistence Logic
+            const storageKey = 'sim_' + id;
+            const storedVal = localStorage.getItem(storageKey);
+            if (storedVal !== null && storedVal !== "") {
+                if (element.type === 'checkbox') {
+                    element.checked = (storedVal === 'true');
+                } else if (element.type === 'radio') {
+                    // Radio buttons usually have same name but different IDs. 
+                    // If ID is in list, we treat it as specific element.
+                    // But usually we store the *value* of the group.
+                    // For now, skip radios in this generic block to avoid conflicts.
+                } else {
+                    element.value = storedVal;
+                }
+            }
+
             const eventType = (element.type === 'radio' || element.type === 'checkbox') ? 'change' : 'input';
-            element.addEventListener(eventType, updateStartPortfolioDisplay);
+
+            element.addEventListener(eventType, () => {
+                // Save to Storage
+                if (element.type === 'checkbox') {
+                    localStorage.setItem(storageKey, element.checked);
+                } else if (element.type !== 'radio') {
+                    localStorage.setItem(storageKey, element.value);
+                }
+                // Trigger UI Update
+                updateStartPortfolioDisplay();
+            });
         }
     });
 
@@ -388,15 +414,37 @@ window.onload = function () {
         });
     }
 
+    // Generic Persistence Helper for Accumulation Fields
+    const accumInputs = [
+        { el: accumulationDurationYears, key: 'sim_accumulationDurationYears' },
+        { el: accumulationSparrate, key: 'sim_accumulationSparrate' },
+        { el: sparrateIndexing, key: 'sim_sparrateIndexing' }
+    ];
+
+    accumInputs.forEach(({ el, key }) => {
+        if (el) {
+            const saved = localStorage.getItem(key);
+            if (saved !== null && saved !== "") {
+                el.value = saved;
+            }
+            el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => {
+                localStorage.setItem(key, el.value);
+                // Also trigger calc if needed (already bound below)
+            });
+        }
+    });
+
     // Update calculations when input fields change
-    if (accumulationDurationYears) {
+    if (accumulationDurationYears)
         accumulationDurationYears.addEventListener('input', updateAccumulationCalculations);
-    }
-    if (accumulationSparrate) {
+    if (accumulationSparrate)
         accumulationSparrate.addEventListener('input', updateAccumulationCalculations);
-    }
-    if (p1StartAlter) {
+    if (p1StartAlter)
         p1StartAlter.addEventListener('input', updateAccumulationCalculations);
+
+    // Trigger initial calc if enabled
+    if (enableAccumulationPhase && enableAccumulationPhase.checked) {
+        updateAccumulationCalculations();
     }
 
     const careDetailsCheckbox = document.getElementById('toggle-care-details');
@@ -539,7 +587,40 @@ window.onload = function () {
 
     // Partner/Rente-2 configuration with localStorage persistence
     initRente2ConfigWithLocalStorage();
+
+    // Reset-Button Initialisierung
+    initResetButton();
+
+    // Initial calculation on load
+    // Note: Some inputs might trigger calc via events, but we do one explicitly to be sure.
+    runMonteCarloSimulation();
 };
+
+/**
+ * Initialisiert den Reset-Button für die Simulator-Einstellungen.
+ */
+function initResetButton() {
+    const resetBtn = document.getElementById('resetBtn');
+    if (!resetBtn) return;
+
+    resetBtn.addEventListener('click', () => {
+        if (confirm('Möchten Sie wirklich alle gespeicherten Simulator-Einstellungen zurücksetzen? Dies kann nicht rückgängig gemacht werden.')) {
+            // Alle Keys entfernen, die mit 'sim_' beginnen
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('sim_')) {
+                    keysToRemove.push(key);
+                }
+            }
+
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+
+            // Seite neu laden, um leere Felder (Default-Zustand) anzuzeigen
+            window.location.reload();
+        }
+    });
+}
 
 /**
  * Initialisiert (falls vorhanden) den alten Pflege-Mortalitäts-Toggle.

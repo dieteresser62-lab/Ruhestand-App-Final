@@ -34,6 +34,9 @@
                     <button id="exportBtn" type="button" class="btn" aria-label="Export (Alt+E)">📤 Export</button>
                     <button id="importBtn" type="button" class="btn" aria-label="Import (Alt+I)">📥 Import</button>
                     <input id="importFile" type="file" accept="application/json,.json" style="display:none">
+                    <a href="index.html" class="btn"
+                        style="text-decoration: none; display: inline-flex; align-items: center; gap: 5px;"
+                        aria-label="Startseite öffnen">🏠 Startseite</a>
                     <a href="Handbuch.html" target="_blank" class="btn"
                         style="text-decoration: none; display: inline-flex; align-items: center; gap: 5px;"
                         aria-label="Handbuch öffnen">📖 Hilfe</a>
@@ -70,12 +73,12 @@
                         </div>
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
                             <div class="form-group"><label for="aktuellesAlter">Aktuelles Alter</label><input
-                                    id="aktuellesAlter" type="number" value="65" min="50"
+                                    id="aktuellesAlter" type="number" placeholder="0" min="50"
                                     title="Ihr aktuelles Lebensalter - wichtig für die Berechnung Ihrer Entnahmestrategien und Lebenserwartung">
                             </div>
                             <div class="form-group">
                                 <label for="inflation">Inflation VJ (%)</label>
-                                <input id="inflation" type="number" value="1.7" step="0.1"
+                                <input id="inflation" type="number" placeholder="0" step="0.1"
                                     title="Inflationsrate des Vorjahres - wird automatisch von der EZB abgerufen und dient zur Anpassung Ihrer Bedarfswerte">
                             </div>
                         </div>
@@ -87,11 +90,11 @@
                         <legend>Vermögen</legend>
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
                             <div class="form-group"><label for="tagesgeld">Tagesgeld (€)</label><input id="tagesgeld"
-                                    class="currency" type="text" inputmode="numeric" value="60000"
+                                    class="currency" type="text" inputmode="numeric" placeholder="0"
                                     title="Ihr Bargeld auf dem Tagesgeldkonto - sofort verfügbar ohne Verzögerung">
                             </div>
                             <div class="form-group"><label for="geldmarktEtf">Geldmarkt-ETF (€)</label><input
-                                    id="geldmarktEtf" class="currency" type="text" inputmode="numeric" value="360000"
+                                    id="geldmarktEtf" class="currency" type="text" inputmode="numeric" placeholder="0"
                                     title="Ihr Geldmarkt-ETF-Bestand - sehr sichere, kurzfristig verfügbare Anlage mit leicht höherer Rendite als Tagesgeld">
                             </div>
                             <div class="form-group"><label for="depotwertAlt">Depotwert Alt (€)</label><input
@@ -127,17 +130,17 @@
                         </legend>
                         <div class="form-grid" style="grid-template-columns: repeat(3, 1fr);">
                             <div class="form-group"><label for="endeVJ">Ende VJ</label><input type="number" id="endeVJ"
-                                    value="2318" min="0" step="0.01"></div>
+                                    min="0" step="0.01" placeholder="0"></div>
                             <div class="form-group"><label for="endeVJ_1">Ende VJ-1</label><input type="number"
-                                    id="endeVJ_1" value="1960" min="0" step="0.01"></div>
+                                    id="endeVJ_1" min="0" step="0.01" placeholder="0"></div>
                             <div class="form-group"><label for="ath">Allzeithoch</label><input type="number" id="ath"
-                                    value="2318" min="0" step="0.01"></div>
+                                    min="0" step="0.01" placeholder="0"></div>
                             <div class="form-group"><label for="endeVJ_2">Ende VJ-2</label><input type="number"
-                                    id="endeVJ_2" value="1850" min="0" step="0.01"></div>
+                                    id="endeVJ_2" min="0" step="0.01" placeholder="0"></div>
                             <div class="form-group"><label for="endeVJ_3">Ende VJ-3</label><input type="number"
-                                    id="endeVJ_3" value="1706" min="0" step="0.01"></div>
+                                    id="endeVJ_3" min="0" step="0.01" placeholder="0"></div>
                             <div class="form-group"><label for="jahreSeitAth">Jahre seit ATH</label><input type="number"
-                                    id="jahreSeitAth" value="0" step="0.01" min="0"></div>
+                                    id="jahreSeitAth" step="0.01" min="0" placeholder="0"></div>
                         </div>
                     </fieldset>
                     <fieldset>
@@ -151,11 +154,12 @@
                                 </select>
                             </div>
                             <div class="form-group" id="renteMonatlichGroup">
-                                <label for="renteMonatlich">Gesetzl. Rente (€/Monat)</label>
-                                <input id="renteMonatlich" class="currency" type="text" inputmode="numeric" value="0"
-                                    disabled>
+                                <div class="form-group"> <label for="renteMonatlich">Monatliche Rente (Netto, €)</label>
+                                    <input id="renteMonatlich" class="currency" type="text" inputmode="numeric"
+                                        placeholder="0">
+                                    <small>Wird nur bei "Ja" berücksichtigt.</small>
+                                </div>
                             </div>
-                        </div>
                     </fieldset>
                 </div>
 
@@ -163,13 +167,11 @@
                     <fieldset>
                         <legend>Bedarfsplanung</legend>
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
-                            <div class="form-group"><label for="floorBedarf">Floor-Bedarf p.a. (€)</label><input
-                                    id="floorBedarf" class="currency" type="text" inputmode="numeric" value="24000"
-                                    title="Ihre essentiellen jährlichen Ausgaben, die Sie auf jeden Fall benötigen (Miete, Essen, Versicherungen, Gesundheit)">
+                            <div class="form-group"> <label for="floorBedarf">Floor-Bedarf (€/Jahr)</label> <input
+                                    id="floorBedarf" class="currency" type="text" inputmode="numeric" value="12000">
                             </div>
-                            <div class="form-group"><label for="flexBedarf">Flex-Bedarf p.a. (€)</label><input
-                                    id="flexBedarf" class="currency" type="text" inputmode="numeric" value="28000"
-                                    title="Ihre flexiblen jährlichen Ausgaben, auf die Sie im Notfall verzichten können (Urlaub, Hobbys, Luxusausgaben)">
+                            <div class="form-group"> <label for="flexBedarf">Flex-Bedarf (€/Jahr)</label> <input
+                                    id="flexBedarf" class="currency" type="text" inputmode="numeric" value="24000">
                             </div>
                         </div>
                     </fieldset>
@@ -178,13 +180,15 @@
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
                             <div class="form-group">
                                 <label for="runwayMinMonths">Runway Minimum (Monate)</label>
-                                <input id="runwayMinMonths" type="number" value="24" min="12" max="60" step="1"
-                                    title="Das absolute Minimum an Liquiditätsreichweite, das nicht unterschritten werden soll. Löst im Bärenmarkt ggf. Not-Auffüllungen aus.">
+                                <input id="runwayMinMonths" type="number" min="12" max="60" step="1"
+                                    title="Das absolute Minimum an Liquiditätsreichweite, das nicht unterschritten werden soll. Löst im Bärenmarkt ggf. Not-Auffüllungen aus."
+                                    value="24">
                             </div>
                             <div class="form-group">
                                 <label for="runwayTargetMonths">Runway Ziel (Monate)</label>
-                                <input id="runwayTargetMonths" type="number" value="36" min="18" max="72" step="1"
-                                    title="Die angestrebte, komfortable Liquiditätsreichweite. Wird in guten Marktphasen proaktiv aufgefüllt (Skim & Fill).">
+                                <input id="runwayTargetMonths" type="number" min="18" max="72" step="1"
+                                    title="Die angestrebte, komfortable Liquiditätsreichweite. Wird in guten Marktphasen proaktiv aufgefüllt (Skim & Fill)."
+                                    value="36">
                             </div>
                         </div>
                     </fieldset>
@@ -193,18 +197,21 @@
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 15px 20px;">
                             <div class="form-group">
                                 <label for="targetEq">Aktien-Zielquote (%)</label>
-                                <input id="targetEq" type="number" value="60" min="20" max="90" step="1"
-                                    title="Die angestrebte prozentuale Allokation in Aktien. Dient als Anker für das Rebalancing.">
+                                <input id="targetEq" type="number" min="20" max="90" step="1"
+                                    title="Die angestrebte prozentuale Allokation in Aktien. Dient als Anker für das Rebalancing."
+                                    value="60">
                             </div>
                             <div class="form-group">
                                 <label for="rebalBand">Rebalancing-Band (±%)</label>
-                                <input id="rebalBand" type="number" value="5" min="1" max="20" step="0.5"
-                                    title="Die prozentuale Toleranz um die Zielquote, bevor ein Rebalancing ausgelöst wird.">
+                                <input id="rebalBand" type="number" min="1" max="20" step="0.5"
+                                    title="Die prozentuale Toleranz um die Zielquote, bevor ein Rebalancing ausgelöst wird."
+                                    value="5">
                             </div>
                             <div class="form-group advanced-only">
                                 <label for="maxSkimPctOfEq">Max. Abschöpfen p.a. (%)</label>
-                                <input id="maxSkimPctOfEq" type="number" value="10" min="0" max="25" step="1"
-                                    title="Der maximal pro Jahr abzuschöpfende Betrag (als Prozentsatz des Aktiendepots), um die Liquidität aufzufüllen.">
+                                <input id="maxSkimPctOfEq" type="number" min="0" max="25" step="1"
+                                    title="Der maximal pro Jahr abzuschöpfende Betrag (als Prozentsatz des Aktiendepots), um die Liquidität aufzufüllen."
+                                    value="10">
                             </div>
                             <!-- ============================================= -->
                             <!-- NEUES FELD FÜR BEAR-MODE-DRIP                 -->
@@ -239,18 +246,18 @@
                             <label
                                 style="flex-direction: row; align-items: center; justify-content: center; padding: 5px 0;">
                                 <input type="checkbox" id="goldAktiv" class="goldAktiv"
-                                    style="width: auto; margin-right: 8px;">Gold-Allokation aktiv
+                                    style="width: auto; margin-right: 8px;" checked>Gold-Allokation aktiv
                             </label>
                         </div>
                         <div id="goldPanel" style="display: none;">
                             <div class="form-grid"
                                 style="grid-template-columns: 1fr 1fr 1fr; gap: 15px 20px; align-items: end;">
-                                <div class="form-group"><label for="goldZielProzent">Ziel-Allokation (%)</label><input
-                                        type="number" id="goldZielProzent" value="7.5" step="0.5"></div>
-                                <div class="form-group"><label for="goldFloorProzent">Gold-Floor (%)</label><input
-                                        type="number" id="goldFloorProzent" value="1" step="0.5"></div>
-                                <div class="form-group"><label for="rebalancingBand">Rebalancing-Band (±%)</label><input
-                                        type="number" id="rebalancingBand" value="25" step="5"></div>
+                                <div class="form-group"> <label for="goldZielProzent">Ziel-Anteil (%)</label> <input
+                                        id="goldZielProzent" type="number" step="0.1" value="7.5"> </div>
+                                <div class="form-group"> <label for="goldFloorProzent">Floor-Anteil (%)</label> <input
+                                        id="goldFloorProzent" type="number" step="0.1" value="1"> </div>
+                                <div class="form-group"> <label for="rebalancingBand">Rebal. Band (%)</label> <input
+                                        id="rebalancingBand" type="number" step="0.1" value="25"> </div>
                                 <div class="form-group full-width"
                                     style="grid-column: 1 / -1; justify-content:center; margin-top: 5px;"><label
                                         style="display:flex; align-items:center; flex-direction: row;"><input
@@ -267,20 +274,21 @@
                             <div style="display: flex; flex-direction: column; gap: 10px;">
                                 <div class="form-group"><label for="costBasisAlt">Einstand Alt (€)</label><input
                                         id="costBasisAlt" class="currency" type="text" inputmode="numeric"
-                                        value="700000"></div>
+                                        placeholder="0"></div>
                                 <div class="form-group"><label for="tqfAlt">TQF Alt</label><input id="tqfAlt"
-                                        type="number" step="0.01" min="0" max="1" value="0.30"></div>
+                                        type="number" step="0.01" min="0" max="1" placeholder="0"></div>
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 10px;">
                                 <div class="form-group"><label for="costBasisNeu">Einstand Neu (€)</label><input
                                         id="costBasisNeu" class="currency" type="text" inputmode="numeric"
-                                        value="750000"></div>
+                                        placeholder="0"></div>
                                 <div class="form-group"><label for="tqfNeu">TQF Neu</label><input id="tqfNeu"
-                                        type="number" step="0.01" min="0" max="1" value="0.30"></div>
+                                        type="number" step="0.01" min="0" max="1" placeholder="0"></div>
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 10px;">
                                 <div class="form-group"><label for="goldCost">Gold-Einstand (€)</label><input
-                                        id="goldCost" class="currency" type="text" inputmode="numeric" value="0"></div>
+                                        id="goldCost" class="currency" type="text" inputmode="numeric" placeholder="0">
+                                </div>
                             </div>
                         </div>
                     </details>
@@ -362,7 +370,8 @@
                 <div id="handlungsanweisung"
                     title="Ihre konkreten Handlungsempfehlungen: Welche Transaktionen Sie durchführen sollten (Rebalancing, Entnahmen, Verkäufe etc.)">
                     <button id="copyAction" type="button" class="btn btn-sm btn-utility"
-                        title="Handlung kopieren">📋</button></div>
+                        title="Handlung kopieren">📋</button>
+                </div>
 
                 <div id="print-footer"></div>
             </div>
