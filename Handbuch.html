@@ -535,23 +535,95 @@
                         <h3>Eingaben</h3>
                         <p>Tragen Sie Vermögen, monatliche Sparrate sowie gewünschtes Renteneintrittsalter ein. Fügen
                             Sie Ihre erwarteten Ausgaben im Ruhestand (Grundbedarf und variable Kosten) hinzu.</p>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Zeithorizont:</strong> Die App simuliert standardmäßig bis zum 100. Lebensjahr; passen
+                                Sie das Zielalter an, falls längere Sicherheitsmargen gewünscht sind.</li>
+                            <li><strong>Inflationsindex:</strong> Geben Sie heutige Euro-Beträge an, die Engine indexiert sie
+                                automatisch mit Ihren Annahmen.</li>
+                            <li><strong>Partner-Fälle:</strong> Aktivieren Sie die zweite Person, wenn zwei Rentenströme oder
+                                Pflegekosten berücksichtigt werden müssen.</li>
+                        </ul>
                     </div>
                     <div class="detail-block" id="simulator-parameter">
                         <h3>Parameter</h3>
                         <p>Passen Sie optional die Asset-Allokation (Aktienquote), sichere Rentenbestandteile und
                             Inflationsannahmen an. Die Standardwerte sind konservativ gewählt und dienen als
                             Startpunkt.</p>
+                        <p style="color: var(--text-light);">Hintergrund: Die Engine arbeitet mit historischen
+                            Kapitalmarktdaten, resampelt Renditen blockweise (Block-Bootstrap) und fügt einen
+                            Inflations-Overlay hinzu. Pessimistische Schwänze werden per Fat-Tail-Adjustment
+                            verstärkt, damit seltene Crash-Jahre realistisch abgebildet werden.</p>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Renditeannahmen:</strong> Passen Sie Mittelwert/Volatilität im Reiter „Erweiterte
+                                Parameter“ an, wenn Sie eigene Kapitalmarktsichten nutzen.</li>
+                            <li><strong>Korrelationen:</strong> Für gemischte Portfolios steuert der Korrela­tionsslider, wie
+                                stark Aktien und Anleihen gemeinsam schwanken; konservative Nutzer lassen den
+                                Standardwert unverändert.</li>
+                            <li><strong>Gebühren/Puffer:</strong> Hinterlegen Sie prozentuale Kosten, um Spar- oder
+                                Auszahlpläne realistisch abzubilden; der Simulator reduziert Renditen automatisch um
+                                diesen Wert.</li>
+                        </ul>
                     </div>
                     <div class="detail-block" id="simulator-start">
                         <h3>Simulation starten</h3>
                         <p>Klicken Sie auf <strong>"Simulation starten"</strong>. Die Engine berechnet mehrere hundert
                             bis tausend Marktszenarien, um realistische Schwankungen abzubilden.</p>
+                        <ol style="margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Monte-Carlo-Läufe:</strong> Jeder Lauf erzeugt eine eigene Rendite- und
+                                Inflationssequenz, wendet Sparraten und Entnahmen an und trackt Liquidität sowie
+                                Depotwerte.</li>
+                            <li><strong>Guardrails:</strong> Bei negativen Pfaden werden automatische Sicherheitsnetze
+                                (z.B. Mindest-Cash, variable Ausgabenbremsen) ausgelöst und in den Ergebnissen als
+                                Ereignis markiert.</li>
+                            <li><strong>Fehlerabfang:</strong> Eingaben werden validiert (keine negativen Sparraten,
+                                Ausgaben &lt;= erreichbare Einnahmen). Fehlende Pflichtfelder werden direkt im UI
+                                hervorgehoben.</li>
+                        </ol>
                     </div>
                     <div class="detail-block" id="simulator-ergebnisse">
                         <h3>Ergebnisse deuten</h3>
                         <p>Achten Sie auf die <strong>Erfolgswahrscheinlichkeit</strong> (Ziel: 90-95%+). Nutzen Sie die
                             Heatmap des <em>Parameter Sweep</em>, um zu sehen, wie Sparrate oder späterer Ruhestand das
                             Ergebnis verändern.</p>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Liquiditäts-Puffer:</strong> Zeigt, wie viele Monate der Grundbedarf auch in
+                                Drawdowns gedeckt bleibt. Werte &gt;= 24 Monate gelten als komfortabel.</li>
+                            <li><strong>Stress-Events:</strong> Die Ergebnis-Timeline markiert Kapitalmarktschocks und
+                                zeigt, ob Anpassungen (z.B. Ausgabenreduktion) notwendig gewesen wären.</li>
+                            <li><strong>Median vs. Perzentile:</strong> Lesen Sie Median, 10. und 90. Perzentil getrennt,
+                                um zu unterscheiden, ob Verbesserungen nur die Mittelwerte betreffen oder wirklich die
+                                Risikoschwänze stabilisieren.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block" id="simulator-sweep">
+                        <h3>Parameter Sweep &amp; Szenarien</h3>
+                        <p>Der Parameter Sweep testet systematisch mehrere Sparraten, Ruhestandsalter oder
+                            Aktienquoten. Die Heatmap zeigt sofort, welche Kombinationen Zielwahrscheinlichkeiten
+                            erreichen.</p>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Konvergenz:</strong> Der Sweep wiederverwendet die gleichen Zufallssamen, um
+                                Varianten vergleichbar zu halten. Kleine Sprünge sind normal; trendende Muster sind
+                                entscheidend.</li>
+                            <li><strong>Szenario-Speicher:</strong> Speichern Sie interessante Konfigurationen als
+                                benannte Szenarien, um sie später in der Balance-App gegenzuprüfen.</li>
+                            <li><strong>Optimierer:</strong> Aktivieren Sie den eingebauten Optimierer, um Sparrate oder
+                                Aktienquote automatisch auf ein Ziel (z.B. 92% Erfolgswahrscheinlichkeit) einzustellen.
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="detail-block" id="simulator-best-practices">
+                        <h3>Best Practices &amp; typische Fragen</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>„Was passiert bei Crash + Inflation?“</strong> Testen Sie ein pessimistisches
+                                Inflationsband und senken Sie die Aktienquote leicht; prüfen Sie, ob die Liquidität in
+                                den ersten fünf Ruhestandsjahren stabil bleibt.</li>
+                            <li><strong>„Reicht meine Sparrate?“</strong> Nutzen Sie den Sweep mit 50-€-Schritten. Ein
+                                Plateau bei 90%+ Erfolgswahrscheinlichkeit zeigt, dass weitere Erhöhungen wenig
+                                zusätzlichen Nutzen bringen.</li>
+                            <li><strong>„Wie robust ist mein Entnahmeplan?“</strong> Simulieren Sie reduzierte flexible
+                                Ausgaben und vergleichen Sie die Erfolgswahrscheinlichkeit. Eine geringe Differenz
+                                deutet auf stabile Guardrails hin.</li>
+                        </ul>
                     </div>
                 </div>
             </div>
