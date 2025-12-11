@@ -548,27 +548,115 @@
                 <div class="manual-grid" style="margin-top: 1.5rem;">
                     <div class="detail-block" id="balance-jahresupdate">
                         <h3>Jahres-Update</h3>
-                        <p>Starten Sie das Jahres-Update, um Inflation, Alter und Markt-Kontext automatisch
-                            fortzuschreiben. Tragen Sie anschließend den aktuellen Marktwert Ihrer Depots und
-                            Cash-Konten ein.</p>
+                        <p>Starten Sie das Jahres-Update, um alle automatischen Schritte gebündelt auszulösen und
+                            danach nur noch die geprüften Werte zu ergänzen.</p>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Automatisch aktualisiert:</strong> Inflation (EC B/World Bank/OECD),
+                                daraus abgeleitete Floor- und Flex-Bedarfe, Altersfelder beider Personen sowie
+                                Markt-Kontext (CAPE-Rotation, ATH-Status, Shiller-Daten nachgerückt).</li>
+                            <li><strong>Manuell zu prüfen:</strong> aktuelle Depotwerte (Aktien, Anleihen,
+                                ETFs), Cash- und Tagesgeldstände. Korrigieren Sie Tippfehler sofort, damit Guardrails
+                                korrekt greifen.</li>
+                            <li><strong>Prozesskette:</strong> Daten abrufen → Inflation anwenden → Guardrails
+                                neu berechnen → Diagnose aktualisieren → Kapitalfluss-Vorschläge anzeigen.</li>
+                        </ul>
                     </div>
                     <div class="detail-block" id="balance-diagnose">
                         <h3>Diagnose</h3>
-                        <p>Der Diagnose-Button erklärt jede Entscheidung der App. Ein Entscheidungsbaum zeigt die
-                            geprüften Schwellen (z.B. Aktienquote &gt; Ziel + Toleranz?).</p>
+                        <p>Der Diagnose-Button öffnet das Panel „Ergebnisse &amp; Handlungsschritte“. Es zeigt den
+                            geprüften Entscheidungsbaum mit Kommentaren zu jedem Knoten (z.B. Liquidität &gt;= Runway?,
+                            Aktienquote über Ziel?). Ampelfarben signalisieren, ob Schwellen erreicht sind.</p>
+                        <p style="color: var(--text-light);">Nutzen Sie die Erläuterungen unter dem Entscheidungsbaum,
+                            um zu verstehen, warum eine Handlung ausgelöst wurde (z.B. CAPE-Bremse, Drawdown-Limit,
+                            Rebalancing-Distanz).</p>
                     </div>
                     <div class="detail-block" id="balance-handlungsschritte">
                         <h3>Handlungsschritte</h3>
-                        <p>Im Panel „Ergebnisse &amp; Handlungsschritte“ sehen Sie klare Aufgaben wie
-                            „Rebalancing durchführen“ oder „kein Handlungsbedarf“. Folgen Sie den vorgeschlagenen
-                            Reihenfolgen, um Transaktionskosten gering zu halten.</p>
+                        <p>Im Panel „Ergebnisse &amp; Handlungsschritte“ sehen Sie klare Aufgaben inklusive Reihenfolge.
+                            Jede Aufgabe verweist auf die benötigten Konten (Aktien-Depot, Geldmarkt, Ausgabenkonto)
+                            und nennt Zielbeträge, sodass Sie jede Transaktion 1:1 umsetzen können.</p>
+                        <p style="color: var(--text-light);">Design-Entscheidung: Die Reihenfolge folgt dem
+                            Entscheidungsbaum (erst Liquidität, dann Quote, dann eventuelle CAPE-Bremsen), um
+                            unnötige Trades zu vermeiden.</p>
                     </div>
                     <div class="detail-block" id="balance-kapitalfluss">
                         <h3>Kapitalfluss</h3>
                         <p>Die App fasst zusammen, welche Beträge zwischen Aktien, Cash und Entnahmekonten fließen
-                            sollen. So können Sie die Transaktionen bei Ihrer Bank vollständig und nachvollziehbar
-                            ausführen.</p>
+                            sollen. Nutzen Sie die Checkliste im Panel, um Verkäufe, Umbuchungen und Auszahlungen in
+                            exakt dieser Reihenfolge abzuwickeln.</p>
                     </div>
+                </div>
+            </div>
+
+            <div class="info-card" id="balance-jahresupdate-guide" style="margin-top: 1.5rem;">
+                <h2>Jahres-Update-Kette im Detail</h2>
+                <p class="card-intro">Diese Schrittfolge beschreibt, welche Felder automatisch aktualisiert werden und
+                    welche Eingaben Sie nach dem Update prüfen oder ergänzen müssen.</p>
+                <div class="manual-grid" style="margin-top: 1.5rem;">
+                    <div class="detail-block">
+                        <h3>Automatische Fortschreibungen</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light);">
+                            <li><strong>Inflation &amp; Bedarf:</strong> Der neu abgerufene Inflationswert indexiert Floor
+                                und Flex-Bedarf. Die Vorjahreswerte bleiben zum Vergleich sichtbar.</li>
+                            <li><strong>Alter:</strong> Startalter aller Personen erhöht sich um ein Jahr; abhängige
+                                Renten- und Pflege-Trigger werden neu berechnet.</li>
+                            <li><strong>Marktkontext:</strong> CAPE-Reihe rückt um ein Jahr weiter, das Allzeithoch wird
+                                ggf. aktualisiert, und der Entscheidungsbaum erhält den neuen CAPE-Overlay-Status.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block">
+                        <h3>Manuelle Prüfungen</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light);">
+                            <li><strong>Depotwerte:</strong> Tragen Sie den aktuellen Marktwert je Depot/ETF ein. Nutzen
+                                Sie getrennte Felder für Aktien und Anleihen, damit die Zielquote korrekt berechnet
+                                wird.</li>
+                            <li><strong>Cash &amp; Tagesgeld:</strong> Hinterlegen Sie Ist-Stände (inkl. Zinsgutschriften),
+                                damit Runway und Liquiditätspuffer stimmen.</li>
+                            <li><strong>Sonstige Zuflüsse:</strong> Prüfen Sie Sonderzahlungen oder Ausgaben, die nicht im
+                                Standardbedarf liegen, bevor Sie den Kapitalfluss ausführen.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="detail-block" style="margin-top: 1rem;">
+                    <h3>Diagnose-Panel lesen</h3>
+                    <p>Das Panel kombiniert Entscheidungsbaum und Handlungsanweisungen:</p>
+                    <ol style="margin-left: 20px; color: var(--text-light);">
+                        <li><strong>Entscheidungsbaum oben links:</strong> Prüft erst Liquidität/Runway, dann
+                            Rebalancing-Bedarf, danach CAPE- oder Drawdown-Bremse. Jeder Knoten zeigt den getesteten
+                            Schwellenwert.</li>
+                        <li><strong>KPIs oben rechts:</strong> Runway (Monate), aktuelle Aktienquote, Floor/Flex-Bedarf,
+                            Drawdown zum Allzeithoch, CAPE-Ampel.</li>
+                        <li><strong>Handlungsanweisungen unten links:</strong> Liste der nötigen Schritte inkl.
+                            Beträge, z.B. „Aktien verkaufen 18.000 € → Geldmarkt“.</li>
+                        <li><strong>Dokumentation unten rechts:</strong> Datenquellen und Zeitstempel des Updates, damit
+                            Entscheidungen nachvollziehbar bleiben.</li>
+                    </ol>
+                    <figure style="margin-top: 1rem;">
+                        <img src="assets/images/diagnose_panel_mock.svg" alt="Mockup des Diagnose-Panels" style="width:100%; max-width: 1100px; border: 1px solid #e0e6ed; border-radius: 12px; box-shadow: var(--card-shadow);">
+                        <figcaption style="color: var(--text-light); margin-top: 0.5rem;">Mockup: Entscheidungsbaum, KPIs,
+                            Handlungsanweisungen und Protokoll im Diagnose-Panel.</figcaption>
+                    </figure>
+                </div>
+
+                <div class="detail-block" style="margin-top: 1rem;" id="balance-kapitalfluss-guide">
+                    <h3>Kapitalfluss praktisch umsetzen</h3>
+                    <ol style="margin-left: 20px; color: var(--text-light);">
+                        <li><strong>Verkauf/Rebalancing:</strong> Entnehmen Sie die genannten Beträge aus dem
+                            Aktien-Depot, falls die Quote über Ziel liegt oder der Runway unter das Ziel fällt.</li>
+                        <li><strong>Geldmarkt auffüllen:</strong> Überweisen Sie Verkaufserlöse auf Tagesgeld/
+                            Geldmarkt, bis der Runway (z.B. 12 Monate) wieder erreicht ist.</li>
+                        <li><strong>Monatsbedarf auszahlen:</strong> Transferieren Sie den Floor/Flex-Betrag vom
+                            Geldmarkt auf das Ausgabenkonto. Keine Aktienverkäufe, wenn die Diagnose „kein
+                            Handlungsbedarf“ meldet.</li>
+                        <li><strong>Überschüsse parken:</strong> Bleibt Cash übrig, schieben Sie ihn zurück auf den
+                            Geldmarkt oder tilgen Sie Kreditlinien; das Panel nennt Prioritäten.</li>
+                    </ol>
+                    <figure style="margin-top: 1rem;">
+                        <img src="assets/images/kapitalfluss_mock.svg" alt="Mockup der Kapitalfluss-Schritte" style="width:100%; max-width: 1100px; border: 1px solid #e0e6ed; border-radius: 12px; box-shadow: var(--card-shadow);">
+                        <figcaption style="color: var(--text-light); margin-top: 0.5rem;">Mockup: Reihenfolge der Schritte
+                            zwischen Depot, Geldmarkt und Ausgabenkonto inklusive Checkliste.</figcaption>
+                    </figure>
                 </div>
             </div>
 
