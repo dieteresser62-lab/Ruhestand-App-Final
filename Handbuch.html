@@ -376,6 +376,21 @@
                         <li><a class="toc-link" data-tab-target="manual" href="#balance-kapitalfluss">Kapitalfluss</a></li>
                     </ol>
                 </li>
+                <li><a class="toc-link" data-tab-target="manual" href="#onboarding-playbook">Onboarding-Playbook</a>
+                    <ol class="toc-sublist">
+                        <li><a class="toc-link" data-tab-target="manual" href="#onboarding-woche">Erste Woche</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#onboarding-jahr">Erstes Jahr</a></li>
+                    </ol>
+                </li>
+                <li><a class="toc-link" data-tab-target="manual" href="#haeufige-probleme">Häufige Probleme</a></li>
+                <li><a class="toc-link" data-tab-target="manual" href="#jahrespflege">Best Practices Jahrespflege</a></li>
+                <li><a class="toc-link" data-tab-target="manual" href="#anhang">Anhang</a>
+                    <ol class="toc-sublist">
+                        <li><a class="toc-link" data-tab-target="manual" href="#anhang-datenquellen">Datenquellen</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#anhang-versionen">Versionshinweise</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#anhang-support">Kontakt &amp; Support</a></li>
+                    </ol>
+                </li>
                 <li><a class="toc-link" data-tab-target="manual" href="#faq">FAQ</a></li>
                 <li><a class="toc-link" data-tab-target="manual" href="#glossar">Glossar</a></li>
             </ol>
@@ -657,6 +672,99 @@
                         <figcaption style="color: var(--text-light); margin-top: 0.5rem;">Mockup: Reihenfolge der Schritte
                             zwischen Depot, Geldmarkt und Ausgabenkonto inklusive Checkliste.</figcaption>
                     </figure>
+                </div>
+            </div>
+
+            <div class="info-card" id="onboarding-playbook" style="margin-top: 2rem;">
+                <h2>Onboarding-Playbook: Erste Woche/Erstes Jahr mit der Suite</h2>
+                <p class="card-intro">Strukturierte Checkliste, damit neue Nutzer schnell produktiv werden.</p>
+                <div class="detail-block" id="onboarding-woche" style="margin-top: 1rem;">
+                    <h3>Erste Woche</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Setup & Zugriff:</strong> Repository klonen oder ZIP laden, <code>index.html</code> öffnen, Tab "Simulator" laden.</li>
+                        <li><strong>Datenbasis füllen:</strong> Startvermögen, Sparrate, Rentenalter und Basis-Ausgaben im Simulator eingeben und erste Simulation speichern.</li>
+                        <li><strong>Balance-Grundlagen:</strong> In der Balance-App einen Testlauf mit Demo-Werten durchführen, um Diagnose-Panel und Kapitalfluss zu verstehen.</li>
+                        <li><strong>Datenablage klären:</strong> Speicherort für exportierte Szenarien (z.B. OneDrive/Nextcloud) definieren und Schreibrechte testen.</li>
+                    </ul>
+                </div>
+                <div class="detail-block" id="onboarding-jahr" style="margin-top: 1rem;">
+                    <h3>Erstes Jahr</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Quartals-Review:</strong> Simulationen bei Lebensereignissen (Bonus, Umzug, Gehaltsänderung) aktualisieren und Benchmarks dokumentieren.</li>
+                        <li><strong>Jahres-Update fest einplanen:</strong> Termin im Kalender blocken, um Inflation, Marktwerte und Bedarfe zu aktualisieren.</li>
+                        <li><strong>Risiko-Governance:</strong> Rebalancing-Schwellen, Notfall-Runway und CAPE-Grenzen in einer kurzen Policy-Notiz festhalten.</li>
+                        <li><strong>Backup & Versionierung:</strong> Exporte versionieren (z.B. YYYY-MM) und mindestens zweifach sichern, um Datenverlust zu vermeiden.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="info-card" id="haeufige-probleme" style="margin-top: 2rem;">
+                <h2>Häufige Probleme</h2>
+                <div class="detail-block" style="margin-top: 1rem;">
+                    <h3>Keine Internetverbindung für EZB-Daten</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Symptom:</strong> Jahres-Update bleibt bei „Inflationsdaten laden“ hängen.</li>
+                        <li><strong>Sofortmaßnahme:</strong> Internetverbindung prüfen, VPN/Firewall temporär deaktivieren, Seite neu laden.</li>
+                        <li><strong>Fallback:</strong> Inflationsrate manuell eintragen (Feld „Inflation manuell“ im Jahres-Update), danach Speichern drücken.</li>
+                        <li><strong>Prävention:</strong> Vor geplantem Update Offline-Sperren (Flugmodus/Firewall) prüfen und Datenquelle in <code>balance-config.js</code> nicht ändern.</li>
+                    </ul>
+                </div>
+                <div class="detail-block" style="margin-top: 1rem;">
+                    <h3>Ungültige Eingaben</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Symptom:</strong> Felder werden rot markiert oder Buttons bleiben deaktiviert.</li>
+                        <li><strong>Checkliste:</strong> Nur Zahlen ohne Sonderzeichen verwenden, Dezimaltrenner als Punkt/Komma akzeptiert; Pflichtfelder (Vermögen, Bedarf, Sparrate) ausfüllen.</li>
+                        <li><strong>Fehlerbehebung:</strong> Seite aktualisieren, Eingaben schrittweise wiederherstellen und auf Plausibilität (keine negativen Werte, realistische Quoten) prüfen.</li>
+                        <li><strong>Dauerhafte Lösung:</strong> Eigene Default-Vorlagen mit validierten Werten als JSON speichern und beim Start laden.</li>
+                    </ul>
+                </div>
+                <div class="detail-block" style="margin-top: 1rem;">
+                    <h3>Speichern und Laden</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Speichern schlägt fehl:</strong> Browser-Storage eventuell blockiert. Drittanbieter-Blocking oder Private Mode deaktivieren, Seite im normalen Modus neu öffnen.</li>
+                        <li><strong>Datei-Export nicht auffindbar:</strong> Download-Ordner des Browsers prüfen und einheitlich auf Cloud-Speicher umstellen.</li>
+                        <li><strong>Laden liefert alte Werte:</strong> Cache leeren (Strg+F5) und sicherstellen, dass die korrekte Datei gewählt wurde; Versionsstempel im Dateinamen verwenden.</li>
+                        <li><strong>Backup-Tipp:</strong> Nach jedem Jahres-Update Export erstellen und in der Haushalts-Dokumentation verlinken.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="info-card" id="jahrespflege" style="margin-top: 2rem;">
+                <h2>Best Practices für die jährliche Pflege</h2>
+                <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                    <li><strong>Fixen Termin setzen:</strong> Einmal pro Jahr (idealerweise Januar) alle Eingaben aktualisieren und Ergebnisse protokollieren.</li>
+                    <li><strong>Datenquellen einfrieren:</strong> Für Vergleiche dasselbe Inflations- und Kursdatum verwenden; danach Export mit Zeitstempel ablegen.</li>
+                    <li><strong>Delta-Review:</strong> Änderungen bei Vermögen, Bedarf und Erfolgswahrscheinlichkeit gegenüber Vorjahr notieren; große Abweichungen kommentieren.</li>
+                    <li><strong>Handlungsschritte prüfen:</strong> Rebalancing und Runway-Anpassungen sofort terminieren, damit der Plan nicht liegen bleibt.</li>
+                    <li><strong>Risiko-Parameter bestätigen:</strong> Ziel-Aktienquote, CAPE-Grenzen und Runway-Minimum jährlich bestätigen oder schriftlich anpassen.</li>
+                </ul>
+            </div>
+
+            <div class="info-card" id="anhang" style="margin-top: 2rem;">
+                <h2>Anhang</h2>
+                <div class="detail-block" id="anhang-datenquellen" style="margin-top: 1rem;">
+                    <h3>Datenquellen</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Inflation:</strong> EZB-HICP über die öffentliche Schnittstelle (Fallback: manuelle Eingabe im Jahres-Update).</li>
+                        <li><strong>Marktdaten:</strong> Shiller-CAPE-Zeitreihe und ETF-Schlusskurse gemäß Konfiguration in <code>balance-config.js</code>.</li>
+                        <li><strong>Simulationsannahmen:</strong> Rendite-/Volatilitätsparameter und Korrelationen in den <code>simulator-*</code>-Modulen dokumentiert.</li>
+                    </ul>
+                </div>
+                <div class="detail-block" id="anhang-versionen" style="margin-top: 1rem;">
+                    <h3>Versionshinweise</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Release-Stand:</strong> Siehe <code>README.md</code> für die aktuelle Version und Changelog-Notizen.</li>
+                        <li><strong>Breaking Changes:</strong> Bei Modellwechseln (z.B. neue CAPE-Logik) alte Exporte archivieren und neu simulieren.</li>
+                        <li><strong>Validierung:</strong> Nach Updates mindestens einen Smoke-Test (Simulator + Balance) durchführen und Ergebnisse kurz protokollieren.</li>
+                    </ul>
+                </div>
+                <div class="detail-block" id="anhang-support" style="margin-top: 1rem;">
+                    <h3>Kontakt &amp; Support</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Feedback:</strong> Issues im Repository anlegen oder per E-Mail an das Maintainer-Team senden.</li>
+                        <li><strong>Hilfesuche:</strong> FAQ und Glossar prüfen; bei technischen Problemen Log-Auszug (Konsole) beilegen.</li>
+                        <li><strong>Response-Zeiten:</strong> Innerhalb von 3 Werktagen für Fehlerberichte, komplexe Anfragen nach Aufwand.</li>
+                    </ul>
                 </div>
             </div>
 
