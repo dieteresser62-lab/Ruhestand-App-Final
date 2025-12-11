@@ -156,6 +156,45 @@
             display: block;
         }
 
+        /* Table of Contents */
+        .toc-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--card-shadow);
+            border: 1px solid rgba(0, 0, 0, 0.03);
+        }
+
+        .toc-card h2 {
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+        }
+
+        .toc-list {
+            list-style: none;
+            margin-left: 0;
+            color: var(--text-light);
+            line-height: 1.8;
+        }
+
+        .toc-list li {
+            margin-left: 0.25rem;
+        }
+
+        .toc-list a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .toc-sublist {
+            list-style: none;
+            margin-left: 1.25rem;
+            margin-top: 0.25rem;
+        }
+
         /* Cards */
         .info-card {
             background: white;
@@ -316,11 +355,37 @@
             <p class="subtitle">Anleitungen und Hilfestellungen für Ihre Finanzplanung</p>
         </div>
 
+        <div class="toc-card" id="inhaltsverzeichnis">
+            <h2>Inhaltsverzeichnis</h2>
+            <ol class="toc-list">
+                <li><a class="toc-link" data-tab-target="manual" href="#ueberblick">Überblick</a></li>
+                <li><a class="toc-link" data-tab-target="manual" href="#installation-start">Installation &amp; Start</a></li>
+                <li><a class="toc-link" data-tab-target="manual" href="#simulator">Simulator</a>
+                    <ol class="toc-sublist">
+                        <li><a class="toc-link" data-tab-target="manual" href="#simulator-eingaben">Eingaben</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#simulator-parameter">Parameter</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#simulator-start">Simulation starten</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#simulator-ergebnisse">Ergebnisse deuten</a></li>
+                    </ol>
+                </li>
+                <li><a class="toc-link" data-tab-target="manual" href="#balance-app">Balance-App</a>
+                    <ol class="toc-sublist">
+                        <li><a class="toc-link" data-tab-target="manual" href="#balance-jahresupdate">Jahres-Update</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#balance-diagnose">Diagnose</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#balance-handlungsschritte">Handlungsschritte</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#balance-kapitalfluss">Kapitalfluss</a></li>
+                    </ol>
+                </li>
+                <li><a class="toc-link" data-tab-target="manual" href="#faq">FAQ</a></li>
+                <li><a class="toc-link" data-tab-target="manual" href="#glossar">Glossar</a></li>
+            </ol>
+        </div>
+
         <div class="tabs-container">
-            <button class="tab-btn active" onclick="switchTab('quickstart')">
+            <button class="tab-btn" data-tab-id="quickstart" onclick="switchTab('quickstart')">
                 🚀 Schnellstart
             </button>
-            <button class="tab-btn" onclick="switchTab('manual')">
+            <button class="tab-btn active" data-tab-id="manual" onclick="switchTab('manual')">
                 📖 Detailliertes Handbuch
             </button>
         </div>
@@ -328,7 +393,7 @@
         <!-- ============================================= -->
         <!-- TAB 1: SCHNELLSTART                           -->
         <!-- ============================================= -->
-        <div id="quickstart" class="content-section active">
+        <div id="quickstart" class="content-section">
 
             <!-- Simulator Quick Start -->
             <div class="info-card">
@@ -420,162 +485,222 @@
         <!-- ============================================= -->
         <!-- TAB 2: DETAILLIERTES HANDBUCH                 -->
         <!-- ============================================= -->
-        <div id="manual" class="content-section">
+        <div id="manual" class="content-section active">
 
-            <div class="info-card">
-                <h2>Einleitung & Philosophie</h2>
-                <p>Diese Suite basiert auf der modernen Portfoliotheorie und historischen Marktdaten (S&P 500 seit
-                    1871). Ziel ist es, nicht mit einer "durchschnittlichen" Rendite zu rechnen, sondern das Risiko von
-                    extremen Marktphasen (Sequence of Returns Risk) transparent zu machen.</p>
+            <div class="info-card" id="ueberblick">
+                <h2>Überblick</h2>
+                <p>Die Ruhestand-Apps Suite bündelt zwei Kernwerkzeuge: den <strong>Simulator</strong> für langfristige
+                    Prognosen und die <strong>Balance-App</strong> für laufende Entscheidungen in der Entnahmephase. Das
+                    Handbuch ist nach den typischen Schritten gegliedert und bietet schnelle Sprungmarken über das
+                    Inhaltsverzeichnis.</p>
             </div>
 
-            <!-- Balance Deep Dive -->
-            <div class="info-card" style="border-left: 5px solid var(--secondary-color);">
-                <h2>⚖️ Balance App: Konzepte & Details</h2>
-                <p class="card-intro">Die Balance App ist Ihr Cockpit für die Entnahmephase. Sie setzt die Strategie des
-                    "Prime Harvesting" und "Cash Buffer" um.</p>
+            <div class="info-card" id="installation-start">
+                <h2>Installation &amp; Start</h2>
+                <p>Zum Start genügt ein moderner Browser (Chrome, Edge oder Firefox). Laden Sie das Repository lokal
+                    und öffnen Sie <code>index.html</code>. Alternativ nutzen Sie den Windows-Starter
+                    <code>start_webserver.cmd</code>, um die Suite als lokalen Webserver auszuführen.</p>
+                <div class="detail-block" style="margin-top: 1.25rem;">
+                    <h3>Praktische Hinweise</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li>Sichern Sie Lese- und Schreibrechte, damit lokale Daten (z.B. Szenarien) gespeichert werden
+                            können.</li>
+                        <li>Für Live-Daten (Inflation, Kurse) ist eine Internetverbindung notwendig; die Simulation
+                            funktioniert auch offline.</li>
+                    </ul>
+                </div>
+            </div>
 
-                <div class="manual-grid" style="margin-top: 2rem;">
-                    <div class="detail-block">
-                        <h3>🌊 Runway & Liquidität</h3>
-                        <p>Die "Runway" ist Ihre Lebensversicherung gegen Börsencrashs.</p>
-                        <dl class="term-list">
-                            <dt>Ziel-Liquidität (Target)</dt>
-                            <dd>Anzustrebender Puffer in sicheren Anlagen (Cash + Geldmarkt). Standard: 36 Monate (3
-                                Jahre) Ausgaben.</dd>
-                            <dt>Minimum Runway</dt>
-                            <dd>Die absolute Untergrenze (z.B. 24 Monate). Fällt die Liquidität darunter (weil der
-                                Aktienmarkt lange schlecht lief), wird auch im Verlust verkauft ("Not-Auffüllung"), um
-                                zahlungsfähig zu bleiben.</dd>
-                        </dl>
+            <div class="info-card" id="simulator">
+                <h2>Simulator</h2>
+                <p class="card-intro">Simulieren Sie Ansparphase, Ruhestandseintritt und Entnahmeverhalten in wenigen
+                    Schritten.</p>
+                <div class="manual-grid" style="margin-top: 1.5rem;">
+                    <div class="detail-block" id="simulator-eingaben">
+                        <h3>Eingaben</h3>
+                        <p>Tragen Sie Vermögen, monatliche Sparrate sowie gewünschtes Renteneintrittsalter ein. Fügen
+                            Sie Ihre erwarteten Ausgaben im Ruhestand (Grundbedarf und variable Kosten) hinzu.</p>
                     </div>
-
-                    <div class="detail-block">
-                        <h3>🔄 Skim & Fill (Abschöpfen & Auffüllen)</h3>
-                        <p>Die intelligente Entnahmestrategie:</p>
-                        <dl class="term-list">
-                            <dt>Gute Börsenphase</dt>
-                            <dd>Ist die Aktienquote zu hoch (> Ziel + Toleranz), wird "abgeschöpft" (Skimming). Aktien
-                                werden verkauft, Gewinne mitgenommen und die Liquidität aufgefüllt.</dd>
-                            <dt>Schlechte Börsenphase</dt>
-                            <dd>Ist die Aktienquote niedrig, werden <strong>keine</strong> Aktien verkauft. Sie leben
-                                von Ihrer Liquidität (Runway). Aktien werden nur im absoluten Notfall (siehe Minimum
-                                Runway) angefasst.</dd>
-                        </dl>
+                    <div class="detail-block" id="simulator-parameter">
+                        <h3>Parameter</h3>
+                        <p>Passen Sie optional die Asset-Allokation (Aktienquote), sichere Rentenbestandteile und
+                            Inflationsannahmen an. Die Standardwerte sind konservativ gewählt und dienen als
+                            Startpunkt.</p>
                     </div>
-
-                    <div class="detail-block">
-                        <h3>🌐 Jahres-Update Funktion</h3>
-                        <p>Ein Klick erledigt komplexe Verwaltungsaufgaben:</p>
-                        <ul
-                            style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Inflation:</strong> Ruft offizielle EZB-Daten ab.</li>
-                            <li><strong>Bedarf:</strong> Passt Floor- und Flex-Ausgaben automatisch an die Inflation an.
-                            </li>
-                            <li><strong>Alter:</strong> Erhöht Ihr Alter um 1 Jahr.</li>
-                            <li><strong>Markt-Kontext:</strong> Rückt historische Vergleichsdaten (CAPE) weiter.</li>
-                        </ul>
+                    <div class="detail-block" id="simulator-start">
+                        <h3>Simulation starten</h3>
+                        <p>Klicken Sie auf <strong>"Simulation starten"</strong>. Die Engine berechnet mehrere hundert
+                            bis tausend Marktszenarien, um realistische Schwankungen abzubilden.</p>
                     </div>
-
-                    <div class="detail-block">
-                        <h3>🤖 KI-Diagnose</h3>
-                        <p>Klicken Sie auf den "Diagnose"-Button im Ergebnis-Panel.</p>
-                        <p style="margin-top: 10px; color: var(--text-light);">
-                            Sie sehen dort genau, <em>warum</em> die App eine Entscheidung getroffen hat. Ein
-                            Entscheidungsbaum zeigt Ihnen Schritt für Schritt die Logik (z.B. "Aktienquote > 65%? JA ->
-                            Skimming aktiv").
-                        </p>
-                    </div>
-
-                    <div class="detail-block">
-                        <h3>🥇 Gold-Strategie (Optional)</h3>
-                        <p>Ein separater Baustein zur Diversifikation.</p>
-                        <dl class="term-list">
-                            <dt>Rebalancing Band</dt>
-                            <dd>Gold wird nur selten gehandelt (breites Band, z.B. +/- 25%), um Transaktionskosten zu
-                                sparen.</dd>
-                            <dt>Steuerfrei</dt>
-                            <dd>Die Simulation kann berücksichtigen, dass physisches Gold nach 1 Jahr Haltedauer
-                                steuerfrei ist.</dd>
-                        </dl>
+                    <div class="detail-block" id="simulator-ergebnisse">
+                        <h3>Ergebnisse deuten</h3>
+                        <p>Achten Sie auf die <strong>Erfolgswahrscheinlichkeit</strong> (Ziel: 90-95%+). Nutzen Sie die
+                            Heatmap des <em>Parameter Sweep</em>, um zu sehen, wie Sparrate oder späterer Ruhestand das
+                            Ergebnis verändern.</p>
                     </div>
                 </div>
             </div>
 
-            <div class="info-card">
-                <h2>📊 Allgemeine Konzepte</h2>
-                <div class="manual-grid">
-                    <!-- Ansparphase -->
-                    <div class="detail-block">
-                        <h3>📈 Ansparphase</h3>
-                        <p>Dieser Bereich betrifft die Zeit bis zu Ihrem Ruhestand.</p>
-                        <dl class="term-list">
-                            <dt>Sparrate / Dynamik</dt>
-                            <dd>Der Betrag, den Sie monatlich zusätzlich investieren, sowie dessen jährliche Steigerung.
-                            </dd>
-                        </dl>
+            <div class="info-card" id="balance-app" style="border-left: 5px solid var(--secondary-color);">
+                <h2>Balance-App</h2>
+                <p class="card-intro">Die Balance-App setzt das Prime-Harvesting-Konzept praktisch um und führt Sie durch
+                    jeden Jahresschritt.</p>
+                <div class="manual-grid" style="margin-top: 1.5rem;">
+                    <div class="detail-block" id="balance-jahresupdate">
+                        <h3>Jahres-Update</h3>
+                        <p>Starten Sie das Jahres-Update, um Inflation, Alter und Markt-Kontext automatisch
+                            fortzuschreiben. Tragen Sie anschließend den aktuellen Marktwert Ihrer Depots und
+                            Cash-Konten ein.</p>
                     </div>
-
-                    <!-- Monte Carlo -->
-                    <div class="detail-block">
-                        <h3>🎲 Monte-Carlo Simulation</h3>
-                        <p>Wir simulieren 500+ verschiedene 40-Jahres-Verläufe basierend auf echten historischen Daten
-                            (Shiller Data).</p>
-                        <dl class="term-list">
-                            <dt>Erfolgsquote</dt>
-                            <dd>Der Prozentsatz der Szenarien, in denen Ihr Geld bis zum Ende gereicht hat ( Ziel >
-                                95%).</dd>
-                        </dl>
+                    <div class="detail-block" id="balance-diagnose">
+                        <h3>Diagnose</h3>
+                        <p>Der Diagnose-Button erklärt jede Entscheidung der App. Ein Entscheidungsbaum zeigt die
+                            geprüften Schwellen (z.B. Aktienquote &gt; Ziel + Toleranz?).</p>
                     </div>
-
-                    <!-- Parameter Sweep -->
-                    <div class="detail-block">
-                        <h3>🔍 Parameter Sweep</h3>
-                        <p>Ein mächtiges Werkzeug für "Was-wäre-wenn" Analysen.</p>
-                        <p style="margin-top: 10px; font-size: 0.95rem; color: var(--text-light);">
-                            Zeigt als Heatmap (Grün/Rot), welche Kombinationen aus Sparrate und Renteneintritt sicher
-                            sind.
-                        </p>
+                    <div class="detail-block" id="balance-handlungsschritte">
+                        <h3>Handlungsschritte</h3>
+                        <p>Im Panel „Ergebnisse &amp; Handlungsschritte“ sehen Sie klare Aufgaben wie
+                            „Rebalancing durchführen“ oder „kein Handlungsbedarf“. Folgen Sie den vorgeschlagenen
+                            Reihenfolgen, um Transaktionskosten gering zu halten.</p>
+                    </div>
+                    <div class="detail-block" id="balance-kapitalfluss">
+                        <h3>Kapitalfluss</h3>
+                        <p>Die App fasst zusammen, welche Beträge zwischen Aktien, Cash und Entnahmekonten fließen
+                            sollen. So können Sie die Transaktionen bei Ihrer Bank vollständig und nachvollziehbar
+                            ausführen.</p>
                     </div>
                 </div>
             </div>
 
-            <div class="info-card" style="margin-top: 2rem;">
+            <div class="info-card" id="faq" style="margin-top: 2rem;">
                 <h2>Häufige Fragen (FAQ)</h2>
                 <dl class="term-list">
                     <dt>Warum reichen durchschnittliche 7% Rendite nicht?</dt>
-                    <dd>Weil Verluste am Anfang der Entnahmephase ("Sequence of Return Risk") das Depot so stark
-                        dezimieren können, dass es sich nicht mehr erholt, selbst wenn die Renditen später gut sind.
-                    </dd>
+                    <dd>Verluste zu Beginn der Entnahmephase (Sequence of Return Risk) können das Depot so stark
+                        verkleinern, dass es sich trotz späterer Gewinne nicht erholt. Unsere Simulation zeigt daher
+                        Spannbreiten statt nur Mittelwerte.</dd>
 
                     <dt>Wie oft sollte ich Rebalancing machen?</dt>
-                    <dd>Einmal jährlich (z.B. zum Jahreswechsel) hat sich als pragmatisch und effektiv erwiesen. Zu
-                        häufiges Handeln verursacht unnötige Kosten.</dd>
+                    <dd>Ein jährlicher Rhythmus (z.B. zum Jahreswechsel) balanciert Aufwand, Steuern und
+                        Transaktionskosten sinnvoll aus.</dd>
+
+                    <dt>Kann ich die Simulation offline nutzen?</dt>
+                    <dd>Ja. Die Berechnungen laufen lokal im Browser. Nur optionale Echtzeitdaten (Inflation,
+                        Marktpreise) benötigen eine Internetverbindung.</dd>
+                </dl>
+            </div>
+
+            <div class="info-card" id="glossar" style="margin-top: 2rem;">
+                <h2>Glossar</h2>
+                <dl class="term-list">
+                    <dt>Erfolgswahrscheinlichkeit</dt>
+                    <dd>Prozentanteil der simulierten Szenarien, in denen das Portfolio bis ans Laufzeitende reicht.</dd>
+
+                    <dt>Runway</dt>
+                    <dd>Liquiditätspuffer in sicheren Anlagen (Cash/Geldmarkt), aus dem Ausgaben in schwachen
+                        Marktphasen bestritten werden.</dd>
+
+                    <dt>Skim &amp; Fill</dt>
+                    <dd>Strategie, bei der in guten Börsenphasen Gewinne „abgeschöpft“ und die Liquidität aufgefüllt
+                        werden, während in schwachen Phasen auf Verkäufe verzichtet wird.</dd>
+
+                    <dt>Parameter Sweep</dt>
+                    <dd>Heatmap, die zeigt, wie unterschiedliche Kombinationen aus Sparrate und Rentenbeginn die
+                        Erfolgswahrscheinlichkeit beeinflussen.</dd>
                 </dl>
             </div>
         </div>
     </div>
 
     <script>
+        /**
+         * Aktiviert einen Tab und blendet alle anderen aus.
+         * Design-Entscheidung: Die Zuordnung Button → Tab erfolgt über data-Attribute statt Array-Indizes,
+         * um spätere Tab-Erweiterungen robust zu unterstützen.
+         * @param {string} tabId - DOM-ID des Tab-Containers, der angezeigt werden soll.
+         * @returns {void}
+         */
         function switchTab(tabId) {
-            // Hide all sections
+            // Eingabe defensiv prüfen, damit fehlerhafte Aufrufe die Navigation nicht brechen.
+            if (typeof tabId !== 'string' || !tabId.trim()) {
+                console.warn('switchTab wurde ohne gültige Tab-ID aufgerufen');
+                return;
+            }
+
+            const normalizedTabId = tabId.trim();
+            const targetSection = document.getElementById(normalizedTabId);
+
+            // Falls der angeforderte Tab nicht existiert, nicht weiterarbeiten und klar loggen.
+            if (!targetSection) {
+                console.warn('Tab-Abschnitt nicht gefunden:', normalizedTabId);
+                return;
+            }
+
+            // Alle Abschnitte umschalten, damit nur der gewählte Bereich sichtbar ist.
             document.querySelectorAll('.content-section').forEach(section => {
-                section.classList.remove('active');
+                section.classList.toggle('active', section.id === normalizedTabId);
             });
 
-            // Deactivate all buttons
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.remove('active');
+            const tabButtons = document.querySelectorAll('.tab-btn');
+
+            // Button-Zuordnung über data-tab-id statt feste Positionen, um künftige Tabs zu erleichtern.
+            tabButtons.forEach(button => {
+                const buttonTabId = button.dataset.tabId;
+                const isTargetButton = buttonTabId === normalizedTabId;
+                button.classList.toggle('active', isTargetButton);
             });
 
-            // Activate selected section and button
-            document.getElementById(tabId).classList.add('active');
-
-            // Find button that triggers this tabId
-            const buttons = document.querySelectorAll('.tab-btn');
-            if (tabId === 'quickstart') buttons[0].classList.add('active');
-            if (tabId === 'manual') buttons[1].classList.add('active');
+            // Fallback: Sollte kein Button matchen, markieren wir den ersten, um den UI-Zustand konsistent zu halten.
+            const hasActiveButton = Array.from(tabButtons).some(button => button.classList.contains('active'));
+            if (!hasActiveButton && tabButtons.length > 0) {
+                tabButtons[0].classList.add('active');
+            }
         }
+
+        /**
+         * Verkettet Inhaltsverzeichnis-Links mit den Tabs und sorgt für sauberes Scrollen zu den Ankern.
+         * Design-Entscheidung: Wir verhindern die Standardnavigation, schalten erst den Tab sichtbar und
+         * scrollen danach kontrolliert, damit Ziele auch dann erreichbar sind, wenn sie zuvor verborgen waren.
+         * @returns {void}
+         */
+        function setupTocNavigation() {
+            const tocLinks = document.querySelectorAll('.toc-link');
+
+            // Defensive Absicherung: Sollte das Inhaltsverzeichnis fehlen, sauber loggen und abbrechen.
+            if (tocLinks.length === 0) {
+                console.warn('Kein Inhaltsverzeichnis gefunden; TOC-Navigation wird übersprungen');
+                return;
+            }
+
+            tocLinks.forEach(link => {
+                // Aktiviert bei Klick den relevanten Tab, damit der Zielanker nicht versteckt bleibt.
+                link.addEventListener('click', event => {
+                    event.preventDefault();
+
+                    const targetTab = link.getAttribute('data-tab-target') || 'manual';
+                    const anchorId = link.getAttribute('href');
+
+                    switchTab(targetTab);
+
+                    // Scroll erst nach dem Tab-Wechsel, damit das Ziel sichtbar ist.
+                    if (anchorId && anchorId.startsWith('#')) {
+                        const anchorElement = document.querySelector(anchorId);
+                        if (anchorElement) {
+                            requestAnimationFrame(() => {
+                                anchorElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                // URL-Hash aktualisieren, damit die Navigation teilbar bleibt.
+                                history.replaceState(null, '', anchorId);
+                            });
+                        } else {
+                            console.warn('Ankerziel nicht gefunden:', anchorId);
+                        }
+                    }
+                });
+            });
+        }
+
+        // Standardmäßig das detaillierte Handbuch offen halten, damit alle Anker direkt erreichbar sind.
+        setupTocNavigation();
     </script>
 </body>
 
