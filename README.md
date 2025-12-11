@@ -27,6 +27,20 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 * Szenario-Log-Analyse mit 30 auswählbaren Szenarien: 15 charakteristische (Perzentile, Pflege-Extremfälle, Risiko-Szenarien) und 15 zufällige Samples für typisches Verhalten.
 * Checkboxen für Pflege-Details und detailliertes Log, JSON/CSV-Export für ausgewählte Szenarien.
 
+#### Schrittfolge für den Simulator (Simulator.html)
+1. **Rahmendaten ausfüllen:** In der Registerkarte „Rahmendaten“ die Kernfelder belegen – u. a. `Gesamtvermögen` (Default: 2 700 000 €), `Depotwert Alt` (1 350 000 €), `Ziel-Liquidität` (200 000 €), `Floor-Bedarf p.a.` (24 000 €) und `Flex-Bedarf p.a.` (28 000 €). Fortgeschrittene Felder wie Gold-Strategie und Runway/Rebalancing bleiben mit sinnvollen Startwerten vorbelegt und können bei Bedarf angepasst werden.
+2. **Renten- und Einkommenstränge prüfen:** Unter den Reitern für Rente/Partner (eingebettet in den Rahmendaten) Startalter, Indexierung (fix, Lohn oder CPI), Witwenlogik und sichere Rentenanteile setzen. Standardindexierung ist auf fixe Anpassung ausgelegt; Prozentfelder werden automatisch deaktiviert, wenn eine lohn- oder inflationsgekoppelte Anpassung gewählt wird.
+3. **Monte-Carlo-Parameter justieren:** Im Tab „Monte-Carlo“ die Anzahl der Läufe (`Anzahl Simulationen`, Default: 1 000), die historischen Quellen (z. B. Regime- oder Block-Bootstrap) und die Aktienquote konfigurieren. Für erste Analysen genügt der Default-Satz, der auf ein balanciertes Wachstums-/Risikoprofil optimiert ist.
+4. **Parameter-Sweep (Tab „Sweep“) ausführen:** Typischer Ablauf: einen Parameter (z. B. `Aktienquote`, `Sparrate` oder `Renteneintritt`) freigeben, Sweep-Grenzen und Schrittweite setzen und den Sweep starten. Der Auto-Optimize-Modus wählt sinnvolle Presets, clont die Basiskonfiguration defensiv und schützt Partner:innendaten. Ergebnisse erscheinen als Heatmap; Badge-Markierungen zeigen invarianten Verletzungen (z. B. Rente-2-Schutz) an.
+5. **Ergebnisse interpretieren:** In der Ergebnisübersicht die Kennzahl „Erfolgswahrscheinlichkeit“ heranziehen; Zielwert ist üblicherweise **> 95 %** für robuste Pläne. Heatmaps zeigen Sensitivitäten einzelner Parameter, das Szenario-Log bietet typische und Extrem-Verläufe (inkl. Pflegekosten) und lässt sich als JSON/CSV exportieren. Beispielhafte Visualisierung siehe `assets/images/retirement_hero_illustration.png` (als Referenzabbildung einbindbar).
+
+**Häufige Eingabefehler und Korrekturen**
+* Negative oder unrealistisch hohe Werte (z. B. `Gesamtvermögen` < 0 oder CAPE > 80) führen zu Warnungen – bitte auf plausible Spannen korrigieren.
+* Prozentwerte im Sweep vergessen zu normalisieren: sicherstellen, dass Quoten in Prozent eingegeben werden (z. B. 60 statt 0.6) oder per Tooltip prüfen; der Simulator clamp’t intern, weist aber auf Fehleingaben hin.
+* Fehlende Pflichtfelder nach Tab-Wechsel: Wenn das UI Inputs deaktiviert (z. B. Rentenprozente bei CPI-Indexierung), zuerst den Anpassungsmodus zurück auf „fix“ stellen oder den Wert via Reset-Button neu laden und anschließend den gewünschten Modus wählen.
+* Konflikte zwischen Partner:inneneingaben (Rente-2-Invarianz): Sweep-Wächter meldet blockierte Felder; Korrektur durch Spiegeln der Einstellungen in beiden Rententabs oder Deaktivierung des Sweep für geschützte Felder.
+* Browser blockiert CSV/JSON-Export oder Snapshots: Pop-up/Download-Berechtigungen prüfen oder alternativen Browser mit File-System-Access-Unterstützung verwenden.
+
 #### Ansparphase (Accumulation Phase)
 
 Der Simulator unterstützt nun optional eine Ansparphase vor dem Renteneintritt:
