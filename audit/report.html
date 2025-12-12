@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Ruhestand-App Auditbericht</title>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; max-width: 960px; margin: 0 auto; padding: 1.5rem; line-height: 1.6; }
+    nav { position: sticky; top: 0; background: #f8f9fa; padding: 0.5rem 0.75rem; border-bottom: 1px solid #ddd; margin-bottom: 1rem; }
+    nav a { margin-right: 1rem; color: #0077b6; text-decoration: none; font-weight: 600; }
+    nav a:hover { text-decoration: underline; }
+    h1, h2, h3 { line-height: 1.25; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.95rem; }
+    th, td { border: 1px solid #ccc; padding: 0.5rem 0.6rem; vertical-align: top; }
+    th { background: #f0f2f5; text-align: left; }
+    code { background: #f6f8fa; padding: 0.1rem 0.25rem; border-radius: 4px; }
+    pre { background: #f6f8fa; padding: 0.75rem; border-radius: 6px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="#executive">Executive Summary</a>
+    <a href="#architektur">Architektur</a>
+    <a href="#module">Module</a>
+    <a href="#guardrails">Guardrails</a>
+    <a href="#assumptions">Annahmen</a>
+    <a href="#daten">Datenquellen</a>
+    <a href="#tests">Tests</a>
+    <a href="#bewertung">Bewertung</a>
+    <a href="#risiken">Risiken</a>
+    <a href="#evidence">Evidence Index</a>
+  </nav>
+
+  <h1>Ruhestand-App Auditbericht</h1>
+
+  <h2 id="executive">Executive Summary</h2>
+  <ul>
+    <li>Engine steuert Entnahmen über Guardrails (Entnahmequote, realer Drawdown, Runway) und liefert Diagnosepfade für die UI.【F:engine/planners/SpendingPlanner.mjs†L12-L168】</li>
+    <li>Simulator besitzt Fail-Safe-Liquiditätslogik (Floor-Deckung, Notverkäufe) sowie Pflege- und Rentenhandling pro Jahr.【F:simulator-engine.js†L24-L200】</li>
+    <li>Datengrundlage umfasst Pflegeprogression aus dem Barmer-Pflegereport und statische historische Marktreihen ohne Aktualisierungsautomatismen.【F:simulator-data.js†L5-L120】</li>
+    <li>Tests decken Parität zwischen Engine und Simulator sowie Pflege-Dualfälle ab; Browserabhängigkeit begrenzt Automatisierung.【F:sim-parity-smoketest.js†L3-L66】【F:test-dual-care.js†L3-L119】</li>
+    <li>Methodik robust dokumentiert, jedoch fehlende Quellenverlinkungen und begrenzte Testtiefe für Steuern/DE-Spezifika.</li>
+  </ul>
+
+  <h2 id="architektur">Architektur</h2>
+  <pre><code class="language-mermaid">graph TD
+  UI_Balance[Balance UI] -->|Inputs| EngineAPI
+  UI_Simulator[Simulator UI] -->|Inputs| Ruhestandsmodell_v30
+  EngineAPI --> Validator[InputValidator]
+  Validator --> Market[MarketAnalyzer]
+  Market --> Planner[SpendingPlanner]
+  Planner --> Trans[TransactionEngine]
+  Trans --> Results[UI/Diagnosis]
+  SimulatorEngine[Simulator Engine] --> MonteCarlo[Monte Carlo Runner]
+  SimulatorEngine --> Pflege[Care Logic]
+  MonteCarlo --> Results
+</code></pre>
+
+  <h2 id="module">Module-Übersicht</h2>
+  <table>
+    <tr><th>Modul</th><th>Zweck</th><th>Zentrale Funktionen</th><th>Inputs → Outputs</th><th>Evidenz</th></tr>
+    <tr><td>SpendingPlanner</td><td>Jahresweise Entnahme- und Guardrail-Logik</td><td><code>determineSpending</code>, <code>_applyGuardrails</code></td><td>Markt, Bedarf, Runway → Entnahmeplan &amp; Diagnose</td><td>【F:engine/planners/SpendingPlanner.mjs†L12-L168】</td></tr>
+    <tr><td>Simulator Engine</td><td>Jahres-Loop mit Liquiditäts-Guard, Pflegekosten, Verkäufen</td><td><code>simulateOneYear</code>, <code>computeLiqNeedForFloor</code>, <code>sellAssetForCash</code></td><td>Portfolio, Inputs, Marktdaten → Jahresergebnis</td><td>【F:simulator-engine.js†L24-L200】</td></tr>
+    <tr><td>Simulator Data</td><td>Statische Pflege- und Marktdaten</td><td>Konstanten</td><td>Eingebettete Quellen → Datensätze für Simulation</td><td>【F:simulator-data.js†L5-L120】</td></tr>
+  </table>
+
+  <h2 id="guardrails">Guardrails &amp; Trigger</h2>
+  <table>
+    <tr><th>Regel</th><th>Definition</th><th>Parameter</th><th>Effekt</th><th>Evidenz</th></tr>
+    <tr><td>Entnahme-Guardrails</td><td>Entnahmequote, realer Drawdown, Runway vs. Schwellen; optionale Inflation-/Budget-Caps</td><td><code>CONFIG.THRESHOLDS</code>, Profil-Runway, Ziel-Runway</td><td>Kürzungen/Diagnose, verhindert riskante Entnahmen</td><td>【F:engine/planners/SpendingPlanner.mjs†L109-L157】</td></tr>
+    <tr><td>Fail-Safe Liquidität</td><td>Mindest-Cash für Floor, Notverkäufe von Gold/Aktien</td><td><code>inflatedFloor</code>, <code>runwayTargetMonths</code>, <code>minGold</code></td><td>Erzwingt Liquidität, auch bei Zielverfehlung</td><td>【F:simulator-engine.js†L24-L161】</td></tr>
+  </table>
+
+  <h2 id="assumptions">Annahmen</h2>
+  <table>
+    <tr><th>Thema</th><th>Default/Range</th><th>Kontext</th><th>Evidenz</th></tr>
+    <tr><td>Runway-Ziel</td><td>Default 12 Monate, fallback bei ungültigen Werten</td><td>Cash-Guard im Simulator</td><td>【F:simulator-engine.js†L50-L55】</td></tr>
+    <tr><td>Floor-Deckung</td><td>0 € Bedarf akzeptiert, wenn Rente Floor abdeckt</td><td>Verhindert künstliche Verkäufe</td><td>【F:simulator-engine.js†L31-L45】</td></tr>
+    <tr><td>Pflegeprogression</td><td>0–15% p.a. je Grad/Alter</td><td>Barmer-basierte Progressionsannahmen</td><td>【F:simulator-data.js†L25-L50】</td></tr>
+  </table>
+
+  <h2 id="daten">Datenquellen &amp; Reproduzierbarkeit</h2>
+  <table>
+    <tr><th>Quelle</th><th>Datei</th><th>Aktualisierung</th><th>Reproduzierbarkeit</th><th>Evidenz</th></tr>
+    <tr><td>Barmer Pflegereport 2024</td><td><code>simulator-data.js</code></td><td>Manuell, hart kodiert</td><td>Keine Rohdaten-Links, nur kommentierte Annahmen</td><td>【F:simulator-data.js†L5-L50】</td></tr>
+    <tr><td>Historische Marktdaten 1950–2013</td><td><code>simulator-data.js</code></td><td>Statisch im Code</td><td>Keine Skripte/Quelle angegeben</td><td>【F:simulator-data.js†L53-L120】</td></tr>
+  </table>
+
+  <h2 id="tests">Tests &amp; Invarianten</h2>
+  <table>
+    <tr><th>Test</th><th>Scope</th><th>Guarded Behavior</th><th>Limitierungen</th><th>Evidenz</th></tr>
+    <tr><td>Parity Smoke Test</td><td>Browser-basierter Vergleich Engine vs. Simulator (mehrjährige Schleife)</td><td>Abbruch bei Ruin/Fehler, Mismatch-Logging</td><td>Keine Headless-Ausführung ohne Browser</td><td>【F:sim-parity-smoketest.js†L3-L66】</td></tr>
+    <tr><td>Dual Care Test Suite</td><td>Node-Test für Pflegekosten &amp; RNG-Forks</td><td>Unabhängigkeit von Zufallsströmen, additive Pflegekosten</td><td>Deckt keine Steuern/Inflation ab</td><td>【F:test-dual-care.js†L3-L119】</td></tr>
+  </table>
+
+  <h2 id="bewertung">Bewertung (0–100)</h2>
+  <table>
+    <tr><th>Kategorie</th><th>Gewicht</th><th>Note</th><th>Begründung</th></tr>
+    <tr><td>Methodik Entnahme/Guardrails</td><td>30</td><td>26</td><td>Klare Guardrails und Diagnosen, aber begrenzte Dokumentation zu Kappungen/Edge-Cases.【F:engine/planners/SpendingPlanner.mjs†L109-L157】</td></tr>
+    <tr><td>Risiko-/Renditemodell</td><td>20</td><td>14</td><td>Monte-Carlo/Regime angedeutet, Fail-Safe Liquidity vorhanden, jedoch keine Tail-Risk/Bootstrap-Dokumentation im Codeauszug.【F:simulator-engine.js†L24-L200】</td></tr>
+    <tr><td>DE-Realismus (Steuern/KV/Pflege)</td><td>15</td><td>10</td><td>Pflege-Progression vorhanden, aber Steuer-/KV-Details fehlen in geprüften Modulen.【F:simulator-data.js†L5-L120】</td></tr>
+    <tr><td>Datenquellen &amp; Reproduzierbarkeit</td><td>15</td><td>8</td><td>Statische Daten ohne Aktualisierungswege; Quellen nur kommentiert, nicht verlinkt.【F:simulator-data.js†L5-L120】</td></tr>
+    <tr><td>Testabdeckung &amp; Invarianten</td><td>10</td><td>6</td><td>Zwei Tests (Parity, Dual Care); Browserabhängigkeit und keine automatisierten Steuer-/Guardrail-Tests.【F:sim-parity-smoketest.js†L3-L66】【F:test-dual-care.js†L3-L119】</td></tr>
+    <tr><td>Erklärbarkeit/UX/Reporting</td><td>10</td><td>8</td><td>Diagnosepfade vorhanden, aber Reporting hängt von UI; keine eigenständigen Audit-Logs im Codeauszug.【F:engine/planners/SpendingPlanner.mjs†L39-L168】</td></tr>
+    <tr><th>Gesamt</th><th>100</th><th>72</th><th>gewichteter Durchschnitt</th></tr>
+  </table>
+
+  <h2 id="risiken">Risiken &amp; Empfehlungen</h2>
+  <table>
+    <tr><th>Risiko</th><th>Schweregrad</th><th>Hinweis</th></tr>
+    <tr><td>Fehlende Datenquellen-Nachvollziehbarkeit</td><td>P1</td><td>Statische Marktdaten ohne Herkunft/Checks; Aktualisierungspfad fehlt.【F:simulator-data.js†L53-L120】</td></tr>
+    <tr><td>Browserabhängige Tests</td><td>P1</td><td>Parity-Test benötigt DOM/Window, verhindert CI-Automatisierung.【F:sim-parity-smoketest.js†L3-L66】</td></tr>
+    <tr><td>Limitierte Steuer-/KV-Abdeckung</td><td>P1</td><td>In sichtbaren Modulen keine Validierung oder Tests spezifischer deutscher Steuer-/KV-Regeln.【F:simulator-engine.js†L24-L200】</td></tr>
+    <tr><td>Guardrail-Kalibrierung</td><td>P2</td><td>Schwellenwerte nicht dokumentiert/parametriert über UI; Gefahr von Fehlkalibrierung.【F:engine/planners/SpendingPlanner.mjs†L109-L157】</td></tr>
+  </table>
+
+  <h2 id="evidence">Evidence Index</h2>
+  <table>
+    <tr><th>Datei</th><th>Inhalt</th></tr>
+    <tr><td>engine/planners/SpendingPlanner.mjs</td><td>Guardrails, Diagnoseaufbau, Entnahmeberechnung</td></tr>
+    <tr><td>simulator-engine.js</td><td>Liquiditäts-Guard, Pflegekostenbezug, Jahresloop</td></tr>
+    <tr><td>simulator-data.js</td><td>Pflegewahrscheinlichkeiten, historische Marktdaten</td></tr>
+    <tr><td>sim-parity-smoketest.js</td><td>Paritätstest Engine vs. Simulator (Browser)</td></tr>
+    <tr><td>test-dual-care.js</td><td>Node-basierte Pflege-/RNG-Tests</td></tr>
+  </table>
+</body>
+</html>

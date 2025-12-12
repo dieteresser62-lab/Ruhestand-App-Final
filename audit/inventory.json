@@ -1,0 +1,109 @@
+{
+  "modules": [
+    {
+      "name": "SpendingPlanner",
+      "path": "engine/planners/SpendingPlanner.mjs",
+      "purpose": "Berechnet Entnahme- und Guardrail-Logik pro Jahr innerhalb der Engine.",
+      "key_functions": ["determineSpending", "_applyGuardrails", "_buildResults"],
+      "inputs": ["market", "inflatedBedarf", "runwayMonate", "profil", "input"],
+      "outputs": ["spendingResult", "newState", "diagnosis"],
+      "evidence": {"path": "engine/planners/SpendingPlanner.mjs", "lines": "12-168"}
+    },
+    {
+      "name": "SimulatorEngine",
+      "path": "simulator-engine.js",
+      "purpose": "Jährliche Simulation inkl. Liquiditäts-Guard, Pflegekosten und Portfolioanpassungen.",
+      "key_functions": ["simulateOneYear", "computeLiqNeedForFloor", "sellAssetForCash"],
+      "inputs": ["currentState", "inputs", "yearData", "pflegeMeta", "householdContext"],
+      "outputs": ["Simulationsergebnisse mit Portfolio-, Cash- und Pflege-Status"],
+      "evidence": {"path": "simulator-engine.js", "lines": "15-200"}
+    },
+    {
+      "name": "SimulatorData",
+      "path": "simulator-data.js",
+      "purpose": "Stellt historische Markt- und Pflegewahrscheinlichkeiten sowie Regime-/Sterbedaten bereit.",
+      "key_functions": ["Konstantenlieferung"],
+      "inputs": ["Pflegegrad-Altersverteilungen", "Marktdatenreihen"],
+      "outputs": ["SUPPORTED_PFLEGE_GRADES", "PFLEGE_GRADE_PROBABILITIES", "HISTORICAL_DATA"],
+      "evidence": {"path": "simulator-data.js", "lines": "5-120"}
+    }
+  ],
+  "rules": [
+    {
+      "name": "Guardrail-Checks",
+      "where": "engine/planners/SpendingPlanner.mjs:109-157",
+      "definition": "Prüft Entnahmequote, realen Drawdown und Runway gegen Schwellen; ergänzt optionale Inflation- und Budget-Caps.",
+      "parameters": "CONFIG.THRESHOLDS.ALARM withdrawRate/drawdown, profil.minRunwayMonths, runwayTargetInfo",
+      "effect": "Steuert Kürzungen und Diagnoseeinträge, bevor Entnahme finalisiert wird.",
+      "evidence": {"path": "engine/planners/SpendingPlanner.mjs", "lines": "109-157"}
+    },
+    {
+      "name": "Fail-Safe Liquidität",
+      "where": "simulator-engine.js:24-161",
+      "definition": "Berechnet Mindestliquidität für Floor-Bedarf und verkauft Assets im Notfall ohne reguläre Regeln.",
+      "parameters": "inflatedFloor, runwayTargetMonths, minGold",
+      "effect": "Stellt Cash-Bedarf sicher, auch wenn Portfolio unter Ziel fällt; dokumentiert Notverkäufe.",
+      "evidence": {"path": "simulator-engine.js", "lines": "24-161"}
+    }
+  ],
+  "assumptions": [
+    {
+      "topic": "Runway-Ziel",
+      "where": "simulator-engine.js:50-55",
+      "default": "12 Monate",
+      "range": ">0 Monate, fällt sonst auf 12",
+      "notes": "RunwayTargetMonths wird auf 12 gesetzt, wenn Eingabe fehlt oder ungültig ist.",
+      "evidence": {"path": "simulator-engine.js", "lines": "50-55"}
+    },
+    {
+      "topic": "Floor-Bedarf bei voller Rentendeckung",
+      "where": "simulator-engine.js:31-45",
+      "default": "0 € Bedarf akzeptiert",
+      "range": "Nicht-negativ, null erlaubt",
+      "notes": "Wenn Rente den Floor deckt, erzeugt Guard keinen Bedarf.",
+      "evidence": {"path": "simulator-engine.js", "lines": "31-45"}
+    },
+    {
+      "topic": "Pflegeprogression",
+      "where": "simulator-data.js:25-50",
+      "default": "Progressionswahrscheinlichkeiten laut Pflegegrad-Modell",
+      "range": "0–15% p.a. je nach Grad und Alter",
+      "notes": "Basierend auf Barmer Pflegereport; Altersspezifische Eintrittschancen",
+      "evidence": {"path": "simulator-data.js", "lines": "25-50"}
+    }
+  ],
+  "data_sources": [
+    {
+      "source": "Barmer Pflegereport 2024",
+      "file": "simulator-data.js",
+      "range": "5-50",
+      "update_method": "Hart codierte Wahrscheinlichkeiten, keine automatische Aktualisierung",
+      "reproducibility_notes": "Modellannahmen dokumentiert, aber keine Rohdaten-Verlinkung",
+      "evidence": {"path": "simulator-data.js", "lines": "5-50"}
+    },
+    {
+      "source": "Historische Marktdaten 1950-2013",
+      "file": "simulator-data.js",
+      "range": "53-120",
+      "update_method": "Statische Datentabelle im Code",
+      "reproducibility_notes": "Keine Quelle/Download-Skript hinterlegt",
+      "evidence": {"path": "simulator-data.js", "lines": "53-120"}
+    }
+  ],
+  "tests": [
+    {
+      "name": "Parity Smoke Test",
+      "scope": "Vergleich Engine vs. Simulator über mehrere Jahre im Browser",
+      "what_it_guards": "Strukturelle Parität der Kernlogik, Abbruch bei Ruin oder Fehlern",
+      "where": "sim-parity-smoketest.js:3-66",
+      "evidence": {"path": "sim-parity-smoketest.js", "lines": "3-66"}
+    },
+    {
+      "name": "Dual Care Test Suite",
+      "scope": "Node-basierte Tests für Pflegekosten, RNG-Forks und additive Effekte",
+      "what_it_guards": "Unabhängige Zufallsströme und korrekte Pflegekostenberechnung für zwei Personen",
+      "where": "test-dual-care.js:3-119",
+      "evidence": {"path": "test-dual-care.js", "lines": "3-119"}
+    }
+  ]
+}
