@@ -18,9 +18,10 @@ function assert(condition, message) {
 
 // MOCKING GLOBAL CLEANUP
 // Since other tests (parity.test.mjs) might have set this global, we clean it up here
-// to ensure we really test the headless path.
+// to ensure we really test the headless path. Remove both legacy and modern globals.
 if (typeof global.window !== 'undefined') {
     global.window.Ruhestandsmodell_v30 = undefined;
+    global.window.EngineAPI = undefined;
 }
 
 console.log('--- Headless Simulator Test ---');

@@ -220,6 +220,16 @@ function _internal_calculateModel(input, lastState) {
  */
 const EngineAPI = {
     /**
+     * Gibt die aktuelle Engine-Konfiguration zurück.
+     *
+     * Hinweis: Wird zusätzlich als Eigenschaft `CONFIG` exponiert, damit
+     * Legacy-Aufrufer die Struktur ohne Funktionsaufruf lesen können.
+     * @returns {Object} Engine-Konfiguration inklusive Profile-Map und Texten
+     */
+    get CONFIG() {
+        return CONFIG;
+    },
+    /**
      * Gibt Versionsinformationen zurück
      */
     getVersion: function () {
@@ -249,6 +259,71 @@ const EngineAPI = {
      */
     calculateTargetLiquidity: function (profil, market, inflatedBedarf) {
         return TransactionEngine.calculateTargetLiquidity(profil, market, inflatedBedarf);
+    },
+
+    /**
+     * Ermittelt Ausgabenstrategie und neuen Guardrail-Status.
+     *
+     * Diese Methode spiegelt die frühere Adapter-Signatur wider, nutzt aber
+     * direkt die interne SpendingPlanner-Logik. Sie kapselt Fehler defensiv
+     * und liefert bei Problemen ein strukturiertes Fehlerobjekt zurück.
+     *
+     * @param {Object} params - Kontext für die Ausgabenplanung
+     * @returns {{spendingResult:Object,newState:Object,diagnosis:Object}|{error:Error}}
+     */
+    determineSpending: function (params) {
+        try {
+            const { spendingResult, newState, diagnosis } = SpendingPlanner.determineSpending(params);
+            return { spendingResult, newState, diagnosis };
+        } catch (e) {
+            return { error: e };
+        }
+    },
+
+    /**
+     * Bestimmt notwendige Transaktionen (Verkauf/Rebalancing).
+     *
+     * Delegiert an TransactionEngine und kapselt Fehler, um Simulator-Aufrufer
+     * vor ungefangenen Exceptions zu schützen.
+     *
+     * @param {Object} context - Ergebnis der Ausgabenplanung und Markt-/Profilkontext
+     * @returns {Object} Transaktionsentscheidung oder Fehlerobjekt
+     */
+    determineAction: function (context) {
+        try {
+            return TransactionEngine.determineAction(context);
+        } catch (e) {
+            return { error: e };
+        }
+    },
+
+    /**
+     * Berechnet steueroptimierte Verkäufe für einen Zielbetrag.
+     *
+     * @param {number} requestedRefill - Zielbetrag in Euro
+     * @param {Object} inputsCtx - Aggregierte Asset- und Steuerbasis-Daten
+     * @param {Object} caps - Zusätzliche Limits (z. B. minGold)
+     * @param {Object} market - Marktkennzahlen
+     * @returns {{saleResult:Object}|{error:Error}}
+     */
+    calculateSaleAndTax: function (requestedRefill, inputsCtx, caps = {}, market) {
+        try {
+            const saleResult = TransactionEngine.calculateSaleAndTax(requestedRefill, inputsCtx, caps, market, true);
+            return { saleResult };
+        } catch (e) {
+            return { error: e };
+        }
+    },
+
+    /**
+     * Führt zwei SaleResults zusammen (z. B. Emergency-Verkäufe).
+     *
+     * @param {Object} baseResult - Primäres Ergebnis
+     * @param {Object} additionalResult - Zweites Ergebnis
+     * @returns {Object} Kombiniertes SaleResult
+     */
+    mergeSaleResults: function (baseResult, additionalResult) {
+        return TransactionEngine.mergeSaleResults(baseResult, additionalResult);
     },
 
     /**
