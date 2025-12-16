@@ -56,6 +56,41 @@ function computeLiqNeedForFloor(ctx) {
 }
 
 /**
+ * Berechnet die Liquidität nach der Action-Phase robust gegen fehlende Adapter-Felder.
+ * Falls der Adapter (liqNachTransaktion) keinen Zielwert liefert, werden geplante
+ * Liquiditätszuflüsse aus Verkäufen und sonstigen Verwendungen additiv auf den aktuellen
+ * Stand aufgeschlagen. Dadurch gehen reale Verkäufe nicht im Nirwana verloren.
+ * @param {number} currentLiquidity - Liquidität vor der Action-Phase.
+ * @param {object} actionResult - Ergebnisobjekt der Action-Phase (kann Teilfelder weglassen).
+ * @param {object|null} saleResult - Normiertes SaleResult mit achievedRefill.
+ * @returns {number} Liquidität nach allen Transaktionen.
+ */
+function computeLiquidityAfterAction(currentLiquidity, actionResult, saleResult) {
+    // Primärpfad: Der Adapter liefert einen fertigen Zielwert (z. B. { total: 123 }).
+    const adapterValue = actionResult?.liqNachTransaktion;
+    if (adapterValue !== undefined && adapterValue !== null) {
+        const numericAdapterValue = typeof adapterValue === 'number'
+            ? adapterValue
+            : (typeof adapterValue.total === 'number' ? adapterValue.total : NaN);
+        if (Number.isFinite(numericAdapterValue)) {
+            return euros(numericAdapterValue);
+        }
+    }
+
+    // Fallback: Additive Berechnung aus aktuellem Stand + geplante Zuflüsse.
+    const plannedLiquidity = Number.isFinite(actionResult?.verwendungen?.liquiditaet)
+        ? actionResult.verwendungen.liquiditaet
+        : 0;
+    const saleRefill = Number.isFinite(saleResult?.achievedRefill)
+        ? saleResult.achievedRefill
+        : 0;
+
+    // Design-Entscheidung: Wir addieren nur Zuflüsse; Abflüsse werden bereits in der
+    // Spending-Phase berücksichtigt. Negative Eingaben werden defensiv gekappt.
+    return euros(currentLiquidity + euros(plannedLiquidity) + euros(saleRefill));
+}
+
+/**
  * Stellt sicher, dass simulateOneYear immer valide Haushaltsdaten erhält.
  * @param {object|null} context - Rohdaten zum Haushaltsstatus (kann null sein).
  * @returns {{p1Alive:boolean,p2Alive:boolean,widowBenefits:{p1FromP2:boolean,p2FromP1:boolean}}}
@@ -603,9 +638,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         applySaleToPortfolio(portfolio, normalizedSaleResult);
     }
 
-    const liqAfterAction = (actionResult.liqNachTransaktion && typeof actionResult.liqNachTransaktion.total === 'number')
-        ? euros(actionResult.liqNachTransaktion.total)
-        : euros(liquiditaet + (actionResult.verwendungen?.liquiditaet || 0));
+    // Sicherstellen, dass Verkaufserlöse immer in der Liquidität ankommen – auch ohne liqNachTransaktion-Adapter.
+    const liqAfterAction = computeLiquidityAfterAction(liquiditaet, actionResult, normalizedSaleResult);
     liquiditaet = liqAfterAction;
 
     const geplanteGoldKauefe = actionResult.kaufGold || 0;
@@ -674,15 +708,24 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
                     // This ensures calculateSaleAndTax sees the actual remaining assets
                     const updatedCtx = buildInputsCtxFromPortfolio(algoInput, portfolio, { pensionAnnual, marketData: marketDataCurrentYear });
                     const { cashGenerated, taxesPaid, saleResult } = sellAssetForCash(
-                        portfolio, updatedCtx, market, 'equity', missing, 0, engine
-                    ); liquiditaet += cashGenerated;
+                        portfolio,
+                        updatedCtx,
+                        market,
+                        'equity',
+                        missing,
+                        0,
+                        engine
+                    );
+                    liquiditaet += cashGenerated;
                     totalTaxesThisYear += taxesPaid;
                     if (saleResult) {
                         mergedSaleResult = mergedSaleResult
                             ? engine.mergeSaleResults(mergedSaleResult, saleResult)
                             : saleResult;
                     }
-                    missing = Math.max(0, missing - eqResult.cashGenerated);
+                    // Design-Entscheidung: Wir rechnen mit dem tatsächlich generierten Cash,
+                    // falls der Verkauf gedeckelt wurde. Ein negativer Wert würde auf 0 gekappt.
+                    missing = Math.max(0, missing - cashGenerated);
                     emergencyRefillHappened = true;
                 }
             }
