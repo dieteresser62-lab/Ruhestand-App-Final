@@ -294,9 +294,11 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
                 careMetaP2
             });
 
+            // Do NOT modify simState.baseFlex permanently.
+            // We pass the effectiveFlexFactor to simulateOneYear to apply it only for the current year's spending decision.
+            // The simulation engine will then base the NEXT year's state on the original (unreduced) baseFlex.
             const stateWithCareFlex = {
-                ...simState,
-                baseFlex: simState.baseFlex * effectiveFlexFactor
+                ...simState
             };
 
             // Berechne dynamische Rentenanpassung basierend auf Modus (fix/wage/cpi)
@@ -311,8 +313,8 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
                 }
             };
 
-            // Pass care floor as separate parameter (NOT added to baseFloor to avoid inflation compounding)
-            const result = simulateOneYear(stateWithCareFlex, adjustedInputs, yearData, simulationsJahr, careMetaP1, totalCareFloor, householdContext);
+            // Pass care floor and Flex Factor as separate parameters
+            const result = simulateOneYear(stateWithCareFlex, adjustedInputs, yearData, simulationsJahr, careMetaP1, totalCareFloor, householdContext, effectiveFlexFactor);
 
             if (result.isRuin) {
                 failed = true;

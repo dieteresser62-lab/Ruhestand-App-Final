@@ -170,9 +170,10 @@ function sellAssetForCash(portfolio, inputsCtx, market, asset, amountEuros, minG
  * @param {Object} pflegeMeta - Pflege-Metadata (optional)
  * @param {number} careFloorAddition - Zusätzlicher Floor-Bedarf durch Pflege (optional, wird nicht inflationsangepasst)
  * @param {Object|null} householdContext - Haushaltsstatus (wer lebt noch, Witwenrenten-Flags)
+ * @param {number} temporaryFlexFactor - Temporärer Faktor (0..1) zur Reduktion des Flex-Budgets in diesem Jahr (z.B. durch Pflegekosten)
  * @returns {Object} Simulationsergebnisse
  */
-export function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta = null, careFloorAddition = 0, householdContext = null) {
+export function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta = null, careFloorAddition = 0, householdContext = null, temporaryFlexFactor = 1.0) {
     let {
         portfolio,
         baseFloor,
@@ -486,7 +487,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const pensionSurplus = Math.max(0, pensionAnnual - effectiveBaseFloor);
     const inflatedFloor = Math.max(0, effectiveBaseFloor - pensionAnnual);
     // Apply pension surplus to flex expenses (Re-applied Fix)
-    const inflatedFlex = Math.max(0, baseFlex - pensionSurplus);
+    // Apply temporary flex factor here - ONLY for the current year's budget
+    const inflatedFlex = Math.max(0, (baseFlex * temporaryFlexFactor) - pensionSurplus);
 
     const jahresbedarfAusPortfolio = inflatedFloor + inflatedFlex;
     const runwayMonths = jahresbedarfAusPortfolio > 0 ? (liquiditaet / (jahresbedarfAusPortfolio / 12)) : Infinity;
@@ -815,8 +817,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             rente1: rente1,
             rente2: rente2,
             renteSum: renteSum,
-            floor_aus_depot: inflatedFloor,
-            flex_brutto: baseFlex,
+            floor_aus_depot: inflatedFloor, // Corrected logic: Use inflatedFloor directly as it represents net floor demand
+            flex_brutto: inflatedFlex, // FIX: Use inflatedFlex (effective reduced flex) instead of baseFlex (theoretical max)
             flex_erfuellt_nominal: jahresEntnahme > inflatedFloor ? jahresEntnahme - inflatedFloor : 0,
             inflation_factor_cum: spendingNewState.cumulativeInflationFactor,
             jahresentnahme_real: jahresEntnahme / spendingNewState.cumulativeInflationFactor,
@@ -1069,23 +1071,60 @@ export function calcCareCost(careMetaP1, careMetaP2 = null) {
  * @returns {number} Household flex factor in [0, 1]. Defaults to 1 if nobody is alive.
  */
 export function computeHouseholdFlexFactor({ p1Alive, careMetaP1, p2Alive, careMetaP2 }) {
-    const aliveFactors = [];
+    // Determine the individual flex factors (0.0 to 1.0) for each person.
+    // A dead person contributes 0.0 leverage to the household budget.
+    // A person in care contributes reduced leverage (e.g. 0.0, 0.5).
+    const f1 = p1Alive ? resolveIndividualFlexFactor(careMetaP1) : 0.0;
 
-    if (p1Alive) {
-        aliveFactors.push(resolveIndividualFlexFactor(careMetaP1));
+    // We determine if this is a "Couple Simulation" by checking if careMetaP2 is provided (even if null/healthy)
+    // or if p2Alive was true at some point. The caller (monte-carlo-runner) initializes careMetaP2 based on inputs.partner.aktiv.
+    // If inputs.partner.aktiv is false, careMetaP2 is usually null or undefined in a way we can distinguish?
+    // Actually, monte-carlo-runner passes `careMetaP2` as `null` if partner is inactive. 
+    // But if partner IS active but healthy, it is ALSO `null`? NO.
+    // In monte-carlo-runner:
+    // const careMetaP2 = (inputs.partner?.aktiv === true) ? makeDefaultCareMeta(...) : null;
+    // So if partner is active, careMetaP2 is an OBJECT (even if not triggered).
+    // If partner is NOT active, careMetaP2 is NULL.
+    // Therefore: careMetaP2 !== null implies "Couple Household".
+
+    // Wait, the updated logic in monte-carlo might handle "null" differently now?
+    // Let's assume: if careMetaP2 is passed as an object (even empty), it's a couple. 
+    // If it's explicitly null/undefined, it's a single.
+    // CAUTION: In the runner loop, p2Alive might be true, but careMetaP2 might be the object.
+
+    // Let's refine the detection. 
+    // In monte-carlo-runner.js:
+    // const careMetaP2 = (inputs.partner?.aktiv === true) ? makeDefaultCareMeta(...) : null;
+    // So `careMetaP2 !== null` is the indicator for "Couple Configured".
+
+    const isCoupleProfile = (careMetaP2 !== null);
+
+    if (!isCoupleProfile) {
+        // Single Profile: The input budget is for ONE person.
+        // Factor is simply f1.
+        return f1;
     }
 
-    if (p2Alive && careMetaP2) {
-        aliveFactors.push(resolveIndividualFlexFactor(careMetaP2));
-    }
+    // Couple Profile: The input budget is for TWO persons.
+    // We apply the "75% Rule" for survivors/singles relative to the Couple Budget.
+    // If P2 is dead (p2Alive=false), f2 is 0.
+    const f2 = p2Alive ? resolveIndividualFlexFactor(careMetaP2) : 0.0;
 
-    if (aliveFactors.length === 0) {
-        // Fail-safe: no living person should reach this branch, but keep flex intact.
-        return 1;
-    }
+    // Formula:
+    // Shared Base (50%) - available if AT LEAST ONE person is "active" (max(f1, f2)).
+    // Plus 25% for Person 1's share.
+    // Plus 25% for Person 2's share.
+    //
+    // Examples:
+    // 1. Both Healthy: 0.5*1 + 0.25*1 + 0.25*1 = 1.0 (100%)
+    // 2. T1 Dead:      0.5*1 + 0.25*1 + 0 = 0.75 (75%) -> "One person less needs 75%"
+    // 3. T1 Care(0%):  0.5*1 + 0 + 0.25*1 = 0.75 (75%) -> "Same if one person needs no Flex from care"
+    // 4. Both Dead:    0.5*0 + 0 + 0 = 0.0 (0%)
+    // 5. Both Care(0%):0.5*0 + 0 + 0 = 0.0 (0%) -> "No flex from care" for both.
 
-    const equalShare = 1 / aliveFactors.length;
-    return aliveFactors.reduce((sum, factor) => sum + equalShare * factor, 0);
+    const householdFactor = (0.5 * Math.max(f1, f2)) + (0.25 * f1) + (0.25 * f2);
+
+    return householdFactor;
 }
 
 /**
@@ -1094,9 +1133,13 @@ export function computeHouseholdFlexFactor({ p1Alive, careMetaP1, p2Alive, careM
  * @returns {number} Clamped flex factor.
  */
 function resolveIndividualFlexFactor(careMeta) {
-    const rawFactor = careMeta?.flexFactor;
+    if (!careMeta || !careMeta.active) {
+        // No active care = 100% Flex
+        return 1.0;
+    }
+    const rawFactor = careMeta.flexFactor;
     if (typeof rawFactor !== 'number' || !Number.isFinite(rawFactor)) {
-        return 1;
+        return 1.0;
     }
     return Math.min(1, Math.max(0, rawFactor));
 }
