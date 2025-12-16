@@ -20,7 +20,7 @@ import { getCommonInputs, prepareHistoricalData } from './simulator-portfolio.js
 import { normalizeWidowOptions, deepClone } from './simulator-sweep-utils.js';
 import { runMonteCarloSimulation } from './monte-carlo-runner.js';
 import { ScenarioAnalyzer } from './scenario-analyzer.js';
-import { Ruhestandsmodell_v30 } from './engine/index.mjs';
+import { EngineAPI } from './engine/index.mjs';
 
 /**
  * Whitelist der erlaubten Parameter-Keys
@@ -368,7 +368,8 @@ async function evaluateCandidate(candidate, baseInputs, runsPerCandidate, maxDau
             useCapeSampling: false,
             onProgress: () => { },
             scenarioAnalyzer,
-            engine: Ruhestandsmodell_v30
+            // EngineAPI bündelt die modernisierte Schnittstelle; Adapter entfällt bewusst
+            engine: EngineAPI
         });
 
         allResults.push({ aggregatedResults, failCount, anzahl: runsPerCandidate });

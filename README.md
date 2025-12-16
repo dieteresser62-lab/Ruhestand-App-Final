@@ -75,7 +75,7 @@ Whitelist, Blocklist und Rente-2-Invarianz-Checks, markiert Verstöße in der He
 
 ### Gemeinsame Engine
 * Acht ES-Module (`engine/`) kapseln Validierung, Marktanalyse, Ausgabenplanung und Transaktionslogik.
-* `build-engine.mjs` bündelt die Module per `esbuild` (oder Modul-Fallback) zu `engine.js`, das in beiden Oberflächen als `EngineAPI` bzw. `Ruhestandsmodell_v30` geladen wird.
+* `build-engine.mjs` bündelt die Module per `esbuild` (oder Modul-Fallback) zu `engine.js`, das in beiden Oberflächen als globale `EngineAPI` geladen wird.
 * Konfigurierbare Guardrails, Marktregime-Übersetzungen und Strategien für Liquiditätsziele.
 
 ---
@@ -92,7 +92,6 @@ Ruhestand-App-Final/
 │   ├── config.mjs
 │   ├── core.mjs
 │   ├── errors.mjs
-│   ├── adapter.mjs
 │   ├── analyzers/MarketAnalyzer.mjs
 │   ├── planners/SpendingPlanner.mjs
 │   ├── transactions/TransactionEngine.mjs
