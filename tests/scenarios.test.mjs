@@ -66,14 +66,8 @@ try {
 
     // Care costs for PG4 = 3000/month = 36000/year.
     // Pension = 20000. Gap = 16000.
-    // This gap should be added to the Floor/Spending Need.
-    // Flex should be reduced by 50% (factor 0.5) -> 10000 * 0.5 = 5000.
-
-    // Note: simulateOneYear calculates spending internally using SpendingPlanner via EngineAPI.
-    // We check the result to see if the "Uncovered Care Costs" influenced the total spending or diagnosis.
 
     // We need to pass pflegeMeta AND careFloorAddition (6th arg).
-    // simulateOneYear signature: (..., pflegeMeta, careFloorAddition, ...)
     const pflegeMeta = {
         active: true, // Mark active!
         triggered: true,
@@ -89,34 +83,14 @@ try {
     };
 
     // Simulate what the runner does: Calculate floor addition
-    // The simulator adds this to baseFloor inside (line 191).
     const careFloorAddition = pflegeMeta.zusatzFloorZiel;
 
     const result = simulateOneYear(state, inputs, normalYear, 0, pflegeMeta, careFloorAddition);
 
     assert(!result.isRuin, 'Care case should not be ruin with enough assets');
 
-    // Check if Uncovered Costs were detected.
-    // The Engine returns `diagnosis` which might contain "Pflegekosten".
-    const diag = result.logData?.diagnosis || {};
-    const stepOutput = result.logData?.stepOutput || {}; // Depending on what simulateOneYear calls "logData"
-
-    // simulateOneYear returns { newState, logData, isRuin }.
-    // logData comes from `_internal_calculateModel` -> `diagnosis`.
-
-    // Hard to check exact numbers without deep access to intermediate steps, 
-    // but we can check if total withdrawal is higher than base.
-    // Base: 24k Floor + 10k Flex - 20k Pension = 14k Gap. (+ Taxes)
-    // Care: 24k Floor + 36k Care - 20k Pension = 40k Gap? 
-    // Or does 36k Care replace Floor/Living? Usually additive or partial replacement.
-    // Assuming additive for unserved costs.
-
-    // Let's just assert it runs and total spending increased significantly.
-    // For comparison, run baseline:
+    // Check if total withdrawal is higher than base.
     const baseResult = simulateOneYear(JSON.parse(JSON.stringify(baseState)), baseInputs, normalYear, 0);
-    const baseWithdrawal = baseState.portfolio.liquiditaet - baseResult.newState.portfolio.liquiditaet + (baseResult.newState.portfolio.depotTranchesAktien[0].marketValue < 500000 ? 10000 : 0);
-    // Complexity in measuring withdrawal because of refill logic.
-    // Better: Check `result.logData.ui.spending.totalAnnual`.
 
     // Correct path matches simulateOneYear return: result.logData.entscheidung.jahresEntnahme
     const spendingCare = result.logData?.entscheidung?.jahresEntnahme || 0;
@@ -135,25 +109,28 @@ try {
 // --- TEST 2: Widow/Survivor (Witwenrente) ---
 try {
     const inputs = { ...baseInputs, p1Alive: false, partner: { aktiv: true } };
-    // p1Alive false usually triggers widow pension logic if partner is simulated.
-    // However, simulation state `widowPensionP1` is usually set at start.
-    // If P1 dies, P2 gets widow pension of P1?
-
-    // Since Inputs are static config, we simulate the state where P1 IS ALREADY DEAD.
-    // This means `currentAnnualPension` should be P2 Own + Widow P1.
-    // OR the Engine adjusts it?
-    // Engine usually takes `currentAnnualPension` from state.
-    // If we want to test the transition, we need to simulate the year OF death or AFTER.
 
     // Let's simulate a state where P1 is dead.
     const state = JSON.parse(JSON.stringify(baseState));
-    // Simulate low pension (Widow state)
-    state.currentAnnualPension = 12000;
+    // P1 is dead, so P1 pension ignored. P2 is alive and gets Widow Pension.
+    state.widowPensionP2 = 12000;
+    state.currentAnnualPension2 = 0; // P2 has no own pension
 
-    const result = simulateOneYear(state, inputs, normalYear, 0);
+    // Explicitly test with P1 Dead context
+    const householdContext = { p1Alive: false, p2Alive: true, widowBenefits: { p1FromP2: false, p2FromP1: true } };
+
+    const result = simulateOneYear(state, inputs, normalYear, 0, null, 0, householdContext);
     assert(!result.isRuin, 'Widow scenario should be solvable');
 
-    console.log('✅ Widow Scenario Passed (Solvency Check)');
+    // STRICT ASSERTION: Verify Pension Logic
+    // We expect the system to use the reduced pension (12000).
+    const usedPension = result.logData?.pension_annual || 0;
+    console.log(`Widow Pension Used: ${usedPension}`);
+
+    // Assert it strictly matches expected weak pension (allow small float diff)
+    assertClose(usedPension, 12000, 1.0, 'Should use the reduced widow pension (12000)');
+
+    console.log('✅ Widow Scenario Passed (Strict Check)');
 } catch (e) {
     console.error('Test 2 (Widow) Failed', e);
     throw e;
@@ -163,11 +140,6 @@ try {
 try {
     const state = JSON.parse(JSON.stringify(baseState));
     const result = simulateOneYear(state, baseInputs, crashYear, 0);
-
-    // 50% crash on 500k -> 250k.
-    // Spending approx 30k.
-    // Portfolio should be ~220k.
-    // Rebalancing should probably NOT sell stocks (Crisis mode usually avoids selling equities in deep crash if "Crisis Mode" active).
 
     const endStocks = result.newState.portfolio.depotTranchesAktien[0].marketValue;
     console.log(`Crash End Stocks: ${endStocks} (Start: 500k -> Market: 250k)`);
@@ -179,11 +151,15 @@ try {
     console.log(`Sales:`, JSON.stringify(vk));
 
     // Assert we didn't sell ALL stocks.
-    // If exact 200k, maybe we loosen assertion or understand why
     assert(endStocks >= 200000, 'Should retain significant stock value after crash (>= 200k)');
 
+    // STRICT ASSERTION: Verify correct crisis reaction
+    const isEmergencyOrRebal = actionTitle.includes("Not-VK") || actionTitle.includes("Rebalancing") || actionTitle.includes("Liquidität");
+    assert(isEmergencyOrRebal, 'Crash should trigger emergency sale or rebalancing action');
+    assert(vk.vkGes > 0, 'Should sell *some* assets to cover liquidity gap');
+
     assert(!result.isRuin, 'Crash should not cause ruin immediately');
-    console.log('✅ Crash Scenario Passed');
+    console.log('✅ Crash Scenario Passed (Strict Check)');
 } catch (e) {
     console.error('Test 3 (Crash) Failed', e);
     throw e;

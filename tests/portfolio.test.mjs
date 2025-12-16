@@ -1,15 +1,29 @@
 
-import { buyGold, buyStocksNeu, sumDepot, initializePortfolio } from '../simulator-portfolio.js';
+import { buyGold, buyStocksNeu, sumDepot, initializePortfolio, getCommonInputs } from '../simulator-portfolio.js';
 
 console.log('--- Portfolio Logic Tests ---');
 
-// Mock DOM for initializePortfolio because it reads documents.getElementById
-// We'll skip initializePortfolio test for now or Mock it heavily if needed.
-// Actually, initializePortfolio reads EVERYTHING from DOM. That's hard to test in Node without JSDOM.
-// Strategies:
-// 1. Refactor initializePortfolio to accept a config object (Best practice, but out of scope?)
-// 2. Mock document.getElementById (Messy global pollution)
-// 3. Test only pure functions like buyGold, sumDepot
+// --- Helper: Mock DOM ---
+// allows us to verify getCommonInputs() logic
+function setupMockDOM(valuesMap) {
+    global.document = {
+        getElementById: (id) => {
+            const entry = valuesMap[id];
+            // Simulate value or checked property
+            return {
+                value: (entry && entry.value !== undefined) ? entry.value : (entry || ''),
+                checked: (entry && entry.checked !== undefined) ? entry.checked : false,
+                style: { display: 'none' }, // Mock style object
+                innerHTML: '', // Mock innerHTML
+            };
+        }
+    };
+}
+
+// Helper: Clear Mock
+function teardownMockDOM() {
+    delete global.document;
+}
 
 // Test 1: sumDepot
 {
@@ -54,6 +68,74 @@ console.log('--- Portfolio Logic Tests ---');
     assertEqual(neu.marketValue, 150, 'Should add to neu tranche');
     assertEqual(portfolio.depotTranchesAktien.length, 2, 'Should keep old tranche');
     console.log('✅ buyStocksNeu works');
+}
+
+// --- Test 4: DOM Mock & Initialization ---
+{
+    // Define inputs mimicking the UI form fields
+    const mockValues = {
+        'simStartVermoegen': 100000,
+        'depotwertAlt': 50000,    // 50k Stocks
+        'einstandAlt': 40000,
+        'zielLiquiditaet': 10000, // 10k Liquid
+        // Gold disabled
+        'goldAllokationAktiv': { checked: false },
+        'startFloorBedarf': 24000,
+        'startFlexBedarf': 6000,
+        'marketCapeRatio': 20,
+        // Person 1
+        'p1StartAlter': 65,
+        'p1Geschlecht': 'w',
+        'p1SparerPauschbetrag': 1000,
+        'p1Monatsrente': 1500,
+        // Person 2
+        'partnerActive': { checked: false }, // Note: Simulator uses specific ID logic, check getCommonInputs
+        // Wait, getCommonInputs doesn't read check for partnerActive? 
+        // It reads inputs.partner fields?
+        // Actually getCommonInputs reads 'widowPensionMode' etc.
+    };
+
+    setupMockDOM(mockValues);
+
+    // Test parsing
+    try {
+        const parsedInputs = getCommonInputs();
+
+        // Assertions on parsing
+        assertEqual(parsedInputs.startVermoegen, 100000, 'Should parse startVermoegen');
+        assertEqual(parsedInputs.zielLiquiditaet, 10000, 'Should parse zielLiquiditaet');
+        assertEqual(parsedInputs.depotwertAlt, 50000, 'Should parse depotwertAlt');
+        assertEqual(parsedInputs.goldAktiv, false, 'Should parse gold toggle');
+
+        // Test Initialization
+        const portfolio = initializePortfolio(parsedInputs);
+
+        // Logic:
+        // Total: 100k. Old Stocks: 50k. Remaining: 50k.
+        // Liquid Goal: 10k. 
+        // Investable New: 40k.
+        // New Portfolio: Old Stock (50k) + New Stock (40k) + Liquid (10k) = 100k.
+
+        const stockTranches = portfolio.depotTranchesAktien;
+        const oldStock = stockTranches.find(t => t.type === 'aktien_alt');
+        const newStock = stockTranches.find(t => t.type === 'aktien_neu');
+
+        assert(oldStock !== undefined, 'Should have old stock tranche');
+        assertEqual(oldStock.marketValue, 50000, 'Old stock value correct');
+
+        assert(newStock !== undefined, 'Should have new stock tranche');
+        assertEqual(newStock.marketValue, 40000, 'New stock value correct (100k - 50k old - 10k liq)');
+
+        assertEqual(portfolio.liquiditaet, 10000, 'Liquidity correct');
+
+        console.log('✅ DOM Parsing & Initialization works');
+
+    } catch (e) {
+        console.error('Test 4 Failed', e);
+        throw e;
+    } finally {
+        teardownMockDOM();
+    }
 }
 
 console.log('--- Portfolio Logic Tests Completed ---');
