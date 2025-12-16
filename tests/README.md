@@ -28,12 +28,30 @@ node tests/run-tests.mjs
 3. Use standard ESM imports to test your modules.
 4. **Mocking:** Since the project relies on browser globals (`window`, `document`), you may need to mock these environments in your test file before importing code. See `simulation.test.mjs` for a comprehensive example of mocking `global.window` and constructing input contexts.
 
-## Key Test Files
-- **`core-engine.test.mjs`**: Validates `EngineAPI.simulateSingleYear`. Useful for testing pure financial logic without UI overhead.
-- **`scenarios.test.mjs`**: Validates specific complex life scenarios (Care Case, Survivor/Widow, Market Crash). Ensures the system behaves robustly under stress.
-- **`parity.test.mjs`**: **Critical Parity Check**. Verifies that the Simulator App and the Balance App (via `EngineAPI`) produce **identical** financial results for identical inputs.
-- **`simulation.test.mjs`**: Validates `simulateOneYear` from `simulator-engine.js`. This is the most complex test as it integrates the entire simulation loop.
-- **`portfolio.test.mjs`**: Validates pure helper functions like `sumDepot` and `buyGold`.
+## Test Coverage Areas
+
+### 1. Financial Core (Priority 1)
+- **`spending-planner.test.mjs`**: Validates 'Fail-Safe' alarm logic, Flex-Rate smoothing algorithms, and Budget Floor protection.
+- **`transaction-tax.test.mjs`**: Validates tax logic (Abgeltungssteuer, TQF, Sparer-Pauschbetrag), FIFO cost-basis tracking, and tax-efficient sale optimization.
+- **`liquidity-guardrail.test.mjs`**: Validates operational guardrails like Bear Market Refill Caps and Runway Coverage triggers.
+
+### 2. Algorithms & Logic (Priority 2)
+- **`monte-carlo-sampling.test.mjs`**: Validates the statistical core: Block-Bootstrap sampling and Market Regime Transition probabilities.
+- **`care-meta.test.mjs`**: Validates Care Logic: Probability of care events, Cost ramping (inflation/progression), and Dual-Household Flex budget adjustments.
+- **`market-analyzer.test.mjs`**: Validates Market Diagnostics: ATH drawdown detection, CAPE valuation signals, and Scenario classification (Bear/Peak/Recovery).
+
+### 3. Utilities & Validation (Priority 3)
+- **`utils.test.mjs`**: Validates core helpers: Currency formatting, Math functions (Mean/StdDev/Quantile), and RNG stability (Seeding/Forking).
+- **`core-engine.test.mjs`**: Validates `EngineAPI` integrity and basic output structures.
+
+### 4. Integration & Parity (Priority 4)
+- **`parity.test.mjs`**: **Critical Parity Check**. Verifies that the Frontend Logic (`simulateOneYear`) and Worker Logic (`EngineAPI`) produce **identical spending results** across diverse scenarios (Growth, High Inflation, Crash).
+- **`scenarios.test.mjs`**: End-to-End verification of complex life paths:
+    - **Care Case**: Checks verifying high cost coverage.
+    - **Widow/Survivor**: Checks pension reduction logic.
+    - **Market Crash**: Checks emergency refill and capital preservation.
+- **`simulation.test.mjs`**: Integration verification of the main simulation loop.
+- **`portfolio.test.mjs`**: Unit tests for isolated portfolio operations (`buyGold`, `sumDepot`) and DOM-independent initialization.
 
 ## Assertions Available
 - `assert(condition, message)`
