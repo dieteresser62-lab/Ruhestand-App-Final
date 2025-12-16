@@ -6,7 +6,7 @@
  * Baut die Engine über einen einfachen Bundler-Aufruf zusammen.
  * Standardpfad nutzt `esbuild` (Bundle → IIFE mit Global-Exports).
  * Fällt `esbuild` weg, wird ein schlanker Modul-Fallback geschrieben,
- * der die Legacy-Globals (EngineAPI, Ruhestandsmodell_v30) weiterhin
+ * der die Legacy-Globals (EngineAPI) weiterhin
  * bereitstellt.
  * ===================================================================
  */
@@ -39,10 +39,8 @@ async function buildWithEsbuild() {
             footer: {
                 js: [
                     'const api = RuhestandEngineBundle.EngineAPI;',
-                    'const adapter = RuhestandEngineBundle.Ruhestandsmodell_v30;',
                     'if (typeof globalThis !== "undefined") {',
                     '  globalThis.EngineAPI = api;',
-                    '  globalThis.Ruhestandsmodell_v30 = adapter;',
                     '}',
                     ''
                 ].join('\n')
@@ -69,12 +67,11 @@ async function buildWithEsbuild() {
  */
 async function writeModuleFallback() {
     const fallbackContent = `// AUTO-GENERATED FALLBACK (kein Bundle, Modul-Import)\n`
-        + `import { EngineAPI, Ruhestandsmodell_v30 } from './engine/index.mjs';\n`
+        + `import { EngineAPI } from './engine/index.mjs';\n`
         + `if (typeof window !== 'undefined') {\n`
         + `  window.EngineAPI = EngineAPI;\n`
-        + `  window.Ruhestandsmodell_v30 = Ruhestandsmodell_v30;\n`
         + `}\n`
-        + `export { EngineAPI, Ruhestandsmodell_v30 };\n`;
+        + `export { EngineAPI };\n`;
 
     await writeFile(outputFile, fallbackContent, 'utf8');
     console.log('ℹ️  Fallback-Build ohne esbuild erstellt (engine.js als Modul-Wrapper).');

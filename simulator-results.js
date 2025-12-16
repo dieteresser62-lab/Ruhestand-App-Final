@@ -337,7 +337,7 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         {
             key: 'Regime', header: 'Markt', width: 12,
             fmt: (v, row) => {
-                const regimeText = window.Ruhestandsmodell_v30.CONFIG.SCENARIO_TEXT[row.Regime] || row.Regime || '';
+                const regimeText = window.EngineAPI?.getConfig?.().SCENARIO_TEXT[row.Regime] || row.Regime || '';
                 return regimeText.substring(0, 12);
             },
             title: 'Marktsituation/Regime'
@@ -345,7 +345,7 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         {
             key: 'aktionUndGrund', header: 'Status', width: 22, fmt: (v, row) => {
                 const alarmMarker = row.Alarm ? '(A) ' : '';
-                const regimeShort = shortenText(window.Ruhestandsmodell_v30.CONFIG.SCENARIO_TEXT[row.Regime] || '');
+                const regimeShort = shortenText(window.EngineAPI?.getConfig?.().SCENARIO_TEXT[row.Regime] || '');
                 const status = `${alarmMarker}${row.CutReason || 'NONE'}/${regimeShort}`;
                 return (v || status).substring(0, 21);
             }

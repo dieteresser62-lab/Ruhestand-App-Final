@@ -75,7 +75,7 @@ Whitelist, Blocklist und Rente-2-Invarianz-Checks, markiert Verstöße in der He
 
 ### Gemeinsame Engine
 * Acht ES-Module (`engine/`) kapseln Validierung, Marktanalyse, Ausgabenplanung und Transaktionslogik.
-* `build-engine.mjs` bündelt die Module per `esbuild` (oder Modul-Fallback) zu `engine.js`, das in beiden Oberflächen als `EngineAPI` bzw. `Ruhestandsmodell_v30` geladen wird.
+* `build-engine.mjs` bündelt die Module per `esbuild` (oder Modul-Fallback) zu `engine.js`, das in beiden Oberflächen als globales `EngineAPI` bereitsteht.
 * Konfigurierbare Guardrails, Marktregime-Übersetzungen und Strategien für Liquiditätsziele.
 
 ---

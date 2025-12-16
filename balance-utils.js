@@ -52,7 +52,7 @@ export const UIUtils = {
      */
     getThreshold(path, defaultValue) {
         // Sicherer Zugriff auf die Engine-Konfiguration mit Fallbacks
-        const config = window.EngineAPI?.getConfig() || window.Ruhestandsmodell_v30?.CONFIG;
+        const config = window.EngineAPI?.getConfig?.();
         if (!config || typeof path !== 'string') {
             return defaultValue;
         }

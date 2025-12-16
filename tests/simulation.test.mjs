@@ -1,13 +1,12 @@
 
 import { simulateOneYear } from '../simulator-engine.js';
-import { EngineAPI, Ruhestandsmodell_v30 } from '../engine/index.mjs';
+import { EngineAPI } from '../engine/index.mjs';
 
 // --- MOCKING GLOBAL STATE ---
-// simulator-engine.js relies on window.Ruhestandsmodell_v30 and window.EngineAPI
+// simulator-engine.js relies on window.EngineAPI
 if (typeof global.window === 'undefined') {
     global.window = {};
 }
-global.window.Ruhestandsmodell_v30 = Ruhestandsmodell_v30;
 global.window.EngineAPI = EngineAPI;
 
 console.log('--- Simulation Loop Tests ---');

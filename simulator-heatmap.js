@@ -159,10 +159,10 @@ export function computeHeatmapStats(heat, bins, totalRuns) {
 /**
  * Löst den Profilschlüssel auf
  * @param {string} raw - Der rohe Profil-Name/Key
- * @param {object} [engine] - Optionale Engine-Instanz (für Headless use). Fallback auf window.Ruhestandsmodell_v30
+ * @param {object} [engine] - Optionale Engine-Instanz (für Headless use). Fallback auf window.EngineAPI
  */
 export function resolveProfileKey(raw, engine) {
-    const effectiveEngine = engine || (typeof window !== 'undefined' ? window.Ruhestandsmodell_v30 : null);
+    const effectiveEngine = engine || (typeof window !== 'undefined' ? window.EngineAPI : null);
     if (!effectiveEngine?.CONFIG?.PROFIL_MAP) return raw;
 
     const keys = Object.keys(effectiveEngine.CONFIG.PROFIL_MAP || {});

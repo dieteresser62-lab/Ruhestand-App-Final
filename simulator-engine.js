@@ -7,6 +7,7 @@ import {
     buildInputsCtxFromPortfolio, sumDepot, buyGold, buyStocksNeu
 } from './simulator-portfolio.js';
 import { resolveProfileKey } from './simulator-heatmap.js';
+import TransactionEngine from './engine/transactions/TransactionEngine.mjs';
 
 /**
  * FAIL-SAFE Liquidity Guard - Hilfsfunktionen
@@ -53,6 +54,190 @@ function computeLiqNeedForFloor(ctx) {
 
     // Endgültiger Liquiditätsbedarf als nicht-negative Zahl.
     return euros(runwayTargetSafe * floorMonthlyNet);
+}
+
+/**
+ * Baut eine Adapter-Fassade auf Basis von EngineAPI, um die frühere Legacy-API
+ * im Simulator weiter nutzen zu können. Alle benötigten Methoden werden
+ * defensiv auf EngineAPI abgebildet, fehlende Features lösen einen klaren
+ * Fehler aus.
+ *
+ * @param {object} engineApi - EngineAPI-Instanz mit den offiziellen Methoden.
+ * @returns {object} Fassade mit CONFIG und Adapter-Methoden.
+ */
+function buildEngineFacade(engineApi) {
+    if (!engineApi || typeof engineApi.simulateSingleYear !== 'function') {
+        throw new Error('Critical: EngineAPI fehlt oder ist inkomplett.');
+    }
+
+    const safeConfig = engineApi.getConfig?.() || {};
+    let lastSimulationResult = null;
+
+    /**
+     * Übersetzt Legacy-Inputs (V5) in das aktuelle Engine-Format.
+     * @param {object} v30_inputsCtx - Ursprünglicher Simulator-Input.
+     * @returns {object} Engine-kompatible Eingaben.
+     */
+    const mapLegacyInputsToEngine = (v30_inputsCtx) => ({
+        ...v30_inputsCtx,
+        renteAktiv: (v30_inputsCtx?.pensionAnnual ?? 0) > 0,
+        renteMonatlich: (v30_inputsCtx?.pensionAnnual ?? 0) / 12,
+        endeVJ: v30_inputsCtx?.marketData?.endeVJ ?? v30_inputsCtx?.endeVJ ?? 0,
+        endeVJ_1: v30_inputsCtx?.marketData?.endeVJ_1 ?? v30_inputsCtx?.endeVJ_1 ?? 0,
+        endeVJ_2: v30_inputsCtx?.marketData?.endeVJ_2 ?? v30_inputsCtx?.endeVJ_2 ?? 0,
+        endeVJ_3: v30_inputsCtx?.marketData?.endeVJ_3 ?? v30_inputsCtx?.endeVJ_3 ?? 0,
+        ath: v30_inputsCtx?.marketData?.ath ?? v30_inputsCtx?.ath ?? 0,
+        jahreSeitAth: v30_inputsCtx?.marketData?.jahreSeitAth ?? v30_inputsCtx?.jahreSeitAth ?? 0
+    });
+
+    /**
+     * Führt eine Jahresberechnung aus und cached das Ergebnis für Folgeaufrufe
+     * (z. B. determineAction nach determineSpending).
+     */
+    const runFullSimulationAndCache = (inputsCtx, lastState) => {
+        const mappedInputs = mapLegacyInputsToEngine(inputsCtx || {});
+        const fullResult = engineApi.simulateSingleYear(mappedInputs, lastState);
+        lastSimulationResult = fullResult;
+        return fullResult;
+    };
+
+    return {
+        CONFIG: safeConfig,
+        analyzeMarket: (...args) => engineApi.analyzeMarket?.(...args),
+        calculateTargetLiquidity: (...args) => engineApi.calculateTargetLiquidity?.(...args),
+        mergeSaleResults: TransactionEngine.mergeSaleResults,
+        calculateSaleAndTax: (requestedRefill, v30_inputsCtx, caps = {}, market) => {
+            const v38_input = {
+                ...v30_inputsCtx,
+                tagesgeld: v30_inputsCtx.tagesgeld,
+                geldmarktEtf: v30_inputsCtx.geldmarktEtf,
+                depotwertAlt: v30_inputsCtx.depotwertAlt,
+                depotwertNeu: v30_inputsCtx.depotwertNeu,
+                goldWert: v30_inputsCtx.goldWert,
+                costBasisAlt: v30_inputsCtx.costBasisAlt,
+                costBasisNeu: v30_inputsCtx.costBasisNeu,
+                goldCost: v30_inputsCtx.goldCost
+            };
+
+            const v38_saleResult = TransactionEngine.calculateSaleAndTax(
+                requestedRefill,
+                v38_input,
+                { minGold: caps?.minGold ?? 0 },
+                market,
+                true
+            );
+
+            return { saleResult: v38_saleResult };
+        },
+        determineSpending({
+            market, lastState, inflatedFloor, inflatedFlex,
+            runwayMonths, liquidNow, profile,
+            depotValue, inputsCtx, totalWealth
+        }) {
+            const inflated = { floor: inflatedFloor, flex: inflatedFlex };
+            const fullResult = runFullSimulationAndCache(inputsCtx, lastState);
+
+            if (fullResult.error) {
+                return {
+                    error: fullResult.error,
+                    spendingResult: null,
+                    newState: lastState
+                };
+            }
+
+            return {
+                spendingResult: fullResult.ui.spending,
+                newState: fullResult.newState,
+                diagnosis: fullResult.diagnosis,
+                _fullEngineResponse: fullResult,
+                inflatedBedarf: inflated,
+                runwayMonate: runwayMonths,
+                liquiditaet: liquidNow,
+                depotwertGesamt: depotValue,
+                gesamtwert: totalWealth,
+                profil: profile,
+                market
+            };
+        },
+        determineAction(v30_results, v30_inputsCtx) {
+            let fullResult;
+
+            if (lastSimulationResult) {
+                fullResult = lastSimulationResult;
+                lastSimulationResult = null;
+            } else {
+                fullResult = runFullSimulationAndCache(
+                    v30_inputsCtx,
+                    v30_results.spending?.details
+                );
+            }
+
+            if (fullResult.error) {
+                const currentLiq = (v30_inputsCtx.tagesgeld || 0) + (v30_inputsCtx.geldmarktEtf || 0);
+                return {
+                    error: fullResult.error,
+                    title: 'Fehler in der Engine',
+                    liqNachTransaktion: {
+                        total: currentLiq
+                    },
+                    saleResult: null,
+                    kaufGold: 0,
+                    kaufAktien: 0
+                };
+            }
+
+            if (!fullResult.ui || !fullResult.ui.action) {
+                const currentLiq = (v30_inputsCtx.tagesgeld || 0) + (v30_inputsCtx.geldmarktEtf || 0);
+                return {
+                    error: new Error('Engine result is missing ui.action structure'),
+                    title: 'Fehler in der Engine-Struktur',
+                    liqNachTransaktion: {
+                        total: currentLiq
+                    },
+                    saleResult: null,
+                    kaufGold: 0,
+                    kaufAktien: 0
+                };
+            }
+
+            const v38_actionResult = fullResult.ui.action;
+            const saleBreakdown = v38_actionResult.quellen || [];
+            const aktuelleLiquiditaet = fullResult.input.tagesgeld + fullResult.input.geldmarktEtf;
+            const depotwertGesamt = fullResult.input.depotwertAlt +
+                fullResult.input.depotwertNeu +
+                (fullResult.input.goldAktiv ? fullResult.input.goldWert : 0);
+
+            return {
+                ...v38_actionResult,
+                saleResult: v38_actionResult.type === 'TRANSACTION' ? {
+                    steuerGesamt: v38_actionResult.steuer,
+                    bruttoVerkaufGesamt: saleBreakdown.reduce((sum, q) => sum + q.brutto, 0),
+                    achievedRefill: v38_actionResult.nettoErlös,
+                    breakdown: saleBreakdown
+                } : null,
+                liqNachTransaktion: {
+                    total: aktuelleLiquiditaet + (v38_actionResult.verwendungen?.liquiditaet || 0)
+                },
+                kaufGold: v38_actionResult.verwendungen?.gold || 0,
+                kaufAktien: v38_actionResult.verwendungen?.aktien || 0,
+                reason: v38_actionResult.transactionDiagnostics?.blockReason || 'none',
+                rebalFlag: !!(v38_actionResult.title?.toLowerCase().includes('rebal')),
+                netSaleEquity: saleBreakdown
+                    .filter(q => q.kind.startsWith('aktien'))
+                    .reduce((sum, q) => sum + q.brutto, 0),
+                netSaleGold: saleBreakdown.find(q => q.kind === 'gold')?.brutto || 0,
+                diagnostics: v38_actionResult.transactionDiagnostics,
+                goldWeightBeforePct: depotwertGesamt > 0
+                    ? (fullResult.input.goldWert / depotwertGesamt) * 100
+                    : 0,
+                taxRateSalesPct: (v38_actionResult.nettoErlös > 0)
+                    ? (v38_actionResult.steuer / v38_actionResult.nettoErlös) * 100
+                    : 0,
+                liquidityGapEUR: fullResult.ui.zielLiquiditaet - aktuelleLiquiditaet,
+                _fullEngineResponse: fullResult
+            };
+        }
+    };
 }
 
 /**
@@ -176,7 +361,7 @@ function sellAssetForCash(portfolio, inputsCtx, market, asset, amountEuros, minG
 export function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta = null, careFloorAddition = 0, householdContext = null, temporaryFlexFactor = 1.0, engineAPI = null) {
     // Falls engineAPI nicht übergeben wurde (Legacy-Support), Fallback auf Global
     // Für Headless/Worker-Kontexte MUSS engineAPI übergeben werden.
-    const engine = engineAPI || (typeof window !== 'undefined' ? window.Ruhestandsmodell_v30 : null);
+    const engine = buildEngineFacade(engineAPI || (typeof window !== 'undefined' ? window.EngineAPI : null));
 
     if (!engine) {
         throw new Error("Critical: No Engine API available in simulateOneYear. Pass it as argument or ensure global scope.");

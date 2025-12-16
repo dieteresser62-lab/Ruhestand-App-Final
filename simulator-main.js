@@ -42,7 +42,7 @@
  * ============================================================================
  */
 
-import { EngineAPI, Ruhestandsmodell_v30 } from './engine/index.mjs';
+import { EngineAPI } from './engine/index.mjs';
 import { quantile, sum, mean, formatCurrency } from './simulator-utils.js';
 import { getStartYearCandidates } from './cape-utils.js';
 import { ENGINE_VERSION, STRESS_PRESETS, BREAK_ON_RUIN, MORTALITY_TABLE, annualData, SUPPORTED_PFLEGE_GRADES } from './simulator-data.js';
@@ -97,12 +97,6 @@ const CARE_GRADE_FIELD_IDS = SUPPORTED_PFLEGE_GRADES.flatMap(grade => [
     `pflegeStufe${grade}FlexCut`,
     `pflegeStufe${grade}Mortality`
 ]);
-
-// Sicherstellen, dass die Legacy-Adapter-API geladen ist (für alte Caller, die Globals erwarten)
-const legacyEngineAdapter = Ruhestandsmodell_v30 || (typeof window !== 'undefined' ? window.Ruhestandsmodell_v30 : null);
-if (typeof window !== 'undefined' && legacyEngineAdapter && !window.Ruhestandsmodell_v30) {
-    window.Ruhestandsmodell_v30 = legacyEngineAdapter;
-}
 
 /**
  * Wandelt den legacy Simulator-State in ein EngineAPI-kompatibles Input-Objekt um.
@@ -239,27 +233,23 @@ function simulateOneYear(currentState, inputs, yearData, yearIndex) {
  * Prüft Engine-Version und -Hash
  */
 export function selfCheckEngine() {
-    if (typeof window.Ruhestandsmodell_v30 === 'undefined') {
-        const footer = document.getElementById('engine-mismatch-footer');
+    const footer = document.getElementById('engine-mismatch-footer');
+    const engineApi = window.EngineAPI;
+
+    if (!engineApi || typeof engineApi.getVersion !== 'function') {
         if (footer) {
             footer.textContent = `FEHLER: Die Engine-Datei 'engine.js' konnte nicht geladen werden!`;
             footer.style.display = 'block';
         }
         return;
-    };
-
-    const fnBody = Object.values(window.Ruhestandsmodell_v30).reduce((s, fn) => s + (typeof fn === 'function' ? fn.toString() : ''), '');
-    let hash = 0;
-    for (let i = 0; i < fnBody.length; i++) {
-        hash = ((hash << 5) - hash) + fnBody.charCodeAt(i);
-        hash |= 0;
     }
-    const currentHash = String(Math.abs(hash));
-    const mismatch = window.Ruhestandsmodell_v30.VERSION !== ENGINE_VERSION;
 
-    const footer = document.getElementById('engine-mismatch-footer');
+    const versionInfo = engineApi.getVersion?.();
+    const apiVersion = versionInfo?.api || 'unbekannt';
+    const mismatch = apiVersion !== ENGINE_VERSION;
+
     if (mismatch && footer) {
-        footer.textContent = `WARNUNG: Engine-Version veraltet! Erwartet: ${ENGINE_VERSION}, gefunden: ${window.Ruhestandsmodell_v30.VERSION}`;
+        footer.textContent = `WARNUNG: Engine-Version veraltet! Erwartet: ${ENGINE_VERSION}, gefunden: ${apiVersion}`;
         footer.style.display = 'block';
     }
 }
