@@ -172,15 +172,15 @@ function sellAssetForCash(portfolio, inputsCtx, market, asset, amountEuros, minG
  * @param {Object|null} householdContext - Haushaltsstatus (wer lebt noch, Witwenrenten-Flags)
  * @param {number} temporaryFlexFactor - Temporärer Faktor (0..1) zur Reduktion des Flex-Budgets in diesem Jahr (z.B. durch Pflegekosten)
  * @param {Object|null} engineAPI - Explizit injizierte Engine-API. Falls nicht gesetzt, wird versucht,
- *                                  eine globale Engine (EngineAPI oder Ruhestandsmodell_v30) zu finden.
+ *                                  eine globale EngineAPI zu finden.
  * @returns {Object} Simulationsergebnisse
  */
 export function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta = null, careFloorAddition = 0, householdContext = null, temporaryFlexFactor = 1.0, engineAPI = null) {
-    // Falls engineAPI nicht übergeben wurde (Legacy-Support), Fallback auf global registrierte Engine
-    // (EngineAPI oder Ruhestandsmodell_v30). Headless/Worker-Kontexte müssen explizit injizieren, damit
-    // versehentlich fehlende Abhängigkeiten sofort auffallen und Tests eine klare Fehlermeldung erhalten.
+    // Falls engineAPI nicht übergeben wurde (Legacy-Support), Fallback auf global registrierte EngineAPI.
+    // Headless/Worker-Kontexte müssen explizit injizieren, damit versehentlich fehlende Abhängigkeiten
+    // sofort auffallen und Tests eine klare Fehlermeldung erhalten.
     const globalEngine = (typeof window !== 'undefined')
-        ? (window.EngineAPI || window.Ruhestandsmodell_v30 || null)
+        ? (window.EngineAPI || null)
         : null;
     const engine = engineAPI || globalEngine;
 

@@ -1,16 +1,40 @@
 
 import { simulateOneYear } from '../simulator-engine.js';
-import { EngineAPI, Ruhestandsmodell_v30 } from '../engine/index.mjs';
+import { EngineAPI } from '../engine/index.mjs';
 
 // --- MOCKING GLOBAL STATE ---
-// simulator-engine.js relies on window.Ruhestandsmodell_v30 and window.EngineAPI
+// simulator-engine.js relies auf eine globale EngineAPI, falls keine explizit injiziert wird
 if (typeof global.window === 'undefined') {
     global.window = {};
 }
-global.window.Ruhestandsmodell_v30 = Ruhestandsmodell_v30;
 global.window.EngineAPI = EngineAPI;
 
 console.log('--- Simulation Loop Tests ---');
+
+/**
+ * Einfache Assertion ohne Test-Runner, damit der Test in Node-Umgebungen stabil bleibt.
+ * @param {boolean} condition - Ausdruck, der wahr sein muss.
+ * @param {string} message - Fehlermeldung für den Fall der Nichterfüllung.
+ */
+function assert(condition, message) {
+    if (!condition) {
+        throw new Error(message || 'Assertion failed');
+    }
+}
+
+/**
+ * Vergleich zweier Zahlen mit Toleranz, um Floating-Point-Abweichungen robust zu behandeln.
+ * @param {number} actual - gemessener Wert
+ * @param {number} expected - Vergleichswert
+ * @param {number} tolerance - maximal erlaubte Abweichung
+ * @param {string} message - Fehlerhinweis
+ */
+function assertClose(actual, expected, tolerance, message) {
+    const delta = Math.abs(actual - expected);
+    if (delta > tolerance) {
+        throw new Error(message + ` (Δ=${delta.toFixed(4)})`);
+    }
+}
 
 // Mock Inputs
 const inputs = {

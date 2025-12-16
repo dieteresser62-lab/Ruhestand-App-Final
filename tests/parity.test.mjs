@@ -1,15 +1,28 @@
 
 import { simulateOneYear } from '../simulator-engine.js';
-import { EngineAPI, Ruhestandsmodell_v30 } from '../engine/index.mjs';
+import { EngineAPI } from '../engine/index.mjs';
 
 // --- MOCKING GLOBAL STATE ---
 if (typeof global.window === 'undefined') {
-    global.window = {};
+global.window = {};
 }
-global.window.Ruhestandsmodell_v30 = Ruhestandsmodell_v30;
 global.window.EngineAPI = EngineAPI;
 
 console.log('--- Parity Test: Simulator vs EngineAPI ---');
+
+/**
+ * Prüft zwei Zahlen auf relative Nähe, um Floating-Point-Effekte im Testlauf abzufangen.
+ * @param {number} actual - Gemessener Wert aus der aktuellen Simulation.
+ * @param {number} expected - Referenzwert aus der Vergleichs-Simulation.
+ * @param {number} tolerance - Erlaubte absolute Abweichung.
+ * @param {string} message - Fehlertext für den Assert-Fall.
+ */
+function assertClose(actual, expected, tolerance, message) {
+    const delta = Math.abs(actual - expected);
+    if (delta > tolerance) {
+        throw new Error(message + ` (Δ=${delta.toFixed(4)})`);
+    }
+}
 
 // --- Helper: Run Parity Check ---
 function runParityCheck(scenarioName, customInputs = {}, customState = {}, customYearData = {}) {

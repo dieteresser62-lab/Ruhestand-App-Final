@@ -11,7 +11,7 @@
 ```mermaid
 graph TD
   UI_Balance[Balance UI] -->|Inputs| EngineAPI
-  UI_Simulator[Simulator UI] -->|Inputs| Ruhestandsmodell_v30
+  UI_Simulator[Simulator UI] -->|Inputs| EngineAPI
   EngineAPI --> Validator[InputValidator]
   Validator --> Market[MarketAnalyzer]
   Market --> Planner[SpendingPlanner]
