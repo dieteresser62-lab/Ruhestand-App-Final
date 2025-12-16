@@ -263,9 +263,9 @@ export function initializePortfolio(inputs) {
  */
 export function prepareHistoricalData() {
     if (annualData.length > 0) return;
-    const years = Object.keys(HISTORICAL_DATA).map(Number).sort((a,b)=>a-b);
+    const years = Object.keys(HISTORICAL_DATA).map(Number).sort((a, b) => a - b);
     for (let i = 1; i < years.length; i++) {
-        const y = years[i], prev = years[i-1];
+        const y = years[i], prev = years[i - 1];
         const cur = HISTORICAL_DATA[y], vj = HISTORICAL_DATA[prev];
         if (!cur || !vj) continue;
 
@@ -298,7 +298,7 @@ export function prepareHistoricalData() {
     const regimes = ['BULL', 'BEAR', 'SIDEWAYS', 'STAGFLATION'];
     regimes.forEach(from => { REGIME_TRANSITIONS[from] = { BULL: 0, BEAR: 0, SIDEWAYS: 0, STAGFLATION: 0, total: 0 }; });
     for (let i = 1; i < annualData.length; i++) {
-        const fromRegime = annualData[i-1].regime, toRegime = annualData[i].regime;
+        const fromRegime = annualData[i - 1].regime, toRegime = annualData[i].regime;
         if (fromRegime && toRegime) { REGIME_TRANSITIONS[fromRegime][toRegime]++; REGIME_TRANSITIONS[fromRegime].total++; }
     }
 }
@@ -374,7 +374,7 @@ export function buildStressContext(presetKey, rand) {
 
     if (preset.type === 'conditional_bootstrap') {
         context.pickableIndices = annualData
-            .map((d, i) => ({...d, index: i}))
+            .map((d, i) => ({ ...d, index: i }))
             .filter(d => {
                 const realReturnPct = (d.rendite * 100) - d.inflation;
                 const passesInflation = preset.filter.inflationMin === undefined || d.inflation >= preset.filter.inflationMin;
@@ -454,44 +454,44 @@ export function applySaleToPortfolio(portfolio, saleResult) {
  * Fasst Verkäufe nach Asset-Typ zusammen
  */
 export function summarizeSalesByAsset(saleResult) {
-  const sums = { vkAkt: 0, vkGld: 0, stAkt: 0, stGld: 0, vkGes: 0, stGes: 0 };
-  if (!saleResult || !Array.isArray(saleResult.breakdown)) return sums;
-  for (const item of saleResult.breakdown) {
-    const isAktie = String(item.kind || '').startsWith('aktien');
-    const brutto = +item.brutto || 0;
-    const steuer = (item.steuer != null) ? (+item.steuer) : 0;
-    if (isAktie) { sums.vkAkt += brutto; sums.stAkt += steuer; }
-    else         { sums.vkGld += brutto; sums.stGld += steuer; }
-    sums.vkGes += brutto; sums.stGes += steuer;
-  }
-  if (sums.stGes === 0 && saleResult.steuerGesamt > 0 && (sums.vkAkt + sums.vkGld) > 0) {
-    const tot = sums.vkAkt + sums.vkGld; const ges = saleResult.steuerGesamt;
-    sums.stAkt = ges * (sums.vkAkt / tot); sums.stGld = ges * (sums.vkGld / tot); sums.stGes = ges;
-  } else if (saleResult.steuerGesamt > 0 && Math.abs(sums.stGes - saleResult.steuerGesamt) > 1e-6) {
-    sums.stGes = saleResult.steuerGesamt;
-  }
-  return sums;
+    const sums = { vkAkt: 0, vkGld: 0, stAkt: 0, stGld: 0, vkGes: 0, stGes: 0 };
+    if (!saleResult || !Array.isArray(saleResult.breakdown)) return sums;
+    for (const item of saleResult.breakdown) {
+        const isAktie = String(item.kind || '').startsWith('aktien');
+        const brutto = +item.brutto || 0;
+        const steuer = (item.steuer != null) ? (+item.steuer) : 0;
+        if (isAktie) { sums.vkAkt += brutto; sums.stAkt += steuer; }
+        else { sums.vkGld += brutto; sums.stGld += steuer; }
+        sums.vkGes += brutto; sums.stGes += steuer;
+    }
+    if (sums.stGes === 0 && saleResult.steuerGesamt > 0 && (sums.vkAkt + sums.vkGld) > 0) {
+        const tot = sums.vkAkt + sums.vkGld; const ges = saleResult.steuerGesamt;
+        sums.stAkt = ges * (sums.vkAkt / tot); sums.stGld = ges * (sums.vkGld / tot); sums.stGes = ges;
+    } else if (saleResult.steuerGesamt > 0 && Math.abs(sums.stGes - saleResult.steuerGesamt) > 1e-6) {
+        sums.stGes = saleResult.steuerGesamt;
+    }
+    return sums;
 }
 
 /**
  * Konvertiert Portfolio-Status zurück in Input-Kontext
  */
-export function buildInputsCtxFromPortfolio(inputs, portfolio, {pensionAnnual, marketData}) {
-  const aktAlt = portfolio.depotTranchesAktien.find(t => t.type === 'aktien_alt') || {marketValue:0, costBasis:0};
-  const aktNeu = portfolio.depotTranchesAktien.find(t => t.type === 'aktien_neu') || {marketValue:0, costBasis:0};
-  const gTr   = portfolio.depotTranchesGold.find(t => t.type === 'gold')       || {marketValue:0, costBasis:0};
+export function buildInputsCtxFromPortfolio(inputs, portfolio, { pensionAnnual, marketData }) {
+    const aktAlt = portfolio.depotTranchesAktien.find(t => t.type === 'aktien_alt') || { marketValue: 0, costBasis: 0 };
+    const aktNeu = portfolio.depotTranchesAktien.find(t => t.type === 'aktien_neu') || { marketValue: 0, costBasis: 0 };
+    const gTr = portfolio.depotTranchesGold.find(t => t.type === 'gold') || { marketValue: 0, costBasis: 0 };
 
-  return {
-    ...inputs,
-    tagesgeld: portfolio.liquiditaet, geldmarktEtf: 0,
-    depotwertAlt: aktAlt.marketValue,  costBasisAlt: aktAlt.costBasis,  tqfAlt: 0.30,
-    depotwertNeu: aktNeu.marketValue,  costBasisNeu: aktNeu.costBasis,  tqfNeu: 0.30,
-    goldWert: gTr.marketValue,         goldCost:    gTr.costBasis,
-    goldSteuerfrei: inputs.goldSteuerfrei,
-    sparerPauschbetrag: inputs.startSPB,
-    marketData,
-    pensionAnnual
-  };
+    return {
+        ...inputs,
+        tagesgeld: portfolio.liquiditaet, geldmarktEtf: 0,
+        depotwertAlt: aktAlt.marketValue, costBasisAlt: aktAlt.costBasis, tqfAlt: 0.30,
+        depotwertNeu: aktNeu.marketValue, costBasisNeu: aktNeu.costBasis, tqfNeu: 0.30,
+        goldWert: gTr.marketValue, goldCost: gTr.costBasis,
+        goldSteuerfrei: inputs.goldSteuerfrei,
+        sparerPauschbetrag: inputs.startSPB,
+        marketData,
+        pensionAnnual
+    };
 }
 
 /**

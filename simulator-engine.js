@@ -566,7 +566,6 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     // We target (jahresEntnahme + zielLiquiditaet) so that after spending, we still hold the buffer.
     // This fixes the "0 Cash Trap" where we only refilled what we spent, staying perpetually at 0.
     const liquidityTargetTotal = jahresEntnahme + zielLiquiditaet;
-
     if (liquiditaet < liquidityTargetTotal && depotWertVorEntnahme > 0) {
         // Calculate shortfall against the FULL target (Spending + Buffer)
         const shortfall = liquidityTargetTotal - liquiditaet;

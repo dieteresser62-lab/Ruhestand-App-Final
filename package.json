@@ -5,10 +5,10 @@
   "main": "balance-binder.js",
   "scripts": {
     "build:engine": "node build-engine.mjs",
-    "test": "node sim-parity-smoketest.js"
+    "test": "node tests/run-tests.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs"
+  "type": "module"
 }
