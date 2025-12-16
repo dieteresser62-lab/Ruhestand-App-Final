@@ -42,7 +42,7 @@
  * ============================================================================
  */
 
-import { EngineAPI, Ruhestandsmodell_v30 } from './engine/index.mjs';
+import { EngineAPI } from './engine/index.mjs';
 import { quantile, sum, mean, formatCurrency } from './simulator-utils.js';
 import { getStartYearCandidates } from './cape-utils.js';
 import { ENGINE_VERSION, STRESS_PRESETS, BREAK_ON_RUIN, MORTALITY_TABLE, annualData, SUPPORTED_PFLEGE_GRADES } from './simulator-data.js';
@@ -98,10 +98,10 @@ const CARE_GRADE_FIELD_IDS = SUPPORTED_PFLEGE_GRADES.flatMap(grade => [
     `pflegeStufe${grade}Mortality`
 ]);
 
-// Sicherstellen, dass die Legacy-Adapter-API geladen ist (für alte Caller, die Globals erwarten)
-const legacyEngineAdapter = Ruhestandsmodell_v30 || (typeof window !== 'undefined' ? window.Ruhestandsmodell_v30 : null);
-if (typeof window !== 'undefined' && legacyEngineAdapter && !window.Ruhestandsmodell_v30) {
-    window.Ruhestandsmodell_v30 = legacyEngineAdapter;
+// Sicherstellen, dass die Engine-API global verfügbar ist (Legacy-Kompatibilität für UI-Skripte)
+const bundledEngineApi = EngineAPI || (typeof window !== 'undefined' ? window.EngineAPI : null);
+if (typeof window !== 'undefined' && bundledEngineApi && !window.EngineAPI) {
+    window.EngineAPI = bundledEngineApi;
 }
 
 /**
@@ -239,7 +239,8 @@ function simulateOneYear(currentState, inputs, yearData, yearIndex) {
  * Prüft Engine-Version und -Hash
  */
 export function selfCheckEngine() {
-    if (typeof window.Ruhestandsmodell_v30 === 'undefined') {
+    const engineGlobal = typeof window !== 'undefined' ? window.EngineAPI : null;
+    if (!engineGlobal || typeof engineGlobal.getVersion !== 'function') {
         const footer = document.getElementById('engine-mismatch-footer');
         if (footer) {
             footer.textContent = `FEHLER: Die Engine-Datei 'engine.js' konnte nicht geladen werden!`;
@@ -248,18 +249,19 @@ export function selfCheckEngine() {
         return;
     };
 
-    const fnBody = Object.values(window.Ruhestandsmodell_v30).reduce((s, fn) => s + (typeof fn === 'function' ? fn.toString() : ''), '');
+    const fnBody = Object.values(engineGlobal).reduce((s, fn) => s + (typeof fn === 'function' ? fn.toString() : ''), '');
     let hash = 0;
     for (let i = 0; i < fnBody.length; i++) {
         hash = ((hash << 5) - hash) + fnBody.charCodeAt(i);
         hash |= 0;
     }
     const currentHash = String(Math.abs(hash));
-    const mismatch = window.Ruhestandsmodell_v30.VERSION !== ENGINE_VERSION;
+    const versionInfo = engineGlobal.getVersion ? engineGlobal.getVersion() : null;
+    const mismatch = versionInfo && versionInfo.api !== ENGINE_VERSION;
 
     const footer = document.getElementById('engine-mismatch-footer');
     if (mismatch && footer) {
-        footer.textContent = `WARNUNG: Engine-Version veraltet! Erwartet: ${ENGINE_VERSION}, gefunden: ${window.Ruhestandsmodell_v30.VERSION}`;
+        footer.textContent = `WARNUNG: Engine-Version veraltet! Erwartet: ${ENGINE_VERSION}, gefunden: ${versionInfo?.api ?? 'unbekannt'}`;
         footer.style.display = 'block';
     }
 }

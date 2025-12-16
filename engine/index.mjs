@@ -24,8 +24,10 @@ export default {
 };
 
 // Optional: Legacy-Globals für Direktnutzung ohne Bundle (z. B. in Modul-Skripten)
-if (typeof window !== 'undefined') {
-    // Defensive Zuweisung, um Überschreibungen nur bei Bedarf vorzunehmen
+if (typeof window !== 'undefined' && typeof window.document !== 'undefined') {
+    // Defensive Zuweisung, um Überschreibungen nur bei Bedarf vorzunehmen.
+    // Headless/Worker-Kontexte ohne DOM erhalten keine automatische Injection,
+    // damit Tests bewusst eine fehlende Engine erkennen können.
     window.EngineAPI = window.EngineAPI || EngineAPI;
     window.Ruhestandsmodell_v30 = window.Ruhestandsmodell_v30 || Ruhestandsmodell_v30;
 }

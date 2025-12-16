@@ -171,12 +171,18 @@ function sellAssetForCash(portfolio, inputsCtx, market, asset, amountEuros, minG
  * @param {number} careFloorAddition - Zusätzlicher Floor-Bedarf durch Pflege (optional, wird nicht inflationsangepasst)
  * @param {Object|null} householdContext - Haushaltsstatus (wer lebt noch, Witwenrenten-Flags)
  * @param {number} temporaryFlexFactor - Temporärer Faktor (0..1) zur Reduktion des Flex-Budgets in diesem Jahr (z.B. durch Pflegekosten)
+ * @param {Object|null} engineAPI - Explizit injizierte Engine-API. Falls nicht gesetzt, wird versucht,
+ *                                  eine globale Engine (EngineAPI oder Ruhestandsmodell_v30) zu finden.
  * @returns {Object} Simulationsergebnisse
  */
 export function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta = null, careFloorAddition = 0, householdContext = null, temporaryFlexFactor = 1.0, engineAPI = null) {
-    // Falls engineAPI nicht übergeben wurde (Legacy-Support), Fallback auf Global
-    // Für Headless/Worker-Kontexte MUSS engineAPI übergeben werden.
-    const engine = engineAPI || (typeof window !== 'undefined' ? window.Ruhestandsmodell_v30 : null);
+    // Falls engineAPI nicht übergeben wurde (Legacy-Support), Fallback auf global registrierte Engine
+    // (EngineAPI oder Ruhestandsmodell_v30). Headless/Worker-Kontexte müssen explizit injizieren, damit
+    // versehentlich fehlende Abhängigkeiten sofort auffallen und Tests eine klare Fehlermeldung erhalten.
+    const globalEngine = (typeof window !== 'undefined')
+        ? (window.EngineAPI || window.Ruhestandsmodell_v30 || null)
+        : null;
+    const engine = engineAPI || globalEngine;
 
     if (!engine) {
         throw new Error("Critical: No Engine API available in simulateOneYear. Pass it as argument or ensure global scope.");
@@ -526,9 +532,29 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
 
 
+    // EngineAPI erwartet ein gebündeltes Bedarf-Objekt; separate Felder führen zu undefinierten Werten
+    // im SpendingPlanner. Deshalb legen wir die Struktur explizit an und übergeben sie unverändert weiter.
+    const inflatedBedarf = { floor: inflatedFloor, flex: inflatedFlex };
     const spendingResponse = engine.determineSpending({
-        market, lastState, inflatedFloor, inflatedFlex,
-        runwayMonths, liquidNow: liquiditaet, profile, depotValue: depotwertGesamt, totalWealth, inputsCtx
+        // Behalte Legacy-Felder für den V30-Adapter bei, damit Headless-Tests weiterhin darauf zugreifen können
+        inflatedFloor,
+        inflatedFlex,
+        runwayMonths,
+        liquidNow: liquiditaet,
+        profile,
+        depotValue: depotwertGesamt,
+        inputsCtx,
+        totalWealth,
+        // Neue EngineAPI-Signatur
+        market,
+        lastState,
+        inflatedBedarf,
+        runwayMonate: runwayMonths,
+        profil: profile,
+        depotwertGesamt: depotwertGesamt,
+        gesamtwert: totalWealth,
+        renteJahr: pensionAnnual,
+        input: algoInput
     });
 
     // FAIL-SAFE: Check if engine returned error or null spendingResult
@@ -539,9 +565,19 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
     const { spendingResult, newState: spendingNewState } = spendingResponse;
 
+    // Design-Entscheidung: Die Action-Phase arbeitet auf derselben Input-Struktur wie der Core, damit
+    // Rebalancing/Verkaufslogik konsistente Schwellen (Band, Gold-Floor, Runway) verwenden kann.
     const results = {
-        aktuelleLiquiditaet: liquiditaet, depotwertGesamt, zielLiquiditaet, gesamtwert: totalWealth,
-        inflatedFloor, grossFloor: baseFloor, spending: spendingResult, market,
+        aktuelleLiquiditaet: liquiditaet,
+        depotwertGesamt,
+        zielLiquiditaet,
+        gesamtwert: totalWealth,
+        inflatedFloor,
+        grossFloor: baseFloor,
+        spending: spendingResult,
+        market,
+        profil: profile,
+        input: algoInput,
         minGold: algoInput.goldAktiv ? (algoInput.goldFloorProzent / 100) * totalWealth : 0
     };
     const actionResult = engine.determineAction(results, inputsCtx);
@@ -552,20 +588,36 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         return { isRuin: true, error: actionResult.error };
     }
 
-    let mergedSaleResult = actionResult.saleResult;
-    if (actionResult.saleResult) {
-        totalTaxesThisYear += (actionResult.saleResult.steuerGesamt || 0);
-        applySaleToPortfolio(portfolio, actionResult.saleResult);
+    const normalizedSaleResult = actionResult.saleResult
+        || (Array.isArray(actionResult.quellen)
+            ? {
+                achievedRefill: actionResult.nettoErlös || (actionResult.verwendungen?.liquiditaet ?? 0),
+                steuerGesamt: actionResult.steuer || 0,
+                bruttoVerkaufGesamt: actionResult.quellen.reduce((sum, item) => sum + (item?.brutto || 0), 0),
+                breakdown: actionResult.quellen
+            }
+            : null);
+
+    if (normalizedSaleResult) {
+        totalTaxesThisYear += (normalizedSaleResult.steuerGesamt || 0);
+        applySaleToPortfolio(portfolio, normalizedSaleResult);
     }
 
-    liquiditaet = actionResult.liqNachTransaktion.total;
+    const liqAfterAction = (actionResult.liqNachTransaktion && typeof actionResult.liqNachTransaktion.total === 'number')
+        ? euros(actionResult.liqNachTransaktion.total)
+        : euros(liquiditaet + (actionResult.verwendungen?.liquiditaet || 0));
+    liquiditaet = liqAfterAction;
 
-    if (actionResult.kaufGold > 0) {
-        buyGold(portfolio, actionResult.kaufGold);
+    const geplanteGoldKauefe = actionResult.kaufGold || 0;
+    const geplanteAktienKauefe = actionResult.kaufAktien || 0;
+    if (geplanteGoldKauefe > 0) {
+        buyGold(portfolio, geplanteGoldKauefe);
     }
-    if (actionResult.kaufAktien > 0) {
-        buyStocksNeu(portfolio, actionResult.kaufAktien);
+    if (geplanteAktienKauefe > 0) {
+        buyStocksNeu(portfolio, geplanteAktienKauefe);
     }
+
+    let mergedSaleResult = normalizedSaleResult;
 
     const depotWertVorEntnahme = sumDepot(portfolio);
     let emergencyRefillHappened = false;
@@ -807,7 +859,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             Alarm: spendingNewState.alarmActive,
             Regime: spendingNewState.lastMarketSKey,
             QuoteEndPct: spendingResult.details.entnahmequoteDepot * 100,
-            RunwayCoveragePct: (zielLiquiditaet > 0 ? (actionResult.liqNachTransaktion.total / zielLiquiditaet) : 1) * 100,
+                RunwayCoveragePct: (zielLiquiditaet > 0 ? (liqAfterAction / zielLiquiditaet) : 1) * 100,
             RealReturnEquityPct: (1 + rA) / (1 + yearData.inflation / 100) - 1,
             RealReturnGoldPct: (1 + rG) / (1 + yearData.inflation / 100) - 1,
             entnahmequote: depotWertVorEntnahme > 0 ? (jahresEntnahme / depotWertVorEntnahme) : 0,

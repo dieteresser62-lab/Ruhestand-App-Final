@@ -242,7 +242,8 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal') {
         {
             header: 'Markt', width: 12, key: 'row.Regime',
             valueFormatter: (v, row) => {
-                const regimeText = window.Ruhestandsmodell_v30?.CONFIG?.SCENARIO_TEXT?.[v] || v || '';
+                const engineConfig = (typeof window !== 'undefined' ? window.EngineAPI?.CONFIG : null) || (typeof window !== 'undefined' ? window.EngineAPI?.getConfig?.() : null);
+                const regimeText = engineConfig?.SCENARIO_TEXT?.[v] || v || '';
                 return regimeText.substring(0, 12);
             },
             align: 'left'
