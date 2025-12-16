@@ -5,7 +5,7 @@ import { lerp } from './simulator-utils.js';
 // Schwellenwerte für die adaptive Anzeige der Heatmap
 export const HEATMAP_META_MIN_TIMESHARE_ABOVE_45 = 0.02; // 2 % der Zeit mit Quote > 4,5 %
 export const HEATMAP_RED_SHARE_THRESHOLD = 0.03; // 3 % Rot (>4.5%) in mindestens einer Spalte
-export const HEATMAP_GREEN_SHARE_MIN     = 0.50; // Grün (0–3 %) fällt in mind. einer Spalte unter 50 %
+export const HEATMAP_GREEN_SHARE_MIN = 0.50; // Grün (0–3 %) fällt in mind. einer Spalte unter 50 %
 
 /**
  * CSS-Styles für die Heatmap
@@ -57,7 +57,7 @@ export function viridis(t) {
     const i = Math.floor(t * (C.length - 1));
     const f = t * (C.length - 1) - i;
     if (f === 0) return `rgb(${C[i][0]}, ${C[i][1]}, ${C[i][2]})`;
-    const c1 = C[i], c2 = C[i+1];
+    const c1 = C[i], c2 = C[i + 1];
     const r = Math.round(c1[0] + f * (c2[0] - c1[0]));
     const g = Math.round(c1[1] + f * (c2[1] - c1[1]));
     const b = Math.round(c1[2] + f * (c2[2] - c1[2]));
@@ -156,15 +156,22 @@ export function computeHeatmapStats(heat, bins, totalRuns) {
 /**
  * Löst den Profilschlüssel auf
  */
-export function resolveProfileKey(raw) {
-  if (!window.Ruhestandsmodell_v30?.CONFIG?.PROFIL_MAP) return raw;
-  const keys = Object.keys(window.Ruhestandsmodell_v30.CONFIG.PROFIL_MAP || {});
-  const norm = s => String(s||"").toLowerCase().replace(/[\s\-_]/g, "");
-  const nraw = norm(raw);
-  let hit = keys.find(k => norm(k) === nraw);
-  if (hit) return hit;
-  hit = keys.find(k => nraw.includes(norm(k)) || norm(k).includes(nraw));
-  return hit || keys[0];
+/**
+ * Löst den Profilschlüssel auf
+ * @param {string} raw - Der rohe Profil-Name/Key
+ * @param {object} [engine] - Optionale Engine-Instanz (für Headless use). Fallback auf window.Ruhestandsmodell_v30
+ */
+export function resolveProfileKey(raw, engine) {
+    const effectiveEngine = engine || (typeof window !== 'undefined' ? window.Ruhestandsmodell_v30 : null);
+    if (!effectiveEngine?.CONFIG?.PROFIL_MAP) return raw;
+
+    const keys = Object.keys(effectiveEngine.CONFIG.PROFIL_MAP || {});
+    const norm = s => String(s || "").toLowerCase().replace(/[\s\-_]/g, "");
+    const nraw = norm(raw);
+    let hit = keys.find(k => norm(k) === nraw);
+    if (hit) return hit;
+    hit = keys.find(k => nraw.includes(norm(k)) || norm(k).includes(nraw));
+    return hit || keys[0];
 }
 
 /**
@@ -201,7 +208,7 @@ export function renderHeatmapSVG(heat, bins, totalRuns, extraKPI = {}, options =
     const cellHeight = chartHeight / numBins;
     const cellWidth = chartWidth / numYears;
 
-    const paletteFn = opts.palette === 'viridis' ? viridis : (t) => `hsl(${lerp(t,0,1,240,0)}, 80%, 50%)`;
+    const paletteFn = opts.palette === 'viridis' ? viridis : (t) => `hsl(${lerp(t, 0, 1, 240, 0)}, 80%, 50%)`;
 
     let cellBackgrounds = '', cellOverlays = '', cellAnnotations = '';
 
@@ -218,8 +225,8 @@ export function renderHeatmapSVG(heat, bins, totalRuns, extraKPI = {}, options =
             const { textFill, bgFill, dotFill } = computeLabelStyles(color);
 
             const tooltip = `Jahr ${yIdx + 1} | Entnahme: ${bins[bIdx].toFixed(1)}%-` +
-                            `${bins[bIdx+1] < 100 ? bins[bIdx+1].toFixed(1) : '∞'}% | ` +
-                            `Anteil: ${pct.toFixed(2)}% (${heat[yIdx][bIdx]} Läufe)`;
+                `${bins[bIdx + 1] < 100 ? bins[bIdx + 1].toFixed(1) : '∞'}% | ` +
+                `Anteil: ${pct.toFixed(2)}% (${heat[yIdx][bIdx]} Läufe)`;
 
             cellBackgrounds += `<rect x="${x}" y="${y}" width="${cellWidth}" height="${cellHeight}" fill="${color}" class="heatmap-cell"><title>${tooltip}</title></rect>`;
 
@@ -231,25 +238,25 @@ export function renderHeatmapSVG(heat, bins, totalRuns, extraKPI = {}, options =
             const labelText = (pct <= 0) ? '0' : (pct < 0.1 ? '<0.1' : (pct < 1 ? pct.toFixed(1) : Math.round(pct)));
 
             if (showText) {
-                cellAnnotations += `<rect x="${x + cellWidth/2 - 15}" y="${y + cellHeight/2 - 8}" width="30" height="16" fill="${bgFill}" class="cell-label-bg" />`;
-                cellAnnotations += `<text x="${x + cellWidth/2}" y="${y + cellHeight/2}" fill="${textFill}" class="cell-label-text">${labelText}%</text>`;
+                cellAnnotations += `<rect x="${x + cellWidth / 2 - 15}" y="${y + cellHeight / 2 - 8}" width="30" height="16" fill="${bgFill}" class="cell-label-bg" />`;
+                cellAnnotations += `<text x="${x + cellWidth / 2}" y="${y + cellHeight / 2}" fill="${textFill}" class="cell-label-text">${labelText}%</text>`;
             } else if (pct >= opts.dotThresholdPct) {
-                cellAnnotations += `<circle cx="${x + cellWidth/2}" cy="${y + cellHeight/2}" r="1.5" fill="${dotFill}" class="cell-dot" />`;
+                cellAnnotations += `<circle cx="${x + cellWidth / 2}" cy="${y + cellHeight / 2}" r="1.5" fill="${dotFill}" class="cell-dot" />`;
             }
         });
     });
 
-    const yAxisLabels = bins.slice(0, -1).map((bin, i) => `<text x="-8" y="${i * cellHeight + cellHeight/2}" class="bin-label">${bin.toFixed(1)}%</text>`).join('');
-    const xAxisLabels = [...Array(numYears).keys()].map(i => `<text x="${i * cellWidth + cellWidth/2}" y="${chartHeight + 20}" class="year-label">${i+1}</text>`).join('');
-    const colHeaders = colSharesAbove45.map((share, i) => `<text x="${i * cellWidth + cellWidth/2}" y="-18" class="col-header" fill="var(--danger-color, #c0392b)">${(share*100).toFixed(1)}%</text>`).join('');
+    const yAxisLabels = bins.slice(0, -1).map((bin, i) => `<text x="-8" y="${i * cellHeight + cellHeight / 2}" class="bin-label">${bin.toFixed(1)}%</text>`).join('');
+    const xAxisLabels = [...Array(numYears).keys()].map(i => `<text x="${i * cellWidth + cellWidth / 2}" y="${chartHeight + 20}" class="year-label">${i + 1}</text>`).join('');
+    const colHeaders = colSharesAbove45.map((share, i) => `<text x="${i * cellWidth + cellWidth / 2}" y="-18" class="col-header" fill="var(--danger-color, #c0392b)">${(share * 100).toFixed(1)}%</text>`).join('');
 
     let legend = '';
     if (opts.showLegend) {
         const legendHeight = chartHeight, legendWidth = 15;
         const stops = [0, 0.25, 0.5, 0.75, 1];
         const legendMaxVal = (opts.normalize === 'global' ? globalP90 : Math.max(...perColP90)) * 100;
-        let gradientStops = stops.map(s => `<stop offset="${s*100}%" stop-color="${paletteFn(s)}" />`).join('');
-        let legendLabels = stops.map(s => `<text x="${chartWidth + 30 + legendWidth}" y="${legendHeight * (1-s)}" dominant-baseline="middle" class="legend-text">${(s * legendMaxVal).toFixed(1)}%</text>`).join('');
+        let gradientStops = stops.map(s => `<stop offset="${s * 100}%" stop-color="${paletteFn(s)}" />`).join('');
+        let legendLabels = stops.map(s => `<text x="${chartWidth + 30 + legendWidth}" y="${legendHeight * (1 - s)}" dominant-baseline="middle" class="legend-text">${(s * legendMaxVal).toFixed(1)}%</text>`).join('');
 
         legend = `
             <g class="legend" transform="translate(${chartWidth + 25}, 0)">
@@ -284,9 +291,9 @@ export function renderHeatmapSVG(heat, bins, totalRuns, extraKPI = {}, options =
         <svg class="heatmap-v4-svg" viewBox="0 0 ${opts.width} ${opts.height}">
             <defs>${HEATMAP_V4_STYLE}</defs>
             <g transform="translate(${margin.left}, ${margin.top})">
-                <text x="${chartWidth/2}" y="-35" text-anchor="middle" class="axis-label">Simulationsjahr</text>
-                <text x="${chartWidth/2}" y="-5" text-anchor="middle" class="axis-label" font-size="9" fill="var(--danger-color, #c0392b)">Anteil Läufe >4.5% Quote</text>
-                <text transform="translate(-50, ${chartHeight/2}) rotate(-90)" text-anchor="middle" class="axis-label">Entnahmerate</text>
+                <text x="${chartWidth / 2}" y="-35" text-anchor="middle" class="axis-label">Simulationsjahr</text>
+                <text x="${chartWidth / 2}" y="-5" text-anchor="middle" class="axis-label" font-size="9" fill="var(--danger-color, #c0392b)">Anteil Läufe >4.5% Quote</text>
+                <text transform="translate(-50, ${chartHeight / 2}) rotate(-90)" text-anchor="middle" class="axis-label">Entnahmerate</text>
 
                 ${cellBackgrounds}
                 ${cellOverlays}
@@ -306,11 +313,11 @@ export function renderHeatmapSVG(heat, bins, totalRuns, extraKPI = {}, options =
  * Rendert den Toggle für Worst-Run-Anzeige
  */
 export function renderWorstRunToggle(hasCareWorst) {
-  const careBtn = hasCareWorst
-    ? `<button id="btnWorstCare" class="toggle-btn">Schlechtester Pflege-Lauf</button>`
-    : '';
+    const careBtn = hasCareWorst
+        ? `<button id="btnWorstCare" class="toggle-btn">Schlechtester Pflege-Lauf</button>`
+        : '';
 
-  const style = `
+    const style = `
     <style>
       .worst-run-toggle { text-align: center; margin-bottom: 12px; display: flex; justify-content: center; gap: 10px; }
       .toggle-btn { padding: 6px 12px; font-size: 0.9rem; border: 1px solid var(--border-color); background-color: #f0f0f0; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
@@ -320,7 +327,7 @@ export function renderWorstRunToggle(hasCareWorst) {
     </style>
   `;
 
-  return `
+    return `
     ${style}
     <div class="worst-run-toggle">
       <button id="btnWorstAll" class="toggle-btn active">Schlechtester Lauf (alle)</button>
@@ -336,137 +343,137 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
 
     try {
 
-    const opts = Object.assign({
-        width: 980, height: 500, showLegend: true
-    }, options);
+        const opts = Object.assign({
+            width: 980, height: 500, showLegend: true
+        }, options);
 
-    const paramLabels = {
-        runwayMin: 'Runway Min',
-        runwayTarget: 'Runway Target',
-        targetEq: 'Target Eq',
-        rebalBand: 'Rebal Band',
-        maxSkimPct: 'Max Skim %',
-        maxBearRefillPct: 'Max Bear Refill %',
-        goldTargetPct: 'Gold Target %'
-    };
+        const paramLabels = {
+            runwayMin: 'Runway Min',
+            runwayTarget: 'Runway Target',
+            targetEq: 'Target Eq',
+            rebalBand: 'Rebal Band',
+            maxSkimPct: 'Max Skim %',
+            maxBearRefillPct: 'Max Bear Refill %',
+            goldTargetPct: 'Gold Target %'
+        };
 
-    const metricLabels = {
-        successProbFloor: 'Success Prob Floor (%)',
-        p10EndWealth: 'P10 End Wealth (€)',
-        p25EndWealth: 'P25 End Wealth (€)',
-        medianEndWealth: 'Median End Wealth (€)',
-        p75EndWealth: 'P75 End Wealth (€)',
-        meanEndWealth: 'Mean End Wealth (€)',
-        maxEndWealth: 'Max End Wealth (€)',
-        worst5Drawdown: 'Worst 5% Drawdown (%)',
-        minRunwayObserved: 'Min Runway Observed (Monate)'
-    };
+        const metricLabels = {
+            successProbFloor: 'Success Prob Floor (%)',
+            p10EndWealth: 'P10 End Wealth (€)',
+            p25EndWealth: 'P25 End Wealth (€)',
+            medianEndWealth: 'Median End Wealth (€)',
+            p75EndWealth: 'P75 End Wealth (€)',
+            meanEndWealth: 'Mean End Wealth (€)',
+            maxEndWealth: 'Max End Wealth (€)',
+            worst5Drawdown: 'Worst 5% Drawdown (%)',
+            minRunwayObserved: 'Min Runway Observed (Monate)'
+        };
 
-    const margin = { top: 60, right: 120, bottom: 60, left: 80 };
-    const chartWidth = opts.width - margin.left - margin.right;
-    const chartHeight = opts.height - margin.top - margin.bottom;
+        const margin = { top: 60, right: 120, bottom: 60, left: 80 };
+        const chartWidth = opts.width - margin.left - margin.right;
+        const chartHeight = opts.height - margin.top - margin.bottom;
 
-    const cellWidth = chartWidth / xValues.length;
-    const cellHeight = chartHeight / yValues.length;
+        const cellWidth = chartWidth / xValues.length;
+        const cellHeight = chartHeight / yValues.length;
 
-    const heatmapData = new Map();
-    for (const result of sweepResults) {
-        const key = `${result.params[xParam]}_${result.params[yParam]}`;
-        heatmapData.set(key, result.metrics[metricKey] || 0);
-    }
-
-    const allValues = Array.from(heatmapData.values());
-    const minVal = Math.min(...allValues);
-    const maxVal = Math.max(...allValues);
-    const range = maxVal - minVal;
-
-    const getColor = (value) => {
-        if (range === 0) return viridis(0.5);
-        const t = (value - minVal) / range;
-        return viridis(t);
-    };
-
-    const formatValue = (value, metric) => {
-        const wealthMetrics = ['p10EndWealth', 'p25EndWealth', 'medianEndWealth', 'p75EndWealth', 'meanEndWealth', 'maxEndWealth'];
-        if (wealthMetrics.includes(metric)) {
-            return `${(value / 1000).toFixed(0)}k €`;
-        } else if (metric === 'successProbFloor' || metric === 'worst5Drawdown') {
-            return `${value.toFixed(1)}%`;
-        } else {
-            return value.toFixed(1);
+        const heatmapData = new Map();
+        for (const result of sweepResults) {
+            const key = `${result.params[xParam]}_${result.params[yParam]}`;
+            heatmapData.set(key, result.metrics[metricKey] || 0);
         }
-    };
 
-    let cellsHtml = '';
-    for (let yi = 0; yi < yValues.length; yi++) {
-        for (let xi = 0; xi < xValues.length; xi++) {
-            const xVal = xValues[xi];
-            const yVal = yValues[yValues.length - 1 - yi];
-            const key = `${xVal}_${yVal}`;
-            const value = heatmapData.get(key) || 0;
+        const allValues = Array.from(heatmapData.values());
+        const minVal = Math.min(...allValues);
+        const maxVal = Math.max(...allValues);
+        const range = maxVal - minVal;
 
-            const x = xi * cellWidth;
-            const y = yi * cellHeight;
-            const color = getColor(value);
+        const getColor = (value) => {
+            if (range === 0) return viridis(0.5);
+            const t = (value - minVal) / range;
+            return viridis(t);
+        };
 
-            const result = sweepResults.find(r => r.params[xParam] === xVal && r.params[yParam] === yVal);
-            const hasR2Warning = result && result.metrics && result.metrics.warningR2Varies;
+        const formatValue = (value, metric) => {
+            const wealthMetrics = ['p10EndWealth', 'p25EndWealth', 'medianEndWealth', 'p75EndWealth', 'meanEndWealth', 'maxEndWealth'];
+            if (wealthMetrics.includes(metric)) {
+                return `${(value / 1000).toFixed(0)}k €`;
+            } else if (metric === 'successProbFloor' || metric === 'worst5Drawdown') {
+                return `${value.toFixed(1)}%`;
+            } else {
+                return value.toFixed(1);
+            }
+        };
 
-            const tooltipLines = result ? [
-                `${paramLabels[xParam]}: ${xVal}`,
-                `${paramLabels[yParam]}: ${yVal}`,
-                '',
-                `Success Prob: ${result.metrics.successProbFloor.toFixed(1)}%`,
-                `P10 End Wealth: ${(result.metrics.p10EndWealth / 1000).toFixed(0)}k €`,
-                `Worst 5% DD: ${result.metrics.worst5Drawdown.toFixed(1)}%`,
-                `Min Runway: ${result.metrics.minRunwayObserved.toFixed(1)} Mo`,
-                hasR2Warning ? '\n⚠ Rente 2 variierte im Sweep' : ''
-            ].filter(Boolean) : [`${paramLabels[xParam]}: ${xVal}`, `${paramLabels[yParam]}: ${yVal}`, 'Keine Daten'];
+        let cellsHtml = '';
+        for (let yi = 0; yi < yValues.length; yi++) {
+            for (let xi = 0; xi < xValues.length; xi++) {
+                const xVal = xValues[xi];
+                const yVal = yValues[yValues.length - 1 - yi];
+                const key = `${xVal}_${yVal}`;
+                const value = heatmapData.get(key) || 0;
 
-            const tooltip = tooltipLines.join('&#10;');
+                const x = xi * cellWidth;
+                const y = yi * cellHeight;
+                const color = getColor(value);
 
-            // Füge gelben Rand hinzu bei R2-Warnung
-            const strokeColor = hasR2Warning ? '#ffc107' : '#fff';
-            const strokeWidth = hasR2Warning ? '3' : '1';
-            cellsHtml += `<rect x="${x}" y="${y}" width="${cellWidth}" height="${cellHeight}" fill="${color}" stroke="${strokeColor}" stroke-width="${strokeWidth}"><title>${tooltip}</title></rect>`;
+                const result = sweepResults.find(r => r.params[xParam] === xVal && r.params[yParam] === yVal);
+                const hasR2Warning = result && result.metrics && result.metrics.warningR2Varies;
 
-            if (cellWidth >= 40 && cellHeight >= 30) {
-                const textColor = pickTextColorForBg(parseRgb(color));
-                const yOffset = hasR2Warning ? -5 : 0;
-                cellsHtml += `<text x="${x + cellWidth / 2}" y="${y + cellHeight / 2 + yOffset}" text-anchor="middle" dominant-baseline="middle" fill="${textColor}" font-size="11px" font-weight="600" pointer-events="none">${formatValue(value, metricKey)}</text>`;
+                const tooltipLines = result ? [
+                    `${paramLabels[xParam]}: ${xVal}`,
+                    `${paramLabels[yParam]}: ${yVal}`,
+                    '',
+                    `Success Prob: ${result.metrics.successProbFloor.toFixed(1)}%`,
+                    `P10 End Wealth: ${(result.metrics.p10EndWealth / 1000).toFixed(0)}k €`,
+                    `Worst 5% DD: ${result.metrics.worst5Drawdown.toFixed(1)}%`,
+                    `Min Runway: ${result.metrics.minRunwayObserved.toFixed(1)} Mo`,
+                    hasR2Warning ? '\n⚠ Rente 2 variierte im Sweep' : ''
+                ].filter(Boolean) : [`${paramLabels[xParam]}: ${xVal}`, `${paramLabels[yParam]}: ${yVal}`, 'Keine Daten'];
 
-                // Warn-Symbol bei R2-Varianz
-                if (hasR2Warning) {
-                    cellsHtml += `<text x="${x + cellWidth / 2}" y="${y + cellHeight / 2 + 10}" text-anchor="middle" dominant-baseline="middle" font-size="14px" pointer-events="none" title="Rente 2 variierte im Sweep">⚠</text>`;
+                const tooltip = tooltipLines.join('&#10;');
+
+                // Füge gelben Rand hinzu bei R2-Warnung
+                const strokeColor = hasR2Warning ? '#ffc107' : '#fff';
+                const strokeWidth = hasR2Warning ? '3' : '1';
+                cellsHtml += `<rect x="${x}" y="${y}" width="${cellWidth}" height="${cellHeight}" fill="${color}" stroke="${strokeColor}" stroke-width="${strokeWidth}"><title>${tooltip}</title></rect>`;
+
+                if (cellWidth >= 40 && cellHeight >= 30) {
+                    const textColor = pickTextColorForBg(parseRgb(color));
+                    const yOffset = hasR2Warning ? -5 : 0;
+                    cellsHtml += `<text x="${x + cellWidth / 2}" y="${y + cellHeight / 2 + yOffset}" text-anchor="middle" dominant-baseline="middle" fill="${textColor}" font-size="11px" font-weight="600" pointer-events="none">${formatValue(value, metricKey)}</text>`;
+
+                    // Warn-Symbol bei R2-Varianz
+                    if (hasR2Warning) {
+                        cellsHtml += `<text x="${x + cellWidth / 2}" y="${y + cellHeight / 2 + 10}" text-anchor="middle" dominant-baseline="middle" font-size="14px" pointer-events="none" title="Rente 2 variierte im Sweep">⚠</text>`;
+                    }
                 }
             }
         }
-    }
 
-    const xAxisLabels = xValues.map((v, i) => `<text x="${i * cellWidth + cellWidth / 2}" y="${chartHeight + 20}" text-anchor="middle" class="tick-label">${v}</text>`).join('');
-    const yAxisLabels = yValues.map((v, i) => `<text x="-8" y="${(yValues.length - 1 - i) * cellHeight + cellHeight / 2}" text-anchor="end" dominant-baseline="middle" class="tick-label">${v}</text>`).join('');
+        const xAxisLabels = xValues.map((v, i) => `<text x="${i * cellWidth + cellWidth / 2}" y="${chartHeight + 20}" text-anchor="middle" class="tick-label">${v}</text>`).join('');
+        const yAxisLabels = yValues.map((v, i) => `<text x="-8" y="${(yValues.length - 1 - i) * cellHeight + cellHeight / 2}" text-anchor="end" dominant-baseline="middle" class="tick-label">${v}</text>`).join('');
 
-    let legend = '';
-    if (opts.showLegend) {
-        const legendHeight = chartHeight;
-        const legendWidth = 15;
-        const stops = [0, 0.25, 0.5, 0.75, 1];
-        const gradientStops = stops.map(s => `<stop offset="${s * 100}%" stop-color="${viridis(s)}" />`).join('');
+        let legend = '';
+        if (opts.showLegend) {
+            const legendHeight = chartHeight;
+            const legendWidth = 15;
+            const stops = [0, 0.25, 0.5, 0.75, 1];
+            const gradientStops = stops.map(s => `<stop offset="${s * 100}%" stop-color="${viridis(s)}" />`).join('');
 
-        const legendLabels = stops.map(s => {
-            const val = minVal + s * range;
-            return `<text x="${chartWidth + 35 + legendWidth}" y="${legendHeight * (1 - s)}" dominant-baseline="middle" class="legend-text">${formatValue(val, metricKey)}</text>`;
-        }).join('');
+            const legendLabels = stops.map(s => {
+                const val = minVal + s * range;
+                return `<text x="${chartWidth + 35 + legendWidth}" y="${legendHeight * (1 - s)}" dominant-baseline="middle" class="legend-text">${formatValue(val, metricKey)}</text>`;
+            }).join('');
 
-        legend = `
+            legend = `
             <g class="legend" transform="translate(${chartWidth + 30}, 0)">
                 <defs><linearGradient id="sweepGradient" x1="0" y1="1" x2="0" y2="0">${gradientStops}</linearGradient></defs>
                 <rect x="0" y="0" width="${legendWidth}" height="${legendHeight}" fill="url(#sweepGradient)"></rect>
                 ${legendLabels}
             </g>`;
-    }
+        }
 
-    return `
+        return `
         ${HEATMAP_V4_STYLE}
         <div style="text-align:center;">
             <h4>Parameter Sweep: ${metricLabels[metricKey] || metricKey}</h4>

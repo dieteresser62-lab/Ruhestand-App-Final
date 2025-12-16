@@ -37,6 +37,7 @@ import {
     areP2InvariantsEqual
 } from './simulator-sweep-utils.js';
 import { renderSweepHeatmapSVG } from './simulator-heatmap.js';
+import { Ruhestandsmodell_v30 } from './engine/index.mjs';
 
 /**
  * Initialisiert Sweep-Inputfelder und synchronisiert sie mit localStorage.
@@ -314,7 +315,7 @@ export async function runParameterSweep() {
                     // Calculate care floor addition (if active)
                     const { zusatzFloor: careFloor } = calcCareCost(careMeta, null);
 
-                    const result = simulateOneYear(simState, adjustedInputs, yearData, simulationsJahr, careMeta, careFloor);
+                    const result = simulateOneYear(simState, adjustedInputs, yearData, simulationsJahr, careMeta, careFloor, null, 1.0, Ruhestandsmodell_v30);
 
                     if (result.isRuin) {
                         failed = true;

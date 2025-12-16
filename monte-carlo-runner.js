@@ -23,7 +23,7 @@ import { ScenarioAnalyzer } from './scenario-analyzer.js';
  * @param {ScenarioAnalyzer} [options.scenarioAnalyzer] - Externer Analyzer zum Tracking von Szenarien.
  * @returns {Promise<{ aggregatedResults: object, failCount: number, worstRun: object, worstRunCare: object, pflegeTriggeredCount: number }>}
  */
-export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowOptions, useCapeSampling, onProgress = () => { }, scenarioAnalyzer = new ScenarioAnalyzer(monteCarloParams?.anzahl || 0) }) {
+export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowOptions, useCapeSampling, onProgress = () => { }, scenarioAnalyzer = new ScenarioAnalyzer(monteCarloParams?.anzahl || 0), engine = null }) {
     const { anzahl, maxDauer, blockSize, seed, methode } = monteCarloParams;
     onProgress(0);
 
@@ -314,7 +314,7 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
             };
 
             // Pass care floor and Flex Factor as separate parameters
-            const result = simulateOneYear(stateWithCareFlex, adjustedInputs, yearData, simulationsJahr, careMetaP1, totalCareFloor, householdContext, effectiveFlexFactor);
+            const result = simulateOneYear(stateWithCareFlex, adjustedInputs, yearData, simulationsJahr, careMetaP1, totalCareFloor, householdContext, effectiveFlexFactor, engine);
 
             if (result.isRuin) {
                 failed = true;

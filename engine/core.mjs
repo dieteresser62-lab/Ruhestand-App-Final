@@ -41,6 +41,7 @@ function _internal_calculateModel(input, lastState) {
     // Profil-Konfiguration laden (Runway-Ziele, Allokationsstrategie)
     const profil = CONFIG.PROFIL_MAP[input.risikoprofil];
 
+
     // Aktuelle Liquidität = Tagesgeld + Geldmarkt-ETF
     const aktuelleLiquiditaet = input.tagesgeld + input.geldmarktEtf;
 

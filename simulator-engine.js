@@ -92,7 +92,7 @@ function normalizeHouseholdContext(context) {
  * @param {number} minGold - Minimaler Gold-Bestand.
  * @returns {Object} { cashGenerated, taxesPaid, saleResult }
  */
-function sellAssetForCash(portfolio, inputsCtx, market, asset, amountEuros, minGold) {
+function sellAssetForCash(portfolio, inputsCtx, market, asset, amountEuros, minGold, engine) {
     if (amountEuros <= 0) {
         return { cashGenerated: 0, taxesPaid: 0, saleResult: null };
     }
@@ -116,7 +116,7 @@ function sellAssetForCash(portfolio, inputsCtx, market, asset, amountEuros, minG
                 costBasisAlt: 0,
                 costBasisNeu: 0
             };
-            const { saleResult: forcedSaleResult } = window.Ruhestandsmodell_v30.calculateSaleAndTax(
+            const { saleResult: forcedSaleResult } = engine.calculateSaleAndTax(
                 targetSale,
                 goldOnlyCtx,
                 { minGold: minGold },
@@ -142,7 +142,7 @@ function sellAssetForCash(portfolio, inputsCtx, market, asset, amountEuros, minG
                 goldWert: 0,
                 goldCost: 0
             };
-            const { saleResult: forcedSaleResult } = window.Ruhestandsmodell_v30.calculateSaleAndTax(
+            const { saleResult: forcedSaleResult } = engine.calculateSaleAndTax(
                 targetSale,
                 equityOnlyCtx,
                 { minGold: 0 },
@@ -173,7 +173,14 @@ function sellAssetForCash(portfolio, inputsCtx, market, asset, amountEuros, minG
  * @param {number} temporaryFlexFactor - Temporärer Faktor (0..1) zur Reduktion des Flex-Budgets in diesem Jahr (z.B. durch Pflegekosten)
  * @returns {Object} Simulationsergebnisse
  */
-export function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta = null, careFloorAddition = 0, householdContext = null, temporaryFlexFactor = 1.0) {
+export function simulateOneYear(currentState, inputs, yearData, yearIndex, pflegeMeta = null, careFloorAddition = 0, householdContext = null, temporaryFlexFactor = 1.0, engineAPI = null) {
+    // Falls engineAPI nicht übergeben wurde (Legacy-Support), Fallback auf Global
+    // Für Headless/Worker-Kontexte MUSS engineAPI übergeben werden.
+    const engine = engineAPI || (typeof window !== 'undefined' ? window.Ruhestandsmodell_v30 : null);
+
+    if (!engine) {
+        throw new Error("Critical: No Engine API available in simulateOneYear. Pass it as argument or ensure global scope.");
+    }
     let {
         portfolio,
         baseFloor,
@@ -221,7 +228,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const marketDataCurrentYear = { ...marketDataHist, inflation: yearData.inflation, capeRatio: resolvedCapeRatio };
 
     const algoInput = { ...inputs, floorBedarf: effectiveBaseFloor, flexBedarf: baseFlex, startSPB: inputs.startSPB };
-    const market = window.Ruhestandsmodell_v30.analyzeMarket(marketDataCurrentYear);
+    const market = engine.analyzeMarket(marketDataCurrentYear);
 
     // ==========================================
     // ANSPARPHASE-LOGIK
@@ -493,18 +500,18 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const jahresbedarfAusPortfolio = inflatedFloor + inflatedFlex;
     const runwayMonths = jahresbedarfAusPortfolio > 0 ? (liquiditaet / (jahresbedarfAusPortfolio / 12)) : Infinity;
 
-    const profileKey = resolveProfileKey(algoInput.risikoprofil);
-    let profile = window.Ruhestandsmodell_v30.CONFIG.PROFIL_MAP[profileKey];
+    const profileKey = resolveProfileKey(algoInput.risikoprofil, engine);
+    let profile = engine.CONFIG.PROFIL_MAP[profileKey];
 
     if (!profile) {
-        const fallbackKey = Object.keys(window.Ruhestandsmodell_v30.CONFIG.PROFIL_MAP)[0];
-        profile = window.Ruhestandsmodell_v30.CONFIG.PROFIL_MAP[fallbackKey];
+        const fallbackKey = Object.keys(engine.CONFIG.PROFIL_MAP)[0];
+        profile = engine.CONFIG.PROFIL_MAP[fallbackKey];
     }
 
     // SAFEGUARE: Ensure target liquidity never drops below 6 months of TARGET GROSS floor (input)
     // This handles both the "Liquidity Trap" (Low Net Need) and "Accumulation Phase" (0 effective Floor),
     // ensuring we enter retirement or shocks with a cash buffer.
-    let zielLiquiditaet = window.Ruhestandsmodell_v30.calculateTargetLiquidity(profile, market, { floor: inflatedFloor, flex: inflatedFlex }, null, null, inputs);
+    let zielLiquiditaet = engine.calculateTargetLiquidity(profile, market, { floor: inflatedFloor, flex: inflatedFlex }, null, null, inputs);
 
     // Use algoInput.floorBedarf because in Accumulation, effectiveBaseFloor is 0.
     const safeMinLiquidity = (algoInput.floorBedarf / 12) * 6;
@@ -517,7 +524,9 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
     const inputsCtx = buildInputsCtxFromPortfolio(algoInput, portfolio, { pensionAnnual, marketData: marketDataCurrentYear });
 
-    const spendingResponse = window.Ruhestandsmodell_v30.determineSpending({
+
+
+    const spendingResponse = engine.determineSpending({
         market, lastState, inflatedFloor, inflatedFlex,
         runwayMonths, liquidNow: liquiditaet, profile, depotValue: depotwertGesamt, totalWealth, inputsCtx
     });
@@ -535,7 +544,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         inflatedFloor, grossFloor: baseFloor, spending: spendingResult, market,
         minGold: algoInput.goldAktiv ? (algoInput.goldFloorProzent / 100) * totalWealth : 0
     };
-    const actionResult = window.Ruhestandsmodell_v30.determineAction(results, inputsCtx);
+    const actionResult = engine.determineAction(results, inputsCtx);
 
     // FAIL-SAFE: Check if engine returned error in action determination
     if (actionResult.error) {
@@ -573,13 +582,13 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
         // EMERGENCY REFILL: Ignore minGold floor to prevent false RUIN
         // We try to fill the full buffer using standard emergency logic (Tax-efficient / Gold priority)
-        const { saleResult: emergencySale } = window.Ruhestandsmodell_v30.calculateSaleAndTax(shortfall, emergencyCtx, { minGold: 0 }, market);
+        const { saleResult: emergencySale } = engine.calculateSaleAndTax(shortfall, emergencyCtx, { minGold: 0 }, market);
 
         if (emergencySale && emergencySale.achievedRefill > 0) {
             liquiditaet += emergencySale.achievedRefill;
             totalTaxesThisYear += (emergencySale.steuerGesamt || 0);
             applySaleToPortfolio(portfolio, emergencySale);
-            mergedSaleResult = mergedSaleResult ? window.Ruhestandsmodell_v30.mergeSaleResults(mergedSaleResult, emergencySale) : emergencySale;
+            mergedSaleResult = mergedSaleResult ? engine.mergeSaleResults(mergedSaleResult, emergencySale) : emergencySale;
             emergencyRefillHappened = true;
         }
 
@@ -599,7 +608,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
                 totalTaxesThisYear += goldResult.taxesPaid;
                 if (goldResult.saleResult) {
                     mergedSaleResult = mergedSaleResult
-                        ? window.Ruhestandsmodell_v30.mergeSaleResults(mergedSaleResult, goldResult.saleResult)
+                        ? engine.mergeSaleResults(mergedSaleResult, goldResult.saleResult)
                         : goldResult.saleResult;
                 }
                 missing = Math.max(0, missing - goldResult.cashGenerated);
@@ -612,13 +621,14 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
                     // CRITICAL: Rebuild context after gold sale to prevent stale asset values
                     // This ensures calculateSaleAndTax sees the actual remaining assets
                     const updatedCtx = buildInputsCtxFromPortfolio(algoInput, portfolio, { pensionAnnual, marketData: marketDataCurrentYear });
-                    const eqResult = sellAssetForCash(portfolio, updatedCtx, market, 'equity', missing, 0);
-                    liquiditaet += eqResult.cashGenerated;
-                    totalTaxesThisYear += eqResult.taxesPaid;
-                    if (eqResult.saleResult) {
+                    const { cashGenerated, taxesPaid, saleResult } = sellAssetForCash(
+                        portfolio, updatedCtx, market, 'equity', missing, 0, engine
+                    ); liquiditaet += cashGenerated;
+                    totalTaxesThisYear += taxesPaid;
+                    if (saleResult) {
                         mergedSaleResult = mergedSaleResult
-                            ? window.Ruhestandsmodell_v30.mergeSaleResults(mergedSaleResult, eqResult.saleResult)
-                            : eqResult.saleResult;
+                            ? engine.mergeSaleResults(mergedSaleResult, saleResult)
+                            : saleResult;
                     }
                     missing = Math.max(0, missing - eqResult.cashGenerated);
                     emergencyRefillHappened = true;
@@ -685,13 +695,14 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
                     market,
                     'gold',
                     missing,
-                    0 // Im FAIL-SAFE Mode ignorieren wir minGold-Floor temporär
+                    0, // Im FAIL-SAFE Mode ignorieren wir minGold-Floor temporär
+                    engine
                 );
                 guardSellGold = result.cashGenerated;
                 guardTaxes += result.taxesPaid;
                 if (result.saleResult) {
                     mergedSaleResult = mergedSaleResult
-                        ? window.Ruhestandsmodell_v30.mergeSaleResults(mergedSaleResult, result.saleResult)
+                        ? engine.mergeSaleResults(mergedSaleResult, result.saleResult)
                         : result.saleResult;
                 }
                 liquiditaet += guardSellGold;
@@ -709,13 +720,14 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
                     market,
                     'equity',
                     missing,
-                    0
+                    0,
+                    engine
                 );
                 guardSellEq = result.cashGenerated;
                 guardTaxes += result.taxesPaid;
                 if (result.saleResult) {
                     mergedSaleResult = mergedSaleResult
-                        ? window.Ruhestandsmodell_v30.mergeSaleResults(mergedSaleResult, result.saleResult)
+                        ? engine.mergeSaleResults(mergedSaleResult, result.saleResult)
                         : result.saleResult;
                 }
                 liquiditaet += guardSellEq;

@@ -28,6 +28,7 @@ import { runMonteCarloSimulation } from './monte-carlo-runner.js';
 export async function runMonteCarlo() {
     const ui = createMonteCarloUI();
     ui.disableStart();
+    ui.hideError(); // Reset error state
 
     try {
         prepareHistoricalData();
@@ -45,13 +46,15 @@ export async function runMonteCarlo() {
             monteCarloParams: { anzahl, maxDauer, blockSize, seed, methode },
             useCapeSampling: ui.readUseCapeSampling(),
             onProgress: pct => ui.updateProgress(pct),
-            scenarioAnalyzer
+            scenarioAnalyzer,
+            engine: window.Ruhestandsmodell_v30
         });
 
         const scenarioLogs = scenarioAnalyzer.buildScenarioLogs();
         displayMonteCarloResults(aggregatedResults, anzahl, failCount, worstRun, {}, {}, pflegeTriggeredCount, inputs, worstRunCare, scenarioLogs);
     } catch (e) {
-        alert("Fehler in der Monte-Carlo-Simulation:\n\n" + e.message + "\n" + e.stack); console.error(e);
+        console.error("Monte-Carlo Simulation Failed:", e);
+        ui.showError(e);
     } finally {
         await ui.finishProgress();
         ui.enableStart();

@@ -41,7 +41,30 @@ export function createMonteCarloUI() {
          * Liest den Status der CAPE-Sampling-Option defensiv aus.
          * @returns {boolean} True, wenn CAPE-Sampling aktiviert ist.
          */
-        readUseCapeSampling() { return document.getElementById('useCapeSampling')?.checked === true; }
+        readUseCapeSampling() { return document.getElementById('useCapeSampling')?.checked === true; },
+        /**
+         * Zeigt eine Fehlermeldung im UI an.
+         * @param {Error|string} error - Das Fehlerobjekt oder die Fehlermeldung.
+         */
+        showError(error) {
+            const container = document.getElementById('mc-error-container');
+            const messageEl = document.getElementById('mc-error-message');
+            if (container && messageEl) {
+                const msg = error instanceof Error ? `${error.message}\n${error.stack || ''}` : String(error);
+                messageEl.textContent = msg;
+                container.style.display = 'block';
+            } else {
+                console.error("Error Container missing!", error);
+                alert("Fehler (Fallback): " + error);
+            }
+        },
+        /**
+         * Versteckt die Fehlermeldung.
+         */
+        hideError() {
+            const container = document.getElementById('mc-error-container');
+            if (container) container.style.display = 'none';
+        }
     };
 }
 

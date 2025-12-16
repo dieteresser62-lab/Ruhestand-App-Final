@@ -20,6 +20,7 @@ import { getCommonInputs, prepareHistoricalData } from './simulator-portfolio.js
 import { normalizeWidowOptions, deepClone } from './simulator-sweep-utils.js';
 import { runMonteCarloSimulation } from './monte-carlo-runner.js';
 import { ScenarioAnalyzer } from './scenario-analyzer.js';
+import { Ruhestandsmodell_v30 } from './engine/index.mjs';
 
 /**
  * Whitelist der erlaubten Parameter-Keys
@@ -365,8 +366,9 @@ async function evaluateCandidate(candidate, baseInputs, runsPerCandidate, maxDau
             widowOptions,
             monteCarloParams,
             useCapeSampling: false,
-            onProgress: () => {},
-            scenarioAnalyzer
+            onProgress: () => { },
+            scenarioAnalyzer,
+            engine: Ruhestandsmodell_v30
         });
 
         allResults.push({ aggregatedResults, failCount, anzahl: runsPerCandidate });
@@ -490,7 +492,7 @@ export async function runAutoOptimize(config) {
         seedsTest,
         constraints,
         maxDauer,
-        onProgress = () => {}
+        onProgress = () => { }
     } = config;
 
     // Prepare historical data

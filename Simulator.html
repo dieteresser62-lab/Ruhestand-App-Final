@@ -627,6 +627,14 @@
                     <div id="mc-progress-bar-container">
                         <div id="mc-progress-bar"></div>
                     </div>
+                    <div id="mc-error-container"
+                        style="display:none; margin-top: 15px; padding: 15px; background-color: #ffebee; border: 1px solid #ffcdd2; border-radius: 6px; color: #c62828;">
+                        <h4 style="margin-top: 0; margin-bottom: 10px;">Fehler in der Simulation</h4>
+                        <pre id="mc-error-message"
+                            style="white-space: pre-wrap; font-family: monospace; font-size: 0.9em; margin: 0;"></pre>
+                        <button onclick="document.getElementById('mc-error-container').style.display='none'"
+                            style="margin-top: 10px; padding: 5px 10px; cursor: pointer;">Schließen</button>
+                    </div>
                     <div id="print-footer" class="print-footer"></div>
                     <div id="monteCarloResults" style="display:none; margin-top: 25px;">
                         <h3>Ergebnisse der Monte-Carlo-Analyse</h3>
