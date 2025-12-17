@@ -2,7 +2,7 @@
 
 import { BREAK_ON_RUIN, HISTORICAL_DATA } from './simulator-data.js';
 import { initializePortfolio, getCommonInputs } from './simulator-portfolio.js';
-import { simulateOneYear } from './simulator-engine.js';
+import { simulateOneYear } from './simulator-engine-wrapper.js';
 import { formatCurrency, formatCurrencyShortLog } from './simulator-utils.js';
 import {
     BACKTEST_LOG_DETAIL_KEY,
