@@ -421,11 +421,9 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         inflation: yearData.inflation,
         floorBedarf: inflatedFloor,  // Floor NACH Rentendeckung
         flexBedarf: inflatedFlex,     // Flex NACH Rentendeckung
-        renteAktiv: pensionAnnual > 0,
-        renteMonatlich: pensionAnnual / 12,
         marketCapeRatio: resolvedCapeRatio,
-        // Portfolio-Werte kommen bereits aus inputsCtx
-        // Market data kommt bereits aus inputsCtx
+        // pensionAnnual und renteMonatlich kommen bereits aus inputsCtx!
+        // NICHT überschreiben - inputsCtx hat die richtigen Werte!
     };
 
     // **HAUPTUNTERSCHIED**: Ein einziger Engine-Aufruf statt 3-5 Adapter-Aufrufe
