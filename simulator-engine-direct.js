@@ -409,28 +409,23 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     // DIREKTE ENGINE API - SINGLE CALL
     // ==========================================
 
-    // Baue EngineAPI-Input auf
+    // Baue EngineAPI-Input auf - WICHTIG: Verwende buildInputsCtxFromPortfolio() wie der Adapter!
+    const inputsCtx = buildInputsCtxFromPortfolio(inputs, portfolio, {
+        pensionAnnual,
+        marketData: marketDataCurrentYear
+    });
+
     const engineInput = {
-        ...inputs,
-        floorBedarf: effectiveBaseFloor,
-        flexBedarf: baseFlex * temporaryFlexFactor,
+        ...inputsCtx,
+        aktuellesAlter: inputs.startAlter + yearIndex,
+        inflation: yearData.inflation,
+        floorBedarf: inflatedFloor,  // Floor NACH Rentendeckung
+        flexBedarf: inflatedFlex,     // Flex NACH Rentendeckung
         renteAktiv: pensionAnnual > 0,
         renteMonatlich: pensionAnnual / 12,
-        tagesgeld: portfolio.liquiditaet * 0.5, // Vereinfachte Annahme: 50/50 Split
-        geldmarktEtf: portfolio.liquiditaet * 0.5,
-        depotwertAlt: sumDepot({ depotTranchesAktien: depotTranchesAktien.filter(t => t.typ === 'alt') }),
-        depotwertNeu: sumDepot({ depotTranchesAktien: depotTranchesAktien.filter(t => t.typ === 'neu') }),
-        goldWert: sumDepot({ depotTranchesGold }),
-        costBasisAlt: depotTranchesAktien.filter(t => t.typ === 'alt').reduce((sum, t) => sum + t.costBasis, 0),
-        costBasisNeu: depotTranchesAktien.filter(t => t.typ === 'neu').reduce((sum, t) => sum + t.costBasis, 0),
-        goldCost: depotTranchesGold.reduce((sum, t) => sum + t.costBasis, 0),
-        endeVJ: marketDataCurrentYear.endeVJ,
-        endeVJ_1: marketDataCurrentYear.endeVJ_1,
-        endeVJ_2: marketDataCurrentYear.endeVJ_2,
-        endeVJ_3: marketDataCurrentYear.endeVJ_3,
-        ath: marketDataCurrentYear.ath,
-        jahreSeitAth: marketDataCurrentYear.jahreSeitAth,
-        marketCapeRatio: resolvedCapeRatio
+        marketCapeRatio: resolvedCapeRatio,
+        // Portfolio-Werte kommen bereits aus inputsCtx
+        // Market data kommt bereits aus inputsCtx
     };
 
     // **HAUPTUNTERSCHIED**: Ein einziger Engine-Aufruf statt 3-5 Adapter-Aufrufe
