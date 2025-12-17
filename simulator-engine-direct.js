@@ -395,9 +395,11 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         rente2 += widowBenefitP2ThisYear;
     }
 
+    // Calculate TOTAL household pension income (both persons)
     const renteSum = rente1 + rente2;
     const pensionAnnual = renteSum;
 
+    // Use TOTAL pension to calculate household floor/flex coverage
     const pensionSurplus = Math.max(0, pensionAnnual - effectiveBaseFloor);
     const inflatedFloor = Math.max(0, effectiveBaseFloor - pensionAnnual);
     const inflatedFlex = Math.max(0, (baseFlex * temporaryFlexFactor) - pensionSurplus);
@@ -410,8 +412,9 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     // ==========================================
 
     // Baue EngineAPI-Input auf - WICHTIG: Verwende buildInputsCtxFromPortfolio() wie der Adapter!
+    // CRITICAL: buildInputsCtxFromPortfolio() expects only Person 1's pension, NOT the sum!
     const inputsCtx = buildInputsCtxFromPortfolio(inputs, portfolio, {
-        pensionAnnual,
+        pensionAnnual: rente1,  // Only Person 1's pension! Person 2 is handled separately
         marketData: marketDataCurrentYear
     });
 
