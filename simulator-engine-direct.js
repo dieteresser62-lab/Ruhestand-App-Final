@@ -96,7 +96,23 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const engine = engineAPI || (typeof window !== 'undefined' ? window.EngineAPI : null);
 
     if (!engine) {
+        console.error('[simulator-engine-direct] EngineAPI not available!', {
+            engineAPI,
+            windowEngineAPI: typeof window !== 'undefined' ? window.EngineAPI : 'no window',
+            windowKeys: typeof window !== 'undefined' ? Object.keys(window).filter(k => k.includes('Engine') || k.includes('Ruhe')) : []
+        });
         throw new Error("Critical: No EngineAPI available in simulateOneYear. Pass it as argument or ensure global scope.");
+    }
+
+    if (typeof engine.simulateSingleYear !== 'function') {
+        console.error('[simulator-engine-direct] engine.simulateSingleYear is not a function!', {
+            engine,
+            engineType: typeof engine,
+            engineKeys: Object.keys(engine || {}),
+            hasSimulateSingleYear: 'simulateSingleYear' in (engine || {}),
+            simulateSingleYearType: typeof engine?.simulateSingleYear
+        });
+        throw new Error("Critical: engine.simulateSingleYear is not a function. Wrong engine object?");
     }
 
     let {

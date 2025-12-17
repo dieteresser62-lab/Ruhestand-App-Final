@@ -591,9 +591,8 @@ window.onload = function () {
     // Reset-Button Initialisierung
     initResetButton();
 
-    // Initial calculation on load
-    // Note: Some inputs might trigger calc via events, but we do one explicitly to be sure.
-    runMonteCarloSimulation();
+    // Initial calculation on load is handled by individual tabs
+    // Monte Carlo, Backtest, Sweep, and Auto-Optimize have their own trigger buttons
 };
 
 /**
