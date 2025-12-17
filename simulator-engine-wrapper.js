@@ -84,6 +84,11 @@ export function simulateOneYear(
         if (performanceMonitoring && startTime) {
             const elapsed = performance.now() - startTime;
             featureFlags.recordPerformance(mode, elapsed, false);
+
+            // Debug logging (only if enabled)
+            if (featureFlags.getAllFlags().debugLogging) {
+                console.log(`[Performance] ${mode}: ${elapsed.toFixed(3)}ms`);
+            }
         }
 
         return result;

@@ -33,6 +33,11 @@ class EngineSwitcher {
             this.updateDisplay();
         });
 
+        // Auto-update every 2 seconds (for live statistics during simulations)
+        this.updateInterval = setInterval(() => {
+            this.updateDisplay();
+        }, 2000);
+
         console.log('[EngineSwitcher] Initialized');
     }
 
@@ -467,6 +472,9 @@ class EngineSwitcher {
     destroy() {
         if (this.unsubscribe) {
             this.unsubscribe();
+        }
+        if (this.updateInterval) {
+            clearInterval(this.updateInterval);
         }
         if (this.panel) {
             this.panel.remove();
