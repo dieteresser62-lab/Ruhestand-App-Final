@@ -75,7 +75,7 @@ Whitelist, Blocklist und Rente-2-Invarianz-Checks, markiert Verstöße in der He
 
 ### Gemeinsame Engine
 * Acht ES-Module (`engine/`) kapseln Validierung, Marktanalyse, Ausgabenplanung und Transaktionslogik.
-* `build-engine.mjs` bündelt die Module per `esbuild` (oder Modul-Fallback) zu `engine.js`, das in beiden Oberflächen als `EngineAPI` bzw. `Ruhestandsmodell_v30` geladen wird.
+* `build-engine.mjs` bündelt die Module per `esbuild` (oder Modul-Fallback) zu `engine.js`, das in beiden Oberflächen als `EngineAPI` geladen wird.
 * Konfigurierbare Guardrails, Marktregime-Übersetzungen und Strategien für Liquiditätsziele.
 
 ---
@@ -146,7 +146,7 @@ Ruhestand-App-Final/
 
 * Die Balance- und Simulator-Module nutzen native ES6-Imports. Änderungen an einzelnen Modulen werden nach dem Speichern direkt beim nächsten Reload geladen.
 * Engine-Anpassungen erfolgen in den Modulen unter `engine/`. Nach Anpassungen `npm run build:engine` ausführen und die Größe der generierten `engine.js` kontrollieren.
-* Für schnelle QA bitte den Selftest `node sim-parity-smoketest.js` einmal durchlaufen lassen (entspricht `npm test`).
+* Für schnelle QA bitte `npm test` einmal durchlaufen lassen.
 
 ## Abschluss-Checkliste
 

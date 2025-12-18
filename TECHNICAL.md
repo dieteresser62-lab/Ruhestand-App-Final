@@ -14,7 +14,7 @@ Dieses Dokument beschreibt die Architektur und zentrale Datenflüsse der Ruhesta
 | Simulator | `Simulator.html`, `simulator-*.js`, `simulator.css` | Monte-Carlo-Simulationen, Parameter-Sweeps, Pflegefall-Szenarien |
 | Engine | `engine/` (ESM) → `engine.js` | Validierung, Marktanalyse, Spending- und Transaktionslogik |
 
-Alle Skripte sind ES6-Module. Die Engine wird per `build-engine.mjs` mit esbuild (oder Modul-Fallback) gebündelt und stellt eine globale `EngineAPI` (Balance) sowie `Ruhestandsmodell_v30` (Simulator-Kompatibilität) bereit.
+Alle Skripte sind ES6-Module. Die Engine wird per `build-engine.mjs` mit esbuild (oder Modul-Fallback) gebündelt und stellt eine globale `EngineAPI` bereit.
 
 ---
 
@@ -29,7 +29,7 @@ Die Engine besteht aus acht ES-Modulen, die von `build-engine.mjs` zu `engine.js
 5. **`engine/core.mjs`** – orchestriert die oben genannten Module, exponiert `EngineAPI` (Version 31) und erzeugt Diagnose-/UI-Strukturen.
 6. **`engine/config.mjs`** – zentrale Konfiguration (Schwellenwerte, Regime-Mapping, Profile). Generiert zur Build-Zeit eine eindeutige Build-ID.
 7. **`engine/errors.mjs`** – Fehlerklassen (`AppError`, `ValidationError`, `FinancialCalculationError`).
-8. **`engine/adapter.mjs`** – Kompatibilitätsadapter für ältere Simulator-Schnittstellen.
+
 
 ### Datenfluss innerhalb der Engine
 
@@ -78,7 +78,8 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 * `monte-carlo-ui.js` – UI-Fassade für Progressbar/Parameter-Lesen; erlaubt Callbacks ohne DOM-Leaks.
 * `scenario-analyzer.js` – wählt während der Simulation 30 Szenarien (Worst, Perzentile, Pflege, Zufall) aus.
 
-* `simulator-engine.js` – Jahr-für-Jahr-Logik (Sampling, Pflegekosten/-sterblichkeit, Run-States).
+* `simulator-engine-wrapper.js` – Facade für Engine-Aufrufe (verwendet nun `simulator-engine-direct.js`).
+* `simulator-engine-direct.js` – Direkte Anbindung an die EngineAPI, ersetzt den alten Adapter.
 * `simulator-portfolio.js` – Initialisierung, Portfolio-Berechnungen, Stress-Kontexte.
 * `simulator-results.js` – Aggregiert MC-Ausgaben und delegiert an `results-metrics.js` / `results-renderers.js` / `results-formatting.js`.
 * `simulator-sweep.js` – Sweep-Logik inkl. Whitelist/Blocklist, Mini-Monte-Carlo und Heatmap-Aufruf.
@@ -129,7 +130,7 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 
 * Engine anpassen → `node build-engine.js` ausführen, anschließend `engine.js` prüfen.
 * Snapshot-Funktionen benötigen File-System-Access-API (Chromium).
-* Tests/Smoketests: `sim-parity-smoketest.js` enthält ein Skript zum Vergleich von Simulationsergebnissen, `test-dual-care.js` prüft Pflegefall-Logik.
+* Tests/Smoketests: `npm test` führt die gesamte Test-Suite aus, inklusive Headless-Simulationen und Szenario-Checks.
 
 ---
 
