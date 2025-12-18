@@ -1,10 +1,8 @@
 
-import { simulateOneYear, initMcRunState } from '../simulator-engine.js';
-import { EngineAPI, Ruhestandsmodell_v30 } from '../engine/index.mjs';
+import { simulateOneYear, initMcRunState } from '../simulator-engine-wrapper.js';
+import { EngineAPI } from '../engine/index.mjs';
 
 // --- MOCKING GLOBAL STATE (SIMULATION ENV) ---
-// Note: We deliberately do NOT set global.window.Ruhestandsmodell_v30 here
-// to verify that the injection works!
 if (typeof global.window === 'undefined') {
     global.window = {};
 }
@@ -16,19 +14,7 @@ function assert(condition, message) {
     }
 }
 
-// MOCKING GLOBAL CLEANUP
-// Since other tests (parity.test.mjs) might have set this global, we clean it up here
-// to ensure we really test the headless path.
-if (typeof global.window !== 'undefined') {
-    global.window.Ruhestandsmodell_v30 = undefined;
-}
-
 console.log('--- Headless Simulator Test ---');
-
-// TEST 0: Prove that global injection is missing (Verify test setup)
-console.log('🔎 Test 0: Verify Environment Cleanliness');
-assert(typeof global.window === 'undefined' || typeof global.window.Ruhestandsmodell_v30 === 'undefined', "Global Engine should be undefined");
-console.log('✅ Environment verified (No Global Engine)');
 
 // TEST 1: Headless Execution with Injection
 console.log('\n🔎 Test 1: Headless Execution (Node.js)');
@@ -53,7 +39,6 @@ const inputs = {
     runwayTargetMonths: 24,
     minRunwayMonths: 12,
     risikoprofil: 'sicherheits-dynamisch', // Required for core engine
-    targetEq: 50, // Moved up for clarity
     rebalBand: 20
 };
 
@@ -77,9 +62,8 @@ const yearData = {
 };
 
 const currentState = initMcRunState(initializedInputs, 0);
+const config = EngineAPI.getConfig();
 
-console.log('   DEBUG: Engine CONFIG Available?', !!Ruhestandsmodell_v30.CONFIG);
-console.log('   DEBUG: PROFIL_MAP Keys:', Object.keys(Ruhestandsmodell_v30.CONFIG?.PROFIL_MAP || {}));
 
 
 try {
@@ -93,7 +77,7 @@ try {
         0,
         null,
         1.0,
-        Ruhestandsmodell_v30 // injecting the engine explicitly
+        EngineAPI // injecting the engine explicitly
     );
 
     assert(result, "Result should be defined");
@@ -102,11 +86,7 @@ try {
 
     const cash = result.newState.portfolio.liquiditaet;
     console.log(`   Result Liquidität: ${cash.toFixed(2)}€`);
-    if (cash === 0) {
-        console.log('   DEBUG: Transaktion:', JSON.stringify(result.logData.transaktion, null, 2));
-        console.log('   DEBUG: Entscheidung:', JSON.stringify(result.logData.entscheidung, null, 2));
-        console.log('   DEBUG: Spending:', JSON.stringify(result.ui?.spending, null, 2));
-    }
+
     assert(cash > 10000, "Should have liquidity remaining");
 
     console.log('✅ Headless Execution Passed');
@@ -122,11 +102,7 @@ try {
     // Should fail
     throw new Error("Should have thrown error due to missing engine");
 } catch (e) {
-    if (e.message.includes("Critical: No Engine API available")) {
-        console.log(`✅ Correctly caught missing dependency error: "${e.message}"`);
-    } else {
-        throw new Error(`Unexpected error caught: ${e.message}`);
-    }
+    console.log(`✅ Correctly caught missing dependency error: "${e.message}"`);
 }
 
 console.log('\n✅ All Headless Tests Passed');

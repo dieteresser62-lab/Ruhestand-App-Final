@@ -189,7 +189,7 @@ function applyPreset(presetKey) {
         return;
     }
 
-    console.log(`Applying preset: ${preset.name}`);
+
 
     // 1. Lösche alle vorhandenen Parameter
     const container = document.getElementById('ao_parameters_container');
@@ -640,7 +640,7 @@ function renderResult(result, objective) {
                 <h4 style="margin: 0;">Stability Score: ${stabilityPct}%</h4>
                 <p style="margin: 5px 0 0 0; font-size: 0.9rem;">
                     ${stabilityPct >= 80 ? '✓ Highly stable across seed sets' :
-                      stabilityPct >= 60 ? '⚠ Moderately stable' : '⚠ Low stability - consider more seeds'}
+            stabilityPct >= 60 ? '⚠ Moderately stable' : '⚠ Low stability - consider more seeds'}
                 </p>
             </div>
         </div>

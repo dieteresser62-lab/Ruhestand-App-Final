@@ -1,5 +1,5 @@
 
-import { sampleNextYearData, initMcRunState } from '../simulator-engine.js';
+import { sampleNextYearData, initMcRunState } from '../simulator-engine-helpers.js';
 import { REGIME_TRANSITIONS, annualData } from '../simulator-data.js';
 import { prepareHistoricalData } from '../simulator-portfolio.js';
 

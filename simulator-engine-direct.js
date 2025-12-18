@@ -136,9 +136,9 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
     let { depotTranchesAktien, depotTranchesGold } = portfolio;
     let liquiditaet = portfolio.liquiditaet;
-    let liqStartVorZins = euros(liquiditaet);
+    let initialLiqStart = euros(liquiditaet);
     let cashZinsen = 0;
-    let liqNachZins = liqStartVorZins;
+    let liqNachZins = initialLiqStart;
     let totalTaxesThisYear = 0;
 
     const rA = isFinite(yearData.rendite) ? yearData.rendite : 0;
@@ -297,7 +297,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
                 wertAktien: euros(wertAktien),
                 wertGold: euros(wertGold),
                 liquiditaet: euros(portfolio.liquiditaet),
-                liqStart: euros(liqStartVorZins),
+                liqStart: euros(initialLiqStart),
                 cashInterestEarned: euros(cashZinsen),
                 liqEnd: euros(liqNachZins),
                 aktionUndGrund: `Sparrate: ${euros(sparrateThisYear)}€ / Kauf A: ${euros(kaufAktTotal)}€ / Kauf G: ${euros(kaufGldTotal)}€`,
@@ -399,6 +399,11 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const renteSum = rente1 + rente2;
     const pensionAnnual = renteSum;
 
+    // CRITICAL FIX: Add pension income to liquidity!
+    // Without this, the subtraction of 'jahresEntnahme' (Spending) later will drain liquidity 
+    // because spending includes the part covered by pension, but liquidity didn't have the pension added.
+    liquiditaet += pensionAnnual;
+
     // Use TOTAL pension to calculate household floor/flex coverage
     const pensionSurplus = Math.max(0, pensionAnnual - effectiveBaseFloor);
     const inflatedFloor = Math.max(0, effectiveBaseFloor - pensionAnnual);
@@ -425,8 +430,14 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         floorBedarf: inflatedFloor,  // Floor NACH Rentendeckung
         flexBedarf: inflatedFlex,     // Flex NACH Rentendeckung
         marketCapeRatio: resolvedCapeRatio,
-        // pensionAnnual und renteMonatlich kommen bereits aus inputsCtx!
-        // NICHT überschreiben - inputsCtx hat die richtigen Werte!
+
+        // WICHTIG: Historische Marktdaten für Regime-Erkennung (ATH, Drawdown)
+        endeVJ: marketDataHist?.endeVJ || 0,
+        endeVJ_1: marketDataHist?.endeVJ_1 || 0,
+        endeVJ_2: marketDataHist?.endeVJ_2 || 0,
+        endeVJ_3: marketDataHist?.endeVJ_3 || 0,
+        ath: marketDataHist?.ath || 0,
+        jahreSeitAth: marketDataHist?.jahreSeitAth || 0
     };
 
     // **HAUPTUNTERSCHIED**: Ein einziger Engine-Aufruf statt 3-5 Adapter-Aufrufe
@@ -459,9 +470,12 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     }
 
     // Aktualisiere Liquidität nach Transaktionen
-    liquiditaet = actionResult.verwendungen?.liquiditaet
-        ? liquiditaet + actionResult.verwendungen.liquiditaet
-        : liquiditaet;
+    // FIX: Wir müssen den gesamten Nettoerlös gutschreiben (inkl. Entnahme-Teil!),
+    // abzüglich direkter Wiederanlagen. Sonst fehlt das Geld für die Entnahme.
+    if (actionResult.nettoErlös > 0) {
+        const reinvested = (actionResult.verwendungen?.gold || 0) + (actionResult.verwendungen?.aktien || 0);
+        liquiditaet += (actionResult.nettoErlös - reinvested);
+    }
 
     // Kaufe Gold/Aktien wenn vorhanden
     if (actionResult.verwendungen?.gold > 0) {
@@ -495,9 +509,10 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     }
 
     // Cash-Verzinsung
-    liqStartVorZins = euros(liquiditaet);
-    cashZinsen = euros(liqStartVorZins * rC);
-    liquiditaet = euros(liqStartVorZins * (1 + rC));
+    // Cash-Verzinsung
+    const liqBasisForInterest = euros(liquiditaet);
+    cashZinsen = euros(liqBasisForInterest * rC);
+    liquiditaet = euros(liqBasisForInterest * (1 + rC));
     liqNachZins = euros(liquiditaet);
     if (!isFinite(liquiditaet)) liquiditaet = 0;
 
@@ -512,7 +527,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         guardReason = "emergency_guard_triggered";
         // In der direkten API-Version sollte dies nicht passieren,
         // da die Engine bereits Guardrails hat
-        console.warn('FAIL-SAFE Guard triggered in direct API version - this should not happen!');
+        // console.warn('FAIL-SAFE Guard triggered in direct API version - this should not happen!');
     } else if (floorCoveredByPension) {
         guardReason = "floor_covered_by_pension";
     }
@@ -556,6 +571,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const nextAnnualPension = currentAnnualPension * (1 + rentAdjPct / 100);
     const nextAnnualPension2 = currentAnnualPension2 * (1 + rentAdjPct / 100);
 
+
+
     return {
         isRuin: false,
         newState: {
@@ -593,7 +610,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             wertAktien: sumDepot({ depotTranchesAktien }),
             wertGold: sumDepot({ depotTranchesGold }),
             liquiditaet,
-            liqStart: liqStartVorZins,
+            liqStart: initialLiqStart,
             cashInterestEarned: cashZinsen,
             liqEnd: liqNachZins,
             aktionUndGrund: aktionText,
@@ -658,7 +675,7 @@ export {
     computeHouseholdFlexFactor,
     computeCareMortalityMultiplier,
     updateCareMeta
-} from './simulator-engine.js';
+} from './simulator-engine-helpers.js';
 
 /**
  * Hilfsfunktion für CAPE-Ratio Resolution

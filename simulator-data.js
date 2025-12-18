@@ -209,3 +209,88 @@ export let annualData = [];
 export let REGIME_DATA = { BULL: [], BEAR: [], SIDEWAYS: [], STAGFLATION: [] };
 export let REGIME_TRANSITIONS = {};
 export const BREAK_ON_RUIN = true;
+
+// --- INITIALIZATION ---
+
+(function initializeData() {
+  const years = Object.keys(HISTORICAL_DATA).map(Number).sort((a, b) => a - b);
+  let prevMsci = null;
+
+  years.forEach((year, index) => {
+    const raw = HISTORICAL_DATA[year];
+
+    let rendite = 0;
+    if (prevMsci !== null && raw.msci_eur > 0) {
+      rendite = (raw.msci_eur / prevMsci) - 1;
+    }
+    prevMsci = raw.msci_eur;
+
+    const inflation = raw.inflation_de;
+    const zinssatz = raw.zinssatz_de;
+    const lohn = raw.lohn_de;
+    const goldPerf = raw.gold_eur_perf; // Percent
+    const cape = raw.cape;
+
+    // Determine Regime
+    let regime = 'SIDEWAYS';
+    const inflHigh = inflation > 5.0;
+    const equityPoor = rendite < 0;
+    const equityCrash = rendite < -0.15;
+    const equityBoom = rendite > 0.15;
+
+    if (inflHigh && equityPoor) {
+      regime = 'STAGFLATION';
+    } else if (equityCrash) {
+      regime = 'BEAR';
+    } else if (equityBoom) {
+      regime = 'BULL';
+    } else {
+      regime = 'SIDEWAYS';
+    }
+
+    const dataPoint = {
+      jahr: year,
+      rendite: rendite,
+      inflation: inflation,
+      zinssatz: zinssatz,
+      lohn: lohn,
+      gold_eur_perf: goldPerf,
+      capeRatio: cape,
+      regime: regime
+    };
+
+    annualData.push(dataPoint);
+
+    if (REGIME_DATA[regime]) {
+      REGIME_DATA[regime].push(dataPoint);
+    }
+  });
+
+  // Initialize Transitions
+  const regimes = ['BULL', 'BEAR', 'SIDEWAYS', 'STAGFLATION'];
+  regimes.forEach(r => {
+    REGIME_TRANSITIONS[r] = { total: 0 };
+    regimes.forEach(target => REGIME_TRANSITIONS[r][target] = 0);
+  });
+
+  // Count transitions from historical data
+  for (let i = 0; i < annualData.length - 1; i++) {
+    const current = annualData[i].regime;
+    const next = annualData[i + 1].regime;
+
+    // Fallback if regime detection marked something weird (should not happen with logic above)
+    if (REGIME_TRANSITIONS[current] && REGIME_TRANSITIONS[current][next] !== undefined) {
+      REGIME_TRANSITIONS[current][next]++;
+      REGIME_TRANSITIONS[current].total++;
+    }
+  }
+
+  // Fallback for empty regimes to establish basic connectivity
+  regimes.forEach(r => {
+    if (REGIME_TRANSITIONS[r].total === 0) {
+      // If a regime never occurred, assume it transitions to SIDEWAYS with 100%
+      REGIME_TRANSITIONS[r]['SIDEWAYS'] = 1;
+      REGIME_TRANSITIONS[r].total = 1;
+    }
+  });
+})();

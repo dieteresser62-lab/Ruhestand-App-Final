@@ -182,6 +182,8 @@ export const TransactionEngine = {
             market, spending, minGold, profil, input
         } = p;
 
+
+
         let actionDetails = { bedarf: 0, title: '', diagnosisEntries: [], isCapped: false };
         let isPufferSchutzAktiv = false;
         let verwendungen = { liquiditaet: 0, gold: 0, aktien: 0 };
@@ -461,6 +463,8 @@ export const TransactionEngine = {
                     }
                 }
 
+
+
                 if (totalerBedarf >= appliedMinTradeGate) {
                     // Gold-Verkaufsbudget berechnen
                     let maxSellableFromGold = 0;
@@ -559,6 +563,8 @@ export const TransactionEngine = {
             ));
 
         if (!saleResult || (saleResult.achievedRefill < minTradeResult && !isPufferSchutzAktiv)) {
+
+
             const achieved = saleResult?.achievedRefill || 0;
             markAsBlocked('min_trade', Math.max(0, minTradeResult - achieved), {
                 direction: actionDetails.title || 'Verkauf',
@@ -622,7 +628,7 @@ export const TransactionEngine = {
      * Berechnet Verkauf und Steuer
      */
     calculateSaleAndTax(requestedRefill, input, context, market, isEmergencySale) {
-        const keSt = 0.25 * (1 + 0.055 + input.kirchensteuerSatz);
+        const keSt = 0.25 * (1 + 0.055 + (input.kirchensteuerSatz || 0));
 
         const _calculateSingleSale = (nettoBedarf, pauschbetrag, tranchesToUse) => {
             let finalBreakdown = [];
@@ -656,7 +662,7 @@ export const TransactionEngine = {
 
                 // Maximal möglichen Netto-Erlös berechnen
                 const gewinnBruttoMax = maxBruttoVerkaufbar * gewinnQuote;
-                const steuerpflichtigerAnteilMax = gewinnBruttoMax * (1 - tranche.tqf);
+                const steuerpflichtigerAnteilMax = gewinnBruttoMax * (1 - (tranche.tqf || 0));
                 const anrechenbarerPauschbetragMax = Math.min(pauschbetragRest, steuerpflichtigerAnteilMax);
                 const finaleSteuerbasisMax = steuerpflichtigerAnteilMax - anrechenbarerPauschbetragMax;
                 const steuerMax = Math.max(0, finaleSteuerbasisMax) * keSt;
@@ -678,7 +684,7 @@ export const TransactionEngine = {
 
                 // Tatsächliche Steuer berechnen
                 const bruttogewinn = zuVerkaufenBrutto * gewinnQuote;
-                const gewinnNachTFS = bruttogewinn * (1 - tranche.tqf);
+                const gewinnNachTFS = bruttogewinn * (1 - (tranche.tqf || 0));
                 const anrechenbarerPauschbetrag = Math.min(pauschbetragRest, gewinnNachTFS);
                 const finaleSteuerbasis = gewinnNachTFS - anrechenbarerPauschbetrag;
                 const steuer = Math.max(0, finaleSteuerbasis) * keSt;
@@ -743,7 +749,7 @@ export const TransactionEngine = {
         const sellOrder = this._getSellOrder(tranches, market, input, context, isEmergencySale);
         const orderedTranches = sellOrder.map(k => tranches[k]);
 
-        return _calculateSingleSale(requestedRefill, input.sparerPauschbetrag, orderedTranches);
+        return _calculateSingleSale(requestedRefill, input.sparerPauschbetrag || 0, orderedTranches);
     },
 
     /**
@@ -763,7 +769,7 @@ export const TransactionEngine = {
                 const gqB = tB.marketValue > 0
                     ? Math.max(0, (tB.marketValue - tB.costBasis) / tB.marketValue)
                     : 0;
-                return (gqA * (1 - tA.tqf)) - (gqB * (1 - tB.tqf));
+                return (gqA * (1 - (tA.tqf || 0))) - (gqB * (1 - (tB.tqf || 0)));
             });
 
         const isDefensiveContext = isEmergencySale ||

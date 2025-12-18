@@ -1,21 +1,22 @@
 /**
  * ===================================================================
- * ENGINE WRAPPER - Adaptive Engine Selection
+ * ENGINE WRAPPER - Direct API (Standardized)
  * ===================================================================
- * Wrapper der automatisch zwischen Adapter und Direct API wählt
- * basierend auf Feature Flags
+ * Wrapper that now exclusively uses the Direct API (EngineAPI).
+ * Adapter references have been removed.
  * ===================================================================
  */
 
 'use strict';
 
 import { featureFlags } from './feature-flags.js';
-import { simulateOneYear as simulateOneYearAdapter } from './simulator-engine.js';
 import { simulateOneYear as simulateOneYearDirect } from './simulator-engine-direct.js';
 
+// Re-export full initMcRunState from helpers to ensure tests get valid state
+export * from './simulator-engine-helpers.js';
+
 /**
- * Adaptive simulateOneYear function that automatically selects the engine
- * based on feature flags and records performance metrics
+ * Standard simulateOneYear function that uses the Direct Engine.
  *
  * @param {Object} currentState - Current state
  * @param {Object} inputs - Input parameters
@@ -39,234 +40,66 @@ export function simulateOneYear(
     temporaryFlexFactor = 1.0,
     engineAPI = null
 ) {
-    const mode = featureFlags.getEngineMode();
     const performanceMonitoring = featureFlags.getAllFlags().performanceMonitoring;
-
-    let result;
     let startTime;
-    let hadError = false;
 
     try {
         if (performanceMonitoring) {
             startTime = performance.now();
         }
 
-        if (mode === 'direct') {
-            // Use Direct API version
-            const engine = engineAPI || (typeof window !== 'undefined' ? window.EngineAPI : null);
-            result = simulateOneYearDirect(
-                currentState,
-                inputs,
-                yearData,
-                yearIndex,
-                pflegeMeta,
-                careFloorAddition,
-                householdContext,
-                temporaryFlexFactor,
-                engine
-            );
-        } else {
-            // Use Adapter version
-            const engine = engineAPI || (typeof window !== 'undefined' ? window.Ruhestandsmodell_v30 : null);
-            result = simulateOneYearAdapter(
-                currentState,
-                inputs,
-                yearData,
-                yearIndex,
-                pflegeMeta,
-                careFloorAddition,
-                householdContext,
-                temporaryFlexFactor,
-                engine
-            );
-        }
+        // Use Direct API version (Exclusive)
+        const engine = engineAPI || (typeof window !== 'undefined' ? window.EngineAPI : null);
+        const result = simulateOneYearDirect(
+            currentState,
+            inputs,
+            yearData,
+            yearIndex,
+            pflegeMeta,
+            careFloorAddition,
+            householdContext,
+            temporaryFlexFactor,
+            engine
+        );
 
         if (performanceMonitoring && startTime) {
             const elapsed = performance.now() - startTime;
-            featureFlags.recordPerformance(mode, elapsed, false);
+            featureFlags.recordPerformance('direct', elapsed, false);
 
-            // Debug logging (only if enabled)
             if (featureFlags.getAllFlags().debugLogging) {
-                console.log(`[Performance] ${mode}: ${elapsed.toFixed(3)}ms`);
+                console.log(`[Performance] Direct: ${elapsed.toFixed(3)}ms`);
             }
         }
 
         return result;
 
     } catch (error) {
-        hadError = true;
-
         if (performanceMonitoring && startTime) {
             const elapsed = performance.now() - startTime;
-            featureFlags.recordPerformance(mode, elapsed, true);
+            featureFlags.recordPerformance('direct', elapsed, true);
         }
-
         throw error;
     }
 }
 
 /**
- * Run simulation in comparison mode (both engines)
- * Returns results from both engines for comparison
- *
- * @param {...args} Same as simulateOneYear
- * @returns {{adapter: Object, direct: Object, match: boolean, differences: Array}}
- */
-export function simulateOneYearComparison(...args) {
-    const [
-        currentState,
-        inputs,
-        yearData,
-        yearIndex,
-        pflegeMeta,
-        careFloorAddition,
-        householdContext,
-        temporaryFlexFactor,
-        engineAPI
-    ] = args;
-
-    // Clone state for adapter
-    const stateAdapter = structuredClone(currentState);
-    const stateDirect = structuredClone(currentState);
-
-    let resultAdapter, resultDirect;
-    let timeAdapter, timeDirect;
-    let errorAdapter, errorDirect;
-
-    // Run Adapter version
-    try {
-        const startAdapter = performance.now();
-        const engine = typeof window !== 'undefined' ? window.Ruhestandsmodell_v30 : null;
-        resultAdapter = simulateOneYearAdapter(
-            stateAdapter,
-            inputs,
-            yearData,
-            yearIndex,
-            pflegeMeta,
-            careFloorAddition,
-            householdContext,
-            temporaryFlexFactor,
-            engine
-        );
-        timeAdapter = performance.now() - startAdapter;
-        featureFlags.recordPerformance('adapter', timeAdapter, false);
-    } catch (error) {
-        errorAdapter = error;
-        featureFlags.recordPerformance('adapter', 0, true);
-    }
-
-    // Run Direct version
-    try {
-        const startDirect = performance.now();
-        const engine = typeof window !== 'undefined' ? window.EngineAPI : null;
-        resultDirect = simulateOneYearDirect(
-            stateDirect,
-            inputs,
-            yearData,
-            yearIndex,
-            pflegeMeta,
-            careFloorAddition,
-            householdContext,
-            temporaryFlexFactor,
-            engine
-        );
-        timeDirect = performance.now() - startDirect;
-        featureFlags.recordPerformance('direct', timeDirect, false);
-    } catch (error) {
-        errorDirect = error;
-        featureFlags.recordPerformance('direct', 0, true);
-    }
-
-    // Compare results
-    const differences = [];
-    let match = true;
-
-    if (errorAdapter || errorDirect) {
-        match = false;
-        if (errorAdapter && !errorDirect) {
-            differences.push({ field: 'error', adapter: errorAdapter.message, direct: 'success' });
-        } else if (!errorAdapter && errorDirect) {
-            differences.push({ field: 'error', adapter: 'success', direct: errorDirect.message });
-        } else {
-            differences.push({ field: 'error', adapter: errorAdapter.message, direct: errorDirect.message });
-        }
-    } else {
-        // Compare key fields
-        const fieldsToCompare = [
-            'newState.portfolio.liquiditaet',
-            'logData.liquiditaet',
-            'logData.entscheidung.jahresEntnahme',
-            'logData.wertAktien',
-            'logData.wertGold',
-            'logData.steuern_gesamt',
-            'totalTaxesThisYear'
-        ];
-
-        for (const field of fieldsToCompare) {
-            const adapterVal = getNestedValue(resultAdapter, field);
-            const directVal = getNestedValue(resultDirect, field);
-
-            if (adapterVal !== undefined && directVal !== undefined) {
-                const diff = Math.abs(adapterVal - directVal);
-                const avg = (Math.abs(adapterVal) + Math.abs(directVal)) / 2;
-                const diffPct = avg > 0 ? (diff / avg) * 100 : 0;
-
-                if (diffPct > 1 && diff > 1) {
-                    match = false;
-                    differences.push({
-                        field,
-                        adapter: adapterVal,
-                        direct: directVal,
-                        diffPct: diffPct.toFixed(2)
-                    });
-                }
-            }
-        }
-    }
-
-    return {
-        adapter: resultAdapter,
-        direct: resultDirect,
-        timeAdapter,
-        timeDirect,
-        speedup: timeAdapter > 0 ? ((timeAdapter - timeDirect) / timeAdapter) * 100 : null,
-        match,
-        differences,
-        errorAdapter,
-        errorDirect
-    };
-}
-
-/**
- * Helper function to get nested object values
- */
-function getNestedValue(obj, path) {
-    return path.split('.').reduce((current, key) => current?.[key], obj);
-}
-
-/**
- * Get the appropriate engine based on mode
- * @returns {Object} Engine instance (Adapter or EngineAPI)
+ * Get the appropriate engine
+ * @returns {Object} EngineAPI instance
  */
 export function getEngine() {
-    return featureFlags.getEngine();
+    return typeof window !== 'undefined' ? window.EngineAPI : null;
 }
 
 /**
- * Get the appropriate simulator function based on mode
+ * Get the appropriate simulator function
  * @returns {Function} simulateOneYear function
  */
 export function getSimulatorFunction() {
-    const mode = featureFlags.getEngineMode();
-    return mode === 'direct' ? simulateOneYearDirect : simulateOneYearAdapter;
+    return simulateOneYearDirect;
 }
-
-// Export everything from original simulator-engine for backward compatibility
-export * from './simulator-engine.js';
 
 // Make available globally
 if (typeof window !== 'undefined') {
-    window.simulateOneYearAdapter = simulateOneYearAdapter;
+    window.simulateOneYear = simulateOneYear;
     window.simulateOneYearDirect = simulateOneYearDirect;
-    window.simulateOneYearComparison = simulateOneYearComparison;
 }

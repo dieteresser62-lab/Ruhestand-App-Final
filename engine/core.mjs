@@ -39,7 +39,12 @@ function _internal_calculateModel(input, lastState) {
 
     // 2. Grundwerte berechnen
     // Profil-Konfiguration laden (Runway-Ziele, Allokationsstrategie)
-    const profil = CONFIG.PROFIL_MAP[input.risikoprofil];
+    // Profil-Konfiguration laden (Runway-Ziele, Allokationsstrategie)
+    let profil = CONFIG.PROFIL_MAP[input.risikoprofil];
+    if (!profil) {
+        // Fallback für Tests oder invalide Eingaben
+        profil = CONFIG.PROFIL_MAP['sicherheits-dynamisch'];
+    }
 
 
     // Aktuelle Liquidität = Tagesgeld + Geldmarkt-ETF
@@ -258,6 +263,7 @@ const EngineAPI = {
         try {
             return _internal_calculateModel(input, lastState);
         } catch (e) {
+            console.error('[EngineAPI] Critical Error in simulateSingleYear:', e);
             if (e instanceof AppError) {
                 return { error: e };
             }
