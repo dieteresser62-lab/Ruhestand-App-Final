@@ -34,9 +34,9 @@ DOM-freie Simulation, die alle Runs, KPI-Arrays und Pflegemetriken berechnet.
 **Hauptfunktionen / Exporte:**
 - `runMonteCarloSimulation()` – führt die komplette Simulation aus, sammelt Worst-Run-Logs, Pflege-KPIs und aggregierte Kennzahlen.
 
-**Einbindung:** Wird ausschließlich aus `simulator-monte-carlo.js` aufgerufen. Erwartet fertige Eingaben und Callbacks (Progress, Szenario-Analyzer) und nutzt `simulator-engine.js` für die Jahr-für-Jahr-Logik.
+**Einbindung:** Wird ausschließlich aus `simulator-monte-carlo.js` aufgerufen. Erwartet fertige Eingaben und Callbacks (Progress, Szenario-Analyzer) und nutzt `simulator-engine-wrapper.js` für die Jahr-für-Jahr-Logik.
 
-**Dependencies:** `simulator-engine.js`, `simulator-portfolio.js`, `simulator-results.js` (Portfolio-Helpers), `simulator-sweep-utils.js`, `simulator-utils.js`, `simulator-data.js`, `cape-utils.js`.
+**Dependencies:** `simulator-engine-wrapper.js`, `simulator-portfolio.js`, `simulator-results.js` (Portfolio-Helpers), `simulator-sweep-utils.js`, `simulator-utils.js`, `simulator-data.js`, `cape-utils.js`.
 
 ---
 
@@ -142,19 +142,19 @@ Persistenz und Migration der Renten-Eingaben (Person 1 & 2) inklusive Legacy-Fel
 
 ---
 
-## 12. `simulator-engine.js` (~1.080 Zeilen)
-Kernlogik für Jahr-für-Jahr-Simulation.
+## 12. `simulator-engine-direct.js` & `simulator-engine-helpers.js`
+Kernlogik für Jahr-für-Jahr-Simulation (Direct Engine).
 
 **Hauptfunktionen:**
-- `sampleNextYearData()` – sampelt nächstes Jahr (historisch/Regime/Block)
-- `yearSimulation()` – simuliert ein Jahr mit allen Transaktionen
-- `makeDefaultCareMeta()` / `updateCareMeta()` – Pflegefall-Zustandsmaschine
-- `calcCareCost()` – berechnet Pflege-Kosten nach Grad
-- `computeCareMortalityMultiplier()` – erhöhte Sterblichkeit bei Pflege
-- `computeHouseholdFlexFactor()` – Flex-Reduktion bei Pflege
-- `initMcRunState()` – initialisiert Zustand für einen MC-Lauf
+- `simulateSingleYear()` (Direct) – simuliert ein Jahr via EngineAPI
+- `sampleNextYearData()` (Helpers) – sampelt nächstes Jahr (historisch/Regime/Block)
+- `makeDefaultCareMeta()` / `updateCareMeta()` (Helpers) – Pflegefall-Zustandsmaschine
+- `calcCareCost()` (Helpers) – berechnet Pflege-Kosten nach Grad
+- `computeCareMortalityMultiplier()` (Helpers) – erhöhte Sterblichkeit bei Pflege
+- `computeHouseholdFlexFactor()` (Helpers) – Flex-Reduktion bei Pflege
+- `initMcRunState()` (Helpers) – initialisiert Zustand für einen MC-Lauf
 
-**Dependencies:** `simulator-utils.js`, `simulator-data.js`
+**Dependencies:** `simulator-utils.js`, `simulator-data.js`, `EngineAPI` (engine.js)
 
 ---
 
@@ -269,9 +269,9 @@ simulator-main.js
   ├─ simulator-monte-carlo.js
   │    ├─ monte-carlo-ui.js
   │    ├─ monte-carlo-runner.js
-  │    │    ├─ simulator-engine.js
-  │    │    │    ├─ simulator-utils.js
-  │    │    │    └─ simulator-data.js
+  │    │    ├─ simulator-engine-wrapper.js
+  │    │    │    ├─ simulator-engine-direct.js
+  │    │    │    └─ simulator-engine-helpers.js
   │    │    ├─ simulator-portfolio.js
   │    │    │    └─ simulator-data.js
   │    │    ├─ simulator-results.js
@@ -322,7 +322,7 @@ simulator-main.js
 
 ### Backtest
 1. `simulator-main.js`: Backtest-Controls triggern `runBacktest()` aus `simulator-backtest.js`.
-2. `simulator-engine.js`: Jahr-für-Jahr mit echten historischen Daten.
+2. `simulator-engine-wrapper.js`: Jahr-für-Jahr mit echten historischen Daten.
 3. `simulator-backtest.js`: `renderBacktestLog()` zeigt Jahresprotokoll.
 
 ---
@@ -371,10 +371,10 @@ Nach jeder Monte-Carlo-Simulation werden 30 Szenarien gespeichert:
 ## Entwicklungstipps
 
 1. **Neue Features:** Direkt im passenden Fachmodul implementieren (siehe oben) und nur über `initializeUI()` verkabeln.
-2. **Pflege-Logik:** In `simulator-engine.js` (`makeDefaultCareMeta`, `updateCareMeta`, `calcCareCost`). UI-Anteile nach `simulator-ui-pflege.js` auslagern.
+2. **Pflege-Logik:** In `simulator-engine-helpers.js`. UI-Anteile nach `simulator-ui-pflege.js` auslagern.
 3. **Neue KPIs:** In `simulator-results.js` (`displayMonteCarloResults`, `createKpiCard`) oder bei Sweep-spezifischen KPIs in `simulator-heatmap.js`.
 4. **Persistenz/Helper:** Gemeinsame Formatter/Downloads in `simulator-main-helpers.js`, Sweep-Clones in `simulator-sweep-utils.js`.
-5. **Tests:** `test-dual-care.js` für Pflege-Logik, `sim-parity-smoketest.js` für Regressionstests.
+5. **Tests:** `npm test` für Regressionstests und Pflege-Logik.
 6. **
 
 ---

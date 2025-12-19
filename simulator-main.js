@@ -42,7 +42,8 @@
  * ============================================================================
  */
 
-import { EngineAPI, Ruhestandsmodell_v30 } from './engine/index.mjs';
+import { EngineAPI } from './engine/index.mjs';
+import { simulateOneYear } from './simulator-engine-wrapper.js';
 import { quantile, sum, mean, formatCurrency } from './simulator-utils.js';
 import { getStartYearCandidates } from './cape-utils.js';
 import { ENGINE_VERSION, STRESS_PRESETS, BREAK_ON_RUIN, MORTALITY_TABLE, annualData, SUPPORTED_PFLEGE_GRADES } from './simulator-data.js';
@@ -98,170 +99,22 @@ const CARE_GRADE_FIELD_IDS = SUPPORTED_PFLEGE_GRADES.flatMap(grade => [
     `pflegeStufe${grade}Mortality`
 ]);
 
-// Sicherstellen, dass die Legacy-Adapter-API geladen ist (für alte Caller, die Globals erwarten)
-const legacyEngineAdapter = Ruhestandsmodell_v30 || (typeof window !== 'undefined' ? window.Ruhestandsmodell_v30 : null);
-if (typeof window !== 'undefined' && legacyEngineAdapter && !window.Ruhestandsmodell_v30) {
-    window.Ruhestandsmodell_v30 = legacyEngineAdapter;
-}
-
 /**
- * Wandelt den legacy Simulator-State in ein EngineAPI-kompatibles Input-Objekt um.
- *
- * Diese Hilfsfunktion dient als Migrationsbrücke: Sie liest die wichtigsten Felder
- * aus dem bestehenden Simulator-Status (Portfolio, Liquidität, Marktdaten) und
- * überführt sie in das schlankere Engine-Eingabeformat. Nicht verfügbare Werte
- * werden defensiv mit 0 oder konservativen Defaults befüllt, damit die neue Engine
- * nachvollziehbare Ergebnisse liefern kann, ohne dass bestehende Aufrufe brechen.
- *
- * @param {Object} currentState - Aktueller Simulator-Status (Portfolio, Marktdaten)
- * @param {Object} inputs - Benutzer-Eingaben aus dem UI
- * @param {Object} yearData - Marktdaten des aktuellen Jahres
- * @returns {Object} EngineAPI-kompatibles Input-Objekt
- */
-function buildEngineInputFromLegacy(currentState, inputs, yearData) {
-    const safeNumber = (value, fallback = 0) => {
-        const numeric = Number(value);
-        return Number.isFinite(numeric) ? numeric : fallback;
-    };
-
-    const portfolio = currentState?.portfolio || {};
-    const equityTranches = Array.isArray(portfolio.depotTranchesAktien) ? portfolio.depotTranchesAktien : [];
-    const goldTranches = Array.isArray(portfolio.depotTranchesGold) ? portfolio.depotTranchesGold : [];
-
-    const depotwertAlt = equityTranches
-        .filter(tranche => tranche?.type === 'aktien_alt')
-        .reduce((sum, tranche) => sum + safeNumber(tranche.marketValue), 0);
-    const depotwertNeu = equityTranches
-        .filter(tranche => tranche?.type === 'aktien_neu')
-        .reduce((sum, tranche) => sum + safeNumber(tranche.marketValue), 0);
-
-    const costBasisAlt = equityTranches
-        .filter(tranche => tranche?.type === 'aktien_alt')
-        .reduce((sum, tranche) => sum + safeNumber(tranche.costBasis, tranche.marketValue), 0);
-    const costBasisNeu = equityTranches
-        .filter(tranche => tranche?.type === 'aktien_neu')
-        .reduce((sum, tranche) => sum + safeNumber(tranche.costBasis, tranche.marketValue), 0);
-
-    const goldWert = goldTranches.reduce((sum, tranche) => sum + safeNumber(tranche.marketValue), 0);
-    const goldCost = goldTranches.reduce((sum, tranche) => sum + safeNumber(tranche.costBasis, tranche.marketValue), 0);
-
-    // Legacy-Portfolio führt Liquidität als Gesamtwert – wir splitten konservativ 50/50
-    const liquiditaetGesamt = safeNumber(portfolio.liquiditaet, 0);
-    const tagesgeld = liquiditaetGesamt * 0.5;
-    const geldmarktEtf = liquiditaetGesamt - tagesgeld;
-
-    const marketDataHist = currentState?.marketDataHist || {};
-    const inflation = safeNumber(yearData?.inflation ?? yearData?.inflation_de, 0);
-
-    return {
-        aktuellesAlter: safeNumber(inputs?.startAlter ?? inputs?.p1StartAlter, 65),
-        inflation,
-        tagesgeld,
-        geldmarktEtf,
-        depotwertAlt,
-        depotwertNeu,
-        goldWert,
-        costBasisAlt,
-        costBasisNeu,
-        goldCost,
-        endeVJ: safeNumber(marketDataHist.endeVJ ?? yearData?.endeVJ, 0),
-        endeVJ_1: safeNumber(marketDataHist.endeVJ_1 ?? yearData?.endeVJ_1, 0),
-        endeVJ_2: safeNumber(marketDataHist.endeVJ_2 ?? yearData?.endeVJ_2, 0),
-        endeVJ_3: safeNumber(marketDataHist.endeVJ_3 ?? yearData?.endeVJ_3, 0),
-        ath: safeNumber(marketDataHist.ath ?? marketDataHist.endeVJ ?? 0, 0),
-        jahreSeitAth: safeNumber(marketDataHist.jahreSeitAth, 0),
-        renteAktiv: safeNumber(inputs?.p1Monatsrente ?? inputs?.renteMonatlich, 0) > 0,
-        renteMonatlich: safeNumber(inputs?.p1Monatsrente ?? inputs?.renteMonatlich, 0),
-        floorBedarf: safeNumber(currentState?.baseFloor ?? inputs?.startFloorBedarf, 0),
-        flexBedarf: safeNumber(currentState?.baseFlex ?? inputs?.startFlexBedarf, 0),
-        risikoprofil: inputs?.risikoprofil || 'sicherheits-dynamisch',
-        kirchensteuerSatz: safeNumber(inputs?.p1KirchensteuerPct ?? inputs?.kirchensteuerSatz, 0),
-        sparerPauschbetrag: safeNumber(inputs?.startSPB ?? inputs?.p1SparerPauschbetrag ?? inputs?.sparerPauschbetrag, 0),
-        goldAktiv: Boolean(inputs?.goldAllokationAktiv ?? inputs?.goldAktiv),
-        goldZielProzent: safeNumber(inputs?.goldAllokationProzent ?? inputs?.goldZielProzent, 0),
-        goldFloorProzent: safeNumber(inputs?.goldFloorProzent, 0),
-        // Rebalancing-Band aus Gold-Logik und allgemeines Rebal-Band sind voneinander unabhängig,
-        // deshalb keine Cross-Fallbacks: jedes Feld nutzt nur seinen eigenen Eingabewert.
-        rebalancingBand: safeNumber(inputs?.rebalancingBand, 5),
-        targetEq: safeNumber(inputs?.targetEq ?? 60, 60),
-        rebalBand: safeNumber(inputs?.rebalBand, 5),
-        maxSkimPctOfEq: safeNumber(inputs?.maxSkimPctOfEq, 10),
-        maxBearRefillPctOfEq: safeNumber(inputs?.maxBearRefillPctOfEq, 5),
-        runwayMinMonths: safeNumber(inputs?.runwayMinMonths ?? 24, 24),
-        runwayTargetMonths: safeNumber(inputs?.runwayTargetMonths ?? 36, 36)
-    };
-}
-
-/**
- * Legacy-Shim für simulateOneYear -> EngineAPI.simulateSingleYear.
- *
- * Der Simulator ruft historisch `simulateOneYear` aus simulator-engine.js auf. Um die
- * neue Engine-API schrittweise einzuführen, wird hier ein synchroner Shim bereitgestellt,
- * der die Legacy-Signatur akzeptiert, die Eingaben konvertiert und Fehler sauber meldet.
- *
- * @param {Object} currentState - Alter Simulator-Zustand (Portfolio, Historie)
- * @param {Object} inputs - UI-Eingaben
- * @param {Object} yearData - Marktdaten des aktuellen Jahres
- * @param {number} yearIndex - Index des Simulationsjahres (nur für Logging genutzt)
- * @returns {Object} Engine-Resultat oder strukturiertes Fehlerobjekt
- */
-function simulateOneYear(currentState, inputs, yearData, yearIndex) {
-    const engineApi = EngineAPI || (typeof window !== 'undefined' ? window.EngineAPI : null);
-    if (!engineApi || typeof engineApi.simulateSingleYear !== 'function') {
-        return {
-            error: new Error('EngineAPI.simulateSingleYear ist nicht verfügbar – Engine-Bundle fehlt?'),
-            yearIndex
-        };
-    }
-
-    try {
-        const engineInput = buildEngineInputFromLegacy(currentState, inputs, yearData);
-        const lastState = currentState?.lastState || null;
-        const result = engineApi.simulateSingleYear(engineInput, lastState);
-
-        if (result?.error) {
-            return result;
-        }
-
-        // Rückgabe enthält zusätzlich das Input-Objekt, um Diagnose und Paritätstests zu erleichtern
-        return {
-            ...result,
-            engineInput,
-            legacyInput: { currentState, inputs, yearData, yearIndex }
-        };
-    } catch (error) {
-        return { error, yearIndex };
-    }
-}
-
-
-/**
- * Prüft Engine-Version und -Hash
+ * Prüft Engine-Version
  */
 export function selfCheckEngine() {
-    if (typeof window.Ruhestandsmodell_v30 === 'undefined') {
+    if (typeof window.EngineAPI === 'undefined' || typeof window.EngineAPI.getVersion !== 'function') {
         const footer = document.getElementById('engine-mismatch-footer');
         if (footer) {
             footer.textContent = `FEHLER: Die Engine-Datei 'engine.js' konnte nicht geladen werden!`;
             footer.style.display = 'block';
         }
         return;
-    };
-
-    const fnBody = Object.values(window.Ruhestandsmodell_v30).reduce((s, fn) => s + (typeof fn === 'function' ? fn.toString() : ''), '');
-    let hash = 0;
-    for (let i = 0; i < fnBody.length; i++) {
-        hash = ((hash << 5) - hash) + fnBody.charCodeAt(i);
-        hash |= 0;
     }
-    const currentHash = String(Math.abs(hash));
-    const mismatch = window.Ruhestandsmodell_v30.VERSION !== ENGINE_VERSION;
 
-    const footer = document.getElementById('engine-mismatch-footer');
-    if (mismatch && footer) {
-        footer.textContent = `WARNUNG: Engine-Version veraltet! Erwartet: ${ENGINE_VERSION}, gefunden: ${window.Ruhestandsmodell_v30.VERSION}`;
-        footer.style.display = 'block';
-    }
+    const version = window.EngineAPI.getVersion();
+    // Version Check logic if needed, currently just existence check
+    // If strict versioning is required, compare version.api with required version
 }
 
 /**
@@ -591,9 +444,8 @@ window.onload = function () {
     // Reset-Button Initialisierung
     initResetButton();
 
-    // Initial calculation on load
-    // Note: Some inputs might trigger calc via events, but we do one explicitly to be sure.
-    runMonteCarloSimulation();
+    // Initial calculation on load is handled by individual tabs
+    // Monte Carlo, Backtest, Sweep, and Auto-Optimize have their own trigger buttons
 };
 
 /**

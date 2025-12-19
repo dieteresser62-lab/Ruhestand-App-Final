@@ -20,7 +20,6 @@ import { getCommonInputs, prepareHistoricalData } from './simulator-portfolio.js
 import { normalizeWidowOptions, deepClone } from './simulator-sweep-utils.js';
 import { runMonteCarloSimulation } from './monte-carlo-runner.js';
 import { ScenarioAnalyzer } from './scenario-analyzer.js';
-import { Ruhestandsmodell_v30 } from './engine/index.mjs';
 
 /**
  * Whitelist der erlaubten Parameter-Keys
@@ -367,21 +366,15 @@ async function evaluateCandidate(candidate, baseInputs, runsPerCandidate, maxDau
             monteCarloParams,
             useCapeSampling: false,
             onProgress: () => { },
-            scenarioAnalyzer,
-            engine: Ruhestandsmodell_v30
+            scenarioAnalyzer
+            // engine parameter removed - wrapper selects correct engine based on feature flag mode
         });
 
         allResults.push({ aggregatedResults, failCount, anzahl: runsPerCandidate });
 
         // DEBUG: Log first aggregatedResults structure
         if (allResults.length === 1) {
-            console.log('🔍 DEBUG - aggregatedResults structure:');
-            console.log('  finalOutcomes.p50:', aggregatedResults.finalOutcomes?.p50);
-            console.log('  maxDrawdowns.p90:', aggregatedResults.maxDrawdowns?.p90);
-            console.log('  depotErschoepfungsQuote:', aggregatedResults.depotErschoepfungsQuote);
-            console.log('  extraKPI.timeShareQuoteAbove45:', aggregatedResults.extraKPI?.timeShareQuoteAbove45);
-            console.log('  failCount:', failCount);
-            console.log('  successRate:', ((runsPerCandidate - failCount) / runsPerCandidate * 100).toFixed(2), '%');
+
         }
 
         // OPTIMIZATION: Early Exit bei harten Constraint-Verletzungen
@@ -615,26 +608,6 @@ export async function runAutoOptimize(config) {
     }
 
     if (evaluated.length === 0) {
-        // DEBUG: Zeige Metriken der Top-3 Kandidaten (vor Constraint-Check)
-        console.log('🔍 DEBUG: Top-3 Kandidaten VOR Constraint-Check:');
-        const allEvaluatedWithMetrics = [];
-        for (const entry of top50.slice(0, Math.min(3, top50.length))) {
-            const candidate = entry.candidate;
-            const results = cache.get(candidate);
-            if (results) {
-                const sr = (results.successProbFloor ?? 0);
-                const exRate = (results.depletionRate ?? 0);
-                const dd = (results.worst5Drawdown ?? 0);
-                const ts = (results.timeShareWRgt45 ?? 0);
-                console.log(`  Candidate: p1=${candidate.p1Val}, p2=${candidate.p2Val}, p3=${candidate.p3Val}`);
-                console.log(`    SR: ${(sr * 100).toFixed(2)}%, Exhaustion: ${(exRate * 100).toFixed(3)}%, DD: ${(dd * 100).toFixed(1)}%, TS: ${(ts * 100).toFixed(2)}%`);
-                console.log(`    Constraints: sr99=${constraints.sr99}, noex=${constraints.noex}, ts45=${constraints.ts45}, dd55=${constraints.dd55}`);
-                allEvaluatedWithMetrics.push({ candidate, results, sr, exRate, dd, ts });
-            } else {
-                console.log(`  ⚠️ Candidate p1=${candidate.p1Val}, p2=${candidate.p2Val}, p3=${candidate.p3Val} - NO RESULTS IN CACHE`);
-            }
-        }
-
         throw new Error('No candidates satisfied constraints after full evaluation');
     }
 

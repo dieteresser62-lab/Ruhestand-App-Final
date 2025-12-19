@@ -4,7 +4,7 @@ import { rng, quantile, sum, mean } from './simulator-utils.js';
 import { getStartYearCandidates } from './cape-utils.js';
 import { STRESS_PRESETS, BREAK_ON_RUIN, MORTALITY_TABLE, annualData } from './simulator-data.js';
 import { buildStressContext, applyStressOverride, computeRentAdjRate } from './simulator-portfolio.js';
-import { simulateOneYear, initMcRunState, makeDefaultCareMeta, sampleNextYearData, computeRunStatsFromSeries, updateCareMeta, calcCareCost, computeCareMortalityMultiplier, computeHouseholdFlexFactor } from './simulator-engine.js';
+import { simulateOneYear, initMcRunState, makeDefaultCareMeta, sampleNextYearData, computeRunStatsFromSeries, updateCareMeta, calcCareCost, computeCareMortalityMultiplier, computeHouseholdFlexFactor } from './simulator-engine-wrapper.js';
 import { portfolioTotal } from './simulator-results.js';
 import { sumDepot } from './simulator-portfolio.js';
 import { cloneStressContext, computeMarriageYearsCompleted } from './simulator-sweep-utils.js';

@@ -3,6 +3,7 @@
 import { formatCurrency, formatCurrencyShortLog, shortenText } from './simulator-utils.js';
 import { prepareMonteCarloViewModel } from './results-metrics.js';
 import { renderSummary, renderKpiDashboard, renderStressSection, renderHeatmap, renderCareSection } from './results-renderers.js';
+import { EngineAPI } from './engine/index.mjs';
 
 /**
  * Storage keys for log detail preferences.
@@ -327,6 +328,7 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         { key: 'pflege_flex_faktor', header: 'FlexPfl%', width: 8, fmt: (v, row) => (row.pflege_aktiv ? formatPctOrDash(v) : '—') },
         { key: 'CareP1_Cost', header: 'P1€', width: 7, fmt: formatCurrencyShortLog, title: 'Zusätzliche Pflege-Kosten P1' },
         { key: 'CareP2_Cost', header: 'P2€', width: 7, fmt: formatCurrencyShortLog, title: 'Zusätzliche Pflege-Kosten P2' },
+        { key: 'CareP2_Cost', header: 7, fmt: formatCurrencyShortLog, title: 'Zusätzliche Pflege-Kosten P2' },
     ];
 
     const activeCareCols = options.showCareDetails ? (options.logDetailLevel === 'detailed' ? careColsDetailed : careColsMinimal) : [];
@@ -337,7 +339,10 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         {
             key: 'Regime', header: 'Markt', width: 12,
             fmt: (v, row) => {
-                const regimeText = window.Ruhestandsmodell_v30.CONFIG.SCENARIO_TEXT[row.Regime] || row.Regime || '';
+                const config = EngineAPI.getConfig();
+                // Access TEXTS.SCENARIO (Modern) or fallback to local SCENARIO_TEXT map if API structure is different
+                const map = config.TEXTS ? config.TEXTS.SCENARIO : {};
+                const regimeText = map[row.Regime] || row.Regime || '';
                 return regimeText.substring(0, 12);
             },
             title: 'Marktsituation/Regime'
@@ -345,7 +350,9 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         {
             key: 'aktionUndGrund', header: 'Status', width: 22, fmt: (v, row) => {
                 const alarmMarker = row.Alarm ? '(A) ' : '';
-                const regimeShort = shortenText(window.Ruhestandsmodell_v30.CONFIG.SCENARIO_TEXT[row.Regime] || '');
+                const config = EngineAPI.getConfig();
+                const map = config.TEXTS ? config.TEXTS.SCENARIO : {};
+                const regimeShort = shortenText(map[row.Regime] || '');
                 const status = `${alarmMarker}${row.CutReason || 'NONE'}/${regimeShort}`;
                 return (v || status).substring(0, 21);
             }

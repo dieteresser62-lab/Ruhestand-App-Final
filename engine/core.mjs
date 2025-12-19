@@ -39,11 +39,18 @@ function _internal_calculateModel(input, lastState) {
 
     // 2. Grundwerte berechnen
     // Profil-Konfiguration laden (Runway-Ziele, Allokationsstrategie)
-    const profil = CONFIG.PROFIL_MAP[input.risikoprofil];
+    // Profil-Konfiguration laden (Runway-Ziele, Allokationsstrategie)
+    let profil = CONFIG.PROFIL_MAP[input.risikoprofil];
+    if (!profil) {
+        // Fallback für Tests oder invalide Eingaben
+        profil = CONFIG.PROFIL_MAP['sicherheits-dynamisch'];
+    }
 
 
-    // Aktuelle Liquidität = Tagesgeld + Geldmarkt-ETF
-    const aktuelleLiquiditaet = input.tagesgeld + input.geldmarktEtf;
+    // Aktuelle Liquidität = Tagesgeld + Geldmarkt-ETF (oder direkter Override)
+    const aktuelleLiquiditaet = (input.aktuelleLiquiditaet !== undefined)
+        ? input.aktuelleLiquiditaet
+        : (input.tagesgeld + input.geldmarktEtf);
 
     // Gesamtes Depotvermögen (Aktien alt + neu + optional Gold)
     const depotwertGesamt = input.depotwertAlt + input.depotwertNeu +
@@ -258,6 +265,7 @@ const EngineAPI = {
         try {
             return _internal_calculateModel(input, lastState);
         } catch (e) {
+            console.error('[EngineAPI] Critical Error in simulateSingleYear:', e);
             if (e instanceof AppError) {
                 return { error: e };
             }

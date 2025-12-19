@@ -1,14 +1,23 @@
 
-import { simulateOneYear } from '../simulator-engine.js';
-import { EngineAPI, Ruhestandsmodell_v30 } from '../engine/index.mjs';
+import { simulateOneYear } from '../simulator-engine-wrapper.js';
+import { EngineAPI } from '../engine/index.mjs';
 
 // --- MOCKING GLOBAL STATE ---
 // simulator-engine.js relies on window.Ruhestandsmodell_v30 and window.EngineAPI
 if (typeof global.window === 'undefined') {
     global.window = {};
 }
-global.window.Ruhestandsmodell_v30 = Ruhestandsmodell_v30;
 global.window.EngineAPI = EngineAPI;
+
+function assert(condition, message) {
+    if (!condition) throw new Error(message || "Assertion failed");
+}
+
+function assertClose(actual, expected, tolerance, message) {
+    if (Math.abs(actual - expected) > tolerance) {
+        throw new Error(`${message}: Actual ${actual} != Expected ${expected}`);
+    }
+}
 
 console.log('--- Simulation Loop Tests ---');
 

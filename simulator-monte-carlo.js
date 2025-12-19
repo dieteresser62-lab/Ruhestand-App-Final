@@ -46,8 +46,8 @@ export async function runMonteCarlo() {
             monteCarloParams: { anzahl, maxDauer, blockSize, seed, methode },
             useCapeSampling: ui.readUseCapeSampling(),
             onProgress: pct => ui.updateProgress(pct),
-            scenarioAnalyzer,
-            engine: window.Ruhestandsmodell_v30
+            scenarioAnalyzer
+            // engine parameter removed - wrapper selects correct engine based on feature flag mode
         });
 
         const scenarioLogs = scenarioAnalyzer.buildScenarioLogs();

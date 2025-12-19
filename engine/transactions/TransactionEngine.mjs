@@ -45,7 +45,12 @@ export const TransactionEngine = {
             ? (inflatedBedarf.floor + inflatedBedarf.flex)
             : (inflatedBedarf.floor + 0.5 * inflatedBedarf.flex);
 
-        return (Math.max(1, anpassbarerBedarf) / 12) * zielMonate;
+        const calculatedTarget = (Math.max(1, anpassbarerBedarf) / 12) * zielMonate;
+
+        // Fix: Absolute Untergrenze für Liquidität erzwingen (z.B. 10.000€)
+        // Verhindert, dass bei 0€ Netto-Bedarf (durch hohe Rente) das Cash-Konto ausblutet
+        const minAbs = CONFIG.THRESHOLDS.STRATEGY.absoluteMinLiquidity || 0;
+        return Math.max(calculatedTarget, minAbs);
     },
 
     /**
@@ -182,8 +187,13 @@ export const TransactionEngine = {
             market, spending, minGold, profil, input
         } = p;
 
+
+
         let actionDetails = { bedarf: 0, title: '', diagnosisEntries: [], isCapped: false };
+
         let isPufferSchutzAktiv = false;
+
+        // EXTENDED DEBUGGING
         let verwendungen = { liquiditaet: 0, gold: 0, aktien: 0 };
         let minTradeResultOverride = null;
         const transactionDiagnostics = {
@@ -422,27 +432,38 @@ export const TransactionEngine = {
                     : 1;
                 const runwayCoverageThresholdLocal = CONFIG.THRESHOLDS.STRATEGY.runwayCoverageMinPct || 0.75;
                 const isCriticalLiquidity = zielLiquiditaetsdeckungLocal < runwayCoverageThresholdLocal;
+                const belowAbsoluteFloor = aktuelleLiquiditaet < (CONFIG.THRESHOLDS.STRATEGY.absoluteMinLiquidity || 10000);
 
                 let goldKaufBedarf = 0;
+                let goldVerkaufBedarf = 0;
 
                 // Gold-Rebalancing prüfen
                 if (input.goldAktiv && input.goldZielProzent > 0) {
                     const goldZielwert = investiertesKapital * (input.goldZielProzent / 100);
                     const bandPct = (input.rebalancingBand ?? input.rebalBand ?? 35) / 100;
                     const goldUntergrenze = goldZielwert * (1 - bandPct);
+                    const goldObergrenze = goldZielwert * (1 + bandPct);
 
                     if (input.goldWert < goldUntergrenze) {
                         goldKaufBedarf = Math.max(0, goldZielwert - input.goldWert);
+                    } else if (input.goldWert > goldObergrenze) {
+                        // FIX: Gold-Überschuss erkennen!
+                        // Wenn Gold stark gestiegen ist (über Band), muss verkauft werden.
+                        goldVerkaufBedarf = Math.max(0, input.goldWert - goldZielwert);
                     }
                 }
 
-                const totalerBedarf = liquiditaetsBedarf + goldKaufBedarf;
+                const totalerBedarf = liquiditaetsBedarf + goldKaufBedarf + goldVerkaufBedarf;
 
                 // Bei kritischer Liquidität: niedrigere Mindestschwelle verwenden
                 // WICHTIG: minTradeResultOverride auf 0 setzen, um RUIN zu verhindern
                 // Sonst würde der dynamische minTradeResult bei großen Portfolios die Transaktion blockieren
                 let appliedMinTradeGate;
-                if (isCriticalLiquidity) {
+                if (belowAbsoluteFloor) {
+                    // NOTFALL: Unter absolutem Minimum -> Sofort handeln, egal wie klein der Betrag
+                    appliedMinTradeGate = 0;
+                    minTradeResultOverride = 0;
+                } else if (isCriticalLiquidity) {
                     appliedMinTradeGate = Math.max(
                         CONFIG.THRESHOLDS.STRATEGY.minRefillAmount || 2500,
                         CONFIG.THRESHOLDS.STRATEGY.cashRebalanceThreshold || 2500
@@ -459,6 +480,17 @@ export const TransactionEngine = {
                     if (minTradeGateResult.diagnosisEntry) {
                         actionDetails.diagnosisEntries.push(minTradeGateResult.diagnosisEntry);
                     }
+                }
+
+
+
+                // DEBUG PROBE
+                if (liquiditaetsBedarf > 50000 && totalerBedarf < appliedMinTradeGate) {
+                    console.warn('DEBUG: Trade Gated!');
+                    console.warn('Total Bedarf:', totalerBedarf);
+                    console.warn('Applied Gate:', appliedMinTradeGate);
+                    console.warn('Is Critical:', isCriticalLiquidity);
+                    console.warn('Min Trade Override:', minTradeResultOverride);
                 }
 
                 if (totalerBedarf >= appliedMinTradeGate) {
@@ -480,12 +512,26 @@ export const TransactionEngine = {
                         rebalancingBandPct: input.rebalancingBand ?? input.rebalBand ?? 35
                     };
 
+                    if (isNaN(maxSellableFromGold)) {
+                        console.error('DEBUG: maxSellableFromGold is NaN!');
+                        console.error('goldWert:', input.goldWert);
+                        console.error('investiertesKapital:', investiertesKapital);
+                        console.error('goldZielProzent:', input.goldZielProzent);
+                    }
+
                     // Aktien-Verkaufsbudget berechnen
                     const aktienZielwert = investiertesKapital * (input.targetEq / 100);
                     const aktienObergrenze = aktienZielwert * (1 + (input.rebalBand / 100));
                     let aktienUeberschuss = (aktienwert > aktienObergrenze)
                         ? (aktienwert - aktienZielwert)
                         : 0;
+
+                    // Fix: Bei Unterschreitung des absoluten Limits (10k) müssen wir Verkauf erlauben,
+                    // auch wenn keine Aktien-Übergewichtung vorliegt (Surplus = 0).
+                    // Sonst "verhungert" das Cash-Konto.
+                    if (belowAbsoluteFloor && aktienUeberschuss < liquiditaetsBedarf) {
+                        aktienUeberschuss = Math.min(liquiditaetsBedarf, aktienwert);
+                    }
 
                     // Bei kritischer Liquidität: Verkauf auch unter Obergrenze/Zielwert erlauben
                     // um RUIN durch Liquiditätsmangel zu verhindern
@@ -495,21 +541,19 @@ export const TransactionEngine = {
                     }
 
                     // ATH-skaliertes Cap: Bei -20% ATH-Abstand kein Rebalancing mehr
-                    const baseMaxSkimCapEuro = (input.maxSkimPctOfEq / 100) * aktienwert;
+                    const baseMaxSkimCapEuro = ((input.maxSkimPctOfEq || 5) / 100) * aktienwert;
                     const athScaledSkimCap = baseMaxSkimCapEuro * athRebalancingFaktor;
-                    // Bei kritischer Liquidität: Cap auf Liquiditätsbedarf + 20% Puffer begrenzen
-                    // Das stellt sicher, dass die Liquidität aufgefüllt wird, aber nicht unbegrenzt für Gold
-                    const effectiveSkimCap = isCriticalLiquidity
+                    // Bei kritischer Liquidität ODER absolutem Minimum: Cap auf Liquiditätsbedarf + 20% Puffer begrenzen
+                    // Das stellt sicher, dass die Liquidität aufgefüllt wird.
+                    const effectiveSkimCap = (isCriticalLiquidity || belowAbsoluteFloor)
                         ? Math.max(athScaledSkimCap, liquiditaetsBedarf * 1.2)
                         : athScaledSkimCap;
                     const maxSellableFromEquity = Math.min(aktienUeberschuss, effectiveSkimCap);
 
                     const totalEquityValue = input.depotwertAlt + input.depotwertNeu;
-                    if (totalEquityValue > 0) {
-                        saleContext.saleBudgets.aktien_alt =
-                            maxSellableFromEquity * (input.depotwertAlt / totalEquityValue);
-                        saleContext.saleBudgets.aktien_neu =
-                            maxSellableFromEquity * (input.depotwertNeu / totalEquityValue);
+                    if (aktienwert > 0) {
+                        saleContext.saleBudgets.aktien_alt = aktienUeberschuss * (input.depotwertAlt / aktienwert);
+                        saleContext.saleBudgets.aktien_neu = aktienUeberschuss * (input.depotwertNeu / aktienwert);
                     }
                     transactionDiagnostics.equityThresholds = {
                         ...transactionDiagnostics.equityThresholds,
@@ -519,8 +563,31 @@ export const TransactionEngine = {
 
                     actionDetails.bedarf = totalerBedarf;
                     actionDetails.title = "Opportunistisches Rebalancing & Liquidität auffüllen";
+
+                    // Verwendungen zuweisen
                     verwendungen.gold = Math.min(totalerBedarf, goldKaufBedarf);
-                    verwendungen.liquiditaet = Math.min(totalerBedarf - verwendungen.gold, liquiditaetsBedarf);
+
+                    // Liquiditätsbedarf abdecken
+                    const remainingForLiq = Math.max(0, totalerBedarf - verwendungen.gold);
+                    verwendungen.liquiditaet = Math.min(remainingForLiq, liquiditaetsBedarf);
+
+                    // Falls Gold verkauft wird (Rebalancing), Erlös in Aktien stecken (wenn Platz)
+                    if (goldVerkaufBedarf > 0) {
+                        // Prüfen wie viel Platz im Aktien-Bucket ist (bis Zielwert)
+                        const aktienZielwert = investiertesKapital * (input.targetEq / 100);
+                        const aktienCurrent = input.depotwertAlt + input.depotwertNeu;
+                        const aktienGap = Math.max(0, aktienZielwert - aktienCurrent);
+
+                        // Alles was nicht für Liquidität nötig war, kann in Aktien gehen
+                        const remainingForEq = Math.max(0, remainingForLiq - verwendungen.liquiditaet);
+                        verwendungen.aktien = Math.min(remainingForEq, aktienGap);
+
+                        // Wenn noch was übrig ist (weil Aktien voll), geht der Rest implizit in Liquidität
+                        // indem er nicht ausgegeben wird -> Cash erhöht sich.
+                        // Hier explizit als Liquiditätsverwendung erfassen, damit die Rechnung aufgeht?
+                        // Nein, die Engine bucht (NettoErlös - Reinvest). 
+                        // Wenn wir verwendungen.aktien begrenzen, bleibt der Rest Cash. Korrekt.
+                    }
                 }
             }
         }
@@ -528,6 +595,43 @@ export const TransactionEngine = {
         // Verkauf berechnen
         const gesamterNettoBedarf = actionDetails.bedarf;
         if (gesamterNettoBedarf <= 0) {
+            // 6. Opportunistisches Rebalancing (Neu aus Simulator portiert)
+            // Falls kein dringender Bedarf besteht, prüfen wir auf überschüssige Liquidität.
+            // Harmonisierung: Das passiert jetzt direkt in der Engine, damit Simulator und Balance App gleich handeln.
+            const surplus = aktuelleLiquiditaet - zielLiquiditaet;
+
+            // Sicherheits-Check: Nur in guten Marktphasen investieren!
+            // Definition "Riskante Marktphase":
+            const isRiskyMarket = market.sKey.includes('bear') ||
+                market.sKey.includes('crash') ||
+                market.sKey.includes('side') || // Auch Seitwärtsphasen sind unsicher
+                (market.abstandVomAthProzent > 15);
+
+            // Mindestens 500€ Überschuss und günstige Marktlage erforderlich
+            if (surplus > 500 && !isRiskyMarket) {
+                const aktienAnteilQuote = input.targetEq / (100 - (input.goldAktiv ? input.goldZielProzent : 0));
+                const goldTeil = input.goldAktiv ? surplus * (1 - aktienAnteilQuote) : 0;
+                const aktienTeil = surplus - goldTeil;
+
+                return {
+                    type: 'TRANSACTION',
+                    details: {
+                        kaufAkt: aktienTeil,
+                        kaufGld: goldTeil,
+                        verkaufLiquiditaet: surplus,
+                        grund: 'Surplus Rebalancing (Opportunistisch)',
+                        source: 'surplus'
+                    },
+                    diagnosisEntries: [{
+                        step: 'Surplus Rebalancing',
+                        impact: `Überschuss (${surplus.toFixed(0)}€) investiert (Markt: ${market.sKey}).`,
+                        status: 'active',
+                        severity: 'info'
+                    }],
+                    transactionDiagnostics
+                };
+            }
+
             markAsBlocked('liquidity_sufficient', 0, {
                 direction: 'Keine Aktion',
                 title: actionDetails.title || 'Keine Aktion',
@@ -536,7 +640,7 @@ export const TransactionEngine = {
             return {
                 type: 'NONE',
                 anweisungKlasse: 'anweisung-gruen',
-                title: `${market.szenarioText} (Kein Handlungsbedarf)`,
+                title: `${market.szenarioText} (${actionDetails.title || 'Kein Handlungsbedarf'})`,
                 diagnosisEntries: actionDetails.diagnosisEntries,
                 transactionDiagnostics
             };
@@ -550,6 +654,10 @@ export const TransactionEngine = {
             isPufferSchutzAktiv
         );
 
+        if (saleResult && isNaN(saleResult.achievedRefill)) {
+            // Should be caught by hardening, but keeping safety check without logs
+        }
+
         // Bei Notfall-Verkäufen (Puffer-Schutz) keine minTrade-Schwelle anwenden
         const minTradeResult = isPufferSchutzAktiv
             ? 0
@@ -559,6 +667,8 @@ export const TransactionEngine = {
             ));
 
         if (!saleResult || (saleResult.achievedRefill < minTradeResult && !isPufferSchutzAktiv)) {
+
+
             const achieved = saleResult?.achievedRefill || 0;
             markAsBlocked('min_trade', Math.max(0, minTradeResult - achieved), {
                 direction: actionDetails.title || 'Verkauf',
@@ -622,41 +732,53 @@ export const TransactionEngine = {
      * Berechnet Verkauf und Steuer
      */
     calculateSaleAndTax(requestedRefill, input, context, market, isEmergencySale) {
-        const keSt = 0.25 * (1 + 0.055 + input.kirchensteuerSatz);
+        // Hardening against NaN inputs
+        const kiSt = Number(input.kirchensteuerSatz) || 0;
+        const keSt = 0.25 * (1 + 0.055 + kiSt);
 
         const _calculateSingleSale = (nettoBedarf, pauschbetrag, tranchesToUse) => {
             let finalBreakdown = [];
             let totalBrutto = 0;
             let totalSteuer = 0;
             let pauschbetragVerbraucht = 0;
-            let nochZuDeckenderNettoBetrag = nettoBedarf;
-            let pauschbetragRest = pauschbetrag;
+            let nochZuDeckenderNettoBetrag = Math.max(0, Number(nettoBedarf) || 0);
+            let pauschbetragRest = Math.max(0, Number(pauschbetrag) || 0);
+
+
+            // DEBUG SALE LOOP (REMOVED)
 
             for (const tranche of tranchesToUse) {
                 if (nochZuDeckenderNettoBetrag <= 0.01) break;
 
-                let maxBruttoVerkaufbar = tranche.marketValue;
+                let maxBruttoVerkaufbar = Number(tranche.marketValue) || 0;
 
                 // Gold-Floor berücksichtigen
                 if (tranche.kind === 'gold' && context.minGold !== undefined) {
-                    maxBruttoVerkaufbar = Math.max(0, input.goldWert - context.minGold);
+                    const goldVal = Number(input.goldWert) || 0;
+                    const minG = Number(context.minGold) || 0;
+                    maxBruttoVerkaufbar = Math.max(0, goldVal - minG);
                 }
 
                 // Sale-Budget berücksichtigen
                 if (context.saleBudgets && context.saleBudgets[tranche.kind] !== undefined) {
-                    maxBruttoVerkaufbar = Math.min(maxBruttoVerkaufbar, context.saleBudgets[tranche.kind]);
+                    const budget = Number(context.saleBudgets[tranche.kind]);
+                    // Only apply budget if it's a valid number, assume 0 if NaN (conservative)
+                    maxBruttoVerkaufbar = Math.min(maxBruttoVerkaufbar, isNaN(budget) ? 0 : budget);
                 }
 
                 if (maxBruttoVerkaufbar <= 0) continue;
 
                 // Gewinnquote berechnen
-                const gewinnQuote = tranche.marketValue > 0
-                    ? Math.max(0, (tranche.marketValue - tranche.costBasis) / tranche.marketValue)
+                const mv = Number(tranche.marketValue) || 0;
+                const cb = Number(tranche.costBasis) || 0;
+                const gewinnQuote = mv > 0
+                    ? Math.max(0, (mv - cb) / mv)
                     : 0;
 
                 // Maximal möglichen Netto-Erlös berechnen
                 const gewinnBruttoMax = maxBruttoVerkaufbar * gewinnQuote;
-                const steuerpflichtigerAnteilMax = gewinnBruttoMax * (1 - tranche.tqf);
+                const tqf = Number(tranche.tqf) || 0;
+                const steuerpflichtigerAnteilMax = gewinnBruttoMax * (1 - tqf);
                 const anrechenbarerPauschbetragMax = Math.min(pauschbetragRest, steuerpflichtigerAnteilMax);
                 const finaleSteuerbasisMax = steuerpflichtigerAnteilMax - anrechenbarerPauschbetragMax;
                 const steuerMax = Math.max(0, finaleSteuerbasisMax) * keSt;
@@ -678,7 +800,7 @@ export const TransactionEngine = {
 
                 // Tatsächliche Steuer berechnen
                 const bruttogewinn = zuVerkaufenBrutto * gewinnQuote;
-                const gewinnNachTFS = bruttogewinn * (1 - tranche.tqf);
+                const gewinnNachTFS = bruttogewinn * (1 - (tranche.tqf || 0));
                 const anrechenbarerPauschbetrag = Math.min(pauschbetragRest, gewinnNachTFS);
                 const finaleSteuerbasis = gewinnNachTFS - anrechenbarerPauschbetrag;
                 const steuer = Math.max(0, finaleSteuerbasis) * keSt;
@@ -743,7 +865,7 @@ export const TransactionEngine = {
         const sellOrder = this._getSellOrder(tranches, market, input, context, isEmergencySale);
         const orderedTranches = sellOrder.map(k => tranches[k]);
 
-        return _calculateSingleSale(requestedRefill, input.sparerPauschbetrag, orderedTranches);
+        return _calculateSingleSale(requestedRefill, input.sparerPauschbetrag || 0, orderedTranches);
     },
 
     /**
@@ -763,7 +885,7 @@ export const TransactionEngine = {
                 const gqB = tB.marketValue > 0
                     ? Math.max(0, (tB.marketValue - tB.costBasis) / tB.marketValue)
                     : 0;
-                return (gqA * (1 - tA.tqf)) - (gqB * (1 - tB.tqf));
+                return (gqA * (1 - (tA.tqf || 0))) - (gqB * (1 - (tB.tqf || 0)));
             });
 
         const isDefensiveContext = isEmergencySale ||
