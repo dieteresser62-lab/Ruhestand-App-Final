@@ -209,6 +209,7 @@ export const STRESS_PRESETS = {
     years: 12,
     muShiftEq: -0.06,
     volScaleEq: 0.8,
+    returnMaxAu: 15.0, // Cap Gold bei +15% (verhindert historische Ausreißer wie 1979 mit +117%)
     inflationFloor: 2.0
   },
 

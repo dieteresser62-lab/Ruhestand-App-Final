@@ -440,6 +440,16 @@ export function applyStressOverride(yearData, stressCtx, rand) {
     modifiedData.rendite += (preset.muShiftEq || 0);
     modifiedData.gold_eur_perf = (modifiedData.gold_eur_perf || 0) + ((preset.muShiftAu || 0) * 100);
 
+    // Caps (Obergrenzen für Renditen) - WICHTIG für "Lost Decade" (keine Gold-Raketen)
+    if (preset.returnMaxAu !== undefined) {
+        // Gold-Perf ist in Prozent (z.B. 19.5 für 19.5%)
+        modifiedData.gold_eur_perf = Math.min(modifiedData.gold_eur_perf, preset.returnMaxAu);
+    }
+    if (preset.returnMaxEq !== undefined) {
+        // Aktien-Rendite ist dezimal (z.B. 0.05 für 5%)
+        modifiedData.rendite = Math.min(modifiedData.rendite, preset.returnMaxEq);
+    }
+
     // Floors/Caps
     if (preset.inflationFloor) {
         modifiedData.inflation = Math.max(modifiedData.inflation, preset.inflationFloor);
