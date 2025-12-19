@@ -412,6 +412,10 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const depotwertGesamt = sumDepot(portfolio);
     const totalWealth = depotwertGesamt + liquiditaet;
 
+    // Calculate reduced floor/flex for FAIL-SAFE Guard (NOT for engine input!)
+    // The engine calculates this internally, but we need it for emergency guard logic
+    // (Variables already calculated above: pensionSurplus, inflatedFloor, inflatedFlex)
+
     // ==========================================
     // DIREKTE ENGINE API - SINGLE CALL
     // ==========================================
