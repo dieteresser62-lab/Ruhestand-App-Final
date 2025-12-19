@@ -435,19 +435,25 @@ export const TransactionEngine = {
                 const belowAbsoluteFloor = aktuelleLiquiditaet < (CONFIG.THRESHOLDS.STRATEGY.absoluteMinLiquidity || 10000);
 
                 let goldKaufBedarf = 0;
+                let goldVerkaufBedarf = 0;
 
                 // Gold-Rebalancing prüfen
                 if (input.goldAktiv && input.goldZielProzent > 0) {
                     const goldZielwert = investiertesKapital * (input.goldZielProzent / 100);
                     const bandPct = (input.rebalancingBand ?? input.rebalBand ?? 35) / 100;
                     const goldUntergrenze = goldZielwert * (1 - bandPct);
+                    const goldObergrenze = goldZielwert * (1 + bandPct);
 
                     if (input.goldWert < goldUntergrenze) {
                         goldKaufBedarf = Math.max(0, goldZielwert - input.goldWert);
+                    } else if (input.goldWert > goldObergrenze) {
+                        // FIX: Gold-Überschuss erkennen!
+                        // Wenn Gold stark gestiegen ist (über Band), muss verkauft werden.
+                        goldVerkaufBedarf = Math.max(0, input.goldWert - goldZielwert);
                     }
                 }
 
-                const totalerBedarf = liquiditaetsBedarf + goldKaufBedarf;
+                const totalerBedarf = liquiditaetsBedarf + goldKaufBedarf + goldVerkaufBedarf;
 
                 // Bei kritischer Liquidität: niedrigere Mindestschwelle verwenden
                 // WICHTIG: minTradeResultOverride auf 0 setzen, um RUIN zu verhindern
@@ -557,8 +563,31 @@ export const TransactionEngine = {
 
                     actionDetails.bedarf = totalerBedarf;
                     actionDetails.title = "Opportunistisches Rebalancing & Liquidität auffüllen";
+
+                    // Verwendungen zuweisen
                     verwendungen.gold = Math.min(totalerBedarf, goldKaufBedarf);
-                    verwendungen.liquiditaet = Math.min(totalerBedarf - verwendungen.gold, liquiditaetsBedarf);
+
+                    // Liquiditätsbedarf abdecken
+                    const remainingForLiq = Math.max(0, totalerBedarf - verwendungen.gold);
+                    verwendungen.liquiditaet = Math.min(remainingForLiq, liquiditaetsBedarf);
+
+                    // Falls Gold verkauft wird (Rebalancing), Erlös in Aktien stecken (wenn Platz)
+                    if (goldVerkaufBedarf > 0) {
+                        // Prüfen wie viel Platz im Aktien-Bucket ist (bis Zielwert)
+                        const aktienZielwert = investiertesKapital * (input.targetEq / 100);
+                        const aktienCurrent = input.depotwertAlt + input.depotwertNeu;
+                        const aktienGap = Math.max(0, aktienZielwert - aktienCurrent);
+
+                        // Alles was nicht für Liquidität nötig war, kann in Aktien gehen
+                        const remainingForEq = Math.max(0, remainingForLiq - verwendungen.liquiditaet);
+                        verwendungen.aktien = Math.min(remainingForEq, aktienGap);
+
+                        // Wenn noch was übrig ist (weil Aktien voll), geht der Rest implizit in Liquidität
+                        // indem er nicht ausgegeben wird -> Cash erhöht sich.
+                        // Hier explizit als Liquiditätsverwendung erfassen, damit die Rechnung aufgeht?
+                        // Nein, die Engine bucht (NettoErlös - Reinvest). 
+                        // Wenn wir verwendungen.aktien begrenzen, bleibt der Rest Cash. Korrekt.
+                    }
                 }
             }
         }
