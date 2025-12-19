@@ -47,8 +47,10 @@ function _internal_calculateModel(input, lastState) {
     }
 
 
-    // Aktuelle Liquidität = Tagesgeld + Geldmarkt-ETF
-    const aktuelleLiquiditaet = input.tagesgeld + input.geldmarktEtf;
+    // Aktuelle Liquidität = Tagesgeld + Geldmarkt-ETF (oder direkter Override)
+    const aktuelleLiquiditaet = (input.aktuelleLiquiditaet !== undefined)
+        ? input.aktuelleLiquiditaet
+        : (input.tagesgeld + input.geldmarktEtf);
 
     // Gesamtes Depotvermögen (Aktien alt + neu + optional Gold)
     const depotwertGesamt = input.depotwertAlt + input.depotwertNeu +

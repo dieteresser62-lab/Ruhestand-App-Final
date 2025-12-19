@@ -399,10 +399,10 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const renteSum = rente1 + rente2;
     const pensionAnnual = renteSum;
 
-    // CRITICAL FIX: Add pension income to liquidity!
-    // Without this, the subtraction of 'jahresEntnahme' (Spending) later will drain liquidity 
-    // because spending includes the part covered by pension, but liquidity didn't have the pension added.
-    liquiditaet += pensionAnnual;
+    // FIX: Do NOT add pension to liquidity explicitly!
+    // The Engine nets pension against usage (monatlicheEntnahme = Bedarf - Pension).
+    // Adding it here would count it twice (once as reduced withdrawal, once as cash injection).
+    // liquiditaet += pensionAnnual;  <-- REMOVED
 
     // Use TOTAL pension to calculate household floor/flex coverage
     const pensionSurplus = Math.max(0, pensionAnnual - effectiveBaseFloor);
@@ -417,19 +417,37 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     // ==========================================
 
     // Baue EngineAPI-Input auf - WICHTIG: Verwende buildInputsCtxFromPortfolio() wie der Adapter!
-    // CRITICAL: buildInputsCtxFromPortfolio() expects only Person 1's pension, NOT the sum!
+    // FIX: Pass FULL pension for correct context (though we override specific fields below)
     const inputsCtx = buildInputsCtxFromPortfolio(inputs, portfolio, {
-        pensionAnnual: rente1,  // Only Person 1's pension! Person 2 is handled separately
+        pensionAnnual: pensionAnnual,  // FIX: Total Hosehold Pension
         marketData: marketDataCurrentYear
     });
 
     const engineInput = {
         ...inputsCtx,
+        aktuelleLiquiditaet: liquiditaet, // FIX: Override with tracked local liquidity (inputsCtx has stale portfolio cash)
         aktuellesAlter: inputs.startAlter + yearIndex,
         inflation: yearData.inflation,
-        floorBedarf: inflatedFloor,  // Floor NACH Rentendeckung
-        flexBedarf: inflatedFlex,     // Flex NACH Rentendeckung
+
+        // FIX: Engine expects GROSS Floor/Flex and TOTAL Pension to do its own netting calculation.
+        // If we pass Net Floor (inflatedFloor), Engine subtracts pension AGAIN, leading to zero demand.
+        floorBedarf: effectiveBaseFloor,
+        flexBedarf: baseFlex * temporaryFlexFactor,
+
+        // FIX: Ensure Engine knows about the Total Pension used for netting
+        renteAktiv: pensionAnnual > 0,
+        renteMonatlich: pensionAnnual / 12,
+
         marketCapeRatio: resolvedCapeRatio,
+
+        // DEFAULT VALUES TO PREVENT NaN (Fix for Bug 4: Liquidity Evaporation)
+        rebalancingBand: inputs.rebalancingBand ?? 35,
+        targetEq: inputs.targetEq ?? 60,
+        goldZielProzent: inputs.goldAktiv ? (inputs.goldZielProzent ?? 10) : 0,
+        maxSkimPctOfEq: inputs.maxSkimPctOfEq ?? 5,
+        maxBearRefillPctOfEq: inputs.maxBearRefillPctOfEq ?? 5,
+        runwayTargetMonths: inputs.runwayTargetMonths ?? 36,
+        runwayMinMonths: inputs.runwayMinMonths ?? 12,
 
         // WICHTIG: Historische Marktdaten für Regime-Erkennung (ATH, Drawdown)
         endeVJ: marketDataHist?.endeVJ || 0,
@@ -470,8 +488,6 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     }
 
     // Aktualisiere Liquidität nach Transaktionen
-    // FIX: Wir müssen den gesamten Nettoerlös gutschreiben (inkl. Entnahme-Teil!),
-    // abzüglich direkter Wiederanlagen. Sonst fehlt das Geld für die Entnahme.
     if (actionResult.nettoErlös > 0) {
         const reinvested = (actionResult.verwendungen?.gold || 0) + (actionResult.verwendungen?.aktien || 0);
         liquiditaet += (actionResult.nettoErlös - reinvested);
@@ -487,26 +503,30 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
     const jahresEntnahme = spendingResult.monatlicheEntnahme * 12;
 
-    // RUIN-Check: Können wir die Entnahme leisten?
+    // RUIN-Check: Können wir zumindest den Floor decken?
+    // Berechnung des Netto-Floors (Floor - Rente)
+    const netFloorYear = Math.max(0, engineInput.floorBedarf - pensionAnnual);
+
+    // Warnung, wenn wir nicht alles zahlen können
     if (liquiditaet < jahresEntnahme) {
-        return { isRuin: true };
+        // Kritisch: Können wir wenigstens den Floor zahlen?
+        if (liquiditaet < netFloorYear) {
+            return { isRuin: true, reason: `Liquidität (${liquiditaet.toFixed(0)}) < Floor (${netFloorYear.toFixed(0)})` };
+        }
+        // Wir können Floor zahlen, aber nicht volle Entnahme -> Flex-Cut durchführen (Payout = was da ist)
+        // Das verhindert "Technischen Ruin" wenn Spending (Flex) > Refill (Puffer)
     }
 
-    liquiditaet -= jahresEntnahme;
+    // Auszahlung (begrenzt auf verfügbare Liquidität)
+    const payout = Math.min(liquiditaet, jahresEntnahme);
+    liquiditaet -= payout;
 
     // Rebalancing bei Überschuss
+    // HINWEIS: Die Logik wurde in die TransactionEngine (determineAction) verschoben,
+    // um Simulator und Balance App zu harmonisieren (Surplus Rebalancing nur in guten Märkten).
+    // simulator-engine-direct.js verlässt sich nun rein auf die Engine-Ergebnisse.
     let kaufAkt = 0, kaufGld = 0;
-    const ueberschuss = liquiditaet - zielLiquiditaet;
-    if (ueberschuss > 500) {
-        liquiditaet -= ueberschuss;
-        const aktienAnteilQuote = inputs.targetEq / (100 - (inputs.goldAktiv ? inputs.goldZielProzent : 0));
-        const goldTeil = inputs.goldAktiv ? ueberschuss * (1 - aktienAnteilQuote) : 0;
-        const aktienTeil = ueberschuss - goldTeil;
-        kaufGld = goldTeil;
-        kaufAkt = aktienTeil;
-        buyGold(portfolio, goldTeil);
-        buyStocksNeu(portfolio, aktienTeil);
-    }
+    // (Legacy Block entfernt)
 
     // Cash-Verzinsung
     // Cash-Verzinsung
