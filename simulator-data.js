@@ -176,6 +176,14 @@ export const STRESS_PRESETS = {
     filter: { equityRealMax: -8.0, minCluster: 2 }
   },
 
+  STAGFLATION_SUPER: {
+    label: "Stagflation (Extrem: 70er -3% Rendite)",
+    type: "conditional_bootstrap",
+    years: 8,
+    filter: { inflationMin: 7.0, equityRealMax: -2.0 },
+    muShiftEq: -0.03 // Hybrid-Modus: Echte 70er Jahre, aber künstlich noch schlechter gemacht
+  },
+
   INFLATION_SPIKE_3Y: {
     label: "Inflationsschock (3 Jahre)",
     type: "parametric",
@@ -193,6 +201,24 @@ export const STRESS_PRESETS = {
     seqReturnsEq: [-0.25, -0.20, -0.15],
     noiseVol: 0.04,
     reboundClamp: { years: 2, cap: 0.05 }
+  },
+
+  LOST_DECADE_12Y: {
+    label: "Verlorenes Jahrzehnt (12J Stagnation)",
+    type: "parametric",
+    years: 12,
+    muShiftEq: -0.06,
+    volScaleEq: 0.8,
+    inflationFloor: 2.0
+  },
+
+  CORRELATION_CRASH_4Y: {
+    label: "System-Krise (Korrelations-Kollaps)",
+    type: "parametric",
+    years: 4,
+    muShiftEq: -0.15,
+    muShiftAu: -0.05,
+    inflationFloor: 5.0
   }
 };
 

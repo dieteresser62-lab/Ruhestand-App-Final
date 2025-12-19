@@ -99,7 +99,7 @@ Historische Backtests inkl. UI-Integration und Log-Export.
 
 **Einbindung:** Wird in `initializeUI()` importiert und an die Backtest-Controls gekoppelt. Nutzt `simulator-main-helpers.js` für Formatierung/Export.
 
-**Dependencies:** `simulator-engine.js`, `simulator-portfolio.js`, `simulator-main-helpers.js`, `simulator-utils.js`, `simulator-data.js`.
+**Dependencies:** `simulator-engine-wrapper.js`, `simulator-portfolio.js`, `simulator-main-helpers.js`, `simulator-utils.js`, `simulator-data.js`.
 
 ---
 
@@ -256,7 +256,7 @@ Historische Daten, Mortalitätstafeln, Stress-Presets.
 - `HISTORICAL_DATA` – historische Marktdaten (MSCI, Gold, Inflation)
 - `MORTALITY_TABLE` – Sterbetafeln nach Geschlecht und Alter
 - `CARE_ENTRY_PROB` – Pflegeeintrittswahrscheinlichkeiten (BARMER)
-- `STRESS_PRESETS` – Stresstest-Szenarien (GFC, Stagflation, etc.)
+- `STRESS_PRESETS` – Stresstest-Szenarien (GFC, Stagflation, Lost Decade, System-Krise etc.)
 
 **Dependencies:** keine
 
@@ -291,7 +291,7 @@ simulator-main.js
   │    ├─ simulator-sweep-utils.js
   │    └─ simulator-utils.js
   ├─ simulator-backtest.js
-  │    ├─ simulator-engine.js
+  │    ├─ simulator-engine-wrapper.js
   │    ├─ simulator-portfolio.js
   │    └─ simulator-main-helpers.js
   ├─ simulator-ui-pflege.js
@@ -311,7 +311,7 @@ simulator-main.js
 ### Monte-Carlo-Simulation
 1. `simulator-main.js`: UI-Bootstrap ruft `runMonteCarlo` aus `simulator-monte-carlo.js` auf.
 2. `simulator-monte-carlo.js`: Erstellt die UI-Fassade, normalisiert Eingaben/Witwen-Optionen und delegiert an den Runner.
-3. `monte-carlo-runner.js`: Führt die reinen Simulationen durch (inkl. Pflege-KPIs) und nutzt `simulator-engine.js` für die Jahresschleifen.
+3. `monte-carlo-runner.js`: Führt die reinen Simulationen durch (inkl. Pflege-KPIs) und nutzt `simulator-engine-wrapper.js` für die Jahresschleifen.
 4. `scenario-analyzer.js`: Zeichnet Worst/Perzentil-/Pflege-/Zufalls-Szenarien während der Runs auf.
 5. `simulator-results.js`: `displayMonteCarloResults()` zeigt Aggregationen und Szenario-Logs an.
 
@@ -361,7 +361,7 @@ Nach jeder Monte-Carlo-Simulation werden 30 Szenarien gespeichert:
 ## Platzierung neuer Features & Helfer
 
 - **UI-spezifische Logik (Formular, Presets, Tooltips):** In thematischen UI-Modulen (`simulator-ui-pflege.js`, `simulator-ui-rente.js`) oder generisch in `simulator-main-helpers.js`. `simulator-main.js` sollte nur die Verkabelung übernehmen.
-- **Simulation / Domain-Logik:** Pflege-/Renten-/Stressberechnungen gehören in `simulator-engine.js` oder `simulator-portfolio.js`. Monte-Carlo-spezifische Steuerparameter in `simulator-monte-carlo.js`. Sweep-spezifische Regeln in `simulator-sweep.js` bzw. `simulator-sweep-utils.js`.
+- **Simulation / Domain-Logik:** Pflege-/Renten-/Stressberechnungen gehören in `simulator-engine-helpers.js`, `simulator-engine-direct.js` oder `simulator-portfolio.js`. Monte-Carlo-spezifische Steuerparameter in `simulator-monte-carlo.js`. Sweep-spezifische Regeln in `simulator-sweep.js` bzw. `simulator-sweep-utils.js`.
 - **Rendering & Exporte:** Tabellen-/CSV-/Heatmap-Aufbereitung in `simulator-results.js`, `simulator-heatmap.js` oder `simulator-main-helpers.js` (falls UI-nah). Backtest-Ausgaben in `simulator-backtest.js`.
 - **Gemeinsame Utilitys:** Statistik/Formatierung bleiben in `simulator-utils.js`. Objekt-Transforms/Clones mit Bezug zu Sweeps oder Renten-Invarianz in `simulator-sweep-utils.js`.
 - **Neue Buttons/Flows:** Im UI-Bootstrap (`initializeUI()`) verdrahten und direkt den passenden Modul-Export aufrufen, statt Logik-Blöcke in `simulator-main.js` zu platzieren.
@@ -379,4 +379,4 @@ Nach jeder Monte-Carlo-Simulation werden 30 Szenarien gespeichert:
 
 ---
 
-**Last Updated:** 2025-12-06
+**Last Updated:** 2025-12-19

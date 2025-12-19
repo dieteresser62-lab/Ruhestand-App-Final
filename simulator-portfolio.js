@@ -411,13 +411,8 @@ export function applyStressOverride(yearData, stressCtx, rand) {
     const preset = stressCtx.preset;
     const modifiedData = { ...yearData };
 
+    // 1. Basis-Logik je nach Typ (Filter, Sequenz etc.)
     switch (preset.type) {
-        case 'parametric':
-            modifiedData.rendite += (preset.muShiftEq || 0);
-            modifiedData.gold_eur_perf = (modifiedData.gold_eur_perf || 0) + ((preset.muShiftAu || 0) * 100);
-            modifiedData.inflation = Math.max(modifiedData.inflation, preset.inflationFloor || 0);
-            break;
-
         case 'parametric_sequence':
             const i = preset.years - stressCtx.remainingYears;
             const baseReturn = preset.seqReturnsEq[i] || 0;
@@ -426,7 +421,28 @@ export function applyStressOverride(yearData, stressCtx, rand) {
             if (preset.inflationFixed !== undefined) {
                 modifiedData.inflation = preset.inflationFixed;
             }
-            break;
+            // Sequenz überschreibt alles, daher hier break und return
+            stressCtx.remainingYears--;
+            return modifiedData;
+    }
+
+    // 2. Parametrische Modifikation (Shift/Scale) auf das Jahr anwenden
+    // Funktioniert nun AUCH für 'conditional_bootstrap' oder andere Typen, 
+    // sofern Parameter im Preset definiert sind.
+
+    // Volatilitäts-Skalierung (staucht/streckt Abweichung vom Mittelwert)
+    if (preset.volScaleEq) {
+        const HIST_MEAN_APPROX = 0.08;
+        modifiedData.rendite = HIST_MEAN_APPROX + (modifiedData.rendite - HIST_MEAN_APPROX) * preset.volScaleEq;
+    }
+
+    // Lineare Shifts
+    modifiedData.rendite += (preset.muShiftEq || 0);
+    modifiedData.gold_eur_perf = (modifiedData.gold_eur_perf || 0) + ((preset.muShiftAu || 0) * 100);
+
+    // Floors/Caps
+    if (preset.inflationFloor) {
+        modifiedData.inflation = Math.max(modifiedData.inflation, preset.inflationFloor);
     }
 
     stressCtx.remainingYears--;
