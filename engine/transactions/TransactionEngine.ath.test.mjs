@@ -144,7 +144,9 @@ function runGuardrailCliffTest() {
     assert.ok(action.verwendungen?.liquiditaet > 0, 'Liquidität sollte aufgefüllt werden.');
 }
 
-if (require.main === module) {
+import { fileURLToPath } from 'url';
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
     try {
         runAthRegimeGapTest();
         runGuardrailCliffTest();

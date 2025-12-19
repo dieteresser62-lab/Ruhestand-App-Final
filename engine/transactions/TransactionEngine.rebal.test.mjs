@@ -100,4 +100,8 @@ function runGoldDriftTest() {
     console.log(`SUCCESS: Gold-Verkauf ausgelöst. Netto: ${goldVerkauf.netto.toLocaleString()} €`);
 }
 
-runGoldDriftTest();
+import { fileURLToPath } from 'url';
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+    runGoldDriftTest();
+}
