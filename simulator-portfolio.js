@@ -484,6 +484,7 @@ export function summarizeSalesByAsset(saleResult) {
     const sums = { vkAkt: 0, vkGld: 0, stAkt: 0, stGld: 0, vkGes: 0, stGes: 0 };
     if (!saleResult || !Array.isArray(saleResult.breakdown)) return sums;
     for (const item of saleResult.breakdown) {
+        if (!item.kind || item.kind === 'liquiditaet') continue;
         const isAktie = String(item.kind || '').startsWith('aktien');
         const brutto = +item.brutto || 0;
         const steuer = (item.steuer != null) ? (+item.steuer) : 0;

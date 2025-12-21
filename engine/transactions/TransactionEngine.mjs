@@ -734,6 +734,7 @@ export const TransactionEngine = {
                             nettoErlös: investAmount, // Zeigt den investierten Betrag an
                             quellen: [{
                                 source: 'Liquidität',
+                                kind: 'liquiditaet',
                                 brutto: investAmount,
                                 netto: investAmount,
                                 steuer: 0
