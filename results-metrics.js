@@ -1,6 +1,6 @@
 "use strict";
 
-import { formatCurrencySafe, formatNumberWithUnit, formatPercentage, sanitizeDescription } from './results-formatting.js';
+import { formatCurrencySafe, formatCurrencyRounded, formatNumberWithUnit, formatPercentage, sanitizeDescription } from './results-formatting.js';
 import { STRESS_PRESETS } from './simulator-data.js';
 
 /**
@@ -43,25 +43,25 @@ export function buildSummaryData({ results, totalRuns, failCount }) {
         },
         {
             title: 'Median (alle)',
-            value: formatCurrencySafe(results?.finalOutcomes?.p50),
+            value: formatCurrencyRounded(results?.finalOutcomes?.p50),
             description: 'Typisches Endvermögen über alle Läufe (Median).',
             tone: 'default'
         },
         {
             title: 'Median (erfolgreiche)',
-            value: formatCurrencySafe(results?.finalOutcomes?.p50_successful),
+            value: formatCurrencyRounded(results?.finalOutcomes?.p50_successful),
             description: 'Median des Endvermögens aller erfolgreichen Läufe.',
             tone: 'default'
         },
         {
             title: '10%/90% Perzentil',
-            value: `${formatCurrencySafe(results?.finalOutcomes?.p10)} / ${formatCurrencySafe(results?.finalOutcomes?.p90)}`,
+            value: `${formatCurrencyRounded(results?.finalOutcomes?.p10)} / ${formatCurrencyRounded(results?.finalOutcomes?.p90)}`,
             description: 'Spannweite der Endvermögen zwischen konservativem (P10) und optimistischem (P90) Szenario.',
             tone: 'default'
         },
         {
             title: 'Median Steuern',
-            value: formatCurrencySafe(results?.taxOutcomes?.p50),
+            value: formatCurrencyRounded(results?.taxOutcomes?.p50),
             description: 'Median der kumulierten Steuerzahlungen.',
             tone: 'default'
         }
@@ -179,7 +179,7 @@ export function buildStressMetrics(stressKPI) {
             },
             {
                 title: 'Consumption-at-Risk P10 (Stress)',
-                value: formatCurrencySafe(stressKPI.consumptionAtRiskP10Real?.p50),
+                value: formatCurrencyRounded(stressKPI.consumptionAtRiskP10Real?.p50),
                 description: 'Inflationsbereinigte Jahresentnahme im P10 über die Stressjahre (Median).',
                 tone: 'danger'
             },
@@ -314,7 +314,7 @@ function buildRiskKpis(results) {
         if (isFinite(results.extraKPI.consumptionAtRiskP10Real)) {
             kpis.push({
                 title: 'Reale Entnahme (P10)',
-                value: formatCurrencySafe(results.extraKPI.consumptionAtRiskP10Real),
+                value: formatCurrencyRounded(results.extraKPI.consumptionAtRiskP10Real),
                 description: 'Worst-Case (10%-Quantil) der inflationsbereinigten Jahresentnahmen.',
                 tone: 'danger'
             });
@@ -348,7 +348,8 @@ function safeAge(value) {
 function buildCareEntryCard(title, value, description, unit = null, isCurrency = false) {
     let formattedValue = '—';
     if (isCurrency) {
-        formattedValue = formatCurrencySafe(value);
+        // Anti-Pseudo-Accuracy: Währungswerte runden für konsistente Darstellung
+        formattedValue = formatCurrencyRounded(value);
     } else if (unit) {
         formattedValue = unit === '%'
             ? formatPercentage(value)

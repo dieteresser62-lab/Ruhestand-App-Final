@@ -1,6 +1,6 @@
 "use strict";
 
-import { formatCurrency, formatCurrencyShortLog, shortenText } from './simulator-utils.js';
+import { formatCurrency, formatCurrencyShortLog, shortenText, roundForHuman } from './simulator-utils.js';
 import { prepareMonteCarloViewModel } from './results-metrics.js';
 import { renderSummary, renderKpiDashboard, renderStressSection, renderHeatmap, renderCareSection } from './results-renderers.js';
 import { EngineAPI } from './engine/index.mjs';
@@ -91,9 +91,9 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
                     <option value="">— Szenario auswählen —</option>
                     <optgroup label="📊 Charakteristische Szenarien">`;
 
-        // Charakteristische Szenarien mit Endvermögen
+        // Charakteristische Szenarien mit Endvermögen (Anti-Pseudo-Accuracy: gerundet)
         for (const s of scenarioLogs.characteristic) {
-            const vermLabel = s.failed ? '⚠️ FAILED' : formatCurrency(s.endVermoegen);
+            const vermLabel = s.failed ? '⚠️ FAILED' : formatCurrency(roundForHuman(s.endVermoegen, 'sell'));
             const careLabel = s.careEverActive ? ' 🏥' : '';
             dropdownHtml += `<option value="char_${s.key}">${s.label} (${vermLabel})${careLabel}</option>`;
         }
@@ -101,9 +101,9 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
         dropdownHtml += `</optgroup>
                     <optgroup label="🎲 Zufällige Szenarien">`;
 
-        // Zufällige Szenarien
+        // Zufällige Szenarien (Anti-Pseudo-Accuracy: gerundet)
         for (const s of scenarioLogs.random) {
-            const vermLabel = s.failed ? '⚠️ FAILED' : formatCurrency(s.endVermoegen);
+            const vermLabel = s.failed ? '⚠️ FAILED' : formatCurrency(roundForHuman(s.endVermoegen, 'sell'));
             const careLabel = s.careEverActive ? ' 🏥' : '';
             dropdownHtml += `<option value="rand_${s.key}">${s.label} (${vermLabel})${careLabel}</option>`;
         }

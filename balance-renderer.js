@@ -202,7 +202,9 @@ class SummaryRenderer {
 
         const monatlicheEntnahme = spending.monatlicheEntnahme;
         if (typeof monatlicheEntnahme === 'number' && isFinite(monatlicheEntnahme)) {
-            this.dom.outputs.monatlicheEntnahme.replaceChildren(document.createTextNode(UIUtils.formatCurrency(monatlicheEntnahme)));
+            // Anti-Pseudo-Accuracy: Entnahme abrunden (konservativ - weniger entnehmen)
+            const roundedMonatlich = UIUtils.roundForHuman(monatlicheEntnahme, 'buy');
+            this.dom.outputs.monatlicheEntnahme.replaceChildren(document.createTextNode(UIUtils.formatCurrency(roundedMonatlich)));
         }
 
         // Ergänzende Erläuterungen werden als Subtext markiert, damit der Einfach-Modus sie ausblenden kann
@@ -211,7 +213,9 @@ class SummaryRenderer {
         small1.className = 'entnahme-subtext';
         small1.style.cssText = 'display:block; font-size:0.85em; opacity:0.8; margin-top: 4px;';
         if (typeof monatlicheEntnahme === 'number' && isFinite(monatlicheEntnahme)) {
-            small1.textContent = `(${UIUtils.formatCurrency(monatlicheEntnahme * 12)} / Jahr)`;
+            // Anti-Pseudo-Accuracy: Jahresentnahme abrunden (konservativ)
+            const roundedJaehrlich = UIUtils.roundForHuman(monatlicheEntnahme * 12, 'buy');
+            small1.textContent = `(${UIUtils.formatCurrency(roundedJaehrlich)} / Jahr)`;
         }
         const small2 = document.createElement('small');
         small2.className = 'entnahme-subtext';

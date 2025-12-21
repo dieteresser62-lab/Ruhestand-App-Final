@@ -8,6 +8,28 @@
 export const formatCurrency = (value) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value);
 
 /**
+ * Rundet einen Betrag auf menschenfreundliche Stufen (Anti-Pseudo-Accuracy).
+ * Verhindert falsche Präzision bei Handlungsempfehlungen.
+ *
+ * @param {number} amount - Zu rundender Betrag
+ * @param {'sell'|'buy'} direction - 'sell' = aufrunden (konservativ), 'buy' = abrunden
+ * @returns {number} Gerundeter Betrag oder 0 bei kleinen Beträgen
+ */
+export const roundForHuman = (amount, direction = 'sell') => {
+    if (!amount || Math.abs(amount) < 500) return 0;
+    const absAmount = Math.abs(amount);
+    const step = absAmount <= 2000 ? 100 :
+                 absAmount <= 10000 ? 500 :
+                 absAmount <= 50000 ? 1000 :
+                 absAmount <= 100000 ? 5000 :
+                 absAmount <= 500000 ? 10000 : 25000;
+
+    return direction === 'sell'
+        ? Math.ceil(absAmount / step) * step
+        : Math.floor(absAmount / step) * step;
+};
+
+/**
  * Formatiert einen Wert als verkürzte Währung (z.B. 5000 € -> 5k €)
  */
 export const formatCurrencyShortLog = (value) => {

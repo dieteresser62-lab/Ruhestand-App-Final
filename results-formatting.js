@@ -1,6 +1,6 @@
 "use strict";
 
-import { formatCurrency } from './simulator-utils.js';
+import { formatCurrency, roundForHuman } from './simulator-utils.js';
 
 /**
  * Wandelt einen numerischen Wert defensiv in einen Währungs-String um.
@@ -14,6 +14,21 @@ export function formatCurrencySafe(value) {
         return '—';
     }
     return formatCurrency(value);
+}
+
+/**
+ * Wandelt einen numerischen Wert defensiv in einen gerundeten Währungs-String um.
+ * Anti-Pseudo-Accuracy: Verhindert falsche Präzision bei Zusammenfassungen.
+ *
+ * @param {number|null|undefined} value - Zahl, die als Währung formatiert werden soll.
+ * @param {'sell'|'buy'} direction - 'sell' = aufrunden, 'buy' = abrunden
+ * @returns {string} Gerundeter Währungswert oder '—' als Fallback.
+ */
+export function formatCurrencyRounded(value, direction = 'sell') {
+    if (value == null || !isFinite(value)) {
+        return '—';
+    }
+    return formatCurrency(roundForHuman(value, direction));
 }
 
 /**
