@@ -154,6 +154,53 @@ export const CONFIG = {
     },
 
     /**
+     * Anti-Pseudo-Accuracy: Größenordnungsabhängige Rundung
+     *
+     * Verhindert falsche Präzision bei Handlungsempfehlungen.
+     * Beträge werden auf "menschenfreundliche" Stufen gerundet:
+     * - Verkäufe: immer aufrunden (konservativ, mehr Puffer)
+     * - Käufe: immer abrunden (konservativ, mehr Liquidität behalten)
+     */
+    ANTI_PSEUDO_ACCURACY: {
+        description: "Größenordnungsabhängige Rundung für actionable Beträge",
+
+        // Staffelung: [bis Betrag, Rundungsschritt]
+        ROUNDING_TIERS: [
+            { upTo: 2000,     step: 100 },      // 1.850€ → 1.900€ (Verkauf) / 1.800€ (Kauf)
+            { upTo: 10000,    step: 500 },      // 7.340€ → 7.500€ / 7.000€
+            { upTo: 50000,    step: 1000 },     // 23.400€ → 24.000€ / 23.000€
+            { upTo: 100000,   step: 5000 },     // 73.200€ → 75.000€ / 70.000€
+            { upTo: 500000,   step: 10000 },    // 238.234€ → 240.000€ / 230.000€
+            { upTo: Infinity, step: 25000 }     // 738.234€ → 750.000€ / 725.000€
+        ],
+
+        // Minimale Schwelle, unter der keine Aktion empfohlen wird
+        ACTION_THRESHOLD: 500,
+
+        /**
+         * Rundet einen Betrag auf menschenfreundliche Stufen
+         * @param {number} amount - Zu rundender Betrag
+         * @param {'sell'|'buy'} direction - 'sell' = aufrunden, 'buy' = abrunden
+         * @returns {number} Gerundeter Betrag
+         */
+        round(amount, direction = 'sell') {
+            if (!amount || amount < this.ACTION_THRESHOLD) return 0;
+
+            const absAmount = Math.abs(amount);
+            const tier = this.ROUNDING_TIERS.find(t => absAmount <= t.upTo);
+            const step = tier ? tier.step : 25000;
+
+            if (direction === 'sell') {
+                // Verkauf: aufrunden (konservativ, mehr Puffer sichern)
+                return Math.ceil(absAmount / step) * step;
+            } else {
+                // Kauf: abrunden (konservativ, mehr Liquidität behalten)
+                return Math.floor(absAmount / step) * step;
+            }
+        }
+    },
+
+    /**
      * Texte und Mappings für UI-Darstellung
      */
     TEXTS: {

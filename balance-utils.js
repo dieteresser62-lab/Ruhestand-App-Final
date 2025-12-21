@@ -99,5 +99,39 @@ export const UIUtils = {
         }
 
         return staticMap[normalized] || fallback;
+    },
+
+    /**
+     * Rundet einen Betrag auf menschenfreundliche Stufen (Anti-Pseudo-Accuracy).
+     * Verhindert falsche Präzision bei Handlungsempfehlungen.
+     *
+     * @param {number} amount - Zu rundender Betrag
+     * @param {'sell'|'buy'} direction - 'sell' = aufrunden (konservativ), 'buy' = abrunden
+     * @returns {number} Gerundeter Betrag oder 0 bei kleinen Beträgen
+     *
+     * @example
+     * roundForHuman(1850, 'sell')   // => 1.900€ (aufgerundet)
+     * roundForHuman(1850, 'buy')    // => 1.800€ (abgerundet)
+     * roundForHuman(238234, 'sell') // => 240.000€ (aufgerundet auf 10k-Stufe)
+     */
+    roundForHuman(amount, direction = 'sell') {
+        // Zugriff auf die zentrale Engine-Konfiguration
+        const config = window.EngineAPI?.getConfig();
+        if (config?.ANTI_PSEUDO_ACCURACY?.round) {
+            return config.ANTI_PSEUDO_ACCURACY.round(amount, direction);
+        }
+
+        // Fallback falls Engine nicht verfügbar (sollte nicht vorkommen)
+        if (!amount || Math.abs(amount) < 500) return 0;
+        const absAmount = Math.abs(amount);
+        const step = absAmount <= 2000 ? 100 :
+                     absAmount <= 10000 ? 500 :
+                     absAmount <= 50000 ? 1000 :
+                     absAmount <= 100000 ? 5000 :
+                     absAmount <= 500000 ? 10000 : 25000;
+
+        return direction === 'sell'
+            ? Math.ceil(absAmount / step) * step
+            : Math.floor(absAmount / step) * step;
     }
 };

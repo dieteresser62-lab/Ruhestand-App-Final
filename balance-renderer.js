@@ -429,7 +429,9 @@ class ActionRenderer {
         div.className = 'internal-rebalance';
         div.style.cssText = 'font-size: 1rem; text-align: center; line-height: 1.5; font-weight: 500;';
         const strong = document.createElement('strong');
-        strong.textContent = UIUtils.formatCurrency(data.amount);
+        // Anti-Pseudo-Accuracy: Interne Umschichtungen aufrunden (konservativ)
+        const roundedAmount = UIUtils.roundForHuman(data.amount, 'sell');
+        strong.textContent = UIUtils.formatCurrency(roundedAmount);
         div.append(document.createTextNode(`${data.from} → ${data.to}: `), strong);
         return div;
     }
@@ -477,22 +479,28 @@ class ActionRenderer {
 
         const quellenMap = { 'gold': 'Gold', 'aktien_neu': 'Aktien (neu)', 'aktien_alt': 'Aktien (alt)' };
         const quellenList = Array.isArray(action.quellen) ? action.quellen : [];
-        const quellenItems = quellenList.map(q => createRow(`- ${quellenMap[q.kind] || q.kind || 'Quelle'}`, UIUtils.formatCurrency(q.brutto || 0)));
+        // Anti-Pseudo-Accuracy: Verkaufsbeträge aufrunden (konservativ, mehr Puffer sichern)
+        const quellenItems = quellenList.map(q => createRow(
+            `- ${quellenMap[q.kind] || q.kind || 'Quelle'}`,
+            UIUtils.formatCurrency(UIUtils.roundForHuman(q.brutto || 0, 'sell'))
+        ));
         const steuerRow = createRow('- Steuern (geschätzt)', UIUtils.formatCurrency(action.steuer || 0));
         steuerRow.style.cssText += 'border-top: 1px solid var(--border-color); margin-top: 5px; padding-top: 5px;';
         quellenItems.push(steuerRow);
 
+        // Anti-Pseudo-Accuracy: Liquiditäts-Auffüllung aufrunden (mehr Puffer), Käufe abrunden (weniger kaufen)
         const verwendungenItems = [];
-        if (action.verwendungen?.liquiditaet > 0) verwendungenItems.push(createRow('Liquidität auffüllen:', UIUtils.formatCurrency(action.verwendungen.liquiditaet)));
-        if (action.verwendungen?.gold > 0) verwendungenItems.push(createRow('Kauf von Gold:', UIUtils.formatCurrency(action.verwendungen.gold)));
-        if (action.verwendungen?.aktien > 0) verwendungenItems.push(createRow('Kauf von Aktien:', UIUtils.formatCurrency(action.verwendungen.aktien)));
+        if (action.verwendungen?.liquiditaet > 0) verwendungenItems.push(createRow('Liquidität auffüllen:', UIUtils.formatCurrency(UIUtils.roundForHuman(action.verwendungen.liquiditaet, 'sell'))));
+        if (action.verwendungen?.gold > 0) verwendungenItems.push(createRow('Kauf von Gold:', UIUtils.formatCurrency(UIUtils.roundForHuman(action.verwendungen.gold, 'buy'))));
+        if (action.verwendungen?.aktien > 0) verwendungenItems.push(createRow('Kauf von Aktien:', UIUtils.formatCurrency(UIUtils.roundForHuman(action.verwendungen.aktien, 'buy'))));
 
         const wrapper = document.createElement('div');
         wrapper.style.cssText = 'text-align: left; font-size: 1rem; line-height: 1.6;';
         // Titel + strukturierte Blöcke reichen aus; eine zusätzliche Kurz-Zusammenfassung würde die Angaben nur duplizieren.
+        // Anti-Pseudo-Accuracy: Netto-Erlös (Verkaufssumme) aufrunden
         wrapper.append(
             title,
-            createSection(`A. Quellen (Netto: ${UIUtils.formatCurrency(action.nettoErlös || 0)})`, quellenItems),
+            createSection(`A. Quellen (Netto: ${UIUtils.formatCurrency(UIUtils.roundForHuman(action.nettoErlös || 0, 'sell'))})`, quellenItems),
             createSection('B. Verwendungen', verwendungenItems)
         );
         content.appendChild(wrapper);
