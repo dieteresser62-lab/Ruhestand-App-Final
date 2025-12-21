@@ -2,6 +2,20 @@
 import { SpendingPlanner } from '../engine/planners/SpendingPlanner.mjs';
 import { CONFIG } from '../engine/config.mjs';
 
+function assert(condition, message) {
+    if (!condition) {
+        console.error('❌ Assertion failed: ' + message);
+        process.exit(1);
+    }
+}
+
+function assertClose(actual, expected, tolerance = 0.001, message) {
+    if (Math.abs(actual - expected) > tolerance) {
+        console.error(`❌ Assertion failed: ${message} (Expected ${expected}, got ${actual})`);
+        process.exit(1);
+    }
+}
+
 console.log('--- SpendingPlanner Logic Tests ---');
 
 // --- Helpers to mock params ---

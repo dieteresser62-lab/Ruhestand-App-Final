@@ -453,7 +453,7 @@ export const TransactionEngine = {
                     }
                 }
 
-                const totalerBedarf = liquiditaetsBedarf + goldKaufBedarf + goldVerkaufBedarf;
+                const totalerBedarf = Math.max(liquiditaetsBedarf + goldKaufBedarf, goldVerkaufBedarf);
 
                 // Bei kritischer Liquidität: niedrigere Mindestschwelle verwenden
                 // WICHTIG: minTradeResultOverride auf 0 setzen, um RUIN zu verhindern
@@ -526,16 +526,29 @@ export const TransactionEngine = {
                         ? (aktienwert - aktienZielwert)
                         : 0;
 
+                    // FIX: Priorisierung von Gold-Verkäufen.
+                    // Wenn Gold massiv verkauft wird (> 150% des Bedarfs), deckt dies die Liquidität sicher ab.
+                    // Wir verzichten dann auf Aktien-Verkauf (Skimming), auch im Notfall (belowAbsoluteFloor),
+                    // da der Gold-Erlös ausreicht.
+                    if (goldVerkaufBedarf > 1.5 * liquiditaetsBedarf) {
+                        aktienUeberschuss = 0;
+                    } else if (goldVerkaufBedarf >= liquiditaetsBedarf && !isCriticalLiquidity && !belowAbsoluteFloor) {
+                        // Fallback für normale Fälle: Wenn Gold reicht und keine Not ist -> Aktien sparen.
+                        aktienUeberschuss = 0;
+                    }
+
                     // Fix: Bei Unterschreitung des absoluten Limits (10k) müssen wir Verkauf erlauben,
-                    // auch wenn keine Aktien-Übergewichtung vorliegt (Surplus = 0).
-                    // Sonst "verhungert" das Cash-Konto.
-                    if (belowAbsoluteFloor && aktienUeberschuss < liquiditaetsBedarf) {
+                    // aber NUR wenn der Gold-Verkauf nicht bereits ausreicht (Check gegen konservativen Netto-Erlös).
+                    const estimatedNetGold = goldVerkaufBedarf * 0.8;
+                    const isGoldInsufficient = estimatedNetGold < liquiditaetsBedarf;
+
+                    if (belowAbsoluteFloor && aktienUeberschuss < liquiditaetsBedarf && isGoldInsufficient) {
                         aktienUeberschuss = Math.min(liquiditaetsBedarf, aktienwert);
                     }
 
                     // Bei kritischer Liquidität: Verkauf auch unter Obergrenze/Zielwert erlauben
-                    // um RUIN durch Liquiditätsmangel zu verhindern
-                    if (isCriticalLiquidity && aktienUeberschuss < liquiditaetsBedarf) {
+                    // um RUIN durch Liquiditätsmangel zu verhindern. Auch hier: Prüfe ob Gold reicht.
+                    if (isCriticalLiquidity && aktienUeberschuss < liquiditaetsBedarf && isGoldInsufficient) {
                         // Erlaube Verkauf bis zum Liquiditätsbedarf, begrenzt durch verfügbare Aktien
                         aktienUeberschuss = Math.min(liquiditaetsBedarf, aktienwert);
                     }
@@ -694,13 +707,30 @@ export const TransactionEngine = {
         // Erlös verteilen: Priorität 1: Liquidität, 2: Gold, 3: Aktien
         let erloesUebrig = effektiverNettoerloes;
 
-        const finalLiq = Math.min(erloesUebrig, verwendungen.liquiditaet);
+        let finalLiq = Math.min(erloesUebrig, verwendungen.liquiditaet);
         erloesUebrig -= finalLiq;
 
         const finalGold = Math.min(erloesUebrig, verwendungen.gold);
         erloesUebrig -= finalGold;
 
         const finalAktien = Math.min(erloesUebrig, verwendungen.aktien);
+        erloesUebrig -= finalAktien;
+
+        // Fix: Überschüssigen Erlös (z.B. durch Gold-Rebalancing) der Liquidität zuschlagen
+        // Damit stimmt die Summe der Verwendungen wieder mit dem Netto-Erlös überein.
+        if (erloesUebrig > 0) {
+            // INFO für den User, warum das Geld in Cash fließt
+            if (erloesUebrig > 1000) {
+                actionDetails.diagnosisEntries.push({
+                    step: 'Verwendung (Restbetrag)',
+                    impact: `${erloesUebrig.toFixed(0)}€ zur Liquidität addiert, da Investitionsziele (Aktien/Gold) bereits erreicht sind.`,
+                    status: 'info',
+                    severity: 'info'
+                });
+            }
+            finalLiq += erloesUebrig;
+            erloesUebrig = 0;
+        }
 
         transactionDiagnostics.wasTriggered = true;
         transactionDiagnostics.blockReason = 'none';

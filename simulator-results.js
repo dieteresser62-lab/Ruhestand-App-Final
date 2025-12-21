@@ -359,8 +359,8 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         },
         { key: 'QuoteEndPct', header: 'Quote%', width: 6, fmt: v => `${(v || 0).toFixed(1)}%` },
         { key: 'RunwayCoveragePct', header: 'Runway%', width: 7, fmt: v => `${Math.round(v || 0)}%` },
-        { key: 'RealReturnEquityPct', header: 'R.Aktien', width: 8, fmt: v => `${((v || 0) * 100).toFixed(1)}%` },
-        { key: 'RealReturnGoldPct', header: 'R.Gold', width: 8, fmt: v => `${((v || 0) * 100).toFixed(1)}%` },
+        { key: 'NominalReturnEquityPct', header: 'Pf.Akt%', width: 8, fmt: v => `${((v || 0) * 100).toFixed(1)}%` },
+        { key: 'NominalReturnGoldPct', header: 'Pf.Gld%', width: 8, fmt: v => `${((v || 0) * 100).toFixed(1)}%` },
         { key: 'inflation', header: 'Infl.', width: 5, fmt: v => `${(v || 0).toFixed(1)}%` },
         {
             key: null, header: 'Handl.A', width: 8,

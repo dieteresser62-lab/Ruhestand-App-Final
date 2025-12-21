@@ -353,9 +353,10 @@ export const SpendingPlanner = {
                     'alarm'
                 );
             } else {
+                geglätteteFlexRate = Math.max(35, state.flexRate);
                 addDecision(
                     'Anpassung im Alarm-Modus',
-                    `Alarm-Modus ist weiterhin aktiv, Rate bleibt bei ${geglätteteFlexRate.toFixed(1)}%.`,
+                    `Alarm-Modus ist weiterhin aktiv, Rate auf ${geglätteteFlexRate.toFixed(1)}% (Min. 35%) gehalten.`,
                     'active',
                     'alarm'
                 );

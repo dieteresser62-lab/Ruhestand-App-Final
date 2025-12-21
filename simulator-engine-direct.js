@@ -154,7 +154,28 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     }
 
     const resolvedCapeRatio = resolveCapeRatio(yearData.capeRatio, inputs.marketCapeRatio, marketDataHist.capeRatio);
-    const marketDataCurrentYear = { ...marketDataHist, inflation: yearData.inflation, capeRatio: resolvedCapeRatio };
+
+    // FIX (Redux): Calculate current market end value for Regime Detection
+    // Shift the historical window by 1 year so 'endeVJ' reflects the value AFTER this year's returns.
+    // This allows the Engine to see the crash (e.g. 2008) in the year it happens.
+    // FIX (Redux): Calculate current market end value for Regime Detection
+    // Shift the historical window by 1 year so 'endeVJ' reflects the value AFTER this year's returns.
+    // This allows the Engine to see the crash (e.g. 2008) in the year it happens.
+    //
+    // CRITICAL FIX: Always calculate synthetically!
+    // We cannot use HISTORICAL_DATA[yearData.jahr] because in Monte Carlo, the sampled year 
+    // has an absolute index value unrelated to the current synthetic simulation state.
+    const marketEnd = marketDataHist.endeVJ * (1 + rA);
+
+    const marketDataCurrentYear = {
+        ...marketDataHist,
+        inflation: yearData.inflation,
+        capeRatio: resolvedCapeRatio,
+        endeVJ_3: marketDataHist.endeVJ_2,
+        endeVJ_2: marketDataHist.endeVJ_1,
+        endeVJ_1: marketDataHist.endeVJ,
+        endeVJ: marketEnd
+    };
 
     // ==========================================
     // ANSPARPHASE-LOGIK (unverändert, da keine Engine-Aufrufe)
@@ -232,7 +253,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         const naechsterBaseFloor = euros(baseFloor * (1 + yearData.inflation / 100));
         const naechsterBaseFlex = euros(baseFlex * (1 + yearData.inflation / 100));
 
-        const marketEnd = yearData.jahr ? (HISTORICAL_DATA[yearData.jahr]?.msci_eur || marketDataHist.endeVJ) : marketDataHist.endeVJ;
+        const marketEnd = marketDataHist.endeVJ * (1 + rA);
         const newAth = Math.max(marketDataHist.ath, marketEnd);
         const jahreSeitAth = (marketEnd < newAth) ? marketDataHist.jahreSeitAth + 1 : 0;
 
@@ -454,12 +475,16 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         runwayMinMonths: inputs.runwayMinMonths ?? 12,
 
         // WICHTIG: Historische Marktdaten für Regime-Erkennung (ATH, Drawdown)
-        endeVJ: marketDataHist?.endeVJ || 0,
-        endeVJ_1: marketDataHist?.endeVJ_1 || 0,
-        endeVJ_2: marketDataHist?.endeVJ_2 || 0,
-        endeVJ_3: marketDataHist?.endeVJ_3 || 0,
-        ath: marketDataHist?.ath || 0,
-        jahreSeitAth: marketDataHist?.jahreSeitAth || 0
+        // FIX für 2008-Diskrepanz:
+        // Die Engine entscheidet "am Ende des Jahres" (oder Anfang des nächsten) über Rebalancing.
+        // Daher muss sie den aktuellen Marktstand (nach Crash) kennen.
+        // Wir nutzen 'marketDataCurrentYear', das den aktuellen Kurs als 'endeVJ' enthält.
+        endeVJ: marketDataCurrentYear.endeVJ || 0,
+        endeVJ_1: marketDataCurrentYear.endeVJ_1 || 0,
+        endeVJ_2: marketDataCurrentYear.endeVJ_2 || 0,
+        endeVJ_3: marketDataCurrentYear.endeVJ_3 || 0,
+        ath: marketDataCurrentYear.ath || marketDataHist.ath || 0,
+        jahreSeitAth: marketDataCurrentYear.jahreSeitAth || marketDataHist.jahreSeitAth || 0
     };
 
     // **HAUPTUNTERSCHIED**: Ein einziger Engine-Aufruf statt 3-5 Adapter-Aufrufe
@@ -626,6 +651,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             RunwayCoveragePct: fullResult.ui.liquiditaet?.deckungNachher || 100,
             RealReturnEquityPct: (1 + rA) / (1 + yearData.inflation / 100) - 1,
             RealReturnGoldPct: (1 + rG) / (1 + yearData.inflation / 100) - 1,
+            NominalReturnEquityPct: rA,
+            NominalReturnGoldPct: rG,
             entnahmequote: depotwertGesamt > 0 ? (jahresEntnahme / depotwertGesamt) : 0,
             steuern_gesamt: totalTaxesThisYear,
             vk,

@@ -138,7 +138,7 @@ export function runBacktest() {
         }
         headerCols.push(
             "Status".padEnd(16), "Quote%".padStart(6), "Runway%".padStart(7),
-            "R.Aktien".padStart(8), "R.Gold".padStart(8), "Infl.".padStart(5),
+            "Pf.Akt%".padStart(8), "Pf.Gld%".padStart(8), "Infl.".padStart(5),
             "Handl.A".padStart(8), "Handl.G".padStart(8), "St.".padStart(6),
             "Aktien".padStart(8), "Gold".padStart(7), "Liq.".padStart(7)
         );
@@ -217,8 +217,8 @@ export function runBacktest() {
                 row.aktionUndGrund.substring(0, 15).padEnd(16),
                 formatPercentOneDecimal(row.QuoteEndPct, 6),
                 formatPercentInteger(row.RunwayCoveragePct, 7),
-                formatPercentOneDecimal((row.RealReturnEquityPct || 0) * 100, 8),
-                formatPercentOneDecimal((row.RealReturnGoldPct || 0) * 100, 8),
+                formatPercentOneDecimal((row.NominalReturnEquityPct || 0) * 100, 8),
+                formatPercentOneDecimal((row.NominalReturnGoldPct || 0) * 100, 8),
                 formatPercentOneDecimal(dataVJ.inflation_de, 5),
                 formatCurrencyShortLog(netA).padStart(8),
                 formatCurrencyShortLog(netG).padStart(8),

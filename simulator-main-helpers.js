@@ -1,8 +1,11 @@
 "use strict";
 
+
 import { formatCurrencyShortLog } from './simulator-utils.js';
+import { EngineAPI } from './engine/index.mjs';
 
 const CSV_DELIMITER = ';';
+
 
 /**
  * Computes the pension adjustment percentage for a specific simulation year.
@@ -242,7 +245,9 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal') {
         {
             header: 'Markt', width: 12, key: 'row.Regime',
             valueFormatter: (v, row) => {
-                const regimeText = window.Ruhestandsmodell_v30?.CONFIG?.SCENARIO_TEXT?.[v] || v || '';
+                const config = EngineAPI.getConfig();
+                const map = config.TEXTS ? config.TEXTS.SCENARIO : {};
+                const regimeText = map[v] || v || '';
                 return regimeText.substring(0, 12);
             },
             align: 'left'
@@ -250,21 +255,25 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal') {
         { header: 'Status', width: 16, key: 'row.aktionUndGrund', valueFormatter: v => (v || '').substring(0, 15), align: 'left' },
         { header: 'Quote%', width: 6, key: 'row.QuoteEndPct', valueFormatter: v => formatPercent(v), align: 'right' },
         { header: 'Runway%', width: 7, key: 'row.RunwayCoveragePct', valueFormatter: v => formatPercentInt(v), align: 'right' },
-        { header: 'R.Aktien', width: 8, extractor: row => (row.row?.RealReturnEquityPct || 0) * 100, valueFormatter: v => formatPercent(v), align: 'right' },
-        { header: 'R.Gold', width: 8, extractor: row => (row.row?.RealReturnGoldPct || 0) * 100, valueFormatter: v => formatPercent(v), align: 'right' },
+        { header: 'Pf.Akt%', width: 8, extractor: row => (row.row?.NominalReturnEquityPct || 0) * 100, valueFormatter: v => formatPercent(v), align: 'right' },
+        { header: 'Pf.Gld%', width: 8, extractor: row => (row.row?.NominalReturnGoldPct || 0) * 100, valueFormatter: v => formatPercent(v), align: 'right' },
         { header: 'Infl.', width: 5, key: 'inflationVJ', valueFormatter: v => formatPercent(v), align: 'right' },
-        { header: 'Handl.A', width: 8, key: 'netA', valueFormatter: v => {
-            const formatted = formatCurrencyShortLog(v);
-            if (v > 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
-            if (v < 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
-            return formatted;
-        }, align: 'right' },
-        { header: 'Handl.G', width: 8, key: 'netG', valueFormatter: v => {
-            const formatted = formatCurrencyShortLog(v);
-            if (v > 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
-            if (v < 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
-            return formatted;
-        }, align: 'right' },
+        {
+            header: 'Handl.A', width: 8, key: 'netA', valueFormatter: v => {
+                const formatted = formatCurrencyShortLog(v);
+                if (v > 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
+                if (v < 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
+                return formatted;
+            }, align: 'right'
+        },
+        {
+            header: 'Handl.G', width: 8, key: 'netG', valueFormatter: v => {
+                const formatted = formatCurrencyShortLog(v);
+                if (v > 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
+                if (v < 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
+                return formatted;
+            }, align: 'right'
+        },
         { header: 'St.', width: 6, key: 'row.steuern_gesamt', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
         { header: 'Aktien', width: 8, key: 'wertAktien', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
         { header: 'Gold', width: 7, key: 'wertGold', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
