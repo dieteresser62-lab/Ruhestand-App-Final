@@ -732,9 +732,12 @@ export const TransactionEngine = {
                             anweisungKlasse: 'anweisung-gelb', // Standard yellow for transactions
                             title: 'Surplus Rebalancing (Opportunistisch)',
                             nettoErlös: investAmount, // Zeigt den investierten Betrag an
-                            quellen: {
-                                liquiditaet: investAmount
-                            },
+                            quellen: [{
+                                source: 'Liquidität',
+                                brutto: investAmount,
+                                netto: investAmount,
+                                steuer: 0
+                            }],
                             verwendungen: {
                                 aktien: aktienTeil,
                                 gold: goldTeil,

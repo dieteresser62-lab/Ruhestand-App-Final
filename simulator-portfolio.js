@@ -465,6 +465,7 @@ export function applyStressOverride(yearData, stressCtx, rand) {
 export function applySaleToPortfolio(portfolio, saleResult) {
     if (!saleResult || !saleResult.breakdown) return;
     saleResult.breakdown.forEach(saleItem => {
+        if (!saleItem.kind || saleItem.kind === 'liquiditaet') return; // Skip liquidity or invalid items
         const tranches = saleItem.kind.startsWith('aktien') ? portfolio.depotTranchesAktien : portfolio.depotTranchesGold;
         const tranche = tranches.find(t => t.type === saleItem.kind);
         if (tranche) {
