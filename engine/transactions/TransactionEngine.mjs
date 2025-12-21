@@ -179,6 +179,26 @@ export const TransactionEngine = {
     },
 
     /**
+     * Quantisiert einen Betrag gemäß Anti-Pseudo-Accuracy Regeln
+     * @private
+     * @param {number} amount - Der zu rundende Betrag
+     * @param {string} mode - 'ceil' (Aufrunden) oder 'floor' (Abrunden)
+     * @returns {number} Quantisierter Betrag
+     */
+    _quantizeAmount(amount, mode = 'ceil') {
+        if (!CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED) return amount;
+
+        const tiers = CONFIG.ANTI_PSEUDO_ACCURACY.QUANTIZATION_TIERS;
+        const tier = tiers.find(t => amount < t.limit);
+        const step = tier ? tier.step : 25000;
+
+        if (mode === 'ceil') {
+            return Math.ceil(amount / step) * step;
+        }
+        return Math.floor(amount / step) * step;
+    },
+
+    /**
      * Bestimmt notwendige Transaktionsaktion
      */
     determineAction(p) {
@@ -203,12 +223,12 @@ export const TransactionEngine = {
             equityThresholds: {
                 targetAllocationPct: input.targetEq,
                 rebalancingBandPct: input.rebalancingBand ?? input.rebalBand ?? 35,
-                maxSkimPctOfEq: input.maxSkimPctOfEq
+                maxSkimPctOfEq: input.maxSkimPctOfEq ?? 1.0
             },
             goldThresholds: {
                 minGoldReserve: minGold,
                 targetPct: input.goldZielProzent || 0,
-                maxBearRefillPctOfEq: input.maxBearRefillPctOfEq
+                maxBearRefillPctOfEq: input.maxBearRefillPctOfEq ?? 0.5
             },
             potentialTrade: {}
         };
@@ -314,7 +334,6 @@ export const TransactionEngine = {
                 ? false
                 : ((hasCoverageGap || hasRunwayGap) && guardrailGapEuro > 1);
 
-            // Bärenmarkt: Runway auffüllen, sobald Guardrail unterschritten wird
             if (isBearRegimeProxy && hasGuardrailGap) {
                 const isCriticalLiquidityBear = aktuelleLiquiditaet < (sicherheitsPuffer * 1.5);
 
@@ -337,11 +356,10 @@ export const TransactionEngine = {
                     });
                     verwendungen.liquiditaet = actionDetails.bedarf;
 
-                    // Im Bärenmarkt: Gold-Floor auf 0 setzen, da Gold als Krisenreserve
-                    // vollständig verfügbar sein soll (analog zur ATH-Logik bei -20% Abstand)
+                    // Im Bärenmarkt: Gold-Floor auf 0 setzen
                     saleContext.minGold = 0;
 
-                    // Sale-Budgets setzen um Aktien-Verkauf zu ermöglichen
+                    // Sale-Budgets setzen
                     const totalEquityValue = input.depotwertAlt + input.depotwertNeu;
                     if (totalEquityValue > 0) {
                         const requiredEquitySale = Math.min(actionDetails.bedarf, totalEquityValue);
@@ -350,7 +368,7 @@ export const TransactionEngine = {
                         saleContext.saleBudgets.aktien_neu =
                             requiredEquitySale * (input.depotwertNeu / totalEquityValue);
                     }
-                    // Gold-Budget: Im Bärenmarkt alles verfügbar (minGold = 0)
+
                     if (input.goldAktiv && input.goldWert > 0) {
                         saleContext.saleBudgets.gold = input.goldWert;
                     }
@@ -419,7 +437,9 @@ export const TransactionEngine = {
 
                 // Nicht-Bärenmarkt: Opportunistisches Rebalancing
             } else if (!isBearRegimeProxy) {
-                const liquiditaetsBedarf = Math.max(0, zielLiquiditaet - aktuelleLiquiditaet);
+                const rawLiqGap = zielLiquiditaet - aktuelleLiquiditaet;
+                const liquiditaetsBedarf = Math.max(0, rawLiqGap);
+                const surplusCash = Math.max(0, -rawLiqGap);
 
                 // ATH-basierte Skalierung: Bei -20% ATH-Abstand kein Rebalancing mehr
                 // seiATH = 1.0 (am ATH) → Faktor = 1.0, seiATH = 0.8 (-20%) → Faktor = 0.0
@@ -453,7 +473,49 @@ export const TransactionEngine = {
                     }
                 }
 
-                const totalerBedarf = Math.max(liquiditaetsBedarf + goldKaufBedarf, goldVerkaufBedarf);
+                // FIX: Wenn wir Überschuss-Liquidität haben, können wir den Gold-Kauf daraus finanzieren.
+                // Das reduziert den 'totalerBedarf' (der einen VERKAUF von Assets anfordert).
+                // Wenn alles durch Cash gedeckt ist, ist totalerBedarf = 0, und wir fallen 
+                // in die Surplus-Logik (unten), die dann sauber investiert.
+                let effectiveGoldBuyNeed = goldKaufBedarf;
+                if (surplusCash > 0 && goldKaufBedarf > 0) {
+                    effectiveGoldBuyNeed = Math.max(0, goldKaufBedarf - surplusCash);
+                }
+
+                const totalerBedarf = Math.max(liquiditaetsBedarf + effectiveGoldBuyNeed, goldVerkaufBedarf);
+
+                // ANTI-PSEUDO-ACCURACY: Rebalancing-Bedarf quantisieren
+                // Wir nutzen hier 'ceil', da es sich primär um Auffüllungen (Defizite) handelt.
+                // Wenn es nur Gold-Verkauf ist, ist 'totalerBedarf' der Verkaufsbetrag.
+                let quantisierterBedarf = totalerBedarf;
+
+                // Hysterese-Check vor Quantisierung (außer bei Gefahr)
+                if (!isCriticalLiquidity && !belowAbsoluteFloor) {
+                    if (totalerBedarf < CONFIG.ANTI_PSEUDO_ACCURACY.HYSTERESIS_MIN_REFILL_AMOUNT) {
+                        // Zu kleiner Betrag, ignorieren
+                        quantisierterBedarf = 0;
+                    } else {
+                        quantisierterBedarf = this._quantizeAmount(totalerBedarf, 'ceil');
+                    }
+                } else if (quantisierterBedarf > 0) {
+                    // Bei Gefahr (Critical/Floor) auch runden, aber Hysterese ignorieren
+                    quantisierterBedarf = this._quantizeAmount(quantisierterBedarf, 'ceil');
+                }
+
+                // Bedarf anpassen
+                // Da wir einzelne Komponenten (liq, goldKauf) haben, müssen wir diese proportional anpassen
+                // oder vereinfacht: den Delta auf Liquidität schlagen (einfacher und sicherer)
+                let bedarfsDelta = Math.max(0, quantisierterBedarf - totalerBedarf);
+
+                // Bei signifikantem Delta (durch Rundung), erhöhen wir den Liquiditätsbedarf,
+                // damit am Ende "Eine glatte Summe" verkauft wird. 
+                // Das gilt nur, wenn wir überhaupt handeln (quantisierterBedarf > 0)
+                let effectiveLiquiditätsBedarf = liquiditaetsBedarf;
+                if (quantisierterBedarf > 0) {
+                    effectiveLiquiditätsBedarf += bedarfsDelta;
+                }
+
+                const effectiveTotalerBedarf = quantisierterBedarf;
 
                 // Bei kritischer Liquidität: niedrigere Mindestschwelle verwenden
                 // WICHTIG: minTradeResultOverride auf 0 setzen, um RUIN zu verhindern
@@ -472,8 +534,8 @@ export const TransactionEngine = {
                 } else {
                     const minTradeGateResult = this._computeAppliedMinTradeGate({
                         investiertesKapital,
-                        liquiditaetsBedarf,
-                        totalerBedarf
+                        liquiditaetsBedarf: effectiveLiquiditätsBedarf,
+                        totalerBedarf: effectiveTotalerBedarf
                     });
                     appliedMinTradeGate = minTradeGateResult.appliedMinTradeGate;
                     minTradeResultOverride = minTradeGateResult.minTradeResultOverride;
@@ -485,15 +547,15 @@ export const TransactionEngine = {
 
 
                 // DEBUG PROBE
-                if (liquiditaetsBedarf > 50000 && totalerBedarf < appliedMinTradeGate) {
+                if (effectiveLiquiditätsBedarf > 50000 && effectiveTotalerBedarf < appliedMinTradeGate) {
                     console.warn('DEBUG: Trade Gated!');
-                    console.warn('Total Bedarf:', totalerBedarf);
+                    console.warn('Total Bedarf:', effectiveTotalerBedarf);
                     console.warn('Applied Gate:', appliedMinTradeGate);
                     console.warn('Is Critical:', isCriticalLiquidity);
                     console.warn('Min Trade Override:', minTradeResultOverride);
                 }
 
-                if (totalerBedarf >= appliedMinTradeGate) {
+                if (effectiveTotalerBedarf >= appliedMinTradeGate) {
                     // Gold-Verkaufsbudget berechnen
                     let maxSellableFromGold = 0;
                     if (input.goldAktiv && input.goldZielProzent > 0) {
@@ -521,7 +583,7 @@ export const TransactionEngine = {
 
                     // Aktien-Verkaufsbudget berechnen
                     const aktienZielwert = investiertesKapital * (input.targetEq / 100);
-                    const aktienObergrenze = aktienZielwert * (1 + (input.rebalBand / 100));
+                    const aktienObergrenze = aktienZielwert * (1 + ((input.rebalancingBand ?? input.rebalBand ?? 35) / 100));
                     let aktienUeberschuss = (aktienwert > aktienObergrenze)
                         ? (aktienwert - aktienZielwert)
                         : 0;
@@ -530,9 +592,9 @@ export const TransactionEngine = {
                     // Wenn Gold massiv verkauft wird (> 150% des Bedarfs), deckt dies die Liquidität sicher ab.
                     // Wir verzichten dann auf Aktien-Verkauf (Skimming), auch im Notfall (belowAbsoluteFloor),
                     // da der Gold-Erlös ausreicht.
-                    if (goldVerkaufBedarf > 1.5 * liquiditaetsBedarf) {
+                    if (goldVerkaufBedarf > 1.5 * effectiveLiquiditätsBedarf) {
                         aktienUeberschuss = 0;
-                    } else if (goldVerkaufBedarf >= liquiditaetsBedarf && !isCriticalLiquidity && !belowAbsoluteFloor) {
+                    } else if (goldVerkaufBedarf >= effectiveLiquiditätsBedarf && !isCriticalLiquidity && !belowAbsoluteFloor) {
                         // Fallback für normale Fälle: Wenn Gold reicht und keine Not ist -> Aktien sparen.
                         aktienUeberschuss = 0;
                     }
@@ -540,17 +602,17 @@ export const TransactionEngine = {
                     // Fix: Bei Unterschreitung des absoluten Limits (10k) müssen wir Verkauf erlauben,
                     // aber NUR wenn der Gold-Verkauf nicht bereits ausreicht (Check gegen konservativen Netto-Erlös).
                     const estimatedNetGold = goldVerkaufBedarf * 0.8;
-                    const isGoldInsufficient = estimatedNetGold < liquiditaetsBedarf;
+                    const isGoldInsufficient = estimatedNetGold < effectiveLiquiditätsBedarf;
 
-                    if (belowAbsoluteFloor && aktienUeberschuss < liquiditaetsBedarf && isGoldInsufficient) {
-                        aktienUeberschuss = Math.min(liquiditaetsBedarf, aktienwert);
+                    if (belowAbsoluteFloor && aktienUeberschuss < effectiveLiquiditätsBedarf && isGoldInsufficient) {
+                        aktienUeberschuss = Math.min(effectiveLiquiditätsBedarf, aktienwert);
                     }
 
                     // Bei kritischer Liquidität: Verkauf auch unter Obergrenze/Zielwert erlauben
                     // um RUIN durch Liquiditätsmangel zu verhindern. Auch hier: Prüfe ob Gold reicht.
-                    if (isCriticalLiquidity && aktienUeberschuss < liquiditaetsBedarf && isGoldInsufficient) {
+                    if (isCriticalLiquidity && aktienUeberschuss < effectiveLiquiditätsBedarf && isGoldInsufficient) {
                         // Erlaube Verkauf bis zum Liquiditätsbedarf, begrenzt durch verfügbare Aktien
-                        aktienUeberschuss = Math.min(liquiditaetsBedarf, aktienwert);
+                        aktienUeberschuss = Math.min(effectiveLiquiditätsBedarf, aktienwert);
                     }
 
                     // ATH-skaliertes Cap: Bei -20% ATH-Abstand kein Rebalancing mehr
@@ -559,7 +621,7 @@ export const TransactionEngine = {
                     // Bei kritischer Liquidität ODER absolutem Minimum: Cap auf Liquiditätsbedarf + 20% Puffer begrenzen
                     // Das stellt sicher, dass die Liquidität aufgefüllt wird.
                     const effectiveSkimCap = (isCriticalLiquidity || belowAbsoluteFloor)
-                        ? Math.max(athScaledSkimCap, liquiditaetsBedarf * 1.2)
+                        ? Math.max(athScaledSkimCap, effectiveLiquiditätsBedarf * 1.2)
                         : athScaledSkimCap;
                     const maxSellableFromEquity = Math.min(aktienUeberschuss, effectiveSkimCap);
 
@@ -574,15 +636,18 @@ export const TransactionEngine = {
                         saleBudgetAktienNeu: saleContext.saleBudgets.aktien_neu || 0
                     };
 
-                    actionDetails.bedarf = totalerBedarf;
+                    actionDetails.bedarf = effectiveTotalerBedarf;
                     actionDetails.title = "Opportunistisches Rebalancing & Liquidität auffüllen";
 
                     // Verwendungen zuweisen
-                    verwendungen.gold = Math.min(totalerBedarf, goldKaufBedarf);
+                    // ANTI-PSEUDO-ACCURACY: Auch Käufe runden (Gold), Rest in Liquidität
+                    const goldAllocRaw = Math.min(effectiveTotalerBedarf, goldKaufBedarf);
+                    const goldAllocQuant = this._quantizeAmount(goldAllocRaw, 'floor');
+                    verwendungen.gold = goldAllocQuant;
 
-                    // Liquiditätsbedarf abdecken
-                    const remainingForLiq = Math.max(0, totalerBedarf - verwendungen.gold);
-                    verwendungen.liquiditaet = Math.min(remainingForLiq, liquiditaetsBedarf);
+                    // Liquiditätsbedarf abdecken (nimmt den Rest auf, damit Summe aufgeht)
+                    // Da 'effectiveTotalerBedarf' bereits quantisiert ist, ist der Rest auch glatt.
+                    verwendungen.liquiditaet = Math.max(0, effectiveTotalerBedarf - verwendungen.gold);
 
                     // Falls Gold verkauft wird (Rebalancing), Erlös in Aktien stecken (wenn Platz)
                     if (goldVerkaufBedarf > 0) {
@@ -621,28 +686,77 @@ export const TransactionEngine = {
                 (market.abstandVomAthProzent > 15);
 
             // Mindestens 500€ Überschuss und günstige Marktlage erforderlich
-            if (surplus > 500 && !isRiskyMarket) {
-                const aktienAnteilQuote = input.targetEq / (100 - (input.goldAktiv ? input.goldZielProzent : 0));
-                const goldTeil = input.goldAktiv ? surplus * (1 - aktienAnteilQuote) : 0;
-                const aktienTeil = surplus - goldTeil;
+            // Hysterese für Surplus: etwas höher, damit wir nicht ständig hin und her traden.
+            const surplusHysteresis = CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED ? 2000 : 500;
 
-                return {
-                    type: 'TRANSACTION',
-                    details: {
-                        kaufAkt: aktienTeil,
-                        kaufGld: goldTeil,
-                        verkaufLiquiditaet: surplus,
-                        grund: 'Surplus Rebalancing (Opportunistisch)',
-                        source: 'surplus'
-                    },
-                    diagnosisEntries: [{
-                        step: 'Surplus Rebalancing',
-                        impact: `Überschuss (${surplus.toFixed(0)}€) investiert (Markt: ${market.sKey}).`,
-                        status: 'active',
-                        severity: 'info'
-                    }],
-                    transactionDiagnostics
-                };
+            if (surplus > surplusHysteresis && !isRiskyMarket) {
+                // FIX: Verteilung relativ zu den Investitions-Assets (Aktien vs. Gold) berechnen.
+                // Nicht (100 - Gold), da das sonst Liqui-Puffer mit einschließt.
+                // Bsp: 60% Aktien, 10% Gold -> 60/70 = 85.7% Aktien, 14.3% Gold.
+                const totalInvestTarget = input.targetEq + (input.goldAktiv ? input.goldZielProzent : 0);
+                const aktienAnteilQuote = (totalInvestTarget > 0)
+                    ? input.targetEq / totalInvestTarget
+                    : 1;
+
+                // ANTI-PSEUDO-ACCURACY: Surplus-Investition runden (floor)
+                // Wir wollen nur "sichere" Beträge investieren, also konservativ abrunden.
+                // Zudem runden wir die EINZELKOMPONENTEN, damit die Kaufbeträge glatt sind.
+
+                let investAmountRaw = surplus;
+                if (CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED) {
+                    // Schritt 1: Gesamtbetrag grob runden
+                    investAmountRaw = this._quantizeAmount(surplus, 'floor');
+                }
+
+                if (investAmountRaw > 0) {
+                    // Schritt 2: Aufteilung berechnen
+                    const goldTeilRaw = input.goldAktiv ? investAmountRaw * (1 - aktienAnteilQuote) : 0;
+                    const aktienTeilRaw = investAmountRaw - goldTeilRaw;
+
+                    // Schritt 3: Komponenten einzeln runden (Floor), damit Anzeige sauber ist
+                    const goldTeil = CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED
+                        ? this._quantizeAmount(goldTeilRaw, 'floor')
+                        : goldTeilRaw;
+
+                    const aktienTeil = CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED
+                        ? this._quantizeAmount(aktienTeilRaw, 'floor')
+                        : aktienTeilRaw;
+
+                    // Schritt 4: Gesamt-Invest neu summieren (damit Source == Sum(Uses))
+                    // Der Rest bleibt implizit als Liquidität erhalten.
+                    const investAmount = goldTeil + aktienTeil;
+
+                    if (investAmount > 0) {
+                        return {
+                            type: 'TRANSACTION',
+                            anweisungKlasse: 'anweisung-gelb', // Standard yellow for transactions
+                            title: 'Surplus Rebalancing (Opportunistisch)',
+                            nettoErlös: investAmount, // Zeigt den investierten Betrag an
+                            quellen: {
+                                liquiditaet: investAmount
+                            },
+                            verwendungen: {
+                                aktien: aktienTeil,
+                                gold: goldTeil,
+                                liquiditaet: 0
+                            },
+                            details: {
+                                kaufAkt: aktienTeil,
+                                kaufGld: goldTeil,
+                                verkaufLiquiditaet: investAmount,
+                                grund: 'Surplus Rebalancing (Opportunistisch)',
+                                source: 'surplus'
+                            },
+                            diagnosisEntries: [{
+                                step: 'Surplus Rebalancing',
+                                impact: `Überschuss (${investAmount.toFixed(0)}€ von ${surplus.toFixed(0)}€) investiert (Markt: ${market.sKey}). Aktien: ${aktienTeil.toFixed(0)}€, Gold: ${goldTeil.toFixed(0)}€.`,
+                                status: 'active',
+                                severity: 'info'
+                            }],
+                            transactionDiagnostics
+                        };
+                    }
+                }
             }
 
             markAsBlocked('liquidity_sufficient', 0, {
@@ -704,14 +818,19 @@ export const TransactionEngine = {
             actionDetails.isCapped = true;
         }
 
-        // Erlös verteilen: Priorität 1: Liquidität, 2: Gold, 3: Aktien
+        // Erlös verteilen: 
+        // ANTI-PSEUDO-ACCURACY: Prio 1: Gold-Kauf (damit Rundung erhalten bleibt), Prio 2: Liquidität.
         let erloesUebrig = effektiverNettoerloes;
 
-        let finalLiq = Math.min(erloesUebrig, verwendungen.liquiditaet);
-        erloesUebrig -= finalLiq;
-
+        // Wenn Gold KAUF geplant war (verwendungen.gold > 0), dann diesen zuerst bedienen,
+        // damit der Betrag "glatt" bleibt (wie in 'verwendungen.gold' quantisiert).
+        // Außer wir haben gar nicht genug Erlös für Gold allein (Notfall/Cap).
         const finalGold = Math.min(erloesUebrig, verwendungen.gold);
         erloesUebrig -= finalGold;
+
+        // Den Rest in die Liquidität (absorbiert "Unrundheit" durch Steuern/Caps)
+        let finalLiq = Math.min(erloesUebrig, verwendungen.liquiditaet);
+        erloesUebrig -= finalLiq;
 
         const finalAktien = Math.min(erloesUebrig, verwendungen.aktien);
         erloesUebrig -= finalAktien;

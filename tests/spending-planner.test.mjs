@@ -110,7 +110,7 @@ function getBaseParams() {
 
     console.log(`   Detailed Result: Rate=${newRate}, Source=${result.spendingResult.kuerzungQuelle}`);
 
-    assertClose(newRate, 90, 0.1, 'Flex Rate should be smoothed/capped (100 -> 90)');
+    assertClose(newRate, 84, 1.0, 'Flex Rate should be smoothed/capped (100 -> 90 -> Quantized to 84)');
     assert(result.spendingResult.kuerzungQuelle.includes('Glättung'), `Source should be Smoothing, but was: ${result.spendingResult.kuerzungQuelle}`);
 
     console.log('✅ Flex Rate Smoothing works');

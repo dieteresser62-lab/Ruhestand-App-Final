@@ -1,6 +1,7 @@
 "use strict";
 
 import { formatCurrencySafe, formatNumberWithUnit, formatPercentage, sanitizeDescription } from './results-formatting.js';
+import { formatCurrencyRounded } from './simulator-utils.js';
 import { STRESS_PRESETS } from './simulator-data.js';
 
 /**
@@ -43,25 +44,25 @@ export function buildSummaryData({ results, totalRuns, failCount }) {
         },
         {
             title: 'Median (alle)',
-            value: formatCurrencySafe(results?.finalOutcomes?.p50),
+            value: formatCurrencyRounded(results?.finalOutcomes?.p50),
             description: 'Typisches Endvermögen über alle Läufe (Median).',
             tone: 'default'
         },
         {
             title: 'Median (erfolgreiche)',
-            value: formatCurrencySafe(results?.finalOutcomes?.p50_successful),
+            value: formatCurrencyRounded(results?.finalOutcomes?.p50_successful),
             description: 'Median des Endvermögens aller erfolgreichen Läufe.',
             tone: 'default'
         },
         {
             title: '10%/90% Perzentil',
-            value: `${formatCurrencySafe(results?.finalOutcomes?.p10)} / ${formatCurrencySafe(results?.finalOutcomes?.p90)}`,
+            value: `${formatCurrencyRounded(results?.finalOutcomes?.p10)} / ${formatCurrencyRounded(results?.finalOutcomes?.p90)}`,
             description: 'Spannweite der Endvermögen zwischen konservativem (P10) und optimistischem (P90) Szenario.',
             tone: 'default'
         },
         {
             title: 'Median Steuern',
-            value: formatCurrencySafe(results?.taxOutcomes?.p50),
+            value: formatCurrencyRounded(results?.taxOutcomes?.p50),
             description: 'Median der kumulierten Steuerzahlungen.',
             tone: 'default'
         }
@@ -179,7 +180,7 @@ export function buildStressMetrics(stressKPI) {
             },
             {
                 title: 'Consumption-at-Risk P10 (Stress)',
-                value: formatCurrencySafe(stressKPI.consumptionAtRiskP10Real?.p50),
+                value: formatCurrencyRounded(stressKPI.consumptionAtRiskP10Real?.p50), // CaR wird auch gerundet
                 description: 'Inflationsbereinigte Jahresentnahme im P10 über die Stressjahre (Median).',
                 tone: 'danger'
             },
@@ -218,17 +219,17 @@ export function buildCareMetrics(results, inputs) {
             buildCareEntryCard('Median Eintrittsalter P2', safeAge(care.p2EntryAgeMedian), 'Typisches Alter bei Eintritt des Pflegefalls Person 2.', 'Jahre'),
             buildCareEntryCard('Median Pflegejahre P2', safeAge(care.p2CareYears), 'Typische Anzahl Jahre in Pflege (Person 2).', 'Jahre'),
             buildCareEntryCard('Median Jahre beide in Pflege', safeAge(care.bothCareYears), 'Typische Anzahl Jahre, in denen beide Personen gleichzeitig in Pflege sind.', 'Jahre'),
-            buildCareEntryCard('Max. jährl. Pflege-Ausgaben', care.maxAnnualCareSpend, 'Median der maximalen jährlichen Pflege-Gesamtkosten (P1+P2).', null, true)
+            buildCareEntryCard('Max. jährl. Pflege-Ausgaben', care.maxAnnualCareSpend, 'Median der maximalen jährlichen Pflege-Gesamtkosten (P1+P2).', null, true, true)
         );
     }
 
     cards.push(
         buildCareEntryCard('Bedingte Shortfall-Rate', care.shortfallRate_condCare, 'Anteil der Fehlschläge, wenn ein Pflegefall eingetreten ist.', '%'),
         buildCareEntryCard('Shortfall-Rate (o. Pflege)', care.shortfallRate_noCareProxy, 'Geschätzte Fehlschlag-Rate ohne Pflegefall-Eintritt.', '%'),
-        buildCareEntryCard('Median Endvermögen (m. Pflege)', care.endwealthWithCare_median, 'Typisches Endvermögen unter Berücksichtigung des Pflegerisikos.', null, true),
-        buildCareEntryCard('Median Endvermögen (o. Pflege)', care.endwealthNoCare_median, 'Geschätztes typisches Endvermögen ohne die Last des Pflegefalls.', null, true),
-        buildCareEntryCard('Median Gesamtkosten (Depot)', care.depotCosts_median, 'Typische Summe der aus dem Depot finanzierten Pflege-Mehrkosten (betroffene Läufe).', null, true),
-        buildCareEntryCard('Median-Vermögensdifferenz', care.shortfallDelta_vs_noCare, 'Unterschied im medianen Endvermögen (ohne Pflege minus mit Pflege).', null, true)
+        buildCareEntryCard('Median Endvermögen (m. Pflege)', care.endwealthWithCare_median, 'Typisches Endvermögen unter Berücksichtigung des Pflegerisikos.', null, true, true),
+        buildCareEntryCard('Median Endvermögen (o. Pflege)', care.endwealthNoCare_median, 'Geschätztes typisches Endvermögen ohne die Last des Pflegefalls.', null, true, true),
+        buildCareEntryCard('Median Gesamtkosten (Depot)', care.depotCosts_median, 'Typische Summe der aus dem Depot finanzierten Pflege-Mehrkosten (betroffene Läufe).', null, true, true),
+        buildCareEntryCard('Median-Vermögensdifferenz', care.shortfallDelta_vs_noCare, 'Unterschied im medianen Endvermögen (ohne Pflege minus mit Pflege).', null, true, true)
     );
 
     return { cards };
@@ -314,7 +315,7 @@ function buildRiskKpis(results) {
         if (isFinite(results.extraKPI.consumptionAtRiskP10Real)) {
             kpis.push({
                 title: 'Reale Entnahme (P10)',
-                value: formatCurrencySafe(results.extraKPI.consumptionAtRiskP10Real),
+                value: formatCurrencyRounded(results.extraKPI.consumptionAtRiskP10Real),
                 description: 'Worst-Case (10%-Quantil) der inflationsbereinigten Jahresentnahmen.',
                 tone: 'danger'
             });
@@ -345,10 +346,10 @@ function safeAge(value) {
  * @param {boolean} isCurrency - Kennzeichnet Währungsformatierung.
  * @returns {KpiDescriptor} Formatierte Pflege-KPI.
  */
-function buildCareEntryCard(title, value, description, unit = null, isCurrency = false) {
+function buildCareEntryCard(title, value, description, unit = null, isCurrency = false, rounded = false) {
     let formattedValue = '—';
     if (isCurrency) {
-        formattedValue = formatCurrencySafe(value);
+        formattedValue = rounded ? formatCurrencyRounded(value) : formatCurrencySafe(value);
     } else if (unit) {
         formattedValue = unit === '%'
             ? formatPercentage(value)

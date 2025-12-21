@@ -23,6 +23,19 @@ export const SpendingPlanner = {
      * @returns {{ spendingResult: Object, newState: Object, diagnosis: Object }}
      *          Komplettes Ergebnis mit neuer State, Diagnose und Entnahmeplan.
      */
+    _quantizeMonthly(amount, mode = 'floor') {
+        if (!CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED) return amount;
+
+        const tiers = CONFIG.ANTI_PSEUDO_ACCURACY.QUANTIZATION_TIERS_MONTHLY;
+        const tier = tiers.find(t => amount < t.limit);
+        const step = tier ? tier.step : 250;
+
+        if (mode === 'ceil') {
+            return Math.ceil(amount / step) * step;
+        }
+        return Math.floor(amount / step) * step;
+    },
+
     determineSpending(params) {
         const {
             lastState,
@@ -76,8 +89,17 @@ export const SpendingPlanner = {
         }
 
         // 5. Endgültige Entnahme bestimmen.
-        const endgueltigeEntnahme = inflatedBedarf.floor +
+        let rawEntnahme = inflatedBedarf.floor +
             (inflatedBedarf.flex * (Math.max(0, Math.min(100, geglätteteFlexRate)) / 100));
+
+        // ANTI-PSEUDO-ACCURACY: Monatliche Entnahme quantisieren
+        // Umrechnung auf Monatsbasis -> Runden -> Zurück auf Jahresbasis
+        // Wir nutzen 'floor' (abrunden) für Budget-Sicherheit.
+        let monthlyEntnahme = rawEntnahme / 12;
+        if (CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED) {
+            monthlyEntnahme = this._quantizeMonthly(monthlyEntnahme, 'floor');
+        }
+        const endgueltigeEntnahme = monthlyEntnahme * 12;
 
         // 6. Flex-Rate ableiten (Anteil des Flex-Bedarfs, der finanziert werden kann).
         const flexRate = (inflatedBedarf.flex > 0)
@@ -412,6 +434,8 @@ export const SpendingPlanner = {
                 'active'
             );
         }
+
+
 
         return { geglätteteFlexRate, kuerzungQuelle };
     },

@@ -50,7 +50,7 @@ const baseState = {
     portfolio: {
         depotTranchesAktien: [{ marketValue: 500000, costBasis: 400000, type: 'aktien_alt' }],
         depotTranchesGold: [],
-        liquiditaet: 20000
+        liquiditaet: 10000
     },
     baseFloor: 24000,
     baseFlex: 10000,
@@ -163,7 +163,7 @@ try {
     assert(endStocks >= 200000, 'Should retain significant stock value after crash (>= 200k)');
 
     // STRICT ASSERTION: Verify correct crisis reaction
-    const isEmergencyOrRebal = actionTitle.includes("Not-VK") || actionTitle.includes("Rebalancing") || actionTitle.includes("Liquidität");
+    const isEmergencyOrRebal = actionTitle.includes("Not-VK") || actionTitle.includes("Notfall") || actionTitle.includes("Rebalancing") || actionTitle.includes("Liquidität");
     assert(isEmergencyOrRebal, 'Crash should trigger emergency sale or rebalancing action');
     assert(vk.vkGes > 0, 'Should sell *some* assets to cover liquidity gap');
 

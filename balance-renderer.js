@@ -926,6 +926,11 @@ Quelle: ${runwaySourceInfo.description}`;
             return 'n/a';
         }
         if (/pct|percent/i.test(key)) {
+            // Heuristik: Werte > 1.5 werden als "bereits Prozent" (0-100) interpretiert,
+            // Werte <= 1.5 als Fraction (0-1). Behebt den "6000%" Anzeigefehler.
+            if (Math.abs(value) > 1.5) {
+                return `${value.toFixed(1)}%`;
+            }
             return `${(value * 100).toFixed(1)}%`;
         }
         if (/monate|months|mon/i.test(key)) {

@@ -106,6 +106,32 @@ export const CONFIG = {
     },
 
     /**
+     * Anti-Pseudo-Accuracy
+     *
+     * Vermeidet "krumme" Beträge in Transaktionen (z.B. 12.341,52€), die eine falsche Präzision suggerieren.
+     * Stattdessen werden Beträge intelligent gerundet (quantisiert).
+     */
+    ANTI_PSEUDO_ACCURACY: {
+        ENABLED: true,
+        HYSTERESIS_MIN_REFILL_AMOUNT: 2000,   // Unter 2.000€ ignorieren (Rauschunterdrückung)
+
+        // Adaptive Rundungsstufen: [Obergrenze (exklusiv), Schrittweite]
+        QUANTIZATION_TIERS: [
+            { limit: 10000, step: 1000 },     // z.B. 1.850 -> 2.000
+            { limit: 50000, step: 5000 },     // z.B. 12.300 -> 15.000
+            { limit: 200000, step: 10000 },   // z.B. 86.000 -> 90.000
+            { limit: Infinity, step: 25000 }  // z.B. 238.234 -> 250.000
+        ],
+
+        // Eigene Tiers für monatliche Beträge (feiner)
+        QUANTIZATION_TIERS_MONTHLY: [
+            { limit: 2000, step: 50 },    // z.B. 1.832 -> 1.850
+            { limit: 5000, step: 100 },   // z.B. 3.420 -> 3.500
+            { limit: Infinity, step: 250 } // z.B. 6.100 -> 6.250
+        ]
+    },
+
+    /**
      * Recovery-Guardrails
      *
      * Verhindert zu aggressive Entnahmen während der Markt-Erholung.

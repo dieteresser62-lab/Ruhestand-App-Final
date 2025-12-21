@@ -11,14 +11,44 @@ export const formatCurrency = (value) => new Intl.NumberFormat('de-DE', { style:
  * Formatiert einen Wert als verkürzte Währung (z.B. 5000 € -> 5k €)
  */
 export const formatCurrencyShortLog = (value) => {
-  if (value === 0) return "0 €";
-  if (value == null || !isFinite(value)) return "—";
-  const valAbs = Math.abs(value);
-  const sign = value < 0 ? "-" : "";
-  if (valAbs < 1000) {
-    return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
-  }
-  return `${sign}${Math.round(valAbs / 1000)}k €`;
+    if (value === 0) return "0 €";
+    if (value == null || !isFinite(value)) return "—";
+    const valAbs = Math.abs(value);
+    const sign = value < 0 ? "-" : "";
+    if (valAbs < 1000) {
+        return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
+    }
+    return `${sign}${Math.round(valAbs / 1000)}k €`;
+};
+
+/**
+ * Formatiert einen Wert als gerundete Währung (Anti-Pseudo-Accuracy) für KPIs.
+ * Tiers: <10k: 1k, <50k: 5k, <200k: 10k, >200k: 25k
+ */
+export const formatCurrencyRounded = (value) => {
+    if (value == null || !isFinite(value)) return "—";
+    const valAbs = Math.abs(value);
+    const sign = value < 0 ? -1 : 1;
+
+    let step = 1000;
+    if (valAbs >= 200000) {
+        step = 25000;
+    } else if (valAbs >= 50000) {
+        step = 10000;
+    } else if (valAbs >= 10000) {
+        step = 5000;
+    }
+
+    // Kaufmännisch runden auf den nächsten Step
+    const roundedAbs = Math.round(valAbs / step) * step;
+    const result = roundedAbs * sign;
+
+    return new Intl.NumberFormat('de-DE', {
+        style: 'currency',
+        currency: 'EUR',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(result);
 };
 
 /**
@@ -73,7 +103,7 @@ export const stdDev = arr => {
     if (arr.length < 2) return 0;
     const mu = mean(arr);
     const diffArr = arr.map(a => (a - mu) ** 2);
-    return Math.sqrt(sum(diffArr) / (arr.length -1));
+    return Math.sqrt(sum(diffArr) / (arr.length - 1));
 };
 export const standardize = (arr) => {
     const mu = mean(arr);
@@ -84,28 +114,28 @@ export const correlation = (arr1, arr2) => {
     if (arr1.length !== arr2.length || arr1.length < 2) return 0;
     const len = arr1.length;
     const xy = [], x = [], y = [], x2 = [], y2 = [];
-    for(let i=0; i<len; i++) {
-        xy.push(arr1[i]*arr2[i]);
+    for (let i = 0; i < len; i++) {
+        xy.push(arr1[i] * arr2[i]);
         x.push(arr1[i]);
         y.push(arr2[i]);
-        x2.push(arr1[i]**2);
-        y2.push(arr1[i]**2);
+        x2.push(arr1[i] ** 2);
+        y2.push(arr1[i] ** 2);
     }
     const num = len * sum(xy) - sum(x) * sum(y);
-    const den = Math.sqrt((len*sum(x2) - sum(x)**2) * (len*sum(y2) - sum(y)**2));
-    return den > 0 ? num/den : 0;
+    const den = Math.sqrt((len * sum(x2) - sum(x) ** 2) * (len * sum(y2) - sum(y) ** 2));
+    return den > 0 ? num / den : 0;
 };
 
 /**
  * Random Number Generator mit Seed
  * Supports forking for independent RNG streams
  */
-export function rng(seed=123456789){
-    let x=seed|0;
-    const generator = ()=> (x = (x^=(x<<13)), x^=(x>>>17), x^=(x<<5), ((x>>>0)%1e9)/1e9);
+export function rng(seed = 123456789) {
+    let x = seed | 0;
+    const generator = () => (x = (x ^= (x << 13)), x ^= (x >>> 17), x ^= (x << 5), ((x >>> 0) % 1e9) / 1e9);
 
     // Fork: creates a new independent RNG stream with derived seed
-    generator.fork = (label='') => {
+    generator.fork = (label = '') => {
         let derivedSeed = x;
         for (let i = 0; i < label.length; i++) {
             derivedSeed = ((derivedSeed << 5) - derivedSeed + label.charCodeAt(i)) | 0;
