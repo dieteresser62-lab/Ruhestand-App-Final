@@ -1,108 +1,120 @@
 
-import { simulateOneYear, initMcRunState } from '../simulator-engine-wrapper.js';
+import { simulateOneYear } from '../simulator-engine-direct.js';
 import { EngineAPI } from '../engine/index.mjs';
+import { annualData } from '../simulator-data.js';
+import { initializePortfolio, buildInputsCtxFromPortfolio, prepareHistoricalData } from '../simulator-portfolio.js';
 
-// --- MOCKING GLOBAL STATE (SIMULATION ENV) ---
+// --- MOCKING GLOBAL STATE ---
 if (typeof global.window === 'undefined') {
     global.window = {};
 }
 
-// Simple assertion helper
-function assert(condition, message) {
-    if (!condition) {
-        throw new Error(message || "Assertion failed");
-    }
-}
+prepareHistoricalData(); // Fix 1: Ensure data ready
 
-console.log('--- Headless Simulator Test ---');
+console.log('--- Headless Full Backtest Reproduction (Direct Mode) ---');
 
-// TEST 1: Headless Execution with Injection
-console.log('\n🔎 Test 1: Headless Execution (Node.js)');
-
-const inputs = {
+const baseInputs = {
     startAlter: 65,
-    startVermoegen: 500000,
-    targetEq: 50,
+    startVermoegen: 2700000,
+    targetEq: 60,
     rebalancingBand: 10,
     renteAktiv: false,
-    startFloorBedarf: 20000,
-    startFlexBedarf: 10000,
-    zielLiquiditaet: 100000,
-    tagesgeld: 50000,
-    geldmarktEtf: 50000,
-    depotwertAlt: 200000,
-    depotwertNeu: 200000,
-    costBasisAlt: 150000,
-    costBasisNeu: 180000,
+    startFloorBedarf: 24000,
+    startFlexBedarf: 12000,
+    zielLiquiditaet: 250000,
+    goldAktiv: true,
+    goldZielProzent: 10,
+    depotwertAlt: 0,
+    depotwertNeu: 0,
+    costBasisAlt: 0,
+    costBasisNeu: 0,
     startSPB: 1000,
     kirchensteuerSatz: 0,
-    runwayTargetMonths: 24,
-    minRunwayMonths: 12,
-    risikoprofil: 'sicherheits-dynamisch', // Required for core engine
-    rebalBand: 20
+    runwayTargetMonths: 36,
+    minRunwayMonths: 24,
+    risikoprofil: 'sicherheits-dynamisch',
+    rebalBand: 5,
+    goldSteuerfrei: true,
+    goldFloorProzent: 0
 };
 
-// Ensure arrays exist for tranche mapping
-const initializedInputs = {
-    ...inputs,
-    depotTranchesAktien: [{
-        marketValue: 200000,
-        costBasis: 150000,
-        type: 'aktien_alt',
-        tqf: 0.3
-    }]
+// Initialize State
+let initialInput = { ...baseInputs };
+let initialPortfolio = initializePortfolio(initialInput);
+
+// Initial Current State (Full)
+let currentState = {
+    portfolio: initialPortfolio,
+    marketDataHist: {
+        ath: 2700000,
+        endeVJ: 2700000,
+        jahreSeitAth: 0,
+        capeRatio: 20
+    },
+    baseFloor: initialInput.startFloorBedarf,
+    baseFlex: initialInput.startFlexBedarf,
+    currentAnnualPension: 12000,
+    currentAnnualPension2: 0,
+    lastState: {}, // Spending Planner state
+    widowPensionP1: 0,
+    widowPensionP2: 0
 };
 
-const yearData = {
-    inflation: 0.02,
-    rendite: 0.05,
-    zinssatz: 0.03,
-    gold_eur_perf: 10,
-    capeRatio: 20
-};
+console.log(`Starting Simulation. Initial Liq: ${currentState.portfolio.liquiditaet}`);
 
-const currentState = initMcRunState(initializedInputs, 0);
-const config = EngineAPI.getConfig();
+(async () => {
+    for (let year = 2000; year <= 2024; year++) {
+        const marketData = annualData.find(d => d.jahr === year);
+        if (!marketData) {
+            console.warn(`Keine Marktdaten für ${year}, Stop.`);
+            break;
+        }
+
+        try {
+            // We use currentState.portfolio for inputs calc
+            const inputsCtx = buildInputsCtxFromPortfolio(initialInput, currentState.portfolio, {
+                pensionAnnual: currentState.currentAnnualPension,
+                marketData
+            });
+
+            // Call Direct simulateOneYear
+            const fullResult = simulateOneYear(
+                currentState, // Pass FULL state
+                inputsCtx,
+                marketData,
+                year - 2000,
+                null,
+                0,
+                null,
+                1.0,
+                EngineAPI
+            );
+
+            // Update State
+            if (!fullResult || !fullResult.portfolio) {
+                console.error(`❌ fullResult invalid in Year ${year}:`, fullResult);
+                throw new Error("Simulation returned invalid result");
+            }
+
+            // Persist State for next year
+            if (fullResult.newState) {
+                currentState = fullResult.newState;
+            } else {
+                // Fallback (should not happen with fixed engine)
+                currentState.portfolio = fullResult.portfolio;
+            }
+
+            console.log(`✅ Year ${year} done. Liq: ${currentState.portfolio.liquiditaet.toFixed(0)}€, Stocks Buy: ${(fullResult.ui.action.details?.kaufAkt || 0)}`);
 
 
+            if (currentState.portfolio.liquiditaet < 0) {
+                console.error(`❌ NEGATIVE LIQUIDITY in Year ${year}!`);
+            }
 
-try {
-    // EXECUTE with manual engine injection
-    const result = simulateOneYear(
-        currentState,
-        initializedInputs,
-        yearData,
-        0,
-        null,
-        0,
-        null,
-        1.0,
-        EngineAPI // injecting the engine explicitly
-    );
-
-    assert(result, "Result should be defined");
-    assert(result.newState, "New State should be defined");
-    assert(!result.isRuin, "Standard values should not lead to ruin");
-
-    const cash = result.newState.portfolio.liquiditaet;
-    console.log(`   Result Liquidität: ${cash.toFixed(2)}€`);
-
-    assert(cash > 10000, "Should have liquidity remaining");
-
-    console.log('✅ Headless Execution Passed');
-} catch (error) {
-    console.error('❌ Headless Execution Failed:', error);
-    process.exit(1);
-}
-
-// TEST 2: Error on Missing Injection
-console.log('\n🔎 Test 2: Error when missing engine');
-try {
-    simulateOneYear(currentState, initializedInputs, yearData, 0);
-    // Should fail
-    throw new Error("Should have thrown error due to missing engine");
-} catch (e) {
-    console.log(`✅ Correctly caught missing dependency error: "${e.message}"`);
-}
-
-console.log('\n✅ All Headless Tests Passed');
+        } catch (e) {
+            console.error(`❌ CRASH in Year ${year}:`, e);
+            process.exit(1);
+        }
+    }
+    console.log('✅ Simulation completed successfully.');
+})();

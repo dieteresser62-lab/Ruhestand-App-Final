@@ -645,9 +645,9 @@ export const TransactionEngine = {
                     const goldAllocQuant = this._quantizeAmount(goldAllocRaw, 'floor');
                     verwendungen.gold = goldAllocQuant;
 
-                    // Liquiditätsbedarf abdecken (nimmt den Rest auf, damit Summe aufgeht)
-                    // Da 'effectiveTotalerBedarf' bereits quantisiert ist, ist der Rest auch glatt.
-                    verwendungen.liquiditaet = Math.max(0, effectiveTotalerBedarf - verwendungen.gold);
+                    // Liquiditätsbedarf abdecken (begrenzt auf Bedarfsdeckung)
+                    const availableForLiq = Math.max(0, effectiveTotalerBedarf - verwendungen.gold);
+                    verwendungen.liquiditaet = Math.min(availableForLiq, effectiveLiquiditätsBedarf);
 
                     // Falls Gold verkauft wird (Rebalancing), Erlös in Aktien stecken (wenn Platz)
                     if (goldVerkaufBedarf > 0) {
@@ -657,7 +657,7 @@ export const TransactionEngine = {
                         const aktienGap = Math.max(0, aktienZielwert - aktienCurrent);
 
                         // Alles was nicht für Liquidität nötig war, kann in Aktien gehen
-                        const remainingForEq = Math.max(0, remainingForLiq - verwendungen.liquiditaet);
+                        const remainingForEq = Math.max(0, availableForLiq - verwendungen.liquiditaet);
                         verwendungen.aktien = Math.min(remainingForEq, aktienGap);
 
                         // Wenn noch was übrig ist (weil Aktien voll), geht der Rest implizit in Liquidität

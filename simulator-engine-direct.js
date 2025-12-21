@@ -622,10 +622,25 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
 
 
+    const nextPortfolio = { ...portfolio, liquiditaet };
+
     return {
         isRuin: false,
+        portfolio: nextPortfolio,
+        ui: {
+            spending: spendingResult,
+            action: actionResult,
+            market: { sKey: spendingNewState.lastMarketSKey, ...yearData }, // Approximation
+            zielLiquiditaet: 0, // Not tracked here?
+            liquiditaet: { // Mock structure for UI compatibility
+                vorher: initialLiqStart,
+                nachher: liquiditaet,
+                deckungNachher: (jahresEntnahme > 0) ? ((liquiditaet / jahresEntnahme) * 100) : 100
+            },
+            runway: { months: 999 } // Mock
+        },
         newState: {
-            portfolio: { ...portfolio, liquiditaet },
+            portfolio: nextPortfolio,
             baseFloor: naechsterBaseFloor,
             baseFlex: naechsterBaseFlex,
             lastState: spendingNewState,
