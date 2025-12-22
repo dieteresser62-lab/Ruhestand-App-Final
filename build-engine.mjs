@@ -39,10 +39,10 @@ async function buildWithEsbuild() {
             footer: {
                 js: [
                     'const api = RuhestandEngineBundle.EngineAPI;',
-                    'const adapter = RuhestandEngineBundle.Ruhestandsmodell_v30;',
                     'if (typeof globalThis !== "undefined") {',
                     '  globalThis.EngineAPI = api;',
-                    '  globalThis.Ruhestandsmodell_v30 = adapter;',
+                    '  // Legacy compat: Ruhestandsmodell_v30 is deprecated, use EngineAPI',
+                    '  globalThis.Ruhestandsmodell_v30 = api;',
                     '}',
                     ''
                 ].join('\n')
@@ -69,12 +69,14 @@ async function buildWithEsbuild() {
  */
 async function writeModuleFallback() {
     const fallbackContent = `// AUTO-GENERATED FALLBACK (kein Bundle, Modul-Import)\n`
-        + `import { EngineAPI, Ruhestandsmodell_v30 } from './engine/index.mjs';\n`
+        + `import { EngineAPI } from './engine/index.mjs';\n`
         + `if (typeof window !== 'undefined') {\n`
         + `  window.EngineAPI = EngineAPI;\n`
-        + `  window.Ruhestandsmodell_v30 = Ruhestandsmodell_v30;\n`
+        + `  // Legacy compat: Ruhestandsmodell_v30 is deprecated, use EngineAPI\n`
+        + `  window.Ruhestandsmodell_v30 = EngineAPI;\n`
         + `}\n`
-        + `export { EngineAPI, Ruhestandsmodell_v30 };\n`;
+        + `export { EngineAPI };\n`
+        + `export { EngineAPI as Ruhestandsmodell_v30 }; // Legacy alias\n`;
 
     await writeFile(outputFile, fallbackContent, 'utf8');
     console.log('ℹ️  Fallback-Build ohne esbuild erstellt (engine.js als Modul-Wrapper).');
