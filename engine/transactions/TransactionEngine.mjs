@@ -659,7 +659,9 @@ export const TransactionEngine = {
                     };
 
                     actionDetails.bedarf = effectiveTotalerBedarf;
-                    actionDetails.title = "Opportunistisches Rebalancing & Liquidität auffüllen";
+                    actionDetails.title = "Opportunistisches Rebalancing & Liquidität auffüllen (Observed 2)";
+                    console.log('DEBUG: effectiveLiquiditätsBedarf at path 2:', effectiveLiquiditätsBedarf);
+                    console.log('DEBUG: effectiveTotalerBedarf at path 2:', effectiveTotalerBedarf);
 
                     // Verwendungen zuweisen
                     // ANTI-PSEUDO-ACCURACY: Auch Käufe runden (Gold), Rest in Liquidität
