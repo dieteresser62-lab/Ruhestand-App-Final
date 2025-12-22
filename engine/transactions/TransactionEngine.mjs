@@ -659,7 +659,7 @@ export const TransactionEngine = {
                     };
 
                     actionDetails.bedarf = effectiveTotalerBedarf;
-                    actionDetails.title = "Opportunistisches Rebalancing & Liquidität auffüllen (Observed 2)";
+                    actionDetails.title = `Opp. (Observed 3) [LiqBed: ${liquiditaetsBedarf.toFixed(0)} | EffTot: ${effectiveTotalerBedarf.toFixed(0)}]`;
                     console.log('DEBUG: effectiveLiquiditätsBedarf at path 2:', effectiveLiquiditätsBedarf);
                     console.log('DEBUG: effectiveTotalerBedarf at path 2:', effectiveTotalerBedarf);
 
