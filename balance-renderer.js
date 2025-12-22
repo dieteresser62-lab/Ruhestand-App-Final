@@ -441,6 +441,14 @@ class ActionRenderer {
      * @returns {Object|null} Handlungsvorschlag für ein internes Rebalancing.
      */
     determineInternalCashRebalance(input, action, spending, targetLiquidity) {
+        /*
+        console.log('DEBUG_RENDERER_CASH:', {
+            inputTagesgeld: input?.tagesgeld,
+            targetLiquidityArg: targetLiquidity,
+            spendingMonatlich: spending?.monatlicheEntnahme
+        });
+        */
+
         if (!input || typeof input.tagesgeld !== 'number' || typeof input.geldmarktEtf !== 'number') {
             console.warn('ActionRenderer.determineInternalCashRebalance: Input-Daten fehlen oder sind unvollständig.');
             return null;
