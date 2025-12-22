@@ -57,7 +57,9 @@ export const TransactionEngine = {
         // Daher nutzen wir die Werte aus dem Input, falls verfügbar.
         let bruttoJahresbedarf = inflatedBedarf.floor + inflatedBedarf.flex;
         if (input && (input.floorBedarf !== undefined || input.flexBedarf !== undefined)) {
-            bruttoJahresbedarf = (input.floorBedarf || 0) + (input.flexBedarf || 0);
+            const fBedarf = Number(input.floorBedarf) || 0;
+            const flexB = Number(input.flexBedarf) || 0;
+            bruttoJahresbedarf = fBedarf + flexB;
         }
 
         const bruttoMonatsbedarf = bruttoJahresbedarf / 12;
