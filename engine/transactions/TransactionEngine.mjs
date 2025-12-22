@@ -816,7 +816,9 @@ export const TransactionEngine = {
                 const gapStock = Math.max(0, targetStockVal - currentStockVal);
                 const gapGold = Math.max(0, targetGoldVal - currentGoldVal);
                 const totalGap = gapStock + gapGold;
-                const investAmountRaw = Math.min(surplus, totalGap);
+
+                // 4. Investitionsbetrag begrenzen
+                let investAmountRaw = Math.min(surplus, totalGap);
 
                 if (CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED) {
                     investAmountRaw = this._quantizeAmount(investAmountRaw, 'floor');
