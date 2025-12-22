@@ -52,7 +52,14 @@ export const TransactionEngine = {
             ? input.minCashBufferMonths
             : 2; // Default 2 Monate
 
-        const bruttoJahresbedarf = inflatedBedarf.floor + inflatedBedarf.flex;
+        // FIX: inflatedBedarf ist bereits um die Rente reduziert (Netto).
+        // Wir brauchen hier aber den Brutto-Bedarf für den "Waschmaschinen-Puffer".
+        // Daher nutzen wir die Werte aus dem Input, falls verfügbar.
+        let bruttoJahresbedarf = inflatedBedarf.floor + inflatedBedarf.flex;
+        if (input && (input.floorBedarf !== undefined || input.flexBedarf !== undefined)) {
+            bruttoJahresbedarf = (input.floorBedarf || 0) + (input.flexBedarf || 0);
+        }
+
         const bruttoMonatsbedarf = bruttoJahresbedarf / 12;
         const absoluteBufferTarget = bruttoMonatsbedarf * minBufferMonths;
 
