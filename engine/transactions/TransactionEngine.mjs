@@ -446,7 +446,10 @@ export const TransactionEngine = {
                 // Nicht-Bärenmarkt: Opportunistisches Rebalancing
             } else if (!isBearRegimeProxy) {
                 const rawLiqGap = zielLiquiditaet - aktuelleLiquiditaet;
-                const liquiditaetsBedarf = Math.max(0, rawLiqGap);
+                // ANTI-PSEUDO-ACCURACY: Liquiditätsbedarf kaufmännisch runden (Ceil)
+                let liquiditaetsBedarf = Math.max(0, rawLiqGap);
+                liquiditaetsBedarf = this._quantizeAmount(liquiditaetsBedarf, 'ceil');
+
                 const surplusCash = Math.max(0, -rawLiqGap);
 
                 // ATH-basierte Skalierung: Bei -20% ATH-Abstand kein Rebalancing mehr

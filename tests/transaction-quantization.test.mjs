@@ -195,4 +195,64 @@ const MOCK_INPUT = {
     console.log('✅ Component Rounding (Gold) Passed');
 }
 
+// --- TEST 6: Standard Opportunistic Refill Rounding ---
+{
+    // Scenario: Normal market (Opportunistic Rebalancing).
+    // Target Liquidity: 156.296,00 (Messy). Current: 66.041,19 (Messy).
+    // Gap: 90.254,81 (Messy).
+    // Expected: Quantized to 95.000 (Tier 3: 10k steps for <200k? Or Tier 4? 
+    // Config: <200k -> 10k steps. 90k -> 90k. 90.254 -> 100k (Ceil).
+
+    // Config Check: <200k Step 10k.
+    // 90.254 / 10.000 = 9.0254. Ceil = 10. * 10k = 100.000.
+
+    const params = {
+        ...MOCK_INPUT,
+        aktuelleLiquiditaet: 66041.19,
+        zielLiquiditaet: 156296.00,
+        depotwertGesamt: 2500000, // Large portfolio
+        market: { sKey: 'hot_neutral', seiATH: 1.0, abstandVomAthProzent: 0, szenarioText: 'Test' },
+        profil: MOCK_PROFIL,
+        spending: {}, minGold: 0,
+        input: { ...MOCK_INPUT, targetEq: 60 }
+    };
+
+    const result = TransactionEngine.determineAction(params);
+
+    // DEBUG: Log result to see structure
+    console.log('DEBUG RESULT:', JSON.stringify(result, null, 2));
+
+    // We expect REFILL transaction.
+    assert(result.type === 'TRANSACTION', 'Should trigger Opportunistic Refill');
+
+    // Check quantized amount.
+    // Gap = 90.254,81.
+    // Tier 3 (<200k) Step 10k.
+    // Ceil(90.254 / 10k) = 10. * 10k = 100.000.
+
+    // Note: If rounding down (floor), it would be 90.000.
+    // We implemented 'ceil' for Refills to be safe.
+
+    // The 'verwendungen.liquiditaet' is NET amount.
+    // The engine sets the Gross Sale Limit based on the quantized demand (100k).
+    // Gross Sale = 100,000.
+    // Tax (Mock 26.375% on 0 Cost Basis) = 26,375.
+    // Net = 73,625.
+
+    // Check Gross Sale using correct property
+    // The engine returns 'quellen' (breakdown) with 'brutto' property.
+    const grossSale = result.quellen
+        ? result.quellen.reduce((sum, item) => sum + item.brutto, 0)
+        : (result.nettoErlös + (result.steuer || 0));
+
+    // Allow small epsilon
+    assertClose(grossSale, 100000, 100,
+        `Gross Sale should be quantized to 100k (from 90.254). Got: ${grossSale}`);
+
+    assertEqual(result.verwendungen.liquiditaet, 73625,
+        `Net Liquidity should be Gross - Tax (73625). Got: ${result.verwendungen.liquiditaet}`);
+
+    console.log('✅ Standard Opportunistic Refill Passed');
+}
+
 console.log('--- Transaction Quantization Tests Completed ---');
