@@ -92,9 +92,14 @@ export const TransactionEngine = {
 
         const maxCapEuro = (capConfig.pct / 100) * aktienwert;
         // Bei kritischer Liquidität: erhöhtes Cap erlauben (10% des Aktienwerts)
-        const effectiveMaxCap = isCriticalLiquidity
+        // Bei kritischer Liquidität: erhöhtes Cap erlauben (10% des Aktienwerts)
+        let effectiveMaxCap = isCriticalLiquidity
             ? Math.max(maxCapEuro, aktienwert * 0.10)
             : maxCapEuro;
+
+        // ANTI-PSEUDO-ACCURACY: Auch das Cap runden (abrunden, um Limit einzuhalten)
+        effectiveMaxCap = this._quantizeAmount(effectiveMaxCap, 'floor');
+
         // ANTI-PSEUDO-ACCURACY: Liquiditätsbedarf 'aufrunden', um glatte Summe zu erhalten
         const quantizedBedarf = this._quantizeAmount(liquiditaetsbedarf, 'ceil');
 

@@ -107,7 +107,9 @@ function getBaseParams() {
     const refillAmount = result.verwendungen.liquiditaet;
     const equity = params.depotwertGesamt; // 500k
     const capPct = params.input.maxBearRefillPctOfEq; // 2.5
-    const expectedRefill = equity * (capPct / 100); // 12500
+    let expectedRefill = equity * (capPct / 100); // 12500
+    // Anti-Pseudo-Accuracy: Cap is now quantized (floor) to nearest step (5000 for <50k)
+    expectedRefill = Math.floor(expectedRefill / 5000) * 5000; // 10000
 
     // Not critical liquidity (30k > 24k isn't critical enough for emergency override? 
     // Critical is < Puffer * 1.5 = 36k. 30k < 36k.
