@@ -787,6 +787,8 @@ export const TransactionEngine = {
             // aber der User wünscht sich Relevanz).
             const surplusHysteresis = CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED ? minTradeThreshold : 500;
 
+
+
             if (surplus > surplusHysteresis && !isRiskyMarket) {
                 // FIX v31.1: Gap-Based Rebalancing
                 // Anstatt den gesamten Surplus blind zu investieren, füllen wir nur die Lücken auf,

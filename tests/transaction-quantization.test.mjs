@@ -119,15 +119,19 @@ const MOCK_INPUT = {
     // Step for <10k is 1k. Floor(4000) = 4000.
 
     // Let's try 4,800 Surplus. Should floor to 4,000.
+    // Ensure thresholds are low enough for this test
+    CONFIG.THRESHOLDS.STRATEGY.minTradeAmountStatic = 1000;
+    CONFIG.THRESHOLDS.STRATEGY.minTradeAmountDynamicFactor = 0;
+
     const params = {
         ...MOCK_INPUT,
         aktuelleLiquiditaet: 104800,
         zielLiquiditaet: 100000,
-        depotwertGesamt: 500000,
+        depotwertGesamt: 140000,
         market: { sKey: 'peak_hot', seiATH: 1.0, abstandVomAthProzent: 0, szenarioText: 'Test' }, // Good market for investing
         profil: MOCK_PROFIL,
         spending: {}, minGold: 0,
-        input: MOCK_INPUT
+        input: { ...MOCK_INPUT, depotwertAlt: 140000 }
     };
 
     const result = TransactionEngine.determineAction(params);

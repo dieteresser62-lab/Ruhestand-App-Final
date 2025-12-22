@@ -9,7 +9,7 @@
 
 // Engine-Versionierung
 export const ENGINE_API_VERSION = "31.0";
-export const ENGINE_BUILD_ID = "2025-12-22_10-40";
+export const ENGINE_BUILD_ID = "2025-12-22_16-35";
 
 /**
  * Zentrale Engine-Konfiguration
@@ -54,6 +54,7 @@ export const CONFIG = {
             stagflationInflation: 4,                    // 4% Inflation als Stagflations-Grenze
             runwayThinMonths: 24,                       // 24 Monate = kritischer Runway
             liquidityBufferZonePercent: 10,             // 10% Pufferzone für Liquiditäts-Ziel
+            minCashBufferMonths: 2,                     // Min. 2 Monate Cash-Puffer (Default, wenn Input fehlt)
             minRefillAmount: 10000,                     // Min. 10.000€ für Depot-Verkauf und reduziertes Liquiditäts-Gate
             minTradeAmountStatic: 25000,                // Min. 25.000€ für Rebalancing-Trades
             minTradeAmountDynamicFactor: 0.005,         // 0.5% des Portfolios als dynamischer Trade-Mindestbetrag
