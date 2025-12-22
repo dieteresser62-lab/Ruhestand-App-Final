@@ -484,6 +484,14 @@ export const TransactionEngine = {
                     }
                 }
 
+                // Action Details vorbereiten
+                actionDetails = {
+                    title: 'Opportunistisches Rebalancing & Liquidität auffüllen (Observed)',
+                    type: 'REFILL',
+                    bedarf: liquiditaetsBedarf,
+                    diagnosisEntries: [],
+                    isCapped: false
+                };
                 // FIX: Wenn wir Überschuss-Liquidität haben, können wir den Gold-Kauf daraus finanzieren.
                 // Das reduziert den 'totalerBedarf' (der einen VERKAUF von Assets anfordert).
                 // Wenn alles durch Cash gedeckt ist, ist totalerBedarf = 0, und wir fallen 

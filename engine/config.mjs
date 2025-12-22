@@ -9,7 +9,7 @@
 
 // Engine-Versionierung
 export const ENGINE_API_VERSION = "31.0";
-export const ENGINE_BUILD_ID = "2025-11-20_16-20";
+export const ENGINE_BUILD_ID = "2025-12-22_10-40";
 
 /**
  * Zentrale Engine-Konfiguration
