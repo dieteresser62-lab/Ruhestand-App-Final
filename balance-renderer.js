@@ -335,8 +335,9 @@ class ActionRenderer {
      * @param {Object} action - Beschriebene Handlungsempfehlung aus der Engine.
      * @param {Object} input - Ursprüngliche Input-Daten (zur Berechnung von Rebalancing-Vorschlägen).
      * @param {Object} spending - Entnahmeinformationen zur Ableitung der Jahresentnahme.
+     * @param {number} [targetLiquidity] - (Optional) Ziel-Liquidität aus der Engine.
      */
-    renderAction(action = {}, input = null, spending = {}) {
+    renderAction(action = {}, input = null, spending = {}, targetLiquidity) {
         const container = this.dom?.outputs?.handlungsanweisung;
         if (!container) return;
         [...container.children].filter(n => n.id !== 'copyAction').forEach(n => n.remove());
@@ -345,7 +346,8 @@ class ActionRenderer {
         const internalRebalance = this.determineInternalCashRebalance(
             input,
             action,
-            spending
+            spending,
+            targetLiquidity
         );
 
         // 2. Integrate into main action object (Unified UI)
@@ -435,9 +437,10 @@ class ActionRenderer {
      * @param {Object|null} input - Originale Eingabedaten des Nutzers.
      * @param {Object} action - Handlungsempfehlung, insbesondere Verwendungsströme.
      * @param {Object} spending - Entnahmedaten zur Ableitung der Jahresentnahme.
+     * @param {number} [targetLiquidity] - (Optional) Ziel-Liquidität aus der Engine.
      * @returns {Object|null} Handlungsvorschlag für ein internes Rebalancing.
      */
-    determineInternalCashRebalance(input, action, spending) {
+    determineInternalCashRebalance(input, action, spending, targetLiquidity) {
         if (!input || typeof input.tagesgeld !== 'number' || typeof input.geldmarktEtf !== 'number') {
             console.warn('ActionRenderer.determineInternalCashRebalance: Input-Daten fehlen oder sind unvollständig.');
             return null;
@@ -446,8 +449,14 @@ class ActionRenderer {
         const annualWithdrawal = (typeof spending.monatlicheEntnahme === 'number' && isFinite(spending.monatlicheEntnahme))
             ? spending.monatlicheEntnahme * 12
             : null;
-        if (!isFinite(annualWithdrawal)) {
-            console.warn('ActionRenderer.determineInternalCashRebalance: Jahresentnahme nicht berechenbar, überspringe Vorschlag.');
+
+        // FIX: Use Engine's target liquidity if available, otherwise fallback to annual withdrawal
+        const zielTagesgeld = (typeof targetLiquidity === 'number' && isFinite(targetLiquidity))
+            ? targetLiquidity
+            : (annualWithdrawal || 0);
+
+        if (!isFinite(zielTagesgeld)) {
+            // console.warn('ActionRenderer.determineInternalCashRebalance: Kein Ziel-Tagesgeld ermittelbar.');
             return null;
         }
 
@@ -464,7 +473,6 @@ class ActionRenderer {
             return null;
         }
 
-        const zielTagesgeld = annualWithdrawal;
         // Adjusted calculation for proper diff
         const tagesgeldVorTransaktion = input.tagesgeld - liquidityOutflow; // Assuming outflow comes from Tagesgeld first
         const liqZufluss = (action.verwendungen?.liquiditaet || 0); // Money coming IN from sales
@@ -475,8 +483,11 @@ class ActionRenderer {
         const schwelle = UIUtils.getThreshold('THRESHOLDS.STRATEGY.cashRebalanceThreshold', 2500);
 
         if (diff > schwelle) {
-            const amount = this._quantize(diff);
-            return { from: 'Tagesgeld', to: 'Geldmarkt-ETF', amount: amount };
+            // FIX: Use FLOOR for excess to be safe and NOT drain below target
+            const amount = this._quantize(diff, 'floor');
+            if (amount > 0) {
+                return { from: 'Tagesgeld', to: 'Geldmarkt-ETF', amount: amount };
+            }
         } else if (diff < -schwelle) {
             const needed = Math.abs(diff);
             let canRefill = Math.min(needed, input.geldmarktEtf);
@@ -490,27 +501,32 @@ class ActionRenderer {
         }
         return null;
     }
-
     /**
      * Quantizes an amount based on the Engine's Anti-Pseudo-Accuracy rules.
      * Replicates the logic from TransactionEngine.
      * @param {number} amount 
+     * @param {string} [mode='ceil'] - 'ceil' or 'floor'
      * @returns {number} Quantized amount
      */
-    _quantize(amount) {
+    _quantize(amount, mode = 'ceil') {
         if (amount < 0) return 0;
 
         // Fetch config via global API
-        const config = window.EngineAPI?.getConfig()?.ANTI_PSEUDO_ACCURACY;
+        const config = (window.EngineAPI && window.EngineAPI.getConfig && window.EngineAPI.getConfig())
+            ? window.EngineAPI.getConfig().ANTI_PSEUDO_ACCURACY
+            : { ENABLED: true, QUANTIZATION_TIERS: [] }; // Fallback defaults
+
         if (!config || !config.ENABLED) return Math.floor(amount);
 
         // Find tier
         const tiers = config.QUANTIZATION_TIERS || [];
         const tier = tiers.find(t => amount < t.limit);
-        const step = tier ? tier.step : 1000; // Default fallback
+        const step = tier ? tier.step : 25000; // Use 25k as default step for large amounts
 
-        // Floor quantization
-        return Math.floor(amount / step) * step;
+        if (mode === 'floor') {
+            return Math.floor(amount / step) * step;
+        }
+        return Math.ceil(amount / step) * step;
     }
 
 
@@ -1200,7 +1216,7 @@ export const UIRenderer = {
             return;
         }
         summaryRenderer.renderOverview(ui);
-        actionRenderer.renderAction(ui?.action, ui?.input, ui?.spending);
+        actionRenderer.renderAction(ui?.action, ui?.input, ui?.spending, ui?.zielLiquiditaet);
     },
 
     /**
