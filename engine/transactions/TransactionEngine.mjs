@@ -69,11 +69,12 @@ export const TransactionEngine = {
         // console.log("DEBUG_LIQ: Wynik", { minBufferMonths, bruttoJahresbedarf, absoluteBufferTarget });
 
         // 3. Absolute Untergrenze (technisch)
+        // FIX: Statt harter 10k Konstante jetzt dynamisch basierend auf Bedarf.
+        // Wir nehmen 1.0 x Brutto-Monatsbedarf als technisches Minimum, damit man nie ganz trocken läuft.
+        // Das respektiert User-Settings (z.B. 2 Monate Puffer), solange diese > 1 Monat sind.
+        const minAbs = bruttoMonatsbedarf * 1.0;
 
-        const minAbs = CONFIG.THRESHOLDS.STRATEGY.absoluteMinLiquidity || 0;
-
-        // Das Maximum gewinnt
-        return Math.max(calculatedTarget, absoluteBufferTarget, minAbs);
+        calculatedTarget = Math.max(calculatedTarget, absoluteBufferTarget, minAbs);
     },
 
     /**
