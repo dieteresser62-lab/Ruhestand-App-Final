@@ -798,7 +798,6 @@ export const TransactionEngine = {
                 // Wir dürfen totalWealth hier NICHT künstlich klein rechnen, sonst sind die Ziel-Beträge für Aktien/Gold zu niedrig.
                 const totalWealth = depotwertGesamt + aktuelleLiquiditaet;
 
-                /*
                 console.log("DEBUG_SURPLUS:", {
                     aktuelleLiq: aktuelleLiquiditaet,
                     zielLiq: zielLiquiditaet,
@@ -808,7 +807,6 @@ export const TransactionEngine = {
                     targetEq: input.targetEq,
                     goldZiel: input.goldZielProzent
                 });
-                */
 
                 // 1. Absolute Zielwerte berechnen
                 const targetStockVal = totalWealth * (input.targetEq / 100);
@@ -820,14 +818,16 @@ export const TransactionEngine = {
                 const currentStockVal = (input.depotwertAlt || 0) + (input.depotwertNeu || 0);
                 const currentGoldVal = input.goldAktiv ? (input.goldWert || 0) : 0;
 
-                /*
                 console.log("DEBUG_GAPS:", {
                     targetStockVal,
                     targetGoldVal,
                     currentStockVal,
-                    currentGoldVal
+                    currentGoldVal,
+                    gapStock: Math.max(0, targetStockVal - currentStockVal),
+                    gapGold: Math.max(0, targetGoldVal - currentGoldVal),
+                    totalGap: Math.max(0, targetStockVal - currentStockVal) + Math.max(0, targetGoldVal - currentGoldVal),
+                    investAmountRaw: Math.min(surplus, Math.max(0, targetStockVal - currentStockVal) + Math.max(0, targetGoldVal - currentGoldVal))
                 });
-                */
 
                 // 3. Gaps berechnen (Nur positive Gaps, wir verkaufen hier nichts, nur Kauf)
                 const gapStock = Math.max(0, targetStockVal - currentStockVal);
@@ -889,6 +889,7 @@ export const TransactionEngine = {
                                 grund: 'Surplus Rebalancing (Opportunistisch)',
                                 source: 'surplus'
                             },
+                            zielLiquiditaet, // FIX: Expose target liquidity
                             diagnosisEntries: [{
                                 step: 'Surplus Rebalancing',
                                 impact: `Überschuss (${investAmount.toFixed(0)}€ von ${surplus.toFixed(0)}€) investiert (Markt: ${market.sKey}). Aktien: ${aktienTeil.toFixed(0)}€, Gold: ${goldTeil.toFixed(0)}€.`,
@@ -910,6 +911,7 @@ export const TransactionEngine = {
                 type: 'NONE',
                 anweisungKlasse: 'anweisung-gruen',
                 title: `${market.szenarioText} (${actionDetails.title || 'Kein Handlungsbedarf'})`,
+                zielLiquiditaet, // FIX: Expose target liquidity
                 diagnosisEntries: actionDetails.diagnosisEntries,
                 transactionDiagnostics
             };
@@ -953,6 +955,7 @@ export const TransactionEngine = {
                 type: 'NONE',
                 anweisungKlasse: 'anweisung-gruen',
                 title: `${market.szenarioText} (Kein Handlungsbedarf)`,
+                zielLiquiditaet, // FIX: Expose target liquidity
                 diagnosisEntries: actionDetails.diagnosisEntries,
                 transactionDiagnostics
             };
@@ -1019,6 +1022,7 @@ export const TransactionEngine = {
             quellen: saleResult.breakdown,
             steuer: saleResult.steuerGesamt,
             verwendungen: { liquiditaet: finalLiq, gold: finalGold, aktien: finalAktien },
+            zielLiquiditaet, // FIX: Expose target liquidity
             diagnosisEntries: actionDetails.diagnosisEntries,
             transactionDiagnostics
         };
