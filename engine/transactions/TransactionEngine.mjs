@@ -573,6 +573,9 @@ export const TransactionEngine = {
 
                         if (input.goldWert > goldObergrenze) {
                             maxSellableFromGold = input.goldWert - goldZielwert;
+                            // ANTI-PSEUDO-ACCURACY: Auch Rebalancing-Verkäufe runden (abrunden)
+                            // Damit wir nicht krumme Beträge wie 40.136,63 EUR verkaufen
+                            maxSellableFromGold = this._quantizeAmount(maxSellableFromGold, 'floor');
                         }
                     }
                     saleContext.saleBudgets.gold = maxSellableFromGold;
