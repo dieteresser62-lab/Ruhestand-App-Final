@@ -25,7 +25,7 @@ Die Engine besteht aus acht ES-Modulen, die von `build-engine.mjs` zu `engine.js
 1. **`engine/validators/InputValidator.mjs`** – prüft sämtliche Eingaben auf Vollständigkeit, Wertebereiche und Konsistenz. Liefert strukturierte Fehlermeldungen.
 2. **`engine/analyzers/MarketAnalyzer.mjs`** – klassifiziert Marktregime, berechnet Drawdowns und leitet Kennzahlen für Guardrails ab.
 3. **`engine/planners/SpendingPlanner.mjs`** – steuert Guardrails, Glättung der Flex-Rate, Alarmstatus und erstellt Diagnoseeinträge.
-4. **`engine/transactions/TransactionEngine.mjs`** – leitet Ziel-Liquidität ab, berücksichtigt Puffer-Schutz und limitiert Verkäufe/Rebalancing.
+4. **`engine/transactions/TransactionEngine.mjs`** – leitet Ziel-Liquidität ab, steuert Puffer-Schutz und führt **Gap-basiertes Surplus-Rebalancing** (Investition nur bis Ziel-Allokation) durch.
 5. **`engine/core.mjs`** – orchestriert die oben genannten Module, exponiert `EngineAPI` (Version 31) und erzeugt Diagnose-/UI-Strukturen.
 6. **`engine/config.mjs`** – zentrale Konfiguration (Schwellenwerte, Regime-Mapping, Profile). Generiert zur Build-Zeit eine eindeutige Build-ID.
 7. **`engine/errors.mjs`** – Fehlerklassen (`AppError`, `ValidationError`, `FinancialCalculationError`).

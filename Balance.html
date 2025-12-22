@@ -74,7 +74,7 @@
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
                             <div class="form-group" style="grid-column: 1 / -1;">
                                 <label for="profilName">Profil / Name</label>
-                                <input id="profilName" type="text" placeholder="z. B. Dieter" 
+                                <input id="profilName" type="text" placeholder="z. B. Dieter"
                                     title="Name des aktuellen Profils - wird für Snapshots und Jahresabschlüsse verwendet">
                             </div>
                             <div class="form-group"><label for="aktuellesAlter">Aktuelles Alter</label><input
@@ -182,7 +182,7 @@
                     </fieldset>
                     <fieldset>
                         <legend>Runway-Steuerung</legend>
-                        <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+                        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 15px;">
                             <div class="form-group">
                                 <label for="runwayMinMonths">Runway Minimum (Monate)</label>
                                 <input id="runwayMinMonths" type="number" min="12" max="60" step="1"
@@ -195,6 +195,12 @@
                                     title="Die angestrebte, komfortable Liquiditätsreichweite. Wird in guten Marktphasen proaktiv aufgefüllt (Skim & Fill)."
                                     value="36">
                             </div>
+                        </div>
+                        <div class="form-group advanced-only" style="margin-top: 10px;">
+                            <label for="minCashBufferMonths">Min. Cash-Puffer (Monate)</label>
+                            <input id="minCashBufferMonths" type="number" min="0" max="12" step="1"
+                                title="Anzahl an Monatsausgaben (Brutto), die immer auf dem Tagesgeld verbleiben sollen, auch wenn keine Entnahme nötig ist."
+                                value="2">
                         </div>
                     </fieldset>
                     <fieldset>
@@ -242,7 +248,8 @@
                                 </select></div>
                             <div class="form-group"><label for="sparerPauschbetrag">Sparer-PB (€)</label><input
                                     id="sparerPauschbetrag" class="currency" type="text" inputmode="numeric"
-                                    value="1000"></div>
+                                    value="1000">
+                            </div>
                         </div>
                     </fieldset>
                     <fieldset class="advanced-only">
@@ -279,14 +286,16 @@
                             <div style="display: flex; flex-direction: column; gap: 10px;">
                                 <div class="form-group"><label for="costBasisAlt">Einstand Alt (€)</label><input
                                         id="costBasisAlt" class="currency" type="text" inputmode="numeric"
-                                        placeholder="0"></div>
+                                        placeholder="0">
+                                </div>
                                 <div class="form-group"><label for="tqfAlt">TQF Alt</label><input id="tqfAlt"
                                         type="number" step="0.01" min="0" max="1" placeholder="0"></div>
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 10px;">
                                 <div class="form-group"><label for="costBasisNeu">Einstand Neu (€)</label><input
                                         id="costBasisNeu" class="currency" type="text" inputmode="numeric"
-                                        placeholder="0"></div>
+                                        placeholder="0">
+                                </div>
                                 <div class="form-group"><label for="tqfNeu">TQF Neu</label><input id="tqfNeu"
                                         type="number" step="0.01" min="0" max="1" placeholder="0"></div>
                             </div>

@@ -428,74 +428,7 @@ class ActionRenderer {
     // I should NOT replace that method here, but I AM replacing renderAction and buildInternalRebalance.
     // I need to be careful with line numbers.
 
-    /**
-     * Baut die Inhaltsstruktur für Transaktions-Empfehlungen auf.
-     *
-     * @param {Object} action - Handlungsempfehlung mit Quellen und Verwendungen.
-     * @param {HTMLElement} content - Container, der befüllt werden soll.
-     */
-    _buildTransactionContent(action, content) {
-        const title = document.createElement('strong');
-        title.style.cssText = 'display: block; font-size: 1.1rem; margin-bottom: 8px; text-align:center;';
-        title.textContent = action.title;
-        if (action.isPufferSchutzAktiv) {
-            const badge = document.createElement('span');
-            badge.className = 'strategy-badge';
-            badge.textContent = 'PUFFER-SCHUTZ';
-            title.append(document.createTextNode(' '), badge);
-        }
 
-        const createSection = (titleText, items) => {
-            const wrapper = document.createElement('div');
-            wrapper.style.cssText = 'border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; margin-bottom: 12px;';
-            wrapper.classList.add('action-detail-block');
-            const head = document.createElement('strong');
-            head.style.cssText = 'display:block; border-bottom: 1px solid var(--border-color); padding-bottom: 5px; margin-bottom: 8px;';
-            head.textContent = titleText;
-            wrapper.appendChild(head);
-            items.forEach(item => wrapper.appendChild(item));
-            return wrapper;
-        };
-
-        const createRow = (label, value) => {
-            const row = document.createElement('div');
-            row.style.cssText = 'display:flex; justify-content:space-between;';
-            const labelSpan = document.createElement('span');
-            labelSpan.textContent = label;
-            const valueSpan = document.createElement('span');
-            valueSpan.textContent = value;
-            row.append(labelSpan, valueSpan);
-            return row;
-        };
-
-        const quellenMap = {
-            'gold': 'Gold',
-            'aktien_neu': 'Aktien (neu)',
-            'aktien_alt': 'Aktien (alt)',
-            'liquiditaet': 'Liquidität (Tagesgeld)',
-            'geldmarkt': 'Geldmarkt-ETF'
-        };
-        const quellenList = Array.isArray(action.quellen) ? action.quellen : [];
-        const quellenItems = quellenList.map(q => createRow(`- ${quellenMap[q.kind] || q.kind || 'Quelle'}`, UIUtils.formatCurrency(q.brutto || 0)));
-        const steuerRow = createRow('- Steuern (geschätzt)', UIUtils.formatCurrency(action.steuer || 0));
-        steuerRow.style.cssText += 'border-top: 1px solid var(--border-color); margin-top: 5px; padding-top: 5px;';
-        quellenItems.push(steuerRow);
-
-        const verwendungenItems = [];
-        if (action.verwendungen?.liquiditaet > 0) verwendungenItems.push(createRow('Zufluss Liquidität:', UIUtils.formatCurrency(action.verwendungen.liquiditaet)));
-        if (action.verwendungen?.gold > 0) verwendungenItems.push(createRow('Kauf von Gold:', UIUtils.formatCurrency(action.verwendungen.gold)));
-        if (action.verwendungen?.aktien > 0) verwendungenItems.push(createRow('Kauf von Aktien:', UIUtils.formatCurrency(action.verwendungen.aktien)));
-        if (action.verwendungen?.geldmarkt > 0) verwendungenItems.push(createRow('Kauf von Geldmarkt-ETF:', UIUtils.formatCurrency(action.verwendungen.geldmarkt)));
-
-        const wrapper = document.createElement('div');
-        wrapper.style.cssText = 'text-align: left; font-size: 1rem; line-height: 1.6;';
-        wrapper.append(
-            title,
-            createSection(`A. Quellen (Netto: ${UIUtils.formatCurrency(action.nettoErlös || 0)})`, quellenItems),
-            createSection('B. Verwendungen', verwendungenItems)
-        );
-        content.appendChild(wrapper);
-    }
     /**
      * Berechnet interne Cash-Umschichtungen nach einer Transaktion.
      *

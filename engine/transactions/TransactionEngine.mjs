@@ -12,45 +12,55 @@ export const TransactionEngine = {
      * Berechnet Ziel-Liquidität basierend auf Profil und Markt
      */
     calculateTargetLiquidity: (profil, market, inflatedBedarf, input = null) => {
+        // 1. Runway-Logik (Netto-Bedarf, falls man so will, aber hier wird oft Brutto verwendet)
+        // Die aktuelle Implementierung nutzt Full Flex oder 50% Flex je nach Regime für die Ziel-Berechnung.
+        // Das ist okay als "Runway"-Ziel.
+
+        let calculatedTarget = 0;
+
         if (!profil.isDynamic) {
-            return (inflatedBedarf.floor + inflatedBedarf.flex) * 2;
-        }
-
-        const regime = CONFIG.TEXTS.REGIME_MAP[market.sKey];
-        const profilMax = profil.runway[regime]?.total || profil.runway.hot_neutral.total;
-        const minMonths = input?.runwayMinMonths || profil.minRunwayMonths;
-        const userTarget = input?.runwayTargetMonths || profilMax;
-
-        // Bidirektionale ATH-Skalierung:
-        // seiATH = 1.0 (am ATH): User-Target (z.B. 36 Monate)
-        // seiATH > 1.0 (über ATH): nach oben skalieren bis Profil-Max (z.B. 48)
-        // seiATH < 1.0 (unter ATH): nach unten skalieren bis Minimum (z.B. 24)
-        const seiATH = market.seiATH || 1;
-
-        let zielMonate;
-        if (seiATH >= 1) {
-            // Über ATH: von userTarget hoch zu profilMax
-            // 20% über ATH → volles profilMax
-            const aboveAthFactor = Math.min((seiATH - 1) * 5, 1);
-            zielMonate = userTarget + aboveAthFactor * (profilMax - userTarget);
+            calculatedTarget = (inflatedBedarf.floor + inflatedBedarf.flex) * 2;
         } else {
-            // Unter ATH: von userTarget runter zu minMonths
-            // 40% unter ATH → minMonths
-            const belowAthFactor = Math.min((1 - seiATH) * 2.5, 1);
-            zielMonate = userTarget - belowAthFactor * (userTarget - minMonths);
+            const regime = CONFIG.TEXTS.REGIME_MAP[market.sKey];
+            const profilMax = profil.runway[regime]?.total || profil.runway.hot_neutral.total;
+            const minMonths = input?.runwayMinMonths || profil.minRunwayMonths;
+            const userTarget = input?.runwayTargetMonths || profilMax;
+
+            // Bidirektionale ATH-Skalierung
+            const seiATH = market.seiATH || 1;
+            let zielMonate;
+            if (seiATH >= 1) {
+                const aboveAthFactor = Math.min((seiATH - 1) * 5, 1);
+                zielMonate = userTarget + aboveAthFactor * (profilMax - userTarget);
+            } else {
+                const belowAthFactor = Math.min((1 - seiATH) * 2.5, 1);
+                zielMonate = userTarget - belowAthFactor * (userTarget - minMonths);
+            }
+
+            const useFullFlex = (regime === 'peak' || regime === 'hot_neutral');
+            const anpassbarerBedarf = useFullFlex
+                ? (inflatedBedarf.floor + inflatedBedarf.flex)
+                : (inflatedBedarf.floor + 0.5 * inflatedBedarf.flex);
+
+            calculatedTarget = (Math.max(1, anpassbarerBedarf) / 12) * zielMonate;
         }
 
-        const useFullFlex = (regime === 'peak' || regime === 'hot_neutral');
-        const anpassbarerBedarf = useFullFlex
-            ? (inflatedBedarf.floor + inflatedBedarf.flex)
-            : (inflatedBedarf.floor + 0.5 * inflatedBedarf.flex);
+        // 2. Mindest-Puffer (Brutto)
+        // "sicherheitsPuffer" im Sinne von: Waschmaschine muss bezahlbar sein.
+        // Auch wenn durch Rente monatliche Entnahme 0 ist.
+        const minBufferMonths = (input && input.minCashBufferMonths !== undefined)
+            ? input.minCashBufferMonths
+            : 2; // Default 2 Monate
 
-        const calculatedTarget = (Math.max(1, anpassbarerBedarf) / 12) * zielMonate;
+        const bruttoJahresbedarf = inflatedBedarf.floor + inflatedBedarf.flex;
+        const bruttoMonatsbedarf = bruttoJahresbedarf / 12;
+        const absoluteBufferTarget = bruttoMonatsbedarf * minBufferMonths;
 
-        // Fix: Absolute Untergrenze für Liquidität erzwingen (z.B. 10.000€)
-        // Verhindert, dass bei 0€ Netto-Bedarf (durch hohe Rente) das Cash-Konto ausblutet
+        // 3. Absolute Untergrenze (technisch)
         const minAbs = CONFIG.THRESHOLDS.STRATEGY.absoluteMinLiquidity || 0;
-        return Math.max(calculatedTarget, minAbs);
+
+        // Das Maximum gewinnt
+        return Math.max(calculatedTarget, absoluteBufferTarget, minAbs);
     },
 
     /**
@@ -735,7 +745,6 @@ export const TransactionEngine = {
 
             // Sicherheits-Check: Nur in guten Marktphasen investieren!
             // Definition "Riskante Marktphase":
-            // Definition "Riskante Marktphase":
             // "Seitwärts" (side) nehmen wir jetzt raus, damit auch in ruhigen Phasen investiert wird.
             const isRiskyMarket = market.sKey.includes('bear') ||
                 market.sKey.includes('crash') ||
@@ -750,7 +759,7 @@ export const TransactionEngine = {
             );
 
             // Hysterese: Surplus muss über der Schwelle liegen
-            // (Optional: Wir könten hier eine eigene, etwas niedrigere Schwelle nehmen, 
+            // (Optional: Wir könnten hier eine eigene, etwas niedrigere Schwelle nehmen, 
             // aber der User wünscht sich Relevanz).
             const surplusHysteresis = CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED ? minTradeThreshold : 500;
 
@@ -765,66 +774,9 @@ export const TransactionEngine = {
                 const targetStockVal = totalWealth * (input.targetEq / 100);
                 const targetGoldVal = input.goldAktiv ? totalWealth * (input.goldZielProzent / 100) : 0;
 
-                // 2. Aktuelle Werte (Wir müssen wissen, wie viel wir schon haben)
-                // Wir haben 'depotwertGesamt', aber wir brauchen die Aufteilung.
-                // 'market' hat 'portfolio' nicht direkt.
-                // Aber wir haben 'p.portfolio' (das Portfolio-Objekt) nicht in den Parametern von determineAction??
-                // DOCH! `p` ist das ganze Input-Objekt.
-                // Warte, `determineAction(p)` destructuring oben:
-                // const { aktuelleLiquiditaet, depotwertGesamt, ... } = p;
-                // Wir brauchen Zugriff auf die Einzelwerte.
-                // TransactionEngine ruft `calculateCurrentAllocation` auf?
-                // Nein, die Werte werden oft nicht einzeln übergeben.
-
-                // Workaround: Wir nutzen die "input" parameter, falls sie aktuelle Werte haben? 
-                // Nein, input ist die Konfig.
-                // Wir müssen 'portfolio' in 'p' haben.
-                // in simulator-engine-direct.js line 451: engineInput hat KEINE Portfolio-Details, nur Summen.
-                // MIST. 
-
-                // WIR BRAUCHEN DIE AKTUELLEN BESTÄNDE (Aktien/Gold) HIER.
-                // In simulator-engine-direct werden sie NICHT explizit übergeben, nur 'depotwertGesamt'.
-                // ABER: In 'TransactionEngine.mjs' rufen wir es auf.
-                // Schauen wir, ob wir 'portfolio' übergeben bekommen.
-
-                // Wenn wir die Bestände nicht kennen, können wir nicht auf Ziel rebalancen.
-                // Da wir "Blind" sind, nehmen WIR AN, dass 'depotwertGesamt' dem aktuellen Split entspricht?
-                // NEIN, das ist gefährlich.
-
-                // STOPP: simulator-engine-direct.js hat Zugriff auf portfolio!
-                // Wir müssen 'aktienWert' und 'goldWert' an die Engine übergeben.
-
-                // Da ich das jetzt nicht in der Engine API ändern will (Schnittstelle!),
-                // müssen wir improvisieren?
-                // Der User sagt: "Ist das Ergebnis von 130k Aktien richtig?"
-                // Antwort: Nein.
-
-                // Lösung: Wir nehmen an, dass 'depotwertGesamt' sich grob wie das Ziel verhält? 
-                // Nein, das ist ja gerade das Problem (0% Aktien).
-
-                // Wir MÜSSEN 'aktienWert' und 'goldWert' an determineAction übergeben.
-                // Ich checke kurz, ob sie schon da sind.
-                // simulator-engine-direct.js Zeile 451 "engineInput".
-                // Es übergibt ...inputsCtx.
-                // inputsCtx kommt aus 'buildInputsCtxFromPortfolio'.
-                // Schauen wir uns an, was das tut.
-
-                // Das ist wahrscheinlich in 'balance-main.js' oder 'balance-utils.js' definiert oder ein Helper.
-                // Ich sehe es im Simulator Code nicht definiert. Es ist ein Import?
-                // Nein, es ist wahrscheinlich im Simulator definiert.
-
-                // Checken wir Zeile 446 in simulator-engine-direct.js.
-
-                /*
-                const inputsCtx = buildInputsCtxFromPortfolio(inputs, portfolio, { ... });
-                */
-
-                // Wenn inputsCtx 'aktienWert' enthält, ist alles gut.
-
-                // Nehmen wir an, wir finden die Werte in `p`.
-                // Wir greifen auf `p.aktienWert` und `p.goldWert` zu.
-                // Falls undefined, ist es 0 (Start-Situation).
-
+                // 2. Aktuelle Werte ermitteln
+                // Da `p` (Parameter-Objekt) Zugriff auf `aktienWert` und `goldWert` hat, nutzen wir diese.
+                // Falls sie im Kontext fehlen (z.B. bei Initialisierung), fallen wir auf 0 zurück.
                 const currentStockVal = p.aktienWert || 0;
                 const currentGoldVal = p.goldWert || 0;
 
@@ -844,8 +796,7 @@ export const TransactionEngine = {
                 if (investAmountRaw > 0) {
                     // 5. Aufteilung proportional zur LÜCKE (nicht zum Ziel)
                     // Wer die größte Lücke hat, kriegt am meisten.
-                    const realTotalGap = gapStock + gapGold; // Kann sich von totalGap unterscheiden? Nein, oben berechnet.
-                    // Fallback: Wenn realTotalGap 0 ist, investieren wir nichts (wurde durch min oben eh abgefangen)
+                    const realTotalGap = gapStock + gapGold;
 
                     const shareStock = (realTotalGap > 0) ? gapStock / realTotalGap : 0;
                     const shareGold = (realTotalGap > 0) ? gapGold / realTotalGap : 0;
@@ -914,6 +865,11 @@ export const TransactionEngine = {
                 transactionDiagnostics
             };
         }
+
+        /* ------------------------------------------------------------------
+     * INTERNE HELPER
+     * ------------------------------------------------------------------ */
+
 
         let saleResult = this.calculateSaleAndTax(
             gesamterNettoBedarf,

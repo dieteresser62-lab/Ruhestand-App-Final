@@ -115,7 +115,8 @@ function _internal_calculateModel(input, lastState) {
     const zielLiquiditaet = TransactionEngine.calculateTargetLiquidity(
         profil,
         market,
-        inflatedBedarf
+        inflatedBedarf,
+        input
     );
 
     // 9. Transaktionsaktion bestimmen

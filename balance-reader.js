@@ -101,9 +101,10 @@ export const UIReader = {
             goldCost: num('goldCost'),
             kirchensteuerSatz: parseFloat(val('kirchensteuerSatz')) || 0,
             sparerPauschbetrag: num('sparerPauschbetrag'),
-            runwayMinMonths: parseInt(val('runwayMinMonths'), 10) || 0,
-            runwayTargetMonths: parseInt(val('runwayTargetMonths'), 10) || 0,
-            targetEq: parseFloat(val('targetEq')) || 0,
+            runwayMinMonths: parseInt(document.getElementById('runwayMinMonths').value) || 24,
+            runwayTargetMonths: parseInt(document.getElementById('runwayTargetMonths').value) || 36,
+            minCashBufferMonths: parseInt(document.getElementById('minCashBufferMonths')?.value) || 2, // Default: 2 Monate Puffer
+            targetEq: parseFloat(document.getElementById('targetEq').value) || 60,
             rebalBand: parseFloat(val('rebalBand')) || 0,
             maxSkimPctOfEq: parseFloat(val('maxSkimPctOfEq')) || 0,
             maxBearRefillPctOfEq: parseFloat(val('maxBearRefillPctOfEq')) || 0,
