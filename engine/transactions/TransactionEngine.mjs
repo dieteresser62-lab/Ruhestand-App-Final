@@ -801,16 +801,6 @@ export const TransactionEngine = {
                 // Wir dürfen totalWealth hier NICHT künstlich klein rechnen, sonst sind die Ziel-Beträge für Aktien/Gold zu niedrig.
                 const totalWealth = depotwertGesamt + aktuelleLiquiditaet;
 
-                console.log("DEBUG_SURPLUS:", {
-                    aktuelleLiq: aktuelleLiquiditaet,
-                    zielLiq: zielLiquiditaet,
-                    depotwert: depotwertGesamt,
-                    totalWealth,
-                    surplus,
-                    targetEq: input.targetEq,
-                    goldZiel: input.goldZielProzent
-                });
-
                 // 1. Absolute Zielwerte berechnen
                 const targetStockVal = totalWealth * (input.targetEq / 100);
                 const targetGoldVal = input.goldAktiv ? totalWealth * (input.goldZielProzent / 100) : 0;
@@ -821,25 +811,12 @@ export const TransactionEngine = {
                 const currentStockVal = (input.depotwertAlt || 0) + (input.depotwertNeu || 0);
                 const currentGoldVal = input.goldAktiv ? (input.goldWert || 0) : 0;
 
-                console.log("DEBUG_GAPS:", {
-                    targetStockVal,
-                    targetGoldVal,
-                    currentStockVal,
-                    currentGoldVal,
-                    gapStock: Math.max(0, targetStockVal - currentStockVal),
-                    gapGold: Math.max(0, targetGoldVal - currentGoldVal),
-                    totalGap: Math.max(0, targetStockVal - currentStockVal) + Math.max(0, targetGoldVal - currentGoldVal),
-                    investAmountRaw: Math.min(surplus, Math.max(0, targetStockVal - currentStockVal) + Math.max(0, targetGoldVal - currentGoldVal))
-                });
 
                 // 3. Gaps berechnen (Nur positive Gaps, wir verkaufen hier nichts, nur Kauf)
                 const gapStock = Math.max(0, targetStockVal - currentStockVal);
                 const gapGold = Math.max(0, targetGoldVal - currentGoldVal);
                 const totalGap = gapStock + gapGold;
-
-                // 4. Investitionsbetrag begrenzen
-                // Wir investieren maximal den Surplus, aber NICHT mehr als nötig, um die Lücken zu schließen.
-                let investAmountRaw = Math.min(surplus, totalGap);
+                const investAmountRaw = Math.min(surplus, totalGap);
 
                 if (CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED) {
                     investAmountRaw = this._quantizeAmount(investAmountRaw, 'floor');
