@@ -69,10 +69,10 @@ export const TransactionEngine = {
         // console.log("DEBUG_LIQ: Wynik", { minBufferMonths, bruttoJahresbedarf, absoluteBufferTarget });
 
         // 3. Absolute Untergrenze (technisch)
-        // FIX: Statt harter 10k Konstante jetzt dynamisch basierend auf Bedarf.
-        // Wir nehmen 1.0 x Brutto-Monatsbedarf als technisches Minimum, damit man nie ganz trocken läuft.
-        // Das respektiert User-Settings (z.B. 2 Monate Puffer), solange diese > 1 Monat sind.
-        const minAbs = bruttoMonatsbedarf * 1.0;
+        // FIX: Wir entfernen die künstliche Untergrenze komplett.
+        // Der User entscheidet über "Min. Cash-Puffer", wie viel Reserve er will.
+        // Wenn er 0 (oder 2) Monate einstellt, soll das gelten (sofern Runway-Logik nicht mehr verlangt).
+        const minAbs = 0;
 
         calculatedTarget = Math.max(calculatedTarget, absoluteBufferTarget, minAbs);
     },
