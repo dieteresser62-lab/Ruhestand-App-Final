@@ -152,7 +152,7 @@ export const StorageManager = {
             if (handle && (await handle.queryPermission({ mode: 'readwrite' })) === 'granted') {
                 appState.snapshotHandle = handle;
             }
-        } catch(e) {
+        } catch (e) {
             console.warn("Konnte Snapshot-Handle nicht laden.", e);
         }
     },
@@ -188,11 +188,24 @@ export const StorageManager = {
                 statusEl.textContent = 'Speicherort: Browser (localStorage)';
                 snapshots = Object.keys(localStorage)
                     .filter(key => key.startsWith(CONFIG.STORAGE.SNAPSHOT_PREFIX))
-                    .map(key => ({
-                        key,
-                        name: new Date(key.replace(CONFIG.STORAGE.SNAPSHOT_PREFIX, ''))
-                            .toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
-                    }));
+                    .map(key => {
+                        const rawSuffix = key.replace(CONFIG.STORAGE.SNAPSHOT_PREFIX, '');
+                        // Check for separator indicating a label we added: '--'
+                        let dateStr = rawSuffix;
+                        let label = '';
+                        if (rawSuffix.includes('--')) {
+                            const parts = rawSuffix.split('--');
+                            dateStr = parts[0];
+                            label = parts.slice(1).join('--'); // Rejoin rest if there were multiple dashes
+                        }
+
+                        let displayName = new Date(dateStr)
+                            .toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' });
+                        if (displayName === 'Invalid Date') displayName = dateStr;
+                        if (label) displayName += ` (${label})`;
+
+                        return { key, name: displayName };
+                    });
             }
         } catch (err) {
             liLoading.textContent = 'Fehler beim Laden der Snapshots.';
@@ -206,7 +219,7 @@ export const StorageManager = {
         }
 
         const fragment = document.createDocumentFragment();
-        snapshots.sort((a,b) => b.name.localeCompare(a.name)).forEach(({ key, name }) => {
+        snapshots.sort((a, b) => b.name.localeCompare(a.name)).forEach(({ key, name }) => {
             const li = document.createElement('li');
             const nameSpan = document.createElement('span');
             nameSpan.textContent = name;
@@ -243,24 +256,36 @@ export const StorageManager = {
      *
      * @async
      * @param {FileSystemDirectoryHandle|null} handle - Verzeichnis-Handle oder null
+     * @param {string} [label=''] - Optionaler Benutzer-Label für den Snapshot
      * @returns {Promise<void>}
      * @throws {StorageError} Wenn keine Daten zum Sichern vorhanden sind
      */
-    async createSnapshot(handle) {
+    async createSnapshot(handle, label = '') {
         const currentData = this.loadState();
         if (!currentData || Object.keys(currentData).length === 0) {
             throw new StorageError("Keine Daten zum Sichern vorhanden.");
         }
         const timestamp = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-');
 
+        // Sanitize label
+        const safeLabel = label ? label.replace(/[^a-zA-Z0-9_\- äöüÄÖÜß]/g, '_').trim() : '';
+
         if (handle) {
-            const fileName = `Snapshot_${timestamp}.json`;
+            // User Format: Profilname & Timestamp -> "Dieter_2025-..."
+            // Fallback: Snapshot_2025-...
+            const prefix = safeLabel ? safeLabel : 'Snapshot';
+            // Ensure separator is clear. If label ends with _, don't add another.
+            const fileName = `${prefix}_${timestamp}.json`;
+
             const fileHandle = await handle.getFileHandle(fileName, { create: true });
             const writable = await fileHandle.createWritable();
             await writable.write(JSON.stringify(currentData, null, 2));
             await writable.close();
         } else {
-            const key = CONFIG.STORAGE.SNAPSHOT_PREFIX + new Date().toISOString();
+            // Use '--' as separator for LocalStorage keys to distinguish date from label
+            // We keep the chronological key structure for LS to maintain sorting
+            const labelPart = safeLabel ? `--${safeLabel}` : '';
+            const key = CONFIG.STORAGE.SNAPSHOT_PREFIX + new Date().toISOString() + labelPart;
             localStorage.setItem(key, JSON.stringify(currentData));
         }
     },

@@ -136,7 +136,7 @@ export const UIBinder = {
     },
 
     handleReset() {
-        if(confirm("Alle gespeicherten Werte (inkl. Guardrail-Daten) zurücksetzen?")) {
+        if (confirm("Alle gespeicherten Werte (inkl. Guardrail-Daten) zurücksetzen?")) {
             StorageManager.resetState();
             location.reload();
         }
@@ -189,7 +189,7 @@ export const UIBinder = {
 
     handleUndoNachruecken() {
         if (appState.lastMarktData) {
-            Object.entries(appState.lastMarktData).forEach(([k,v]) => {
+            Object.entries(appState.lastMarktData).forEach(([k, v]) => {
                 dom.inputs[k].value = v;
             });
         }
@@ -202,7 +202,7 @@ export const UIBinder = {
         const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `balancing-export-${new Date().toISOString().slice(0,10)}.json`;
+        a.download = `balancing-export-${new Date().toISOString().slice(0, 10)}.json`;
         a.click();
         URL.revokeObjectURL(a.href);
         UIRenderer.toast('Export erstellt.');
@@ -217,7 +217,7 @@ export const UIBinder = {
             UIReader.applyStoredInputs(StorageManager.loadState().inputs);
             update();
             UIRenderer.toast('Import erfolgreich.');
-        } catch(err) {
+        } catch (err) {
             UIRenderer.handleError(new AppError('Import fehlgeschlagen.', { originalError: err }));
         } finally {
             e.target.value = '';
@@ -250,7 +250,7 @@ export const UIBinder = {
                     close: parseValue(columns[4])
                 };
             }).filter(d => d && d.date && !isNaN(d.close))
-              .sort((a, b) => a.date - b.date);
+                .sort((a, b) => a.date - b.date);
 
             if (data.length === 0) throw new Error('Keine gültigen Daten in der CSV gefunden.');
 
@@ -942,13 +942,17 @@ export const UIBinder = {
     },
 
     async handleJahresabschluss() {
-        if (!confirm("Möchten Sie einen Jahresabschluss-Snapshot erstellen? Die Inflation für das aktuelle Alter wird dabei fortgeschrieben.")) return;
+        const label = dom.inputs.profilName.value.trim();
+
+        if (!confirm(`Soll der Jahresabschluss ${label ? `"${label}" ` : ''}jetzt erstellt werden?\n\nHinweis: Das aktuelle Alter (+1) und die Inflation werden dabei automatisch fortgeschrieben.`)) return;
+
         try {
             this._applyAnnualInflation();
             debouncedUpdate();
             await new Promise(resolve => setTimeout(resolve, 300));
-            await StorageManager.createSnapshot(appState.snapshotHandle);
-            UIRenderer.toast('Jahresabschluss-Snapshot erfolgreich erstellt.');
+            // Pass the custom label to createSnapshot
+            await StorageManager.createSnapshot(appState.snapshotHandle, label);
+            UIRenderer.toast(`Jahresabschluss-Snapshot ${label ? `"${label}" ` : ''}erfolgreich erstellt.`);
             await StorageManager.renderSnapshots(dom.outputs.snapshotList, dom.controls.snapshotStatus, appState.snapshotHandle);
         } catch (err) {
             UIRenderer.handleError(err);
@@ -961,7 +965,7 @@ export const UIBinder = {
         try {
             if (restoreBtn) {
                 const key = restoreBtn.dataset.key;
-                if (confirm(`Snapshot "${key.replace('.json','')}" wiederherstellen? Alle aktuellen Eingaben gehen verloren.`)) {
+                if (confirm(`Snapshot "${key.replace('.json', '')}" wiederherstellen? Alle aktuellen Eingaben gehen verloren.`)) {
                     await StorageManager.restoreSnapshot(key, appState.snapshotHandle);
                 }
             }

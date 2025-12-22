@@ -340,36 +340,162 @@ class ActionRenderer {
         const container = this.dom?.outputs?.handlungsanweisung;
         if (!container) return;
         [...container.children].filter(n => n.id !== 'copyAction').forEach(n => n.remove());
-        container.className = action.anweisungKlasse || 'anweisung-grau';
 
-        const content = document.createElement('div');
-        content.id = 'handlungContent';
-
-        if (action.type === 'TRANSACTION') {
-            // Strukturierter Aufbau der Handlungskarte.
-            this._buildTransactionContent(action, content);
-        } else if (action.title) {
-            content.textContent = action.title;
-        }
-
+        // 1. Calculate potential internal cash rebalance
         const internalRebalance = this.determineInternalCashRebalance(
             input,
             action,
             spending
         );
 
-        if (internalRebalance) {
-            if (content.childNodes.length > 0) {
-                const hr = document.createElement('hr');
-                hr.style.cssText = 'margin: 15px -10px; border-color: rgba(127,127,127,0.2);';
-                content.appendChild(hr);
-            }
-            content.appendChild(this.buildInternalRebalance(internalRebalance));
+        // 2. Integrate into main action object (Unified UI)
+        const uiAction = this._integrateCashRebalance(action, internalRebalance);
+
+        container.className = uiAction.anweisungKlasse || 'anweisung-grau';
+
+        const content = document.createElement('div');
+        content.id = 'handlungContent';
+
+        if (uiAction.type === 'TRANSACTION') {
+            // Strukturierter Aufbau der Handlungskarte.
+            this._buildTransactionContent(uiAction, content);
+        } else if (uiAction.title) {
+            content.textContent = uiAction.title;
         }
+
+        // NOTE: Separate internal rebalance rendering removed as requested by user.
 
         container.appendChild(content);
     }
 
+    /**
+     * Integrates the internal cash rebalance into the standard action object
+     * so it renders strictly as part of the transaction card (like ETFs).
+     */
+    _integrateCashRebalance(originalAction, rebalance) {
+        if (!rebalance) return originalAction;
+
+        // Deep clone to avoid mutating the original Engine result
+        const action = JSON.parse(JSON.stringify(originalAction));
+
+        // Ensure it looks like a transaction
+        action.type = 'TRANSACTION';
+        if (!action.title || action.title.includes('Kein Handlungsbedarf')) {
+            action.title = 'Liquiditäts-Management';
+            action.anweisungKlasse = 'anweisung-gelb'; // Upgrade to action color
+        } else {
+            action.title += ' & Geldmarkt-Opt.';
+        }
+
+        if (!action.quellen) action.quellen = [];
+        if (!action.verwendungen) action.verwendungen = {};
+
+        if (rebalance.to === 'Geldmarkt-ETF') {
+            // BUY Money Market (Source: Liquidity)
+            let liqSource = action.quellen.find(q => q.kind === 'liquiditaet' || q.source === 'Liquidität');
+            if (!liqSource) {
+                liqSource = { kind: 'liquiditaet', brutto: 0, netto: 0, steuer: 0 };
+                action.quellen.unshift(liqSource);
+            }
+            liqSource.brutto += rebalance.amount;
+            liqSource.netto += rebalance.amount; // Assuming cash is tax free
+
+            // Add Use
+            action.verwendungen.geldmarkt = (action.verwendungen.geldmarkt || 0) + rebalance.amount;
+
+        } else if (rebalance.from === 'Geldmarkt-ETF') {
+            // SELL Money Market (Source: Geldmarkt-ETF, Use: Liquidity)
+            // Add Source
+            action.quellen.push({
+                kind: 'geldmarkt',
+                brutto: rebalance.amount,
+                netto: rebalance.amount,
+                steuer: 0 // Ignoring tax for internal helper for now
+            });
+
+            // Add Use (Liquidity Refill)
+            action.verwendungen.liquiditaet = (action.verwendungen.liquiditaet || 0) + rebalance.amount;
+        }
+
+        // Update Totals
+        action.nettoErlös = action.quellen.reduce((sum, q) => sum + (q.netto || 0), 0);
+
+        return action;
+    }
+
+    // Removed determineInternalCashRebalance logic as it was replaced in previous steps? 
+    // Wait, the previous tool call modified determineInternalCashRebalance. 
+    // I should NOT replace that method here, but I AM replacing renderAction and buildInternalRebalance.
+    // I need to be careful with line numbers.
+
+    /**
+     * Baut die Inhaltsstruktur für Transaktions-Empfehlungen auf.
+     *
+     * @param {Object} action - Handlungsempfehlung mit Quellen und Verwendungen.
+     * @param {HTMLElement} content - Container, der befüllt werden soll.
+     */
+    _buildTransactionContent(action, content) {
+        const title = document.createElement('strong');
+        title.style.cssText = 'display: block; font-size: 1.1rem; margin-bottom: 8px; text-align:center;';
+        title.textContent = action.title;
+        if (action.isPufferSchutzAktiv) {
+            const badge = document.createElement('span');
+            badge.className = 'strategy-badge';
+            badge.textContent = 'PUFFER-SCHUTZ';
+            title.append(document.createTextNode(' '), badge);
+        }
+
+        const createSection = (titleText, items) => {
+            const wrapper = document.createElement('div');
+            wrapper.style.cssText = 'border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; margin-bottom: 12px;';
+            wrapper.classList.add('action-detail-block');
+            const head = document.createElement('strong');
+            head.style.cssText = 'display:block; border-bottom: 1px solid var(--border-color); padding-bottom: 5px; margin-bottom: 8px;';
+            head.textContent = titleText;
+            wrapper.appendChild(head);
+            items.forEach(item => wrapper.appendChild(item));
+            return wrapper;
+        };
+
+        const createRow = (label, value) => {
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex; justify-content:space-between;';
+            const labelSpan = document.createElement('span');
+            labelSpan.textContent = label;
+            const valueSpan = document.createElement('span');
+            valueSpan.textContent = value;
+            row.append(labelSpan, valueSpan);
+            return row;
+        };
+
+        const quellenMap = {
+            'gold': 'Gold',
+            'aktien_neu': 'Aktien (neu)',
+            'aktien_alt': 'Aktien (alt)',
+            'liquiditaet': 'Liquidität (Tagesgeld)',
+            'geldmarkt': 'Geldmarkt-ETF'
+        };
+        const quellenList = Array.isArray(action.quellen) ? action.quellen : [];
+        const quellenItems = quellenList.map(q => createRow(`- ${quellenMap[q.kind] || q.kind || 'Quelle'}`, UIUtils.formatCurrency(q.brutto || 0)));
+        const steuerRow = createRow('- Steuern (geschätzt)', UIUtils.formatCurrency(action.steuer || 0));
+        steuerRow.style.cssText += 'border-top: 1px solid var(--border-color); margin-top: 5px; padding-top: 5px;';
+        quellenItems.push(steuerRow);
+
+        const verwendungenItems = [];
+        if (action.verwendungen?.liquiditaet > 0) verwendungenItems.push(createRow('Zufluss Liquidität:', UIUtils.formatCurrency(action.verwendungen.liquiditaet)));
+        if (action.verwendungen?.gold > 0) verwendungenItems.push(createRow('Kauf von Gold:', UIUtils.formatCurrency(action.verwendungen.gold)));
+        if (action.verwendungen?.aktien > 0) verwendungenItems.push(createRow('Kauf von Aktien:', UIUtils.formatCurrency(action.verwendungen.aktien)));
+        if (action.verwendungen?.geldmarkt > 0) verwendungenItems.push(createRow('Kauf von Geldmarkt-ETF:', UIUtils.formatCurrency(action.verwendungen.geldmarkt)));
+
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'text-align: left; font-size: 1rem; line-height: 1.6;';
+        wrapper.append(
+            title,
+            createSection(`A. Quellen (Netto: ${UIUtils.formatCurrency(action.nettoErlös || 0)})`, quellenItems),
+            createSection('B. Verwendungen', verwendungenItems)
+        );
+        content.appendChild(wrapper);
+    }
     /**
      * Berechnet interne Cash-Umschichtungen nach einer Transaktion.
      *
@@ -392,47 +518,72 @@ class ActionRenderer {
             return null;
         }
 
-        const liqNachTransaktion = (input.tagesgeld + input.geldmarktEtf) + (action.verwendungen?.liquiditaet || 0);
+        // Fix: Subtract liquidity used as source (Surplus Investing)
+        const liquidityOutflow = (Array.isArray(action.quellen) ? action.quellen : [])
+            .filter(q => q.kind === 'liquiditaet' || q.source === 'Liquidität')
+            .reduce((sum, q) => sum + (q.brutto || 0), 0);
+
+        const liqNachTransaktion = (input.tagesgeld + input.geldmarktEtf)
+            - liquidityOutflow
+            + (action.verwendungen?.liquiditaet || 0);
+
         if (!isFinite(liqNachTransaktion)) {
             return null;
         }
 
         const zielTagesgeld = annualWithdrawal;
-        const tagesgeldVorTransaktion = input.tagesgeld;
-        const liqZufluss = liqNachTransaktion - (tagesgeldVorTransaktion + input.geldmarktEtf);
-        const tagesgeldNachTransaktion = tagesgeldVorTransaktion + liqZufluss;
-        const geldmarktNachTransaktion = input.geldmarktEtf;
+        // Adjusted calculation for proper diff
+        const tagesgeldVorTransaktion = input.tagesgeld - liquidityOutflow; // Assuming outflow comes from Tagesgeld first
+        const liqZufluss = (action.verwendungen?.liquiditaet || 0); // Money coming IN from sales
 
-        const umschichtungsbetrag = tagesgeldNachTransaktion - zielTagesgeld;
+        const virtualTagesgeld = input.tagesgeld - liquidityOutflow + liqZufluss;
+        const diff = virtualTagesgeld - zielTagesgeld; // positive = excess, negative = need refill
 
         const schwelle = UIUtils.getThreshold('THRESHOLDS.STRATEGY.cashRebalanceThreshold', 2500);
 
-        if (umschichtungsbetrag > schwelle) {
-            return { from: 'Tagesgeld', to: 'Geldmarkt-ETF', amount: umschichtungsbetrag };
-        } else if (umschichtungsbetrag < -schwelle) {
-            const benoetigterBetrag = Math.abs(umschichtungsbetrag);
-            if (geldmarktNachTransaktion >= benoetigterBetrag) {
-                return { from: 'Geldmarkt-ETF', to: 'Tagesgeld', amount: benoetigterBetrag };
+        if (diff > schwelle) {
+            const amount = this._quantize(diff);
+            return { from: 'Tagesgeld', to: 'Geldmarkt-ETF', amount: amount };
+        } else if (diff < -schwelle) {
+            const needed = Math.abs(diff);
+            let canRefill = Math.min(needed, input.geldmarktEtf);
+
+            // Only quantize if significantly large
+            canRefill = this._quantize(canRefill);
+
+            if (canRefill > 0) {
+                return { from: 'Geldmarkt-ETF', to: 'Tagesgeld', amount: canRefill };
             }
         }
         return null;
     }
 
     /**
-     * Baut ein visuelles Highlight für interne Umschichtungen.
-     *
-     * @param {Object} data - Berechneter Rebalancing-Vorschlag.
-     * @returns {HTMLDivElement} DOM-Knoten mit formatierter Nachricht.
+     * Quantizes an amount based on the Engine's Anti-Pseudo-Accuracy rules.
+     * Replicates the logic from TransactionEngine.
+     * @param {number} amount 
+     * @returns {number} Quantized amount
      */
-    buildInternalRebalance(data) {
-        const div = document.createElement('div');
-        div.className = 'internal-rebalance';
-        div.style.cssText = 'font-size: 1rem; text-align: center; line-height: 1.5; font-weight: 500;';
-        const strong = document.createElement('strong');
-        strong.textContent = UIUtils.formatCurrency(data.amount);
-        div.append(document.createTextNode(`${data.from} → ${data.to}: `), strong);
-        return div;
+    _quantize(amount) {
+        if (amount < 0) return 0;
+
+        // Fetch config via global API
+        const config = window.EngineAPI?.getConfig()?.ANTI_PSEUDO_ACCURACY;
+        if (!config || !config.ENABLED) return Math.floor(amount);
+
+        // Find tier
+        const tiers = config.QUANTIZATION_TIERS || [];
+        const tier = tiers.find(t => amount < t.limit);
+        const step = tier ? tier.step : 1000; // Default fallback
+
+        // Floor quantization
+        return Math.floor(amount / step) * step;
     }
+
+
+    // determineInternalCashRebalance remains here...
+
+    // buildInternalRebalance REMOVED
 
     /**
      * Baut die Inhaltsstruktur für Transaktions-Empfehlungen auf.
@@ -475,7 +626,13 @@ class ActionRenderer {
             return row;
         };
 
-        const quellenMap = { 'gold': 'Gold', 'aktien_neu': 'Aktien (neu)', 'aktien_alt': 'Aktien (alt)', 'liquiditaet': 'Liquidität' };
+        const quellenMap = {
+            'gold': 'Gold',
+            'aktien_neu': 'Aktien (neu)',
+            'aktien_alt': 'Aktien (alt)',
+            'liquiditaet': 'Liquidität (Tagesgeld)',
+            'geldmarkt': 'Geldmarkt-ETF'
+        };
         const quellenList = Array.isArray(action.quellen) ? action.quellen : [];
         const quellenItems = quellenList.map(q => createRow(`- ${quellenMap[q.kind] || q.kind || 'Quelle'}`, UIUtils.formatCurrency(q.brutto || 0)));
         const steuerRow = createRow('- Steuern (geschätzt)', UIUtils.formatCurrency(action.steuer || 0));
@@ -483,9 +640,10 @@ class ActionRenderer {
         quellenItems.push(steuerRow);
 
         const verwendungenItems = [];
-        if (action.verwendungen?.liquiditaet > 0) verwendungenItems.push(createRow('Liquidität auffüllen:', UIUtils.formatCurrency(action.verwendungen.liquiditaet)));
+        if (action.verwendungen?.liquiditaet > 0) verwendungenItems.push(createRow('Zufluss Liquidität:', UIUtils.formatCurrency(action.verwendungen.liquiditaet)));
         if (action.verwendungen?.gold > 0) verwendungenItems.push(createRow('Kauf von Gold:', UIUtils.formatCurrency(action.verwendungen.gold)));
         if (action.verwendungen?.aktien > 0) verwendungenItems.push(createRow('Kauf von Aktien:', UIUtils.formatCurrency(action.verwendungen.aktien)));
+        if (action.verwendungen?.geldmarkt > 0) verwendungenItems.push(createRow('Kauf von Geldmarkt-ETF:', UIUtils.formatCurrency(action.verwendungen.geldmarkt)));
 
         const wrapper = document.createElement('div');
         wrapper.style.cssText = 'text-align: left; font-size: 1rem; line-height: 1.6;';

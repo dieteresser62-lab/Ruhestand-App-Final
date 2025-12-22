@@ -106,7 +106,8 @@ export const UIReader = {
             targetEq: parseFloat(val('targetEq')) || 0,
             rebalBand: parseFloat(val('rebalBand')) || 0,
             maxSkimPctOfEq: parseFloat(val('maxSkimPctOfEq')) || 0,
-            maxBearRefillPctOfEq: parseFloat(val('maxBearRefillPctOfEq')) || 0
+            maxBearRefillPctOfEq: parseFloat(val('maxBearRefillPctOfEq')) || 0,
+            profilName: val('profilName') || ''
         };
     },
 
@@ -132,6 +133,9 @@ export const UIReader = {
                     el.checked = storedInputs[key];
                 } else if (el.classList.contains('currency')) {
                     el.value = UIUtils.formatNumber(UIUtils.parseCurrency(storedInputs[key]));
+                } else if (key === 'renteAktiv' && typeof storedInputs[key] === 'boolean') {
+                    // Fix: Convert saved boolean back to "ja"/"nein" for the select element
+                    el.value = storedInputs[key] ? 'ja' : 'nein';
                 } else {
                     el.value = storedInputs[key];
                 }
