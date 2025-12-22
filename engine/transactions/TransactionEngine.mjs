@@ -485,8 +485,17 @@ export const TransactionEngine = {
                 }
 
                 // Action Details vorbereiten
+                let actionTitle = '';
+                if (liquiditaetsBedarf > 0) {
+                    actionTitle = 'Opportunistisches Rebalancing & Liquidität auffüllen';
+                } else if (goldKaufBedarf > 0 || goldVerkaufBedarf > 0) {
+                    actionTitle = 'Opportunistisches Rebalancing (Gold)';
+                } else {
+                    actionTitle = ''; // Titel leer lassen, falls wir in Surplus-Logik fallen
+                }
+
                 actionDetails = {
-                    title: 'Opportunistisches Rebalancing & Liquidität auffüllen (Observed)',
+                    title: actionTitle,
                     type: 'REFILL',
                     bedarf: liquiditaetsBedarf,
                     diagnosisEntries: [],
