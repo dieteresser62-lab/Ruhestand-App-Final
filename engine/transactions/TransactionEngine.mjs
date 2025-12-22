@@ -658,10 +658,32 @@ export const TransactionEngine = {
                         saleBudgetAktienNeu: saleContext.saleBudgets.aktien_neu || 0
                     };
 
+                    // ANTI-PSEUDO-ACCURACY: Liquiditätsbedarf kaufmännisch runden (Ceil)
+
+                    // NEU: Wir runden den BRUTTO-VERKAUF, nicht den Netto-Bedarf.
+                    // 1. Dry Run: Wie viel Brutto müssten wir für den exakten Netto-Bedarf verkaufen?
+                    let dryRunSale = this.calculateSaleAndTax(
+                        effectiveTotalerBedarf,
+                        input,
+                        { minGold: saleContext.minGold, saleBudgets: saleContext.saleBudgets },
+                        market,
+                        false // isEmergencySale
+                    );
+
+                    let bruttoTarget = dryRunSale.bruttoVerkaufGesamt;
+
+                    // 2. Brutto-Betrag runden (Aufrunden)
+                    let cleanBruttoTarget = this._quantizeAmount(bruttoTarget, 'ceil');
+
+                    // 3. Context für echten Verkauf setzen
+                    saleContext.forceGrossSellAmount = cleanBruttoTarget;
+
+                    // Der "Bedarf" für die Anzeige/Resultat ist jetzt abgeleitet vom Gross Target?
+                    // Nein, calculateSaleAndTax liefert den erreichten Netto-Betrag zurück.
+                    // Wir lassen effectiveTotalerBedarf für die Verwendungs-Logik auf dem Netto-Gap (bzw. dem Resultat daraus).
+
                     actionDetails.bedarf = effectiveTotalerBedarf;
-                    actionDetails.title = `Opp. (Observed 3) [LiqBed: ${liquiditaetsBedarf.toFixed(0)} | EffTot: ${effectiveTotalerBedarf.toFixed(0)}]`;
-                    console.log('DEBUG: effectiveLiquiditätsBedarf at path 2:', effectiveLiquiditätsBedarf);
-                    console.log('DEBUG: effectiveTotalerBedarf at path 2:', effectiveTotalerBedarf);
+                    actionDetails.title = "Opportunistisches Rebalancing & Liquidität auffüllen";
 
                     // Verwendungen zuweisen
                     // ANTI-PSEUDO-ACCURACY: Auch Käufe runden (Gold), Rest in Liquidität
@@ -909,6 +931,8 @@ export const TransactionEngine = {
      * Berechnet Verkauf und Steuer
      */
     calculateSaleAndTax(requestedRefill, input, context, market, isEmergencySale) {
+        const forceGrossSellAmount = context && context.forceGrossSellAmount ? Number(context.forceGrossSellAmount) : 0;
+
         // Hardening against NaN inputs
         const kiSt = Number(input.kirchensteuerSatz) || 0;
         const keSt = 0.25 * (1 + 0.055 + kiSt);
@@ -925,7 +949,13 @@ export const TransactionEngine = {
             // DEBUG SALE LOOP (REMOVED)
 
             for (const tranche of tranchesToUse) {
-                if (nochZuDeckenderNettoBetrag <= 0.01) break;
+                // Abbruchbedingung: Wenn Netto-Bedarf gedeckt ist (Normalfall)
+                // ODER: Wenn ein explizites Brutto-Ziel gesetzt ist, muss dieses erreicht werden.
+                if (forceGrossSellAmount > 0) {
+                    if (totalBrutto >= forceGrossSellAmount) break;
+                } else {
+                    if (nochZuDeckenderNettoBetrag <= 0.01) break;
+                }
 
                 let maxBruttoVerkaufbar = Number(tranche.marketValue) || 0;
 
@@ -963,11 +993,29 @@ export const TransactionEngine = {
 
                 if (maxNettoAusTranche <= 0) continue;
 
-                const nettoAusDieserTranche = Math.min(nochZuDeckenderNettoBetrag, maxNettoAusTranche);
+                // Normalfall: Wir verkaufen nur so viel wie nötig für Netto-Bedarf
+                // Sonderfall (Gross Target): Wir verkaufen so viel wie nötig für Brutto-Ziel
+                let nettoAusDieserTranche = 0;
+
+                if (forceGrossSellAmount > 0) {
+                    // Bei Gross Target Logik berechnen wir "zuVerkaufenBrutto" direkt vom Brutto-Rest
+                    const remainingGross = Math.max(0, forceGrossSellAmount - totalBrutto);
+                    // Wir setzen nettoAusDieserTranche vorläufig auf max, um "zuVerkaufenBrutto" Logik unten nicht zu brechen
+                    // (oder wir passen die Logik unten an)
+                    // Einfacher: Wir nutzen direkt maxBruttoVerkaufbar, aber gekappt auf remainingGross
+                    const targetBruttoForTranche = Math.min(remainingGross, maxBruttoVerkaufbar);
+
+                    // Helper variable to bypass standard calc
+                    var explicitBrutto = targetBruttoForTranche;
+                } else {
+                    nettoAusDieserTranche = Math.min(nochZuDeckenderNettoBetrag, maxNettoAusTranche);
+                }
 
                 // Zu verkaufenden Bruttobetrag berechnen
                 let zuVerkaufenBrutto;
-                if (nettoAusDieserTranche < maxNettoAusTranche) {
+                if (forceGrossSellAmount > 0 && typeof explicitBrutto !== 'undefined') {
+                    zuVerkaufenBrutto = explicitBrutto;
+                } else if (nettoAusDieserTranche < maxNettoAusTranche) {
                     zuVerkaufenBrutto = (nettoAusDieserTranche / maxNettoAusTranche) * maxBruttoVerkaufbar;
                 } else {
                     zuVerkaufenBrutto = maxBruttoVerkaufbar;
