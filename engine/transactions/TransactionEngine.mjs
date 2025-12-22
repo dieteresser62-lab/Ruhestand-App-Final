@@ -95,7 +95,10 @@ export const TransactionEngine = {
         const effectiveMaxCap = isCriticalLiquidity
             ? Math.max(maxCapEuro, aktienwert * 0.10)
             : maxCapEuro;
-        const nettoBedarf = Math.min(liquiditaetsbedarf, effectiveMaxCap);
+        // ANTI-PSEUDO-ACCURACY: Liquiditätsbedarf 'aufrunden', um glatte Summe zu erhalten
+        const quantizedBedarf = this._quantizeAmount(liquiditaetsbedarf, 'ceil');
+
+        const nettoBedarf = Math.min(quantizedBedarf, effectiveMaxCap);
         const isCapped = nettoBedarf < liquiditaetsbedarf;
 
         // Bei kritischer Liquidität: stark reduzierte Mindestschwelle verwenden
