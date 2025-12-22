@@ -198,24 +198,32 @@ function _internal_calculateModel(input, lastState) {
 
     // 12. Ergebnis zusammenstellen
     // Struktur: {input, newState, diagnosis, ui}
+
+    const resultForUI = {
+        depotwertGesamt,
+        neuerBedarf,
+        minGold,
+        zielLiquiditaet, // Explicitly check this!
+        market,
+        spending: spendingResult,
+        action,
+        liquiditaet: {
+            deckungVorher,
+            deckungNachher
+        },
+        runway: { months: runwayMonths, status: runwayStatus }
+    };
+
+    console.log('DEBUG_CORE_RETURN:', {
+        zielLiquiditaetVar: zielLiquiditaet,
+        resultHasZiel: resultForUI.zielLiquiditaet
+    });
+
     return {
         input,
         newState,
         diagnosis,
-        ui: {
-            depotwertGesamt,
-            neuerBedarf,
-            minGold,
-            zielLiquiditaet,
-            market,
-            spending: spendingResult,
-            action,
-            liquiditaet: {
-                deckungVorher,
-                deckungNachher
-            },
-            runway: { months: runwayMonths, status: runwayStatus }
-        }
+        ui: resultForUI
     };
 }
 

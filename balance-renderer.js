@@ -1219,6 +1219,14 @@ export const UIRenderer = {
      * @param {Object} ui - Aufbereitete UI-Daten (inkl. input, action, spending, liquiditaet).
      */
     render(ui) {
+
+        console.log('DEBUG_UI_RENDER:', {
+            uiKeys: Object.keys(ui || {}),
+            zielLiquiditaet: ui?.zielLiquiditaet,
+            inLiquiditaetObj: ui?.liquiditaet,
+            actionHasZiel: ui?.action?.zielLiquiditaet
+        });
+
         if (!summaryRenderer || !actionRenderer) {
             console.warn('UIRenderer.render: Renderer nicht initialisiert.');
             return;
