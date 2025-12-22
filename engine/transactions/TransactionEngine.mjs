@@ -82,6 +82,9 @@ export const TransactionEngine = {
         });
 
         calculatedTarget = Math.max(calculatedTarget, absoluteBufferTarget);
+
+        // Rundung auf 100er
+        return Math.ceil(calculatedTarget / 100) * 100;
     },
 
     /**
