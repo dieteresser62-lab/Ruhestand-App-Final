@@ -66,6 +66,8 @@ export const TransactionEngine = {
         const bruttoMonatsbedarf = bruttoJahresbedarf / 12;
         const absoluteBufferTarget = bruttoMonatsbedarf * minBufferMonths;
 
+        // console.log("DEBUG_LIQ: Wynik", { minBufferMonths, bruttoJahresbedarf, absoluteBufferTarget });
+
         // 3. Absolute Untergrenze (technisch)
 
         const minAbs = CONFIG.THRESHOLDS.STRATEGY.absoluteMinLiquidity || 0;
@@ -779,11 +781,16 @@ export const TransactionEngine = {
                 // Anstatt den gesamten Surplus blind zu investieren, füllen wir nur die Lücken auf,
                 // um die Ziel-Allokation zu erreichen. Der Rest bleibt Cash (und geht in den Geldmarkt).
 
-                // FIX: totalWealth muss die ZIEL-Liquidität verwenden, nicht die aktuelle.
-                // Sonst würde der Puffer mit in die Allokationsberechnung einfließen und investiert werden.
-                // Beispiel: 225k Cash, 18k Ziel → Wir wollen nur 207k investieren, nicht 225k.
-                const totalWealth = depotwertGesamt + zielLiquiditaet;
+                // FIX v31.1: Gap-Based Rebalancing
+                // Anstatt den gesamten Surplus blind zu investieren, füllen wir nur die Lücken auf,
+                // um die Ziel-Allokation zu erreichen. Der Rest bleibt Cash (und geht in den Geldmarkt).
 
+                // KORREKTUR: Wir nutzen wieder das VOLLE Vermögen zur Berechnung der Soll-Werte.
+                // Der Puffer wird bereits durch "surplus = aktuelleLiquiditaet - zielLiquiditaet" geschützt.
+                // Wir dürfen totalWealth hier NICHT künstlich klein rechnen, sonst sind die Ziel-Beträge für Aktien/Gold zu niedrig.
+                const totalWealth = depotwertGesamt + aktuelleLiquiditaet;
+
+                /*
                 console.log("DEBUG_SURPLUS:", {
                     aktuelleLiq: aktuelleLiquiditaet,
                     zielLiq: zielLiquiditaet,
@@ -793,6 +800,7 @@ export const TransactionEngine = {
                     targetEq: input.targetEq,
                     goldZiel: input.goldZielProzent
                 });
+                */
 
                 // 1. Absolute Zielwerte berechnen
                 const targetStockVal = totalWealth * (input.targetEq / 100);
@@ -804,12 +812,14 @@ export const TransactionEngine = {
                 const currentStockVal = (input.depotwertAlt || 0) + (input.depotwertNeu || 0);
                 const currentGoldVal = input.goldAktiv ? (input.goldWert || 0) : 0;
 
+                /*
                 console.log("DEBUG_GAPS:", {
                     targetStockVal,
                     targetGoldVal,
                     currentStockVal,
                     currentGoldVal
                 });
+                */
 
                 // 3. Gaps berechnen (Nur positive Gaps, wir verkaufen hier nichts, nur Kauf)
                 const gapStock = Math.max(0, targetStockVal - currentStockVal);
