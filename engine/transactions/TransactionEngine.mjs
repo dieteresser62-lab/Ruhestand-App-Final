@@ -56,11 +56,26 @@ export const TransactionEngine = {
         // Wir brauchen hier aber den Brutto-Bedarf für den "Waschmaschinen-Puffer".
         // Daher nutzen wir die Werte aus dem Input, falls verfügbar.
         let bruttoJahresbedarf = inflatedBedarf.floor + inflatedBedarf.flex;
+
+        console.log("DEBUG_LIQ: Start", {
+            input_minBuffer: input?.minCashBufferMonths,
+            input_floor: input?.floorBedarf,
+            input_flex: input?.flexBedarf,
+            netto_internal: bruttoJahresbedarf
+        });
+
         if (input && (input.floorBedarf !== undefined || input.flexBedarf !== undefined)) {
             const fBedarf = Number(input.floorBedarf) || 0;
             const flexB = Number(input.flexBedarf) || 0;
             bruttoJahresbedarf = fBedarf + flexB;
         }
+
+        const bruttoMonatsbedarf = bruttoJahresbedarf / 12;
+        const absoluteBufferTarget = bruttoMonatsbedarf * minBufferMonths;
+
+        console.log("DEBUG_LIQ: Wynik", { minBufferMonths, bruttoJahresbedarf, absoluteBufferTarget });
+
+        // 3. Absolute Untergrenze (technisch)
 
         const bruttoMonatsbedarf = bruttoJahresbedarf / 12;
         const absoluteBufferTarget = bruttoMonatsbedarf * minBufferMonths;
