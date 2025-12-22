@@ -77,10 +77,6 @@ export const TransactionEngine = {
 
         // 3. Absolute Untergrenze (technisch)
 
-        const bruttoMonatsbedarf = bruttoJahresbedarf / 12;
-        const absoluteBufferTarget = bruttoMonatsbedarf * minBufferMonths;
-
-        // 3. Absolute Untergrenze (technisch)
         const minAbs = CONFIG.THRESHOLDS.STRATEGY.absoluteMinLiquidity || 0;
 
         // Das Maximum gewinnt
