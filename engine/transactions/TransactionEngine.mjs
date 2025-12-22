@@ -789,10 +789,10 @@ export const TransactionEngine = {
                 const targetGoldVal = input.goldAktiv ? totalWealth * (input.goldZielProzent / 100) : 0;
 
                 // 2. Aktuelle Werte ermitteln
-                // Da `p` (Parameter-Objekt) Zugriff auf `aktienWert` und `goldWert` hat, nutzen wir diese.
-                // Falls sie im Kontext fehlen (z.B. bei Initialisierung), fallen wir auf 0 zurück.
-                const currentStockVal = p.aktienWert || 0;
-                const currentGoldVal = p.goldWert || 0;
+                // FIX: p.aktienWert und p.goldWert existieren nicht als Parameter.
+                // Wir müssen stattdessen die Input-Werte nutzen.
+                const currentStockVal = (input.depotwertAlt || 0) + (input.depotwertNeu || 0);
+                const currentGoldVal = input.goldAktiv ? (input.goldWert || 0) : 0;
 
                 // 3. Gaps berechnen (Nur positive Gaps, wir verkaufen hier nichts, nur Kauf)
                 const gapStock = Math.max(0, targetStockVal - currentStockVal);
