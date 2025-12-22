@@ -57,13 +57,6 @@ export const TransactionEngine = {
         // Daher nutzen wir die Werte aus dem Input, falls verfügbar.
         let bruttoJahresbedarf = inflatedBedarf.floor + inflatedBedarf.flex;
 
-        console.log("DEBUG_LIQ: Start", {
-            input_minBuffer: input?.minCashBufferMonths,
-            input_floor: input?.floorBedarf,
-            input_flex: input?.flexBedarf,
-            netto_internal: bruttoJahresbedarf
-        });
-
         if (input && (input.floorBedarf !== undefined || input.flexBedarf !== undefined)) {
             const fBedarf = Number(input.floorBedarf) || 0;
             const flexB = Number(input.flexBedarf) || 0;
@@ -72,8 +65,6 @@ export const TransactionEngine = {
 
         const bruttoMonatsbedarf = bruttoJahresbedarf / 12;
         const absoluteBufferTarget = bruttoMonatsbedarf * minBufferMonths;
-
-        console.log("DEBUG_LIQ: Wynik", { minBufferMonths, bruttoJahresbedarf, absoluteBufferTarget });
 
         // 3. Absolute Untergrenze (technisch)
 
@@ -788,7 +779,10 @@ export const TransactionEngine = {
                 // Anstatt den gesamten Surplus blind zu investieren, füllen wir nur die Lücken auf,
                 // um die Ziel-Allokation zu erreichen. Der Rest bleibt Cash (und geht in den Geldmarkt).
 
-                const totalWealth = depotwertGesamt + aktuelleLiquiditaet;
+                // FIX: totalWealth muss die ZIEL-Liquidität verwenden, nicht die aktuelle.
+                // Sonst würde der Puffer mit in die Allokationsberechnung einfließen und investiert werden.
+                // Beispiel: 225k Cash, 18k Ziel → Wir wollen nur 207k investieren, nicht 225k.
+                const totalWealth = depotwertGesamt + zielLiquiditaet;
 
                 // 1. Absolute Zielwerte berechnen
                 const targetStockVal = totalWealth * (input.targetEq / 100);
