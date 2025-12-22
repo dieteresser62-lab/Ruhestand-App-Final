@@ -784,6 +784,16 @@ export const TransactionEngine = {
                 // Beispiel: 225k Cash, 18k Ziel → Wir wollen nur 207k investieren, nicht 225k.
                 const totalWealth = depotwertGesamt + zielLiquiditaet;
 
+                console.log("DEBUG_SURPLUS:", {
+                    aktuelleLiq: aktuelleLiquiditaet,
+                    zielLiq: zielLiquiditaet,
+                    depotwert: depotwertGesamt,
+                    totalWealth,
+                    surplus,
+                    targetEq: input.targetEq,
+                    goldZiel: input.goldZielProzent
+                });
+
                 // 1. Absolute Zielwerte berechnen
                 const targetStockVal = totalWealth * (input.targetEq / 100);
                 const targetGoldVal = input.goldAktiv ? totalWealth * (input.goldZielProzent / 100) : 0;
@@ -793,6 +803,13 @@ export const TransactionEngine = {
                 // Wir müssen stattdessen die Input-Werte nutzen.
                 const currentStockVal = (input.depotwertAlt || 0) + (input.depotwertNeu || 0);
                 const currentGoldVal = input.goldAktiv ? (input.goldWert || 0) : 0;
+
+                console.log("DEBUG_GAPS:", {
+                    targetStockVal,
+                    targetGoldVal,
+                    currentStockVal,
+                    currentGoldVal
+                });
 
                 // 3. Gaps berechnen (Nur positive Gaps, wir verkaufen hier nichts, nur Kauf)
                 const gapStock = Math.max(0, targetStockVal - currentStockVal);
