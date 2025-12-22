@@ -732,8 +732,17 @@ export const TransactionEngine = {
                 (market.abstandVomAthProzent > 15);
 
             // Mindestens 500€ Überschuss und günstige Marktlage erforderlich
-            // Hysterese für Surplus: etwas höher, damit wir nicht ständig hin und her traden.
-            const surplusHysteresis = CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED ? 2000 : 500;
+            // Hysterese für Surplus: Wir nutzen die globale Min-Trade-Schwelle
+            // (statisch 25k oder dynamisch 0.5%), damit wir keine "Peanuts" handeln.
+            const minTradeThreshold = Math.max(
+                CONFIG.THRESHOLDS.STRATEGY.minTradeAmountStatic,
+                investiertesKapital * CONFIG.THRESHOLDS.STRATEGY.minTradeAmountDynamicFactor
+            );
+
+            // Hysterese: Surplus muss über der Schwelle liegen
+            // (Optional: Wir könten hier eine eigene, etwas niedrigere Schwelle nehmen, 
+            // aber der User wünscht sich Relevanz).
+            const surplusHysteresis = CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED ? minTradeThreshold : 500;
 
             if (surplus > surplusHysteresis && !isRiskyMarket) {
                 // FIX: Verteilung relativ zu den Investitions-Assets (Aktien vs. Gold) berechnen.
