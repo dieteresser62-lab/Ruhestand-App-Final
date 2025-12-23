@@ -97,6 +97,9 @@ async function testBacktest() {
                 : 'None';
 
             console.log(`${snap.year} │ ${snap.age}  │ ${wealthStr} │ ${flexStr} │ ${scenarioStr} │ ${actionStr}`);
+
+            // Asset Details (enabled for verification)
+            console.log(`      Assets: Alt €${(snap.depotAlt / 1000).toFixed(0)}k, Neu €${(snap.depotNeu / 1000).toFixed(0)}k, Gold €${(snap.goldValue / 1000).toFixed(0)}k`);
         });
 
         console.log('\n✅ Test completed successfully!');
