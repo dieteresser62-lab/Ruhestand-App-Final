@@ -10,6 +10,7 @@ pub struct HistoricalMarketData {
     pub market_index: f64,      // S&P 500 oder MSCI World zum Jahresende
     pub inflation: f64,          // Inflation in % für dieses Jahr
     pub cape_ratio: Option<f64>, // Shiller CAPE (optional)
+    pub gold_eur_perf: Option<f64>, // Gold Perf in % (optional)
 }
 
 /// Konfiguration für Backtest
@@ -176,7 +177,7 @@ pub fn run_backtest(
                 let deckung_nachher_pct = liq_nachher_obj["deckungNachher"].as_f64().unwrap_or(100.0);
                 let liquiditaet_nachher = ziel_liq * (deckung_nachher_pct / 100.0);
                 
-                let min_gold = ui["minGold"].as_f64().unwrap_or(0.0);
+                let _min_gold = ui["minGold"].as_f64().unwrap_or(0.0);
                 let flex_rate = ui["flexRate"].as_f64().unwrap_or(100.0);
                 let runway_months = ui["runway"]["months"].as_f64().unwrap_or(0.0);
                 let runway_status = ui["runway"]["status"].as_str().unwrap_or("unknown").to_string();
@@ -301,16 +302,64 @@ pub fn run_backtest(
                 
                 // Let's implement this.
                 
+                // Growth Application
                 let prev_index = if year_index > 0 {
                     config.historical_data[year_index - 1].market_index
                 } else {
-                    market_data.market_index // First year: assume no growth step from "before start"? Or growth included?
-                    // Usually Start Year inputs are "Current values".
-                    // So Year 1 growth happens DURING Year 1.
-                    // If `market_index` is End-Of-Year index.
-                    // Then growth = Index_Year_1 / Index_Start.
-                    // Using `ende_vj` logic.
+                    // Fore first year, assume index from previous year in history or 1.0 growth?
+                    // market_data (current) vs prev.
+                    // If year_index == 0, we don't have prev index in the loop vector.
+                    // But `base_input` implies starting values.
+                    // Let's assume Year 0 starts with values as is.
+                    // So performance = 1.0?
+                    // Usually Backtest Y1: Start Value is Start Value.
+                    // Growth Y1: Index(Y1) / Index(Y0).
+                    // We need Index(Y0).
+                    // `base_input.ende_vj` *is* Index(Y0) (End of Previous Year).
+                    base_input.ende_vj
                 };
+                
+                let performance = if prev_index != 0.0 {
+                    market_data.market_index / prev_index
+                } else {
+                    1.0
+                };
+                
+                // Apple Growth to Assets BEFORE simulation step
+                // Note: base_input.depotwert_alt was set to `depot_total` from previous loop.
+                // But that `depot_total` was "End of Year Value".
+                // Does it include growth?
+                // Logic loop:
+                // Y0 End: V0.
+                // Y1 Start: Input = V0.
+                // Apply Growth: V0 * Perf.
+                // Run Model.
+                
+                base_input.depotwert_alt *= performance;
+                base_input.depotwert_neu *= performance;
+                // Gold growth? Uses `market_data.gold_eur_perf`?
+                // Or simply `inflation` as per "Gold assumes inflation match" if no perf data?
+                // JS Logic usually tracks Gold Price.
+                // Rust `MarketData` struct has `gold_eur_perf: Option<f64>`.
+                // Let's use it if available.
+                
+                if let Some(gold_perf) = market_data.gold_eur_perf {
+                     // gold_perf is percent? e.g. 10.0 for 10%? or 0.10?
+                     // Verify `MarketData` struct or JS logic.
+                     // JS `simulator-backtest.js` line 159: `(dataVJ.gold_eur_perf || 0) / 100`.
+                     // So it is percentage (e.g. 5.5).
+                     let gold_factor = 1.0 + (gold_perf / 100.0);
+                     base_input.gold_wert *= gold_factor;
+                } else {
+                     // Fallback to inflation? Or 0 real growth?
+                     // Let's assume 0 nominal growth if missing? Or Inflation?
+                     // Safest is inflation.
+                     let infl_factor = 1.0 + (market_data.inflation / 100.0);
+                     base_input.gold_wert *= infl_factor;
+                }
+
+                // Update Market Data in Input
+                base_input.ende_vj = market_data.market_index;
                 
                 // Actually, `core.rs` calculates market analysis but doesn't apply growth to input assets.
                 // So we must apply growth to `new_depot` before feeding it to next loop?

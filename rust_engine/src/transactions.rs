@@ -106,10 +106,55 @@ pub fn determine_action(
     } else {
         // SURPLUS (Invest)
         let surplus = -raw_gap;
-        let min_trade = 25000.0; // Static simplification
+        let min_trade = 25000.0;
+        
         if surplus > min_trade && !market.s_key.contains("bear") {
-             // Invest surplus
-             // Allocation logic omitted for brevity in first pass
+             // Allocation Logic
+             let total_assets = input.depotwert_alt + input.depotwert_neu + input.gold_wert + surplus;
+             
+             // Calculate target amounts
+             let target_gold = if input.gold_aktiv {
+                 total_assets * (input.gold_ziel_prozent / 100.0)
+             } else {
+                 0.0
+             };
+             
+             // Determine Gold need
+             let gold_need = (target_gold - input.gold_wert).max(0.0);
+             
+             // Split surplus
+             let invest_gold = gold_need.min(surplus);
+             let invest_stocks = surplus - invest_gold;
+             
+             return TransactionAction {
+                 action_type: "TRANSACTION".to_string(),
+                 title: "Überschuss investieren".to_string(),
+                 netto_erloes: 0.0, // Cost, not proceeds? Wait, logic return type says "netto_erloes". 
+                 // Usually for refill implies sales. For Invest implies cost?
+                 // Let's check struct definition. 
+                 // If action is Invest, netto_erloes usually negative or 0?
+                 // In JS engine: "nettoErloes" is positive for sales.
+                 // Here we are returning a TransactionAction.
+                 // If we invest, we occupy liquidity.
+                 // The caller handles liquidity update.
+                 // Let's send 0.0 as "erloes" (proceeds), but populate "verwendungen".
+                 
+                 quellen: vec![],
+                 verwendungen: TransactionUsage {
+                     liquiditaet: 0.0, // Used from surplus logic outside?
+                     // Wait, TransactionUsage defines where money goes.
+                     // But here 'verwendungen' usually means "Where did the money go?".
+                     // If we invest, we use liquidity.
+                     aktien: invest_stocks,
+                     gold: invest_gold,
+                 },
+                 steuer: 0.0,
+                 diagnosis_entries: vec![
+                     format!("Surplus: {:.0}€", surplus).into(),
+                     format!("Invest Stocks: {:.0}€", invest_stocks).into(),
+                     format!("Invest Gold: {:.0}€", invest_gold).into(),
+                 ],
+             };
         }
     }
 

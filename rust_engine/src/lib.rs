@@ -47,6 +47,28 @@ pub fn run_backtest_native(
     backtest::run_backtest(input, config)
 }
 
+// ✅ NEU: Monte Carlo WASM-Interface
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn run_monte_carlo_wasm(
+    input_val: JsValue,
+    config_val: JsValue
+) -> Result<JsValue, JsValue> {
+    console_error_panic_hook::set_once();
+    
+    let input: SimulationInput = serde_wasm_bindgen::from_value(input_val)
+        .map_err(|e| JsValue::from_str(&format!("Invalid Input: {}", e)))?;
+    
+    let config: simulation::MonteCarloConfig = serde_wasm_bindgen::from_value(config_val)
+        .map_err(|e| JsValue::from_str(&format!("Invalid Config: {}", e)))?;
+    
+    match simulation::run_monte_carlo(input, config) {
+        Ok(result) => Ok(serde_wasm_bindgen::to_value(&result)?),
+        Err(e) => Err(JsValue::from_str(&e))
+    }
+}
+
+
 // --- WASM INTERFACE ---
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
