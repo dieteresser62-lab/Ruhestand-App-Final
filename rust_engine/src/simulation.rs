@@ -106,55 +106,25 @@ fn run_single_simulation(mut input: SimulationInput, config: &MonteCarloConfig) 
         // Run Core Logic
         match core::calculate_model(&input, Some(&state)) {
             Ok(result) => {
-                // Parse Result to get Transactions/Spending
-                // Optimization: core could return structured data instead of JSON string
-                // But for now we parse JSON (Perf hit? Maybe. But `core` is fast).
-                // Actually `core` returns `SimulationResult`.
-                // Wait, `calculate_model` returns `SimulationResult` which *contains* `ui` string.
-                // We need to parse it to get `action`. This is suboptimal for MC.
-                // But let's stick to valid logic first.
+                // Optimization: Use CoreData if available (always true in native)
+                let core_data = result.core_data.as_ref().expect("CoreData missing");
                 
-                let ui: serde_json::Value = serde_json::from_str(&result.ui).unwrap_or(serde_json::Value::Null);
+                let liquiditaet_nachher = core_data.liquiditaet_nachher;
+                 // new_depot_total calculation removed as it was unused and replaced by next_depot_alt/neu logic
+                                      
+                // Split back new depot roughly?
+                // Simplification for MC: 
+                // We don't strictly separate Alt/Neu growth in Input struct beyond passing it in.
+                // We should respect the split if possible.
+                // But `depot_gesamt` is sum.
+                // Let's rely on `sell_amount` breakdown.
                 
-                let liquiditaet_nachher_obj = &ui["liquiditaet"];
-                let ziel_liq = ui["zielLiquiditaet"].as_f64().unwrap_or(0.0);
-                let deckung_nachher_pct = liquiditaet_nachher_obj["deckungNachher"].as_f64().unwrap_or(100.0);
-                let liquiditaet_nachher = ziel_liq * (deckung_nachher_pct / 100.0);
+                let mut next_depot_alt = input.depotwert_alt - core_data.sell_amount_aktien_alt;
+                let mut next_depot_neu = input.depotwert_neu - core_data.sell_amount_aktien_neu + core_data.invest_aktien;
                 
-                let depot_gesamt = ui["depotwertGesamt"].as_f64().unwrap_or(0.0);
+                let mut next_gold = input.gold_wert - core_data.sell_amount_gold + core_data.invest_gold;
                 
-                // Transactions
-                let action_details = &ui["action"];
-                // We need to know net flow to update assets.
-                // Simplified Asset Tracking for MC:
-                // We track Total Wealth split roughly?
-                // Or try to replicate `backtest.rs` precision?
-                // `backtest.rs` logic is complex parsing.
-                // For MC speed, maybe simplify?
-                // Total Wealth = Depot + Liq.
-                // Next Year Wealth = (Depot +/- Tx) * Growth + Liq.
-                
-                // Let's grab `depotwertGesamt` from UI (this is pre-tx).
-                // Apply Tx.
-                let action_type = action_details["type"].as_str().unwrap_or("NONE");
-                
-                let mut invest_amount = 0.0;
-                let mut sell_amount = 0.0;
-                
-                if action_type == "TRANSACTION" {
-                     let quellen = action_details["quellen"].as_array();
-                     if let Some(q) = quellen {
-                         for item in q {
-                             sell_amount += item["brutto"].as_f64().unwrap_or(0.0);
-                         }
-                     }
-                     let verwendungen = &action_details["verwendungen"];
-                     invest_amount += verwendungen["aktien"].as_f64().unwrap_or(0.0);
-                     invest_amount += verwendungen["gold"].as_f64().unwrap_or(0.0);
-                }
-                
-                let new_depot = depot_gesamt - sell_amount + invest_amount;
-                let new_total_wealth = new_depot + liquiditaet_nachher;
+                let new_total_wealth = next_depot_alt + next_depot_neu + next_gold + liquiditaet_nachher;
                 
                 if new_total_wealth <= 0.0 {
                     ruined = true;
@@ -167,24 +137,23 @@ fn run_single_simulation(mut input: SimulationInput, config: &MonteCarloConfig) 
 
                 // Prepare Input for Next Year
                 // Grow the depot (Assets)
-                // Note: `market_return` is for THIS year? 
-                // Usually MC samples "Next Year Return".
-                // We simulate Year 1. We sample Return 1.
-                // Returns 1.07.
-                // We apply this to assets for next loop?
-                // Yes.
-                let grown_depot = new_depot * market_return;
-                let final_liq = liquiditaet_nachher; // Cash doesn't grow? Or risk-free rate?
-                // Assume 0% real or inflation match? 
-                // Let's assume cash is flat for safety or matches inflation.
-                // Input tracks `tagesgeld`, `geldmarkt_etf`. 
-                // Let's assume flat for now to be conservative.
+                // Note: `market_return` was sampled for THIS year and used to update index.
+                // But `calculate_model` uses values at START of year (essentially).
+                // So we should apply growth to carry over to NEXT year.
+                // `market_return` is the performance OF this year.
+                
+                next_depot_alt *= market_return;
+                next_depot_neu *= market_return;
+                
+                // Gold Tracking
+                // Use inflation as proxy for gold growth if no explicit data
+                let gold_growth = 1.0 + (inflation_rate / 100.0);
+                next_gold *= gold_growth;
 
-                input.depotwert_alt = grown_depot; // Simplify: put all in 'alt' or track mix? 
-                // For MC, cost basis taxes matters less? 
-                // Use `depotwert_alt` as main bucket.
-                input.depotwert_neu = 0.0; 
-                input.aktuelle_liquiditaet = Some(final_liq);
+                input.depotwert_alt = next_depot_alt;
+                input.depotwert_neu = next_depot_neu; 
+                input.gold_wert = next_gold;
+                input.aktuelle_liquiditaet = Some(liquiditaet_nachher);
                 input.aktuelles_alter += 1;
             }
             Err(_) => {
@@ -237,4 +206,121 @@ fn calculate_statistics(mut results: Vec<SimulationRunResult>, num_sims: u32) ->
         ruin_probability,
         avg_years_to_ruin,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::SimulationInput;
+
+    fn create_test_input() -> SimulationInput {
+        SimulationInput {
+            aktuelles_alter: 60,
+            risikoprofil: "wachstum".to_string(),
+            inflation: 2.0,
+            tagesgeld: 50000.0,
+            geldmarkt_etf: 0.0,
+            aktuelle_liquiditaet: Some(50000.0),
+            depotwert_alt: 500000.0,
+            depotwert_neu: 0.0,
+            gold_aktiv: true,
+            gold_wert: 50000.0,
+            gold_cost: 40000.0,
+            gold_ziel_prozent: 10.0,
+            gold_floor_prozent: 5.0,
+            floor_bedarf: 30000.0,
+            flex_bedarf: 12000.0,
+            rente_aktiv: false,
+            rente_monatlich: 0.0,
+            cost_basis_alt: 400000.0,
+            cost_basis_neu: 0.0,
+            sparer_pauschbetrag: 1000.0,
+            ende_vj: 100.0,
+            ende_vj_1: 95.0,
+            ende_vj_2: 90.0,
+            ende_vj_3: 85.0,
+            ath: 100.0,
+            jahre_seit_ath: 0.0,
+            cape_ratio: Some(20.0),
+            runway_min_months: 24.0,
+            runway_target_months: 36.0,
+            target_eq: 75.0,
+            rebal_band: 5.0,
+            max_skim_pct_of_eq: 10.0,
+            max_bear_refill_pct_of_eq: 20.0,
+        }
+    }
+
+    #[test]
+    fn test_monte_carlo_basic() {
+        let mut input = create_test_input();
+        input.depotwert_alt = 800000.0; // Increase to safe WR level (~5%)
+
+        // Konstante Returns für deterministischen Test
+        let config = MonteCarloConfig {
+            num_simulations: 100,
+            years_to_simulate: 10,
+            historical_returns: vec![1.07; 20],  // 7% jedes Jahr
+            historical_inflation: vec![2.0; 20],
+        };
+
+        let result = run_monte_carlo(input, config).unwrap();
+
+        // Bei 7% Rendite und 42k Entnahme sollte Portfolio überleben
+        assert!(result.success_rate > 0.9, "Success rate too low: {}", result.success_rate);
+        assert!(result.median_final_wealth > 500000.0, "Median wealth too low");
+    }
+
+    #[test]
+    fn test_monte_carlo_bear_market() {
+        let input = create_test_input();
+
+        // Negative Returns
+        let config = MonteCarloConfig {
+            num_simulations: 100,
+            years_to_simulate: 30,
+            historical_returns: vec![0.95; 20],  // -5% jedes Jahr
+            historical_inflation: vec![3.0; 20],
+        };
+
+        let result = run_monte_carlo(input, config).unwrap();
+
+        // Bei -5% Rendite sollte Portfolio irgendwann scheitern
+        assert!(result.ruin_probability > 0.5, "Ruin prob too low in bear: {}", result.ruin_probability);
+    }
+
+    #[test]
+    fn test_monte_carlo_empty_returns() {
+        let input = create_test_input();
+
+        let config = MonteCarloConfig {
+            num_simulations: 10,
+            years_to_simulate: 5,
+            historical_returns: vec![],  // LEER
+            historical_inflation: vec![2.0],
+        };
+
+        let result = run_monte_carlo(input, config);
+        assert!(result.is_err(), "Should fail with empty returns");
+    }
+
+    #[test]
+    fn test_percentile_calculation() {
+        let input = create_test_input();
+
+        let config = MonteCarloConfig {
+            num_simulations: 1000,
+            years_to_simulate: 20,
+            historical_returns: vec![1.05, 1.10, 0.90, 1.15, 0.85],  // Varianz
+            historical_inflation: vec![2.0, 2.5, 3.0, 1.5, 2.0],
+        };
+
+        let result = run_monte_carlo(input, config).unwrap();
+
+        // Percentile-Ordnung prüfen
+        assert!(result.percentile_5 <= result.percentile_25);
+        assert!(result.percentile_25 <= result.median_final_wealth);
+        assert!(result.median_final_wealth <= result.percentile_75);
+        assert!(result.percentile_75 <= result.percentile_95);
+    }
 }

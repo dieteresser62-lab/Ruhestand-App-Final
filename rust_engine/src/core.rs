@@ -91,8 +91,10 @@ pub fn calculate_model(input: &SimulationInput, last_state: Option<&SimulationSt
     // Collect Diagnosis from Action
     // (In full port, push action.diagnosis_entries to diagnosis.decisionTree)
 
-    // 10. Liquidität nach Transaktion
-    let liq_nach_transaktion = aktuelle_liquiditaet + action.verwendungen.liquiditaet;
+    // 10. Liquidität nach Transaktion und Entnahme
+    // Note: Action calculates refill based on (Liq - Spend).
+    // So final liq = Liq + Refill - Spend.
+    let liq_nach_transaktion = aktuelle_liquiditaet + action.verwendungen.liquiditaet - spending_result.total_entnahme;
     
     // 11. Final Metrics (Runway Status etc)
     let runway_months_post = if neuer_bedarf > 0.0 {
@@ -110,6 +112,23 @@ pub fn calculate_model(input: &SimulationInput, last_state: Option<&SimulationSt
     };
 
     // Construct Result
+    // 12. Determine precise sell amounts for core_data
+    let mut sell_aktien_alt = 0.0;
+    let mut sell_aktien_neu = 0.0;
+    let mut sell_gold = 0.0;
+    
+    // Note: action.verwendungen has total amounts.
+    // action.quellen has breakdown of source.
+    for q in &action.quellen {
+        match q.kind.as_str() {
+            "aktien_alt" => sell_aktien_alt += q.brutto,
+            "aktien_neu" => sell_aktien_neu += q.brutto,
+            "gold" => sell_gold += q.brutto,
+            _ => {}
+        }
+    }
+
+    // Construct Result
     Ok(SimulationResult {
         new_state,
         diagnosis: SimulationDiagnosis {
@@ -124,6 +143,17 @@ pub fn calculate_model(input: &SimulationInput, last_state: Option<&SimulationSt
             }),
             guardrails: vec![],
         },
+        core_data: Some(crate::types::CoreData {
+            depot_gesamt: depotwert_gesamt,
+            liquiditaet_nachher: liq_nach_transaktion, // Use the calculated post-tx value
+            ziel_liquiditaet,
+            action_type: action.action_type.clone(),
+            sell_amount_aktien_alt: sell_aktien_alt,
+            sell_amount_aktien_neu: sell_aktien_neu,
+            sell_amount_gold: sell_gold,
+            invest_aktien: action.verwendungen.aktien,
+            invest_gold: action.verwendungen.gold,
+        }),
         ui: serde_json::json!({
             "depotwertGesamt": depotwert_gesamt,
             "neuerBedarf": neuer_bedarf,

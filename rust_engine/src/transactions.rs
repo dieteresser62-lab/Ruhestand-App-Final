@@ -48,7 +48,7 @@ pub fn determine_action(
     _depotwert_gesamt: f64,
     ziel_liquiditaet: f64,
     market: &MarketAnalysisResult,
-    _spending: &SpendingResult,
+    spending: &SpendingResult,
     min_gold: f64,
     input: &SimulationInput,
     min_runway_months_profil: f64,
@@ -82,8 +82,10 @@ pub fn determine_action(
          };
     }
 
-    // 2. Normal Logic (Simplified: Refill or Surplus)
-    let raw_gap = ziel_liquiditaet - aktuelle_liquiditaet;
+    // 2. Normal Logic (Refill or Surplus)
+    // Account for annual spending in the liquidity gap
+    let effective_liquidity = aktuelle_liquiditaet - spending.total_entnahme;
+    let raw_gap = ziel_liquiditaet - effective_liquidity;
     
     if raw_gap > 0.0 {
         // REFILL
