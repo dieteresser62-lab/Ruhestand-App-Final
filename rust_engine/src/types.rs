@@ -141,6 +141,20 @@ pub struct SimulationDiagnosis {
     pub guardrails: Vec<serde_json::Value>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CoreData {
+    pub depot_gesamt: f64,
+    pub liquiditaet_nachher: f64,
+    pub ziel_liquiditaet: f64,
+    pub action_type: String,
+    pub sell_amount_aktien_alt: f64,
+    pub sell_amount_aktien_neu: f64,
+    pub sell_amount_gold: f64,
+    pub invest_aktien: f64,
+    pub invest_gold: f64,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SimulationResult {
@@ -148,4 +162,5 @@ pub struct SimulationResult {
     pub new_state: SimulationState,
     pub diagnosis: SimulationDiagnosis,
     pub ui: String, // Serialize to string to bypass serde_wasm_bindgen issues with Value
+    pub core_data: Option<CoreData>, // Optimization for Rust-internal usage
 }
