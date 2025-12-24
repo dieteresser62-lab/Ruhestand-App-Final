@@ -19,5 +19,7 @@ getrandom = { version = "0.2", features = ["js"] }
 console_error_panic_hook = "0.1"
 
 # Native-specific dependencies (future proofing)
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-rayon = "1.10"
+[profile.release]
+opt-level = 's'     # Size optimization
+lto = true          # Link-time optimization
+codegen-units = 1   # Better optimization
