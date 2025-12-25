@@ -8,12 +8,16 @@ pub struct Tranche {
     pub tqf: f64,
 }
 
-#[derive(Clone, Debug)]
+use serde::Serialize;
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SaleResult {
     pub steuer_gesamt: f64,
     pub brutto_verkauf_gesamt: f64,
     pub achieved_refill: f64,
     pub breakdown: Vec<TransactionSource>,
+    pub pauschbetrag_verbraucht: f64,
 }
 
 pub fn calculate_sale_and_tax(
@@ -27,66 +31,62 @@ pub fn calculate_sale_and_tax(
 ) -> SaleResult {
     let kist = 0.0; // Simplification: input.kirchensteuerSatz isn't in InputValidator yet!
     let kest = 0.25 * (1.0 + 0.055 + kist);
-    
+
     // 1. Build Tranches
     let mut tranches = Vec::new();
     if input.depotwert_alt > 0.0 {
-        tranches.push(Tranche { 
-            kind: "aktien_alt".to_string(), 
-            market_value: input.depotwert_alt, 
-            cost_basis: input.cost_basis_alt, 
-            tqf: 0.15 // TODO: input.tqfAlt 
+        tranches.push(Tranche {
+            kind: "aktien_alt".to_string(),
+            market_value: input.depotwert_alt,
+            cost_basis: input.cost_basis_alt,
+            tqf: 0.15 // TODO: input.tqfAlt
         });
     }
     if input.depotwert_neu > 0.0 {
-        tranches.push(Tranche { 
-            kind: "aktien_neu".to_string(), 
-            market_value: input.depotwert_neu, 
-            cost_basis: input.cost_basis_neu, 
+        tranches.push(Tranche {
+            kind: "aktien_neu".to_string(),
+            market_value: input.depotwert_neu,
+            cost_basis: input.cost_basis_neu,
             tqf: 0.15 // TODO: input.tqfNeu
         });
     }
     if input.gold_aktiv && input.gold_wert > 0.0 {
-        tranches.push(Tranche { 
-            kind: "gold".to_string(), 
-            market_value: input.gold_wert, 
-            cost_basis: input.gold_cost, 
-            tqf: 1.0 // Steuerfrei assumption or logic
+        tranches.push(Tranche {
+            kind: "gold".to_string(),
+            market_value: input.gold_wert,
+            cost_basis: input.gold_cost,
+            tqf: 1.0 // Steuerfrei assumption
         });
     }
 
     // 2. Sort Tranches
-    // ... logic port from _getSellOrder ...
-    // Sort logic simplified for PoC:
     let is_defensive = is_emergency_sale || market.s_key == "bear_deep" || market.s_key == "recovery_in_bear";
-    
+
     tranches.sort_by(|a, b| {
          if is_defensive {
              // Gold first
              if a.kind == "gold" { return std::cmp::Ordering::Less; }
              if b.kind == "gold" { return std::cmp::Ordering::Greater; }
          }
-         // Efficiency sort (descending efficiency = ascending tax/loss impact?)
-         // JS sorts by efficiency (low tax first?)
-         // JS Logic: (gqA * (1-tqfA)) - (gqB * (1-tqfB)) -> sort ascending? 
-         // JS comment: "Aktien nach steuerlicher Effizienz sortieren"
-         // Logic implies we want to sell least tax efficient first? No, normally we want to defer tax.
-         // Let's assume standard sort for now or copy JS logic exactly.
-         // JS sorts ascending result.
-         
+         // Efficiency sort
          let gq_a = if a.market_value > 0.0 { (a.market_value - a.cost_basis).max(0.0) / a.market_value } else { 0.0 };
          let gq_b = if b.market_value > 0.0 { (b.market_value - b.cost_basis).max(0.0) / b.market_value } else { 0.0 };
          let val_a = gq_a * (1.0 - a.tqf);
          let val_b = gq_b * (1.0 - b.tqf);
-         
+
          val_a.partial_cmp(&val_b).unwrap_or(std::cmp::Ordering::Equal)
     });
 
-
     // 3. Execution Loop
-    let mut result = SaleResult { steuer_gesamt: 0.0, brutto_verkauf_gesamt: 0.0, achieved_refill: 0.0, breakdown: vec![] };
+    let mut result = SaleResult {
+        steuer_gesamt: 0.0,
+        brutto_verkauf_gesamt: 0.0,
+        achieved_refill: 0.0,
+        breakdown: vec![],
+        pauschbetrag_verbraucht: 0.0
+    };
     let mut noch_zu_deckender_netto = requested_refill.max(0.0);
-    let mut pauschbetrag_rest = input.sparer_pauschbetrag; 
+    let mut pauschbetrag_rest = input.sparer_pauschbetrag;
     let mut total_brutto_tracker = 0.0;
 
     for tranche in tranches {
@@ -102,7 +102,7 @@ pub fn calculate_sale_and_tax(
         if tranche.kind == "gold" {
             max_brutto = (input.gold_wert - min_gold).max(0.0).min(max_brutto);
         }
-        
+
         if max_brutto <= 0.0 { continue; }
 
         if force_gross_sell_amount > 0.0 && total_brutto_tracker >= force_gross_sell_amount { break; }
@@ -110,30 +110,17 @@ pub fn calculate_sale_and_tax(
 
         // Tax calculation on max sale
         let gewinn_quote = if tranche.market_value > 0.0 { (tranche.market_value - tranche.cost_basis).max(0.0) / tranche.market_value } else { 0.0 };
-        let _steuer_factor_per_euro_brutto = gewinn_quote * (1.0 - tranche.tqf) * kest; 
-        // Note: Pauschbetrag complicates per-euro factor, using iterative check or simplified
-        
-        // Simplified Logic: Calculate needed brutto to cover remaining Netto (or remaining Brutto target)
-        // Netto = Brutto - Steuer
-        // Steuer = (Brutto * GQ * (1-TQF) - Pausch) * KESt
-        // Steuer = Brutto*Factor - Pausch*KESt
-        // Netto = Brutto - (Brutto*Factor - Pausch*KESt) = Brutto * (1-Factor) + Pausch*KESt
-        // => Brutto = (Netto - Pausch*KESt) / (1 - Factor)
-        
-        // Handling Pauschbetrag logic correctly in a loop is tricky without full simulation if we sell partial.
-        // For PoC, let's just sell whatever covers the gap linear approximation
-        
+        let _steuer_factor_per_euro_brutto = gewinn_quote * (1.0 - tranche.tqf) * kest;
+
         let target_brutto = if force_gross_sell_amount > 0.0 {
              (force_gross_sell_amount - total_brutto_tracker).min(max_brutto)
         } else {
              // Netto Search
-             // Attempt to cover 'noch_zu_deckender_netto'
-             // Assumption: Pauschbetrag usage is negligible for exact math in PoC or handled simply
              let factor = gewinn_quote * (1.0 - tranche.tqf) * kest;
-             let needed = noch_zu_deckender_netto / (1.0 - factor).max(0.01); 
+             let needed = noch_zu_deckender_netto / (1.0 - factor).max(0.01);
              needed.min(max_brutto)
         };
-        
+
         // Execute Sale
         let brutto_verkauf = target_brutto;
         let gewinn_brutto = brutto_verkauf * gewinn_quote;
@@ -142,14 +129,14 @@ pub fn calculate_sale_and_tax(
         let steuer_basis = gewinn_nach_tqs - anrechenbarer_pausch;
         let steuer = steuer_basis.max(0.0) * kest;
         let netto = brutto_verkauf - steuer;
-        
+
         result.steuer_gesamt += steuer;
         result.brutto_verkauf_gesamt += brutto_verkauf;
         result.achieved_refill += netto;
         total_brutto_tracker += brutto_verkauf;
         pauschbetrag_rest -= anrechenbarer_pausch;
         noch_zu_deckender_netto -= netto;
-        
+
         result.breakdown.push(TransactionSource {
             kind: tranche.kind.clone(),
             brutto: brutto_verkauf,
@@ -158,6 +145,7 @@ pub fn calculate_sale_and_tax(
         });
     }
 
+    result.pauschbetrag_verbraucht = input.sparer_pauschbetrag - pauschbetrag_rest;
     result
 }
 
@@ -223,15 +211,15 @@ mod tests {
     fn test_sale_tax_calculation_gain() {
         let input = create_mock_input();
         let market = create_mock_market();
-        
+
         let mut budgets = std::collections::HashMap::new();
         budgets.insert("aktien_alt".to_string(), 10000.0);
-        
+
         let mut test_input = input.clone();
         test_input.sparer_pauschbetrag = 0.0; // Ensure tax is triggered
         test_input.depotwert_alt = 10000.0;
         test_input.cost_basis_alt = 5000.0;
-        
+
         let result = calculate_sale_and_tax(
             907.69,
             &test_input,
@@ -241,29 +229,29 @@ mod tests {
             false,
             0.0
         );
-        
+
         assert_eq!(result.breakdown.len(), 1);
-        let sale = &result.breakdown[0]; // Fixed field name
-        
+        let sale = &result.breakdown[0];
+
         // Approx check (TQF 0.15 -> Eff Tax ~11.2% -> Gross ~1022)
         assert!((sale.brutto - 1022.3).abs() < 1.0, "Gross sell invalid, got {}", sale.brutto);
         assert!(sale.steuer > 50.0, "Tax should be positive, got {}", sale.steuer);
     }
-    
+
     #[test]
     fn test_sale_no_tax_on_loss() {
         let input = create_mock_input();
         let market = create_mock_market();
-        
+
         let mut test_input = input.clone();
         test_input.depotwert_alt = 8000.0;
         test_input.cost_basis_alt = 10000.0;
-        
+
          let mut budgets = std::collections::HashMap::new();
         budgets.insert("aktien_alt".to_string(), 10000.0);
 
         let result = calculate_sale_and_tax(
-            1000.0, 
+            1000.0,
             &test_input,
             0.0,
             Some(&budgets),
@@ -272,7 +260,7 @@ mod tests {
             0.0
         );
 
-        let sale = &result.breakdown[0]; // Fixed field name
+        let sale = &result.breakdown[0];
         assert!((sale.brutto - 1000.0).abs() < 5.0);
         assert_eq!(sale.steuer, 0.0);
     }
