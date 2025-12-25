@@ -131,25 +131,26 @@
                         <div class="fieldset-content">
                             <div class="form-grid">
                                 <div class="form-group"><label for="simStartVermoegen">Gesamtvermögen (€)</label><input
-                                        type="number" id="simStartVermoegen" placeholder="0"
+                                        type="number" id="simStartVermoegen" value="2700000" placeholder="0"
                                         title="Ihr gesamtes Vermögen zum Simulationsstart (inkl. Liquidität und alle Depots)">
                                 </div>
                                 <div class="form-group"><label for="depotwertAlt">Depotwert Alt (€)</label><input
-                                        type="number" id="depotwertAlt" placeholder="0"
+                                        type="number" id="depotwertAlt" value="1250000" placeholder="0"
                                         title="Aktueller Wert Ihres 'alten' Depots (typischerweise vor 2018 angelegt, höhere Teilfreistellung)">
                                 </div>
                                 <div class="form-group"><label for="zielLiquiditaet">Ziel-Liquidität (€)</label><input
-                                        type="number" id="zielLiquiditaet" placeholder="0"
+                                        type="number" id="zielLiquiditaet" value="180000" placeholder="0"
                                         title="Gewünschte Liquiditätsreserve in Cash/Geldmarkt-ETF"></div>
                             </div>
                             <div class="form-grid"
                                 style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
                                 <div class="form-group"><label for="startFloorBedarf">Floor-Bedarf p.a.
-                                        (€)</label><input type="number" id="startFloorBedarf" placeholder="0"
+                                        (€)</label><input type="number" id="startFloorBedarf" value="24000"
+                                        placeholder="0"
                                         title="Essenzielle jährliche Ausgaben, die Sie auf jeden Fall benötigen (Miete, Essen, Versicherungen etc.)">
                                 </div>
                                 <div class="form-group"><label for="startFlexBedarf">Flex-Bedarf p.a. (€)</label><input
-                                        type="number" id="startFlexBedarf" placeholder="0"
+                                        type="number" id="startFlexBedarf" value="28000" placeholder="0"
                                         title="Wünschenswerte jährliche Ausgaben, auf die Sie im Notfall verzichten können (Urlaub, Hobbys, Luxus)">
                                 </div>
                                 <div class="form-group"><label for="marketCapeRatio">CAPE (Shiller)</label><input
@@ -157,7 +158,7 @@
                                         title="Aktuelles Shiller-CAPE (Cyclically Adjusted Price-to-Earnings Ratio) - Bewertungskennzahl für den Aktienmarkt">
                                 </div>
                                 <div class="form-group"><label for="einstandAlt">Einstand Alt (€)</label><input
-                                        type="number" id="einstandAlt" placeholder="0"
+                                        type="number" id="einstandAlt" value="725000" placeholder="0"
                                         title="Ursprünglicher Einstandswert (Kaufpreis) des alten Depots - wichtig für Steuerberechnung">
                                 </div>
                                 <div class="form-group"><label>Einstand Neu (€)</label><input type="number"
@@ -247,7 +248,8 @@
                         <div class="fieldset-content">
                             <div class="form-grid-four-col" style="align-items: end;">
                                 <div class="form-group"> <label for="p1StartAlter">Aktuelles Alter</label> <input
-                                        type="number" id="p1StartAlter" min="50" max="110" placeholder="0"> </div>
+                                        type="number" id="p1StartAlter" value="63" min="50" max="110" placeholder="0">
+                                </div>
                                 <div class="form-group"> <label for="p1Geschlecht">Geschlecht</label> <select
                                         id="p1Geschlecht">
                                         <option value="m" selected>Männlich</option>
@@ -255,8 +257,8 @@
                                         <option value="d">Divers</option>
                                     </select> </div>
                                 <div class="form-group"> <label for="p1SparerPauschbetrag">Sparer-Pauschbetrag
-                                        (€)</label> <input type="number" id="p1SparerPauschbetrag" min="0" step="50"
-                                        placeholder="0"> </div>
+                                        (€)</label> <input type="number" id="p1SparerPauschbetrag" value="1000" min="0"
+                                        step="50" placeholder="0"> </div>
                                 <div class="form-group"> <label for="p1KirchensteuerPct">Kirchensteuer</label>
                                     <select id="p1KirchensteuerPct">
                                         <option value="0">0 %</option>
@@ -265,10 +267,12 @@
                                     </select>
                                 </div>
                                 <div class="form-group"> <label for="p1Monatsrente">Monatliche Rente (€)</label>
-                                    <input type="number" id="p1Monatsrente" min="0" step="10" placeholder="0">
+                                    <input type="number" id="p1Monatsrente" value="650" min="0" step="10"
+                                        placeholder="0">
                                 </div>
                                 <div class="form-group"> <label for="p1StartInJahren">Start in … Jahren</label>
-                                    <input type="number" id="p1StartInJahren" min="0" max="120" placeholder="0">
+                                    <input type="number" id="p1StartInJahren" value="3" min="0" max="120"
+                                        placeholder="0">
                                 </div>
                                 <div class="form-group" style="grid-column: span 2;"><label
                                         for="rentAdjMode">Rentenanpassung koppeln an</label><select id="rentAdjMode">
@@ -300,13 +304,15 @@
                                 style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
                                 <div class="form-group" style="justify-content: center; margin-bottom: 15px;">
                                     <label style="flex-direction: row; align-items: center;"> <input type="checkbox"
-                                            id="chkPartnerAktiv" style="width: auto; margin-right: 8px;"> Partner
+                                            id="chkPartnerAktiv" style="width: auto; margin-right: 8px;" checked>
+                                        Partner
                                         aktivieren (zweite Person) </label>
                                 </div>
                                 <div id="sectionRente2" style="display: none;">
                                     <div class="form-grid-four-col">
                                         <div class="form-group"> <label for="r2StartAlter">Startalter</label> <input
-                                                type="number" id="r2StartAlter" min="0" max="120" placeholder="0">
+                                                type="number" id="r2StartAlter" value="60" min="0" max="120"
+                                                placeholder="0">
                                         </div>
                                         <div class="form-group"> <label for="r2Geschlecht">Geschlecht</label>
                                             <select id="r2Geschlecht">
@@ -316,22 +322,22 @@
                                             </select>
                                         </div>
                                         <div class="form-group"> <label for="r2SparerPauschbetrag">Sparer-Pauschbetrag
-                                                (€)</label> <input type="number" id="r2SparerPauschbetrag" min="0"
-                                                step="50" placeholder="0">
+                                                (€)</label> <input type="number" id="r2SparerPauschbetrag" value="1000"
+                                                min="0" step="50" placeholder="0">
                                         </div>
                                         <div class="form-group"> <label for="r2KirchensteuerPct">Kirchensteuer</label>
                                             <select id="r2KirchensteuerPct">
-                                                <option value="0" selected>0 %</option>
+                                                <option value="0">0 %</option>
                                                 <option value="8">8 %</option>
-                                                <option value="9">9 %</option>
+                                                <option value="9" selected>9 %</option>
                                             </select>
                                         </div>
                                         <div class="form-group"> <label for="r2Monatsrente">Monatliche Rente
-                                                (€)</label> <input type="number" id="r2Monatsrente" min="0" step="10"
-                                                placeholder="0"> </div>
+                                                (€)</label> <input type="number" id="r2Monatsrente" value="1000" min="0"
+                                                step="10" placeholder="0"> </div>
                                         <div class="form-group"> <label for="r2StartInJahren">Start in …
-                                                Jahren</label> <input type="number" id="r2StartInJahren" min="0"
-                                                max="120" placeholder="0"> </div>
+                                                Jahren</label> <input type="number" id="r2StartInJahren" value="0"
+                                                min="0" max="120" placeholder="0"> </div>
                                         <div class="form-group"> <label for="r2Steuerquote">Steuerquote (%)</label>
                                             <input type="number" id="r2Steuerquote" min="0" max="100" step="0.1"
                                                 value="0" title="Optionaler Pauschalsatz. 0 = keine Pauschalsteuer.">
@@ -1268,6 +1274,21 @@
                 initializeUnifiedTooltips();
             }
         })();
+    </script>
+    <script type="module">
+        import { universalEngine } from './engine/UniversalEngine.js';
+
+        // Expose globally for TransactionEngine hook
+        window.universalEngine = universalEngine;
+
+        // Initialize WASM
+        universalEngine.init().then(success => {
+            if (success) {
+                console.log("%c[Main] UniversalEngine Initialized & Global Link Established", "color: green; font-weight: bold;");
+            } else {
+                console.warn("[Main] UniversalEngine Initialization Failed");
+            }
+        }).catch(err => console.error("[Main] Init Error:", err));
     </script>
 </body>
 

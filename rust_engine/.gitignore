@@ -1,0 +1,4 @@
+# Rust
+target/
+pkg/
+**/*.rs.bk

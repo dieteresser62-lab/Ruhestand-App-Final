@@ -6,6 +6,7 @@
  * ===================================================================
  */
 import { CONFIG } from '../config.mjs';
+import { universalEngine } from '../UniversalEngine.js'; // Helper for Shadow Mode
 
 export const TransactionEngine = {
     /**
@@ -62,24 +63,13 @@ export const TransactionEngine = {
             const flexB = Number(input.flexBedarf) || 0;
             bruttoJahresbedarf = fBedarf + flexB;
 
-            /*
-            console.log("DEBUG_BUFFER_INPUT:", { 
-                floorRaw: input.floorBedarf, 
-                flexRaw: input.flexBedarf,
-                fBedarf, flexB, bruttoJahresbedarf 
-            });
-            */
+
         }
 
         const bruttoMonatsbedarf = bruttoJahresbedarf / 12;
         const absoluteBufferTarget = bruttoMonatsbedarf * minBufferMonths;
 
-        console.log("DEBUG_LIQ_CALC:", {
-            minBufferMonths,
-            bruttoJahresbedarf,
-            absoluteBufferTarget,
-            calculatedTargetBefore: calculatedTarget
-        });
+
 
         calculatedTarget = Math.max(calculatedTarget, absoluteBufferTarget);
 
@@ -1174,6 +1164,35 @@ export const TransactionEngine = {
 
         const sellOrder = this._getSellOrder(tranches, market, input, context, isEmergencySale);
         const orderedTranches = sellOrder.map(k => tranches[k]);
+
+        // Hook for Universal Engine / Shadow Mode
+        // We defer the execution to the Universal Engine if available to run side-by-side
+        if (typeof universalEngine !== 'undefined' && universalEngine.mode === 'SHADOW' && universalEngine.wasmInitialized) {
+            // Context matching Rust's expected input
+            const contextForCheck = {
+                minGold: context?.minGold,
+                forceGrossSellAmount: context?.forceGrossSellAmount
+            };
+
+            // Wrapped execution
+            // We wrap _calculateSingleSale but we need to pass the ARGS expected by checkTaxParity
+            // checkTaxParity(context, jsImpl, args)
+            // args: [requestedRefill, input, contextCtx, market, isEmergencySale]
+
+            // Define the JS implementation wrapper that matches the signature we pass to checkTaxParity
+            const jsImplementationWrapper = (refill, inp, ctx, mkt, isEmerg) => {
+                // The internal logic needs 'orderedTranches', which we already computed.
+                // We can capture 'orderedTranches' via closure, OR re-compute them if we wanted 100% isolation.
+                // For now, capturing 'orderedTranches' is safer to ensure identical inputs.
+                return _calculateSingleSale(refill, inp.sparerPauschbetrag || 0, orderedTranches);
+            };
+
+            return universalEngine.checkTaxParity(
+                'calculate_tax_yearly',
+                jsImplementationWrapper,
+                [requestedRefill, input, contextForCheck, market, isEmergencySale]
+            );
+        }
 
         return _calculateSingleSale(requestedRefill, input.sparerPauschbetrag || 0, orderedTranches);
     },
