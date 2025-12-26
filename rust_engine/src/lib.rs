@@ -86,6 +86,40 @@ pub fn run_simulation_poc(val: JsValue) -> Result<JsValue, JsValue> {
     }
 }
 
+// --- GRANULAR WASM EXPORTS ---
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn calculate_tax_wasm(
+    requested_refill: f64,
+    input_val: JsValue,
+    market_val: JsValue,
+    min_gold: f64,
+    is_emergency_sale: bool,
+    force_gross: f64
+) -> Result<JsValue, JsValue> {
+    let input: SimulationInput = serde_wasm_bindgen::from_value(input_val)
+        .map_err(|e| JsValue::from_str(&format!("Invalid Input: {}", e)))?;
+
+    let market: crate::types::MarketAnalysisResult = serde_wasm_bindgen::from_value(market_val)
+        .map_err(|e| JsValue::from_str(&format!("Invalid Market: {}", e)))?;
+
+    // Budgets currently ignored in simplified export or need explicit passing
+    let budgets = None; 
+
+    let result = tax::calculate_sale_and_tax(
+        requested_refill,
+        &input,
+        min_gold,
+        budgets,
+        &market,
+        is_emergency_sale,
+        force_gross
+    );
+
+    Ok(serde_wasm_bindgen::to_value(&result)?)
+}
+
 // --- NATIVE INTERFACE (for testing) ---
 #[cfg(not(target_arch = "wasm32"))]
 pub fn run_simulation_native(input: SimulationInput) -> Result<crate::types::SimulationResult, String> {

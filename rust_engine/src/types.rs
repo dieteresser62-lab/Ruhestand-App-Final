@@ -97,6 +97,9 @@ pub struct TransactionSource {
     pub brutto: f64,
     pub netto: f64,
     pub steuer: f64,
+    // pub tqf: f64,
+    // #[serde(rename = "spbUsed")]
+    // pub spb_used: f64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]

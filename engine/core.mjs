@@ -214,10 +214,7 @@ function _internal_calculateModel(input, lastState) {
         runway: { months: runwayMonths, status: runwayStatus }
     };
 
-    console.log('DEBUG_CORE_RETURN:', {
-        zielLiquiditaetVar: zielLiquiditaet,
-        resultHasZiel: resultForUI.zielLiquiditaet
-    });
+
 
     return {
         input,

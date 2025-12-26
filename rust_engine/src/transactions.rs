@@ -236,7 +236,7 @@ mod tests {
         let market = create_mock_market();
         let spending = create_mock_spending(); // 30k need
         
-        let state = SimulationState { flex_rate: 100.0, ..Default::default() };
+        let _state = SimulationState { flex_rate: 100.0, ..Default::default() };
         
         // Need target liquidity. Let's assume need 30k (Spending) + buffer
         let ziel_liquiditaet = 36000.0; // 3 years of flex bedarf? Simplified.

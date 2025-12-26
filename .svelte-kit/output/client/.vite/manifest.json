@@ -1,0 +1,124 @@
+{
+  ".svelte-kit/generated/client-optimized/app.js": {
+    "file": "_app/immutable/entry/app.AzZgrT2s.js",
+    "name": "entry/app",
+    "src": ".svelte-kit/generated/client-optimized/app.js",
+    "isEntry": true,
+    "imports": [
+      "_CmsKOCeN.js",
+      "_CArxwV3n.js",
+      "_DK8bGZiz.js"
+    ],
+    "dynamicImports": [
+      ".svelte-kit/generated/client-optimized/nodes/0.js",
+      ".svelte-kit/generated/client-optimized/nodes/1.js",
+      ".svelte-kit/generated/client-optimized/nodes/2.js"
+    ]
+  },
+  ".svelte-kit/generated/client-optimized/nodes/0.js": {
+    "file": "_app/immutable/nodes/0.Be4MMC2A.js",
+    "name": "nodes/0",
+    "src": ".svelte-kit/generated/client-optimized/nodes/0.js",
+    "isEntry": true,
+    "isDynamicEntry": true,
+    "imports": [
+      "_CArxwV3n.js",
+      "_DK8bGZiz.js"
+    ]
+  },
+  ".svelte-kit/generated/client-optimized/nodes/1.js": {
+    "file": "_app/immutable/nodes/1.BrIDDGgI.js",
+    "name": "nodes/1",
+    "src": ".svelte-kit/generated/client-optimized/nodes/1.js",
+    "isEntry": true,
+    "isDynamicEntry": true,
+    "imports": [
+      "_CArxwV3n.js",
+      "_DK8bGZiz.js",
+      "_BKuRRfIk.js"
+    ]
+  },
+  ".svelte-kit/generated/client-optimized/nodes/2.js": {
+    "file": "_app/immutable/nodes/2.C3K_ie7g.js",
+    "name": "nodes/2",
+    "src": ".svelte-kit/generated/client-optimized/nodes/2.js",
+    "isEntry": true,
+    "isDynamicEntry": true,
+    "imports": [
+      "_CArxwV3n.js",
+      "_DK8bGZiz.js",
+      "_CmsKOCeN.js",
+      "_CGTK0Dt_.js"
+    ],
+    "dynamicImports": [
+      "src/lib/rust-engine.mjs"
+    ],
+    "css": [
+      "_app/immutable/assets/2.BT0v74Ch.css"
+    ]
+  },
+  "_BKuRRfIk.js": {
+    "file": "_app/immutable/chunks/BKuRRfIk.js",
+    "name": "entry",
+    "imports": [
+      "_CArxwV3n.js",
+      "_CGTK0Dt_.js"
+    ]
+  },
+  "_CArxwV3n.js": {
+    "file": "_app/immutable/chunks/CArxwV3n.js",
+    "name": "scheduler"
+  },
+  "_CGTK0Dt_.js": {
+    "file": "_app/immutable/chunks/CGTK0Dt_.js",
+    "name": "index",
+    "imports": [
+      "_CArxwV3n.js"
+    ]
+  },
+  "_CmsKOCeN.js": {
+    "file": "_app/immutable/chunks/CmsKOCeN.js",
+    "name": "preload-helper"
+  },
+  "_DK8bGZiz.js": {
+    "file": "_app/immutable/chunks/DK8bGZiz.js",
+    "name": "index",
+    "imports": [
+      "_CArxwV3n.js"
+    ]
+  },
+  "node_modules/@sveltejs/kit/src/runtime/client/entry.js": {
+    "file": "_app/immutable/entry/start.BBlXSvyT.js",
+    "name": "entry/start",
+    "src": "node_modules/@sveltejs/kit/src/runtime/client/entry.js",
+    "isEntry": true,
+    "imports": [
+      "_BKuRRfIk.js"
+    ]
+  },
+  "pkg/rust_engine.js": {
+    "file": "_app/immutable/chunks/CnKu8VUe.js",
+    "name": "rust_engine",
+    "src": "pkg/rust_engine.js",
+    "isDynamicEntry": true,
+    "assets": [
+      "_app/immutable/assets/rust_engine_bg.C7JsDaaL.wasm"
+    ]
+  },
+  "pkg/rust_engine_bg.wasm": {
+    "file": "_app/immutable/assets/rust_engine_bg.C7JsDaaL.wasm",
+    "src": "pkg/rust_engine_bg.wasm"
+  },
+  "src/lib/rust-engine.mjs": {
+    "file": "_app/immutable/chunks/DhE-M1A1.js",
+    "name": "rust-engine",
+    "src": "src/lib/rust-engine.mjs",
+    "isDynamicEntry": true,
+    "imports": [
+      "_CmsKOCeN.js"
+    ],
+    "dynamicImports": [
+      "pkg/rust_engine.js"
+    ]
+  }
+}
