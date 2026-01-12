@@ -62,24 +62,10 @@ export const TransactionEngine = {
             const flexB = Number(input.flexBedarf) || 0;
             bruttoJahresbedarf = fBedarf + flexB;
 
-            /*
-            console.log("DEBUG_BUFFER_INPUT:", { 
-                floorRaw: input.floorBedarf, 
-                flexRaw: input.flexBedarf,
-                fBedarf, flexB, bruttoJahresbedarf 
-            });
-            */
         }
 
         const bruttoMonatsbedarf = bruttoJahresbedarf / 12;
         const absoluteBufferTarget = bruttoMonatsbedarf * minBufferMonths;
-
-        console.log("DEBUG_LIQ_CALC:", {
-            minBufferMonths,
-            bruttoJahresbedarf,
-            absoluteBufferTarget,
-            calculatedTargetBefore: calculatedTarget
-        });
 
         calculatedTarget = Math.max(calculatedTarget, absoluteBufferTarget);
 

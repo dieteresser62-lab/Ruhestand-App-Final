@@ -146,6 +146,31 @@ export function rng(seed = 123456789) {
     return generator;
 }
 
+export const RUNIDX_COMBO_SETUP = 0x7fffffff;
+
+function normalizeSeed(value) {
+    return (Number.isFinite(value) ? value : 0) >>> 0;
+}
+
+function mix32(x) {
+    let h = x >>> 0;
+    h ^= h >>> 16;
+    h = Math.imul(h, 0x85ebca6b);
+    h ^= h >>> 13;
+    h = Math.imul(h, 0xc2b2ae35);
+    h ^= h >>> 16;
+    return h >>> 0;
+}
+
+export function makeRunSeed(baseSeed, comboIdx, runIdx) {
+    const base = normalizeSeed(baseSeed);
+    const combo = normalizeSeed(comboIdx);
+    const run = normalizeSeed(runIdx);
+    let h = mix32(base ^ mix32(combo + 0x9e3779b9));
+    h = mix32(h ^ mix32(run + 0x85ebca6b));
+    return h >>> 0;
+}
+
 /**
  * Berechnet ein Quantil performant mithilfe des Quickselect-Algorithmus.
  * @param {Float64Array|number[]} arr - Das Array von Zahlen.

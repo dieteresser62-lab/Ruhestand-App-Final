@@ -610,6 +610,19 @@
                                 <option value="regime_iid">Regime-Sampling (iid)</option>
                                 <option value="block">Block-Bootstrap (Stresstest)</option>
                             </select></div>
+                        <div class="form-group advanced-only" style="margin-top: 10px;"><label
+                                for="rngMode">RNG-Modus</label><select id="rngMode">
+                                <option value="per-run-seed" selected>Per-Run Seed (deterministisch)</option>
+                                <option value="legacy-stream">Legacy Stream (alte Ergebnisse)</option>
+                            </select></div>
+                        <div class="form-grid-four-col advanced-only" style="margin-top: 10px;">
+                            <div class="form-group"><label for="mcWorkerCount">Worker-Anzahl</label><input
+                                    type="number" id="mcWorkerCount" value="0" min="0"
+                                    title="0 = auto (hardwareConcurrency), sonst fixe Worker-Anzahl"></div>
+                            <div class="form-group"><label for="mcWorkerBudget">Job-Timebudget (ms)</label><input
+                                    type="number" id="mcWorkerBudget" value="200" min="50"
+                                    title="Ziel-CPU-Zeit pro Worker-Job (auto Chunking)"></div>
+                        </div>
                         <div class="form-group advanced-only" style="justify-content: center; margin-top: 10px;"><label
                                 style="flex-direction: row; align-items: center;"
                                 title="Wenn aktiv, werden Startjahre bevorzugt, deren historisches CAPE dem aktuellen Eingabewert ähnelt (+/- 20%)."><input
@@ -623,7 +636,17 @@
                                 Simulationsjahre</label><select id="stressPreset">
                                 <!-- Wird per JavaScript befüllt -->
                             </select></div>
-                    </fieldset><button id="mcButton" onclick="runMonteCarlo()">Monte-Carlo-Simulation starten</button>
+                    </fieldset>
+                    <div class="form-group advanced-only" style="margin-top: 10px; justify-content: center;">
+                        <label style="flex-direction: row; align-items: center;"
+                            title="Fuehrt zuerst seriell, dann mit Web-Workern aus und zeigt beide Laufzeiten.">
+                            <input type="checkbox" id="mcCompareMode" style="width: auto; margin-right: 8px;">
+                            Vergleich: Seriell vs. Worker
+                        </label>
+                    </div>
+                    <div id="mc-compare-results" class="advanced-only"
+                        style="display:none; margin-top: 10px; font-size: 0.95rem; color: var(--text-secondary);"></div>
+                    <button id="mcButton" onclick="runMonteCarlo()">Monte-Carlo-Simulation starten</button>
                     <div id="mc-progress-bar-container">
                         <div id="mc-progress-bar"></div>
                     </div>

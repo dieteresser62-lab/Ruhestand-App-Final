@@ -17,9 +17,227 @@
 
 import { rng } from './simulator-utils.js';
 import { getCommonInputs, prepareHistoricalData } from './simulator-portfolio.js';
+import { compileScenario, getDataVersion } from './simulator-engine-helpers.js';
 import { normalizeWidowOptions, deepClone } from './simulator-sweep-utils.js';
-import { runMonteCarloSimulation } from './monte-carlo-runner.js';
-import { ScenarioAnalyzer } from './scenario-analyzer.js';
+import { buildMonteCarloAggregates, createMonteCarloBuffers, MC_HEATMAP_BINS, runMonteCarloChunk } from './monte-carlo-runner.js';
+import { WorkerPool } from './workers/worker-pool.js';
+
+function mergeHeatmap(target, source) {
+    for (let year = 0; year < target.length; year++) {
+        const targetRow = target[year];
+        const sourceRow = source[year];
+        if (!sourceRow) continue;
+        for (let i = 0; i < targetRow.length; i++) {
+            targetRow[i] += sourceRow[i] || 0;
+        }
+    }
+}
+
+function readWorkerConfig() {
+    const workerCountRaw = document.getElementById('mcWorkerCount')?.value ?? '0';
+    const budgetRaw = document.getElementById('mcWorkerBudget')?.value ?? '200';
+    const workerCount = parseInt(String(workerCountRaw).trim(), 10);
+    const timeBudgetMs = parseInt(String(budgetRaw).trim(), 10);
+    return {
+        workerCount: Number.isFinite(workerCount) && workerCount > 0 ? workerCount : 0,
+        timeBudgetMs: Number.isFinite(timeBudgetMs) && timeBudgetMs > 0 ? timeBudgetMs : 200
+    };
+}
+
+let autoOptimizePool = null;
+let autoOptimizePoolSize = 0;
+
+function getAutoOptimizePool(workerCount) {
+    if (!autoOptimizePool || autoOptimizePoolSize !== workerCount) {
+        if (autoOptimizePool) {
+            autoOptimizePool.dispose();
+        }
+        autoOptimizePool = new WorkerPool({
+            workerUrl: new URL('./workers/mc-worker.js', import.meta.url),
+            size: workerCount,
+            type: 'module',
+            onError: error => console.error('[AUTO_OPT] WorkerPool Error:', error)
+        });
+        autoOptimizePoolSize = workerCount;
+    }
+    return autoOptimizePool;
+}
+
+async function runMonteCarloAutoOptimize({ inputs, widowOptions, monteCarloParams, useCapeSampling }) {
+    const { anzahl } = monteCarloParams;
+    const workerConfig = readWorkerConfig();
+    const desiredWorkers = workerConfig.workerCount ?? 0;
+    const workerCount = Math.max(1, Number.isFinite(desiredWorkers) && desiredWorkers > 0
+        ? desiredWorkers
+        : (navigator?.hardwareConcurrency || 2));
+    const timeBudgetMs = workerConfig.timeBudgetMs ?? 200;
+
+    if (typeof Worker === 'undefined') {
+        const chunk = await runMonteCarloChunk({
+            inputs,
+            widowOptions,
+            monteCarloParams,
+            useCapeSampling,
+            runRange: { start: 0, count: anzahl },
+            logIndices: []
+        });
+        const aggregatedResults = buildMonteCarloAggregates({
+            inputs,
+            totalRuns: anzahl,
+            buffers: chunk.buffers,
+            heatmap: chunk.heatmap,
+            bins: chunk.bins || MC_HEATMAP_BINS,
+            totals: chunk.totals,
+            lists: chunk.lists,
+            allRealWithdrawalsSample: chunk.allRealWithdrawalsSample
+        });
+        return { aggregatedResults, failCount: chunk.totals.failCount };
+    }
+
+    const pool = getAutoOptimizePool(workerCount);
+
+    const { scenarioKey, compiledScenario } = compileScenario(inputs, widowOptions, monteCarloParams.methode, useCapeSampling, inputs.stressPreset);
+    const dataVersion = getDataVersion();
+
+    const buffers = createMonteCarloBuffers(anzahl);
+    const heatmap = Array(10).fill(0).map(() => new Uint32Array(MC_HEATMAP_BINS.length - 1));
+    const lists = {
+        entryAges: [],
+        entryAgesP2: [],
+        careDepotCosts: [],
+        endWealthWithCareList: [],
+        endWealthNoCareList: [],
+        p1CareYearsTriggered: [],
+        p2CareYearsTriggered: [],
+        bothCareYearsOverlapTriggered: [],
+        maxAnnualCareSpendTriggered: []
+    };
+    const allRealWithdrawalsSample = [];
+    const totals = {
+        failCount: 0,
+        pflegeTriggeredCount: 0,
+        totalSimulatedYears: 0,
+        totalYearsQuoteAbove45: 0,
+        shortfallWithCareCount: 0,
+        shortfallNoCareProxyCount: 0,
+        p2TriggeredCount: 0
+    };
+
+    let nextRunIdx = 0;
+    const minChunk = 25;
+    const maxChunk = Math.max(minChunk, Math.ceil(anzahl / workerCount));
+    let chunkSize = Math.min(maxChunk, Math.max(minChunk, Math.floor(anzahl / (workerCount * 4)) || minChunk));
+
+    const pending = new Set();
+
+    const scheduleJob = (start, count) => {
+        const startedAt = performance.now();
+        const payload = {
+            type: 'job',
+            scenarioKey,
+            runRange: { start, count },
+            monteCarloParams: {
+                anzahl: count,
+                maxDauer: monteCarloParams.maxDauer,
+                blockSize: monteCarloParams.blockSize,
+                seed: monteCarloParams.seed,
+                methode: monteCarloParams.methode,
+                rngMode: monteCarloParams.rngMode || 'per-run-seed'
+            },
+            useCapeSampling,
+            logIndices: []
+        };
+        const promise = pool.runJob(payload).then(result => {
+            const elapsedMs = result.elapsedMs ?? (performance.now() - startedAt);
+            return { result, start, count, elapsedMs };
+        });
+        pending.add(promise);
+        promise.finally(() => pending.delete(promise));
+    };
+
+    try {
+        await pool.broadcast({
+            type: 'init',
+            scenarioKey,
+            compiledScenario,
+            dataVersion
+        });
+
+        while (nextRunIdx < anzahl && pending.size < workerCount) {
+            const count = Math.min(chunkSize, anzahl - nextRunIdx);
+            scheduleJob(nextRunIdx, count);
+            nextRunIdx += count;
+        }
+
+        while (pending.size > 0) {
+            const { result, start, count, elapsedMs } = await Promise.race(pending);
+
+            const chunkBuffers = result.buffers;
+            buffers.finalOutcomes.set(chunkBuffers.finalOutcomes, start);
+            buffers.taxOutcomes.set(chunkBuffers.taxOutcomes, start);
+            buffers.kpiLebensdauer.set(chunkBuffers.kpiLebensdauer, start);
+            buffers.kpiKuerzungsjahre.set(chunkBuffers.kpiKuerzungsjahre, start);
+            buffers.kpiMaxKuerzung.set(chunkBuffers.kpiMaxKuerzung, start);
+            buffers.volatilities.set(chunkBuffers.volatilities, start);
+            buffers.maxDrawdowns.set(chunkBuffers.maxDrawdowns, start);
+            buffers.depotErschoepft.set(chunkBuffers.depotErschoepft, start);
+            buffers.alterBeiErschoepfung.set(chunkBuffers.alterBeiErschoepfung, start);
+            buffers.anteilJahreOhneFlex.set(chunkBuffers.anteilJahreOhneFlex, start);
+            buffers.stress_maxDrawdowns.set(chunkBuffers.stress_maxDrawdowns, start);
+            buffers.stress_timeQuoteAbove45.set(chunkBuffers.stress_timeQuoteAbove45, start);
+            buffers.stress_cutYears.set(chunkBuffers.stress_cutYears, start);
+            buffers.stress_CaR_P10_Real.set(chunkBuffers.stress_CaR_P10_Real, start);
+            buffers.stress_recoveryYears.set(chunkBuffers.stress_recoveryYears, start);
+
+            mergeHeatmap(heatmap, result.heatmap);
+
+            totals.failCount += result.totals.failCount;
+            totals.pflegeTriggeredCount += result.totals.pflegeTriggeredCount;
+            totals.totalSimulatedYears += result.totals.totalSimulatedYears;
+            totals.totalYearsQuoteAbove45 += result.totals.totalYearsQuoteAbove45;
+            totals.shortfallWithCareCount += result.totals.shortfallWithCareCount;
+            totals.shortfallNoCareProxyCount += result.totals.shortfallNoCareProxyCount;
+            totals.p2TriggeredCount += result.totals.p2TriggeredCount;
+
+            lists.entryAges.push(...result.lists.entryAges);
+            lists.entryAgesP2.push(...result.lists.entryAgesP2);
+            lists.careDepotCosts.push(...result.lists.careDepotCosts);
+            lists.endWealthWithCareList.push(...result.lists.endWealthWithCareList);
+            lists.endWealthNoCareList.push(...result.lists.endWealthNoCareList);
+            lists.p1CareYearsTriggered.push(...result.lists.p1CareYearsTriggered);
+            lists.p2CareYearsTriggered.push(...result.lists.p2CareYearsTriggered);
+            lists.bothCareYearsOverlapTriggered.push(...result.lists.bothCareYearsOverlapTriggered);
+            lists.maxAnnualCareSpendTriggered.push(...result.lists.maxAnnualCareSpendTriggered);
+            allRealWithdrawalsSample.push(...result.allRealWithdrawalsSample);
+
+            if (elapsedMs > 0) {
+                const scaled = Math.round(count * (timeBudgetMs / elapsedMs));
+                chunkSize = Math.max(minChunk, Math.min(maxChunk, scaled || minChunk));
+            }
+
+            if (nextRunIdx < anzahl) {
+                const nextCount = Math.min(chunkSize, anzahl - nextRunIdx);
+                scheduleJob(nextRunIdx, nextCount);
+                nextRunIdx += nextCount;
+            }
+        }
+    } finally {
+        // keep pool alive for reuse across candidates/seeds
+    }
+
+    const aggregatedResults = buildMonteCarloAggregates({
+        inputs,
+        totalRuns: anzahl,
+        buffers,
+        heatmap,
+        bins: MC_HEATMAP_BINS,
+        totals,
+        lists,
+        allRealWithdrawalsSample
+    });
+
+    return { aggregatedResults, failCount: totals.failCount };
+}
 
 /**
  * Whitelist der erlaubten Parameter-Keys
@@ -358,16 +576,12 @@ async function evaluateCandidate(candidate, baseInputs, runsPerCandidate, maxDau
             methode: 'regime_markov'
         };
 
-        const scenarioAnalyzer = new ScenarioAnalyzer(runsPerCandidate);
-
-        const { aggregatedResults, failCount } = await runMonteCarloSimulation({
+        const { aggregatedResults, failCount } = await runMonteCarloAutoOptimize({
             inputs,
             widowOptions,
             monteCarloParams,
             useCapeSampling: false,
-            onProgress: () => { },
-            scenarioAnalyzer
-            // engine parameter removed - wrapper selects correct engine based on feature flag mode
+            onProgress: () => { }
         });
 
         allResults.push({ aggregatedResults, failCount, anzahl: runsPerCandidate });
