@@ -75,11 +75,20 @@ export class WorkerPool {
             }
             this.activeJobs.delete(worker);
         }
-        // Unblock the worker in case of an error to avoid deadlocks.
-        if (!this.idle.includes(worker)) {
+        // Replace the worker to avoid reusing a potentially corrupted state.
+        const index = this.workers.indexOf(worker);
+        if (index !== -1) {
+            worker.terminate();
+            const replacement = new Worker(this.workerUrl, { type: this.type });
+            replacement.onmessage = event => this._handleMessage(replacement, event.data);
+            replacement.onerror = err => this._handleError(replacement, err);
+            this.workers[index] = replacement;
+            this.idle = this.idle.filter(item => item !== worker);
+            this.idle.push(replacement);
+        } else if (!this.idle.includes(worker)) {
             this.idle.push(worker);
-            this._drainQueue();
         }
+        this._drainQueue();
     }
 
     _drainQueue() {
@@ -115,6 +124,10 @@ export class WorkerPool {
         return new Promise((resolve, reject) => {
             this.jobs.set(jobId, { resolve, reject });
             this.activeJobs.set(worker, jobId);
+            const idleIndex = this.idle.indexOf(worker);
+            if (idleIndex !== -1) {
+                this.idle.splice(idleIndex, 1);
+            }
             worker.postMessage(message, transferables);
         });
     }

@@ -47,6 +47,32 @@ async function runMonteCarloLogsForIndices({
     return logsByIndex;
 }
 
+function appendArray(target, source) {
+    if (!source || source.length === 0) return;
+    for (let i = 0; i < source.length; i++) {
+        target.push(source[i]);
+    }
+}
+
+let globalMonteCarloPool = null;
+let globalMonteCarloPoolSize = 0;
+
+function getMonteCarloPool(workerCount) {
+    if (!globalMonteCarloPool || globalMonteCarloPoolSize !== workerCount) {
+        if (globalMonteCarloPool) {
+            globalMonteCarloPool.dispose();
+        }
+        globalMonteCarloPool = new WorkerPool({
+            workerUrl: new URL('./workers/mc-worker.js', import.meta.url),
+            size: workerCount,
+            type: 'module',
+            onError: error => console.error('[MC WorkerPool] Error:', error)
+        });
+        globalMonteCarloPoolSize = workerCount;
+    }
+    return globalMonteCarloPool;
+}
+
 async function runMonteCarloWithWorkers({
     inputs,
     widowOptions,
@@ -60,20 +86,16 @@ async function runMonteCarloWithWorkers({
     const desiredWorkers = workerConfig?.workerCount ?? 0;
     const workerCount = Math.max(1, Number.isFinite(desiredWorkers) && desiredWorkers > 0
         ? desiredWorkers
-        : (navigator?.hardwareConcurrency || 2));
-    const workerUrl = new URL('./workers/mc-worker.js', import.meta.url);
-    const stallTimeoutMs = 20000;
+        : Math.max(1, (navigator?.hardwareConcurrency || 2) - 1));
+    const baseTimeoutMs = 5000;
+    let stallTimeoutMs = 20000;
     const pollIntervalMs = 250;
     let lastProgressAt = performance.now();
-    const pool = new WorkerPool({
-        workerUrl,
-        size: workerCount,
-        type: 'module',
-        onProgress: () => {
-            lastProgressAt = performance.now();
-        },
-        onError: error => console.error('[MC WorkerPool] Error:', error)
-    });
+    const pool = getMonteCarloPool(workerCount);
+    pool.onProgress = () => {
+        lastProgressAt = performance.now();
+    };
+    pool.onError = error => console.error('[MC WorkerPool] Error:', error);
 
     const { scenarioKey, compiledScenario } = compileScenario(inputs, widowOptions, methode, useCapeSampling, inputs.stressPreset);
     const dataVersion = getDataVersion();
@@ -112,6 +134,7 @@ async function runMonteCarloWithWorkers({
     const minChunk = 25;
     const maxChunk = Math.max(minChunk, Math.ceil(anzahl / workerCount));
     let chunkSize = Math.min(maxChunk, Math.max(minChunk, Math.floor(anzahl / (workerCount * 4)) || minChunk));
+    let smoothedChunkSize = chunkSize;
 
     const pending = new Set();
 
@@ -199,16 +222,16 @@ async function runMonteCarloWithWorkers({
             totals.shortfallNoCareProxyCount += result.totals.shortfallNoCareProxyCount;
             totals.p2TriggeredCount += result.totals.p2TriggeredCount;
 
-            lists.entryAges.push(...result.lists.entryAges);
-            lists.entryAgesP2.push(...result.lists.entryAgesP2);
-            lists.careDepotCosts.push(...result.lists.careDepotCosts);
-            lists.endWealthWithCareList.push(...result.lists.endWealthWithCareList);
-            lists.endWealthNoCareList.push(...result.lists.endWealthNoCareList);
-            lists.p1CareYearsTriggered.push(...result.lists.p1CareYearsTriggered);
-            lists.p2CareYearsTriggered.push(...result.lists.p2CareYearsTriggered);
-            lists.bothCareYearsOverlapTriggered.push(...result.lists.bothCareYearsOverlapTriggered);
-            lists.maxAnnualCareSpendTriggered.push(...result.lists.maxAnnualCareSpendTriggered);
-            allRealWithdrawalsSample.push(...result.allRealWithdrawalsSample);
+            appendArray(lists.entryAges, result.lists.entryAges);
+            appendArray(lists.entryAgesP2, result.lists.entryAgesP2);
+            appendArray(lists.careDepotCosts, result.lists.careDepotCosts);
+            appendArray(lists.endWealthWithCareList, result.lists.endWealthWithCareList);
+            appendArray(lists.endWealthNoCareList, result.lists.endWealthNoCareList);
+            appendArray(lists.p1CareYearsTriggered, result.lists.p1CareYearsTriggered);
+            appendArray(lists.p2CareYearsTriggered, result.lists.p2CareYearsTriggered);
+            appendArray(lists.bothCareYearsOverlapTriggered, result.lists.bothCareYearsOverlapTriggered);
+            appendArray(lists.maxAnnualCareSpendTriggered, result.lists.maxAnnualCareSpendTriggered);
+            appendArray(allRealWithdrawalsSample, result.allRealWithdrawalsSample);
 
             worstRun = pickWorstRun(worstRun, result.worstRun);
             worstRunCare = pickWorstRun(worstRunCare, result.worstRunCare);
@@ -226,7 +249,11 @@ async function runMonteCarloWithWorkers({
 
             if (elapsedMs > 0) {
                 const scaled = Math.round(count * (timeBudgetMs / elapsedMs));
-                chunkSize = Math.max(minChunk, Math.min(maxChunk, scaled || minChunk));
+                const targetSize = Math.max(minChunk, Math.min(maxChunk, scaled || minChunk));
+                smoothedChunkSize = Math.max(minChunk, Math.min(maxChunk, Math.round(smoothedChunkSize * 0.7 + targetSize * 0.3)));
+                chunkSize = smoothedChunkSize;
+                const perRunMs = elapsedMs / count;
+                stallTimeoutMs = Math.max(baseTimeoutMs, Math.round(perRunMs * chunkSize * 3));
             }
 
             if (nextRunIdx < anzahl) {
@@ -236,7 +263,7 @@ async function runMonteCarloWithWorkers({
         }
         }
     } finally {
-        pool.dispose();
+        // keep pool alive for reuse across runs
     }
 
     if (!worstRun) {

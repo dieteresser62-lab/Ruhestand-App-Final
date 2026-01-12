@@ -113,7 +113,7 @@ async function runSweepWithWorkers({
     const desiredWorkers = workerConfig.workerCount ?? 0;
     const workerCount = Math.max(1, Number.isFinite(desiredWorkers) && desiredWorkers > 0
         ? desiredWorkers
-        : (navigator?.hardwareConcurrency || 2));
+        : Math.max(1, (navigator?.hardwareConcurrency || 2) - 1));
     const timeBudgetMs = workerConfig.timeBudgetMs ?? 200;
     const workerUrl = new URL('./workers/mc-worker.js', import.meta.url);
 
@@ -132,6 +132,7 @@ async function runSweepWithWorkers({
     const minChunk = 1;
     const maxChunk = Math.max(minChunk, Math.ceil(totalCombos / workerCount));
     let chunkSize = Math.min(maxChunk, Math.max(minChunk, Math.floor(totalCombos / (workerCount * 4)) || minChunk));
+    let smoothedChunkSize = chunkSize;
 
     const pending = new Set();
 
@@ -177,7 +178,9 @@ async function runSweepWithWorkers({
 
             if (elapsedMs > 0) {
                 const scaled = Math.round(count * (timeBudgetMs / elapsedMs));
-                chunkSize = Math.max(minChunk, Math.min(maxChunk, scaled || minChunk));
+                const targetSize = Math.max(minChunk, Math.min(maxChunk, scaled || minChunk));
+                smoothedChunkSize = Math.max(minChunk, Math.min(maxChunk, Math.round(smoothedChunkSize * 0.7 + targetSize * 0.3)));
+                chunkSize = smoothedChunkSize;
             }
 
             if (nextComboIdx < totalCombos) {
