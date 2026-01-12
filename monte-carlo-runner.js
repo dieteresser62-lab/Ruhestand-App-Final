@@ -186,13 +186,18 @@ export async function runMonteCarloChunk({
     // Optimiert: Dynamisches Progress-Update-Intervall für bessere Performance
     // Mindestens alle 100 Runs ODER 1% der Gesamtzahl (je nachdem was größer ist)
     const progressUpdateInterval = Math.max(100, Math.floor(runCount / 100));
+    let lastProgressPct = -1;
 
     const logIndexSet = Array.isArray(logIndices) ? new Set(logIndices) : null;
 
     for (let i = 0; i < runCount; i++) {
         if (i % progressUpdateInterval === 0) {
-            onProgress((i / runCount) * 90);
-            await new Promise(resolve => setTimeout(resolve, 0));
+            const pct = Math.floor((i / runCount) * 90);
+            if (pct > lastProgressPct) {
+                lastProgressPct = pct;
+                onProgress(pct);
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
         }
         const runIdx = runStart + i;
         let failed = false, totalTaxesThisRun = 0, kpiJahreMitKuerzungDieserLauf = 0, kpiMaxKuerzungDieserLauf = 0;
