@@ -66,6 +66,7 @@ function getMonteCarloPool(workerCount) {
             workerUrl: new URL('./workers/mc-worker.js', import.meta.url),
             size: workerCount,
             type: 'module',
+            telemetryName: 'MonteCarloPool',
             onError: error => console.error('[MC WorkerPool] Error:', error)
         });
         globalMonteCarloPoolSize = workerCount;
@@ -96,6 +97,9 @@ async function runMonteCarloWithWorkers({
         lastProgressAt = performance.now();
     };
     pool.onError = error => console.error('[MC WorkerPool] Error:', error);
+    const memoryInterval = pool.telemetry && pool.telemetry.enabled
+        ? setInterval(() => pool.telemetry.recordMemorySnapshot(), 5000)
+        : null;
 
     const { scenarioKey, compiledScenario } = compileScenario(inputs, widowOptions, methode, useCapeSampling, inputs.stressPreset);
     const dataVersion = getDataVersion();
@@ -131,12 +135,20 @@ async function runMonteCarloWithWorkers({
     let nextRunIdx = 0;
 
     const timeBudgetMs = workerConfig?.timeBudgetMs ?? 200;
-    const minChunk = 25;
-    const maxChunk = Math.max(minChunk, Math.ceil(anzahl / workerCount));
+    const minChunk = 10;
+    const maxChunk = Math.min(400, Math.max(minChunk, Math.ceil(anzahl / workerCount)));
     let chunkSize = Math.min(maxChunk, Math.max(minChunk, Math.floor(anzahl / (workerCount * 4)) || minChunk));
     let smoothedChunkSize = chunkSize;
 
     const pending = new Set();
+
+    const scheduleNextIfNeeded = () => {
+        while (pending.size < workerCount && nextRunIdx < anzahl) {
+            const count = Math.min(chunkSize, anzahl - nextRunIdx);
+            scheduleJob(nextRunIdx, count);
+            nextRunIdx += count;
+        }
+    };
 
     const scheduleJob = (start, count) => {
         const startedAt = performance.now();
@@ -171,11 +183,7 @@ async function runMonteCarloWithWorkers({
             dataVersion
         });
 
-        while (nextRunIdx < anzahl && pending.size < workerCount) {
-            const count = Math.min(chunkSize, anzahl - nextRunIdx);
-            scheduleJob(nextRunIdx, count);
-            nextRunIdx += count;
-        }
+        scheduleNextIfNeeded();
 
         while (pending.size > 0) {
             let raced = null;
@@ -252,17 +260,22 @@ async function runMonteCarloWithWorkers({
                 const targetSize = Math.max(minChunk, Math.min(maxChunk, scaled || minChunk));
                 smoothedChunkSize = Math.max(minChunk, Math.min(maxChunk, Math.round(smoothedChunkSize * 0.7 + targetSize * 0.3)));
                 chunkSize = smoothedChunkSize;
+                if (pool.telemetry) {
+                    pool.telemetry.recordChunkSize(chunkSize);
+                }
                 const perRunMs = elapsedMs / count;
                 stallTimeoutMs = Math.max(baseTimeoutMs, Math.round(perRunMs * chunkSize * 3));
             }
 
-            if (nextRunIdx < anzahl) {
-                const nextCount = Math.min(chunkSize, anzahl - nextRunIdx);
-            scheduleJob(nextRunIdx, nextCount);
-            nextRunIdx += nextCount;
-        }
+            scheduleNextIfNeeded();
         }
     } finally {
+        if (memoryInterval) {
+            clearInterval(memoryInterval);
+        }
+        if (pool.telemetry && pool.telemetry.enabled) {
+            pool.telemetry.printReport();
+        }
         // keep pool alive for reuse across runs
     }
 

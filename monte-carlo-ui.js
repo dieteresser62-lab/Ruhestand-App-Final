@@ -47,13 +47,13 @@ export function createMonteCarloUI() {
          * @returns {{ workerCount: number, timeBudgetMs: number }}
          */
         readWorkerConfig() {
-            const workerCountRaw = document.getElementById('mcWorkerCount')?.value ?? '0';
-            const budgetRaw = document.getElementById('mcWorkerBudget')?.value ?? '200';
+            const workerCountRaw = document.getElementById('mcWorkerCount')?.value ?? '8';
+            const budgetRaw = document.getElementById('mcWorkerBudget')?.value ?? '500';
             const workerCount = parseInt(String(workerCountRaw).trim(), 10);
             const timeBudgetMs = parseInt(String(budgetRaw).trim(), 10);
             return {
                 workerCount: Number.isFinite(workerCount) && workerCount > 0 ? workerCount : 0,
-                timeBudgetMs: Number.isFinite(timeBudgetMs) && timeBudgetMs > 0 ? timeBudgetMs : 200
+                timeBudgetMs: Number.isFinite(timeBudgetMs) && timeBudgetMs > 0 ? timeBudgetMs : 500
             };
         },
         /**

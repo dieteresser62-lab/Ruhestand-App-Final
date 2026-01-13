@@ -8,7 +8,13 @@ const __dirname = path.dirname(__filename);
 async function runTests() {
     console.log('🚀 Starting Test Runner...');
 
-    const files = fs.readdirSync(__dirname).filter(f => f.endsWith('.test.mjs'));
+    const quickOnly = process.env.QUICK_TESTS === '1';
+    const quickFiles = new Set([
+        'worker-parity.test.mjs'
+    ]);
+    const files = fs.readdirSync(__dirname)
+        .filter(f => f.endsWith('.test.mjs'))
+        .filter(f => !quickOnly || quickFiles.has(f));
     console.log(`Found ${files.length} test files.`);
 
     let totalTests = 0;

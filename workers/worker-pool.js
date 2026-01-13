@@ -1,7 +1,9 @@
 "use strict";
 
+import { WorkerTelemetry } from './worker-telemetry.js';
+
 export class WorkerPool {
-    constructor({ workerUrl, size = 1, type = 'module', onProgress = null, onError = null } = {}) {
+    constructor({ workerUrl, size = 1, type = 'module', onProgress = null, onError = null, telemetryName = 'default' } = {}) {
         if (!workerUrl) {
             throw new Error('WorkerPool requires workerUrl');
         }
@@ -10,6 +12,7 @@ export class WorkerPool {
         this.type = type;
         this.onProgress = typeof onProgress === 'function' ? onProgress : null;
         this.onError = typeof onError === 'function' ? onError : null;
+        this.telemetry = new WorkerTelemetry(telemetryName);
 
         this.workers = [];
         this.idle = [];
@@ -17,6 +20,8 @@ export class WorkerPool {
         this.jobs = new Map();
         this.activeJobs = new Map();
         this.nextJobId = 1;
+        this.workerIds = new Map();
+        this.nextWorkerId = 1;
 
         this._initWorkers();
     }
@@ -28,7 +33,16 @@ export class WorkerPool {
             worker.onerror = error => this._handleError(worker, error);
             this.workers.push(worker);
             this.idle.push(worker);
+            const workerId = `worker-${this.nextWorkerId++}`;
+            this.workerIds.set(worker, workerId);
         }
+        if (this.telemetry && this.telemetry.enabled) {
+            this.telemetry.workerCount = this.size;
+        }
+    }
+
+    _getWorkerId(worker) {
+        return this.workerIds.get(worker) || 'unknown';
     }
 
     _handleMessage(worker, message) {
@@ -57,10 +71,16 @@ export class WorkerPool {
         if (message.type === 'error') {
             const err = new Error(message.message || 'Worker error');
             err.stack = message.stack || err.stack;
+            if (this.telemetry) {
+                this.telemetry.recordJobFailed(jobId, this._getWorkerId(worker), err);
+            }
             job.reject(err);
             return;
         }
 
+        if (this.telemetry) {
+            this.telemetry.recordJobComplete(jobId, this._getWorkerId(worker), message.elapsedMs);
+        }
         job.resolve(message);
     }
 
@@ -71,6 +91,9 @@ export class WorkerPool {
             const job = this.jobs.get(activeJobId);
             if (job) {
                 this.jobs.delete(activeJobId);
+                if (this.telemetry) {
+                    this.telemetry.recordJobFailed(activeJobId, this._getWorkerId(worker), error);
+                }
                 job.reject(error instanceof Error ? error : new Error(String(error)));
             }
             this.activeJobs.delete(worker);
@@ -85,6 +108,9 @@ export class WorkerPool {
             this.workers[index] = replacement;
             this.idle = this.idle.filter(item => item !== worker);
             this.idle.push(replacement);
+            const replacementId = `worker-${this.nextWorkerId++}`;
+            this.workerIds.set(replacement, replacementId);
+            this.workerIds.delete(worker);
         } else if (!this.idle.includes(worker)) {
             this.idle.push(worker);
         }
@@ -97,6 +123,9 @@ export class WorkerPool {
             const job = this.queue.shift();
             this.jobs.set(job.jobId, job);
             this.activeJobs.set(worker, job.jobId);
+            if (this.telemetry) {
+                this.telemetry.recordJobStart(job.jobId, this._getWorkerId(worker), job.payload);
+            }
             worker.postMessage(job.payload, job.transferables);
         }
     }
@@ -104,6 +133,9 @@ export class WorkerPool {
     runJob(payload, transferables = []) {
         const jobId = this.nextJobId++;
         const message = { ...payload, jobId };
+        if (this.telemetry) {
+            this.telemetry.recordJobStart(jobId, 'pending', message);
+        }
         return new Promise((resolve, reject) => {
             this.queue.push({ jobId, payload: message, transferables, resolve, reject });
             this._drainQueue();
@@ -128,11 +160,17 @@ export class WorkerPool {
             if (idleIndex !== -1) {
                 this.idle.splice(idleIndex, 1);
             }
+            if (this.telemetry) {
+                this.telemetry.recordJobStart(jobId, this._getWorkerId(worker), message);
+            }
             worker.postMessage(message, transferables);
         });
     }
 
     dispose() {
+        if (this.telemetry) {
+            this.telemetry.printReport();
+        }
         for (const worker of this.workers) {
             worker.terminate();
         }
@@ -141,5 +179,6 @@ export class WorkerPool {
         this.queue = [];
         this.jobs.clear();
         this.activeJobs.clear();
+        this.workerIds.clear();
     }
 }

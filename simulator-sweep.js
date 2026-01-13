@@ -91,13 +91,13 @@ export function displaySweepResults() {
 }
 
 function readSweepWorkerConfig() {
-    const workerCountRaw = document.getElementById('mcWorkerCount')?.value ?? '0';
-    const budgetRaw = document.getElementById('mcWorkerBudget')?.value ?? '200';
+    const workerCountRaw = document.getElementById('mcWorkerCount')?.value ?? '8';
+    const budgetRaw = document.getElementById('mcWorkerBudget')?.value ?? '500';
     const workerCount = parseInt(String(workerCountRaw).trim(), 10);
     const timeBudgetMs = parseInt(String(budgetRaw).trim(), 10);
     return {
         workerCount: Number.isFinite(workerCount) && workerCount > 0 ? workerCount : 0,
-        timeBudgetMs: Number.isFinite(timeBudgetMs) && timeBudgetMs > 0 ? timeBudgetMs : 200
+        timeBudgetMs: Number.isFinite(timeBudgetMs) && timeBudgetMs > 0 ? timeBudgetMs : 500
     };
 }
 
@@ -121,6 +121,7 @@ async function runSweepWithWorkers({
         workerUrl,
         size: workerCount,
         type: 'module',
+        telemetryName: 'SweepPool',
         onError: error => console.error('[SWEEP WorkerPool] Error:', error)
     });
 
@@ -129,12 +130,19 @@ async function runSweepWithWorkers({
     let p2VarianceCount = 0;
     let nextComboIdx = 0;
 
-    const minChunk = 1;
-    const maxChunk = Math.max(minChunk, Math.ceil(totalCombos / workerCount));
+    const minChunk = 2;
+    const maxChunk = Math.min(80, Math.max(minChunk, Math.ceil(totalCombos / workerCount)));
     let chunkSize = Math.min(maxChunk, Math.max(minChunk, Math.floor(totalCombos / (workerCount * 4)) || minChunk));
     let smoothedChunkSize = chunkSize;
 
     const pending = new Set();
+    const scheduleNextIfNeeded = () => {
+        while (pending.size < workerCount && nextComboIdx < totalCombos) {
+            const count = Math.min(chunkSize, totalCombos - nextComboIdx);
+            scheduleJob(nextComboIdx, count);
+            nextComboIdx += count;
+        }
+    };
 
     const scheduleJob = (start, count) => {
         const startedAt = performance.now();
@@ -159,11 +167,7 @@ async function runSweepWithWorkers({
             paramCombinations
         });
 
-        while (nextComboIdx < totalCombos && pending.size < workerCount) {
-            const count = Math.min(chunkSize, totalCombos - nextComboIdx);
-            scheduleJob(nextComboIdx, count);
-            nextComboIdx += count;
-        }
+        scheduleNextIfNeeded();
 
         while (pending.size > 0) {
             const { result, start, count, elapsedMs } = await Promise.race(pending);
@@ -183,11 +187,7 @@ async function runSweepWithWorkers({
                 chunkSize = smoothedChunkSize;
             }
 
-            if (nextComboIdx < totalCombos) {
-                const nextCount = Math.min(chunkSize, totalCombos - nextComboIdx);
-                scheduleJob(nextComboIdx, nextCount);
-                nextComboIdx += nextCount;
-            }
+            scheduleNextIfNeeded();
         }
     } finally {
         pool.dispose();

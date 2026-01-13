@@ -90,6 +90,53 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 * `simulator-utils.js` – Zufallszahlengenerator, Statistikfunktionen, Parser, Formatierung.
 * `simulator-data.js` – Historische Daten, Mortalitäts- und Stress-Presets.
 
+### Worker-Architektur (Monte Carlo, Sweep, Auto-Optimize)
+
+Die Parallelisierung basiert auf Web-Workern und einer gemeinsamen Pool-Schicht:
+
+* `workers/worker-pool.js` verwaltet einen Pool fester Worker-Instanzen, verteilt Jobs und ersetzt defekte Worker.
+* `workers/mc-worker.js` hostet die DOM-freien Runner (`monte-carlo-runner.js`, `sweep-runner.js`) und verarbeitet Job-Typen (`init`, `job`, `sweep-init`, `sweep`).
+* `simulator-monte-carlo.js` orchestriert die Worker-Jobs, führt Chunking (Zeitbudget) durch, aggregiert Ergebnisse und fällt bei Stalls auf seriell zurück.
+* `simulator-sweep.js` verteilt Parameter-Kombinationen auf Worker-Chunks und aggregiert Sweep-Metriken (Fallback seriell).
+* `auto_optimize.js` nutzt einen wiederverwendeten Pool, fährt Candidate-Runs ohne Log-Ausgabe und fällt bei Fehlern auf seriell zurück.
+
+**Determinismus/Seeding**
+* Jeder Run erhält einen deterministischen Seed (`per-run-seed`), damit Chunking/Worker keine Ergebnisse verändert.
+* `legacy-stream` bleibt seriell, da Chunking dort den RNG-Stream verändern würde.
+
+**Logs und Szenarioauswahl**
+* Worker-Läufe sammeln nur aggregierte Daten; detaillierte Logs werden in einem zweiten, seriellen Pass für ausgewählte Runs erstellt.
+* `ScenarioAnalyzer` wählt Worst-/Perzentil-/Pflege- und Zufalls-Szenarien aus.
+
+**Performance-Details**
+* Chunk-Größe wird über ein Zeitbudget dynamisch angepasst (glatt gefiltert), um kurze und lange Jobs auszugleichen.
+* Stall-Detection nutzt Progress-Timestamps und skaliert das Timeout mit der zuletzt gemessenen Chunk-Dauer.
+
+### Worker-Telemetrie (Dev-only)
+
+Die Worker-Pools bieten ein opt-in Telemetrie-System für lokale Performance-Analyse. Aktivierung:
+* URL-Parameter `?telemetry=true` oder
+* `localStorage.setItem('enableWorkerTelemetry','true')` + Reload
+* Dev-Panel via `?dev=true` (Toggle + Print/Export JSON).
+
+**Was liefert der Report (Console)?**
+* **Jobs:** `total/completed/failed/successRate%` – Stabilität der Jobs.
+* **Performance:** `avg/min/max JobTime` + `throughput (jobs/sec)` – Zeitbudget-Treffer & Effizienz.
+* **Chunking:** `avg/min/max/current` – Adaptives Chunking, ob sich die Größe stabilisiert.
+* **Workers:** pro Worker `jobsCompleted`, `totalTime`, `idleTime`, `utilization%` – Lastverteilung/Idle-Anteile.
+* **Memory:** nur wenn `performance.memory` verfügbar ist.
+
+**Interpretation (Beispiel)**
+* `successRate=100%` → keine Worker-Fehler.
+* `avgJobTime ≈ timeBudget` → Chunking trifft das Ziel.
+* `currentChunk` nahe `maxChunk` → System hat sich eingependelt.
+* Große Unterschiede bei `utilization%` → einzelne Jobs dauern länger (normal bei MC).
+
+**Beispielwerte (8 Worker, 500 ms Budget)**
+* `avgJobTime ~302 ms`, `min/max ~58/515 ms`
+* `chunk avg/current ~392/399`
+* `utilization ~76–99%`, `jobVariance CoV ~0.28`
+
 ### Parameter-Sweep & Auto-Optimize
 
 #### Schutzmechanismen

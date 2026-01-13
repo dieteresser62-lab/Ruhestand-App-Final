@@ -350,6 +350,28 @@
     <footer>
         <p>&copy; 2025 Ruhestand-Apps Suite | Entwickelt für Ihre finanzielle Sicherheit</p>
     </footer>
+
+    <div id="devTools" style="display:none; position:fixed; bottom:10px; right:10px; background:#333; color:#fff; padding:10px; border-radius:5px; z-index:9999;">
+        <label>
+            <input type="checkbox" id="telemetryToggle" />
+            Worker Telemetry
+        </label>
+    </div>
+
+    <script>
+        if (window.location.search.includes('dev=true')) {
+            const devTools = document.getElementById('devTools');
+            const toggle = document.getElementById('telemetryToggle');
+            if (devTools && toggle) {
+                devTools.style.display = 'block';
+                toggle.checked = localStorage.getItem('enableWorkerTelemetry') === 'true';
+                toggle.addEventListener('change', e => {
+                    localStorage.setItem('enableWorkerTelemetry', e.target.checked);
+                    alert('Telemetry ' + (e.target.checked ? 'aktiviert' : 'deaktiviert') + '. Seite neu laden.');
+                });
+            }
+        }
+    </script>
 </body>
 
 </html>

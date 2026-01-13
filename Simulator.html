@@ -617,11 +617,11 @@
                             </select></div>
                         <div class="form-grid-four-col advanced-only" style="margin-top: 10px;">
                             <div class="form-group"><label for="mcWorkerCount">Worker-Anzahl</label><input
-                                    type="number" id="mcWorkerCount" value="0" min="0"
-                                    title="0 = auto (hardwareConcurrency), sonst fixe Worker-Anzahl"></div>
+                                    type="number" id="mcWorkerCount" value="8" min="0"
+                                    title="Default: 8. 0 = auto (hardwareConcurrency), sonst fixe Worker-Anzahl"></div>
                             <div class="form-group"><label for="mcWorkerBudget">Job-Timebudget (ms)</label><input
-                                    type="number" id="mcWorkerBudget" value="200" min="50"
-                                    title="Ziel-CPU-Zeit pro Worker-Job (auto Chunking)"></div>
+                                    type="number" id="mcWorkerBudget" value="500" min="50"
+                                    title="Default: 500 ms. Ziel-CPU-Zeit pro Worker-Job (auto Chunking)"></div>
                         </div>
                         <div class="form-group advanced-only" style="justify-content: center; margin-top: 10px;"><label
                                 style="flex-direction: row; align-items: center;"
@@ -1291,6 +1291,85 @@
                 initializeUnifiedTooltips();
             }
         })();
+    </script>
+    <div id="devTools" style="display:none; position:fixed; bottom:10px; right:10px; background:#333; color:#fff; padding:10px; border-radius:5px; z-index:9999;">
+        <div style="margin-bottom:8px;">
+            <label>
+                <input type="checkbox" id="telemetryToggle" />
+                Worker Telemetry
+            </label>
+        </div>
+        <div style="display:flex; gap:8px;">
+            <button id="printTelemetry" style="padding:4px 8px; cursor:pointer;">Print</button>
+            <button id="exportTelemetry" style="padding:4px 8px; cursor:pointer;">Export JSON</button>
+        </div>
+    </div>
+    <script>
+        if (window.location.search.includes('dev=true')) {
+            const devTools = document.getElementById('devTools');
+            const toggle = document.getElementById('telemetryToggle');
+            const printBtn = document.getElementById('printTelemetry');
+            const exportBtn = document.getElementById('exportTelemetry');
+
+            if (devTools && toggle) {
+                devTools.style.display = 'block';
+                toggle.checked = localStorage.getItem('enableWorkerTelemetry') === 'true';
+                toggle.addEventListener('change', e => {
+                    localStorage.setItem('enableWorkerTelemetry', e.target.checked);
+                    alert('Telemetry ' + (e.target.checked ? 'aktiviert' : 'deaktiviert') + '. Seite neu laden.');
+                });
+            }
+
+            const getRegistry = () => {
+                if (!(window.__workerTelemetryRegistry instanceof Map)) {
+                    window.__workerTelemetryRegistry = new Map();
+                }
+                return window.__workerTelemetryRegistry;
+            };
+
+            if (printBtn) {
+                printBtn.addEventListener('click', () => {
+                    const registry = getRegistry();
+                    if (!registry || registry.size === 0) {
+                        console.warn('[Telemetry] Keine Telemetry-Instanzen gefunden.');
+                        return;
+                    }
+                    for (const telemetry of registry.values()) {
+                        if (telemetry && typeof telemetry.printReport === 'function') {
+                            telemetry.printReport();
+                        }
+                    }
+                });
+            }
+
+            if (exportBtn) {
+                exportBtn.addEventListener('click', async () => {
+                    const registry = getRegistry();
+                    if (!registry || registry.size === 0) {
+                        console.warn('[Telemetry] Keine Telemetry-Instanzen gefunden.');
+                        return;
+                    }
+                    const report = {};
+                    for (const [name, telemetry] of registry.entries()) {
+                        if (telemetry && typeof telemetry.getReport === 'function') {
+                            report[name] = telemetry.getReport();
+                        }
+                    }
+                    const json = JSON.stringify(report, null, 2);
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        try {
+                            await navigator.clipboard.writeText(json);
+                            alert('Telemetry JSON kopiert.');
+                        } catch (err) {
+                            console.warn('[Telemetry] Clipboard fehlgeschlagen:', err);
+                            console.log(json);
+                        }
+                    } else {
+                        console.log(json);
+                    }
+                });
+            }
+        }
     </script>
 </body>
 

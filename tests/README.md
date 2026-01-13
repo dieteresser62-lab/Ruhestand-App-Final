@@ -52,6 +52,7 @@ node tests/run-tests.mjs
     - **Market Crash**: Checks emergency refill and capital preservation.
 - **`simulation.test.mjs`**: Integration verification of the main simulation loop.
 - **`portfolio.test.mjs`**: Unit tests for isolated portfolio operations (`buyGold`, `sumDepot`) and DOM-independent initialization.
+- **`worker-parity.test.mjs`**: Verifies that Monte-Carlo/Sweep chunk merges produce identical aggregates as single-pass runs.
 
 ## Assertions Available
 - `assert(condition, message)`
