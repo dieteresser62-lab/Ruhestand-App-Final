@@ -12,31 +12,15 @@
  * ==========================================================================
  */
 
-import { rng, parseRangeInput, cartesianProductLimited } from './simulator-utils.js';
-import { prepareHistoricalData, getCommonInputs, buildStressContext, computeRentAdjRate, applyStressOverride } from './simulator-portfolio.js';
-import { MORTALITY_TABLE, annualData, BREAK_ON_RUIN } from './simulator-data.js';
+import { parseRangeInput, cartesianProductLimited } from './simulator-utils.js';
+import { getCommonInputs } from './simulator-portfolio.js';
+import { prepareHistoricalDataOnce } from './simulator-engine-helpers.js';
 import { findBestParameters, shouldMaximizeMetric, displayBestParameters, displayMultiObjectiveOptimization, displayConstraintBasedOptimization } from './simulator-optimizer.js';
 import { displaySensitivityAnalysis, displayParetoFrontier } from './simulator-visualization.js';
-import {
-    simulateOneYear,
-    initMcRunState,
-    makeDefaultCareMeta,
-    sampleNextYearData,
-    computeRunStatsFromSeries,
-    updateCareMeta,
-    calcCareCost,
-    computeCareMortalityMultiplier
-} from './simulator-engine-wrapper.js';
-import { aggregateSweepMetrics, portfolioTotal } from './simulator-results.js';
-import {
-    deepClone,
-    SWEEP_ALLOWED_KEYS,
-    cloneStressContext,
-    isBlockedKey,
-    extractP2Invariants,
-    areP2InvariantsEqual
-} from './simulator-sweep-utils.js';
+import { deepClone, extractP2Invariants } from './simulator-sweep-utils.js';
 import { renderSweepHeatmapSVG } from './simulator-heatmap.js';
+import { WorkerPool } from './workers/worker-pool.js';
+import { buildSweepInputs, runSweepChunk } from './sweep-runner.js';
 
 /**
  * Initialisiert Sweep-Inputfelder und synchronisiert sie mit localStorage.
@@ -106,6 +90,116 @@ export function displaySweepResults() {
     }
 }
 
+function readSweepWorkerConfig() {
+    const workerCountRaw = document.getElementById('mcWorkerCount')?.value ?? '8';
+    const budgetRaw = document.getElementById('mcWorkerBudget')?.value ?? '500';
+    const workerCount = parseInt(String(workerCountRaw).trim(), 10);
+    const timeBudgetMs = parseInt(String(budgetRaw).trim(), 10);
+    return {
+        workerCount: Number.isFinite(workerCount) && workerCount > 0 ? workerCount : 0,
+        timeBudgetMs: Number.isFinite(timeBudgetMs) && timeBudgetMs > 0 ? timeBudgetMs : 500
+    };
+}
+
+async function runSweepWithWorkers({
+    baseInputs,
+    paramCombinations,
+    sweepConfig,
+    refP2Invariants,
+    onProgress
+}) {
+    const totalCombos = paramCombinations.length;
+    const workerConfig = readSweepWorkerConfig();
+    const desiredWorkers = workerConfig.workerCount ?? 0;
+    const workerCount = Math.max(1, Number.isFinite(desiredWorkers) && desiredWorkers > 0
+        ? desiredWorkers
+        : Math.max(1, (navigator?.hardwareConcurrency || 2) - 1));
+    const timeBudgetMs = workerConfig.timeBudgetMs ?? 200;
+    const workerUrl = new URL('./workers/mc-worker.js', import.meta.url);
+
+    const pool = new WorkerPool({
+        workerUrl,
+        size: workerCount,
+        type: 'module',
+        telemetryName: 'SweepPool',
+        onError: error => console.error('[SWEEP WorkerPool] Error:', error)
+    });
+
+    const sweepResults = new Array(totalCombos);
+    let completedCombos = 0;
+    let p2VarianceCount = 0;
+    let nextComboIdx = 0;
+
+    const minChunk = 2;
+    const maxChunk = Math.min(80, Math.max(minChunk, Math.ceil(totalCombos / workerCount)));
+    let chunkSize = Math.min(maxChunk, Math.max(minChunk, Math.floor(totalCombos / (workerCount * 4)) || minChunk));
+    let smoothedChunkSize = chunkSize;
+
+    const pending = new Set();
+    const scheduleNextIfNeeded = () => {
+        while (pending.size < workerCount && nextComboIdx < totalCombos) {
+            const count = Math.min(chunkSize, totalCombos - nextComboIdx);
+            scheduleJob(nextComboIdx, count);
+            nextComboIdx += count;
+        }
+    };
+
+    const scheduleJob = (start, count) => {
+        const startedAt = performance.now();
+        const payload = {
+            type: 'sweep',
+            sweepConfig,
+            comboRange: { start, count },
+            refP2Invariants
+        };
+        const promise = pool.runJob(payload).then(result => {
+            const elapsedMs = result.elapsedMs ?? (performance.now() - startedAt);
+            return { result, start, count, elapsedMs };
+        });
+        pending.add(promise);
+        promise.finally(() => pending.delete(promise));
+    };
+
+    try {
+        await pool.broadcast({
+            type: 'sweep-init',
+            baseInputs,
+            paramCombinations
+        });
+
+        scheduleNextIfNeeded();
+
+        while (pending.size > 0) {
+            const { result, start, count, elapsedMs } = await Promise.race(pending);
+
+            for (const item of result.results) {
+                sweepResults[item.comboIdx] = { params: item.params, metrics: item.metrics };
+            }
+            p2VarianceCount += result.p2VarianceCount || 0;
+
+            completedCombos += count;
+            onProgress((completedCombos / totalCombos) * 100);
+
+            if (elapsedMs > 0) {
+                const scaled = Math.round(count * (timeBudgetMs / elapsedMs));
+                const targetSize = Math.max(minChunk, Math.min(maxChunk, scaled || minChunk));
+                smoothedChunkSize = Math.max(minChunk, Math.min(maxChunk, Math.round(smoothedChunkSize * 0.7 + targetSize * 0.3)));
+                chunkSize = smoothedChunkSize;
+            }
+
+            scheduleNextIfNeeded();
+        }
+    } finally {
+        pool.dispose();
+    }
+
+    if (p2VarianceCount > 0) {
+        console.warn(`[SWEEP][ASSERT] P2-Basis-Parameter variieren in ${p2VarianceCount} Kombos.`);
+    }
+
+    return sweepResults;
+}
+
 /**
  * Führt den Parameter-Sweep über alle gewählten Parameterkombinationen aus.
  *
@@ -124,7 +218,7 @@ export async function runParameterSweep() {
     const progressBar = document.getElementById('sweep-progress-bar');
 
     try {
-        prepareHistoricalData();
+        prepareHistoricalDataOnce();
 
         // ========= Parameter-Parsing (mit frühzeitigen, konkreten Alerts) =========
         const rangeInputs = {
@@ -199,157 +293,43 @@ export async function runParameterSweep() {
         const blockSize = parseInt(document.getElementById('mcBlockSize').value) || 5;
         const baseSeed = parseInt(document.getElementById('mcSeed').value) || 12345;
         const methode = document.getElementById('mcMethode').value;
+        const rngModeEl = document.getElementById('rngMode');
+        const rngMode = rngModeEl ? rngModeEl.value : 'per-run-seed';
 
-        const sweepResults = [];
+        const sweepConfig = { anzahlRuns, maxDauer, blockSize, baseSeed, methode, rngMode };
+        const sweepResults = new Array(paramCombinations.length);
 
-        // P2-Invarianz-Guard: Referenz-Invarianten für Person 2 (wird beim ersten Case gesetzt)
-        let REF_P2_INVARIANTS = null;
+        const refInputs = buildSweepInputs(baseInputs, paramCombinations[0]);
+        const refP2Invariants = extractP2Invariants(refInputs);
 
-        for (let comboIdx = 0; comboIdx < paramCombinations.length; comboIdx++) {
-            const params = paramCombinations[comboIdx];
-
-            // Erstelle Case-spezifische Inputs durch Deep Clone der Basis
-            const inputs = deepClone(baseInputs);
-
-            // Überschreibe nur erlaubte Parameter (Whitelist + Blockliste prüfen)
-            const caseOverrides = {
-                runwayMinMonths: params.runwayMin,
-                runwayTargetMonths: params.runwayTarget,
-                targetEq: params.targetEq,
-                rebalBand: params.rebalBand,
-                maxSkimPctOfEq: params.maxSkimPct,
-                maxBearRefillPctOfEq: params.maxBearRefillPct
-            };
-
-            if (params.goldTargetPct !== undefined) {
-                caseOverrides.goldZielProzent = params.goldTargetPct;
-                caseOverrides.goldAktiv = params.goldTargetPct > 0;
-            }
-
-            // Wende Overrides an mit Whitelist/Blockliste-Prüfung
-            for (const [key, value] of Object.entries(caseOverrides)) {
-                if (isBlockedKey(key)) {
-                    console.warn(`[SWEEP] Ignoriere Person-2-Key im Sweep: ${key}`);
-                    continue;
+        try {
+            const workerResults = await runSweepWithWorkers({
+                baseInputs,
+                paramCombinations,
+                sweepConfig,
+                refP2Invariants,
+                onProgress: pct => {
+                    progressBar.style.width = `${pct}%`;
+                    progressBar.textContent = `${Math.round(pct)}%`;
                 }
-                if (SWEEP_ALLOWED_KEYS.size && !SWEEP_ALLOWED_KEYS.has(key)) {
-                    console.warn(`[SWEEP] Key nicht auf Whitelist, übersprungen: ${key}`);
-                    continue;
-                }
-                // Setze erlaubten Parameter
-                inputs[key] = value;
+            });
+            for (let i = 0; i < workerResults.length; i++) {
+                sweepResults[i] = workerResults[i];
             }
-
-            // P2-Invarianz-Guard: Extrahiere Basis-Parameter (NICHT abgeleitete Zeitserien!)
-            const p2Invariants = extractP2Invariants(inputs);
-
-            if (REF_P2_INVARIANTS === null) {
-                // Erste Case-Referenz setzen
-                REF_P2_INVARIANTS = p2Invariants;
+        } catch (error) {
+            console.error('[SWEEP] Worker execution failed, falling back to serial.', error);
+            const serial = runSweepChunk({
+                baseInputs,
+                paramCombinations,
+                comboRange: { start: 0, count: paramCombinations.length },
+                sweepConfig,
+                refP2Invariants
+            });
+            for (const item of serial.results) {
+                sweepResults[item.comboIdx] = { params: item.params, metrics: item.metrics };
             }
-
-            // Prüfe P2-Invarianz VOR der Simulation (keine YearLogs mehr nötig!)
-            const p2VarianceWarning = !areP2InvariantsEqual(p2Invariants, REF_P2_INVARIANTS);
-
-            if (p2VarianceWarning) {
-                console.warn(`[SWEEP][ASSERT] P2-Basis-Parameter variieren im Sweep (Case ${comboIdx}), sollten konstant bleiben!`);
-                console.warn('[SWEEP] Referenz:', REF_P2_INVARIANTS);
-                console.warn('[SWEEP] Aktuell:', p2Invariants);
-            }
-
-            const rand = rng(baseSeed + comboIdx);
-            const stressCtxMaster = buildStressContext(inputs.stressPreset, rand);
-
-            const runOutcomes = [];
-
-            for (let i = 0; i < anzahlRuns; i++) {
-                let failed = false;
-                const startYearIndex = Math.floor(rand() * annualData.length);
-                let simState = initMcRunState(inputs, startYearIndex);
-
-                const depotWertHistorie = [portfolioTotal(simState.portfolio)];
-                let careMeta = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren, inputs.geschlecht);
-                let stressCtx = cloneStressContext(stressCtxMaster);
-
-                let minRunway = Infinity;
-
-                // Track dynamic transition year (can be shortened by care event)
-                let effectiveTransitionYear = inputs.transitionYear ?? 0;
-
-                for (let simulationsJahr = 0; simulationsJahr < maxDauer; simulationsJahr++) {
-                    const currentAge = inputs.startAlter + simulationsJahr;
-
-                    let yearData = sampleNextYearData(simState, methode, blockSize, rand, stressCtx);
-                    yearData = applyStressOverride(yearData, stressCtx, rand);
-
-                    careMeta = updateCareMeta(careMeta, inputs, currentAge, yearData, rand);
-
-                    // FORCE RETIREMENT if care is active in Accumulation Phase
-                    // If we are currently in accumulation (simulation year < transition year) and care triggers,
-                    // we immediately stop accumulation and switch to retirement mode for this and future years.
-                    if (inputs.accumulationPhase?.enabled && simulationsJahr < effectiveTransitionYear) {
-                        if (careMeta && careMeta.active) {
-                            effectiveTransitionYear = simulationsJahr;
-                        }
-                    }
-
-                    // Mortality Check
-                    // Skip mortality during Accumulation Phase to focus on financial outcome
-                    const isAccumulation = inputs.accumulationPhase?.enabled && simulationsJahr < effectiveTransitionYear;
-
-                    if (!isAccumulation) {
-                        let qx = MORTALITY_TABLE[inputs.geschlecht][currentAge] || 1;
-                        const careFactor = computeCareMortalityMultiplier(careMeta, inputs);
-                        if (careFactor > 1) {
-                            qx = Math.min(1.0, qx * careFactor);
-                        }
-
-                        if (rand() < qx) break;
-                    }
-
-                    // Berechne dynamische Rentenanpassung basierend auf Modus (fix/wage/cpi)
-                    const effectiveRentAdjPct = computeRentAdjRate(inputs, yearData);
-                    const adjustedInputs = { ...inputs, rentAdjPct: effectiveRentAdjPct, transitionYear: effectiveTransitionYear };
-
-                    // Calculate care floor addition (if active)
-                    const { zusatzFloor: careFloor } = calcCareCost(careMeta, null);
-
-                    const result = simulateOneYear(simState, adjustedInputs, yearData, simulationsJahr, careMeta, careFloor, null, 1.0);
-
-                    if (result.isRuin) {
-                        failed = true;
-                        if (BREAK_ON_RUIN) break;
-                    } else {
-                        simState = result.newState;
-                        depotWertHistorie.push(portfolioTotal(simState.portfolio));
-
-                        const runway = result.logData.RunwayCoveragePct || 0;
-                        if (runway < minRunway) minRunway = runway;
-                    }
-                }
-
-                const endVermoegen = failed ? 0 : portfolioTotal(simState.portfolio);
-                const { maxDDpct } = computeRunStatsFromSeries(depotWertHistorie);
-
-                runOutcomes.push({
-                    finalVermoegen: endVermoegen,
-                    maxDrawdown: maxDDpct,
-                    minRunway: minRunway === Infinity ? 0 : minRunway,
-                    failed: failed
-                });
-            }
-
-            const metrics = aggregateSweepMetrics(runOutcomes);
-            metrics.warningR2Varies = p2VarianceWarning; // Füge Warnung zu Metriken hinzu
-            sweepResults.push({ params, metrics });
-
-            const progress = ((comboIdx + 1) / paramCombinations.length) * 100;
-            progressBar.style.width = `${progress}%`;
-            progressBar.textContent = `${Math.round(progress)}%`;
-
-            if (comboIdx % 5 === 0) {
-                await new Promise(resolve => setTimeout(resolve, 0));
-            }
+            progressBar.style.width = '100%';
+            progressBar.textContent = '100%';
         }
 
         window.sweepResults = sweepResults;

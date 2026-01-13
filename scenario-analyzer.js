@@ -38,6 +38,74 @@ export class ScenarioAnalyzer {
     }
 
     /**
+     * Liefert die Indizes der Zufallsstichprobe als Array.
+     * @returns {number[]} Indizes fuer detaillierte Logs.
+     */
+    getRandomSampleIndices() {
+        return Array.from(this.randomSampleIndices);
+    }
+
+    /**
+     * Liefert die Indizes der charakteristischen Szenarien (Worst, Perzentile, Care, Risiko).
+     * @returns {number[]} Indizes, fuer die Logs nachgezogen werden sollen.
+     */
+    getCharacteristicIndices() {
+        if (!this.meta.length) return [];
+        const sortedByWealth = [...this.meta].sort((a, b) => a.endVermoegen - b.endVermoegen);
+        const percentileIndex = (arr, p) => Math.min(Math.floor(arr.length * p), arr.length - 1);
+
+        const indices = new Set();
+        const percentilePicks = [
+            0,
+            percentileIndex(sortedByWealth, 0.05),
+            percentileIndex(sortedByWealth, 0.10),
+            percentileIndex(sortedByWealth, 0.25),
+            percentileIndex(sortedByWealth, 0.50),
+            percentileIndex(sortedByWealth, 0.75),
+            percentileIndex(sortedByWealth, 0.90),
+            percentileIndex(sortedByWealth, 0.95),
+            sortedByWealth.length - 1
+        ];
+        for (const idx of percentilePicks) {
+            const meta = sortedByWealth[idx];
+            if (meta) indices.add(meta.index);
+        }
+
+        const careScenarios = this.meta.filter(s => s.careEverActive);
+        if (careScenarios.length > 0) {
+            const worstWithCare = careScenarios.reduce((a, b) => a.endVermoegen < b.endVermoegen ? a : b);
+            const longestCare = careScenarios.reduce((a, b) => a.totalCareYears > b.totalCareYears ? a : b);
+            const highestCareCost = careScenarios.reduce((a, b) => a.totalCareCosts > b.totalCareCosts ? a : b);
+            const earliestCare = careScenarios.filter(s => s.triggeredAge !== null)
+                .reduce((a, b) => (a.triggeredAge < b.triggeredAge ? a : b), careScenarios[0]);
+            indices.add(worstWithCare.index);
+            indices.add(longestCare.index);
+            indices.add(highestCareCost.index);
+            if (earliestCare) indices.add(earliestCare.index);
+        }
+
+        const longestLife = this.meta.reduce((a, b) => a.lebensdauer > b.lebensdauer ? a : b);
+        const maxCut = this.meta.reduce((a, b) => a.maxKuerzung > b.maxKuerzung ? a : b);
+        if (longestLife) indices.add(longestLife.index);
+        if (maxCut) indices.add(maxCut.index);
+
+        return Array.from(indices);
+    }
+
+    /**
+     * Aktualisiert Log-Daten fuer bestimmte Runs.
+     * @param {Map<number, Array>} logsByIndex - Map von Run-Index zu Log-Zeilen.
+     */
+    updateRunLogs(logsByIndex) {
+        if (!logsByIndex || typeof logsByIndex.get !== 'function') return;
+        for (const meta of this.meta) {
+            if (logsByIndex.has(meta.index)) {
+                meta.logDataRows = logsByIndex.get(meta.index);
+            }
+        }
+    }
+
+    /**
      * Registriert die Meta-Daten eines Runs für spätere Auswertung.
      * @param {object} meta - Zusammenfassung eines Runs inklusive Log-Daten.
      */

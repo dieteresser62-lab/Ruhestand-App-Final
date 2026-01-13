@@ -20,7 +20,7 @@ UI-Orchestrierung und Klammer um die ausgelagerten Feature-Module. Registriert E
 Koordiniert die Monte-Carlo-Simulation und verbindet DOM-Interaktion mit der reinen Simulationslogik.
 
 **Hauptfunktionen / Exporte:**
-- `runMonteCarlo()` – liest UI-Parameter, bereitet Inputs auf, orchestriert `monte-carlo-runner.js` und aktualisiert Progress/UI.
+- `runMonteCarlo()` – liest UI-Parameter, orchestriert `monte-carlo-runner.js` und Web-Worker-Jobs und aktualisiert Progress/UI (Default: 8 Worker, 500 ms Job-Budget).
 
 **Einbindung:** Wird von `simulator-main.js` importiert und im UI-Bootstrap an den Start-Button (`#mcButton`) gekoppelt. Alle Monte-Carlo-spezifischen Anpassungen sollten hier erfolgen, damit `simulator-main.js` schlank bleibt.
 
@@ -65,7 +65,7 @@ Sammelt und sortiert Szenarien (Worst, Perzentile, Pflege, Zufalls-Samples) wäh
 Sweep-spezifische Logik mit Guardrails für Partner:innen-Felder und Heatmap-Ausgabe.
 
 **Hauptfunktionen / Exporte:**
-- `runParameterSweep()` – iteriert über Whitelist-Parameter, führt Mini-Monte-Carlo aus und leitet Ergebnisse an die Heatmap weiter.
+- `runParameterSweep()` – iteriert über Whitelist-Parameter, nutzt Worker-Jobs (Fallback seriell) und leitet Ergebnisse an die Heatmap weiter.
 - `displaySweepResults()` – rendert Sweep-KPIs und Statushinweise.
 - `initSweepDefaultsWithLocalStorageFallback()` – lädt Sweep-Voreinstellungen und setzt Defaults.
 
@@ -76,6 +76,8 @@ Sweep-spezifische Logik mit Guardrails für Partner:innen-Felder und Heatmap-Aus
 ---
 
 ## 7. `simulator-sweep-utils.js` (~220 Zeilen)
+## 8. `sweep-runner.js` (neu)
+DOM-freier Sweep-Runner fuer Worker-Jobs (Combos + RunRanges) mit deterministischer Seeding-Logik.
 Gemeinsame Helfer für Sweep, Rente-2-Schutz und Deep-Clones.
 
 **Hauptfunktionen / Exporte:**
@@ -317,7 +319,7 @@ simulator-main.js
 
 ### Parameter-Sweep
 1. `simulator-main.js`: Sweep-Button bindet `runParameterSweep()` aus `simulator-sweep.js`.
-2. `simulator-sweep.js`: Iteriert über Whitelist-Parameter, ruft Mini-Monte-Carlo aus `monte-carlo-runner.js`.
+2. `simulator-sweep.js`: Iteriert über Whitelist-Parameter, nutzt Worker-Jobs (Fallback seriell).
 3. `simulator-heatmap.js`: `renderHeatmapSVG()` visualisiert Ergebnisse.
 
 ### Backtest

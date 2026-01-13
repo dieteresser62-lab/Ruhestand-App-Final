@@ -21,8 +21,8 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 * Tastenkürzel u. a. für Jahresabschluss (`Alt` + `J`), Import (`Alt` + `I`), Export (`Alt` + `E`) und Marktdaten nachrücken (`Alt` + `N`).
 
 ### Simulator
-* Monte-Carlo-Simulationen mit unterschiedlichen Renditequellen (historisch, Regime, Block-Bootstrap).
-* **Parameter-Sweep mit Auto-Optimize:** Whitelist-Ansatz, Deep-Clones und Wächterlogik für Zwei-Personen-Haushalte. Neue Auto-Optimize-Funktion mit 3-stufiger Optimierung (~8-10x schneller), dynamischer Parameter-UI (1-7 Parameter), Preset-Konfigurationen und Champion-Config-Output für optimale Strategiefindung.
+* Monte-Carlo-Simulationen mit unterschiedlichen Renditequellen (historisch, Regime, Block-Bootstrap) inkl. Worker-Parallelisierung.
+* **Parameter-Sweep mit Auto-Optimize:** Whitelist-Ansatz, Deep-Clones und Wächterlogik für Zwei-Personen-Haushalte. Worker-Parallelisierung fuer Sweep und Auto-Optimize, 3-stufige Optimierung (~8-10x schneller), dynamische Parameter-UI (1-7 Parameter), Preset-Konfigurationen und Champion-Config-Output für optimale Strategiefindung.
 * Stresstests, Pflegefall-Szenarien und Heatmap-Visualisierung (fokussiert auf Rentenphase).
 * Sweep-Schutz für Partner:innen-Renten inklusive Rente-2-Invarianz und Heatmap-Badges.
 * Szenario-Log-Analyse mit 30 auswählbaren Szenarien: 15 charakteristische (Perzentile, Pflege-Extremfälle, Risiko-Szenarien) und 15 zufällige Samples für typisches Verhalten.
@@ -31,7 +31,7 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 #### Schrittfolge für den Simulator (Simulator.html)
 1. **Rahmendaten ausfüllen:** In der Registerkarte „Rahmendaten“ die Kernfelder belegen – u. a. `Gesamtvermögen` (Default: 2 700 000 €), `Depotwert Alt` (1 350 000 €), `Ziel-Liquidität` (200 000 €), `Floor-Bedarf p.a.` (24 000 €) und `Flex-Bedarf p.a.` (28 000 €). Fortgeschrittene Felder wie Gold-Strategie und Runway/Rebalancing bleiben mit sinnvollen Startwerten vorbelegt und können bei Bedarf angepasst werden.
 2. **Renten- und Einkommenstränge prüfen:** Unter den Reitern für Rente/Partner (eingebettet in den Rahmendaten) Startalter, Indexierung (fix, Lohn oder CPI), Witwenlogik und sichere Rentenanteile setzen. Standardindexierung ist auf fixe Anpassung ausgelegt; Prozentfelder werden automatisch deaktiviert, wenn eine lohn- oder inflationsgekoppelte Anpassung gewählt wird.
-3. **Monte-Carlo-Parameter justieren:** Im Tab „Monte-Carlo“ die Anzahl der Läufe (`Anzahl Simulationen`, Default: 1 000), die historischen Quellen (z. B. Regime- oder Block-Bootstrap) und die Aktienquote konfigurieren. Für erste Analysen genügt der Default-Satz, der auf ein balanciertes Wachstums-/Risikoprofil optimiert ist.
+3. **Monte-Carlo-Parameter justieren:** Im Tab „Monte-Carlo“ die Anzahl der Läufe (`Anzahl Simulationen`, Default: 1 000), die historischen Quellen (z. B. Regime- oder Block-Bootstrap) und die Aktienquote konfigurieren. Für erste Analysen genügt der Default-Satz, der auf ein balanciertes Wachstums-/Risikoprofil optimiert ist. Im Advanced-Bereich lassen sich Worker-Anzahl und Job-Timebudget setzen (Default: 8 Worker, 500 ms).
 4. **Parameter-Sweep (Tab „Sweep“) ausführen:** Typischer Ablauf: einen Parameter (z. B. `Aktienquote`, `Sparrate` oder `Renteneintritt`) freigeben, Sweep-Grenzen und Schrittweite setzen und den Sweep starten. Der Auto-Optimize-Modus wählt sinnvolle Presets, clont die Basiskonfiguration defensiv und schützt Partner:innendaten. Ergebnisse erscheinen als Heatmap; Badge-Markierungen zeigen invarianten Verletzungen (z. B. Rente-2-Schutz) an.
 5. **Ergebnisse interpretieren:** In der Ergebnisübersicht die Kennzahl „Erfolgswahrscheinlichkeit“ heranziehen; Zielwert ist üblicherweise **> 95 %** für robuste Pläne. Heatmaps zeigen Sensitivitäten einzelner Parameter, das Szenario-Log bietet typische und Extrem-Verläufe (inkl. Pflegekosten) und lässt sich als JSON/CSV exportieren. Beispielhafte Visualisierung siehe `assets/images/retirement_hero_illustration.png` (als Referenzabbildung einbindbar).
 
@@ -153,6 +153,7 @@ Ruhestand-App-Final/
 
 * **Dokumentation synchron halten:** Nach Engine-Änderungen oder neuen Simulator-Modulen (z. B. Monte-Carlo-Runner/UI/Analyzer) README, TECHNICAL.md und SIMULATOR_MODULES_README aktualisieren.
 * **Konsole sauber halten:** Vor dem Release auskommentierten Code entfernen, damit Nutzer:innen keine unnötigen Meldungen im Browser-Log sehen.
+* **Tauri/Web-Worker:** Die Parallelisierung nutzt Web Worker mit Transferables (kein SharedArrayBuffer). Das funktioniert in Tauri als EXE, sofern die Worker-Skripte gebündelt und per `new URL(..., import.meta.url)` erreichbar sind. CSP/Asset-Bundling sollten Worker-Module erlauben.
 
 ---
 

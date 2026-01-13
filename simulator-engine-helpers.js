@@ -1,7 +1,65 @@
 "use strict";
 
 import { HISTORICAL_DATA, PFLEGE_GRADE_PROBABILITIES, PFLEGE_GRADE_LABELS, PFLEGE_GRADE_PROGRESSION_PROBABILITIES, SUPPORTED_PFLEGE_GRADES, annualData, REGIME_DATA, REGIME_TRANSITIONS, MORTALITY_TABLE } from './simulator-data.js';
-import { initializePortfolio } from './simulator-portfolio.js';
+import { initializePortfolio, prepareHistoricalData } from './simulator-portfolio.js';
+
+let historicalDataPrepared = false;
+
+export function prepareHistoricalDataOnce() {
+    if (historicalDataPrepared) return;
+    prepareHistoricalData();
+    historicalDataPrepared = true;
+}
+
+function stableStringify(value) {
+    const stringify = (val) => {
+        if (val === null) return 'null';
+        const type = typeof val;
+        if (type === 'number') {
+            if (Number.isNaN(val)) return '"__NaN__"';
+            if (val === Infinity) return '"__Infinity__"';
+            if (val === -Infinity) return '"__-Infinity__"';
+            return JSON.stringify(val);
+        }
+        if (type === 'string') return JSON.stringify(val);
+        if (type === 'boolean') return val ? 'true' : 'false';
+        if (type === 'undefined') return '"__undefined__"';
+        if (Array.isArray(val)) {
+            return `[${val.map(stringify).join(',')}]`;
+        }
+        if (type === 'object') {
+            const keys = Object.keys(val).sort();
+            return `{${keys.map(k => `${JSON.stringify(k)}:${stringify(val[k])}`).join(',')}}`;
+        }
+        return JSON.stringify(String(val));
+    };
+    return stringify(value);
+}
+
+function hashString(input) {
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < input.length; i++) {
+        hash ^= input.charCodeAt(i);
+        hash = Math.imul(hash, 0x01000193);
+    }
+    return (hash >>> 0).toString(16);
+}
+
+export function compileScenario(inputs, widowOptions, methode, useCapeSampling, stressPreset) {
+    const payload = { inputs, widowOptions, methode, useCapeSampling, stressPreset };
+    const key = hashString(stableStringify(payload));
+    return {
+        scenarioKey: key,
+        compiledScenario: payload
+    };
+}
+
+export function getDataVersion() {
+    return {
+        annualDataHash: hashString(stableStringify(annualData)),
+        regimeHash: hashString(stableStringify(REGIME_TRANSITIONS))
+    };
+}
 
 /**
  * Hilfsfunktion für CAPE-Ratio Resolution

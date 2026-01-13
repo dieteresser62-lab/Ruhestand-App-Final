@@ -1,6 +1,6 @@
 "use strict";
 
-import { rng, quantile, sum, mean } from './simulator-utils.js';
+import { rng, quantile, sum, mean, makeRunSeed, RUNIDX_COMBO_SETUP } from './simulator-utils.js';
 import { getStartYearCandidates } from './cape-utils.js';
 import { STRESS_PRESETS, BREAK_ON_RUIN, MORTALITY_TABLE, annualData } from './simulator-data.js';
 import { buildStressContext, applyStressOverride, computeRentAdjRate } from './simulator-portfolio.js';
@@ -9,6 +9,42 @@ import { portfolioTotal } from './simulator-results.js';
 import { sumDepot } from './simulator-portfolio.js';
 import { cloneStressContext, computeMarriageYearsCompleted } from './simulator-sweep-utils.js';
 import { ScenarioAnalyzer } from './scenario-analyzer.js';
+
+export const MC_HEATMAP_BINS = [0, 3, 3.5, 4, 4.5, 5, 5.5, 6, 7, 8, 10, Infinity];
+
+export function pickWorstRun(current, candidate) {
+    if (!current) return candidate;
+    if (!candidate) return current;
+    if (candidate.finalVermoegen < current.finalVermoegen) return candidate;
+    if (candidate.finalVermoegen > current.finalVermoegen) return current;
+    const currentCombo = Number.isFinite(current.comboIdx) ? current.comboIdx : 0;
+    const candidateCombo = Number.isFinite(candidate.comboIdx) ? candidate.comboIdx : 0;
+    if (candidateCombo < currentCombo) return candidate;
+    if (candidateCombo > currentCombo) return current;
+    const currentRun = Number.isFinite(current.runIdx) ? current.runIdx : 0;
+    const candidateRun = Number.isFinite(candidate.runIdx) ? candidate.runIdx : 0;
+    return candidateRun < currentRun ? candidate : current;
+}
+
+export function createMonteCarloBuffers(runCount) {
+    return {
+        finalOutcomes: new Float64Array(runCount),
+        taxOutcomes: new Float64Array(runCount),
+        kpiLebensdauer: new Uint8Array(runCount),
+        kpiKuerzungsjahre: new Float32Array(runCount),
+        kpiMaxKuerzung: new Float32Array(runCount),
+        volatilities: new Float32Array(runCount),
+        maxDrawdowns: new Float32Array(runCount),
+        depotErschoepft: new Uint8Array(runCount),
+        alterBeiErschoepfung: new Uint8Array(runCount).fill(255),
+        anteilJahreOhneFlex: new Float32Array(runCount),
+        stress_maxDrawdowns: new Float32Array(runCount),
+        stress_timeQuoteAbove45: new Float32Array(runCount),
+        stress_cutYears: new Float32Array(runCount),
+        stress_CaR_P10_Real: new Float64Array(runCount),
+        stress_recoveryYears: new Float32Array(runCount)
+    };
+}
 
 /**
  * Reine Monte-Carlo-Simulation ohne DOM-Abhängigkeiten.
@@ -23,35 +59,101 @@ import { ScenarioAnalyzer } from './scenario-analyzer.js';
  * @param {ScenarioAnalyzer} [options.scenarioAnalyzer] - Externer Analyzer zum Tracking von Szenarien.
  * @returns {Promise<{ aggregatedResults: object, failCount: number, worstRun: object, worstRunCare: object, pflegeTriggeredCount: number }>}
  */
-export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowOptions, useCapeSampling, onProgress = () => { }, scenarioAnalyzer = new ScenarioAnalyzer(monteCarloParams?.anzahl || 0), engine = null }) {
-    const { anzahl, maxDauer, blockSize, seed, methode } = monteCarloParams;
+export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowOptions, useCapeSampling, onProgress = () => { }, scenarioAnalyzer = null, engine = null }) {
+    const { anzahl } = monteCarloParams;
+    const analyzer = scenarioAnalyzer || new ScenarioAnalyzer(anzahl);
+
+    const chunk = await runMonteCarloChunk({
+        inputs,
+        monteCarloParams,
+        widowOptions,
+        useCapeSampling,
+        onProgress,
+        engine,
+        runRange: { start: 0, count: anzahl }
+    });
+
+    if (analyzer && chunk.runMeta) {
+        for (const meta of chunk.runMeta) {
+            meta.isRandomSample = analyzer.shouldCaptureRandomSample(meta.index);
+            analyzer.addRun(meta);
+        }
+    }
+
+    onProgress(95);
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const aggregatedResults = buildMonteCarloAggregates({
+        inputs,
+        totalRuns: anzahl,
+        buffers: chunk.buffers,
+        heatmap: chunk.heatmap,
+        bins: chunk.bins,
+        totals: chunk.totals,
+        lists: chunk.lists,
+        allRealWithdrawalsSample: chunk.allRealWithdrawalsSample
+    });
+
+    onProgress(100);
+
+    return {
+        aggregatedResults,
+        failCount: chunk.totals.failCount,
+        worstRun: chunk.worstRun,
+        worstRunCare: chunk.worstRunCare,
+        pflegeTriggeredCount: chunk.totals.pflegeTriggeredCount
+    };
+}
+
+export async function runMonteCarloChunk({
+    inputs,
+    monteCarloParams,
+    widowOptions,
+    useCapeSampling,
+    runRange = null,
+    onProgress = () => { },
+    logIndices = null,
+    engine = null
+}) {
+    const { anzahl, maxDauer, blockSize, seed, methode, rngMode = 'per-run-seed' } = monteCarloParams;
+    const runStart = runRange?.start ?? 0;
+    const runCount = runRange?.count ?? anzahl;
+
     onProgress(0);
 
-    const rand = rng(seed);
-    const stressCtxMaster = buildStressContext(inputs.stressPreset, rand);
+    const resolvedRngMode = rngMode === 'legacy-stream' ? 'legacy-stream' : 'per-run-seed';
+    if (resolvedRngMode === 'legacy-stream' && runStart !== 0) {
+        throw new Error('legacy-stream RNG does not support chunked run ranges.');
+    }
 
-    const finalOutcomes = new Float64Array(anzahl);
-    const taxOutcomes = new Float64Array(anzahl);
-    const kpiLebensdauer = new Uint8Array(anzahl);
-    const kpiKuerzungsjahre = new Float32Array(anzahl);
-    const kpiMaxKuerzung = new Float32Array(anzahl);
-    const volatilities = new Float32Array(anzahl);
-    const maxDrawdowns = new Float32Array(anzahl);
-    const depotErschoepft = new Uint8Array(anzahl);
-    const alterBeiErschoepfung = new Uint8Array(anzahl).fill(255);
-    const anteilJahreOhneFlex = new Float32Array(anzahl);
+    const legacyRand = resolvedRngMode === 'legacy-stream' ? rng(seed) : null;
+    const comboRand = legacyRand || rng(makeRunSeed(seed, 0, RUNIDX_COMBO_SETUP));
+    const stressCtxMaster = buildStressContext(inputs.stressPreset, comboRand);
+
+    const buffers = createMonteCarloBuffers(runCount);
+    const {
+        finalOutcomes,
+        taxOutcomes,
+        kpiLebensdauer,
+        kpiKuerzungsjahre,
+        kpiMaxKuerzung,
+        volatilities,
+        maxDrawdowns,
+        depotErschoepft,
+        alterBeiErschoepfung,
+        anteilJahreOhneFlex,
+        stress_maxDrawdowns,
+        stress_timeQuoteAbove45,
+        stress_cutYears,
+        stress_CaR_P10_Real,
+        stress_recoveryYears
+    } = buffers;
 
     // Realistischer Schwellenwert für Depot-Erschöpfung: 100 € (vorher 0,000001 €)
     const DEPOT_DEPLETION_THRESHOLD = 100;
 
-    const stress_maxDrawdowns = new Float32Array(anzahl);
-    const stress_timeQuoteAbove45 = new Float32Array(anzahl);
-    const stress_cutYears = new Float32Array(anzahl);
-    const stress_CaR_P10_Real = new Float64Array(anzahl);
-    const stress_recoveryYears = new Float32Array(anzahl);
-
-    let worstRun = { finalVermoegen: Infinity, logDataRows: [], failed: false };
-    let worstRunCare = { finalVermoegen: Infinity, logDataRows: [], failed: false, hasCare: false };
+    let worstRun = null;
+    let worstRunCare = null;
 
     let failCount = 0;
     let pflegeTriggeredCount = 0;
@@ -62,9 +164,9 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
     const endWealthNoCareList = [];
 
     // Dual Care KPIs
-    const p1CareYearsArr = new Uint16Array(anzahl);
-    const p2CareYearsArr = new Uint16Array(anzahl);
-    const bothCareYearsArr = new Uint16Array(anzahl);
+    const p1CareYearsArr = new Uint16Array(runCount);
+    const p2CareYearsArr = new Uint16Array(runCount);
+    const bothCareYearsArr = new Uint16Array(runCount);
     const entryAgesP2 = [];
     let p2TriggeredCount = 0;
     const maxAnnualCareSpendTriggered = [];
@@ -75,23 +177,34 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
     const p2CareYearsTriggered = [];
     const bothCareYearsTriggered = [];
 
-    const BINS = [0, 3, 3.5, 4, 4.5, 5, 5.5, 6, 7, 8, 10, Infinity];
-    const heatmap = Array(10).fill(0).map(() => new Uint32Array(BINS.length - 1));
+    const heatmap = Array(10).fill(0).map(() => new Uint32Array(MC_HEATMAP_BINS.length - 1));
     let totalSimulatedYears = 0, totalYearsQuoteAbove45 = 0;
     const allRealWithdrawalsSample = [];
 
+    const runMeta = [];
+
     // Optimiert: Dynamisches Progress-Update-Intervall für bessere Performance
     // Mindestens alle 100 Runs ODER 1% der Gesamtzahl (je nachdem was größer ist)
-    const progressUpdateInterval = Math.max(100, Math.floor(anzahl / 100));
+    const progressUpdateInterval = Math.max(100, Math.floor(runCount / 100));
+    let lastProgressPct = -1;
 
-    for (let i = 0; i < anzahl; i++) {
+    const logIndexSet = Array.isArray(logIndices) ? new Set(logIndices) : null;
+
+    for (let i = 0; i < runCount; i++) {
         if (i % progressUpdateInterval === 0) {
-            onProgress((i / anzahl) * 90);
-            await new Promise(resolve => setTimeout(resolve, 0));
+            const pct = Math.floor((i / runCount) * 90);
+            if (pct > lastProgressPct) {
+                lastProgressPct = pct;
+                onProgress(pct);
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
         }
+        const runIdx = runStart + i;
         let failed = false, totalTaxesThisRun = 0, kpiJahreMitKuerzungDieserLauf = 0, kpiMaxKuerzungDieserLauf = 0;
         let lebensdauer = 0, jahreOhneFlex = 0, triggeredAge = null;
         let careEverActive = false;
+
+        const rand = legacyRand || rng(makeRunSeed(seed, 0, runIdx));
 
         // --- CAPE-SAMPLING LOGIC START ---
         let startYearIndex;
@@ -113,7 +226,8 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
         let simState = initMcRunState(inputs, startYearIndex);
 
         const depotWertHistorie = [portfolioTotal(simState.portfolio)];
-        const currentRunLog = [];
+        const shouldLogRun = !logIndexSet || logIndexSet.has(runIdx);
+        const currentRunLog = shouldLogRun ? [] : null;
         let depotNurHistorie = [sumDepot(simState.portfolio)];
         let depotErschoepfungAlterGesetzt = false;
         let widowBenefitActiveForP1 = false; // P1 erhält Witwenrente nach P2
@@ -150,6 +264,8 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
         let runEndedBecauseAllDied = false;
         let deathLogContext = null;
         let retirementYearCounter = 0; // Track years in retirement for heatmap alignment
+        let p1ActiveThisYear = false;
+        let p2ActiveThisYear = false;
 
         for (let simulationsJahr = 0; simulationsJahr < maxDauer; simulationsJahr++) {
             const ageP1 = inputs.startAlter + simulationsJahr;
@@ -193,8 +309,8 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
             }
 
             // Track care years
-            const p1ActiveThisYear = p1Alive && careMetaP1?.active;
-            const p2ActiveThisYear = p2Alive && careMetaP2?.active;
+            p1ActiveThisYear = p1Alive && careMetaP1?.active;
+            p2ActiveThisYear = p2Alive && careMetaP2?.active;
             if (p2ActiveThisYear) careEverActive = true;
             if (p1ActiveThisYear) p1CareYears++;
             if (p2ActiveThisYear) p2CareYears++;
@@ -239,37 +355,14 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
                 }
             }
 
-            const p1DiedThisYear = p1AliveAtStart && !p1Alive;
-            const p2DiedThisYear = p2AliveAtStart && !p2Alive;
-
-            if (!p1Alive) {
-                widowBenefitActiveForP1 = false;
-            }
-            if (!p2Alive) {
-                widowBenefitActiveForP2 = false;
-            }
-
-            if (p1DiedThisYear) {
-                if (widowEligibleThisYear && p2Alive) {
+            if (widowEligibleThisYear && (!p1AliveAtStart || !p2AliveAtStart)) {
+                if (!p1AliveAtStart && p2AliveAtStart) {
                     widowBenefitActiveForP2 = true;
-                    simState.widowPensionP2 = Math.max(0, (simState.currentAnnualPension || 0) * widowOptions.percent);
-                } else {
-                    widowBenefitActiveForP2 = false;
-                    simState.widowPensionP2 = 0;
-                }
-            }
-
-            if (p2DiedThisYear) {
-                if (widowEligibleThisYear && p1Alive) {
+                } else if (!p2AliveAtStart && p1AliveAtStart) {
                     widowBenefitActiveForP1 = true;
-                    simState.widowPensionP1 = Math.max(0, (simState.currentAnnualPension2 || 0) * widowOptions.percent);
-                } else {
-                    widowBenefitActiveForP1 = false;
-                    simState.widowPensionP1 = 0;
                 }
             }
 
-            // Simulation ends when both persons have died
             if (!p1Alive && !p2Alive) {
                 runEndedBecauseAllDied = true;
                 deathLogContext = {
@@ -323,7 +416,7 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
                     alterBeiErschoepfung[i] = ageP1;
                     depotErschoepfungAlterGesetzt = true;
                 }
-                currentRunLog.push({
+                if (currentRunLog) currentRunLog.push({
                     jahr: simulationsJahr + 1,
                     histJahr: yearData.jahr,
                     inflation: yearData.inflation,
@@ -386,12 +479,12 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
 
                 totalSimulatedYears++;
                 if (result.logData.entnahmequote * 100 > 4.5) totalYearsQuoteAbove45++;
-                if (i % 100 === 0) allRealWithdrawalsSample.push(result.logData.jahresentnahme_real);
+                if (runIdx % 100 === 0) allRealWithdrawalsSample.push(result.logData.jahresentnahme_real);
 
                 if (!isAccumulation && retirementYearCounter < 10) {
                     const quote = result.logData.entnahmequote * 100;
-                    for (let b = 0; b < BINS.length - 1; b++) {
-                        if (quote >= BINS[b] && quote < BINS[b + 1]) { heatmap[retirementYearCounter][b]++; break; }
+                    for (let b = 0; b < MC_HEATMAP_BINS.length - 1; b++) {
+                        if (quote >= MC_HEATMAP_BINS[b] && quote < MC_HEATMAP_BINS[b + 1]) { heatmap[retirementYearCounter][b]++; break; }
                     }
                     retirementYearCounter++;
                 }
@@ -416,7 +509,7 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
                     }
                 }
 
-                currentRunLog.push({
+                if (currentRunLog) currentRunLog.push({
                     jahr: simulationsJahr + 1, histJahr: yearData.jahr, inflation: yearData.inflation, ...result.logData,
                     Person1Alive: p1Alive ? 1 : 0,
                     Person2Alive: hasPartner ? (p2Alive ? 1 : 0) : null,
@@ -446,7 +539,7 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
         if (runEndedBecauseAllDied) {
             // Ergänze einen letzten Log-Eintrag, damit klar ersichtlich ist, dass alle Personen verstorben sind.
             const portfolioSnapshot = simState?.portfolio || {};
-            currentRunLog.push({
+            if (currentRunLog) currentRunLog.push({
                 jahr: deathLogContext?.jahr ?? (currentRunLog.length + 1),
                 histJahr: deathLogContext?.histJahr ?? null,
                 inflation: deathLogContext?.inflation ?? null,
@@ -454,11 +547,47 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
                 wertAktien: sumDepot({ depotTranchesAktien: portfolioSnapshot.depotTranchesAktien }),
                 wertGold: sumDepot({ depotTranchesGold: portfolioSnapshot.depotTranchesGold }),
                 liquiditaet: portfolioSnapshot.liquiditaet ?? 0,
-                Person1Alive: 0,
-                Person2Alive: hasPartner ? 0 : null,
-                terminationReason: 'all_participants_deceased'
+                entscheidung: { jahresEntnahme: 0 },
+                floor_brutto: 0,
+                rente1: inputs.rente1 || 0,
+                rente2: inputs.rente2 || 0,
+                renteSum: (inputs.rente1 || 0) + (inputs.rente2 || 0),
+                FlexRatePct: 0,
+                flex_erfuellt_nominal: 0,
+                QuoteEndPct: 0,
+                RunwayCoveragePct: 0,
+                RealReturnEquityPct: 0,
+                RealReturnGoldPct: 0,
+                jahresentnahme_real: 0,
+                Person1Alive: p1Alive ? 1 : 0,
+                Person2Alive: hasPartner ? (p2Alive ? 1 : 0) : null,
+                // P1 Care (legacy compatibility)
+                pflege_aktiv: !!(careMetaP1 && careMetaP1.active),
+                pflege_grade: careMetaP1?.grade ?? null,
+                pflege_grade_label: careMetaP1?.gradeLabel ?? '',
+                pflege_zusatz_floor: careMetaP1?.zusatzFloorZiel ?? 0,
+                pflege_zusatz_floor_delta: careMetaP1?.zusatzFloorDelta ?? 0,
+                pflege_flex_faktor: careMetaP1?.flexFactor ?? 1,
+                pflege_kumuliert: careMetaP1?.kumulierteKosten ?? 0,
+                pflege_floor_anchor: careMetaP1?.log_floor_anchor ?? 0,
+                pflege_maxfloor_anchor: careMetaP1?.log_maxfloor_anchor ?? 0,
+                pflege_cap_zusatz: careMetaP1?.log_cap_zusatz ?? 0,
+                pflege_delta_flex: careMetaP1?.log_delta_flex ?? 0,
+                // P2 Care (new dual care support)
+                CareP1_Active: p1ActiveThisYear ? 1 : 0,
+                CareP1_Cost: p1ActiveThisYear ? (careMetaP1?.zusatzFloorZiel ?? 0) : 0,
+                CareP1_Grade: p1ActiveThisYear ? (careMetaP1?.grade ?? null) : null,
+                CareP1_GradeLabel: p1ActiveThisYear ? (careMetaP1?.gradeLabel ?? '') : '',
+                CareP2_Active: p2ActiveThisYear ? 1 : 0,
+                CareP2_Cost: p2ActiveThisYear ? (careMetaP2?.zusatzFloorZiel ?? 0) : 0,
+                CareP2_Grade: p2ActiveThisYear ? (careMetaP2?.grade ?? null) : null,
+                CareP2_GradeLabel: p2ActiveThisYear ? (careMetaP2?.gradeLabel ?? '') : ''
             });
         }
+
+        const { maxDDpct } = computeRunStatsFromSeries(depotWertHistorie);
+        volatilities[i] = maxDDpct;
+        maxDrawdowns[i] = maxDDpct;
 
         if (stressYears > 0) {
             const { maxDDpct: stressMaxDD } = computeRunStatsFromSeries(stressPortfolioValues);
@@ -466,33 +595,21 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
             stress_timeQuoteAbove45[i] = (stressYearsAbove45 / stressYears) * 100;
             stress_cutYears[i] = stressCutYears;
             stress_CaR_P10_Real[i] = stressRealWithdrawals.length > 0 ? quantile(stressRealWithdrawals, 0.10) : 0;
-
-            if (postStressRecoveryYears === null) {
-                postStressRecoveryYears = Math.max(0, lebensdauer - stressYears);
-            }
+            if (postStressRecoveryYears === null) postStressRecoveryYears = stressYears;
             stress_recoveryYears[i] = postStressRecoveryYears;
+        } else {
+            stress_maxDrawdowns[i] = 0;
+            stress_timeQuoteAbove45[i] = 0;
+            stress_cutYears[i] = 0;
+            stress_CaR_P10_Real[i] = 0;
+            stress_recoveryYears[i] = 0;
         }
-
-        const { maxDDpct } = computeRunStatsFromSeries(depotWertHistorie);
-        volatilities[i] = maxDDpct / 2; // Dummy Ersatz: Wir approximieren die Volatilität grob, um teure Berechnungen zu sparen.
-        maxDrawdowns[i] = maxDDpct;
 
         const depotOnlyStart = depotNurHistorie[0] || 1;
         const depotOnlyEnd = depotNurHistorie[depotNurHistorie.length - 1] || 0;
         const ruinOrDepleted = failed || depotOnlyEnd <= DEPOT_DEPLETION_THRESHOLD;
-        depotErschoepft[i] = ruinOrDepleted ? 1 : 0;
-        if (ruinOrDepleted && depotNurHistorie.length > 0) {
-            const depletionIdx = depotNurHistorie.findIndex(v => v <= DEPOT_DEPLETION_THRESHOLD);
-            if (depletionIdx >= 0) {
-                const candidateDepletionAge = inputs.startAlter + depletionIdx; // Absolutes Alter zum Zeitpunkt der Erschöpfung berechnen
-                // Aktualisiere nur, wenn der neu berechnete Zeitpunkt früher als der bisher gespeicherte ist
-                if (candidateDepletionAge < alterBeiErschoepfung[i]) {
-                    alterBeiErschoepfung[i] = candidateDepletionAge;
-                }
-            }
-        }
-
         finalOutcomes[i] = failed ? 0 : portfolioTotal(simState.portfolio);
+        depotErschoepft[i] = ruinOrDepleted ? 1 : 0;
         taxOutcomes[i] = totalTaxesThisRun;
         kpiLebensdauer[i] = lebensdauer;
         kpiKuerzungsjahre[i] = kpiJahreMitKuerzungDieserLauf;
@@ -527,8 +644,8 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
         bothCareYearsArr[i] = bothCareYears;
         if (p2CareYears > 0) { p2TriggeredCount++; }
 
-        const runMeta = {
-            index: i,
+        runMeta.push({
+            index: runIdx,
             endVermoegen: finalOutcomes[i],
             failed,
             lebensdauer,
@@ -537,36 +654,130 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
             totalCareCosts: Math.max(0, depotOnlyStart - depotOnlyEnd),
             maxKuerzung: kpiMaxKuerzungDieserLauf,
             jahreOhneFlex,
-            logDataRows: [...currentRunLog],
-            isRandomSample: scenarioAnalyzer.shouldCaptureRandomSample(i),
+            logDataRows: currentRunLog ? [...currentRunLog] : [],
             triggeredAge
-        };
-        scenarioAnalyzer.addRun(runMeta);
+        });
 
-        if (finalOutcomes[i] < worstRun.finalVermoegen) {
-            worstRun = { finalVermoegen: finalOutcomes[i], logDataRows: currentRunLog, failed };
-        }
+        worstRun = pickWorstRun(worstRun, {
+            finalVermoegen: finalOutcomes[i],
+            logDataRows: currentRunLog || [],
+            failed,
+            comboIdx: 0,
+            runIdx
+        });
 
-        if (careEverActive && finalOutcomes[i] < worstRunCare.finalVermoegen) {
-            worstRunCare = { finalVermoegen: finalOutcomes[i], logDataRows: currentRunLog, failed, hasCare: true };
+        if (careEverActive) {
+            worstRunCare = pickWorstRun(worstRunCare, {
+                finalVermoegen: finalOutcomes[i],
+                logDataRows: currentRunLog || [],
+                failed,
+                hasCare: true,
+                comboIdx: 0,
+                runIdx
+            });
         }
 
         if (failed) failCount++;
     }
 
-    onProgress(95);
-    await new Promise(resolve => setTimeout(resolve, 0));
+    if (!worstRun) {
+        worstRun = { finalVermoegen: Infinity, logDataRows: [], failed: false, comboIdx: 0, runIdx: 0 };
+    }
+    if (!worstRunCare) {
+        worstRunCare = { finalVermoegen: Infinity, logDataRows: [], failed: false, hasCare: false, comboIdx: 0, runIdx: 0 };
+    }
+
+    return {
+        runRange: { start: runStart, count: runCount },
+        buffers,
+        heatmap,
+        bins: MC_HEATMAP_BINS,
+        totals: {
+            failCount,
+            pflegeTriggeredCount,
+            totalSimulatedYears,
+            totalYearsQuoteAbove45,
+            shortfallWithCareCount,
+            shortfallNoCareProxyCount,
+            p2TriggeredCount
+        },
+        lists: {
+            entryAges,
+            entryAgesP2,
+            careDepotCosts,
+            endWealthWithCareList,
+            endWealthNoCareList,
+            p1CareYearsTriggered,
+            p2CareYearsTriggered,
+            bothCareYearsOverlapTriggered,
+            maxAnnualCareSpendTriggered
+        },
+        allRealWithdrawalsSample,
+        worstRun,
+        worstRunCare,
+        runMeta
+    };
+}
+
+export function buildMonteCarloAggregates({
+    inputs,
+    totalRuns,
+    buffers,
+    heatmap,
+    bins,
+    totals,
+    lists,
+    allRealWithdrawalsSample
+}) {
+    const {
+        finalOutcomes,
+        taxOutcomes,
+        kpiLebensdauer,
+        kpiKuerzungsjahre,
+        kpiMaxKuerzung,
+        volatilities,
+        maxDrawdowns,
+        depotErschoepft,
+        alterBeiErschoepfung,
+        anteilJahreOhneFlex,
+        stress_maxDrawdowns,
+        stress_timeQuoteAbove45,
+        stress_cutYears,
+        stress_CaR_P10_Real,
+        stress_recoveryYears
+    } = buffers;
+    const {
+        pflegeTriggeredCount,
+        totalSimulatedYears,
+        totalYearsQuoteAbove45,
+        shortfallWithCareCount,
+        shortfallNoCareProxyCount,
+        p2TriggeredCount
+    } = totals;
+    const {
+        entryAges,
+        entryAgesP2,
+        careDepotCosts,
+        endWealthWithCareList,
+        endWealthNoCareList,
+        p1CareYearsTriggered,
+        p2CareYearsTriggered,
+        bothCareYearsOverlapTriggered,
+        maxAnnualCareSpendTriggered
+    } = lists;
 
     const successfulOutcomes = [];
-    for (let i = 0; i < anzahl; ++i) { if (finalOutcomes[i] > 0) successfulOutcomes.push(finalOutcomes[i]); }
+    for (let i = 0; i < totalRuns; ++i) {
+        if (finalOutcomes[i] > 0) successfulOutcomes.push(finalOutcomes[i]);
+    }
 
     const medianWithCare = endWealthWithCareList.length ? quantile(endWealthWithCareList, 0.5) : 0;
     const medianNoCare = endWealthNoCareList.length ? quantile(endWealthNoCareList, 0.5) : 0;
     const pflegeResults = {
-        entryRatePct: (pflegeTriggeredCount / anzahl) * 100,
+        entryRatePct: (pflegeTriggeredCount / totalRuns) * 100,
         entryAgeMedian: entryAges.length ? quantile(entryAges, 0.5) : 0,
         shortfallRate_condCare: pflegeTriggeredCount > 0 ? (shortfallWithCareCount / pflegeTriggeredCount) * 100 : 0,
-        shortfallRate_noCareProxy: (anzahl - pflegeTriggeredCount) > 0 ? (shortfallNoCareProxyCount / (anzahl - pflegeTriggeredCount)) * 100 : 0,
+        shortfallRate_noCareProxy: (totalRuns - pflegeTriggeredCount) > 0 ? (shortfallNoCareProxyCount / (totalRuns - pflegeTriggeredCount)) * 100 : 0,
         endwealthWithCare_median: medianWithCare,
         endwealthNoCare_median: medianNoCare,
         depotCosts_median: careDepotCosts.length ? quantile(careDepotCosts, 0.5) : 0,
@@ -574,7 +785,7 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
         p1CareYears: p1CareYearsTriggered.length ? quantile(p1CareYearsTriggered, 0.5) : 0,
         p2CareYears: p2CareYearsTriggered.length ? quantile(p2CareYearsTriggered, 0.5) : 0,
         bothCareYears: bothCareYearsOverlapTriggered.length ? quantile(bothCareYearsOverlapTriggered, 0.5) : 0,
-        p2EntryRatePct: (p2TriggeredCount / anzahl) * 100,
+        p2EntryRatePct: (p2TriggeredCount / totalRuns) * 100,
         p2EntryAgeMedian: entryAgesP2.length ? quantile(entryAgesP2, 0.5) : 0,
         maxAnnualCareSpend: maxAnnualCareSpendTriggered.length ? quantile(maxAnnualCareSpendTriggered, 0.5) : 0,
         shortfallDelta_vs_noCare: (endWealthNoCareList.length && endWealthWithCareList.length)
@@ -583,7 +794,7 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
     };
 
     const stressPresetKey = inputs.stressPreset || 'NONE';
-    const aggregatedResults = {
+    return {
         finalOutcomes: {
             p10: quantile(finalOutcomes, 0.1), p50: quantile(finalOutcomes, 0.5),
             p90: quantile(finalOutcomes, 0.9), p50_successful: quantile(successfulOutcomes, 0.5)
@@ -592,13 +803,13 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
         kpiLebensdauer: { mean: mean(kpiLebensdauer) },
         kpiKuerzungsjahre: { p50: quantile(kpiKuerzungsjahre, 0.5) },
         kpiMaxKuerzung: { p50: quantile(kpiMaxKuerzung, 0.5) },
-        depotErschoepfungsQuote: (sum(depotErschoepft) / anzahl) * 100,
+        depotErschoepfungsQuote: (sum(depotErschoepft) / totalRuns) * 100,
         alterBeiErschoepfung: { p50: quantile(Array.from(alterBeiErschoepfung).filter(a => a < 255), 0.5) || 0 },
         anteilJahreOhneFlex: { p50: quantile(anteilJahreOhneFlex, 0.5) },
         volatilities: { p50: quantile(volatilities, 0.5) },
         maxDrawdowns: { p50: quantile(maxDrawdowns, 0.5), p90: quantile(maxDrawdowns, 0.9) },
         heatmap: heatmap.map(yearData => Array.from(yearData)),
-        bins: BINS,
+        bins: bins || MC_HEATMAP_BINS,
         extraKPI: {
             timeShareQuoteAbove45: totalSimulatedYears > 0 ? totalYearsQuoteAbove45 / totalSimulatedYears : 0,
             consumptionAtRiskP10Real: quantile(allRealWithdrawalsSample, 0.1),
@@ -625,9 +836,4 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
             }
         }
     };
-
-    onProgress(100);
-
-    return { aggregatedResults, failCount, worstRun, worstRunCare, pflegeTriggeredCount };
 }
-

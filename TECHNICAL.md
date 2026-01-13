@@ -73,7 +73,7 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 ### Wichtige Module
 
 * `simulator-main.js` – zentrale Steuerung, Parameter-Sweep-Logik, Self-Tests.
-* `simulator-monte-carlo.js` – UI-Koordinator für Monte-Carlo (liest Inputs, setzt Progress, orchestriert Runner/Analyzer).
+* `simulator-monte-carlo.js` – UI-Koordinator für Monte-Carlo (liest Inputs, setzt Progress, orchestriert Runner/Analyzer) inkl. Worker-Orchestrierung.
 * `monte-carlo-runner.js` – DOM-freie Simulation (Jahresschleife, Pflege-KPIs) auf Basis von `simulator-engine-wrapper.js`. Unterstützt nun auch eine **Ansparphase** mit dynamischem Übergang in die Rentenphase (via `effectiveTransitionYear`).
 * `monte-carlo-ui.js` – UI-Fassade für Progressbar/Parameter-Lesen; erlaubt Callbacks ohne DOM-Leaks.
 * `scenario-analyzer.js` – wählt während der Simulation 30 Szenarien (Worst, Perzentile, Pflege, Zufall) aus.
@@ -82,12 +82,60 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 * `simulator-engine-direct.js` – Direkte Anbindung an die EngineAPI, ersetzt den alten Adapter.
 * `simulator-portfolio.js` – Initialisierung, Portfolio-Berechnungen, Stress-Kontexte.
 * `simulator-results.js` – Aggregiert MC-Ausgaben und delegiert an `results-metrics.js` / `results-renderers.js` / `results-formatting.js`.
-* `simulator-sweep.js` – Sweep-Logik inkl. Whitelist/Blocklist, Mini-Monte-Carlo und Heatmap-Aufruf.
+* `simulator-sweep.js` – Sweep-Logik inkl. Whitelist/Blocklist, Heatmap und Worker-Orchestrierung.
+* `sweep-runner.js` – DOM-freier Sweep-Runner (kombinierbar in Worker-Jobs).
 * `simulator-optimizer.js` – Auto-Optimize-Kernlogik mit 3-stufiger Optimierung (Coarse Grid → Refinement → Final Verification).
-* `auto_optimize.js` / `auto_optimize_ui.js` – Auto-Optimize UI-Integration, Preset-Konfigurationen und Champion-Config-Output (1-7 dynamische Parameter).
+* `auto_optimize.js` / `auto_optimize_ui.js` – Auto-Optimize UI-Integration inkl. Worker-Parallelisierung, Preset-Konfigurationen und Champion-Config-Output (1-7 dynamische Parameter).
 * `simulator-heatmap.js` – SVG-Rendering für Parameter-Sweeps inkl. Warnhinweise bei Verstößen.
 * `simulator-utils.js` – Zufallszahlengenerator, Statistikfunktionen, Parser, Formatierung.
 * `simulator-data.js` – Historische Daten, Mortalitäts- und Stress-Presets.
+
+### Worker-Architektur (Monte Carlo, Sweep, Auto-Optimize)
+
+Die Parallelisierung basiert auf Web-Workern und einer gemeinsamen Pool-Schicht:
+
+* `workers/worker-pool.js` verwaltet einen Pool fester Worker-Instanzen, verteilt Jobs und ersetzt defekte Worker.
+* `workers/mc-worker.js` hostet die DOM-freien Runner (`monte-carlo-runner.js`, `sweep-runner.js`) und verarbeitet Job-Typen (`init`, `job`, `sweep-init`, `sweep`).
+* `simulator-monte-carlo.js` orchestriert die Worker-Jobs, führt Chunking (Zeitbudget) durch, aggregiert Ergebnisse und fällt bei Stalls auf seriell zurück.
+* `simulator-sweep.js` verteilt Parameter-Kombinationen auf Worker-Chunks und aggregiert Sweep-Metriken (Fallback seriell).
+* `auto_optimize.js` nutzt einen wiederverwendeten Pool, fährt Candidate-Runs ohne Log-Ausgabe und fällt bei Fehlern auf seriell zurück.
+
+**Determinismus/Seeding**
+* Jeder Run erhält einen deterministischen Seed (`per-run-seed`), damit Chunking/Worker keine Ergebnisse verändert.
+* `legacy-stream` bleibt seriell, da Chunking dort den RNG-Stream verändern würde.
+
+**Logs und Szenarioauswahl**
+* Worker-Läufe sammeln nur aggregierte Daten; detaillierte Logs werden in einem zweiten, seriellen Pass für ausgewählte Runs erstellt.
+* `ScenarioAnalyzer` wählt Worst-/Perzentil-/Pflege- und Zufalls-Szenarien aus.
+
+**Performance-Details**
+* Chunk-Größe wird über ein Zeitbudget dynamisch angepasst (glatt gefiltert), um kurze und lange Jobs auszugleichen.
+* Stall-Detection nutzt Progress-Timestamps und skaliert das Timeout mit der zuletzt gemessenen Chunk-Dauer.
+
+### Worker-Telemetrie (Dev-only)
+
+Die Worker-Pools bieten ein opt-in Telemetrie-System für lokale Performance-Analyse. Aktivierung:
+* URL-Parameter `?telemetry=true` oder
+* `localStorage.setItem('enableWorkerTelemetry','true')` + Reload
+* Dev-Panel via `?dev=true` (Toggle + Print/Export JSON).
+
+**Was liefert der Report (Console)?**
+* **Jobs:** `total/completed/failed/successRate%` – Stabilität der Jobs.
+* **Performance:** `avg/min/max JobTime` + `throughput (jobs/sec)` – Zeitbudget-Treffer & Effizienz.
+* **Chunking:** `avg/min/max/current` – Adaptives Chunking, ob sich die Größe stabilisiert.
+* **Workers:** pro Worker `jobsCompleted`, `totalTime`, `idleTime`, `utilization%` – Lastverteilung/Idle-Anteile.
+* **Memory:** nur wenn `performance.memory` verfügbar ist.
+
+**Interpretation (Beispiel)**
+* `successRate=100%` → keine Worker-Fehler.
+* `avgJobTime ≈ timeBudget` → Chunking trifft das Ziel.
+* `currentChunk` nahe `maxChunk` → System hat sich eingependelt.
+* Große Unterschiede bei `utilization%` → einzelne Jobs dauern länger (normal bei MC).
+
+**Beispielwerte (8 Worker, 500 ms Budget)**
+* `avgJobTime ~302 ms`, `min/max ~58/515 ms`
+* `chunk avg/current ~392/399`
+* `utilization ~76–99%`, `jobVariance CoV ~0.28`
 
 ### Parameter-Sweep & Auto-Optimize
 

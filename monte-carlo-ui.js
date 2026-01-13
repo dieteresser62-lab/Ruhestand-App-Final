@@ -43,6 +43,43 @@ export function createMonteCarloUI() {
          */
         readUseCapeSampling() { return document.getElementById('useCapeSampling')?.checked === true; },
         /**
+         * Liest Worker-Config fuer Monte-Carlo aus der UI.
+         * @returns {{ workerCount: number, timeBudgetMs: number }}
+         */
+        readWorkerConfig() {
+            const workerCountRaw = document.getElementById('mcWorkerCount')?.value ?? '8';
+            const budgetRaw = document.getElementById('mcWorkerBudget')?.value ?? '500';
+            const workerCount = parseInt(String(workerCountRaw).trim(), 10);
+            const timeBudgetMs = parseInt(String(budgetRaw).trim(), 10);
+            return {
+                workerCount: Number.isFinite(workerCount) && workerCount > 0 ? workerCount : 0,
+                timeBudgetMs: Number.isFinite(timeBudgetMs) && timeBudgetMs > 0 ? timeBudgetMs : 500
+            };
+        },
+        /**
+         * Liest den Vergleichsmodus fuer Seriell vs Worker aus.
+         * @returns {boolean} True, wenn der Vergleich aktiviert ist.
+         */
+        readCompareMode() { return document.getElementById('mcCompareMode')?.checked === true; },
+        /**
+         * Zeigt Vergleichsergebnisse an.
+         * @param {string} text - Vergleichstext.
+         */
+        showCompareResults(text) {
+            const container = document.getElementById('mc-compare-results');
+            if (container) {
+                container.textContent = text;
+                container.style.display = 'block';
+            }
+        },
+        /**
+         * Versteckt Vergleichsergebnisse.
+         */
+        hideCompareResults() {
+            const container = document.getElementById('mc-compare-results');
+            if (container) container.style.display = 'none';
+        },
+        /**
          * Zeigt eine Fehlermeldung im UI an.
          * @param {Error|string} error - Das Fehlerobjekt oder die Fehlermeldung.
          */
@@ -117,7 +154,7 @@ export function readIntegerInput(elementId, description, { min = -Infinity, max 
  * Liest alle Monte-Carlo-Steuerparameter aus dem UI und validiert sie defensiv.
  * Design-Entscheidung: Frühes Validieren verhindert späte Ausfälle tief in der Simulation
  * und liefert dem Nutzer klare Fehlermeldungen.
- * @returns {{ anzahl: number, maxDauer: number, blockSize: number, seed: number, methode: string }}
+ * @returns {{ anzahl: number, maxDauer: number, blockSize: number, seed: number, methode: string, rngMode: string }}
  */
 export function readMonteCarloParameters() {
     const methodeSelect = requireElement('mcMethode', 'Monte-Carlo Methode');
@@ -131,6 +168,8 @@ export function readMonteCarloParameters() {
     const maxDauer = readIntegerInput('mcDauer', 'Simulationsdauer in Jahren', { min: 1 });
     const blockSize = readIntegerInput('mcBlockSize', 'Blockgröße', { min: 1 });
     const seed = readIntegerInput('mcSeed', 'Zufalls-Seed', { defaultValue: 0 });
+    const rngModeElement = document.getElementById('rngMode');
+    const rngMode = rngModeElement ? rngModeElement.value : 'per-run-seed';
 
-    return { anzahl, maxDauer, blockSize, seed, methode };
+    return { anzahl, maxDauer, blockSize, seed, methode, rngMode };
 }

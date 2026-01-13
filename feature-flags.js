@@ -15,6 +15,9 @@ const DEFAULT_FLAGS = {
     // Engine Mode: 'adapter' oder 'direct'
     engineMode: 'adapter',
 
+    // Worker Usage (Monte-Carlo/Sweep)
+    useWorkers: false,
+
     // Side-by-Side Comparison Mode
     comparisonMode: false,
 
@@ -75,6 +78,28 @@ class FeatureFlags {
         const newMode = this.flags.engineMode === 'adapter' ? 'direct' : 'adapter';
         this.setEngineMode(newMode);
         return newMode;
+    }
+
+    /**
+     * Enable/disable worker execution for simulations
+     * @param {boolean} enabled
+     */
+    setUseWorkers(enabled) {
+        this.flags.useWorkers = Boolean(enabled);
+        this.saveToStorage();
+        this.notifyListeners('useWorkers', this.flags.useWorkers);
+
+        if (this.flags.debugLogging) {
+            console.log(`[FeatureFlags] useWorkers changed to: ${this.flags.useWorkers}`);
+        }
+    }
+
+    /**
+     * Check if worker execution is enabled
+     * @returns {boolean}
+     */
+    isWorkersEnabled() {
+        return this.flags.useWorkers === true;
     }
 
     /**
@@ -286,3 +311,5 @@ if (typeof window !== 'undefined') {
 }
 
 export default featureFlags;
+
+
