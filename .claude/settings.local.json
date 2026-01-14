@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(wc:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(cd:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(npm test)"
     ]
   }
 }

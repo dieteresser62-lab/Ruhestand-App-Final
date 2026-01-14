@@ -225,4 +225,59 @@ const baseContext = { saleBudgets: {} }; // No budget limits
     console.log('✅ Sell Order (Efficiency) works');
 }
 
+
+// --- TEST 6: Detailed Tranches (Unique IDs, No Overwrite) ---
+{
+    const input = getBaseInputs();
+    input.depotwertAlt = 0;
+    input.costBasisAlt = 0;
+    input.depotwertNeu = 0;
+    input.costBasisNeu = 0;
+
+    input.detailledTranches = [
+        { trancheId: 't1', isin: 'SAME', name: 'Lot A', type: 'aktien_neu', category: 'equity', marketValue: 1000, costBasis: 1000, tqf: 0, purchaseDate: '2020-01-01' },
+        { trancheId: 't2', isin: 'SAME', name: 'Lot B', type: 'aktien_neu', category: 'equity', marketValue: 1000, costBasis: 1000, tqf: 0, purchaseDate: '2021-01-01' }
+    ];
+
+    const result = TransactionEngine.calculateSaleAndTax(
+        1500,
+        input,
+        baseContext,
+        baseMarket,
+        false
+    );
+
+    const totalBrutto = result.breakdown.reduce((sum, b) => sum + (b.brutto || 0), 0);
+    assertClose(totalBrutto, 1500, 0.01, 'Should sell across multiple detailed tranches');
+    assert(result.breakdown.length === 2, 'Should preserve multiple detailed tranches with same ISIN');
+
+    console.log('? Detailed tranches (unique IDs) work');
+}
+
+// --- TEST 7: Sale Budgets Across Lots ---
+{
+    const input = getBaseInputs();
+    input.depotwertAlt = 0;
+    input.costBasisAlt = 0;
+    input.depotwertNeu = 0;
+    input.costBasisNeu = 0;
+
+    input.detailledTranches = [
+        { trancheId: 't1', isin: 'SAME', name: 'Lot A', type: 'aktien_neu', category: 'equity', marketValue: 1000, costBasis: 1000, tqf: 0, purchaseDate: '2020-01-01' },
+        { trancheId: 't2', isin: 'SAME', name: 'Lot B', type: 'aktien_neu', category: 'equity', marketValue: 1000, costBasis: 1000, tqf: 0, purchaseDate: '2021-01-01' }
+    ];
+
+    const budgetContext = { saleBudgets: { aktien_neu: 1200 } };
+    const result = TransactionEngine.calculateSaleAndTax(
+        2000,
+        input,
+        budgetContext,
+        baseMarket,
+        false
+    );
+
+    assert(result.bruttoVerkaufGesamt <= 1200.01, 'Sale budget should cap total gross across lots');
+
+    console.log('? Sale budget caps total across lots');
+}
 console.log('--- Transaction Tax Tests Completed ---');

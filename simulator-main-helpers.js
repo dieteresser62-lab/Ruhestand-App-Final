@@ -285,6 +285,7 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal') {
             { header: 'Liq@rC-', width: 9, key: 'row.liqStart', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
             { header: 'Zins€', width: 7, key: 'row.cashInterestEarned', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
             { header: 'Liq@rC+', width: 9, key: 'row.liqEnd', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'ZielLiq', width: 8, key: 'row.zielLiquiditaet', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
             { header: 'NeedLiq', width: 8, key: 'row.NeedLiq', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
             { header: 'GuardG', width: 7, key: 'row.GuardGold', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
             { header: 'GuardA', width: 7, key: 'row.GuardEq', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },

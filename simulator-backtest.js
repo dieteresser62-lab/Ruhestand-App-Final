@@ -145,7 +145,7 @@ export function runBacktest() {
         if (logDetailLevel === 'detailed') {
             headerCols.push(
                 "Liq@rC-".padStart(9), "Zins€".padStart(7), "Liq@rC+".padStart(9),
-                "NeedLiq".padStart(8), "GuardG".padStart(7), "GuardA".padStart(7), "GuardNote".padStart(16)
+                "ZielLiq".padStart(8), "NeedLiq".padStart(8), "GuardG".padStart(7), "GuardA".padStart(7), "GuardNote".padStart(16)
             );
         }
         let header = headerCols.join("  ");
@@ -232,6 +232,7 @@ export function runBacktest() {
                     formatCurrencyShortLog(row.liqStart || 0).padStart(9),
                     formatCurrencyShortLog(row.cashInterestEarned || 0).padStart(7),
                     formatCurrencyShortLog(row.liqEnd || 0).padStart(9),
+                    formatCurrencyShortLog(row.zielLiquiditaet || 0).padStart(8),
                     formatCurrencyShortLog(row.NeedLiq || 0).padStart(8),
                     formatCurrencyShortLog(row.GuardGold || 0).padStart(7),
                     formatCurrencyShortLog(row.GuardEq || 0).padStart(7),

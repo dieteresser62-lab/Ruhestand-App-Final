@@ -15,6 +15,8 @@
     --success-color: #2ecc71; --warning-color: #f39c12; --danger-color: #e74c3c;
     --content-bg-color: rgba(248, 249, 250, 0.8); --content-border-color: #e2e8f0;
     --info-text-color: #4a5568;
+    --tranchen-hint-color: var(--info-text-color);
+    --tranchen-warning-color: #fff3cd;
 }
 
 /* Base Layout */
@@ -1068,3 +1070,14 @@ body:not(.mode-simple) .help-tooltip {
     display: none;
 }
 
+.tranchen-hint {
+    margin-top: 6px;
+    font-size: 0.85em;
+    color: var(--tranchen-hint-color);
+}
+
+.tranchen-warning {
+    margin-top: 10px;
+    font-size: 0.85rem;
+    color: var(--tranchen-warning-color);
+}

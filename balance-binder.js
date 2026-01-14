@@ -507,18 +507,19 @@ export const UIBinder = {
             // Kurze Pause für besseres UX
             await new Promise(resolve => setTimeout(resolve, 500));
 
-            // Schritt 2: ETF-Daten abrufen + Nachrücken + ATH
-            btn.innerHTML = '⏳ ETF...';
-            try {
-                results.etf = await this.handleNachrueckenMitETF();
-            } catch (err) {
-                results.errors.push({ step: 'ETF & Nachrücken', error: err.message || 'Unbekannter Fehler' });
-            }
-
             // Schritt 3: Alter um 1 Jahr erhöhen (ein Jahr ist vergangen)
             const currentAge = parseInt(dom.inputs.aktuellesAlter.value) || 0;
-            dom.inputs.aktuellesAlter.value = (currentAge + 1).toString();
-            results.age.new = currentAge + 1;
+            const newAge = currentAge + 1;
+            dom.inputs.aktuellesAlter.value = newAge.toString();
+            results.age.new = newAge;
+
+            // State aktualisieren: Das neue Alter gilt als "inflationsbereinigt"
+            const state = StorageManager.loadState();
+            state.ageAdjustedForInflation = newAge;
+            StorageManager.saveState(state);
+
+            // UI aktualisieren, damit die Erfolgsmeldung das neue Alter anzeigt
+            debouncedUpdate();
 
             results.endTime = Date.now();
 
@@ -528,8 +529,12 @@ export const UIBinder = {
                 dom.controls.btnJahresUpdateLog.disabled = false;
             }
 
-            // Zeige Modal mit Ergebnissen
-            this.showUpdateResultModal(results);
+            // Zeige Modal nur bei Fehlern, sonst Toast
+            if (results.errors.length > 0) {
+                this.showUpdateResultModal(results);
+            } else {
+                UIRenderer.toast('✅ Jahres-Update erfolgreich abgeschlossen.');
+            }
 
         } catch (err) {
             console.error('Jahres-Update fehlgeschlagen:', err);
@@ -571,7 +576,7 @@ export const UIBinder = {
 
         // Bestimme Titel basierend auf Erfolg/Fehler
         const hasErrors = results.errors.length > 0;
-        const allFailed = results.errors.length === 2; // Inflation + ETF beide fehlgeschlagen
+        const allFailed = false;
 
         if (allFailed) {
             modalTitle.innerHTML = '❌ Jahres-Update fehlgeschlagen';
@@ -719,78 +724,79 @@ export const UIBinder = {
         startDate.setDate(startDate.getDate() - 10);
         const startTime = formatDate(startDate);
 
-        // Strategie 1: Yahoo Finance über CORS-Proxy (allorigins.win)
-        try {
-            const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${startTime}&period2=${targetTime}&interval=1d`;
-            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`;
+        // Strategie 1-2: Yahoo Finance ueber CORS-Proxies
+        const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${startTime}&period2=${targetTime}&interval=1d`;
+        const parseYahooResponse = (data, sourceLabel) => {
+            if (data.chart?.result?.[0]) {
+                const result = data.chart.result[0];
+                const timestamps = result.timestamp;
+                const quotes = result.indicators.quote[0];
 
-            const response = await fetch(proxyUrl);
-
-            if (response.ok) {
-                const data = await response.json();
-
-                if (data.chart?.result?.[0]) {
-                    const result = data.chart.result[0];
-                    const timestamps = result.timestamp;
-                    const quotes = result.indicators.quote[0];
-
-                    if (timestamps && quotes?.close) {
-                        // Finde den letzten verfügbaren Schlusskurs
-                        for (let i = timestamps.length - 1; i >= 0; i--) {
-                            const price = quotes.close[i];
-                            if (price !== null && !isNaN(price)) {
-                                return {
-                                    price: price,
-                                    date: new Date(timestamps[i] * 1000),
-                                    ticker: ticker,
-                                    source: 'Yahoo Finance (Proxy)'
-                                };
-                            }
+                if (timestamps && quotes?.close) {
+                    // Finde den letzten verf?gbaren Schlusskurs
+                    for (let i = timestamps.length - 1; i >= 0; i--) {
+                        const price = quotes.close[i];
+                        if (price !== null && !isNaN(price)) {
+                            return {
+                                price: price,
+                                date: new Date(timestamps[i] * 1000),
+                                ticker: ticker,
+                                source: sourceLabel
+                            };
                         }
                     }
                 }
             }
-        } catch (err) {
-            // Yahoo Finance via Proxy failed, try next
+            return null;
+        };
+        const buildProxyUrl = (template, targetUrl) => {
+            if (template.includes('{url}')) {
+                return template.replace('{url}', encodeURIComponent(targetUrl));
+            }
+            return `${template}${encodeURIComponent(targetUrl)}`;
+        };
+        const proxyEntries = [];
+        const rawCustomProxy = localStorage.getItem('etfProxyUrls') || localStorage.getItem('etfProxyUrl');
+        if (rawCustomProxy) {
+            let customList = [];
+            try {
+                const parsed = JSON.parse(rawCustomProxy);
+                if (Array.isArray(parsed)) customList = parsed;
+                else if (typeof parsed === 'string') customList = [parsed];
+            } catch (err) {
+                customList = [rawCustomProxy];
+            }
+            customList
+                .filter(entry => typeof entry === 'string' && entry.trim().length > 0)
+                .forEach(entry => {
+                    proxyEntries.push({
+                        name: 'Custom Proxy',
+                        template: entry.trim()
+                    });
+                });
         }
+        proxyEntries.push(
+            { name: 'Yahoo Finance (allorigins.win)', template: 'https://api.allorigins.win/raw?url=' },
+            { name: 'Yahoo Finance (corsproxy.io)', template: 'https://corsproxy.io/?' }
+        );
 
-        // Strategie 2: Yahoo Finance über alternativen CORS-Proxy (corsproxy.io)
-        try {
-            const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${startTime}&period2=${targetTime}&interval=1d`;
-            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(yahooUrl)}`;
-
-            const response = await fetch(proxyUrl);
-
-            if (response.ok) {
-                const data = await response.json();
-
-                if (data.chart?.result?.[0]) {
-                    const result = data.chart.result[0];
-                    const timestamps = result.timestamp;
-                    const quotes = result.indicators.quote[0];
-
-                    if (timestamps && quotes?.close) {
-                        for (let i = timestamps.length - 1; i >= 0; i--) {
-                            const price = quotes.close[i];
-                            if (price !== null && !isNaN(price)) {
-                                return {
-                                    price: price,
-                                    date: new Date(timestamps[i] * 1000),
-                                    ticker: ticker,
-                                    source: 'Yahoo Finance (corsproxy.io)'
-                                };
-                            }
-                        }
-                    }
+        for (const proxy of proxyEntries) {
+            try {
+                const proxyUrl = buildProxyUrl(proxy.template, yahooUrl);
+                const response = await fetch(proxyUrl);
+                if (response.ok) {
+                    const data = await response.json();
+                    const parsed = parseYahooResponse(data, proxy.name);
+                    if (parsed) return parsed;
                 }
+            } catch (err) {
+                // Yahoo Finance via proxy failed, try next
             }
-        } catch (err) {
-            // Yahoo Finance via corsproxy.io failed, try next
         }
 
         // Strategie 3: Finnhub API (kostenlos, CORS-freundlich, aber braucht Demo-Key)
         try {
-            const finnhubKey = 'demo'; // Demo-Key, begrenzt aber funktioniert für Tests
+            const finnhubKey = localStorage.getItem('finnhubApiKey') || 'demo';
             const finnhubUrl = `https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${finnhubKey}`;
 
             const response = await fetch(finnhubUrl);
@@ -816,15 +822,27 @@ export const UIBinder = {
             `ETF-Daten konnten nicht abgerufen werden.\n\n` +
             `Ticker: ${ticker} (ISIN: ${isin})\n` +
             `Zieldatum: ${targetDate.toLocaleDateString('de-DE')}\n\n` +
-            `Getestete APIs:\n` +
-            `• Yahoo Finance via allorigins.win Proxy\n` +
-            `• Yahoo Finance via corsproxy.io Proxy\n` +
-            `• Finnhub API\n\n` +
-            `Alle CORS-Proxies sind fehlgeschlagen.\n\n` +
-            `💡 Alternativen:\n` +
-            `• Nutze den manuellen "🗓️ Nachr." Button\n` +
-            `• Importiere Daten via "📄 CSV" Button\n` +
-            `• Prüfe die Browser-Konsole (F12) für Details`
+            `Getestete APIs:
+` +
+            `- Yahoo Finance via CORS-Proxy (Standard + optional Custom)
+` +
+            `- Finnhub API
+
+` +
+            `Alle CORS-Proxies sind fehlgeschlagen.
+
+` +
+            `Hinweise:
+` +
+            `- Nutze den manuellen "Nachr." Button
+` +
+            `- Importiere Daten via "CSV" Button
+` +
+            `- Optional: localStorage "finnhubApiKey" setzen
+` +
+            `- Optional: localStorage "etfProxyUrl" oder "etfProxyUrls" setzen
+` +
+            `- Pruefe die Browser-Konsole (F12) fuer Details`
         );
     },
 

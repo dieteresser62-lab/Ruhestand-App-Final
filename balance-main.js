@@ -11,6 +11,7 @@ import { StorageManager, initStorageManager } from './balance-storage.js';
 import { UIReader, initUIReader } from './balance-reader.js';
 import { UIRenderer, initUIRenderer } from './balance-renderer.js';
 import { UIBinder, initUIBinder } from './balance-binder.js';
+import { initTranchenStatus } from './depot-tranchen-status.js';
 
 // ==================================================================================
 // APPLICATION STATE & DOM REFERENCES
@@ -299,6 +300,10 @@ function init() {
     // 9. Initial update
     // Führt ersten Berechnungs- und Render-Zyklus durch
     update();
+
+    // 10. Initialize Depot-Tranchen Status Badge
+    // Zeigt Status der geladenen detaillierten Tranchen an
+    initTranchenStatus('tranchenStatusBadge');
 }
 
 // ==================================================================================

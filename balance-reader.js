@@ -7,9 +7,11 @@
  */
 
 import { UIUtils } from './balance-utils.js';
+import { calculateAggregatedValues } from './depot-tranchen-status.js';
 
 // Module-level DOM reference
 let dom = null;
+let hasLoggedTranchenAggregation = false;
 
 /**
  * Initialisiert den UIReader mit DOM-Referenzen
@@ -70,16 +72,45 @@ export const UIReader = {
         const num = (id) => UIUtils.parseCurrency(dom.inputs[id].value);
         const val = (id) => dom.inputs[id].value;
         const checked = (id) => dom.inputs[id].checked;
+
+        // Lade detaillierte Tranchen aus localStorage (falls vorhanden)
+        let detailledTranches = null;
+        try {
+            const saved = localStorage.getItem('depot_tranchen');
+            if (saved) {
+                detailledTranches = JSON.parse(saved);
+                console.log('✅ Detaillierte Depot-Tranchen geladen:', detailledTranches.length, 'Positionen');
+            }
+        } catch (err) {
+            console.warn('Fehler beim Laden der Depot-Tranchen:', err);
+        }
+
+        const aggregated = (detailledTranches && Array.isArray(detailledTranches) && detailledTranches.length)
+            ? calculateAggregatedValues()
+            : null;
+
+        const useAggregates = aggregated && (
+            aggregated.depotwertAlt > 0 ||
+            aggregated.depotwertNeu > 0 ||
+            aggregated.geldmarktEtf > 0 ||
+            aggregated.goldWert > 0
+        );
+
+        if (useAggregates && !hasLoggedTranchenAggregation) {
+            console.log('Tranchen-Aggregate werden fuer Balance-Eingaben verwendet.');
+            hasLoggedTranchenAggregation = true;
+        }
+
         return {
             aktuellesAlter: parseInt(val('aktuellesAlter')) || 0,
             floorBedarf: num('floorBedarf'),
             flexBedarf: num('flexBedarf'),
             inflation: parseFloat(val('inflation')) || 0,
             tagesgeld: num('tagesgeld'),
-            geldmarktEtf: num('geldmarktEtf'),
-            depotwertAlt: num('depotwertAlt'),
-            depotwertNeu: num('depotwertNeu'),
-            goldWert: num('goldWert'),
+            geldmarktEtf: useAggregates ? aggregated.geldmarktEtf : num('geldmarktEtf'),
+            depotwertAlt: useAggregates ? aggregated.depotwertAlt : num('depotwertAlt'),
+            depotwertNeu: useAggregates ? aggregated.depotwertNeu : num('depotwertNeu'),
+            goldWert: useAggregates ? aggregated.goldWert : num('goldWert'),
             endeVJ: parseFloat(val('endeVJ')) || 0,
             endeVJ_1: parseFloat(val('endeVJ_1')) || 0,
             endeVJ_2: parseFloat(val('endeVJ_2')) || 0,
@@ -94,11 +125,11 @@ export const UIReader = {
             goldFloorProzent: parseFloat(val('goldFloorProzent')) || 0,
             goldSteuerfrei: checked('goldSteuerfrei'),
             rebalancingBand: parseFloat(val('rebalancingBand')) || 0,
-            costBasisAlt: num('costBasisAlt'),
-            costBasisNeu: num('costBasisNeu'),
+            costBasisAlt: useAggregates ? aggregated.costBasisAlt : num('costBasisAlt'),
+            costBasisNeu: useAggregates ? aggregated.costBasisNeu : num('costBasisNeu'),
             tqfAlt: parseFloat(val('tqfAlt')) || 0,
             tqfNeu: parseFloat(val('tqfNeu')) || 0,
-            goldCost: num('goldCost'),
+            goldCost: useAggregates ? aggregated.goldCost : num('goldCost'),
             kirchensteuerSatz: parseFloat(val('kirchensteuerSatz')) || 0,
             sparerPauschbetrag: num('sparerPauschbetrag'),
             runwayMinMonths: parseInt(document.getElementById('runwayMinMonths').value) || 24,
@@ -108,7 +139,9 @@ export const UIReader = {
             rebalBand: parseFloat(val('rebalBand')) || 0,
             maxSkimPctOfEq: parseFloat(val('maxSkimPctOfEq')) || 0,
             maxBearRefillPctOfEq: parseFloat(val('maxBearRefillPctOfEq')) || 0,
-            profilName: val('profilName') || ''
+            profilName: val('profilName') || '',
+            // NEU: Detaillierte Tranchen für FIFO und präzise Steuerberechnung
+            detailledTranches: detailledTranches
         };
     },
 

@@ -394,6 +394,7 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         { key: 'liqStart', header: 'Liq@rC-', width: 9, fmt: formatCurrencyShortLog },
         { key: 'cashInterestEarned', header: 'Zins€', width: 7, fmt: formatCurrencyShortLog },
         { key: 'liqEnd', header: 'Liq@rC+', width: 9, fmt: formatCurrencyShortLog },
+        { key: 'zielLiquiditaet', header: 'ZielLiq', width: 8, fmt: formatCurrencyShortLog },
     ] : [];
 
     const guardCols = options.logDetailLevel === 'detailed' ? [

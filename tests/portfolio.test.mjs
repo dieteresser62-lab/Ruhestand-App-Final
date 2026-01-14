@@ -77,7 +77,8 @@ function teardownMockDOM() {
         'simStartVermoegen': 100000,
         'depotwertAlt': 50000,    // 50k Stocks
         'einstandAlt': 40000,
-        'zielLiquiditaet': 10000, // 10k Liquid
+        'tagesgeld': 10000, // 10k Liquid
+        'geldmarktEtf': 0,
         // Gold disabled
         'goldAllokationAktiv': { checked: false },
         'startFloorBedarf': 24000,
@@ -103,7 +104,7 @@ function teardownMockDOM() {
 
         // Assertions on parsing
         assertEqual(parsedInputs.startVermoegen, 100000, 'Should parse startVermoegen');
-        assertEqual(parsedInputs.zielLiquiditaet, 10000, 'Should parse zielLiquiditaet');
+        assertEqual(parsedInputs.zielLiquiditaet, 10000, 'Should derive zielLiquiditaet');
         assertEqual(parsedInputs.depotwertAlt, 50000, 'Should parse depotwertAlt');
         assertEqual(parsedInputs.goldAktiv, false, 'Should parse gold toggle');
 

@@ -16,6 +16,9 @@ import {
     buildInputsCtxFromPortfolio, sumDepot, buyGold, buyStocksNeu
 } from './simulator-portfolio.js';
 import { resolveProfileKey } from './simulator-heatmap.js';
+import { CONFIG } from './engine/config.mjs';
+import { MarketAnalyzer } from './engine/analyzers/MarketAnalyzer.mjs';
+import TransactionEngine from './engine/transactions/TransactionEngine.mjs';
 
 /**
  * FAIL-SAFE Liquidity Guard - Hilfsfunktionen
@@ -70,6 +73,63 @@ function normalizeHouseholdContext(context) {
             p2FromP1: !!context?.widowBenefits?.p2FromP1
         }
     };
+}
+
+
+function calculateTargetLiquidityBalanceLike(inputs, marketData, floorBedarf, flexBedarf, pensionAnnual) {
+    const profil = CONFIG.PROFIL_MAP[inputs?.risikoprofil] || CONFIG.PROFIL_MAP['sicherheits-dynamisch'];
+    const market = MarketAnalyzer.analyzeMarket({
+        ...marketData,
+        inflation: marketData?.inflation ?? 0,
+        capeRatio: marketData?.capeRatio ?? inputs?.marketCapeRatio ?? 0
+    });
+
+    const renteJahr = Number(pensionAnnual) || 0;
+    const pensionSurplus = Math.max(0, renteJahr - floorBedarf);
+    const inflatedBedarf = {
+        floor: Math.max(0, floorBedarf - renteJahr),
+        flex: Math.max(0, flexBedarf - pensionSurplus)
+    };
+
+    const inputForTarget = {
+        ...inputs,
+        floorBedarf,
+        flexBedarf,
+        renteAktiv: renteJahr > 0,
+        renteMonatlich: renteJahr / 12
+    };
+
+    return TransactionEngine.calculateTargetLiquidity(profil, market, inflatedBedarf, inputForTarget);
+}
+
+function buildDetailedTranchesFromPortfolio(portfolio) {
+    const list = [];
+    const pushTranche = (t, fallbackCategory) => {
+        if (!t) return;
+        const type = t.type || t.kind || '';
+        const category = t.category
+            || (type === 'gold' ? 'gold' : (type === 'geldmarkt' ? 'money_market' : (fallbackCategory || 'equity')));
+        list.push({
+            trancheId: t.trancheId || null,
+            name: t.name || null,
+            isin: t.isin || null,
+            shares: Number(t.shares) || 0,
+            purchasePrice: Number(t.purchasePrice) || 0,
+            purchaseDate: t.purchaseDate || null,
+            currentPrice: Number(t.currentPrice) || 0,
+            marketValue: Number(t.marketValue) || 0,
+            costBasis: Number(t.costBasis) || 0,
+            tqf: Number.isFinite(Number(t.tqf)) ? Number(t.tqf) : 0.30,
+            type: type || (fallbackCategory === 'gold' ? 'gold' : (fallbackCategory === 'money_market' ? 'geldmarkt' : 'aktien_alt')),
+            category
+        });
+    };
+
+    (portfolio?.depotTranchesAktien || []).forEach(t => pushTranche(t, 'equity'));
+    (portfolio?.depotTranchesGold || []).forEach(t => pushTranche(t, 'gold'));
+    (portfolio?.depotTranchesGeldmarkt || []).forEach(t => pushTranche(t, 'money_market'));
+
+    return list;
 }
 
 /**
@@ -211,7 +271,13 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         liquiditaet += sparrateThisYear;
 
         // Rebalancing
-        const zielLiquiditaet = inputs.zielLiquiditaet || 0;
+        const zielLiquiditaet = calculateTargetLiquidityBalanceLike(
+            inputs,
+            marketDataCurrentYear,
+            effectiveBaseFloor,
+            baseFlex,
+            currentAnnualPension + currentAnnualPension2
+        );
         const ueberschuss = liquiditaet - zielLiquiditaet;
 
         let kaufAktTotal = 0;
@@ -448,6 +514,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         marketData: marketDataCurrentYear
     });
 
+    const detailedTranches = buildDetailedTranchesFromPortfolio(portfolio);
     const engineInput = {
         ...inputsCtx,
         aktuelleLiquiditaet: liquiditaet, // FIX: Override with tracked local liquidity (inputsCtx has stale portfolio cash)
@@ -486,6 +553,9 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         ath: marketDataCurrentYear.ath || marketDataHist.ath || 0,
         jahreSeitAth: marketDataCurrentYear.jahreSeitAth || marketDataHist.jahreSeitAth || 0
     };
+    if (detailedTranches.length) {
+        engineInput.detailledTranches = detailedTranches;
+    }
 
     // **HAUPTUNTERSCHIED**: Ein einziger Engine-Aufruf statt 3-5 Adapter-Aufrufe
     const fullResult = engine.simulateSingleYear(engineInput, lastState);
@@ -514,6 +584,14 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
         totalTaxesThisYear += saleResult.steuerGesamt;
         applySaleToPortfolio(portfolio, saleResult);
+    }
+
+    // Cash-funded Käufe (Quelle: Liquidität) reduzieren die Liquidität direkt.
+    const cashSpend = Array.isArray(actionResult.quellen)
+        ? actionResult.quellen.reduce((sum, q) => (q?.kind === 'liquiditaet' ? sum + (q.brutto || 0) : sum), 0)
+        : 0;
+    if (cashSpend > 0) {
+        liquiditaet -= cashSpend;
     }
 
     // Aktualisiere Liquidität nach Transaktionen
@@ -679,6 +757,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             liqStart: initialLiqStart,
             cashInterestEarned: cashZinsen,
             liqEnd: liqNachZins,
+            zielLiquiditaet: zielLiquiditaet || 0,
             aktionUndGrund: aktionText,
             usedSPB: actionResult.pauschbetragVerbraucht || 0,
             floor_brutto: effectiveBaseFloor,

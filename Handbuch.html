@@ -360,11 +360,13 @@
             <ol class="toc-list">
                 <li><a class="toc-link" data-tab-target="manual" href="#ueberblick">Überblick</a></li>
                 <li><a class="toc-link" data-tab-target="manual" href="#ansparer-jung">Ansparer (lange Laufzeit)</a></li>
+                <li><a class="toc-link" data-tab-target="manual" href="#ansparphase">Ansparphase</a></li>
                 <li><a class="toc-link" data-tab-target="manual" href="#installation-start">Installation &amp; Start</a></li>
                 <li><a class="toc-link" data-tab-target="manual" href="#simulator">Simulator</a>
                     <ol class="toc-sublist">
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-eingaben">Eingaben</a></li>
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-parameter">Parameter</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#simulator-tranchen">Depot-Tranchen</a></li>
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-start">Simulation starten</a></li>
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-ergebnisse">Ergebnisse deuten</a></li>
                     </ol>
@@ -375,6 +377,7 @@
                         <li><a class="toc-link" data-tab-target="manual" href="#balance-diagnose">Diagnose</a></li>
                         <li><a class="toc-link" data-tab-target="manual" href="#balance-handlungsschritte">Handlungsschritte</a></li>
                         <li><a class="toc-link" data-tab-target="manual" href="#balance-kapitalfluss">Kapitalfluss</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#balance-tranchen">Depot-Tranchen</a></li>
                     </ol>
                 </li>
                 <li><a class="toc-link" data-tab-target="manual" href="#onboarding-playbook">Onboarding-Playbook</a>
@@ -556,6 +559,88 @@
                             Kurz-Review fest. Führen Sie einen Parameter-Sweep mit +10 %/-10 % Sparrate durch und
                             speichern Sie das beste Szenario als neue Basis.
                         </div>
+
+            <div class="info-card" id="ansparphase" style="margin-top: 2rem;">
+                <h2>Ansparphase: Ablauf und Pflege</h2>
+                <p class="card-intro">Diese Schritte helfen, die Ansparphase planbar und belastbar aufzusetzen. Fokus:
+                    Simulator nutzen, Annahmen sauber halten, Abweichungen frueh erkennen.</p>
+                <div class="manual-grid" style="margin-top: 1.5rem;">
+                    <div class="detail-block">
+                        <h3>1) Startwerte und Einzahlungen</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Startvermögen:</strong> Aktuellen Depotwert inkl. Cash erfassen.</li>
+                            <li><strong>Sparrate:</strong> Monatliche Einzahlungen angeben; optional Sparsteigerung p.a. eintragen.</li>
+                            <li><strong>Sonderzahlungen:</strong> Bonus, Erbe oder Einmalzahlungen als Extra-Sparjahr simulieren.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block">
+                        <h3>2) Simulator als Hauptwerkzeug</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Parameter-Sweep:</strong> Sparrate/Rentenbeginn variieren, um Zielkorridore zu finden.</li>
+                            <li><strong>Risiko-Sensitivität:</strong> Aktienquote und Fees anpassen, um robuste Korridore zu testen.</li>
+                            <li><strong>Interpretation:</strong> Nicht nur Median, sondern 10./90. Perzentil betrachten.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block">
+                        <h3>3) Jahrespflege in der Ansparphase</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Update-Rhythmus:</strong> Einmal pro Jahr Werte aktualisieren (Vermoegen, Sparrate, Ziele).</li>
+                            <li><strong>Ist vs. Plan:</strong> Abweichungen dokumentieren und Szenario neu rechnen.</li>
+                            <li><strong>Rebalancing:</strong> Wenn noetig manuell; Balance-App ist erst in der Entnahmephase relevant.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block">
+                        <h3>4) Uebergang zur Entnahmephase</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Timing:</strong> 3-5 Jahre vor Ruhestand erste Balance-Tests durchfuehren.</li>
+                            <li><strong>Liquiditaet:</strong> Cash-Buffer aufbauen, um erste Entnahmejahre zu stabilisieren.</li>
+                            <li><strong>Tranchen:</strong> Depot-Tranchen-Manager pflegen, damit Steuerlogik realistisch wird.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block">
+                        <h3>5) ETF-Auswahl und Diversifikation</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Breit diversifiziert:</strong> Welt-ETF als Kern; Sektor- oder Themen-ETFs nur als Satelliten.</li>
+                            <li><strong>Waehrung:</strong> Keine starre Waehrungswette; Diversifikation ueber Regionen bevorzugen.</li>
+                            <li><strong>Kosten:</strong> TER und Spreads vergleichen; kleine Kostenunterschiede wirken langfristig stark.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block">
+                        <h3>6) Rebalancing-Regeln</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Rhythmus:</strong> Jaehlich pruefen; bei starken Abweichungen kuerzer reagieren.</li>
+                            <li><strong>Bandbreiten:</strong> Zielquote plus/minus 5-10 Prozentpunkte als Trigger.</li>
+                            <li><strong>Umsetzung:</strong> Rebalancing in der Ansparphase meist durch Sparraten steuern.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block">
+                        <h3>7) Sparplan-Steigerungen</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Automatik:</strong> Sparrate jaehrlich anpassen (z.B. +2-3% oder Inflationsrate).</li>
+                            <li><strong>Meilensteine:</strong> Gehaltsstufen und Einmalzahlungen als Sonderbeitrag abbilden.</li>
+                            <li><strong>Realismus:</strong> Sparrate nicht nur am Optimum, sondern am realen Cashflow ausrichten.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block">
+                        <h3>Beispiel-Strategien (Ansparphase)</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Konservativ:</strong> 40-60% Aktien, Rest sichere Bausteine; geringere Schwankung.</li>
+                            <li><strong>Ausgewogen:</strong> 60-75% Aktien, Rest stabilisierend; guter Kompromiss.</li>
+                            <li><strong>Offensiv:</strong> 80-100% Aktien; hohe Schwankungen, lange Anlagehorizonte vorausgesetzt.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block">
+                        <h3>Beispielwerte (Orientierung)</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Cash-Puffer:</strong> 3-6 Monatsausgaben als Reserve neben dem Depot.</li>
+                            <li><strong>Sparrate:</strong> 10-20% des Nettoeinkommens als Zielkorridor.</li>
+                            <li><strong>Sparsteigerung:</strong> 2-3% pro Jahr oder Inflationsrate als Automatismus.</li>
+                        </ul>
+                        <p style="color: var(--text-light); margin-top: 0.75rem;">Hinweis: Diese Werte sind nur Orientierung und ersetzen keine individuelle Planung.</p>
+                    </div>
+                </div>
+            </div>
+
                     </div>
                 </div>
             </div>
@@ -609,12 +694,23 @@
                         <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
                             <li><strong>Renditeannahmen:</strong> Passen Sie Mittelwert/Volatilität im Reiter „Erweiterte
                                 Parameter“ an, wenn Sie eigene Kapitalmarktsichten nutzen.</li>
-                            <li><strong>Korrelationen:</strong> Für gemischte Portfolios steuert der Korrela­tionsslider, wie
+                            <li><strong>Korrelationen:</strong> Für gemischte Portfolios steuert der Korrelationsslider, wie
                                 stark Aktien und Anleihen gemeinsam schwanken; konservative Nutzer lassen den
                                 Standardwert unverändert.</li>
                             <li><strong>Gebühren/Puffer:</strong> Hinterlegen Sie prozentuale Kosten, um Spar- oder
                                 Auszahlpläne realistisch abzubilden; der Simulator reduziert Renditen automatisch um
                                 diesen Wert.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block" id="simulator-tranchen">
+                        <h3>Depot-Tranchen-Manager</h3>
+                        <p>Für eine realistische Steuerberechnung können Sie Ihre ETF-Positionen als einzelne
+                            Tranchen pflegen. Der Simulator nutzt diese Tranchen automatisch für Verkäufe und
+                            Steuerabzüge.</p>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Öffnen:</strong> Button "Depot-Tranchen Manager öffnen" im Vermögen-Block.</li>
+                            <li><strong>Speichern:</strong> Tranchen werden lokal im Browser gespeichert (localStorage).</li>
+                            <li><strong>Wirkung:</strong> Verkäufe werden steueroptimiert aus den Tranchen ausgewählt.</li>
                         </ul>
                     </div>
                     <div class="detail-block" id="simulator-start">
@@ -724,6 +820,18 @@
                         <p>Die App fasst zusammen, welche Beträge zwischen Aktien, Cash und Entnahmekonten fließen
                             sollen. Nutzen Sie die Checkliste im Panel, um Verkäufe, Umbuchungen und Auszahlungen in
                             exakt dieser Reihenfolge abzuwickeln.</p>
+                    </div>
+
+                    <div class="detail-block" id="balance-tranchen">
+                        <h3>Depot-Tranchen-Manager</h3>
+                        <p>In der Balance-App fließen detaillierte Tranchen direkt in die Handlungsschritte ein. Das
+                            sorgt für realistische Steuerabschätzungen und eine klare Zuordnung, welche Positionen
+                            verkauft werden sollen.</p>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Aktivierung:</strong> Tranchen im Manager pflegen und "Werte übernehmen".</li>
+                            <li><strong>Verkaufsauswahl:</strong> Steueroptimierte Reihenfolge (geringste Steuerlast zuerst).</li>
+                            <li><strong>Hinweis:</strong> Die App zeigt die ausgewählten Tranchen im Diagnose-Panel.</li>
+                        </ul>
                     </div>
                 </div>
             </div>

@@ -2,9 +2,11 @@
 
 import { formatCurrency } from './simulator-utils.js';
 import { HISTORICAL_DATA, STRESS_PRESETS, annualData, REGIME_DATA, REGIME_TRANSITIONS, SUPPORTED_PFLEGE_GRADES } from './simulator-data.js';
+import { calculateAggregatedValues } from './depot-tranchen-status.js';
 
 const DEFAULT_RISIKOPROFIL = 'sicherheits-dynamisch';
 const DEFAULT_PFLEGE_DRIFT_PCT = 3.5; // Realistische Langfrist-Annahme (3–4 % über VPI)
+let hasLoggedTranchenDisplay = false;
 
 /**
  * Geschlechtsspezifische Default-Annahmen für die Dauer eines akuten Pflegefalls.
@@ -52,6 +54,18 @@ function normalizeCareDurationRange(minYearsRaw, maxYearsRaw, gender) {
  * Sammelt alle Eingabewerte aus dem UI
  */
 export function getCommonInputs() {
+    // Lade detaillierte Tranchen aus localStorage (falls vorhanden)
+    let detailledTranches = null;
+    try {
+        const saved = localStorage.getItem('depot_tranchen');
+        if (saved) {
+            detailledTranches = JSON.parse(saved);
+            console.log('✅ Detaillierte Depot-Tranchen geladen:', detailledTranches.length, 'Positionen');
+        }
+    } catch (err) {
+        console.warn('Fehler beim Laden der Depot-Tranchen:', err);
+    }
+
     const goldAktiv = document.getElementById('goldAllokationAktiv').checked;
 
     // Gemeinsame Rentenanpassung (gilt für Person 1 und Partner)
@@ -109,11 +123,16 @@ export function getCommonInputs() {
     const rawPflegeMax = parseInt(document.getElementById('pflegeMaxDauer')?.value);
     const normalizedCareDuration = normalizeCareDurationRange(rawPflegeMin, rawPflegeMax, p1Geschlecht);
 
+    const tagesgeld = parseFloat(document.getElementById('tagesgeld')?.value) || 0;
+    const geldmarktEtf = parseFloat(document.getElementById('geldmarktEtf')?.value) || 0;
+
     const baseInputs = {
         startVermoegen: parseFloat(document.getElementById('simStartVermoegen').value) || 0,
         depotwertAlt: parseFloat(document.getElementById('depotwertAlt').value) || 0,
+        tagesgeld: tagesgeld,
+        geldmarktEtf: geldmarktEtf,
         einstandAlt: parseFloat(document.getElementById('einstandAlt').value) || 0,
-        zielLiquiditaet: parseFloat(document.getElementById('zielLiquiditaet').value) || 0,
+        zielLiquiditaet: tagesgeld + geldmarktEtf,
         startFloorBedarf: parseFloat(document.getElementById('startFloorBedarf').value) || 0,
         startFlexBedarf: parseFloat(document.getElementById('startFlexBedarf').value) || 0,
         marketCapeRatio: parseFloat(document.getElementById('marketCapeRatio')?.value) || 0,
@@ -201,7 +220,9 @@ export function getCommonInputs() {
         ...strategyInputs,
         accumulationPhase,
         transitionYear,
-        transitionAge
+        transitionAge,
+        // NEU: Detaillierte Tranchen für FIFO und präzise Steuerberechnung
+        detailledTranches: detailledTranches
     };
 }
 
@@ -210,33 +231,201 @@ export function getCommonInputs() {
  */
 export function updateStartPortfolioDisplay() {
     const inputs = getCommonInputs();
-    const flexiblesVermoegen = Math.max(0, inputs.startVermoegen - inputs.depotwertAlt);
-    const investitionsKapitalNeu = Math.max(0, flexiblesVermoegen - inputs.zielLiquiditaet);
-    const investitionsKapitalGesamt = inputs.depotwertAlt + investitionsKapitalNeu;
-    const zielwertGold = inputs.goldAktiv ? investitionsKapitalGesamt * (inputs.goldZielProzent / 100) : 0;
-    const depotwertNeu = Math.max(0, investitionsKapitalNeu - zielwertGold);
-    document.getElementById('einstandNeu').value = (depotwertNeu).toFixed(0);
+    const aggregated = (inputs.detailledTranches && Array.isArray(inputs.detailledTranches) && inputs.detailledTranches.length)
+        ? calculateAggregatedValues()
+        : null;
+    const useAggregates = aggregated && (
+        aggregated.depotwertAlt > 0 ||
+        aggregated.depotwertNeu > 0 ||
+        aggregated.geldmarktEtf > 0 ||
+        aggregated.goldWert > 0
+    );
+
+    if (useAggregates && !hasLoggedTranchenDisplay) {
+        console.log('Tranchen-Aggregate werden fuer die Start-Portfolio-Anzeige verwendet.');
+        hasLoggedTranchenDisplay = true;
+    }
+
+    let displayDepotwertAlt = 0;
+    let displayDepotwertNeu = 0;
+    let displayGoldWert = 0;
+    let displayGeldmarkt = 0;
+    let displayTagesgeld = 0;
+    let depotwertNeu = 0;
+    let zielwertGold = 0;
+
+    if (useAggregates) {
+        displayDepotwertAlt = aggregated.depotwertAlt || 0;
+        displayDepotwertNeu = aggregated.depotwertNeu || 0;
+        displayGoldWert = aggregated.goldWert || 0;
+        displayGeldmarkt = aggregated.geldmarktEtf || 0;
+        displayTagesgeld = inputs.tagesgeld || 0;
+    } else {
+        const startLiquiditaet = (inputs.tagesgeld || 0) + (inputs.geldmarktEtf || 0);
+        const flexiblesVermoegen = Math.max(0, inputs.startVermoegen - inputs.depotwertAlt);
+        const investitionsKapitalNeu = Math.max(0, flexiblesVermoegen - startLiquiditaet);
+        const investitionsKapitalGesamt = inputs.depotwertAlt + investitionsKapitalNeu;
+        zielwertGold = inputs.goldAktiv ? investitionsKapitalGesamt * (inputs.goldZielProzent / 100) : 0;
+        depotwertNeu = Math.max(0, investitionsKapitalNeu - zielwertGold);
+
+        displayDepotwertAlt = inputs.depotwertAlt;
+        displayDepotwertNeu = depotwertNeu;
+        displayGoldWert = zielwertGold;
+        displayGeldmarkt = inputs.geldmarktEtf || 0;
+        displayTagesgeld = inputs.tagesgeld || 0;
+    }
+
+    const derivedStartVermoegen = displayDepotwertAlt + displayDepotwertNeu + displayGoldWert + displayTagesgeld + displayGeldmarkt;
+    const startField = document.getElementById('simStartVermoegen');
+    if (startField) {
+        startField.value = String(Math.round(derivedStartVermoegen));
+    }
+
+    const showGoldPanel = inputs.goldAktiv || (useAggregates && displayGoldWert > 0);
+
+    document.getElementById('einstandNeu').value = useAggregates
+        ? Math.round(aggregated.costBasisNeu || 0)
+        : (depotwertNeu).toFixed(0);
+
     let breakdownHtml = `
         <div style="text-align:center; font-weight:bold; color: var(--primary-color); margin-bottom:10px;">Finale Start-Allokation</div>
         <div class="form-grid-three-col">
-            <div class="form-group"><label>Depot (Aktien)</label><span class="calculated-display" style="background-color: #e0f7fa;">${formatCurrency(inputs.depotwertAlt + depotwertNeu)}</span></div>
-            <div class="form-group"><label>Depot (Gold)</label><span class="calculated-display" style="background-color: #fff9c4;">${formatCurrency(zielwertGold)}</span></div>
-            <div class="form-group"><label>Liquidität</label><span class="calculated-display" style="background-color: #e8f5e9;">${formatCurrency(inputs.zielLiquiditaet)}</span></div>
+            <div class="form-group"><label>Depot (Aktien)</label><span class="calculated-display" style="background-color: #e0f7fa;">${formatCurrency(displayDepotwertAlt + displayDepotwertNeu)}</span></div>
+            <div class="form-group"><label>Depot (Gold)</label><span class="calculated-display" style="background-color: #fff9c4;">${formatCurrency(displayGoldWert)}</span></div>
+            <div class="form-group"><label>Liquiditд</label><span class="calculated-display" style="background-color: #e8f5e9;">${formatCurrency(displayTagesgeld + displayGeldmarkt)}</span></div>
         </div>
-        <div style="font-size: 0.8rem; text-align: center; margin-top: 10px; color: #555;">Aufteilung: Depot Alt (${formatCurrency(inputs.depotwertAlt)}) + Depot Neu (${formatCurrency(depotwertNeu)})</div>`;
+        <div style="font-size: 0.8rem; text-align: center; margin-top: 10px; color: #555;">Aufteilung: Depot Alt (${formatCurrency(displayDepotwertAlt)}) + Depot Neu (${formatCurrency(displayDepotwertNeu)})</div>`;
     document.getElementById('displayPortfolioBreakdown').innerHTML = breakdownHtml;
-    document.getElementById('goldStrategyPanel').style.display = inputs.goldAktiv ? 'block' : 'none';
+    document.getElementById('goldStrategyPanel').style.display = showGoldPanel ? 'block' : 'none';
 }
 
 /**
- * Initialisiert das Portfolio mit Tranchen
+ * Initialisiert das Portfolio mit detaillierten Tranchen (erweiterte Logik)
+ * Unterstützt mehrere individuelle Positionen mit FIFO-Tracking
  */
-export function initializePortfolio(inputs) {
+export function initializePortfolioDetailed(inputs) {
     let depotTranchesAktien = [];
     let depotTranchesGold = [];
+    let depotTranchesGeldmarkt = [];
 
+    // Falls detaillierte Tranchen in inputs vorhanden sind, diese verwenden
+    if (inputs.detailledTranches && Array.isArray(inputs.detailledTranches)) {
+        // Sortiere nach Kaufdatum (FIFO)
+        const sortedTranches = [...inputs.detailledTranches].sort((a, b) => {
+            const dateA = a.purchaseDate ? new Date(a.purchaseDate) : new Date('1900-01-01');
+            const dateB = b.purchaseDate ? new Date(b.purchaseDate) : new Date('1900-01-01');
+            return dateA - dateB;
+        });
+
+        for (const tranche of sortedTranches) {
+            const trancheObj = {
+                trancheId: tranche.trancheId || tranche.id || null,
+                name: tranche.name || 'Unbekannt',
+                isin: tranche.isin || '',
+                shares: Number(tranche.shares) || 0,
+                purchasePrice: Number(tranche.purchasePrice) || 0,
+                purchaseDate: tranche.purchaseDate || null,
+                currentPrice: Number(tranche.currentPrice) || 0,
+                marketValue: (Number(tranche.shares) || 0) * (Number(tranche.currentPrice) || 0),
+                costBasis: (Number(tranche.shares) || 0) * (Number(tranche.purchasePrice) || 0),
+                tqf: Number(tranche.tqf) ?? 0.30,
+                type: tranche.type || 'aktien_alt',
+                category: tranche.category || 'equity'
+            };
+
+            // Kategorisierung
+            if (trancheObj.category === 'equity') {
+                depotTranchesAktien.push(trancheObj);
+            } else if (trancheObj.category === 'gold') {
+                depotTranchesGold.push(trancheObj);
+            } else if (trancheObj.category === 'money_market') {
+                depotTranchesGeldmarkt.push(trancheObj);
+            }
+        }
+    }
+
+    // Fallback auf alte Logik, wenn keine detaillierten Tranchen vorhanden
+    if (depotTranchesAktien.length === 0) {
+        const startLiquiditaet = (inputs.tagesgeld || 0) + (inputs.geldmarktEtf || 0);
+        const flexiblesVermoegen = Math.max(0, inputs.startVermoegen - inputs.depotwertAlt);
+        const investitionsKapitalNeu = Math.max(0, flexiblesVermoegen - startLiquiditaet);
+        const investitionsKapitalGesamt = inputs.depotwertAlt + investitionsKapitalNeu;
+        const zielwertGold = inputs.goldAktiv ? investitionsKapitalGesamt * (inputs.goldZielProzent / 100) : 0;
+        const depotwertNeu = Math.max(0, investitionsKapitalNeu - zielwertGold);
+
+        if (inputs.depotwertAlt > 1) {
+            depotTranchesAktien.push({
+                marketValue: inputs.depotwertAlt,
+                costBasis: inputs.einstandAlt,
+                tqf: 0.30,
+                type: 'aktien_alt',
+                name: 'Altbestand (aggregiert)',
+                purchaseDate: null
+            });
+        }
+        if (depotwertNeu > 1) {
+            depotTranchesAktien.push({
+                marketValue: depotwertNeu,
+                costBasis: depotwertNeu,
+                tqf: 0.30,
+                type: 'aktien_neu',
+                name: 'Neubestand (aggregiert)',
+                purchaseDate: null
+            });
+        }
+        if (inputs.geldmarktEtf > 1) {
+            depotTranchesGeldmarkt.push({
+                marketValue: inputs.geldmarktEtf,
+                costBasis: inputs.geldmarktEtf,
+                tqf: 0,
+                type: 'geldmarkt',
+                name: 'Geldmarkt',
+                purchaseDate: null
+            });
+        }
+        if (zielwertGold > 1) {
+            depotTranchesGold.push({
+                marketValue: zielwertGold,
+                costBasis: zielwertGold,
+                tqf: inputs.goldSteuerfrei ? 1.0 : 0.0,
+                type: 'gold',
+                name: 'Gold',
+                purchaseDate: null
+            });
+        }
+    }
+
+    const geldmarktSum = depotTranchesGeldmarkt.reduce((sum, t) => sum + (Number(t.marketValue) || 0), 0);
+    const geldmarktEtf = geldmarktSum > 0 ? geldmarktSum : (inputs.geldmarktEtf || 0);
+    const tagesgeld = inputs.tagesgeld || 0;
+
+    return {
+        depotTranchesAktien: [...depotTranchesAktien],
+        depotTranchesGold: [...depotTranchesGold],
+        depotTranchesGeldmarkt: [...depotTranchesGeldmarkt],
+        liquiditaet: tagesgeld + geldmarktEtf,
+        tagesgeld,
+        geldmarktEtf
+    };
+}
+
+/**
+ * Initialisiert das Portfolio mit Tranchen (Legacy-Kompatibilität)
+ */
+export function initializePortfolio(inputs) {
+    // Falls detaillierte Tranchen vorhanden, nutze erweiterte Funktion
+    if (inputs.detailledTranches && Array.isArray(inputs.detailledTranches)) {
+        return initializePortfolioDetailed(inputs);
+    }
+
+    // Sonst alte Logik
+    let depotTranchesAktien = [];
+    let depotTranchesGold = [];
+    let depotTranchesGeldmarkt = [];
+
+    const startLiquiditaet = (inputs.tagesgeld || 0) + (inputs.geldmarktEtf || 0);
     const flexiblesVermoegen = Math.max(0, inputs.startVermoegen - inputs.depotwertAlt);
-    const investitionsKapitalNeu = Math.max(0, flexiblesVermoegen - inputs.zielLiquiditaet);
+    const investitionsKapitalNeu = Math.max(0, flexiblesVermoegen - startLiquiditaet);
     const investitionsKapitalGesamt = inputs.depotwertAlt + investitionsKapitalNeu;
     const zielwertGold = inputs.goldAktiv ? investitionsKapitalGesamt * (inputs.goldZielProzent / 100) : 0;
     const depotwertNeu = Math.max(0, investitionsKapitalNeu - zielwertGold);
@@ -247,6 +436,9 @@ export function initializePortfolio(inputs) {
     if (depotwertNeu > 1) {
         depotTranchesAktien.push({ marketValue: depotwertNeu, costBasis: depotwertNeu, tqf: 0.30, type: 'aktien_neu' });
     }
+    if (inputs.geldmarktEtf > 1) {
+        depotTranchesGeldmarkt.push({ marketValue: inputs.geldmarktEtf, costBasis: inputs.geldmarktEtf, tqf: 0, type: 'geldmarkt' });
+    }
     if (zielwertGold > 1) {
         depotTranchesGold.push({ marketValue: zielwertGold, costBasis: zielwertGold, tqf: inputs.goldSteuerfrei ? 1.0 : 0.0, type: 'gold' });
     }
@@ -254,7 +446,10 @@ export function initializePortfolio(inputs) {
     return {
         depotTranchesAktien: [...depotTranchesAktien],
         depotTranchesGold: [...depotTranchesGold],
-        liquiditaet: inputs.zielLiquiditaet
+        depotTranchesGeldmarkt: [...depotTranchesGeldmarkt],
+        liquiditaet: (inputs.tagesgeld || 0) + (inputs.geldmarktEtf || 0),
+        tagesgeld: inputs.tagesgeld || 0,
+        geldmarktEtf: inputs.geldmarktEtf || 0
     };
 }
 
@@ -460,14 +655,95 @@ export function applyStressOverride(yearData, stressCtx, rand) {
 }
 
 /**
+ * Sortiert Tranchen nach FIFO-Prinzip (First In, First Out)
+ * Älteste Käufe (nach Datum) werden zuerst verkauft (gesetzlich vorgeschrieben)
+ */
+export function sortTranchesFIFO(tranches) {
+    return [...tranches].sort((a, b) => {
+        const dateA = a.purchaseDate ? new Date(a.purchaseDate) : new Date('1900-01-01');
+        const dateB = b.purchaseDate ? new Date(b.purchaseDate) : new Date('1900-01-01');
+        return dateA - dateB;
+    });
+}
+
+/**
+ * Sortiert Tranchen nach steuerlicher Effizienz (niedrigste Steuerlast zuerst)
+ * Berücksichtigt Gewinnquote und Teilfreistellung
+ */
+export function sortTranchesTaxOptimized(tranches) {
+    return [...tranches].sort((a, b) => {
+        const gqA = a.marketValue > 0 ? Math.max(0, (a.marketValue - a.costBasis) / a.marketValue) : 0;
+        const gqB = b.marketValue > 0 ? Math.max(0, (b.marketValue - b.costBasis) / b.marketValue) : 0;
+        const taxLoadA = gqA * (1 - (a.tqf || 0));
+        const taxLoadB = gqB * (1 - (b.tqf || 0));
+        return taxLoadA - taxLoadB;
+    });
+}
+
+/**
+ * Berechnet die Gesamtsteuer für einen hypothetischen Verkauf einer Tranche
+ * @param {object} tranche - Die zu verkaufende Tranche
+ * @param {number} sellAmount - Verkaufsbetrag (Marktwert)
+ * @param {number} sparerPauschbetrag - Verfügbarer Sparer-Pauschbetrag
+ * @param {number} kirchensteuerSatz - Kirchensteuersatz (z.B. 0.09 für 9%)
+ * @returns {{steuer: number, netto: number, pauschbetragUsed: number}}
+ */
+export function calculateTrancheTax(tranche, sellAmount, sparerPauschbetrag, kirchensteuerSatz) {
+    const keSt = 0.25 * (1 + 0.055 + (kirchensteuerSatz || 0));
+
+    const marketValue = tranche.marketValue || 0;
+    const costBasis = tranche.costBasis || 0;
+    const tqf = tranche.tqf || 0;
+
+    if (marketValue <= 0 || sellAmount <= 0) {
+        return { steuer: 0, netto: sellAmount, pauschbetragUsed: 0 };
+    }
+
+    // Gewinnquote berechnen
+    const gewinnQuote = Math.max(0, (marketValue - costBasis) / marketValue);
+
+    // Bruttogewinn für den Verkaufsbetrag
+    const bruttogewinn = sellAmount * gewinnQuote;
+
+    // Teilfreistellung anwenden
+    const gewinnNachTFS = bruttogewinn * (1 - tqf);
+
+    // Sparer-Pauschbetrag anwenden
+    const anrechenbarerPauschbetrag = Math.min(sparerPauschbetrag, gewinnNachTFS);
+    const finaleSteuerbasis = Math.max(0, gewinnNachTFS - anrechenbarerPauschbetrag);
+
+    // Steuer berechnen
+    const steuer = finaleSteuerbasis * keSt;
+    const netto = sellAmount - steuer;
+
+    return {
+        steuer: steuer,
+        netto: netto,
+        pauschbetragUsed: anrechenbarerPauschbetrag
+    };
+}
+
+/**
  * Wendet Verkaufsergebnis auf Portfolio an
  */
 export function applySaleToPortfolio(portfolio, saleResult) {
     if (!saleResult || !saleResult.breakdown) return;
+
+    const findTrancheById = (trancheId) => {
+        if (!trancheId) return null;
+        const byId = (arr) => Array.isArray(arr) ? arr.find(t => t.trancheId === trancheId) : null;
+        return byId(portfolio.depotTranchesAktien)
+            || byId(portfolio.depotTranchesGold)
+            || byId(portfolio.depotTranchesGeldmarkt);
+    };
+
     saleResult.breakdown.forEach(saleItem => {
         if (!saleItem.kind || saleItem.kind === 'liquiditaet') return; // Skip liquidity or invalid items
-        const tranches = saleItem.kind.startsWith('aktien') ? portfolio.depotTranchesAktien : portfolio.depotTranchesGold;
-        const tranche = tranches.find(t => t.type === saleItem.kind);
+        let tranche = findTrancheById(saleItem.trancheId);
+        if (!tranche) {
+            const tranches = saleItem.kind.startsWith('aktien') ? portfolio.depotTranchesAktien : portfolio.depotTranchesGold;
+            tranche = tranches.find(t => t.type === saleItem.kind);
+        }
         if (tranche) {
             const reduction = Math.min(saleItem.brutto, tranche.marketValue);
             const reductionRatio = tranche.marketValue > 0 ? reduction / tranche.marketValue : 0;
@@ -505,13 +781,29 @@ export function summarizeSalesByAsset(saleResult) {
  * Konvertiert Portfolio-Status zurück in Input-Kontext
  */
 export function buildInputsCtxFromPortfolio(inputs, portfolio, { pensionAnnual, marketData }) {
-    const aktAlt = portfolio.depotTranchesAktien.find(t => t.type === 'aktien_alt') || { marketValue: 0, costBasis: 0 };
-    const aktNeu = portfolio.depotTranchesAktien.find(t => t.type === 'aktien_neu') || { marketValue: 0, costBasis: 0 };
-    const gTr = portfolio.depotTranchesGold.find(t => t.type === 'gold') || { marketValue: 0, costBasis: 0 };
+    const sumByType = (arr, type) => {
+        const list = Array.isArray(arr) ? arr : [];
+        return list.reduce((acc, t) => {
+            if (t.type === type) {
+                acc.marketValue += Number(t.marketValue) || 0;
+                acc.costBasis += Number(t.costBasis) || 0;
+            }
+            return acc;
+        }, { marketValue: 0, costBasis: 0 });
+    };
+
+    const aktAlt = sumByType(portfolio.depotTranchesAktien, 'aktien_alt');
+    const aktNeu = sumByType(portfolio.depotTranchesAktien, 'aktien_neu');
+    const gTr = sumByType(portfolio.depotTranchesGold, 'gold');
+
+    const gmm = sumByType(portfolio.depotTranchesGeldmarkt, 'geldmarkt');
+    const geldmarktEtf = Number(portfolio.geldmarktEtf) || gmm.marketValue || 0;
+    const tagesgeld = Number(portfolio.tagesgeld) || Math.max(0, (portfolio.liquiditaet || 0) - geldmarktEtf);
 
     return {
         ...inputs,
-        tagesgeld: portfolio.liquiditaet, geldmarktEtf: 0,
+        tagesgeld,
+        geldmarktEtf,
         depotwertAlt: aktAlt.marketValue, costBasisAlt: aktAlt.costBasis, tqfAlt: 0.30,
         depotwertNeu: aktNeu.marketValue, costBasisNeu: aktNeu.costBasis, tqfNeu: 0.30,
         goldWert: gTr.marketValue, goldCost: gTr.costBasis,

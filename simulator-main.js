@@ -47,6 +47,7 @@ import { simulateOneYear } from './simulator-engine-wrapper.js';
 import { quantile, sum, mean, formatCurrency } from './simulator-utils.js';
 import { getStartYearCandidates } from './cape-utils.js';
 import { ENGINE_VERSION, STRESS_PRESETS, BREAK_ON_RUIN, MORTALITY_TABLE, annualData, SUPPORTED_PFLEGE_GRADES } from './simulator-data.js';
+import { initTranchenStatus } from './depot-tranchen-status.js';
 import {
     getCommonInputs,
     updateStartPortfolioDisplay,
@@ -127,7 +128,7 @@ window.onload = function () {
     updateStartPortfolioDisplay();
 
     const allInputs = [
-        'simStartVermoegen', 'depotwertAlt', 'zielLiquiditaet',
+        'simStartVermoegen', 'depotwertAlt', 'tagesgeld', 'geldmarktEtf',
         'goldAllokationAktiv', 'goldAllokationProzent', 'goldFloorProzent', 'rebalancingBand',
         'goldSteuerfrei', 'startFloorBedarf', 'startFlexBedarf',
         'einstandAlt', 'p1StartAlter', 'p1Geschlecht', 'p1SparerPauschbetrag', 'p1KirchensteuerPct',
@@ -443,6 +444,10 @@ window.onload = function () {
 
     // Reset-Button Initialisierung
     initResetButton();
+
+    // Depot-Tranchen Status Badge
+    // Zeigt Status der geladenen detaillierten Tranchen an
+    initTranchenStatus('tranchenStatusBadge');
 
     // Initial calculation on load is handled by individual tabs
     // Monte Carlo, Backtest, Sweep, and Auto-Optimize have their own trigger buttons

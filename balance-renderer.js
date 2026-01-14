@@ -360,7 +360,7 @@ class ActionRenderer {
 
         if (uiAction.type === 'TRANSACTION') {
             // Strukturierter Aufbau der Handlungskarte.
-            this._buildTransactionContent(uiAction, content);
+            this._buildTransactionContent(uiAction, content, input, spending, targetLiquidity);
         } else if (uiAction.title) {
             content.textContent = uiAction.title;
         }
@@ -425,6 +425,41 @@ class ActionRenderer {
         return action;
     }
 
+    _resolveZielTagesgeld(spending, targetLiquidity) {
+        const annualWithdrawal = (typeof spending?.monatlicheEntnahme === 'number' && isFinite(spending.monatlicheEntnahme))
+            ? spending.monatlicheEntnahme * 12
+            : null;
+        const monthlyWithdrawal = (typeof spending?.monatlicheEntnahme === 'number' && isFinite(spending.monatlicheEntnahme))
+            ? spending.monatlicheEntnahme
+            : null;
+        if (typeof annualWithdrawal === 'number' && isFinite(annualWithdrawal)) {
+            return annualWithdrawal + ((monthlyWithdrawal || 0) * 2);
+        }
+        return (typeof targetLiquidity === 'number' && isFinite(targetLiquidity)) ? targetLiquidity : 0;
+    }
+
+    _splitLiquiditySource(input, action, spending, targetLiquidity) {
+        if (!input || typeof input.tagesgeld !== 'number' || typeof input.geldmarktEtf !== 'number') {
+            return null;
+        }
+        const zielTagesgeld = this._resolveZielTagesgeld(spending, targetLiquidity);
+        const liquidityOutflow = (Array.isArray(action?.quellen) ? action.quellen : [])
+            .filter(q => q.kind === 'liquiditaet' || q.source === 'Liquidität')
+            .reduce((sum, q) => sum + (q.brutto || 0), 0);
+        if (!isFinite(liquidityOutflow) || liquidityOutflow <= 0) {
+            return null;
+        }
+        const availableFromTagesgeld = Math.max(0, input.tagesgeld - zielTagesgeld);
+        const fromTagesgeld = Math.min(liquidityOutflow, availableFromTagesgeld);
+        const fromGeldmarkt = Math.max(0, liquidityOutflow - fromTagesgeld);
+        return {
+            zielTagesgeld,
+            fromTagesgeld,
+            fromGeldmarkt,
+            totalOutflow: liquidityOutflow
+        };
+    }
+
     // Removed determineInternalCashRebalance logic as it was replaced in previous steps? 
     // Wait, the previous tool call modified determineInternalCashRebalance. 
     // I should NOT replace that method here, but I AM replacing renderAction and buildInternalRebalance.
@@ -454,38 +489,26 @@ class ActionRenderer {
             return null;
         }
 
-        const annualWithdrawal = (typeof spending.monatlicheEntnahme === 'number' && isFinite(spending.monatlicheEntnahme))
-            ? spending.monatlicheEntnahme * 12
-            : null;
 
-        // FIX: Use Engine's target liquidity if available, otherwise fallback to annual withdrawal
-        const zielTagesgeld = (typeof targetLiquidity === 'number' && isFinite(targetLiquidity))
-            ? targetLiquidity
-            : (annualWithdrawal || 0);
+        const zielTagesgeld = this._resolveZielTagesgeld(spending, targetLiquidity);
 
         if (!isFinite(zielTagesgeld)) {
             // console.warn('ActionRenderer.determineInternalCashRebalance: Kein Ziel-Tagesgeld ermittelbar.');
             return null;
         }
 
-        // Fix: Subtract liquidity used as source (Surplus Investing)
-        const liquidityOutflow = (Array.isArray(action.quellen) ? action.quellen : [])
-            .filter(q => q.kind === 'liquiditaet' || q.source === 'Liquidität')
-            .reduce((sum, q) => sum + (q.brutto || 0), 0);
-
-        const liqNachTransaktion = (input.tagesgeld + input.geldmarktEtf)
-            - liquidityOutflow
-            + (action.verwendungen?.liquiditaet || 0);
-
-        if (!isFinite(liqNachTransaktion)) {
-            return null;
-        }
-
-        // Adjusted calculation for proper diff
-        const tagesgeldVorTransaktion = input.tagesgeld - liquidityOutflow; // Assuming outflow comes from Tagesgeld first
+        const split = this._splitLiquiditySource(input, action, spending, targetLiquidity) || {
+            zielTagesgeld,
+            fromTagesgeld: 0,
+            fromGeldmarkt: 0,
+            totalOutflow: 0
+        };
         const liqZufluss = (action.verwendungen?.liquiditaet || 0); // Money coming IN from sales
 
-        const virtualTagesgeld = input.tagesgeld - liquidityOutflow + liqZufluss;
+        const tagesgeldAfterOutflow = input.tagesgeld - split.fromTagesgeld;
+        const gapToTarget = Math.max(0, zielTagesgeld - tagesgeldAfterOutflow);
+        const inflowToTagesgeld = Math.min(liqZufluss, gapToTarget);
+        const virtualTagesgeld = tagesgeldAfterOutflow + inflowToTagesgeld;
         const diff = virtualTagesgeld - zielTagesgeld; // positive = excess, negative = need refill
 
         const schwelle = UIUtils.getThreshold('THRESHOLDS.STRATEGY.cashRebalanceThreshold', 2500);
@@ -498,10 +521,12 @@ class ActionRenderer {
             }
         } else if (diff < -schwelle) {
             const needed = Math.abs(diff);
-            let canRefill = Math.min(needed, input.geldmarktEtf);
+            const geldmarktAfterOutflow = input.geldmarktEtf - split.fromGeldmarkt + (liqZufluss - inflowToTagesgeld);
+            let canRefill = Math.min(needed, geldmarktAfterOutflow);
 
-            // Only quantize if significantly large
-            canRefill = this._quantize(canRefill);
+            // Only quantize if significantly large (floor to avoid overdraw)
+            canRefill = this._quantize(canRefill, 'floor');
+            canRefill = Math.min(canRefill, geldmarktAfterOutflow);
 
             if (canRefill > 0) {
                 return { from: 'Geldmarkt-ETF', to: 'Tagesgeld', amount: canRefill };
@@ -548,7 +573,7 @@ class ActionRenderer {
      * @param {Object} action - Handlungsempfehlung mit Quellen und Verwendungen.
      * @param {HTMLElement} content - Container, der befüllt werden soll.
      */
-    _buildTransactionContent(action, content) {
+    _buildTransactionContent(action, content, input, spending, targetLiquidity) {
         const title = document.createElement('strong');
         title.style.cssText = 'display: block; font-size: 1.1rem; margin-bottom: 8px; text-align:center;';
         title.textContent = action.title;
@@ -587,17 +612,48 @@ class ActionRenderer {
             'gold': 'Gold',
             'aktien_neu': 'Aktien (neu)',
             'aktien_alt': 'Aktien (alt)',
-            'liquiditaet': 'Liquidität (Tagesgeld)',
+            'liquiditaet': 'Liquidität (Cash)',
             'geldmarkt': 'Geldmarkt-ETF'
         };
+
+        const buildQuelleLabel = (q) => {
+            const base = quellenMap[q.kind] || q.kind || 'Quelle';
+            const infoParts = [];
+            if (q.name) infoParts.push(q.name);
+            if (!infoParts.length) return `- ${base}`;
+            return `- ${base} - ${infoParts.join(', ')}`;
+        };
         const quellenList = Array.isArray(action.quellen) ? action.quellen : [];
-        const quellenItems = quellenList.map(q => createRow(`- ${quellenMap[q.kind] || q.kind || 'Quelle'}`, UIUtils.formatCurrency(q.brutto || 0)));
+        const split = this._splitLiquiditySource(input, action, spending, targetLiquidity);
+        const quellenItems = [];
+        quellenList.forEach(q => {
+            if (q.kind === 'liquiditaet' && split && split.totalOutflow > 0) {
+                if (split.fromTagesgeld > 0) {
+                    quellenItems.push(createRow('- Tagesgeld', UIUtils.formatCurrency(split.fromTagesgeld)));
+                }
+                if (split.fromGeldmarkt > 0) {
+                    quellenItems.push(createRow('- Geldmarkt-ETF', UIUtils.formatCurrency(split.fromGeldmarkt)));
+                }
+                return;
+            }
+            quellenItems.push(createRow(buildQuelleLabel(q), UIUtils.formatCurrency(q.brutto || 0)));
+        });
         const steuerRow = createRow('- Steuern (geschätzt)', UIUtils.formatCurrency(action.steuer || 0));
         steuerRow.style.cssText += 'border-top: 1px solid var(--border-color); margin-top: 5px; padding-top: 5px;';
         quellenItems.push(steuerRow);
 
         const verwendungenItems = [];
-        if (action.verwendungen?.liquiditaet > 0) verwendungenItems.push(createRow('Zufluss Liquidität:', UIUtils.formatCurrency(action.verwendungen.liquiditaet)));
+        const annualWithdrawal = (typeof action?.spending?.monatlicheEntnahme === 'number' && isFinite(action.spending.monatlicheEntnahme))
+            ? action.spending.monatlicheEntnahme * 12
+            : null;
+        if (annualWithdrawal) {
+            const zielTagesgeld = annualWithdrawal + (action.spending.monatlicheEntnahme * 2);
+            verwendungenItems.push(createRow('Ziel Tagesgeld (Jahr + 2 Monate):', UIUtils.formatCurrency(zielTagesgeld)));
+        }
+        const minVisibleUse = 1000;
+        if (action.verwendungen?.liquiditaet > minVisibleUse) {
+            verwendungenItems.push(createRow('Zufluss Liquidität:', UIUtils.formatCurrency(action.verwendungen.liquiditaet)));
+        }
         if (action.verwendungen?.gold > 0) verwendungenItems.push(createRow('Kauf von Gold:', UIUtils.formatCurrency(action.verwendungen.gold)));
         if (action.verwendungen?.aktien > 0) verwendungenItems.push(createRow('Kauf von Aktien:', UIUtils.formatCurrency(action.verwendungen.aktien)));
         if (action.verwendungen?.geldmarkt > 0) verwendungenItems.push(createRow('Kauf von Geldmarkt-ETF:', UIUtils.formatCurrency(action.verwendungen.geldmarkt)));
@@ -897,6 +953,28 @@ Quelle: ${runwaySourceInfo.description}`;
 
         thresholdCards.forEach(card => fragment.appendChild(card));
 
+        if (Array.isArray(transactionDiag.selectedTranches) && transactionDiag.selectedTranches.length > 0) {
+            const rows = transactionDiag.selectedTranches.map(item => {
+                const labelParts = [];
+                if (item.name) labelParts.push(item.name);
+                labelParts.push(item.kind || 'Tranche');
+                const taxPct = (typeof item.taxPerEuro === 'number' && isFinite(item.taxPerEuro))
+                    ? `${(item.taxPerEuro * 100).toFixed(2)}%`
+                    : '0.00%';
+                const taxVal = UIUtils.formatCurrency(item.steuer || 0);
+                const bruttoVal = UIUtils.formatCurrency(item.brutto || 0);
+                return {
+                    label: labelParts.filter(Boolean).join(' / '),
+                    value: `Steuer/€ ${taxPct} | Brutto ${bruttoVal} | Steuer ${taxVal}`
+                };
+            });
+            fragment.appendChild(this._createTransactionCard({
+                title: 'Tranchenauswahl (Steuerlast)',
+                subtitle: 'Geringste Steuerlast zuerst',
+                rows
+            }, 'info'));
+        }
+
         return fragment;
     }
 
@@ -1070,6 +1148,13 @@ Quelle: ${runwaySourceInfo.description}`;
             const sign = value > 0 ? '+' : '';
             return `${prefixPlus ? sign : ''}${(value * 100).toFixed(fractionDigits)}%`;
         };
+        const formatPercentFromPct = (value, { fractionDigits = 1, prefixPlus = false } = {}) => {
+            if (typeof value !== 'number' || !isFinite(value)) {
+                return null;
+            }
+            const sign = value > 0 ? '+' : '';
+            return `${prefixPlus ? sign : ''}${value.toFixed(fractionDigits)}%`;
+        };
 
         const formatCurrencySafe = (value) => {
             if (typeof value !== 'number' || !isFinite(value)) {
@@ -1116,7 +1201,7 @@ Quelle: ${runwaySourceInfo.description}`;
         }
 
         const inflationPercent = (typeof params.cumulativeInflationFactor === 'number' && isFinite(params.cumulativeInflationFactor))
-            ? ((params.cumulativeInflationFactor - 1) * 100)
+            ? (params.cumulativeInflationFactor - 1)
             : null;
         const formattedInflation = formatPercent(inflationPercent, { prefixPlus: true });
         if (formattedInflation) {
@@ -1130,7 +1215,7 @@ Quelle: ${runwaySourceInfo.description}`;
         if (typeof params.aktuelleFlexRate === 'number' && isFinite(params.aktuelleFlexRate)) {
             pushMetric({
                 label: 'Effektive Flex-Rate',
-                value: formatPercent(params.aktuelleFlexRate, { fractionDigits: 1 }),
+                value: formatPercentFromPct(params.aktuelleFlexRate, { fractionDigits: 1 }),
                 meta: 'Geplante Entnahmedynamik'
             });
         }
@@ -1139,7 +1224,7 @@ Quelle: ${runwaySourceInfo.description}`;
             const trend = params.kuerzungProzent > 0 ? 'down' : params.kuerzungProzent < 0 ? 'up' : 'neutral';
             pushMetric({
                 label: 'Kürzung ggü. Flex-Bedarf',
-                value: formatPercent(params.kuerzungProzent, { fractionDigits: 1 }),
+                value: formatPercentFromPct(params.kuerzungProzent, { fractionDigits: 1 }),
                 meta: 'Abweichung zum Soll',
                 trend
             });
