@@ -1,0 +1,1383 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ruhestandsmodell-Simulator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="simulator.css">
+    <style>
+        .debug-actions {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem
+        }
+
+        .btn-debug {
+            font-size: .8rem;
+            padding: .25rem .5rem;
+            border-radius: .5rem;
+            border: 1px solid #3b82f6;
+            background: transparent;
+            color: #1f3b8f;
+            cursor: pointer
+        }
+
+        .btn-debug:hover {
+            background: #eaf2ff
+        }
+
+        .dev-only {
+            display: none
+        }
+
+        .dev-on .dev-only {
+            display: block
+        }
+
+        .debug-link {
+            font-size: .8rem;
+            padding: .1rem .3rem;
+            border: 1px solid #d6e6ff;
+            border-radius: .4rem;
+            color: #3b82f6;
+            text-decoration: none
+        }
+
+        .debug-link:hover {
+            background: #f3f8ff
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between
+        }
+
+        /* Log Export Buttons - wie toggle-btn */
+        .log-export-buttons {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        .log-export-buttons button {
+            padding: 4px 10px;
+            font-size: 0.75rem;
+            border: 1px solid #9ca3af;
+            background-color: #f0f0f0;
+            color: #000000 !important;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: auto !important;
+            min-width: 0 !important;
+            flex: 0 0 auto !important;
+        }
+
+        .log-export-buttons button:hover {
+            border-color: var(--secondary-color, #9ca3af);
+            background-color: #e5e5e5;
+        }
+
+        /* Auto-Optimize Preset Buttons */
+        .ao-preset-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-color: var(--secondary-color) !important;
+        }
+
+        .ao-preset-btn:active {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="main-layout">
+        <div class="panel">
+            <div class="section-title">
+                <h1>Ruhestand-Simulator</h1>
+                <div style="display: flex; gap: 10px;">
+                    <a href="index.html" class="nav-button"
+                        style="text-decoration: none; font-size: 1rem; color: var(--primary-color); display: flex; align-items: center; gap: 5px; background: #e0f2fe; padding: 5px 10px; border-radius: 8px; border: 1px solid #bae6fd;">
+                        🏠 Startseite
+                    </a>
+                    <a href="Handbuch.html" target="_blank"
+                        style="text-decoration: none; font-size: 1rem; color: var(--primary-color); display: flex; align-items: center; gap: 5px; background: #f0f0f0; padding: 5px 10px; border-radius: 8px;">📖
+                        Hilfe</a>
+                </div>
+            </div>
+
+            <!-- Mode Toggle -->
+            <div class="mode-toggle-container"><label class="mode-toggle"><span class="mode-label">🎯
+                        Einfach</span><input type="checkbox" id="modeToggle" class="mode-toggle-input"><span
+                        class="mode-toggle-slider"></span><span class="mode-label">🔧 Fortgeschritten</span></label>
+            </div>
+            <div class="tab-buttons"><button class="tab-btn active" data-tab="rahmendaten">Rahmendaten</button><button
+                    class="tab-btn" data-tab="montecarlo">Monte-Carlo</button><button class="tab-btn advanced-only"
+                    data-tab="backtesting">Backtesting</button><button class="tab-btn advanced-only"
+                    data-tab="sweep">Parameter-Sweep</button></div>
+            <div class="tab-content">
+                <div id="tab-rahmendaten" class="tab-panel active">
+                    <fieldset class="collapsible" data-fieldset="portfolio">
+                        <legend><span class="section-icon">💰</span>Startportfolio & Bedarf<span
+                                class="progress-indicator"></span></legend>
+                        <div class="fieldset-content">
+                            <div class="form-grid">
+                                <div class="form-group"><label for="simStartVermoegen">Gesamtvermögen (€)</label><input
+                                        type="number" id="simStartVermoegen" placeholder="0" readonly
+                                        title="Wird automatisch aus Depot + Gold + Tagesgeld + Geldmarkt berechnet">
+                                </div>
+                                <div class="form-group"><label for="depotwertAlt">Depotwert Alt (€)</label><input
+                                        type="number" id="depotwertAlt" placeholder="0"
+                                        title="Aktueller Wert Ihres 'alten' Depots (typischerweise vor 2018 angelegt, höhere Teilfreistellung)">
+                                </div>
+                                <div class="form-group"><label for="tagesgeld">Tagesgeld (€)</label><input
+                                        type="number" id="tagesgeld" placeholder="0"
+                                        title="Startbestand Tagesgeld - wird in die Liquidität der Simulation einbezogen"></div>
+                                <div class="form-group"><label for="geldmarktEtf">Geldmarkt-ETF (€)</label><input
+                                        type="number" id="geldmarktEtf" placeholder="0"
+                                        title="Startbestand Geldmarkt-ETF - wird in die Liquidität der Simulation einbezogen"></div>
+                            </div>
+                            <div class="form-grid"
+                                style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
+                                <div class="form-group"><label for="startFloorBedarf">Floor-Bedarf p.a.
+                                        (€)</label><input type="number" id="startFloorBedarf" placeholder="0"
+                                        title="Essenzielle jährliche Ausgaben, die Sie auf jeden Fall benötigen (Miete, Essen, Versicherungen etc.)">
+                                </div>
+                                <div class="form-group"><label for="startFlexBedarf">Flex-Bedarf p.a. (€)</label><input
+                                        type="number" id="startFlexBedarf" placeholder="0"
+                                        title="Wünschenswerte jährliche Ausgaben, auf die Sie im Notfall verzichten können (Urlaub, Hobbys, Luxus)">
+                                </div>
+                                <div class="form-group"><label for="marketCapeRatio">CAPE (Shiller)</label><input
+                                        type="number" id="marketCapeRatio" value="32" step="0.1" min="0"
+                                        title="Aktuelles Shiller-CAPE (Cyclically Adjusted Price-to-Earnings Ratio) - Bewertungskennzahl für den Aktienmarkt">
+                                </div>
+                                <div class="form-group"><label for="einstandAlt">Einstand Alt (€)</label><input
+                                        type="number" id="einstandAlt" placeholder="0"
+                                        title="Ursprünglicher Einstandswert (Kaufpreis) des alten Depots - wichtig für Steuerberechnung">
+                                </div>
+                                <div class="form-group"><label>Einstand Neu (€)</label><input type="number"
+                                        id="einstandNeu" placeholder="wird berechnet" disabled
+                                        title="Ursprünglicher Einstandswert des neuen Depots - wird automatisch berechnet">
+                                </div>
+                            </div>
+                            <div id="displayPortfolioBreakdown"
+                                style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                            </div>
+                        <div id="tranchenStatusBadge"></div>
+                            <div class="tranchen-hint">
+                                Hinweis: Geladene Tranchen ueberschreiben die Depot- und Einstandsfelder.
+                            </div>
+                        </div>
+                    </fieldset>
+                    <fieldset class="collapsible advanced-only" data-fieldset="gold">
+                        <legend><span class="section-icon">🥇</span>Gold-Strategie<span
+                                class="progress-indicator"></span></legend>
+                        <div class="fieldset-content">
+                            <div class="form-group" style="justify-content: center;"><label
+                                    style="flex-direction: row; align-items: center;"><input type="checkbox"
+                                        id="goldAllokationAktiv" style="width: auto; margin-right: 8px;"
+                                        checked>Gold-Allokation aktiv </label></div>
+                            <div id="goldStrategyPanel" style="display: none;">
+                                <div class="form-grid-four-col">
+                                    <div class="form-group"><label for="goldAllokationProzent">Ziel-Allokation
+                                            (%)</label><input type="number" id="goldAllokationProzent" value="7.5"
+                                            step="1" title="Angestrebter Gold-Anteil als Prozentsatz des Gesamtdepots">
+                                    </div>
+                                    <div class="form-group"><label for="goldFloorProzent">Gold-Floor (%)</label><input
+                                            type="number" id="goldFloorProzent" value="1" step="0.5"
+                                            title="Mindest-Gold-Bestand als Prozentsatz des Gesamtvermögens"></div>
+                                    <div class="form-group"><label for="rebalancingBand">Rebalancing-Band (±
+                                            %)</label><input type="number" id="rebalancingBand" value="25" step="5"
+                                            title="Prozentuale Toleranz um die Ziel-Allokation, bevor Gold rebalanciert wird">
+                                    </div>
+                                    <div class="form-group" style="grid-column: span 2; justify-content: center;"><label
+                                            style="flex-direction: row; align-items: center;"><input type="checkbox"
+                                                id="goldSteuerfrei" style="width: auto; margin-right: 8px;"
+                                                checked>Gold-Verkäufe steuerfrei (simuliert >1J Haltefrist) </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <fieldset class="collapsible collapsed advanced-only" data-fieldset="rebalancing">
+                        <legend><span class="section-icon">⚖️</span>Runway & Rebalancing<span
+                                class="progress-indicator"></span></legend>
+                        <div class="fieldset-content">
+                            <h4 style="margin-top: 0; margin-bottom: 12px; font-size: 0.95rem;">Runway-Steuerung</h4>
+                            <div class="form-grid" style="margin-bottom: 20px;">
+                                <div class="form-group"><label for="runwayMinMonths">Runway Minimum
+                                        (Monate)</label><input type="number" id="runwayMinMonths" value="24" min="12"
+                                        max="60"
+                                        title="Absolute Mindest-Liquiditätsreichweite in Monaten - löst im Bärenmarkt Not-Verkäufe aus, wenn unterschritten">
+                                </div>
+                                <div class="form-group"><label for="runwayTargetMonths">Runway Ziel
+                                        (Monate)</label><input type="number" id="runwayTargetMonths" value="36" min="18"
+                                        max="72"
+                                        title="Angestrebte komfortable Liquiditätsreichweite in Monaten - wird in guten Marktphasen proaktiv aufgefüllt">
+                                </div>
+                            </div>
+                            <h4
+                                style="margin-bottom: 12px; font-size: 0.95rem; padding-top: 15px; border-top: 1px solid var(--border-color);">
+                                Rebalancing-Strategie</h4>
+                            <div class="form-grid-four-col">
+                                <div class="form-group"><label for="targetEq">Aktien-Zielquote (%)</label><input
+                                        type="number" id="targetEq" value="60" min="0" max="100"
+                                        title="Angestrebte prozentuale Allokation in Aktien - dient als Anker für das Rebalancing">
+                                </div>
+                                <div class="form-group"><label for="rebalBand">Rebalancing-Band (±%)</label><input
+                                        type="number" id="rebalBand" value="5" min="1" max="50"
+                                        title="Prozentuale Toleranz um die Zielquote, bevor ein Rebalancing ausgelöst wird">
+                                </div>
+                                <div class="form-group"><label for="maxSkimPctOfEq">Max. Abschöpfen p.a.
+                                        (%)</label><input type="number" id="maxSkimPctOfEq" value="10" min="0" max="100"
+                                        title="Maximal pro Jahr abzuschöpfender Betrag vom Aktiendepot (als % des Depot-Werts), um Liquidität aufzufüllen">
+                                </div>
+                                <div class="form-group"><label for="maxBearRefillPctOfEq">Max. Auffüllen (Bär)
+                                        (%)</label><input type="number" id="maxBearRefillPctOfEq" value="5" min="0"
+                                        max="100"
+                                        title="Maximal pro Jahr verkaufbarer Betrag vom Aktiendepot im Bärenmarkt (als % des Depot-Werts), um Runway-Minimum zu sichern">
+                                </div>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <fieldset class="collapsible collapsed advanced-only" data-fieldset="personen">
+                        <legend><span class="section-icon">👤</span>Personen & Rente<span
+                                class="progress-indicator"></span></legend>
+                        <div class="fieldset-content">
+                            <div class="form-grid-four-col" style="align-items: end;">
+                                <div class="form-group"> <label for="p1StartAlter">Aktuelles Alter</label> <input
+                                        type="number" id="p1StartAlter" min="50" max="110" placeholder="0"> </div>
+                                <div class="form-group"> <label for="p1Geschlecht">Geschlecht</label> <select
+                                        id="p1Geschlecht">
+                                        <option value="m" selected>Männlich</option>
+                                        <option value="w">Weiblich</option>
+                                        <option value="d">Divers</option>
+                                    </select> </div>
+                                <div class="form-group"> <label for="p1SparerPauschbetrag">Sparer-Pauschbetrag
+                                        (€)</label> <input type="number" id="p1SparerPauschbetrag" min="0" step="50"
+                                        placeholder="0"> </div>
+                                <div class="form-group"> <label for="p1KirchensteuerPct">Kirchensteuer</label>
+                                    <select id="p1KirchensteuerPct">
+                                        <option value="0">0 %</option>
+                                        <option value="8">8 %</option>
+                                        <option value="9" selected>9 %</option>
+                                    </select>
+                                </div>
+                                <div class="form-group"> <label for="p1Monatsrente">Monatliche Rente (€)</label>
+                                    <input type="number" id="p1Monatsrente" min="0" step="10" placeholder="0">
+                                </div>
+                                <div class="form-group"> <label for="p1StartInJahren">Start in … Jahren</label>
+                                    <input type="number" id="p1StartInJahren" min="0" max="120" placeholder="0">
+                                </div>
+                                <div class="form-group" style="grid-column: span 2;"><label
+                                        for="rentAdjMode">Rentenanpassung koppeln an</label><select id="rentAdjMode">
+                                        <option value="fix">Fixer Prozentsatz</option>
+                                        <option value="wage" selected>Lohnentwicklung (hist. Daten)</option>
+                                        <option value="cpi">Inflation</option>
+                                    </select></div>
+                                <div class="form-group"><label for="rentAdjPct">Rentenanpassung (% p.a.)</label><input
+                                        type="number" id="rentAdjPct" step="0.1" value="2.0"
+                                        title="Gemeinsame Rentenanpassung für beide Personen"></div>
+                                <!-- VERALTET: Alte Felder (versteckt, nur für Abwärtskompatibilität) --> <input
+                                    type="hidden" id="startAlter"> <input type="hidden" id="geschlecht"> <input
+                                    type="hidden" id="startSPB"> <input type="hidden" id="kirchensteuerSatz"> <input
+                                    type="hidden" id="renteMonatlich"> <input type="hidden" id="renteStartOffsetJahre">
+                                <div class="form-group" id="renteIndexierungsartContainer"
+                                    style="display: none; grid-column: span 2;"> <label
+                                        for="renteIndexierungsart">Rentenanpassung koppeln an</label> <select
+                                        id="renteIndexierungsart">
+                                        <option value="lohn" selected>Lohnentwicklung (hist. Daten)</option>
+                                        <option value="inflation">Inflation (VPI)</option>
+                                        <option value="fest">Festen Satz p.a.</option>
+                                    </select> </div>
+                                <div class="form-group" id="festerSatzContainer" style="display: none;"> <label
+                                        for="renteFesterSatz">Fester Satz (% p.a.)</label> <input type="number"
+                                        id="renteFesterSatz" value="2.0" step="0.1"> </div>
+                            </div>
+                            <!-- Partner/Zweite Person (Rente 2) -->
+                            <div
+                                style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
+                                <div class="form-group" style="justify-content: center; margin-bottom: 15px;">
+                                    <label style="flex-direction: row; align-items: center;"> <input type="checkbox"
+                                            id="chkPartnerAktiv" style="width: auto; margin-right: 8px;"> Partner
+                                        aktivieren (zweite Person) </label>
+                                </div>
+                                <div id="sectionRente2" style="display: none;">
+                                    <div class="form-grid-four-col">
+                                        <div class="form-group"> <label for="r2StartAlter">Startalter</label> <input
+                                                type="number" id="r2StartAlter" min="0" max="120" placeholder="0">
+                                        </div>
+                                        <div class="form-group"> <label for="r2Geschlecht">Geschlecht</label>
+                                            <select id="r2Geschlecht">
+                                                <option value="w" selected>Weiblich</option>
+                                                <option value="m">Männlich</option>
+                                                <option value="d">Divers</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group"> <label for="r2SparerPauschbetrag">Sparer-Pauschbetrag
+                                                (€)</label> <input type="number" id="r2SparerPauschbetrag" min="0"
+                                                step="50" placeholder="0">
+                                        </div>
+                                        <div class="form-group"> <label for="r2KirchensteuerPct">Kirchensteuer</label>
+                                            <select id="r2KirchensteuerPct">
+                                                <option value="0" selected>0 %</option>
+                                                <option value="8">8 %</option>
+                                                <option value="9">9 %</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group"> <label for="r2Monatsrente">Monatliche Rente
+                                                (€)</label> <input type="number" id="r2Monatsrente" min="0" step="10"
+                                                placeholder="0"> </div>
+                                        <div class="form-group"> <label for="r2StartInJahren">Start in …
+                                                Jahren</label> <input type="number" id="r2StartInJahren" min="0"
+                                                max="120" placeholder="0"> </div>
+                                        <div class="form-group"> <label for="r2Steuerquote">Steuerquote (%)</label>
+                                            <input type="number" id="r2Steuerquote" min="0" max="100" step="0.1"
+                                                value="0" title="Optionaler Pauschalsatz. 0 = keine Pauschalsteuer.">
+                                        </div>
+                                        <!-- VERALTET: Alte Felder (versteckt, nur für Abwärtskompatibilität) -->
+                                        <input type="hidden" id="r2Brutto">
+                                        <div class="form-group" id="r2AnpassungContainer" style="display: none;"> <label
+                                                for="r2Anpassung">Rentenanpassung (%
+                                                p.a.)</label> <input type="number" id="r2Anpassung" step="0.1"
+                                                value="2.0"> </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="widowPensionSection"
+                                style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
+                                <h4 style="margin-bottom: 10px;">Hinterbliebenenrente</h4>
+                                <div class="form-grid-four-col">
+                                    <div class="form-group"> <label for="widowPensionMode">Verhalten bei
+                                            Todesfall</label> <select id="widowPensionMode">
+                                            <option value="stop">Rente endet vollständig</option>
+                                            <option value="percent" selected>Witwen-/Witwerrente (Prozent)</option>
+                                        </select> </div>
+                                    <div class="form-group"> <label for="widowPensionPct">Witwenrente (%)</label>
+                                        <input type="number" id="widowPensionPct" min="0" max="100" step="5" value="55">
+                                    </div>
+                                    <div class="form-group"> <label for="widowMarriageOffsetYears">Eheschließung in
+                                            … Jahren</label> <input type="number" id="widowMarriageOffsetYears" min="0"
+                                            max="120" value="0"> </div>
+                                    <div class="form-group"> <label for="widowMinMarriageYears">Mindest-Ehedauer
+                                            (Jahre)</label> <input type="number" id="widowMinMarriageYears" min="0"
+                                            max="120" value="1"> </div>
+                                </div>
+                                <p class="form-hint" style="grid-column: span 4; margin-top: 10px;"> Hinweis: Die
+                                    Witwen-/Witwerrente wird nur gezahlt, wenn die Eheschließung erfolgt ist und die
+                                    Mindestdauer erreicht wurde. </p>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <fieldset class="collapsible collapsed" data-fieldset="ansparphase">
+                        <legend><span class="section-icon">📈</span>Ansparphase<span class="progress-indicator"></span>
+                        </legend>
+                        <div class="fieldset-content">
+                            <div class="form-group" style="justify-content: center; margin-bottom: 15px;"> <label
+                                    style="flex-direction: row; align-items: center;"> <input type="checkbox"
+                                        id="enableAccumulationPhase" style="width: auto; margin-right: 8px;">
+                                    Ansparphase aktivieren (für Personen, die noch nicht im Ruhestand sind) </label>
+                            </div>
+                            <div id="accumulationPhaseDetails" style="display: none;">
+                                <p class="form-hint" style="margin-bottom: 15px; color: var(--text-secondary);">
+                                    Simuliere eine Ansparphase vor dem Ruhestand, in der monatlich Kapital angelegt
+                                    wird. Nach der Ansparphase beginnt automatisch die Entnahmephase. </p>
+                                <div class="form-grid-four-col">
+                                    <div class="form-group"> <label for="accumulationDurationYears">Dauer Ansparphase
+                                            (Jahre)</label> <input type="number" id="accumulationDurationYears" min="1"
+                                            max="50" placeholder="0"
+                                            title="Wie viele Jahre wird noch gespart, bis der Ruhestand beginnt?">
+                                    </div>
+                                    <div class="form-group"> <label for="accumulationSparrate">Monatliche Sparrate
+                                            (€)</label> <input type="number" id="accumulationSparrate" min="0"
+                                            step="100" placeholder="0"
+                                            title="Betrag, der jeden Monat ins Portfolio eingezahlt wird"> </div>
+                                    <div class="form-group" style="grid-column: span 2;"> <label
+                                            for="sparrateIndexing">Sparraten-Anpassung</label> <select
+                                            id="sparrateIndexing">
+                                            <option value="none">Keine (konstante Sparrate)</option>
+                                            <option value="inflation" selected>Inflationsindexiert</option>
+                                            <option value="wage">Lohnindexiert</option>
+                                        </select> </div>
+                                </div>
+                                <div
+                                    style="background-color: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 15px; margin-top: 15px;">
+                                    <h4 style="margin: 0 0 10px 0; color: #0369a1; font-size: 0.95rem;">📊 Berechnete
+                                        Werte</h4>
+                                    <div class="form-grid-four-col">
+                                        <div> <label
+                                                style="font-weight: 500; font-size: 0.85rem;">Übergangsalter:</label>
+                                            <div id="transitionAgeDisplay"
+                                                style="font-size: 1.1rem; font-weight: 600; color: #0369a1;"> -- Jahre
+                                            </div>
+                                        </div>
+                                        <div> <label
+                                                style="font-weight: 500; font-size: 0.85rem;">Simulationsjahr:</label>
+                                            <div id="transitionYearDisplay"
+                                                style="font-size: 1.1rem; font-weight: 600; color: #0369a1;"> Jahr --
+                                            </div>
+                                        </div>
+                                        <div style="grid-column: span 2;"> <label
+                                                style="font-weight: 500; font-size: 0.85rem;">Gesamte Einzahlungen
+                                                (nominal):</label>
+                                            <div id="totalContributionsDisplay"
+                                                style="font-size: 1.1rem; font-weight: 600; color: #0369a1;"> -- €
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p class="form-hint" style="margin-top: 15px;"> 💡 <strong>Hinweis:</strong> Das
+                                    "Startalter" bei Person 1 ist nun das Alter zu Beginn der Ansparphase (nicht des
+                                    Ruhestands). Die Rente startet automatisch am Übergangsalter + "Start in ... Jahren"
+                                    . </p>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <fieldset class="collapsible collapsed advanced-only" data-fieldset="pflege">
+                        <legend><span class="section-icon">🏥</span>Pflegefall-Absicherung<span
+                                class="progress-indicator"></span></legend>
+                        <div class="fieldset-content">
+                            <div id="pflegePanelContainer" class="care-panel"
+                                style="border-top: none; margin-top: 0; padding-top: 0;">
+                                <div class="care-panel-toggle"> <label class="care-inline-toggle"> <input
+                                            type="checkbox" id="pflegefallLogikAktivieren" checked> Pflegefall-Logik
+                                        aktiv </label>
+                                    <p class="care-panel-subtitle">Definiere Kostenverlauf, Pflegedauer und
+                                        Mortalitätsanpassungen klar getrennt.</p>
+                                </div>
+                                <!-- Die Sektionen strukturieren die Pflegekonfiguration in überschaubare Teilbereiche
+                                    -->
+                                <div id="pflegePanel" class="care-sections">
+                                    <section class="care-section">
+                                        <div class="care-section-header">
+                                            <h4>Pflegemodell &amp;
+                                                Verlauf</h4>
+                                            <p>Lege fest,
+                                                wie lange die Pflege dauert und wie schnell der Bedarf ansteigt.
+                                            </p>
+                                        </div>
+                                        <div class="care-section-grid">
+                                            <div class="form-group"><label
+                                                    for="pflegeModellTyp">Pflegemodell-Typ</label><select
+                                                    id="pflegeModellTyp">
+                                                    <option value="chronisch" selected>Chronisch (bis Lebensende)
+                                                    </option>
+                                                    <option value="akut">Akut (begrenzte Dauer)</option>
+                                                </select></div>
+                                            <div class="form-group"><label for="pflegeRampUp">Anstiegsdauer
+                                                    (Jahre)</label><input type="number" id="pflegeRampUp" value="5">
+                                            </div>
+                                            <div id="pflegeDauerContainer" class="care-duration-group">
+                                                <div class="form-group"><label for="pflegeMinDauer">Min. Pflegedauer
+                                                        (Jahre)</label><input type="number" id="pflegeMinDauer"
+                                                        value="5" min="1" step="1"></div>
+                                                <div class="form-group"><label for="pflegeMaxDauer">Max. Pflegedauer
+                                                        (Jahre)</label><input type="number" id="pflegeMaxDauer"
+                                                        value="10" min="1" step="1"></div>
+                                            </div>
+                                        </div>
+                                    </section>
+                                    <section class="care-section">
+                                        <div class="care-section-header">
+                                            <h4>Kostenprofil &amp;
+                                                Flex</h4>
+                                            <p>Bestimme Zusatzbedarf,
+                                                Flex-Verlust und den Floor-Cap.</p>
+                                        </div>
+                                        <div class="care-section-grid care-config-grid">
+                                            <div class="form-group" style="grid-column: span 2;"><label
+                                                    for="pflegeKostenStaffelPreset">Kostenstaffel je
+                                                    Pflegegrad</label><select id="pflegeKostenStaffelPreset">
+                                                    <option value="custom" selected>Individuelle Werte</option>
+                                                    <option value="ambulant">Ambulant (ab 36 Tsd. €)</option>
+                                                    <option value="stationaer">Stationär (Premium)</option>
+                                                </select><small id="pflegeStaffelPresetHint">Wähle ein Preset,
+                                                    um typische Staffelungen zu übernehmen.</small></div>
+                                            <div class="form-group"><label for="pflegeMaxFloor">Maximaler
+                                                    Pflege-Floor (€ p.a.)</label><input type="number"
+                                                    id="pflegeMaxFloor" value="120000"></div>
+                                            <div class="form-group"><label for="pflegeRegionalZuschlag">Regionaler
+                                                    Zuschlag (%)</label><input type="number" id="pflegeRegionalZuschlag"
+                                                    value="0" step="0.5" min="0"><small>Multipliziert alle Pflegegrade
+                                                    z.&nbsp;
+                                                    B. für Metropol-Zuschläge.</small></div>
+                                            <div class="form-group"><label for="pflegeKostenDrift">Zusätzl.
+                                                    Kostenanstieg p.a. (%)</label><input type="number"
+                                                    id="pflegeKostenDrift" value="3.5" step="0.1"
+                                                    min="0"><small>Konservativer Aufschlag (Default: 3, 5&nbsp; %)
+                                                    zusätzlich zur Inflation.</small></div>
+                                        </div>
+                                        <div class="care-grade-matrix" aria-label="Einstellungen pro Pflegegrad">
+                                            <div class="care-grade-row care-grade-header">
+                                                <div>Pflegegrad</div>
+                                                <div>Zusatzbedarf (€ p.a.)</div>
+                                                <div>Flex-Level (%)</div>
+                                                <div>Max. Mortalitäts-Faktor*</div>
+                                            </div>
+                                            <div class="care-grade-row">
+                                                <div class="care-grade-label"><strong>Pflegegrad
+                                                        1</strong><small>Leichte Beeinträchtigung,
+                                                        Einstieg</small></div>
+                                                <div><input type="number" id="pflegeStufe1Zusatz" value="6000" min="0"
+                                                        step="500"></div>
+                                                <div><input type="number" id="pflegeStufe1FlexCut" value="75" min="0"
+                                                        max="100"></div>
+                                                <div><input type="number" id="pflegeStufe1Mortality" value="0" min="0"
+                                                        step="0.1"></div>
+                                            </div>
+                                            <div class="care-grade-row">
+                                                <div class="care-grade-label"><strong>Pflegegrad
+                                                        2</strong><small>Erhebliche Beeinträchtigung</small></div>
+                                                <div><input type="number" id="pflegeStufe2Zusatz" value="12000" min="0"
+                                                        step="500"></div>
+                                                <div><input type="number" id="pflegeStufe2FlexCut" value="25" min="0"
+                                                        max="100"></div>
+                                                <div><input type="number" id="pflegeStufe2Mortality" value="0" min="0"
+                                                        step="0.1"></div>
+                                            </div>
+                                            <div class="care-grade-row">
+                                                <div class="care-grade-label"><strong>Pflegegrad
+                                                        3</strong><small>Schwere Beeinträchtigung</small></div>
+                                                <div><input type="number" id="pflegeStufe3Zusatz" value="18000" min="0"
+                                                        step="500"></div>
+                                                <div><input type="number" id="pflegeStufe3FlexCut" value="10" min="0"
+                                                        max="100"></div>
+                                                <div><input type="number" id="pflegeStufe3Mortality" value="3" min="0"
+                                                        step="0.1"></div>
+                                            </div>
+                                            <div class="care-grade-row">
+                                                <div class="care-grade-label"><strong>Pflegegrad
+                                                        4</strong><small>Schwerste Beeinträchtigung</small></div>
+                                                <div><input type="number" id="pflegeStufe4Zusatz" value="32000" min="0"
+                                                        step="500"></div>
+                                                <div><input type="number" id="pflegeStufe4FlexCut" value="0" min="0"
+                                                        max="100"></div>
+                                                <div><input type="number" id="pflegeStufe4Mortality" value="5" min="0"
+                                                        step="0.1"></div>
+                                            </div>
+                                            <div class="care-grade-row">
+                                                <div class="care-grade-label"><strong>Pflegegrad
+                                                        5</strong><small>Schwerste+besondere Anforderungen</small>
+                                                </div>
+                                                <div><input type="number" id="pflegeStufe5Zusatz" value="60000" min="0"
+                                                        step="500"></div>
+                                                <div><input type="number" id="pflegeStufe5FlexCut" value="0" min="0"
+                                                        max="100"></div>
+                                                <div><input type="number" id="pflegeStufe5Mortality" value="5" min="0"
+                                                        step="0.1"></div>
+                                            </div>
+                                        </div><small class="care-grade-note">*0=keine Erhöhung,
+                                            Werte &gt;
+                                            1 multiplizieren das Basismortalitätsrisiko nach Ablauf der
+                                            Ramp-Up-Dauer. Mortalitätsfaktoren pflegestufen-spezifisch hier im Panel
+                                            einstellen.</small>
+                                    </section>
+                                </div>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <div style="margin-top: 20px; text-align: right;">
+                        <button type="button" id="resetBtn" class="btn btn-sm"
+                            style="background-color: transparent; color: var(--text-secondary); border: 1px solid var(--border-color);">
+                            Gespeicherte Werte zurücksetzen
+                        </button>
+                    </div>
+                </div>
+                <div id="tab-montecarlo" class="tab-panel">
+                    <fieldset>
+                        <legend><span class="section-icon">🎲</span>Simulationsparameter</legend>
+                        <div class="form-grid-four-col">
+                            <div class="form-group"><label for="mcAnzahl">Anzahl Simulationen</label><input
+                                    type="number" id="mcAnzahl" value="1000"
+                                    title="Wie viele verschiedene Zukunftsszenarien simuliert werden - mehr Simulationen = genauere Ergebnisse">
+                            </div>
+                            <div class="form-group"><label for="mcDauer">Maximale Dauer (Jahre)</label><input
+                                    type="number" id="mcDauer" value="35"
+                                    title="Über wie viele Jahre in die Zukunft simuliert wird - sollte mindestens Ihre Lebenserwartung abdecken">
+                            </div>
+                            <div class="form-group advanced-only"><label for="mcBlockSize">Blockgröße
+                                    (Jahre)</label><input type="number" id="mcBlockSize" value="5"
+                                    title="Länge der historischen Blöcke für Block-Bootstrap (nur bei Block-Bootstrap-Methode relevant)">
+                            </div>
+                            <div class="form-group advanced-only"><label for="mcSeed">Seed</label><input type="number"
+                                    id="mcSeed" value="12345"
+                                    title="Zufallszahlengenerator-Seed für reproduzierbare Simulationen"></div>
+                        </div>
+                        <div class="form-group advanced-only" style="margin-top: 20px;"><label
+                                for="mcMethode">Simulationsmethode</label><select id="mcMethode">
+                                <option value="regime_markov" selected>Regime-Sampling (Markov-Chain)</option>
+                                <option value="regime_iid">Regime-Sampling (iid)</option>
+                                <option value="block">Block-Bootstrap (Stresstest)</option>
+                            </select></div>
+                        <div class="form-group advanced-only" style="margin-top: 10px;"><label
+                                for="rngMode">RNG-Modus</label><select id="rngMode">
+                                <option value="per-run-seed" selected>Per-Run Seed (deterministisch)</option>
+                                <option value="legacy-stream">Legacy Stream (alte Ergebnisse)</option>
+                            </select></div>
+                        <div class="form-grid-four-col advanced-only" style="margin-top: 10px;">
+                            <div class="form-group"><label for="mcWorkerCount">Worker-Anzahl</label><input
+                                    type="number" id="mcWorkerCount" value="8" min="0"
+                                    title="Default: 8. 0 = auto (hardwareConcurrency), sonst fixe Worker-Anzahl"></div>
+                            <div class="form-group"><label for="mcWorkerBudget">Job-Timebudget (ms)</label><input
+                                    type="number" id="mcWorkerBudget" value="500" min="50"
+                                    title="Default: 500 ms. Ziel-CPU-Zeit pro Worker-Job (auto Chunking)"></div>
+                        </div>
+                        <div class="form-group advanced-only" style="justify-content: center; margin-top: 10px;"><label
+                                style="flex-direction: row; align-items: center;"
+                                title="Wenn aktiv, werden Startjahre bevorzugt, deren historisches CAPE dem aktuellen Eingabewert ähnelt (+/- 20%)."><input
+                                    type="checkbox" id="useCapeSampling"
+                                    style="width: auto; margin-right: 8px;">CAPE-basiertes Sampling verwenden </label>
+                        </div>
+                    </fieldset>
+                    <fieldset class="advanced-only">
+                        <legend><span class="section-icon">⚡</span>Stressmodus</legend>
+                        <div class="form-group"><label for="stressPreset">Szenario für die ersten
+                                Simulationsjahre</label><select id="stressPreset">
+                                <!-- Wird per JavaScript befüllt -->
+                            </select></div>
+                    </fieldset>
+                    <div class="form-group advanced-only" style="margin-top: 10px; justify-content: center;">
+                        <label style="flex-direction: row; align-items: center;"
+                            title="Fuehrt zuerst seriell, dann mit Web-Workern aus und zeigt beide Laufzeiten.">
+                            <input type="checkbox" id="mcCompareMode" style="width: auto; margin-right: 8px;">
+                            Vergleich: Seriell vs. Worker
+                        </label>
+                    </div>
+                    <div id="mc-compare-results" class="advanced-only"
+                        style="display:none; margin-top: 10px; font-size: 0.95rem; color: var(--text-secondary);"></div>
+                    <button id="mcButton" onclick="runMonteCarlo()">Monte-Carlo-Simulation starten</button>
+                    <div id="mc-progress-bar-container">
+                        <div id="mc-progress-bar"></div>
+                    </div>
+                    <div id="mc-error-container"
+                        style="display:none; margin-top: 15px; padding: 15px; background-color: #ffebee; border: 1px solid #ffcdd2; border-radius: 6px; color: #c62828;">
+                        <h4 style="margin-top: 0; margin-bottom: 10px;">Fehler in der Simulation</h4>
+                        <pre id="mc-error-message"
+                            style="white-space: pre-wrap; font-family: monospace; font-size: 0.9em; margin: 0;"></pre>
+                        <button onclick="document.getElementById('mc-error-container').style.display='none'"
+                            style="margin-top: 10px; padding: 5px 10px; cursor: pointer;">Schließen</button>
+                    </div>
+                    <div id="print-footer" class="print-footer"></div>
+                    <div id="monteCarloResults" style="display:none; margin-top: 25px;">
+                        <h3>Ergebnisse der Monte-Carlo-Analyse</h3>
+                        <div id="monteCarloSummary"></div>
+                        <div id="unifiedKpiDashboard" style="display:none;"></div>
+                        <div id="advancedKpiDashboard" class="advanced-only" style="display:none;"></div>
+                        <div id="withdrawalRateChartContainer"></div>
+                        <div id="pflegeKpiResults" class="advanced-only" style="display:none;">
+                            <h3 style="border-top: 1px solid var(--border-color); padding-top: 25px;">Analyse des
+                                Pflegerisikos</h3>
+                            <div id="pflegeKpiSummary" class="summary-grid"></div>
+                        </div>
+                        <!-- Szenario-Log Auswahl -->
+                        <div id="scenarioLogContainer" class="advanced-only" style="display:none; margin-top: 25px;">
+                            <h4 style="text-align:center;">Szenario-Logs analysieren</h4>
+                            <div id="scenario-controls"
+                                style="text-align: center; margin-bottom: 10px; font-size: 0.9rem; display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                                <label style="user-select:none; cursor:pointer;"
+                                    title="Zeige vollständige Pflege-Aufschlüsselung (Anker, Cap, Deltas, Flex-Faktor)."><input
+                                        type="checkbox" id="toggle-care-details"
+                                        style="width:auto; vertical-align: middle; margin-right: 4px;">Pflege-Details
+                                    anzeigen </label><label style="user-select:none; cursor:pointer;"
+                                    title="Umschalten zwischen normalem (kompakt) und detailliertem (alle Spalten) Log."><input
+                                        type="checkbox" id="toggle-log-detail"
+                                        style="width:auto; vertical-align: middle; margin-right: 4px;">Detailliertes
+                                    Log anzeigen </label>
+                            </div>
+                            <div id="scenarioSelector"></div>
+                            <div id="scenarioLogOutput"></div>
+                            <div class="log-export-buttons" id="scenarioExportButtons" style="display:none;"><button
+                                    type="button" id="exportScenarioLogJson">JSON</button><button type="button"
+                                    id="exportScenarioLogCsv">CSV</button></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="tab-backtesting" class="tab-panel advanced-only">
+                    <fieldset>
+                        <legend><span class="section-icon">📅</span>Backtesting-Parameter</legend>
+                        <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+                            <div class="form-group"><label for="simStartJahr">Startjahr</label><input type="number"
+                                    id="simStartJahr" value="2000"></div>
+                            <div class="form-group"><label for="simEndJahr">Endjahr</label><input type="number"
+                                    id="simEndJahr" value="2024"></div>
+                        </div>
+                    </fieldset><button id="btButton" onclick="runBacktest()">Historische Simulation starten</button>
+                    <div id="simulationResults" style="display:none; margin-top: 25px;">
+                        <h3>Ergebnis des Backtests</h3>
+                        <div id="simulationSummary"></div>
+                        <h4 style="text-align:center; margin-top:20px;">Jahresprotokoll</h4>
+                        <div style="text-align: center; margin-bottom: 10px; font-size: 0.9rem;"><label
+                                style="user-select:none; cursor:pointer;"
+                                title="Umschalten zwischen normalem (kompakt) und detailliertem (alle Spalten) Log."><input
+                                    type="checkbox" id="toggle-backtest-detail"
+                                    style="width:auto; vertical-align: middle; margin-right: 4px;">Detailliertes Log
+                                anzeigen </label></div>
+                        <div id="simulationLog">Keine Daten</div>
+                        <div class="log-export-buttons"><button type="button"
+                                id="exportBacktestJson">JSON</button><button type="button"
+                                id="exportBacktestCsv">CSV</button></div>
+                    </div>
+                    <div id="engine-mismatch-footer"></div>
+                    <section class="dev-only" id="parity-smoketest-card">
+                        <fieldset style="margin-top: 25px;">
+                            <div class="section-title">
+                                <h3 style="margin:0">Parity Smoke Test</h3><a id="runParitySmokeTestBtn"
+                                    class="debug-link" href="javascript:void(0)"
+                                    onclick="window.runParitySmokeTest({years:3})"
+                                    aria-label="Run Parity Smoke Test">Run</a>
+                            </div>
+                            <div style="margin-top: 10px; font-size: 0.85rem; color: #666;">Vergleicht Engine und
+                                Simulator über 3 Jahre. Ergebnisse in der Browser-Konsole.</div>
+                        </fieldset>
+                    </section>
+                </div>
+                <div id="tab-sweep" class="tab-panel advanced-only">
+                    <!--==========PARAMETER SWEEP (EXPLORATION)==========-->
+                    <h3
+                        style="margin-top: 0; color: var(--primary-color); border-bottom: 2px solid var(--primary-color); padding-bottom: 8px;">
+                        📊 Parameter Sweep (Exploration) </h3>
+                    <p style="color: #666; margin-bottom: 20px; font-size: 0.95rem;">Systematische Exploration des
+                        Parameter-Raums über vordefinierte Ranges. Gut für erste Analysen und Heatmaps. </p>
+                    <fieldset>
+                        <legend><span class="section-icon">🔄</span>Sweep-Ranges</legend>
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 0.85rem; color: #555;">
+                            <div><strong>Format: </strong> start:step:end (z.B. 24:6:48) oder Liste 50, 60, 70 oder
+                                Einzelwert 24 </div>
+                            <div id="sweepGridSize" style="font-weight: 600; color: var(--secondary-color);"> Grid:
+                                0 Kombis </div>
+                        </div>
+                        <div class="form-grid-four-col">
+                            <div class="form-group"><label for="sweepRunwayMin">Runway Min (Monate)</label><input
+                                    type="text" id="sweepRunwayMin" value="18" placeholder="12,18,24"
+                                    title="Format: start:step:end (z.B. 18:6:36) oder Liste 12,18,24 oder Einzelwert 18">
+                            </div>
+                            <div class="form-group"><label for="sweepRunwayTarget">Runway Target
+                                    (Monate)</label><input type="text" id="sweepRunwayTarget" value="24:6:36"
+                                    placeholder="18:6:36"
+                                    title="Format: start:step:end (z.B. 18:6:36) oder Liste 18,24,30 oder Einzelwert 24">
+                            </div>
+                            <div class="form-group"><label for="sweepTargetEq">Target Eq (%)</label><input type="text"
+                                    id="sweepTargetEq" value="50,60,70" placeholder="50,60,70"
+                                    title="Format: start:step:end (z.B. 50:10:80) oder Liste 50,60,70 oder Einzelwert 60">
+                            </div>
+                            <div class="form-group"><label for="sweepRebalBand">Rebal Band (%)</label><input type="text"
+                                    id="sweepRebalBand" value="5" placeholder="3,5,7"
+                                    title="Format: start:step:end (z.B. 3:2:9) oder Liste 3,5,7 oder Einzelwert 5">
+                            </div>
+                            <div class="form-group"><label for="sweepMaxSkimPct">Max Skim % of Eq</label><input
+                                    type="text" id="sweepMaxSkimPct" value="2" placeholder="0,2,4"
+                                    title="Format: start:step:end (z.B. 0:2:6) oder Liste 0,2,4 oder Einzelwert 2">
+                            </div>
+                            <div class="form-group"><label for="sweepMaxBearRefillPct">Max Bear Refill % of
+                                    Eq</label><input type="text" id="sweepMaxBearRefillPct" value="2"
+                                    placeholder="0,2,4"
+                                    title="Format: start:step:end (z.B. 0:2:8) oder Liste 0,2,4 oder Einzelwert 2">
+                            </div>
+                            <div class="form-group"><label for="sweepGoldTargetPct">Gold Target (%)</label><input
+                                    type="text" id="sweepGoldTargetPct" value="5,7.5" placeholder="0,2.5,5,7.5"
+                                    title="Format: start:step:end (z.B. 0:2.5:10) oder Liste 0,2.5,5,7.5 oder Einzelwert 7.5">
+                            </div>
+                        </div>
+                    </fieldset>
+                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;"> <button
+                            id="sweepButton" onclick="runParameterSweep()">Run Sweep</button> <button
+                            id="findBestButton" onclick="findAndDisplayBest()"
+                            style="background-color: #4caf50; display: none;">🎯 Beste Parameter finden</button>
+                        <button id="sensitivityButton" onclick="showSensitivityAnalysis()"
+                            style="background-color: #ff9800; display: none;">📊 Sensitivity Analysis</button>
+                        <button id="paretoButton" onclick="showParetoDialog()"
+                            style="background-color: #9c27b0; display: none;">🎯 Pareto Frontier</button>
+                    </div>
+                    <div id="sweep-progress-bar-container"
+                        style="display:none; width: 100%; background-color: #e0e0e0; height: 24px; border-radius: 4px; margin-top: 15px; overflow: hidden;">
+                        <div id="sweep-progress-bar"
+                            style="width: 0%; height: 100%; background-color: var(--secondary-color); transition: width 0.3s; line-height: 24px; text-align: center; color: white; font-size: 0.85rem;">
+                        </div>
+                    </div>
+                    <!-- Optimization Results Container -->
+                    <div id="optimizationResults" style="display: none; margin-top: 20px;"></div>
+                    <!-- Sensitivity Analysis Results Container -->
+                    <div id="sensitivityResults" style="display: none; margin-top: 20px;"></div>
+                    <!-- Pareto Frontier Results Container -->
+                    <div id="paretoResults" style="display: none; margin-top: 20px;"></div>
+                    <!-- Selbsttest-Panel (nur bei ?debug=1 sichtbar) -->
+                    <div id="sweepSelfTestPanel" class="dev-only"
+                        style="margin-top: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9;">
+                        <h4 style="margin-top: 0;">🧪 Sweep-Selbsttest (Debug)</h4>
+                        <p style="font-size: 0.85rem; color: #666;"> Führt einen Mini-Sweep mit 3
+                            Fällen aus (nur rebalBand-Variation) und prüft, ob R2 konstant bleibt.
+                        </p> <button id="sweepSelfTestButton" onclick="runSweepSelfTest()">Selbsttest ausführen</button>
+                        <div id="sweepSelfTestResults" style="margin-top: 10px; display: none;">
+                        </div>
+                    </div>
+                    <div id="sweepResults" style="display:none; margin-top: 25px;">
+                        <h3>Sweep Ergebnisse</h3>
+                        <div id="sweepControls" style="margin-bottom: 15px;">
+                            <div class="form-grid-four-col">
+                                <div class="form-group"> <label for="sweepMetric">Metrik</label>
+                                    <select id="sweepMetric">
+                                        <option value="successProbFloor" selected>Success Prob Floor
+                                        </option>
+                                        <option value="p10EndWealth">P10 End Wealth</option>
+                                        <option value="p25EndWealth">P25 End Wealth</option>
+                                        <option value="medianEndWealth">Median End Wealth (P50)
+                                        </option>
+                                        <option value="p75EndWealth">P75 End Wealth</option>
+                                        <option value="meanEndWealth">Mean End Wealth</option>
+                                        <option value="maxEndWealth">Max End Wealth</option>
+                                        <option value="worst5Drawdown">Worst 5% Drawdown</option>
+                                        <option value="minRunwayObserved">Min Runway Observed
+                                        </option>
+                                    </select>
+                                </div>
+                                <div class="form-group"> <label for="sweepAxisX">X-Achse
+                                        Parameter</label> <select id="sweepAxisX">
+                                        <option value="runwayMin">Runway Min</option>
+                                        <option value="runwayTarget" selected>Runway Target</option>
+                                        <option value="targetEq">Target Eq</option>
+                                        <option value="rebalBand">Rebal Band</option>
+                                        <option value="maxSkimPct">Max Skim Pct</option>
+                                        <option value="maxBearRefillPct">Max Bear Refill Pct
+                                        </option>
+                                        <option value="goldTargetPct">Gold Target Pct</option>
+                                    </select> </div>
+                                <div class="form-group"> <label for="sweepAxisY">Y-Achse
+                                        Parameter</label> <select id="sweepAxisY">
+                                        <option value="runwayMin">Runway Min</option>
+                                        <option value="runwayTarget">Runway Target</option>
+                                        <option value="targetEq" selected>Target Eq</option>
+                                        <option value="rebalBand">Rebal Band</option>
+                                        <option value="maxSkimPct">Max Skim Pct</option>
+                                        <option value="maxBearRefillPct">Max Bear Refill Pct
+                                        </option>
+                                        <option value="goldTargetPct">Gold Target Pct</option>
+                                    </select> </div>
+                            </div>
+                        </div>
+                        <div id="sweepHeatmap"></div>
+                    </div>
+                    <!--==========AUTO-OPTIMIZE (INTELLIGENT SEARCH)==========-->
+                    <h3
+                        style="margin-top: 40px; color: var(--secondary-color); border-bottom: 2px solid var(--secondary-color); padding-bottom: 8px;">
+                        🚀 Auto-Optimize (Intelligent Search) </h3>
+                    <p style="color: #666; margin-bottom: 20px; font-size: 0.95rem;">
+                        Effiziente, KI-gestützte Parameter-Optimierung mit Latin Hypercube
+                        Sampling, Quick-Filter und Train/Test-Validierung. Findet optimale
+                        Parameter-Kombinationen schneller und zuverlässiger als brute-force
+                        Sweep. </p>
+                    <fieldset style="border: 2px solid var(--secondary-color);">
+                        <legend><span class="section-icon">🎯</span>Optimization Configuration
+                        </legend>
+                        <!-- Objective -->
+                        <div style="background: #f0f8ff; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                            <h4 style="margin-top: 0; margin-bottom: 15px;">Objective</h4>
+                            <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+                                <div class="form-group"> <label for="ao_metric">Metrik</label> <select id="ao_metric">
+                                        <option value="EndWealth_P50">End Wealth P50
+                                        </option>
+                                        <option value="EndWealth_P25">End Wealth P25
+                                        </option>
+                                        <option value="SuccessRate" selected>Success Rate
+                                        </option>
+                                        <option value="Drawdown_P90">Drawdown P90</option>
+                                        <option value="TimeShare_WR_gt_4_5">Time Share WR >
+                                            4.5%</option>
+                                        <option value="Median_WR">Median Withdrawal Rate
+                                        </option>
+                                    </select> </div>
+                                <div class="form-group"> <label for="ao_direction">Optimierungsziel</label> <select
+                                        id="ao_direction">
+                                        <option value="max" selected>Maximize</option>
+                                        <option value="min">Minimize</option>
+                                    </select> </div>
+                            </div>
+                            <div id="ao_quantile_container" class="form-group" style="display: none;"> <label
+                                    for="ao_quantile">Quantile
+                                    (%)</label> <input type="number" id="ao_quantile" value="50" min="1" max="99"
+                                    step="1"> </div>
+                        </div>
+                        <!-- Presets -->
+                        <div style="background: #fff9e6; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                            <h4 style="margin-top: 0; margin-bottom: 10px;">🎯
+                                Vorkonfigurierte Presets</h4>
+                            <p style="font-size: 0.85rem; color: #666; margin-bottom: 15px;">
+                                Wähle ein Preset, um passende Parameter für dein
+                                Optimierungsziel vorzufüllen. Du kannst anschließend
+                                manuell anpassen. </p>
+                            <div id="ao_presets_container"
+                                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                                <button type="button" class="ao-preset-btn" data-preset="standard"
+                                    style="padding: 10px; border: 2px solid var(--secondary-color); border-radius: 6px; background: white; cursor: pointer; text-align: left; transition: all 0.2s;">
+                                    <div style="font-weight: 600; margin-bottom: 4px;">
+                                        📊 Standard</div>
+                                    <div style="font-size: 0.8rem; color: #666;">
+                                        Ausgewogene Optimierung</div>
+                                </button> <button type="button" class="ao-preset-btn" data-preset="runway"
+                                    style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; text-align: left; transition: all 0.2s;">
+                                    <div style="font-weight: 600; margin-bottom: 4px;">
+                                        🛫 Runway Optimierung</div>
+                                    <div style="font-size: 0.8rem; color: #666;">
+                                        Optimale Runway-Konfiguration</div>
+                                </button> <button type="button" class="ao-preset-btn" data-preset="allocation"
+                                    style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; text-align: left; transition: all 0.2s;">
+                                    <div style="font-weight: 600; margin-bottom: 4px;">
+                                        📈 Asset Allocation</div>
+                                    <div style="font-size: 0.8rem; color: #666;">
+                                        Vermögensaufteilung</div>
+                                </button> <button type="button" class="ao-preset-btn" data-preset="conservative"
+                                    style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; text-align: left; transition: all 0.2s;">
+                                    <div style="font-weight: 600; margin-bottom: 4px;">
+                                        🛡️ Konservativ</div>
+                                    <div style="font-size: 0.8rem; color: #666;">Hohe
+                                        Sicherheit</div>
+                                </button> <button type="button" class="ao-preset-btn" data-preset="aggressive"
+                                    style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; text-align: left; transition: all 0.2s;">
+                                    <div style="font-weight: 600; margin-bottom: 4px;">
+                                        🚀 Aggressiv</div>
+                                    <div style="font-size: 0.8rem; color: #666;">
+                                        Maximales Endvermögen</div>
+                                </button> <button type="button" class="ao-preset-btn" data-preset="drawdown"
+                                    style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; text-align: left; transition: all 0.2s;">
+                                    <div style="font-weight: 600; margin-bottom: 4px;">
+                                        📉 Drawdown-Minimierung</div>
+                                    <div style="font-size: 0.8rem; color: #666;">
+                                        Minimierung von Verlusten</div>
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Parameter Picker (Dynamic) -->
+                        <div style="background: #fff8f0; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                            <div
+                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h4 style="margin: 0;">Parameter (1 bis 7)</h4>
+                                <div style="display: flex; gap: 8px;"> <button type="button" id="ao_add_param_btn"
+                                        style="padding: 6px 12px; background-color: #4caf50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem;">
+                                        + Parameter hinzufügen </button> <button type="button" id="ao_remove_param_btn"
+                                        style="padding: 6px 12px; background-color: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem;">
+                                        - Parameter entfernen </button> </div>
+                            </div>
+                            <!-- Dynamic Parameter Container -->
+                            <div id="ao_parameters_container">
+                                <!-- Parameters will be added dynamically via
+                                            JavaScript -->
+                            </div>
+                        </div>
+                        <!-- Simulation Scope -->
+                        <div style="background: #f0fff4; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                            <h4 style="margin-top: 0; margin-bottom: 15px;">
+                                Simulationsumfang</h4>
+                            <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+                                <div class="form-group"> <label for="ao_runs_per_candidate">Runs per
+                                        Candidate</label> <input type="number" id="ao_runs_per_candidate" value="2000"
+                                        min="100" max="10000" step="100"> </div>
+                                <div class="form-group"> <label for="ao_seeds_train">Train Seeds</label>
+                                    <input type="number" id="ao_seeds_train" value="5" min="1" max="20" step="1">
+                                </div>
+                                <div class="form-group"> <label for="ao_seeds_test">Test Seeds</label>
+                                    <input type="number" id="ao_seeds_test" value="2" min="1" max="20" step="1">
+                                </div>
+                            </div>
+                            <p style="font-size: 0.85rem; color: #666; margin: 10px 0 0 0;">
+                                Hinweis: Diese Einstellung ist unabhängig von
+                                der Monte-Carlo-Konfiguration im Haupt-Tab. </p>
+                        </div>
+                        <!-- Constraints -->
+                        <div style="background: #fff0f0; padding: 15px; border-radius: 6px; margin-bottom: 20px;">
+                            <h4 style="margin-top: 0; margin-bottom: 15px;">
+                                Constraints (optional)</h4>
+                            <div class="form-grid" style="grid-template-columns: repeat(2, 1fr);">
+                                <div class="form-group" style="justify-content: center;"> <label
+                                        style="flex-direction: row; align-items: center;">
+                                        <input type="checkbox" id="ao_c_sr99" style="width: auto; margin-right: 8px;"
+                                            checked> Success
+                                        Rate ≥ 99%
+                                    </label> </div>
+                                <div class="form-group" style="justify-content: center;"> <label
+                                        style="flex-direction: row; align-items: center;">
+                                        <input type="checkbox" id="ao_c_noex" style="width: auto; margin-right: 8px;"
+                                            checked>
+                                        Depot-Erschöpfung=0
+                                    </label> </div>
+                                <div class="form-group" style="justify-content: center;"> <label
+                                        style="flex-direction: row; align-items: center;">
+                                        <input type="checkbox" id="ao_c_ts45" style="width: auto; margin-right: 8px;">
+                                        Zeitanteil Quote > 4.5% ≤ 1%
+                                    </label> </div>
+                                <div class="form-group" style="justify-content: center;"> <label
+                                        style="flex-direction: row; align-items: center;">
+                                        <input type="checkbox" id="ao_c_dd55" style="width: auto; margin-right: 8px;">
+                                        P90 Drawdown ≤ 55% </label> </div>
+                            </div>
+                        </div>
+                        <!-- Actions & Output -->
+                        <div style="text-align: center; margin-bottom: 20px;">
+                            <button id="ao_run_btn"
+                                style="background-color: var(--secondary-color); color: white; padding: 12px 24px; font-size: 1rem; border: none; border-radius: 6px; cursor: pointer;">
+                                🚀 Auto-Optimize starten </button>
+                        </div>
+                        <div id="ao_progress"
+                            style="display: none; padding: 10px; background: #e3f2fd; border-radius: 6px; margin-bottom: 20px; text-align: center; font-weight: 500;">
+                            <!-- Progress text -->
+                        </div>
+                        <div id="ao_result" style="display: none;">
+                            <!-- Result will be rendered here -->
+                        </div>
+                        <div style="text-align: center; margin-top: 20px;">
+                            <button id="ao_apply_btn"
+                                style="display: none; background-color: #4caf50; color: white; padding: 10px 20px; font-size: 0.95rem; border: none; border-radius: 6px; cursor: pointer;">
+                                ✓ Konfiguration übernehmen </button>
+                        </div>
+                    </fieldset>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="engine.js"></script>
+
+
+    <!-- Engine Switcher: Feature Flags and UI -->
+    <script type="module" src="feature-flags.js"></script>
+    <script type="module" src="simulator-engine-direct.js"></script>
+    <script type="module" src="simulator-engine-wrapper.js"></script>
+
+
+    <script type="module" src="auto_optimize.js"></script>
+    <script type="module" src="auto_optimize_ui.js"></script>
+    <script type="module" src="simulator-main.js"></script>
+    <!-- Accordion Toggle & Progress Indicator Functionality -->
+    <script> document.addEventListener('DOMContentLoaded', function () {
+
+            // Accordion toggle
+            document.querySelectorAll('fieldset.collapsible legend').forEach(legend => {
+                legend.addEventListener('click', function (e) {
+                    // Don't toggle if clicking on the indicator
+                    if (e.target.classList.contains('progress-indicator')) return;
+                    const fieldset = this.closest('fieldset');
+                    fieldset.classList.toggle('collapsed');
+                });
+            });
+
+            // Progress indicator update function
+            function updateProgressIndicators() {
+                document.querySelectorAll('fieldset.collapsible[data-fieldset]').forEach(fieldset => {
+                    const inputs = fieldset.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"]), select');
+                    let hasData = false;
+
+                    inputs.forEach(input => {
+                        if (input.disabled) return;
+                        const value = input.value;
+                        const defaultValue = input.defaultValue;
+
+                        // Check if value differs from default or has meaningful data
+                        if (value && value !== '' && value !== '0') {
+                            hasData = true;
+                        }
+                    });
+
+                    // Always show as filled if there are any inputs with values
+                    if (hasData) {
+                        fieldset.classList.add('has-data');
+                    }
+
+                    else {
+                        fieldset.classList.remove('has-data');
+                    }
+                });
+            }
+
+            // Initial check
+            updateProgressIndicators();
+
+            // Update on input changes
+            document.querySelectorAll('#tab-rahmendaten input, #tab-rahmendaten select').forEach(input => {
+                input.addEventListener('change', updateProgressIndicators);
+                input.addEventListener('input', updateProgressIndicators);
+            });
+        });
+
+    </script>
+    <!-- Mode Toggle Logic -->
+    <script type="module">import {
+            initModeToggle
+        }
+
+            from './mode-toggle.js';
+
+        initModeToggle({
+            tooltipMap: {
+                'simStartVermoegen': 'Ihr gesamtes Vermögen zum Start der Simulation (inkl. Liquidität und Depots)',
+                'startFloorBedarf': 'Die absolut notwendigen Ausgaben pro Jahr (z.B. Miete, Essen, Versicherungen)',
+                'startFlexBedarf': 'Wünschenswerte Ausgaben, auf die Sie notfalls verzichten können (z.B. Urlaub, Hobbys)',
+                'mcAnzahl': 'Wie viele verschiedene Zukunftsszenarien simuliert werden (mehr = genauer)',
+                'mcDauer': 'Über wie viele Jahre in die Zukunft simuliert wird'
+            }
+
+            ,
+            labelMappings: {
+                'simStartVermoegen': {
+                    original: 'Gesamtvermögen (€)', simple: 'Mein gesamtes Vermögen (€)'
+                }
+
+                ,
+                'startFloorBedarf': {
+                    original: 'Floor-Bedarf p.a. (€)', simple: 'Was ich mindestens pro Jahr brauche (€)'
+                }
+
+                ,
+                'startFlexBedarf': {
+                    original: 'Flex-Bedarf p.a. (€)', simple: 'Was ich gerne pro Jahr hätte (€)'
+                }
+
+                ,
+                'mcAnzahl': {
+                    original: 'Anzahl Simulationen', simple: 'Wie viele Szenarien?'
+                }
+
+                ,
+                'mcDauer': {
+                    original: 'Maximale Dauer (Jahre)', simple: 'Über wie viele Jahre?'
+                }
+            }
+
+            ,
+            // Kompakte Darstellung: kein erklärender Hinweis und kein automatischer Reset,
+            // damit der Toggle die UI nicht überdeckt und Nutzerwerte erhalten bleiben.
+        });
+
+    </script>
+    <!-- Tooltip normalization & single-line label safety net -->
+    <script>(function () {
+
+            /**
+         * Setzt einen Titel auf dem übergebenen Element, sofern noch keiner vorhanden ist.
+         *
+         * @param {HTMLElement|null} element - Zielknoten, der den Tooltip erhalten soll.
+         * @param {string} tooltipText - Text, der als Title-Attribut gesetzt wird.
+         * @returns {void}
+         */
+            function setTitleIfMissing(element, tooltipText) {
+                if (!element || !tooltipText) return;
+                const existingTitle = (element.getAttribute('title') || '').trim();
+
+                if (!existingTitle) {
+                    element.setAttribute('title', tooltipText);
+                }
+            }
+
+            /**
+         * Leitet einen passenden Tooltip-Text aus vorhandenen Informationen ab.
+         *
+         * @param {HTMLInputElement|HTMLSelectElement|HTMLTextAreaElement} control - Formularelement.
+         * @param {HTMLLabelElement|null} label - Zugehöriges Label zum Formularfeld.
+         * @returns {string|null} Tooltip-Text oder null, falls nichts Geeignetes gefunden wurde.
+         */
+            function resolveTooltipText(control, label) {
+                const explicitTitle = (control.getAttribute('title') || '').trim();
+                if (explicitTitle) return explicitTitle;
+
+                const labelText = (label?.textContent || '').replace(/\s+/g, ' ').trim();
+                if (labelText) return labelText;
+
+                const placeholder = (control.getAttribute('placeholder') || '').trim();
+                return placeholder || null;
+            }
+
+            /**
+         * Sorgt dafür, dass alle Formularfelder (Einfach- und Fortgeschritten-Modus) einen Tooltip besitzen.
+         * Der Tooltip wird am Feld selbst sowie am Label hinterlegt, damit MouseOver immer Details liefert.
+         *
+         * @returns {void}
+         */
+            function enforceFormTooltips(root = document) {
+                const selector = '.form-group input, .form-group select, .form-group textarea';
+                const controls = [];
+
+                // Erfasse das Root-Element selbst, falls es ein passendes Formularelement ist.
+                if (root instanceof Element && root.matches(selector)) {
+                    controls.push(root);
+                }
+
+                // Ergänze alle Nachfahren, die Formularelemente sind.
+                root.querySelectorAll?.(selector).forEach(node => controls.push(node));
+
+                controls.forEach(control => {
+                    if (control.type === 'hidden') return;
+                    const label = control.closest('.form-group')?.querySelector('label');
+                    const tooltipText = resolveTooltipText(control, label);
+                    if (!tooltipText) return;
+
+                    setTitleIfMissing(control, tooltipText);
+                    setTitleIfMissing(label, tooltipText);
+                });
+            }
+
+            /**
+         * Ergänzt KPI- und Summary-Kacheln um aussagekräftige Tooltips, falls diese fehlen.
+         * Dadurch bleiben Beschriftungen trotz Einzeiligkeit verständlich.
+         *
+         * @returns {void}
+         */
+            function enforceKpiTooltips(root = document) {
+                const selector = '.kpi-card, .summary-item';
+                const kpiNodes = [];
+
+                // Falls das Root selbst ein KPI/Summary ist, zuerst berücksichtigen.
+                if (root instanceof Element && root.matches(selector)) {
+                    kpiNodes.push(root);
+                }
+
+                // Ergänze alle Nachfahren, die KPI/Summary-Karten darstellen.
+                root.querySelectorAll?.(selector).forEach(node => kpiNodes.push(node));
+
+                kpiNodes.forEach(node => {
+                    const titleFromNode = (node.getAttribute('title') || '').trim();
+                    const headingText = (node.querySelector('strong')?.textContent || node.textContent || '').replace(/\s+/g, ' ').trim();
+                    const tooltipText = titleFromNode || headingText;
+
+                    if (tooltipText) {
+                        setTitleIfMissing(node, tooltipText);
+                        const heading = node.querySelector('strong');
+                        setTitleIfMissing(heading, tooltipText);
+                    }
+                });
+            }
+
+            /**
+         * Bearbeitet einen neu hinzugefügten DOM-Knoten und dessen Kinder, um Tooltips
+         * gezielt nur für veränderte Bereiche zu ergänzen. Dadurch vermeiden wir
+         * kostspielige Ganzseiten-Scans bei jeder Mutation.
+         *
+         * @param {Node} addedNode - Neu in den DOM eingefügter Knoten.
+         * @returns {void}
+         */
+            function processAddedNode(addedNode) {
+                if (!(addedNode instanceof Element)) return;
+
+                // Verarbeite Formularfelder und KPI-Karten innerhalb des neuen Teilbaums.
+                enforceFormTooltips(addedNode);
+                enforceKpiTooltips(addedNode);
+            }
+
+            /**
+         * Initialisiert die Tooltip-Logik und überwacht spätere DOM-Änderungen (z.B. neu gerenderte KPIs).
+         *
+         * @returns {void}
+         */
+            function initializeUnifiedTooltips() {
+                // Initiale Durchläufe auf dem bestehenden DOM.
+                enforceFormTooltips();
+                enforceKpiTooltips();
+
+                const observer = new MutationObserver(mutations => {
+
+                    // Nur die tatsächlich neu eingefügten Knoten verarbeiten, um Performance zu schonen.
+                    mutations.forEach(mutation => {
+                        mutation.addedNodes.forEach(processAddedNode);
+                    });
+                });
+
+                observer.observe(document.body, {
+                    childList: true, subtree: true
+                });
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initializeUnifiedTooltips);
+            }
+
+            else {
+                initializeUnifiedTooltips();
+            }
+        })();
+    </script>
+    <div id="devTools" style="display:none; position:fixed; bottom:10px; right:10px; background:#333; color:#fff; padding:10px; border-radius:5px; z-index:9999;">
+        <div style="margin-bottom:8px;">
+            <label>
+                <input type="checkbox" id="telemetryToggle" />
+                Worker Telemetry
+            </label>
+        </div>
+        <div style="display:flex; gap:8px;">
+            <button id="printTelemetry" style="padding:4px 8px; cursor:pointer;">Print</button>
+            <button id="exportTelemetry" style="padding:4px 8px; cursor:pointer;">Export JSON</button>
+        </div>
+    </div>
+    <script>
+        if (window.location.search.includes('dev=true')) {
+            const devTools = document.getElementById('devTools');
+            const toggle = document.getElementById('telemetryToggle');
+            const printBtn = document.getElementById('printTelemetry');
+            const exportBtn = document.getElementById('exportTelemetry');
+
+            if (devTools && toggle) {
+                devTools.style.display = 'block';
+                toggle.checked = localStorage.getItem('enableWorkerTelemetry') === 'true';
+                toggle.addEventListener('change', e => {
+                    localStorage.setItem('enableWorkerTelemetry', e.target.checked);
+                    alert('Telemetry ' + (e.target.checked ? 'aktiviert' : 'deaktiviert') + '. Seite neu laden.');
+                });
+            }
+
+            const getRegistry = () => {
+                if (!(window.__workerTelemetryRegistry instanceof Map)) {
+                    window.__workerTelemetryRegistry = new Map();
+                }
+                return window.__workerTelemetryRegistry;
+            };
+
+            if (printBtn) {
+                printBtn.addEventListener('click', () => {
+                    const registry = getRegistry();
+                    if (!registry || registry.size === 0) {
+                        console.warn('[Telemetry] Keine Telemetry-Instanzen gefunden.');
+                        return;
+                    }
+                    for (const telemetry of registry.values()) {
+                        if (telemetry && typeof telemetry.printReport === 'function') {
+                            telemetry.printReport();
+                        }
+                    }
+                });
+            }
+
+            if (exportBtn) {
+                exportBtn.addEventListener('click', async () => {
+                    const registry = getRegistry();
+                    if (!registry || registry.size === 0) {
+                        console.warn('[Telemetry] Keine Telemetry-Instanzen gefunden.');
+                        return;
+                    }
+                    const report = {};
+                    for (const [name, telemetry] of registry.entries()) {
+                        if (telemetry && typeof telemetry.getReport === 'function') {
+                            report[name] = telemetry.getReport();
+                        }
+                    }
+                    const json = JSON.stringify(report, null, 2);
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        try {
+                            await navigator.clipboard.writeText(json);
+                            alert('Telemetry JSON kopiert.');
+                        } catch (err) {
+                            console.warn('[Telemetry] Clipboard fehlgeschlagen:', err);
+                            console.log(json);
+                        }
+                    } else {
+                        console.log(json);
+                    }
+                });
+            }
+        }
+    </script>
+</body>
+
+</html>

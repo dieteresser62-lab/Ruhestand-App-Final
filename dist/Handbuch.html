@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Benutzerhandbuch | Ruhestand-Apps Suite</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #1a2530;
+            --secondary-color: #c5a059;
+            --accent-color: #3498db;
+            --background-color: #f8f9fa;
+            --text-color: #2c3e50;
+            --text-light: #7f8c8d;
+            --card-bg: #ffffff;
+            --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 10px 15px rgba(0, 0, 0, 0.1);
+            --border-radius: 16px;
+            --success-color: #2ecc71;
+            --warning-color: #f1c40f;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        /* Navigation Bar */
+        .navbar {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-brand {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: white;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-brand span {
+            color: var(--secondary-color);
+        }
+
+        .back-link {
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .back-link:hover {
+            color: white;
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 1000px;
+            margin: 2rem auto;
+            padding: 0 20px;
+        }
+
+        /* Header Section */
+        .page-header {
+            text-align: center;
+            margin-bottom: 3rem;
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: var(--text-light);
+            font-size: 1.1rem;
+        }
+
+        /* Tabs */
+        .tabs-container {
+            background: white;
+            padding: 10px;
+            border-radius: 50px;
+            display: inline-flex;
+            box-shadow: var(--card-shadow);
+            margin-bottom: 2rem;
+            position: relative;
+            left: 50%;
+            transform: translateX(-50%);
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .tab-btn {
+            padding: 12px 30px;
+            border-radius: 40px;
+            border: none;
+            background: transparent;
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--text-light);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tab-btn.active {
+            background: var(--primary-color);
+            color: white;
+            box-shadow: 0 4px 10px rgba(26, 37, 48, 0.2);
+        }
+
+        .tab-btn:hover:not(.active) {
+            color: var(--primary-color);
+            background: rgba(0, 0, 0, 0.03);
+        }
+
+        /* Content Sections */
+        .content-section {
+            display: none;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        .content-section.active {
+            display: block;
+        }
+
+        /* Table of Contents */
+        .toc-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--card-shadow);
+            border: 1px solid rgba(0, 0, 0, 0.03);
+        }
+
+        .toc-card h2 {
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+        }
+
+        .toc-list {
+            list-style: none;
+            margin-left: 0;
+            color: var(--text-light);
+            line-height: 1.8;
+        }
+
+        .toc-list li {
+            margin-left: 0.25rem;
+        }
+
+        .toc-list a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .toc-sublist {
+            list-style: none;
+            margin-left: 1.25rem;
+            margin-top: 0.25rem;
+        }
+
+        /* Cards */
+        .info-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 2.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--card-shadow);
+            border: 1px solid rgba(0, 0, 0, 0.03);
+        }
+
+        .info-card h2 {
+            font-size: 1.5rem;
+            color: var(--primary-color);
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--secondary-color);
+            display: inline-block;
+        }
+
+        .card-intro {
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+        }
+
+        /* Steps List (Schnellstart) */
+        .steps-list {
+            list-style: none;
+            counter-reset: step-counter;
+        }
+
+        .step-item {
+            margin-bottom: 2rem;
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .step-number {
+            counter-increment: step-counter;
+            background: var(--primary-color);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            flex-shrink: 0;
+            box-shadow: 0 4px 10px rgba(26, 37, 48, 0.2);
+        }
+
+        .step-content h3 {
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+            color: var(--primary-color);
+        }
+
+        .step-content p {
+            color: var(--text-light);
+        }
+
+        /* Detailed Manual Styling */
+        .manual-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .detail-block {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 12px;
+            border-left: 4px solid var(--accent-color);
+        }
+
+        .detail-block h3 {
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .term-list dt {
+            font-weight: 600;
+            margin-top: 1rem;
+            color: var(--primary-color);
+        }
+
+        .term-list dd {
+            margin-left: 0;
+            margin-top: 0.25rem;
+            color: var(--text-light);
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .tip-box {
+            background-color: rgba(197, 160, 89, 0.1);
+            border: 1px solid rgba(197, 160, 89, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1.5rem;
+            display: flex;
+            gap: 1rem;
+            align-items: flex-start;
+        }
+
+        .tip-icon {
+            font-size: 1.2rem;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .page-header h1 {
+                font-size: 2rem;
+            }
+
+            .tabs-container {
+                width: 100%;
+                justify-content: center;
+                border-radius: 12px;
+            }
+
+            .tab-btn {
+                flex: 1;
+                justify-content: center;
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar">
+        <a href="index.html" class="nav-brand">
+            🏛️ <span>Ruhestand-Apps</span>
+        </a>
+        <a href="index.html" class="back-link">
+            ← Zurück zur Übersicht
+        </a>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h1>Benutzerhandbuch</h1>
+            <p class="subtitle">Anleitungen und Hilfestellungen für Ihre Finanzplanung</p>
+        </div>
+
+        <div class="toc-card" id="inhaltsverzeichnis">
+            <h2>Inhaltsverzeichnis</h2>
+            <ol class="toc-list">
+                <li><a class="toc-link" data-tab-target="manual" href="#ueberblick">Überblick</a></li>
+                <li><a class="toc-link" data-tab-target="manual" href="#ansparer-jung">Ansparer (lange Laufzeit)</a></li>
+                <li><a class="toc-link" data-tab-target="manual" href="#ansparphase">Ansparphase</a></li>
+                <li><a class="toc-link" data-tab-target="manual" href="#installation-start">Installation &amp; Start</a></li>
+                <li><a class="toc-link" data-tab-target="manual" href="#simulator">Simulator</a>
+                    <ol class="toc-sublist">
+                        <li><a class="toc-link" data-tab-target="manual" href="#simulator-eingaben">Eingaben</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#simulator-parameter">Parameter</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#simulator-tranchen">Depot-Tranchen</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#simulator-start">Simulation starten</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#simulator-ergebnisse">Ergebnisse deuten</a></li>
+                    </ol>
+                </li>
+                <li><a class="toc-link" data-tab-target="manual" href="#balance-app">Balance-App</a>
+                    <ol class="toc-sublist">
+                        <li><a class="toc-link" data-tab-target="manual" href="#balance-jahresupdate">Jahres-Update</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#balance-diagnose">Diagnose</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#balance-handlungsschritte">Handlungsschritte</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#balance-kapitalfluss">Kapitalfluss</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#balance-tranchen">Depot-Tranchen</a></li>
+                    </ol>
+                </li>
+                <li><a class="toc-link" data-tab-target="manual" href="#onboarding-playbook">Onboarding-Playbook</a>
+                    <ol class="toc-sublist">
+                        <li><a class="toc-link" data-tab-target="manual" href="#onboarding-woche">Erste Woche</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#onboarding-jahr">Erstes Jahr</a></li>
+                    </ol>
+                </li>
+                <li><a class="toc-link" data-tab-target="manual" href="#haeufige-probleme">Häufige Probleme</a></li>
+                <li><a class="toc-link" data-tab-target="manual" href="#jahrespflege">Best Practices Jahrespflege</a></li>
+                <li><a class="toc-link" data-tab-target="manual" href="#anhang">Anhang</a>
+                    <ol class="toc-sublist">
+                        <li><a class="toc-link" data-tab-target="manual" href="#anhang-datenquellen">Datenquellen</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#anhang-versionen">Versionshinweise</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#anhang-support">Kontakt &amp; Support</a></li>
+                    </ol>
+                </li>
+                <li><a class="toc-link" data-tab-target="manual" href="#faq">FAQ</a></li>
+                <li><a class="toc-link" data-tab-target="manual" href="#glossar">Glossar</a></li>
+            </ol>
+        </div>
+
+        <div class="tabs-container">
+            <button class="tab-btn" data-tab-id="quickstart" onclick="switchTab('quickstart')">
+                🚀 Schnellstart
+            </button>
+            <button class="tab-btn active" data-tab-id="manual" onclick="switchTab('manual')">
+                📖 Detailliertes Handbuch
+            </button>
+        </div>
+
+        <!-- ============================================= -->
+        <!-- TAB 1: SCHNELLSTART                           -->
+        <!-- ============================================= -->
+        <div id="quickstart" class="content-section">
+
+            <!-- Simulator Quick Start -->
+            <div class="info-card">
+                <h2>📊 Simulator Schnellstart</h2>
+                <p class="card-intro">In 3 einfachen Schritten zu Ihrer Ruhestandsprognose.</p>
+
+                <ol class="steps-list">
+                    <li class="step-item">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h3>Daten eingeben</h3>
+                            <p>Geben Sie Ihr aktuelles Vermögen, Ihre monatliche Sparrate und das gewünschte
+                                Renteneintrittsalter ein. Ergänzen Sie Ihre erwarteten monatlichen Ausgaben im
+                                Ruhestand.</p>
+                        </div>
+                    </li>
+                    <li class="step-item">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h3>Parameter anpassen (Optional)</h3>
+                            <p>Wählen Sie Ihre Asset-Allokation (Aktienquote) und bestimmen Sie, wie viel Rente Sie
+                                bereits sicher haben (z.B. gesetzliche Rente). Standardwerte sind bereits für Sie
+                                vorausgefüllt.</p>
+                        </div>
+                    </li>
+                    <li class="step-item">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h3>Simulieren und Analysieren</h3>
+                            <p>Klicken Sie auf "Simulation starten". Das System berechnet tausende mögliche
+                                Marktszenarien. Achten Sie auf die <strong>Erfolgswahrscheinlichkeit</strong> – diese
+                                sollte idealerweise über 90-95% liegen.</p>
+                        </div>
+                    </li>
+                </ol>
+                <div class="tip-box">
+                    <span class="tip-icon">💡</span>
+                    <div>
+                        <strong>Tipp:</strong> Nutzen Sie den Parameter-Sweep, um schnell zu sehen, wie sich eine höhere
+                        Sparrate oder ein späterer Renteneintritt auf Ihre Erfolgchancen auswirkt.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Balance App Quick Start -->
+            <div class="info-card">
+                <h2>⚖️ Balance App Schnellstart</h2>
+                <p class="card-intro">Das jährliche Ritual für Ihr Portfolio (Prime Harvesting).</p>
+
+                <ol class="steps-list">
+                    <li class="step-item">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h3>Jahres-Update starten</h3>
+                            <p>Klicken Sie oben auf den Button <strong>"🌐 Jahres-Update"</strong>. Die App ruft
+                                automatisch die aktuelle Inflation (EZB) und ETF-Kurse ab, aktualisiert Ihr Alter und
+                                rückt die Marktdaten (Shiller-CAPE Basis) um ein Jahr weiter.</p>
+                        </div>
+                    </li>
+                    <li class="step-item">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h3>Aktuelle Werte prüfen</h3>
+                            <p>Kontrollieren Sie die aktualisierten Felder. Tragen Sie den <strong>heutigen
+                                    Marktwert</strong> Ihrer Depots und Cash-Konten ein. Die neuen Bedarfswerte
+                                (Floor/Flex) wurden bereits automatisch um die Inflation erhöht.</p>
+                        </div>
+                    </li>
+                    <li class="step-item">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h3>Diagnose & Handlung</h3>
+                            <p>Schauen Sie auf das Panel "Ergebnisse & Handlungsschritte". Folgen Sie genau der
+                                Anweisung (z.B. "Kein Handlungsbedarf" oder "Rebalancing durchführen").</p>
+                        </div>
+                    </li>
+                    <li class="step-item">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <h3>Kapitalfluss</h3>
+                            <p>Führen Sie die angezeigten Transaktionen bei Ihrer Bank durch (z.B. Verkauf von XX € um
+                                Cash aufzufüllen).</p>
+                        </div>
+                    </li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- ============================================= -->
+        <!-- TAB 2: DETAILLIERTES HANDBUCH                 -->
+        <!-- ============================================= -->
+        <div id="manual" class="content-section active">
+
+            <div class="info-card" id="ueberblick">
+                <h2>Überblick</h2>
+                <p>Die Ruhestand-Apps Suite bündelt zwei Kernwerkzeuge: den <strong>Simulator</strong> für langfristige
+                    Prognosen und die <strong>Balance-App</strong> für laufende Entscheidungen in der Entnahmephase. Das
+                    Handbuch ist nach den typischen Schritten gegliedert und bietet schnelle Sprungmarken über das
+                    Inhaltsverzeichnis.</p>
+            </div>
+
+            <div class="info-card" id="ansparer-jung">
+                <h2>Junger Ansparer: So nutzen Sie die Suite optimal</h2>
+                <p>Wenn der Ruhestand noch weit entfernt ist, hilft Ihnen die Suite dabei, den langfristigen
+                    Spar- und Investitionsplan robust aufzusetzen und regelmäßig zu kalibrieren. Konzentrieren Sie
+                    sich im Simulator auf die Wachstumsphase, nutzen Sie Parameter-Sweeps für Szenarien und bauen Sie
+                    Routinen auf, um Ihre Fortschritte jährlich zu messen.</p>
+                <div class="detail-block" style="margin-top: 1rem;">
+                    <h3>Empfohlener Ablauf</h3>
+                    <ol style="margin-left: 20px; color: var(--text-light);">
+                        <li><strong>Horizont & Sparrate festlegen:</strong> Tragen Sie aktuelles Vermögen,
+                            geplante Monatsrate und Ziel-Rentenalter ein. Prüfen Sie, ob der monatliche Überschuss
+                            realistisch zur Haushaltsplanung passt.</li>
+                        <li><strong>Asset-Allokation wählen:</strong> Starten Sie mit einer Aktienquote passend zu
+                            Ihrem Risikoappetit (z.B. 70-90 % bei langem Horizont). Nutzen Sie die Sensitivität der
+                            Erfolgswahrscheinlichkeit, um die Quote anzupassen.</li>
+                        <li><strong>Parameter-Sweep ausführen:</strong> Variieren Sie Sparrate, Rentenalter und
+                            Aktienquote automatisch, um zu sehen, wie viel Puffer Sie für Marktstress haben.</li>
+                        <li><strong>Zielkorridor definieren:</strong> Speichern Sie zwei bis drei Szenarien
+                            (Basis, optimistisch, konservativ) und vergleichen Sie Erfolgswahrscheinlichkeiten sowie
+                            Endvermögen.</li>
+                        <li><strong>Jährliches Update:</strong> Wiederholen Sie die Simulation nach Gehaltsänderungen
+                            oder größeren Ausgaben. Dokumentieren Sie die Version (z.B. YYYY-MM) für Ihre
+                            Haushaltsunterlagen.</li>
+                    </ol>
+                </div>
+                <div class="detail-block" style="margin-top: 1rem;">
+                    <h3>Nutzen für Ansparer</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Klarheit über Sparlücke:</strong> Zeigt, ob Sparrate oder Rentenalter angepasst
+                            werden sollten, um eine hohe Erfolgswahrscheinlichkeit zu erreichen.</li>
+                        <li><strong>Stress-Resilienz:</strong> Monte-Carlo-Simulationen machen sichtbar, wie robust
+                            der Plan gegenüber Crashs oder hoher Inflation bleibt.</li>
+                        <li><strong>Messbare Fortschritte:</strong> Durch jährliche Szenarienvergleiche erkennen Sie,
+                            ob Sie im Soll liegen oder nachjustieren müssen.</li>
+                        <li><strong>Frühe Warnsignale:</strong> Sinkt die Erfolgswahrscheinlichkeit unter Ihren
+                            Zielkorridor, können Sie Sparraten erhöhen oder Konsumziele anpassen, solange noch viel
+                            Zeit bleibt.</li>
+                    </ul>
+                    <div class="tip-box">
+                        <span class="tip-icon">💡</span>
+                        <div>
+                            <strong>Praxis-Tipp:</strong> Legen Sie einen festen Termin (z.B. Jahresbeginn) für ein
+                            Kurz-Review fest. Führen Sie einen Parameter-Sweep mit +10 %/-10 % Sparrate durch und
+                            speichern Sie das beste Szenario als neue Basis.
+                        </div>
+
+            <div class="info-card" id="ansparphase" style="margin-top: 2rem;">
+                <h2>Ansparphase: Ablauf und Pflege</h2>
+                <p class="card-intro">Diese Schritte helfen, die Ansparphase planbar und belastbar aufzusetzen. Fokus:
+                    Simulator nutzen, Annahmen sauber halten, Abweichungen frueh erkennen.</p>
+                <div class="manual-grid" style="margin-top: 1.5rem;">
+                    <div class="detail-block">
+                        <h3>1) Startwerte und Einzahlungen</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Startvermögen:</strong> Aktuellen Depotwert inkl. Cash erfassen.</li>
+                            <li><strong>Sparrate:</strong> Monatliche Einzahlungen angeben; optional Sparsteigerung p.a. eintragen.</li>
+                            <li><strong>Sonderzahlungen:</strong> Bonus, Erbe oder Einmalzahlungen als Extra-Sparjahr simulieren.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block">
+                        <h3>2) Simulator als Hauptwerkzeug</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Parameter-Sweep:</strong> Sparrate/Rentenbeginn variieren, um Zielkorridore zu finden.</li>
+                            <li><strong>Risiko-Sensitivität:</strong> Aktienquote und Fees anpassen, um robuste Korridore zu testen.</li>
+                            <li><strong>Interpretation:</strong> Nicht nur Median, sondern 10./90. Perzentil betrachten.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block">
+                        <h3>3) Jahrespflege in der Ansparphase</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Update-Rhythmus:</strong> Einmal pro Jahr Werte aktualisieren (Vermoegen, Sparrate, Ziele).</li>
+                            <li><strong>Ist vs. Plan:</strong> Abweichungen dokumentieren und Szenario neu rechnen.</li>
+                            <li><strong>Rebalancing:</strong> Wenn noetig manuell; Balance-App ist erst in der Entnahmephase relevant.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block">
+                        <h3>4) Uebergang zur Entnahmephase</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Timing:</strong> 3-5 Jahre vor Ruhestand erste Balance-Tests durchfuehren.</li>
+                            <li><strong>Liquiditaet:</strong> Cash-Buffer aufbauen, um erste Entnahmejahre zu stabilisieren.</li>
+                            <li><strong>Tranchen:</strong> Depot-Tranchen-Manager pflegen, damit Steuerlogik realistisch wird.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block">
+                        <h3>5) ETF-Auswahl und Diversifikation</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Breit diversifiziert:</strong> Welt-ETF als Kern; Sektor- oder Themen-ETFs nur als Satelliten.</li>
+                            <li><strong>Waehrung:</strong> Keine starre Waehrungswette; Diversifikation ueber Regionen bevorzugen.</li>
+                            <li><strong>Kosten:</strong> TER und Spreads vergleichen; kleine Kostenunterschiede wirken langfristig stark.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block">
+                        <h3>6) Rebalancing-Regeln</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Rhythmus:</strong> Jaehlich pruefen; bei starken Abweichungen kuerzer reagieren.</li>
+                            <li><strong>Bandbreiten:</strong> Zielquote plus/minus 5-10 Prozentpunkte als Trigger.</li>
+                            <li><strong>Umsetzung:</strong> Rebalancing in der Ansparphase meist durch Sparraten steuern.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block">
+                        <h3>7) Sparplan-Steigerungen</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Automatik:</strong> Sparrate jaehrlich anpassen (z.B. +2-3% oder Inflationsrate).</li>
+                            <li><strong>Meilensteine:</strong> Gehaltsstufen und Einmalzahlungen als Sonderbeitrag abbilden.</li>
+                            <li><strong>Realismus:</strong> Sparrate nicht nur am Optimum, sondern am realen Cashflow ausrichten.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block">
+                        <h3>Beispiel-Strategien (Ansparphase)</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Konservativ:</strong> 40-60% Aktien, Rest sichere Bausteine; geringere Schwankung.</li>
+                            <li><strong>Ausgewogen:</strong> 60-75% Aktien, Rest stabilisierend; guter Kompromiss.</li>
+                            <li><strong>Offensiv:</strong> 80-100% Aktien; hohe Schwankungen, lange Anlagehorizonte vorausgesetzt.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block">
+                        <h3>Beispielwerte (Orientierung)</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Cash-Puffer:</strong> 3-6 Monatsausgaben als Reserve neben dem Depot.</li>
+                            <li><strong>Sparrate:</strong> 10-20% des Nettoeinkommens als Zielkorridor.</li>
+                            <li><strong>Sparsteigerung:</strong> 2-3% pro Jahr oder Inflationsrate als Automatismus.</li>
+                        </ul>
+                        <p style="color: var(--text-light); margin-top: 0.75rem;">Hinweis: Diese Werte sind nur Orientierung und ersetzen keine individuelle Planung.</p>
+                    </div>
+                </div>
+            </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-card" id="installation-start">
+                <h2>Installation &amp; Start</h2>
+                <p>Zum Start genügt ein moderner Browser (Chrome, Edge oder Firefox). Laden Sie das Repository lokal
+                    und öffnen Sie <code>index.html</code>. Alternativ nutzen Sie den Windows-Starter
+                    <code>start_webserver.cmd</code>, um die Suite als lokalen Webserver auszuführen. Für einen komplett
+                    browserfreien Aufruf steht die portable <code>RuhestandSuite.exe</code> bereit; sie benötigt keine
+                    zusätzlichen Abhängigkeiten und lässt sich direkt per Doppelklick starten. Legen Sie die EXE in einen
+                    beliebigen Ordner und kopieren Sie sie bei Bedarf zusammen mit dem Konfigurationsordner als Backup.</p>
+                <div class="detail-block" style="margin-top: 1.25rem;">
+                    <h3>Praktische Hinweise</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li>Sichern Sie Lese- und Schreibrechte, damit lokale Daten (z.B. Szenarien) gespeichert werden
+                            können.</li>
+                        <li>Für Live-Daten (Inflation, Kurse) ist eine Internetverbindung notwendig; die Simulation
+                            funktioniert auch offline.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="info-card" id="simulator">
+                <h2>Simulator</h2>
+                <p class="card-intro">Simulieren Sie Ansparphase, Ruhestandseintritt und Entnahmeverhalten in wenigen
+                    Schritten.</p>
+                <div class="manual-grid" style="margin-top: 1.5rem;">
+                    <div class="detail-block" id="simulator-eingaben">
+                        <h3>Eingaben</h3>
+                        <p>Tragen Sie Vermögen, monatliche Sparrate sowie gewünschtes Renteneintrittsalter ein. Fügen
+                            Sie Ihre erwarteten Ausgaben im Ruhestand (Grundbedarf und variable Kosten) hinzu.</p>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Zeithorizont:</strong> Die App simuliert standardmäßig bis zum 100. Lebensjahr; passen
+                                Sie das Zielalter an, falls längere Sicherheitsmargen gewünscht sind.</li>
+                            <li><strong>Inflationsindex:</strong> Geben Sie heutige Euro-Beträge an, die Engine indexiert sie
+                                automatisch mit Ihren Annahmen.</li>
+                            <li><strong>Partner-Fälle:</strong> Aktivieren Sie die zweite Person, wenn zwei Rentenströme oder
+                                Pflegekosten berücksichtigt werden müssen.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block" id="simulator-parameter">
+                        <h3>Parameter</h3>
+                        <p>Passen Sie optional die Asset-Allokation (Aktienquote), sichere Rentenbestandteile und
+                            Inflationsannahmen an. Die Standardwerte sind konservativ gewählt und dienen als
+                            Startpunkt.</p>
+                        <p style="color: var(--text-light);">Hintergrund: Die Engine arbeitet mit historischen
+                            Kapitalmarktdaten, resampelt Renditen blockweise (Block-Bootstrap) und fügt einen
+                            Inflations-Overlay hinzu. Pessimistische Schwänze werden per Fat-Tail-Adjustment
+                            verstärkt, damit seltene Crash-Jahre realistisch abgebildet werden.</p>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Renditeannahmen:</strong> Passen Sie Mittelwert/Volatilität im Reiter „Erweiterte
+                                Parameter“ an, wenn Sie eigene Kapitalmarktsichten nutzen.</li>
+                            <li><strong>Korrelationen:</strong> Für gemischte Portfolios steuert der Korrelationsslider, wie
+                                stark Aktien und Anleihen gemeinsam schwanken; konservative Nutzer lassen den
+                                Standardwert unverändert.</li>
+                            <li><strong>Gebühren/Puffer:</strong> Hinterlegen Sie prozentuale Kosten, um Spar- oder
+                                Auszahlpläne realistisch abzubilden; der Simulator reduziert Renditen automatisch um
+                                diesen Wert.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block" id="simulator-tranchen">
+                        <h3>Depot-Tranchen-Manager</h3>
+                        <p>Für eine realistische Steuerberechnung können Sie Ihre ETF-Positionen als einzelne
+                            Tranchen pflegen. Der Simulator nutzt diese Tranchen automatisch für Verkäufe und
+                            Steuerabzüge.</p>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Öffnen:</strong> Button "Depot-Tranchen Manager öffnen" im Vermögen-Block.</li>
+                            <li><strong>Speichern:</strong> Tranchen werden lokal im Browser gespeichert (localStorage).</li>
+                            <li><strong>Wirkung:</strong> Verkäufe werden steueroptimiert aus den Tranchen ausgewählt.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block" id="simulator-start">
+                        <h3>Simulation starten</h3>
+                        <p>Klicken Sie auf <strong>"Simulation starten"</strong>. Die Engine berechnet mehrere hundert
+                            bis tausend Marktszenarien, um realistische Schwankungen abzubilden.</p>
+                        <ol style="margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Monte-Carlo-Läufe:</strong> Jeder Lauf erzeugt eine eigene Rendite- und
+                                Inflationssequenz, wendet Sparraten und Entnahmen an und trackt Liquidität sowie
+                                Depotwerte.</li>
+                            <li><strong>Guardrails:</strong> Bei negativen Pfaden werden automatische Sicherheitsnetze
+                                (z.B. Mindest-Cash, variable Ausgabenbremsen) ausgelöst und in den Ergebnissen als
+                                Ereignis markiert.</li>
+                            <li><strong>Fehlerabfang:</strong> Eingaben werden validiert (keine negativen Sparraten,
+                                Ausgaben &lt;= erreichbare Einnahmen). Fehlende Pflichtfelder werden direkt im UI
+                                hervorgehoben.</li>
+                        </ol>
+                    </div>
+                    <div class="detail-block" id="simulator-ergebnisse">
+                        <h3>Ergebnisse deuten</h3>
+                        <p>Achten Sie auf die <strong>Erfolgswahrscheinlichkeit</strong> (Ziel: 90-95%+). Nutzen Sie die
+                            Heatmap des <em>Parameter Sweep</em>, um zu sehen, wie Sparrate oder späterer Ruhestand das
+                            Ergebnis verändern.</p>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Liquiditäts-Puffer:</strong> Zeigt, wie viele Monate der Grundbedarf auch in
+                                Drawdowns gedeckt bleibt. Werte &gt;= 24 Monate gelten als komfortabel.</li>
+                            <li><strong>Stress-Events:</strong> Die Ergebnis-Timeline markiert Kapitalmarktschocks und
+                                zeigt, ob Anpassungen (z.B. Ausgabenreduktion) notwendig gewesen wären.</li>
+                            <li><strong>Median vs. Perzentile:</strong> Lesen Sie Median, 10. und 90. Perzentil getrennt,
+                                um zu unterscheiden, ob Verbesserungen nur die Mittelwerte betreffen oder wirklich die
+                                Risikoschwänze stabilisieren.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block" id="simulator-sweep">
+                        <h3>Parameter Sweep &amp; Szenarien</h3>
+                        <p>Der Parameter Sweep testet systematisch mehrere Sparraten, Ruhestandsalter oder
+                            Aktienquoten. Die Heatmap zeigt sofort, welche Kombinationen Zielwahrscheinlichkeiten
+                            erreichen.</p>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Konvergenz:</strong> Der Sweep wiederverwendet die gleichen Zufallssamen, um
+                                Varianten vergleichbar zu halten. Kleine Sprünge sind normal; trendende Muster sind
+                                entscheidend.</li>
+                            <li><strong>Szenario-Speicher:</strong> Speichern Sie interessante Konfigurationen als
+                                benannte Szenarien, um sie später in der Balance-App gegenzuprüfen.</li>
+                            <li><strong>Optimierer:</strong> Aktivieren Sie den eingebauten Optimierer, um Sparrate oder
+                                Aktienquote automatisch auf ein Ziel (z.B. 92% Erfolgswahrscheinlichkeit) einzustellen.
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="detail-block" id="simulator-best-practices">
+                        <h3>Best Practices &amp; typische Fragen</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>„Was passiert bei Crash + Inflation?“</strong> Testen Sie ein pessimistisches
+                                Inflationsband und senken Sie die Aktienquote leicht; prüfen Sie, ob die Liquidität in
+                                den ersten fünf Ruhestandsjahren stabil bleibt.</li>
+                            <li><strong>„Reicht meine Sparrate?“</strong> Nutzen Sie den Sweep mit 50-€-Schritten. Ein
+                                Plateau bei 90%+ Erfolgswahrscheinlichkeit zeigt, dass weitere Erhöhungen wenig
+                                zusätzlichen Nutzen bringen.</li>
+                            <li><strong>„Wie robust ist mein Entnahmeplan?“</strong> Simulieren Sie reduzierte flexible
+                                Ausgaben und vergleichen Sie die Erfolgswahrscheinlichkeit. Eine geringe Differenz
+                                deutet auf stabile Guardrails hin.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-card" id="balance-app" style="border-left: 5px solid var(--secondary-color);">
+                <h2>Balance-App</h2>
+                <p class="card-intro">Die Balance-App setzt das Prime-Harvesting-Konzept praktisch um und führt Sie durch
+                    jeden Jahresschritt.</p>
+                <div class="manual-grid" style="margin-top: 1.5rem;">
+                    <div class="detail-block" id="balance-jahresupdate">
+                        <h3>Jahres-Update</h3>
+                        <p>Starten Sie das Jahres-Update, um alle automatischen Schritte gebündelt auszulösen und
+                            danach nur noch die geprüften Werte zu ergänzen.</p>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Automatisch aktualisiert:</strong> Inflation (EC B/World Bank/OECD),
+                                daraus abgeleitete Floor- und Flex-Bedarfe, Altersfelder beider Personen sowie
+                                Markt-Kontext (CAPE-Rotation, ATH-Status, Shiller-Daten nachgerückt).</li>
+                            <li><strong>Manuell zu prüfen:</strong> aktuelle Depotwerte (Aktien, Anleihen,
+                                ETFs), Cash- und Tagesgeldstände. Korrigieren Sie Tippfehler sofort, damit Guardrails
+                                korrekt greifen.</li>
+                            <li><strong>Prozesskette:</strong> Daten abrufen → Inflation anwenden → Guardrails
+                                neu berechnen → Diagnose aktualisieren → Kapitalfluss-Vorschläge anzeigen.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block" id="balance-diagnose">
+                        <h3>Diagnose</h3>
+                        <p>Der Diagnose-Button öffnet das Panel „Ergebnisse &amp; Handlungsschritte“. Es zeigt den
+                            geprüften Entscheidungsbaum mit Kommentaren zu jedem Knoten (z.B. Liquidität &gt;= Runway?,
+                            Aktienquote über Ziel?). Ampelfarben signalisieren, ob Schwellen erreicht sind.</p>
+                        <p style="color: var(--text-light);">Nutzen Sie die Erläuterungen unter dem Entscheidungsbaum,
+                            um zu verstehen, warum eine Handlung ausgelöst wurde (z.B. CAPE-Bremse, Drawdown-Limit,
+                            Rebalancing-Distanz).</p>
+                    </div>
+                    <div class="detail-block" id="balance-handlungsschritte">
+                        <h3>Handlungsschritte</h3>
+                        <p>Im Panel „Ergebnisse &amp; Handlungsschritte“ sehen Sie klare Aufgaben inklusive Reihenfolge.
+                            Jede Aufgabe verweist auf die benötigten Konten (Aktien-Depot, Geldmarkt, Ausgabenkonto)
+                            und nennt Zielbeträge, sodass Sie jede Transaktion 1:1 umsetzen können.</p>
+                        <p style="color: var(--text-light);">Design-Entscheidung: Die Reihenfolge folgt dem
+                            Entscheidungsbaum (erst Liquidität, dann Quote, dann eventuelle CAPE-Bremsen), um
+                            unnötige Trades zu vermeiden.</p>
+                    </div>
+                    <div class="detail-block" id="balance-kapitalfluss">
+                        <h3>Kapitalfluss</h3>
+                        <p>Die App fasst zusammen, welche Beträge zwischen Aktien, Cash und Entnahmekonten fließen
+                            sollen. Nutzen Sie die Checkliste im Panel, um Verkäufe, Umbuchungen und Auszahlungen in
+                            exakt dieser Reihenfolge abzuwickeln.</p>
+                    </div>
+
+                    <div class="detail-block" id="balance-tranchen">
+                        <h3>Depot-Tranchen-Manager</h3>
+                        <p>In der Balance-App fließen detaillierte Tranchen direkt in die Handlungsschritte ein. Das
+                            sorgt für realistische Steuerabschätzungen und eine klare Zuordnung, welche Positionen
+                            verkauft werden sollen.</p>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Aktivierung:</strong> Tranchen im Manager pflegen und "Werte übernehmen".</li>
+                            <li><strong>Verkaufsauswahl:</strong> Steueroptimierte Reihenfolge (geringste Steuerlast zuerst).</li>
+                            <li><strong>Hinweis:</strong> Die App zeigt die ausgewählten Tranchen im Diagnose-Panel.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-card" id="balance-jahresupdate-guide" style="margin-top: 1.5rem;">
+                <h2>Jahres-Update-Kette im Detail</h2>
+                <p class="card-intro">Diese Schrittfolge beschreibt, welche Felder automatisch aktualisiert werden und
+                    welche Eingaben Sie nach dem Update prüfen oder ergänzen müssen.</p>
+                <div class="manual-grid" style="margin-top: 1.5rem;">
+                    <div class="detail-block">
+                        <h3>Automatische Fortschreibungen</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light);">
+                            <li><strong>Inflation &amp; Bedarf:</strong> Der neu abgerufene Inflationswert indexiert Floor
+                                und Flex-Bedarf. Die Vorjahreswerte bleiben zum Vergleich sichtbar.</li>
+                            <li><strong>Alter:</strong> Startalter aller Personen erhöht sich um ein Jahr; abhängige
+                                Renten- und Pflege-Trigger werden neu berechnet.</li>
+                            <li><strong>Marktkontext:</strong> CAPE-Reihe rückt um ein Jahr weiter, das Allzeithoch wird
+                                ggf. aktualisiert, und der Entscheidungsbaum erhält den neuen CAPE-Overlay-Status.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block">
+                        <h3>Manuelle Prüfungen</h3>
+                        <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light);">
+                            <li><strong>Depotwerte:</strong> Tragen Sie den aktuellen Marktwert je Depot/ETF ein. Nutzen
+                                Sie getrennte Felder für Aktien und Anleihen, damit die Zielquote korrekt berechnet
+                                wird.</li>
+                            <li><strong>Cash &amp; Tagesgeld:</strong> Hinterlegen Sie Ist-Stände (inkl. Zinsgutschriften),
+                                damit Runway und Liquiditätspuffer stimmen.</li>
+                            <li><strong>Sonstige Zuflüsse:</strong> Prüfen Sie Sonderzahlungen oder Ausgaben, die nicht im
+                                Standardbedarf liegen, bevor Sie den Kapitalfluss ausführen.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="detail-block" style="margin-top: 1rem;">
+                    <h3>Diagnose-Panel lesen</h3>
+                    <p>Das Panel kombiniert Entscheidungsbaum und Handlungsanweisungen:</p>
+                    <ol style="margin-left: 20px; color: var(--text-light);">
+                        <li><strong>Entscheidungsbaum oben links:</strong> Prüft erst Liquidität/Runway, dann
+                            Rebalancing-Bedarf, danach CAPE- oder Drawdown-Bremse. Jeder Knoten zeigt den getesteten
+                            Schwellenwert.</li>
+                        <li><strong>KPIs oben rechts:</strong> Runway (Monate), aktuelle Aktienquote, Floor/Flex-Bedarf,
+                            Drawdown zum Allzeithoch, CAPE-Ampel.</li>
+                        <li><strong>Handlungsanweisungen unten links:</strong> Liste der nötigen Schritte inkl.
+                            Beträge, z.B. „Aktien verkaufen 18.000 € → Geldmarkt“.</li>
+                        <li><strong>Dokumentation unten rechts:</strong> Datenquellen und Zeitstempel des Updates, damit
+                            Entscheidungen nachvollziehbar bleiben.</li>
+                    </ol>
+                    <figure style="margin-top: 1rem;">
+                        <img src="assets/images/diagnose_panel_mock.svg" alt="Mockup des Diagnose-Panels" style="width:100%; max-width: 1100px; border: 1px solid #e0e6ed; border-radius: 12px; box-shadow: var(--card-shadow);">
+                        <figcaption style="color: var(--text-light); margin-top: 0.5rem;">Mockup: Entscheidungsbaum, KPIs,
+                            Handlungsanweisungen und Protokoll im Diagnose-Panel.</figcaption>
+                    </figure>
+                </div>
+
+                <div class="detail-block" style="margin-top: 1rem;" id="balance-kapitalfluss-guide">
+                    <h3>Kapitalfluss praktisch umsetzen</h3>
+                    <ol style="margin-left: 20px; color: var(--text-light);">
+                        <li><strong>Verkauf/Rebalancing:</strong> Entnehmen Sie die genannten Beträge aus dem
+                            Aktien-Depot, falls die Quote über Ziel liegt oder der Runway unter das Ziel fällt.</li>
+                        <li><strong>Geldmarkt auffüllen:</strong> Überweisen Sie Verkaufserlöse auf Tagesgeld/
+                            Geldmarkt, bis der Runway (z.B. 12 Monate) wieder erreicht ist.</li>
+                        <li><strong>Monatsbedarf auszahlen:</strong> Transferieren Sie den Floor/Flex-Betrag vom
+                            Geldmarkt auf das Ausgabenkonto. Keine Aktienverkäufe, wenn die Diagnose „kein
+                            Handlungsbedarf“ meldet.</li>
+                        <li><strong>Überschüsse parken:</strong> Bleibt Cash übrig, schieben Sie ihn zurück auf den
+                            Geldmarkt oder tilgen Sie Kreditlinien; das Panel nennt Prioritäten.</li>
+                    </ol>
+                    <figure style="margin-top: 1rem;">
+                        <img src="assets/images/kapitalfluss_mock.svg" alt="Mockup der Kapitalfluss-Schritte" style="width:100%; max-width: 1100px; border: 1px solid #e0e6ed; border-radius: 12px; box-shadow: var(--card-shadow);">
+                        <figcaption style="color: var(--text-light); margin-top: 0.5rem;">Mockup: Reihenfolge der Schritte
+                            zwischen Depot, Geldmarkt und Ausgabenkonto inklusive Checkliste.</figcaption>
+                    </figure>
+                </div>
+            </div>
+
+            <div class="info-card" id="onboarding-playbook" style="margin-top: 2rem;">
+                <h2>Onboarding-Playbook: Erste Woche/Erstes Jahr mit der Suite</h2>
+                <p class="card-intro">Strukturierte Checkliste, damit neue Nutzer schnell produktiv werden.</p>
+                <div class="detail-block" id="onboarding-woche" style="margin-top: 1rem;">
+                    <h3>Erste Woche</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Setup & Zugriff:</strong> Repository klonen oder ZIP laden, <code>index.html</code> öffnen, Tab "Simulator" laden.</li>
+                        <li><strong>Datenbasis füllen:</strong> Startvermögen, Sparrate, Rentenalter und Basis-Ausgaben im Simulator eingeben und erste Simulation speichern.</li>
+                        <li><strong>Balance-Grundlagen:</strong> In der Balance-App einen Testlauf mit Demo-Werten durchführen, um Diagnose-Panel und Kapitalfluss zu verstehen.</li>
+                        <li><strong>Datenablage klären:</strong> Speicherort für exportierte Szenarien (z.B. OneDrive/Nextcloud) definieren und Schreibrechte testen.</li>
+                    </ul>
+                </div>
+                <div class="detail-block" id="onboarding-jahr" style="margin-top: 1rem;">
+                    <h3>Erstes Jahr</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Quartals-Review:</strong> Simulationen bei Lebensereignissen (Bonus, Umzug, Gehaltsänderung) aktualisieren und Benchmarks dokumentieren.</li>
+                        <li><strong>Jahres-Update fest einplanen:</strong> Termin im Kalender blocken, um Inflation, Marktwerte und Bedarfe zu aktualisieren.</li>
+                        <li><strong>Risiko-Governance:</strong> Rebalancing-Schwellen, Notfall-Runway und CAPE-Grenzen in einer kurzen Policy-Notiz festhalten.</li>
+                        <li><strong>Backup & Versionierung:</strong> Exporte versionieren (z.B. YYYY-MM) und mindestens zweifach sichern, um Datenverlust zu vermeiden.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="info-card" id="haeufige-probleme" style="margin-top: 2rem;">
+                <h2>Häufige Probleme</h2>
+                <div class="detail-block" style="margin-top: 1rem;">
+                    <h3>Keine Internetverbindung für EZB-Daten</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Symptom:</strong> Jahres-Update bleibt bei „Inflationsdaten laden“ hängen.</li>
+                        <li><strong>Sofortmaßnahme:</strong> Internetverbindung prüfen, VPN/Firewall temporär deaktivieren, Seite neu laden.</li>
+                        <li><strong>Fallback:</strong> Inflationsrate manuell eintragen (Feld „Inflation manuell“ im Jahres-Update), danach Speichern drücken.</li>
+                        <li><strong>Prävention:</strong> Vor geplantem Update Offline-Sperren (Flugmodus/Firewall) prüfen und Datenquelle in <code>balance-config.js</code> nicht ändern.</li>
+                    </ul>
+                </div>
+                <div class="detail-block" style="margin-top: 1rem;">
+                    <h3>Ungültige Eingaben</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Symptom:</strong> Felder werden rot markiert oder Buttons bleiben deaktiviert.</li>
+                        <li><strong>Checkliste:</strong> Nur Zahlen ohne Sonderzeichen verwenden, Dezimaltrenner als Punkt/Komma akzeptiert; Pflichtfelder (Vermögen, Bedarf, Sparrate) ausfüllen.</li>
+                        <li><strong>Fehlerbehebung:</strong> Seite aktualisieren, Eingaben schrittweise wiederherstellen und auf Plausibilität (keine negativen Werte, realistische Quoten) prüfen.</li>
+                        <li><strong>Dauerhafte Lösung:</strong> Eigene Default-Vorlagen mit validierten Werten als JSON speichern und beim Start laden.</li>
+                    </ul>
+                </div>
+                <div class="detail-block" style="margin-top: 1rem;">
+                    <h3>Speichern und Laden</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Speichern schlägt fehl:</strong> Browser-Storage eventuell blockiert. Drittanbieter-Blocking oder Private Mode deaktivieren, Seite im normalen Modus neu öffnen.</li>
+                        <li><strong>Datei-Export nicht auffindbar:</strong> Download-Ordner des Browsers prüfen und einheitlich auf Cloud-Speicher umstellen.</li>
+                        <li><strong>Laden liefert alte Werte:</strong> Cache leeren (Strg+F5) und sicherstellen, dass die korrekte Datei gewählt wurde; Versionsstempel im Dateinamen verwenden.</li>
+                        <li><strong>Backup-Tipp:</strong> Nach jedem Jahres-Update Export erstellen und in der Haushalts-Dokumentation verlinken.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="info-card" id="jahrespflege" style="margin-top: 2rem;">
+                <h2>Best Practices für die jährliche Pflege</h2>
+                <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                    <li><strong>Fixen Termin setzen:</strong> Einmal pro Jahr (idealerweise Januar) alle Eingaben aktualisieren und Ergebnisse protokollieren.</li>
+                    <li><strong>Datenquellen einfrieren:</strong> Für Vergleiche dasselbe Inflations- und Kursdatum verwenden; danach Export mit Zeitstempel ablegen.</li>
+                    <li><strong>Delta-Review:</strong> Änderungen bei Vermögen, Bedarf und Erfolgswahrscheinlichkeit gegenüber Vorjahr notieren; große Abweichungen kommentieren.</li>
+                    <li><strong>Handlungsschritte prüfen:</strong> Rebalancing und Runway-Anpassungen sofort terminieren, damit der Plan nicht liegen bleibt.</li>
+                    <li><strong>Risiko-Parameter bestätigen:</strong> Ziel-Aktienquote, CAPE-Grenzen und Runway-Minimum jährlich bestätigen oder schriftlich anpassen.</li>
+                </ul>
+            </div>
+
+            <div class="info-card" id="anhang" style="margin-top: 2rem;">
+                <h2>Anhang</h2>
+                <div class="detail-block" id="anhang-datenquellen" style="margin-top: 1rem;">
+                    <h3>Datenquellen</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Inflation:</strong> EZB-HICP über die öffentliche Schnittstelle (Fallback: manuelle Eingabe im Jahres-Update).</li>
+                        <li><strong>Marktdaten:</strong> Shiller-CAPE-Zeitreihe und ETF-Schlusskurse gemäß Konfiguration in <code>balance-config.js</code>.</li>
+                        <li><strong>Simulationsannahmen:</strong> Rendite-/Volatilitätsparameter und Korrelationen in den <code>simulator-*</code>-Modulen dokumentiert.</li>
+                    </ul>
+                </div>
+                <div class="detail-block" id="anhang-versionen" style="margin-top: 1rem;">
+                    <h3>Versionshinweise</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Release-Stand:</strong> Siehe <code>README.md</code> für die aktuelle Version und Changelog-Notizen.</li>
+                        <li><strong>Breaking Changes:</strong> Bei Modellwechseln (z.B. neue CAPE-Logik) alte Exporte archivieren und neu simulieren.</li>
+                        <li><strong>Validierung:</strong> Nach Updates mindestens einen Smoke-Test (Simulator + Balance) durchführen und Ergebnisse kurz protokollieren.</li>
+                    </ul>
+                </div>
+                <div class="detail-block" id="anhang-support" style="margin-top: 1rem;">
+                    <h3>Kontakt &amp; Support</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Feedback:</strong> Issues im Repository anlegen oder per E-Mail an das Maintainer-Team senden.</li>
+                        <li><strong>Hilfesuche:</strong> FAQ und Glossar prüfen; bei technischen Problemen Log-Auszug (Konsole) beilegen.</li>
+                        <li><strong>Response-Zeiten:</strong> Innerhalb von 3 Werktagen für Fehlerberichte, komplexe Anfragen nach Aufwand.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="info-card" id="faq" style="margin-top: 2rem;">
+                <h2>Häufige Fragen (FAQ)</h2>
+                <dl class="term-list">
+                    <dt>Warum reichen durchschnittliche 7% Rendite nicht?</dt>
+                    <dd>Verluste zu Beginn der Entnahmephase (Sequence of Return Risk) können das Depot so stark
+                        verkleinern, dass es sich trotz späterer Gewinne nicht erholt. Unsere Simulation zeigt daher
+                        Spannbreiten statt nur Mittelwerte.</dd>
+
+                    <dt>Wie oft sollte ich Rebalancing machen?</dt>
+                    <dd>Ein jährlicher Rhythmus (z.B. zum Jahreswechsel) balanciert Aufwand, Steuern und
+                        Transaktionskosten sinnvoll aus.</dd>
+
+                    <dt>Kann ich die Simulation offline nutzen?</dt>
+                    <dd>Ja. Die Berechnungen laufen lokal im Browser. Nur optionale Echtzeitdaten (Inflation,
+                        Marktpreise) benötigen eine Internetverbindung.</dd>
+                </dl>
+            </div>
+
+            <div class="info-card" id="glossar" style="margin-top: 2rem;">
+                <h2>Glossar</h2>
+                <dl class="term-list">
+                    <dt><a class="toc-link" data-tab-target="manual" href="#simulator-ergebnisse">Erfolgswahrscheinlichkeit</a></dt>
+                    <dd>Prozent der <strong>simulierten Lebensläufe</strong>, in denen Ihr Portfolio bis zum Ende der geplanten
+                        Laufzeit finanzierbar bleibt. Beispiel: <em>93% bei 1.000 Läufen</em> bedeutet, dass 930 Pfade nicht
+                        vorzeitig scheitern. In der Simulator-Ausgabe sehen Sie den Wert oberhalb der
+                        Ergebnis-Grafik.</dd>
+
+                    <dt><a class="toc-link" data-tab-target="manual" href="#balance-diagnose">Runway</a></dt>
+                    <dd>Monatspuffer aus Cash/Geldmarkt, der Entnahmen in schwachen Märkten abfedert. Beispiel:
+                        <em>12 Monate Runway</em> = 12 × aktueller Monatsbedarf liegen auf Tagesgeld. Im Diagnose-Panel
+                        (KPIs oben rechts) zeigt die Runway-Anzeige in Monaten, ob der Puffer reicht.</dd>
+
+                    <dt><a class="toc-link" data-tab-target="manual" href="#balance-handlungsschritte">Skim &amp; Fill</a></dt>
+                    <dd>Kapitalfluss-Logik: Gewinne werden in starken Phasen „abgeschöpft“ (Skim) und füllen den
+                        Runway (Fill), während in Schwächephasen keine Verkäufe erfolgen. Beispiel-Sequenz:
+                        <div style="background: var(--card-background); border: 1px solid #e0e6ed; border-radius: 8px; padding: 10px; margin-top: 8px; color: var(--text-light);">
+                            <pre style="margin: 0; white-space: pre-line;">Aktien (über Ziel) → Verkauf 8.000 €
+Geldmarkt +8.000 € → Runway steigt auf 12 Monate
+Ausgabe-Konto erhält Monatsbedarf aus Geldmarkt</pre>
+                        </div>
+                        Die Handlungsschritte im Panel verlinken jede Bewegung zwischen Depot, Geldmarkt und Konto.</dd>
+
+                    <dt><a class="toc-link" data-tab-target="manual" href="#simulator-ergebnisse">Parameter Sweep</a></dt>
+                    <dd>Heatmap, die zeigt, wie Kombinationen aus Sparrate und Rentenbeginn die
+                        Erfolgswahrscheinlichkeit beeinflussen. Beispiel: Dunkelgrüne Felder markieren hohe
+                        Erfolgswerte bei <em>+200 € Sparrate</em> und <em>Rente ab 66</em>. Öffnen Sie den Sweep unter den
+                        Simulator-Ergebnissen.</dd>
+
+                    <dt><a class="toc-link" data-tab-target="manual" href="#balance-jahresupdate">Floor/Flex-Bedarf</a></dt>
+                    <dd>Fixer Grundbedarf (<strong>Floor</strong>) plus variable Ausgaben (<strong>Flex</strong>). Beide Werte werden im
+                        Jahres-Update indexiert und steuern Runway- und Kapitalfluss-Berechnungen. Beispiel: 1.500 €
+                        Floor + 700 € Flex = 2.200 € Monatsbedarf → 12 Monate Runway = 26.400 € Cash.</dd>
+
+                    <dt><a class="toc-link" data-tab-target="manual" href="#balance-diagnose">Rebalancing-Distanz</a></dt>
+                    <dd>Abstand zwischen aktueller und Ziel-Aktienquote, ab dem das System Umschichten vorschlägt.
+                        Im Entscheidungsbaum wird der Knoten „Aktienquote über Ziel?“ geprüft. Beispiel: Ziel 60%, Ist
+                        66% → Distanz 6 Prozentpunkte, Rebalancing ausgelöst sofern Runway erfüllt ist.</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Aktiviert einen Tab und blendet alle anderen aus.
+         * Design-Entscheidung: Die Zuordnung Button → Tab erfolgt über data-Attribute statt Array-Indizes,
+         * um spätere Tab-Erweiterungen robust zu unterstützen.
+         * @param {string} tabId - DOM-ID des Tab-Containers, der angezeigt werden soll.
+         * @returns {void}
+         */
+        function switchTab(tabId) {
+            // Eingabe defensiv prüfen, damit fehlerhafte Aufrufe die Navigation nicht brechen.
+            if (typeof tabId !== 'string' || !tabId.trim()) {
+                console.warn('switchTab wurde ohne gültige Tab-ID aufgerufen');
+                return;
+            }
+
+            const normalizedTabId = tabId.trim();
+            const targetSection = document.getElementById(normalizedTabId);
+
+            // Falls der angeforderte Tab nicht existiert, nicht weiterarbeiten und klar loggen.
+            if (!targetSection) {
+                console.warn('Tab-Abschnitt nicht gefunden:', normalizedTabId);
+                return;
+            }
+
+            // Alle Abschnitte umschalten, damit nur der gewählte Bereich sichtbar ist.
+            document.querySelectorAll('.content-section').forEach(section => {
+                section.classList.toggle('active', section.id === normalizedTabId);
+            });
+
+            const tabButtons = document.querySelectorAll('.tab-btn');
+
+            // Button-Zuordnung über data-tab-id statt feste Positionen, um künftige Tabs zu erleichtern.
+            tabButtons.forEach(button => {
+                const buttonTabId = button.dataset.tabId;
+                const isTargetButton = buttonTabId === normalizedTabId;
+                button.classList.toggle('active', isTargetButton);
+            });
+
+            // Fallback: Sollte kein Button matchen, markieren wir den ersten, um den UI-Zustand konsistent zu halten.
+            const hasActiveButton = Array.from(tabButtons).some(button => button.classList.contains('active'));
+            if (!hasActiveButton && tabButtons.length > 0) {
+                tabButtons[0].classList.add('active');
+            }
+        }
+
+        /**
+         * Verkettet Inhaltsverzeichnis-Links mit den Tabs und sorgt für sauberes Scrollen zu den Ankern.
+         * Design-Entscheidung: Wir verhindern die Standardnavigation, schalten erst den Tab sichtbar und
+         * scrollen danach kontrolliert, damit Ziele auch dann erreichbar sind, wenn sie zuvor verborgen waren.
+         * @returns {void}
+         */
+        function setupTocNavigation() {
+            const tocLinks = document.querySelectorAll('.toc-link');
+
+            // Defensive Absicherung: Sollte das Inhaltsverzeichnis fehlen, sauber loggen und abbrechen.
+            if (tocLinks.length === 0) {
+                console.warn('Kein Inhaltsverzeichnis gefunden; TOC-Navigation wird übersprungen');
+                return;
+            }
+
+            tocLinks.forEach(link => {
+                // Aktiviert bei Klick den relevanten Tab, damit der Zielanker nicht versteckt bleibt.
+                link.addEventListener('click', event => {
+                    event.preventDefault();
+
+                    const targetTab = link.getAttribute('data-tab-target') || 'manual';
+                    const anchorId = link.getAttribute('href');
+
+                    switchTab(targetTab);
+
+                    // Scroll erst nach dem Tab-Wechsel, damit das Ziel sichtbar ist.
+                    if (anchorId && anchorId.startsWith('#')) {
+                        const anchorElement = document.querySelector(anchorId);
+                        if (anchorElement) {
+                            requestAnimationFrame(() => {
+                                anchorElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                // URL-Hash aktualisieren, damit die Navigation teilbar bleibt.
+                                history.replaceState(null, '', anchorId);
+                            });
+                        } else {
+                            console.warn('Ankerziel nicht gefunden:', anchorId);
+                        }
+                    }
+                });
+            });
+        }
+
+        // Standardmäßig das detaillierte Handbuch offen halten, damit alle Anker direkt erreichbar sind.
+        setupTocNavigation();
+    </script>
+</body>
+
+</html>

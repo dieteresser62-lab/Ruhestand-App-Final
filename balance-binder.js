@@ -496,18 +496,7 @@ export const UIBinder = {
 
             UIRenderer.toast('Starte Jahres-Update...');
 
-            // Schritt 1: Inflation abrufen
-            btn.innerHTML = '⏳ Inflation...';
-            try {
-                results.inflation = await this.handleFetchInflation();
-            } catch (err) {
-                results.errors.push({ step: 'Inflation', error: err.message || 'Unbekannter Fehler' });
-            }
-
-            // Kurze Pause für besseres UX
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            // Schritt 3: Alter um 1 Jahr erhöhen (ein Jahr ist vergangen)
+            // Schritt 1: Alter um 1 Jahr erhoehen (ein Jahr ist vergangen)
             const currentAge = parseInt(dom.inputs.aktuellesAlter.value) || 0;
             const newAge = currentAge + 1;
             dom.inputs.aktuellesAlter.value = newAge.toString();
@@ -517,6 +506,25 @@ export const UIBinder = {
             const state = StorageManager.loadState();
             state.ageAdjustedForInflation = newAge;
             StorageManager.saveState(state);
+
+            // Schritt 2: Inflation abrufen
+            btn.innerHTML = '⏳ Inflation...';
+            try {
+                results.inflation = await this.handleFetchInflation();
+            } catch (err) {
+                results.errors.push({ step: 'Inflation', error: err.message || 'Unbekannter Fehler' });
+            }
+
+            // Kurze Pause fuer besseres UX
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // Schritt 3: Marktdaten via ETF abrufen und nachruecken
+            btn.innerHTML = '⏳ ETF...';
+            try {
+                results.etf = await this.handleNachrueckenMitETF();
+            } catch (err) {
+                results.errors.push({ step: 'ETF/Nachr.', error: err.message || 'Unbekannter Fehler' });
+            }
 
             // UI aktualisieren, damit die Erfolgsmeldung das neue Alter anzeigt
             debouncedUpdate();
@@ -714,6 +722,7 @@ export const UIBinder = {
     async _fetchVanguardETFPrice(targetDate) {
         const ticker = 'VWCE.DE'; // Vanguard FTSE All-World in EUR (Xetra)
         const isin = 'IE00BK5BQT80'; // ISIN für alternative APIs
+        const LOCAL_YAHOO_PROXY = 'http://127.0.0.1:8787';
 
         const formatDate = (date) => Math.floor(date.getTime() / 1000); // Unix timestamp
         const formatDateYMD = (date) => date.toISOString().split('T')[0]; // YYYY-MM-DD
@@ -724,7 +733,7 @@ export const UIBinder = {
         startDate.setDate(startDate.getDate() - 10);
         const startTime = formatDate(startDate);
 
-        // Strategie 1-2: Yahoo Finance ueber CORS-Proxies
+        // Strategie 1: Yahoo Finance ueber lokalen Proxy
         const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${startTime}&period2=${targetTime}&interval=1d`;
         const parseYahooResponse = (data, sourceLabel) => {
             if (data.chart?.result?.[0]) {
@@ -749,6 +758,18 @@ export const UIBinder = {
             }
             return null;
         };
+        try {
+            const proxyUrl = `${LOCAL_YAHOO_PROXY}/chart?symbol=${encodeURIComponent(ticker)}&period1=${startTime}&period2=${targetTime}&interval=1d`;
+            const response = await fetch(proxyUrl);
+            if (response.ok) {
+                const data = await response.json();
+                const parsed = parseYahooResponse(data, 'Yahoo Finance (lokaler Proxy)');
+                if (parsed) return parsed;
+            }
+        } catch (err) {
+            // Yahoo Finance via local proxy failed, try fallback
+        }
+
         const buildProxyUrl = (template, targetUrl) => {
             if (template.includes('{url}')) {
                 return template.replace('{url}', encodeURIComponent(targetUrl));
@@ -775,10 +796,6 @@ export const UIBinder = {
                     });
                 });
         }
-        proxyEntries.push(
-            { name: 'Yahoo Finance (allorigins.win)', template: 'https://api.allorigins.win/raw?url=' },
-            { name: 'Yahoo Finance (corsproxy.io)', template: 'https://corsproxy.io/?' }
-        );
 
         for (const proxy of proxyEntries) {
             try {
@@ -824,14 +841,14 @@ export const UIBinder = {
             `Zieldatum: ${targetDate.toLocaleDateString('de-DE')}\n\n` +
             `Getestete APIs:
 ` +
-            `- Yahoo Finance via CORS-Proxy (Standard + optional Custom)
+            `- Yahoo Finance via lokalem Proxy (localhost:8787)
+` +
+            `- Optional: Custom Proxy (localStorage etfProxyUrl/etfProxyUrls)
 ` +
             `- Finnhub API
 
 ` +
-            `Alle CORS-Proxies sind fehlgeschlagen.
-
-` +
+            
             `Hinweise:
 ` +
             `- Nutze den manuellen "Nachr." Button
@@ -856,12 +873,12 @@ export const UIBinder = {
                 btn.innerHTML = '⏳ ETF...';
             }
 
-            // Berechne Zieldatum: 31.01. des aktuellen Jahres
-            const currentYear = new Date().getFullYear();
-            const targetDate = new Date(currentYear, 0, 31); // Monat 0 = Januar
+            // Zieldatum: aktuelles Tagesdatum
+            const targetDate = new Date();
 
             if (btn) {
-                UIRenderer.toast(`Rufe VWCE.DE Kurs vom 31.01.${currentYear} ab...`);
+                const todayLabel = targetDate.toLocaleDateString('de-DE');
+                UIRenderer.toast(`Rufe VWCE.DE Kurs vom ${todayLabel} ab...`);
             }
 
             // 1. ETF-Kurs abrufen
