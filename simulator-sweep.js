@@ -200,6 +200,46 @@ async function runSweepWithWorkers({
     return sweepResults;
 }
 
+async function runSweepSerial({
+    baseInputs,
+    paramCombinations,
+    sweepConfig,
+    refP2Invariants,
+    onProgress
+}) {
+    const totalCombos = paramCombinations.length;
+    const sweepResults = new Array(totalCombos);
+    let completedCombos = 0;
+    let p2VarianceCount = 0;
+    const chunkSize = Math.min(20, Math.max(1, Math.ceil(totalCombos / 20)));
+
+    for (let start = 0; start < totalCombos; start += chunkSize) {
+        const count = Math.min(chunkSize, totalCombos - start);
+        const serial = runSweepChunk({
+            baseInputs,
+            paramCombinations,
+            comboRange: { start, count },
+            sweepConfig,
+            refP2Invariants
+        });
+        for (const item of serial.results) {
+            sweepResults[item.comboIdx] = { params: item.params, metrics: item.metrics };
+        }
+        p2VarianceCount += serial.p2VarianceCount || 0;
+        completedCombos += count;
+        if (typeof onProgress === 'function') {
+            onProgress((completedCombos / totalCombos) * 100);
+        }
+        await new Promise(resolve => setTimeout(resolve, 0));
+    }
+
+    if (p2VarianceCount > 0) {
+        console.warn(`[SWEEP][ASSERT] P2-Basis-Parameter variieren in ${p2VarianceCount} Kombos.`);
+    }
+
+    return sweepResults;
+}
+
 /**
  * Führt den Parameter-Sweep über alle gewählten Parameterkombinationen aus.
  *
@@ -318,18 +358,19 @@ export async function runParameterSweep() {
             }
         } catch (error) {
             console.error('[SWEEP] Worker execution failed, falling back to serial.', error);
-            const serial = runSweepChunk({
+            const serialResults = await runSweepSerial({
                 baseInputs,
                 paramCombinations,
-                comboRange: { start: 0, count: paramCombinations.length },
                 sweepConfig,
-                refP2Invariants
+                refP2Invariants,
+                onProgress: pct => {
+                    progressBar.style.width = `${pct}%`;
+                    progressBar.textContent = `${Math.round(pct)}%`;
+                }
             });
-            for (const item of serial.results) {
-                sweepResults[item.comboIdx] = { params: item.params, metrics: item.metrics };
+            for (let i = 0; i < serialResults.length; i++) {
+                sweepResults[i] = serialResults[i];
             }
-            progressBar.style.width = '100%';
-            progressBar.textContent = '100%';
         }
 
         window.sweepResults = sweepResults;

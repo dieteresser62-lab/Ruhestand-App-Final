@@ -11,6 +11,7 @@ import { StorageManager, initStorageManager } from './balance-storage.js';
 import { UIReader, initUIReader } from './balance-reader.js';
 import { UIRenderer, initUIRenderer } from './balance-renderer.js';
 import { UIBinder, initUIBinder } from './balance-binder.js';
+import { initTranchenStatus, syncTranchenToInputs } from './depot-tranchen-status.js';
 
 // ==================================================================================
 // APPLICATION STATE & DOM REFERENCES
@@ -285,6 +286,7 @@ function init() {
     // Lädt letzten Zustand aus localStorage und wendet ihn auf die Formular-Felder an
     const persistentState = StorageManager.loadState();
     UIReader.applyStoredInputs(persistentState.inputs);
+    syncTranchenToInputs({ silent: true });
 
     // 7. Bind UI events
     // Registriert alle Event-Listener (input, change, click, keyboard shortcuts)
@@ -299,6 +301,10 @@ function init() {
     // 9. Initial update
     // Führt ersten Berechnungs- und Render-Zyklus durch
     update();
+
+    // 10. Initialize Depot-Tranchen Status Badge
+    // Zeigt Status der geladenen detaillierten Tranchen an
+    initTranchenStatus('tranchenStatusBadge');
 }
 
 // ==================================================================================

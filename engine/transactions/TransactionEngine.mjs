@@ -250,7 +250,7 @@ export const TransactionEngine = {
             blockedAmount: 0,
             equityThresholds: {
                 targetAllocationPct: input.targetEq,
-                rebalancingBandPct: input.rebalancingBand ?? input.rebalBand ?? 35,
+                rebalancingBandPct: input.rebalBand ?? input.rebalancingBand ?? 35,
                 maxSkimPctOfEq: input.maxSkimPctOfEq ?? 1.0
             },
             goldThresholds: {
@@ -491,9 +491,9 @@ export const TransactionEngine = {
                 // Gold-Rebalancing prüfen
                 if (input.goldAktiv && input.goldZielProzent > 0) {
                     const goldZielwert = investiertesKapital * (input.goldZielProzent / 100);
-                    const bandPct = (input.rebalancingBand ?? input.rebalBand ?? 35) / 100;
-                    const goldUntergrenze = goldZielwert * (1 - bandPct);
-                    const goldObergrenze = goldZielwert * (1 + bandPct);
+                    const goldBandPct = (input.rebalancingBand ?? input.rebalBand ?? 35) / 100;
+                    const goldUntergrenze = goldZielwert * (1 - goldBandPct);
+                    const goldObergrenze = goldZielwert * (1 + goldBandPct);
 
                     if (input.goldWert < goldUntergrenze) {
                         goldKaufBedarf = Math.max(0, goldZielwert - input.goldWert);
@@ -502,6 +502,10 @@ export const TransactionEngine = {
                         // Wenn Gold stark gestiegen ist (über Band), muss verkauft werden.
                         goldVerkaufBedarf = Math.max(0, input.goldWert - goldZielwert);
                     }
+                }
+                if (liquiditaetsBedarf > 0 && goldKaufBedarf > 0) {
+                    // Kein Gold-Kauf aus Verkäufen, solange Liquidität unter Ziel ist.
+                    goldKaufBedarf = Math.min(goldKaufBedarf, surplusCash);
                 }
 
                 // Action Details vorbereiten
@@ -606,10 +610,12 @@ export const TransactionEngine = {
                 if (effectiveTotalerBedarf >= appliedMinTradeGate) {
                     // Gold-Verkaufsbudget berechnen
                     let maxSellableFromGold = 0;
-                    if (input.goldAktiv && input.goldZielProzent > 0) {
-                        const goldZielwert = investiertesKapital * (input.goldZielProzent / 100);
-                        const bandPct = (input.rebalancingBand ?? input.rebalBand ?? 35) / 100;
-                        const goldObergrenze = goldZielwert * (1 + bandPct);
+                const goldBandPct = (input.rebalancingBand ?? input.rebalBand ?? 35) / 100;
+                const equityBandPct = (input.rebalBand ?? input.rebalancingBand ?? 35) / 100;
+
+                if (input.goldAktiv && input.goldZielProzent > 0) {
+                    const goldZielwert = investiertesKapital * (input.goldZielProzent / 100);
+                    const goldObergrenze = goldZielwert * (1 + goldBandPct);
 
                         if (input.goldWert > goldObergrenze) {
                             maxSellableFromGold = input.goldWert - goldZielwert;
@@ -622,7 +628,7 @@ export const TransactionEngine = {
                     transactionDiagnostics.goldThresholds = {
                         ...transactionDiagnostics.goldThresholds,
                         saleBudgetGold: maxSellableFromGold,
-                        rebalancingBandPct: input.rebalancingBand ?? input.rebalBand ?? 35
+                        rebalancingBandPct: (goldBandPct * 100)
                     };
 
                     if (isNaN(maxSellableFromGold)) {
@@ -634,7 +640,7 @@ export const TransactionEngine = {
 
                     // Aktien-Verkaufsbudget berechnen
                     const aktienZielwert = investiertesKapital * (input.targetEq / 100);
-                    const aktienObergrenze = aktienZielwert * (1 + ((input.rebalancingBand ?? input.rebalBand ?? 35) / 100));
+                    const aktienObergrenze = aktienZielwert * (1 + equityBandPct);
                     let aktienUeberschuss = (aktienwert > aktienObergrenze)
                         ? (aktienwert - aktienZielwert)
                         : 0;
@@ -677,14 +683,12 @@ export const TransactionEngine = {
                     const maxSellableFromEquity = Math.min(aktienUeberschuss, effectiveSkimCap);
 
                     const totalEquityValue = input.depotwertAlt + input.depotwertNeu;
-                    if (aktienwert > 0) {
-                        saleContext.saleBudgets.aktien_alt = aktienUeberschuss * (input.depotwertAlt / aktienwert);
-                        saleContext.saleBudgets.aktien_neu = aktienUeberschuss * (input.depotwertNeu / aktienwert);
+                    if (totalEquityValue > 0) {
+                        saleContext.maxEquityBudgetTotal = maxSellableFromEquity;
                     }
                     transactionDiagnostics.equityThresholds = {
                         ...transactionDiagnostics.equityThresholds,
-                        saleBudgetAktienAlt: saleContext.saleBudgets.aktien_alt || 0,
-                        saleBudgetAktienNeu: saleContext.saleBudgets.aktien_neu || 0
+                        saleBudgetEquityTotal: maxSellableFromEquity || 0
                     };
 
                     // ANTI-PSEUDO-ACCURACY: Liquiditätsbedarf kaufmännisch runden (Ceil)
@@ -789,9 +793,13 @@ export const TransactionEngine = {
                 // Wir dürfen totalWealth hier NICHT künstlich klein rechnen, sonst sind die Ziel-Beträge für Aktien/Gold zu niedrig.
                 const totalWealth = depotwertGesamt + aktuelleLiquiditaet;
 
-                // 1. Absolute Zielwerte berechnen
+                // 1. Zielwerte + Obergrenzen (Rebalancing-Band) berechnen
                 const targetStockVal = totalWealth * (input.targetEq / 100);
                 const targetGoldVal = input.goldAktiv ? totalWealth * (input.goldZielProzent / 100) : 0;
+                const equityBandPct = (input.rebalBand ?? input.rebalancingBand ?? 35) / 100;
+                const goldBandPct = (input.rebalancingBand ?? input.rebalBand ?? 35) / 100;
+                const upperStockVal = targetStockVal * (1 + equityBandPct);
+                const upperGoldVal = targetGoldVal * (1 + goldBandPct);
 
                 // 2. Aktuelle Werte ermitteln
                 // FIX: p.aktienWert und p.goldWert existieren nicht als Parameter.
@@ -800,13 +808,20 @@ export const TransactionEngine = {
                 const currentGoldVal = input.goldAktiv ? (input.goldWert || 0) : 0;
 
 
-                // 3. Gaps berechnen (Nur positive Gaps, wir verkaufen hier nichts, nur Kauf)
-                const gapStock = Math.max(0, targetStockVal - currentStockVal);
-                const gapGold = Math.max(0, targetGoldVal - currentGoldVal);
+                // 3. Gaps berechnen (bis zur Obergrenze; wir verkaufen hier nichts, nur Kauf)
+                const gapStock = Math.max(0, upperStockVal - currentStockVal);
+                const gapGold = Math.max(0, upperGoldVal - currentGoldVal);
                 const totalGap = gapStock + gapGold;
 
                 // 4. Investitionsbetrag begrenzen
                 let investAmountRaw = Math.min(surplus, totalGap);
+
+                // Wenn keine Gaps existieren, aber Überschuss hoch ist, erlauben wir
+                // einen begrenzten Cash-Abbau in Aktien (marktabhängig).
+                const equityOverflowCap = ((input.maxSkimPctOfEq || 5) / 100) * currentStockVal;
+                if (totalGap <= 0) {
+                    investAmountRaw = Math.min(surplus, equityOverflowCap);
+                }
 
                 if (CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED) {
                     investAmountRaw = this._quantizeAmount(investAmountRaw, 'floor');
@@ -817,7 +832,7 @@ export const TransactionEngine = {
                     // Wer die größte Lücke hat, kriegt am meisten.
                     const realTotalGap = gapStock + gapGold;
 
-                    const shareStock = (realTotalGap > 0) ? gapStock / realTotalGap : 0;
+                    const shareStock = (realTotalGap > 0) ? gapStock / realTotalGap : 1;
                     const shareGold = (realTotalGap > 0) ? gapGold / realTotalGap : 0;
 
                     const goldTeilRaw = investAmountRaw * shareGold;
@@ -833,12 +848,13 @@ export const TransactionEngine = {
                         : aktienTeilRaw;
 
                     const investAmount = goldTeil + aktienTeil;
+                    const isOverflowInvest = totalGap <= 0;
 
                     if (investAmount > 0) {
                         return {
                             type: 'TRANSACTION',
                             anweisungKlasse: 'anweisung-gelb', // Standard yellow for transactions
-                            title: 'Surplus Rebalancing (Opportunistisch)',
+                            title: isOverflowInvest ? 'Surplus Rebalancing (Liquiditätsabbau)' : 'Surplus Rebalancing (Opportunistisch)',
                             nettoErlös: investAmount, // Zeigt den investierten Betrag an
                             quellen: [{
                                 source: 'Liquidität',
@@ -856,7 +872,7 @@ export const TransactionEngine = {
                                 kaufAkt: aktienTeil,
                                 kaufGld: goldTeil,
                                 verkaufLiquiditaet: investAmount,
-                                grund: 'Surplus Rebalancing (Opportunistisch)',
+                                grund: isOverflowInvest ? 'Surplus Rebalancing (Liquiditätsabbau)' : 'Surplus Rebalancing (Opportunistisch)',
                                 source: 'surplus'
                             },
                             zielLiquiditaet, // FIX: Expose target liquidity
@@ -932,6 +948,24 @@ export const TransactionEngine = {
         }
 
         const effektiverNettoerloes = saleResult.achievedRefill;
+
+        if (saleResult?.breakdown && Array.isArray(saleResult.breakdown)) {
+            transactionDiagnostics.selectedTranches = saleResult.breakdown
+                .filter(item => item && item.kind && item.kind !== 'liquiditaet')
+                .map(item => {
+                    const brutto = Number(item.brutto) || 0;
+                    const steuer = Number(item.steuer) || 0;
+                    const taxPerEuro = brutto > 0 ? (steuer / brutto) : 0;
+                    return {
+                        kind: item.kind,
+                        name: item.name || null,
+                        trancheId: item.trancheId || null,
+                        brutto,
+                        steuer,
+                        taxPerEuro
+                    };
+                });
+        }
 
         if (gesamterNettoBedarf > effektiverNettoerloes + 1 && !actionDetails.isCapped) {
             actionDetails.title += ' (Cap aktiv)';
@@ -1016,6 +1050,14 @@ export const TransactionEngine = {
             let nochZuDeckenderNettoBetrag = Math.max(0, Number(nettoBedarf) || 0);
             let pauschbetragRest = Math.max(0, Number(pauschbetrag) || 0);
 
+            const remainingBudgets = (context && context.saleBudgets)
+                ? { ...context.saleBudgets }
+                : null;
+            let remainingEquityBudget = Number(context?.maxEquityBudgetTotal);
+            if (!Number.isFinite(remainingEquityBudget) || remainingEquityBudget <= 0) {
+                remainingEquityBudget = null;
+            }
+
 
             // DEBUG SALE LOOP (REMOVED)
 
@@ -1038,10 +1080,13 @@ export const TransactionEngine = {
                 }
 
                 // Sale-Budget berücksichtigen
-                if (context.saleBudgets && context.saleBudgets[tranche.kind] !== undefined) {
-                    const budget = Number(context.saleBudgets[tranche.kind]);
-                    // Only apply budget if it's a valid number, assume 0 if NaN (conservative)
-                    maxBruttoVerkaufbar = Math.min(maxBruttoVerkaufbar, isNaN(budget) ? 0 : budget);
+                if (remainingBudgets && remainingBudgets[tranche.kind] !== undefined) {
+                    const budgetRaw = remainingBudgets[tranche.kind];
+                    const budget = Number.isFinite(budgetRaw) ? budgetRaw : 0;
+                    maxBruttoVerkaufbar = Math.min(maxBruttoVerkaufbar, budget);
+                }
+                if (remainingEquityBudget !== null && String(tranche.kind || '').startsWith('aktien')) {
+                    maxBruttoVerkaufbar = Math.min(maxBruttoVerkaufbar, remainingEquityBudget);
                 }
 
                 if (maxBruttoVerkaufbar <= 0) continue;
@@ -1094,6 +1139,14 @@ export const TransactionEngine = {
 
                 if (zuVerkaufenBrutto < 1) continue;
 
+                if (remainingBudgets && remainingBudgets[tranche.kind] !== undefined) {
+                    const budgetLeft = Number(remainingBudgets[tranche.kind]) || 0;
+                    remainingBudgets[tranche.kind] = Math.max(0, budgetLeft - zuVerkaufenBrutto);
+                }
+                if (remainingEquityBudget !== null && String(tranche.kind || '').startsWith('aktien')) {
+                    remainingEquityBudget = Math.max(0, remainingEquityBudget - zuVerkaufenBrutto);
+                }
+
                 // Tatsächliche Steuer berechnen
                 const bruttogewinn = zuVerkaufenBrutto * gewinnQuote;
                 const gewinnNachTFS = bruttogewinn * (1 - (tranche.tqf || 0));
@@ -1110,6 +1163,10 @@ export const TransactionEngine = {
 
                 finalBreakdown.push({
                     kind: tranche.kind,
+                    trancheId: tranche.trancheId || null,
+                    name: tranche.name || null,
+                    isin: tranche.isin || null,
+                    purchaseDate: tranche.purchaseDate || null,
                     brutto: zuVerkaufenBrutto,
                     steuer,
                     tqf: tranche.tqf,
@@ -1128,28 +1185,52 @@ export const TransactionEngine = {
         };
 
         // Tranchen zusammenstellen
-        let tranches = {
-            aktien_alt: {
-                marketValue: input.depotwertAlt,
-                costBasis: input.costBasisAlt,
-                tqf: input.tqfAlt,
-                kind: 'aktien_alt'
-            },
-            aktien_neu: {
-                marketValue: input.depotwertNeu,
-                costBasis: input.costBasisNeu,
-                tqf: input.tqfNeu,
-                kind: 'aktien_neu'
-            },
-            gold: (input.goldAktiv && input.goldWert > 0)
-                ? {
-                    marketValue: input.goldWert,
-                    costBasis: input.goldCost,
-                    tqf: input.goldSteuerfrei ? 1.0 : 0.0,
-                    kind: 'gold'
+        let tranches = {};
+
+        // Prüfe ob detaillierte Tranchen verfügbar sind (aus Portfolio)
+        if (input.detailledTranches && Array.isArray(input.detailledTranches)) {
+            // Verwende detaillierte Tranchen
+            input.detailledTranches.forEach((t, idx) => {
+                const baseKey = t.trancheId || t.isin || `tranche_${t.name || 'unnamed'}_${idx}`;
+                let key = baseKey;
+                let suffix = 1;
+                while (tranches[key]) {
+                    key = `${baseKey}_${suffix++}`;
                 }
-                : null
-        };
+                tranches[key] = {
+                    ...t,
+                    trancheId: t.trancheId || null,
+                    kind: t.type || t.kind || 'aktien_alt',
+                    marketValue: t.marketValue || (t.shares * t.currentPrice) || 0,
+                    costBasis: t.costBasis || (t.shares * t.purchasePrice) || 0,
+                    tqf: t.tqf ?? 0.30
+                };
+            });
+        } else {
+            // Fallback auf alte Struktur
+            tranches = {
+                aktien_alt: {
+                    marketValue: input.depotwertAlt,
+                    costBasis: input.costBasisAlt,
+                    tqf: input.tqfAlt,
+                    kind: 'aktien_alt'
+                },
+                aktien_neu: {
+                    marketValue: input.depotwertNeu,
+                    costBasis: input.costBasisNeu,
+                    tqf: input.tqfNeu,
+                    kind: 'aktien_neu'
+                },
+                gold: (input.goldAktiv && input.goldWert > 0)
+                    ? {
+                        marketValue: input.goldWert,
+                        costBasis: input.goldCost,
+                        tqf: input.goldSteuerfrei ? 1.0 : 0.0,
+                        kind: 'gold'
+                    }
+                    : null
+            };
+        }
 
         // Leere Tranchen entfernen
         Object.keys(tranches).forEach(key => {
@@ -1165,52 +1246,102 @@ export const TransactionEngine = {
     },
 
     /**
-     * Bestimmt Verkaufsreihenfolge
+     * Bestimmt Verkaufsreihenfolge (mit FIFO-Unterstützung)
      * @private
      */
     _getSellOrder(tranches, market, input, context, isEmergencySale) {
-        // Aktien nach steuerlicher Effizienz sortieren
-        const equityKeys = Object.keys(tranches)
-            .filter(k => k.startsWith('aktien'))
-            .sort((a, b) => {
-                const tA = tranches[a];
-                const tB = tranches[b];
-                const gqA = tA.marketValue > 0
-                    ? Math.max(0, (tA.marketValue - tA.costBasis) / tA.marketValue)
-                    : 0;
-                const gqB = tB.marketValue > 0
-                    ? Math.max(0, (tB.marketValue - tB.costBasis) / tB.marketValue)
-                    : 0;
-                return (gqA * (1 - (tA.tqf || 0))) - (gqB * (1 - (tB.tqf || 0)));
-            });
+        // Alle verfügbaren Keys
+        const allKeys = Object.keys(tranches);
+
+        // Separate Aktien- und Gold-Keys
+        const equityKeys = allKeys.filter(k => {
+            const t = tranches[k];
+            return k.startsWith('aktien') || (t.category && t.category === 'equity');
+        });
+
+        const goldKeys = allKeys.filter(k => {
+            const t = tranches[k];
+            return k === 'gold' || (t.category && t.category === 'gold');
+        });
+
+        // Steuer-optimierte Sortierung für Aktien (geringste Steuerlast zuerst)
+        const sortedEquityKeys = [...equityKeys].sort((a, b) => {
+            const tA = tranches[a];
+            const tB = tranches[b];
+            const kiSt = Number(input.kirchensteuerSatz) || 0;
+            const keSt = 0.25 * (1 + 0.055 + kiSt);
+            const mvA = Number(tA.marketValue) || 0;
+            const mvB = Number(tB.marketValue) || 0;
+            const cbA = Number(tA.costBasis) || 0;
+            const cbB = Number(tB.costBasis) || 0;
+            const tqfA = Number(tA.tqf) || 0;
+            const tqfB = Number(tB.tqf) || 0;
+            const gqA = mvA > 0 ? Math.max(0, (mvA - cbA) / mvA) : 0;
+            const gqB = mvB > 0 ? Math.max(0, (mvB - cbB) / mvB) : 0;
+            const taxRateA = gqA * (1 - tqfA) * keSt;
+            const taxRateB = gqB * (1 - tqfB) * keSt;
+
+            if (taxRateA !== taxRateB) return taxRateA - taxRateB;
+            if (gqA !== gqB) return gqA - gqB;
+
+            const dateA = tA.purchaseDate ? Date.parse(tA.purchaseDate) : NaN;
+            const dateB = tB.purchaseDate ? Date.parse(tB.purchaseDate) : NaN;
+            const dateAOk = Number.isFinite(dateA);
+            const dateBOk = Number.isFinite(dateB);
+            if (dateAOk && dateBOk && dateA !== dateB) return dateB - dateA; // newer first
+            if (dateAOk && !dateBOk) return -1;
+            if (!dateAOk && dateBOk) return 1;
+
+            return String(a).localeCompare(String(b));
+        });
+
+        // FIFO-Sortierung für Gold (falls mehrere Gold-Tranchen existieren)
+        const sortedGoldKeys = [...goldKeys].sort((a, b) => {
+            const tA = tranches[a];
+            const tB = tranches[b];
+
+            if (tA.purchaseDate && tB.purchaseDate) {
+                const dateA = new Date(tA.purchaseDate);
+                const dateB = new Date(tB.purchaseDate);
+                return dateA - dateB;
+            }
+
+            if (tA.purchaseDate && !tB.purchaseDate) return -1;
+            if (!tA.purchaseDate && tB.purchaseDate) return 1;
+
+            return 0;
+        });
 
         const isDefensiveContext = isEmergencySale ||
             market.sKey === 'bear_deep' ||
             market.sKey === 'recovery_in_bear';
 
-        // Im defensiven Kontext: Gold zuerst
+        // Im defensiven Kontext: Gold zuerst, dann Aktien (beide FIFO-sortiert)
         if (isDefensiveContext) {
-            const order = ['gold', ...equityKeys];
+            const order = [...sortedGoldKeys, ...sortedEquityKeys];
             return order.filter(k => tranches[k]);
         }
 
         // Gold über Obergrenze? Gold zuerst verkaufen
-        if (input.goldAktiv && tranches.gold) {
+        if (input.goldAktiv && sortedGoldKeys.length > 0) {
             const depotwertGesamt = (input.depotwertAlt || 0) +
                 (input.depotwertNeu || 0) +
                 (input.goldWert || 0);
             const investiertesKapital = depotwertGesamt + input.tagesgeld + input.geldmarktEtf;
             const goldZielwert = investiertesKapital * (input.goldZielProzent / 100);
-            const bandPct = (input.rebalancingBand ?? input.rebalBand ?? 35) / 100;
-            const goldObergrenze = goldZielwert * (1 + bandPct);
+            const goldBandPct = (input.rebalancingBand ?? input.rebalBand ?? 35) / 100;
+            const goldObergrenze = goldZielwert * (1 + goldBandPct);
 
-            if (tranches.gold.marketValue > goldObergrenze) {
-                return ['gold', ...equityKeys].filter(k => tranches[k]);
+            // Gesamter Gold-Wert berechnen
+            const totalGoldValue = sortedGoldKeys.reduce((sum, k) => sum + (tranches[k].marketValue || 0), 0);
+
+            if (totalGoldValue > goldObergrenze) {
+                return [...sortedGoldKeys, ...sortedEquityKeys].filter(k => tranches[k]);
             }
         }
 
-        // Standard: Aktien zuerst, dann Gold
-        return [...equityKeys, 'gold'].filter(k => tranches[k]);
+        // Standard: Aktien zuerst (FIFO), dann Gold (FIFO)
+        return [...sortedEquityKeys, ...sortedGoldKeys].filter(k => tranches[k]);
     },
 
     /**

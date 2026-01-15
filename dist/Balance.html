@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="de" data-density="compact">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ruhestand-Balancing</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- External Stylesheets -->
+    <link rel="stylesheet" href="css/balance.css">
+
+    <!-- External Scripts -->
+    <script type="module" src="engine.js"></script>
+    <script type="module" src="balance-main.js"></script>
+</head>
+
+<body>
+    <div class="main-layout">
+        <div id="engine-version-alert" role="alert" tabindex="-1"
+            style="display:none; padding: 15px; background-color: var(--warning-color); color: #000; font-weight: bold; text-align: center; margin-bottom: 15px; border-radius: 8px; grid-column: 1 / -1;">
+        </div>
+
+        <div class="form-column panel">
+            <div class="app-header">
+                <h1>Ruhestand-Balancing</h1>
+                <div class="app-controls">
+                    <button id="jahresabschlussBtn" type="button" class="btn"
+                        aria-label="Jahresabschluss erstellen (Alt+J)">⭐ Jahresabschluss</button>
+                    <button id="exportBtn" type="button" class="btn" aria-label="Export (Alt+E)">📤 Export</button>
+                    <button id="importBtn" type="button" class="btn" aria-label="Import (Alt+I)">📥 Import</button>
+                    <input id="importFile" type="file" accept="application/json,.json" style="display:none">
+                    <a href="index.html" class="btn"
+                        style="text-decoration: none; display: inline-flex; align-items: center; gap: 5px;"
+                        aria-label="Startseite öffnen">🏠 Startseite</a>
+                    <a href="Handbuch.html" target="_blank" class="btn"
+                        style="text-decoration: none; display: inline-flex; align-items: center; gap: 5px;"
+                        aria-label="Handbuch öffnen">📖 Hilfe</a>
+                </div>
+            </div>
+
+            <div class="tab-buttons">
+                <button class="tab-btn active" data-tab="update">Jahres-Update</button>
+                <button class="tab-btn" data-tab="settings">Grundeinstellungen & Strategie</button>
+            </div>
+
+            <div class="tab-content">
+                <div id="tab-update" class="tab-panel active">
+                    <fieldset>
+                        <legend>Basiswerte</legend>
+                        <!-- Jahres-Update Button -->
+                        <div class="update-actions" style="margin-bottom: 15px;">
+                            <div class="update-primary-actions">
+                                <button id="btnJahresUpdate" type="button" class="btn btn-primary"
+                                    title="Ruft Inflation (ECB) und ETF-Kurs (VWCE.DE) ab, führt Nachrücken durch und aktualisiert ATH">🌐
+                                    Jahres-Update</button>
+                                <button id="btnJahresUpdateLog" type="button" class="btn btn-utility btn-icon"
+                                    aria-label="Protokoll des letzten Jahres-Updates anzeigen"
+                                    title="Protokoll des letzten Jahres-Updates anzeigen" disabled>🧾</button>
+                            </div>
+                            <div class="mode-toggle-inline" aria-label="Modusauswahl">
+                                <label class="mode-toggle">
+                                    <span class="mode-label">🎯 Einfach</span>
+                                    <input type="checkbox" id="modeToggle" class="mode-toggle-input">
+                                    <span class="mode-toggle-slider"></span>
+                                    <span class="mode-label">🔧 Fortgeschritten</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+                            <div class="form-group" style="grid-column: 1 / -1;">
+                                <label for="profilName">Profil / Name</label>
+                                <input id="profilName" type="text" placeholder="z. B. Dieter"
+                                    title="Name des aktuellen Profils - wird für Snapshots und Jahresabschlüsse verwendet">
+                            </div>
+                            <div class="form-group"><label for="aktuellesAlter">Aktuelles Alter</label><input
+                                    id="aktuellesAlter" type="number" placeholder="0" min="50"
+                                    title="Ihr aktuelles Lebensalter - wichtig für die Berechnung Ihrer Entnahmestrategien und Lebenserwartung">
+                            </div>
+                            <div class="form-group">
+                                <label for="inflation">Inflation VJ (%)</label>
+                                <input id="inflation" type="number" placeholder="0" step="0.1"
+                                    title="Inflationsrate des Vorjahres - wird automatisch von der EZB abgerufen und dient zur Anpassung Ihrer Bedarfswerte">
+                            </div>
+                        </div>
+                        <!-- NEUER CONTAINER FÜR DEN INTELLIGENTEN HINWEIS -->
+                        <div id="bedarfAnpassungContainer" class="full-width"
+                            style="margin-top: 10px; text-align: center;"></div>
+                    </fieldset>
+                    <fieldset>
+                        <legend>Vermögen</legend>
+                        <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+                            <div class="form-group"><label for="tagesgeld">Tagesgeld (€)</label><input id="tagesgeld"
+                                    class="currency" type="text" inputmode="numeric" placeholder="0"
+                                    title="Ihr Bargeld auf dem Tagesgeldkonto - sofort verfügbar ohne Verzögerung">
+                            </div>
+                            <div class="form-group"><label for="geldmarktEtf">Geldmarkt-ETF (€)</label><input
+                                    id="geldmarktEtf" class="currency" type="text" inputmode="numeric" placeholder="0"
+                                    title="Ihr Geldmarkt-ETF-Bestand - sehr sichere, kurzfristig verfügbare Anlage mit leicht höherer Rendite als Tagesgeld">
+                            </div>
+                            <div class="form-group"><label for="depotwertAlt">Depotwert Alt (€)</label><input
+                                    id="depotwertAlt" class="currency" type="text" inputmode="numeric"
+                                    placeholder="z. B. 1.200.000"
+                                    title="Aktueller Wert Ihres 'alten' Depots (vor 2018 angelegt) - profitiert von höherer Teilfreistellung">
+                            </div>
+                            <div class="form-group"><label for="depotwertNeu">Depotwert Neu (€)</label><input
+                                    id="depotwertNeu" class="currency" type="text" inputmode="numeric"
+                                    placeholder="z. B. 750.000"
+                                    title="Aktueller Wert Ihres 'neuen' Depots (nach 2018 angelegt) - hat geringere Teilfreistellung">
+                            </div>
+                            <div class="form-group" id="goldWertGroup"><label for="goldWert">Gold-Bestand
+                                    (€)</label><input id="goldWert" class="currency" type="text" inputmode="numeric"
+                                    value="0"
+                                    title="Aktueller Wert Ihres physischen Gold-Bestands (optional, wenn Gold-Strategie aktiv)">
+                            </div>
+                        </div>
+                        <div id="tranchenStatusBadge"></div>
+                        <div class="tranchen-hint">
+                            Hinweis: Geladene Tranchen ueberschreiben die Depot- und Einstandsfelder.
+                        </div>
+                    </fieldset>
+                    <fieldset class="advanced-only">
+                        <legend
+                            style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                            Marktdaten
+                            <span style="display: flex; gap: 6px;">
+                                <button id="btnCsvImport" type="button" class="btn btn-utility btn-sm"
+                                    title="Marktdaten aus CSV-Datei importieren">📄 CSV</button>
+                                <input type="file" id="csvFileInput" accept=".csv" style="display:none">
+                                <button id="btnNachruecken" type="button" class="btn btn-utility btn-sm"
+                                    title="Marktdaten um ein Jahr verschieben (Alt+N)">🗓️ Nachr.</button>
+                                <button id="btnUndoNachruecken" type="button" class="btn btn-utility btn-sm"
+                                    title="Nachrücken rückgängig machen" style="display:none;">↩️</button>
+                            </span>
+                        </legend>
+                        <div class="form-grid" style="grid-template-columns: repeat(3, 1fr);">
+                            <div class="form-group"><label for="endeVJ">Ende VJ</label><input type="number" id="endeVJ"
+                                    min="0" step="0.01" placeholder="0"></div>
+                            <div class="form-group"><label for="endeVJ_1">Ende VJ-1</label><input type="number"
+                                    id="endeVJ_1" min="0" step="0.01" placeholder="0"></div>
+                            <div class="form-group"><label for="ath">Allzeithoch</label><input type="number" id="ath"
+                                    min="0" step="0.01" placeholder="0"></div>
+                            <div class="form-group"><label for="endeVJ_2">Ende VJ-2</label><input type="number"
+                                    id="endeVJ_2" min="0" step="0.01" placeholder="0"></div>
+                            <div class="form-group"><label for="endeVJ_3">Ende VJ-3</label><input type="number"
+                                    id="endeVJ_3" min="0" step="0.01" placeholder="0"></div>
+                            <div class="form-group"><label for="jahreSeitAth">Jahre seit ATH</label><input type="number"
+                                    id="jahreSeitAth" step="0.01" min="0" placeholder="0"></div>
+                        </div>
+                    </fieldset>
+                    <fieldset>
+                        <legend>Externe Einkünfte</legend>
+                        <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+                            <div class="form-group">
+                                <label for="renteAktiv">Rente aktiv</label>
+                                <select id="renteAktiv">
+                                    <option value="nein">Nein</option>
+                                    <option value="ja">Ja</option>
+                                </select>
+                            </div>
+                            <div class="form-group" id="renteMonatlichGroup">
+                                <div class="form-group"> <label for="renteMonatlich">Monatliche Rente (Netto, €)</label>
+                                    <input id="renteMonatlich" class="currency" type="text" inputmode="numeric"
+                                        placeholder="0">
+                                    <small>Wird nur bei "Ja" berücksichtigt.</small>
+                                </div>
+                            </div>
+                    </fieldset>
+                </div>
+
+                <div id="tab-settings" class="tab-panel">
+                    <fieldset>
+                        <legend>Bedarfsplanung</legend>
+                        <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+                            <div class="form-group"> <label for="floorBedarf">Floor-Bedarf (€/Jahr)</label> <input
+                                    id="floorBedarf" class="currency" type="text" inputmode="numeric" value="12000">
+                            </div>
+                            <div class="form-group"> <label for="flexBedarf">Flex-Bedarf (€/Jahr)</label> <input
+                                    id="flexBedarf" class="currency" type="text" inputmode="numeric" value="24000">
+                            </div>
+                        </div>
+                    </fieldset>
+                    <fieldset>
+                        <legend>Runway-Steuerung</legend>
+                        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 15px;">
+                            <div class="form-group">
+                                <label for="runwayMinMonths">Runway Minimum (Monate)</label>
+                                <input id="runwayMinMonths" type="number" min="12" max="60" step="1"
+                                    title="Das absolute Minimum an Liquiditätsreichweite, das nicht unterschritten werden soll. Löst im Bärenmarkt ggf. Not-Auffüllungen aus."
+                                    value="24">
+                            </div>
+                            <div class="form-group">
+                                <label for="runwayTargetMonths">Runway Ziel (Monate)</label>
+                                <input id="runwayTargetMonths" type="number" min="18" max="72" step="1"
+                                    title="Die angestrebte, komfortable Liquiditätsreichweite. Wird in guten Marktphasen proaktiv aufgefüllt (Skim & Fill)."
+                                    value="36">
+                            </div>
+                        </div>
+                        <div class="form-group advanced-only" style="margin-top: 10px;">
+                            <label for="minCashBufferMonths">Min. Cash-Puffer (Monate)</label>
+                            <input id="minCashBufferMonths" type="number" min="0" max="12" step="1"
+                                title="Anzahl an Monatsausgaben (Brutto), die immer auf dem Tagesgeld verbleiben sollen, auch wenn keine Entnahme nötig ist."
+                                value="2">
+                        </div>
+                    </fieldset>
+                    <fieldset>
+                        <legend>Rebalancing-Strategie</legend>
+                        <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 15px 20px;">
+                            <div class="form-group">
+                                <label for="targetEq">Aktien-Zielquote (%)</label>
+                                <input id="targetEq" type="number" min="20" max="90" step="1"
+                                    title="Die angestrebte prozentuale Allokation in Aktien. Dient als Anker für das Rebalancing."
+                                    value="60">
+                            </div>
+                            <div class="form-group">
+                                <label for="rebalBand">Rebalancing-Band (±%)</label>
+                                <input id="rebalBand" type="number" min="1" max="20" step="0.5"
+                                    title="Die prozentuale Toleranz um die Zielquote, bevor ein Rebalancing ausgelöst wird."
+                                    value="5">
+                            </div>
+                            <div class="form-group advanced-only">
+                                <label for="maxSkimPctOfEq">Max. Abschöpfen p.a. (%)</label>
+                                <input id="maxSkimPctOfEq" type="number" min="0" max="25" step="1"
+                                    title="Der maximal pro Jahr abzuschöpfende Betrag (als Prozentsatz des Aktiendepots), um die Liquidität aufzufüllen."
+                                    value="10">
+                            </div>
+                            <!-- ============================================= -->
+                            <!-- NEUES FELD FÜR BEAR-MODE-DRIP                 -->
+                            <!-- ============================================= -->
+                            <div class="form-group advanced-only">
+                                <label for="maxBearRefillPctOfEq">Max. Auffüllen (Bär) (%)</label>
+                                <input id="maxBearRefillPctOfEq" type="number" value="5" min="0" max="15" step="0.5"
+                                    title="Der maximal pro Jahr zu verkaufende Betrag (als Prozentsatz des Aktiendepots) im Bärenmarkt, um die Runway bis zum Minimum aufzufüllen.">
+                            </div>
+                            <!-- ============================================= -->
+                            <!-- ENDE NEUES FELD                               -->
+                            <!-- ============================================= -->
+                        </div>
+                    </fieldset>
+                    <fieldset class="advanced-only">
+                        <legend>Steuern</legend>
+                        <div class="form-grid">
+                            <div class="form-group"><label for="kirchensteuerSatz">Kirchensteuer</label><select
+                                    id="kirchensteuerSatz">
+                                    <option value="0">0 %</option>
+                                    <option value="0.08">8 %</option>
+                                    <option value="0.09" selected>9 %</option>
+                                </select></div>
+                            <div class="form-group"><label for="sparerPauschbetrag">Sparer-PB (€)</label><input
+                                    id="sparerPauschbetrag" class="currency" type="text" inputmode="numeric"
+                                    value="1000">
+                            </div>
+                        </div>
+                    </fieldset>
+                    <fieldset class="advanced-only">
+                        <legend>Gold-Strategie</legend>
+                        <div class="form-group full-width">
+                            <label
+                                style="flex-direction: row; align-items: center; justify-content: center; padding: 5px 0;">
+                                <input type="checkbox" id="goldAktiv" class="goldAktiv"
+                                    style="width: auto; margin-right: 8px;" checked>Gold-Allokation aktiv
+                            </label>
+                        </div>
+                        <div id="goldPanel" style="display: none;">
+                            <div class="form-grid"
+                                style="grid-template-columns: 1fr 1fr 1fr; gap: 15px 20px; align-items: end;">
+                                <div class="form-group"> <label for="goldZielProzent">Ziel-Anteil (%)</label> <input
+                                        id="goldZielProzent" type="number" step="0.1" value="7.5"> </div>
+                                <div class="form-group"> <label for="goldFloorProzent">Floor-Anteil (%)</label> <input
+                                        id="goldFloorProzent" type="number" step="0.1" value="1"> </div>
+                                <div class="form-group"> <label for="rebalancingBand">Rebal. Band (%)</label> <input
+                                        id="rebalancingBand" type="number" step="0.1" value="25"> </div>
+                                <div class="form-group full-width"
+                                    style="grid-column: 1 / -1; justify-content:center; margin-top: 5px;"><label
+                                        style="display:flex; align-items:center; flex-direction: row;"><input
+                                            type="checkbox" id="goldSteuerfrei" style="width:auto; margin-right:8px;">
+                                        Gold-Verkäufe steuerfrei</label></div>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <details id="einstandDetails" class="details-card advanced-only" aria-label="Einstandswerte">
+                        <summary aria-controls="einstandContent">Einstandswerte & Teilfreistellung</summary>
+                        <div class="einstand-hinweis">Selten ändern – wird automatisch gespeichert.</div>
+                        <div class="form-grid"
+                            style="grid-template-columns: 1fr 1fr 1fr; gap: 20px; align-items: start;">
+                            <div style="display: flex; flex-direction: column; gap: 10px;">
+                                <div class="form-group"><label for="costBasisAlt">Einstand Alt (€)</label><input
+                                        id="costBasisAlt" class="currency" type="text" inputmode="numeric"
+                                        placeholder="0">
+                                </div>
+                                <div class="form-group"><label for="tqfAlt">TQF Alt</label><input id="tqfAlt"
+                                        type="number" step="0.01" min="0" max="1" placeholder="0"></div>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 10px;">
+                                <div class="form-group"><label for="costBasisNeu">Einstand Neu (€)</label><input
+                                        id="costBasisNeu" class="currency" type="text" inputmode="numeric"
+                                        placeholder="0">
+                                </div>
+                                <div class="form-group"><label for="tqfNeu">TQF Neu</label><input id="tqfNeu"
+                                        type="number" step="0.01" min="0" max="1" placeholder="0"></div>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 10px;">
+                                <div class="form-group"><label for="goldCost">Gold-Einstand (€)</label><input
+                                        id="goldCost" class="currency" type="text" inputmode="numeric" placeholder="0">
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+
+                    <details id="snapshot-management" class="details-card advanced-only" style="margin-top: 25px;">
+                        <summary>Jahresabschluss-Snapshots</summary>
+                        <div style="padding: 10px 0 5px 0;">
+                            <button type="button" class="btn btn-sm" id="connectFolderBtn" style="width: 100%;">Lokalen
+                                Snapshot-Ordner verbinden</button>
+                            <div id="snapshotStatus" class="snapshot-status">Speicherort: Browser (localStorage)</div>
+                        </div>
+                        <ul id="snapshotList"
+                            style="list-style: none; padding: 10px 0 0 0; margin: 0; font-size: 0.9rem;">
+                        </ul>
+                    </details>
+                    <button type="button" class="reset-button" id="resetBtn">Gespeicherte Werte zurücksetzen</button>
+                </div>
+            </div>
+        </div>
+        <div class="results-column panel" role="region" aria-live="polite">
+            <div id="results" role="status">
+                <h2>
+                    Ergebnisse & Handlungsschritte
+                    <button id="openDiagnosisBtn" type="button" class="btn btn-sm btn-utility"
+                        title="Diagnosepanel öffnen">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"></path>
+                            <path d="M12 18a6 6 0 0 0 0-12V2a10 10 0 0 0-9.9 12"></path>
+                            <path d="M12 12h.01"></path>
+                        </svg>
+                        Diagnose
+                    </button>
+                </h2>
+                <div class="mini-summary" id="miniSummary"></div>
+                <div id="error-container" aria-live="polite"></div>
+
+                <!--
+                    Kompakte KPI-Übersicht: Durch die Grid-Anordnung stehen Kennzahlen auf einem normalen Monitor ohne Scrollen zur Verfügung.
+                    Die wichtigsten Werte sind gruppiert, Breiten werden automatisch angepasst.
+                -->
+                <div class="results-kpi-grid" aria-label="Kennzahlenübersicht">
+                    <div class="result-item"><strong
+                            title="Gesamtwert aller Ihrer Aktiendepots (Alt + Neu) ohne Liquidität und Gold">Gesamt-Depotwert:</strong><span
+                            id="displayDepotwert"></span></div>
+                    <div class="result-item"><strong
+                            title="Ihr inflationsangepasster Jahresbedarf (Floor + Flex) für das kommende Jahr">Gesamtjahresbedarf:</strong><span
+                            id="neuerBedarf"></span></div>
+                    <div class="result-item advanced-result" id="minGoldRow"><strong
+                            title="Mindestbestand an Gold gemäß Ihrer Gold-Strategie (Gold-Floor als % des Gesamtvermögens)">Gold-Mindestbestand:</strong><span
+                            id="minGoldDisplay"></span></div>
+
+                    <!-- Ziel-Liquidität inklusive Fortschrittsbalken als stapelbare Karte, um vertikalen Platz zu sparen. -->
+                    <div class="result-item result-item-stack advanced-result" aria-live="polite">
+                        <div class="result-item-header">
+                            <strong
+                                title="Angestrebte Liquiditätsreserve basierend auf Ihrer Runway-Ziel-Einstellung">Ziel-Liquidität:</strong>
+                            <span id="zielLiquiditaet"></span>
+                        </div>
+                        <div class="progress-bar-container compact-progress" role="progressbar" aria-valuenow="0"
+                            aria-valuemin="0" aria-valuemax="100">
+                            <div id="liquiditaetBalken" class="progress-bar"></div>
+                        </div>
+                    </div>
+
+                    <div class="result-item advanced-result" id="marktstatusRow"><strong style="padding-right:10px"
+                            title="Aktuelle Marktphase basierend auf historischen Kursverläufen (Bullenmarkt, Bärenmarkt, Erholung etc.)">Marktsituation:</strong><span
+                            id="marktstatusText"></span></div>
+                    <div class="result-item"><strong
+                            title="Ihre empfohlene monatliche Entnahme aus der Liquidität für das kommende Jahr">Monatliche
+                            Entnahme:</strong><span id="monatlicheEntnahme"></span></div>
+                </div>
+                <details class="details-card" id="entnahme-breakdown" style="margin-top: 10px; display: none;">
+                    <summary>Details zur Entnahme</summary>
+                    <div style="margin-top: 10px; font-size: 0.9rem; line-height: 1.5;" id="entnahmeDetailsContent">
+                    </div>
+                </details>
+
+                <div id="handlungsanweisung"
+                    title="Ihre konkreten Handlungsempfehlungen: Welche Transaktionen Sie durchführen sollten (Rebalancing, Entnahmen, Verkäufe etc.)">
+                    <button id="copyAction" type="button" class="btn btn-sm btn-utility"
+                        title="Handlung kopieren">📋</button>
+                </div>
+
+                <div id="print-footer"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="drawerOverlay" class="drawer-overlay"></div>
+    <div id="diagnosisDrawer" class="diagnosis-drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+        <div class="drawer-header">
+            <h3 id="drawerTitle">KI-Diagnose</h3>
+            <div class="controls">
+                <label style="font-weight:400; font-size: .8rem; margin:0;"><input type="checkbox" id="diagFilterToggle"
+                        style="width:auto; margin-right: 5px;">Nur aktive Regeln</label>
+                <button id="copyDiagnosisBtn" type="button" class="btn btn-sm btn-utility"
+                    title="Diagnose kopieren">📋</button>
+                <button id="closeDiagnosisBtn" type="button" class="btn btn-sm" title="Schließen">&times;</button>
+            </div>
+        </div>
+        <div id="diagContent" class="drawer-content">
+            <div class="diag-section">
+                <h4>Status-Übersicht</h4>
+                <div id="diag-chips" class="diag-chips"></div>
+            </div>
+            <div class="diag-section">
+                <h4>Entscheidungsbaum (Warum?)</h4>
+                <ul id="diag-decision-tree"></ul>
+            </div>
+            <div class="diag-section">
+                <h4>Guardrails</h4>
+                <div id="diag-guardrails" class="diag-guardrails"></div>
+            </div>
+            <div class="diag-section">
+                <h4>Transaktions-Diagnostik</h4>
+                <div id="diag-transaction" class="diag-guardrails diag-transaction"></div>
+            </div>
+            <div class="diag-section">
+                <h4>Schlüsselparameter (Intern)</h4>
+                <div id="diag-key-params"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Jahres-Update Ergebnis -->
+    <div id="updateResultModal" class="modal" style="display: none;">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">✅ Jahres-Update erfolgreich</h3>
+                <button class="modal-close" aria-label="Schließen">&times;</button>
+            </div>
+            <div class="modal-body">
+                <h4>📊 Durchgeführte Aktionen:</h4>
+                <div id="modalResults" class="modal-results"></div>
+                <div id="modalDuration" class="modal-duration"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="modalCloseBtn" class="btn btn-primary">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mode Toggle Logic -->
+    <script type="module">
+        import { initModeToggle } from './mode-toggle.js';
+
+        initModeToggle({
+            tooltipMap: {
+                'aktuellesAlter': 'Ihr aktuelles Lebensalter - wichtig für die Berechnung Ihrer Entnahmestrategien',
+                'inflation': 'Die Inflationsrate des letzten Jahres - wird automatisch von der EZB abgerufen',
+                'tagesgeld': 'Ihr Bargeld auf dem Tagesgeldkonto - sofort verfügbar',
+                'geldmarktEtf': 'Ihr Geldmarkt-ETF - sehr sichere, kurzfristig verfügbare Anlage',
+                'depotwertAlt': 'Der aktuelle Wert Ihres "alten" Depots (meist vor 2018 angelegt)',
+                'depotwertNeu': 'Der aktuelle Wert Ihres "neuen" Depots (meist nach 2018 angelegt)',
+                'floorBedarf': 'Ihre essentiellen jährlichen Ausgaben, die Sie auf jeden Fall brauchen',
+                'flexBedarf': 'Ihre flexiblen jährlichen Ausgaben, auf die Sie notfalls verzichten können',
+                'runwayMinMonths': 'Die Mindestmenge an Liquidität (in Monaten), die Sie immer haben sollten',
+                'runwayTargetMonths': 'Ihre angestrebte komfortable Liquiditätsreichweite (in Monaten)',
+                'targetEq': 'Ihr Zielanteil an Aktien im Portfolio (in Prozent)',
+                'rebalBand': 'Die Toleranz, um die Ihre Aktienquote schwanken darf, bevor umgeschichtet wird'
+            },
+            labelMappings: {
+                'aktuellesAlter': { original: 'Aktuelles Alter', simple: 'Mein Alter' },
+                'inflation': { original: 'Inflation VJ (%)', simple: 'Teuerung letztes Jahr (%)' },
+                'tagesgeld': { original: 'Tagesgeld (€)', simple: 'Bargeld / Tagesgeld (€)' },
+                'geldmarktEtf': { original: 'Geldmarkt-ETF (€)', simple: 'Geldmarkt-Fonds (€)' },
+                'depotwertAlt': { original: 'Depotwert Alt (€)', simple: 'Depot "Alt" (€)' },
+                'depotwertNeu': { original: 'Depotwert Neu (€)', simple: 'Depot "Neu" (€)' },
+                'floorBedarf': { original: 'Floor-Bedarf p.a. (€)', simple: 'Notwendige Ausgaben pro Jahr (€)' },
+                'flexBedarf': { original: 'Flex-Bedarf p.a. (€)', simple: 'Zusätzliche Wünsche pro Jahr (€)' },
+                'runwayMinMonths': { original: 'Runway Minimum (Monate)', simple: 'Mindest-Liquidität (Monate)' },
+                'runwayTargetMonths': { original: 'Runway Ziel (Monate)', simple: 'Wunsch-Liquidität (Monate)' },
+                'targetEq': { original: 'Aktien-Zielquote (%)', simple: 'Aktien-Anteil (%)' },
+                'rebalBand': { original: 'Rebalancing-Band (±%)', simple: 'Toleranz (±%)' }
+            },
+            // Der UI-Toggle bleibt bewusst minimal: keine Statusbox und kein Standard-Reset,
+            // damit die Oberfläche schlank bleibt und erfasste Werte unangetastet bleiben.
+        });
+    </script>
+    <div id="devTools" style="display:none; position:fixed; bottom:10px; right:10px; background:#333; color:#fff; padding:10px; border-radius:5px; z-index:9999;">
+        <div style="margin-bottom:8px;">
+            <label>
+                <input type="checkbox" id="telemetryToggle" />
+                Worker Telemetry
+            </label>
+        </div>
+        <div style="display:flex; gap:8px;">
+            <button id="printTelemetry" style="padding:4px 8px; cursor:pointer;">Print</button>
+            <button id="exportTelemetry" style="padding:4px 8px; cursor:pointer;">Export JSON</button>
+        </div>
+    </div>
+    <script>
+        if (window.location.search.includes('dev=true')) {
+            const devTools = document.getElementById('devTools');
+            const toggle = document.getElementById('telemetryToggle');
+            const printBtn = document.getElementById('printTelemetry');
+            const exportBtn = document.getElementById('exportTelemetry');
+
+            if (devTools && toggle) {
+                devTools.style.display = 'block';
+                toggle.checked = localStorage.getItem('enableWorkerTelemetry') === 'true';
+                toggle.addEventListener('change', e => {
+                    localStorage.setItem('enableWorkerTelemetry', e.target.checked);
+                    alert('Telemetry ' + (e.target.checked ? 'aktiviert' : 'deaktiviert') + '. Seite neu laden.');
+                });
+            }
+
+            const getRegistry = () => {
+                if (!(window.__workerTelemetryRegistry instanceof Map)) {
+                    window.__workerTelemetryRegistry = new Map();
+                }
+                return window.__workerTelemetryRegistry;
+            };
+
+            if (printBtn) {
+                printBtn.addEventListener('click', () => {
+                    const registry = getRegistry();
+                    if (!registry || registry.size === 0) {
+                        console.warn('[Telemetry] Keine Telemetry-Instanzen gefunden.');
+                        return;
+                    }
+                    for (const telemetry of registry.values()) {
+                        if (telemetry && typeof telemetry.printReport === 'function') {
+                            telemetry.printReport();
+                        }
+                    }
+                });
+            }
+
+            if (exportBtn) {
+                exportBtn.addEventListener('click', async () => {
+                    const registry = getRegistry();
+                    if (!registry || registry.size === 0) {
+                        console.warn('[Telemetry] Keine Telemetry-Instanzen gefunden.');
+                        return;
+                    }
+                    const report = {};
+                    for (const [name, telemetry] of registry.entries()) {
+                        if (telemetry && typeof telemetry.getReport === 'function') {
+                            report[name] = telemetry.getReport();
+                        }
+                    }
+                    const json = JSON.stringify(report, null, 2);
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        try {
+                            await navigator.clipboard.writeText(json);
+                            alert('Telemetry JSON kopiert.');
+                        } catch (err) {
+                            console.warn('[Telemetry] Clipboard fehlgeschlagen:', err);
+                            console.log(json);
+                        }
+                    } else {
+                        console.log(json);
+                    }
+                });
+            }
+        }
+    </script>
+
+</body>
+
+</html>

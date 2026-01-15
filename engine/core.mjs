@@ -140,6 +140,9 @@ function _internal_calculateModel(input, lastState) {
     if (Array.isArray(action.diagnosisEntries) && action.diagnosisEntries.length) {
         diagnosis.decisionTree.push(...action.diagnosisEntries);
     }
+    if (action.transactionDiagnostics) {
+        diagnosis.transactionDiagnostics = action.transactionDiagnostics;
+    }
 
     // 10. Liquidität nach Transaktion berechnen
     // Berücksichtigt Depot-Verkäufe zur Liquiditäts-Auffüllung

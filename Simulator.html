@@ -131,16 +131,19 @@
                         <div class="fieldset-content">
                             <div class="form-grid">
                                 <div class="form-group"><label for="simStartVermoegen">Gesamtvermögen (€)</label><input
-                                        type="number" id="simStartVermoegen" placeholder="0"
-                                        title="Ihr gesamtes Vermögen zum Simulationsstart (inkl. Liquidität und alle Depots)">
+                                        type="number" id="simStartVermoegen" placeholder="0" readonly
+                                        title="Wird automatisch aus Depot + Gold + Tagesgeld + Geldmarkt berechnet">
                                 </div>
                                 <div class="form-group"><label for="depotwertAlt">Depotwert Alt (€)</label><input
                                         type="number" id="depotwertAlt" placeholder="0"
                                         title="Aktueller Wert Ihres 'alten' Depots (typischerweise vor 2018 angelegt, höhere Teilfreistellung)">
                                 </div>
-                                <div class="form-group"><label for="zielLiquiditaet">Ziel-Liquidität (€)</label><input
-                                        type="number" id="zielLiquiditaet" placeholder="0"
-                                        title="Gewünschte Liquiditätsreserve in Cash/Geldmarkt-ETF"></div>
+                                <div class="form-group"><label for="tagesgeld">Tagesgeld (€)</label><input
+                                        type="number" id="tagesgeld" placeholder="0"
+                                        title="Startbestand Tagesgeld - wird in die Liquidität der Simulation einbezogen"></div>
+                                <div class="form-group"><label for="geldmarktEtf">Geldmarkt-ETF (€)</label><input
+                                        type="number" id="geldmarktEtf" placeholder="0"
+                                        title="Startbestand Geldmarkt-ETF - wird in die Liquidität der Simulation einbezogen"></div>
                             </div>
                             <div class="form-grid"
                                 style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
@@ -167,6 +170,10 @@
                             </div>
                             <div id="displayPortfolioBreakdown"
                                 style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                            </div>
+                        <div id="tranchenStatusBadge"></div>
+                            <div class="tranchen-hint">
+                                Hinweis: Geladene Tranchen ueberschreiben die Depot- und Einstandsfelder.
                             </div>
                         </div>
                     </fieldset>

@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Depot-Tranchen Manager</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 30px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .hint {
+            color: #4a5568;
+            margin-bottom: 20px;
+            font-size: 12px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .api-key {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        .api-key label {
+            font-size: 12px;
+            color: #4a5568;
+            font-weight: 600;
+        }
+
+        .api-key input {
+            padding: 8px 10px;
+            border: 1px solid #cbd5e0;
+            border-radius: 6px;
+            min-width: 260px;
+            font-size: 12px;
+        }
+
+        .api-key small {
+            color: #718096;
+            font-size: 12px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-success {
+            background: #48bb78;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #718096;
+            color: white;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        th {
+            background: #f7fafc;
+            font-weight: 600;
+            color: #2d3748;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        tr:hover {
+            background: #f7fafc;
+        }
+
+        .tranche-row td {
+            font-size: 14px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .badge-alt {
+            background: #fef5e7;
+            color: #f39c12;
+        }
+
+        .badge-neu {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .badge-geldmarkt {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .badge-steuerfrei {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .positive {
+            color: #2e7d32;
+            font-weight: 600;
+        }
+
+        .negative {
+            color: #c53030;
+            font-weight: 600;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e0;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 30px;
+        }
+
+        .delete-btn {
+            background: #f56565;
+            color: white;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .delete-btn:hover {
+            background: #e53e3e;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #718096;
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Depot-Tranchen Manager</h1>
+        <p class="subtitle">Verwalten Sie Ihre Depot-Positionen mit detaillierten Tranchen fuer praezise Steuerberechnung und steueroptimierte Verkaeufe</p>
+
+        <div class="controls">
+            <button class="btn-primary" onclick="addTranche()">➕ Neue Tranche</button>
+            <button class="btn-success" onclick="loadExample()">📥 Beispiel laden</button>
+            <button class="btn-secondary" onclick="updatePrices()">🔄 Kurse aktualisieren</button>
+            <button class="btn-secondary" onclick="exportTranches()">💾 Export JSON</button>
+            <button class="btn-secondary" onclick="importTranches()">📂 Import JSON</button>
+            <button class="btn-danger" onclick="clearAll()">🗑️ Alle löschen</button>
+        </div>
+
+        <div id="priceUpdateStatus" class="hint"></div>
+
+        <div class="stats" id="stats"></div>
+
+        <div id="tranchenTable"></div>
+    </div>
+
+    <!-- Modal für Tranche hinzufügen/bearbeiten -->
+    <div class="modal" id="trancheModal">
+        <div class="modal-content">
+            <h2 id="modalTitle">Neue Tranche hinzufügen</h2>
+            <form id="trancheForm" onsubmit="saveTranche(event)">
+                <div class="form-group">
+                    <label for="name">Name / Bezeichnung *</label>
+                    <input type="text" id="name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="isin">ISIN</label>
+                    <input type="text" id="isin" placeholder="z.B. DE0007164600">
+                </div>
+
+                <div class="form-group">
+                    <label for="ticker">Ticker / Symbol (fuer Kurs-API)</label>
+                    <input type="text" id="ticker" placeholder="z.B. SAP.DE oder VWCE.DE">
+                    <small style="color: #718096; display: block; margin-top: 5px;">
+                        Hinweis: Ticker ist am zuverlaessigsten; Ticker mit Boersen-Suffix (z.B. .DE, .L, .MI) nutzen.
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label for="shares">Anzahl Stücke *</label>
+                    <input type="number" id="shares" step="0.001" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="purchasePrice">Kaufpreis pro Stück (€) *</label>
+                    <input type="number" id="purchasePrice" step="0.01" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="currentPrice">Aktueller Kurs (€)</label>
+                    <input type="number" id="currentPrice" step="0.01">
+                </div>
+
+                <div class="form-group">
+                    <label for="purchaseDate">Kaufdatum</label>
+                    <input type="date" id="purchaseDate">
+                </div>
+
+                <div class="form-group">
+                    <label for="category">Kategorie *</label>
+                    <select id="category" required>
+                        <option value="equity">Aktien / Equity</option>
+                        <option value="gold">Gold / Edelmetalle</option>
+                        <option value="money_market">Geldmarkt</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="type">Typ *</label>
+                    <select id="type" required>
+                        <option value="aktien_alt">Altbestand (vor 2018)</option>
+                        <option value="aktien_neu">Neubestand (nach 2018)</option>
+                        <option value="geldmarkt">Geldmarkt-ETF</option>
+                        <option value="gold">Gold-ETC</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="tqf">Teilfreistellung / Steuerfreiheit (0.0 = voll steuerpflichtig, 1.0 = steuerfrei)</label>
+                    <input type="number" id="tqf" step="0.01" min="0" max="1" value="0.30">
+                    <small style="color: #718096; display: block; margin-top: 5px;">
+                        0.30 = 30% Teilfreistellung (Standard Aktienfonds)<br>
+                        1.0 = 100% steuerfrei (Altbestand vor 2009)
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label for="notes">Notizen</label>
+                    <input type="text" id="notes" placeholder="z.B. 'Steuerfrei durch Spekulationsfrist'">
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="closeModal()">Abbrechen</button>
+                    <button type="submit" class="btn-primary">Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        import { BEISPIEL_DEPOT_TRANCHEN } from './tranche-config-example.js';
+
+        // Global state
+        let tranchen = [];
+        let editingIndex = -1;
+
+        // Make functions global
+        window.tranchen = tranchen;
+        window.BEISPIEL_DEPOT_TRANCHEN = BEISPIEL_DEPOT_TRANCHEN;
+
+        function generateTrancheId() {
+            const rand = Math.random().toString(36).slice(2, 8);
+            return `tranche_${Date.now()}_${rand}`;
+        }
+
+        function normalizeTranches(items) {
+            if (!Array.isArray(items)) return [];
+            const normalized = items.map((t) => {
+                const existingId = t && (t.trancheId || t.id);
+                return {
+                    ...t,
+                    trancheId: existingId || generateTrancheId()
+                };
+            });
+            window.tranchen = normalized;
+            return normalized;
+        }
+
+        // Load from localStorage on start
+        window.addEventListener('DOMContentLoaded', () => {
+            const saved = localStorage.getItem('depot_tranchen');
+            if (saved) {
+                tranchen = normalizeTranches(JSON.parse(saved));
+                saveTranchen();
+            }
+            render();
+        });
+
+        const LOCAL_YAHOO_PROXY = 'http://127.0.0.1:8787';
+
+        function saveTranchen() {
+            localStorage.setItem('depot_tranchen', JSON.stringify(tranchen));
+        }
+
+        window.addTranche = function() {
+            editingIndex = -1;
+            document.getElementById('modalTitle').textContent = 'Neue Tranche hinzufügen';
+            document.getElementById('trancheForm').reset();
+            document.getElementById('tqf').value = '0.30';
+            document.getElementById('trancheModal').classList.add('active');
+        };
+
+        window.editTranche = function(index) {
+            editingIndex = index;
+            const t = tranchen[index];
+            document.getElementById('modalTitle').textContent = 'Tranche bearbeiten';
+            document.getElementById('name').value = t.name;
+            document.getElementById('isin').value = t.isin || '';
+            document.getElementById('ticker').value = t.ticker || '';
+            document.getElementById('shares').value = t.shares;
+            document.getElementById('purchasePrice').value = t.purchasePrice;
+            document.getElementById('currentPrice').value = t.currentPrice || '';
+            document.getElementById('purchaseDate').value = t.purchaseDate || '';
+            document.getElementById('category').value = t.category;
+            document.getElementById('type').value = t.type;
+            document.getElementById('tqf').value = t.tqf;
+            document.getElementById('notes').value = t.notes || '';
+            document.getElementById('trancheModal').classList.add('active');
+        };
+
+        window.deleteTranche = function(index) {
+            if (confirm('Tranche wirklich löschen?')) {
+                tranchen.splice(index, 1);
+                saveTranchen();
+                render();
+            }
+        };
+
+        window.saveTranche = function(event) {
+            event.preventDefault();
+
+            const existingId = (editingIndex >= 0 && tranchen[editingIndex])
+                ? tranchen[editingIndex].trancheId
+                : null;
+
+            const tranche = {
+                trancheId: existingId || generateTrancheId(),
+                name: document.getElementById('name').value,
+                isin: document.getElementById('isin').value,
+                ticker: document.getElementById('ticker').value,
+                shares: parseFloat(document.getElementById('shares').value),
+                purchasePrice: parseFloat(document.getElementById('purchasePrice').value),
+                currentPrice: parseFloat(document.getElementById('currentPrice').value) || parseFloat(document.getElementById('purchasePrice').value),
+                purchaseDate: document.getElementById('purchaseDate').value,
+                category: document.getElementById('category').value,
+                type: document.getElementById('type').value,
+                tqf: parseFloat(document.getElementById('tqf').value),
+                notes: document.getElementById('notes').value
+            };
+
+            tranche.marketValue = tranche.shares * tranche.currentPrice;
+            tranche.costBasis = tranche.shares * tranche.purchasePrice;
+
+            if (editingIndex >= 0) {
+                tranchen[editingIndex] = tranche;
+            } else {
+                tranchen.push(tranche);
+            }
+
+            saveTranchen();
+            closeModal();
+            render();
+        };
+
+        window.closeModal = function() {
+            document.getElementById('trancheModal').classList.remove('active');
+        };
+
+        window.loadExample = function() {
+            if (confirm('Beispiel-Daten laden? Bestehende Tranchen werden überschrieben.')) {
+                tranchen = normalizeTranches(JSON.parse(JSON.stringify(BEISPIEL_DEPOT_TRANCHEN)));
+                saveTranchen();
+                render();
+            }
+        };
+
+        window.exportTranches = function() {
+            const json = JSON.stringify(tranchen, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `depot-tranchen-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        };
+
+        window.importTranches = function() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'application/json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        tranchen = normalizeTranches(JSON.parse(event.target.result));
+                        saveTranchen();
+                        render();
+                        alert('Import erfolgreich!');
+                    } catch (err) {
+                        alert('Fehler beim Import: ' + err.message);
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        };
+
+        window.clearAll = function() {
+            if (confirm('Alle Tranchen löschen? Diese Aktion kann nicht rückgängig gemacht werden.')) {
+                tranchen = [];
+                saveTranchen();
+                render();
+            }
+        };
+
+        async function fetchWithTimeout(url, options, timeoutMs) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                return await fetch(url, { ...options, signal: controller.signal });
+            } finally {
+                clearTimeout(timer);
+            }
+        }
+
+        async function fetchProxyJson(proxyUrl) {
+            const res = await fetchWithTimeout(proxyUrl, { cache: 'no-store' }, 8000);
+            if (!res.ok) {
+                throw new Error(`Proxy HTTP ${res.status}`);
+            }
+            return await res.json();
+        }
+
+        async function fetchProxyPrice(symbol, proxyBase) {
+            const rawSymbol = String(symbol || '').trim();
+            const base = proxyBase.replace(/\/$/, '');
+            const url = `${base}/quote?symbol=${encodeURIComponent(rawSymbol)}`;
+            const data = await fetchProxyJson(url);
+            if (data && data.status === 'error') {
+                throw new Error(data.message || 'Proxy: error');
+            }
+            const price = Number(data && data.price);
+            if (Number.isFinite(price) && price > 0) return price;
+            throw new Error('Proxy: no price');
+        }
+
+        async function fetchProxySymbol(query, proxyBase, nameHint) {
+            const url = `${proxyBase.replace(/\/$/, '')}/search?q=${encodeURIComponent(query)}`;
+            const data = await fetchProxyJson(url);
+            if (data && data.status === 'error') {
+                throw new Error(data.message || 'Proxy: error');
+            }
+            const results = data && Array.isArray(data.quotes) ? data.quotes : [];
+            if (!results.length) return null;
+            const q = String(query || '').toUpperCase();
+            const exact = results.find(r => String(r.symbol || '').toUpperCase() == q);
+            if (exact && exact.symbol) {
+                const exchange = exact.exchange || '';
+                return exchange ? `${exact.symbol}@${exchange}` : exact.symbol;
+            }
+            if (nameHint) {
+                const name = String(nameHint).toUpperCase();
+                const byName = results.find(r => String(r.shortname || r.longname || '').toUpperCase().includes(name));
+                if (byName && byName.symbol) {
+                    const exchange = byName.exchange || '';
+                    return exchange ? `${byName.symbol}@${exchange}` : byName.symbol;
+                }
+            }
+            const first = results[0];
+            if (!first || !first.symbol) return null;
+            return first.symbol;
+        }
+
+        window.updatePrices = async function() {
+            if (!tranchen.length) {
+                alert('Keine Tranchen vorhanden.');
+                return;
+            }
+
+            const proxyBase = LOCAL_YAHOO_PROXY;
+
+            const statusEl = document.getElementById('priceUpdateStatus');
+            statusEl.textContent = 'Kurse werden aktualisiert...';
+
+            let updated = 0;
+            let failed = 0;
+            let skipped = 0;
+            const failedSymbols = [];
+
+            for (const t of tranchen) {
+                const ticker = (t.ticker || '').trim();
+                const isin = (t.isin || '').trim();
+                const symbols = [];
+                if (ticker) symbols.push(ticker);
+                if (isin && !symbols.includes(isin)) symbols.push(isin);
+                if (!symbols.length) {
+                    skipped += 1;
+                    continue;
+                }
+
+                statusEl.textContent = `Kurse werden aktualisiert... (${updated + failed + skipped + 1}/${tranchen.length})`;
+
+                let price = null;
+                let resolvedSymbol = null;
+
+                for (const symbol of symbols) {
+                    try {
+                        price = await fetchProxyPrice(symbol, proxyBase);
+                        resolvedSymbol = symbol;
+                        break;
+                    } catch (errPrice) {
+                        // try symbol search based on ISIN/name
+                        try {
+                            const lookup = await fetchProxySymbol(symbol, proxyBase, t.name);
+                            if (lookup) {
+                                price = await fetchProxyPrice(lookup, proxyBase);
+                                resolvedSymbol = lookup;
+                                break;
+                            }
+                        } catch (errLookup) {
+                            console.warn('Yahoo Lookup fehlgeschlagen:', symbol, errLookup);
+                        }
+                    }
+                }
+
+                if (resolvedSymbol && resolvedSymbol !== ticker) {
+                    t.ticker = resolvedSymbol;
+                }
+
+                if (!Number.isFinite(price) || price <= 0) {
+                    failed += 1;
+                    failedSymbols.push(ticker || isin || 'unbekannt');
+                    continue;
+                }
+
+                t.currentPrice = price;
+                t.marketValue = t.shares * price;
+                updated += 1;
+            }
+
+            saveTranchen();
+            render();
+
+            const stamp = new Date().toLocaleString('de-DE');
+            const failedNote = failedSymbols.length ? ` Fehlgeschlagen: ${failedSymbols.slice(0, 5).join(', ')}${failedSymbols.length > 5 ? ' ...' : ''}` : '';
+            statusEl.textContent = `Kurs-Update ${stamp}: ${updated} aktualisiert, ${failed} fehlgeschlagen, ${skipped} ohne Ticker/ISIN. (Yahoo Finance)${failedNote}`;
+        };
+
+        function render() {
+            renderStats();
+            renderTable();
+        }
+
+        function renderStats() {
+            const totalValue = tranchen.reduce((sum, t) => sum + t.marketValue, 0);
+            const totalCost = tranchen.reduce((sum, t) => sum + t.costBasis, 0);
+            const totalGain = totalValue - totalCost;
+            const gainPct = totalCost > 0 ? (totalGain / totalCost) * 100 : 0;
+
+            const statsHtml = `
+                <div class="stat-card">
+                    <div class="stat-label">Gesamtwert</div>
+                    <div class="stat-value">${totalValue.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Einstandswert</div>
+                    <div class="stat-value">${totalCost.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Gewinn absolut</div>
+                    <div class="stat-value">${totalGain.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Gewinn relativ</div>
+                    <div class="stat-value">${gainPct.toFixed(2)} %</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Anzahl Tranchen</div>
+                    <div class="stat-value">${tranchen.length}</div>
+                </div>
+            `;
+
+            document.getElementById('stats').innerHTML = statsHtml;
+        }
+
+        function renderTable() {
+            const container = document.getElementById('tranchenTable');
+
+            if (tranchen.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <h3>Keine Tranchen vorhanden</h3>
+                        <p>Fügen Sie Ihre erste Tranche hinzu oder laden Sie das Beispiel.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Sort by purchase date (FIFO)
+            const sorted = [...tranchen].sort((a, b) => {
+                const dateA = a.purchaseDate ? new Date(a.purchaseDate) : new Date('1900-01-01');
+                const dateB = b.purchaseDate ? new Date(b.purchaseDate) : new Date('1900-01-01');
+                return dateA - dateB;
+            });
+
+            const rows = sorted.map((t, originalIndex) => {
+                const gain = t.marketValue - t.costBasis;
+                const gainPct = t.costBasis > 0 ? (gain / t.costBasis) * 100 : 0;
+                const gainClass = gain >= 0 ? 'positive' : 'negative';
+                const gainSign = gain >= 0 ? '+' : '-';
+                const typeBadge =
+                    t.type === 'aktien_alt' ? '<span class="badge badge-alt">Alt</span>' :
+                    t.type === 'aktien_neu' ? '<span class="badge badge-neu">Neu</span>' :
+                    '<span class="badge badge-geldmarkt">Geldmarkt</span>';
+                const taxBadge = t.tqf >= 1.0 ? '<span class="badge badge-steuerfrei">Steuerfrei</span>' : '';
+
+                return `
+                    <tr class="tranche-row">
+                        <td>${t.purchaseDate || '-'}</td>
+                        <td>
+                            <strong>${t.name}</strong><br>
+                            <small style="color: #718096;">${t.isin || '-'}</small><br>
+                            <small style="color: #718096;">${t.ticker || '-'}</small>
+                        </td>
+                        <td>${t.shares.toLocaleString('de-DE')}</td>
+                        <td>${t.purchasePrice.toFixed(2)} €</td>
+                        <td>${t.currentPrice.toFixed(2)} €</td>
+                        <td>${t.costBasis.toLocaleString('de-DE', {minimumFractionDigits: 2})} €</td>
+                        <td>${t.marketValue.toLocaleString('de-DE', {minimumFractionDigits: 2})} €</td>
+                        <td class="positive">+${gain.toLocaleString('de-DE', {minimumFractionDigits: 2})} € (${gainPct.toFixed(2)}%)</td>
+                        <td>${typeBadge} ${taxBadge}</td>
+                        <td>
+                            <button class="btn-primary" style="padding: 4px 8px; font-size: 12px; margin-right: 5px;" onclick="editTranche(${tranchen.indexOf(t)})">✏️</button>
+                            <button class="delete-btn" onclick="deleteTranche(${tranchen.indexOf(t)})">🗑️</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            container.innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Kaufdatum</th>
+                            <th>Name / ISIN</th>
+                            <th>Stücke</th>
+                            <th>Kaufpreis</th>
+                            <th>Aktuell</th>
+                            <th>Einstand</th>
+                            <th>Marktwert</th>
+                            <th>Gewinn</th>
+                            <th>Typ</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        // Initial render
+        render();
+    </script>
+</body>
+</html>

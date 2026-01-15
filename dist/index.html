@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ruhestand-Apps Suite</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #1a2530;
+            --secondary-color: #c5a059;
+            /* Premium Gold */
+            --accent-color: #3498db;
+            --background-color: #f8f9fa;
+            --text-color: #2c3e50;
+            --text-light: #7f8c8d;
+            --card-bg: rgba(255, 255, 255, 0.95);
+            --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            --hover-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            --border-radius: 20px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-color);
+            background-image:
+                radial-gradient(at 0% 0%, rgba(197, 160, 89, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(52, 152, 219, 0.1) 0px, transparent 50%);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .hero {
+            width: 100%;
+            max-width: 1200px;
+            padding: 20px 20px 10px;
+            /* Reduced padding */
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        .hero-image-container {
+            width: 100%;
+            max-width: 300px;
+            /* Much smaller image */
+            margin-bottom: 20px;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: var(--card-shadow);
+            position: relative;
+        }
+
+        .hero-image {
+            width: 100%;
+            height: auto;
+            display: block;
+            transition: transform 0.5s ease;
+        }
+
+        .hero-image-container:hover .hero-image {
+            transform: scale(1.02);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            /* Smaller title */
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, var(--primary-color) 0%, #34495e 100%);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            color: var(--text-light);
+            max-width: 600px;
+            line-height: 1.5;
+            margin-bottom: 30px;
+            /* Reduced margin */
+        }
+
+        .apps-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            /* Slightly narrower col min width */
+            gap: 25px;
+            /* Reduced gap */
+            width: 100%;
+            max-width: 900px;
+            /* Tighter grid */
+            padding: 0 20px 40px;
+            /* Reduced bottom padding */
+        }
+
+        .app-card {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            padding: 25px;
+            /* Compact padding */
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+            box-shadow: var(--card-shadow);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .app-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 100%);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        .app-card:hover {
+            transform: translateY(-10px);
+            box-shadow: var(--hover-shadow);
+        }
+
+        .app-card:hover::after {
+            opacity: 1;
+        }
+
+        .app-icon-wrapper {
+            width: 60px;
+            /* Smaller icon */
+            height: 60px;
+            background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            font-size: 2rem;
+            transition: transform 0.3s ease;
+        }
+
+        .app-card:hover .app-icon-wrapper {
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        .app-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 12px;
+        }
+
+        .app-description {
+            font-size: 0.95rem;
+            color: var(--text-light);
+            line-height: 1.5;
+            margin-bottom: 20px;
+            flex-grow: 1;
+        }
+
+        .features {
+            width: 100%;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+            font-size: 0.95rem;
+            color: #555;
+        }
+
+        .feature-icon {
+            color: var(--secondary-color);
+            font-weight: bold;
+        }
+
+        .cta-button {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 14px 32px;
+            border-radius: 12px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border: none;
+            width: 100%;
+            position: relative;
+            z-index: 1;
+        }
+
+        .app-card:hover .cta-button {
+            background-color: var(--secondary-color);
+            transform: translateY(-2px);
+        }
+
+        footer {
+            margin-top: auto;
+            padding: 40px;
+            color: var(--text-light);
+            font-size: 0.9rem;
+            text-align: center;
+            width: 100%;
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.5rem;
+            }
+
+            .hero {
+                padding: 40px 20px;
+            }
+
+            .apps-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="hero">
+        <div class="hero-image-container">
+            <img src="assets/images/retirement_hero_illustration.png" alt="Finanzielle Freiheit" class="hero-image">
+        </div>
+        <h1>Ruhestand-Apps Suite</h1>
+        <p class="subtitle">Planen, simulieren und optimieren Sie Ihre finanzielle Zukunft mit Ihren persönlichen
+            Werkzeugen.</p>
+    </div>
+
+    <div class="apps-grid">
+        <!-- Balance App -->
+        <a href="Balance.html" class="app-card">
+            <div class="app-icon-wrapper">⚖️</div>
+            <h2 class="app-title">Portfolio Balancing</h2>
+            <p class="app-description">
+                Optimieren Sie Ihre Asset-Allokation und behalten Sie den Überblick über Ihr Vermögen mit intelligentem
+                Rebalancing.
+            </p>
+            <div class="features">
+                <div class="feature-item">
+                    <span class="feature-icon">✓</span>
+                    <span>Smarte Portfolio-Strukturierung</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">✓</span>
+                    <span>Jahresabschluss-Workflow</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">✓</span>
+                    <span>Detaillierte Vermögensübersicht</span>
+                </div>
+            </div>
+            <button class="cta-button">Balance App starten</button>
+        </a>
+
+        <!-- Simulator App -->
+        <a href="Simulator.html" class="app-card">
+            <div class="app-icon-wrapper">📊</div>
+            <h2 class="app-title">Monte-Carlo Simulator</h2>
+            <p class="app-description">
+                Validieren Sie Ihre Ruhestandsstrategie mit tausenden von Marktszenarien und stress-getesteten
+                Prognosen.
+            </p>
+            <div class="features">
+                <div class="feature-item">
+                    <span class="feature-icon">✓</span>
+                    <span>Historische Marktdaten-Analyse</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">✓</span>
+                    <span>Entnahme-Strategien testen</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">✓</span>
+                    <span>Visuelle Erfolgswahrscheinlichkeiten</span>
+                </div>
+            </div>
+            <button class="cta-button">Simulator starten</button>
+        </a>
+
+        <!-- Depot-Tranchen Manager -->
+        <a href="depot-tranchen-manager.html" class="app-card">
+            <div class="app-icon-wrapper">📊</div>
+            <h2 class="app-title">Depot-Tranchen Manager</h2>
+            <p class="app-description">
+                Verwalten Sie Ihre Depot-Positionen mit detaillierten Tranchen für präzise Steuerberechnung und FIFO-Verkäufe.
+            </p>
+            <div class="features">
+                <div class="feature-item">
+                    <span class="feature-icon">✓</span>
+                    <span>Individuelle Positionen verwalten</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">✓</span>
+                    <span>FIFO-Verkaufslogik & Steueroptimierung</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">✓</span>
+                    <span>Export/Import als JSON</span>
+                </div>
+            </div>
+            <button class="cta-button">Tranchen Manager öffnen</button>
+        </a>
+
+        <!-- Manual Card -->
+        <a href="Handbuch.html" class="app-card">
+            <div class="app-icon-wrapper">📖</div>
+            <h2 class="app-title">Benutzerhandbuch</h2>
+            <p class="app-description">
+                Lernen Sie alle Funktionen kennen mit unseren Schnellstart-Guides und detaillierten Erklärungen.
+            </p>
+            <div class="features">
+                <div class="feature-item">
+                    <span class="feature-icon">✓</span>
+                    <span>Schritt-für-Schritt Anleitungen</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">✓</span>
+                    <span>Erklärung aller Parameter</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">✓</span>
+                    <span>Häufig gestellte Fragen</span>
+                </div>
+            </div>
+            <button class="cta-button">Handbuch öffnen</button>
+        </a>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 Ruhestand-Apps Suite | Entwickelt für Ihre finanzielle Sicherheit</p>
+    </footer>
+
+    <div id="devTools" style="display:none; position:fixed; bottom:10px; right:10px; background:#333; color:#fff; padding:10px; border-radius:5px; z-index:9999;">
+        <label>
+            <input type="checkbox" id="telemetryToggle" />
+            Worker Telemetry
+        </label>
+    </div>
+
+    <script>
+        if (window.location.search.includes('dev=true')) {
+            const devTools = document.getElementById('devTools');
+            const toggle = document.getElementById('telemetryToggle');
+            if (devTools && toggle) {
+                devTools.style.display = 'block';
+                toggle.checked = localStorage.getItem('enableWorkerTelemetry') === 'true';
+                toggle.addEventListener('change', e => {
+                    localStorage.setItem('enableWorkerTelemetry', e.target.checked);
+                    alert('Telemetry ' + (e.target.checked ? 'aktiviert' : 'deaktiviert') + '. Seite neu laden.');
+                });
+            }
+        }
+    </script>
+</body>
+
+</html>
