@@ -95,6 +95,144 @@
         .ao-preset-btn:active {
             transform: translateY(0);
         }
+
+        .household-panel {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .household-profile-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 8px 12px;
+        }
+
+        .household-profile-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.95rem;
+        }
+
+        .household-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px 16px;
+            align-items: end;
+        }
+
+        .household-progress {
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 6px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .household-progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #38bdf8, #0ea5e9);
+            transition: width 0.2s ease;
+        }
+
+        .household-kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+        }
+
+        .household-kpi {
+            background: white;
+            border-radius: 8px;
+            padding: 10px 12px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .household-kpi .label {
+            font-size: 0.8rem;
+            color: #64748b;
+            margin-bottom: 4px;
+        }
+
+        .household-kpi .value {
+            font-weight: 600;
+            color: #0f172a;
+        }
+
+        .household-warnings {
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 0.85rem;
+            color: #9a3412;
+        }
+
+        .household-note {
+            font-size: 0.85rem;
+            color: #475569;
+        }
+
+        .household-withdrawals {
+            margin-top: 12px;
+        }
+
+        .household-withdrawal-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 8px;
+            font-size: 0.9rem;
+        }
+
+        .household-status {
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+
+        .household-status[data-kind="ok"] {
+            color: #15803d;
+        }
+
+        .household-status[data-kind="error"] {
+            color: #b91c1c;
+        }
+
+        .household-risk-panel {
+            border: 1px dashed #cbd5f5;
+            border-radius: 10px;
+            padding: 12px;
+            background: #f9fafb;
+        }
+
+        .household-risk-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 10px;
+            font-size: 0.9rem;
+        }
+
+        .household-risk-item {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 8px 10px;
+        }
+
+        .household-risk-item.ok {
+            border-color: #86efac;
+            background: #f0fdf4;
+        }
+
+        .household-risk-item.fail {
+            border-color: #fecaca;
+            background: #fef2f2;
+        }
     </style>
 </head>
 
@@ -120,8 +258,8 @@
                         class="mode-toggle-slider"></span><span class="mode-label">🔧 Fortgeschritten</span></label>
             </div>
             <div class="tab-buttons"><button class="tab-btn active" data-tab="rahmendaten">Rahmendaten</button><button
-                    class="tab-btn" data-tab="montecarlo">Monte-Carlo</button><button class="tab-btn advanced-only"
-                    data-tab="backtesting">Backtesting</button><button class="tab-btn advanced-only"
+                    class="tab-btn" data-tab="montecarlo">Monte-Carlo</button><button class="tab-btn"
+                    data-tab="haushalt">Haushalt</button><button class="tab-btn advanced-only" data-tab="backtesting">Backtesting</button><button class="tab-btn advanced-only"
                     data-tab="sweep">Parameter-Sweep</button></div>
             <div class="tab-content">
                 <div id="tab-rahmendaten" class="tab-panel active">
@@ -700,6 +838,74 @@
                         </div>
                     </div>
                 </div>
+                <div id="tab-haushalt" class="tab-panel">
+                    <div class="household-panel">
+                        <p style="margin: 0; color: #475569;">
+                            Haushalts-Simulation (Additiv). Demografie und Pflege-Logik kommen aus dem gewaehlten Hauptprofil.
+                        </p>
+                        <div>
+                            <h3 style="margin: 0 0 8px 0;">Profile auswaehlen</h3>
+                            <div id="householdProfileList" class="household-profile-list"></div>
+                        </div>
+                        <div class="household-controls">
+                            <div class="form-group">
+                                <label for="householdPrimaryProfile">Hauptprofil fuer Demografie</label>
+                                <select id="householdPrimaryProfile"></select>
+                            </div>
+                            <div class="form-group">
+                                <label for="householdAggregationStrategy">Aggregation</label>
+                                <select id="householdAggregationStrategy">
+                                    <option value="additive">Additiv (ein Portfolio)</option>
+                                    <option value="accounts">Accounts (getrennte Portfolios)</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="justify-content: center;">
+                                <label style="flex-direction: row; align-items: center;">
+                                    <input type="checkbox" id="householdCashBufferEnabled" style="width: auto; margin-right: 8px;">
+                                    Gemeinsamer Cash-Puffer aktiv
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label for="householdCashBufferMonths">Cash-Puffer (Monate)</label>
+                                <input type="number" id="householdCashBufferMonths" value="6" min="0" max="36">
+                            </div>
+                            <div class="form-group">
+                                <label for="householdWithdrawalPolicy">Entnahme-Policy</label>
+                                <select id="householdWithdrawalPolicy">
+                                    <option value="proportional">Proportional</option>
+                                    <option value="runway_first">Runway-First</option>
+                                    <option value="tax_first">Tax-First (Schaetzung)</option>
+                                    <option value="stabilizer">Stabilizer (Schaetzung)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="household-risk-panel">
+                            <h3 style="margin: 0 0 8px 0;">Risiko-Budget (Haushalt)</h3>
+                            <div class="household-controls">
+                                <div class="form-group">
+                                    <label for="householdRiskMaxDrawdown">Max. Drawdown P90 (%)</label>
+                                    <input type="number" id="householdRiskMaxDrawdown" value="45" min="10" max="90" step="1">
+                                </div>
+                                <div class="form-group">
+                                    <label for="householdRiskMaxDepletion">Max. Depot-Erschoepfung (%)</label>
+                                    <input type="number" id="householdRiskMaxDepletion" value="5" min="0" max="50" step="1">
+                                </div>
+                                <div class="form-group">
+                                    <label for="householdRiskMinSuccess">Min. Success-Rate (%)</label>
+                                    <input type="number" id="householdRiskMinSuccess" value="90" min="50" max="100" step="1">
+                                </div>
+                            </div>
+                        </div>
+                        <button id="householdRunBtn" class="nav-button" style="align-self: flex-start;">Haushalts-Simulation starten</button>
+                        <div id="household-progress-bar-container" class="household-progress">
+                            <div id="household-progress-bar" class="household-progress-bar"></div>
+                        </div>
+                        <div id="householdStatus" class="household-status">
+                            Hinweise und Warnungen erscheinen hier.
+                        </div>
+                        <div id="householdResults"></div>
+                    </div>
+                </div>
                 <div id="tab-backtesting" class="tab-panel advanced-only">
                     <fieldset>
                         <legend><span class="section-icon">📅</span>Backtesting-Parameter</legend>
@@ -1041,6 +1247,7 @@
             </div>
         </div>
     </div>
+    <script type="module" src="profile-bridge.js"></script>
     <script type="module" src="engine.js"></script>
 
 
@@ -1053,6 +1260,7 @@
     <script type="module" src="auto_optimize.js"></script>
     <script type="module" src="auto_optimize_ui.js"></script>
     <script type="module" src="simulator-main.js"></script>
+    <script type="module" src="household-simulator.js"></script>
     <!-- Accordion Toggle & Progress Indicator Functionality -->
     <script> document.addEventListener('DOMContentLoaded', function () {
 
