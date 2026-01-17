@@ -15,6 +15,7 @@ const STORAGE_KEYS = {
     cashEnabled: 'household_cash_buffer_enabled',
     cashMonths: 'household_cash_buffer_months',
     withdrawalPolicy: 'household_withdrawal_policy',
+    withdrawalMode: 'household_withdrawal_mode',
     riskMaxDrawdown: 'household_risk_max_drawdown',
     riskMaxDepletion: 'household_risk_max_depletion',
     riskMinSuccess: 'household_risk_min_success'
@@ -105,14 +106,25 @@ function readAggregationStrategy() {
     return localStorage.getItem(STORAGE_KEYS.aggregation) || 'additive';
 }
 
+function readWithdrawalMode() {
+    const select = byId('householdWithdrawalMode');
+    if (select && select.value) return select.value;
+    return localStorage.getItem(STORAGE_KEYS.withdrawalMode) || 'household';
+}
+
 function applyCashBufferToInputs(inputs, cashBuffer) {
     if (!inputs) return inputs;
     if (!cashBuffer?.enabled) return inputs;
     const months = cashBuffer.months || 0;
+
+    // BUGFIX: Gold-Validierung - goldAktiv sollte nur true sein wenn goldZielProzent > 0
+    const fixedGoldAktiv = (inputs.goldAktiv && (inputs.goldZielProzent || 0) > 0);
+
     return {
         ...inputs,
         runwayMinMonths: (inputs.runwayMinMonths || 0) + months,
-        runwayTargetMonths: (inputs.runwayTargetMonths || 0) + months
+        runwayTargetMonths: (inputs.runwayTargetMonths || 0) + months,
+        goldAktiv: fixedGoldAktiv  // BUGFIX: Korrigiere Gold-Flag
     };
 }
 
@@ -147,7 +159,131 @@ function buildRiskListsFromPrimary(primaryChunk) {
     return primaryChunk.lists;
 }
 
-async function runHouseholdAccountsSimulation({ profileInputs, primaryProfileId, monteCarloParams, useCapeSampling, cashBuffer }, onProgress) {
+/**
+ * Wendet Withdrawal-Shares auf Profil-Inputs an
+ * @param {Object} inputs - Die ursprünglichen Profil-Inputs
+ * @param {number} shareFraction - Dezimal-Bruchteil (0-1) für Entnahme-Orchestrierung
+ * @param {number} totalFloor - Gesamt-Floor-Bedarf aller Profile
+ * @param {number} totalFlex - Gesamt-Flex-Bedarf aller Profile
+ * @param {string} mode - 'profile' oder 'household'
+ *
+ * MODE SEMANTIK:
+ * - 'profile': Skaliert individuelle Profil-Ausgaben mit shareFraction
+ *              (Jedes Profil hat eigene Ausgaben)
+ * - 'household': Alle Profile erhalten die VOLLEN totalFloor/totalFlex Werte
+ *                (Gemeinsamer Haushalt mit gleichen Gesamt-Ausgaben)
+ */
+function applyWithdrawalShareToInputs(inputs, shareFraction, totalFloor, totalFlex, mode) {
+    if (!inputs || !Number.isFinite(shareFraction)) return inputs;
+    const factor = Math.max(0, shareFraction);
+
+    // BUGFIX: Gold-Validierung - goldAktiv sollte nur true sein wenn goldZielProzent > 0
+    const fixedGoldAktiv = (inputs.goldAktiv && (inputs.goldZielProzent || 0) > 0);
+
+    if (mode === 'profile') {
+        // Profile-Modus: Skaliere individuelle Profil-Ausgaben proportional
+        return {
+            ...inputs,
+            startFloorBedarf: (inputs.startFloorBedarf || 0) * factor,
+            startFlexBedarf: (inputs.startFlexBedarf || 0) * factor,
+            goldAktiv: fixedGoldAktiv  // BUGFIX: Korrigiere Gold-Flag
+        };
+    }
+    // Household-Modus: Alle Profile erhalten die VOLLEN Haushalts-Ausgaben
+    // shareFraction wird NICHT zur Ausgaben-Skalierung verwendet
+    return {
+        ...inputs,
+        startFloorBedarf: totalFloor || 0,
+        startFlexBedarf: totalFlex || 0,
+        goldAktiv: fixedGoldAktiv  // BUGFIX: Korrigiere Gold-Flag
+    };
+}
+
+function buildShareMap(withdrawalShares) {
+    const totalPct = withdrawalShares.reduce((sum, entry) => sum + (entry.pct || 0), 0);
+    const map = {};
+    withdrawalShares.forEach(entry => {
+        const pct = entry.pct || 0;
+        map[entry.profileId] = totalPct > 0 ? pct / totalPct : 0;
+    });
+    return map;
+}
+
+function buildProfileSummaryRows(profileInputs, withdrawalShares) {
+    const shareMap = buildShareMap(withdrawalShares || []);
+    return profileInputs.map(entry => {
+        const inputs = entry.inputs;
+        const sharePct = (shareMap[entry.profileId] ?? 0) * 100;
+        return {
+            name: entry.name,
+            startVermoegen: inputs.startVermoegen || 0,
+            floor: inputs.startFloorBedarf || 0,
+            flex: inputs.startFlexBedarf || 0,
+            sharePct
+        };
+    });
+}
+
+function summarizeTranches(tranches) {
+    const totals = { equity: 0, gold: 0, moneyMarket: 0, count: 0 };
+    if (!Array.isArray(tranches)) return totals;
+    totals.count = tranches.length;
+    tranches.forEach(tranche => {
+        const mv = Number(tranche?.marketValue) || (Number(tranche?.shares) || 0) * (Number(tranche?.currentPrice) || 0);
+        const category = String(tranche?.category || '').toLowerCase();
+        const type = String(tranche?.type || '').toLowerCase();
+        if (category === 'gold' || type.includes('gold')) {
+            totals.gold += mv;
+            return;
+        }
+        if (category === 'money_market' || type.includes('geldmarkt')) {
+            totals.moneyMarket += mv;
+            return;
+        }
+        totals.equity += mv;
+    });
+    return totals;
+}
+
+function computeEffectiveNeeds(profileInputs, withdrawalShares, withdrawalMode, aggregationStrategy, combinedInputs) {
+    if (aggregationStrategy === 'additive' && combinedInputs) {
+        const totalFloor = combinedInputs.startFloorBedarf || 0;
+        const totalFlex = combinedInputs.startFlexBedarf || 0;
+        return { totalFloor, totalFlex, totalCombined: totalFloor + totalFlex };
+    }
+    const shareMap = buildShareMap(withdrawalShares || []);
+    let totalFloor = 0;
+    let totalFlex = 0;
+
+    profileInputs.forEach(entry => {
+        const floor = entry.inputs.startFloorBedarf || 0;
+        const flex = entry.inputs.startFlexBedarf || 0;
+        const share = shareMap[entry.profileId] ?? 0;
+
+        if (withdrawalMode === 'profile') {
+            totalFloor += floor * share;
+            totalFlex += flex * share;
+        } else {
+            totalFloor += floor;
+            totalFlex += flex;
+        }
+    });
+
+    return { totalFloor, totalFlex, totalCombined: totalFloor + totalFlex };
+}
+
+function isProfileEmpty(inputs) {
+    if (!inputs) return true;
+    const hasTranches = Array.isArray(inputs.detailledTranches) && inputs.detailledTranches.length > 0;
+    const hasAssets = (inputs.startVermoegen || 0) > 0
+        || (inputs.depotwertAlt || 0) > 0
+        || (inputs.tagesgeld || 0) > 0
+        || (inputs.geldmarktEtf || 0) > 0;
+    const hasNeeds = (inputs.startFloorBedarf || 0) > 0 || (inputs.startFlexBedarf || 0) > 0;
+    return !hasTranches && !hasAssets && !hasNeeds;
+}
+
+async function runHouseholdAccountsSimulation({ profileInputs, primaryProfileId, monteCarloParams, useCapeSampling, cashBuffer, withdrawalShares, withdrawalMode }, onProgress) {
     const totalRuns = monteCarloParams.anzahl;
     const primaryEntry = profileInputs.find(entry => entry.profileId === primaryProfileId) || profileInputs[0];
     const primaryInputsRaw = primaryEntry?.inputs;
@@ -155,10 +291,20 @@ async function runHouseholdAccountsSimulation({ profileInputs, primaryProfileId,
     const primaryWeights = profileInputs.map(entry => entry.inputs.startVermoegen || 0);
     const totalWeight = primaryWeights.reduce((sum, val) => sum + val, 0);
 
+    const shareMap = buildShareMap(withdrawalShares || []);
+    const totalFloor = profileInputs.reduce((sum, entry) => sum + (entry.inputs.startFloorBedarf || 0), 0);
+    const totalFlex = profileInputs.reduce((sum, entry) => sum + (entry.inputs.startFlexBedarf || 0), 0);
     const profileChunks = [];
     for (let idx = 0; idx < profileInputs.length; idx++) {
         const entry = profileInputs[idx];
-        const adjustedInputs = applyCashBufferToInputs(entry.inputs, cashBuffer);
+        const adjustedInputs = applyWithdrawalShareToInputs(
+            applyCashBufferToInputs(entry.inputs, cashBuffer),
+            shareMap[entry.profileId] ?? 0,
+            totalFloor,
+            totalFlex,
+            withdrawalMode
+        );
+
         const widowOptions = normalizeWidowOptions(adjustedInputs.widowOptions);
         const chunk = await runMonteCarloChunk({
             inputs: adjustedInputs,
@@ -294,7 +440,7 @@ function renderRiskBudget(result, successProb, budget) {
     return { html, allOk: checks.every(item => item.ok) };
 }
 
-function renderResults(result, warnings, withdrawalShares, cashBuffer, riskBudget, withdrawalPolicy) {
+function renderResults(result, warnings, withdrawalShares, cashBuffer, riskBudget, withdrawalPolicy, effectiveNeeds, simulationMeta, combinedSummary) {
     const container = byId('householdResults');
     if (!container) return;
 
@@ -319,6 +465,18 @@ function renderResults(result, warnings, withdrawalShares, cashBuffer, riskBudge
         ? `<div class="household-warnings">${warnings.map(w => `<div>! ${w}</div>`).join('')}</div>`
         : '';
 
+    const needsHtml = effectiveNeeds
+        ? `<div class="household-note">Effektiver Bedarf: Floor ${formatCurrencyRounded(effectiveNeeds.totalFloor)} + Flex ${formatCurrencyRounded(effectiveNeeds.totalFlex)} = ${formatCurrencyRounded(effectiveNeeds.totalCombined)}</div>`
+        : '';
+
+    const metaHtml = simulationMeta
+        ? `<div class="household-note">Simulation: ${simulationMeta.mode} | ${simulationMeta.method} | Runs ${simulationMeta.runs} | Dauer ${simulationMeta.years} J | Seed ${simulationMeta.seed}${simulationMeta.cape ? ' | CAPE-Sampling' : ''}</div>`
+        : '';
+
+    const combinedHtml = combinedSummary
+        ? `<div class="household-note">Haushalt-Inputs: Start ${formatCurrencyRounded(combinedSummary.startVermoegen)} | Depot ${formatCurrencyRounded(combinedSummary.depotwertAlt)} | Liquid ${formatCurrencyRounded((combinedSummary.tagesgeld || 0) + (combinedSummary.geldmarktEtf || 0))}${combinedSummary.trancheSummary ? ` | Tranchen ${combinedSummary.trancheSummary.count} (Eq ${formatCurrencyRounded(combinedSummary.trancheSummary.equity)} / Gold ${formatCurrencyRounded(combinedSummary.trancheSummary.gold)} / MM ${formatCurrencyRounded(combinedSummary.trancheSummary.moneyMarket)})` : ''}</div>`
+        : '';
+
     const cashHtml = cashBuffer.enabled
         ? `<div class="household-note">Gemeinsamer Cash-Puffer: ${cashBuffer.months} Monate (Runway-Min/Target erhoeht).</div>`
         : '';
@@ -339,15 +497,37 @@ function renderResults(result, warnings, withdrawalShares, cashBuffer, riskBudge
            </div>`
         : '';
 
+    const profileRows = buildProfileSummaryRows(result.profileInputs || [], withdrawalShares);
+    const profileSummaryHtml = profileRows.length
+        ? `<div class="household-withdrawals">
+                <h4>Profil-Check (Inputs)</h4>
+                <div class="household-withdrawal-grid">
+                    ${profileRows.map(row => `
+                        <div>
+                            <strong>${row.name}</strong><br>
+                            Start: ${formatCurrencyRounded(row.startVermoegen)}<br>
+                            Floor: ${formatCurrencyRounded(row.floor)}<br>
+                            Flex: ${formatCurrencyRounded(row.flex)}<br>
+                            Anteil: ${row.sharePct.toFixed(1)} %
+                        </div>
+                    `).join('')}
+                </div>
+           </div>`
+        : '';
+
     const riskOutput = renderRiskBudget(aggregatedResults, successProb, riskBudget);
 
     container.innerHTML = `
         ${warningHtml}
+        ${needsHtml}
+        ${metaHtml}
+        ${combinedHtml}
         ${cashHtml}
         <div class="household-kpi-grid">
             ${summaryCards.map(card => `<div class="household-kpi"><div class="label">${card.label}</div><div class="value">${card.value}</div></div>`).join('')}
         </div>
         ${withdrawalHtml}
+        ${profileSummaryHtml}
         ${riskOutput.html}
     `;
 
@@ -370,16 +550,21 @@ async function runHouseholdSimulation() {
     const riskBudget = readRiskBudgetSettings();
 
     const profileInputs = [];
+    const skippedProfiles = [];
     for (const id of activeIds) {
         const data = getProfileData(id);
         if (!data) continue;
         const inputs = buildSimulatorInputsFromProfileData(data);
         const meta = getProfileMeta(id);
+        if (isProfileEmpty(inputs)) {
+            skippedProfiles.push(meta?.name || id);
+            continue;
+        }
         profileInputs.push({ profileId: id, name: meta?.name || id, inputs });
     }
 
     if (profileInputs.length < 2) {
-        setStatus('Zu wenig Profile mit Daten gefunden.', 'error');
+        setStatus('Zu wenig Profile mit Simulator-Daten gefunden.', 'error');
         return;
     }
 
@@ -390,13 +575,28 @@ async function runHouseholdSimulation() {
     }
 
     const withdrawalPolicy = localStorage.getItem(STORAGE_KEYS.withdrawalPolicy) || 'proportional';
+    const withdrawalMode = readWithdrawalMode();
     const withdrawalShares = buildWithdrawalShares(profileInputs, withdrawalPolicy);
+
+    const effectiveNeeds = computeEffectiveNeeds(profileInputs, withdrawalShares, withdrawalMode, aggregationStrategy, combined);
     const warningsExtended = warnings.slice();
+    if (aggregationStrategy === 'additive') {
+        const anyTranches = profileInputs.some(entry => Array.isArray(entry.inputs.detailledTranches) && entry.inputs.detailledTranches.length > 0);
+        const combinedHasTranches = Array.isArray(combined?.detailledTranches) && combined.detailledTranches.length > 0;
+        // WARNING REMOVED: Tranches are now aggregated.
+        // if (anyTranches && !combinedHasTranches) { ... }
+    }
     if (aggregationStrategy === 'accounts') {
         warningsExtended.push('Accounts-Modus aggregiert Drawdowns konservativ (Max je Profil).');
+        warningsExtended.push(withdrawalMode === 'profile'
+            ? 'Entnahme-Policy skaliert die Profilbedarfe.'
+            : 'Entnahme-Policy verteilt den Haushaltsbedarf (Floor/Flex) auf Profile.');
     }
-    if (withdrawalPolicy !== 'proportional') {
-        warningsExtended.push('Entnahme-Policy ist eine Heuristik und wirkt aktuell nur im Reporting.');
+    if (withdrawalPolicy !== 'proportional' && aggregationStrategy !== 'accounts') {
+        warningsExtended.push('Additiv-Modus ignoriert Entnahme-Policy/Basis (Reporting only).');
+    }
+    if (skippedProfiles.length) {
+        warningsExtended.push(`Profile ohne Simulator-Daten ignoriert: ${skippedProfiles.join(', ')}`);
     }
 
     const runButton = byId('householdRunBtn');
@@ -414,13 +614,16 @@ async function runHouseholdSimulation() {
         const params = readMonteCarloParameters();
         const useCapeSampling = byId('useCapeSampling')?.checked === true;
         let result = null;
+
         if (aggregationStrategy === 'accounts') {
             result = await runHouseholdAccountsSimulation({
                 profileInputs,
                 primaryProfileId,
                 monteCarloParams: params,
                 useCapeSampling,
-                cashBuffer
+                cashBuffer,
+                withdrawalShares,
+                withdrawalMode
             }, pct => {
                 if (progressBar) progressBar.style.width = `${Math.max(0, Math.min(100, pct))}%`;
             });
@@ -437,11 +640,31 @@ async function runHouseholdSimulation() {
             });
         }
 
+        const simulationMeta = {
+            mode: aggregationStrategy === 'accounts' ? 'Accounts' : 'Additiv',
+            method: params.methode,
+            runs: params.anzahl,
+            years: params.maxDauer,
+            seed: params.seed,
+            cape: useCapeSampling
+        };
+
+        const trancheSummary = combined?.detailledTranches ? summarizeTranches(combined.detailledTranches) : null;
+        const combinedSummary = combined
+            ? {
+                startVermoegen: combined.startVermoegen || 0,
+                depotwertAlt: combined.depotwertAlt || 0,
+                tagesgeld: combined.tagesgeld || 0,
+                geldmarktEtf: combined.geldmarktEtf || 0,
+                trancheSummary
+            }
+            : null;
         const riskOk = renderResults({
             aggregatedResults: result.aggregatedResults,
             failCount: result.failCount,
-            totalRuns: params.anzahl
-        }, warningsExtended, withdrawalShares, cashBuffer, riskBudget, withdrawalPolicy);
+            totalRuns: params.anzahl,
+            profileInputs
+        }, warningsExtended, withdrawalShares, cashBuffer, riskBudget, withdrawalPolicy, effectiveNeeds, simulationMeta, combinedSummary);
         setStatus(riskOk ? 'Haushalts-Simulation abgeschlossen.' : 'Simulation abgeschlossen: Risiko-Budget verletzt.', riskOk ? 'ok' : 'error');
     } catch (err) {
         console.error('[Household] Simulation failed:', err);
@@ -460,6 +683,7 @@ function restoreHouseholdSettings() {
     const cashMonths = localStorage.getItem(STORAGE_KEYS.cashMonths);
     const policy = localStorage.getItem(STORAGE_KEYS.withdrawalPolicy) || 'proportional';
     const aggregation = localStorage.getItem(STORAGE_KEYS.aggregation) || 'additive';
+    const withdrawalMode = localStorage.getItem(STORAGE_KEYS.withdrawalMode) || 'household';
     const riskMaxDrawdown = localStorage.getItem(STORAGE_KEYS.riskMaxDrawdown);
     const riskMaxDepletion = localStorage.getItem(STORAGE_KEYS.riskMaxDepletion);
     const riskMinSuccess = localStorage.getItem(STORAGE_KEYS.riskMinSuccess);
@@ -468,6 +692,7 @@ function restoreHouseholdSettings() {
     const cashInput = byId('householdCashBufferMonths');
     const policySelect = byId('householdWithdrawalPolicy');
     const aggregationSelect = byId('householdAggregationStrategy');
+    const withdrawalModeSelect = byId('householdWithdrawalMode');
     const riskDrawdownInput = byId('householdRiskMaxDrawdown');
     const riskDepletionInput = byId('householdRiskMaxDepletion');
     const riskSuccessInput = byId('householdRiskMinSuccess');
@@ -476,6 +701,7 @@ function restoreHouseholdSettings() {
     if (cashInput && cashMonths) cashInput.value = cashMonths;
     if (policySelect) policySelect.value = policy;
     if (aggregationSelect) aggregationSelect.value = aggregation;
+    if (withdrawalModeSelect) withdrawalModeSelect.value = withdrawalMode;
     if (riskDrawdownInput && riskMaxDrawdown) riskDrawdownInput.value = riskMaxDrawdown;
     if (riskDepletionInput && riskMaxDepletion) riskDepletionInput.value = riskMaxDepletion;
     if (riskSuccessInput && riskMinSuccess) riskSuccessInput.value = riskMinSuccess;
@@ -486,6 +712,7 @@ function bindHouseholdSettings() {
     const cashInput = byId('householdCashBufferMonths');
     const policySelect = byId('householdWithdrawalPolicy');
     const aggregationSelect = byId('householdAggregationStrategy');
+    const withdrawalModeSelect = byId('householdWithdrawalMode');
     const riskDrawdownInput = byId('householdRiskMaxDrawdown');
     const riskDepletionInput = byId('householdRiskMaxDepletion');
     const riskSuccessInput = byId('householdRiskMinSuccess');
@@ -508,6 +735,11 @@ function bindHouseholdSettings() {
     if (aggregationSelect) {
         aggregationSelect.addEventListener('change', () => {
             localStorage.setItem(STORAGE_KEYS.aggregation, aggregationSelect.value);
+        });
+    }
+    if (withdrawalModeSelect) {
+        withdrawalModeSelect.addEventListener('change', () => {
+            localStorage.setItem(STORAGE_KEYS.withdrawalMode, withdrawalModeSelect.value);
         });
     }
     if (riskDrawdownInput) {
@@ -557,4 +789,10 @@ function initHouseholdTab() {
     bindHouseholdSettings();
 }
 
-document.addEventListener('DOMContentLoaded', initHouseholdTab);
+// Exports für Testing
+export { applyWithdrawalShareToInputs, buildShareMap };
+
+// Browser-spezifischer Code (nur im Browser-Kontext ausführen)
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', initHouseholdTab);
+}
