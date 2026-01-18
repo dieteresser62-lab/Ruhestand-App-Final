@@ -123,7 +123,8 @@ Regeln festlegen, aus welchem Profil entnommen wird, um Steuern, Risiko und Runw
 3) Reporting: Anteil je Profil
 
 ### MVP-Status
-- Policies werden aktuell als Reporting-Heuristik genutzt (keine Rueckwirkung auf Simulation).
+- Policies werden im Accounts-Modus als Aufteilung der Floor/Flex-Bedarfe genutzt.
+- Im Additiv-Modus bleiben Policies Reporting-Heuristiken.
 
 ---
 
@@ -180,6 +181,59 @@ Ein Haushaltspuffer (gemeinsame Liquiditaet), der in schlechten Jahren Sicherhei
 - Endvermoegen wird pro Run summiert.
 - Drawdown wird konservativ als Max je Profil aggregiert.
 - Nicht-Portfolio-KPIs (Pflege, Lebensdauer) stammen aus dem Hauptprofil.
+- Entnahme-Policy wirkt explizit im Accounts-Modus.
+- Entnahme-Basis ist konfigurierbar:
+  - Haushaltsbedarf verteilen (Default)
+  - Profilbedarf skalieren
+- Effektiver Gesamtbedarf (Floor/Flex) wird im Haushalt-Tab angezeigt.
+- Profile ohne Simulator-Daten werden ignoriert (mit Warnhinweis).
+- Startvermoegen wird aus Depot/Tagesgeld/Geldmarkt abgeleitet, falls simStartVermoegen nicht gespeichert ist.
+- Haushalts-Startvermoegen nutzt pro Profil den groesseren Wert aus simStartVermoegen oder Depot+Liquiditaet, um Unterzaehlung zu vermeiden.
+- Fallback fuer Floor/Flex: Balance-Werte werden genutzt, wenn Simulator-Werte fehlen.
+- Profil-Check (Inputs) zeigt Start/Floor/Flex/Anteil pro Profil im Haushalt-Tab.
+- Wenn ein Profil detaillierte Tranchen hat, werden Depotwert/Geldmarkt/Einstand aus den Tranchen abgeleitet, falls die Simulator-Felder leer sind.
+- Additiv-Modus fuehrt detailledTranches aller Profile zusammen (sofern vorhanden).
+- Wenn die Tranchen-Summe deutlich unter dem Startvermoegen liegt, faellt Additiv auf Aggregatwerte zurueck (Warnhinweis).
+
+---
+
+## Phase-1 Hardening
+- Profile-Switch ist gegen Doppelklick (Race) abgesichert.
+- Profil-Loeschung fragt per Confirm nach.
+- LocalStorage-Quota wird abgefangen (Import/Registry speichern).
+- Haushalt-Kombination prueft leere Profilelisten.
+
+---
+
+## Behobene Bugs (Phase 1)
+
+### Bug 1: Ausgaben-Vervielfachung im Household-Modus
+**Problem:** Im Household-Withdrawal-Mode bekam jedes Profil die VOLLEN Haushaltsausgaben zugewiesen, statt diese aufzuteilen.
+- Bei 2 Profilen mit je 35k/36k Ausgaben → Haushalt 71k
+- JEDES Profil wurde mit 71k simuliert → Effektiv 142k Gesamt-Entnahme
+- **Folge:** Drastisch reduzierte Success Rate, viel zu frühe Depot-Erschöpfung
+
+**Fix:** `applyWithdrawalShareToInputs()` unterscheidet nun korrekt:
+- **'household'-Modus**: Haushaltsausgaben (71k) werden nach Withdrawal-Policy VERTEILT
+- **'profile'-Modus**: Individuelle Profil-Ausgaben werden proportional skaliert
+
+### Bug 2: Gold-Validierungs-Fehler
+**Problem:** Inkonsistente Gold-Parameter beim Kombinieren von Profilen
+- Profil A: `goldAktiv=true`, `goldZielProzent=10%`
+- Profil B: `goldAktiv=false`, `goldZielProzent=0%`
+- Naive Aggregation: `goldAktiv=true` aber `goldZielProzent=5%` oder 0%
+- **Folge:** Engine-Validierung schlägt fehl (erwartet goldZielProzent > 0 wenn goldAktiv=true)
+
+**Fix:** Drei-stufige Validierung:
+1. `applyCashBufferToInputs()`: Prüft goldAktiv nur true wenn goldZielProzent > 0
+2. `applyWithdrawalShareToInputs()`: Dieselbe Prüfung vor Engine-Übergabe
+3. `combineHouseholdInputs()`: Filtert Profile ohne gültiges Gold vor Mittelung
+
+### Regression Tests
+- `tests/household-withdrawal-modes.test.mjs` Test 1-8
+- Test 2: Household-Modus mit vollen Ausgaben
+- Test 3: Profile-Modus mit proportionaler Skalierung
+- Test 8: Gold-Validierungs-Regression
 
 ---
 

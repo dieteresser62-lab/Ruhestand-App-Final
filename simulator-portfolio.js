@@ -318,19 +318,50 @@ export function initializePortfolioDetailed(inputs) {
         });
 
         for (const tranche of sortedTranches) {
+            const rawType = String(tranche.type || tranche.kind || '').toLowerCase();
+            const rawCategory = String(tranche.category || '').toLowerCase();
+            let category = rawCategory;
+            if (!category) {
+                if (rawType.includes('gold')) {
+                    category = 'gold';
+                } else if (rawType.includes('geldmarkt') || rawType.includes('money')) {
+                    category = 'money_market';
+                } else {
+                    category = 'equity';
+                }
+            }
+
+            let normalizedType = rawType;
+            if (category === 'gold') {
+                normalizedType = 'gold';
+            } else if (category === 'money_market') {
+                normalizedType = 'geldmarkt';
+            } else if (category === 'equity') {
+                if (rawType === 'aktien_neu' || rawType === 'aktien_alt') {
+                    normalizedType = rawType;
+                } else if (rawType.includes('neu')) {
+                    normalizedType = 'aktien_neu';
+                } else {
+                    normalizedType = 'aktien_alt';
+                }
+            }
+
+            const shares = Number(tranche.shares) || 0;
+            const purchasePrice = Number(tranche.purchasePrice) || 0;
+            const currentPrice = Number(tranche.currentPrice) || 0;
             const trancheObj = {
                 trancheId: tranche.trancheId || tranche.id || null,
                 name: tranche.name || 'Unbekannt',
                 isin: tranche.isin || '',
-                shares: Number(tranche.shares) || 0,
-                purchasePrice: Number(tranche.purchasePrice) || 0,
+                shares,
+                purchasePrice,
                 purchaseDate: tranche.purchaseDate || null,
-                currentPrice: Number(tranche.currentPrice) || 0,
-                marketValue: (Number(tranche.shares) || 0) * (Number(tranche.currentPrice) || 0),
-                costBasis: (Number(tranche.shares) || 0) * (Number(tranche.purchasePrice) || 0),
+                currentPrice,
+                marketValue: shares * currentPrice,
+                costBasis: shares * purchasePrice,
                 tqf: Number(tranche.tqf) ?? 0.30,
-                type: tranche.type || 'aktien_alt',
-                category: tranche.category || 'equity'
+                type: normalizedType || 'aktien_alt',
+                category
             };
 
             // Kategorisierung

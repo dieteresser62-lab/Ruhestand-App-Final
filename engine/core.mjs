@@ -34,6 +34,8 @@ function _internal_calculateModel(input, lastState) {
     // Prüft alle Eingaben auf Plausibilität und Vollständigkeit
     const validationResult = InputValidator.validate(input);
     if (!validationResult.valid) {
+        // DEBUG: Log validation errors
+        console.error('[VALIDATION ERROR] Invalid input fields:', validationResult.errors);
         return { error: new ValidationError(validationResult.errors) };
     }
 

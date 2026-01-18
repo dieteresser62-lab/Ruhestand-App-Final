@@ -224,54 +224,6 @@ function buildProfileSummaryRows(profileInputs, withdrawalShares) {
     });
 }
 
-function summarizeTranches(tranches) {
-    const totals = { equity: 0, gold: 0, moneyMarket: 0, count: 0 };
-    if (!Array.isArray(tranches)) return totals;
-    totals.count = tranches.length;
-    tranches.forEach(tranche => {
-        const mv = Number(tranche?.marketValue) || (Number(tranche?.shares) || 0) * (Number(tranche?.currentPrice) || 0);
-        const category = String(tranche?.category || '').toLowerCase();
-        const type = String(tranche?.type || '').toLowerCase();
-        if (category === 'gold' || type.includes('gold')) {
-            totals.gold += mv;
-            return;
-        }
-        if (category === 'money_market' || type.includes('geldmarkt')) {
-            totals.moneyMarket += mv;
-            return;
-        }
-        totals.equity += mv;
-    });
-    return totals;
-}
-
-function computeEffectiveNeeds(profileInputs, withdrawalShares, withdrawalMode, aggregationStrategy, combinedInputs) {
-    if (aggregationStrategy === 'additive' && combinedInputs) {
-        const totalFloor = combinedInputs.startFloorBedarf || 0;
-        const totalFlex = combinedInputs.startFlexBedarf || 0;
-        return { totalFloor, totalFlex, totalCombined: totalFloor + totalFlex };
-    }
-    const shareMap = buildShareMap(withdrawalShares || []);
-    let totalFloor = 0;
-    let totalFlex = 0;
-
-    profileInputs.forEach(entry => {
-        const floor = entry.inputs.startFloorBedarf || 0;
-        const flex = entry.inputs.startFlexBedarf || 0;
-        const share = shareMap[entry.profileId] ?? 0;
-
-        if (withdrawalMode === 'profile') {
-            totalFloor += floor * share;
-            totalFlex += flex * share;
-        } else {
-            totalFloor += floor;
-            totalFlex += flex;
-        }
-    });
-
-    return { totalFloor, totalFlex, totalCombined: totalFloor + totalFlex };
-}
-
 function isProfileEmpty(inputs) {
     if (!inputs) return true;
     const hasTranches = Array.isArray(inputs.detailledTranches) && inputs.detailledTranches.length > 0;
@@ -397,7 +349,7 @@ function readRiskBudgetSettings() {
 }
 
 function renderRiskBudget(result, successProb, budget) {
-    const drawdownP90 = (result.maxDrawdowns?.p90 || 0) * 100;
+    const drawdownP90 = result.maxDrawdowns?.p90 || 0;
     const depletion = result.depotErschoepfungsQuote || 0;
     const success = successProb;
 
@@ -440,7 +392,7 @@ function renderRiskBudget(result, successProb, budget) {
     return { html, allOk: checks.every(item => item.ok) };
 }
 
-function renderResults(result, warnings, withdrawalShares, cashBuffer, riskBudget, withdrawalPolicy, effectiveNeeds, simulationMeta, combinedSummary) {
+function renderResults(result, warnings, withdrawalShares, riskBudget, withdrawalPolicy) {
     const container = byId('householdResults');
     if (!container) return;
 
@@ -458,28 +410,8 @@ function renderResults(result, warnings, withdrawalShares, cashBuffer, riskBudge
         { label: 'P50 Endvermoegen', value: formatCurrencyRounded(aggregatedResults.finalOutcomes.p50 || 0) },
         { label: 'P10 Endvermoegen', value: formatCurrencyRounded(aggregatedResults.finalOutcomes.p10 || 0) },
         { label: 'P90 Endvermoegen', value: formatCurrencyRounded(aggregatedResults.finalOutcomes.p90 || 0) },
-        { label: 'P90 Drawdown', value: `${(aggregatedResults.maxDrawdowns.p90 * 100).toFixed(1)} %` }
+        { label: 'P90 Drawdown', value: `${(aggregatedResults.maxDrawdowns.p90 || 0).toFixed(1)} %` }
     ];
-
-    const warningHtml = warnings.length
-        ? `<div class="household-warnings">${warnings.map(w => `<div>! ${w}</div>`).join('')}</div>`
-        : '';
-
-    const needsHtml = effectiveNeeds
-        ? `<div class="household-note">Effektiver Bedarf: Floor ${formatCurrencyRounded(effectiveNeeds.totalFloor)} + Flex ${formatCurrencyRounded(effectiveNeeds.totalFlex)} = ${formatCurrencyRounded(effectiveNeeds.totalCombined)}</div>`
-        : '';
-
-    const metaHtml = simulationMeta
-        ? `<div class="household-note">Simulation: ${simulationMeta.mode} | ${simulationMeta.method} | Runs ${simulationMeta.runs} | Dauer ${simulationMeta.years} J | Seed ${simulationMeta.seed}${simulationMeta.cape ? ' | CAPE-Sampling' : ''}</div>`
-        : '';
-
-    const combinedHtml = combinedSummary
-        ? `<div class="household-note">Haushalt-Inputs: Start ${formatCurrencyRounded(combinedSummary.startVermoegen)} | Depot ${formatCurrencyRounded(combinedSummary.depotwertAlt)} | Liquid ${formatCurrencyRounded((combinedSummary.tagesgeld || 0) + (combinedSummary.geldmarktEtf || 0))}${combinedSummary.trancheSummary ? ` | Tranchen ${combinedSummary.trancheSummary.count} (Eq ${formatCurrencyRounded(combinedSummary.trancheSummary.equity)} / Gold ${formatCurrencyRounded(combinedSummary.trancheSummary.gold)} / MM ${formatCurrencyRounded(combinedSummary.trancheSummary.moneyMarket)})` : ''}</div>`
-        : '';
-
-    const cashHtml = cashBuffer.enabled
-        ? `<div class="household-note">Gemeinsamer Cash-Puffer: ${cashBuffer.months} Monate (Runway-Min/Target erhoeht).</div>`
-        : '';
 
     const policyLabelMap = {
         proportional: 'Proportional',
@@ -518,11 +450,6 @@ function renderResults(result, warnings, withdrawalShares, cashBuffer, riskBudge
     const riskOutput = renderRiskBudget(aggregatedResults, successProb, riskBudget);
 
     container.innerHTML = `
-        ${warningHtml}
-        ${needsHtml}
-        ${metaHtml}
-        ${combinedHtml}
-        ${cashHtml}
         <div class="household-kpi-grid">
             ${summaryCards.map(card => `<div class="household-kpi"><div class="label">${card.label}</div><div class="value">${card.value}</div></div>`).join('')}
         </div>
@@ -577,8 +504,6 @@ async function runHouseholdSimulation() {
     const withdrawalPolicy = localStorage.getItem(STORAGE_KEYS.withdrawalPolicy) || 'proportional';
     const withdrawalMode = readWithdrawalMode();
     const withdrawalShares = buildWithdrawalShares(profileInputs, withdrawalPolicy);
-
-    const effectiveNeeds = computeEffectiveNeeds(profileInputs, withdrawalShares, withdrawalMode, aggregationStrategy, combined);
     const warningsExtended = warnings.slice();
     if (aggregationStrategy === 'additive') {
         const anyTranches = profileInputs.some(entry => Array.isArray(entry.inputs.detailledTranches) && entry.inputs.detailledTranches.length > 0);
@@ -640,31 +565,12 @@ async function runHouseholdSimulation() {
             });
         }
 
-        const simulationMeta = {
-            mode: aggregationStrategy === 'accounts' ? 'Accounts' : 'Additiv',
-            method: params.methode,
-            runs: params.anzahl,
-            years: params.maxDauer,
-            seed: params.seed,
-            cape: useCapeSampling
-        };
-
-        const trancheSummary = combined?.detailledTranches ? summarizeTranches(combined.detailledTranches) : null;
-        const combinedSummary = combined
-            ? {
-                startVermoegen: combined.startVermoegen || 0,
-                depotwertAlt: combined.depotwertAlt || 0,
-                tagesgeld: combined.tagesgeld || 0,
-                geldmarktEtf: combined.geldmarktEtf || 0,
-                trancheSummary
-            }
-            : null;
         const riskOk = renderResults({
             aggregatedResults: result.aggregatedResults,
             failCount: result.failCount,
             totalRuns: params.anzahl,
             profileInputs
-        }, warningsExtended, withdrawalShares, cashBuffer, riskBudget, withdrawalPolicy, effectiveNeeds, simulationMeta, combinedSummary);
+        }, warningsExtended, withdrawalShares, riskBudget, withdrawalPolicy);
         setStatus(riskOk ? 'Haushalts-Simulation abgeschlossen.' : 'Simulation abgeschlossen: Risiko-Budget verletzt.', riskOk ? 'ok' : 'error');
     } catch (err) {
         console.error('[Household] Simulation failed:', err);

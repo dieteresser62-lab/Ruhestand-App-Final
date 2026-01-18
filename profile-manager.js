@@ -58,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const importFile = byId('profileImportFile');
     const activeBadge = byId('activeProfileBadge');
     const statusEl = byId('profileStatus');
+    let isSwitching = false;
 
     if (!profileSelect || !profileNameInput || !activateBtn || !createBtn || !renameBtn || !deleteBtn || !saveBtn || !exportBtn || !importBtn || !importFile || !activeBadge || !statusEl) {
         return;
@@ -74,7 +75,10 @@ document.addEventListener('DOMContentLoaded', () => {
     activateBtn.addEventListener('click', () => {
         const selectedId = profileSelect.value;
         if (!selectedId) return;
+        if (isSwitching) return;
+        isSwitching = true;
         const ok = switchProfile(selectedId);
+        isSwitching = false;
         if (ok) {
             refresh();
             setStatus(statusEl, 'Profil aktiviert und geladen.', 'ok');
@@ -128,6 +132,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!selectedId) return;
         if (selectedId === 'default') {
             setStatus(statusEl, 'Default-Profil kann nicht geloescht werden.', 'error');
+            return;
+        }
+        const name = getProfileMeta(selectedId)?.name || selectedId;
+        if (!confirm(`Profil "${name}" wirklich loeschen? Dies kann nicht rueckgaengig gemacht werden.`)) {
             return;
         }
         const ok = deleteProfile(selectedId);

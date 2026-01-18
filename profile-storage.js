@@ -68,7 +68,13 @@ function getProfileRegistry() {
 }
 
 function saveProfileRegistry(registry) {
-    localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(registry));
+    try {
+        localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(registry));
+        return true;
+    } catch (err) {
+        console.error('[ProfileStorage] Registry speichern fehlgeschlagen:', err);
+        return false;
+    }
 }
 
 function listProfileScopedKeys() {
@@ -199,8 +205,7 @@ export function saveCurrentProfileFromLocalStorage() {
     if (!registry.profiles[id]) return false;
     registry.profiles[id].data = captureProfileData();
     registry.profiles[id].meta.updatedAt = nowIso();
-    saveProfileRegistry(registry);
-    return true;
+    return saveProfileRegistry(registry);
 }
 
 export function loadProfileIntoLocalStorage(id) {
@@ -260,7 +265,12 @@ export function importProfilesBundle(bundle) {
         return { ok: false, message: 'Registry fehlt oder ist ungueltig.' };
     }
 
-    localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(bundle.registry));
+    try {
+        localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(bundle.registry));
+    } catch (err) {
+        console.error('[ProfileStorage] Import fehlgeschlagen:', err);
+        return { ok: false, message: 'Speicher voll: Import konnte nicht geschrieben werden.' };
+    }
 
     const nextProfileId = String(bundle.currentProfileId || 'default');
     localStorage.setItem(CURRENT_PROFILE_KEY, nextProfileId);
@@ -272,6 +282,9 @@ export function importProfilesBundle(bundle) {
         });
     }
 
-    loadProfileIntoLocalStorage(nextProfileId);
+    const loaded = loadProfileIntoLocalStorage(nextProfileId);
+    if (!loaded) {
+        return { ok: false, message: 'Import gespeichert, aber Profil konnte nicht geladen werden.' };
+    }
     return { ok: true, message: 'Import erfolgreich.' };
 }
