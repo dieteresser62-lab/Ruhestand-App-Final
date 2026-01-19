@@ -174,6 +174,86 @@ Die Worker-Pools bieten ein opt-in Telemetrie-System für lokale Performance-Ana
 
 ---
 
+## Haushaltssimulation (Multi-User)
+
+### Architektur
+
+Die Haushaltssimulation ermöglicht die Kombination mehrerer Profile zu einer gemeinsamen Analyse:
+
+**Module:**
+- `profile-storage.js` – Profil-Registry und Persistenz-Layer
+- `profile-manager.js` – UI-Steuerung für Profilverwaltung (index.html)
+- `household-inputs.js` – Aggregation von Profil-Daten zu Haushalts-Inputs
+- `household-simulator.js` – Haushalts-Simulationslogik mit zwei Strategien
+
+### Datenfluss
+
+```
+Profile (localStorage) → profile-storage.js
+                        ↓
+          buildSimulatorInputsFromProfileData()
+                        ↓
+          profileInputs[] (pro Profil)
+                        ↓
+          combineHouseholdInputs() → Combined Inputs (Additiv)
+                        ↓
+          applyWithdrawalShareToInputs() → Adjusted Inputs (Accounts)
+                        ↓
+          runMonteCarloSimulation() / runHouseholdAccountsSimulation()
+                        ↓
+          Aggregated Results
+```
+
+### Aggregationsstrategien
+
+**1. Additiv-Modus:**
+- Vermögen, Ausgaben und Renten werden summiert
+- Eine gemeinsame Simulation mit kombinierten Inputs
+- Tranchen aller Profile werden zusammengeführt
+- Partner-Konfiguration wird deaktiviert (Renten summiert)
+
+**2. Accounts-Modus:**
+- Separate Simulation pro Profil mit gleichem Seed/Marktpfad
+- Endvermögen wird pro Run summiert
+- Drawdown konservativ als Maximum je Profil aggregiert
+- Nicht-Portfolio-KPIs (Pflege, Lebensdauer) vom Primärprofil
+
+### Entnahme-Orchestrierung
+
+**Entnahme-Modi:**
+- **'household'**: Haushaltsausgaben (Summe Floor+Flex) werden nach Policy auf Profile **verteilt**
+- **'profile'**: Individuelle Profilausgaben werden proportional **skaliert**
+
+**Entnahme-Policies:**
+- `proportional`: Nach Vermögensanteil (Default)
+- `runway_first`: Profil mit größerer Runway trägt mehr
+- `tax_first`: Profil mit geringerer Steuerlast zuerst
+- `stabilizer`: Heuristik aus Runway + Vermögen
+
+**Kritischer Fix (Phase 1):**
+Im Household-Modus wurde ursprünglich jedes Profil mit den VOLLEN Haushaltsausgaben simuliert (Vervielfachung).
+Fix: `applyWithdrawalShareToInputs()` verteilt nun korrekt nach `shareFraction` statt volle Zuweisung.
+
+### Gold-Validierung
+
+**Problem:** Inkonsistente Gold-Parameter beim Kombinieren von Profilen führten zu Engine-Validierungsfehlern.
+
+**Lösung (3-stufig):**
+1. `applyCashBufferToInputs()`: `goldAktiv` nur true wenn `goldZielProzent > 0`
+2. `applyWithdrawalShareToInputs()`: Dieselbe Validierung vor Engine-Aufruf
+3. `combineHouseholdInputs()`: Filtert Profile ohne gültiges Gold vor gewichteter Mittelung
+
+### Risiko-Budget
+
+Optional können Limits für:
+- Max-Drawdown (P90)
+- Max-Depot-Erschöpfung
+- Min-Success-Rate
+
+definiert werden. Ergebnisse werden gegen diese Limits geprüft und als OK/Verletzt markiert.
+
+---
+
 ## Build- und Laufzeit-Hinweise
 
 * Engine anpassen → `node build-engine.js` ausführen, anschließend `engine.js` prüfen.

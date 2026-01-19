@@ -111,6 +111,98 @@
             /* Reduced bottom padding */
         }
 
+        .profile-panel {
+            width: 100%;
+            max-width: 900px;
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            box-shadow: var(--card-shadow);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            padding: 20px;
+            margin: 0 20px 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .profile-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .profile-header h2 {
+            font-size: 1.2rem;
+            color: var(--primary-color);
+        }
+
+        .profile-badge {
+            font-size: 0.9rem;
+            color: var(--text-light);
+            background: rgba(52, 152, 219, 0.12);
+            padding: 6px 10px;
+            border-radius: 10px;
+        }
+
+        .profile-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .profile-row label {
+            font-size: 0.9rem;
+            color: var(--text-light);
+        }
+
+        .profile-row select,
+        .profile-row input {
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            font-size: 0.95rem;
+            min-width: 200px;
+        }
+
+        .profile-button {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 10px 16px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .profile-button.secondary {
+            background: rgba(52, 152, 219, 0.12);
+            color: var(--primary-color);
+        }
+
+        .profile-button.danger {
+            background: #c0392b;
+        }
+
+        .profile-button:hover {
+            transform: translateY(-1px);
+        }
+
+        .profile-status {
+            font-size: 0.85rem;
+            color: var(--text-light);
+        }
+
+        .profile-status[data-kind="ok"] {
+            color: #1f7a3f;
+        }
+
+        .profile-status[data-kind="error"] {
+            color: #b03a2e;
+        }
+
         .app-card {
             background: var(--card-bg);
             border-radius: var(--border-radius);
@@ -271,6 +363,33 @@
             Werkzeugen.</p>
     </div>
 
+    <div class="profile-panel">
+        <div class="profile-header">
+            <h2>Profile</h2>
+            <div class="profile-badge" id="activeProfileBadge">Aktiv: -</div>
+        </div>
+        <div class="profile-row">
+            <label for="profileSelect">Profil waehlen</label>
+            <select id="profileSelect"></select>
+            <button class="profile-button" id="profileActivateBtn">Aktivieren</button>
+            <button class="profile-button secondary" id="profileSaveBtn">Speichern</button>
+        </div>
+        <div class="profile-row">
+            <input id="profileNameInput" type="text" placeholder="Neues Profil (Name)">
+            <button class="profile-button" id="profileCreateBtn">Anlegen</button>
+            <button class="profile-button secondary" id="profileRenameBtn">Umbenennen</button>
+            <button class="profile-button danger" id="profileDeleteBtn">Loeschen</button>
+        </div>
+        <div class="profile-row">
+            <button class="profile-button secondary" id="profileExportBtn">Backup exportieren</button>
+            <button class="profile-button secondary" id="profileImportBtn">Backup importieren</button>
+            <input id="profileImportFile" type="file" accept="application/json,.json" style="display:none">
+        </div>
+        <div class="profile-status" id="profileStatus">
+            Hinweis: Beim Wechsel wird der aktuelle Stand gespeichert und das Ziel-Profil geladen.
+        </div>
+    </div>
+
     <div class="apps-grid">
         <!-- Balance App -->
         <a href="Balance.html" class="app-card">
@@ -374,6 +493,8 @@
     <footer>
         <p>&copy; 2025 Ruhestand-Apps Suite | Entwickelt für Ihre finanzielle Sicherheit</p>
     </footer>
+
+    <script type="module" src="profile-manager.js"></script>
 
     <div id="devTools" style="display:none; position:fixed; bottom:10px; right:10px; background:#333; color:#fff; padding:10px; border-radius:5px; z-index:9999;">
         <label>

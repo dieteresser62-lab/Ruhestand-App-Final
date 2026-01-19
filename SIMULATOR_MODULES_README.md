@@ -264,6 +264,78 @@ Historische Daten, Mortalitätstafeln, Stress-Presets.
 
 ---
 
+## 21. `household-inputs.js` (~430 Zeilen)
+Aggregiert Profildaten zu Haushalts-Inputs für Multi-User-Simulationen.
+
+**Hauptfunktionen:**
+- `buildSimulatorInputsFromProfileData()` – liest Profildaten (localStorage) und baut vollständige Simulator-Inputs
+- `combineHouseholdInputs()` – aggregiert mehrere Profile zu einem kombinierten Input-Objekt (Additiv-Modus)
+- `buildWithdrawalShares()` – berechnet Entnahme-Anteile pro Profil nach Policy (proportional, runway-first, tax-first, stabilizer)
+
+**Besonderheiten:**
+- Drei-stufige Gold-Validierung: `goldAktiv` nur true wenn `goldZielProzent > 0`
+- Tranchen-Aggregation: Fügt detaillierte Tranchen aller Profile zusammen
+- Fallback-Logik: Nutzt Balance-Werte wenn Simulator-Felder leer sind
+- Gewichtete Mittelung für Steuersätze, Aktienquote und Rebalancing-Parameter
+
+**Dependencies:** `simulator-data.js`, `balance-config.js`
+
+---
+
+## 22. `household-simulator.js` (~700 Zeilen)
+Haushalts-Simulationslogik mit zwei Aggregationsstrategien und Entnahme-Orchestrierung.
+
+**Hauptfunktionen:**
+- `runHouseholdAccountsSimulation()` – Accounts-Modus: Separate Simulationen pro Profil mit Ergebnisaggregation
+- `applyWithdrawalShareToInputs()` – Verteilt Ausgaben nach Entnahme-Modus ('household' vs. 'profile') und Policy
+- `applyCashBufferToInputs()` – Fügt gemeinsamen Cash-Puffer zur Runway hinzu
+- `computeEffectiveNeeds()` – Berechnet effektive Floor/Flex-Ausgaben abhängig von Modus
+- UI-Event-Handler für Haushalts-Tab (Profilauswahl, Aggregationsstrategie, Risiko-Budget)
+
+**Entnahme-Modi:**
+- **'household'**: Haushaltsausgaben (Summe Floor+Flex) werden nach Policy auf Profile **verteilt**
+- **'profile'**: Individuelle Profilausgaben werden proportional **skaliert**
+
+**Kritische Fixes:**
+- Bug 1: Ausgaben-Vervielfachung im Household-Modus behoben (korrekte Verteilung statt volle Zuweisung)
+- Bug 2: Gold-Validierung dreistufig implementiert (verhindert Engine-Fehler bei inkonsistenten Profilen)
+
+**Dependencies:** `profile-storage.js`, `household-inputs.js`, `monte-carlo-runner.js`, `monte-carlo-ui.js`, `simulator-engine-helpers.js`, `simulator-sweep-utils.js`, `simulator-utils.js`
+
+---
+
+## 23. `profile-storage.js` (~290 Zeilen)
+Profil-Registry und Persistenz-Layer für Multi-User-Verwaltung.
+
+**Hauptfunktionen:**
+- `listProfiles()` / `getProfileMeta()` / `getProfileData()` – Profil-Registry-Zugriff
+- `createProfile()` / `renameProfile()` / `deleteProfile()` – CRUD-Operationen
+- `switchProfile()` – Wechselt aktives Profil (speichert aktuelles, lädt neues)
+- `saveCurrentProfileFromLocalStorage()` – Speichert profilspezifische Keys in Registry
+- `exportProfilesBundle()` / `importProfilesBundle()` – Backup/Restore aller Profile
+
+**Profilspezifische Keys:**
+- `balance_data` (Balance-App Inputs)
+- `depot_tranchen` (Depot-Positionen)
+- Alle Keys mit Prefix `sim_` (Simulator-Inputs)
+- Snapshots mit Prefix `rs_snapshot_`
+
+**Dependencies:** `balance-config.js`
+
+---
+
+## 24. `profile-manager.js` (~190 Zeilen)
+UI-Steuerung für Profilverwaltung (index.html).
+
+**Hauptfunktionen:**
+- `renderProfiles()` – Zeigt Profilliste mit Checkboxen
+- `refreshPrimaryOptions()` – Aktualisiert Primary-Profil Dropdown
+- Event-Handler für Erstellen, Umbenennen, Löschen, Aktivieren, Export, Import
+
+**Dependencies:** `profile-storage.js`
+
+---
+
 ## Modulabhängigkeiten
 
 ```

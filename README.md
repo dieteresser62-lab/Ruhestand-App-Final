@@ -76,6 +76,40 @@ Das UI blendet Partner- und Rentenfelder dynamisch ein, deaktiviert Prozentfelde
 Anpassung und merkt sich den Aktivierungsstatus im `localStorage`. Gleichzeitig schützt der Sweep-Wächter alle Person-2-Felder über
 Whitelist, Blocklist und Rente-2-Invarianz-Checks, markiert Verstöße in der Heatmap und lässt sich über einen Dev-Self-Test prüfen.【F:simulator-main.js†L3-L64】【F:simulator-main.js†L1563-L1614】
 
+#### Haushaltssimulation (Multi-User)
+
+Der Simulator unterstützt Haushaltsanalysen durch Kombination mehrerer Profile:
+
+**Profilverwaltung:**
+* Profile können unter `index.html` angelegt, umbenannt und zwischen ihnen gewechselt werden
+* Jedes Profil speichert eigene Balance- und Simulator-Daten (Vermögen, Ausgaben, Renten, Tranchen)
+* Export/Import-Funktion für Backups der gesamten Profil-Registry
+
+**Haushalts-Tab (Simulator):**
+* **Profilauswahl:** Mindestens 2 Profile für Haushaltssimulation auswählen
+* **Primärprofil:** Demografische Daten (Alter, Pflege, Lebenserwartung) stammen vom Primärprofil
+* **Aggregationsstrategie:**
+  - **Additiv:** Vermögen und Ausgaben werden summiert, eine gemeinsame Simulation
+  - **Accounts:** Separate Simulationen pro Profil mit gleichem Marktpfad, Ergebnisse werden aggregiert
+* **Entnahme-Modus (nur Accounts):**
+  - **Household:** Haushaltsausgaben (Summe Floor+Flex) werden nach Policy auf Profile verteilt
+  - **Profile:** Individuelle Profilausgaben werden nach Policy skaliert
+* **Entnahme-Policy:** Proportional (nach Vermögen), Runway-First, Tax-First oder Stabilizer
+* **Gemeinsamer Cash-Puffer:** Optional zusätzliche Liquiditäts-Monate für den Haushalt
+* **Risiko-Budget:** Definierte Limits für Max-Drawdown, Depot-Erschöpfung und Success-Rate
+
+**Ergebnisse:**
+* Success-Rate, P10/P50/P90 Endvermögen, Depot-Erschöpfungsquote
+* Warnhinweise bei Profilen ohne Simulator-Daten oder Tranchen-Inkonsistenzen
+* Detaillierte Profil-Übersicht mit Start-Vermögen, Floor/Flex und Entnahme-Anteil
+* Risiko-Budget-Prüfung mit Ampel-Status (OK/Verletzt)
+
+**Wichtige Hinweise:**
+* Gold-Allokation wird nur von Profilen berücksichtigt, die Gold aktiv UND mit Zielwert > 0 nutzen
+* Im Additiv-Modus werden Tranchen aller Profile zusammengeführt (falls vorhanden)
+* Im Accounts-Modus wird Drawdown konservativ als Maximum je Profil aggregiert
+* Detaillierte Designdokumentation siehe `docs/HOUSEHOLD_FEATURES.md`
+
 ### Gemeinsame Engine
 * Acht ES-Module (`engine/`) kapseln Validierung, Marktanalyse, Ausgabenplanung und Transaktionslogik.
 * `build-engine.mjs` bündelt die Module per `esbuild` (oder Modul-Fallback) zu `engine.js`, das in beiden Oberflächen als `EngineAPI` geladen wird.
