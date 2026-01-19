@@ -69,9 +69,33 @@ export const UIReader = {
      * @property {number} maxBearRefillPctOfEq - Max. Bear-Refill-Prozent von Equity (%)
      */
     readAllInputs() {
-        const num = (id) => UIUtils.parseCurrency(dom.inputs[id].value);
-        const val = (id) => dom.inputs[id].value;
-        const checked = (id) => dom.inputs[id].checked;
+        const num = (id) => dom.inputs[id] ? UIUtils.parseCurrency(dom.inputs[id].value) : 0;
+        const val = (id) => dom.inputs[id] ? dom.inputs[id].value : '';
+        const checked = (id) => dom.inputs[id] ? dom.inputs[id].checked : false;
+        const readProfileNumber = (key) => {
+            const raw = localStorage.getItem(key);
+            if (raw === null || raw === undefined || raw === '') return null;
+            const n = UIUtils.parseCurrency(raw);
+            return Number.isFinite(n) ? n : null;
+        };
+        const readProfileBool = (key) => {
+            const raw = localStorage.getItem(key);
+            if (raw === null || raw === undefined || raw === '') return null;
+            const normalized = String(raw).toLowerCase();
+            if (normalized === 'true') return true;
+            if (normalized === 'false') return false;
+            return null;
+        };
+
+        const profileTagesgeld = readProfileNumber('profile_tagesgeld');
+        const profileRenteAktiv = readProfileBool('profile_rente_aktiv');
+        const profileRenteMonatlich = readProfileNumber('profile_rente_monatlich');
+        const profileAlter = readProfileNumber('profile_aktuelles_alter');
+        const profileGoldAktiv = readProfileBool('profile_gold_aktiv');
+        const profileGoldZiel = readProfileNumber('profile_gold_ziel_pct');
+        const profileGoldFloor = readProfileNumber('profile_gold_floor_pct');
+        const profileGoldSteuerfrei = readProfileBool('profile_gold_steuerfrei');
+        const profileGoldRebalBand = readProfileNumber('profile_gold_rebal_band');
 
         // Lade detaillierte Tranchen aus localStorage (falls vorhanden)
         let detailledTranches = null;
@@ -101,12 +125,32 @@ export const UIReader = {
             hasLoggedTranchenAggregation = true;
         }
 
+        const DEFAULT_GOLD_ZIEL = 7.5;
+        const DEFAULT_GOLD_FLOOR = 1;
+        const DEFAULT_GOLD_BAND = 25;
+
+        let goldAktivFinal = (typeof profileGoldAktiv === 'boolean') ? profileGoldAktiv : checked('goldAktiv');
+        let goldZielFinal = Number.isFinite(profileGoldZiel) ? profileGoldZiel : (parseFloat(val('goldZielProzent')) || 0);
+        let goldFloorFinal = Number.isFinite(profileGoldFloor) ? profileGoldFloor : (parseFloat(val('goldFloorProzent')) || 0);
+        let goldSteuerfreiFinal = (typeof profileGoldSteuerfrei === 'boolean') ? profileGoldSteuerfrei : checked('goldSteuerfrei');
+        let rebalancingBandFinal = Number.isFinite(profileGoldRebalBand) ? profileGoldRebalBand : (parseFloat(val('rebalancingBand')) || 0);
+
+        if (!Number.isFinite(goldZielFinal) || goldZielFinal <= 0 || goldZielFinal > 50) {
+            goldZielFinal = DEFAULT_GOLD_ZIEL;
+        }
+        if (!Number.isFinite(goldFloorFinal) || goldFloorFinal < 0 || goldFloorFinal > 50) {
+            goldFloorFinal = DEFAULT_GOLD_FLOOR;
+        }
+        if (goldAktivFinal && rebalancingBandFinal <= 0) {
+            rebalancingBandFinal = DEFAULT_GOLD_BAND;
+        }
+
         return {
-            aktuellesAlter: parseInt(val('aktuellesAlter')) || 0,
+            aktuellesAlter: Number.isFinite(profileAlter) ? profileAlter : (parseInt(val('aktuellesAlter')) || 0),
             floorBedarf: num('floorBedarf'),
             flexBedarf: num('flexBedarf'),
             inflation: parseFloat(val('inflation')) || 0,
-            tagesgeld: num('tagesgeld'),
+            tagesgeld: Number.isFinite(profileTagesgeld) ? profileTagesgeld : num('tagesgeld'),
             geldmarktEtf: useAggregates ? aggregated.geldmarktEtf : num('geldmarktEtf'),
             depotwertAlt: useAggregates ? aggregated.depotwertAlt : num('depotwertAlt'),
             depotwertNeu: useAggregates ? aggregated.depotwertNeu : num('depotwertNeu'),
@@ -117,14 +161,14 @@ export const UIReader = {
             endeVJ_3: parseFloat(val('endeVJ_3')) || 0,
             ath: parseFloat(val('ath')) || 0,
             jahreSeitAth: parseFloat(val('jahreSeitAth')) || 0,
-            renteAktiv: val('renteAktiv') === 'ja',
-            renteMonatlich: num('renteMonatlich'),
+            renteAktiv: (typeof profileRenteAktiv === 'boolean') ? profileRenteAktiv : val('renteAktiv') === 'ja',
+            renteMonatlich: Number.isFinite(profileRenteMonatlich) ? profileRenteMonatlich : num('renteMonatlich'),
             risikoprofil: 'sicherheits-dynamisch',
-            goldAktiv: checked('goldAktiv'),
-            goldZielProzent: parseFloat(val('goldZielProzent')) || 0,
-            goldFloorProzent: parseFloat(val('goldFloorProzent')) || 0,
-            goldSteuerfrei: checked('goldSteuerfrei'),
-            rebalancingBand: parseFloat(val('rebalancingBand')) || 0,
+            goldAktiv: goldAktivFinal,
+            goldZielProzent: goldZielFinal,
+            goldFloorProzent: goldFloorFinal,
+            goldSteuerfrei: goldSteuerfreiFinal,
+            rebalancingBand: rebalancingBandFinal,
             costBasisAlt: useAggregates ? aggregated.costBasisAlt : num('costBasisAlt'),
             costBasisNeu: useAggregates ? aggregated.costBasisNeu : num('costBasisNeu'),
             tqfAlt: parseFloat(val('tqfAlt')) || 0,
@@ -190,17 +234,28 @@ export const UIReader = {
      * Wird automatisch von applyStoredInputs() aufgerufen.
      */
     applySideEffectsFromInputs() {
-        const isGoldActive = dom.inputs.goldAktiv.checked;
-        dom.controls.goldPanel.style.display = isGoldActive ? 'block' : 'none';
-        document.getElementById('goldWertGroup').style.display = isGoldActive ? '' : 'none';
-        if (!isGoldActive) {
+        const goldAktivInput = dom.inputs.goldAktiv;
+        const goldPanel = dom.controls.goldPanel;
+        const goldWertGroup = document.getElementById('goldWertGroup');
+        const isGoldActive = goldAktivInput ? goldAktivInput.checked : false;
+        if (goldPanel) {
+            goldPanel.style.display = isGoldActive ? 'block' : 'none';
+        }
+        if (goldWertGroup) {
+            goldWertGroup.style.display = isGoldActive ? '' : 'none';
+        }
+        if (!isGoldActive && dom.inputs.goldWert) {
             dom.inputs.goldWert.value = UIUtils.formatNumber(0);
         }
 
-        const isRenteAktiv = dom.inputs.renteAktiv.value === 'ja';
-        dom.inputs.renteMonatlich.disabled = !isRenteAktiv;
-        if (!isRenteAktiv) {
-            dom.inputs.renteMonatlich.value = UIUtils.formatNumber(0);
+        const renteAktivInput = dom.inputs.renteAktiv;
+        const renteMonatlichInput = dom.inputs.renteMonatlich;
+        if (renteAktivInput && renteMonatlichInput) {
+            const isRenteAktiv = renteAktivInput.value === 'ja';
+            renteMonatlichInput.disabled = !isRenteAktiv;
+            if (!isRenteAktiv) {
+                renteMonatlichInput.value = UIUtils.formatNumber(0);
+            }
         }
     }
 };

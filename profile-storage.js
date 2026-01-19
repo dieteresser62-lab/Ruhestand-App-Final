@@ -9,6 +9,15 @@ const PROFILE_VERSION = 1;
 
 const FIXED_KEYS = new Set([
     'depot_tranchen',
+    'profile_tagesgeld',
+    'profile_rente_aktiv',
+    'profile_rente_monatlich',
+    'profile_aktuelles_alter',
+    'profile_gold_aktiv',
+    'profile_gold_ziel_pct',
+    'profile_gold_floor_pct',
+    'profile_gold_steuerfrei',
+    'profile_gold_rebal_band',
     'showCareDetails',
     'logDetailLevel',
     'worstLogDetailLevel',
@@ -28,6 +37,11 @@ const EXACT_KEYS = new Set([
 
 function nowIso() {
     return new Date().toISOString();
+}
+
+function normalizeBelongsFlag(meta) {
+    if (!meta) return true;
+    return meta.belongsToHousehold !== false;
 }
 
 function slugify(name) {
@@ -121,7 +135,7 @@ function ensureDefaultProfile() {
     const id = 'default';
     const createdAt = nowIso();
     registry.profiles[id] = {
-        meta: { id, name: 'Default', createdAt, updatedAt: createdAt },
+        meta: { id, name: 'Default', createdAt, updatedAt: createdAt, belongsToHousehold: true },
         data: captureProfileData()
     };
 
@@ -144,12 +158,17 @@ export function setCurrentProfileId(id) {
 
 export function listProfiles() {
     const registry = ensureDefaultProfile();
-    return Object.values(registry.profiles).map(p => p.meta);
+    return Object.values(registry.profiles).map(p => ({
+        ...p.meta,
+        belongsToHousehold: normalizeBelongsFlag(p.meta)
+    }));
 }
 
 export function getProfileMeta(id) {
     const registry = ensureDefaultProfile();
-    return registry.profiles[id]?.meta || null;
+    const meta = registry.profiles[id]?.meta || null;
+    if (!meta) return null;
+    return { ...meta, belongsToHousehold: normalizeBelongsFlag(meta) };
 }
 
 export function getProfileData(id) {
@@ -169,7 +188,7 @@ export function createProfile(name) {
 
     const createdAt = nowIso();
     registry.profiles[id] = {
-        meta: { id, name: name || id, createdAt, updatedAt: createdAt },
+        meta: { id, name: name || id, createdAt, updatedAt: createdAt, belongsToHousehold: true },
         data: {}
     };
 
@@ -183,18 +202,27 @@ export function renameProfile(id, name) {
     registry.profiles[id].meta.name = name || registry.profiles[id].meta.name;
     registry.profiles[id].meta.updatedAt = nowIso();
     saveProfileRegistry(registry);
-    return registry.profiles[id].meta;
+    return { ...registry.profiles[id].meta, belongsToHousehold: normalizeBelongsFlag(registry.profiles[id].meta) };
+}
+
+export function setProfileHouseholdMembership(profileId, belongs) {
+    const registry = ensureDefaultProfile();
+    if (!registry.profiles[profileId]) return false;
+    registry.profiles[profileId].meta.belongsToHousehold = Boolean(belongs);
+    registry.profiles[profileId].meta.updatedAt = nowIso();
+    return saveProfileRegistry(registry);
 }
 
 export function deleteProfile(id) {
     const registry = ensureDefaultProfile();
     if (!registry.profiles[id]) return false;
-    if (id === 'default') return false;
+    if (id === 'default' && Object.keys(registry.profiles).length <= 1) return false;
     delete registry.profiles[id];
     saveProfileRegistry(registry);
 
     if (getCurrentProfileId() === id) {
-        setCurrentProfileId('default');
+        const remainingIds = Object.keys(registry.profiles);
+        setCurrentProfileId(remainingIds[0] || 'default');
     }
     return true;
 }
@@ -215,6 +243,15 @@ export function loadProfileIntoLocalStorage(id) {
     loadProfileDataIntoLocalStorage(profile.data);
     localStorage.setItem(ACTIVE_PROFILE_KEY, id);
     return true;
+}
+
+export function updateProfileData(id, patch) {
+    const registry = ensureDefaultProfile();
+    if (!registry.profiles[id]) return false;
+    const currentData = registry.profiles[id].data || {};
+    registry.profiles[id].data = { ...currentData, ...patch };
+    registry.profiles[id].meta.updatedAt = nowIso();
+    return saveProfileRegistry(registry);
 }
 
 export function switchProfile(id) {

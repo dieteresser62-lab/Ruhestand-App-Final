@@ -569,7 +569,7 @@ Erwartet:
 ## Abhängigkeiten
 
 - `profile-storage.js` - Profilverwaltung (existiert)
-- `household-inputs.js` - Input-Aggregation (existiert, kann wiederverwendet werden)
+- `simulator-profile-inputs.js` - Input-Aggregation fuer Multi-Profil-Inputs
 - `balance-reader.js` - Input-Reading (existiert)
 - `balance-renderer.js` - Basis-Rendering (existiert)
 

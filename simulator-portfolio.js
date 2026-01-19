@@ -57,10 +57,15 @@ export function getCommonInputs() {
     // Lade detaillierte Tranchen aus localStorage (falls vorhanden)
     let detailledTranches = null;
     try {
-        const saved = localStorage.getItem('depot_tranchen');
-        if (saved) {
-            detailledTranches = JSON.parse(saved);
-            console.log('✅ Detaillierte Depot-Tranchen geladen:', detailledTranches.length, 'Positionen');
+        const override = (typeof window !== 'undefined') ? window.__householdTranchenOverride : null;
+        if (Array.isArray(override) && override.length > 0) {
+            detailledTranches = override;
+        } else {
+            const saved = localStorage.getItem('depot_tranchen');
+            if (saved) {
+                detailledTranches = JSON.parse(saved);
+                console.log('✅ Detaillierte Depot-Tranchen geladen:', detailledTranches.length, 'Positionen');
+            }
         }
     } catch (err) {
         console.warn('Fehler beim Laden der Depot-Tranchen:', err);

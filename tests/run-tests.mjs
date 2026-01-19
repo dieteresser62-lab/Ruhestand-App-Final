@@ -87,7 +87,23 @@ async function runTests() {
     console.log(`Failed: ${failedTests}`);
     console.log('='.repeat(40));
 
-    if (failedTests > 0) process.exit(1);
+    const activeHandles = typeof process._getActiveHandles === 'function'
+        ? process._getActiveHandles()
+        : [];
+    const openHandles = activeHandles.filter(handle => (
+        handle !== process.stdout &&
+        handle !== process.stderr &&
+        handle !== process.stdin
+    ));
+    if (openHandles.length > 0) {
+        console.warn(`\n⚠️  Open handles detected: ${openHandles.length}`);
+        openHandles.forEach((handle, index) => {
+            const name = handle?.constructor?.name || typeof handle;
+            console.warn(`  ${index + 1}. ${name}`);
+        });
+    }
+
+    process.exit(failedTests > 0 ? 1 : 0);
 }
 
 runTests().catch(e => {

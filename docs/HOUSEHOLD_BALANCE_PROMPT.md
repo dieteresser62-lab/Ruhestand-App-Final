@@ -43,7 +43,7 @@ export function selectTranchesForSale(tranches, targetAmount)
 
 Die Logik soll:
 - `profile-storage.js` nutzen für Profil-Zugriff (listProfiles, getProfileData)
-- `household-inputs.js` wiederverwenden wo möglich (buildSimulatorInputsFromProfileData)
+- `simulator-profile-inputs.js` wiederverwenden wo möglich (buildSimulatorInputsFromProfileData)
 - Steuerberechnung: KapESt 25% + Soli 5,5% + optionale Kirchensteuer
 
 ### 2. Neue Datei: `household-balance-ui.js`

@@ -90,7 +90,7 @@ Input
 ### Multi-User/Household (Phase 1)
 
 Recent addition supports household-level analysis by combining multiple profiles:
-- `household-simulator.js` - Aggregation logic (additive vs. accounts mode)
+- `simulator-profile-inputs.js` - Multi-Profil Aggregation für Simulator-Inputs
 - `profile-manager.js` + `profile-storage.js` - Profile switching and persistence
 - Withdrawal orchestration modes: proportional, tax-first, runway-first
 - See `docs/HOUSEHOLD_FEATURES.md` for detailed design decisions

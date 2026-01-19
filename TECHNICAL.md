@@ -174,17 +174,16 @@ Die Worker-Pools bieten ein opt-in Telemetrie-System für lokale Performance-Ana
 
 ---
 
-## Haushaltssimulation (Multi-User)
+## Multi-Profil Simulator
 
 ### Architektur
 
-Die Haushaltssimulation ermöglicht die Kombination mehrerer Profile zu einer gemeinsamen Analyse:
+Die Simulator-Eingaben können aus mehreren Profilen aggregiert werden:
 
 **Module:**
 - `profile-storage.js` – Profil-Registry und Persistenz-Layer
 - `profile-manager.js` – UI-Steuerung für Profilverwaltung (index.html)
-- `household-inputs.js` – Aggregation von Profil-Daten zu Haushalts-Inputs
-- `household-simulator.js` – Haushalts-Simulationslogik mit zwei Strategien
+- `simulator-profile-inputs.js` – Profilaggregation und Simulator-Input-Mapping
 
 ### Datenfluss
 
@@ -195,19 +194,10 @@ Profile (localStorage) → profile-storage.js
                         ↓
           profileInputs[] (pro Profil)
                         ↓
-          combineHouseholdInputs() → Combined Inputs (Additiv)
+          combineSimulatorProfiles() → Combined Inputs
                         ↓
-          applyWithdrawalShareToInputs() → Adjusted Inputs (Accounts)
-                        ↓
-          runMonteCarloSimulation() / runHouseholdAccountsSimulation()
-                        ↓
-          Aggregated Results
+          getCommonInputs() → MC/Backtest/Optimize
 ```
-
-### Aggregationsstrategien
-
-**1. Additiv-Modus:**
-- Vermögen, Ausgaben und Renten werden summiert
 - Eine gemeinsame Simulation mit kombinierten Inputs
 - Tranchen aller Profile werden zusammengeführt
 - Partner-Konfiguration wird deaktiviert (Renten summiert)

@@ -264,16 +264,15 @@ Historische Daten, Mortalitätstafeln, Stress-Presets.
 
 ---
 
-## 21. `household-inputs.js` (~430 Zeilen)
-Aggregiert Profildaten zu Haushalts-Inputs für Multi-User-Simulationen.
+## 21. `simulator-profile-inputs.js` (~430 Zeilen)
+Aggregiert Profildaten zu Simulator-Inputs für Multi-Profil-Setups.
 
 **Hauptfunktionen:**
 - `buildSimulatorInputsFromProfileData()` – liest Profildaten (localStorage) und baut vollständige Simulator-Inputs
-- `combineHouseholdInputs()` – aggregiert mehrere Profile zu einem kombinierten Input-Objekt (Additiv-Modus)
-- `buildWithdrawalShares()` – berechnet Entnahme-Anteile pro Profil nach Policy (proportional, runway-first, tax-first, stabilizer)
+- `combineSimulatorProfiles()` – aggregiert mehrere Profile zu einem kombinierten Input-Objekt (1–2 Personen)
 
 **Besonderheiten:**
-- Drei-stufige Gold-Validierung: `goldAktiv` nur true wenn `goldZielProzent > 0`
+- Gold-Validierung: `goldAktiv` nur true wenn `goldZielProzent > 0`
 - Tranchen-Aggregation: Fügt detaillierte Tranchen aller Profile zusammen
 - Fallback-Logik: Nutzt Balance-Werte wenn Simulator-Felder leer sind
 - Gewichtete Mittelung für Steuersätze, Aktienquote und Rebalancing-Parameter
@@ -282,29 +281,7 @@ Aggregiert Profildaten zu Haushalts-Inputs für Multi-User-Simulationen.
 
 ---
 
-## 22. `household-simulator.js` (~700 Zeilen)
-Haushalts-Simulationslogik mit zwei Aggregationsstrategien und Entnahme-Orchestrierung.
-
-**Hauptfunktionen:**
-- `runHouseholdAccountsSimulation()` – Accounts-Modus: Separate Simulationen pro Profil mit Ergebnisaggregation
-- `applyWithdrawalShareToInputs()` – Verteilt Ausgaben nach Entnahme-Modus ('household' vs. 'profile') und Policy
-- `applyCashBufferToInputs()` – Fügt gemeinsamen Cash-Puffer zur Runway hinzu
-- `computeEffectiveNeeds()` – Berechnet effektive Floor/Flex-Ausgaben abhängig von Modus
-- UI-Event-Handler für Haushalts-Tab (Profilauswahl, Aggregationsstrategie, Risiko-Budget)
-
-**Entnahme-Modi:**
-- **'household'**: Haushaltsausgaben (Summe Floor+Flex) werden nach Policy auf Profile **verteilt**
-- **'profile'**: Individuelle Profilausgaben werden proportional **skaliert**
-
-**Kritische Fixes:**
-- Bug 1: Ausgaben-Vervielfachung im Household-Modus behoben (korrekte Verteilung statt volle Zuweisung)
-- Bug 2: Gold-Validierung dreistufig implementiert (verhindert Engine-Fehler bei inkonsistenten Profilen)
-
-**Dependencies:** `profile-storage.js`, `household-inputs.js`, `monte-carlo-runner.js`, `monte-carlo-ui.js`, `simulator-engine-helpers.js`, `simulator-sweep-utils.js`, `simulator-utils.js`
-
----
-
-## 23. `profile-storage.js` (~290 Zeilen)
+## 22. `profile-storage.js` (~290 Zeilen)
 Profil-Registry und Persistenz-Layer für Multi-User-Verwaltung.
 
 **Hauptfunktionen:**
@@ -324,7 +301,7 @@ Profil-Registry und Persistenz-Layer für Multi-User-Verwaltung.
 
 ---
 
-## 24. `profile-manager.js` (~190 Zeilen)
+## 23. `profile-manager.js` (~190 Zeilen)
 UI-Steuerung für Profilverwaltung (index.html).
 
 **Hauptfunktionen:**
