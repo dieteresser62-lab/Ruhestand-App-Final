@@ -54,6 +54,40 @@ function hasCostBasisInput(tranche) {
  */
 export function getTranchenStatus() {
     try {
+        const override = (typeof window !== 'undefined') ? window.__profilverbundTranchenOverride : null;
+        if (Array.isArray(override) && override.length > 0) {
+            const tranches = override;
+            let missingMarketValueCount = 0;
+            let missingCostBasisCount = 0;
+            const totalValue = tranches.reduce((sum, t) => {
+                if (!hasMarketValueInput(t)) {
+                    missingMarketValueCount += 1;
+                }
+                return sum + resolveTrancheMarketValue(t);
+            }, 0);
+            const totalCost = tranches.reduce((sum, t) => {
+                if (!hasCostBasisInput(t)) {
+                    missingCostBasisCount += 1;
+                }
+                return sum + resolveTrancheCostBasis(t);
+            }, 0);
+            const totalGain = totalValue - totalCost;
+            const gainPct = totalCost > 0 ? (totalGain / totalCost) * 100 : 0;
+            return {
+                loaded: true,
+                count: tranches.length,
+                totalValue,
+                totalCost,
+                totalGain,
+                gainPct,
+                tranches,
+                warnings: {
+                    missingMarketValueCount,
+                    missingCostBasisCount
+                }
+            };
+        }
+
         const saved = localStorage.getItem('depot_tranchen');
         if (!saved) {
             return {
@@ -181,15 +215,7 @@ export function renderTranchenStatusBadge(containerId) {
                     <span style="font-size: 1.2rem;">✅</span>
                     <strong style="font-size: 1rem;">${status.count} Tranchen geladen (FIFO aktiv)</strong>
                 </div>
-                <div style="display: flex; gap: 6px;">
-                    <button onclick="window.DepotTranchenStatus.syncToInputs()"
-                       style="color: white; background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.5); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 0.9rem;"
-                       onmouseover="this.style.background='rgba(255,255,255,0.3)'"
-                       onmouseout="this.style.background='rgba(255,255,255,0.2)'">
-                        🔄 Werte übernehmen
-                    </button>
-                    
-                </div>
+                <div></div>
             </div>
             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 0.85rem; opacity: 0.95;">
                 <div>
@@ -369,12 +395,14 @@ export function syncTranchenToInputs(options = {}) {
 export function initTranchenStatus(containerId) {
     // Initial rendern
     renderTranchenStatusBadge(containerId);
+    syncTranchenToInputs({ silent: true });
 
     // Auf localStorage-Änderungen reagieren (z.B. wenn Tranchen-Manager in neuem Tab geöffnet ist)
     window.addEventListener('storage', (e) => {
         if (e.key === 'depot_tranchen') {
             console.log('📊 Depot-Tranchen wurden aktualisiert');
             renderTranchenStatusBadge(containerId);
+            syncTranchenToInputs({ silent: true });
         }
     });
 

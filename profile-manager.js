@@ -48,7 +48,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const profileSelect = byId('profileSelect');
     const profileNameInput = byId('profileNameInput');
-    const activateBtn = byId('profileActivateBtn');
     const createBtn = byId('profileCreateBtn');
     const renameBtn = byId('profileRenameBtn');
     const deleteBtn = byId('profileDeleteBtn');
@@ -60,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusEl = byId('profileStatus');
     let isSwitching = false;
 
-    if (!profileSelect || !profileNameInput || !activateBtn || !createBtn || !renameBtn || !deleteBtn || !saveBtn || !exportBtn || !importBtn || !importFile || !activeBadge || !statusEl) {
+    if (!profileSelect || !profileNameInput || !createBtn || !renameBtn || !deleteBtn || !exportBtn || !importBtn || !importFile || !activeBadge || !statusEl) {
         return;
     }
 
@@ -72,7 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     refresh();
 
-    activateBtn.addEventListener('click', () => {
+    profileSelect.addEventListener('change', () => {
         const selectedId = profileSelect.value;
         if (!selectedId) return;
         if (isSwitching) return;
@@ -81,21 +80,23 @@ document.addEventListener('DOMContentLoaded', () => {
         isSwitching = false;
         if (ok) {
             refresh();
-            setStatus(statusEl, 'Profil aktiviert und geladen.', 'ok');
+            setStatus(statusEl, 'Profil gewechselt und geladen.', 'ok');
         } else {
             setStatus(statusEl, 'Profil konnte nicht geladen werden.', 'error');
         }
     });
 
-    saveBtn.addEventListener('click', () => {
-        const ok = saveCurrentProfileFromLocalStorage();
-        if (ok) {
-            refresh();
-            setStatus(statusEl, 'Aktuelles Profil gespeichert.', 'ok');
-        } else {
-            setStatus(statusEl, 'Speichern fehlgeschlagen.', 'error');
-        }
-    });
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            const ok = saveCurrentProfileFromLocalStorage();
+            if (ok) {
+                refresh();
+                setStatus(statusEl, 'Aktuelles Profil gespeichert.', 'ok');
+            } else {
+                setStatus(statusEl, 'Speichern fehlgeschlagen.', 'error');
+            }
+        });
+    }
 
     createBtn.addEventListener('click', () => {
         const name = profileNameInput.value.trim();
@@ -131,8 +132,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const selectedId = profileSelect.value;
         if (!selectedId) return;
         if (selectedId === 'default') {
-            setStatus(statusEl, 'Default-Profil kann nicht geloescht werden.', 'error');
-            return;
+            const profiles = listProfiles();
+            if (profiles.length <= 1) {
+                setStatus(statusEl, 'Default-Profil kann nicht geloescht werden, solange keine anderen Profile existieren.', 'error');
+                return;
+            }
         }
         const name = getProfileMeta(selectedId)?.name || selectedId;
         if (!confirm(`Profil "${name}" wirklich loeschen? Dies kann nicht rueckgaengig gemacht werden.`)) {

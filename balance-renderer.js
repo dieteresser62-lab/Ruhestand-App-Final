@@ -626,21 +626,6 @@ class ActionRenderer {
         const quellenList = Array.isArray(action.quellen) ? action.quellen : [];
         const split = this._splitLiquiditySource(input, action, spending, targetLiquidity);
         const quellenItems = [];
-        quellenList.forEach(q => {
-            if (q.kind === 'liquiditaet' && split && split.totalOutflow > 0) {
-                if (split.fromTagesgeld > 0) {
-                    quellenItems.push(createRow('- Tagesgeld', UIUtils.formatCurrency(split.fromTagesgeld)));
-                }
-                if (split.fromGeldmarkt > 0) {
-                    quellenItems.push(createRow('- Geldmarkt-ETF', UIUtils.formatCurrency(split.fromGeldmarkt)));
-                }
-                return;
-            }
-            quellenItems.push(createRow(buildQuelleLabel(q), UIUtils.formatCurrency(q.brutto || 0)));
-        });
-        const steuerRow = createRow('- Steuern (geschätzt)', UIUtils.formatCurrency(action.steuer || 0));
-        steuerRow.style.cssText += 'border-top: 1px solid var(--border-color); margin-top: 5px; padding-top: 5px;';
-        quellenItems.push(steuerRow);
 
         const verwendungenItems = [];
         const annualWithdrawal = (typeof action?.spending?.monatlicheEntnahme === 'number' && isFinite(action.spending.monatlicheEntnahme))
@@ -658,6 +643,171 @@ class ActionRenderer {
         if (action.verwendungen?.aktien > 0) verwendungenItems.push(createRow('Kauf von Aktien:', UIUtils.formatCurrency(action.verwendungen.aktien)));
         if (action.verwendungen?.geldmarkt > 0) verwendungenItems.push(createRow('Kauf von Geldmarkt-ETF:', UIUtils.formatCurrency(action.verwendungen.geldmarkt)));
 
+        const profilverbundActionResults = (typeof window !== 'undefined') ? window.__profilverbundActionResults : null;
+        const hasProfilverbundActions = profilverbundActionResults && Array.isArray(profilverbundActionResults) && profilverbundActionResults.length > 0;
+        const profilverbundProfiles = (typeof window !== 'undefined') ? window.__profilverbundProfileSummaries : null;
+        const hasProfilverbundProfiles = profilverbundProfiles && Array.isArray(profilverbundProfiles) && profilverbundProfiles.length > 0;
+
+        if (hasProfilverbundActions) {
+            quellenItems.length = 0;
+            verwendungenItems.length = 0;
+            if (annualWithdrawal) {
+                const zielTagesgeld = annualWithdrawal + (action.spending.monatlicheEntnahme * 2);
+                verwendungenItems.push(createRow('Ziel Tagesgeld (Jahr + 2 Monate):', UIUtils.formatCurrency(zielTagesgeld)));
+            }
+            profilverbundActionResults.forEach(entry => {
+                const entryAction = entry?.action || {};
+                const entryInput = entry?.input || input;
+                const entrySpending = entry?.spending || spending;
+                const entryTarget = entry?.targetLiquidity;
+                const entryName = entry?.name || 'Profil';
+                const entryQuellen = Array.isArray(entryAction.quellen) ? entryAction.quellen : [];
+                const splitEntry = this._splitLiquiditySource(entryInput, entryAction, entrySpending, entryTarget);
+
+                if (entryQuellen.length === 0) {
+                    quellenItems.push(createRow(`- ${entryName}: Tagesgeld`, UIUtils.formatCurrency(0)));
+                    quellenItems.push(createRow(`- ${entryName}: Geldmarkt-ETF`, UIUtils.formatCurrency(0)));
+                    quellenItems.push(createRow(`- ${entryName}: Depotverkauf`, UIUtils.formatCurrency(0)));
+                    quellenItems.push(createRow(`- ${entryName}: Tranchen`, UIUtils.formatCurrency(0)));
+                } else {
+                    entryQuellen.forEach(q => {
+                        if (q.kind === 'liquiditaet' && splitEntry && splitEntry.totalOutflow > 0) {
+                            quellenItems.push(createRow(`- ${entryName}: Tagesgeld`, UIUtils.formatCurrency(splitEntry.fromTagesgeld)));
+                            quellenItems.push(createRow(`- ${entryName}: Geldmarkt-ETF`, UIUtils.formatCurrency(splitEntry.fromGeldmarkt)));
+                            return;
+                        }
+                        quellenItems.push(createRow(`- ${entryName}: ${buildQuelleLabel(q).replace(/^-\s*/, '')}`, UIUtils.formatCurrency(q.brutto || 0)));
+                    });
+                }
+                quellenItems.push(createRow(`- ${entryName}: Steuern (geschaetzt)`, UIUtils.formatCurrency(entryAction.steuer || 0)));
+
+                const uses = entryAction.verwendungen || {};
+                if (uses.gold > 0) verwendungenItems.push(createRow(`- ${entryName}: Kauf von Gold`, UIUtils.formatCurrency(uses.gold)));
+                if (uses.aktien > 0) verwendungenItems.push(createRow(`- ${entryName}: Kauf von Aktien`, UIUtils.formatCurrency(uses.aktien)));
+                if (uses.geldmarkt > 0) verwendungenItems.push(createRow(`- ${entryName}: Kauf von Geldmarkt-ETF`, UIUtils.formatCurrency(uses.geldmarkt)));
+                if (uses.liquiditaet > minVisibleUse) verwendungenItems.push(createRow(`- ${entryName}: Zufluss Liquiditaet`, UIUtils.formatCurrency(uses.liquiditaet)));
+            });
+        } else if (hasProfilverbundProfiles) {
+            const totalProfiles = profilverbundProfiles.length;
+            const sourceTotals = new Array(totalProfiles).fill(0);
+            const totalAssets = profilverbundProfiles.map(profile => profile.totalAssets || 0);
+
+            const sumWeights = (weights) => weights.reduce((sum, value) => sum + value, 0);
+            const distributeAmount = (amount, weights) => {
+                const totalWeight = sumWeights(weights);
+                if (!amount || !isFinite(amount)) {
+                    return weights.map(() => 0);
+                }
+                if (totalWeight <= 0) {
+                    const share = totalProfiles > 0 ? amount / totalProfiles : 0;
+                    return weights.map(() => share);
+                }
+                return weights.map(weight => amount * (weight / totalWeight));
+            };
+
+            const buildSourceLabel = (q) => {
+                const base = quellenMap[q.kind] || q.kind || 'Quelle';
+                const infoParts = [];
+                if (q.name) infoParts.push(q.name);
+                if (q.isin) infoParts.push(q.isin);
+                if (!infoParts.length) return base;
+                return `${base} - ${infoParts.join(', ')}`;
+            };
+
+            const addRows = (label, allocations) => {
+                allocations.forEach((amount, index) => {
+                    const profileName = profilverbundProfiles[index]?.name || `Profil ${index + 1}`;
+                    quellenItems.push(createRow(`- ${profileName}: ${label}`, UIUtils.formatCurrency(amount || 0)));
+                    sourceTotals[index] += amount || 0;
+                });
+            };
+
+            quellenItems.length = 0;
+            const quellenEntries = Array.isArray(action.quellen) ? action.quellen : [];
+            const splitLiquidity = this._splitLiquiditySource(input, action, spending, targetLiquidity);
+
+            if (quellenEntries.length === 0) {
+                const zeroAlloc = new Array(totalProfiles).fill(0);
+                addRows('Tagesgeld', zeroAlloc);
+                addRows('Geldmarkt-ETF', zeroAlloc);
+                addRows('Depotverkauf', zeroAlloc);
+                addRows('Gold', zeroAlloc);
+            } else {
+                quellenEntries.forEach(q => {
+                    if (!q) return;
+                    const kind = q.kind || '';
+                    if (kind === 'liquiditaet' || q.source === 'Liquidität') {
+                        if (splitLiquidity && splitLiquidity.totalOutflow > 0) {
+                            const tagesgeldWeights = profilverbundProfiles.map(profile => profile.tagesgeld || 0);
+                            const geldmarktWeights = profilverbundProfiles.map(profile => profile.geldmarkt || 0);
+                            addRows('Tagesgeld', distributeAmount(splitLiquidity.fromTagesgeld || 0, tagesgeldWeights));
+                            addRows('Geldmarkt-ETF', distributeAmount(splitLiquidity.fromGeldmarkt || 0, geldmarktWeights));
+                        } else {
+                            const liquidityWeights = profilverbundProfiles.map(profile => (profile.tagesgeld || 0) + (profile.geldmarkt || 0));
+                            addRows('Liquiditaet', distributeAmount(q.brutto || 0, liquidityWeights));
+                        }
+                        return;
+                    }
+
+                    let weights = totalAssets;
+                    if (kind === 'geldmarkt') {
+                        weights = profilverbundProfiles.map(profile => profile.geldmarkt || 0);
+                    } else if (kind === 'gold') {
+                        weights = profilverbundProfiles.map(profile => profile.gold || 0);
+                    } else if (kind === 'aktien_alt') {
+                        weights = profilverbundProfiles.map(profile => profile.depotAlt || 0);
+                    } else if (kind === 'aktien_neu') {
+                        weights = profilverbundProfiles.map(profile => profile.depotNeu || 0);
+                    }
+
+                    addRows(buildSourceLabel(q), distributeAmount(q.brutto || 0, weights));
+                });
+            }
+
+            const taxTotal = action.steuer || 0;
+            const taxWeights = sourceTotals.some(total => total > 0) ? sourceTotals : totalAssets;
+            addRows('Steuern (geschaetzt)', distributeAmount(taxTotal, taxWeights));
+
+            verwendungenItems.length = 0;
+            if (annualWithdrawal) {
+                const zielTagesgeld = annualWithdrawal + (action.spending.monatlicheEntnahme * 2);
+                verwendungenItems.push(createRow('Ziel Tagesgeld (Jahr + 2 Monate):', UIUtils.formatCurrency(zielTagesgeld)));
+            }
+            const usageTotals = action?.verwendungen || {};
+            const usageEntries = [
+                { key: 'gold', label: 'Kauf von Gold' },
+                { key: 'aktien', label: 'Kauf von Aktien' },
+                { key: 'geldmarkt', label: 'Kauf von Geldmarkt-ETF' },
+                { key: 'liquiditaet', label: 'Zufluss Liquiditaet' }
+            ];
+            const usageWeights = sourceTotals.some(total => total > 0) ? sourceTotals : totalAssets;
+            usageEntries.forEach(entry => {
+                const total = usageTotals[entry.key] || 0;
+                if (total <= 0) return;
+                distributeAmount(total, usageWeights).forEach((amount, index) => {
+                    if (amount <= 0) return;
+                    const profileName = profilverbundProfiles[index]?.name || `Profil ${index + 1}`;
+                    verwendungenItems.push(createRow(`- ${profileName}: ${entry.label}`, UIUtils.formatCurrency(amount)));
+                });
+            });
+        } else {
+            quellenList.forEach(q => {
+                if (q.kind === 'liquiditaet' && split && split.totalOutflow > 0) {
+                    if (split.fromTagesgeld > 0) {
+                        quellenItems.push(createRow('- Tagesgeld', UIUtils.formatCurrency(split.fromTagesgeld)));
+                    }
+                    if (split.fromGeldmarkt > 0) {
+                        quellenItems.push(createRow('- Geldmarkt-ETF', UIUtils.formatCurrency(split.fromGeldmarkt)));
+                    }
+                    return;
+                }
+                quellenItems.push(createRow(buildQuelleLabel(q), UIUtils.formatCurrency(q.brutto || 0)));
+            });
+            const steuerRow = createRow('- Steuern (geschätzt)', UIUtils.formatCurrency(action.steuer || 0));
+            steuerRow.style.cssText += 'border-top: 1px solid var(--border-color); margin-top: 5px; padding-top: 5px;';
+            quellenItems.push(steuerRow);
+        }
+
         const wrapper = document.createElement('div');
         wrapper.style.cssText = 'text-align: left; font-size: 1rem; line-height: 1.6;';
         // Titel + strukturierte Blöcke reichen aus; eine zusätzliche Kurz-Zusammenfassung würde die Angaben nur duplizieren.
@@ -666,6 +816,7 @@ class ActionRenderer {
             createSection(`A. Quellen (Netto: ${UIUtils.formatCurrency(action.nettoErlös || 0)})`, quellenItems),
             createSection('B. Verwendungen', verwendungenItems)
         );
+
         content.appendChild(wrapper);
     }
 }

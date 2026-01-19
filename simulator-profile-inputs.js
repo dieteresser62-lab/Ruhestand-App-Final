@@ -53,6 +53,21 @@ function parseWidowOptions(data) {
     };
 }
 
+function parseProfileGoldOverrides(data) {
+    const hasGoldAktiv = Object.prototype.hasOwnProperty.call(data, 'profile_gold_aktiv');
+    const hasGoldZiel = Object.prototype.hasOwnProperty.call(data, 'profile_gold_ziel_pct');
+    const hasGoldFloor = Object.prototype.hasOwnProperty.call(data, 'profile_gold_floor_pct');
+    const hasGoldSteuerfrei = Object.prototype.hasOwnProperty.call(data, 'profile_gold_steuerfrei');
+    const hasGoldBand = Object.prototype.hasOwnProperty.call(data, 'profile_gold_rebal_band');
+    return {
+        goldAktiv: hasGoldAktiv ? readBool(data, 'profile_gold_aktiv', false) : null,
+        goldZielProzent: hasGoldZiel ? readNumber(data, 'profile_gold_ziel_pct', 0) : null,
+        goldFloorProzent: hasGoldFloor ? readNumber(data, 'profile_gold_floor_pct', 0) : null,
+        goldSteuerfrei: hasGoldSteuerfrei ? readBool(data, 'profile_gold_steuerfrei', false) : null,
+        rebalancingBand: hasGoldBand ? readNumber(data, 'profile_gold_rebal_band', 0) : null
+    };
+}
+
 function parsePflegeGradeConfigs(data) {
     const configs = {};
     SUPPORTED_PFLEGE_GRADES.forEach(grade => {
@@ -115,6 +130,7 @@ export function buildSimulatorInputsFromProfileData(profileData) {
     const detailedTranches = parseDetailledTranches(profileData);
     const trancheTotals = sumTrancheTotals(detailedTranches);
     const grade1Config = pflegeGradeConfigs[1] || { zusatz: 0, flexCut: 1 };
+    const goldOverrides = parseProfileGoldOverrides(profileData);
 
     const p1StartAlter = readInt(profileData, simKey('p1StartAlter'), 65);
     const p1Geschlecht = readString(profileData, simKey('p1Geschlecht'), 'm');
@@ -123,7 +139,22 @@ export function buildSimulatorInputsFromProfileData(profileData) {
     const rentAdjMode = readString(profileData, simKey('rentAdjMode'), 'wage');
     const rentAdjPct = readNumber(profileData, simKey('rentAdjPct'), 0);
 
-    const goldAktiv = readBool(profileData, simKey('goldAllokationAktiv'), true);
+    const goldAktivFromProfile = goldOverrides.goldAktiv;
+    const goldAktiv = (typeof goldAktivFromProfile === 'boolean')
+        ? goldAktivFromProfile
+        : readBool(profileData, simKey('goldAllokationAktiv'), true);
+    const goldZielProzent = Number.isFinite(goldOverrides.goldZielProzent)
+        ? goldOverrides.goldZielProzent
+        : readNumber(profileData, simKey('goldAllokationProzent'), 0);
+    const goldFloorProzent = Number.isFinite(goldOverrides.goldFloorProzent)
+        ? goldOverrides.goldFloorProzent
+        : readNumber(profileData, simKey('goldFloorProzent'), 0);
+    const goldSteuerfrei = (typeof goldOverrides.goldSteuerfrei === 'boolean')
+        ? goldOverrides.goldSteuerfrei
+        : readBool(profileData, simKey('goldSteuerfrei'), false);
+    const rebalancingBand = Number.isFinite(goldOverrides.rebalancingBand)
+        ? goldOverrides.rebalancingBand
+        : readNumber(profileData, simKey('rebalancingBand'), 25);
 
     const baseInputs = {
         startVermoegen: readNumber(profileData, simKey('simStartVermoegen'), 0),
@@ -137,10 +168,10 @@ export function buildSimulatorInputsFromProfileData(profileData) {
         marketCapeRatio: readNumber(profileData, simKey('marketCapeRatio'), 0),
         risikoprofil: 'sicherheits-dynamisch',
         goldAktiv,
-        goldZielProzent: goldAktiv ? readNumber(profileData, simKey('goldAllokationProzent'), 0) : 0,
-        goldFloorProzent: goldAktiv ? readNumber(profileData, simKey('goldFloorProzent'), 0) : 0,
-        rebalancingBand: goldAktiv ? readNumber(profileData, simKey('rebalancingBand'), 25) : 25,
-        goldSteuerfrei: goldAktiv && readBool(profileData, simKey('goldSteuerfrei'), false),
+        goldZielProzent: goldAktiv ? goldZielProzent : 0,
+        goldFloorProzent: goldAktiv ? goldFloorProzent : 0,
+        rebalancingBand: goldAktiv ? rebalancingBand : 25,
+        goldSteuerfrei: goldAktiv && goldSteuerfrei,
         startAlter: p1StartAlter,
         geschlecht: p1Geschlecht,
         startSPB: readNumber(profileData, simKey('p1SparerPauschbetrag'), 0),
@@ -257,6 +288,12 @@ function maxNumber(list, selector, fallback = 0) {
     return Math.max(...list.map(selector));
 }
 
+function ensureValueMatch(list, selector) {
+    if (!list.length) return true;
+    const first = selector(list[0]);
+    return list.every(item => selector(item) === first);
+}
+
 function profileAssetTotal(inputs) {
     if (!inputs) return 0;
     const start = inputs.startVermoegen || 0;
@@ -264,16 +301,11 @@ function profileAssetTotal(inputs) {
     return Math.max(start, components);
 }
 
-function ensureValueMatch(list, selector) {
-    if (!list.length) return true;
-    const first = selector(list[0]);
-    return list.every(item => selector(item) === first);
-}
-
-export function combineHouseholdInputs(profileInputs, primaryProfileId, cashBufferMonths) {
+export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
     if (!Array.isArray(profileInputs) || profileInputs.length === 0) {
-        return { combined: null, warnings: ['Keine Profile fuer Haushalt gefunden.'] };
+        return { combined: null, warnings: ['Keine Profile fuer Simulator gefunden.'] };
     }
+
     const inputsList = profileInputs.map(entry => entry.inputs);
     const warnings = [];
     const mergedTranches = [];
@@ -284,8 +316,7 @@ export function combineHouseholdInputs(profileInputs, primaryProfileId, cashBuff
     });
 
     const primaryEntry = profileInputs.find(entry => entry.profileId === primaryProfileId) || profileInputs[0];
-    const primaryInputs = primaryEntry ? primaryEntry.inputs : inputsList[0];
-
+    const primaryInputs = primaryEntry?.inputs;
     if (!primaryInputs) {
         return { combined: null, warnings: ['Keine gueltigen Profile gefunden.'] };
     }
@@ -315,25 +346,16 @@ export function combineHouseholdInputs(profileInputs, primaryProfileId, cashBuff
         startFloorBedarf: sumFloor,
         startFlexBedarf: sumFlex,
         detailledTranches: mergedTranches.length ? mergedTranches : null,
-        renteMonatlich: sumNumbers(inputsList, i => (i.renteMonatlich || 0) + (i.partner?.monatsrente || 0)),
-        partner: {
-            ...primaryInputs.partner,
-            aktiv: false,
-            monatsrente: 0,
-            brutto: 0
-        },
-        startSPB: sumNumbers(inputsList, i => (i.startSPB || 0) + (i.partner?.sparerPauschbetrag || 0)),
+        startSPB: sumNumbers(inputsList, i => i.startSPB || 0),
         kirchensteuerSatz: weightedAverage(inputsList, i => i.kirchensteuerSatz || 0, i => i.startVermoegen || 0, primaryInputs.kirchensteuerSatz || 0),
         targetEq: Math.round(weightedAverage(inputsList, i => i.targetEq || 0, i => i.startVermoegen || 0, primaryInputs.targetEq || 0)),
         rebalBand: Math.round(weightedAverage(inputsList, i => i.rebalBand || 0, i => i.startVermoegen || 0, primaryInputs.rebalBand || 0)),
         maxSkimPctOfEq: Math.round(weightedAverage(inputsList, i => i.maxSkimPctOfEq || 0, i => i.startVermoegen || 0, primaryInputs.maxSkimPctOfEq || 0)),
         maxBearRefillPctOfEq: Math.round(weightedAverage(inputsList, i => i.maxBearRefillPctOfEq || 0, i => i.startVermoegen || 0, primaryInputs.maxBearRefillPctOfEq || 0)),
-        // BUGFIX: goldAktiv nur wenn Profile mit Gold UND gültigem Zielwert existieren
         goldAktiv: (() => {
             const goldProfiles = inputsList.filter(i => i.goldAktiv && (i.goldZielProzent || 0) > 0);
             return goldProfiles.length > 0;
         })(),
-        // BUGFIX: Berechne Gold-Prozente nur über Profile mit aktivem Gold, um Validierungsfehler zu vermeiden
         goldZielProzent: (() => {
             const goldProfiles = inputsList.filter(i => i.goldAktiv && (i.goldZielProzent || 0) > 0);
             if (goldProfiles.length === 0) return 0;
@@ -345,8 +367,8 @@ export function combineHouseholdInputs(profileInputs, primaryProfileId, cashBuff
             return weightedAverage(goldProfiles, i => i.goldFloorProzent || 0, i => i.startVermoegen || 0, primaryInputs.goldFloorProzent || 0);
         })(),
         rebalancingBand: weightedAverage(inputsList, i => i.rebalancingBand || 0, i => i.startVermoegen || 0, primaryInputs.rebalancingBand || 0),
-        runwayMinMonths: maxNumber(inputsList, i => i.runwayMinMonths || 0, primaryInputs.runwayMinMonths || 0) + (cashBufferMonths || 0),
-        runwayTargetMonths: maxNumber(inputsList, i => i.runwayTargetMonths || 0, primaryInputs.runwayTargetMonths || 0) + (cashBufferMonths || 0),
+        runwayMinMonths: maxNumber(inputsList, i => i.runwayMinMonths || 0, primaryInputs.runwayMinMonths || 0),
+        runwayTargetMonths: maxNumber(inputsList, i => i.runwayTargetMonths || 0, primaryInputs.runwayTargetMonths || 0),
         accumulationPhase: {
             enabled: false,
             durationYears: 0,
@@ -381,49 +403,43 @@ export function combineHouseholdInputs(profileInputs, primaryProfileId, cashBuff
         warnings.push('Pflege-Modell unterscheidet sich zwischen Profilen. Es wird das Hauptprofil verwendet.');
     }
 
-    // NEW: Aggregate Detailled Tranches (Flattening the lists)
-    // This allows the engine to load the actual assets instead of relying on scalar startVermoegen only.
-    const combinedTranches = [];
-    inputsList.forEach(input => {
-        if (Array.isArray(input.detailledTranches)) {
-            combinedTranches.push(...input.detailledTranches);
-        }
-    });
+    const secondaryEntry = profileInputs.find(entry => entry.profileId !== primaryEntry.profileId) || null;
+    const secondaryInputs = secondaryEntry?.inputs || null;
+    const totalRente = sumNumbers(profileInputs, entry => entry.inputs?.renteMonatlich || 0);
+    const partnerRente = secondaryInputs ? (secondaryInputs.renteMonatlich || 0) : 0;
+    const p1Rente = Math.max(0, totalRente - partnerRente);
 
-    // Create aggregated input object
-    const finalCombined = {
-        ...combined,
-        detailledTranches: combinedTranches.length > 0 ? combinedTranches : null
+    const partner = secondaryInputs ? {
+        aktiv: true,
+        geschlecht: secondaryInputs.geschlecht || 'w',
+        startAlter: secondaryInputs.startAlter || 0,
+        startInJahren: secondaryInputs.renteStartOffsetJahre || 0,
+        monatsrente: partnerRente,
+        sparerPauschbetrag: secondaryInputs.startSPB || 0,
+        kirchensteuerPct: (secondaryInputs.kirchensteuerSatz || 0) * 100,
+        steuerquotePct: 0,
+        brutto: partnerRente * 12
+    } : {
+        ...combined.partner,
+        aktiv: false,
+        monatsrente: 0,
+        brutto: 0
     };
 
-    return { combined: finalCombined, warnings };
-}
+    const merged = {
+        ...combined,
+        startAlter: primaryInputs.startAlter || combined.startAlter,
+        geschlecht: primaryInputs.geschlecht || combined.geschlecht,
+        renteMonatlich: p1Rente,
+        renteStartOffsetJahre: primaryInputs.renteStartOffsetJahre || 0,
+        rentAdjMode: primaryInputs.rentAdjMode || combined.rentAdjMode,
+        rentAdjPct: Number.isFinite(primaryInputs.rentAdjPct) ? primaryInputs.rentAdjPct : combined.rentAdjPct,
+        partner
+    };
 
-export function buildWithdrawalShares(profileInputs, policy = 'proportional') {
-    const weights = profileInputs.map(entry => {
-        const inputs = entry.inputs;
-        const startAssets = inputs.startVermoegen || 0;
-        const runwayTarget = inputs.runwayTargetMonths || 0;
-        const depotwertAlt = inputs.depotwertAlt || 0;
-        const einstandAlt = inputs.einstandAlt || 0;
-        const taxBurden = depotwertAlt > 0 ? Math.max(0, (depotwertAlt - einstandAlt) / depotwertAlt) : 0.3;
+    if (profileInputs.length > 2) {
+        warnings.push('Mehr als 2 Profile gewaehlt: Demografie auf 2 Personen begrenzt.');
+    }
 
-        switch (policy) {
-            case 'runway_first':
-                return Math.max(1, runwayTarget);
-            case 'tax_first':
-                return 1 / Math.max(0.05, taxBurden);
-            case 'stabilizer':
-                return Math.max(1, runwayTarget) * 0.5 + Math.max(1, startAssets / 100000);
-            case 'proportional':
-            default:
-                return Math.max(0, startAssets);
-        }
-    });
-
-    const totalWeight = weights.reduce((sum, val) => sum + val, 0);
-    return profileInputs.map((entry, idx) => {
-        const pct = totalWeight > 0 ? (weights[idx] / totalWeight) * 100 : 0;
-        return { profileId: entry.profileId, name: entry.name, pct };
-    });
+    return { combined: merged, warnings };
 }

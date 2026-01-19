@@ -420,6 +420,154 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
 .diag-chip.status-danger { background-color: #fff5f5; color: #c53030; border-color: #feb2b2; }
 .diag-chip.status-info { background-color: var(--content-bg-color); color: var(--primary-text); border-color: var(--content-border-color); }
 
+/* Profilverbund */
+.profilverbund-mode {
+    display: none;
+    margin: 10px 0 16px;
+}
+
+.profilverbund-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+}
+
+.profilverbund-container {
+    border: 1px solid var(--content-border-color);
+    background: var(--content-bg-color);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.profilverbund-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.profilverbund-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.profilverbund-profile-box {
+    margin: 12px 0;
+}
+
+.profilverbund-profile-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 8px;
+}
+
+.profilverbund-profile-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--content-border-color);
+    border-radius: 8px;
+    background: #fff;
+}
+
+.profilverbund-status {
+    margin: 8px 0 12px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #f8fafc;
+    border: 1px dashed var(--content-border-color);
+    color: var(--secondary-text);
+    font-size: 0.9rem;
+}
+
+.profilverbund-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.profilverbund-card {
+    border: 1px solid var(--content-border-color);
+    border-radius: 10px;
+    padding: 12px;
+    background: #fff;
+}
+
+.profilverbund-card-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.profilverbund-card-meta {
+    display: grid;
+    gap: 4px;
+    font-size: 0.9rem;
+    color: var(--secondary-text);
+    margin-bottom: 8px;
+}
+
+.profilverbund-tranche-list {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--primary-text);
+}
+
+.profilverbund-tranche-list li {
+    margin-bottom: 4px;
+}
+
+.profilverbund-warning {
+    margin-top: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #fff4e5;
+    border: 1px solid #f6c26b;
+    color: #92400e;
+    font-weight: 600;
+}
+
+.muted-text {
+    color: var(--secondary-text);
+    font-size: 0.9rem;
+}
+
+.tranchen-status-details {
+    margin-top: 10px;
+}
+
+.tranchen-status-details summary {
+    cursor: pointer;
+    color: var(--secondary-text);
+    font-size: 0.85rem;
+    font-weight: 600;
+    list-style: none;
+}
+
+.tranchen-status-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.tranchen-status-details summary::before {
+    content: '▸';
+    display: inline-block;
+    margin-right: 6px;
+    transition: transform 0.2s ease;
+}
+
+.tranchen-status-details[open] summary::before {
+    transform: rotate(90deg);
+}
+
 #diag-decision-tree { list-style: none; padding-left: 15px; margin: 0; font-size: .9rem; }
 
 #diag-decision-tree li {
@@ -580,13 +728,6 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
     flex-wrap: wrap;
 }
 
-.mode-toggle-inline {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    flex: 1;
-    min-width: 240px;
-}
 
 .snapshot-status {
     font-size: 0.8rem; color: var(--secondary-text); margin-top: 10px; text-align: center;
@@ -760,187 +901,7 @@ html[data-density=compact] .result-item { padding: 12px; }
     #print-footer div { margin-bottom: 4px; }
 }
 
-/* ============================================
-   MODE TOGGLE (Einfach/Fortgeschritten)
-   ============================================ */
 
-/* Status-Hinweis zum aktiven Modus und optionalem Reset */
-.mode-status {
-    margin-top: 8px;
-    width: 100%;
-    max-width: 760px;
-}
-
-.mode-status-card {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 12px 14px;
-    background: var(--panel-bg);
-    border: 1px solid var(--border-color);
-    border-radius: 10px;
-    color: var(--text-color);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-}
-
-.mode-status-card p {
-    margin: 0;
-    line-height: 1.4;
-    flex: 1;
-    font-size: 0.95rem;
-}
-
-.btn-reset-advanced {
-    white-space: nowrap;
-    font-size: 0.9rem;
-}
-
-/* Mode Toggle Label */
-.mode-toggle {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    cursor: pointer;
-    user-select: none;
-    font-size: 0.95rem;
-    font-weight: 500;
-    color: var(--text-color);
-}
-
-/* Mode Labels */
-.mode-toggle .mode-label {
-    transition: color 0.3s ease, font-weight 0.3s ease;
-}
-
-.mode-toggle .mode-label:first-child {
-    color: var(--primary-color);
-    font-weight: 600;
-}
-
-.mode-toggle .mode-label:last-child {
-    color: var(--text-light);
-}
-
-/* Hide the actual checkbox */
-.mode-toggle-input {
-    position: absolute;
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-/* Toggle Slider */
-.mode-toggle-slider {
-    position: relative;
-    width: 52px;
-    height: 28px;
-    background-color: var(--secondary-color);
-    border-radius: 28px;
-    transition: background-color 0.3s ease;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.mode-toggle-slider::before {
-    content: '';
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 22px;
-    height: 22px;
-    background-color: white;
-    border-radius: 50%;
-    transition: transform 0.3s ease;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-/* Checked state (Advanced mode) */
-.mode-toggle-input:checked ~ .mode-toggle-slider {
-    background-color: var(--accent-color);
-}
-
-.mode-toggle-input:checked ~ .mode-toggle-slider::before {
-    transform: translateX(24px);
-}
-
-/* Update label colors when checked */
-.mode-toggle-input:checked ~ .mode-label:first-child {
-    color: var(--text-light);
-    font-weight: 400;
-}
-
-.mode-toggle-input:checked ~ .mode-label:last-child {
-    color: var(--primary-color);
-    font-weight: 600;
-}
-
-/* ============================================
-   SIMPLE MODE: Hide Advanced Elements
-   ============================================ */
-
-/* When body has class 'mode-simple', hide all advanced-only elements */
-body.mode-simple .advanced-only {
-    display: none !important;
-}
-
-/* Ergebnisse im Einfach-Modus bewusst schlanker halten. */
-body.mode-simple .advanced-result {
-    display: none !important;
-}
-
-/* Smooth transitions for appearing/disappearing elements */
-.advanced-only {
-    transition: opacity 0.2s ease-in-out;
-}
-
-/* Optional: Fade effect */
-body.mode-simple .advanced-only {
-    opacity: 0;
-    height: 0;
-    overflow: hidden;
-    margin: 0;
-    padding: 0;
-}
-
-
-/* ============================================
-   EINFACH-MODUS: FOKUS AUF INHALTE (nicht Größe!)
-   ============================================ */
-
-/* Keep normal sizes - no scaling */
-body.mode-simple .results-column {
-    /* Normal size - no transform */
-}
-
-body.mode-simple #results h2 {
-    /* Normal font size */
-}
-
-body.mode-simple .result-item {
-    /* Normal font size */
-}
-
-body.mode-simple .result-item strong {
-    /* Normal font size */
-}
-
-body.mode-simple .result-item span {
-    /* Normal font size */
-}
-
-/* Keep normal progress bar sizes */
-body.mode-simple .progress-bar-container {
-    /* Normal 24px height */
-}
-
-body.mode-simple .progress-bar {
-    /* Normal size */
-}
-
-/* Untertitel und Jahres-/Anmerkungszeilen bei Entnahme in der Einfach-Ansicht verstecken. */
-body.mode-simple .entnahme-subtext {
-    display: none;
-}
 
 /* Detaillierte Handlungsschritte bleiben in allen Modi sichtbar, damit die Anweisungen jederzeit nachvollziehbar sind. */
 
@@ -1063,11 +1024,6 @@ body.mode-simple .entnahme-subtext {
 .help-tooltip:hover .tooltip-text {
     visibility: visible;
     opacity: 1;
-}
-
-/* Ensure tooltips are only shown in simple mode for basic fields */
-body:not(.mode-simple) .help-tooltip {
-    display: none;
 }
 
 .tranchen-hint {

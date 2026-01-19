@@ -63,24 +63,32 @@
                                     aria-label="Protokoll des letzten Jahres-Updates anzeigen"
                                     title="Protokoll des letzten Jahres-Updates anzeigen" disabled>🧾</button>
                             </div>
-                            <div class="mode-toggle-inline" aria-label="Modusauswahl">
-                                <label class="mode-toggle">
-                                    <span class="mode-label">🎯 Einfach</span>
-                                    <input type="checkbox" id="modeToggle" class="mode-toggle-input">
-                                    <span class="mode-toggle-slider"></span>
-                                    <span class="mode-label">🔧 Fortgeschritten</span>
-                                </label>
-                            </div>
                         </div>
-                        <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
-                            <div class="form-group" style="grid-column: 1 / -1;">
-                                <label for="profilName">Profil / Name</label>
-                                <input id="profilName" type="text" placeholder="z. B. Dieter"
-                                    title="Name des aktuellen Profils - wird für Snapshots und Jahresabschlüsse verwendet">
+                        <section id="profilverbund-section" class="profilverbund-container" style="display: none;">
+                            <div class="profilverbund-header">
+                                <div>
+                                    <h2>Profilverbund</h2>
+                                </div>
+                                <div class="profilverbund-controls">
+                                    <label for="profilverbund-withdrawal-mode">Verteilung</label>
+                                    <select id="profilverbund-withdrawal-mode">
+                                        <option value="tax_optimized">Steueroptimiert</option>
+                                        <option value="proportional">Proportional</option>
+                                        <option value="runway_first">Runway-First</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div class="form-group"><label for="aktuellesAlter">Aktuelles Alter</label><input
-                                    id="aktuellesAlter" type="number" placeholder="0" min="50"
-                                    title="Ihr aktuelles Lebensalter - wichtig für die Berechnung Ihrer Entnahmestrategien und Lebenserwartung">
+                            <div class="profilverbund-profile-box">
+                                <h3>Profile im Verbund</h3>
+                                <div id="profilverbund-profile-list" class="profilverbund-profile-list"></div>
+                            </div>
+                        </section>
+                        <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+                            <input id="profilName" type="hidden">
+                            <input id="aktuellesAlter" type="hidden">
+                            <div class="form-group">
+                                <label for="fixedIncomeAnnual">Feste Einkuenfte (€/Jahr)</label>
+                                <input id="fixedIncomeAnnual" type="text" inputmode="numeric" disabled>
                             </div>
                             <div class="form-group">
                                 <label for="inflation">Inflation VJ (%)</label>
@@ -96,35 +104,32 @@
                         <legend>Vermögen</legend>
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
                             <div class="form-group"><label for="tagesgeld">Tagesgeld (€)</label><input id="tagesgeld"
-                                    class="currency" type="text" inputmode="numeric" placeholder="0"
-                                    title="Ihr Bargeld auf dem Tagesgeldkonto - sofort verfügbar ohne Verzögerung">
+                                    class="currency" type="text" inputmode="numeric" placeholder="0" disabled
+                                    title="Wird im Profil-Assets Manager gepflegt">
                             </div>
                             <div class="form-group"><label for="geldmarktEtf">Geldmarkt-ETF (€)</label><input
-                                    id="geldmarktEtf" class="currency" type="text" inputmode="numeric" placeholder="0"
+                                    id="geldmarktEtf" class="currency" type="text" inputmode="numeric" placeholder="0" disabled
                                     title="Ihr Geldmarkt-ETF-Bestand - sehr sichere, kurzfristig verfügbare Anlage mit leicht höherer Rendite als Tagesgeld">
                             </div>
-                            <div class="form-group"><label for="depotwertAlt">Depotwert Alt (€)</label><input
-                                    id="depotwertAlt" class="currency" type="text" inputmode="numeric"
-                                    placeholder="z. B. 1.200.000"
-                                    title="Aktueller Wert Ihres 'alten' Depots (vor 2018 angelegt) - profitiert von höherer Teilfreistellung">
-                            </div>
-                            <div class="form-group"><label for="depotwertNeu">Depotwert Neu (€)</label><input
-                                    id="depotwertNeu" class="currency" type="text" inputmode="numeric"
-                                    placeholder="z. B. 750.000"
-                                    title="Aktueller Wert Ihres 'neuen' Depots (nach 2018 angelegt) - hat geringere Teilfreistellung">
+                            <div class="form-group"><label for="depotwertGesamt">Depotwert gesamt (€)</label><input
+                                    id="depotwertGesamt" class="currency" type="text" inputmode="numeric"
+                                    placeholder="z. B. 1.950.000" disabled
+                                    title="Gesamtwert Ihres Depots (aus Tranchen/Profilen aggregiert)">
                             </div>
                             <div class="form-group" id="goldWertGroup"><label for="goldWert">Gold-Bestand
-                                    (€)</label><input id="goldWert" class="currency" type="text" inputmode="numeric"
+                                    (€)</label><input id="goldWert" class="currency" type="text" inputmode="numeric" disabled
                                     value="0"
                                     title="Aktueller Wert Ihres physischen Gold-Bestands (optional, wenn Gold-Strategie aktiv)">
                             </div>
+                            <input id="depotwertAlt" type="hidden">
+                            <input id="depotwertNeu" type="hidden">
                         </div>
-                        <div id="tranchenStatusBadge"></div>
-                        <div class="tranchen-hint">
-                            Hinweis: Geladene Tranchen ueberschreiben die Depot- und Einstandsfelder.
-                        </div>
+                        <details class="tranchen-status-details">
+                            <summary>Tranchenstatus anzeigen</summary>
+                            <div id="tranchenStatusBadge"></div>
+                        </details>
                     </fieldset>
-                    <fieldset class="advanced-only">
+                    <fieldset>
                         <legend
                             style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                             Marktdaten
@@ -153,24 +158,8 @@
                                     id="jahreSeitAth" step="0.01" min="0" placeholder="0"></div>
                         </div>
                     </fieldset>
-                    <fieldset>
-                        <legend>Externe Einkünfte</legend>
-                        <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
-                            <div class="form-group">
-                                <label for="renteAktiv">Rente aktiv</label>
-                                <select id="renteAktiv">
-                                    <option value="nein">Nein</option>
-                                    <option value="ja">Ja</option>
-                                </select>
-                            </div>
-                            <div class="form-group" id="renteMonatlichGroup">
-                                <div class="form-group"> <label for="renteMonatlich">Monatliche Rente (Netto, €)</label>
-                                    <input id="renteMonatlich" class="currency" type="text" inputmode="numeric"
-                                        placeholder="0">
-                                    <small>Wird nur bei "Ja" berücksichtigt.</small>
-                                </div>
-                            </div>
-                    </fieldset>
+                    <input id="renteAktiv" type="hidden">
+                    <input id="renteMonatlich" type="hidden">
                 </div>
 
                 <div id="tab-settings" class="tab-panel">
@@ -201,7 +190,7 @@
                                     value="36">
                             </div>
                         </div>
-                        <div class="form-group advanced-only" style="margin-top: 10px;">
+                        <div class="form-group" style="margin-top: 10px;">
                             <label for="minCashBufferMonths">Min. Cash-Puffer (Monate)</label>
                             <input id="minCashBufferMonths" type="number" min="0" max="12" step="1"
                                 title="Anzahl an Monatsausgaben (Brutto), die immer auf dem Tagesgeld verbleiben sollen, auch wenn keine Entnahme nötig ist."
@@ -223,7 +212,7 @@
                                     title="Die prozentuale Toleranz um die Zielquote, bevor ein Rebalancing ausgelöst wird."
                                     value="5">
                             </div>
-                            <div class="form-group advanced-only">
+                            <div class="form-group">
                                 <label for="maxSkimPctOfEq">Max. Abschöpfen p.a. (%)</label>
                                 <input id="maxSkimPctOfEq" type="number" min="0" max="25" step="1"
                                     title="Der maximal pro Jahr abzuschöpfende Betrag (als Prozentsatz des Aktiendepots), um die Liquidität aufzufüllen."
@@ -232,7 +221,7 @@
                             <!-- ============================================= -->
                             <!-- NEUES FELD FÜR BEAR-MODE-DRIP                 -->
                             <!-- ============================================= -->
-                            <div class="form-group advanced-only">
+                            <div class="form-group">
                                 <label for="maxBearRefillPctOfEq">Max. Auffüllen (Bär) (%)</label>
                                 <input id="maxBearRefillPctOfEq" type="number" value="5" min="0" max="15" step="0.5"
                                     title="Der maximal pro Jahr zu verkaufende Betrag (als Prozentsatz des Aktiendepots) im Bärenmarkt, um die Runway bis zum Minimum aufzufüllen.">
@@ -242,7 +231,7 @@
                             <!-- ============================================= -->
                         </div>
                     </fieldset>
-                    <fieldset class="advanced-only">
+                    <fieldset>
                         <legend>Steuern</legend>
                         <div class="form-grid">
                             <div class="form-group"><label for="kirchensteuerSatz">Kirchensteuer</label><select
@@ -257,62 +246,37 @@
                             </div>
                         </div>
                     </fieldset>
-                    <fieldset class="advanced-only">
-                        <legend>Gold-Strategie</legend>
-                        <div class="form-group full-width">
-                            <label
-                                style="flex-direction: row; align-items: center; justify-content: center; padding: 5px 0;">
-                                <input type="checkbox" id="goldAktiv" class="goldAktiv"
-                                    style="width: auto; margin-right: 8px;" checked>Gold-Allokation aktiv
-                            </label>
-                        </div>
-                        <div id="goldPanel" style="display: none;">
-                            <div class="form-grid"
-                                style="grid-template-columns: 1fr 1fr 1fr; gap: 15px 20px; align-items: end;">
-                                <div class="form-group"> <label for="goldZielProzent">Ziel-Anteil (%)</label> <input
-                                        id="goldZielProzent" type="number" step="0.1" value="7.5"> </div>
-                                <div class="form-group"> <label for="goldFloorProzent">Floor-Anteil (%)</label> <input
-                                        id="goldFloorProzent" type="number" step="0.1" value="1"> </div>
-                                <div class="form-group"> <label for="rebalancingBand">Rebal. Band (%)</label> <input
-                                        id="rebalancingBand" type="number" step="0.1" value="25"> </div>
-                                <div class="form-group full-width"
-                                    style="grid-column: 1 / -1; justify-content:center; margin-top: 5px;"><label
-                                        style="display:flex; align-items:center; flex-direction: row;"><input
-                                            type="checkbox" id="goldSteuerfrei" style="width:auto; margin-right:8px;">
-                                        Gold-Verkäufe steuerfrei</label></div>
-                            </div>
-                        </div>
-                    </fieldset>
-                    <details id="einstandDetails" class="details-card advanced-only" aria-label="Einstandswerte">
+                    <details id="einstandDetails" class="details-card" aria-label="Einstandswerte">
                         <summary aria-controls="einstandContent">Einstandswerte & Teilfreistellung</summary>
                         <div class="einstand-hinweis">Selten ändern – wird automatisch gespeichert.</div>
                         <div class="form-grid"
                             style="grid-template-columns: 1fr 1fr 1fr; gap: 20px; align-items: start;">
                             <div style="display: flex; flex-direction: column; gap: 10px;">
                                 <div class="form-group"><label for="costBasisAlt">Einstand Alt (€)</label><input
-                                        id="costBasisAlt" class="currency" type="text" inputmode="numeric"
-                                        placeholder="0">
+                                        id="costBasisAlt" class="currency" type="text" inputmode="numeric" disabled
+                                        placeholder="0" title="Einstand Alt wird aus Profilen/Tranchen aggregiert">
                                 </div>
                                 <div class="form-group"><label for="tqfAlt">TQF Alt</label><input id="tqfAlt"
                                         type="number" step="0.01" min="0" max="1" placeholder="0"></div>
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 10px;">
                                 <div class="form-group"><label for="costBasisNeu">Einstand Neu (€)</label><input
-                                        id="costBasisNeu" class="currency" type="text" inputmode="numeric"
-                                        placeholder="0">
+                                        id="costBasisNeu" class="currency" type="text" inputmode="numeric" disabled
+                                        placeholder="0" title="Einstand Neu wird aus Profilen/Tranchen aggregiert">
                                 </div>
                                 <div class="form-group"><label for="tqfNeu">TQF Neu</label><input id="tqfNeu"
                                         type="number" step="0.01" min="0" max="1" placeholder="0"></div>
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 10px;">
                                 <div class="form-group"><label for="goldCost">Gold-Einstand (€)</label><input
-                                        id="goldCost" class="currency" type="text" inputmode="numeric" placeholder="0">
+                                        id="goldCost" class="currency" type="text" inputmode="numeric" disabled
+                                        placeholder="0" title="Gold-Einstand wird aus Profilen/Tranchen aggregiert">
                                 </div>
                             </div>
                         </div>
                     </details>
 
-                    <details id="snapshot-management" class="details-card advanced-only" style="margin-top: 25px;">
+                    <details id="snapshot-management" class="details-card" style="margin-top: 25px;">
                         <summary>Jahresabschluss-Snapshots</summary>
                         <div style="padding: 10px 0 5px 0;">
                             <button type="button" class="btn btn-sm" id="connectFolderBtn" style="width: 100%;">Lokalen
@@ -452,43 +416,6 @@
         </div>
     </div>
 
-    <!-- Mode Toggle Logic -->
-    <script type="module">
-        import { initModeToggle } from './mode-toggle.js';
-
-        initModeToggle({
-            tooltipMap: {
-                'aktuellesAlter': 'Ihr aktuelles Lebensalter - wichtig für die Berechnung Ihrer Entnahmestrategien',
-                'inflation': 'Die Inflationsrate des letzten Jahres - wird automatisch von der EZB abgerufen',
-                'tagesgeld': 'Ihr Bargeld auf dem Tagesgeldkonto - sofort verfügbar',
-                'geldmarktEtf': 'Ihr Geldmarkt-ETF - sehr sichere, kurzfristig verfügbare Anlage',
-                'depotwertAlt': 'Der aktuelle Wert Ihres "alten" Depots (meist vor 2018 angelegt)',
-                'depotwertNeu': 'Der aktuelle Wert Ihres "neuen" Depots (meist nach 2018 angelegt)',
-                'floorBedarf': 'Ihre essentiellen jährlichen Ausgaben, die Sie auf jeden Fall brauchen',
-                'flexBedarf': 'Ihre flexiblen jährlichen Ausgaben, auf die Sie notfalls verzichten können',
-                'runwayMinMonths': 'Die Mindestmenge an Liquidität (in Monaten), die Sie immer haben sollten',
-                'runwayTargetMonths': 'Ihre angestrebte komfortable Liquiditätsreichweite (in Monaten)',
-                'targetEq': 'Ihr Zielanteil an Aktien im Portfolio (in Prozent)',
-                'rebalBand': 'Die Toleranz, um die Ihre Aktienquote schwanken darf, bevor umgeschichtet wird'
-            },
-            labelMappings: {
-                'aktuellesAlter': { original: 'Aktuelles Alter', simple: 'Mein Alter' },
-                'inflation': { original: 'Inflation VJ (%)', simple: 'Teuerung letztes Jahr (%)' },
-                'tagesgeld': { original: 'Tagesgeld (€)', simple: 'Bargeld / Tagesgeld (€)' },
-                'geldmarktEtf': { original: 'Geldmarkt-ETF (€)', simple: 'Geldmarkt-Fonds (€)' },
-                'depotwertAlt': { original: 'Depotwert Alt (€)', simple: 'Depot "Alt" (€)' },
-                'depotwertNeu': { original: 'Depotwert Neu (€)', simple: 'Depot "Neu" (€)' },
-                'floorBedarf': { original: 'Floor-Bedarf p.a. (€)', simple: 'Notwendige Ausgaben pro Jahr (€)' },
-                'flexBedarf': { original: 'Flex-Bedarf p.a. (€)', simple: 'Zusätzliche Wünsche pro Jahr (€)' },
-                'runwayMinMonths': { original: 'Runway Minimum (Monate)', simple: 'Mindest-Liquidität (Monate)' },
-                'runwayTargetMonths': { original: 'Runway Ziel (Monate)', simple: 'Wunsch-Liquidität (Monate)' },
-                'targetEq': { original: 'Aktien-Zielquote (%)', simple: 'Aktien-Anteil (%)' },
-                'rebalBand': { original: 'Rebalancing-Band (±%)', simple: 'Toleranz (±%)' }
-            },
-            // Der UI-Toggle bleibt bewusst minimal: keine Statusbox und kein Standard-Reset,
-            // damit die Oberfläche schlank bleibt und erfasste Werte unangetastet bleiben.
-        });
-    </script>
     <div id="devTools" style="display:none; position:fixed; bottom:10px; right:10px; background:#333; color:#fff; padding:10px; border-radius:5px; z-index:9999;">
         <div style="margin-bottom:8px;">
             <label>

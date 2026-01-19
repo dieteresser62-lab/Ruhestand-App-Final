@@ -96,143 +96,32 @@
             transform: translateY(0);
         }
 
-        .household-panel {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 10px;
-            padding: 16px;
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-        }
-
-        .household-profile-list {
+        .profilverbund-profile-list {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 8px 12px;
         }
 
-        .household-profile-row {
+        .profilverbund-profile-row {
             display: flex;
             align-items: center;
             gap: 8px;
             font-size: 0.95rem;
         }
 
-        .household-controls {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 12px 16px;
-            align-items: end;
-        }
-
-        .household-progress {
-            height: 8px;
-            background: #e2e8f0;
-            border-radius: 6px;
-            overflow: hidden;
-            display: none;
-        }
-
-        .household-progress-bar {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(90deg, #38bdf8, #0ea5e9);
-            transition: width 0.2s ease;
-        }
-
-        .household-kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 12px;
-        }
-
-        .household-kpi {
-            background: white;
-            border-radius: 8px;
-            padding: 10px 12px;
-            border: 1px solid #e5e7eb;
-        }
-
-        .household-kpi .label {
-            font-size: 0.8rem;
-            color: #64748b;
-            margin-bottom: 4px;
-        }
-
-        .household-kpi .value {
-            font-weight: 600;
-            color: #0f172a;
-        }
-
-        .household-warnings {
-            background: #fff7ed;
-            border: 1px solid #fed7aa;
-            border-radius: 8px;
-            padding: 10px 12px;
-            font-size: 0.85rem;
-            color: #9a3412;
-        }
-
-        .household-note {
-            font-size: 0.85rem;
-            color: #475569;
-        }
-
-        .household-withdrawals {
-            margin-top: 12px;
-        }
-
-        .household-withdrawal-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 8px;
-            font-size: 0.9rem;
-        }
-
-        .household-status {
+        .profilverbund-status {
             font-size: 0.85rem;
             color: #64748b;
         }
 
-        .household-status[data-kind="ok"] {
+        .profilverbund-status[data-kind="ok"] {
             color: #15803d;
         }
 
-        .household-status[data-kind="error"] {
+        .profilverbund-status[data-kind="error"] {
             color: #b91c1c;
         }
 
-        .household-risk-panel {
-            border: 1px dashed #cbd5f5;
-            border-radius: 10px;
-            padding: 12px;
-            background: #f9fafb;
-        }
-
-        .household-risk-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 10px;
-            font-size: 0.9rem;
-        }
-
-        .household-risk-item {
-            background: white;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 8px 10px;
-        }
-
-        .household-risk-item.ok {
-            border-color: #86efac;
-            background: #f0fdf4;
-        }
-
-        .household-risk-item.fail {
-            border-color: #fecaca;
-            background: #fef2f2;
-        }
     </style>
 </head>
 
@@ -252,36 +141,42 @@
                 </div>
             </div>
 
-            <!-- Mode Toggle -->
-            <div class="mode-toggle-container"><label class="mode-toggle"><span class="mode-label">🎯
-                        Einfach</span><input type="checkbox" id="modeToggle" class="mode-toggle-input"><span
-                        class="mode-toggle-slider"></span><span class="mode-label">🔧 Fortgeschritten</span></label>
-            </div>
             <div class="tab-buttons"><button class="tab-btn active" data-tab="rahmendaten">Rahmendaten</button><button
-                    class="tab-btn" data-tab="montecarlo">Monte-Carlo</button><button class="tab-btn"
-                    data-tab="haushalt">Haushalt</button><button class="tab-btn advanced-only" data-tab="backtesting">Backtesting</button><button class="tab-btn advanced-only"
+                    class="tab-btn" data-tab="montecarlo">Monte-Carlo</button><button class="tab-btn" data-tab="backtesting">Backtesting</button><button class="tab-btn"
                     data-tab="sweep">Parameter-Sweep</button></div>
             <div class="tab-content">
                 <div id="tab-rahmendaten" class="tab-panel active">
+                    <fieldset class="collapsible" data-fieldset="profile-selection">
+                        <legend><span class="section-icon">👥</span>Profile<span class="progress-indicator"></span></legend>
+                        <div class="fieldset-content">
+                            <div id="simProfileList" class="profilverbund-profile-list"></div>
+                            <div id="simProfileStatus" class="profilverbund-status">
+                                Auswahl bestimmt die Simulator-Grunddaten.
+                            </div>
+                        </div>
+                    </fieldset>
                     <fieldset class="collapsible" data-fieldset="portfolio">
                         <legend><span class="section-icon">💰</span>Startportfolio & Bedarf<span
                                 class="progress-indicator"></span></legend>
                         <div class="fieldset-content">
                             <div class="form-grid">
                                 <div class="form-group"><label for="simStartVermoegen">Gesamtvermögen (€)</label><input
-                                        type="number" id="simStartVermoegen" placeholder="0" readonly
+                                        type="text" id="simStartVermoegen" placeholder="0" disabled inputmode="numeric" data-no-persist="true"
                                         title="Wird automatisch aus Depot + Gold + Tagesgeld + Geldmarkt berechnet">
                                 </div>
-                                <div class="form-group"><label for="depotwertAlt">Depotwert Alt (€)</label><input
-                                        type="number" id="depotwertAlt" placeholder="0"
-                                        title="Aktueller Wert Ihres 'alten' Depots (typischerweise vor 2018 angelegt, höhere Teilfreistellung)">
+                                <div class="form-group"><label for="depotwertGesamt">Depotwert gesamt (€)</label><input
+                                        type="text" id="depotwertGesamt" placeholder="0" disabled inputmode="numeric" data-no-persist="true"
+                                        title="Depotwert gesamt (aus Profilen/Tranchen aggregiert)">
                                 </div>
                                 <div class="form-group"><label for="tagesgeld">Tagesgeld (€)</label><input
-                                        type="number" id="tagesgeld" placeholder="0"
-                                        title="Startbestand Tagesgeld - wird in die Liquidität der Simulation einbezogen"></div>
+                                        type="text" id="tagesgeld" placeholder="0" disabled inputmode="numeric" data-no-persist="true"
+                                        title="Tagesgeld (aus Profilen/Tranchen aggregiert)"></div>
                                 <div class="form-group"><label for="geldmarktEtf">Geldmarkt-ETF (€)</label><input
-                                        type="number" id="geldmarktEtf" placeholder="0"
-                                        title="Startbestand Geldmarkt-ETF - wird in die Liquidität der Simulation einbezogen"></div>
+                                        type="text" id="geldmarktEtf" placeholder="0" disabled inputmode="numeric" data-no-persist="true"
+                                        title="Geldmarkt-ETF (aus Profilen/Tranchen aggregiert)"></div>
+                                <div class="form-group"><label for="goldWert">Gold-Bestand (€)</label><input
+                                        type="text" id="goldWert" placeholder="0" disabled inputmode="numeric" data-no-persist="true"
+                                        title="Gold-Bestand (aus Profilen/Tranchen aggregiert)"></div>
                             </div>
                             <div class="form-grid"
                                 style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
@@ -297,55 +192,25 @@
                                         type="number" id="marketCapeRatio" value="32" step="0.1" min="0"
                                         title="Aktuelles Shiller-CAPE (Cyclically Adjusted Price-to-Earnings Ratio) - Bewertungskennzahl für den Aktienmarkt">
                                 </div>
-                                <div class="form-group"><label for="einstandAlt">Einstand Alt (€)</label><input
-                                        type="number" id="einstandAlt" placeholder="0"
-                                        title="Ursprünglicher Einstandswert (Kaufpreis) des alten Depots - wichtig für Steuerberechnung">
-                                </div>
-                                <div class="form-group"><label>Einstand Neu (€)</label><input type="number"
-                                        id="einstandNeu" placeholder="wird berechnet" disabled
-                                        title="Ursprünglicher Einstandswert des neuen Depots - wird automatisch berechnet">
-                                </div>
                             </div>
                             <div id="displayPortfolioBreakdown"
                                 style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
                             </div>
                         <div id="tranchenStatusBadge"></div>
                             <div class="tranchen-hint">
-                                Hinweis: Geladene Tranchen ueberschreiben die Depot- und Einstandsfelder.
+                                Hinweis: Werte stammen aus Profilen/Tranchen.
                             </div>
                         </div>
                     </fieldset>
-                    <fieldset class="collapsible advanced-only" data-fieldset="gold">
-                        <legend><span class="section-icon">🥇</span>Gold-Strategie<span
-                                class="progress-indicator"></span></legend>
-                        <div class="fieldset-content">
-                            <div class="form-group" style="justify-content: center;"><label
-                                    style="flex-direction: row; align-items: center;"><input type="checkbox"
-                                        id="goldAllokationAktiv" style="width: auto; margin-right: 8px;"
-                                        checked>Gold-Allokation aktiv </label></div>
-                            <div id="goldStrategyPanel" style="display: none;">
-                                <div class="form-grid-four-col">
-                                    <div class="form-group"><label for="goldAllokationProzent">Ziel-Allokation
-                                            (%)</label><input type="number" id="goldAllokationProzent" value="7.5"
-                                            step="1" title="Angestrebter Gold-Anteil als Prozentsatz des Gesamtdepots">
-                                    </div>
-                                    <div class="form-group"><label for="goldFloorProzent">Gold-Floor (%)</label><input
-                                            type="number" id="goldFloorProzent" value="1" step="0.5"
-                                            title="Mindest-Gold-Bestand als Prozentsatz des Gesamtvermögens"></div>
-                                    <div class="form-group"><label for="rebalancingBand">Rebalancing-Band (±
-                                            %)</label><input type="number" id="rebalancingBand" value="25" step="5"
-                                            title="Prozentuale Toleranz um die Ziel-Allokation, bevor Gold rebalanciert wird">
-                                    </div>
-                                    <div class="form-group" style="grid-column: span 2; justify-content: center;"><label
-                                            style="flex-direction: row; align-items: center;"><input type="checkbox"
-                                                id="goldSteuerfrei" style="width: auto; margin-right: 8px;"
-                                                checked>Gold-Verkäufe steuerfrei (simuliert >1J Haltefrist) </label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </fieldset>
-                    <fieldset class="collapsible collapsed advanced-only" data-fieldset="rebalancing">
+                    <input type="hidden" id="depotwertAlt" data-no-persist="true">
+                    <input type="hidden" id="einstandAlt" data-no-persist="true">
+                    <input type="hidden" id="einstandNeu" data-no-persist="true">
+                    <input type="hidden" id="goldAllokationAktiv" data-no-persist="true">
+                    <input type="hidden" id="goldAllokationProzent" data-no-persist="true">
+                    <input type="hidden" id="goldFloorProzent" data-no-persist="true">
+                    <input type="hidden" id="rebalancingBand" data-no-persist="true">
+                    <input type="hidden" id="goldSteuerfrei" data-no-persist="true">
+                    <fieldset class="collapsible collapsed" data-fieldset="rebalancing">
                         <legend><span class="section-icon">⚖️</span>Runway & Rebalancing<span
                                 class="progress-indicator"></span></legend>
                         <div class="fieldset-content">
@@ -386,7 +251,7 @@
                             </div>
                         </div>
                     </fieldset>
-                    <fieldset class="collapsible collapsed advanced-only" data-fieldset="personen">
+                    <fieldset class="collapsible collapsed" data-fieldset="personen">
                         <legend><span class="section-icon">👤</span>Personen & Rente<span
                                 class="progress-indicator"></span></legend>
                         <div class="fieldset-content">
@@ -579,7 +444,7 @@
                             </div>
                         </div>
                     </fieldset>
-                    <fieldset class="collapsible collapsed advanced-only" data-fieldset="pflege">
+                    <fieldset class="collapsible collapsed" data-fieldset="pflege">
                         <legend><span class="section-icon">🏥</span>Pflegefall-Absicherung<span
                                 class="progress-indicator"></span></legend>
                         <div class="fieldset-content">
@@ -741,26 +606,26 @@
                                     type="number" id="mcDauer" value="35"
                                     title="Über wie viele Jahre in die Zukunft simuliert wird - sollte mindestens Ihre Lebenserwartung abdecken">
                             </div>
-                            <div class="form-group advanced-only"><label for="mcBlockSize">Blockgröße
+                            <div class="form-group"><label for="mcBlockSize">Blockgröße
                                     (Jahre)</label><input type="number" id="mcBlockSize" value="5"
                                     title="Länge der historischen Blöcke für Block-Bootstrap (nur bei Block-Bootstrap-Methode relevant)">
                             </div>
-                            <div class="form-group advanced-only"><label for="mcSeed">Seed</label><input type="number"
+                            <div class="form-group"><label for="mcSeed">Seed</label><input type="number"
                                     id="mcSeed" value="12345"
                                     title="Zufallszahlengenerator-Seed für reproduzierbare Simulationen"></div>
                         </div>
-                        <div class="form-group advanced-only" style="margin-top: 20px;"><label
+                        <div class="form-group" style="margin-top: 20px;"><label
                                 for="mcMethode">Simulationsmethode</label><select id="mcMethode">
                                 <option value="regime_markov" selected>Regime-Sampling (Markov-Chain)</option>
                                 <option value="regime_iid">Regime-Sampling (iid)</option>
                                 <option value="block">Block-Bootstrap (Stresstest)</option>
                             </select></div>
-                        <div class="form-group advanced-only" style="margin-top: 10px;"><label
+                        <div class="form-group" style="margin-top: 10px;"><label
                                 for="rngMode">RNG-Modus</label><select id="rngMode">
                                 <option value="per-run-seed" selected>Per-Run Seed (deterministisch)</option>
                                 <option value="legacy-stream">Legacy Stream (alte Ergebnisse)</option>
                             </select></div>
-                        <div class="form-grid-four-col advanced-only" style="margin-top: 10px;">
+                        <div class="form-grid-four-col" style="margin-top: 10px;">
                             <div class="form-group"><label for="mcWorkerCount">Worker-Anzahl</label><input
                                     type="number" id="mcWorkerCount" value="8" min="0"
                                     title="Default: 8. 0 = auto (hardwareConcurrency), sonst fixe Worker-Anzahl"></div>
@@ -768,28 +633,28 @@
                                     type="number" id="mcWorkerBudget" value="500" min="50"
                                     title="Default: 500 ms. Ziel-CPU-Zeit pro Worker-Job (auto Chunking)"></div>
                         </div>
-                        <div class="form-group advanced-only" style="justify-content: center; margin-top: 10px;"><label
+                        <div class="form-group" style="justify-content: center; margin-top: 10px;"><label
                                 style="flex-direction: row; align-items: center;"
                                 title="Wenn aktiv, werden Startjahre bevorzugt, deren historisches CAPE dem aktuellen Eingabewert ähnelt (+/- 20%)."><input
                                     type="checkbox" id="useCapeSampling"
                                     style="width: auto; margin-right: 8px;">CAPE-basiertes Sampling verwenden </label>
                         </div>
                     </fieldset>
-                    <fieldset class="advanced-only">
+                    <fieldset>
                         <legend><span class="section-icon">⚡</span>Stressmodus</legend>
                         <div class="form-group"><label for="stressPreset">Szenario für die ersten
                                 Simulationsjahre</label><select id="stressPreset">
                                 <!-- Wird per JavaScript befüllt -->
                             </select></div>
                     </fieldset>
-                    <div class="form-group advanced-only" style="margin-top: 10px; justify-content: center;">
+                    <div class="form-group" style="margin-top: 10px; justify-content: center;">
                         <label style="flex-direction: row; align-items: center;"
                             title="Fuehrt zuerst seriell, dann mit Web-Workern aus und zeigt beide Laufzeiten.">
                             <input type="checkbox" id="mcCompareMode" style="width: auto; margin-right: 8px;">
                             Vergleich: Seriell vs. Worker
                         </label>
                     </div>
-                    <div id="mc-compare-results" class="advanced-only"
+                    <div id="mc-compare-results"
                         style="display:none; margin-top: 10px; font-size: 0.95rem; color: var(--text-secondary);"></div>
                     <button id="mcButton" onclick="runMonteCarlo()">Monte-Carlo-Simulation starten</button>
                     <div id="mc-progress-bar-container">
@@ -808,15 +673,15 @@
                         <h3>Ergebnisse der Monte-Carlo-Analyse</h3>
                         <div id="monteCarloSummary"></div>
                         <div id="unifiedKpiDashboard" style="display:none;"></div>
-                        <div id="advancedKpiDashboard" class="advanced-only" style="display:none;"></div>
+                        <div id="advancedKpiDashboard" style="display:none;"></div>
                         <div id="withdrawalRateChartContainer"></div>
-                        <div id="pflegeKpiResults" class="advanced-only" style="display:none;">
+                        <div id="pflegeKpiResults" style="display:none;">
                             <h3 style="border-top: 1px solid var(--border-color); padding-top: 25px;">Analyse des
                                 Pflegerisikos</h3>
                             <div id="pflegeKpiSummary" class="summary-grid"></div>
                         </div>
                         <!-- Szenario-Log Auswahl -->
-                        <div id="scenarioLogContainer" class="advanced-only" style="display:none; margin-top: 25px;">
+                        <div id="scenarioLogContainer" style="display:none; margin-top: 25px;">
                             <h4 style="text-align:center;">Szenario-Logs analysieren</h4>
                             <div id="scenario-controls"
                                 style="text-align: center; margin-bottom: 10px; font-size: 0.9rem; display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
@@ -838,82 +703,7 @@
                         </div>
                     </div>
                 </div>
-                <div id="tab-haushalt" class="tab-panel">
-                    <div class="household-panel">
-                        <p style="margin: 0; color: #475569;">
-                            Haushalts-Simulation (Additiv). Demografie und Pflege-Logik kommen aus dem gewaehlten Hauptprofil.
-                        </p>
-                        <div>
-                            <h3 style="margin: 0 0 8px 0;">Profile auswaehlen</h3>
-                            <div id="householdProfileList" class="household-profile-list"></div>
-                        </div>
-                        <div class="household-controls">
-                            <div class="form-group">
-                                <label for="householdPrimaryProfile">Hauptprofil fuer Demografie</label>
-                                <select id="householdPrimaryProfile"></select>
-                            </div>
-                            <div class="form-group">
-                                <label for="householdAggregationStrategy">Aggregation</label>
-                                <select id="householdAggregationStrategy">
-                                    <option value="additive">Additiv (ein Portfolio)</option>
-                                    <option value="accounts">Accounts (getrennte Portfolios)</option>
-                                </select>
-                            </div>
-                            <div class="form-group" style="justify-content: center;">
-                                <label style="flex-direction: row; align-items: center;">
-                                    <input type="checkbox" id="householdCashBufferEnabled" style="width: auto; margin-right: 8px;">
-                                    Gemeinsamer Cash-Puffer aktiv
-                                </label>
-                            </div>
-                            <div class="form-group">
-                                <label for="householdCashBufferMonths">Cash-Puffer (Monate)</label>
-                                <input type="number" id="householdCashBufferMonths" value="6" min="0" max="36">
-                            </div>
-                            <div class="form-group">
-                                <label for="householdWithdrawalPolicy">Entnahme-Policy</label>
-                                <select id="householdWithdrawalPolicy">
-                                    <option value="proportional">Proportional</option>
-                                    <option value="runway_first">Runway-First</option>
-                                    <option value="tax_first">Tax-First (Schaetzung)</option>
-                                    <option value="stabilizer">Stabilizer (Schaetzung)</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="householdWithdrawalMode">Entnahme-Basis</label>
-                                <select id="householdWithdrawalMode">
-                                    <option value="household">Haushaltsbedarf verteilen</option>
-                                    <option value="profile">Profilbedarf skalieren</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="household-risk-panel">
-                            <h3 style="margin: 0 0 8px 0;">Risiko-Budget (Haushalt)</h3>
-                            <div class="household-controls">
-                                <div class="form-group">
-                                    <label for="householdRiskMaxDrawdown">Max. Drawdown P90 (%)</label>
-                                    <input type="number" id="householdRiskMaxDrawdown" value="45" min="10" max="90" step="1">
-                                </div>
-                                <div class="form-group">
-                                    <label for="householdRiskMaxDepletion">Max. Depot-Erschoepfung (%)</label>
-                                    <input type="number" id="householdRiskMaxDepletion" value="5" min="0" max="50" step="1">
-                                </div>
-                                <div class="form-group">
-                                    <label for="householdRiskMinSuccess">Min. Success-Rate (%)</label>
-                                    <input type="number" id="householdRiskMinSuccess" value="90" min="50" max="100" step="1">
-                                </div>
-                            </div>
-                        </div>
-                        <button id="householdRunBtn" class="nav-button" style="align-self: flex-start;">Haushalts-Simulation starten</button>
-                        <div id="household-progress-bar-container" class="household-progress">
-                            <div id="household-progress-bar" class="household-progress-bar"></div>
-                        </div>
-                        <div id="householdStatus" class="household-status">
-                            Hinweise und Warnungen erscheinen hier.
-                        </div>
-                        <div id="householdResults"></div>
-                    </div>
-                </div>
-                <div id="tab-backtesting" class="tab-panel advanced-only">
+                <div id="tab-backtesting" class="tab-panel">
                     <fieldset>
                         <legend><span class="section-icon">📅</span>Backtesting-Parameter</legend>
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
@@ -952,7 +742,7 @@
                         </fieldset>
                     </section>
                 </div>
-                <div id="tab-sweep" class="tab-panel advanced-only">
+                <div id="tab-sweep" class="tab-panel">
                     <!--==========PARAMETER SWEEP (EXPLORATION)==========-->
                     <h3
                         style="margin-top: 0; color: var(--primary-color); border-bottom: 2px solid var(--primary-color); padding-bottom: 8px;">
@@ -1267,7 +1057,6 @@
     <script type="module" src="auto_optimize.js"></script>
     <script type="module" src="auto_optimize_ui.js"></script>
     <script type="module" src="simulator-main.js"></script>
-    <script type="module" src="household-simulator.js"></script>
     <!-- Accordion Toggle & Progress Indicator Functionality -->
     <script> document.addEventListener('DOMContentLoaded', function () {
 
@@ -1317,55 +1106,6 @@
                 input.addEventListener('change', updateProgressIndicators);
                 input.addEventListener('input', updateProgressIndicators);
             });
-        });
-
-    </script>
-    <!-- Mode Toggle Logic -->
-    <script type="module">import {
-            initModeToggle
-        }
-
-            from './mode-toggle.js';
-
-        initModeToggle({
-            tooltipMap: {
-                'simStartVermoegen': 'Ihr gesamtes Vermögen zum Start der Simulation (inkl. Liquidität und Depots)',
-                'startFloorBedarf': 'Die absolut notwendigen Ausgaben pro Jahr (z.B. Miete, Essen, Versicherungen)',
-                'startFlexBedarf': 'Wünschenswerte Ausgaben, auf die Sie notfalls verzichten können (z.B. Urlaub, Hobbys)',
-                'mcAnzahl': 'Wie viele verschiedene Zukunftsszenarien simuliert werden (mehr = genauer)',
-                'mcDauer': 'Über wie viele Jahre in die Zukunft simuliert wird'
-            }
-
-            ,
-            labelMappings: {
-                'simStartVermoegen': {
-                    original: 'Gesamtvermögen (€)', simple: 'Mein gesamtes Vermögen (€)'
-                }
-
-                ,
-                'startFloorBedarf': {
-                    original: 'Floor-Bedarf p.a. (€)', simple: 'Was ich mindestens pro Jahr brauche (€)'
-                }
-
-                ,
-                'startFlexBedarf': {
-                    original: 'Flex-Bedarf p.a. (€)', simple: 'Was ich gerne pro Jahr hätte (€)'
-                }
-
-                ,
-                'mcAnzahl': {
-                    original: 'Anzahl Simulationen', simple: 'Wie viele Szenarien?'
-                }
-
-                ,
-                'mcDauer': {
-                    original: 'Maximale Dauer (Jahre)', simple: 'Über wie viele Jahre?'
-                }
-            }
-
-            ,
-            // Kompakte Darstellung: kein erklärender Hinweis und kein automatischer Reset,
-            // damit der Toggle die UI nicht überdeckt und Nutzerwerte erhalten bleiben.
         });
 
     </script>

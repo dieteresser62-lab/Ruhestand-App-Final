@@ -380,11 +380,11 @@
                         <li><a class="toc-link" data-tab-target="manual" href="#balance-tranchen">Depot-Tranchen</a></li>
                     </ol>
                 </li>
-                <li><a class="toc-link" data-tab-target="manual" href="#haushaltssimulation">Haushaltssimulation (Multi-User)</a>
+                <li><a class="toc-link" data-tab-target="manual" href="#profilverbund">Profilverbund (Multi-Profil)</a>
                     <ol class="toc-sublist">
-                        <li><a class="toc-link" data-tab-target="manual" href="#haushalt-profilverwaltung">Profilverwaltung</a></li>
-                        <li><a class="toc-link" data-tab-target="manual" href="#haushalt-konfiguration">Haushalts-Konfiguration</a></li>
-                        <li><a class="toc-link" data-tab-target="manual" href="#haushalt-ergebnisse">Ergebnisse & Interpretation</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#profilverbund-profilverwaltung">Profilverwaltung</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#profilverbund-balance">Balance-App</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#profilverbund-simulator">Simulator</a></li>
                     </ol>
                 </li>
                 <li><a class="toc-link" data-tab-target="manual" href="#onboarding-playbook">Onboarding-Playbook</a>
@@ -532,7 +532,7 @@
                     <ol style="margin-left: 20px; color: var(--text-light);">
                         <li><strong>Horizont & Sparrate festlegen:</strong> Tragen Sie aktuelles Vermögen,
                             geplante Monatsrate und Ziel-Rentenalter ein. Prüfen Sie, ob der monatliche Überschuss
-                            realistisch zur Haushaltsplanung passt.</li>
+                            realistisch zur Gesamtplanung passt.</li>
                         <li><strong>Asset-Allokation wählen:</strong> Starten Sie mit einer Aktienquote passend zu
                             Ihrem Risikoappetit (z.B. 70-90 % bei langem Horizont). Nutzen Sie die Sensitivität der
                             Erfolgswahrscheinlichkeit, um die Quote anzupassen.</li>
@@ -543,7 +543,7 @@
                             Endvermögen.</li>
                         <li><strong>Jährliches Update:</strong> Wiederholen Sie die Simulation nach Gehaltsänderungen
                             oder größeren Ausgaben. Dokumentieren Sie die Version (z.B. YYYY-MM) für Ihre
-                            Haushaltsunterlagen.</li>
+                            Planungsunterlagen.</li>
                     </ol>
                 </div>
                 <div class="detail-block" style="margin-top: 1rem;">
@@ -915,87 +915,53 @@
                 </div>
             </div>
 
-            <div class="info-card" id="haushaltssimulation" style="margin-top: 2rem; border-left: 5px solid var(--accent-color);">
-                <h2>🏠 Haushaltssimulation (Multi-User)</h2>
-                <p class="card-intro">Kombinieren Sie mehrere Profile für gemeinsame Haushaltsanalysen und optimierte Entnahmestrategien.</p>
+            <div class="info-card" id="profilverbund" style="margin-top: 2rem; border-left: 5px solid var(--accent-color);">
+                <h2>👥 Profilverbund (Multi-Profil)</h2>
+                <p class="card-intro">Mehrere Profile werden gemeinsam ausgewertet. Die Profilauswahl steuert Balance und Simulator direkt.</p>
 
-                <div class="detail-block" id="haushalt-profilverwaltung" style="margin-top: 1rem;">
+                <div class="detail-block" id="profilverbund-profilverwaltung" style="margin-top: 1rem;">
                     <h3>Profilverwaltung</h3>
                     <p style="color: var(--text-light); margin-top: 10px;">Die Profilverwaltung finden Sie auf der Startseite (<code>index.html</code>):</p>
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                        <li><strong>Profil erstellen:</strong> Geben Sie einen Namen ein (z.B. "Max", "Maria") und klicken Sie auf "Neues Profil erstellen".</li>
-                        <li><strong>Zwischen Profilen wechseln:</strong> Wählen Sie ein Profil aus der Liste und klicken Sie auf "Aktivieren". Alle Balance- und Simulator-Daten werden geladen.</li>
-                        <li><strong>Profil umbenennen:</strong> Neuen Namen eingeben und "Aktuelles Profil umbenennen" klicken.</li>
-                        <li><strong>Profil löschen:</strong> Profil auswählen und auf "Profil löschen" klicken (mit Sicherheitsabfrage).</li>
-                        <li><strong>Backup erstellen:</strong> "Alle Profile exportieren" speichert die gesamte Registry als JSON-Datei.</li>
-                        <li><strong>Backup importieren:</strong> JSON-Datei auswählen, um Profile wiederherzustellen.</li>
+                        <li><strong>Profil erstellen:</strong> Geben Sie einen Namen ein und klicken Sie auf "Neues Profil".</li>
+                        <li><strong>Zwischen Profilen wechseln:</strong> Profil auswaehlen und "Aktivieren" klicken.</li>
+                        <li><strong>Profil umbenennen:</strong> Neuen Namen eingeben und "Umbenennen" klicken.</li>
+                        <li><strong>Profil loeschen:</strong> Profil auswaehlen und loeschen (mit Sicherheitsabfrage).</li>
+                        <li><strong>Backup erstellen/importieren:</strong> Die gesamte Profil-Registry als JSON exportieren oder wiederherstellen.</li>
                     </ul>
                     <div class="tip-box" style="background: #e8f4f8; padding: 1rem; border-radius: 8px; margin-top: 1rem;">
-                        <strong>💡 Tipp:</strong> Jedes Profil speichert eigene Vermögenswerte, Ausgaben, Renten und Depot-Tranchen. Wechseln Sie das Profil <em>vor</em> dem Eingeben oder Ändern von Daten.
+                        <strong>💡 Tipp:</strong> Jedes Profil speichert eigene Vermoegenswerte, Ausgaben, Renten und Tranchen. Wechseln Sie das Profil <em>vor</em> Eingaben oder Aenderungen.
                     </div>
                 </div>
 
-                <div class="detail-block" id="haushalt-konfiguration" style="margin-top: 1.5rem;">
-                    <h3>Haushalts-Konfiguration (Simulator-Tab "Haushalt")</h3>
+                <div class="detail-block" id="profilverbund-balance" style="margin-top: 1.5rem;">
+                    <h3>Balance-App</h3>
                     <ol style="margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                        <li><strong>Profile auswählen:</strong> Mindestens 2 Profile per Checkbox markieren. Nur Profile mit Simulator-Daten werden berücksichtigt.</li>
-                        <li><strong>Primärprofil festlegen:</strong> Wählen Sie das Profil, dessen demografische Daten (Alter, Pflege, Lebenserwartung) für die Simulation verwendet werden.</li>
-                        <li><strong>Aggregationsstrategie wählen:</strong>
-                            <ul style="margin-left: 20px; margin-top: 5px;">
-                                <li><strong>Additiv:</strong> Vermögen und Ausgaben werden summiert, eine gemeinsame Simulation läuft.</li>
-                                <li><strong>Accounts:</strong> Separate Simulationen pro Profil mit gleichem Marktpfad. Ergebnisse werden aggregiert.</li>
-                            </ul>
-                        </li>
-                        <li><strong>Entnahme-Modus (nur Accounts):</strong>
-                            <ul style="margin-left: 20px; margin-top: 5px;">
-                                <li><strong>Household:</strong> Haushaltsausgaben (Summe Floor+Flex) werden nach Policy auf Profile verteilt.</li>
-                                <li><strong>Profile:</strong> Individuelle Profilausgaben werden nach Policy skaliert.</li>
-                            </ul>
-                        </li>
-                        <li><strong>Entnahme-Policy:</strong> Wählen Sie, wie Entnahmen auf Profile aufgeteilt werden:
-                            <ul style="margin-left: 20px; margin-top: 5px;">
-                                <li><strong>Proportional:</strong> Nach Vermögensanteil (empfohlen für Start)</li>
-                                <li><strong>Runway-First:</strong> Profil mit größerer Runway trägt mehr Entnahmen</li>
-                                <li><strong>Tax-First:</strong> Profil mit geringerer Steuerlast wird zuerst genutzt</li>
-                                <li><strong>Stabilizer:</strong> Heuristik aus Runway + Vermögen</li>
-                            </ul>
-                        </li>
-                        <li><strong>Gemeinsamer Cash-Puffer (optional):</strong> Zusätzliche Liquiditäts-Monate für den gesamten Haushalt.</li>
-                        <li><strong>Risiko-Budget (optional):</strong> Definieren Sie Limits für Max-Drawdown, Depot-Erschöpfung und Success-Rate.</li>
+                        <li><strong>Profile auswaehlen:</strong> Checkboxen steuern die aktiven Profile (Standard: alle aktiv).</li>
+                        <li><strong>Aggregation:</strong> Tagesgeld, Geldmarkt, Depot, Gold und Renten werden summiert.</li>
+                        <li><strong>Verteilungsmodus:</strong> Steueroptimiert, proportional oder runway-first.</li>
+                        <li><strong>Handlungsschritte:</strong> Quellen/Verwendungen werden pro Profil getrennt dargestellt.</li>
+                    </ol>
+                </div>
+
+                <div class="detail-block" id="profilverbund-simulator" style="margin-top: 1.5rem;">
+                    <h3>Simulator</h3>
+                    <ol style="margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Profilauswahl:</strong> Im Tab "Rahmendaten" Profile aktivieren.</li>
+                        <li><strong>Startdaten:</strong> Startvermoegen, Floor/Flex und Renten werden aus den Profilen gefuellt.</li>
+                        <li><strong>Personen & Renten:</strong> Ergeben sich automatisch aus den Profilen (kein separater Tab).</li>
                     </ol>
                     <div class="warning-box" style="background: #fff3cd; padding: 1rem; border-radius: 8px; margin-top: 1rem; border-left: 4px solid var(--warning-color);">
-                        <strong>⚠️ Wichtig:</strong> Stellen Sie sicher, dass alle Profile vollständige Simulator-Daten haben (Vermögen, Floor/Flex-Ausgaben). Profile ohne Daten werden automatisch übersprungen mit Warnhinweis.
-                    </div>
-                </div>
-
-                <div class="detail-block" id="haushalt-ergebnisse" style="margin-top: 1.5rem;">
-                    <h3>Ergebnisse & Interpretation</h3>
-                    <p style="color: var(--text-light); margin-top: 10px;">Nach dem Start der Haushaltssimulation sehen Sie:</p>
-                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                        <li><strong>Success-Rate:</strong> Wahrscheinlichkeit, dass das Haushaltsvermögen bis zum Lebensende ausreicht (Ziel: >95%).</li>
-                        <li><strong>Depot-Erschöpfungsquote:</strong> Anteil der Simulationen, in denen das Vermögen aufgebraucht wird.</li>
-                        <li><strong>P10/P50/P90 Endvermögen:</strong> Perzentile des verbleibenden Vermögens am Ende der Simulation.</li>
-                        <li><strong>Profil-Übersicht:</strong> Start-Vermögen, Floor/Flex-Ausgaben und Entnahme-Anteil pro Profil.</li>
-                        <li><strong>Effektiver Bedarf:</strong> Zeigt die tatsächlichen Gesamt-Ausgaben (abhängig von Aggregationsstrategie und Entnahme-Modus).</li>
-                        <li><strong>Risiko-Budget-Prüfung:</strong> Ampel-Status (grün/rot) für jedes definierte Limit.</li>
-                    </ul>
-                    <div class="tip-box" style="background: #e8f4f8; padding: 1rem; border-radius: 8px; margin-top: 1rem;">
-                        <strong>💡 Interpretation:</strong>
-                        <ul style="margin-left: 20px; margin-top: 5px;">
-                            <li>Success-Rate <95%: Ausgaben reduzieren oder Entnahme-Policy anpassen</li>
-                            <li>P10 Endvermögen sehr niedrig: Risikoprofil zu aggressiv, mehr Liquidität halten</li>
-                            <li>Große Unterschiede bei Entnahme-Anteilen: Policy prüfen (ggf. "Proportional" wählen)</li>
-                        </ul>
+                        <strong>⚠️ Hinweis:</strong> Profile ohne Simulator-Daten werden uebersprungen. Fuellen Sie die Rahmendaten einmal pro Profil aus.
                     </div>
                 </div>
 
                 <div class="detail-block" style="margin-top: 1.5rem; background: #f0f4f8;">
-                    <h4>Häufige Fehler vermeiden</h4>
+                    <h4>Haeufige Fehler vermeiden</h4>
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                        <li><strong>Gold-Allokation inkonsistent:</strong> Gold wird nur berücksichtigt, wenn ein Profil Gold aktiv UND mit Zielwert >0 nutzt. Profile ohne Gold werden bei der Gold-Mittelung ignoriert.</li>
-                        <li><strong>Fehlende Simulator-Daten:</strong> Profile, die nur Balance-Daten haben, werden übersprungen. Füllen Sie im Simulator-Tab die Felder aus.</li>
-                        <li><strong>Tranchen-Warnung (Additiv):</strong> Wenn Tranchen-Summe deutlich unter Startvermögen liegt, nutzt der Simulator Aggregat-Werte als Fallback.</li>
-                        <li><strong>Accounts-Modus Drawdown:</strong> Im Accounts-Modus wird Drawdown konservativ als Maximum je Profil berechnet (nicht gemittelt).</li>
+                        <li><strong>Gold-Allokation inkonsistent:</strong> Gold wird nur genutzt, wenn ein Profil Gold aktiv UND Zielwert > 0 nutzt.</li>
+                        <li><strong>Tranchen-Warnung:</strong> Bei stark abweichender Tranchensumme wird im Simulator auf Aggregatwerte zurueckgegriffen.</li>
+                        <li><strong>Zu wenige aktive Profile:</strong> Mit nur einem Profil entspricht der Profilverbund der Einzelplanung.</li>
                     </ul>
                 </div>
             </div>
@@ -1049,7 +1015,7 @@
                         <li><strong>Speichern schlägt fehl:</strong> Browser-Storage eventuell blockiert. Drittanbieter-Blocking oder Private Mode deaktivieren, Seite im normalen Modus neu öffnen.</li>
                         <li><strong>Datei-Export nicht auffindbar:</strong> Download-Ordner des Browsers prüfen und einheitlich auf Cloud-Speicher umstellen.</li>
                         <li><strong>Laden liefert alte Werte:</strong> Cache leeren (Strg+F5) und sicherstellen, dass die korrekte Datei gewählt wurde; Versionsstempel im Dateinamen verwenden.</li>
-                        <li><strong>Backup-Tipp:</strong> Nach jedem Jahres-Update Export erstellen und in der Haushalts-Dokumentation verlinken.</li>
+                        <li><strong>Backup-Tipp:</strong> Nach jedem Jahres-Update Export erstellen und in der Planungs-Dokumentation verlinken.</li>
                     </ul>
                 </div>
             </div>
