@@ -191,8 +191,8 @@ function normalizeTrancheDate(tranche) {
     return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
 }
 
-// Lade alle Profile, die zum Haushalt gehören
-export function loadHouseholdProfiles() {
+// Lade alle Profile, die zum Profilverbund gehören
+export function loadProfilverbundProfiles() {
     const profiles = listProfiles();
     const selected = profiles.filter(p => p.belongsToHousehold !== false);
     return selected.map(meta => {
@@ -211,8 +211,8 @@ export function loadHouseholdProfiles() {
     }).filter(Boolean);
 }
 
-// Aggregiere Haushaltswerte (Bedarf, Rente, Depot, etc.)
-export function aggregateHouseholdInputs(profileInputs, overrides = {}) {
+// Aggregiere Profilverbund-Werte (Bedarf, Rente, Depot, etc.)
+export function aggregateProfilverbundInputs(profileInputs, overrides = {}) {
     const list = Array.isArray(profileInputs) ? profileInputs : [];
     const totals = list.reduce((acc, entry) => {
         const inputs = entry.inputs || {};
@@ -418,7 +418,7 @@ export function calculateWithdrawalDistribution(profileInputs, aggregated, mode 
     return { items, totalNeed, remaining, totalTaxEstimate, mode };
 }
 
-export function buildHouseholdAssetSummary(profileInputs) {
+export function buildProfilverbundAssetSummary(profileInputs) {
     const list = Array.isArray(profileInputs) ? profileInputs : [];
     const summary = {
         totalTagesgeld: 0,
@@ -468,7 +468,7 @@ export function buildHouseholdAssetSummary(profileInputs) {
     return summary;
 }
 
-export function buildHouseholdProfileSummaries(profileInputs) {
+export function buildProfilverbundProfileSummaries(profileInputs) {
     const list = Array.isArray(profileInputs) ? profileInputs : [];
     return list.map(entry => {
         const inputs = entry.inputs || {};

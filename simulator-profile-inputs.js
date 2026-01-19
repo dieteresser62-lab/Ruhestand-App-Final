@@ -53,6 +53,21 @@ function parseWidowOptions(data) {
     };
 }
 
+function parseProfileGoldOverrides(data) {
+    const hasGoldAktiv = Object.prototype.hasOwnProperty.call(data, 'profile_gold_aktiv');
+    const hasGoldZiel = Object.prototype.hasOwnProperty.call(data, 'profile_gold_ziel_pct');
+    const hasGoldFloor = Object.prototype.hasOwnProperty.call(data, 'profile_gold_floor_pct');
+    const hasGoldSteuerfrei = Object.prototype.hasOwnProperty.call(data, 'profile_gold_steuerfrei');
+    const hasGoldBand = Object.prototype.hasOwnProperty.call(data, 'profile_gold_rebal_band');
+    return {
+        goldAktiv: hasGoldAktiv ? readBool(data, 'profile_gold_aktiv', false) : null,
+        goldZielProzent: hasGoldZiel ? readNumber(data, 'profile_gold_ziel_pct', 0) : null,
+        goldFloorProzent: hasGoldFloor ? readNumber(data, 'profile_gold_floor_pct', 0) : null,
+        goldSteuerfrei: hasGoldSteuerfrei ? readBool(data, 'profile_gold_steuerfrei', false) : null,
+        rebalancingBand: hasGoldBand ? readNumber(data, 'profile_gold_rebal_band', 0) : null
+    };
+}
+
 function parsePflegeGradeConfigs(data) {
     const configs = {};
     SUPPORTED_PFLEGE_GRADES.forEach(grade => {
@@ -115,6 +130,7 @@ export function buildSimulatorInputsFromProfileData(profileData) {
     const detailedTranches = parseDetailledTranches(profileData);
     const trancheTotals = sumTrancheTotals(detailedTranches);
     const grade1Config = pflegeGradeConfigs[1] || { zusatz: 0, flexCut: 1 };
+    const goldOverrides = parseProfileGoldOverrides(profileData);
 
     const p1StartAlter = readInt(profileData, simKey('p1StartAlter'), 65);
     const p1Geschlecht = readString(profileData, simKey('p1Geschlecht'), 'm');
@@ -123,7 +139,22 @@ export function buildSimulatorInputsFromProfileData(profileData) {
     const rentAdjMode = readString(profileData, simKey('rentAdjMode'), 'wage');
     const rentAdjPct = readNumber(profileData, simKey('rentAdjPct'), 0);
 
-    const goldAktiv = readBool(profileData, simKey('goldAllokationAktiv'), true);
+    const goldAktivFromProfile = goldOverrides.goldAktiv;
+    const goldAktiv = (typeof goldAktivFromProfile === 'boolean')
+        ? goldAktivFromProfile
+        : readBool(profileData, simKey('goldAllokationAktiv'), true);
+    const goldZielProzent = Number.isFinite(goldOverrides.goldZielProzent)
+        ? goldOverrides.goldZielProzent
+        : readNumber(profileData, simKey('goldAllokationProzent'), 0);
+    const goldFloorProzent = Number.isFinite(goldOverrides.goldFloorProzent)
+        ? goldOverrides.goldFloorProzent
+        : readNumber(profileData, simKey('goldFloorProzent'), 0);
+    const goldSteuerfrei = (typeof goldOverrides.goldSteuerfrei === 'boolean')
+        ? goldOverrides.goldSteuerfrei
+        : readBool(profileData, simKey('goldSteuerfrei'), false);
+    const rebalancingBand = Number.isFinite(goldOverrides.rebalancingBand)
+        ? goldOverrides.rebalancingBand
+        : readNumber(profileData, simKey('rebalancingBand'), 25);
 
     const baseInputs = {
         startVermoegen: readNumber(profileData, simKey('simStartVermoegen'), 0),
@@ -137,10 +168,10 @@ export function buildSimulatorInputsFromProfileData(profileData) {
         marketCapeRatio: readNumber(profileData, simKey('marketCapeRatio'), 0),
         risikoprofil: 'sicherheits-dynamisch',
         goldAktiv,
-        goldZielProzent: goldAktiv ? readNumber(profileData, simKey('goldAllokationProzent'), 0) : 0,
-        goldFloorProzent: goldAktiv ? readNumber(profileData, simKey('goldFloorProzent'), 0) : 0,
-        rebalancingBand: goldAktiv ? readNumber(profileData, simKey('rebalancingBand'), 25) : 25,
-        goldSteuerfrei: goldAktiv && readBool(profileData, simKey('goldSteuerfrei'), false),
+        goldZielProzent: goldAktiv ? goldZielProzent : 0,
+        goldFloorProzent: goldAktiv ? goldFloorProzent : 0,
+        rebalancingBand: goldAktiv ? rebalancingBand : 25,
+        goldSteuerfrei: goldAktiv && goldSteuerfrei,
         startAlter: p1StartAlter,
         geschlecht: p1Geschlecht,
         startSPB: readNumber(profileData, simKey('p1SparerPauschbetrag'), 0),

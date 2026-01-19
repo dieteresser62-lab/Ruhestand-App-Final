@@ -643,19 +643,19 @@ class ActionRenderer {
         if (action.verwendungen?.aktien > 0) verwendungenItems.push(createRow('Kauf von Aktien:', UIUtils.formatCurrency(action.verwendungen.aktien)));
         if (action.verwendungen?.geldmarkt > 0) verwendungenItems.push(createRow('Kauf von Geldmarkt-ETF:', UIUtils.formatCurrency(action.verwendungen.geldmarkt)));
 
-        const householdActionResults = (typeof window !== 'undefined') ? window.__householdActionResults : null;
-        const hasHouseholdActions = householdActionResults && Array.isArray(householdActionResults) && householdActionResults.length > 0;
-        const householdProfiles = (typeof window !== 'undefined') ? window.__householdProfileSummaries : null;
-        const hasHouseholdProfiles = householdProfiles && Array.isArray(householdProfiles) && householdProfiles.length > 0;
+        const profilverbundActionResults = (typeof window !== 'undefined') ? window.__profilverbundActionResults : null;
+        const hasProfilverbundActions = profilverbundActionResults && Array.isArray(profilverbundActionResults) && profilverbundActionResults.length > 0;
+        const profilverbundProfiles = (typeof window !== 'undefined') ? window.__profilverbundProfileSummaries : null;
+        const hasProfilverbundProfiles = profilverbundProfiles && Array.isArray(profilverbundProfiles) && profilverbundProfiles.length > 0;
 
-        if (hasHouseholdActions) {
+        if (hasProfilverbundActions) {
             quellenItems.length = 0;
             verwendungenItems.length = 0;
             if (annualWithdrawal) {
                 const zielTagesgeld = annualWithdrawal + (action.spending.monatlicheEntnahme * 2);
                 verwendungenItems.push(createRow('Ziel Tagesgeld (Jahr + 2 Monate):', UIUtils.formatCurrency(zielTagesgeld)));
             }
-            householdActionResults.forEach(entry => {
+            profilverbundActionResults.forEach(entry => {
                 const entryAction = entry?.action || {};
                 const entryInput = entry?.input || input;
                 const entrySpending = entry?.spending || spending;
@@ -687,10 +687,10 @@ class ActionRenderer {
                 if (uses.geldmarkt > 0) verwendungenItems.push(createRow(`- ${entryName}: Kauf von Geldmarkt-ETF`, UIUtils.formatCurrency(uses.geldmarkt)));
                 if (uses.liquiditaet > minVisibleUse) verwendungenItems.push(createRow(`- ${entryName}: Zufluss Liquiditaet`, UIUtils.formatCurrency(uses.liquiditaet)));
             });
-        } else if (hasHouseholdProfiles) {
-            const totalProfiles = householdProfiles.length;
+        } else if (hasProfilverbundProfiles) {
+            const totalProfiles = profilverbundProfiles.length;
             const sourceTotals = new Array(totalProfiles).fill(0);
-            const totalAssets = householdProfiles.map(profile => profile.totalAssets || 0);
+            const totalAssets = profilverbundProfiles.map(profile => profile.totalAssets || 0);
 
             const sumWeights = (weights) => weights.reduce((sum, value) => sum + value, 0);
             const distributeAmount = (amount, weights) => {
@@ -716,7 +716,7 @@ class ActionRenderer {
 
             const addRows = (label, allocations) => {
                 allocations.forEach((amount, index) => {
-                    const profileName = householdProfiles[index]?.name || `Profil ${index + 1}`;
+                    const profileName = profilverbundProfiles[index]?.name || `Profil ${index + 1}`;
                     quellenItems.push(createRow(`- ${profileName}: ${label}`, UIUtils.formatCurrency(amount || 0)));
                     sourceTotals[index] += amount || 0;
                 });
@@ -738,12 +738,12 @@ class ActionRenderer {
                     const kind = q.kind || '';
                     if (kind === 'liquiditaet' || q.source === 'Liquidität') {
                         if (splitLiquidity && splitLiquidity.totalOutflow > 0) {
-                            const tagesgeldWeights = householdProfiles.map(profile => profile.tagesgeld || 0);
-                            const geldmarktWeights = householdProfiles.map(profile => profile.geldmarkt || 0);
+                            const tagesgeldWeights = profilverbundProfiles.map(profile => profile.tagesgeld || 0);
+                            const geldmarktWeights = profilverbundProfiles.map(profile => profile.geldmarkt || 0);
                             addRows('Tagesgeld', distributeAmount(splitLiquidity.fromTagesgeld || 0, tagesgeldWeights));
                             addRows('Geldmarkt-ETF', distributeAmount(splitLiquidity.fromGeldmarkt || 0, geldmarktWeights));
                         } else {
-                            const liquidityWeights = householdProfiles.map(profile => (profile.tagesgeld || 0) + (profile.geldmarkt || 0));
+                            const liquidityWeights = profilverbundProfiles.map(profile => (profile.tagesgeld || 0) + (profile.geldmarkt || 0));
                             addRows('Liquiditaet', distributeAmount(q.brutto || 0, liquidityWeights));
                         }
                         return;
@@ -751,13 +751,13 @@ class ActionRenderer {
 
                     let weights = totalAssets;
                     if (kind === 'geldmarkt') {
-                        weights = householdProfiles.map(profile => profile.geldmarkt || 0);
+                        weights = profilverbundProfiles.map(profile => profile.geldmarkt || 0);
                     } else if (kind === 'gold') {
-                        weights = householdProfiles.map(profile => profile.gold || 0);
+                        weights = profilverbundProfiles.map(profile => profile.gold || 0);
                     } else if (kind === 'aktien_alt') {
-                        weights = householdProfiles.map(profile => profile.depotAlt || 0);
+                        weights = profilverbundProfiles.map(profile => profile.depotAlt || 0);
                     } else if (kind === 'aktien_neu') {
-                        weights = householdProfiles.map(profile => profile.depotNeu || 0);
+                        weights = profilverbundProfiles.map(profile => profile.depotNeu || 0);
                     }
 
                     addRows(buildSourceLabel(q), distributeAmount(q.brutto || 0, weights));
@@ -786,7 +786,7 @@ class ActionRenderer {
                 if (total <= 0) return;
                 distributeAmount(total, usageWeights).forEach((amount, index) => {
                     if (amount <= 0) return;
-                    const profileName = householdProfiles[index]?.name || `Profil ${index + 1}`;
+                    const profileName = profilverbundProfiles[index]?.name || `Profil ${index + 1}`;
                     verwendungenItems.push(createRow(`- ${profileName}: ${entry.label}`, UIUtils.formatCurrency(amount)));
                 });
             });

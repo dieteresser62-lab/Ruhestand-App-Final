@@ -1,9 +1,9 @@
 // @ts-check
 
 import { CONFIG } from '../balance-config.js';
-import { loadHouseholdProfiles } from '../household-balance.js';
+import { loadProfilverbundProfiles } from '../profilverbund-balance.js';
 
-console.log('--- Household Profile Gold Overrides ---');
+console.log('--- Profilverbund Profile Gold Overrides ---');
 
 const store = new Map();
 const localStorageMock = {
@@ -123,7 +123,7 @@ const registry = {
 
 localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(registry));
 
-const profiles = loadHouseholdProfiles();
+const profiles = loadProfilverbundProfiles();
 const dieter = profiles.find(entry => entry.profileId === 'dieter');
 const karin = profiles.find(entry => entry.profileId === 'karin');
 const petra = profiles.find(entry => entry.profileId === 'petra');
@@ -132,7 +132,7 @@ const lone = profiles.find(entry => entry.profileId === 'lone');
 assert(!!dieter, 'Dieter profile should be loaded');
 assert(!!karin, 'Karin profile should be loaded');
 assert(!!petra, 'Petra profile should be loaded');
-assertEqual(lone, undefined, 'Profiles excluded from household should not be loaded');
+assertEqual(lone, undefined, 'Profiles excluded from profilverbund should not be loaded');
 
 assertEqual(dieter.inputs.goldAktiv, false, 'Dieter should use profile gold aktiv override');
 assertEqual(dieter.inputs.goldZielProzent, 5, 'Dieter gold target should use profile override');

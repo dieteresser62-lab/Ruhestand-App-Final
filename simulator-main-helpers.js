@@ -261,16 +261,16 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal') {
         {
             header: 'Handl.A', width: 8, key: 'netA', valueFormatter: v => {
                 const formatted = formatCurrencyShortLog(v);
-                if (v > 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
-                if (v < 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
+                if (v > 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
+                if (v < 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
                 return formatted;
             }, align: 'right'
         },
         {
             header: 'Handl.G', width: 8, key: 'netG', valueFormatter: v => {
                 const formatted = formatCurrencyShortLog(v);
-                if (v > 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
-                if (v < 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
+                if (v > 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
+                if (v < 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
                 return formatted;
             }, align: 'right'
         },

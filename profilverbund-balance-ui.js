@@ -15,7 +15,7 @@ function formatMonths(value) {
     return `${UIUtils.formatNumber(value)} Monate`;
 }
 
-export function renderHouseholdOverview(aggregated, containerId = 'household-overview') {
+export function renderProfilverbundOverview(aggregated, containerId = 'profilverbund-overview') {
     const container = byId(containerId);
     if (!container) return;
     if (!aggregated) {
@@ -65,7 +65,7 @@ export function renderWithdrawalRecommendation(distribution, containerId = 'with
         }
 
         const trancheList = item.tranches && item.tranches.length
-            ? `<ul class="household-tranche-list">
+            ? `<ul class="profilverbund-tranche-list">
                     ${item.tranches.map(entry => {
                         const name = entry.tranche?.name || entry.tranche?.isin || 'Tranche';
                         return `<li>${name}: ${formatCurrency(entry.sellAmount)} (Steuer ~ ${formatCurrency(entry.taxAmount)})</li>`;
@@ -74,27 +74,27 @@ export function renderWithdrawalRecommendation(distribution, containerId = 'with
             : '';
 
         return `
-            <div class="household-card">
-                <div class="household-card-header">
+            <div class="profilverbund-card">
+                <div class="profilverbund-card-header">
                     <strong>${item.name}</strong>
                     <span>${formatCurrency(item.withdrawalAmount)}</span>
                 </div>
-                <div class="household-card-meta">
+                <div class="profilverbund-card-meta">
                     <div>Geplanter Verkauf: ${formatCurrency(item.sellAmount)}</div>
                     <div>Steuer Schaetzung: ${formatCurrency(item.taxEstimate)}</div>
                 </div>
-                ${sourceLines.length ? `<div class="household-card-meta"><div>Quellen: ${sourceLines.join(' | ')}</div></div>` : ''}
+                ${sourceLines.length ? `<div class="profilverbund-card-meta"><div>Quellen: ${sourceLines.join(' | ')}</div></div>` : ''}
                 ${trancheList}
             </div>
         `;
     }).join('');
 
     const remainderNote = distribution.remaining > 0
-        ? `<div class="household-warning">Nicht gedeckte Entnahme: ${formatCurrency(distribution.remaining)}</div>`
+        ? `<div class="profilverbund-warning">Nicht gedeckte Entnahme: ${formatCurrency(distribution.remaining)}</div>`
         : '';
 
     container.innerHTML = `
-        <div class="household-cards">
+        <div class="profilverbund-cards">
             ${cards}
         </div>
         ${remainderNote}
@@ -117,13 +117,13 @@ export function renderTaxComparison(taxOptimized, proportional, containerId = 't
     `;
 }
 
-export function renderHouseholdProfileSelector(profiles, containerId = 'household-profile-list') {
+export function renderProfilverbundProfileSelector(profiles, containerId = 'profilverbund-profile-list') {
     const container = byId(containerId);
     if (!container) return;
     container.innerHTML = '';
     profiles.forEach(profile => {
         const row = document.createElement('label');
-        row.className = 'household-profile-row';
+        row.className = 'profilverbund-profile-row';
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.value = profile.id;
@@ -137,8 +137,8 @@ export function renderHouseholdProfileSelector(profiles, containerId = 'househol
     });
 }
 
-export function toggleHouseholdMode(enabled) {
-    const section = byId('household-section');
+export function toggleProfilverbundMode(enabled) {
+    const section = byId('profilverbund-section');
     if (!section) return;
     section.style.display = enabled ? 'block' : 'none';
 }

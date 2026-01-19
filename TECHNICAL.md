@@ -202,36 +202,25 @@ Profile (localStorage) → profile-storage.js
 - Tranchen aller Profile werden zusammengeführt
 - Partner-Konfiguration wird deaktiviert (Renten summiert)
 
-**2. Accounts-Modus:**
-- Separate Simulation pro Profil mit gleichem Seed/Marktpfad
-- Endvermögen wird pro Run summiert
-- Drawdown konservativ als Maximum je Profil aggregiert
-- Nicht-Portfolio-KPIs (Pflege, Lebensdauer) vom Primärprofil
+**Profilverbund (Simulator):**
+- Gemeinsame Simulation mit kombinierten Inputs
+- Tranchen der aktiven Profile werden zusammengeführt
+- Personen/Renten werden aus der Profilwahl abgeleitet (kein separater Partner-Tab)
 
-### Entnahme-Orchestrierung
+### Profilverbund-Verteilung (Balance-App)
 
-**Entnahme-Modi:**
-- **'household'**: Haushaltsausgaben (Summe Floor+Flex) werden nach Policy auf Profile **verteilt**
-- **'profile'**: Individuelle Profilausgaben werden proportional **skaliert**
-
-**Entnahme-Policies:**
+**Verteilungsmodi:**
+- `tax_optimized`: Profil mit geringerer Steuerlast zuerst
 - `proportional`: Nach Vermögensanteil (Default)
 - `runway_first`: Profil mit größerer Runway trägt mehr
-- `tax_first`: Profil mit geringerer Steuerlast zuerst
-- `stabilizer`: Heuristik aus Runway + Vermögen
-
-**Kritischer Fix (Phase 1):**
-Im Household-Modus wurde ursprünglich jedes Profil mit den VOLLEN Haushaltsausgaben simuliert (Vervielfachung).
-Fix: `applyWithdrawalShareToInputs()` verteilt nun korrekt nach `shareFraction` statt volle Zuweisung.
 
 ### Gold-Validierung
 
 **Problem:** Inkonsistente Gold-Parameter beim Kombinieren von Profilen führten zu Engine-Validierungsfehlern.
 
-**Lösung (3-stufig):**
-1. `applyCashBufferToInputs()`: `goldAktiv` nur true wenn `goldZielProzent > 0`
-2. `applyWithdrawalShareToInputs()`: Dieselbe Validierung vor Engine-Aufruf
-3. `combineHouseholdInputs()`: Filtert Profile ohne gültiges Gold vor gewichteter Mittelung
+**Lösung:**
+`combineSimulatorProfiles()` berücksichtigt nur Profile mit `goldAktiv` und `goldZielProzent > 0` bei der Mittelung von Ziel/Floor.
+Sind keine gültigen Gold-Profile aktiv, werden die kombinierten Goldwerte auf 0 gesetzt.
 
 ### Risiko-Budget
 

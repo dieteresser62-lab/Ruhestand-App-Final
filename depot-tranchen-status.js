@@ -54,7 +54,7 @@ function hasCostBasisInput(tranche) {
  */
 export function getTranchenStatus() {
     try {
-        const override = (typeof window !== 'undefined') ? window.__householdTranchenOverride : null;
+        const override = (typeof window !== 'undefined') ? window.__profilverbundTranchenOverride : null;
         if (Array.isArray(override) && override.length > 0) {
             const tranches = override;
             let missingMarketValueCount = 0;

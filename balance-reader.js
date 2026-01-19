@@ -236,16 +236,9 @@ export const UIReader = {
     applySideEffectsFromInputs() {
         const goldAktivInput = dom.inputs.goldAktiv;
         const goldPanel = dom.controls.goldPanel;
-        const goldWertGroup = document.getElementById('goldWertGroup');
         const isGoldActive = goldAktivInput ? goldAktivInput.checked : false;
         if (goldPanel) {
             goldPanel.style.display = isGoldActive ? 'block' : 'none';
-        }
-        if (goldWertGroup) {
-            goldWertGroup.style.display = isGoldActive ? '' : 'none';
-        }
-        if (!isGoldActive && dom.inputs.goldWert) {
-            dom.inputs.goldWert.value = UIUtils.formatNumber(0);
         }
 
         const renteAktivInput = dom.inputs.renteAktiv;

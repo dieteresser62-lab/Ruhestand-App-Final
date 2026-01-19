@@ -23,7 +23,7 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 
 ### Simulator
 * Monte-Carlo-Simulationen mit unterschiedlichen Renditequellen (historisch, Regime, Block-Bootstrap) inkl. Worker-Parallelisierung.
-* **Parameter-Sweep mit Auto-Optimize:** Whitelist-Ansatz, Deep-Clones und Wächterlogik für Zwei-Personen-Haushalte. Worker-Parallelisierung fuer Sweep und Auto-Optimize, 3-stufige Optimierung (~8-10x schneller), dynamische Parameter-UI (1-7 Parameter), Preset-Konfigurationen und Champion-Config-Output für optimale Strategiefindung.
+* **Parameter-Sweep mit Auto-Optimize:** Whitelist-Ansatz, Deep-Clones und Wächterlogik für Zwei-Personen-Setups. Worker-Parallelisierung fuer Sweep und Auto-Optimize, 3-stufige Optimierung (~8-10x schneller), dynamische Parameter-UI (1-7 Parameter), Preset-Konfigurationen und Champion-Config-Output für optimale Strategiefindung.
 * Stresstests, Pflegefall-Szenarien und Heatmap-Visualisierung (fokussiert auf Rentenphase).
 * Sweep-Schutz für Partner:innen-Renten inklusive Rente-2-Invarianz und Heatmap-Badges.
 * Szenario-Log-Analyse mit 30 auswählbaren Szenarien: 15 charakteristische (Perzentile, Pflege-Extremfälle, Risiko-Szenarien) und 15 zufällige Samples für typisches Verhalten.
@@ -76,39 +76,29 @@ Das UI blendet Partner- und Rentenfelder dynamisch ein, deaktiviert Prozentfelde
 Anpassung und merkt sich den Aktivierungsstatus im `localStorage`. Gleichzeitig schützt der Sweep-Wächter alle Person-2-Felder über
 Whitelist, Blocklist und Rente-2-Invarianz-Checks, markiert Verstöße in der Heatmap und lässt sich über einen Dev-Self-Test prüfen.【F:simulator-main.js†L3-L64】【F:simulator-main.js†L1563-L1614】
 
-#### Haushaltssimulation (Multi-User)
+#### Profilverbund (Multi-Profil)
 
-Der Simulator unterstützt Haushaltsanalysen durch Kombination mehrerer Profile:
+Die Suite kann mehrere Profile als Profilverbund gleichzeitig auswerten. Es gibt keinen separaten Tab mehr – die Auswahl der Profile steuert Balance und Simulator direkt.
 
 **Profilverwaltung:**
 * Profile können unter `index.html` angelegt, umbenannt und zwischen ihnen gewechselt werden
 * Jedes Profil speichert eigene Balance- und Simulator-Daten (Vermögen, Ausgaben, Renten, Tranchen)
 * Export/Import-Funktion für Backups der gesamten Profil-Registry
 
-**Haushalts-Tab (Simulator):**
-* **Profilauswahl:** Mindestens 2 Profile für Haushaltssimulation auswählen
-* **Primärprofil:** Demografische Daten (Alter, Pflege, Lebenserwartung) stammen vom Primärprofil
-* **Aggregationsstrategie:**
-  - **Additiv:** Vermögen und Ausgaben werden summiert, eine gemeinsame Simulation
-  - **Accounts:** Separate Simulationen pro Profil mit gleichem Marktpfad, Ergebnisse werden aggregiert
-* **Entnahme-Modus (nur Accounts):**
-  - **Household:** Haushaltsausgaben (Summe Floor+Flex) werden nach Policy auf Profile verteilt
-  - **Profile:** Individuelle Profilausgaben werden nach Policy skaliert
-* **Entnahme-Policy:** Proportional (nach Vermögen), Runway-First, Tax-First oder Stabilizer
-* **Gemeinsamer Cash-Puffer:** Optional zusätzliche Liquiditäts-Monate für den Haushalt
-* **Risiko-Budget:** Definierte Limits für Max-Drawdown, Depot-Erschöpfung und Success-Rate
+**Balance-App (Profilverbund):**
+* Profile werden per Checkbox ausgewählt (Standard: alle aktiv).
+* Vermögenswerte, Tranchen und feste Einkünfte werden über die gewählten Profile aggregiert.
+* Entnahme-Verteilung: Proportional (nach Vermögen), Runway-First oder Steueroptimiert.
 
-**Ergebnisse:**
-* Success-Rate, P10/P50/P90 Endvermögen, Depot-Erschöpfungsquote
-* Warnhinweise bei Profilen ohne Simulator-Daten oder Tranchen-Inkonsistenzen
-* Detaillierte Profil-Übersicht mit Start-Vermögen, Floor/Flex und Entnahme-Anteil
-* Risiko-Budget-Prüfung mit Ampel-Status (OK/Verletzt)
+**Simulator (Profilverbund):**
+* Profile werden im Tab „Rahmendaten“ ausgewählt.
+* Startvermögen, Floor/Flex und Renten werden aus den Profilen gefüllt.
+* Personenanzahl und Renten ergeben sich automatisch aus der Profilwahl.
 
 **Wichtige Hinweise:**
-* Gold-Allokation wird nur von Profilen berücksichtigt, die Gold aktiv UND mit Zielwert > 0 nutzen
-* Im Additiv-Modus werden Tranchen aller Profile zusammengeführt (falls vorhanden)
-* Im Accounts-Modus wird Drawdown konservativ als Maximum je Profil aggregiert
-* Detaillierte Designdokumentation siehe `docs/HOUSEHOLD_FEATURES.md`
+* Gold-Strategie wird pro Profil gepflegt und in Balance/Simulator übernommen.
+* Tranchen werden aus den aktiven Profilen zusammengeführt.
+* Detaillierte Designdokumentation siehe `docs/PROFILVERBUND_FEATURES.md`
 
 ### Gemeinsame Engine
 * Acht ES-Module (`engine/`) kapseln Validierung, Marktanalyse, Ausgabenplanung und Transaktionslogik.

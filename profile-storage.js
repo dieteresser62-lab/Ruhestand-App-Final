@@ -205,7 +205,7 @@ export function renameProfile(id, name) {
     return { ...registry.profiles[id].meta, belongsToHousehold: normalizeBelongsFlag(registry.profiles[id].meta) };
 }
 
-export function setProfileHouseholdMembership(profileId, belongs) {
+export function setProfileVerbundMembership(profileId, belongs) {
     const registry = ensureDefaultProfile();
     if (!registry.profiles[profileId]) return false;
     registry.profiles[profileId].meta.belongsToHousehold = Boolean(belongs);

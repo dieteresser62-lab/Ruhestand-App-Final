@@ -7,6 +7,7 @@ import { calculateAggregatedValues } from './depot-tranchen-status.js';
 const DEFAULT_RISIKOPROFIL = 'sicherheits-dynamisch';
 const DEFAULT_PFLEGE_DRIFT_PCT = 3.5; // Realistische Langfrist-Annahme (3–4 % über VPI)
 let hasLoggedTranchenDisplay = false;
+const NUM_FORMATTER = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 });
 
 /**
  * Geschlechtsspezifische Default-Annahmen für die Dauer eines akuten Pflegefalls.
@@ -50,6 +51,37 @@ function normalizeCareDurationRange(minYearsRaw, maxYearsRaw, gender) {
     return { minYears, maxYears };
 }
 
+function parseDisplayNumber(value) {
+    if (!value) return 0;
+    const raw = String(value).trim().replace(/\s/g, '');
+    if (!raw) return 0;
+    const lastComma = raw.lastIndexOf(',');
+    const lastDot = raw.lastIndexOf('.');
+    let normalized = raw;
+    if (lastComma !== -1 && lastDot !== -1) {
+        if (lastComma > lastDot) {
+            normalized = raw.replace(/\./g, '').replace(',', '.');
+        } else {
+            normalized = raw.replace(/,/g, '');
+        }
+    } else if (lastComma !== -1) {
+        normalized = raw.replace(/\./g, '').replace(',', '.');
+    } else if (lastDot !== -1) {
+        const parts = raw.split('.');
+        const tail = parts[parts.length - 1];
+        if (tail.length === 3) {
+            normalized = raw.replace(/\./g, '');
+        }
+    }
+    const n = parseFloat(normalized);
+    return Number.isFinite(n) ? n : 0;
+}
+
+function formatDisplayNumber(value) {
+    if (!Number.isFinite(value)) return '0';
+    return NUM_FORMATTER.format(Math.round(value));
+}
+
 /**
  * Sammelt alle Eingabewerte aus dem UI
  */
@@ -57,7 +89,7 @@ export function getCommonInputs() {
     // Lade detaillierte Tranchen aus localStorage (falls vorhanden)
     let detailledTranches = null;
     try {
-        const override = (typeof window !== 'undefined') ? window.__householdTranchenOverride : null;
+        const override = (typeof window !== 'undefined') ? window.__profilverbundTranchenOverride : null;
         if (Array.isArray(override) && override.length > 0) {
             detailledTranches = override;
         } else {
@@ -71,7 +103,7 @@ export function getCommonInputs() {
         console.warn('Fehler beim Laden der Depot-Tranchen:', err);
     }
 
-    const goldAktiv = document.getElementById('goldAllokationAktiv').checked;
+    const goldAktiv = String(document.getElementById('goldAllokationAktiv')?.value || '').toLowerCase() === 'true';
 
     // Gemeinsame Rentenanpassung (gilt für Person 1 und Partner)
     const rentAdjMode = document.getElementById('rentAdjMode')?.value || 'fix';
@@ -128,11 +160,11 @@ export function getCommonInputs() {
     const rawPflegeMax = parseInt(document.getElementById('pflegeMaxDauer')?.value);
     const normalizedCareDuration = normalizeCareDurationRange(rawPflegeMin, rawPflegeMax, p1Geschlecht);
 
-    const tagesgeld = parseFloat(document.getElementById('tagesgeld')?.value) || 0;
-    const geldmarktEtf = parseFloat(document.getElementById('geldmarktEtf')?.value) || 0;
+    const tagesgeld = parseDisplayNumber(document.getElementById('tagesgeld')?.value);
+    const geldmarktEtf = parseDisplayNumber(document.getElementById('geldmarktEtf')?.value);
 
     const baseInputs = {
-        startVermoegen: parseFloat(document.getElementById('simStartVermoegen').value) || 0,
+        startVermoegen: parseDisplayNumber(document.getElementById('simStartVermoegen')?.value),
         depotwertAlt: parseFloat(document.getElementById('depotwertAlt').value) || 0,
         tagesgeld: tagesgeld,
         geldmarktEtf: geldmarktEtf,
@@ -143,10 +175,10 @@ export function getCommonInputs() {
         marketCapeRatio: parseFloat(document.getElementById('marketCapeRatio')?.value) || 0,
         risikoprofil: DEFAULT_RISIKOPROFIL,
         goldAktiv: goldAktiv,
-        goldZielProzent: (goldAktiv ? parseFloat(document.getElementById('goldAllokationProzent').value) : 0),
-        goldFloorProzent: (goldAktiv ? parseFloat(document.getElementById('goldFloorProzent').value) : 0),
-        rebalancingBand: (goldAktiv ? parseFloat(document.getElementById('rebalancingBand').value) : 25),
-        goldSteuerfrei: goldAktiv && document.getElementById('goldSteuerfrei').checked,
+        goldZielProzent: (goldAktiv ? parseFloat(document.getElementById('goldAllokationProzent')?.value) : 0),
+        goldFloorProzent: (goldAktiv ? parseFloat(document.getElementById('goldFloorProzent')?.value) : 0),
+        rebalancingBand: (goldAktiv ? parseFloat(document.getElementById('rebalancingBand')?.value) : 25),
+        goldSteuerfrei: goldAktiv && (String(document.getElementById('goldSteuerfrei')?.value || '').toLowerCase() === 'true'),
         startAlter: p1StartAlter,
         geschlecht: p1Geschlecht,
         startSPB: p1SparerPB,
@@ -283,25 +315,39 @@ export function updateStartPortfolioDisplay() {
     const derivedStartVermoegen = displayDepotwertAlt + displayDepotwertNeu + displayGoldWert + displayTagesgeld + displayGeldmarkt;
     const startField = document.getElementById('simStartVermoegen');
     if (startField) {
-        startField.value = String(Math.round(derivedStartVermoegen));
+        startField.value = formatDisplayNumber(derivedStartVermoegen);
     }
 
     const showGoldPanel = inputs.goldAktiv || (useAggregates && displayGoldWert > 0);
 
-    document.getElementById('einstandNeu').value = useAggregates
-        ? Math.round(aggregated.costBasisNeu || 0)
-        : (depotwertNeu).toFixed(0);
+    const einstandNeuField = document.getElementById('einstandNeu');
+    if (einstandNeuField) {
+        einstandNeuField.value = useAggregates
+            ? Math.round(aggregated.costBasisNeu || 0)
+            : (depotwertNeu).toFixed(0);
+    }
+
+    const depotwertGesamtField = document.getElementById('depotwertGesamt');
+    if (depotwertGesamtField) {
+        depotwertGesamtField.value = formatDisplayNumber(displayDepotwertAlt + displayDepotwertNeu);
+    }
+    const goldWertField = document.getElementById('goldWert');
+    if (goldWertField) {
+        goldWertField.value = formatDisplayNumber(displayGoldWert);
+    }
 
     let breakdownHtml = `
         <div style="text-align:center; font-weight:bold; color: var(--primary-color); margin-bottom:10px;">Finale Start-Allokation</div>
         <div class="form-grid-three-col">
-            <div class="form-group"><label>Depot (Aktien)</label><span class="calculated-display" style="background-color: #e0f7fa;">${formatCurrency(displayDepotwertAlt + displayDepotwertNeu)}</span></div>
-            <div class="form-group"><label>Depot (Gold)</label><span class="calculated-display" style="background-color: #fff9c4;">${formatCurrency(displayGoldWert)}</span></div>
-            <div class="form-group"><label>Liquiditд</label><span class="calculated-display" style="background-color: #e8f5e9;">${formatCurrency(displayTagesgeld + displayGeldmarkt)}</span></div>
-        </div>
-        <div style="font-size: 0.8rem; text-align: center; margin-top: 10px; color: #555;">Aufteilung: Depot Alt (${formatCurrency(displayDepotwertAlt)}) + Depot Neu (${formatCurrency(displayDepotwertNeu)})</div>`;
+            <div class="form-group"><label>Depot</label><span class="calculated-display" style="background-color: #e0f7fa;">${formatCurrency(displayDepotwertAlt + displayDepotwertNeu)}</span></div>
+            <div class="form-group"><label>Gold</label><span class="calculated-display" style="background-color: #fff9c4;">${formatCurrency(displayGoldWert)}</span></div>
+            <div class="form-group"><label>Liquiditaet</label><span class="calculated-display" style="background-color: #e8f5e9;">${formatCurrency(displayTagesgeld + displayGeldmarkt)}</span></div>
+        </div>`;
     document.getElementById('displayPortfolioBreakdown').innerHTML = breakdownHtml;
-    document.getElementById('goldStrategyPanel').style.display = showGoldPanel ? 'block' : 'none';
+    const goldPanel = document.getElementById('goldStrategyPanel');
+    if (goldPanel) {
+        goldPanel.style.display = showGoldPanel ? 'block' : 'none';
+    }
 }
 
 /**

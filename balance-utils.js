@@ -35,7 +35,31 @@ export const UIUtils = {
      */
     parseCurrency: str => {
         if (!str) return 0;
-        const n = parseFloat(String(str).replace(/\./g, '').replace(',', '.'));
+        const raw = String(str).trim().replace(/\s/g, '');
+        if (!raw) return 0;
+        const lastComma = raw.lastIndexOf(',');
+        const lastDot = raw.lastIndexOf('.');
+        let normalized = raw;
+        if (lastComma !== -1 && lastDot !== -1) {
+            if (lastComma > lastDot) {
+                // Comma is decimal separator: 1.234,56
+                normalized = raw.replace(/\./g, '').replace(',', '.');
+            } else {
+                // Dot is decimal separator: 1,234.56
+                normalized = raw.replace(/,/g, '');
+            }
+        } else if (lastComma !== -1) {
+            // Only comma present: 1234,56
+            normalized = raw.replace(/\./g, '').replace(',', '.');
+        } else if (lastDot !== -1) {
+            // Only dot present: 1.234 (thousands) or 12.5 (decimal)
+            const parts = raw.split('.');
+            const tail = parts[parts.length - 1];
+            if (tail.length === 3) {
+                normalized = raw.replace(/\./g, '');
+            }
+        }
+        const n = parseFloat(normalized);
         return isFinite(n) ? n : 0;
     },
 

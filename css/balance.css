@@ -420,20 +420,20 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
 .diag-chip.status-danger { background-color: #fff5f5; color: #c53030; border-color: #feb2b2; }
 .diag-chip.status-info { background-color: var(--content-bg-color); color: var(--primary-text); border-color: var(--content-border-color); }
 
-/* Household Balance */
-.household-mode {
+/* Profilverbund */
+.profilverbund-mode {
     display: none;
     margin: 10px 0 16px;
 }
 
-.household-toggle {
+.profilverbund-toggle {
     display: inline-flex;
     align-items: center;
     gap: 8px;
     font-weight: 600;
 }
 
-.household-container {
+.profilverbund-container {
     border: 1px solid var(--content-border-color);
     background: var(--content-bg-color);
     border-radius: 10px;
@@ -441,7 +441,7 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
     margin-bottom: 16px;
 }
 
-.household-header {
+.profilverbund-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -449,23 +449,23 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
     margin-bottom: 12px;
 }
 
-.household-controls {
+.profilverbund-controls {
     display: flex;
     flex-direction: column;
     gap: 6px;
 }
 
-.household-profile-box {
+.profilverbund-profile-box {
     margin: 12px 0;
 }
 
-.household-profile-list {
+.profilverbund-profile-list {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 8px;
 }
 
-.household-profile-row {
+.profilverbund-profile-row {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -475,7 +475,7 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
     background: #fff;
 }
 
-.household-status {
+.profilverbund-status {
     margin: 8px 0 12px;
     padding: 8px 10px;
     border-radius: 8px;
@@ -485,28 +485,28 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
     font-size: 0.9rem;
 }
 
-.household-cards {
+.profilverbund-cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 12px;
     margin-top: 10px;
 }
 
-.household-card {
+.profilverbund-card {
     border: 1px solid var(--content-border-color);
     border-radius: 10px;
     padding: 12px;
     background: #fff;
 }
 
-.household-card-header {
+.profilverbund-card-header {
     display: flex;
     justify-content: space-between;
     margin-bottom: 8px;
     font-weight: 600;
 }
 
-.household-card-meta {
+.profilverbund-card-meta {
     display: grid;
     gap: 4px;
     font-size: 0.9rem;
@@ -514,7 +514,7 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
     margin-bottom: 8px;
 }
 
-.household-tranche-list {
+.profilverbund-tranche-list {
     list-style: none;
     padding-left: 0;
     margin: 0;
@@ -522,11 +522,11 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
     color: var(--primary-text);
 }
 
-.household-tranche-list li {
+.profilverbund-tranche-list li {
     margin-bottom: 4px;
 }
 
-.household-warning {
+.profilverbund-warning {
     margin-top: 10px;
     padding: 8px 10px;
     border-radius: 8px;

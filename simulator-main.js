@@ -48,7 +48,7 @@ import { quantile, sum, mean, formatCurrency } from './simulator-utils.js';
 import { getStartYearCandidates } from './cape-utils.js';
 import { ENGINE_VERSION, STRESS_PRESETS, BREAK_ON_RUIN, MORTALITY_TABLE, annualData, SUPPORTED_PFLEGE_GRADES } from './simulator-data.js';
 import { initTranchenStatus, syncTranchenToInputs } from './depot-tranchen-status.js';
-import { listProfiles, getProfileData, getCurrentProfileId, setProfileHouseholdMembership } from './profile-storage.js';
+import { listProfiles, getProfileData, getCurrentProfileId, setProfileVerbundMembership } from './profile-storage.js';
 import { buildSimulatorInputsFromProfileData, combineSimulatorProfiles } from './simulator-profile-inputs.js';
 import {
     getCommonInputs,
@@ -130,10 +130,8 @@ window.onload = function () {
     updateStartPortfolioDisplay();
 
     const allInputs = [
-        'simStartVermoegen', 'depotwertAlt', 'tagesgeld', 'geldmarktEtf',
-        'goldAllokationAktiv', 'goldAllokationProzent', 'goldFloorProzent', 'rebalancingBand',
-        'goldSteuerfrei', 'startFloorBedarf', 'startFlexBedarf',
-        'einstandAlt', 'p1StartAlter', 'p1Geschlecht', 'p1SparerPauschbetrag', 'p1KirchensteuerPct',
+        'startFloorBedarf', 'startFlexBedarf',
+        'p1StartAlter', 'p1Geschlecht', 'p1SparerPauschbetrag', 'p1KirchensteuerPct',
         'p1Monatsrente', 'p1StartInJahren', 'rentAdjMode', 'rentAdjPct',
         'pflegefallLogikAktivieren', 'pflegeModellTyp', ...CARE_GRADE_FIELD_IDS,
         'pflegeMaxFloor', 'pflegeRampUp', 'pflegeMinDauer', 'pflegeMaxDauer', 'pflegeKostenDrift',
@@ -145,7 +143,7 @@ window.onload = function () {
             // Persistence Logic
             const storageKey = 'sim_' + id;
             const storedVal = localStorage.getItem(storageKey);
-            if (storedVal !== null && storedVal !== "") {
+            if (!element.dataset.noPersist && storedVal !== null && storedVal !== "") {
                 if (element.type === 'checkbox') {
                     element.checked = (storedVal === 'true');
                 } else if (element.type === 'radio') {
@@ -162,10 +160,12 @@ window.onload = function () {
 
             element.addEventListener(eventType, () => {
                 // Save to Storage
-                if (element.type === 'checkbox') {
-                    localStorage.setItem(storageKey, element.checked);
-                } else if (element.type !== 'radio') {
-                    localStorage.setItem(storageKey, element.value);
+                if (!element.dataset.noPersist) {
+                    if (element.type === 'checkbox') {
+                        localStorage.setItem(storageKey, element.checked);
+                    } else if (element.type !== 'radio') {
+                        localStorage.setItem(storageKey, element.value);
+                    }
                 }
                 // Trigger UI Update
                 updateStartPortfolioDisplay();
@@ -470,7 +470,7 @@ function initSimulatorProfileSelection() {
         listContainer.innerHTML = '';
         profiles.forEach(profile => {
             const row = document.createElement('label');
-            row.className = 'household-profile-row';
+            row.className = 'profilverbund-profile-row';
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.value = profile.id;
@@ -499,7 +499,7 @@ function initSimulatorProfileSelection() {
 
         let selected = profiles.filter(p => p.belongsToHousehold !== false);
         if (!selected.length) {
-            profiles.forEach(profile => setProfileHouseholdMembership(profile.id, true));
+            profiles.forEach(profile => setProfileVerbundMembership(profile.id, true));
             selected = profiles.slice();
             renderList(profiles);
         }
@@ -520,7 +520,7 @@ function initSimulatorProfileSelection() {
         }
 
         if (typeof window !== 'undefined') {
-            window.__householdTranchenOverride = Array.isArray(combined.detailledTranches) ? combined.detailledTranches : null;
+            window.__profilverbundTranchenOverride = Array.isArray(combined.detailledTranches) ? combined.detailledTranches : null;
         }
 
         applyCombinedInputsToUI(combined, selected.length);
@@ -541,7 +541,7 @@ function initSimulatorProfileSelection() {
         if (!target || target.type !== 'checkbox') return;
         const profileId = target.dataset.profileId || target.value;
         if (!profileId) return;
-        setProfileHouseholdMembership(profileId, target.checked);
+        setProfileVerbundMembership(profileId, target.checked);
         applySelection();
     });
 
@@ -567,17 +567,15 @@ function applyCombinedInputsToUI(combined, selectedCount) {
 
     setValue('simStartVermoegen', Math.round(combined.startVermoegen || 0));
     setValue('depotwertAlt', Math.round(combined.depotwertAlt || 0));
-    setValue('tagesgeld', Math.round(combined.tagesgeld || 0));
-    setValue('geldmarktEtf', Math.round(combined.geldmarktEtf || 0));
+    setValue('tagesgeld', (combined.tagesgeld || 0).toLocaleString('de-DE'));
+    setValue('geldmarktEtf', (combined.geldmarktEtf || 0).toLocaleString('de-DE'));
     setValue('einstandAlt', Math.round(combined.einstandAlt || 0));
-    setValue('startFloorBedarf', Math.round(combined.startFloorBedarf || 0));
-    setValue('startFlexBedarf', Math.round(combined.startFlexBedarf || 0));
 
-    setChecked('goldAllokationAktiv', Boolean(combined.goldAktiv));
+    setValue('goldAllokationAktiv', combined.goldAktiv ? 'true' : 'false');
     setValue('goldAllokationProzent', combined.goldZielProzent || 0);
     setValue('goldFloorProzent', combined.goldFloorProzent || 0);
     setValue('rebalancingBand', combined.rebalancingBand || 0);
-    setChecked('goldSteuerfrei', Boolean(combined.goldSteuerfrei));
+    setValue('goldSteuerfrei', combined.goldSteuerfrei ? 'true' : 'false');
 
     setValue('runwayMinMonths', combined.runwayMinMonths || 0);
     setValue('runwayTargetMonths', combined.runwayTargetMonths || 0);
@@ -607,10 +605,6 @@ function applyCombinedInputsToUI(combined, selectedCount) {
     const lockIds = [
         'p1StartAlter',
         'p1Geschlecht',
-        'p1SparerPauschbetrag',
-        'p1KirchensteuerPct',
-        'p1Monatsrente',
-        'p1StartInJahren',
         'rentAdjMode',
         'rentAdjPct',
         'chkPartnerAktiv',
@@ -626,6 +620,11 @@ function applyCombinedInputsToUI(combined, selectedCount) {
         if (!el) return;
         el.disabled = true;
     });
+
+    const sectionRente2 = document.getElementById('sectionRente2');
+    if (sectionRente2) {
+        sectionRente2.style.display = hasPartner ? 'block' : 'none';
+    }
 
     const accumulationToggle = document.getElementById('enableAccumulationPhase');
     const accumulationDetails = document.getElementById('accumulationPhaseDetails');

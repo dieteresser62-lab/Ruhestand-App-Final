@@ -1,17 +1,17 @@
 // @ts-check
 
 import {
-    aggregateHouseholdInputs,
+    aggregateProfilverbundInputs,
     calculateTaxPerEuro,
     calculateWithdrawalDistribution,
     selectTranchesForSale
-} from '../household-balance.js';
+} from '../profilverbund-balance.js';
 
-console.log('--- Household Balance Tests ---');
+console.log('--- Profilverbund Balance Tests ---');
 
 // --- TEST 1: Aggregation ---
 {
-    console.log('\n📋 Test 1: aggregateHouseholdInputs');
+    console.log('\n📋 Test 1: aggregateProfilverbundInputs');
     const profileInputs = [
         {
             profileId: 'a',
@@ -49,7 +49,7 @@ console.log('--- Household Balance Tests ---');
         }
     ];
 
-    const aggregated = aggregateHouseholdInputs(profileInputs);
+    const aggregated = aggregateProfilverbundInputs(profileInputs);
     assertEqual(aggregated.totalBedarf, 50000, 'Total Bedarf should sum floor+flex');
     assertEqual(aggregated.totalRenteJahr, 12000, 'Total Rente should be monthly * 12');
     assertEqual(aggregated.netWithdrawal, 38000, 'Net withdrawal should be Bedarf - Rente');

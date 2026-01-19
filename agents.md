@@ -87,13 +87,13 @@ Input
 - Whitelist/blocklist guards prevent modifying protected fields (e.g., second pension)
 - Heatmap rendering in `simulator-heatmap.js` with invariant violation badges
 
-### Multi-User/Household (Phase 1)
+### Profilverbund (Multi-Profil)
 
-Recent addition supports household-level analysis by combining multiple profiles:
-- `simulator-profile-inputs.js` - Multi-Profil Aggregation für Simulator-Inputs
+Recent addition supports multi-profile analysis by combining selected profiles:
+- `simulator-profile-inputs.js` - Aggregation für Simulator-Inputs
 - `profile-manager.js` + `profile-storage.js` - Profile switching and persistence
-- Withdrawal orchestration modes: proportional, tax-first, runway-first
-- See `docs/HOUSEHOLD_FEATURES.md` for detailed design decisions
+- Verteilungsmodi in der Balance-App: steueroptimiert, proportional, runway-first
+- See `docs/PROFILVERBUND_FEATURES.md` for detailed design decisions
 
 ## Code Organization
 
@@ -196,7 +196,7 @@ Use `assert()`, `assertEqual()`, `assertClose()` global helpers.
 - `BALANCE_MODULES_README.md` - Balance-app module details
 - `SIMULATOR_MODULES_README.md` - Simulator module details
 - `engine/README.md` - Engine-specific documentation
-- `docs/HOUSEHOLD_FEATURES.md` - Multi-user design decisions
+- `docs/PROFILVERBUND_FEATURES.md` - Multi-profile design decisions
 - `MULTI-TRANCHEN-ANLEITUNG.md` - Tranche management guide
 
 ### After Changes

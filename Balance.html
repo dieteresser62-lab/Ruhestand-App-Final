@@ -64,23 +64,23 @@
                                     title="Protokoll des letzten Jahres-Updates anzeigen" disabled>🧾</button>
                             </div>
                         </div>
-                        <section id="household-section" class="household-container" style="display: none;">
-                            <div class="household-header">
+                        <section id="profilverbund-section" class="profilverbund-container" style="display: none;">
+                            <div class="profilverbund-header">
                                 <div>
-                                    <h2>Haushalts-Balance</h2>
+                                    <h2>Profilverbund</h2>
                                 </div>
-                                <div class="household-controls">
-                                    <label for="household-withdrawal-mode">Verteilung</label>
-                                    <select id="household-withdrawal-mode">
+                                <div class="profilverbund-controls">
+                                    <label for="profilverbund-withdrawal-mode">Verteilung</label>
+                                    <select id="profilverbund-withdrawal-mode">
                                         <option value="tax_optimized">Steueroptimiert</option>
                                         <option value="proportional">Proportional</option>
                                         <option value="runway_first">Runway-First</option>
                                     </select>
                                 </div>
                             </div>
-                            <div class="household-profile-box">
-                                <h3>Profile im Haushalt</h3>
-                                <div id="household-profile-list" class="household-profile-list"></div>
+                            <div class="profilverbund-profile-box">
+                                <h3>Profile im Verbund</h3>
+                                <div id="profilverbund-profile-list" class="profilverbund-profile-list"></div>
                             </div>
                         </section>
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
@@ -108,24 +108,21 @@
                                     title="Wird im Profil-Assets Manager gepflegt">
                             </div>
                             <div class="form-group"><label for="geldmarktEtf">Geldmarkt-ETF (€)</label><input
-                                    id="geldmarktEtf" class="currency" type="text" inputmode="numeric" placeholder="0"
+                                    id="geldmarktEtf" class="currency" type="text" inputmode="numeric" placeholder="0" disabled
                                     title="Ihr Geldmarkt-ETF-Bestand - sehr sichere, kurzfristig verfügbare Anlage mit leicht höherer Rendite als Tagesgeld">
                             </div>
-                            <div class="form-group"><label for="depotwertAlt">Depotwert Alt (€)</label><input
-                                    id="depotwertAlt" class="currency" type="text" inputmode="numeric"
-                                    placeholder="z. B. 1.200.000"
-                                    title="Aktueller Wert Ihres 'alten' Depots (vor 2018 angelegt) - profitiert von höherer Teilfreistellung">
-                            </div>
-                            <div class="form-group"><label for="depotwertNeu">Depotwert Neu (€)</label><input
-                                    id="depotwertNeu" class="currency" type="text" inputmode="numeric"
-                                    placeholder="z. B. 750.000"
-                                    title="Aktueller Wert Ihres 'neuen' Depots (nach 2018 angelegt) - hat geringere Teilfreistellung">
+                            <div class="form-group"><label for="depotwertGesamt">Depotwert gesamt (€)</label><input
+                                    id="depotwertGesamt" class="currency" type="text" inputmode="numeric"
+                                    placeholder="z. B. 1.950.000" disabled
+                                    title="Gesamtwert Ihres Depots (aus Tranchen/Profilen aggregiert)">
                             </div>
                             <div class="form-group" id="goldWertGroup"><label for="goldWert">Gold-Bestand
-                                    (€)</label><input id="goldWert" class="currency" type="text" inputmode="numeric"
+                                    (€)</label><input id="goldWert" class="currency" type="text" inputmode="numeric" disabled
                                     value="0"
                                     title="Aktueller Wert Ihres physischen Gold-Bestands (optional, wenn Gold-Strategie aktiv)">
                             </div>
+                            <input id="depotwertAlt" type="hidden">
+                            <input id="depotwertNeu" type="hidden">
                         </div>
                         <details class="tranchen-status-details">
                             <summary>Tranchenstatus anzeigen</summary>
@@ -256,23 +253,24 @@
                             style="grid-template-columns: 1fr 1fr 1fr; gap: 20px; align-items: start;">
                             <div style="display: flex; flex-direction: column; gap: 10px;">
                                 <div class="form-group"><label for="costBasisAlt">Einstand Alt (€)</label><input
-                                        id="costBasisAlt" class="currency" type="text" inputmode="numeric"
-                                        placeholder="0">
+                                        id="costBasisAlt" class="currency" type="text" inputmode="numeric" disabled
+                                        placeholder="0" title="Einstand Alt wird aus Profilen/Tranchen aggregiert">
                                 </div>
                                 <div class="form-group"><label for="tqfAlt">TQF Alt</label><input id="tqfAlt"
                                         type="number" step="0.01" min="0" max="1" placeholder="0"></div>
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 10px;">
                                 <div class="form-group"><label for="costBasisNeu">Einstand Neu (€)</label><input
-                                        id="costBasisNeu" class="currency" type="text" inputmode="numeric"
-                                        placeholder="0">
+                                        id="costBasisNeu" class="currency" type="text" inputmode="numeric" disabled
+                                        placeholder="0" title="Einstand Neu wird aus Profilen/Tranchen aggregiert">
                                 </div>
                                 <div class="form-group"><label for="tqfNeu">TQF Neu</label><input id="tqfNeu"
                                         type="number" step="0.01" min="0" max="1" placeholder="0"></div>
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 10px;">
                                 <div class="form-group"><label for="goldCost">Gold-Einstand (€)</label><input
-                                        id="goldCost" class="currency" type="text" inputmode="numeric" placeholder="0">
+                                        id="goldCost" class="currency" type="text" inputmode="numeric" disabled
+                                        placeholder="0" title="Gold-Einstand wird aus Profilen/Tranchen aggregiert">
                                 </div>
                             </div>
                         </div>

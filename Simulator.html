@@ -96,29 +96,29 @@
             transform: translateY(0);
         }
 
-        .household-profile-list {
+        .profilverbund-profile-list {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 8px 12px;
         }
 
-        .household-profile-row {
+        .profilverbund-profile-row {
             display: flex;
             align-items: center;
             gap: 8px;
             font-size: 0.95rem;
         }
 
-        .household-status {
+        .profilverbund-status {
             font-size: 0.85rem;
             color: #64748b;
         }
 
-        .household-status[data-kind="ok"] {
+        .profilverbund-status[data-kind="ok"] {
             color: #15803d;
         }
 
-        .household-status[data-kind="error"] {
+        .profilverbund-status[data-kind="error"] {
             color: #b91c1c;
         }
 
@@ -149,8 +149,8 @@
                     <fieldset class="collapsible" data-fieldset="profile-selection">
                         <legend><span class="section-icon">👥</span>Profile<span class="progress-indicator"></span></legend>
                         <div class="fieldset-content">
-                            <div id="simProfileList" class="household-profile-list"></div>
-                            <div id="simProfileStatus" class="household-status">
+                            <div id="simProfileList" class="profilverbund-profile-list"></div>
+                            <div id="simProfileStatus" class="profilverbund-status">
                                 Auswahl bestimmt die Simulator-Grunddaten.
                             </div>
                         </div>
@@ -161,19 +161,22 @@
                         <div class="fieldset-content">
                             <div class="form-grid">
                                 <div class="form-group"><label for="simStartVermoegen">Gesamtvermögen (€)</label><input
-                                        type="number" id="simStartVermoegen" placeholder="0" readonly
+                                        type="text" id="simStartVermoegen" placeholder="0" disabled inputmode="numeric" data-no-persist="true"
                                         title="Wird automatisch aus Depot + Gold + Tagesgeld + Geldmarkt berechnet">
                                 </div>
-                                <div class="form-group"><label for="depotwertAlt">Depotwert Alt (€)</label><input
-                                        type="number" id="depotwertAlt" placeholder="0"
-                                        title="Aktueller Wert Ihres 'alten' Depots (typischerweise vor 2018 angelegt, höhere Teilfreistellung)">
+                                <div class="form-group"><label for="depotwertGesamt">Depotwert gesamt (€)</label><input
+                                        type="text" id="depotwertGesamt" placeholder="0" disabled inputmode="numeric" data-no-persist="true"
+                                        title="Depotwert gesamt (aus Profilen/Tranchen aggregiert)">
                                 </div>
                                 <div class="form-group"><label for="tagesgeld">Tagesgeld (€)</label><input
-                                        type="number" id="tagesgeld" placeholder="0"
-                                        title="Startbestand Tagesgeld - wird in die Liquidität der Simulation einbezogen"></div>
+                                        type="text" id="tagesgeld" placeholder="0" disabled inputmode="numeric" data-no-persist="true"
+                                        title="Tagesgeld (aus Profilen/Tranchen aggregiert)"></div>
                                 <div class="form-group"><label for="geldmarktEtf">Geldmarkt-ETF (€)</label><input
-                                        type="number" id="geldmarktEtf" placeholder="0"
-                                        title="Startbestand Geldmarkt-ETF - wird in die Liquidität der Simulation einbezogen"></div>
+                                        type="text" id="geldmarktEtf" placeholder="0" disabled inputmode="numeric" data-no-persist="true"
+                                        title="Geldmarkt-ETF (aus Profilen/Tranchen aggregiert)"></div>
+                                <div class="form-group"><label for="goldWert">Gold-Bestand (€)</label><input
+                                        type="text" id="goldWert" placeholder="0" disabled inputmode="numeric" data-no-persist="true"
+                                        title="Gold-Bestand (aus Profilen/Tranchen aggregiert)"></div>
                             </div>
                             <div class="form-grid"
                                 style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
@@ -189,54 +192,24 @@
                                         type="number" id="marketCapeRatio" value="32" step="0.1" min="0"
                                         title="Aktuelles Shiller-CAPE (Cyclically Adjusted Price-to-Earnings Ratio) - Bewertungskennzahl für den Aktienmarkt">
                                 </div>
-                                <div class="form-group"><label for="einstandAlt">Einstand Alt (€)</label><input
-                                        type="number" id="einstandAlt" placeholder="0"
-                                        title="Ursprünglicher Einstandswert (Kaufpreis) des alten Depots - wichtig für Steuerberechnung">
-                                </div>
-                                <div class="form-group"><label>Einstand Neu (€)</label><input type="number"
-                                        id="einstandNeu" placeholder="wird berechnet" disabled
-                                        title="Ursprünglicher Einstandswert des neuen Depots - wird automatisch berechnet">
-                                </div>
                             </div>
                             <div id="displayPortfolioBreakdown"
                                 style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
                             </div>
                         <div id="tranchenStatusBadge"></div>
                             <div class="tranchen-hint">
-                                Hinweis: Geladene Tranchen ueberschreiben die Depot- und Einstandsfelder.
+                                Hinweis: Werte stammen aus Profilen/Tranchen.
                             </div>
                         </div>
                     </fieldset>
-                    <fieldset class="collapsible" data-fieldset="gold">
-                        <legend><span class="section-icon">🥇</span>Gold-Strategie<span
-                                class="progress-indicator"></span></legend>
-                        <div class="fieldset-content">
-                            <div class="form-group" style="justify-content: center;"><label
-                                    style="flex-direction: row; align-items: center;"><input type="checkbox"
-                                        id="goldAllokationAktiv" style="width: auto; margin-right: 8px;"
-                                        checked>Gold-Allokation aktiv </label></div>
-                            <div id="goldStrategyPanel" style="display: none;">
-                                <div class="form-grid-four-col">
-                                    <div class="form-group"><label for="goldAllokationProzent">Ziel-Allokation
-                                            (%)</label><input type="number" id="goldAllokationProzent" value="7.5"
-                                            step="1" title="Angestrebter Gold-Anteil als Prozentsatz des Gesamtdepots">
-                                    </div>
-                                    <div class="form-group"><label for="goldFloorProzent">Gold-Floor (%)</label><input
-                                            type="number" id="goldFloorProzent" value="1" step="0.5"
-                                            title="Mindest-Gold-Bestand als Prozentsatz des Gesamtvermögens"></div>
-                                    <div class="form-group"><label for="rebalancingBand">Rebalancing-Band (±
-                                            %)</label><input type="number" id="rebalancingBand" value="25" step="5"
-                                            title="Prozentuale Toleranz um die Ziel-Allokation, bevor Gold rebalanciert wird">
-                                    </div>
-                                    <div class="form-group" style="grid-column: span 2; justify-content: center;"><label
-                                            style="flex-direction: row; align-items: center;"><input type="checkbox"
-                                                id="goldSteuerfrei" style="width: auto; margin-right: 8px;"
-                                                checked>Gold-Verkäufe steuerfrei (simuliert >1J Haltefrist) </label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </fieldset>
+                    <input type="hidden" id="depotwertAlt" data-no-persist="true">
+                    <input type="hidden" id="einstandAlt" data-no-persist="true">
+                    <input type="hidden" id="einstandNeu" data-no-persist="true">
+                    <input type="hidden" id="goldAllokationAktiv" data-no-persist="true">
+                    <input type="hidden" id="goldAllokationProzent" data-no-persist="true">
+                    <input type="hidden" id="goldFloorProzent" data-no-persist="true">
+                    <input type="hidden" id="rebalancingBand" data-no-persist="true">
+                    <input type="hidden" id="goldSteuerfrei" data-no-persist="true">
                     <fieldset class="collapsible collapsed" data-fieldset="rebalancing">
                         <legend><span class="section-icon">⚖️</span>Runway & Rebalancing<span
                                 class="progress-indicator"></span></legend>

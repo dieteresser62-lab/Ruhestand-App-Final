@@ -12,9 +12,9 @@ import { UIReader, initUIReader } from './balance-reader.js';
 import { UIRenderer, initUIRenderer } from './balance-renderer.js';
 import { UIBinder, initUIBinder } from './balance-binder.js';
 import { initTranchenStatus, syncTranchenToInputs } from './depot-tranchen-status.js';
-import { listProfiles, saveCurrentProfileFromLocalStorage, setProfileHouseholdMembership, updateProfileData, getCurrentProfileId } from './profile-storage.js';
-import { loadHouseholdProfiles, aggregateHouseholdInputs, calculateWithdrawalDistribution, buildHouseholdAssetSummary, buildHouseholdProfileSummaries } from './household-balance.js';
-import { renderHouseholdProfileSelector, toggleHouseholdMode } from './household-balance-ui.js';
+import { listProfiles, saveCurrentProfileFromLocalStorage, setProfileVerbundMembership, updateProfileData, getCurrentProfileId } from './profile-storage.js';
+import { loadProfilverbundProfiles, aggregateProfilverbundInputs, calculateWithdrawalDistribution, buildProfilverbundAssetSummary, buildProfilverbundProfileSummaries } from './profilverbund-balance.js';
+import { renderProfilverbundProfileSelector, toggleProfilverbundMode } from './profilverbund-balance-ui.js';
 import { UIUtils } from './balance-utils.js';
 
 // ==================================================================================
@@ -29,7 +29,7 @@ const appState = {
     lastMarktData: null
 };
 
-const HOUSEHOLD_STORAGE_KEYS = {
+const PROFILVERBUND_STORAGE_KEYS = {
     mode: 'household_withdrawal_mode'
 };
 
@@ -133,9 +133,9 @@ function update() {
         // 1. Read Inputs & State
         // Liest alle Formular-Eingaben und den letzten gespeicherten Zustand
         const inputData = UIReader.readAllInputs();
-        const householdProfiles = loadHouseholdProfiles();
-        if (householdProfiles.length > 0) {
-            const assetSummary = buildHouseholdAssetSummary(householdProfiles);
+        const profilverbundProfiles = loadProfilverbundProfiles();
+        if (profilverbundProfiles.length > 0) {
+            const assetSummary = buildProfilverbundAssetSummary(profilverbundProfiles);
             const totalRenteMonatlich = assetSummary.totalRenteMonatlich;
             inputData.tagesgeld = assetSummary.totalTagesgeld;
             inputData.geldmarktEtf = assetSummary.totalGeldmarkt;
@@ -148,15 +148,15 @@ function update() {
             inputData.renteAktiv = totalRenteMonatlich > 0;
             inputData.renteMonatlich = totalRenteMonatlich;
 
-            const aggregated = aggregateHouseholdInputs(householdProfiles, {
+            const aggregated = aggregateProfilverbundInputs(profilverbundProfiles, {
                 floorBedarf: inputData.floorBedarf,
                 flexBedarf: inputData.flexBedarf
             });
-            window.__householdDistribution = calculateWithdrawalDistribution(householdProfiles, aggregated, localStorage.getItem(HOUSEHOLD_STORAGE_KEYS.mode) || 'tax_optimized');
-            window.__householdProfileSummaries = buildHouseholdProfileSummaries(householdProfiles);
+            window.__profilverbundDistribution = calculateWithdrawalDistribution(profilverbundProfiles, aggregated, localStorage.getItem(PROFILVERBUND_STORAGE_KEYS.mode) || 'tax_optimized');
+            window.__profilverbundProfileSummaries = buildProfilverbundProfileSummaries(profilverbundProfiles);
         } else {
-            window.__householdDistribution = null;
-            window.__householdProfileSummaries = null;
+            window.__profilverbundDistribution = null;
+            window.__profilverbundProfileSummaries = null;
         }
 
         // Check for empty/initial state to avoid validation errors
@@ -169,11 +169,11 @@ function update() {
 
         const persistentState = StorageManager.loadState();
 
-        const householdRuns = (householdProfiles.length > 1)
-            ? runHouseholdProfileSimulations(inputData, householdProfiles)
+        const profilverbundRuns = (profilverbundProfiles.length > 1)
+            ? runProfilverbundProfileSimulations(inputData, profilverbundProfiles)
             : null;
-        if (!householdRuns && typeof window !== 'undefined') {
-            window.__householdActionResults = null;
+        if (!profilverbundRuns && typeof window !== 'undefined') {
+            window.__profilverbundActionResults = null;
         }
 
         // 2. Render Bedarfsanpassungs-UI
@@ -193,8 +193,8 @@ function update() {
         if (modelResult.error) {
             throw modelResult.error;
         }
-        if (householdRuns && modelResult.ui) {
-            modelResult.ui.action = mergeHouseholdActions(householdRuns);
+        if (profilverbundRuns && modelResult.ui) {
+            modelResult.ui.action = mergeProfilverbundActions(profilverbundRuns);
         }
 
         // 5. Prepare data for Renderer
@@ -221,13 +221,13 @@ function update() {
         UIRenderer.renderDiagnosis(appState.diagnosisData);
 
         // Speichert Eingaben und neuen Zustand
-        if (householdRuns) {
-            persistHouseholdProfileStates(householdRuns);
+        if (profilverbundRuns) {
+            persistProfilverbundProfileStates(profilverbundRuns);
         } else {
             StorageManager.saveState({ ...persistentState, inputs: inputData, lastState: modelResult.newState });
         }
 
-        refreshHouseholdBalance();
+        refreshProfilverbundBalance();
 
     } catch (error) {
         console.error("Update-Fehler:", error);
@@ -370,20 +370,20 @@ function init() {
     // Zeigt Status der geladenen detaillierten Tranchen an
     initTranchenStatus('tranchenStatusBadge');
 
-    initHouseholdBalance();
+    initProfilverbundBalance();
 }
 
-function refreshHouseholdBalance() {
-    const mode = localStorage.getItem(HOUSEHOLD_STORAGE_KEYS.mode) || 'tax_optimized';
+function refreshProfilverbundBalance() {
+    const mode = localStorage.getItem(PROFILVERBUND_STORAGE_KEYS.mode) || 'tax_optimized';
 
     saveCurrentProfileFromLocalStorage();
-    const profileInputs = loadHouseholdProfiles();
+    const profileInputs = loadProfilverbundProfiles();
     if (profileInputs.length < 1) {
         return;
     }
 
     const currentInputs = UIReader.readAllInputs();
-    const aggregated = aggregateHouseholdInputs(profileInputs, {
+    const aggregated = aggregateProfilverbundInputs(profileInputs, {
         floorBedarf: currentInputs.floorBedarf,
         flexBedarf: currentInputs.flexBedarf
     });
@@ -403,9 +403,9 @@ function syncProfileDerivedInputs() {
     const goldSteuerfreiRaw = localStorage.getItem(PROFILE_VALUE_KEYS.goldSteuerfrei);
     const goldRebalRaw = localStorage.getItem(PROFILE_VALUE_KEYS.goldRebalBand);
 
-    const householdProfiles = loadHouseholdProfiles();
-    if (householdProfiles.length > 0) {
-        const assetSummary = buildHouseholdAssetSummary(householdProfiles);
+    const profilverbundProfiles = loadProfilverbundProfiles();
+    if (profilverbundProfiles.length > 0) {
+        const assetSummary = buildProfilverbundAssetSummary(profilverbundProfiles);
         const tagesgeld = assetSummary.totalTagesgeld;
         const renteMonatlich = assetSummary.totalRenteMonatlich;
 
@@ -437,6 +437,10 @@ function syncProfileDerivedInputs() {
         if (dom.inputs.depotwertNeu && Number.isFinite(assetSummary.totalDepotNeu)) {
             dom.inputs.depotwertNeu.value = Math.round(assetSummary.totalDepotNeu).toLocaleString('de-DE');
         }
+        if (dom.inputs.depotwertGesamt) {
+            const totalDepot = (assetSummary.totalDepotAlt || 0) + (assetSummary.totalDepotNeu || 0);
+            dom.inputs.depotwertGesamt.value = Math.round(totalDepot).toLocaleString('de-DE');
+        }
         if (dom.inputs.costBasisAlt && Number.isFinite(assetSummary.totalCostAlt)) {
             dom.inputs.costBasisAlt.value = Math.round(assetSummary.totalCostAlt).toLocaleString('de-DE');
         }
@@ -451,7 +455,7 @@ function syncProfileDerivedInputs() {
         }
 
         if (typeof window !== 'undefined') {
-            window.__householdTranchenOverride = assetSummary.mergedTranches;
+            window.__profilverbundTranchenOverride = assetSummary.mergedTranches;
         }
     } else {
         if (dom.inputs.tagesgeld && tagesgeldRaw !== null) {
@@ -482,8 +486,16 @@ function syncProfileDerivedInputs() {
                 dom.inputs.aktuellesAlter.value = String(Math.round(alter));
             }
         }
+        if (dom.inputs.depotwertGesamt) {
+            const depotAlt = dom.inputs.depotwertAlt ? UIUtils.parseCurrency(dom.inputs.depotwertAlt.value) : 0;
+            const depotNeu = dom.inputs.depotwertNeu ? UIUtils.parseCurrency(dom.inputs.depotwertNeu.value) : 0;
+            if (Number.isFinite(depotAlt) || Number.isFinite(depotNeu)) {
+                const totalDepot = (Number.isFinite(depotAlt) ? depotAlt : 0) + (Number.isFinite(depotNeu) ? depotNeu : 0);
+                dom.inputs.depotwertGesamt.value = Math.round(totalDepot).toLocaleString('de-DE');
+            }
+        }
         if (typeof window !== 'undefined') {
-            window.__householdTranchenOverride = null;
+            window.__profilverbundTranchenOverride = null;
         }
     }
 
@@ -545,7 +557,7 @@ function buildProfileEngineInput(sharedInput, entry) {
     return output;
 }
 
-function runHouseholdProfileSimulations(sharedInput, profiles) {
+function runProfilverbundProfileSimulations(sharedInput, profiles) {
     const runs = profiles.map(entry => {
         const input = buildProfileEngineInput(sharedInput, entry);
         const lastState = entry?.balanceState?.lastState || null;
@@ -564,7 +576,7 @@ function runHouseholdProfileSimulations(sharedInput, profiles) {
     });
 
     if (typeof window !== 'undefined') {
-        window.__householdActionResults = runs.map(run => ({
+        window.__profilverbundActionResults = runs.map(run => ({
             profileId: run.profileId,
             name: run.name,
             action: run.ui?.action || {},
@@ -576,9 +588,9 @@ function runHouseholdProfileSimulations(sharedInput, profiles) {
     return runs;
 }
 
-function mergeHouseholdActions(runs) {
+function mergeProfilverbundActions(runs) {
     const hasTransaction = runs.some(run => run.ui?.action?.type === 'TRANSACTION');
-    const title = hasTransaction ? 'Haushalts-Transaktionen' : (runs[0]?.ui?.action?.title || 'Kein Handlungsbedarf');
+    const title = hasTransaction ? 'Profilverbund-Transaktionen' : (runs[0]?.ui?.action?.title || 'Kein Handlungsbedarf');
     const anweisungKlasse = hasTransaction ? 'anweisung-gelb' : (runs[0]?.ui?.action?.anweisungKlasse || 'anweisung-gruen');
     const mergedUses = runs.reduce((acc, run) => {
         const uses = run.ui?.action?.verwendungen || {};
@@ -599,7 +611,7 @@ function mergeHouseholdActions(runs) {
     };
 }
 
-function persistHouseholdProfileStates(runs) {
+function persistProfilverbundProfileStates(runs) {
     runs.forEach(run => {
         const existing = (run.balanceState && typeof run.balanceState === 'object') ? run.balanceState : {};
         const nextState = { ...existing, inputs: run.input, lastState: run.newState };
@@ -612,32 +624,32 @@ function persistHouseholdProfileStates(runs) {
     });
 }
 
-function initHouseholdBalance() {
-    const modeSelect = document.getElementById('household-withdrawal-mode');
-    const profileList = document.getElementById('household-profile-list');
+function initProfilverbundBalance() {
+    const modeSelect = document.getElementById('profilverbund-withdrawal-mode');
+    const profileList = document.getElementById('profilverbund-profile-list');
 
     if (!modeSelect || !profileList) return;
 
     const profiles = listProfiles();
     if (profiles.length < 1) {
-        toggleHouseholdMode(false);
+        toggleProfilverbundMode(false);
         return;
     }
 
     profiles.forEach(profile => {
-        setProfileHouseholdMembership(profile.id, true);
+        setProfileVerbundMembership(profile.id, true);
     });
     const refreshedProfiles = listProfiles();
-    renderHouseholdProfileSelector(refreshedProfiles, 'household-profile-list');
+    renderProfilverbundProfileSelector(refreshedProfiles, 'profilverbund-profile-list');
 
-    const storedMode = localStorage.getItem(HOUSEHOLD_STORAGE_KEYS.mode) || 'tax_optimized';
+    const storedMode = localStorage.getItem(PROFILVERBUND_STORAGE_KEYS.mode) || 'tax_optimized';
 
     modeSelect.value = storedMode;
-    toggleHouseholdMode(true);
+    toggleProfilverbundMode(true);
 
     modeSelect.addEventListener('change', () => {
-        localStorage.setItem(HOUSEHOLD_STORAGE_KEYS.mode, modeSelect.value);
-        refreshHouseholdBalance();
+        localStorage.setItem(PROFILVERBUND_STORAGE_KEYS.mode, modeSelect.value);
+        refreshProfilverbundBalance();
     });
 
     profileList.addEventListener('change', event => {
@@ -645,11 +657,11 @@ function initHouseholdBalance() {
         if (!(target instanceof HTMLInputElement)) return;
         const profileId = target.dataset.profileId;
         if (!profileId) return;
-        setProfileHouseholdMembership(profileId, target.checked);
-        refreshHouseholdBalance();
+        setProfileVerbundMembership(profileId, target.checked);
+        refreshProfilverbundBalance();
     });
 
-    refreshHouseholdBalance();
+    refreshProfilverbundBalance();
 }
 
 // ==================================================================================
