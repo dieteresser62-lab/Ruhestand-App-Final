@@ -25,3 +25,6 @@ Thumbs.db
 __pycache__/
 
 dist/
+
+# Executables
+*.exe
