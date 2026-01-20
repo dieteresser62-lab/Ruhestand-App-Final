@@ -26,10 +26,14 @@ Formatierungs- und Hilfsfunktionen für die UI.
   - `EUR_FORMATTER` / `NUM_FORMATTER`
   - `formatCurrency(val)`
   - `formatNumber(num)`
+  - `formatPercent(value, options)`
+  - `formatPercentValue(value, options)`
+  - `formatPercentRatio(value, options)`
+  - `formatMonths(value, options)`
   - `parseCurrency(str)`
   - `getThreshold(path, defaultValue)` – greift sicher auf Engine-Konfigurationen zu
 
-**Dependencies:** keine
+**Dependencies:** `shared-formatting.js`
 
 ---
 
@@ -79,6 +83,17 @@ Renderlogik für KPIs, Guardrails, Diagnose, Toasts und Theme-Umschaltung.
 
 **Dependencies:** `balance-utils.js`, `balance-config.js`
 
+**Helper-Module (ausgelagert):**
+- `balance-renderer-summary.js` – KPIs, Marktstatus, Liquiditätsbalken
+- `balance-renderer-action.js` – Handlungsempfehlungen & Cash-Rebalancing
+- `balance-renderer-diagnosis.js` – Diagnose-Chips, Guardrails, Kennzahlen
+- `balance-diagnosis-format.js` – Diagnose-Payload normalisieren
+- `balance-diagnosis-chips.js` – Diagnose-Chips (Runway, Quote, Drawdown)
+- `balance-diagnosis-decision-tree.js` – Entscheidungsbaum
+- `balance-diagnosis-guardrails.js` – Guardrail-Karten
+- `balance-diagnosis-transaction.js` – Transaktionsdiagnostik (Status, Schwellen)
+- `balance-diagnosis-keyparams.js` – Schlüsselkennzahlen
+
 ---
 
 ## 6. `balance-binder.js`
@@ -102,6 +117,12 @@ Event-Hub der Anwendung.
 
 **Dependencies:** `balance-config.js`, `balance-utils.js`, `balance-reader.js`, `balance-renderer.js`, `balance-storage.js`
 
+**Helper-Module (ausgelagert):**
+- `balance-binder-annual.js` – Jahres-Update, Inflation, ETF-Nachrücken, Modal-Logik
+- `balance-binder-imports.js` – Import/Export/CSV
+- `balance-binder-snapshots.js` – Snapshot-Handling
+- `balance-binder-diagnosis.js` – Diagnose-Export
+
 ---
 
 ## 7. `balance-main.js`
@@ -114,6 +135,10 @@ Einstiegspunkt und Orchestrator.
 - Übergibt Engine-Ergebnisse an Renderer und Storage.
 
 **Dependencies:** alle oben genannten Module sowie die globale `EngineAPI`.
+
+**Helper-Module (ausgelagert):**
+- `balance-main-profile-sync.js` – Profilwerte in Balance-Inputs spiegeln
+- `balance-main-profilverbund.js` – Profilverbund-Simulationen & UI-Handling
 
 ---
 

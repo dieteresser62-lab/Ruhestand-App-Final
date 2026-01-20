@@ -1,6 +1,6 @@
 "use strict";
 
-import { formatCurrency } from './simulator-utils.js';
+import { formatCurrency, formatNumberWithUnit, formatPercentage } from './simulator-formatting.js';
 
 /**
  * Wandelt einen numerischen Wert defensiv in einen Währungs-String um.
@@ -24,23 +24,7 @@ export function formatCurrencySafe(value) {
  * @param {number} fractionDigits - Anzahl der Nachkommastellen.
  * @returns {string} Formatierter Wert mit Einheit oder '—' falls nicht darstellbar.
  */
-export function formatNumberWithUnit(value, unit = '', fractionDigits = 1) {
-    if (value == null || !isFinite(value)) {
-        return '—';
-    }
-    const formatted = Number(value).toFixed(fractionDigits).replace('.', ',');
-    return unit ? `${formatted} ${unit}` : formatted;
-}
-
-/**
- * Gibt einen Prozentwert mit Standard-Formatierung aus.
- *
- * @param {number|null|undefined} value - Prozentwert ohne %-Zeichen (z.B. 12.3).
- * @returns {string} Formatierter Prozentwert oder '—'.
- */
-export function formatPercentage(value) {
-    return formatNumberWithUnit(value, '%');
-}
+export { formatNumberWithUnit, formatPercentage };
 
 /**
  * Hilfsfunktion für plain-text KPI-Beschreibungen.

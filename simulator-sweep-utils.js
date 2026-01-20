@@ -70,25 +70,6 @@ export function deepClone(obj) {
 }
 
 /**
- * Setzt verschachtelten Pfad in Objekt (z.B. "partner.monatsrente").
- * @param {object} obj - Zielobjekt.
- * @param {string} path - Pfad (z.B. "a.b.c" oder "key").
- * @param {any} value - Wert zum Setzen.
- */
-export function setNested(obj, path, value) {
-    const parts = path.split('.');
-    let current = obj;
-    for (let i = 0; i < parts.length - 1; i++) {
-        const key = parts[i];
-        if (!(key in current) || typeof current[key] !== 'object') {
-            current[key] = {};
-        }
-        current = current[key];
-    }
-    current[parts[parts.length - 1]] = value;
-}
-
-/**
  * Whitelist für erlaubte Sweep-Parameter.
  * Nur diese Parameter dürfen im Sweep variiert werden.
  */
@@ -200,19 +181,3 @@ export function areR2SeriesEqual(series1, series2, tolerance = 1e-6) {
     return series1.every((v, i) => Math.abs(v - series2[i]) < tolerance);
 }
 
-/**
- * Führt eine Funktion aus, ohne dass localStorage.setItem aufgerufen werden kann.
- * @param {Function} fn - Auszuführende Funktion.
- * @returns {*} Rückgabewert der Funktion.
- */
-export function withNoLSWrites(fn) {
-    const _lsSet = localStorage.setItem;
-    localStorage.setItem = function () {
-        // No-op während Sweep - verhindert Side-Effects
-    };
-    try {
-        return fn();
-    } finally {
-        localStorage.setItem = _lsSet;
-    }
-}

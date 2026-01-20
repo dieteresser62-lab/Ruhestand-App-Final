@@ -8,7 +8,13 @@
       "Bash(ls:*)",
       "Bash(npm test)",
       "Bash(node:*)",
-      "Bash(timeout 30 node:*)"
+      "Bash(timeout 30 node:*)",
+      "Bash(for fn in applyParametersToForm calculateParetoFrontier findBestParametersMultiObjective findBestParametersWithConstraints renderParetoFrontier)",
+      "Bash(do echo '=== $fn ===')",
+      "Bash(done)",
+      "Bash(for fn in areR2SeriesEqual buildBacktestColumnDefinitions buildCareMetrics convertRowsToCsv)",
+      "Bash(for fn in cartesianProduct correlation standardize setNested generateNeighbors parseRange)",
+      "Bash(for fn in applyPensionTax initModeToggle withNoLSWrites renderTaxComparison renderWithdrawalRecommendation renderWorstRunToggle formatCellForDisplay renderProfilverbundOverview)"
     ]
   }
 }

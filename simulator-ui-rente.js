@@ -214,12 +214,13 @@ function migrateMonthlyPensionIfNeeded(monthlyPensionInput, storageKeys) {
 function syncP1LegacyFields(legacyFields, p1Fields) {
     const { startAlter, geschlecht, startSPB, kirchensteuerSatz, renteMonatlich, renteStartOffsetJahre } = legacyFields;
     const { p1StartAlter, p1Geschlecht, p1SparerPB, p1KirchensteuerPct, p1Monatsrente, p1StartInJahren } = p1Fields;
+    const formatFixed = (value, digits = 2) => Number.isFinite(value) ? value.toFixed(digits) : '0.00';
 
     const performSync = () => {
         if (startAlter && p1StartAlter) startAlter.value = p1StartAlter.value;
         if (geschlecht && p1Geschlecht) geschlecht.value = p1Geschlecht.value;
         if (startSPB && p1SparerPB) startSPB.value = p1SparerPB.value;
-        if (kirchensteuerSatz && p1KirchensteuerPct) kirchensteuerSatz.value = (parseFloat(p1KirchensteuerPct.value) / 100).toFixed(2);
+        if (kirchensteuerSatz && p1KirchensteuerPct) kirchensteuerSatz.value = formatFixed(parseFloat(p1KirchensteuerPct.value) / 100, 2);
         if (renteMonatlich && p1Monatsrente) renteMonatlich.value = p1Monatsrente.value;
         if (renteStartOffsetJahre && p1StartInJahren) renteStartOffsetJahre.value = p1StartInJahren.value;
     };

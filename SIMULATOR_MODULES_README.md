@@ -4,15 +4,28 @@ Die Simulator-App ist inzwischen in mehrere spezialisierte ES6-Module zerlegt. D
 
 ---
 
-## 1. `simulator-main.js` (~600 Zeilen)
+## 1. `simulator-main.js` (Fassade)
 UI-Orchestrierung und Klammer um die ausgelagerten Feature-Module. Registriert Event-Handler, lädt/persistiert Eingaben und ruft die spezialisierten Startpunkte auf.
 
 **Hauptaufgaben / Exporte:**
-- `initializeUI()` – UI-Bootstrap: verbindet Buttons mit `runMonteCarlo`, `runBacktest`, `runParameterSweep`, setzt Debug-Toggles, lädt letzte Detailstufe für Logs.
+- `initializeSimulatorApp()` – UI-Bootstrap: verbindet Buttons mit `runMonteCarlo`, `runBacktest`, `runParameterSweep`, setzt Debug-Toggles, lädt letzte Detailstufe für Logs.
 - Weiterleitung der Kern-Handler: Buttons und Hotkeys rufen direkt Funktionen aus `simulator-monte-carlo.js`, `simulator-backtest.js` und `simulator-sweep.js` auf.
 - Drehscheibe für gemeinsame Hilfsfunktionen (`simulator-main-helpers.js`) und Shared-Kontext (`WORST_LOG_DETAIL_KEY` aus `simulator-results.js`).
 
 **Einbindung:** Wird von `Simulator.html` geladen und importiert alle übrigen Simulator-Module. Neue UI-Buttons sollten hier mit dem passenden Fachmodul verdrahtet werden.
+
+**Helper-Module (ausgelagert):**
+- `simulator-main-init.js` – Bootstrapping & Orchestrierung
+- `simulator-main-input-persist.js` – Persistenz + Start-Portfolio-Refresh
+- `simulator-main-rent-adjust.js` – Rentenanpassungs-UI
+- `simulator-main-accumulation.js` – Ansparphase-UI
+- `simulator-main-sweep-ui.js` – Sweep-UI + Grid-Size
+- `simulator-main-tabs.js` – Tab-Umschaltung
+- `simulator-main-profiles.js` – Profilverbund-Auswahl
+- `simulator-main-reset.js` – Reset-Button
+- `simulator-main-stress.js` – Stress-Preset-Select
+- `simulator-main-partner.js` – Partner-UI Toggle
+- `simulator-main-sweep-selftest.js` – Sweep-Selbsttest (Dev)
 
 ---
 
@@ -201,26 +214,80 @@ Rendering-Layer für KPI-Karten, Tabellen und Badges.
 
 ---
 
+## 16. `auto_optimize.js` & `auto_optimize_ui.js`
+Auto-Optimierung für Parameter (LHS + Verfeinerung) und UI-Bedienung.
+
+**Hauptfunktionen / Exporte:**
+- `runAutoOptimize()` – orchestriert LHS, Quick-Filter, Verfeinerung und Test-Validierung.
+- UI-Integration (Start, Progress, Ergebnisdarstellung) in `auto_optimize_ui.js`.
+
+**Helper-Module (ausgelagert):**
+- `auto-optimize-worker.js` – MC-Ausführung/Worker-Pool
+- `auto-optimize-evaluate.js` – Kandidatenbewertung über Seeds
+- `auto-optimize-metrics.js` – Objective + Constraints
+- `auto-optimize-sampling.js` – LHS + Nachbarschaften
+- `auto-optimize-utils.js` – Cache + Tie-Breaker
+- `auto-optimize-params.js` – Parameter-Invarianten
+
+**Dependencies:** `simulator-portfolio.js`, `monte-carlo-runner.js`, `simulator-engine-helpers.js`, `simulator-sweep-utils.js`, `workers/worker-pool.js`.
+
+---
+
 ## 16. `results-formatting.js` (~160 Zeilen)
 Hält Formatierungs-Utilities und kleine Adapter, um Renderer und Metriken von DOM-Details zu entkoppeln.
 
 **Hauptfunktionen / Exporte:**
-- `formatKpiValue()` / `formatPct()` / `formatCurrency()` – zentrale Formatter für KPI-Ausgaben.
+- `formatCurrencySafe()` – Währungsformat mit Fallback
+- `formatNumberWithUnit()` / `formatPercentage()` – Zahlen-/Prozent-Formatter
+- `sanitizeDescription()` – Text-Sanitizing für KPI-Labels
 
-**Dependencies:** `simulator-utils.js`.
+**Dependencies:** `shared-formatting.js`.
 
 ---
 
-## 17. `simulator-portfolio.js` (~510 Zeilen)
+## 16a. `shared-formatting.js` (~140 Zeilen)
+Zentrale Formatierer für Währung, Zahlen und Einheiten (Balance + Simulator).
+
+**Hauptfunktionen / Exporte:**
+- `formatCurrency()` / `formatCurrencyShortLog()` / `formatCurrencyRounded()` – Währungs-Formatter
+- `formatNumber()` – Ganzzahlformatierung
+- `formatPercent()` / `formatPercentValue()` / `formatPercentRatio()` – Prozent-Formatter
+- `formatMonths()` – Monatswerte
+- `formatNumberWithUnit()` / `formatPercentage()` – Zahlen-/Prozent-Formatter
+
+**Dependencies:** keine
+
+---
+
+## 16b. `simulator-formatting.js` (~20 Zeilen)
+Re-Exports der gemeinsamen Formatter für den Simulator.
+
+**Hauptfunktionen / Exporte:**
+- Re-export aller Formatter aus `shared-formatting.js`
+
+**Dependencies:** `shared-formatting.js`
+
+---
+
+## 17. `simulator-portfolio.js` (Fassade)
 Portfolio-Initialisierung, Renten- und Stress-Kontexte.
 
 **Hauptfunktionen:**
-- `initializePortfolio()` – erstellt Portfolio-Struktur mit Tranchen
-- `portfolioTotal()` / `sumDepot()` – Vermögensberechnungen
+- `getCommonInputs()` – liest alle Portfolio-/Strategie-Inputs
+- `updateStartPortfolioDisplay()` – UI-Display für Start-Allokation
+- `initializePortfolio()` / `initializePortfolioDetailed()` – Tranchen-Setup
 - `computeRentAdjRate()` / `computePensionNext()` – Rentenanpassungslogik
-- `normalizeWidowOptions()` – Witwenrenten-Konfiguration
 - `buildStressContext()` / `applyStressOverride()` – Stresstest-Szenarien
-- `computeMarriageYearsCompleted()` – Ehejahre für Hinterbliebenenrente
+
+**Helper-Module (ausgelagert):**
+- `simulator-portfolio-inputs.js` – DOM-Input-Parsing
+- `simulator-portfolio-display.js` – Start-Portfolio-UI
+- `simulator-portfolio-init.js` – Portfolio-Tranchen
+- `simulator-portfolio-historical.js` – Regime-Daten vorbereiten
+- `simulator-portfolio-pension.js` – Rentenberechnungen
+- `simulator-portfolio-stress.js` – Stress-Presets/Overrides
+- `simulator-portfolio-tranches.js` – FIFO/Tax/Portfolio-Updates
+- `simulator-portfolio-format.js` – Zahlformatierung
 
 **Dependencies:** `simulator-data.js`
 
@@ -239,12 +306,11 @@ SVG-Rendering für Parameter-Sweeps und Heatmaps.
 ---
 
 ## 19. `simulator-utils.js` (~320 Zeilen)
-Zufallszahlen, Statistik und Formatierung.
+Zufallszahlen und Statistik (Formatierung wird aus `shared-formatting.js` re-exportiert).
 
 **Hauptfunktionen:**
 - `rng(seed)` – Seeded PRNG mit `.fork()` für unabhängige Streams
 - `quantile()` / `mean()` / `sum()` – Statistikfunktionen
-- `formatCurrency()` / `formatCurrencyShortLog()` – Währungsformatierung
 - `shortenText()` – Text auf Maximallänge kürzen
 
 **Dependencies:** keine

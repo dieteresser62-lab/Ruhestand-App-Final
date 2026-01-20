@@ -10,6 +10,11 @@
  */
 
 import { aggregateSweepMetrics } from './simulator-results.js';
+import { formatPercentValue } from './simulator-formatting.js';
+
+const formatFixed = (value, digits = 1) => value.toFixed(digits);
+const formatPercent = (value, digits = 0) => formatPercentValue(value, { fractionDigits: digits, invalid: '0%' });
+const formatRangeLine = (min, max, range) => `Range: ${formatFixed(min, 1)} → ${formatFixed(max, 1)} (Δ ${formatFixed(range, 1)})`;
 
 /**
  * Berechnet Sensitivity für jeden Parameter
@@ -124,13 +129,13 @@ export function renderSensitivityChart(sensitivity, metricKey) {
         html += '<div style="margin-bottom: 15px;">';
         html += `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">`;
         html += `<strong>${label}</strong>`;
-        html += `<span style="color: #666; font-size: 0.85rem;">${data.normalized.toFixed(0)}% Impact</span>`;
+        html += `<span style="color: #666; font-size: 0.85rem;">${formatPercent(data.normalized, 0)} Impact</span>`;
         html += `</div>`;
         html += `<div style="background: #e0e0e0; height: 24px; border-radius: 4px; position: relative;">`;
         html += `<div style="background: linear-gradient(90deg, #4caf50, #8bc34a); height: 100%; width: ${barWidth}px; border-radius: 4px; transition: width 0.3s;"></div>`;
         html += `</div>`;
         html += `<div style="font-size: 0.8rem; color: #999; margin-top: 2px;">`;
-        html += `Range: ${data.min.toFixed(1)} → ${data.max.toFixed(1)} (Δ ${data.range.toFixed(1)})`;
+        html += formatRangeLine(data.min, data.max, data.range);
         html += `</div>`;
         html += '</div>';
     }

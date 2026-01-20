@@ -63,7 +63,7 @@ function getBaseParams() {
     assert(result.type !== 'NONE', 'Should trigger a transaction when liquidity is below target');
     assert(!(result.verwendungen?.gold > 0), 'Should not buy gold while liquidity gap exists');
 
-    console.log('? Gold buy blocked under liquidity gap passed');
+    console.log('✅ Gold buy blocked under liquidity gap passed');
 }
 
 // --- TEST 2: Gold buy allowed when liquidity surplus exists ---
@@ -78,7 +78,7 @@ function getBaseParams() {
     assert(result.type !== 'NONE', 'Should trigger a transaction when surplus exists');
     assert(result.verwendungen?.gold > 0, 'Should allow gold buy from surplus cash');
 
-    console.log('? Gold buy from surplus passed');
+    console.log('✅ Gold buy from surplus passed');
 }
 
 console.log('--- Gold Buy vs Liquidity Gap Tests Completed ---');

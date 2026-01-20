@@ -2,54 +2,11 @@
 
 // --- UI & UTILITIES ---
 
-/**
- * Formatiert einen Wert als Währung in EUR
- */
-export const formatCurrency = (value) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(value);
-
-/**
- * Formatiert einen Wert als verkürzte Währung (z.B. 5000 € -> 5k €)
- */
-export const formatCurrencyShortLog = (value) => {
-    if (value === 0) return "0 €";
-    if (value == null || !isFinite(value)) return "—";
-    const valAbs = Math.abs(value);
-    const sign = value < 0 ? "-" : "";
-    if (valAbs < 1000) {
-        return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
-    }
-    return `${sign}${Math.round(valAbs / 1000)}k €`;
-};
-
-/**
- * Formatiert einen Wert als gerundete Währung (Anti-Pseudo-Accuracy) für KPIs.
- * Tiers: <10k: 1k, <50k: 5k, <200k: 10k, >200k: 25k
- */
-export const formatCurrencyRounded = (value) => {
-    if (value == null || !isFinite(value)) return "—";
-    const valAbs = Math.abs(value);
-    const sign = value < 0 ? -1 : 1;
-
-    let step = 1000;
-    if (valAbs >= 200000) {
-        step = 25000;
-    } else if (valAbs >= 50000) {
-        step = 10000;
-    } else if (valAbs >= 10000) {
-        step = 5000;
-    }
-
-    // Kaufmännisch runden auf den nächsten Step
-    const roundedAbs = Math.round(valAbs / step) * step;
-    const result = roundedAbs * sign;
-
-    return new Intl.NumberFormat('de-DE', {
-        style: 'currency',
-        currency: 'EUR',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-    }).format(result);
-};
+export {
+    formatCurrency,
+    formatCurrencyShortLog,
+    formatCurrencyRounded
+} from './simulator-formatting.js';
 
 /**
  * Verkürzt Textbezeichnungen für kompakte Darstellung
@@ -99,32 +56,6 @@ export const lerp = (x, x0, x1, y0, y1) => y0 + (Math.min(Math.max(x, x0), x1) -
  */
 export const sum = arr => arr.reduce((a, b) => a + b, 0);
 export const mean = arr => arr.length > 0 ? sum(arr) / arr.length : 0;
-export const stdDev = arr => {
-    if (arr.length < 2) return 0;
-    const mu = mean(arr);
-    const diffArr = arr.map(a => (a - mu) ** 2);
-    return Math.sqrt(sum(diffArr) / (arr.length - 1));
-};
-export const standardize = (arr) => {
-    const mu = mean(arr);
-    const sigma = stdDev(arr);
-    return arr.map(x => sigma > 0 ? (x - mu) / sigma : 0);
-};
-export const correlation = (arr1, arr2) => {
-    if (arr1.length !== arr2.length || arr1.length < 2) return 0;
-    const len = arr1.length;
-    const xy = [], x = [], y = [], x2 = [], y2 = [];
-    for (let i = 0; i < len; i++) {
-        xy.push(arr1[i] * arr2[i]);
-        x.push(arr1[i]);
-        y.push(arr2[i]);
-        x2.push(arr1[i] ** 2);
-        y2.push(arr1[i] ** 2);
-    }
-    const num = len * sum(xy) - sum(x) * sum(y);
-    const den = Math.sqrt((len * sum(x2) - sum(x) ** 2) * (len * sum(y2) - sum(y) ** 2));
-    return den > 0 ? num / den : 0;
-};
 
 /**
  * Random Number Generator mit Seed
@@ -213,28 +144,6 @@ export function quantile(arr, q) {
 }
 
 /**
- * Parse range string in format "start:step:end" to array of numbers
- * @param {string} rangeStr - Range string (e.g., "18:6:36")
- * @returns {number[]} Array of numbers
- */
-export function parseRange(rangeStr) {
-    if (!rangeStr || typeof rangeStr !== 'string') return [];
-    const parts = rangeStr.trim().split(':');
-    if (parts.length !== 3) return [];
-
-    const [start, step, end] = parts.map(p => parseFloat(p.trim()));
-    if (!isFinite(start) || !isFinite(step) || !isFinite(end)) return [];
-    if (step <= 0) return [];
-    if (start > end) return [];
-
-    const result = [];
-    for (let val = start; val <= end + 1e-9; val += step) {
-        result.push(Math.round(val * 1e9) / 1e9);
-    }
-    return result;
-}
-
-/**
  * Parse range input with multiple formats:
  * - "start:step:end" (e.g., "18:6:36") -> [18, 24, 30, 36]
  * - "a,b,c" (e.g., "50,60,70") -> [50, 60, 70]
@@ -305,31 +214,6 @@ export function parseRangeInput(str) {
     }
 
     return [singleValue];
-}
-
-/**
- * Create Cartesian product of parameter arrays
- * @param {Object} paramRanges - Object with parameter names as keys and arrays as values
- * @returns {Object[]} Array of parameter combinations
- */
-export function cartesianProduct(paramRanges) {
-    const keys = Object.keys(paramRanges);
-    if (keys.length === 0) return [];
-
-    const result = [{}];
-    for (const key of keys) {
-        const values = paramRanges[key];
-        if (!Array.isArray(values) || values.length === 0) continue;
-
-        const newResult = [];
-        for (const existing of result) {
-            for (const value of values) {
-                newResult.push({ ...existing, [key]: value });
-            }
-        }
-        result.splice(0, result.length, ...newResult);
-    }
-    return result;
 }
 
 /**

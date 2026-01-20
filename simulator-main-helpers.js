@@ -2,6 +2,7 @@
 
 
 import { formatCurrencyShortLog } from './simulator-utils.js';
+import { formatPercentValue, formatPercentRatio } from './simulator-formatting.js';
 import { EngineAPI } from './engine/index.mjs';
 
 const CSV_DELIMITER = ';';
@@ -39,30 +40,6 @@ export function computeAdjPctForYear(ctx, yearIdx) {
         return pickSeriesValue(series.inflationPct);
     }
     return 0;
-}
-
-/**
- * Applies simplified pension taxation rules and returns the net pension amount.
- * @param {number} pensionGross - Annual gross pension.
- * @param {Object} params - Tax parameters { sparerPauschbetrag, kirchensteuerPct, steuerquotePct }.
- * @returns {number} Net pension amount (never negative).
- */
-export function applyPensionTax(pensionGross, params) {
-    const gross = Number(pensionGross);
-    if (!Number.isFinite(gross) || gross <= 0) {
-        return 0;
-    }
-
-    const safeParams = params && typeof params === 'object' ? params : {};
-    const steuerquotePct = Number(safeParams.steuerquotePct);
-
-    if (Number.isFinite(steuerquotePct) && steuerquotePct > 0) {
-        const netto = gross * (1 - steuerquotePct / 100);
-        return Math.max(0, netto);
-    }
-
-    // Default branch: keep gross untouched when no valid tax rate is provided.
-    return Math.max(0, gross);
 }
 
 /**
@@ -110,23 +87,6 @@ export function formatColumnValue(column, row) {
         return column.fmt(rawValue, row);
     }
     return rawValue == null ? '' : String(rawValue);
-}
-
-/**
- * Pads a value for monospace display according to alignment rules.
- * @param {Object} column - Column definition containing width and alignment metadata.
- * @param {Object} row - Current row data.
- * @returns {string} Formatted cell string with padding applied.
- */
-export function formatCellForDisplay(column, row) {
-    const value = formatColumnValue(column, row);
-    const align = column?.align === 'left' ? 'left' : 'right';
-    const width = Number(column?.width) || 0;
-
-    if (align === 'left') {
-        return String(value).padEnd(width);
-    }
-    return String(value).padStart(width);
 }
 
 /**
@@ -207,8 +167,8 @@ export function triggerDownload(filename, content, mimeType) {
  */
 export function buildBacktestColumnDefinitions(detailLevel = 'normal') {
     const isDetailed = detailLevel === 'detailed';
-    const formatPercent = (value, decimals = 1) => `${(Number(value) || 0).toFixed(decimals)}%`;
-    const formatPercentInt = (value) => `${Math.round(Number(value) || 0)}%`;
+    const formatPercent = (value, decimals = 1) => formatPercentValue(Number(value) || 0, { fractionDigits: decimals, invalid: '0.0%' });
+    const formatPercentInt = (value) => formatPercentValue(Math.round(Number(value) || 0), { fractionDigits: 0, invalid: '0%' });
 
     const columns = [
         { header: 'Jahr', width: 4, key: 'jahr', valueFormatter: v => v ?? '', align: 'right' },
@@ -255,8 +215,8 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal') {
         { header: 'Status', width: 16, key: 'row.aktionUndGrund', valueFormatter: v => (v || '').substring(0, 15), align: 'left' },
         { header: 'Quote%', width: 6, key: 'row.QuoteEndPct', valueFormatter: v => formatPercent(v), align: 'right' },
         { header: 'Runway%', width: 7, key: 'row.RunwayCoveragePct', valueFormatter: v => formatPercentInt(v), align: 'right' },
-        { header: 'Pf.Akt%', width: 8, extractor: row => (row.row?.NominalReturnEquityPct || 0) * 100, valueFormatter: v => formatPercent(v), align: 'right' },
-        { header: 'Pf.Gld%', width: 8, extractor: row => (row.row?.NominalReturnGoldPct || 0) * 100, valueFormatter: v => formatPercent(v), align: 'right' },
+        { header: 'Pf.Akt%', width: 8, extractor: row => formatPercentRatio(row.row?.NominalReturnEquityPct || 0, { fractionDigits: 1, invalid: '0.0%' }), valueFormatter: v => v, align: 'right' },
+        { header: 'Pf.Gld%', width: 8, extractor: row => formatPercentRatio(row.row?.NominalReturnGoldPct || 0, { fractionDigits: 1, invalid: '0.0%' }), valueFormatter: v => v, align: 'right' },
         { header: 'Infl.', width: 5, key: 'inflationVJ', valueFormatter: v => formatPercent(v), align: 'right' },
         {
             header: 'Handl.A', width: 8, key: 'netA', valueFormatter: v => {

@@ -1,9 +1,13 @@
 "use strict";
 
 import { formatCurrency, formatCurrencyShortLog, shortenText } from './simulator-utils.js';
+import { formatPercentValue, formatPercentRatio } from './simulator-formatting.js';
 import { prepareMonteCarloViewModel } from './results-metrics.js';
 import { renderSummary, renderKpiDashboard, renderStressSection, renderHeatmap, renderCareSection } from './results-renderers.js';
 import { EngineAPI } from './engine/index.mjs';
+
+const formatPercent = (value, digits = 1) => formatPercentValue(Number(value) || 0, { fractionDigits: digits, invalid: '0.0%' });
+const formatPercentFromRatio = (value, digits = 1) => formatPercentRatio(Number(value) || 0, { fractionDigits: digits, invalid: '0.0%' });
 
 /**
  * Storage keys for log detail preferences.
@@ -357,11 +361,11 @@ export function getWorstRunColumnDefinitions(opts = {}) {
                 return (v || status).substring(0, 21);
             }
         },
-        { key: 'QuoteEndPct', header: 'Quote%', width: 6, fmt: v => `${(v || 0).toFixed(1)}%` },
-        { key: 'RunwayCoveragePct', header: 'Runway%', width: 7, fmt: v => `${Math.round(v || 0)}%` },
-        { key: 'NominalReturnEquityPct', header: 'Pf.Akt%', width: 8, fmt: v => `${((v || 0) * 100).toFixed(1)}%` },
-        { key: 'NominalReturnGoldPct', header: 'Pf.Gld%', width: 8, fmt: v => `${((v || 0) * 100).toFixed(1)}%` },
-        { key: 'inflation', header: 'Infl.', width: 5, fmt: v => `${(v || 0).toFixed(1)}%` },
+        { key: 'QuoteEndPct', header: 'Quote%', width: 6, fmt: v => formatPercent(v, 1) },
+        { key: 'RunwayCoveragePct', header: 'Runway%', width: 7, fmt: v => formatPercentValue(v || 0, { fractionDigits: 0, invalid: '0%' }) },
+        { key: 'NominalReturnEquityPct', header: 'Pf.Akt%', width: 8, fmt: v => formatPercentFromRatio(v, 1) },
+        { key: 'NominalReturnGoldPct', header: 'Pf.Gld%', width: 8, fmt: v => formatPercentFromRatio(v, 1) },
+        { key: 'inflation', header: 'Infl.', width: 5, fmt: v => formatPercent(v, 1) },
         {
             key: null, header: 'Handl.A', width: 8,
             fmt: (v, row) => {

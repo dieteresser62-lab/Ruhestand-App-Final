@@ -26,6 +26,7 @@ Die Engine besteht aus acht ES-Modulen, die von `build-engine.mjs` zu `engine.js
 2. **`engine/analyzers/MarketAnalyzer.mjs`** – klassifiziert Marktregime, berechnet Drawdowns und leitet Kennzahlen für Guardrails ab.
 3. **`engine/planners/SpendingPlanner.mjs`** – steuert Guardrails, Glättung der Flex-Rate, Alarmstatus und erstellt Diagnoseeinträge.
 4. **`engine/transactions/TransactionEngine.mjs`** – leitet Ziel-Liquidität ab, steuert Puffer-Schutz und führt **Gap-basiertes Surplus-Rebalancing** (Investition nur bis Ziel-Allokation) durch.
+   - Unterteilt in `engine/transactions/transaction-action.mjs`, `transaction-opportunistic.mjs`, `transaction-surplus.mjs`, `sale-engine.mjs` und `transaction-utils.mjs` für Entscheidungslogik, Rebalancing-Pfade, Verkauf/Steuern und Hilfsfunktionen.
 5. **`engine/core.mjs`** – orchestriert die oben genannten Module, exponiert `EngineAPI` (Version 31) und erzeugt Diagnose-/UI-Strukturen.
 6. **`engine/config.mjs`** – zentrale Konfiguration (Schwellenwerte, Regime-Mapping, Profile). Generiert zur Build-Zeit eine eindeutige Build-ID.
 7. **`engine/errors.mjs`** – Fehlerklassen (`AppError`, `ValidationError`, `FinancialCalculationError`).
@@ -50,7 +51,7 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 ### Modulübersicht
 
 * `balance-config.js` – Konfiguration, Fehlertypen, Debug-Utilities.
-* `balance-utils.js` – Formatierungs- und Hilfsfunktionen (Währung, Threshold-Zugriff).
+* `balance-utils.js` – Formatierungs- und Hilfsfunktionen (shared-formatting, Threshold-Zugriff).
 * `balance-storage.js` – Persistenzschicht für `localStorage` und File-System-Snapshots.
 * `balance-reader.js` – liest Benutzerinputs aus dem DOM und setzt UI-Side-Effects.
 * `balance-renderer.js` – Darstellung der Ergebnisse (Summary, Guardrails, Diagnose, Toasts, Themes).
@@ -87,7 +88,8 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 * `simulator-optimizer.js` – Auto-Optimize-Kernlogik mit 3-stufiger Optimierung (Coarse Grid → Refinement → Final Verification).
 * `auto_optimize.js` / `auto_optimize_ui.js` – Auto-Optimize UI-Integration inkl. Worker-Parallelisierung, Preset-Konfigurationen und Champion-Config-Output (1-7 dynamische Parameter).
 * `simulator-heatmap.js` – SVG-Rendering für Parameter-Sweeps inkl. Warnhinweise bei Verstößen.
-* `simulator-utils.js` – Zufallszahlengenerator, Statistikfunktionen, Parser, Formatierung.
+* `simulator-utils.js` – Zufallszahlengenerator, Statistikfunktionen, Parser (Formatierung über `shared-formatting.js`).
+* `shared-formatting.js` – gemeinsame Formatter für Balance und Simulator (Währung, Prozent, Monate).
 * `simulator-data.js` – Historische Daten, Mortalitäts- und Stress-Presets.
 
 ### Worker-Architektur (Monte Carlo, Sweep, Auto-Optimize)

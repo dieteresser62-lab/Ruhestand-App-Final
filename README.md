@@ -190,6 +190,7 @@ Ruhestand-App-Final/
 * **SIMULATOR_MODULES_README.md** – aktuelle Modulübersicht (Monte-Carlo, Sweep, Backtest, UI-Pfade) inkl. Init-Funktionen und Platzierung neuer Helfer.
 * **TECHNICAL.md** – Architekturübersicht von Engine, Balance- und Simulator-Anwendung.
 * **engine/README.md** – Detaildokumentation der Engine-Module und des Build-Prozesses.
+* **shared-formatting.js** – zentrale Formatter (Währung/Prozent/Monate) für Balance + Simulator.
 
 ---
 

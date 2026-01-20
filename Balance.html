@@ -54,22 +54,11 @@
                     <fieldset>
                         <legend>Basiswerte</legend>
                         <!-- Jahres-Update Button -->
-                        <div class="update-actions" style="margin-bottom: 15px;">
-                            <div class="update-primary-actions">
-                                <button id="btnJahresUpdate" type="button" class="btn btn-primary"
-                                    title="Ruft Inflation (ECB) und ETF-Kurs (VWCE.DE) ab, führt Nachrücken durch und aktualisiert ATH">🌐
-                                    Jahres-Update</button>
-                                <button id="btnJahresUpdateLog" type="button" class="btn btn-utility btn-icon"
-                                    aria-label="Protokoll des letzten Jahres-Updates anzeigen"
-                                    title="Protokoll des letzten Jahres-Updates anzeigen" disabled>🧾</button>
-                            </div>
-                        </div>
-                        <section id="profilverbund-section" class="profilverbund-container" style="display: none;">
-                            <div class="profilverbund-header">
-                                <div>
-                                    <h2>Profilverbund</h2>
-                                </div>
-                                <div class="profilverbund-controls">
+                        <!-- Compact Header Row -->
+                        <div class="basiswerte-header-row basiswerte-header-compact">
+                            <div class="profilverbund-toggle-target profilverbund-header-group profilverbund-compact" style="display:none;">
+                                <div class="profilverbund-title">Profilverbund</div>
+                                <div class="profilverbund-controls-inline">
                                     <label for="profilverbund-withdrawal-mode">Verteilung</label>
                                     <select id="profilverbund-withdrawal-mode">
                                         <option value="tax_optimized">Steueroptimiert</option>
@@ -77,12 +66,25 @@
                                         <option value="runway_first">Runway-First</option>
                                     </select>
                                 </div>
+                                <div class="profilverbund-profile-strip">
+                                    <div id="profilverbund-profile-list" class="profilverbund-profile-list compact"></div>
+                                </div>
                             </div>
-                            <div class="profilverbund-profile-box">
-                                <h3>Profile im Verbund</h3>
-                                <div id="profilverbund-profile-list" class="profilverbund-profile-list"></div>
+                            <div class="basiswerte-divider profilverbund-toggle-target" aria-hidden="true" style="display:none;"></div>
+                            <div class="update-primary-actions update-actions-compact">
+                                <button id="btnJahresUpdate" type="button" class="btn btn-primary"
+                                    title="Ruft Inflation (ECB) und ETF-Kurs (VWCE.DE) ab, führt Nachrücken durch und aktualisiert ATH">🌐
+                                    Jahres-Update</button>
+                                <div class="annual-update-steps" aria-label="Jahres-Update Schritte">
+                                    <span class="step-dot" title="Inflation abrufen"></span>
+                                    <span class="step-dot" title="Kurse aktualisieren"></span>
+                                    <span class="step-dot" title="Alter erhöhen"></span>
+                                </div>
+                                <button id="btnJahresUpdateLog" type="button" class="btn btn-utility btn-icon"
+                                    aria-label="Protokoll des letzten Jahres-Updates anzeigen"
+                                    title="Protokoll des letzten Jahres-Updates anzeigen" disabled>🧾</button>
                             </div>
-                        </section>
+                        </div>
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
                             <input id="profilName" type="hidden">
                             <input id="aktuellesAlter" type="hidden">
@@ -108,7 +110,8 @@
                                     title="Wird im Profil-Assets Manager gepflegt">
                             </div>
                             <div class="form-group"><label for="geldmarktEtf">Geldmarkt-ETF (€)</label><input
-                                    id="geldmarktEtf" class="currency" type="text" inputmode="numeric" placeholder="0" disabled
+                                    id="geldmarktEtf" class="currency" type="text" inputmode="numeric" placeholder="0"
+                                    disabled
                                     title="Ihr Geldmarkt-ETF-Bestand - sehr sichere, kurzfristig verfügbare Anlage mit leicht höherer Rendite als Tagesgeld">
                             </div>
                             <div class="form-group"><label for="depotwertGesamt">Depotwert gesamt (€)</label><input
@@ -117,8 +120,8 @@
                                     title="Gesamtwert Ihres Depots (aus Tranchen/Profilen aggregiert)">
                             </div>
                             <div class="form-group" id="goldWertGroup"><label for="goldWert">Gold-Bestand
-                                    (€)</label><input id="goldWert" class="currency" type="text" inputmode="numeric" disabled
-                                    value="0"
+                                    (€)</label><input id="goldWert" class="currency" type="text" inputmode="numeric"
+                                    disabled value="0"
                                     title="Aktueller Wert Ihres physischen Gold-Bestands (optional, wenn Gold-Strategie aktiv)">
                             </div>
                             <input id="depotwertAlt" type="hidden">
@@ -416,7 +419,8 @@
         </div>
     </div>
 
-    <div id="devTools" style="display:none; position:fixed; bottom:10px; right:10px; background:#333; color:#fff; padding:10px; border-radius:5px; z-index:9999;">
+    <div id="devTools"
+        style="display:none; position:fixed; bottom:10px; right:10px; background:#333; color:#fff; padding:10px; border-radius:5px; z-index:9999;">
         <div style="margin-bottom:8px;">
             <label>
                 <input type="checkbox" id="telemetryToggle" />

@@ -12,6 +12,8 @@
 import { featureFlags } from './feature-flags.js';
 import { simulateOneYear as simulateOneYearDirect } from './simulator-engine-direct.js';
 
+const formatMs = (value, digits = 3) => Number(value).toFixed(digits);
+
 // Re-export full initMcRunState from helpers to ensure tests get valid state
 export * from './simulator-engine-helpers.js';
 
@@ -67,7 +69,7 @@ export function simulateOneYear(
             featureFlags.recordPerformance('direct', elapsed, false);
 
             if (featureFlags.getAllFlags().debugLogging) {
-                console.log(`[Performance] Direct: ${elapsed.toFixed(3)}ms`);
+                console.log(`[Performance] Direct: ${formatMs(elapsed, 3)}ms`);
             }
         }
 

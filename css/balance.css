@@ -426,6 +426,59 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
     margin: 10px 0 16px;
 }
 
+.basiswerte-header-compact {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.profilverbund-compact {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.profilverbund-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--primary-text);
+    white-space: nowrap;
+}
+
+.profilverbund-profile-strip {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    padding-bottom: 2px;
+}
+
+.profilverbund-profile-list.compact {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+}
+
+.profilverbund-profile-list.compact .profilverbund-profile-row {
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #fff;
+    border: 1px solid var(--content-border-color);
+}
+
+.profilverbund-profile-list.compact .profilverbund-profile-row input {
+    margin: 0;
+}
+
+.basiswerte-divider {
+    width: 1px;
+    align-self: stretch;
+    background: var(--content-border-color);
+    opacity: 0.6;
+}
+
 .profilverbund-toggle {
     display: inline-flex;
     align-items: center;
@@ -453,6 +506,28 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
     display: flex;
     flex-direction: column;
     gap: 6px;
+}
+
+.update-actions-compact {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+
+.annual-update-steps {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 6px;
+}
+
+.annual-update-steps .step-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--content-border-color);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
 }
 
 .profilverbund-profile-box {
@@ -1036,4 +1111,69 @@ html[data-density=compact] .result-item { padding: 12px; }
     margin-top: 10px;
     font-size: 0.85rem;
     color: var(--tranchen-warning-color);
+}
+
+/* Compact Basiswerte Layout */
+.basiswerte-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 5px;
+    flex-wrap: wrap;
+    min-height: 40px;
+}
+
+.profilverbund-header-group {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: linear-gradient(to right, rgba(197, 160, 89, 0.05), transparent);
+    padding: 5px 10px;
+    border-radius: 6px;
+    border-left: 3px solid var(--secondary-color);
+}
+
+.profilverbund-header-group h2 {
+    margin: 0;
+    padding: 0;
+    border: none;
+    font-size: 1.1rem;
+    display: flex;
+    gap: 5px;
+}
+
+.profilverbund-controls-inline {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.profilverbund-controls-inline label {
+    margin: 0;
+    white-space: nowrap;
+    font-size: 0.85rem;
+}
+
+.profilverbund-controls-inline select {
+    padding: 4px 8px;
+    font-size: 0.9rem;
+    width: auto;
+}
+
+.profilverbund-profile-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.profilverbund-profile-row {
+    margin-bottom: 0;
+    background: #fff;
+    border: 1px solid var(--border-color);
+    padding: 6px 12px;
+}
+
+.profilverbund-profile-list:empty {
+    display: none;
 }

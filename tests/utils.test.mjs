@@ -2,10 +2,9 @@
 import {
     formatCurrencyShortLog,
     shortenText,
-    mean, stdDev, quantile,
+    mean, quantile,
     rng,
-    parseRangeInput,
-    cartesianProduct
+    parseRangeInput
 } from '../simulator-utils.js';
 
 console.log('--- Utilities Tests ---');
@@ -30,8 +29,6 @@ console.log('--- Utilities Tests ---');
 {
     const data = [1, 2, 3, 4, 5];
     assert(mean(data) === 3, 'Mean check');
-    assertClose(stdDev(data), 1.581, 0.001, 'StdDev check');
-
     const unsorted = [5, 1, 4, 3, 2];
     assert(quantile(unsorted, 0.5) === 3, 'Median (Quantile 0.5) check');
     assert(quantile(unsorted, 0) === 1, 'Min (Quantile 0) check');
@@ -71,21 +68,6 @@ console.log('--- Utilities Tests ---');
     assert(JSON.stringify(r3) === JSON.stringify([42]), 'Single value');
 
     console.log('✅ Range Parsing Passed');
-}
-
-// --- TEST 5: Cartesian Product ---
-{
-    const params = {
-        a: [1, 2],
-        b: ['x', 'y']
-    };
-    const combos = cartesianProduct(params);
-    assert(combos.length === 4, '2x2 should produce 4 combos');
-    // Check one
-    const hasA1Bx = combos.some(c => c.a === 1 && c.b === 'x');
-    assert(hasA1Bx, 'Combos contain {a:1, b:x}');
-
-    console.log('✅ Cartesian Product Passed');
 }
 
 console.log('--- Utilities Tests Completed ---');

@@ -5,6 +5,7 @@
  * Zeigt den Status der geladenen Depot-Tranchen in Balance & Simulator an
  */
 
+import { EUR_NO_DEC_FORMATTER } from './shared-formatting.js';
 
 function resolveTrancheMarketValue(tranche) {
     const mv = Number(tranche?.marketValue);
@@ -192,14 +193,7 @@ export function renderTranchenStatusBadge(containerId) {
         return;
     }
 
-    const formatCurrency = (val) => {
-        return new Intl.NumberFormat('de-DE', {
-            style: 'currency',
-            currency: 'EUR',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0
-        }).format(val);
-    };
+    const formatCurrency = (val) => EUR_NO_DEC_FORMATTER.format(val);
 
     container.innerHTML = `
         <div style="
@@ -244,8 +238,10 @@ export function renderTranchenStatusBadge(containerId) {
 /**
  * Berechnet aggregierte Werte aus Tranchen für die Eingabefelder
  */
-export function calculateAggregatedValues() {
-    const status = getTranchenStatus();
+export function calculateAggregatedValues(tranchesOverride = null) {
+    const status = Array.isArray(tranchesOverride)
+        ? { loaded: tranchesOverride.length > 0, count: tranchesOverride.length, tranches: tranchesOverride }
+        : getTranchenStatus();
 
     if (!status.loaded || status.count === 0) {
         return null;
@@ -315,7 +311,12 @@ export function calculateAggregatedValues() {
  */
 export function syncTranchenToInputs(options = {}) {
     const { silent = false } = options;
-    const values = calculateAggregatedValues();
+    const override = (typeof window !== 'undefined') ? window.__profilverbundTranchenOverride : null;
+    const preferAggregates = (typeof window !== 'undefined') && window.__profilverbundPreferAggregates;
+    if (preferAggregates && !Array.isArray(override)) {
+        return false;
+    }
+    const values = calculateAggregatedValues(override);
 
     if (!values) {
         if (!silent) {
@@ -407,9 +408,13 @@ export function initTranchenStatus(containerId) {
     });
 
     // Periodisch prüfen (alle 5 Sekunden), falls localStorage im selben Tab geändert wurde
-    setInterval(() => {
+    const intervalId = setInterval(() => {
         renderTranchenStatusBadge(containerId);
     }, 5000);
+    if (intervalId && typeof intervalId.unref === 'function') {
+        intervalId.unref();
+    }
+    return intervalId;
 }
 
 // Browser-Kompatibilität

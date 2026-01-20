@@ -10,6 +10,9 @@ import { buildMonteCarloAggregates, createMonteCarloBuffers, MC_HEATMAP_BINS, pi
 import { featureFlags } from './feature-flags.js';
 import { WorkerPool } from './workers/worker-pool.js';
 
+const formatMs = (value, digits = 0) => `${Number(value).toFixed(digits)} ms`;
+const formatSpeedup = (value, digits = 2) => `${Number(value).toFixed(digits)}x`;
+
 function mergeHeatmap(target, source) {
     for (let year = 0; year < target.length; year++) {
         const targetRow = target[year];
@@ -365,7 +368,7 @@ export async function runMonteCarlo() {
             const serialElapsed = performance.now() - serialStart;
 
             if (!useWorkers) {
-                ui.showCompareResults(`Seriell: ${serialElapsed.toFixed(0)} ms (Worker nicht verfuegbar im Legacy-Stream).`);
+                ui.showCompareResults(`Seriell: ${formatMs(serialElapsed)} (Worker nicht verfuegbar im Legacy-Stream).`);
                 results = serialResults;
             } else {
                 const workerStart = performance.now();
@@ -382,11 +385,11 @@ export async function runMonteCarlo() {
                     usedWorkers = true;
                     const workerElapsed = performance.now() - workerStart;
                     const speedup = serialElapsed > 0 ? (serialElapsed / workerElapsed) : 0;
-                    ui.showCompareResults(`Seriell: ${serialElapsed.toFixed(0)} ms · Worker: ${workerElapsed.toFixed(0)} ms · Speedup: ${speedup.toFixed(2)}x`);
+                    ui.showCompareResults(`Seriell: ${formatMs(serialElapsed)} · Worker: ${formatMs(workerElapsed)} · Speedup: ${formatSpeedup(speedup, 2)}`);
                 } catch (error) {
                     console.error('[MC] Worker execution failed, falling back to serial.', error);
                     results = serialResults;
-                    ui.showCompareResults(`Seriell: ${serialElapsed.toFixed(0)} ms · Worker fehlgeschlagen (Fallback auf seriell).`);
+                    ui.showCompareResults(`Seriell: ${formatMs(serialElapsed)} · Worker fehlgeschlagen (Fallback auf seriell).`);
                 }
             }
         } else if (useWorkers) {

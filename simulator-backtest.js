@@ -4,6 +4,7 @@ import { BREAK_ON_RUIN, HISTORICAL_DATA } from './simulator-data.js';
 import { initializePortfolio, getCommonInputs } from './simulator-portfolio.js';
 import { simulateOneYear } from './simulator-engine-wrapper.js';
 import { formatCurrency, formatCurrencyShortLog } from './simulator-utils.js';
+import { formatPercentValue } from './simulator-formatting.js';
 import {
     BACKTEST_LOG_DETAIL_KEY,
     LEGACY_LOG_DETAIL_KEY,
@@ -39,7 +40,8 @@ function padLeft(value, targetWidth) {
  * @returns {string} Formatted percentage string.
  */
 function formatPercentOneDecimal(value, targetWidth) {
-    return padLeft(`${(value || 0).toFixed(1)}%`, targetWidth);
+    const formatted = formatPercentValue(value || 0, { fractionDigits: 1, invalid: '0.0%' });
+    return padLeft(formatted, targetWidth);
 }
 
 /**
@@ -49,7 +51,8 @@ function formatPercentOneDecimal(value, targetWidth) {
  * @returns {string} Formatted integer percentage string.
  */
 function formatPercentInteger(value, targetWidth) {
-    return padLeft(`${Math.round(value || 0)}%`, targetWidth);
+    const formatted = formatPercentValue(Math.round(value || 0), { fractionDigits: 0, invalid: '0%' });
+    return padLeft(formatted, targetWidth);
 }
 
 /**

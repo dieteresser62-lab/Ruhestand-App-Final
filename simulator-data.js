@@ -226,8 +226,6 @@ export const STRESS_PRESETS = {
 /**
  * Engine-Version und Hash
  */
-export const ENGINE_VERSION = '31.0';
-export const ENGINE_HASH = '2016807894';
 
 /**
  * Globale Daten für die Simulation

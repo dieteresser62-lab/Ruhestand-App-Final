@@ -11,6 +11,29 @@
 import { aggregateSweepMetrics } from './simulator-results.js';
 import { runParameterSweep } from './simulator-sweep.js';
 
+const WEALTH_METRICS = new Set([
+    'p10EndWealth',
+    'p25EndWealth',
+    'medianEndWealth',
+    'p75EndWealth',
+    'meanEndWealth',
+    'maxEndWealth'
+]);
+const PERCENT_METRICS = new Set(['successProbFloor', 'worst5Drawdown']);
+
+const formatFixed = (value, digits = 1) => value.toFixed(digits);
+const formatPercent = (value, digits = 1) => `${formatFixed(value, digits)}%`;
+const formatThousandsEuro = (value) => `${formatFixed(value / 1000, 0)}k €`;
+const formatMetricValue = (value, metric) => {
+    if (WEALTH_METRICS.has(metric)) {
+        return formatThousandsEuro(value);
+    }
+    if (PERCENT_METRICS.has(metric)) {
+        return formatPercent(value, 1);
+    }
+    return formatFixed(value, 1);
+};
+
 /**
  * Findet die beste Parameterkombination aus den Sweep-Ergebnissen
  * @param {Array} sweepResults - Array von {params, metrics}
@@ -140,21 +163,10 @@ export function displayBestParameters(bestResult, metricKey) {
         goldTargetPct: 'Gold Target %'
     };
 
-    const formatValue = (value, metric) => {
-        const wealthMetrics = ['p10EndWealth', 'p25EndWealth', 'medianEndWealth', 'p75EndWealth', 'meanEndWealth', 'maxEndWealth'];
-        if (wealthMetrics.includes(metric)) {
-            return `${(value / 1000).toFixed(0)}k €`;
-        } else if (metric === 'successProbFloor' || metric === 'worst5Drawdown') {
-            return `${value.toFixed(1)}%`;
-        } else {
-            return value.toFixed(1);
-        }
-    };
-
     let html = '<div style="padding: 15px; background-color: #e8f5e9; border-radius: 8px; border: 2px solid #4caf50;">';
     html += `<h4 style="margin-top: 0; color: #2e7d32;">✓ Optimale Parameter gefunden</h4>`;
     html += `<p><strong>Optimiert für:</strong> ${metricLabels[metricKey] || metricKey}</p>`;
-    html += `<p><strong>Optimaler Wert:</strong> ${formatValue(bestResult.metricValue, metricKey)}</p>`;
+    html += `<p><strong>Optimaler Wert:</strong> ${formatMetricValue(bestResult.metricValue, metricKey)}</p>`;
     html += '<h5>Parameter:</h5>';
     html += '<table style="width: 100%; border-collapse: collapse;">';
 
@@ -173,7 +185,7 @@ export function displayBestParameters(bestResult, metricKey) {
         if (key === 'warningR2Varies') continue;
         html += `<tr style="border-bottom: 1px solid #ddd;">`;
         html += `<td style="padding: 5px;"><strong>${metricLabels[key] || key}:</strong></td>`;
-        html += `<td style="padding: 5px; text-align: right;">${formatValue(value, key)}</td>`;
+        html += `<td style="padding: 5px; text-align: right;">${formatMetricValue(value, key)}</td>`;
         html += `</tr>`;
     }
 
@@ -383,7 +395,7 @@ export function displayMultiObjectiveOptimization(objectives) {
         html += `<li><strong>${metricLabels[obj.metricKey] || obj.metricKey}</strong> - ${dir} (Gewicht: ${obj.weight})</li>`;
     }
     html += '</ul>';
-    html += `<p><strong>Gewichteter Score:</strong> ${result.score.toFixed(3)}</p>`;
+    html += `<p><strong>Gewichteter Score:</strong> ${formatFixed(result.score, 3)}</p>`;
     html += '<h5>Optimale Parameter:</h5>';
     html += '<table style="width: 100%; border-collapse: collapse;">';
 
@@ -456,17 +468,6 @@ export function displayConstraintBasedOptimization(objectiveMetricKey, maximize,
         goldTargetPct: 'Gold Target %'
     };
 
-    const formatValue = (value, metric) => {
-        const wealthMetrics = ['p10EndWealth', 'p25EndWealth', 'medianEndWealth', 'p75EndWealth', 'meanEndWealth', 'maxEndWealth'];
-        if (wealthMetrics.includes(metric)) {
-            return `${(value / 1000).toFixed(0)}k €`;
-        } else if (metric === 'successProbFloor' || metric === 'worst5Drawdown') {
-            return `${value.toFixed(1)}%`;
-        } else {
-            return value.toFixed(1);
-        }
-    };
-
     let html = '<div style="padding: 15px; background-color: #e1f5fe; border-radius: 8px; border: 2px solid #03a9f4;">';
     html += '<h4 style="margin-top: 0; color: #01579b;">⚖️ Constraint-Based Optimization</h4>';
     html += `<p><strong>Optimiert für:</strong> ${metricLabels[objectiveMetricKey] || objectiveMetricKey} (${maximize ? 'Maximize' : 'Minimize'})</p>`;
@@ -477,7 +478,7 @@ export function displayConstraintBasedOptimization(objectiveMetricKey, maximize,
     }
     html += '</ul>';
     html += `<p><strong>Gefunden:</strong> ${result.feasibleCount} von ${result.totalCount} Kombinationen erfüllen alle Constraints</p>`;
-    html += `<p><strong>Optimaler Wert:</strong> ${formatValue(result.metricValue, objectiveMetricKey)}</p>`;
+    html += `<p><strong>Optimaler Wert:</strong> ${formatMetricValue(result.metricValue, objectiveMetricKey)}</p>`;
     html += '<h5>Optimale Parameter:</h5>';
     html += '<table style="width: 100%; border-collapse: collapse;">';
 

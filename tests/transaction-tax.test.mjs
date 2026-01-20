@@ -251,7 +251,7 @@ const baseContext = { saleBudgets: {} }; // No budget limits
     assertClose(totalBrutto, 1500, 0.01, 'Should sell across multiple detailed tranches');
     assert(result.breakdown.length === 2, 'Should preserve multiple detailed tranches with same ISIN');
 
-    console.log('? Detailed tranches (unique IDs) work');
+    console.log('✅ Detailed tranches (unique IDs) work');
 }
 
 // --- TEST 7: Sale Budgets Across Lots ---
@@ -278,6 +278,6 @@ const baseContext = { saleBudgets: {} }; // No budget limits
 
     assert(result.bruttoVerkaufGesamt <= 1200.01, 'Sale budget should cap total gross across lots');
 
-    console.log('? Sale budget caps total across lots');
+    console.log('✅ Sale budget caps total across lots');
 }
 console.log('--- Transaction Tax Tests Completed ---');

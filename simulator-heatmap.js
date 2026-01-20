@@ -2,10 +2,18 @@
 
 import { lerp } from './simulator-utils.js';
 
-// Schwellenwerte für die adaptive Anzeige der Heatmap
-export const HEATMAP_META_MIN_TIMESHARE_ABOVE_45 = 0.02; // 2 % der Zeit mit Quote > 4,5 %
-export const HEATMAP_RED_SHARE_THRESHOLD = 0.03; // 3 % Rot (>4.5%) in mindestens einer Spalte
-export const HEATMAP_GREEN_SHARE_MIN = 0.50; // Grün (0–3 %) fällt in mind. einer Spalte unter 50 %
+const formatFixed = (value, digits = 1) => value.toFixed(digits);
+const formatPercent = (value, digits = 1) => `${formatFixed(value, digits)}%`;
+const formatPercentFromRatio = (value, digits = 1) => formatPercent(value * 100, digits);
+const formatThousandsEuro = (value) => `${formatFixed(value / 1000, 0)}k €`;
+const formatMonths = (value, digits = 1) => `${formatFixed(value, digits)} Mo`;
+
+const formatHeatmapCellLabel = (pct) => {
+    if (pct <= 0) return '0';
+    if (pct < 0.1) return '<0.1';
+    if (pct < 1) return formatFixed(pct, 1);
+    return String(Math.round(pct));
+};
 
 /**
  * CSS-Styles für die Heatmap
@@ -224,9 +232,9 @@ export function renderHeatmapSVG(heat, bins, totalRuns, extraKPI = {}, options =
             const color = paletteFn(t);
             const { textFill, bgFill, dotFill } = computeLabelStyles(color);
 
-            const tooltip = `Jahr ${yIdx + 1} | Entnahme: ${bins[bIdx].toFixed(1)}%-` +
-                `${bins[bIdx + 1] < 100 ? bins[bIdx + 1].toFixed(1) : '∞'}% | ` +
-                `Anteil: ${pct.toFixed(2)}% (${heat[yIdx][bIdx]} Läufe)`;
+            const tooltip = `Jahr ${yIdx + 1} | Entnahme: ${formatFixed(bins[bIdx], 1)}%-` +
+                `${bins[bIdx + 1] < 100 ? formatFixed(bins[bIdx + 1], 1) : '∞'}% | ` +
+                `Anteil: ${formatFixed(pct, 2)}% (${heat[yIdx][bIdx]} Läufe)`;
 
             cellBackgrounds += `<rect x="${x}" y="${y}" width="${cellWidth}" height="${cellHeight}" fill="${color}" class="heatmap-cell"><title>${tooltip}</title></rect>`;
 
@@ -235,7 +243,7 @@ export function renderHeatmapSVG(heat, bins, totalRuns, extraKPI = {}, options =
             }
 
             const showText = (pct > 0) && (cellWidth >= 24 && cellHeight >= 16);
-            const labelText = (pct <= 0) ? '0' : (pct < 0.1 ? '<0.1' : (pct < 1 ? pct.toFixed(1) : Math.round(pct)));
+            const labelText = formatHeatmapCellLabel(pct);
 
             if (showText) {
                 cellAnnotations += `<rect x="${x + cellWidth / 2 - 15}" y="${y + cellHeight / 2 - 8}" width="30" height="16" fill="${bgFill}" class="cell-label-bg" />`;
@@ -246,9 +254,9 @@ export function renderHeatmapSVG(heat, bins, totalRuns, extraKPI = {}, options =
         });
     });
 
-    const yAxisLabels = bins.slice(0, -1).map((bin, i) => `<text x="-8" y="${i * cellHeight + cellHeight / 2}" class="bin-label">${bin.toFixed(1)}%</text>`).join('');
+    const yAxisLabels = bins.slice(0, -1).map((bin, i) => `<text x="-8" y="${i * cellHeight + cellHeight / 2}" class="bin-label">${formatPercent(bin, 1)}</text>`).join('');
     const xAxisLabels = [...Array(numYears).keys()].map(i => `<text x="${i * cellWidth + cellWidth / 2}" y="${chartHeight + 20}" class="year-label">${i + 1}</text>`).join('');
-    const colHeaders = colSharesAbove45.map((share, i) => `<text x="${i * cellWidth + cellWidth / 2}" y="-18" class="col-header" fill="var(--danger-color, #c0392b)">${(share * 100).toFixed(1)}%</text>`).join('');
+    const colHeaders = colSharesAbove45.map((share, i) => `<text x="${i * cellWidth + cellWidth / 2}" y="-18" class="col-header" fill="var(--danger-color, #c0392b)">${formatPercentFromRatio(share, 1)}</text>`).join('');
 
     let legend = '';
     if (opts.showLegend) {
@@ -256,7 +264,7 @@ export function renderHeatmapSVG(heat, bins, totalRuns, extraKPI = {}, options =
         const stops = [0, 0.25, 0.5, 0.75, 1];
         const legendMaxVal = (opts.normalize === 'global' ? globalP90 : Math.max(...perColP90)) * 100;
         let gradientStops = stops.map(s => `<stop offset="${s * 100}%" stop-color="${paletteFn(s)}" />`).join('');
-        let legendLabels = stops.map(s => `<text x="${chartWidth + 30 + legendWidth}" y="${legendHeight * (1 - s)}" dominant-baseline="middle" class="legend-text">${(s * legendMaxVal).toFixed(1)}%</text>`).join('');
+        let legendLabels = stops.map(s => `<text x="${chartWidth + 30 + legendWidth}" y="${legendHeight * (1 - s)}" dominant-baseline="middle" class="legend-text">${formatPercent(s * legendMaxVal, 1)}</text>`).join('');
 
         legend = `
             <g class="legend" transform="translate(${chartWidth + 25}, 0)">
@@ -272,9 +280,9 @@ export function renderHeatmapSVG(heat, bins, totalRuns, extraKPI = {}, options =
 
     let footer = '';
     if (opts.showFooterStats) {
-        const kpi1 = extraKPI.timeShareQuoteAbove45 !== undefined ? `${(extraKPI.timeShareQuoteAbove45 * 100).toFixed(1)}%` : 'N/A';
-        const kpi2 = `${(stats.shareYear1In_3_to_3_5 * 100).toFixed(1)}%`;
-        const kpi3 = `${(stats.shareYear1Above_5_5 * 100).toFixed(1)}%`;
+        const kpi1 = extraKPI.timeShareQuoteAbove45 !== undefined ? formatPercentFromRatio(extraKPI.timeShareQuoteAbove45, 1) : 'N/A';
+        const kpi2 = formatPercentFromRatio(stats.shareYear1In_3_to_3_5, 1);
+        const kpi3 = formatPercentFromRatio(stats.shareYear1Above_5_5, 1);
         footer = `
             <g class="footer" transform="translate(0, ${opts.height - 25})">
                 <text x="0" y="0" class="footer-text">
@@ -306,32 +314,6 @@ export function renderHeatmapSVG(heat, bins, totalRuns, extraKPI = {}, options =
             </g>
             ${footer}
         </svg>
-    </div>`;
-}
-
-/**
- * Rendert den Toggle für Worst-Run-Anzeige
- */
-export function renderWorstRunToggle(hasCareWorst) {
-    const careBtn = hasCareWorst
-        ? `<button id="btnWorstCare" class="toggle-btn">Schlechtester Pflege-Lauf</button>`
-        : '';
-
-    const style = `
-    <style>
-      .worst-run-toggle { text-align: center; margin-bottom: 12px; display: flex; justify-content: center; gap: 10px; }
-      .toggle-btn { padding: 6px 12px; font-size: 0.9rem; border: 1px solid var(--border-color); background-color: #f0f0f0; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
-      .toggle-btn:hover { border-color: var(--secondary-color); }
-      .toggle-btn.active { background-color: var(--secondary-color); color: white; border-color: var(--secondary-color); font-weight: bold; }
-      .toggle-btn:disabled { background-color: #e0e0e0; cursor: not-allowed; color: #999; }
-    </style>
-  `;
-
-    return `
-    ${style}
-    <div class="worst-run-toggle">
-      <button id="btnWorstAll" class="toggle-btn active">Schlechtester Lauf (alle)</button>
-      ${careBtn}
     </div>`;
 }
 
@@ -396,11 +378,11 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
         const formatValue = (value, metric) => {
             const wealthMetrics = ['p10EndWealth', 'p25EndWealth', 'medianEndWealth', 'p75EndWealth', 'meanEndWealth', 'maxEndWealth'];
             if (wealthMetrics.includes(metric)) {
-                return `${(value / 1000).toFixed(0)}k €`;
+                return formatThousandsEuro(value);
             } else if (metric === 'successProbFloor' || metric === 'worst5Drawdown') {
-                return `${value.toFixed(1)}%`;
+                return formatPercent(value, 1);
             } else {
-                return value.toFixed(1);
+                return formatFixed(value, 1);
             }
         };
 
@@ -423,10 +405,10 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
                     `${paramLabels[xParam]}: ${xVal}`,
                     `${paramLabels[yParam]}: ${yVal}`,
                     '',
-                    `Success Prob: ${result.metrics.successProbFloor.toFixed(1)}%`,
-                    `P10 End Wealth: ${(result.metrics.p10EndWealth / 1000).toFixed(0)}k €`,
-                    `Worst 5% DD: ${result.metrics.worst5Drawdown.toFixed(1)}%`,
-                    `Min Runway: ${result.metrics.minRunwayObserved.toFixed(1)} Mo`,
+                    `Success Prob: ${formatPercent(result.metrics.successProbFloor, 1)}`,
+                    `P10 End Wealth: ${formatThousandsEuro(result.metrics.p10EndWealth)}`,
+                    `Worst 5% DD: ${formatPercent(result.metrics.worst5Drawdown, 1)}`,
+                    `Min Runway: ${formatMonths(result.metrics.minRunwayObserved, 1)}`,
                     hasR2Warning ? '\n⚠ Rente 2 variierte im Sweep' : ''
                 ].filter(Boolean) : [`${paramLabels[xParam]}: ${xVal}`, `${paramLabels[yParam]}: ${yVal}`, 'Keine Daten'];
 

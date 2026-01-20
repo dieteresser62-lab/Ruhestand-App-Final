@@ -17,6 +17,10 @@ import { runAutoOptimize } from './auto_optimize.js';
 import { formatCurrency } from './simulator-utils.js';
 import { updateStartPortfolioDisplay } from './simulator-portfolio.js';
 
+const formatFixed = (value, digits = 1) => Number(value).toFixed(digits);
+const formatPercentFromRatio = (value, digits = 1) => `${formatFixed((value ?? 0) * 100, digits)}%`;
+const formatSignedPercentFromRatio = (value, digits = 2) => `${value >= 0 ? '+' : ''}${formatPercentFromRatio(value, digits)}`;
+
 // Global parameter counter
 let aoParamCounter = 0;
 
@@ -564,7 +568,7 @@ function renderResult(result, objective) {
     for (const [key, value] of Object.entries(championCfg)) {
         const label = paramLabels[key] || key;
         const unit = paramUnits[key] || '';
-        const displayValue = typeof value === 'number' ? value.toFixed(1) : value;
+        const displayValue = typeof value === 'number' ? formatFixed(value, 1) : value;
 
         paramCardsHtml += `
             <div style="background: white; padding: 15px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
@@ -589,11 +593,11 @@ function renderResult(result, objective) {
                 <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
                     <div>
                         <strong>Success Rate:</strong>
-                        <span style="margin-left: 10px;">${((metricsTest.successProbFloor ?? 0) * 100).toFixed(1)}%</span>
+                        <span style="margin-left: 10px;">${formatPercentFromRatio(metricsTest.successProbFloor, 1)}</span>
                     </div>
                     <div>
                         <strong>P90 Drawdown:</strong>
-                        <span style="margin-left: 10px;">${((metricsTest.worst5Drawdown ?? 0) * 100).toFixed(1)}%</span>
+                        <span style="margin-left: 10px;">${formatPercentFromRatio(metricsTest.worst5Drawdown, 1)}</span>
                     </div>
                     <div>
                         <strong>End Wealth P50:</strong>
@@ -601,7 +605,7 @@ function renderResult(result, objective) {
                     </div>
                     <div>
                         <strong>Time Share WR > 4.5%:</strong>
-                        <span style="margin-left: 10px;">${((metricsTest.timeShareWRgt45 ?? 0) * 100).toFixed(2)}%</span>
+                        <span style="margin-left: 10px;">${formatPercentFromRatio(metricsTest.timeShareWRgt45, 2)}</span>
                     </div>
                 </div>
             </div>
@@ -612,13 +616,13 @@ function renderResult(result, objective) {
                     <div>
                         <strong>Success Rate:</strong>
                         <span style="margin-left: 10px; color: ${deltaVsCurrent.successRate >= 0 ? '#4caf50' : '#f44336'};">
-                            ${deltaVsCurrent.successRate >= 0 ? '+' : ''}${(deltaVsCurrent.successRate * 100).toFixed(2)}%
+                            ${formatSignedPercentFromRatio(deltaVsCurrent.successRate, 2)}
                         </span>
                     </div>
                     <div>
                         <strong>P90 Drawdown:</strong>
                         <span style="margin-left: 10px; color: ${deltaVsCurrent.drawdownP90 <= 0 ? '#4caf50' : '#f44336'};">
-                            ${deltaVsCurrent.drawdownP90 >= 0 ? '+' : ''}${(deltaVsCurrent.drawdownP90 * 100).toFixed(2)}%
+                            ${formatSignedPercentFromRatio(deltaVsCurrent.drawdownP90, 2)}
                         </span>
                     </div>
                     <div>
@@ -630,7 +634,7 @@ function renderResult(result, objective) {
                     <div>
                         <strong>Time Share WR > 4.5%:</strong>
                         <span style="margin-left: 10px; color: ${deltaVsCurrent.timeShareWRgt45 <= 0 ? '#4caf50' : '#f44336'};">
-                            ${deltaVsCurrent.timeShareWRgt45 >= 0 ? '+' : ''}${(deltaVsCurrent.timeShareWRgt45 * 100).toFixed(2)}%
+                            ${formatSignedPercentFromRatio(deltaVsCurrent.timeShareWRgt45, 2)}
                         </span>
                     </div>
                 </div>

@@ -14,7 +14,12 @@ engine/
 ├── errors.mjs                    # Fehlerklassen (AppError, ValidationError, FinancialCalculationError)
 ├── analyzers/MarketAnalyzer.mjs  # Marktanalyse & Regime-Klassifikation
 ├── planners/SpendingPlanner.mjs  # Guardrails & Entnahmeplanung
-├── transactions/TransactionEngine.mjs  # Transaktionslogik & Liquiditätsziele
+├── transactions/TransactionEngine.mjs      # Transaktionslogik & Liquiditätsziele
+├── transactions/transaction-action.mjs     # Orchestrierung der Transaktionsentscheidungen
+├── transactions/transaction-opportunistic.mjs # Opportunistisches Rebalancing (Refill)
+├── transactions/transaction-surplus.mjs    # Surplus-Investments (Cash-Abbau)
+├── transactions/sale-engine.mjs            # Verkauf/Steuer/Tranchensortierung
+├── transactions/transaction-utils.mjs      # Ziel-Liquidität, Quantisierung, Min-Trade
 ├── validators/InputValidator.mjs # Eingabevalidierung
 └── index.mjs                     # Bündel-Entry, re-exportiert API
 ```

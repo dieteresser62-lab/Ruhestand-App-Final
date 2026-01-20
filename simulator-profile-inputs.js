@@ -131,6 +131,11 @@ export function buildSimulatorInputsFromProfileData(profileData) {
     const trancheTotals = sumTrancheTotals(detailedTranches);
     const grade1Config = pflegeGradeConfigs[1] || { zusatz: 0, flexCut: 1 };
     const goldOverrides = parseProfileGoldOverrides(profileData);
+    const hasProfileTagesgeld = Object.prototype.hasOwnProperty.call(profileData, 'profile_tagesgeld');
+    const profileTagesgeld = hasProfileTagesgeld ? readNumber(profileData, 'profile_tagesgeld', 0) : 0;
+    const hasProfileRenteAktiv = Object.prototype.hasOwnProperty.call(profileData, 'profile_rente_aktiv');
+    const profileRenteAktiv = hasProfileRenteAktiv ? readBool(profileData, 'profile_rente_aktiv', false) : false;
+    const profileRenteMonatlich = readNumber(profileData, 'profile_rente_monatlich', 0);
 
     const p1StartAlter = readInt(profileData, simKey('p1StartAlter'), 65);
     const p1Geschlecht = readString(profileData, simKey('p1Geschlecht'), 'm');
@@ -156,13 +161,15 @@ export function buildSimulatorInputsFromProfileData(profileData) {
         ? goldOverrides.rebalancingBand
         : readNumber(profileData, simKey('rebalancingBand'), 25);
 
+    const simTagesgeld = readNumber(profileData, simKey('tagesgeld'), 0);
+    const tagesgeld = hasProfileTagesgeld ? profileTagesgeld : simTagesgeld;
     const baseInputs = {
         startVermoegen: readNumber(profileData, simKey('simStartVermoegen'), 0),
         depotwertAlt: readNumber(profileData, simKey('depotwertAlt'), 0),
-        tagesgeld: readNumber(profileData, simKey('tagesgeld'), 0),
+        tagesgeld,
         geldmarktEtf: readNumber(profileData, simKey('geldmarktEtf'), 0),
         einstandAlt: readNumber(profileData, simKey('einstandAlt'), 0),
-        zielLiquiditaet: readNumber(profileData, simKey('tagesgeld'), 0) + readNumber(profileData, simKey('geldmarktEtf'), 0),
+        zielLiquiditaet: tagesgeld + readNumber(profileData, simKey('geldmarktEtf'), 0),
         startFloorBedarf: readNumber(profileData, simKey('startFloorBedarf'), 0),
         startFlexBedarf: readNumber(profileData, simKey('startFlexBedarf'), 0),
         marketCapeRatio: readNumber(profileData, simKey('marketCapeRatio'), 0),
@@ -209,21 +216,23 @@ export function buildSimulatorInputsFromProfileData(profileData) {
         widowOptions: parseWidowOptions(profileData)
     };
 
-    if (!baseInputs.startVermoegen || baseInputs.startVermoegen <= 0) {
+    if (profileRenteAktiv && baseInputs.renteMonatlich <= 0 && profileRenteMonatlich > 0) {
+        baseInputs.renteMonatlich = profileRenteMonatlich;
+    }
+
+    const hasTranches = Array.isArray(detailedTranches) && detailedTranches.length > 0;
+    if (hasTranches) {
         const trancheSum = trancheTotals.equity + trancheTotals.gold + trancheTotals.moneyMarket;
-        const balanceSum = balanceInputs
-            ? (Number(balanceInputs.depotwertAlt) || 0)
-            + (Number(balanceInputs.depotwertNeu) || 0)
-            + (Number(balanceInputs.goldWert) || 0)
-            + (Number(balanceInputs.tagesgeld) || 0)
-            + (Number(balanceInputs.geldmarktEtf) || 0)
-            : 0;
-        const derivedStart = trancheSum > 0
-            ? trancheSum + (baseInputs.tagesgeld || 0)
-            : (balanceSum > 0 ? balanceSum : (baseInputs.depotwertAlt + baseInputs.tagesgeld + baseInputs.geldmarktEtf));
+        const derivedStart = trancheSum + (baseInputs.tagesgeld || 0) + (baseInputs.geldmarktEtf || 0);
         if (derivedStart > 0) {
             baseInputs.startVermoegen = derivedStart;
         }
+    } else {
+        baseInputs.depotwertAlt = 0;
+        baseInputs.einstandAlt = 0;
+        baseInputs.geldmarktEtf = 0;
+        baseInputs.startVermoegen = (baseInputs.tagesgeld || 0);
+        baseInputs.zielLiquiditaet = baseInputs.startVermoegen;
     }
 
     if ((!baseInputs.depotwertAlt || baseInputs.depotwertAlt <= 0) && trancheTotals.equity > 0) {
@@ -383,10 +392,7 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
         const totals = sumTrancheTotals(mergedTranches);
         const trancheTotal = totals.equity + totals.gold + totals.moneyMarket;
         const trancheWithCash = trancheTotal + sumTagesgeld + sumGeldmarkt;
-        if (totalAssets > 0 && trancheWithCash > 0 && trancheWithCash < totalAssets * 0.8) {
-            warnings.push('Tranchen-Summe deutlich kleiner als Startvermoegen; Additiv faellt auf Aggregat zurueck.');
-            combined.detailledTranches = null;
-        }
+        combined.startVermoegen = trancheWithCash;
         if (trancheWithCash <= 0) {
             warnings.push('Tranchen ohne Marktwert erkannt; Additiv nutzt Aggregat.');
             combined.detailledTranches = null;

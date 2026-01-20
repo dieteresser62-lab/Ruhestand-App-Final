@@ -1,5 +1,16 @@
 "use strict";
 
+import {
+    EUR_FORMATTER,
+    NUM_FORMATTER,
+    formatCurrency,
+    formatNumber,
+    formatPercent,
+    formatPercentValue,
+    formatPercentRatio,
+    formatMonths
+} from './shared-formatting.js';
+
 /**
  * ===================================================================================
  * BALANCE-APP UTILITY FUNKTIONEN
@@ -10,22 +21,40 @@
 
 export const UIUtils = {
     // Intl.NumberFormat-Instanzen für Performance (einmalige Initialisierung)
-    EUR_FORMATTER: new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }),
-    NUM_FORMATTER: new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 }),
+    EUR_FORMATTER,
+    NUM_FORMATTER,
 
     /**
      * Formatiert eine Zahl als Währung (Euro)
      * @param {number} val - Zu formatierende Zahl
      * @returns {string} Formatierter String (z.B. "1.234,56 €") oder "N/A"
      */
-    formatCurrency: val => (typeof val === 'number' && isFinite(val)) ? UIUtils.EUR_FORMATTER.format(val) : 'N/A',
+    formatCurrency: val => (typeof val === 'number' && isFinite(val)) ? formatCurrency(val) : 'N/A',
 
     /**
      * Formatiert eine Zahl als Ganzzahl mit Tausendertrennern
      * @param {number} num - Zu formatierende Zahl
      * @returns {string} Formatierter String (z.B. "1.234")
      */
-    formatNumber: num => UIUtils.NUM_FORMATTER.format(Math.round(num)),
+    formatNumber,
+
+    /**
+     * Formatiert Prozentwerte mit einstellbarer Skalierung.
+     * @param {number} value - Eingabewert
+     * @param {object} options - Formatoptionen
+     * @returns {string|null} Formatierter Prozentwert oder Fallback
+     */
+    formatPercent,
+    formatPercentValue,
+    formatPercentRatio,
+
+    /**
+     * Formatiert Monatswerte mit Suffix.
+     * @param {number} value - Eingabewert
+     * @param {object} options - Formatoptionen
+     * @returns {string} Formatierter Monatswert oder Fallback
+     */
+    formatMonths,
 
     /**
      * Parst einen Währungs-String zu einer Zahl
