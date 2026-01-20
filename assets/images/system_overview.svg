@@ -1,0 +1,51 @@
+<svg width="1100" height="320" viewBox="0 0 1100 320" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .text { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+      .title { font-size: 20px; font-weight: bold; fill: #1a2530; }
+      .label { font-size: 13px; fill: #546e7a; }
+      .small { font-size: 12px; fill: #78909c; }
+      .bg { fill: #f8f9fa; }
+      .card-bg { fill: #ffffff; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.08)); }
+      .accent { fill: #c5a059; }
+      .line { stroke: #cfd8dc; stroke-width: 2; }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#cfd8dc"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1100" height="320" class="bg"/>
+  <rect x="20" y="20" width="1060" height="280" rx="12" fill="#ffffff" stroke="#e0e0e0"/>
+
+  <rect x="60" y="60" width="220" height="90" rx="10" class="card-bg" stroke="#e0e0e0"/>
+  <text x="170" y="95" text-anchor="middle" class="text title">Balance-App</text>
+  <text x="170" y="120" text-anchor="middle" class="text label">Jahresplanung</text>
+
+  <rect x="60" y="180" width="220" height="90" rx="10" class="card-bg" stroke="#e0e0e0"/>
+  <text x="170" y="215" text-anchor="middle" class="text title">Simulator</text>
+  <text x="170" y="240" text-anchor="middle" class="text label">Monte-Carlo</text>
+
+  <rect x="340" y="105" width="220" height="110" rx="12" fill="#fdf6e9" stroke="#e0c18a"/>
+  <text x="450" y="140" text-anchor="middle" class="text title">Engine</text>
+  <text x="450" y="165" text-anchor="middle" class="text label">Validierung</text>
+  <text x="450" y="186" text-anchor="middle" class="text label">Analyse → Trades</text>
+
+  <rect x="620" y="60" width="220" height="90" rx="10" class="card-bg" stroke="#e0e0e0"/>
+  <text x="730" y="95" text-anchor="middle" class="text title">Local Storage</text>
+  <text x="730" y="120" text-anchor="middle" class="text label">Profile + Tranchen</text>
+
+  <rect x="620" y="180" width="220" height="90" rx="10" class="card-bg" stroke="#e0e0e0"/>
+  <text x="730" y="215" text-anchor="middle" class="text title">Datenquellen</text>
+  <text x="730" y="240" text-anchor="middle" class="text label">Inflation & Kurse</text>
+
+  <rect x="880" y="120" width="160" height="80" rx="10" class="card-bg" stroke="#e0e0e0"/>
+  <text x="960" y="150" text-anchor="middle" class="text title">Browser</text>
+  <text x="960" y="173" text-anchor="middle" class="text label">Local-first</text>
+
+  <path d="M280 105 L340 130" class="line" marker-end="url(#arrow)"/>
+  <path d="M280 215 L340 190" class="line" marker-end="url(#arrow)"/>
+  <path d="M560 140 L620 105" class="line" marker-end="url(#arrow)"/>
+  <path d="M560 180 L620 205" class="line" marker-end="url(#arrow)"/>
+  <path d="M840 150 L880 160" class="line" marker-end="url(#arrow)"/>
+</svg>

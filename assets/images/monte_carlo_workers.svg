@@ -1,0 +1,57 @@
+<svg width="1100" height="320" viewBox="0 0 1100 320" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .text { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+      .title { font-size: 18px; font-weight: bold; fill: #1a2530; }
+      .label { font-size: 12px; fill: #546e7a; }
+      .bg { fill: #f8f9fa; }
+      .card-bg { fill: #ffffff; filter: drop-shadow(0px 2px 4px rgba(0,0,0,0.08)); }
+      .accent { fill: #e8f5e9; stroke: #c8e6c9; }
+      .line { stroke: #cfd8dc; stroke-width: 2; }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#cfd8dc"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1100" height="320" class="bg"/>
+  <rect x="20" y="20" width="1060" height="280" rx="12" fill="#ffffff" stroke="#e0e0e0"/>
+
+  <rect x="60" y="130" width="170" height="70" rx="10" class="card-bg" stroke="#e0e0e0"/>
+  <text x="145" y="158" text-anchor="middle" class="text title">UI</text>
+  <text x="145" y="182" text-anchor="middle" class="text label">MC Start</text>
+
+  <rect x="260" y="95" width="200" height="130" rx="12" class="accent"/>
+  <text x="360" y="130" text-anchor="middle" class="text title">Worker-Pool</text>
+  <text x="360" y="155" text-anchor="middle" class="text label">Chunking + Seeds</text>
+  <text x="360" y="178" text-anchor="middle" class="text label">Fallback serial</text>
+
+  <rect x="510" y="70" width="150" height="60" rx="10" class="card-bg" stroke="#e0e0e0"/>
+  <text x="585" y="98" text-anchor="middle" class="text title">Worker 1</text>
+  <text x="585" y="118" text-anchor="middle" class="text label">Runner</text>
+
+  <rect x="510" y="150" width="150" height="60" rx="10" class="card-bg" stroke="#e0e0e0"/>
+  <text x="585" y="178" text-anchor="middle" class="text title">Worker 2</text>
+  <text x="585" y="198" text-anchor="middle" class="text label">Runner</text>
+
+  <rect x="510" y="230" width="150" height="60" rx="10" class="card-bg" stroke="#e0e0e0"/>
+  <text x="585" y="258" text-anchor="middle" class="text title">Worker N</text>
+  <text x="585" y="278" text-anchor="middle" class="text label">Runner</text>
+
+  <rect x="720" y="125" width="180" height="80" rx="10" class="card-bg" stroke="#e0e0e0"/>
+  <text x="810" y="153" text-anchor="middle" class="text title">Aggregation</text>
+  <text x="810" y="176" text-anchor="middle" class="text label">KPIs</text>
+
+  <rect x="930" y="125" width="130" height="80" rx="10" class="card-bg" stroke="#e0e0e0"/>
+  <text x="995" y="153" text-anchor="middle" class="text title">Result</text>
+  <text x="995" y="176" text-anchor="middle" class="text label">Dashboard</text>
+
+  <path d="M230 165 L260 165" class="line" marker-end="url(#arrow)"/>
+  <path d="M460 165 L510 100" class="line" marker-end="url(#arrow)"/>
+  <path d="M460 165 L510 180" class="line" marker-end="url(#arrow)"/>
+  <path d="M460 165 L510 260" class="line" marker-end="url(#arrow)"/>
+  <path d="M660 100 L720 150" class="line" marker-end="url(#arrow)"/>
+  <path d="M660 180 L720 150" class="line" marker-end="url(#arrow)"/>
+  <path d="M660 260 L720 150" class="line" marker-end="url(#arrow)"/>
+  <path d="M900 165 L930 165" class="line" marker-end="url(#arrow)"/>
+</svg>
