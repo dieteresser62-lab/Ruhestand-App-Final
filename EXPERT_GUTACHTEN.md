@@ -4,9 +4,9 @@
 
 **Gutachten erstellt:** Januar 2026
 **Gutachter:** Claude Opus 4.5 (KI-gestützte Analyse)
-**Analysierte Version:** Engine API v31.0, Build 2025-12-22, Commit `c523fff`
-**Analysemethode:** Code-Review (~27.500 LOC) + Web-Recherche
 **Rollen-Perspektive:** Software-Architekt, Quant/Finanzplaner, Research-Experte
+**Analysierte Version:** Engine API v32.0, Build 2026-01-21
+**Analysemethode:** Code-Review (~27.500 LOC) + Web-Recherche
 
 ---
 
@@ -15,7 +15,7 @@
 ## Analysierte Software
 
 **Ruhestand-Suite** — DIY-Softwaresuite zur Ruhestandsplanung
-- **Version:** Engine API v31.0, Build 2025-12-22
+- **Version:** Engine API v32.0, Build 2026-01-21
 - **Sprache:** JavaScript (ES6 Module)
 - **Lizenz:** MIT
 - **Zielgruppe:** Deutschsprachige Solo-Ruheständler mit Finanzverständnis
@@ -812,7 +812,7 @@ if (scenario.startsWith('peak') && equityOverweight > rebalBand) {
 ## D.1 Kommerzielle Retirement Planner (2025/2026)
 
 ### D.1.1 ProjectionLab
-
+rt
 | Aspekt | Details |
 |--------|---------|
 | **Preis** | $9/Monat (Premium), $799 Lifetime |
@@ -1146,4 +1146,4 @@ if (scenario.startsWith('peak') && equityOverweight > rebalBand) {
 
 ---
 
-*Dokument erstellt durch KI-gestützte Code-Analyse (Claude Opus 4.5) und Web-Recherche. Alle Bewertungen basieren auf Commit `c523fff` (Engine API v31.0, Build 2025-12-22). Code-Zeilenangaben können bei zukünftigen Änderungen abweichen; Algorithmen-Beschreibungen bleiben konzeptionell gültig.*
+*Dokument erstellt durch KI-gestützte Code-Analyse (Claude Opus 4.5) und Web-Recherche. Alle Bewertungen basieren auf dem analysierten Code-Stand (Engine API v32.0, Build 2026-01-21). Code-Zeilenangaben können bei zukünftigen Änderungen abweichen; Algorithmen-Beschreibungen bleiben konzeptionell gültig.*

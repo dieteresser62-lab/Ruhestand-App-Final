@@ -136,11 +136,28 @@
             grid-column: 1 / -1;
             font-size: 16px;
             color: #2d3748;
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            margin: 0;
         }
 
         .profile-values small {
             color: #718096;
             font-size: 12px;
+        }
+
+        .gold-row {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: repeat(5, minmax(140px, 1fr));
+            gap: 12px;
+        }
+
+        @media (max-width: 980px) {
+            .gold-row {
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            }
         }
 
         .stat-card {
@@ -344,10 +361,7 @@
         <div id="priceUpdateStatus" class="hint"></div>
 
         <div class="profile-values">
-            <h3>Profilwerte</h3>
-            <div class="hint" style="margin-bottom: 12px;">
-                Profil: <strong id="activeProfileName">-</strong>
-            </div>
+            <h3>Profilwerte: <span id="activeProfileName">-</span></h3>
             <div class="form-group">
                 <label for="profileTagesgeld">Tagesgeld (€)</label>
                 <input type="number" id="profileTagesgeld" step="1" min="0" placeholder="0">
@@ -364,39 +378,46 @@
                     <option value="false">Nein</option>
                     <option value="true">Ja</option>
                 </select>
-                <small>Steuert ob Rentenwerte beruecksichtigt werden.</small>
+                <small>Wird automatisch aus der Monatsrente abgeleitet.</small>
             </div>
             <div class="form-group">
                 <label for="profileRenteMonatlich">Monatliche Rente (Netto, €)</label>
                 <input type="number" id="profileRenteMonatlich" step="1" min="0" placeholder="0">
-                <small>Nur relevant wenn Rente aktiv ist.</small>
+                <small>Wird mit sonstigen Einkuenften summiert.</small>
             </div>
             <div class="form-group">
-                <label for="profileGoldAktiv">Gold-Strategie aktiv</label>
-                <select id="profileGoldAktiv">
-                    <option value="false">Nein</option>
-                    <option value="true">Ja</option>
-                </select>
-                <small>Steuert ob Gold in der Planung aktiv ist.</small>
+                <label for="profileSonstigeEinkuenfte">Sonstige Einkuenfte (Monat, €)</label>
+                <input type="number" id="profileSonstigeEinkuenfte" step="1" min="0" placeholder="0">
+                <small>Gehalt, Unterhalt, sonstige Zufluesse.</small>
             </div>
-            <div class="form-group">
-                <label for="profileGoldZiel">Gold Ziel-Anteil (%)</label>
-                <input type="number" id="profileGoldZiel" step="0.1" min="0" max="100" placeholder="7.5">
-            </div>
-            <div class="form-group">
-                <label for="profileGoldFloor">Gold Floor-Anteil (%)</label>
-                <input type="number" id="profileGoldFloor" step="0.1" min="0" max="100" placeholder="1">
-            </div>
-            <div class="form-group">
-                <label for="profileGoldBand">Rebal. Band (%)</label>
-                <input type="number" id="profileGoldBand" step="0.1" min="0" max="100" placeholder="25">
-            </div>
-            <div class="form-group">
-                <label for="profileGoldSteuerfrei">Gold-Verkaeufe steuerfrei</label>
-                <select id="profileGoldSteuerfrei">
-                    <option value="false">Nein</option>
-                    <option value="true">Ja</option>
-                </select>
+            <div class="gold-row">
+                <div class="form-group">
+                    <label for="profileGoldAktiv">Gold-Strategie aktiv</label>
+                    <select id="profileGoldAktiv">
+                        <option value="false">Nein</option>
+                        <option value="true">Ja</option>
+                    </select>
+                    <small>Steuert ob Gold in der Planung aktiv ist.</small>
+                </div>
+                <div class="form-group">
+                    <label for="profileGoldZiel">Gold Ziel-Anteil (%)</label>
+                    <input type="number" id="profileGoldZiel" step="0.1" min="0" max="100" placeholder="7.5">
+                </div>
+                <div class="form-group">
+                    <label for="profileGoldFloor">Gold Floor-Anteil (%)</label>
+                    <input type="number" id="profileGoldFloor" step="0.1" min="0" max="100" placeholder="1">
+                </div>
+                <div class="form-group">
+                    <label for="profileGoldBand">Rebal. Band (%)</label>
+                    <input type="number" id="profileGoldBand" step="0.1" min="0" max="100" placeholder="25">
+                </div>
+                <div class="form-group">
+                    <label for="profileGoldSteuerfrei">Gold-Verkaeufe steuerfrei</label>
+                    <select id="profileGoldSteuerfrei">
+                        <option value="false">Nein</option>
+                        <option value="true">Ja</option>
+                    </select>
+                </div>
             </div>
         </div>
 
@@ -502,6 +523,7 @@
             tagesgeld: 0,
             renteAktiv: false,
             renteMonatlich: 0,
+            sonstigeEinkuenfte: 0,
             goldAktiv: false,
             goldZiel: 7.5,
             goldFloor: 1,
@@ -513,6 +535,7 @@
             tagesgeld: 'profile_tagesgeld',
             renteAktiv: 'profile_rente_aktiv',
             renteMonatlich: 'profile_rente_monatlich',
+            sonstigeEinkuenfte: 'profile_sonstige_einkuenfte',
             alter: 'profile_aktuelles_alter',
             goldAktiv: 'profile_gold_aktiv',
             goldZiel: 'profile_gold_ziel_pct',
@@ -583,8 +606,8 @@
         function loadProfileValues() {
             const storedInputs = readProfileStoredInputs();
             const tagesgeldRaw = localStorage.getItem(PROFILE_KEYS.tagesgeld);
-            const renteAktivRaw = localStorage.getItem(PROFILE_KEYS.renteAktiv);
             const renteMonatlichRaw = localStorage.getItem(PROFILE_KEYS.renteMonatlich);
+            const sonstigeEinkuenfteRaw = localStorage.getItem(PROFILE_KEYS.sonstigeEinkuenfte);
             const alterRaw = localStorage.getItem(PROFILE_KEYS.alter);
             const goldAktivRaw = localStorage.getItem(PROFILE_KEYS.goldAktiv);
             const goldZielRaw = localStorage.getItem(PROFILE_KEYS.goldZiel);
@@ -595,12 +618,13 @@
             const tagesgeld = tagesgeldRaw !== null
                 ? Number(tagesgeldRaw) || 0
                 : Number(storedInputs.tagesgeld) || 0;
-            const renteAktiv = renteAktivRaw !== null
-                ? String(renteAktivRaw) === 'true'
-                : Boolean(storedInputs.renteAktiv);
             const renteMonatlich = renteMonatlichRaw !== null
                 ? Number(renteMonatlichRaw) || 0
                 : Number(storedInputs.renteMonatlich) || 0;
+            const sonstigeEinkuenfte = sonstigeEinkuenfteRaw !== null
+                ? Number(sonstigeEinkuenfteRaw) || 0
+                : Number(storedInputs.sonstigeEinkuenfte) || 0;
+            const renteAktiv = (renteMonatlich + sonstigeEinkuenfte) > 0;
             const alter = alterRaw !== null
                 ? Number(alterRaw) || 0
                 : Number(storedInputs.aktuellesAlter) || 0;
@@ -620,11 +644,12 @@
                 ? String(goldSteuerfreiRaw) === 'true'
                 : Boolean(storedInputs.goldSteuerfrei);
 
-            profileValues = { tagesgeld, renteAktiv, renteMonatlich, alter, goldAktiv, goldZiel, goldFloor, goldBand, goldSteuerfrei };
+            profileValues = { tagesgeld, renteAktiv, renteMonatlich, sonstigeEinkuenfte, alter, goldAktiv, goldZiel, goldFloor, goldBand, goldSteuerfrei };
 
             const tagesgeldInput = document.getElementById('profileTagesgeld');
             const renteAktivInput = document.getElementById('profileRenteAktiv');
             const renteMonatlichInput = document.getElementById('profileRenteMonatlich');
+            const sonstigeEinkuenfteInput = document.getElementById('profileSonstigeEinkuenfte');
             const alterInput = document.getElementById('profileAlter');
             const goldAktivInput = document.getElementById('profileGoldAktiv');
             const goldZielInput = document.getElementById('profileGoldZiel');
@@ -633,8 +658,12 @@
             const goldSteuerfreiInput = document.getElementById('profileGoldSteuerfrei');
 
             if (tagesgeldInput) tagesgeldInput.value = tagesgeld || 0;
-            if (renteAktivInput) renteAktivInput.value = renteAktiv ? 'true' : 'false';
+            if (renteAktivInput) {
+                renteAktivInput.value = renteAktiv ? 'true' : 'false';
+                renteAktivInput.disabled = true;
+            }
             if (renteMonatlichInput) renteMonatlichInput.value = renteMonatlich || 0;
+            if (sonstigeEinkuenfteInput) sonstigeEinkuenfteInput.value = sonstigeEinkuenfte || 0;
             if (alterInput) alterInput.value = alter || 0;
             if (goldAktivInput) goldAktivInput.value = goldAktiv ? 'true' : 'false';
             if (goldZielInput) goldZielInput.value = goldZiel;
@@ -649,6 +678,7 @@
             const tagesgeldInput = document.getElementById('profileTagesgeld');
             const renteAktivInput = document.getElementById('profileRenteAktiv');
             const renteMonatlichInput = document.getElementById('profileRenteMonatlich');
+            const sonstigeEinkuenfteInput = document.getElementById('profileSonstigeEinkuenfte');
             const alterInput = document.getElementById('profileAlter');
             const goldAktivInput = document.getElementById('profileGoldAktiv');
             const goldZielInput = document.getElementById('profileGoldZiel');
@@ -657,8 +687,9 @@
             const goldSteuerfreiInput = document.getElementById('profileGoldSteuerfrei');
 
             const tagesgeld = tagesgeldInput ? Number(tagesgeldInput.value) || 0 : 0;
-            const renteAktiv = renteAktivInput ? renteAktivInput.value === 'true' : false;
             const renteMonatlich = renteMonatlichInput ? Number(renteMonatlichInput.value) || 0 : 0;
+            const sonstigeEinkuenfte = sonstigeEinkuenfteInput ? Number(sonstigeEinkuenfteInput.value) || 0 : 0;
+            const renteAktiv = (renteMonatlich + sonstigeEinkuenfte) > 0;
             const alter = alterInput ? Number(alterInput.value) || 0 : 0;
             const goldAktiv = goldAktivInput ? goldAktivInput.value === 'true' : false;
             const goldZiel = goldZielInput ? Number(goldZielInput.value) || 0 : 0;
@@ -666,10 +697,12 @@
             const goldBand = goldBandInput ? Number(goldBandInput.value) || 0 : 0;
             const goldSteuerfrei = goldSteuerfreiInput ? goldSteuerfreiInput.value === 'true' : false;
 
-            profileValues = { tagesgeld, renteAktiv, renteMonatlich, alter, goldAktiv, goldZiel, goldFloor, goldBand, goldSteuerfrei };
+            profileValues = { tagesgeld, renteAktiv, renteMonatlich, sonstigeEinkuenfte, alter, goldAktiv, goldZiel, goldFloor, goldBand, goldSteuerfrei };
+            if (renteAktivInput) renteAktivInput.value = renteAktiv ? 'true' : 'false';
             localStorage.setItem(PROFILE_KEYS.tagesgeld, String(tagesgeld));
             localStorage.setItem(PROFILE_KEYS.renteAktiv, renteAktiv ? 'true' : 'false');
             localStorage.setItem(PROFILE_KEYS.renteMonatlich, String(renteMonatlich));
+            localStorage.setItem(PROFILE_KEYS.sonstigeEinkuenfte, String(sonstigeEinkuenfte));
             localStorage.setItem(PROFILE_KEYS.alter, String(alter));
             localStorage.setItem(PROFILE_KEYS.goldAktiv, goldAktiv ? 'true' : 'false');
             localStorage.setItem(PROFILE_KEYS.goldZiel, String(goldZiel));
@@ -682,8 +715,8 @@
             const inputIds = [
                 'profileTagesgeld',
                 'profileAlter',
-                'profileRenteAktiv',
                 'profileRenteMonatlich',
+                'profileSonstigeEinkuenfte',
                 'profileGoldAktiv',
                 'profileGoldZiel',
                 'profileGoldFloor',
@@ -971,14 +1004,6 @@
             const gainPct = totalCost > 0 ? (totalGain / totalCost) * 100 : 0;
 
             const statsHtml = `
-                <div class="stat-card">
-                    <div class="stat-label">Tagesgeld</div>
-                    <div class="stat-value">${profileValues.tagesgeld.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-label">Rente (Monat)</div>
-                    <div class="stat-value">${profileValues.renteAktiv ? profileValues.renteMonatlich.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0,00'} €</div>
-                </div>
                 <div class="stat-card">
                     <div class="stat-label">Gesamtwert</div>
                     <div class="stat-value">${totalValue.toLocaleString('de-DE', {minimumFractionDigits: 2, maximumFractionDigits: 2})} €</div>

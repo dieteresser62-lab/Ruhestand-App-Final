@@ -90,6 +90,7 @@ export const UIReader = {
         const profileTagesgeld = readProfileNumber('profile_tagesgeld');
         const profileRenteAktiv = readProfileBool('profile_rente_aktiv');
         const profileRenteMonatlich = readProfileNumber('profile_rente_monatlich');
+        const profileSonstigeEinkuenfte = readProfileNumber('profile_sonstige_einkuenfte');
         const profileAlter = readProfileNumber('profile_aktuelles_alter');
         const profileGoldAktiv = readProfileBool('profile_gold_aktiv');
         const profileGoldZiel = readProfileNumber('profile_gold_ziel_pct');
@@ -145,6 +146,16 @@ export const UIReader = {
             rebalancingBandFinal = DEFAULT_GOLD_BAND;
         }
 
+        const hasProfileRenteSum = Number.isFinite(profileRenteMonatlich)
+            || Number.isFinite(profileSonstigeEinkuenfte);
+        const renteMonatlichFinal = hasProfileRenteSum
+            ? (Number.isFinite(profileRenteMonatlich) ? profileRenteMonatlich : 0)
+                + (Number.isFinite(profileSonstigeEinkuenfte) ? profileSonstigeEinkuenfte : 0)
+            : num('renteMonatlich');
+        const renteAktivFinal = hasProfileRenteSum
+            ? renteMonatlichFinal > 0
+            : ((typeof profileRenteAktiv === 'boolean') ? profileRenteAktiv : val('renteAktiv') === 'ja');
+
         return {
             aktuellesAlter: Number.isFinite(profileAlter) ? profileAlter : (parseInt(val('aktuellesAlter')) || 0),
             floorBedarf: num('floorBedarf'),
@@ -161,8 +172,8 @@ export const UIReader = {
             endeVJ_3: parseFloat(val('endeVJ_3')) || 0,
             ath: parseFloat(val('ath')) || 0,
             jahreSeitAth: parseFloat(val('jahreSeitAth')) || 0,
-            renteAktiv: (typeof profileRenteAktiv === 'boolean') ? profileRenteAktiv : val('renteAktiv') === 'ja',
-            renteMonatlich: Number.isFinite(profileRenteMonatlich) ? profileRenteMonatlich : num('renteMonatlich'),
+            renteAktiv: renteAktivFinal,
+            renteMonatlich: renteMonatlichFinal,
             risikoprofil: 'sicherheits-dynamisch',
             goldAktiv: goldAktivFinal,
             goldZielProzent: goldZielFinal,

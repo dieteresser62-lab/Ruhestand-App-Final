@@ -1,14 +1,16 @@
 {
   "name": "ruhestand-app-final",
   "version": "1.0.0",
-  "description": "Die Ruhestand-App ist ein vollständig lokal ausführbares Planungstool mit zwei Oberflächen:",
+  "description": "Die Ruhestand-App ist ein vollst\u00c3\u00a4ndig lokal ausf\u00c3\u00bchrbares Planungstool mit zwei Oberfl\u00c3\u00a4chen:",
   "main": "balance-binder.js",
   "scripts": {
     "build:engine": "node build-engine.mjs",
     "test": "node tests/run-tests.mjs",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "sync-dist": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/sync-dist.ps1",
+    "build-tauri-exe": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-tauri.ps1"
   },
   "keywords": [],
   "author": "",

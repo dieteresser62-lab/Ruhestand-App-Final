@@ -36,6 +36,7 @@ const PROFILE_VALUE_KEYS = {
     tagesgeld: 'profile_tagesgeld',
     renteAktiv: 'profile_rente_aktiv',
     renteMonatlich: 'profile_rente_monatlich',
+    sonstigeEinkuenfte: 'profile_sonstige_einkuenfte',
     alter: 'profile_aktuelles_alter',
     goldAktiv: 'profile_gold_aktiv',
     goldZiel: 'profile_gold_ziel_pct',

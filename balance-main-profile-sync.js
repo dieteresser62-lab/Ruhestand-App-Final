@@ -9,6 +9,7 @@ export function createProfileSyncHandlers({ dom, PROFILE_VALUE_KEYS }) {
         const tagesgeldRaw = localStorage.getItem(PROFILE_VALUE_KEYS.tagesgeld);
         const renteAktivRaw = localStorage.getItem(PROFILE_VALUE_KEYS.renteAktiv);
         const renteMonatlichRaw = localStorage.getItem(PROFILE_VALUE_KEYS.renteMonatlich);
+        const sonstigeEinkuenfteRaw = localStorage.getItem(PROFILE_VALUE_KEYS.sonstigeEinkuenfte);
         const alterRaw = localStorage.getItem(PROFILE_VALUE_KEYS.alter);
         const goldAktivRaw = localStorage.getItem(PROFILE_VALUE_KEYS.goldAktiv);
         const goldZielRaw = localStorage.getItem(PROFILE_VALUE_KEYS.goldZiel);
@@ -81,17 +82,16 @@ export function createProfileSyncHandlers({ dom, PROFILE_VALUE_KEYS }) {
                 const normalized = String(renteAktivRaw).toLowerCase() === 'true' ? 'ja' : 'nein';
                 dom.inputs.renteAktiv.value = normalized;
             }
-            if (dom.inputs.renteMonatlich && renteMonatlichRaw !== null) {
-                const renteMonatlich = UIUtils.parseCurrency(renteMonatlichRaw);
-                if (Number.isFinite(renteMonatlich)) {
-                    dom.inputs.renteMonatlich.value = Math.round(renteMonatlich).toLocaleString('de-DE');
-                }
+            const renteMonatlich = UIUtils.parseCurrency(renteMonatlichRaw);
+            const sonstigeEinkuenfte = UIUtils.parseCurrency(sonstigeEinkuenfteRaw);
+            const renteSumme = (Number.isFinite(renteMonatlich) ? renteMonatlich : 0)
+                + (Number.isFinite(sonstigeEinkuenfte) ? sonstigeEinkuenfte : 0);
+
+            if (dom.inputs.renteMonatlich && Number.isFinite(renteSumme)) {
+                dom.inputs.renteMonatlich.value = Math.round(renteSumme).toLocaleString('de-DE');
             }
-            if (dom.inputs.fixedIncomeAnnual) {
-                const renteMonatlich = UIUtils.parseCurrency(renteMonatlichRaw);
-                if (Number.isFinite(renteMonatlich)) {
-                    dom.inputs.fixedIncomeAnnual.value = Math.round(renteMonatlich * 12).toLocaleString('de-DE');
-                }
+            if (dom.inputs.fixedIncomeAnnual && Number.isFinite(renteSumme)) {
+                dom.inputs.fixedIncomeAnnual.value = Math.round(renteSumme * 12).toLocaleString('de-DE');
             }
             if (dom.inputs.aktuellesAlter && alterRaw !== null) {
                 const alter = UIUtils.parseCurrency(alterRaw);

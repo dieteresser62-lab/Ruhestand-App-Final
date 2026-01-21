@@ -261,10 +261,20 @@ export const StorageManager = {
      * @throws {StorageError} Wenn keine Daten zum Sichern vorhanden sind
      */
     async createSnapshot(handle, label = '') {
-        const currentData = this.loadState();
-        if (!currentData || Object.keys(currentData).length === 0) {
+        const localSnapshot = {};
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (!key) continue;
+            localSnapshot[key] = localStorage.getItem(key);
+        }
+        if (Object.keys(localSnapshot).length === 0) {
             throw new StorageError("Keine Daten zum Sichern vorhanden.");
         }
+        const currentData = {
+            snapshotType: 'full-localstorage',
+            createdAt: new Date().toISOString(),
+            localStorage: localSnapshot
+        };
         const timestamp = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-');
 
         // Sanitize label
@@ -332,14 +342,29 @@ export const StorageManager = {
      */
     async restoreSnapshot(key, handle) {
         let snapshotData;
+        let rawSnapshot = null;
         if (handle) {
             const fileHandle = await handle.getFileHandle(key);
             const file = await fileHandle.getFile();
             snapshotData = JSON.parse(await file.text());
         } else {
-            snapshotData = JSON.parse(localStorage.getItem(key));
+            rawSnapshot = localStorage.getItem(key);
+            snapshotData = JSON.parse(rawSnapshot);
         }
-        this.saveState(snapshotData);
+        if (!snapshotData || typeof snapshotData !== "object") {
+            throw new StorageError("Snapshot enthält keine gültigen Daten.");
+        }
+        if (snapshotData.snapshotType === "full-localstorage" && snapshotData.localStorage) {
+            localStorage.clear();
+            Object.entries(snapshotData.localStorage).forEach(([lsKey, value]) => {
+                localStorage.setItem(lsKey, value);
+            });
+            if (!handle && rawSnapshot && key) {
+                localStorage.setItem(key, rawSnapshot);
+            }
+        } else {
+            this.saveState(snapshotData);
+        }
         location.reload();
     },
 

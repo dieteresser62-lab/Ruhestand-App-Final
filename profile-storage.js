@@ -12,6 +12,7 @@ const FIXED_KEYS = new Set([
     'profile_tagesgeld',
     'profile_rente_aktiv',
     'profile_rente_monatlich',
+    'profile_sonstige_einkuenfte',
     'profile_aktuelles_alter',
     'profile_gold_aktiv',
     'profile_gold_ziel_pct',

@@ -33,6 +33,7 @@ function parseProfileOverrides(profileData) {
             ? String(profileData.profile_rente_aktiv || '').toLowerCase() === 'true'
             : null,
         profileRenteMonatlich: readNumber(profileData.profile_rente_monatlich, null),
+        profileSonstigeEinkuenfte: readNumber(profileData.profile_sonstige_einkuenfte, null),
         profileGoldAktiv: hasGoldAktiv
             ? String(profileData.profile_gold_aktiv || '').toLowerCase() === 'true'
             : null,
@@ -62,16 +63,24 @@ function normalizeBalanceInputs(inputs, overrides = {}) {
     const tagesgeldOverride = overrides.profileTagesgeld;
     const renteMonatlichOverride = overrides.profileRenteMonatlich;
     const renteAktivOverride = overrides.profileRenteAktiv;
+    const sonstigeEinkuenfteOverride = overrides.profileSonstigeEinkuenfte;
     const goldAktivOverride = overrides.profileGoldAktiv;
     const goldZielOverride = overrides.profileGoldZiel;
     const goldFloorOverride = overrides.profileGoldFloor;
     const goldSteuerfreiOverride = overrides.profileGoldSteuerfrei;
     const goldRebalBandOverride = overrides.profileGoldRebalBand;
+    const renteMonatlich = Number.isFinite(renteMonatlichOverride)
+        ? renteMonatlichOverride
+        : readNumber(inputs.renteMonatlich, 0);
+    const sonstigeEinkuenfte = Number.isFinite(sonstigeEinkuenfteOverride)
+        ? sonstigeEinkuenfteOverride
+        : 0;
+    const renteSumme = renteMonatlich + sonstigeEinkuenfte;
     return {
         floorBedarf: readNumber(inputs.floorBedarf, 0),
         flexBedarf: readNumber(inputs.flexBedarf, 0),
-        renteAktiv: typeof renteAktivOverride === 'boolean' ? renteAktivOverride : Boolean(inputs.renteAktiv),
-        renteMonatlich: Number.isFinite(renteMonatlichOverride) ? renteMonatlichOverride : readNumber(inputs.renteMonatlich, 0),
+        renteAktiv: typeof renteAktivOverride === 'boolean' ? renteAktivOverride : (renteSumme > 0),
+        renteMonatlich: renteSumme,
         tagesgeld: Number.isFinite(tagesgeldOverride) ? tagesgeldOverride : readNumber(inputs.tagesgeld, 0),
         geldmarktEtf: readNumber(inputs.geldmarktEtf, 0),
         depotwertAlt: readNumber(inputs.depotwertAlt, 0),
