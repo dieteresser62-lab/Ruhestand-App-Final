@@ -44,10 +44,10 @@
 
 | Aspekt | Wert |
 |--------|------|
-| **Analysierter Commit** | `c523fff` (2026-01-21) |
-| **Engine Build-ID** | 2025-12-22 (in `engine/config.mjs`) |
-| **Engine API Version** | v31.0 |
-| **Geschätzte LOC** | ~27.500 (via `wc -l`) |
+| **Analysierter Commit** | `35f19f2` (2026-01-21) |
+| **Engine Build-ID** | 2026-01-21 (in `engine/config.mjs`) |
+| **Engine API Version** | v32.0 |
+| **Geschätzte LOC** | ~28.500 (via `wc -l`) |
 | **Gutachten-Erstellung** | Januar 2026, Claude Opus 4.5 |
 
 *Hinweis: Code-Zeilenangaben (z.B. `SpendingPlanner.mjs:326`) beziehen sich auf den analysierten Commit und können bei zukünftigen Änderungen abweichen. Die Algorithmen-Beschreibungen bleiben konzeptionell gültig.*
@@ -69,7 +69,12 @@ Die **Ruhestand-Suite** ist nach meiner Einschätzung **eines der funktionsreich
 - Kein Stationary Bootstrap (nur Block-Bootstrap)
 - Keine expliziten Fat Tails im Return-Modell
 - Keine Verlustverrechnung
-- Index-Variante (`msci_eur`) undokumentiert (siehe Abschnitt C.3.3)
+
+**v32.0-Verbesserungen:**
+- ✅ Startjahr-Sampling mit FILTER/RECENCY-Modi (behebt "Wirtschaftswunder"-Bias)
+- ✅ Erweiterte historische Daten (1925-2024, +25 Jahre Depression/WWII)
+- ✅ Neue Stress-Presets (Great Depression, WWII)
+- ✅ Index-Variante dokumentiert (siehe Abschnitt C.3.4)
 
 ---
 
@@ -550,100 +555,126 @@ if (purchaseDate < new Date('2009-01-01')) {
 
 ## C.3 Monte-Carlo-Methodik
 
-### C.3.1 Sampling-Strategien
+### C.3.1 Startjahr-Sampling (NEU in v32.0)
 
-**Strategie 1: Zufälliges Jahr** (monte-carlo-runner.js:190)
+**Problem:** Bei uniformer Zufallsauswahl haben alle historischen Jahre gleiche Wahrscheinlichkeit. Die "Wirtschaftswunder"-Jahre 1950-1960 mit ~19% CAGR können zu optimistischen Ergebnissen führen.
+
+**Lösung:** Drei konfigurierbare Sampling-Modi (monte-carlo-runner.js:16-150):
+
+| Modus | Beschreibung | Use Case |
+|-------|--------------|----------|
+| `UNIFORM` | Alle Jahre gleich wahrscheinlich (Default) | Abwärtskompatibilität |
+| `FILTER` | Nur Jahre ab Startjahr-Grenze (z.B. 1970) | Ausschluss "Golden Age" |
+| `RECENCY` | Exponentieller Abfall mit Half-Life | Bevorzugung neuerer Daten |
+
+**Recency-Gewichtung (Half-Life = 20 Jahre):**
+
 ```javascript
-startYearIndex = Math.floor(rand() * annualData.length);
+// monte-carlo-runner.js:60-68
+if (mode === 'RECENCY') {
+    const age = currentYear - year;
+    weightsByIndex[i] = Math.pow(0.5, age / halfLife);
+}
 ```
 
-**Strategie 2: CAPE-Sampling** (monte-carlo-runner.js:177-191)
+| Jahr | Alter | Gewicht | Relativ zu 2024 |
+|------|-------|---------|-----------------|
+| 2024 | 0 | 1.000 | 100% |
+| 2004 | 20 | 0.500 | 50% |
+| 1984 | 40 | 0.250 | 25% |
+| 1964 | 60 | 0.125 | 12.5% |
+| 1954 | 70 | 0.063 | 6.3% |
+
+**UI-Integration:** Neues Fieldset "Daten-Gewichtung (Advanced)" im Simulator mit Schiebereglern für Filter-Jahr (1950-2010) und Half-Life (5-50 Jahre).
+
+### C.3.2 Weitere Sampling-Strategien
+
+**CAPE-Sampling** (monte-carlo-runner.js:347-356):
 ```javascript
 if (useCapeSampling && inputs.marketCapeRatio > 0) {
     const candidates = getStartYearCandidates(inputs.marketCapeRatio, annualData);
-    if (candidates.length > 0) {
-        const chosenYear = candidates[Math.floor(rand() * candidates.length)];
-        startYearIndex = annualData.findIndex(d => d.jahr === chosenYear);
-    }
+    // Startjahre mit ähnlichem CAPE (+/- 20%) bevorzugen
 }
 ```
 
-**Strategie 3: Block-Bootstrap**
+**Block-Bootstrap** (für Autokorrelation):
 ```javascript
-function sampleNextYearData(state, method, blockSize, rand, stressCtx) {
-    if (method === 'block_bootstrap') {
-        if (state.blockRemaining > 0) {
-            state.blockRemaining--;
-            return annualData[(state.currentIndex + 1) % annualData.length];
-        } else {
-            state.currentIndex = Math.floor(rand() * annualData.length);
-            state.blockRemaining = blockSize - 1;
-            return annualData[state.currentIndex];
-        }
-    }
-}
+// Blöcke von aufeinanderfolgenden Jahren ziehen
+state.currentIndex = Math.floor(rand() * annualData.length);
+state.blockRemaining = blockSize - 1;
 ```
 
-**Strategie 4: Regime-basiert** (simulator-data.js:294-320)
+**Regime-basiert** (Markov-Chain):
 ```javascript
 REGIME_TRANSITIONS = {
     BULL: { BULL: 0.65, BEAR: 0.10, SIDEWAYS: 0.20, STAGFLATION: 0.05 },
     BEAR: { BULL: 0.20, BEAR: 0.40, SIDEWAYS: 0.30, STAGFLATION: 0.10 },
-    // ...
 };
 ```
 
-### C.3.2 Stress-Presets
+### C.3.3 Stress-Presets
 
-**7 vordefinierte Stress-Szenarien** (simulator-data.js:162-224):
+**9 vordefinierte Stress-Szenarien** (simulator-data.js:176-250):
 
 | Preset | Typ | Jahre | Parameter |
 |--------|-----|-------|-----------|
 | `STAGFLATION_70s` | conditional_bootstrap | 7 | Inflation ≥ 7%, Real-Rendite ≤ -2% |
 | `DOUBLE_BEAR_00s` | conditional_bootstrap | 6 | Real-Rendite ≤ -8%, Min-Cluster 2 |
+| `GREAT_DEPRESSION_29_33` | conditional_bootstrap | 5 | Jahre 1929-1933 (NEU) |
+| `WWII_40s` | conditional_bootstrap | 7 | Jahre 1939-1945 (NEU) |
 | `STAGFLATION_SUPER` | hybrid | 8 | 70er + künstlich -3% μ |
 | `INFLATION_SPIKE_3Y` | parametric | 3 | μ = -5%, σ × 1.5, Inflation ≥ 7% |
 | `FORCED_DRAWDOWN_3Y` | parametric_sequence | 3 | -25%, -20%, -15% |
 | `LOST_DECADE_12Y` | parametric | 12 | μ = -6%, Gold capped bei +15% |
 | `CORRELATION_CRASH_4Y` | parametric | 4 | Aktien -15%, Gold -5%, Inflation 5% |
 
-### C.3.3 Historische Daten
+### C.3.4 Historische Daten (erweitert in v32.0)
 
-**Datenbasis** (simulator-data.js:56-132):
+**Datenbasis** (simulator-data.js:56-170):
 
 | Feld | Quelle | Zeitraum |
 |------|--------|----------|
-| `msci_eur` | MSCI World EUR | 1950-2024 |
-| `inflation_de` | Statistisches Bundesamt | 1950-2024 |
-| `zinssatz_de` | Bundesbank | 1950-2024 |
-| `lohn_de` | Lohnentwicklung DE | 1950-2024 |
+| `msci_eur` | MSCI World EUR | **1925-2024** (erweitert) |
+| `inflation_de` | Statistisches Bundesamt | 1925-2024 |
+| `zinssatz_de` | Bundesbank | 1925-2024 |
+| `lohn_de` | Lohnentwicklung DE | 1925-2024 |
 | `gold_eur_perf` | Gold in EUR | 1961-2024 |
-| `cape` | Shiller CAPE | 1950-2024 |
+| `cape` | Shiller CAPE | 1925-2024 |
+
+**NEU: Erweiterung 1925-1949 (Schwarze-Schwan-Phasen):**
+- **Great Depression (1929-1933):** MSCI fiel von 16.06 auf 6.27 (-61%)
+- **Zweiter Weltkrieg (1939-1945):** Volatilität und Währungseffekte
+- **Normalisierung:** 1925-1949-Werte werden auf die 1950-Basis skaliert, um Sprünge zu vermeiden
+
+```javascript
+// simulator-data.js:172-183
+const factor = HISTORICAL_DATA[1950].msci_eur / HISTORICAL_DATA[1949].msci_eur;
+for (let year = 1925; year <= 1949; year++) {
+    entry.msci_eur = entry.msci_eur * factor;
+}
+```
 
 **Daten-Validierung `msci_eur`:**
-*   **Zeitraum 2012–2023:** Die Werte stimmen exakt (auf 2 Nachkommastellen) mit dem **MSCI World Net Total Return EUR** überein.
-*   **Zeitraum vor 2000:** Die langfristige CAGR (1978–2024) von ~7.8% liegt unter dem typischen langfristigen Total-Return-Schnitt (~10%).
-*   **Diagnose:** Es handelt sich um eine **hybride Datenreihe**. Die jüngere Historie ist präzise (Net Return), während die älteren Daten (insb. die Extrapolationen) konservativ modelliert sind (vermutlich Price Index oder starke Währungseffekte).
-*   **Bewertung:** Für die Simulation ist dies **vorteilhaft konservativ**. Die "fehlende Rendite" in der Historie wirkt wie ein impliziter Puffer gegen Sequenzrisiken (Sequence of Returns Risk). Ein expliziter Abzug von TER oder Dividenden ist daher **nicht** notwendig, da die Datenbasis bereits eine Sicherheitsmarge enthält.
+*   **Zeitraum 2012–2023:** Die Werte stimmen exakt mit dem **MSCI World Net Total Return EUR** überein.
+*   **Zeitraum vor 2000:** CAGR (1978–2024) von ~7.8% — konservativ modelliert.
+*   **Bewertung:** Impliziter Puffer gegen Sequenzrisiken (SoRR), kein TER-Abzug nötig.
 
-**Hinweis Balance-App:** In der Balance-App werden reale Depotstände und ETF-Kurse verwendet; TER ist dort bereits im NAV eingepreist. Ein zusätzlicher TER-Abzug wäre doppelt.
+**Hinweis Balance-App:** Reale Depotstände/ETF-Kurse verwendet; TER bereits im NAV enthalten.
 
 **Daten-Anomalie 1950-1960 ("Wirtschaftswunder"):**
-*   **Beobachtung:** Die Jahre 1950-1960 weisen eine nominale CAGR von **~19.4%** (Real: ~17.4%) auf.
-*   **Bewertung:** Dies ist ein historischer Sonderfall (Nachkriegs-Wiederaufbau), der sich so kaum wiederholen lässt.
-*   **Risiko:** Da die Monte-Carlo-Simulation zufällige Blöcke aus der Historie zieht, besteht das Risiko, dass "Wirtschaftswunder"-Phasen eine zu optimistische Erwartungshaltung erzeugen.
-*   **Empfehlung:** Für eine konservative Planung ("Stress-Test") wäre es ratsam, die Datenbasis erst ab **1970** (Beginn Stagflation) oder **1978** (Präzisere Daten) zu nutzen, um diesen "Golden Age Bias" auszuschließen. Die Jahre **1970-1980** (Stagflation) sind hingegen essenziell für Robustheits-Tests.
+*   **Beobachtung:** CAGR von **~19.4%** — historischer Sonderfall (Nachkriegs-Wiederaufbau).
+*   **Lösung (v32.0):** Die neuen Startjahr-Sampling-Modi (`FILTER` ab 1970, `RECENCY` mit Half-Life) erlauben es, diese Phase auszuschließen oder abzuwerten. ✅ **Problem adressiert**
 
-**Verteilung der Regime (1950-2024):**
+**Verteilung der Regime (1925-2024):**
 
 | Regime | Jahre | Anteil |
 |--------|-------|--------|
-| BULL | 22 | 29% |
-| BEAR | 12 | 16% |
-| SIDEWAYS | 34 | 45% |
-| STAGFLATION | 7 | 9% |
+| BULL | 28 | 28% |
+| BEAR | 18 | 18% |
+| SIDEWAYS | 42 | 42% |
+| STAGFLATION | 12 | 12% |
 
-### C.3.4 Determinismus
+### C.3.5 Determinismus
 
 **Per-Run-Seeding** (simulator-utils.js:96-103):
 ```javascript
@@ -992,13 +1023,13 @@ rt
 |-----------|-------|------------|
 | Guardrails | 95 | State-of-the-art, übertrifft Guyton-Klinger |
 | Steuer-Engine | 95 | Vollständige DE-Kapitalertragssteuer |
-| MC-Qualität | 85 | 4 Methoden, 7 Presets |
-| SoRR-Handling | 85 | CAPE-Sampling, Stress-Tests |
+| MC-Qualität | 92 | 4 Methoden, 9 Presets, 3 Sampling-Modi (v32.0) |
+| SoRR-Handling | 90 | CAPE-Sampling, Recency-Gewichtung, Stress-Tests (v32.0) |
 | Pflegefall | 90 | PG1-5, Dual-Care, BARMER-Daten |
 | Liquiditäts-Targeting | 90 | Dynamisch, Regime-abhängig |
-| TER/Fees | 70 | Implizit konservativ (Price Index), Dokumentation fehlt |
+| TER/Fees | 75 | Implizit konservativ, dokumentiert (v32.0) |
 
-**Fachliche Methodik-Score: 90/100**
+**Fachliche Methodik-Score: 92/100**
 
 ## F.3 Validierung (Gewicht: 15%)
 
@@ -1035,45 +1066,42 @@ rt
 | Kategorie | Gewicht | Score | Gewichteter Score |
 |-----------|---------|-------|-------------------|
 | Technik | 25% | 83 | 20.75 |
-| Fachliche Methodik | 35% | 90 | 31.50 |
+| Fachliche Methodik | 35% | 92 | 32.20 |
 | Validierung | 15% | 87 | 13.05 |
 | Nutzerwert | 15% | 80 | 12.00 |
 | Marktposition | 10% | 92 | 9.20 |
 
-### **Gesamtscore: 86.50/100 ≈ 87%**
+### **Gesamtscore: 87.20/100 ≈ 87%**
 
 ---
 
 # TEIL G: Empfehlungen
 
-## G.1 Top 5 Verbesserungen (priorisiert)
+## G.1 In v32.0 umgesetzte Empfehlungen
+
+| Empfehlung | Status | Details |
+|------------|--------|---------|
+| Index-Dokumentation | ✅ Umgesetzt | Dokumentation in `simulator-data.js` hinzugefügt |
+| Startjahr-Bias-Fix | ✅ Umgesetzt | FILTER/RECENCY-Modi für Startjahr-Sampling |
+| Depression/WWII-Daten | ✅ Umgesetzt | Historische Daten erweitert auf 1925-2024 |
+| Neue Stress-Presets | ✅ Umgesetzt | Great Depression + WWII hinzugefügt |
+
+## G.2 Verbleibende Verbesserungen (priorisiert)
 
 | # | Verbesserung | Impact | Aufwand | ROI |
 |---|--------------|--------|---------|-----|
-| 1 | **Index-Dokumentation** | Hoch | Niedrig | ⭐⭐⭐⭐⭐ |
-| 2 | **Onboarding-Wizard** | Mittel | Mittel | ⭐⭐⭐⭐ |
-| 3 | **Stationary Bootstrap** | Niedrig | Mittel | ⭐⭐⭐ |
-| 4 | **Student-t Returns** | Niedrig | Mittel | ⭐⭐⭐ |
-| 5 | **Verlustverrechnung** | Niedrig | Mittel | ⭐⭐ |
+| 1 | **Onboarding-Wizard** | Mittel | Mittel | ⭐⭐⭐⭐ |
+| 2 | **Stationary Bootstrap** | Niedrig | Mittel | ⭐⭐⭐ |
+| 3 | **Student-t Returns** | Niedrig | Mittel | ⭐⭐⭐ |
+| 4 | **Verlustverrechnung** | Niedrig | Mittel | ⭐⭐ |
 
-### G.1.1 Index-Dokumentation (Empfehlung #1)
-
-**Problem:** Die Variante der `msci_eur`-Reihe (Price vs. Net vs. Gross Total Return) ist undokumentiert. CAGR-Analyse (1978-2024: ~7.9%) deutet auf Price Index hin.
-
-**Empfehlung:**
-- Datenquelle und Index-Variante in `simulator-data.js` dokumentieren
-- Falls Price Index: Im UI als "konservativer Ansatz (ohne Dividenden)" kennzeichnen
-- Alternativ: Checkbox "Dividenden einbeziehen" mit +2% Rendite-Aufschlag
-
-**Hinweis:** Falls tatsächlich Price Index, ist kein zusätzlicher TER-Abzug nötig — die fehlenden Dividenden (~2-2.5% p.a.) überkompensieren typische ETF-Kosten (~0.2% p.a.).
-
-### G.1.2 Onboarding-Wizard
+### G.2.1 Onboarding-Wizard
 
 **Problem:** Komplexität kann neue Nutzer überfordern.
 
 **Lösung:** Geführter Ersteinrichtungs-Wizard mit sinnvollen Defaults.
 
-## G.2 Was NICHT fehlt
+## G.3 Was NICHT fehlt
 
 | Oft gefordert | Warum nicht nötig |
 |---------------|-------------------|
@@ -1144,4 +1172,4 @@ rt
 
 ---
 
-*Dokument erstellt durch KI-gestützte Code-Analyse (Claude Opus 4.5) und Web-Recherche. Alle Bewertungen basieren auf dem analysierten Code-Stand (Engine API v32.0, Build 2026-01-21). Code-Zeilenangaben können bei zukünftigen Änderungen abweichen; Algorithmen-Beschreibungen bleiben konzeptionell gültig.*
+*Dokument erstellt durch KI-gestützte Code-Analyse (Claude Opus 4.5) und Web-Recherche. Alle Bewertungen basieren auf Commit `35f19f2` (Engine API v32.0, Build 2026-01-21). Code-Zeilenangaben können bei zukünftigen Änderungen abweichen; Algorithmen-Beschreibungen bleiben konzeptionell gültig.*
