@@ -63,13 +63,13 @@ Die **Ruhestand-Suite** ist nach meiner Einschätzung **eines der funktionsreich
 5. **Balance-App** für operative Jahresplanung mit Online-Datenabruf
 6. **Simulator** mit Monte-Carlo, Parameter-Sweeps und 3-stufiger Auto-Optimierung
 
-**Gesamtscore: 86/100** (gewichteter Durchschnitt, siehe TEIL F)
+**Gesamtscore: 87/100** (gewichteter Durchschnitt, siehe TEIL F)
 
 **Hauptlücken:**
-- TER/Fondskosten nicht modelliert (~0.2-0.5% p.a. Überschätzung)
 - Kein Stationary Bootstrap (nur Block-Bootstrap)
 - Keine expliziten Fat Tails im Return-Modell
 - Keine Verlustverrechnung
+- Index-Variante (`msci_eur`) undokumentiert (siehe Abschnitt C.3.3)
 
 ---
 
@@ -620,6 +620,22 @@ REGIME_TRANSITIONS = {
 | `gold_eur_perf` | Gold in EUR | 1961-2024 |
 | `cape` | Shiller CAPE | 1950-2024 |
 
+**Index-Variante `msci_eur` (wichtige Anmerkung):**
+
+Die CAGR der `msci_eur`-Reihe (1978-2024) liegt bei ~7.9%, deutlich unter typischen Total-Return-Reihen (~10.4%). Dies deutet auf einen **Price Index** (ohne reinvestierte Dividenden) hin:
+
+| Index-Typ | Typische CAGR | Enthält |
+|-----------|---------------|---------|
+| Price Index | ~7-8% | Nur Kursgewinne |
+| Net Total Return | ~9-10% | + Dividenden nach Quellensteuer |
+| Gross Total Return | ~10-11% | + Dividenden brutto |
+
+**Implikation:** Falls `msci_eur` tatsächlich ein Price Index ist, ist die Simulation bereits **konservativ** um ~2-2.5% p.a. (fehlende Dividenden). Ein zusätzlicher TER-Abzug (~0.2-0.5% p.a.) wäre dann nicht nötig — die fehlenden Dividenden überkompensieren die fehlende TER-Modellierung.
+
+**Empfehlung:** Die Datenquelle/Variante der MSCI-Reihe sollte dokumentiert und als konservativer Ansatz gekennzeichnet werden.
+
+**Hinweis Balance-App:** In der Balance-App werden reale Depotstände und ETF-Kurse verwendet; TER ist dort bereits im NAV eingepreist. Ein zusätzlicher TER-Abzug wäre doppelt.
+
 **Verteilung der Regime (1950-2024):**
 
 | Regime | Jahre | Anteil |
@@ -982,9 +998,9 @@ if (scenario.startsWith('peak') && equityOverweight > rebalBand) {
 | SoRR-Handling | 85 | CAPE-Sampling, Stress-Tests |
 | Pflegefall | 90 | PG1-5, Dual-Care, BARMER-Daten |
 | Liquiditäts-Targeting | 90 | Dynamisch, Regime-abhängig |
-| TER/Fees | 0 | Nicht implementiert |
+| TER/Fees | 70 | Implizit konservativ (Price Index), Dokumentation fehlt |
 
-**Fachliche Methodik-Score: 88/100**
+**Fachliche Methodik-Score: 90/100**
 
 ## F.3 Validierung (Gewicht: 15%)
 
@@ -1021,12 +1037,12 @@ if (scenario.startsWith('peak') && equityOverweight > rebalBand) {
 | Kategorie | Gewicht | Score | Gewichteter Score |
 |-----------|---------|-------|-------------------|
 | Technik | 25% | 83 | 20.75 |
-| Fachliche Methodik | 35% | 88 | 30.80 |
+| Fachliche Methodik | 35% | 90 | 31.50 |
 | Validierung | 15% | 87 | 13.05 |
 | Nutzerwert | 15% | 80 | 12.00 |
 | Marktposition | 10% | 92 | 9.20 |
 
-### **Gesamtscore: 85.80/100 ≈ 86%**
+### **Gesamtscore: 86.50/100 ≈ 87%**
 
 ---
 
@@ -1036,24 +1052,22 @@ if (scenario.startsWith('peak') && equityOverweight > rebalBand) {
 
 | # | Verbesserung | Impact | Aufwand | ROI |
 |---|--------------|--------|---------|-----|
-| 1 | **TER/Fees-Parameter** | Hoch | Niedrig | ⭐⭐⭐⭐⭐ |
+| 1 | **Index-Dokumentation** | Hoch | Niedrig | ⭐⭐⭐⭐⭐ |
 | 2 | **Onboarding-Wizard** | Mittel | Mittel | ⭐⭐⭐⭐ |
 | 3 | **Stationary Bootstrap** | Niedrig | Mittel | ⭐⭐⭐ |
 | 4 | **Student-t Returns** | Niedrig | Mittel | ⭐⭐⭐ |
 | 5 | **Verlustverrechnung** | Niedrig | Mittel | ⭐⭐ |
 
-### G.1.1 TER/Fees-Parameter (Empfehlung #1)
+### G.1.1 Index-Dokumentation (Empfehlung #1)
 
-**Problem:** Fondskosten (TER) werden nicht berücksichtigt. Bei einem MSCI-World-ETF mit TER 0.2% und einem Portfolio von 500.000€ fehlen ~1.000€/Jahr.
+**Problem:** Die Variante der `msci_eur`-Reihe (Price vs. Net vs. Gross Total Return) ist undokumentiert. CAGR-Analyse (1978-2024: ~7.9%) deutet auf Price Index hin.
 
-**Lösung:**
-```javascript
-// In simulator-portfolio.js
-const annualFeeRate = inputs.terPercent / 100 || 0.002;  // Default 0.2%
-const feeDeduction = portfolioValue * annualFeeRate;
-```
+**Empfehlung:**
+- Datenquelle und Index-Variante in `simulator-data.js` dokumentieren
+- Falls Price Index: Im UI als "konservativer Ansatz (ohne Dividenden)" kennzeichnen
+- Alternativ: Checkbox "Dividenden einbeziehen" mit +2% Rendite-Aufschlag
 
-**Impact:** ~0.2-0.5% p.a. realistischere Rendite
+**Hinweis:** Falls tatsächlich Price Index, ist kein zusätzlicher TER-Abzug nötig — die fehlenden Dividenden (~2-2.5% p.a.) überkompensieren typische ETF-Kosten (~0.2% p.a.).
 
 ### G.1.2 Onboarding-Wizard
 
