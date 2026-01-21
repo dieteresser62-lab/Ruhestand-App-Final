@@ -3,9 +3,10 @@
 **Umfassendes Experten-Gutachten zur DIY-Software für Ruhestandsplanung**
 
 **Gutachten erstellt:** Januar 2026
-**Gutachter-Rolle:** Software-Architekt, Quant/Finanzplaner, Research-Literatur-Experte
-**Analysierte Version:** Engine API v31.0, Build 2025-12-22
-**Analysemethode:** Vollständige Code-Review aller ~27.500 LOC + Web-Recherche
+**Gutachter:** Claude Opus 4.5 (KI-gestützte Analyse)
+**Analysierte Version:** Engine API v31.0, Build 2025-12-22, Commit `c523fff`
+**Analysemethode:** Code-Review (~27.500 LOC) + Web-Recherche
+**Rollen-Perspektive:** Software-Architekt, Quant/Finanzplaner, Research-Experte
 
 ---
 
@@ -39,9 +40,21 @@
 | Web-Recherche Marktvergleich | ✅ |
 | Web-Recherche Forschungsstand | ✅ |
 
+### Reproduzierbarkeit
+
+| Aspekt | Wert |
+|--------|------|
+| **Analysierter Commit** | `c523fff` (2026-01-21) |
+| **Engine Build-ID** | 2025-12-22 (in `engine/config.mjs`) |
+| **Engine API Version** | v31.0 |
+| **Geschätzte LOC** | ~27.500 (via `wc -l`) |
+| **Gutachten-Erstellung** | Januar 2026, Claude Opus 4.5 |
+
+*Hinweis: Code-Zeilenangaben (z.B. `SpendingPlanner.mjs:326`) beziehen sich auf den analysierten Commit und können bei zukünftigen Änderungen abweichen. Die Algorithmen-Beschreibungen bleiben konzeptionell gültig.*
+
 ## Executive Summary
 
-Die **Ruhestand-Suite** ist das **funktionsreichste Open-Source-Tool zur Ruhestandsplanung im deutschsprachigen Raum**. Sie kombiniert:
+Die **Ruhestand-Suite** ist nach meiner Einschätzung **eines der funktionsreichsten Open-Source-Tools zur Ruhestandsplanung im deutschsprachigen Raum**. Sie kombiniert:
 
 1. **Vollständige deutsche Kapitalertragssteuer** (Abgeltungssteuer, Soli, KiSt, Teilfreistellung, SPB, steueroptimierte Verkaufsreihenfolge)
 2. **Dynamische Guardrails** mit 7-stufiger Marktregime-Erkennung
@@ -50,9 +63,13 @@ Die **Ruhestand-Suite** ist das **funktionsreichste Open-Source-Tool zur Ruhesta
 5. **Balance-App** für operative Jahresplanung mit Online-Datenabruf
 6. **Simulator** mit Monte-Carlo, Parameter-Sweeps und 3-stufiger Auto-Optimierung
 
-**Gesamtscore: 87/100**
+**Gesamtscore: 86/100** (gewichteter Durchschnitt, siehe TEIL F)
 
-**Einzige nennenswerte Lücke:** TER/Fondskosten nicht modelliert (~0.2-0.5% p.a. Überschätzung)
+**Hauptlücken:**
+- TER/Fondskosten nicht modelliert (~0.2-0.5% p.a. Überschätzung)
+- Kein Stationary Bootstrap (nur Block-Bootstrap)
+- Keine expliziten Fat Tails im Return-Modell
+- Keine Verlustverrechnung
 
 ---
 
@@ -870,13 +887,15 @@ if (scenario.startsWith('peak') && equityOverweight > rebalBand) {
 | **Offline** | ✅ | ⚠️ ($799) | ❌ | ✅ (Gold) | ✅ | ✅ |
 | **Open Source** | ✅ MIT | ❌ | ❌ | ❌ | ✅ | ❌ |
 
-## D.4 Alleinstellungsmerkmale
+## D.4 Alleinstellungsmerkmale (im Vergleich zu analysierten Tools)
 
-1. **Einziges Tool mit vollständiger DE-Kapitalertragssteuer** (Abgeltungssteuer, Soli, KiSt, Teilfreistellung, SPB, FIFO)
-2. **Einziges Tool mit Pflegefall-Modellierung** (PG1-5, Progression, Dual-Care)
-3. **Einziges kostenloses Tool mit 7-stufiger Marktregime-Erkennung**
-4. **Einziges Tool mit Risk-Based Guardrails** (Kitces-Ansatz statt Guyton-Klinger)
-5. **Vollständig offline und Open Source**
+*Hinweis: Diese Bewertung basiert auf der Recherche der in diesem Gutachten verglichenen Tools (ProjectionLab, Boldin, Pralana, Portfolio Visualizer, FI Calc). Es können weitere Tools existieren, die nicht analysiert wurden.*
+
+1. **Vollständige DE-Kapitalertragssteuer** — Kein anderes verglichenes Tool implementiert Abgeltungssteuer, Soli, KiSt, Teilfreistellung, SPB und steueroptimierte Reihenfolge
+2. **Pflegefall-Modellierung mit PG1-5** — Kein anderes verglichenes Tool hat ein deutsches Pflegegrad-Modell mit Progression und Dual-Care
+3. **7-stufige Marktregime-Erkennung** — Im Vergleich zu den analysierten kostenlosen Tools einzigartig
+4. **Risk-Based Guardrails** — Implementiert den Kitces-Ansatz statt klassischer Guyton-Klinger
+5. **Vollständig offline und Open Source** — Daten verlassen nie den lokalen Rechner
 
 ---
 
@@ -1113,4 +1132,4 @@ const feeDeduction = portfolioValue * annualFeeRate;
 
 ---
 
-*Dokument erstellt durch vollständige Code-Analyse (~27.500 LOC) und Web-Recherche. Alle Bewertungen basieren auf dem analysierten Code-Stand (Engine API v31.0, 2025-12-22). Bewertungen können bei zukünftigen Änderungen abweichen.*
+*Dokument erstellt durch KI-gestützte Code-Analyse (Claude Opus 4.5) und Web-Recherche. Alle Bewertungen basieren auf Commit `c523fff` (Engine API v31.0, Build 2025-12-22). Code-Zeilenangaben können bei zukünftigen Änderungen abweichen; Algorithmen-Beschreibungen bleiben konzeptionell gültig.*
