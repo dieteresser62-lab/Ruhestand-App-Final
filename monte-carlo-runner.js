@@ -1,6 +1,6 @@
 "use strict";
 
-import { rng, makeRunSeed, RUNIDX_COMBO_SETUP } from './simulator-utils.js';
+import { rng, makeRunSeed, RUNIDX_COMBO_SETUP, quantile } from './simulator-utils.js';
 import { getStartYearCandidates } from './cape-utils.js';
 import { BREAK_ON_RUIN, MORTALITY_TABLE, annualData } from './simulator-data.js';
 import { buildStressContext, applyStressOverride, computeRentAdjRate } from './simulator-portfolio.js';
@@ -13,6 +13,155 @@ import { MC_HEATMAP_BINS, pickWorstRun, createMonteCarloBuffers } from './monte-
 import { buildMonteCarloAggregates } from './monte-carlo-aggregates.js';
 
 export { MC_HEATMAP_BINS, pickWorstRun, createMonteCarloBuffers, buildMonteCarloAggregates };
+
+const MIN_START_YEAR_INDEX = 4;
+
+function buildCdfFromIndices(indices, weightsByIndex) {
+    if (!Array.isArray(indices) || indices.length === 0) return null;
+    let total = 0;
+    for (const idx of indices) {
+        const weight = weightsByIndex ? (weightsByIndex[idx] || 0) : 1;
+        total += weight;
+    }
+    if (total <= 0) return null;
+    let cumulative = 0;
+    const cdf = indices.map(idx => {
+        const weight = weightsByIndex ? (weightsByIndex[idx] || 0) : 1;
+        cumulative += weight / total;
+        return cumulative;
+    });
+    cdf[cdf.length - 1] = 1;
+    return { indices, cdf };
+}
+
+function pickFromSampler(rand, sampler, fallbackIndex = 0) {
+    if (!sampler || !sampler.cdf || !sampler.indices || sampler.indices.length === 0) {
+        return fallbackIndex;
+    }
+    const sample = rand ? rand() : Math.random();
+    const r = Math.min(1 - Number.EPSILON, Math.max(0, Number.isFinite(sample) ? sample : 0));
+    let low = 0;
+    let high = sampler.cdf.length - 1;
+    while (low < high) {
+        const mid = Math.floor((low + high) / 2);
+        if (r < sampler.cdf[mid]) {
+            high = mid;
+        } else {
+            low = mid + 1;
+        }
+    }
+    return sampler.indices[low] ?? fallbackIndex;
+}
+
+function buildYearSamplingConfig(mode, data, { startYearFilter = 1970, startYearHalfLife = 20, blockSize = 1 } = {}) {
+    if (!Array.isArray(data) || data.length === 0) return null;
+
+    const cutoff = Number.isFinite(startYearFilter) ? startYearFilter : 1970;
+    const halfLife = Number.isFinite(startYearHalfLife) && startYearHalfLife > 0 ? startYearHalfLife : 20;
+    const currentYear = data[data.length - 1]?.jahr ?? new Date().getFullYear();
+
+    const allowedIndices = [];
+    const weightsByIndex = new Array(data.length).fill(0);
+    for (let i = MIN_START_YEAR_INDEX; i < data.length; i++) {
+        const year = data[i].jahr;
+        if (mode === 'FILTER' && year < cutoff) continue;
+        allowedIndices.push(i);
+        if (mode === 'RECENCY') {
+            const age = currentYear - year;
+            weightsByIndex[i] = Math.pow(0.5, age / halfLife);
+        } else {
+            weightsByIndex[i] = 1;
+        }
+    }
+
+    if (allowedIndices.length === 0) return null;
+
+    const allowedIndexSet = new Set(allowedIndices);
+    const allSampler = (mode === 'FILTER' || mode === 'RECENCY')
+        ? buildCdfFromIndices(allowedIndices, weightsByIndex)
+        : null;
+
+    const maxStartIndex = Math.max(1, data.length - blockSize);
+    const blockStartIndices = allowedIndices.filter(idx => idx < maxStartIndex);
+    const blockSampler = (mode === 'FILTER' || mode === 'RECENCY')
+        ? buildCdfFromIndices(blockStartIndices, weightsByIndex)
+        : null;
+
+    const regimeSamplers = {};
+    for (const idx of allowedIndices) {
+        const regime = data[idx].regime;
+        if (!regimeSamplers[regime]) regimeSamplers[regime] = [];
+        regimeSamplers[regime].push(idx);
+    }
+    const regimeSamplerMap = {};
+    for (const [regime, indices] of Object.entries(regimeSamplers)) {
+        regimeSamplerMap[regime] = (mode === 'FILTER' || mode === 'RECENCY')
+            ? buildCdfFromIndices(indices, weightsByIndex)
+            : { indices, cdf: null };
+    }
+
+    return {
+        allowedIndices,
+        allowedIndexSet,
+        allSampler,
+        blockSampler,
+        blockStartIndices,
+        maxStartIndex,
+        regimeSamplers: regimeSamplerMap,
+        weightsByIndex
+    };
+}
+
+export function buildStartYearCdf(mode, data, { startYearFilter = 1970, startYearHalfLife = 20 } = {}) {
+    if (!Array.isArray(data) || data.length === 0) return null;
+    if (mode !== 'FILTER' && mode !== 'RECENCY') return null;
+
+    const currentYear = data[data.length - 1]?.jahr ?? new Date().getFullYear();
+    const halfLife = Number.isFinite(startYearHalfLife) && startYearHalfLife > 0 ? startYearHalfLife : 20;
+    const cutoff = Number.isFinite(startYearFilter) ? startYearFilter : 1970;
+
+    const weights = data.map((entry, index) => {
+        if (index < MIN_START_YEAR_INDEX) return 0;
+        if (mode === 'FILTER') {
+            return entry.jahr >= cutoff ? 1 : 0;
+        }
+        const age = currentYear - entry.jahr;
+        return Math.pow(0.5, age / halfLife);
+    });
+
+    const totalWeight = weights.reduce((sum, value) => sum + value, 0);
+    if (totalWeight <= 0) return null;
+
+    let cumulative = 0;
+    const cdf = weights.map(weight => {
+        cumulative += weight / totalWeight;
+        return cumulative;
+    });
+    cdf[cdf.length - 1] = 1;
+    return cdf;
+}
+
+export function pickStartYearIndex(rand, data, cdf, minIndex = MIN_START_YEAR_INDEX) {
+    if (!Array.isArray(data) || data.length === 0) return 0;
+    const sample = rand ? rand() : Math.random();
+    const r = Math.min(1 - Number.EPSILON, Math.max(0, Number.isFinite(sample) ? sample : 0));
+    if (!cdf || cdf.length !== data.length) {
+        const min = Math.max(0, Math.min(minIndex, data.length - 1));
+        const span = Math.max(1, data.length - min);
+        return Math.min(data.length - 1, min + Math.floor(r * span));
+    }
+    let low = 0;
+    let high = cdf.length - 1;
+    while (low < high) {
+        const mid = Math.floor((low + high) / 2);
+        if (r < cdf[mid]) {
+            high = mid;
+        } else {
+            low = mid + 1;
+        }
+    }
+    return low;
+}
 
 /**
  * Reine Monte-Carlo-Simulation ohne DOM-Abhängigkeiten.
@@ -83,7 +232,17 @@ export async function runMonteCarloChunk({
     logIndices = null,
     engine = null
 }) {
-    const { anzahl, maxDauer, blockSize, seed, methode, rngMode = 'per-run-seed' } = monteCarloParams;
+    const {
+        anzahl,
+        maxDauer,
+        blockSize,
+        seed,
+        methode,
+        rngMode = 'per-run-seed',
+        startYearMode = 'UNIFORM',
+        startYearFilter = 1970,
+        startYearHalfLife = 20
+    } = monteCarloParams;
     const runStart = runRange?.start ?? 0;
     const runCount = runRange?.count ?? anzahl;
 
@@ -157,6 +316,12 @@ export async function runMonteCarloChunk({
     let lastProgressPct = -1;
 
     const logIndexSet = Array.isArray(logIndices) ? new Set(logIndices) : null;
+    const yearSamplingConfig = buildYearSamplingConfig(startYearMode, annualData, {
+        startYearFilter,
+        startYearHalfLife,
+        blockSize
+    });
+    const startYearCdf = buildStartYearCdf(startYearMode, annualData, { startYearFilter, startYearHalfLife });
 
     for (let i = 0; i < runCount; i++) {
         if (i % progressUpdateInterval === 0) {
@@ -182,16 +347,21 @@ export async function runMonteCarloChunk({
             if (candidates.length > 0) {
                 const chosenYear = candidates[Math.floor(rand() * candidates.length)];
                 startYearIndex = annualData.findIndex(d => d.jahr === chosenYear);
-                if (startYearIndex === -1) startYearIndex = Math.floor(rand() * annualData.length);
+                if (startYearIndex === -1) startYearIndex = pickStartYearIndex(rand, annualData, null);
             } else {
-                startYearIndex = Math.floor(rand() * annualData.length);
+                startYearIndex = pickStartYearIndex(rand, annualData, null);
             }
         } else {
-            startYearIndex = Math.floor(rand() * annualData.length);
+            startYearIndex = yearSamplingConfig?.allSampler
+                ? pickFromSampler(rand, yearSamplingConfig.allSampler, pickStartYearIndex(rand, annualData, null))
+                : pickStartYearIndex(rand, annualData, startYearCdf);
         }
         // --- CAPE-SAMPLING LOGIC END ---
 
         let simState = initMcRunState(inputs, startYearIndex);
+        if (yearSamplingConfig) {
+            simState.samplerState.yearSampling = yearSamplingConfig;
+        }
 
         const depotWertHistorie = [portfolioTotal(simState.portfolio)];
         const shouldLogRun = !logIndexSet || logIndexSet.has(runIdx);

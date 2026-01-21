@@ -14,7 +14,14 @@
       "Bash(done)",
       "Bash(for fn in areR2SeriesEqual buildBacktestColumnDefinitions buildCareMetrics convertRowsToCsv)",
       "Bash(for fn in cartesianProduct correlation standardize setNested generateNeighbors parseRange)",
-      "Bash(for fn in applyPensionTax initModeToggle withNoLSWrites renderTaxComparison renderWithdrawalRecommendation renderWorstRunToggle formatCellForDisplay renderProfilverbundOverview)"
+      "Bash(for fn in applyPensionTax initModeToggle withNoLSWrites renderTaxComparison renderWithdrawalRecommendation renderWorstRunToggle formatCellForDisplay renderProfilverbundOverview)",
+      "WebSearch",
+      "WebFetch(domain:curvo.eu)",
+      "WebFetch(domain:www.msci.com)",
+      "WebFetch(domain:www.ubs.com)",
+      "WebFetch(domain:vocal.media)",
+      "WebFetch(domain:global.morningstar.com)",
+      "WebFetch(domain:mobile.next-finance.net)"
     ]
   }
 }

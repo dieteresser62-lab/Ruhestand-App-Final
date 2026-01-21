@@ -20,9 +20,11 @@ export function buildStressContext(presetKey, rand) {
             .map((d, i) => ({ ...d, index: i }))
             .filter(d => {
                 const realReturnPct = (d.rendite * 100) - d.inflation;
+                const passesYearMin = preset.filter.yearMin === undefined || d.jahr >= preset.filter.yearMin;
+                const passesYearMax = preset.filter.yearMax === undefined || d.jahr <= preset.filter.yearMax;
                 const passesInflation = preset.filter.inflationMin === undefined || d.inflation >= preset.filter.inflationMin;
                 const passesRealReturn = preset.filter.equityRealMax === undefined || realReturnPct <= preset.filter.equityRealMax;
-                return passesInflation && passesRealReturn;
+                return passesYearMin && passesYearMax && passesInflation && passesRealReturn;
             })
             .map(d => d.index);
 

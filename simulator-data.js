@@ -51,9 +51,48 @@ export const PFLEGE_GRADE_PROBABILITIES = {
 };
 
 /**
- * Historische Marktdaten (1969-2024)
+ * Historische Marktdaten (1925-2024)
+ *
+ * Hinweis zu `msci_eur`:
+ * - Die Index-Variante (Price vs. Net vs. Gross Total Return) ist aktuell
+ *   nicht dokumentiert.
+ * - Die CAGR der Reihe (1978-2024) liegt bei ~7.9%, was eher zu einem
+ *   Price Index passt (Total Return waere typischerweise ~10%+ in EUR).
+ * - Im Zweifel ist das konservativ; bitte Quelle/Variante dokumentieren,
+ *   sobald bekannt (z.B. MSCI World Index EUR Price/Net/Gross).
+ *
+ * Erweiterung 1925-1949:
+ * - Diese Jahre dienen als "Schwarze-Schwan"-Phase (Depression/Kriegsjahre).
+ * - Empfehlung: per Startjahr-Filter oder Recency-Gewichtung seltener ziehen.
+ * - Die MSCI-Levels werden auf die 1950-Basis skaliert, um Spruenge zu vermeiden.
+ * - Stress-Presets nutzen die Phase fuer Great Depression und Zweiter Weltkrieg.
  */
 export const HISTORICAL_DATA = {
+  1925: { msci_eur: 9.49, inflation_de: 2.5, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 10 },
+  1926: { msci_eur: 8.5, inflation_de: 1.1, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 11.7 },
+  1927: { msci_eur: 12.21, inflation_de: -1.7, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 17.5 },
+  1928: { msci_eur: 17.54, inflation_de: -1.2, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 24.8 },
+  1929: { msci_eur: 16.06, inflation_de: 0, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 32.6 },
+  1930: { msci_eur: 12.06, inflation_de: -2.3, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 21 },
+  1931: { msci_eur: 6.83, inflation_de: -9, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 12.3 },
+  1932: { msci_eur: 6.27, inflation_de: -9.9, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 5.6 },
+  1933: { msci_eur: 9.66, inflation_de: -5.1, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 69, cape: 10.3 },
+  1934: { msci_eur: 9.52, inflation_de: 3.1, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 11.3 },
+  1935: { msci_eur: 14.06, inflation_de: 2.2, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 14 },
+  1936: { msci_eur: 18.83, inflation_de: 1.5, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 18.2 },
+  1937: { msci_eur: 12.23, inflation_de: 3.6, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 14.2 },
+  1938: { msci_eur: 16.04, inflation_de: -2.1, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 11 },
+  1939: { msci_eur: 15.97, inflation_de: -1.4, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 12 },
+  1940: { msci_eur: 14.41, inflation_de: 0.7, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 10.2 },
+  1941: { msci_eur: 12.74, inflation_de: 5, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 10.2 },
+  1942: { msci_eur: 15.33, inflation_de: 10.9, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 8.4 },
+  1943: { msci_eur: 19.3, inflation_de: 6.1, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 10.3 },
+  1944: { msci_eur: 23.11, inflation_de: 1.7, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 11.2 },
+  1945: { msci_eur: 31.53, inflation_de: 2.3, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 11.9 },
+  1946: { msci_eur: 28.99, inflation_de: 8.3, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 15.2 },
+  1947: { msci_eur: 30.65, inflation_de: 14.4, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 10.8 },
+  1948: { msci_eur: 32.34, inflation_de: 8.1, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 9.3 },
+  1949: { msci_eur: 38.42, inflation_de: -1.2, zinssatz_de: 4, lohn_de: 3, gold_eur_perf: 0, cape: 9.1 },
   1950: { msci_eur: 4.68, inflation_de: -0.6, zinssatz_de: 4.0, lohn_de: 12.0, gold_eur_perf: 0.0, cape: 10.8 },
   1951: { msci_eur: 6.16, inflation_de: 7.6, zinssatz_de: 6.0, lohn_de: 14.0, gold_eur_perf: 0.0, cape: 11.8 },
   1952: { msci_eur: 7.64, inflation_de: 2.1, zinssatz_de: 5.0, lohn_de: 8.0, gold_eur_perf: 0.0, cape: 12.3 },
@@ -131,6 +170,22 @@ export const HISTORICAL_DATA = {
   2024: { msci_eur: 2500, inflation_de: 2.5, zinssatz_de: 3.75, lohn_de: 3, gold_eur_perf: 15, cape: 31.0 }
 };
 
+// Normalize 1925-1949 MSCI levels to connect smoothly to the 1950 base.
+(() => {
+  const anchorYear = 1950;
+  const bridgeYear = 1949;
+  const anchor = HISTORICAL_DATA[anchorYear]?.msci_eur;
+  const bridge = HISTORICAL_DATA[bridgeYear]?.msci_eur;
+  if (!Number.isFinite(anchor) || !Number.isFinite(bridge) || bridge <= 0) return;
+  const factor = anchor / bridge;
+  for (let year = 1925; year <= bridgeYear; year++) {
+    const entry = HISTORICAL_DATA[year];
+    if (entry && Number.isFinite(entry.msci_eur)) {
+      entry.msci_eur = entry.msci_eur * factor;
+    }
+  }
+})();
+
 /**
  * Sterbetafeln für Männer und Frauen
  */
@@ -174,6 +229,20 @@ export const STRESS_PRESETS = {
     type: "conditional_bootstrap",
     years: 6,
     filter: { equityRealMax: -8.0, minCluster: 2 }
+  },
+
+  GREAT_DEPRESSION_29_33: {
+    label: "Great Depression (1929-1933)",
+    type: "conditional_bootstrap",
+    years: 5,
+    filter: { yearMin: 1929, yearMax: 1933 }
+  },
+
+  WWII_40s: {
+    label: "Zweiter Weltkrieg (1939-1945)",
+    type: "conditional_bootstrap",
+    years: 7,
+    filter: { yearMin: 1939, yearMax: 1945 }
   },
 
   STAGFLATION_SUPER: {

@@ -86,7 +86,17 @@ async function runMonteCarloWithWorkers({
     onProgress,
     workerConfig = null
 }) {
-    const { anzahl, maxDauer, blockSize, seed, methode, rngMode = 'per-run-seed' } = monteCarloParams;
+    const {
+        anzahl,
+        maxDauer,
+        blockSize,
+        seed,
+        methode,
+        rngMode = 'per-run-seed',
+        startYearMode,
+        startYearFilter,
+        startYearHalfLife
+    } = monteCarloParams;
     const desiredWorkers = workerConfig?.workerCount ?? 0;
     const workerCount = Math.max(1, Number.isFinite(desiredWorkers) && desiredWorkers > 0
         ? desiredWorkers
@@ -165,7 +175,10 @@ async function runMonteCarloWithWorkers({
                 blockSize,
                 seed,
                 methode,
-                rngMode
+                rngMode,
+                startYearMode,
+                startYearFilter,
+                startYearHalfLife
             },
             useCapeSampling,
             logIndices
@@ -341,7 +354,17 @@ export async function runMonteCarlo() {
         prepareHistoricalDataOnce();
         const inputs = getCommonInputs();
         const widowOptions = normalizeWidowOptions(inputs.widowOptions);
-        const { anzahl, maxDauer, blockSize, seed, methode, rngMode } = readMonteCarloParameters();
+        const {
+            anzahl,
+            maxDauer,
+            blockSize,
+            seed,
+            methode,
+            rngMode,
+            startYearMode,
+            startYearFilter,
+            startYearHalfLife
+        } = readMonteCarloParameters();
 
         ui.showProgress();
         ui.updateProgress(0);
@@ -360,7 +383,17 @@ export async function runMonteCarlo() {
             const serialResults = await runMonteCarloSimulation({
                 inputs,
                 widowOptions,
-                monteCarloParams: { anzahl, maxDauer, blockSize, seed, methode, rngMode },
+                monteCarloParams: {
+                    anzahl,
+                    maxDauer,
+                    blockSize,
+                    seed,
+                    methode,
+                    rngMode,
+                    startYearMode,
+                    startYearFilter,
+                    startYearHalfLife
+                },
                 useCapeSampling,
                 onProgress: pct => ui.updateProgress(pct * 0.5),
                 scenarioAnalyzer: null
@@ -376,7 +409,17 @@ export async function runMonteCarlo() {
                     results = await runMonteCarloWithWorkers({
                         inputs,
                         widowOptions,
-                        monteCarloParams: { anzahl, maxDauer, blockSize, seed, methode, rngMode },
+                        monteCarloParams: {
+                            anzahl,
+                            maxDauer,
+                            blockSize,
+                            seed,
+                            methode,
+                            rngMode,
+                            startYearMode,
+                            startYearFilter,
+                            startYearHalfLife
+                        },
                         useCapeSampling,
                         onProgress: pct => ui.updateProgress(50 + pct * 0.5),
                         scenarioAnalyzer,
@@ -397,7 +440,17 @@ export async function runMonteCarlo() {
                 results = await runMonteCarloWithWorkers({
                     inputs,
                     widowOptions,
-                    monteCarloParams: { anzahl, maxDauer, blockSize, seed, methode, rngMode },
+                    monteCarloParams: {
+                        anzahl,
+                        maxDauer,
+                        blockSize,
+                        seed,
+                        methode,
+                        rngMode,
+                        startYearMode,
+                        startYearFilter,
+                        startYearHalfLife
+                    },
                     useCapeSampling,
                     onProgress: pct => ui.updateProgress(pct),
                     scenarioAnalyzer,
@@ -414,7 +467,17 @@ export async function runMonteCarlo() {
             results = await runMonteCarloSimulation({
                 inputs,
                 widowOptions,
-                monteCarloParams: { anzahl, maxDauer, blockSize, seed, methode, rngMode },
+                monteCarloParams: {
+                    anzahl,
+                    maxDauer,
+                    blockSize,
+                    seed,
+                    methode,
+                    rngMode,
+                    startYearMode,
+                    startYearFilter,
+                    startYearHalfLife
+                },
                 useCapeSampling,
                 onProgress: pct => ui.updateProgress(pct),
                 scenarioAnalyzer
@@ -429,7 +492,17 @@ export async function runMonteCarlo() {
             const logsByIndex = await runMonteCarloLogsForIndices({
                 inputs,
                 widowOptions,
-                monteCarloParams: { anzahl, maxDauer, blockSize, seed, methode, rngMode },
+                monteCarloParams: {
+                    anzahl,
+                    maxDauer,
+                    blockSize,
+                    seed,
+                    methode,
+                    rngMode,
+                    startYearMode,
+                    startYearFilter,
+                    startYearHalfLife
+                },
                 useCapeSampling,
                 runIndices: targetIndices
             });

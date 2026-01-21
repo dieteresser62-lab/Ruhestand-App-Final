@@ -90,7 +90,13 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 * `simulator-heatmap.js` – SVG-Rendering für Parameter-Sweeps inkl. Warnhinweise bei Verstößen.
 * `simulator-utils.js` – Zufallszahlengenerator, Statistikfunktionen, Parser (Formatierung über `shared-formatting.js`).
 * `shared-formatting.js` – gemeinsame Formatter für Balance und Simulator (Währung, Prozent, Monate).
-* `simulator-data.js` – Historische Daten, Mortalitäts- und Stress-Presets.
+* `simulator-data.js` – Historische Daten (inkl. 1925-1949 Schwarze-Schwan-Erweiterung), Mortalitäts- und Stress-Presets.
+
+**Monte-Carlo Startjahr-Sampling**
+* Default ist uniformes Sampling über alle historischen Startjahre.
+* Optional: `FILTER` (harte Startjahr-Grenze) oder `RECENCY` (Half-Life-Gewichtung).
+* Die Gewichtung beeinflusst Startjahr und laufende Jahresdaten (Regime/Block/IID).
+* CAPE-Sampling hat Vorrang; wenn aktiv, wird die Startjahr-Gewichtung ignoriert.
 
 ### Worker-Architektur (Monte Carlo, Sweep, Auto-Optimize)
 

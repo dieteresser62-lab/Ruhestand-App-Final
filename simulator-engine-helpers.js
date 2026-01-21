@@ -84,8 +84,10 @@ export function initMcRunState(inputs, startYearIndex) {
     const startPortfolio = initializePortfolio(inputs);
 
     const histYears = Object.keys(HISTORICAL_DATA).map(Number).sort((a, b) => a - b);
-    const validStartIndices = annualData.map((d, i) => i).filter(i => i >= 4);
-    const effectiveIndex = validStartIndices[startYearIndex % validStartIndices.length];
+    const minIndex = 4;
+    const maxIndex = Math.max(minIndex, annualData.length - 1);
+    const rawIndex = Number.isFinite(startYearIndex) ? Math.round(startYearIndex) : minIndex;
+    const effectiveIndex = Math.min(maxIndex, Math.max(minIndex, rawIndex));
     const startJahr = annualData[effectiveIndex].jahr;
 
     const marketDataHist = {
@@ -177,22 +179,59 @@ export function makeDefaultCareMeta(enabled, personGender = 'm') {
     };
 }
 
+function pickIndexFromSampler(rand, sampler, fallbackIndex = 0) {
+    if (sampler && Array.isArray(sampler.indices) && sampler.indices.length > 0) {
+        if (Array.isArray(sampler.cdf) && sampler.cdf.length === sampler.indices.length) {
+            const r = Math.min(1 - Number.EPSILON, Math.max(0, rand()));
+            let low = 0;
+            let high = sampler.cdf.length - 1;
+            while (low < high) {
+                const mid = Math.floor((low + high) / 2);
+                if (r < sampler.cdf[mid]) {
+                    high = mid;
+                } else {
+                    low = mid + 1;
+                }
+            }
+            return sampler.indices[low];
+        }
+        return sampler.indices[Math.floor(rand() * sampler.indices.length)];
+    }
+    return fallbackIndex;
+}
+
 /**
  * Wählt Marktdaten für das nächste Jahr gemäß der MC-Methode aus
  */
 export function sampleNextYearData(state, methode, blockSize, rand, stressCtx) {
     const samplerState = state.samplerState;
+    const yearSampling = samplerState?.yearSampling || null;
+    const allowedIndexSet = yearSampling?.allowedIndexSet || null;
 
     if (stressCtx && stressCtx.type === 'conditional_bootstrap' && stressCtx.remainingYears > 0) {
-        const randomIndex = Math.floor(rand() * stressCtx.pickableIndices.length);
-        const chosenYearIndex = stressCtx.pickableIndices[randomIndex];
+        const pickable = Array.isArray(stressCtx.pickableIndices) ? stressCtx.pickableIndices : [];
+        const filteredPickable = allowedIndexSet
+            ? pickable.filter(idx => allowedIndexSet.has(idx))
+            : pickable;
+        const pool = filteredPickable.length > 0
+            ? filteredPickable
+            : (yearSampling?.allowedIndices || pickable);
+        const randomIndex = Math.floor(rand() * pool.length);
+        const chosenYearIndex = pool[randomIndex];
         return { ...annualData[chosenYearIndex] };
     }
 
     if (methode === 'block') {
         if (!samplerState.blockStartIndex || samplerState.yearInBlock >= blockSize) {
-            const maxIndex = annualData.length - blockSize;
-            samplerState.blockStartIndex = Math.floor(rand() * maxIndex);
+            if (yearSampling?.blockSampler) {
+                samplerState.blockStartIndex = pickIndexFromSampler(rand, yearSampling.blockSampler, 0);
+            } else if (Array.isArray(yearSampling?.blockStartIndices) && yearSampling.blockStartIndices.length > 0) {
+                const indices = yearSampling.blockStartIndices;
+                samplerState.blockStartIndex = indices[Math.floor(rand() * indices.length)];
+            } else {
+                const maxIndex = annualData.length - blockSize;
+                samplerState.blockStartIndex = Math.floor(rand() * maxIndex);
+            }
             samplerState.yearInBlock = 0;
         }
         const data = annualData[samplerState.blockStartIndex + samplerState.yearInBlock];
@@ -206,7 +245,15 @@ export function sampleNextYearData(state, methode, blockSize, rand, stressCtx) {
         regime = regimes[Math.floor(rand() * regimes.length)];
     } else {
         if (!samplerState.currentRegime) {
-            samplerState.currentRegime = annualData[Math.floor(rand() * annualData.length)].regime;
+            if (yearSampling?.allSampler) {
+                const initialIndex = pickIndexFromSampler(rand, yearSampling.allSampler, 0);
+                samplerState.currentRegime = annualData[initialIndex].regime;
+            } else if (Array.isArray(yearSampling?.allowedIndices) && yearSampling.allowedIndices.length > 0) {
+                const indices = yearSampling.allowedIndices;
+                samplerState.currentRegime = annualData[indices[Math.floor(rand() * indices.length)]].regime;
+            } else {
+                samplerState.currentRegime = annualData[Math.floor(rand() * annualData.length)].regime;
+            }
         }
 
         const transitions = REGIME_TRANSITIONS[samplerState.currentRegime];
@@ -223,6 +270,12 @@ export function sampleNextYearData(state, methode, blockSize, rand, stressCtx) {
         }
         regime = nextRegime;
         samplerState.currentRegime = nextRegime;
+    }
+
+    const samplerForRegime = yearSampling?.regimeSamplers?.[regime];
+    if (samplerForRegime && Array.isArray(samplerForRegime.indices) && samplerForRegime.indices.length > 0) {
+        const idx = pickIndexFromSampler(rand, samplerForRegime, samplerForRegime.indices[0]);
+        return { ...annualData[idx] };
     }
 
     const possibleYears = REGIME_DATA[regime];

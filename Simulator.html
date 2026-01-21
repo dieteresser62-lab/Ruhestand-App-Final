@@ -641,6 +641,38 @@
                         </div>
                     </fieldset>
                     <fieldset>
+                        <legend><span class="section-icon">🧭</span>Daten-Gewichtung (Advanced)</legend>
+                        <div class="form-grid-four-col">
+                            <div class="form-group"><label for="mcStartYearMode">Modus</label><select
+                                    id="mcStartYearMode">
+                                    <option value="UNIFORM" selected>Uniform (alle Jahre gleich)</option>
+                                    <option value="FILTER">Startjahr filtern (harte Grenze)</option>
+                                    <option value="RECENCY">Recency (Half-Life-Gewichtung)</option>
+                                </select></div>
+                            <div class="form-group" id="mcStartYearFilterRow" style="display:none;">
+                                <label for="mcStartYearFilter">Startjahr-Filter</label>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <input type="range" id="mcStartYearFilter" min="1950" max="2010" value="1970">
+                                    <output id="mcStartYearFilterValue">1970</output>
+                                </div>
+                            </div>
+                            <div class="form-group" id="mcStartYearHalfLifeRow" style="display:none;">
+                                <label for="mcStartYearHalfLife">Half-Life (Jahre)</label>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <input type="range" id="mcStartYearHalfLife" min="5" max="50" value="20">
+                                    <output id="mcStartYearHalfLifeValue">20</output>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="mcStartYearCapeWarning"
+                            style="display:none; margin-top: 6px; font-size: 0.9rem; color: var(--text-secondary); text-align: center;">
+                            Hinweis: CAPE-Sampling hat Vorrang; die Gewichtung wird dann ignoriert.
+                        </div>
+                        <small style="display:block; margin-top: 8px; color: var(--text-secondary); text-align: center;">
+                            Advanced-Feature: optional, beeinflusst Startjahre und die laufenden historischen Jahresdaten.
+                        </small>
+                    </fieldset>
+                    <fieldset>
                         <legend><span class="section-icon">⚡</span>Stressmodus</legend>
                         <div class="form-group"><label for="stressPreset">Szenario für die ersten
                                 Simulationsjahre</label><select id="stressPreset">

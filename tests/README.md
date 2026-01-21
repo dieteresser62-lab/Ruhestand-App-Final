@@ -37,6 +37,7 @@ node tests/run-tests.mjs
 
 ### 2. Algorithms & Logic (Priority 2)
 - **`monte-carlo-sampling.test.mjs`**: Validates the statistical core: Block-Bootstrap sampling and Market Regime Transition probabilities.
+- **`monte-carlo-startyear.test.mjs`**: Validates weighted start-year sampling (Filter/Recency) and deterministic CDF selection.
 - **`care-meta.test.mjs`**: Validates Care Logic: Probability of care events, Cost ramping (inflation/progression), and Dual-Household Flex budget adjustments.
 - **`market-analyzer.test.mjs`**: Validates Market Diagnostics: ATH drawdown detection, CAPE valuation signals, and Scenario classification (Bear/Peak/Recovery).
 

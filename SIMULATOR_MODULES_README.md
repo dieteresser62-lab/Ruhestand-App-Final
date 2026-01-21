@@ -318,7 +318,7 @@ Zufallszahlen und Statistik (Formatierung wird aus `shared-formatting.js` re-exp
 ---
 
 ## 20. `simulator-data.js` (~190 Zeilen)
-Historische Daten, Mortalitätstafeln, Stress-Presets.
+Historische Daten (inkl. 1925-1949 Schwarze-Schwan-Erweiterung), Mortalitätstafeln, Stress-Presets.
 
 **Exporte:**
 - `HISTORICAL_DATA` – historische Marktdaten (MSCI, Gold, Inflation)
@@ -471,7 +471,8 @@ Nach jeder Monte-Carlo-Simulation werden 30 Szenarien gespeichert:
 - **Renten-Persistenz:** `initRente2ConfigWithLocalStorage()` in `simulator-ui-rente.js` liest/migriert Rentenfelder, schaltet Partner-Section (`chkPartnerAktiv`, `sectionRente2`) und schreibt zurück in `localStorage`.
 - **Sweep-Voreinstellungen:** `initSweepDefaultsWithLocalStorageFallback()` in `simulator-sweep.js` lädt Defaults, liest `localStorage` und setzt Guardrails (Whitelist/Blocklist). Erwartet Zugriff auf Sweep-Formularfelder und das Toggle.
 - **Backtest-Setup:** `initializeBacktestUI()` in `simulator-backtest.js` verknüpft Zeitraum-/Startknöpfe, ruft `runBacktest()` und nutzt `renderBacktestLog()`/`exportBacktestLogData()` für Ausgabe. Erwartet vorhandene DOM-IDs des Backtest-Tabs.
-- **Monte-Carlo-Start:** `runMonteCarlo()` in `simulator-monte-carlo.js` liest `mcAnzahl`, `mcDauer`, `mcBlockSize`, `mcSeed`, `mcMethode` sowie Progress-UI (`mc-progress-bar*`). Liefert nach Abschluss aggregierte Ergebnisse an `displayMonteCarloResults()`.
+- **Monte-Carlo-Start:** `runMonteCarlo()` in `simulator-monte-carlo.js` liest `mcAnzahl`, `mcDauer`, `mcBlockSize`, `mcSeed`, `mcMethode`, `mcStartYearMode`, `mcStartYearFilter`, `mcStartYearHalfLife` sowie Progress-UI (`mc-progress-bar*`). Liefert nach Abschluss aggregierte Ergebnisse an `displayMonteCarloResults()`.
+- **Startjahr-Sampling:** `monte-carlo-runner.js` nutzt optional `FILTER` (harte Grenze) oder `RECENCY` (Half-Life). Die Gewichtung wirkt auf Startjahr und laufende Jahresdaten; CAPE-Sampling hat Vorrang vor Gewichtung.
 
 ---
 
@@ -496,4 +497,4 @@ Nach jeder Monte-Carlo-Simulation werden 30 Szenarien gespeichert:
 
 ---
 
-**Last Updated:** 2025-12-19
+**Last Updated:** 2026-01-21

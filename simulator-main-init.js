@@ -16,6 +16,7 @@ import { initResetButton } from './simulator-main-reset.js';
 import { initPartnerToggle } from './simulator-main-partner.js';
 import { initStressPresetOptions } from './simulator-main-stress.js';
 import { initSimulatorProfileSelection } from './simulator-main-profiles.js';
+import { initMonteCarloStartYearControls } from './monte-carlo-ui.js';
 
 /**
  * Prüft Engine-Version
@@ -57,6 +58,7 @@ export function initializeSimulatorApp() {
     initializeBacktestUI();
 
     initStressPresetOptions();
+    initMonteCarloStartYearControls();
 
     document.getElementById('mcBlockSize').disabled = mcMethodeSelect.value !== 'block';
 

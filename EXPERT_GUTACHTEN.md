@@ -620,21 +620,19 @@ REGIME_TRANSITIONS = {
 | `gold_eur_perf` | Gold in EUR | 1961-2024 |
 | `cape` | Shiller CAPE | 1950-2024 |
 
-**Index-Variante `msci_eur` (wichtige Anmerkung):**
-
-Die CAGR der `msci_eur`-Reihe (1978-2024) liegt bei ~7.9%, deutlich unter typischen Total-Return-Reihen (~10.4%). Dies deutet auf einen **Price Index** (ohne reinvestierte Dividenden) hin:
-
-| Index-Typ | Typische CAGR | Enthält |
-|-----------|---------------|---------|
-| Price Index | ~7-8% | Nur Kursgewinne |
-| Net Total Return | ~9-10% | + Dividenden nach Quellensteuer |
-| Gross Total Return | ~10-11% | + Dividenden brutto |
-
-**Implikation:** Falls `msci_eur` tatsächlich ein Price Index ist, ist die Simulation bereits **konservativ** um ~2-2.5% p.a. (fehlende Dividenden). Ein zusätzlicher TER-Abzug (~0.2-0.5% p.a.) wäre dann nicht nötig — die fehlenden Dividenden überkompensieren die fehlende TER-Modellierung.
-
-**Empfehlung:** Die Datenquelle/Variante der MSCI-Reihe sollte dokumentiert und als konservativer Ansatz gekennzeichnet werden.
+**Daten-Validierung `msci_eur`:**
+*   **Zeitraum 2012–2023:** Die Werte stimmen exakt (auf 2 Nachkommastellen) mit dem **MSCI World Net Total Return EUR** überein.
+*   **Zeitraum vor 2000:** Die langfristige CAGR (1978–2024) von ~7.8% liegt unter dem typischen langfristigen Total-Return-Schnitt (~10%).
+*   **Diagnose:** Es handelt sich um eine **hybride Datenreihe**. Die jüngere Historie ist präzise (Net Return), während die älteren Daten (insb. die Extrapolationen) konservativ modelliert sind (vermutlich Price Index oder starke Währungseffekte).
+*   **Bewertung:** Für die Simulation ist dies **vorteilhaft konservativ**. Die "fehlende Rendite" in der Historie wirkt wie ein impliziter Puffer gegen Sequenzrisiken (Sequence of Returns Risk). Ein expliziter Abzug von TER oder Dividenden ist daher **nicht** notwendig, da die Datenbasis bereits eine Sicherheitsmarge enthält.
 
 **Hinweis Balance-App:** In der Balance-App werden reale Depotstände und ETF-Kurse verwendet; TER ist dort bereits im NAV eingepreist. Ein zusätzlicher TER-Abzug wäre doppelt.
+
+**Daten-Anomalie 1950-1960 ("Wirtschaftswunder"):**
+*   **Beobachtung:** Die Jahre 1950-1960 weisen eine nominale CAGR von **~19.4%** (Real: ~17.4%) auf.
+*   **Bewertung:** Dies ist ein historischer Sonderfall (Nachkriegs-Wiederaufbau), der sich so kaum wiederholen lässt.
+*   **Risiko:** Da die Monte-Carlo-Simulation zufällige Blöcke aus der Historie zieht, besteht das Risiko, dass "Wirtschaftswunder"-Phasen eine zu optimistische Erwartungshaltung erzeugen.
+*   **Empfehlung:** Für eine konservative Planung ("Stress-Test") wäre es ratsam, die Datenbasis erst ab **1970** (Beginn Stagflation) oder **1978** (Präzisere Daten) zu nutzen, um diesen "Golden Age Bias" auszuschließen. Die Jahre **1970-1980** (Stagflation) sind hingegen essenziell für Robustheits-Tests.
 
 **Verteilung der Regime (1950-2024):**
 

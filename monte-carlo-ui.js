@@ -150,11 +150,19 @@ export function readIntegerInput(elementId, description, { min = -Infinity, max 
     return parsed;
 }
 
+function readOptionalIntegerInput(elementId, description, { min = -Infinity, max = Infinity, defaultValue } = {}) {
+    const element = document.getElementById(elementId);
+    if (!element) {
+        return defaultValue;
+    }
+    return readIntegerInput(elementId, description, { min, max, defaultValue });
+}
+
 /**
  * Liest alle Monte-Carlo-Steuerparameter aus dem UI und validiert sie defensiv.
  * Design-Entscheidung: Frühes Validieren verhindert späte Ausfälle tief in der Simulation
  * und liefert dem Nutzer klare Fehlermeldungen.
- * @returns {{ anzahl: number, maxDauer: number, blockSize: number, seed: number, methode: string, rngMode: string }}
+ * @returns {{ anzahl: number, maxDauer: number, blockSize: number, seed: number, methode: string, rngMode: string, startYearMode: string, startYearFilter: number, startYearHalfLife: number }}
  */
 export function readMonteCarloParameters() {
     const methodeSelect = requireElement('mcMethode', 'Monte-Carlo Methode');
@@ -171,5 +179,64 @@ export function readMonteCarloParameters() {
     const rngModeElement = document.getElementById('rngMode');
     const rngMode = rngModeElement ? rngModeElement.value : 'per-run-seed';
 
-    return { anzahl, maxDauer, blockSize, seed, methode, rngMode };
+    const startYearModeElement = document.getElementById('mcStartYearMode');
+    const startYearModeRaw = startYearModeElement ? startYearModeElement.value : 'UNIFORM';
+    const allowedStartYearModes = ['UNIFORM', 'FILTER', 'RECENCY'];
+    const startYearMode = allowedStartYearModes.includes(startYearModeRaw) ? startYearModeRaw : 'UNIFORM';
+    const startYearFilter = readOptionalIntegerInput('mcStartYearFilter', 'Startjahr-Filter', {
+        min: 1950,
+        max: 2010,
+        defaultValue: 1970
+    });
+    const startYearHalfLife = readOptionalIntegerInput('mcStartYearHalfLife', 'Half-Life (Jahre)', {
+        min: 5,
+        max: 50,
+        defaultValue: 20
+    });
+
+    return { anzahl, maxDauer, blockSize, seed, methode, rngMode, startYearMode, startYearFilter, startYearHalfLife };
+}
+
+export function initMonteCarloStartYearControls() {
+    const modeElement = document.getElementById('mcStartYearMode');
+    if (!modeElement) return;
+
+    const filterRow = document.getElementById('mcStartYearFilterRow');
+    const halfLifeRow = document.getElementById('mcStartYearHalfLifeRow');
+    const filterValue = document.getElementById('mcStartYearFilterValue');
+    const halfLifeValue = document.getElementById('mcStartYearHalfLifeValue');
+    const filterInput = document.getElementById('mcStartYearFilter');
+    const halfLifeInput = document.getElementById('mcStartYearHalfLife');
+    const capeToggle = document.getElementById('useCapeSampling');
+    const capeWarning = document.getElementById('mcStartYearCapeWarning');
+
+    const syncRangeValue = (input, output) => {
+        if (!input || !output) return;
+        output.textContent = String(input.value);
+    };
+
+    const updateVisibility = () => {
+        const mode = modeElement.value || 'UNIFORM';
+        if (filterRow) filterRow.style.display = mode === 'FILTER' ? 'block' : 'none';
+        if (halfLifeRow) halfLifeRow.style.display = mode === 'RECENCY' ? 'block' : 'none';
+        if (capeWarning) {
+            const capeActive = capeToggle?.checked === true;
+            capeWarning.style.display = capeActive && mode !== 'UNIFORM' ? 'block' : 'none';
+        }
+    };
+
+    if (filterInput && filterValue) {
+        syncRangeValue(filterInput, filterValue);
+        filterInput.addEventListener('input', () => syncRangeValue(filterInput, filterValue));
+    }
+    if (halfLifeInput && halfLifeValue) {
+        syncRangeValue(halfLifeInput, halfLifeValue);
+        halfLifeInput.addEventListener('input', () => syncRangeValue(halfLifeInput, halfLifeValue));
+    }
+
+    modeElement.addEventListener('change', updateVisibility);
+    if (capeToggle) {
+        capeToggle.addEventListener('change', updateVisibility);
+    }
+    updateVisibility();
 }
