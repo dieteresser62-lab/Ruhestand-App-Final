@@ -122,10 +122,20 @@ export function computeCappedRefill({
         };
 
     const maxCapEuro = (capConfig.pct / 100) * aktienwert;
-    // Bei kritischer Liquidität: erhöhtes Cap erlauben (10% des Aktienwerts)
-    let effectiveMaxCap = isCriticalLiquidity
-        ? Math.max(maxCapEuro, aktienwert * 0.10)
-        : maxCapEuro;
+    // Bei kritischer Liquidität: erhöhtes Cap erlauben
+    // Wenn keine Aktien vorhanden (nur Gold), Cap auf Liquiditätsbedarf setzen,
+    // um Verkauf aus Gold zu ermöglichen
+    let effectiveMaxCap;
+    if (isCriticalLiquidity) {
+        if (aktienwert > 0) {
+            effectiveMaxCap = Math.max(maxCapEuro, aktienwert * 0.10);
+        } else {
+            // Kein Aktienbestand - Cap auf Bedarf setzen um Gold-Verkauf zu erlauben
+            effectiveMaxCap = liquiditaetsbedarf;
+        }
+    } else {
+        effectiveMaxCap = maxCapEuro;
+    }
 
     // ANTI-PSEUDO-ACCURACY: Auch das Cap runden (abrunden, um Limit einzuhalten)
     effectiveMaxCap = quantizeAmount(effectiveMaxCap, 'floor');

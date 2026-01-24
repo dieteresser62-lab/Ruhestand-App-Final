@@ -1,5 +1,7 @@
 "use strict";
 
+import { parseDisplayNumber } from './simulator-portfolio-format.js';
+
 /**
  * Initialisiert das Portfolio mit detaillierten Tranchen (erweiterte Logik)
  * Unterstützt mehrere individuelle Positionen mit FIFO-Tracking
@@ -47,9 +49,16 @@ export function initializePortfolioDetailed(inputs) {
                 }
             }
 
-            const shares = Number(tranche.shares) || 0;
-            const purchasePrice = Number(tranche.purchasePrice) || 0;
-            const currentPrice = Number(tranche.currentPrice) || 0;
+            const shares = parseDisplayNumber(tranche.shares);
+            const purchasePriceRaw = parseDisplayNumber(tranche.purchasePrice);
+            const currentPriceRaw = parseDisplayNumber(tranche.currentPrice || tranche.purchasePrice);
+            const marketValueRaw = parseDisplayNumber(tranche.marketValue);
+            const costBasisRaw = parseDisplayNumber(tranche.costBasis);
+            const purchasePrice = purchasePriceRaw > 0 ? purchasePriceRaw : 0;
+            const currentPrice = currentPriceRaw > 0 ? currentPriceRaw
+                : (shares > 0 && marketValueRaw > 0 ? marketValueRaw / shares : 0);
+            const marketValue = marketValueRaw > 0 ? marketValueRaw : (shares * currentPrice);
+            const costBasis = costBasisRaw > 0 ? costBasisRaw : (shares * purchasePrice);
             const trancheObj = {
                 trancheId: tranche.trancheId || tranche.id || null,
                 name: tranche.name || 'Unbekannt',
@@ -58,8 +67,8 @@ export function initializePortfolioDetailed(inputs) {
                 purchasePrice,
                 purchaseDate: tranche.purchaseDate || null,
                 currentPrice,
-                marketValue: shares * currentPrice,
-                costBasis: shares * purchasePrice,
+                marketValue,
+                costBasis,
                 tqf: Number(tranche.tqf) ?? 0.30,
                 type: normalizedType || 'aktien_alt',
                 category

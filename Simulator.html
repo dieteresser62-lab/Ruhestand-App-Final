@@ -122,6 +122,35 @@
             color: #b91c1c;
         }
 
+        .toast-container {
+            position: fixed;
+            right: 16px;
+            bottom: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 9999;
+            pointer-events: none;
+        }
+
+        .toast {
+            max-width: 300px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            background: #1f2937;
+            color: #ffffff;
+            font-size: 0.85rem;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            transform: translateY(6px);
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        .toast-show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
     </style>
 </head>
 
@@ -1365,6 +1394,7 @@
             }
         }
     </script>
+    <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
 </body>
 
 </html>

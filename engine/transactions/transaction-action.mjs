@@ -91,6 +91,13 @@ export function determineAction(p, helpers) {
     }
 
     // Normale Transaktionslogik
+    // Kritischer Floor-Mangel: Wenn wir weniger als den vollen Jahres-Floor auf dem Konto haben.
+    // In diesem Fall erlauben wir auch kleine Verkäufe (ignorieren MinTrade), um die Zahlungsfähigkeit zu sichern.
+    const isCriticalFloorShortfall = aktuelleLiquiditaet < floorBedarfNetto;
+    if (isCriticalFloorShortfall) {
+        minTradeResultOverride = 0;
+    }
+
     if (!isPufferSchutzAktiv) {
         const gesamtjahresbedarf = floorBedarfNetto + input.flexBedarf;
         const currentRunwayMonths = (gesamtjahresbedarf > 0)
@@ -134,13 +141,24 @@ export function determineAction(p, helpers) {
         // Peak-Regimes: KEIN Guardrail - immer Opportunistisches Rebalancing verwenden.
         // Im Peak wollen wir die gute Marktlage nutzen, um BEIDES aufzufüllen (Liquidität + Gold).
         // Gold aufschieben ist riskant, da der nächste Bär jederzeit kommen kann.
+        // AUSNAHME: Bei extrem kritischer Liquidität (unter absolutem Minimum oder < 25% Deckung)
+        // muss der Guardrail trotzdem greifen, um Liquiditätsengpass zu verhindern.
+        const absoluteMinLiq = CONFIG.THRESHOLDS.STRATEGY.absoluteMinLiquidity || 10000;
+        const isCriticalLiquidityForGuardrail =
+            aktuelleLiquiditaet < absoluteMinLiq ||
+            zielLiquiditaetsdeckung < 0.25;
         // Nicht-Peak: Guardrail bei Coverage-Lücke oder Runway-Lücke
-        const hasGuardrailGap = isPeakRegime
+        const hasGuardrailGap = (isPeakRegime && !isCriticalLiquidityForGuardrail)
             ? false
             : ((hasCoverageGap || hasRunwayGap) && guardrailGapEuro > 1);
 
         if (isBearRegimeProxy && hasGuardrailGap) {
-            const isCriticalLiquidityBear = aktuelleLiquiditaet < (sicherheitsPuffer * 1.5);
+            // FIX: isCriticalLiquidity muss AUCH Runway% berücksichtigen, nicht nur absoluten Puffer.
+            // Bei hoher Rentendeckung ist sicherheitsPuffer klein, aber 72% Runway ist trotzdem kritisch.
+            // Die runwayCoverageThreshold (75%) ist der Standard für "sicher", darunter sollte das Cap angehoben werden.
+            const isCriticalLiquidityBear =
+                aktuelleLiquiditaet < (sicherheitsPuffer * 1.5) ||
+                zielLiquiditaetsdeckung < runwayCoverageThreshold;
 
             const bearRefill = computeCappedRefill({
                 isBearContext: true,
@@ -161,8 +179,9 @@ export function determineAction(p, helpers) {
                 });
                 verwendungen.liquiditaet = actionDetails.bedarf;
 
-                // Im Bärenmarkt: Gold-Floor auf 0 setzen
+                // Im Bärenmarkt: Gold-Floor ignorieren um Notverkauf zu ermöglichen
                 saleContext.minGold = 0;
+                saleContext.ignoreGoldFloor = true;
 
                 // Sale-Budgets setzen
                 const totalEquityValue = input.depotwertAlt + input.depotwertNeu;
@@ -222,6 +241,12 @@ export function determineAction(p, helpers) {
                 });
                 verwendungen.liquiditaet = actionDetails.bedarf;
 
+                // Bei kritischer Liquidität: Gold-Floor ignorieren, um Notverkauf zu ermöglichen
+                if (isCriticalLiquidityFailsafe) {
+                    saleContext.ignoreGoldFloor = true;
+                    saleContext.minGold = 0;
+                }
+
                 // Sale-Budgets setzen um Aktien-Verkauf zu ermöglichen
                 // Bei Guardrail-Aktivierung muss genug verkauft werden können
                 const totalEquityValue = input.depotwertAlt + input.depotwertNeu;
@@ -233,9 +258,12 @@ export function determineAction(p, helpers) {
                     saleContext.saleBudgets.aktien_neu =
                         requiredEquitySale * (input.depotwertNeu / totalEquityValue);
                 }
-                // Gold-Budget auf verfügbaren Wert setzen (über dem Floor)
+                // Gold-Budget setzen: Bei kritischer Liquidität volles Gold verfügbar,
+                // sonst nur der Teil über dem Floor
                 if (input.goldAktiv && input.goldWert > 0) {
-                    const availableGold = Math.max(0, input.goldWert - (minGold || 0));
+                    const availableGold = isCriticalLiquidityFailsafe
+                        ? input.goldWert
+                        : Math.max(0, input.goldWert - (minGold || 0));
                     saleContext.saleBudgets.gold = availableGold;
                 }
             }
@@ -308,15 +336,17 @@ export function determineAction(p, helpers) {
         // Should be caught by hardening, but keeping safety check without logs
     }
 
-    // Bei Notfall-Verkäufen (Puffer-Schutz) keine minTrade-Schwelle anwenden
-    const minTradeResult = isPufferSchutzAktiv
+    // Bei Notfall-Verkäufen (Puffer-Schutz) ODER kritischem Floor-Mangel keine minTrade-Schwelle anwenden
+    // (Nutze oben deklarierte Variable isCriticalFloorShortfall)
+    
+    const minTradeResult = (isPufferSchutzAktiv || isCriticalFloorShortfall)
         ? 0
         : (minTradeResultOverride ?? Math.max(
             CONFIG.THRESHOLDS.STRATEGY.minTradeAmountStatic,
             (depotwertGesamt + aktuelleLiquiditaet) * CONFIG.THRESHOLDS.STRATEGY.minTradeAmountDynamicFactor
         ));
 
-    if (!saleResult || (saleResult.achievedRefill < minTradeResult && !isPufferSchutzAktiv)) {
+    if (!saleResult || (saleResult.achievedRefill < minTradeResult && !isPufferSchutzAktiv && !isCriticalFloorShortfall)) {
         const achieved = saleResult?.achievedRefill || 0;
         markAsBlocked('min_trade', Math.max(0, minTradeResult - achieved), {
             direction: actionDetails.title || 'Verkauf',

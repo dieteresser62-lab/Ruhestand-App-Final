@@ -92,8 +92,11 @@ export function buildOpportunisticRefill({
     // Wenn es nur Gold-Verkauf ist, ist 'totalerBedarf' der Verkaufsbetrag.
     let quantisierterBedarf = totalerBedarf;
 
+    // Notfall-Flag: Override von außen ODER lokale Krise
+    const forceAction = (minTradeResultOverride === 0) || isCriticalLiquidity || belowAbsoluteFloor;
+
     // Hysterese-Check vor Quantisierung (außer bei Gefahr)
-    if (!isCriticalLiquidity && !belowAbsoluteFloor) {
+    if (!forceAction) {
         if (totalerBedarf < CONFIG.ANTI_PSEUDO_ACCURACY.HYSTERESIS_MIN_REFILL_AMOUNT) {
             // Zu kleiner Betrag, ignorieren
             quantisierterBedarf = 0;
@@ -135,15 +138,21 @@ export function buildOpportunisticRefill({
         );
         minTradeResultOverride = 0;
     } else {
-        const minTradeGateResult = computeAppliedMinTradeGate({
-            investiertesKapital,
-            liquiditaetsBedarf: effectiveLiquiditätsBedarf,
-            totalerBedarf: effectiveTotalerBedarf
-        });
-        appliedMinTradeGate = minTradeGateResult.appliedMinTradeGate;
-        minTradeResultOverride = minTradeGateResult.minTradeResultOverride;
-        if (minTradeGateResult.diagnosisEntry) {
-            actionDetails.diagnosisEntries.push(minTradeGateResult.diagnosisEntry);
+        // Respektiere den Override von außen (z.B. aus determineAction bei Floor-Notfall)
+        if (minTradeResultOverride !== null && minTradeResultOverride !== undefined) {
+             appliedMinTradeGate = minTradeResultOverride;
+        } else {
+            const minTradeGateResult = computeAppliedMinTradeGate({
+                investiertesKapital,
+                liquiditaetsBedarf: effectiveLiquiditätsBedarf,
+                totalerBedarf: effectiveTotalerBedarf
+            });
+            appliedMinTradeGate = minTradeGateResult.appliedMinTradeGate;
+            // Nur überschreiben, wenn wir keinen externen Override hatten
+            minTradeResultOverride = minTradeGateResult.minTradeResultOverride;
+            if (minTradeGateResult.diagnosisEntry) {
+                actionDetails.diagnosisEntries.push(minTradeGateResult.diagnosisEntry);
+            }
         }
     }
 
@@ -224,11 +233,14 @@ export function buildOpportunisticRefill({
         // ATH-skaliertes Cap: Bei -20% ATH-Abstand kein Rebalancing mehr
         const baseMaxSkimCapEuro = ((input.maxSkimPctOfEq || 5) / 100) * aktienwert;
         const athScaledSkimCap = baseMaxSkimCapEuro * athRebalancingFaktor;
-        // Bei kritischer Liquidität ODER absolutem Minimum: Cap auf Liquiditätsbedarf + 20% Puffer begrenzen
-        // Das stellt sicher, dass die Liquidität aufgefüllt wird.
-        const effectiveSkimCap = (isCriticalLiquidity || belowAbsoluteFloor)
+        
+        // Bei kritischer Liquidität ODER absolutem Minimum ODER externem Override: Cap lockern
+        const isEmergencyRefill = isCriticalLiquidity || belowAbsoluteFloor || (minTradeResultOverride === 0);
+        
+        const effectiveSkimCap = isEmergencyRefill
             ? Math.max(athScaledSkimCap, effectiveLiquiditätsBedarf * 1.2)
             : athScaledSkimCap;
+            
         const maxSellableFromEquity = Math.min(aktienUeberschuss, effectiveSkimCap);
 
         const totalEquityValue = input.depotwertAlt + input.depotwertNeu;

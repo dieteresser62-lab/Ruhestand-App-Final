@@ -9,6 +9,7 @@ export function initSimulatorProfileSelection() {
     const listContainer = document.getElementById('simProfileList');
     const statusEl = document.getElementById('simProfileStatus');
     if (!listContainer) return;
+    const MAX_HOUSEHOLD_PROFILES = 2;
 
     const renderList = (profiles) => {
         listContainer.innerHTML = '';
@@ -34,6 +35,18 @@ export function initSimulatorProfileSelection() {
         statusEl.dataset.kind = kind;
     };
 
+    const limitSelection = (selected, currentId) => {
+        if (selected.length <= MAX_HOUSEHOLD_PROFILES) return selected;
+        const current = selected.find(p => p.id === currentId);
+        const limited = [];
+        if (current) limited.push(current);
+        for (const profile of selected) {
+            if (limited.length >= MAX_HOUSEHOLD_PROFILES) break;
+            if (!current || profile.id !== current.id) limited.push(profile);
+        }
+        return limited;
+    };
+
     const applySelection = () => {
         const profiles = listProfiles();
         if (!profiles.length) {
@@ -43,9 +56,22 @@ export function initSimulatorProfileSelection() {
 
         let selected = profiles.filter(p => p.belongsToHousehold !== false);
         if (!selected.length) {
-            profiles.forEach(profile => setProfileVerbundMembership(profile.id, true));
-            selected = profiles.slice();
+            const currentId = getCurrentProfileId();
+            const preferred = profiles.find(p => p.id === currentId) || profiles[0];
+            profiles.forEach(profile => setProfileVerbundMembership(profile.id, profile.id === preferred?.id));
+            selected = preferred ? [preferred] : [];
             renderList(profiles);
+        }
+
+        const currentId = getCurrentProfileId();
+        let selectionWarning = '';
+        if (selected.length > MAX_HOUSEHOLD_PROFILES) {
+            const limited = limitSelection(selected, currentId);
+            const limitedIds = new Set(limited.map(p => p.id));
+            profiles.forEach(profile => setProfileVerbundMembership(profile.id, limitedIds.has(profile.id)));
+            renderList(profiles);
+            selected = limited;
+            selectionWarning = 'Haushalte im Simulator sind auf 2 Personen begrenzt. Auswahl wurde gekuerzt.';
         }
 
         const profileInputs = selected.map(meta => {
@@ -54,7 +80,6 @@ export function initSimulatorProfileSelection() {
             return { profileId: meta.id, name: meta.name || meta.id, inputs };
         });
 
-        const currentId = getCurrentProfileId();
         const primaryId = selected.find(p => p.id === currentId)?.id || selected[0]?.id;
         const { combined, warnings } = combineSimulatorProfiles(profileInputs, primaryId);
 
@@ -74,7 +99,10 @@ export function initSimulatorProfileSelection() {
         updateStartPortfolioDisplay();
 
         if (warnings && warnings.length) {
-            updateStatus(warnings.join(' '), 'error');
+            const combinedWarnings = selectionWarning ? warnings.concat(selectionWarning) : warnings;
+            updateStatus(combinedWarnings.join(' '), 'error');
+        } else if (selectionWarning) {
+            updateStatus(selectionWarning, 'error');
         } else {
             updateStatus(`Aktive Profile: ${selected.length}.`, 'ok');
         }
@@ -87,6 +115,15 @@ export function initSimulatorProfileSelection() {
         if (!target || target.type !== 'checkbox') return;
         const profileId = target.dataset.profileId || target.value;
         if (!profileId) return;
+        if (target.checked) {
+            const checked = listContainer.querySelectorAll('input[type="checkbox"]:checked');
+            if (checked.length > MAX_HOUSEHOLD_PROFILES) {
+                target.checked = false;
+                setProfileVerbundMembership(profileId, false);
+                updateStatus('Haushalte im Simulator sind auf 2 Personen begrenzt.', 'error');
+                return;
+            }
+        }
         setProfileVerbundMembership(profileId, target.checked);
         applySelection();
     });
@@ -153,13 +190,7 @@ function applyCombinedInputsToUI(combined, selectedCount) {
         'p1Geschlecht',
         'rentAdjMode',
         'rentAdjPct',
-        'chkPartnerAktiv',
-        'r2Geschlecht',
-        'r2StartAlter',
-        'r2StartInJahren',
-        'r2Monatsrente',
-        'r2SparerPauschbetrag',
-        'r2KirchensteuerPct'
+        'chkPartnerAktiv'
     ];
     lockIds.forEach(id => {
         const el = document.getElementById(id);

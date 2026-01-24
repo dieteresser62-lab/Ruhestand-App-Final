@@ -134,12 +134,14 @@ function getBaseParams() {
     // Standard Cap: 12.5k.
     // Refill limited to 12.5k. Cap Active.
 
-    console.log(`Debug Check: Current=${params.aktuelleLiquiditaet}, Puffer=24000, CriticalBoundary=36000`);
+    console.log(`Debug Check: Current=${params.aktuelleLiquiditaet}, Puffer=24000, CriticalBoundary=36000, Coverage=<75%→critical`);
 
     const paramsSafe = JSON.parse(JSON.stringify(params));
-    paramsSafe.aktuelleLiquiditaet = 40000;
-    paramsSafe.input.tagesgeld = 40000;
-    // Gap 32k. Cap 12.5k. Result 12.5k.
+    // Mit 46k Cash ist die Deckung 46/60 = 76.7% > 75% (runwayCoverageThreshold).
+    // Dadurch bleibt isCriticalLiquidityBear=false und das Standard-Cap greift.
+    // Gap: 72k (24mo * 3k/mo) - 46k = 26k. Cap 12.5k (quantized to 10k). Result 10k.
+    paramsSafe.aktuelleLiquiditaet = 46000;
+    paramsSafe.input.tagesgeld = 46000;
 
     const resultSafe = TransactionEngine.determineAction(paramsSafe);
 

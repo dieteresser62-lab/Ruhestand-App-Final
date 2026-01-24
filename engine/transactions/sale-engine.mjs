@@ -32,11 +32,15 @@ export function calculateSaleAndTax(requestedRefill, input, context, market, isE
 
             let maxBruttoVerkaufbar = Number(tranche.marketValue) || 0;
 
-            // Gold-Floor berücksichtigen
+            // Gold-Floor berücksichtigen - ABER: Bei Notfallverkäufen (isEmergencySale)
+            // oder wenn context.ignoreGoldFloor gesetzt ist, darf der Floor ignoriert werden,
+            // um Liquiditätsengpässe zu vermeiden.
             if (tranche.kind === 'gold' && context.minGold !== undefined) {
                 const goldVal = Number(input.goldWert) || 0;
                 const minG = Number(context.minGold) || 0;
-                maxBruttoVerkaufbar = Math.max(0, goldVal - minG);
+                // Bei Notfallverkäufen: Gold-Floor auf 0 setzen, um volle Liquiditätsbeschaffung zu ermöglichen
+                const effectiveMinGold = (isEmergencySale || context.ignoreGoldFloor) ? 0 : minG;
+                maxBruttoVerkaufbar = Math.max(0, goldVal - effectiveMinGold);
             }
 
             // Sale-Budget berücksichtigen

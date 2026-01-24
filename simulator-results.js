@@ -4,6 +4,7 @@ import { formatCurrency, formatCurrencyShortLog, shortenText } from './simulator
 import { formatPercentValue, formatPercentRatio } from './simulator-formatting.js';
 import { prepareMonteCarloViewModel } from './results-metrics.js';
 import { renderSummary, renderKpiDashboard, renderStressSection, renderHeatmap, renderCareSection } from './results-renderers.js';
+import { showToast } from './simulator-main-helpers.js';
 import { EngineAPI } from './engine/index.mjs';
 
 const formatPercent = (value, digits = 1) => formatPercentValue(Number(value) || 0, { fractionDigits: digits, invalid: '0.0%' });
@@ -198,6 +199,7 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
                     a.download = 'scenario-log.json';
                     a.click();
                     URL.revokeObjectURL(url);
+                    showToast('Export gespeichert: scenario-log.json');
                 }
             };
         }
@@ -223,6 +225,7 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
                     a.download = 'scenario-log.csv';
                     a.click();
                     URL.revokeObjectURL(url);
+                    showToast('Export gespeichert: scenario-log.csv');
                 }
             };
         }
@@ -369,7 +372,9 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         {
             key: null, header: 'Handl.A', width: 8,
             fmt: (v, row) => {
-                const val = (row.vk?.vkAkt || 0) - (row.kaufAkt || 0);
+                const val = Number.isFinite(row.netTradeEq)
+                    ? row.netTradeEq
+                    : (row.vk?.vkAkt || 0) - (row.kaufAkt || 0);
                 const formatted = formatCurrencyShortLog(val);
                 if (val > 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
                 if (val < 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
@@ -379,7 +384,9 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         {
             key: null, header: 'Handl.G', width: 8,
             fmt: (v, row) => {
-                const val = (row.vk?.vkGld || 0) - (row.kaufGld || 0);
+                const val = Number.isFinite(row.netTradeGold)
+                    ? row.netTradeGold
+                    : (row.vk?.vkGld || 0) - (row.kaufGld || 0);
                 const formatted = formatCurrencyShortLog(val);
                 if (val > 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
                 if (val < 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;

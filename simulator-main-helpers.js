@@ -134,6 +134,44 @@ export function convertRowsToCsv(rows, columns) {
 }
 
 /**
+ * Shows a short toast message in the UI (best effort).
+ * @param {string} message - Message to display.
+ * @param {Object} [options] - Optional settings.
+ * @param {number} [options.duration=2400] - Time in ms before the toast fades out.
+ */
+export function showToast(message, options = {}) {
+    if (!message || typeof document === 'undefined') return;
+
+    const duration = Number(options.duration) || 2400;
+    let container = document.getElementById('toastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.className = 'toast-container';
+        container.setAttribute('aria-live', 'polite');
+        container.setAttribute('aria-atomic', 'true');
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = String(message);
+    container.appendChild(toast);
+
+    requestAnimationFrame(() => toast.classList.add('toast-show'));
+
+    const removeToast = () => {
+        toast.classList.remove('toast-show');
+        toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+        setTimeout(() => {
+            if (toast.parentNode) toast.remove();
+        }, 300);
+    };
+
+    setTimeout(removeToast, duration);
+}
+
+/**
  * Triggers a browser download for the provided content.
  * @param {string} filename - Suggested file name for the download.
  * @param {string} content - File content to persist.
@@ -158,6 +196,7 @@ export function triggerDownload(filename, content, mimeType) {
     anchor.click();
     document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
+    showToast(`Export gespeichert: ${filename}`);
 }
 
 /**
@@ -249,7 +288,15 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal') {
             { header: 'NeedLiq', width: 8, key: 'row.NeedLiq', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
             { header: 'GuardG', width: 7, key: 'row.GuardGold', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
             { header: 'GuardA', width: 7, key: 'row.GuardEq', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
-            { header: 'GuardNote', width: 16, key: 'row.GuardNote', valueFormatter: v => (v || '').substring(0, 16), align: 'right' }
+            { header: 'GuardNote', width: 16, key: 'row.GuardNote', valueFormatter: v => (v || '').substring(0, 16), align: 'right' },
+            { header: 'Akt_vorR', width: 9, key: 'row.eq_before_return', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'Akt_nachR', width: 9, key: 'row.eq_after_return', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'Akt_nachV', width: 9, key: 'row.eq_after_sales', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'Akt_nachK', width: 9, key: 'row.eq_after_buys', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'Gld_vorR', width: 9, key: 'row.gold_before_return', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'Gld_nachR', width: 9, key: 'row.gold_after_return', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'Gld_nachV', width: 9, key: 'row.gold_after_sales', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'Gld_nachK', width: 9, key: 'row.gold_after_buys', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' }
         );
     }
 

@@ -74,21 +74,99 @@ export function calculateTrancheTax(tranche, sellAmount, sparerPauschbetrag, kir
  */
 export function applySaleToPortfolio(portfolio, saleResult) {
     if (!saleResult || !saleResult.breakdown) return;
+    const normalizeKind = (kind) => String(kind || '').toLowerCase();
+    const isEquityKind = (kind) => kind.startsWith('aktien') || kind === 'equity' || kind === 'stocks' || kind === 'stock';
+    const isGoldKind = (kind) => kind.startsWith('gold');
+    const isMoneyKind = (kind) => kind.startsWith('geldmarkt') || kind === 'money_market' || kind === 'money market';
+    const logDebug = () => {};
 
+    const trimId = (value) => String(value || '').trim();
     const findTrancheById = (trancheId) => {
         if (!trancheId) return null;
+        const id = trimId(trancheId);
         const byId = (arr) => Array.isArray(arr) ? arr.find(t => t.trancheId === trancheId) : null;
-        return byId(portfolio.depotTranchesAktien)
+        const exact = byId(portfolio.depotTranchesAktien)
             || byId(portfolio.depotTranchesGold)
             || byId(portfolio.depotTranchesGeldmarkt);
+        if (exact) return exact;
+        if (id.includes(':')) {
+            const suffix = id.split(':').pop();
+            const bySuffix = (arr) => Array.isArray(arr)
+                ? arr.find(t => trimId(t.trancheId).split(':').pop() === suffix)
+                : null;
+            return bySuffix(portfolio.depotTranchesAktien)
+                || bySuffix(portfolio.depotTranchesGold)
+                || bySuffix(portfolio.depotTranchesGeldmarkt);
+        }
+        return null;
+    };
+    const findTrancheByMeta = (tranches, saleItem) => {
+        if (!Array.isArray(tranches) || !tranches.length) return null;
+        const isin = trimId(saleItem.isin);
+        const name = trimId(saleItem.name);
+        if (isin) {
+            const match = tranches.find(t => trimId(t.isin) === isin);
+            if (match) return match;
+        }
+        if (name) {
+            const match = tranches.find(t => trimId(t.name) === name);
+            if (match) return match;
+        }
+        return null;
+    };
+    const findTranchesByMeta = (tranches, saleItem) => {
+        if (!Array.isArray(tranches) || !tranches.length) return [];
+        const isin = trimId(saleItem.isin);
+        const name = trimId(saleItem.name);
+        if (isin) {
+            const matches = tranches.filter(t => trimId(t.isin) === isin);
+            if (matches.length) return matches;
+        }
+        if (name) {
+            const matches = tranches.filter(t => trimId(t.name) === name);
+            if (matches.length) return matches;
+        }
+        return [];
+    };
+    const reduceAcrossTranches = (tranches, amount, useFifo) => {
+        let remaining = Number(amount) || 0;
+        if (!Array.isArray(tranches) || remaining <= 0) return;
+        const ordered = useFifo ? sortTranchesFIFO(tranches) : tranches;
+        for (const t of ordered) {
+            if (remaining <= 0) break;
+            const reduction = Math.min(remaining, t.marketValue || 0);
+            const reductionRatio = t.marketValue > 0 ? reduction / t.marketValue : 0;
+            t.costBasis -= t.costBasis * reductionRatio;
+            t.marketValue -= reduction;
+            remaining -= reduction;
+        }
     };
 
     saleResult.breakdown.forEach(saleItem => {
         if (!saleItem.kind || saleItem.kind === 'liquiditaet') return; // Skip liquidity or invalid items
         let tranche = findTrancheById(saleItem.trancheId);
         if (!tranche) {
-            const tranches = saleItem.kind.startsWith('aktien') ? portfolio.depotTranchesAktien : portfolio.depotTranchesGold;
-            tranche = tranches.find(t => t.type === saleItem.kind);
+            const kind = normalizeKind(saleItem.kind);
+            const tranches = isEquityKind(kind)
+                ? portfolio.depotTranchesAktien
+                : (isGoldKind(kind) ? portfolio.depotTranchesGold : (isMoneyKind(kind) ? portfolio.depotTranchesGeldmarkt : null));
+            if (tranches && tranches.length) {
+                const normalizedType = normalizeKind(saleItem.kind);
+                const matchingByType = tranches.filter(t => normalizeKind(t.type) === normalizedType);
+                const pool = matchingByType.length ? matchingByType : tranches;
+                const metaMatches = findTranchesByMeta(pool, saleItem);
+                if (metaMatches.length > 1) {
+                    // Distribute across identical-name/ISIN tranches to prevent repeated hits on the first match.
+                    reduceAcrossTranches(metaMatches, saleItem.brutto, isEquityKind(kind));
+                    return;
+                }
+                tranche = metaMatches.length === 1 ? metaMatches[0] : findTrancheByMeta(pool, saleItem);
+                if (!tranche) {
+                    // Fallback: reduce across all matching tranches to avoid "phantom sales".
+                    reduceAcrossTranches(pool, saleItem.brutto, isEquityKind(kind));
+                    return;
+                }
+            }
         }
         if (tranche) {
             const reduction = Math.min(saleItem.brutto, tranche.marketValue);

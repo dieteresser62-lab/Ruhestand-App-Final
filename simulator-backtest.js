@@ -1,7 +1,7 @@
 "use strict";
 
 import { BREAK_ON_RUIN, HISTORICAL_DATA } from './simulator-data.js';
-import { initializePortfolio, getCommonInputs } from './simulator-portfolio.js';
+import { initializePortfolio, getCommonInputs, sumDepot } from './simulator-portfolio.js';
 import { simulateOneYear } from './simulator-engine-wrapper.js';
 import { formatCurrency, formatCurrencyShortLog } from './simulator-utils.js';
 import { formatPercentValue } from './simulator-formatting.js';
@@ -148,7 +148,9 @@ export function runBacktest() {
         if (logDetailLevel === 'detailed') {
             headerCols.push(
                 "Liq@rC-".padStart(9), "Zins€".padStart(7), "Liq@rC+".padStart(9),
-                "ZielLiq".padStart(8), "NeedLiq".padStart(8), "GuardG".padStart(7), "GuardA".padStart(7), "GuardNote".padStart(16)
+                "ZielLiq".padStart(8), "NeedLiq".padStart(8), "GuardG".padStart(7), "GuardA".padStart(7), "GuardNote".padStart(16),
+                "Akt_vorR".padStart(9), "Akt_nachR".padStart(9), "Akt_nachV".padStart(9), "Akt_nachK".padStart(9),
+                "Gld_vorR".padStart(9), "Gld_nachR".padStart(9), "Gld_nachV".padStart(9), "Gld_nachK".padStart(9)
             );
         }
         let header = headerCols.join("  ");
@@ -172,7 +174,42 @@ export function runBacktest() {
             const result = simulateOneYear(simState, adjustedInputs, yearData, yearIndex);
 
             if (result.isRuin) {
-                log += `${String(jahr).padEnd(5)}... RUIN ...\n`; if (BREAK_ON_RUIN) break;
+                log += `${String(jahr).padEnd(5)}... RUIN ...\n`; 
+                
+                // Expliziter Ruin-Eintrag für die Tabelle erzwingen
+                logRows.push({
+                    jahr,
+                    row: {
+                        floor_brutto: simState.baseFloor,
+                        renteSum: 0,
+                        aktionUndGrund: "!!! RUIN !!!",
+                        Regime: "BANKRUPT",
+                        liquiditaet: 0,
+                        wertAktien: 0,
+                        wertGold: 0,
+                        FlexRatePct: 0,
+                        flex_erfuellt_nominal: 0,
+                        QuoteEndPct: 0,
+                        RunwayCoveragePct: 0,
+                        NominalReturnEquityPct: 0,
+                        NominalReturnGoldPct: 0,
+                        steuern_gesamt: 0,
+                        NeedLiq: 0,
+                        GuardGold: 0,
+                        GuardEq: 0,
+                        GuardNote: result.reason || 'Pleite'
+                    },
+                    entscheidung: { jahresEntnahme: 0 },
+                    wertAktien: 0,
+                    wertGold: 0,
+                    liquiditaet: 0,
+                    netA: 0,
+                    netG: 0,
+                    adjPct: adjPct,
+                    inflationVJ: dataVJ.inflation_de
+                });
+
+                if (BREAK_ON_RUIN) break;
             }
 
             simState = result.newState;
@@ -181,8 +218,12 @@ export function runBacktest() {
             const { entscheidung, wertAktien, wertGold, liquiditaet } = row;
             totalEntnahme += entscheidung.jahresEntnahme;
 
-            const netA = (row.vk?.vkAkt || 0) - (row.kaufAkt || 0);
-            const netG = (row.vk?.vkGld || 0) - (row.kaufGld || 0);
+            const netA = Number.isFinite(row.netTradeEq)
+                ? row.netTradeEq
+                : (row.vk?.vkAkt || 0) - (row.kaufAkt || 0);
+            const netG = Number.isFinite(row.netTradeGold)
+                ? row.netTradeGold
+                : (row.vk?.vkGld || 0) - (row.kaufGld || 0);
 
             // Speichere Log-Daten für späteres Neu-Rendern
             logRows.push({
@@ -239,7 +280,15 @@ export function runBacktest() {
                     formatCurrencyShortLog(row.NeedLiq || 0).padStart(8),
                     formatCurrencyShortLog(row.GuardGold || 0).padStart(7),
                     formatCurrencyShortLog(row.GuardEq || 0).padStart(7),
-                    String(row.GuardNote || '').substring(0, 16).padStart(16)
+                    String(row.GuardNote || '').substring(0, 16).padStart(16),
+                    formatCurrencyShortLog(row.eq_before_return || 0).padStart(9),
+                    formatCurrencyShortLog(row.eq_after_return || 0).padStart(9),
+                    formatCurrencyShortLog(row.eq_after_sales || 0).padStart(9),
+                    formatCurrencyShortLog(row.eq_after_buys || 0).padStart(9),
+                    formatCurrencyShortLog(row.gold_before_return || 0).padStart(9),
+                    formatCurrencyShortLog(row.gold_after_return || 0).padStart(9),
+                    formatCurrencyShortLog(row.gold_after_sales || 0).padStart(9),
+                    formatCurrencyShortLog(row.gold_after_buys || 0).padStart(9)
                 );
             }
             log += logCols.join("  ") + "\n";

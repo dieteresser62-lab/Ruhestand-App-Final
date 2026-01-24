@@ -21,7 +21,9 @@
       "WebFetch(domain:www.ubs.com)",
       "WebFetch(domain:vocal.media)",
       "WebFetch(domain:global.morningstar.com)",
-      "WebFetch(domain:mobile.next-finance.net)"
+      "WebFetch(domain:mobile.next-finance.net)",
+      "Bash(npm run build:engine:*)",
+      "Bash(QUICK_TESTS=1 npm test:*)"
     ]
   }
 }

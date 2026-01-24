@@ -318,9 +318,32 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
     const inputsList = profileInputs.map(entry => entry.inputs);
     const warnings = [];
     const mergedTranches = [];
-    inputsList.forEach(input => {
-        if (Array.isArray(input.detailledTranches) && input.detailledTranches.length > 0) {
-            mergedTranches.push(...input.detailledTranches);
+    const usedTrancheIds = new Set();
+    const normalizeTranche = (tranche, profileId, seq) => {
+        const normalized = { ...tranche };
+        const rawId = String(normalized.trancheId || normalized.id || '').trim();
+        const baseId = rawId || `tranche_${seq}`;
+        const prefixedId = `${profileId}:${baseId}`;
+        let uniqueId = prefixedId;
+        let suffix = 1;
+        while (usedTrancheIds.has(uniqueId)) {
+            uniqueId = `${prefixedId}_${suffix++}`;
+        }
+        usedTrancheIds.add(uniqueId);
+        normalized.trancheId = uniqueId;
+        normalized.sourceProfileId = profileId;
+        if (normalized.isin) normalized.isin = String(normalized.isin).trim();
+        if (normalized.name) normalized.name = String(normalized.name).trim();
+        if (normalized.type) normalized.type = String(normalized.type).trim();
+        if (normalized.category) normalized.category = String(normalized.category).trim();
+        return normalized;
+    };
+    profileInputs.forEach(entry => {
+        const input = entry?.inputs;
+        if (Array.isArray(input?.detailledTranches) && input.detailledTranches.length > 0) {
+            input.detailledTranches.forEach((tranche, idx) => {
+                mergedTranches.push(normalizeTranche(tranche, entry.profileId || 'profil', idx));
+            });
         }
     });
 
