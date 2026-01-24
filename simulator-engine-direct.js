@@ -17,6 +17,7 @@ import {
 } from './simulator-portfolio.js';
 import { resolveProfileKey } from './simulator-heatmap.js';
 import { calculateTargetLiquidityBalanceLike, buildDetailedTranchesFromPortfolio, computeLiqNeedForFloor, euros, normalizeHouseholdContext, resolveCapeRatio } from './simulator-engine-direct-utils.js';
+import { calculateSaleAndTax } from './engine/transactions/sale-engine.mjs';
 
 const formatInteger = (value) => Number.isFinite(value) ? Math.round(value) : 0;
 
@@ -92,10 +93,14 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     let cashZinsen = 0;
     let liqNachZins = initialLiqStart;
     let totalTaxesThisYear = 0;
+    let plannedTaxesThisYear = 0;
+    let forcedTaxesThisYear = 0;
 
     const rA = isFinite(yearData.rendite) ? yearData.rendite : 0;
     const rG = isFinite(yearData.gold_eur_perf) ? yearData.gold_eur_perf / 100 : 0;
     const rC = isFinite(yearData.zinssatz) ? yearData.zinssatz / 100 : 0;
+    const equityBeforeReturn = sumDepot({ depotTranchesAktien });
+    const goldBeforeReturn = sumDepot({ depotTranchesGold });
 
     // Renditen anwenden
     for (let i = 0; i < depotTranchesAktien.length; i++) {
@@ -104,6 +109,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     for (let i = 0; i < depotTranchesGold.length; i++) {
         depotTranchesGold[i].marketValue *= (1 + rG);
     }
+    const equityAfterReturn = sumDepot({ depotTranchesAktien });
+    const goldAfterReturn = sumDepot({ depotTranchesGold });
 
     const resolvedCapeRatio = resolveCapeRatio(yearData.capeRatio, inputs.marketCapeRatio, marketDataHist.capeRatio);
 
@@ -449,6 +456,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         engineInput.detailledTranches = detailedTranches;
     }
 
+
     // **HAUPTUNTERSCHIED**: Ein einziger Engine-Aufruf statt 3-5 Adapter-Aufrufe
     const fullResult = engine.simulateSingleYear(engineInput, lastState);
 
@@ -465,60 +473,275 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const zielLiquiditaet = fullResult.ui.zielLiquiditaet;
     const spendingNewState = fullResult.newState;
 
-    // Wende Transaktionen auf Portfolio an
-    if (actionResult.type === 'TRANSACTION' && actionResult.quellen) {
-        const saleResult = {
-            steuerGesamt: actionResult.steuer || 0,
-            bruttoVerkaufGesamt: actionResult.quellen.reduce((sum, q) => sum + q.brutto, 0),
-            achievedRefill: actionResult.nettoErlös || 0,
-            breakdown: actionResult.quellen
-        };
+    const allQuellen = Array.isArray(actionResult.quellen) ? actionResult.quellen : [];
+    let saleQuellen = allQuellen.filter(q => q?.kind && q.kind !== 'liquiditaet');
+    let plannedSaleBrutto = saleQuellen.reduce((sum, q) => sum + (q?.brutto || 0), 0);
+    let hasSales = plannedSaleBrutto > 0;
+    let buyGoldAmount = 0;
+    let buyEqAmount = 0;
 
-        totalTaxesThisYear += saleResult.steuerGesamt;
-        applySaleToPortfolio(portfolio, saleResult);
+    // Check if this is a cash-funded transaction (Surplus Rebalancing)
+    // In this case, we DON'T sell assets - we BUY them using liquidity
+    const cashQuellen = allQuellen.filter(q => q?.kind === 'liquiditaet');
+    const isCashFundedPurchase = cashQuellen.length > 0 && !hasSales &&
+        (actionResult.verwendungen?.gold > 0 || actionResult.verwendungen?.aktien > 0);
+
+    // Wende Transaktionen auf Portfolio an
+    // FIX: Only infer sales from nettoErlös if this is NOT a cash-funded purchase
+    // (Surplus Rebalancing uses liquidity to BUY assets, not sell them)
+    if (actionResult.type === 'TRANSACTION' && !hasSales && actionResult.nettoErlös > 0 && !isCashFundedPurchase) {
+        const inferredBrutto = (actionResult.nettoErlös || 0) + (actionResult.steuer || 0);
+        if (inferredBrutto > 0) {
+            saleQuellen = [{
+                kind: 'aktien_alt',
+                brutto: inferredBrutto,
+                steuer: actionResult.steuer || 0,
+                trancheId: null,
+                name: null,
+                isin: null,
+                netto: actionResult.nettoErlös || 0
+            }];
+            plannedSaleBrutto = inferredBrutto;
+            hasSales = true;
+        }
     }
 
+    if (actionResult.type === 'TRANSACTION' && hasSales) {
+        const saleResult = {
+            steuerGesamt: actionResult.steuer || 0,
+            bruttoVerkaufGesamt: plannedSaleBrutto,
+            achievedRefill: actionResult.nettoErlös || 0,
+            breakdown: saleQuellen
+        };
+
+        plannedTaxesThisYear += saleResult.steuerGesamt;
+        applySaleToPortfolio(portfolio, saleResult);
+    }
+    const equityAfterSalesAction = sumDepot({ depotTranchesAktien });
+    const goldAfterSalesAction = sumDepot({ depotTranchesGold });
+
     // Cash-funded Käufe (Quelle: Liquidität) reduzieren die Liquidität direkt.
-    const cashSpend = Array.isArray(actionResult.quellen)
-        ? actionResult.quellen.reduce((sum, q) => (q?.kind === 'liquiditaet' ? sum + (q.brutto || 0) : sum), 0)
-        : 0;
+    const cashSpend = allQuellen.reduce(
+        (sum, q) => (q?.kind === 'liquiditaet' ? sum + (q.brutto || 0) : sum),
+        0
+    );
     if (cashSpend > 0) {
         liquiditaet -= cashSpend;
     }
 
-    // Aktualisiere Liquidität nach Transaktionen
-    if (actionResult.nettoErlös > 0) {
-        const reinvested = (actionResult.verwendungen?.gold || 0) + (actionResult.verwendungen?.aktien || 0);
-        liquiditaet += (actionResult.nettoErlös - reinvested);
+    // FIX: For cash-funded purchases (Surplus Rebalancing), set buy amounts directly
+    if (isCashFundedPurchase) {
+        buyGoldAmount = actionResult.verwendungen?.gold || 0;
+        buyEqAmount = actionResult.verwendungen?.aktien || 0;
     }
 
-    // Kaufe Gold/Aktien wenn vorhanden
-    if (actionResult.verwendungen?.gold > 0) {
-        buyGold(portfolio, actionResult.verwendungen.gold);
-    }
-    if (actionResult.verwendungen?.aktien > 0) {
-        buyStocksNeu(portfolio, actionResult.verwendungen.aktien);
+    // Aktualisiere Liquidität nach Transaktionen
+    if (hasSales && actionResult.nettoErlös > 0) {
+        const reinvestedPlanned = (actionResult.verwendungen?.gold || 0) + (actionResult.verwendungen?.aktien || 0);
+        const executedEqSale = Math.max(0, equityAfterReturn - equityAfterSalesAction);
+        const executedGldSale = Math.max(0, goldAfterReturn - goldAfterSalesAction);
+        const executedTotalSale = executedEqSale + executedGldSale;
+        const saleScale = plannedSaleBrutto > 0 ? Math.min(1, executedTotalSale / plannedSaleBrutto) : 0;
+        const actualNettoErlos = (actionResult.nettoErlös || 0) * saleScale;
+        const actualReinvested = reinvestedPlanned * saleScale;
+        buyGoldAmount = (actionResult.verwendungen?.gold || 0) * saleScale;
+        buyEqAmount = (actionResult.verwendungen?.aktien || 0) * saleScale;
+        liquiditaet += Math.max(0, actualNettoErlos - actualReinvested);
     }
 
     const jahresEntnahme = spendingResult.monatlicheEntnahme * 12;
+    const jahresEntnahmePlan = jahresEntnahme;
 
     // RUIN-Check: Können wir zumindest den Floor decken?
     // Berechnung des Netto-Floors (Floor - Rente)
     const netFloorYear = Math.max(0, engineInput.floorBedarf - pensionAnnual);
 
-    // Warnung, wenn wir nicht alles zahlen können
-    if (liquiditaet < jahresEntnahme) {
-        // Kritisch: Können wir wenigstens den Floor zahlen?
-        if (liquiditaet < netFloorYear) {
-            return { isRuin: true, reason: `Liquidität (${formatInteger(liquiditaet)}) < Floor (${formatInteger(netFloorYear)})` };
+    // FIX: forcedShortfall muss die TATSÄCHLICHE Entnahme abdecken, nicht nur den Floor.
+    // Sonst kann bei Flex-Ausgaben ein Liquiditätsengpass entstehen.
+    // Zusätzlich: Mindest-Puffer für das nächste Jahr einplanen (1 Monat Floor-Deckung),
+    // um emergency_guard am Jahresende zu vermeiden.
+    const jahresEntnahmeTarget = Math.max(jahresEntnahmePlan, netFloorYear);
+    const minLiqAfterPayout = netFloorYear / 12; // 1 Monat Mindest-Liquidität nach Auszahlung
+    const totalLiqNeed = jahresEntnahmeTarget + minLiqAfterPayout;
+    const forcedShortfall = Math.max(0, totalLiqNeed - liquiditaet);
+    const equityBeforeForced = equityAfterSalesAction;
+    const goldBeforeForced = goldAfterSalesAction;
+    if (forcedShortfall > 0) {
+        // FIX: Build CURRENT tranches from portfolio (not stale engineInput.detailledTranches)
+        // This ensures we use up-to-date marketValue after any prior sales in this year
+        const currentTranches = buildDetailedTranchesFromPortfolio(portfolio);
+        const forcedInputWithCurrentTranches = {
+            ...engineInput,
+            detailledTranches: currentTranches.length > 0 ? currentTranches : undefined,
+            // Also update the fallback fields with current values
+            depotwertAlt: sumDepot({ depotTranchesAktien: depotTranchesAktien.filter(t => t.type === 'aktien_alt') }),
+            depotwertNeu: sumDepot({ depotTranchesAktien: depotTranchesAktien.filter(t => t.type === 'aktien_neu') }),
+            goldWert: sumDepot({ depotTranchesGold })
+        };
+        const forcedSale = calculateSaleAndTax(forcedShortfall, forcedInputWithCurrentTranches, { minGold: 0 }, market, true);
+        const forcedBrutto = forcedSale.bruttoVerkaufGesamt || 0;
+        if (forcedBrutto > 0) {
+            const baseBreakdown = Array.isArray(forcedSale.breakdown) && forcedSale.breakdown.length > 0
+                ? forcedSale.breakdown
+                : [{
+                    kind: 'aktien_alt',
+                    brutto: forcedBrutto,
+                    steuer: forcedSale.steuerGesamt || 0,
+                    netto: forcedSale.achievedRefill || 0,
+                    trancheId: null,
+                    isin: null,
+                    name: null
+                }];
+            const fallbackBreakdown = baseBreakdown.map(item => ({
+                ...item,
+                trancheId: null,
+                isin: null,
+                name: null
+            }));
+            applySaleToPortfolio(portfolio, { ...forcedSale, breakdown: fallbackBreakdown });
+            const equityAfterForced = sumDepot({ depotTranchesAktien });
+            const goldAfterForced = sumDepot({ depotTranchesGold });
+            const forcedExecutedEq = Math.max(0, equityBeforeForced - equityAfterForced);
+            const forcedExecutedGld = Math.max(0, goldBeforeForced - goldAfterForced);
+            const forcedExecutedTotal = forcedExecutedEq + forcedExecutedGld;
+            const forcedScale = forcedBrutto > 0 ? Math.min(1, forcedExecutedTotal / forcedBrutto) : 0;
+            liquiditaet += (forcedSale.achievedRefill || 0) * forcedScale;
+            forcedTaxesThisYear += (forcedSale.steuerGesamt || 0) * forcedScale;
+        } else {
+            const fallbackBreakdown = [{
+                kind: 'aktien_alt',
+                brutto: forcedShortfall,
+                steuer: 0,
+                netto: forcedShortfall,
+                trancheId: null,
+                isin: null,
+                name: null
+            }];
+            applySaleToPortfolio(portfolio, { steuerGesamt: 0, bruttoVerkaufGesamt: forcedShortfall, achievedRefill: forcedShortfall, breakdown: fallbackBreakdown });
+            const equityAfterForced = sumDepot({ depotTranchesAktien });
+            const goldAfterForced = sumDepot({ depotTranchesGold });
+            const forcedExecutedEq = Math.max(0, equityBeforeForced - equityAfterForced);
+            const forcedExecutedGld = Math.max(0, goldBeforeForced - goldAfterForced);
+            const forcedExecutedTotal = forcedExecutedEq + forcedExecutedGld;
+            liquiditaet += Math.min(forcedShortfall, forcedExecutedTotal);
         }
-        // Wir können Floor zahlen, aber nicht volle Entnahme -> Flex-Cut durchführen (Payout = was da ist)
-        // Das verhindert "Technischen Ruin" wenn Spending (Flex) > Refill (Puffer)
     }
 
+    if (forcedShortfall > 0) {
+        const equityAfterForcedFallback = sumDepot({ depotTranchesAktien });
+        const goldAfterForcedFallback = sumDepot({ depotTranchesGold });
+        const forcedExecutedEq = Math.max(0, equityBeforeForced - equityAfterForcedFallback);
+        const forcedExecutedGld = Math.max(0, goldBeforeForced - goldAfterForcedFallback);
+        const forcedExecutedTotal = forcedExecutedEq + forcedExecutedGld;
+        if (forcedExecutedTotal < 1) {
+            const reduceAcrossTranches = (tranches, amount, useFifo) => {
+                let remaining = Number(amount) || 0;
+                if (!Array.isArray(tranches) || remaining <= 0) return 0;
+                const ordered = useFifo
+                    ? [...tranches].sort((a, b) => new Date(a.purchaseDate || '1900-01-01') - new Date(b.purchaseDate || '1900-01-01'))
+                    : tranches;
+                let reduced = 0;
+                for (const t of ordered) {
+                    if (remaining <= 0) break;
+                    const mv = Number(t.marketValue) || 0;
+                    if (mv <= 0) continue;
+                    const reduction = Math.min(remaining, mv);
+                    const reductionRatio = mv > 0 ? reduction / mv : 0;
+                    t.costBasis -= t.costBasis * reductionRatio;
+                    t.marketValue -= reduction;
+                    remaining -= reduction;
+                    reduced += reduction;
+                }
+                return reduced;
+            };
+            const reducedEq = reduceAcrossTranches(depotTranchesAktien, forcedShortfall, true);
+            const remaining = Math.max(0, forcedShortfall - reducedEq);
+            const reducedGld = reduceAcrossTranches(depotTranchesGold, remaining, false);
+            liquiditaet += Math.min(forcedShortfall, reducedEq + reducedGld);
+        }
+    }
+
+    const equityAfterSales = sumDepot({ depotTranchesAktien });
+    const goldAfterSales = sumDepot({ depotTranchesGold });
+
+    // Kaufe Gold/Aktien wenn vorhanden
+    if (buyGoldAmount > 0) {
+        buyGold(portfolio, buyGoldAmount);
+    }
+    if (buyEqAmount > 0) {
+        buyStocksNeu(portfolio, buyEqAmount);
+    }
+    let equityAfterBuys = sumDepot({ depotTranchesAktien });
+    let goldAfterBuys = sumDepot({ depotTranchesGold });
+
+    const totalWealthAvailable = equityAfterBuys + goldAfterBuys + liquiditaet;
+    if (totalWealthAvailable + 1e-6 < netFloorYear) {
+        return {
+            isRuin: true,
+            reason: `Gesamtvermögen (${formatInteger(totalWealthAvailable)}) < Floor (${formatInteger(netFloorYear)})`
+        };
+    }
+
+    // Hinweis: Ein Liquiditäts-Engpass erzeugt keinen Ruin, solange das Gesamtvermögen den Floor deckt.
+    // Payout wird unten an die Liquidität angepasst.
+
     // Auszahlung (begrenzt auf verfügbare Liquidität)
-    const payout = Math.min(liquiditaet, jahresEntnahme);
+    // Hinweis: jahresEntnahmeTarget wurde bereits oben für forcedShortfall berechnet
+    const payout = Math.min(liquiditaet, jahresEntnahmeTarget);
     liquiditaet -= payout;
+    const jahresEntnahmeEffektiv = payout;
+
+    // FIX: If payout is less than needed floor, but we HAVE enough total wealth (checked above),
+    // we must force additional sales to cover the floor. This handles cases where the
+    // forcedShortfall mechanism didn't sell enough due to stale data or other edge cases.
+    if (jahresEntnahmeEffektiv + 1e-6 < netFloorYear) {
+        const additionalNeeded = netFloorYear - jahresEntnahmeEffektiv;
+        const currentEquity = sumDepot({ depotTranchesAktien });
+        const currentGold = sumDepot({ depotTranchesGold });
+
+        // Only declare RUIN if there truly isn't enough total wealth
+        if (currentEquity + currentGold < additionalNeeded) {
+            return {
+                isRuin: true,
+                reason: `Entnahme (${formatInteger(jahresEntnahmeEffektiv)}) < Floor (${formatInteger(netFloorYear)}) und nicht genug Assets`
+            };
+        }
+
+        // Force emergency sale to cover shortfall
+        const reduceAcrossTranches = (tranches, amount, useFifo) => {
+            let remaining = Number(amount) || 0;
+            if (!Array.isArray(tranches) || remaining <= 0) return 0;
+            const ordered = useFifo
+                ? [...tranches].sort((a, b) => new Date(a.purchaseDate || '1900-01-01') - new Date(b.purchaseDate || '1900-01-01'))
+                : tranches;
+            let reduced = 0;
+            for (const t of ordered) {
+                if (remaining <= 0) break;
+                const mv = Number(t.marketValue) || 0;
+                if (mv <= 0) continue;
+                const reduction = Math.min(remaining, mv);
+                const reductionRatio = mv > 0 ? reduction / mv : 0;
+                t.costBasis -= t.costBasis * reductionRatio;
+                t.marketValue -= reduction;
+                remaining -= reduction;
+                reduced += reduction;
+            }
+            return reduced;
+        };
+
+        // Sell from equity first, then gold
+        const reducedEq = reduceAcrossTranches(depotTranchesAktien, additionalNeeded, true);
+        const remainingAfterEq = Math.max(0, additionalNeeded - reducedEq);
+        const reducedGld = reduceAcrossTranches(depotTranchesGold, remainingAfterEq, false);
+        const totalReduced = reducedEq + reducedGld;
+
+        // Add the sold amount to liquidity and then pay out
+        liquiditaet += payout; // Undo the payout subtraction
+        liquiditaet += totalReduced; // Add new sales
+        const newPayout = Math.min(liquiditaet, netFloorYear);
+        liquiditaet -= newPayout;
+        // Note: We continue with reduced payout but don't declare RUIN since we have the wealth
+    }
 
     // Rebalancing bei Überschuss
     // HINWEIS: Die Logik wurde in die TransactionEngine (determineAction) verschoben,
@@ -542,7 +765,9 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const need = computeLiqNeedForFloor(guardCtx);
     const floorCoveredByPension = inflatedFloor === 0;
 
-    if (!floorCoveredByPension && liquiditaet < need) {
+    // Emergency Guard nur feuern, wenn wir weniger als 1 Monat Floor-Deckung haben (echter Notfall)
+    const criticalLiqThreshold = netFloorYear / 12;
+    if (!floorCoveredByPension && liquiditaet < criticalLiqThreshold) {
         guardReason = "emergency_guard_triggered";
         // In der direkten API-Version sollte dies nicht passieren,
         // da die Engine bereits Guardrails hat
@@ -569,8 +794,28 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         steuerGesamt: actionResult.steuer || 0
     }) : { vkAkt: 0, vkGld: 0, stAkt: 0, stGld: 0, vkGes: 0, stGes: 0 };
 
-    const kaufAktTotal = (actionResult.verwendungen?.aktien || 0) + kaufAkt;
-    const totalGoldKauf = (actionResult.verwendungen?.gold || 0) + kaufGld;
+    const plannedEqSale = vk.vkAkt || 0;
+    const plannedGldSale = vk.vkGld || 0;
+    const executedEqSale = Math.max(0, equityAfterReturn - equityAfterSalesAction);
+    const executedGldSale = Math.max(0, goldAfterReturn - goldAfterSalesAction);
+
+    // FIX: Only calculate taxes if there were ACTUAL executed sales
+    // This prevents showing taxes when no sales occurred
+    const totalExecutedSales = executedEqSale + executedGldSale;
+    if (totalExecutedSales > 0) {
+        const eqTaxFactor = plannedEqSale > 0 ? Math.min(1, executedEqSale / plannedEqSale) : 0;
+        const gldTaxFactor = plannedGldSale > 0 ? Math.min(1, executedGldSale / plannedGldSale) : 0;
+        totalTaxesThisYear = (vk.stAkt || 0) * eqTaxFactor + (vk.stGld || 0) * gldTaxFactor;
+        if (totalTaxesThisYear === 0 && plannedTaxesThisYear > 0 && (plannedEqSale + plannedGldSale) > 0) {
+            const ratio = Math.min(1, totalExecutedSales / (plannedEqSale + plannedGldSale));
+            totalTaxesThisYear = plannedTaxesThisYear * ratio;
+        }
+    }
+    // Always add forced taxes (from emergency sales to cover shortfall)
+    totalTaxesThisYear += forcedTaxesThisYear;
+
+    const kaufAktTotal = buyEqAmount + kaufAkt;
+    const totalGoldKauf = buyGoldAmount + kaufGld;
 
     let aktionText = shortenReasonText(
         actionResult.transactionDiagnostics?.blockReason || 'none',
@@ -605,7 +850,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             liquiditaet: { // Mock structure for UI compatibility
                 vorher: initialLiqStart,
                 nachher: liquiditaet,
-                deckungNachher: (jahresEntnahme > 0) ? ((liquiditaet / jahresEntnahme) * 100) : 100
+                deckungNachher: (jahresEntnahmePlan > 0) ? ((liquiditaet / jahresEntnahmePlan) * 100) : 100
             },
             runway: { months: 999 } // Mock
         },
@@ -624,7 +869,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         logData: {
             entscheidung: {
                 ...spendingResult,
-                jahresEntnahme,
+                jahresEntnahme: jahresEntnahmeEffektiv,
+                jahresEntnahme_plan: jahresEntnahmePlan,
                 runwayMonths: fullResult.ui.runway?.months || Infinity,
                 kuerzungProzent: spendingResult.kuerzungProzent
             },
@@ -638,7 +884,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             RealReturnGoldPct: (1 + rG) / (1 + yearData.inflation / 100) - 1,
             NominalReturnEquityPct: rA,
             NominalReturnGoldPct: rG,
-            entnahmequote: depotwertGesamt > 0 ? (jahresEntnahme / depotwertGesamt) : 0,
+            entnahmequote: depotwertGesamt > 0 ? (jahresEntnahmeEffektiv / depotwertGesamt) : 0,
             steuern_gesamt: totalTaxesThisYear,
             vk,
             kaufAkt: kaufAktTotal,
@@ -646,6 +892,16 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             wertAktien: sumDepot({ depotTranchesAktien }),
             wertGold: sumDepot({ depotTranchesGold }),
             liquiditaet,
+            eq_before_return: equityBeforeReturn,
+            eq_after_return: equityAfterReturn,
+            eq_after_sales: equityAfterSales,
+            eq_after_buys: equityAfterBuys,
+            gold_before_return: goldBeforeReturn,
+            gold_after_return: goldAfterReturn,
+            gold_after_sales: goldAfterSales,
+            gold_after_buys: goldAfterBuys,
+            netTradeEq: equityAfterReturn - equityAfterBuys,
+            executedSaleEq: equityAfterReturn - equityAfterSales,
             liqStart: initialLiqStart,
             cashInterestEarned: cashZinsen,
             liqEnd: liqNachZins,
@@ -659,9 +915,9 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             renteSum,
             floor_aus_depot: inflatedFloor,
             flex_brutto: inflatedFlex,
-            flex_erfuellt_nominal: jahresEntnahme > inflatedFloor ? jahresEntnahme - inflatedFloor : 0,
+            flex_erfuellt_nominal: jahresEntnahmeEffektiv > inflatedFloor ? jahresEntnahmeEffektiv - inflatedFloor : 0,
             inflation_factor_cum: spendingNewState.cumulativeInflationFactor || 1,
-            jahresentnahme_real: jahresEntnahme / (spendingNewState.cumulativeInflationFactor || 1),
+            jahresentnahme_real: jahresEntnahmeEffektiv / (spendingNewState.cumulativeInflationFactor || 1),
             pflege_aktiv: pflegeMeta?.active ?? false,
             pflege_zusatz_floor: pflegeMeta?.zusatzFloorZiel ?? 0,
             pflege_zusatz_floor_delta: pflegeMeta?.zusatzFloorDelta ?? 0,
