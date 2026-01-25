@@ -99,6 +99,8 @@ export function runBacktest() {
             portfolio: initializePortfolio(inputs),
             baseFloor: inputs.startFloorBedarf,
             baseFlex: inputs.startFlexBedarf,
+            baseFlexBudgetAnnual: inputs.flexBudgetAnnual || 0,
+            baseFlexBudgetRecharge: inputs.flexBudgetRecharge || 0,
             lastState: null,
             currentAnnualPension: (inputs.renteMonatlich || 0) * 12,
             currentAnnualPension2: (inputs.partner?.brutto || 0),
@@ -135,12 +137,18 @@ export function runBacktest() {
         if (logDetailLevel === 'detailed') {
             headerCols.push("FloorDep".padStart(8));
         }
-        headerCols.push("Flex%".padStart(5), "Flex€".padStart(7));
+        headerCols.push(
+            "Flex%".padStart(5),
+            "MinF%".padStart(5),
+            "WRed%".padStart(5),
+            "WQ%".padStart(4),
+            "Flex€".padStart(7)
+        );
         if (logDetailLevel === 'detailed') {
             headerCols.push("Entn_real".padStart(9), "Adj%".padStart(5));
         }
         headerCols.push(
-            "Status".padEnd(16), "Quote%".padStart(6), "Runway%".padStart(7),
+            "Status".padEnd(16), "Cut".padEnd(12), "Alarm".padEnd(6), "Quote%".padStart(6), "Runway%".padStart(7),
             "Pf.Akt%".padStart(8), "Pf.Gld%".padStart(8), "Infl.".padStart(5),
             "Handl.A".padStart(8), "Handl.G".padStart(8), "St.".padStart(6),
             "Aktien".padStart(8), "Gold".padStart(7), "Liq.".padStart(7)
@@ -249,6 +257,9 @@ export function runBacktest() {
             }
             logCols.push(
                 formatPercentInteger(row.FlexRatePct, 5),
+                formatPercentInteger(row.MinFlexRatePct || 0, 5),
+                formatPercentInteger(row.WealthRedF || 0, 5),
+                formatPercentInteger(row.WealthQuoteUsedPct || 0, 4),
                 formatCurrencyShortLog(row.flex_erfuellt_nominal).padStart(7)
             );
             if (logDetailLevel === 'detailed') {
@@ -259,6 +270,8 @@ export function runBacktest() {
             }
             logCols.push(
                 row.aktionUndGrund.substring(0, 15).padEnd(16),
+                (row.CutReason || '').substring(0, 12).padEnd(12),
+                (row.Alarm ? 'A' : '').padEnd(6),
                 formatPercentOneDecimal(row.QuoteEndPct, 6),
                 formatPercentInteger(row.RunwayCoveragePct, 7),
                 formatPercentOneDecimal((row.NominalReturnEquityPct || 0) * 100, 8),

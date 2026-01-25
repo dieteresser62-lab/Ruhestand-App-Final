@@ -72,6 +72,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         portfolio,
         baseFloor,
         baseFlex,
+        baseFlexBudgetAnnual = 0,
+        baseFlexBudgetRecharge = 0,
         lastState,
         currentAnnualPension,
         currentAnnualPension2,
@@ -217,6 +219,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
         const naechsterBaseFloor = euros(baseFloor * (1 + yearData.inflation / 100));
         const naechsterBaseFlex = euros(baseFlex * (1 + yearData.inflation / 100));
+        const naechsterFlexBudgetAnnual = euros(baseFlexBudgetAnnual * (1 + yearData.inflation / 100));
+        const naechsterFlexBudgetRecharge = euros(baseFlexBudgetRecharge * (1 + yearData.inflation / 100));
 
         const marketEnd = marketDataHist.endeVJ * (1 + rA);
         const newAth = Math.max(marketDataHist.ath, marketEnd);
@@ -243,6 +247,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
                 portfolio,
                 baseFloor: naechsterBaseFloor,
                 baseFlex: naechsterBaseFlex,
+                baseFlexBudgetAnnual: naechsterFlexBudgetAnnual,
+                baseFlexBudgetRecharge: naechsterFlexBudgetRecharge,
                 lastState: null,
                 currentAnnualPension: nextP1,
                 currentAnnualPension2: nextP2,
@@ -424,6 +430,9 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         // If we pass Net Floor (inflatedFloor), Engine subtracts pension AGAIN, leading to zero demand.
         floorBedarf: effectiveBaseFloor,
         flexBedarf: baseFlex * temporaryFlexFactor,
+        flexBudgetAnnual: baseFlexBudgetAnnual,
+        flexBudgetYears: inputs.flexBudgetYears ?? 0,
+        flexBudgetRecharge: baseFlexBudgetRecharge,
 
         // FIX: Ensure Engine knows about the Total Pension used for netting
         renteAktiv: pensionAnnual > 0,
@@ -827,6 +836,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const inflFactorThisYear = 1 + (yearData.inflation / 100);
     const naechsterBaseFloor = baseFloor * inflFactorThisYear;
     const naechsterBaseFlex = baseFlex * inflFactorThisYear;
+    const naechsterFlexBudgetAnnual = baseFlexBudgetAnnual * inflFactorThisYear;
+    const naechsterFlexBudgetRecharge = baseFlexBudgetRecharge * inflFactorThisYear;
 
     const widowAdjFactor = 1 + (rentAdjPct / 100);
     const nextWidowPensionP1 = widowBenefits.p1FromP2 ? Math.max(0, widowPensionP1 * widowAdjFactor) : 0;
@@ -858,6 +869,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             portfolio: nextPortfolio,
             baseFloor: naechsterBaseFloor,
             baseFlex: naechsterBaseFlex,
+            baseFlexBudgetAnnual: naechsterFlexBudgetAnnual,
+            baseFlexBudgetRecharge: naechsterFlexBudgetRecharge,
             lastState: spendingNewState,
             currentAnnualPension: nextAnnualPension,
             currentAnnualPension2: nextAnnualPension2,
@@ -875,6 +888,13 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
                 kuerzungProzent: spendingResult.kuerzungProzent
             },
             FlexRatePct: spendingResult.details?.flexRate || 1.0,
+            MinFlexRatePct: spendingResult.details?.minFlexRatePct ?? null,
+            WealthRedF: Number.isFinite(spendingResult.details?.wealthReductionFactor)
+                ? spendingResult.details.wealthReductionFactor * 100
+                : null,
+            WealthQuoteUsedPct: Number.isFinite(spendingResult.details?.entnahmequoteUsed)
+                ? spendingResult.details.entnahmequoteUsed * 100
+                : null,
             CutReason: spendingResult.kuerzungQuelle || 'none',
             Alarm: spendingNewState.alarmActive || false,
             Regime: spendingNewState.lastMarketSKey || 'unknown',

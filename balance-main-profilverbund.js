@@ -25,7 +25,10 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
         const currentInputs = UIReader.readAllInputs();
         const aggregated = aggregateProfilverbundInputs(profileInputs, {
             floorBedarf: currentInputs.floorBedarf,
-            flexBedarf: currentInputs.flexBedarf
+            flexBedarf: currentInputs.flexBedarf,
+            flexBudgetAnnual: currentInputs.flexBudgetAnnual,
+            flexBudgetYears: currentInputs.flexBudgetYears,
+            flexBudgetRecharge: currentInputs.flexBudgetRecharge
         });
         calculateWithdrawalDistribution(profileInputs, aggregated, mode);
         calculateWithdrawalDistribution(profileInputs, aggregated, 'proportional');
@@ -189,7 +192,10 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
 
             const aggregated = aggregateProfilverbundInputs(profilverbundProfiles, {
                 floorBedarf: inputData.floorBedarf,
-                flexBedarf: inputData.flexBedarf
+                flexBedarf: inputData.flexBedarf,
+                flexBudgetAnnual: inputData.flexBudgetAnnual,
+                flexBudgetYears: inputData.flexBudgetYears,
+                flexBudgetRecharge: inputData.flexBudgetRecharge
             });
             window.__profilverbundDistribution = calculateWithdrawalDistribution(profilverbundProfiles, aggregated, localStorage.getItem(PROFILVERBUND_STORAGE_KEYS.mode) || 'tax_optimized');
             window.__profilverbundProfileSummaries = buildProfilverbundProfileSummaries(profilverbundProfiles);

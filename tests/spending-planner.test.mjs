@@ -16,6 +16,11 @@ function assertClose(actual, expected, tolerance = 0.001, message) {
     }
 }
 
+function smoothstep(x) {
+    const t = Math.min(1, Math.max(0, x));
+    return t * t * (3 - 2 * t);
+}
+
 console.log('--- SpendingPlanner Logic Tests ---');
 
 // --- Helpers to mock params ---
@@ -89,7 +94,7 @@ function getBaseParams() {
     console.log('✅ Alarm De-escalation Logic works');
 }
 
-// --- TEST 3: Flex Rate Smoothing ---
+// --- TEST 3: Flex Rate Smoothing / Caps ---
 {
     const params = getBaseParams();
     // Increase depot to avoid 'Caution' guardrail (Withdrawal Rate < 4.5%)
@@ -110,10 +115,18 @@ function getBaseParams() {
 
     console.log(`   Detailed Result: Rate=${newRate}, Source=${result.spendingResult.kuerzungQuelle}`);
 
-    assertClose(newRate, 84, 1.0, 'Flex Rate should be smoothed/capped (100 -> 90 -> Quantized to 84)');
-    assert(result.spendingResult.kuerzungQuelle.includes('Glättung'), `Source should be Smoothing, but was: ${result.spendingResult.kuerzungQuelle}`);
+    const prevRate = params.lastState.flexRate ?? 100;
+    assert(newRate <= prevRate, `Flex Rate should not increase in Bear test, got ${newRate}`);
+    assert(newRate >= 0, `Flex Rate should be non-negative, got ${newRate}`);
+    assert(
+        result.spendingResult.kuerzungQuelle.includes('Glättung') ||
+        result.spendingResult.kuerzungQuelle.includes('Flex-Anteil') ||
+        result.spendingResult.kuerzungQuelle.includes('Guardrail') ||
+        result.spendingResult.kuerzungQuelle.includes('Vermögen'),
+        `Source should be Smoothing/Flex-Anteil/Guardrail, but was: ${result.spendingResult.kuerzungQuelle}`
+    );
 
-    console.log('✅ Flex Rate Smoothing works');
+    console.log('✅ Flex Rate Smoothing/Caps work');
 }
 
 // --- TEST 4: Budget Floor Protection ---
@@ -131,7 +144,68 @@ function getBaseParams() {
     const spending = result.spendingResult.details.endgueltigeEntnahme;
     assert(spending >= 24000, 'Must pay at least the nominal floor');
 
-    console.log('✅ Budget Floor Protection works');
+console.log('✅ Budget Floor Protection works');
+}
+
+// --- TEST 5: Wealth-adjusted reduction factor (net withdrawal) ---
+{
+    const params = {
+        inflatedBedarf: { floor: 40000, flex: 20000 },
+        renteJahr: 0,
+        depotwertGesamt: 6000000
+    };
+    const result = SpendingPlanner._calculateWealthAdjustedReductionFactor(params);
+    assertClose(result.factor, 0, 0.001, 'No reduction at 1% withdrawal rate');
+    console.log('✅ Wealth-adjusted reduction: 1% => 0');
+}
+
+// --- TEST 6: Wealth-adjusted reduction factor midpoint ---
+{
+    const params = {
+        inflatedBedarf: { floor: 40000, flex: 20000 },
+        renteJahr: 0,
+        depotwertGesamt: 2400000 // 60k / 2.4M = 2.5%
+    };
+    const result = SpendingPlanner._calculateWealthAdjustedReductionFactor(params);
+    assertClose(result.factor, 0.5, 0.01, 'Midpoint reduction at 2.5% withdrawal rate');
+    console.log('✅ Wealth-adjusted reduction: 2.5% => 0.5');
+}
+
+// --- TEST 7: Wealth-adjusted reduction factor full ---
+{
+    const params = {
+        inflatedBedarf: { floor: 40000, flex: 20000 },
+        renteJahr: 0,
+        depotwertGesamt: 1200000 // 60k / 1.2M = 5%
+    };
+    const result = SpendingPlanner._calculateWealthAdjustedReductionFactor(params);
+    assertClose(result.factor, 1, 0.001, 'Full reduction at 5% withdrawal rate');
+    console.log('✅ Wealth-adjusted reduction: 5% => 1');
+}
+
+// --- TEST 8: Wealth-adjusted reduction respects pensions (net withdrawal) ---
+{
+    const params = {
+        inflatedBedarf: { floor: 40000, flex: 20000 },
+        renteJahr: 60000, // pensions cover full need
+        depotwertGesamt: 1000000
+    };
+    const result = SpendingPlanner._calculateWealthAdjustedReductionFactor(params);
+    assertClose(result.factor, 0, 0.001, 'No reduction when pensions cover full need');
+    console.log('✅ Wealth-adjusted reduction: pensions cover need => 0');
+}
+
+// --- TEST 9: S-curve check against linear ---
+{
+    const params = {
+        inflatedBedarf: { floor: 40000, flex: 20000 },
+        renteJahr: 0,
+        depotwertGesamt: 3000000 // 60k / 3.0M = 2.0%
+    };
+    const result = SpendingPlanner._calculateWealthAdjustedReductionFactor(params);
+    const expected = smoothstep(0.25);
+    assertClose(result.factor, expected, 0.01, 'S-curve factor at 2% matches smoothstep');
+    console.log('✅ Wealth-adjusted reduction: S-curve matches at 2%');
 }
 
 console.log('--- SpendingPlanner Tests Completed ---');

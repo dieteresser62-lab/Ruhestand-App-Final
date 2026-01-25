@@ -230,6 +230,9 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal') {
 
     columns.push(
         { header: 'Flex%', width: 5, key: 'row.FlexRatePct', valueFormatter: v => formatPercentInt(v), align: 'right' },
+        { header: 'MinF%', width: 5, key: 'row.MinFlexRatePct', valueFormatter: v => formatPercentInt(v), align: 'right' },
+        { header: 'WRed%', width: 5, key: 'row.WealthRedF', valueFormatter: v => formatPercentInt(v), align: 'right' },
+        { header: 'WQ%', width: 4, key: 'row.WealthQuoteUsedPct', valueFormatter: v => formatPercentInt(v), align: 'right' },
         { header: 'Flex€', width: 7, key: 'row.flex_erfuellt_nominal', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' }
     );
 
@@ -252,6 +255,8 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal') {
             align: 'left'
         },
         { header: 'Status', width: 16, key: 'row.aktionUndGrund', valueFormatter: v => (v || '').substring(0, 15), align: 'left' },
+        { header: 'Cut', width: 12, key: 'row.CutReason', valueFormatter: v => (v || '').substring(0, 12), align: 'left' },
+        { header: 'Alarm', width: 6, key: 'row.Alarm', valueFormatter: v => (v ? 'AKTIV' : ''), align: 'left' },
         { header: 'Quote%', width: 6, key: 'row.QuoteEndPct', valueFormatter: v => formatPercent(v), align: 'right' },
         { header: 'Runway%', width: 7, key: 'row.RunwayCoveragePct', valueFormatter: v => formatPercentInt(v), align: 'right' },
         { header: 'Pf.Akt%', width: 8, extractor: row => formatPercentRatio(row.row?.NominalReturnEquityPct || 0, { fractionDigits: 1, invalid: '0.0%' }), valueFormatter: v => v, align: 'right' },

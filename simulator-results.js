@@ -342,6 +342,9 @@ export function getWorstRunColumnDefinitions(opts = {}) {
 
     const finalCols = [
         { key: 'FlexRatePct', header: 'Flex%', width: 5, fmt: v => `${Math.round(v || 0)}%` },
+        { key: 'MinFlexRatePct', header: 'MinF%', width: 5, fmt: v => `${Math.round(v || 0)}%` },
+        { key: 'WealthRedF', header: 'WRed%', width: 5, fmt: v => `${Math.round(v || 0)}%` },
+        { key: 'WealthQuoteUsedPct', header: 'WQ%', width: 4, fmt: v => `${Math.round(v || 0)}%` },
         { key: 'flex_erfuellt_nominal', header: 'Flex', width: 7, fmt: formatCurrencyShortLog },
         {
             key: 'Regime', header: 'Markt', width: 12,
@@ -364,6 +367,8 @@ export function getWorstRunColumnDefinitions(opts = {}) {
                 return (v || status).substring(0, 21);
             }
         },
+        { key: 'CutReason', header: 'Cut', width: 12, fmt: v => (v || '').substring(0, 12) },
+        { key: 'Alarm', header: 'Alarm', width: 6, fmt: v => (v ? 'AKTIV' : '') },
         { key: 'QuoteEndPct', header: 'Quote%', width: 6, fmt: v => formatPercent(v, 1) },
         { key: 'RunwayCoveragePct', header: 'Runway%', width: 7, fmt: v => formatPercentValue(v || 0, { fractionDigits: 0, invalid: '0%' }) },
         { key: 'NominalReturnEquityPct', header: 'Pf.Akt%', width: 8, fmt: v => formatPercentFromRatio(v, 1) },
@@ -412,7 +417,15 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         { key: 'NeedLiq', header: 'NeedLiq', width: 8, fmt: formatCurrencyShortLog, title: 'Benötigte Liquidität für Floor-Runway' },
         { key: 'GuardGold', header: 'GuardG', width: 7, fmt: formatCurrencyShortLog, title: 'FAIL-SAFE: Gold verkauft' },
         { key: 'GuardEq', header: 'GuardA', width: 7, fmt: formatCurrencyShortLog, title: 'FAIL-SAFE: Aktien verkauft' },
-        { key: 'GuardNote', header: 'GuardNote', width: 16, fmt: v => (v || '').substring(0, 16), title: 'FAIL-SAFE: Grund/Status' }
+        { key: 'GuardNote', header: 'GuardNote', width: 16, fmt: v => (v || '').substring(0, 16), title: 'FAIL-SAFE: Grund/Status' },
+        { key: 'eq_before_return', header: 'Akt_vorR', width: 9, fmt: formatCurrencyShortLog },
+        { key: 'eq_after_return', header: 'Akt_nachR', width: 9, fmt: formatCurrencyShortLog },
+        { key: 'eq_after_sales', header: 'Akt_nachV', width: 9, fmt: formatCurrencyShortLog },
+        { key: 'eq_after_buys', header: 'Akt_nachK', width: 9, fmt: formatCurrencyShortLog },
+        { key: 'gold_before_return', header: 'Gld_vorR', width: 9, fmt: formatCurrencyShortLog },
+        { key: 'gold_after_return', header: 'Gld_nachR', width: 9, fmt: formatCurrencyShortLog },
+        { key: 'gold_after_sales', header: 'Gld_nachV', width: 9, fmt: formatCurrencyShortLog },
+        { key: 'gold_after_buys', header: 'Gld_nachK', width: 9, fmt: formatCurrencyShortLog }
     ] : [];
 
     return [...baseCols, ...activeCareCols, ...finalCols, ...detailCols, ...guardCols];

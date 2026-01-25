@@ -227,9 +227,14 @@ export function aggregateProfilverbundInputs(profileInputs, overrides = {}) {
         const inputs = entry.inputs || {};
         const floor = inputs.floorBedarf || 0;
         const flex = inputs.flexBedarf || 0;
+        const flexBudgetAnnual = inputs.flexBudgetAnnual || 0;
+        const flexBudgetRecharge = inputs.flexBudgetRecharge || 0;
+        const flexBudgetYears = inputs.flexBudgetYears || 0;
         const renteMonatlich = inputs.renteAktiv ? (inputs.renteMonatlich || 0) : 0;
         acc.totalFloor += floor;
         acc.totalFlex += flex;
+        acc.totalFlexBudgetAnnual += flexBudgetAnnual;
+        acc.totalFlexBudgetRecharge += flexBudgetRecharge;
         acc.totalRenteMonatlich += renteMonatlich;
         acc.totalTagesgeld += inputs.tagesgeld || 0;
         acc.totalGeldmarkt += inputs.geldmarktEtf || 0;
@@ -238,10 +243,13 @@ export function aggregateProfilverbundInputs(profileInputs, overrides = {}) {
         acc.totalGold += inputs.goldWert || 0;
         acc.runwayMin = acc.runwayMin === null ? inputs.runwayMinMonths || 0 : Math.min(acc.runwayMin, inputs.runwayMinMonths || 0);
         acc.runwayTarget = acc.runwayTarget === null ? inputs.runwayTargetMonths || 0 : Math.min(acc.runwayTarget, inputs.runwayTargetMonths || 0);
+        acc.flexBudgetYears = acc.flexBudgetYears === null ? flexBudgetYears : Math.min(acc.flexBudgetYears, flexBudgetYears || acc.flexBudgetYears || 0);
         return acc;
     }, {
         totalFloor: 0,
         totalFlex: 0,
+        totalFlexBudgetAnnual: 0,
+        totalFlexBudgetRecharge: 0,
         totalRenteMonatlich: 0,
         totalTagesgeld: 0,
         totalGeldmarkt: 0,
@@ -249,13 +257,20 @@ export function aggregateProfilverbundInputs(profileInputs, overrides = {}) {
         totalDepotNeu: 0,
         totalGold: 0,
         runwayMin: null,
-        runwayTarget: null
+        runwayTarget: null,
+        flexBudgetYears: null
     });
 
     const overrideFloor = Number.isFinite(overrides.floorBedarf) ? overrides.floorBedarf : null;
     const overrideFlex = Number.isFinite(overrides.flexBedarf) ? overrides.flexBedarf : null;
+    const overrideFlexBudgetAnnual = Number.isFinite(overrides.flexBudgetAnnual) ? overrides.flexBudgetAnnual : null;
+    const overrideFlexBudgetRecharge = Number.isFinite(overrides.flexBudgetRecharge) ? overrides.flexBudgetRecharge : null;
+    const overrideFlexBudgetYears = Number.isFinite(overrides.flexBudgetYears) ? overrides.flexBudgetYears : null;
     const totalFloor = overrideFloor !== null ? overrideFloor : totals.totalFloor;
     const totalFlex = overrideFlex !== null ? overrideFlex : totals.totalFlex;
+    const totalFlexBudgetAnnual = overrideFlexBudgetAnnual !== null ? overrideFlexBudgetAnnual : totals.totalFlexBudgetAnnual;
+    const totalFlexBudgetRecharge = overrideFlexBudgetRecharge !== null ? overrideFlexBudgetRecharge : totals.totalFlexBudgetRecharge;
+    const totalFlexBudgetYears = overrideFlexBudgetYears !== null ? overrideFlexBudgetYears : (totals.flexBudgetYears || 0);
     const totalBedarf = totalFloor + totalFlex;
     const totalRente = totals.totalRenteMonatlich * 12;
     const netWithdrawal = Math.max(0, totalBedarf - totalRente);
@@ -267,6 +282,9 @@ export function aggregateProfilverbundInputs(profileInputs, overrides = {}) {
         profilesCount: list.length,
         totalFloor,
         totalFlex,
+        totalFlexBudgetAnnual,
+        totalFlexBudgetRecharge,
+        totalFlexBudgetYears,
         totalBedarf,
         totalRenteMonatlich: totals.totalRenteMonatlich,
         totalRenteJahr: totalRente,

@@ -34,6 +34,8 @@ const INPUT = { inflation: 2 };
 // --- TEST 2: Integration Logic ---
 {
     CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED = true;
+    const prevFlexCurve = CONFIG.SPENDING_MODEL.FLEX_SHARE_S_CURVE.ENABLED;
+    CONFIG.SPENDING_MODEL.FLEX_SHARE_S_CURVE.ENABLED = false;
 
     const oddBedarf = {
         floor: 30000,
@@ -64,6 +66,7 @@ const INPUT = { inflation: 2 };
     const total = result.spendingResult.details.endgueltigeEntnahme;
     assertEqual(total, 42000, 'Annual should be 12 * 3500 = 42000');
 
+    CONFIG.SPENDING_MODEL.FLEX_SHARE_S_CURVE.ENABLED = prevFlexCurve;
     console.log('✅ Integration Logic Passed');
 }
 

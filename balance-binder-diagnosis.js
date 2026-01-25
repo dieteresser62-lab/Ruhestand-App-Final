@@ -122,6 +122,9 @@ export function createDiagnosisHandlers({ dom, appState }) {
         if (typeof diagnosis.keyParams.aktuelleFlexRate === 'number') {
             text += `Effektive Flex-Rate: ${UIUtils.formatPercentValue(diagnosis.keyParams.aktuelleFlexRate, { fractionDigits: 1, invalid: 'n/a' })}\n`;
         }
+        if (typeof diagnosis.keyParams.minFlexRatePct === 'number') {
+            text += `Flex-Min-Rate: ${UIUtils.formatPercentValue(diagnosis.keyParams.minFlexRatePct, { fractionDigits: 1, invalid: 'n/a' })}\n`;
+        }
         if (typeof diagnosis.keyParams.kuerzungProzent === 'number') {
             text += `Kürzung ggü. Flex-Bedarf: ${UIUtils.formatPercentValue(diagnosis.keyParams.kuerzungProzent, { fractionDigits: 1, invalid: 'n/a' })}\n`;
         }

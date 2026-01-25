@@ -51,8 +51,8 @@ export const InputValidator = {
         // 3. Vermögenswerte dürfen nicht negativ sein
         // Prüft alle Depot- und Kostenbasis-Felder
         ['tagesgeld', 'geldmarktEtf', 'depotwertAlt', 'depotwertNeu', 'goldWert',
-         'floorBedarf', 'flexBedarf', 'costBasisAlt', 'costBasisNeu', 'goldCost',
-         'sparerPauschbetrag'].forEach(field => {
+         'floorBedarf', 'flexBedarf', 'flexBudgetAnnual', 'flexBudgetRecharge',
+         'costBasisAlt', 'costBasisNeu', 'goldCost', 'sparerPauschbetrag'].forEach(field => {
             check(input[field] < 0, field, 'Wert darf nicht negativ sein.');
         });
 
@@ -110,6 +110,14 @@ export const InputValidator = {
             'rebalBand',
             'Rebalancing-Band muss zwischen 1% und 20% liegen.'
         );
+
+        if (Number.isFinite(input.flexBudgetYears)) {
+            check(
+                input.flexBudgetYears < 0 || input.flexBudgetYears > 10,
+                'flexBudgetYears',
+                'Flex-Budget Jahre müssen zwischen 0 und 10 liegen.'
+            );
+        }
 
         // Max. Abschöpfen
         // Erweiterte Grenze für Parameter Sweep (bis 50% statt 25%)

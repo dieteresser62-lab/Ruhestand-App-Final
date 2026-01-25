@@ -54,6 +54,7 @@ export function formatDiagnosisPayload(raw) {
     const safeKeyParams = { ...(raw.keyParams || {}) };
     const ensureNumberOrNull = (value) => (typeof value === 'number' && isFinite(value)) ? value : null;
     safeKeyParams.aktuelleFlexRate = ensureNumberOrNull(safeKeyParams.aktuelleFlexRate);
+    safeKeyParams.minFlexRatePct = ensureNumberOrNull(safeKeyParams.minFlexRatePct);
     safeKeyParams.kuerzungProzent = ensureNumberOrNull(safeKeyParams.kuerzungProzent);
     safeKeyParams.jahresentnahme = ensureNumberOrNull(safeKeyParams.jahresentnahme);
     formatted.keyParams = safeKeyParams;

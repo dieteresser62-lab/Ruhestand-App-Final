@@ -12,7 +12,7 @@ export function createInflationHandlers({ dom, update, debouncedUpdate }) {
         const infl = inputData.inflation;
         const currentAge = inputData.aktuellesAlter;
 
-        ['floorBedarf', 'flexBedarf'].forEach(id => {
+        ['floorBedarf', 'flexBedarf', 'flexBudgetAnnual', 'flexBudgetRecharge'].forEach(id => {
             const el = dom.inputs[id];
             el.value = UIUtils.formatNumber(UIUtils.parseCurrency(el.value) * (1 + infl / 100));
         });

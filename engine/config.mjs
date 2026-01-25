@@ -103,7 +103,55 @@ export const CONFIG = {
         RATE_CHANGE_MAX_UP_PP: 2.5,                     // +2.5pp pro Jahr (konservativ)
         RATE_CHANGE_AGILE_UP_PP: 4.5,                   // +4.5pp in Peak/Recovery (agiler)
         RATE_CHANGE_MAX_DOWN_PP: 3.5,                   // -3.5pp pro Jahr (normal)
-        RATE_CHANGE_MAX_DOWN_IN_BEAR_PP: 10.0           // -10pp im Bärenmarkt (drastisch)
+        RATE_CHANGE_MAX_DOWN_IN_BEAR_PP: 6.0,           // -6pp im Bärenmarkt (sanfter)
+        RATE_CHANGE_RELAX_MAX_DOWN_PP: 20.0,            // Max. Relaxierung der Down-Rate bei hohem Vermögen
+        WEALTH_ADJUSTED_REDUCTION: {
+            SAFE_WITHDRAWAL_RATE: 0.015,                // Unter 1.5%: keine marktbedingte Reduktion
+            FULL_WITHDRAWAL_RATE: 0.035                 // Ab 3.5%: volle Reduktion
+        },
+        FLEX_BUDGET: {
+            ENABLED: true,
+            DEFAULT_MAX_YEARS: 5,
+            DEFAULT_RECHARGE_FRACTION: 0.7,
+            ACTIVE_REGIMES: ['bear_deep', 'recovery_in_bear'],
+            REGIME_WEIGHTS: {
+                bear_deep: 1.0,
+                recovery_in_bear: 0.5
+            },
+            REGIME_CAP_MULTIPLIER: {
+                bear_deep: 1.0,
+                recovery_in_bear: 1.5
+            },
+            MIN_RATE_BASE_PCT: {
+                bear_deep: 5,
+                recovery_in_bear: 5
+            },
+            MIN_RATE_FLOOR_SLOPE_PCT: {
+                bear_deep: 60,
+                recovery_in_bear: 60
+            }
+        },
+        FLEX_SHARE_S_CURVE: {
+            ENABLED: true,
+            K: 0.8,                                     // Cap-Stärke (0..1)
+            A: 14.0,                                    // Steilheit der S-Kurve
+            B: 0.52                                     // Knickpunkt (Flex-Anteil 0..1)
+        },
+        FLEX_RATE_HARD_CAPS: {
+            BEAR_DEEP_MAX_RATE: 70,                     // Max. Flex-Rate im tiefen Bärenmarkt
+            FLEX_SHARE_RELIEF_MAX_PP: 15,              // Entlastung bei geringem Flex-Anteil
+            RUNWAY_COVERAGE_CAPS: [
+                { maxCoverage: 1.20, maxRate: 70 },     // <120% Runway-Deckung
+                { maxCoverage: 1.05, maxRate: 60 },     // <105% Runway-Deckung
+                { maxCoverage: 0.90, maxRate: 50 }      // <90% Runway-Deckung
+            ]
+        },
+        FLEX_RATE_FINAL_LIMITS: {
+            MAX_UP_PP: 12.0,                            // Max. Anstieg nach Caps pro Jahr
+            MAX_DOWN_PP: 12.0,                          // Max. Rückgang nach Caps pro Jahr
+            MAX_DOWN_IN_BEAR_PP: 10.0,                  // Sanfterer Abbau im Bärenmarkt
+            RELAX_MAX_DOWN_PP: 20.0                     // Max. Relaxierung des Final-Down-Limits
+        }
     },
 
     /**

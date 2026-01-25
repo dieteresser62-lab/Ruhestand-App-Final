@@ -36,6 +36,222 @@ export const SpendingPlanner = {
         return Math.floor(amount / step) * step;
     },
 
+    _smoothstep(x) {
+        const t = Math.min(1, Math.max(0, x));
+        return t * t * (3 - 2 * t);
+    },
+
+    _calculateWealthAdjustedReductionFactor(params) {
+        const cfg = CONFIG.SPENDING_MODEL?.WEALTH_ADJUSTED_REDUCTION;
+        if (!cfg) return { factor: 1, entnahmequoteUsed: null };
+        const safeRate = Number(cfg.SAFE_WITHDRAWAL_RATE);
+        const fullRate = Number(cfg.FULL_WITHDRAWAL_RATE);
+        if (!Number.isFinite(safeRate) || !Number.isFinite(fullRate) || fullRate <= safeRate) {
+            return { factor: 1, entnahmequoteUsed: null };
+        }
+
+        const inflatedBedarf = params?.inflatedBedarf || {};
+        const floor = Math.max(0, Number(inflatedBedarf.floor) || 0);
+        const flex = Math.max(0, Number(inflatedBedarf.flex) || 0);
+        const renteJahr = Math.max(0, Number(params?.renteJahr) || 0);
+        const maxEntnahme = Math.max(0, floor + flex - renteJahr);
+        const depotwertGesamt = Math.max(0, Number(params?.depotwertGesamt) || 0);
+        const lastState = params?.lastState || {};
+        const lastEntnahmeReal = Number.isFinite(lastState.lastEntnahmeReal)
+            ? Math.max(0, lastState.lastEntnahmeReal)
+            : null;
+        const inflationFactor = Number.isFinite(lastState.cumulativeInflationFactor)
+            ? Math.max(1e-9, lastState.cumulativeInflationFactor)
+            : 1;
+        const depotwertReal = depotwertGesamt / inflationFactor;
+
+        let entnahmequoteUsed = null;
+        if (lastEntnahmeReal !== null && depotwertReal > 0) {
+            entnahmequoteUsed = lastEntnahmeReal / depotwertReal;
+        } else if (depotwertGesamt > 0) {
+            entnahmequoteUsed = maxEntnahme / depotwertGesamt;
+        } else {
+            entnahmequoteUsed = 1;
+        }
+
+        const linearT = (entnahmequoteUsed - safeRate) / (fullRate - safeRate);
+        return { factor: this._smoothstep(linearT), entnahmequoteUsed };
+    },
+
+    _applyFlexShareCurve(flexRate, inflatedBedarf, addDecision, wealthFactor = 1) {
+        const curve = CONFIG.SPENDING_MODEL?.FLEX_SHARE_S_CURVE;
+        if (!curve?.ENABLED) {
+            return { rate: flexRate, applied: false };
+        }
+
+        const floor = Math.max(0, Number(inflatedBedarf?.floor) || 0);
+        const flex = Math.max(0, Number(inflatedBedarf?.flex) || 0);
+        const total = floor + flex;
+        if (total <= 0 || flex <= 0 || flexRate <= 0) {
+            return { rate: flexRate, applied: false };
+        }
+
+        const share = Math.min(1, Math.max(0, flex / total));
+        const s = 1 / (1 + Math.exp(-curve.A * (share - curve.B)));
+        const baseCap = Math.max(0, Math.min(100, 100 - (curve.K * 100 * s)));
+        const w = Number.isFinite(wealthFactor) ? Math.min(1, Math.max(0, wealthFactor)) : 1;
+        const cap = Math.max(0, Math.min(100, 100 - (w * (100 - baseCap))));
+        const adjusted = Math.max(0, Math.min(100, Math.min(flexRate, cap)));
+
+        const applied = adjusted + 0.05 < flexRate;
+        if (applied) {
+            addDecision(
+                'Flex-S-Kurve',
+                `Flex-Anteil ${Math.round(share * 100)}% -> Cap ${(cap).toFixed(1)}%.`,
+                'active'
+            );
+        }
+
+        return { rate: adjusted, applied };
+    },
+
+    _calcFlexShare(inflatedBedarf) {
+        const floor = Math.max(0, Number(inflatedBedarf?.floor) || 0);
+        const flex = Math.max(0, Number(inflatedBedarf?.flex) || 0);
+        const total = floor + flex;
+        if (total <= 0 || flex <= 0) return 0;
+        return Math.min(1, Math.max(0, flex / total));
+    },
+
+    _applyFlexBudgetCap(flexRate, inflatedBedarf, input, state, market, addDecision) {
+        const cfg = CONFIG.SPENDING_MODEL?.FLEX_BUDGET;
+        if (!cfg?.ENABLED) {
+            return { rate: flexRate, balanceYears: state.flexBudgetBalanceYears, minRatePct: 0, applied: false };
+        }
+
+        const annualCap = Number(input?.flexBudgetAnnual) || 0;
+        if (annualCap <= 0) {
+            return { rate: flexRate, balanceYears: state.flexBudgetBalanceYears, minRatePct: 0, applied: false };
+        }
+
+        const maxYearsInput = Number(input?.flexBudgetYears);
+        const maxYears = (Number.isFinite(maxYearsInput) && maxYearsInput > 0)
+            ? maxYearsInput
+            : (cfg.DEFAULT_MAX_YEARS || 0);
+        const maxBalanceYears = Math.max(0, maxYears);
+        let prevBalanceYears = Number.isFinite(state.flexBudgetBalanceYears)
+            ? state.flexBudgetBalanceYears
+            : (Number.isFinite(state.flexBudgetBalance) ? state.flexBudgetBalance : maxBalanceYears);
+        if (!Number.isFinite(prevBalanceYears) || prevBalanceYears <= 0) {
+            prevBalanceYears = maxBalanceYears;
+        }
+        prevBalanceYears = Math.min(maxBalanceYears, Math.max(0, prevBalanceYears));
+
+        const rechargeInput = Number(input?.flexBudgetRecharge);
+        const recharge = Number.isFinite(rechargeInput)
+            ? rechargeInput
+            : (annualCap * (cfg.DEFAULT_RECHARGE_FRACTION || 0));
+
+        const activeRegimes = Array.isArray(cfg.ACTIVE_REGIMES) ? cfg.ACTIVE_REGIMES : [];
+        const isActive = activeRegimes.includes(market?.sKey);
+        const regimeWeights = cfg.REGIME_WEIGHTS || {};
+        const regimeWeight = Number.isFinite(regimeWeights?.[market?.sKey])
+            ? regimeWeights[market.sKey]
+            : 1.0;
+        const capMultipliers = cfg.REGIME_CAP_MULTIPLIER || {};
+        const capMultiplier = Number.isFinite(capMultipliers?.[market?.sKey])
+            ? capMultipliers[market.sKey]
+            : 1.0;
+        const minRateBaseByRegime = cfg.MIN_RATE_BASE_PCT || {};
+        const baseMinRate = Number.isFinite(minRateBaseByRegime?.[market?.sKey])
+            ? minRateBaseByRegime[market.sKey]
+            : 0;
+        const minRateSlopeByRegime = cfg.MIN_RATE_FLOOR_SLOPE_PCT || {};
+        const slopeRate = Number.isFinite(minRateSlopeByRegime?.[market?.sKey])
+            ? minRateSlopeByRegime[market.sKey]
+            : 0;
+        const wealthFactor = Number.isFinite(state?.keyParams?.wealthReductionFactor)
+            ? Math.min(1, Math.max(0, state.keyParams.wealthReductionFactor))
+            : 1;
+        const floorGross = Math.max(0, Number(input?.floorBedarf) || 0);
+        const flexGross = Math.max(0, Number(input?.flexBedarf) || 0);
+        const totalGross = floorGross + flexGross;
+        const floorShare = totalGross > 0 ? Math.min(1, Math.max(0, floorGross / totalGross)) : 0;
+        const minRatePct = Math.max(0, (baseMinRate + (slopeRate * floorShare)) * wealthFactor);
+
+        let balanceYears = prevBalanceYears;
+        let rate = flexRate;
+        let applied = false;
+        if (isActive && balanceYears > 0 && inflatedBedarf?.flex > 0) {
+            const currentFlex = inflatedBedarf.flex * (Math.max(0, Math.min(100, flexRate)) / 100);
+            const capThisYear = annualCap * capMultiplier;
+            const capWithWealth = capThisYear + (1 - wealthFactor) * Math.max(0, currentFlex - capThisYear);
+            const allowedFlex = Math.min(currentFlex, capWithWealth);
+            if (allowedFlex + 0.01 < currentFlex) {
+                rate = Math.min(100, Math.max(0, (allowedFlex / inflatedBedarf.flex) * 100));
+                applied = true;
+                addDecision(
+                    'Flex-Budget (Cap)',
+                    `Flex auf ${allowedFlex.toFixed(0)}€ gekappt (Topf ${balanceYears.toFixed(1)} J, x${capMultiplier}).`,
+                    'active',
+                    'guardrail'
+                );
+            }
+            balanceYears = Math.max(0, balanceYears - Math.max(0, regimeWeight));
+        } else if (!isActive && recharge > 0 && maxBalanceYears > 0 && balanceYears < maxBalanceYears - 0.01) {
+            const rechargeYears = recharge / annualCap;
+            balanceYears = Math.min(maxBalanceYears, balanceYears + Math.max(0, rechargeYears));
+        }
+
+        if (isActive && minRatePct > 0 && rate < minRatePct) {
+            rate = minRatePct;
+            applied = true;
+            addDecision(
+                'Flex-Budget (Min-Rate)',
+                `Flex-Rate auf min. ${minRatePct.toFixed(0)}% angehoben (Regime ${market?.sKey}, Floor-Anteil ${Math.round(floorShare * 100)}%).`,
+                'active',
+                'guardrail'
+            );
+        }
+
+        return { rate, balanceYears, minRatePct, applied };
+    },
+
+    _applyFinalRateLimits(prevFlexRate, nextFlexRate, market, addDecision, wealthFactor = 1) {
+        const limits = CONFIG.SPENDING_MODEL?.FLEX_RATE_FINAL_LIMITS;
+        if (!limits) return { rate: nextFlexRate, applied: false };
+
+        const baseMaxUp = limits.MAX_UP_PP ?? 0;
+        const baseMaxDown = (market?.sKey === 'bear_deep')
+            ? (limits.MAX_DOWN_IN_BEAR_PP ?? limits.MAX_DOWN_PP ?? 0)
+            : (limits.MAX_DOWN_PP ?? 0);
+        const w = Number.isFinite(wealthFactor) ? Math.min(1, Math.max(0, wealthFactor)) : 1;
+        const maxUp = baseMaxUp;
+        const relaxCap = Number.isFinite(limits.RELAX_MAX_DOWN_PP)
+            ? limits.RELAX_MAX_DOWN_PP
+            : 20;
+        const relaxScale = 1 - w;
+        const relax = relaxScale * relaxScale;
+        const maxDown = baseMaxDown + (relax * (relaxCap - baseMaxDown));
+        const delta = nextFlexRate - prevFlexRate;
+        let rate = nextFlexRate;
+
+        if (maxUp > 0 && delta > maxUp) {
+            rate = prevFlexRate + maxUp;
+            addDecision(
+                'Glättung (Final-Guardrail)',
+                `Anstieg nach Guardrails auf max. ${maxUp} pp begrenzt.`,
+                'active',
+                'guardrail'
+            );
+        } else if (maxDown > 0 && delta < -maxDown) {
+            rate = prevFlexRate - maxDown;
+            addDecision(
+                'Glättung (Final-Guardrail)',
+                `Rückgang nach Guardrails auf max. ${maxDown} pp begrenzt.`,
+                'active',
+                'guardrail'
+            );
+        }
+
+        return { rate, applied: rate !== nextFlexRate };
+    },
+
     determineSpending(params) {
         const {
             lastState,
@@ -86,6 +302,45 @@ export const SpendingPlanner = {
             geglätteteFlexRate = guardrailResult.rate;
             kuerzungQuelle = guardrailResult.source;
             guardrailDiagnostics = guardrailResult.diagnostics || {};
+        }
+
+        const flexBudgetResult = this._applyFlexBudgetCap(
+            geglätteteFlexRate,
+            inflatedBedarf,
+            input,
+            state,
+            market,
+            addDecision
+        );
+        if (flexBudgetResult.applied) {
+            geglätteteFlexRate = flexBudgetResult.rate;
+            if (kuerzungQuelle !== 'Budget-Floor') {
+                kuerzungQuelle = 'Flex-Budget (Cap)';
+            }
+        }
+        if (Number.isFinite(flexBudgetResult.balanceYears)) {
+            state.flexBudgetBalanceYears = flexBudgetResult.balanceYears;
+        }
+        if (state.keyParams && Number.isFinite(flexBudgetResult.minRatePct)) {
+            state.keyParams.minFlexRatePct = flexBudgetResult.minRatePct;
+        }
+
+        const wealthFactor = Number.isFinite(state.keyParams?.wealthReductionFactor)
+            ? Math.min(1, Math.max(0, state.keyParams.wealthReductionFactor))
+            : 1;
+
+        const finalLimitResult = this._applyFinalRateLimits(
+            state.flexRate ?? 100,
+            geglätteteFlexRate,
+            market,
+            addDecision,
+            wealthFactor
+        );
+        if (finalLimitResult.applied) {
+            geglätteteFlexRate = finalLimitResult.rate;
+            if (kuerzungQuelle !== 'Budget-Floor') {
+                kuerzungQuelle = 'Glättung (Final-Guardrail)';
+            }
         }
 
         // 5. Endgültige Entnahme bestimmen.
@@ -300,6 +555,11 @@ export const SpendingPlanner = {
     _evaluateAlarmConditions(state, params, addDecision) {
         const { market, runwayMonate, profil } = params;
         const { entnahmequoteDepot, realerDepotDrawdown } = state.keyParams;
+        const wealthReduction = this._calculateWealthAdjustedReductionFactor(params);
+        const wealthFactor = Number.isFinite(wealthReduction.factor)
+            ? Math.min(1, Math.max(0, wealthReduction.factor))
+            : 1;
+        const wealthSufficient = wealthFactor < 0.5;
 
         let alarmWarAktiv = state.alarmActive;
 
@@ -328,7 +588,26 @@ export const SpendingPlanner = {
         const isQuoteCritical = entnahmequoteDepot > CONFIG.THRESHOLDS.ALARM.withdrawalRate;
         const isDrawdownCritical = realerDepotDrawdown > CONFIG.THRESHOLDS.ALARM.realDrawdown;
 
-        const alarmAktivInDieserRunde = !alarmWarAktiv && isCrisis &&
+        if (isCrisis && wealthSufficient) {
+            if (alarmWarAktiv) {
+                addDecision(
+                    'Alarm unterdrückt',
+                    'Vermögen ausreichend – Alarm-Modus wird beendet.',
+                    'active',
+                    'info'
+                );
+            } else {
+                addDecision(
+                    'Alarm unterdrückt',
+                    'Vermögen ausreichend – kein Alarm-Modus trotz Bärenmarkt.',
+                    'active',
+                    'info'
+                );
+            }
+            alarmWarAktiv = false;
+        }
+
+        const alarmAktivInDieserRunde = !alarmWarAktiv && isCrisis && !wealthSufficient &&
             ((isQuoteCritical && isRunwayThin) || isDrawdownCritical);
 
         if (alarmAktivInDieserRunde) {
@@ -357,6 +636,17 @@ export const SpendingPlanner = {
      */
     _calculateFlexRate(state, alarmStatus, params, addDecision) {
         const p = params;
+        const wealthReduction = this._calculateWealthAdjustedReductionFactor(p);
+        const wealthFactor = Number.isFinite(wealthReduction.factor)
+            ? Math.min(1, Math.max(0, wealthReduction.factor))
+            : 1;
+        if (state.keyParams) {
+            state.keyParams.wealthReductionFactor = wealthFactor;
+            if (Number.isFinite(wealthReduction.entnahmequoteUsed)) {
+                state.keyParams.entnahmequoteUsed = wealthReduction.entnahmequoteUsed;
+            }
+        }
+
         if (alarmStatus.active) {
             const kuerzungQuelle = 'Guardrail (Alarm)';
             let geglätteteFlexRate = state.flexRate;
@@ -367,13 +657,22 @@ export const SpendingPlanner = {
                     (p.profil.minRunwayMonths - p.runwayMonate) / p.profil.minRunwayMonths
                 );
                 const zielCut = Math.min(10, Math.round(10 + 20 * shortfallRatio));
-                geglätteteFlexRate = Math.max(35, state.flexRate - zielCut);
+                const zielCutScaled = zielCut * wealthFactor;
+                geglätteteFlexRate = Math.max(35, state.flexRate - zielCutScaled);
                 addDecision(
                     'Anpassung im Alarm-Modus',
                     `Flex-Rate wird auf ${geglätteteFlexRate.toFixed(1)}% gesetzt.`,
                     'active',
                     'alarm'
                 );
+                if (wealthFactor < 1) {
+                    addDecision(
+                        'Vermögensbasierte Dämpfung',
+                        'Alarm-Kürzung wird aufgrund hoher Vermögensdeckung reduziert.',
+                        'active',
+                        'info'
+                    );
+                }
             } else {
                 geglätteteFlexRate = Math.max(35, state.flexRate);
                 addDecision(
@@ -393,31 +692,61 @@ export const SpendingPlanner = {
             RATE_CHANGE_MAX_UP_PP,
             RATE_CHANGE_AGILE_UP_PP,
             RATE_CHANGE_MAX_DOWN_PP,
-            RATE_CHANGE_MAX_DOWN_IN_BEAR_PP
+            RATE_CHANGE_MAX_DOWN_IN_BEAR_PP,
+            RATE_CHANGE_RELAX_MAX_DOWN_PP
         } = CONFIG.SPENDING_MODEL;
 
         let kuerzungQuelle = 'Profil';
         let roheKuerzungProzent = 0;
 
         if (market.sKey === 'bear_deep') {
-            roheKuerzungProzent = 50 + Math.max(0, market.abstandVomAthProzent - 20);
-            kuerzungQuelle = 'Tiefer Bär';
+            const reductionFactor = wealthFactor;
+            const basisKuerzung = 50 + Math.max(0, market.abstandVomAthProzent - 20);
+            roheKuerzungProzent = basisKuerzung * reductionFactor;
+
+            if (reductionFactor === 0) {
+                kuerzungQuelle = 'Vermögen ausreichend';
+                addDecision(
+                    'Vermögensbasierte Anpassung',
+                    'Keine Reduktion nötig – Entnahmequote unter dem Safe-Wert.',
+                    'active',
+                    'info'
+                );
+            } else if (reductionFactor < 1) {
+                kuerzungQuelle = 'Tiefer Bär (vermögensadj.)';
+                addDecision(
+                    'Vermögensbasierte Anpassung',
+                    `Reduktion auf ${(reductionFactor * 100).toFixed(0)}% skaliert wegen niedriger Entnahmequote.`,
+                    'active',
+                    'info'
+                );
+            } else {
+                kuerzungQuelle = 'Tiefer Bär';
+            }
         }
 
         const roheFlexRate = 100 - roheKuerzungProzent;
         const prevFlexRate = state.flexRate ?? 100;
-        let geglätteteFlexRate = FLEX_RATE_SMOOTHING_ALPHA * roheFlexRate +
-            (1 - FLEX_RATE_SMOOTHING_ALPHA) * prevFlexRate;
+        const alphaEff = FLEX_RATE_SMOOTHING_ALPHA + (1 - wealthFactor) * (1 - FLEX_RATE_SMOOTHING_ALPHA);
+        let geglätteteFlexRate = alphaEff * roheFlexRate +
+            (1 - alphaEff) * prevFlexRate;
 
         // Veränderungsraten begrenzen.
         const delta = geglätteteFlexRate - prevFlexRate;
         const regime = CONFIG.TEXTS.REGIME_MAP[market.sKey];
-        const maxUp = (regime === 'peak' || regime === 'hot_neutral' || regime === 'recovery_in_bear')
+        const baseMaxUp = (regime === 'peak' || regime === 'hot_neutral' || regime === 'recovery_in_bear')
             ? RATE_CHANGE_AGILE_UP_PP
             : RATE_CHANGE_MAX_UP_PP;
-        const MAX_DOWN = (market.sKey === 'bear_deep')
+        const baseMaxDown = (market.sKey === 'bear_deep')
             ? RATE_CHANGE_MAX_DOWN_IN_BEAR_PP
             : RATE_CHANGE_MAX_DOWN_PP;
+        const maxUp = baseMaxUp;
+        const relaxCap = Number.isFinite(RATE_CHANGE_RELAX_MAX_DOWN_PP)
+            ? RATE_CHANGE_RELAX_MAX_DOWN_PP
+            : 20;
+        const relaxScale = 1 - wealthFactor;
+        const relax = relaxScale * relaxScale;
+        const MAX_DOWN = baseMaxDown + (relax * (relaxCap - baseMaxDown));
 
         if (delta > maxUp) {
             geglätteteFlexRate = prevFlexRate + maxUp;
@@ -435,7 +764,56 @@ export const SpendingPlanner = {
             );
         }
 
+        const flexShare = this._calcFlexShare(p.inflatedBedarf);
+        const curveResult = this._applyFlexShareCurve(geglätteteFlexRate, p.inflatedBedarf, addDecision, wealthFactor);
+        if (curveResult.applied) {
+            geglätteteFlexRate = curveResult.rate;
+            if (['Profil', 'Glättung (Anstieg)', 'Glättung (Abfall)'].includes(kuerzungQuelle)) {
+                kuerzungQuelle = 'Flex-Anteil (S-Kurve)';
+            }
+        }
 
+        // Harte Caps: tiefer Bär + Runway-Deckung
+        const hardCaps = CONFIG.SPENDING_MODEL?.FLEX_RATE_HARD_CAPS;
+        const shareRelief = Math.max(0, hardCaps?.FLEX_SHARE_RELIEF_MAX_PP ?? 0);
+        const relief = shareRelief * (1 - flexShare);
+        if (hardCaps?.BEAR_DEEP_MAX_RATE && market.sKey === 'bear_deep') {
+            const baseCap = Math.min(100, hardCaps.BEAR_DEEP_MAX_RATE + relief);
+            const cap = Math.min(100, 100 - (wealthFactor * (100 - baseCap)));
+            if (geglätteteFlexRate > cap) {
+                geglätteteFlexRate = cap;
+                kuerzungQuelle = 'Guardrail (Bären-Cap)';
+                addDecision(
+                    'Guardrail (Bären-Cap)',
+                    `Flex-Rate im tiefen Bärenmarkt auf ${geglätteteFlexRate.toFixed(1)}% gekappt (Flex-Anteil ${Math.round(flexShare * 100)}%).`,
+                    'active',
+                    'guardrail'
+                );
+            }
+        }
+
+        if (hardCaps?.RUNWAY_COVERAGE_CAPS?.length) {
+            const targetMonths = p.profil?.minRunwayMonths || p.input?.runwayMinMonths || 0;
+            if (targetMonths > 0) {
+                const coverage = p.runwayMonate / targetMonths;
+                const rules = hardCaps.RUNWAY_COVERAGE_CAPS
+                    .slice()
+                    .sort((a, b) => a.maxCoverage - b.maxCoverage);
+                const match = rules.find(r => coverage < r.maxCoverage);
+                const baseCap = match ? Math.min(100, match.maxRate + relief) : null;
+                const cap = baseCap === null ? null : Math.min(100, 100 - (wealthFactor * (100 - baseCap)));
+                if (cap !== null && geglätteteFlexRate > cap) {
+                    geglätteteFlexRate = cap;
+                    kuerzungQuelle = 'Guardrail (Runway-Cap)';
+                    addDecision(
+                        'Guardrail (Runway-Cap)',
+                        `Runway-Deckung ${(coverage * 100).toFixed(0)}% -> Flex-Rate auf ${geglätteteFlexRate.toFixed(1)}% gekappt (Flex-Anteil ${Math.round(flexShare * 100)}%).`,
+                        'active',
+                        'guardrail'
+                    );
+                }
+            }
+        }
 
         return { geglätteteFlexRate, kuerzungQuelle };
     },
@@ -468,20 +846,40 @@ export const SpendingPlanner = {
         // Recovery-Guardrail.
         if (market.sKey === 'recovery_in_bear') {
             const gap = market.abstandVomAthProzent || 0;
-            let curb = CONFIG.RECOVERY_GUARDRAILS.getCurb(gap);
-            if (runwayMonate < 30) curb = Math.max(curb, 20);
+            let basisCurb = CONFIG.RECOVERY_GUARDRAILS.getCurb(gap);
+            if (runwayMonate < 30) basisCurb = Math.max(basisCurb, 20);
+
+            const wealthReduction = this._calculateWealthAdjustedReductionFactor(params);
+            const reductionFactor = wealthReduction.factor;
+            if (state.keyParams && Number.isFinite(reductionFactor)) {
+                state.keyParams.wealthReductionFactor = reductionFactor;
+            }
+            if (state.keyParams && Number.isFinite(wealthReduction.entnahmequoteUsed)) {
+                state.keyParams.entnahmequoteUsed = wealthReduction.entnahmequoteUsed;
+            }
+
+            const curb = basisCurb * reductionFactor;
             const maxFlexRate = 100 - curb;
 
-            if (geglätteteFlexRate > maxFlexRate) {
+            if (reductionFactor > 0 && geglätteteFlexRate > maxFlexRate) {
                 geglätteteFlexRate = maxFlexRate;
-                kuerzungQuelle = 'Guardrail (Vorsicht)';
+                kuerzungQuelle = reductionFactor < 1
+                    ? 'Guardrail (vermögensadj.)'
+                    : 'Guardrail (Vorsicht)';
                 addDecision(
-                    'Guardrail (Vorsicht)',
+                    kuerzungQuelle,
                     `Recovery-Cap: Flex-Rate auf ${maxFlexRate.toFixed(1)}% gekappt.`,
                     'active',
                     'guardrail'
                 );
                 cautiousRuleApplied = true;
+            } else if (reductionFactor === 0) {
+                addDecision(
+                    'Vermögensbasierte Anpassung',
+                    'Recovery-Cap entfällt – Entnahmequote unter dem Safe-Wert.',
+                    'active',
+                    'info'
+                );
             }
         }
 
@@ -531,6 +929,10 @@ export const SpendingPlanner = {
         let geplanteJahresentnahme = inflatedBedarf.floor +
             (inflatedBedarf.flex * (Math.max(0, Math.min(100, geglätteteFlexRate)) / 100));
         let aktuellesGesamtbudget = geplanteJahresentnahme + renteJahr;
+        const wealthFactor = Number.isFinite(state.keyParams?.wealthReductionFactor)
+            ? Math.min(1, Math.max(0, state.keyParams.wealthReductionFactor))
+            : 1;
+        const minBudgetWithWealth = aktuellesGesamtbudget + (angepasstesMinBudget - aktuellesGesamtbudget) * wealthFactor;
         const noNewLowerYearlyCloses = input.endeVJ > Math.min(input.endeVJ_1, input.endeVJ_2);
         const budgetFloorErlaubt = !['bear_deep', 'recovery_in_bear'].includes(market.sKey) ||
             ((market.abstandVomAthProzent || 0) <= 10 && noNewLowerYearlyCloses &&
@@ -540,13 +942,13 @@ export const SpendingPlanner = {
             diagnostics.budgetFloor = {
                 rule: 'min',
                 type: 'currency',
-                threshold: angepasstesMinBudget,
+                threshold: minBudgetWithWealth,
                 value: aktuellesGesamtbudget
             };
         }
 
-        if (budgetFloorErlaubt && !cautiousRuleApplied && aktuellesGesamtbudget + 1 < angepasstesMinBudget) {
-            const benötigteJahresentnahme = Math.max(0, angepasstesMinBudget - renteJahr);
+        if (budgetFloorErlaubt && !cautiousRuleApplied && aktuellesGesamtbudget + 1 < minBudgetWithWealth) {
+            const benötigteJahresentnahme = Math.max(0, minBudgetWithWealth - renteJahr);
             const nötigeFlexRate = inflatedBedarf.flex > 0
                 ? Math.min(100, Math.max(0, ((benötigteJahresentnahme - inflatedBedarf.floor) / inflatedBedarf.flex) * 100))
                 : 0;
@@ -596,6 +998,7 @@ export const SpendingPlanner = {
             jahresentnahme: endgueltigeEntnahme
         };
 
+        const entnahmeReal = endgueltigeEntnahme / (cumulativeInflationFactor || 1);
         const newState = {
             ...state,
             flexRate,
@@ -604,7 +1007,8 @@ export const SpendingPlanner = {
             peakRealVermoegen: Math.max(peakRealVermoegen, currentRealVermoegen),
             alarmActive: alarmStatus.active,
             cumulativeInflationFactor: cumulativeInflationFactor,
-            lastInflationAppliedAtAge: state.lastInflationAppliedAtAge
+            lastInflationAppliedAtAge: state.lastInflationAppliedAtAge,
+            lastEntnahmeReal: entnahmeReal
         };
         delete newState.keyParams;
 

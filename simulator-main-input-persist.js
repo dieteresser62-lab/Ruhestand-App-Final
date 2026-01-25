@@ -11,7 +11,7 @@ const CARE_GRADE_FIELD_IDS = SUPPORTED_PFLEGE_GRADES.flatMap(grade => [
 
 export function initInputPersistence() {
     const allInputs = [
-        'startFloorBedarf', 'startFlexBedarf',
+        'startFloorBedarf', 'startFlexBedarf', 'flexBudgetAnnual', 'flexBudgetYears', 'flexBudgetRecharge',
         'p1StartAlter', 'p1Geschlecht', 'p1SparerPauschbetrag', 'p1KirchensteuerPct',
         'p1Monatsrente', 'p1StartInJahren', 'rentAdjMode', 'rentAdjPct',
         'pflegefallLogikAktivieren', 'pflegeModellTyp', ...CARE_GRADE_FIELD_IDS,

@@ -172,6 +172,9 @@ export function buildSimulatorInputsFromProfileData(profileData) {
         zielLiquiditaet: tagesgeld + readNumber(profileData, simKey('geldmarktEtf'), 0),
         startFloorBedarf: readNumber(profileData, simKey('startFloorBedarf'), 0),
         startFlexBedarf: readNumber(profileData, simKey('startFlexBedarf'), 0),
+        flexBudgetAnnual: readNumber(profileData, simKey('flexBudgetAnnual'), 0),
+        flexBudgetYears: readNumber(profileData, simKey('flexBudgetYears'), 0),
+        flexBudgetRecharge: readNumber(profileData, simKey('flexBudgetRecharge'), 0),
         marketCapeRatio: readNumber(profileData, simKey('marketCapeRatio'), 0),
         risikoprofil: 'sicherheits-dynamisch',
         goldAktiv,
@@ -250,6 +253,15 @@ export function buildSimulatorInputsFromProfileData(profileData) {
     }
     if ((!baseInputs.startFlexBedarf || baseInputs.startFlexBedarf <= 0) && balanceInputs) {
         baseInputs.startFlexBedarf = Number(balanceInputs.flexBedarf) || baseInputs.startFlexBedarf;
+    }
+    if ((!baseInputs.flexBudgetAnnual || baseInputs.flexBudgetAnnual <= 0) && balanceInputs) {
+        baseInputs.flexBudgetAnnual = Number(balanceInputs.flexBudgetAnnual) || baseInputs.flexBudgetAnnual;
+    }
+    if ((!baseInputs.flexBudgetYears || baseInputs.flexBudgetYears <= 0) && balanceInputs) {
+        baseInputs.flexBudgetYears = Number(balanceInputs.flexBudgetYears) || baseInputs.flexBudgetYears;
+    }
+    if ((!baseInputs.flexBudgetRecharge || baseInputs.flexBudgetRecharge <= 0) && balanceInputs) {
+        baseInputs.flexBudgetRecharge = Number(balanceInputs.flexBudgetRecharge) || baseInputs.flexBudgetRecharge;
     }
 
     const strategyInputs = {
@@ -360,6 +372,14 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
     const sumEinstandAlt = sumNumbers(inputsList, i => i.einstandAlt || 0);
     const sumFloor = sumNumbers(inputsList, i => i.startFloorBedarf || 0);
     const sumFlex = sumNumbers(inputsList, i => i.startFlexBedarf || 0);
+    const sumFlexBudgetAnnual = sumNumbers(inputsList, i => i.flexBudgetAnnual || 0);
+    const sumFlexBudgetRecharge = sumNumbers(inputsList, i => i.flexBudgetRecharge || 0);
+    const minFlexBudgetYears = inputsList.reduce((minVal, i) => {
+        const years = Number(i.flexBudgetYears);
+        if (!Number.isFinite(years) || years <= 0) return minVal;
+        if (minVal === null) return years;
+        return Math.min(minVal, years);
+    }, null);
 
     const totalAssets = sumStartVermoegen || (sumDepotwertAlt + sumTagesgeld + sumGeldmarkt);
 
@@ -377,6 +397,9 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
         zielLiquiditaet: sumTagesgeld + sumGeldmarkt,
         startFloorBedarf: sumFloor,
         startFlexBedarf: sumFlex,
+        flexBudgetAnnual: sumFlexBudgetAnnual,
+        flexBudgetRecharge: sumFlexBudgetRecharge,
+        flexBudgetYears: minFlexBudgetYears || 0,
         detailledTranches: mergedTranches.length ? mergedTranches : null,
         startSPB: sumNumbers(inputsList, i => i.startSPB || 0),
         kirchensteuerSatz: weightedAverage(inputsList, i => i.kirchensteuerSatz || 0, i => i.startVermoegen || 0, primaryInputs.kirchensteuerSatz || 0),

@@ -69,6 +69,13 @@ export function buildKeyParams(params = {}) {
             meta: 'Geplante Entnahmedynamik'
         });
     }
+    if (typeof params.minFlexRatePct === 'number' && isFinite(params.minFlexRatePct)) {
+        pushMetric({
+            label: 'Flex-Min-Rate',
+            value: UIUtils.formatPercentValue(params.minFlexRatePct, { fractionDigits: 1, invalid: null }),
+            meta: 'Regime-Mindestwert'
+        });
+    }
 
     if (typeof params.kuerzungProzent === 'number' && isFinite(params.kuerzungProzent)) {
         const trend = params.kuerzungProzent > 0 ? 'down' : params.kuerzungProzent < 0 ? 'up' : 'neutral';
