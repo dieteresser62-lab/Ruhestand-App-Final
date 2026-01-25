@@ -195,3 +195,40 @@ export class ScenarioAnalyzer {
         };
     }
 }
+
+export function extractKeyMetrics(meta = {}) {
+    return {
+        endVermoegen: Number.isFinite(meta.endVermoegen) ? meta.endVermoegen : 0,
+        failed: !!meta.failed,
+        lebensdauer: Number.isFinite(meta.lebensdauer) ? meta.lebensdauer : 0,
+        careEverActive: !!meta.careEverActive,
+        totalCareYears: Number.isFinite(meta.totalCareYears) ? meta.totalCareYears : 0,
+        totalCareCosts: Number.isFinite(meta.totalCareCosts) ? meta.totalCareCosts : 0,
+        maxKuerzung: Number.isFinite(meta.maxKuerzung) ? meta.maxKuerzung : 0,
+        triggeredAge: Number.isFinite(meta.triggeredAge) ? meta.triggeredAge : null,
+        isWidow: !!(meta.isWidow || meta.widowTriggered),
+        isCrash: !!(meta.isCrash || meta.crashTriggered)
+    };
+}
+
+export function analyzeScenario(meta = {}) {
+    const metrics = extractKeyMetrics(meta);
+    const tags = [];
+    if (metrics.careEverActive) tags.push('care');
+    if (metrics.totalCareCosts > 0) tags.push('care_costs');
+    if (metrics.failed) tags.push('failed');
+    if (metrics.triggeredAge !== null && metrics.triggeredAge <= 70) tags.push('early_care');
+    if (metrics.maxKuerzung >= 50) tags.push('severe_cut');
+    if (metrics.isWidow || meta.logDataRows?.some(row => row?.widow === true || row?.witwe === true)) tags.push('widow');
+    if (metrics.isCrash || meta.logDataRows?.some(row => row?.crash === true || String(row?.action || '').includes('Notfall'))) tags.push('crash');
+    return { ...metrics, tags };
+}
+
+export function compareScenarios(a = {}, b = {}) {
+    const ma = extractKeyMetrics(a);
+    const mb = extractKeyMetrics(b);
+    const scoreA = ma.failed ? -1e15 : ma.endVermoegen;
+    const scoreB = mb.failed ? -1e15 : mb.endVermoegen;
+    if (scoreA === scoreB) return 0;
+    return scoreA > scoreB ? 1 : -1;
+}

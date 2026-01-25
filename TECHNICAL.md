@@ -24,7 +24,36 @@ Die Engine besteht aus acht ES-Modulen, die von `build-engine.mjs` zu `engine.js
 
 1. **`engine/validators/InputValidator.mjs`** – prüft sämtliche Eingaben auf Vollständigkeit, Wertebereiche und Konsistenz. Liefert strukturierte Fehlermeldungen.
 2. **`engine/analyzers/MarketAnalyzer.mjs`** – klassifiziert Marktregime, berechnet Drawdowns und leitet Kennzahlen für Guardrails ab.
-3. **`engine/planners/SpendingPlanner.mjs`** – steuert Guardrails, Glättung der Flex-Rate, Alarmstatus, S-Kurven-Dämpfung nach Flex-Anteil, harte Caps (Bär/Runway), Flex-Budget-Cap (Euro-basiert) und erstellt Diagnoseeinträge.
+3. **`engine/planners/SpendingPlanner.mjs`** – steuert Guardrails, Glättung der Flex-Rate, Alarmstatus, S-Kurven-Dämpfung nach Flex-Anteil, harte Caps (Bär/Runway), Flex-Budget-Cap (Euro-basiert) sowie die vermögensbasierte Dämpfung der Flex-Kürzung (abhängig von jährlichem Flex-Bedarf und Gesamtvermögen) und erstellt Diagnoseeinträge.
+
+### Flex-Reduktion: Reihenfolge der Caps/Limits
+
+Das folgende Flussdiagramm zeigt die Reihenfolge, in der die Flex-Rate angepasst und begrenzt wird. Entscheidend ist die Abfolge im `SpendingPlanner` (siehe `determineSpending()`):
+
+```plantuml
+@startuml
+start
+:Start: Inputs + lastState;
+:State initialisieren/laden;
+:Alarmbedingungen evaluieren\n(Quote, Drawdown, Runway,\nVermögensfaktor);
+:Wealth-Reduction-Faktor\n(aus Entnahmequote);
+if (Alarm aktiv?) then (ja)
+  :Alarm-Pfad:\n- Zielkürzung skalieren\n  (min. 35%)\n- Vermögensdämpfung\n- Alarm-Minrate halten;
+else (nein)
+  :Normal-Pfad:\n- Bear-Reduktion\n  (vermögensadj.)\n- Glättung (alpha)\n- Delta-Caps\n  (Up/Down)\n- Flex-Anteil S‑Kurve\n- Harte Caps\n  (Bär/Runway);
+endif
+if (Alarm aktiv?) then (ja)
+  :Guardrails überspringen;
+else (nein)
+  :Guardrails anwenden\n- Recovery-Cap\n- Budget-Floor\n- weitere Guardrails;
+endif
+:Flex-Budget Cap\n- Euro-Topf (Cap)\n- Min-Rate;
+:Finale Rate-Limits\n(Delta Caps + Final-Guardrail);
+:Entnahme berechnen\n+ Quantisierung;
+:Finale Flex-Rate ableiten\n& Ergebnisse bauen;
+stop
+@enduml
+```
 4. **`engine/transactions/TransactionEngine.mjs`** – leitet Ziel-Liquidität ab, steuert Puffer-Schutz und führt **Gap-basiertes Surplus-Rebalancing** (Investition nur bis Ziel-Allokation) durch.
    - Unterteilt in `engine/transactions/transaction-action.mjs`, `transaction-opportunistic.mjs`, `transaction-surplus.mjs`, `sale-engine.mjs` und `transaction-utils.mjs` für Entscheidungslogik, Rebalancing-Pfade, Verkauf/Steuern und Hilfsfunktionen.
 5. **`engine/core.mjs`** – orchestriert die oben genannten Module, exponiert `EngineAPI` (Version 31) und erzeugt Diagnose-/UI-Strukturen.

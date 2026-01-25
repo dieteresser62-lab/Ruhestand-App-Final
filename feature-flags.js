@@ -113,6 +113,50 @@ class FeatureFlags {
     }
 
     /**
+     * Set a generic boolean flag by name.
+     * @param {string} flag
+     * @param {boolean} value
+     */
+    setFlag(flag, value) {
+        if (!(flag in DEFAULT_FLAGS)) {
+            throw new Error(`Unknown feature flag: ${flag}`);
+        }
+        if (flag === 'engineMode') {
+            this.setEngineMode(value);
+            return;
+        }
+        if (typeof value !== 'boolean') {
+            throw new Error(`Flag ${flag} must be a boolean`);
+        }
+        if (flag === 'useWorkers') {
+            this.setUseWorkers(value);
+            return;
+        }
+        if (flag === 'comparisonMode') {
+            this.setComparisonMode(value);
+            return;
+        }
+        this.flags[flag] = value;
+        this.saveToStorage();
+        this.notifyListeners(flag, value);
+    }
+
+    /**
+     * Toggle a boolean flag by name.
+     * @param {string} flag
+     * @returns {boolean}
+     */
+    toggleFlag(flag) {
+        const current = this.flags[flag];
+        if (typeof current !== 'boolean') {
+            throw new Error(`Flag ${flag} is not boolean or does not exist`);
+        }
+        const next = !current;
+        this.setFlag(flag, next);
+        return next;
+    }
+
+    /**
      * Check if comparison mode is active
      * @returns {boolean}
      */
@@ -304,6 +348,19 @@ class FeatureFlags {
 
 // Global singleton instance
 export const featureFlags = new FeatureFlags();
+
+export function getDefaultFlags() {
+    return { ...DEFAULT_FLAGS };
+}
+
+export function isEnabled(flag) {
+    const flags = featureFlags.getAllFlags();
+    return flags[flag] === true;
+}
+
+export function toggleFlag(flag) {
+    return featureFlags.toggleFlag(flag);
+}
 
 // Make available globally for debugging
 if (typeof window !== 'undefined') {

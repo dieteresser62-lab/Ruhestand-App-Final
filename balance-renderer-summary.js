@@ -2,6 +2,29 @@
 
 import { UIUtils } from './balance-utils.js';
 
+export function formatCurrency(value) {
+    return UIUtils.formatCurrency(value);
+}
+
+export function calculateTotals(ui = {}) {
+    const num = (value) => (typeof value === 'number' && isFinite(value)) ? value : 0;
+    return {
+        depotwertGesamt: num(ui.depotwertGesamt),
+        neuerBedarf: num(ui.neuerBedarf),
+        minGold: num(ui.minGold),
+        zielLiquiditaet: num(ui.zielLiquiditaet)
+    };
+}
+
+export function renderSummary(outputs = {}, ui = {}) {
+    const totals = calculateTotals(ui);
+    if (outputs?.depotwert) outputs.depotwert.textContent = formatCurrency(totals.depotwertGesamt);
+    if (outputs?.neuerBedarf) outputs.neuerBedarf.textContent = formatCurrency(totals.neuerBedarf);
+    if (outputs?.minGoldDisplay) outputs.minGoldDisplay.textContent = formatCurrency(totals.minGold);
+    if (outputs?.zielLiquiditaet) outputs.zielLiquiditaet.textContent = formatCurrency(totals.zielLiquiditaet);
+    return totals;
+}
+
 /**
  * Renderer für die Kern-KPIs und Zusammenfassungen.
  * Kapselt sämtliche DOM-Zugriffe rund um die Hauptübersicht und validiert Eingaben defensiv.

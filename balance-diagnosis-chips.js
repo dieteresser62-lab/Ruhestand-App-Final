@@ -2,6 +2,38 @@
 
 import { UIUtils } from './balance-utils.js';
 
+export function formatChipValue(value, formatter, fallback = 'n/a') {
+    if (value === null || value === undefined || value === '') return fallback;
+    if (typeof value === 'number' && !isFinite(value)) return fallback;
+    if (typeof formatter === 'function') return formatter(value);
+    return String(value);
+}
+
+export function getChipColor(value, thresholds = {}) {
+    if (typeof value === 'string') {
+        const normalized = value.toLowerCase();
+        return ['ok', 'warn', 'danger', 'info'].includes(normalized) ? normalized : 'info';
+    }
+    if (typeof value !== 'number' || !isFinite(value)) return 'info';
+    const danger = Number.isFinite(thresholds.danger) ? thresholds.danger : null;
+    const warn = Number.isFinite(thresholds.warn) ? thresholds.warn : null;
+    if (danger !== null && value >= danger) return 'danger';
+    if (warn !== null && value >= warn) return 'warn';
+    return 'ok';
+}
+
+export function createChip(status, label, value, title) {
+    const chip = document.createElement('span');
+    const resolvedStatus = getChipColor(status);
+    chip.className = `diag-chip status-${resolvedStatus}`;
+    chip.title = title || '';
+    const labelEl = document.createElement('span');
+    labelEl.className = 'label';
+    labelEl.textContent = label;
+    chip.append(labelEl, document.createTextNode(formatChipValue(value, null, '')));
+    return chip;
+}
+
 export function buildDiagnosisChips(d) {
     const { entnahmequoteDepot, realerDepotDrawdown } = d.keyParams;
     const {
@@ -40,16 +72,6 @@ Quelle: ${runwaySourceInfo.description}`
         : `Aktuelle Runway basierend auf verfügbaren Barmitteln.
 Quelle: ${runwaySourceInfo.description}`;
 
-    const createChip = (status, label, value, title) => {
-        const chip = document.createElement('span');
-        chip.className = `diag-chip status-${status}`;
-        chip.title = title || '';
-        const labelEl = document.createElement('span');
-        labelEl.className = 'label';
-        labelEl.textContent = label;
-        chip.append(labelEl, document.createTextNode(value));
-        return chip;
-    };
     const fragment = document.createDocumentFragment();
     const formatPercentValue = (value) => UIUtils.formatPercentValue(value, { fractionDigits: 0, invalid: 'n/a' });
     const liquidityChipValue = `${formatPercentValue(deckungVorher)} → ${formatPercentValue(deckungNachher)}`;

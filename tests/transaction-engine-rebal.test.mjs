@@ -1,6 +1,7 @@
-import assert from 'node:assert';
-import { TransactionEngine } from './TransactionEngine.mjs';
-import { CONFIG } from '../config.mjs';
+console.log('--- TransactionEngine Rebal Tests ---');
+
+import TransactionEngine from '../engine/transactions/TransactionEngine.mjs';
+import { CONFIG } from '../engine/config.mjs';
 
 /**
  * TestSuite: Gold Rebalancing Logic
@@ -81,27 +82,20 @@ function runGoldDriftTest() {
         input
     });
 
-    console.log('Action Result:', JSON.stringify(action, null, 2));
-
     // Assertions
-    if (action.type !== 'TRANSACTION') {
-        console.error('FAIL: Keine Transaktion ausgelöst trotz massivem Gold-Überschuss!');
-        process.exit(1);
-    }
+    assertEqual(action.type, 'TRANSACTION', 'Gold Drift: Keine Transaktion trotz massivem Gold-Überschuss');
 
     // Prüfen ob Gold verkauft wird
     // quellen array sollte eintrag mit kind: 'gold' haben
     const goldVerkauf = action.quellen?.find(q => q.kind === 'gold');
-    if (!goldVerkauf || goldVerkauf.netto <= 0) {
-        console.error('FAIL: Transaktion ausgelöst, aber kein Gold verkauft!');
-        process.exit(1);
-    }
+    assert(goldVerkauf && goldVerkauf.netto > 0, 'Gold Drift: Transaktion ohne Gold-Verkauf');
+    assert(action.quellen && action.quellen.length > 0, 'Gold Drift: Quellen sollten gesetzt sein');
+    assert(!action.quellen.some(q => q.kind === 'stock' && q.netto < 0), 'Gold Drift: Keine Aktien-Käufe erwartet');
 
     console.log(`SUCCESS: Gold-Verkauf ausgelöst. Netto: ${goldVerkauf.netto.toLocaleString()} €`);
 }
 
-import { fileURLToPath } from 'url';
+runGoldDriftTest();
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-    runGoldDriftTest();
-}
+console.log('✅ TransactionEngine Rebal tests passed');
+console.log('--- TransactionEngine Rebal Tests Completed ---');

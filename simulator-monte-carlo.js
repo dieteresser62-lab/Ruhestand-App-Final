@@ -57,6 +57,8 @@ function appendArray(target, source) {
     }
 }
 
+export { mergeHeatmap, appendArray };
+
 let globalMonteCarloPool = null;
 let globalMonteCarloPoolSize = 0;
 

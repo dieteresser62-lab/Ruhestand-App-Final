@@ -123,3 +123,22 @@ console.log('--- Profilverbund Balance Tests ---');
     assertEqual(selections[0].sellAmount, 100, 'First tranche should be fully sold');
     assertEqual(selections[1].sellAmount, 50, 'Second tranche should cover remaining amount');
 }
+
+// --- TEST 6: Tranche Selection ignores non-equity + tie-break by date ---
+{
+    console.log('\n📋 Test 6: selectTranchesForSale mixed categories');
+    const tranches = [
+        { marketValue: 100, costBasis: 90, category: 'equity', purchaseDate: '2010-01-01', name: 'A' }, // low tax, older
+        { marketValue: 50, costBasis: 45, category: 'equity', purchaseDate: '2020-01-01', name: 'B' },  // low tax, newer
+        { marketValue: 100, costBasis: 50, category: 'equity', purchaseDate: '2015-01-01', name: 'C' }, // higher tax
+        { marketValue: 80, costBasis: 80, category: 'gold', purchaseDate: '2012-01-01', name: 'Gold' },
+        { marketValue: 60, costBasis: 60, category: 'money_market', purchaseDate: '2011-01-01', name: 'MM' }
+    ];
+
+    const selections = selectTranchesForSale(tranches, 120);
+    assertEqual(selections.length, 2, 'Should use two equity tranches to reach target');
+    assertEqual(selections[0].tranche.name, 'A', 'Lower tax + older tranche should be sold first');
+    assertEqual(selections[1].tranche.name, 'B', 'Second low-tax tranche should fill remaining');
+    assertEqual(selections[0].sellAmount, 100, 'First tranche fully sold');
+    assertEqual(selections[1].sellAmount, 20, 'Second tranche partially sold to reach target');
+}

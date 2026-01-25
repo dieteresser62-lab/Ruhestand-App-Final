@@ -208,4 +208,43 @@ console.log('✅ Budget Floor Protection works');
     console.log('✅ Wealth-adjusted reduction: S-curve matches at 2%');
 }
 
+// --- TEST 10: Alarm + Flex-Budget + Final-Limits interaction ---
+{
+    const params = getBaseParams();
+    params.market.sKey = 'bear_deep';
+    params.market.abstandVomAthProzent = 35;
+    params.runwayMonate = 6;
+    params.lastState.flexRate = 100;
+    params.lastState.alarmActive = false;
+    params.lastState.keyParams.entnahmequoteDepot = 0.10;
+    params.lastState.keyParams.realerDepotDrawdown = 0.40;
+    params.inflatedBedarf = { floor: 24000, flex: 24000 };
+    params.renteJahr = 0;
+    params.depotwertGesamt = 300000;
+    params.gesamtwert = 310000;
+    params.input = {
+        ...params.input,
+        floorBedarf: 24000,
+        flexBedarf: 24000,
+        flexBudgetAnnual: 6000,
+        flexBudgetYears: 2,
+        flexBudgetRecharge: 0
+    };
+
+    const result = SpendingPlanner.determineSpending(params);
+    const flexRate = result.spendingResult.details.flexRate;
+    const decisionSteps = result.diagnosis.decisionTree.map(d => d.step);
+
+    assert(result.diagnosis.general.alarmActive === true, 'Alarm should be active in this scenario');
+    assert(decisionSteps.includes('Flex-Budget (Cap)'), 'Flex-Budget cap should be applied in decision tree');
+    assert(
+        result.spendingResult.kuerzungQuelle.includes('Final-Guardrail') ||
+        result.spendingResult.kuerzungQuelle.includes('Glättung'),
+        'Final limits should cap the extreme cut'
+    );
+    assert(flexRate >= 85 && flexRate <= 100, `Final flex rate should be limited by final caps (got ${flexRate})`);
+
+    console.log('✅ Alarm + Flex-Budget + Final-Limits interaction works');
+}
+
 console.log('--- SpendingPlanner Tests Completed ---');

@@ -1267,8 +1267,10 @@ Ausgabe-Konto erhält Monatsbedarf aus Geldmarkt</pre>
                     </dt>
                     <dd>Fixer Grundbedarf (<strong>Floor</strong>) plus variable Ausgaben (<strong>Flex</strong>). Beide
                         Werte werden im
-                        Jahres-Update indexiert und steuern Runway- und Kapitalfluss-Berechnungen. Beispiel: 1.500 €
-                        Floor + 700 € Flex = 2.200 € Monatsbedarf → 12 Monate Runway = 26.400 € Cash.</dd>
+                        Jahres-Update indexiert und steuern Runway- und Kapitalfluss-Berechnungen. Die Flex-Kürzung
+                        berücksichtigt sowohl die Höhe des jährlichen Flex-Bedarfs als auch das Gesamtvermögen (hohes
+                        Vermögen dämpft die Kürzung). Beispiel: 1.500 € Floor + 700 € Flex = 2.200 € Monatsbedarf → 12
+                        Monate Runway = 26.400 € Cash.</dd>
 
                     <dt><a class="toc-link" data-tab-target="manual" href="#balance-diagnose">Rebalancing-Distanz</a>
                     </dt>

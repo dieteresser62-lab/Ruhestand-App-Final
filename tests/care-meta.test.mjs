@@ -133,4 +133,29 @@ function getCareInputs() {
     console.log('✅ Household Flex Logic (Dual) Passed');
 }
 
+// --- TEST 4: Deterministic Grade Progression ---
+{
+    const inputs = getCareInputs();
+    inputs.pflegeMaxFloor = 3000;
+    const careMeta = makeDefaultCareMeta(true, 'm');
+    careMeta.active = true;
+    careMeta.triggered = true;
+    careMeta.grade = 1;
+    careMeta.gradeLabel = 'Pflegegrad 1';
+    careMeta.currentYearInCare = 1; // allow progression check
+    careMeta.floorAtTrigger = 1000;
+    careMeta.flexAtTrigger = 1000;
+    careMeta.maxFloorAtTrigger = 3000;
+
+    const rand = createMockRng([0.0]); // always progress if probability > 0
+    const yearData = { inflation: 0 };
+
+    const result = updateCareMeta(careMeta, inputs, 81, yearData, rand);
+    assert(result.grade === 2, 'Care grade should progress from 1 to 2 with low RNG');
+    assertClose(result.flexFactor, 0.8, 0.001, 'Flex factor should update to grade 2 config');
+    assertClose(result.mortalityFactor, 1.5, 0.001, 'Mortality factor should update to grade 2 config');
+
+    console.log('✅ Deterministic grade progression passed');
+}
+
 console.log('--- Care Logic Tests Completed ---');

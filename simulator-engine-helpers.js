@@ -206,6 +206,18 @@ function pickIndexFromSampler(rand, sampler, fallbackIndex = 0) {
  * Wählt Marktdaten für das nächste Jahr gemäß der MC-Methode aus
  */
 export function sampleNextYearData(state, methode, blockSize, rand, stressCtx) {
+    if (!Array.isArray(annualData) || annualData.length === 0) {
+        return {
+            jahr: 0,
+            rendite: 0,
+            inflation: 0,
+            zinssatz: 0,
+            lohn: 0,
+            gold_eur_perf: 0,
+            capeRatio: null,
+            regime: 'SIDEWAYS'
+        };
+    }
     const samplerState = state.samplerState;
     const yearSampling = samplerState?.yearSampling || null;
     const allowedIndexSet = yearSampling?.allowedIndexSet || null;

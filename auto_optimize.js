@@ -39,8 +39,10 @@ export async function runAutoOptimize(config) {
         seedsTest,
         constraints,
         maxDauer,
-        onProgress = () => { }
+        onProgress = () => { },
+        evaluateCandidateFn
     } = config;
+    const evaluate = evaluateCandidateFn || evaluateCandidate;
 
     // Prepare historical data
     prepareHistoricalData();
@@ -94,7 +96,7 @@ export async function runAutoOptimize(config) {
         // Parallel evaluation
         const batchResults = await Promise.all(
             batch.map(async (candidate) => {
-                const results = await evaluateCandidate(
+                const results = await evaluate(
                     candidate,
                     baseInputs,
                     quickFilterRuns,
@@ -137,7 +139,7 @@ export async function runAutoOptimize(config) {
                 const candidate = entry.candidate;
 
                 if (!cache.has(candidate)) {
-                    const results = await evaluateCandidate(
+                    const results = await evaluate(
                         candidate,
                         baseInputs,
                         runsPerCandidate,
@@ -194,7 +196,7 @@ export async function runAutoOptimize(config) {
         const batchResults = await Promise.all(
             batch.map(async (candidate) => {
                 if (!cache.has(candidate)) {
-                    const results = await evaluateCandidate(
+                    const results = await evaluate(
                         candidate,
                         baseInputs,
                         runsPerCandidate,
@@ -235,7 +237,7 @@ export async function runAutoOptimize(config) {
     for (let i = 0; i < top3.length; i++) {
         const entry = top3[i];
 
-        const testResults = await evaluateCandidate(
+        const testResults = await evaluate(
             entry.candidate,
             baseInputs,
             runsPerCandidate,
@@ -303,7 +305,7 @@ export async function runAutoOptimize(config) {
         currentConfig.maxBearRefillPct = baseInputs.maxBearRefillPctOfEq || 50;
     }
 
-    const currentResults = await evaluateCandidate(
+    const currentResults = await evaluate(
         currentConfig,
         baseInputs,
         runsPerCandidate,

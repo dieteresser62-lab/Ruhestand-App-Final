@@ -1,6 +1,7 @@
-import assert from 'node:assert';
-import TransactionEngine from './TransactionEngine.mjs';
-import { CONFIG } from '../config.mjs';
+console.log('--- TransactionEngine ATH Tests ---');
+
+import TransactionEngine from '../engine/transactions/TransactionEngine.mjs';
+import { CONFIG } from '../engine/config.mjs';
 
 /**
  * Prüft das Verhalten der TransactionEngine im ATH/Peak-Stable-Regime.
@@ -71,12 +72,14 @@ function runAthRegimeGapTest() {
 
     // Erwartung: Bei ATH ohne Runway-Lücke (27 Monate > 24 Minimum) → Opportunistisches Rebalancing
     // NICHT Runway-Notfüllung, da ATH der optimale Zeitpunkt für normale Auffüllung ist.
-    assert.strictEqual(action.type, 'TRANSACTION');
-    assert.ok(!action.title.includes('Notfüllung'), 'Bei ATH ohne Runway-Lücke sollte KEINE Notfüllung erfolgen.');
-    assert.ok(action.title.includes('Auffüllen') || action.title.includes('Rebalancing') || action.title.startsWith('Aktien'),
-        'Bei ATH sollte opportunistisches Rebalancing/Auffüllen aktiv sein: ' + action.title);
+    assertEqual(action.type, 'TRANSACTION', 'ATH: Action type should be TRANSACTION');
+    assert(!action.title.includes('Notfüllung'), 'ATH: Bei ATH ohne Runway-Lücke sollte KEINE Notfüllung erfolgen.');
+    assert(action.title.includes('Auffüllen') || action.title.includes('Rebalancing') || action.title.startsWith('Aktien'),
+        'ATH: Opportunistisches Rebalancing/Auffüllen sollte aktiv sein: ' + action.title);
     // Prüfe dass Liquidität aufgefüllt wird
-    assert.ok(action.verwendungen?.liquiditaet > 0, 'Liquidität sollte aufgefüllt werden.');
+    assert(action.verwendungen?.liquiditaet > 0, 'ATH: Liquidität sollte aufgefüllt werden.');
+    assert(action.quellen && action.quellen.length > 0, 'ATH: Quellen sollten gesetzt sein');
+    assert(!Number.isNaN(action.verwendungen?.liquiditaet), 'ATH: Liquidität darf nicht NaN sein');
 }
 
 /**
@@ -138,24 +141,15 @@ function runGuardrailCliffTest() {
     });
 
     // Bei ATH ohne Runway-Lücke sollte opportunistisches Rebalancing greifen
-    assert.ok(!action.title.includes('Notfüllung'), 'Bei ATH ohne Runway-Lücke sollte KEINE Notfüllung erfolgen.');
-    assert.strictEqual(action.type, 'TRANSACTION');
+    assert(!action.title.includes('Notfüllung'), 'ATH Guardrail: Keine Notfüllung bei ATH ohne Runway-Lücke.');
+    assertEqual(action.type, 'TRANSACTION', 'ATH Guardrail: Action type should be TRANSACTION');
     // Liquidität wird aufgefüllt (52k Gap zum Ziel)
-    assert.ok(action.verwendungen?.liquiditaet > 0, 'Liquidität sollte aufgefüllt werden.');
+    assert(action.verwendungen?.liquiditaet > 0, 'ATH Guardrail: Liquidität sollte aufgefüllt werden.');
+    assert(action.quellen && action.quellen.length > 0, 'ATH Guardrail: Quellen sollten gesetzt sein');
 }
 
-import { fileURLToPath } from 'url';
+runAthRegimeGapTest();
+runGuardrailCliffTest();
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-    try {
-        runAthRegimeGapTest();
-        runGuardrailCliffTest();
-        console.log('✅ ATH-Regime-Tests: Bei ATH ohne Runway-Lücke greift opportunistisches Rebalancing.');
-    } catch (error) {
-        console.error('❌ ATH-Regime-Test fehlgeschlagen:', error.message);
-        process.exit(1);
-    }
-}
-
-export { runAthRegimeGapTest, runGuardrailCliffTest };
-export default { runAthRegimeGapTest, runGuardrailCliffTest };
+console.log('✅ TransactionEngine ATH tests passed');
+console.log('--- TransactionEngine ATH Tests Completed ---');
