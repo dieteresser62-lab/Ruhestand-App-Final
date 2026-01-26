@@ -51,7 +51,7 @@ Für steueroptimierte Verkäufe benötigt die Suite Ihre Depot-Positionen mit Ka
    - Steueroptimale Verkaufsreihenfolge
    - Teilfreistellung (30% für Aktienfonds, 15% für Mischfonds)
 
-> **Ohne Tranchen:** Die Suite funktioniert auch ohne Tranchen-Details, nutzt dann aber pauschale Steuerannahmen statt optimierter Berechnung.
+> **Wichtig:** Die Tranchen-Pflege ist erforderlich. Die Suite nutzt diese Daten für alle Steuerberechnungen und Entnahmeempfehlungen.
 
 ### 3. Grunddaten im Profil speichern
 
@@ -153,7 +153,7 @@ Ja, per Export (JSON) und Import auf dem anderen Gerät.
 Die Monte-Carlo-Simulation nutzt 100 Jahre historische Daten (1925-2025). Das Ergebnis zeigt Wahrscheinlichkeiten, keine Garantien.
 
 **Muss ich Tranchen pflegen?**
-Nein, aber es lohnt sich. Mit Tranchen berechnet die Suite steueroptimierte Verkaufsreihenfolgen. Ohne Tranchen werden pauschale Steuerannahmen verwendet.
+Ja. Die Suite benötigt Ihre Depot-Positionen mit Kaufdaten für korrekte Steuerberechnungen (FIFO, Teilfreistellung) und Entnahmeempfehlungen.
 
 **Wie funktioniert der Profilverbund für Paare?**
 Jeder Partner hat ein eigenes Profil mit separatem Depot und Renten. Der Verbund aggregiert die Vermögen und verteilt Entnahmen optimal (steueroptimiert, proportional oder runway-first).
