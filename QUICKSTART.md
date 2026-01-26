@@ -2,7 +2,17 @@
 
 Schnelleinstieg für Einzelpersonen und Paare zur Entnahmeplanung im Ruhestand.
 
+
 ---
+
+## Voraussetzungen
+
+*   **Betriebssystem:** Windows 10/11
+*   **Browser:** Ein aktueller Chrome, Edge oder Firefox
+*   **Optional:** [Node.js](https://nodejs.org/) (nur erforderlich für Online-Kursdaten via Yahoo-Proxy)
+
+---
+
 
 ## Start in 2 Minuten
 

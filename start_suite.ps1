@@ -108,7 +108,7 @@ $proxyScript = Join-Path $Root "tools\yahoo-proxy.cjs"
 if (Test-Path $proxyScript) {
     Write-Host "Starte Yahoo-Proxy auf Port $ProxyPort..." -ForegroundColor Gray
     try {
-        $proxyProcess = Start-Process -FilePath "node" -ArgumentList $proxyScript -PassThru -WindowStyle Minimized -ErrorAction Stop
+        $proxyProcess = Start-Process -FilePath "node" -ArgumentList "`"$proxyScript`"" -PassThru -WindowStyle Minimized -ErrorAction Stop
         Start-Sleep -Milliseconds 500
         if ($proxyProcess -and !$proxyProcess.HasExited) {
             Write-Host "  Yahoo-Proxy gestartet (PID: $($proxyProcess.Id))" -ForegroundColor DarkGray
