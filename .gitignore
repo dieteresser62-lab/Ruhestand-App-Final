@@ -28,3 +28,4 @@ dist/
 
 # Executables
 *.exe
+!RuheStandSuite.exe
