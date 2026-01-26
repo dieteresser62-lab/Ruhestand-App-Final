@@ -22,6 +22,50 @@ Schnelleinstieg für Einzelpersonen und Paare zur Entnahmeplanung im Ruhestand.
 
 ---
 
+## Vorarbeit: Profile und Tranchen einrichten
+
+Bevor Sie mit der eigentlichen Planung beginnen, sollten Sie Ihre Daten einmalig konfigurieren.
+
+### 1. Profil anlegen (index.html)
+
+Die Startseite (`index.html`) ist die zentrale Profilverwaltung:
+
+1. **Neues Profil erstellen:** Name eingeben (z.B. "Dieter" oder "Haushalt")
+2. **Bei Paaren:** Separate Profile für jeden Partner anlegen, oder ein gemeinsames Profil
+3. **Profilverbund:** Mehrere Profile können für gemeinsame Auswertung kombiniert werden
+
+> **Tipp:** Für Paare mit getrennten Depots empfiehlt sich je ein Profil pro Person.
+
+### 2. Depot-Tranchen erfassen (Tranchen-Manager)
+
+Für steueroptimierte Verkäufe benötigt die Suite Ihre Depot-Positionen mit Kaufdaten:
+
+1. **Tranchen-Manager** über die Startseite oder Balance-App öffnen
+2. Pro Position eingeben:
+   - **Wertpapier** (z.B. "VWCE")
+   - **Kaufdatum** (für FIFO-Berechnung)
+   - **Kaufkurs** und **Stückzahl**
+   - **Aktueller Kurs** (kann per Yahoo-Proxy aktualisiert werden)
+3. Die Suite berechnet automatisch:
+   - Unrealisierte Gewinne/Verluste
+   - Steueroptimale Verkaufsreihenfolge
+   - Teilfreistellung (30% für Aktienfonds, 15% für Mischfonds)
+
+> **Ohne Tranchen:** Die Suite funktioniert auch ohne Tranchen-Details, nutzt dann aber pauschale Steuerannahmen statt optimierter Berechnung.
+
+### 3. Grunddaten im Profil speichern
+
+In der Balance-App einmalig hinterlegen:
+
+- **Vermögenswerte:** Depotwert, Tagesgeld, sonstige Liquidität
+- **Jährlicher Bedarf:** Floor (Grundbedarf) und Flex (optional)
+- **Renten:** Betrag, Startjahr, Indexierung
+- **Steuereinstellungen:** Kirchensteuer ja/nein, Sparer-Pauschbetrag
+
+Diese Daten werden im localStorage gespeichert und stehen bei jedem Start zur Verfügung.
+
+---
+
 ## Erste Schritte
 
 ### Balance-App (jährliche Planung)
@@ -107,6 +151,12 @@ Ja, per Export (JSON) und Import auf dem anderen Gerät.
 
 **Wie genau ist die Simulation?**
 Die Monte-Carlo-Simulation nutzt 100 Jahre historische Daten (1925-2025). Das Ergebnis zeigt Wahrscheinlichkeiten, keine Garantien.
+
+**Muss ich Tranchen pflegen?**
+Nein, aber es lohnt sich. Mit Tranchen berechnet die Suite steueroptimierte Verkaufsreihenfolgen. Ohne Tranchen werden pauschale Steuerannahmen verwendet.
+
+**Wie funktioniert der Profilverbund für Paare?**
+Jeder Partner hat ein eigenes Profil mit separatem Depot und Renten. Der Verbund aggregiert die Vermögen und verteilt Entnahmen optimal (steueroptimiert, proportional oder runway-first).
 
 ---
 
