@@ -1,5 +1,5 @@
 @echo off
-REM Startet die Ruhestand-App-Suite über den Node.js-basierten http-server.
+REM Startet die Ruhestand-Suite (Webserver + Yahoo-Proxy fuer Online-Kurse).
 REM Dieses Wrapper-Skript delegiert die eigentliche Logik an start_webserver.ps1.
 REM Aus Sicherheitsgründen nutzen wir ExecutionPolicy RemoteSigned statt Bypass.
 
@@ -15,7 +15,7 @@ if %ERRORLEVEL% NEQ 0 (
     pause
 ) else (
     echo.
-    echo Startvorgang abgeschlossen. Dieses Fenster kann geschlossen werden, wenn der Server laeuft.
+    echo Suite gestartet. Dieses Fenster kann geschlossen werden.
     timeout /t 5
 )
 endlocal & exit /b %EXIT_CODE%
