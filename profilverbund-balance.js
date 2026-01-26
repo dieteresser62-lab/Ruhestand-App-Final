@@ -210,11 +210,23 @@ export function loadProfilverbundProfiles() {
         const overrides = parseProfileOverrides(data);
         const normalized = normalizeBalanceInputs(balanceState?.inputs, overrides);
         if (!normalized) return null;
+        const tranches = parseTranches(data);
+        const split = resolveTrancheSplitTotals(tranches);
+        const hasTranches = tranches.length > 0 && (split.altValue + split.neuValue + split.goldValue + split.moneyValue) > 0;
+        if (hasTranches) {
+            normalized.depotwertAlt = split.altValue;
+            normalized.depotwertNeu = split.neuValue;
+            normalized.goldWert = split.goldValue;
+            normalized.geldmarktEtf = split.moneyValue;
+            normalized.costBasisAlt = split.altCost;
+            normalized.costBasisNeu = split.neuCost;
+            normalized.goldCost = split.goldCost;
+        }
         return {
             profileId: meta.id,
             name: meta.name || meta.id,
             inputs: normalized,
-            tranches: parseTranches(data),
+            tranches,
             balanceState
         };
     }).filter(Boolean);

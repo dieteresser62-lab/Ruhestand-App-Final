@@ -15,6 +15,7 @@ import { initTranchenStatus, syncTranchenToInputs } from './depot-tranchen-statu
 import { loadProfilverbundProfiles } from './profilverbund-balance.js';
 import { createProfilverbundHandlers } from './balance-main-profilverbund.js';
 import { createProfileSyncHandlers } from './balance-main-profile-sync.js';
+import { shouldResetGuardrailState } from './balance-guardrail-reset.js';
 
 // ==================================================================================
 // APPLICATION STATE & DOM REFERENCES
@@ -172,7 +173,9 @@ function update() {
         // Die externe Engine (engine.js) berechnet alle Werte
         // Input: Benutzereingaben + letzter State
         // Output: {input, newState, diagnosis, ui} oder {error}
-        const modelResult = window.EngineAPI.simulateSingleYear(inputData, persistentState.lastState);
+        const shouldResetState = shouldResetGuardrailState(persistentState.inputs, inputData);
+        const lastState = shouldResetState ? null : persistentState.lastState;
+        const modelResult = window.EngineAPI.simulateSingleYear(inputData, lastState);
 
         // 4. Handle Engine Response
         // Bei Fehler: Exception werfen für einheitliches Error-Handling

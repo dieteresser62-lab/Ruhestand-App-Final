@@ -11,6 +11,7 @@ import {
     buildProfilverbundProfileSummaries
 } from './profilverbund-balance.js';
 import { renderProfilverbundProfileSelector, toggleProfilverbundMode } from './profilverbund-balance-ui.js';
+import { shouldResetGuardrailState } from './balance-guardrail-reset.js';
 
 export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS }) {
     const refreshProfilverbundBalance = () => {
@@ -71,7 +72,8 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
     const runProfilverbundProfileSimulations = (sharedInput, profiles) => {
         const runs = profiles.map(entry => {
             const input = buildProfileEngineInput(sharedInput, entry);
-            const lastState = entry?.balanceState?.lastState || null;
+            const prevInputs = entry?.balanceState?.inputs || null;
+            const lastState = shouldResetGuardrailState(prevInputs, input) ? null : (entry?.balanceState?.lastState || null);
             const result = window.EngineAPI.simulateSingleYear(input, lastState);
             if (result?.error) {
                 throw result.error;
