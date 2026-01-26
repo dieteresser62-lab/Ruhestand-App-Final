@@ -7,7 +7,7 @@ powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 8000 -ErrorActio
 REM Yahoo-Proxy (Port 8787)
 powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 8787 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | Where-Object { $_ -gt 4 } | ForEach-Object { Stop-Process -Id $_ -Force; Write-Host 'Proxy-Prozess' $_ 'wurde terminiert.' -ForegroundColor Red }"
 REM Ghost-Prozesse
-powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*start_webserver.ps1*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force; Write-Host 'Ghost-Prozess' $_.ProcessId 'terminiert.' -ForegroundColor Red }"
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*start_suite.ps1*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force; Write-Host 'Ghost-Prozess' $_.ProcessId 'terminiert.' -ForegroundColor Red }"
 
 echo.
 echo Alles sauber.

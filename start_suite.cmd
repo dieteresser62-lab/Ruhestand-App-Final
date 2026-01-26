@@ -5,7 +5,7 @@ REM Aus Sicherheitsgründen nutzen wir ExecutionPolicy RemoteSigned statt Bypass
 
 setlocal
 set "SCRIPT_DIR=%~dp0"
-set "PS_SCRIPT=%SCRIPT_DIR%start_webserver.ps1"
+set "PS_SCRIPT=%SCRIPT_DIR%start_suite.ps1"
 
 powershell.exe -NoLogo -NoProfile -ExecutionPolicy RemoteSigned -File "%PS_SCRIPT%"
 set "EXIT_CODE=%ERRORLEVEL%"
