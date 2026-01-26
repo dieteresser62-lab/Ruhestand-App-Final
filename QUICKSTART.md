@@ -81,12 +81,13 @@ Alle Profildaten werden im localStorage gespeichert und stehen bei jedem Start z
 ### Balance-App (jährliche Planung)
 
 1. **Balance.html** öffnen
-2. Grunddaten eingeben:
-   - Gesamtvermögen (Depot + Liquidität)
-   - Jährlicher Bedarf (Floor = Grundbedarf, Flex = optionale Ausgaben)
-   - Rente(n) und Startjahr
-3. **Berechnen** klicken → Entnahmeempfehlung erscheint
-4. Diagnose-Tab zeigt Erklärungen zu allen Berechnungsschritten
+2. Tab "Jahres-Update":
+   - **Vermögen prüen:** Die Werte (Depot, Tagesgeld) sind schreibgeschützt und kommen direkt aus dem Profil.
+   - **Jahres-Update starten:** Button klicken für Online-Daten und Jahreswechsel.
+3. Tab "Grundeinstellungen & Strategie":
+   - **Bedarf anpassen:** Floor (Grundbedarf) und Flex (optional) hier einstellen.
+4. **Ergebnis lesen:** Die Entnahmeempfehlung wird **automatisch** und sofort rechts angezeigt (kein "Berechnen"-Button nötig).
+5. Diagnose-Tab zeigt Erklärungen zu allen Berechnungsschritten.
 
 ### Simulator (Was-wäre-wenn)
 
