@@ -40,7 +40,7 @@ Bevor Sie mit der eigentlichen Planung beginnen, müssen Sie Ihr Profil einricht
 
 Die Startseite (`index.html`) ist die zentrale Profilverwaltung:
 
-1. **Neues Profil erstellen:** Name eingeben (z.B. "Dieter" oder "Haushalt")
+1. **Neues Profil erstellen:** Name eingeben (z.B. "Max" oder "Haushalt")
 2. **Bei Paaren:** Separate Profile für jeden Partner anlegen
 3. **Profilverbund:** Mehrere Profile können für gemeinsame Auswertung kombiniert werden
 
@@ -48,12 +48,12 @@ Die Startseite (`index.html`) ist die zentrale Profilverwaltung:
 
 ### 2. Profil-Stammdaten erfassen
 
-In der Balance-App die Grunddaten hinterlegen:
+Im Profil-Assets Manager die Stammdaten hinterlegen:
 
-- **Vermögenswerte:** Depotwert, Tagesgeld, sonstige Liquidität
-- **Jährlicher Bedarf:** Floor (Grundbedarf) und Flex (optional)
-- **Renten:** Betrag, Startjahr, Indexierung
-- **Steuereinstellungen:** Kirchensteuer ja/nein, Sparer-Pauschbetrag
+- **Vermögenswerte:** Tagesgeld (als Liquiditätsreserve)
+- **Renten & Einkünfte:** Monatliche Renten, Status (aktiv/inaktiv) und sonstige Einkünfte
+- **Gold-Strategie:** Optionaler Gold-Anteil und Rebalancing-Band
+
 
 ### 3. Depot-Tranchen erfassen (Tranchen-Manager)
 
