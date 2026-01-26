@@ -157,16 +157,20 @@ Ruhestand-App-Final/
 ### Option 2: Browser-basierte Nutzung
 
 1. Repository klonen oder herunterladen.
-2. `Balance.html` bzw. `Simulator.html` im Browser öffnen.
+2. **Suite starten:** Doppelklick auf `start_suite.cmd` (Windows).
+   * Startet automatisch den lokalen Webserver (Port 8000) und den Yahoo-Proxy für Online-Kurse (Port 8787).
+   * Öffnet den Browser mit der Startseite.
+   * Beim Schließen (Ctrl+C oder Fenster schließen) werden beide Prozesse sauber beendet.
+3. `Balance.html` bzw. `Simulator.html` im Browser aufrufen.
    * Getestet mit Chromium-basierten Browsern und Firefox.
    * Keine Build-Schritte nötig.
-3. Optional: `npm run build:engine` ausführen, wenn Änderungen in `engine/` vorgenommen wurden. Dadurch wird `engine.js` aktualisiert (esbuild-Bundle oder Modul-Fallback).
-4. Für lokale Aufrufe bitte den mitgelieferten Entwicklungsserver nutzen, damit `.mjs`-Module korrekt als JavaScript ausgeliefert werden:
-   * Windows: `index_start.bat` starten (ruft intern `python dev_server.py --port 8000 --bind 127.0.0.1 --directory .` auf).
-   * Manuell: `python dev_server.py --port 8000 --bind 127.0.0.1 --directory .`
-   * Hintergrund: Einige Python-Versionen (z. B. 3.14) geben `engine/index.mjs` sonst mit falschem MIME-Type aus, wodurch die Engine nicht geladen wird.
+4. Optional: `npm run build:engine` ausführen, wenn Änderungen in `engine/` vorgenommen wurden. Dadurch wird `engine.js` aktualisiert (esbuild-Bundle oder Modul-Fallback).
 
-> **Hinweis:** Einige Funktionen (Snapshots, Dateiimporte) benötigen Browser mit File-System-Access-Unterstützung.
+**Weitere Skripte:**
+* `stop_suite.cmd` – Beendet eventuell noch laufende Server-Prozesse (Webserver und Proxy).
+* Manuell ohne Proxy: `python dev_server.py --port 8000` (Online-Kurse dann nicht verfügbar).
+
+> **Hinweis:** Einige Funktionen (Snapshots, Dateiimporte) benötigen Browser mit File-System-Access-Unterstützung. Der Yahoo-Proxy benötigt Node.js; ohne Node.js läuft die Suite trotzdem, jedoch ohne Online-Kursabruf.
 
 ---
 

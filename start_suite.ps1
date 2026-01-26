@@ -1,10 +1,11 @@
 <#
-    Startskript fuer die Ruhestand-App-Suite (Native .NET HttpListener Version)
-    
+    Startskript fuer die Ruhestand-Suite (Native .NET HttpListener Version)
+
     Features:
+    - Startet Webserver und Yahoo-Proxy gemeinsam
     - Zombie-Prozess-Killer vor dem Start
     - Sauberer HttpListener mit korrektem Shutdown
-    - Graceful Exit bei Ctrl+C
+    - Graceful Exit bei Ctrl+C (beendet beide Prozesse)
     - Directory Traversal Protection
 #>
 
@@ -94,15 +95,40 @@ function Get-MimeType {
 
 # --- MAIN ---
 
-# 1. Zombies beseitigen
+# 1. Zombies beseitigen (Webserver)
 Stop-ZombiesOnPort -TargetPort $Port
 
-# 2. HttpListener erstellen
+# 2. Yahoo-Proxy starten
+$ProxyPort = 8787
+Stop-ZombiesOnPort -TargetPort $ProxyPort
+
+$proxyProcess = $null
+$proxyScript = Join-Path $Root "tools\yahoo-proxy.cjs"
+
+if (Test-Path $proxyScript) {
+    Write-Host "Starte Yahoo-Proxy auf Port $ProxyPort..." -ForegroundColor Gray
+    try {
+        $proxyProcess = Start-Process -FilePath "node" -ArgumentList $proxyScript -PassThru -WindowStyle Minimized -ErrorAction Stop
+        Start-Sleep -Milliseconds 500
+        if ($proxyProcess -and !$proxyProcess.HasExited) {
+            Write-Host "  Yahoo-Proxy gestartet (PID: $($proxyProcess.Id))" -ForegroundColor DarkGray
+        } else {
+            Write-Host "  Yahoo-Proxy konnte nicht gestartet werden (Node.js installiert?)" -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "  Yahoo-Proxy Start fehlgeschlagen: $_" -ForegroundColor Yellow
+        Write-Host "  (Online-Kurse nicht verfuegbar, App funktioniert trotzdem)" -ForegroundColor DarkGray
+    }
+} else {
+    Write-Host "Yahoo-Proxy nicht gefunden, ueberspringe..." -ForegroundColor DarkGray
+}
+
+# 4. HttpListener erstellen
 $listener = [System.Net.HttpListener]::new()
 $listener.Prefixes.Add("http://localhost:$Port/")
 
 try {
-    # 3. Server starten
+    # 5. Server starten
     $listener.Start()
     
     Write-Host ""
@@ -114,11 +140,11 @@ try {
     Write-Host "Druecke Ctrl+C um den Server zu stoppen." -ForegroundColor Yellow
     Write-Host ""
 
-    # 4. Browser oeffnen
+    # 6. Browser oeffnen
     Start-Sleep -Milliseconds 300
     Open-DefaultBrowser -Url "http://localhost:$Port/index.html"
 
-    # 5. Request-Loop
+    # 7. Request-Loop
     while ($listener.IsListening) {
         try {
             $context = $listener.GetContext()
@@ -192,8 +218,19 @@ catch {
 }
 finally {
     Write-Host ""
-    Write-Host "Server wird beendet..." -ForegroundColor Yellow
-    
+    Write-Host "Suite wird beendet..." -ForegroundColor Yellow
+
+    # Yahoo-Proxy beenden
+    if ($proxyProcess -and !$proxyProcess.HasExited) {
+        try {
+            Stop-Process -Id $proxyProcess.Id -Force -ErrorAction Stop
+            Write-Host "Yahoo-Proxy beendet." -ForegroundColor Green
+        } catch {
+            Write-Host "Yahoo-Proxy konnte nicht beendet werden: $_" -ForegroundColor Yellow
+        }
+    }
+
+    # HttpListener beenden
     if ($listener) {
         if ($listener.IsListening) {
             $listener.Stop()
