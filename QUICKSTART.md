@@ -22,23 +22,32 @@ Schnelleinstieg für Einzelpersonen und Paare zur Entnahmeplanung im Ruhestand.
 
 ---
 
-## Vorarbeit: Profile und Tranchen einrichten
+## Vorarbeit: Profil pflegen
 
-Bevor Sie mit der eigentlichen Planung beginnen, sollten Sie Ihre Daten einmalig konfigurieren.
+Bevor Sie mit der eigentlichen Planung beginnen, müssen Sie Ihr Profil einrichten. Ein Profil besteht aus zwei Teilen: den Stammdaten und den Depot-Tranchen.
 
 ### 1. Profil anlegen (index.html)
 
 Die Startseite (`index.html`) ist die zentrale Profilverwaltung:
 
 1. **Neues Profil erstellen:** Name eingeben (z.B. "Dieter" oder "Haushalt")
-2. **Bei Paaren:** Separate Profile für jeden Partner anlegen, oder ein gemeinsames Profil
+2. **Bei Paaren:** Separate Profile für jeden Partner anlegen
 3. **Profilverbund:** Mehrere Profile können für gemeinsame Auswertung kombiniert werden
 
 > **Tipp:** Für Paare mit getrennten Depots empfiehlt sich je ein Profil pro Person.
 
-### 2. Depot-Tranchen erfassen (Tranchen-Manager)
+### 2. Profil-Stammdaten erfassen
 
-Für steueroptimierte Verkäufe benötigt die Suite Ihre Depot-Positionen mit Kaufdaten:
+In der Balance-App die Grunddaten hinterlegen:
+
+- **Vermögenswerte:** Depotwert, Tagesgeld, sonstige Liquidität
+- **Jährlicher Bedarf:** Floor (Grundbedarf) und Flex (optional)
+- **Renten:** Betrag, Startjahr, Indexierung
+- **Steuereinstellungen:** Kirchensteuer ja/nein, Sparer-Pauschbetrag
+
+### 3. Depot-Tranchen erfassen (Tranchen-Manager)
+
+Die Tranchen sind Teil des Profils und erforderlich für korrekte Steuerberechnungen:
 
 1. **Tranchen-Manager** über die Startseite oder Balance-App öffnen
 2. Pro Position eingeben:
@@ -53,16 +62,7 @@ Für steueroptimierte Verkäufe benötigt die Suite Ihre Depot-Positionen mit Ka
 
 > **Wichtig:** Die Tranchen-Pflege ist erforderlich. Die Suite nutzt diese Daten für alle Steuerberechnungen und Entnahmeempfehlungen.
 
-### 3. Grunddaten im Profil speichern
-
-In der Balance-App einmalig hinterlegen:
-
-- **Vermögenswerte:** Depotwert, Tagesgeld, sonstige Liquidität
-- **Jährlicher Bedarf:** Floor (Grundbedarf) und Flex (optional)
-- **Renten:** Betrag, Startjahr, Indexierung
-- **Steuereinstellungen:** Kirchensteuer ja/nein, Sparer-Pauschbetrag
-
-Diese Daten werden im localStorage gespeichert und stehen bei jedem Start zur Verfügung.
+Alle Profildaten werden im localStorage gespeichert und stehen bei jedem Start zur Verfügung.
 
 ---
 
