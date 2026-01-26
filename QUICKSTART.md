@@ -95,9 +95,11 @@ Alle Profildaten werden im localStorage gespeichert und stehen bei jedem Start z
 1. **Simulator.html** öffnen
 2. Tab "Rahmendaten":
    - **Profile wählen:** Gewünschte Profile für die Simulation aktivieren.
-   - **Werte prüfen:** Automatisch geladene Summen (Vermögen, Renten) kontrollieren.
-3. Tab "Monte-Carlo": **Simulation starten** klicken
-4. Ergebnis: Erfolgswahrscheinlichkeit und Szenario-Analyse
+   - **Bedarf pflegen:** **Floor** (Muss-Ausgaben) und **Flex** (Wunsch-Ausgaben) prüfen und anpassen.
+   - **Personen prüfen:** Rentenhöhe und Startalter kontrollieren (Sektion "Personen & Rente").
+3. Tab "Monte-Carlo": **Simulation starten** klicken für die Monte-Carlo-Prognose.
+4. Tab "Backtesting": **Historische Simulation** für einen Realitätscheck gegen historische Marktdaten.
+5. Ergebnis: Erfolgswahrscheinlichkeit und detaillierte Szenario-Analysen.
 
 ---
 
