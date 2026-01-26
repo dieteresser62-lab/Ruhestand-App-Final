@@ -81,7 +81,8 @@ Alle Profildaten werden im localStorage gespeichert und stehen bei jedem Start z
 ### Balance-App (jährliche Planung)
 
 1. **Balance.html** öffnen
-2. Tab "Jahres-Update":
+2. **Profil wählen:** Oben links die gewünschten Profile aktivieren (bei Paaren ggf. beide).
+3. Tab "Jahres-Update":
    - **Vermögen prüen:** Die Werte (Depot, Tagesgeld) sind schreibgeschützt und kommen direkt aus dem Profil.
    - **Jahres-Update starten:** Button klicken für Online-Daten und Jahreswechsel.
 3. Tab "Grundeinstellungen & Strategie":
@@ -92,7 +93,9 @@ Alle Profildaten werden im localStorage gespeichert und stehen bei jedem Start z
 ### Simulator (Was-wäre-wenn)
 
 1. **Simulator.html** öffnen
-2. Tab "Rahmendaten": Vermögen, Bedarf und Renten eintragen
+2. Tab "Rahmendaten":
+   - **Profile wählen:** Gewünschte Profile für die Simulation aktivieren.
+   - **Werte prüfen:** Automatisch geladene Summen (Vermögen, Renten) kontrollieren.
 3. Tab "Monte-Carlo": **Simulation starten** klicken
 4. Ergebnis: Erfolgswahrscheinlichkeit und Szenario-Analyse
 
