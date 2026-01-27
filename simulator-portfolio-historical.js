@@ -1,3 +1,10 @@
+/**
+ * Module: Simulator Portfolio Historical
+ * Purpose: Preparing and analyzing historical market data.
+ *          Calculates returns, inflation, and market regimes from raw data.
+ * Usage: Called by simulator-portfolio.js facade.
+ * Dependencies: simulator-data.js
+ */
 "use strict";
 
 import { HISTORICAL_DATA, annualData, REGIME_DATA, REGIME_TRANSITIONS } from './simulator-data.js';
@@ -13,6 +20,7 @@ export function prepareHistoricalData() {
         const cur = HISTORICAL_DATA[y], vj = HISTORICAL_DATA[prev];
         if (!cur || !vj) continue;
 
+        // Equity returns are based on MSCI EUR year-over-year changes.
         const m1 = Number(cur.msci_eur);
         const m0 = Number(vj.msci_eur);
         if (!isFinite(m0) || !isFinite(m1)) {
@@ -23,6 +31,7 @@ export function prepareHistoricalData() {
         let rendite = (m0 > 0) ? (m1 - m0) / m0 : 0;
         if (!isFinite(rendite)) rendite = 0;
 
+        // Use previous-year macro values to align returns with inflation/interest.
         const dataPoint = {
             jahr: y,
             rendite: rendite,
@@ -34,6 +43,7 @@ export function prepareHistoricalData() {
 
         annualData.push(dataPoint);
         const realRendite = rendite * 100 - dataPoint.inflation;
+        // Regime is a coarse classification used for sampling and stress logic.
         let regime = (dataPoint.inflation > 4 && realRendite < 0) ? 'STAGFLATION' : (rendite > 0.15) ? 'BULL' : (rendite < -0.10) ? 'BEAR' : 'SIDEWAYS';
         dataPoint.regime = regime;
         if (!REGIME_DATA[regime]) REGIME_DATA[regime] = [];
@@ -43,6 +53,7 @@ export function prepareHistoricalData() {
     regimes.forEach(from => { REGIME_TRANSITIONS[from] = { BULL: 0, BEAR: 0, SIDEWAYS: 0, STAGFLATION: 0, total: 0 }; });
     for (let i = 1; i < annualData.length; i++) {
         const fromRegime = annualData[i - 1].regime, toRegime = annualData[i].regime;
+        // Transition counts feed the Markov regime sampler.
         if (fromRegime && toRegime) { REGIME_TRANSITIONS[fromRegime][toRegime]++; REGIME_TRANSITIONS[fromRegime].total++; }
     }
 }

@@ -35,6 +35,7 @@ export function initSimulatorProfileSelection() {
         statusEl.dataset.kind = kind;
     };
 
+    // Enforce at most two profiles per household; keep current if possible.
     const limitSelection = (selected, currentId) => {
         if (selected.length <= MAX_HOUSEHOLD_PROFILES) return selected;
         const current = selected.find(p => p.id === currentId);
@@ -74,6 +75,7 @@ export function initSimulatorProfileSelection() {
             selectionWarning = 'Haushalte im Simulator sind auf 2 Personen begrenzt. Auswahl wurde gekuerzt.';
         }
 
+        // Convert each profile into simulator inputs before aggregation.
         const profileInputs = selected.map(meta => {
             const data = getProfileData(meta.id);
             const inputs = buildSimulatorInputsFromProfileData(data);
@@ -89,6 +91,7 @@ export function initSimulatorProfileSelection() {
         }
 
         if (typeof window !== 'undefined') {
+            // Overrides allow the simulator to use aggregated tranche data.
             const override = Array.isArray(combined.detailledTranches) ? combined.detailledTranches : null;
             window.__profilverbundTranchenOverride = override;
             window.__profilverbundPreferAggregates = !override;

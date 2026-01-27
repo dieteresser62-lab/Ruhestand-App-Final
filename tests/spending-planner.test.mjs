@@ -9,6 +9,7 @@ function assert(condition, message) {
     }
 }
 
+// Small numeric tolerance helper for percent-ish outputs.
 function assertClose(actual, expected, tolerance = 0.001, message) {
     if (Math.abs(actual - expected) > tolerance) {
         console.error(`❌ Assertion failed: ${message} (Expected ${expected}, got ${actual})`);
@@ -16,6 +17,7 @@ function assertClose(actual, expected, tolerance = 0.001, message) {
     }
 }
 
+// Mirror the S-curve helper so we can validate the factor directly.
 function smoothstep(x) {
     const t = Math.min(1, Math.max(0, x));
     return t * t * (3 - 2 * t);
@@ -30,7 +32,7 @@ const mockProfile = {
     runway: { 'bear': { total: 60 }, 'peak': { total: 48 }, 'recovery_in_bear': { total: 48 } }
 };
 
-// Use deep clone helper for clean state
+// Create a fresh params object for each test block.
 function getBaseParams() {
     return {
         lastState: {
@@ -52,7 +54,7 @@ function getBaseParams() {
 
 // --- TEST 1: Alarm Trigger ---
 {
-    // Conditions: >5.5% Withdrawal AND >25% Drawdown AND Bear Market
+    // Conditions: >5.5% withdrawal AND >25% drawdown AND bear market.
     const params = getBaseParams();
     params.market.sKey = 'bear_deep';
     params.lastState.keyParams.entnahmequoteDepot = 0.06; // 6% > 5.5%
@@ -74,7 +76,7 @@ function getBaseParams() {
 
 // --- TEST 2: Alarm De-escalation (Recovery) ---
 {
-    // Setup: Alarm WAS active, Market is now RecoveryInBear, Metrics healthy
+    // Setup: alarm WAS active, market is now recovery-in-bear, metrics healthy.
     const params = getBaseParams();
     params.lastState.alarmActive = true;
     params.market.sKey = 'recovery_in_bear';
@@ -97,11 +99,11 @@ function getBaseParams() {
 // --- TEST 3: Flex Rate Smoothing / Caps ---
 {
     const params = getBaseParams();
-    // Increase depot to avoid 'Caution' guardrail (Withdrawal Rate < 4.5%)
+    // Increase depot to avoid 'Caution' guardrail (withdrawal rate < 4.5%).
     params.depotwertGesamt = 1000000;
     params.gesamtwert = 1100000;
 
-    // Previous rate was 100%. Market Bear Deep demands -10pp or raw cut.
+    // Previous rate was 100%. Bear-deep demands a large cut; caps should limit it.
     params.market.sKey = 'bear_deep';
     params.market.abstandVomAthProzent = 30; // 30% crash
     // Raw Formula: 50 + (30-20) = 60% Cut => 40% Target Flex Rate.
@@ -131,12 +133,12 @@ function getBaseParams() {
 
 // --- TEST 4: Budget Floor Protection ---
 {
-    // Scenario: High Spending Pressure (Bear), but Floor MUST be paid.
+    // Scenario: high spending pressure (bear), but floor MUST be paid.
     const params = getBaseParams();
     params.market.sKey = 'bear_deep';
     params.market.abstandVomAthProzent = 5; // Mild bear
 
-    // Force very low flex rate from previous state to see if it bumps up
+    // Force very low flex rate from previous state to see if it bumps up.
     params.lastState.flexRate = 0;
 
     const result = SpendingPlanner.determineSpending(params);

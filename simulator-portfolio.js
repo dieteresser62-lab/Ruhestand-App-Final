@@ -1,3 +1,10 @@
+/**
+ * Module: Simulator Portfolio Facade
+ * Purpose: Central facade for all portfolio-related operations.
+ *          Exports functions from specialized sub-modules (init, inputs, display, historical, pension, stress, tranches).
+ * Usage: Main entry point for other modules to access portfolio logic.
+ * Dependencies: simulator-portfolio-*.js
+ */
 "use strict";
 
 export { getCommonInputs } from './simulator-portfolio-inputs.js';

@@ -19,6 +19,13 @@ import {
  * ===================================================================================
  */
 
+/**
+ * Module: Balance Utils
+ * Purpose: Collection of utility functions for formatting (Currency, Percent, Months) and configuration access.
+ *          Centralizes number formatting logic using Intl.NumberFormat for performance.
+ * Usage: Used widely across the application for display formatting.
+ * Dependencies: shared-formatting.js
+ */
 export const UIUtils = {
     // Intl.NumberFormat-Instanzen für Performance (einmalige Initialisierung)
     EUR_FORMATTER,

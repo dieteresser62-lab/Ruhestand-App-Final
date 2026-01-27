@@ -96,6 +96,7 @@ function readSweepWorkerConfig() {
     const workerCount = parseInt(String(workerCountRaw).trim(), 10);
     const timeBudgetMs = parseInt(String(budgetRaw).trim(), 10);
     return {
+        // 0 means "auto" (use hardwareConcurrency heuristic).
         workerCount: Number.isFinite(workerCount) && workerCount > 0 ? workerCount : 0,
         timeBudgetMs: Number.isFinite(timeBudgetMs) && timeBudgetMs > 0 ? timeBudgetMs : 500
     };
@@ -130,6 +131,7 @@ async function runSweepWithWorkers({
     let p2VarianceCount = 0;
     let nextComboIdx = 0;
 
+    // Adaptive chunking to balance worker overhead vs. throughput.
     const minChunk = 2;
     const maxChunk = Math.min(80, Math.max(minChunk, Math.ceil(totalCombos / workerCount)));
     let chunkSize = Math.min(maxChunk, Math.max(minChunk, Math.floor(totalCombos / (workerCount * 4)) || minChunk));
@@ -172,6 +174,7 @@ async function runSweepWithWorkers({
         while (pending.size > 0) {
             const { result, start, count, elapsedMs } = await Promise.race(pending);
 
+            // Merge sparse results into the full array by combo index.
             for (const item of result.results) {
                 sweepResults[item.comboIdx] = { params: item.params, metrics: item.metrics };
             }
@@ -181,6 +184,7 @@ async function runSweepWithWorkers({
             onProgress((completedCombos / totalCombos) * 100);
 
             if (elapsedMs > 0) {
+                // Adjust chunk size toward the worker time budget.
                 const scaled = Math.round(count * (timeBudgetMs / elapsedMs));
                 const targetSize = Math.max(minChunk, Math.min(maxChunk, scaled || minChunk));
                 smoothedChunkSize = Math.max(minChunk, Math.min(maxChunk, Math.round(smoothedChunkSize * 0.7 + targetSize * 0.3)));
@@ -211,6 +215,7 @@ async function runSweepSerial({
     const sweepResults = new Array(totalCombos);
     let completedCombos = 0;
     let p2VarianceCount = 0;
+    // Chunk serial execution to keep UI responsive.
     const chunkSize = Math.min(20, Math.max(1, Math.ceil(totalCombos / 20)));
 
     for (let start = 0; start < totalCombos; start += chunkSize) {
@@ -327,6 +332,7 @@ export async function runParameterSweep() {
         progressBar.textContent = '0%';
 
         // Basis-Inputs nur EINMAL lesen und einfrieren (Deep Clone)
+        // Clone once so each combo can be safely overridden without side effects.
         const baseInputs = deepClone(getCommonInputs());
         const anzahlRuns = parseInt(document.getElementById('mcAnzahl').value) || 100;
         const maxDauer = parseInt(document.getElementById('mcDauer').value) || 35;
@@ -339,6 +345,7 @@ export async function runParameterSweep() {
         const sweepConfig = { anzahlRuns, maxDauer, blockSize, baseSeed, methode, rngMode };
         const sweepResults = new Array(paramCombinations.length);
 
+        // Reference P2 invariants guard against accidental partner changes.
         const refInputs = buildSweepInputs(baseInputs, paramCombinations[0]);
         const refP2Invariants = extractP2Invariants(refInputs);
 

@@ -4,6 +4,7 @@ import { analyzeScenario, compareScenarios, extractKeyMetrics } from '../scenari
 
 // --- TEST 1: extractKeyMetrics defaults and coercion ---
 {
+    // Input enthält absichtlich fehlerhafte Typen.
     const metrics = extractKeyMetrics({
         endVermoegen: 'not-a-number',
         failed: 0,

@@ -6,6 +6,7 @@ export function initTabSwitching() {
 
     tabButtons.forEach(button => {
         button.addEventListener('click', () => {
+            // Toggle active tab button and panel.
             // Remove active class from all buttons and panels
             tabButtons.forEach(btn => btn.classList.remove('active'));
             tabPanels.forEach(panel => panel.classList.remove('active'));

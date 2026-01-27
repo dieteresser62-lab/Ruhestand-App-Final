@@ -83,6 +83,7 @@ try {
 
     // --- TEST 7: Guardrail severity when "cap wirksam" ---
     {
+        // Severity-Klasse signalisiert Guardrail-Eingriff.
         const fragment = buildDecisionTree([
             { step: 'Cap wirksam: Guardrail greift', impact: '-', status: 'active' }
         ]);

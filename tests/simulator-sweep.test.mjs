@@ -316,6 +316,7 @@ console.log('Test 21: buildSweepInputs - Parameter-Überschreibung');
         goldTargetPct: 5
     };
 
+    // buildSweepInputs maps sweep params onto engine inputs.
     const result = buildSweepInputs(baseInputs, params);
 
     assertEqual(result.runwayMinMonths, 18, 'runwayMinMonths sollte überschrieben sein');
@@ -384,6 +385,7 @@ console.log('Test 22: runSweepChunk - Basis-Ausführung');
         rngMode: 'per-run-seed'
     };
 
+    // Run two param combos in a single chunk and validate the output shape.
     const { results, p2VarianceCount } = runSweepChunk({
         baseInputs,
         paramCombinations,
@@ -408,6 +410,7 @@ console.log('Test 22: runSweepChunk - Basis-Ausführung');
 // Test 23: runSweepChunk - Determinismus
 console.log('Test 23: runSweepChunk - Determinismus');
 {
+    // Same inputs + seed must be stable across runs.
     const baseInputs = {
         startAlter: 65,
         geschlecht: 'm',

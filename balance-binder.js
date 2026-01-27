@@ -1,3 +1,10 @@
+/**
+ * Module: Balance Binder (UI Binder)
+ * Purpose: Centralizes Event Handling and wiring for the Balance App.
+ *          It connects DOM events (clicks, inputs, shortcuts) to the appropriate logic handlers (Annual, Imports, Diagnosis, Snapshots).
+ * Usage: Initialized by balance-main.js to set up all event listeners.
+ * Dependencies: balance-reader.js, balance-renderer.js, balance-storage.js, balance-binder-*.js
+ */
 "use strict";
 
 /**

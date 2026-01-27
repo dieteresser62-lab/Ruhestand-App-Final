@@ -1,3 +1,10 @@
+/**
+ * Module: Auto-Optimize UI
+ * Purpose: Manages the User Interface for the Auto-Optimize feature.
+ *          Handles Preset selection, dynamic parameter inputs, validation, and results rendering.
+ * Usage: Initialized by the main application to power the Optimization tab.
+ * Dependencies: auto_optimize.js, simulator-utils.js
+ */
 "use strict";
 
 /**

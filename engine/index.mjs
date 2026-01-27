@@ -1,4 +1,11 @@
 /**
+ * Module: Engine Entry Point
+ * Purpose: Central bundle and re-export module for the Retirement Engine.
+ *          Exports the modern ESM interfaces (EngineAPI, _internal_calculateModel).
+ * Usage: Imported by engine.js (adapter) or directly by modern modules.
+ * Dependencies: core.mjs
+ */
+/**
  * ===================================================================
  * ENGINE ENTRY MODULE
  * ===================================================================

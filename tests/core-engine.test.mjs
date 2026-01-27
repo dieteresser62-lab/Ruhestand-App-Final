@@ -3,7 +3,7 @@ import { EngineAPI } from '../engine/index.mjs';
 
 console.log('--- Core Engine Tests ---');
 
-// Mock Data
+// Mock Data: minimal vollständiger Input für Engine (Balance-ähnlich).
 const baseInput = {
     depotwertAlt: 100000,
     depotwertNeu: 0,
@@ -35,6 +35,7 @@ const marketBase = {
 try {
     const result = EngineAPI.simulateSingleYear(baseInput, null);
 
+    // Struktur-Check: Engine muss UI + neuen State liefern.
     assert(result !== null, 'Should return a result object');
     assert(result.ui !== undefined, 'Should have UI result');
     assert(result.newState !== undefined, 'Should have newState');
@@ -54,6 +55,7 @@ try {
     const result = EngineAPI.simulateSingleYear(tightInput, null);
     const spending = result.ui.spending;
 
+    // Auch bei knapper Liquidität darf die Entnahme > 0 bleiben (Verkäufe möglich).
     assert(spending.monatlicheEntnahme > 0, 'Should allow withdrawal');
     console.log('✅ Spending logic basic check passed');
 } catch (e) {
@@ -73,10 +75,10 @@ try {
         jahreSeitAth: 1
     };
 
-    // EngineAPI determines regime internally based on these history inputs
+    // EngineAPI bestimmt Regime intern aus den Preis-Inputs.
     const result = EngineAPI.simulateSingleYear(bearInput, null);
 
-    // Check internal regime
+    // Check internal regime (kann leicht variieren: bear_deep vs crash).
     // Note: Engine result structure has diagnose -> diagnosis
     const diagnosis = result.diagnosis || result.logData?.diagnosis;
     const regime = result.newState.lastMarketSKey || (diagnosis?.general?.marketSKey);

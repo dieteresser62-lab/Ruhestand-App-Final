@@ -1,3 +1,10 @@
+/**
+ * Module: Simulator Engine Direct Utils
+ * Purpose: Utility functions for the Direct Engine implementation.
+ *          Provides target liquidity calculation, tranche helpers, and type safety (euros).
+ * Usage: Helper module for simulator-engine-direct.js.
+ * Dependencies: engine/config.mjs, engine/transactions/TransactionEngine.mjs
+ */
 "use strict";
 
 import { CONFIG } from './engine/config.mjs';
@@ -56,6 +63,7 @@ export function normalizeHouseholdContext(context) {
 }
 
 export function calculateTargetLiquidityBalanceLike(inputs, marketData, floorBedarf, flexBedarf, pensionAnnual) {
+    // Aligns Simulator-Liquiditätsziel mit Balance-App Logik (Profil + MarketAnalyzer).
     const profil = CONFIG.PROFIL_MAP[inputs?.risikoprofil] || CONFIG.PROFIL_MAP['sicherheits-dynamisch'];
     const market = MarketAnalyzer.analyzeMarket({
         ...marketData,

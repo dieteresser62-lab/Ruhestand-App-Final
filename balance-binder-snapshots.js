@@ -1,3 +1,10 @@
+/**
+ * Module: Balance Binder Snapshots
+ * Purpose: Manages Snapshot UI actions (Create, Restore, Delete).
+ *          It interfaces with the StorageManager to persist/retrieve specific application states.
+ * Usage: Used by balance-binder.js to handle snapshot list interactions.
+ * Dependencies: balance-config.js, balance-renderer.js, balance-storage.js
+ */
 import { StorageError } from './balance-config.js';
 import { UIRenderer } from './balance-renderer.js';
 import { StorageManager } from './balance-storage.js';

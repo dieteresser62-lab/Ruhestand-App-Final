@@ -49,7 +49,7 @@ function getBaseMarketInput() {
     inputRec.jahreSeitAth = 2; // > 6 months
 
     const resRec = MarketAnalyzer.analyzeMarket(inputRec);
-    // Logic: abstand=10% (>10? No, needs >10 for Recovery? Wait)
+    // Recovery braucht abstand >10% + Momentum >10% + >6 Monate seit ATH.
     // Code: abstand > 10 && perf > 10 && months > 6.
     // 10 > 10 is False. Recovery needs > 10% drawdown?
     // Let's make drawdown 11% (EndeVJ = 89).

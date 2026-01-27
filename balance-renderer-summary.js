@@ -1,3 +1,10 @@
+/**
+ * Module: Balance Renderer Summary
+ * Purpose: Renders the high-level summary KPIs (Runway, Liquidity Coverage) and Market Status.
+ *          Visualizes the "Traffic Light" system for market regimes.
+ * Usage: Used by balance-renderer.js to update the top summary section.
+ * Dependencies: balance-utils.js, balance-reader.js
+ */
 "use strict";
 
 import { UIUtils } from './balance-utils.js';

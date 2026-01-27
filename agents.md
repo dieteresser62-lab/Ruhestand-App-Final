@@ -44,8 +44,9 @@ npm run tauri:build                   # Production build (creates RuhestandSuite
    - Build creates deterministic build ID in `engine/config.mjs`
 
 2. **Balance-App** (`Balance.html` + `balance-*.js`)
-   - Seven specialized modules for single-year planning
-   - Chain: Reader → Engine → Renderer → Storage
+   - 27+ specialized ES6 modules for single-year planning
+   - Core chain: Reader → Engine → Renderer → Storage
+   - Extended modules for annual updates, diagnosis, Profilverbund
    - Local persistence via `localStorage` and File System Access API
 
 3. **Simulator** (`Simulator.html` + `simulator-*.js`)
@@ -100,13 +101,14 @@ Recent addition supports multi-profile analysis by combining selected profiles:
 ### Module Boundaries
 
 **Balance-App modules** (see `BALANCE_MODULES_README.md`):
-- `balance-config.js` - Configuration & error types
-- `balance-utils.js` - Formatting utilities
-- `balance-storage.js` - Persistence layer
-- `balance-reader.js` - DOM input reading
-- `balance-renderer.js` - Result rendering
-- `balance-binder.js` - Event hub & keyboard shortcuts
-- `balance-main.js` - Orchestrator
+- Core: `balance-config.js`, `balance-utils.js`, `balance-storage.js`
+- Input: `balance-reader.js`
+- Output: `balance-renderer.js`, `balance-renderer-*.js`
+- Events: `balance-binder.js`, `balance-binder-*.js`
+- Annual: `balance-annual-*.js` (inflation, marketdata, orchestrator)
+- Diagnosis: `balance-diagnosis-*.js` (chips, decision-tree, guardrails)
+- Profile: `balance-main-profile-sync.js`, `profilverbund-balance*.js`
+- Main: `balance-main.js` - Orchestrator
 
 **Simulator modules** (see `SIMULATOR_MODULES_README.md`):
 - Keep `simulator-main.js` lean (~600 lines) - it's just the UI bootstrap
@@ -193,9 +195,11 @@ Use `assert()`, `assertEqual()`, `assertClose()` global helpers.
 
 - `README.md` - User guide, features overview, step-by-step workflows
 - `TECHNICAL.md` - Architecture, data flows, build notes
+- `QUICKSTART.md` - Quick start guide for new users
 - `BALANCE_MODULES_README.md` - Balance-app module details
 - `SIMULATOR_MODULES_README.md` - Simulator module details
 - `engine/README.md` - Engine-specific documentation
+- `tests/README.md` - Test suite documentation (45 test files)
 - `docs/PROFILVERBUND_FEATURES.md` - Multi-profile design decisions
 - `MULTI-TRANCHEN-ANLEITUNG.md` - Tranche management guide
 

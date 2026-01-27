@@ -132,10 +132,10 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 Die Parallelisierung basiert auf Web-Workern und einer gemeinsamen Pool-Schicht:
 
 * `workers/worker-pool.js` verwaltet einen Pool fester Worker-Instanzen, verteilt Jobs und ersetzt defekte Worker.
-* `workers/mc-worker.js` hostet die DOM-freien Runner (`monte-carlo-runner.js`, `sweep-runner.js`) und verarbeitet Job-Typen (`init`, `job`, `sweep-init`, `sweep`).
+* `workers/mc-worker.js` hostet die DOM-freien Runner (`monte-carlo-runner.js`, `sweep-runner.js`, `auto-optimize-worker.js`) und verarbeitet Job-Typen (`init`, `job`, `sweep-init`, `sweep`, `optimize-init`, `optimize-batch`).
 * `simulator-monte-carlo.js` orchestriert die Worker-Jobs, führt Chunking (Zeitbudget) durch, aggregiert Ergebnisse und fällt bei Stalls auf seriell zurück.
 * `simulator-sweep.js` verteilt Parameter-Kombinationen auf Worker-Chunks und aggregiert Sweep-Metriken (Fallback seriell).
-* `auto_optimize.js` nutzt einen wiederverwendeten Pool, fährt Candidate-Runs ohne Log-Ausgabe und fällt bei Fehlern auf seriell zurück.
+* `auto_optimize.js` nutzt den gleichen Pool für Kandidaten-Batches ohne Chunking-Overhead (ein Batch = viele Runs).
 
 **Determinismus/Seeding**
 * Jeder Run erhält einen deterministischen Seed (`per-run-seed`), damit Chunking/Worker keine Ergebnisse verändert.
@@ -283,4 +283,6 @@ definiert werden. Ergebnisse werden gegen diese Limits geprüft und als OK/Verle
 * **BALANCE_MODULES_README.md** – Detailtiefe zur Balance-App.
 * **SIMULATOR_MODULES_README.md** – Detaillierte Modulübersicht des Simulators.
 * **engine/README.md** – Engine-spezifische Informationen inkl. Build-Beschreibung.
+* **tests/README.md** – Test-Suite-Dokumentation mit 45 Testdateien.
+* **docs/PROFILVERBUND_FEATURES.md** – Profilverbund-Design und -Module.
 

@@ -24,6 +24,7 @@ const mockDocument = {
     createDocumentFragment: () => new MockNode('fragment')
 };
 
+// Flatten node tree to string to assert content.
 function collectText(node) {
     if (!node) return '';
     if (typeof node.textContent === 'string' && node.children.length === 0) return node.textContent;

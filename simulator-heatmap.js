@@ -114,6 +114,7 @@ export function computeHeatmapStats(heat, bins, totalRuns) {
     const sumCol0 = col0.reduce((a, b) => a + (Number(b) || 0), 0);
     const looksLikeShares = sumCol0 > 0 && sumCol0 < 1.000001;
 
+    // Heatmap kann bereits Anteile enthalten (0..1) oder absolute Counts.
     const shares = looksLikeShares
         ? heat.map(col => Array.from(col).map(Number))
         : heat.map(col => Array.from(col).map(count => (Number(count) || 0) / Math.max(1, totalRuns)));
@@ -129,6 +130,7 @@ export function computeHeatmapStats(heat, bins, totalRuns) {
 
     const allSharesFlat = shares.flat().filter(s => s > 1e-6);
 
+    // Fix-Bins für KPI-Highlights (z.B. Quote >4.5%).
     const binIdx30 = bins.findIndex(b => b === 3.0);
     const binIdx55 = bins.findIndex(b => b === 5.5);
     const binIdx45 = bins.findIndex(b => b === 4.5);

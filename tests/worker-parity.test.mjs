@@ -3,6 +3,7 @@ import { prepareHistoricalDataOnce } from '../simulator-engine-helpers.js';
 import { createMonteCarloBuffers, MC_HEATMAP_BINS, runMonteCarloChunk, buildMonteCarloAggregates } from '../monte-carlo-runner.js';
 import { runSweepChunk } from '../sweep-runner.js';
 
+// Engine API is expected to live on window in browser-mode code.
 if (typeof global.window === 'undefined') {
     global.window = {};
 }
@@ -18,6 +19,7 @@ function assertClose(actual, expected, tolerance, message) {
     }
 }
 
+// Append helper used to merge worker-like list outputs.
 function appendArray(target, source) {
     if (!source || source.length === 0) return;
     for (let i = 0; i < source.length; i++) {
@@ -25,6 +27,7 @@ function appendArray(target, source) {
     }
 }
 
+// Merge heatmap counts (year x bin) by simple summation.
 function mergeHeatmap(target, source) {
     for (let year = 0; year < target.length; year++) {
         const targetRow = target[year];
@@ -38,6 +41,7 @@ function mergeHeatmap(target, source) {
 
 console.log('--- Worker Parity Tests ---');
 
+// Ensure historical data is initialized before MC/sweep runs.
 prepareHistoricalDataOnce();
 
 const baseInputs = {
@@ -119,6 +123,7 @@ try {
     });
 
     const mergedBuffers = createMonteCarloBuffers(monteCarloParams.anzahl);
+    // Keep merged structures identical to the worker aggregation path.
     const mergedHeatmap = Array(10).fill(0).map(() => new Uint32Array(MC_HEATMAP_BINS.length - 1));
     const mergedLists = {
         entryAges: [],
@@ -142,6 +147,7 @@ try {
     };
     const mergedWithdrawals = [];
 
+    // Merge-Helper: entspricht der Worker-Chunk-Akkumulation im echten Lauf.
     const mergeChunk = (chunk, start) => {
         const chunkBuffers = chunk.buffers;
         mergedBuffers.finalOutcomes.set(chunkBuffers.finalOutcomes, start);

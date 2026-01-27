@@ -23,7 +23,8 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 
 ### Simulator
 * Monte-Carlo-Simulationen mit unterschiedlichen Renditequellen (historisch, Regime, Block-Bootstrap) inkl. Worker-Parallelisierung. Historische Daten reichen bis 1925 (Schwarze-Schwan-Phase optional per Filter/Recency abgewichtbar).
-* **Parameter-Sweep mit Auto-Optimize:** Whitelist-Ansatz, Deep-Clones und Wächterlogik für Zwei-Personen-Setups. Worker-Parallelisierung fuer Sweep und Auto-Optimize, 3-stufige Optimierung (~8-10x schneller), dynamische Parameter-UI (1-7 Parameter), Preset-Konfigurationen und Champion-Config-Output für optimale Strategiefindung.
+* **Parameter-Sweep mit Auto-Optimize:** Whitelist-Ansatz, Deep-Clones und Wächterlogik für Zwei-Personen-Setups. Worker-Parallelisierung fuer Sweep und Auto-Optimize, 3-stufige Optimierung (~8-10x schneller), dynamische Parameter-UI (1-7 Parameter), Preset-Konfigurationen und Champion-Config-Output für optimale Strategiefindung. Details siehe `docs/AUTO_OPTIMIZE_DETAILS.md`.
+* **Workflow-Transparenz:** Die Hauptabläufe (Balance, Monte-Carlo, Backtest) sind nun als Pseudo-Code dokumentiert: `docs/WORKFLOW_PSEUDOCODE.md`.
 * Stresstests, Pflegefall-Szenarien und Heatmap-Visualisierung (fokussiert auf Rentenphase). Neue Presets: Great Depression (1929-1933) und Zweiter Weltkrieg (1939-1945).
 * Sweep-Schutz für Partner:innen-Renten inklusive Rente-2-Invarianz und Heatmap-Badges.
 * Szenario-Log-Analyse mit 30 auswählbaren Szenarien: 15 charakteristische (Perzentile, Pflege-Extremfälle, Risiko-Szenarien) und 15 zufällige Samples für typisches Verhalten.
@@ -121,10 +122,16 @@ Ruhestand-App-Final/
 │   ├── config.mjs
 │   ├── core.mjs
 │   ├── errors.mjs
-│   ├── adapter.mjs
+│   ├── index.mjs
 │   ├── analyzers/MarketAnalyzer.mjs
 │   ├── planners/SpendingPlanner.mjs
-│   ├── transactions/TransactionEngine.mjs
+│   ├── transactions/
+│   │   ├── TransactionEngine.mjs
+│   │   ├── transaction-action.mjs
+│   │   ├── transaction-opportunistic.mjs
+│   │   ├── transaction-surplus.mjs
+│   │   ├── sale-engine.mjs
+│   │   └── transaction-utils.mjs
 │   └── validators/InputValidator.mjs
 ├── engine.js                   # Gebündelte Engine (generiert)
 ├── build-engine.mjs            # Node-Skript zum Bundlen der Engine

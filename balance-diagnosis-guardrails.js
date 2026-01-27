@@ -1,3 +1,10 @@
+/**
+ * Module: Balance Diagnosis Guardrails
+ * Purpose: Renders the "Guardrails" section of the Diagnosis Panel.
+ *          Displays individual guardrail metrics (e.g., withdrawal rate thresholds) as cards with status colors.
+ * Usage: Used by balance-renderer-diagnosis.js to visualize guardrail statuses.
+ * Dependencies: None
+ */
 "use strict";
 
 export function buildGuardrails(guardrailData = []) {

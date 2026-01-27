@@ -1,5 +1,11 @@
 # Ruhestand-App Auditbericht
 
+> **Hinweis:** Dieser Auditbericht wurde vor der Adapter-Eliminierung erstellt (Dezember 2025).
+> Die referenzierten Dateien `simulator-engine.js` und `sim-parity-smoketest.js` wurden seitdem
+> entfernt. Siehe `ADAPTER-ELIMINATION-REPORT.md` für Details zur Migration.
+
+---
+
 ## Executive Summary
 - Engine steuert Entnahmen über Guardrails (Entnahmequote, realer Drawdown, Runway) und liefert Diagnosepfade für die UI.【F:engine/planners/SpendingPlanner.mjs†L12-L168】
 - Simulator besitzt Fail-Safe-Liquiditätslogik (Floor-Deckung, Notverkäufe) sowie Pflege- und Rentenhandling pro Jahr.【F:simulator-engine.js†L24-L200】

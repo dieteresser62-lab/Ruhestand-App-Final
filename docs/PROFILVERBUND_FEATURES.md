@@ -34,3 +34,29 @@ Der Profilverbund verbindet mehrere Profile zu einer gemeinsamen Analyse. Es gib
 - Gold-Strategie ist pro Profil gepflegt; die Kombination nutzt nur Profile mit aktivem Gold und Ziel > 0.
 - Bei unplausiblen Tranchensummen faellt der Simulator auf aggregierte Werte zurueck.
 - Legacy-Keys wie `belongsToHousehold` und `household_withdrawal_mode` bleiben intern bestehen, sind aber UI-seitig nicht sichtbar.
+
+## Beteiligte Module
+
+### Balance-App
+- `profilverbund-balance.js` – Aggregation, Verteilung, Tranche-Auswahl
+- `profilverbund-balance-ui.js` – Profilverbund-UI (Profilwahl + Karten)
+- `balance-main.js` – Integration und Zustandssynchronisation
+
+### Simulator
+- `profile-storage.js` – Profil-Registry und Persistenz-Layer
+- `profile-manager.js` – UI-Steuerung fuer Profilverwaltung (index.html)
+- `simulator-profile-inputs.js` – Profilaggregation und Simulator-Input-Mapping
+
+### Profilverwaltung
+- `index.html` – Zentraler Einstiegspunkt fuer Profilverwaltung
+- `profile-bridge.js` – Synchronisation zwischen Balance und Simulator
+
+## Tests
+- `tests/profilverbund-balance.test.mjs` – Aggregation und Verteilungslogik
+- `tests/profilverbund-profile-gold-overrides.test.mjs` – Gold-Strategie bei Profilkombination
+- `tests/profile-storage.test.mjs` – Persistenz und Profilwechsel
+
+## Verwandte Dokumentation
+## Verwandte Dokumentation
+- `README.md` → Abschnitt "Profilverbund (Multi-Profil)"
+- `TECHNICAL.md` → Abschnitt "Multi-Profil Simulator"

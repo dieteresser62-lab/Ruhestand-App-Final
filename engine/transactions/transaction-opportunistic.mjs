@@ -1,3 +1,10 @@
+/**
+ * Module: Transaction Opportunistic
+ * Purpose: Logic for "Opportunistic Rebalancing".
+ *          Fills liquidity gaps using asset sales, but tries to respect safe withdrawal rates and market timing (Skim & Fill).
+ * Usage: Called by transaction-action.mjs.
+ * Dependencies: config.mjs
+ */
 import { CONFIG } from '../config.mjs';
 
 export function buildOpportunisticRefill({
@@ -140,7 +147,7 @@ export function buildOpportunisticRefill({
     } else {
         // Respektiere den Override von außen (z.B. aus determineAction bei Floor-Notfall)
         if (minTradeResultOverride !== null && minTradeResultOverride !== undefined) {
-             appliedMinTradeGate = minTradeResultOverride;
+            appliedMinTradeGate = minTradeResultOverride;
         } else {
             const minTradeGateResult = computeAppliedMinTradeGate({
                 investiertesKapital,
@@ -233,14 +240,14 @@ export function buildOpportunisticRefill({
         // ATH-skaliertes Cap: Bei -20% ATH-Abstand kein Rebalancing mehr
         const baseMaxSkimCapEuro = ((input.maxSkimPctOfEq || 5) / 100) * aktienwert;
         const athScaledSkimCap = baseMaxSkimCapEuro * athRebalancingFaktor;
-        
+
         // Bei kritischer Liquidität ODER absolutem Minimum ODER externem Override: Cap lockern
         const isEmergencyRefill = isCriticalLiquidity || belowAbsoluteFloor || (minTradeResultOverride === 0);
-        
+
         const effectiveSkimCap = isEmergencyRefill
             ? Math.max(athScaledSkimCap, effectiveLiquiditätsBedarf * 1.2)
             : athScaledSkimCap;
-            
+
         const maxSellableFromEquity = Math.min(aktienUeberschuss, effectiveSkimCap);
 
         const totalEquityValue = input.depotwertAlt + input.depotwertNeu;

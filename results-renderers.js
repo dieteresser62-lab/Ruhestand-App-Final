@@ -30,7 +30,7 @@ export function renderKpiCard(kpi) {
 export function renderSummary(container, summaryCards) {
     if (!container || !Array.isArray(summaryCards)) return;
 
-    // In simple mode, show only the 3 most important cards
+    // In simple mode, show only the 3 most important cards.
     const isSimpleMode = document.body.classList.contains('mode-simple');
     const cardsToShow = isSimpleMode ? summaryCards.slice(0, 3) : summaryCards;
 
@@ -114,6 +114,7 @@ export function renderStressSection(referenceContainer, stressMetrics) {
 export function renderHeatmap(container, heatmapData) {
     if (!container || !heatmapData) return;
 
+    // Fixed dimensions keep the SVG layout consistent across renders.
     container.innerHTML = renderHeatmapSVG(
         heatmapData.heatmap,
         heatmapData.bins,

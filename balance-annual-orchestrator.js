@@ -1,3 +1,10 @@
+/**
+ * Module: Balance Annual Orchestrator
+ * Purpose: Coordinates the complex "Annual Update" workflow (Year Adjustment -> Inflation -> Market Data).
+ *          It ensures the sequence is correct (Age update first, then financial data) and tracks errors.
+ * Usage: Used by balance-binder-annual.js to provide the main "Jahres-Update" function.
+ * Dependencies: balance-config.js, balance-renderer.js, balance-storage.js
+ */
 "use strict";
 
 import { AppError } from './balance-config.js';

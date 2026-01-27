@@ -1,3 +1,10 @@
+/**
+ * Module: Balance Renderer Diagnosis
+ * Purpose: Facade/Manager for rendering the Diagnosis Panel.
+ *          Delegates to specific renderers (Chips, Tree, Guardrails, etc.).
+ * Usage: Used by balance-renderer.js to update the diagnosis section.
+ * Dependencies: balance-diagnosis-*.js
+ */
 "use strict";
 
 import { formatDiagnosisPayload } from './balance-diagnosis-format.js';

@@ -1,4 +1,11 @@
 /**
+ * Module: Transaction Engine
+ * Purpose: Central facade for the transaction logic.
+ *          Exposes functions to determine actions (buy/sell) and calculate tax-aware sales.
+ * Usage: Called by engine/core.mjs.
+ * Dependencies: transaction-utils.mjs, sale-engine.mjs, transaction-action.mjs
+ */
+/**
  * ===================================================================
  * TRANSACTION ENGINE MODULE
  * ===================================================================

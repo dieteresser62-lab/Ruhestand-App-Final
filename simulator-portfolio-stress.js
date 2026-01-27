@@ -1,3 +1,10 @@
+/**
+ * Module: Simulator Portfolio Stress
+ * Purpose: Applying stress tests to market data.
+ *          Handles conditional bootstrapping and parametric modifications (e.g., rebound caps).
+ * Usage: Called by simulator-portfolio.js facade.
+ * Dependencies: simulator-data.js
+ */
 "use strict";
 
 import { STRESS_PRESETS, annualData } from './simulator-data.js';
@@ -16,6 +23,7 @@ export function buildStressContext(presetKey, rand) {
     };
 
     if (preset.type === 'conditional_bootstrap') {
+        // Build a filtered list of historical years that match the stress criteria.
         context.pickableIndices = annualData
             .map((d, i) => ({ ...d, index: i }))
             .filter(d => {
@@ -35,6 +43,7 @@ export function buildStressContext(presetKey, rand) {
     }
 
     if (preset.type === 'parametric_sequence' && preset.reboundClamp) {
+        // Track rebound clamp years after the parametric shock ends.
         context.reboundYearsRemaining = preset.reboundClamp.years;
     }
 
@@ -46,6 +55,7 @@ export function buildStressContext(presetKey, rand) {
  */
 export function applyStressOverride(yearData, stressCtx, rand) {
     if (!stressCtx || stressCtx.remainingYears <= 0) {
+        // After the stress window, optionally cap rebounds for a few years.
         if (stressCtx?.reboundYearsRemaining > 0 && stressCtx.preset.reboundClamp) {
             yearData.rendite = Math.min(yearData.rendite, stressCtx.preset.reboundClamp.cap);
             stressCtx.reboundYearsRemaining--;

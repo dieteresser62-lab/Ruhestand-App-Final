@@ -39,6 +39,7 @@ export function initializeSimulatorApp() {
     selfCheckEngine();
     prepareHistoricalData();
 
+    // Populate derived start portfolio numbers before wiring UI events.
     updateStartPortfolioDisplay();
 
     initInputPersistence();
@@ -46,6 +47,7 @@ export function initializeSimulatorApp() {
 
     const mcMethodeSelect = document.getElementById('mcMethode');
     mcMethodeSelect.addEventListener('change', () => {
+        // Block size only applies to block bootstrap sampling.
         document.getElementById('mcBlockSize').disabled = mcMethodeSelect.value !== 'block';
     });
 

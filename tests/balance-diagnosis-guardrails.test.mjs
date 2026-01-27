@@ -67,6 +67,7 @@ try {
 
     // --- TEST 5: Correct color coding classes ---
     {
+        // Status-Klassen müssen dem Ampel-Schema folgen.
         const fragment = buildGuardrails([
             { name: 'OK', value: 'ok', threshold: '-', status: 'ok' },
             { name: 'Warn', value: 'warn', threshold: '-', status: 'warn' },

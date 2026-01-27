@@ -1,3 +1,10 @@
+/**
+ * Module: Balance Annual Inflation
+ * Purpose: Handles inflation-related operations, including fetching external inflation data (ECB, World Bank, OECD)
+ *          and applying inflation adjustments to user inputs (needs, budget).
+ * Usage: Used by balance-binder-annual.js and balance-binder.js to perform annual updates.
+ * Dependencies: balance-config.js, balance-utils.js, balance-reader.js, balance-renderer.js, balance-storage.js
+ */
 "use strict";
 
 import { AppError } from './balance-config.js';

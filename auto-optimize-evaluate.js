@@ -1,3 +1,10 @@
+/**
+ * Module: Auto-Optimize Evaluate
+ * Purpose: Evaluates a single optimization candidate by running a Monte Carlo simulation.
+ *          Clone inputs, applies mutations, runs MC, and aggregates KPIs (Success Rate, Drawdown).
+ * Usage: Used by auto_optimize.js to score candidates.
+ * Dependencies: auto-optimize-worker.js, simulator-sweep-utils.js
+ */
 "use strict";
 
 import { deepClone, normalizeWidowOptions } from './simulator-sweep-utils.js';

@@ -58,7 +58,7 @@ window.onload = function () {
     initializeSimulatorApp();
 };
 
-// Globale Funktionen für HTML onclick-Handler
+// Globale Funktionen für HTML onclick-Handler.
 window.runMonteCarlo = runMonteCarlo;
 window.runBacktest = runBacktest;
 window.runParameterSweep = runParameterSweep;
@@ -68,6 +68,6 @@ window.runSweepSelfTest = runSweepSelfTest;
 window.renderBacktestLog = renderBacktestLog;
 window.exportBacktestLogData = exportBacktestLogData;
 
-// Für Parity Smoke Test
+// Für Parity Smoke Test / Legacy Entry Points.
 window.simulateOneYear = simulateOneYear;
 window.annualData = annualData;

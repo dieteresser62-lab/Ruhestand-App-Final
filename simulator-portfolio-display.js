@@ -1,3 +1,10 @@
+/**
+ * Module: Simulator Portfolio Display
+ * Purpose: Updating the UI display for portfolio status.
+ *          Handles formatting of currency values and breakdown panels.
+ * Usage: Called by simulator-portfolio.js facade.
+ * Dependencies: simulator-utils.js, depot-tranchen-status.js, simulator-portfolio-inputs.js, simulator-portfolio-format.js
+ */
 "use strict";
 
 import { formatCurrency } from './simulator-utils.js';
@@ -37,12 +44,14 @@ export function updateStartPortfolioDisplay() {
     let zielwertGold = 0;
 
     if (useAggregates) {
+        // Prefer tranche aggregates to avoid rounding drift from form inputs.
         displayDepotwertAlt = aggregated.depotwertAlt || 0;
         displayDepotwertNeu = aggregated.depotwertNeu || 0;
         displayGoldWert = aggregated.goldWert || 0;
         displayGeldmarkt = aggregated.geldmarktEtf || 0;
         displayTagesgeld = inputs.tagesgeld || 0;
     } else {
+        // Derive portfolio split from cash + target gold allocation.
         const startLiquiditaet = (inputs.tagesgeld || 0) + (inputs.geldmarktEtf || 0);
         const flexiblesVermoegen = Math.max(0, inputs.startVermoegen - inputs.depotwertAlt);
         const investitionsKapitalNeu = Math.max(0, flexiblesVermoegen - startLiquiditaet);
@@ -57,6 +66,7 @@ export function updateStartPortfolioDisplay() {
         displayTagesgeld = inputs.tagesgeld || 0;
     }
 
+    // Keep the "start wealth" field aligned with the computed breakdown.
     const derivedStartVermoegen = displayDepotwertAlt + displayDepotwertNeu + displayGoldWert + displayTagesgeld + displayGeldmarkt;
     const startField = document.getElementById('simStartVermoegen');
     if (startField) {
@@ -81,6 +91,7 @@ export function updateStartPortfolioDisplay() {
         goldWertField.value = formatDisplayNumber(displayGoldWert);
     }
 
+    // Render a quick visual split for user validation.
     let breakdownHtml = `
         <div style="text-align:center; font-weight:bold; color: var(--primary-color); margin-bottom:10px;">Finale Start-Allokation</div>
         <div class="form-grid-three-col">

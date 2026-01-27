@@ -41,10 +41,12 @@ function teardownMockDOM() {
     const portfolio = {
         depotTranchesGold: []
     };
+    // Erster Kauf erstellt Tranche.
     buyGold(portfolio, 100);
     assertEqual(portfolio.depotTranchesGold.length, 1, 'Should add gold tranche');
     assertEqual(portfolio.depotTranchesGold[0].marketValue, 100, 'Should have correct value');
 
+    // Zweiter Kauf soll in bestehende Tranche aggregieren.
     buyGold(portfolio, 50);
     assertEqual(portfolio.depotTranchesGold.length, 1, 'Should merge into existing tranche');
     assertEqual(portfolio.depotTranchesGold[0].marketValue, 150, 'Should sum up value');
@@ -63,6 +65,7 @@ function teardownMockDOM() {
     const oldTranche = { type: 'aktien_alt', marketValue: 500 };
     portfolio.depotTranchesAktien.push(oldTranche);
 
+    // Neue Käufe addieren nur zur "neu"-Tranche.
     buyStocksNeu(portfolio, 50);
     const neu = portfolio.depotTranchesAktien.find(t => t.type === 'aktien_neu');
     assertEqual(neu.marketValue, 150, 'Should add to neu tranche');

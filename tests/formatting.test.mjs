@@ -11,6 +11,7 @@ import {
 import { formatDisplayNumber } from '../simulator-portfolio-format.js';
 import { formatPercentValue, formatPercentRatio } from '../simulator-formatting.js';
 
+// Some formatters emit non-breaking spaces; normalize for stable assertions.
 const normalizeNbsp = (value) => String(value).replace(/\u00a0/g, ' ');
 
 assertEqual(

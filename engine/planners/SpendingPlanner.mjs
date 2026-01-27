@@ -1,12 +1,10 @@
 /**
- * ===================================================================
- * SPENDING PLANNER MODULE
- * ===================================================================
- * Berechnet die optimale Ausgabenstrategie basierend auf Marktbedingungen
- * und finanzieller Situation
- * ===================================================================
+ * Module: Spending Planner
+ * Purpose: Determines the annual spending strategy (Flex-Rate) based on market conditions, portfolio state, and guardrails.
+ *          Implements the core "Variable Withdrawal Rate" logic, including smoothing and alarms.
+ * Usage: Called by engine/core.mjs during the simulation loop.
+ * Dependencies: engine/config.mjs
  */
-
 import { CONFIG } from '../config.mjs';
 
 export const SpendingPlanner = {
@@ -280,9 +278,12 @@ export const SpendingPlanner = {
         const state = this._initializeOrLoadState(lastState, params, addDecision);
 
         // 2. Alarm-Bedingungen evaluieren.
+        // Alarm > Guardrails: Im Alarmmodus werden Guardrails bewusst ausgesetzt,
+        // damit der Sicherheitsmechanismus nicht durch Nebenregeln verwässert wird.
         const alarmStatus = this._evaluateAlarmConditions(state, params, addDecision);
 
         // 3. Flex-Rate berechnen (inkl. Glättung/Alarm-Verhalten).
+        // Diese Rate ist die "Zentralsteuerung" der Flex-Entnahme.
         let { geglätteteFlexRate, kuerzungQuelle } = this._calculateFlexRate(
             state,
             alarmStatus,
@@ -304,6 +305,8 @@ export const SpendingPlanner = {
             guardrailDiagnostics = guardrailResult.diagnostics || {};
         }
 
+        // Flex-Budget wirkt als weicher Deckel: schützt den Floor,
+        // begrenzt aber die Flex-Entnahme bei langer Durststrecke.
         const flexBudgetResult = this._applyFlexBudgetCap(
             geglätteteFlexRate,
             inflatedBedarf,
@@ -325,10 +328,12 @@ export const SpendingPlanner = {
             state.keyParams.minFlexRatePct = flexBudgetResult.minRatePct;
         }
 
+        // Wealth-Faktor dämpft Ausgaben bei sehr hohem Vermögen (Sicherheitsmodus).
         const wealthFactor = Number.isFinite(state.keyParams?.wealthReductionFactor)
             ? Math.min(1, Math.max(0, state.keyParams.wealthReductionFactor))
             : 1;
 
+        // Finale Limits wirken als letzte Schutzbarriere (Rate-Clamp).
         const finalLimitResult = this._applyFinalRateLimits(
             state.flexRate ?? 100,
             geglätteteFlexRate,
@@ -344,6 +349,7 @@ export const SpendingPlanner = {
         }
 
         // 5. Endgültige Entnahme bestimmen.
+        // Floor wird immer voll genommen, Flex wird mit der finalen Rate skaliert.
         let rawEntnahme = inflatedBedarf.floor +
             (inflatedBedarf.flex * (Math.max(0, Math.min(100, geglätteteFlexRate)) / 100));
 
@@ -357,6 +363,7 @@ export const SpendingPlanner = {
         const endgueltigeEntnahme = monthlyEntnahme * 12;
 
         // 6. Flex-Rate ableiten (Anteil des Flex-Bedarfs, der finanziert werden kann).
+        // Diese Rate spiegelt die tatsächlich finanzierbare Flex-Komponente wider.
         const flexRate = (inflatedBedarf.flex > 0)
             ? ((Math.max(0, endgueltigeEntnahme - inflatedBedarf.floor) / inflatedBedarf.flex) * 100)
             : 0;
@@ -555,10 +562,13 @@ export const SpendingPlanner = {
     _evaluateAlarmConditions(state, params, addDecision) {
         const { market, runwayMonate, profil } = params;
         const { entnahmequoteDepot, realerDepotDrawdown } = state.keyParams;
+        // Wealth-Adjusted Reduction: gibt eine Dämpfung zurück, wenn die Entnahmequote
+        // unter dem Safe-Rate-Niveau liegt (Signal: Vermögen reicht).
         const wealthReduction = this._calculateWealthAdjustedReductionFactor(params);
         const wealthFactor = Number.isFinite(wealthReduction.factor)
             ? Math.min(1, Math.max(0, wealthReduction.factor))
             : 1;
+        // <0.5 bedeutet: wir schneiden die Reduktion mindestens halb – also "reichlich Vermögen".
         const wealthSufficient = wealthFactor < 0.5;
 
         let alarmWarAktiv = state.alarmActive;
@@ -607,6 +617,8 @@ export const SpendingPlanner = {
             alarmWarAktiv = false;
         }
 
+        // Alarm-Trigger: tiefer Bär + nicht vermögenssicher + (kritische Quote+Runway)
+        // oder harter Drawdown als alleiniger Auslöser.
         const alarmAktivInDieserRunde = !alarmWarAktiv && isCrisis && !wealthSufficient &&
             ((isQuoteCritical && isRunwayThin) || isDrawdownCritical);
 
@@ -700,6 +712,8 @@ export const SpendingPlanner = {
         let roheKuerzungProzent = 0;
 
         if (market.sKey === 'bear_deep') {
+            // Tiefer Bär: Basis-Kürzung steigt mit ATH-Abstand,
+            // wird aber bei "Vermögen ausreichend" skaliert.
             const reductionFactor = wealthFactor;
             const basisKuerzung = 50 + Math.max(0, market.abstandVomAthProzent - 20);
             roheKuerzungProzent = basisKuerzung * reductionFactor;

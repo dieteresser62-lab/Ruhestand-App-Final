@@ -121,6 +121,7 @@ const registry = {
     }
 };
 
+// Registry in localStorage injizieren, damit loadProfilverbundProfiles darauf zugreift.
 localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(registry));
 
 const profiles = loadProfilverbundProfiles();

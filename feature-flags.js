@@ -1,15 +1,9 @@
 /**
- * ===================================================================
- * FEATURE FLAGS - Adaptive Engine Selection
- * ===================================================================
- * Ermöglicht das dynamische Umschalten zwischen Adapter und Direct API
- * ===================================================================
- */
-
-'use strict';
-
-/**
- * Feature Flags Configuration
+ * Module: Feature Flags
+ * Purpose: Global configuration for enabling/disabling application features and engine modes.
+ *          Manages 'adapter' vs 'direct' engine mode and performance monitoring.
+ * Usage: Imported by engine modules to check features.
+ * Dependencies: None
  */
 const DEFAULT_FLAGS = {
     // Engine Mode: 'adapter' oder 'direct'

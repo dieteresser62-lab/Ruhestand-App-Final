@@ -1,3 +1,10 @@
+/**
+ * Module: Profilverbund Balance
+ * Purpose: Core logic for the "Profilverbund" (Profile Compound) feature.
+ *          Handles loading multiple profiles, aggregating their financial data, and calculating optimal withdrawal distributions.
+ * Usage: Used by balance-main-profilverbund.js to perform multi-user calculations.
+ * Dependencies: balance-config.js, profile-storage.js
+ */
 // @ts-check
 
 import { CONFIG } from './balance-config.js';
@@ -319,6 +326,7 @@ export function calculateTaxPerEuro(inputs) {
     if (!inputs) return 0;
     const marketValue = (inputs.depotwertAlt || 0) + (inputs.depotwertNeu || 0);
     const costBasis = (inputs.costBasisAlt || 0) + (inputs.costBasisNeu || 0);
+    // Steuerlast pro € = Gewinnquote * effektiver Steuersatz.
     const profitRatio = computeProfitRatio(marketValue, costBasis);
     return profitRatio * computeTaxRate(inputs);
 }
@@ -341,6 +349,7 @@ export function selectTranchesForSale(tranches, targetAmount, taxRate = DEFAULT_
         })
         .filter(item => item.marketValue > 0);
 
+    // Sortierung: niedrigste Steuerlast zuerst, dann FIFO nach Kaufdatum.
     candidates.sort((a, b) => {
         if (a.taxPerEuro !== b.taxPerEuro) return a.taxPerEuro - b.taxPerEuro;
         return a.purchaseStamp - b.purchaseStamp;
@@ -371,6 +380,7 @@ export function calculateWithdrawalDistribution(profileInputs, aggregated, mode 
         return { items: [], totalNeed, remaining: totalNeed, totalTaxEstimate: 0, mode };
     }
 
+    // Pro Profil alle Kennzahlen vorbereiten, die für Verteilung & Steuer-Schätzung nötig sind.
     const entries = list.map(entry => {
         const inputs = entry.inputs || {};
         const taxPerEuro = calculateTaxPerEuro(inputs);
@@ -396,6 +406,7 @@ export function calculateWithdrawalDistribution(profileInputs, aggregated, mode 
     let allocations = [];
 
     if (mode === 'tax_optimized') {
+        // Greedy: zuerst Profile mit geringster Steuerlast pro Euro bedienen.
         const sorted = entries.slice().sort((a, b) => a.taxPerEuro - b.taxPerEuro);
         allocations = sorted.map(entry => {
             const maxShare = entry.assets || 0;
@@ -404,6 +415,7 @@ export function calculateWithdrawalDistribution(profileInputs, aggregated, mode 
             return { entry, amount };
         });
     } else {
+        // Proportional nach Vermögen oder (runway_first) nach Runway-Zielen.
         const weights = entries.map(entry => {
             if (mode === 'runway_first') {
                 return Math.max(0, entry.runwayTargetMonths || 0);
@@ -421,6 +433,7 @@ export function calculateWithdrawalDistribution(profileInputs, aggregated, mode 
 
     let totalTaxEstimate = 0;
     const items = allocations.map(({ entry, amount }) => {
+        // Cash zuerst nutzen (Tagesgeld/Geldmarkt), Verkauf nur für Restbedarf.
         const tagesgeldAvailable = entry.inputs?.tagesgeld || 0;
         const geldmarktInput = entry.inputs?.geldmarktEtf || 0;
         const geldmarktAvailable = geldmarktInput > 0 ? geldmarktInput : (entry.derivedMoneyMarket || 0);

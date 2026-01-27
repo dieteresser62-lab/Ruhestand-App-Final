@@ -1,3 +1,10 @@
+/**
+ * Module: Simulator Portfolio Tranches
+ * Purpose: Low-level operations on portfolio tranches.
+ *          Sorting (FIFO, Tax-Optimized), tax calculation, and executing sales.
+ * Usage: Called by simulator-portfolio.js facade.
+ * Dependencies: None (pure logic)
+ */
 "use strict";
 
 /**
@@ -74,13 +81,15 @@ export function calculateTrancheTax(tranche, sellAmount, sparerPauschbetrag, kir
  */
 export function applySaleToPortfolio(portfolio, saleResult) {
     if (!saleResult || !saleResult.breakdown) return;
+    // Normalize asset kinds to keep legacy names compatible.
     const normalizeKind = (kind) => String(kind || '').toLowerCase();
     const isEquityKind = (kind) => kind.startsWith('aktien') || kind === 'equity' || kind === 'stocks' || kind === 'stock';
     const isGoldKind = (kind) => kind.startsWith('gold');
     const isMoneyKind = (kind) => kind.startsWith('geldmarkt') || kind === 'money_market' || kind === 'money market';
-    const logDebug = () => {};
+    const logDebug = () => { };
 
     const trimId = (value) => String(value || '').trim();
+    // Resolve tranches by id, with a suffix fallback for older snapshots.
     const findTrancheById = (trancheId) => {
         if (!trancheId) return null;
         const id = trimId(trancheId);
@@ -100,6 +109,7 @@ export function applySaleToPortfolio(portfolio, saleResult) {
         }
         return null;
     };
+    // Fallback to ISIN/name matching when no id is present.
     const findTrancheByMeta = (tranches, saleItem) => {
         if (!Array.isArray(tranches) || !tranches.length) return null;
         const isin = trimId(saleItem.isin);
@@ -128,6 +138,7 @@ export function applySaleToPortfolio(portfolio, saleResult) {
         }
         return [];
     };
+    // Apply a sale across multiple tranches, optionally FIFO-sorted.
     const reduceAcrossTranches = (tranches, amount, useFifo) => {
         let remaining = Number(amount) || 0;
         if (!Array.isArray(tranches) || remaining <= 0) return;

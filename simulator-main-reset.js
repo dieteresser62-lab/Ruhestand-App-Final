@@ -18,6 +18,7 @@ export function initResetButton() {
                 }
             }
 
+            // Remove after collecting to avoid index shifting while iterating.
             keysToRemove.forEach(key => localStorage.removeItem(key));
 
             // Seite neu laden, um leere Felder (Default-Zustand) anzuzeigen

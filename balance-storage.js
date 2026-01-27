@@ -1,3 +1,10 @@
+/**
+ * Module: Balance Storage (StorageManager)
+ * Purpose: Manages data persistence via LocalStorage and the File System Access API (for Snapshots).
+ *          Handles state loading/saving, migrations for older versions, and snapshot management.
+ * Usage: Used by balance-main.js and balance-binder.js for all persistence operations.
+ * Dependencies: balance-config.js
+ */
 "use strict";
 
 /**

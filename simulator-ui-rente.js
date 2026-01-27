@@ -145,6 +145,7 @@ function applyInitialValueWithPersistence(element, storageKey, defaultValue, eve
 
     // Alle angegebenen Events lösen ein Speichern aus.
     eventTypes.forEach(eventType => {
+        // Persist raw string values to avoid locale parsing issues.
         element.addEventListener(eventType, () => localStorage.setItem(storageKey, element.value));
     });
 }

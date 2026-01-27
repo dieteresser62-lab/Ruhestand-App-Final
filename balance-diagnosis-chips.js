@@ -1,3 +1,10 @@
+/**
+ * Module: Balance Diagnosis Chips
+ * Purpose: Generates the specialized "Chip" UI elements for the Diagnosis Panel.
+ *          Visualizes key metrics (Runway, Liquidity, Drawdown) with status colors (Red/Yellow/Green).
+ * Usage: Used by balance-renderer-diagnosis.js to populate the status header.
+ * Dependencies: balance-utils.js
+ */
 "use strict";
 
 import { UIUtils } from './balance-utils.js';

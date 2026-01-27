@@ -1,13 +1,13 @@
 /**
- * ===================================================================
- * ENGINE WRAPPER - Direct API (Standardized)
- * ===================================================================
- * Wrapper that now exclusively uses the Direct API (EngineAPI).
- * Adapter references have been removed.
- * ===================================================================
+ * Module: Simulator Engine Wrapper
+ * Purpose: Standardized facade for the simulation engine.
+ *          Routes calls to the direct engine implementation (simulator-engine-direct.js)
+ *          and handles performance monitoring.
+ * Usage: Main entry point for running a simulation year.
+ * Dependencies: feature-flags.js, simulator-engine-direct.js, simulator-engine-helpers.js
  */
 
-'use strict';
+"use strict";
 
 import { featureFlags } from './feature-flags.js';
 import { simulateOneYear as simulateOneYearDirect } from './simulator-engine-direct.js';

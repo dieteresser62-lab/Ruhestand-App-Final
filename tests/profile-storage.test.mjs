@@ -83,6 +83,7 @@ try {
     console.log('Test 3: Slug conflicts');
     {
         localStorage.clear();
+        // Gleicher Anzeigename soll automatisch eindeutige Slugs erzeugen.
         const a = createProfile('Meine Familie');
         const b = createProfile('Meine Familie');
         const c = createProfile('Meine Familie');

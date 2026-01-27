@@ -53,6 +53,7 @@ export function initSweepUIControls() {
                     hasError = true;
                     break;
                 }
+                // Reuse the same parser as the sweep runner to stay consistent.
                 const values = parseRangeInput(rangeStr);
                 if (values.length === 0) {
                     hasError = true;

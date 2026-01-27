@@ -43,7 +43,7 @@ function getCareInputs() {
     const careMeta = makeDefaultCareMeta(true, 'm');
     const age = 80;
 
-    // Mock RNG: 0.001 -> Should trigger entry (prob for PG1 at 80 is ~0.055).
+    // Mock RNG: 0.001 -> sollte Eintritt auslösen (PG1-Wahrscheinlichkeit ~0.055 bei 80).
     const rand = createMockRng([0.001]);
 
     const yearData = { inflation: 0 };
@@ -72,7 +72,7 @@ function getCareInputs() {
     careMeta.floorAtTrigger = 1000;
     careMeta.maxFloorAtTrigger = 2000;
 
-    // Year 1 (Index 1): Ramp 1/5 = 20%. Target = 2000 * 0.2 = 400. 
+    // Year 1 (Index 1): Ramp 1/5 = 20%. Target = 2000 * 0.2 = 400.
     // 400 < 1000 (Cap). Result 400.
     const rand = () => 0.99;
     const yearData = { inflation: 0 };
@@ -115,7 +115,7 @@ function getCareInputs() {
     });
     assertClose(fP1Care, 0.75, 0.01, 'One Care (0%) -> 0.75');
 
-    // 3. P1 Dead, P2 Healthy -> 75%
+    // 3. P1 Dead, P2 Healthy -> 75% (Regel wie "eine Person fällt weg").
     const fP1Dead = computeHouseholdFlexFactor({
         p1Alive: false, careMetaP1: p1Care, // P1 dead
         p2Alive: true, careMetaP2: p2Meta
@@ -147,7 +147,7 @@ function getCareInputs() {
     careMeta.flexAtTrigger = 1000;
     careMeta.maxFloorAtTrigger = 3000;
 
-    const rand = createMockRng([0.0]); // always progress if probability > 0
+    const rand = createMockRng([0.0]); // immer Progression, falls p>0
     const yearData = { inflation: 0 };
 
     const result = updateCareMeta(careMeta, inputs, 81, yearData, rand);

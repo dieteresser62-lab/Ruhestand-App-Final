@@ -92,6 +92,7 @@ try {
         global.document.getElementById('simulationSummary').innerHTML = '';
         global.document.getElementById('simulationLog').innerHTML = '';
 
+        // Zwei Läufe mit gleichen Inputs müssen identisch sein.
         runBacktest();
         const firstRows = (window.globalBacktestData?.rows || []).map(r => [r.jahr, r.wertAktien, r.wertGold, r.liquiditaet]);
 

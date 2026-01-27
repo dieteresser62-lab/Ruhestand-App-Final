@@ -1,3 +1,10 @@
+/**
+ * Module: Balance Binder Annual
+ * Purpose: specific binder module for Annual Update workflows.
+ *          It groups functionality for Inflation, Market Data updates, and the Annual Update Modal.
+ * Usage: Used by balance-binder.js to organize annual update logic.
+ * Dependencies: balance-annual-inflation.js, balance-annual-marketdata.js, balance-annual-modal.js, balance-annual-orchestrator.js
+ */
 import { createInflationHandlers } from './balance-annual-inflation.js';
 import { createMarketdataHandlers } from './balance-annual-marketdata.js';
 import { createAnnualModalHandlers } from './balance-annual-modal.js';

@@ -8,7 +8,7 @@
  * - Snapshot-Erstellung (mit Mock)
  */
 
-// Mock für localStorage
+// Mock für localStorage (Map-basiert, genügt für Tests).
 class MockLocalStorage {
     constructor() {
         this.store = new Map();
@@ -45,7 +45,7 @@ class MockLocalStorage {
     }
 }
 
-// Mock für IndexedDB
+// Mock für IndexedDB (nur für API-Kompatibilität).
 class MockIDBHelper {
     constructor() {
         this.store = new Map();
@@ -204,6 +204,7 @@ console.log('Test 1: saveState und loadState - Basis');
         }
     };
 
+    // Rundtrip: speichern -> laden -> Struktur erhalten.
     StorageManager.saveState(testState);
     const loaded = StorageManager.loadState();
 

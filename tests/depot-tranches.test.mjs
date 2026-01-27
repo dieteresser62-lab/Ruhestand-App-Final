@@ -17,6 +17,7 @@ console.log('--- Depot Tranchen Tests ---');
 // --- TEST 2: Tax calculation with partial sale and TFS ---
 {
     const tranche = { marketValue: 100, costBasis: 60, tqf: 0.30 };
+    // Teilverkauf mit TFS und Kirchensteuer.
     const result = calculateTrancheTax(tranche, 50, 10, 0.09);
     assertClose(result.steuer, 1.145, 0.01, 'Tax should match expected calculation');
     assertClose(result.netto, 48.855, 0.01, 'Net amount should reflect tax');

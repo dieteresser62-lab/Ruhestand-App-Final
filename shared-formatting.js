@@ -1,3 +1,10 @@
+/**
+ * Module: Shared Formatting
+ * Purpose: Central utility for currency and number formatting (de-DE).
+ *          Provides consistent formatting for UI displays (e.g. "5k €", rounded numbers).
+ * Usage: Imported by various UI and logic modules.
+ * Dependencies: Intl.NumberFormat
+ */
 "use strict";
 
 const EUR_FORMATTER = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });

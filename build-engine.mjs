@@ -1,14 +1,10 @@
 #!/usr/bin/env node
 /**
- * ===================================================================
- * ENGINE BUILD SCRIPT (ESM)
- * ===================================================================
- * Baut die Engine über einen einfachen Bundler-Aufruf zusammen.
- * Standardpfad nutzt `esbuild` (Bundle → IIFE mit Global-Exports).
- * Fällt `esbuild` weg, wird ein schlanker Modul-Fallback geschrieben,
- * der die Legacy-Globals (EngineAPI, Ruhestandsmodell_v30) weiterhin
- * bereitstellt.
- * ===================================================================
+ * Module: Build Engine
+ * Purpose: Builds the Engine bundle (ESM -> IIFE or Module Wrapper).
+ *          Uses esbuild if available, otherwise creates a fallback module wrapper.
+ * Usage: node build-engine.mjs
+ * Dependencies: esbuild (optional), fs, path
  */
 
 import path from 'node:path';

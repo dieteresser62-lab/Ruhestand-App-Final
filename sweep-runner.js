@@ -36,9 +36,11 @@ export function buildSweepInputs(baseInputs, params) {
 
     if (params.goldTargetPct !== undefined) {
         caseOverrides.goldZielProzent = params.goldTargetPct;
+        // Gold is implicitly active once a target is set.
         caseOverrides.goldAktiv = params.goldTargetPct > 0;
     }
 
+    // Apply only whitelisted keys and block any partner-specific fields.
     for (const [key, value] of Object.entries(caseOverrides)) {
         if (isBlockedKey(key)) {
             console.warn(`[SWEEP] Ignoriere Person-2-Key im Sweep: ${key}`);
@@ -69,6 +71,7 @@ export function runSweepChunk({
     let p2VarianceCount = 0;
     let resolvedRef = refP2Invariants;
 
+    // Sweep each combination deterministically using comboIdx-based seeds.
     for (let offset = 0; offset < count; offset++) {
         const comboIdx = start + offset;
         const params = paramCombinations[comboIdx];
@@ -86,6 +89,7 @@ export function runSweepChunk({
             console.warn('[SWEEP] Aktuell:', p2Invariants);
         }
 
+        // Legacy-stream uses one RNG per combo, otherwise per-run seeds for determinism.
         const resolvedRngMode = rngMode === 'legacy-stream' ? 'legacy-stream' : 'per-run-seed';
         const legacyRand = resolvedRngMode === 'legacy-stream' ? rng(baseSeed + comboIdx) : null;
         const comboRand = legacyRand || rng(makeRunSeed(baseSeed, comboIdx, RUNIDX_COMBO_SETUP));
@@ -114,6 +118,7 @@ export function runSweepChunk({
 
                 careMeta = updateCareMeta(careMeta, inputs, currentAge, yearData, rand);
 
+                // If care triggers during accumulation, force early transition to withdrawal.
                 if (inputs.accumulationPhase?.enabled && simulationsJahr < effectiveTransitionYear) {
                     if (careMeta && careMeta.active) {
                         effectiveTransitionYear = simulationsJahr;
@@ -122,6 +127,7 @@ export function runSweepChunk({
 
                 const isAccumulation = inputs.accumulationPhase?.enabled && simulationsJahr < effectiveTransitionYear;
 
+                // Mortality only applies in withdrawal phase.
                 if (!isAccumulation) {
                     let qx = MORTALITY_TABLE[inputs.geschlecht][currentAge] || 1;
                     const careFactor = computeCareMortalityMultiplier(careMeta, inputs);
@@ -131,6 +137,7 @@ export function runSweepChunk({
                     if (rand() < qx) break;
                 }
 
+                // Inflation/rent adjustment can be regime-dependent.
                 const effectiveRentAdjPct = computeRentAdjRate(inputs, yearData);
                 const adjustedInputs = { ...inputs, rentAdjPct: effectiveRentAdjPct, transitionYear: effectiveTransitionYear };
 
@@ -145,6 +152,7 @@ export function runSweepChunk({
                     simState = result.newState;
                     depotWertHistorie.push(portfolioTotal(simState.portfolio));
 
+                    // Track the worst runway coverage within a run.
                     const runway = result.logData.RunwayCoveragePct || 0;
                     if (runway < minRunway) minRunway = runway;
                 }
@@ -161,6 +169,7 @@ export function runSweepChunk({
             });
         }
 
+        // Aggregate P50/P10/etc per combo to feed the heatmap.
         const metrics = aggregateSweepMetrics(runOutcomes);
         metrics.warningR2Varies = p2VarianceWarning;
         results.push({ comboIdx, params, metrics });

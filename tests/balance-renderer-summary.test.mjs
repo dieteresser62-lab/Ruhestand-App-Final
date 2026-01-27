@@ -30,6 +30,7 @@ console.log('--- Balance Renderer Summary Tests ---');
         minGoldDisplay: { textContent: '' },
         zielLiquiditaet: { textContent: '' }
     };
+    // DOM-Outputs werden formatiert, Rückgabewerte bleiben numerisch.
     const totals = renderSummary(outputs, {
         depotwertGesamt: 1500,
         neuerBedarf: 2500,

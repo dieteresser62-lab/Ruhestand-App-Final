@@ -1,3 +1,9 @@
+/**
+ * Module: Balance Config
+ * Purpose: Defines global application constants, configuration settings (Versions, Storage Keys), and custom Error classes.
+ * Usage: Imported by almost all other modules for shared constants and error handling.
+ * Dependencies: None
+ */
 "use strict";
 
 /**

@@ -49,6 +49,7 @@ console.log('--- Profilverbund Balance Tests ---');
         }
     ];
 
+    // Aggregation: Summe aus Bedarf, Renten, Depots, Liquidität, konservative Runway-Min.
     const aggregated = aggregateProfilverbundInputs(profileInputs);
     assertEqual(aggregated.totalBedarf, 50000, 'Total Bedarf should sum floor+flex');
     assertEqual(aggregated.totalRenteJahr, 12000, 'Total Rente should be monthly * 12');

@@ -9,7 +9,7 @@ if (typeof global.window === 'undefined') {
     global.window = {};
 }
 
-prepareHistoricalData(); // Fix 1: Ensure data ready
+prepareHistoricalData(); // Ensure market data is ready for annualData lookup
 
 console.log('--- Headless Full Backtest Reproduction (Direct Mode) ---');
 
@@ -90,7 +90,7 @@ console.log(`Starting Simulation. Initial Liq: ${currentState.portfolio.liquidit
                 EngineAPI
             );
 
-            // Update State
+            // Update State: carry forward for next year.
             if (!fullResult || !fullResult.portfolio) {
                 console.error(`❌ fullResult invalid in Year ${year}:`, fullResult);
                 throw new Error("Simulation returned invalid result");

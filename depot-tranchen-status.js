@@ -1,14 +1,16 @@
 /**
- * =============================================================================
- * DEPOT-TRANCHEN STATUS MODULE
- * =============================================================================
- * Zeigt den Status der geladenen Depot-Tranchen in Balance & Simulator an
+ * Module: Depot Tranchen Status
+ * Purpose: Manages and displays the status of detailed portfolio tranches.
+ *          Loads tranches from localStorage, calculates aggregates, and updates UI badges/inputs.
+ * Usage: Used by Balance App and Simulator to sync detailed tranche data.
+ * Dependencies: shared-formatting.js
  */
+"use strict";
 
 import { EUR_NO_DEC_FORMATTER } from './shared-formatting.js';
 
 function resolveTrancheMarketValue(tranche) {
-    const mv = Number(tranche?.marketValue);
+    // Priorität: expliziter MarketValue > Shares * CurrentPrice.
     if (Number.isFinite(mv) && mv > 0) {
         return mv;
     }
@@ -21,6 +23,7 @@ function resolveTrancheMarketValue(tranche) {
 }
 
 function resolveTrancheCostBasis(tranche) {
+    // Priorität: expliziter CostBasis > Shares * PurchasePrice.
     const cb = Number(tranche?.costBasis);
     if (Number.isFinite(cb) && cb > 0) {
         return cb;
@@ -227,10 +230,10 @@ export function renderTranchenStatusBadge(containerId) {
             </div>
 
             ${status.warnings && (status.warnings.missingMarketValueCount > 0 || status.warnings.missingCostBasisCount > 0)
-                ? `<div class="tranchen-warning">
+            ? `<div class="tranchen-warning">
                     Hinweis: ${status.warnings.missingMarketValueCount} Tranche(n) ohne Marktwert und ${status.warnings.missingCostBasisCount} ohne Einstand.
                    </div>`
-                : ''}
+            : ''}
         </div>
     `;
 }

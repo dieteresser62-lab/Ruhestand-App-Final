@@ -1,3 +1,10 @@
+/**
+ * Module: Simulator Portfolio Care
+ * Purpose: Logic for care duration ranges (Pflege).
+ *          Provides gender-specific default assumptions.
+ * Usage: Called by simulator-portfolio-inputs.js.
+ * Dependencies: None (pure logic)
+ */
 "use strict";
 
 /**

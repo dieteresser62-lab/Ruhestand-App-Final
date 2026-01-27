@@ -1,3 +1,10 @@
+/**
+ * Module: Profile Storage
+ * Purpose: Manages the storage and lifecycle of User Profiles (CRUD operations).
+ *          Handles creating, renaming, deleting profiles, and Import/Export functionality.
+ * Usage: Used by profilverbund-balance.js and balance-binder.js for profile management.
+ * Dependencies: balance-config.js
+ */
 // @ts-check
 
 import { CONFIG } from './balance-config.js';
@@ -57,6 +64,7 @@ function isProfileScopedKey(key) {
     if (!key) return false;
     if (EXACT_KEYS.has(key)) return true;
     if (FIXED_KEYS.has(key)) return true;
+    // Prefixe markieren dynamische Simulator-/Snapshot-Keys als profilbezogen.
     for (const prefix of PREFIX_KEYS) {
         if (key.startsWith(prefix)) return true;
     }
@@ -64,6 +72,7 @@ function isProfileScopedKey(key) {
 }
 
 function getProfileRegistry() {
+    // Registry-Shape: { version, profiles: { [id]: { meta, data } } }
     const raw = localStorage.getItem(PROFILE_STORAGE_KEY);
     if (!raw) {
         return { version: PROFILE_VERSION, profiles: {} };
@@ -104,6 +113,7 @@ function listProfileScopedKeys() {
 }
 
 function captureProfileData() {
+    // Snapshot aller profilbezogenen localStorage-Keys (z.B. Inputs, Tranchen).
     const data = {};
     const keys = listProfileScopedKeys();
     for (const key of keys) {
@@ -133,6 +143,7 @@ function ensureDefaultProfile() {
         return registry;
     }
 
+    // Erstes Profil: Default wird aus aktuellem localStorage abgeleitet.
     const id = 'default';
     const createdAt = nowIso();
     registry.profiles[id] = {

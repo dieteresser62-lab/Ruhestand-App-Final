@@ -31,6 +31,7 @@ try {
 
     // --- TEST 1: formatChipValue edge cases ---
     {
+        // Fallbacks müssen auch bei leerem String greifen.
         assertEqual(formatChipValue(null, null, 'n/a'), 'n/a', 'Null should return fallback');
         assertEqual(formatChipValue(undefined, null, 'n/a'), 'n/a', 'Undefined should return fallback');
         assertEqual(formatChipValue('', null, 'n/a'), 'n/a', 'Empty string should return fallback');

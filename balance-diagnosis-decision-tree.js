@@ -1,3 +1,10 @@
+/**
+ * Module: Balance Diagnosis Decision Tree
+ * Purpose: Renders the "Decision Tree" section of the Diagnosis Panel.
+ *          It visualizes the engine's decision path (Why was this action chosen?), formatting each step.
+ * Usage: Used by balance-renderer-diagnosis.js to show the decision logic.
+ * Dependencies: None
+ */
 "use strict";
 
 export function buildDecisionTree(treeData = []) {

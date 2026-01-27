@@ -14,6 +14,7 @@ const formatMs = (value, digits = 0) => `${Number(value).toFixed(digits)} ms`;
 const formatSpeedup = (value, digits = 2) => `${Number(value).toFixed(digits)}x`;
 
 function mergeHeatmap(target, source) {
+    // Sum bin counts per year; used for worker chunk merges.
     for (let year = 0; year < target.length; year++) {
         const targetRow = target[year];
         const sourceRow = source[year];
@@ -34,6 +35,7 @@ async function runMonteCarloLogsForIndices({
     const logsByIndex = new Map();
     if (!Array.isArray(runIndices) || runIndices.length === 0) return logsByIndex;
     for (const runIdx of runIndices) {
+        // Re-run a single index with logging enabled to get full log rows.
         const chunk = await runMonteCarloChunk({
             inputs,
             widowOptions,
@@ -104,6 +106,7 @@ async function runMonteCarloWithWorkers({
         ? desiredWorkers
         : Math.max(1, (navigator?.hardwareConcurrency || 2) - 1));
     const baseTimeoutMs = 5000;
+    // Stall-Detection: wenn kein Fortschritt, nach Timeout abbrechen/auffrischen.
     let stallTimeoutMs = 20000;
     const pollIntervalMs = 250;
     let lastProgressAt = performance.now();
@@ -118,6 +121,7 @@ async function runMonteCarloWithWorkers({
 
     const { scenarioKey, compiledScenario } = compileScenario(inputs, widowOptions, methode, useCapeSampling, inputs.stressPreset);
     const dataVersion = getDataVersion();
+    // Random sample indices are logged by workers to build scenario highlights.
     const logIndices = scenarioAnalyzer?.getRandomSampleIndices?.() || null;
 
     const buffers = createMonteCarloBuffers(anzahl);
@@ -150,6 +154,7 @@ async function runMonteCarloWithWorkers({
     let nextRunIdx = 0;
 
     const timeBudgetMs = workerConfig?.timeBudgetMs ?? 200;
+    // Adaptive Chunking: klein starten, dann via Budget glätten.
     const minChunk = 10;
     const maxChunk = Math.min(400, Math.max(minChunk, Math.ceil(anzahl / workerCount)));
     let chunkSize = Math.min(maxChunk, Math.max(minChunk, Math.floor(anzahl / (workerCount * 4)) || minChunk));
@@ -166,6 +171,7 @@ async function runMonteCarloWithWorkers({
     };
 
     const scheduleJob = (start, count) => {
+        // Job-Payload ist deterministisch; Ergebnisse können sauber gemerged werden.
         const startedAt = performance.now();
         const payload = {
             type: 'job',
@@ -221,6 +227,7 @@ async function runMonteCarloWithWorkers({
 
             const { result, start, count, elapsedMs } = raced;
 
+            // Merge fixed-size buffers at their run indices.
             const chunkBuffers = result.buffers;
             buffers.finalOutcomes.set(chunkBuffers.finalOutcomes, start);
             buffers.taxOutcomes.set(chunkBuffers.taxOutcomes, start);
@@ -264,6 +271,7 @@ async function runMonteCarloWithWorkers({
 
             if (scenarioAnalyzer && result.runMeta) {
                 for (const meta of result.runMeta) {
+                    // Track characteristic and random samples for later log rendering.
                     meta.isRandomSample = scenarioAnalyzer.shouldCaptureRandomSample(meta.index);
                     scenarioAnalyzer.addRun(meta);
                 }
@@ -274,6 +282,7 @@ async function runMonteCarloWithWorkers({
             lastProgressAt = performance.now();
 
             if (elapsedMs > 0) {
+                // Smooth chunk size toward the time budget based on last chunk runtime.
                 const scaled = Math.round(count * (timeBudgetMs / elapsedMs));
                 const targetSize = Math.max(minChunk, Math.min(maxChunk, scaled || minChunk));
                 smoothedChunkSize = Math.max(minChunk, Math.min(maxChunk, Math.round(smoothedChunkSize * 0.7 + targetSize * 0.3)));
@@ -490,6 +499,7 @@ export async function runMonteCarlo() {
         const { aggregatedResults, failCount, worstRun, worstRunCare, pflegeTriggeredCount } = results;
 
         if (usedWorkers && scenarioAnalyzer) {
+            // Re-run selected indices in serial to capture full log rows.
             const targetIndices = scenarioAnalyzer.getCharacteristicIndices();
             const logsByIndex = await runMonteCarloLogsForIndices({
                 inputs,

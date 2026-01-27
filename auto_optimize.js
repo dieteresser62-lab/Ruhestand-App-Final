@@ -1,3 +1,10 @@
+/**
+ * Module: Auto-Optimize Core
+ * Purpose: Central logic for the auto-optimization feature.
+ *          Implements Latin Hypercube Sampling (LHS), candidate filtering, and multi-stage evaluation (Quick -> Full -> Refine -> Validate).
+ * Usage: Called by auto_optimize_ui.js to run the optimization process.
+ * Dependencies: auto-optimize-metrics.js, auto-optimize-params.js, auto-optimize-evaluate.js, auto-optimize-sampling.js
+ */
 "use strict";
 
 /**

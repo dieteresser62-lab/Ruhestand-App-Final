@@ -136,6 +136,7 @@ export function initializePflegeUIControls() {
     const pflegePresetHint = document.getElementById('pflegeStaffelPresetHint');
     if (pflegeStaffelSelect) {
         pflegeStaffelSelect.addEventListener('change', (event) => {
+            // Presets overwrite per-grade inputs unless "custom" is selected.
             updatePflegePresetHint(pflegeStaffelSelect, pflegePresetHint);
             if (event.target.value !== 'custom') {
                 applyPflegeKostenPreset(event.target.value);

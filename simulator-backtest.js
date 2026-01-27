@@ -61,6 +61,7 @@ function formatPercentInteger(value, targetWidth) {
  */
 export function runBacktest() {
     try {
+        // Reuse MC extra KPIs when available for context in the log UI.
         const extraKPI = document.getElementById('monteCarloResults').style.display === 'block' ? (window.lastMcRunExtraKPI || {}) : {};
         document.getElementById('btButton').disabled = true;
         const inputs = getCommonInputs();

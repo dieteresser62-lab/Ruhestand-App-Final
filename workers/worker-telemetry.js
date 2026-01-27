@@ -1,9 +1,17 @@
 "use strict";
 
+/**
+ * Module: Worker Telemetry
+ * Purpose: Lightweight metrics collection for worker pool runs.
+ *          Tracks job durations, idle times, chunk sizes, and recent errors.
+ * Usage: Enabled via ?telemetry=true or localStorage flag.
+ */
+
 function safeNow() {
     if (typeof performance !== "undefined" && typeof performance.now === "function") {
         return performance.now();
     }
+    // Fallback auf Date.now() wenn performance.now nicht verfügbar ist (z.B. Worker/Tests).
     return Date.now();
 }
 
@@ -42,9 +50,11 @@ export class WorkerTelemetry {
         this.minJobTime = null;
         this.maxJobTime = null;
 
+        // jobStarts mappt Job-ID -> {start, workerId, payload}
         this.jobStarts = new Map();
         this.workerStats = new Map();
 
+        // Arrays werden absichtlich kurz gehalten (siehe clampArray).
         this.chunkSizes = [];
         this.errors = [];
         this.memorySnapshots = [];
@@ -137,6 +147,7 @@ export class WorkerTelemetry {
         this.completedJobs += 1;
 
         const entry = this.jobStarts.get(id);
+        // Wenn Worker schon gemessen hat, nutze elapsedMs; sonst aus jobStarts ableiten.
         const elapsed = Number.isFinite(elapsedMs) && elapsedMs > 0
             ? elapsedMs
             : this._resolveElapsedFromEntry(entry, now);
@@ -172,6 +183,7 @@ export class WorkerTelemetry {
             this.totalWorkTime += elapsed;
         }
 
+        // Fehlerliste begrenzen, um Speicher klein zu halten.
         if (this.errors.length < 10) {
             const message = safeString(error && error.message ? error.message : error);
             const stack = safeString(error && error.stack ? error.stack : "");
@@ -202,6 +214,7 @@ export class WorkerTelemetry {
         this.jobDetails.push({
             elapsedMs,
             runCount,
+            // msPerRun: einfache Kennzahl für Chunk-Effizienz.
             msPerRun: elapsedMs / runCount
         });
         clampArray(this.jobDetails, 200);

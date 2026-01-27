@@ -55,7 +55,7 @@ function createMockRng(sequence) {
         samplerState: { currentRegime: 'BULL' }
     };
 
-    // Pick ANY valid transition
+    // Pick ANY valid transition (Regime-Matrix wird intern genutzt).
     const rand = createMockRng([0.5, 0.5]);
 
     const result = sampleNextYearData(mockState, 'block', 1, rand, null);

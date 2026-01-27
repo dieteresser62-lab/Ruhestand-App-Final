@@ -2,6 +2,7 @@ import { TransactionEngine } from '../engine/transactions/TransactionEngine.mjs'
 
 console.log('--- Gold Buy vs Liquidity Gap Tests ---');
 
+// Minimal profile with runway targets used by TransactionEngine.
 const mockProfile = {
     minRunwayMonths: 24,
     isDynamic: true,
@@ -13,6 +14,7 @@ const mockProfile = {
     }
 };
 
+// Create a default scenario with a liquidity gap (target > current).
 function getBaseParams() {
     return {
         aktuelleLiquiditaet: 50000,
@@ -69,6 +71,7 @@ function getBaseParams() {
 // --- TEST 2: Gold buy allowed when liquidity surplus exists ---
 {
     const params = getBaseParams();
+    // Flip to surplus cash to ensure gold purchases are allowed.
     params.aktuelleLiquiditaet = 200000;
     params.zielLiquiditaet = 130000;
     params.input.tagesgeld = 200000;

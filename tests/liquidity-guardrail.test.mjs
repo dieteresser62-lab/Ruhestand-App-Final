@@ -32,7 +32,7 @@ function getBaseParams() {
             runwayTargetMonths: 0,
             startVermoegen: 550000,
 
-            // Portfolio Details required for Tax Calc
+            // Portfolio Details required for Tax Calc (Gewinnquote + Steuerlast).
             depotwertAlt: 250000, costBasisAlt: 100000, tqfAlt: 0,
             depotwertNeu: 250000, costBasisNeu: 100000, tqfNeu: 0,
             goldWert: 0, goldCost: 0, tagesgeld: 50000,

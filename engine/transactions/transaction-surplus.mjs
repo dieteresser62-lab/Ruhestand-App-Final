@@ -1,3 +1,10 @@
+/**
+ * Module: Transaction Surplus
+ * Purpose: Logic for "Surplus Rebalancing".
+ *          Invests excess liquidity into underweighted assets (Gold, Equity) when the market is safe.
+ * Usage: Called by transaction-action.mjs.
+ * Dependencies: config.mjs
+ */
 import { CONFIG } from '../config.mjs';
 
 export function trySurplusRebalance({

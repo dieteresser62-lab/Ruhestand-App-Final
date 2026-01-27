@@ -1,3 +1,10 @@
+/**
+ * Module: Balance Main Profilverbund
+ * Purpose: Manages the "Profilverbund" (Profile Compound) logic, allowing simulation of multi-person households (e.g., couples).
+ *          It handles aggregating inputs from multiple profiles, running simulations for each, and merging the results.
+ * Usage: Used by balance-main.js to handle multi-profile scenarios.
+ * Dependencies: profile-storage.js, profilverbund-balance.js, profilverbund-balance-ui.js, balance-guardrail-reset.js
+ */
 "use strict";
 
 import { CONFIG } from './balance-config.js';

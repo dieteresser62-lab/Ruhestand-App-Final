@@ -51,10 +51,12 @@ export class ScenarioAnalyzer {
      */
     getCharacteristicIndices() {
         if (!this.meta.length) return [];
+        // Hauptsortierung: Endvermögen (schlechteste bis beste Runs).
         const sortedByWealth = [...this.meta].sort((a, b) => a.endVermoegen - b.endVermoegen);
         const percentileIndex = (arr, p) => Math.min(Math.floor(arr.length * p), arr.length - 1);
 
         const indices = new Set();
+        // Perzentil-Stützstellen für repräsentative Szenarien.
         const percentilePicks = [
             0,
             percentileIndex(sortedByWealth, 0.05),
@@ -71,6 +73,7 @@ export class ScenarioAnalyzer {
             if (meta) indices.add(meta.index);
         }
 
+        // Pflege-Szenarien separat betrachten, da sie eine eigene Risiko-Dimension abbilden.
         const careScenarios = this.meta.filter(s => s.careEverActive);
         if (careScenarios.length > 0) {
             const worstWithCare = careScenarios.reduce((a, b) => a.endVermoegen < b.endVermoegen ? a : b);
@@ -84,6 +87,7 @@ export class ScenarioAnalyzer {
             if (earliestCare) indices.add(earliestCare.index);
         }
 
+        // Extremfälle als "Stress-Szenarien".
         const longestLife = this.meta.reduce((a, b) => a.lebensdauer > b.lebensdauer ? a : b);
         const maxCut = this.meta.reduce((a, b) => a.maxKuerzung > b.maxKuerzung ? a : b);
         if (longestLife) indices.add(longestLife.index);

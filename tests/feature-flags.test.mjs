@@ -28,6 +28,7 @@ try {
     // --- TEST 2: isEnabled + toggleFlag ---
     {
         featureFlags.reset();
+        // Toggle muss sowohl in-memory als auch im Storage wirken.
         assertEqual(isEnabled('useWorkers'), false, 'useWorkers should be disabled by default');
         const next = toggleFlag('useWorkers');
         assertEqual(next, true, 'toggleFlag should return new value');

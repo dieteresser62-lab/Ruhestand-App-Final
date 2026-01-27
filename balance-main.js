@@ -1,3 +1,11 @@
+/**
+ * Module: Balance Main
+ * Purpose: The central entry point and orchestrator for the Balance App (ES6 version).
+ *          It initializes the application, handles the main update loop, manages state, and coordinates
+ *          interactions between the UI, Storage, and the Calculation Engine.
+ * Usage: Loaded as the main script in the HTML file.
+ * Dependencies: balance-config.js, balance-storage.js, balance-reader.js, balance-renderer.js, balance-binder.js, engine.js (global)
+ */
 "use strict";
 
 /**
@@ -138,6 +146,7 @@ function update() {
     try {
         UIRenderer.clearError();
 
+        // Keep profile-derived values in sync before reading inputs.
         profileSyncHandlers.syncProfileDerivedInputs();
 
         // 1. Read Inputs & State
@@ -156,6 +165,7 @@ function update() {
 
         const persistentState = StorageManager.loadState();
 
+        // Profilverbund runs are computed only for multi-profile households.
         const profilverbundRuns = (profilverbundProfiles.length > 1)
             ? profilverbundHandlers.runProfilverbundProfileSimulations(inputData, profilverbundProfiles)
             : null;
@@ -173,6 +183,7 @@ function update() {
         // Die externe Engine (engine.js) berechnet alle Werte
         // Input: Benutzereingaben + letzter State
         // Output: {input, newState, diagnosis, ui} oder {error}
+        // Reset guardrail history if key inputs changed.
         const shouldResetState = shouldResetGuardrailState(persistentState.inputs, inputData);
         const lastState = shouldResetState ? null : persistentState.lastState;
         const modelResult = window.EngineAPI.simulateSingleYear(inputData, lastState);
@@ -210,6 +221,7 @@ function update() {
         UIRenderer.renderDiagnosis(appState.diagnosisData);
 
         // Speichert Eingaben und neuen Zustand
+        // Persist per-profile states to keep each profile's guardrails stable.
         if (profilverbundRuns) {
             profilverbundHandlers.persistProfilverbundProfileStates(profilverbundRuns);
         } else {

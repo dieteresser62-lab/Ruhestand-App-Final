@@ -1,3 +1,10 @@
+/**
+ * Module: Auto-Optimize Params
+ * Purpose: Defines allowed parameters, mutation logic, and validation constraints for candidates.
+ *          Ensures generated candidates are logically valid (e.g. Min <= Target).
+ * Usage: Used by auto_optimize.js and auto-optimize-evaluate.js.
+ * Dependencies: None
+ */
 "use strict";
 
 /**

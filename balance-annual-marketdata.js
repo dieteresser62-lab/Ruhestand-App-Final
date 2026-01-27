@@ -1,3 +1,11 @@
+/**
+ * Module: Balance Annual Market Data
+ * Purpose: Manages market data updates for the annual review process ("Nachrücken").
+ *          It fetches ETF prices (e.g., Vanguard FTSE All-World) via various APIs (Yahoo Proxy, Finnhub)
+ *          and updates the historical performance data (ATH, Years since ATH).
+ * Usage: Used by balance-binder-annual.js to support the "Nachrücken" workflow.
+ * Dependencies: balance-config.js, balance-renderer.js
+ */
 "use strict";
 
 import { AppError } from './balance-config.js';

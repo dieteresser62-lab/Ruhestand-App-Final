@@ -12,6 +12,7 @@ const htmlContent = fs.readFileSync(path.join(rootDir, 'Balance.html'), 'utf8');
 console.log("--- Balance App Smoke Test (No JSDOM) ---");
 
 // --- 1. Custom DOM Mock ---
+// Ziel: Balance.html initialisieren, ohne JSDOM, mit minimalem DOM-API.
 
 class MockElement {
     constructor(id, tagName = 'div') {

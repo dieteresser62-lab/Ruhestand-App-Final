@@ -1,3 +1,10 @@
+/**
+ * Module: Simulator Engine Helpers
+ * Purpose: Shared helper functions for the simulation engine.
+ *          Handles MC initialization, market data preparation, care logic updates, and statistics.
+ * Usage: Imported by simulator-engine-direct.js and simulator-engine-wrapper.js.
+ * Dependencies: simulator-data.js, simulator-portfolio.js
+ */
 "use strict";
 
 import { HISTORICAL_DATA, PFLEGE_GRADE_PROBABILITIES, PFLEGE_GRADE_LABELS, PFLEGE_GRADE_PROGRESSION_PROBABILITIES, SUPPORTED_PFLEGE_GRADES, annualData, REGIME_DATA, REGIME_TRANSITIONS, MORTALITY_TABLE } from './simulator-data.js';
@@ -88,6 +95,7 @@ export function initMcRunState(inputs, startYearIndex) {
     const maxIndex = Math.max(minIndex, annualData.length - 1);
     const rawIndex = Number.isFinite(startYearIndex) ? Math.round(startYearIndex) : minIndex;
     const effectiveIndex = Math.min(maxIndex, Math.max(minIndex, rawIndex));
+    // Startjahr wird aus den historischen Daten gezogen (Index stabilisiert).
     const startJahr = annualData[effectiveIndex].jahr;
 
     const marketDataHist = {
@@ -101,6 +109,7 @@ export function initMcRunState(inputs, startYearIndex) {
         capeRatio: resolveCapeRatio(undefined, inputs.marketCapeRatio, 0)
     };
 
+    // ATH-Bestimmung über alle Jahre vor Startjahr.
     const pastValues = histYears.filter(y => y < startJahr).map(y => HISTORICAL_DATA[y].msci_eur);
     marketDataHist.ath = pastValues.length > 0 ? Math.max(...pastValues, marketDataHist.endeVJ) : marketDataHist.endeVJ;
     if (marketDataHist.endeVJ < marketDataHist.ath) {
@@ -108,7 +117,7 @@ export function initMcRunState(inputs, startYearIndex) {
         marketDataHist.jahreSeitAth = (startJahr - 1) - lastAthYear;
     }
 
-    // Ansparphase-Tracking
+    // Ansparphase-Tracking (vor Ruhestand) optional.
     const accumulationState = inputs.accumulationPhase?.enabled ? {
         yearsSaved: 0,
         totalContributed: 0,
@@ -145,6 +154,7 @@ function estimateRemainingLifeYears(gender, currentAge) {
     let survivalProbability = 1;
     let expectedYears = 0;
 
+    // Erwartungswert über die Überlebenswahrscheinlichkeiten der Sterbetafel.
     for (let age = Math.max(currentAge, minAge); age <= maxAge; age++) {
         const qxRaw = table[age] ?? 1;
         const qx = Math.min(1, Math.max(0, qxRaw));

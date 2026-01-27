@@ -7,6 +7,7 @@ export function initPartnerToggle() {
 
     chkPartnerAktiv.addEventListener('change', () => {
         const aktiv = chkPartnerAktiv.checked;
+        // Toggle partner section visibility and persist the flag.
         sectionRente2.style.display = aktiv ? 'block' : 'none';
         localStorage.setItem('sim_partnerAktiv', aktiv ? '1' : '0');
     });

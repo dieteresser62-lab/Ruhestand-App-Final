@@ -1,22 +1,15 @@
-"use strict";
-
-/**
- * ===================================================================
- * SIMULATOR ENGINE - DIRECT API VERSION (NO ADAPTER)
- * ===================================================================
- * Diese Version verwendet EngineAPI direkt statt den Adapter.
- * Für Side-by-Side Vergleich mit simulator-engine.js
- * ===================================================================
- */
-
-import { shortenReasonText } from './simulator-utils.js';
-import { HISTORICAL_DATA, PFLEGE_GRADE_PROBABILITIES, PFLEGE_GRADE_LABELS, PFLEGE_GRADE_PROGRESSION_PROBABILITIES, SUPPORTED_PFLEGE_GRADES, annualData, REGIME_DATA, REGIME_TRANSITIONS, MORTALITY_TABLE } from './simulator-data.js';
 import {
-    computeYearlyPension, computePensionNext, initializePortfolio, applySaleToPortfolio, summarizeSalesByAsset,
-    buildInputsCtxFromPortfolio, sumDepot, buyGold, buyStocksNeu
+    applySaleToPortfolio,
+    buildInputsCtxFromPortfolio,
+    buyGold,
+    buyStocksNeu,
+    initializePortfolio,
+    summarizeSalesByAsset,
+    sumDepot
 } from './simulator-portfolio.js';
 import { resolveProfileKey } from './simulator-heatmap.js';
 import { calculateTargetLiquidityBalanceLike, buildDetailedTranchesFromPortfolio, computeLiqNeedForFloor, euros, normalizeHouseholdContext, resolveCapeRatio } from './simulator-engine-direct-utils.js';
+import { shortenReasonText } from './simulator-utils.js';
 import { calculateSaleAndTax } from './engine/transactions/sale-engine.mjs';
 
 const formatInteger = (value) => Number.isFinite(value) ? Math.round(value) : 0;

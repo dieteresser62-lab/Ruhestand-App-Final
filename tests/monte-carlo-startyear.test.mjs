@@ -15,6 +15,7 @@ prepareHistoricalData();
     const firstEligibleIdx = annualData.findIndex(entry => entry.jahr >= startYearFilter);
     assert(firstEligibleIdx >= 0, 'Filter should have at least one eligible year');
 
+    // Deterministische CDF-Samples über r in [0,1).
     for (let r = 0; r < 1; r += 0.02) {
         const idx = pickStartYearIndex(() => r, annualData, cdf);
         assert(idx >= firstEligibleIdx, `Filtered index should be >= ${startYearFilter} (got ${annualData[idx].jahr})`);

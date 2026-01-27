@@ -1,3 +1,10 @@
+/**
+ * Module: Balance Annual Modal
+ * Purpose: Controls the UI Modal that displays the results of the Annual Update process.
+ *          It summarizes successes (Inflation, ATH) and errors for the user.
+ * Usage: Used by balance-binder-annual.js to show update results.
+ * Dependencies: balance-utils.js, balance-renderer.js
+ */
 "use strict";
 
 import { UIUtils } from './balance-utils.js';

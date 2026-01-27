@@ -1,3 +1,10 @@
+/**
+ * Module: Balance Diagnosis Transaction
+ * Purpose: Renders the detailed "Transaction Diagnostics" in the Diagnosis Panel.
+ *          Explains WHY a specific transaction (or no transaction) was recommended (e.g., blocked by Gold Floor).
+ * Uage: Used by balance-renderer-diagnosis.js to provide transparency on engine decisions.
+ * Dependencies: balance-utils.js
+ */
 "use strict";
 
 import { UIUtils } from './balance-utils.js';
@@ -162,6 +169,7 @@ function describeThresholdGroup(label, thresholds) {
     const lowerValue = (lower && typeof lower[1] === 'number') ? lower[1] : null;
     const upperValue = (upper && typeof upper[1] === 'number') ? upper[1] : null;
 
+    // Status-Ampel: rot außerhalb der Grenzen, gelb nahe an der Grenze, sonst ok.
     let status = 'info';
     if (currentValue !== null) {
         if ((lowerValue !== null && currentValue < lowerValue) ||

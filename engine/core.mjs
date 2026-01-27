@@ -1,4 +1,11 @@
 /**
+ * Module: Engine Core
+ * Purpose: Orchestrates the entire calculation logic of the engine.
+ *          Coordinates InputValidator, MarketAnalyzer, SpendingPlanner, and TransactionEngine.
+ * Usage: The brain of the simulation, called via EngineAPI.
+ * Dependencies: config.mjs, errors.mjs, validators/InputValidator.mjs, analyzers/MarketAnalyzer.mjs, planners/SpendingPlanner.mjs, transactions/TransactionEngine.mjs
+ */
+/**
  * ===================================================================
  * ENGINE CORE MODULE
  * ===================================================================
@@ -32,6 +39,7 @@ import TransactionEngine from './transactions/TransactionEngine.mjs';
 function _internal_calculateModel(input, lastState) {
     // 1. Validierung der Eingabedaten
     // Prüft alle Eingaben auf Plausibilität und Vollständigkeit
+    // Harte Eingabevalidierung vor jeder Modellrechnung (fail-fast).
     const validationResult = InputValidator.validate(input);
     if (!validationResult.valid) {
         // DEBUG: Log validation errors
@@ -42,6 +50,7 @@ function _internal_calculateModel(input, lastState) {
     // 2. Grundwerte berechnen
     // Profil-Konfiguration laden (Runway-Ziele, Allokationsstrategie)
     // Profil-Konfiguration laden (Runway-Ziele, Allokationsstrategie)
+    // Risikoprofil steuert Runway-Ziele, Guardrails und Entnahme-Logik.
     let profil = CONFIG.PROFIL_MAP[input.risikoprofil];
     if (!profil) {
         // Fallback für Tests oder invalide Eingaben
@@ -50,6 +59,7 @@ function _internal_calculateModel(input, lastState) {
 
 
     // Aktuelle Liquidität = Tagesgeld + Geldmarkt-ETF (oder direkter Override)
+    // Liquidität kann direkt überschrieben werden (z. B. Simulator/Tests).
     const aktuelleLiquiditaet = (input.aktuelleLiquiditaet !== undefined)
         ? input.aktuelleLiquiditaet
         : (input.tagesgeld + input.geldmarktEtf);
@@ -74,6 +84,7 @@ function _internal_calculateModel(input, lastState) {
     // Bedarf wird um Renteneinkünfte reduziert (netto)
     const renteJahr = input.renteAktiv ? (input.renteMonatlich * 12) : 0;
     // Fix: Überschussrente auf den Flex-Bedarf anrechnen
+    // Überschussrente reduziert zuerst den Flex-Bedarf (Floor bleibt geschützt).
     const pensionSurplus = Math.max(0, renteJahr - input.floorBedarf);
 
     const inflatedBedarf = {
@@ -88,6 +99,7 @@ function _internal_calculateModel(input, lastState) {
 
     // 6. Runway berechnen (Liquiditäts-Reichweite in Monaten)
     // Wie lange reicht die aktuelle Liquidität bei aktuellem Bedarf?
+    // Runway: Wie viele Monate deckt die Liquidität den aktuellen Bedarf?
     const reichweiteMonate = (inflatedBedarf.floor + inflatedBedarf.flex) > 0
         ? (aktuelleLiquiditaet / ((inflatedBedarf.floor + inflatedBedarf.flex) / 12))
         : Infinity;

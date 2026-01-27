@@ -1,3 +1,10 @@
+/**
+ * Module: Auto-Optimize Worker
+ * Purpose: Manages parallel execution of Monte Carlo simulations using Web Workers.
+ *          Handles WorkerPool creation, job scheduling, and results aggregation.
+ * Usage: Used by auto-optimize-evaluate.js to offload heavy computations.
+ * Dependencies: monte-carlo-runner.js, worker-pool.js
+ */
 "use strict";
 
 import {
@@ -67,6 +74,7 @@ export async function runMonteCarloAutoOptimize({ inputs, widowOptions, monteCar
         : Math.max(1, (navigator?.hardwareConcurrency || 2) - 1));
     const timeBudgetMs = workerConfig.timeBudgetMs ?? 200;
 
+    // Fallback: ohne Worker läuft alles seriell im Main Thread.
     if (typeof Worker === 'undefined') {
         const chunk = await runMonteCarloChunk({
             inputs,
@@ -119,6 +127,7 @@ export async function runMonteCarloAutoOptimize({ inputs, widowOptions, monteCar
     };
 
     let nextRunIdx = 0;
+    // Chunk-Größen adaptieren: kleine Jobs für Parallelität, aber begrenzt, um Overhead zu vermeiden.
     const minChunk = 10;
     const maxChunk = Math.min(80, Math.max(minChunk, Math.ceil(anzahl / workerCount)));
     let chunkSize = Math.min(maxChunk, Math.max(minChunk, Math.floor(anzahl / (workerCount * 4)) || minChunk));
@@ -134,6 +143,7 @@ export async function runMonteCarloAutoOptimize({ inputs, widowOptions, monteCar
     };
 
     const scheduleJob = (start, count) => {
+        // Job-Payload ist vollständig deterministisch über scenarioKey + runRange.
         const startedAt = performance.now();
         const payload = {
             type: 'job',

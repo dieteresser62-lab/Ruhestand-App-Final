@@ -12,6 +12,7 @@
 import { aggregateSweepMetrics } from './simulator-results.js';
 import { formatPercentValue } from './simulator-formatting.js';
 
+// Kleine Format-Helfer, damit die UI-Strings konsistent sind.
 const formatFixed = (value, digits = 1) => value.toFixed(digits);
 const formatPercent = (value, digits = 0) => formatPercentValue(value, { fractionDigits: digits, invalid: '0%' });
 const formatRangeLine = (min, max, range) => `Range: ${formatFixed(min, 1)} → ${formatFixed(max, 1)} (Δ ${formatFixed(range, 1)})`;
@@ -25,15 +26,16 @@ const formatRangeLine = (min, max, range) => `Range: ${formatFixed(min, 1)} → 
 export function calculateSensitivity(sweepResults, metricKey) {
     if (!sweepResults || sweepResults.length === 0) return null;
 
+    // Parameterräume kommen aus der Sweep-UI und sind global gepuffert.
     const paramRanges = window.sweepParamRanges;
     if (!paramRanges) return null;
 
     const sensitivity = {};
 
-    // Für jeden Parameter
+    // Für jeden Parameter separat die Spannweite der Zielmetrik bestimmen.
     for (const [paramKey, values] of Object.entries(paramRanges)) {
         if (values.length <= 1) {
-            // Konstanter Parameter - keine Sensitivity
+            // Konstanter Parameter - keine Sensitivity (Impact = 0).
             sensitivity[paramKey] = {
                 impact: 0,
                 min: null,
@@ -44,7 +46,7 @@ export function calculateSensitivity(sweepResults, metricKey) {
             continue;
         }
 
-        // Finde min/max Metrik-Werte für diesen Parameter
+        // Werte nach Parameterausprägung gruppieren, um Mittelwerte zu bilden.
         const metricsByParamValue = {};
         for (const result of sweepResults) {
             const paramValue = result.params[paramKey];
@@ -56,7 +58,7 @@ export function calculateSensitivity(sweepResults, metricKey) {
             metricsByParamValue[paramValue].push(metricValue);
         }
 
-        // Berechne Durchschnitt für jeden Parameter-Wert
+        // Mittelwerte je Parameterausprägung (reduziert Rauschen durch andere Parameter).
         const avgByParamValue = {};
         for (const [paramValue, metricValues] of Object.entries(metricsByParamValue)) {
             avgByParamValue[paramValue] = metricValues.reduce((sum, val) => sum + val, 0) / metricValues.length;
@@ -76,7 +78,7 @@ export function calculateSensitivity(sweepResults, metricKey) {
         };
     }
 
-    // Normalisiere Sensitivity (0-100)
+    // Normalisiere Sensitivity relativ zum größten Impact (0-100).
     const maxImpact = Math.max(...Object.values(sensitivity).map(s => s.impact));
     if (maxImpact > 0) {
         for (const key of Object.keys(sensitivity)) {
@@ -106,7 +108,7 @@ export function renderSensitivityChart(sensitivity, metricKey) {
         goldTargetPct: 'Gold Target %'
     };
 
-    // Sortiere Parameter nach Impact (höchster zuerst)
+    // Sortiere Parameter nach Impact (höchster zuerst) für ein lesbares Ranking.
     const sorted = Object.entries(sensitivity)
         .filter(([key, data]) => data.impact > 0)
         .sort(([, a], [, b]) => b.normalized - a.normalized);
@@ -167,15 +169,15 @@ export function calculateParetoFrontier(sweepResults, metricKey1, metricKey2, ma
 
         let isDominated = false;
 
-        // Prüfe ob dieser Punkt von einem anderen dominiert wird
-        for (let j = 0; j < sweepResults.length; j++) {
-            if (i === j) continue;
+    // Prüfe ob dieser Punkt von einem anderen dominiert wird.
+    for (let j = 0; j < sweepResults.length; j++) {
+        if (i === j) continue;
 
             const other = sweepResults[j];
             const om1 = other.metrics[metricKey1];
             const om2 = other.metrics[metricKey2];
 
-            // Prüfe Dominanz basierend auf Maximierung/Minimierung
+            // Dominanz hängt von der Maximierungs-/Minimierungsrichtung ab.
             const better1 = maximize1 ? (om1 > m1) : (om1 < m1);
             const better2 = maximize2 ? (om2 > m2) : (om2 < m2);
             const equal1 = om1 === m1;
@@ -198,7 +200,7 @@ export function calculateParetoFrontier(sweepResults, metricKey1, metricKey2, ma
         }
     }
 
-    // Sortiere Pareto-Punkte für bessere Visualisierung
+    // Sortiere Pareto-Punkte für eine glatte Verbindungslinie.
     paretoPoints.sort((a, b) => a.metric1 - b.metric1);
 
     return paretoPoints;
@@ -231,7 +233,7 @@ export function renderParetoFrontier(paretoPoints, allPoints, metricKey1, metric
         minRunwayObserved: 'Min Runway Observed'
     };
 
-    // Extrahiere Metrik-Werte
+    // Extrahiere Metrik-Werte für Achsenskalierung.
     const m1Values = allPoints.map(p => p.metrics[metricKey1]);
     const m2Values = allPoints.map(p => p.metrics[metricKey2]);
 
@@ -240,7 +242,7 @@ export function renderParetoFrontier(paretoPoints, allPoints, metricKey1, metric
     const minY = Math.min(...m2Values);
     const maxY = Math.max(...m2Values);
 
-    // Skalierung
+    // Lineare Skalierung von Metrikraum in SVG-Koordinaten.
     const scaleX = (val) => margin.left + ((val - minX) / (maxX - minX)) * plotWidth;
     const scaleY = (val) => height - margin.bottom - ((val - minY) / (maxY - minY)) * plotHeight;
 
@@ -257,21 +259,21 @@ export function renderParetoFrontier(paretoPoints, allPoints, metricKey1, metric
     svg += `<text x="${width / 2}" y="${height - 10}" text-anchor="middle" style="font-size: 12px;">${metricLabels[metricKey1] || metricKey1}</text>`;
     svg += `<text x="15" y="${height / 2}" text-anchor="middle" transform="rotate(-90, 15, ${height / 2})" style="font-size: 12px;">${metricLabels[metricKey2] || metricKey2}</text>`;
 
-    // Alle Punkte (grau)
+    // Alle Punkte (grau) als Kontextwolke.
     for (const point of allPoints) {
         const x = scaleX(point.metrics[metricKey1]);
         const y = scaleY(point.metrics[metricKey2]);
         svg += `<circle cx="${x}" cy="${y}" r="4" fill="#ccc" opacity="0.6"/>`;
     }
 
-    // Pareto-Punkte (grün, größer)
+    // Pareto-Punkte (grün, größer) für Fokus.
     for (const point of paretoPoints) {
         const x = scaleX(point.metric1);
         const y = scaleY(point.metric2);
         svg += `<circle cx="${x}" cy="${y}" r="6" fill="#4caf50" stroke="#2e7d32" stroke-width="2"/>`;
     }
 
-    // Verbinde Pareto-Punkte
+    // Verbinde Pareto-Punkte, um die Frontier visuell zu betonen.
     if (paretoPoints.length > 1) {
         let pathData = `M ${scaleX(paretoPoints[0].metric1)} ${scaleY(paretoPoints[0].metric2)}`;
         for (let i = 1; i < paretoPoints.length; i++) {
@@ -321,11 +323,11 @@ export function displayParetoFrontier() {
         return;
     }
 
-    // Verwende gespeicherte Metriken aus Dialog
+    // Verwende gespeicherte Metriken aus Dialog (UI pflegt window.paretoMetrics).
     const metric1 = window.paretoMetrics?.metric1 || 'medianEndWealth';
     const metric2 = window.paretoMetrics?.metric2 || 'worst5Drawdown';
 
-    // Import shouldMaximizeMetric
+    // Lokale Kopie zur Maximierungslogik, um keine UI-Abhängigkeit zu ziehen.
     const maximize1 = shouldMaximizeMetricLocal(metric1);
     const maximize2 = shouldMaximizeMetricLocal(metric2);
 

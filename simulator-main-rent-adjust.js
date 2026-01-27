@@ -14,6 +14,7 @@ export function initRentAdjModeUI() {
             rentAdjPctInput.title = 'Gemeinsame Rentenanpassung für beide Personen';
             if (rentAdjPctGroup) rentAdjPctGroup.style.display = 'flex';
         } else {
+            // For wage/CPI coupling, the percent is derived from data.
             rentAdjPctInput.disabled = true;
             rentAdjPctInput.title = 'Wird automatisch über Koppelung gesteuert (' + (mode === 'wage' ? 'Lohnentwicklung' : 'Inflation') + ')';
             if (rentAdjPctGroup) rentAdjPctGroup.style.display = 'none';

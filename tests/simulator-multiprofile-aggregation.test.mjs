@@ -69,6 +69,7 @@ const profileInputs = [
 
 {
     console.log('\n📋 Test 1: Two profiles');
+    // Primary profile = 'a', Partner aus Profil 'b'.
     const result = combineSimulatorProfiles(profileInputs, 'a');
     assert(result.combined, 'Combined inputs should be created');
     const combined = result.combined;

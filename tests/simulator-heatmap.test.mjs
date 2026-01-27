@@ -10,6 +10,7 @@ console.log('--- Simulator Heatmap Tests ---');
 
 // --- TEST 2: computeHeatmapStats empty ---
 {
+    // Empty heatmap should short-circuit to zero stats.
     const stats = computeHeatmapStats([], [0, 4.5, 10], 10);
     assertEqual(stats.shares.length, 0, 'Empty heatmap should return empty shares');
     assertEqual(stats.globalP90, 0, 'Empty heatmap should have globalP90=0');
@@ -17,6 +18,7 @@ console.log('--- Simulator Heatmap Tests ---');
 
 // --- TEST 3: computeHeatmapStats single value ---
 {
+    // One year, two bins: put all mass into bin 0 to get 100% share.
     const heat = [new Uint32Array([2, 0])];
     const stats = computeHeatmapStats(heat, [0, 4.5, 10], 2);
     assertClose(stats.globalP90, 1, 0.0001, 'Single-value heatmap should have globalP90=1');
@@ -25,6 +27,7 @@ console.log('--- Simulator Heatmap Tests ---');
 
 // --- TEST 4: renderHeatmapSVG cell mapping ---
 {
+    // 2 years x 2 bins -> 4 cells.
     const heat = [new Uint32Array([1, 1]), new Uint32Array([0, 2])];
     const bins = [0, 4.5, 10];
     const svg = renderHeatmapSVG(heat, bins, 2, { timeShareQuoteAbove45: 0.1 }, { showLegend: false, showFooterStats: false });
@@ -34,6 +37,7 @@ console.log('--- Simulator Heatmap Tests ---');
 
 // --- TEST 5: renderSweepHeatmapSVG edge cases ---
 {
+    // Empty sweep should emit a placeholder message (no grid).
     const empty = renderSweepHeatmapSVG([], 'successProbFloor', 'targetEq', 'runwayMin', [], []);
     assert(empty.includes('Keine Sweep-Ergebnisse'), 'Empty sweep should show placeholder');
 

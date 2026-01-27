@@ -1,3 +1,10 @@
+/**
+ * Module: Simulator Portfolio Inputs
+ * Purpose: Collecting input values from the UI.
+ *          Handles complex parsing of form fields, care config, and partner details.
+ * Usage: Called by simulator-portfolio.js facade.
+ * Dependencies: simulator-data.js, simulator-portfolio-care.js, simulator-portfolio-format.js
+ */
 "use strict";
 
 import { SUPPORTED_PFLEGE_GRADES } from './simulator-data.js';
@@ -17,6 +24,7 @@ export function getCommonInputs() {
         const override = (typeof window !== 'undefined') ? window.__profilverbundTranchenOverride : null;
         const preferAggregates = (typeof window !== 'undefined') && window.__profilverbundPreferAggregates;
         if (Array.isArray(override) && override.length > 0) {
+            // Profilverbund override has highest priority.
             detailledTranches = override;
         } else if (!preferAggregates) {
             const saved = localStorage.getItem('depot_tranchen');
@@ -40,6 +48,7 @@ export function getCommonInputs() {
     const widowPctRaw = parseFloat(document.getElementById('widowPensionPct')?.value);
     const widowMarriageOffsetRaw = parseInt(document.getElementById('widowMarriageOffsetYears')?.value);
     const widowMinMarriageYearsRaw = parseInt(document.getElementById('widowMinMarriageYears')?.value);
+    // Normalize widow options into validated percent + integer years.
     const widowOptions = {
         mode: widowModeRaw,
         percent: (() => {
@@ -50,6 +59,7 @@ export function getCommonInputs() {
         minMarriageYears: Math.max(0, Number.isFinite(widowMinMarriageYearsRaw) ? widowMinMarriageYearsRaw : 0)
     };
 
+    // Pflegegrade: normalize per-grade extra cost, flex cut, mortality factor.
     const pflegeGradeConfigs = {};
     SUPPORTED_PFLEGE_GRADES.forEach(grade => {
         const zusatzInput = document.getElementById(`pflegeStufe${grade}Zusatz`);
@@ -84,6 +94,7 @@ export function getCommonInputs() {
 
     const rawPflegeMin = parseInt(document.getElementById('pflegeMinDauer')?.value);
     const rawPflegeMax = parseInt(document.getElementById('pflegeMaxDauer')?.value);
+    // Normalize care duration bounds with gender defaults.
     const normalizedCareDuration = normalizeCareDurationRange(rawPflegeMin, rawPflegeMax, p1Geschlecht);
 
     const tagesgeld = parseDisplayNumber(document.getElementById('tagesgeld')?.value);
@@ -95,6 +106,7 @@ export function getCommonInputs() {
         tagesgeld: tagesgeld,
         geldmarktEtf: geldmarktEtf,
         einstandAlt: parseFloat(document.getElementById('einstandAlt').value) || 0,
+        // Liquidity target is current cash + money market.
         zielLiquiditaet: tagesgeld + geldmarktEtf,
         startFloorBedarf: parseFloat(document.getElementById('startFloorBedarf').value) || 0,
         startFlexBedarf: parseFloat(document.getElementById('startFlexBedarf').value) || 0,
@@ -178,6 +190,7 @@ export function getCommonInputs() {
         sparrateIndexing: sparrateIndexing
     };
 
+    // Transition occurs after the accumulation window ends.
     const transitionYear = accumulationPhaseEnabled ? accumulationDurationYears : 0;
     const transitionAge = p1StartAlter + transitionYear;
 

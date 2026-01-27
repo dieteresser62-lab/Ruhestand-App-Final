@@ -69,6 +69,7 @@ const baseContext = { saleBudgets: {} }; // No budget limits
     // It will sell 20k Gross.
     // Profit 10k. Tax 2637.50. Net 17362.50.
 
+    // Vollverkauf erzwingen, um Steuerberechnung eindeutig zu prüfen.
     const fullSale = TransactionEngine.calculateSaleAndTax(
         20000,
         input,

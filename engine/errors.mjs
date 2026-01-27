@@ -1,4 +1,11 @@
 /**
+ * Module: Engine Errors
+ * Purpose: specialized error classes for the Retirement Engine.
+ *          Includes AppError, ValidationError, and FinancialCalculationError.
+ * Usage: Thrown by engine modules when exceptions occur.
+ * Dependencies: None
+ */
+/**
  * ===================================================================
  * ENGINE ERRORS MODULE
  * ===================================================================

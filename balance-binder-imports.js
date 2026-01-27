@@ -1,3 +1,10 @@
+/**
+ * Module: Balance Binder Imports
+ * Purpose: Manages Data Import/Export functionality.
+ *          It handles JSON state export/import and CSV market data import (parsing legacy CSV formats).
+ * Usage: Used by balance-binder.js to handle file inputs and export buttons.
+ * Dependencies: balance-config.js, balance-reader.js, balance-renderer.js, balance-storage.js
+ */
 import { CONFIG, AppError } from './balance-config.js';
 import { UIReader } from './balance-reader.js';
 import { UIRenderer } from './balance-renderer.js';

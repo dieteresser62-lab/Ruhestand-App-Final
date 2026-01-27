@@ -1,3 +1,10 @@
+/**
+ * Module: Balance Diagnosis Key Params
+ * Purpose: Renders the "Key Parameters" grid in the Diagnosis Panel.
+ *          Visualizes high-level metrics like Peak Wealth, Current Real Wealth, and Inflation.
+ * Usage: Used by balance-renderer-diagnosis.js to show key financial indicators.
+ * Dependencies: balance-utils.js
+ */
 "use strict";
 
 import { UIUtils } from './balance-utils.js';

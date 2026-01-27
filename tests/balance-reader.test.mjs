@@ -289,6 +289,7 @@ console.log('Test 1: readAllInputs - Basis mit DOM-Werten');
 
     const inputs = {
         aktuellesAlter: new MockElement('input', '67'),
+        // Punkt als Tausendertrenner soll korrekt geparst werden.
         floorBedarf: new MockElement('input', '24.000'),
         flexBedarf: new MockElement('input', '12.000'),
         inflation: new MockElement('input', '2.5'),
@@ -316,6 +317,7 @@ console.log('Test 1: readAllInputs - Basis mit DOM-Werten');
 
     initUIReader({ inputs, controls: {} });
 
+    // Ergebnis: numerisch normalisierte Werte aus dem DOM.
     const result = UIReader.readAllInputs();
 
     assertEqual(result.aktuellesAlter, 67, 'aktuellesAlter sollte 67 sein');
@@ -334,7 +336,7 @@ console.log('Test 2: Profile-Override hat Vorrang vor DOM');
 {
     mockLocalStorage.clear();
 
-    // Setze Profile-Werte
+    // Setze Profile-Werte (localStorage überschreibt DOM).
     mockLocalStorage.setItem('profile_aktuelles_alter', '70');
     mockLocalStorage.setItem('profile_tagesgeld', '100000');
     mockLocalStorage.setItem('profile_rente_monatlich', '2000');

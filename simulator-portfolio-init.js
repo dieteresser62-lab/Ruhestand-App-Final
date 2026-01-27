@@ -1,3 +1,10 @@
+/**
+ * Module: Simulator Portfolio Init
+ * Purpose: Initializing the portfolio structure.
+ *          Creates initial tranches (Equity, Gold, Money Market) from inputs or detailed lists.
+ * Usage: Called by simulator-portfolio.js facade.
+ * Dependencies: simulator-portfolio-format.js
+ */
 "use strict";
 
 import { parseDisplayNumber } from './simulator-portfolio-format.js';
@@ -21,6 +28,7 @@ export function initializePortfolioDetailed(inputs) {
         });
 
         for (const tranche of sortedTranches) {
+            // Normalize type/category across legacy labels.
             const rawType = String(tranche.type || tranche.kind || '').toLowerCase();
             const rawCategory = String(tranche.category || '').toLowerCase();
             let category = rawCategory;
@@ -49,6 +57,7 @@ export function initializePortfolioDetailed(inputs) {
                 }
             }
 
+            // Derive missing price/value fields from shares where possible.
             const shares = parseDisplayNumber(tranche.shares);
             const purchasePriceRaw = parseDisplayNumber(tranche.purchasePrice);
             const currentPriceRaw = parseDisplayNumber(tranche.currentPrice || tranche.purchasePrice);
@@ -87,6 +96,7 @@ export function initializePortfolioDetailed(inputs) {
 
     // Fallback auf alte Logik, wenn keine detaillierten Tranchen vorhanden
     if (depotTranchesAktien.length === 0) {
+        // Aggregate legacy fields into synthetic tranches.
         const startLiquiditaet = (inputs.tagesgeld || 0) + (inputs.geldmarktEtf || 0);
         const flexiblesVermoegen = Math.max(0, inputs.startVermoegen - inputs.depotwertAlt);
         const investitionsKapitalNeu = Math.max(0, flexiblesVermoegen - startLiquiditaet);

@@ -83,6 +83,7 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
     const scenarioContainer = document.getElementById('scenarioLogContainer');
     if (scenarioLogs && scenarioContainer) {
         const caR = viewModel.carThreshold;
+        // Expose scenario logs globally for export actions.
         window.globalScenarioLogs = scenarioLogs;
         window.globalScenarioCarThreshold = caR;
         window.globalCurrentScenarioData = null;
@@ -144,6 +145,7 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
             }
 
             if (scenario && scenario.logDataRows && scenario.logDataRows.length > 0) {
+                // Respect persisted detail toggles for care and log verbosity.
                 const showCareDetails = (localStorage.getItem('showCareDetails') === '1');
                 const logDetailLevel = loadDetailLevel(WORST_LOG_DETAIL_KEY);
                 output.innerHTML = renderWorstRunLog(scenario.logDataRows, caR, {
@@ -192,6 +194,7 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
         if (jsonBtn) {
             jsonBtn.onclick = () => {
                 if (window.globalCurrentScenarioData?.rows) {
+                    // JSON export preserves full row structure.
                     const blob = new Blob([JSON.stringify(window.globalCurrentScenarioData.rows, null, 2)], { type: 'application/json' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
@@ -209,6 +212,7 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
                 if (window.globalCurrentScenarioData?.rows && window.globalCurrentScenarioData.rows.length > 0) {
                     const rows = window.globalCurrentScenarioData.rows;
                     const headers = Object.keys(rows[0]);
+                    // CSV export flattens object cells via JSON to keep structure.
                     const csvContent = [
                         headers.join(';'),
                         ...rows.map(row => headers.map(h => {
@@ -507,6 +511,7 @@ export function aggregateSweepMetrics(runOutcomes) {
     const successCount = runOutcomes.filter(r => !r.failed).length;
     const successProbFloor = (successCount / runOutcomes.length) * 100;
 
+    // Sort end wealths to compute percentile cutoffs.
     const endWealths = runOutcomes.map(r => r.finalVermoegen || 0);
     endWealths.sort((a, b) => a - b);
 

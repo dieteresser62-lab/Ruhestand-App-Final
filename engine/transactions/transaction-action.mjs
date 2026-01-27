@@ -1,3 +1,10 @@
+/**
+ * Module: Transaction Action
+ * Purpose: Determines the best financial move (Action) based on market and portfolio state.
+ *          Decides between Emergency Sale, Opportunistic Rebalancing, or Surplus Investment.
+ * Usage: Core decision making logic for transactions.
+ * Dependencies: transaction-opportunistic.mjs, transaction-surplus.mjs, config.mjs
+ */
 import { CONFIG } from '../config.mjs';
 import { buildOpportunisticRefill } from './transaction-opportunistic.mjs';
 import { trySurplusRebalance } from './transaction-surplus.mjs';
@@ -338,7 +345,7 @@ export function determineAction(p, helpers) {
 
     // Bei Notfall-Verkäufen (Puffer-Schutz) ODER kritischem Floor-Mangel keine minTrade-Schwelle anwenden
     // (Nutze oben deklarierte Variable isCriticalFloorShortfall)
-    
+
     const minTradeResult = (isPufferSchutzAktiv || isCriticalFloorShortfall)
         ? 0
         : (minTradeResultOverride ?? Math.max(

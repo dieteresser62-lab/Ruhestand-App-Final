@@ -52,7 +52,7 @@ try {
         applyAnnualInflation: () => {}
     });
 
-    // Seed localStorage with state + tranchen
+    // Seed localStorage with state + tranchen (Snapshot muss beide enthalten).
     localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify({ inputs: { foo: 1 }, lastState: { bar: 2 } }));
     localStorage.setItem('depot_tranchen', JSON.stringify([{ trancheId: 't1' }]));
 

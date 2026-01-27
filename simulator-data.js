@@ -1,3 +1,11 @@
+/**
+ * Module: Simulator Data
+ * Purpose: Central repository for static simulation data.
+ *          Includes historical market data (1925-2024), mortality tables,
+ *          care grades/probabilities, and stress test presets.
+ * Usage: Imported by various simulator modules (historical, stress, etc.).
+ * Dependencies: None (pure data)
+ */
 "use strict";
 
 // --- DATA & CONFIG ---

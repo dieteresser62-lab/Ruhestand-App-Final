@@ -1,3 +1,11 @@
+/**
+ * Module: Balance Renderer
+ * Purpose: The Facade pattern for all UI rendering operations.
+ *          Delegates specific rendering tasks to SummaryRenderer, ActionRenderer, and DiagnosisRenderer.
+ *          Also handles global UI feedback like Toasts and Error messages.
+ * Usage: Used by balance-main.js to update the UI after calculations.
+ * Dependencies: balance-renderer-summary.js, balance-renderer-action.js, balance-renderer-diagnosis.js
+ */
 "use strict";
 
 /**
@@ -44,6 +52,7 @@ export const UIRenderer = {
      */
     render(ui) {
 
+        // Debug snapshot for diagnosis; safe to remove in production builds.
         console.log('DEBUG_UI_RENDER:', {
             uiKeys: Object.keys(ui || {}),
             zielLiquiditaet: ui?.zielLiquiditaet,
@@ -55,6 +64,7 @@ export const UIRenderer = {
             console.warn('UIRenderer.render: Renderer nicht initialisiert.');
             return;
         }
+        // Summary first, then action panel to keep layout stable.
         summaryRenderer.renderOverview(ui);
         actionRenderer.renderAction(ui?.action, ui?.input, ui?.spending, ui?.zielLiquiditaet);
     },
@@ -114,6 +124,7 @@ export const UIRenderer = {
         container.className = 'error-warn';
 
         if (error instanceof ValidationError) {
+            // Highlight field-level errors and show a compact list.
             container.textContent = error.message;
             const ul = document.createElement('ul');
             error.errors.forEach(({ fieldId, message }) => {

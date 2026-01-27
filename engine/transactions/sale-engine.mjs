@@ -1,3 +1,10 @@
+/**
+ * Module: Sale Engine
+ * Purpose: Calculates tax-efficient sales of assets (Shares, Gold).
+ *          Handles FIFO vs Tax-Optimized sorting and capital gains tax (Abgeltungsteuer).
+ * Usage: Called by transaction-action.mjs to execute sell orders.
+ * Dependencies: None (pure logic)
+ */
 export function calculateSaleAndTax(requestedRefill, input, context, market, isEmergencySale) {
     const forceGrossSellAmount = context && context.forceGrossSellAmount ? Number(context.forceGrossSellAmount) : 0;
 

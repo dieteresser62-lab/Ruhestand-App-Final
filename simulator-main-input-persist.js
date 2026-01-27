@@ -24,6 +24,7 @@ export function initInputPersistence() {
             // Persistence Logic
             const storageKey = 'sim_' + id;
             const storedVal = localStorage.getItem(storageKey);
+            // noPersist allows specific fields to opt out of localStorage.
             if (!element.dataset.noPersist && storedVal !== null && storedVal !== "") {
                 if (element.type === 'checkbox') {
                     element.checked = (storedVal === 'true');

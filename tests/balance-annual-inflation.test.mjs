@@ -59,6 +59,7 @@ try {
         const baseState = { lastState: { cumulativeInflationFactor: 1, lastInflationAppliedAtAge: 60 } };
         localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify(baseState));
 
+        // Jährlich erhöhen (Alter 61..70) -> Faktor ~1.219.
         for (let age = 61; age <= 70; age++) {
             dom.inputs.aktuellesAlter.value = String(age);
             dom.inputs.inflation.value = '2';
@@ -77,6 +78,7 @@ try {
         dom.inputs.flexBudgetRecharge.value = '200';
         dom.inputs.inflation.value = '2';
         handlers.applyInflationToBedarfe();
+        // Inputs werden im DOM angepasst (Strings), dann geparst.
         const floor = UIUtils.parseCurrency(dom.inputs.floorBedarf.value);
         const flex = UIUtils.parseCurrency(dom.inputs.flexBedarf.value);
         assertClose(floor, 1020, 0.01, 'Floor should be adjusted by inflation');

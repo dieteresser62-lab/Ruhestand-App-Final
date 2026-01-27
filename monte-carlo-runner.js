@@ -1,3 +1,10 @@
+/**
+ * Module: Monte Carlo Runner
+ * Purpose: Core orchestrator for the Monte Carlo simulation.
+ *          Handles the simulation loop, years, life events (Care, Death), and results aggregation.
+ * Usage: Called by auto-optimize-worker.js and the main simulation UI.
+ * Dependencies: simulator-utils.js, simulator-data.js, simulator-engine-wrapper.js
+ */
 "use strict";
 
 import { rng, makeRunSeed, RUNIDX_COMBO_SETUP, quantile } from './simulator-utils.js';
@@ -25,6 +32,7 @@ function buildCdfFromIndices(indices, weightsByIndex) {
     }
     if (total <= 0) return null;
     let cumulative = 0;
+    // CDF: monoton wachsend, letzter Wert wird auf 1 geklemmt.
     const cdf = indices.map(idx => {
         const weight = weightsByIndex ? (weightsByIndex[idx] || 0) : 1;
         cumulative += weight / total;
@@ -40,6 +48,7 @@ function pickFromSampler(rand, sampler, fallbackIndex = 0) {
     }
     const sample = rand ? rand() : Math.random();
     const r = Math.min(1 - Number.EPSILON, Math.max(0, Number.isFinite(sample) ? sample : 0));
+    // Binäre Suche im CDF für O(log n) Sampling.
     let low = 0;
     let high = sampler.cdf.length - 1;
     while (low < high) {
@@ -58,6 +67,7 @@ function buildYearSamplingConfig(mode, data, { startYearFilter = 1970, startYear
 
     const cutoff = Number.isFinite(startYearFilter) ? startYearFilter : 1970;
     const halfLife = Number.isFinite(startYearHalfLife) && startYearHalfLife > 0 ? startYearHalfLife : 20;
+    // Recency-Mode: Exponentielles Abklingen mit Halbwertszeit (halfLife).
     const currentYear = data[data.length - 1]?.jahr ?? new Date().getFullYear();
 
     const allowedIndices = [];
@@ -81,6 +91,7 @@ function buildYearSamplingConfig(mode, data, { startYearFilter = 1970, startYear
         ? buildCdfFromIndices(allowedIndices, weightsByIndex)
         : null;
 
+    // Block-Sampling: Startindex so wählen, dass ein Block (blockSize) passt.
     const maxStartIndex = Math.max(1, data.length - blockSize);
     const blockStartIndices = allowedIndices.filter(idx => idx < maxStartIndex);
     const blockSampler = (mode === 'FILTER' || mode === 'RECENCY')
@@ -146,6 +157,7 @@ export function pickStartYearIndex(rand, data, cdf, minIndex = MIN_START_YEAR_IN
     const sample = rand ? rand() : Math.random();
     const r = Math.min(1 - Number.EPSILON, Math.max(0, Number.isFinite(sample) ? sample : 0));
     if (!cdf || cdf.length !== data.length) {
+        // Gleichverteilung als Fallback, wenn kein CDF vorhanden ist.
         const min = Math.max(0, Math.min(minIndex, data.length - 1));
         const span = Math.max(1, data.length - min);
         return Math.min(data.length - 1, min + Math.floor(r * span));

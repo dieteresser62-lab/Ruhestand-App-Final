@@ -20,7 +20,7 @@ function assertClose(actual, expected, tolerance, message) {
 
 console.log('--- Advanced Scenario Tests ---');
 
-// Base Inputs
+// Base Inputs: bewusst "realistisch", aber mit aktivem Partner für Witwenlogik.
 const baseInputs = {
     startAlter: 65,
     rentAdjPct: 0,
@@ -45,7 +45,7 @@ const baseInputs = {
     pflege_flex_faktor: 0.5 // 50% flex reduction if care case
 };
 
-// Base State
+// Base State: Startportfolio + Pensionen + Markthistorie.
 const baseState = {
     portfolio: {
         depotTranchesAktien: [{ marketValue: 500000, costBasis: 400000, type: 'aktien_alt' }],
@@ -62,7 +62,7 @@ const baseState = {
     }
 };
 
-// Year Data
+// Year Data: Normaljahr vs Crashjahr für Stressreaktionen.
 const normalYear = { jahr: 2025, rendite: 0.05, inflation: 1.02, zinssatz: 0.01, gold_eur_perf: 0 };
 const crashYear = { jahr: 2025, rendite: -0.50, inflation: 1.02, zinssatz: 0.01, gold_eur_perf: 0.10 };
 
@@ -119,7 +119,7 @@ try {
 try {
     const inputs = { ...baseInputs, p1Alive: false, partner: { aktiv: true } };
 
-    // Let's simulate a state where P1 is dead.
+    // Simuliere P1 tot -> P2 bekommt Witwenrente.
     const state = JSON.parse(JSON.stringify(baseState));
     // P1 is dead, so P1 pension ignored. P2 is alive and gets Widow Pension.
     state.widowPensionP2 = 12000;
@@ -159,7 +159,7 @@ try {
     console.log(`Crash Action: ${actionTitle}`);
     console.log(`Sales:`, JSON.stringify(vk));
 
-    // Assert we didn't sell ALL stocks.
+    // Assert we didn't sell ALL stocks (kein kompletter Ausverkauf).
     assert(endStocks >= 200000, 'Should retain significant stock value after crash (>= 200k)');
 
     // STRICT ASSERTION: Verify correct crisis reaction

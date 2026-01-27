@@ -56,6 +56,7 @@ function buildBasicInputs() {
     const target = [new Uint32Array([1, 2]), new Uint32Array([3, 4])];
     const source = [new Uint32Array([10, 20]), new Uint32Array([30, 40])];
     mergeHeatmap(target, source);
+    // Summe je Zelle muss korrekt akkumulieren.
     assert(target[0][0] === 11 && target[0][1] === 22, 'Heatmap merge should sum row 0');
     assert(target[1][0] === 33 && target[1][1] === 44, 'Heatmap merge should sum row 1');
 }
@@ -92,6 +93,7 @@ function buildBasicInputs() {
     const d = { finalVermoegen: 100, comboIdx: 1, runIdx: 2 };
     assert(pickWorstRun(null, a) === a, 'Null current should return candidate');
     assert(pickWorstRun(a, null) === a, 'Null candidate should keep current');
+    // Tie-Breaker: erst Endvermögen, dann comboIdx, dann runIdx.
     assert(pickWorstRun(a, b) === b, 'Lower finalVermoegen should win');
     assert(pickWorstRun(a, c) === c, 'Lower comboIdx should win on tie');
     assert(pickWorstRun(c, d) === d, 'Lower runIdx should win on full tie');
@@ -118,6 +120,7 @@ function buildBasicInputs() {
         engine: EngineAPI
     });
 
+    // Struktur-Checks: Buffers, Heatmap, Bins, Totals vorhanden.
     assert(chunk.buffers.finalOutcomes.length === 4, 'Buffers should match run count');
     assert(chunk.heatmap.length === 10, 'Heatmap should have 10 rows');
     assertEqual(chunk.bins.length, MC_HEATMAP_BINS.length, 'Bins should match MC_HEATMAP_BINS');
@@ -177,6 +180,7 @@ function buildBasicInputs() {
         allRealWithdrawalsSample
     });
 
+    // Verifikation: zentrale Kennzahlen korrekt abgeleitet.
     assertClose(aggregates.finalOutcomes.p50, 200, 0.0001, 'Median end wealth should be 200');
     assertClose(aggregates.taxOutcomes.p50, 20, 0.0001, 'Median tax should be 20');
     assertClose(aggregates.depotErschoepfungsQuote, (1 / 3) * 100, 0.0001, 'Depletion rate should match');

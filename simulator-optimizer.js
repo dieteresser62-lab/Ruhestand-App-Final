@@ -223,7 +223,8 @@ export function findBestParametersMultiObjective(sweepResults, objectives) {
         return null;
     }
 
-    // Normalisiere Metriken auf 0-1 Skala
+    // Normalisiere Metriken auf 0-1 Skala, damit die Gewichtung vergleichbar wird
+    // (sonst dominiert eine Metrik mit großem Wertebereich).
     const normalized = {};
     for (const obj of objectives) {
         const values = sweepResults.map(r => r.metrics[obj.metricKey]);
@@ -245,7 +246,7 @@ export function findBestParametersMultiObjective(sweepResults, objectives) {
             const value = sweepResults[i].metrics[obj.metricKey];
             const norm = normalized[obj.metricKey];
 
-            // Normalisiere auf 0-1
+            // Normalisiere auf 0-1 (Range=0 => neutraler 0.5-Wert).
             let normalizedValue = norm.range > 0 ? (value - norm.min) / norm.range : 0.5;
 
             // Invertiere wenn minimieren

@@ -1,3 +1,10 @@
+/**
+ * Module: Simulator Utils
+ * Purpose: Critical utility functions for the simulation.
+ *          Includes RNG (Random Number Generator), math helpers (quantile, mean), and text formatting.
+ * Usage: Used universally across the simulation and engine modules.
+ * Dependencies: simulator-formatting.js
+ */
 "use strict";
 
 // --- UI & UTILITIES ---
@@ -63,9 +70,10 @@ export const mean = arr => arr.length > 0 ? sum(arr) / arr.length : 0;
  */
 export function rng(seed = 123456789) {
     let x = seed | 0;
+    // Xorshift32: schneller, deterministischer RNG für Reproduzierbarkeit.
     const generator = () => (x = (x ^= (x << 13)), x ^= (x >>> 17), x ^= (x << 5), ((x >>> 0) % 1e9) / 1e9);
 
-    // Fork: creates a new independent RNG stream with derived seed
+    // Fork: deterministische Ableitung eines unabhängigen Streams (Label-mix).
     generator.fork = (label = '') => {
         let derivedSeed = x;
         for (let i = 0; i < label.length; i++) {
@@ -97,6 +105,7 @@ export function makeRunSeed(baseSeed, comboIdx, runIdx) {
     const base = normalizeSeed(baseSeed);
     const combo = normalizeSeed(comboIdx);
     const run = normalizeSeed(runIdx);
+    // Zweistufiges Mischen reduziert Korrelationen zwischen Combo- und Run-Index.
     let h = mix32(base ^ mix32(combo + 0x9e3779b9));
     h = mix32(h ^ mix32(run + 0x85ebca6b));
     return h >>> 0;

@@ -8,20 +8,23 @@ Die Berechnungs-Engine wurde aus dem historischen Monolithen extrahiert und best
 
 ```
 engine/
-
 ├── config.mjs                    # Schwellenwerte, Profile, Texte, Build-ID
 ├── core.mjs                      # Orchestrierung & EngineAPI
 ├── errors.mjs                    # Fehlerklassen (AppError, ValidationError, FinancialCalculationError)
-├── analyzers/MarketAnalyzer.mjs  # Marktanalyse & Regime-Klassifikation
-├── planners/SpendingPlanner.mjs  # Guardrails & Entnahmeplanung
-├── transactions/TransactionEngine.mjs      # Transaktionslogik & Liquiditätsziele
-├── transactions/transaction-action.mjs     # Orchestrierung der Transaktionsentscheidungen
-├── transactions/transaction-opportunistic.mjs # Opportunistisches Rebalancing (Refill)
-├── transactions/transaction-surplus.mjs    # Surplus-Investments (Cash-Abbau)
-├── transactions/sale-engine.mjs            # Verkauf/Steuer/Tranchensortierung
-├── transactions/transaction-utils.mjs      # Ziel-Liquidität, Quantisierung, Min-Trade
-├── validators/InputValidator.mjs # Eingabevalidierung
-└── index.mjs                     # Bündel-Entry, re-exportiert API
+├── index.mjs                     # Bündel-Entry, re-exportiert API
+├── analyzers/
+│   └── MarketAnalyzer.mjs        # Marktanalyse & Regime-Klassifikation
+├── planners/
+│   └── SpendingPlanner.mjs       # Guardrails & Entnahmeplanung
+├── transactions/
+│   ├── TransactionEngine.mjs     # Transaktionslogik & Liquiditätsziele
+│   ├── transaction-action.mjs    # Orchestrierung der Transaktionsentscheidungen
+│   ├── transaction-opportunistic.mjs  # Opportunistisches Rebalancing (Refill)
+│   ├── transaction-surplus.mjs   # Surplus-Investments (Cash-Abbau)
+│   ├── sale-engine.mjs           # Verkauf/Steuer/Tranchensortierung
+│   └── transaction-utils.mjs     # Ziel-Liquidität, Quantisierung, Min-Trade
+└── validators/
+    └── InputValidator.mjs        # Eingabevalidierung
 ```
 
 `build-engine.mjs` nutzt `engine/index.mjs` als Einstieg und erzeugt daraus das Browser-Artefakt `engine.js`.

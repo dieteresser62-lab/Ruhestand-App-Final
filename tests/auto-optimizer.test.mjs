@@ -59,6 +59,7 @@ try {
             targetEq: { min: 20, max: 80, step: 5 }
         };
 
+        // Erwartung: LHS liefert gleichmäßig verteilte Samples im Range.
         const samples = latinHypercubeSample(ranges, 10, rand);
 
         assert(samples.length === 10, 'LHS sollte 10 Samples liefern');
@@ -93,6 +94,7 @@ try {
             runwayMinM: { min: 12, max: 48, step: 6 }
         };
 
+        // Alle Samples müssen auf dem Step-Grid landen.
         const samples = latinHypercubeSample(ranges, 50, rand);
 
         // Alle Werte sollten durch Step teilbar sein
@@ -128,6 +130,7 @@ try {
             targetEq: { min: 20, max: 80, step: 2 }
         };
 
+        // Nachbarn dürfen nicht unter das Minimum fallen.
         const neighbors = generateNeighborsReduced(candidate, ranges);
 
         // Kein Nachbar sollte unter 20 sein

@@ -1,5 +1,12 @@
 // @ts-check
 
+/**
+ * Module: Simulator Profile Inputs
+ * Purpose: Build Simulator inputs from stored profile data (inkl. Balance-Inputs & Tranchen).
+ *          Applies profile overrides and normalizes Pflege- und Gold-Konfiguration.
+ * Usage: Used by Simulator when profiles are active or aggregated.
+ */
+
 import { SUPPORTED_PFLEGE_GRADES } from './simulator-data.js';
 import { CONFIG } from './balance-config.js';
 
@@ -71,6 +78,7 @@ function parseProfileGoldOverrides(data) {
 function parsePflegeGradeConfigs(data) {
     const configs = {};
     SUPPORTED_PFLEGE_GRADES.forEach(grade => {
+        // Pflege-Stufen: Zusatzkosten + Flex-Cut + Mortalitätsfaktor.
         const zusatz = readNumber(data, simKey(`pflegeStufe${grade}Zusatz`), 0);
         const flexPct = readNumber(data, simKey(`pflegeStufe${grade}FlexCut`), 100);
         const flexCut = Math.min(1, Math.max(0, flexPct / 100));
@@ -96,6 +104,7 @@ function parseBalanceInputs(data) {
     if (!raw) return null;
     try {
         const parsed = JSON.parse(raw);
+        // Balance speichert unter LS_KEY ein Objekt mit { inputs, ... }.
         return parsed && parsed.inputs ? parsed.inputs : null;
     } catch {
         return null;
@@ -110,6 +119,7 @@ function sumTrancheTotals(tranches) {
         const costBasis = Number(tranche.costBasis) || 0;
         const category = String(tranche.category || '').toLowerCase();
         const type = String(tranche.type || '').toLowerCase();
+        // Kategorie bestimmt, wohin die Marktwerte aggregiert werden.
         if (category === 'gold' || type.includes('gold')) {
             totals.gold += marketValue;
             return;
@@ -125,6 +135,7 @@ function sumTrancheTotals(tranches) {
 }
 
 export function buildSimulatorInputsFromProfileData(profileData) {
+    // Balance-App Inputs (falls vorhanden) liefern Defaults für fehlende Simulator-Werte.
     const balanceInputs = parseBalanceInputs(profileData);
     const pflegeGradeConfigs = parsePflegeGradeConfigs(profileData);
     const detailedTranches = parseDetailledTranches(profileData);
@@ -162,6 +173,7 @@ export function buildSimulatorInputsFromProfileData(profileData) {
         : readNumber(profileData, simKey('rebalancingBand'), 25);
 
     const simTagesgeld = readNumber(profileData, simKey('tagesgeld'), 0);
+    // Profil-Tagesgeld (Balance) überschreibt Simulator-Tagesgeld, falls gesetzt.
     const tagesgeld = hasProfileTagesgeld ? profileTagesgeld : simTagesgeld;
     const baseInputs = {
         startVermoegen: readNumber(profileData, simKey('simStartVermoegen'), 0),
@@ -238,6 +250,7 @@ export function buildSimulatorInputsFromProfileData(profileData) {
         baseInputs.zielLiquiditaet = baseInputs.startVermoegen;
     }
 
+    // Tranchen schlagen einzelne Werte nur dann, wenn diese sonst leer/0 wären.
     if ((!baseInputs.depotwertAlt || baseInputs.depotwertAlt <= 0) && trancheTotals.equity > 0) {
         baseInputs.depotwertAlt = trancheTotals.equity;
     }
@@ -248,6 +261,7 @@ export function buildSimulatorInputsFromProfileData(profileData) {
         baseInputs.geldmarktEtf = trancheTotals.moneyMarket;
     }
 
+    // Balance-Inputs nur als Fallback verwenden, um Simulator-Felder zu füllen.
     if ((!baseInputs.startFloorBedarf || baseInputs.startFloorBedarf <= 0) && balanceInputs) {
         baseInputs.startFloorBedarf = Number(balanceInputs.floorBedarf) || baseInputs.startFloorBedarf;
     }

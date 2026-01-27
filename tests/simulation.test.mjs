@@ -21,7 +21,7 @@ function assertClose(actual, expected, tolerance, message) {
 
 console.log('--- Simulation Loop Tests ---');
 
-// Mock Inputs
+// Mock Inputs: minimaler Satz, um simulateOneYear deterministisch laufen zu lassen.
 const inputs = {
     startAlter: 65,
     rentAdjPct: 0,
@@ -42,7 +42,7 @@ const inputs = {
     maxBearRefillPctOfEq: 5
 };
 
-// Mock State
+// Mock State: Portfolio + Guardrail-State für Jahr 0.
 const startPortfolio = {
     depotTranchesAktien: [{ marketValue: 500000, costBasis: 400000, type: 'aktien_alt' }],
     depotTranchesGold: [],
@@ -90,7 +90,7 @@ try {
     assert(result.newState !== undefined, 'Should return newState');
     assert(result.logData !== undefined, 'Should return logData');
 
-    // Check inflation adjustment
+    // Check inflation adjustment (Floor inflates yearly).
     const expectedFloor = 24000 * 1.02;
     // Floating point precision check
     assertClose(result.newState.baseFloor, expectedFloor, 0.01, 'Floor should inflate by 2%');

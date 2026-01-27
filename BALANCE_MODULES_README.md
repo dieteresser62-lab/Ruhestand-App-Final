@@ -1,6 +1,8 @@
 # Balance-App – Modulübersicht
 
-Die Balance-App besteht aus sieben ES6-Modulen, die direkt nebeneinander im Repository liegen. Das folgende Dokument fasst Verantwortung, Exporte und wichtige Abhängigkeiten zusammen.
+Die Balance-App besteht aus 29 ES6-Modulen, die direkt nebeneinander im Repository liegen. Das folgende Dokument fasst Verantwortung, Exporte und wichtige Abhängigkeiten zusammen.
+
+**Stand:** Januar 2026
 
 ---
 
@@ -139,6 +141,108 @@ Einstiegspunkt und Orchestrator.
 **Helper-Module (ausgelagert):**
 - `balance-main-profile-sync.js` – Profilwerte in Balance-Inputs spiegeln
 - `balance-main-profilverbund.js` – Profilverbund-Simulationen & UI-Handling
+
+---
+
+## 8. Jahres-Update Module (balance-annual-*.js)
+
+### 8.1 `balance-annual-inflation.js`
+Inflation-bezogene Operationen für das jährliche Update.
+
+**Exports:**
+- `createInflationHandlers({ dom, update, debouncedUpdate })`
+  - `applyInflationToBedarfe()` – Wendet Inflationsrate auf Floor/Flex-Bedarfe an
+  - `applyAnnualInflation()` – Fortschreibung der kumulierten Inflation
+  - `handleFetchInflation()` – Holt Inflationsdaten via API-Kette (ECB → World Bank → OECD)
+
+**Dependencies:** `balance-config.js`, `balance-utils.js`, `balance-reader.js`, `balance-renderer.js`, `balance-storage.js`
+
+---
+
+### 8.2 `balance-annual-marketdata.js`
+Marktdaten-Updates für das „Nachrücken"-Workflow.
+
+**Exports:**
+- `createMarketdataHandlers({ dom, appState, debouncedUpdate, applyAnnualInflation })`
+  - `handleNachruecken()` – Verschiebt Vorjahreswerte und aktualisiert ATH
+  - `handleUndoNachruecken()` – Macht Nachrücken rückgängig
+  - `handleNachrueckenMitETF()` – Holt VWCE.DE-Kurs via Yahoo-Proxy/Finnhub und führt Nachrücken durch
+
+**Dependencies:** `balance-config.js`, `balance-renderer.js`
+
+---
+
+### 8.3 `balance-annual-modal.js`
+UI-Modal für die Anzeige der Jahres-Update Ergebnisse.
+
+**Exports:**
+- `createAnnualModalHandlers({ getLastUpdateResults })`
+  - `showUpdateResultModal(results)` – Zeigt Modal mit Erfolgen/Fehlern (Inflation, ETF, ATH)
+  - `handleShowUpdateLog()` – Öffnet Protokoll des letzten Updates
+
+**Dependencies:** `balance-utils.js`, `balance-renderer.js`
+
+---
+
+### 8.4 `balance-annual-orchestrator.js`
+Koordiniert den komplexen Jahres-Update Workflow.
+
+**Exports:**
+- `createAnnualOrchestrator({ dom, debouncedUpdate, handleFetchInflation, handleNachrueckenMitETF, showUpdateResultModal, setLastUpdateResults })`
+  - `handleJahresUpdate()` – Orchestriert: Alter erhöhen → Inflation → ETF → Protokoll
+
+**Dependencies:** `balance-config.js`, `balance-renderer.js`, `balance-storage.js`
+
+---
+
+## 9. `balance-guardrail-reset.js`
+Logik zur Erkennung signifikanter Eingabeänderungen, die den historischen Guardrail-State invalidieren.
+
+**Exports:**
+- `shouldResetGuardrailState(prevInputs, nextInputs)` – Prüft ob lastState zurückgesetzt werden soll
+
+**Kriterien für Reset:**
+- Bedarf (Floor/Flex): Änderung ≥1.000€ oder ≥10%
+- Vermögen: Änderung ≥10.000€ oder ≥10%
+- Rente: Statuswechsel oder Änderung ≥1.000€
+- Marktdaten: Jede Änderung (ATH, Jahre seit ATH)
+- Flex-Budget: Änderung ≥1.000€ oder ≥20%
+
+**Dependencies:** Keine (Pure Logic)
+
+---
+
+## 10. Profilverbund-Module
+
+### 10.1 `profilverbund-balance.js`
+Kernlogik für den Profilverbund (Multi-Profil-Modus).
+
+**Exports:**
+- `loadProfilverbundProfiles()` – Lädt alle Profile aus dem Haushalt
+- `aggregateProfilverbundInputs(profileInputs, overrides)` – Aggregiert Bedarf, Rente, Depot über Profile
+- `calculateTaxPerEuro(inputs)` – Berechnet Steuerlast pro Euro für ein Profil
+- `selectTranchesForSale(tranches, targetAmount, taxRate)` – Wählt steueroptimale Tranchen für Verkauf
+- `calculateWithdrawalDistribution(profileInputs, aggregated, mode)` – Verteilt Entnahme nach Modus (tax_optimized, proportional, runway_first)
+- `buildProfilverbundAssetSummary(profileInputs)` – Vermögenszusammenfassung aller Profile
+- `buildProfilverbundProfileSummaries(profileInputs)` – Einzelprofil-Übersichten
+
+**Verteilungsmodi:**
+- `tax_optimized` – Greedy: Profile mit niedrigster Steuerlast zuerst
+- `proportional` – Nach Vermögensanteil
+- `runway_first` – Nach Runway-Zielen gewichtet
+
+**Dependencies:** `balance-config.js`, `profile-storage.js`
+
+---
+
+### 10.2 `profilverbund-balance-ui.js`
+DOM-Operationen für die Profilverbund-UI.
+
+**Exports:**
+- `renderProfilverbundProfileSelector(profiles, containerId)` – Rendert Profil-Checkboxen
+- `toggleProfilverbundMode(enabled)` – Zeigt/verbirgt Profilverbund-spezifische UI-Elemente
+
+**Dependencies:** Keine (Pure DOM)
 
 ---
 

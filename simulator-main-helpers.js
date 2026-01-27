@@ -26,6 +26,7 @@ export function computeAdjPctForYear(ctx, yearIdx) {
     const series = safeCtx.series && typeof safeCtx.series === 'object' ? safeCtx.series : {};
     const startYear = Number(series.startYear) || 0;
     const simStartYear = Number(safeCtx.simStartYear) || 0;
+    // Map simulation year index into the historical series offset.
     const offsetIdx = simStartYear - startYear + safeYearIdx;
 
     const pickSeriesValue = (collection) => {
@@ -119,6 +120,7 @@ export function convertRowsToCsv(rows, columns) {
     const safeRows = Array.isArray(rows) ? rows : [];
     const safeColumns = Array.isArray(columns) ? columns : [];
 
+    // Escape delimiter/newlines to keep CSV parsers stable.
     const escapeCell = (value) => {
         const safeValue = value == null ? '' : String(value);
         return /["\n;]/.test(safeValue)
@@ -158,6 +160,7 @@ export function showToast(message, options = {}) {
     toast.textContent = String(message);
     container.appendChild(toast);
 
+    // Defer to next frame so CSS transitions apply.
     requestAnimationFrame(() => toast.classList.add('toast-show'));
 
     const removeToast = () => {

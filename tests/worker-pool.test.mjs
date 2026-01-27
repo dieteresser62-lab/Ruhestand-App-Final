@@ -9,7 +9,7 @@
  * - Telemetrie
  */
 
-// Mock für Worker
+// Mock für Worker: simuliert init/job/sweep Antwortpfade ohne echte Threads.
 class MockWorker {
     constructor(url, options = {}) {
         this.url = url;
@@ -46,6 +46,7 @@ class MockWorker {
         }
 
         if (message.type === 'job') {
+            // Return minimal result payloads used by worker-pool logic.
             return {
                 jobId: message.jobId,
                 type: 'result',
@@ -97,7 +98,7 @@ class MockWorker {
     }
 }
 
-// Mock für WorkerTelemetry
+// Mock für WorkerTelemetry: hält nur Events für Assertions.
 class MockWorkerTelemetry {
     constructor(name) {
         this.name = name;
@@ -134,7 +135,7 @@ class MockWorkerTelemetry {
 // Ersetze global Worker
 global.Worker = MockWorker;
 
-// Minimale WorkerPool-Implementierung für Tests (aus worker-pool.js)
+// Minimale WorkerPool-Implementierung für Tests (aus worker-pool.js).
 class WorkerPool {
     constructor({ workerUrl, size = 1, type = 'module', onProgress = null, onError = null, telemetryName = 'default' } = {}) {
         if (!workerUrl) {

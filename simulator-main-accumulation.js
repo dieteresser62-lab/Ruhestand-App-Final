@@ -11,6 +11,7 @@ export function initAccumulationControls() {
     function updateAccumulationCalculations() {
         if (!enableAccumulationPhase || !enableAccumulationPhase.checked) return;
 
+        // Compute derived outputs for the summary panel.
         const startAge = parseInt(p1StartAlter?.value || 40);
         const duration = parseInt(accumulationDurationYears?.value || 25);
         const monthlySavings = parseFloat(accumulationSparrate?.value || 2000);
@@ -36,6 +37,7 @@ export function initAccumulationControls() {
     if (enableAccumulationPhase && accumulationPhaseDetails) {
         enableAccumulationPhase.addEventListener('change', () => {
             const enabled = enableAccumulationPhase.checked;
+            // Toggle details panel and persist the flag.
             accumulationPhaseDetails.style.display = enabled ? 'block' : 'none';
             localStorage.setItem('sim_accumulationPhaseEnabled', enabled ? '1' : '0');
             if (enabled) {

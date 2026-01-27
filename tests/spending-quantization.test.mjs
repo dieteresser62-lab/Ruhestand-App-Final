@@ -4,7 +4,7 @@ import { CONFIG } from '../engine/config.mjs';
 
 console.log('--- Spending Quantization Tests ---');
 
-// MOCK CONSTANTS
+// Shared minimal fixtures to keep assertions focused on quantization.
 const PROFILE = { minRunwayMonths: 24, isDynamic: true };
 const MARKET = { sKey: 'hot_neutral', abstandVomAthProzent: 0, szenarioText: 'Test' };
 const LAST_STATE = { flexRate: 100, initialized: true, keyParams: { peakRealVermoegen: 500000, currentRealVermoegen: 500000, entnahmequoteDepot: 0.03 } };
@@ -12,6 +12,7 @@ const INPUT = { inflation: 2 };
 
 // --- TEST 1: Helper Logic ---
 {
+    // Force quantization on so helper outputs are deterministic.
     CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED = true;
 
     // Tier 1 (< 2000): Step 50
@@ -33,6 +34,7 @@ const INPUT = { inflation: 2 };
 
 // --- TEST 2: Integration Logic ---
 {
+    // Disable the S-curve so we only test the rounding path.
     CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED = true;
     const prevFlexCurve = CONFIG.SPENDING_MODEL.FLEX_SHARE_S_CURVE.ENABLED;
     CONFIG.SPENDING_MODEL.FLEX_SHARE_S_CURVE.ENABLED = false;
@@ -66,6 +68,7 @@ const INPUT = { inflation: 2 };
     const total = result.spendingResult.details.endgueltigeEntnahme;
     assertEqual(total, 42000, 'Annual should be 12 * 3500 = 42000');
 
+    // Restore config for later tests.
     CONFIG.SPENDING_MODEL.FLEX_SHARE_S_CURVE.ENABLED = prevFlexCurve;
     console.log('✅ Integration Logic Passed');
 }

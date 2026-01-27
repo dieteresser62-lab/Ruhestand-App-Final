@@ -1,4 +1,10 @@
 
+/**
+ * Module: Debug Script
+ * Purpose: Parses a log file to verify data integrity (e.g. 2012 Gold values).
+ * Usage: Standalone script (node debug_script.js).
+ * Dependencies: fs
+ */
 import fs from 'fs';
 
 function parseCurrency(str) {

@@ -23,7 +23,7 @@ function assertClose(actual, expected, epsilon, message) {
 
 console.log('--- Transaction Quantization Tests ---');
 
-// MOCK CONSTANTS
+// Minimal profile/input used across tests to avoid repeating boilerplate.
 const MOCK_PROFIL = { minRunwayMonths: 24, isDynamic: true };
 const MOCK_INPUT = {
     targetEq: 60, rebalancingBand: 35, maxSkimPctOfEq: 5,
@@ -34,7 +34,7 @@ const MOCK_INPUT = {
 
 // --- TEST 1: Core Quantization Logic ---
 {
-    // Setup Config
+    // Force quantization logic on for deterministic rounding.
     CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED = true;
 
     // Tier 1: Limit 10,000, Step 1,000
@@ -57,6 +57,7 @@ const MOCK_INPUT = {
 
 // --- TEST 2: Hysteresis ---
 {
+    // Tiny liquidity gap should be ignored to avoid noisy trades.
     const smallGapParams = {
         ...MOCK_INPUT,
         aktuelleLiquiditaet: 99800, // Ziel 100k -> 200 difference
@@ -75,7 +76,7 @@ const MOCK_INPUT = {
 
 // --- TEST 3: Quantized Refill ---
 {
-    // We must ensure minRefillAmount doesn't block this small trade
+    // Ensure min thresholds don't block the small refill.
     CONFIG.THRESHOLDS.STRATEGY.minRefillAmount = 1000;
     CONFIG.THRESHOLDS.STRATEGY.minTradeAmountStatic = 1000;
 
@@ -186,7 +187,7 @@ const MOCK_INPUT = {
 
 // --- TEST 6: Standard Opportunistic Refill Rounding ---
 {
-    // Scenario: Normal market (Opportunistic Rebalancing).
+    // Scenario: normal market (opportunistic rebalancing) with messy inputs.
     // Target Liquidity: 156.296,00 (Messy). Current: 66.041,19 (Messy).
     // Gap: 90.254,81 (Messy).
     // Expected: Quantized to 95.000 (Tier 3: 10k steps for <200k? Or Tier 4? 

@@ -1,3 +1,10 @@
+/**
+ * Module: Balance Reader
+ * Purpose: Responsible for reading and parsing all user inputs from the DOM.
+ *          Handles currency parsing, boolean conversion, and aggregating detailed tranche data.
+ * Usage: Used by balance-main.js to gather the current application state before updates.
+ * Dependencies: balance-utils.js, depot-tranchen-status.js
+ */
 "use strict";
 
 /**
@@ -87,6 +94,7 @@ export const UIReader = {
             return null;
         };
 
+        // Profilwerte (localStorage) überschreiben DOM-Werte, wenn vorhanden.
         const profileTagesgeld = readProfileNumber('profile_tagesgeld');
         const profileRenteAktiv = readProfileBool('profile_rente_aktiv');
         const profileRenteMonatlich = readProfileNumber('profile_rente_monatlich');
@@ -110,6 +118,7 @@ export const UIReader = {
             console.warn('Fehler beim Laden der Depot-Tranchen:', err);
         }
 
+        // Falls Tranchen vorhanden sind, nutzen wir die aggregierten Werte als Wahrheit.
         const aggregated = (detailledTranches && Array.isArray(detailledTranches) && detailledTranches.length)
             ? calculateAggregatedValues()
             : null;
@@ -126,6 +135,7 @@ export const UIReader = {
             hasLoggedTranchenAggregation = true;
         }
 
+        // Fallback-Defaults für Gold, wenn Inputs unplausibel/leer sind.
         const DEFAULT_GOLD_ZIEL = 7.5;
         const DEFAULT_GOLD_FLOOR = 1;
         const DEFAULT_GOLD_BAND = 25;
@@ -150,7 +160,7 @@ export const UIReader = {
             || Number.isFinite(profileSonstigeEinkuenfte);
         const renteMonatlichFinal = hasProfileRenteSum
             ? (Number.isFinite(profileRenteMonatlich) ? profileRenteMonatlich : 0)
-                + (Number.isFinite(profileSonstigeEinkuenfte) ? profileSonstigeEinkuenfte : 0)
+            + (Number.isFinite(profileSonstigeEinkuenfte) ? profileSonstigeEinkuenfte : 0)
             : num('renteMonatlich');
         const renteAktivFinal = hasProfileRenteSum
             ? renteMonatlichFinal > 0

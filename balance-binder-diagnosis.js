@@ -1,3 +1,10 @@
+/**
+ * Module: Balance Binder Diagnosis
+ * Purpose: Handles UI logic related to the Diagnosis Panel.
+ *          It generates formatted diagnosis text for the user to copy/paste and formats guardrail/status information.
+ * Usage: Used by balance-binder.js for diagnosis-related actions.
+ * Dependencies: balance-config.js, balance-utils.js, balance-renderer.js
+ */
 import { CONFIG } from './balance-config.js';
 import { UIUtils } from './balance-utils.js';
 import { UIRenderer } from './balance-renderer.js';

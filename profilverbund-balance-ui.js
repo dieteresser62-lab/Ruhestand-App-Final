@@ -1,3 +1,10 @@
+/**
+ * Module: Profilverbund Balance UI
+ * Purpose: Handles DOM operations specific to the Profilverbund UI (e.g., Profile Selector).
+ *          Manages the list of checkboxes for selecting active profiles.
+ * Usage: Used by balance-main-profilverbund.js to toggle multi-user mode.
+ * Dependencies: None
+ */
 "use strict";
 
 export function renderProfilverbundProfileSelector(profiles, containerId = 'profilverbund-profile-list') {

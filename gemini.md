@@ -73,7 +73,9 @@ npm run tauri:build                   # Production build (creates RuhestandSuite
 
 - `README.md` - User guide and workflows
 - `TECHNICAL.md` - Deep dive into architecture and data flows
+- `QUICKSTART.md` - Quick start guide for new users
 - `BALANCE_MODULES_README.md` - Module breakdown for the Balance app
 - `SIMULATOR_MODULES_README.md` - Module breakdown for the Simulator
 - `engine/README.md` - Engine details
+- `tests/README.md` - Test suite documentation (45 test files)
 - `docs/` - Specific feature documentation and design specs

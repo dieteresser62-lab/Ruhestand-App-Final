@@ -1,10 +1,9 @@
 /**
- * ===================================================================
- * ENGINE CONFIGURATION MODULE
- * ===================================================================
- * Zentrale Konfiguration für die Ruhestand-Engine
- * Einzige Quelle für Schwellenwerte, Profile und Texte
- * ===================================================================
+ * Module: Engine Config
+ * Purpose: Central configuration for the simulation engine.
+ *          Defines thresholds (alarms, caution), control parameters, and version info.
+ * Usage: Imported by all engine modules.
+ * Dependencies: None
  */
 
 // Engine-Versionierung

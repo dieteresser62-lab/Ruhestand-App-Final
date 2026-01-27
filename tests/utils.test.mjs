@@ -18,7 +18,7 @@ console.log('--- Utilities Tests ---');
     const f99 = formatCurrencyShortLog(999);
     assert(f99.includes('999') && f99.includes('€'), '<1k formatting');
 
-    // shortenText
+    // shortenText keeps UI labels compact while keeping intent.
     assert(shortenText('Markt heiß gelaufen') === 'HEISS', 'Text shortening');
     assert(shortenText('Unbekannt (Stagflation)') === 'Unbekannt (S)', 'Stagflation shortening');
 
@@ -27,6 +27,7 @@ console.log('--- Utilities Tests ---');
 
 // --- TEST 2: Math Utils ---
 {
+    // Simple aggregates used by charts and stats.
     const data = [1, 2, 3, 4, 5];
     assert(mean(data) === 3, 'Mean check');
     const unsorted = [5, 1, 4, 3, 2];
@@ -39,6 +40,7 @@ console.log('--- Utilities Tests ---');
 
 // --- TEST 3: RNG (Seeding & Forking) ---
 {
+    // Same seed must produce deterministic streams.
     const seed = 12345;
     const rng1 = rng(seed);
     const rng2 = rng(seed);
@@ -55,6 +57,7 @@ console.log('--- Utilities Tests ---');
 
 // --- TEST 4: Range Parsing ---
 {
+    // Range parsing supports sweep input formats.
     // Format "start:step:end"
     const r1 = parseRangeInput("10:5:20");
     assert(JSON.stringify(r1) === JSON.stringify([10, 15, 20]), 'Range start:step:end');

@@ -25,6 +25,7 @@ import { STRESS_PRESETS } from './simulator-data.js';
 export function buildSummaryData({ results, totalRuns, failCount }) {
     const safeTotalRuns = Math.max(0, Number(totalRuns) || 0);
     const safeFailCount = Math.max(0, Number(failCount) || 0);
+    // Success rate is derived, not directly stored, so guard division by zero.
     const successRate = safeTotalRuns > 0
         ? ((safeTotalRuns - safeFailCount) / safeTotalRuns) * 100
         : 0;
@@ -77,6 +78,7 @@ export function buildSummaryData({ results, totalRuns, failCount }) {
  */
 export function buildKpiDashboard(results) {
     const deQuote = Number(results?.depotErschoepfungsQuote) || 0;
+    // Severity thresholds tuned for UI color coding.
     const depotTone = deQuote > 20 ? 'danger' : (deQuote > 5 ? 'warning' : 'success');
 
     const primary = [

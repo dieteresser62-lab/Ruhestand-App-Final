@@ -45,9 +45,11 @@ Koordiniert die Monte-Carlo-Simulation und verbindet DOM-Interaktion mit der rei
 DOM-freie Simulation, die alle Runs, KPI-Arrays und Pflegemetriken berechnet.
 
 **Hauptfunktionen / Exporte:**
-- `runMonteCarloSimulation()` – führt die komplette Simulation aus, sammelt Worst-Run-Logs, Pflege-KPIs und aggregierte Kennzahlen.
+**Hauptfunktionen / Exporte:**
+- `runMonteCarloSimulation()` – Führt die komplette Simulation aus, sammelt Worst-Run-Logs, Pflege-KPIs und aggregierte Kennzahlen.
+- Implementiert Ruin-Logik (Depot < 100€) und Ansparphase-Übergang.
 
-**Einbindung:** Wird ausschließlich aus `simulator-monte-carlo.js` aufgerufen. Erwartet fertige Eingaben und Callbacks (Progress, Szenario-Analyzer) und nutzt `simulator-engine-wrapper.js` für die Jahr-für-Jahr-Logik.
+**Einbindung:** Wird ausschließlich aus `simulator-monte-carlo.js` aufgerufen. Erwartet fertige Eingaben und Callbacks (Progress, Szenario-Analyzer) und nutzt `simulator-engine-wrapper.js` (delegiert an Direct Engine) für die Jahr-für-Jahr-Logik.
 
 **Dependencies:** `simulator-engine-wrapper.js`, `simulator-portfolio.js`, `simulator-results.js` (Portfolio-Helpers), `simulator-sweep-utils.js`, `simulator-utils.js`, `simulator-data.js`, `cape-utils.js`.
 
@@ -89,9 +91,12 @@ Sweep-spezifische Logik mit Guardrails für Partner:innen-Felder und Heatmap-Aus
 ---
 
 ## 7. `simulator-sweep-utils.js` (~220 Zeilen)
-## 8. `sweep-runner.js` (neu)
-DOM-freier Sweep-Runner fuer Worker-Jobs (Combos + RunRanges) mit deterministischer Seeding-Logik.
 Gemeinsame Helfer für Sweep, Rente-2-Schutz und Deep-Clones.
+
+---
+
+## 8. `sweep-runner.js`
+DOM-freier Sweep-Runner für Worker-Jobs (Combos + RunRanges) mit deterministischer Seeding-Logik.
 
 **Hauptfunktionen / Exporte:**
 - `normalizeWidowOptions()` / `computeMarriageYearsCompleted()` – Abgleich von Hinterbliebenen-Optionen.
@@ -215,25 +220,27 @@ Rendering-Layer für KPI-Karten, Tabellen und Badges.
 ---
 
 ## 16. `auto_optimize.js` & `auto_optimize_ui.js`
-Auto-Optimierung für Parameter (LHS + Verfeinerung) und UI-Bedienung.
+Auto-Optimierung für Parameter (LHS + Verfeinerung) und UI-Bedienung. Details siehe: `docs/AUTO_OPTIMIZE_DETAILS.md`.
 
 **Hauptfunktionen / Exporte:**
-- `runAutoOptimize()` – orchestriert LHS, Quick-Filter, Verfeinerung und Test-Validierung.
+- `runAutoOptimize()` – Orchestriert den 3-stufigen Prozess (Coarse -> Refinement -> Final).
 - UI-Integration (Start, Progress, Ergebnisdarstellung) in `auto_optimize_ui.js`.
 
-**Helper-Module (ausgelagert):**
-- `auto-optimize-worker.js` – MC-Ausführung/Worker-Pool
-- `auto-optimize-evaluate.js` – Kandidatenbewertung über Seeds
-- `auto-optimize-metrics.js` – Objective + Constraints
-- `auto-optimize-sampling.js` – LHS + Nachbarschaften
-- `auto-optimize-utils.js` – Cache + Tie-Breaker
-- `auto-optimize-params.js` – Parameter-Invarianten
+**Modul-Split:**
+Die Logik wurde in spezialisierte Module zerlegt, um Wartbarkeit und Testbarkeit zu erhöhen:
 
-**Dependencies:** `simulator-portfolio.js`, `monte-carlo-runner.js`, `simulator-engine-helpers.js`, `simulator-sweep-utils.js`, `workers/worker-pool.js`.
+- `auto-optimize-worker.js` – Der Worker-To-Main-Adapter. Führt Kandidaten-Evaluationen im Worker aus.
+- `auto-optimize-evaluate.js` – Bewertet Kandidaten anhand der Zielfunktion (Score-Berechnung).
+- `auto-optimize-metrics.js` – Definiert Metriken (Success Rate, Median End Wealth) und Constraints.
+- `auto-optimize-sampling.js` – Algorithmen für die Kandidatengenerierung (Latin Hypercube, Nachbarschaft).
+- `auto-optimize-utils.js` – Hilfsfunktionen (Caching, Logging, ID-Generierung).
+- `auto-optimize-params.js` – Definition der Parameter-Räume und Mapping (UI <-> Intern).
+
+**Dependencies:** `simulator-portfolio.js`, `monte-carlo-runner.js`, `simulator-engine-helpers.js`, `workers/worker-pool.js`.
 
 ---
 
-## 16. `results-formatting.js` (~160 Zeilen)
+## 17. `results-formatting.js` (~160 Zeilen)
 Hält Formatierungs-Utilities und kleine Adapter, um Renderer und Metriken von DOM-Details zu entkoppeln.
 
 **Hauptfunktionen / Exporte:**
@@ -245,7 +252,7 @@ Hält Formatierungs-Utilities und kleine Adapter, um Renderer und Metriken von D
 
 ---
 
-## 16a. `shared-formatting.js` (~140 Zeilen)
+## 18. `shared-formatting.js` (~140 Zeilen)
 Zentrale Formatierer für Währung, Zahlen und Einheiten (Balance + Simulator).
 
 **Hauptfunktionen / Exporte:**
@@ -259,7 +266,7 @@ Zentrale Formatierer für Währung, Zahlen und Einheiten (Balance + Simulator).
 
 ---
 
-## 16b. `simulator-formatting.js` (~20 Zeilen)
+## 19. `simulator-formatting.js` (~20 Zeilen)
 Re-Exports der gemeinsamen Formatter für den Simulator.
 
 **Hauptfunktionen / Exporte:**
@@ -269,7 +276,7 @@ Re-Exports der gemeinsamen Formatter für den Simulator.
 
 ---
 
-## 17. `simulator-portfolio.js` (Fassade)
+## 20. `simulator-portfolio.js` (Fassade)
 Portfolio-Initialisierung, Renten- und Stress-Kontexte.
 
 **Hauptfunktionen:**
@@ -293,7 +300,7 @@ Portfolio-Initialisierung, Renten- und Stress-Kontexte.
 
 ---
 
-## 18. `simulator-heatmap.js` (~480 Zeilen)
+## 21. `simulator-heatmap.js` (~480 Zeilen)
 SVG-Rendering für Parameter-Sweeps und Heatmaps.
 
 **Hauptfunktionen:**
@@ -305,7 +312,7 @@ SVG-Rendering für Parameter-Sweeps und Heatmaps.
 
 ---
 
-## 19. `simulator-utils.js` (~320 Zeilen)
+## 22. `simulator-utils.js` (~320 Zeilen)
 Zufallszahlen und Statistik (Formatierung wird aus `shared-formatting.js` re-exportiert).
 
 **Hauptfunktionen:**
@@ -317,7 +324,7 @@ Zufallszahlen und Statistik (Formatierung wird aus `shared-formatting.js` re-exp
 
 ---
 
-## 20. `simulator-data.js` (~190 Zeilen)
+## 23. `simulator-data.js` (~190 Zeilen)
 Historische Daten (inkl. 1925-1949 Schwarze-Schwan-Erweiterung), Mortalitätstafeln, Stress-Presets.
 
 **Exporte:**
@@ -330,7 +337,7 @@ Historische Daten (inkl. 1925-1949 Schwarze-Schwan-Erweiterung), Mortalitätstaf
 
 ---
 
-## 21. `simulator-profile-inputs.js` (~430 Zeilen)
+## 24. `simulator-profile-inputs.js` (~430 Zeilen)
 Aggregiert Profildaten zu Simulator-Inputs für Multi-Profil-Setups.
 
 **Hauptfunktionen:**
@@ -347,7 +354,7 @@ Aggregiert Profildaten zu Simulator-Inputs für Multi-Profil-Setups.
 
 ---
 
-## 22. `profile-storage.js` (~290 Zeilen)
+## 25. `profile-storage.js` (~290 Zeilen)
 Profil-Registry und Persistenz-Layer für Multi-User-Verwaltung.
 
 **Hauptfunktionen:**
@@ -367,7 +374,7 @@ Profil-Registry und Persistenz-Layer für Multi-User-Verwaltung.
 
 ---
 
-## 23. `profile-manager.js` (~190 Zeilen)
+## 26. `profile-manager.js` (~190 Zeilen)
 UI-Steuerung für Profilverwaltung (index.html).
 
 **Hauptfunktionen:**
@@ -376,6 +383,168 @@ UI-Steuerung für Profilverwaltung (index.html).
 - Event-Handler für Erstellen, Umbenennen, Löschen, Aktivieren, Export, Import
 
 **Dependencies:** `profile-storage.js`
+
+---
+
+## 27. `profile-bridge.js` (~40 Zeilen)
+Synchronisiert Profildaten zwischen Balance und Simulator beim Seitenwechsel.
+
+**Hauptfunktionen:**
+- `initProfileBridge()` – Initialisiert Profile beim Laden, speichert bei `beforeunload` und `visibilitychange`
+
+**Verhalten:**
+- Lädt das aktuelle Profil aus der Registry, wenn die Seite geladen wird
+- Speichert automatisch bei Navigation (Tab-Wechsel, Schließen)
+- Stellt Konsistenz zwischen Balance.html und Simulator.html sicher
+
+**Dependencies:** `profile-storage.js`
+
+---
+
+## 28. `simulator-engine-wrapper.js` (~110 Zeilen)
+Standardisierte Fassade für die Simulationsengine.
+
+**Hauptfunktionen / Exporte:**
+- `simulateOneYear()` – Routet Aufrufe zur Direct-Engine-Implementierung
+- `getEngine()` – Liefert passende EngineAPI-Instanz
+- `getSimulatorFunction()` – Liefert die aktive Simulator-Funktion
+- Re-exportiert `initMcRunState` und andere Helpers aus `simulator-engine-helpers.js`
+
+**Features:**
+- Performance-Monitoring via Feature-Flags (Elapsed Time Tracking)
+- Debug-Logging bei aktiviertem Flag
+- Globale Bereitstellung (`window.simulateOneYear`, `window.simulateOneYearDirect`)
+
+**Dependencies:** `feature-flags.js`, `simulator-engine-direct.js`, `simulator-engine-helpers.js`
+
+---
+
+## 29. `simulator-engine-direct-utils.js` (~140 Zeilen)
+Utility-Funktionen für die Direct-Engine-Implementierung.
+
+**Hauptfunktionen / Exporte:**
+- `euros(x)` – Stellt sicher, dass ein Wert eine nicht-negative Zahl ist
+- `computeLiqNeedForFloor(ctx)` – Berechnet benötigte Liquidität für Floor-Bedarf
+- `normalizeHouseholdContext(context)` – Normalisiert Haushaltsdaten (p1Alive, p2Alive, widowBenefits)
+- `calculateTargetLiquidityBalanceLike()` – Berechnet Liquiditätsziel analog zur Balance-App
+- `buildDetailedTranchesFromPortfolio()` – Extrahiert detaillierte Tranchen aus Portfolio
+- `resolveCapeRatio()` – Auflösung des CAPE-Ratio aus verschiedenen Quellen
+
+**Dependencies:** `engine/config.mjs`, `engine/analyzers/MarketAnalyzer.mjs`, `engine/transactions/TransactionEngine.mjs`
+
+---
+
+## 30. `monte-carlo-runner-utils.js` (~40 Zeilen)
+Konstanten und Hilfsfunktionen für den Monte-Carlo-Runner.
+
+**Hauptfunktionen / Exporte:**
+- `MC_HEATMAP_BINS` – Bin-Grenzen für Heatmap-Visualisierung [0, 3, 3.5, 4, 4.5, 5, 5.5, 6, 7, 8, 10, ∞]
+- `pickWorstRun(current, candidate)` – Deterministische Auswahl des schlechtesten Runs
+- `createMonteCarloBuffers(runCount)` – Erzeugt typisierte Arrays für MC-Metriken
+
+**Buffer-Typen:**
+- `Float64Array`: finalOutcomes, taxOutcomes, stress_CaR_P10_Real
+- `Float32Array`: kpiKuerzungsjahre, kpiMaxKuerzung, volatilities, maxDrawdowns, etc.
+- `Uint8Array`: kpiLebensdauer, depotErschoepft, alterBeiErschoepfung
+
+**Dependencies:** keine
+
+---
+
+## 31. `monte-carlo-aggregates.js` (~125 Zeilen)
+Aggregation aller Monte-Carlo-Ergebnisse nach Abschluss der Simulation.
+
+**Hauptfunktionen / Exporte:**
+- `buildMonteCarloAggregates({ inputs, totalRuns, buffers, heatmap, bins, totals, lists, allRealWithdrawalsSample })`
+
+**Aggregierte Metriken:**
+- `finalOutcomes`: P10, P50, P90, P50 (nur erfolgreiche)
+- `taxOutcomes`: P50
+- `kpiLebensdauer`: Mean
+- `kpiKuerzungsjahre`, `kpiMaxKuerzung`: P50
+- `depotErschoepfungsQuote`, `alterBeiErschoepfung`: P50
+- `volatilities`, `maxDrawdowns`: P50, P90
+- `extraKPI`: timeShareQuoteAbove45, consumptionAtRiskP10Real, Pflege-KPIs
+- `stressKPI`: maxDD, timeShareAbove45, cutYears, CaR, recoveryYears
+- `pflegeResults`: entryRate, entryAge, shortfallRate, endWealth, depotCosts, Dual-Care-KPIs
+
+**Dependencies:** `simulator-utils.js`, `simulator-data.js`, `monte-carlo-runner-utils.js`
+
+---
+
+## 32. `simulator-portfolio-care.js` (~50 Zeilen)
+Logik für Pflegedauer-Intervalle nach Geschlecht.
+
+**Hauptfunktionen / Exporte:**
+- `normalizeCareDurationRange(minYearsRaw, maxYearsRaw, gender)` – Normalisiert Benutzerintervall mit Geschlechts-Defaults
+
+**Default-Werte (CARE_DURATION_DEFAULTS):**
+- Männer (m): 5–10 Jahre
+- Frauen (w): 6–12 Jahre
+- Divers (d): 5–11 Jahre
+- Default: 5–10 Jahre
+
+**Verhalten:**
+- Werte ≤ 0 oder NaN werden durch Defaults ersetzt
+- Falls min > max, wird max = min gesetzt
+
+**Dependencies:** keine (Pure Logic)
+
+---
+
+## 33. `cape-utils.js` (~55 Zeilen)
+CAPE-basierte Startjahr-Filterung für Monte-Carlo-Simulationen.
+
+**Hauptfunktionen / Exporte:**
+- `getStartYearCandidates(targetCape, data, tolerance)` – Findet historische Jahre mit ähnlichem CAPE-Ratio
+
+**Verhalten:**
+- Strenge Toleranz: ±20% um Ziel-CAPE
+- Fallback (< 5 Kandidaten): ±50% Toleranz
+- Letzter Fallback: Alle validen Jahre
+
+**Dependencies:** `simulator-data.js` (HISTORICAL_DATA)
+
+---
+
+## 34. `simulator-optimizer.js` (~515 Zeilen)
+Auto-Parameter-Optimierung für Sweep-Ergebnisse.
+
+**Hauptfunktionen / Exporte:**
+- `findBestParameters(sweepResults, metricKey, maximize)` – Findet optimale Parameter aus Sweep
+- `shouldMaximizeMetric(metricKey)` – Bestimmt Optimierungsrichtung
+- `applyParametersToForm(params)` – Überträgt Parameter ins Hauptformular
+- `displayBestParameters(bestResult, metricKey)` – Zeigt Ergebnis in UI
+- `findBestParametersMultiObjective(sweepResults, objectives)` – Multi-Objective (Weighted Sum)
+- `findBestParametersWithConstraints(sweepResults, objectiveMetricKey, maximize, constraints)` – Constraint-basierte Optimierung
+- `displayMultiObjectiveOptimization(objectives)` – Multi-Objective UI
+- `displayConstraintBasedOptimization(objectiveMetricKey, maximize, constraints)` – Constraint-Based UI
+
+**Optimierungs-Modi:**
+- Single-Objective: Maximiere/Minimiere eine Metrik
+- Multi-Objective: Gewichtete Summe normalisierter Metriken
+- Constraint-Based: Optimiere unter Nebenbedingungen (≥, >, ≤, <, =)
+
+**Dependencies:** `simulator-results.js`, `simulator-sweep.js`
+
+---
+
+## 35. `simulator-visualization.js` (~365 Zeilen)
+Erweiterte Visualisierungen für Parameter-Sweep-Analysen.
+
+**Hauptfunktionen / Exporte:**
+- `calculateSensitivity(sweepResults, metricKey)` – Berechnet Parameter-Sensitivity
+- `renderSensitivityChart(sensitivity, metricKey)` – Rendert Sensitivity-Balkendiagramm (HTML)
+- `calculateParetoFrontier(sweepResults, metricKey1, metricKey2, maximize1, maximize2)` – Berechnet Pareto-Frontier
+- `renderParetoFrontier(paretoPoints, allPoints, metricKey1, metricKey2)` – Rendert Scatter-Plot (SVG)
+- `displaySensitivityAnalysis()` – UI-Integration Sensitivity
+- `displayParetoFrontier()` – UI-Integration Pareto
+
+**Features:**
+- Sensitivity Analysis: Impact-Berechnung (0–100%), Range, normalisierte Darstellung
+- Pareto Frontier: Multi-objective Optimization, Dominanz-Prüfung, verbundene Punkte
+
+**Dependencies:** `simulator-results.js`, `simulator-formatting.js`
 
 ---
 

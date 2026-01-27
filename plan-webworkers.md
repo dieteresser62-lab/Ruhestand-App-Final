@@ -1,5 +1,8 @@
 # Plan: Web Workers fuer MonteCarlo und ParameterSweep
 
+> **Status (Januar 2026):** Die Worker-Parallelisierung ist implementiert und produktiv.
+> Dieses Dokument dient als historische Referenz fuer Design-Entscheidungen.
+
 ## Ziel
 Parallelisierung der Monte-Carlo- und ParameterSweep-Simulationen mit deterministischem Seeding, ohne Semantik-Aenderungen. Fokus auf Browser/TAURI (Web Workers) mit Transferables; worker_threads nur optional fuer Node-CLI.
 

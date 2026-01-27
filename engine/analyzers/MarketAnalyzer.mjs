@@ -1,12 +1,11 @@
 /**
- * ===================================================================
- * MARKET ANALYZER MODULE
- * ===================================================================
- * Analysiert Marktbedingungen und bestimmt das aktuelle Marktszenario
- * ===================================================================
+ * Module: Market Analyzer
+ * Purpose: Analyzes current market conditions (CAPE, Drawdown, etc.) to determine the market regime.
+ *          Classifies market as 'peak', 'bear', 'recovery', etc.
+ * Usage: Called by engine/core.mjs to inform spending and asset allocation decisions.
+ * Dependencies: engine/config.mjs
  */
 import { CONFIG } from '../config.mjs';
-
 /**
  * Normalisiert den übergebenen CAPE-Wert und fällt auf die Konfiguration zurück.
  * @param {number} rawCapeRatio - Optionaler CAPE-Wert aus den Eingaben.
@@ -78,11 +77,13 @@ export const MarketAnalyzer = {
         // Szenario bestimmen
         let sKey, reasons = [];
 
+        // Entscheidungsreihenfolge ist bewusst: ATH-Situation zuerst, dann tiefer Bär,
+        // dann Erholung / junge Korrektur, sonst Seitwärtsphase.
         if (abstandVomAthProzent <= 0) {
             // Neues Allzeithoch
             sKey = (perf1Y >= 10) ? 'peak_hot' : 'peak_stable';
             reasons.push('Neues Allzeithoch');
-            if(perf1Y >= 10) reasons.push('Starkes Momentum (>10%)');
+            if (perf1Y >= 10) reasons.push('Starkes Momentum (>10%)');
         } else if (abstandVomAthProzent > 20) {
             // Tiefer Bärenmarkt
             sKey = 'bear_deep';
@@ -102,6 +103,8 @@ export const MarketAnalyzer = {
         }
 
         // Prüfung auf Erholung im Bärenmarkt
+        // Innerhalb von Bear/Recovery zusätzlich prüfen, ob eine Erholung
+        // nur ein Rally-Intermezzo im Bärenmarkt ist (höherer Risiko-Mode).
         if (sKey === 'bear_deep' || sKey === 'recovery') {
             const last4years = [endeVJ, endeVJ_1, endeVJ_2, endeVJ_3].filter(v => v > 0);
             const lowPoint = last4years.length > 0 ? Math.min(...last4years) : 0;
@@ -109,6 +112,8 @@ export const MarketAnalyzer = {
                 ? ((endeVJ - lowPoint) / lowPoint) * 100
                 : 0;
 
+            // Kombiniert Momentum (1Y) + Rally vom Tief und verlangt weiter >15% ATH-Abstand,
+            // um "Erholung im Bären" klar von echter Trendwende abzugrenzen.
             if ((perf1Y >= 15 || rallyFromLow >= 30) && abstandVomAthProzent > 15) {
                 sKey = 'recovery_in_bear';
                 reasons.push(
@@ -121,7 +126,7 @@ export const MarketAnalyzer = {
         // Stagflation prüfen
         const real1Y = perf1Y - inflation;
         const isStagflation = inflation >= CONFIG.THRESHOLDS.STRATEGY.stagflationInflation && real1Y < 0;
-        if(isStagflation) {
+        if (isStagflation) {
             reasons.push(
                 `Stagflation (Inflation ${inflation}% > Realrendite ${real1Y.toFixed(1)}%)`
             );

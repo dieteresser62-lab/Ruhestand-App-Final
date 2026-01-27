@@ -1,3 +1,10 @@
+/**
+ * Module: Balance Guardrail Reset
+ * Purpose: Logic to detect significant input changes ("Events") that invalidate the historical guardrail state.
+ *          Determines if the "Last State" should be reset to avoid incorrect chasing of historical peaks.
+ * Usage: Used by balance-main.js to potentially clear the `lastState` before simulation.
+ * Dependencies: None
+ */
 "use strict";
 
 /**
@@ -31,11 +38,11 @@ export function shouldResetGuardrailState(prevInputs, nextInputs) {
         return Math.abs(next - prev) > 0;
     };
 
-    // Bedarf
+    // Bedarf: Reset erst bei spürbaren Änderungen, um "Reset-Rauschen" zu vermeiden.
     const needChanged = ['floorBedarf', 'flexBedarf']
         .some(key => changedNumber(key, { abs: 1000, rel: 0.1 }));
 
-    // Vermögen
+    // Vermögen: größere Schwelle, da Depotwerte stärker schwanken.
     const assetsChanged = ['tagesgeld', 'geldmarktEtf', 'depotwertAlt', 'depotwertNeu', 'goldWert']
         .some(key => changedNumber(key, { abs: 10000, rel: 0.1 }));
 
@@ -43,7 +50,7 @@ export function shouldResetGuardrailState(prevInputs, nextInputs) {
     const incomeChanged = changedBool('renteAktiv')
         || changedNumber('renteMonatlich', { abs: 1000, rel: 0.1 });
 
-    // Markt / Regime-relevant
+    // Markt / Regime-relevant: Jede Veränderung kann das Szenario kippen.
     const marketChanged = ['endeVJ', 'endeVJ_1', 'endeVJ_2', 'endeVJ_3', 'ath', 'jahreSeitAth']
         .some(anyNumberChange);
 

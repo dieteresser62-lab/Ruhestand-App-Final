@@ -1,3 +1,10 @@
+/**
+ * Module: Balance Diagnosis Format
+ * Purpose: Formats raw diagnosis data from the engine for UI presentation.
+ *          It prepares Guardrail statuses and Key Parameter values/types for the renderer.
+ * Usage: Used by balance-main.js (via UIRenderer) to prepare data before rendering the diagnosis panel.
+ * Dependencies: balance-utils.js
+ */
 "use strict";
 
 import { UIUtils } from './balance-utils.js';

@@ -1,3 +1,10 @@
+/**
+ * Module: Balance Renderer Action
+ * Purpose: Renders the "Action Card" (Handlungsempfehlung).
+ *          Visualizes Sources (Funds/Sales) and Uses (Purchases/Liquidity) and handles Profilverbund rendering.
+ * Usage: Used by balance-renderer.js to display recommendations.
+ * Dependencies: balance-utils.js
+ */
 "use strict";
 
 import { UIUtils } from './balance-utils.js';

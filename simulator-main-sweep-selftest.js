@@ -22,6 +22,7 @@ export async function runSweepSelfTest() {
     try {
         prepareHistoricalData();
 
+        // Collect HTML log lines for a compact report.
         const logMessages = [];
         let allTestsPassed = true;
 

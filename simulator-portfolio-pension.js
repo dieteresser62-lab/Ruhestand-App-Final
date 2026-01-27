@@ -1,3 +1,10 @@
+/**
+ * Module: Simulator Portfolio Pension
+ * Purpose: Calculating pension payments.
+ *          Handles standard indexing, adjustments, and legacy logic.
+ * Usage: Called by simulator-portfolio.js facade.
+ * Dependencies: None (pure logic)
+ */
 "use strict";
 
 /**

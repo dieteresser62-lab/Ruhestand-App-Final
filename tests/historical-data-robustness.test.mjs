@@ -3,6 +3,7 @@ import { sampleNextYearData } from '../simulator-engine-helpers.js';
 
 console.log('--- Historical Data Robustness Tests ---');
 
+// Simple deterministic RNG that returns a fixed sequence then 0.5.
 function createMockRng(sequence) {
     let index = 0;
     return () => {
@@ -11,6 +12,7 @@ function createMockRng(sequence) {
     };
 }
 
+// Backup global data so we can restore after the mutation test.
 const backupAnnual = annualData.slice();
 const backupRegimeData = {
     BULL: REGIME_DATA.BULL.slice(),
@@ -21,6 +23,7 @@ const backupRegimeData = {
 const backupTransitions = JSON.parse(JSON.stringify(REGIME_TRANSITIONS));
 
 try {
+    // Wipe all historical data to trigger the empty-data fallback path.
     annualData.length = 0;
     REGIME_DATA.BULL.length = 0;
     REGIME_DATA.BEAR.length = 0;
@@ -39,6 +42,7 @@ try {
 
     console.log('✅ Empty historical data handled');
 } finally {
+    // Restore original data to avoid polluting other tests.
     annualData.length = 0;
     backupAnnual.forEach(entry => annualData.push(entry));
     REGIME_DATA.BULL.length = 0;

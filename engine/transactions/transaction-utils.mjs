@@ -1,3 +1,10 @@
+/**
+ * Module: Transaction Utils
+ * Purpose: Helper functions for transactions.
+ *          Includes Target Liquidity calculation, Min-Trade-Gate logic, and Anti-Pseudo-Accuracy quantization.
+ * Usage: Shared utility for transaction modules.
+ * Dependencies: config.mjs
+ */
 import { CONFIG } from '../config.mjs';
 
 /**
@@ -18,7 +25,8 @@ export function calculateTargetLiquidity(profil, market, inflatedBedarf, input =
         const minMonths = input?.runwayMinMonths || profil.minRunwayMonths;
         const userTarget = input?.runwayTargetMonths || profilMax;
 
-        // Bidirektionale ATH-Skalierung
+        // Bidirektionale ATH-Skalierung:
+        // Über ATH -> mehr Puffer; unter ATH -> Puffer schrittweise reduzieren.
         const seiATH = market.seiATH || 1;
         let zielMonate;
         if (seiATH >= 1) {
@@ -29,6 +37,8 @@ export function calculateTargetLiquidity(profil, market, inflatedBedarf, input =
             zielMonate = userTarget - belowAthFactor * (userTarget - minMonths);
         }
 
+        // In Peak/Hot: voller Flex-Bedarf für den Ziel-Runway.
+        // In schwierigeren Regimen: nur 50% Flex, um Ziel realistischer zu halten.
         const useFullFlex = (regime === 'peak' || regime === 'hot_neutral');
         const anpassbarerBedarf = useFullFlex
             ? (inflatedBedarf.floor + inflatedBedarf.flex)

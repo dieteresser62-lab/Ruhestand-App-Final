@@ -1,3 +1,10 @@
+/**
+ * Module: Balance Main Profile Sync
+ * Purpose: Synchronizes profile-specific derived inputs (like "Rente Aktiv" or "Alter") from LocalStorage to the main UI.
+ *          Ensures that even in single-user mode, the inputs reflect the underlying profile data.
+ * Usage: Used by balance-main.js to keep UI inputs in sync with profile storage.
+ * Dependencies: balance-reader.js, balance-utils.js, profilverbund-balance.js
+ */
 "use strict";
 
 import { UIReader } from './balance-reader.js';
