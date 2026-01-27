@@ -70,6 +70,7 @@ Die **Ruhestand-Suite** ist nach meiner Einschätzung **eines der funktionsreich
 8. **Historische Daten ab 1925** mit Stress-Szenarien (Große Depression, WWII)
 9. **Optionale Ansparphase** für vollständige Lebenszyklus-Modellierung
 10. **Rentensystem** für 1-2 Personen mit verschiedenen Indexierungsarten
+11. **Portable Desktop-App** als Tauri-EXE (~8 MB, keine Installation nötig)
 
 **Gesamtscore: 89/100** (gewichteter Durchschnitt, siehe TEIL F, aktualisiert Januar 2026)
 
@@ -123,6 +124,84 @@ Die **Ruhestand-Suite** ist nach meiner Einschätzung **eines der funktionsreich
 │  └────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+## B.1.1 Tauri Desktop-App (Portable EXE)
+
+### Was ist Tauri?
+
+**Tauri** ist ein modernes Framework zur Erstellung von Desktop-Anwendungen mit Web-Technologien (HTML/CSS/JavaScript). Im Gegensatz zu Electron verwendet Tauri:
+
+| Aspekt | Tauri | Electron |
+|--------|-------|----------|
+| **Backend** | Rust (nativ, sicher) | Node.js |
+| **WebView** | System-WebView (Edge/WebKit) | Chromium (gebündelt) |
+| **Binärgröße** | ~3-10 MB | ~150-200 MB |
+| **RAM-Verbrauch** | ~30-50 MB | ~150-300 MB |
+| **Sicherheit** | Sandbox, minimale Permissions | Volle Node.js-Rechte |
+
+### Ruhestand-Suite als Desktop-App
+
+Die Suite wird als **portable Windows-EXE** (`RuhestandSuite.exe`) ausgeliefert:
+
+```
+src-tauri/
+├── Cargo.toml          # Rust-Abhängigkeiten
+├── tauri.conf.json     # App-Konfiguration (Fenster, Permissions)
+├── src/
+│   ├── main.rs         # Rust-Haupteintrag
+│   └── lib.rs          # Tauri-Bindings
+└── icons/              # App-Icons
+```
+
+**Konfiguration** (`tauri.conf.json`):
+```json
+{
+  "productName": "RuhestandSuite",
+  "identifier": "de.ruhestandsuite.app",
+  "build": {
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [{
+      "title": "Ruhestand Suite",
+      "width": 1400,
+      "height": 900,
+      "resizable": true
+    }]
+  }
+}
+```
+
+### Vorteile der Desktop-Version
+
+| Vorteil | Beschreibung |
+|---------|--------------|
+| **Portable** | Keine Installation nötig, läuft von USB-Stick |
+| **Offline** | Funktioniert ohne Internetverbindung |
+| **Datenschutz** | Keine Daten verlassen den Rechner |
+| **Performance** | Natives Fenster, kein Browser-Overhead |
+| **Auto-Update** | (geplant) Tauri-Updater-Modul |
+
+### Build-Prozess
+
+```bash
+# Development-Modus (Hot-Reload)
+npm run tauri:dev
+
+# Production-Build (erstellt RuhestandSuite.exe)
+npm run tauri:build
+```
+
+**Output:** `src-tauri/target/release/RuhestandSuite.exe` (~8 MB)
+
+### Technische Details
+
+- **Rust-Version:** 1.70+ (für Tauri 2.0)
+- **WebView:** Microsoft Edge WebView2 (Windows), WebKit (macOS/Linux)
+- **Permissions:** Nur `fs` (Dateizugriff für Snapshots), keine Netzwerk-Permissions
+- **Signierung:** Unsigned (Community-Build), kann mit eigenem Zertifikat signiert werden
+
+---
 
 ## B.2 Balance-App: Detaillierte Modul-Analyse
 
@@ -1860,6 +1939,7 @@ rt
 | **Parameter-Sweeps** | ✅ Heatmap | ❌ | ❌ | ⚠️ | ❌ | ❌ |
 | **Auto-Optimize** | ✅ 4-stufig LHS | ❌ | ❌ | ✅ | ❌ | ❌ |
 | **Offline** | ✅ | ⚠️ ($799) | ❌ | ✅ (Gold) | ✅ | ✅ |
+| **Desktop-App** | ✅ Tauri (8 MB) | ❌ | ❌ | ✅ Excel | ❌ | ❌ |
 | **Open Source** | ✅ MIT | ❌ | ❌ | ❌ | ✅ | ❌ |
 
 ## D.4 Alleinstellungsmerkmale (im Vergleich zu analysierten Tools)
@@ -1874,7 +1954,8 @@ rt
 6. **4-stufige Auto-Optimierung (LHS)** — Latin Hypercube Sampling + Quick-Filter + Lokale Verfeinerung + Train/Test-Validierung
 7. **Parameter-Sweep mit Heatmap-Visualisierung** — Sensitivitätsanalyse mit SVG-basierter Viridis-Heatmap und Invarianten-Prüfung
 8. **Historischer Backtest mit DE-Daten** — Deterministische Simulation 1951-2024 mit deutscher Inflation und Lohnentwicklung
-9. **Vollständig offline und Open Source** — Daten verlassen nie den lokalen Rechner
+9. **Portable Tauri-Desktop-App** — ~8 MB EXE, keine Installation, läuft von USB-Stick
+10. **Vollständig offline und Open Source** — Daten verlassen nie den lokalen Rechner
 
 ---
 
@@ -2115,6 +2196,17 @@ rt
 | `depot-tranchen-status.js` | 432 | Aggregation, UI-Sync, Status-Badge |
 | `balance-main-profile-sync.js` | ~150 | Cross-App-Synchronisation |
 | `tranche-config-example.js` | ~100 | Beispiel-Konfiguration |
+
+## Tauri Desktop-App (4 Dateien)
+
+| Datei | Sprache | Funktion |
+|-------|---------|----------|
+| `src-tauri/src/main.rs` | Rust | Desktop-Eintragspunkt |
+| `src-tauri/src/lib.rs` | Rust | Tauri-Bindings |
+| `src-tauri/tauri.conf.json` | JSON | App-Konfiguration (Fenster, Permissions) |
+| `src-tauri/Cargo.toml` | TOML | Rust-Abhängigkeiten |
+
+**Output:** `RuhestandSuite.exe` (~8 MB, portable)
 
 ## Kernalgorithmen
 
