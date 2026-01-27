@@ -37,7 +37,8 @@
 |---------|--------------|
 | Vollständiges Lesen aller Engine-Module | ✅ |
 | Vollständiges Lesen aller Balance-App-Module | ✅ |
-| Stichprobenlesung Simulator-Module | ✅ |
+| Vollständiges Lesen aller Simulator-Module | ✅ |
+| Vollständiges Lesen Profil-/Tranchen-Module | ✅ |
 | Analyse der Test-Suite | ✅ |
 | Web-Recherche Marktvergleich | ✅ |
 | Web-Recherche Forschungsstand | ✅ |
@@ -63,13 +64,14 @@ Die **Ruhestand-Suite** ist nach meiner Einschätzung **eines der funktionsreich
 2. **Dynamische Guardrails** mit 7-stufiger Marktregime-Erkennung
 3. **Pflegefall-Modellierung** (PG1-5, Progression, Dual-Care)
 4. **Multi-Profil-Unterstützung** für Paare mit getrennten Depots und **Witwenrente**
-5. **Balance-App** für operative Jahresplanung mit Online-Datenabruf
-6. **Simulator** mit Monte-Carlo, Parameter-Sweeps und 3-stufiger Auto-Optimierung
-7. **Historische Daten ab 1925** mit Stress-Szenarien (Große Depression, WWII)
-8. **Optionale Ansparphase** für vollständige Lebenszyklus-Modellierung
-9. **Rentensystem** für 1-2 Personen mit verschiedenen Indexierungsarten
+5. **Tranchen-Management** mit FIFO-Steueroptimierung und Online-Kursaktualisierung
+6. **Balance-App** für operative Jahresplanung mit Online-Datenabruf
+7. **Simulator** mit Monte-Carlo, historischem Backtest, Parameter-Sweeps und 4-stufiger Auto-Optimierung
+8. **Historische Daten ab 1925** mit Stress-Szenarien (Große Depression, WWII)
+9. **Optionale Ansparphase** für vollständige Lebenszyklus-Modellierung
+10. **Rentensystem** für 1-2 Personen mit verschiedenen Indexierungsarten
 
-**Gesamtscore: 88/100** (gewichteter Durchschnitt, siehe TEIL F, aktualisiert Januar 2026)
+**Gesamtscore: 89/100** (gewichteter Durchschnitt, siehe TEIL F, aktualisiert Januar 2026)
 
 **Hauptlücken:**
 - Kein Stationary Bootstrap (nur Block-Bootstrap)
@@ -204,6 +206,182 @@ DiagnosisRenderer
 | `Alt+E` | Export | `balance-binder.js:113-116` |
 | `Alt+I` | Import | `balance-binder.js:119-122` |
 | `Alt+N` | Marktdaten nachrücken | `balance-binder.js:125-128` |
+
+### B.2.8 Profil-Management-System
+
+Die Suite implementiert ein vollständiges **Profil-Management-System** für Multi-Personen-Haushalte.
+
+**Architektur:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Profil-Storage-Layer                      │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐ │
+│  │ profile-storage │→ │ profile-manager │→ │ profilverbund│ │
+│  │     .js         │  │      .js        │  │ -balance.js  │ │
+│  │  (CRUD, I/O)    │  │   (UI-Facade)   │  │ (Aggregation)│ │
+│  └─────────────────┘  └─────────────────┘  └─────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**CRUD-Operationen** (`profile-storage.js`):
+
+| Operation | Funktion | Beschreibung |
+|-----------|----------|--------------|
+| **Create** | `createProfile(name)` | Erzeugt neues Profil mit Slug-ID |
+| **Read** | `getProfileData(id)` | Lädt Profil-Daten aus Registry |
+| **Update** | `saveCurrentProfileFromLocalStorage()` | Speichert aktuellen State |
+| **Delete** | `deleteProfile(id)` | Löscht Profil (außer letztes) |
+| **Switch** | `switchProfile(id)` | Wechselt aktives Profil |
+| **Export** | `exportProfilesBundle()` | JSON-Backup aller Profile |
+| **Import** | `importProfilesBundle(bundle)` | Restore aus Backup |
+
+**Profilbezogene Keys** (automatisch isoliert pro Profil):
+```javascript
+const FIXED_KEYS = new Set([
+    'depot_tranchen',           // Tranchen-Daten
+    'profile_tagesgeld',        // Cash-Bestände
+    'profile_rente_aktiv',      // Renten-Flags
+    'profile_rente_monatlich',  // Renten-Beträge
+    'profile_gold_aktiv',       // Gold-Konfiguration
+    // ... weitere profilspezifische Keys
+]);
+```
+
+**Profilverbund-Aggregation** (`profilverbund-balance.js`):
+
+Das System aggregiert mehrere Profile zu einem Gesamt-Haushalt:
+
+```javascript
+export function aggregateProfilverbundInputs(profileInputs) {
+    // Summiert: Floor, Flex, Renten, Depot-Werte
+    // Minimiert: Runway-Targets (konservativstes Profil)
+    return {
+        totalFloor,      // Summe aller Floor-Bedarfe
+        totalFlex,       // Summe aller Flex-Bedarfe
+        totalRenteJahr,  // Summe aller Renteneinkünfte
+        totalAssets,     // Summe aller Vermögenswerte
+        netWithdrawal    // Bedarf minus Renten
+    };
+}
+```
+
+**Entnahme-Verteilungsmodi:**
+
+| Modus | Algorithmus | Anwendungsfall |
+|-------|-------------|----------------|
+| `tax_optimized` | Greedy nach niedrigster Steuerlast | Standard für Steueroptimierung |
+| `proportional` | Anteilig nach Vermögen | Gleichmäßige Belastung |
+| `runway_first` | Nach Runway-Zielen gewichtet | Liquiditäts-Priorisierung |
+
+---
+
+### B.2.9 Depot-Tranchen-Verwaltung
+
+Die Suite ermöglicht **detailliertes Tranchen-Management** mit FIFO-basierter Steueroptimierung.
+
+**Hauptkomponenten:**
+
+| Datei | LOC | Funktion |
+|-------|-----|----------|
+| `depot-tranchen-manager.html` | ~400 | Standalone-UI für Tranchenverwaltung |
+| `depot-tranchen-status.js` | 432 | Status-Berechnung, Aggregation, UI-Sync |
+| `tranche-config-example.js` | ~100 | Beispiel-Konfiguration |
+
+**Tranchen-Datenmodell:**
+
+```javascript
+const tranche = {
+    id: "uuid",
+    name: "VWCE.DE Sparplan Jan 2020",
+    type: "aktien_neu",        // oder: aktien_alt, gold, geldmarkt
+    category: "equity",        // oder: gold, money_market
+    shares: 50,                // Anzahl Anteile
+    purchasePrice: 85.00,      // Kaufpreis pro Anteil
+    currentPrice: 120.00,      // Aktueller Kurs
+    purchaseDate: "2020-01-15",
+    marketValue: 6000,         // Marktwert (berechnet oder manuell)
+    costBasis: 4250,           // Einstand (berechnet oder manuell)
+    tqf: 0.30                  // Teilfreistellung (30% für Aktienfonds)
+};
+```
+
+**Aggregations-Algorithmus** (`depot-tranchen-status.js:244-310`):
+
+```javascript
+export function calculateAggregatedValues(tranches) {
+    // Gruppiert nach Kategorie
+    let altbestand = { marketValue: 0, costBasis: 0 };
+    let neubestand = { marketValue: 0, costBasis: 0 };
+    let geldmarkt  = { marketValue: 0, costBasis: 0 };
+    let gold       = { marketValue: 0, costBasis: 0 };
+
+    tranches.forEach(t => {
+        // Klassifizierung nach type/category/tqf
+        if (type === 'aktien_alt' || tqf === 1.0) {
+            altbestand.marketValue += mv;
+        } else if (type === 'aktien_neu') {
+            neubestand.marketValue += mv;
+        }
+        // ... weitere Kategorien
+    });
+
+    return { depotwertAlt, depotwertNeu, geldmarktEtf, goldWert, ... };
+}
+```
+
+**Online-Aktualisierung der Kurse:**
+
+Die Tranchen-Kurse können über verschiedene Quellen aktualisiert werden:
+
+| Quelle | API | Unterstützte Assets |
+|--------|-----|---------------------|
+| Yahoo Finance | Lokaler Proxy (`tools/yahoo-proxy.cjs`) | ETFs, Aktien |
+| Finnhub | Direkt | ETFs, Aktien (Fallback) |
+| Manuell | Eingabefeld | Alle |
+
+**Automatische Synchronisation:**
+
+```javascript
+export function initTranchenStatus(containerId) {
+    // Initial rendern
+    renderTranchenStatusBadge(containerId);
+    syncTranchenToInputs({ silent: true });
+
+    // Cross-Tab-Sync via localStorage-Event
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'depot_tranchen') {
+            syncTranchenToInputs({ silent: true });
+        }
+    });
+
+    // Periodische Aktualisierung (alle 5 Sekunden)
+    setInterval(() => renderTranchenStatusBadge(containerId), 5000);
+}
+```
+
+**Steueroptimierte Verkaufsreihenfolge** (`profilverbund-balance.js:334-373`):
+
+```javascript
+export function selectTranchesForSale(tranches, targetAmount, taxRate) {
+    const candidates = tranches
+        .filter(t => resolveTrancheCategory(t) === 'equity')
+        .map(t => ({
+            tranche: t,
+            taxPerEuro: computeProfitRatio(t) * taxRate,
+            purchaseStamp: normalizeTrancheDate(t)
+        }));
+
+    // Sortierung: 1. Niedrigste Steuerlast, 2. FIFO (älteste zuerst)
+    candidates.sort((a, b) => {
+        if (a.taxPerEuro !== b.taxPerEuro) return a.taxPerEuro - b.taxPerEuro;
+        return a.purchaseStamp - b.purchaseStamp;
+    });
+
+    // Greedy-Auswahl bis Zielbetrag erreicht
+    // ...
+}
+```
 
 ---
 
@@ -1118,6 +1296,474 @@ let widowBenefitActiveForP2 = false; // P2 erhält Witwenrente nach P1
 
 ---
 
+## C.8 Historischer Backtest
+
+### C.8.1 Grundkonzept
+
+Neben der Monte-Carlo-Simulation bietet die Suite einen **deterministischen historischen Backtest**, der einen Ruhestandsplan über reale historische Zeiträume simuliert.
+
+**Kernunterschied zu Monte Carlo:**
+
+| Aspekt | Monte Carlo | Historischer Backtest |
+|--------|-------------|----------------------|
+| Datenquelle | Zufällige Stichproben aus Historie | Exakte historische Sequenz |
+| Zeitraum | Beliebig lang | 1951-2024 (begrenzt) |
+| Ergebnis | Verteilung (Perzentile) | Ein deterministischer Pfad |
+| Anwendung | Risikobewertung | Validierung ("Hätte mein Plan 2008 überlebt?") |
+
+### C.8.2 Implementierung (`simulator-backtest.js`)
+
+**Hauptfunktion:**
+```javascript
+export function runBacktest() {
+    const inputs = getCommonInputs();
+    const startJahr = parseInt(document.getElementById('simStartJahr').value);
+    const endJahr = parseInt(document.getElementById('simEndJahr').value);
+
+    // Validierung: 1951-2024
+    if (startJahr < 1951 || endJahr > 2024 || startJahr >= endJahr) {
+        alert('Fehler: Bitte gültigen Zeitraum eingeben.');
+        return;
+    }
+
+    // Historische Serien aufbauen
+    const backtestCtx = {
+        series: {
+            wageGrowth: histYears.map(y => HISTORICAL_DATA[y].lohn_de),
+            inflationPct: histYears.map(y => HISTORICAL_DATA[y].inflation_de)
+        }
+    };
+
+    // Jahr-für-Jahr-Simulation
+    for (let jahr = startJahr; jahr <= endJahr; jahr++) {
+        const jahresrenditeAktien = (HISTORICAL_DATA[jahr].msci_eur - dataVJ.msci_eur) / dataVJ.msci_eur;
+        const result = simulateOneYear(simState, adjustedInputs, yearData, yearIndex);
+
+        if (result.isRuin) {
+            log += `${jahr}: RUIN`;
+            if (BREAK_ON_RUIN) break;
+        }
+        simState = result.newState;
+    }
+}
+```
+
+### C.8.3 Backtest-Ausgabe
+
+**Spalten im Detail-Modus:**
+
+| Spalte | Beschreibung |
+|--------|--------------|
+| `Jahr` | Simulationsjahr (z.B. 2008) |
+| `Entn.` | Jahresentnahme in € |
+| `Floor` | Floor-Bedarf (inflationsbereinigt) |
+| `Rente1/Rente2` | Renteneinkünfte pro Person |
+| `Flex%` | Aktuelle Flex-Rate |
+| `WQ%` | Entnahmequote vom Depot |
+| `Status` | Marktregime + Aktion |
+| `Quote%` | Entnahmequote Ende Jahr |
+| `Runway%` | Liquiditäts-Deckungsgrad |
+| `Pf.Akt%/Pf.Gld%` | Aktien-/Gold-Rendite |
+| `Handl.A/Handl.G` | Netto-Handelsaktivität Aktien/Gold |
+| `St.` | Gezahlte Steuern |
+
+### C.8.4 Renten-Indexierung im Backtest
+
+Der Backtest unterstützt dynamische Rentenanpassung basierend auf historischen Daten:
+
+```javascript
+export function computeAdjPctForYear(backtestCtx, yearIndex) {
+    const { mode, pct } = backtestCtx.inputs.rentAdj;
+
+    if (mode === 'wage') {
+        return backtestCtx.series.wageGrowth[yearIndex] || 0;
+    }
+    if (mode === 'cpi') {
+        return backtestCtx.series.inflationPct[yearIndex] || 0;
+    }
+    return pct || 0;  // Fixe Anpassung
+}
+```
+
+### C.8.5 Export-Funktionen
+
+| Format | Inhalt |
+|--------|--------|
+| **JSON** | Vollständige Rohdaten inkl. Metadaten |
+| **CSV** | Tabellarisch für Excel/Google Sheets |
+
+---
+
+## C.9 Parameter Sweep (Sensitivitätsanalyse)
+
+### C.9.1 Grundkonzept
+
+Der **Parameter Sweep** ermöglicht die systematische Untersuchung, wie verschiedene Parameterkombinationen die Simulationsergebnisse beeinflussen.
+
+**Anwendungsfälle:**
+- Sensitivitätsanalyse: "Wie stark beeinflusst Runway-Min die Erfolgsquote?"
+- Trade-off-Analyse: "Wo liegt das Optimum zwischen Erfolgsrate und Endvermögen?"
+- Robustheits-Test: "Ist mein Plan sensitiv gegenüber einzelnen Parametern?"
+
+### C.9.2 Sweep-Parameter
+
+**Konfigurierbare Parameter** (`simulator-sweep.js:269-277`):
+
+| Parameter | Input-ID | Beschreibung | Beispiel-Range |
+|-----------|----------|--------------|----------------|
+| `runwayMin` | `sweepRunwayMin` | Minimale Liquiditäts-Monate | 18:6:36 |
+| `runwayTarget` | `sweepRunwayTarget` | Ziel-Liquiditäts-Monate | 36:6:60 |
+| `targetEq` | `sweepTargetEq` | Ziel-Aktienquote % | 50:5:70 |
+| `rebalBand` | `sweepRebalBand` | Rebalancing-Band % | 3:1:7 |
+| `maxSkimPct` | `sweepMaxSkimPct` | Max. Abschöpfung im Peak % | 15:5:35 |
+| `maxBearRefillPct` | `sweepMaxBearRefillPct` | Max. Nachfüllung im Crash % | 30:10:60 |
+| `goldTargetPct` | `sweepGoldTargetPct` | Gold-Zielallokation % | 0:2:10 |
+
+**Range-Syntax:**
+- `24` — Einzelwert
+- `24,36,48` — Kommaliste
+- `18:6:36` — Range (Start:Schritt:Ende)
+
+### C.9.3 Whitelist/Blocklist-System
+
+**Schutzmechanismus** (`simulator-sweep-utils.js`):
+
+```javascript
+export const SWEEP_ALLOWED_KEYS = new Set([
+    'runwayMinMonths',
+    'runwayTargetMonths',
+    'targetEq',
+    'rebalBand',
+    'maxSkimPctOfEq',
+    'maxBearRefillPctOfEq',
+    'goldZielProzent',
+    'goldAktiv'
+]);
+
+export function isBlockedKey(key) {
+    // Partner-spezifische Keys sind geblockt
+    const blocked = ['partnerRente', 'partnerAlter', 'partnerLebenserwartung'];
+    return blocked.some(b => key.toLowerCase().includes(b.toLowerCase()));
+}
+```
+
+**Zweck:** Verhindert versehentliche Variation von Partner-Parametern (Rente 2), die zwischen Profilen konstant bleiben sollten.
+
+### C.9.4 Parallelisierung mit Workers
+
+**Worker-Pool-Architektur:**
+
+```javascript
+async function runSweepWithWorkers({ baseInputs, paramCombinations, sweepConfig }) {
+    const pool = new WorkerPool({
+        workerUrl: new URL('./workers/mc-worker.js', import.meta.url),
+        size: workerCount,  // Default: 8
+        type: 'module'
+    });
+
+    // Broadcast: Initialisiere alle Worker mit Basisdaten
+    await pool.broadcast({ type: 'sweep-init', baseInputs, paramCombinations });
+
+    // Adaptive Chunk-Größe (Zeit-Budget: 500ms)
+    let chunkSize = initialChunk;
+    while (nextComboIdx < totalCombos) {
+        const result = await Promise.race(pending);
+
+        // Anpassung basierend auf tatsächlicher Laufzeit
+        const targetSize = Math.round(count * (timeBudgetMs / elapsedMs));
+        smoothedChunkSize = Math.round(smoothedChunkSize * 0.7 + targetSize * 0.3);
+        chunkSize = smoothedChunkSize;
+    }
+}
+```
+
+### C.9.5 Sweep-Runner (`sweep-runner.js`)
+
+**DOM-freie Ausführungslogik** (Worker-kompatibel):
+
+```javascript
+export function runSweepChunk({ baseInputs, paramCombinations, comboRange, sweepConfig }) {
+    const { anzahlRuns, maxDauer, blockSize, baseSeed, methode } = sweepConfig;
+
+    for (let offset = 0; offset < count; offset++) {
+        const comboIdx = start + offset;
+        const params = paramCombinations[comboIdx];
+        const inputs = buildSweepInputs(baseInputs, params);
+
+        // P2-Invarianz prüfen (Partner-Daten dürfen nicht variieren)
+        const p2Invariants = extractP2Invariants(inputs);
+        if (!areP2InvariantsEqual(p2Invariants, refP2Invariants)) {
+            console.warn('[SWEEP] P2-Basis-Parameter variieren!');
+        }
+
+        // Monte-Carlo für diese Kombination
+        const runOutcomes = [];
+        for (let i = 0; i < anzahlRuns; i++) {
+            const rand = rng(makeRunSeed(baseSeed, comboIdx, i));
+            // ... Simulation ...
+            runOutcomes.push({ finalVermoegen, maxDrawdown, minRunway, failed });
+        }
+
+        const metrics = aggregateSweepMetrics(runOutcomes);
+        results.push({ comboIdx, params, metrics });
+    }
+    return { results, p2VarianceCount };
+}
+```
+
+### C.9.6 Heatmap-Visualisierung
+
+**SVG-basierte Heatmap** (`simulator-heatmap.js`):
+
+```javascript
+export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, xValues, yValues) {
+    // Viridis-Farbpalette für Werte
+    const getColor = (value) => {
+        const t = (value - minVal) / range;
+        return viridis(t);  // Perceptually uniform colormap
+    };
+
+    // Zellen mit Tooltip
+    for (let yi = 0; yi < yValues.length; yi++) {
+        for (let xi = 0; xi < xValues.length; xi++) {
+            const value = heatmapData.get(`${xVal}_${yVal}`);
+            const color = getColor(value);
+
+            // Warn-Badge bei P2-Varianz
+            if (result.metrics.warningR2Varies) {
+                cellsHtml += `<text>⚠</text>`;  // Gelber Rand + Symbol
+            }
+        }
+    }
+}
+```
+
+**Metriken für Heatmap:**
+
+| Metrik | Beschreibung | Optimierungsziel |
+|--------|--------------|------------------|
+| `successProbFloor` | Erfolgsrate (Floor gedeckt) | Maximieren |
+| `medianEndWealth` | Median Endvermögen | Maximieren |
+| `p10EndWealth` | 10%-Perzentil Endvermögen | Maximieren |
+| `worst5Drawdown` | Schlimmste 5% Drawdowns | Minimieren |
+| `minRunwayObserved` | Minimale beobachtete Runway | Maximieren |
+
+---
+
+## C.10 Auto-Optimize (Automatische Parameteroptimierung)
+
+### C.10.1 Grundkonzept
+
+**Auto-Optimize** ist ein **4-stufiger Optimierungsalgorithmus**, der automatisch die besten Parameterkombinationen findet. Im Vergleich zu einem exhaustiven Sweep ist er **8-10× schneller**.
+
+**Architektur:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Auto-Optimize Pipeline                      │
+├─────────────────────────────────────────────────────────────────┤
+│  Phase 1a: Latin Hypercube Sampling (100 Samples)               │
+│      ↓                                                          │
+│  Phase 1b: Quick-Filter (200 Runs × 2 Seeds) → Top-50           │
+│      ↓                                                          │
+│  Phase 2:  Volle Evaluation (Top-50) → Constraint-Check         │
+│      ↓                                                          │
+│  Phase 3:  Lokale Verfeinerung (Nachbarschaft von Top-5)        │
+│      ↓                                                          │
+│  Phase 4:  Test-Validierung (Top-3 auf separaten Seeds)         │
+│      ↓                                                          │
+│  Output:   Champion-Konfiguration + Delta vs. Current           │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### C.10.2 Latin Hypercube Sampling (`auto-optimize-sampling.js`)
+
+**Algorithmus:**
+
+```javascript
+export function latinHypercubeSample(ranges, n, rand) {
+    const params = Object.keys(ranges);
+    const samples = [];
+
+    // Permutationen für jede Dimension (Fisher-Yates Shuffle)
+    const perms = params.map(() => {
+        const perm = Array.from({ length: n }, (_, i) => i);
+        for (let i = n - 1; i > 0; i--) {
+            const j = Math.floor(rand() * (i + 1));
+            [perm[i], perm[j]] = [perm[j], perm[i]];
+        }
+        return perm;
+    });
+
+    for (let i = 0; i < n; i++) {
+        const sample = {};
+        params.forEach((key, dim) => {
+            const { min, max, step } = ranges[key];
+            const bin = perms[dim][i];
+            const binSize = (max - min) / n;
+            const offset = rand() * binSize;  // Jitter innerhalb Bin
+            const rawValue = min + bin * binSize + offset;
+            sample[key] = Math.round(rawValue / step) * step;  // Snap to grid
+        });
+        samples.push(sample);
+    }
+    return samples;
+}
+```
+
+**Vorteil gegenüber Grid-Sampling:** LHS garantiert gleichmäßige Abdeckung aller Dimensionen mit weniger Samples.
+
+### C.10.3 Optimierungsziele und Constraints
+
+**Konfigurierbare Objectives:**
+
+| Objective | Metrik | Standard |
+|-----------|--------|----------|
+| Primär | `successProbFloor` | Maximieren |
+| Sekundär | `medianEndWealth` | Maximieren |
+| Risiko | `worst5Drawdown` | Minimieren |
+
+**Beispiel-Constraints:**
+```javascript
+const constraints = [
+    { metricKey: 'successProbFloor', operator: '>=', value: 95 },
+    { metricKey: 'worst5Drawdown', operator: '<=', value: 40 }
+];
+```
+
+### C.10.4 Lokale Verfeinerung
+
+**Nachbarschafts-Generierung** (`auto-optimize-sampling.js:80-97`):
+
+```javascript
+export function generateNeighborsReduced(candidate, ranges) {
+    const neighbors = [];
+
+    for (const [key, value] of Object.entries(candidate)) {
+        const deltas = getParameterDeltas(key, true);  // z.B. [-2, +2]
+        for (const delta of deltas) {
+            const newVal = value + delta;
+            if (newVal >= ranges[key].min && newVal <= ranges[key].max) {
+                neighbors.push({ ...candidate, [key]: newVal });
+            }
+        }
+    }
+    return neighbors;
+}
+
+// Parameter-spezifische Deltas
+function getParameterDeltas(key, reduced = false) {
+    const deltaMap = {
+        runwayMinM: reduced ? [-2, 2] : [-4, -2, 2, 4],
+        goldTargetPct: reduced ? [-1, 1] : [-2, -1, 1, 2],
+        targetEq: reduced ? [-2, 2] : [-5, -2, 2, 5]
+    };
+    return deltaMap[key] || [-1, 1];
+}
+```
+
+### C.10.5 Train/Test-Validierung
+
+**Separate Seeds für Validierung:**
+
+```javascript
+// Train-Seeds: Für Optimierung
+const trainSeedArray = Array.from({ length: seedsTrain }, (_, i) => 42 + i);
+
+// Test-Seeds: Für finale Validierung (disjunkt!)
+const testSeedArray = Array.from({ length: seedsTest }, (_, i) => 420 + i);
+```
+
+**Stabilitäts-Metrik:**
+```javascript
+const stability = Math.min(1, champion.trainObjValue / (champion.testObjValue + 0.0001));
+```
+
+### C.10.6 Caching und Parallelisierung
+
+**Kandidaten-Cache** (`auto-optimize-utils.js`):
+```javascript
+export class CandidateCache {
+    constructor() { this.cache = new Map(); }
+
+    has(candidate) {
+        return this.cache.has(JSON.stringify(this._normalize(candidate)));
+    }
+
+    get(candidate) {
+        return this.cache.get(JSON.stringify(this._normalize(candidate)));
+    }
+
+    set(candidate, results) {
+        this.cache.set(JSON.stringify(this._normalize(candidate)), results);
+    }
+}
+```
+
+**Batch-Parallelisierung:**
+```javascript
+const BATCH_SIZE = 4;  // Parallel evaluation
+
+for (let i = 0; i < validCandidates.length; i += BATCH_SIZE) {
+    const batch = validCandidates.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.all(
+        batch.map(candidate => evaluate(candidate, baseInputs, runs, maxDauer, seeds))
+    );
+}
+```
+
+### C.10.7 Ergebnis-Ausgabe
+
+**Champion-Konfiguration:**
+```javascript
+return {
+    championCfg: champion.candidate,    // Optimale Parameter
+    metricsTest: champion.testResults,  // Metriken auf Test-Seeds
+    deltaVsCurrent: {                   // Verbesserung vs. aktuelle Einstellungen
+        successRate: +2.3,              // +2.3 Prozentpunkte
+        drawdownP90: -5.1,              // -5.1 Prozentpunkte (besser!)
+        endWealthP50: +45000            // +45.000€ median
+    },
+    stability: 0.98                     // Train/Test-Konsistenz
+};
+```
+
+### C.10.8 Optimierungs-Modi (`simulator-optimizer.js`)
+
+**1. Single-Objective:**
+```javascript
+const best = findBestParameters(sweepResults, 'medianEndWealth', true);
+```
+
+**2. Multi-Objective (Weighted Sum):**
+```javascript
+const objectives = [
+    { metricKey: 'medianEndWealth', weight: 0.6, maximize: true },
+    { metricKey: 'successProbFloor', weight: 0.4, maximize: true }
+];
+const best = findBestParametersMultiObjective(sweepResults, objectives);
+```
+
+**3. Constraint-Based:**
+```javascript
+const constraints = [
+    { metricKey: 'successProbFloor', operator: '>=', value: 95 }
+];
+const best = findBestParametersWithConstraints(
+    sweepResults, 'medianEndWealth', true, constraints
+);
+```
+
+### C.10.9 Performance-Vergleich
+
+| Methode | Kombinationen | Evaluationen | Relative Zeit |
+|---------|---------------|--------------|---------------|
+| Exhaustiver Grid-Sweep (7×7×7) | 343 | 343 × 1000 | 100% |
+| Auto-Optimize (LHS + Refine) | ~100 + ~50 | ~150 × 1000 | **~44%** |
+| Auto-Optimize (mit Quick-Filter) | ~100 + ~30 | ~50 × 1000 + ~100 × 200 | **~12%** |
+
+---
+
 # TEIL D: Vollständiger Marktvergleich
 
 ## D.1 Kommerzielle Retirement Planner (2025/2026)
@@ -1205,12 +1851,14 @@ rt
 |---------|----------------|---------------|--------|---------|---------|-----|
 | **Preis** | Kostenlos | $9-799 | $0-144 | $0-119 | Kostenlos | Kostenlos |
 | **Monte Carlo** | ✅ 4 Methoden | ✅ | ✅ | ✅ | ❌ | ✅ |
+| **Historischer Backtest** | ✅ 1951-2024 | ⚠️ | ❌ | ✅ | ✅ | ✅ |
 | **Dynamische Guardrails** | ✅ 7 Regime | ❌ | ❌ | ⚠️ | ✅ | ❌ |
 | **DE-Steuern (vollst.)** | ✅ | ⚠️ | ❌ | ❌ | ❌ | ❌ |
 | **Pflegefall-Modell** | ✅ PG1-5 | ⚠️ | ⚠️ | ⚠️ | ❌ | ❌ |
 | **Multi-Profil** | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| **Parameter-Sweeps** | ✅ | ❌ | ❌ | ⚠️ | ❌ | ❌ |
-| **Auto-Optimize** | ✅ 3-stufig | ❌ | ❌ | ✅ | ❌ | ❌ |
+| **Tranchen-Management** | ✅ FIFO+Online | ❌ | ⚠️ | ❌ | ❌ | ❌ |
+| **Parameter-Sweeps** | ✅ Heatmap | ❌ | ❌ | ⚠️ | ❌ | ❌ |
+| **Auto-Optimize** | ✅ 4-stufig LHS | ❌ | ❌ | ✅ | ❌ | ❌ |
 | **Offline** | ✅ | ⚠️ ($799) | ❌ | ✅ (Gold) | ✅ | ✅ |
 | **Open Source** | ✅ MIT | ❌ | ❌ | ❌ | ✅ | ❌ |
 
@@ -1222,7 +1870,11 @@ rt
 2. **Pflegefall-Modellierung mit PG1-5** — Kein anderes verglichenes Tool hat ein deutsches Pflegegrad-Modell mit Progression und Dual-Care
 3. **7-stufige Marktregime-Erkennung** — Im Vergleich zu den analysierten kostenlosen Tools einzigartig
 4. **Risk-Based Guardrails** — Implementiert den Kitces-Ansatz statt klassischer Guyton-Klinger
-5. **Vollständig offline und Open Source** — Daten verlassen nie den lokalen Rechner
+5. **Tranchen-Management mit Online-Kursen** — Einzelpositionen mit FIFO-Steueroptimierung und automatischer Kursabfrage
+6. **4-stufige Auto-Optimierung (LHS)** — Latin Hypercube Sampling + Quick-Filter + Lokale Verfeinerung + Train/Test-Validierung
+7. **Parameter-Sweep mit Heatmap-Visualisierung** — Sensitivitätsanalyse mit SVG-basierter Viridis-Heatmap und Invarianten-Prüfung
+8. **Historischer Backtest mit DE-Daten** — Deterministische Simulation 1951-2024 mit deutscher Inflation und Lohnentwicklung
+9. **Vollständig offline und Open Source** — Daten verlassen nie den lokalen Rechner
 
 ---
 
@@ -1309,9 +1961,11 @@ rt
 | SoRR-Handling | 85 | CAPE-Sampling, Stress-Tests |
 | Pflegefall | 90 | PG1-5, Dual-Care, BARMER-Daten |
 | Liquiditäts-Targeting | 90 | Dynamisch, Regime-abhängig |
+| Historischer Backtest | 90 | Deterministisch 1951-2024, DE-Inflation/Lohn |
+| Auto-Optimize | 92 | 4-stufig LHS, Train/Test-Validierung |
 | TER/Fees | 70 | Implizit konservativ (Price Index), Dokumentation fehlt |
 
-**Fachliche Methodik-Score: 90/100**
+**Fachliche Methodik-Score: 91/100** (aktualisiert)
 
 ## F.3 Validierung (Gewicht: 15%)
 
@@ -1330,30 +1984,32 @@ rt
 | Entscheidungsunterstützung | 90 | Diagnose-Panel, Aktionsbox |
 | Bedienbarkeit | 70 | Komplex, kein Onboarding |
 | Erklärbarkeit | 80 | Entscheidungsbaum |
+| Tranchen-Verwaltung | 88 | Online-Kurse, FIFO-Steueroptimierung |
+| Profil-Management | 85 | CRUD, Export/Import, Profilverbund |
 
-**Nutzerwert-Score: 80/100**
+**Nutzerwert-Score: 83/100** (aktualisiert)
 
 ## F.5 Marktposition (Gewicht: 10%)
 
 | Kriterium | Score | Begründung |
 |-----------|-------|------------|
 | Feature-Parität | 95 | Übertrifft alle kostenlosen Tools |
-| Alleinstellung | 95 | DE-Steuern + Pflege + Guardrails |
+| Alleinstellung | 97 | DE-Steuern + Pflege + Guardrails + Tranchen + Auto-Optimize |
 | Preis-Leistung | 85 | Kostenlos, aber Setup-Aufwand |
 
-**Marktposition-Score: 92/100**
+**Marktposition-Score: 93/100** (aktualisiert)
 
 ## F.6 Finaler Score
 
 | Kategorie | Gewicht | Score | Gewichteter Score |
 |-----------|---------|-------|-------------------|
 | Technik | 25% | **86** | 21.50 |
-| Fachliche Methodik | 35% | 90 | 31.50 |
+| Fachliche Methodik | 35% | **91** | 31.85 |
 | Validierung | 15% | **91** | 13.65 |
-| Nutzerwert | 15% | 80 | 12.00 |
-| Marktposition | 10% | 92 | 9.20 |
+| Nutzerwert | 15% | **83** | 12.45 |
+| Marktposition | 10% | **93** | 9.30 |
 
-### **Gesamtscore: 87.85/100 ≈ 88%** (aktualisiert nach Refactoring)
+### **Gesamtscore: 88.75/100 ≈ 89%** (aktualisiert Januar 2026, vollständige Analyse)
 
 ---
 
@@ -1449,6 +2105,17 @@ rt
 | `balance-annual-*.js` (4) | ~400 | Jahresabschluss, Inflation, Marktdaten |
 | `balance-diagnosis-*.js` (6) | ~600 | Chips, Entscheidungsbaum, Guardrails |
 
+## Profil- und Tranchen-Module (6)
+
+| Modul | LOC | Funktion |
+|-------|-----|----------|
+| `profile-storage.js` | 340 | CRUD, Export/Import, Registry-Management |
+| `profile-manager.js` | 192 | UI-Facade für Profilverwaltung |
+| `profilverbund-balance.js` | 550 | Multi-Profil-Aggregation, Entnahme-Verteilung |
+| `depot-tranchen-status.js` | 432 | Aggregation, UI-Sync, Status-Badge |
+| `balance-main-profile-sync.js` | ~150 | Cross-App-Synchronisation |
+| `tranche-config-example.js` | ~100 | Beispiel-Konfiguration |
+
 ## Kernalgorithmen
 
 1. **Floor-Flex-Guardrails** (`SpendingPlanner.mjs`)
@@ -1457,16 +2124,24 @@ rt
 4. **Block-Bootstrap** (`monte-carlo-runner.js:sampleNextYearData`)
 5. **Worker-Pool mit adaptivem Chunking** (`worker-pool.js`)
 6. **Pflegegrad-Progression** (`simulator-data.js:PFLEGE_GRADE_PROGRESSION_PROBABILITIES`)
-7. **3-Stage-Optimization** (`simulator-optimizer.js`)
+7. **4-Stage-Optimization** (`simulator-optimizer.js`, `auto-optimize-sampling.js`)
 8. **FIFO-Steueroptimierung** (`sale-engine.mjs:getSellOrder`)
 9. **Wealth-Adjusted Reduction** (`SpendingPlanner.mjs`)
 10. **Flex-Budget-System** (`SpendingPlanner.mjs`)
 11. **Flex-Share S-Curve** (`SpendingPlanner.mjs`)
 12. **FILTER/RECENCY Sampling** (`monte-carlo-runner.js`)
-13. **Ansparphase-Logik** (`simulator-engine-direct.js`, `simulator-main-accumulation.js`) **(neu!)**
-14. **Renten-Indexierung** (`simulator-portfolio-pension.js:computeRentAdjRate`) **(neu!)**
-15. **Witwenrente** (`monte-carlo-runner.js:widowBenefitActive`) **(neu!)**
-16. **Great Depression/WWII Stress-Presets** (`simulator-data.js`) **(neu!)**
+13. **Ansparphase-Logik** (`simulator-engine-direct.js`, `simulator-main-accumulation.js`)
+14. **Renten-Indexierung** (`simulator-portfolio-pension.js:computeRentAdjRate`)
+15. **Witwenrente** (`monte-carlo-runner.js:widowBenefitActive`)
+16. **Great Depression/WWII Stress-Presets** (`simulator-data.js`)
+17. **Latin Hypercube Sampling** (`auto-optimize-sampling.js:latinHypercubeSample`) **(neu!)**
+18. **Historischer Backtest** (`simulator-backtest.js:runBacktest`) **(neu!)**
+19. **Profilverbund-Aggregation** (`profilverbund-balance.js:aggregateProfilverbundInputs`) **(neu!)**
+20. **Tranchen-FIFO-Selektion** (`profilverbund-balance.js:selectTranchesForSale`) **(neu!)**
+21. **Multi-Objective-Optimierung** (`simulator-optimizer.js:findBestParametersMultiObjective`) **(neu!)**
+22. **Constraint-Based-Optimierung** (`simulator-optimizer.js:findBestParametersWithConstraints`) **(neu!)**
+23. **Sweep-Heatmap-Rendering** (`simulator-heatmap.js:renderSweepHeatmapSVG`) **(neu!)**
+24. **P2-Invarianz-Prüfung** (`simulator-sweep-utils.js:areP2InvariantsEqual`) **(neu!)**
 
 ---
 
@@ -1493,4 +2168,4 @@ rt
 
 ---
 
-*Dokument erstellt durch KI-gestützte Code-Analyse (Claude Opus 4.5) und Web-Recherche. Alle Bewertungen basieren auf dem analysierten Code-Stand (Engine API v31.0, Commit `f3f8817`, 2026-01-27). Code-Zeilenangaben können bei zukünftigen Änderungen abweichen; Algorithmen-Beschreibungen bleiben konzeptionell gültig. Letzte Aktualisierung: 27.01.2026.*
+*Dokument erstellt durch KI-gestützte Code-Analyse (Claude Opus 4.5) und Web-Recherche. Alle Bewertungen basieren auf dem analysierten Code-Stand (Engine API v31.0, Commit `f3f8817`, 2026-01-27). Vollständige Analyse aller Module inkl. Profil-Management, Tranchen-Verwaltung, Backtest, Parameter-Sweep und Auto-Optimize. Code-Zeilenangaben können bei zukünftigen Änderungen abweichen; Algorithmen-Beschreibungen bleiben konzeptionell gültig. Letzte Aktualisierung: 27.01.2026.*

@@ -367,13 +367,21 @@
                 <li><a class="toc-link" data-tab-target="manual" href="#simulator">Simulator</a>
                     <ol class="toc-sublist">
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-eingaben">Eingaben</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#simulator-renten">Personen &amp;
+                                Rente</a></li>
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-parameter">Parameter</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#simulator-backtest">Backtesting</a>
+                        </li>
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-tranchen">Depot-Tranchen</a>
                         </li>
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-start">Simulation starten</a>
                         </li>
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-ergebnisse">Ergebnisse
                                 deuten</a></li>
+                        <li><a class="toc-link" data-tab-target="manual"
+                                href="#simulator-szenario-log">Szenario-Log</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#simulator-sweep">Parameter Sweep</a>
+                        </li>
                     </ol>
                 </li>
                 <li><a class="toc-link" data-tab-target="manual" href="#balance-app">Balance-App</a>
@@ -414,6 +422,8 @@
                         </li>
                         <li><a class="toc-link" data-tab-target="manual" href="#anhang-versionen">Versionshinweise</a>
                         </li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#anhang-dokumente">Weiterführende
+                                Dokumente</a></li>
                         <li><a class="toc-link" data-tab-target="manual" href="#anhang-support">Kontakt &amp;
                                 Support</a></li>
                     </ol>
@@ -474,8 +484,10 @@
                 <div class="tip-box">
                     <span class="tip-icon">💡</span>
                     <div>
-                        <strong>Tipp:</strong> Nutzen Sie den Parameter-Sweep, um schnell zu sehen, wie sich eine höhere
-                        Sparrate oder ein späterer Renteneintritt auf Ihre Erfolgchancen auswirkt.
+                        <strong>Tipp:</strong> Pflegen Sie Profile und Depot-Tranchen zuerst in
+                        <code>index.html</code>, damit Steuerlogik und Aggregation korrekt arbeiten. Nutzen Sie danach
+                        den Parameter-Sweep, um schnell zu sehen, wie sich eine höhere Sparrate oder ein späterer
+                        Renteneintritt auf Ihre Erfolgchancen auswirkt.
                     </div>
                 </div>
             </div>
@@ -491,8 +503,9 @@
                         <div class="step-content">
                             <h3>Jahres-Update starten</h3>
                             <p>Klicken Sie oben auf den Button <strong>"🌐 Jahres-Update"</strong>. Die App ruft
-                                automatisch die aktuelle Inflation (EZB) und ETF-Kurse ab, aktualisiert Ihr Alter und
-                                rückt die Marktdaten (Shiller-CAPE Basis) um ein Jahr weiter.</p>
+                                automatisch die aktuelle Inflation (EZB/World Bank/OECD) und ETF-Kurse ab,
+                                aktualisiert Ihr Alter und rückt die Marktdaten (Shiller-CAPE Basis) um ein Jahr
+                                weiter.</p>
                         </div>
                     </li>
                     <li class="step-item">
@@ -707,11 +720,11 @@
                 <h2>Installation &amp; Start</h2>
                 <p>Zum Start genügt ein moderner Browser (Chrome, Edge oder Firefox). Laden Sie das Repository lokal
                     und öffnen Sie <code>index.html</code>. Alternativ nutzen Sie den Windows-Starter
-                    <code>start_webserver.cmd</code>, um die Suite als lokalen Webserver auszuführen. Für einen komplett
-                    browserfreien Aufruf steht die portable <code>RuhestandSuite.exe</code> bereit; sie benötigt keine
-                    zusätzlichen Abhängigkeiten und lässt sich direkt per Doppelklick starten. Legen Sie die EXE in
-                    einen
-                    beliebigen Ordner und kopieren Sie sie bei Bedarf zusammen mit dem Konfigurationsordner als Backup.
+                    <code>start_suite.cmd</code> (oder <code>start_suite.ps1</code>), um die Suite als lokalen Webserver
+                    inklusive Yahoo-Proxy für Online-Kurse zu starten. Für einen komplett browserfreien Aufruf steht die
+                    portable <code>RuhestandSuite.exe</code> bereit; sie benötigt keine zusätzlichen Abhängigkeiten und
+                    lässt sich direkt per Doppelklick starten. Legen Sie die EXE in einen beliebigen Ordner und kopieren
+                    Sie sie bei Bedarf zusammen mit dem Konfigurationsordner als Backup.
                 </p>
                 <div class="detail-block" style="margin-top: 1.25rem;">
                     <h3>Praktische Hinweise</h3>
@@ -720,6 +733,11 @@
                             können.</li>
                         <li>Für Live-Daten (Inflation, Kurse) ist eine Internetverbindung notwendig; die Simulation
                             funktioniert auch offline.</li>
+                        <li>Online-ETF-Kurse benötigen Node.js, da der lokale Yahoo-Proxy über
+                            <code>start_suite.cmd</code> gestartet wird; ohne Node.js läuft die Suite weiter, nur der
+                            Kurs-Download ist deaktiviert.</li>
+                        <li>Beenden Sie die lokalen Dienste mit <code>stop_suite.cmd</code>, wenn der Browser
+                            geschlossen wird.</li>
                     </ul>
                 </div>
             </div>
@@ -752,6 +770,23 @@
                                 Pflegekosten berücksichtigt werden müssen.</li>
                         </ul>
                     </div>
+                    <div class="detail-block" id="simulator-renten">
+                        <h3>Personen &amp; Rente</h3>
+                        <p>Im Bereich „Personen &amp; Rente“ pflegen Sie Rentenstart, Anpassungsmodus und
+                            Hinterbliebenenoptionen für eine oder zwei Personen. Die Suite hält beide Rentenstränge
+                            konsistent und blendet nicht benötigte Felder automatisch aus.</p>
+                        <ul
+                            style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Indexierung:</strong> Wählen Sie fix, Lohn- oder CPI-Indexierung; die
+                                Anpassungsrate wird automatisch für beide Personen berechnet.</li>
+                            <li><strong>Hinterbliebenenlogik:</strong> Hinterbliebenenrente mit Mindest-Ehezeit und
+                                prozentualem Bezug aktivieren.</li>
+                            <li><strong>Partner-Setups:</strong> Zweite Person aktivieren, wenn zwei Rentenströme oder
+                                Pflegekosten parallel gelten; der Simulator übernimmt die Profile automatisch.</li>
+                            <li><strong>Sweep-Schutz:</strong> Felder der zweiten Person sind in Sweeps geschützt;
+                                gesperrte Variationen werden in der Heatmap markiert.</li>
+                        </ul>
+                    </div>
                     <div class="detail-block" id="simulator-parameter">
                         <h3>Parameter</h3>
                         <p>Passen Sie optional die Asset-Allokation (Aktienquote), sichere Rentenbestandteile und
@@ -763,6 +798,8 @@
                             verstärkt, damit seltene Crash-Jahre realistisch abgebildet werden.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Datenbasis:</strong> Historische Renditen reichen bis 1925; per Startjahr-Filter
+                                und Recency-Gewichtung können Sie jüngere Perioden stärker betonen.</li>
                             <li><strong>Renditeannahmen:</strong> Passen Sie Mittelwert/Volatilität im Reiter
                                 „Erweiterte
                                 Parameter“ an, wenn Sie eigene Kapitalmarktsichten nutzen.</li>
@@ -775,11 +812,26 @@
                                 diesen Wert.</li>
                         </ul>
                     </div>
+                    <div class="detail-block" id="simulator-stresstest">
+                        <h3>Stresstests &amp; Presets</h3>
+                        <p>Im Tab „Stress &amp; Pflege“ können Sie historische Extremphasen oder eigene Stressannahmen
+                            aktivieren, um die Robustheit zu prüfen.</p>
+                        <ul
+                            style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Presets:</strong> Great Depression (1929-1933) und Zweiter Weltkrieg
+                                (1939-1945) simulieren seltene Schockperioden.</li>
+                            <li><strong>Custom-Overlay:</strong> Zusätzliche Drawdowns/Inflationsschocks lassen sich
+                                über eigene Parameter abbilden.</li>
+                            <li><strong>Vergleichbarkeit:</strong> Gleiche Einstellungen liefern deterministische
+                                Vergleichswerte – ideal für Vorher/Nachher-Checks.</li>
+                        </ul>
+                    </div>
                     <div class="detail-block" id="simulator-tranchen">
                         <h3>Depot-Tranchen-Manager</h3>
                         <p>Für eine realistische Steuerberechnung können Sie Ihre ETF-Positionen als einzelne
-                            Tranchen pflegen. Der Simulator nutzt diese Tranchen automatisch für Verkäufe und
-                            Steuerabzüge.</p>
+                            Tranchen pflegen. Für korrekte Steuerberechnungen sind Tranchen notwendig; ohne Tranchen
+                            arbeitet der Simulator mit groben Schätzungen. Der Simulator nutzt die Tranchen automatisch
+                            für Verkäufe und Steuerabzüge.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
                             <li><strong>Öffnen:</strong> Button "Depot-Tranchen Manager öffnen" im Vermögen-Block.</li>
@@ -805,6 +857,22 @@
                                 hervorgehoben.</li>
                         </ol>
                     </div>
+                    <div class="detail-block" id="simulator-backtest">
+                        <h3>Backtesting (Realitätscheck)</h3>
+                        <p>Im Tab „Backtesting“ testen Sie Ihre Strategie gegen konkrete historische Marktphasen,
+                            z.B. ab dem Jahr 2000. Das ergänzt die Monte-Carlo-Prognose um einen direkten
+                            Realitätscheck.</p>
+                        <ul
+                            style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Startjahr wählen:</strong> Setzen Sie ein historisches Startjahr und prüfen Sie
+                                den Verlauf Ihrer Entnahmen.</li>
+                            <li><strong>Vergleich nutzen:</strong> Nutzen Sie Backtests für den Abgleich mit
+                                Monte-Carlo-Metriken (z.B. Runway-Stabilität).</li>
+                            <li><strong>Interpretation:</strong> Ein guter Backtest ersetzt keine
+                                Wahrscheinlichkeiten, zeigt aber, ob die Strategie plausible Vergangenheitsszenarien
+                                übersteht.</li>
+                        </ul>
+                    </div>
                     <div class="detail-block" id="simulator-ergebnisse">
                         <h3>Ergebnisse deuten</h3>
                         <p>Achten Sie auf die <strong>Erfolgswahrscheinlichkeit</strong> (Ziel: 90-95%+). Nutzen Sie die
@@ -820,6 +888,22 @@
                                 getrennt,
                                 um zu unterscheiden, ob Verbesserungen nur die Mittelwerte betreffen oder wirklich die
                                 Risikoschwänze stabilisieren.</li>
+                            <li><strong>Pflege-KPIs:</strong> KPI-Karten je Person zeigen Eintrittsalter, Dauer,
+                                Kosten, simultane Pflegejahre sowie Shortfall-Deltas.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block" id="simulator-szenario-log">
+                        <h3>Szenario-Log &amp; Export</h3>
+                        <p>Das Szenario-Log enthält 30 repräsentative Läufe: 15 charakteristische Pfade (Perzentile,
+                            Pflege-Extremfälle, Risiko-Szenarien) plus 15 Zufallsbeispiele. Damit sehen Sie
+                            „typische“ und „kritische“ Entwicklungen nebeneinander.</p>
+                        <ul
+                            style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Dropdown-Auswahl:</strong> Jeder Lauf zeigt Endvermögen und Pflege-Status auf
+                                einen Blick.</li>
+                            <li><strong>Detail-Filter:</strong> Pflege-Details und detailliertes Log können per
+                                Checkbox ein- oder ausgeblendet werden.</li>
+                            <li><strong>Export:</strong> Einzelne Szenarien lassen sich als JSON oder CSV sichern.</li>
                         </ul>
                     </div>
                     <div class="detail-block" id="simulator-sweep">
@@ -836,6 +920,13 @@
                                 benannte Szenarien, um sie später in der Balance-App gegenzuprüfen.</li>
                             <li><strong>Optimierer:</strong> Aktivieren Sie den eingebauten Optimierer, um Sparrate oder
                                 Aktienquote automatisch auf ein Ziel (z.B. 92% Erfolgswahrscheinlichkeit) einzustellen.
+                            </li>
+                            <li><strong>Auto-Optimize-Details:</strong> Der Optimierer arbeitet in drei Stufen
+                                (Grob/Raffiniert/Verifikation) und gibt eine Champion-Konfiguration als Vorlage aus.</li>
+                            <li><strong>Preset-Setups:</strong> Vordefinierte Sweep-Presets und eine dynamische
+                                Parameter-Auswahl (1-7 Parameter) beschleunigen den Einstieg.</li>
+                            <li><strong>Schutzmechanismen:</strong> Whitelist + Rente-2-Invarianz verhindern, dass
+                                Partner-Felder versehentlich verändert werden; Verstöße erscheinen als Heatmap-Badges.
                             </li>
                         </ul>
                         <figure style="margin-top: 1rem;">
@@ -875,7 +966,7 @@
                             danach nur noch die geprüften Werte zu ergänzen.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Automatisch aktualisiert:</strong> Inflation (EC B/World Bank/OECD),
+                            <li><strong>Automatisch aktualisiert:</strong> Inflation (ECB/World Bank/OECD),
                                 daraus abgeleitete Floor- und Flex-Bedarfe, Altersfelder beider Personen sowie
                                 Markt-Kontext (CAPE-Rotation, ATH-Status, Shiller-Daten nachgerückt).</li>
                             <li><strong>Manuell zu prüfen:</strong> aktuelle Depotwerte (Aktien, Anleihen,
@@ -923,6 +1014,8 @@
                             <li><strong>Hinweis:</strong> Die App zeigt die ausgewählten Tranchen im Diagnose-Panel.
                             </li>
                         </ul>
+                        <p style="color: var(--text-light); margin-top: 0.5rem;">Ohne gepflegte Tranchen fallen die
+                            Steuerwerte auf eine vereinfachte Schätzung zurück.</p>
                     </div>
                 </div>
             </div>
@@ -1174,10 +1267,10 @@
                 <div class="detail-block" id="anhang-datenquellen" style="margin-top: 1rem;">
                     <h3>Datenquellen</h3>
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                        <li><strong>Inflation:</strong> EZB-HICP über die öffentliche Schnittstelle (Fallback: manuelle
-                            Eingabe im Jahres-Update).</li>
-                        <li><strong>Marktdaten:</strong> Shiller-CAPE-Zeitreihe und ETF-Schlusskurse gemäß Konfiguration
-                            in <code>balance-config.js</code>.</li>
+                        <li><strong>Inflation:</strong> EZB/World Bank/OECD (Fallback: manuelle Eingabe im
+                            Jahres-Update).</li>
+                        <li><strong>Marktdaten:</strong> Shiller-CAPE-Zeitreihe und ETF-Schlusskurse (z.B. VWCE.DE via
+                            Yahoo/Finnhub) gemäß Konfiguration in <code>balance-config.js</code>.</li>
                         <li><strong>Simulationsannahmen:</strong> Rendite-/Volatilitätsparameter und Korrelationen in
                             den <code>simulator-*</code>-Modulen dokumentiert.</li>
                     </ul>
@@ -1191,6 +1284,17 @@
                             archivieren und neu simulieren.</li>
                         <li><strong>Validierung:</strong> Nach Updates mindestens einen Smoke-Test (Simulator + Balance)
                             durchführen und Ergebnisse kurz protokollieren.</li>
+                    </ul>
+                </div>
+                <div class="detail-block" id="anhang-dokumente" style="margin-top: 1rem;">
+                    <h3>Weiterführende Dokumente</h3>
+                    <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                        <li><strong>Auto-Optimize Details:</strong> <code>docs/AUTO_OPTIMIZE_DETAILS.md</code> erklärt
+                            Ziele, Constraints und Ablauf.</li>
+                        <li><strong>Workflow-Pseudocode:</strong> <code>docs/WORKFLOW_PSEUDOCODE.md</code> beschreibt
+                            Balance-, Monte-Carlo- und Backtesting-Abläufe in Klartext.</li>
+                        <li><strong>Profilverbund:</strong> <code>docs/PROFILVERBUND_FEATURES.md</code> dokumentiert
+                            Aggregations- und Verteilungslogik.</li>
                     </ul>
                 </div>
                 <div class="detail-block" id="anhang-support" style="margin-top: 1rem;">
@@ -1214,6 +1318,20 @@
                         verkleinern, dass es sich trotz späterer Gewinne nicht erholt. Unsere Simulation zeigt daher
                         Spannbreiten statt nur Mittelwerte.</dd>
 
+                    <dt>Was bringt das Backtesting zusätzlich zur Monte-Carlo-Simulation?</dt>
+                    <dd>Backtests prüfen konkrete historische Zeiträume (z.B. ab 2000) und zeigen, ob Ihre Strategie
+                        in realen Marktphasen funktioniert. Monte-Carlo liefert Wahrscheinlichkeiten; Backtesting
+                        gibt einen Realitätscheck.</dd>
+
+                    <dt>Muss ich Depot-Tranchen pflegen?</dt>
+                    <dd>Ja, für korrekte Steuerberechnungen sind Tranchen notwendig. Ohne Tranchen nutzt die Suite
+                        vereinfachte Schätzwerte; für verlässliche Handlungsschritte sollten Sie Tranchen erfassen.</dd>
+
+                    <dt>Warum blockiert der Parameter-Sweep manche Felder?</dt>
+                    <dd>Die Sweep-Logik schützt Partner-Felder (Rente 2) und weitere kritische Eingaben über eine
+                        Whitelist. So bleiben Zweitpersonen-Parameter konsistent. Blockierte Variationen erscheinen
+                        als Heatmap-Badges.</dd>
+
                     <dt>Wie oft sollte ich Rebalancing machen?</dt>
                     <dd>Ein jährlicher Rhythmus (z.B. zum Jahreswechsel) balanciert Aufwand, Steuern und
                         Transaktionskosten sinnvoll aus.</dd>
@@ -1221,6 +1339,10 @@
                     <dt>Kann ich die Simulation offline nutzen?</dt>
                     <dd>Ja. Die Berechnungen laufen lokal im Browser. Nur optionale Echtzeitdaten (Inflation,
                         Marktpreise) benötigen eine Internetverbindung.</dd>
+
+                    <dt>Wie weit reichen die historischen Daten?</dt>
+                    <dd>Die historische Renditebasis reicht bis 1925. Über Startjahr-Filter und Recency-Gewichtung
+                        können Sie jüngere Perioden bevorzugen.</dd>
                 </dl>
             </div>
 
@@ -1262,6 +1384,14 @@ Ausgabe-Konto erhält Monatsbedarf aus Geldmarkt</pre>
                         Erfolgswerte bei <em>+200 € Sparrate</em> und <em>Rente ab 66</em>. Öffnen Sie den Sweep unter
                         den
                         Simulator-Ergebnissen.</dd>
+
+                    <dt><a class="toc-link" data-tab-target="manual" href="#simulator-backtest">Backtesting</a></dt>
+                    <dd>Historischer Realitätscheck: Die Strategie wird ab einem gewählten Startjahr durch echte
+                        Marktphasen geführt (z.B. ab 2000). Ergänzt Monte-Carlo-Ergebnisse um konkrete Pfade.</dd>
+
+                    <dt><a class="toc-link" data-tab-target="manual" href="#simulator-szenario-log">Szenario-Log</a></dt>
+                    <dd>Auswahl von 30 repräsentativen Simulationen (Perzentile, Pflege-Extremfälle, Risiko- und
+                        Zufallsszenarien) inkl. Exportfunktion.</dd>
 
                     <dt><a class="toc-link" data-tab-target="manual" href="#balance-jahresupdate">Floor/Flex-Bedarf</a>
                     </dt>
