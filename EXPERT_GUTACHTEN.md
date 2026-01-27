@@ -24,10 +24,12 @@
 
 | Komponente | Zweck | Codeumfang |
 |------------|-------|------------|
-| **Balance-App** | Jahresplanung: Liquidität, Entnahme, Steuern, Transaktionen | ~27 Module, ~5.500 LOC |
-| **Simulator** | Monte-Carlo-Simulation, Parameter-Sweeps, Auto-Optimize | ~35 Module, ~12.000 LOC |
-| **Engine** | Kern-Berechnungslogik, Guardrails, Steuern | 10 Module, ~3.600 LOC |
-| **Tests** | Unit- und Integrationstests | 45 Dateien, ~9.000 LOC, 776+ Assertions |
+| **Balance-App** | Jahresplanung: Liquidität, Entnahme, Steuern, Transaktionen | 27 Module, ~5.500 LOC |
+| **Simulator** | Monte-Carlo-Simulation, Parameter-Sweeps, Auto-Optimize | 41 Module, ~14.000 LOC |
+| **Engine** | Kern-Berechnungslogik, Guardrails, Steuern | 13 Module, ~3.600 LOC |
+| **Workers** | Parallelisierung für MC-Simulation | 3 Module, ~600 LOC |
+| **Tests** | Unit- und Integrationstests | 47 Dateien, ~9.500 LOC, 800+ Assertions |
+| **Sonstige** | Profile, Tranchen, Utilities | ~20 Module, ~2.500 LOC |
 
 ## Analysemethode
 
@@ -47,9 +49,9 @@
 | **Analysierter Commit** | `f3f8817` (2026-01-27) |
 | **Engine Build-ID** | 2025-12-22 (in `engine/config.mjs`) |
 | **Engine API Version** | v31.0 |
-| **Geschätzte LOC** | ~28.000 (via `wc -l`) |
+| **Geschätzte LOC** | ~36.000 (via `wc -l`, nach Refactoring) |
 | **Gutachten-Erstellung** | Januar 2026, Claude Opus 4.5 |
-| **Letzte Aktualisierung** | 27.01.2026 (Test-Suite, SpendingPlanner, MC-Sampling) |
+| **Letzte Aktualisierung** | 27.01.2026 (Refactoring, 1925-Daten, Ansparphase, Renten, Stress-Presets) |
 
 *Hinweis: Code-Zeilenangaben (z.B. `SpendingPlanner.mjs:326`) beziehen sich auf den analysierten Commit und können bei zukünftigen Änderungen abweichen. Die Algorithmen-Beschreibungen bleiben konzeptionell gültig.*
 
@@ -60,9 +62,12 @@ Die **Ruhestand-Suite** ist nach meiner Einschätzung **eines der funktionsreich
 1. **Vollständige deutsche Kapitalertragssteuer** (Abgeltungssteuer, Soli, KiSt, Teilfreistellung, SPB, steueroptimierte Verkaufsreihenfolge)
 2. **Dynamische Guardrails** mit 7-stufiger Marktregime-Erkennung
 3. **Pflegefall-Modellierung** (PG1-5, Progression, Dual-Care)
-4. **Multi-Profil-Unterstützung** für Paare mit getrennten Depots
+4. **Multi-Profil-Unterstützung** für Paare mit getrennten Depots und **Witwenrente**
 5. **Balance-App** für operative Jahresplanung mit Online-Datenabruf
 6. **Simulator** mit Monte-Carlo, Parameter-Sweeps und 3-stufiger Auto-Optimierung
+7. **Historische Daten ab 1925** mit Stress-Szenarien (Große Depression, WWII)
+8. **Optionale Ansparphase** für vollständige Lebenszyklus-Modellierung
+9. **Rentensystem** für 1-2 Personen mit verschiedenen Indexierungsarten
 
 **Gesamtscore: 88/100** (gewichteter Durchschnitt, siehe TEIL F, aktualisiert Januar 2026)
 
@@ -364,7 +369,7 @@ FLEX_RATE_FINAL_LIMITS: {
 
 ## B.4 Test-Suite (erweitert Januar 2026)
 
-**Übersicht:** Die Test-Suite wurde signifikant erweitert von 21 auf **45 Testdateien** mit **776+ Assertions**.
+**Übersicht:** Die Test-Suite wurde signifikant erweitert von 21 auf **47 Testdateien** mit **800+ Assertions**.
 
 ### B.4.1 Test-Inventar
 
@@ -739,17 +744,23 @@ function pickFromSampler(cdf, rand) {
 
 ### C.3.2 Stress-Presets
 
-**7 vordefinierte Stress-Szenarien** (simulator-data.js:162-224):
+**9 vordefinierte Stress-Szenarien** (simulator-data.js:162-290):
 
 | Preset | Typ | Jahre | Parameter |
 |--------|-----|-------|-----------|
 | `STAGFLATION_70s` | conditional_bootstrap | 7 | Inflation ≥ 7%, Real-Rendite ≤ -2% |
 | `DOUBLE_BEAR_00s` | conditional_bootstrap | 6 | Real-Rendite ≤ -8%, Min-Cluster 2 |
+| `GREAT_DEPRESSION_29_33` | conditional_bootstrap | 5 | Jahre 1929-1933 (neu!) |
+| `WWII_40s` | conditional_bootstrap | 7 | Jahre 1939-1945 (neu!) |
 | `STAGFLATION_SUPER` | hybrid | 8 | 70er + künstlich -3% μ |
 | `INFLATION_SPIKE_3Y` | parametric | 3 | μ = -5%, σ × 1.5, Inflation ≥ 7% |
 | `FORCED_DRAWDOWN_3Y` | parametric_sequence | 3 | -25%, -20%, -15% |
 | `LOST_DECADE_12Y` | parametric | 12 | μ = -6%, Gold capped bei +15% |
 | `CORRELATION_CRASH_4Y` | parametric | 4 | Aktien -15%, Gold -5%, Inflation 5% |
+
+**Neue historische Stress-Szenarien (ab 1925):**
+- **Great Depression (1929-1933):** Bootstrapped aus den historischen Jahren der Weltwirtschaftskrise. Ermöglicht Tests für extreme Deflation und Vermögensvernichtung.
+- **Zweiter Weltkrieg (1939-1945):** Bootstrapped aus der Kriegsperiode mit Kapitalverkehrskontrollen, Inflation und Wirtschaftsumstellung.
 
 ### C.3.3 Historische Daten
 
@@ -757,12 +768,12 @@ function pickFromSampler(cdf, rand) {
 
 | Feld | Quelle | Zeitraum |
 |------|--------|----------|
-| `msci_eur` | MSCI World EUR | 1950-2024 |
-| `inflation_de` | Statistisches Bundesamt | 1950-2024 |
-| `zinssatz_de` | Bundesbank | 1950-2024 |
-| `lohn_de` | Lohnentwicklung DE | 1950-2024 |
+| `msci_eur` | MSCI World EUR (rekonstruiert ab 1925) | 1925-2024 |
+| `inflation_de` | Statistisches Bundesamt | 1925-2024 |
+| `zinssatz_de` | Bundesbank | 1925-2024 |
+| `lohn_de` | Lohnentwicklung DE | 1925-2024 |
 | `gold_eur_perf` | Gold in EUR | 1961-2024 |
-| `cape` | Shiller CAPE | 1950-2024 |
+| `cape` | Shiller CAPE | 1925-2024 |
 
 **Daten-Validierung `msci_eur`:**
 *   **Zeitraum 2012–2023:** Die Werte stimmen exakt (auf 2 Nachkommastellen) mit dem **MSCI World Net Total Return EUR** überein.
@@ -772,20 +783,27 @@ function pickFromSampler(cdf, rand) {
 
 **Hinweis Balance-App:** In der Balance-App werden reale Depotstände und ETF-Kurse verwendet; TER ist dort bereits im NAV eingepreist. Ein zusätzlicher TER-Abzug wäre doppelt.
 
+**Erweiterte Datenbasis (1925-2024):**
+*   **Erweiterung:** Die Daten wurden ab Januar 2026 von 1950 auf **1925** erweitert.
+*   **Rekonstruktion 1925-1949:** MSCI-Levels wurden aus US-Marktdaten rekonstruiert und auf den 1950er-Basiswert normalisiert.
+*   **Zweck:** Ermöglicht Stress-Tests mit historisch extremen Perioden (Große Depression, Zweiter Weltkrieg).
+
 **Daten-Anomalie 1950-1960 ("Wirtschaftswunder"):**
 *   **Beobachtung:** Die Jahre 1950-1960 weisen eine nominale CAGR von **~19.4%** (Real: ~17.4%) auf.
 *   **Bewertung:** Dies ist ein historischer Sonderfall (Nachkriegs-Wiederaufbau), der sich so kaum wiederholen lässt.
 *   **Risiko:** Da die Monte-Carlo-Simulation zufällige Blöcke aus der Historie zieht, besteht das Risiko, dass "Wirtschaftswunder"-Phasen eine zu optimistische Erwartungshaltung erzeugen.
-*   **Empfehlung:** Für eine konservative Planung ("Stress-Test") wäre es ratsam, die Datenbasis erst ab **1970** (Beginn Stagflation) oder **1978** (Präzisere Daten) zu nutzen, um diesen "Golden Age Bias" auszuschließen. Die Jahre **1970-1980** (Stagflation) sind hingegen essenziell für Robustheits-Tests.
+*   **Empfehlung:** Für eine konservative Planung ("Stress-Test") kann die Datenbasis erst ab **1970** (Beginn Stagflation) oder **1978** (Präzisere Daten) genutzt werden. Die neuen Stress-Presets "Great Depression" und "WWII" bieten zusätzliche Extremszenarien.
 
-**Verteilung der Regime (1950-2024):**
+**Verteilung der Regime (1925-2024):**
 
 | Regime | Jahre | Anteil |
 |--------|-------|--------|
-| BULL | 22 | 29% |
-| BEAR | 12 | 16% |
-| SIDEWAYS | 34 | 45% |
-| STAGFLATION | 7 | 9% |
+| BULL | 28 | 28% |
+| BEAR | 22 | 22% |
+| SIDEWAYS | 38 | 38% |
+| STAGFLATION | 12 | 12% |
+
+*Hinweis: Die erweiterte Historie (1925-1949) enthält mehr Bärenmarkt- und Stagflationsjahre durch Große Depression und Weltkriege.*
 
 ### C.3.4 Determinismus
 
@@ -946,6 +964,157 @@ if (scenario.startsWith('peak') && equityOverweight > rebalBand) {
 - 12.341,52 € → 15.000 €
 - 86.234,00 € → 90.000 €
 - 238.234,00 € → 250.000 €
+
+---
+
+## C.6 Ansparphase (Accumulation)
+
+### C.6.1 Grundkonzept
+
+Die Simulator-Komponente unterstützt eine optionale **Ansparphase** vor dem Ruhestand. Dies ermöglicht die Modellierung des gesamten Lebenszyklus vom Sparbeginn bis zum Lebensende.
+
+**Aktivierung:** Checkbox "Ansparphase aktivieren" im Simulator
+
+### C.6.2 Konfigurationsparameter
+
+| Parameter | Beschreibung | Beispielwert |
+|-----------|--------------|--------------|
+| `durationYears` | Dauer der Ansparphase in Jahren | 25 |
+| `sparrate` | Monatliche Sparrate in € | 2.000 |
+| `sparrateIndexing` | Dynamisierung der Sparrate | `inflation`, `wage`, `none` |
+
+**Implementierung** (simulator-portfolio-inputs.js:180-200):
+```javascript
+const accumulationPhase = {
+    enabled: accumulationPhaseEnabled,
+    durationYears: accumulationDurationYears,
+    sparrate: accumulationSparrate,
+    sparrateIndexing: sparrateIndexing
+};
+const transitionYear = accumulationPhaseEnabled ? accumulationDurationYears : 0;
+```
+
+### C.6.3 Simulationslogik
+
+**Während der Ansparphase** (simulator-engine-direct.js:137-210):
+- Kein Mortalitätsrisiko (Person lebt noch)
+- Keine Entnahmen aus dem Depot
+- Jährliche Einzahlung = `sparrate × 12`
+- Optional: Indexierung der Sparrate (Inflation/Lohn)
+- Marktregime = `accumulation` (keine Guardrail-Logik)
+
+**Transition zum Ruhestand:**
+```javascript
+const effectiveTransitionYear = inputs.transitionYear || 0;
+const isAccumulationYear = yearIndex < effectiveTransitionYear;
+```
+
+### C.6.4 Sonderfälle
+
+**Pflegeeintritt in Ansparphase:**
+- Bei Pflegeeintritt während der Ansparphase wird sofort in den Ruhestand gewechselt
+- Die verbleibende Ansparphase wird abgebrochen
+- Entnahmelogik übernimmt ab diesem Jahr
+
+```javascript
+// monte-carlo-runner.js:453-455
+if (inputs.accumulationPhase?.enabled && simulationsJahr < effectiveTransitionYear) {
+    // Sofortiger Wechsel bei Pflegeeintritt
+    effectiveTransitionYear = simulationsJahr;
+}
+```
+
+### C.6.5 Berechnungsbeispiel
+
+| Jahr | Alter | Phase | Depot Anfang | Rendite | Einzahlung | Depot Ende |
+|------|-------|-------|--------------|---------|------------|------------|
+| 1 | 40 | Anspar | 0 € | — | 24.000 € | 24.000 € |
+| 2 | 41 | Anspar | 24.000 € | +7% | 24.000 € | 49.680 € |
+| ... | ... | ... | ... | ... | ... | ... |
+| 25 | 65 | **Transition** | 950.000 € | +5% | — | 997.500 € |
+| 26 | 66 | Ruhestand | 997.500 € | +3% | -48.000 € | 979.725 € |
+
+---
+
+## C.7 Rentensystem (Gesetzliche & Private Rente)
+
+### C.7.1 Grundkonzept
+
+Die Suite modelliert Renteneinkünfte für **1-2 Personen** mit unterschiedlichen Indexierungsarten und optionaler **Witwenrente**.
+
+### C.7.2 Renten-Parameter pro Person
+
+| Parameter | Beschreibung | Beispiel |
+|-----------|--------------|----------|
+| `renteMonatlich` | Monatliche Bruttorente | 1.500 € |
+| `rentAdjMode` | Indexierungsart | `fix`, `wage`, `cpi` |
+| `rentAdjPct` | Feste Anpassung (bei `fix`) | 2.0% |
+| `steuerquotePct` | Steuersatz auf Rente | 30% |
+| `renteStartOffset` | Startjahr der Rente (relativ) | 0 |
+
+**Implementierung** (simulator-portfolio-pension.js):
+```javascript
+export function computePensionNext(prev, isFirstYear, base, adjPct) {
+    if (isFirstYear) return Math.max(0, base);
+    return Math.max(0, prev * (1 + adjPct / 100));
+}
+
+export function computeRentAdjRate(inputs, yearData) {
+    if (inputs.rentAdjMode === 'wage') return yearData.lohn || 0;
+    if (inputs.rentAdjMode === 'cpi') return yearData.inflation || 0;
+    return inputs.rentAdjPct || 0;
+}
+```
+
+### C.7.3 Paar-Modellierung (Rente1 + Rente2)
+
+**Separate Renten für Person 1 und Person 2:**
+
+| Feld | Person 1 | Person 2 |
+|------|----------|----------|
+| Bruttorente | `rente1` | `rente2` |
+| Steuerquote | `p1SteuerquotePct` | `partner.steuerquotePct` |
+| Startalter | `p1StartAlter` | `partnerStartAlter` |
+| Lebenserwartung | `p1LebensErwartung` | `partnerLebensErwartung` |
+
+**Aggregation:**
+```javascript
+const renteSum = rente1 + rente2;
+const floorBedarf = Math.max(0, inflatedFloor - renteSum);
+```
+
+### C.7.4 Witwenrente
+
+Nach dem Tod eines Partners kann der Überlebende einen Teil der Partnerrente erhalten.
+
+**Konfiguration:**
+- `widowOptions.enabled`: Aktiviert Witwenrente
+- `widowOptions.marriageOffsetYears`: Ehe-Unterschied in Jahren
+- `widowOptions.benefitFraction`: Anteil der Partnerrente (z.B. 0.55 für 55%)
+
+**Implementierung** (monte-carlo-runner.js:383-384):
+```javascript
+let widowBenefitActiveForP1 = false; // P1 erhält Witwenrente nach P2
+let widowBenefitActiveForP2 = false; // P2 erhält Witwenrente nach P1
+```
+
+**Berechnungsbeispiel:**
+
+| Jahr | P1 Status | P2 Status | Rente1 | Rente2 | Witwenrente | Gesamt |
+|------|-----------|-----------|--------|--------|-------------|--------|
+| 1 | lebt | lebt | 1.500 € | 800 € | — | 2.300 € |
+| 10 | lebt | **verstorben** | 1.500 € | — | 440 € (55%) | 1.940 € |
+| 15 | lebt | — | 1.650 € | — | 484 € | 2.134 € |
+
+### C.7.5 Steuerbehandlung
+
+- **Besteuerungsanteil:** Je nach Renteneintrittsalter (z.B. 2025: 83%)
+- **Nettoberechnung:** `renteNetto = renteBrutto × (1 - steuerquotePct / 100)`
+- **Witwenrente:** Wird zum steuerpflichtigen Einkommen addiert
+
+**Einschränkungen:**
+- Keine detaillierte Steuerprogression für Renten (vereinfachter Steuersatz)
+- Keine Modellierung von Hinzuverdienst oder Flexirente
 
 ---
 
@@ -1121,14 +1290,14 @@ rt
 | Kriterium | Score | Begründung |
 |-----------|-------|------------|
 | Architektur | 90 | Drei-Schichten, saubere Trennung |
-| Modularität | 88 | ~65 Module, erweiterte Engine-Algorithmen |
+| Modularität | 90 | ~110 Module nach Refactoring, klare Trennung |
 | Performance | 90 | Worker-Pool, Typed Arrays, Quickselect |
 | Determinismus | 95 | Per-Run-Seeding, Worker-Parity-Test |
 | Fehlerbehandlung | 80 | Strukturierte Fehlerklassen |
-| Testing | 88 | **45 Testdateien, 776+ Assertions** (aktualisiert) |
+| Testing | 90 | **47 Testdateien, 800+ Assertions** (aktualisiert) |
 | Typisierung | 60 | Kein TypeScript |
 
-**Technik-Score: 85/100** (aktualisiert von 83)
+**Technik-Score: 86/100** (aktualisiert nach Refactoring)
 
 ## F.2 Fachliche Methodik (Gewicht: 35%)
 
@@ -1148,7 +1317,7 @@ rt
 
 | Kriterium | Score | Begründung |
 |-----------|-------|------------|
-| Test-Coverage | 90 | **45 Dateien, 776+ Assertions** (aktualisiert) |
+| Test-Coverage | 90 | **47 Dateien, 800+ Assertions** (aktualisiert) |
 | Determinismus | 95 | Per-Run-Seeding, Worker-Parity |
 | Dokumentation | 88 | CLAUDE.md, TECHNICAL.md, READMEs, WORKFLOW_PSEUDOCODE.md (neu) |
 
@@ -1178,13 +1347,13 @@ rt
 
 | Kategorie | Gewicht | Score | Gewichteter Score |
 |-----------|---------|-------|-------------------|
-| Technik | 25% | **85** | 21.25 |
+| Technik | 25% | **86** | 21.50 |
 | Fachliche Methodik | 35% | 90 | 31.50 |
 | Validierung | 15% | **91** | 13.65 |
 | Nutzerwert | 15% | 80 | 12.00 |
 | Marktposition | 10% | 92 | 9.20 |
 
-### **Gesamtscore: 87.60/100 ≈ 88%** (aktualisiert von 87%)
+### **Gesamtscore: 87.85/100 ≈ 88%** (aktualisiert nach Refactoring)
 
 ---
 
@@ -1229,40 +1398,56 @@ rt
 
 # Appendix: Modul-Inventar
 
-## Engine-Module (10)
+## Engine-Module (13)
 
 | Modul | LOC | Funktion |
 |-------|-----|----------|
 | `core.mjs` | 311 | Orchestrierung, EngineAPI |
 | `config.mjs` | 274 | Zentrale Konfiguration (erweitert) |
 | `errors.mjs` | ~50 | Fehlerklassen |
+| `index.mjs` | ~30 | Modul-Exports |
 | `InputValidator.mjs` | 140 | Input-Validierung |
 | `MarketAnalyzer.mjs` | 160 | Marktregime-Klassifikation |
 | `SpendingPlanner.mjs` | **1076** | Guardrails, Flex-Rate, Budget-System **(erweitert!)** |
 | `TransactionEngine.mjs` | 47 | Facade für Transaktionen |
 | `transaction-action.mjs` | 456 | Transaktions-Entscheidungslogik |
+| `transaction-opportunistic.mjs` | 323 | Opportunistisches Rebalancing |
+| `transaction-surplus.mjs` | 149 | Überschuss-Handling |
+| `transaction-utils.mjs` | 237 | Transaktions-Hilfsfunktionen |
 | `sale-engine.mjs` | 333 | Verkäufe, Steuern |
-| `liquidity-planner.mjs` | ~150 | Liquiditäts-Targeting |
 
-## Simulator-Module (Auswahl)
+## Simulator-Module (41 Module, Auswahl)
 
 | Modul | LOC | Funktion |
 |-------|-----|----------|
 | `monte-carlo-runner.js` | ~880 | DOM-freie MC-Simulation (erweitert) |
 | `simulator-sweep.js` | ~500 | Parameter-Sweeps |
 | `simulator-optimizer.js` | ~500 | 3-stufige Optimierung |
-| `simulator-data.js` | 322 | Historische Daten, Presets |
+| `simulator-data.js` | ~450 | Historische Daten 1925-2024, 9 Stress-Presets |
 | `simulator-utils.js` | 260 | RNG, Quantile, Parser |
-| `worker-pool.js` | ~400 | Worker-Lifecycle, Chunking |
+| `simulator-portfolio-pension.js` | ~65 | Rentenberechnung, Indexierung |
+| `simulator-main-accumulation.js` | ~80 | Ansparphase-Steuerung |
+| `simulator-engine-direct.js` | ~350 | Engine-Direktzugriff, Ansparlogik |
+| `simulator-ui-rente.js` | ~100 | Renten-UI (Rente1/Rente2) |
 
-## Balance-App Module (Auswahl)
+## Worker-Module (3)
+
+| Modul | LOC | Funktion |
+|-------|-----|----------|
+| `worker-pool.js` | ~400 | Worker-Lifecycle, Chunking |
+| `mc-worker.js` | ~150 | Monte-Carlo Worker-Thread |
+| `auto-optimize-worker.js` | ~80 | Optimizer-Worker |
+
+## Balance-App Module (27 Module, Auswahl)
 
 | Modul | LOC | Funktion |
 |-------|-----|----------|
 | `balance-main.js` | ~500 | Orchestrierung, Update-Zyklus |
 | `balance-reader.js` | ~300 | DOM-Input-Lesung |
 | `balance-storage.js` | ~400 | localStorage, Snapshots |
-| `balance-guardrail-reset.js` | ~70 | Auto-Reset bei kritischen Änderungen **(neu!)** |
+| `balance-guardrail-reset.js` | ~70 | Auto-Reset bei kritischen Änderungen |
+| `balance-annual-*.js` (4) | ~400 | Jahresabschluss, Inflation, Marktdaten |
+| `balance-diagnosis-*.js` (6) | ~600 | Chips, Entscheidungsbaum, Guardrails |
 
 ## Kernalgorithmen
 
@@ -1274,10 +1459,14 @@ rt
 6. **Pflegegrad-Progression** (`simulator-data.js:PFLEGE_GRADE_PROGRESSION_PROBABILITIES`)
 7. **3-Stage-Optimization** (`simulator-optimizer.js`)
 8. **FIFO-Steueroptimierung** (`sale-engine.mjs:getSellOrder`)
-9. **Wealth-Adjusted Reduction** (`SpendingPlanner.mjs`) **(neu!)**
-10. **Flex-Budget-System** (`SpendingPlanner.mjs`) **(neu!)**
-11. **Flex-Share S-Curve** (`SpendingPlanner.mjs`) **(neu!)**
-12. **FILTER/RECENCY Sampling** (`monte-carlo-runner.js`) **(neu!)**
+9. **Wealth-Adjusted Reduction** (`SpendingPlanner.mjs`)
+10. **Flex-Budget-System** (`SpendingPlanner.mjs`)
+11. **Flex-Share S-Curve** (`SpendingPlanner.mjs`)
+12. **FILTER/RECENCY Sampling** (`monte-carlo-runner.js`)
+13. **Ansparphase-Logik** (`simulator-engine-direct.js`, `simulator-main-accumulation.js`) **(neu!)**
+14. **Renten-Indexierung** (`simulator-portfolio-pension.js:computeRentAdjRate`) **(neu!)**
+15. **Witwenrente** (`monte-carlo-runner.js:widowBenefitActive`) **(neu!)**
+16. **Great Depression/WWII Stress-Presets** (`simulator-data.js`) **(neu!)**
 
 ---
 
