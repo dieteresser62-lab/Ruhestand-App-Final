@@ -2,11 +2,11 @@
 
 **Umfassendes Experten-Gutachten zur DIY-Software für Ruhestandsplanung**
 
-**Gutachten erstellt:** Januar 2026
+**Gutachten erstellt:** Januar 2026 (aktualisiert: 27.01.2026)
 **Gutachter:** Claude Opus 4.5 (KI-gestützte Analyse)
 **Rollen-Perspektive:** Software-Architekt, Quant/Finanzplaner, Research-Experte
-**Analysierte Version:** Engine API v32.0, Build 2026-01-21
-**Analysemethode:** Code-Review (~27.500 LOC) + Web-Recherche
+**Analysierte Version:** Engine API v31.0, Build 2025-12-22, Commit `f3f8817`
+**Analysemethode:** Code-Review (~28.000 LOC) + Web-Recherche
 
 ---
 
@@ -24,10 +24,10 @@
 
 | Komponente | Zweck | Codeumfang |
 |------------|-------|------------|
-| **Balance-App** | Jahresplanung: Liquidität, Entnahme, Steuern, Transaktionen | ~25 Module, ~5.000 LOC |
+| **Balance-App** | Jahresplanung: Liquidität, Entnahme, Steuern, Transaktionen | ~27 Module, ~5.500 LOC |
 | **Simulator** | Monte-Carlo-Simulation, Parameter-Sweeps, Auto-Optimize | ~35 Module, ~12.000 LOC |
-| **Engine** | Kern-Berechnungslogik, Guardrails, Steuern | 8 Module, ~2.500 LOC |
-| **Tests** | Unit- und Integrationstests | 21 Dateien, ~8.000 LOC |
+| **Engine** | Kern-Berechnungslogik, Guardrails, Steuern | 10 Module, ~3.600 LOC |
+| **Tests** | Unit- und Integrationstests | 45 Dateien, ~9.000 LOC, 776+ Assertions |
 
 ## Analysemethode
 
@@ -44,11 +44,12 @@
 
 | Aspekt | Wert |
 |--------|------|
-| **Analysierter Commit** | `c523fff` (2026-01-21) |
+| **Analysierter Commit** | `f3f8817` (2026-01-27) |
 | **Engine Build-ID** | 2025-12-22 (in `engine/config.mjs`) |
 | **Engine API Version** | v31.0 |
-| **Geschätzte LOC** | ~27.500 (via `wc -l`) |
+| **Geschätzte LOC** | ~28.000 (via `wc -l`) |
 | **Gutachten-Erstellung** | Januar 2026, Claude Opus 4.5 |
+| **Letzte Aktualisierung** | 27.01.2026 (Test-Suite, SpendingPlanner, MC-Sampling) |
 
 *Hinweis: Code-Zeilenangaben (z.B. `SpendingPlanner.mjs:326`) beziehen sich auf den analysierten Commit und können bei zukünftigen Änderungen abweichen. Die Algorithmen-Beschreibungen bleiben konzeptionell gültig.*
 
@@ -63,7 +64,7 @@ Die **Ruhestand-Suite** ist nach meiner Einschätzung **eines der funktionsreich
 5. **Balance-App** für operative Jahresplanung mit Online-Datenabruf
 6. **Simulator** mit Monte-Carlo, Parameter-Sweeps und 3-stufiger Auto-Optimierung
 
-**Gesamtscore: 87/100** (gewichteter Durchschnitt, siehe TEIL F)
+**Gesamtscore: 88/100** (gewichteter Durchschnitt, siehe TEIL F, aktualisiert Januar 2026)
 
 **Hauptlücken:**
 - Kein Stationary Bootstrap (nur Block-Bootstrap)
@@ -208,19 +209,22 @@ DiagnosisRenderer
 ```
 engine/
 ├── core.mjs              (311 LOC) → Orchestrierung, EngineAPI
-├── config.mjs            (228 LOC) → Zentrale Konfiguration
+├── config.mjs            (274 LOC) → Zentrale Konfiguration (erweitert)
 ├── errors.mjs            (~50 LOC) → Fehlerklassen
 ├── validators/
-│   └── InputValidator.mjs (~200 LOC) → Input-Validierung
+│   └── InputValidator.mjs (140 LOC) → Input-Validierung
 ├── analyzers/
-│   └── MarketAnalyzer.mjs (156 LOC) → Marktregime-Klassifikation
+│   └── MarketAnalyzer.mjs (160 LOC) → Marktregime-Klassifikation
 ├── planners/
-│   └── SpendingPlanner.mjs (659 LOC) → Guardrails, Flex-Rate
+│   └── SpendingPlanner.mjs (1076 LOC) → Guardrails, Flex-Rate, Budget-System (erweitert!)
 └── transactions/
-    ├── TransactionEngine.mjs (41 LOC) → Facade
-    ├── liquidity-planner.mjs (~150 LOC) → Liquiditäts-Targeting
-    ├── sale-engine.mjs      (323 LOC) → Verkäufe, Steuern
-    └── gold-rebalance.mjs   (~100 LOC) → Gold-Rebalancing
+    ├── TransactionEngine.mjs (47 LOC) → Facade
+    ├── transaction-action.mjs (456 LOC) → Transaktions-Entscheidungslogik
+    ├── transaction-opportunistic.mjs (323 LOC) → Opportunistisches Rebalancing
+    ├── transaction-surplus.mjs (149 LOC) → Überschuss-Handling
+    ├── transaction-utils.mjs (237 LOC) → Transaktions-Hilfsfunktionen
+    ├── sale-engine.mjs      (333 LOC) → Verkäufe, Steuern
+    └── liquidity-planner.mjs (~150 LOC) → Liquiditäts-Targeting
 ```
 
 ### B.3.2 Engine-Datenfluss (core.mjs:32-228)
@@ -272,7 +276,9 @@ function _internal_calculateModel(input, lastState) {
 - **Stagflation-Erkennung:** Inflation ≥ 4% UND Real-Rendite < 0 (Zeile 122-128)
 - **CAPE-Bewertung:** 4 Stufen (günstig/fair/teuer/sehr teuer) mit erwarteten Renditen (Zeile 28-51)
 
-### B.3.4 SpendingPlanner: Guardrail-System
+### B.3.4 SpendingPlanner: Guardrail-System (erweitert)
+
+**Hinweis:** Der SpendingPlanner wurde signifikant erweitert (659 → 1076 LOC) mit neuen Algorithmen.
 
 **Alarm-Aktivierung** (SpendingPlanner.mjs:326-341):
 ```javascript
@@ -287,31 +293,109 @@ const shouldActivateAlarm =
 ```javascript
 const ALPHA = 0.35;  // Glättungsfaktor
 const maxUp = isRecoveryOrPeak ? 4.5 : 2.5;    // pp/Jahr
-const maxDown = isBearDeep ? 10.0 : 3.5;       // pp/Jahr
+const maxDown = isBearDeep ? 6.0 : 3.5;        // pp/Jahr (geändert: 10.0 → 6.0, sanfter)
 
 smoothedFlexRate = ALPHA * newRate + (1 - ALPHA) * oldRate;
 smoothedFlexRate = clamp(smoothedFlexRate, oldRate - maxDown, oldRate + maxUp);
 ```
 
+### B.3.5 SpendingPlanner: Neue Algorithmen (Januar 2026)
+
+**1. Wealth-Adjusted Reduction** (config.mjs:106-111):
+```javascript
+WEALTH_ADJUSTED_REDUCTION: {
+    SAFE_WITHDRAWAL_RATE: 0.015,   // Unter 1.5%: keine marktbedingte Reduktion
+    FULL_WITHDRAWAL_RATE: 0.035   // Ab 3.5%: volle Reduktion
+}
+```
+*Funktion:* Bei niedriger Entnahmequote (<1.5%) werden Markt-Regime-Kürzungen gedämpft (Smoothstep-Interpolation).
+
+**2. Flex-Budget-System** (config.mjs:112-132):
+```javascript
+FLEX_BUDGET: {
+    ENABLED: true,
+    DEFAULT_MAX_YEARS: 5,              // 5-Jahres-"Topf"
+    DEFAULT_RECHARGE_FRACTION: 0.7,    // 70% Recharge in guten Zeiten
+    ACTIVE_REGIMES: ['bear_deep', 'recovery_in_bear'],
+    REGIME_WEIGHTS: { bear_deep: 1.0, recovery_in_bear: 0.5 },
+    MIN_RATE_BASE_PCT: { bear_deep: 5, recovery_in_bear: 5 },
+    MIN_RATE_FLOOR_SLOPE_PCT: { bear_deep: 60, recovery_in_bear: 60 }
+}
+```
+*Funktion:* Zeit-basierter "Topf" begrenzt kumulative Kürzungen über 5 Jahre, verhindert Überreaktion bei langen Bärenmärkten.
+
+**3. Flex-Share S-Curve** (config.mjs:133-138):
+```javascript
+FLEX_SHARE_S_CURVE: {
+    ENABLED: true,
+    K: 0.8,    // Cap-Stärke (0..1)
+    A: 14.0,   // Steilheit der S-Kurve
+    B: 0.52    // Knickpunkt (Flex-Anteil 0..1)
+}
+```
+*Funktion:* Sigmoid-basierte Dämpfung bei hohem Flex-Anteil. Verhindert extreme Kürzungen wenn Flex > 50% des Gesamtbedarfs ausmacht.
+
+**4. Hard Caps für Flex-Rate** (config.mjs:139-150):
+```javascript
+FLEX_RATE_HARD_CAPS: {
+    BEAR_DEEP_MAX_RATE: 70,           // Max. Flex-Rate im tiefen Bärenmarkt
+    FLEX_SHARE_RELIEF_MAX_PP: 15,     // Entlastung bei geringem Flex-Anteil
+    RUNWAY_COVERAGE_CAPS: [
+        { maxCoverage: 1.20, maxRate: 70 },  // <120% Runway → max 70%
+        { maxCoverage: 1.05, maxRate: 60 },  // <105% Runway → max 60%
+        { maxCoverage: 0.90, maxRate: 50 }   // <90% Runway  → max 50%
+    ]
+}
+```
+*Funktion:* Harte Obergrenzen basierend auf Runway-Deckung. Verhindert zu aggressive Ausgaben bei kritischer Liquidität.
+
+**5. Final Rate Limits** (config.mjs:151-157):
+```javascript
+FLEX_RATE_FINAL_LIMITS: {
+    MAX_UP_PP: 12.0,               // Max. Anstieg nach allen Caps
+    MAX_DOWN_PP: 12.0,             // Max. Rückgang nach allen Caps
+    MAX_DOWN_IN_BEAR_PP: 10.0,     // Sanfterer Abbau im Bärenmarkt
+    RELAX_MAX_DOWN_PP: 20.0        // Max. Relaxierung bei hohem Vermögen
+}
+```
+*Funktion:* Post-Guardrail Rate-Limitierung als letzte Sicherheitsstufe.
+
 ---
 
-## B.4 Test-Suite
+## B.4 Test-Suite (erweitert Januar 2026)
+
+**Übersicht:** Die Test-Suite wurde signifikant erweitert von 21 auf **45 Testdateien** mit **776+ Assertions**.
 
 ### B.4.1 Test-Inventar
 
-| Kategorie | Dateien | Bytes | Fokus |
-|-----------|---------|-------|-------|
-| Engine Core | `core-engine.test.mjs` | 4.7k | Engine-Orchestrierung |
-| Transaktionen | `transaction-*.test.mjs` (3) | 20k+ | Verkäufe, Quantisierung |
-| Steuern | `transaction-tax.test.mjs` | 8.7k | Steuerberechnung |
-| Worker-Parität | `worker-parity.test.mjs` | 11k | Determinismus |
-| Spending | `spending-*.test.mjs` (2) | 7.7k | Guardrails, Quantisierung |
-| Monte-Carlo | `simulation.test.mjs` | 3.2k | MC-Sampling |
-| Pflegefall | `care-meta.test.mjs` | 4.9k | Pflegegrad-Modell |
-| Profilverbund | `profilverbund-*.test.mjs` (3) | 16k | Multi-Profil |
-| Integration | `balance-smoke.test.mjs` | 9.9k | Balance-App E2E |
+| Kategorie | Dateien | LOC | Fokus |
+|-----------|---------|-----|-------|
+| **Engine Core** | `core-engine.test.mjs`, `engine-robustness.test.mjs` | ~390 | Engine-Orchestrierung, Edge Cases |
+| **Transaktionen** | `transaction-*.test.mjs` (5) | ~755 | Verkäufe, ATH, Rebal, Gold, Quantisierung |
+| **Steuern** | `transaction-tax.test.mjs` | ~150 | Steuerberechnung |
+| **Worker** | `worker-parity.test.mjs`, `worker-pool.test.mjs` | ~820 | Determinismus, Pool-Lifecycle |
+| **Spending** | `spending-*.test.mjs` (2) | ~280 | Guardrails, Quantisierung |
+| **Monte-Carlo** | `simulator-monte-carlo.test.mjs`, `monte-carlo-*.test.mjs` (2) | ~760 | MC-Kern, Sampling, Startjahr |
+| **Pflegefall** | `care-meta.test.mjs` | ~200 | Pflegegrad-Modell |
+| **Profilverbund** | `profilverbund-*.test.mjs` (3), `profile-storage.test.mjs` | ~1000 | Multi-Profil, Storage |
+| **Balance-App** | `balance-*.test.mjs` (10) | ~2300 | Smoke, Reader, Storage, Diagnosis, Annual |
+| **Simulator** | `simulator-*.test.mjs` (4) | ~1000 | Sweep, Backtest, Heatmap, Multi-Profile |
+| **Scenarios** | `scenarios.test.mjs`, `scenario-analyzer.test.mjs` | ~245 | Komplexe Lebenspfade |
+| **Utilities** | `utils.test.mjs`, `formatting.test.mjs`, `feature-flags.test.mjs` | ~280 | Hilfsfunktionen |
 
-### B.4.2 Worker-Parity-Test
+### B.4.2 Neue Test-Kategorien (seit Januar 2026)
+
+| Testdatei | LOC | Neue Abdeckung |
+|-----------|-----|----------------|
+| `profile-storage.test.mjs` | 540 | Profil-Registry CRUD, Import/Export |
+| `simulator-monte-carlo.test.mjs` | 460 | Heatmap Merge, Buffer-Strukturen, Perzentile |
+| `simulator-sweep.test.mjs` | 470 | Parameter-Sweep, Whitelist/Blocklist |
+| `worker-pool.test.mjs` | 670 | Worker-Lifecycle, Queue, Telemetrie |
+| `auto-optimizer.test.mjs` | 500 | LHS, Nachbarschaft, Constraints, Cache |
+| `balance-reader.test.mjs` | 640 | DOM-Lesen, Profile-Overrides, Gold-Defaults |
+| `balance-storage.test.mjs` | 490 | localStorage, Migrations, Snapshots |
+
+### B.4.3 Worker-Parity-Test
 
 Validiert Determinismus zwischen Main-Thread und Worker:
 ```javascript
@@ -320,6 +404,17 @@ const mainResult = runSimulation({ seed: 12345, runs: 100 });
 const workerResult = await runInWorker({ seed: 12345, runs: 100 });
 assertEqual(mainResult.successRate, workerResult.successRate);
 ```
+
+### B.4.4 Test-Prioritäten
+
+| Priorität | Kategorie | Kritikalität |
+|-----------|-----------|--------------|
+| 1 | Finanz-Kern (Spending, Tax, Liquidity) | ⚠️ Kritisch |
+| 2 | Algorithmen (MC, Market, Care) | ⚠️ Hoch |
+| 3 | Transaktions-Details | Mittel |
+| 4 | UI & Persistenz | Mittel |
+| 5 | Integration & Parity | Mittel |
+| 6 | Utilities & Sweep | Niedrig |
 
 ---
 
@@ -384,14 +479,16 @@ SPENDING_MODEL: {
     RATE_CHANGE_MAX_UP_PP: 2.5,          // +2.5pp pro Jahr (konservativ)
     RATE_CHANGE_AGILE_UP_PP: 4.5,        // +4.5pp in Peak/Recovery (agiler)
     RATE_CHANGE_MAX_DOWN_PP: 3.5,        // -3.5pp pro Jahr (normal)
-    RATE_CHANGE_MAX_DOWN_IN_BEAR_PP: 10.0 // -10pp im Bärenmarkt (drastisch)
+    RATE_CHANGE_MAX_DOWN_IN_BEAR_PP: 6.0,// -6pp im Bärenmarkt (geändert: war 10.0)
+    RATE_CHANGE_RELAX_MAX_DOWN_PP: 20.0  // Relaxierung bei hohem Vermögen (neu)
 }
 ```
 
 **Warum diese Werte?**
 - α = 0.35: Reagiert auf Marktänderungen, glättet aber Noise
 - Max +2.5pp: Verhindert zu schnelles "Hochfahren" nach Krise
-- Max -10pp im Bärenmarkt: Ermöglicht schnelle Reaktion bei Crash
+- Max -6pp im Bärenmarkt: Sanftere Reduktion (geändert von -10pp), kombiniert mit Flex-Budget-System
+- Relaxierung +20pp: Bei niedriger Entnahmequote darf Down-Limit entspannt werden
 
 ### C.1.4 Recovery-Guardrail
 
@@ -552,7 +649,7 @@ if (purchaseDate < new Date('2009-01-01')) {
 
 ### C.3.1 Sampling-Strategien
 
-**Strategie 1: Zufälliges Jahr** (monte-carlo-runner.js:190)
+**Strategie 1: Zufälliges Jahr (UNIFORM)** (monte-carlo-runner.js:190)
 ```javascript
 startYearIndex = Math.floor(rand() * annualData.length);
 ```
@@ -592,6 +689,53 @@ REGIME_TRANSITIONS = {
     // ...
 };
 ```
+
+### C.3.1a Neue Startjahr-Sampling-Modi (Januar 2026)
+
+**Strategie 5: FILTER Mode** (monte-carlo-runner.js)
+```javascript
+// Beschränkt Sampling auf bestimmte Jahre (z.B. ab 1970)
+if (samplingMode === 'FILTER') {
+    const validIndices = annualData
+        .map((d, i) => i)
+        .filter(i => annualData[i].jahr >= filterStartYear);
+    startYearIndex = validIndices[Math.floor(rand() * validIndices.length)];
+}
+```
+*Anwendung:* Ausschluss des "Wirtschaftswunder"-Bias (1950-1960) für konservativere Simulationen.
+
+**Strategie 6: RECENCY Mode mit Halbwertszeit** (monte-carlo-runner.js)
+```javascript
+// Exponentiell gewichtetes Sampling - jüngere Jahre bevorzugt
+function buildCdfFromIndices(indices, halfLife) {
+    const weights = indices.map((_, i) => Math.exp(-i * Math.LN2 / halfLife));
+    const total = weights.reduce((a, b) => a + b, 0);
+    let cumulative = 0;
+    return weights.map(w => (cumulative += w / total));
+}
+
+function pickFromSampler(cdf, rand) {
+    const r = rand();
+    // Binäre Suche O(log n)
+    let lo = 0, hi = cdf.length - 1;
+    while (lo < hi) {
+        const mid = (lo + hi) >>> 1;
+        if (cdf[mid] < r) lo = mid + 1;
+        else hi = mid;
+    }
+    return lo;
+}
+```
+*Anwendung:* Höhere Gewichtung für jüngere Marktdaten (z.B. Halbwertszeit = 20 Jahre).
+
+**Vergleich der Sampling-Modi:**
+
+| Modus | Gewichtung | Anwendungsfall |
+|-------|------------|----------------|
+| UNIFORM | Gleichverteilt | Standard, historisch neutral |
+| CAPE | CAPE-Band-Match | Aktuelle Bewertung berücksichtigen |
+| FILTER | Ausschluss Jahre | Konservativ ohne "Golden Age" |
+| RECENCY | Exponentiell | Jüngere Marktstruktur bevorzugen |
 
 ### C.3.2 Stress-Presets
 
@@ -977,14 +1121,14 @@ rt
 | Kriterium | Score | Begründung |
 |-----------|-------|------------|
 | Architektur | 90 | Drei-Schichten, saubere Trennung |
-| Modularität | 85 | ~60 Module, klare Verantwortlichkeiten |
+| Modularität | 88 | ~65 Module, erweiterte Engine-Algorithmen |
 | Performance | 90 | Worker-Pool, Typed Arrays, Quickselect |
 | Determinismus | 95 | Per-Run-Seeding, Worker-Parity-Test |
 | Fehlerbehandlung | 80 | Strukturierte Fehlerklassen |
-| Testing | 80 | 21 Testdateien |
+| Testing | 88 | **45 Testdateien, 776+ Assertions** (aktualisiert) |
 | Typisierung | 60 | Kein TypeScript |
 
-**Technik-Score: 83/100**
+**Technik-Score: 85/100** (aktualisiert von 83)
 
 ## F.2 Fachliche Methodik (Gewicht: 35%)
 
@@ -1004,11 +1148,11 @@ rt
 
 | Kriterium | Score | Begründung |
 |-----------|-------|------------|
-| Test-Coverage | 80 | 21 Dateien, ~70% geschätzt |
+| Test-Coverage | 90 | **45 Dateien, 776+ Assertions** (aktualisiert) |
 | Determinismus | 95 | Per-Run-Seeding, Worker-Parity |
-| Dokumentation | 85 | CLAUDE.md, TECHNICAL.md, READMEs |
+| Dokumentation | 88 | CLAUDE.md, TECHNICAL.md, READMEs, WORKFLOW_PSEUDOCODE.md (neu) |
 
-**Validierung-Score: 87/100**
+**Validierung-Score: 91/100** (aktualisiert von 87)
 
 ## F.4 Nutzerwert (Gewicht: 15%)
 
@@ -1034,13 +1178,13 @@ rt
 
 | Kategorie | Gewicht | Score | Gewichteter Score |
 |-----------|---------|-------|-------------------|
-| Technik | 25% | 83 | 20.75 |
+| Technik | 25% | **85** | 21.25 |
 | Fachliche Methodik | 35% | 90 | 31.50 |
-| Validierung | 15% | 87 | 13.05 |
+| Validierung | 15% | **91** | 13.65 |
 | Nutzerwert | 15% | 80 | 12.00 |
 | Marktposition | 10% | 92 | 9.20 |
 
-### **Gesamtscore: 86.50/100 ≈ 87%**
+### **Gesamtscore: 87.60/100 ≈ 88%** (aktualisiert von 87%)
 
 ---
 
@@ -1085,28 +1229,40 @@ rt
 
 # Appendix: Modul-Inventar
 
-## Engine-Module (8)
+## Engine-Module (10)
 
 | Modul | LOC | Funktion |
 |-------|-----|----------|
 | `core.mjs` | 311 | Orchestrierung, EngineAPI |
-| `config.mjs` | 228 | Zentrale Konfiguration |
-| `InputValidator.mjs` | ~200 | Input-Validierung |
-| `MarketAnalyzer.mjs` | 156 | Marktregime-Klassifikation |
-| `SpendingPlanner.mjs` | 659 | Guardrails, Flex-Rate |
-| `TransactionEngine.mjs` | 41 | Facade für Transaktionen |
-| `sale-engine.mjs` | 323 | Verkäufe, Steuern |
+| `config.mjs` | 274 | Zentrale Konfiguration (erweitert) |
+| `errors.mjs` | ~50 | Fehlerklassen |
+| `InputValidator.mjs` | 140 | Input-Validierung |
+| `MarketAnalyzer.mjs` | 160 | Marktregime-Klassifikation |
+| `SpendingPlanner.mjs` | **1076** | Guardrails, Flex-Rate, Budget-System **(erweitert!)** |
+| `TransactionEngine.mjs` | 47 | Facade für Transaktionen |
+| `transaction-action.mjs` | 456 | Transaktions-Entscheidungslogik |
+| `sale-engine.mjs` | 333 | Verkäufe, Steuern |
 | `liquidity-planner.mjs` | ~150 | Liquiditäts-Targeting |
 
 ## Simulator-Module (Auswahl)
 
 | Modul | LOC | Funktion |
 |-------|-----|----------|
-| `monte-carlo-runner.js` | 689 | DOM-freie MC-Simulation |
+| `monte-carlo-runner.js` | ~880 | DOM-freie MC-Simulation (erweitert) |
 | `simulator-sweep.js` | ~500 | Parameter-Sweeps |
 | `simulator-optimizer.js` | ~500 | 3-stufige Optimierung |
 | `simulator-data.js` | 322 | Historische Daten, Presets |
 | `simulator-utils.js` | 260 | RNG, Quantile, Parser |
+| `worker-pool.js` | ~400 | Worker-Lifecycle, Chunking |
+
+## Balance-App Module (Auswahl)
+
+| Modul | LOC | Funktion |
+|-------|-----|----------|
+| `balance-main.js` | ~500 | Orchestrierung, Update-Zyklus |
+| `balance-reader.js` | ~300 | DOM-Input-Lesung |
+| `balance-storage.js` | ~400 | localStorage, Snapshots |
+| `balance-guardrail-reset.js` | ~70 | Auto-Reset bei kritischen Änderungen **(neu!)** |
 
 ## Kernalgorithmen
 
@@ -1118,6 +1274,10 @@ rt
 6. **Pflegegrad-Progression** (`simulator-data.js:PFLEGE_GRADE_PROGRESSION_PROBABILITIES`)
 7. **3-Stage-Optimization** (`simulator-optimizer.js`)
 8. **FIFO-Steueroptimierung** (`sale-engine.mjs:getSellOrder`)
+9. **Wealth-Adjusted Reduction** (`SpendingPlanner.mjs`) **(neu!)**
+10. **Flex-Budget-System** (`SpendingPlanner.mjs`) **(neu!)**
+11. **Flex-Share S-Curve** (`SpendingPlanner.mjs`) **(neu!)**
+12. **FILTER/RECENCY Sampling** (`monte-carlo-runner.js`) **(neu!)**
 
 ---
 
@@ -1144,4 +1304,4 @@ rt
 
 ---
 
-*Dokument erstellt durch KI-gestützte Code-Analyse (Claude Opus 4.5) und Web-Recherche. Alle Bewertungen basieren auf dem analysierten Code-Stand (Engine API v32.0, Build 2026-01-21). Code-Zeilenangaben können bei zukünftigen Änderungen abweichen; Algorithmen-Beschreibungen bleiben konzeptionell gültig.*
+*Dokument erstellt durch KI-gestützte Code-Analyse (Claude Opus 4.5) und Web-Recherche. Alle Bewertungen basieren auf dem analysierten Code-Stand (Engine API v31.0, Commit `f3f8817`, 2026-01-27). Code-Zeilenangaben können bei zukünftigen Änderungen abweichen; Algorithmen-Beschreibungen bleiben konzeptionell gültig. Letzte Aktualisierung: 27.01.2026.*
