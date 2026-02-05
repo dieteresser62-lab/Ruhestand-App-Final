@@ -11,6 +11,7 @@ import { EUR_NO_DEC_FORMATTER } from './shared-formatting.js';
 
 function resolveTrancheMarketValue(tranche) {
     // Priorität: expliziter MarketValue > Shares * CurrentPrice.
+    const mv = Number(tranche?.marketValue);
     if (Number.isFinite(mv) && mv > 0) {
         return mv;
     }
