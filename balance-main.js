@@ -24,6 +24,8 @@ import { loadProfilverbundProfiles } from './profilverbund-balance.js';
 import { createProfilverbundHandlers } from './balance-main-profilverbund.js';
 import { createProfileSyncHandlers } from './balance-main-profile-sync.js';
 import { shouldResetGuardrailState } from './balance-guardrail-reset.js';
+import { UIUtils } from './balance-utils.js';
+import { initExpensesTab, updateExpensesBudget } from './balance-expenses.js';
 
 // ==================================================================================
 // APPLICATION STATE & DOM REFERENCES
@@ -110,6 +112,18 @@ const dom = {
         guardrails: document.getElementById('diag-guardrails'),
         transaction: document.getElementById('diag-transaction'),
         keyParams: document.getElementById('diag-key-params')
+    },
+    expenses: {
+        annualBudget: document.getElementById('expensesAnnualBudget'),
+        monthlyBudget: document.getElementById('expensesMonthlyBudget'),
+        annualRemaining: document.getElementById('expensesAnnualRemaining'),
+        annualUsed: document.getElementById('expensesAnnualUsed'),
+        table: document.getElementById('expensesTable'),
+        csvInput: document.getElementById('expensesCsvInput'),
+        detailDialog: document.getElementById('expensesDetailDialog'),
+        detailTitle: document.getElementById('expensesDetailTitle'),
+        detailBody: document.getElementById('expensesDetailBody'),
+        detailClose: document.getElementById('expensesDetailClose')
     }
 };
 
@@ -230,6 +244,14 @@ function update() {
 
         profilverbundHandlers.refreshProfilverbundBalance();
 
+        const fixedIncomeAnnual = UIUtils.parseCurrency(dom.inputs.fixedIncomeAnnual?.value || 0);
+        const monatlicheEntnahme = (typeof modelResult.ui?.spending?.monatlicheEntnahme === 'number' && isFinite(modelResult.ui.spending.monatlicheEntnahme))
+            ? modelResult.ui.spending.monatlicheEntnahme
+            : 0;
+        const monthlyBudget = monatlicheEntnahme + (fixedIncomeAnnual / 12);
+        const annualBudget = monthlyBudget * 12;
+        updateExpensesBudget({ monthlyBudget, annualBudget });
+
     } catch (error) {
         console.error("Update-Fehler:", error);
         UIRenderer.handleError(error);
@@ -341,6 +363,7 @@ function init() {
     initStorageManager(dom, appState, UIRenderer);
     initUIRenderer(dom, StorageManager);
     initUIBinder(dom, appState, update, debouncedUpdate);
+    initExpensesTab(dom);
 
     // 5. Set version info
     // Zeigt UI- und Engine-Version im Print-Footer

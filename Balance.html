@@ -47,6 +47,7 @@
             <div class="tab-buttons">
                 <button class="tab-btn active" data-tab="update">Jahres-Update</button>
                 <button class="tab-btn" data-tab="settings">Grundeinstellungen & Strategie</button>
+                <button class="tab-btn" data-tab="ausgaben">Ausgaben-Check</button>
             </div>
 
             <div class="tab-content">
@@ -308,6 +309,35 @@
                         </ul>
                     </details>
                     <button type="button" class="reset-button" id="resetBtn">Gespeicherte Werte zurücksetzen</button>
+                </div>
+
+                <div id="tab-ausgaben" class="tab-panel">
+                    <div class="expenses-summary">
+                        <div class="expenses-card">
+                            <div class="expenses-card-label">Jahresbudget</div>
+                            <div id="expensesAnnualBudget" class="expenses-card-value">—</div>
+                            <div id="expensesMonthlyBudget" class="expenses-card-sub">Monatsbudget: —</div>
+                        </div>
+                        <div class="expenses-card">
+                            <div class="expenses-card-label">Noch frei (Jahr)</div>
+                            <div id="expensesAnnualRemaining" class="expenses-card-value">—</div>
+                            <div id="expensesAnnualUsed" class="expenses-card-sub">Verbraucht: —</div>
+                        </div>
+                    </div>
+
+                    <div class="expenses-table-wrap">
+                        <div id="expensesTable"></div>
+                    </div>
+
+                    <input id="expensesCsvInput" type="file" accept=".csv" style="display:none">
+
+                    <dialog id="expensesDetailDialog" class="expenses-dialog">
+                        <div class="expenses-dialog-header">
+                            <div id="expensesDetailTitle" class="expenses-dialog-title">Details</div>
+                            <button id="expensesDetailClose" type="button" class="btn btn-utility btn-sm">Schließen</button>
+                        </div>
+                        <div id="expensesDetailBody" class="expenses-dialog-body"></div>
+                    </dialog>
                 </div>
             </div>
         </div>

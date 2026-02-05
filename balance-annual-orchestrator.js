@@ -10,6 +10,7 @@
 import { AppError } from './balance-config.js';
 import { UIRenderer } from './balance-renderer.js';
 import { StorageManager } from './balance-storage.js';
+import { saveCurrentProfileFromLocalStorage } from './profile-storage.js';
 
 export function createAnnualOrchestrator({
     dom,
@@ -71,6 +72,9 @@ export function createAnnualOrchestrator({
 
             // UI aktualisieren, damit die Erfolgsmeldung das neue Alter anzeigt
             debouncedUpdate();
+
+            // Profil-Daten (inkl. Tranchen) explizit in Registry speichern
+            saveCurrentProfileFromLocalStorage();
 
             results.endTime = Date.now();
 

@@ -311,6 +311,165 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button {
 
 .tab-panel.active { display: block; animation: fadeIn .3s ease-in-out; }
 
+/* ============================================
+   AUSGABEN-CHECK (Monatsbudget)
+   ============================================ */
+
+.expenses-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.expenses-card {
+    background: var(--input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: var(--card-shadow);
+}
+
+.expenses-card-label {
+    font-size: 0.9rem;
+    color: var(--info-text-color);
+    margin-bottom: 6px;
+}
+
+.expenses-card-value {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.expenses-card-sub {
+    margin-top: 6px;
+    font-size: 0.85rem;
+    color: var(--info-text-color);
+}
+
+.expenses-table-wrap {
+    overflow: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--panel-bg);
+}
+
+.expenses-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 720px;
+}
+
+.expenses-table th,
+.expenses-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-color);
+    text-align: left;
+    vertical-align: top;
+}
+
+.expenses-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--panel-bg);
+    font-weight: 600;
+    z-index: 1;
+}
+
+.month-cell {
+    font-weight: 600;
+    color: var(--text-color);
+    white-space: nowrap;
+}
+
+.profile-cell,
+.total-cell {
+    min-width: 180px;
+}
+
+.expense-value {
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.expense-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.expense-actions .btn {
+    margin: 0;
+}
+
+.budget-ok {
+    color: var(--success-color);
+}
+
+.budget-warn {
+    color: var(--warning-color);
+}
+
+.budget-bad {
+    color: var(--danger-color);
+}
+
+.expenses-dialog {
+    border: none;
+    border-radius: 16px;
+    padding: 0;
+    width: min(520px, 92vw);
+    background: var(--panel-bg);
+    color: var(--text-color);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+}
+
+.expenses-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.45);
+}
+
+.expenses-dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.expenses-dialog-title {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.expenses-dialog-body {
+    padding: 16px 18px;
+}
+
+.expense-detail-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.expense-detail-table td {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.expense-detail-table tr:last-child td {
+    border-bottom: none;
+}
+
+.expense-detail-value {
+    text-align: right;
+    font-weight: 600;
+}
+
+.expense-empty {
+    color: var(--info-text-color);
+    font-style: italic;
+}
+
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(5px); }
     to { opacity: 1; transform: translateY(0); }
