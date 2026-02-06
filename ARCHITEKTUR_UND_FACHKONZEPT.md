@@ -18,6 +18,7 @@
 - [Komponenten](#komponenten)
 - [Hauptfunktionen](#hauptfunktionen)
 - [Bekannte Einschränkungen](#bekannte-einschränkungen)
+- [Anlagephilosophie und Eignung](#anlagephilosophie-und-eignung)
 - [Geltungsbereich und Abgrenzung](#geltungsbereich-und-abgrenzung)
 - [Release-Checkliste (Dokumentpflege)](#release-checkliste-dokumentpflege)
 - [Technische Architektur](#technische-architektur)
@@ -71,6 +72,56 @@ Die Ruhestand-Suite kombiniert folgende Funktionen:
 - Keine expliziten Fat Tails im Return-Modell
 - Keine Verlustverrechnung
 - Index-Variante (`msci_eur`) siehe Abschnitt C.3.3
+
+## Anlagephilosophie und Eignung
+
+Die Suite basiert auf einer spezifischen Anlagephilosophie und ist für Nutzer konzipiert, die diesem Ansatz folgen:
+
+### Vorausgesetztes Anlagemodell
+
+| Asset-Klasse | Umsetzung | Rolle im Portfolio |
+|--------------|-----------|-------------------|
+| **Liquidität** | Geldmarkt-ETF (z.B. €STR-basiert) | Laufende Entnahmen, Notreserve, Runway-Puffer |
+| **Aktien** | Breit gestreuter Welt-ETF (z.B. Vanguard FTSE All-World, MSCI World) | Langfristiger Vermögensaufbau und -erhalt |
+| **Gold** | Physisch oder ETC | Krisenabsicherung, Rebalancing-Quelle in Bärenmärkten |
+
+### Kernprinzipien
+
+1. **Passive, breit diversifizierte Aktienanlage:** Die Suite geht von einem einzelnen, global gestreuten Aktien-ETF aus – keine Einzelaktien, keine Sektorwetten, keine aktive Titelauswahl.
+
+2. **Liquiditätsmanagement über Geldmarkt-ETF:** Statt klassischem Tagesgeld bei Banken wird Liquidität in Geldmarkt-ETFs gehalten, die täglich handelbar sind und aktuell marktnahe Zinsen bieten.
+
+3. **Gold als antizyklischer Puffer:** Gold dient nicht primär der Rendite, sondern als Stabilitätsanker. In Bärenmärkten, wenn Aktien fallen, kann Gold zur Liquiditätsbeschaffung verkauft werden, ohne Aktien zu ungünstigen Kursen liquidieren zu müssen.
+
+4. **Regelbasierte Entnahme:** Guardrails und Marktregime-Erkennung steuern die Entnahmen automatisch – keine diskretionären Timing-Entscheidungen.
+
+### Für wen die Suite geeignet ist
+
+✅ Passiv-Investoren mit Buy-and-Hold-Strategie
+✅ Nutzer von Welt-ETFs (MSCI World, FTSE All-World, ACWI)
+✅ Anleger, die Geldmarkt-ETFs als Liquiditätsinstrument nutzen
+✅ Investoren mit optionaler Gold-Beimischung zur Diversifikation
+✅ Ruheständler, die regelbasierte Entnahmestrategien bevorzugen
+
+### Für wen die Suite nicht geeignet ist
+
+❌ **Einzelaktien-Investoren:** Keine Unterstützung für Stock-Picking oder Dividendenstrategien mit Einzeltiteln
+❌ **Anleihen-Portfolios:** Keine Modellierung von Staatsanleihen, Unternehmensanleihen oder Rentenfonds (außer Geldmarkt)
+❌ **Immobilien-Investoren:** Keine Integration von Mieteinnahmen oder Immobilienwerten
+❌ **Krypto-Anleger:** Keine Unterstützung für Bitcoin, Ethereum oder andere Kryptowährungen
+❌ **Aktive Trader:** Keine Unterstützung für Market-Timing, Optionen oder gehebelte Produkte
+❌ **Multi-Asset-Strategien:** Keine Modellierung komplexer Portfolios mit vielen Asset-Klassen
+
+### Warum diese Einschränkung?
+
+Die Fokussierung auf ein einfaches, aber robustes Anlagemodell ermöglicht:
+
+- **Präzise Steuerberechnung:** Die deutsche Kapitalertragssteuer wird exakt für ETFs mit Teilfreistellung modelliert
+- **Zuverlässige historische Simulation:** Die Monte-Carlo-Daten basieren auf MSCI-World-ähnlichen Renditereihen
+- **Klare Entscheidungslogik:** Guardrails und Rebalancing-Regeln sind auf das Drei-Säulen-Modell (Aktien-ETF, Geldmarkt, Gold) abgestimmt
+- **Geringere Komplexität:** Weniger Stellschrauben bedeuten weniger Fehlkonfiguration
+
+*Wer einem anderen Anlagemodell folgt, sollte prüfen, ob die Annahmen der Suite auf das eigene Portfolio übertragbar sind.*
 
 ## Geltungsbereich und Abgrenzung
 
