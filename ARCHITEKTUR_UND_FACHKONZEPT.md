@@ -1,64 +1,56 @@
-# Kritische Analyse: Ruhestand-Suite
+# Architektur und Fachkonzept: Ruhestand-Suite
 
-**Umfassendes Experten-Gutachten zur DIY-Software für Ruhestandsplanung**
+**Technische Dokumentation der DIY-Software für Ruhestandsplanung**
 
-**Gutachten erstellt:** Januar 2026 (aktualisiert: 27.01.2026)
-**Gutachter:** Claude Opus 4.5 (KI-gestützte Analyse)
-**Rollen-Perspektive:** Software-Architekt, Quant/Finanzplaner, Research-Experte
-**Analysierte Version:** Engine API v31.0, Build 2025-12-22, Commit `f3f8817`
-**Analysemethode:** Code-Review (~28.000 LOC) + Web-Recherche
+**Version:** Engine API v31.0, Build 2025-12-22
+**Stand:** Februar 2026
+**Zuletzt validiert (Codebasis):** 2026-02-06
+**Codeumfang:** ~37.000 LOC (JavaScript ES6 Module)
+**Lizenz:** MIT
 
 ---
 
-# TEIL A: Executive Summary & Methodologie
+# Übersicht
 
-## Analysierte Software
+## Inhaltsverzeichnis
+
+- [Software-Profil](#software-profil)
+- [Komponenten](#komponenten)
+- [Hauptfunktionen](#hauptfunktionen)
+- [Bekannte Einschränkungen](#bekannte-einschränkungen)
+- [Geltungsbereich und Abgrenzung](#geltungsbereich-und-abgrenzung)
+- [Release-Checkliste (Dokumentpflege)](#release-checkliste-dokumentpflege)
+- [Technische Architektur](#technische-architektur)
+- [Fachliche Algorithmen](#fachliche-algorithmen)
+- [Marktvergleich](#marktvergleich)
+- [Forschungsabgleich](#forschungsabgleich)
+- [Appendix: Modul-Inventar](#appendix-modul-inventar)
+
+## Software-Profil
 
 **Ruhestand-Suite** — DIY-Softwaresuite zur Ruhestandsplanung
-- **Version:** Engine API v32.0, Build 2026-01-21
 - **Sprache:** JavaScript (ES6 Module)
 - **Lizenz:** MIT
-- **Zielgruppe:** Deutschsprachige Solo-Ruheständler mit Finanzverständnis
+- **Zielgruppe:** Deutschsprachige Einzelpersonen und Haushalte (inkl. Paare) mit Finanzverständnis
 
 ## Komponenten
 
+*Metriken in dieser Tabelle sind stichtagsbezogene Schätzwerte (validiert am 2026-02-06).*
+
 | Komponente | Zweck | Codeumfang |
 |------------|-------|------------|
-| **Balance-App** | Jahresplanung: Liquidität, Entnahme, Steuern, Transaktionen | 27 Module, ~5.500 LOC |
+| **Balance-App** | Jahresplanung: Liquidität, Entnahme, Steuern, Transaktionen, Ausgaben-Check | 28 Module, ~6.100 LOC |
 | **Simulator** | Monte-Carlo-Simulation, Parameter-Sweeps, Auto-Optimize | 41 Module, ~14.000 LOC |
 | **Engine** | Kern-Berechnungslogik, Guardrails, Steuern | 13 Module, ~3.600 LOC |
 | **Workers** | Parallelisierung für MC-Simulation | 3 Module, ~600 LOC |
-| **Tests** | Unit- und Integrationstests | 47 Dateien, ~9.500 LOC, 800+ Assertions |
+| **Tests** | Unit- und Integrationstests | 48 Dateien (davon 45 `*.test.mjs`), ~9.500 LOC, 800+ Assertions |
 | **Sonstige** | Profile, Tranchen, Utilities | ~20 Module, ~2.500 LOC |
 
-## Analysemethode
+*Hinweis: Code-Zeilenangaben (z.B. `SpendingPlanner.mjs:326`) können bei zukünftigen Änderungen abweichen. Die Algorithmen-Beschreibungen bleiben konzeptionell gültig.*
 
-| Schritt | Durchgeführt |
-|---------|--------------|
-| Vollständiges Lesen aller Engine-Module | ✅ |
-| Vollständiges Lesen aller Balance-App-Module | ✅ |
-| Vollständiges Lesen aller Simulator-Module | ✅ |
-| Vollständiges Lesen Profil-/Tranchen-Module | ✅ |
-| Analyse der Test-Suite | ✅ |
-| Web-Recherche Marktvergleich | ✅ |
-| Web-Recherche Forschungsstand | ✅ |
+## Hauptfunktionen
 
-### Reproduzierbarkeit
-
-| Aspekt | Wert |
-|--------|------|
-| **Analysierter Commit** | `f3f8817` (2026-01-27) |
-| **Engine Build-ID** | 2025-12-22 (in `engine/config.mjs`) |
-| **Engine API Version** | v31.0 |
-| **Geschätzte LOC** | ~36.000 (via `wc -l`, nach Refactoring) |
-| **Gutachten-Erstellung** | Januar 2026, Claude Opus 4.5 |
-| **Letzte Aktualisierung** | 27.01.2026 (Refactoring, 1925-Daten, Ansparphase, Renten, Stress-Presets) |
-
-*Hinweis: Code-Zeilenangaben (z.B. `SpendingPlanner.mjs:326`) beziehen sich auf den analysierten Commit und können bei zukünftigen Änderungen abweichen. Die Algorithmen-Beschreibungen bleiben konzeptionell gültig.*
-
-## Executive Summary
-
-Die **Ruhestand-Suite** ist nach meiner Einschätzung **eines der funktionsreichsten Open-Source-Tools zur Ruhestandsplanung im deutschsprachigen Raum**. Sie kombiniert:
+Die Ruhestand-Suite kombiniert folgende Funktionen:
 
 1. **Vollständige deutsche Kapitalertragssteuer** (Abgeltungssteuer, Soli, KiSt, Teilfreistellung, SPB, steueroptimierte Verkaufsreihenfolge)
 2. **Dynamische Guardrails** mit 7-stufiger Marktregime-Erkennung
@@ -70,19 +62,38 @@ Die **Ruhestand-Suite** ist nach meiner Einschätzung **eines der funktionsreich
 8. **Historische Daten ab 1925** mit Stress-Szenarien (Große Depression, WWII)
 9. **Optionale Ansparphase** für vollständige Lebenszyklus-Modellierung
 10. **Rentensystem** für 1-2 Personen mit verschiedenen Indexierungsarten
-11. **Portable Desktop-App** als Tauri-EXE (~8 MB, keine Installation nötig)
+11. **Portable Desktop-App** via Tauri für Windows, macOS und Linux
+12. **Ausgaben-Check** zur Kontrolle monatlicher Ausgaben gegen das Budget mit CSV-Import, Hochrechnung und Ampel-Visualisierung
 
-**Gesamtscore: 89/100** (gewichteter Durchschnitt, siehe TEIL F, aktualisiert Januar 2026)
+## Bekannte Einschränkungen
 
-**Hauptlücken:**
 - Kein Stationary Bootstrap (nur Block-Bootstrap)
 - Keine expliziten Fat Tails im Return-Modell
 - Keine Verlustverrechnung
-- Index-Variante (`msci_eur`) undokumentiert (siehe Abschnitt C.3.3)
+- Index-Variante (`msci_eur`) siehe Abschnitt C.3.3
+
+## Geltungsbereich und Abgrenzung
+
+- **Monte-Carlo vs. Backtest:** Die MC-Datenbasis reicht bis 1925 zurück; der deterministische Backtest nutzt ein engeres historisches Fenster (siehe Abschnitt C.8).
+- **Single vs. Haushalt:** Das Dokument beschreibt sowohl Einzelprofil- als auch Profilverbund-Flows. Aussagen zur Zielgruppe und zu Workflows gelten für beide Modi.
+- **Codebezug:** Codezeilen-/LOC-Angaben dienen der Orientierung und sind nicht normativ. Bei Abweichungen gilt immer der aktuelle Code im Repository.
+- **Abgrenzung zu `TECHNICAL.md`:** `TECHNICAL.md` dient als kompakte Betriebs- und Entwicklerreferenz. Dieses Dokument enthält die vertiefte fachliche Herleitung, Designentscheidungen und Vergleichskapitel.
+
+## Release-Checkliste (Dokumentpflege)
+
+Vor jedem Release oder größeren Merge diese Punkte aktualisieren:
+
+1. **Metadaten aktualisieren:** `Version`, `Stand`, `Zuletzt validiert`.
+2. **Bestandszahlen prüfen:** Modulanzahlen, Testdateien, LOC-Schätzwerte, Build-Hinweise.
+3. **Codeverweise verifizieren:** Dateinamen, Funktionsnamen und Modulzuordnungen (insb. bei Refactorings).
+4. **Zeitfenster prüfen:** Historische Datenräume in MC/Backtest auf Konsistenz prüfen und klar abgrenzen.
+5. **Feature-Delta nachziehen:** Neue Features in `Hauptfunktionen`, Architekturabschnitten und Appendix ergänzen.
+6. **Quellenabschnitte aktualisieren:** Externe Vergleiche/Forschung mit Stand und ggf. Versionshinweis versehen.
+7. **Smoke-Review durchführen:** Dokument auf doppelte/obsolete Aussagen und widersprüchliche Zahlen durchsuchen.
 
 ---
 
-# TEIL B: Technische Architektur-Analyse
+# Technische Architektur
 
 ## B.1 Drei-Schichten-Architektur
 
@@ -141,7 +152,15 @@ Die **Ruhestand-Suite** ist nach meiner Einschätzung **eines der funktionsreich
 
 ### Ruhestand-Suite als Desktop-App
 
-Die Suite wird als **portable Windows-EXE** (`RuhestandSuite.exe`) ausgeliefert:
+Die Suite wird als **native Desktop-App** für alle Plattformen ausgeliefert (siehe auch B.1.2 für Details zu macOS/Linux):
+
+| Plattform | Format | Größe |
+|-----------|--------|-------|
+| **Windows** | `RuhestandSuite.exe` | ~8 MB |
+| **macOS** | `RuhestandSuite.app` / `.dmg` | ~10 MB |
+| **Linux** | AppImage / `.deb` | ~12 MB |
+
+**Projektstruktur:**
 
 ```
 src-tauri/
@@ -172,15 +191,16 @@ src-tauri/
 }
 ```
 
-### Vorteile der Desktop-Version
+### Eigenschaften der Desktop-Version
 
-| Vorteil | Beschreibung |
+| Aspekt | Beschreibung |
 |---------|--------------|
-| **Portable** | Keine Installation nötig, läuft von USB-Stick |
+| **Multi-Plattform** | Eine Codebasis für Windows, macOS und Linux |
+| **Portable** | Keine Installation nötig, läuft von USB-Stick (AppImage auf Linux) |
 | **Offline** | Funktioniert ohne Internetverbindung |
 | **Datenschutz** | Keine Daten verlassen den Rechner |
 | **Performance** | Natives Fenster, kein Browser-Overhead |
-| **Auto-Update** | (geplant) Tauri-Updater-Modul |
+| **Leichtgewichtig** | ~8-12 MB statt ~200 MB bei Electron-Apps |
 
 ### Build-Prozess
 
@@ -188,11 +208,16 @@ src-tauri/
 # Development-Modus (Hot-Reload)
 npm run tauri:dev
 
-# Production-Build (erstellt RuhestandSuite.exe)
+# Production-Build (für aktuelle Plattform)
 npm run tauri:build
 ```
 
-**Output:** `src-tauri/target/release/RuhestandSuite.exe` (~8 MB)
+**Output je nach Plattform:**
+- **Windows:** `src-tauri/target/release/RuhestandSuite.exe`
+- **macOS:** `src-tauri/target/release/bundle/macos/RuhestandSuite.app`
+- **Linux:** `src-tauri/target/release/bundle/appimage/RuhestandSuite.AppImage`
+
+*Für detaillierte Build-Anleitungen aller Plattformen siehe Abschnitt B.1.2.*
 
 ### Technische Details
 
@@ -203,27 +228,178 @@ npm run tauri:build
 
 ---
 
+## B.1.2 Plattformunabhängigkeit
+
+Die Ruhestand-Suite ist plattformübergreifend nutzbar und kann auf Windows, macOS und Linux ausgeführt werden. Es gibt drei Ausführungsmethoden mit unterschiedlichen Anforderungen.
+
+### Übersicht der Ausführungsmethoden
+
+| Methode | Windows | macOS | Linux | Voraussetzungen |
+|---------|---------|-------|-------|-----------------|
+| **Tauri Desktop-App** | ✅ `.exe` | ✅ `.app` | ✅ AppImage/deb | Rust + Tauri CLI |
+| **Start-Script** | ✅ `.ps1`/`.cmd` | ✅ `.sh` | ✅ `.sh` | Node.js (optional für Proxy) |
+| **Browser direkt** | ✅ | ✅ | ✅ | Python 3 oder Node.js für Webserver |
+
+### Methode 1: Tauri Desktop-App
+
+Die Tauri-Konfiguration (`bundle.targets: "all"`) unterstützt alle Plattformen:
+
+**Windows:**
+```bash
+npm run tauri:build
+# Output: src-tauri/target/release/RuhestandSuite.exe (~8 MB)
+```
+
+**macOS:**
+```bash
+npm run tauri:build
+# Output: src-tauri/target/release/bundle/macos/RuhestandSuite.app
+# Optional: .dmg Installer
+```
+
+**Linux:**
+```bash
+npm run tauri:build
+# Output: src-tauri/target/release/bundle/appimage/RuhestandSuite.AppImage
+# Alternativ: .deb Paket für Debian/Ubuntu
+```
+
+**Build-Voraussetzungen:**
+
+| Plattform | Erforderliche Pakete |
+|-----------|---------------------|
+| **Windows** | Visual Studio Build Tools, WebView2 Runtime |
+| **macOS** | Xcode Command Line Tools, Rust |
+| **Linux** | `libwebkit2gtk-4.1-dev`, `libgtk-3-dev`, `libayatana-appindicator3-dev` |
+
+**Linux-Abhängigkeiten (Debian/Ubuntu):**
+```bash
+sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev \
+  libayatana-appindicator3-dev librsvg2-dev
+```
+
+### Methode 2: Start-Script mit lokalem Webserver
+
+**Windows (PowerShell):**
+```powershell
+# start_suite.ps1 - Startet HttpListener + Yahoo-Proxy
+.\start_suite.ps1
+# Öffnet http://localhost:8000/index.html im Browser
+```
+
+**macOS / Linux (Bash):**
+```bash
+#!/bin/bash
+# start_suite.sh - Equivalent zum PowerShell-Script
+
+PORT=8000
+PROXY_PORT=8787
+
+# Yahoo-Proxy starten (optional, für Online-Kurse)
+if [ -f "tools/yahoo-proxy.cjs" ]; then
+    node tools/yahoo-proxy.cjs &
+    PROXY_PID=$!
+    echo "Yahoo-Proxy gestartet (PID: $PROXY_PID)"
+fi
+
+# Webserver starten (Python 3)
+echo "Starte Webserver auf http://localhost:$PORT/"
+python3 -m http.server $PORT &
+SERVER_PID=$!
+
+# Browser öffnen
+sleep 1
+if command -v xdg-open &> /dev/null; then
+    xdg-open "http://localhost:$PORT/index.html"  # Linux
+elif command -v open &> /dev/null; then
+    open "http://localhost:$PORT/index.html"      # macOS
+fi
+
+# Cleanup bei Ctrl+C
+trap "kill $SERVER_PID $PROXY_PID 2>/dev/null; exit" INT TERM
+wait
+```
+
+**Alternativ mit Node.js:**
+```bash
+# Einfacher Webserver mit npx (keine Installation nötig)
+npx http-server -p 8000 -c-1
+```
+
+### Methode 3: Browser direkt (ohne Script)
+
+Für reine Offline-Nutzung ohne Online-Kursaktualisierung:
+
+```bash
+# macOS / Linux
+cd /pfad/zur/RuhestandsApp
+python3 -m http.server 8000
+# Dann im Browser: http://localhost:8000/Balance.html
+
+# Oder mit Node.js
+npx serve -p 8000
+```
+
+**Hinweis:** Ein lokaler Webserver ist erforderlich, da ES6-Module (`import`/`export`) aus Sicherheitsgründen nicht über `file://`-URLs geladen werden können.
+
+### Plattform-spezifische Hinweise
+
+**macOS:**
+- Bei M1/M2-Macs: Tauri-Build erzeugt Universal Binary (ARM + x86)
+- Gatekeeper kann unsignierte Apps blockieren → Rechtsklick → "Öffnen"
+- WebKit (Safari-Engine) ist systemseitig vorhanden
+
+**Linux:**
+- AppImage ist die portabelste Variante (funktioniert ohne Installation)
+- Für Wayland: `GDK_BACKEND=x11` vor Start setzen, falls WebView-Probleme
+- Auf älteren Distros (z.B. Ubuntu 20.04) ggf. WebKit-Version prüfen
+
+**Chromebook / WSL:**
+- Tauri funktioniert in WSL2 mit WSLg (Windows 11)
+- Alternativ: Browser-Methode mit localhost-Forwarding
+
+### Datenpersistenz über Plattformen
+
+| Speicherort | Windows | macOS | Linux |
+|-------------|---------|-------|-------|
+| **localStorage** | `%APPDATA%/.../LocalStorage` | `~/Library/WebKit/LocalStorage` | `~/.local/share/.../LocalStorage` |
+| **Snapshots (Tauri)** | Fenstergröße/Position | Native Dateisystem-Dialoge | XDG-Verzeichnisse |
+| **Snapshots (Browser)** | Download-Ordner | Download-Ordner | Download-Ordner |
+
+**Daten-Migration zwischen Plattformen:**
+1. Export via "Snapshot erstellen" → JSON-Datei
+2. Auf Zielplattform: Import via "Snapshot laden"
+3. Alternativ: `localStorage`-Keys manuell über DevTools kopieren
+
+---
+
 ## B.2 Balance-App: Detaillierte Modul-Analyse
 
 ### B.2.1 Hauptmodule
 
+*LOC-/Zeilenangaben sind stichtagsbezogen (validiert am 2026-02-06).*
+
 | Modul | LOC | Verantwortung | Evidenz |
 |-------|-----|---------------|---------|
-| `balance-main.js` | 366 | Orchestrierung, Init, Update-Zyklus | `update()` Zeile 135-221 |
-| `balance-reader.js` | 255 | DOM-Input-Lesung, Tranchen-Aggregation | `readAllInputs()` Zeile 71-189 |
-| `balance-renderer.js` | 146 | Render-Facade, delegiert an Sub-Renderer | `render()` Zeile 45-60 |
-| `balance-binder.js` | 238 | Event-Handler, Keyboard-Shortcuts | `bindUI()` Zeile 54-103 |
-| `balance-storage.js` | 368 | localStorage, File System API, Snapshots | `createSnapshot()` Zeile 263-291 |
+| `balance-main.js` | 409 | Orchestrierung, Init, Update-Zyklus | `update()` |
+| `balance-reader.js` | 278 | DOM-Input-Lesung, Tranchen-Aggregation | `readAllInputs()` |
+| `balance-renderer.js` | 156 | Render-Facade, delegiert an Sub-Renderer | `render()` |
+| `balance-binder.js` | 244 | Event-Handler, Keyboard-Shortcuts | `bindUI()` |
+| `balance-storage.js` | 399 | localStorage, File System API, Snapshots | `createSnapshot()` |
 
-### B.2.2 Update-Zyklus (balance-main.js:135-221)
+### B.2.2 Update-Zyklus (vereinfachter Pseudocode)
+
+*Hinweis: Der folgende Ablauf ist bewusst vereinfacht und beschreibt die Kernschritte, nicht den exakten Codepfad jeder Hilfsfunktion.*
 
 ```javascript
 function update() {
     // 1. Read Inputs
+    profileSyncHandlers.syncProfileDerivedInputs();
     const inputData = UIReader.readAllInputs();
 
     // 2. Load State (Guardrail-History)
     const persistentState = StorageManager.loadState();
+    const shouldResetState = shouldResetGuardrailState(persistentState.inputs, inputData);
 
     // 3. Profilverbund (Multi-Profil)
     const profilverbundRuns = (profilverbundProfiles.length > 1)
@@ -231,10 +407,14 @@ function update() {
         : null;
 
     // 4. Engine Call
-    const modelResult = window.EngineAPI.simulateSingleYear(inputData, persistentState.lastState);
+    const lastState = shouldResetState ? null : persistentState.lastState;
+    const modelResult = window.EngineAPI.simulateSingleYear(inputData, lastState);
+    if (profilverbundRuns) {
+        modelResult.ui.action = profilverbundHandlers.mergeProfilverbundActions(profilverbundRuns);
+    }
 
     // 5. Render
-    UIRenderer.render(uiDataForRenderer);
+    UIRenderer.render({...modelResult.ui, input: inputData});
     UIRenderer.renderDiagnosis(appState.diagnosisData);
 
     // 6. Persist
@@ -464,6 +644,148 @@ export function selectTranchesForSale(tranches, targetAmount, taxRate) {
 
 ---
 
+### B.2.10 Ausgaben-Check (balance-expenses.js)
+
+Das **Ausgaben-Check-Modul** ermöglicht die Kontrolle tatsächlicher monatlicher Ausgaben gegen das geplante Budget. Es schlägt die Brücke zwischen der jährlichen Entnahmeplanung und dem realen Cashflow-Management.
+
+**Architektur:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Ausgaben-Check                            │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐ │
+│  │ CSV-Import      │→ │ Kategorien-     │→ │ Budget-     │ │
+│  │ (Kontoauszüge)  │  │ Aggregation     │  │ Vergleich   │ │
+│  └─────────────────┘  └─────────────────┘  └─────────────┘ │
+│           ↓                    ↓                    ↓       │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │                   Visualisierung                      │   │
+│  │  • Jahres-Summary (4 Cards)                          │   │
+│  │  • Monats-Tabelle (12 Zeilen × Profile)              │   │
+│  │  • Ampel-Farbcodierung (OK/Warnung/Überschritten)    │   │
+│  │  • Detail-Dialog (Top-3 + alle Kategorien)           │   │
+│  └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Hauptfunktionen:**
+
+| Funktion | Beschreibung | Evidenz |
+|----------|--------------|---------|
+| `initExpensesTab()` | Initialisierung, Event-Binding, Jahresauswahl | `balance-expenses.js:625-633` |
+| `parseCategoryCsv()` | CSV-Parser mit flexiblem Delimiter (`;`, `\t`, `,`) | `balance-expenses.js:175-206` |
+| `computeYearStats()` | Berechnet Jahres- und YTD-Statistiken | `balance-expenses.js:291-330` |
+| `updateSummary()` | Aktualisiert die 4 Summary-Cards | `balance-expenses.js:219-289` |
+| `openDetails()` | Öffnet Detail-Dialog mit Top-3 Kategorien | `balance-expenses.js:483-550` |
+
+**Datenmodell:**
+
+```javascript
+const store = {
+    version: 1,
+    activeYear: 2026,
+    years: {
+        "2026": {
+            months: {
+                "1": {  // Januar
+                    profiles: {
+                        "profil-1": {
+                            categories: {
+                                "Lebensmittel": 450.00,
+                                "Mobilität": 180.00,
+                                "Freizeit": 320.00,
+                                // ...
+                            },
+                            updatedAt: "2026-01-31T12:00:00.000Z"
+                        }
+                    }
+                }
+            }
+        }
+    }
+};
+```
+
+**CSV-Import-Algorithmus:**
+
+```javascript
+function parseCategoryCsv(text) {
+    // 1. Delimiter erkennen (häufigstes Zeichen: ; | \t | ,)
+    const delimiter = detectDelimiter(lines[0]);
+
+    // 2. Header parsen (sucht "Kategorie" und "Betrag")
+    const header = splitCsvLine(lines[0], delimiter);
+    let categoryIndex = header.findIndex(h => h.includes('kategorie'));
+    let amountIndex = header.findIndex(h => h.includes('betrag'));
+
+    // 3. Kategorien aggregieren
+    const categories = {};
+    for (let i = 1; i < lines.length; i++) {
+        const category = row[categoryIndex];
+        const amount = parseAmount(row[amountIndex]);  // DE/US-Format
+        categories[category] = (categories[category] || 0) + amount;
+    }
+
+    return categories;
+}
+```
+
+**Hochrechnung-Algorithmus (Median-basiert):**
+
+```javascript
+function computeYearStats(currentMonth) {
+    // Ab 2 Monaten: Median statt Durchschnitt (robust gegen Ausreißer)
+    const forecastBase = monthsWithData >= 2 ? medianMonthly : avgMonthly;
+    const annualForecast = forecastBase * 12;
+
+    return {
+        annualForecast,         // Hochrechnung aufs Jahr
+        ytdUsed,                // Verbrauch in Importmonaten
+        ytdBudget,              // Soll-Budget für Importmonate
+        ytdDelta                // Abweichung vom Soll
+    };
+}
+```
+
+**Ampel-Farbcodierung:**
+
+| Status | Kriterium | CSS-Klasse |
+|--------|-----------|------------|
+| ✅ Grün | Ausgaben ≤ Budget | `budget-ok` |
+| ⚠️ Gelb | Budget < Ausgaben ≤ 105% | `budget-warn` |
+| 🔴 Rot | Ausgaben > 105% Budget | `budget-bad` |
+
+**Integration mit Profilverbund:**
+
+Das Modul arbeitet mit dem Profilverbund zusammen:
+- Jedes Profil hat eine eigene Spalte in der Monats-Tabelle
+- CSV-Import erfolgt pro Profil und Monat
+- Die "Gesamt"-Spalte aggregiert alle Profile
+
+**Jahresabschluss-Integration:**
+
+```javascript
+export function rollExpensesYear() {
+    const nextYear = state.year + 1;
+    setYear(nextYear);  // Wechselt zum nächsten Jahr
+    return nextYear;
+}
+```
+
+Wird automatisch vom Jahresabschluss-Handler (`balance-binder-snapshots.js`) aufgerufen.
+
+**Persistenz:**
+
+| Aspekt | Implementierung |
+|--------|-----------------|
+| Storage-Key | `balance_expenses_v1` |
+| Format | JSON mit Versions-Header |
+| Scope | Alle Jahre, alle Profile |
+| Größe | Typisch 5-20 KB pro Jahr |
+
+---
+
 ## B.3 Engine: Detaillierte Modul-Analyse
 
 ### B.3.1 Modulstruktur
@@ -680,7 +1002,7 @@ assertEqual(mainResult.successRate, workerResult.successRate);
 
 ---
 
-# TEIL C: Fachliche Algorithmen-Analyse
+# Fachliche Algorithmen
 
 ## C.1 Floor-Flex-Guardrail-System
 
@@ -1633,7 +1955,7 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
 
 ### C.10.1 Grundkonzept
 
-**Auto-Optimize** ist ein **4-stufiger Optimierungsalgorithmus**, der automatisch die besten Parameterkombinationen findet. Im Vergleich zu einem exhaustiven Sweep ist er **8-10× schneller**.
+**Auto-Optimize** ist ein **4-stufiger Optimierungsalgorithmus**, der automatisch geeignete Parameterkombinationen ermittelt. Im Vergleich zu einem exhaustiven Sweep reduziert er die Anzahl zu prüfender Kombinationen.
 
 **Architektur:**
 
@@ -1843,7 +2165,7 @@ const best = findBestParametersWithConstraints(
 
 ---
 
-# TEIL D: Vollständiger Marktvergleich
+# Marktvergleich
 
 ## D.1 Kommerzielle Retirement Planner (2025/2026)
 
@@ -1938,28 +2260,32 @@ rt
 | **Tranchen-Management** | ✅ FIFO+Online | ❌ | ⚠️ | ❌ | ❌ | ❌ |
 | **Parameter-Sweeps** | ✅ Heatmap | ❌ | ❌ | ⚠️ | ❌ | ❌ |
 | **Auto-Optimize** | ✅ 4-stufig LHS | ❌ | ❌ | ✅ | ❌ | ❌ |
+| **Ausgaben-Check** | ✅ CSV+Median | ❌ | ❌ | ❌ | ❌ | ❌ |
 | **Offline** | ✅ | ⚠️ ($799) | ❌ | ✅ (Gold) | ✅ | ✅ |
 | **Desktop-App** | ✅ Tauri (8 MB) | ❌ | ❌ | ✅ Excel | ❌ | ❌ |
+| **Multi-Plattform** | ✅ Win/Mac/Linux | ⚠️ Web only | ⚠️ Web only | ⚠️ Win only | ✅ Web | ✅ Web |
 | **Open Source** | ✅ MIT | ❌ | ❌ | ❌ | ✅ | ❌ |
 
-## D.4 Alleinstellungsmerkmale (im Vergleich zu analysierten Tools)
+## D.4 Differenzierungsmerkmale (im Vergleich zu analysierten Tools)
 
-*Hinweis: Diese Bewertung basiert auf der Recherche der in diesem Gutachten verglichenen Tools (ProjectionLab, Boldin, Pralana, Portfolio Visualizer, FI Calc). Es können weitere Tools existieren, die nicht analysiert wurden.*
+*Hinweis: Dieser Vergleich basiert auf einer Recherche der oben genannten Tools (ProjectionLab, Boldin, Pralana, Portfolio Visualizer, FI Calc). Es können weitere Tools existieren, die nicht analysiert wurden.*
 
 1. **Vollständige DE-Kapitalertragssteuer** — Kein anderes verglichenes Tool implementiert Abgeltungssteuer, Soli, KiSt, Teilfreistellung, SPB und steueroptimierte Reihenfolge
 2. **Pflegefall-Modellierung mit PG1-5** — Kein anderes verglichenes Tool hat ein deutsches Pflegegrad-Modell mit Progression und Dual-Care
-3. **7-stufige Marktregime-Erkennung** — Im Vergleich zu den analysierten kostenlosen Tools einzigartig
+3. **7-stufige Marktregime-Erkennung** — In den betrachteten kostenlosen Tools in dieser Form nicht enthalten
 4. **Risk-Based Guardrails** — Implementiert den Kitces-Ansatz statt klassischer Guyton-Klinger
 5. **Tranchen-Management mit Online-Kursen** — Einzelpositionen mit FIFO-Steueroptimierung und automatischer Kursabfrage
 6. **4-stufige Auto-Optimierung (LHS)** — Latin Hypercube Sampling + Quick-Filter + Lokale Verfeinerung + Train/Test-Validierung
 7. **Parameter-Sweep mit Heatmap-Visualisierung** — Sensitivitätsanalyse mit SVG-basierter Viridis-Heatmap und Invarianten-Prüfung
 8. **Historischer Backtest mit DE-Daten** — Deterministische Simulation 1951-2024 mit deutscher Inflation und Lohnentwicklung
 9. **Portable Tauri-Desktop-App** — ~8 MB EXE, keine Installation, läuft von USB-Stick
-10. **Vollständig offline und Open Source** — Daten verlassen nie den lokalen Rechner
+10. **Offline-Betrieb und Open Source** — Daten verbleiben lokal auf dem Rechner
+11. **Ausgaben-Check mit CSV-Import** — Monatliches Budget-Tracking gegen Floor+Flex, Median-basierte Hochrechnung, Ampel-Visualisierung, Profilverbund-Integration
+12. **Echte Multi-Plattform-Unterstützung** — Native Desktop-Apps für Windows (.exe), macOS (.app) und Linux (AppImage/deb) aus einer Codebasis, plus Browser-Fallback mit Start-Scripts
 
 ---
 
-# TEIL E: Forschungsabgleich
+# Forschungsabgleich
 
 ## E.1 Morningstar 2025: Safe Withdrawal Rates
 
@@ -1972,7 +2298,7 @@ rt
 | RMD-based | 4.8% | ✅ | ❌ |
 | Forgo Inflation | 4.3% | ✅ | ❌ |
 
-**Suite-Alignment:** ✅ Im Einklang — Floor-Flex implementiert den Guardrails-Ansatz, der laut Morningstar die höchste SWR ermöglicht.
+**Implementierung:** Floor-Flex implementiert den Guardrails-Ansatz, der laut Morningstar die höchste SWR ermöglicht.
 
 ## E.2 Kitces 2024: Risk-Based Guardrails
 
@@ -1987,7 +2313,7 @@ rt
 | Worst-Case (2008) | -28% Einkommen | -3% Einkommen |
 | Worst-Case (Stagflation) | -54% Einkommen | -32% Einkommen |
 
-**Suite-Alignment:** ✅ Exzellent — Die Suite implementiert Risk-Based Guardrails:
+**Implementierung:** Die Suite implementiert Risk-Based Guardrails:
 - Marktregime-Erkennung statt fixer Withdrawal-Rate-Trigger
 - Adaptive Rate-Change-Caps (2.5-10 pp) statt fixer ±10%
 - Recovery-Guardrails verhindern zu schnelle Erhöhung
@@ -2004,132 +2330,15 @@ rt
 
 ## E.4 Bootstrap-Methodik
 
-**Stand der Forschung:** Block-Bootstrap erhält Autokorrelation, Stationary Bootstrap (Politis/Romano) ist optimal.
+**Stand der Forschung:** Block-Bootstrap erhält Autokorrelation; Stationary Bootstrap (Politis/Romano) wird in der Literatur häufig als geeignete Alternative eingeordnet.
 
-**Suite-Status:** ✅ Block-Bootstrap implementiert, ⚠️ kein Stationary Bootstrap
+**Status:** ✅ Block-Bootstrap implementiert, ⚠️ kein Stationary Bootstrap
 
 ## E.5 Fat Tails / Regime Switching
 
 **Stand der Forschung:** Student-t oder GARCH erfassen Tail-Risiken besser als Normalverteilung.
 
-**Suite-Status:** ✅ Regime-Switching via Markov-Chain, ⚠️ keine expliziten Fat Tails im Return-Modell
-
----
-
-# TEIL F: Bewertungsraster
-
-## F.1 Technik (Gewicht: 25%)
-
-| Kriterium | Score | Begründung |
-|-----------|-------|------------|
-| Architektur | 90 | Drei-Schichten, saubere Trennung |
-| Modularität | 90 | ~110 Module nach Refactoring, klare Trennung |
-| Performance | 90 | Worker-Pool, Typed Arrays, Quickselect |
-| Determinismus | 95 | Per-Run-Seeding, Worker-Parity-Test |
-| Fehlerbehandlung | 80 | Strukturierte Fehlerklassen |
-| Testing | 90 | **47 Testdateien, 800+ Assertions** (aktualisiert) |
-| Typisierung | 60 | Kein TypeScript |
-
-**Technik-Score: 86/100** (aktualisiert nach Refactoring)
-
-## F.2 Fachliche Methodik (Gewicht: 35%)
-
-| Kriterium | Score | Begründung |
-|-----------|-------|------------|
-| Guardrails | 95 | State-of-the-art, übertrifft Guyton-Klinger |
-| Steuer-Engine | 95 | Vollständige DE-Kapitalertragssteuer |
-| MC-Qualität | 85 | 4 Methoden, 7 Presets |
-| SoRR-Handling | 85 | CAPE-Sampling, Stress-Tests |
-| Pflegefall | 90 | PG1-5, Dual-Care, BARMER-Daten |
-| Liquiditäts-Targeting | 90 | Dynamisch, Regime-abhängig |
-| Historischer Backtest | 90 | Deterministisch 1951-2024, DE-Inflation/Lohn |
-| Auto-Optimize | 92 | 4-stufig LHS, Train/Test-Validierung |
-| TER/Fees | 70 | Implizit konservativ (Price Index), Dokumentation fehlt |
-
-**Fachliche Methodik-Score: 91/100** (aktualisiert)
-
-## F.3 Validierung (Gewicht: 15%)
-
-| Kriterium | Score | Begründung |
-|-----------|-------|------------|
-| Test-Coverage | 90 | **47 Dateien, 800+ Assertions** (aktualisiert) |
-| Determinismus | 95 | Per-Run-Seeding, Worker-Parity |
-| Dokumentation | 88 | CLAUDE.md, TECHNICAL.md, READMEs, WORKFLOW_PSEUDOCODE.md (neu) |
-
-**Validierung-Score: 91/100** (aktualisiert von 87)
-
-## F.4 Nutzerwert (Gewicht: 15%)
-
-| Kriterium | Score | Begründung |
-|-----------|-------|------------|
-| Entscheidungsunterstützung | 90 | Diagnose-Panel, Aktionsbox |
-| Bedienbarkeit | 70 | Komplex, kein Onboarding |
-| Erklärbarkeit | 80 | Entscheidungsbaum |
-| Tranchen-Verwaltung | 88 | Online-Kurse, FIFO-Steueroptimierung |
-| Profil-Management | 85 | CRUD, Export/Import, Profilverbund |
-
-**Nutzerwert-Score: 83/100** (aktualisiert)
-
-## F.5 Marktposition (Gewicht: 10%)
-
-| Kriterium | Score | Begründung |
-|-----------|-------|------------|
-| Feature-Parität | 95 | Übertrifft alle kostenlosen Tools |
-| Alleinstellung | 97 | DE-Steuern + Pflege + Guardrails + Tranchen + Auto-Optimize |
-| Preis-Leistung | 85 | Kostenlos, aber Setup-Aufwand |
-
-**Marktposition-Score: 93/100** (aktualisiert)
-
-## F.6 Finaler Score
-
-| Kategorie | Gewicht | Score | Gewichteter Score |
-|-----------|---------|-------|-------------------|
-| Technik | 25% | **86** | 21.50 |
-| Fachliche Methodik | 35% | **91** | 31.85 |
-| Validierung | 15% | **91** | 13.65 |
-| Nutzerwert | 15% | **83** | 12.45 |
-| Marktposition | 10% | **93** | 9.30 |
-
-### **Gesamtscore: 88.75/100 ≈ 89%** (aktualisiert Januar 2026, vollständige Analyse)
-
----
-
-# TEIL G: Empfehlungen
-
-## G.1 Top 5 Verbesserungen (priorisiert)
-
-| # | Verbesserung | Impact | Aufwand | ROI |
-|---|--------------|--------|---------|-----|
-| 1 | **Index-Dokumentation** | Hoch | Niedrig | ⭐⭐⭐⭐⭐ |
-| 2 | **Onboarding-Wizard** | Mittel | Mittel | ⭐⭐⭐⭐ |
-| 3 | **Stationary Bootstrap** | Niedrig | Mittel | ⭐⭐⭐ |
-| 4 | **Student-t Returns** | Niedrig | Mittel | ⭐⭐⭐ |
-| 5 | **Verlustverrechnung** | Niedrig | Mittel | ⭐⭐ |
-
-### G.1.1 Index-Dokumentation (Empfehlung #1)
-
-**Problem:** Die Variante der `msci_eur`-Reihe (Price vs. Net vs. Gross Total Return) ist undokumentiert. CAGR-Analyse (1978-2024: ~7.9%) deutet auf Price Index hin.
-
-**Empfehlung:**
-- Datenquelle und Index-Variante in `simulator-data.js` dokumentieren
-- Falls Price Index: Im UI als "konservativer Ansatz (ohne Dividenden)" kennzeichnen
-- Alternativ: Checkbox "Dividenden einbeziehen" mit +2% Rendite-Aufschlag
-
-**Hinweis:** Falls tatsächlich Price Index, ist kein zusätzlicher TER-Abzug nötig — die fehlenden Dividenden (~2-2.5% p.a.) überkompensieren typische ETF-Kosten (~0.2% p.a.).
-
-### G.1.2 Onboarding-Wizard
-
-**Problem:** Komplexität kann neue Nutzer überfordern.
-
-**Lösung:** Geführter Ersteinrichtungs-Wizard mit sinnvollen Defaults.
-
-## G.2 Was NICHT fehlt
-
-| Oft gefordert | Warum nicht nötig |
-|---------------|-------------------|
-| Roth-Conversion | US-spezifisch, irrelevant für DE |
-| Social Security Optimizer | GRV ist fix, keine Optimierung möglich |
-| Account-Linking | Sicherheitsrisiko, manuelle Eingabe OK |
+**Status:** Regime-Switching via Markov-Chain implementiert; keine expliziten Fat Tails im Return-Modell
 
 ---
 
@@ -2175,13 +2384,14 @@ rt
 | `mc-worker.js` | ~150 | Monte-Carlo Worker-Thread |
 | `auto-optimize-worker.js` | ~80 | Optimizer-Worker |
 
-## Balance-App Module (27 Module, Auswahl)
+## Balance-App Module (28 Module, Auswahl)
 
 | Modul | LOC | Funktion |
 |-------|-----|----------|
 | `balance-main.js` | ~500 | Orchestrierung, Update-Zyklus |
 | `balance-reader.js` | ~300 | DOM-Input-Lesung |
 | `balance-storage.js` | ~400 | localStorage, Snapshots |
+| `balance-expenses.js` | **646** | Ausgaben-Check mit CSV-Import, Budget-Tracking **(neu!)** |
 | `balance-guardrail-reset.js` | ~70 | Auto-Reset bei kritischen Änderungen |
 | `balance-annual-*.js` (4) | ~400 | Jahresabschluss, Inflation, Marktdaten |
 | `balance-diagnosis-*.js` (6) | ~600 | Chips, Entscheidungsbaum, Guardrails |
@@ -2234,6 +2444,8 @@ rt
 22. **Constraint-Based-Optimierung** (`simulator-optimizer.js:findBestParametersWithConstraints`) **(neu!)**
 23. **Sweep-Heatmap-Rendering** (`simulator-heatmap.js:renderSweepHeatmapSVG`) **(neu!)**
 24. **P2-Invarianz-Prüfung** (`simulator-sweep-utils.js:areP2InvariantsEqual`) **(neu!)**
+25. **Ausgaben-Check CSV-Parser** (`balance-expenses.js:parseCategoryCsv`) **(neu!)**
+26. **Median-basierte Hochrechnung** (`balance-expenses.js:computeYearStats`) **(neu!)**
 
 ---
 
@@ -2260,4 +2472,4 @@ rt
 
 ---
 
-*Dokument erstellt durch KI-gestützte Code-Analyse (Claude Opus 4.5) und Web-Recherche. Alle Bewertungen basieren auf dem analysierten Code-Stand (Engine API v31.0, Commit `f3f8817`, 2026-01-27). Vollständige Analyse aller Module inkl. Profil-Management, Tranchen-Verwaltung, Backtest, Parameter-Sweep und Auto-Optimize. Code-Zeilenangaben können bei zukünftigen Änderungen abweichen; Algorithmen-Beschreibungen bleiben konzeptionell gültig. Letzte Aktualisierung: 27.01.2026.*
+*Technische Dokumentation der Ruhestand-Suite. Code-Zeilenangaben beziehen sich auf Engine API v31.0 und können bei zukünftigen Änderungen abweichen. Algorithmen-Beschreibungen bleiben konzeptionell gültig. Stand: Februar 2026.*

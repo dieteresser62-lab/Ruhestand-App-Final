@@ -393,6 +393,8 @@
                                 href="#balance-handlungsschritte">Handlungsschritte</a></li>
                         <li><a class="toc-link" data-tab-target="manual" href="#balance-kapitalfluss">Kapitalfluss</a>
                         </li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#balance-ausgaben-check">Ausgaben-Check</a>
+                        </li>
                         <li><a class="toc-link" data-tab-target="manual" href="#balance-tranchen">Depot-Tranchen</a>
                         </li>
                     </ol>
@@ -557,7 +559,7 @@
             </div>
 
             <div class="info-card" id="ansparer-jung">
-                <h2>Junger Ansparer: So nutzen Sie die Suite optimal</h2>
+                <h2>Junger Ansparer: Nutzung der Suite</h2>
                 <p>Wenn der Ruhestand noch weit entfernt ist, hilft Ihnen die Suite dabei, den langfristigen
                     Spar- und Investitionsplan robust aufzusetzen und regelmäßig zu kalibrieren. Konzentrieren Sie
                     sich im Simulator auf die Wachstumsphase, nutzen Sie Parameter-Sweeps für Szenarien und bauen Sie
@@ -599,7 +601,7 @@
                         <div>
                             <strong>Praxis-Tipp:</strong> Legen Sie einen festen Termin (z.B. Jahresbeginn) für ein
                             Kurz-Review fest. Führen Sie einen Parameter-Sweep mit +10 %/-10 % Sparrate durch und
-                            speichern Sie das beste Szenario als neue Basis.
+                            speichern Sie ein Referenzszenario als neue Basis.
                         </div>
                     </div>
                 </div>
@@ -823,7 +825,7 @@
                             <li><strong>Custom-Overlay:</strong> Zusätzliche Drawdowns/Inflationsschocks lassen sich
                                 über eigene Parameter abbilden.</li>
                             <li><strong>Vergleichbarkeit:</strong> Gleiche Einstellungen liefern deterministische
-                                Vergleichswerte – ideal für Vorher/Nachher-Checks.</li>
+                                Vergleichswerte für Vorher/Nachher-Checks.</li>
                         </ul>
                     </div>
                     <div class="detail-block" id="simulator-tranchen">
@@ -999,6 +1001,50 @@
                         <p>Die App fasst zusammen, welche Beträge zwischen Aktien, Cash und Entnahmekonten fließen
                             sollen. Nutzen Sie die Checkliste im Panel, um Verkäufe, Umbuchungen und Auszahlungen in
                             exakt dieser Reihenfolge abzuwickeln.</p>
+                    </div>
+
+                    <div class="detail-block" id="balance-ausgaben-check">
+                        <h3>Ausgaben-Check (monatlich)</h3>
+                        <p>Der Tab „Ausgaben-Check“ ergänzt die Jahresplanung um eine laufende Ist-Kontrolle Ihrer
+                            realen Ausgaben. Pro Monat und Profil können CSV-Kategorien importiert und direkt gegen das
+                            Budget geprüft werden.</p>
+                        <p style="color: var(--text-light); margin-top: 0.5rem;">CSV-Mindestformat für den Import:</p>
+                        <table style="width: 100%; border-collapse: collapse; margin-top: 0.4rem; font-size: 0.95rem;">
+                            <thead>
+                                <tr>
+                                    <th style="text-align: left; padding: 0.4rem; border-bottom: 1px solid #d9e2ec;">Spalte</th>
+                                    <th style="text-align: left; padding: 0.4rem; border-bottom: 1px solid #d9e2ec;">Bedeutung</th>
+                                    <th style="text-align: left; padding: 0.4rem; border-bottom: 1px solid #d9e2ec;">Beispiel</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="padding: 0.4rem; border-bottom: 1px solid #eef2f7;"><code>Kategorie</code></td>
+                                    <td style="padding: 0.4rem; border-bottom: 1px solid #eef2f7;">Name der Ausgabengruppe</td>
+                                    <td style="padding: 0.4rem; border-bottom: 1px solid #eef2f7;"><code>Versicherungen &amp; Gesundheit</code></td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 0.4rem; border-bottom: 1px solid #eef2f7;"><code>Betrag</code></td>
+                                    <td style="padding: 0.4rem; border-bottom: 1px solid #eef2f7;">Monatssumme der Kategorie</td>
+                                    <td style="padding: 0.4rem; border-bottom: 1px solid #eef2f7;"><code>-325,50</code> oder <code>325,50</code></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p style="color: var(--text-light); margin-top: 0.5rem;">Trennzeichen <code>;</code>, <code>,</code>
+                            und Tabulator werden automatisch erkannt.</p>
+                        <ul
+                            style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>CSV je Monat/Profil:</strong> Importieren Sie Ausgaben nach Kategorien;
+                                die Detailansicht zeigt die sortierte Liste inklusive Top-3-Kategorien.</li>
+                            <li><strong>Budget-Ampeln:</strong> Monatswerte sowie Prognose/Soll-Ist sind farblich
+                                markiert (grün/gelb/rot), um Abweichungen früh sichtbar zu machen.</li>
+                            <li><strong>Kennzahlen:</strong> Jahresrestbudget, Hochrechnung (ab zwei Datenmonaten mit
+                                Median statt Mittelwert) und Soll/Ist auf Basis importierter Monate.</li>
+                            <li><strong>Historie:</strong> Über den Jahres-Selector können Vorjahre weiter eingesehen
+                                werden.</li>
+                            <li><strong>Jahresabschluss:</strong> Der Abschluss wechselt den Ausgaben-Check automatisch
+                                auf das nächste Jahr, ohne alte Monatsdaten zu überschreiben.</li>
+                        </ul>
                     </div>
 
                     <div class="detail-block" id="balance-tranchen">

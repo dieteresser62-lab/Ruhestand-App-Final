@@ -8,6 +8,7 @@
 import { StorageError } from './balance-config.js';
 import { UIRenderer } from './balance-renderer.js';
 import { StorageManager } from './balance-storage.js';
+import { rollExpensesYear } from './balance-expenses.js';
 
 export function createSnapshotHandlers({
     dom,
@@ -19,7 +20,7 @@ export function createSnapshotHandlers({
         async handleJahresabschluss() {
             const label = dom.inputs.profilName.value.trim();
 
-            if (!confirm(`Soll der Jahresabschluss ${label ? `"${label}" ` : ''}jetzt erstellt werden?\n\nHinweis: Das aktuelle Alter (+1) und die Inflation werden dabei automatisch fortgeschrieben.`)) return;
+            if (!confirm(`Soll der Jahresabschluss ${label ? `"${label}" ` : ''}jetzt erstellt werden?\n\nHinweis: Das aktuelle Alter (+1) und die Inflation werden dabei automatisch fortgeschrieben. Der Ausgaben-Check wird auf das nächste Jahr umgestellt, die Historie bleibt abrufbar.`)) return;
 
             try {
                 applyAnnualInflation();
@@ -28,6 +29,8 @@ export function createSnapshotHandlers({
                 // Pass the custom label to createSnapshot
                 await StorageManager.createSnapshot(appState.snapshotHandle, label);
                 UIRenderer.toast(`Jahresabschluss-Snapshot ${label ? `"${label}" ` : ''}erfolgreich erstellt.`);
+                const nextYear = rollExpensesYear();
+                UIRenderer.toast(`Ausgaben-Check auf ${nextYear} umgestellt.`);
                 await StorageManager.renderSnapshots(dom.outputs.snapshotList, dom.controls.snapshotStatus, appState.snapshotHandle);
             } catch (err) {
                 UIRenderer.handleError(err);

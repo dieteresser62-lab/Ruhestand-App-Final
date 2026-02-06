@@ -1,6 +1,6 @@
 # Auto-Optimize: Technische Details
 
-Die Auto-Optimierung ("Auto-Optimize") ist ein leistungsfähiges Feature des Simulators, das automatisch die besten Parameterkombinationen für eine gegebene Rentenstrategie findet. Statt manuell hunderte Kombinationen im Sweep-Modus durchzuprobieren, nutzt der Auto-Optimizer Algorithmen, um effizient optimale Lösungen zu identifizieren.
+Die Auto-Optimierung ("Auto-Optimize") ist ein Feature des Simulators, das automatisch geeignete Parameterkombinationen für eine gegebene Rentenstrategie ermittelt. Statt manuell hunderte Kombinationen im Sweep-Modus durchzuprobieren, nutzt der Auto-Optimizer Algorithmen, um den Suchraum systematisch zu durchlaufen.
 
 ## Architektur
 

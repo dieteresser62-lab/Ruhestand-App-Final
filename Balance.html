@@ -312,6 +312,11 @@
                 </div>
 
                 <div id="tab-ausgaben" class="tab-panel">
+                    <div class="expenses-toolbar">
+                        <label class="expenses-year-label" for="expensesYearSelect">Jahr</label>
+                        <select id="expensesYearSelect"></select>
+                        <div class="expenses-toolbar-hint">Historie bleibt erhalten, Jahresabschluss schaltet auf nächstes Jahr.</div>
+                    </div>
                     <div class="expenses-summary">
                         <div class="expenses-card">
                             <div class="expenses-card-label">Jahresbudget</div>
@@ -322,6 +327,16 @@
                             <div class="expenses-card-label">Noch frei (Jahr)</div>
                             <div id="expensesAnnualRemaining" class="expenses-card-value">—</div>
                             <div id="expensesAnnualUsed" class="expenses-card-sub">Verbraucht: —</div>
+                        </div>
+                        <div class="expenses-card">
+                            <div class="expenses-card-label" title="Prognose: 1 Monat = Ø/Monat, ab 2 Monaten = Median/Monat (robust gegen Ausreißer).">Hochrechnung (Jahr)</div>
+                            <div id="expensesAnnualForecast" class="expenses-card-value">—</div>
+                            <div id="expensesForecastSub" class="expenses-card-sub">Ø/Monat: —</div>
+                        </div>
+                        <div class="expenses-card">
+                            <div class="expenses-card-label">Soll/Ist (Importmonate)</div>
+                            <div id="expensesYtdValue" class="expenses-card-value">—</div>
+                            <div id="expensesYtdSub" class="expenses-card-sub">Soll: —</div>
                         </div>
                     </div>
 

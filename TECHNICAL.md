@@ -2,6 +2,9 @@
 
 Dieses Dokument beschreibt die Architektur und zentrale Datenflüsse der Ruhestand-App. Die Anwendung besteht aus zwei getrennten Oberflächen (Balance & Simulator) und einer gemeinsam genutzten Engine.
 
+**Dokumentrolle:** Operative Entwickler-Referenz für aktuelle Modulzuständigkeiten, Datenflüsse und Laufzeitverhalten.
+**Abgrenzung:** Vertiefte fachliche Herleitungen, Marktvergleiche und Forschungsabgleich stehen in `ARCHITEKTUR_UND_FACHKONZEPT.md`.
+
 ---
 
 ## Architekturüberblick
@@ -10,7 +13,7 @@ Dieses Dokument beschreibt die Architektur und zentrale Datenflüsse der Ruhesta
 
 | Komponente | Dateien | Zweck |
 |------------|---------|-------|
-| Balance-App | `Balance.html`, `balance-*.js`, `css/balance.css` | Jahresabschluss, Liquiditäts- und Entnahmeplanung, Diagnosen |
+| Balance-App | `Balance.html`, `balance-*.js`, `css/balance.css` | Jahresabschluss, Liquiditäts- und Entnahmeplanung, Diagnosen, Ausgaben-Check mit Jahreshistorie |
 | Simulator | `Simulator.html`, `simulator-*.js`, `simulator.css` | Monte-Carlo-Simulationen, Parameter-Sweeps, Pflegefall-Szenarien |
 | Engine | `engine/` (ESM) → `engine.js` | Validierung, Marktanalyse, Spending- und Transaktionslogik |
 
@@ -86,6 +89,7 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 * `balance-renderer.js` – Darstellung der Ergebnisse (Summary, Guardrails, Diagnose, Toasts, Themes).
 * `balance-binder.js` – Event-Hub mit Tastenkürzeln, Import/Export, Snapshots, Debug-Modus.
 * `balance-main.js` – Orchestrator: initiiert Module, führt `update()` aus und spricht `EngineAPI` an.
+* `balance-expenses.js` – Ausgaben-Check: CSV-Import pro Monat/Profil, Monats-/Jahresbudgets, Prognose, Soll/Ist, Detaildialog und Jahrumschaltung.
 
 ### Ablauf einer Aktualisierung
 
@@ -95,6 +99,21 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 4. Die Engine liefert Ergebnisse/Diagnose/Fehler.
 5. `balance-renderer.js` aktualisiert UI-Komponenten und Statusanzeigen.
 6. `balance-storage.js` persistiert den Zustand und verwaltet Snapshots.
+
+### Ausgaben-Check (Balance)
+
+`balance-expenses.js` verwaltet einen separaten lokalen Datenspeicher (`balance_expenses_v1`) mit Jahrescontainer:
+
+* `years[YYYY].months[1..12].profiles[profileId]` speichert importierte Kategorien je Monat/Profil.
+* `activeYear` steuert, welches Jahr im Tab angezeigt wird.
+* Beim Jahresabschluss wird der Ausgaben-Check auf `activeYear + 1` gestellt; bestehende Jahresdaten bleiben unverändert als Historie erhalten.
+
+Die Kennzahlen im Tab berechnen sich wie folgt:
+
+* `Monatssumme`: Summe aller Profil-Ausgaben des Monats.
+* `Jahresrest`: `annualBudget - annualUsed`.
+* `Hochrechnung`: bei 1 Datenmonat `Ø/Monat * 12`, ab 2 Datenmonaten `Median/Monat * 12`.
+* `Soll/Ist`: basiert auf importierten Monaten (`monthlyBudget * monthsWithData`) statt auf Kalendermonaten.
 
 ---
 

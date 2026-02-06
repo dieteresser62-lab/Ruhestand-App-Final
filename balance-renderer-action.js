@@ -327,6 +327,20 @@ export class ActionRenderer {
         const hasProfilverbundActions = profilverbundActionResults && Array.isArray(profilverbundActionResults) && profilverbundActionResults.length > 0;
         const profilverbundProfiles = (typeof window !== 'undefined') ? window.__profilverbundProfileSummaries : null;
         const hasProfilverbundProfiles = profilverbundProfiles && Array.isArray(profilverbundProfiles) && profilverbundProfiles.length > 0;
+        let displayNetto = action.nettoErlös || 0;
+        let displayBrutto = 0;
+        let displaySteuer = action.steuer || 0;
+        if (hasProfilverbundActions) {
+            displayNetto = profilverbundActionResults.reduce((sum, entry) => sum + (entry?.action?.nettoErlös || 0), 0);
+            displaySteuer = profilverbundActionResults.reduce((sum, entry) => sum + (entry?.action?.steuer || 0), 0);
+            displayBrutto = profilverbundActionResults.reduce((sum, entry) => {
+                const list = Array.isArray(entry?.action?.quellen) ? entry.action.quellen : [];
+                return sum + list.reduce((inner, q) => inner + (q?.brutto || 0), 0);
+            }, 0);
+        } else {
+            const list = Array.isArray(action.quellen) ? action.quellen : [];
+            displayBrutto = list.reduce((sum, q) => sum + (q?.brutto || 0), 0);
+        }
 
         if (hasProfilverbundActions) {
             quellenItems.length = 0;
@@ -493,7 +507,11 @@ export class ActionRenderer {
         // Titel + strukturierte Blöcke reichen aus; eine zusätzliche Kurz-Zusammenfassung würde die Angaben nur duplizieren.
         wrapper.append(
             title,
-            createSection(`A. Quellen (Netto: ${UIUtils.formatCurrency(action.nettoErlös || 0)})`, quellenItems),
+            createSection(`A. Quellen (Netto: ${UIUtils.formatCurrency(displayNetto)})`, [
+                createRow('Summe Quellen (Brutto):', UIUtils.formatCurrency(displayBrutto)),
+                createRow('Steuern (gesamt):', UIUtils.formatCurrency(displaySteuer)),
+                ...quellenItems
+            ]),
             createSection('B. Verwendungen', verwendungenItems)
         );
 

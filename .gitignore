@@ -29,3 +29,9 @@ dist/
 # Executables
 *.exe
 !RuheStandSuite.exe
+
+# Screenshots
+Screenshots/
+
+# Lock files
+.~lock.*

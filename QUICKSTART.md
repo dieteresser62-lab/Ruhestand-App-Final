@@ -16,7 +16,7 @@ Schnelleinstieg für Einzelpersonen und Paare zur Entnahmeplanung im Ruhestand.
 
 ## Start in 2 Minuten
 
-### Option A: Windows-EXE (einfachste Variante)
+### Option A: Windows-EXE
 
 1. `RuhestandSuite.exe` herunterladen
 2. Doppelklick → App startet automatisch im Browser
@@ -87,8 +87,12 @@ Alle Profildaten werden im localStorage gespeichert und stehen bei jedem Start z
    - **Jahres-Update starten:** Button klicken für Online-Daten und Jahreswechsel.
 3. Tab "Grundeinstellungen & Strategie":
    - **Bedarf anpassen:** Floor (Grundbedarf) und Flex (optional) hier einstellen.
-4. **Ergebnis lesen:** Die Entnahmeempfehlung wird **automatisch** und sofort rechts angezeigt (kein "Berechnen"-Button nötig).
-5. Diagnose-Tab zeigt Erklärungen zu allen Berechnungsschritten.
+4. Tab "Ausgaben-Check":
+   - **Monat importieren:** Pro Profil und Monat CSV einlesen.
+   - **Budget prüfen:** Monatsampel, Jahresrestbudget, Hochrechnung und Soll/Ist (auf Basis importierter Monate) kontrollieren.
+   - **Historie nutzen:** Über die Jahresauswahl alte Jahre anzeigen; der Jahresabschluss schaltet automatisch auf das nächste Jahr.
+5. **Ergebnis lesen:** Die Entnahmeempfehlung wird **automatisch** und sofort rechts angezeigt (kein "Berechnen"-Button nötig).
+6. Diagnose-Tab zeigt Erklärungen zu allen Berechnungsschritten.
 
 ### Simulator (Was-wäre-wenn)
 
@@ -121,9 +125,10 @@ Alle Profildaten werden im localStorage gespeichert und stehen bei jedem Start z
 
 1. Balance-App öffnen
 2. `Alt+J` → Jahresabschluss-Assistent
-3. Aktuelle Depotwerte eingeben
-4. Entnahmeempfehlung für das Jahr ablesen
-5. Optional: Snapshot speichern (`Alt+E`)
+3. Im Tab "Ausgaben-Check" prüfen, ob das neue Jahr aktiv ist (Vorjahre bleiben über den Jahres-Selector abrufbar)
+4. Aktuelle Depotwerte eingeben
+5. Entnahmeempfehlung für das Jahr ablesen
+6. Optional: Snapshot speichern (`Alt+E`)
 
 ### Langfristplanung prüfen
 
@@ -172,7 +177,7 @@ Die Monte-Carlo-Simulation nutzt 100 Jahre historische Daten (1925-2025). Das Er
 Ja. Die Suite benötigt Ihre Depot-Positionen mit Kaufdaten für korrekte Steuerberechnungen (FIFO, Teilfreistellung) und Entnahmeempfehlungen.
 
 **Wie funktioniert der Profilverbund für Paare?**
-Jeder Partner hat ein eigenes Profil mit separatem Depot und Renten. Der Verbund aggregiert die Vermögen und verteilt Entnahmen optimal (steueroptimiert, proportional oder runway-first).
+Jeder Partner hat ein eigenes Profil mit separatem Depot und Renten. Der Verbund aggregiert die Vermögen und verteilt Entnahmen gemäß gewähltem Modus (steueroptimiert, proportional oder runway-first).
 
 ---
 

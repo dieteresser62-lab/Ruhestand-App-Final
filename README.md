@@ -15,6 +15,8 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 * Speichert Eingaben dauerhaft im `localStorage` und erzeugt auf Wunsch Dateisnapshots (File System Access API).
 * Importiert/Exportiert Portfolios als JSON und liest Marktdaten aus CSV-Dateien ein.
 * **Jahres-Update mit Online-Datenabruf:** Automatischer Abruf von Inflationsdaten (ECB, World Bank, OECD) und ETF-Kursen (VWCE.DE via Yahoo Finance/Finnhub), automatisches Nachrücken der Marktdaten und ATH-Update. Detailliertes Update-Protokoll zeigt Datenquellen und abgerufene Werte.
+* **Ausgaben-Check (monatlich):** CSV-Import pro Monat und Profil, Budgetkontrolle je Monat, Detailansicht mit Top-3-Kategorien, Jahreshochrechnung (ab 2 Datenmonaten mit Median), Soll/Ist auf Basis importierter Monate sowie Jahres-Historie per Jahr-Auswahl.
+* **Jahresabschluss + Ausgaben-Historie:** Beim Jahresabschluss wechselt der Ausgaben-Check automatisch auf das nächste Jahr; Vorjahre bleiben vollständig einsehbar.
 * Nutzt die Engine v31 zur Marktanalyse, Entnahmeplanung und Liquiditätssteuerung.
 * Diagnoseansicht mit Guardrails, Entscheidungsbaum und Key-Performance-Parametern.
 * **Depot-Tranchen-Manager:** Detaillierte Tranchen werden automatisch geladen und für steueroptimierte Verkäufe genutzt.
@@ -23,7 +25,7 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 
 ### Simulator
 * Monte-Carlo-Simulationen mit unterschiedlichen Renditequellen (historisch, Regime, Block-Bootstrap) inkl. Worker-Parallelisierung. Historische Daten reichen bis 1925 (Schwarze-Schwan-Phase optional per Filter/Recency abgewichtbar).
-* **Parameter-Sweep mit Auto-Optimize:** Whitelist-Ansatz, Deep-Clones und Wächterlogik für Zwei-Personen-Setups. Worker-Parallelisierung fuer Sweep und Auto-Optimize, 3-stufige Optimierung (~8-10x schneller), dynamische Parameter-UI (1-7 Parameter), Preset-Konfigurationen und Champion-Config-Output für optimale Strategiefindung. Details siehe `docs/AUTO_OPTIMIZE_DETAILS.md`.
+* **Parameter-Sweep mit Auto-Optimize:** Whitelist-Ansatz, Deep-Clones und Wächterlogik für Zwei-Personen-Setups. Worker-Parallelisierung fuer Sweep und Auto-Optimize, 3-stufige Optimierung (~8-10x schneller), dynamische Parameter-UI (1-7 Parameter), Preset-Konfigurationen und Champion-Config-Output für die Strategiefindung. Details siehe `docs/AUTO_OPTIMIZE_DETAILS.md`.
 * **Workflow-Transparenz:** Die Hauptabläufe (Balance, Monte-Carlo, Backtest) sind nun als Pseudo-Code dokumentiert: `docs/WORKFLOW_PSEUDOCODE.md`.
 * Stresstests, Pflegefall-Szenarien und Heatmap-Visualisierung (fokussiert auf Rentenphase). Neue Presets: Great Depression (1929-1933) und Zweiter Weltkrieg (1939-1945).
 * Sweep-Schutz für Partner:innen-Renten inklusive Rente-2-Invarianz und Heatmap-Badges.
@@ -158,7 +160,7 @@ Die Anwendung ist bewusst minimalistisch gehalten, hat aber für den vollen Funk
 
 ## Nutzung
 
-### Option 1: Standalone-Anwendung (empfohlen)
+### Option 1: Standalone-Anwendung
 
 **RuhestandSuite.exe** – portable Standalone-Desktop-Anwendung basierend auf Tauri:
 * Keine Installation, kein Installer und keine Administratorrechte erforderlich
@@ -210,11 +212,13 @@ Die Anwendung ist bewusst minimalistisch gehalten, hat aber für den vollen Funk
 
 ## Weitere Dokumentation
 
-* **BALANCE_MODULES_README.md** – detaillierte Beschreibung der Balance-Module.
-* **SIMULATOR_MODULES_README.md** – aktuelle Modulübersicht (Monte-Carlo, Sweep, Backtest, UI-Pfade) inkl. Init-Funktionen und Platzierung neuer Helfer.
-* **TECHNICAL.md** – Architekturübersicht von Engine, Balance- und Simulator-Anwendung.
-* **engine/README.md** – Detaildokumentation der Engine-Module und des Build-Prozesses.
-* **shared-formatting.js** – zentrale Formatter (Währung/Prozent/Monate) für Balance + Simulator.
+* **TECHNICAL.md** – kompakte technische Referenz (Module, Datenflüsse, Laufzeitverhalten).
+* **ARCHITEKTUR_UND_FACHKONZEPT.md** – vertiefte Architektur-, Fach- und Methoden-Dokumentation (inkl. Herleitungen/Abgrenzungen).
+* **BALANCE_MODULES_README.md** – Modulübersicht der Balance-App.
+* **SIMULATOR_MODULES_README.md** – Modulübersicht des Simulators (MC, Sweep, Backtest, UI-Pfade).
+* **engine/README.md** – Engine-Module und Build-Prozess.
+* **tests/README.md** – Aufbau und Ausführung der Test-Suite.
+* **docs/WORKFLOW_PSEUDOCODE.md** – Ablaufdarstellung zentraler Workflows in Pseudocode.
 
 ---
 

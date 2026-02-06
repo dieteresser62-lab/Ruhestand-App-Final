@@ -1,6 +1,6 @@
 # Balance-App – Modulübersicht
 
-Die Balance-App besteht aus 29 ES6-Modulen, die direkt nebeneinander im Repository liegen. Das folgende Dokument fasst Verantwortung, Exporte und wichtige Abhängigkeiten zusammen.
+Die Balance-App besteht aus 30 ES6-Modulen, die direkt nebeneinander im Repository liegen. Das folgende Dokument fasst Verantwortung, Exporte und wichtige Abhängigkeiten zusammen.
 
 **Stand:** Januar 2026
 
@@ -144,9 +144,31 @@ Einstiegspunkt und Orchestrator.
 
 ---
 
-## 8. Jahres-Update Module (balance-annual-*.js)
+## 8. `balance-expenses.js`
+Ausgaben-Check für monatliche CSV-Importe und Budgettracking.
 
-### 8.1 `balance-annual-inflation.js`
+**Exports:**
+- `initExpensesTab(domRefs)` – initialisiert Tabellenaufbau, Detaildialog und Jahr-Selector
+- `updateExpensesBudget({ monthlyBudget, annualBudget })` – übernimmt Budgetwerte aus der Balance-Berechnung
+- `rollExpensesYear()` – schaltet auf das nächste Ausgabenjahr (Historie bleibt erhalten)
+
+**Funktionen:**
+- CSV-Parser mit Delimiter-Erkennung (`;`, `,`, `Tab`) und Betragsnormalisierung.
+- Monatliche Ablage pro Profil und Jahr in `localStorage` (`balance_expenses_v1`).
+- Budgetmonitoring:
+  - Monatsampel (`ok/warn/bad`) mit 5%-Warnschwelle
+  - Jahresverbrauch, Restbudget
+  - Jahreshochrechnung (ab 2 Datenmonaten Median statt Mittelwert)
+  - Soll/Ist auf Basis importierter Monate
+- Detaildialog mit sortierter Kategorieliste und „Top 3 Kategorien“.
+
+**Dependencies:** `balance-utils.js`, `balance-renderer.js`, `profilverbund-balance.js`
+
+---
+
+## 9. Jahres-Update Module (balance-annual-*.js)
+
+### 9.1 `balance-annual-inflation.js`
 Inflation-bezogene Operationen für das jährliche Update.
 
 **Exports:**
@@ -159,7 +181,7 @@ Inflation-bezogene Operationen für das jährliche Update.
 
 ---
 
-### 8.2 `balance-annual-marketdata.js`
+### 9.2 `balance-annual-marketdata.js`
 Marktdaten-Updates für das „Nachrücken"-Workflow.
 
 **Exports:**
@@ -172,7 +194,7 @@ Marktdaten-Updates für das „Nachrücken"-Workflow.
 
 ---
 
-### 8.3 `balance-annual-modal.js`
+### 9.3 `balance-annual-modal.js`
 UI-Modal für die Anzeige der Jahres-Update Ergebnisse.
 
 **Exports:**
@@ -184,7 +206,7 @@ UI-Modal für die Anzeige der Jahres-Update Ergebnisse.
 
 ---
 
-### 8.4 `balance-annual-orchestrator.js`
+### 9.4 `balance-annual-orchestrator.js`
 Koordiniert den komplexen Jahres-Update Workflow.
 
 **Exports:**
@@ -195,7 +217,7 @@ Koordiniert den komplexen Jahres-Update Workflow.
 
 ---
 
-## 9. `balance-guardrail-reset.js`
+## 10. `balance-guardrail-reset.js`
 Logik zur Erkennung signifikanter Eingabeänderungen, die den historischen Guardrail-State invalidieren.
 
 **Exports:**
@@ -212,9 +234,9 @@ Logik zur Erkennung signifikanter Eingabeänderungen, die den historischen Guard
 
 ---
 
-## 10. Profilverbund-Module
+## 11. Profilverbund-Module
 
-### 10.1 `profilverbund-balance.js`
+### 11.1 `profilverbund-balance.js`
 Kernlogik für den Profilverbund (Multi-Profil-Modus).
 
 **Exports:**
@@ -235,7 +257,7 @@ Kernlogik für den Profilverbund (Multi-Profil-Modus).
 
 ---
 
-### 10.2 `profilverbund-balance-ui.js`
+### 11.2 `profilverbund-balance-ui.js`
 DOM-Operationen für die Profilverbund-UI.
 
 **Exports:**
@@ -258,5 +280,5 @@ balance-main.js
   └─ balance-binder.js
 ```
 
-Die Modules kommunizieren über klar definierte Schnittstellen und halten damit die Balance-App test- und wartbar.
+Die Module kommunizieren über definierte Schnittstellen; Änderungen lassen sich damit auf einzelne Komponenten begrenzen.
 

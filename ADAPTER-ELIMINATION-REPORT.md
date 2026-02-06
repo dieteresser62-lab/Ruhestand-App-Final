@@ -54,4 +54,4 @@ Alle Test-Suites laufen erfolgreich durch (91 Assertions):
 
 ## 4. Fazit
 
-Die Migration ist vollständig abgeschlossen. Der Branch `claude/eliminate-adapter-2Msdt` enthält eine saubere, adapter-freie Version der Anwendung. Die Codebasis ist nun einheitlich, wartbarer und performanter.
+Die Migration ist vollständig abgeschlossen. Der Branch `claude/eliminate-adapter-2Msdt` enthält eine adapter-freie Version der Anwendung. Die Codebasis wurde vereinheitlicht.

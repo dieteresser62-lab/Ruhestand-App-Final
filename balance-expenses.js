@@ -31,6 +31,7 @@ function loadStore() {
         const parsed = JSON.parse(raw);
         if (!parsed || typeof parsed !== 'object') return { version: 1, years: {} };
         if (!parsed.years || typeof parsed.years !== 'object') parsed.years = {};
+        if (!parsed.activeYear) parsed.activeYear = new Date().getFullYear();
         return parsed;
     } catch {
         return { version: 1, years: {} };
@@ -46,6 +47,54 @@ function getYearData(store, year) {
     if (!store.years[key]) store.years[key] = { months: {} };
     if (!store.years[key].months) store.years[key].months = {};
     return store.years[key];
+}
+
+function setActiveYear(year) {
+    const store = loadStore();
+    store.activeYear = year;
+    getYearData(store, year);
+    saveStore(store);
+}
+
+function resolveInitialYear() {
+    const store = loadStore();
+    const fallback = new Date().getFullYear();
+    const activeYear = Number(store.activeYear);
+    return Number.isFinite(activeYear) ? activeYear : fallback;
+}
+
+function getAvailableYears() {
+    const store = loadStore();
+    const current = new Date().getFullYear();
+    const years = new Set([current, state.year]);
+    Object.keys(store.years || {}).forEach(key => {
+        const val = Number(key);
+        if (Number.isFinite(val)) years.add(val);
+    });
+    return Array.from(years).sort((a, b) => a - b);
+}
+
+function renderYearSelect() {
+    if (!dom?.expenses?.yearSelect) return;
+    const select = dom.expenses.yearSelect;
+    const years = getAvailableYears();
+    select.replaceChildren();
+    years.forEach(year => {
+        const option = document.createElement('option');
+        option.value = String(year);
+        option.textContent = String(year);
+        select.appendChild(option);
+    });
+    select.value = String(state.year);
+}
+
+function setYear(year) {
+    if (!Number.isFinite(year)) return;
+    state.year = year;
+    setActiveYear(year);
+    renderYearSelect();
+    renderTable();
+    updateSummary();
 }
 
 function getMonthData(yearData, month) {
@@ -180,7 +229,8 @@ function updateSummary() {
             : 'Monatsbudget: —';
     }
 
-    const { annualUsed, annualRemaining } = computeAnnualTotals();
+    const currentMonth = new Date().getMonth() + 1;
+    const { annualUsed, annualRemaining, ytdUsed, ytdBudget, ytdDelta, annualForecast, avgMonthly, medianMonthly, monthsWithData } = computeYearStats(currentMonth);
     if (dom.expenses.annualUsed) {
         dom.expenses.annualUsed.textContent = annualBudget > 0
             ? `Verbraucht: ${UIUtils.formatCurrency(annualUsed)}`
@@ -194,19 +244,99 @@ function updateSummary() {
             dom.expenses.annualRemaining.textContent = '—';
         }
     }
+
+    if (dom.expenses.annualForecast) {
+        dom.expenses.annualForecast.textContent = annualForecast > 0 ? UIUtils.formatCurrency(annualForecast) : '—';
+        dom.expenses.annualForecast.classList.remove('budget-ok', 'budget-warn', 'budget-bad');
+        if (annualBudget > 0 && annualForecast > 0) {
+            if (annualForecast <= annualBudget) {
+                dom.expenses.annualForecast.classList.add('budget-ok');
+            } else if (annualForecast <= annualBudget * 1.05) {
+                dom.expenses.annualForecast.classList.add('budget-warn');
+            } else {
+                dom.expenses.annualForecast.classList.add('budget-bad');
+            }
+        }
+    }
+    if (dom.expenses.forecastSub) {
+        if (annualForecast > 0) {
+            const baseLabel = monthsWithData >= 2 ? 'Median/Monat' : 'Ø/Monat';
+            const baseValue = monthsWithData >= 2 ? medianMonthly : avgMonthly;
+            dom.expenses.forecastSub.textContent = `${baseLabel}: ${UIUtils.formatCurrency(baseValue)} · Datenmonate: ${monthsWithData}/12`;
+        } else {
+            dom.expenses.forecastSub.textContent = 'Ø/Monat: —';
+        }
+    }
+
+    if (dom.expenses.ytdValue) {
+        dom.expenses.ytdValue.textContent = ytdUsed > 0 ? UIUtils.formatCurrency(ytdUsed) : '—';
+        dom.expenses.ytdValue.classList.remove('budget-ok', 'budget-warn', 'budget-bad');
+        if (ytdBudget > 0) {
+            if (ytdUsed <= ytdBudget) {
+                dom.expenses.ytdValue.classList.add('budget-ok');
+            } else if (ytdUsed <= ytdBudget * 1.05) {
+                dom.expenses.ytdValue.classList.add('budget-warn');
+            } else {
+                dom.expenses.ytdValue.classList.add('budget-bad');
+            }
+        }
+    }
+    if (dom.expenses.ytdSub) {
+        dom.expenses.ytdSub.textContent = ytdBudget > 0
+            ? `Soll: ${UIUtils.formatCurrency(ytdBudget)} · Δ ${UIUtils.formatCurrency(ytdDelta)}`
+            : 'Soll: —';
+    }
 }
 
-function computeAnnualTotals() {
+function computeYearStats(currentMonth) {
     const store = loadStore();
     const yearData = getYearData(store, state.year);
     let annualUsed = 0;
+    let ytdUsed = 0;
+    let monthsWithData = 0;
+    let sumWithData = 0;
+    const monthTotalsWithData = [];
     for (let month = 1; month <= 12; month++) {
         const monthData = getMonthData(yearData, month);
         const monthTotal = sumMonthProfiles(monthData);
         annualUsed += monthTotal;
+        if (monthTotal > 0) {
+            ytdUsed += monthTotal;
+        }
+        if (monthTotal > 0) {
+            monthsWithData += 1;
+            sumWithData += monthTotal;
+            monthTotalsWithData.push(monthTotal);
+        }
     }
     const annualRemaining = (state.annualBudget || 0) - annualUsed;
-    return { annualUsed, annualRemaining };
+    const avgMonthly = monthsWithData > 0 ? sumWithData / monthsWithData : 0;
+    const medianMonthly = computeMedian(monthTotalsWithData);
+    const forecastBase = monthsWithData >= 2 ? medianMonthly : avgMonthly;
+    const annualForecast = forecastBase > 0 ? forecastBase * 12 : 0;
+    const ytdBudget = (state.monthlyBudget || 0) * monthsWithData;
+    const ytdDelta = ytdBudget > 0 ? (ytdUsed - ytdBudget) : 0;
+    return {
+        annualUsed,
+        annualRemaining,
+        ytdUsed,
+        ytdBudget,
+        ytdDelta,
+        annualForecast,
+        avgMonthly,
+        medianMonthly,
+        monthsWithData
+    };
+}
+
+function computeMedian(values) {
+    if (!values || values.length === 0) return 0;
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    if (sorted.length % 2 === 0) {
+        return (sorted[mid - 1] + sorted[mid]) / 2;
+    }
+    return sorted[mid];
 }
 
 function sumMonthProfiles(monthData) {
@@ -338,7 +468,7 @@ function refreshTableValues() {
             if (state.monthlyBudget > 0) {
                 if (monthTotal <= state.monthlyBudget) {
                     totalCell.classList.add('budget-ok');
-                } else if (monthTotal <= state.monthlyBudget * 1.1) {
+                } else if (monthTotal <= state.monthlyBudget * 1.05) {
                     totalCell.classList.add('budget-warn');
                 } else {
                     totalCell.classList.add('budget-bad');
@@ -375,6 +505,29 @@ function openDetails(month, profileId) {
             empty.textContent = 'Keine Kategorien hinterlegt.';
             dom.expenses.detailBody.appendChild(empty);
         } else {
+            const topWrap = document.createElement('div');
+            topWrap.className = 'expense-top';
+            const topTitle = document.createElement('div');
+            topTitle.className = 'expense-top-title';
+            topTitle.textContent = 'Top 3 Kategorien';
+            topWrap.appendChild(topTitle);
+            const topList = document.createElement('div');
+            topList.className = 'expense-top-list';
+            entries.slice(0, 3).forEach(entry => {
+                const item = document.createElement('div');
+                item.className = 'expense-top-item';
+                const name = document.createElement('span');
+                name.className = 'expense-top-name';
+                name.textContent = entry.name;
+                const value = document.createElement('span');
+                value.className = 'expense-top-value';
+                value.textContent = formatCurrency(entry.value);
+                item.append(name, value);
+                topList.appendChild(item);
+            });
+            topWrap.appendChild(topList);
+            dom.expenses.detailBody.appendChild(topWrap);
+
             const list = document.createElement('table');
             list.className = 'expense-detail-table';
             const tbody = document.createElement('tbody');
@@ -453,6 +606,12 @@ function bindEvents() {
     if (dom?.expenses?.csvInput) {
         dom.expenses.csvInput.addEventListener('change', handleFileChange);
     }
+    if (dom?.expenses?.yearSelect) {
+        dom.expenses.yearSelect.addEventListener('change', (event) => {
+            const year = Number(event.target.value);
+            setYear(year);
+        });
+    }
     if (dom?.expenses?.detailClose) {
         dom.expenses.detailClose.addEventListener('click', () => dom.expenses.detailDialog.close());
     }
@@ -465,7 +624,10 @@ function bindEvents() {
 
 export function initExpensesTab(domRefs) {
     dom = domRefs;
+    state.year = resolveInitialYear();
+    setActiveYear(state.year);
     bindEvents();
+    renderYearSelect();
     renderTable();
     updateSummary();
 }
@@ -474,4 +636,10 @@ export function updateExpensesBudget({ monthlyBudget, annualBudget }) {
     state.monthlyBudget = Number.isFinite(monthlyBudget) ? monthlyBudget : 0;
     state.annualBudget = Number.isFinite(annualBudget) ? annualBudget : 0;
     renderTable();
+}
+
+export function rollExpensesYear() {
+    const nextYear = state.year + 1;
+    setYear(nextYear);
+    return nextYear;
 }
