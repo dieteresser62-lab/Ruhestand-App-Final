@@ -2,6 +2,8 @@
 
 Die Simulator-App ist inzwischen in mehrere spezialisierte ES6-Module zerlegt. Die zentralen Abläufe (Monte-Carlo, Sweep, Backtests, Pflege-UI) leben nicht mehr als Monolith in `simulator-main.js`, sondern wurden in klar abgegrenzte Dateien ausgelagert. Dieses Dokument beschreibt Zweck, Haupt-Exports, Einbindungspunkte und die gewünschte Aufteilung neuer Features.
 
+**Pfadkonvention:** Simulator-Module liegen unter `app/simulator/`, Profilmodule unter `app/profile/`, Shared-Utilities unter `app/shared/`, Tranchen-Status unter `app/tranches/`. Im Dokument werden Dateinamen aus Lesbarkeit meist ohne Präfix genannt.
+
 ---
 
 ## 1. `simulator-main.js` (Fassade)
@@ -220,7 +222,7 @@ Rendering-Layer für KPI-Karten, Tabellen und Badges.
 ---
 
 ## 16. `auto_optimize.js` & `auto_optimize_ui.js`
-Auto-Optimierung für Parameter (LHS + Verfeinerung) und UI-Bedienung. Details siehe: `docs/AUTO_OPTIMIZE_DETAILS.md`.
+Auto-Optimierung für Parameter (LHS + Verfeinerung) und UI-Bedienung. Details siehe: `docs/reference/AUTO_OPTIMIZE_DETAILS.md`.
 
 **Hauptfunktionen / Exporte:**
 - `runAutoOptimize()` – Orchestriert den 3-stufigen Prozess (Coarse -> Refinement -> Final).
@@ -248,11 +250,11 @@ Hält Formatierungs-Utilities und kleine Adapter, um Renderer und Metriken von D
 - `formatNumberWithUnit()` / `formatPercentage()` – Zahlen-/Prozent-Formatter
 - `sanitizeDescription()` – Text-Sanitizing für KPI-Labels
 
-**Dependencies:** `shared-formatting.js`.
+**Dependencies:** `app/shared/shared-formatting.js`.
 
 ---
 
-## 18. `shared-formatting.js` (~140 Zeilen)
+## 18. `app/shared/shared-formatting.js` (~140 Zeilen)
 Zentrale Formatierer für Währung, Zahlen und Einheiten (Balance + Simulator).
 
 **Hauptfunktionen / Exporte:**
@@ -270,9 +272,9 @@ Zentrale Formatierer für Währung, Zahlen und Einheiten (Balance + Simulator).
 Re-Exports der gemeinsamen Formatter für den Simulator.
 
 **Hauptfunktionen / Exporte:**
-- Re-export aller Formatter aus `shared-formatting.js`
+- Re-export aller Formatter aus `app/shared/shared-formatting.js`
 
-**Dependencies:** `shared-formatting.js`
+**Dependencies:** `app/shared/shared-formatting.js`
 
 ---
 
@@ -313,7 +315,7 @@ SVG-Rendering für Parameter-Sweeps und Heatmaps.
 ---
 
 ## 22. `simulator-utils.js` (~320 Zeilen)
-Zufallszahlen und Statistik (Formatierung wird aus `shared-formatting.js` re-exportiert).
+Zufallszahlen und Statistik (Formatierung wird aus `app/shared/shared-formatting.js` re-exportiert).
 
 **Hauptfunktionen:**
 - `rng(seed)` – Seeded PRNG mit `.fork()` für unabhängige Streams
@@ -551,43 +553,43 @@ Erweiterte Visualisierungen für Parameter-Sweep-Analysen.
 ## Modulabhängigkeiten
 
 ```
-simulator-main.js
-  ├─ simulator-monte-carlo.js
+app/simulator/simulator-main.js
+  ├─ app/simulator/simulator-monte-carlo.js
   │    ├─ monte-carlo-ui.js
-  │    ├─ monte-carlo-runner.js
-  │    │    ├─ simulator-engine-wrapper.js
-  │    │    │    ├─ simulator-engine-direct.js
-  │    │    │    └─ simulator-engine-helpers.js
-  │    │    ├─ simulator-portfolio.js
-  │    │    │    └─ simulator-data.js
-  │    │    ├─ simulator-results.js
+  │    ├─ app/simulator/monte-carlo-runner.js
+  │    │    ├─ app/simulator/simulator-engine-wrapper.js
+  │    │    │    ├─ app/simulator/simulator-engine-direct.js
+  │    │    │    └─ app/simulator/simulator-engine-helpers.js
+  │    │    ├─ app/simulator/simulator-portfolio.js
+  │    │    │    └─ app/simulator/simulator-data.js
+  │    │    ├─ app/simulator/simulator-results.js
   │    │    │    ├─ results-metrics.js
   │    │    │    ├─ results-renderers.js
   │    │    │    ├─ results-formatting.js
-  │    │    │    └─ simulator-utils.js
-  │    │    ├─ simulator-sweep-utils.js
-  │    │    ├─ simulator-utils.js
-  │    │    └─ simulator-data.js
-  │    ├─ scenario-analyzer.js
-  │    └─ cape-utils.js
-  ├─ simulator-sweep.js
-  │    ├─ monte-carlo-runner.js (Mini-Läufe)
-  │    ├─ simulator-heatmap.js
-  │    ├─ simulator-results.js
-  │    ├─ simulator-sweep-utils.js
-  │    └─ simulator-utils.js
-  ├─ simulator-backtest.js
-  │    ├─ simulator-engine-wrapper.js
-  │    ├─ simulator-portfolio.js
-  │    └─ simulator-main-helpers.js
-  ├─ simulator-ui-pflege.js
-  ├─ simulator-ui-rente.js
-  ├─ simulator-main-helpers.js
-  ├─ simulator-results.js
-  ├─ simulator-portfolio.js
-  ├─ simulator-heatmap.js
-  ├─ simulator-utils.js
-  └─ simulator-data.js
+  │    │    │    └─ app/simulator/simulator-utils.js
+  │    │    ├─ app/simulator/simulator-sweep-utils.js
+  │    │    ├─ app/simulator/simulator-utils.js
+  │    │    └─ app/simulator/simulator-data.js
+  │    ├─ app/simulator/scenario-analyzer.js
+  │    └─ app/shared/cape-utils.js
+  ├─ app/simulator/simulator-sweep.js
+  │    ├─ app/simulator/monte-carlo-runner.js (Mini-Läufe)
+  │    ├─ app/simulator/simulator-heatmap.js
+  │    ├─ app/simulator/simulator-results.js
+  │    ├─ app/simulator/simulator-sweep-utils.js
+  │    └─ app/simulator/simulator-utils.js
+  ├─ app/simulator/simulator-backtest.js
+  │    ├─ app/simulator/simulator-engine-wrapper.js
+  │    ├─ app/simulator/simulator-portfolio.js
+  │    └─ app/simulator/simulator-main-helpers.js
+  ├─ app/simulator/simulator-ui-pflege.js
+  ├─ app/simulator/simulator-ui-rente.js
+  ├─ app/simulator/simulator-main-helpers.js
+  ├─ app/simulator/simulator-results.js
+  ├─ app/simulator/simulator-portfolio.js
+  ├─ app/simulator/simulator-heatmap.js
+  ├─ app/simulator/simulator-utils.js
+  └─ app/simulator/simulator-data.js
 ```
 
 ---

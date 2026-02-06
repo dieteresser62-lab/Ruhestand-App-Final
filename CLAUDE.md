@@ -94,7 +94,7 @@ Recent addition supports multi-profile analysis by combining selected profiles:
 - `simulator-profile-inputs.js` - Aggregation für Simulator-Inputs
 - `profile-manager.js` + `profile-storage.js` - Profile switching and persistence
 - Verteilungsmodi in der Balance-App: steueroptimiert, proportional, runway-first
-- See `docs/PROFILVERBUND_FEATURES.md` for detailed design decisions
+- See `docs/reference/PROFILVERBUND_FEATURES.md` for detailed design decisions
 
 ## Code Organization
 
@@ -200,7 +200,7 @@ Use `assert()`, `assertEqual()`, `assertClose()` global helpers.
 - `SIMULATOR_MODULES_README.md` - Simulator module details
 - `engine/README.md` - Engine-specific documentation
 - `tests/README.md` - Test suite documentation (45 test files)
-- `docs/PROFILVERBUND_FEATURES.md` - Multi-profile design decisions
+- `docs/reference/PROFILVERBUND_FEATURES.md` - Multi-profile design decisions
 - `MULTI-TRANCHEN-ANLEITUNG.md` - Tranche management guide
 
 ### After Changes
@@ -260,7 +260,7 @@ Balance-App has debug mode (keyboard shortcut or localStorage flag) that logs:
 ### Online Data Updates
 Balance-App can fetch:
 - Inflation data (ECB, World Bank, OECD)
-- ETF prices (Yahoo Finance/Finnhub for VWCE.DE)
+- ETF prices (Yahoo Finance via local proxy for VWCE.DE)
 - Update protocol shows data sources and values
 - Requires internet connection, otherwise runs fully offline
 

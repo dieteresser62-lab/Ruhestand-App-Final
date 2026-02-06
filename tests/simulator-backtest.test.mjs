@@ -1,5 +1,5 @@
-import { runBacktest } from '../simulator-backtest.js';
-import { HISTORICAL_DATA } from '../simulator-data.js';
+import { runBacktest } from '../app/simulator/simulator-backtest.js';
+import { HISTORICAL_DATA } from '../app/simulator/simulator-data.js';
 import { EngineAPI } from '../engine/index.mjs';
 
 console.log('--- Simulator Backtest Tests ---');

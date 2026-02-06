@@ -1,6 +1,6 @@
-import { buildStartYearCdf, pickStartYearIndex } from '../monte-carlo-runner.js';
-import { annualData } from '../simulator-data.js';
-import { prepareHistoricalData } from '../simulator-portfolio.js';
+import { buildStartYearCdf, pickStartYearIndex } from '../app/simulator/monte-carlo-runner.js';
+import { annualData } from '../app/simulator/simulator-data.js';
+import { prepareHistoricalData } from '../app/simulator/simulator-portfolio.js';
 
 console.log('--- Monte-Carlo Start-Year Sampling Tests ---');
 

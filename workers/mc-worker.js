@@ -1,9 +1,9 @@
 "use strict";
 
 import { EngineAPI } from '../engine/index.mjs';
-import { runMonteCarloChunk } from '../monte-carlo-runner.js';
-import { runSweepChunk } from '../sweep-runner.js';
-import { prepareHistoricalDataOnce } from '../simulator-engine-helpers.js';
+import { runMonteCarloChunk } from '../app/simulator/monte-carlo-runner.js';
+import { runSweepChunk } from '../app/simulator/sweep-runner.js';
+import { prepareHistoricalDataOnce } from '../app/simulator/simulator-engine-helpers.js';
 
 const scenarioCache = new Map();
 let sweepCache = null;

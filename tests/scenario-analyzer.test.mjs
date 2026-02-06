@@ -1,6 +1,6 @@
 console.log('--- Scenario Analyzer Tests ---');
 
-import { analyzeScenario, compareScenarios, extractKeyMetrics } from '../scenario-analyzer.js';
+import { analyzeScenario, compareScenarios, extractKeyMetrics } from '../app/simulator/scenario-analyzer.js';
 
 // --- TEST 1: extractKeyMetrics defaults and coercion ---
 {

@@ -1,5 +1,5 @@
 
-import { simulateOneYear } from '../simulator-engine-wrapper.js';
+import { simulateOneYear } from '../app/simulator/simulator-engine-wrapper.js';
 import { EngineAPI } from '../engine/index.mjs';
 
 // --- MOCKING GLOBAL STATE ---

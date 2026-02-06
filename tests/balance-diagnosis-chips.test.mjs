@@ -1,4 +1,4 @@
-import { createChip, getChipColor, formatChipValue } from '../balance-diagnosis-chips.js';
+import { createChip, getChipColor, formatChipValue } from '../app/balance/balance-diagnosis-chips.js';
 
 console.log('--- Balance Diagnosis Chips Tests ---');
 

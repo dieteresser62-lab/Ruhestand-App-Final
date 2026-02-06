@@ -5,7 +5,7 @@ import {
     mean, quantile,
     rng,
     parseRangeInput
-} from '../simulator-utils.js';
+} from '../app/simulator/simulator-utils.js';
 
 console.log('--- Utilities Tests ---');
 

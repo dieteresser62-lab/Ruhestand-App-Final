@@ -5,7 +5,7 @@ import {
     calculateTaxPerEuro,
     calculateWithdrawalDistribution,
     selectTranchesForSale
-} from '../profilverbund-balance.js';
+} from '../app/profile/profilverbund-balance.js';
 
 console.log('--- Profilverbund Balance Tests ---');
 

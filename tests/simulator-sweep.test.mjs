@@ -10,8 +10,8 @@
  */
 
 import { EngineAPI } from '../engine/index.mjs';
-import { prepareHistoricalDataOnce } from '../simulator-engine-helpers.js';
-import { parseRangeInput, cartesianProductLimited } from '../simulator-utils.js';
+import { prepareHistoricalDataOnce } from '../app/simulator/simulator-engine-helpers.js';
+import { parseRangeInput, cartesianProductLimited } from '../app/simulator/simulator-utils.js';
 import {
     deepClone,
     SWEEP_ALLOWED_KEYS,
@@ -20,8 +20,8 @@ import {
     extractP2Invariants,
     areP2InvariantsEqual,
     normalizeWidowOptions
-} from '../simulator-sweep-utils.js';
-import { buildSweepInputs, runSweepChunk } from '../sweep-runner.js';
+} from '../app/simulator/simulator-sweep-utils.js';
+import { buildSweepInputs, runSweepChunk } from '../app/simulator/sweep-runner.js';
 
 if (typeof global.window === 'undefined') {
     global.window = {};

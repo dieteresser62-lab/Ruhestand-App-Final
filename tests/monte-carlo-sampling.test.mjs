@@ -1,7 +1,7 @@
 
-import { sampleNextYearData, initMcRunState } from '../simulator-engine-helpers.js';
-import { REGIME_TRANSITIONS, annualData } from '../simulator-data.js';
-import { prepareHistoricalData } from '../simulator-portfolio.js';
+import { sampleNextYearData, initMcRunState } from '../app/simulator/simulator-engine-helpers.js';
+import { REGIME_TRANSITIONS, annualData } from '../app/simulator/simulator-data.js';
+import { prepareHistoricalData } from '../app/simulator/simulator-portfolio.js';
 
 console.log('--- Monte-Carlo Sampling Tests ---');
 

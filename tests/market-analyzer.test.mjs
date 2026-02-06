@@ -1,7 +1,7 @@
 
 import { MarketAnalyzer } from '../engine/analyzers/MarketAnalyzer.mjs';
-import { getStartYearCandidates } from '../cape-utils.js';
-import { HISTORICAL_DATA, annualData } from '../simulator-data.js';
+import { getStartYearCandidates } from '../app/shared/cape-utils.js';
+import { HISTORICAL_DATA, annualData } from '../app/simulator/simulator-data.js';
 
 console.log('--- Market Analyzer Tests ---');
 

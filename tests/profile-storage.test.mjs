@@ -29,8 +29,8 @@ import {
     ensureProfileRegistry,
     exportProfilesBundle,
     importProfilesBundle
-} from '../profile-storage.js';
-import { CONFIG } from '../balance-config.js';
+} from '../app/profile/profile-storage.js';
+import { CONFIG } from '../app/balance/balance-config.js';
 
 console.log('--- Profile Storage Tests ---');
 

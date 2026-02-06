@@ -1,8 +1,8 @@
-import { createInflationHandlers } from '../balance-annual-inflation.js';
-import { initUIReader } from '../balance-reader.js';
-import { StorageManager } from '../balance-storage.js';
-import { CONFIG } from '../balance-config.js';
-import { UIUtils } from '../balance-utils.js';
+import { createInflationHandlers } from '../app/balance/balance-annual-inflation.js';
+import { initUIReader } from '../app/balance/balance-reader.js';
+import { StorageManager } from '../app/balance/balance-storage.js';
+import { CONFIG } from '../app/balance/balance-config.js';
+import { UIUtils } from '../app/balance/balance-utils.js';
 
 console.log('--- Balance Annual Inflation Tests ---');
 

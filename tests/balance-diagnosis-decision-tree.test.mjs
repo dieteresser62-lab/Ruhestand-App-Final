@@ -1,4 +1,4 @@
-import { buildDecisionTree } from '../balance-diagnosis-decision-tree.js';
+import { buildDecisionTree } from '../app/balance/balance-diagnosis-decision-tree.js';
 
 console.log('--- Balance Diagnosis Decision Tree Tests ---');
 

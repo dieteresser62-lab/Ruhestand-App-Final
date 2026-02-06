@@ -1,5 +1,5 @@
 
-import { buyGold, buyStocksNeu, sumDepot, initializePortfolio, getCommonInputs } from '../simulator-portfolio.js';
+import { buyGold, buyStocksNeu, sumDepot, initializePortfolio, getCommonInputs } from '../app/simulator/simulator-portfolio.js';
 
 console.log('--- Portfolio Logic Tests ---');
 

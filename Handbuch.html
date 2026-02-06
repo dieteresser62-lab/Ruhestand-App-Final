@@ -448,6 +448,43 @@
         <!-- TAB 1: SCHNELLSTART                           -->
         <!-- ============================================= -->
         <div id="quickstart" class="content-section">
+            <div class="info-card">
+                <h2>⚡ Start in 2 Minuten</h2>
+                <p class="card-intro">Kurzfassung analog zum <code>QUICKSTART.md</code>.</p>
+                <ol class="steps-list">
+                    <li class="step-item">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h3>Startart wählen</h3>
+                            <p><strong>Option A:</strong> <code>RuhestandSuite.exe</code> starten. <strong>Option B:</strong>
+                                Repository entpacken und <code>start_suite.cmd</code> ausführen.</p>
+                        </div>
+                    </li>
+                    <li class="step-item">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h3>Profile vorbereiten</h3>
+                            <p>In <code>index.html</code> Profil(e) anlegen und Stammdaten pflegen. Für Paare je Partner ein
+                                eigenes Profil verwenden.</p>
+                        </div>
+                    </li>
+                    <li class="step-item">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h3>Tranchen erfassen</h3>
+                            <p>Depot-Tranchen im Tranchen-Manager pflegen. Diese Daten sind die Basis für FIFO,
+                                Teilfreistellung und steueroptimierte Verkäufe.</p>
+                        </div>
+                    </li>
+                </ol>
+                <div class="tip-box">
+                    <span class="tip-icon">🔗</span>
+                    <div>
+                        <strong>Weiterlesen:</strong> Vollständiger Einstieg in <code>QUICKSTART.md</code> und
+                        aufgabenorientierte Abläufe in <code>docs/guides/GUIDED_TOURS.md</code>.
+                    </div>
+                </div>
+            </div>
 
             <!-- Simulator Quick Start -->
             <div class="info-card">
@@ -458,10 +495,9 @@
                     <li class="step-item">
                         <div class="step-number">1</div>
                         <div class="step-content">
-                            <h3>Daten eingeben</h3>
-                            <p>Geben Sie Ihr aktuelles Vermögen, Ihre monatliche Sparrate und das gewünschte
-                                Renteneintrittsalter ein. Ergänzen Sie Ihre erwarteten monatlichen Ausgaben im
-                                Ruhestand.</p>
+                            <h3>Rahmendaten prüfen</h3>
+                            <p>Profil(e) auswählen, Floor/Flex-Bedarf setzen und Personen/Renten in der Sektion
+                                "Personen & Rente" kontrollieren.</p>
                         </div>
                     </li>
                     <li class="step-item">
@@ -479,7 +515,7 @@
                             <h3>Simulieren und Analysieren</h3>
                             <p>Klicken Sie auf "Simulation starten". Das System berechnet tausende mögliche
                                 Marktszenarien. Achten Sie auf die <strong>Erfolgswahrscheinlichkeit</strong> – diese
-                                sollte idealerweise über 90-95% liegen.</p>
+                                sollte idealerweise über 95% liegen. Prüfen Sie zusätzlich den Backtesting-Tab.</p>
                         </div>
                     </li>
                 </ol>
@@ -530,12 +566,27 @@
                     <li class="step-item">
                         <div class="step-number">4</div>
                         <div class="step-content">
-                            <h3>Kapitalfluss</h3>
+                            <h3>Ausgaben-Check</h3>
+                            <p>Im Tab "Ausgaben-Check" pro Monat CSV importieren, Monatsampel prüfen und
+                                Soll/Ist auf Basis importierter Monate bewerten.</p>
+                        </div>
+                    </li>
+                    <li class="step-item">
+                        <div class="step-number">5</div>
+                        <div class="step-content">
+                            <h3>Kapitalfluss umsetzen</h3>
                             <p>Führen Sie die angezeigten Transaktionen bei Ihrer Bank durch (z.B. Verkauf von XX € um
                                 Cash aufzufüllen).</p>
                         </div>
                     </li>
                 </ol>
+                <div class="tip-box">
+                    <span class="tip-icon">⌨️</span>
+                    <div>
+                        <strong>Kürzel:</strong> <code>Alt+J</code> Jahresabschluss, <code>Alt+N</code> Marktdaten,
+                        <code>Alt+I</code> Import, <code>Alt+E</code> Export.
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1316,7 +1367,7 @@
                         <li><strong>Inflation:</strong> EZB/World Bank/OECD (Fallback: manuelle Eingabe im
                             Jahres-Update).</li>
                         <li><strong>Marktdaten:</strong> Shiller-CAPE-Zeitreihe und ETF-Schlusskurse (z.B. VWCE.DE via
-                            Yahoo/Finnhub) gemäß Konfiguration in <code>balance-config.js</code>.</li>
+                            Yahoo über lokalen Proxy) gemäß Konfiguration.</li>
                         <li><strong>Simulationsannahmen:</strong> Rendite-/Volatilitätsparameter und Korrelationen in
                             den <code>simulator-*</code>-Modulen dokumentiert.</li>
                     </ul>
@@ -1335,11 +1386,13 @@
                 <div class="detail-block" id="anhang-dokumente" style="margin-top: 1rem;">
                     <h3>Weiterführende Dokumente</h3>
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                        <li><strong>Auto-Optimize Details:</strong> <code>docs/AUTO_OPTIMIZE_DETAILS.md</code> erklärt
+                        <li><strong>Guided Tours:</strong> <code>docs/guides/GUIDED_TOURS.md</code> liefert
+                            aufgabenorientierte Schritt-fuer-Schritt-Pfade fuer Setup, Jahresablauf und Simulation.</li>
+                        <li><strong>Auto-Optimize Details:</strong> <code>docs/reference/AUTO_OPTIMIZE_DETAILS.md</code> erklärt
                             Ziele, Constraints und Ablauf.</li>
-                        <li><strong>Workflow-Pseudocode:</strong> <code>docs/WORKFLOW_PSEUDOCODE.md</code> beschreibt
+                        <li><strong>Workflow-Pseudocode:</strong> <code>docs/reference/WORKFLOW_PSEUDOCODE.md</code> beschreibt
                             Balance-, Monte-Carlo- und Backtesting-Abläufe in Klartext.</li>
-                        <li><strong>Profilverbund:</strong> <code>docs/PROFILVERBUND_FEATURES.md</code> dokumentiert
+                        <li><strong>Profilverbund:</strong> <code>docs/reference/PROFILVERBUND_FEATURES.md</code> dokumentiert
                             Aggregations- und Verteilungslogik.</li>
                     </ul>
                 </div>

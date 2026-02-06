@@ -1,4 +1,4 @@
-import { viridis, computeHeatmapStats, renderHeatmapSVG, renderSweepHeatmapSVG } from '../simulator-heatmap.js';
+import { viridis, computeHeatmapStats, renderHeatmapSVG, renderSweepHeatmapSVG } from '../app/simulator/simulator-heatmap.js';
 
 console.log('--- Simulator Heatmap Tests ---');
 

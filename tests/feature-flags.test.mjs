@@ -16,7 +16,7 @@ const prevLocalStorage = global.localStorage;
 try {
     global.localStorage = createLocalStorageMock();
 
-    const { featureFlags, getDefaultFlags, isEnabled, toggleFlag } = await import('../feature-flags.js');
+    const { featureFlags, getDefaultFlags, isEnabled, toggleFlag } = await import('../app/shared/feature-flags.js');
 
     // --- TEST 1: Defaults ---
     {

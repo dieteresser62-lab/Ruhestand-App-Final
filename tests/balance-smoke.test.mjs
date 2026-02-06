@@ -269,7 +269,7 @@ console.error = (...args) => {
 console.info = () => { };
 
 // --- 2. Import Module ---
-const modulePath = path.join(rootDir, 'balance-main.js');
+const modulePath = path.join(rootDir, 'app', 'balance', 'balance-main.js');
 const moduleUrl = new URL(`file:///${modulePath.replace(/\\/g, '/')}`).href;
 
 try {

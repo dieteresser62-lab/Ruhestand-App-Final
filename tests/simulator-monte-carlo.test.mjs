@@ -1,6 +1,6 @@
 import { EngineAPI } from '../engine/index.mjs';
-import { mergeHeatmap, appendArray } from '../simulator-monte-carlo.js';
-import { MC_HEATMAP_BINS, pickWorstRun, createMonteCarloBuffers, buildMonteCarloAggregates, runMonteCarloChunk } from '../monte-carlo-runner.js';
+import { mergeHeatmap, appendArray } from '../app/simulator/simulator-monte-carlo.js';
+import { MC_HEATMAP_BINS, pickWorstRun, createMonteCarloBuffers, buildMonteCarloAggregates, runMonteCarloChunk } from '../app/simulator/monte-carlo-runner.js';
 
 console.log('--- Simulator Monte Carlo Tests ---');
 

@@ -1,4 +1,4 @@
-import { buildTransactionDiagnostics } from '../balance-diagnosis-transaction.js';
+import { buildTransactionDiagnostics } from '../app/balance/balance-diagnosis-transaction.js';
 
 console.log('--- Balance Diagnosis Transaction Tests ---');
 

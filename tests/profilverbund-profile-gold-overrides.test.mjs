@@ -1,7 +1,7 @@
 // @ts-check
 
-import { CONFIG } from '../balance-config.js';
-import { loadProfilverbundProfiles } from '../profilverbund-balance.js';
+import { CONFIG } from '../app/balance/balance-config.js';
+import { loadProfilverbundProfiles } from '../app/profile/profilverbund-balance.js';
 
 console.log('--- Profilverbund Profile Gold Overrides ---');
 

@@ -1,4 +1,4 @@
-import { formatCurrency, calculateTotals, renderSummary } from '../balance-renderer-summary.js';
+import { formatCurrency, calculateTotals, renderSummary } from '../app/balance/balance-renderer-summary.js';
 
 console.log('--- Balance Renderer Summary Tests ---');
 

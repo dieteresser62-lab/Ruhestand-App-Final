@@ -1,5 +1,5 @@
 
-import { updateCareMeta, computeHouseholdFlexFactor, makeDefaultCareMeta } from '../simulator-engine-helpers.js';
+import { updateCareMeta, computeHouseholdFlexFactor, makeDefaultCareMeta } from '../app/simulator/simulator-engine-helpers.js';
 // Note: sampleCareGrade is not exported directly, but updateCareMeta uses it. 
 // We will test sampling implicitly via updateCareMeta or export it if needed.
 // Actually, sampleCareGrade IS NOT exported. I have to rely on updateCareMeta.

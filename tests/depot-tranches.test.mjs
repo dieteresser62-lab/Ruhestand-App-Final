@@ -1,4 +1,4 @@
-import { sortTranchesFIFO, calculateTrancheTax, applySaleToPortfolio } from '../simulator-portfolio-tranches.js';
+import { sortTranchesFIFO, calculateTrancheTax, applySaleToPortfolio } from '../app/simulator/simulator-portfolio-tranches.js';
 
 console.log('--- Depot Tranchen Tests ---');
 

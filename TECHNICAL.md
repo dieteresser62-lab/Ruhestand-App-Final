@@ -13,8 +13,10 @@ Dieses Dokument beschreibt die Architektur und zentrale Datenflüsse der Ruhesta
 
 | Komponente | Dateien | Zweck |
 |------------|---------|-------|
-| Balance-App | `Balance.html`, `balance-*.js`, `css/balance.css` | Jahresabschluss, Liquiditäts- und Entnahmeplanung, Diagnosen, Ausgaben-Check mit Jahreshistorie |
-| Simulator | `Simulator.html`, `simulator-*.js`, `simulator.css` | Monte-Carlo-Simulationen, Parameter-Sweeps, Pflegefall-Szenarien |
+| Balance-App | `Balance.html`, `app/balance/*.js`, `css/balance.css` | Jahresabschluss, Liquiditäts- und Entnahmeplanung, Diagnosen, Ausgaben-Check mit Jahreshistorie |
+| Simulator | `Simulator.html`, `app/simulator/*.js`, `simulator.css` | Monte-Carlo-Simulationen, Parameter-Sweeps, Pflegefall-Szenarien |
+| Profil/Verbund | `index.html`, `app/profile/*.js`, `app/tranches/*.js` | Profilverwaltung, Profilverbund, Tranchen-Sync |
+| Shared | `app/shared/*.js` | Gemeinsame Formatter, Feature-Flags, CAPE-Helfer |
 | Engine | `engine/` (ESM) → `engine.js` | Validierung, Marktanalyse, Spending- und Transaktionslogik |
 
 Alle Skripte sind ES6-Module. Die Engine wird per `build-engine.mjs` mit esbuild (oder Modul-Fallback) gebündelt und stellt eine globale `EngineAPI` bereit.
@@ -80,16 +82,18 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 
 ## Balance-App
 
+**Pfadkonvention:** Die Balance-Module liegen unter `app/balance/`. Profilverbund-/Profilmodule liegen unter `app/profile/`, Shared-Utilities unter `app/shared/`.
+
 ### Modulübersicht
 
-* `balance-config.js` – Konfiguration, Fehlertypen, Debug-Utilities.
-* `balance-utils.js` – Formatierungs- und Hilfsfunktionen (shared-formatting, Threshold-Zugriff).
-* `balance-storage.js` – Persistenzschicht für `localStorage` und File-System-Snapshots.
-* `balance-reader.js` – liest Benutzerinputs aus dem DOM und setzt UI-Side-Effects.
-* `balance-renderer.js` – Darstellung der Ergebnisse (Summary, Guardrails, Diagnose, Toasts, Themes).
-* `balance-binder.js` – Event-Hub mit Tastenkürzeln, Import/Export, Snapshots, Debug-Modus.
-* `balance-main.js` – Orchestrator: initiiert Module, führt `update()` aus und spricht `EngineAPI` an.
-* `balance-expenses.js` – Ausgaben-Check: CSV-Import pro Monat/Profil, Monats-/Jahresbudgets, Prognose, Soll/Ist, Detaildialog und Jahrumschaltung.
+* `app/balance/balance-config.js` – Konfiguration, Fehlertypen, Debug-Utilities.
+* `app/balance/balance-utils.js` – Formatierungs- und Hilfsfunktionen (shared-formatting, Threshold-Zugriff).
+* `app/balance/balance-storage.js` – Persistenzschicht für `localStorage` und File-System-Snapshots.
+* `app/balance/balance-reader.js` – liest Benutzerinputs aus dem DOM und setzt UI-Side-Effects.
+* `app/balance/balance-renderer.js` – Darstellung der Ergebnisse (Summary, Guardrails, Diagnose, Toasts, Themes).
+* `app/balance/balance-binder.js` – Event-Hub mit Tastenkürzeln, Import/Export, Snapshots, Debug-Modus.
+* `app/balance/balance-main.js` – Orchestrator: initiiert Module, führt `update()` aus und spricht `EngineAPI` an.
+* `app/balance/balance-expenses.js` – Ausgaben-Check: CSV-Import pro Monat/Profil, Monats-/Jahresbudgets, Prognose, Soll/Ist, Detaildialog und Jahrumschaltung.
 
 ### Ablauf einer Aktualisierung
 
@@ -102,7 +106,7 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 
 ### Ausgaben-Check (Balance)
 
-`balance-expenses.js` verwaltet einen separaten lokalen Datenspeicher (`balance_expenses_v1`) mit Jahrescontainer:
+`app/balance/balance-expenses.js` verwaltet einen separaten lokalen Datenspeicher (`balance_expenses_v1`) mit Jahrescontainer:
 
 * `years[YYYY].months[1..12].profiles[profileId]` speichert importierte Kategorien je Monat/Profil.
 * `activeYear` steuert, welches Jahr im Tab angezeigt wird.
@@ -119,26 +123,28 @@ Die Kennzahlen im Tab berechnen sich wie folgt:
 
 ## Simulator
 
+**Pfadkonvention:** Die Simulator-Module liegen unter `app/simulator/`. Profil-/Verbundmodule liegen unter `app/profile/`, gemeinsame Utilities unter `app/shared/`, Tranchen-Status unter `app/tranches/`.
+
 ### Wichtige Module
 
-* `simulator-main.js` – zentrale Steuerung, Parameter-Sweep-Logik, Self-Tests.
-* `simulator-monte-carlo.js` – UI-Koordinator für Monte-Carlo (liest Inputs, setzt Progress, orchestriert Runner/Analyzer) inkl. Worker-Orchestrierung.
-* `monte-carlo-runner.js` – DOM-freie Simulation (Jahresschleife, Pflege-KPIs) auf Basis von `simulator-engine-wrapper.js`. Unterstützt nun auch eine **Ansparphase** mit dynamischem Übergang in die Rentenphase (via `effectiveTransitionYear`).
-* `monte-carlo-ui.js` – UI-Fassade für Progressbar/Parameter-Lesen; erlaubt Callbacks ohne DOM-Leaks.
-* `scenario-analyzer.js` – wählt während der Simulation 30 Szenarien (Worst, Perzentile, Pflege, Zufall) aus.
+* `app/simulator/simulator-main.js` – zentrale Steuerung, Parameter-Sweep-Logik, Self-Tests.
+* `app/simulator/simulator-monte-carlo.js` – UI-Koordinator für Monte-Carlo (liest Inputs, setzt Progress, orchestriert Runner/Analyzer) inkl. Worker-Orchestrierung.
+* `app/simulator/monte-carlo-runner.js` – DOM-freie Simulation (Jahresschleife, Pflege-KPIs) auf Basis von `simulator-engine-wrapper.js`. Unterstützt nun auch eine **Ansparphase** mit dynamischem Übergang in die Rentenphase (via `effectiveTransitionYear`).
+* `app/simulator/monte-carlo-ui.js` – UI-Fassade für Progressbar/Parameter-Lesen; erlaubt Callbacks ohne DOM-Leaks.
+* `app/simulator/scenario-analyzer.js` – wählt während der Simulation 30 Szenarien (Worst, Perzentile, Pflege, Zufall) aus.
 
-* `simulator-engine-wrapper.js` – Facade für Engine-Aufrufe (verwendet nun `simulator-engine-direct.js`).
-* `simulator-engine-direct.js` – Direkte Anbindung an die EngineAPI, ersetzt den alten Adapter.
-* `simulator-portfolio.js` – Initialisierung, Portfolio-Berechnungen, Stress-Kontexte.
-* `simulator-results.js` – Aggregiert MC-Ausgaben und delegiert an `results-metrics.js` / `results-renderers.js` / `results-formatting.js`.
-* `simulator-sweep.js` – Sweep-Logik inkl. Whitelist/Blocklist, Heatmap und Worker-Orchestrierung.
-* `sweep-runner.js` – DOM-freier Sweep-Runner (kombinierbar in Worker-Jobs).
-* `simulator-optimizer.js` – Auto-Optimize-Kernlogik mit 3-stufiger Optimierung (Coarse Grid → Refinement → Final Verification).
-* `auto_optimize.js` / `auto_optimize_ui.js` – Auto-Optimize UI-Integration inkl. Worker-Parallelisierung, Preset-Konfigurationen und Champion-Config-Output (1-7 dynamische Parameter).
-* `simulator-heatmap.js` – SVG-Rendering für Parameter-Sweeps inkl. Warnhinweise bei Verstößen.
-* `simulator-utils.js` – Zufallszahlengenerator, Statistikfunktionen, Parser (Formatierung über `shared-formatting.js`).
-* `shared-formatting.js` – gemeinsame Formatter für Balance und Simulator (Währung, Prozent, Monate).
-* `simulator-data.js` – Historische Daten (inkl. 1925-1949 Schwarze-Schwan-Erweiterung), Mortalitäts- und Stress-Presets.
+* `app/simulator/simulator-engine-wrapper.js` – Facade für Engine-Aufrufe (verwendet nun `simulator-engine-direct.js`).
+* `app/simulator/simulator-engine-direct.js` – Direkte Anbindung an die EngineAPI, ersetzt den alten Adapter.
+* `app/simulator/simulator-portfolio.js` – Initialisierung, Portfolio-Berechnungen, Stress-Kontexte.
+* `app/simulator/simulator-results.js` – Aggregiert MC-Ausgaben und delegiert an `results-metrics.js` / `results-renderers.js` / `results-formatting.js`.
+* `app/simulator/simulator-sweep.js` – Sweep-Logik inkl. Whitelist/Blocklist, Heatmap und Worker-Orchestrierung.
+* `app/simulator/sweep-runner.js` – DOM-freier Sweep-Runner (kombinierbar in Worker-Jobs).
+* `app/simulator/simulator-optimizer.js` – Auto-Optimize-Kernlogik mit 3-stufiger Optimierung (Coarse Grid → Refinement → Final Verification).
+* `app/simulator/auto_optimize.js` / `app/simulator/auto_optimize_ui.js` – Auto-Optimize UI-Integration inkl. Worker-Parallelisierung, Preset-Konfigurationen und Champion-Config-Output (1-7 dynamische Parameter).
+* `app/simulator/simulator-heatmap.js` – SVG-Rendering für Parameter-Sweeps inkl. Warnhinweise bei Verstößen.
+* `app/simulator/simulator-utils.js` – Zufallszahlengenerator, Statistikfunktionen, Parser (Formatierung über `app/shared/shared-formatting.js`).
+* `app/shared/shared-formatting.js` – gemeinsame Formatter für Balance und Simulator (Währung, Prozent, Monate).
+* `app/simulator/simulator-data.js` – Historische Daten (inkl. 1925-1949 Schwarze-Schwan-Erweiterung), Mortalitäts- und Stress-Presets.
 
 **Monte-Carlo Startjahr-Sampling**
 * Default ist uniformes Sampling über alle historischen Startjahre.
@@ -237,14 +243,14 @@ Die Worker-Pools bieten ein opt-in Telemetrie-System für lokale Performance-Ana
 Die Simulator-Eingaben können aus mehreren Profilen aggregiert werden:
 
 **Module:**
-- `profile-storage.js` – Profil-Registry und Persistenz-Layer
-- `profile-manager.js` – UI-Steuerung für Profilverwaltung (index.html)
-- `simulator-profile-inputs.js` – Profilaggregation und Simulator-Input-Mapping
+- `app/profile/profile-storage.js` – Profil-Registry und Persistenz-Layer
+- `app/profile/profile-manager.js` – UI-Steuerung für Profilverwaltung (index.html)
+- `app/simulator/simulator-profile-inputs.js` – Profilaggregation und Simulator-Input-Mapping
 
 ### Datenfluss
 
 ```
-Profile (localStorage) → profile-storage.js
+Profile (localStorage) → app/profile/profile-storage.js
                         ↓
           buildSimulatorInputsFromProfileData()
                         ↓
@@ -303,5 +309,5 @@ definiert werden. Ergebnisse werden gegen diese Limits geprüft und als OK/Verle
 * **SIMULATOR_MODULES_README.md** – Detaillierte Modulübersicht des Simulators.
 * **engine/README.md** – Engine-spezifische Informationen inkl. Build-Beschreibung.
 * **tests/README.md** – Test-Suite-Dokumentation mit 45 Testdateien.
-* **docs/PROFILVERBUND_FEATURES.md** – Profilverbund-Design und -Module.
+* **docs/reference/PROFILVERBUND_FEATURES.md** – Profilverbund-Design und -Module.
 

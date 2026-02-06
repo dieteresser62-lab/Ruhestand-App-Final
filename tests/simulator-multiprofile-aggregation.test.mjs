@@ -1,6 +1,6 @@
 // @ts-check
 
-import { combineSimulatorProfiles } from '../simulator-profile-inputs.js';
+import { combineSimulatorProfiles } from '../app/simulator/simulator-profile-inputs.js';
 
 console.log('--- Simulator Multi-Profile Aggregation ---');
 

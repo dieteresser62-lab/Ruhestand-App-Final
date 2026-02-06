@@ -510,11 +510,11 @@
         </div>
     </div>
 
-    <script type="module" src="profile-bridge.js"></script>
+    <script type="module" src="app/profile/profile-bridge.js"></script>
     <script type="module">
-        import { BEISPIEL_DEPOT_TRANCHEN } from './tranche-config-example.js';
-        import { CONFIG } from './balance-config.js';
-        import { getCurrentProfileId, getProfileMeta } from './profile-storage.js';
+        import { BEISPIEL_DEPOT_TRANCHEN } from './app/tranches/tranche-config-example.js';
+        import { CONFIG } from './app/balance/balance-config.js';
+        import { getCurrentProfileId, getProfileMeta } from './app/profile/profile-storage.js';
 
         // Global state
         let tranchen = [];

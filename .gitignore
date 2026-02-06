@@ -35,3 +35,10 @@ Screenshots/
 
 # Lock files
 .~lock.*
+
+# Local debug/output artifacts
+audit/logs/
+log.txt
+out*.txt
+parity_failure.log
+test_output.txt

@@ -2,7 +2,7 @@
 
 > **Hinweis:** Dieser Auditbericht wurde vor der Adapter-Eliminierung erstellt (Dezember 2025).
 > Die referenzierten Dateien `simulator-engine.js` und `sim-parity-smoketest.js` wurden seitdem
-> entfernt. Siehe `ADAPTER-ELIMINATION-REPORT.md` für Details zur Migration.
+> entfernt. Siehe `docs/internal/archive/ADAPTER-ELIMINATION-REPORT.md` fuer Details zur Migration.
 
 ---
 

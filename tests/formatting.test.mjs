@@ -2,14 +2,14 @@ import {
     formatCurrency,
     formatCurrencyShortLog,
     formatCurrencyRounded
-} from '../simulator-utils.js';
+} from '../app/simulator/simulator-utils.js';
 import {
     formatCurrencySafe,
     formatNumberWithUnit,
     formatPercentage
-} from '../results-formatting.js';
-import { formatDisplayNumber } from '../simulator-portfolio-format.js';
-import { formatPercentValue, formatPercentRatio } from '../simulator-formatting.js';
+} from '../app/simulator/results-formatting.js';
+import { formatDisplayNumber } from '../app/simulator/simulator-portfolio-format.js';
+import { formatPercentValue, formatPercentRatio } from '../app/simulator/simulator-formatting.js';
 
 // Some formatters emit non-breaking spaces; normalize for stable assertions.
 const normalizeNbsp = (value) => String(value).replace(/\u00a0/g, ' ');

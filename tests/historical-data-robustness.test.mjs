@@ -1,5 +1,5 @@
-import { annualData, REGIME_DATA, REGIME_TRANSITIONS } from '../simulator-data.js';
-import { sampleNextYearData } from '../simulator-engine-helpers.js';
+import { annualData, REGIME_DATA, REGIME_TRANSITIONS } from '../app/simulator/simulator-data.js';
+import { sampleNextYearData } from '../app/simulator/simulator-engine-helpers.js';
 
 console.log('--- Historical Data Robustness Tests ---');
 

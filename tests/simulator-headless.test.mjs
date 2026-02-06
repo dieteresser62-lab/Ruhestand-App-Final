@@ -1,8 +1,8 @@
 
-import { simulateOneYear } from '../simulator-engine-direct.js';
+import { simulateOneYear } from '../app/simulator/simulator-engine-direct.js';
 import { EngineAPI } from '../engine/index.mjs';
-import { annualData } from '../simulator-data.js';
-import { initializePortfolio, buildInputsCtxFromPortfolio, prepareHistoricalData } from '../simulator-portfolio.js';
+import { annualData } from '../app/simulator/simulator-data.js';
+import { initializePortfolio, buildInputsCtxFromPortfolio, prepareHistoricalData } from '../app/simulator/simulator-portfolio.js';
 
 // --- MOCKING GLOBAL STATE ---
 if (typeof global.window === 'undefined') {

@@ -9,12 +9,25 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 
 ---
 
+## Dokumentation
+
+| Dokument | Zielgruppe | Inhalt |
+|----------|------------|--------|
+| **[QUICKSTART.md](QUICKSTART.md)** | Einsteiger | Start in 2 Minuten, erste Schritte |
+| **[docs/guides/GUIDED_TOURS.md](docs/guides/GUIDED_TOURS.md)** | Alle Nutzer | Schritt-für-Schritt-Anleitungen für typische Aufgaben |
+| **[Handbuch.html](Handbuch.html)** | Alle Nutzer | Interaktive Hilfe im Browser |
+| **[ARCHITEKTUR_UND_FACHKONZEPT.md](ARCHITEKTUR_UND_FACHKONZEPT.md)** | Fortgeschrittene | Algorithmen, Fachlogik, Designentscheidungen |
+| **[TECHNICAL.md](TECHNICAL.md)** | Entwickler | Architektur, Build, Debugging |
+| **[docs/README.md](docs/README.md)** | Autoren/Entwickler | Doku-Struktur und Aufräum-Status |
+
+---
+
 ## Funktionen im Überblick
 
 ### Balance-App
 * Speichert Eingaben dauerhaft im `localStorage` und erzeugt auf Wunsch Dateisnapshots (File System Access API).
 * Importiert/Exportiert Portfolios als JSON und liest Marktdaten aus CSV-Dateien ein.
-* **Jahres-Update mit Online-Datenabruf:** Automatischer Abruf von Inflationsdaten (ECB, World Bank, OECD) und ETF-Kursen (VWCE.DE via Yahoo Finance/Finnhub), automatisches Nachrücken der Marktdaten und ATH-Update. Detailliertes Update-Protokoll zeigt Datenquellen und abgerufene Werte.
+* **Jahres-Update mit Online-Datenabruf:** Automatischer Abruf von Inflationsdaten (ECB, World Bank, OECD) und ETF-Kursen (VWCE.DE via Yahoo Finance über lokalen Proxy), automatisches Nachrücken der Marktdaten und ATH-Update. Detailliertes Update-Protokoll zeigt Datenquellen und abgerufene Werte.
 * **Ausgaben-Check (monatlich):** CSV-Import pro Monat und Profil, Budgetkontrolle je Monat, Detailansicht mit Top-3-Kategorien, Jahreshochrechnung (ab 2 Datenmonaten mit Median), Soll/Ist auf Basis importierter Monate sowie Jahres-Historie per Jahr-Auswahl.
 * **Jahresabschluss + Ausgaben-Historie:** Beim Jahresabschluss wechselt der Ausgaben-Check automatisch auf das nächste Jahr; Vorjahre bleiben vollständig einsehbar.
 * Nutzt die Engine v31 zur Marktanalyse, Entnahmeplanung und Liquiditätssteuerung.
@@ -25,8 +38,8 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 
 ### Simulator
 * Monte-Carlo-Simulationen mit unterschiedlichen Renditequellen (historisch, Regime, Block-Bootstrap) inkl. Worker-Parallelisierung. Historische Daten reichen bis 1925 (Schwarze-Schwan-Phase optional per Filter/Recency abgewichtbar).
-* **Parameter-Sweep mit Auto-Optimize:** Whitelist-Ansatz, Deep-Clones und Wächterlogik für Zwei-Personen-Setups. Worker-Parallelisierung fuer Sweep und Auto-Optimize, 3-stufige Optimierung (~8-10x schneller), dynamische Parameter-UI (1-7 Parameter), Preset-Konfigurationen und Champion-Config-Output für die Strategiefindung. Details siehe `docs/AUTO_OPTIMIZE_DETAILS.md`.
-* **Workflow-Transparenz:** Die Hauptabläufe (Balance, Monte-Carlo, Backtest) sind nun als Pseudo-Code dokumentiert: `docs/WORKFLOW_PSEUDOCODE.md`.
+* **Parameter-Sweep mit Auto-Optimize:** Whitelist-Ansatz, Deep-Clones und Wächterlogik für Zwei-Personen-Setups. Worker-Parallelisierung fuer Sweep und Auto-Optimize, 3-stufige Optimierung (~8-10x schneller), dynamische Parameter-UI (1-7 Parameter), Preset-Konfigurationen und Champion-Config-Output für die Strategiefindung. Details siehe `docs/reference/AUTO_OPTIMIZE_DETAILS.md`.
+* **Workflow-Transparenz:** Die Hauptabläufe (Balance, Monte-Carlo, Backtest) sind nun als Pseudo-Code dokumentiert: `docs/reference/WORKFLOW_PSEUDOCODE.md`.
 * Stresstests, Pflegefall-Szenarien und Heatmap-Visualisierung (fokussiert auf Rentenphase). Neue Presets: Great Depression (1929-1933) und Zweiter Weltkrieg (1939-1945).
 * Sweep-Schutz für Partner:innen-Renten inklusive Rente-2-Invarianz und Heatmap-Badges.
 * Szenario-Log-Analyse mit 30 auswählbaren Szenarien: 15 charakteristische (Perzentile, Pflege-Extremfälle, Risiko-Szenarien) und 15 zufällige Samples für typisches Verhalten.
@@ -103,7 +116,7 @@ Die Suite kann mehrere Profile als Profilverbund gleichzeitig auswerten. Es gibt
 **Wichtige Hinweise:**
 * Gold-Strategie wird pro Profil gepflegt und in Balance/Simulator übernommen.
 * Tranchen werden aus den aktiven Profilen zusammengeführt.
-* Detaillierte Designdokumentation siehe `docs/PROFILVERBUND_FEATURES.md`
+* Detaillierte Designdokumentation siehe `docs/reference/PROFILVERBUND_FEATURES.md`
 
 ### Gemeinsame Engine
 * Acht ES-Module (`engine/`) kapseln Validierung, Marktanalyse, Ausgabenplanung und Transaktionslogik.
@@ -118,8 +131,12 @@ Die Suite kann mehrere Profile als Profilverbund gleichzeitig auswerten. Es gibt
 Ruhestand-App-Final/
 ├── Balance.html                # Einstiegspunkt Balance-App
 ├── Simulator.html              # Einstiegspunkt Simulator
-├── balance-*.js                # ES6-Module der Balance-App
-├── simulator-*.js              # ES6-Module des Simulators
+├── app/
+│   ├── balance/                # ES6-Module der Balance-App
+│   ├── simulator/              # ES6-Module des Simulators
+│   ├── profile/                # Profilverwaltung / Profilverbund
+│   ├── tranches/               # Tranchen-Status & Aggregation
+│   └── shared/                 # gemeinsame Utilities/Formatter
 ├── engine/                     # Quellmodule der Berechnungsengine (ESM)
 │   ├── config.mjs
 │   ├── core.mjs
@@ -218,7 +235,7 @@ Die Anwendung ist bewusst minimalistisch gehalten, hat aber für den vollen Funk
 * **SIMULATOR_MODULES_README.md** – Modulübersicht des Simulators (MC, Sweep, Backtest, UI-Pfade).
 * **engine/README.md** – Engine-Module und Build-Prozess.
 * **tests/README.md** – Aufbau und Ausführung der Test-Suite.
-* **docs/WORKFLOW_PSEUDOCODE.md** – Ablaufdarstellung zentraler Workflows in Pseudocode.
+* **docs/reference/WORKFLOW_PSEUDOCODE.md** – Ablaufdarstellung zentraler Workflows in Pseudocode.
 
 ---
 

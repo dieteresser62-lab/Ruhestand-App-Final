@@ -1,7 +1,7 @@
-import { createSnapshotHandlers } from '../balance-binder-snapshots.js';
-import { StorageManager } from '../balance-storage.js';
-import { UIRenderer } from '../balance-renderer.js';
-import { CONFIG } from '../balance-config.js';
+import { createSnapshotHandlers } from '../app/balance/balance-binder-snapshots.js';
+import { StorageManager } from '../app/balance/balance-storage.js';
+import { UIRenderer } from '../app/balance/balance-renderer.js';
+import { CONFIG } from '../app/balance/balance-config.js';
 
 console.log('--- Balance Binder Snapshots Tests ---');
 

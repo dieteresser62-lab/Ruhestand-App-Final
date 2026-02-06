@@ -1,7 +1,7 @@
 import { EngineAPI } from '../engine/index.mjs';
-import { prepareHistoricalDataOnce } from '../simulator-engine-helpers.js';
-import { createMonteCarloBuffers, MC_HEATMAP_BINS, runMonteCarloChunk, buildMonteCarloAggregates } from '../monte-carlo-runner.js';
-import { runSweepChunk } from '../sweep-runner.js';
+import { prepareHistoricalDataOnce } from '../app/simulator/simulator-engine-helpers.js';
+import { createMonteCarloBuffers, MC_HEATMAP_BINS, runMonteCarloChunk, buildMonteCarloAggregates } from '../app/simulator/monte-carlo-runner.js';
+import { runSweepChunk } from '../app/simulator/sweep-runner.js';
 
 // Engine API is expected to live on window in browser-mode code.
 if (typeof global.window === 'undefined') {

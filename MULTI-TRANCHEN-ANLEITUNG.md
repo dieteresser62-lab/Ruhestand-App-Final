@@ -15,7 +15,7 @@ Das Multi-Tranchen-System ermöglicht die **detaillierte Verwaltung einzelner De
 
 ### Neu hinzugefügt:
 1. **`depot-tranchen-manager.html`** - Eigenständiges Tool zur Verwaltung der Tranchen
-2. **`tranche-config-example.js`** - Beispiel-Konfiguration mit Ihren Positionen
+2. **`app/tranches/tranche-config-example.js`** - Beispiel-Konfiguration mit Ihren Positionen
 3. **`MULTI-TRANCHEN-ANLEITUNG.md`** - Diese Dokumentation
 
 ### Erweitert:
@@ -356,7 +356,7 @@ console.log(localStorage.getItem('depot_tranchen'));
 
 ## 📚 Weiterführende Informationen
 
-- `tranche-config-example.js` - Vollständiges Beispiel mit Ihren Positionen
+- `app/tranches/tranche-config-example.js` - Vollständiges Beispiel mit Ihren Positionen
 - `simulator-portfolio.js` - Backend-Logik für Portfolio-Verwaltung
 - `engine/transactions/TransactionEngine.mjs` - steueroptimierte Verkaufslogik und Steuerberechnung
 

@@ -1,6 +1,8 @@
 # Balance-App – Modulübersicht
 
-Die Balance-App besteht aus 30 ES6-Modulen, die direkt nebeneinander im Repository liegen. Das folgende Dokument fasst Verantwortung, Exporte und wichtige Abhängigkeiten zusammen.
+Die Balance-App besteht aus 30 ES6-Modulen unter `app/balance/`. Das folgende Dokument fasst Verantwortung, Exporte und wichtige Abhängigkeiten zusammen.
+Dateinamen werden unten kurz ohne Präfix genannt; tatsächlicher Pfad ist in der Regel `app/balance/<datei>.js`.
+Ausnahmen: Profilverbund-Module liegen unter `app/profile/`, Shared-Formatter unter `app/shared/`.
 
 **Stand:** Januar 2026
 
@@ -35,7 +37,7 @@ Formatierungs- und Hilfsfunktionen für die UI.
   - `parseCurrency(str)`
   - `getThreshold(path, defaultValue)` – greift sicher auf Engine-Konfigurationen zu
 
-**Dependencies:** `shared-formatting.js`
+**Dependencies:** `app/shared/shared-formatting.js`
 
 ---
 
@@ -111,7 +113,7 @@ Event-Hub der Anwendung.
   - `handleReset()` – Reset mit Bestätigung
   - `handleBedarfAnpassungClick(e)` – inflationsbedingte Anpassung
   - `handleNachruecken()` / `handleUndoNachruecken()` – Marktdatenpflege
-  - `handleJahresUpdate()` – **Jahres-Update mit Online-API-Zugriff:** Ruft automatisch Inflationsdaten (ECB → World Bank → OECD Fallback-Kette) und ETF-Kurse (VWCE.DE via Yahoo Finance/Finnhub) ab, führt Nachrücken durch und aktualisiert ATH. Zeigt detailliertes Protokoll mit Datenquellen und Werten.
+  - `handleJahresUpdate()` – **Jahres-Update mit Online-API-Zugriff:** Ruft automatisch Inflationsdaten (ECB → World Bank → OECD Fallback-Kette) und ETF-Kurse (VWCE.DE via Yahoo Finance über lokalen Proxy) ab, führt Nachrücken durch und aktualisiert ATH. Zeigt detailliertes Protokoll mit Datenquellen und Werten.
   - `handleExport()` / `handleImport(e)` / `handleCsvImport(e)` – Datenimporte/-exporte
   - `handleJahresabschluss()` – Snapshot & Jahreswechsel
   - `handleSnapshotActions(e)` – Snapshot verwalten (restore/delete)
@@ -162,7 +164,7 @@ Ausgaben-Check für monatliche CSV-Importe und Budgettracking.
   - Soll/Ist auf Basis importierter Monate
 - Detaildialog mit sortierter Kategorieliste und „Top 3 Kategorien“.
 
-**Dependencies:** `balance-utils.js`, `balance-renderer.js`, `profilverbund-balance.js`
+**Dependencies:** `balance-utils.js`, `balance-renderer.js`, `app/profile/profilverbund-balance.js`
 
 ---
 
@@ -188,7 +190,7 @@ Marktdaten-Updates für das „Nachrücken"-Workflow.
 - `createMarketdataHandlers({ dom, appState, debouncedUpdate, applyAnnualInflation })`
   - `handleNachruecken()` – Verschiebt Vorjahreswerte und aktualisiert ATH
   - `handleUndoNachruecken()` – Macht Nachrücken rückgängig
-  - `handleNachrueckenMitETF()` – Holt VWCE.DE-Kurs via Yahoo-Proxy/Finnhub und führt Nachrücken durch
+  - `handleNachrueckenMitETF()` – Holt VWCE.DE-Kurs via Yahoo-Proxy und führt Nachrücken durch
 
 **Dependencies:** `balance-config.js`, `balance-renderer.js`
 
@@ -253,7 +255,7 @@ Kernlogik für den Profilverbund (Multi-Profil-Modus).
 - `proportional` – Nach Vermögensanteil
 - `runway_first` – Nach Runway-Zielen gewichtet
 
-**Dependencies:** `balance-config.js`, `profile-storage.js`
+**Dependencies:** `balance-config.js`, `app/profile/profile-storage.js`
 
 ---
 
@@ -271,13 +273,13 @@ DOM-Operationen für die Profilverbund-UI.
 ## Abhängigkeiten
 
 ```
-balance-main.js
-  ├─ balance-config.js
-  ├─ balance-utils.js
-  ├─ balance-storage.js
-  ├─ balance-reader.js
-  ├─ balance-renderer.js
-  └─ balance-binder.js
+app/balance/balance-main.js
+  ├─ app/balance/balance-config.js
+  ├─ app/balance/balance-utils.js
+  ├─ app/balance/balance-storage.js
+  ├─ app/balance/balance-reader.js
+  ├─ app/balance/balance-renderer.js
+  └─ app/balance/balance-binder.js
 ```
 
 Die Module kommunizieren über definierte Schnittstellen; Änderungen lassen sich damit auf einzelne Komponenten begrenzen.

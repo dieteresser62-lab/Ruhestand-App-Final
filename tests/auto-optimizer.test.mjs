@@ -42,12 +42,12 @@ try {
     global.window = {};
 
     // Importiere Module
-    const { latinHypercubeSample, generateNeighborsReduced } = await import('../auto-optimize-sampling.js');
-    const { isValidCandidate } = await import('../auto-optimize-params.js');
-    const { checkConstraints, getObjectiveValue } = await import('../auto-optimize-metrics.js');
-    const { CandidateCache, tieBreaker } = await import('../auto-optimize-utils.js');
-    const { rng } = await import('../simulator-utils.js');
-    const { runAutoOptimize } = await import('../auto_optimize.js');
+    const { latinHypercubeSample, generateNeighborsReduced } = await import('../app/simulator/auto-optimize-sampling.js');
+    const { isValidCandidate } = await import('../app/simulator/auto-optimize-params.js');
+    const { checkConstraints, getObjectiveValue } = await import('../app/simulator/auto-optimize-metrics.js');
+    const { CandidateCache, tieBreaker } = await import('../app/simulator/auto-optimize-utils.js');
+    const { rng } = await import('../app/simulator/simulator-utils.js');
+    const { runAutoOptimize } = await import('../app/simulator/auto_optimize.js');
 
     // ========== Latin Hypercube Sampling Tests ==========
 

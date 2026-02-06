@@ -505,7 +505,7 @@ DiagnosisRenderer
 
 | Datenquelle | API | Fallback |
 |-------------|-----|----------|
-| ETF-Kurse (VWCE.DE) | Yahoo Finance via lokalem Proxy | Finnhub API |
+| ETF-Kurse (VWCE.DE) | Yahoo Finance via lokalem Proxy | Optional: Custom Proxy (`etfProxyUrl`/`etfProxyUrls`) |
 | Inflation | ECB/World Bank/OECD | Manuell |
 
 ### B.2.7 Keyboard-Shortcuts
@@ -596,7 +596,7 @@ Die Suite ermöglicht **detailliertes Tranchen-Management** mit FIFO-basierter S
 |-------|-----|----------|
 | `depot-tranchen-manager.html` | ~400 | Standalone-UI für Tranchenverwaltung |
 | `depot-tranchen-status.js` | 432 | Status-Berechnung, Aggregation, UI-Sync |
-| `tranche-config-example.js` | ~100 | Beispiel-Konfiguration |
+| `app/tranches/tranche-config-example.js` | ~100 | Beispiel-Konfiguration |
 
 **Tranchen-Datenmodell:**
 
@@ -647,7 +647,7 @@ Die Tranchen-Kurse können über verschiedene Quellen aktualisiert werden:
 | Quelle | API | Unterstützte Assets |
 |--------|-----|---------------------|
 | Yahoo Finance | Lokaler Proxy (`tools/yahoo-proxy.cjs`) | ETFs, Aktien |
-| Finnhub | Direkt | ETFs, Aktien (Fallback) |
+| Custom Proxy | Konfigurierbar via `localStorage` (`etfProxyUrl`/`etfProxyUrls`) | ETFs, Aktien |
 | Manuell | Eingabefeld | Alle |
 
 **Automatische Synchronisation:**
@@ -2456,7 +2456,7 @@ rt
 | `profilverbund-balance.js` | 550 | Multi-Profil-Aggregation, Entnahme-Verteilung |
 | `depot-tranchen-status.js` | 432 | Aggregation, UI-Sync, Status-Badge |
 | `balance-main-profile-sync.js` | ~150 | Cross-App-Synchronisation |
-| `tranche-config-example.js` | ~100 | Beispiel-Konfiguration |
+| `app/tranches/tranche-config-example.js` | ~100 | Beispiel-Konfiguration |
 
 ## Tauri Desktop-App (4 Dateien)
 

@@ -1,4 +1,4 @@
-import { buildGuardrails } from '../balance-diagnosis-guardrails.js';
+import { buildGuardrails } from '../app/balance/balance-diagnosis-guardrails.js';
 
 console.log('--- Balance Diagnosis Guardrails Tests ---');
 
