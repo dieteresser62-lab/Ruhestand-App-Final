@@ -353,6 +353,7 @@
             <button class="btn-primary" onclick="addTranche()">➕ Neue Tranche</button>
             <button class="btn-success" onclick="loadExample()">📥 Beispiel laden</button>
             <button class="btn-secondary" onclick="updatePrices()">🔄 Kurse aktualisieren</button>
+            <button class="btn-secondary" onclick="checkProxyHealth()">🩺 Proxy-Check</button>
             <button class="btn-secondary" onclick="exportTranches()">💾 Export JSON</button>
             <button class="btn-secondary" onclick="importTranches()">📂 Import JSON</button>
             <button class="btn-danger" onclick="clearAll()">🗑️ Alle löschen</button>
@@ -917,6 +918,25 @@
             if (!first || !first.symbol) return null;
             return first.symbol;
         }
+
+        window.checkProxyHealth = async function() {
+            const statusEl = document.getElementById('priceUpdateStatus');
+            const proxyBase = LOCAL_YAHOO_PROXY.replace(/\/$/, '');
+            const startedAt = performance.now();
+            statusEl.textContent = `Proxy-Check laeuft... (${proxyBase})`;
+            try {
+                const data = await fetchProxyJson(`${proxyBase}/search?q=VWCE`);
+                const elapsed = Math.round(performance.now() - startedAt);
+                const count = Array.isArray(data?.quotes) ? data.quotes.length : 0;
+                const stamp = new Date().toLocaleString('de-DE');
+                statusEl.textContent = `Proxy OK (${stamp}) - Antwort in ${elapsed} ms, Treffer: ${count}.`;
+            } catch (error) {
+                const elapsed = Math.round(performance.now() - startedAt);
+                const stamp = new Date().toLocaleString('de-DE');
+                const message = error?.message || String(error);
+                statusEl.textContent = `Proxy FEHLER (${stamp}) nach ${elapsed} ms - ${message}`;
+            }
+        };
 
         window.updatePrices = async function() {
             if (!tranchen.length) {

@@ -8,7 +8,7 @@ use tiny_http::{Header, Method, Response, Server, StatusCode};
 
 fn allowed_cors_origin(origin: &str) -> &str {
   match origin {
-    "null" | "tauri://localhost" => origin,
+    "null" | "tauri://localhost" | "https://tauri.localhost" | "http://tauri.localhost" => origin,
     o if o.starts_with("http://localhost:") || o.starts_with("http://127.0.0.1:") => o,
     o if o == "http://localhost" || o == "http://127.0.0.1" => o,
     _ => "null",
@@ -24,13 +24,9 @@ fn build_headers_for_origin(origin: &str) -> Vec<Header> {
   ]
 }
 
-fn build_headers() -> Vec<Header> {
-  build_headers_for_origin("tauri://localhost")
-}
-
 fn get_request_origin(request: &tiny_http::Request) -> String {
   for header in request.headers() {
-    if header.field.as_str().eq_ignore_ascii_case("origin") {
+    if header.field.to_string().eq_ignore_ascii_case("origin") {
       return header.value.as_str().to_string();
     }
   }
@@ -38,10 +34,12 @@ fn get_request_origin(request: &tiny_http::Request) -> String {
 }
 
 fn send_json(request: tiny_http::Request, status: u16, payload: serde_json::Value) {
+  let origin = get_request_origin(&request);
+  let cors = allowed_cors_origin(&origin);
   let body = payload.to_string();
   let mut response = Response::from_string(body)
     .with_status_code(StatusCode(status));
-  for header in build_headers() {
+  for header in build_headers_for_origin(cors) {
     response = response.with_header(header);
   }
   let _ = request.respond(response);
