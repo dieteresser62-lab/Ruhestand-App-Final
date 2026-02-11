@@ -515,6 +515,7 @@
         import { BEISPIEL_DEPOT_TRANCHEN } from './app/tranches/tranche-config-example.js';
         import { CONFIG } from './app/balance/balance-config.js';
         import { getCurrentProfileId, getProfileMeta } from './app/profile/profile-storage.js';
+        import { escapeHtml } from './app/shared/security-utils.js';
 
         // Global state
         let tranchen = [];
@@ -1063,11 +1064,11 @@
 
                 return `
                     <tr class="tranche-row">
-                        <td>${t.purchaseDate || '-'}</td>
+                        <td>${escapeHtml(t.purchaseDate) || '-'}</td>
                         <td>
-                            <strong>${t.name}</strong><br>
-                            <small style="color: #718096;">${t.isin || '-'}</small><br>
-                            <small style="color: #718096;">${t.ticker || '-'}</small>
+                            <strong>${escapeHtml(t.name)}</strong><br>
+                            <small style="color: #718096;">${escapeHtml(t.isin) || '-'}</small><br>
+                            <small style="color: #718096;">${escapeHtml(t.ticker) || '-'}</small>
                         </td>
                         <td>${t.shares.toLocaleString('de-DE')}</td>
                         <td>${t.purchasePrice.toFixed(2)} €</td>

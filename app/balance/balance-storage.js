@@ -362,9 +362,21 @@ export const StorageManager = {
             throw new StorageError("Snapshot enthält keine gültigen Daten.");
         }
         if (snapshotData.snapshotType === "full-localstorage" && snapshotData.localStorage) {
+            const ALLOWED_KEY_PREFIXES = [
+                'ruhestandsmodellValues_', 'ruhestandsmodell_snapshot_',
+                'migration_', 'rs_profiles_', 'rs_current_profile', 'rs_active_profile',
+                'profile_', 'depot_tranchen', 'featureFlags',
+                'sim_', 'sim.', 'balance_expenses_',
+                'showCareDetails', 'household_withdrawal_mode',
+                'logDetailLevel', 'worstLogDetailLevel', 'backtestLogDetailLevel',
+                'etfProxyUrl'
+            ];
+            const isAllowedKey = (k) => ALLOWED_KEY_PREFIXES.some(prefix => k.startsWith(prefix));
             localStorage.clear();
             Object.entries(snapshotData.localStorage).forEach(([lsKey, value]) => {
-                localStorage.setItem(lsKey, value);
+                if (isAllowedKey(lsKey)) {
+                    localStorage.setItem(lsKey, value);
+                }
             });
             if (!handle && rawSnapshot && key) {
                 localStorage.setItem(key, rawSnapshot);

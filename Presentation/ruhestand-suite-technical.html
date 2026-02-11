@@ -1,0 +1,2105 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ruhestand Suite - Technische Architektur</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #fff;
+    --text: #1d1d1f;
+    --text-secondary: #6e6e73;
+    --accent: #0071e3;
+    --accent-hover: #0077ed;
+    --surface: #f5f5f7;
+    --border: #d2d2d7;
+    --code-bg: #1d1d1f;
+    --code-text: #f5f5f7;
+    --card-shadow: 0 4px 24px rgba(0,0,0,0.06);
+    --slide-width: 1200px;
+    --green: #34c759;
+    --orange: #ff9500;
+    --red: #ff3b30;
+    --blue: #0071e3;
+    --purple: #af52de;
+    --teal: #5ac8fa;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html {
+    scroll-snap-type: y mandatory;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+
+  /* Navigation */
+  nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 52px;
+    background: rgba(255,255,255,0.72);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 40px;
+    z-index: 1000;
+  }
+
+  nav .brand {
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+  }
+
+  nav .nav-links {
+    display: flex;
+    gap: 24px;
+    list-style: none;
+  }
+
+  nav .nav-links a {
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  nav .nav-links a:hover { color: var(--text); }
+
+  /* Slide */
+  .slide {
+    min-height: 100vh;
+    scroll-snap-align: start;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 40px;
+    position: relative;
+  }
+
+  .slide-inner {
+    max-width: var(--slide-width);
+    width: 100%;
+  }
+
+  /* Typography */
+  .section-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+  }
+
+  h1 {
+    font-size: 64px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.08;
+  }
+
+  h2 {
+    font-size: 48px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.1;
+    margin-bottom: 16px;
+  }
+
+  h3 {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    margin-bottom: 12px;
+  }
+
+  h4 {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin-bottom: 8px;
+  }
+
+  .lead {
+    font-size: 20px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    max-width: 700px;
+  }
+
+  /* Code blocks */
+  .code-block {
+    background: var(--code-bg);
+    color: var(--code-text);
+    border-radius: 12px;
+    padding: 24px 28px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    overflow-x: auto;
+    margin-top: 16px;
+  }
+
+  .code-block .comment { color: #6a9955; }
+  .code-block .keyword { color: #c586c0; }
+  .code-block .string { color: #ce9178; }
+  .code-block .function { color: #dcdcaa; }
+  .code-block .type { color: #4ec9b0; }
+  .code-block .number { color: #b5cea8; }
+  .code-block .arrow { color: #d4d4d4; }
+  .code-block .highlight-line { background: rgba(255,255,255,0.06); margin: 0 -28px; padding: 0 28px; display: block; }
+
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    background: var(--surface);
+    padding: 2px 8px;
+    border-radius: 6px;
+  }
+
+  /* Cards */
+  .card-grid {
+    display: grid;
+    gap: 20px;
+    margin-top: 32px;
+  }
+
+  .card-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+  .card-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .card-grid.cols-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+
+  .card {
+    background: var(--surface);
+    border-radius: 20px;
+    padding: 32px;
+    transition: transform 0.2s;
+  }
+
+  .card:hover { transform: translateY(-2px); }
+  .card p { font-size: 15px; color: var(--text-secondary); line-height: 1.55; }
+
+  .card .card-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    margin-bottom: 14px;
+  }
+
+  .card .card-icon.blue { background: #e8f0fe; color: #1a73e8; }
+  .card .card-icon.green { background: #e6f4ea; color: #137333; }
+  .card .card-icon.orange { background: #fef7e0; color: #e37400; }
+  .card .card-icon.purple { background: #f3e8fd; color: #8430ce; }
+  .card .card-icon.red { background: #fce8e6; color: #c5221f; }
+  .card .card-icon.teal { background: #e0f7fa; color: #00796b; }
+
+  /* Split */
+  .split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    align-items: center;
+  }
+
+  .split.reverse { direction: rtl; }
+  .split.reverse > * { direction: ltr; }
+
+  .split.wide { grid-template-columns: 2fr 1fr; }
+  .split.wide-right { grid-template-columns: 1fr 2fr; }
+
+  /* Architecture diagram */
+  .arch-diagram {
+    background: var(--surface);
+    border-radius: 16px;
+    padding: 32px;
+    margin-top: 24px;
+  }
+
+  .arch-layer {
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    position: relative;
+  }
+
+  .arch-layer:last-child { margin-bottom: 0; }
+
+  .arch-layer .layer-label {
+    position: absolute;
+    top: -12px;
+    left: 20px;
+    background: var(--bg);
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+  }
+
+  .arch-layer.l1 { border-color: #bfdbfe; background: #eff6ff; }
+  .arch-layer.l1 .layer-label { color: #2563eb; }
+  .arch-layer.l2 { border-color: #bbf7d0; background: #f0fdf4; }
+  .arch-layer.l2 .layer-label { color: #16a34a; }
+  .arch-layer.l3 { border-color: #fde68a; background: #fffbeb; }
+  .arch-layer.l3 .layer-label { color: #d97706; }
+
+  .arch-modules {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .arch-module {
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .arch-module.ui { background: #dbeafe; color: #1e40af; }
+  .arch-module.app { background: #dcfce7; color: #166534; }
+  .arch-module.engine { background: #fef3c7; color: #92400e; }
+  .arch-module.worker { background: #f3e8ff; color: #6b21a8; }
+  .arch-module.shared { background: #e0f2fe; color: #075985; }
+
+  /* Flow diagram */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 12px 0;
+    flex-wrap: wrap;
+  }
+
+  .flow-step {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .flow-arrow {
+    color: var(--text-secondary);
+    font-size: 18px;
+  }
+
+  .flow-step.validator { background: #fce4ec; color: #c62828; }
+  .flow-step.analyzer { background: #e3f2fd; color: #1565c0; }
+  .flow-step.planner { background: #e8f5e9; color: #2e7d32; }
+  .flow-step.transaction { background: #fff3e0; color: #e65100; }
+  .flow-step.core { background: #f3e5f5; color: #6a1b9a; }
+
+  /* Stats */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    margin-top: 32px;
+  }
+
+  .stat {
+    text-align: center;
+    padding: 28px 16px;
+    background: var(--surface);
+    border-radius: 16px;
+  }
+
+  .stat .number {
+    font-size: 42px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.03em;
+    line-height: 1;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .stat .label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 6px;
+  }
+
+  /* Table */
+  .data-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-top: 24px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--card-shadow);
+    font-size: 14px;
+  }
+
+  .data-table th {
+    background: var(--surface);
+    padding: 12px 20px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .data-table td {
+    padding: 10px 20px;
+    border-bottom: 1px solid rgba(0,0,0,0.04);
+  }
+
+  .data-table tr:last-child td { border-bottom: none; }
+
+  .data-table code {
+    font-size: 12px;
+    padding: 2px 6px;
+  }
+
+  /* Tags */
+  .tag {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .tag.esm { background: #fef3c7; color: #92400e; }
+  .tag.es6 { background: #dbeafe; color: #1e40af; }
+  .tag.worker { background: #f3e8ff; color: #6b21a8; }
+  .tag.dom-free { background: #dcfce7; color: #166534; }
+  .tag.bundled { background: #fce4ec; color: #c62828; }
+
+  /* Screenshot */
+  .screenshot-frame {
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--card-shadow);
+    border: 1px solid var(--border);
+  }
+
+  .screenshot-frame img { width: 100%; display: block; }
+
+  .screenshot-caption {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 10px;
+  }
+
+  /* Feature list */
+  .feature-list {
+    list-style: none;
+    margin-top: 20px;
+  }
+
+  .feature-list li {
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    font-size: 15px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .feature-list li:last-child { border-bottom: none; }
+
+  .feature-list .check {
+    color: var(--green);
+    font-weight: 700;
+    font-size: 16px;
+    flex-shrink: 0;
+    line-height: 1.5;
+  }
+
+  /* Dark slide */
+  .slide.dark {
+    background: #1d1d1f;
+    color: #f5f5f7;
+  }
+
+  .slide.dark h2 { color: #f5f5f7; }
+  .slide.dark h3 { color: #f5f5f7; }
+  .slide.dark .lead { color: #a1a1a6; }
+  .slide.dark .section-label { color: #2997ff; }
+  .slide.dark .card { background: #2d2d2f; }
+  .slide.dark .card p { color: #a1a1a6; }
+  .slide.dark .card h4 { color: #f5f5f7; }
+  .slide.dark code { background: #3a3a3c; color: #f5f5f7; }
+  .slide.dark .data-table th { background: #2d2d2f; color: #a1a1a6; border-color: #3a3a3c; }
+  .slide.dark .data-table td { color: #f5f5f7; border-color: #3a3a3c; }
+  .slide.dark .arch-layer { background: #2d2d2f; border-color: #3a3a3c; }
+  .slide.dark .arch-layer .layer-label { background: #1d1d1f; }
+
+  /* Accent slide */
+  .slide.accent {
+    background: linear-gradient(135deg, #0071e3 0%, #40a9ff 100%);
+    color: white;
+  }
+
+  .slide.accent h2 { color: white; }
+  .slide.accent .lead { color: rgba(255,255,255,0.8); }
+  .slide.accent .section-label { color: rgba(255,255,255,0.7); }
+
+  /* Timeline */
+  .timeline-step {
+    display: flex;
+    gap: 20px;
+    padding: 16px 0;
+  }
+
+  .timeline-step .step-num {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .timeline-step .step-content h4 {
+    font-size: 16px;
+    margin-bottom: 2px;
+  }
+
+  .timeline-step .step-content p {
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+
+  /* Page indicator */
+  .page-indicator {
+    position: fixed;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 100;
+  }
+
+  .page-indicator .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: all 0.3s;
+    cursor: pointer;
+  }
+
+  .page-indicator .dot.active {
+    background: var(--accent);
+    transform: scale(1.4);
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    h1 { font-size: 40px; }
+    h2 { font-size: 36px; }
+    .split, .split.wide, .split.wide-right { grid-template-columns: 1fr; gap: 24px; }
+    .card-grid.cols-3, .card-grid.cols-4 { grid-template-columns: 1fr; }
+    .card-grid.cols-2 { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: 1fr 1fr; }
+    nav .nav-links { display: none; }
+  }
+
+  /* Print */
+  @media print {
+    nav, .page-indicator { display: none; }
+    .slide { min-height: auto; page-break-after: always; padding: 40px 20px; }
+    html { scroll-snap-type: none; }
+  }
+
+  .keyboard-hint {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 8px 20px;
+    border-radius: 980px;
+    font-size: 13px;
+    opacity: 0.8;
+    z-index: 100;
+    pointer-events: none;
+    animation: fadeOut 4s 3s forwards;
+  }
+
+  @keyframes fadeOut { to { opacity: 0; } }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="brand">Ruhestand Suite // Technical</div>
+  <ul class="nav-links">
+    <li><a href="#start">Start</a></li>
+    <li><a href="#architektur">Architektur</a></li>
+    <li><a href="#engine">Engine</a></li>
+    <li><a href="#balance">Balance</a></li>
+    <li><a href="#simulator">Simulator</a></li>
+    <li><a href="#worker">Workers</a></li>
+    <li><a href="#testing">Tests</a></li>
+    <li><a href="#besonderes">Besonderes</a></li>
+  </ul>
+</nav>
+
+<div class="keyboard-hint">Scrollen oder Pfeiltasten zum Navigieren</div>
+
+<!-- ==================== SLIDE 1: Title ==================== -->
+<section class="slide dark" id="start">
+  <div class="slide-inner" style="text-align: center;">
+    <p class="section-label">Technical Deep Dive</p>
+    <h1 style="color: #f5f5f7;">Ruhestand Suite<br>Architektur.</h1>
+    <p class="lead" style="margin: 20px auto 48px; color: #a1a1a6;">
+      96 ES6-Module, 13 Engine-Module, 46 Testdateien, 8 Web Workers.<br>
+      Kein Framework. Kein Bundler. Kein Backend.
+    </p>
+    <div class="stats-row" style="max-width: 900px; margin: 0 auto;">
+      <div class="stat" style="background: #2d2d2f;">
+        <div class="number" style="color: #2997ff;">37.5k</div>
+        <div class="label" style="color: #a1a1a6;">Lines of Code</div>
+      </div>
+      <div class="stat" style="background: #2d2d2f;">
+        <div class="number" style="color: #30d158;">96</div>
+        <div class="label" style="color: #a1a1a6;">ES6-Module</div>
+      </div>
+      <div class="stat" style="background: #2d2d2f;">
+        <div class="number" style="color: #ff9f0a;">46</div>
+        <div class="label" style="color: #a1a1a6;">Test Files</div>
+      </div>
+      <div class="stat" style="background: #2d2d2f;">
+        <div class="number" style="color: #bf5af2;">0</div>
+        <div class="label" style="color: #a1a1a6;">Frameworks</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 2: Tech Stack ==================== -->
+<section class="slide" id="architektur">
+  <div class="slide-inner">
+    <p class="section-label">Technologien</p>
+    <h2>Der Stack.</h2>
+    <p class="lead">Bewusst minimalistisch. Keine Abhangigkeiten ausser dem Browser.</p>
+    <div class="card-grid cols-3" style="margin-top: 40px;">
+      <div class="card">
+        <div class="card-icon blue">JS</div>
+        <h4>Vanilla ES6 Modules</h4>
+        <p>Native Browser-Imports ohne Bundler, Transpiler oder Framework. Anderungen an Modulen werden per Browser-Reload sofort wirksam.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon orange">&#9881;</div>
+        <h4>esbuild (nur Engine)</h4>
+        <p>Einzige Build-Abhangigkeit. Bundelt 13 ESM-Module in ein einziges <code>engine.js</code> mit globalem <code>EngineAPI</code>-Objekt.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon purple">&#9874;</div>
+        <h4>Web Workers</h4>
+        <p>8 parallele Worker fur Monte-Carlo-Simulationen. Transferable Objects (kein SharedArrayBuffer) fur Tauri-Kompatibilitat.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon green">&#128190;</div>
+        <h4>localStorage + FSA API</h4>
+        <p>Persistenz per localStorage, Snapshots per File System Access API (Chromium). Zero-Cloud-Architektur.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon red">&#9883;</div>
+        <h4>Tauri (Rust)</h4>
+        <p>Desktop-Packaging als portable EXE. Integrierter Webserver + Yahoo-Finance-Proxy. Kein Electron-Overhead.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon teal">&#9889;</div>
+        <h4>Seeded PRNG</h4>
+        <p>Deterministische Zufallszahlen per Custom RNG. Worker-Chunking andert Ergebnisse nicht. Reproduzierbar bis auf die letzte Dezimalstelle.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 3: Drei-Schichten-Architektur ==================== -->
+<section class="slide" style="background: var(--surface);">
+  <div class="slide-inner">
+    <p class="section-label">Architektur</p>
+    <h2>Drei Schichten.</h2>
+    <p class="lead">Klare Trennung von UI, Logik und Berechnung.</p>
+    <div class="arch-diagram">
+      <div class="arch-layer l1">
+        <span class="layer-label">Layer 1: User Interface (HTML)</span>
+        <div class="arch-modules">
+          <span class="arch-module ui">Balance.html</span>
+          <span class="arch-module ui">Simulator.html</span>
+          <span class="arch-module ui">index.html</span>
+          <span class="arch-module ui">depot-tranchen-manager.html</span>
+        </div>
+      </div>
+      <div style="text-align: center; padding: 4px 0; color: var(--text-secondary); font-size: 20px;">&#8595;</div>
+      <div class="arch-layer l2">
+        <span class="layer-label">Layer 2: Application Logic (96 ES6 Modules)</span>
+        <div class="arch-modules">
+          <span class="arch-module app">app/balance/ (28)</span>
+          <span class="arch-module app">app/simulator/ (58)</span>
+          <span class="arch-module shared">app/profile/ (4)</span>
+          <span class="arch-module shared">app/tranches/ (3)</span>
+          <span class="arch-module shared">app/shared/ (3)</span>
+          <span class="arch-module worker">workers/ (3)</span>
+        </div>
+      </div>
+      <div style="text-align: center; padding: 4px 0; color: var(--text-secondary); font-size: 20px;">&#8595;</div>
+      <div class="arch-layer l3">
+        <span class="layer-label">Layer 3: Calculation Engine (13 ESM &rarr; 1 Bundle)</span>
+        <div class="arch-modules">
+          <span class="arch-module engine">validators/</span>
+          <span class="arch-module engine">analyzers/</span>
+          <span class="arch-module engine">planners/</span>
+          <span class="arch-module engine">transactions/ (6)</span>
+          <span class="arch-module engine">core.mjs</span>
+          <span class="arch-module engine">config.mjs</span>
+          <span class="arch-module engine">&rarr; engine.js</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 4: Engine Pipeline ==================== -->
+<section class="slide" id="engine">
+  <div class="slide-inner">
+    <p class="section-label">Engine</p>
+    <h2>Die Berechnungs-Pipeline.</h2>
+    <p class="lead">Vier Stufen transformieren Rohdaten in eine Entnahmeempfehlung.</p>
+
+    <div class="flow" style="margin: 40px 0 24px;">
+      <span class="flow-step validator">InputValidator</span>
+      <span class="flow-arrow">&rarr;</span>
+      <span class="flow-step analyzer">MarketAnalyzer</span>
+      <span class="flow-arrow">&rarr;</span>
+      <span class="flow-step planner">SpendingPlanner</span>
+      <span class="flow-arrow">&rarr;</span>
+      <span class="flow-step transaction">TransactionEngine</span>
+      <span class="flow-arrow">&rarr;</span>
+      <span class="flow-step core">core.mjs</span>
+    </div>
+
+    <div class="card-grid cols-2">
+      <div class="card">
+        <h4>1. InputValidator</h4>
+        <p>Validiert alle Eingaben auf Bereich und Konsistenz. Fehlende Pflichtfelder, negative Werte, inkonsistente Altersangaben -- alles wird hier abgefangen.</p>
+      </div>
+      <div class="card">
+        <h4>2. MarketAnalyzer</h4>
+        <p>Klassifiziert das Marktregime (Bull / Seitwarts / Bar). Berechnet Drawdown, CAPE-Ratio-basierte Bewertung und Sequence-of-Returns-Risiko.</p>
+      </div>
+      <div class="card">
+        <h4>3. SpendingPlanner</h4>
+        <p>Kernlogik der Guardrails. Flex-Rate-Glatten per S-Kurve, Wealth-basierte Flexreduktion, Hard Caps bei Bar/Runway-Alarm, Budget-Caps, Mindestrate.</p>
+      </div>
+      <div class="card">
+        <h4>4. TransactionEngine</h4>
+        <p>Berechnet Liquiditats-Zielallokation. Gap-basiertes Rebalancing (Buy/Sell/Hold). Steueroptimierte Positionsauswahl mit Tranchenlogik.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 5: Engine Internals ==================== -->
+<section class="slide dark">
+  <div class="slide-inner">
+    <p class="section-label">Engine Internals</p>
+    <h2 style="color: #f5f5f7;">TransactionEngine<br>im Detail.</h2>
+    <p class="lead" style="color: #a1a1a6;">6 Sub-Module fur die Transaktionslogik.</p>
+
+    <table class="data-table" style="margin-top: 32px;">
+      <thead>
+        <tr>
+          <th>Modul</th>
+          <th>Verantwortung</th>
+          <th>Typ</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>TransactionEngine.mjs</code></td>
+          <td>Orchestrierung: Liquiditatsberechnung, Rebalancing-Entscheidung</td>
+          <td><span class="tag esm">ESM</span></td>
+        </tr>
+        <tr>
+          <td><code>rebalancing.mjs</code></td>
+          <td>Gap-basiertes Surplus-Rebalancing, Toleranzbander</td>
+          <td><span class="tag esm">ESM</span></td>
+        </tr>
+        <tr>
+          <td><code>tax-engine.mjs</code></td>
+          <td>Steuerberechnung: Teilfreistellung, Altbestande, KESt + Soli</td>
+          <td><span class="tag esm">ESM</span></td>
+        </tr>
+        <tr>
+          <td><code>tranche-selector.mjs</code></td>
+          <td>FIFO/steueroptimierte Positionsauswahl aus Tranchenliste</td>
+          <td><span class="tag esm">ESM</span></td>
+        </tr>
+        <tr>
+          <td><code>gold-handler.mjs</code></td>
+          <td>Goldanteil-Verwaltung mit eigener Liquiditatslogik</td>
+          <td><span class="tag esm">ESM</span></td>
+        </tr>
+        <tr>
+          <td><code>liquidity.mjs</code></td>
+          <td>Liquiditatsplanung, Pufferverwaltung, Zielallokation</td>
+          <td><span class="tag esm">ESM</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="code-block" style="margin-top: 24px;">
+<span class="comment">// Engine API Signature (Version 31)</span>
+<span class="keyword">const</span> result = <span class="function">EngineAPI.simulateSingleYear</span>({
+  vermoegenStart,      <span class="comment">// Gesamtvermogen zum Jahresbeginn</span>
+  bedarf,              <span class="comment">// Jahrlicher Bedarf (nominal)</span>
+  rpiAktuell,          <span class="comment">// Aktuelle Rentenhohe (gesetzlich)</span>
+  aktienQuote,         <span class="comment">// Ziel-Aktienquote (0-100%)</span>
+  renditeAktien,       <span class="comment">// Rendite der Aktienanlage</span>
+  renditeSafe,         <span class="comment">// Rendite der sicheren Anlage</span>
+  liquiditaetStart,    <span class="comment">// Liquide Mittel zum Jahresbeginn</span>
+  tranchen: [],        <span class="comment">// Array von Depot-Positionen</span>
+  pflegeSzenario: {},  <span class="comment">// Optional: Pflegekosten-Modell</span>
+  <span class="comment">// ... 30+ weitere Parameter</span>
+});
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 6: SpendingPlanner ==================== -->
+<section class="slide">
+  <div class="slide-inner">
+    <p class="section-label">Engine</p>
+    <h2>SpendingPlanner:<br>Das Guardrail-System.</h2>
+    <p class="lead">Mehrstufige Entnahme-Anpassung mit mathematisch glatter Flexreduktion.</p>
+
+    <div class="card-grid cols-2" style="margin-top: 32px;">
+      <div>
+        <h3>Guardrail-Kaskade</h3>
+        <div class="code-block">
+<span class="comment">// Verarbeitungsreihenfolge</span>
+<span class="number">1.</span> Quote-Guardrail    <span class="comment">// Max Entnahmequote</span>
+<span class="number">2.</span> Drawdown-Guardrail <span class="comment">// Portfolio-Verlust &gt; Schwelle</span>
+<span class="number">3.</span> Runway-Guardrail   <span class="comment">// Jahre bis Depletion &lt; Min</span>
+<span class="number">4.</span> Wealth-Flex        <span class="comment">// Pro-Euro-Reduktion</span>
+<span class="number">5.</span> S-Kurve Dampfung   <span class="comment">// Glatte Flexreduktion</span>
+<span class="number">6.</span> Hard Caps          <span class="comment">// 35% Minimum-Rate</span>
+<span class="number">7.</span> Budget Caps        <span class="comment">// Absolute Ober-/Untergrenze</span>
+        </div>
+      </div>
+      <div>
+        <h3>Besondere Eigenschaften</h3>
+        <ul class="feature-list">
+          <li><span class="check">&#10003;</span> <strong>S-Kurve Dampfung:</strong> Vermeidet harte Stufen. Die Flexreduktion wird am Flex-Anteil des Bedarfs dampfend appliziert.</li>
+          <li><span class="check">&#10003;</span> <strong>Wealth-basierte Flexreduktion:</strong> Stetige, lineare Reduktion pro Euro Vermogensveranderung statt binarer Schwellen.</li>
+          <li><span class="check">&#10003;</span> <strong>Alarm-Modus:</strong> Bei Runway &lt; Schwelle greift ein automatischer 35%-Cut als absolute Untergrenze.</li>
+          <li><span class="check">&#10003;</span> <strong>Sequenz-Schutz:</strong> Besondere Vorsicht bei Sequence-of-Returns-Risiko in fruhen Ruhestandsjahren.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 7: Balance-App Module ==================== -->
+<section class="slide" style="background: var(--surface);" id="balance">
+  <div class="slide-inner">
+    <p class="section-label">Balance-App</p>
+    <h2>28 Module.<br>Eine Datenkette.</h2>
+    <p class="lead">Vom DOM-Input bis zur gespeicherten Empfehlung -- jeder Schritt modular.</p>
+
+    <table class="data-table" style="margin-top: 32px;">
+      <thead>
+        <tr>
+          <th>Kategorie</th>
+          <th>Module</th>
+          <th>Aufgabe</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Kern</strong></td>
+          <td><code>balance-config</code>, <code>balance-utils</code>, <code>balance-storage</code></td>
+          <td>Konfiguration, Hilfsfunktionen, Persistenz</td>
+        </tr>
+        <tr>
+          <td><strong>Input</strong></td>
+          <td><code>balance-reader</code></td>
+          <td>DOM-Werte lesen und strukturieren</td>
+        </tr>
+        <tr>
+          <td><strong>Output</strong></td>
+          <td><code>balance-renderer</code>, <code>-diagnose</code>, <code>-kapitalfluss</code></td>
+          <td>Engine-Ergebnisse ins DOM rendern</td>
+        </tr>
+        <tr>
+          <td><strong>Events</strong></td>
+          <td><code>balance-binder</code>, <code>-annual</code>, <code>-market</code></td>
+          <td>Event-Handler, Jahresabschluss, Marktdaten</td>
+        </tr>
+        <tr>
+          <td><strong>Diagnose</strong></td>
+          <td><code>-diagnosis-chips</code>, <code>-decision-tree</code>, <code>-guardrails</code></td>
+          <td>KPI-Chips, Entscheidungsbaum, Guardrail-Visualisierung</td>
+        </tr>
+        <tr>
+          <td><strong>Profil</strong></td>
+          <td><code>-profile-sync</code>, <code>profilverbund-balance</code></td>
+          <td>Profilwechsel, Multi-Profil-Aggregation</td>
+        </tr>
+        <tr>
+          <td><strong>Ausgaben</strong></td>
+          <td><code>-expenses</code>, <code>-expenses-storage</code></td>
+          <td>CSV-Import, Budgetuberprufung</td>
+        </tr>
+        <tr>
+          <td><strong>Main</strong></td>
+          <td><code>balance-main</code></td>
+          <td>Orchestrator, Init, Event-Routing</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="flow" style="margin-top: 24px;">
+      <span class="flow-step" style="background:#e8f0fe;color:#1565c0;">DOM/Reader</span>
+      <span class="flow-arrow">&rarr;</span>
+      <span class="flow-step" style="background:#f3e8ff;color:#6a1b9a;">ProfileSync</span>
+      <span class="flow-arrow">&rarr;</span>
+      <span class="flow-step" style="background:#fff3e0;color:#e65100;">EngineAPI</span>
+      <span class="flow-arrow">&rarr;</span>
+      <span class="flow-step" style="background:#e8f5e9;color:#2e7d32;">Renderer</span>
+      <span class="flow-arrow">&rarr;</span>
+      <span class="flow-step" style="background:#fce4ec;color:#c62828;">Storage</span>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 8: Simulator Module ==================== -->
+<section class="slide" id="simulator">
+  <div class="slide-inner">
+    <p class="section-label">Simulator</p>
+    <h2>58 Module.<br>Vier Subsysteme.</h2>
+    <p class="lead">Monte Carlo, Sweep, Backtest und Auto-Optimize als eigenstandige Subsysteme.</p>
+
+    <div class="card-grid cols-2" style="margin-top: 32px;">
+      <div class="card">
+        <h4>Monte Carlo</h4>
+        <div class="arch-modules" style="margin-top: 12px;">
+          <span class="arch-module app">simulator-monte-carlo.js</span>
+          <span class="arch-module worker">monte-carlo-runner.js</span>
+          <span class="arch-module shared">monte-carlo-ui.js</span>
+          <span class="arch-module worker">scenario-analyzer.js</span>
+        </div>
+        <p style="margin-top: 12px;">UI-Koordination, DOM-freie Runner, Worker-fahige Simulation, Szenario-Auswahl.</p>
+      </div>
+      <div class="card">
+        <h4>Parameter Sweep</h4>
+        <div class="arch-modules" style="margin-top: 12px;">
+          <span class="arch-module app">simulator-sweep.js</span>
+          <span class="arch-module worker">sweep-runner.js</span>
+          <span class="arch-module shared">simulator-sweep-utils.js</span>
+          <span class="arch-module app">simulator-heatmap.js</span>
+        </div>
+        <p style="margin-top: 12px;">Grid-Generierung, Whitelist/Blocklist-Guards, SVG-Heatmap-Rendering.</p>
+      </div>
+      <div class="card">
+        <h4>Auto-Optimize</h4>
+        <div class="arch-modules" style="margin-top: 12px;">
+          <span class="arch-module app">auto_optimize.js</span>
+          <span class="arch-module worker">simulator-optimizer.js</span>
+          <span class="arch-module shared">auto_optimize_ui.js</span>
+        </div>
+        <p style="margin-top: 12px;">3-Stufen-Algorithmus: LHS Coarse &rarr; Local Refinement &rarr; Verification.</p>
+      </div>
+      <div class="card">
+        <h4>Backtesting</h4>
+        <div class="arch-modules" style="margin-top: 12px;">
+          <span class="arch-module app">simulator-backtest.js</span>
+          <span class="arch-module shared">simulator-data.js</span>
+        </div>
+        <p style="margin-top: 12px;">Historische Simulation gegen reale Marktdaten (1925-2025). Preset-Krisenszenarien.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 9: Modul-Konventionen ==================== -->
+<section class="slide" style="background: var(--surface);">
+  <div class="slide-inner">
+    <p class="section-label">Konventionen</p>
+    <h2>Modul-Design-Patterns.</h2>
+    <p class="lead">Strikte Trennung von DOM-Zugriff und Business-Logik.</p>
+
+    <div class="card-grid cols-3" style="margin-top: 32px;">
+      <div class="card">
+        <h4><code>*-runner.js</code></h4>
+        <span class="tag dom-free">DOM-Free</span>
+        <p style="margin-top: 12px;">Reine Berechnungslogik ohne DOM-Abhangigkeiten. Lauft im Main-Thread und in Web Workers.</p>
+      </div>
+      <div class="card">
+        <h4><code>*-ui.js</code></h4>
+        <span class="tag es6">DOM Access</span>
+        <p style="margin-top: 12px;">Fassaden fur DOM-Zugriffe. Kapseln alle getElementById, querySelector, Event-Listener.</p>
+      </div>
+      <div class="card">
+        <h4><code>*-utils.js</code></h4>
+        <span class="tag dom-free">Pure Functions</span>
+        <p style="margin-top: 12px;">Reine Hilfsfunktionen ohne Seiteneffekte. Formatierung, Konvertierung, Validierung.</p>
+      </div>
+    </div>
+
+    <div class="card-grid cols-2" style="margin-top: 20px;">
+      <div class="card">
+        <h4>Datei-Endungen</h4>
+        <table class="data-table" style="margin-top: 12px; box-shadow: none;">
+          <tr><td><code>.mjs</code></td><td>ESM fur Node.js (Engine-Source, Tests, Build-Scripts)</td></tr>
+          <tr><td><code>.js</code></td><td>ES6-Module fur den Browser (App-Code)</td></tr>
+          <tr><td><code>.test.mjs</code></td><td>Testdateien (laufen mit Node.js)</td></tr>
+          <tr><td><code>.cjs</code></td><td>CommonJS (Legacy-Tools, Proxy-Server)</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h4>Import-Regeln</h4>
+        <ul class="feature-list">
+          <li><span class="check">&#10003;</span> Native ES6-Imports, kein Bundler fur App-Code</li>
+          <li><span class="check">&#10003;</span> Engine als globales <code>EngineAPI</code> Objekt</li>
+          <li><span class="check">&#10003;</span> Keine zirkularen Abhangigkeiten</li>
+          <li><span class="check">&#10003;</span> Worker laden eigene Kopie des Engine-Bundles</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 10: Worker-Architektur ==================== -->
+<section class="slide dark" id="worker">
+  <div class="slide-inner">
+    <p class="section-label">Parallelisierung</p>
+    <h2 style="color: #f5f5f7;">Web Worker<br>Architektur.</h2>
+    <p class="lead" style="color: #a1a1a6;">8 parallele Worker mit deterministischem Seeding und adaptivem Chunking.</p>
+
+    <div class="card-grid cols-2" style="margin-top: 32px;">
+      <div>
+        <div class="code-block">
+<span class="comment">// Worker Pool Lifecycle</span>
+
+<span class="keyword">class</span> <span class="type">WorkerPool</span> {
+  <span class="function">init</span>() {
+    <span class="comment">// 8 Worker erstellen</span>
+    <span class="comment">// Engine-Bundle an jeden Worker senden</span>
+    <span class="comment">// Historische Daten ubertragen</span>
+  }
+
+  <span class="function">dispatch</span>(job) {
+    <span class="comment">// Freien Worker finden</span>
+    <span class="comment">// Job mit Seed + Chunk-Size senden</span>
+    <span class="comment">// Transferable Objects (kein Clone)</span>
+  }
+
+  <span class="function">onResult</span>(workerResult) {
+    <span class="comment">// Aggregierte Metriken mergen</span>
+    <span class="comment">// Chunk-Size adaptieren</span>
+    <span class="comment">// Nachsten Job dispatchen</span>
+  }
+}
+        </div>
+      </div>
+      <div>
+        <div class="card" style="background: #2d2d2f;">
+          <h4 style="color: #f5f5f7;">Determinismus</h4>
+          <p>Jeder Simulationslauf erhalt einen eindeutigen Seed: <code>baseSeed + runIndex</code>. Das Ergebnis ist identisch, egal ob seriell oder in 8 Workern aufgeteilt.</p>
+        </div>
+        <div class="card" style="background: #2d2d2f; margin-top: 16px;">
+          <h4 style="color: #f5f5f7;">Adaptives Chunking</h4>
+          <p>Die Chunk-Size (Runs pro Job) passt sich dynamisch an: Zeitbudget 500ms pro Job, geglatteter Filter verhindert Oszillation. Typisch: 300-500 Runs/Chunk.</p>
+        </div>
+        <div class="card" style="background: #2d2d2f; margin-top: 16px;">
+          <h4 style="color: #f5f5f7;">Stall Detection</h4>
+          <p>Progress-Timestamps erkennen haengende Worker. Automatischer Fallback auf serielle Ausfuhrung bei Worker-Fehlern.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 11: Worker Data Flow ==================== -->
+<section class="slide">
+  <div class="slide-inner">
+    <p class="section-label">Workers</p>
+    <h2>Datenfluss<br>Main &harr; Worker.</h2>
+    <p class="lead">Zweistufig: Aggregate in Workern, Detail-Logs seriell im Nachgang.</p>
+
+    <div class="card-grid cols-2" style="margin-top: 32px;">
+      <div class="card" style="border-left: 4px solid var(--blue);">
+        <h4>Phase 1: Parallele Simulation</h4>
+        <div class="code-block" style="font-size: 12px;">
+<span class="comment">// Main &rarr; Worker (Init)</span>
+{ type: <span class="string">'init'</span>,
+  engineBundle, historicalData,
+  commonInputs }
+
+<span class="comment">// Main &rarr; Worker (Job)</span>
+{ type: <span class="string">'job'</span>,
+  startRun: <span class="number">1000</span>,
+  count: <span class="number">400</span>,
+  seed: <span class="number">42</span> }
+
+<span class="comment">// Worker &rarr; Main (Result)</span>
+{ type: <span class="string">'result'</span>,
+  aggregates: { successRate, p10, p50, p90 },
+  worstRun: { ... },
+  elapsed: <span class="number">487</span> }
+        </div>
+      </div>
+      <div class="card" style="border-left: 4px solid var(--green);">
+        <h4>Phase 2: Serieller Detail-Pass</h4>
+        <div class="code-block" style="font-size: 12px;">
+<span class="comment">// 30 identifizierte Szenarien</span>
+<span class="comment">// werden seriell wiederholt</span>
+<span class="comment">// (gleicher Seed = gleiches Ergebnis)</span>
+
+<span class="keyword">for</span> (<span class="keyword">const</span> scenario <span class="keyword">of</span> tracked30) {
+  <span class="keyword">const</span> detail = <span class="function">rerunWithLogs</span>(
+    scenario.seed,
+    { collectYearLogs: <span class="keyword">true</span> }
+  );
+  <span class="comment">// Jetzt: Jahr-fur-Jahr-Protokoll</span>
+  <span class="comment">// fur Drill-Down verfugbar</span>
+}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 12: Monte Carlo Runner ==================== -->
+<section class="slide" style="background: var(--surface);">
+  <div class="slide-inner">
+    <p class="section-label">Monte Carlo</p>
+    <h2>Der Simulations-Kern.</h2>
+    <p class="lead"><code>monte-carlo-runner.js</code> -- DOM-frei, Worker-fahig, deterministisch.</p>
+
+    <div class="split wide-right" style="margin-top: 32px;">
+      <div>
+        <ul class="feature-list">
+          <li><span class="check">&#10003;</span> <strong>100+ Jahre</strong> historische Daten (1925-2025)</li>
+          <li><span class="check">&#10003;</span> <strong>CAPE-basiertes Sampling:</strong> Gewichtung nach aktuellen Marktbedingungen</li>
+          <li><span class="check">&#10003;</span> <strong>Black Swan Filter:</strong> Optionale Phase 1925-1949</li>
+          <li><span class="check">&#10003;</span> <strong>Recency Bias:</strong> Neuere Jahre optional starker gewichten</li>
+          <li><span class="check">&#10003;</span> <strong>Pflege-Integration:</strong> Probabilistische Pflege-Eintrittsmodellierung</li>
+          <li><span class="check">&#10003;</span> <strong>Dual-Care:</strong> Simultane Pflege beider Partner</li>
+          <li><span class="check">&#10003;</span> <strong>Accumulation Phase:</strong> Pre-Retirement-Ansparphase</li>
+        </ul>
+      </div>
+      <div>
+        <div class="code-block" style="font-size: 12px;">
+<span class="comment">// Simulations-Loop (vereinfacht)</span>
+<span class="keyword">function</span> <span class="function">runSimulation</span>(inputs, seed) {
+  <span class="keyword">const</span> rng = <span class="keyword">new</span> <span class="type">SeededRNG</span>(seed);
+  <span class="keyword">let</span> wealth = inputs.startWealth;
+
+  <span class="keyword">for</span> (<span class="keyword">let</span> year = <span class="number">0</span>; year &lt; <span class="number">100</span>; year++) {
+    <span class="comment">// Historisches Jahr ziehen (gewichtet)</span>
+    <span class="keyword">const</span> histYear = <span class="function">sampleYear</span>(rng, inputs);
+
+    <span class="comment">// Engine aufrufen</span>
+    <span class="keyword">const</span> result = <span class="function">EngineAPI.simulateSingleYear</span>({
+      vermoegenStart: wealth,
+      renditeAktien: histYear.equityReturn,
+      renditeSafe: histYear.bondReturn,
+      inflation: histYear.inflation,
+      ...inputs
+    });
+
+    <span class="comment">// Pflege-Check</span>
+    <span class="keyword">if</span> (<span class="function">shouldEnterCare</span>(rng, year)) {
+      <span class="function">applyCareScenario</span>(result, inputs);
+    }
+
+    wealth = result.vermoegenEnd;
+    <span class="keyword">if</span> (wealth &lt;= <span class="number">0</span>) <span class="keyword">return</span> { depleted: <span class="keyword">true</span>, year };
+  }
+  <span class="keyword">return</span> { depleted: <span class="keyword">false</span>, finalWealth: wealth };
+}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 13: Scenario Analyzer ==================== -->
+<section class="slide">
+  <div class="slide-inner">
+    <div class="split">
+      <div>
+        <p class="section-label">Szenarien</p>
+        <h2>30 Szenarien.<br>Intelligent ausgewahlt.</h2>
+        <p class="lead">Aus Tausenden Laufen wahlt der <code>scenario-analyzer.js</code> die 30 aussagekraftigsten.</p>
+
+        <div class="card" style="margin-top: 24px;">
+          <h4>15 Charakteristische</h4>
+          <p>Worst Case, P5, P10, P25, Median, P75, P90, P95, Best Case. Plus: Extremste Pflegefalle (fruhester Eintritt, langste Dauer, hochste Kosten, Dual-Care).</p>
+        </div>
+        <div class="card" style="margin-top: 12px;">
+          <h4>15 Zufallsstichproben</h4>
+          <p>Gleichverteilte Stichprobe uber die Ergebnisverteilung. Zeigt typisches Verhalten, nicht nur Extremfalle.</p>
+        </div>
+      </div>
+      <div>
+        <div class="screenshot-frame">
+          <img src="../Screenshots/Monte Carlo Szenarien 02.png" alt="Szenario-Analyse Detail">
+        </div>
+        <p class="screenshot-caption">Detail-Drill-Down in ein einzelnes Szenario</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 14: Parameter Sweep Technik ==================== -->
+<section class="slide dark">
+  <div class="slide-inner">
+    <p class="section-label">Sweep</p>
+    <h2 style="color: #f5f5f7;">Parameter Sweep<br>Architektur.</h2>
+    <p class="lead" style="color: #a1a1a6;">Grid-basierte Exploration mit Whitelist/Blocklist-Guard.</p>
+
+    <div class="card-grid cols-2" style="margin-top: 32px;">
+      <div>
+        <div class="code-block" style="font-size: 12px;">
+<span class="comment">// Sweep Whitelist (erlaubte Parameter)</span>
+<span class="keyword">const</span> SWEEP_ALLOWED_KEYS = [
+  <span class="string">'equityAllocation'</span>,
+  <span class="string">'withdrawalRate'</span>,
+  <span class="string">'floorBedarf'</span>,
+  <span class="string">'ceilingBedarf'</span>,
+  <span class="string">'liquidityMonths'</span>,
+  <span class="string">'goldAllocation'</span>,
+  <span class="string">'rebalancingThreshold'</span>,
+  <span class="comment">// ... weitere</span>
+];
+
+<span class="comment">// Blocklist: Partner-Felder nie uberschreiben</span>
+<span class="keyword">const</span> SWEEP_BLOCKED_KEYS = [
+  <span class="string">'partnerRente'</span>,
+  <span class="string">'partnerAlter'</span>,
+  <span class="comment">// Schutz vor unbeabsichtigter Anderung</span>
+];
+
+<span class="comment">// Self-Test bei Initialisierung</span>
+<span class="function">runSweepSelfTest</span>();
+<span class="comment">// Pruft Whitelist/Blocklist-Konsistenz</span>
+        </div>
+      </div>
+      <div>
+        <div class="card" style="background: #2d2d2f;">
+          <h4 style="color: #f5f5f7;">Heatmap-Rendering</h4>
+          <p>SVG-basiert. Farbskala: Rot (schlecht) &rarr; Gelb (ok) &rarr; Grun (gut). Hover zeigt exakte Metriken. Badges fur Invariant-Verletzungen.</p>
+        </div>
+        <div class="card" style="background: #2d2d2f; margin-top: 16px;">
+          <h4 style="color: #f5f5f7;">Deep Clone</h4>
+          <p>Jede Sweep-Zelle erhalt eine vollstandige Kopie aller Inputs via <code>structuredClone()</code> mit Fallback. Keine Shared-State-Probleme.</p>
+        </div>
+        <div class="card" style="background: #2d2d2f; margin-top: 16px;">
+          <h4 style="color: #f5f5f7;">Sensitivitatsanalyse</h4>
+          <p>Berechnet den marginalen Einfluss jedes Parameters auf die Zielfunktion. Identifiziert dominante vs. irrelevante Parameter.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 15: Auto-Optimize Algorithmus ==================== -->
+<section class="slide">
+  <div class="slide-inner">
+    <p class="section-label">Optimierung</p>
+    <h2>3-Stufen Auto-Optimize.</h2>
+    <p class="lead">Latin Hypercube Sampling, lokale Verfeinerung und Verifizierung. 8-10x schneller als exhaustiver Sweep.</p>
+
+    <div class="card-grid cols-3" style="margin-top: 32px;">
+      <div class="card" style="border-top: 4px solid var(--blue);">
+        <h4>Stufe 1: Coarse (LHS)</h4>
+        <p>Latin Hypercube Sampling verteilt Stichproben gleichmassig im Parameterraum. Maximal 200 Kombinationen statt Tausender Grid-Punkte.</p>
+        <div class="code-block" style="font-size: 11px; margin-top: 12px;">
+<span class="comment">// 7 Parameter, je 10 Stufen</span>
+<span class="comment">// Exhaustiv: 10^7 = 10M</span>
+<span class="comment">// LHS: ~200 Samples</span>
+<span class="function">latinHypercubeSample</span>(
+  paramRanges, <span class="number">200</span>
+);
+        </div>
+      </div>
+      <div class="card" style="border-top: 4px solid var(--green);">
+        <h4>Stufe 2: Refinement</h4>
+        <p>Lokale Nachbarschaftssuche um die Top-10 Kandidaten aus Stufe 1. Feinere Auflosung in vielversprechenden Regionen.</p>
+        <div class="code-block" style="font-size: 11px; margin-top: 12px;">
+<span class="comment">// Top-10 aus Stage 1</span>
+<span class="keyword">for</span> (candidate <span class="keyword">of</span> top10) {
+  <span class="function">localSearch</span>(
+    candidate,
+    stepSize: <span class="number">0.5</span> * originalStep
+  );
+}
+        </div>
+      </div>
+      <div class="card" style="border-top: 4px solid var(--orange);">
+        <h4>Stufe 3: Verification</h4>
+        <p>Finale Prufung des besten Kandidaten mit 10x mehr Simulationsruns. Konfidenz-Intervall wird berechnet.</p>
+        <div class="code-block" style="font-size: 11px; margin-top: 12px;">
+<span class="comment">// Best aus Stage 2</span>
+<span class="function">verifyCandidate</span>(
+  bestParams,
+  runs: <span class="number">5000</span>,  <span class="comment">// statt 500</span>
+  confidence: <span class="number">0.95</span>
+);
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 16: Historische Daten ==================== -->
+<section class="slide" style="background: var(--surface);">
+  <div class="slide-inner">
+    <p class="section-label">Daten</p>
+    <h2>100 Jahre<br>Marktgeschichte.</h2>
+    <p class="lead">1925 bis 2025 -- inklusive der grossten Krisen des 20. Jahrhunderts.</p>
+
+    <div class="card-grid cols-3" style="margin-top: 32px;">
+      <div class="card">
+        <h4>Enthaltene Krisen</h4>
+        <ul class="feature-list">
+          <li><span class="check">&#10003;</span> Weltwirtschaftskrise (1929-1932)</li>
+          <li><span class="check">&#10003;</span> Zweiter Weltkrieg (1939-1945)</li>
+          <li><span class="check">&#10003;</span> Olkrise / Stagflation (1973-1982)</li>
+          <li><span class="check">&#10003;</span> Dotcom-Crash (2000-2003)</li>
+          <li><span class="check">&#10003;</span> Finanzkrise (2007-2009)</li>
+          <li><span class="check">&#10003;</span> COVID-19 (2020)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>Sampling-Methoden</h4>
+        <ul class="feature-list">
+          <li><span class="check">&#10003;</span> <strong>Gleichverteilt:</strong> Jedes Jahr gleich wahrscheinlich</li>
+          <li><span class="check">&#10003;</span> <strong>CAPE-gewichtet:</strong> Ahnliche Marktbewertungen bevorzugt</li>
+          <li><span class="check">&#10003;</span> <strong>Recency-gewichtet:</strong> Neuere Jahre starker</li>
+          <li><span class="check">&#10003;</span> <strong>Black Swan Filter:</strong> 1925-1949 optional ausschliessen</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>Datenpunkte pro Jahr</h4>
+        <ul class="feature-list">
+          <li><span class="check">&#10003;</span> Aktienrendite (nominal)</li>
+          <li><span class="check">&#10003;</span> Anleihenrendite</li>
+          <li><span class="check">&#10003;</span> Inflationsrate</li>
+          <li><span class="check">&#10003;</span> CAPE-Ratio</li>
+          <li><span class="check">&#10003;</span> Dividendenrendite</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 17: Profilverbund Technik ==================== -->
+<section class="slide">
+  <div class="slide-inner">
+    <p class="section-label">Multi-Profil</p>
+    <h2>Profilverbund-<br>Aggregation.</h2>
+    <p class="lead">Separate Profile werden mathematisch zu einem Haushalt aggregiert.</p>
+
+    <div class="split" style="margin-top: 32px;">
+      <div>
+        <div class="code-block" style="font-size: 12px;">
+<span class="comment">// Aggregation uber N Profile</span>
+<span class="keyword">function</span> <span class="function">aggregateProfiles</span>(profiles) {
+  <span class="keyword">return</span> {
+    <span class="comment">// Vermogen: Summe aller Depots</span>
+    vermoegenStart: profiles.<span class="function">reduce</span>(
+      (sum, p) <span class="arrow">=&gt;</span> sum + p.vermoegenStart, <span class="number">0</span>
+    ),
+
+    <span class="comment">// Bedarf: Einmal Haushalt, nicht pro Person</span>
+    bedarf: household.bedarf,
+
+    <span class="comment">// Renten: Summe beider Partner</span>
+    rpiAktuell: profiles.<span class="function">reduce</span>(
+      (sum, p) <span class="arrow">=&gt;</span> sum + p.rpiAktuell, <span class="number">0</span>
+    ),
+
+    <span class="comment">// Tranchen: Merged mit Profil-Tag</span>
+    tranchen: profiles.<span class="function">flatMap</span>(
+      (p, i) <span class="arrow">=&gt;</span> p.tranchen.<span class="function">map</span>(
+        t <span class="arrow">=&gt;</span> ({ ...t, profilIndex: i })
+      )
+    ),
+  };
+}
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <h4>Verteilungsstrategien</h4>
+          <p style="margin-bottom: 16px;">Nach Berechnung wird die Gesamt-Entnahme auf die Einzelprofile verteilt:</p>
+          <table class="data-table" style="box-shadow: none; margin: 0;">
+            <tr>
+              <td><strong>Steueroptimiert</strong></td>
+              <td>Greedy: Profil mit niedrigster Steuerlast zuerst</td>
+            </tr>
+            <tr>
+              <td><strong>Proportional</strong></td>
+              <td>Anteil proportional zum Vermogensanteil</td>
+            </tr>
+            <tr>
+              <td><strong>Runway-First</strong></td>
+              <td>Profil mit langster Laufzeit wird priorisiert</td>
+            </tr>
+          </table>
+        </div>
+        <div class="card" style="margin-top: 12px;">
+          <h4>Profil-Isolation</h4>
+          <p>Jedes Profil hat eigene localStorage-Keys. Kein Cross-Contamination bei Profilwechsel. Clean separation of concerns.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 18: Steuerlogik ==================== -->
+<section class="slide dark">
+  <div class="slide-inner">
+    <p class="section-label">Steuer-Engine</p>
+    <h2 style="color: #f5f5f7;">Steuerberechnung<br>im Detail.</h2>
+    <p class="lead" style="color: #a1a1a6;">Deutsches Steuerrecht in Code: Teilfreistellung, Altbestande, KESt + Soli.</p>
+
+    <div class="card-grid cols-2" style="margin-top: 32px;">
+      <div>
+        <div class="code-block" style="font-size: 12px;">
+<span class="comment">// Steuerberechnung fur eine Tranche</span>
+<span class="keyword">function</span> <span class="function">calculateTax</span>(tranche, sellAmount) {
+  <span class="comment">// 1. Gewinn ermitteln</span>
+  <span class="keyword">const</span> gain = sellAmount - tranche.costBasis;
+  <span class="keyword">if</span> (gain &lt;= <span class="number">0</span>) <span class="keyword">return</span> <span class="number">0</span>;
+
+  <span class="comment">// 2. Altbestand? (Kauf vor 2009)</span>
+  <span class="keyword">if</span> (tranche.purchaseDate &lt; <span class="string">'2009-01-01'</span>) {
+    <span class="keyword">return</span> <span class="number">0</span>; <span class="comment">// Steuerfrei</span>
+  }
+
+  <span class="comment">// 3. Teilfreistellung anwenden</span>
+  <span class="keyword">const</span> taxableGain = gain * (
+    <span class="number">1</span> - tranche.partialExemption
+  );
+  <span class="comment">// Aktienfonds: 30% frei</span>
+  <span class="comment">// Mischfonds:  15% frei</span>
+  <span class="comment">// Rentenfonds:  0% frei</span>
+
+  <span class="comment">// 4. KESt + Soli</span>
+  <span class="keyword">const</span> kest = taxableGain * <span class="number">0.25</span>;
+  <span class="keyword">const</span> soli = kest * <span class="number">0.055</span>;
+
+  <span class="keyword">return</span> kest + soli;
+}
+        </div>
+      </div>
+      <div>
+        <div class="card" style="background: #2d2d2f;">
+          <h4 style="color: #f5f5f7;">Tranche-Selektion</h4>
+          <p>Bei einer Entnahme von z.B. 50.000 EUR wahlt der Algorithmus die Kombination von Positionen, die die niedrigste Gesamtsteuerlast ergibt:</p>
+          <ol style="margin-top: 12px; padding-left: 20px; color: #a1a1a6; font-size: 14px; line-height: 2;">
+            <li>Altbestande (steuerfrei) zuerst</li>
+            <li>Positionen mit Verlust (kein Gewinn)</li>
+            <li>Positionen mit hochster Teilfreistellung</li>
+            <li>FIFO innerhalb gleicher Kategorie</li>
+          </ol>
+        </div>
+        <div class="card" style="background: #2d2d2f; margin-top: 16px;">
+          <h4 style="color: #f5f5f7;">Freibetrag-Tracking</h4>
+          <p>Der jahrliche Sparerpauschbetrag (1.000 EUR / 2.000 EUR bei Ehepaaren) wird uber alle Transaktionen im Jahr kumuliert und korrekt verrechnet.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 19: Pflege-Modellierung ==================== -->
+<section class="slide">
+  <div class="slide-inner">
+    <p class="section-label">Pflege</p>
+    <h2>Pflege-Szenario-<br>Modellierung.</h2>
+    <p class="lead">Probabilistischer Pflegeeintritt mit 5 Graden und Dual-Care-Support.</p>
+
+    <div class="split" style="margin-top: 32px;">
+      <div>
+        <div class="code-block" style="font-size: 12px;">
+<span class="comment">// Pflege-Eintrittswahrscheinlichkeit</span>
+<span class="keyword">function</span> <span class="function">shouldEnterCare</span>(rng, age, params) {
+  <span class="comment">// Altersabhaengige Basis-Wahrscheinlichkeit</span>
+  <span class="keyword">const</span> baseProb = <span class="function">careEntryProbability</span>(age);
+
+  <span class="comment">// Mortalitats-Multiplikator fur Pflegestatus</span>
+  <span class="keyword">const</span> adjusted = baseProb
+    * params.mortalityMultiplier;
+
+  <span class="keyword">return</span> rng.<span class="function">random</span>() &lt; adjusted;
+}
+
+<span class="comment">// Pflege-Kostenmodell</span>
+<span class="keyword">const</span> careCosts = {
+  ambulant: {
+    PG1: <span class="number">500</span>,  PG2: <span class="number">1200</span>,
+    PG3: <span class="number">1800</span>, PG4: <span class="number">2500</span>,
+    PG5: <span class="number">3500</span>
+  },
+  stationaer: {
+    PG1: <span class="number">1500</span>, PG2: <span class="number">2500</span>,
+    PG3: <span class="number">3500</span>, PG4: <span class="number">4500</span>,
+    PG5: <span class="number">5500</span>
+  }
+};
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <h4>KPI-Tracking pro Simulation</h4>
+          <ul class="feature-list">
+            <li><span class="check">&#10003;</span> Pflege-Eintrittsalter (Person 1 + 2)</li>
+            <li><span class="check">&#10003;</span> Pflegedauer in Jahren</li>
+            <li><span class="check">&#10003;</span> Gesamtkosten der Pflege</li>
+            <li><span class="check">&#10003;</span> Simultane Pflege (ja/nein)</li>
+            <li><span class="check">&#10003;</span> Hochster erreichter Pflegegrad</li>
+            <li><span class="check">&#10003;</span> Einfluss auf Portfolio-Depletion</li>
+          </ul>
+        </div>
+        <div class="card" style="margin-top: 12px;">
+          <h4>Besonderheiten</h4>
+          <p>Pflegegrad-Upgrades uber die Zeit (z.B. PG 2 &rarr; PG 4), regionale Kostenfaktoren, Witwenrente nach Tod des Partners, Pflege-Leistungskurzung bei langer Dauer.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 20: Online-Daten ==================== -->
+<section class="slide" style="background: var(--surface);">
+  <div class="slide-inner">
+    <p class="section-label">Daten-Updates</p>
+    <h2>Online-Daten<br>mit Fallback-Kette.</h2>
+    <p class="lead">Inflation und ETF-Kurse von externen Quellen -- mit dreistufigem Fallback.</p>
+
+    <div class="card-grid cols-2" style="margin-top: 32px;">
+      <div class="card">
+        <h4>Inflationsdaten</h4>
+        <div class="flow" style="margin: 16px 0;">
+          <span class="flow-step" style="background:#e3f2fd;color:#1565c0;">ECB</span>
+          <span class="flow-arrow">&rarr;</span>
+          <span class="flow-step" style="background:#fff3e0;color:#e65100;">World Bank</span>
+          <span class="flow-arrow">&rarr;</span>
+          <span class="flow-step" style="background:#e8f5e9;color:#2e7d32;">OECD</span>
+          <span class="flow-arrow">&rarr;</span>
+          <span class="flow-step" style="background:#fce4ec;color:#c62828;">Fallback</span>
+        </div>
+        <p>Drei Quellen werden der Reihe nach probiert. Bei Offline-Betrieb greift der letzte bekannte Wert.</p>
+      </div>
+      <div class="card">
+        <h4>ETF-Kurse</h4>
+        <div class="flow" style="margin: 16px 0;">
+          <span class="flow-step" style="background:#e3f2fd;color:#1565c0;">Yahoo Finance</span>
+          <span class="flow-arrow">&rarr;</span>
+          <span class="flow-step" style="background:#f3e8ff;color:#6a1b9a;">Node.js Proxy</span>
+          <span class="flow-arrow">&rarr;</span>
+          <span class="flow-step" style="background:#e8f5e9;color:#2e7d32;">Browser</span>
+        </div>
+        <p>Yahoo Finance API per lokalem Node.js CORS-Proxy (<code>yahoo-proxy.cjs</code>). Kein externer Server.</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 20px;">
+      <h4>Jahresabschluss-Workflow</h4>
+      <p>Ein einziger Klick (Alt+J) aktualisiert alle Werte: Inflation, Depot-Kurse, Renten-Index, Alter. Jeder Schritt wird protokolliert (Quelle, Zeitstempel, alter/neuer Wert). Snapshot wird automatisch angelegt.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 21: Tauri-Integration ==================== -->
+<section class="slide">
+  <div class="slide-inner">
+    <p class="section-label">Desktop</p>
+    <h2>Tauri-Desktop-App.</h2>
+    <p class="lead">Rust-basiertes Packaging als portable EXE. Kein Electron, kein Node.js-Bundling.</p>
+
+    <div class="split" style="margin-top: 32px;">
+      <div>
+        <div class="code-block" style="font-size: 12px;">
+<span class="comment">// tauri.conf.json (vereinfacht)</span>
+{
+  <span class="string">"productName"</span>: <span class="string">"RuhestandSuite"</span>,
+  <span class="string">"identifier"</span>: <span class="string">"ruhestand.suite"</span>,
+  <span class="string">"windows"</span>: [{
+    <span class="string">"title"</span>: <span class="string">"Ruhestand Suite"</span>,
+    <span class="string">"width"</span>: <span class="number">1400</span>,
+    <span class="string">"height"</span>: <span class="number">900</span>
+  }],
+  <span class="string">"security"</span>: {
+    <span class="string">"csp"</span>: <span class="string">"default-src 'self'"</span>
+  }
+}
+        </div>
+        <div class="card" style="margin-top: 16px;">
+          <h4>Build-Kette</h4>
+          <div class="flow" style="margin-top: 12px;">
+            <span class="flow-step" style="background:#fef3c7;color:#92400e;">npm run build:engine</span>
+            <span class="flow-arrow">&rarr;</span>
+            <span class="flow-step" style="background:#fce4ec;color:#c62828;">cargo build</span>
+            <span class="flow-arrow">&rarr;</span>
+            <span class="flow-step" style="background:#e8f5e9;color:#2e7d32;">RuhestandSuite.exe</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <h4>Warum Tauri statt Electron?</h4>
+          <ul class="feature-list">
+            <li><span class="check">&#10003;</span> Kein bundled Chromium (~150MB gespart)</li>
+            <li><span class="check">&#10003;</span> Nativer WebView (Edge WebView2 auf Windows)</li>
+            <li><span class="check">&#10003;</span> Rust-Backend fur Proxy und Server</li>
+            <li><span class="check">&#10003;</span> Portable EXE, keine Installation</li>
+            <li><span class="check">&#10003;</span> CSP-basierte Sicherheit</li>
+          </ul>
+        </div>
+        <div class="card" style="margin-top: 12px;">
+          <h4>Integrierte Dienste</h4>
+          <p>Die Tauri-App startet automatisch einen lokalen Webserver und den Yahoo-Finance-Proxy. Kein manueller Node.js-Start notig.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 22: Persistenz ==================== -->
+<section class="slide dark">
+  <div class="slide-inner">
+    <p class="section-label">Storage</p>
+    <h2 style="color: #f5f5f7;">Persistenz-<br>Architektur.</h2>
+    <p class="lead" style="color: #a1a1a6;">Drei Persistenz-Schichten fur unterschiedliche Datentypen.</p>
+
+    <div class="card-grid cols-3" style="margin-top: 32px;">
+      <div class="card" style="background: #2d2d2f;">
+        <h4 style="color: #f5f5f7;">localStorage</h4>
+        <p>Primare Speicherung fur Inputs, Engine-State und Profildaten. Pro Profil separierte Keys: <code>balance_[profilName]_*</code></p>
+      </div>
+      <div class="card" style="background: #2d2d2f;">
+        <h4 style="color: #f5f5f7;">File System Access API</h4>
+        <p>Chromium-exklusiv. Snapshots als JSON-Dateien im vom Benutzer gewahlten Verzeichnis. Persistenter Directory Handle.</p>
+      </div>
+      <div class="card" style="background: #2d2d2f;">
+        <h4 style="color: #f5f5f7;">Export/Import</h4>
+        <p>JSON-Export aller Daten zum Backup. Import mit Struktur-Validierung und automatischer Migration. CSV-Export fur Analyse.</p>
+      </div>
+    </div>
+
+    <div class="code-block" style="margin-top: 24px; font-size: 12px;">
+<span class="comment">// localStorage Key Schema</span>
+<span class="string">"balance_Max_inputs"</span>          <span class="comment">// Profil "Max": Eingabewerte</span>
+<span class="string">"balance_Max_engineState"</span>      <span class="comment">// Profil "Max": Letzter Engine-Output</span>
+<span class="string">"balance_Max_tranchen"</span>         <span class="comment">// Profil "Max": Depot-Positionen</span>
+<span class="string">"balance_Max_expenses_2024"</span>    <span class="comment">// Profil "Max": Ausgaben 2024</span>
+<span class="string">"balance_Partner_inputs"</span>       <span class="comment">// Profil "Partner": Eingabewerte</span>
+<span class="string">"profilverbund_config"</span>         <span class="comment">// Verbund-Konfiguration</span>
+<span class="string">"simulator_lastParams"</span>         <span class="comment">// Zuletzt verwendete Simulator-Params</span>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 23: Testing ==================== -->
+<section class="slide" id="testing">
+  <div class="slide-inner">
+    <p class="section-label">Testing</p>
+    <h2>46 Test-Dateien.<br>Kein Test-Framework.</h2>
+    <p class="lead">Custom Assertion-Helpers, kein Jest/Mocha/Vitest. Lauft direkt mit Node.js.</p>
+
+    <div class="split" style="margin-top: 32px;">
+      <div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Kategorie</th>
+              <th>Tests</th>
+              <th>Abdeckung</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Engine-Kern</td>
+              <td><code>core-engine.test.mjs</code></td>
+              <td>Vollstandige Pipeline-Tests</td>
+            </tr>
+            <tr>
+              <td>Transaktionen</td>
+              <td><code>transaction-*.test.mjs</code> (5)</td>
+              <td>Tax, Rebalancing, Gold, ATH, Quantization</td>
+            </tr>
+            <tr>
+              <td>Simulation</td>
+              <td><code>simulation.test.mjs</code></td>
+              <td>Multi-Year-Scenarios</td>
+            </tr>
+            <tr>
+              <td>Monte Carlo</td>
+              <td><code>monte-carlo-sampling.test.mjs</code></td>
+              <td>Sampling-Verteilung, Determinismus</td>
+            </tr>
+            <tr>
+              <td>Worker Parity</td>
+              <td><code>worker-pool.test.mjs</code></td>
+              <td>Seriell vs. Parallel identisch</td>
+            </tr>
+            <tr>
+              <td>Balance</td>
+              <td><code>balance-*.test.mjs</code> (3)</td>
+              <td>Reader, Smoke, Storage</td>
+            </tr>
+            <tr>
+              <td>Profilverbund</td>
+              <td><code>profilverbund-*.test.mjs</code> (2)</td>
+              <td>Aggregation, Gold-Overrides</td>
+            </tr>
+            <tr>
+              <td>Sweep</td>
+              <td><code>simulator-sweep.test.mjs</code></td>
+              <td>Whitelist/Blocklist-Guards</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <div class="code-block" style="font-size: 12px;">
+<span class="comment">// Custom Assertion Framework</span>
+<span class="comment">// tests/run-tests.mjs</span>
+
+<span class="function">assert</span>(condition, message);
+<span class="function">assertEqual</span>(actual, expected, msg);
+<span class="function">assertClose</span>(actual, expected, tol, msg);
+<span class="function">assertThrows</span>(<span class="keyword">fn</span>, msg);
+
+<span class="comment">// Test-Runner</span>
+<span class="keyword">const</span> { <span class="function">test</span>, <span class="function">describe</span>, <span class="function">run</span> } =
+  <span class="keyword">await</span> <span class="function">import</span>(<span class="string">'./run-tests.mjs'</span>);
+
+<span class="function">describe</span>(<span class="string">'TransactionEngine'</span>, () => {
+  <span class="function">test</span>(<span class="string">'tax-optimal selection'</span>, () => {
+    <span class="keyword">const</span> result = <span class="function">selectTranches</span>(
+      tranchen, amount
+    );
+    <span class="function">assertClose</span>(
+      result.totalTax, <span class="number">1234.56</span>, <span class="number">0.01</span>
+    );
+  });
+});
+
+<span class="comment">// Ausfuhrung:</span>
+<span class="comment">// npm test             (alle)</span>
+<span class="comment">// node tests/run-single.mjs &lt;file&gt;</span>
+<span class="comment">// QUICK_TESTS=1 npm test (subset)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 24: Feature Flags & Debug ==================== -->
+<section class="slide" style="background: var(--surface);">
+  <div class="slide-inner">
+    <p class="section-label">Developer Experience</p>
+    <h2>Feature Flags,<br>Debug Mode,<br>Telemetrie.</h2>
+
+    <div class="card-grid cols-3" style="margin-top: 32px;">
+      <div class="card">
+        <h4>Feature Flags</h4>
+        <p>Kontrollierte Freigabe neuer Features. Gespeichert in <code>feature-flags.js</code>. Toggle per URL-Parameter oder localStorage.</p>
+        <div class="code-block" style="font-size: 11px; margin-top: 12px;">
+<span class="comment">// Aktivierung</span>
+?feature=telemetry
+localStorage.<span class="function">setItem</span>(
+  <span class="string">'ff_telemetry'</span>, <span class="string">'true'</span>
+);
+        </div>
+      </div>
+      <div class="card">
+        <h4>Debug Mode</h4>
+        <p>Detailliertes Logging aller Engine-Eingaben/-Ausgaben, Regime-Klassifikation und Transaktionsentscheidungen.</p>
+        <div class="code-block" style="font-size: 11px; margin-top: 12px;">
+<span class="comment">// Balance-App Debug</span>
+?debug=<span class="keyword">true</span>
+<span class="comment">// Logs: Inputs, Regime,</span>
+<span class="comment">// Guardrails, Transactions</span>
+        </div>
+      </div>
+      <div class="card">
+        <h4>Worker Telemetrie</h4>
+        <p>Performance-Metriken fur Worker-Pool: Job-Zeiten, Chunk-Adaptation, Worker-Auslastung, Idle-Time.</p>
+        <div class="code-block" style="font-size: 11px; margin-top: 12px;">
+<span class="comment">// Telemetrie aktivieren</span>
+?telemetry=<span class="keyword">true</span>
+<span class="comment">// Zeigt: Avg/Min/Max</span>
+<span class="comment">// per worker, idle ratio</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 20px;">
+      <h4>Development Workflow</h4>
+      <p>Keine Build-Tools fur App-Code notig. Datei andern, Browser reloaden. Nur bei Engine-Anderungen: <code>npm run build:engine</code> und <code>npm test</code>.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 25: Build & Deploy ==================== -->
+<section class="slide">
+  <div class="slide-inner">
+    <p class="section-label">Build</p>
+    <h2>Build-Pipeline.</h2>
+    <p class="lead">Minimal und deterministisch. Ein einziger Bundle-Schritt.</p>
+
+    <div class="split" style="margin-top: 32px;">
+      <div>
+        <div class="timeline-step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <h4>Engine Build</h4>
+            <p><code>npm run build:engine</code> -- esbuild bundelt 13 ESM-Module zu <code>engine.js</code> mit globalem <code>EngineAPI</code>. Generiert deterministischen Build-ID in <code>engine/config.mjs</code>.</p>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <h4>Tests</h4>
+            <p><code>npm test</code> -- 46 Testdateien verifizieren Engine-Determinismus, Steuerlogik, Guardrails, Worker-Paritat und Sweep-Guards.</p>
+          </div>
+        </div>
+        <div class="timeline-step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <h4>Tauri Build (optional)</h4>
+            <p><code>npm run tauri:build</code> -- Rust-Compiler erzeugt portable <code>RuhestandSuite.exe</code>. Inkludiert Webserver + Proxy.</p>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="code-block" style="font-size: 12px;">
+<span class="comment">// build-engine.mjs</span>
+<span class="keyword">import</span> esbuild <span class="keyword">from</span> <span class="string">'esbuild'</span>;
+
+<span class="keyword">await</span> esbuild.<span class="function">build</span>({
+  entryPoints: [<span class="string">'engine/index.mjs'</span>],
+  bundle: <span class="keyword">true</span>,
+  format: <span class="string">'iife'</span>,
+  globalName: <span class="string">'EngineAPI'</span>,
+  outfile: <span class="string">'engine.js'</span>,
+  target: <span class="string">'es2020'</span>,
+  minify: <span class="keyword">false</span>, <span class="comment">// Lesbar bleiben</span>
+});
+
+<span class="comment">// Build-ID in config.mjs aktualisieren</span>
+<span class="keyword">const</span> buildId = <span class="function">hash</span>(
+  <span class="function">readFileSync</span>(<span class="string">'engine.js'</span>)
+);
+<span class="function">updateConfig</span>({ buildId, version: <span class="number">31</span> });
+        </div>
+
+        <div class="card" style="margin-top: 16px;">
+          <h4>Version Handshake</h4>
+          <p>Balance-App und Simulator prufen die Engine-Version beim Start. Mismatch (z.B. vergessener Build) wird sofort erkannt und gemeldet.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 26: Determinismus ==================== -->
+<section class="slide dark">
+  <div class="slide-inner" style="text-align: center;">
+    <p class="section-label">Kernprinzip</p>
+    <h2 style="color: #f5f5f7;">Determinismus<br>als Fundament.</h2>
+    <p class="lead" style="margin: 0 auto 40px; color: #a1a1a6;">
+      Gleiche Inputs. Gleiche Ergebnisse. Immer.<br>
+      Unabhangig von Worker-Anzahl, Chunk-Grosse oder Plattform.
+    </p>
+    <div class="card-grid cols-3" style="max-width: 1000px; margin: 0 auto;">
+      <div class="card" style="background: #2d2d2f;">
+        <h4 style="color: #f5f5f7;">Seeded RNG</h4>
+        <p>Custom PRNG in <code>simulator-utils.js</code>. Jeder Run bekommt <code>baseSeed + runIndex</code>. Kein <code>Math.random()</code>.</p>
+      </div>
+      <div class="card" style="background: #2d2d2f;">
+        <h4 style="color: #f5f5f7;">Worker-Invarianz</h4>
+        <p>1 Worker mit 1000 Runs = 8 Worker mit je 125 Runs. Identische Ergebnisse per Seed-Schema.</p>
+      </div>
+      <div class="card" style="background: #2d2d2f;">
+        <h4 style="color: #f5f5f7;">Legacy-Stream</h4>
+        <p>Alter Modus: Seriell, ein globaler Seed. Chunking wurde explizit deaktiviert, um RNG-State nicht zu brechen.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 27: Performance ==================== -->
+<section class="slide">
+  <div class="slide-inner">
+    <p class="section-label">Performance</p>
+    <h2>Performance-Profil.</h2>
+    <p class="lead">Optimiert fur interaktive Nutzung auf Standard-Hardware.</p>
+
+    <div class="stats-row" style="margin-top: 32px;">
+      <div class="stat">
+        <div class="number">&lt;100KB</div>
+        <div class="label">Engine Bundle</div>
+      </div>
+      <div class="stat">
+        <div class="number">8</div>
+        <div class="label">Default Workers</div>
+      </div>
+      <div class="stat">
+        <div class="number">500ms</div>
+        <div class="label">Time Budget/Job</div>
+      </div>
+      <div class="stat">
+        <div class="number">300-500</div>
+        <div class="label">Runs/Chunk</div>
+      </div>
+    </div>
+
+    <div class="card-grid cols-2" style="margin-top: 32px;">
+      <div class="card">
+        <h4>Optimierungs-Strategien</h4>
+        <ul class="feature-list">
+          <li><span class="check">&#10003;</span> <strong>Lazy Scenario Logs:</strong> Worker sammeln nur Aggregate. Detail-Logs nur fur die 30 ausgewahlten Szenarien im Nachgang.</li>
+          <li><span class="check">&#10003;</span> <strong>Adaptives Chunking:</strong> Geglaetteter Filter passt Runs/Job an, verhindert Uber-/Unterlastung.</li>
+          <li><span class="check">&#10003;</span> <strong>Auto-Optimize 3-Stage:</strong> ~90% weniger Kombinationen vs. exhaustiver Sweep.</li>
+          <li><span class="check">&#10003;</span> <strong>SVG-Heatmap:</strong> Effizient fur 10-50 Zellen, kein Canvas-Overhead.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>Typische Laufzeiten</h4>
+        <table class="data-table" style="box-shadow: none; margin: 0;">
+          <tr>
+            <td>Monte Carlo (1000 Runs)</td>
+            <td>~2-4 Sekunden</td>
+          </tr>
+          <tr>
+            <td>Monte Carlo (10.000 Runs)</td>
+            <td>~15-25 Sekunden</td>
+          </tr>
+          <tr>
+            <td>Parameter Sweep (25 Zellen)</td>
+            <td>~30-60 Sekunden</td>
+          </tr>
+          <tr>
+            <td>Auto-Optimize (7 Params)</td>
+            <td>~2-5 Minuten</td>
+          </tr>
+          <tr>
+            <td>Backtest (1 Szenario)</td>
+            <td>&lt;1 Sekunde</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 28: Sicherheit ==================== -->
+<section class="slide" style="background: var(--surface);">
+  <div class="slide-inner">
+    <p class="section-label">Sicherheit</p>
+    <h2>Security by Design.</h2>
+    <p class="lead">Kein Backend, kein Auth, kein Cloud-Risiko -- aber dennoch durchdacht.</p>
+
+    <div class="card-grid cols-2" style="margin-top: 32px;">
+      <div class="card">
+        <h4>Threat Model</h4>
+        <ul class="feature-list">
+          <li><span class="check">&#10003;</span> <strong>Keine Netzwerk-Angriffsoberflache:</strong> Kein Backend-Server, keine API-Endpoints</li>
+          <li><span class="check">&#10003;</span> <strong>CSP-Headers:</strong> Content Security Policy in Tauri-Konfiguration</li>
+          <li><span class="check">&#10003;</span> <strong>Lokaler Proxy:</strong> Yahoo-Finance-Proxy nur auf localhost</li>
+          <li><span class="check">&#10003;</span> <strong>Keine Credentials:</strong> Kein Login, kein Token-Management</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>Input-Validierung</h4>
+        <ul class="feature-list">
+          <li><span class="check">&#10003;</span> <strong>InputValidator:</strong> Alle Engine-Inputs auf Bereich und Typ gepruft</li>
+          <li><span class="check">&#10003;</span> <strong>CSV-Sanitizing:</strong> Import-Daten werden bereinigt und validiert</li>
+          <li><span class="check">&#10003;</span> <strong>JSON-Schema:</strong> Import-Dateien gegen erwartete Struktur gepruft</li>
+          <li><span class="check">&#10003;</span> <strong>DOM Escaping:</strong> Keine innerHTML mit User-Input</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 29: Architektur-Entscheidungen ==================== -->
+<section class="slide">
+  <div class="slide-inner">
+    <p class="section-label">Architektur</p>
+    <h2>Design-Entscheidungen<br>und Trade-Offs.</h2>
+
+    <table class="data-table" style="margin-top: 32px;">
+      <thead>
+        <tr>
+          <th>Entscheidung</th>
+          <th>Pro</th>
+          <th>Contra</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Kein Framework</strong></td>
+          <td>Zero-Dependency, keine Build-Pipeline fur App-Code, volle Kontrolle</td>
+          <td>Kein Virtual DOM, manuelle DOM-Updates, kein Routing-Framework</td>
+        </tr>
+        <tr>
+          <td><strong>Globales EngineAPI</strong></td>
+          <td>Einfacher Zugriff aus allen Modulen und Workern</td>
+          <td>Kein Tree-Shaking, globaler Namespace-Eintrag</td>
+        </tr>
+        <tr>
+          <td><strong>localStorage</strong></td>
+          <td>Simpel, synchron, universell unterstutzt</td>
+          <td>~5-10MB Limit, keine strukturierte Query, kein Multi-Tab-Lock</td>
+        </tr>
+        <tr>
+          <td><strong>Transferable statt SharedArrayBuffer</strong></td>
+          <td>Tauri-kompatibel, kein COOP/COEP notig</td>
+          <td>Copy-Overhead bei grossen Datentransfers</td>
+        </tr>
+        <tr>
+          <td><strong>Custom Test Framework</strong></td>
+          <td>Zero Dependencies, schneller Start, volle Kontrolle</td>
+          <td>Kein Watch-Mode, keine Coverage, kein Mocking-Framework</td>
+        </tr>
+        <tr>
+          <td><strong>Tauri statt Electron</strong></td>
+          <td>~90% kleinere Binary, nativer WebView</td>
+          <td>Weniger Ecosystem, WebView-Unterschiede pro OS</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 30: Fazit ==================== -->
+<section class="slide accent">
+  <div class="slide-inner" style="text-align: center;">
+    <h2 style="font-size: 52px;">37.500 Zeilen.<br>96 Module.<br>0 Frameworks.</h2>
+    <p class="lead" style="margin: 24px auto 40px; max-width: 700px;">
+      Die Ruhestand Suite zeigt, dass ein komplexes Finanztool mit deterministischer
+      Monte-Carlo-Simulation, steueroptimierter Tranchenverwaltung und paralleler
+      Worker-Ausfuhrung ohne ein einziges Framework funktioniert.
+    </p>
+    <div class="stats-row" style="max-width: 900px; margin: 0 auto;">
+      <div class="stat" style="background: rgba(255,255,255,0.15);">
+        <div class="number" style="color: white;">13</div>
+        <div class="label" style="color: rgba(255,255,255,0.7);">Engine Module</div>
+      </div>
+      <div class="stat" style="background: rgba(255,255,255,0.15);">
+        <div class="number" style="color: white;">96</div>
+        <div class="label" style="color: rgba(255,255,255,0.7);">App Module</div>
+      </div>
+      <div class="stat" style="background: rgba(255,255,255,0.15);">
+        <div class="number" style="color: white;">46</div>
+        <div class="label" style="color: rgba(255,255,255,0.7);">Tests</div>
+      </div>
+      <div class="stat" style="background: rgba(255,255,255,0.15);">
+        <div class="number" style="color: white;">v31</div>
+        <div class="label" style="color: rgba(255,255,255,0.7);">Engine Version</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Page indicator -->
+<div class="page-indicator" id="pageIndicator"></div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  const indicator = document.getElementById('pageIndicator');
+
+  slides.forEach((_, i) => {
+    const dot = document.createElement('div');
+    dot.classList.add('dot');
+    dot.addEventListener('click', () => {
+      slides[i].scrollIntoView({ behavior: 'smooth' });
+    });
+    indicator.appendChild(dot);
+  });
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const idx = Array.from(slides).indexOf(entry.target);
+        document.querySelectorAll('.page-indicator .dot').forEach((d, i) => {
+          d.classList.toggle('active', i === idx);
+        });
+      }
+    });
+  }, { threshold: 0.5 });
+
+  slides.forEach(s => observer.observe(s));
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ') {
+      e.preventDefault();
+      const current = Array.from(slides).findIndex(s => {
+        const rect = s.getBoundingClientRect();
+        return rect.top >= -100 && rect.top < window.innerHeight / 2;
+      });
+      if (current < slides.length - 1) {
+        slides[current + 1].scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+    if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const current = Array.from(slides).findIndex(s => {
+        const rect = s.getBoundingClientRect();
+        return rect.top >= -100 && rect.top < window.innerHeight / 2;
+      });
+      if (current > 0) {
+        slides[current - 1].scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  });
+</script>
+
+</body>
+</html>

@@ -6,13 +6,35 @@ use std::collections::HashMap;
 use std::thread;
 use tiny_http::{Header, Method, Response, Server, StatusCode};
 
-fn build_headers() -> Vec<Header> {
+fn allowed_cors_origin(origin: &str) -> &str {
+  match origin {
+    "null" | "tauri://localhost" => origin,
+    o if o.starts_with("http://localhost:") || o.starts_with("http://127.0.0.1:") => o,
+    o if o == "http://localhost" || o == "http://127.0.0.1" => o,
+    _ => "null",
+  }
+}
+
+fn build_headers_for_origin(origin: &str) -> Vec<Header> {
   vec![
     Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap(),
-    Header::from_bytes(&b"Access-Control-Allow-Origin"[..], &b"*"[..]).unwrap(),
+    Header::from_bytes(&b"Access-Control-Allow-Origin"[..], origin.as_bytes()).unwrap(),
     Header::from_bytes(&b"Access-Control-Allow-Methods"[..], &b"GET,OPTIONS"[..]).unwrap(),
     Header::from_bytes(&b"Access-Control-Allow-Headers"[..], &b"Content-Type"[..]).unwrap(),
   ]
+}
+
+fn build_headers() -> Vec<Header> {
+  build_headers_for_origin("tauri://localhost")
+}
+
+fn get_request_origin(request: &tiny_http::Request) -> String {
+  for header in request.headers() {
+    if header.field.as_str().eq_ignore_ascii_case("origin") {
+      return header.value.as_str().to_string();
+    }
+  }
+  "null".to_string()
 }
 
 fn send_json(request: tiny_http::Request, status: u16, payload: serde_json::Value) {
@@ -104,9 +126,10 @@ fn pick_chart_price(data: &serde_json::Value) -> Option<f64> {
 }
 
 fn handle_quote(request: tiny_http::Request, symbol: &str) {
+  let encoded_symbol = urlencoding::encode(symbol);
   let chart_urls = [
-    format!("https://query1.finance.yahoo.com/v8/finance/chart/{}?interval=1d&range=1d&lang=en-US&region=US&corsDomain=finance.yahoo.com", symbol),
-    format!("https://query2.finance.yahoo.com/v8/finance/chart/{}?interval=1d&range=1d&lang=en-US&region=US&corsDomain=finance.yahoo.com", symbol),
+    format!("https://query1.finance.yahoo.com/v8/finance/chart/{}?interval=1d&range=1d&lang=en-US&region=US&corsDomain=finance.yahoo.com", encoded_symbol),
+    format!("https://query2.finance.yahoo.com/v8/finance/chart/{}?interval=1d&range=1d&lang=en-US&region=US&corsDomain=finance.yahoo.com", encoded_symbol),
   ];
 
   for url in chart_urls.iter() {
@@ -123,8 +146,8 @@ fn handle_quote(request: tiny_http::Request, symbol: &str) {
   }
 
   let quote_urls = [
-    format!("https://query1.finance.yahoo.com/v7/finance/quote?symbols={}", symbol),
-    format!("https://query2.finance.yahoo.com/v7/finance/quote?symbols={}", symbol),
+    format!("https://query1.finance.yahoo.com/v7/finance/quote?symbols={}", encoded_symbol),
+    format!("https://query2.finance.yahoo.com/v7/finance/quote?symbols={}", encoded_symbol),
   ];
 
   for url in quote_urls.iter() {
@@ -140,7 +163,7 @@ fn handle_quote(request: tiny_http::Request, symbol: &str) {
 }
 
 fn handle_search(request: tiny_http::Request, query: &str) {
-  let url = format!("https://query1.finance.yahoo.com/v1/finance/search?q={}", query);
+  let url = format!("https://query1.finance.yahoo.com/v1/finance/search?q={}", urlencoding::encode(query));
   match fetch_json(&url) {
     Ok(data) => send_json(request, 200, data),
     Err(err) => send_json(request, 502, json!({"error": err})),
@@ -150,7 +173,7 @@ fn handle_search(request: tiny_http::Request, query: &str) {
 fn handle_chart(request: tiny_http::Request, symbol: &str, period1: &str, period2: &str, interval: &str) {
   let url = format!(
     "https://query1.finance.yahoo.com/v8/finance/chart/{}?period1={}&period2={}&interval={}&lang=en-US&region=US&corsDomain=finance.yahoo.com",
-    symbol, period1, period2, interval
+    urlencoding::encode(symbol), urlencoding::encode(period1), urlencoding::encode(period2), urlencoding::encode(interval)
   );
   match fetch_json(&url) {
     Ok(data) => send_json(request, 200, data),
@@ -169,9 +192,11 @@ fn start_yahoo_proxy() {
 
   for request in server.incoming_requests() {
     if request.method() == &Method::Options {
+      let origin = get_request_origin(&request);
+      let cors = allowed_cors_origin(&origin);
       let mut response = Response::from_string("")
         .with_status_code(StatusCode(204));
-      for header in build_headers() {
+      for header in build_headers_for_origin(cors) {
         response = response.with_header(header);
       }
       let _ = request.respond(response);

@@ -22,23 +22,106 @@ export class WorkerPool {
         this.nextJobId = 1;
         this.workerIds = new Map();
         this.nextWorkerId = 1;
+        this.workerReady = new WeakMap();
+        this.poolDisabled = false;
+        this.poolFailureReason = null;
+        this.consecutiveBootstrapFailures = 0;
+        this.maxBootstrapFailures = Math.max(3, this.size * 2);
 
         this._initWorkers();
     }
 
     _initWorkers() {
         for (let i = 0; i < this.size; i++) {
-            const worker = new Worker(this.workerUrl, { type: this.type });
-            worker.onmessage = event => this._handleMessage(worker, event.data);
-            worker.onerror = error => this._handleError(worker, error);
+            const worker = this._createWorker();
             this.workers.push(worker);
             this.idle.push(worker);
-            const workerId = `worker-${this.nextWorkerId++}`;
-            this.workerIds.set(worker, workerId);
         }
         if (this.telemetry && this.telemetry.enabled) {
             this.telemetry.workerCount = this.size;
         }
+    }
+
+    _createWorker() {
+        const worker = new Worker(this.workerUrl, { type: this.type });
+        worker.onmessage = event => this._handleMessage(worker, event.data);
+        worker.onerror = error => this._handleError(worker, error);
+        const workerId = `worker-${this.nextWorkerId++}`;
+        this.workerIds.set(worker, workerId);
+        this.workerReady.set(worker, false);
+        return worker;
+    }
+
+    _formatErrorMessage(error) {
+        if (!error) return 'Unknown worker error';
+        if (error instanceof Error) return error.message || String(error);
+        const message = (typeof error.message === 'string' && error.message.trim()) ? error.message.trim() : '';
+        const filename = typeof error.filename === 'string' ? error.filename : '';
+        const lineno = Number.isFinite(error.lineno) && error.lineno > 0 ? error.lineno : null;
+        const colno = Number.isFinite(error.colno) && error.colno > 0 ? error.colno : null;
+        const location = filename
+            ? `${filename}${lineno ? `:${lineno}` : ''}${colno ? `:${colno}` : ''}`
+            : '';
+        if (message && location) return `${message} @ ${location}`;
+        if (message) return message;
+        if (location) return `Worker script error @ ${location}`;
+        return String(error);
+    }
+
+    _toError(error, worker) {
+        if (error instanceof Error) {
+            return error;
+        }
+        const workerId = this._getWorkerId(worker);
+        const msg = this._formatErrorMessage(error);
+        const normalized = new Error(`[WorkerPool:${workerId}] ${msg}`);
+        if (error && typeof error === 'object') {
+            if (typeof error.filename === 'string') normalized.filename = error.filename;
+            if (Number.isFinite(error.lineno)) normalized.lineno = error.lineno;
+            if (Number.isFinite(error.colno)) normalized.colno = error.colno;
+        }
+        return normalized;
+    }
+
+    _disablePool(reason) {
+        if (this.poolDisabled) return;
+        this.poolDisabled = true;
+        this.poolFailureReason = reason instanceof Error ? reason : new Error(String(reason));
+        const allJobIds = new Set([
+            ...this.jobs.keys(),
+            ...this.activeJobs.values()
+        ]);
+        for (const jobId of allJobIds) {
+            const job = this.jobs.get(jobId);
+            if (!job) continue;
+            this.jobs.delete(jobId);
+            if (this.telemetry) {
+                this.telemetry.recordJobFailed(jobId, 'pool-disabled', this.poolFailureReason);
+            }
+            job.reject(this.poolFailureReason);
+        }
+        while (this.queue.length > 0) {
+            const queued = this.queue.shift();
+            if (!queued) continue;
+            if (this.telemetry) {
+                this.telemetry.recordJobFailed(queued.jobId, 'pool-disabled', this.poolFailureReason);
+            }
+            queued.reject(this.poolFailureReason);
+        }
+        for (const worker of this.workers) {
+            worker.terminate();
+        }
+        this.workers = [];
+        this.idle = [];
+        this.activeJobs.clear();
+        this.workerIds.clear();
+    }
+
+    _getPoolDisabledError() {
+        if (this.poolFailureReason instanceof Error) {
+            return this.poolFailureReason;
+        }
+        return new Error('WorkerPool disabled due to repeated worker bootstrap failures.');
     }
 
     _getWorkerId(worker) {
@@ -47,6 +130,8 @@ export class WorkerPool {
 
     _handleMessage(worker, message) {
         if (!message || typeof message !== 'object') return;
+        this.workerReady.set(worker, true);
+        this.consecutiveBootstrapFailures = 0;
 
         if (message.type === 'progress') {
             if (this.onProgress) this.onProgress(message);
@@ -85,39 +170,68 @@ export class WorkerPool {
     }
 
     _handleError(worker, error) {
-        if (this.onError) this.onError(error);
+        const normalizedError = this._toError(error, worker);
+        const isBootstrapFailure = this.workerReady.get(worker) !== true;
+        if (isBootstrapFailure) {
+            this.consecutiveBootstrapFailures += 1;
+        } else {
+            this.consecutiveBootstrapFailures = 0;
+        }
+        const workerId = this._getWorkerId(worker);
+        if (this.onError) this.onError(normalizedError);
         const activeJobId = this.activeJobs.get(worker);
         if (activeJobId) {
             const job = this.jobs.get(activeJobId);
             if (job) {
                 this.jobs.delete(activeJobId);
                 if (this.telemetry) {
-                    this.telemetry.recordJobFailed(activeJobId, this._getWorkerId(worker), error);
+                    this.telemetry.recordJobFailed(activeJobId, workerId, normalizedError);
                 }
-                job.reject(error instanceof Error ? error : new Error(String(error)));
+                job.reject(normalizedError);
             }
             this.activeJobs.delete(worker);
         }
-        // Replace the worker to avoid reusing a potentially corrupted state.
         const index = this.workers.indexOf(worker);
         if (index !== -1) {
             worker.terminate();
-            const replacement = new Worker(this.workerUrl, { type: this.type });
-            replacement.onmessage = event => this._handleMessage(replacement, event.data);
-            replacement.onerror = err => this._handleError(replacement, err);
-            this.workers[index] = replacement;
             this.idle = this.idle.filter(item => item !== worker);
-            this.idle.push(replacement);
-            const replacementId = `worker-${this.nextWorkerId++}`;
-            this.workerIds.set(replacement, replacementId);
+            this.workers.splice(index, 1);
             this.workerIds.delete(worker);
-        } else if (!this.idle.includes(worker)) {
-            this.idle.push(worker);
         }
+
+        if (isBootstrapFailure && this.consecutiveBootstrapFailures >= this.maxBootstrapFailures) {
+            const message = [
+                'WorkerPool disabled after repeated bootstrap failures.',
+                `workerUrl=${String(this.workerUrl)}`,
+                `failures=${this.consecutiveBootstrapFailures}`,
+                `lastError=${this._formatErrorMessage(normalizedError)}`
+            ].join(' ');
+            this._disablePool(new Error(message));
+            return;
+        }
+        if (this.poolDisabled) {
+            return;
+        }
+        // Replace the worker to avoid reusing a potentially corrupted state.
+        const replacement = this._createWorker();
+        this.workers.push(replacement);
+        this.idle.push(replacement);
         this._drainQueue();
     }
 
     _drainQueue() {
+        if (this.poolDisabled) {
+            const disabledError = this._getPoolDisabledError();
+            while (this.queue.length > 0) {
+                const job = this.queue.shift();
+                if (!job) continue;
+                if (this.telemetry) {
+                    this.telemetry.recordJobFailed(job.jobId, 'pool-disabled', disabledError);
+                }
+                job.reject(disabledError);
+            }
+            return;
+        }
         while (this.idle.length > 0 && this.queue.length > 0) {
             const worker = this.idle.pop();
             const job = this.queue.shift();
@@ -126,11 +240,18 @@ export class WorkerPool {
             if (this.telemetry) {
                 this.telemetry.recordJobStart(job.jobId, this._getWorkerId(worker), job.payload);
             }
-            worker.postMessage(job.payload, job.transferables);
+            try {
+                worker.postMessage(job.payload, job.transferables);
+            } catch (postMessageError) {
+                this._handleError(worker, postMessageError);
+            }
         }
     }
 
     runJob(payload, transferables = []) {
+        if (this.poolDisabled) {
+            return Promise.reject(this._getPoolDisabledError());
+        }
         const jobId = this.nextJobId++;
         const message = { ...payload, jobId };
         if (this.telemetry) {
@@ -143,6 +264,9 @@ export class WorkerPool {
     }
 
     async broadcast(payload, transferables = []) {
+        if (this.poolDisabled) {
+            throw this._getPoolDisabledError();
+        }
         const responses = [];
         for (const worker of this.workers) {
             responses.push(this._sendDirect(worker, payload, transferables));
@@ -151,6 +275,9 @@ export class WorkerPool {
     }
 
     _sendDirect(worker, payload, transferables = []) {
+        if (this.poolDisabled) {
+            return Promise.reject(this._getPoolDisabledError());
+        }
         const jobId = this.nextJobId++;
         const message = { ...payload, jobId };
         return new Promise((resolve, reject) => {
@@ -163,7 +290,13 @@ export class WorkerPool {
             if (this.telemetry) {
                 this.telemetry.recordJobStart(jobId, this._getWorkerId(worker), message);
             }
-            worker.postMessage(message, transferables);
+            try {
+                worker.postMessage(message, transferables);
+            } catch (postMessageError) {
+                this.jobs.delete(jobId);
+                this.activeJobs.delete(worker);
+                reject(this._toError(postMessageError, worker));
+            }
         });
     }
 
@@ -180,5 +313,7 @@ export class WorkerPool {
         this.jobs.clear();
         this.activeJobs.clear();
         this.workerIds.clear();
+        this.poolDisabled = true;
+        this.poolFailureReason = null;
     }
 }

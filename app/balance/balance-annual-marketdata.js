@@ -116,8 +116,14 @@ export function createMarketdataHandlers({
             } catch (err) {
                 customList = [rawCustomProxy];
             }
+            const isLocalUrl = (url) => {
+                try {
+                    const parsed = new URL(url.replace('{url}', 'placeholder'));
+                    return ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname);
+                } catch { return false; }
+            };
             customList
-                .filter(entry => typeof entry === 'string' && entry.trim().length > 0)
+                .filter(entry => typeof entry === 'string' && entry.trim().length > 0 && isLocalUrl(entry.trim()))
                 .forEach(entry => {
                     proxyEntries.push({
                         name: 'Custom Proxy',

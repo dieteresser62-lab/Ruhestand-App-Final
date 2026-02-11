@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ruhestand Suite - Ihre Finanzplanung im Ruhestand</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg: #fff;
+    --text: #1d1d1f;
+    --text-secondary: #6e6e73;
+    --accent: #0071e3;
+    --accent-hover: #0077ed;
+    --surface: #f5f5f7;
+    --border: #d2d2d7;
+    --gradient-start: #fbfbfd;
+    --gradient-end: #f5f5f7;
+    --card-shadow: 0 4px 24px rgba(0,0,0,0.06);
+    --slide-width: 1200px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html {
+    scroll-snap-type: y mandatory;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+
+  /* Navigation */
+  nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 52px;
+    background: rgba(255,255,255,0.72);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 40px;
+    z-index: 1000;
+  }
+
+  nav .brand {
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: -0.01em;
+  }
+
+  nav .nav-links {
+    display: flex;
+    gap: 28px;
+    list-style: none;
+  }
+
+  nav .nav-links a {
+    font-size: 13px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  nav .nav-links a:hover { color: var(--text); }
+
+  /* Slide */
+  .slide {
+    min-height: 100vh;
+    scroll-snap-align: start;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 40px;
+    position: relative;
+  }
+
+  .slide-inner {
+    max-width: var(--slide-width);
+    width: 100%;
+  }
+
+  /* Hero */
+  .hero {
+    text-align: center;
+    background: linear-gradient(180deg, var(--gradient-start) 0%, var(--bg) 100%);
+  }
+
+  .hero .overline {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--accent);
+    margin-bottom: 12px;
+    letter-spacing: 0.02em;
+  }
+
+  .hero h1 {
+    font-size: 64px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.08;
+    margin-bottom: 20px;
+  }
+
+  .hero .subtitle {
+    font-size: 24px;
+    color: var(--text-secondary);
+    font-weight: 400;
+    max-width: 700px;
+    margin: 0 auto 48px;
+    line-height: 1.4;
+  }
+
+  .hero .hero-visual {
+    max-width: 900px;
+    margin: 0 auto;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.12);
+  }
+
+  .hero .hero-visual img {
+    width: 100%;
+    display: block;
+  }
+
+  /* Section Headers */
+  .section-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+  }
+
+  h2 {
+    font-size: 48px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.1;
+    margin-bottom: 16px;
+  }
+
+  h3 {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    margin-bottom: 12px;
+  }
+
+  .lead {
+    font-size: 20px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    max-width: 680px;
+  }
+
+  /* Cards */
+  .card-grid {
+    display: grid;
+    gap: 20px;
+    margin-top: 40px;
+  }
+
+  .card-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+  .card-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+  .card {
+    background: var(--surface);
+    border-radius: 20px;
+    padding: 36px;
+    transition: transform 0.2s;
+  }
+
+  .card:hover { transform: translateY(-2px); }
+
+  .card .card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    margin-bottom: 16px;
+  }
+
+  .card .card-icon.blue { background: #e8f0fe; color: #1a73e8; }
+  .card .card-icon.green { background: #e6f4ea; color: #137333; }
+  .card .card-icon.orange { background: #fef7e0; color: #e37400; }
+  .card .card-icon.purple { background: #f3e8fd; color: #8430ce; }
+  .card .card-icon.red { background: #fce8e6; color: #c5221f; }
+  .card .card-icon.teal { background: #e0f7fa; color: #00796b; }
+
+  .card h4 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    letter-spacing: -0.01em;
+  }
+
+  .card p {
+    font-size: 15px;
+    color: var(--text-secondary);
+    line-height: 1.55;
+  }
+
+  /* Screenshot */
+  .screenshot-frame {
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--card-shadow);
+    border: 1px solid var(--border);
+    margin-top: 32px;
+  }
+
+  .screenshot-frame img {
+    width: 100%;
+    display: block;
+  }
+
+  .screenshot-caption {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 12px;
+  }
+
+  /* Split Layout */
+  .split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    align-items: center;
+  }
+
+  .split.reverse { direction: rtl; }
+  .split.reverse > * { direction: ltr; }
+
+  /* Feature List */
+  .feature-list {
+    list-style: none;
+    margin-top: 24px;
+  }
+
+  .feature-list li {
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    font-size: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .feature-list li:last-child { border-bottom: none; }
+
+  .feature-list .check {
+    color: #34c759;
+    font-weight: 700;
+    font-size: 18px;
+    flex-shrink: 0;
+    line-height: 1.5;
+  }
+
+  /* Stats */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+    margin-top: 40px;
+  }
+
+  .stat {
+    text-align: center;
+    padding: 32px 16px;
+    background: var(--surface);
+    border-radius: 16px;
+  }
+
+  .stat .number {
+    font-size: 48px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+
+  .stat .label {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-top: 8px;
+  }
+
+  /* Timeline */
+  .timeline {
+    margin-top: 32px;
+  }
+
+  .timeline-step {
+    display: flex;
+    gap: 24px;
+    padding: 24px 0;
+  }
+
+  .timeline-step .step-num {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .timeline-step .step-content h4 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .timeline-step .step-content p {
+    font-size: 15px;
+    color: var(--text-secondary);
+  }
+
+  /* Comparison Table */
+  .comparison-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-top: 32px;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: var(--card-shadow);
+  }
+
+  .comparison-table th {
+    background: var(--surface);
+    padding: 16px 24px;
+    text-align: left;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .comparison-table td {
+    padding: 14px 24px;
+    font-size: 15px;
+    border-bottom: 1px solid rgba(0,0,0,0.04);
+  }
+
+  .comparison-table tr:last-child td { border-bottom: none; }
+
+  .comparison-table .yes { color: #34c759; font-weight: 600; }
+  .comparison-table .no { color: #ff3b30; }
+
+  /* Dark slide */
+  .slide.dark {
+    background: #1d1d1f;
+    color: #f5f5f7;
+  }
+
+  .slide.dark h2 { color: #f5f5f7; }
+  .slide.dark .lead { color: #a1a1a6; }
+  .slide.dark .section-label { color: #2997ff; }
+  .slide.dark .card { background: #2d2d2f; }
+  .slide.dark .card p { color: #a1a1a6; }
+
+  /* Accent slide */
+  .slide.accent {
+    background: linear-gradient(135deg, #0071e3 0%, #40a9ff 100%);
+    color: white;
+  }
+
+  .slide.accent h2 { color: white; }
+  .slide.accent .lead { color: rgba(255,255,255,0.8); }
+  .slide.accent .section-label { color: rgba(255,255,255,0.7); }
+
+  /* CTA */
+  .cta-button {
+    display: inline-flex;
+    align-items: center;
+    padding: 14px 28px;
+    background: var(--accent);
+    color: white;
+    border-radius: 980px;
+    font-size: 16px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: background 0.2s;
+    margin-top: 24px;
+  }
+
+  .cta-button:hover { background: var(--accent-hover); }
+
+  .cta-button.outline {
+    background: transparent;
+    border: 2px solid var(--accent);
+    color: var(--accent);
+  }
+
+  /* Page indicator */
+  .page-indicator {
+    position: fixed;
+    right: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 100;
+  }
+
+  .page-indicator .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: all 0.3s;
+    cursor: pointer;
+  }
+
+  .page-indicator .dot.active {
+    background: var(--accent);
+    transform: scale(1.3);
+  }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .hero h1 { font-size: 40px; }
+    h2 { font-size: 36px; }
+    .split { grid-template-columns: 1fr; gap: 32px; }
+    .card-grid.cols-3 { grid-template-columns: 1fr; }
+    .card-grid.cols-2 { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: 1fr 1fr; }
+    nav .nav-links { display: none; }
+  }
+
+  /* Print */
+  @media print {
+    nav, .page-indicator { display: none; }
+    .slide { min-height: auto; page-break-after: always; padding: 40px 20px; }
+    html { scroll-snap-type: none; }
+  }
+
+  /* Keyboard hint */
+  .keyboard-hint {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 8px 20px;
+    border-radius: 980px;
+    font-size: 13px;
+    opacity: 0.8;
+    z-index: 100;
+    pointer-events: none;
+    animation: fadeOut 4s 3s forwards;
+  }
+
+  @keyframes fadeOut {
+    to { opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="brand">Ruhestand Suite</div>
+  <ul class="nav-links">
+    <li><a href="#start">Start</a></li>
+    <li><a href="#problem">Problem</a></li>
+    <li><a href="#loesung">Losung</a></li>
+    <li><a href="#balance">Balance-App</a></li>
+    <li><a href="#simulator">Simulator</a></li>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#fazit">Fazit</a></li>
+  </ul>
+</nav>
+
+<div class="keyboard-hint">Scrollen oder Pfeiltasten zum Navigieren</div>
+
+<!-- ==================== SLIDE 1: Hero ==================== -->
+<section class="slide hero" id="start">
+  <div class="slide-inner">
+    <p class="overline">Ruhestand Suite</p>
+    <h1>Finanzplanung<br>im Ruhestand.</h1>
+    <p class="subtitle">Das professionelle Werkzeug fur die Entnahmestrategie, Steueroptimierung und langfristige Absicherung Ihres Vermogens.</p>
+    <div class="hero-visual">
+      <img src="../Screenshots/Balance 01.png" alt="Ruhestand Suite - Balance App">
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 2: Das Problem ==================== -->
+<section class="slide" id="problem">
+  <div class="slide-inner">
+    <p class="section-label">Die Herausforderung</p>
+    <h2>Ruhestand ist kein<br>Autopilot.</h2>
+    <p class="lead">Mit dem Ende des Berufslebens beginnt die komplexeste Finanzphase. Wie viel kann ich jahrlich entnehmen, ohne mein Vermogen zu gefahrden?</p>
+    <div class="card-grid cols-3" style="margin-top: 48px;">
+      <div class="card">
+        <div class="card-icon red">?</div>
+        <h4>Unsicherheit</h4>
+        <p>Wie lange reicht mein Geld? Steigende Inflation, Borsencrashs und Pflegekosten machen die Planung unberechenbar.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon orange">%</div>
+        <h4>Steuer-Komplexitat</h4>
+        <p>Welche Positionen verkaufe ich zuerst? Altbestande, Teilfreistellungen und FIFO-Regeln erfordern prazise Berechnung.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon purple">+</div>
+        <h4>Partner-Dynamik</h4>
+        <p>Zwei Personen, unterschiedliche Renten, verschiedene Depots -- die Koordination auf Haushaltsebene ist aufwandig.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 3: Die Losung ==================== -->
+<section class="slide" id="loesung">
+  <div class="slide-inner" style="text-align: center;">
+    <p class="section-label">Die Antwort</p>
+    <h2>Zwei Apps.<br>Ein System.</h2>
+    <p class="lead" style="margin: 0 auto 48px;">Die Ruhestand Suite kombiniert jahrliche Entnahmeplanung mit langfristiger Monte-Carlo-Simulation -- alles lokal, ohne Cloud, ohne Abo.</p>
+    <div class="card-grid cols-2">
+      <div class="card" style="text-align: left;">
+        <div class="card-icon blue">B</div>
+        <h4>Balance-App</h4>
+        <p>Ihr jahrlicher Finanz-Check. Eingaben aktualisieren, Empfehlung erhalten, Positionen liquidieren. Mit Diagnose-Panel und Guardrail-System.</p>
+      </div>
+      <div class="card" style="text-align: left;">
+        <div class="card-icon green">S</div>
+        <h4>Simulator</h4>
+        <p>Langfristige Absicherung per Monte-Carlo-Simulation. Tausende Szenarien durchrechnen, Parameter optimieren, Pflegefalle modellieren.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 4: Balance-App Uberblick ==================== -->
+<section class="slide" id="balance">
+  <div class="slide-inner">
+    <div class="split">
+      <div>
+        <p class="section-label">Balance-App</p>
+        <h2>Ihr jahrlicher Finanz-Kompass.</h2>
+        <p class="lead">Geben Sie Ihr aktuelles Vermogen, Ihren Bedarf und Ihre Renten ein. Die App berechnet, wie viel Sie sicher entnehmen konnen.</p>
+        <ul class="feature-list">
+          <li><span class="check">&#10003;</span> Automatische Entnahmeempfehlung</li>
+          <li><span class="check">&#10003;</span> Steueroptimierte Positionsauswahl</li>
+          <li><span class="check">&#10003;</span> Marktregime-Erkennung (Bulle/Seitwarts/Bar)</li>
+          <li><span class="check">&#10003;</span> Guardrail-basierte Sicherheitsgrenzen</li>
+          <li><span class="check">&#10003;</span> Jahresend-Aktualisierungsworkflow</li>
+        </ul>
+      </div>
+      <div>
+        <div class="screenshot-frame">
+          <img src="../Screenshots/Balance 01.png" alt="Balance-App Hauptansicht">
+        </div>
+        <p class="screenshot-caption">Balance-App: Jahresplanung auf einen Blick</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 5: Diagnose ==================== -->
+<section class="slide">
+  <div class="slide-inner">
+    <div class="split reverse">
+      <div>
+        <p class="section-label">Balance-App</p>
+        <h2>Diagnose-Panel.</h2>
+        <p class="lead">Verstehen Sie nicht nur was die App empfiehlt, sondern warum. Der Entscheidungsbaum zeigt transparent, welche Regeln greifen.</p>
+        <ul class="feature-list">
+          <li><span class="check">&#10003;</span> Entscheidungsbaum mit allen aktiven Regeln</li>
+          <li><span class="check">&#10003;</span> KPI-Chips fur schnelle Orientierung</li>
+          <li><span class="check">&#10003;</span> Guardrail-Status auf einen Blick</li>
+          <li><span class="check">&#10003;</span> Marktregime-Klassifikation</li>
+        </ul>
+      </div>
+      <div>
+        <div class="screenshot-frame">
+          <img src="../Screenshots/Diagnose 01.png" alt="Diagnose-Panel">
+        </div>
+        <p class="screenshot-caption">Diagnose: Transparenter Entscheidungsbaum</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 6: Guardrails ==================== -->
+<section class="slide" style="background: var(--surface);">
+  <div class="slide-inner" style="text-align: center;">
+    <p class="section-label">Sicherheit</p>
+    <h2>Guardrails schutzen<br>Ihr Vermogen.</h2>
+    <p class="lead" style="margin: 0 auto 48px;">Ein mehrstufiges Sicherheitssystem passt Ihre Entnahme automatisch an, bevor Ihr Kapital gefahrdet wird.</p>
+    <div class="card-grid cols-2">
+      <div class="card">
+        <div class="card-icon green">&#9650;</div>
+        <h4>Quote-basierte Guardrails</h4>
+        <p>Begrenzen die Entnahmequote auf ein Maximum relativ zum Gesamtvermogen. Bei uberschreitung wird automatisch reduziert.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon orange">&#9660;</div>
+        <h4>Drawdown-Guardrails</h4>
+        <p>Reagieren auf Borsenverluste. Sinkt das Portfolio stark, greift eine zusatzliche Kurzung der Entnahme.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon red">&#9888;</div>
+        <h4>Runway-Guardrails</h4>
+        <p>Prufen, wie viele Jahre das Geld noch reicht. Wird die Schwelle unterschritten, tritt der Alarmmodus ein.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon purple">&#8734;</div>
+        <h4>Wealth-basierte Flexreduktion</h4>
+        <p>Glatte, stetige Anpassung pro Euro Vermogensveranderung statt harter Stufen.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 7: Simulator Uberblick ==================== -->
+<section class="slide" id="simulator">
+  <div class="slide-inner">
+    <div class="split">
+      <div>
+        <p class="section-label">Simulator</p>
+        <h2>Tausende Szenarien. Eine Antwort.</h2>
+        <p class="lead">Monte-Carlo-Simulationen testen Ihre Strategie gegen uber 100 Jahre historische Marktdaten -- inklusive Weltwirtschaftskrise und Stagflation.</p>
+        <ul class="feature-list">
+          <li><span class="check">&#10003;</span> 100+ Jahre Marktdaten (1925--2025)</li>
+          <li><span class="check">&#10003;</span> Parallele Berechnung in 8 Threads</li>
+          <li><span class="check">&#10003;</span> 30 reprasentative Szenarien im Detail</li>
+          <li><span class="check">&#10003;</span> Stress-Tests mit historischen Krisen</li>
+        </ul>
+      </div>
+      <div>
+        <div class="screenshot-frame">
+          <img src="../Screenshots/Simulator 01.png" alt="Simulator Hauptansicht">
+        </div>
+        <p class="screenshot-caption">Simulator: Monte-Carlo-Ergebnisse</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 8: Monte Carlo Ergebnisse ==================== -->
+<section class="slide">
+  <div class="slide-inner">
+    <div class="split reverse">
+      <div>
+        <p class="section-label">Simulator</p>
+        <h2>Ergebnisse, die Sie verstehen.</h2>
+        <p class="lead">Erfolgswahrscheinlichkeit, Medianvermogen, Worst-Case -- alle wichtigen Kennzahlen auf einen Blick. Mit Drill-Down in einzelne Szenarien.</p>
+        <ul class="feature-list">
+          <li><span class="check">&#10003;</span> Erfolgsrate in Prozent</li>
+          <li><span class="check">&#10003;</span> Vermogensverlauf uber die Jahre</li>
+          <li><span class="check">&#10003;</span> 30 Szenarien einzeln nachvollziehbar</li>
+          <li><span class="check">&#10003;</span> Export als JSON oder CSV</li>
+        </ul>
+      </div>
+      <div>
+        <div class="screenshot-frame">
+          <img src="../Screenshots/Monte Carlo 01.png" alt="Monte Carlo Ergebnisse">
+        </div>
+        <p class="screenshot-caption">Monte Carlo: KPI-Ubersicht und Szenarien</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 9: Szenario-Analyse ==================== -->
+<section class="slide" style="background: var(--surface);">
+  <div class="slide-inner">
+    <div class="split">
+      <div>
+        <p class="section-label">Szenarien</p>
+        <h2>30 Szenarien im Detail.</h2>
+        <p class="lead">Die App wahlt automatisch die 15 wichtigsten und 15 typische Szenarien aus. Jedes mit Jahr-fur-Jahr-Protokoll.</p>
+        <ul class="feature-list">
+          <li><span class="check">&#10003;</span> Worst Case, Best Case, Median</li>
+          <li><span class="check">&#10003;</span> P5/P10/P25/P75/P90/P95 Quantile</li>
+          <li><span class="check">&#10003;</span> Pflege-Extremszenarien</li>
+          <li><span class="check">&#10003;</span> Detailliertes Jahresprotokoll</li>
+        </ul>
+      </div>
+      <div>
+        <div class="screenshot-frame">
+          <img src="../Screenshots/Monte Carlo Szenarien 01.png" alt="Szenario-Analyse">
+        </div>
+        <p class="screenshot-caption">30 reprasentative Szenarien zur Detailanalyse</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 10: Parameter Sweep ==================== -->
+<section class="slide">
+  <div class="slide-inner">
+    <div class="split reverse">
+      <div>
+        <p class="section-label">Optimierung</p>
+        <h2>Parameter-Sweep.</h2>
+        <p class="lead">Variieren Sie bis zu 7 Parameter gleichzeitig. Die Heatmap zeigt sofort, welche Kombination die besten Ergebnisse liefert.</p>
+        <ul class="feature-list">
+          <li><span class="check">&#10003;</span> 1-7 Parameter gleichzeitig variieren</li>
+          <li><span class="check">&#10003;</span> Farbcodierte Heatmap</li>
+          <li><span class="check">&#10003;</span> Sensitivitatsanalyse</li>
+          <li><span class="check">&#10003;</span> Automatische Bestwerterkennung</li>
+        </ul>
+      </div>
+      <div>
+        <div class="screenshot-frame">
+          <img src="../Screenshots/Parameter Sweep 01.png" alt="Parameter Sweep Heatmap">
+        </div>
+        <p class="screenshot-caption">Heatmap: Erfolgrate nach Aktienquote und Entnahmerate</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 11: Auto-Optimierung ==================== -->
+<section class="slide" style="background: var(--surface);">
+  <div class="slide-inner">
+    <div class="split">
+      <div>
+        <p class="section-label">Optimierung</p>
+        <h2>Auto-Optimize.</h2>
+        <p class="lead">Der 3-Stufen-Algorithmus findet die optimalen Parameter automatisch -- 8-10x schneller als ein vollstandiger Sweep.</p>
+        <div class="timeline">
+          <div class="timeline-step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <h4>Grob-Scan (Latin Hypercube)</h4>
+              <p>Intelligente Stichprobenverteilung uber den gesamten Parameterraum.</p>
+            </div>
+          </div>
+          <div class="timeline-step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <h4>Lokale Verfeinerung</h4>
+              <p>Konzentrierte Suche um die vielversprechendsten Kandidaten.</p>
+            </div>
+          </div>
+          <div class="timeline-step">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <h4>Verifizierung</h4>
+              <p>Finale Prufung der besten Kombination mit hoher Genauigkeit.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="screenshot-frame">
+          <img src="../Screenshots/Auto Optimzire 01.png" alt="Auto-Optimierung">
+        </div>
+        <p class="screenshot-caption">Auto-Optimize: 3-Stufen-Ergebnis</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 12: Backtesting ==================== -->
+<section class="slide">
+  <div class="slide-inner">
+    <div class="split reverse">
+      <div>
+        <p class="section-label">Validierung</p>
+        <h2>Backtesting.</h2>
+        <p class="lead">Testen Sie Ihre Strategie gegen reale historische Marktphasen. Wie hatte sich Ihr Portfolio in der Finanzkrise 2008 verhalten?</p>
+        <ul class="feature-list">
+          <li><span class="check">&#10003;</span> Reale Marktdaten ab 1925</li>
+          <li><span class="check">&#10003;</span> Preset-Szenarien (Finanzkrise, Stagflation, ...)</li>
+          <li><span class="check">&#10003;</span> Vermogensverlauf uber die Jahre</li>
+          <li><span class="check">&#10003;</span> Vergleich mit Monte-Carlo-Ergebnissen</li>
+        </ul>
+      </div>
+      <div>
+        <div class="screenshot-frame">
+          <img src="../Screenshots/Backtest 01.png" alt="Backtesting">
+        </div>
+        <p class="screenshot-caption">Backtest: Strategie gegen historische Krisen</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 13: Pflege-Szenarien ==================== -->
+<section class="slide dark">
+  <div class="slide-inner" style="text-align: center;">
+    <p class="section-label">Vorsorge</p>
+    <h2>Pflege einplanen.<br>Bevor es soweit ist.</h2>
+    <p class="lead" style="margin: 0 auto 48px;">Die Suite modelliert Pflegeszenarien mit 5 Pflegegraden, ambulanter und stationarer Pflege und simultaner Pflege beider Partner.</p>
+    <div class="card-grid cols-3">
+      <div class="card">
+        <div class="card-icon blue">&#9825;</div>
+        <h4>5 Pflegegrade</h4>
+        <p>PG 0 bis PG 5 mit realistischen Kostenstufen und regionalen Anpassungen.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon green">&#8962;</div>
+        <h4>Ambulant & Stationar</h4>
+        <p>Unterschiedliche Kostenmodelle fur Pflege zu Hause oder im Pflegeheim.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon purple">&#9829;&#9829;</div>
+        <h4>Dual-Care</h4>
+        <p>Beide Partner gleichzeitig pflegebedurftig? Die App rechnet auch das durch.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 14: Depot-Tranchen ==================== -->
+<section class="slide">
+  <div class="slide-inner">
+    <div class="split">
+      <div>
+        <p class="section-label">Steueroptimierung</p>
+        <h2>Jede Position zahlt.</h2>
+        <p class="lead">Das Tranchen-System verwaltet jede einzelne Depot-Position mit Kaufdatum, Einstandskurs und Teilfreistellung -- fur maximale Steuereffizienz.</p>
+        <ul class="feature-list">
+          <li><span class="check">&#10003;</span> Einzelposition-Tracking (ISIN, Kaufdatum, Kurs)</li>
+          <li><span class="check">&#10003;</span> FIFO-Verkauf mit Steueroptimierung</li>
+          <li><span class="check">&#10003;</span> Altbestande steuerfrei (vor 2009)</li>
+          <li><span class="check">&#10003;</span> Teilfreistellung: Aktienfonds 30%, Mischfonds 15%</li>
+          <li><span class="check">&#10003;</span> Automatische Steuerberechnung bei Entnahme</li>
+        </ul>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <div class="card" style="background: #f0f7ff;">
+          <h4>Beispiel: Steuerersparnis</h4>
+          <p style="font-size: 15px; color: var(--text);">
+            Bei 50.000 EUR Entnahme kann die richtige Reihenfolge der Positionen
+            uber <strong>3.000 EUR</strong> Steuerdifferenz ausmachen --
+            dank Altbestand- und Teilfreistellungseffekten.
+          </p>
+        </div>
+        <div class="card" style="background: #f0faf0;">
+          <h4>Automatisch berechnet</h4>
+          <p style="font-size: 15px; color: var(--text);">
+            Die App wahlt automatisch die steuergunstigsten Positionen aus und
+            zeigt die exakte Steuerlast fur jede Transaktion.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 15: Profilverbund ==================== -->
+<section class="slide" style="background: var(--surface);">
+  <div class="slide-inner" style="text-align: center;">
+    <p class="section-label">Mehrpersonen-Haushalt</p>
+    <h2>Profilverbund.</h2>
+    <p class="lead" style="margin: 0 auto 48px;">Verwalten Sie mehrere Profile fur jeden Partner -- mit automatischer Aggregation und drei Verteilungsstrategien.</p>
+    <div class="card-grid cols-3">
+      <div class="card">
+        <div class="card-icon blue">&#8364;</div>
+        <h4>Steueroptimiert</h4>
+        <p>Entnahme priorisiert die steuergunstigsten Positionen uber alle Profile hinweg.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon green">&#8801;</div>
+        <h4>Proportional</h4>
+        <p>Entnahme proportional zum Vermogens-anteil jedes Profils.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon orange">&#8635;</div>
+        <h4>Runway-First</h4>
+        <p>Priorisiert das Profil mit der langsten verbleibenden Laufzeit.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 16: Ausgaben-Tracking ==================== -->
+<section class="slide">
+  <div class="slide-inner">
+    <div class="split reverse">
+      <div>
+        <p class="section-label">Budget</p>
+        <h2>Ausgaben im Blick.</h2>
+        <p class="lead">Importieren Sie Ihre monatlichen Ausgaben per CSV und vergleichen Sie diese mit Ihrem geplanten Budget. Jahr fur Jahr.</p>
+        <ul class="feature-list">
+          <li><span class="check">&#10003;</span> CSV-Import (automatische Erkennung)</li>
+          <li><span class="check">&#10003;</span> Monatliche Gegenuberstellung</li>
+          <li><span class="check">&#10003;</span> Historischer Ausgabenverlauf</li>
+          <li><span class="check">&#10003;</span> Soll/Ist-Vergleich</li>
+        </ul>
+      </div>
+      <div>
+        <div class="screenshot-frame">
+          <img src="../Screenshots/Ausgaben.png" alt="Ausgaben-Tracking">
+        </div>
+        <p class="screenshot-caption">Monatliche Ausgaben vs. geplantes Budget</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 17: Datenhoheit ==================== -->
+<section class="slide dark">
+  <div class="slide-inner" style="text-align: center;">
+    <p class="section-label">Datenschutz</p>
+    <h2>Ihre Daten bleiben<br>bei Ihnen.</h2>
+    <p class="lead" style="margin: 0 auto 48px;">Kein Cloud-Dienst. Kein Abo. Kein Account. Alles lauft lokal auf Ihrem Rechner.</p>
+    <div class="card-grid cols-2" style="max-width: 800px; margin: 0 auto;">
+      <div class="card">
+        <div class="card-icon green">&#128274;</div>
+        <h4>100% Lokal</h4>
+        <p>Alle Berechnungen, alle Daten, alle Ergebnisse -- ausschliesslich auf Ihrem Computer.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon blue">&#128268;</div>
+        <h4>Offline-fahig</h4>
+        <p>Funktioniert komplett ohne Internetverbindung. Online-Daten (Inflation, ETF-Kurse) sind optional.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 18: Installation ==================== -->
+<section class="slide">
+  <div class="slide-inner">
+    <p class="section-label">Einfach starten</p>
+    <h2>In 3 Schritten loslegen.</h2>
+    <p class="lead">Keine Installation, keine Konfiguration, kein Registrierung.</p>
+    <div class="timeline" style="max-width: 700px;">
+      <div class="timeline-step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h4>Herunterladen</h4>
+          <p>RuhestandSuite.exe herunterladen -- eine einzige Datei, portabel, keine Installation notig.</p>
+        </div>
+      </div>
+      <div class="timeline-step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h4>Starten</h4>
+          <p>Doppelklick auf die EXE. Die Suite offnet sich im Browser -- fertig.</p>
+        </div>
+      </div>
+      <div class="timeline-step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h4>Daten eingeben</h4>
+          <p>Vermogen, Bedarf, Renten eintragen. Die App berechnet sofort Ihre personliche Entnahmeempfehlung.</p>
+        </div>
+      </div>
+    </div>
+    <div class="stats-row" style="margin-top: 60px;">
+      <div class="stat">
+        <div class="number">0</div>
+        <div class="label">Cloud-Abhangigkeit</div>
+      </div>
+      <div class="stat">
+        <div class="number">0</div>
+        <div class="label">Monatliche Kosten</div>
+      </div>
+      <div class="stat">
+        <div class="number">100%</div>
+        <div class="label">Datenhoheit</div>
+      </div>
+      <div class="stat">
+        <div class="number">1</div>
+        <div class="label">Datei zum Starten</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 19: Fur wen ist das? ==================== -->
+<section class="slide" style="background: var(--surface);">
+  <div class="slide-inner" style="text-align: center;">
+    <p class="section-label">Zielgruppe</p>
+    <h2>Fur wen ist die<br>Ruhestand Suite?</h2>
+    <p class="lead" style="margin: 0 auto 48px;">
+      Die Suite richtet sich an alle, die ihre Entnahmestrategie selbst in die Hand nehmen wollen.
+    </p>
+    <div class="card-grid cols-2" style="max-width: 900px; margin: 0 auto;">
+      <div class="card" style="text-align: left;">
+        <div class="card-icon blue">&#128100;</div>
+        <h4>Privatanleger im Ruhestand</h4>
+        <p>Sie haben ein ETF-/Aktien-Depot und gesetzliche Rente. Sie wollen wissen, wie viel Sie jahrlich entnehmen konnen, ohne das Vermogen zu riskieren.</p>
+      </div>
+      <div class="card" style="text-align: left;">
+        <div class="card-icon purple">&#128101;</div>
+        <h4>Paare &amp; Mehrpersonen-Haushalte</h4>
+        <p>Zwei Personen, unterschiedliche Depots und Renten. Der Profilverbund koordiniert die Entnahme auf Haushaltsebene.</p>
+      </div>
+      <div class="card" style="text-align: left;">
+        <div class="card-icon green">&#128202;</div>
+        <h4>Zahlenaffine Planer</h4>
+        <p>Sie mochten Monte-Carlo-Simulationen, Parameter-Sweeps und Backtests -- nicht nur eine Faustregel.</p>
+      </div>
+      <div class="card" style="text-align: left;">
+        <div class="card-icon orange">&#128272;</div>
+        <h4>Datenschutz-Bewusste</h4>
+        <p>Sie vertrauen Ihre Finanzdaten keinem Cloud-Dienst an. Alles bleibt auf Ihrem Rechner.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 20: Fazit ==================== -->
+<section class="slide accent" id="fazit">
+  <div class="slide-inner" style="text-align: center;">
+    <h2 style="font-size: 56px;">Finanzplanung<br>im Ruhestand.<br>Neu gedacht.</h2>
+    <p class="lead" style="margin: 24px auto 40px; max-width: 600px;">
+      Die Ruhestand Suite vereint jahrliche Entnahmeplanung, Monte-Carlo-Simulation,
+      Steueroptimierung und Pflegevorsorge in einem lokalen, kostenfreien Werkzeug.
+    </p>
+    <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+      <a class="cta-button" href="#" style="background: white; color: var(--accent);">Jetzt starten</a>
+      <a class="cta-button outline" href="#" style="border-color: white; color: white;">Mehr erfahren</a>
+    </div>
+  </div>
+</section>
+
+<!-- Page indicator dots -->
+<div class="page-indicator" id="pageIndicator"></div>
+
+<script>
+  // Page indicator
+  const slides = document.querySelectorAll('.slide');
+  const indicator = document.getElementById('pageIndicator');
+
+  slides.forEach((_, i) => {
+    const dot = document.createElement('div');
+    dot.classList.add('dot');
+    dot.addEventListener('click', () => {
+      slides[i].scrollIntoView({ behavior: 'smooth' });
+    });
+    indicator.appendChild(dot);
+  });
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const idx = Array.from(slides).indexOf(entry.target);
+        document.querySelectorAll('.page-indicator .dot').forEach((d, i) => {
+          d.classList.toggle('active', i === idx);
+        });
+      }
+    });
+  }, { threshold: 0.5 });
+
+  slides.forEach(s => observer.observe(s));
+
+  // Keyboard navigation
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ') {
+      e.preventDefault();
+      const current = Array.from(slides).findIndex(s => {
+        const rect = s.getBoundingClientRect();
+        return rect.top >= -100 && rect.top < window.innerHeight / 2;
+      });
+      if (current < slides.length - 1) {
+        slides[current + 1].scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+    if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const current = Array.from(slides).findIndex(s => {
+        const rect = s.getBoundingClientRect();
+        return rect.top >= -100 && rect.top < window.innerHeight / 2;
+      });
+      if (current > 0) {
+        slides[current - 1].scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  });
+</script>
+
+</body>
+</html>

@@ -54,7 +54,7 @@ function getAutoOptimizePool(workerCount) {
             autoOptimizePool.dispose();
         }
         autoOptimizePool = new WorkerPool({
-            workerUrl: new URL('./workers/mc-worker.js', import.meta.url),
+            workerUrl: new URL('../../workers/mc-worker.js', import.meta.url),
             size: workerCount,
             type: 'module',
             telemetryName: 'AutoOptimizePool',

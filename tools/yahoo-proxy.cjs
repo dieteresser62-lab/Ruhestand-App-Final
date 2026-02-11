@@ -11,10 +11,19 @@ const getArg = (name, fallback) => {
 
 const port = Number(getArg('--port', process.env.PORT || 8787));
 
+const ALLOWED_ORIGINS = ['null', 'tauri://localhost'];
+const isAllowedOrigin = (origin) =>
+  ALLOWED_ORIGINS.includes(origin) || (origin && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin));
+
+const corsOrigin = (req) => {
+  const origin = req.headers.origin || 'null';
+  return isAllowedOrigin(origin) ? origin : 'null';
+};
+
 const sendJson = (res, status, payload) => {
   res.writeHead(status, {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': res._corsOrigin || 'null',
     'Access-Control-Allow-Methods': 'GET,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type'
   });
@@ -148,9 +157,10 @@ const proxyChart = async (symbol, period1, period2, interval, res) => {
 };
 
 const server = http.createServer((req, res) => {
+  res._corsOrigin = corsOrigin(req);
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': res._corsOrigin,
       'Access-Control-Allow-Methods': 'GET,OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type'
     });

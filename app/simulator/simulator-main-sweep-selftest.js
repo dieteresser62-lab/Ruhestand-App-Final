@@ -150,7 +150,7 @@ export async function runSweepSelfTest() {
         resultsDiv.innerHTML = html;
 
     } catch (error) {
-        resultsDiv.innerHTML = `<p style="color: red;">Fehler: ${error.message}</p>`;
+        resultsDiv.textContent = `Fehler: ${error.message}`;
     } finally {
         button.disabled = false;
     }

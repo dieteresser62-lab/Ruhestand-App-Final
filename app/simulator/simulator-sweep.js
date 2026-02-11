@@ -116,7 +116,7 @@ async function runSweepWithWorkers({
         ? desiredWorkers
         : Math.max(1, (navigator?.hardwareConcurrency || 2) - 1));
     const timeBudgetMs = workerConfig.timeBudgetMs ?? 200;
-    const workerUrl = new URL('./workers/mc-worker.js', import.meta.url);
+    const workerUrl = new URL('../../workers/mc-worker.js', import.meta.url);
 
     const pool = new WorkerPool({
         workerUrl,

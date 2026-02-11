@@ -9,6 +9,7 @@
 
 import { UIUtils } from './balance-utils.js';
 import { UIRenderer } from './balance-renderer.js';
+import { escapeHtml } from '../shared/security-utils.js';
 
 export function createAnnualModalHandlers({ getLastUpdateResults }) {
     const showUpdateResultModal = (results) => {
@@ -58,7 +59,7 @@ export function createAnnualModalHandlers({ getLastUpdateResults }) {
                     <div class="result-content">
                         <div class="result-title">Inflation ${results.inflation.year}</div>
                         <div class="result-value">${UIUtils.formatPercentValue(results.inflation.rate, { fractionDigits: 1, invalid: 'n/a' })}</div>
-                        <div class="result-details">Quelle: ${results.inflation.source} • Bedarfe automatisch angepasst</div>
+                        <div class="result-details">Quelle: ${escapeHtml(results.inflation.source)} • Bedarfe automatisch angepasst</div>
                     </div>
                 </div>
             `;
@@ -70,7 +71,7 @@ export function createAnnualModalHandlers({ getLastUpdateResults }) {
                     <div class="result-content">
                         <div class="result-title">Inflation</div>
                         <div class="result-value">Fehler</div>
-                        <div class="result-details">${error.error}</div>
+                        <div class="result-details">${escapeHtml(error.error)}</div>
                     </div>
                 </div>
             `;
@@ -87,9 +88,9 @@ export function createAnnualModalHandlers({ getLastUpdateResults }) {
                 <div class="modal-result-item success">
                     <div class="result-icon">${athIcon}</div>
                     <div class="result-content">
-                        <div class="result-title">${results.etf.ticker} • Nachrücken durchgeführt</div>
-                        <div class="result-value">${results.etf.price} €</div>
-                        <div class="result-details">Stand: ${results.etf.date} • Quelle: ${results.etf.source}<br>${athText}</div>
+                        <div class="result-title">${escapeHtml(results.etf.ticker)} • Nachrücken durchgeführt</div>
+                        <div class="result-value">${escapeHtml(String(results.etf.price))} €</div>
+                        <div class="result-details">Stand: ${escapeHtml(results.etf.date)} • Quelle: ${escapeHtml(results.etf.source)}<br>${athText}</div>
                     </div>
                 </div>
             `;
@@ -101,7 +102,7 @@ export function createAnnualModalHandlers({ getLastUpdateResults }) {
                     <div class="result-content">
                         <div class="result-title">ETF & Nachrücken</div>
                         <div class="result-value">Fehler</div>
-                        <div class="result-details">${error.error}</div>
+                        <div class="result-details">${escapeHtml(error.error)}</div>
                     </div>
                 </div>
             `;

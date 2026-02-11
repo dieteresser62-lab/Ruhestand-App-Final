@@ -90,17 +90,17 @@ try {
             createdAt: new Date().toISOString(),
             localStorage: {
                 [CONFIG.STORAGE.LS_KEY]: JSON.stringify({ inputs: { a: 1 }, lastState: { b: 2 } }),
-                custom_key: 'value'
+                depot_tranchen: 'restored_value'
             }
         };
         localStorage.setItem(snapshotKey, JSON.stringify(snapshotPayload));
-        localStorage.setItem('custom_key', 'old');
+        localStorage.setItem('depot_tranchen', 'old');
 
         const restoreBtn = { dataset: { key: snapshotKey } };
         const event = { target: { closest: (sel) => (sel === '.restore-snapshot' ? restoreBtn : null) } };
         await handlers.handleSnapshotActions(event);
 
-        assertEqual(localStorage.getItem('custom_key'), 'value', 'restoreSnapshot should restore localStorage data');
+        assertEqual(localStorage.getItem('depot_tranchen'), 'restored_value', 'restoreSnapshot should restore localStorage data');
     }
 
     // --- TEST 4: Fehlerhafte Snapshots werden abgefangen ---
