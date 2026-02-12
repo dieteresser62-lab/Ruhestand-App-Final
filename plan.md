@@ -1,4 +1,4 @@
-# Implementierungsplan: VPW-basierte Dynamische Flex-Entnahme
+# Implementierungsplan: Dynamische Flex-Entnahme (VPW + Sterbetafeln)
 
 ## Kernidee
 
@@ -19,6 +19,58 @@ Entnahme = Floor(fix, inflationsbereinigt)
          + Flex(VPW-dynamisch) × FlexRate%(Guardrails)
 ```
 
+---
+
+## Optionen-Übersicht
+
+### Option A: RMD (Vermögen / Restlebenserwartung)
+
+- **Formel:** `Flex = max(0, Depotwert / LE(Alter) - Floor)`
+- **Horizont:** Aktuarisch aus Sterbetafeln (Single/Joint/Konservativ)
+- **Rendite:** Keine Renditeerwartung eingepreist
+- **Architektur:** App-Layer (`simulator-engine-direct.js`), Engine unverändert
+- **Features:** Joint Life für Ehepaare, Konservativ-Aufschlag, Go-Go-Multiplikator
+- **Nachteil:** Frühphase zu konservativ ("knauserig") — 5% statt realitätsnäher 6-7%
+
+### Option B: VPW (Variable Percentage Withdrawal)
+
+- **Formel:** `Flex = max(0, Vermögen × r/(1-(1+r)^-n) - Floor)`
+- **Horizont:** Fixer Planungshorizont (z.B. "plane bis 95")
+- **Rendite:** CAPE-basierte erwartete Realrendite, gewichtet nach Ziel-Allokation
+- **Architektur:** Engine-Layer (`engine/core.mjs`), beide Apps profitieren
+- **Features:** Antizyklisch (CAPE), renditeaware, natürliche Anpassung
+- **Nachteil:** Fixer Horizont ignoriert aktuarische Realität und Geschlecht
+
+### Option C: Beides kombiniert (Empfehlung) ★
+
+VPW-Formel (renditeaware) **+** aktuarischer Horizont aus Sterbetafeln **+** RMD-Features.
+
+- **Formel:** `Flex = max(0, Vermögen × r/(1-(1+r)^-n) - Floor)`
+- **Horizont:** `n = estimateRemainingLifeYears(gender, age)` aus Sterbetafeln, NICHT fix
+- **Rendite:** CAPE-basierte erwartete Realrendite (wie Option B)
+- **Features:** Joint Life, Konservativ-Aufschlag (+X Jahre), Go-Go-Multiplikator
+- **Architektur:** VPW-Formel in Engine, Horizont-Berechnung in App-Layer → Engine bekommt `horizonYears`
+
+| | Option A (RMD) | Option B (VPW) | **Option C (Kombiniert)** |
+|---|---|---|---|
+| Formel | V / n | V × r/(1-(1+r)^-n) | V × r/(1-(1+r)^-n) |
+| Horizont | Sterbetafel (aktuarisch) | Fix (z.B. 95) | **Sterbetafel (aktuarisch)** |
+| Rendite | Keine (r=0) | CAPE + Allokation | **CAPE + Allokation** |
+| Alter 65, r=3% | 5.0% (zu wenig) | 6.7% (fix n=30) | **6.7%** (n=LE≈21) → **7.8%** |
+| Joint Life | Ja | Nein | **Ja** |
+| Go-Go | Ja | Nein | **Ja** |
+| Konservativ | +X Jahre | - | **+X Jahre** |
+| Engine-Changes | Keine | Ja | Ja |
+| Antizyklisch | Nein | Ja (CAPE) | **Ja (CAPE)** |
+
+**Warum Option C überlegen ist:**
+1. **Aktuarisch korrekt**: n basiert auf tatsächlicher Lebenserwartung (Single: ~21J mit 65, Joint: ~26J), nicht auf Wunschalter
+2. **Renditeaware**: VPW preist Portfolio-Rendite ein → ~35% mehr als reines RMD in der Frühphase
+3. **Paaradaptiv**: Joint Life verlängert den Horizont → niedrigere Rate → sicherer für den Überlebenden
+4. **Go-Go-Phase**: Erste 5-10 Jahre mit Multiplikator (1.1-1.3×) → höhere Entnahmen in den aktiven Jahren
+5. **Konservativ-Puffer**: +5 Jahre auf LE schützt Langlebige, statt "auf Punkt" zu planen
+6. **Natürlich steigend**: LE sinkt mit dem Alter → vpwRate steigt automatisch → mehr Flex im Alter
+
 ### Warum VPW statt RMD
 
 | | RMD (Vermögen/LE) | VPW (mit Renditeerwartung) |
@@ -35,16 +87,39 @@ Kapital schneller aufzubrauchen.
 
 ---
 
-## Architektur-Entscheidung
+## Architektur-Entscheidung (Option C)
 
-**VPW-Logik lebt in `engine/core.mjs`, vor dem SpendingPlanner-Aufruf.**
+**Zwei Ebenen: Horizont-Berechnung im App-Layer, VPW-Formel in der Engine.**
 
-Begründung:
-- core.mjs macht bereits Input-Preprocessing (Renten-Nettierung, Zeilen 85-98)
-- VPW ersetzt `inflatedBedarf.flex` – genau dort, wo der Wert gesetzt wird
+```
+App-Layer (Simulator/Balance)                    Engine-Layer (core.mjs)
+┌─────────────────────────────┐                 ┌──────────────────────────┐
+│ Sterbetafeln (MORTALITY_TABLE)│                │ VPW-Formel:              │
+│ → Single/Joint LE           │  horizonYears   │   vpwRate(r, n)          │
+│ → + konservativPlus         │ ──────────────→ │   vpwTotal = V × rate    │
+│ → Go-Go-Multiplikator       │  goGoMultiplier │   flex = vpwTotal - floor│
+│                             │ ──────────────→ │   × goGoMultiplier       │
+└─────────────────────────────┘                 └──────────────────────────┘
+```
+
+**Warum diese Aufteilung:**
+- **Sterbetafeln im App-Layer**: `MORTALITY_TABLE` (~50 Einträge pro Geschlecht) lebt bereits in `simulator-data.js`. In der Balance-App wird sie importiert. Engine bleibt schlank und demografiefrei.
+- **VPW-Formel in der Engine**: core.mjs macht bereits Input-Preprocessing (Renten-Nettierung). VPW ersetzt `inflatedBedarf.flex` – genau dort, wo der Wert gesetzt wird.
 - SpendingPlanner bleibt **unverändert** – er sieht den dynamischen Flex wie normalen `flexBedarf`
 - Beide Apps (Balance + Simulator) profitieren über einen einzigen Eingriffspunkt
 - `dynamicFlex: false` (Default) → exakt das bisherige Verhalten, volle Abwärtskompatibilität
+
+**Engine-Input-Kontrakt:**
+Die Engine erhält `horizonYears` (Zahl, z.B. 21) statt `planungshorizont` (Alter, z.B. 95).
+Der App-Layer berechnet `horizonYears` aus Sterbetafeln und ist verantwortlich für:
+- Wahl der Tabelle (Single/Joint)
+- Konservativ-Aufschlag (+X Jahre)
+- Min/Max-Clamping
+
+Die Engine ist verantwortlich für:
+- VPW-Rate aus `horizonYears` + erwarteter Realrendite
+- Go-Go-Multiplikator auf `vpwTotal`
+- Diagnostics
 
 ### Inflation-Frage (geklärt)
 
@@ -60,23 +135,37 @@ Bei aktivem VPW wird die Simulator-seitige Inflation-Fortschreibung von `baseFle
 
 ---
 
-## Datenfluss-Diagramm
+## Datenfluss-Diagramm (Option C)
 
 ```
 Simulator UI / Balance UI
   │
   ├─ dynamicFlex: true/false (Checkbox)
-  ├─ planungshorizont: 95 (Alter, Default)
-  ├─ startFlexBedarf: 28000 (wird bei VPW ignoriert)
+  ├─ dynamicFlexHorizont: 'single' | 'joint' | 'konservativ' (Select)
+  ├─ konservativPlus: 5 (Jahre, Default)
+  ├─ goGoJahre: 0 (Anzahl Jahre mit Bonus, Default 0 = aus)
+  ├─ goGoMultiplier: 1.2 (Faktor, Default 1.0)
+  ├─ startFlexBedarf: 28000 (wird bei dynamicFlex ignoriert)
   │
   ▼
 simulator-portfolio-inputs.js / balance-reader.js
   │
   ▼
-simulator-engine-direct.js (simulateOneYear)
+simulator-engine-direct.js (simulateOneYear) / balance-main.js
+  │
+  ├─ *** HORIZONT-BERECHNUNG (App-Layer) ***
+  ├─ if (dynamicFlex):
+  │   ├─ if (horizont === 'joint' && partner.aktiv):
+  │   │     n = estimateJointRemainingLifeYears(g1, age1, g2, age2)
+  │   ├─ else:
+  │   │     n = estimateRemainingLifeYears(gender, age)
+  │   ├─ if (horizont === 'konservativ'):  n += konservativPlus
+  │   └─ horizonYears = clamp(n, 1, 60)
   │
   ├─ engineInput.dynamicFlex = true
-  ├─ engineInput.planungshorizont = 95
+  ├─ engineInput.horizonYears = 21  (berechnet, nicht fix!)
+  ├─ engineInput.goGoActive = (yearIndex < goGoJahre)
+  ├─ engineInput.goGoMultiplier = 1.2
   ├─ engineInput.flexBedarf = baseFlex (wird in Engine überschrieben)
   │
   ▼
@@ -85,11 +174,11 @@ engine/core.mjs (_internal_calculateModel)
   ├─ Marktanalyse → market.expectedReturnCape (4-8% je nach CAPE)
   ├─ Gesamtvermögen = Depot + Liquidität (Zeile 72, bereits vorhanden)
   │
-  ├─ if (dynamicFlex):
+  ├─ if (dynamicFlex && horizonYears > 0):
   │   ├─ r = gewichtete Realrendite aus targetEq + CAPE + Gold + Safe
-  │   ├─ n = planungshorizont - aktuellesAlter
   │   ├─ vpwRate = r / (1 - (1+r)^(-n))    [bei r≈0: 1/n]
   │   ├─ vpwTotal = gesamtwert × vpwRate
+  │   ├─ if (goGoActive): vpwTotal *= goGoMultiplier
   │   └─ inflatedBedarf.flex = max(0, vpwTotal - inflatedBedarf.floor)
   │
   ▼
@@ -103,7 +192,8 @@ SpendingPlanner.determineSpending() ← KEINE ÄNDERUNG
 Entnahme = Floor_netto + VPW-Flex × FlexRate%
   │
   ▼
-Ergebnis enthält ui.vpw = { horizonYears, vpwRate, dynamicFlex, expectedRealReturn }
+Ergebnis enthält ui.vpw = { horizonYears, vpwRate, dynamicFlex,
+                            expectedRealReturn, goGoActive, horizonMode }
 ```
 
 ---
@@ -122,7 +212,8 @@ DYNAMIC_FLEX: {
     GOLD_REAL_RETURN: 0.01,          // 1.0% reale Rendite Gold (konservativ)
     MIN_HORIZON_YEARS: 1,            // Mindest-Restlaufzeit
     MAX_HORIZON_YEARS: 60,           // Maximale Restlaufzeit
-    FALLBACK_REAL_RETURN: 0.03       // 3% real wenn keine CAPE-Daten
+    FALLBACK_REAL_RETURN: 0.03,      // 3% real wenn keine CAPE-Daten
+    MAX_GO_GO_MULTIPLIER: 1.5        // Maximaler Go-Go-Multiplikator
 }
 ```
 
@@ -135,24 +226,24 @@ DYNAMIC_FLEX: {
 Nach dem `flexBudgetYears`-Block (Zeile 132) einfügen:
 
 ```javascript
-// Dynamische Flex (VPW-Modus)
+// Dynamische Flex (VPW + Sterbetafeln, Option C)
 if (input.dynamicFlex) {
     checkFiniteRange(
-        input.planungshorizont, 70, 120,
-        'planungshorizont',
-        'Planungshorizont muss zwischen 70 und 120 Jahren liegen.'
+        input.horizonYears, 1, 60,
+        'horizonYears',
+        'Horizont muss zwischen 1 und 60 Jahren liegen.'
     );
-    if (Number.isFinite(input.planungshorizont) && Number.isFinite(input.aktuellesAlter)) {
-        check(
-            input.planungshorizont <= input.aktuellesAlter,
-            'planungshorizont',
-            'Planungshorizont muss größer als aktuelles Alter sein.'
+    if (input.goGoActive) {
+        checkFiniteRange(
+            input.goGoMultiplier, 1.0, CONFIG.SPENDING_MODEL.DYNAMIC_FLEX.MAX_GO_GO_MULTIPLIER,
+            'goGoMultiplier',
+            `Go-Go-Multiplikator muss zwischen 1.0 und ${CONFIG.SPENDING_MODEL.DYNAMIC_FLEX.MAX_GO_GO_MULTIPLIER} liegen.`
         );
     }
 }
 ```
 
-`dynamicFlex` ist boolean, `planungshorizont` ist ein Alter (z.B. 95 = "plane bis 95").
+`dynamicFlex` ist boolean, `horizonYears` ist die vom App-Layer berechnete Restlaufzeit (Zahl, z.B. 21).
 
 ---
 
@@ -205,17 +296,28 @@ Einfügen ZWISCHEN der bestehenden `inflatedBedarf`-Berechnung (Zeilen 90-97) un
 wird in den neuen Block integriert:
 
 ```javascript
-    // === VPW DYNAMIC FLEX ===
+    // === VPW DYNAMIC FLEX (Option C: VPW + Sterbetafeln) ===
     let vpwDiagnostics = null;
-    if (input.dynamicFlex && input.planungshorizont > input.aktuellesAlter) {
-        const horizonYears = input.planungshorizont - input.aktuellesAlter;
+    if (input.dynamicFlex && input.horizonYears > 0) {
+        const horizonYears = Math.max(
+            CONFIG.SPENDING_MODEL.DYNAMIC_FLEX.MIN_HORIZON_YEARS,
+            Math.min(CONFIG.SPENDING_MODEL.DYNAMIC_FLEX.MAX_HORIZON_YEARS, input.horizonYears)
+        );
         const expectedRealReturn = _calculateExpectedRealReturn({
             gesamtwert, expectedReturnCape: market.expectedReturnCape,
             inflation: input.inflation, targetEq: input.targetEq,
             goldAktiv: input.goldAktiv, goldZielProzent: input.goldZielProzent
         });
         const vpwRate = _calculateVpwRate(expectedRealReturn, horizonYears);
-        const vpwTotal = gesamtwert * vpwRate;
+        let vpwTotal = gesamtwert * vpwRate;
+
+        // Go-Go-Multiplikator (erste N Jahre → höhere Entnahme in aktiven Jahren)
+        const goGoActive = input.goGoActive || false;
+        const goGoMultiplier = (goGoActive && input.goGoMultiplier > 1.0)
+            ? Math.min(input.goGoMultiplier, CONFIG.SPENDING_MODEL.DYNAMIC_FLEX.MAX_GO_GO_MULTIPLIER)
+            : 1.0;
+        vpwTotal *= goGoMultiplier;
+
         inflatedBedarf.flex = Math.max(0, vpwTotal - inflatedBedarf.floor);
 
         vpwDiagnostics = {
@@ -224,7 +326,9 @@ wird in den neuen Block integriert:
             vpwRate: Math.round(vpwRate * 10000) / 100,
             vpwTotal: Math.round(vpwTotal),
             dynamicFlex: Math.round(inflatedBedarf.flex),
-            gesamtwert: Math.round(gesamtwert)
+            gesamtwert: Math.round(gesamtwert),
+            goGoActive,
+            goGoMultiplier: Math.round(goGoMultiplier * 100) / 100
         };
     }
     const neuerBedarf = inflatedBedarf.floor + inflatedBedarf.flex;
@@ -243,20 +347,42 @@ wird in den neuen Block integriert:
 Im Bereich der Floor/Flex-Eingabe:
 
 ```html
+<!-- Dynamische Flex (Option C: VPW + Sterbetafeln) -->
 <div class="form-group">
     <label for="dynamicFlex">
         <input type="checkbox" id="dynamicFlex"> Dynamische Flex (VPW)
     </label>
-    <small class="help-text">Flex wird dynamisch aus Vermögen, Alter und
+    <small class="help-text">Flex wird dynamisch aus Vermögen, Lebenserwartung und
     Renditeerwartung berechnet. Manuelle Flex-Eingabe entfällt.</small>
 </div>
-<div class="form-group" id="planungshorizontGroup" style="display:none">
-    <label for="planungshorizont">Planungshorizont (Alter)</label>
-    <input type="number" id="planungshorizont" value="95" min="70" max="120">
+<div id="dynamicFlexPanel" style="display:none">
+    <div class="form-group">
+        <label for="dynamicFlexHorizont">Horizont-Modus</label>
+        <select id="dynamicFlexHorizont">
+            <option value="single">Einzelperson (Sterbetafel)</option>
+            <option value="joint">Ehepaar (Joint Life)</option>
+            <option value="konservativ" selected>Konservativ (+5 Jahre)</option>
+        </select>
+    </div>
+    <div class="form-group" id="konservativPlusGroup">
+        <label for="konservativPlus">Konservativ-Aufschlag (Jahre)</label>
+        <input type="number" id="konservativPlus" value="5" min="0" max="15">
+    </div>
+    <div class="form-group">
+        <label for="goGoJahre">Go-Go-Phase (Jahre ab Start)</label>
+        <input type="number" id="goGoJahre" value="0" min="0" max="20">
+        <small class="help-text">Erhöhte Entnahme in den ersten aktiven Ruhestandsjahren (0 = deaktiviert)</small>
+    </div>
+    <div class="form-group" id="goGoMultiplierGroup" style="display:none">
+        <label for="goGoMultiplier">Go-Go-Multiplikator</label>
+        <input type="number" id="goGoMultiplier" value="1.2" min="1.0" max="1.5" step="0.05">
+    </div>
 </div>
 ```
 
-JS: Checkbox togglet Sichtbarkeit von `planungshorizontGroup` und disabled `startFlexBedarf`.
+JS: Checkbox togglet Sichtbarkeit von `dynamicFlexPanel` und disabled `startFlexBedarf`.
+Horizont-Select togglet `konservativPlusGroup` (nur bei 'konservativ').
+Go-Go-Jahre > 0 zeigt `goGoMultiplierGroup`.
 
 **4b. Input-Reader** (`app/simulator/simulator-portfolio-inputs.js`)
 
@@ -264,20 +390,89 @@ In `getCommonInputs()` nach Zeile 115 (flexBudgetRecharge):
 
 ```javascript
 dynamicFlex: document.getElementById('dynamicFlex')?.checked || false,
-planungshorizont: parseInt(document.getElementById('planungshorizont')?.value) || 95,
+dynamicFlexHorizont: document.getElementById('dynamicFlexHorizont')?.value || 'konservativ',
+konservativPlus: parseInt(document.getElementById('konservativPlus')?.value) || 5,
+goGoJahre: parseInt(document.getElementById('goGoJahre')?.value) || 0,
+goGoMultiplier: parseFloat(document.getElementById('goGoMultiplier')?.value) || 1.0,
 ```
 
-**4c. Engine-Input durchreichen** (`app/simulator/simulator-engine-direct.js`)
+**4c. Horizont-Berechnung + Engine-Input** (`app/simulator/simulator-engine-direct.js`)
+
+Neue Hilfsfunktion und Anpassung im `simulateOneYear`:
+
+```javascript
+import { estimateRemainingLifeYears, estimateJointRemainingLifeYears }
+    from './simulator-engine-helpers.js';
+
+/**
+ * Berechnet horizonYears aus Sterbetafeln (Option C).
+ * Wird pro Simulationsjahr aufgerufen.
+ */
+function _calculateHorizonYears(inputs, yearIndex) {
+    const currentAge = inputs.startAlter + yearIndex;
+    const mode = inputs.dynamicFlexHorizont || 'konservativ';
+    let n;
+
+    if (mode === 'joint' && inputs.partner?.aktiv) {
+        const ageP2 = (inputs.partner.startAlter || currentAge) + yearIndex;
+        const p2Gender = inputs.partner.geschlecht || 'm';
+        n = estimateJointRemainingLifeYears(
+            inputs.geschlecht, currentAge, p2Gender, ageP2
+        );
+    } else {
+        n = estimateRemainingLifeYears(inputs.geschlecht, currentAge);
+    }
+
+    if (mode === 'konservativ') {
+        n += (inputs.konservativPlus || 5);
+    }
+
+    return Math.max(1, Math.min(60, n));
+}
+```
 
 Im `engineInput`-Objekt (nach Zeile 428):
 
 ```javascript
 dynamicFlex: inputs.dynamicFlex || false,
-planungshorizont: inputs.planungshorizont || 95,
+horizonYears: inputs.dynamicFlex ? _calculateHorizonYears(inputs, yearIndex) : 0,
+goGoActive: inputs.dynamicFlex && inputs.goGoJahre > 0 && yearIndex < inputs.goGoJahre,
+goGoMultiplier: inputs.goGoMultiplier || 1.0,
 ```
 
-`aktuellesAlter` ist bereits korrekt gesetzt (Zeile 419: `inputs.startAlter + yearIndex`).
-Die Engine berechnet `n = planungshorizont - aktuellesAlter`, das sinkt automatisch pro Jahr.
+`horizonYears` sinkt automatisch pro Jahr (LE wird kürzer mit steigendem Alter).
+Bei Go-Go: `goGoActive` ist nur die ersten N Jahre true.
+
+**4d. Joint-Life-Funktion exportieren** (`app/simulator/simulator-engine-helpers.js`)
+
+Neue Funktion (nach der bestehenden `estimateRemainingLifeYears`):
+
+```javascript
+/**
+ * Joint Life: Erwartete Restjahre bis der letzte von beiden stirbt.
+ * P(mindestens einer lebt in Jahr t) = 1 - P(P1 tot) × P(P2 tot)
+ */
+export function estimateJointRemainingLifeYears(gender1, age1, gender2, age2) {
+    const table1 = MORTALITY_TABLE[gender1] || MORTALITY_TABLE.m;
+    const table2 = MORTALITY_TABLE[gender2] || MORTALITY_TABLE.m;
+    let survP1 = 1, survP2 = 1;
+    let expectedYears = 0;
+
+    for (let t = 0; t < 60; t++) {
+        const qx1 = table1[age1 + t] ?? 1;
+        const qx2 = table2[age2 + t] ?? 1;
+        const jointSurv = 1 - (1 - survP1) * (1 - survP2);
+        expectedYears += jointSurv;
+        survP1 *= (1 - Math.min(1, Math.max(0, qx1)));
+        survP2 *= (1 - Math.min(1, Math.max(0, qx2)));
+        if (jointSurv < 0.0001) break;
+    }
+
+    return Math.max(1, Math.round(expectedYears));
+}
+```
+
+Bestehende `estimateRemainingLifeYears` ebenfalls exportieren (aktuell nur intern).
 
 ---
 
@@ -285,7 +480,8 @@ Die Engine berechnet `n = planungshorizont - aktuellesAlter`, das sinkt automati
 
 **5a. HTML** (`Balance.html`)
 
-Analog zum Simulator: Checkbox + Planungshorizont-Feld neben `flexBedarf`.
+Analog zum Simulator: Checkbox + Horizont-Modus + Konservativ-Aufschlag + Go-Go neben `flexBedarf`.
+Gleiche UI-Elemente wie in Schritt 4a, angepasst an Balance-App Formular-Stil.
 
 **5b. Reader** (`app/balance/balance-reader.js`)
 
@@ -293,13 +489,38 @@ In `readAllInputs()`:
 
 ```javascript
 dynamicFlex: dom.inputs['dynamicFlex']?.checked || false,
-planungshorizont: parseInt(dom.inputs['planungshorizont']?.value) || 95,
+dynamicFlexHorizont: dom.inputs['dynamicFlexHorizont']?.value || 'konservativ',
+konservativPlus: parseInt(dom.inputs['konservativPlus']?.value) || 5,
+goGoJahre: parseInt(dom.inputs['goGoJahre']?.value) || 0,
+goGoMultiplier: parseFloat(dom.inputs['goGoMultiplier']?.value) || 1.0,
 ```
 
-**5c. Renderer** (`app/balance/balance-renderer-summary.js`)
+**5c. Horizont-Berechnung** (`app/balance/balance-main.js` oder neues Modul)
+
+Balance-App ist Einzeljahr-Berechnung. `horizonYears` wird einmalig aus Sterbetafeln berechnet:
+
+```javascript
+import { MORTALITY_TABLE } from '../simulator/simulator-data.js';  // shared data
+
+// Einfachere Variante: Balance kennt kein Joint Life (Einzelprofil)
+function calculateHorizonYears(gender, currentAge, mode, konservativPlus) {
+    // Sterbetafel-Berechnung (analog estimateRemainingLifeYears)
+    const table = MORTALITY_TABLE[gender] || MORTALITY_TABLE.m;
+    // ... (gleiche Logik wie in simulator-engine-helpers.js)
+    let n = estimatedYears;
+    if (mode === 'konservativ') n += konservativPlus;
+    return Math.max(1, Math.min(60, n));
+}
+```
+
+Alternativ: Sterbetafel-Funktion in ein shared Modul extrahieren (z.B. `app/shared/life-expectancy.js`),
+das beide Apps importieren. **Entscheidung bei Implementierung.**
+
+**5d. Renderer** (`app/balance/balance-renderer-summary.js`)
 
 Wenn `ui.vpw` vorhanden, VPW-Info unter der monatlichen Entnahme anzeigen:
-`"VPW-Flex: €X/Jahr (Rate: Y%, Restlaufzeit: Z J., exp. Rendite: W%)"`.
+`"VPW-Flex: €X/Jahr (Rate: Y%, LE: Z J. [konservativ], exp. Rendite: W%)"`.
+Bei Go-Go: zusätzlich `"Go-Go aktiv: ×1.2"` anzeigen.
 
 ---
 
@@ -318,12 +539,17 @@ npm test                # Regressionstests — alles muss bestehen (dynamicFlex 
 | 2 | VPW-Rate bei r=3%, n=20 | ≈ 0.0672 |
 | 3 | VPW-Rate bei r=5%, n=10 | ≈ 0.1295 |
 | 4 | dynamicFlex=false | flexBedarf unverändert, exakt wie bisher |
-| 5 | dynamicFlex=true, Vermögen 600k, Floor(netto) 6k, n=20, r≈3% | vpwTotal ≈ 40k, Flex ≈ 34k |
+| 5 | dynamicFlex=true, Vermögen 600k, Floor(netto) 6k, n=21(LE), r≈3% | vpwTotal ≈ 38k, Flex ≈ 32k |
 | 6 | Renten-Nettierung + VPW | Floor 24k - Rente 18k = netFloor 6k, VPW-Flex basiert auf 6k |
-| 7 | Restlaufzeit sinkt pro Jahr | Alter 65→vpwRate≈5.1%, Alter 80→≈8.4%, Alter 94→≈103% |
+| 7 | Restlaufzeit sinkt mit Alter | LE(65)≈21→vpwRate≈6.2%, LE(80)≈9→≈13.1%, LE(90)≈4→≈27.5% |
 | 8 | Bear-Market + VPW | FlexRate < 100% → tatsächliche Entnahme < VPW-Flex |
-| 9 | vpwDiagnostics im Ergebnis | Bei true: alle Felder vorhanden. Bei false: null |
+| 9 | vpwDiagnostics im Ergebnis | Bei true: alle Felder inkl. goGoActive. Bei false: null |
 | 10 | Regression: alle bestehenden Tests | Bestehen unverändert |
+| 11 | Joint Life Horizont | Ehepaar (m65+w63) → LE≈26J > Single(m65)≈21J |
+| 12 | Konservativ-Aufschlag | Single LE 21 + 5 = 26 → niedrigere vpwRate |
+| 13 | Go-Go aktiv (Jahr 0-9) | vpwTotal × 1.2, goGoActive=true in Diagnostics |
+| 14 | Go-Go inaktiv (Jahr 10+) | vpwTotal × 1.0, goGoActive=false |
+| 15 | Go-Go-Multiplikator geclampt | Max 1.5, Input 2.0 → wird auf 1.5 begrenzt |
 
 ---
 
@@ -331,21 +557,34 @@ npm test                # Regressionstests — alles muss bestehen (dynamicFlex 
 
 | Datei | Änderung | Zeilen |
 |-------|----------|--------|
-| `engine/config.mjs` | Neuer Block `DYNAMIC_FLEX` | ~8 |
-| `engine/validators/InputValidator.mjs` | Validierung `dynamicFlex`, `planungshorizont` | ~12 |
-| `engine/core.mjs` | VPW-Funktionen + Override + Diagnostics | ~55 |
-| `Simulator.html` | Checkbox + Planungshorizont-Input + Toggle-JS | ~15 |
-| `app/simulator/simulator-portfolio-inputs.js` | 2 Felder in `getCommonInputs()` | ~3 |
-| `app/simulator/simulator-engine-direct.js` | 2 Felder in `engineInput` | ~3 |
-| `Balance.html` | Checkbox + Planungshorizont-Input | ~12 |
-| `app/balance/balance-reader.js` | 2 Felder in `readAllInputs()` | ~3 |
-| `app/balance/balance-renderer-summary.js` | VPW-Info-Anzeige | ~15 |
-| `tests/vpw-dynamic-flex.test.mjs` | Neue Testdatei | ~150 |
-| **Gesamt** | | **~275** |
+| `engine/config.mjs` | Neuer Block `DYNAMIC_FLEX` (inkl. Go-Go-Max) | ~9 |
+| `engine/validators/InputValidator.mjs` | Validierung `dynamicFlex`, `horizonYears`, `goGoMultiplier` | ~15 |
+| `engine/core.mjs` | VPW-Funktionen + Override + Go-Go + Diagnostics | ~65 |
+| `Simulator.html` | Checkbox + Horizont-Modus + Go-Go + Toggle-JS | ~40 |
+| `app/simulator/simulator-portfolio-inputs.js` | 5 Felder in `getCommonInputs()` | ~6 |
+| `app/simulator/simulator-engine-direct.js` | Horizont-Berechnung + 4 Felder in `engineInput` | ~35 |
+| `app/simulator/simulator-engine-helpers.js` | Export LE + neue Joint-Life-Funktion | ~30 |
+| `Balance.html` | Checkbox + Horizont-Modus + Go-Go | ~35 |
+| `app/balance/balance-reader.js` | 5 Felder in `readAllInputs()` | ~6 |
+| `app/balance/balance-main.js` (o. shared) | Horizont-Berechnung für Balance | ~25 |
+| `app/balance/balance-renderer-summary.js` | VPW-Info + Go-Go-Anzeige | ~20 |
+| `tests/vpw-dynamic-flex.test.mjs` | Neue Testdatei (15 Testfälle) | ~200 |
+| **Gesamt** | | **~485** |
 
 ---
 
 ## Kritische Design-Entscheidungen
+
+### 0. Aktuarischer Horizont statt fixer Planungshorizont (Option C)
+
+Der fixe Planungshorizont (z.B. "plane bis 95") hat zwei Probleme:
+- **Willkürlich**: Warum 95 und nicht 90 oder 100? Jede Wahl erzeugt bias.
+- **Geschlechtsblind**: Frauen leben statistisch 4-5 Jahre länger als Männer.
+
+Sterbetafeln lösen beides: `estimateRemainingLifeYears(gender, age)` liefert den
+aktuarischen Erwartungswert, der automatisch mit Alter und Geschlecht skaliert.
+Der Konservativ-Aufschlag (+5 Jahre) ersetzt die Sicherheitsmarge, die man bei
+fixem Horizont manuell wählen musste. Joint Life schützt den Überlebenden bei Ehepaaren.
 
 ### 1. Realrendite aus `targetEq` (Ziel-Allokation), NICHT aktueller Allokation
 
@@ -387,16 +626,39 @@ Bei VPW ist dieser Wert jährlich anders, aber der Cap funktioniert identisch:
 Er begrenzt die tatsächliche Flex-Entnahme in Bärenmärkten. Bei VPW ist der
 dynamische Flex in Bärenmärkten ohnehin kleiner → Cap greift seltener → erwünschtes Verhalten.
 
+### 6. Go-Go-Multiplikator: Einfach und transparent
+
+Go-Go erhöht `vpwTotal` um einen Faktor (z.B. 1.2× = 20% mehr) in den ersten N Jahren.
+- Kein eigenes Budget, keine separate Berechnung
+- Geclampt auf MAX_GO_GO_MULTIPLIER (1.5) als Sicherheitslimit
+- Engine sieht nur `goGoActive: true/false` + `goGoMultiplier: 1.2`
+- App-Layer entscheidet ob Go-Go aktiv ist: `yearIndex < goGoJahre`
+- Nach Ablauf der Go-Go-Phase: automatisch Faktor 1.0, kein "Knick" weil VPW ohnehin jedes Jahr neu berechnet
+
+### 7. Horizont-Berechnung im App-Layer, nicht in der Engine
+
+Die Engine bekommt `horizonYears` als fertige Zahl. Sie weiß nicht, ob dieser
+Wert aus Sterbetafeln, Joint Life oder einem fixen Planungshorizont stammt.
+
+Vorteile:
+- Engine bleibt schlank (~100KB Ziel) und demografiefrei
+- `MORTALITY_TABLE` (~2KB) muss nicht in den Engine-Bundle
+- Testbarkeit: Engine-Tests brauchen keine Sterbetafeln, nur `horizonYears`
+- Zukünftig: Andere Horizont-Quellen (z.B. individuelle LE) ohne Engine-Änderung
+
 ---
 
 ## Scope-Abgrenzung
 
 **In Scope (Phase 1):**
 - VPW-Berechnung in Engine Core (beide Apps)
-- Simulator UI: Checkbox + Planungshorizont
-- Balance UI: Checkbox + Planungshorizont
-- VPW-Diagnostics in Ergebnis
-- Tests
+- Sterbetafeln-basierter Horizont (Single/Joint/Konservativ)
+- Joint-Life-Funktion in simulator-engine-helpers.js
+- Go-Go-Multiplikator (erste N Jahre)
+- Simulator UI: Checkbox + Horizont-Modus + Go-Go + Konservativ-Aufschlag
+- Balance UI: Checkbox + Horizont-Modus + Go-Go + Konservativ-Aufschlag
+- VPW-Diagnostics in Ergebnis (inkl. Go-Go-Status)
+- Tests (15 Testfälle inkl. Joint Life + Go-Go)
 
 **Nicht in Scope (Phase 2):**
 - VPW in Parameter-Sweeps (SWEEP_ALLOWED_KEYS)
@@ -404,6 +666,7 @@ dynamische Flex in Bärenmärkten ohnehin kleiner → Cap greift seltener → er
 - Eigene Diagnose-Chips für VPW in der Balance-App
 - Profilverbund mit VPW (Multi-Profil hat unterschiedliche Allokationen)
 - Akkumulationsphase (VPW irrelevant während Ansparphase)
+- Shared Modul für Sterbetafeln (erst wenn Code-Duplikation zu groß wird)
 
 **Nicht nötig (bereits vorhanden):**
 - Smoothing → FlexRate-Smoothing im SpendingPlanner
@@ -411,61 +674,79 @@ dynamische Flex in Bärenmärkten ohnehin kleiner → Cap greift seltener → er
 - Cap → FlexRate ist auf 100% begrenzt
 - CAPE-Daten → MarketAnalyzer liefert expectedReturnCape
 - Asset-Allokation → targetEq bereits als Input vorhanden
+- Sterbetafeln → MORTALITY_TABLE in simulator-data.js
 
 ---
 
 ## Rechenbeispiele
 
-### Beispiel 1: Typischer deutscher Ruheständler
+### Beispiel 1: Typischer deutscher Ruheständler (Single, konservativ)
 
-Gesamtvermögen 600k, Floor 24k, Rente 18k/J, Alter 65, Horizont 95, targetEq 60%
+Gesamtvermögen 600k, Floor 24k, Rente 18k/J, Mann 65, targetEq 60%, Modus konservativ (+5J)
 
 ```
 netFloor = max(0, 24k - 18k) = 6k
+LE(m,65) ≈ 21 Jahre → n = 21 + 5 (konservativ) = 26
 CAPE 30 → expectedReturnCape = 5% nominal
 inflation = 2.5%
 r_real = 60% × (5%-2.5%) + 10% × 1% + 30% × 0.5% = 1.75%
-n = 95 - 65 = 30
-vpwRate = 0.0175 / (1 - 1.0175^(-30)) = 0.0408 (4.08%)
-vpwTotal = 600k × 0.0408 = 24.480
-dynamicFlex = max(0, 24.480 - 6.000) = 18.480
-Gesamt-Entnahme = 6k + 18.48k + 18k(Rente) = 42.480/Jahr = 3.540/Monat
+vpwRate = 0.0175 / (1 - 1.0175^(-26)) = 0.0460 (4.60%)
+vpwTotal = 600k × 0.0460 = 27.600
+dynamicFlex = max(0, 27.600 - 6.000) = 21.600
+Gesamt-Entnahme = 6k + 21.6k + 18k(Rente) = 45.600/Jahr = 3.800/Monat
 ```
 
-### Beispiel 2: Hohes Vermögen (das Ausgangsproblem)
+Vergleich Option B (fixer Horizont 95): n=30 → vpwRate=4.08% → Flex=18.5k → 42.5k/Jahr.
+**Option C liefert +3.1k/Jahr mehr** weil aktuarisch n=26 < 30 (realistischer).
 
-Gesamtvermögen 2.5 Mio, Floor 24k, Rente 18k/J, Alter 65, Horizont 95, targetEq 70%
+### Beispiel 2: Ehepaar mit Go-Go (Joint Life)
+
+Gesamtvermögen 2.5 Mio, Floor 24k, Rente 18k/J, Mann 65 + Frau 63, targetEq 70%,
+Joint Life, Go-Go 10 Jahre × 1.2
 
 ```
 netFloor = 6k
-r_real = 70% × 2.5% + 0% gold + 30% × 0.5% = 1.9%
-vpwRate = 0.019 / (1 - 1.019^(-30)) = 0.0415 (4.15%)
-vpwTotal = 2.5M × 0.0415 = 103.750
-dynamicFlex = max(0, 103.750 - 6.000) = 97.750
-Gesamt-Entnahme = 6k + 97.75k + 18k = 121.750/Jahr ≈ 10.146/Monat
+LE_joint(m65, w63) ≈ 28 Jahre (Frau lebt statistisch länger → Joint > Single)
+CAPE 30 → r_real = 70% × 2.5% + 30% × 0.5% = 1.9%
+vpwRate = 0.019 / (1 - 1.019^(-28)) = 0.0432 (4.32%)
+vpwTotal = 2.5M × 0.0432 = 108.000
+Go-Go aktiv (Jahr 1): vpwTotal × 1.2 = 129.600
+dynamicFlex = max(0, 129.600 - 6.000) = 123.600
+Gesamt-Entnahme = 6k + 123.6k + 18k = 147.600/Jahr ≈ 12.300/Monat
 ```
 
-Statt der manuellen 28k Flex (→ 52k/Jahr) liefert VPW **122k/Jahr**. Das Vermögen wird
-tatsächlich genutzt statt endlos akkumuliert.
+Nach Go-Go-Phase (ab Jahr 11):
+```
+Alter 75, LE_joint(m75, w73) ≈ 18 Jahre
+Vermögen ≈ 2.0M (angenommen)
+vpwRate = 0.019 / (1 - 1.019^(-18)) = 0.0630 (6.30%)
+vpwTotal = 2.0M × 0.063 = 126.000 (ohne Go-Go)
+dynamicFlex = 120.000
+Gesamt = 6k + 120k + 18k = 144k/Jahr
+```
 
-### Beispiel 3: Crash-Szenario
+Statt der manuellen 28k Flex (→ 52k/Jahr) liefert Option C **148k/Jahr** in der Go-Go-Phase.
+Das Vermögen wird tatsächlich genutzt, mit Joint-Life-Sicherheit für den Überlebenden.
 
-Gesamtvermögen sinkt auf 800k (bei Alter 75), CAPE fällt auf 15
+### Beispiel 3: Crash-Szenario (Single, konservativ)
+
+Gesamtvermögen sinkt auf 800k (bei Alter 75, Mann), CAPE fällt auf 15
 
 ```
 netFloor = 6k (unverändert, inflationsbereinigt)
+LE(m,75) ≈ 12 Jahre → n = 12 + 5 (konservativ) = 17
 CAPE 15 → expectedReturnCape = 8% (attraktive Bewertung!)
 r_real = 70% × (8%-2.5%) + 30% × 0.5% = 4.0%
-n = 95 - 75 = 20
-vpwRate = 0.04 / (1 - 1.04^(-20)) = 0.0736 (7.36%)
-vpwTotal = 800k × 0.0736 = 58.880
-dynamicFlex = 52.880
+vpwRate = 0.04 / (1 - 1.04^(-17)) = 0.0822 (8.22%)
+vpwTotal = 800k × 0.0822 = 65.760
+dynamicFlex = 59.760
 
 Plus: Guardrails senken FlexRate auf z.B. 70% (bear_deep)
-Tatsächliche Flex = 52.880 × 70% = 37.016
-Gesamt = 6k + 37k + 18k = 61k/Jahr
+Tatsächliche Flex = 59.760 × 70% = 41.832
+Gesamt = 6k + 41.8k + 18k = 65.8k/Jahr
 ```
 
 Deutlich reduziert gegenüber dem Median-Szenario, aber immer noch komfortabel.
 Die CAPE-basierte Renditeerwartung wirkt antizyklisch: nach dem Crash ist die
 erwartete Rendite höher → VPW-Flex sinkt nicht so stark wie das Vermögen.
+Der Konservativ-Aufschlag (+5J) verhindert, dass die vpwRate bei kurzer LE zu aggressiv wird.
