@@ -482,6 +482,88 @@ try {
     }
     console.log('✓ runAutoOptimize Delta vs Current OK');
 
+    // Test 27: runAutoOptimize - Dynamic-Flex Modus (Stufe A)
+    console.log('Test 27: runAutoOptimize - Dynamic-Flex Modus (Stufe A)');
+    {
+        const seenModes = [];
+        const mockEvaluate = async (_candidate, baseInputs) => {
+            seenModes.push(baseInputs?.dynamicFlex === true);
+            return {
+                medianEndWealth: 500000,
+                successProbFloor: 1,
+                worst5Drawdown: 0.2,
+                timeShareWRgt45: 0
+            };
+        };
+
+        const resultOn = await runAutoOptimize({
+            objective: { metric: 'EndWealth_P50', direction: 'max' },
+            params: { targetEq: { min: 50, max: 70, step: 5 } },
+            runsPerCandidate: 10,
+            seedsTrain: 2,
+            seedsTest: 2,
+            constraints: {},
+            maxDauer: 20,
+            dynamicFlexMode: 'force_on',
+            evaluateCandidateFn: mockEvaluate
+        });
+        assert(resultOn.optimizationContext.dynamicFlexMode === 'force_on', 'Mode sollte force_on sein');
+        assert(resultOn.optimizationContext.dynamicFlexActive === true, 'Dynamic Flex sollte aktiv sein');
+
+        const resultOff = await runAutoOptimize({
+            objective: { metric: 'EndWealth_P50', direction: 'max' },
+            params: { targetEq: { min: 50, max: 70, step: 5 } },
+            runsPerCandidate: 10,
+            seedsTrain: 2,
+            seedsTest: 2,
+            constraints: {},
+            maxDauer: 20,
+            dynamicFlexMode: 'force_off',
+            evaluateCandidateFn: mockEvaluate
+        });
+        assert(resultOff.optimizationContext.dynamicFlexMode === 'force_off', 'Mode sollte force_off sein');
+        assert(resultOff.optimizationContext.dynamicFlexActive === false, 'Dynamic Flex sollte inaktiv sein');
+
+        assert(seenModes.includes(true), 'Evaluations sollten den force_on Modus sehen');
+        assert(seenModes.includes(false), 'Evaluations sollten den force_off Modus sehen');
+    }
+    console.log('✓ runAutoOptimize Dynamic-Flex Modus (Stufe A) OK');
+
+    // Test 28: runAutoOptimize - Safety-Guards bremsen aggressive Dynamic-Flex Loesungen
+    console.log('Test 28: runAutoOptimize - Safety-Guards bremsen aggressive Dynamic-Flex Loesungen');
+    {
+        const mockEvaluate = async (candidate) => {
+            const multiplier = Number(candidate.goGoMultiplier) || 1.0;
+            const isAggressive = multiplier >= 1.25;
+            return {
+                medianEndWealth: isAggressive ? 1200000 : 900000,
+                successProbFloor: isAggressive ? 0.90 : 0.985,
+                worst5Drawdown: isAggressive ? 0.72 : 0.42,
+                timeShareWRgt45: isAggressive ? 0.35 : 0.08,
+                medianWithdrawalRate: isAggressive ? 0.072 : 0.046
+            };
+        };
+
+        const result = await runAutoOptimize({
+            objective: { metric: 'EndWealth_P50', direction: 'max' },
+            params: {
+                goGoMultiplier: { min: 1.0, max: 1.3, step: 0.05 }
+            },
+            runsPerCandidate: 20,
+            seedsTrain: 2,
+            seedsTest: 2,
+            constraints: { sr99: false, noex: false, ts45: false, dd55: false },
+            maxDauer: 30,
+            dynamicFlexMode: 'force_on',
+            evaluateCandidateFn: mockEvaluate
+        });
+
+        assert(Number(result.championCfg.goGoMultiplier) < 1.25, 'Champion sollte keine aggressive Go-Go Loesung sein');
+        assert(result.optimizationContext.safetyGuardsActive === true, 'Safety-Guards sollten aktiv sein');
+        assert(result.optimizationContext.usesDynamicFlexParams === true, 'Dynamic-Flex-Parameter sollten erkannt sein');
+    }
+    console.log('✓ runAutoOptimize Safety-Guards bremsen aggressive Dynamic-Flex Loesungen OK');
+
     console.log('✅ Auto-Optimizer objective search works');
 
 } finally {

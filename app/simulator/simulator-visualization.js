@@ -16,6 +16,7 @@ import { formatPercentValue } from './simulator-formatting.js';
 const formatFixed = (value, digits = 1) => value.toFixed(digits);
 const formatPercent = (value, digits = 0) => formatPercentValue(value, { fractionDigits: digits, invalid: '0%' });
 const formatRangeLine = (min, max, range) => `Range: ${formatFixed(min, 1)} → ${formatFixed(max, 1)} (Δ ${formatFixed(range, 1)})`;
+const isValidSweepResult = result => result && result.metrics && result.metrics.invalidCombination !== true;
 
 /**
  * Berechnet Sensitivity für jeden Parameter
@@ -25,6 +26,8 @@ const formatRangeLine = (min, max, range) => `Range: ${formatFixed(min, 1)} → 
  */
 export function calculateSensitivity(sweepResults, metricKey) {
     if (!sweepResults || sweepResults.length === 0) return null;
+    const validSweepResults = sweepResults.filter(isValidSweepResult);
+    if (validSweepResults.length === 0) return null;
 
     // Parameterräume kommen aus der Sweep-UI und sind global gepuffert.
     const paramRanges = window.sweepParamRanges;
@@ -48,7 +51,7 @@ export function calculateSensitivity(sweepResults, metricKey) {
 
         // Werte nach Parameterausprägung gruppieren, um Mittelwerte zu bilden.
         const metricsByParamValue = {};
-        for (const result of sweepResults) {
+        for (const result of validSweepResults) {
             const paramValue = result.params[paramKey];
             const metricValue = result.metrics[metricKey];
 
@@ -105,7 +108,10 @@ export function renderSensitivityChart(sensitivity, metricKey) {
         rebalBand: 'Rebal Band',
         maxSkimPct: 'Max Skim %',
         maxBearRefillPct: 'Max Bear Refill %',
-        goldTargetPct: 'Gold Target %'
+        goldTargetPct: 'Gold Target %',
+        horizonYears: 'VPW Horizon',
+        survivalQuantile: 'VPW Quantile',
+        goGoMultiplier: 'VPW Go-Go Mult'
     };
 
     // Sortiere Parameter nach Impact (höchster zuerst) für ein lesbares Ranking.
@@ -159,21 +165,23 @@ export function renderSensitivityChart(sensitivity, metricKey) {
  */
 export function calculateParetoFrontier(sweepResults, metricKey1, metricKey2, maximize1 = true, maximize2 = true) {
     if (!sweepResults || sweepResults.length === 0) return [];
+    const validSweepResults = sweepResults.filter(isValidSweepResult);
+    if (validSweepResults.length === 0) return [];
 
     const paretoPoints = [];
 
-    for (let i = 0; i < sweepResults.length; i++) {
-        const point = sweepResults[i];
+    for (let i = 0; i < validSweepResults.length; i++) {
+        const point = validSweepResults[i];
         const m1 = point.metrics[metricKey1];
         const m2 = point.metrics[metricKey2];
 
         let isDominated = false;
 
     // Prüfe ob dieser Punkt von einem anderen dominiert wird.
-    for (let j = 0; j < sweepResults.length; j++) {
+    for (let j = 0; j < validSweepResults.length; j++) {
         if (i === j) continue;
 
-            const other = sweepResults[j];
+            const other = validSweepResults[j];
             const om1 = other.metrics[metricKey1];
             const om2 = other.metrics[metricKey2];
 

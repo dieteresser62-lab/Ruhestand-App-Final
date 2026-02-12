@@ -10,6 +10,7 @@ import { initializeBacktestUI } from './simulator-backtest.js';
 import { initInputPersistence } from './simulator-main-input-persist.js';
 import { initRentAdjModeUI } from './simulator-main-rent-adjust.js';
 import { initAccumulationControls } from './simulator-main-accumulation.js';
+import { initDynamicFlexControls } from './simulator-main-dynamic-flex.js';
 import { initSweepUIControls } from './simulator-main-sweep-ui.js';
 import { initTabSwitching } from './simulator-main-tabs.js';
 import { initResetButton } from './simulator-main-reset.js';
@@ -43,6 +44,7 @@ export function initializeSimulatorApp() {
     updateStartPortfolioDisplay();
 
     initInputPersistence();
+    initDynamicFlexControls();
     initializePflegeUIControls();
 
     const mcMethodeSelect = document.getElementById('mcMethode');

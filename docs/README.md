@@ -15,10 +15,12 @@ Diese Datei dient als Uebersicht und Bestandsaufnahme fuer die Dokumentation.
     - `docs/reference/WORKFLOW_PSEUDOCODE.md`
 - `docs/internal/`
   - Arbeitsdokumente und Entwurfsartefakte.
-  - Dateien:
-    - `docs/internal/PROFILVERBUND_BALANCE_PROGRESS.md`
-    - `docs/internal/PROFILVERBUND_BALANCE_PROMPT.md`
-    - `docs/internal/PROFILVERBUND_BALANCE_SPEC.md`
+  - Archiv-Ordner:
+    - `docs/internal/archive/2026-dynamic-flex/` (Dynamic-Flex Umsetzung: Plan/Tickets/Rollout/Baseline/CAPE-Contract)
+    - `docs/internal/archive/2025-profilverbund-balance/` (Profilverbund-Balance Umsetzung: Spec/Prompt/Progress)
+    - `docs/internal/archive/2025-webworkers-rollout/` (WebWorker-Rollout-Plan)
+    - `docs/internal/archive/2025-adapter-elimination/` (Adapter-Ablösung Report)
+    - `docs/internal/archive/2025-gemini-notes/` (historische Notizen)
 - `tests/`
   - Testdokumentation (`tests/README.md`)
 - `engine/`
@@ -28,13 +30,17 @@ Diese Datei dient als Uebersicht und Bestandsaufnahme fuer die Dokumentation.
 
 - `README.md` (Einstieg/Navigation)
 - `QUICKSTART.md` (Schnellstart)
-- `TECHNICAL.md` (technische Referenz)
-- `ARCHITEKTUR_UND_FACHKONZEPT.md` (fachlich-technische Vertiefung)
-- `BALANCE_MODULES_README.md` und `SIMULATOR_MODULES_README.md` (Modulreferenz)
+- `LICENSE.md` (Lizenz)
+
+## Referenzdokumente (unter `docs/reference/`)
+
+- `docs/reference/TECHNICAL.md` (technische Referenz)
+- `docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md` (fachlich-technische Vertiefung)
+- `docs/reference/BALANCE_MODULES_README.md` und `docs/reference/SIMULATOR_MODULES_README.md` (Modulreferenz)
 
 Diese Root-Dateien bleiben vorerst erhalten, damit bestehende Links und externe Referenzen stabil bleiben.
 
 ## Hinweis zur Stabilitaet
 
-- Die zentrale Einstiegsdokumentation bleibt im Projekt-Root (`README.md`, `QUICKSTART.md`, `TECHNICAL.md`).
-- Guided Tours haben einen Root-Weiterleitungsstummel unter `GUIDED_TOURS.md`, der auf `docs/guides/GUIDED_TOURS.md` zeigt.
+- Die zentrale Einstiegsdokumentation bleibt im Projekt-Root (`README.md`, `QUICKSTART.md`, `LICENSE.md`).
+- Guided Tours liegen unter `docs/guides/GUIDED_TOURS.md`.

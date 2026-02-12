@@ -13,6 +13,19 @@ import { parseDisplayNumber } from './simulator-portfolio-format.js';
 
 const DEFAULT_RISIKOPROFIL = 'sicherheits-dynamisch';
 const DEFAULT_PFLEGE_DRIFT_PCT = 3.5; // Realistische Langfrist-Annahme (3–4 % über VPI)
+const DYNAMIC_FLEX_DEFAULTS = {
+    HORIZON_METHOD: 'survival_quantile',
+    HORIZON_YEARS: 30,
+    SURVIVAL_QUANTILE: 0.85,
+    GO_GO_MULTIPLIER: 1.0
+};
+const DYNAMIC_FLEX_ALLOWED_HORIZON_METHODS = new Set(['mean', 'survival_quantile']);
+
+function parseBoundedNumber(rawValue, fallback, min, max) {
+    const n = Number.parseFloat(String(rawValue ?? '').replace(',', '.'));
+    if (!Number.isFinite(n)) return fallback;
+    return Math.max(min, Math.min(max, n));
+}
 
 /**
  * Sammelt alle Eingabewerte aus dem UI
@@ -99,6 +112,36 @@ export function getCommonInputs() {
 
     const tagesgeld = parseDisplayNumber(document.getElementById('tagesgeld')?.value);
     const geldmarktEtf = parseDisplayNumber(document.getElementById('geldmarktEtf')?.value);
+    const dynamicFlex = document.getElementById('dynamicFlex')?.checked === true;
+    const horizonMethodRaw = document.getElementById('horizonMethod')?.value;
+    const horizonMethod = DYNAMIC_FLEX_ALLOWED_HORIZON_METHODS.has(horizonMethodRaw)
+        ? horizonMethodRaw
+        : DYNAMIC_FLEX_DEFAULTS.HORIZON_METHOD;
+    const horizonYears = parseBoundedNumber(
+        document.getElementById('horizonYears')?.value,
+        DYNAMIC_FLEX_DEFAULTS.HORIZON_YEARS,
+        1,
+        60
+    );
+    const survivalQuantile = parseBoundedNumber(
+        document.getElementById('survivalQuantile')?.value,
+        DYNAMIC_FLEX_DEFAULTS.SURVIVAL_QUANTILE,
+        0.5,
+        0.99
+    );
+    const goGoActive = document.getElementById('goGoActive')?.checked === true;
+    const goGoMultiplier = parseBoundedNumber(
+        document.getElementById('goGoMultiplier')?.value,
+        DYNAMIC_FLEX_DEFAULTS.GO_GO_MULTIPLIER,
+        1.0,
+        10.0
+    );
+    const marketCapeRatio = Math.max(0, parseBoundedNumber(
+        document.getElementById('marketCapeRatio')?.value,
+        0,
+        0,
+        Number.MAX_SAFE_INTEGER
+    ));
 
     const baseInputs = {
         startVermoegen: parseDisplayNumber(document.getElementById('simStartVermoegen')?.value),
@@ -113,7 +156,14 @@ export function getCommonInputs() {
         flexBudgetAnnual: parseFloat(document.getElementById('flexBudgetAnnual')?.value) || 0,
         flexBudgetYears: parseFloat(document.getElementById('flexBudgetYears')?.value) || 0,
         flexBudgetRecharge: parseFloat(document.getElementById('flexBudgetRecharge')?.value) || 0,
-        marketCapeRatio: parseFloat(document.getElementById('marketCapeRatio')?.value) || 0,
+        marketCapeRatio,
+        capeRatio: marketCapeRatio,
+        dynamicFlex,
+        horizonMethod,
+        horizonYears,
+        survivalQuantile,
+        goGoActive,
+        goGoMultiplier,
         risikoprofil: DEFAULT_RISIKOPROFIL,
         goldAktiv: goldAktiv,
         goldZielProzent: (goldAktiv ? parseFloat(document.getElementById('goldAllokationProzent')?.value) : 0),

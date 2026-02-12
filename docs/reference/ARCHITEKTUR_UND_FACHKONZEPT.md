@@ -4,7 +4,7 @@
 
 **Version:** Engine API v31.0, Build 2025-12-22
 **Stand:** Februar 2026
-**Zuletzt validiert (Codebasis):** 2026-02-06
+**Zuletzt validiert (Codebasis):** 2026-02-12
 **Codeumfang:** ~37.000 LOC (JavaScript ES6 Module)
 **Lizenz:** MIT
 
@@ -41,10 +41,10 @@
 | Komponente | Zweck | Codeumfang |
 |------------|-------|------------|
 | **Balance-App** | Jahresplanung: Liquidität, Entnahme, Steuern, Transaktionen, Ausgaben-Check | 28 Module, ~6.100 LOC |
-| **Simulator** | Monte-Carlo-Simulation, Parameter-Sweeps, Auto-Optimize | 41 Module, ~14.000 LOC |
+| **Simulator** | Monte-Carlo-Simulation, Parameter-Sweeps, Auto-Optimize, Dynamic Flex | 43 Module, ~14.500 LOC |
 | **Engine** | Kern-Berechnungslogik, Guardrails, Steuern | 13 Module, ~3.600 LOC |
 | **Workers** | Parallelisierung für MC-Simulation | 3 Module, ~600 LOC |
-| **Tests** | Unit- und Integrationstests | 48 Dateien (davon 45 `*.test.mjs`), ~9.500 LOC, 800+ Assertions |
+| **Tests** | Unit- und Integrationstests | 49 Testdateien, ~9.800 LOC, 835 Assertions |
 | **Sonstige** | Profile, Tranchen, Utilities | ~20 Module, ~2.500 LOC |
 
 *Hinweis: Code-Zeilenangaben (z.B. `SpendingPlanner.mjs:326`) können bei zukünftigen Änderungen abweichen. Die Algorithmen-Beschreibungen bleiben konzeptionell gültig.*
@@ -65,6 +65,8 @@ Die Ruhestand-Suite kombiniert folgende Funktionen:
 10. **Rentensystem** für 1-2 Personen mit verschiedenen Indexierungsarten
 11. **Portable Desktop-App** via Tauri für Windows, macOS und Linux
 12. **Ausgaben-Check** zur Kontrolle monatlicher Ausgaben gegen das Budget mit CSV-Import, Hochrechnung und Ampel-Visualisierung
+13. **Dynamic-Flex (VPW)** mit CAPE-basierter Renditeerwartung, Sterbetafeln, EMA-Glättung und Go-Go-Phase; integriert in Balance-App, Backtest, Monte Carlo, Sweep und Auto-Optimize
+14. **Auto-CAPE im Jahreswechsel** (US-Shiller-CAPE mit Fallback-Kette und non-blocking Fehlerbehandlung)
 
 ## Bekannte Einschränkungen
 
@@ -843,11 +845,11 @@ Wird automatisch vom Jahresabschluss-Handler (`balance-binder-snapshots.js`) auf
 
 ```
 engine/
-├── core.mjs              (311 LOC) → Orchestrierung, EngineAPI
-├── config.mjs            (274 LOC) → Zentrale Konfiguration (erweitert)
+├── core.mjs              (459 LOC) → Orchestrierung, EngineAPI, VPW-Berechnung (erweitert!)
+├── config.mjs            (286 LOC) → Zentrale Konfiguration inkl. DYNAMIC_FLEX (erweitert)
 ├── errors.mjs            (~50 LOC) → Fehlerklassen
 ├── validators/
-│   └── InputValidator.mjs (140 LOC) → Input-Validierung
+│   └── InputValidator.mjs (199 LOC) → Input-Validierung inkl. Dynamic-Flex (erweitert)
 ├── analyzers/
 │   └── MarketAnalyzer.mjs (160 LOC) → Marktregime-Klassifikation
 ├── planners/
@@ -878,15 +880,23 @@ function _internal_calculateModel(input, lastState) {
     // 3. Marktanalyse
     const market = MarketAnalyzer.analyzeMarket(input);
 
-    // 4. Ausgabenplanung mit Guardrails
+    // 4. Dynamic Flex (VPW) — optional
+    if (input.dynamicFlex) {
+        const expectedRealReturn = _calculateExpectedRealReturn({ input, lastState });
+        const vpwRate = _calculateVpwRate(expectedRealReturn, input.horizonYears);
+        const vpwTotal = gesamtwert * vpwRate * (input.goGoActive ? input.goGoMultiplier : 1);
+        inflatedBedarf.flex = Math.max(0, vpwTotal - inflatedBedarf.floor);
+    }
+
+    // 5. Ausgabenplanung mit Guardrails
     const { spendingResult, newState, diagnosis } = SpendingPlanner.determineSpending({
         market, lastState, inflatedBedarf, runwayMonate, profil, depotwertGesamt, gesamtwert, renteJahr, input
     });
 
-    // 5. Ziel-Liquidität
+    // 6. Ziel-Liquidität
     const zielLiquiditaet = TransactionEngine.calculateTargetLiquidity(profil, market, inflatedBedarf, input);
 
-    // 6. Transaktions-Bestimmung
+    // 7. Transaktions-Bestimmung
     const action = TransactionEngine.determineAction({
         aktuelleLiquiditaet, depotwertGesamt, zielLiquiditaet, market, spending: spendingResult, minGold, profil, input
     });
@@ -999,7 +1009,7 @@ FLEX_RATE_FINAL_LIMITS: {
 
 ## B.4 Test-Suite (erweitert Januar 2026)
 
-**Übersicht:** Die Test-Suite wurde signifikant erweitert von 21 auf **47 Testdateien** mit **800+ Assertions**.
+**Übersicht:** Die Test-Suite wurde signifikant erweitert von 21 auf **49 Testdateien** mit **835 Assertions**.
 
 ### B.4.1 Test-Inventar
 
@@ -1015,6 +1025,7 @@ FLEX_RATE_FINAL_LIMITS: {
 | **Profilverbund** | `profilverbund-*.test.mjs` (3), `profile-storage.test.mjs` | ~1000 | Multi-Profil, Storage |
 | **Balance-App** | `balance-*.test.mjs` (10) | ~2300 | Smoke, Reader, Storage, Diagnosis, Annual |
 | **Simulator** | `simulator-*.test.mjs` (4) | ~1000 | Sweep, Backtest, Heatmap, Multi-Profile |
+| **Dynamic Flex** | `vpw-dynamic-flex.test.mjs`, `dynamic-flex-horizon.test.mjs` | ~270 | VPW-Formel, Horizont, Glättung, Go-Go |
 | **Scenarios** | `scenarios.test.mjs`, `scenario-analyzer.test.mjs` | ~245 | Komplexe Lebenspfade |
 | **Utilities** | `utils.test.mjs`, `formatting.test.mjs`, `feature-flags.test.mjs` | ~280 | Hilfsfunktionen |
 
@@ -1029,6 +1040,8 @@ FLEX_RATE_FINAL_LIMITS: {
 | `auto-optimizer.test.mjs` | 500 | LHS, Nachbarschaft, Constraints, Cache |
 | `balance-reader.test.mjs` | 640 | DOM-Lesen, Profile-Overrides, Gold-Defaults |
 | `balance-storage.test.mjs` | 490 | localStorage, Migrations, Snapshots |
+| `vpw-dynamic-flex.test.mjs` | 232 | VPW-Formel, Rate-Clamping, Smoothing, Go-Go, Bear-Flex |
+| `dynamic-flex-horizon.test.mjs` | 38 | Sterbetafel-Horizonte, Single/Joint, Mean/Quantil |
 
 ### B.4.3 Worker-Parity-Test
 
@@ -2214,6 +2227,181 @@ const best = findBestParametersWithConstraints(
 | Auto-Optimize (LHS + Refine) | ~100 + ~50 | ~150 × 1000 | **~44%** |
 | Auto-Optimize (mit Quick-Filter) | ~100 + ~30 | ~50 × 1000 + ~100 × 200 | **~12%** |
 
+## C.11 Dynamic Flex (VPW — Variable Percentage Withdrawal)
+
+### C.11.1 Grundkonzept
+
+Dynamic Flex ersetzt den manuellen Flex-Betrag durch eine **VPW-basierte dynamische Berechnung** (Variable Percentage Withdrawal). Die Entnahme passt sich jährlich an die Restlebenserwartung, erwartete Rendite und Gesamtvermögen an.
+
+**Zentrale Idee:** Statt eines fixen Flex-Betrags berechnet die Engine pro Jahr:
+```
+flexBedarf = max(0, Gesamtvermögen × VPW-Rate × GoGo-Multiplikator − Floor)
+```
+
+**Architekturentscheidung:** Die Horizont-Berechnung (Sterbetafeln) liegt in der App-Schicht (`simulator-engine-helpers.js`). Die Engine erhält nur `horizonYears` als Zahl und bleibt damit demographik-agnostisch.
+
+### C.11.2 VPW-Formel (`core.mjs:62-69`)
+
+Die VPW-Rate ist die PMT-Formel (Annuitätenfaktor) der Finanzmathematik:
+
+```javascript
+function _calculateVpwRate(realReturn, horizonYears) {
+    if (Math.abs(realReturn) < 0.001) return 1 / horizonYears;  // Fallback
+    return realReturn / (1 - Math.pow(1 + realReturn, -horizonYears));
+}
+```
+
+| Parameter | Beschreibung | Wertebereich |
+|-----------|-------------|--------------|
+| `realReturn` | Geglättete erwartete Realrendite | 0.00 – 0.05 (0% – 5%) |
+| `horizonYears` | Erwartete Restlaufzeit | 1 – 60 Jahre |
+
+**Ergebnis:** Bei `realReturn = 2%` und `horizonYears = 20` ergibt sich eine VPW-Rate von ~6.12%.
+
+### C.11.3 Erwartete Realrendite (`core.mjs:71-92`)
+
+Die erwartete Realrendite wird als **gewichteter Durchschnitt** der Asset-Klassen berechnet, per EMA geglättet und auf [0%, 5%] geclippt:
+
+```javascript
+// 1. Renditekomponenten
+const equityReturn = expectedReturnCape - inflation/100;  // CAPE-basiert
+const goldReturn   = CONFIG.DYNAMIC_FLEX.GOLD_REAL_RETURN;     // 1.0%
+const safeReturn   = CONFIG.DYNAMIC_FLEX.SAFE_ASSET_REAL_RETURN; // 0.5%
+
+// 2. Gewichtung nach Allokation
+const rawReturn = equityWeight * equityReturn
+                + goldWeight * goldReturn
+                + safeWeight * safeReturn;
+
+// 3. EMA-Glättung (Smoothing)
+const alpha = CONFIG.DYNAMIC_FLEX.SMOOTHING_ALPHA;  // 0.35
+const smoothed = alpha * rawReturn + (1 - alpha) * lastSmoothedReturn;
+
+// 4. Clamping
+return clamp(smoothed, MIN_REAL_RETURN, MAX_REAL_RETURN);  // [0%, 5%]
+```
+
+**CAPE-Rendite-Mapping (`MarketAnalyzer.mjs`):**
+
+| CAPE-Bereich | Erwartete Nominalrendite |
+|-------------|-------------------------|
+| CAPE ≤ 15 | 8% |
+| CAPE 15–20 | 6% |
+| CAPE 20–30 | 5% |
+| CAPE > 30 | 4% |
+
+### C.11.4 Horizont-Berechnung (`simulator-engine-helpers.js`)
+
+Der Horizont wird aus **deutschen Periodensterbetafeln** (`MORTALITY_TABLE` in `simulator-data.js`) berechnet.
+
+**Zwei Methoden:**
+
+| Methode | Funktion | Beschreibung |
+|---------|----------|-------------|
+| `mean` | `estimateRemainingLifeYears()` | Mittlere Restlebenserwartung |
+| `survival_quantile` | `estimateSingleRemainingLifeYearsAtQuantile()` | Alter, bei dem nur noch q% der Kohorte lebt |
+
+**Single-Life vs. Joint-Life:**
+- **Single:** Horizont basiert auf Person 1 (oder Person 2, wenn allein)
+- **Joint:** Horizont basiert auf dem längsten verbleibenden Leben beider Personen (max)
+
+**Monte-Carlo-Integration:** Im MC-Lauf wird der Horizont **pro Simulationsjahr** neu berechnet:
+- Alter inkrementiertgiert sich
+- Bei Tod einer Person: Fallback auf Single-Life-Horizont der überlebenden Person
+- Implementierung: `computeDynamicFlexHorizonForYear()` in `monte-carlo-runner.js`
+
+### C.11.5 Go-Go-Phase
+
+Optional erhöhte Entnahme in den ersten Ruhestandsjahren ("Go-Go Years"):
+
+```javascript
+vpwTotal = gesamtwert * vpwRate * (goGoActive ? goGoMultiplier : 1.0);
+```
+
+| Parameter | Beschreibung | Wertebereich |
+|-----------|-------------|--------------|
+| `goGoActive` | Go-Go ein/aus | boolean |
+| `goGoMultiplier` | Multiplikator | 1.0 – 1.5 |
+
+**Validierung:** `goGoMultiplier > MAX_GO_GO_MULTIPLIER` (1.5) erzeugt einen `ValidationError` — keine stille Clampung.
+
+### C.11.6 Konfiguration (`config.mjs:154-164`)
+
+```javascript
+DYNAMIC_FLEX: {
+    SAFE_ASSET_REAL_RETURN: 0.005,   // 0.5% p.a.
+    GOLD_REAL_RETURN: 0.01,          // 1.0% p.a.
+    MIN_HORIZON_YEARS: 1,
+    MAX_HORIZON_YEARS: 60,
+    FALLBACK_REAL_RETURN: 0.03,      // Ohne CAPE-Daten
+    MIN_REAL_RETURN: 0.00,           // Untere Schranke
+    MAX_REAL_RETURN: 0.05,           // Obere Schranke (5%)
+    SMOOTHING_ALPHA: 0.35,           // EMA-Glättung (35% neuer Wert)
+    MAX_GO_GO_MULTIPLIER: 1.5        // Go-Go-Obergrenze
+}
+```
+
+### C.11.7 Integration in die Berechnungskette
+
+Dynamic Flex greift **vor** dem SpendingPlanner ein:
+
+```
+Input → Validation → Market Analysis → [VPW: Flex-Override] → SpendingPlanner → Transactions
+```
+
+1. Die VPW-Berechnung überschreibt `inflatedBedarf.flex` mit dem dynamisch berechneten Wert
+2. Der SpendingPlanner behandelt den Wert dann wie einen normalen Flex-Bedarf
+3. Alle bestehenden Guardrails (FlexRate 0-100%, Alarm-Modus, Hard Caps) wirken weiterhin auf den VPW-abgeleiteten Flex
+
+**Diagnostik:** Das Ergebnisobjekt enthält immer `ui.vpw` mit:
+- `status`: `'active'` | `'disabled'` | `'contract_ready'`
+- `vpwRate`, `expectedRealReturn`, `vpwTotal`, `dynamicFlex`, `gesamtwert`
+- `horizonYears`, `horizonMethod`, `survivalQuantile`
+- `goGoActive`, `goGoMultiplier`
+- `capeRatioUsed`, `expectedReturnCape`
+
+### C.11.8 UI-Presets (`simulator-main-dynamic-flex.js`)
+
+| Preset | Horizont-Methode | Quantil | Horizont | Go-Go |
+|--------|-----------------|---------|----------|-------|
+| **Aus** | — | — | — | — |
+| **Konservativ** | survival_quantile | 0.90 | 35 J. | Aus |
+| **Ausgewogen** | survival_quantile | 0.85 | 30 J. | 1.10 |
+| **Offensiv** | mean | — | 25 J. | 1.20 |
+
+### C.11.9 Balance-App-Diagnose
+
+Die Balance-App zeigt 8 VPW-Metriken im Diagnose-Panel (`balance-diagnosis-keyparams.js`):
+
+| Metrik | Beschreibung | Warnschwelle |
+|--------|-------------|-------------|
+| Dynamic Flex (VPW) | Status + Methode | — |
+| VPW-Rate | Entnahmesatz | ≥ 6% (erhöht), ≥ 8% (Warnung) |
+| VPW-Horizont | Restlaufzeit in Jahren | ≤ 18 J. (kurz), ≤ 12 J. (Warnung) |
+| ER(real) | Geglättete Realrendite | < 0% (Warnung) |
+| ER(CAPE) | CAPE-basierte Nominalrendite | — |
+| Go-Go-Phase | Status + Multiplikator | — |
+| VPW-Basisvermögen | Gesamtvermögen für VPW-Formel | — |
+| VPW-Total | Vermögen × Rate × Go-Go | — |
+| VPW-Flex (abgeleitet) | VPW-Total minus Floor | — |
+
+**Feature-Gate:** Dynamic Flex wird in der Balance-App nur aktiviert, wenn `capeRatio > 0` (CAPE-Daten müssen vorliegen).
+
+### C.11.10 Sweep- und Optimizer-Integration
+
+**Sweep-fähige Parameter:**
+- `horizonYears` — Horizont-Variation
+- `survivalQuantile` — Quantil-Variation
+- `goGoMultiplier` — Go-Go-Variation
+
+**Auto-Optimize-Grenzen:**
+
+| Parameter | Min | Max |
+|-----------|-----|-----|
+| `horizonYears` | 15 | 45 |
+| `survivalQuantile` | 0.75 | 0.95 |
+| `goGoMultiplier` | 1.0 | 1.35 |
+
 ---
 
 # Marktvergleich
@@ -2310,6 +2498,7 @@ rt
 | **Multi-Profil** | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | **Tranchen-Management** | ✅ FIFO+Online | ❌ | ⚠️ | ❌ | ❌ | ❌ |
 | **Parameter-Sweeps** | ✅ Heatmap | ❌ | ❌ | ⚠️ | ❌ | ❌ |
+| **Dynamic Flex (VPW)** | ✅ CAPE+Sterbetafel | ❌ | ❌ | ❌ | ❌ | ⚠️ RMD |
 | **Auto-Optimize** | ✅ 4-stufig LHS | ❌ | ❌ | ✅ | ❌ | ❌ |
 | **Ausgaben-Check** | ✅ CSV+Median | ❌ | ❌ | ❌ | ❌ | ❌ |
 | **Offline** | ✅ | ⚠️ ($799) | ❌ | ✅ (Gold) | ✅ | ✅ |
@@ -2333,6 +2522,7 @@ rt
 10. **Offline-Betrieb und Open Source** — Daten verbleiben lokal auf dem Rechner
 11. **Ausgaben-Check mit CSV-Import** — Monatliches Budget-Tracking gegen Floor+Flex, Median-basierte Hochrechnung, Ampel-Visualisierung, Profilverbund-Integration
 12. **Echte Multi-Plattform-Unterstützung** — Native Desktop-Apps für Windows (.exe), macOS (.app) und Linux (AppImage/deb) aus einer Codebasis, plus Browser-Fallback mit Start-Scripts
+13. **Dynamic Flex (VPW) mit Sterbetafeln** — Variable Percentage Withdrawal mit CAPE-basierter Renditeerwartung, EMA-Glättung, Mortality-Table-Horizont (Single/Joint, Mean/Quantil) und Go-Go-Phase. Integriert in Balance-App, Backtest, Monte Carlo, Parameter-Sweep und Auto-Optimize. Kein anderes verglichenes Tool kombiniert VPW mit Guardrails und deutscher Steuer.
 
 ---
 
@@ -2346,10 +2536,10 @@ rt
 |-----------|--------------|-------------|-----------------|
 | Constant Dollar | 3.9% | ✅ | ✅ Floor |
 | Guardrails | 5.2% | ✅ | ✅ Floor + Flex |
-| RMD-based | 4.8% | ✅ | ❌ |
+| RMD-based / VPW | 4.8% | ✅ | ✅ Dynamic Flex (VPW) |
 | Forgo Inflation | 4.3% | ✅ | ❌ |
 
-**Implementierung:** Floor-Flex implementiert den Guardrails-Ansatz, der laut Morningstar die höchste SWR ermöglicht.
+**Implementierung:** Floor-Flex implementiert den Guardrails-Ansatz, der laut Morningstar die höchste SWR ermöglicht. Seit Februar 2026 deckt Dynamic Flex (VPW) auch den RMD-basierten Ansatz ab — mit CAPE-basierter Renditeerwartung statt fixer Rate.
 
 ## E.2 Kitces 2024: Risk-Based Guardrails
 
@@ -2391,6 +2581,27 @@ rt
 
 **Status:** Regime-Switching via Markov-Chain implementiert; keine expliziten Fat Tails im Return-Modell
 
+## E.6 VPW / Variable Percentage Withdrawal
+
+**Quellen:**
+- [Bogleheads: Variable Percentage Withdrawal](https://www.bogleheads.org/wiki/Variable_percentage_withdrawal) — Grundkonzept und PMT-Formel
+- McClung, M. (2017): *Living Off Your Money* — VPW als dynamische Entnahmestrategie
+- Morningstar 2025: RMD-basierte Strategien erreichen ~4.8% Starting SWR
+
+**Kernaussage:** VPW berechnet jährlich den Entnahmebetrag als Annuität (PMT-Formel) basierend auf Vermögen, erwarteter Rendite und Restlaufzeit. Im Vergleich zu fixen Entnahmeraten passt sich VPW automatisch an Marktschwankungen an und reduziert das Ruinrisiko.
+
+| Aspekt | Klassisches VPW | Ruhestand-Suite |
+|--------|----------------|-----------------|
+| Renditeerwartung | Fix (z.B. 4%) | CAPE-basiert, EMA-geglättet, [0%-5%] |
+| Horizont | Fixe Jahre oder Mean-LE | Mean oder Survival-Quantil aus Sterbetafeln |
+| Joint-Life | Selten implementiert | Single + Joint (max beider Horizonte) |
+| Guardrails | Keine | ✅ FlexRate 0-100%, Hard Caps, Alarm |
+| Go-Go-Phase | Nicht Teil von VPW | ✅ Optionaler Multiplikator (1.0–1.5) |
+| Steuer | Nicht integriert | ✅ Vollständige DE-Kapitalertragssteuer |
+| MC-Integration | Meist unabhängig | ✅ Dynamischer Horizont pro Simulationsjahr |
+
+**Status:** ✅ VPW implementiert mit CAPE-basierter Rendite, Sterbetafel-Horizont, EMA-Glättung und vollständiger Guardrail-Integration
+
 ---
 
 # Appendix: Modul-Inventar
@@ -2399,11 +2610,11 @@ rt
 
 | Modul | LOC | Funktion |
 |-------|-----|----------|
-| `core.mjs` | 311 | Orchestrierung, EngineAPI |
-| `config.mjs` | 274 | Zentrale Konfiguration (erweitert) |
+| `core.mjs` | 459 | Orchestrierung, EngineAPI, VPW-Berechnung **(erweitert!)** |
+| `config.mjs` | 286 | Zentrale Konfiguration inkl. DYNAMIC_FLEX **(erweitert)** |
 | `errors.mjs` | ~50 | Fehlerklassen |
 | `index.mjs` | ~30 | Modul-Exports |
-| `InputValidator.mjs` | 140 | Input-Validierung |
+| `InputValidator.mjs` | 199 | Input-Validierung inkl. Dynamic-Flex **(erweitert)** |
 | `MarketAnalyzer.mjs` | 160 | Marktregime-Klassifikation |
 | `SpendingPlanner.mjs` | **1076** | Guardrails, Flex-Rate, Budget-System **(erweitert!)** |
 | `TransactionEngine.mjs` | 47 | Facade für Transaktionen |
@@ -2413,11 +2624,11 @@ rt
 | `transaction-utils.mjs` | 237 | Transaktions-Hilfsfunktionen |
 | `sale-engine.mjs` | 333 | Verkäufe, Steuern |
 
-## Simulator-Module (41 Module, Auswahl)
+## Simulator-Module (43 Module, Auswahl)
 
 | Modul | LOC | Funktion |
 |-------|-----|----------|
-| `monte-carlo-runner.js` | ~880 | DOM-freie MC-Simulation (erweitert) |
+| `monte-carlo-runner.js` | ~985 | DOM-freie MC-Simulation, Dynamic-Flex-Horizont **(erweitert!)** |
 | `simulator-sweep.js` | ~500 | Parameter-Sweeps |
 | `simulator-optimizer.js` | ~500 | 3-stufige Optimierung |
 | `simulator-data.js` | ~450 | Historische Daten 1925-2024, 9 Stress-Presets |
@@ -2426,6 +2637,8 @@ rt
 | `simulator-main-accumulation.js` | ~80 | Ansparphase-Steuerung |
 | `simulator-engine-direct.js` | ~350 | Engine-Direktzugriff, Ansparlogik |
 | `simulator-ui-rente.js` | ~100 | Renten-UI (Rente1/Rente2) |
+| `simulator-main-dynamic-flex.js` | ~180 | Dynamic-Flex-UI, Presets, Sync **(neu!)** |
+| `simulator-engine-helpers.js` | ~250 | Sterbetafel-Horizonte (Mean/Quantil, Single/Joint) **(erweitert!)** |
 
 ## Worker-Module (3)
 
@@ -2445,7 +2658,7 @@ rt
 | `balance-expenses.js` | **646** | Ausgaben-Check mit CSV-Import, Budget-Tracking **(neu!)** |
 | `balance-guardrail-reset.js` | ~70 | Auto-Reset bei kritischen Änderungen |
 | `balance-annual-*.js` (4) | ~400 | Jahresabschluss, Inflation, Marktdaten |
-| `balance-diagnosis-*.js` (6) | ~600 | Chips, Entscheidungsbaum, Guardrails |
+| `balance-diagnosis-*.js` (7) | ~840 | Chips, Entscheidungsbaum, Guardrails, VPW-Keyparams **(erweitert!)** |
 
 ## Profil- und Tranchen-Module (6)
 
@@ -2497,6 +2710,10 @@ rt
 24. **P2-Invarianz-Prüfung** (`simulator-sweep-utils.js:areP2InvariantsEqual`) **(neu!)**
 25. **Ausgaben-Check CSV-Parser** (`balance-expenses.js:parseCategoryCsv`) **(neu!)**
 26. **Median-basierte Hochrechnung** (`balance-expenses.js:computeYearStats`) **(neu!)**
+27. **VPW-Annuitätenformel** (`core.mjs:_calculateVpwRate`) **(neu!)**
+28. **CAPE-basierte Realrendite mit EMA-Glättung** (`core.mjs:_calculateExpectedRealReturn`) **(neu!)**
+29. **Sterbetafel-Horizont (Single/Joint, Mean/Quantil)** (`simulator-engine-helpers.js`) **(neu!)**
+30. **Dynamischer MC-Horizont pro Simulationsjahr** (`monte-carlo-runner.js:computeDynamicFlexHorizonForYear`) **(neu!)**
 
 ---
 
@@ -2516,6 +2733,7 @@ rt
 - [Morningstar: Best Flexible Strategies](https://www.morningstar.com/retirement/best-flexible-strategies-retirement-income-2)
 - [Kitces: Why Guyton-Klinger Guardrails Are Too Risky](https://www.kitces.com/blog/guyton-klinger-guardrails-retirement-income-rules-risk-based/)
 - [Kitces: Risk-Based Guardrails](https://www.kitces.com/blog/risk-based-monte-carlo-probability-of-success-guardrails-retirement-distribution-hatchet/)
+- [Bogleheads: Variable Percentage Withdrawal](https://www.bogleheads.org/wiki/Variable_percentage_withdrawal) (VPW/PMT-Grundlage)
 
 ### Deutsche Quellen
 - [BARMER Pflegereport 2024](https://www.barmer.de/pflegereport) (Pflegefall-Daten)

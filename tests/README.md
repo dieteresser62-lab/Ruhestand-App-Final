@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 45 Testdateien mit 400+ Einzeltests
+**Test-Statistik:** 54 Testdateien mit 900+ Assertions
 
 ## Directory Structure
 

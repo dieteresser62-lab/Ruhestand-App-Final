@@ -26,6 +26,7 @@ import { createProfileSyncHandlers } from './balance-main-profile-sync.js';
 import { shouldResetGuardrailState } from './balance-guardrail-reset.js';
 import { UIUtils } from './balance-utils.js';
 import { initExpensesTab, updateExpensesBudget } from './balance-expenses.js';
+import { initDynamicFlexControls } from '../simulator/simulator-main-dynamic-flex.js';
 
 // ==================================================================================
 // APPLICATION STATE & DOM REFERENCES
@@ -235,6 +236,10 @@ function update() {
         if (formattedDiagnosis && modelResult.ui?.action?.transactionDiagnostics) {
             formattedDiagnosis.transactionDiagnostics = modelResult.ui.action.transactionDiagnostics;
         }
+        if (formattedDiagnosis && modelResult.ui?.vpw) {
+            formattedDiagnosis.keyParams = formattedDiagnosis.keyParams || {};
+            formattedDiagnosis.keyParams.vpw = modelResult.ui.vpw;
+        }
 
         appState.diagnosisData = formattedDiagnosis;
         UIRenderer.renderDiagnosis(appState.diagnosisData);
@@ -380,6 +385,7 @@ function init() {
     UIReader.applyStoredInputs(persistentState.inputs);
     profileSyncHandlers.syncProfileDerivedInputs();
     syncTranchenToInputs({ silent: true });
+    initDynamicFlexControls({ enableLocalPersistence: false });
 
     // 7. Bind UI events
     // Registriert alle Event-Listener (input, change, click, keyboard shortcuts)

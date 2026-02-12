@@ -11,7 +11,7 @@ import { rng, makeRunSeed, RUNIDX_COMBO_SETUP, quantile } from './simulator-util
 import { getStartYearCandidates } from '../shared/cape-utils.js';
 import { BREAK_ON_RUIN, MORTALITY_TABLE, annualData } from './simulator-data.js';
 import { buildStressContext, applyStressOverride, computeRentAdjRate } from './simulator-portfolio.js';
-import { simulateOneYear, initMcRunState, makeDefaultCareMeta, sampleNextYearData, computeRunStatsFromSeries, updateCareMeta, calcCareCost, computeCareMortalityMultiplier, computeHouseholdFlexFactor } from './simulator-engine-wrapper.js';
+import { simulateOneYear, initMcRunState, makeDefaultCareMeta, sampleNextYearData, computeRunStatsFromSeries, updateCareMeta, calcCareCost, computeCareMortalityMultiplier, computeHouseholdFlexFactor, estimateRemainingLifeYears, estimateJointRemainingLifeYears, estimateSingleRemainingLifeYearsAtQuantile, estimateJointRemainingLifeYearsAtQuantile } from './simulator-engine-wrapper.js';
 import { portfolioTotal } from './simulator-results.js';
 import { sumDepot } from './simulator-portfolio.js';
 import { cloneStressContext, computeMarriageYearsCompleted } from './simulator-sweep-utils.js';
@@ -22,6 +22,85 @@ import { buildMonteCarloAggregates } from './monte-carlo-aggregates.js';
 export { MC_HEATMAP_BINS, pickWorstRun, createMonteCarloBuffers, buildMonteCarloAggregates };
 
 const MIN_START_YEAR_INDEX = 4;
+const DYNAMIC_FLEX_MIN_HORIZON = 1;
+const DYNAMIC_FLEX_MAX_HORIZON = 60;
+
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
+
+function resolveMonteCarloCape(yearData, inputs, marketDataHist) {
+    const yearCape = Number(yearData?.capeRatio ?? yearData?.cape);
+    if (Number.isFinite(yearCape) && yearCape > 0) return yearCape;
+    const inputCape = Number(inputs?.capeRatio);
+    if (Number.isFinite(inputCape) && inputCape > 0) return inputCape;
+    const legacyCape = Number(inputs?.marketCapeRatio);
+    if (Number.isFinite(legacyCape) && legacyCape > 0) return legacyCape;
+    const histCape = Number(marketDataHist?.capeRatio);
+    if (Number.isFinite(histCape) && histCape > 0) return histCape;
+    return 0;
+}
+
+function computeDynamicFlexHorizonForYear(inputs, { yearIndex, ageP1, ageP2, p1Alive, p2Alive }) {
+    // UI/Preset horizon is fallback only; bei aktivem Dynamic-Flex wird jahrweise aus Sterbetafeln neu berechnet.
+    const fallback = clamp(Number(inputs?.horizonYears) || 30, DYNAMIC_FLEX_MIN_HORIZON, DYNAMIC_FLEX_MAX_HORIZON);
+    if (inputs?.dynamicFlex !== true) return fallback;
+    const method = inputs?.horizonMethod || 'survival_quantile';
+    const quantile = clamp(Number(inputs?.survivalQuantile) || 0.85, 0.5, 0.99);
+    const currentAgeP1 = Number.isFinite(ageP1) ? ageP1 : ((Number(inputs?.startAlter) || 65) + yearIndex);
+    const currentAgeP2 = Number.isFinite(ageP2) ? ageP2 : ((Number(inputs?.partner?.startAlter) || currentAgeP1) + yearIndex);
+    const genderP1 = inputs?.geschlecht || 'm';
+    const genderP2 = inputs?.partner?.geschlecht || (genderP1 === 'm' ? 'w' : 'm');
+
+    if (p1Alive && p2Alive && inputs?.partner?.aktiv === true) {
+        if (method === 'mean') {
+            return clamp(
+                estimateJointRemainingLifeYears(genderP1, currentAgeP1, genderP2, currentAgeP2),
+                DYNAMIC_FLEX_MIN_HORIZON,
+                DYNAMIC_FLEX_MAX_HORIZON
+            );
+        }
+        return estimateJointRemainingLifeYearsAtQuantile(
+            genderP1,
+            currentAgeP1,
+            genderP2,
+            currentAgeP2,
+            quantile,
+            { minYears: DYNAMIC_FLEX_MIN_HORIZON, maxYears: DYNAMIC_FLEX_MAX_HORIZON }
+        );
+    }
+    if (p1Alive) {
+        if (method === 'mean') {
+            return clamp(
+                estimateRemainingLifeYears(genderP1, currentAgeP1),
+                DYNAMIC_FLEX_MIN_HORIZON,
+                DYNAMIC_FLEX_MAX_HORIZON
+            );
+        }
+        return estimateSingleRemainingLifeYearsAtQuantile(
+            genderP1,
+            currentAgeP1,
+            quantile,
+            { minYears: DYNAMIC_FLEX_MIN_HORIZON, maxYears: DYNAMIC_FLEX_MAX_HORIZON }
+        );
+    }
+    if (p2Alive) {
+        if (method === 'mean') {
+            return clamp(
+                estimateRemainingLifeYears(genderP2, currentAgeP2),
+                DYNAMIC_FLEX_MIN_HORIZON,
+                DYNAMIC_FLEX_MAX_HORIZON
+            );
+        }
+        return estimateSingleRemainingLifeYearsAtQuantile(
+            genderP2,
+            currentAgeP2,
+            quantile,
+            { minYears: DYNAMIC_FLEX_MIN_HORIZON, maxYears: DYNAMIC_FLEX_MAX_HORIZON }
+        );
+    }
+    return DYNAMIC_FLEX_MIN_HORIZON;
+}
 
 function buildCdfFromIndices(indices, weightsByIndex) {
     if (!Array.isArray(indices) || indices.length === 0) return null;
@@ -354,8 +433,9 @@ export async function runMonteCarloChunk({
         // --- CAPE-SAMPLING LOGIC START ---
         let startYearIndex;
 
-        if (useCapeSampling && inputs.marketCapeRatio > 0) {
-            const candidates = getStartYearCandidates(inputs.marketCapeRatio, annualData);
+        const inputCapeForSampling = Number(inputs.capeRatio) > 0 ? Number(inputs.capeRatio) : Number(inputs.marketCapeRatio);
+        if (useCapeSampling && inputCapeForSampling > 0) {
+            const candidates = getStartYearCandidates(inputCapeForSampling, annualData);
             if (candidates.length > 0) {
                 const chosenYear = candidates[Math.floor(rand() * candidates.length)];
                 startYearIndex = annualData.findIndex(d => d.jahr === chosenYear);
@@ -546,7 +626,23 @@ export async function runMonteCarloChunk({
 
             // Berechne dynamische Rentenanpassung basierend auf Modus (fix/wage/cpi)
             const effectiveRentAdjPct = computeRentAdjRate(inputs, yearData);
-            const adjustedInputs = { ...inputs, rentAdjPct: effectiveRentAdjPct, transitionYear: effectiveTransitionYear };
+            const resolvedCapeRatio = resolveMonteCarloCape(yearData, inputs, simState.marketDataHist);
+            const dynamicHorizonYears = computeDynamicFlexHorizonForYear(inputs, {
+                yearIndex: simulationsJahr,
+                ageP1,
+                ageP2,
+                p1Alive,
+                p2Alive
+            });
+            const adjustedInputs = {
+                ...inputs,
+                rentAdjPct: effectiveRentAdjPct,
+                transitionYear: effectiveTransitionYear,
+                capeRatio: resolvedCapeRatio,
+                marketCapeRatio: resolvedCapeRatio,
+                horizonYears: dynamicHorizonYears
+            };
+            yearData.capeRatio = resolvedCapeRatio;
             const householdContext = {
                 p1Alive,
                 p2Alive: hasPartner ? p2Alive : false,
@@ -606,7 +702,8 @@ export async function runMonteCarloChunk({
                     CareP2_Active: p2ActiveThisYear ? 1 : 0,
                     CareP2_Cost: p2ActiveThisYear ? (careMetaP2?.zusatzFloorZiel ?? 0) : 0,
                     CareP2_Grade: p2ActiveThisYear ? (careMetaP2?.grade ?? null) : null,
-                    CareP2_GradeLabel: p2ActiveThisYear ? (careMetaP2?.gradeLabel ?? '') : ''
+                    CareP2_GradeLabel: p2ActiveThisYear ? (careMetaP2?.gradeLabel ?? '') : '',
+                    vpw: null
                 });
                 if (BREAK_ON_RUIN) break;
             } else {
@@ -681,7 +778,8 @@ export async function runMonteCarloChunk({
                     CareP2_Active: p2ActiveThisYear ? 1 : 0,
                     CareP2_Cost: p2ActiveThisYear ? (careMetaP2?.zusatzFloorZiel ?? 0) : 0,
                     CareP2_Grade: p2ActiveThisYear ? (careMetaP2?.grade ?? null) : null,
-                    CareP2_GradeLabel: p2ActiveThisYear ? (careMetaP2?.gradeLabel ?? '') : ''
+                    CareP2_GradeLabel: p2ActiveThisYear ? (careMetaP2?.gradeLabel ?? '') : '',
+                    vpw: result.ui?.vpw || null
                 });
             }
         }
@@ -731,7 +829,8 @@ export async function runMonteCarloChunk({
                 CareP2_Active: p2ActiveThisYear ? 1 : 0,
                 CareP2_Cost: p2ActiveThisYear ? (careMetaP2?.zusatzFloorZiel ?? 0) : 0,
                 CareP2_Grade: p2ActiveThisYear ? (careMetaP2?.grade ?? null) : null,
-                CareP2_GradeLabel: p2ActiveThisYear ? (careMetaP2?.gradeLabel ?? '') : ''
+                CareP2_GradeLabel: p2ActiveThisYear ? (careMetaP2?.gradeLabel ?? '') : '',
+                vpw: null
             });
         }
 

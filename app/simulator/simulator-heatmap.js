@@ -338,7 +338,10 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
             rebalBand: 'Rebal Band',
             maxSkimPct: 'Max Skim %',
             maxBearRefillPct: 'Max Bear Refill %',
-            goldTargetPct: 'Gold Target %'
+            goldTargetPct: 'Gold Target %',
+            horizonYears: 'VPW Horizon',
+            survivalQuantile: 'VPW Quantile',
+            goGoMultiplier: 'VPW Go-Go Mult'
         };
 
         const metricLabels = {
@@ -363,10 +366,14 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
         const heatmapData = new Map();
         for (const result of sweepResults) {
             const key = `${result.params[xParam]}_${result.params[yParam]}`;
+            if (result?.metrics?.invalidCombination === true) continue;
             heatmapData.set(key, result.metrics[metricKey] || 0);
         }
 
         const allValues = Array.from(heatmapData.values());
+        if (allValues.length === 0) {
+            return '<p>Keine gueltigen Sweep-Ergebnisse fuer die aktuelle Auswahl vorhanden.</p>';
+        }
         const minVal = Math.min(...allValues);
         const maxVal = Math.max(...allValues);
         const range = maxVal - minVal;
@@ -394,7 +401,8 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
                 const xVal = xValues[xi];
                 const yVal = yValues[yValues.length - 1 - yi];
                 const key = `${xVal}_${yVal}`;
-                const value = heatmapData.get(key) || 0;
+                const hasValue = heatmapData.has(key);
+                const value = hasValue ? (heatmapData.get(key) || 0) : minVal;
 
                 const x = xi * cellWidth;
                 const y = yi * cellHeight;
@@ -402,33 +410,37 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
 
                 const result = sweepResults.find(r => r.params[xParam] === xVal && r.params[yParam] === yVal);
                 const hasR2Warning = result && result.metrics && result.metrics.warningR2Varies;
+                const isInvalidCombo = result && result.metrics && result.metrics.invalidCombination === true;
+                const invalidReason = isInvalidCombo ? (result.metrics.invalidReason || 'ungueltige Kombination') : '';
 
                 const tooltipLines = result ? [
                     `${paramLabels[xParam]}: ${xVal}`,
                     `${paramLabels[yParam]}: ${yVal}`,
                     '',
-                    `Success Prob: ${formatPercent(result.metrics.successProbFloor, 1)}`,
-                    `P10 End Wealth: ${formatThousandsEuro(result.metrics.p10EndWealth)}`,
-                    `Worst 5% DD: ${formatPercent(result.metrics.worst5Drawdown, 1)}`,
-                    `Min Runway: ${formatMonths(result.metrics.minRunwayObserved, 1)}`,
+                    isInvalidCombo ? `Ungueltig: ${invalidReason}` : `Success Prob: ${formatPercent(result.metrics.successProbFloor, 1)}`,
+                    isInvalidCombo ? '' : `P10 End Wealth: ${formatThousandsEuro(result.metrics.p10EndWealth)}`,
+                    isInvalidCombo ? '' : `Worst 5% DD: ${formatPercent(result.metrics.worst5Drawdown, 1)}`,
+                    isInvalidCombo ? '' : `Min Runway: ${formatMonths(result.metrics.minRunwayObserved, 1)}`,
                     hasR2Warning ? '\n⚠ Rente 2 variierte im Sweep' : ''
                 ].filter(Boolean) : [`${paramLabels[xParam]}: ${xVal}`, `${paramLabels[yParam]}: ${yVal}`, 'Keine Daten'];
 
                 const tooltip = tooltipLines.join('&#10;');
 
                 // Füge gelben Rand hinzu bei R2-Warnung
-                const strokeColor = hasR2Warning ? '#ffc107' : '#fff';
-                const strokeWidth = hasR2Warning ? '3' : '1';
+                const strokeColor = isInvalidCombo ? '#ff7043' : (hasR2Warning ? '#ffc107' : '#fff');
+                const strokeWidth = isInvalidCombo ? '3' : (hasR2Warning ? '3' : '1');
                 cellsHtml += `<rect x="${x}" y="${y}" width="${cellWidth}" height="${cellHeight}" fill="${color}" stroke="${strokeColor}" stroke-width="${strokeWidth}"><title>${tooltip}</title></rect>`;
 
                 if (cellWidth >= 40 && cellHeight >= 30) {
                     const textColor = pickTextColorForBg(parseRgb(color));
-                    const yOffset = hasR2Warning ? -5 : 0;
-                    cellsHtml += `<text x="${x + cellWidth / 2}" y="${y + cellHeight / 2 + yOffset}" text-anchor="middle" dominant-baseline="middle" fill="${textColor}" font-size="11px" font-weight="600" pointer-events="none">${formatValue(value, metricKey)}</text>`;
+                    const yOffset = (hasR2Warning || isInvalidCombo) ? -5 : 0;
+                    cellsHtml += `<text x="${x + cellWidth / 2}" y="${y + cellHeight / 2 + yOffset}" text-anchor="middle" dominant-baseline="middle" fill="${textColor}" font-size="11px" font-weight="600" pointer-events="none">${isInvalidCombo ? 'N/A' : formatValue(value, metricKey)}</text>`;
 
-                    // Warn-Symbol bei R2-Varianz
-                    if (hasR2Warning) {
-                        cellsHtml += `<text x="${x + cellWidth / 2}" y="${y + cellHeight / 2 + 10}" text-anchor="middle" dominant-baseline="middle" font-size="14px" pointer-events="none" title="Rente 2 variierte im Sweep">⚠</text>`;
+                    // Warn-Symbol bei R2-Varianz oder invaliden Kombis
+                    if (hasR2Warning || isInvalidCombo) {
+                        const warnTitle = isInvalidCombo ? 'Ungueltige Parameterkombination' : 'Rente 2 variierte im Sweep';
+                        const warnGlyph = isInvalidCombo ? '⛔' : '⚠';
+                        cellsHtml += `<text x="${x + cellWidth / 2}" y="${y + cellHeight / 2 + 10}" text-anchor="middle" dominant-baseline="middle" font-size="14px" pointer-events="none" title="${warnTitle}">${warnGlyph}</text>`;
                     }
                 }
             }

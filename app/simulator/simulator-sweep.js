@@ -37,7 +37,10 @@ export function initSweepDefaultsWithLocalStorageFallback() {
         ['sweepRebalBand', 'sim.sweep.rebalBand'],
         ['sweepMaxSkimPct', 'sim.sweep.maxSkimPct'],
         ['sweepMaxBearRefillPct', 'sim.sweep.maxBearRefillPct'],
-        ['sweepGoldTargetPct', 'sim.sweep.goldTarget']
+        ['sweepGoldTargetPct', 'sim.sweep.goldTarget'],
+        ['sweepHorizonYears', 'sim.sweep.horizonYears'],
+        ['sweepSurvivalQuantile', 'sim.sweep.survivalQuantile'],
+        ['sweepGoGoMultiplier', 'sim.sweep.goGoMultiplier']
     ];
 
     for (const [elementId, storageKey] of map) {
@@ -273,7 +276,10 @@ export async function runParameterSweep() {
             rebalBand: document.getElementById('sweepRebalBand').value,
             maxSkimPct: document.getElementById('sweepMaxSkimPct').value,
             maxBearRefillPct: document.getElementById('sweepMaxBearRefillPct').value,
-            goldTargetPct: document.getElementById('sweepGoldTargetPct').value
+            goldTargetPct: document.getElementById('sweepGoldTargetPct').value,
+            horizonYears: document.getElementById('sweepHorizonYears').value,
+            survivalQuantile: document.getElementById('sweepSurvivalQuantile').value,
+            goGoMultiplier: document.getElementById('sweepGoGoMultiplier').value
         };
 
         const paramLabels = {
@@ -283,7 +289,10 @@ export async function runParameterSweep() {
             rebalBand: 'Rebal Band',
             maxSkimPct: 'Max Skim %',
             maxBearRefillPct: 'Max Bear Refill %',
-            goldTargetPct: 'Gold Target %'
+            goldTargetPct: 'Gold Target %',
+            horizonYears: 'VPW Horizon Jahre',
+            survivalQuantile: 'VPW Survival-Quantile',
+            goGoMultiplier: 'VPW Go-Go Multiplikator'
         };
 
         const paramRanges = {};

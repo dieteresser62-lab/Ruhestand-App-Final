@@ -234,6 +234,55 @@
                                         title="Aktuelles Shiller-CAPE (Cyclically Adjusted Price-to-Earnings Ratio) - Bewertungskennzahl für den Aktienmarkt">
                                 </div>
                             </div>
+                            <div class="form-grid"
+                                style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
+                                <div class="form-group"><label for="dynamicFlexPreset">Dynamic-Flex Profil</label><select
+                                        id="dynamicFlexPreset"
+                                        title="Einfaches Profil für Dynamic-Flex: Details werden automatisch gesetzt">
+                                        <option value="off">Aus</option>
+                                        <option value="konservativ">Konservativ</option>
+                                        <option value="ausgewogen" selected>Ausgewogen</option>
+                                        <option value="offensiv">Offensiv</option>
+                                        <option value="custom">Benutzerdefiniert</option>
+                                    </select>
+                                </div>
+                                <div class="form-group"><label for="dynamicFlexShowAdvanced">Erweiterte Parameter</label><input
+                                        type="checkbox" id="dynamicFlexShowAdvanced"
+                                        title="Zeigt Detailparameter für Dynamic-Flex an">
+                                </div>
+                            </div>
+                            <div id="dynamicFlexAdvancedToggleRow" class="form-grid"
+                                style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
+                                <div class="form-group"><label for="dynamicFlex">Dynamic Flex (VPW) aktivieren</label><input
+                                        type="checkbox" id="dynamicFlex"
+                                        title="Steuert den Flex-Bedarf dynamisch per VPW-Logik (nur Flex-Anteil, Floor bleibt fix)">
+                                </div>
+                            </div>
+                            <div id="dynamicFlexConfigGroup" class="form-grid">
+                                <div class="form-group"><label for="horizonMethod">Horizon-Methode</label><select
+                                        id="horizonMethod"
+                                        title="Methode für die Restlaufzeitberechnung des VPW-Faktors">
+                                        <option value="survival_quantile" selected>Survival-Quantile</option>
+                                        <option value="mean">Erwartungswert</option>
+                                    </select>
+                                </div>
+                                <div class="form-group"><label for="horizonYears">Horizon Jahre</label><input
+                                        type="number" id="horizonYears" value="30" min="1" max="60" step="1"
+                                        title="Direkte Vorgabe der Restlaufzeit in Jahren (validiert 1 bis 60)">
+                                </div>
+                                <div class="form-group"><label for="survivalQuantile">Survival-Quantil</label><input
+                                        type="number" id="survivalQuantile" value="0.85" min="0.5" max="0.99" step="0.01"
+                                        title="Quantil für aktuarische Restlaufzeit (0.5 bis 0.99)">
+                                </div>
+                                <div class="form-group"><label for="goGoActive">Go-Go Phase aktivieren</label><input
+                                        type="checkbox" id="goGoActive"
+                                        title="Aktiviert temporären VPW-Flex-Aufschlag in der Go-Go-Phase">
+                                </div>
+                                <div class="form-group"><label for="goGoMultiplier">Go-Go Multiplikator</label><input
+                                        type="number" id="goGoMultiplier" value="1.1" min="1" max="10" step="0.05"
+                                        title="Multiplikator auf VPW-Flex in Go-Go-Jahren (1.0 bis 10.0)">
+                                </div>
+                            </div>
                             <div id="displayPortfolioBreakdown"
                                 style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
                             </div>
@@ -862,6 +911,18 @@
                                     type="text" id="sweepGoldTargetPct" value="5,7.5" placeholder="0,2.5,5,7.5"
                                     title="Format: start:step:end (z.B. 0:2.5:10) oder Liste 0,2.5,5,7.5 oder Einzelwert 7.5">
                             </div>
+                            <div class="form-group"><label for="sweepHorizonYears">VPW Horizon (Jahre)</label><input
+                                    type="text" id="sweepHorizonYears" value="30" placeholder="25,30,35"
+                                    title="Nur bei Dynamic Flex aktiv. Format: start:step:end, Liste oder Einzelwert.">
+                            </div>
+                            <div class="form-group"><label for="sweepSurvivalQuantile">VPW Quantile</label><input
+                                    type="text" id="sweepSurvivalQuantile" value="0.85" placeholder="0.80,0.85,0.90"
+                                    title="Nur bei Dynamic Flex aktiv. Gueltig: 0.50 bis 0.99.">
+                            </div>
+                            <div class="form-group"><label for="sweepGoGoMultiplier">VPW Go-Go Multiplikator</label><input
+                                    type="text" id="sweepGoGoMultiplier" value="1.10" placeholder="1.0,1.1,1.2"
+                                    title="Nur bei Go-Go aktiv. Gueltig fuer Sweep: 1.0 bis 2.0.">
+                            </div>
                         </div>
                     </fieldset>
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;"> <button
@@ -925,6 +986,9 @@
                                         <option value="maxBearRefillPct">Max Bear Refill Pct
                                         </option>
                                         <option value="goldTargetPct">Gold Target Pct</option>
+                                        <option value="horizonYears">VPW Horizon</option>
+                                        <option value="survivalQuantile">VPW Quantile</option>
+                                        <option value="goGoMultiplier">VPW Go-Go Mult</option>
                                     </select> </div>
                                 <div class="form-group"> <label for="sweepAxisY">Y-Achse
                                         Parameter</label> <select id="sweepAxisY">
@@ -936,6 +1000,9 @@
                                         <option value="maxBearRefillPct">Max Bear Refill Pct
                                         </option>
                                         <option value="goldTargetPct">Gold Target Pct</option>
+                                        <option value="horizonYears">VPW Horizon</option>
+                                        <option value="survivalQuantile">VPW Quantile</option>
+                                        <option value="goGoMultiplier">VPW Go-Go Mult</option>
                                     </select> </div>
                             </div>
                         </div>
@@ -1027,6 +1094,12 @@
                                         📉 Drawdown-Minimierung</div>
                                     <div style="font-size: 0.8rem; color: #666;">
                                         Minimierung von Verlusten</div>
+                                </button> <button type="button" class="ao-preset-btn" data-preset="dynamicFlexBalanced"
+                                    style="padding: 10px; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; text-align: left; transition: all 0.2s;">
+                                    <div style="font-weight: 600; margin-bottom: 4px;">
+                                        🧭 Dynamic Flex</div>
+                                    <div style="font-size: 0.8rem; color: #666;">
+                                        VPW Parameter + Safety</div>
                                 </button>
                             </div>
                         </div>
@@ -1060,6 +1133,16 @@
                                 </div>
                                 <div class="form-group"> <label for="ao_seeds_test">Test Seeds</label>
                                     <input type="number" id="ao_seeds_test" value="2" min="1" max="20" step="1">
+                                </div>
+                            </div>
+                            <div class="form-grid" style="grid-template-columns: 1fr; margin-top: 12px;">
+                                <div class="form-group">
+                                    <label for="ao_dynamic_flex_mode">Dynamic-Flex Modus (Stufe A)</label>
+                                    <select id="ao_dynamic_flex_mode">
+                                        <option value="inherit" selected>Rahmendaten verwenden</option>
+                                        <option value="force_on">Dynamic Flex erzwingen EIN</option>
+                                        <option value="force_off">Dynamic Flex erzwingen AUS</option>
+                                    </select>
                                 </div>
                             </div>
                             <p style="font-size: 0.85rem; color: #666; margin: 10px 0 0 0;">

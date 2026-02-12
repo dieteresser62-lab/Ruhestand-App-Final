@@ -4,6 +4,8 @@
  * Usage: Called by Engine Core before simulation starts.
  * Dependencies: None
  */
+import { CONFIG } from '../config.mjs';
+
 const InputValidator = {
     /**
      * Validiert alle Benutzereingaben auf Plausibilität
@@ -145,6 +147,49 @@ const InputValidator = {
         input.maxBearRefillPctOfEq, 0, 70,
         'maxBearRefillPctOfEq',
         'Max. Auffüllen (Bär) muss zwischen 0% und 70% liegen.'
+    );
+
+    // T01: Dynamic-Flex Contract Validation
+    if (input.dynamicFlex != null) {
+        check(typeof input.dynamicFlex !== 'boolean', 'dynamicFlex', 'dynamicFlex muss ein Boolean sein.');
+    }
+    if (input.goGoActive != null) {
+        check(typeof input.goGoActive !== 'boolean', 'goGoActive', 'goGoActive muss ein Boolean sein.');
+    }
+    if (input.horizonMethod != null) {
+        const validMethod = (input.horizonMethod === 'mean' || input.horizonMethod === 'survival_quantile');
+        check(!validMethod, 'horizonMethod', "horizonMethod muss 'mean' oder 'survival_quantile' sein.");
+    }
+
+    if (input.dynamicFlex === true) {
+        const maxGoGoMultiplier = CONFIG.SPENDING_MODEL.DYNAMIC_FLEX.MAX_GO_GO_MULTIPLIER;
+        checkFiniteRange(
+            input.horizonYears, 1, 60,
+            'horizonYears',
+            'horizonYears muss zwischen 1 und 60 liegen.'
+        );
+        checkFiniteRange(
+            input.survivalQuantile, 0.5, 0.99,
+            'survivalQuantile',
+            'survivalQuantile muss zwischen 0.5 und 0.99 liegen.'
+        );
+        checkFiniteRange(
+            input.goGoMultiplier, 1.0, maxGoGoMultiplier,
+            'goGoMultiplier',
+            `goGoMultiplier muss zwischen 1.0 und ${maxGoGoMultiplier.toFixed(1)} liegen.`
+        );
+    }
+
+    // CAPE alias contract: both fields are accepted, both must be plausible if present.
+    checkFiniteRange(
+        input.capeRatio, 0, 100,
+        'capeRatio',
+        'CAPE muss zwischen 0 und 100 liegen.'
+    );
+    checkFiniteRange(
+        input.marketCapeRatio, 0, 100,
+        'marketCapeRatio',
+        'marketCapeRatio muss zwischen 0 und 100 liegen.'
     );
 
         return { valid: errors.length === 0, errors };

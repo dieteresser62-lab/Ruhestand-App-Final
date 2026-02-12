@@ -60,7 +60,10 @@ function getParameterDeltas(key, reduced = false) {
         targetEq: reduced ? [-2, 2] : [-5, -2, 2, 5],
         rebalBand: reduced ? [-0.5, 0.5] : [-1, -0.5, 0.5, 1],
         maxSkimPct: reduced ? [-2, 2] : [-5, -2, 2, 5],
-        maxBearRefillPct: reduced ? [-2, 2] : [-5, -2, 2, 5]
+        maxBearRefillPct: reduced ? [-2, 2] : [-5, -2, 2, 5],
+        horizonYears: reduced ? [-2, 2] : [-4, -2, 2, 4],
+        survivalQuantile: reduced ? [-0.02, 0.02] : [-0.04, -0.02, 0.02, 0.04],
+        goGoMultiplier: reduced ? [-0.05, 0.05] : [-0.1, -0.05, 0.05, 0.1]
     };
     return deltaMap[key] || (reduced ? [-1, 1] : [-2, -1, 1, 2]);
 }

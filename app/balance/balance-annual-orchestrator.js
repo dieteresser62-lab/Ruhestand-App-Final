@@ -17,6 +17,7 @@ export function createAnnualOrchestrator({
     debouncedUpdate,
     handleFetchInflation,
     handleNachrueckenMitETF,
+    handleFetchCapeAuto,
     showUpdateResultModal,
     setLastUpdateResults
 }) {
@@ -30,6 +31,7 @@ export function createAnnualOrchestrator({
             startTime: startTime,
             inflation: null,
             etf: null,
+            cape: null,
             age: { old: parseInt(dom.inputs.aktuellesAlter.value) || 0, new: 0 },
             errors: []
         };
@@ -67,7 +69,24 @@ export function createAnnualOrchestrator({
             try {
                 results.etf = await handleNachrueckenMitETF();
             } catch (err) {
-                results.errors.push({ step: 'ETF/Nachr.', error: err.message || 'Unbekannter Fehler' });
+                results.errors.push({ step: 'ETF & Nachrücken', error: err.message || 'Unbekannter Fehler' });
+            }
+
+            // Schritt 4: CAPE automatisch aktualisieren (non-blocking)
+            btn.innerHTML = '⏳ CAPE...';
+            try {
+                results.cape = await handleFetchCapeAuto();
+                if (results.cape?.capeFetchStatus === 'error_no_source_no_stored') {
+                    const details = Array.isArray(results.cape?.errors) && results.cape.errors.length > 0
+                        ? ` Details: ${results.cape.errors.join(' | ')}`
+                        : '';
+                    results.errors.push({
+                        step: 'CAPE',
+                        error: `Keine CAPE-Quelle verfügbar und kein lokaler Stand vorhanden.${details}`
+                    });
+                }
+            } catch (err) {
+                results.errors.push({ step: 'CAPE', error: err.message || 'Unbekannter Fehler' });
             }
 
             // UI aktualisieren, damit die Erfolgsmeldung das neue Alter anzeigt
@@ -88,7 +107,17 @@ export function createAnnualOrchestrator({
             if (results.errors.length > 0) {
                 showUpdateResultModal(results);
             } else {
-                UIRenderer.toast('✅ Jahres-Update erfolgreich abgeschlossen.');
+                const capeStatus = results.cape?.capeFetchStatus || '';
+                if (capeStatus === 'ok_primary' || capeStatus === 'ok_fallback_mirror') {
+                    UIRenderer.toast('✅ ETF + CAPE aktualisiert.');
+                } else if (capeStatus === 'ok_fallback_stored' || capeStatus === 'warn_stale_source') {
+                    const asOf = results.cape?.capeAsOf
+                        ? new Date(results.cape.capeAsOf).toLocaleDateString('de-DE')
+                        : 'unbekannt';
+                    UIRenderer.toast(`⚠️ ETF aktualisiert, CAPE aus lokalem Stand (${asOf}).`);
+                } else {
+                    UIRenderer.toast('✅ Jahres-Update erfolgreich abgeschlossen.');
+                }
             }
 
         } catch (err) {

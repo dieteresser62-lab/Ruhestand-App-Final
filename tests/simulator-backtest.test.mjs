@@ -76,6 +76,12 @@ try {
         p1StartInJahren: 0,
         rentAdjMode: 'fix',
         rentAdjPct: 0,
+        dynamicFlex: false,
+        horizonMethod: 'survival_quantile',
+        horizonYears: 30,
+        survivalQuantile: 0.85,
+        goGoActive: false,
+        goGoMultiplier: 1.0,
         goldAllokationAktiv: 'false',
         goldAllokationProzent: 0,
         goldFloorProzent: 0,
@@ -133,6 +139,50 @@ try {
         const finalWealth = (last?.wertAktien || 0) + (last?.wertGold || 0) + (last?.liquiditaet || 0);
         assert(Number.isFinite(finalWealth), 'Final wealth should be finite');
         assert(finalWealth >= 0, 'Final wealth should be >= 0');
+    }
+
+    // --- TEST 6: Dynamic Flex horizon is recomputed per year and ui.vpw is exposed ---
+    {
+        global.document = createMockDocument({
+            ...baseInputs,
+            simStartJahr: 2010,
+            simEndJahr: 2013,
+            dynamicFlex: 'true',
+            horizonMethod: 'mean',
+            p1StartAlter: 65
+        });
+        global.document.getElementById('dynamicFlex').checked = true;
+        global.document.getElementById('goGoActive').checked = false;
+        global.document.getElementById('monteCarloResults').style.display = 'none';
+        runBacktest();
+
+        const rows = window.globalBacktestData?.rows || [];
+        assert(rows.length >= 3, 'Dynamic flex test should create multiple rows');
+        assert(rows.every(r => r?.vpw !== undefined), 'Backtest rows should expose ui.vpw payload');
+        const horizons = rows.map(r => Number(r?.vpw?.horizonYears)).filter(Number.isFinite);
+        assert(horizons.length >= 3, 'Dynamic flex rows should contain horizon values');
+        assert(horizons[1] <= horizons[0], 'Horizon should not increase from year 1 to year 2');
+        assert(horizons[2] <= horizons[1], 'Horizon should not increase from year 2 to year 3');
+        const hints = rows.map(r => r?.vpwFallbackHint);
+        assert(hints.every(h => typeof h === 'string' && h.length > 0), 'Each row should include VPW fallback hint');
+        assert(hints.every(h => h === 'ok'), 'Active dynamic-flex rows should not report fallback in this scenario');
+    }
+
+    // --- TEST 7: Dynamic Flex off exposes explicit hint ---
+    {
+        global.document = createMockDocument({
+            ...baseInputs,
+            simStartJahr: 2015,
+            simEndJahr: 2016,
+            dynamicFlex: 'false'
+        });
+        global.document.getElementById('dynamicFlex').checked = false;
+        global.document.getElementById('monteCarloResults').style.display = 'none';
+        runBacktest();
+        const rows = window.globalBacktestData?.rows || [];
+        assert(rows.length === 2, 'Dynamic flex off scenario should create two rows');
+        assert(rows.every(r => r?.vpw?.status === 'disabled'), 'VPW status should be disabled when dynamic flex is off');
+        assert(rows.every(r => r?.vpwFallbackHint === 'dynamic_flex_off'), 'Hint should explicitly mark dynamic flex off mode');
     }
 
     console.log('✅ Simulator backtest tests passed');

@@ -42,8 +42,15 @@ function buildBasicInputs() {
         maxSkimPctOfEq: 10,
         maxBearRefillPctOfEq: 5,
         marketCapeRatio: 20,
+        capeRatio: 20,
         kirchensteuerSatz: 0,
         startSPB: 1000,
+        dynamicFlex: false,
+        horizonMethod: 'survival_quantile',
+        horizonYears: 30,
+        survivalQuantile: 0.85,
+        goGoActive: false,
+        goGoMultiplier: 1.0,
         pflegefallLogikAktivieren: false,
         geschlecht: 'm',
         partner: { aktiv: false },
@@ -451,6 +458,47 @@ const emptyLists = {
     const expectedSuccessRate = ((4 - ruinCount) / 4) * 100;
     const actualSuccessRate = 100 - aggregates.depotErschoepfungsQuote;
     assertClose(actualSuccessRate, expectedSuccessRate, 0.0001, 'Success rate should match depletion rate');
+}
+
+// --- TEST 14: Dynamic Flex horizon recomputation in serial MC ---
+{
+    const inputs = {
+        ...buildBasicInputs(),
+        startAlter: 50,
+        dynamicFlex: true,
+        horizonMethod: 'mean',
+        horizonYears: 35,
+        marketCapeRatio: 30,
+        capeRatio: 30
+    };
+    const monteCarloParams = {
+        anzahl: 1,
+        maxDauer: 4,
+        blockSize: 1,
+        seed: 2026,
+        methode: 'block',
+        rngMode: 'per-run-seed',
+        startYearMode: 'UNIFORM'
+    };
+    const chunk = await runMonteCarloChunk({
+        inputs,
+        monteCarloParams,
+        widowOptions: { mode: 'stop', percent: 0, marriageOffsetYears: 0, minMarriageYears: 0 },
+        useCapeSampling: false,
+        runRange: { start: 0, count: 1 },
+        logIndices: [0],
+        engine: EngineAPI
+    });
+
+    const run = chunk.runMeta?.[0];
+    const rows = run?.logDataRows || [];
+    assert(rows.length >= 3, 'Dynamic flex MC run should produce at least three log rows');
+    const horizons = rows
+        .map(row => Number(row?.vpw?.horizonYears))
+        .filter(Number.isFinite);
+    assert(horizons.length >= 3, 'Dynamic flex MC rows should include VPW horizons');
+    assert(horizons[1] <= horizons[0], 'MC horizon should not increase year-over-year (y1->y2)');
+    assert(horizons[2] <= horizons[1], 'MC horizon should not increase year-over-year (y2->y3)');
 }
 
 console.log('--- Simulator Monte Carlo Tests Completed ---');

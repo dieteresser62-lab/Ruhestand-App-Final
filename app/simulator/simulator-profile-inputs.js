@@ -10,6 +10,14 @@
 import { SUPPORTED_PFLEGE_GRADES } from './simulator-data.js';
 import { CONFIG } from '../balance/balance-config.js';
 
+const DYNAMIC_FLEX_DEFAULTS = {
+    HORIZON_METHOD: 'survival_quantile',
+    HORIZON_YEARS: 30,
+    SURVIVAL_QUANTILE: 0.85,
+    GO_GO_MULTIPLIER: 1.0
+};
+const DYNAMIC_FLEX_ALLOWED_HORIZON_METHODS = new Set(['mean', 'survival_quantile']);
+
 function readValue(data, key) {
     if (!data || typeof data !== 'object') return null;
     return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null;
@@ -45,6 +53,16 @@ function readBool(data, key, fallback = false) {
 
 function simKey(id) {
     return `sim_${id}`;
+}
+
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
+
+function normalizeDynamicFlexHorizonMethod(method) {
+    return DYNAMIC_FLEX_ALLOWED_HORIZON_METHODS.has(method)
+        ? method
+        : DYNAMIC_FLEX_DEFAULTS.HORIZON_METHOD;
 }
 
 function parseWidowOptions(data) {
@@ -154,6 +172,26 @@ export function buildSimulatorInputsFromProfileData(profileData) {
 
     const rentAdjMode = readString(profileData, simKey('rentAdjMode'), 'wage');
     const rentAdjPct = readNumber(profileData, simKey('rentAdjPct'), 0);
+    const dynamicFlex = readBool(profileData, simKey('dynamicFlex'), false);
+    const horizonMethod = normalizeDynamicFlexHorizonMethod(
+        readString(profileData, simKey('horizonMethod'), DYNAMIC_FLEX_DEFAULTS.HORIZON_METHOD)
+    );
+    const horizonYears = clamp(
+        readNumber(profileData, simKey('horizonYears'), DYNAMIC_FLEX_DEFAULTS.HORIZON_YEARS),
+        1,
+        60
+    );
+    const survivalQuantile = clamp(
+        readNumber(profileData, simKey('survivalQuantile'), DYNAMIC_FLEX_DEFAULTS.SURVIVAL_QUANTILE),
+        0.5,
+        0.99
+    );
+    const goGoActive = readBool(profileData, simKey('goGoActive'), false);
+    const goGoMultiplier = clamp(
+        readNumber(profileData, simKey('goGoMultiplier'), DYNAMIC_FLEX_DEFAULTS.GO_GO_MULTIPLIER),
+        1.0,
+        10.0
+    );
 
     const goldAktivFromProfile = goldOverrides.goldAktiv;
     const goldAktiv = (typeof goldAktivFromProfile === 'boolean')
@@ -188,6 +226,13 @@ export function buildSimulatorInputsFromProfileData(profileData) {
         flexBudgetYears: readNumber(profileData, simKey('flexBudgetYears'), 0),
         flexBudgetRecharge: readNumber(profileData, simKey('flexBudgetRecharge'), 0),
         marketCapeRatio: readNumber(profileData, simKey('marketCapeRatio'), 0),
+        capeRatio: readNumber(profileData, simKey('marketCapeRatio'), 0),
+        dynamicFlex,
+        horizonMethod,
+        horizonYears,
+        survivalQuantile,
+        goGoActive,
+        goGoMultiplier,
         risikoprofil: 'sicherheits-dynamisch',
         goldAktiv,
         goldZielProzent: goldAktiv ? goldZielProzent : 0,
@@ -276,6 +321,10 @@ export function buildSimulatorInputsFromProfileData(profileData) {
     }
     if ((!baseInputs.flexBudgetRecharge || baseInputs.flexBudgetRecharge <= 0) && balanceInputs) {
         baseInputs.flexBudgetRecharge = Number(balanceInputs.flexBudgetRecharge) || baseInputs.flexBudgetRecharge;
+    }
+    if ((!baseInputs.marketCapeRatio || baseInputs.marketCapeRatio <= 0) && balanceInputs) {
+        baseInputs.marketCapeRatio = Number(balanceInputs.marketCapeRatio) || baseInputs.marketCapeRatio;
+        baseInputs.capeRatio = baseInputs.marketCapeRatio;
     }
 
     const strategyInputs = {
@@ -468,6 +517,8 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
     if (!ensureValueMatch(inputsList, i => i.pflegeModellTyp)) {
         warnings.push('Pflege-Modell unterscheidet sich zwischen Profilen. Es wird das Hauptprofil verwendet.');
     }
+    // Dynamic-Flex-Parameter werden im Simulator explizit aus den aktuellen Rahmendaten
+    // gelesen und nicht aus Profil-Differenzen im Profilverbund abgeleitet.
 
     const secondaryEntry = profileInputs.find(entry => entry.profileId !== primaryEntry.profileId) || null;
     const secondaryInputs = secondaryEntry?.inputs || null;

@@ -87,6 +87,12 @@ function teardownMockDOM() {
         'startFloorBedarf': 24000,
         'startFlexBedarf': 6000,
         'marketCapeRatio': 20,
+        'dynamicFlex': { checked: false },
+        'horizonMethod': 'survival_quantile',
+        'horizonYears': 30,
+        'survivalQuantile': 0.85,
+        'goGoActive': { checked: false },
+        'goGoMultiplier': 1.1,
         // Person 1
         'p1StartAlter': 65,
         'p1Geschlecht': 'w',
@@ -110,6 +116,13 @@ function teardownMockDOM() {
         assertEqual(parsedInputs.zielLiquiditaet, 10000, 'Should derive zielLiquiditaet');
         assertEqual(parsedInputs.depotwertAlt, 50000, 'Should parse depotwertAlt');
         assertEqual(parsedInputs.goldAktiv, false, 'Should parse gold toggle');
+        assertEqual(parsedInputs.dynamicFlex, false, 'Should parse dynamicFlex toggle');
+        assertEqual(parsedInputs.horizonMethod, 'survival_quantile', 'Should parse default horizonMethod');
+        assertEqual(parsedInputs.horizonYears, 30, 'Should parse horizonYears');
+        assertEqual(parsedInputs.survivalQuantile, 0.85, 'Should parse survivalQuantile');
+        assertEqual(parsedInputs.goGoActive, false, 'Should parse goGoActive');
+        assertEqual(parsedInputs.goGoMultiplier, 1.1, 'Should parse goGoMultiplier');
+        assertEqual(parsedInputs.capeRatio, 20, 'Should mirror marketCapeRatio as capeRatio');
 
         // Test Initialization
         const portfolio = initializePortfolio(parsedInputs);
@@ -137,6 +150,35 @@ function teardownMockDOM() {
     } catch (e) {
         console.error('Test 4 Failed', e);
         throw e;
+    } finally {
+        teardownMockDOM();
+    }
+}
+
+// Test 5: Dynamic Flex bounds and fallbacks
+{
+    const mockValues = {
+        'dynamicFlex': { checked: true },
+        'horizonMethod': 'invalid',
+        'horizonYears': 120,
+        'survivalQuantile': 0.1,
+        'goGoActive': { checked: true },
+        'goGoMultiplier': 999,
+        'marketCapeRatio': 31.4
+    };
+
+    setupMockDOM(mockValues);
+    try {
+        const parsedInputs = getCommonInputs();
+        assertEqual(parsedInputs.dynamicFlex, true, 'Should enable dynamicFlex');
+        assertEqual(parsedInputs.horizonMethod, 'survival_quantile', 'Invalid horizonMethod should fallback');
+        assertEqual(parsedInputs.horizonYears, 60, 'horizonYears should clamp to max');
+        assertEqual(parsedInputs.survivalQuantile, 0.5, 'survivalQuantile should clamp to min');
+        assertEqual(parsedInputs.goGoActive, true, 'Should enable goGoActive');
+        assertEqual(parsedInputs.goGoMultiplier, 10, 'goGoMultiplier should clamp to max');
+        assertEqual(parsedInputs.marketCapeRatio, 31.4, 'Should parse marketCapeRatio');
+        assertEqual(parsedInputs.capeRatio, 31.4, 'Should keep cape alias in sync');
+        console.log('✅ Dynamic Flex parsing bounds work');
     } finally {
         teardownMockDOM();
     }

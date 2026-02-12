@@ -241,8 +241,62 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal') {
 
     if (isDetailed) {
         columns.push(
+            {
+                header: 'VPW%',
+                width: 5,
+                key: 'vpw.vpwRate',
+                valueFormatter: v => (Number.isFinite(v) ? formatPercentValue(v * 100, { fractionDigits: 1, invalid: '' }) : ''),
+                align: 'right'
+            },
+            {
+                header: 'Hor',
+                width: 4,
+                key: 'vpw.horizonYears',
+                valueFormatter: v => (Number.isFinite(v) ? Math.round(v) : ''),
+                align: 'right'
+            },
+            {
+                header: 'VPWSt',
+                width: 7,
+                key: 'vpw.status',
+                valueFormatter: v => {
+                    if (v === 'active') return 'aktiv';
+                    if (v === 'disabled') return 'aus';
+                    if (v === 'contract_ready') return 'bereit';
+                    return v || '';
+                },
+                align: 'left'
+            },
+            {
+                header: 'VPWHint',
+                width: 18,
+                key: 'vpwFallbackHint',
+                valueFormatter: v => v || '',
+                align: 'left'
+            },
             { header: 'Entn_real', width: 9, key: 'row.jahresentnahme_real', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
-            { header: 'Adj%', width: 5, key: 'adjPct', valueFormatter: v => formatPercent(v), align: 'right' }
+            { header: 'Adj%', width: 5, key: 'adjPct', valueFormatter: v => formatPercent(v), align: 'right' },
+            {
+                header: 'CAPE',
+                width: 6,
+                key: 'vpw.capeRatioUsed',
+                valueFormatter: v => (Number.isFinite(v) ? Number(v).toFixed(1) : ''),
+                align: 'right'
+            },
+            {
+                header: 'ER(CAPE)',
+                width: 8,
+                key: 'vpw.expectedReturnCape',
+                valueFormatter: v => (Number.isFinite(v) ? formatPercentRatio(v, { fractionDigits: 1, invalid: '' }) : ''),
+                align: 'right'
+            },
+            {
+                header: 'ER(real)',
+                width: 8,
+                key: 'vpw.expectedRealReturn',
+                valueFormatter: v => (Number.isFinite(v) ? formatPercentRatio(v, { fractionDigits: 1, invalid: '' }) : ''),
+                align: 'right'
+            }
         );
     }
 

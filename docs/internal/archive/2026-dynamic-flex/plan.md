@@ -577,6 +577,30 @@ Wenn `ui.vpw` vorhanden, VPW-Info unter der monatlichen Entnahme anzeigen:
 `"VPW-Flex: €X/Jahr (Rate: Y%, LE: Z J. [konservativ], exp. Rendite: W%)"`.
 Bei Go-Go: zusätzlich `"Go-Go aktiv: ×1.2"` anzeigen.
 
+**5e. CAPE im Jahreswechsel vollautomatisch (Ein-Knopf-Prinzip)**
+
+Ziel: Der Nutzer drückt nur den Jahreswechsel-/Nachrücken-Knopf. CAPE wird dabei automatisch mit aktualisiert.
+
+- Primärquelle (Source of Truth): **US Shiller CAPE** (Yale `ie_data.xls`)
+- Fallback 1: `shillerdata.com` Mirror
+- Fallback 2: letzter lokal gespeicherter CAPE-Wert
+
+Technischer Ablauf im bestehenden Jahreswechsel-Flow (`balance-annual-marketdata.js`):
+1. ETF/ATH nachrücken (bestehende Logik)
+2. Shiller-CAPE abrufen und letzte valide Beobachtung extrahieren
+3. `capeRatio` (kanonisch) aktualisieren
+4. Metadaten speichern: `capeAsOf`, `capeSource`, `capeFetchStatus`, `capeUpdatedAt`
+5. Bei Fehlern: Jahreswechsel nicht abbrechen, sondern mit letztem CAPE fortfahren + Warnhinweis
+
+UX-Regeln:
+- Kein Pflichtdialog, keine manuelle CAPE-Eingabe im Normalfall
+- Erfolgs-Toast/Modal: "ETF + CAPE aktualisiert"
+- Warnfall: "ETF aktualisiert, CAPE unverändert (Stand DD.MM.YYYY)"
+
+Persistenz:
+- Speicherung in Snapshot/State, damit der CAPE-Stand revisionssicher nachvollziehbar bleibt.
+- Verbindlicher Datenvertrag und Statusmodell: siehe `CAPE_AUTOMATION_CONTRACT.md`.
+
 ---
 
 ### Schritt 6: Engine Build + Tests
@@ -609,6 +633,9 @@ npm test                # Regressionstests — alles muss bestehen (dynamicFlex 
 | 17 | Realrendite-Smoothing | Return-Änderung zwischen Jahren gedämpft |
 | 18 | CAPE-Feldkonsistenz | `capeRatio` wird durchgängig genutzt (Alias-Fallback getestet) |
 | 19 | Balance-Gate | Ohne Gender-Datenvertrag: Dynamic Flex in Balance nicht aktiv |
+| 20 | Jahreswechsel Auto-CAPE (Primärquelle) | CAPE wird mit Jahreswechsel automatisch aktualisiert |
+| 21 | Jahreswechsel Auto-CAPE (Fallback) | Bei Quellfehler: letzter CAPE bleibt, Lauf bricht nicht ab |
+| 22 | CAPE-Metadaten | `capeAsOf/source/fetchStatus/updatedAt` werden persistiert |
 
 ---
 
@@ -627,8 +654,9 @@ npm test                # Regressionstests — alles muss bestehen (dynamicFlex 
 | `app/balance/balance-reader.js` | zusätzliche DynamicFlex-Felder | ~8 |
 | `app/balance/balance-main.js` (o. shared) | Horizont-Berechnung + Datenvertrags-Gate | ~30 |
 | `app/balance/balance-renderer-summary.js` | VPW-Info + Go-Go-Anzeige | ~20 |
-| `tests/vpw-dynamic-flex.test.mjs` | Neue Testdatei (19 Testfälle) | ~230 |
-| **Gesamt** | | **~590** |
+| `app/balance/balance-annual-marketdata.js` | Jahreswechsel erweitert um Auto-CAPE + Fallback + Status | ~70 |
+| `tests/vpw-dynamic-flex.test.mjs` | Neue Testdatei (22 Testfälle) | ~250 |
+| **Gesamt** | | **~665** |
 
 ---
 
@@ -715,7 +743,20 @@ Die Engine/MarketAnalyzer arbeiten mit `capeRatio`. Im Simulator existiert zusä
 `marketCapeRatio`. Für Phase 1 gilt: vor Engine-Aufruf wird immer `capeRatio` gesetzt
 (alias/fallback weiter zulässig), damit VPW und Marktdiagnostik denselben Wert nutzen.
 
-### 9. Balance-Datenvertrag vor Feature-Freischaltung
+### 9. CAPE-Quelle und Automatisierung (Ein-Knopf-Betrieb)
+
+Für den operativen Betrieb wird CAPE als **US Shiller CAPE** standardisiert.
+Der jährliche Bedienprozess bleibt "ein Knopf": Jahreswechsel/Nachrücken triggert
+automatisch auch die CAPE-Aktualisierung.
+
+Quelle/Fallback:
+- Primär: Yale `ie_data.xls`
+- Sekundär: `shillerdata.com` Mirror
+- Tertiär: letzter gespeicherter CAPE-Wert (degradierter, aber stabiler Betrieb)
+
+Prinzip: Datenfehler dürfen den Jahreswechsel nicht blockieren.
+
+### 10. Balance-Datenvertrag vor Feature-Freischaltung
 
 Balance-Reader enthält aktuell kein explizites Geschlecht/Partnerprofil. Ohne klaren
 Datenvertrag für `gender` (und optional Partner) darf Dynamic Flex in Balance nicht
@@ -733,6 +774,8 @@ voll freigeschaltet werden. Phase 1 enthält deshalb einen expliziten Gate:
 - Go-Go-Multiplikator (erste N Jahre)
 - Rendite-Glättung + Min/Max-Return-Clamp für VPW
 - CAPE-Feldkonsistenz (`capeRatio` als kanonisches Engine-Feld)
+- Vollautomatische CAPE-Aktualisierung im Jahreswechsel (Yale -> Mirror -> letzter Wert)
+- Persistenz von CAPE-Metadaten (`capeAsOf`, `capeSource`, `capeFetchStatus`, `capeUpdatedAt`)
 - Simulator UI: Checkbox + Horizont-Modus + Go-Go + Konservativ-Aufschlag
 - Simulator UI: Quantil-Auswahl (z.B. p85/p90)
 - Balance: nur mit geklärtem Gender-Datenvertrag freischalten
@@ -888,9 +931,17 @@ Ziel: Vor Code-Start wenige Kernparameter fixieren, damit Verhalten stabil und t
 - [ ] Gate aktiv (empfohlen)
 - [ ] Ohne Gate (nicht empfohlen)
 
+### 5b) Auto-CAPE im Jahreswechsel
+- **Empfehlung:** Immer automatisch ausführen, ohne zusätzliche Nutzereingaben.
+
+**Entscheidung:**
+- [ ] Auto-CAPE aktiv (empfohlen)
+- [ ] Manuelle CAPE-Pflege (nicht empfohlen)
+
 ### 6) Abnahmekriterien Phase 1
 - `dynamicFlex=false` ist bit-identisch zum bisherigen Verhalten.
-- 19 neue Tests grün (inkl. Quantil/Clamp/Smoothing/CAPE-Konsistenz).
+- 22 neue Tests grün (inkl. Quantil/Clamp/Smoothing/CAPE-Konsistenz + Auto-CAPE).
+- Jahreswechsel läuft mit einem Knopf vollständig durch (inkl. CAPE), auch bei Datenquellen-Ausfall mit sauberem Fallback-Hinweis.
 - Dokumentation aktualisiert (`README.md`, `TECHNICAL.md`, `engine/README.md`).
 
 **Go/No-Go:**

@@ -179,6 +179,9 @@ console.log('Test 13: SWEEP_ALLOWED_KEYS - Whitelist');
     assert(SWEEP_ALLOWED_KEYS.has('rebalBand'), 'rebalBand sollte erlaubt sein');
     assert(SWEEP_ALLOWED_KEYS.has('maxSkimPctOfEq'), 'maxSkimPctOfEq sollte erlaubt sein');
     assert(SWEEP_ALLOWED_KEYS.has('goldZielProzent'), 'goldZielProzent sollte erlaubt sein');
+    assert(SWEEP_ALLOWED_KEYS.has('horizonYears'), 'horizonYears sollte erlaubt sein');
+    assert(SWEEP_ALLOWED_KEYS.has('survivalQuantile'), 'survivalQuantile sollte erlaubt sein');
+    assert(SWEEP_ALLOWED_KEYS.has('goGoMultiplier'), 'goGoMultiplier sollte erlaubt sein');
     assert(!SWEEP_ALLOWED_KEYS.has('startAlter'), 'startAlter sollte nicht auf Whitelist sein');
     console.log('✓ SWEEP_ALLOWED_KEYS Whitelist OK');
 }
@@ -303,7 +306,12 @@ console.log('Test 21: buildSweepInputs - Parameter-Überschreibung');
         maxSkimPctOfEq: 10,
         maxBearRefillPctOfEq: 5,
         goldAktiv: false,
-        goldZielProzent: 0
+        goldZielProzent: 0,
+        dynamicFlex: true,
+        horizonYears: 30,
+        survivalQuantile: 0.85,
+        goGoActive: true,
+        goGoMultiplier: 1.1
     };
 
     const params = {
@@ -313,7 +321,10 @@ console.log('Test 21: buildSweepInputs - Parameter-Überschreibung');
         rebalBand: 6,
         maxSkimPct: 12,
         maxBearRefillPct: 8,
-        goldTargetPct: 5
+        goldTargetPct: 5,
+        horizonYears: 35,
+        survivalQuantile: 0.9,
+        goGoMultiplier: 1.2
     };
 
     // buildSweepInputs maps sweep params onto engine inputs.
@@ -327,6 +338,9 @@ console.log('Test 21: buildSweepInputs - Parameter-Überschreibung');
     assertEqual(result.maxBearRefillPctOfEq, 8, 'maxBearRefillPctOfEq sollte überschrieben sein');
     assertEqual(result.goldZielProzent, 5, 'goldZielProzent sollte überschrieben sein');
     assert(result.goldAktiv === true, 'goldAktiv sollte true sein bei goldTargetPct > 0');
+    assertEqual(result.horizonYears, 35, 'horizonYears sollte überschrieben sein');
+    assertClose(result.survivalQuantile, 0.9, 1e-9, 'survivalQuantile sollte überschrieben sein');
+    assertClose(result.goGoMultiplier, 1.2, 1e-9, 'goGoMultiplier sollte überschrieben sein');
 
     // Nicht überschriebene Werte bleiben
     assertEqual(result.startAlter, 65, 'startAlter sollte unverändert sein');
@@ -463,6 +477,275 @@ console.log('Test 23: runSweepChunk - Determinismus');
     assertClose(run1.results[0].metrics.successProbFloor, run2.results[0].metrics.successProbFloor, 1e-9, 'successProbFloor sollte deterministisch sein');
     assertClose(run1.results[0].metrics.medianEndWealth, run2.results[0].metrics.medianEndWealth, 1e-6, 'medianEndWealth sollte deterministisch sein');
     console.log('✓ runSweepChunk Determinismus OK');
+}
+
+// Test 24: runSweepChunk - Invalid Dynamic-Flex Kombination
+console.log('Test 24: runSweepChunk - Invalid Dynamic-Flex Kombination');
+{
+    const baseInputs = {
+        startAlter: 65,
+        geschlecht: 'm',
+        startVermoegen: 500000,
+        depotwertAlt: 200000,
+        einstandAlt: 150000,
+        zielLiquiditaet: 30000,
+        startFloorBedarf: 24000,
+        startFlexBedarf: 12000,
+        targetEq: 60,
+        rebalBand: 5,
+        maxSkimPctOfEq: 10,
+        maxBearRefillPctOfEq: 5,
+        runwayMinMonths: 24,
+        runwayTargetMonths: 36,
+        goldAktiv: false,
+        goldZielProzent: 0,
+        goldFloorProzent: 0,
+        goldSteuerfrei: true,
+        dynamicFlex: false,
+        horizonYears: 30,
+        survivalQuantile: 0.85,
+        goGoActive: false,
+        goGoMultiplier: 1.0,
+        startSPB: 1000,
+        kirchensteuerSatz: 0,
+        rentAdjMode: 'fix',
+        rentAdjPct: 0,
+        renteMonatlich: 0,
+        renteStartOffsetJahre: 0,
+        marketCapeRatio: 0,
+        stressPreset: 'NONE',
+        pflegefallLogikAktivieren: false,
+        partner: { aktiv: false },
+        accumulationPhase: { enabled: false },
+        transitionYear: 0
+    };
+
+    const paramCombinations = [
+        { runwayMin: 18, runwayTarget: 24, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, survivalQuantile: 0.9 }
+    ];
+
+    const sweepConfig = {
+        anzahlRuns: 10,
+        maxDauer: 10,
+        blockSize: 5,
+        baseSeed: 42,
+        methode: 'block',
+        rngMode: 'per-run-seed'
+    };
+
+    const { results } = runSweepChunk({
+        baseInputs,
+        paramCombinations,
+        comboRange: { start: 0, count: 1 },
+        sweepConfig
+    });
+
+    assert(results[0].metrics.invalidCombination === true, 'Kombination sollte als invalid markiert sein');
+    assert(String(results[0].metrics.invalidReason || '').includes('Dynamic Flex'), 'Invalid-Reason sollte Dynamic Flex enthalten');
+    console.log('✓ runSweepChunk Invalid Dynamic-Flex Kombination OK');
+}
+
+// Test 25: runSweepChunk - Invalid Quantile-Bereich
+console.log('Test 25: runSweepChunk - Invalid Quantile-Bereich');
+{
+    const baseInputs = {
+        startAlter: 65,
+        geschlecht: 'm',
+        startVermoegen: 500000,
+        depotwertAlt: 200000,
+        einstandAlt: 150000,
+        zielLiquiditaet: 30000,
+        startFloorBedarf: 24000,
+        startFlexBedarf: 12000,
+        targetEq: 60,
+        rebalBand: 5,
+        maxSkimPctOfEq: 10,
+        maxBearRefillPctOfEq: 5,
+        runwayMinMonths: 24,
+        runwayTargetMonths: 36,
+        goldAktiv: false,
+        goldZielProzent: 0,
+        goldFloorProzent: 0,
+        goldSteuerfrei: true,
+        dynamicFlex: true,
+        horizonMethod: 'survival_quantile',
+        horizonYears: 30,
+        survivalQuantile: 0.85,
+        goGoActive: false,
+        goGoMultiplier: 1.0,
+        startSPB: 1000,
+        kirchensteuerSatz: 0,
+        rentAdjMode: 'fix',
+        rentAdjPct: 0,
+        renteMonatlich: 0,
+        renteStartOffsetJahre: 0,
+        marketCapeRatio: 0,
+        stressPreset: 'NONE',
+        pflegefallLogikAktivieren: false,
+        partner: { aktiv: false },
+        accumulationPhase: { enabled: false },
+        transitionYear: 0
+    };
+
+    const paramCombinations = [
+        { runwayMin: 18, runwayTarget: 24, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, survivalQuantile: 0.2 }
+    ];
+
+    const sweepConfig = {
+        anzahlRuns: 10,
+        maxDauer: 10,
+        blockSize: 5,
+        baseSeed: 42,
+        methode: 'block',
+        rngMode: 'per-run-seed'
+    };
+
+    const { results } = runSweepChunk({
+        baseInputs,
+        paramCombinations,
+        comboRange: { start: 0, count: 1 },
+        sweepConfig
+    });
+
+    assert(results[0].metrics.invalidCombination === true, 'Out-of-range Quantile sollte invalid sein');
+    assert(String(results[0].metrics.invalidReason || '').includes('survivalQuantile'), 'Reason sollte survivalQuantile enthalten');
+    console.log('✓ runSweepChunk Invalid Quantile-Bereich OK');
+}
+
+// Test 26: runSweepChunk - Invalid Go-Go Multiplikator wenn Go-Go inaktiv
+console.log('Test 26: runSweepChunk - Invalid Go-Go Multiplikator wenn Go-Go inaktiv');
+{
+    const baseInputs = {
+        startAlter: 65,
+        geschlecht: 'm',
+        startVermoegen: 500000,
+        depotwertAlt: 200000,
+        einstandAlt: 150000,
+        zielLiquiditaet: 30000,
+        startFloorBedarf: 24000,
+        startFlexBedarf: 12000,
+        targetEq: 60,
+        rebalBand: 5,
+        maxSkimPctOfEq: 10,
+        maxBearRefillPctOfEq: 5,
+        runwayMinMonths: 24,
+        runwayTargetMonths: 36,
+        goldAktiv: false,
+        goldZielProzent: 0,
+        goldFloorProzent: 0,
+        goldSteuerfrei: true,
+        dynamicFlex: true,
+        horizonMethod: 'survival_quantile',
+        horizonYears: 30,
+        survivalQuantile: 0.85,
+        goGoActive: false,
+        goGoMultiplier: 1.0,
+        startSPB: 1000,
+        kirchensteuerSatz: 0,
+        rentAdjMode: 'fix',
+        rentAdjPct: 0,
+        renteMonatlich: 0,
+        renteStartOffsetJahre: 0,
+        marketCapeRatio: 0,
+        stressPreset: 'NONE',
+        pflegefallLogikAktivieren: false,
+        partner: { aktiv: false },
+        accumulationPhase: { enabled: false },
+        transitionYear: 0
+    };
+
+    const paramCombinations = [
+        { runwayMin: 18, runwayTarget: 24, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, goGoMultiplier: 1.2 }
+    ];
+
+    const sweepConfig = {
+        anzahlRuns: 10,
+        maxDauer: 10,
+        blockSize: 5,
+        baseSeed: 42,
+        methode: 'block',
+        rngMode: 'per-run-seed'
+    };
+
+    const { results } = runSweepChunk({
+        baseInputs,
+        paramCombinations,
+        comboRange: { start: 0, count: 1 },
+        sweepConfig
+    });
+
+    assert(results[0].metrics.invalidCombination === true, 'Go-Go Multiplikator ohne Go-Go sollte invalid sein');
+    assert(String(results[0].metrics.invalidReason || '').includes('Go-Go'), 'Reason sollte Go-Go enthalten');
+    console.log('✓ runSweepChunk Invalid Go-Go Multiplikator wenn Go-Go inaktiv OK');
+}
+
+// Test 27: runSweepChunk - Gueltige Dynamic-Flex Grenzwerte
+console.log('Test 27: runSweepChunk - Gueltige Dynamic-Flex Grenzwerte');
+{
+    prepareHistoricalDataOnce();
+
+    const baseInputs = {
+        startAlter: 65,
+        geschlecht: 'm',
+        startVermoegen: 500000,
+        depotwertAlt: 200000,
+        einstandAlt: 150000,
+        zielLiquiditaet: 30000,
+        startFloorBedarf: 24000,
+        startFlexBedarf: 12000,
+        targetEq: 60,
+        rebalBand: 5,
+        maxSkimPctOfEq: 10,
+        maxBearRefillPctOfEq: 5,
+        runwayMinMonths: 24,
+        runwayTargetMonths: 36,
+        goldAktiv: false,
+        goldZielProzent: 0,
+        goldFloorProzent: 0,
+        goldSteuerfrei: true,
+        dynamicFlex: true,
+        horizonMethod: 'survival_quantile',
+        horizonYears: 30,
+        survivalQuantile: 0.85,
+        goGoActive: true,
+        goGoMultiplier: 1.0,
+        startSPB: 1000,
+        kirchensteuerSatz: 0,
+        rentAdjMode: 'fix',
+        rentAdjPct: 0,
+        renteMonatlich: 0,
+        renteStartOffsetJahre: 0,
+        marketCapeRatio: 0,
+        stressPreset: 'NONE',
+        pflegefallLogikAktivieren: false,
+        partner: { aktiv: false },
+        accumulationPhase: { enabled: false },
+        transitionYear: 0
+    };
+
+    const paramCombinations = [
+        { runwayMin: 18, runwayTarget: 24, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, horizonYears: 60, survivalQuantile: 0.99, goGoMultiplier: 2.0 }
+    ];
+
+    const sweepConfig = {
+        anzahlRuns: 10,
+        maxDauer: 10,
+        blockSize: 5,
+        baseSeed: 42,
+        methode: 'block',
+        rngMode: 'per-run-seed'
+    };
+
+    const { results } = runSweepChunk({
+        baseInputs,
+        paramCombinations,
+        comboRange: { start: 0, count: 1 },
+        sweepConfig
+    });
+
+    assert(results[0].metrics.invalidCombination !== true, 'Grenzwerte sollten gueltig sein');
+    assert(typeof results[0].metrics.successProbFloor === 'number', 'Metriken sollten berechnet werden');
+    console.log('✓ runSweepChunk Gueltige Dynamic-Flex Grenzwerte OK');
 }
 
 console.log('--- Simulator Sweep Tests Abgeschlossen ---');

@@ -15,6 +15,7 @@
 
 import { UIUtils } from './balance-utils.js';
 import { calculateAggregatedValues } from '../tranches/depot-tranchen-status.js';
+import { CONFIG } from './balance-config.js';
 
 // Module-level DOM reference
 let dom = null;
@@ -93,6 +94,20 @@ export const UIReader = {
             if (normalized === 'false') return false;
             return null;
         };
+        const readPersistedCapeRatio = () => {
+            try {
+                const raw = localStorage.getItem(CONFIG.STORAGE.LS_KEY);
+                if (!raw) return null;
+                const parsed = JSON.parse(raw);
+                const direct = Number(parsed?.capeMeta?.capeRatio);
+                if (Number.isFinite(direct) && direct > 0) return direct;
+                const legacy = Number(parsed?.inputs?.capeRatio);
+                if (Number.isFinite(legacy) && legacy > 0) return legacy;
+                return null;
+            } catch {
+                return null;
+            }
+        };
 
         // Profilwerte (localStorage) überschreiben DOM-Werte, wenn vorhanden.
         const profileTagesgeld = readProfileNumber('profile_tagesgeld');
@@ -105,7 +120,6 @@ export const UIReader = {
         const profileGoldFloor = readProfileNumber('profile_gold_floor_pct');
         const profileGoldSteuerfrei = readProfileBool('profile_gold_steuerfrei');
         const profileGoldRebalBand = readProfileNumber('profile_gold_rebal_band');
-
         // Lade detaillierte Tranchen aus localStorage (falls vorhanden)
         let detailledTranches = null;
         try {
@@ -165,6 +179,20 @@ export const UIReader = {
         const renteAktivFinal = hasProfileRenteSum
             ? renteMonatlichFinal > 0
             : ((typeof profileRenteAktiv === 'boolean') ? profileRenteAktiv : val('renteAktiv') === 'ja');
+        const capeInputValue = parseFloat(val('marketCapeRatio') || val('capeRatio')) || 0;
+        const persistedCapeRatio = readPersistedCapeRatio() || 0;
+        const capeRatio = Math.max(0, capeInputValue > 0 ? capeInputValue : persistedCapeRatio);
+        const rawDynamicFlex = checked('dynamicFlex');
+        const rawHorizonMethod = val('horizonMethod') || 'survival_quantile';
+        const horizonMethod = (rawHorizonMethod === 'mean' || rawHorizonMethod === 'survival_quantile')
+            ? rawHorizonMethod
+            : 'survival_quantile';
+        const horizonYears = Math.max(1, Math.min(60, parseFloat(val('horizonYears')) || 30));
+        const survivalQuantile = Math.max(0.5, Math.min(0.99, parseFloat(val('survivalQuantile')) || 0.85));
+        const goGoActive = checked('goGoActive');
+        const goGoMultiplier = Math.max(1.0, Math.min(10.0, parseFloat(val('goGoMultiplier')) || 1.0));
+        // Feature gate for Balance rollout: Dynamic Flex requires a valid CAPE anchor.
+        const dynamicFlex = rawDynamicFlex && capeRatio > 0;
 
         return {
             aktuellesAlter: Number.isFinite(profileAlter) ? profileAlter : (parseInt(val('aktuellesAlter')) || 0),
@@ -207,6 +235,14 @@ export const UIReader = {
             rebalBand: parseFloat(val('rebalBand')) || 0,
             maxSkimPctOfEq: parseFloat(val('maxSkimPctOfEq')) || 0,
             maxBearRefillPctOfEq: parseFloat(val('maxBearRefillPctOfEq')) || 0,
+            marketCapeRatio: capeRatio,
+            capeRatio: capeRatio,
+            dynamicFlex,
+            horizonMethod,
+            horizonYears,
+            survivalQuantile,
+            goGoActive,
+            goGoMultiplier,
             profilName: val('profilName') || '',
             // NEU: Detaillierte Tranchen für FIFO und präzise Steuerberechnung
             detailledTranches: detailledTranches

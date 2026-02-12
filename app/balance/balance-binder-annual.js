@@ -31,6 +31,7 @@ export function createAnnualHandlers({
         debouncedUpdate,
         handleFetchInflation: inflation.handleFetchInflation,
         handleNachrueckenMitETF: marketdata.handleNachrueckenMitETF,
+        handleFetchCapeAuto: marketdata.handleFetchCapeAuto,
         showUpdateResultModal: modal.showUpdateResultModal,
         setLastUpdateResults
     });
@@ -44,6 +45,7 @@ export function createAnnualHandlers({
         handleJahresUpdate: orchestrator.handleJahresUpdate,
         showUpdateResultModal: modal.showUpdateResultModal,
         handleShowUpdateLog: modal.handleShowUpdateLog,
-        handleNachrueckenMitETF: marketdata.handleNachrueckenMitETF
+        handleNachrueckenMitETF: marketdata.handleNachrueckenMitETF,
+        handleFetchCapeAuto: marketdata.handleFetchCapeAuto
     };
 }

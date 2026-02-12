@@ -100,6 +100,18 @@ const PRESETS = {
             { key: 'targetEq', min: 30, max: 60, step: 5 },
             { key: 'rebalBand', min: 3, max: 8, step: 1 }
         ]
+    },
+    dynamicFlexBalanced: {
+        name: '🧭 Dynamic Flex',
+        description: 'Optimiert VPW-Parameter mit Safety-Guards',
+        objective: { metric: 'EndWealth_P50', direction: 'max' },
+        constraints: { sr99: true, noex: true, ts45: false, dd55: false },
+        dynamicFlexMode: 'force_on',
+        params: [
+            { key: 'horizonYears', min: 24, max: 36, step: 1 },
+            { key: 'survivalQuantile', min: 0.80, max: 0.92, step: 0.01 },
+            { key: 'goGoMultiplier', min: 1.00, max: 1.20, step: 0.05 }
+        ]
     }
 };
 
@@ -226,6 +238,10 @@ function applyPreset(presetKey) {
     }
 
     // 5. Update UI
+    const dynamicFlexModeSelect = document.getElementById('ao_dynamic_flex_mode');
+    if (dynamicFlexModeSelect) {
+        dynamicFlexModeSelect.value = preset.dynamicFlexMode || 'inherit';
+    }
     updateParameterButtonStates();
     updateRunButtonState();
 }
@@ -273,6 +289,9 @@ function addParameter(defaults = null) {
         <option value="rebalBand">Rebal Band (%)</option>
         <option value="maxSkimPct">Max Skim (%)</option>
         <option value="maxBearRefillPct">Max Bear Refill (%)</option>
+        <option value="horizonYears">VPW Horizon (Jahre)</option>
+        <option value="survivalQuantile">VPW Quantile</option>
+        <option value="goGoMultiplier">VPW Go-Go Multiplikator</option>
     `;
 
     paramDiv.innerHTML = `
@@ -458,6 +477,20 @@ function readConfigFromUI() {
         ts45: document.getElementById('ao_c_ts45')?.checked ?? false,
         dd55: document.getElementById('ao_c_dd55')?.checked ?? false
     };
+    const dynamicFlexModeRaw = document.getElementById('ao_dynamic_flex_mode')?.value || 'inherit';
+    const dynamicFlexMode = ['inherit', 'force_on', 'force_off'].includes(dynamicFlexModeRaw)
+        ? dynamicFlexModeRaw
+        : 'inherit';
+
+    const dynamicFlexParamKeys = new Set(['horizonYears', 'survivalQuantile', 'goGoMultiplier']);
+    const hasDynamicFlexParams = Object.keys(params).some(key => dynamicFlexParamKeys.has(key));
+    if (hasDynamicFlexParams) {
+        const dynamicFlexChecked = document.getElementById('dynamicFlex')?.checked === true;
+        const effectiveDynamicFlexOn = (dynamicFlexMode === 'force_on') || (dynamicFlexMode === 'inherit' && dynamicFlexChecked);
+        if (!effectiveDynamicFlexOn) {
+            throw new Error('Dynamic-Flex Parameter gewaehlt, aber Dynamic Flex ist effektiv AUS (Modus oder Rahmendaten anpassen).');
+        }
+    }
 
     // Max Duration (fest oder aus MC-Tab übernommen)
     const maxDauer = 35;
@@ -469,7 +502,8 @@ function readConfigFromUI() {
         seedsTrain,
         seedsTest,
         constraints,
-        maxDauer
+        maxDauer,
+        dynamicFlexMode
     };
 }
 
@@ -544,7 +578,7 @@ async function handleRunAutoOptimize() {
  */
 function renderResult(result, objective) {
     const resultEl = document.getElementById('ao_result');
-    const { championCfg, metricsTest, deltaVsCurrent, stability } = result;
+    const { championCfg, metricsTest, deltaVsCurrent, stability, optimizationContext } = result;
 
     const stabilityPct = Math.round(stability * 100);
     const stabilityColor = stabilityPct >= 80 ? '#4caf50' : stabilityPct >= 60 ? '#ff9800' : '#f44336';
@@ -557,7 +591,10 @@ function renderResult(result, objective) {
         targetEq: 'Target Eq',
         rebalBand: 'Rebal Band',
         maxSkimPct: 'Max Skim',
-        maxBearRefillPct: 'Max Bear Refill'
+        maxBearRefillPct: 'Max Bear Refill',
+        horizonYears: 'VPW Horizon',
+        survivalQuantile: 'VPW Quantile',
+        goGoMultiplier: 'VPW Go-Go Mult'
     };
 
     const paramUnits = {
@@ -567,8 +604,19 @@ function renderResult(result, objective) {
         targetEq: '%',
         rebalBand: '%',
         maxSkimPct: '%',
-        maxBearRefillPct: '%'
+        maxBearRefillPct: '%',
+        horizonYears: 'Jahre',
+        survivalQuantile: '',
+        goGoMultiplier: 'x'
     };
+    const modeLabelMap = {
+        inherit: 'Rahmendaten verwenden',
+        force_on: 'Dynamic Flex erzwungen EIN',
+        force_off: 'Dynamic Flex erzwungen AUS'
+    };
+    const dynamicFlexModeLabel = modeLabelMap[optimizationContext?.dynamicFlexMode] || modeLabelMap.inherit;
+    const dynamicFlexStateLabel = optimizationContext?.dynamicFlexActive === true ? 'aktiv' : 'inaktiv';
+    const safetyLabel = optimizationContext?.safetyGuardsActive === true ? 'aktiv' : 'inaktiv';
 
     // Generiere Parameter-Cards dynamisch
     let paramCardsHtml = '';
@@ -590,6 +638,10 @@ function renderResult(result, objective) {
     let html = `
         <div style="border: 2px solid var(--secondary-color); border-radius: 8px; padding: 20px; background: #f9f9f9; margin-top: 20px;">
             <h3 style="margin-top: 0; color: var(--secondary-color);">🏆 Champion Configuration</h3>
+            <div style="background: #eef6ff; border: 1px solid #cddff8; color: #244f7a; padding: 10px 12px; border-radius: 6px; margin-bottom: 14px; font-size: 0.9rem;">
+                <strong>Dynamic-Flex Modus:</strong> ${dynamicFlexModeLabel} (${dynamicFlexStateLabel})
+                <br><strong>Safety-Guards:</strong> ${safetyLabel}
+            </div>
 
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px;">
                 ${paramCardsHtml}
@@ -680,7 +732,10 @@ function applyChampionToConfig() {
         targetEq: 'targetEq',
         rebalBand: 'rebalBand',
         maxSkimPct: 'maxSkimPctOfEq',
-        maxBearRefillPct: 'maxBearRefillPctOfEq'
+        maxBearRefillPct: 'maxBearRefillPctOfEq',
+        horizonYears: 'horizonYears',
+        survivalQuantile: 'survivalQuantile',
+        goGoMultiplier: 'goGoMultiplier'
     };
 
     // Übernehme alle Parameter
@@ -692,6 +747,14 @@ function applyChampionToConfig() {
                 input.value = value;
                 input.dispatchEvent(new Event('change', { bubbles: true }));
             }
+        }
+    }
+
+    if (championCfg.goGoMultiplier !== undefined) {
+        const goGoActive = document.getElementById('goGoActive');
+        if (goGoActive) {
+            goGoActive.checked = true;
+            goGoActive.dispatchEvent(new Event('change', { bubbles: true }));
         }
     }
 
@@ -743,6 +806,11 @@ export function setAutoOptimizeDefaults() {
     const seedsTestInput = document.getElementById('ao_seeds_test');
     if (seedsTestInput && !seedsTestInput.value) {
         seedsTestInput.value = '2';
+    }
+
+    const dynamicFlexModeSelect = document.getElementById('ao_dynamic_flex_mode');
+    if (dynamicFlexModeSelect && !dynamicFlexModeSelect.value) {
+        dynamicFlexModeSelect.value = 'inherit';
     }
 
     // Constraints (sr99 & noex aktiv per Default)
