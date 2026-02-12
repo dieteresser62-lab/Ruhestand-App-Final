@@ -162,13 +162,6 @@ export class ActionRenderer {
      * @returns {Object|null} Handlungsvorschlag für ein internes Rebalancing.
      */
     determineInternalCashRebalance(input, action, spending, targetLiquidity) {
-
-        console.log('DEBUG_RENDERER_CASH:', {
-            inputTagesgeld: input?.tagesgeld,
-            targetLiquidityArg: targetLiquidity,
-            spendingMonatlich: spending?.monatlicheEntnahme
-        });
-
         if (!input || typeof input.tagesgeld !== 'number' || typeof input.geldmarktEtf !== 'number') {
             console.warn('ActionRenderer.determineInternalCashRebalance: Input-Daten fehlen oder sind unvollständig.');
             return null;
@@ -327,10 +320,19 @@ export class ActionRenderer {
         const hasProfilverbundActions = profilverbundActionResults && Array.isArray(profilverbundActionResults) && profilverbundActionResults.length > 0;
         const profilverbundProfiles = (typeof window !== 'undefined') ? window.__profilverbundProfileSummaries : null;
         const hasProfilverbundProfiles = profilverbundProfiles && Array.isArray(profilverbundProfiles) && profilverbundProfiles.length > 0;
+        const hasMeaningfulFlow = (entryAction = {}) => {
+            const quellenTotal = (Array.isArray(entryAction?.quellen) ? entryAction.quellen : [])
+                .reduce((sum, q) => sum + (q?.brutto || 0), 0);
+            const uses = entryAction?.verwendungen || {};
+            const usesTotal = (uses.liquiditaet || 0) + (uses.gold || 0) + (uses.aktien || 0) + (uses.geldmarkt || 0);
+            return quellenTotal > 0 || usesTotal > 0 || (entryAction?.steuer || 0) > 0 || (entryAction?.nettoErlös || 0) > 0;
+        };
+        const hasProfilverbundMaterialActions = hasProfilverbundActions
+            && profilverbundActionResults.some(entry => hasMeaningfulFlow(entry?.action || {}));
         let displayNetto = action.nettoErlös || 0;
         let displayBrutto = 0;
         let displaySteuer = action.steuer || 0;
-        if (hasProfilverbundActions) {
+        if (hasProfilverbundMaterialActions) {
             displayNetto = profilverbundActionResults.reduce((sum, entry) => sum + (entry?.action?.nettoErlös || 0), 0);
             displaySteuer = profilverbundActionResults.reduce((sum, entry) => sum + (entry?.action?.steuer || 0), 0);
             displayBrutto = profilverbundActionResults.reduce((sum, entry) => {
@@ -342,7 +344,7 @@ export class ActionRenderer {
             displayBrutto = list.reduce((sum, q) => sum + (q?.brutto || 0), 0);
         }
 
-        if (hasProfilverbundActions) {
+        if (hasProfilverbundMaterialActions) {
             quellenItems.length = 0;
             verwendungenItems.length = 0;
             if (annualWithdrawal) {
@@ -358,22 +360,23 @@ export class ActionRenderer {
                 const entryQuellen = Array.isArray(entryAction.quellen) ? entryAction.quellen : [];
                 const splitEntry = this._splitLiquiditySource(entryInput, entryAction, entrySpending, entryTarget);
 
-                if (entryQuellen.length === 0) {
-                    quellenItems.push(createRow(`- ${entryName}: Tagesgeld`, UIUtils.formatCurrency(0)));
-                    quellenItems.push(createRow(`- ${entryName}: Geldmarkt-ETF`, UIUtils.formatCurrency(0)));
-                    quellenItems.push(createRow(`- ${entryName}: Depotverkauf`, UIUtils.formatCurrency(0)));
-                    quellenItems.push(createRow(`- ${entryName}: Tranchen`, UIUtils.formatCurrency(0)));
-                } else {
+                if (entryQuellen.length > 0) {
                     entryQuellen.forEach(q => {
                         if (q.kind === 'liquiditaet' && splitEntry && splitEntry.totalOutflow > 0) {
-                            quellenItems.push(createRow(`- ${entryName}: Tagesgeld`, UIUtils.formatCurrency(splitEntry.fromTagesgeld)));
-                            quellenItems.push(createRow(`- ${entryName}: Geldmarkt-ETF`, UIUtils.formatCurrency(splitEntry.fromGeldmarkt)));
+                            if ((splitEntry.fromTagesgeld || 0) > 0) {
+                                quellenItems.push(createRow(`- ${entryName}: Tagesgeld`, UIUtils.formatCurrency(splitEntry.fromTagesgeld)));
+                            }
+                            if ((splitEntry.fromGeldmarkt || 0) > 0) {
+                                quellenItems.push(createRow(`- ${entryName}: Geldmarkt-ETF`, UIUtils.formatCurrency(splitEntry.fromGeldmarkt)));
+                            }
                             return;
                         }
                         quellenItems.push(createRow(`- ${entryName}: ${buildQuelleLabel(q).replace(/^-\s*/, '')}`, UIUtils.formatCurrency(q.brutto || 0)));
                     });
                 }
-                quellenItems.push(createRow(`- ${entryName}: Steuern (geschaetzt)`, UIUtils.formatCurrency(entryAction.steuer || 0)));
+                if ((entryAction.steuer || 0) > 0) {
+                    quellenItems.push(createRow(`- ${entryName}: Steuern (geschaetzt)`, UIUtils.formatCurrency(entryAction.steuer || 0)));
+                }
 
                 const uses = entryAction.verwendungen || {};
                 if (uses.gold > 0) verwendungenItems.push(createRow(`- ${entryName}: Kauf von Gold`, UIUtils.formatCurrency(uses.gold)));
@@ -410,6 +413,7 @@ export class ActionRenderer {
 
             const addRows = (label, allocations) => {
                 allocations.forEach((amount, index) => {
+                    if (!(amount > 0)) return;
                     const profileName = profilverbundProfiles[index]?.name || `Profil ${index + 1}`;
                     quellenItems.push(createRow(`- ${profileName}: ${label}`, UIUtils.formatCurrency(amount || 0)));
                     sourceTotals[index] += amount || 0;
@@ -420,13 +424,7 @@ export class ActionRenderer {
             const quellenEntries = Array.isArray(action.quellen) ? action.quellen : [];
             const splitLiquidity = this._splitLiquiditySource(input, action, spending, targetLiquidity);
 
-            if (quellenEntries.length === 0) {
-                const zeroAlloc = new Array(totalProfiles).fill(0);
-                addRows('Tagesgeld', zeroAlloc);
-                addRows('Geldmarkt-ETF', zeroAlloc);
-                addRows('Depotverkauf', zeroAlloc);
-                addRows('Gold', zeroAlloc);
-            } else {
+            if (quellenEntries.length > 0) {
                 quellenEntries.forEach(q => {
                     if (!q) return;
                     const kind = q.kind || '';
@@ -459,8 +457,10 @@ export class ActionRenderer {
             }
 
             const taxTotal = action.steuer || 0;
-            const taxWeights = sourceTotals.some(total => total > 0) ? sourceTotals : totalAssets;
-            addRows('Steuern (geschaetzt)', distributeAmount(taxTotal, taxWeights));
+            if (taxTotal > 0) {
+                const taxWeights = sourceTotals.some(total => total > 0) ? sourceTotals : totalAssets;
+                addRows('Steuern (geschaetzt)', distributeAmount(taxTotal, taxWeights));
+            }
 
             verwendungenItems.length = 0;
             if (annualWithdrawal) {
@@ -505,11 +505,17 @@ export class ActionRenderer {
         const wrapper = document.createElement('div');
         wrapper.style.cssText = 'text-align: left; font-size: 1rem; line-height: 1.6;';
         // Titel + strukturierte Blöcke reichen aus; eine zusätzliche Kurz-Zusammenfassung würde die Angaben nur duplizieren.
+        const quellenSummaryRows = [
+            createRow('Summe Quellen (Brutto):', UIUtils.formatCurrency(displayBrutto))
+        ];
+        if (displaySteuer > 0) {
+            quellenSummaryRows.push(createRow('Steuern (gesamt):', UIUtils.formatCurrency(displaySteuer)));
+        }
+
         wrapper.append(
             title,
             createSection(`A. Quellen (Netto: ${UIUtils.formatCurrency(displayNetto)})`, [
-                createRow('Summe Quellen (Brutto):', UIUtils.formatCurrency(displayBrutto)),
-                createRow('Steuern (gesamt):', UIUtils.formatCurrency(displaySteuer)),
+                ...quellenSummaryRows,
                 ...quellenItems
             ]),
             createSection('B. Verwendungen', verwendungenItems)

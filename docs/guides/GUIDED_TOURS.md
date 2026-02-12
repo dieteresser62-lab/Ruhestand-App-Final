@@ -19,9 +19,9 @@
 |------------|--------------|
 | Die Suite zum ersten Mal startest | [QUICKSTART.md](../../QUICKSTART.md) |
 | Eine bestimmte Aufgabe erledigen willst | **Dieses Dokument** |
-| Verstehen willst, wie die Algorithmen funktionieren | [ARCHITEKTUR_UND_FACHKONZEPT.md](../../ARCHITEKTUR_UND_FACHKONZEPT.md) |
+| Verstehen willst, wie die Algorithmen funktionieren | [ARCHITEKTUR_UND_FACHKONZEPT.md](../reference/ARCHITEKTUR_UND_FACHKONZEPT.md) |
 | Hilfe direkt in der App brauchst | [Handbuch.html](../../Handbuch.html) |
-| Entwickeln oder debuggen willst | [TECHNICAL.md](../../TECHNICAL.md) |
+| Entwickeln oder debuggen willst | [TECHNICAL.md](../reference/TECHNICAL.md) |
 
 ---
 
@@ -510,10 +510,10 @@ Die Werte werden aus deinem Profil übernommen:
 
 | Thema | Dokument |
 |-------|----------|
-| Technische Details der Algorithmen | [ARCHITEKTUR_UND_FACHKONZEPT.md](../../ARCHITEKTUR_UND_FACHKONZEPT.md) |
+| Technische Details der Algorithmen | [ARCHITEKTUR_UND_FACHKONZEPT.md](../reference/ARCHITEKTUR_UND_FACHKONZEPT.md) |
 | Parameter-Sweeps und Auto-Optimize | [AUTO_OPTIMIZE_DETAILS.md](../reference/AUTO_OPTIMIZE_DETAILS.md) |
 | Profilverbund im Detail | [PROFILVERBUND_FEATURES.md](../reference/PROFILVERBUND_FEATURES.md) |
-| Tranchen-Management | [MULTI-TRANCHEN-ANLEITUNG.md](../../MULTI-TRANCHEN-ANLEITUNG.md) |
+| Tranchen-Management | [MULTI-TRANCHEN-ANLEITUNG.md](./MULTI-TRANCHEN-ANLEITUNG.md) |
 | Workflow-Pseudocode | [WORKFLOW_PSEUDOCODE.md](../reference/WORKFLOW_PSEUDOCODE.md) |
 
 ---

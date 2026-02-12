@@ -108,6 +108,39 @@ export function createAnnualModalHandlers({ getLastUpdateResults }) {
             `;
         }
 
+        // CAPE
+        if (results.cape && results.cape.capeFetchStatus !== 'error_no_source_no_stored') {
+            const isWarning = results.cape.capeFetchStatus === 'warn_stale_source';
+            const cssClass = isWarning ? 'warning' : 'success';
+            const icon = isWarning ? '⚠️' : '📐';
+            const capeAsOf = results.cape.capeAsOf
+                ? new Date(results.cape.capeAsOf).toLocaleDateString('de-DE')
+                : 'n/a';
+            const sourceLabel = results.cape.sourceLabel || results.cape.capeSource || 'n/a';
+            html += `
+                <div class="modal-result-item ${cssClass}">
+                    <div class="result-icon">${icon}</div>
+                    <div class="result-content">
+                        <div class="result-title">US Shiller CAPE</div>
+                        <div class="result-value">${escapeHtml(String(results.cape.capeRatio ?? 'n/a'))}</div>
+                        <div class="result-details">Stand: ${escapeHtml(capeAsOf)} • Quelle: ${escapeHtml(sourceLabel)}${isWarning ? ' • Quelle veraltet' : ''}</div>
+                    </div>
+                </div>
+            `;
+        } else if (results.errors.find(e => e.step === 'CAPE')) {
+            const error = results.errors.find(e => e.step === 'CAPE');
+            html += `
+                <div class="modal-result-item error">
+                    <div class="result-icon">❌</div>
+                    <div class="result-content">
+                        <div class="result-title">US Shiller CAPE</div>
+                        <div class="result-value">Fehler</div>
+                        <div class="result-details">${escapeHtml(error.error)}</div>
+                    </div>
+                </div>
+            `;
+        }
+
         // Alter
         html += `
             <div class="modal-result-item success">

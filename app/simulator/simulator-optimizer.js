@@ -34,6 +34,15 @@ const formatMetricValue = (value, metric) => {
     return formatFixed(value, 1);
 };
 
+function isValidSweepResult(result, metricKeys = []) {
+    if (!result || !result.metrics || result.metrics.invalidCombination === true) return false;
+    for (const key of metricKeys) {
+        const value = Number(result.metrics[key]);
+        if (!Number.isFinite(value)) return false;
+    }
+    return true;
+}
+
 /**
  * Findet die beste Parameterkombination aus den Sweep-Ergebnissen
  * @param {Array} sweepResults - Array von {params, metrics}
@@ -46,11 +55,14 @@ export function findBestParameters(sweepResults, metricKey, maximize = true) {
         return null;
     }
 
-    let bestIndex = 0;
-    let bestValue = sweepResults[0].metrics[metricKey];
+    const validResults = sweepResults.filter(result => isValidSweepResult(result, [metricKey]));
+    if (validResults.length === 0) return null;
 
-    for (let i = 1; i < sweepResults.length; i++) {
-        const value = sweepResults[i].metrics[metricKey];
+    let bestIndex = 0;
+    let bestValue = validResults[0].metrics[metricKey];
+
+    for (let i = 1; i < validResults.length; i++) {
+        const value = validResults[i].metrics[metricKey];
 
         if (maximize && value > bestValue) {
             bestValue = value;
@@ -62,10 +74,10 @@ export function findBestParameters(sweepResults, metricKey, maximize = true) {
     }
 
     return {
-        params: sweepResults[bestIndex].params,
+        params: validResults[bestIndex].params,
         metricValue: bestValue,
         index: bestIndex,
-        metrics: sweepResults[bestIndex].metrics
+        metrics: validResults[bestIndex].metrics
     };
 }
 
@@ -106,7 +118,10 @@ export function applyParametersToForm(params) {
         rebalBand: 'rebalBand',
         maxSkimPct: 'maxSkimPct',
         maxBearRefillPct: 'maxBearRefillPct',
-        goldTargetPct: 'goldZielProzent'
+        goldTargetPct: 'goldZielProzent',
+        horizonYears: 'horizonYears',
+        survivalQuantile: 'survivalQuantile',
+        goGoMultiplier: 'goGoMultiplier'
     };
 
     for (const [sweepKey, formId] of Object.entries(mapping)) {
@@ -160,7 +175,10 @@ export function displayBestParameters(bestResult, metricKey) {
         rebalBand: 'Rebal Band',
         maxSkimPct: 'Max Skim %',
         maxBearRefillPct: 'Max Bear Refill %',
-        goldTargetPct: 'Gold Target %'
+        goldTargetPct: 'Gold Target %',
+        horizonYears: 'VPW Horizon',
+        survivalQuantile: 'VPW Quantile',
+        goGoMultiplier: 'VPW Go-Go Mult'
     };
 
     let html = '<div style="padding: 15px; background-color: #e8f5e9; border-radius: 8px; border: 2px solid #4caf50;">';
@@ -223,11 +241,15 @@ export function findBestParametersMultiObjective(sweepResults, objectives) {
         return null;
     }
 
+    const metricKeys = objectives.map(obj => obj.metricKey);
+    const validResults = sweepResults.filter(result => isValidSweepResult(result, metricKeys));
+    if (validResults.length === 0) return null;
+
     // Normalisiere Metriken auf 0-1 Skala, damit die Gewichtung vergleichbar wird
     // (sonst dominiert eine Metrik mit großem Wertebereich).
     const normalized = {};
     for (const obj of objectives) {
-        const values = sweepResults.map(r => r.metrics[obj.metricKey]);
+        const values = validResults.map(r => r.metrics[obj.metricKey]);
         const min = Math.min(...values);
         const max = Math.max(...values);
         const range = max - min;
@@ -239,11 +261,11 @@ export function findBestParametersMultiObjective(sweepResults, objectives) {
     let bestIndex = 0;
     let bestScore = -Infinity;
 
-    for (let i = 0; i < sweepResults.length; i++) {
+    for (let i = 0; i < validResults.length; i++) {
         let score = 0;
 
         for (const obj of objectives) {
-            const value = sweepResults[i].metrics[obj.metricKey];
+            const value = validResults[i].metrics[obj.metricKey];
             const norm = normalized[obj.metricKey];
 
             // Normalisiere auf 0-1 (Range=0 => neutraler 0.5-Wert).
@@ -264,10 +286,10 @@ export function findBestParametersMultiObjective(sweepResults, objectives) {
     }
 
     return {
-        params: sweepResults[bestIndex].params,
+        params: validResults[bestIndex].params,
         score: bestScore,
         index: bestIndex,
-        metrics: sweepResults[bestIndex].metrics
+        metrics: validResults[bestIndex].metrics
     };
 }
 
@@ -286,6 +308,7 @@ export function findBestParametersWithConstraints(sweepResults, objectiveMetricK
 
     // Filtere Ergebnisse die alle Constraints erfüllen
     const feasible = sweepResults.filter(result => {
+        if (!isValidSweepResult(result, [objectiveMetricKey])) return false;
         for (const constraint of constraints) {
             const value = result.metrics[constraint.metricKey];
             const target = constraint.value;
@@ -384,7 +407,10 @@ export function displayMultiObjectiveOptimization(objectives) {
         rebalBand: 'Rebal Band',
         maxSkimPct: 'Max Skim %',
         maxBearRefillPct: 'Max Bear Refill %',
-        goldTargetPct: 'Gold Target %'
+        goldTargetPct: 'Gold Target %',
+        horizonYears: 'VPW Horizon',
+        survivalQuantile: 'VPW Quantile',
+        goGoMultiplier: 'VPW Go-Go Mult'
     };
 
     let html = '<div style="padding: 15px; background-color: #fff3e0; border-radius: 8px; border: 2px solid #ff9800;">';
@@ -466,7 +492,10 @@ export function displayConstraintBasedOptimization(objectiveMetricKey, maximize,
         rebalBand: 'Rebal Band',
         maxSkimPct: 'Max Skim %',
         maxBearRefillPct: 'Max Bear Refill %',
-        goldTargetPct: 'Gold Target %'
+        goldTargetPct: 'Gold Target %',
+        horizonYears: 'VPW Horizon',
+        survivalQuantile: 'VPW Quantile',
+        goGoMultiplier: 'VPW Go-Go Mult'
     };
 
     let html = '<div style="padding: 15px; background-color: #e1f5fe; border-radius: 8px; border: 2px solid #03a9f4;">';

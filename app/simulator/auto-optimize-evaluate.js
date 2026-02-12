@@ -55,6 +55,21 @@ export async function evaluateCandidate(candidate, baseInputs, runsPerCandidate,
     if (candidate.maxBearRefillPct !== undefined) {
         inputs.maxBearRefillPctOfEq = candidate.maxBearRefillPct;
     }
+    if (candidate.horizonYears !== undefined) {
+        inputs.horizonYears = candidate.horizonYears;
+    }
+    if (candidate.survivalQuantile !== undefined) {
+        inputs.survivalQuantile = candidate.survivalQuantile;
+        // Quantile wirkt nur in dieser Horizon-Methode.
+        inputs.horizonMethod = 'survival_quantile';
+    }
+    if (candidate.goGoMultiplier !== undefined) {
+        inputs.goGoMultiplier = candidate.goGoMultiplier;
+        if (inputs.dynamicFlex === true) {
+            // Bei Optimierung des Multiplikators Go-Go sicher aktivieren.
+            inputs.goGoActive = true;
+        }
+    }
 
     // Normalisiere Widow Options
     const widowOptions = normalizeWidowOptions(inputs.widowOptions);

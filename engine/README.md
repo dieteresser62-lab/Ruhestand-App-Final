@@ -46,6 +46,17 @@ engine/
 
 `EngineAPI` stellt die Methoden `getVersion()`, `getConfig()`, `analyzeMarket()`, `calculateTargetLiquidity()` und `simulateSingleYear()` bereit.
 
+### Dynamic-Flex Vertragsfelder (`simulateSingleYear`)
+
+Bei aktivem Dynamic-Flex (`dynamicFlex=true`) werden folgende Eingaben genutzt:
+
+* `horizonYears` (1..60), `horizonMethod` (`mean` | `survival_quantile`), `survivalQuantile` (0.5..0.99)
+* `goGoActive` (Boolean), `goGoMultiplier` (1.0..10.0)
+* `capeRatio` (kanonisch; `marketCapeRatio` wird als Alias-Fallback akzeptiert)
+
+Ausgabe für UI/Diagnostik erfolgt in `result.ui.vpw` (u. a. `enabled`, `horizonYears`, `vpwRate`, `expectedRealReturn`, `status`).
+Bei `dynamicFlex=false` bleibt das bisherige Flex-Verhalten unverändert.
+
 ---
 
 ## Build-Prozess

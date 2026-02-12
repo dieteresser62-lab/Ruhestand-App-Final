@@ -101,6 +101,18 @@ label {
     color: var(--secondary-text); display: flex; align-items: center; gap: 5px;
 }
 
+.inline-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    margin-bottom: 0;
+}
+
+.inline-toggle input[type="checkbox"] {
+    width: auto;
+}
+
 input, select {
     padding: 8px; border: 1px solid var(--border-color); border-radius: 6px;
     font-size: 0.95rem; width: 100%; box-sizing: border-box;

@@ -11,7 +11,9 @@ const CARE_GRADE_FIELD_IDS = SUPPORTED_PFLEGE_GRADES.flatMap(grade => [
 
 export function initInputPersistence() {
     const allInputs = [
-        'startFloorBedarf', 'startFlexBedarf', 'flexBudgetAnnual', 'flexBudgetYears', 'flexBudgetRecharge',
+        'startFloorBedarf', 'startFlexBedarf', 'flexBudgetAnnual', 'flexBudgetYears', 'flexBudgetRecharge', 'marketCapeRatio',
+        'dynamicFlexPreset', 'dynamicFlexShowAdvanced',
+        'dynamicFlex', 'horizonMethod', 'horizonYears', 'survivalQuantile', 'goGoActive', 'goGoMultiplier',
         'p1StartAlter', 'p1Geschlecht', 'p1SparerPauschbetrag', 'p1KirchensteuerPct',
         'p1Monatsrente', 'p1StartInJahren', 'rentAdjMode', 'rentAdjPct',
         'pflegefallLogikAktivieren', 'pflegeModellTyp', ...CARE_GRADE_FIELD_IDS,
@@ -35,9 +37,7 @@ export function initInputPersistence() {
                 }
             }
 
-            const eventType = (element.type === 'radio' || element.type === 'checkbox') ? 'change' : 'input';
-
-            element.addEventListener(eventType, () => {
+            const persistAndRefresh = () => {
                 // Save to Storage
                 if (!element.dataset.noPersist) {
                     if (element.type === 'checkbox') {
@@ -48,7 +48,14 @@ export function initInputPersistence() {
                 }
                 // Trigger UI Update
                 updateStartPortfolioDisplay();
-            });
+            };
+
+            if (element.type === 'radio' || element.type === 'checkbox' || element.tagName === 'SELECT') {
+                element.addEventListener('change', persistAndRefresh);
+            } else {
+                element.addEventListener('input', persistAndRefresh);
+                element.addEventListener('change', persistAndRefresh);
+            }
         }
     });
 }

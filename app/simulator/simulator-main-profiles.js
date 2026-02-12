@@ -4,6 +4,7 @@ import { syncTranchenToInputs } from '../tranches/depot-tranchen-status.js';
 import { listProfiles, getProfileData, getCurrentProfileId, setProfileVerbundMembership } from '../profile/profile-storage.js';
 import { buildSimulatorInputsFromProfileData, combineSimulatorProfiles } from './simulator-profile-inputs.js';
 import { updateStartPortfolioDisplay } from './simulator-portfolio.js';
+import { refreshDynamicFlexControls, syncDynamicFlexPresetSelection } from './simulator-main-dynamic-flex.js';
 
 export function initSimulatorProfileSelection() {
     const listContainer = document.getElementById('simProfileList');
@@ -169,6 +170,11 @@ function applyCombinedInputsToUI(combined, selectedCount) {
     setValue('rebalBand', combined.rebalBand || 0);
     setValue('maxSkimPctOfEq', combined.maxSkimPctOfEq || 0);
     setValue('maxBearRefillPctOfEq', combined.maxBearRefillPctOfEq || 0);
+    // Dynamic-Flex bleibt bewusst bei den aktuell gesetzten Rahmendaten.
+    // Profilverbund-Aggregation überschreibt diese Felder nicht.
+    syncDynamicFlexPresetSelection();
+    refreshDynamicFlexControls();
+    setValue('marketCapeRatio', combined.marketCapeRatio || 0);
 
     setValue('p1StartAlter', combined.startAlter || 0);
     setSelect('p1Geschlecht', combined.geschlecht || 'm');

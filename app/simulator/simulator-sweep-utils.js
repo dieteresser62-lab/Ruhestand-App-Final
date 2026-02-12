@@ -85,6 +85,8 @@ export const SWEEP_ALLOWED_KEYS = new Set([
     // Basis-Parameter (gemeinsam für beide Personen)
     'rentAdjMode', 'rentAdjPct',
     'startFloorBedarf', 'startFlexBedarf',
+    // Dynamic Flex (VPW) Parameter
+    'horizonYears', 'survivalQuantile', 'goGoMultiplier',
     // Weitere erlaubte Parameter können hier hinzugefügt werden
     // ACHTUNG: Keine Person-2-spezifischen Parameter (r2*, partner.*, p2*)!
 ]);

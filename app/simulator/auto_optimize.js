@@ -32,6 +32,56 @@ import { checkConstraints, getObjectiveValue } from './auto-optimize-metrics.js'
 
 export { getObjectiveValue } from './auto-optimize-metrics.js';
 
+function resolveDynamicFlexMode(modeRaw) {
+    const mode = String(modeRaw || 'inherit').toLowerCase();
+    if (mode === 'force_on' || mode === 'force_off' || mode === 'inherit') return mode;
+    return 'inherit';
+}
+
+function applyDynamicFlexMode(baseInputs, modeRaw) {
+    const mode = resolveDynamicFlexMode(modeRaw);
+    const resolved = { ...(baseInputs || {}) };
+    if (mode === 'force_on') {
+        resolved.dynamicFlex = true;
+    } else if (mode === 'force_off') {
+        resolved.dynamicFlex = false;
+    }
+    return { inputs: resolved, mode };
+}
+
+const DYNAMIC_FLEX_OPTIMIZER_KEYS = new Set(['horizonYears', 'survivalQuantile', 'goGoMultiplier']);
+
+function hasDynamicFlexOptimizerParams(params) {
+    return Object.keys(params || {}).some(key => DYNAMIC_FLEX_OPTIMIZER_KEYS.has(key));
+}
+
+function computeDynamicFlexSafetyPenalty(results, objective) {
+    const sr = Number(results?.successProbFloor);
+    const dd = Number(results?.worst5Drawdown);
+    const ts = Number(results?.timeShareWRgt45);
+    const wr = Number(results?.medianWithdrawalRate);
+
+    const srPenalty = Number.isFinite(sr) ? Math.max(0, (0.97 - sr) / 0.05) : 0;
+    const ddPenalty = Number.isFinite(dd) ? Math.max(0, (dd - 0.50) / 0.20) : 0;
+    const tsPenalty = Number.isFinite(ts) ? Math.max(0, (ts - 0.12) / 0.20) : 0;
+    const wrPenalty = Number.isFinite(wr) ? Math.max(0, (wr - 0.055) / 0.020) : 0;
+    const combined = (0.30 * srPenalty) + (0.35 * ddPenalty) + (0.25 * tsPenalty) + (0.10 * wrPenalty);
+    if (combined <= 0) return 0;
+
+    if (objective?.metric === 'EndWealth_P50' || objective?.metric === 'EndWealth_P25') {
+        const wealthBase = Math.max(50000, Number(results?.medianEndWealth) || 0);
+        return wealthBase * Math.min(0.75, combined * 0.35);
+    }
+    return Math.min(0.8, combined * 0.2);
+}
+
+function computeObjectiveWithSafety(results, objective, useSafetyGuards) {
+    const baseObjective = getObjectiveValue(results, objective);
+    if (!useSafetyGuards) return baseObjective;
+    const penalty = computeDynamicFlexSafetyPenalty(results, objective);
+    return baseObjective - penalty;
+}
+
 /**
  * Hauptfunktion: Auto-Optimize
  * @param {object} config - Konfiguration
@@ -46,6 +96,8 @@ export async function runAutoOptimize(config) {
         seedsTest,
         constraints,
         maxDauer,
+        dynamicFlexMode = 'inherit',
+        safetyGuards = true,
         onProgress = () => { },
         evaluateCandidateFn
     } = config;
@@ -55,7 +107,14 @@ export async function runAutoOptimize(config) {
     prepareHistoricalData();
 
     // Basis-Inputs
-    const baseInputs = getCommonInputs();
+    const baseInputsRaw = getCommonInputs();
+    const { inputs: baseInputs, mode: effectiveDynamicFlexMode } = applyDynamicFlexMode(baseInputsRaw, dynamicFlexMode);
+    const usesDynamicFlexParams = hasDynamicFlexOptimizerParams(params);
+    const safetyGuardsActive = safetyGuards !== false && usesDynamicFlexParams;
+
+    if (usesDynamicFlexParams && baseInputs.dynamicFlex !== true) {
+        throw new Error('Dynamic-Flex Parameter im Optimizer gewaehlt, aber Dynamic Flex ist nicht aktiv (Mode=force_on oder aktive Rahmendaten erforderlich).');
+    }
 
     // Gold Cap aus Config
     const goldCap = baseInputs.goldAllokationProzent || 10;
@@ -114,7 +173,7 @@ export async function runAutoOptimize(config) {
 
                 if (results) {
                     // Quick-Filter: Sortiere nur nach Objective, keine harten Constraints
-                    const objValue = getObjectiveValue(results, objective);
+                    const objValue = computeObjectiveWithSafety(results, objective, safetyGuardsActive);
                     return { candidate, objValue, quickResults: results };
                 }
                 return null;
@@ -159,7 +218,7 @@ export async function runAutoOptimize(config) {
 
                 const results = cache.get(candidate);
                 if (results && checkConstraints(results, constraints)) {
-                    const objValue = getObjectiveValue(results, objective);
+                    const objValue = computeObjectiveWithSafety(results, objective, safetyGuardsActive);
                     return { candidate, results, objValue };
                 }
                 return null;
@@ -216,7 +275,7 @@ export async function runAutoOptimize(config) {
 
                 const results = cache.get(candidate);
                 if (results && checkConstraints(results, constraints)) {
-                    const objValue = getObjectiveValue(results, objective);
+                    const objValue = computeObjectiveWithSafety(results, objective, safetyGuardsActive);
                     return { candidate, results, objValue };
                 }
                 return null;
@@ -253,7 +312,7 @@ export async function runAutoOptimize(config) {
         );
 
         if (checkConstraints(testResults, constraints)) {
-            const testObjValue = getObjectiveValue(testResults, objective);
+            const testObjValue = computeObjectiveWithSafety(testResults, objective, safetyGuardsActive);
             validated.push({
                 candidate: entry.candidate,
                 trainResults: entry.results,
@@ -311,6 +370,15 @@ export async function runAutoOptimize(config) {
     if (params.maxBearRefillPct !== undefined) {
         currentConfig.maxBearRefillPct = baseInputs.maxBearRefillPctOfEq || 50;
     }
+    if (params.horizonYears !== undefined) {
+        currentConfig.horizonYears = baseInputs.horizonYears || 30;
+    }
+    if (params.survivalQuantile !== undefined) {
+        currentConfig.survivalQuantile = baseInputs.survivalQuantile || 0.85;
+    }
+    if (params.goGoMultiplier !== undefined) {
+        currentConfig.goGoMultiplier = baseInputs.goGoMultiplier || 1.0;
+    }
 
     const currentResults = await evaluate(
         currentConfig,
@@ -333,6 +401,12 @@ export async function runAutoOptimize(config) {
         championCfg: champion.candidate,
         metricsTest: champion.testResults,
         deltaVsCurrent: delta,
-        stability
+        stability,
+        optimizationContext: {
+            dynamicFlexMode: effectiveDynamicFlexMode,
+            dynamicFlexActive: baseInputs.dynamicFlex === true,
+            safetyGuardsActive,
+            usesDynamicFlexParams
+        }
     };
 }

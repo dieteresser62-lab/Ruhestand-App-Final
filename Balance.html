@@ -194,6 +194,70 @@
                                     title="Wie schnell der Flex-Topf in Nicht-Krisenjahren wieder aufgefüllt wird.">
                             </div>
                         </div>
+                        <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr; margin-top: 12px;">
+                            <div class="form-group"><label for="marketCapeRatio">CAPE (Shiller)</label><input
+                                    type="number" id="marketCapeRatio" value="32" step="0.1" min="0"
+                                    title="Aktuelles Shiller-CAPE (Cyclically Adjusted Price-to-Earnings Ratio) - Bewertungskennzahl für den Aktienmarkt">
+                            </div>
+                            <div class="form-group"><label for="dynamicFlexPreset">Dynamic-Flex Profil</label><select
+                                    id="dynamicFlexPreset"
+                                    title="Einfaches Profil für Dynamic-Flex: Details werden automatisch gesetzt">
+                                    <option value="off">Aus</option>
+                                    <option value="konservativ">Konservativ</option>
+                                    <option value="ausgewogen" selected>Ausgewogen</option>
+                                    <option value="offensiv">Offensiv</option>
+                                    <option value="custom">Benutzerdefiniert</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="dynamicFlexShowAdvanced" style="display:block;">Erweiterte Parameter</label>
+                                <label for="dynamicFlexShowAdvanced" class="inline-toggle">
+                                    <input type="checkbox" id="dynamicFlexShowAdvanced"
+                                        title="Zeigt Detailparameter für Dynamic-Flex an">
+                                    <span>Anzeigen</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div id="dynamicFlexAdvancedToggleRow" class="form-grid"
+                            style="border-top: 1px solid var(--border-color); margin-top: 15px; padding-top: 15px;">
+                            <div class="form-group">
+                                <label for="dynamicFlex" style="display:block;">Dynamic Flex (VPW) aktivieren</label>
+                                <label for="dynamicFlex" class="inline-toggle">
+                                    <input type="checkbox" id="dynamicFlex"
+                                        title="Steuert den Flex-Bedarf dynamisch per VPW-Logik (nur Flex-Anteil, Floor bleibt fix)">
+                                    <span>Aktiv</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div id="dynamicFlexConfigGroup" class="form-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+                            <div class="form-group"><label for="horizonMethod">Horizon-Methode</label><select
+                                    id="horizonMethod"
+                                    title="Methode für die Restlaufzeitberechnung des VPW-Faktors">
+                                    <option value="survival_quantile" selected>Survival-Quantile</option>
+                                    <option value="mean">Erwartungswert</option>
+                                </select>
+                            </div>
+                            <div class="form-group"><label for="horizonYears">Horizon Jahre</label><input
+                                    type="number" id="horizonYears" value="30" min="1" max="60" step="1"
+                                    title="Direkte Vorgabe der Restlaufzeit in Jahren (validiert 1 bis 60)">
+                            </div>
+                            <div class="form-group"><label for="survivalQuantile">Survival-Quantil</label><input
+                                    type="number" id="survivalQuantile" value="0.85" min="0.5" max="0.99" step="0.01"
+                                    title="Quantil für aktuarische Restlaufzeit (0.5 bis 0.99)">
+                            </div>
+                            <div class="form-group">
+                                <label for="goGoActive" style="display:block;">Go-Go Phase aktivieren</label>
+                                <label for="goGoActive" class="inline-toggle">
+                                    <input type="checkbox" id="goGoActive"
+                                        title="Aktiviert temporären VPW-Flex-Aufschlag in der Go-Go-Phase">
+                                    <span>Aktiv</span>
+                                </label>
+                            </div>
+                            <div class="form-group"><label for="goGoMultiplier">Go-Go Multiplikator</label><input
+                                    type="number" id="goGoMultiplier" value="1.1" min="1" max="10" step="0.05"
+                                    title="Multiplikator auf VPW-Flex in Go-Go-Jahren (1.0 bis 10.0)">
+                            </div>
+                        </div>
                     </fieldset>
                     <fieldset>
                         <legend>Runway-Steuerung</legend>

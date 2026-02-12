@@ -110,3 +110,42 @@ const profileInputs = [
     const result = combineSimulatorProfiles(extended, 'a');
     assert(result.warnings.some(msg => msg.includes('Mehr als 2 Profile')), 'Warning should mention >2 profiles');
 }
+
+{
+    console.log('\n📋 Test 3: Dynamic-Flex profile differences should not produce household warning');
+    const withDynamicDiffs = [
+        {
+            profileId: 'a',
+            name: 'A',
+            inputs: {
+                ...profileInputs[0].inputs,
+                dynamicFlex: false,
+                horizonMethod: 'survival_quantile',
+                horizonYears: 30,
+                survivalQuantile: 0.85,
+                goGoActive: false,
+                goGoMultiplier: 1.0
+            }
+        },
+        {
+            profileId: 'b',
+            name: 'B',
+            inputs: {
+                ...profileInputs[1].inputs,
+                dynamicFlex: true,
+                horizonMethod: 'mean',
+                horizonYears: 22,
+                survivalQuantile: 0.75,
+                goGoActive: true,
+                goGoMultiplier: 1.2
+            }
+        }
+    ];
+    const result = combineSimulatorProfiles(withDynamicDiffs, 'a');
+    const warningText = (result.warnings || []).join(' ');
+    assert(!warningText.includes('Dynamic Flex unterscheidet sich'), 'No dynamic-flex mismatch warning expected');
+    assert(!warningText.includes('Dynamic-Flex Horizon Jahre unterscheiden sich'), 'No dynamic-flex horizon warning expected');
+    assert(!warningText.includes('Dynamic-Flex Survival-Quantil unterscheidet sich'), 'No dynamic-flex quantile warning expected');
+    assert(!warningText.includes('Dynamic-Flex Go-Go Aktivierung unterscheidet sich'), 'No dynamic-flex go-go warning expected');
+    assert(!warningText.includes('Dynamic-Flex Go-Go Multiplikator unterscheidet sich'), 'No dynamic-flex multiplier warning expected');
+}

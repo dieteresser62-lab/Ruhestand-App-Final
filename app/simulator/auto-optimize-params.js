@@ -17,7 +17,10 @@ const ALLOWED_PARAM_KEYS = [
     'targetEq',
     'rebalBand',
     'maxSkimPct',
-    'maxBearRefillPct'
+    'maxBearRefillPct',
+    'horizonYears',
+    'survivalQuantile',
+    'goGoMultiplier'
 ];
 
 /**
@@ -55,6 +58,19 @@ function applyParameterMutation(cfg, key, value) {
         case 'maxBearRefillPct':
             if (!cfg.bear) cfg.bear = {};
             cfg.bear.maxRefillPct = Number(value);
+            break;
+        case 'horizonYears':
+            cfg.horizonYears = Math.round(Number(value));
+            break;
+        case 'survivalQuantile':
+            cfg.survivalQuantile = Number(value);
+            cfg.horizonMethod = 'survival_quantile';
+            break;
+        case 'goGoMultiplier':
+            cfg.goGoMultiplier = Number(value);
+            if (cfg.dynamicFlex === true) {
+                cfg.goGoActive = true;
+            }
             break;
         default:
             throw new Error(`Unknown parameter key: ${key}`);
@@ -96,6 +112,17 @@ export function isValidCandidate(candidate, goldCap) {
     // Max Bear Refill %: 0 <= maxBearRefillPct <= 100
     if (candidate.maxBearRefillPct !== undefined) {
         if (candidate.maxBearRefillPct < 0 || candidate.maxBearRefillPct > 100) return false;
+    }
+
+    // Dynamic-Flex Stellschrauben (Stage B): enger Suchraum für robuste Lösungen.
+    if (candidate.horizonYears !== undefined) {
+        if (candidate.horizonYears < 15 || candidate.horizonYears > 45) return false;
+    }
+    if (candidate.survivalQuantile !== undefined) {
+        if (candidate.survivalQuantile < 0.75 || candidate.survivalQuantile > 0.95) return false;
+    }
+    if (candidate.goGoMultiplier !== undefined) {
+        if (candidate.goGoMultiplier < 1.0 || candidate.goGoMultiplier > 1.35) return false;
     }
 
     return true;

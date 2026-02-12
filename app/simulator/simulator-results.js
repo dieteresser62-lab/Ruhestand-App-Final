@@ -409,6 +409,19 @@ export function getWorstRunColumnDefinitions(opts = {}) {
     ];
 
     const detailCols = options.logDetailLevel === 'detailed' ? [
+        { key: 'vpw.vpwRate', header: 'VPW%', width: 5, fmt: v => (Number.isFinite(v) ? formatPercentValue(v * 100, { fractionDigits: 1, invalid: '' }) : '') },
+        { key: 'vpw.horizonYears', header: 'Hor', width: 4, fmt: v => (Number.isFinite(v) ? Math.round(v) : '') },
+        {
+            key: 'vpw.status', header: 'VPWSt', width: 7, fmt: v => {
+                if (v === 'active') return 'aktiv';
+                if (v === 'disabled') return 'aus';
+                if (v === 'contract_ready') return 'bereit';
+                return v || '';
+            }
+        },
+        { key: 'vpw.capeRatioUsed', header: 'CAPE', width: 6, fmt: v => (Number.isFinite(v) ? Number(v).toFixed(1) : '') },
+        { key: 'vpw.expectedReturnCape', header: 'ER(CAPE)', width: 8, fmt: v => (Number.isFinite(v) ? formatPercentRatio(v, { fractionDigits: 1, invalid: '' }) : '') },
+        { key: 'vpw.expectedRealReturn', header: 'ER(real)', width: 8, fmt: v => (Number.isFinite(v) ? formatPercentRatio(v, { fractionDigits: 1, invalid: '' }) : '') },
         { key: 'jahresentnahme_real', header: 'Entn_real', width: 9, fmt: formatCurrencyShortLog },
         { key: 'floor_aus_depot', header: 'FloorDep', width: 8, fmt: formatCurrencyShortLog },
         { key: 'liqStart', header: 'Liq@rC-', width: 9, fmt: formatCurrencyShortLog },

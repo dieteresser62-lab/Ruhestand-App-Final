@@ -185,7 +185,7 @@ Jeder Partner hat ein eigenes Profil mit separatem Depot und Renten. Der Verbund
 
 - **README.md** – Vollständige Dokumentation aller Features
 - **docs/guides/GUIDED_TOURS.md** – Geführte Schritt-für-Schritt-Touren
-- **TECHNICAL.md** – Technische Details zur Architektur
+- **docs/reference/TECHNICAL.md** – Technische Details zur Architektur
 - **docs/reference/PROFILVERBUND_FEATURES.md** – Multi-Profil für Paare
 
 ---

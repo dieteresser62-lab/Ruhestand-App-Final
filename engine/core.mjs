@@ -20,6 +20,78 @@ import MarketAnalyzer from './analyzers/MarketAnalyzer.mjs';
 import SpendingPlanner from './planners/SpendingPlanner.mjs';
 import TransactionEngine from './transactions/TransactionEngine.mjs';
 
+const DYNAMIC_FLEX_ALLOWED_HORIZON_METHODS = new Set(['mean', 'survival_quantile']);
+
+function _coalesceCapeRatio(input) {
+    if (Number.isFinite(input?.capeRatio) && input.capeRatio > 0) {
+        return input.capeRatio;
+    }
+    if (Number.isFinite(input?.marketCapeRatio) && input.marketCapeRatio > 0) {
+        return input.marketCapeRatio;
+    }
+    return undefined;
+}
+
+function _normalizeEngineInput(rawInput) {
+    const input = { ...(rawInput || {}) };
+    const capeRatio = _coalesceCapeRatio(input);
+    if (capeRatio !== undefined) {
+        input.capeRatio = capeRatio;
+    }
+
+    // Dynamic-Flex contract defaults (T01). T02 will consume these fields.
+    input.dynamicFlex = input.dynamicFlex === true;
+    input.horizonMethod = DYNAMIC_FLEX_ALLOWED_HORIZON_METHODS.has(input.horizonMethod)
+        ? input.horizonMethod
+        : 'survival_quantile';
+    if (!Number.isFinite(input.survivalQuantile)) {
+        input.survivalQuantile = 0.85;
+    }
+    input.goGoActive = input.goGoActive === true;
+    if (!Number.isFinite(input.goGoMultiplier)) {
+        input.goGoMultiplier = 1.0;
+    }
+
+    return input;
+}
+
+function _clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
+
+function _calculateVpwRate(realReturn, horizonYears) {
+    const n = Math.max(1, Number(horizonYears) || 1);
+    const r = Number(realReturn) || 0;
+    if (Math.abs(r) < 0.001) {
+        return 1 / n;
+    }
+    return r / (1 - Math.pow(1 + r, -n));
+}
+
+function _calculateExpectedRealReturn(params) {
+    const cfg = CONFIG.SPENDING_MODEL.DYNAMIC_FLEX;
+    const inflRate = Number.isFinite(params?.inflation) ? (params.inflation / 100) : 0.02;
+    const equityNominal = Number.isFinite(params?.expectedReturnCape)
+        ? params.expectedReturnCape
+        : (cfg.FALLBACK_REAL_RETURN + inflRate);
+    const eqPct = Number.isFinite(params?.targetEq) ? (params.targetEq / 100) : 0.60;
+    const goldPctRaw = (params?.goldAktiv && Number.isFinite(params?.goldZielProzent))
+        ? (params.goldZielProzent / 100)
+        : 0;
+    const goldPct = _clamp(goldPctRaw, 0, 1);
+    const safePct = Math.max(0, 1 - eqPct - goldPct);
+    const rawReal = (eqPct * (equityNominal - inflRate)) +
+        (goldPct * cfg.GOLD_REAL_RETURN) +
+        (safePct * cfg.SAFE_ASSET_REAL_RETURN);
+    const clampedReal = _clamp(rawReal, cfg.MIN_REAL_RETURN, cfg.MAX_REAL_RETURN);
+    const prior = Number.isFinite(params?.lastExpectedRealReturn)
+        ? params.lastExpectedRealReturn
+        // Erstjahr: kein Vorwert vorhanden -> direkte Uebernahme des geclampten Werts.
+        : clampedReal;
+    const alpha = _clamp(cfg.EXPECTED_RETURN_SMOOTHING_ALPHA, 0, 1);
+    return prior + alpha * (clampedReal - prior);
+}
+
 /**
  * Interne Orchestrierungsfunktion - Berechnet ein komplettes Jahresergebnis
  *
@@ -37,10 +109,11 @@ import TransactionEngine from './transactions/TransactionEngine.mjs';
  * @returns {Object} Ergebnis mit {input, newState, diagnosis, ui} oder {error} bei Fehler
  */
 function _internal_calculateModel(input, lastState) {
+    const normalizedInput = _normalizeEngineInput(input);
     // 1. Validierung der Eingabedaten
     // Prüft alle Eingaben auf Plausibilität und Vollständigkeit
     // Harte Eingabevalidierung vor jeder Modellrechnung (fail-fast).
-    const validationResult = InputValidator.validate(input);
+    const validationResult = InputValidator.validate(normalizedInput);
     if (!validationResult.valid) {
         // DEBUG: Log validation errors
         console.error('[VALIDATION ERROR] Invalid input fields:', validationResult.errors);
@@ -51,7 +124,7 @@ function _internal_calculateModel(input, lastState) {
     // Profil-Konfiguration laden (Runway-Ziele, Allokationsstrategie)
     // Profil-Konfiguration laden (Runway-Ziele, Allokationsstrategie)
     // Risikoprofil steuert Runway-Ziele, Guardrails und Entnahme-Logik.
-    let profil = CONFIG.PROFIL_MAP[input.risikoprofil];
+    let profil = CONFIG.PROFIL_MAP[normalizedInput.risikoprofil];
     if (!profil) {
         // Fallback für Tests oder invalide Eingaben
         profil = CONFIG.PROFIL_MAP['sicherheits-dynamisch'];
@@ -60,40 +133,87 @@ function _internal_calculateModel(input, lastState) {
 
     // Aktuelle Liquidität = Tagesgeld + Geldmarkt-ETF (oder direkter Override)
     // Liquidität kann direkt überschrieben werden (z. B. Simulator/Tests).
-    const aktuelleLiquiditaet = (input.aktuelleLiquiditaet !== undefined)
-        ? input.aktuelleLiquiditaet
-        : (input.tagesgeld + input.geldmarktEtf);
+    const aktuelleLiquiditaet = (normalizedInput.aktuelleLiquiditaet !== undefined)
+        ? normalizedInput.aktuelleLiquiditaet
+        : (normalizedInput.tagesgeld + normalizedInput.geldmarktEtf);
 
     // Gesamtes Depotvermögen (Aktien alt + neu + optional Gold)
-    const depotwertGesamt = input.depotwertAlt + input.depotwertNeu +
-        (input.goldAktiv ? input.goldWert : 0);
+    const depotwertGesamt = normalizedInput.depotwertAlt + normalizedInput.depotwertNeu +
+        (normalizedInput.goldAktiv ? normalizedInput.goldWert : 0);
 
     // Gesamtvermögen = Depot + Liquidität
     const gesamtwert = depotwertGesamt + aktuelleLiquiditaet;
 
     // 3. Marktanalyse durchführen
     // Bestimmt Marktszenario (Bär, Bulle, Seitwärts, etc.) basierend auf historischen Daten
-    const market = MarketAnalyzer.analyzeMarket(input);
+    const market = MarketAnalyzer.analyzeMarket(normalizedInput);
 
     // 4. Gold-Floor berechnen (Mindestbestand)
     // Definiert minimalen Gold-Bestand als Prozentsatz des Gesamtvermögens
-    const goldFloorAbs = (input.goldFloorProzent / 100) * gesamtwert;
-    const minGold = input.goldAktiv ? goldFloorAbs : 0;
+    const goldFloorAbs = (normalizedInput.goldFloorProzent / 100) * gesamtwert;
+    const minGold = normalizedInput.goldAktiv ? goldFloorAbs : 0;
 
     // 5. Inflationsangepassten Bedarf berechnen
     // Bedarf wird um Renteneinkünfte reduziert (netto)
-    const renteJahr = input.renteAktiv ? (input.renteMonatlich * 12) : 0;
+    const renteJahr = normalizedInput.renteAktiv ? (normalizedInput.renteMonatlich * 12) : 0;
     // Fix: Überschussrente auf den Flex-Bedarf anrechnen
     // Überschussrente reduziert zuerst den Flex-Bedarf (Floor bleibt geschützt).
-    const pensionSurplus = Math.max(0, renteJahr - input.floorBedarf);
+    const pensionSurplus = Math.max(0, renteJahr - normalizedInput.floorBedarf);
 
     const inflatedBedarf = {
-        floor: Math.max(0, input.floorBedarf - renteJahr),  // Grundbedarf (essentiell)
-        flex: input.flexBedarf                              // Flexibler Bedarf (optional)
+        floor: Math.max(0, normalizedInput.floorBedarf - renteJahr),  // Grundbedarf (essentiell)
+        flex: normalizedInput.flexBedarf                              // Flexibler Bedarf (optional)
     };
 
     if (pensionSurplus > 0) {
         inflatedBedarf.flex = Math.max(0, inflatedBedarf.flex - pensionSurplus);
+    }
+    const dynamicFlexCfg = CONFIG.SPENDING_MODEL.DYNAMIC_FLEX;
+    let vpwExpectedRealReturn = Number.isFinite(lastState?.vpwExpectedRealReturn)
+        ? lastState.vpwExpectedRealReturn
+        : null;
+    let vpwDiagnostics = null;
+    if (normalizedInput.dynamicFlex && Number.isFinite(normalizedInput.horizonYears) && normalizedInput.horizonYears > 0) {
+        const horizonYears = _clamp(
+            normalizedInput.horizonYears,
+            dynamicFlexCfg.MIN_HORIZON_YEARS,
+            dynamicFlexCfg.MAX_HORIZON_YEARS
+        );
+        const expectedRealReturn = _calculateExpectedRealReturn({
+            expectedReturnCape: market.expectedReturnCape,
+            inflation: normalizedInput.inflation,
+            targetEq: normalizedInput.targetEq,
+            goldAktiv: normalizedInput.goldAktiv,
+            goldZielProzent: normalizedInput.goldZielProzent,
+            lastExpectedRealReturn: vpwExpectedRealReturn
+        });
+        vpwExpectedRealReturn = expectedRealReturn;
+        const vpwRate = _calculateVpwRate(expectedRealReturn, horizonYears);
+        let vpwTotal = gesamtwert * vpwRate;
+        const goGoMultiplier = normalizedInput.goGoActive
+            ? _clamp(normalizedInput.goGoMultiplier, 1.0, dynamicFlexCfg.MAX_GO_GO_MULTIPLIER)
+            : 1.0;
+        vpwTotal *= goGoMultiplier;
+
+        // VPW setzt den Flex-Anteil neu auf Basis von Netto-Floor (nach Rentenabzug).
+        // Die vorherige statische Flex-/Pensions-Reduktion dient nur dem Legacy-Pfad.
+        inflatedBedarf.flex = Math.max(0, vpwTotal - inflatedBedarf.floor);
+        vpwDiagnostics = {
+            enabled: true,
+            status: 'active',
+            gesamtwert: Math.round(gesamtwert),
+            horizonYears,
+            horizonMethod: normalizedInput.horizonMethod,
+            survivalQuantile: normalizedInput.survivalQuantile,
+            goGoActive: normalizedInput.goGoActive,
+            goGoMultiplier,
+            capeRatioUsed: Number.isFinite(market?.capeRatio) ? market.capeRatio : null,
+            expectedReturnCape: Number.isFinite(market?.expectedReturnCape) ? market.expectedReturnCape : null,
+            expectedRealReturn,
+            vpwRate,
+            vpwTotal,
+            dynamicFlex: inflatedBedarf.flex
+        };
     }
     const neuerBedarf = inflatedBedarf.floor + inflatedBedarf.flex;
 
@@ -119,7 +239,7 @@ function _internal_calculateModel(input, lastState) {
         depotwertGesamt,
         gesamtwert,
         renteJahr,
-        input
+        input: normalizedInput
     });
 
     // 8. Ziel-Liquidität berechnen
@@ -130,7 +250,7 @@ function _internal_calculateModel(input, lastState) {
         profil,
         market,
         inflatedBedarf,
-        input
+        normalizedInput
     );
 
     // 9. Transaktionsaktion bestimmen
@@ -146,7 +266,7 @@ function _internal_calculateModel(input, lastState) {
         spending: spendingResult,
         minGold,
         profil,
-        input
+        input: normalizedInput
     });
 
     // Diagnose-Einträge von Transaktion hinzufügen
@@ -181,9 +301,9 @@ function _internal_calculateModel(input, lastState) {
     // - 'warn': Runway >= Minimum aber < Ziel (z.B. 24-36 Monate)
     // - 'bad': Runway < Minimum (< 24 Monate) - kritisch!
     let runwayStatus = 'bad';
-    if (runwayMonths >= input.runwayTargetMonths) {
+    if (runwayMonths >= normalizedInput.runwayTargetMonths) {
         runwayStatus = 'ok';
-    } else if (runwayMonths >= input.runwayMinMonths) {
+    } else if (runwayMonths >= normalizedInput.runwayMinMonths) {
         runwayStatus = 'warn';
     }
 
@@ -193,8 +313,8 @@ function _internal_calculateModel(input, lastState) {
     diagnosis.general.runwayMonate = runwayMonths;
     diagnosis.general.deckungVorher = deckungVorher;
     diagnosis.general.deckungNachher = deckungNachher;
-    const validInputRunwayTarget = (typeof input.runwayTargetMonths === 'number' && isFinite(input.runwayTargetMonths) && input.runwayTargetMonths > 0)
-        ? input.runwayTargetMonths
+    const validInputRunwayTarget = (typeof normalizedInput.runwayTargetMonths === 'number' && isFinite(normalizedInput.runwayTargetMonths) && normalizedInput.runwayTargetMonths > 0)
+        ? normalizedInput.runwayTargetMonths
         : null;
     const hasValidTarget = (typeof diagnosis.general.runwayTargetMonate === 'number' && isFinite(diagnosis.general.runwayTargetMonate));
     if (!hasValidTarget && validInputRunwayTarget) {
@@ -228,11 +348,32 @@ function _internal_calculateModel(input, lastState) {
             deckungVorher,
             deckungNachher
         },
-        runway: { months: runwayMonths, status: runwayStatus }
+        runway: { months: runwayMonths, status: runwayStatus },
+        // Stable schema for Dynamic-Flex contract (T01/T02).
+        vpw: vpwDiagnostics || {
+            enabled: normalizedInput.dynamicFlex,
+            gesamtwert: Math.round(gesamtwert),
+            horizonYears: Number.isFinite(normalizedInput.horizonYears) ? normalizedInput.horizonYears : null,
+            horizonMethod: normalizedInput.horizonMethod,
+            survivalQuantile: Number.isFinite(normalizedInput.survivalQuantile) ? normalizedInput.survivalQuantile : null,
+            goGoActive: normalizedInput.goGoActive,
+            goGoMultiplier: Number.isFinite(normalizedInput.goGoMultiplier) ? normalizedInput.goGoMultiplier : 1.0,
+            capeRatioUsed: Number.isFinite(market?.capeRatio) ? market.capeRatio : null,
+            expectedReturnCape: Number.isFinite(market?.expectedReturnCape) ? market.expectedReturnCape : null,
+            status: normalizedInput.dynamicFlex ? 'contract_ready' : 'disabled'
+        }
     };
 
+    if (newState && typeof newState === 'object') {
+        if (Number.isFinite(vpwExpectedRealReturn)) {
+            newState.vpwExpectedRealReturn = vpwExpectedRealReturn;
+        } else {
+            delete newState.vpwExpectedRealReturn;
+        }
+    }
+
     return {
-        input,
+        input: normalizedInput,
         newState,
         diagnosis,
         ui: resultForUI

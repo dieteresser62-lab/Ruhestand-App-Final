@@ -11,6 +11,7 @@ import { UIUtils } from './balance-utils.js';
 
 export function buildKeyParams(params = {}) {
     const metrics = [];
+    const vpw = (params && typeof params.vpw === 'object') ? params.vpw : null;
 
     const formatCurrencySafe = (value) => {
         if (typeof value !== 'number' || !isFinite(value)) {
@@ -100,6 +101,102 @@ export function buildKeyParams(params = {}) {
             value: formatCurrencySafe(params.jahresentnahme),
             meta: 'Geplante Auszahlung'
         });
+    }
+
+    if (vpw) {
+        const methodLabel = vpw.horizonMethod === 'mean'
+            ? 'Mean'
+            : (vpw.horizonMethod === 'survival_quantile' ? 'Survival-Quantil' : (vpw.horizonMethod || 'n/a'));
+        const statusLabelMap = {
+            active: 'Aktiv',
+            disabled: 'Inaktiv',
+            contract_ready: 'Bereit (noch nicht aktiv)'
+        };
+        const statusLabel = statusLabelMap[vpw.status] || (vpw.enabled ? 'Aktiv' : 'Inaktiv');
+        pushMetric({
+            label: 'Dynamic Flex (VPW)',
+            value: statusLabel,
+            meta: vpw.enabled ? `Methode: ${methodLabel}` : 'statisches Flex-Budget aktiv'
+        });
+
+        if (typeof vpw.vpwRate === 'number' && isFinite(vpw.vpwRate)) {
+            const vpwRatePct = vpw.vpwRate * 100;
+            const isHigh = vpwRatePct >= 8;
+            const isElevated = vpwRatePct >= 6;
+            pushMetric({
+                label: 'VPW-Rate',
+                value: UIUtils.formatPercentValue(vpw.vpwRate * 100, { fractionDigits: 1, invalid: null }),
+                meta: isHigh
+                    ? 'Warnsignal: hoher Entnahmesatz'
+                    : (isElevated ? 'Erhöht: Entnahmesatz beobachten' : 'Entnahmesatz aus Restlaufzeit und Rendite'),
+                trend: isHigh ? 'down' : 'neutral'
+            });
+        }
+        if (typeof vpw.horizonYears === 'number' && isFinite(vpw.horizonYears)) {
+            const roundedHorizon = Math.round(vpw.horizonYears);
+            const veryShort = roundedHorizon <= 12;
+            const shortish = roundedHorizon <= 18;
+            const q = (typeof vpw.survivalQuantile === 'number' && isFinite(vpw.survivalQuantile))
+                ? `, q=${vpw.survivalQuantile.toFixed(2)}`
+                : '';
+            pushMetric({
+                label: 'VPW-Horizont',
+                value: `${roundedHorizon} Jahre`,
+                meta: veryShort
+                    ? `Warnsignal: sehr kurzer Horizont (${methodLabel}${q})`
+                    : (shortish ? `Kurzfristig (${methodLabel}${q})` : `${methodLabel}${q}`),
+                trend: veryShort ? 'down' : 'neutral'
+            });
+        }
+        if (typeof vpw.expectedRealReturn === 'number' && isFinite(vpw.expectedRealReturn)) {
+            const negativeReal = vpw.expectedRealReturn < 0;
+            pushMetric({
+                label: 'ER(real)',
+                value: UIUtils.formatPercentValue(vpw.expectedRealReturn * 100, { fractionDigits: 1, invalid: null }),
+                meta: negativeReal ? 'Warnsignal: negative Realrendite' : 'Glättete Realrendite für VPW',
+                trend: negativeReal ? 'down' : 'neutral'
+            });
+        }
+        if (typeof vpw.expectedReturnCape === 'number' && isFinite(vpw.expectedReturnCape)) {
+            let capeMeta = 'Nominale CAPE-basierte Rendite';
+            if (typeof vpw.capeRatioUsed === 'number' && isFinite(vpw.capeRatioUsed)) {
+                capeMeta += ` (CAPE ${vpw.capeRatioUsed.toFixed(1)})`;
+            }
+            pushMetric({
+                label: 'ER(CAPE)',
+                value: UIUtils.formatPercentValue(vpw.expectedReturnCape * 100, { fractionDigits: 1, invalid: null }),
+                meta: capeMeta
+            });
+        }
+        const goGoValue = vpw.goGoActive
+            ? `Aktiv x${Number.isFinite(vpw.goGoMultiplier) ? vpw.goGoMultiplier.toFixed(2) : '1.00'}`
+            : 'Inaktiv';
+        pushMetric({
+            label: 'Go-Go-Phase',
+            value: goGoValue,
+            meta: 'Multiplikator auf VPW-Gesamtentnahme'
+        });
+        if (typeof vpw.gesamtwert === 'number' && isFinite(vpw.gesamtwert)) {
+            pushMetric({
+                label: 'VPW-Basisvermögen',
+                value: UIUtils.formatCurrency(vpw.gesamtwert),
+                meta: 'Gesamtvermögen für VPW-Formel'
+            });
+        }
+        if (typeof vpw.vpwTotal === 'number' && isFinite(vpw.vpwTotal)) {
+            pushMetric({
+                label: 'VPW-Total',
+                value: UIUtils.formatCurrency(vpw.vpwTotal),
+                meta: 'Vermögen × VPW-Rate × Go-Go'
+            });
+        }
+        if (typeof vpw.dynamicFlex === 'number' && isFinite(vpw.dynamicFlex)) {
+            pushMetric({
+                label: 'VPW-Flex (abgeleitet)',
+                value: UIUtils.formatCurrency(vpw.dynamicFlex),
+                meta: 'VPW-Total abzüglich netto Floor'
+            });
+        }
     }
 
     const grid = document.createElement('div');

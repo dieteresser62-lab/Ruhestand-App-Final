@@ -139,4 +139,28 @@ try {
     throw e;
 }
 
+// --- Test 5: T01 Contract (CAPE alias + stable ui.vpw schema) ---
+try {
+    const contractInput = {
+        ...baseInput,
+        capeRatio: undefined,
+        marketCapeRatio: 31.5,
+        dynamicFlex: false
+    };
+    const result = EngineAPI.simulateSingleYear(contractInput, null);
+
+    assert(result?.ui?.vpw !== undefined, 'ui.vpw must always be present');
+    assert(result.ui.vpw.enabled === false, 'ui.vpw.enabled should reflect dynamicFlex=false');
+    assert(Number.isFinite(result.ui.vpw.gesamtwert), 'ui.vpw.gesamtwert should always be present');
+    assert(result.ui.vpw.horizonMethod === 'survival_quantile', 'default horizonMethod should be survival_quantile');
+    assert(result.ui.vpw.goGoMultiplier === 1.0, 'default goGoMultiplier should be 1.0');
+    assert(result.ui.market?.capeRatio === 31.5, 'market.capeRatio should accept marketCapeRatio alias');
+    assert(result.ui.vpw.capeRatioUsed === 31.5, 'ui.vpw.capeRatioUsed should expose resolved CAPE');
+
+    console.log('✅ T01 contract (CAPE alias + ui.vpw schema) passed');
+} catch (e) {
+    console.error('Test 5 (T01 contract) Failed', e);
+    throw e;
+}
+
 console.log('--- Core Engine Tests Completed ---');

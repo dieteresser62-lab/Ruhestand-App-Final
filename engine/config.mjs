@@ -150,6 +150,17 @@ export const CONFIG = {
             MAX_DOWN_PP: 12.0,                          // Max. Rückgang nach Caps pro Jahr
             MAX_DOWN_IN_BEAR_PP: 10.0,                  // Sanfterer Abbau im Bärenmarkt
             RELAX_MAX_DOWN_PP: 20.0                     // Max. Relaxierung des Final-Down-Limits
+        },
+        DYNAMIC_FLEX: {
+            SAFE_ASSET_REAL_RETURN: 0.005,              // 0.5% reale Rendite sichere Anlagen
+            GOLD_REAL_RETURN: 0.01,                     // 1.0% reale Rendite Gold
+            MIN_HORIZON_YEARS: 1,                       // Mindest-Restlaufzeit
+            MAX_HORIZON_YEARS: 60,                      // Maximale Restlaufzeit
+            FALLBACK_REAL_RETURN: 0.03,                 // Fallback wenn kein CAPE-Signal
+            MIN_REAL_RETURN: 0.00,                      // Untergrenze fuer Phase 1
+            MAX_REAL_RETURN: 0.05,                      // Obergrenze fuer Phase 1
+            EXPECTED_RETURN_SMOOTHING_ALPHA: 0.35,      // Daempfung gegen Spruenge
+            MAX_GO_GO_MULTIPLIER: 1.5                   // Sicherheitslimit Go-Go
         }
     },
 

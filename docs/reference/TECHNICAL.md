@@ -93,6 +93,8 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 * `app/balance/balance-renderer.js` – Darstellung der Ergebnisse (Summary, Guardrails, Diagnose, Toasts, Themes).
 * `app/balance/balance-binder.js` – Event-Hub mit Tastenkürzeln, Import/Export, Snapshots, Debug-Modus.
 * `app/balance/balance-main.js` – Orchestrator: initiiert Module, führt `update()` aus und spricht `EngineAPI` an.
+* `app/balance/balance-annual-marketdata.js` – Online-Marktdaten für Jahreswechsel (Inflation, ETF, CAPE inkl. Fallback-Kette).
+* `app/balance/balance-annual-orchestrator.js` / `app/balance/balance-annual-modal.js` – nicht-blockierende Jahreswechsel-Pipeline und Ergebnisprotokoll.
 * `app/balance/balance-expenses.js` – Ausgaben-Check: CSV-Import pro Monat/Profil, Monats-/Jahresbudgets, Prognose, Soll/Ist, Detaildialog und Jahrumschaltung.
 
 ### Ablauf einer Aktualisierung
@@ -118,6 +120,15 @@ Die Kennzahlen im Tab berechnen sich wie folgt:
 * `Jahresrest`: `annualBudget - annualUsed`.
 * `Hochrechnung`: bei 1 Datenmonat `Ø/Monat * 12`, ab 2 Datenmonaten `Median/Monat * 12`.
 * `Soll/Ist`: basiert auf importierten Monaten (`monthlyBudget * monthsWithData`) statt auf Kalendermonaten.
+
+### Jahreswechsel mit Auto-CAPE
+
+Der Jahreswechsel ruft CAPE automatisiert und fehlertolerant ab:
+
+* Quelle/Fallback: Yale (Primary) -> Mirror (`shillerdata`) -> letzter gespeicherter Wert.
+* Persistente Meta-Felder: `capeAsOf`, `capeSource`, `capeFetchStatus`, `capeUpdatedAt`.
+* Der Ablauf ist non-blocking: fehlende CAPE-Daten werden als Warnung protokolliert, der Jahreswechsel läuft weiter.
+* Vertragsdetails und Fehlerszenarien: `docs/internal/archive/2026-dynamic-flex/CAPE_AUTOMATION_CONTRACT.md`.
 
 ---
 
@@ -145,6 +156,16 @@ Die Kennzahlen im Tab berechnen sich wie folgt:
 * `app/simulator/simulator-utils.js` – Zufallszahlengenerator, Statistikfunktionen, Parser (Formatierung über `app/shared/shared-formatting.js`).
 * `app/shared/shared-formatting.js` – gemeinsame Formatter für Balance und Simulator (Währung, Prozent, Monate).
 * `app/simulator/simulator-data.js` – Historische Daten (inkl. 1925-1949 Schwarze-Schwan-Erweiterung), Mortalitäts- und Stress-Presets.
+
+### Dynamic-Flex (VPW) Pipeline
+
+Dynamic-Flex ist entlang der Simulator-Pipeline konsistent aktiviert:
+
+* UI/Profile: `app/simulator/simulator-main-dynamic-flex.js`, `app/simulator/simulator-profile-inputs.js`.
+* Input-Layer: `app/simulator/simulator-portfolio-inputs.js` normalisiert `dynamicFlex`, `horizonYears`, `horizonMethod`, `survivalQuantile`, `goGoMultiplier`.
+* Backtest/MC: `app/simulator/monte-carlo-runner.js` berechnet den Horizont pro Simulationsjahr neu (Alter steigt im Loop).
+* Worker-Parität: `workers/mc-worker.js` erhält dieselben Dynamic-Flex Inputs; Seed/Chunking bleiben deterministisch.
+* Sweep/Heatmap: `app/simulator/sweep-runner.js` validiert Invariants; invalid Kombinationen werden markiert statt gerechnet.
 
 **Monte-Carlo Startjahr-Sampling**
 * Default ist uniformes Sampling über alle historischen Startjahre.
@@ -215,6 +236,8 @@ Die Worker-Pools bieten ein opt-in Telemetrie-System für lokale Performance-Ana
 * **Preset-Konfigurationen:** Vordefinierte Optimierungsszenarien (konservativ, moderat, risikobereit, etc.) für schnellen Einstieg.
 * **Champion-Config-Output:** Detaillierte Ausgabe der optimalen Parameterkombination mit allen relevanten Metriken.
 * **Constraint-basierte Filterung:** Automatische Verwerfung von Konfigurationen, die definierte Mindestanforderungen nicht erfüllen (z.B. Erfolgsquote, Erschöpfungsrate).
+* **Dynamic-Flex-Modus:** `inherit`, `force_on`, `force_off`; Dynamic-Flex-Parameter sind nur bei effektiv aktivem Dynamic-Flex zulässig.
+* **Safety-Guards:** Zusätzliche Zielstrafen verhindern überaggressive Dynamic-Flex-Lösungen in Top-Ergebnissen.
 
 ### Ergebnisdarstellung
 
@@ -308,6 +331,7 @@ definiert werden. Ergebnisse werden gegen diese Limits geprüft und als OK/Verle
 * **BALANCE_MODULES_README.md** – Detailtiefe zur Balance-App.
 * **SIMULATOR_MODULES_README.md** – Detaillierte Modulübersicht des Simulators.
 * **engine/README.md** – Engine-spezifische Informationen inkl. Build-Beschreibung.
-* **tests/README.md** – Test-Suite-Dokumentation mit 45 Testdateien.
+* **tests/README.md** – Test-Suite-Dokumentation mit 54 Testdateien.
 * **docs/reference/PROFILVERBUND_FEATURES.md** – Profilverbund-Design und -Module.
-
+* **docs/internal/archive/2026-dynamic-flex/CAPE_AUTOMATION_CONTRACT.md** – CAPE-Quelle, Fallback-Vertrag und Jahreswechsel-Fehlerszenarien.
+* **docs/internal/archive/2026-dynamic-flex/DYNAMIC_FLEX_ROLLOUT.md** – interner Rollout-Abschluss inkl. finaler Testmatrix.

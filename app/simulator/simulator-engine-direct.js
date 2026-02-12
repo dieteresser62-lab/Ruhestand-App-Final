@@ -107,7 +107,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const equityAfterReturn = sumDepot({ depotTranchesAktien });
     const goldAfterReturn = sumDepot({ depotTranchesGold });
 
-    const resolvedCapeRatio = resolveCapeRatio(yearData.capeRatio, inputs.marketCapeRatio, marketDataHist.capeRatio);
+    const resolvedCapeRatio = resolveCapeRatio(yearData.capeRatio, inputs.capeRatio, inputs.marketCapeRatio ?? marketDataHist.capeRatio);
 
     // FIX (Redux): Calculate current market end value for Regime Detection
     // Shift the historical window by 1 year so 'endeVJ' reflects the value AFTER this year's returns.
@@ -431,6 +431,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         renteAktiv: pensionAnnual > 0,
         renteMonatlich: pensionAnnual / 12,
 
+        capeRatio: resolvedCapeRatio,
         marketCapeRatio: resolvedCapeRatio,
 
         // DEFAULT VALUES TO PREVENT NaN (Fix for Bug 4: Liquidity Evaporation)
@@ -850,6 +851,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             spending: spendingResult,
             action: actionResult,
             market: { sKey: spendingNewState.lastMarketSKey, ...yearData }, // Approximation
+            vpw: fullResult.ui.vpw || null,
             zielLiquiditaet: 0, // Not tracked here?
             liquiditaet: { // Mock structure for UI compatibility
                 vorher: initialLiqStart,

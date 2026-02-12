@@ -921,6 +921,9 @@
                                 den Verlauf Ihrer Entnahmen.</li>
                             <li><strong>Vergleich nutzen:</strong> Nutzen Sie Backtests für den Abgleich mit
                                 Monte-Carlo-Metriken (z.B. Runway-Stabilität).</li>
+                            <li><strong>Dynamic-Flex-Transparenz:</strong> VPW-Spalten (u.a. VPW%, Hor, VPWSt,
+                                ER(CAPE), ER(real)) erscheinen nur im <em>detaillierten</em> Logmodus, damit die
+                                Standardansicht kompakt bleibt.</li>
                             <li><strong>Interpretation:</strong> Ein guter Backtest ersetzt keine
                                 Wahrscheinlichkeiten, zeigt aber, ob die Strategie plausible Vergangenheitsszenarien
                                 übersteht.</li>
@@ -956,6 +959,8 @@
                                 einen Blick.</li>
                             <li><strong>Detail-Filter:</strong> Pflege-Details und detailliertes Log können per
                                 Checkbox ein- oder ausgeblendet werden.</li>
+                            <li><strong>Dynamic-Flex im Log:</strong> VPW-Felder werden im Szenario-Log nur in der
+                                Detailansicht eingeblendet; im Normalmodus bleiben sie ausgeblendet.</li>
                             <li><strong>Export:</strong> Einzelne Szenarien lassen sich als JSON oder CSV sichern.</li>
                         </ul>
                     </div>
@@ -1037,6 +1042,10 @@
                         <p style="color: var(--text-light);">Nutzen Sie die Erläuterungen unter dem Entscheidungsbaum,
                             um zu verstehen, warum eine Handlung ausgelöst wurde (z.B. CAPE-Bremse, Drawdown-Limit,
                             Rebalancing-Distanz).</p>
+                        <p style="color: var(--text-light);">Bei aktivem Dynamic Flex (VPW) finden Sie die
+                            Nachvollziehbarkeit im Diagnosebereich „Schlüsselparameter“: Status, VPW-Rate, Horizont,
+                            ER(CAPE), ER(real), Go-Go-Status, VPW-Basisvermögen und VPW-Total. Die Hauptansicht bleibt
+                            bewusst kompakt.</p>
                     </div>
                     <div class="detail-block" id="balance-handlungsschritte">
                         <h3>Handlungsschritte</h3>
@@ -1421,6 +1430,12 @@
                     <dd>Backtests prüfen konkrete historische Zeiträume (z.B. ab 2000) und zeigen, ob Ihre Strategie
                         in realen Marktphasen funktioniert. Monte-Carlo liefert Wahrscheinlichkeiten; Backtesting
                         gibt einen Realitätscheck.</dd>
+
+                    <dt>Warum steigt die Entnahme bei Dynamic Flex plötzlich so stark?</dt>
+                    <dd>Dynamic Flex (VPW) berechnet entnahmebasiert aus Vermögen, Restlaufzeit und Renditeannahmen
+                        statt nur aus dem statischen Bedarf. Dadurch kann die Entnahme deutlich höher ausfallen. Prüfen
+                        Sie im Diagnose-Panel die VPW-Werte (insb. VPW-Rate, Horizont, ER(real), Basisvermögen) und
+                        passen Sie das Preset bei Bedarf defensiver an.</dd>
 
                     <dt>Muss ich Depot-Tranchen pflegen?</dt>
                     <dd>Ja, für korrekte Steuerberechnungen sind Tranchen notwendig. Ohne Tranchen nutzt die Suite

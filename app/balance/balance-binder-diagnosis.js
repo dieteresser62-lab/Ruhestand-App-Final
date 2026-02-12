@@ -138,6 +138,61 @@ export function createDiagnosisHandlers({ dom, appState }) {
         if (typeof diagnosis.keyParams.jahresentnahme === 'number') {
             text += `Jahresentnahme (brutto): ${UIUtils.formatCurrency(diagnosis.keyParams.jahresentnahme)}\n`;
         }
+        const vpw = diagnosis.keyParams?.vpw;
+        if (vpw && typeof vpw === 'object') {
+            text += `\n--- Dynamic Flex (VPW) ---\n`;
+            const methodLabel = vpw.horizonMethod === 'mean'
+                ? 'Mean'
+                : (vpw.horizonMethod === 'survival_quantile' ? 'Survival-Quantil' : (vpw.horizonMethod || 'n/a'));
+            const statusLabelMap = {
+                active: 'Aktiv',
+                disabled: 'Inaktiv',
+                contract_ready: 'Bereit (noch nicht aktiv)'
+            };
+            text += `Status: ${statusLabelMap[vpw.status] || (vpw.enabled ? 'Aktiv' : 'Inaktiv')}\n`;
+            text += `Methode: ${methodLabel}\n`;
+            if (typeof vpw.horizonYears === 'number' && isFinite(vpw.horizonYears)) {
+                text += `Horizont: ${Math.round(vpw.horizonYears)} Jahre\n`;
+            }
+            if (typeof vpw.survivalQuantile === 'number' && isFinite(vpw.survivalQuantile)) {
+                text += `Survival-Quantil: ${vpw.survivalQuantile.toFixed(2)}\n`;
+            }
+            if (typeof vpw.vpwRate === 'number' && isFinite(vpw.vpwRate)) {
+                text += `VPW-Rate: ${UIUtils.formatPercentValue(vpw.vpwRate * 100, { fractionDigits: 1, invalid: 'n/a' })}\n`;
+            }
+            if (typeof vpw.expectedRealReturn === 'number' && isFinite(vpw.expectedRealReturn)) {
+                text += `ER(real): ${UIUtils.formatPercentValue(vpw.expectedRealReturn * 100, { fractionDigits: 1, invalid: 'n/a' })}\n`;
+            }
+            if (typeof vpw.expectedReturnCape === 'number' && isFinite(vpw.expectedReturnCape)) {
+                text += `ER(CAPE): ${UIUtils.formatPercentValue(vpw.expectedReturnCape * 100, { fractionDigits: 1, invalid: 'n/a' })}\n`;
+            }
+            if (typeof vpw.capeRatioUsed === 'number' && isFinite(vpw.capeRatioUsed)) {
+                text += `CAPE: ${vpw.capeRatioUsed.toFixed(1)}\n`;
+            }
+            text += `Go-Go: ${vpw.goGoActive ? `Aktiv (x${Number.isFinite(vpw.goGoMultiplier) ? vpw.goGoMultiplier.toFixed(2) : '1.00'})` : 'Inaktiv'}\n`;
+            if (typeof vpw.gesamtwert === 'number' && isFinite(vpw.gesamtwert)) {
+                text += `VPW-Basisvermögen: ${UIUtils.formatCurrency(vpw.gesamtwert)}\n`;
+            }
+            if (typeof vpw.vpwTotal === 'number' && isFinite(vpw.vpwTotal)) {
+                text += `VPW-Total: ${UIUtils.formatCurrency(vpw.vpwTotal)}\n`;
+            }
+            if (typeof vpw.dynamicFlex === 'number' && isFinite(vpw.dynamicFlex)) {
+                text += `VPW-Flex (abgeleitet): ${UIUtils.formatCurrency(vpw.dynamicFlex)}\n`;
+            }
+            const warnings = [];
+            if (typeof vpw.expectedRealReturn === 'number' && isFinite(vpw.expectedRealReturn) && vpw.expectedRealReturn < 0) {
+                warnings.push('ER(real) negativ');
+            }
+            if (typeof vpw.horizonYears === 'number' && isFinite(vpw.horizonYears) && vpw.horizonYears <= 12) {
+                warnings.push('sehr kurzer VPW-Horizont (<=12J)');
+            }
+            if (typeof vpw.vpwRate === 'number' && isFinite(vpw.vpwRate) && (vpw.vpwRate * 100) >= 8) {
+                warnings.push('hohe VPW-Rate (>=8%)');
+            }
+            if (warnings.length > 0) {
+                text += `Warnsignale: ${warnings.join('; ')}\n`;
+            }
+        }
         text += `\n===== Ende der Diagnose =====`;
         return text;
     };

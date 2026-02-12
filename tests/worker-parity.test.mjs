@@ -69,6 +69,13 @@ const baseInputs = {
     rentAdjPct: 0,
     renteMonatlich: 0,
     renteStartOffsetJahre: 0,
+    dynamicFlex: false,
+    horizonMethod: 'survival_quantile',
+    horizonYears: 30,
+    survivalQuantile: 0.85,
+    goGoActive: false,
+    goGoMultiplier: 1.0,
+    capeRatio: 0,
     marketCapeRatio: 0,
     stressPreset: 'NONE',
     pflegefallLogikAktivieren: false,
@@ -283,9 +290,160 @@ try {
 
     assert(fullSweep.p2VarianceCount === (sweepA.p2VarianceCount + sweepB.p2VarianceCount), 'Sweep p2 variance mismatch');
 
-    console.log('✅ Sweep split parity passed');
+console.log('✅ Sweep split parity passed');
 } catch (e) {
     console.error('❌ Sweep split parity failed', e);
+    throw e;
+}
+
+// Test 3: Dynamic-Flex parity incl. VPW log payload (serial full vs split chunks)
+try {
+    const dynamicInputs = {
+        ...baseInputs,
+        startAlter: 50,
+        dynamicFlex: true,
+        horizonMethod: 'mean',
+        horizonYears: 35,
+        capeRatio: 30,
+        marketCapeRatio: 30
+    };
+    const monteCarloParams = {
+        anzahl: 12,
+        maxDauer: 6,
+        blockSize: 3,
+        seed: 314159,
+        methode: 'block',
+        rngMode: 'per-run-seed'
+    };
+
+    const fullChunk = await runMonteCarloChunk({
+        inputs: dynamicInputs,
+        monteCarloParams,
+        widowOptions,
+        useCapeSampling: false,
+        runRange: { start: 0, count: monteCarloParams.anzahl },
+        logIndices: [0],
+        engine: EngineAPI
+    });
+
+    const splitA = await runMonteCarloChunk({
+        inputs: dynamicInputs,
+        monteCarloParams,
+        widowOptions,
+        useCapeSampling: false,
+        runRange: { start: 0, count: 6 },
+        logIndices: [0],
+        engine: EngineAPI
+    });
+
+    const splitB = await runMonteCarloChunk({
+        inputs: dynamicInputs,
+        monteCarloParams,
+        widowOptions,
+        useCapeSampling: false,
+        runRange: { start: 6, count: 6 },
+        logIndices: [0],
+        engine: EngineAPI
+    });
+
+    const mergedBuffers = createMonteCarloBuffers(monteCarloParams.anzahl);
+    const mergedHeatmap = Array(10).fill(0).map(() => new Uint32Array(MC_HEATMAP_BINS.length - 1));
+    const mergedLists = {
+        entryAges: [],
+        entryAgesP2: [],
+        careDepotCosts: [],
+        endWealthWithCareList: [],
+        endWealthNoCareList: [],
+        p1CareYearsTriggered: [],
+        p2CareYearsTriggered: [],
+        bothCareYearsOverlapTriggered: [],
+        maxAnnualCareSpendTriggered: []
+    };
+    const mergedTotals = {
+        failCount: 0,
+        pflegeTriggeredCount: 0,
+        totalSimulatedYears: 0,
+        totalYearsQuoteAbove45: 0,
+        shortfallWithCareCount: 0,
+        shortfallNoCareProxyCount: 0,
+        p2TriggeredCount: 0
+    };
+    const mergedWithdrawals = [];
+
+    const mergeChunk = (chunk, start) => {
+        const chunkBuffers = chunk.buffers;
+        mergedBuffers.finalOutcomes.set(chunkBuffers.finalOutcomes, start);
+        mergedBuffers.taxOutcomes.set(chunkBuffers.taxOutcomes, start);
+        mergedBuffers.kpiLebensdauer.set(chunkBuffers.kpiLebensdauer, start);
+        mergedBuffers.kpiKuerzungsjahre.set(chunkBuffers.kpiKuerzungsjahre, start);
+        mergedBuffers.kpiMaxKuerzung.set(chunkBuffers.kpiMaxKuerzung, start);
+        mergedBuffers.volatilities.set(chunkBuffers.volatilities, start);
+        mergedBuffers.maxDrawdowns.set(chunkBuffers.maxDrawdowns, start);
+        mergedBuffers.depotErschoepft.set(chunkBuffers.depotErschoepft, start);
+        mergedBuffers.alterBeiErschoepfung.set(chunkBuffers.alterBeiErschoepfung, start);
+        mergedBuffers.anteilJahreOhneFlex.set(chunkBuffers.anteilJahreOhneFlex, start);
+        mergedBuffers.stress_maxDrawdowns.set(chunkBuffers.stress_maxDrawdowns, start);
+        mergedBuffers.stress_timeQuoteAbove45.set(chunkBuffers.stress_timeQuoteAbove45, start);
+        mergedBuffers.stress_cutYears.set(chunkBuffers.stress_cutYears, start);
+        mergedBuffers.stress_CaR_P10_Real.set(chunkBuffers.stress_CaR_P10_Real, start);
+        mergedBuffers.stress_recoveryYears.set(chunkBuffers.stress_recoveryYears, start);
+        mergeHeatmap(mergedHeatmap, chunk.heatmap);
+        mergedTotals.failCount += chunk.totals.failCount;
+        mergedTotals.pflegeTriggeredCount += chunk.totals.pflegeTriggeredCount;
+        mergedTotals.totalSimulatedYears += chunk.totals.totalSimulatedYears;
+        mergedTotals.totalYearsQuoteAbove45 += chunk.totals.totalYearsQuoteAbove45;
+        mergedTotals.shortfallWithCareCount += chunk.totals.shortfallWithCareCount;
+        mergedTotals.shortfallNoCareProxyCount += chunk.totals.shortfallNoCareProxyCount;
+        mergedTotals.p2TriggeredCount += chunk.totals.p2TriggeredCount;
+        appendArray(mergedLists.entryAges, chunk.lists.entryAges);
+        appendArray(mergedLists.entryAgesP2, chunk.lists.entryAgesP2);
+        appendArray(mergedLists.careDepotCosts, chunk.lists.careDepotCosts);
+        appendArray(mergedLists.endWealthWithCareList, chunk.lists.endWealthWithCareList);
+        appendArray(mergedLists.endWealthNoCareList, chunk.lists.endWealthNoCareList);
+        appendArray(mergedLists.p1CareYearsTriggered, chunk.lists.p1CareYearsTriggered);
+        appendArray(mergedLists.p2CareYearsTriggered, chunk.lists.p2CareYearsTriggered);
+        appendArray(mergedLists.bothCareYearsOverlapTriggered, chunk.lists.bothCareYearsOverlapTriggered);
+        appendArray(mergedLists.maxAnnualCareSpendTriggered, chunk.lists.maxAnnualCareSpendTriggered);
+        appendArray(mergedWithdrawals, chunk.allRealWithdrawalsSample);
+    };
+
+    mergeChunk(splitA, 0);
+    mergeChunk(splitB, 6);
+
+    const fullAggregates = buildMonteCarloAggregates({
+        inputs: dynamicInputs,
+        totalRuns: monteCarloParams.anzahl,
+        buffers: fullChunk.buffers,
+        heatmap: fullChunk.heatmap,
+        bins: fullChunk.bins,
+        totals: fullChunk.totals,
+        lists: fullChunk.lists,
+        allRealWithdrawalsSample: fullChunk.allRealWithdrawalsSample
+    });
+    const mergedAggregates = buildMonteCarloAggregates({
+        inputs: dynamicInputs,
+        totalRuns: monteCarloParams.anzahl,
+        buffers: mergedBuffers,
+        heatmap: mergedHeatmap,
+        bins: MC_HEATMAP_BINS,
+        totals: mergedTotals,
+        lists: mergedLists,
+        allRealWithdrawalsSample: mergedWithdrawals
+    });
+
+    assertClose(fullAggregates.finalOutcomes.p50, mergedAggregates.finalOutcomes.p50, 1e-6, 'Dynamic MC p50 mismatch');
+    assertClose(fullAggregates.depotErschoepfungsQuote, mergedAggregates.depotErschoepfungsQuote, 1e-6, 'Dynamic MC depletion mismatch');
+
+    const fullMetaRun0 = (fullChunk.runMeta || []).find(m => m.index === 0);
+    const splitMetaRun0 = (splitA.runMeta || []).find(m => m.index === 0);
+    const fullHorizons = (fullMetaRun0?.logDataRows || []).map(r => Number(r?.vpw?.horizonYears)).filter(Number.isFinite);
+    const splitHorizons = (splitMetaRun0?.logDataRows || []).map(r => Number(r?.vpw?.horizonYears)).filter(Number.isFinite);
+    assert(fullHorizons.length > 0, 'Dynamic full run should expose VPW horizons');
+    assertEqual(JSON.stringify(splitHorizons), JSON.stringify(fullHorizons), 'Dynamic run-0 VPW horizons should match split/full');
+
+    console.log('✅ Dynamic-Flex MC parity passed');
+} catch (e) {
+    console.error('❌ Dynamic-Flex MC parity failed', e);
     throw e;
 }
 

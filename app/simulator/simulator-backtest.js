@@ -6,6 +6,12 @@ import { simulateOneYear } from './simulator-engine-wrapper.js';
 import { formatCurrency, formatCurrencyShortLog } from './simulator-utils.js';
 import { formatPercentValue } from './simulator-formatting.js';
 import {
+    estimateJointRemainingLifeYears,
+    estimateRemainingLifeYears,
+    estimateSingleRemainingLifeYearsAtQuantile,
+    estimateJointRemainingLifeYearsAtQuantile
+} from './simulator-engine-helpers.js';
+import {
     BACKTEST_LOG_DETAIL_KEY,
     LEGACY_LOG_DETAIL_KEY,
     loadDetailLevel,
@@ -22,6 +28,8 @@ import {
 } from './simulator-main-helpers.js';
 
 const HIST_SERIES_START_YEAR = 1950;
+const DYNAMIC_FLEX_MIN_HORIZON = 1;
+const DYNAMIC_FLEX_MAX_HORIZON = 60;
 
 /**
  * Pads a value to the left, ensuring consistent monospace alignment within the textual backtest log.
@@ -53,6 +61,78 @@ function formatPercentOneDecimal(value, targetWidth) {
 function formatPercentInteger(value, targetWidth) {
     const formatted = formatPercentValue(Math.round(value || 0), { fractionDigits: 0, invalid: '0%' });
     return padLeft(formatted, targetWidth);
+}
+
+function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
+
+function resolveBacktestCape(yearData, inputs, marketDataHist) {
+    const yearCape = Number(yearData?.cape);
+    if (Number.isFinite(yearCape) && yearCape > 0) return yearCape;
+    const inputCape = Number(inputs?.capeRatio);
+    if (Number.isFinite(inputCape) && inputCape > 0) return inputCape;
+    const inputLegacyCape = Number(inputs?.marketCapeRatio);
+    if (Number.isFinite(inputLegacyCape) && inputLegacyCape > 0) return inputLegacyCape;
+    const histCape = Number(marketDataHist?.capeRatio);
+    if (Number.isFinite(histCape) && histCape > 0) return histCape;
+    return 0;
+}
+
+function computeDynamicFlexHorizonForYear(inputs, yearIndex) {
+    // UI/Preset horizon is fallback only; bei aktivem Dynamic-Flex wird jahrweise aus Sterbetafeln neu berechnet.
+    if (inputs?.dynamicFlex !== true) {
+        return clamp(Number(inputs?.horizonYears) || 30, DYNAMIC_FLEX_MIN_HORIZON, DYNAMIC_FLEX_MAX_HORIZON);
+    }
+    const currentAgeP1 = (Number(inputs.startAlter) || 65) + yearIndex;
+    const hasPartner = inputs.partner?.aktiv === true;
+    const method = inputs.horizonMethod || 'survival_quantile';
+    const quantile = clamp(Number(inputs.survivalQuantile) || 0.85, 0.5, 0.99);
+
+    if (hasPartner) {
+        const currentAgeP2 = (Number(inputs.partner.startAlter) || currentAgeP1) + yearIndex;
+        if (method === 'mean') {
+            return clamp(
+                estimateJointRemainingLifeYears(inputs.geschlecht || 'm', currentAgeP1, inputs.partner.geschlecht || 'w', currentAgeP2),
+                DYNAMIC_FLEX_MIN_HORIZON,
+                DYNAMIC_FLEX_MAX_HORIZON
+            );
+        }
+        return estimateJointRemainingLifeYearsAtQuantile(
+            inputs.geschlecht || 'm',
+            currentAgeP1,
+            inputs.partner.geschlecht || 'w',
+            currentAgeP2,
+            quantile,
+            { minYears: DYNAMIC_FLEX_MIN_HORIZON, maxYears: DYNAMIC_FLEX_MAX_HORIZON }
+        );
+    }
+
+    if (method === 'mean') {
+        return clamp(
+            estimateRemainingLifeYears(inputs.geschlecht || 'm', currentAgeP1),
+            DYNAMIC_FLEX_MIN_HORIZON,
+            DYNAMIC_FLEX_MAX_HORIZON
+        );
+    }
+    return estimateSingleRemainingLifeYearsAtQuantile(
+        inputs.geschlecht || 'm',
+        currentAgeP1,
+        quantile,
+        { minYears: DYNAMIC_FLEX_MIN_HORIZON, maxYears: DYNAMIC_FLEX_MAX_HORIZON }
+    );
+}
+
+function buildVpwFallbackHint(vpwPayload) {
+    if (!vpwPayload || typeof vpwPayload !== 'object') return 'no_vpw';
+    const status = String(vpwPayload.status || '');
+    if (status === 'disabled') return 'dynamic_flex_off';
+    if (status === 'contract_ready') return 'contract_not_active';
+    if (status !== 'active') return 'unknown_status';
+    if (!Number.isFinite(vpwPayload.capeRatioUsed) || vpwPayload.capeRatioUsed <= 0) return 'fallback_no_cape';
+    if (!Number.isFinite(vpwPayload.expectedReturnCape)) return 'fallback_no_cape_return';
+    if (!Number.isFinite(vpwPayload.expectedRealReturn)) return 'fallback_no_real_return';
+    return 'ok';
 }
 
 /**
@@ -146,7 +226,14 @@ export function runBacktest() {
             "Flex€".padStart(7)
         );
         if (logDetailLevel === 'detailed') {
-            headerCols.push("Entn_real".padStart(9), "Adj%".padStart(5));
+            headerCols.push(
+                "VPW%".padStart(5),
+                "Hor".padStart(4),
+                "VPWSt".padEnd(7),
+                "VPWHint".padEnd(18),
+                "Entn_real".padStart(9),
+                "Adj%".padStart(5)
+            );
         }
         headerCols.push(
             "Status".padEnd(16), "Cut".padEnd(12), "Alarm".padEnd(6), "Quote%".padStart(6), "Runway%".padStart(7),
@@ -172,6 +259,7 @@ export function runBacktest() {
             const jahresrenditeAktien = (HISTORICAL_DATA[jahr].msci_eur - dataVJ.msci_eur) / dataVJ.msci_eur;
             const jahresrenditeGold = (dataVJ.gold_eur_perf || 0) / 100;
             const yearData = { ...dataVJ, rendite: jahresrenditeAktien, gold_eur_perf: dataVJ.gold_eur_perf, zinssatz: dataVJ.zinssatz_de, inflation: dataVJ.inflation_de, jahr };
+            const resolvedCapeRatio = resolveBacktestCape(yearData, inputs, simState.marketDataHist);
 
             const yearIndex = jahr - startJahr;
 
@@ -179,7 +267,14 @@ export function runBacktest() {
             const adjPct = computeAdjPctForYear(backtestCtx, yearIndex);
 
             // Übergebe die berechnete Anpassungsrate an simulateOneYear
-            const adjustedInputs = { ...inputs, rentAdjPct: adjPct };
+            const adjustedInputs = {
+                ...inputs,
+                rentAdjPct: adjPct,
+                capeRatio: resolvedCapeRatio,
+                marketCapeRatio: resolvedCapeRatio,
+                horizonYears: computeDynamicFlexHorizonForYear(inputs, yearIndex)
+            };
+            yearData.capeRatio = resolvedCapeRatio;
             const result = simulateOneYear(simState, adjustedInputs, yearData, yearIndex);
 
             if (result.isRuin) {
@@ -214,6 +309,8 @@ export function runBacktest() {
                     liquiditaet: 0,
                     netA: 0,
                     netG: 0,
+                    vpw: null,
+                    vpwFallbackHint: 'no_vpw',
                     adjPct: adjPct,
                     inflationVJ: dataVJ.inflation_de
                 });
@@ -235,9 +332,13 @@ export function runBacktest() {
                 : (row.vk?.vkGld || 0) - (row.kaufGld || 0);
 
             // Speichere Log-Daten für späteres Neu-Rendern
+            const vpwPayload = result.ui?.vpw || null;
             logRows.push({
                 jahr, row, entscheidung, wertAktien, wertGold, liquiditaet,
-                netA, netG, adjPct, inflationVJ: dataVJ.inflation_de
+                netA, netG,
+                vpw: vpwPayload,
+                vpwFallbackHint: buildVpwFallbackHint(vpwPayload),
+                adjPct, inflationVJ: dataVJ.inflation_de
             });
 
             // Log-Zeile basierend auf Detail-Level
@@ -264,7 +365,15 @@ export function runBacktest() {
                 formatCurrencyShortLog(row.flex_erfuellt_nominal).padStart(7)
             );
             if (logDetailLevel === 'detailed') {
+                const vpw = result.ui?.vpw || null;
+                const vpwStatus = vpw?.status === 'active'
+                    ? 'aktiv'
+                    : (vpw?.status === 'disabled' ? 'aus' : (vpw?.status === 'contract_ready' ? 'bereit' : ''));
                 logCols.push(
+                    formatPercentOneDecimal((vpw?.vpwRate || 0) * 100, 5),
+                    padLeft((Number.isFinite(vpw?.horizonYears) ? Math.round(vpw.horizonYears) : ''), 4),
+                    String(vpwStatus || '').substring(0, 7).padEnd(7),
+                    String(buildVpwFallbackHint(vpw)).substring(0, 18).padEnd(18),
                     formatCurrencyShortLog(row.jahresentnahme_real).padStart(9),
                     formatPercentOneDecimal(adjPct, 5)
                 );
