@@ -37,7 +37,6 @@ export function buildStressContext(presetKey, rand) {
             .map(d => d.index);
 
         if (context.pickableIndices.length === 0) {
-            console.warn(`Stress-Szenario "${preset.label}" fand keine passenden historischen Jahre. Fallback auf 'Kein Stress'.`);
             return null;
         }
     }

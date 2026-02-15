@@ -99,7 +99,8 @@ async function runMonteCarloWithWorkers({
         rngMode = 'per-run-seed',
         startYearMode,
         startYearFilter,
-        startYearHalfLife
+        startYearHalfLife,
+        excludeEstimatedHistory = false
     } = monteCarloParams;
     const desiredWorkers = workerConfig?.workerCount ?? 0;
     const workerCount = Math.max(1, Number.isFinite(desiredWorkers) && desiredWorkers > 0
@@ -143,9 +144,14 @@ async function runMonteCarloWithWorkers({
         pflegeTriggeredCount: 0,
         totalSimulatedYears: 0,
         totalYearsQuoteAbove45: 0,
+        totalYearsSafetyStage1plus: 0,
+        totalYearsSafetyStage2: 0,
         shortfallWithCareCount: 0,
         shortfallNoCareProxyCount: 0,
-        p2TriggeredCount: 0
+        p2TriggeredCount: 0,
+        runsSafetyStage1Triggered: 0,
+        runsSafetyStage2Triggered: 0,
+        totalTaxSavedByLossCarry: 0
     };
 
     let worstRun = null;
@@ -186,7 +192,8 @@ async function runMonteCarloWithWorkers({
                 rngMode,
                 startYearMode,
                 startYearFilter,
-                startYearHalfLife
+                startYearHalfLife,
+                excludeEstimatedHistory
             },
             useCapeSampling,
             logIndices
@@ -251,9 +258,14 @@ async function runMonteCarloWithWorkers({
             totals.pflegeTriggeredCount += result.totals.pflegeTriggeredCount;
             totals.totalSimulatedYears += result.totals.totalSimulatedYears;
             totals.totalYearsQuoteAbove45 += result.totals.totalYearsQuoteAbove45;
+            totals.totalYearsSafetyStage1plus += result.totals.totalYearsSafetyStage1plus || 0;
+            totals.totalYearsSafetyStage2 += result.totals.totalYearsSafetyStage2 || 0;
             totals.shortfallWithCareCount += result.totals.shortfallWithCareCount;
             totals.shortfallNoCareProxyCount += result.totals.shortfallNoCareProxyCount;
             totals.p2TriggeredCount += result.totals.p2TriggeredCount;
+            totals.runsSafetyStage1Triggered += result.totals.runsSafetyStage1Triggered || 0;
+            totals.runsSafetyStage2Triggered += result.totals.runsSafetyStage2Triggered || 0;
+            totals.totalTaxSavedByLossCarry += result.totals.totalTaxSavedByLossCarry || 0;
 
             appendArray(lists.entryAges, result.lists.entryAges);
             appendArray(lists.entryAgesP2, result.lists.entryAgesP2);
@@ -374,7 +386,8 @@ export async function runMonteCarlo() {
             rngMode,
             startYearMode,
             startYearFilter,
-            startYearHalfLife
+            startYearHalfLife,
+            excludeEstimatedHistory
         } = readMonteCarloParameters();
 
         ui.showProgress();
@@ -403,7 +416,8 @@ export async function runMonteCarlo() {
                     rngMode,
                     startYearMode,
                     startYearFilter,
-                    startYearHalfLife
+                    startYearHalfLife,
+                    excludeEstimatedHistory
                 },
                 useCapeSampling,
                 onProgress: pct => ui.updateProgress(pct * 0.5),
@@ -429,7 +443,8 @@ export async function runMonteCarlo() {
                             rngMode,
                             startYearMode,
                             startYearFilter,
-                            startYearHalfLife
+                            startYearHalfLife,
+                            excludeEstimatedHistory
                         },
                         useCapeSampling,
                         onProgress: pct => ui.updateProgress(50 + pct * 0.5),
@@ -460,7 +475,8 @@ export async function runMonteCarlo() {
                         rngMode,
                         startYearMode,
                         startYearFilter,
-                        startYearHalfLife
+                        startYearHalfLife,
+                        excludeEstimatedHistory
                     },
                     useCapeSampling,
                     onProgress: pct => ui.updateProgress(pct),
@@ -487,7 +503,8 @@ export async function runMonteCarlo() {
                     rngMode,
                     startYearMode,
                     startYearFilter,
-                    startYearHalfLife
+                    startYearHalfLife,
+                    excludeEstimatedHistory
                 },
                 useCapeSampling,
                 onProgress: pct => ui.updateProgress(pct),
@@ -513,7 +530,8 @@ export async function runMonteCarlo() {
                     rngMode,
                     startYearMode,
                     startYearFilter,
-                    startYearHalfLife
+                    startYearHalfLife,
+                    excludeEstimatedHistory
                 },
                 useCapeSampling,
                 runIndices: targetIndices

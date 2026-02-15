@@ -113,7 +113,21 @@ export const StorageManager = {
      * @private
      */
     _runMigrations(data) {
-        if (localStorage.getItem(CONFIG.STORAGE.MIGRATION_FLAG)) return data;
+        const ensureTaxState = (payload) => {
+            if (!payload || typeof payload !== 'object') return payload;
+            const state = payload.lastState;
+            if (!state || typeof state !== 'object') return payload;
+            if (!state.taxState || typeof state.taxState !== 'object') {
+                state.taxState = { lossCarry: 0 };
+            } else if (!Number.isFinite(state.taxState.lossCarry) || state.taxState.lossCarry < 0) {
+                state.taxState.lossCarry = 0;
+            }
+            payload.lastState = state;
+            return payload;
+        };
+        if (localStorage.getItem(CONFIG.STORAGE.MIGRATION_FLAG)) {
+            return ensureTaxState(data);
+        }
 
         let state = data.lastState || {};
         if (state) {
@@ -126,7 +140,7 @@ export const StorageManager = {
             data.lastState = state;
         }
         localStorage.setItem(CONFIG.STORAGE.MIGRATION_FLAG, '1');
-        return data;
+        return ensureTaxState(data);
     },
 
     /**
@@ -159,9 +173,7 @@ export const StorageManager = {
             if (handle && (await handle.queryPermission({ mode: 'readwrite' })) === 'granted') {
                 appState.snapshotHandle = handle;
             }
-        } catch (e) {
-            console.warn("Konnte Snapshot-Handle nicht laden.", e);
-        }
+        } catch (e) { }
     },
 
     /**

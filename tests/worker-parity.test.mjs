@@ -150,7 +150,8 @@ try {
         totalYearsQuoteAbove45: 0,
         shortfallWithCareCount: 0,
         shortfallNoCareProxyCount: 0,
-        p2TriggeredCount: 0
+        p2TriggeredCount: 0,
+        totalTaxSavedByLossCarry: 0
     };
     const mergedWithdrawals = [];
 
@@ -182,6 +183,7 @@ try {
         mergedTotals.shortfallWithCareCount += chunk.totals.shortfallWithCareCount;
         mergedTotals.shortfallNoCareProxyCount += chunk.totals.shortfallNoCareProxyCount;
         mergedTotals.p2TriggeredCount += chunk.totals.p2TriggeredCount;
+        mergedTotals.totalTaxSavedByLossCarry += chunk.totals.totalTaxSavedByLossCarry || 0;
 
         appendArray(mergedLists.entryAges, chunk.lists.entryAges);
         appendArray(mergedLists.entryAgesP2, chunk.lists.entryAgesP2);
@@ -366,7 +368,8 @@ try {
         totalYearsQuoteAbove45: 0,
         shortfallWithCareCount: 0,
         shortfallNoCareProxyCount: 0,
-        p2TriggeredCount: 0
+        p2TriggeredCount: 0,
+        totalTaxSavedByLossCarry: 0
     };
     const mergedWithdrawals = [];
 
@@ -395,6 +398,7 @@ try {
         mergedTotals.shortfallWithCareCount += chunk.totals.shortfallWithCareCount;
         mergedTotals.shortfallNoCareProxyCount += chunk.totals.shortfallNoCareProxyCount;
         mergedTotals.p2TriggeredCount += chunk.totals.p2TriggeredCount;
+        mergedTotals.totalTaxSavedByLossCarry += chunk.totals.totalTaxSavedByLossCarry || 0;
         appendArray(mergedLists.entryAges, chunk.lists.entryAges);
         appendArray(mergedLists.entryAgesP2, chunk.lists.entryAgesP2);
         appendArray(mergedLists.careDepotCosts, chunk.lists.careDepotCosts);

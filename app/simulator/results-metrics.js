@@ -322,6 +322,39 @@ function buildRiskKpis(results) {
                 tone: 'danger'
             });
         }
+        const lossCarrySavings = Number(results.extraKPI?.lossCarryTaxSavings?.perRunMean);
+        if (Number.isFinite(lossCarrySavings)) {
+            kpis.push({
+                title: 'Ø Steuerersparnis Verlusttopf',
+                value: formatCurrencyRounded(lossCarrySavings),
+                description: 'Durchschnittliche Steuerersparnis pro Lauf durch Verlustvortrag.',
+                tone: lossCarrySavings > 0 ? 'success' : 'default'
+            });
+        }
+        const safety = results.extraKPI.dynamicFlexSafety;
+        if (safety && typeof safety === 'object') {
+            const stage1Years = isFinite(safety.yearShareStage1plus) ? safety.yearShareStage1plus * 100 : 0;
+            const stage2Years = isFinite(safety.yearShareStage2) ? safety.yearShareStage2 * 100 : 0;
+            const stage2Runs = isFinite(safety.runShareStage2) ? safety.runShareStage2 * 100 : 0;
+            kpis.push({
+                title: 'Safety aktiv (Jahre)',
+                value: formatPercentage(stage1Years),
+                description: 'Anteil aller Simulationsjahre mit aktivem Dynamic-Flex-Sicherheitsmodus (Stufe 1/2).',
+                tone: stage1Years > 25 ? 'warning' : 'default'
+            });
+            kpis.push({
+                title: 'Safety Stufe 2 (Jahre)',
+                value: formatPercentage(stage2Years),
+                description: 'Anteil aller Simulationsjahre mit Fallback auf statischen Flex.',
+                tone: stage2Years > 10 ? 'danger' : (stage2Years > 0 ? 'warning' : 'default')
+            });
+            kpis.push({
+                title: 'Läufe mit Stufe 2',
+                value: formatPercentage(stage2Runs),
+                description: 'Anteil der Läufe, in denen mindestens einmal Stufe 2 erreicht wurde.',
+                tone: stage2Runs > 20 ? 'danger' : (stage2Runs > 0 ? 'warning' : 'default')
+            });
+        }
     }
     return kpis;
 }

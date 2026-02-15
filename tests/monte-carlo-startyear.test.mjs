@@ -51,4 +51,24 @@ prepareHistoricalData();
     console.log('✅ Uniform mode fallback works');
 }
 
+// --- TEST 4: Excluding Estimated History Works ---
+{
+    const cdf = buildStartYearCdf('FILTER', annualData, {
+        startYearFilter: 1925,
+        startYearHalfLife: 20,
+        excludeEstimatedHistory: true
+    });
+    assert(cdf && cdf.length === annualData.length, 'CDF should be built when excluding estimated history');
+
+    const firstEligibleIdx = annualData.findIndex(entry => entry.jahr >= 1950);
+    assert(firstEligibleIdx >= 0, 'Expected at least one year >= 1950');
+
+    for (let r = 0; r < 1; r += 0.02) {
+        const idx = pickStartYearIndex(() => r, annualData, cdf);
+        assert(idx >= firstEligibleIdx, `Index must be >= 1950 (got ${annualData[idx].jahr})`);
+    }
+
+    console.log('✅ Estimated years can be excluded from start-year sampling');
+}
+
 console.log('--- Monte-Carlo Start-Year Sampling Tests Completed ---');

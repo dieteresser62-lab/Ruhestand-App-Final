@@ -52,7 +52,6 @@ export const UIRenderer = {
      */
     render(ui) {
         if (!summaryRenderer || !actionRenderer) {
-            console.warn('UIRenderer.render: Renderer nicht initialisiert.');
             return;
         }
         // Summary first, then action panel to keep layout stable.

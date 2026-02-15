@@ -159,9 +159,13 @@ function buildBasicInputs() {
         pflegeTriggeredCount: 0,
         totalSimulatedYears: 10,
         totalYearsQuoteAbove45: 2,
+        totalYearsSafetyStage1plus: 3,
+        totalYearsSafetyStage2: 1,
         shortfallWithCareCount: 0,
         shortfallNoCareProxyCount: 0,
-        p2TriggeredCount: 0
+        p2TriggeredCount: 0,
+        runsSafetyStage1Triggered: 1,
+        runsSafetyStage2Triggered: 1
     };
     const lists = {
         entryAges: [],
@@ -192,6 +196,8 @@ function buildBasicInputs() {
     assertClose(aggregates.taxOutcomes.p50, 20, 0.0001, 'Median tax should be 20');
     assertClose(aggregates.depotErschoepfungsQuote, (1 / 3) * 100, 0.0001, 'Depletion rate should match');
     assertClose(aggregates.extraKPI.timeShareQuoteAbove45, 0.2, 0.0001, 'Time share above 4.5 should match');
+    assertClose(aggregates.extraKPI.dynamicFlexSafety.yearShareStage1plus, 0.3, 0.0001, 'Safety stage1+ year share should match');
+    assertClose(aggregates.extraKPI.dynamicFlexSafety.yearShareStage2, 0.1, 0.0001, 'Safety stage2 year share should match');
 }
 
 // --- TEST 8: Chunk merge consistency (split vs full) ---
@@ -274,9 +280,14 @@ function buildBasicInputs() {
         pflegeTriggeredCount: chunkA.totals.pflegeTriggeredCount + chunkB.totals.pflegeTriggeredCount,
         totalSimulatedYears: chunkA.totals.totalSimulatedYears + chunkB.totals.totalSimulatedYears,
         totalYearsQuoteAbove45: chunkA.totals.totalYearsQuoteAbove45 + chunkB.totals.totalYearsQuoteAbove45,
+        totalYearsSafetyStage1plus: (chunkA.totals.totalYearsSafetyStage1plus || 0) + (chunkB.totals.totalYearsSafetyStage1plus || 0),
+        totalYearsSafetyStage2: (chunkA.totals.totalYearsSafetyStage2 || 0) + (chunkB.totals.totalYearsSafetyStage2 || 0),
         shortfallWithCareCount: chunkA.totals.shortfallWithCareCount + chunkB.totals.shortfallWithCareCount,
         shortfallNoCareProxyCount: chunkA.totals.shortfallNoCareProxyCount + chunkB.totals.shortfallNoCareProxyCount,
-        p2TriggeredCount: chunkA.totals.p2TriggeredCount + chunkB.totals.p2TriggeredCount
+        p2TriggeredCount: chunkA.totals.p2TriggeredCount + chunkB.totals.p2TriggeredCount,
+        runsSafetyStage1Triggered: (chunkA.totals.runsSafetyStage1Triggered || 0) + (chunkB.totals.runsSafetyStage1Triggered || 0),
+        runsSafetyStage2Triggered: (chunkA.totals.runsSafetyStage2Triggered || 0) + (chunkB.totals.runsSafetyStage2Triggered || 0),
+        totalTaxSavedByLossCarry: (chunkA.totals.totalTaxSavedByLossCarry || 0) + (chunkB.totals.totalTaxSavedByLossCarry || 0)
     };
 
     const combinedLists = {
@@ -344,9 +355,14 @@ const emptyTotals = {
     pflegeTriggeredCount: 0,
     totalSimulatedYears: 0,
     totalYearsQuoteAbove45: 0,
+    totalYearsSafetyStage1plus: 0,
+    totalYearsSafetyStage2: 0,
     shortfallWithCareCount: 0,
     shortfallNoCareProxyCount: 0,
-    p2TriggeredCount: 0
+    p2TriggeredCount: 0,
+    runsSafetyStage1Triggered: 0,
+    runsSafetyStage2Triggered: 0,
+    totalTaxSavedByLossCarry: 0
 };
 const emptyLists = {
     entryAges: [],
@@ -499,6 +515,57 @@ const emptyLists = {
     assert(horizons.length >= 3, 'Dynamic flex MC rows should include VPW horizons');
     assert(horizons[1] <= horizons[0], 'MC horizon should not increase year-over-year (y1->y2)');
     assert(horizons[2] <= horizons[1], 'MC horizon should not increase year-over-year (y2->y3)');
+}
+
+// --- TEST 15: taxSavedByLossCarry is deterministic with fixed seed ---
+{
+    const inputs = {
+        ...buildBasicInputs(),
+        startVermoegen: 450000,
+        depotwertAlt: 450000,
+        einstandAlt: 700000, // encourages realized losses in down years
+        startSPB: 1000,
+        kirchensteuerSatz: 0
+    };
+    const monteCarloParams = {
+        anzahl: 4,
+        maxDauer: 4,
+        blockSize: 1,
+        seed: 424242,
+        methode: 'block',
+        rngMode: 'per-run-seed',
+        startYearMode: 'UNIFORM'
+    };
+    const runA = await runMonteCarloChunk({
+        inputs,
+        monteCarloParams,
+        widowOptions: { mode: 'stop', percent: 0, marriageOffsetYears: 0, minMarriageYears: 0 },
+        useCapeSampling: false,
+        runRange: { start: 0, count: 4 },
+        logIndices: [0, 1, 2, 3],
+        engine: EngineAPI
+    });
+    const runB = await runMonteCarloChunk({
+        inputs,
+        monteCarloParams,
+        widowOptions: { mode: 'stop', percent: 0, marriageOffsetYears: 0, minMarriageYears: 0 },
+        useCapeSampling: false,
+        runRange: { start: 0, count: 4 },
+        logIndices: [0, 1, 2, 3],
+        engine: EngineAPI
+    });
+
+    const sumTaxSaved = (chunk) => (chunk.runMeta || []).reduce((sum, meta) => {
+        const rows = Array.isArray(meta?.logDataRows) ? meta.logDataRows : [];
+        return sum + rows.reduce((inner, row) => inner + (Number(row?.taxSavedByLossCarry) || 0), 0);
+    }, 0);
+
+    const sumA = sumTaxSaved(runA);
+    const sumB = sumTaxSaved(runB);
+    assertClose(sumA, sumB, 1e-9, 'taxSavedByLossCarry sum should be deterministic for fixed seed');
+
+    const sampleRow = runA.runMeta?.[0]?.logDataRows?.find(r => r && typeof r === 'object');
+    assert(sampleRow && Number.isFinite(Number(sampleRow.taxSavedByLossCarry)), 'Log rows should expose numeric taxSavedByLossCarry');
 }
 
 console.log('--- Simulator Monte Carlo Tests Completed ---');

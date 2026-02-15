@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 54 Testdateien mit 900+ Assertions
+**Test-Statistik:** 57 Testdateien mit 1000+ Assertions
 
 ## Directory Structure
 
@@ -118,6 +118,30 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 - **FIFO Cost-Basis Tracking:** Korrekte Kostenbasis-Verfolgung
 - **Kirchensteuer:** Zusätzliche Steuerbelastung
 - Steueroptimierte Verkaufsreihenfolge
+- **Zwei Gewinnquoten:** `gainQuotePlan` (≥ 0) vs. `gainQuoteSigned` (mit Vorzeichen für Verlustpositionen)
+- **TQF-Symmetrie:** Teilfreistellung wird symmetrisch auf Verluste angewandt (§ 22 InvStG)
+- **Roh-Aggregate:** `sumRealizedGainSigned`, `sumTaxableAfterTqfSigned` für Settlement
+
+#### `tax-settlement.test.mjs`
+**Zweck:** Validiert das Jahres-Settlement (Verlustverrechnungstopf).
+- **Verrechnungsreihenfolge:** lossCarry → SPB → Steuer
+- **Negativer Jahressaldo:** Zero Tax, additive lossCarry-Fortschreibung
+- **Exakter Aufbrauch:** Floating-Point-Robustheit bei lossCarry = Gewinn
+- **SPB-Restverbrauch:** SPB absorbiert Rest nach lossCarry
+- **Non-Mutation:** taxStatePrev wird nicht verändert
+
+#### `core-tax-settlement.test.mjs`
+**Zweck:** End-to-End-Integration Settlement in Engine.
+- **taxState-Fortschreibung:** `lastState.taxState.lossCarry` wird korrekt propagiert
+- **action.steuer:** Enthält Settlement-Steuer (nicht Sale-Plan-Steuer)
+- **taxRawAggregate:** Roh-Aggregate in UI-Ausgabe vorhanden
+- **Default-Robustheit:** `lastState: {}` ohne taxState funktioniert
+
+#### `simulator-tax-settlement.test.mjs`
+**Zweck:** Simulator-Integration mit Gesamt-Settlement-Recompute.
+- **Notfallverkauf-Recompute:** Bei Forced Sales werden reguläre + Notfall-Aggregate kombiniert und Settlement neu berechnet
+- **Kein-Notfall-Regression:** Ohne Forced Sale bleibt Engine-Settlement unverändert
+- **Steuerkonsistenz:** `totalTaxesThisYear` kommt aus Settlement
 
 #### `transaction-engine-ath.test.mjs`
 **Zweck:** Testet Transaktionsverhalten bei All-Time-High.
@@ -437,6 +461,8 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 ### Priorität 1: Finanz-Kern (Kritisch)
 - `spending-planner.test.mjs`
 - `transaction-tax.test.mjs`
+- `tax-settlement.test.mjs`
+- `core-tax-settlement.test.mjs`
 - `liquidity-guardrail.test.mjs`
 - `core-engine.test.mjs`
 - `engine-robustness.test.mjs`
@@ -467,6 +493,7 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 - `simulation.test.mjs`
 - `simulator-headless.test.mjs`
 - `simulator-backtest.test.mjs`
+- `simulator-tax-settlement.test.mjs`
 
 ### Priorität 6: Utilities & Sweep
 - `utils.test.mjs`
@@ -524,6 +551,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `balance-storage.test.mjs` | ~490 | localStorage-Persistenz |
 | `care-meta.test.mjs` | ~200 | Pflegefall-Logik |
 | `core-engine.test.mjs` | ~150 | EngineAPI-Basisvalidierung |
+| `core-tax-settlement.test.mjs` | ~70 | Core Settlement-Integration |
 | `depot-tranches.test.mjs` | ~130 | FIFO-Verkäufe, Steuer |
 | `engine-robustness.test.mjs` | ~240 | Edge Cases, Fehlereingaben |
 | `feature-flags.test.mjs` | ~60 | Feature-Flag-System |
@@ -546,13 +574,15 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `simulator-monte-carlo.test.mjs` | ~460 | MC-Kern, Buffers, Merge |
 | `simulator-multiprofile-aggregation.test.mjs` | ~115 | Simulator Multi-Profil |
 | `simulator-sweep.test.mjs` | ~470 | Parameter-Sweep |
+| `simulator-tax-settlement.test.mjs` | ~180 | Simulator Settlement-Recompute |
 | `spending-planner.test.mjs` | ~200 | Entnahme-Logik |
 | `spending-quantization.test.mjs` | ~80 | Entnahme-Rundung |
 | `transaction-engine-ath.test.mjs` | ~160 | ATH-Verhalten |
 | `transaction-engine-rebal.test.mjs` | ~105 | Gold-Rebalancing |
 | `transaction-gold-liquidity.test.mjs` | ~90 | Gold vs. Liquidität |
 | `transaction-quantization.test.mjs` | ~250 | Transaktions-Rundung |
-| `transaction-tax.test.mjs` | ~150 | Steuerberechnung |
+| `tax-settlement.test.mjs` | ~70 | Jahres-Settlement, Verlusttopf |
+| `transaction-tax.test.mjs` | ~340 | Steuerberechnung, Roh-Aggregate |
 | `utils.test.mjs` | ~100 | Hilfsfunktionen |
 | `worker-parity.test.mjs` | ~150 | Worker-Chunk-Parity |
 | `worker-pool.test.mjs` | ~670 | Worker-Pool-Lifecycle |

@@ -9,7 +9,7 @@
 
 import { rng, makeRunSeed, RUNIDX_COMBO_SETUP, quantile } from './simulator-utils.js';
 import { getStartYearCandidates } from '../shared/cape-utils.js';
-import { BREAK_ON_RUIN, MORTALITY_TABLE, annualData } from './simulator-data.js';
+import { BREAK_ON_RUIN, MORTALITY_TABLE, annualData, ESTIMATED_HISTORY_CUTOFF_YEAR } from './simulator-data.js';
 import { buildStressContext, applyStressOverride, computeRentAdjRate } from './simulator-portfolio.js';
 import { simulateOneYear, initMcRunState, makeDefaultCareMeta, sampleNextYearData, computeRunStatsFromSeries, updateCareMeta, calcCareCost, computeCareMortalityMultiplier, computeHouseholdFlexFactor, estimateRemainingLifeYears, estimateJointRemainingLifeYears, estimateSingleRemainingLifeYearsAtQuantile, estimateJointRemainingLifeYearsAtQuantile } from './simulator-engine-wrapper.js';
 import { portfolioTotal } from './simulator-results.js';
@@ -141,18 +141,27 @@ function pickFromSampler(rand, sampler, fallbackIndex = 0) {
     return sampler.indices[low] ?? fallbackIndex;
 }
 
-function buildYearSamplingConfig(mode, data, { startYearFilter = 1970, startYearHalfLife = 20, blockSize = 1 } = {}) {
+function resolveMinStartYearIndex(data, excludeEstimatedHistory = false) {
+    const safeFallback = Math.max(0, Math.min(MIN_START_YEAR_INDEX, data.length - 1));
+    if (!excludeEstimatedHistory) return safeFallback;
+    const idx = data.findIndex(entry => (entry?.jahr ?? 0) >= ESTIMATED_HISTORY_CUTOFF_YEAR);
+    return idx >= 0 ? idx : safeFallback;
+}
+
+function buildYearSamplingConfig(mode, data, { startYearFilter = 1970, startYearHalfLife = 20, blockSize = 1, excludeEstimatedHistory = false } = {}) {
     if (!Array.isArray(data) || data.length === 0) return null;
 
     const cutoff = Number.isFinite(startYearFilter) ? startYearFilter : 1970;
     const halfLife = Number.isFinite(startYearHalfLife) && startYearHalfLife > 0 ? startYearHalfLife : 20;
+    const minStartIndex = resolveMinStartYearIndex(data, excludeEstimatedHistory);
     // Recency-Mode: Exponentielles Abklingen mit Halbwertszeit (halfLife).
     const currentYear = data[data.length - 1]?.jahr ?? new Date().getFullYear();
 
     const allowedIndices = [];
     const weightsByIndex = new Array(data.length).fill(0);
-    for (let i = MIN_START_YEAR_INDEX; i < data.length; i++) {
+    for (let i = minStartIndex; i < data.length; i++) {
         const year = data[i].jahr;
+        if (excludeEstimatedHistory && year < ESTIMATED_HISTORY_CUTOFF_YEAR) continue;
         if (mode === 'FILTER' && year < cutoff) continue;
         allowedIndices.push(i);
         if (mode === 'RECENCY') {
@@ -171,7 +180,7 @@ function buildYearSamplingConfig(mode, data, { startYearFilter = 1970, startYear
         : null;
 
     // Block-Sampling: Startindex so wählen, dass ein Block (blockSize) passt.
-    const maxStartIndex = Math.max(1, data.length - blockSize);
+    const maxStartIndex = Math.max(minStartIndex + 1, data.length - blockSize);
     const blockStartIndices = allowedIndices.filter(idx => idx < maxStartIndex);
     const blockSampler = (mode === 'FILTER' || mode === 'RECENCY')
         ? buildCdfFromIndices(blockStartIndices, weightsByIndex)
@@ -202,16 +211,18 @@ function buildYearSamplingConfig(mode, data, { startYearFilter = 1970, startYear
     };
 }
 
-export function buildStartYearCdf(mode, data, { startYearFilter = 1970, startYearHalfLife = 20 } = {}) {
+export function buildStartYearCdf(mode, data, { startYearFilter = 1970, startYearHalfLife = 20, excludeEstimatedHistory = false } = {}) {
     if (!Array.isArray(data) || data.length === 0) return null;
     if (mode !== 'FILTER' && mode !== 'RECENCY') return null;
 
     const currentYear = data[data.length - 1]?.jahr ?? new Date().getFullYear();
     const halfLife = Number.isFinite(startYearHalfLife) && startYearHalfLife > 0 ? startYearHalfLife : 20;
     const cutoff = Number.isFinite(startYearFilter) ? startYearFilter : 1970;
+    const minStartIndex = resolveMinStartYearIndex(data, excludeEstimatedHistory);
 
     const weights = data.map((entry, index) => {
-        if (index < MIN_START_YEAR_INDEX) return 0;
+        if (index < minStartIndex) return 0;
+        if (excludeEstimatedHistory && entry.jahr < ESTIMATED_HISTORY_CUTOFF_YEAR) return 0;
         if (mode === 'FILTER') {
             return entry.jahr >= cutoff ? 1 : 0;
         }
@@ -332,7 +343,8 @@ export async function runMonteCarloChunk({
         rngMode = 'per-run-seed',
         startYearMode = 'UNIFORM',
         startYearFilter = 1970,
-        startYearHalfLife = 20
+        startYearHalfLife = 20,
+        excludeEstimatedHistory = false
     } = monteCarloParams;
     const runStart = runRange?.start ?? 0;
     const runCount = runRange?.count ?? anzahl;
@@ -397,6 +409,9 @@ export async function runMonteCarloChunk({
 
     const heatmap = Array(10).fill(0).map(() => new Uint32Array(MC_HEATMAP_BINS.length - 1));
     let totalSimulatedYears = 0, totalYearsQuoteAbove45 = 0;
+    let totalYearsSafetyStage1plus = 0, totalYearsSafetyStage2 = 0;
+    let runsSafetyStage1Triggered = 0, runsSafetyStage2Triggered = 0;
+    let totalTaxSavedByLossCarry = 0;
     const allRealWithdrawalsSample = [];
 
     const runMeta = [];
@@ -410,9 +425,11 @@ export async function runMonteCarloChunk({
     const yearSamplingConfig = buildYearSamplingConfig(startYearMode, annualData, {
         startYearFilter,
         startYearHalfLife,
-        blockSize
+        blockSize,
+        excludeEstimatedHistory
     });
-    const startYearCdf = buildStartYearCdf(startYearMode, annualData, { startYearFilter, startYearHalfLife });
+    const startYearCdf = buildStartYearCdf(startYearMode, annualData, { startYearFilter, startYearHalfLife, excludeEstimatedHistory });
+    const minStartYearIndex = resolveMinStartYearIndex(annualData, excludeEstimatedHistory);
 
     for (let i = 0; i < runCount; i++) {
         if (i % progressUpdateInterval === 0) {
@@ -424,7 +441,7 @@ export async function runMonteCarloChunk({
             }
         }
         const runIdx = runStart + i;
-        let failed = false, totalTaxesThisRun = 0, kpiJahreMitKuerzungDieserLauf = 0, kpiMaxKuerzungDieserLauf = 0;
+        let failed = false, totalTaxesThisRun = 0, totalTaxSavedByLossCarryThisRun = 0, kpiJahreMitKuerzungDieserLauf = 0, kpiMaxKuerzungDieserLauf = 0;
         let lebensdauer = 0, jahreOhneFlex = 0, triggeredAge = null;
         let careEverActive = false;
 
@@ -435,18 +452,19 @@ export async function runMonteCarloChunk({
 
         const inputCapeForSampling = Number(inputs.capeRatio) > 0 ? Number(inputs.capeRatio) : Number(inputs.marketCapeRatio);
         if (useCapeSampling && inputCapeForSampling > 0) {
-            const candidates = getStartYearCandidates(inputCapeForSampling, annualData);
+            const candidates = getStartYearCandidates(inputCapeForSampling, annualData)
+                .filter(year => !excludeEstimatedHistory || year >= ESTIMATED_HISTORY_CUTOFF_YEAR);
             if (candidates.length > 0) {
                 const chosenYear = candidates[Math.floor(rand() * candidates.length)];
                 startYearIndex = annualData.findIndex(d => d.jahr === chosenYear);
-                if (startYearIndex === -1) startYearIndex = pickStartYearIndex(rand, annualData, null);
+                if (startYearIndex === -1) startYearIndex = pickStartYearIndex(rand, annualData, null, minStartYearIndex);
             } else {
-                startYearIndex = pickStartYearIndex(rand, annualData, null);
+                startYearIndex = pickStartYearIndex(rand, annualData, null, minStartYearIndex);
             }
         } else {
             startYearIndex = yearSamplingConfig?.allSampler
-                ? pickFromSampler(rand, yearSamplingConfig.allSampler, pickStartYearIndex(rand, annualData, null))
-                : pickStartYearIndex(rand, annualData, startYearCdf);
+                ? pickFromSampler(rand, yearSamplingConfig.allSampler, pickStartYearIndex(rand, annualData, null, minStartYearIndex))
+                : pickStartYearIndex(rand, annualData, startYearCdf, minStartYearIndex);
         }
         // --- CAPE-SAMPLING LOGIC END ---
 
@@ -496,6 +514,8 @@ export async function runMonteCarloChunk({
         let retirementYearCounter = 0; // Track years in retirement for heatmap alignment
         let p1ActiveThisYear = false;
         let p2ActiveThisYear = false;
+        let runSafetyStage1Ever = false;
+        let runSafetyStage2Ever = false;
 
         for (let simulationsJahr = 0; simulationsJahr < maxDauer; simulationsJahr++) {
             const ageP1 = inputs.startAlter + simulationsJahr;
@@ -709,6 +729,7 @@ export async function runMonteCarloChunk({
             } else {
                 simState = result.newState;
                 totalTaxesThisRun += result.totalTaxesThisYear;
+                totalTaxSavedByLossCarryThisRun += Number(result.logData?.taxSavedByLossCarry) || 0;
                 if (result.logData.entscheidung.kuerzungProzent >= 10) kpiJahreMitKuerzungDieserLauf++;
                 kpiMaxKuerzungDieserLauf = Math.max(kpiMaxKuerzungDieserLauf, result.logData.entscheidung.kuerzungProzent);
 
@@ -726,6 +747,18 @@ export async function runMonteCarloChunk({
 
                 totalSimulatedYears++;
                 if (result.logData.entnahmequote * 100 > 4.5) totalYearsQuoteAbove45++;
+                const vpwPayload = result.ui?.vpw || null;
+                const vpwSafetyStage = Number(vpwPayload?.safetyStage);
+                if (Number.isFinite(vpwSafetyStage)) {
+                    if (vpwSafetyStage >= 1) {
+                        totalYearsSafetyStage1plus++;
+                        runSafetyStage1Ever = true;
+                    }
+                    if (vpwSafetyStage >= 2) {
+                        totalYearsSafetyStage2++;
+                        runSafetyStage2Ever = true;
+                    }
+                }
                 if (runIdx % 100 === 0) allRealWithdrawalsSample.push(result.logData.jahresentnahme_real);
 
                 if (!isAccumulation && retirementYearCounter < 10) {
@@ -860,6 +893,7 @@ export async function runMonteCarloChunk({
         finalOutcomes[i] = failed ? 0 : portfolioTotal(simState.portfolio);
         depotErschoepft[i] = ruinOrDepleted ? 1 : 0;
         taxOutcomes[i] = totalTaxesThisRun;
+        totalTaxSavedByLossCarry += totalTaxSavedByLossCarryThisRun;
         kpiLebensdauer[i] = lebensdauer;
         kpiKuerzungsjahre[i] = kpiJahreMitKuerzungDieserLauf;
         kpiMaxKuerzung[i] = kpiMaxKuerzungDieserLauf;
@@ -892,6 +926,8 @@ export async function runMonteCarloChunk({
         p2CareYearsArr[i] = p2CareYears;
         bothCareYearsArr[i] = bothCareYears;
         if (p2CareYears > 0) { p2TriggeredCount++; }
+        if (runSafetyStage1Ever) { runsSafetyStage1Triggered++; }
+        if (runSafetyStage2Ever) { runsSafetyStage2Triggered++; }
 
         runMeta.push({
             index: runIdx,
@@ -946,9 +982,14 @@ export async function runMonteCarloChunk({
             pflegeTriggeredCount,
             totalSimulatedYears,
             totalYearsQuoteAbove45,
+            totalYearsSafetyStage1plus,
+            totalYearsSafetyStage2,
             shortfallWithCareCount,
             shortfallNoCareProxyCount,
-            p2TriggeredCount
+            p2TriggeredCount,
+            runsSafetyStage1Triggered,
+            runsSafetyStage2Triggered,
+            totalTaxSavedByLossCarry
         },
         lists: {
             entryAges,

@@ -16,6 +16,11 @@ const __dirname = path.dirname(__filename);
 
 const entryFile = path.join(__dirname, 'engine', 'index.mjs');
 const outputFile = path.join(__dirname, 'engine.js');
+const strictBuild = (() => {
+    const strictEnv = String(process.env.ENGINE_BUILD_STRICT || '').toLowerCase();
+    const ciEnv = String(process.env.CI || '').toLowerCase();
+    return strictEnv === '1' || strictEnv === 'true' || ciEnv === '1' || ciEnv === 'true';
+})();
 
 /**
  * Erstellt den Bundle-Build mit esbuild.
@@ -84,6 +89,9 @@ async function writeModuleFallback() {
 async function main() {
     const bundlerAvailable = await buildWithEsbuild();
     if (!bundlerAvailable) {
+        if (strictBuild) {
+            throw new Error("Strict build active: esbuild fehlt. Installieren Sie 'esbuild' oder deaktivieren Sie ENGINE_BUILD_STRICT.");
+        }
         await writeModuleFallback();
     }
 }

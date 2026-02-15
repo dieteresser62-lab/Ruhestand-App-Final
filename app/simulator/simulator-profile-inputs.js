@@ -190,7 +190,7 @@ export function buildSimulatorInputsFromProfileData(profileData) {
     const goGoMultiplier = clamp(
         readNumber(profileData, simKey('goGoMultiplier'), DYNAMIC_FLEX_DEFAULTS.GO_GO_MULTIPLIER),
         1.0,
-        10.0
+        1.5
     );
 
     const goldAktivFromProfile = goldOverrides.goldAktiv;

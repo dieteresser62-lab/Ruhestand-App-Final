@@ -10,6 +10,54 @@
 
 // --- DATA & CONFIG ---
 
+export const ESTIMATED_HISTORY_MIN_YEAR = 1925;
+export const ESTIMATED_HISTORY_MAX_YEAR = 1949;
+export const ESTIMATED_HISTORY_CUTOFF_YEAR = 1950;
+
+/**
+ * Maschinenlesbare Metadaten zu Datenherkunft und Qualität der Simulationsreihen.
+ * Detaillierte Quellenangaben stehen in docs/reference/DATA_SOURCES.md.
+ */
+export const DATASET_META = Object.freeze({
+  historicalData: {
+    coverageYears: [1925, 2024],
+    estimatedYears: [ESTIMATED_HISTORY_MIN_YEAR, ESTIMATED_HISTORY_MAX_YEAR],
+    estimatedHistoryCutoffYear: ESTIMATED_HISTORY_CUTOFF_YEAR,
+    notes: [
+      'Years 1925-1949 are normalized to connect to the 1950 level.',
+      'Use the Monte Carlo setting "exclude estimated history" to drop years < 1950 from sampling.'
+    ],
+    series: {
+      msci_eur: {
+        label: 'MSCI World EUR-like index level',
+        variantStatus: 'undocumented',
+        sourceStatus: 'partially_estimated_pre_1950'
+      },
+      inflation_de: {
+        label: 'German CPI inflation (annual)',
+        sourceStatus: 'historical_series'
+      },
+      zinssatz_de: {
+        label: 'German short-rate proxy (annual)',
+        sourceStatus: 'historical_series'
+      },
+      lohn_de: {
+        label: 'German wage growth proxy (annual)',
+        sourceStatus: 'historical_series'
+      },
+      gold_eur_perf: {
+        label: 'Gold annual performance (EUR proxy)',
+        sourceStatus: 'partial_history_with_zero_fallbacks'
+      },
+      cape: {
+        label: 'CAPE/Shiller valuation proxy',
+        sourceStatus: 'historical_proxy'
+      }
+    },
+    documentation: 'docs/reference/DATA_SOURCES.md'
+  }
+});
+
 /**
  * Altersabhängige Eintrittswahrscheinlichkeiten für Pflegegrade 1–5.
  *

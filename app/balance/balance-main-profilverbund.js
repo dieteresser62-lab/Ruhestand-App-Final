@@ -80,7 +80,13 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
         const runs = profiles.map(entry => {
             const input = buildProfileEngineInput(sharedInput, entry);
             const prevInputs = entry?.balanceState?.inputs || null;
-            const lastState = shouldResetGuardrailState(prevInputs, input) ? null : (entry?.balanceState?.lastState || null);
+            const previousLastState = entry?.balanceState?.lastState || null;
+            const preservedTaxState = previousLastState?.taxState
+                ? { taxState: previousLastState.taxState }
+                : null;
+            const lastState = shouldResetGuardrailState(prevInputs, input)
+                ? preservedTaxState
+                : previousLastState;
             const result = window.EngineAPI.simulateSingleYear(input, lastState);
             if (result?.error) {
                 throw result.error;

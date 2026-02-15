@@ -35,9 +35,14 @@ export function buildMonteCarloAggregates({
         pflegeTriggeredCount,
         totalSimulatedYears,
         totalYearsQuoteAbove45,
+        totalYearsSafetyStage1plus = 0,
+        totalYearsSafetyStage2 = 0,
         shortfallWithCareCount,
         shortfallNoCareProxyCount,
-        p2TriggeredCount
+        p2TriggeredCount,
+        runsSafetyStage1Triggered = 0,
+        runsSafetyStage2Triggered = 0,
+        totalTaxSavedByLossCarry = 0
     } = totals;
     const {
         entryAges,
@@ -98,6 +103,18 @@ export function buildMonteCarloAggregates({
         extraKPI: {
             timeShareQuoteAbove45: totalSimulatedYears > 0 ? totalYearsQuoteAbove45 / totalSimulatedYears : 0,
             consumptionAtRiskP10Real: quantile(allRealWithdrawalsSample, 0.1),
+            dynamicFlexSafety: {
+                yearShareStage1plus: totalSimulatedYears > 0 ? totalYearsSafetyStage1plus / totalSimulatedYears : 0,
+                yearShareStage2: totalSimulatedYears > 0 ? totalYearsSafetyStage2 / totalSimulatedYears : 0,
+                runShareStage1plus: totalRuns > 0 ? runsSafetyStage1Triggered / totalRuns : 0,
+                runShareStage2: totalRuns > 0 ? runsSafetyStage2Triggered / totalRuns : 0,
+                runsStage1plus: runsSafetyStage1Triggered || 0,
+                runsStage2: runsSafetyStage2Triggered || 0
+            },
+            lossCarryTaxSavings: {
+                total: totalTaxSavedByLossCarry || 0,
+                perRunMean: totalRuns > 0 ? (totalTaxSavedByLossCarry / totalRuns) : 0
+            },
             pflege: pflegeResults
         },
         stressKPI: {

@@ -24,7 +24,6 @@ export function prepareHistoricalData() {
         const m1 = Number(cur.msci_eur);
         const m0 = Number(vj.msci_eur);
         if (!isFinite(m0) || !isFinite(m1)) {
-            console.warn(`Ungültige MSCI-Daten für Jahr ${y} oder ${prev} übersprungen.`);
             continue;
         }
 

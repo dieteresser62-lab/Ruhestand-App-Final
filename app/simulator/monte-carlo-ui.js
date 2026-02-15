@@ -162,7 +162,7 @@ function readOptionalIntegerInput(elementId, description, { min = -Infinity, max
  * Liest alle Monte-Carlo-Steuerparameter aus dem UI und validiert sie defensiv.
  * Design-Entscheidung: Frühes Validieren verhindert späte Ausfälle tief in der Simulation
  * und liefert dem Nutzer klare Fehlermeldungen.
- * @returns {{ anzahl: number, maxDauer: number, blockSize: number, seed: number, methode: string, rngMode: string, startYearMode: string, startYearFilter: number, startYearHalfLife: number }}
+ * @returns {{ anzahl: number, maxDauer: number, blockSize: number, seed: number, methode: string, rngMode: string, startYearMode: string, startYearFilter: number, startYearHalfLife: number, excludeEstimatedHistory: boolean }}
  */
 export function readMonteCarloParameters() {
     const methodeSelect = requireElement('mcMethode', 'Monte-Carlo Methode');
@@ -193,8 +193,10 @@ export function readMonteCarloParameters() {
         max: 50,
         defaultValue: 20
     });
+    const excludeEstimatedHistoryElement = document.getElementById('mcExcludeEstimatedHistory');
+    const excludeEstimatedHistory = excludeEstimatedHistoryElement?.checked === true;
 
-    return { anzahl, maxDauer, blockSize, seed, methode, rngMode, startYearMode, startYearFilter, startYearHalfLife };
+    return { anzahl, maxDauer, blockSize, seed, methode, rngMode, startYearMode, startYearFilter, startYearHalfLife, excludeEstimatedHistory };
 }
 
 export function initMonteCarloStartYearControls() {

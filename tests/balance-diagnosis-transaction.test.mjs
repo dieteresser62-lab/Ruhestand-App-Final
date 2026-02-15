@@ -74,6 +74,9 @@ try {
         const fragment = buildTransactionDiagnostics(diag);
         const card = fragment.children[0];
         assert(card.className.includes('status-warn'), 'Cap active should be warn status');
+        const text = collectText(card);
+        assert(text.includes('Keine geplante Aktion'), 'Empty trade should render "Keine geplante Aktion"');
+        assert(!text.includes('Unbekannte Aktion'), 'Empty trade should not render "Unbekannte Aktion"');
     }
 
     // --- TEST 4: Tranche selection rendering ---

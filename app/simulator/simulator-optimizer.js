@@ -331,7 +331,7 @@ export function findBestParametersWithConstraints(sweepResults, objectiveMetricK
                     if (Math.abs(value - target) > 0.001) return false;
                     break;
                 default:
-                    console.warn(`Unknown operator: ${constraint.operator}`);
+                    return false;
             }
         }
         return true;

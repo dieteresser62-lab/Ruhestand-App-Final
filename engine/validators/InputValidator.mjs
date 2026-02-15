@@ -192,6 +192,16 @@ const InputValidator = {
         'marketCapeRatio muss zwischen 0 und 100 liegen.'
     );
 
+    // Optional persisted tax state (loss carry) for annual settlement.
+    const lossCarry = input?.lastState?.taxState?.lossCarry;
+    if (lossCarry != null) {
+        check(
+            !Number.isFinite(lossCarry) || Number(lossCarry) < 0,
+            'lastState.taxState.lossCarry',
+            'lastState.taxState.lossCarry muss eine gültige nicht-negative Zahl sein.'
+        );
+    }
+
         return { valid: errors.length === 0, errors };
     }
 };

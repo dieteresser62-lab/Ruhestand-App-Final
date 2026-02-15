@@ -134,7 +134,7 @@ export function initMcRunState(inputs, startYearIndex) {
         baseFlex: inputs.startFlexBedarf,
         baseFlexBudgetAnnual: inputs.flexBudgetAnnual || 0,
         baseFlexBudgetRecharge: inputs.flexBudgetRecharge || 0,
-        lastState: null,
+        lastState: { taxState: { lossCarry: 0 } },
         // Initialisiere mit Eingabewert (Jahresbasis), damit Indexierung ab Jahr 0 starten kann
         currentAnnualPension: (inputs.renteMonatlich || 0) * 12,
         currentAnnualPension2: (inputs.partner?.brutto || 0),

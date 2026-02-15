@@ -54,6 +54,8 @@ Persistenzschicht für `localStorage` und File-System-Snapshots.
 
 **Dependencies:** `balance-config.js` (Konfiguration & Fehlerklassen)
 
+**Hinweis Steuerzustand:** `lastState.taxState.lossCarry` wird migriert/defaulted und bei Guardrail-Resets erhalten.
+
 ---
 
 ## 4. `balance-reader.js`
@@ -90,6 +92,8 @@ Renderlogik für KPIs, Guardrails, Diagnose, Toasts und Theme-Umschaltung.
 **Helper-Module (ausgelagert):**
 - `balance-renderer-summary.js` – KPIs, Marktstatus, Liquiditätsbalken
 - `balance-renderer-action.js` – Handlungsempfehlungen & Cash-Rebalancing
+  - zeigt finale Settlement-Steuer (`action.steuer`) inkl. optionaler Aufschlüsselung
+    (`taxBeforeLossCarry`, `taxAfterLossCarry`, `taxSavedByLossCarry`)
 - `balance-renderer-diagnosis.js` – Diagnose-Chips, Guardrails, Kennzahlen
 - `balance-diagnosis-format.js` – Diagnose-Payload normalisieren
 - `balance-diagnosis-chips.js` – Diagnose-Chips (Runway, Quote, Drawdown)
@@ -137,6 +141,7 @@ Einstiegspunkt und Orchestrator.
 - Prüft Engine-Kompatibilität (`initVersionHandshake`).
 - Definiert `update()` / `debouncedUpdate()` und reicht Eingaben an `EngineAPI.simulateSingleYear()` weiter.
 - Übergibt Engine-Ergebnisse an Renderer und Storage.
+- Erhält bei Guardrail-Resets den steuerlichen Zustand (`lastState.taxState`) explizit.
 
 **Dependencies:** alle oben genannten Module sowie die globale `EngineAPI`.
 

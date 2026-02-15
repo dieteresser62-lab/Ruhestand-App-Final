@@ -179,11 +179,15 @@ Ja. Die Suite benötigt Ihre Depot-Positionen mit Kaufdaten für korrekte Steuer
 **Wie funktioniert der Profilverbund für Paare?**
 Jeder Partner hat ein eigenes Profil mit separatem Depot und Renten. Der Verbund aggregiert die Vermögen und verteilt Entnahmen gemäß gewähltem Modus (steueroptimiert, proportional oder runway-first).
 
+**Was ist neu bei der Steuerlogik?**
+Verkäufe werden jahresweise per Settlement verrechnet. Verluste werden als Verlusttopf (`lossCarry`) ins nächste Jahr übernommen und reduzieren dort die Steuer.
+
 ---
 
 ## Nächste Schritte
 
 - **README.md** – Vollständige Dokumentation aller Features
+- **CHANGELOG.md** – Änderungen pro Release
 - **docs/guides/GUIDED_TOURS.md** – Geführte Schritt-für-Schritt-Touren
 - **docs/reference/TECHNICAL.md** – Technische Details zur Architektur
 - **docs/reference/PROFILVERBUND_FEATURES.md** – Multi-Profil für Paare

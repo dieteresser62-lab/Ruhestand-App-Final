@@ -17,6 +17,8 @@ export function calculateSaleAndTax(requestedRefill, input, context, market, isE
         let totalBrutto = 0;
         let totalSteuer = 0;
         let pauschbetragVerbraucht = 0;
+        let totalRealizedGainSigned = 0;
+        let totalTaxableAfterTqfSigned = 0;
         let nochZuDeckenderNettoBetrag = Math.max(0, Number(nettoBedarf) || 0);
         let pauschbetragRest = Math.max(0, Number(pauschbetrag) || 0);
 
@@ -65,6 +67,9 @@ export function calculateSaleAndTax(requestedRefill, input, context, market, isE
             // Gewinnquote berechnen
             const mv = Number(tranche.marketValue) || 0;
             const cb = Number(tranche.costBasis) || 0;
+            const gewinnQuoteSigned = mv > 0
+                ? ((mv - cb) / mv)
+                : 0;
             const gewinnQuote = mv > 0
                 ? Math.max(0, (mv - cb) / mv)
                 : 0;
@@ -83,6 +88,7 @@ export function calculateSaleAndTax(requestedRefill, input, context, market, isE
             // Normalfall: Wir verkaufen nur so viel wie nötig für Netto-Bedarf
             // Sonderfall (Gross Target): Wir verkaufen so viel wie nötig für Brutto-Ziel
             let nettoAusDieserTranche = 0;
+            let explicitBrutto;
 
             if (forceGrossSellAmount > 0) {
                 // Bei Gross Target Logik berechnen wir "zuVerkaufenBrutto" direkt vom Brutto-Rest
@@ -93,7 +99,7 @@ export function calculateSaleAndTax(requestedRefill, input, context, market, isE
                 const targetBruttoForTranche = Math.min(remainingGross, maxBruttoVerkaufbar);
 
                 // Helper variable to bypass standard calc
-                var explicitBrutto = targetBruttoForTranche;
+                explicitBrutto = targetBruttoForTranche;
             } else {
                 nettoAusDieserTranche = Math.min(nochZuDeckenderNettoBetrag, maxNettoAusTranche);
             }
@@ -120,7 +126,9 @@ export function calculateSaleAndTax(requestedRefill, input, context, market, isE
 
             // Tatsächliche Steuer berechnen
             const bruttogewinn = zuVerkaufenBrutto * gewinnQuote;
-            const gewinnNachTFS = bruttogewinn * (1 - (tranche.tqf || 0));
+            const bruttogewinnSigned = zuVerkaufenBrutto * gewinnQuoteSigned;
+            const gewinnNachTFSSigned = bruttogewinnSigned * (1 - tqf);
+            const gewinnNachTFS = bruttogewinn * (1 - tqf);
             const anrechenbarerPauschbetrag = Math.min(pauschbetragRest, gewinnNachTFS);
             const finaleSteuerbasis = gewinnNachTFS - anrechenbarerPauschbetrag;
             const steuer = Math.max(0, finaleSteuerbasis) * keSt;
@@ -130,6 +138,8 @@ export function calculateSaleAndTax(requestedRefill, input, context, market, isE
             totalSteuer += steuer;
             pauschbetragRest -= anrechenbarerPauschbetrag;
             pauschbetragVerbraucht += anrechenbarerPauschbetrag;
+            totalRealizedGainSigned += bruttogewinnSigned;
+            totalTaxableAfterTqfSigned += gewinnNachTFSSigned;
             nochZuDeckenderNettoBetrag -= nettoErlös;
 
             finalBreakdown.push({
@@ -142,7 +152,11 @@ export function calculateSaleAndTax(requestedRefill, input, context, market, isE
                 steuer,
                 tqf: tranche.tqf,
                 spbUsed: anrechenbarerPauschbetrag,
-                netto: nettoErlös
+                netto: nettoErlös,
+                gainQuotePlan: gewinnQuote,
+                gainQuoteSigned: gewinnQuoteSigned,
+                realizedGainSigned: bruttogewinnSigned,
+                taxableAfterTqfSigned: gewinnNachTFSSigned
             });
         }
 
@@ -152,6 +166,12 @@ export function calculateSaleAndTax(requestedRefill, input, context, market, isE
             achievedRefill: Math.max(0, nettoBedarf - nochZuDeckenderNettoBetrag),
             breakdown: finalBreakdown,
             pauschbetragVerbraucht: pauschbetragVerbraucht,
+            sumRealizedGainSigned: totalRealizedGainSigned,
+            sumTaxableAfterTqfSigned: totalTaxableAfterTqfSigned,
+            taxRawAggregate: {
+                sumRealizedGainSigned: totalRealizedGainSigned,
+                sumTaxableAfterTqfSigned: totalTaxableAfterTqfSigned
+            }
         };
     };
 
@@ -326,6 +346,12 @@ export function mergeSaleResults(res1, res2) {
         bruttoVerkaufGesamt: (res1.bruttoVerkaufGesamt || 0) + (res2.bruttoVerkaufGesamt || 0),
         achievedRefill: (res1.achievedRefill || 0) + (res2.achievedRefill || 0),
         pauschbetragVerbraucht: (res1.pauschbetragVerbraucht || 0) + (res2.pauschbetragVerbraucht || 0),
+        sumRealizedGainSigned: (res1.sumRealizedGainSigned || 0) + (res2.sumRealizedGainSigned || 0),
+        sumTaxableAfterTqfSigned: (res1.sumTaxableAfterTqfSigned || 0) + (res2.sumTaxableAfterTqfSigned || 0),
+        taxRawAggregate: {
+            sumRealizedGainSigned: (res1?.taxRawAggregate?.sumRealizedGainSigned || 0) + (res2?.taxRawAggregate?.sumRealizedGainSigned || 0),
+            sumTaxableAfterTqfSigned: (res1?.taxRawAggregate?.sumTaxableAfterTqfSigned || 0) + (res2?.taxRawAggregate?.sumTaxableAfterTqfSigned || 0)
+        },
         breakdown: [...(res1.breakdown || []), ...(res2.breakdown || [])]
     };
 

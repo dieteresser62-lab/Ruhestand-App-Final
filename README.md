@@ -9,6 +9,13 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 
 ---
 
+## Release-Stand
+
+**Aktueller Stand:** 2026-02-15  
+**Changelog:** siehe [CHANGELOG.md](CHANGELOG.md)
+
+---
+
 ## Dokumentation
 
 | Dokument | Zielgruppe | Inhalt |
@@ -16,6 +23,7 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 | **[QUICKSTART.md](QUICKSTART.md)** | Einsteiger | Start in 2 Minuten, erste Schritte |
 | **[docs/guides/GUIDED_TOURS.md](docs/guides/GUIDED_TOURS.md)** | Alle Nutzer | Schritt-für-Schritt-Anleitungen für typische Aufgaben |
 | **[Handbuch.html](Handbuch.html)** | Alle Nutzer | Interaktive Hilfe im Browser |
+| **[CHANGELOG.md](CHANGELOG.md)** | Alle Nutzer/Entwickler | Änderungen pro Release |
 | **[docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md](docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md)** | Fortgeschrittene | Algorithmen, Fachlogik, Designentscheidungen |
 | **[docs/reference/TECHNICAL.md](docs/reference/TECHNICAL.md)** | Entwickler | Architektur, Build, Debugging |
 | **[docs/README.md](docs/README.md)** | Autoren/Entwickler | Doku-Struktur und Aufräum-Status |
@@ -33,6 +41,7 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 * **Ausgaben-Check (monatlich):** CSV-Import pro Monat und Profil, Budgetkontrolle je Monat, Detailansicht mit Top-3-Kategorien, Jahreshochrechnung (ab 2 Datenmonaten mit Median), Soll/Ist auf Basis importierter Monate sowie Jahres-Historie per Jahr-Auswahl.
 * **Jahresabschluss + Ausgaben-Historie:** Beim Jahresabschluss wechselt der Ausgaben-Check automatisch auf das nächste Jahr; Vorjahre bleiben vollständig einsehbar.
 * Nutzt die Engine v31 zur Marktanalyse, Entnahmeplanung und Liquiditätssteuerung.
+* Jahresübergreifende Verlustverrechnung (Verlusttopf) ist integriert; die finale Steuer stammt aus dem Jahres-Settlement.
 * Diagnoseansicht mit Guardrails, Entscheidungsbaum und Key-Performance-Parametern.
 * **Depot-Tranchen-Manager:** Detaillierte Tranchen werden automatisch geladen und für steueroptimierte Verkäufe genutzt.
 * **Profil-Verwaltung:** Optionales Namensfeld zur Unterscheidung von Snapshots (z. B. "Max" vs. "Partnerin") für effektive Mehr-Personen-Planung.
@@ -49,6 +58,7 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 * Szenario-Log-Analyse mit 30 auswählbaren Szenarien: 15 charakteristische (Perzentile, Pflege-Extremfälle, Risiko-Szenarien) und 15 zufällige Samples für typisches Verhalten.
 * Checkboxen für Pflege-Details und detailliertes Log, JSON/CSV-Export für ausgewählte Szenarien.
 * **Tranchen-Integration:** Steueroptimierte Verkäufe mit detaillierten Depot-Positionen (Balance/Simulator teilen dieselben Tranchen).
+* Notfallverkäufe werden steuerlich per Gesamt-Settlement-Recompute mit den regulären Verkäufen des Jahres konsistent verrechnet.
 
 #### Schrittfolge für den Simulator (Simulator.html)
 1. **Profile wählen & Rahmendaten:** Im Tab „Rahmendaten“ die gewünschten Profile aktivieren. Die Vermögenswerte und Renten werden automatisch aggregiert und schreibgeschützt angezeigt.
@@ -209,6 +219,7 @@ Die Anwendung ist bewusst minimalistisch gehalten, hat aber für den vollen Funk
    * Getestet mit Chromium-basierten Browsern und Firefox.
    * Keine Build-Schritte nötig.
 4. Optional: `npm run build:engine` ausführen, wenn Änderungen in `engine/` vorgenommen wurden. Dadurch wird `engine.js` aktualisiert (esbuild-Bundle oder Modul-Fallback).
+5. Für CI/Release: `npm run build:engine:strict` nutzen. Der Build schlägt dann ohne `esbuild` bewusst fehl.
 
 **Weitere Skripte:**
 * `stop_suite.cmd` – Beendet eventuell noch laufende Server-Prozesse (Webserver und Proxy).

@@ -110,7 +110,8 @@ export function buildKeyParams(params = {}) {
         const statusLabelMap = {
             active: 'Aktiv',
             disabled: 'Inaktiv',
-            contract_ready: 'Bereit (noch nicht aktiv)'
+            contract_ready: 'Bereit (noch nicht aktiv)',
+            safety_static_flex: 'Statisch (Safety)'
         };
         const statusLabel = statusLabelMap[vpw.status] || (vpw.enabled ? 'Aktiv' : 'Inaktiv');
         pushMetric({
@@ -176,6 +177,18 @@ export function buildKeyParams(params = {}) {
             value: goGoValue,
             meta: 'Multiplikator auf VPW-Gesamtentnahme'
         });
+        if (Number.isFinite(vpw.safetyStage)) {
+            const stage = Math.max(0, Math.round(vpw.safetyStage));
+            const stageLabel = stage === 0
+                ? 'Normal'
+                : (stage === 1 ? 'Stufe 1: Go-Go aus' : 'Stufe 2: Statischer Flex');
+            pushMetric({
+                label: 'VPW-Sicherheitsmodus',
+                value: stageLabel,
+                meta: stage === 0 ? 'Keine Eskalation aktiv' : 'Automatische Stabilisierung aktiv',
+                trend: stage >= 2 ? 'down' : (stage === 1 ? 'neutral' : 'up')
+            });
+        }
         if (typeof vpw.gesamtwert === 'number' && isFinite(vpw.gesamtwert)) {
             pushMetric({
                 label: 'VPW-Basisvermögen',

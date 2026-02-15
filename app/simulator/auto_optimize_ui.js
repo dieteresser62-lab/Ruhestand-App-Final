@@ -123,7 +123,6 @@ export function initAutoOptimizeUI() {
     const applyBtn = document.getElementById('ao_apply_btn');
 
     if (!runBtn) {
-        console.warn('Auto-Optimize UI elements not found');
         return;
     }
 
@@ -179,7 +178,6 @@ export function initAutoOptimizeUI() {
 function initPresetButtons() {
     const container = document.getElementById('ao_presets_container');
     if (!container) {
-        console.warn('Presets container not found');
         return;
     }
 
@@ -399,7 +397,6 @@ function validateInputs() {
 
         return true;
     } catch (e) {
-        console.warn('Validation error:', e);
         return false;
     }
 }

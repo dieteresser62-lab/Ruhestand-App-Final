@@ -59,9 +59,6 @@ class FeatureFlags {
         this.saveToStorage();
         this.notifyListeners('engineMode', mode);
 
-        if (this.flags.debugLogging) {
-            console.log(`[FeatureFlags] Engine mode changed to: ${mode}`);
-        }
     }
 
     /**
@@ -83,9 +80,6 @@ class FeatureFlags {
         this.saveToStorage();
         this.notifyListeners('useWorkers', this.flags.useWorkers);
 
-        if (this.flags.debugLogging) {
-            console.log(`[FeatureFlags] useWorkers changed to: ${this.flags.useWorkers}`);
-        }
     }
 
     /**
@@ -298,9 +292,7 @@ class FeatureFlags {
         if (typeof localStorage !== 'undefined') {
             try {
                 localStorage.setItem('featureFlags', JSON.stringify(this.flags));
-            } catch (e) {
-                console.warn('[FeatureFlags] Could not save to localStorage:', e);
-            }
+            } catch (e) { }
         }
     }
 
@@ -315,9 +307,7 @@ class FeatureFlags {
                 if (stored) {
                     this.flags = { ...DEFAULT_FLAGS, ...JSON.parse(stored) };
                 }
-            } catch (e) {
-                console.warn('[FeatureFlags] Could not load from localStorage:', e);
-            }
+            } catch (e) { }
         }
     }
 

@@ -177,4 +177,90 @@ global.document = {
     assert(!renderedText.includes(': Geldmarkt-ETF0,00'), 'Should not show Profilverbund Geldmarkt-ETF rows with 0,00 €');
 }
 
+// Settlement breakdown should be rendered when taxSettlement data exists.
+{
+    global.window = {
+        __profilverbundActionResults: null,
+        __profilverbundProfileSummaries: null
+    };
+
+    const container = new FakeElement('div');
+    const copyBtn = new FakeElement('button');
+    copyBtn.id = 'copyAction';
+    container.appendChild(copyBtn);
+
+    const renderer = new ActionRenderer({
+        outputs: { handlungsanweisung: container }
+    });
+
+    renderer.renderAction(
+        {
+            type: 'TRANSACTION',
+            title: 'Verkauf',
+            anweisungKlasse: 'anweisung-gelb',
+            nettoErlös: 10000,
+            steuer: 500,
+            quellen: [{ kind: 'aktien_alt', brutto: 10500, netto: 10000, steuer: 500 }],
+            verwendungen: {},
+            taxSettlement: {
+                taxBeforeLossCarry: 800,
+                taxAfterLossCarry: 500,
+                taxSavedByLossCarry: 300
+            }
+        },
+        null,
+        {},
+        0
+    );
+
+    const renderedText = collectText(container);
+    assert(renderedText.includes('Steuern vor Verlusttopf:'), 'Should render tax-before-loss-carry row');
+    assert(renderedText.includes('Steuern nach Verlusttopf:'), 'Should render tax-after-loss-carry row');
+    assert(renderedText.includes('Steuerersparnis Verlusttopf:'), 'Should render tax-saved row');
+    assert(renderedText.includes('Steuern (final, Settlement)'), 'Should render final settlement tax row label');
+}
+
+// Zero settlement values should be hidden to stay consistent with other 0-row filters.
+{
+    global.window = {
+        __profilverbundActionResults: null,
+        __profilverbundProfileSummaries: null
+    };
+
+    const container = new FakeElement('div');
+    const copyBtn = new FakeElement('button');
+    copyBtn.id = 'copyAction';
+    container.appendChild(copyBtn);
+
+    const renderer = new ActionRenderer({
+        outputs: { handlungsanweisung: container }
+    });
+
+    renderer.renderAction(
+        {
+            type: 'TRANSACTION',
+            title: 'Verkauf',
+            anweisungKlasse: 'anweisung-gelb',
+            nettoErlös: 0,
+            steuer: 0,
+            quellen: [{ kind: 'aktien_alt', brutto: 0, netto: 0, steuer: 0 }],
+            verwendungen: {},
+            taxSettlement: {
+                taxBeforeLossCarry: 0,
+                taxAfterLossCarry: 0,
+                taxSavedByLossCarry: 0
+            }
+        },
+        null,
+        {},
+        0
+    );
+
+    const renderedText = collectText(container);
+    assert(!renderedText.includes('Steuern vor Verlusttopf:'), 'Should hide tax-before row when value is 0');
+    assert(!renderedText.includes('Steuern nach Verlusttopf:'), 'Should hide tax-after row when value is 0');
+    assert(!renderedText.includes('Steuerersparnis Verlusttopf:'), 'Should hide tax-saved row when value is 0');
+    assert(!renderedText.includes('Steuern (final, Settlement)'), 'Should hide final settlement tax row when value is 0');
+}
+
 console.log('✅ Balance renderer action tests passed');

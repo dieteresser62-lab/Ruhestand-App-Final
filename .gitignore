@@ -37,7 +37,9 @@ Screenshots/
 .~lock.*
 
 # Local debug/output artifacts
+diskussion*.md
 audit/logs/
+.coverage/
 log.txt
 out*.txt
 parity_failure.log

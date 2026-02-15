@@ -31,7 +31,6 @@ export function updateStartPortfolioDisplay() {
     );
 
     if (useAggregates && !hasLoggedTranchenDisplay) {
-        console.log('Tranchen-Aggregate werden fuer die Start-Portfolio-Anzeige verwendet.');
         hasLoggedTranchenDisplay = true;
     }
 

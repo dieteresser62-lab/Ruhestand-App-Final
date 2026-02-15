@@ -12,6 +12,7 @@ engine/
 ├── core.mjs                      # Orchestrierung & EngineAPI
 ├── errors.mjs                    # Fehlerklassen (AppError, ValidationError, FinancialCalculationError)
 ├── index.mjs                     # Bündel-Entry, re-exportiert API
+├── tax-settlement.mjs            # Jahres-Settlement (Verlusttopf, SPB, finale Steuer)
 ├── analyzers/
 │   └── MarketAnalyzer.mjs        # Marktanalyse & Regime-Klassifikation
 ├── planners/
@@ -51,7 +52,7 @@ engine/
 Bei aktivem Dynamic-Flex (`dynamicFlex=true`) werden folgende Eingaben genutzt:
 
 * `horizonYears` (1..60), `horizonMethod` (`mean` | `survival_quantile`), `survivalQuantile` (0.5..0.99)
-* `goGoActive` (Boolean), `goGoMultiplier` (1.0..10.0)
+* `goGoActive` (Boolean), `goGoMultiplier` (1.0..1.5)
 * `capeRatio` (kanonisch; `marketCapeRatio` wird als Alias-Fallback akzeptiert)
 
 Ausgabe für UI/Diagnostik erfolgt in `result.ui.vpw` (u. a. `enabled`, `horizonYears`, `vpwRate`, `expectedRealReturn`, `status`).
@@ -66,6 +67,14 @@ npm run build:engine
 ```
 
 Das Skript versucht zuerst einen esbuild-Bundle-Lauf (IIFE, globale Exporte). Wenn `esbuild` nicht verfügbar ist (z. B. Offline-Umgebung), wird automatisch ein Modul-Fallback geschrieben, der die Globals per `engine.js` bereitstellt.
+
+Für CI/Release sollte Strict-Mode genutzt werden:
+
+```bash
+npm run build:engine:strict
+```
+
+Strict-Mode (`ENGINE_BUILD_STRICT=1` oder `CI=true`) bricht ohne `esbuild` ab und verhindert versehentliche Fallback-Releases.
 
 ---
 

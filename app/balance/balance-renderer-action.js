@@ -163,7 +163,6 @@ export class ActionRenderer {
      */
     determineInternalCashRebalance(input, action, spending, targetLiquidity) {
         if (!input || typeof input.tagesgeld !== 'number' || typeof input.geldmarktEtf !== 'number') {
-            console.warn('ActionRenderer.determineInternalCashRebalance: Input-Daten fehlen oder sind unvollständig.');
             return null;
         }
 
@@ -497,9 +496,13 @@ export class ActionRenderer {
                 }
                 quellenItems.push(createRow(buildQuelleLabel(q), UIUtils.formatCurrency(q.brutto || 0)));
             });
-            const steuerRow = createRow('- Steuern (geschätzt)', UIUtils.formatCurrency(action.steuer || 0));
-            steuerRow.style.cssText += 'border-top: 1px solid var(--border-color); margin-top: 5px; padding-top: 5px;';
-            quellenItems.push(steuerRow);
+            const actionTax = Number(action?.steuer || 0);
+            if (actionTax > 0) {
+                const taxRowLabel = action?.taxSettlement ? '- Steuern (final, Settlement)' : '- Steuern (geschätzt)';
+                const steuerRow = createRow(taxRowLabel, UIUtils.formatCurrency(actionTax));
+                steuerRow.style.cssText += 'border-top: 1px solid var(--border-color); margin-top: 5px; padding-top: 5px;';
+                quellenItems.push(steuerRow);
+            }
         }
 
         const wrapper = document.createElement('div');
@@ -510,6 +513,21 @@ export class ActionRenderer {
         ];
         if (displaySteuer > 0) {
             quellenSummaryRows.push(createRow('Steuern (gesamt):', UIUtils.formatCurrency(displaySteuer)));
+        }
+        const taxSettlement = (action?.taxSettlement && typeof action.taxSettlement === 'object')
+            ? action.taxSettlement
+            : null;
+        const taxBeforeLossCarry = Number(taxSettlement?.taxBeforeLossCarry);
+        const taxAfterLossCarry = Number(taxSettlement?.taxAfterLossCarry);
+        const taxSavedByLossCarry = Number(taxSettlement?.taxSavedByLossCarry);
+        if (Number.isFinite(taxBeforeLossCarry) && taxBeforeLossCarry > 0) {
+            quellenSummaryRows.push(createRow('Steuern vor Verlusttopf:', UIUtils.formatCurrency(taxBeforeLossCarry)));
+        }
+        if (Number.isFinite(taxAfterLossCarry) && taxAfterLossCarry > 0) {
+            quellenSummaryRows.push(createRow('Steuern nach Verlusttopf:', UIUtils.formatCurrency(taxAfterLossCarry)));
+        }
+        if (Number.isFinite(taxSavedByLossCarry) && taxSavedByLossCarry > 0) {
+            quellenSummaryRows.push(createRow('Steuerersparnis Verlusttopf:', UIUtils.formatCurrency(taxSavedByLossCarry)));
         }
 
         wrapper.append(

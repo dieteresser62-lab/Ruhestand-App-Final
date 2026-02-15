@@ -24,7 +24,9 @@
       "WebFetch(domain:mobile.next-finance.net)",
       "Bash(npm run build:engine:*)",
       "Bash(QUICK_TESTS=1 npm test:*)",
-      "Bash(comm:*)"
+      "Bash(comm:*)",
+      "Bash(xxd:*)",
+      "Bash(python3:*)"
     ]
   }
 }
