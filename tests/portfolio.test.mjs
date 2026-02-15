@@ -175,7 +175,7 @@ function teardownMockDOM() {
         assertEqual(parsedInputs.horizonYears, 60, 'horizonYears should clamp to max');
         assertEqual(parsedInputs.survivalQuantile, 0.5, 'survivalQuantile should clamp to min');
         assertEqual(parsedInputs.goGoActive, true, 'Should enable goGoActive');
-        assertEqual(parsedInputs.goGoMultiplier, 10, 'goGoMultiplier should clamp to max');
+        assertEqual(parsedInputs.goGoMultiplier, 1.5, 'goGoMultiplier should clamp to max');
         assertEqual(parsedInputs.marketCapeRatio, 31.4, 'Should parse marketCapeRatio');
         assertEqual(parsedInputs.capeRatio, 31.4, 'Should keep cape alias in sync');
         console.log('✅ Dynamic Flex parsing bounds work');

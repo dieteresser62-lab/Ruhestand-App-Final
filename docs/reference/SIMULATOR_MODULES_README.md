@@ -50,6 +50,7 @@ DOM-freie Simulation, die alle Runs, KPI-Arrays und Pflegemetriken berechnet.
 **Hauptfunktionen / Exporte:**
 - `runMonteCarloSimulation()` – Führt die komplette Simulation aus, sammelt Worst-Run-Logs, Pflege-KPIs und aggregierte Kennzahlen.
 - Implementiert Ruin-Logik (Depot < 100€) und Ansparphase-Übergang.
+- Aggregiert zusätzlich `taxSavedByLossCarry` (gesamt und pro Run), damit Steuerersparnis aus Verlustvorträgen auswertbar bleibt.
 
 **Einbindung:** Wird ausschließlich aus `simulator-monte-carlo.js` aufgerufen. Erwartet fertige Eingaben und Callbacks (Progress, Szenario-Analyzer) und nutzt `simulator-engine-wrapper.js` (delegiert an Direct Engine) für die Jahr-für-Jahr-Logik.
 
@@ -104,6 +105,7 @@ DOM-freier Sweep-Runner für Worker-Jobs (Combos + RunRanges) mit deterministisc
 - `normalizeWidowOptions()` / `computeMarriageYearsCompleted()` – Abgleich von Hinterbliebenen-Optionen.
 - `deepClone()` / `cloneStressContext()` – Side-Effect-freie Kopien für Sweep-Zellen.
 - `setNested()` / `withNoLSWrites()` – Hilfsfunktionen für sichere Mutationen.
+- Führt pro Run `taxSavedByLossCarry` mit, damit Sweep-Metriken auch den Verlusttopf-Effekt abbilden.
 
 **Einbindung:** Genutzt von `simulator-sweep.js`, `simulator-main.js` (Renten-Invarianz-Checks) und `simulator-monte-carlo.js`.
 
@@ -169,6 +171,7 @@ Kernlogik für Jahr-für-Jahr-Simulation (Direct Engine).
 
 **Hauptfunktionen:**
 - `simulateSingleYear()` (Direct) – simuliert ein Jahr via EngineAPI
+- Recompute-Pfad für Notfallverkäufe: kombiniert reguläre + Notfall-Rohaggregate und rechnet Settlement mit `taxStatePrev` neu.
 - `sampleNextYearData()` (Helpers) – sampelt nächstes Jahr (historisch/Regime/Block)
 - `makeDefaultCareMeta()` / `updateCareMeta()` (Helpers) – Pflegefall-Zustandsmaschine
 - `calcCareCost()` (Helpers) – berechnet Pflege-Kosten nach Grad
@@ -195,6 +198,7 @@ Aggregation der Monte-Carlo-Ausgabe, Orchestrierung von KPI-Berechnung und Rende
 - Checkboxen für Pflege-Details und detailliertes Log
 - JSON/CSV-Export für ausgewählte Szenarien
 - Pflege-KPI-Dashboard mit Dual-Care-Metriken
+- enthält zusätzlich Metriken für `taxSavedByLossCarry` aus Sweep/MC-Ergebnissen
 
 **Dependencies:** `simulator-utils.js`, `simulator-heatmap.js`, `simulator-data.js`, `results-metrics.js`, `results-renderers.js`, `results-formatting.js`.
 
@@ -205,6 +209,7 @@ Berechnet alle KPIs (Perzentile, Quoten, Pflege-Kosten/Overlap, Shortfall-Deltas
 
 **Hauptfunktionen:**
 - `computeKpiCards()` / `computeScenarioSummary()` – strukturierte KPI-Objekte für Renderer.
+- Rendert u. a. die KPI `Ø Steuerersparnis Verlusttopf` auf Basis von `extraKPI.lossCarryTaxSavings.perRunMean`.
 
 **Dependencies:** `results-formatting.js`, `simulator-utils.js`.
 
@@ -467,6 +472,7 @@ Aggregation aller Monte-Carlo-Ergebnisse nach Abschluss der Simulation.
 - `depotErschoepfungsQuote`, `alterBeiErschoepfung`: P50
 - `volatilities`, `maxDrawdowns`: P50, P90
 - `extraKPI`: timeShareQuoteAbove45, consumptionAtRiskP10Real, Pflege-KPIs
+- `extraKPI.lossCarryTaxSavings`: `total`, `perRunMean`
 - `stressKPI`: maxDD, timeShareAbove45, cutYears, CaR, recoveryYears
 - `pflegeResults`: entryRate, entryAge, shortfallRate, endWealth, depotCosts, Dual-Care-KPIs
 

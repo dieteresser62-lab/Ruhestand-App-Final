@@ -128,6 +128,7 @@ function buildVpwFallbackHint(vpwPayload) {
     const status = String(vpwPayload.status || '');
     if (status === 'disabled') return 'dynamic_flex_off';
     if (status === 'contract_ready') return 'contract_not_active';
+    if (status === 'safety_static_flex') return 'safety_static_flex';
     if (status !== 'active') return 'unknown_status';
     if (!Number.isFinite(vpwPayload.capeRatioUsed) || vpwPayload.capeRatioUsed <= 0) return 'fallback_no_cape';
     if (!Number.isFinite(vpwPayload.expectedReturnCape)) return 'fallback_no_cape_return';
@@ -230,6 +231,7 @@ export function runBacktest() {
                 "VPW%".padStart(5),
                 "Hor".padStart(4),
                 "VPWSt".padEnd(7),
+                "Safe".padStart(4),
                 "VPWHint".padEnd(18),
                 "Entn_real".padStart(9),
                 "Adj%".padStart(5)
@@ -368,11 +370,12 @@ export function runBacktest() {
                 const vpw = result.ui?.vpw || null;
                 const vpwStatus = vpw?.status === 'active'
                     ? 'aktiv'
-                    : (vpw?.status === 'disabled' ? 'aus' : (vpw?.status === 'contract_ready' ? 'bereit' : ''));
+                    : (vpw?.status === 'disabled' ? 'aus' : (vpw?.status === 'contract_ready' ? 'bereit' : (vpw?.status === 'safety_static_flex' ? 's2-stat' : '')));
                 logCols.push(
                     formatPercentOneDecimal((vpw?.vpwRate || 0) * 100, 5),
                     padLeft((Number.isFinite(vpw?.horizonYears) ? Math.round(vpw.horizonYears) : ''), 4),
                     String(vpwStatus || '').substring(0, 7).padEnd(7),
+                    padLeft((Number.isFinite(vpw?.safetyStage) ? Math.round(vpw.safetyStage) : ''), 4),
                     String(buildVpwFallbackHint(vpw)).substring(0, 18).padEnd(18),
                     formatCurrencyShortLog(row.jahresentnahme_real).padStart(9),
                     formatPercentOneDecimal(adjPct, 5)
@@ -505,8 +508,6 @@ export function exportBacktestLogData(format = 'json') {
     } else if (format === 'csv') {
         const csvContent = convertRowsToCsv(backtestData.rows, columns);
         triggerDownload(`${filenameBase}.csv`, csvContent, 'text/csv;charset=utf-8');
-    } else {
-        console.warn('Unbekanntes Exportformat:', format);
     }
 }
 

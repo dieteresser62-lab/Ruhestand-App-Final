@@ -163,15 +163,6 @@ export function buildOpportunisticRefill({
         }
     }
 
-    // DEBUG PROBE
-    if (effectiveLiquiditätsBedarf > 50000 && effectiveTotalerBedarf < appliedMinTradeGate) {
-        console.warn('DEBUG: Trade Gated!');
-        console.warn('Total Bedarf:', effectiveTotalerBedarf);
-        console.warn('Applied Gate:', appliedMinTradeGate);
-        console.warn('Is Critical:', isCriticalLiquidity);
-        console.warn('Min Trade Override:', minTradeResultOverride);
-    }
-
     if (effectiveTotalerBedarf >= appliedMinTradeGate) {
         // Gold-Verkaufsbudget berechnen
         let maxSellableFromGold = 0;
@@ -196,11 +187,18 @@ export function buildOpportunisticRefill({
             rebalancingBandPct: (goldBandPct * 100)
         };
 
-        if (isNaN(maxSellableFromGold)) {
-            console.error('DEBUG: maxSellableFromGold is NaN!');
-            console.error('goldWert:', input.goldWert);
-            console.error('investiertesKapital:', investiertesKapital);
-            console.error('goldZielProzent:', input.goldZielProzent);
+        if (!Number.isFinite(maxSellableFromGold)) {
+            maxSellableFromGold = 0;
+            saleContext.saleBudgets.gold = 0;
+            transactionDiagnostics.goldThresholds = {
+                ...transactionDiagnostics.goldThresholds,
+                saleBudgetGold: 0
+            };
+            actionDetails.diagnosisEntries.push({
+                key: 'gold_budget_invalid',
+                severity: 'warn',
+                message: 'Gold-Verkaufsbudget ungueltig, auf 0 gesetzt.'
+            });
         }
 
         // Aktien-Verkaufsbudget berechnen

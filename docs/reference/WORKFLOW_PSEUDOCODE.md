@@ -34,6 +34,11 @@ Funktion update():
 
   7. ENGINE-Aufruf (Window.EngineAPI)
      - result = EngineAPI.simulateSingleYear(inputs, lastState)
+       - Engine führt intern Steuer-Settlement durch:
+         - Roh-Aggregate aus Verkäufen summieren
+         - Verlustvortrag (lastState.taxState.lossCarry) verrechnen
+         - SPB anwenden, finale Steuer berechnen
+         - Neuen lossCarry in newState.taxState fortschreiben
      - CATCH Fehler -> Fehler-Display rendern
 
   8. UI-Rendering (UIRenderer)
@@ -87,6 +92,7 @@ Funktion runMonteCarlo():
 
   5. Finales Rendering
      - Berechne Gesamt-Statistiken (Erfolgsquote, Mediane)
+     - Aggregiere taxSavedByLossCarry pro Run → KPI "Ø Steuerersparnis Verlusttopf"
      - Zeige Ergebnisse, Charts und Szenario-Logs an
 ```
 
@@ -107,22 +113,32 @@ Funktion runHistoricalBacktest():
 
   3. Simulations-Schleife (Jahr = Start BIS Ende)
      - Lade Marktdaten für 'Jahr' (Rendite, Zinssatz, Inflation)
-     
+
      - Berechne Rentenanpassung (dynamisch oder fix)
-     
+
+     - taxStatePrev merken (für möglichen Recompute)
+
      - ENGINE-Aufruf (simulateOneYear)
          - Berechne Entnahme, Steuern, Transaktionen
+         - Engine liefert Settlement inkl. taxRawAggregate
          - Wende Markt-Rendite an
-         - Aktualisiere `simState` (neues Vermögen)
+         - Aktualisiere `simState` (neues Vermögen, taxState)
      
+     - Notfallverkauf-Prüfung
+         - WENN (Liquiditätslücke nach Rendite):
+             - Forced Sale durchführen (calculateSaleAndTax)
+             - Roh-Aggregate von regulär + Notfallverkauf kombinieren
+             - Gesamt-Settlement-Recompute mit taxStatePrev
+             - action.steuer und taxState überschreiben
+
      - Ruin-Check
          - WENN (Vermögen <= 0):
              - Logge "RUIN"
              - Falls `BREAK_ON_RUIN` -> Abbruch
-     
+
      - Logging
          - Füge Jahresergebnis zur Log-Tabelle hinzu (HTML)
-         - Sammle Statistiken (Steuern, Kürzungsjahre)
+         - Sammle Statistiken (Steuern, Kürzungsjahre, taxSavedByLossCarry)
 
   4. Abschluss
      - Zeige Zusammenfassung (Endvermögen, Max Drawdown)

@@ -200,10 +200,6 @@ async function runSweepWithWorkers({
         pool.dispose();
     }
 
-    if (p2VarianceCount > 0) {
-        console.warn(`[SWEEP][ASSERT] P2-Basis-Parameter variieren in ${p2VarianceCount} Kombos.`);
-    }
-
     return sweepResults;
 }
 
@@ -239,10 +235,6 @@ async function runSweepSerial({
             onProgress((completedCombos / totalCombos) * 100);
         }
         await new Promise(resolve => setTimeout(resolve, 0));
-    }
-
-    if (p2VarianceCount > 0) {
-        console.warn(`[SWEEP][ASSERT] P2-Basis-Parameter variieren in ${p2VarianceCount} Kombos.`);
     }
 
     return sweepResults;

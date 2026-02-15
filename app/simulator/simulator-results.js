@@ -419,11 +419,14 @@ export function getWorstRunColumnDefinitions(opts = {}) {
                 return v || '';
             }
         },
+        { key: 'vpw.safetyStage', header: 'Safe', width: 4, fmt: v => (Number.isFinite(v) ? Math.round(v) : '') },
         { key: 'vpw.capeRatioUsed', header: 'CAPE', width: 6, fmt: v => (Number.isFinite(v) ? Number(v).toFixed(1) : '') },
         { key: 'vpw.expectedReturnCape', header: 'ER(CAPE)', width: 8, fmt: v => (Number.isFinite(v) ? formatPercentRatio(v, { fractionDigits: 1, invalid: '' }) : '') },
         { key: 'vpw.expectedRealReturn', header: 'ER(real)', width: 8, fmt: v => (Number.isFinite(v) ? formatPercentRatio(v, { fractionDigits: 1, invalid: '' }) : '') },
         { key: 'jahresentnahme_real', header: 'Entn_real', width: 9, fmt: formatCurrencyShortLog },
         { key: 'floor_aus_depot', header: 'FloorDep', width: 8, fmt: formatCurrencyShortLog },
+        { key: 'lossCarryEnd', header: 'VTopf', width: 8, fmt: formatCurrencyShortLog },
+        { key: 'taxSavedByLossCarry', header: 'StSave', width: 8, fmt: formatCurrencyShortLog },
         { key: 'liqStart', header: 'Liq@rC-', width: 9, fmt: formatCurrencyShortLog },
         { key: 'cashInterestEarned', header: 'Zins€', width: 7, fmt: formatCurrencyShortLog },
         { key: 'liqEnd', header: 'Liq@rC+', width: 9, fmt: formatCurrencyShortLog },

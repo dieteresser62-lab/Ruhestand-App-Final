@@ -327,7 +327,11 @@ export function determineAction(p, helpers) {
             title: `${market.szenarioText} (${actionDetails.title || 'Kein Handlungsbedarf'})`,
             zielLiquiditaet, // FIX: Expose target liquidity
             diagnosisEntries: actionDetails.diagnosisEntries,
-            transactionDiagnostics
+            transactionDiagnostics,
+            taxRawAggregate: {
+                sumRealizedGainSigned: 0,
+                sumTaxableAfterTqfSigned: 0
+            }
         };
     }
 
@@ -366,7 +370,11 @@ export function determineAction(p, helpers) {
             title: `${market.szenarioText} (Kein Handlungsbedarf)`,
             zielLiquiditaet, // FIX: Expose target liquidity
             diagnosisEntries: actionDetails.diagnosisEntries,
-            transactionDiagnostics
+            transactionDiagnostics,
+            taxRawAggregate: {
+                sumRealizedGainSigned: 0,
+                sumTaxableAfterTqfSigned: 0
+            }
         };
     }
 
@@ -448,6 +456,10 @@ export function determineAction(p, helpers) {
         nettoErlös: effektiverNettoerloes,
         quellen: saleResult.breakdown,
         steuer: saleResult.steuerGesamt,
+        taxRawAggregate: saleResult.taxRawAggregate || {
+            sumRealizedGainSigned: saleResult.sumRealizedGainSigned || 0,
+            sumTaxableAfterTqfSigned: saleResult.sumTaxableAfterTqfSigned || 0
+        },
         verwendungen: { liquiditaet: finalLiq, gold: finalGold, aktien: finalAktien },
         zielLiquiditaet, // FIX: Expose target liquidity
         diagnosisEntries: actionDetails.diagnosisEntries,

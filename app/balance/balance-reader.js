@@ -126,11 +126,8 @@ export const UIReader = {
             const saved = localStorage.getItem('depot_tranchen');
             if (saved) {
                 detailledTranches = JSON.parse(saved);
-                console.log('✅ Detaillierte Depot-Tranchen geladen:', detailledTranches.length, 'Positionen');
             }
-        } catch (err) {
-            console.warn('Fehler beim Laden der Depot-Tranchen:', err);
-        }
+        } catch (err) { }
 
         // Falls Tranchen vorhanden sind, nutzen wir die aggregierten Werte als Wahrheit.
         const aggregated = (detailledTranches && Array.isArray(detailledTranches) && detailledTranches.length)
@@ -145,7 +142,6 @@ export const UIReader = {
         );
 
         if (useAggregates && !hasLoggedTranchenAggregation) {
-            console.log('Tranchen-Aggregate werden fuer Balance-Eingaben verwendet.');
             hasLoggedTranchenAggregation = true;
         }
 
@@ -190,7 +186,7 @@ export const UIReader = {
         const horizonYears = Math.max(1, Math.min(60, parseFloat(val('horizonYears')) || 30));
         const survivalQuantile = Math.max(0.5, Math.min(0.99, parseFloat(val('survivalQuantile')) || 0.85));
         const goGoActive = checked('goGoActive');
-        const goGoMultiplier = Math.max(1.0, Math.min(10.0, parseFloat(val('goGoMultiplier')) || 1.0));
+        const goGoMultiplier = Math.max(1.0, Math.min(1.5, parseFloat(val('goGoMultiplier')) || 1.0));
         // Feature gate for Balance rollout: Dynamic Flex requires a valid CAPE anchor.
         const dynamicFlex = rawDynamicFlex && capeRatio > 0;
 

@@ -170,7 +170,6 @@ export function renderTranchenStatusBadge(containerId) {
     }
     const container = document.getElementById(containerId);
     if (!container) {
-        console.warn(`Container mit ID "${containerId}" nicht gefunden`);
         return;
     }
 
@@ -384,8 +383,6 @@ export function syncTranchenToInputs(options = {}) {
         }
     });
 
-    console.log(`✅ ${updated} Felder aus Tranchen synchronisiert`);
-
     // Trigger Change-Event, damit Balance neu berechnet
     const event = new Event('input', { bubbles: true });
     document.getElementById('depotwertAlt')?.dispatchEvent(event);
@@ -405,7 +402,6 @@ export function initTranchenStatus(containerId) {
     // Auf localStorage-Änderungen reagieren (z.B. wenn Tranchen-Manager in neuem Tab geöffnet ist)
     window.addEventListener('storage', (e) => {
         if (e.key === 'depot_tranchen') {
-            console.log('📊 Depot-Tranchen wurden aktualisiert');
             renderTranchenStatusBadge(containerId);
             syncTranchenToInputs({ silent: true });
         }

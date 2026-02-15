@@ -146,12 +146,4 @@ if (typeof window !== 'undefined') {
     window.calculateTotalPortfolioValue = calculateTotalPortfolioValue;
     window.calculateAverageGainPct = calculateAverageGainPct;
     window.groupTranchesByCategory = groupTranchesByCategory;
-
-    console.log('='.repeat(80));
-    console.log('DEPOT-TRANCHEN BEISPIEL GELADEN');
-    console.log('='.repeat(80));
-    console.log('Gesamtwert Portfolio:', calculateTotalPortfolioValue(BEISPIEL_DEPOT_TRANCHEN).toFixed(2), '€');
-    console.log('Durchschnittlicher Gewinn:', calculateAverageGainPct(BEISPIEL_DEPOT_TRANCHEN).toFixed(2), '%');
-    console.log('Anzahl Tranchen:', BEISPIEL_DEPOT_TRANCHEN.length);
-    console.log('='.repeat(80));
 }

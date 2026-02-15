@@ -3,6 +3,9 @@ import { TransactionEngine } from '../engine/transactions/TransactionEngine.mjs'
 
 console.log('--- Transaction Tax Tests ---');
 
+// NOTE: steuerGesamt in this suite is "plan tax" from sale-engine.
+// Final annual tax is set by core settlement (ui.action.steuer).
+
 // --- Helper: Base Inputs ---
 function getBaseInputs() {
     return {
@@ -280,5 +283,55 @@ const baseContext = { saleBudgets: {} }; // No budget limits
     assert(result.bruttoVerkaufGesamt <= 1200.01, 'Sale budget should cap total gross across lots');
 
     console.log('✅ Sale budget caps total across lots');
+}
+
+// --- TEST 8: Signed gain is preserved for loss positions ---
+{
+    const input = getBaseInputs();
+    input.depotwertAlt = 8000;
+    input.costBasisAlt = 12000; // Unrealized loss
+    input.tqfAlt = 0.0;
+    input.depotwertNeu = 0;
+    input.costBasisNeu = 0;
+    input.sparerPauschbetrag = 0;
+
+    const result = TransactionEngine.calculateSaleAndTax(
+        1000,
+        input,
+        baseContext,
+        baseMarket,
+        false
+    );
+    const row = result.breakdown[0];
+    assert(row.gainQuotePlan >= 0, 'Plan gain quote should never be negative');
+    assert(row.gainQuoteSigned < 0, 'Signed gain quote should keep loss sign');
+    assert(row.realizedGainSigned < 0, 'Realized gain should be negative in a loss position');
+
+    console.log('✅ Signed loss gain data is preserved');
+}
+
+// --- TEST 9: TQF is applied symmetrically to losses in raw aggregate ---
+{
+    const input = getBaseInputs();
+    input.depotwertAlt = 7000;
+    input.costBasisAlt = 10000; // -3000 total unrealized
+    input.tqfAlt = 0.30;
+    input.depotwertNeu = 0;
+    input.costBasisNeu = 0;
+
+    const result = TransactionEngine.calculateSaleAndTax(
+        7000,
+        input,
+        baseContext,
+        baseMarket,
+        false
+    );
+
+    const expectedRealized = -3000;
+    const expectedTaxableAfterTqf = -2100;
+    assertClose(result.sumRealizedGainSigned, expectedRealized, 0.01, 'Signed realized loss should match full loss');
+    assertClose(result.sumTaxableAfterTqfSigned, expectedTaxableAfterTqf, 0.01, 'TQF should reduce absolute loss in raw taxable aggregate');
+
+    console.log('✅ TQF symmetry on loss raw aggregate works');
 }
 console.log('--- Transaction Tax Tests Completed ---');

@@ -147,7 +147,8 @@ export function createDiagnosisHandlers({ dom, appState }) {
             const statusLabelMap = {
                 active: 'Aktiv',
                 disabled: 'Inaktiv',
-                contract_ready: 'Bereit (noch nicht aktiv)'
+                contract_ready: 'Bereit (noch nicht aktiv)',
+                safety_static_flex: 'Statisch (Safety)'
             };
             text += `Status: ${statusLabelMap[vpw.status] || (vpw.enabled ? 'Aktiv' : 'Inaktiv')}\n`;
             text += `Methode: ${methodLabel}\n`;
@@ -170,6 +171,11 @@ export function createDiagnosisHandlers({ dom, appState }) {
                 text += `CAPE: ${vpw.capeRatioUsed.toFixed(1)}\n`;
             }
             text += `Go-Go: ${vpw.goGoActive ? `Aktiv (x${Number.isFinite(vpw.goGoMultiplier) ? vpw.goGoMultiplier.toFixed(2) : '1.00'})` : 'Inaktiv'}\n`;
+            if (typeof vpw.safetyStage === 'number' && isFinite(vpw.safetyStage)) {
+                const stage = Math.max(0, Math.round(vpw.safetyStage));
+                const stageText = stage === 0 ? 'Normal' : (stage === 1 ? 'Stufe 1 (Go-Go aus)' : 'Stufe 2 (Statischer Flex)');
+                text += `VPW-Sicherheitsmodus: ${stageText}\n`;
+            }
             if (typeof vpw.gesamtwert === 'number' && isFinite(vpw.gesamtwert)) {
                 text += `VPW-Basisvermögen: ${UIUtils.formatCurrency(vpw.gesamtwert)}\n`;
             }

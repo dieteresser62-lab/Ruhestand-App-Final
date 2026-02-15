@@ -1123,6 +1123,27 @@
                         <p style="color: var(--text-light); margin-top: 0.5rem;">Ohne gepflegte Tranchen fallen die
                             Steuerwerte auf eine vereinfachte Schätzung zurück.</p>
                     </div>
+                    <div class="detail-block" id="balance-verlusttopf">
+                        <h3>Verlustverrechnungstopf</h3>
+                        <p>Die Suite führt einen <strong>Verlustverrechnungstopf</strong> (Verlustvortrag), der
+                            realisierte Kapitalverluste eines Jahres automatisch ins Folgejahr überträgt und dort mit
+                            Gewinnen verrechnet.</p>
+                        <ul
+                            style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Automatisch:</strong> Der Verlustvortrag wird bei jedem Jahresabschluss
+                                fortgeschrieben. Sie müssen nichts manuell eingeben.</li>
+                            <li><strong>Anzeige:</strong> In der Handlungsanweisung sehen Sie die finale Steuer nach
+                                Settlement. Falls Verluste verrechnet wurden, erscheint die Steuerersparnis als
+                                separater Hinweis.</li>
+                            <li><strong>Verrechnungsreihenfolge:</strong> Zuerst wird der Verlustvortrag verrechnet,
+                                dann der Sparer-Pauschbetrag angewandt, erst danach die Steuer berechnet.</li>
+                            <li><strong>Reset-sicher:</strong> Der Verlusttopf bleibt auch bei einem Guardrail-Reset
+                                erhalten.</li>
+                            <li><strong>Simulator:</strong> In Monte-Carlo-Simulationen wird der Verlusttopf pro Lauf
+                                Jahr für Jahr fortgeschrieben. Die KPI „Ø Steuerersparnis
+                                Verlusttopf“ zeigt den durchschnittlichen Effekt.</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
 
@@ -1386,6 +1407,8 @@
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
                         <li><strong>Release-Stand:</strong> Siehe <code>README.md</code> für die aktuelle Version und
                             Changelog-Notizen.</li>
+                        <li><strong>Changelog:</strong> Detaillierte Änderungen stehen in <code>CHANGELOG.md</code>
+                            (z. B. neue Steuer-Settlement-Logik mit Verlusttopf).</li>
                         <li><strong>Breaking Changes:</strong> Bei Modellwechseln (z.B. neue CAPE-Logik) alte Exporte
                             archivieren und neu simulieren.</li>
                         <li><strong>Validierung:</strong> Nach Updates mindestens einen Smoke-Test (Simulator + Balance)
@@ -1397,6 +1420,8 @@
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
                         <li><strong>Guided Tours:</strong> <code>docs/guides/GUIDED_TOURS.md</code> liefert
                             aufgabenorientierte Schritt-fuer-Schritt-Pfade fuer Setup, Jahresablauf und Simulation.</li>
+                        <li><strong>Dokumentationsindex:</strong> <code>docs/README.md</code> bietet die zentrale
+                            Struktur und Navigation über alle Doku-Bereiche.</li>
                         <li><strong>Auto-Optimize Details:</strong> <code>docs/reference/AUTO_OPTIMIZE_DETAILS.md</code> erklärt
                             Ziele, Constraints und Ablauf.</li>
                         <li><strong>Workflow-Pseudocode:</strong> <code>docs/reference/WORKFLOW_PSEUDOCODE.md</code> beschreibt
@@ -1440,6 +1465,13 @@
                     <dt>Muss ich Depot-Tranchen pflegen?</dt>
                     <dd>Ja, für korrekte Steuerberechnungen sind Tranchen notwendig. Ohne Tranchen nutzt die Suite
                         vereinfachte Schätzwerte; für verlässliche Handlungsschritte sollten Sie Tranchen erfassen.</dd>
+
+                    <dt>Was ist der Verlustverrechnungstopf?</dt>
+                    <dd>Wenn Sie in einem Jahr Kapitalverluste realisieren (z.B. durch Verkauf bei niedrigeren
+                        Kursen), werden diese Verluste automatisch ins nächste Jahr übertragen. Dort werden sie
+                        mit künftigen Gewinnen verrechnet, sodass Sie weniger Steuern zahlen. Die Suite zeigt
+                        die Steuerersparnis in der Handlungsanweisung an. Im Simulator sehen Sie den
+                        durchschnittlichen Effekt als KPI.</dd>
 
                     <dt>Warum blockiert der Parameter-Sweep manche Felder?</dt>
                     <dd>Die Sweep-Logik schützt Partner-Felder (Rente 2) und weitere kritische Eingaben über eine

@@ -29,6 +29,8 @@ Diese Datei dient als Uebersicht und Bestandsaufnahme fuer die Dokumentation.
 ## Root-Dokumente (bewusst beibehalten)
 
 - `README.md` (Einstieg/Navigation)
+- `Handbuch.html` (interaktive Nutzerdokumentation)
+- `CHANGELOG.md` (Release-Historie)
 - `QUICKSTART.md` (Schnellstart)
 - `LICENSE.md` (Lizenz)
 
@@ -44,3 +46,4 @@ Diese Root-Dateien bleiben vorerst erhalten, damit bestehende Links und externe 
 
 - Die zentrale Einstiegsdokumentation bleibt im Projekt-Root (`README.md`, `QUICKSTART.md`, `LICENSE.md`).
 - Guided Tours liegen unter `docs/guides/GUIDED_TOURS.md`.
+- Link-Check Kernpfade: `README.md` verlinkt auf `docs/README.md` und `Handbuch.html`; `Handbuch.html` verweist auf `README.md` und `CHANGELOG.md`.

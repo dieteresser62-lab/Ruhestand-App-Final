@@ -161,6 +161,23 @@ export const CONFIG = {
             MAX_REAL_RETURN: 0.05,                      // Obergrenze fuer Phase 1
             EXPECTED_RETURN_SMOOTHING_ALPHA: 0.35,      // Daempfung gegen Spruenge
             MAX_GO_GO_MULTIPLIER: 1.5                   // Sicherheitslimit Go-Go
+        },
+        DYNAMIC_FLEX_SAFETY: {
+            ENABLED: true,
+            MAX_STAGE: 2,
+            BAD_SCORE_THRESHOLD: 2,                     // Ab diesem Score gilt ein Jahr als "kritisch"
+            SEVERE_SCORE_THRESHOLD: 5,                  // Harte Eskalation um 1 Stufe
+            ESCALATE_STREAK_YEARS: 2,                   // Kritische Jahre in Folge bis Eskalation
+            DEESCALATE_STREAK_YEARS: 2,                 // Stabile Jahre in Folge bis Deeskalation
+            HARD_CUT_PCT: 35,                           // Sehr starke Flex-Kuerzung als Stresssignal
+            GOOD_WITHDRAWAL_RATE: 0.05,                 // Für Deeskalation: Entnahmequote <= 5%
+            GOOD_DRAWDOWN: 0.25,                        // Für Deeskalation: Drawdown <= 25%
+            GOOD_CUT_PCT: 45,                           // Für Deeskalation: max. 45% Kürzung
+            RUNWAY_HEADROOM_MONTHS: 3,                  // Für Deeskalation: Min-Runway + Puffer
+            REENTRY_RAMP_YEARS: 3,                      // Nach 2->1 Dynamic-Flex über N Jahre weich einblenden
+            STAGE2_REQUIRE_CRITICAL_STRESS: true,       // Stage 2 nur bei Alarm/Runway-Krise
+            STAGE2_MIN_FLEX_OF_FLOOR_RATIO: 0.25,       // Stage-2-Flexboden relativ zum Floor
+            STAGE2_MIN_FLEX_OF_PREV_DYNAMIC_RATIO: 0.20 // Stage-2-Flexboden relativ zur letzten Dynamic-Flex-Hoehe
         }
     },
 

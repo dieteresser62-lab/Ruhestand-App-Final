@@ -162,7 +162,6 @@ export function extractR2Series(yearLog) {
     const key = possibleKeys.find(k => k in (yearLog[0] || {}));
 
     if (!key) {
-        console.warn('[SWEEP] Konnte kein Rente-2-Feld in YearLog finden. Verfügbare Keys:', Object.keys(yearLog[0] || {}));
         return null;
     }
 

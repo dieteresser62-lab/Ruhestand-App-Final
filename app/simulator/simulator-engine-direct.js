@@ -8,9 +8,10 @@ import {
     sumDepot
 } from './simulator-portfolio.js';
 import { resolveProfileKey } from './simulator-heatmap.js';
-import { calculateTargetLiquidityBalanceLike, buildDetailedTranchesFromPortfolio, computeLiqNeedForFloor, euros, normalizeHouseholdContext, resolveCapeRatio } from './simulator-engine-direct-utils.js';
+import { calculateTargetLiquidityBalanceLike, buildDetailedTranchesFromPortfolio, euros, normalizeHouseholdContext, resolveCapeRatio } from './simulator-engine-direct-utils.js';
 import { shortenReasonText } from './simulator-utils.js';
 import { calculateSaleAndTax } from '../../engine/transactions/sale-engine.mjs';
+import { settleTaxYear } from '../../engine/tax-settlement.mjs';
 
 const formatInteger = (value) => Number.isFinite(value) ? Math.round(value) : 0;
 
@@ -88,8 +89,12 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     let cashZinsen = 0;
     let liqNachZins = initialLiqStart;
     let totalTaxesThisYear = 0;
-    let plannedTaxesThisYear = 0;
-    let forcedTaxesThisYear = 0;
+    const taxStatePrev = {
+        lossCarry: Math.max(0, Number(lastState?.taxState?.lossCarry) || 0)
+    };
+    let combinedTaxRawAggregate = null;
+    let didForcedSale = false;
+    let forcedSaleScaleApplied = null;
 
     const rA = isFinite(yearData.rendite) ? yearData.rendite : 0;
     const rG = isFinite(yearData.gold_eur_perf) ? yearData.gold_eur_perf / 100 : 0;
@@ -475,6 +480,11 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const market = fullResult.ui.market;
     const zielLiquiditaet = fullResult.ui.zielLiquiditaet;
     const spendingNewState = fullResult.newState;
+    const actionRawAggregate = {
+        sumRealizedGainSigned: Number(actionResult?.taxRawAggregate?.sumRealizedGainSigned) || 0,
+        sumTaxableAfterTqfSigned: Number(actionResult?.taxRawAggregate?.sumTaxableAfterTqfSigned) || 0
+    };
+    combinedTaxRawAggregate = { ...actionRawAggregate };
 
     const allQuellen = Array.isArray(actionResult.quellen) ? actionResult.quellen : [];
     let saleQuellen = allQuellen.filter(q => q?.kind && q.kind !== 'liquiditaet');
@@ -517,7 +527,6 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             breakdown: saleQuellen
         };
 
-        plannedTaxesThisYear += saleResult.steuerGesamt;
         applySaleToPortfolio(portfolio, saleResult);
     }
     const equityAfterSalesAction = sumDepot({ depotTranchesAktien });
@@ -608,8 +617,13 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             const forcedExecutedGld = Math.max(0, goldBeforeForced - goldAfterForced);
             const forcedExecutedTotal = forcedExecutedEq + forcedExecutedGld;
             const forcedScale = forcedBrutto > 0 ? Math.min(1, forcedExecutedTotal / forcedBrutto) : 0;
+            forcedSaleScaleApplied = forcedScale;
             liquiditaet += (forcedSale.achievedRefill || 0) * forcedScale;
-            forcedTaxesThisYear += (forcedSale.steuerGesamt || 0) * forcedScale;
+            // Only executed (realized) sales are tax-relevant.
+            // Non-executed planned emergency sales must not affect loss-carry.
+            combinedTaxRawAggregate.sumRealizedGainSigned += (forcedSale.taxRawAggregate?.sumRealizedGainSigned || 0) * forcedScale;
+            combinedTaxRawAggregate.sumTaxableAfterTqfSigned += (forcedSale.taxRawAggregate?.sumTaxableAfterTqfSigned || 0) * forcedScale;
+            didForcedSale = true;
         } else {
             const fallbackBreakdown = [{
                 kind: 'aktien_alt',
@@ -761,23 +775,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     liqNachZins = euros(liquiditaet);
     if (!isFinite(liquiditaet)) liquiditaet = 0;
 
-    // FAIL-SAFE LIQUIDITY GUARD (vereinfacht, da Engine bereits Guard hat)
-    // Diese Guard ist nur für extreme Notfälle wo Engine fehlschlägt
-    let guardSellGold = 0, guardSellEq = 0, guardReason = "";
-    const guardCtx = { inflatedFloor, inputs };
-    const need = computeLiqNeedForFloor(guardCtx);
     const floorCoveredByPension = inflatedFloor === 0;
-
-    // Emergency Guard nur feuern, wenn wir weniger als 1 Monat Floor-Deckung haben (echter Notfall)
-    const criticalLiqThreshold = netFloorYear / 12;
-    if (!floorCoveredByPension && liquiditaet < criticalLiqThreshold) {
-        guardReason = "emergency_guard_triggered";
-        // In der direkten API-Version sollte dies nicht passieren,
-        // da die Engine bereits Guardrails hat
-        // console.warn('FAIL-SAFE Guard triggered in direct API version - this should not happen!');
-    } else if (floorCoveredByPension) {
-        guardReason = "floor_covered_by_pension";
-    }
+    const guardReason = floorCoveredByPension ? "floor_covered_by_pension" : "engine_guard_primary";
 
     // Market History für nächstes Jahr
     const newMarketDataHist = {
@@ -797,25 +796,31 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         steuerGesamt: actionResult.steuer || 0
     }) : { vkAkt: 0, vkGld: 0, stAkt: 0, stGld: 0, vkGes: 0, stGes: 0 };
 
-    const plannedEqSale = vk.vkAkt || 0;
-    const plannedGldSale = vk.vkGld || 0;
-    const executedEqSale = Math.max(0, equityAfterReturn - equityAfterSalesAction);
-    const executedGldSale = Math.max(0, goldAfterReturn - goldAfterSalesAction);
-
-    // FIX: Only calculate taxes if there were ACTUAL executed sales
-    // This prevents showing taxes when no sales occurred
-    const totalExecutedSales = executedEqSale + executedGldSale;
-    if (totalExecutedSales > 0) {
-        const eqTaxFactor = plannedEqSale > 0 ? Math.min(1, executedEqSale / plannedEqSale) : 0;
-        const gldTaxFactor = plannedGldSale > 0 ? Math.min(1, executedGldSale / plannedGldSale) : 0;
-        totalTaxesThisYear = (vk.stAkt || 0) * eqTaxFactor + (vk.stGld || 0) * gldTaxFactor;
-        if (totalTaxesThisYear === 0 && plannedTaxesThisYear > 0 && (plannedEqSale + plannedGldSale) > 0) {
-            const ratio = Math.min(1, totalExecutedSales / (plannedEqSale + plannedGldSale));
-            totalTaxesThisYear = plannedTaxesThisYear * ratio;
+    if (didForcedSale) {
+        const recomputedSettlement = settleTaxYear({
+            taxStatePrev,
+            rawAggregate: combinedTaxRawAggregate,
+            sparerPauschbetrag: engineInput.sparerPauschbetrag,
+            kirchensteuerSatz: engineInput.kirchensteuerSatz
+        });
+        actionResult.steuer = recomputedSettlement.taxDue;
+        actionResult.taxSettlement = {
+            ...recomputedSettlement.details,
+            recomputedWithForcedSales: true,
+            forcedSaleScaleApplied: forcedSaleScaleApplied
+        };
+        actionResult.taxRawAggregate = { ...combinedTaxRawAggregate };
+        if (spendingNewState && typeof spendingNewState === 'object') {
+            spendingNewState.taxState = recomputedSettlement.taxStateNext;
         }
+    } else if (actionResult?.taxSettlement && typeof actionResult.taxSettlement === 'object') {
+        actionResult.taxSettlement = {
+            ...actionResult.taxSettlement,
+            recomputedWithForcedSales: false,
+            forcedSaleScaleApplied: null
+        };
     }
-    // Always add forced taxes (from emergency sales to cover shortfall)
-    totalTaxesThisYear += forcedTaxesThisYear;
+    totalTaxesThisYear = Number(actionResult?.steuer) || 0;
 
     const kaufAktTotal = buyEqAmount + kaufAkt;
     const totalGoldKauf = buyGoldAmount + kaufGld;
@@ -922,7 +927,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             liqEnd: liqNachZins,
             zielLiquiditaet: zielLiquiditaet || 0,
             aktionUndGrund: aktionText,
-            usedSPB: actionResult.pauschbetragVerbraucht || 0,
+            usedSPB: actionResult?.taxSettlement?.spbUsedThisYear || actionResult.pauschbetragVerbraucht || 0,
             floor_brutto: effectiveBaseFloor,
             pension_annual: pensionAnnual,
             rente1,
@@ -943,12 +948,14 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             pflege_delta_flex: pflegeMeta?.log_delta_flex ?? 0,
             WidowBenefitP1: widowBenefits.p1FromP2 ? widowPensionP1 : 0,
             WidowBenefitP2: widowBenefits.p2FromP1 ? widowPensionP2 : 0,
-            NeedLiq: Math.round(need),
-            GuardGold: Math.round(guardSellGold),
-            GuardEq: Math.round(guardSellEq),
+            NeedLiq: 0,
+            GuardGold: 0,
+            GuardEq: 0,
             GuardNote: guardReason,
             Person1Alive: p1Alive ? 1 : 0,
             Person2Alive: p2Alive ? 1 : 0,
+            lossCarryEnd: Number(spendingNewState?.taxState?.lossCarry) || 0,
+            taxSavedByLossCarry: Number(actionResult?.taxSettlement?.taxSavedByLossCarry) || 0,
             pflege_floor_anchor: pflegeMeta?.log_floor_anchor ?? 0,
             pflege_maxfloor_anchor: pflegeMeta?.log_maxfloor_anchor ?? 0,
             pflege_cap_zusatz: pflegeMeta?.log_cap_zusatz ?? 0,
@@ -969,7 +976,6 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 export {
     initializePortfolio as initMcRunState,
     normalizeHouseholdContext,
-    computeLiqNeedForFloor,
     euros
 };
 

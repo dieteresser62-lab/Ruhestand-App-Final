@@ -44,7 +44,7 @@
 | **Simulator** | Monte-Carlo-Simulation, Parameter-Sweeps, Auto-Optimize, Dynamic Flex | 43 Module, ~14.500 LOC |
 | **Engine** | Kern-Berechnungslogik, Guardrails, Steuern | 13 Module, ~3.600 LOC |
 | **Workers** | Parallelisierung für MC-Simulation | 3 Module, ~600 LOC |
-| **Tests** | Unit- und Integrationstests | 49 Testdateien, ~9.800 LOC, 835 Assertions |
+| **Tests** | Unit- und Integrationstests | 57 Testdateien, ~10.500 LOC, 1000+ Assertions |
 | **Sonstige** | Profile, Tranchen, Utilities | ~20 Module, ~2.500 LOC |
 
 *Hinweis: Code-Zeilenangaben (z.B. `SpendingPlanner.mjs:326`) können bei zukünftigen Änderungen abweichen. Die Algorithmen-Beschreibungen bleiben konzeptionell gültig.*
@@ -53,7 +53,7 @@
 
 Die Ruhestand-Suite kombiniert folgende Funktionen:
 
-1. **Vollständige deutsche Kapitalertragssteuer** (Abgeltungssteuer, Soli, KiSt, Teilfreistellung, SPB, steueroptimierte Verkaufsreihenfolge)
+1. **Vollständige deutsche Kapitalertragssteuer** (Abgeltungssteuer, Soli, KiSt, Teilfreistellung, SPB, steueroptimierte Verkaufsreihenfolge, Verlustverrechnungstopf mit jahresübergreifendem Verlustvortrag)
 2. **Dynamische Guardrails** mit 7-stufiger Marktregime-Erkennung
 3. **Pflegefall-Modellierung** (PG1-5, Progression, Dual-Care)
 4. **Multi-Profil-Unterstützung** für Paare mit getrennten Depots und **Witwenrente**
@@ -72,7 +72,6 @@ Die Ruhestand-Suite kombiniert folgende Funktionen:
 
 - Kein Stationary Bootstrap (nur Block-Bootstrap)
 - Keine expliziten Fat Tails im Return-Modell
-- Keine Verlustverrechnung
 - Index-Variante (`msci_eur`) siehe Abschnitt C.3.3
 
 ## Anlagephilosophie und Eignung
@@ -848,6 +847,7 @@ engine/
 ├── core.mjs              (459 LOC) → Orchestrierung, EngineAPI, VPW-Berechnung (erweitert!)
 ├── config.mjs            (286 LOC) → Zentrale Konfiguration inkl. DYNAMIC_FLEX (erweitert)
 ├── errors.mjs            (~50 LOC) → Fehlerklassen
+├── tax-settlement.mjs    (~80 LOC) → Jahres-Settlement (Verlusttopf, SPB, finale Steuer)
 ├── validators/
 │   └── InputValidator.mjs (199 LOC) → Input-Validierung inkl. Dynamic-Flex (erweitert)
 ├── analyzers/
@@ -900,6 +900,15 @@ function _internal_calculateModel(input, lastState) {
     const action = TransactionEngine.determineAction({
         aktuelleLiquiditaet, depotwertGesamt, zielLiquiditaet, market, spending: spendingResult, minGold, profil, input
     });
+
+    // 8. Steuer-Settlement (Jahresabschluss)
+    const taxSettlement = settleTaxYear({
+        taxStatePrev: lastState?.taxState ?? { lossCarry: 0 },
+        rawAggregate: action.taxRawAggregate,
+        sparerPauschbetrag, kirchensteuerSatz
+    });
+    action.steuer = taxSettlement.taxDue;          // Settlement überschreibt Plan-Steuer
+    newState.taxState = taxSettlement.taxStateNext; // lossCarry fortschreiben
 
     return { input, newState, diagnosis, ui: resultForUI };
 }
@@ -1009,7 +1018,7 @@ FLEX_RATE_FINAL_LIMITS: {
 
 ## B.4 Test-Suite (erweitert Januar 2026)
 
-**Übersicht:** Die Test-Suite wurde signifikant erweitert von 21 auf **49 Testdateien** mit **835 Assertions**.
+**Übersicht:** Die Test-Suite wurde signifikant erweitert auf **57 Testdateien** mit **1000+ Assertions**.
 
 ### B.4.1 Test-Inventar
 
@@ -1017,7 +1026,7 @@ FLEX_RATE_FINAL_LIMITS: {
 |-----------|---------|-----|-------|
 | **Engine Core** | `core-engine.test.mjs`, `engine-robustness.test.mjs` | ~390 | Engine-Orchestrierung, Edge Cases |
 | **Transaktionen** | `transaction-*.test.mjs` (5) | ~755 | Verkäufe, ATH, Rebal, Gold, Quantisierung |
-| **Steuern** | `transaction-tax.test.mjs` | ~150 | Steuerberechnung |
+| **Steuern** | `transaction-tax.test.mjs`, `tax-settlement.test.mjs`, `core-tax-settlement.test.mjs`, `simulator-tax-settlement.test.mjs` | ~500 | Steuerberechnung, Settlement, Verlustvortrag |
 | **Worker** | `worker-parity.test.mjs`, `worker-pool.test.mjs` | ~820 | Determinismus, Pool-Lifecycle |
 | **Spending** | `spending-*.test.mjs` (2) | ~280 | Guardrails, Quantisierung |
 | **Monte-Carlo** | `simulator-monte-carlo.test.mjs`, `monte-carlo-*.test.mjs` (2) | ~760 | MC-Kern, Sampling, Startjahr |
@@ -1290,6 +1299,49 @@ if (purchaseDate < new Date('2009-01-01')) {
     tranche.tqf = 1.0;  // 100% steuerfrei
 }
 ```
+
+### C.2.5 Jahres-Settlement mit Verlustverrechnungstopf
+
+Die finale Steuer eines Jahres wird nicht pro Einzelverkauf bestimmt, sondern durch ein zentrales **Jahres-Settlement** (`tax-settlement.mjs`). Die Sale-Engine liefert dafür nur noch Roh-Aggregate (`realizedGainSigned`, `taxableAfterTqfSigned`) pro Verkauf.
+
+**Verrechnungsreihenfolge** (§ 20 Abs. 6 EStG):
+
+1. **Rohsumme bilden:** Alle Gewinne und Verluste des Jahres nach TQF summieren (`sumTaxableAfterTqfSigned`)
+2. **Verlustvortrag verrechnen:** Vorjahres-`lossCarry` von der Summe abziehen
+3. **Sparer-Pauschbetrag anwenden:** Nur auf verbleibenden positiven Rest
+4. **Steuer berechnen:** KESt + Soli + ggf. KiSt auf finalen Steuerbetrag
+5. **Negativen Rest vortragen:** Wird als `lossCarry` ins nächste Jahr übernommen
+
+```javascript
+// tax-settlement.mjs (vereinfacht)
+function settleTaxYear({ taxStatePrev, rawAggregate, sparerPauschbetrag, kirchensteuerSatz }) {
+    const signedAfterCarry = rawAggregate.sumTaxableAfterTqfSigned - taxStatePrev.lossCarry;
+    const positiveAfterCarry = Math.max(0, signedAfterCarry);
+    const spbUsed = Math.min(sparerPauschbetrag, positiveAfterCarry);
+    const taxBase = Math.max(0, positiveAfterCarry - spbUsed);
+    const taxDue = taxBase * keSt;
+    const lossCarryNext = Math.max(0, -signedAfterCarry);
+    return { taxDue, taxStateNext: { lossCarry: lossCarryNext }, details: { ... } };
+}
+```
+
+**Wichtige Designentscheidungen:**
+
+- **TQF-Symmetrie:** Teilfreistellung wird symmetrisch auf Gewinne und Verluste angewandt (§ 22 InvStG). Eine Verlustposition mit TQF 30% erzeugt nur 70% anrechenbare Verluste.
+- **Zwei Gewinnquoten:** `gainQuotePlan` (≥ 0, für Mengenplanung) und `gainQuoteSigned` (mit Vorzeichen, für Roh-Steuerdaten) in der Sale-Engine.
+- **SPB nur im Settlement:** Der Sparer-Pauschbetrag wird offiziell nur im Jahres-Settlement verbraucht. Die Sale-Engine nutzt SPB weiterhin zur Mengenplanung, aber nicht als finale Steuerlogik.
+- **Kein Feature-Toggle:** `lossCarry = 0` ist der natürliche No-Op-Default.
+
+**State-Persistenz:**
+
+- `lastState.taxState.lossCarry` wird in der Balance-App über `balance-storage.js` persistiert und überlebt Guardrail-Resets.
+- Im Simulator wird `taxState` pro Run Jahr-für-Jahr fortgeschrieben. Bei Notfallverkäufen (Forced Sales) wird ein **Gesamt-Settlement-Recompute** durchgeführt, um SPB-Doppelverbrauch zu vermeiden.
+
+**UI-Ausgabe:**
+
+- `action.steuer` enthält die finale Settlement-Steuer (nicht die Plansteuer der Sale-Engine).
+- `action.taxSettlement` liefert Details (taxBeforeLossCarry, taxAfterLossCarry, taxSavedByLossCarry, spbUsedThisYear).
+- `action.taxRawAggregate` enthält die Roh-Aggregate für Diagnose und Simulator-Recompute.
 
 ---
 
@@ -2510,7 +2562,7 @@ rt
 
 *Hinweis: Dieser Vergleich basiert auf einer Recherche der oben genannten Tools (ProjectionLab, Boldin, Pralana, Portfolio Visualizer, FI Calc). Es können weitere Tools existieren, die nicht analysiert wurden.*
 
-1. **Vollständige DE-Kapitalertragssteuer** — Kein anderes verglichenes Tool implementiert Abgeltungssteuer, Soli, KiSt, Teilfreistellung, SPB und steueroptimierte Reihenfolge
+1. **Vollständige DE-Kapitalertragssteuer** — Kein anderes verglichenes Tool implementiert Abgeltungssteuer, Soli, KiSt, Teilfreistellung, SPB, steueroptimierte Reihenfolge und jahresübergreifenden Verlustverrechnungstopf
 2. **Pflegefall-Modellierung mit PG1-5** — Kein anderes verglichenes Tool hat ein deutsches Pflegegrad-Modell mit Progression und Dual-Care
 3. **7-stufige Marktregime-Erkennung** — In den betrachteten kostenlosen Tools in dieser Form nicht enthalten
 4. **Risk-Based Guardrails** — Implementiert den Kitces-Ansatz statt klassischer Guyton-Klinger
@@ -2622,7 +2674,8 @@ rt
 | `transaction-opportunistic.mjs` | 323 | Opportunistisches Rebalancing |
 | `transaction-surplus.mjs` | 149 | Überschuss-Handling |
 | `transaction-utils.mjs` | 237 | Transaktions-Hilfsfunktionen |
-| `sale-engine.mjs` | 333 | Verkäufe, Steuern |
+| `sale-engine.mjs` | 333 | Verkäufe, Steuern, Roh-Aggregate |
+| `tax-settlement.mjs` | ~80 | Jahres-Settlement (Verlusttopf, SPB, finale Steuer) **(neu!)** |
 
 ## Simulator-Module (43 Module, Auswahl)
 
@@ -2707,6 +2760,7 @@ rt
 21. **Multi-Objective-Optimierung** (`simulator-optimizer.js:findBestParametersMultiObjective`) **(neu!)**
 22. **Constraint-Based-Optimierung** (`simulator-optimizer.js:findBestParametersWithConstraints`) **(neu!)**
 23. **Sweep-Heatmap-Rendering** (`simulator-heatmap.js:renderSweepHeatmapSVG`) **(neu!)**
+24. **Verlustverrechnungstopf** (`tax-settlement.mjs:settleTaxYear`) — Jahres-Settlement mit Verlustvortrag, SPB und Gesamt-Recompute **(neu!)**
 24. **P2-Invarianz-Prüfung** (`simulator-sweep-utils.js:areP2InvariantsEqual`) **(neu!)**
 25. **Ausgaben-Check CSV-Parser** (`balance-expenses.js:parseCategoryCsv`) **(neu!)**
 26. **Median-basierte Hochrechnung** (`balance-expenses.js:computeYearStats`) **(neu!)**

@@ -205,7 +205,11 @@ function update() {
         // Output: {input, newState, diagnosis, ui} oder {error}
         // Reset guardrail history if key inputs changed.
         const shouldResetState = shouldResetGuardrailState(persistentState.inputs, inputData);
-        const lastState = shouldResetState ? null : persistentState.lastState;
+        const previousLastState = persistentState.lastState || null;
+        const preservedTaxState = previousLastState?.taxState
+            ? { taxState: previousLastState.taxState }
+            : null;
+        const lastState = shouldResetState ? preservedTaxState : previousLastState;
         const modelResult = window.EngineAPI.simulateSingleYear(inputData, lastState);
 
         // 4. Handle Engine Response

@@ -724,7 +724,7 @@ console.log('Test 27: runSweepChunk - Gueltige Dynamic-Flex Grenzwerte');
     };
 
     const paramCombinations = [
-        { runwayMin: 18, runwayTarget: 24, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, horizonYears: 60, survivalQuantile: 0.99, goGoMultiplier: 2.0 }
+        { runwayMin: 18, runwayTarget: 24, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, horizonYears: 60, survivalQuantile: 0.99, goGoMultiplier: 1.5 }
     ];
 
     const sweepConfig = {

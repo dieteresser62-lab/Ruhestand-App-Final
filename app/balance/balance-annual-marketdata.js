@@ -426,11 +426,6 @@ export function createMarketdataHandlers({
             fetchStatus = 'ok_primary';
         } catch (err) {
             errors.push(`Primary fehlgeschlagen: ${err?.message || 'unbekannt'}`);
-            console.warn('[CAPE] Primary source failed', {
-                source: CAPE_SOURCES.PRIMARY.id,
-                url: CAPE_SOURCES.PRIMARY.url,
-                error: err?.message || String(err)
-            });
         }
 
         if (!resolved) {
@@ -439,11 +434,6 @@ export function createMarketdataHandlers({
                 fetchStatus = 'ok_fallback_mirror';
             } catch (err) {
                 errors.push(`Mirror fehlgeschlagen: ${err?.message || 'unbekannt'}`);
-                console.warn('[CAPE] Mirror source failed', {
-                    source: CAPE_SOURCES.MIRROR.id,
-                    url: CAPE_SOURCES.MIRROR.url,
-                    error: err?.message || String(err)
-                });
             }
         }
 

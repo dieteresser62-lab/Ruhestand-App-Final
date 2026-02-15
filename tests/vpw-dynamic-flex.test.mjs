@@ -230,4 +230,130 @@ function vpwRate(r, n) {
     assert(Number.isFinite(flexRate) && flexRate < 100, 'bear regime should apply flex reduction under VPW path');
 }
 
+// Test 12: Safety stage 1 should disable Go-Go after repeated bad years.
+{
+    const stressInput = {
+        ...baseInput,
+        depotwertAlt: 250000,
+        tagesgeld: 5000,
+        floorBedarf: 24000,
+        flexBedarf: 12000,
+        dynamicFlex: true,
+        horizonYears: 25,
+        marketCapeRatio: 30,
+        goGoActive: true,
+        goGoMultiplier: 1.2,
+        endeVJ: 60,
+        endeVJ_1: 80,
+        endeVJ_2: 100,
+        endeVJ_3: 110,
+        ath: 120,
+        jahreSeitAth: 3
+    };
+    const seededState = {
+        initialized: true,
+        flexRate: 100,
+        alarmActive: false,
+        cumulativeInflationFactor: 1,
+        peakRealVermoegen: 300000
+    };
+    const runs = [];
+    let state = seededState;
+    for (let i = 0; i < 6; i += 1) {
+        const yearRun = EngineAPI.simulateSingleYear(stressInput, state);
+        runs.push(yearRun);
+        state = yearRun.newState;
+    }
+    const escalated = runs.some((r) => Number(r.newState?.vpwSafetyStage || 0) >= 1);
+    assert(escalated, 'safety should escalate to at least stage 1 under sustained stress');
+    const suppressionIdx = runs.findIndex((r, i) =>
+        i > 0 &&
+        Number(runs[i - 1].newState?.vpwSafetyStage || 0) >= 1 &&
+        r.ui?.vpw?.goGoSuppressed === true
+    );
+    assert(suppressionIdx >= 1, 'go-go suppression should apply in the year after safety escalation');
+    assertEqual(runs[suppressionIdx].ui.vpw.goGoActive, false, 'go-go should be inactive when suppression is applied');
+}
+
+// Test 13: Safety stage 2 should switch Dynamic Flex to static flex.
+{
+    const stressInput = {
+        ...baseInput,
+        depotwertAlt: 250000,
+        tagesgeld: 5000,
+        floorBedarf: 24000,
+        flexBedarf: 12000,
+        dynamicFlex: true,
+        horizonYears: 25,
+        marketCapeRatio: 30,
+        goGoActive: true,
+        goGoMultiplier: 1.2,
+        endeVJ: 60,
+        endeVJ_1: 80,
+        endeVJ_2: 100,
+        endeVJ_3: 110,
+        ath: 120,
+        jahreSeitAth: 3
+    };
+    const seededState = {
+        initialized: true,
+        flexRate: 100,
+        alarmActive: false,
+        cumulativeInflationFactor: 1,
+        peakRealVermoegen: 300000
+    };
+    const runs = [];
+    let state = seededState;
+    for (let i = 0; i < 8; i += 1) {
+        const yearRun = EngineAPI.simulateSingleYear(stressInput, state);
+        runs.push(yearRun);
+        state = yearRun.newState;
+    }
+    const hasStageTwo = runs.some((r) => Number(r.newState?.vpwSafetyStage || 0) >= 2);
+    assert(hasStageTwo, 'safety should escalate to stage 2 under extended stress');
+    const staticFlexIdx = runs.findIndex((r, i) =>
+        i > 0 &&
+        Number(runs[i - 1].newState?.vpwSafetyStage || 0) >= 2 &&
+        r.ui?.vpw?.status === 'safety_static_flex'
+    );
+    assert(staticFlexIdx >= 1, 'stage 2 should switch to static flex in the following year');
+    assertEqual(runs[staticFlexIdx].ui.vpw.enabled, false, 'stage 2 should disable dynamic flex');
+    assertEqual(runs[staticFlexIdx].ui.vpw.dynamicFlexSuppressed, true, 'dynamic flex suppression flag should be true');
+}
+
+// Test 14: Re-entry from stage 2 to stage 1 should be damped (no full jump-in).
+{
+    const reentryInput = {
+        ...baseInput,
+        depotwertAlt: 4000000,
+        tagesgeld: 400000,
+        floorBedarf: 24000,
+        flexBedarf: 12000,
+        dynamicFlex: true,
+        horizonYears: 24,
+        marketCapeRatio: 24,
+        goGoActive: true,
+        goGoMultiplier: 1.1,
+        endeVJ: 110,
+        endeVJ_1: 105,
+        endeVJ_2: 100,
+        endeVJ_3: 95,
+        ath: 110,
+        jahreSeitAth: 0
+    };
+    const seededReentryState = {
+        initialized: true,
+        flexRate: 100,
+        alarmActive: false,
+        cumulativeInflationFactor: 1,
+        peakRealVermoegen: 300000,
+        vpwSafetyStage: 1,
+        vpwSafetyReentryRemaining: 3
+    };
+    const reentryRun = EngineAPI.simulateSingleYear(reentryInput, seededReentryState);
+    assertEqual(reentryRun.ui.vpw.status, 'active', 'stage 1 should reactivate VPW path');
+    assertEqual(reentryRun.ui.vpw.reentryApplied, true, 'first re-entry year should be damped');
+    assert(reentryRun.ui.vpw.dynamicFlex < reentryRun.ui.vpw.rawDynamicFlex, 'damped flex should be below raw VPW flex');
+}
+
 console.log('--- VPW Dynamic Flex Tests Completed ---');

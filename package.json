@@ -5,7 +5,9 @@
   "main": "balance-binder.js",
   "scripts": {
     "build:engine": "node build-engine.mjs",
+    "build:engine:strict": "node -e \"process.env.ENGINE_BUILD_STRICT='1'; import('./build-engine.mjs')\"",
     "test": "node tests/run-tests.mjs",
+    "test:coverage": "node tests/run-coverage.mjs",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",

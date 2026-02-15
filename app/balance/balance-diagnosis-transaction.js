@@ -45,9 +45,9 @@ export function buildTransactionDiagnostics(transactionDiag) {
         }
     ];
 
-    if (transactionDiag.potentialTrade && typeof transactionDiag.potentialTrade === 'object') {
-        const trade = transactionDiag.potentialTrade;
-        const descriptor = [trade.direction || trade.kind || 'Unbekannte Aktion'];
+    const trade = transactionDiag.potentialTrade;
+    if (trade && typeof trade === 'object' && Object.keys(trade).length > 0) {
+        const descriptor = [trade.direction || trade.kind];
         if (typeof trade.netAmount === 'number') {
             descriptor.push(UIUtils.formatCurrency(trade.netAmount));
         } else if (typeof trade.netto === 'number') {
@@ -55,7 +55,12 @@ export function buildTransactionDiagnostics(transactionDiag) {
         }
         summaryRows.push({
             label: 'Geplante Aktion',
-            value: descriptor.filter(Boolean).join(' · ')
+            value: descriptor.filter(Boolean).join(' · ') || 'Keine geplante Aktion'
+        });
+    } else {
+        summaryRows.push({
+            label: 'Geplante Aktion',
+            value: 'Keine geplante Aktion'
         });
     }
 

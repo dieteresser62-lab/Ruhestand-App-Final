@@ -41,7 +41,7 @@ const SWEEP_LIMITS = {
     dynamicQuantileMin: 0.5,
     dynamicQuantileMax: 0.99,
     dynamicGoGoMultiplierMin: 1.0,
-    dynamicGoGoMultiplierMax: 2.0
+    dynamicGoGoMultiplierMax: 1.5
 };
 
 function makeInvalidSweepMetrics(reason) {
@@ -153,11 +153,9 @@ export function buildSweepInputs(baseInputs, params) {
     // Apply only whitelisted keys and block any partner-specific fields.
     for (const [key, value] of Object.entries(caseOverrides)) {
         if (isBlockedKey(key)) {
-            console.warn(`[SWEEP] Ignoriere Person-2-Key im Sweep: ${key}`);
             continue;
         }
         if (SWEEP_ALLOWED_KEYS.size && !SWEEP_ALLOWED_KEYS.has(key)) {
-            console.warn(`[SWEEP] Key nicht auf Whitelist, übersprungen: ${key}`);
             continue;
         }
         inputs[key] = value;
@@ -203,9 +201,6 @@ export function runSweepChunk({
         const p2VarianceWarning = resolvedRef ? !areP2InvariantsEqual(p2Invariants, resolvedRef) : false;
         if (p2VarianceWarning) {
             p2VarianceCount++;
-            console.warn(`[SWEEP][ASSERT] P2-Basis-Parameter variieren im Sweep (Case ${comboIdx}), sollten konstant bleiben!`);
-            console.warn('[SWEEP] Referenz:', resolvedRef);
-            console.warn('[SWEEP] Aktuell:', p2Invariants);
         }
 
         // Legacy-stream uses one RNG per combo, otherwise per-run seeds for determinism.
@@ -215,10 +210,12 @@ export function runSweepChunk({
         const stressCtxMaster = buildStressContext(inputs.stressPreset, comboRand);
 
         const runOutcomes = [];
+        let invalidComboReason = '';
 
         for (let i = 0; i < anzahlRuns; i++) {
             const rand = legacyRand || rng(makeRunSeed(baseSeed, comboIdx, i));
             let failed = false;
+            let totalTaxSavedByLossCarryThisRun = 0;
             const startYearIndex = Math.floor(rand() * annualData.length);
             let simState = initMcRunState(inputs, startYearIndex);
 
@@ -264,11 +261,21 @@ export function runSweepChunk({
 
                 const result = simulateOneYear(simState, adjustedInputs, yearData, simulationsJahr, careMeta, careFloor, null, 1.0);
 
+                if (result?.error) {
+                    const firstFieldError = Array.isArray(result.error?.errors) && result.error.errors.length > 0
+                        ? result.error.errors[0]?.message
+                        : '';
+                    invalidComboReason = firstFieldError || result.error?.message || 'Engine-Validierungsfehler';
+                    failed = true;
+                    break;
+                }
+
                 if (result.isRuin) {
                     failed = true;
                     if (BREAK_ON_RUIN) break;
                 } else {
                     simState = result.newState;
+                    totalTaxSavedByLossCarryThisRun += Number(result.logData?.taxSavedByLossCarry) || 0;
                     depotWertHistorie.push(portfolioTotal(simState.portfolio));
 
                     // Track the worst runway coverage within a run.
@@ -284,8 +291,22 @@ export function runSweepChunk({
                 finalVermoegen: endVermoegen,
                 maxDrawdown: maxDDpct,
                 minRunway: minRunway === Infinity ? 0 : minRunway,
+                taxSavedByLossCarry: totalTaxSavedByLossCarryThisRun,
                 failed: failed
             });
+
+            if (invalidComboReason) {
+                break;
+            }
+        }
+
+        if (invalidComboReason) {
+            results.push({
+                comboIdx,
+                params,
+                metrics: makeInvalidSweepMetrics(`Engine Validation: ${invalidComboReason}`)
+            });
+            continue;
         }
 
         // Aggregate P50/P10/etc per combo to feed the heatmap.

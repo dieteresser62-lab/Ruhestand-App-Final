@@ -268,6 +268,13 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal') {
                 align: 'left'
             },
             {
+                header: 'Safe',
+                width: 4,
+                key: 'vpw.safetyStage',
+                valueFormatter: v => (Number.isFinite(v) ? Math.round(v) : ''),
+                align: 'right'
+            },
+            {
                 header: 'VPWHint',
                 width: 18,
                 key: 'vpwFallbackHint',
@@ -343,6 +350,8 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal') {
 
     if (isDetailed) {
         columns.push(
+            { header: 'VTopf', width: 8, key: 'row.lossCarryEnd', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'StSave', width: 8, key: 'row.taxSavedByLossCarry', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
             { header: 'Liq@rC-', width: 9, key: 'row.liqStart', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
             { header: 'Zins€', width: 7, key: 'row.cashInterestEarned', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
             { header: 'Liq@rC+', width: 9, key: 'row.liqEnd', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },

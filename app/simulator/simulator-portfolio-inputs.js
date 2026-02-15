@@ -43,12 +43,9 @@ export function getCommonInputs() {
             const saved = localStorage.getItem('depot_tranchen');
             if (saved) {
                 detailledTranches = JSON.parse(saved);
-                console.log('✅ Detaillierte Depot-Tranchen geladen:', detailledTranches.length, 'Positionen');
             }
         }
-    } catch (err) {
-        console.warn('Fehler beim Laden der Depot-Tranchen:', err);
-    }
+    } catch (err) { }
 
     const goldAktiv = String(document.getElementById('goldAllokationAktiv')?.value || '').toLowerCase() === 'true';
 
@@ -134,7 +131,7 @@ export function getCommonInputs() {
         document.getElementById('goGoMultiplier')?.value,
         DYNAMIC_FLEX_DEFAULTS.GO_GO_MULTIPLIER,
         1.0,
-        10.0
+        1.5
     );
     const marketCapeRatio = Math.max(0, parseBoundedNumber(
         document.getElementById('marketCapeRatio')?.value,
