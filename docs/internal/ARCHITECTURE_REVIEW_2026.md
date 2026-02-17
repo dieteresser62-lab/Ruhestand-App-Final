@@ -33,6 +33,34 @@ Die Suite übersteigt das Niveau gängiger Privatnutzer-Rechner und kommerzielle
 
 ---
 
+## 1b. Monte-Carlo-Robustheit — Nachträgliche Einordnung
+
+*Ergänzt auf Basis der Rückmeldung des Erstellers (2026-02-17)*
+
+Der Ersteller hat 100.000 Monte-Carlo-Läufe mit der eigenen Parametrierung durchgeführt. Ergebnis: **~20 Failures** (Ruin-Events), entspricht einer Failure-Rate von **0,02%**.
+
+### Einordnung
+
+Diese Rate ist außerordentlich niedrig. Zum Vergleich: Die klassische 4%-Regel zeigt in US-Daten über 30 Jahre typisch 5–7% Failure-Rate im schlechtesten historischen Quartil. Eine Rate von 0,02% bedeutet, dass die gewählte Strategie in den historischen Daten als extrem robust erscheint.
+
+### Was diese Zahl aussagt
+
+**Die Simulation ist primär eine Tendenzaussage**, keine Wahrscheinlichkeitspräzision. Die relevante Frage lautet nicht „Wie hoch ist die exakte Ruin-Wahrscheinlichkeit?", sondern: „Ist die gewählte Strategie-Philosophie grundsätzlich tragfähig?" Mit 0,02% ist die Antwort: Ja, eindeutig.
+
+Der Price-Index-Safety-Margin verstärkt diesen Befund: Die echte historische Failure-Rate (mit Total Return statt Price Index) wäre voraussichtlich noch niedriger — die 0,02% sind der konservative Wert.
+
+### Was diese Zahl nicht aussagt
+
+- Keine Aussage über zukünftige Märkte außerhalb des historischen Stichprobenraums
+- Kein Konfidenzintervall: Die statistische Unsicherheit bei 20 Failures aus 100.000 Läufen ist erheblich (Poisson-Konfidenzintervall bei k=20: [12, 31], d.h. die wahre Rate liegt mit 95% Wahrscheinlichkeit zwischen 0,012% und 0,031%)
+- Kein Schutz gegen Modell-Fehler (Regime-Klassifikation, CAPE-Signal)
+
+### Fazit
+
+0,02% Failure-Rate bei bewusst konservativem Price-Index-Benchmark ist ein starkes Signal für die Robustheit der gewählten Philosophie. Es rechtfertigt Vertrauen in die Strategie als Ganzes — ohne die benannten Einzelschwächen zu eliminieren.
+
+---
+
 ## 2. Fachliche Analyse
 
 ### 2.1 Entnahmestrategien
@@ -115,11 +143,11 @@ Der Unterschied in der Strategie zwischen -19,9% und -20,1% ATH-Abstand ist erhe
 
 **Datenbasis:** 1925–2024. Pre-1950-Daten sind im Code explizit als `estimated/normalized` markiert. Die Normalisierungsmethode ist im Code (`DATASET_META`) dokumentiert als: „Years 1925-1949 are normalized to connect to the 1950 level." Die Glättungsmethodik selbst ist nicht weiter spezifiziert.
 
-**MSCI-Variante (kritisch):** `DATASET_META.historicalData.series.msci_eur.variantStatus = 'undocumented'` — der Code selbst benennt dies als bekanntes Problem. Der implizit erkennbare CAGR von ~7,9% für MSCI 1978–2024 deutet stark auf einen Price Index hin, nicht auf einen Total Return Index. Ein MSCI World Net Return in EUR über denselben Zeitraum liegt bei ~10,5–11%. Der Unterschied: ca. 2–3 Prozentpunkte p.a. durch Dividenden, die im Price Index fehlen.
+**MSCI-Variante (bewusste Konservativität):** `DATASET_META.historicalData.series.msci_eur.variantStatus = 'undocumented'` — der Code selbst markiert dies. Der Ersteller bestätigt: Es handelt sich um einen **Price Index ohne Dividendenrenditen**. Der implizit erkennbare CAGR von ~7,9% für MSCI 1978–2024 ist damit korrekt erklärt. Ein MSCI World Net Return in EUR über denselben Zeitraum liegt bei ~10,5–11% — der Unterschied von 2–3 Pp p.a. entspricht dem historischen Dividendenbeitrag.
 
-Konsequenz: Wenn die Annahme korrekt ist, sind alle historischen Renditen in der Simulation um 2–3% p.a. systematisch unterschätzt. Das macht die Simulation konservativer (höhere scheinbare Ruin-Risiken), kalibriert aber gleichzeitig die Empfehlungen zu vorsichtig. Die Verzerrung ist asymmetrisch: Man wird nicht ruiniert — man gibt zu wenig aus.
+**Das ist eine bewusste Designentscheidung:** Der fehlende Dividendenertrag wirkt als eingebauter Safety Margin. Die Simulation ist systematisch pessimistischer als die historische Realität. Die Verzerrung ist **unidirektional** — man läuft nie in falsche Sicherheit, sondern immer in überschätzte Vorsicht. Für ein persönliches Planungstool ist das eine valide, verteidigbare Strategie.
 
-Das ist kein triviales Problem und das einzige, das ich als **Blocker-Severity** bezeichnen würde: Es muss geklärt werden, welcher Index verwendet wurde.
+**Was bleibt:** Die Variante ist im Code als `'undocumented'` markiert — der Kommentar sollte durch `'price_index_intentional'` o.ä. ersetzt werden, um die Absicht festzuhalten. Das ist eine Dokumentationslücke, kein Designfehler.
 
 **Survivorship-Bias:** MSCI World ist implizit Survivorship-bereinigt — er enthält die Märkte, die heute noch existieren, nicht die, die untergegangen sind. Für sehr langfristige historische Analysen ist das eine bekannte und akzeptierte Einschränkung. Sie sollte beim Interpretieren der Ergebnisse bewusst sein.
 
@@ -278,29 +306,31 @@ Die historischen Daten verwenden German CPI als Inflationsdeflator für einen gl
 
 10. **Anti-Pseudo-Accuracy:** Quantisierung auf sinnvolle Einheiten (50–250 € monatlich) verhindert den Irrtum, dass eine Zahl wie „1.387,42 €/Monat" eine verlässliche Empfehlung darstellt.
 
+11. **Price-Index als konservativer Safety Margin:** Die bewusste Entscheidung, einen MSCI World Price Index (ohne Dividendenrenditen) zu verwenden, macht alle Simulationen systematisch pessimistischer als die historische Realität. Dieser Puffer schützt vor falschem Optimismus bei Parameteroptimierungen. Die Verzerrung ist unidirektional und damit für ein Planungstool akzeptabel — besser als der umgekehrte Fehler.
+
 ---
 
 ## 6. Schwächen & Verbesserungspotenzial
 
 ### Kritisch (Vertrauen gefährdend)
 
-**S1 — MSCI-Variante undokumentiert**
-
-`DATASET_META.msci_eur.variantStatus = 'undocumented'` — vom Code selbst so markiert. Alle historischen Renditeberechnungen, alle Erfolgsquoten, alle Optimierungsergebnisse hängen davon ab, welcher MSCI-Index verwendet wurde. Vermutlich Price Index, nicht Net Return. Wenn korrekt: systematische Unterschätzung historischer Renditen um 2–3 Pp p.a.
-
-**Verbesserung:** Datenquelle und Index-Variante in `docs/reference/DATA_SOURCES.md` explizit dokumentieren. Wenn Price Index: durch MSCI World Net Return EUR ersetzen (verfügbar ab ca. 1970 über verschiedene Quellen).
-
-**S2 — Hard-Threshold-Regime-Klassifikation**
+**S1 — Hard-Threshold-Regime-Klassifikation**
 
 Bin-äre Schwellenwerte erzeugen Cliff-Effects im Entnahmeprofil. -19,9% und -20,1% ATH-Abstand → sehr unterschiedliche Strategieempfehlung. Das ist fachlich nicht begründbar.
 
 **Verbesserung:** Runway-Zielwerte linear zwischen Regime-Schwellen interpolieren. Beispiel: ATH-Abstand 15–20% → Runway interpoliert zwischen 36 und 60 Monaten, statt abrupt zu springen.
 
-**S3 — CAPE-to-Return: 4 diskrete Stufen**
+**S2 — CAPE-to-Return: 4 diskrete Stufen**
 
 Sprünge in der Erwartungsrendite bei CAPE-Grenzen erzeugen nicht-kontinuierliche VPW-Raten. Methodisch nicht begründet.
 
 **Verbesserung:** Excess CAPE Earnings Yield als kontinuierliche Funktion: `equityExpectedReturn = (1/CAPE) + risikoprämie - safe_rate`. Eliminiert die diskreten Sprünge und ist in der akademischen Literatur besser fundiert.
+
+**S3 — MSCI-Variante nicht als Designentscheidung dokumentiert**
+
+`DATASET_META.msci_eur.variantStatus = 'undocumented'` — der Entwickler bestätigt, dass es sich um einen bewussten Price Index handelt. Aber der Code markiert dies als undokumentiert. Damit ist die Absicht nicht für spätere Revision oder Dritte erkennbar.
+
+**Verbesserung:** `variantStatus` auf `'price_index_intentional'` setzen, einen Kommentar ergänzen: *„MSCI World Price Index (ohne Dividenden) — bewusst als konservativer Safety Margin gewählt."* Ein Satz in DATA_SOURCES.md. Aufwand: 5 Minuten.
 
 ### Signifikant
 
@@ -392,17 +422,64 @@ Ich würde die Suite **nicht als alleinigen Entscheidungsgrundlage** verwenden f
 
 ### Die drei kritischsten Schwachstellen
 
-**1. MSCI-Variante undokumentiert (Blocker)**
+**1. Hard-Threshold-Regime-Klassifikation (Design-Schwäche, behebbar)**
 
-Solange unbekannt ist, ob der verwendete Index ein Price Index oder Total Return Index ist, sind alle absoluten Erfolgsquoten mit einer Unsicherheit von ±5–10 Prozentpunkten behaftet. Das untergräbt das Vertrauen in alle quantitativen Ausgaben der Simulation. Diese Frage muss zuerst geklärt werden.
+Die diskreten Schwellen erzeugen Cliff-Effects, die wirtschaftlich nicht begründbar sind. Ein Nutzer, der nicht weiß, dass -19,9% und -20,1% ATH-Abstand zu sehr unterschiedlichen Entnahmeempfehlungen führen, kann aus dem Tool ein Sicherheitsgefühl ableiten, das durch die Entscheidungslogik nicht gestützt wird. Diese Schwäche ist behebbar: lineare Interpolation der Runway-Ziele zwischen den Schwellen würde das Problem vollständig beseitigen, ohne die Strategie selbst zu verändern.
 
-**2. Hard-Threshold-Regime-Klassifikation (Design-Schwäche)**
+**2. Keine externe Validierung (strukturell, unvermeidlich)**
 
-Die diskreten Schwellen erzeugen Cliff-Effects, die wirtschaftlich nicht begründbar sind. Ein Nutzer, der nicht weiß, dass -19,9% und -20,1% ATH-Abstand zu sehr unterschiedlichen Empfehlungen führen, kann aus dem Tool ein Sicherheitsgefühl ableiten, das durch die Entscheidungslogik nicht gestützt wird. Diese Schwäche ist behebbar ohne Architektur-Änderung.
+Das Tool ist vollständig selbstreferentiell. Es gibt keine unabhängige Überprüfung der Kalkulationsergebnisse gegen externe Referenzimplementierungen (cFIREsim, FIRECalc, institutionelle Modelle). Das ist bei Eigenentwicklungen strukturell unvermeidlich — aber es muss im Nutzungskontext explizit stehen.
 
-**3. Keine externe Validierung (strukturell)**
+**3. Gold-Floor vs. Liquiditätsziel: Priorisierung nicht kommuniziert (Edge Case)**
 
-Das Tool ist vollständig selbstreferentiell. Es gibt keine unabhängige Überprüfung der Kalkulationsergebnisse gegen externe Referenzimplementierungen (cFIREsim, FIRECalc, institutionelle Modelle). Das ist bei Eigenentwicklungen strukturell unvermeidlich — aber es muss im Nutzungskontext explizit stehen: Die Ergebnisse wurden von keiner unabhängigen Stelle validiert.
+Wenn Portfolio gleichzeitig unter Liquiditätsziel und unter Gold-Floor liegt, kann die Engine beide Ziele konkurrierend verfolgen. Die Priorisierung (Liquidität > Gold-Floor) ist im Code korrekt implementiert, aber dem Nutzer nicht in der Handlungskarte mitgeteilt. In diesem seltenen Szenario könnte die Transaktion unvollständig wirken, ohne Erklärung warum. Verbesserung: In solchen Konfliktfällen einen Hinweis in der Handlungskarte einblenden.
+
+---
+
+## 9. Balance-App — Jahresentscheidungsqualität
+
+*Ergänzt auf Basis der Rückmeldung des Erstellers (2026-02-17)*
+
+Die zentrale Nutzungsform der Suite ist die jährliche Balance-App-Sitzung: Der Nutzer öffnet die App einmal pro Jahr, liest die Empfehlungen, und entscheidet über Entnahme und Transaktionen. Die Frage: Liefert die App hierfür qualitativ ausreichende Entscheide?
+
+### Was die App jährlich produziert
+
+Die Ausgabe ist in vier Schichten organisiert:
+
+**Schicht 1 — Handlungsanweisung (Kernentscheid):**
+Die primäre Ausgabe ist eine konkrete, ampelfarbige Transaktionskarte. Sie enthält:
+- Den monatlichen Entnahmebetrag als €-Zahl (keine Prozente, kein Interpretationsbedarf)
+- Die vollständige Transaktionsanweisung: welche Tranchen in welcher Reihenfolge verkaufen (steueroptimal nach Steuer/€-Rate sortiert), wie viel in welche Asset-Klassen fließt
+- Brutto-/Netto-Aufspaltung mit Steuervoraushberechnung
+- Ampelstatus: 🟢 Situation gesund / 🟡 Handlungsbedarf / 🔴 Guardrail aktiv
+
+**Schicht 2 — Decision Tree (Warum-Antwort):**
+Ein expliziter Begründungspfad, der jeden Schritt der Entscheidungslogik nennt: warum eine Transaktion ausgelöst oder geblockt wurde, welches Guardrail aktiv ist, welcher Cap gewirkt hat. Ein Nutzer kann jeden Entscheid rückverfolgen.
+
+**Schicht 3 — Diagnostik-Kennzahlen:**
+Peak-Vermögen (real), Drawdown seit Peak, kumulierte Inflation, effektive Flex-Rate, Kürzungsprozent, VPW-Rate und Safety Stage, erwartete Realrendite (CAPE-geglättet). Diese Parameter geben Kontext für die eigene Einschätzung.
+
+**Schicht 4 — Ausgaben-Check:**
+Jahresbudget vs. tatsächlicher YTD-Verbrauch, Jahreshochrechnung, Topkategorien. Das schließt die Informationskette vom Portfoliostand bis zum Konsumverhalten.
+
+### Entscheidungsqualität in der Praxis
+
+| Entscheidungsebene | Klarheit | Umsetzbarkeit |
+|---|---|---|
+| Monatlicher Entnahmebetrag | Konkrete €-Zahl | Direkt umsetzbar |
+| Transaktionsanweisung | Betrag, Quelle, Verwendung, Steuer | Direkt bei Broker umsetzbar |
+| Steueroptimierung | Tranchenauswahl nach Steuer/€-Effizienz | Informiert Verkaufsentscheid |
+| Guardrail-Begründung | Explizit im Decision Tree | Nutzer versteht Einschränkung |
+| VPW-Safety-Stage | Stage-Nummer + Konsequenz | Klar |
+| Ausgaben-Tracking | Budget-Ampel mit Hochrechnung | Direkt interpretierbar |
+
+### Identifizierter Edge Case
+
+**Gold-Floor vs. Liquiditätsziel bei Simultankonfikt:** Wenn das Portfolio gleichzeitig unter dem Liquiditätsziel und dem Gold-Floor liegt, priorisiert die Engine intern Liquidität über Gold-Aufbau — aber diese Priorisierung wird dem Nutzer nicht explizit kommuniziert. Die Transaktion kann dann unvollständig wirken (Gold bleibt unter Floor), ohne dass ein Hinweis erscheint. Das ist der einzige identifizierte Fall, in dem die Handlungsempfehlung erklärungsbedürftig sein könnte.
+
+### Fazit
+
+**Die Balance App liefert in normalen und moderaten Stressszenarien qualitativ hochwertige, konkrete und durchführbare Jahresentscheide.** Die mehrstufige Informationshierarchie — von der €-Zahl bis zur Begründungskette — ist für einen selbstentscheidenden Privatanleger angemessen strukturiert. Es gibt keine Ambiguität im Regelfall, keine widersprüchlichen Empfehlungen, keinen unnötigen Interpretationsraum.
 
 ---
 
