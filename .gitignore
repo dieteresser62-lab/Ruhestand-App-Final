@@ -44,3 +44,11 @@ log.txt
 out*.txt
 parity_failure.log
 test_output.txt
+
+# Codex sessions
+.codex/
+
+# Orchestrator task files
+Aufgabe.md
+aufgabe.md
+feedback.md

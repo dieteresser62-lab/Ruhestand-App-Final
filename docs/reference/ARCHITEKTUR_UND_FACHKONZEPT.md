@@ -597,7 +597,6 @@ Die Suite ermöglicht **detailliertes Tranchen-Management** mit FIFO-basierter S
 |-------|-----|----------|
 | `depot-tranchen-manager.html` | ~400 | Standalone-UI für Tranchenverwaltung |
 | `depot-tranchen-status.js` | 432 | Status-Berechnung, Aggregation, UI-Sync |
-| `app/tranches/tranche-config-example.js` | ~100 | Beispiel-Konfiguration |
 
 **Tranchen-Datenmodell:**
 
@@ -883,7 +882,7 @@ function _internal_calculateModel(input, lastState) {
     // 4. Dynamic Flex (VPW) — optional
     if (input.dynamicFlex) {
         const expectedRealReturn = _calculateExpectedRealReturn({ input, lastState });
-        const vpwRate = _calculateVpwRate(expectedRealReturn, input.horizonYears);
+        const vpwRate = _berechneEntnahmeRate(expectedRealReturn, input.horizonYears);
         const vpwTotal = gesamtwert * vpwRate * (input.goGoActive ? input.goGoMultiplier : 1);
         inflatedBedarf.flex = Math.max(0, vpwTotal - inflatedBedarf.floor);
     }
@@ -2297,7 +2296,7 @@ flexBedarf = max(0, Gesamtvermögen × VPW-Rate × GoGo-Multiplikator − Floor)
 Die VPW-Rate ist die PMT-Formel (Annuitätenfaktor) der Finanzmathematik:
 
 ```javascript
-function _calculateVpwRate(realReturn, horizonYears) {
+function _berechneEntnahmeRate(realReturn, horizonYears) {
     if (Math.abs(realReturn) < 0.001) return 1 / horizonYears;  // Fallback
     return realReturn / (1 - Math.pow(1 + realReturn, -horizonYears));
 }
@@ -2722,7 +2721,6 @@ rt
 | `profilverbund-balance.js` | 550 | Multi-Profil-Aggregation, Entnahme-Verteilung |
 | `depot-tranchen-status.js` | 432 | Aggregation, UI-Sync, Status-Badge |
 | `balance-main-profile-sync.js` | ~150 | Cross-App-Synchronisation |
-| `app/tranches/tranche-config-example.js` | ~100 | Beispiel-Konfiguration |
 
 ## Tauri Desktop-App (4 Dateien)
 
@@ -2764,7 +2762,7 @@ rt
 24. **P2-Invarianz-Prüfung** (`simulator-sweep-utils.js:areP2InvariantsEqual`) **(neu!)**
 25. **Ausgaben-Check CSV-Parser** (`balance-expenses.js:parseCategoryCsv`) **(neu!)**
 26. **Median-basierte Hochrechnung** (`balance-expenses.js:computeYearStats`) **(neu!)**
-27. **VPW-Annuitätenformel** (`core.mjs:_calculateVpwRate`) **(neu!)**
+27. **VPW-Annuitätenformel** (`core.mjs:_berechneEntnahmeRate`) **(neu!)**
 28. **CAPE-basierte Realrendite mit EMA-Glättung** (`core.mjs:_calculateExpectedRealReturn`) **(neu!)**
 29. **Sterbetafel-Horizont (Single/Joint, Mean/Quantil)** (`simulator-engine-helpers.js`) **(neu!)**
 30. **Dynamischer MC-Horizont pro Simulationsjahr** (`monte-carlo-runner.js:computeDynamicFlexHorizonForYear`) **(neu!)**

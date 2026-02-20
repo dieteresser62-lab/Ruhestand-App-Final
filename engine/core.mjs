@@ -65,14 +65,14 @@ function _clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
-function _calculateVpwRate(realReturn, horizonYears) {
-    const n = Math.max(1, Number(horizonYears) || 1);
-    const r = Number(realReturn) || 0;
-    if (Math.abs(r) < 0.001) {
-        return 1 / n;
+const _berechneEntnahmeRate = (realeRendite, horizontJahre) => {
+    const laufzeitJahre = Math.max(1, Number(horizontJahre) || 1);
+    const rendite = Number(realeRendite) || 0;
+    if (Math.abs(rendite) < 0.001) {
+        return 1 / laufzeitJahre;
     }
-    return r / (1 - Math.pow(1 + r, -n));
-}
+    return rendite / (1 - Math.pow(1 + rendite, -laufzeitJahre));
+};
 
 function _calculateExpectedRealReturn(params) {
     const cfg = CONFIG.SPENDING_MODEL.DYNAMIC_FLEX;
@@ -360,7 +360,7 @@ function _internal_calculateModel(input, lastState) {
             lastExpectedRealReturn: vpwExpectedRealReturn
         });
         vpwExpectedRealReturn = expectedRealReturn;
-        const vpwRate = _calculateVpwRate(expectedRealReturn, horizonYears);
+        const vpwRate = _berechneEntnahmeRate(expectedRealReturn, horizonYears);
         let vpwTotal = gesamtwert * vpwRate;
         const goGoMultiplier = vpwEffectiveSettings.effectiveGoGo
             ? _clamp(normalizedInput.goGoMultiplier, 1.0, dynamicFlexCfg.MAX_GO_GO_MULTIPLIER)

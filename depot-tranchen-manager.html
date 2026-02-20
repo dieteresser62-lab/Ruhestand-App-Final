@@ -351,7 +351,6 @@
 
         <div class="controls">
             <button class="btn-primary" onclick="addTranche()">➕ Neue Tranche</button>
-            <button class="btn-success" onclick="loadExample()">📥 Beispiel laden</button>
             <button class="btn-secondary" onclick="updatePrices()">🔄 Kurse aktualisieren</button>
             <button class="btn-secondary" onclick="checkProxyHealth()">🩺 Proxy-Check</button>
             <button class="btn-secondary" onclick="exportTranches()">💾 Export JSON</button>
@@ -513,7 +512,6 @@
 
     <script type="module" src="app/profile/profile-bridge.js"></script>
     <script type="module">
-        import { BEISPIEL_DEPOT_TRANCHEN } from './app/tranches/tranche-config-example.js';
         import { CONFIG } from './app/balance/balance-config.js';
         import { getCurrentProfileId, getProfileMeta } from './app/profile/profile-storage.js';
         import { escapeHtml } from './app/shared/security-utils.js';
@@ -548,7 +546,6 @@
 
         // Make functions global
         window.tranchen = tranchen;
-        window.BEISPIEL_DEPOT_TRANCHEN = BEISPIEL_DEPOT_TRANCHEN;
 
         function generateTrancheId() {
             const rand = Math.random().toString(36).slice(2, 8);
@@ -810,14 +807,6 @@
             document.getElementById('trancheModal').classList.remove('active');
         };
 
-        window.loadExample = function() {
-            if (confirm('Beispiel-Daten laden? Bestehende Tranchen werden überschrieben.')) {
-                tranchen = normalizeTranches(JSON.parse(JSON.stringify(BEISPIEL_DEPOT_TRANCHEN)));
-                saveTranchen();
-                render();
-            }
-        };
-
         window.exportTranches = function() {
             const json = JSON.stringify(tranchen, null, 2);
             const blob = new Blob([json], { type: 'application/json' });
@@ -1058,7 +1047,7 @@
                     <div class="empty-state">
                         <div class="empty-state-icon">📭</div>
                         <h3>Keine Tranchen vorhanden</h3>
-                        <p>Fügen Sie Ihre erste Tranche hinzu oder laden Sie das Beispiel.</p>
+                        <p>Fügen Sie Ihre erste Tranche hinzu.</p>
                     </div>
                 `;
                 return;

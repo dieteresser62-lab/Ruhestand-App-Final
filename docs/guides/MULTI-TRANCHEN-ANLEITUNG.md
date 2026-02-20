@@ -15,8 +15,7 @@ Das Multi-Tranchen-System ermöglicht die **detaillierte Verwaltung einzelner De
 
 ### Neu hinzugefügt:
 1. **`depot-tranchen-manager.html`** - Eigenständiges Tool zur Verwaltung der Tranchen
-2. **`app/tranches/tranche-config-example.js`** - Beispiel-Konfiguration mit Ihren Positionen
-3. **`MULTI-TRANCHEN-ANLEITUNG.md`** - Diese Dokumentation
+2. **`MULTI-TRANCHEN-ANLEITUNG.md`** - Diese Dokumentation
 
 ### Erweitert:
 1. **`simulator-portfolio.js`** - Neue Funktion `initializePortfolioDetailed()`
@@ -33,13 +32,7 @@ Das Multi-Tranchen-System ermöglicht die **detaillierte Verwaltung einzelner De
 depot-tranchen-manager.html
 ```
 
-### Schritt 2: Beispiel laden
-
-1. Klicken Sie auf **"📥 Beispiel laden"**
-2. Die Beispiel-Daten mit Ihren realen Positionen werden geladen
-3. Passen Sie die Werte an (Stückzahlen, Preise, Kaufdaten)
-
-### Schritt 3: Tranchen anpassen
+### Schritt 2: Tranchen anpassen
 
 Für jede Position:
 - **Name**: z.B. "SAP SE"
@@ -53,7 +46,7 @@ Für jede Position:
   - `0.30` = 30% Teilfreistellung (Standard Aktienfonds)
   - `0.0` = Voll steuerpflichtig
 
-### Schritt 4: Exportieren
+### Schritt 3: Exportieren
 
 1. Klicken Sie auf **"💾 Export JSON"**
 2. Eine JSON-Datei wird heruntergeladen
@@ -356,7 +349,6 @@ console.log(localStorage.getItem('depot_tranchen'));
 
 ## 📚 Weiterführende Informationen
 
-- `app/tranches/tranche-config-example.js` - Vollständiges Beispiel mit Ihren Positionen
 - `simulator-portfolio.js` - Backend-Logik für Portfolio-Verwaltung
 - `engine/transactions/TransactionEngine.mjs` - steueroptimierte Verkaufslogik und Steuerberechnung
 
