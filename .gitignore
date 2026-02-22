@@ -19,7 +19,9 @@
 Thumbs.db
 
 # Agent files
-
+.orchestrator/
+inbox/
+outbox/
 
 # Python
 __pycache__/
