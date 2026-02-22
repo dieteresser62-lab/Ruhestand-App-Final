@@ -1,5 +1,8 @@
 # CLAUDE.md
 
+> **Diese Datei gilt für alle KI-Agenten** (Claude Code, Gemini CLI, Codex CLI und andere).  
+> This file provides guidance to any AI agent working with this repository.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
