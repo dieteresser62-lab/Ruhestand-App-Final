@@ -7,6 +7,7 @@ import { normalizeWidowOptions } from './simulator-sweep-utils.js';
 import { readMonteCarloParameters, createMonteCarloUI } from './monte-carlo-ui.js';
 import { ScenarioAnalyzer } from './scenario-analyzer.js';
 import { buildMonteCarloAggregates, createMonteCarloBuffers, MC_HEATMAP_BINS, pickWorstRun, runMonteCarloChunk, runMonteCarloSimulation } from './monte-carlo-runner.js';
+import { WorkerJobRunner } from './worker-job-runner.js';
 import { featureFlags } from '../shared/feature-flags.js';
 import { WorkerPool } from '../../workers/worker-pool.js';
 
@@ -106,19 +107,8 @@ async function runMonteCarloWithWorkers({
     const workerCount = Math.max(1, Number.isFinite(desiredWorkers) && desiredWorkers > 0
         ? desiredWorkers
         : Math.max(1, (navigator?.hardwareConcurrency || 2) - 1));
-    const baseTimeoutMs = 5000;
-    // Stall-Detection: wenn kein Fortschritt, nach Timeout abbrechen/auffrischen.
-    let stallTimeoutMs = 20000;
-    const pollIntervalMs = 250;
-    let lastProgressAt = performance.now();
     const pool = getMonteCarloPool(workerCount);
-    pool.onProgress = () => {
-        lastProgressAt = performance.now();
-    };
     pool.onError = error => console.error('[MC WorkerPool] Error:', error);
-    const memoryInterval = pool.telemetry && pool.telemetry.enabled
-        ? setInterval(() => pool.telemetry.recordMemorySnapshot(), 5000)
-        : null;
 
     const { scenarioKey, compiledScenario } = compileScenario(inputs, widowOptions, methode, useCapeSampling, inputs.stressPreset);
     const dataVersion = getDataVersion();
@@ -156,30 +146,17 @@ async function runMonteCarloWithWorkers({
 
     let worstRun = null;
     let worstRunCare = null;
-    let runsCompleted = 0;
-    let nextRunIdx = 0;
-
     const timeBudgetMs = workerConfig?.timeBudgetMs ?? 200;
-    // Adaptive Chunking: klein starten, dann via Budget glätten.
-    const minChunk = 10;
-    const maxChunk = Math.min(400, Math.max(minChunk, Math.ceil(anzahl / workerCount)));
-    let chunkSize = Math.min(maxChunk, Math.max(minChunk, Math.floor(anzahl / (workerCount * 4)) || minChunk));
-    let smoothedChunkSize = chunkSize;
-
-    const pending = new Set();
-
-    const scheduleNextIfNeeded = () => {
-        while (pending.size < workerCount && nextRunIdx < anzahl) {
-            const count = Math.min(chunkSize, anzahl - nextRunIdx);
-            scheduleJob(nextRunIdx, count);
-            nextRunIdx += count;
-        }
-    };
-
-    const scheduleJob = (start, count) => {
-        // Job-Payload ist deterministisch; Ergebnisse können sauber gemerged werden.
-        const startedAt = performance.now();
-        const payload = {
+    const runner = new WorkerJobRunner({
+        pool,
+        totalItems: anzahl,
+        workerCount,
+        timeBudgetMs,
+        minChunk: 10,
+        baseTimeoutMs: 5000,
+        stallTimeoutMs: 20000,
+        onProgress: pct => onProgress(pct * 0.9),
+        buildPayload: (start, count) => ({
             type: 'job',
             scenarioKey,
             runRange: { start, count },
@@ -197,43 +174,8 @@ async function runMonteCarloWithWorkers({
             },
             useCapeSampling,
             logIndices
-        };
-        const promise = pool.runJob(payload).then(result => {
-            const elapsedMs = result.elapsedMs ?? (performance.now() - startedAt);
-            return { result, start, count, elapsedMs };
-        });
-        pending.add(promise);
-        promise.finally(() => pending.delete(promise));
-    };
-
-    try {
-        await pool.broadcast({
-            type: 'init',
-            scenarioKey,
-            compiledScenario,
-            dataVersion
-        });
-
-        scheduleNextIfNeeded();
-
-        while (pending.size > 0) {
-            let raced = null;
-            while (!raced) {
-                const next = await Promise.race([
-                    Promise.race(pending),
-                    new Promise(resolve => setTimeout(resolve, pollIntervalMs))
-                ]);
-                if (next) {
-                    raced = next;
-                    break;
-                }
-                if (performance.now() - lastProgressAt > stallTimeoutMs) {
-                    throw new Error('Worker jobs stalled; falling back to serial execution.');
-                }
-            }
-
-            const { result, start, count, elapsedMs } = raced;
-
+        }),
+        mergeResult: (result, start, count) => {
             // Merge fixed-size buffers at their run indices.
             const chunkBuffers = result.buffers;
             buffers.finalOutcomes.set(chunkBuffers.finalOutcomes, start);
@@ -288,33 +230,19 @@ async function runMonteCarloWithWorkers({
                     scenarioAnalyzer.addRun(meta);
                 }
             }
-
-            runsCompleted += count;
-            onProgress((runsCompleted / anzahl) * 90);
-            lastProgressAt = performance.now();
-
-            if (elapsedMs > 0) {
-                // Smooth chunk size toward the time budget based on last chunk runtime.
-                const scaled = Math.round(count * (timeBudgetMs / elapsedMs));
-                const targetSize = Math.max(minChunk, Math.min(maxChunk, scaled || minChunk));
-                smoothedChunkSize = Math.max(minChunk, Math.min(maxChunk, Math.round(smoothedChunkSize * 0.7 + targetSize * 0.3)));
-                chunkSize = smoothedChunkSize;
-                if (pool.telemetry) {
-                    pool.telemetry.recordChunkSize(chunkSize);
-                }
-                const perRunMs = elapsedMs / count;
-                stallTimeoutMs = Math.max(baseTimeoutMs, Math.round(perRunMs * chunkSize * 3));
-            }
-
-            scheduleNextIfNeeded();
         }
+    });
+
+    try {
+        await pool.broadcast({
+            type: 'init',
+            scenarioKey,
+            compiledScenario,
+            dataVersion
+        });
+
+        await runner.run();
     } finally {
-        if (memoryInterval) {
-            clearInterval(memoryInterval);
-        }
-        if (pool.telemetry && pool.telemetry.enabled) {
-            pool.telemetry.printReport();
-        }
         // keep pool alive for reuse across runs
     }
 

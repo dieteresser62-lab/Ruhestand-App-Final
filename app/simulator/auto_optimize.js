@@ -5,6 +5,9 @@
  * Usage: Called by auto_optimize_ui.js to run the optimization process.
  * Dependencies: auto-optimize-metrics.js, auto-optimize-params.js, auto-optimize-evaluate.js, auto-optimize-sampling.js
  */
+// Note: This module uses Promise.all batching for candidate evaluation,
+// not WebWorker-based parallelism. See worker-job-runner.js for the
+// Worker-based orchestration pattern used by MC and Sweep.
 "use strict";
 
 /**

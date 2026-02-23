@@ -20,6 +20,7 @@ import { displaySensitivityAnalysis, displayParetoFrontier } from './simulator-v
 import { deepClone, extractP2Invariants } from './simulator-sweep-utils.js';
 import { renderSweepHeatmapSVG } from './simulator-heatmap.js';
 import { WorkerPool } from '../../workers/worker-pool.js';
+import { WorkerJobRunner } from './worker-job-runner.js';
 import { buildSweepInputs, runSweepChunk } from './sweep-runner.js';
 
 /**
@@ -130,40 +131,30 @@ async function runSweepWithWorkers({
     });
 
     const sweepResults = new Array(totalCombos);
-    let completedCombos = 0;
-    let p2VarianceCount = 0;
-    let nextComboIdx = 0;
-
-    // Adaptive chunking to balance worker overhead vs. throughput.
     const minChunk = 2;
     const maxChunk = Math.min(80, Math.max(minChunk, Math.ceil(totalCombos / workerCount)));
-    let chunkSize = Math.min(maxChunk, Math.max(minChunk, Math.floor(totalCombos / (workerCount * 4)) || minChunk));
-    let smoothedChunkSize = chunkSize;
-
-    const pending = new Set();
-    const scheduleNextIfNeeded = () => {
-        while (pending.size < workerCount && nextComboIdx < totalCombos) {
-            const count = Math.min(chunkSize, totalCombos - nextComboIdx);
-            scheduleJob(nextComboIdx, count);
-            nextComboIdx += count;
-        }
-    };
-
-    const scheduleJob = (start, count) => {
-        const startedAt = performance.now();
-        const payload = {
+    const runner = new WorkerJobRunner({
+        pool,
+        totalItems: totalCombos,
+        workerCount,
+        timeBudgetMs,
+        minChunk,
+        maxChunk,
+        enableStallDetection: false,
+        onProgress,
+        buildPayload: (start, count) => ({
             type: 'sweep',
             sweepConfig,
             comboRange: { start, count },
             refP2Invariants
-        };
-        const promise = pool.runJob(payload).then(result => {
-            const elapsedMs = result.elapsedMs ?? (performance.now() - startedAt);
-            return { result, start, count, elapsedMs };
-        });
-        pending.add(promise);
-        promise.finally(() => pending.delete(promise));
-    };
+        }),
+        mergeResult: result => {
+            // Merge sparse results into the full array by combo index.
+            for (const item of result.results) {
+                sweepResults[item.comboIdx] = { params: item.params, metrics: item.metrics };
+            }
+        }
+    });
 
     try {
         await pool.broadcast({
@@ -171,31 +162,7 @@ async function runSweepWithWorkers({
             baseInputs,
             paramCombinations
         });
-
-        scheduleNextIfNeeded();
-
-        while (pending.size > 0) {
-            const { result, start, count, elapsedMs } = await Promise.race(pending);
-
-            // Merge sparse results into the full array by combo index.
-            for (const item of result.results) {
-                sweepResults[item.comboIdx] = { params: item.params, metrics: item.metrics };
-            }
-            p2VarianceCount += result.p2VarianceCount || 0;
-
-            completedCombos += count;
-            onProgress((completedCombos / totalCombos) * 100);
-
-            if (elapsedMs > 0) {
-                // Adjust chunk size toward the worker time budget.
-                const scaled = Math.round(count * (timeBudgetMs / elapsedMs));
-                const targetSize = Math.max(minChunk, Math.min(maxChunk, scaled || minChunk));
-                smoothedChunkSize = Math.max(minChunk, Math.min(maxChunk, Math.round(smoothedChunkSize * 0.7 + targetSize * 0.3)));
-                chunkSize = smoothedChunkSize;
-            }
-
-            scheduleNextIfNeeded();
-        }
+        await runner.run();
     } finally {
         pool.dispose();
     }
@@ -213,7 +180,6 @@ async function runSweepSerial({
     const totalCombos = paramCombinations.length;
     const sweepResults = new Array(totalCombos);
     let completedCombos = 0;
-    let p2VarianceCount = 0;
     // Chunk serial execution to keep UI responsive.
     const chunkSize = Math.min(20, Math.max(1, Math.ceil(totalCombos / 20)));
 
@@ -229,7 +195,6 @@ async function runSweepSerial({
         for (const item of serial.results) {
             sweepResults[item.comboIdx] = { params: item.params, metrics: item.metrics };
         }
-        p2VarianceCount += serial.p2VarianceCount || 0;
         completedCombos += count;
         if (typeof onProgress === 'function') {
             onProgress((completedCombos / totalCombos) * 100);
