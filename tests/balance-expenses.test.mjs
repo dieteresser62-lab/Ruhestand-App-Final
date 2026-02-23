@@ -1,8 +1,17 @@
 import { initExpensesTab, updateExpensesBudget, rollExpensesYear } from '../app/balance/balance-expenses.js';
+import assert from 'node:assert/strict';
 
 console.log('--- Balance Expenses Tests ---');
 
 const STORAGE_KEY = 'balance_expenses_v1';
+
+function assertEqual(actual, expected, message) {
+    assert.equal(actual, expected, message);
+}
+
+function assertClose(actual, expected, epsilon, message) {
+    assert.ok(Math.abs(actual - expected) <= epsilon, message);
+}
 
 class MockLocalStorage {
     constructor() {
@@ -268,6 +277,7 @@ function seedMonth(year, month, categories) {
 const prevLocalStorage = global.localStorage;
 const prevWindow = global.window;
 const prevDocument = global.document;
+const prevConfirm = global.confirm;
 
 try {
     global.localStorage = new MockLocalStorage();
@@ -280,6 +290,17 @@ try {
     const dom = createDomRefs();
     initExpensesTab(dom);
     updateExpensesBudget({ monthlyBudget: 1000, annualBudget: 12000 });
+
+    // 0) Performance: refreshTableValues darf nur einmal auf STORAGE lesen
+    const originalGetItem = global.localStorage.getItem.bind(global.localStorage);
+    let storageReads = 0;
+    global.localStorage.getItem = function (key) {
+        if (key === STORAGE_KEY) storageReads += 1;
+        return originalGetItem(key);
+    };
+    updateExpensesBudget({ monthlyBudget: 1000, annualBudget: 12000 });
+    assertEqual(storageReads, 1, 'refreshTableValues-Zyklus sollte STORAGE nur einmal laden');
+    global.localStorage.getItem = originalGetItem;
 
     // 1) Ein Datenmonat => Ø/Monat
     assert(dom.expenses.forecastSub.textContent.includes('Ø/Monat'), 'Forecast sollte bei 1 Datenmonat mit Durchschnitt arbeiten');
@@ -332,6 +353,45 @@ try {
     assertClose(marchCategories.Versicherungen, -1500.5, 1e-9, 'CSV-Import sollte Kategorien aggregieren');
     assertClose(marchCategories.Krankenkasse, -99.5, 1e-9, 'CSV-Import sollte DE-Format korrekt parsen');
 
+    // 3b) Delete: vorhandene Monatsdaten entfernen
+    let confirmMessage = null;
+    global.confirm = (msg) => {
+        confirmMessage = msg;
+        return true;
+    };
+    const deleteBtn = dom.expenses.table.querySelector('[data-month="3"][data-profile="default"] [data-action="delete"]');
+    assert(deleteBtn, 'Delete-Button sollte existieren');
+    assertEqual(deleteBtn.classList.contains('btn-hidden'), false, 'Delete-Button sollte bei vorhandenen Daten sichtbar sein');
+    assertEqual(deleteBtn.tabIndex, 0, 'Sichtbarer Delete-Button sollte per Tastatur erreichbar sein');
+    assertEqual(deleteBtn.ariaHidden, 'false', 'Sichtbarer Delete-Button darf nicht aria-hidden sein');
+    dom.expenses.table.trigger('click', {
+        target: {
+            closest: (selector) => selector === 'button[data-action]' ? deleteBtn : null
+        }
+    });
+    assertEqual(confirmMessage, 'Monatsdaten für März löschen?', 'Delete-Confirm sollte den Monatstext exakt anzeigen');
+    const afterDeleteStore = readStore();
+    assertEqual(afterDeleteStore.years['2026'].months['3'].profiles.default, undefined, 'Delete sollte den Profileintrag entfernen');
+    const marchCell = dom.expenses.table.querySelector('[data-month="3"][data-profile="default"] [data-role="value"]');
+    assertEqual(marchCell?.textContent, '—', 'Delete sollte die Tabellenzelle neu rendern');
+    assertEqual(deleteBtn.classList.contains('btn-hidden'), true, 'Delete-Button sollte ohne Daten unsichtbar bleiben');
+    assertEqual(deleteBtn.tabIndex, -1, 'Unsichtbarer Delete-Button darf nicht per Tastatur erreichbar sein');
+    assertEqual(deleteBtn.ariaHidden, 'true', 'Unsichtbarer Delete-Button sollte für Assistive Tech verborgen sein');
+
+    // 3c) Delete-No-Op: nicht vorhandener Eintrag über Handler-Pfad
+    const beforeNoOp = JSON.stringify(readStore());
+    global.confirm = () => true;
+    const phantomDeleteBtn = {
+        dataset: { action: 'delete', month: '11', profile: 'default' }
+    };
+    dom.expenses.table.trigger('click', {
+        target: {
+            closest: (selector) => selector === 'button[data-action]' ? phantomDeleteBtn : null
+        }
+    });
+    const afterNoOp = JSON.stringify(readStore());
+    assertEqual(afterNoOp, beforeNoOp, 'Delete ohne vorhandenen Eintrag muss No-Op sein');
+
     // 4) Jahresabschluss: neues Jahr aktiv, Historie bleibt
     const newYear = rollExpensesYear();
     assertEqual(newYear, 2027, 'rollExpensesYear sollte auf Folgejahr wechseln');
@@ -348,6 +408,7 @@ try {
     if (prevDocument === undefined) delete global.document; else global.document = prevDocument;
     if (prevWindow === undefined) delete global.window; else global.window = prevWindow;
     if (prevLocalStorage === undefined) delete global.localStorage; else global.localStorage = prevLocalStorage;
+    if (prevConfirm === undefined) delete global.confirm; else global.confirm = prevConfirm;
 }
 
 console.log('--- Balance Expenses Tests Completed ---');

@@ -94,7 +94,6 @@ function setYear(year) {
     setActiveYear(year);
     renderYearSelect();
     renderTable();
-    updateSummary();
 }
 
 function getMonthData(yearData, month) {
@@ -216,8 +215,9 @@ function formatCurrency(value) {
     return UIUtils.formatCurrency(Math.abs(value || 0));
 }
 
-function updateSummary() {
+function updateSummary(store) {
     if (!dom?.expenses) return;
+    const safeStore = store || loadStore();
     const annualBudget = Number.isFinite(state.annualBudget) ? state.annualBudget : 0;
     const monthlyBudget = Number.isFinite(state.monthlyBudget) ? state.monthlyBudget : 0;
     if (dom.expenses.annualBudget) {
@@ -230,7 +230,7 @@ function updateSummary() {
     }
 
     const currentMonth = new Date().getMonth() + 1;
-    const { annualUsed, annualRemaining, ytdUsed, ytdBudget, ytdDelta, annualForecast, avgMonthly, medianMonthly, monthsWithData } = computeYearStats(currentMonth);
+    const { annualUsed, annualRemaining, ytdUsed, ytdBudget, ytdDelta, annualForecast, avgMonthly, medianMonthly, monthsWithData } = computeYearStats(safeStore, currentMonth);
     if (dom.expenses.annualUsed) {
         dom.expenses.annualUsed.textContent = annualBudget > 0
             ? `Verbraucht: ${UIUtils.formatCurrency(annualUsed)}`
@@ -288,8 +288,7 @@ function updateSummary() {
     }
 }
 
-function computeYearStats(currentMonth) {
-    const store = loadStore();
+function computeYearStats(store, currentMonth) {
     const yearData = getYearData(store, state.year);
     let annualUsed = 0;
     let ytdUsed = 0;
@@ -395,6 +394,9 @@ function renderTable() {
             td.dataset.month = String(m);
             td.dataset.profile = profile.profileId;
 
+            const inner = document.createElement('div');
+            inner.className = 'profile-cell-inner';
+
             const value = document.createElement('div');
             value.className = 'expense-value';
             value.dataset.role = 'value';
@@ -409,7 +411,9 @@ function renderTable() {
             importBtn.dataset.action = 'import';
             importBtn.dataset.month = String(m);
             importBtn.dataset.profile = profile.profileId;
-            importBtn.textContent = 'CSV';
+            importBtn.textContent = '📥';
+            importBtn.title = 'CSV importieren';
+            importBtn.ariaLabel = 'CSV importieren';
 
             const detailBtn = document.createElement('button');
             detailBtn.type = 'button';
@@ -417,10 +421,26 @@ function renderTable() {
             detailBtn.dataset.action = 'details';
             detailBtn.dataset.month = String(m);
             detailBtn.dataset.profile = profile.profileId;
-            detailBtn.textContent = 'Details';
+            detailBtn.textContent = '🔍';
+            detailBtn.title = 'Details anzeigen';
+            detailBtn.ariaLabel = 'Details anzeigen';
 
-            actions.append(importBtn, detailBtn);
-            td.append(value, actions);
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.className = 'btn btn-utility btn-sm';
+            deleteBtn.dataset.action = 'delete';
+            deleteBtn.dataset.month = String(m);
+            deleteBtn.dataset.profile = profile.profileId;
+            deleteBtn.textContent = '🗑️';
+            deleteBtn.title = 'Monatsdaten löschen';
+            deleteBtn.ariaLabel = 'Monatsdaten löschen';
+            deleteBtn.classList.add('btn-hidden');
+            deleteBtn.tabIndex = -1;
+            deleteBtn.ariaHidden = 'true';
+
+            actions.append(importBtn, detailBtn, deleteBtn);
+            inner.append(value, actions);
+            td.appendChild(inner);
             tr.appendChild(td);
         });
 
@@ -459,6 +479,21 @@ function refreshTableValues() {
 
             const cell = dom.expenses.table.querySelector(`[data-month="${month}"][data-profile="${profileId}"] [data-role="value"]`);
             if (cell) cell.textContent = spent > 0 ? formatCurrency(spent) : '—';
+            const deleteButton = dom.expenses.table.querySelector(`[data-month="${month}"][data-profile="${profileId}"] [data-action="delete"]`);
+            if (deleteButton) {
+                const hasProfileData = Boolean(profileData);
+                if (hasProfileData) {
+                    deleteButton.classList.remove('btn-hidden');
+                } else {
+                    deleteButton.classList.add('btn-hidden');
+                }
+                deleteButton.tabIndex = hasProfileData ? 0 : -1;
+                if (hasProfileData) {
+                    deleteButton.ariaHidden = 'false';
+                } else {
+                    deleteButton.ariaHidden = 'true';
+                }
+            }
         });
 
         const totalCell = dom.expenses.table.querySelector(`[data-month-total="${month}"] [data-role="total"]`);
@@ -477,7 +512,7 @@ function refreshTableValues() {
         }
     }
 
-    updateSummary();
+    updateSummary(store);
 }
 
 function openDetails(month, profileId) {
@@ -567,6 +602,21 @@ async function handleCsvImport(file, month, profileId) {
     UIRenderer.toast('CSV importiert.');
 }
 
+function deleteMonthData(month, profileId) {
+    const store = loadStore();
+    const yearData = store?.years?.[String(state.year)];
+    if (!yearData?.months) return false;
+    const monthData = yearData.months[String(month)];
+    if (!monthData?.profiles || !Object.prototype.hasOwnProperty.call(monthData.profiles, profileId)) {
+        return false;
+    }
+    delete monthData.profiles[profileId];
+    saveStore(store);
+    refreshTableValues();
+    UIRenderer.toast('Monatsdaten gelöscht.');
+    return true;
+}
+
 function handleTableClick(e) {
     const button = e.target.closest('button[data-action]');
     if (!button) return;
@@ -583,6 +633,16 @@ function handleTableClick(e) {
 
     if (action === 'details') {
         openDetails(month, profileId);
+        return;
+    }
+
+    if (action === 'delete') {
+        const monthName = MONTHS[month - 1] || String(month);
+        const confirmFn = typeof globalThis.confirm === 'function' ? globalThis.confirm.bind(globalThis) : null;
+        if (!confirmFn) return;
+        const confirmed = confirmFn(`Monatsdaten für ${monthName} löschen?`);
+        if (!confirmed) return;
+        deleteMonthData(month, profileId);
     }
 }
 
@@ -629,7 +689,6 @@ export function initExpensesTab(domRefs) {
     bindEvents();
     renderYearSelect();
     renderTable();
-    updateSummary();
 }
 
 export function updateExpensesBudget({ monthlyBudget, annualBudget }) {
