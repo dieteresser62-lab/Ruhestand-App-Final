@@ -9,6 +9,7 @@
 
 import { SUPPORTED_PFLEGE_GRADES } from './simulator-data.js';
 import { CONFIG } from '../balance/balance-config.js';
+import { STRATEGY_OPTIONS } from '../../types/strategy-options.js';
 
 const DYNAMIC_FLEX_DEFAULTS = {
     HORIZON_METHOD: 'survival_quantile',
@@ -17,6 +18,7 @@ const DYNAMIC_FLEX_DEFAULTS = {
     GO_GO_MULTIPLIER: 1.0
 };
 const DYNAMIC_FLEX_ALLOWED_HORIZON_METHODS = new Set(['mean', 'survival_quantile']);
+const LEGACY_STANDARD_MODES = new Set(['dynamic_flex', 'vpw', 'guardrails', 'fixed_real', 'none']);
 
 function readValue(data, key) {
     if (!data || typeof data !== 'object') return null;
@@ -63,6 +65,15 @@ function normalizeDynamicFlexHorizonMethod(method) {
     return DYNAMIC_FLEX_ALLOWED_HORIZON_METHODS.has(method)
         ? method
         : DYNAMIC_FLEX_DEFAULTS.HORIZON_METHOD;
+}
+
+function normalizeDecumulationMode(modeRaw) {
+    const mode = String(modeRaw || '').trim().toLowerCase();
+    if (mode === STRATEGY_OPTIONS.THREE_BUCKET_JILGE) return STRATEGY_OPTIONS.THREE_BUCKET_JILGE;
+    if (mode === STRATEGY_OPTIONS.STANDARD || LEGACY_STANDARD_MODES.has(mode) || mode === '') {
+        return STRATEGY_OPTIONS.STANDARD;
+    }
+    return STRATEGY_OPTIONS.STANDARD;
 }
 
 function parseWidowOptions(data) {
@@ -192,6 +203,33 @@ export function buildSimulatorInputsFromProfileData(profileData) {
         1.0,
         1.5
     );
+    const decumulationRaw = readValue(profileData, 'decumulation');
+    const decumulationFromProfile = (decumulationRaw && typeof decumulationRaw === 'object') ? decumulationRaw : null;
+    const decumulationMode = normalizeDecumulationMode(
+        readString(profileData, simKey('entnahmeStrategie'),
+            decumulationFromProfile?.mode || STRATEGY_OPTIONS.STANDARD)
+    );
+    const bondTargetFactor = readNumber(
+        profileData,
+        simKey('bondTargetFactor'),
+        Number(decumulationFromProfile?.bondTargetFactor)
+    );
+    const drawdownTrigger = readNumber(
+        profileData,
+        simKey('drawdownTrigger'),
+        Number(decumulationFromProfile?.drawdownTrigger)
+    );
+    const bondRefillThreshold = (() => {
+        const simValue = readValue(profileData, simKey('bondRefillThreshold'));
+        if (simValue === null || simValue === undefined || simValue === '') {
+            const profileValue = decumulationFromProfile?.bondRefillThreshold;
+            if (profileValue === null || profileValue === undefined || profileValue === '') return null;
+            const n = Number(String(profileValue).replace(',', '.'));
+            return Number.isFinite(n) ? Math.max(0, n) : null;
+        }
+        const n = Number(String(simValue).replace(',', '.'));
+        return Number.isFinite(n) ? Math.max(0, n) : null;
+    })();
 
     const goldAktivFromProfile = goldOverrides.goldAktiv;
     const goldAktiv = (typeof goldAktivFromProfile === 'boolean')
@@ -260,7 +298,12 @@ export function buildSimulatorInputsFromProfileData(profileData) {
         pflegeMaxDauer: readInt(profileData, simKey('pflegeMaxDauer'), 10),
         pflegeKostenDrift: readNumber(profileData, simKey('pflegeKostenDrift'), 0) / 100,
         pflegeRegionalZuschlag: readNumber(profileData, simKey('pflegeRegionalZuschlag'), 0) / 100,
-        decumulation: { mode: 'none' },
+        decumulation: {
+            mode: decumulationMode,
+            bondTargetFactor: Number.isFinite(bondTargetFactor) ? Math.max(0, bondTargetFactor) : null,
+            drawdownTrigger: Number.isFinite(drawdownTrigger) ? drawdownTrigger : null,
+            bondRefillThreshold
+        },
         stressPreset: readString(profileData, simKey('stressPreset'), 'NONE'),
         partner: {
             aktiv: readBool(profileData, 'sim_partnerAktiv', false),

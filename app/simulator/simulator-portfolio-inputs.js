@@ -10,6 +10,7 @@
 import { SUPPORTED_PFLEGE_GRADES } from './simulator-data.js';
 import { normalizeCareDurationRange } from './simulator-portfolio-care.js';
 import { parseDisplayNumber } from './simulator-portfolio-format.js';
+import { STRATEGY_OPTIONS } from '../../types/strategy-options.js';
 
 const DEFAULT_RISIKOPROFIL = 'sicherheits-dynamisch';
 const DEFAULT_PFLEGE_DRIFT_PCT = 3.5; // Realistische Langfrist-Annahme (3–4 % über VPI)
@@ -20,11 +21,21 @@ const DYNAMIC_FLEX_DEFAULTS = {
     GO_GO_MULTIPLIER: 1.0
 };
 const DYNAMIC_FLEX_ALLOWED_HORIZON_METHODS = new Set(['mean', 'survival_quantile']);
+const LEGACY_STANDARD_MODES = new Set(['dynamic_flex', 'vpw', 'guardrails', 'fixed_real', 'none']);
 
 function parseBoundedNumber(rawValue, fallback, min, max) {
     const n = Number.parseFloat(String(rawValue ?? '').replace(',', '.'));
     if (!Number.isFinite(n)) return fallback;
     return Math.max(min, Math.min(max, n));
+}
+
+function normalizeDecumulationMode(modeRaw) {
+    const mode = String(modeRaw || '').trim().toLowerCase();
+    if (mode === STRATEGY_OPTIONS.THREE_BUCKET_JILGE) return STRATEGY_OPTIONS.THREE_BUCKET_JILGE;
+    if (mode === STRATEGY_OPTIONS.STANDARD || LEGACY_STANDARD_MODES.has(mode) || mode === '') {
+        return STRATEGY_OPTIONS.STANDARD;
+    }
+    return STRATEGY_OPTIONS.STANDARD;
 }
 
 /**
@@ -139,6 +150,10 @@ export function getCommonInputs() {
         0,
         Number.MAX_SAFE_INTEGER
     ));
+    const decumulationMode = normalizeDecumulationMode(document.getElementById('entnahmeStrategie')?.value);
+    const bondTargetFactorRaw = Number.parseFloat(String(document.getElementById('bondTargetFactor')?.value || '').replace(',', '.'));
+    const drawdownTriggerRaw = Number.parseFloat(String(document.getElementById('drawdownTrigger')?.value || '').replace(',', '.'));
+    const bondRefillThresholdRaw = Number.parseFloat(String(document.getElementById('bondRefillThreshold')?.value || '').replace(',', '.'));
 
     const baseInputs = {
         startVermoegen: parseDisplayNumber(document.getElementById('simStartVermoegen')?.value),
@@ -197,7 +212,12 @@ export function getCommonInputs() {
             const raw = parseFloat(document.getElementById('pflegeRegionalZuschlag')?.value);
             return Math.max(0, Number.isFinite(raw) ? raw : 0) / 100;
         })(),
-        decumulation: { mode: 'none' },
+        decumulation: {
+            mode: decumulationMode,
+            bondTargetFactor: Number.isFinite(bondTargetFactorRaw) ? Math.max(0, bondTargetFactorRaw) : null,
+            drawdownTrigger: Number.isFinite(drawdownTriggerRaw) ? drawdownTriggerRaw : null,
+            bondRefillThreshold: Number.isFinite(bondRefillThresholdRaw) ? Math.max(0, bondRefillThresholdRaw) : null
+        },
         stressPreset: document.getElementById('stressPreset').value || 'NONE',
         // Partner-Konfiguration (Rente 2)
         partner: {

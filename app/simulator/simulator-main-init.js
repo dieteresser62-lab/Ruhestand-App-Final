@@ -18,6 +18,7 @@ import { initPartnerToggle } from './simulator-main-partner.js';
 import { initStressPresetOptions } from './simulator-main-stress.js';
 import { initSimulatorProfileSelection } from './simulator-main-profiles.js';
 import { initMonteCarloStartYearControls } from './monte-carlo-ui.js';
+import { initThreeBucketControls } from './simulator-main-3bucket.js';
 
 /**
  * Prüft Engine-Version
@@ -45,6 +46,7 @@ export function initializeSimulatorApp() {
 
     initInputPersistence();
     initDynamicFlexControls();
+    initThreeBucketControls();
     initializePflegeUIControls();
 
     const mcMethodeSelect = document.getElementById('mcMethode');

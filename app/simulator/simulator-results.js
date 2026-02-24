@@ -6,6 +6,7 @@ import { prepareMonteCarloViewModel } from './results-metrics.js';
 import { renderSummary, renderKpiDashboard, renderStressSection, renderHeatmap, renderCareSection } from './results-renderers.js';
 import { showToast } from './simulator-main-helpers.js';
 import { EngineAPI } from '../../engine/index.mjs';
+import { STRATEGY_OPTIONS } from '../../types/strategy-options.js';
 
 const formatPercent = (value, digits = 1) => formatPercentValue(Number(value) || 0, { fractionDigits: digits, invalid: '0.0%' });
 const formatPercentFromRatio = (value, digits = 1) => formatPercentRatio(Number(value) || 0, { fractionDigits: digits, invalid: '0.0%' });
@@ -150,7 +151,8 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
                 const logDetailLevel = loadDetailLevel(WORST_LOG_DETAIL_KEY);
                 output.innerHTML = renderWorstRunLog(scenario.logDataRows, caR, {
                     showCareDetails: showCareDetails,
-                    logDetailLevel: logDetailLevel
+                    logDetailLevel: logDetailLevel,
+                    strategyMode: inputs?.decumulation?.mode || STRATEGY_OPTIONS.STANDARD
                 });
                 output.style.display = 'block';
                 exportButtons.style.display = 'flex';
@@ -251,6 +253,8 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
  */
 export function getWorstRunColumnDefinitions(opts = {}) {
     const options = { showCareDetails: false, logDetailLevel: 'normal', ...opts };
+    const strategyMode = String(options.strategyMode || '').toLowerCase();
+    const isThreeBucket = strategyMode === STRATEGY_OPTIONS.THREE_BUCKET_JILGE;
 
     const formatPctOrDash = (value, fallback = '—') => {
         if (value == null || !isFinite(value)) return fallback;
@@ -403,10 +407,27 @@ export function getWorstRunColumnDefinitions(opts = {}) {
             }
         },
         { key: 'steuern_gesamt', header: 'St.', width: 6, fmt: formatCurrencyShortLog },
-        { key: 'wertAktien', header: 'Aktien', width: 8, fmt: formatCurrencyShortLog },
+        {
+            key: 'wertAktien',
+            header: isThreeBucket ? 'ETF' : 'Aktien',
+            width: 8,
+            fmt: (v, row) => {
+                if (!isThreeBucket) return formatCurrencyShortLog(v);
+                const bond = Number(row?.bondBucketAfter ?? row?.threeBucket?.bondBucketAfter) || 0;
+                const etf = Math.max(0, (Number(v) || 0) - bond);
+                return formatCurrencyShortLog(etf);
+            }
+        },
         { key: 'wertGold', header: 'Gold', width: 7, fmt: formatCurrencyShortLog },
         { key: 'liquiditaet', header: 'Liq.', width: 7, fmt: formatCurrencyShortLog },
     ];
+    if (isThreeBucket) {
+        finalCols.push(
+            { key: 'bondBucketAfter', header: 'Bonds/Puffer', width: 10, fmt: (v, row) => formatCurrencyShortLog(v ?? row?.threeBucket?.bondBucketAfter) },
+            { key: 'bondRefillNet', header: 'Bd.Kauf', width: 8, fmt: (v, row) => formatCurrencyShortLog(v ?? row?.threeBucket?.bondRefillNet) },
+            { key: 'bondSaleAmount', header: 'Bd.Verk', width: 8, fmt: (v, row) => formatCurrencyShortLog(v ?? row?.threeBucket?.bondSaleAmount) }
+        );
+    }
 
     const detailCols = options.logDetailLevel === 'detailed' ? [
         { key: 'vpw.vpwRate', header: 'VPW%', width: 5, fmt: v => (Number.isFinite(v) ? formatPercentValue(v * 100, { fractionDigits: 1, invalid: '' }) : '') },

@@ -5,6 +5,7 @@ import { listProfiles, getProfileData, getCurrentProfileId, setProfileVerbundMem
 import { buildSimulatorInputsFromProfileData, combineSimulatorProfiles } from './simulator-profile-inputs.js';
 import { updateStartPortfolioDisplay } from './simulator-portfolio.js';
 import { refreshDynamicFlexControls, syncDynamicFlexPresetSelection } from './simulator-main-dynamic-flex.js';
+import { refreshThreeBucketControls } from './simulator-main-3bucket.js';
 
 export function initSimulatorProfileSelection() {
     const listContainer = document.getElementById('simProfileList');
@@ -166,6 +167,10 @@ function applyCombinedInputsToUI(combined, selectedCount) {
 
     setValue('runwayMinMonths', combined.runwayMinMonths || 0);
     setValue('runwayTargetMonths', combined.runwayTargetMonths || 0);
+    setValue('entnahmeStrategie', combined.decumulation?.mode || 'standard');
+    setValue('bondTargetFactor', combined.decumulation?.bondTargetFactor ?? '');
+    setValue('drawdownTrigger', combined.decumulation?.drawdownTrigger ?? '');
+    setValue('bondRefillThreshold', combined.decumulation?.bondRefillThreshold ?? '');
     setValue('targetEq', combined.targetEq || 0);
     setValue('rebalBand', combined.rebalBand || 0);
     setValue('maxSkimPctOfEq', combined.maxSkimPctOfEq || 0);
@@ -174,6 +179,7 @@ function applyCombinedInputsToUI(combined, selectedCount) {
     // Profilverbund-Aggregation überschreibt diese Felder nicht.
     syncDynamicFlexPresetSelection();
     refreshDynamicFlexControls();
+    refreshThreeBucketControls();
     setValue('marketCapeRatio', combined.marketCapeRatio || 0);
 
     setValue('p1StartAlter', combined.startAlter || 0);

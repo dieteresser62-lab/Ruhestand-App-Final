@@ -295,6 +295,12 @@ export function calculateAggregatedValues(tranchesOverride = null) {
                 neubestand.marketValue += mv;
                 neubestand.costBasis += cb;
             }
+            return;
+        }
+
+        if (category === 'bonds' || type === 'anleihe' || String(type).includes('bond') || String(category).includes('bond')) {
+            neubestand.marketValue += mv;
+            neubestand.costBasis += cb;
         }
     });
 

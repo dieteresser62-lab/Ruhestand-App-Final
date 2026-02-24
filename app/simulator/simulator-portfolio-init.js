@@ -31,12 +31,15 @@ export function initializePortfolioDetailed(inputs) {
             // Normalize type/category across legacy labels.
             const rawType = String(tranche.type || tranche.kind || '').toLowerCase();
             const rawCategory = String(tranche.category || '').toLowerCase();
+            const isBond = rawType.includes('bond') || rawType.includes('anleihe') || rawCategory.includes('bond') || rawCategory.includes('anleihe');
             let category = rawCategory;
             if (!category) {
                 if (rawType.includes('gold')) {
                     category = 'gold';
                 } else if (rawType.includes('geldmarkt') || rawType.includes('money')) {
                     category = 'money_market';
+                } else if (isBond) {
+                    category = 'bonds';
                 } else {
                     category = 'equity';
                 }
@@ -47,6 +50,9 @@ export function initializePortfolioDetailed(inputs) {
                 normalizedType = 'gold';
             } else if (category === 'money_market') {
                 normalizedType = 'geldmarkt';
+            } else if (category === 'bonds' || isBond) {
+                normalizedType = rawType || 'anleihe';
+                category = 'bonds';
             } else if (category === 'equity') {
                 if (rawType === 'aktien_neu' || rawType === 'aktien_alt') {
                     normalizedType = rawType;
@@ -84,7 +90,7 @@ export function initializePortfolioDetailed(inputs) {
             };
 
             // Kategorisierung
-            if (trancheObj.category === 'equity') {
+            if (trancheObj.category === 'equity' || trancheObj.category === 'bonds') {
                 depotTranchesAktien.push(trancheObj);
             } else if (trancheObj.category === 'gold') {
                 depotTranchesGold.push(trancheObj);

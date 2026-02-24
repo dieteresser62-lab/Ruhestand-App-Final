@@ -304,6 +304,25 @@
                         <legend><span class="section-icon">⚖️</span>Runway & Rebalancing<span
                                 class="progress-indicator"></span></legend>
                         <div class="fieldset-content">
+                            <h4 style="margin-top: 0; margin-bottom: 12px; font-size: 0.95rem;">Entnahme-Strategie</h4>
+                            <div class="form-grid" style="margin-bottom: 20px;">
+                                <div class="form-group"><label for="entnahmeStrategie">Strategie</label><select
+                                        id="entnahmeStrategie">
+                                        <option value="standard" selected>Standard</option>
+                                        <option value="3_bucket_jilge">3-Bucket Jilge</option>
+                                    </select></div>
+                            </div>
+                            <div id="threeBucketConfigGroup" class="form-grid-four-col"
+                                style="display: none; margin-bottom: 20px;">
+                                <div class="form-group"><label for="bondTargetFactor">Anleihen-Zielfaktor
+                                        (Jahresausgaben)</label><input type="number" id="bondTargetFactor"
+                                        placeholder="5" step="0.1" min="0"></div>
+                                <div class="form-group"><label for="drawdownTrigger">Drawdown-Schwelle (% Verlust)</label><input
+                                        type="number" id="drawdownTrigger" placeholder="15" step="0.1" min="0"></div>
+                                <div class="form-group"><label for="bondRefillThreshold">Anleihen-Auffüll-Schwelle
+                                        (%)</label><input type="number" id="bondRefillThreshold"
+                                        placeholder="optional" step="0.1" min="0"></div>
+                            </div>
                             <h4 style="margin-top: 0; margin-bottom: 12px; font-size: 0.95rem;">Runway-Steuerung</h4>
                             <div class="form-grid" style="margin-bottom: 20px;">
                                 <div class="form-group"><label for="runwayMinMonths">Runway Minimum
@@ -844,6 +863,7 @@
                     <div id="simulationResults" style="display:none; margin-top: 25px;">
                         <h3>Ergebnis des Backtests</h3>
                         <div id="simulationSummary"></div>
+                        <div id="portfolioCompositionChart" style="display:none; margin-top: 18px;"></div>
                         <h4 style="text-align:center; margin-top:20px;">Jahresprotokoll</h4>
                         <div style="text-align: center; margin-bottom: 10px; font-size: 0.9rem;"><label
                                 style="user-select:none; cursor:pointer;"

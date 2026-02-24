@@ -26,6 +26,8 @@ import {
     prepareRowsForExport,
     triggerDownload
 } from './simulator-main-helpers.js';
+import { renderThreeBucketPortfolioChart } from './simulator-portfolio-chart.js';
+import { STRATEGY_OPTIONS } from '../../types/strategy-options.js';
 
 const HIST_SERIES_START_YEAR = 1950;
 const DYNAMIC_FLEX_MIN_HORIZON = 1;
@@ -426,7 +428,11 @@ export function runBacktest() {
         const endVermoegen = portfolioTotal(simState.portfolio);
 
         // Speichere Log-Daten für späteres Neu-Rendern
-        window.globalBacktestData = { rows: logRows, startJahr };
+        window.globalBacktestData = {
+            rows: logRows,
+            startJahr,
+            decumulationMode: inputs?.decumulation?.mode || STRATEGY_OPTIONS.STANDARD
+        };
 
         document.getElementById('simulationResults').style.display = 'block';
         document.getElementById('simulationSummary').innerHTML = `
@@ -456,7 +462,9 @@ export function renderBacktestLog() {
 
     const logDetailLevel = loadDetailLevel(BACKTEST_LOG_DETAIL_KEY, LEGACY_LOG_DETAIL_KEY);
     const { rows: logRows } = window.globalBacktestData;
-    const columns = buildBacktestColumnDefinitions(logDetailLevel);
+    const columns = buildBacktestColumnDefinitions(logDetailLevel, {
+        strategyMode: window.globalBacktestData?.decumulationMode
+    });
 
     // Generate HTML table
     let html = '<table><thead><tr>';
@@ -479,6 +487,17 @@ export function renderBacktestLog() {
     html += '</tbody></table>';
 
     document.getElementById('simulationLog').innerHTML = html;
+    const chartContainer = document.getElementById('portfolioCompositionChart');
+    if (chartContainer) {
+        const mode = String(window.globalBacktestData?.decumulationMode || '').toLowerCase();
+        if (mode === STRATEGY_OPTIONS.THREE_BUCKET_JILGE) {
+            chartContainer.style.display = 'block';
+            renderThreeBucketPortfolioChart(chartContainer, logRows);
+        } else {
+            chartContainer.style.display = 'none';
+            chartContainer.innerHTML = '';
+        }
+    }
 }
 
 /**
@@ -494,7 +513,9 @@ export function exportBacktestLogData(format = 'json') {
     }
 
     const detailLevel = loadDetailLevel(BACKTEST_LOG_DETAIL_KEY, LEGACY_LOG_DETAIL_KEY);
-    const columns = buildBacktestColumnDefinitions(detailLevel);
+    const columns = buildBacktestColumnDefinitions(detailLevel, {
+        strategyMode: backtestData?.decumulationMode
+    });
     const timestamp = new Date().toISOString().replace(/[:]/g, '-');
     const filenameBase = `backtest-log-${timestamp}`;
 

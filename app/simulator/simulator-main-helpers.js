@@ -4,6 +4,7 @@
 import { formatCurrencyShortLog } from './simulator-utils.js';
 import { formatPercentValue, formatPercentRatio } from './simulator-formatting.js';
 import { EngineAPI } from '../../engine/index.mjs';
+import { STRATEGY_OPTIONS } from '../../types/strategy-options.js';
 
 const CSV_DELIMITER = ';';
 
@@ -207,8 +208,10 @@ export function triggerDownload(filename, content, mimeType) {
  * @param {string} detailLevel - Either 'normal' or 'detailed'.
  * @returns {Array<Object>} Column definitions for rendering/export.
  */
-export function buildBacktestColumnDefinitions(detailLevel = 'normal') {
+export function buildBacktestColumnDefinitions(detailLevel = 'normal', options = {}) {
     const isDetailed = detailLevel === 'detailed';
+    const strategyMode = String(options?.strategyMode || '').toLowerCase();
+    const isThreeBucket = strategyMode === STRATEGY_OPTIONS.THREE_BUCKET_JILGE;
     const formatPercent = (value, decimals = 1) => formatPercentValue(Number(value) || 0, { fractionDigits: decimals, invalid: '0.0%' });
     const formatPercentInt = (value) => formatPercentValue(Math.round(Number(value) || 0), { fractionDigits: 0, invalid: '0%' });
 
@@ -343,10 +346,44 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal') {
             }, align: 'right'
         },
         { header: 'St.', width: 6, key: 'row.steuern_gesamt', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
-        { header: 'Aktien', width: 8, key: 'wertAktien', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+        {
+            header: isThreeBucket ? 'ETF' : 'Aktien',
+            width: 8,
+            extractor: isThreeBucket
+                ? (row => (Number(row?.wertAktien) || 0) - (Number(row?.row?.bondBucketAfter ?? row?.row?.threeBucket?.bondBucketAfter) || 0))
+                : undefined,
+            key: isThreeBucket ? undefined : 'wertAktien',
+            valueFormatter: v => formatCurrencyShortLog(Math.max(0, Number(v) || 0)),
+            align: 'right'
+        },
         { header: 'Gold', width: 7, key: 'wertGold', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
         { header: 'Liq.', width: 7, key: 'liquiditaet', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' }
     );
+    if (isThreeBucket) {
+        columns.push(
+            {
+                header: 'Bonds/Puffer',
+                width: 10,
+                extractor: row => Number(row?.row?.bondBucketAfter ?? row?.row?.threeBucket?.bondBucketAfter) || 0,
+                valueFormatter: v => formatCurrencyShortLog(v),
+                align: 'right'
+            },
+            {
+                header: 'Bd.Kauf',
+                width: 8,
+                extractor: row => Number(row?.row?.bondRefillNet ?? row?.row?.threeBucket?.bondRefillNet) || 0,
+                valueFormatter: v => formatCurrencyShortLog(v),
+                align: 'right'
+            },
+            {
+                header: 'Bd.Verk',
+                width: 8,
+                extractor: row => Number(row?.row?.bondSaleAmount ?? row?.row?.threeBucket?.bondSaleAmount) || 0,
+                valueFormatter: v => formatCurrencyShortLog(v),
+                align: 'right'
+            }
+        );
+    }
 
     if (isDetailed) {
         columns.push(

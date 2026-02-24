@@ -18,7 +18,8 @@ export function initInputPersistence() {
         'p1Monatsrente', 'p1StartInJahren', 'rentAdjMode', 'rentAdjPct',
         'pflegefallLogikAktivieren', 'pflegeModellTyp', ...CARE_GRADE_FIELD_IDS,
         'pflegeMaxFloor', 'pflegeRampUp', 'pflegeMinDauer', 'pflegeMaxDauer', 'pflegeKostenDrift',
-        'pflegeRegionalZuschlag', 'pflegeKostenStaffelPreset'
+        'pflegeRegionalZuschlag', 'pflegeKostenStaffelPreset',
+        'entnahmeStrategie', 'bondTargetFactor', 'drawdownTrigger', 'bondRefillThreshold'
     ];
     allInputs.forEach(id => {
         const element = document.getElementById(id);

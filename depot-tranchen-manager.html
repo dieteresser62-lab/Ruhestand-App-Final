@@ -473,6 +473,7 @@
                     <label for="category">Kategorie *</label>
                     <select id="category" required>
                         <option value="equity">Aktien / Equity</option>
+                        <option value="bonds">Anleihen / Bonds</option>
                         <option value="gold">Gold / Edelmetalle</option>
                         <option value="money_market">Geldmarkt</option>
                     </select>
@@ -483,6 +484,7 @@
                     <select id="type" required>
                         <option value="aktien_alt">Altbestand (vor 2018)</option>
                         <option value="aktien_neu">Neubestand (nach 2018)</option>
+                        <option value="anleihe">Anleihe</option>
                         <option value="geldmarkt">Geldmarkt-ETF</option>
                         <option value="gold">Gold-ETC</option>
                     </select>
@@ -1068,6 +1070,7 @@
                 const typeBadge =
                     t.type === 'aktien_alt' ? '<span class="badge badge-alt">Alt</span>' :
                     t.type === 'aktien_neu' ? '<span class="badge badge-neu">Neu</span>' :
+                    t.type === 'anleihe' ? '<span class="badge badge-geldmarkt">Bond</span>' :
                     '<span class="badge badge-geldmarkt">Geldmarkt</span>';
                 const taxBadge = t.tqf >= 1.0 ? '<span class="badge badge-steuerfrei">Steuerfrei</span>' : '';
 

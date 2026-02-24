@@ -14,6 +14,7 @@ export { prepareHistoricalData } from './simulator-portfolio-historical.js';
 export { computeYearlyPension, computePensionNext, computeRentAdjRate } from './simulator-portfolio-pension.js';
 export { buildStressContext, applyStressOverride } from './simulator-portfolio-stress.js';
 export {
+    isBondKind,
     sortTranchesFIFO,
     sortTranchesTaxOptimized,
     calculateTrancheTax,

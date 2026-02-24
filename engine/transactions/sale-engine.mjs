@@ -240,6 +240,10 @@ export function calculateSaleAndTax(requestedRefill, input, context, market, isE
  * Bestimmt Verkaufsreihenfolge (mit FIFO-Unterstützung)
  */
 export function getSellOrder(tranches, market, input, context, isEmergencySale) {
+    const isBondKind = (value) => {
+        const s = String(value || '').toLowerCase();
+        return s.includes('bond') || s.includes('anleihe');
+    };
     // Alle verfügbaren Keys
     const allKeys = Object.keys(tranches);
 
@@ -247,6 +251,10 @@ export function getSellOrder(tranches, market, input, context, isEmergencySale) 
     const equityKeys = allKeys.filter(k => {
         const t = tranches[k];
         return k.startsWith('aktien') || (t.category && t.category === 'equity');
+    });
+    const bondKeys = allKeys.filter(k => {
+        const t = tranches[k];
+        return isBondKind(k) || isBondKind(t?.kind) || isBondKind(t?.type) || isBondKind(t?.category) || t?.category === 'bonds';
     });
 
     const goldKeys = allKeys.filter(k => {
@@ -308,7 +316,7 @@ export function getSellOrder(tranches, market, input, context, isEmergencySale) 
 
     // Im defensiven Kontext: Gold zuerst, dann Aktien (beide FIFO-sortiert)
     if (isDefensiveContext) {
-        const order = [...sortedGoldKeys, ...sortedEquityKeys];
+        const order = [...sortedGoldKeys, ...bondKeys, ...sortedEquityKeys];
         return order.filter(k => tranches[k]);
     }
 
@@ -331,7 +339,7 @@ export function getSellOrder(tranches, market, input, context, isEmergencySale) 
     }
 
     // Standard: Aktien zuerst (FIFO), dann Gold (FIFO)
-    return [...sortedEquityKeys, ...sortedGoldKeys].filter(k => tranches[k]);
+    return [...bondKeys, ...sortedEquityKeys, ...sortedGoldKeys].filter(k => tranches[k]);
 }
 
 /**

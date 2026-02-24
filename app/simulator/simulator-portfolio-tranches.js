@@ -7,6 +7,11 @@
  */
 "use strict";
 
+export function isBondKind(typeOrCategory) {
+    const s = String(typeOrCategory || '').toLowerCase();
+    return s.includes('bond') || s.includes('anleihe');
+}
+
 /**
  * Sortiert Tranchen nach FIFO-Prinzip (First In, First Out)
  * Älteste Käufe (nach Datum) werden zuerst verkauft (gesetzlich vorgeschrieben)
@@ -85,6 +90,7 @@ export function applySaleToPortfolio(portfolio, saleResult) {
     const normalizeKind = (kind) => String(kind || '').toLowerCase();
     const isEquityKind = (kind) => kind.startsWith('aktien') || kind === 'equity' || kind === 'stocks' || kind === 'stock';
     const isGoldKind = (kind) => kind.startsWith('gold');
+    const isBondSaleKind = (kind) => isBondKind(kind) || kind === 'bonds';
     const isMoneyKind = (kind) => kind.startsWith('geldmarkt') || kind === 'money_market' || kind === 'money market';
     const logDebug = () => { };
 
@@ -158,7 +164,7 @@ export function applySaleToPortfolio(portfolio, saleResult) {
         let tranche = findTrancheById(saleItem.trancheId);
         if (!tranche) {
             const kind = normalizeKind(saleItem.kind);
-            const tranches = isEquityKind(kind)
+            const tranches = isEquityKind(kind) || isBondSaleKind(kind)
                 ? portfolio.depotTranchesAktien
                 : (isGoldKind(kind) ? portfolio.depotTranchesGold : (isMoneyKind(kind) ? portfolio.depotTranchesGeldmarkt : null));
             if (tranches && tranches.length) {
@@ -192,20 +198,22 @@ export function applySaleToPortfolio(portfolio, saleResult) {
  * Fasst Verkäufe nach Asset-Typ zusammen
  */
 export function summarizeSalesByAsset(saleResult) {
-    const sums = { vkAkt: 0, vkGld: 0, stAkt: 0, stGld: 0, vkGes: 0, stGes: 0 };
+    const sums = { vkAkt: 0, vkGld: 0, vkBnd: 0, stAkt: 0, stGld: 0, stBnd: 0, vkGes: 0, stGes: 0 };
     if (!saleResult || !Array.isArray(saleResult.breakdown)) return sums;
     for (const item of saleResult.breakdown) {
         if (!item.kind || item.kind === 'liquiditaet') continue;
         const isAktie = String(item.kind || '').startsWith('aktien');
+        const isBond = isBondKind(item.kind) || String(item.category || '').toLowerCase() === 'bonds';
         const brutto = +item.brutto || 0;
         const steuer = (item.steuer != null) ? (+item.steuer) : 0;
         if (isAktie) { sums.vkAkt += brutto; sums.stAkt += steuer; }
+        else if (isBond) { sums.vkBnd += brutto; sums.stBnd += steuer; }
         else { sums.vkGld += brutto; sums.stGld += steuer; }
         sums.vkGes += brutto; sums.stGes += steuer;
     }
-    if (sums.stGes === 0 && saleResult.steuerGesamt > 0 && (sums.vkAkt + sums.vkGld) > 0) {
-        const tot = sums.vkAkt + sums.vkGld; const ges = saleResult.steuerGesamt;
-        sums.stAkt = ges * (sums.vkAkt / tot); sums.stGld = ges * (sums.vkGld / tot); sums.stGes = ges;
+    if (sums.stGes === 0 && saleResult.steuerGesamt > 0 && (sums.vkAkt + sums.vkGld + sums.vkBnd) > 0) {
+        const tot = sums.vkAkt + sums.vkGld + sums.vkBnd; const ges = saleResult.steuerGesamt;
+        sums.stAkt = ges * (sums.vkAkt / tot); sums.stGld = ges * (sums.vkGld / tot); sums.stBnd = ges * (sums.vkBnd / tot); sums.stGes = ges;
     } else if (saleResult.steuerGesamt > 0 && Math.abs(sums.stGes - saleResult.steuerGesamt) > 1e-6) {
         sums.stGes = saleResult.steuerGesamt;
     }
@@ -229,6 +237,12 @@ export function buildInputsCtxFromPortfolio(inputs, portfolio, { pensionAnnual, 
 
     const aktAlt = sumByType(portfolio.depotTranchesAktien, 'aktien_alt');
     const aktNeu = sumByType(portfolio.depotTranchesAktien, 'aktien_neu');
+    const bond = (Array.isArray(portfolio?.depotTranchesAktien) ? portfolio.depotTranchesAktien : []).reduce((acc, t) => {
+        if (!isBondKind(t?.type) && !isBondKind(t?.category)) return acc;
+        acc.marketValue += Number(t.marketValue) || 0;
+        acc.costBasis += Number(t.costBasis) || 0;
+        return acc;
+    }, { marketValue: 0, costBasis: 0 });
     const gTr = sumByType(portfolio.depotTranchesGold, 'gold');
 
     const gmm = sumByType(portfolio.depotTranchesGeldmarkt, 'geldmarkt');
@@ -240,7 +254,7 @@ export function buildInputsCtxFromPortfolio(inputs, portfolio, { pensionAnnual, 
         tagesgeld,
         geldmarktEtf,
         depotwertAlt: aktAlt.marketValue, costBasisAlt: aktAlt.costBasis, tqfAlt: 0.30,
-        depotwertNeu: aktNeu.marketValue, costBasisNeu: aktNeu.costBasis, tqfNeu: 0.30,
+        depotwertNeu: aktNeu.marketValue + bond.marketValue, costBasisNeu: aktNeu.costBasis + bond.costBasis, tqfNeu: 0.30,
         goldWert: gTr.marketValue, goldCost: gTr.costBasis,
         goldSteuerfrei: inputs.goldSteuerfrei,
         sparerPauschbetrag: inputs.startSPB,
