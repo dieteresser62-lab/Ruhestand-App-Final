@@ -345,6 +345,14 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal', options =
                 return formatted;
             }, align: 'right'
         },
+        ...(isThreeBucket ? [{
+            header: 'Handl.Bd', width: 8, extractor: row => (Number(row?.row?.threeBucket?.bondSaleAmount ?? row?.row?.bondSaleAmount) || 0) - (Number(row?.row?.threeBucket?.bondRefillNet ?? row?.row?.bondRefillNet) || 0), valueFormatter: v => {
+                const formatted = formatCurrencyShortLog(v);
+                if (v > 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
+                if (v < 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
+                return formatted;
+            }, align: 'right'
+        }] : []),
         { header: 'St.', width: 6, key: 'row.steuern_gesamt', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
         {
             header: isThreeBucket ? 'ETF' : 'Aktien',
@@ -365,20 +373,6 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal', options =
                 header: 'Bonds/Puffer',
                 width: 10,
                 extractor: row => Number(row?.row?.bondBucketAfter ?? row?.row?.threeBucket?.bondBucketAfter) || 0,
-                valueFormatter: v => formatCurrencyShortLog(v),
-                align: 'right'
-            },
-            {
-                header: 'Bd.Kauf',
-                width: 8,
-                extractor: row => Number(row?.row?.bondRefillNet ?? row?.row?.threeBucket?.bondRefillNet) || 0,
-                valueFormatter: v => formatCurrencyShortLog(v),
-                align: 'right'
-            },
-            {
-                header: 'Bd.Verk',
-                width: 8,
-                extractor: row => Number(row?.row?.bondSaleAmount ?? row?.row?.threeBucket?.bondSaleAmount) || 0,
                 valueFormatter: v => formatCurrencyShortLog(v),
                 align: 'right'
             }

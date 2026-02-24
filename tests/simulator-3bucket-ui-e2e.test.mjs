@@ -11,6 +11,16 @@ import { STRATEGY_OPTIONS } from '../types/strategy-options.js';
 
 console.log('--- Simulator 3-Bucket UI E2E Tests ---');
 
+function assert(condition, message) {
+    if (!condition) throw new Error(message || 'Assertion failed');
+}
+
+function assertEqual(actual, expected, message) {
+    if (actual !== expected) {
+        throw new Error((message || 'Assertion failed') + `: expected '${expected}', got '${actual}'`);
+    }
+}
+
 function createElement({ id, value = '', tagName = 'INPUT' }) {
     return {
         id,
@@ -70,8 +80,7 @@ try {
     assert(!standardCols.some(col => col.header === 'Bonds/Puffer'), 'standard mode must not expose 3-bucket columns');
     assert(headers.includes('ETF'), '3-bucket mode should expose ETF column');
     assert(headers.includes('Bonds/Puffer'), '3-bucket mode should expose Bonds/Puffer column');
-    assert(headers.includes('Bd.Kauf'), '3-bucket mode should expose Bd.Kauf column');
-    assert(headers.includes('Bd.Verk'), '3-bucket mode should expose Bd.Verk column');
+    assert(headers.includes('Handl.Bd'), '3-bucket mode should expose Handl.Bd column');
 
     const csv = convertRowsToCsv([{
         jahr: 1,
@@ -90,8 +99,7 @@ try {
         netG: 0
     }], threeBucketCols);
     assert(csv.includes('Bonds/Puffer'), 'CSV should include Bonds/Puffer header in 3-bucket mode');
-    assert(csv.includes('Bd.Kauf'), 'CSV should include Bd.Kauf header in 3-bucket mode');
-    assert(csv.includes('Bd.Verk'), 'CSV should include Bd.Verk header in 3-bucket mode');
+    assert(csv.includes('Handl.Bd'), 'CSV should include Handl.Bd header in 3-bucket mode');
 }
 
 {

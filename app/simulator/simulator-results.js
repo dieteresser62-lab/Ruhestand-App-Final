@@ -389,8 +389,8 @@ export function getWorstRunColumnDefinitions(opts = {}) {
                     ? row.netTradeEq
                     : (row.vk?.vkAkt || 0) - (row.kaufAkt || 0);
                 const formatted = formatCurrencyShortLog(val);
-                if (val > 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
-                if (val < 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
+                if (val > 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
+                if (val < 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
                 return formatted;
             }
         },
@@ -401,11 +401,21 @@ export function getWorstRunColumnDefinitions(opts = {}) {
                     ? row.netTradeGold
                     : (row.vk?.vkGld || 0) - (row.kaufGld || 0);
                 const formatted = formatCurrencyShortLog(val);
-                if (val > 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
-                if (val < 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
+                if (val > 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
+                if (val < 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
                 return formatted;
             }
         },
+        ...(isThreeBucket ? [{
+            key: null, header: 'Handl.Bd', width: 8,
+            fmt: (v, row) => {
+                const val = (Number(row?.threeBucket?.bondSaleAmount ?? row?.bondSaleAmount) || 0) - (Number(row?.threeBucket?.bondRefillGross ?? row?.bondRefillNet) || 0);
+                const formatted = formatCurrencyShortLog(val);
+                if (val > 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
+                if (val < 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
+                return formatted;
+            }
+        }] : []),
         { key: 'steuern_gesamt', header: 'St.', width: 6, fmt: formatCurrencyShortLog },
         {
             key: 'wertAktien',
@@ -423,9 +433,7 @@ export function getWorstRunColumnDefinitions(opts = {}) {
     ];
     if (isThreeBucket) {
         finalCols.push(
-            { key: 'bondBucketAfter', header: 'Bonds/Puffer', width: 10, fmt: (v, row) => formatCurrencyShortLog(v ?? row?.threeBucket?.bondBucketAfter) },
-            { key: 'bondRefillNet', header: 'Bd.Kauf', width: 8, fmt: (v, row) => formatCurrencyShortLog(v ?? row?.threeBucket?.bondRefillNet) },
-            { key: 'bondSaleAmount', header: 'Bd.Verk', width: 8, fmt: (v, row) => formatCurrencyShortLog(v ?? row?.threeBucket?.bondSaleAmount) }
+            { key: 'bondBucketAfter', header: 'Bonds/Puffer', width: 10, fmt: (v, row) => formatCurrencyShortLog(v ?? row?.threeBucket?.bondBucketAfter) }
         );
     }
 
