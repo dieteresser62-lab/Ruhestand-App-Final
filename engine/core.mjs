@@ -20,8 +20,10 @@ import MarketAnalyzer from './analyzers/MarketAnalyzer.mjs';
 import SpendingPlanner from './planners/SpendingPlanner.mjs';
 import TransactionEngine from './transactions/TransactionEngine.mjs';
 import { settleTaxYear } from './tax-settlement.mjs';
+import { STRATEGY_OPTIONS } from '../types/strategy-options.js';
 
 const DYNAMIC_FLEX_ALLOWED_HORIZON_METHODS = new Set(['mean', 'survival_quantile']);
+const LEGACY_STANDARD_MODES = new Set(['dynamic_flex', 'vpw', 'guardrails', 'fixed_real', 'none']);
 const VPW_SAFETY_STAGE_LABELS = {
     0: 'normal',
     1: 'gogo_off',
@@ -57,6 +59,37 @@ function _normalizeEngineInput(rawInput) {
     if (!Number.isFinite(input.goGoMultiplier)) {
         input.goGoMultiplier = 1.0;
     }
+
+    const decumulationRaw = (input.decumulation && typeof input.decumulation === 'object')
+        ? input.decumulation
+        : {};
+    const modeRaw = String(decumulationRaw.mode || '').trim().toLowerCase();
+    const mode = (modeRaw === STRATEGY_OPTIONS.THREE_BUCKET_JILGE)
+        ? STRATEGY_OPTIONS.THREE_BUCKET_JILGE
+        : ((modeRaw === STRATEGY_OPTIONS.STANDARD || LEGACY_STANDARD_MODES.has(modeRaw) || modeRaw === '')
+            ? STRATEGY_OPTIONS.STANDARD
+            : STRATEGY_OPTIONS.STANDARD);
+    let drawdownTrigger = Number(decumulationRaw.drawdownTrigger);
+    if (!Number.isFinite(drawdownTrigger)) {
+        drawdownTrigger = Number(CONFIG.SPENDING_MODEL?.THREE_BUCKET?.DEFAULT_DRAWDOWN_TRIGGER);
+    }
+    if (Number.isFinite(drawdownTrigger) && drawdownTrigger > 0) {
+        drawdownTrigger = -drawdownTrigger;
+    }
+    const bondTargetFactor = Number(decumulationRaw.bondTargetFactor);
+    const bondRefillThreshold = Number(decumulationRaw.bondRefillThreshold);
+    input.decumulation = {
+        mode,
+        bondTargetFactor: Number.isFinite(bondTargetFactor)
+            ? Math.max(0, bondTargetFactor)
+            : Number(CONFIG.SPENDING_MODEL?.THREE_BUCKET?.DEFAULT_BOND_TARGET_FACTOR),
+        drawdownTrigger: Number.isFinite(drawdownTrigger)
+            ? drawdownTrigger
+            : Number(CONFIG.SPENDING_MODEL?.THREE_BUCKET?.DEFAULT_DRAWDOWN_TRIGGER),
+        bondRefillThreshold: Number.isFinite(bondRefillThreshold)
+            ? Math.max(0, bondRefillThreshold)
+            : CONFIG.SPENDING_MODEL?.THREE_BUCKET?.DEFAULT_BOND_REFILL_THRESHOLD
+    };
 
     return input;
 }

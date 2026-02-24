@@ -178,6 +178,12 @@ export const CONFIG = {
             STAGE2_REQUIRE_CRITICAL_STRESS: true,       // Stage 2 nur bei Alarm/Runway-Krise
             STAGE2_MIN_FLEX_OF_FLOOR_RATIO: 0.25,       // Stage-2-Flexboden relativ zum Floor
             STAGE2_MIN_FLEX_OF_PREV_DYNAMIC_RATIO: 0.20 // Stage-2-Flexboden relativ zur letzten Dynamic-Flex-Hoehe
+        },
+        THREE_BUCKET: {
+            DEFAULT_BOND_TARGET_FACTOR: 5.0,
+            DEFAULT_DRAWDOWN_TRIGGER: -15,
+            DEFAULT_BOND_REFILL_THRESHOLD: null,
+            BOND_NOMINAL_RETURN: 0.02
         }
     },
 
