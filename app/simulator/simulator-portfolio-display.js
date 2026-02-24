@@ -90,6 +90,16 @@ export function updateStartPortfolioDisplay() {
         goldWertField.value = formatDisplayNumber(displayGoldWert);
     }
 
+    const initialBondBucketField = document.getElementById('initialBondBucket');
+    if (initialBondBucketField) {
+        let displayBondsWert = 0;
+        if (useAggregates && aggregated && aggregated.bondsWert > 0) {
+            displayBondsWert = aggregated.bondsWert;
+        }
+        // Only format Currency string out of it
+        initialBondBucketField.value = formatCurrency(displayBondsWert);
+    }
+
     // Render a quick visual split for user validation.
     let breakdownHtml = `
         <div style="text-align:center; font-weight:bold; color: var(--primary-color); margin-bottom:10px;">Finale Start-Allokation</div>

@@ -283,6 +283,30 @@
                                         title="Multiplikator auf VPW-Flex in Go-Go-Jahren (1.0 bis 1.5)">
                                 </div>
                             </div>
+                            <h4 style="margin-top: 20px; margin-bottom: 12px; font-size: 0.95rem; border-top: 1px solid var(--border-color); padding-top: 15px;">Entnahme-Strategie</h4>
+                            <div class="form-grid" style="margin-bottom: 20px;">
+                                <div class="form-group"><label for="entnahmeStrategie">Strategie</label><select
+                                        id="entnahmeStrategie">
+                                        <option value="standard" selected>Standard</option>
+                                        <option value="3_bucket_jilge">3-Bucket Jilge</option>
+                                    </select></div>
+                                <div class="form-group"><label for="initialBondBucket">Bonds / Puffer beim Start (€)</label><input
+                                        type="text" id="initialBondBucket" placeholder="0" disabled inputmode="numeric" data-no-persist="true"
+                                        title="Wert aller Anleihen/Bonds-Tranchen beim Start (aus Profilen/Tranchen aggregiert)">
+                                </div>
+                            </div>
+                            <div id="threeBucketConfigGroup" class="form-grid-four-col"
+                                style="display: none; margin-bottom: 20px;">
+                                <div class="form-group"><label for="bondTargetFactor">Anleihen-Zielfaktor
+                                        (Jahresausgaben)</label><input type="number" id="bondTargetFactor"
+                                        placeholder="5" step="0.1" min="0"></div>
+                                <div class="form-group"><label for="drawdownTrigger">Drawdown-Schwelle (% Verlust)</label><input
+                                        type="number" id="drawdownTrigger" placeholder="15" step="0.1" min="0"></div>
+                                <div class="form-group"><label for="bondRefillThreshold">Anleihen-Auffüll-Schwelle
+                                        (%)</label><input type="number" id="bondRefillThreshold"
+                                        placeholder="optional" step="0.1" min="0"></div>
+                            </div>
+
                             <div id="displayPortfolioBreakdown"
                                 style="margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
                             </div>
@@ -304,25 +328,6 @@
                         <legend><span class="section-icon">⚖️</span>Runway & Rebalancing<span
                                 class="progress-indicator"></span></legend>
                         <div class="fieldset-content">
-                            <h4 style="margin-top: 0; margin-bottom: 12px; font-size: 0.95rem;">Entnahme-Strategie</h4>
-                            <div class="form-grid" style="margin-bottom: 20px;">
-                                <div class="form-group"><label for="entnahmeStrategie">Strategie</label><select
-                                        id="entnahmeStrategie">
-                                        <option value="standard" selected>Standard</option>
-                                        <option value="3_bucket_jilge">3-Bucket Jilge</option>
-                                    </select></div>
-                            </div>
-                            <div id="threeBucketConfigGroup" class="form-grid-four-col"
-                                style="display: none; margin-bottom: 20px;">
-                                <div class="form-group"><label for="bondTargetFactor">Anleihen-Zielfaktor
-                                        (Jahresausgaben)</label><input type="number" id="bondTargetFactor"
-                                        placeholder="5" step="0.1" min="0"></div>
-                                <div class="form-group"><label for="drawdownTrigger">Drawdown-Schwelle (% Verlust)</label><input
-                                        type="number" id="drawdownTrigger" placeholder="15" step="0.1" min="0"></div>
-                                <div class="form-group"><label for="bondRefillThreshold">Anleihen-Auffüll-Schwelle
-                                        (%)</label><input type="number" id="bondRefillThreshold"
-                                        placeholder="optional" step="0.1" min="0"></div>
-                            </div>
                             <h4 style="margin-top: 0; margin-bottom: 12px; font-size: 0.95rem;">Runway-Steuerung</h4>
                             <div class="form-grid" style="margin-bottom: 20px;">
                                 <div class="form-group"><label for="runwayMinMonths">Runway Minimum

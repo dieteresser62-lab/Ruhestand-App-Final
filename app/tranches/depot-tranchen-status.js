@@ -255,12 +255,23 @@ export function calculateAggregatedValues(tranchesOverride = null) {
     let neubestand = { marketValue: 0, costBasis: 0 };
     let geldmarkt = { marketValue: 0, costBasis: 0 };
     let gold = { marketValue: 0, costBasis: 0 };
+    let bonds = { marketValue: 0, costBasis: 0 };
 
     status.tranches.forEach(t => {
         const mv = resolveTrancheMarketValue(t);
         const cb = resolveTrancheCostBasis(t);
         const type = t.type || t.kind || '';
         const category = t.category || '';
+
+        if (category === 'bonds' || type === 'anleihe' || String(type).includes('bond') || String(category).includes('bond')) {
+            // Also adding to neubestand for backwards compatibility, 
+            // but tracking bonds independently for the UI.
+            neubestand.marketValue += mv;
+            neubestand.costBasis += cb;
+            bonds.marketValue += mv;
+            bonds.costBasis += cb;
+            return;
+        }
 
         if (type === 'gold' || category === 'gold') {
             gold.marketValue += mv;
@@ -297,11 +308,6 @@ export function calculateAggregatedValues(tranchesOverride = null) {
             }
             return;
         }
-
-        if (category === 'bonds' || type === 'anleihe' || String(type).includes('bond') || String(category).includes('bond')) {
-            neubestand.marketValue += mv;
-            neubestand.costBasis += cb;
-        }
     });
 
     return {
@@ -311,7 +317,9 @@ export function calculateAggregatedValues(tranchesOverride = null) {
         costBasisNeu: neubestand.costBasis,
         geldmarktEtf: geldmarkt.marketValue,
         goldWert: gold.marketValue,
-        goldCost: gold.costBasis
+        goldCost: gold.costBasis,
+        bondsWert: bonds.marketValue,
+        bondsCost: bonds.costBasis
     };
 }
 
