@@ -115,6 +115,17 @@ try {
         assertEqual(result.capeFetchStatus, 'warn_stale_source', 'very old CAPE should be marked stale');
     }
 
+    // Test 6: Timeout/Abort should be reported with a useful message.
+    {
+        localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify({}));
+        const aborted = new Error('signal is aborted without reason');
+        aborted.name = 'AbortError';
+        global.fetch = mockFetchWithSequence([aborted, aborted]);
+        const result = await handlers.handleFetchCapeAuto();
+        assertEqual(result.capeFetchStatus, 'error_no_source_no_stored', 'timeout should still be treated as source failure');
+        assert(result.errors.every(e => e.includes('Timeout nach')), 'abort errors should be normalized to timeout messages');
+    }
+
     console.log('✅ Balance annual CAPE tests passed');
 } finally {
     if (prevFetch === undefined) delete global.fetch; else global.fetch = prevFetch;

@@ -1,7 +1,6 @@
 // @ts-check
 
 import {
-    ensureProfileRegistry,
     listProfiles,
     getCurrentProfileId,
     getProfileMeta,
@@ -13,6 +12,7 @@ import {
     exportProfilesBundle,
     importProfilesBundle
 } from './profile-storage.js';
+import { initProfileIndexLifecycle } from './profile-navigation.js';
 
 function byId(id) {
     return document.getElementById(id);
@@ -43,8 +43,7 @@ function setStatus(statusEl, message, kind = '') {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    ensureProfileRegistry();
-    saveCurrentProfileFromLocalStorage();
+    initProfileIndexLifecycle();
 
     const profileSelect = byId('profileSelect');
     const profileNameInput = byId('profileNameInput');

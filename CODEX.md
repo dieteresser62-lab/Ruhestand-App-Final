@@ -1,18 +1,33 @@
 # CODEX.md
 
-## Role Focus
-- Primary reviewer in Phase 1.
-- Primary implementer in Phase 2.
+## Rolle
+- Codex arbeitet in diesem Repository primär als Implementer und technischer Reviewer.
+- Gemeinsame Ausführungs-, Validierungs- und Sicherheitsregeln kommen aus `AGENTS.md`.
+- Diese Datei muss konsistent mit `CLAUDE.md` und `GEMINI.md` bleiben.
 
-## Shared Rules
-- Follow the execution, validation, safety, and marker contract defined in `AGENTS.md`.
-- Keep this file consistent with `CLAUDE.md` and `GEMINI.md`.
+## Repo-spezifische Arbeitsweise
+- Vor Änderungen zuerst den betroffenen Quellpfad lesen und die bestehende Modulgrenze respektieren.
+- UI-nahe Änderungen gehören in die vorhandenen Feature-Bereiche:
+  - `app/balance/` für Balance-App,
+  - `app/simulator/` für Simulator,
+  - `app/profile/` und `app/tranches/` für Profilverbund und Tranchen,
+  - `app/shared/` für gemeinsam genutzte Hilfen.
+- Deterministische Fachlogik gehört bevorzugt nach `engine/`.
+- Rechenintensive, DOM-freie Abläufe gehören nach `workers/`, `monte-carlo-runner.js`, `sweep-runner.js` oder angrenzende Runner-Module statt in UI-Dateien.
+- Native ES-Module und Browser-/Tauri-Kompatibilität erhalten; keine unnötigen Framework- oder Build-Step-Abhängigkeiten einführen.
+- Vorhandene Spezialisierung beibehalten: lieber bestehendes Fachmodul erweitern als neue Sammeldateien oder Monolithen aufbauen.
 
-## Codex-Specific Output Duties
-- In Phase 1 review, emit `PHASE1_APPROVAL: YES|NO` and required findings lifecycle lines.
-- In Phase 2 implementation reporting, emit `IMPLEMENTATION_READY: YES|NO`.
-- Legacy marker `CODEX_APPROVAL` may be emitted only for compatibility when explicitly requested.
-- End every orchestrated response with `STATUS: DONE`.
+## Implementierungsregeln
+- `engine.js` nie direkt editieren. Änderungen an der Engine immer in `engine/*.mjs` vornehmen und danach neu bauen.
+- Wenn Engine-Verträge, Worker-Payloads oder Persistenz-Schemas geändert werden, alle betroffenen Aufrufer in Balance, Simulator, Profilverbund und Tests mitziehen.
+- Generierte oder ausgelieferte Artefakte wie `dist/` und `RuheStandSuite.exe` nur ändern, wenn der Auftrag das ausdrücklich verlangt.
+- Bei Strukturänderungen auch die Referenzdokumentation prüfen, insbesondere `README.md`, `docs/reference/TECHNICAL.md`, `docs/reference/BALANCE_MODULES_README.md`, `docs/reference/SIMULATOR_MODULES_README.md` und `engine/README.md`.
 
-## Target Repository Extension
-- In non-orchestrator target repos, use this file primarily for project architecture, coding rules, and implementation constraints.
+## Validierung und Reporting
+- Standardvalidierung ist `npm test`.
+- Nach Engine-Änderungen zusätzlich `npm run build:engine`.
+- Bei gezielten Fixes kann `node tests/run-single.mjs <datei>` sinnvoll sein; unvollständige Abdeckung muss im Abschluss erwähnt werden.
+- Abschlussberichte sollen knapp nennen:
+  - welche Module geändert wurden,
+  - welche Validierung lief,
+  - welche Restrisiken oder offenen Annahmen bleiben.

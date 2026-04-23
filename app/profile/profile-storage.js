@@ -8,29 +8,15 @@
 // @ts-check
 
 import { CONFIG } from '../balance/balance-config.js';
+import { PROFILE_SCOPED_FIXED_KEYS, PROFILE_STORAGE_KEYS, PROFILE_TRANCHES_KEY } from './profile-state.js';
 
-const PROFILE_STORAGE_KEY = 'rs_profiles_v1';
-const CURRENT_PROFILE_KEY = 'rs_current_profile';
-const ACTIVE_PROFILE_KEY = 'rs_active_profile';
+const PROFILE_STORAGE_KEY = PROFILE_STORAGE_KEYS.registry;
+const CURRENT_PROFILE_KEY = PROFILE_STORAGE_KEYS.current;
+const ACTIVE_PROFILE_KEY = PROFILE_STORAGE_KEYS.active;
 const PROFILE_VERSION = 1;
+const WINDOW_NAME_BUNDLE_PREFIX = 'RUHESTAND_PROFILE_BUNDLE:';
 
-const FIXED_KEYS = new Set([
-    'depot_tranchen',
-    'profile_tagesgeld',
-    'profile_rente_aktiv',
-    'profile_rente_monatlich',
-    'profile_sonstige_einkuenfte',
-    'profile_aktuelles_alter',
-    'profile_gold_aktiv',
-    'profile_gold_ziel_pct',
-    'profile_gold_floor_pct',
-    'profile_gold_steuerfrei',
-    'profile_gold_rebal_band',
-    'showCareDetails',
-    'logDetailLevel',
-    'worstLogDetailLevel',
-    'backtestLogDetailLevel'
-]);
+const FIXED_KEYS = new Set(PROFILE_SCOPED_FIXED_KEYS);
 
 const PREFIX_KEYS = [
     'sim_',
@@ -102,14 +88,44 @@ function saveProfileRegistry(registry) {
 }
 
 function listProfileScopedKeys() {
-    const keys = [];
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (isProfileScopedKey(key)) {
-            keys.push(key);
+    const keys = new Set();
+    
+    // 1. Explizit bekannte Keys pruefen (Workaround fuer WebView2/Tauri Iterations-Probleme)
+    FIXED_KEYS.forEach(key => {
+        if (localStorage.getItem(key) !== null) keys.add(key);
+    });
+    EXACT_KEYS.forEach(key => {
+        if (localStorage.getItem(key) !== null) keys.add(key);
+    });
+
+    // 2. Dynamische Keys ueber localStorage.key(index) ermitteln
+    try {
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (!key) continue;
+            for (const prefix of PREFIX_KEYS) {
+                if (key.startsWith(prefix)) {
+                    keys.add(key);
+                    break;
+                }
+            }
         }
+    } catch (err) {
+        console.warn('[ProfileStorage] localStorage Iteration fehlgeschlagen:', err);
     }
-    return keys;
+
+    // 3. Fallback fuer Umgebungen, in denen gespeicherte Keys enumerable sind
+    try {
+        const allKeys = Object.keys(localStorage);
+        for (const key of allKeys) {
+            if (!key || !isProfileScopedKey(key)) continue;
+            keys.add(key);
+        }
+    } catch {
+        // no-op
+    }
+    
+    return Array.from(keys);
 }
 
 function captureProfileData() {
@@ -134,6 +150,13 @@ function loadProfileDataIntoLocalStorage(data) {
         if (!isProfileScopedKey(key)) return;
         if (value === null || value === undefined) return;
         localStorage.setItem(key, String(value));
+    });
+}
+
+export function hasProfileScopedDataInLocalStorage() {
+    return listProfileScopedKeys().some(key => {
+        const value = localStorage.getItem(key);
+        return value !== null && value !== undefined && value !== '';
     });
 }
 
@@ -284,6 +307,36 @@ export function ensureProfileRegistry() {
     return ensureDefaultProfile();
 }
 
+export function bootstrapProfileContext(options = {}) {
+    const {
+        importFromWindowName = false,
+        preserveLiveProfileData = false
+    } = options;
+
+    let importResult = { ok: false, message: 'window.name import disabled' };
+    if (importFromWindowName && !localStorage.getItem(PROFILE_STORAGE_KEY)) {
+        importResult = importProfilesBundleFromWindowName();
+    }
+
+    ensureProfileRegistry();
+
+    const currentId = getCurrentProfileId();
+    const activeId = getActiveProfileId();
+    const hasLiveProfileData = hasProfileScopedDataInLocalStorage();
+    const shouldSaveLiveData =
+        preserveLiveProfileData &&
+        activeId === currentId &&
+        hasLiveProfileData;
+
+    if (shouldSaveLiveData) {
+        saveCurrentProfileFromLocalStorage();
+        return { currentId, action: 'saved', importResult };
+    }
+
+    loadProfileIntoLocalStorage(currentId);
+    return { currentId, action: 'loaded', importResult };
+}
+
 export function exportProfilesBundle() {
     saveCurrentProfileFromLocalStorage();
     const registry = getProfileRegistry();
@@ -304,6 +357,18 @@ export function exportProfilesBundle() {
         currentProfileId,
         globals
     };
+}
+
+export function exportProfilesBundleToWindowName() {
+    if (typeof window === 'undefined') return false;
+    try {
+        const bundle = exportProfilesBundle();
+        window.name = WINDOW_NAME_BUNDLE_PREFIX + JSON.stringify(bundle);
+        return true;
+    } catch (err) {
+        console.error('[ProfileStorage] Export to window.name failed:', err);
+        return false;
+    }
 }
 
 export function importProfilesBundle(bundle) {
@@ -336,4 +401,21 @@ export function importProfilesBundle(bundle) {
         return { ok: false, message: 'Import gespeichert, aber Profil konnte nicht geladen werden.' };
     }
     return { ok: true, message: 'Import erfolgreich.' };
+}
+
+export function importProfilesBundleFromWindowName() {
+    if (typeof window === 'undefined') {
+        return { ok: false, message: 'window not available' };
+    }
+    const raw = String(window.name || '');
+    if (!raw.startsWith(WINDOW_NAME_BUNDLE_PREFIX)) {
+        return { ok: false, message: 'No bundle in window.name' };
+    }
+    try {
+        const payload = JSON.parse(raw.slice(WINDOW_NAME_BUNDLE_PREFIX.length));
+        return importProfilesBundle(payload);
+    } catch (err) {
+        console.error('[ProfileStorage] Import from window.name failed:', err);
+        return { ok: false, message: 'window.name bundle invalid' };
+    }
 }

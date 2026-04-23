@@ -23,7 +23,6 @@ $excludedDirectories = @(
     'docs',
     'tools',
     'tests',
-    'types',
     'scripts'
 )
 

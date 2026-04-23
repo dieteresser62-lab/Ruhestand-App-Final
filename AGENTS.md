@@ -1,59 +1,68 @@
-## Purpose
-- Runtime policy for all orchestrated agents used by `run_task`.
-- Defines stable output markers consumed by `src/orchestrator.py`.
-- Must stay aligned with prompt contracts in `src/prompts.py`.
-- Is the single source of truth for shared execution, safety, validation, and output-contract rules.
-- Project-specific architecture and coding conventions belong in the target repository's local agent files.
+## Zweck
+- Projektweite Arbeitsregeln für Agenten in diesem Repository.
+- Beschreibt den tatsächlichen Stand der Ruhestands-App als lokale Browser-/Tauri-Anwendung.
+- Ist die gemeinsame Referenz für Ausführung, Validierung, Sicherheitsgrenzen und Doku-Sync.
+- Projekt- und architekturspezifische Details müssen mit `README.md` und den Referenzdokumenten konsistent bleiben.
 
-## Execution Policy
-- Start implementation/review immediately for actionable tasks.
-- Ask clarifying questions only when:
-  - requirements are technically ambiguous,
-  - there are multiple valid directions with materially different trade-offs,
-  - permissions/secrets/external approvals are required,
-  - a destructive operation is being considered.
-- After edits, run relevant validation and report:
-  - what changed,
-  - test/lint results,
-  - remaining risks.
+## Projektstand
+- Die Suite hat mehrere Einstiegspunkte: `Balance.html`, `Simulator.html`, `index.html`, `depot-tranchen-manager.html` und `Handbuch.html`.
+- Die fachliche Logik liegt in nativen ES-Modulen unter `app/`, `engine/`, `workers/` und `types/`.
+- Desktop-Paketierung läuft über Tauri in `src-tauri/`.
+- Generierte Artefakte sind insbesondere `engine.js`, `dist/` und `RuheStandSuite.exe`; diese sind nicht der primäre Bearbeitungsort.
 
-## Repository Rules
-- Source of truth for orchestration behavior:
-  - `src/orchestrator.py`
-  - `src/prompts.py`
-  - `src/state_io.py`
-- Do not manually edit `.orchestrator/state.json` or checkpoint files.
+## Source of Truth
+- Laufzeit- und Build-Kommandos: `package.json`
+- Produkt- und Funktionsüberblick: `README.md`
+- Technische Architektur: `docs/reference/TECHNICAL.md`
+- Modulzuschnitte:
+  - `docs/reference/BALANCE_MODULES_README.md`
+  - `docs/reference/SIMULATOR_MODULES_README.md`
+  - `engine/README.md`
+- Test-Infrastruktur: `tests/README.md`
+- Desktop-Konfiguration: `src-tauri/tauri.conf.json`
 - Keep instruction files synchronized and non-contradictory:
   - `AGENTS.md`
   - `CLAUDE.md`
   - `CODEX.md`
   - `GEMINI.md`
 
-## Validation Command
-- Default: `python3 -m pytest tests/ -v`
-- Mandatory after changes to orchestration flow, prompt contracts, parsing, fallback logic, watch mode, or state handling.
+## Ausführung
+- Start implementation/review immediately for actionable tasks.
+- Ask clarifying questions only when:
+  - Anforderungen technisch mehrdeutig sind,
+  - mehrere Richtungen mit klar unterschiedlichen Trade-offs offenstehen,
+  - Berechtigungen, Secrets oder externe Freigaben fehlen,
+  - eine destruktive Aktion im Raum steht.
+- Arbeite in den Quellmodulen, nicht in generierten Artefakten.
+- Teile Logik so auf, wie das Repo bereits strukturiert ist:
+  - `app/balance/` und `app/simulator/` für UI-nahe Feature-Logik,
+  - `app/profile/` und `app/tranches/` für Profilverbund und Tranchen,
+  - `app/shared/` für gemeinsam genutzte Formatter, Flags und Hilfen,
+  - `engine/` für deterministische Kernlogik,
+  - `workers/` und DOM-freie Runner für parallele Rechenpfade.
+- `engine.js` nie manuell editieren; Änderungen an `engine/` laufen über `build-engine.mjs`.
+- `dist/` und `RuheStandSuite.exe` nur anfassen, wenn der Auftrag explizit Build-, Sync- oder Release-Artefakte umfasst.
 
-## Safety
+## Validierung
+- Default: `npm test`
+- Mandatory after changes to:
+  - `engine/`,
+  - `workers/`,
+  - DOM-freie Runner wie Monte Carlo, Sweep oder Auto-Optimize,
+  - Persistenz- oder Datenverträge in Profil-/Tranchen-Modulen,
+  - gemeinsam genutzte Formatter, Feature-Flags oder Engine-Contracts.
+- Nach Änderungen an `engine/` oder an der öffentlichen `EngineAPI` zusätzlich `npm run build:engine` ausführen.
+- Für fokussierte Fehlersuche sind gezielte Läufe via `node tests/run-single.mjs <datei>` zulässig; wenn nicht die ganze Suite lief, muss das berichtet werden.
+
+## Dokumentations-Sync
+- Wenn Architektur, Modulzuschnitt, Build-/Startpfade oder Nutzer-Workflows geändert werden, mindestens die betroffenen Referenzen aktualisieren:
+  - `README.md`
+  - `docs/reference/TECHNICAL.md`
+  - relevante Modul-READMEs
+- Änderungen an Projektregeln müssen in `AGENTS.md`, `CODEX.md`, `CLAUDE.md` und `GEMINI.md` widerspruchsfrei bleiben.
+
+## Sicherheit
 - No destructive commands (for example `rm -rf`, hard reset, history rewrite, force push) without explicit approval.
 - Never commit secrets, tokens, credentials, or sensitive local paths.
+- Keine Snapshots, Logs, lokale Exporte oder personenbezogene Finanzdaten unbedacht in Doku oder Tests übernehmen.
 - Keep scope limited to the assigned task.
-
-## Dual-Agent Contract
-- Review/planning outputs must end with `STATUS: DONE` as the final non-empty line.
-- Approval markers by phase:
-  - Phase 1 review/confirmation: `PHASE1_APPROVAL: YES|NO`
-  - Phase 2 review: `PHASE2_APPROVAL: YES|NO`
-  - Phase 2 implementation report (Codex): `IMPLEMENTATION_READY: YES|NO`
-- Legacy compatibility markers still accepted by parser:
-  - `CODEX_APPROVAL: YES|NO`
-  - `CLAUDE_APPROVAL: YES|NO`
-- Findings lifecycle markers for review steps:
-  - `OPEN_FINDINGS: NONE` or `OPEN_FINDINGS: F-001,F-002,...`
-  - `FINDING_STATUS: <ID> | OPEN|CLOSED | <rationale>`
-  - `NEW_FINDING: <ID> | <description> | <acceptance test>`
-- Finding IDs must match `F-001` format.
-- Decision consistency:
-  - `*_APPROVAL: YES` only when `OPEN_FINDINGS: NONE`
-  - `*_APPROVAL: NO` only when at least one finding is open
-- Planning step should include:
-  - `ADDRESSED_FINDINGS: <IDs...>` or `ADDRESSED_FINDINGS: NONE`

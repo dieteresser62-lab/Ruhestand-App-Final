@@ -1,34 +1,9 @@
 // @ts-check
 
-import {
-    ensureProfileRegistry,
-    getCurrentProfileId,
-    getActiveProfileId,
-    loadProfileIntoLocalStorage,
-    saveCurrentProfileFromLocalStorage
-} from './profile-storage.js';
+import { initProfileSubpageLifecycle } from './profile-navigation.js';
 
 function initProfileBridge() {
-    ensureProfileRegistry();
-
-    const currentId = getCurrentProfileId();
-    const activeId = getActiveProfileId();
-
-    if (activeId === currentId) {
-        saveCurrentProfileFromLocalStorage();
-    } else {
-        loadProfileIntoLocalStorage(currentId);
-    }
-
-    window.addEventListener('beforeunload', () => {
-        saveCurrentProfileFromLocalStorage();
-    });
-
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') {
-            saveCurrentProfileFromLocalStorage();
-        }
-    });
+    initProfileSubpageLifecycle();
 }
 
 if (document.readyState === 'loading') {

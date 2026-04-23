@@ -115,7 +115,8 @@ self.onmessage = async event => {
                 paramCombinations: sweepCache.paramCombinations,
                 comboRange,
                 sweepConfig,
-                refP2Invariants
+                refP2Invariants,
+                engine: EngineAPI
             });
             const elapsedMs = performance.now() - startedAt;
             send('result', { jobId, ...result, elapsedMs });

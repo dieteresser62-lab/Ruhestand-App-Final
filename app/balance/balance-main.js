@@ -27,6 +27,8 @@ import { shouldResetGuardrailState } from './balance-guardrail-reset.js';
 import { UIUtils } from './balance-utils.js';
 import { initExpensesTab, updateExpensesBudget } from './balance-expenses.js';
 import { initDynamicFlexControls } from '../simulator/simulator-main-dynamic-flex.js';
+import { applyThreeBucketLogic, sumBondBucketValuation, appendBondReplenishment } from '../../engine/transactions/three-bucket-logic.mjs';
+import { PROFILE_VALUE_KEYS } from '../profile/profile-state.js';
 
 // ==================================================================================
 // APPLICATION STATE & DOM REFERENCES
@@ -42,19 +44,6 @@ const appState = {
 
 const PROFILVERBUND_STORAGE_KEYS = {
     mode: 'household_withdrawal_mode'
-};
-
-const PROFILE_VALUE_KEYS = {
-    tagesgeld: 'profile_tagesgeld',
-    renteAktiv: 'profile_rente_aktiv',
-    renteMonatlich: 'profile_rente_monatlich',
-    sonstigeEinkuenfte: 'profile_sonstige_einkuenfte',
-    alter: 'profile_aktuelles_alter',
-    goldAktiv: 'profile_gold_aktiv',
-    goldZiel: 'profile_gold_ziel_pct',
-    goldFloor: 'profile_gold_floor_pct',
-    goldSteuerfrei: 'profile_gold_steuerfrei',
-    goldRebalBand: 'profile_gold_rebal_band'
 };
 
 const dom = {
@@ -221,6 +210,50 @@ function update() {
             modelResult.ui.action = profilverbundHandlers.mergeProfilverbundActions(profilverbundRuns);
         }
 
+        // --- 3-BUCKET JILGE INTEGRATION ---
+        let finalAction = modelResult.ui?.action || {};
+        let threeBucketDiagnosis = null;
+
+        if (inputData.decumulation && inputData.decumulation.mode === '3_bucket_jilge' && modelResult.ui && modelResult.ui.action) {
+            const market = {
+                realReturnEq: (Number(modelResult.newState?.marketData?.returns?.realEq) || 0),
+                sKey: modelResult.ui?.market?.sKey || 'neutral'
+            };
+            const bondBucketBefore = sumBondBucketValuation(inputData.detailledTranches || []);
+
+            const threeBucketResult = applyThreeBucketLogic(
+                inputData.detailledTranches || [],
+                inputData,
+                market,
+                modelResult.ui.action,
+                market.realReturnEq,
+                bondBucketBefore
+            );
+
+            // Note: The actual bond replenishment (selling equity to buy bonds) is handled separately:
+            // - For Profilverbund (Couples): Inside balance-main-profilverbund.js (each person independently)
+            // - For Singles: We still need to do it here
+
+            if (!profilverbundRuns) {
+                const jahresEntnahmeTarget = Math.max(0, inputData.floorBedarf - (inputData.renteAktiv ? (inputData.renteMonatlich * 12) : 0)) + Math.max(0, inputData.flexBedarf);
+                const replenishResult = appendBondReplenishment(
+                    inputData.detailledTranches || [],
+                    inputData,
+                    threeBucketResult.updatedAction,
+                    market.realReturnEq,
+                    jahresEntnahmeTarget,
+                    bondBucketBefore,
+                    market
+                );
+
+                finalAction = replenishResult.updatedAction;
+                modelResult.ui.action = finalAction; // Overwrite for renderer
+            }
+
+            threeBucketDiagnosis = threeBucketResult.threeBucketState;
+        }
+        // ----------------------------------
+
         // 5. Prepare data for Renderer
         // Kombiniert Engine-Output mit Eingaben für vollständige UI-Darstellung
         const uiDataForRenderer = {
@@ -243,6 +276,9 @@ function update() {
         if (formattedDiagnosis && modelResult.ui?.vpw) {
             formattedDiagnosis.keyParams = formattedDiagnosis.keyParams || {};
             formattedDiagnosis.keyParams.vpw = modelResult.ui.vpw;
+        }
+        if (formattedDiagnosis && threeBucketDiagnosis) {
+            formattedDiagnosis.threeBucket = threeBucketDiagnosis;
         }
 
         appState.diagnosisData = formattedDiagnosis;

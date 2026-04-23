@@ -16,6 +16,12 @@
 import { UIUtils } from './balance-utils.js';
 import { calculateAggregatedValues } from '../tranches/depot-tranchen-status.js';
 import { CONFIG } from './balance-config.js';
+import {
+    PROFILE_TRANCHES_KEY,
+    PROFILE_VALUE_KEYS,
+    parseStoredTranchesFromData,
+    readProfileOverridesFromStorage
+} from '../profile/profile-state.js';
 
 // Module-level DOM reference
 let dom = null;
@@ -80,20 +86,6 @@ export const UIReader = {
         const num = (id) => dom.inputs[id] ? UIUtils.parseCurrency(dom.inputs[id].value) : 0;
         const val = (id) => dom.inputs[id] ? dom.inputs[id].value : '';
         const checked = (id) => dom.inputs[id] ? dom.inputs[id].checked : false;
-        const readProfileNumber = (key) => {
-            const raw = localStorage.getItem(key);
-            if (raw === null || raw === undefined || raw === '') return null;
-            const n = UIUtils.parseCurrency(raw);
-            return Number.isFinite(n) ? n : null;
-        };
-        const readProfileBool = (key) => {
-            const raw = localStorage.getItem(key);
-            if (raw === null || raw === undefined || raw === '') return null;
-            const normalized = String(raw).toLowerCase();
-            if (normalized === 'true') return true;
-            if (normalized === 'false') return false;
-            return null;
-        };
         const readPersistedCapeRatio = () => {
             try {
                 const raw = localStorage.getItem(CONFIG.STORAGE.LS_KEY);
@@ -110,27 +102,25 @@ export const UIReader = {
         };
 
         // Profilwerte (localStorage) überschreiben DOM-Werte, wenn vorhanden.
-        const profileTagesgeld = readProfileNumber('profile_tagesgeld');
-        const profileRenteAktiv = readProfileBool('profile_rente_aktiv');
-        const profileRenteMonatlich = readProfileNumber('profile_rente_monatlich');
-        const profileSonstigeEinkuenfte = readProfileNumber('profile_sonstige_einkuenfte');
-        const profileAlter = readProfileNumber('profile_aktuelles_alter');
-        const profileGoldAktiv = readProfileBool('profile_gold_aktiv');
-        const profileGoldZiel = readProfileNumber('profile_gold_ziel_pct');
-        const profileGoldFloor = readProfileNumber('profile_gold_floor_pct');
-        const profileGoldSteuerfrei = readProfileBool('profile_gold_steuerfrei');
-        const profileGoldRebalBand = readProfileNumber('profile_gold_rebal_band');
+        const profileOverrides = readProfileOverridesFromStorage(localStorage);
+        const profileTagesgeld = profileOverrides.profileTagesgeld;
+        const profileRenteAktiv = profileOverrides.profileRenteAktiv;
+        const profileRenteMonatlich = profileOverrides.profileRenteMonatlich;
+        const profileSonstigeEinkuenfte = profileOverrides.profileSonstigeEinkuenfte;
+        const profileAlterRaw = localStorage.getItem(PROFILE_VALUE_KEYS.alter);
+        const profileAlter = profileAlterRaw === null ? null : UIUtils.parseCurrency(profileAlterRaw);
+        const profileGoldAktiv = profileOverrides.profileGoldAktiv;
+        const profileGoldZiel = profileOverrides.profileGoldZiel;
+        const profileGoldFloor = profileOverrides.profileGoldFloor;
+        const profileGoldSteuerfrei = profileOverrides.profileGoldSteuerfrei;
+        const profileGoldRebalBand = profileOverrides.profileGoldRebalBand;
         // Lade detaillierte Tranchen aus localStorage (falls vorhanden)
-        let detailledTranches = null;
-        try {
-            const saved = localStorage.getItem('depot_tranchen');
-            if (saved) {
-                detailledTranches = JSON.parse(saved);
-            }
-        } catch (err) { }
+        const detailledTranches = parseStoredTranchesFromData({
+            [PROFILE_TRANCHES_KEY]: localStorage.getItem(PROFILE_TRANCHES_KEY)
+        });
 
         // Falls Tranchen vorhanden sind, nutzen wir die aggregierten Werte als Wahrheit.
-        const aggregated = (detailledTranches && Array.isArray(detailledTranches) && detailledTranches.length)
+        const aggregated = (Array.isArray(detailledTranches) && detailledTranches.length)
             ? calculateAggregatedValues()
             : null;
 
@@ -190,6 +180,10 @@ export const UIReader = {
         // Feature gate for Balance rollout: Dynamic Flex requires a valid CAPE anchor.
         const dynamicFlex = rawDynamicFlex && capeRatio > 0;
 
+        const bondTargetFactor = parseFloat(val('bondTargetFactor'));
+        const drawdownTrigger = parseFloat(val('drawdownTrigger'));
+        const bondRefillThreshold = parseFloat(val('bondRefillThreshold'));
+
         return {
             aktuellesAlter: Number.isFinite(profileAlter) ? profileAlter : (parseInt(val('aktuellesAlter')) || 0),
             floorBedarf: num('floorBedarf'),
@@ -239,9 +233,15 @@ export const UIReader = {
             survivalQuantile,
             goGoActive,
             goGoMultiplier,
+            decumulation: {
+                mode: val('entnahmeStrategie') || 'standard',
+                bondTargetFactor: Number.isFinite(bondTargetFactor) ? bondTargetFactor : 5.0,
+                drawdownTrigger: Number.isFinite(drawdownTrigger) ? drawdownTrigger : 15.0,
+                bondRefillThreshold: Number.isFinite(bondRefillThreshold) ? bondRefillThreshold : null
+            },
             profilName: val('profilName') || '',
             // NEU: Detaillierte Tranchen für FIFO und präzise Steuerberechnung
-            detailledTranches: detailledTranches
+            detailledTranches: detailledTranches.length ? detailledTranches : null
         };
     },
 
@@ -275,6 +275,24 @@ export const UIReader = {
                 }
             }
         });
+
+        if (storedInputs.decumulation && storedInputs.decumulation.mode) {
+            if (dom.inputs.entnahmeStrategie) dom.inputs.entnahmeStrategie.value = storedInputs.decumulation.mode;
+            const threeBucket = storedInputs.decumulation.threeBucket || storedInputs.decumulation;
+            if (dom.inputs.bondTargetFactor && Number.isFinite(threeBucket?.bondTargetFactor)) {
+                dom.inputs.bondTargetFactor.value = threeBucket.bondTargetFactor;
+            }
+            if (dom.inputs.drawdownTrigger && Number.isFinite(threeBucket?.drawdownTrigger)) {
+                dom.inputs.drawdownTrigger.value = threeBucket.drawdownTrigger;
+            }
+            const refillThreshold = Number.isFinite(threeBucket?.bondRefillThreshold)
+                ? threeBucket.bondRefillThreshold
+                : (Number.isFinite(threeBucket?.bondRefillThresholdPct) ? threeBucket.bondRefillThresholdPct : null);
+            if (dom.inputs.bondRefillThreshold && Number.isFinite(refillThreshold)) {
+                dom.inputs.bondRefillThreshold.value = refillThreshold;
+            }
+        }
+
         this.applySideEffectsFromInputs();
     },
 
@@ -295,6 +313,13 @@ export const UIReader = {
         const isGoldActive = goldAktivInput ? goldAktivInput.checked : false;
         if (goldPanel) {
             goldPanel.style.display = isGoldActive ? 'block' : 'none';
+        }
+
+        const entnahmeStrategieInput = dom.inputs.entnahmeStrategie;
+        const threeBucketConfigGroup = document.getElementById('threeBucketConfigGroup');
+        if (entnahmeStrategieInput && threeBucketConfigGroup) {
+            const is3Bucket = entnahmeStrategieInput.value === '3_bucket_jilge';
+            threeBucketConfigGroup.style.display = is3Bucket ? 'grid' : 'none';
         }
 
         const renteAktivInput = dom.inputs.renteAktiv;

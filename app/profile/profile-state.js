@@ -1,0 +1,150 @@
+// @ts-check
+
+import { CONFIG } from '../balance/balance-config.js';
+
+export const PROFILE_STORAGE_KEYS = {
+    registry: 'rs_profiles_v1',
+    current: 'rs_current_profile',
+    active: 'rs_active_profile'
+};
+
+export const PROFILE_VALUE_KEYS = {
+    tagesgeld: 'profile_tagesgeld',
+    renteAktiv: 'profile_rente_aktiv',
+    renteMonatlich: 'profile_rente_monatlich',
+    sonstigeEinkuenfte: 'profile_sonstige_einkuenfte',
+    alter: 'profile_aktuelles_alter',
+    goldAktiv: 'profile_gold_aktiv',
+    goldZiel: 'profile_gold_ziel_pct',
+    goldFloor: 'profile_gold_floor_pct',
+    goldSteuerfrei: 'profile_gold_steuerfrei',
+    goldRebalBand: 'profile_gold_rebal_band'
+};
+
+export const PROFILE_TRANCHES_KEY = 'depot_tranchen';
+
+export const PROFILE_SCOPED_FIXED_KEYS = [
+    PROFILE_TRANCHES_KEY,
+    ...Object.values(PROFILE_VALUE_KEYS),
+    'showCareDetails',
+    'logDetailLevel',
+    'worstLogDetailLevel',
+    'backtestLogDetailLevel'
+];
+
+function hasOwn(data, key) {
+    return Boolean(data) && Object.prototype.hasOwnProperty.call(data, key);
+}
+
+export function parseStoredNumber(raw, fallback = null) {
+    if (raw === null || raw === undefined || raw === '') return fallback;
+    const n = Number(String(raw).replace(',', '.'));
+    return Number.isFinite(n) ? n : fallback;
+}
+
+export function parseStoredBool(raw, fallback = null) {
+    if (raw === null || raw === undefined || raw === '') return fallback;
+    if (raw === true || raw === false) return raw;
+    const normalized = String(raw).toLowerCase();
+    if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on') return true;
+    if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'off') return false;
+    return fallback;
+}
+
+export function readStoredProfileValue(storage, key) {
+    if (!storage || typeof storage.getItem !== 'function') return null;
+    return storage.getItem(key);
+}
+
+export function readStoredProfileNumber(storage, key, fallback = null) {
+    return parseStoredNumber(readStoredProfileValue(storage, key), fallback);
+}
+
+export function readStoredProfileBool(storage, key, fallback = null) {
+    return parseStoredBool(readStoredProfileValue(storage, key), fallback);
+}
+
+export function parseProfileOverridesFromData(data) {
+    if (!data || typeof data !== 'object') return {};
+    return {
+        profileTagesgeld: hasOwn(data, PROFILE_VALUE_KEYS.tagesgeld)
+            ? parseStoredNumber(data[PROFILE_VALUE_KEYS.tagesgeld], null)
+            : null,
+        profileRenteAktiv: hasOwn(data, PROFILE_VALUE_KEYS.renteAktiv)
+            ? parseStoredBool(data[PROFILE_VALUE_KEYS.renteAktiv], null)
+            : null,
+        profileRenteMonatlich: hasOwn(data, PROFILE_VALUE_KEYS.renteMonatlich)
+            ? parseStoredNumber(data[PROFILE_VALUE_KEYS.renteMonatlich], null)
+            : null,
+        profileSonstigeEinkuenfte: hasOwn(data, PROFILE_VALUE_KEYS.sonstigeEinkuenfte)
+            ? parseStoredNumber(data[PROFILE_VALUE_KEYS.sonstigeEinkuenfte], null)
+            : null,
+        profileAlter: hasOwn(data, PROFILE_VALUE_KEYS.alter)
+            ? parseStoredNumber(data[PROFILE_VALUE_KEYS.alter], null)
+            : null,
+        profileGoldAktiv: hasOwn(data, PROFILE_VALUE_KEYS.goldAktiv)
+            ? parseStoredBool(data[PROFILE_VALUE_KEYS.goldAktiv], null)
+            : null,
+        profileGoldZiel: hasOwn(data, PROFILE_VALUE_KEYS.goldZiel)
+            ? parseStoredNumber(data[PROFILE_VALUE_KEYS.goldZiel], null)
+            : null,
+        profileGoldFloor: hasOwn(data, PROFILE_VALUE_KEYS.goldFloor)
+            ? parseStoredNumber(data[PROFILE_VALUE_KEYS.goldFloor], null)
+            : null,
+        profileGoldSteuerfrei: hasOwn(data, PROFILE_VALUE_KEYS.goldSteuerfrei)
+            ? parseStoredBool(data[PROFILE_VALUE_KEYS.goldSteuerfrei], null)
+            : null,
+        profileGoldRebalBand: hasOwn(data, PROFILE_VALUE_KEYS.goldRebalBand)
+            ? parseStoredNumber(data[PROFILE_VALUE_KEYS.goldRebalBand], null)
+            : null
+    };
+}
+
+export function readProfileOverridesFromStorage(storage = localStorage) {
+    return parseProfileOverridesFromData({
+        [PROFILE_VALUE_KEYS.tagesgeld]: readStoredProfileValue(storage, PROFILE_VALUE_KEYS.tagesgeld),
+        [PROFILE_VALUE_KEYS.renteAktiv]: readStoredProfileValue(storage, PROFILE_VALUE_KEYS.renteAktiv),
+        [PROFILE_VALUE_KEYS.renteMonatlich]: readStoredProfileValue(storage, PROFILE_VALUE_KEYS.renteMonatlich),
+        [PROFILE_VALUE_KEYS.sonstigeEinkuenfte]: readStoredProfileValue(storage, PROFILE_VALUE_KEYS.sonstigeEinkuenfte),
+        [PROFILE_VALUE_KEYS.alter]: readStoredProfileValue(storage, PROFILE_VALUE_KEYS.alter),
+        [PROFILE_VALUE_KEYS.goldAktiv]: readStoredProfileValue(storage, PROFILE_VALUE_KEYS.goldAktiv),
+        [PROFILE_VALUE_KEYS.goldZiel]: readStoredProfileValue(storage, PROFILE_VALUE_KEYS.goldZiel),
+        [PROFILE_VALUE_KEYS.goldFloor]: readStoredProfileValue(storage, PROFILE_VALUE_KEYS.goldFloor),
+        [PROFILE_VALUE_KEYS.goldSteuerfrei]: readStoredProfileValue(storage, PROFILE_VALUE_KEYS.goldSteuerfrei),
+        [PROFILE_VALUE_KEYS.goldRebalBand]: readStoredProfileValue(storage, PROFILE_VALUE_KEYS.goldRebalBand)
+    });
+}
+
+export function hasProfileOverrides(overrides) {
+    if (!overrides || typeof overrides !== 'object') return false;
+    return Object.values(overrides).some(value => value !== null && value !== undefined);
+}
+
+export function parseStoredTranchesFromData(data) {
+    if (!data || typeof data !== 'object') return [];
+    const raw = data[PROFILE_TRANCHES_KEY];
+    if (!raw) return [];
+    try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+}
+
+export function parseStoredBalanceStateFromData(data) {
+    if (!data || typeof data !== 'object') return null;
+    const raw = data[CONFIG.STORAGE.LS_KEY];
+    if (!raw) return null;
+    try {
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch {
+        return null;
+    }
+}
+
+export function parseStoredBalanceInputsFromData(data) {
+    const parsed = parseStoredBalanceStateFromData(data);
+    return parsed && typeof parsed.inputs === 'object' ? parsed.inputs : null;
+}

@@ -4,10 +4,31 @@ import {
     aggregateProfilverbundInputs,
     calculateTaxPerEuro,
     calculateWithdrawalDistribution,
+    loadProfilverbundProfiles,
     selectTranchesForSale
 } from '../app/profile/profilverbund-balance.js';
+import {
+    createProfile,
+    ensureProfileRegistry,
+    updateProfileData
+} from '../app/profile/profile-storage.js';
 
 console.log('--- Profilverbund Balance Tests ---');
+
+function createLocalStorageMock() {
+    const store = new Map();
+    return {
+        getItem: (key) => (store.has(key) ? store.get(key) : null),
+        setItem: (key, value) => { store.set(String(key), String(value)); },
+        removeItem: (key) => { store.delete(key); },
+        clear: () => { store.clear(); },
+        key: (index) => Array.from(store.keys())[index] || null,
+        get length() { return store.size; }
+    };
+}
+
+const prevLocalStorage = global.localStorage;
+global.localStorage = createLocalStorageMock();
 
 // --- TEST 1: Aggregation ---
 {
@@ -143,3 +164,32 @@ console.log('--- Profilverbund Balance Tests ---');
     assertEqual(selections[0].sellAmount, 100, 'First tranche fully sold');
     assertEqual(selections[1].sellAmount, 20, 'Second tranche partially sold to reach target');
 }
+
+// --- TEST 7: Profiles without saved balance state still load via overrides/tranches ---
+{
+    console.log('\n📋 Test 7: loadProfilverbundProfiles fallback ohne Balance-State');
+    localStorage.clear();
+    ensureProfileRegistry();
+
+    const profile = createProfile('Nur Assets');
+    updateProfileData(profile.id, {
+        profile_tagesgeld: '25000',
+        profile_rente_monatlich: '1200',
+        depot_tranchen: JSON.stringify([
+            { trancheId: 't1', marketValue: 100000, costBasis: 80000, category: 'equity', type: 'aktien_alt' },
+            { trancheId: 't2', marketValue: 15000, costBasis: 15000, category: 'money_market', type: 'geldmarkt' }
+        ])
+    });
+
+    const profiles = loadProfilverbundProfiles();
+    const loaded = profiles.find(entry => entry.profileId === profile.id);
+
+    assert(loaded, 'Profil sollte auch ohne Balance-State geladen werden');
+    assertEqual(loaded.inputs.tagesgeld, 25000, 'Tagesgeld-Override sollte übernommen werden');
+    assertEqual(loaded.inputs.renteMonatlich, 1200, 'Rente-Override sollte übernommen werden');
+    assertEqual(loaded.inputs.depotwertAlt, 100000, 'Equity-Tranche sollte als Depotwert übernommen werden');
+    assertEqual(loaded.inputs.geldmarktEtf, 15000, 'Money-Market-Tranche sollte übernommen werden');
+    assertEqual(loaded.tranches.length, 2, 'Tranchen sollten erhalten bleiben');
+}
+
+global.localStorage = prevLocalStorage;

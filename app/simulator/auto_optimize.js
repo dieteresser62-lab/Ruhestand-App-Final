@@ -159,6 +159,7 @@ export async function runAutoOptimize(config) {
     const BATCH_SIZE = 4; // OPTIMIZATION 3: Parallele Evaluation
     const quickFiltered = [];
 
+    let quickCompleted = 0;
     for (let i = 0; i < validCandidates.length; i += BATCH_SIZE) {
         const batch = validCandidates.slice(i, i + BATCH_SIZE);
 
@@ -174,6 +175,9 @@ export async function runAutoOptimize(config) {
                     null // KEIN Early Exit im Quick-Filter (zu wenig Runs für verlässliche Constraints)
                 );
 
+                quickCompleted++;
+                onProgress({ stage: 'quick_filter', progress: quickCompleted, total: validCandidates.length });
+
                 if (results) {
                     // Quick-Filter: Sortiere nur nach Objective, keine harten Constraints
                     const objValue = computeObjectiveWithSafety(results, objective, safetyGuardsActive);
@@ -184,7 +188,6 @@ export async function runAutoOptimize(config) {
         );
 
         quickFiltered.push(...batchResults.filter(r => r !== null));
-        onProgress({ stage: 'quick_filter', progress: Math.min(i + BATCH_SIZE, validCandidates.length), total: validCandidates.length });
     }
 
     if (quickFiltered.length === 0) {
@@ -200,6 +203,7 @@ export async function runAutoOptimize(config) {
     // Phase 1b: Volle Evaluation der Top-50
     const evaluated = [];
 
+    let evalCompleted = 0;
     for (let i = 0; i < top50.length; i += BATCH_SIZE) {
         const batch = top50.slice(i, i + BATCH_SIZE);
 
@@ -219,6 +223,9 @@ export async function runAutoOptimize(config) {
                     if (results) cache.set(candidate, results);
                 }
 
+                evalCompleted++;
+                onProgress({ stage: 'evaluate_lhs', progress: evalCompleted, total: top50.length });
+
                 const results = cache.get(candidate);
                 if (results && checkConstraints(results, constraints)) {
                     const objValue = computeObjectiveWithSafety(results, objective, safetyGuardsActive);
@@ -229,7 +236,6 @@ export async function runAutoOptimize(config) {
         );
 
         evaluated.push(...batchResults.filter(r => r !== null));
-        onProgress({ stage: 'evaluate_lhs', progress: Math.min(i + BATCH_SIZE, top50.length), total: top50.length });
     }
 
     if (evaluated.length === 0) {
@@ -259,6 +265,7 @@ export async function runAutoOptimize(config) {
 
     onProgress({ stage: 'refine', progress: 0, total: refineArray.length });
 
+    let refineCompleted = 0;
     for (let i = 0; i < refineArray.length; i += BATCH_SIZE) {
         const batch = refineArray.slice(i, i + BATCH_SIZE);
 
@@ -276,6 +283,9 @@ export async function runAutoOptimize(config) {
                     if (results) cache.set(candidate, results);
                 }
 
+                refineCompleted++;
+                onProgress({ stage: 'refine', progress: refineCompleted, total: refineArray.length });
+
                 const results = cache.get(candidate);
                 if (results && checkConstraints(results, constraints)) {
                     const objValue = computeObjectiveWithSafety(results, objective, safetyGuardsActive);
@@ -286,7 +296,6 @@ export async function runAutoOptimize(config) {
         );
 
         evaluated.push(...batchResults.filter(r => r !== null));
-        onProgress({ stage: 'refine', progress: Math.min(i + BATCH_SIZE, refineArray.length), total: refineArray.length });
     }
 
     // Neu sortieren

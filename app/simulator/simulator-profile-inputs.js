@@ -8,8 +8,13 @@
  */
 
 import { SUPPORTED_PFLEGE_GRADES } from './simulator-data.js';
-import { CONFIG } from '../balance/balance-config.js';
 import { STRATEGY_OPTIONS } from '../../types/strategy-options.js';
+import {
+    PROFILE_VALUE_KEYS,
+    parseProfileOverridesFromData,
+    parseStoredBalanceInputsFromData,
+    parseStoredTranchesFromData
+} from '../profile/profile-state.js';
 
 const DYNAMIC_FLEX_DEFAULTS = {
     HORIZON_METHOD: 'survival_quantile',
@@ -89,21 +94,6 @@ function parseWidowOptions(data) {
     };
 }
 
-function parseProfileGoldOverrides(data) {
-    const hasGoldAktiv = Object.prototype.hasOwnProperty.call(data, 'profile_gold_aktiv');
-    const hasGoldZiel = Object.prototype.hasOwnProperty.call(data, 'profile_gold_ziel_pct');
-    const hasGoldFloor = Object.prototype.hasOwnProperty.call(data, 'profile_gold_floor_pct');
-    const hasGoldSteuerfrei = Object.prototype.hasOwnProperty.call(data, 'profile_gold_steuerfrei');
-    const hasGoldBand = Object.prototype.hasOwnProperty.call(data, 'profile_gold_rebal_band');
-    return {
-        goldAktiv: hasGoldAktiv ? readBool(data, 'profile_gold_aktiv', false) : null,
-        goldZielProzent: hasGoldZiel ? readNumber(data, 'profile_gold_ziel_pct', 0) : null,
-        goldFloorProzent: hasGoldFloor ? readNumber(data, 'profile_gold_floor_pct', 0) : null,
-        goldSteuerfrei: hasGoldSteuerfrei ? readBool(data, 'profile_gold_steuerfrei', false) : null,
-        rebalancingBand: hasGoldBand ? readNumber(data, 'profile_gold_rebal_band', 0) : null
-    };
-}
-
 function parsePflegeGradeConfigs(data) {
     const configs = {};
     SUPPORTED_PFLEGE_GRADES.forEach(grade => {
@@ -118,26 +108,8 @@ function parsePflegeGradeConfigs(data) {
 }
 
 function parseDetailledTranches(data) {
-    const raw = readValue(data, 'depot_tranchen');
-    if (!raw) return null;
-    try {
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : null;
-    } catch {
-        return null;
-    }
-}
-
-function parseBalanceInputs(data) {
-    const raw = readValue(data, CONFIG.STORAGE.LS_KEY);
-    if (!raw) return null;
-    try {
-        const parsed = JSON.parse(raw);
-        // Balance speichert unter LS_KEY ein Objekt mit { inputs, ... }.
-        return parsed && parsed.inputs ? parsed.inputs : null;
-    } catch {
-        return null;
-    }
+    const parsed = parseStoredTranchesFromData(data);
+    return parsed.length ? parsed : null;
 }
 
 function sumTrancheTotals(tranches) {
@@ -165,17 +137,24 @@ function sumTrancheTotals(tranches) {
 
 export function buildSimulatorInputsFromProfileData(profileData) {
     // Balance-App Inputs (falls vorhanden) liefern Defaults für fehlende Simulator-Werte.
-    const balanceInputs = parseBalanceInputs(profileData);
+    const balanceInputs = parseStoredBalanceInputsFromData(profileData);
     const pflegeGradeConfigs = parsePflegeGradeConfigs(profileData);
     const detailedTranches = parseDetailledTranches(profileData);
     const trancheTotals = sumTrancheTotals(detailedTranches);
     const grade1Config = pflegeGradeConfigs[1] || { zusatz: 0, flexCut: 1 };
-    const goldOverrides = parseProfileGoldOverrides(profileData);
-    const hasProfileTagesgeld = Object.prototype.hasOwnProperty.call(profileData, 'profile_tagesgeld');
-    const profileTagesgeld = hasProfileTagesgeld ? readNumber(profileData, 'profile_tagesgeld', 0) : 0;
-    const hasProfileRenteAktiv = Object.prototype.hasOwnProperty.call(profileData, 'profile_rente_aktiv');
-    const profileRenteAktiv = hasProfileRenteAktiv ? readBool(profileData, 'profile_rente_aktiv', false) : false;
-    const profileRenteMonatlich = readNumber(profileData, 'profile_rente_monatlich', 0);
+    const overrides = parseProfileOverridesFromData(profileData);
+    const goldOverrides = {
+        goldAktiv: overrides.profileGoldAktiv,
+        goldZielProzent: overrides.profileGoldZiel,
+        goldFloorProzent: overrides.profileGoldFloor,
+        goldSteuerfrei: overrides.profileGoldSteuerfrei,
+        rebalancingBand: overrides.profileGoldRebalBand
+    };
+    const hasProfileTagesgeld = Object.prototype.hasOwnProperty.call(profileData, PROFILE_VALUE_KEYS.tagesgeld);
+    const profileTagesgeld = hasProfileTagesgeld ? readNumber(profileData, PROFILE_VALUE_KEYS.tagesgeld, 0) : 0;
+    const hasProfileRenteAktiv = Object.prototype.hasOwnProperty.call(profileData, PROFILE_VALUE_KEYS.renteAktiv);
+    const profileRenteAktiv = hasProfileRenteAktiv ? readBool(profileData, PROFILE_VALUE_KEYS.renteAktiv, false) : false;
+    const profileRenteMonatlich = readNumber(profileData, PROFILE_VALUE_KEYS.renteMonatlich, 0);
 
     const p1StartAlter = readInt(profileData, simKey('p1StartAlter'), 65);
     const p1Geschlecht = readString(profileData, simKey('p1Geschlecht'), 'm');

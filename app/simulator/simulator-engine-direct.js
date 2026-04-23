@@ -15,39 +15,14 @@ import { calculateSaleAndTax } from '../../engine/transactions/sale-engine.mjs';
 import { settleTaxYear } from '../../engine/tax-settlement.mjs';
 import { CONFIG } from '../../engine/config.mjs';
 import { STRATEGY_OPTIONS } from '../../types/strategy-options.js';
+import {
+    getThreeBucketInputs,
+    sumBondBucketValuation,
+    applyThreeBucketLogic,
+    isBondCategory
+} from '../../engine/transactions/three-bucket-logic.mjs';
 
 const formatInteger = (value) => Number.isFinite(value) ? Math.round(value) : 0;
-const THREE_BUCKET_CFG = CONFIG.SPENDING_MODEL?.THREE_BUCKET || {};
-
-function isBondType(tranche) {
-    return isBondKind(tranche?.type) || isBondKind(tranche?.category);
-}
-
-function getThreeBucketInputs(inputs) {
-    const dec = (inputs?.decumulation && typeof inputs.decumulation === 'object') ? inputs.decumulation : {};
-    const modeRaw = String(dec.mode || '').toLowerCase();
-    const drawdownRaw = Number(dec.drawdownTrigger);
-    const normalizedDrawdown = Number.isFinite(drawdownRaw)
-        ? (drawdownRaw > 0 ? -drawdownRaw : drawdownRaw)
-        : Number(THREE_BUCKET_CFG.DEFAULT_DRAWDOWN_TRIGGER ?? -15);
-    const targetRaw = Number(dec.bondTargetFactor);
-    const refillRaw = Number(dec.bondRefillThreshold);
-    return {
-        is3Bucket: modeRaw === STRATEGY_OPTIONS.THREE_BUCKET_JILGE,
-        drawdownTrigger: normalizedDrawdown,
-        bondTargetFactor: Number.isFinite(targetRaw) ? Math.max(0, targetRaw) : Number(THREE_BUCKET_CFG.DEFAULT_BOND_TARGET_FACTOR ?? 5),
-        bondRefillThresholdPct: Number.isFinite(refillRaw) ? Math.max(0, refillRaw) : null,
-        bondNominalReturn: Number(THREE_BUCKET_CFG.BOND_NOMINAL_RETURN ?? 0.02)
-    };
-}
-
-function sumBondBucket(tranches) {
-    return (tranches || []).reduce((sum, tranche) => sum + (isBondType(tranche) ? (Number(tranche.marketValue) || 0) : 0), 0);
-}
-
-function sumEquityOnlyBucket(tranches) {
-    return (tranches || []).reduce((sum, tranche) => sum + (!isBondType(tranche) ? (Number(tranche.marketValue) || 0) : 0), 0);
-}
 
 /**
  * FAIL-SAFE Liquidity Guard - Hilfsfunktionen
@@ -135,23 +110,21 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const rA = isFinite(yearData.rendite) ? yearData.rendite : 0;
     const rG = isFinite(yearData.gold_eur_perf) ? yearData.gold_eur_perf / 100 : 0;
     const rC = isFinite(yearData.zinssatz) ? yearData.zinssatz / 100 : 0;
-    const drawdownTriggerRatio = (Number.isFinite(threeBucketInput.drawdownTrigger) && Math.abs(threeBucketInput.drawdownTrigger) > 1)
-        ? (threeBucketInput.drawdownTrigger / 100)
-        : threeBucketInput.drawdownTrigger;
-    const isBadYear = is3Bucket && (rA < drawdownTriggerRatio);
+
     let bondSaleAmount = 0;
     let bondRefillGross = 0;
     let bondRefillNet = 0;
     let bondRefillTax = 0;
     let equityPreserved = 0;
     let unmetLiquidity = 0;
-    const bondBucketBefore = sumBondBucket(depotTranchesAktien);
+    let isBadYear = false;
+    const bondBucketBefore = sumBondBucketValuation(depotTranchesAktien);
     const equityBeforeReturn = sumDepot({ depotTranchesAktien });
     const goldBeforeReturn = sumDepot({ depotTranchesGold });
 
     // Renditen anwenden
     for (let i = 0; i < depotTranchesAktien.length; i++) {
-        const trancheReturn = isBondType(depotTranchesAktien[i]) ? threeBucketInput.bondNominalReturn : rA;
+        const trancheReturn = (isBondCategory(depotTranchesAktien[i].type) || isBondCategory(depotTranchesAktien[i].category)) ? threeBucketInput.bondNominalReturn : rA;
         depotTranchesAktien[i].marketValue *= (1 + trancheReturn);
     }
     for (let i = 0; i < depotTranchesGold.length; i++) {
@@ -380,7 +353,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
                 threeBucket: {
                     isBadYear,
                     bondBucketBefore: euros(bondBucketBefore),
-                    bondBucketAfter: euros(sumBondBucket(portfolio.depotTranchesAktien)),
+                    bondBucketAfter: euros(sumBondBucketValuation(portfolio.depotTranchesAktien)),
                     bondRefillGross: 0,
                     bondRefillNet: 0,
                     bondRefillTax: 0,
@@ -544,43 +517,30 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     };
     combinedTaxRawAggregate = { ...actionRawAggregate };
 
+    // 3-Bucket Override
+    const { updatedAction, threeBucketState } = applyThreeBucketLogic(
+        detailedTranches,
+        engineInput,
+        market,
+        actionResult,
+        rA,
+        bondBucketBefore
+    );
+
+    Object.assign(actionResult, updatedAction);
+    combinedTaxRawAggregate = {
+        sumRealizedGainSigned: Number(actionResult?.taxRawAggregate?.sumRealizedGainSigned) || 0,
+        sumTaxableAfterTqfSigned: Number(actionResult?.taxRawAggregate?.sumTaxableAfterTqfSigned) || 0
+    };
+
     const allQuellen = Array.isArray(actionResult.quellen) ? actionResult.quellen : [];
     let saleQuellen = allQuellen.filter(q => q?.kind && q.kind !== 'liquiditaet');
-    if (is3Bucket && isBadYear) {
-        const blockedEquitySale = saleQuellen.reduce((sum, q) => {
-            const kind = String(q?.kind || '').toLowerCase();
-            if (!kind || kind === 'liquiditaet' || isBondKind(kind) || kind.startsWith('gold')) return sum;
-            return sum + (Number(q?.brutto) || 0);
-        }, 0);
-        equityPreserved += blockedEquitySale;
-        const requestedNetto = Math.max(0, Number(actionResult.nettoErlös) || 0);
-        const bondTranchesOnly = buildDetailedTranchesFromPortfolio(portfolio).filter(t => isBondType(t));
-        if (requestedNetto > 0 && bondTranchesOnly.length > 0) {
-            const bondSale = calculateSaleAndTax(requestedNetto, {
-                ...engineInput,
-                detailledTranches: bondTranchesOnly,
-                depotwertAlt: 0,
-                depotwertNeu: 0,
-                goldWert: 0
-            }, { minGold: 0 }, market, false);
-            saleQuellen = Array.isArray(bondSale.breakdown) ? bondSale.breakdown.map(item => ({ ...item, category: 'bonds' })) : [];
-            actionResult.nettoErlös = bondSale.achievedRefill || 0;
-            actionResult.steuer = bondSale.steuerGesamt || 0;
-            actionResult.taxRawAggregate = {
-                sumRealizedGainSigned: Number(bondSale.taxRawAggregate?.sumRealizedGainSigned) || 0,
-                sumTaxableAfterTqfSigned: Number(bondSale.taxRawAggregate?.sumTaxableAfterTqfSigned) || 0
-            };
-            combinedTaxRawAggregate = { ...actionResult.taxRawAggregate };
-            unmetLiquidity += Math.max(0, requestedNetto - (bondSale.achievedRefill || 0));
-        } else if (requestedNetto > 0) {
-            saleQuellen = [];
-            actionResult.nettoErlös = 0;
-            actionResult.steuer = 0;
-            unmetLiquidity += requestedNetto;
-        } else {
-            saleQuellen = [];
-        }
-    }
+
+    isBadYear = threeBucketState.isBadYear;
+    bondSaleAmount = threeBucketState.bondSaleAmount;
+    equityPreserved = threeBucketState.equityPreserved;
+    unmetLiquidity += threeBucketState.unmetLiquidity;
+
     let plannedSaleBrutto = saleQuellen.reduce((sum, q) => sum + (q?.brutto || 0), 0);
     let hasSales = plannedSaleBrutto > 0;
     let buyGoldAmount = 0;
@@ -683,7 +643,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         // This ensures we use up-to-date marketValue after any prior sales in this year
         const currentTranches = buildDetailedTranchesFromPortfolio(portfolio);
         const forcedTranches = (is3Bucket && isBadYear)
-            ? currentTranches.filter(t => isBondType(t))
+            ? currentTranches.filter(t => isBondCategory(t))
             : currentTranches;
         if (is3Bucket && isBadYear) {
             const availableBond = forcedTranches.reduce((sum, t) => sum + (Number(t.marketValue) || 0), 0);
@@ -787,7 +747,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
                 return reduced;
             };
             if (is3Bucket && isBadYear) {
-                const reducedBond = reduceAcrossTranches(depotTranchesAktien.filter(t => isBondType(t)), forcedShortfall, true);
+                const reducedBond = reduceAcrossTranches(depotTranchesAktien.filter(t => isBondCategory(t)), forcedShortfall, true);
                 liquiditaet += Math.min(forcedShortfall, reducedBond);
                 bondSaleAmount += reducedBond;
                 unmetLiquidity += Math.max(0, forcedShortfall - reducedBond);
@@ -870,7 +830,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
         let totalReduced = 0;
         if (is3Bucket && isBadYear) {
-            const reducedBond = reduceAcrossTranches(depotTranchesAktien.filter(t => isBondType(t)), additionalNeeded, true);
+            const reducedBond = reduceAcrossTranches(depotTranchesAktien.filter(t => isBondCategory(t)), additionalNeeded, true);
             totalReduced = reducedBond;
             bondSaleAmount += reducedBond;
             unmetLiquidity += Math.max(0, additionalNeeded - reducedBond);
@@ -892,13 +852,13 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
     if (is3Bucket && !isBadYear && threeBucketInput.bondTargetFactor > 0) {
         const bondTarget = Math.max(0, threeBucketInput.bondTargetFactor * jahresEntnahmeTarget);
-        const currentBondValue = sumBondBucket(depotTranchesAktien);
+        const currentBondValue = sumBondBucketValuation(depotTranchesAktien);
         const bondDeficit = Math.max(0, bondTarget - currentBondValue);
         const refillThreshold = Number.isFinite(threeBucketInput.bondRefillThresholdPct)
             ? (bondTarget * (threeBucketInput.bondRefillThresholdPct / 100))
             : 0;
         if (bondDeficit > refillThreshold) {
-            let bondTranche = depotTranchesAktien.find(t => isBondType(t));
+            let bondTranche = depotTranchesAktien.find(t => isBondCategory(t.type) || isBondCategory(t.category));
             if (!bondTranche) {
                 bondTranche = {
                     type: 'anleihe', category: 'bonds',
@@ -907,12 +867,12 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
                 };
                 depotTranchesAktien.push(bondTranche);
             }
-            const equityOnly = sumEquityOnlyBucket(depotTranchesAktien);
+            const equityOnly = depotTranchesAktien.reduce((sum, t) => sum + (!(isBondCategory(t.type) || isBondCategory(t.category)) ? (Number(t.marketValue) || 0) : 0), 0);
             const equityGuardMin = Math.max(jahresEntnahmeTarget, netFloorYear);
             const maxRefillNet = Math.max(0, equityOnly - equityGuardMin);
             if (maxRefillNet > 0) {
                 const requestedNet = Math.min(bondDeficit, maxRefillNet);
-                const refillTranches = buildDetailedTranchesFromPortfolio(portfolio).filter(t => !isBondType(t) && String(t.category || '') === 'equity');
+                const refillTranches = buildDetailedTranchesFromPortfolio(portfolio).filter(t => !(isBondCategory(t.type) || isBondCategory(t.category)) && String(t.category || '') === 'equity');
                 if (requestedNet > 0 && refillTranches.length > 0) {
                     const refillSale = calculateSaleAndTax(requestedNet, {
                         ...engineInput,
@@ -1031,7 +991,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
 
     const nextPortfolio = { ...portfolio, liquiditaet };
-    const bondBucketAfter = sumBondBucket(nextPortfolio.depotTranchesAktien);
+    const bondBucketAfter = sumBondBucketValuation(nextPortfolio.depotTranchesAktien);
 
     return {
         isRuin: false,

@@ -169,7 +169,8 @@ export function runSweepChunk({
     paramCombinations,
     comboRange,
     sweepConfig,
-    refP2Invariants = null
+    refP2Invariants = null,
+    engine = null
 }) {
     const { anzahlRuns, maxDauer, blockSize, baseSeed, methode, rngMode = 'per-run-seed' } = sweepConfig;
     const start = comboRange?.start ?? 0;
@@ -259,7 +260,7 @@ export function runSweepChunk({
 
                 const { zusatzFloor: careFloor } = calcCareCost(careMeta, null);
 
-                const result = simulateOneYear(simState, adjustedInputs, yearData, simulationsJahr, careMeta, careFloor, null, 1.0);
+                const result = simulateOneYear(simState, adjustedInputs, yearData, simulationsJahr, careMeta, careFloor, null, 1.0, engine);
 
                 if (result?.error) {
                     const firstFieldError = Array.isArray(result.error?.errors) && result.error.errors.length > 0

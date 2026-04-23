@@ -22,6 +22,23 @@ Dieses Dokument beschreibt die Architektur und zentrale Datenflüsse der Ruhesta
 Alle Skripte sind ES6-Module. Die Engine wird per `build-engine.mjs` mit esbuild (oder Modul-Fallback) gebündelt und stellt eine globale `EngineAPI` bereit.  
 Für CI/Release ist Strict-Mode vorgesehen (`npm run build:engine:strict`), der ohne `esbuild` fehlschlägt.
 
+### Tauri Desktop-Build und Live-Daten
+
+Die Desktop-App lädt das Frontend direkt aus `dist/` (`src-tauri/tauri.conf.json -> build.frontendDist = "../dist"`). Für Windows ist der praktische Build-Pfad:
+
+1. `build-tauri.bat`
+2. `scripts/build-tauri.ps1`
+3. `npm run sync-dist`
+4. `npm run tauri:build`
+5. Kopie der erzeugten Binary nach `RuhestandSuite.exe`
+
+Wichtig für Live-Daten:
+
+* ETF-Kurse laufen in der EXE über den in `src-tauri/src/lib.rs` gestarteten lokalen Yahoo-Proxy auf `127.0.0.1:8787`.
+* Inflation (ECB, World Bank, OECD) und CAPE (`r.jina.ai` -> Yale/Mirror) laufen in der EXE direkt aus der Tauri-WebView.
+* Die dafür nötigen Ziele stehen explizit in `src-tauri/tauri.conf.json` unter `app.security.csp.connect-src`.
+* In der Browser-Variante wird der Yahoo-Proxy weiterhin über `start_suite.cmd` / `start_suite.ps1` gestartet und benötigt dafür Node.js.
+
 ---
 
 ## Engine
@@ -129,6 +146,7 @@ Die Kennzahlen im Tab berechnen sich wie folgt:
 Der Jahreswechsel ruft CAPE automatisiert und fehlertolerant ab:
 
 * Quelle/Fallback: Yale (Primary) -> Mirror (`shillerdata`) -> letzter gespeicherter Wert.
+* Requests laufen mit eigenem Timeout; Abort-/Timeout-Fehler werden in nutzbare Statusmeldungen übersetzt.
 * Persistente Meta-Felder: `capeAsOf`, `capeSource`, `capeFetchStatus`, `capeUpdatedAt`.
 * Der Ablauf ist non-blocking: fehlende CAPE-Daten werden als Warnung protokolliert, der Jahreswechsel läuft weiter.
 * Vertragsdetails und Fehlerszenarien: `docs/internal/archive/2026-dynamic-flex/CAPE_AUTOMATION_CONTRACT.md`.

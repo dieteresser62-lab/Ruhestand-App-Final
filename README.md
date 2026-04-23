@@ -200,12 +200,13 @@ Die Anwendung ist bewusst minimalistisch gehalten, hat aber für den vollen Funk
 * Beinhaltet beide Apps (Balance & Simulator) in einer nativen Desktop-Umgebung
 * Läuft komplett offline; Internetzugriff wird nur für optionale Live-Daten (Inflation/Kurse) benötigt
 * Download direkt aus dem Repository-Root (`RuhestandSuite.exe`) oder dem GitHub-Release
-* Enthaelt einen integrierten Yahoo-Proxy fuer Kurs-Updates im Depot-Tranchen-Manager (lokaler Port 8787)
+* Nutzt kein separates lokales Webserver-Setup; das Frontend wird direkt aus `dist/` in der Tauri-WebView geladen
+* Enthaelt einen integrierten Yahoo-Proxy fuer Kurs-Updates (lokaler Port 8787)
 
 **So nutzen Sie die portable EXE:**
 1. `RuhestandSuite.exe` aus dem Repository oder Release-Download in einen beliebigen Ordner kopieren.
-2. Per Doppelklick starten; der integrierte Webserver und die Oberfläche öffnen sich automatisch.
-3. Optionale Live-Datenzugriffe funktionieren, wenn eine Internetverbindung besteht; andernfalls läuft die App vollständig lokal weiter.
+2. Per Doppelklick starten; die Tauri-App öffnet die Oberfläche direkt aus dem gebündelten `dist/`-Stand.
+3. Optionale Live-Datenzugriffe funktionieren, wenn eine Internetverbindung besteht; ETF-Kurse laufen über den integrierten lokalen Proxy, Inflation und CAPE direkt über freigegebene externe Endpunkte. Ohne Internet läuft die App vollständig lokal weiter.
 4. Eigene Szenarien und Snapshots werden im Benutzerprofil gespeichert; bei Bedarf kann die EXE samt Konfigurationsordner als Backup kopiert werden.
 
 ### Option 2: Browser-basierte Nutzung
@@ -225,7 +226,7 @@ Die Anwendung ist bewusst minimalistisch gehalten, hat aber für den vollen Funk
 * `stop_suite.cmd` – Beendet eventuell noch laufende Server-Prozesse (Webserver und Proxy).
 * Manuell ohne Proxy: `python dev_server.py --port 8000` (Online-Kurse dann nicht verfügbar).
 
-> **Hinweis:** Einige Funktionen (Snapshots, Dateiimporte) benötigen Browser mit File-System-Access-Unterstützung. Der Yahoo-Proxy benötigt Node.js; ohne Node.js läuft die Suite trotzdem, jedoch ohne Online-Kursabruf.
+> **Hinweis:** Einige Funktionen (Snapshots, Dateiimporte) benötigen Browser mit File-System-Access-Unterstützung. In der Browser-Variante benötigt der Yahoo-Proxy Node.js; ohne Node.js läuft die Suite trotzdem, jedoch ohne Online-Kursabruf. Die Tauri-EXE bringt den Proxy selbst mit und benötigt dafür kein separates Node.js.
 
 ---
 
@@ -233,6 +234,7 @@ Die Anwendung ist bewusst minimalistisch gehalten, hat aber für den vollen Funk
 
 * Die Balance- und Simulator-Module nutzen native ES6-Imports. Änderungen an einzelnen Modulen werden nach dem Speichern direkt beim nächsten Reload geladen.
 * Engine-Anpassungen erfolgen in den Modulen unter `engine/`. Nach Anpassungen `npm run build:engine` ausführen und die Größe der generierten `engine.js` kontrollieren.
+* Der Windows-Release-Build läuft über `build-tauri.bat` bzw. `scripts/build-tauri.ps1`: zuerst `npm run sync-dist`, dann `npm run tauri:build`, danach wird die erzeugte EXE ins Repo-Root kopiert.
 * Für schnelle QA bitte `npm test` einmal durchlaufen lassen.
 
 ## Abschluss-Checkliste

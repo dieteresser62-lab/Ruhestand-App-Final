@@ -18,7 +18,6 @@ export class WorkerPool {
         this.idle = [];
         this.queue = [];
         this.jobs = new Map();
-        this.activeJobs = new Map();
         this.nextJobId = 1;
         this.workerIds = new Map();
         this.nextWorkerId = 1;
@@ -87,10 +86,7 @@ export class WorkerPool {
         if (this.poolDisabled) return;
         this.poolDisabled = true;
         this.poolFailureReason = reason instanceof Error ? reason : new Error(String(reason));
-        const allJobIds = new Set([
-            ...this.jobs.keys(),
-            ...this.activeJobs.values()
-        ]);
+        const allJobIds = Array.from(this.jobs.keys());
         for (const jobId of allJobIds) {
             const job = this.jobs.get(jobId);
             if (!job) continue;
@@ -113,7 +109,6 @@ export class WorkerPool {
         }
         this.workers = [];
         this.idle = [];
-        this.activeJobs.clear();
         this.workerIds.clear();
     }
 
@@ -149,8 +144,19 @@ export class WorkerPool {
         }
 
         this.jobs.delete(jobId);
-        this.activeJobs.delete(worker);
-        this.idle.push(worker);
+
+        let hasMoreJobs = false;
+        for (const activeJob of this.jobs.values()) {
+            if (activeJob.worker === worker) {
+                hasMoreJobs = true;
+                break;
+            }
+        }
+
+        if (!hasMoreJobs && !this.idle.includes(worker)) {
+            this.idle.push(worker);
+        }
+
         this._drainQueue();
 
         if (message.type === 'error') {
@@ -179,17 +185,15 @@ export class WorkerPool {
         }
         const workerId = this._getWorkerId(worker);
         if (this.onError) this.onError(normalizedError);
-        const activeJobId = this.activeJobs.get(worker);
-        if (activeJobId) {
-            const job = this.jobs.get(activeJobId);
-            if (job) {
-                this.jobs.delete(activeJobId);
+
+        for (const [jobId, job] of this.jobs.entries()) {
+            if (job.worker === worker) {
+                this.jobs.delete(jobId);
                 if (this.telemetry) {
-                    this.telemetry.recordJobFailed(activeJobId, workerId, normalizedError);
+                    this.telemetry.recordJobFailed(jobId, workerId, normalizedError);
                 }
                 job.reject(normalizedError);
             }
-            this.activeJobs.delete(worker);
         }
         const index = this.workers.indexOf(worker);
         if (index !== -1) {
@@ -235,8 +239,7 @@ export class WorkerPool {
         while (this.idle.length > 0 && this.queue.length > 0) {
             const worker = this.idle.pop();
             const job = this.queue.shift();
-            this.jobs.set(job.jobId, job);
-            this.activeJobs.set(worker, job.jobId);
+            this.jobs.set(job.jobId, { ...job, worker });
             if (this.telemetry) {
                 this.telemetry.recordJobStart(job.jobId, this._getWorkerId(worker), job.payload);
             }
@@ -281,8 +284,7 @@ export class WorkerPool {
         const jobId = this.nextJobId++;
         const message = { ...payload, jobId };
         return new Promise((resolve, reject) => {
-            this.jobs.set(jobId, { resolve, reject });
-            this.activeJobs.set(worker, jobId);
+            this.jobs.set(jobId, { resolve, reject, worker });
             const idleIndex = this.idle.indexOf(worker);
             if (idleIndex !== -1) {
                 this.idle.splice(idleIndex, 1);
@@ -294,7 +296,6 @@ export class WorkerPool {
                 worker.postMessage(message, transferables);
             } catch (postMessageError) {
                 this.jobs.delete(jobId);
-                this.activeJobs.delete(worker);
                 reject(this._toError(postMessageError, worker));
             }
         });
@@ -311,7 +312,6 @@ export class WorkerPool {
         this.idle = [];
         this.queue = [];
         this.jobs.clear();
-        this.activeJobs.clear();
         this.workerIds.clear();
         this.poolDisabled = true;
         this.poolFailureReason = null;

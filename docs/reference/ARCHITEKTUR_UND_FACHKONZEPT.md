@@ -228,15 +228,20 @@ src-tauri/
 ```json
 {
   "productName": "RuhestandSuite",
-  "identifier": "de.ruhestandsuite.app",
+  "identifier": "com.dieter.ruhestandsapp",
   "build": {
     "frontendDist": "../dist"
   },
   "app": {
+    "security": {
+      "csp": {
+        "connect-src": "'self' http://127.0.0.1:8787 https://data-api.ecb.europa.eu https://api.worldbank.org https://stats.oecd.org https://r.jina.ai"
+      }
+    },
     "windows": [{
-      "title": "Ruhestand Suite",
-      "width": 1400,
-      "height": 900,
+      "title": "RuhestandsApp",
+      "width": 1920,
+      "height": 1080,
       "resizable": true
     }]
   }
@@ -257,15 +262,18 @@ src-tauri/
 ### Build-Prozess
 
 ```bash
-# Development-Modus (Hot-Reload)
-npm run tauri:dev
+# Windows-Shortcut für den Produktivbuild
+build-tauri.bat
 
-# Production-Build (für aktuelle Plattform)
-npm run tauri:build
+# Entspricht intern:
+# 1) npm run sync-dist
+# 2) npm run tauri:build
+# 3) Copy src-tauri/target/release/ruhestand_suite.exe -> RuheStandSuite.exe
 ```
 
 **Output je nach Plattform:**
-- **Windows:** `src-tauri/target/release/RuhestandSuite.exe`
+- **Windows (Build-Artefakt):** `src-tauri/target/release/ruhestand_suite.exe`
+- **Windows (kopiertes Repo-Root-Artefakt):** `RuheStandSuite.exe`
 - **macOS:** `src-tauri/target/release/bundle/macos/RuhestandSuite.app`
 - **Linux:** `src-tauri/target/release/bundle/appimage/RuhestandSuite.AppImage`
 
@@ -275,7 +283,8 @@ npm run tauri:build
 
 - **Rust-Version:** 1.70+ (für Tauri 2.0)
 - **WebView:** Microsoft Edge WebView2 (Windows), WebKit (macOS/Linux)
-- **Permissions:** Nur `fs` (Dateizugriff für Snapshots), keine Netzwerk-Permissions
+- **Netzwerkpfade:** Lokaler Yahoo-Proxy in Rust auf `127.0.0.1:8787`; Inflation/CAPE direkt aus der WebView über CSP-Allowlist
+- **Build-Input:** Tauri lädt immer den frisch synchronisierten `dist/`-Ordner, nicht die Root-HTML-Dateien direkt
 - **Signierung:** Unsigned (Community-Build), kann mit eigenem Zertifikat signiert werden
 
 ---

@@ -57,7 +57,8 @@
                         <!-- Jahres-Update Button -->
                         <!-- Compact Header Row -->
                         <div class="basiswerte-header-row basiswerte-header-compact">
-                            <div class="profilverbund-toggle-target profilverbund-header-group profilverbund-compact" style="display:none;">
+                            <div class="profilverbund-toggle-target profilverbund-header-group profilverbund-compact"
+                                style="display:none;">
                                 <div class="profilverbund-title">Profilverbund</div>
                                 <div class="profilverbund-controls-inline">
                                     <label for="profilverbund-withdrawal-mode">Verteilung</label>
@@ -68,10 +69,12 @@
                                     </select>
                                 </div>
                                 <div class="profilverbund-profile-strip">
-                                    <div id="profilverbund-profile-list" class="profilverbund-profile-list compact"></div>
+                                    <div id="profilverbund-profile-list" class="profilverbund-profile-list compact">
+                                    </div>
                                 </div>
                             </div>
-                            <div class="basiswerte-divider profilverbund-toggle-target" aria-hidden="true" style="display:none;"></div>
+                            <div class="basiswerte-divider profilverbund-toggle-target" aria-hidden="true"
+                                style="display:none;"></div>
                             <div class="update-primary-actions update-actions-compact">
                                 <button id="btnJahresUpdate" type="button" class="btn btn-primary"
                                     title="Ruft Inflation (ECB) und ETF-Kurs (VWCE.DE) ab, führt Nachrücken durch und aktualisiert ATH">🌐
@@ -107,9 +110,9 @@
                     <fieldset>
                         <legend>Vermögen</legend>
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
-                            <div class="form-group"><label for="tagesgeld">Tagesgeld / Girokonto (€)</label><input id="tagesgeld"
-                                    class="currency" type="text" inputmode="numeric" placeholder="0" disabled
-                                    title="Wird im Profil-Assets Manager gepflegt">
+                            <div class="form-group"><label for="tagesgeld">Tagesgeld / Girokonto (€)</label><input
+                                    id="tagesgeld" class="currency" type="text" inputmode="numeric" placeholder="0"
+                                    disabled title="Wird im Profil-Assets Manager gepflegt">
                             </div>
                             <div class="form-group"><label for="geldmarktEtf">Geldmarkt-ETF (€)</label><input
                                     id="geldmarktEtf" class="currency" type="text" inputmode="numeric" placeholder="0"
@@ -120,6 +123,12 @@
                                     id="depotwertGesamt" class="currency" type="text" inputmode="numeric"
                                     placeholder="z. B. 1.950.000" disabled
                                     title="Gesamtwert Ihres Depots (aus Tranchen/Profilen aggregiert)">
+                            </div>
+                            <div class="form-group" id="initialBondBucketGroup"><label
+                                    for="initialBondBucket">Anleihen-Bestand
+                                    (€)</label><input type="text" id="initialBondBucket" placeholder="0" disabled
+                                    inputmode="numeric" data-no-persist="true"
+                                    title="Wert aller Anleihen/Bonds-Tranchen beim Start (aus Profilen/Tranchen aggregiert)">
                             </div>
                             <div class="form-group" id="goldWertGroup"><label for="goldWert">Gold-Bestand
                                     (€)</label><input id="goldWert" class="currency" type="text" inputmode="numeric"
@@ -181,7 +190,8 @@
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr; margin-top: 12px;">
                             <div class="form-group">
                                 <label for="flexBudgetAnnual">Flex-Budget Cap (€/Jahr)</label>
-                                <input id="flexBudgetAnnual" class="currency" type="text" inputmode="numeric" value="7000"
+                                <input id="flexBudgetAnnual" class="currency" type="text" inputmode="numeric"
+                                    value="7000"
                                     title="Maximaler Flex-Betrag pro Krisenjahr (inflationsbereinigt). 0 = deaktiviert.">
                             </div>
                             <div class="form-group">
@@ -191,7 +201,8 @@
                             </div>
                             <div class="form-group">
                                 <label for="flexBudgetRecharge">Flex-Budget Recharge (€/Jahr)</label>
-                                <input id="flexBudgetRecharge" class="currency" type="text" inputmode="numeric" value="5000"
+                                <input id="flexBudgetRecharge" class="currency" type="text" inputmode="numeric"
+                                    value="5000"
                                     title="Wie schnell der Flex-Topf in Nicht-Krisenjahren wieder aufgefüllt wird.">
                             </div>
                         </div>
@@ -232,14 +243,13 @@
                         </div>
                         <div id="dynamicFlexConfigGroup" class="form-grid" style="grid-template-columns: 1fr 1fr 1fr;">
                             <div class="form-group"><label for="horizonMethod">Horizon-Methode</label><select
-                                    id="horizonMethod"
-                                    title="Methode für die Restlaufzeitberechnung des VPW-Faktors">
+                                    id="horizonMethod" title="Methode für die Restlaufzeitberechnung des VPW-Faktors">
                                     <option value="survival_quantile" selected>Survival-Quantile</option>
                                     <option value="mean">Erwartungswert</option>
                                 </select>
                             </div>
-                            <div class="form-group"><label for="horizonYears">Horizon Jahre</label><input
-                                    type="number" id="horizonYears" value="30" min="1" max="60" step="1"
+                            <div class="form-group"><label for="horizonYears">Horizon Jahre</label><input type="number"
+                                    id="horizonYears" value="30" min="1" max="60" step="1"
                                     title="Direkte Vorgabe der Restlaufzeit in Jahren (validiert 1 bis 60)">
                             </div>
                             <div class="form-group"><label for="survivalQuantile">Survival-Quantil</label><input
@@ -258,6 +268,28 @@
                                     type="number" id="goGoMultiplier" value="1.1" min="1" max="1.5" step="0.05"
                                     title="Multiplikator auf VPW-Flex in Go-Go-Jahren (1.0 bis 1.5)">
                             </div>
+                        </div>
+                        <h4
+                            style="margin-top: 20px; margin-bottom: 12px; font-size: 0.95rem; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                            Entnahme-Strategie</h4>
+                        <div class="form-grid" style="margin-bottom: 20px;">
+                            <div class="form-group"><label for="entnahmeStrategie">Strategie</label><select
+                                    id="entnahmeStrategie">
+                                    <option value="standard" selected>Standard</option>
+                                    <option value="3_bucket_jilge">3-Bucket Jilge</option>
+                                </select></div>
+                        </div>
+                        <div id="threeBucketConfigGroup" class="form-grid"
+                            style="display: none; margin-bottom: 20px; grid-template-columns: repeat(3, 1fr);">
+                            <div class="form-group"><label for="bondTargetFactor">Anleihen-Zielfaktor
+                                    (Jahresausgaben)</label><input type="number" id="bondTargetFactor" placeholder="5"
+                                    step="0.1" min="0"></div>
+                            <div class="form-group"><label for="drawdownTrigger">Drawdown-Schwelle (%
+                                    Verlust)</label><input type="number" id="drawdownTrigger" placeholder="15"
+                                    step="0.1" min="0"></div>
+                            <div class="form-group"><label for="bondRefillThreshold">Anleihen-Auffüll-Schwelle
+                                    (%)</label><input type="number" id="bondRefillThreshold" placeholder="optional"
+                                    step="0.1" min="0"></div>
                         </div>
                     </fieldset>
                     <fieldset>
@@ -380,7 +412,8 @@
                     <div class="expenses-toolbar">
                         <label class="expenses-year-label" for="expensesYearSelect">Jahr</label>
                         <select id="expensesYearSelect"></select>
-                        <div class="expenses-toolbar-hint">Historie bleibt erhalten, Jahresabschluss schaltet auf nächstes Jahr.</div>
+                        <div class="expenses-toolbar-hint">Historie bleibt erhalten, Jahresabschluss schaltet auf
+                            nächstes Jahr.</div>
                     </div>
                     <div class="expenses-summary">
                         <div class="expenses-card">
@@ -394,7 +427,9 @@
                             <div id="expensesAnnualUsed" class="expenses-card-sub">Verbraucht: —</div>
                         </div>
                         <div class="expenses-card">
-                            <div class="expenses-card-label" title="Prognose: 1 Monat = Ø/Monat, ab 2 Monaten = Median/Monat (robust gegen Ausreißer).">Hochrechnung (Jahr)</div>
+                            <div class="expenses-card-label"
+                                title="Prognose: 1 Monat = Ø/Monat, ab 2 Monaten = Median/Monat (robust gegen Ausreißer).">
+                                Hochrechnung (Jahr)</div>
                             <div id="expensesAnnualForecast" class="expenses-card-value">—</div>
                             <div id="expensesForecastSub" class="expenses-card-sub">Ø/Monat: —</div>
                         </div>
@@ -414,7 +449,8 @@
                     <dialog id="expensesDetailDialog" class="expenses-dialog">
                         <div class="expenses-dialog-header">
                             <div id="expensesDetailTitle" class="expenses-dialog-title">Details</div>
-                            <button id="expensesDetailClose" type="button" class="btn btn-utility btn-sm">Schließen</button>
+                            <button id="expensesDetailClose" type="button"
+                                class="btn btn-utility btn-sm">Schließen</button>
                         </div>
                         <div id="expensesDetailBody" class="expenses-dialog-body"></div>
                     </dialog>

@@ -10,19 +10,12 @@
 import { UIReader } from './balance-reader.js';
 import { UIUtils } from './balance-utils.js';
 import { loadProfilverbundProfiles, buildProfilverbundAssetSummary } from '../profile/profilverbund-balance.js';
+import { readProfileOverridesFromStorage } from '../profile/profile-state.js';
 
 export function createProfileSyncHandlers({ dom, PROFILE_VALUE_KEYS }) {
     const syncProfileDerivedInputs = () => {
-        const tagesgeldRaw = localStorage.getItem(PROFILE_VALUE_KEYS.tagesgeld);
-        const renteAktivRaw = localStorage.getItem(PROFILE_VALUE_KEYS.renteAktiv);
-        const renteMonatlichRaw = localStorage.getItem(PROFILE_VALUE_KEYS.renteMonatlich);
-        const sonstigeEinkuenfteRaw = localStorage.getItem(PROFILE_VALUE_KEYS.sonstigeEinkuenfte);
+        const overrides = readProfileOverridesFromStorage(localStorage);
         const alterRaw = localStorage.getItem(PROFILE_VALUE_KEYS.alter);
-        const goldAktivRaw = localStorage.getItem(PROFILE_VALUE_KEYS.goldAktiv);
-        const goldZielRaw = localStorage.getItem(PROFILE_VALUE_KEYS.goldZiel);
-        const goldFloorRaw = localStorage.getItem(PROFILE_VALUE_KEYS.goldFloor);
-        const goldSteuerfreiRaw = localStorage.getItem(PROFILE_VALUE_KEYS.goldSteuerfrei);
-        const goldRebalRaw = localStorage.getItem(PROFILE_VALUE_KEYS.goldRebalBand);
 
         const profilverbundProfiles = loadProfilverbundProfiles();
         if (profilverbundProfiles.length > 0) {
@@ -79,18 +72,17 @@ export function createProfileSyncHandlers({ dom, PROFILE_VALUE_KEYS }) {
                 window.__profilverbundTranchenOverride = assetSummary.mergedTranches;
             }
         } else {
-            if (dom.inputs.tagesgeld && tagesgeldRaw !== null) {
-                const tagesgeld = UIUtils.parseCurrency(tagesgeldRaw);
+            if (dom.inputs.tagesgeld && Number.isFinite(overrides.profileTagesgeld)) {
+                const tagesgeld = overrides.profileTagesgeld;
                 if (Number.isFinite(tagesgeld)) {
                     dom.inputs.tagesgeld.value = Math.round(tagesgeld).toLocaleString('de-DE');
                 }
             }
-            if (dom.inputs.renteAktiv && renteAktivRaw !== null) {
-                const normalized = String(renteAktivRaw).toLowerCase() === 'true' ? 'ja' : 'nein';
-                dom.inputs.renteAktiv.value = normalized;
+            if (dom.inputs.renteAktiv && typeof overrides.profileRenteAktiv === 'boolean') {
+                dom.inputs.renteAktiv.value = overrides.profileRenteAktiv ? 'ja' : 'nein';
             }
-            const renteMonatlich = UIUtils.parseCurrency(renteMonatlichRaw);
-            const sonstigeEinkuenfte = UIUtils.parseCurrency(sonstigeEinkuenfteRaw);
+            const renteMonatlich = overrides.profileRenteMonatlich;
+            const sonstigeEinkuenfte = overrides.profileSonstigeEinkuenfte;
             const renteSumme = (Number.isFinite(renteMonatlich) ? renteMonatlich : 0)
                 + (Number.isFinite(sonstigeEinkuenfte) ? sonstigeEinkuenfte : 0);
 
@@ -119,22 +111,22 @@ export function createProfileSyncHandlers({ dom, PROFILE_VALUE_KEYS }) {
             }
         }
 
-        if (dom.inputs.goldAktiv && goldAktivRaw !== null) {
-            dom.inputs.goldAktiv.checked = String(goldAktivRaw).toLowerCase() === 'true';
+        if (dom.inputs.goldAktiv && typeof overrides.profileGoldAktiv === 'boolean') {
+            dom.inputs.goldAktiv.checked = overrides.profileGoldAktiv;
         }
-        if (dom.inputs.goldZielProzent && goldZielRaw !== null) {
-            const ziel = UIUtils.parseCurrency(goldZielRaw);
+        if (dom.inputs.goldZielProzent && Number.isFinite(overrides.profileGoldZiel)) {
+            const ziel = overrides.profileGoldZiel;
             if (Number.isFinite(ziel)) dom.inputs.goldZielProzent.value = ziel;
         }
-        if (dom.inputs.goldFloorProzent && goldFloorRaw !== null) {
-            const floor = UIUtils.parseCurrency(goldFloorRaw);
+        if (dom.inputs.goldFloorProzent && Number.isFinite(overrides.profileGoldFloor)) {
+            const floor = overrides.profileGoldFloor;
             if (Number.isFinite(floor)) dom.inputs.goldFloorProzent.value = floor;
         }
-        if (dom.inputs.goldSteuerfrei && goldSteuerfreiRaw !== null) {
-            dom.inputs.goldSteuerfrei.checked = String(goldSteuerfreiRaw).toLowerCase() === 'true';
+        if (dom.inputs.goldSteuerfrei && typeof overrides.profileGoldSteuerfrei === 'boolean') {
+            dom.inputs.goldSteuerfrei.checked = overrides.profileGoldSteuerfrei;
         }
-        if (dom.inputs.rebalancingBand && goldRebalRaw !== null) {
-            const band = UIUtils.parseCurrency(goldRebalRaw);
+        if (dom.inputs.rebalancingBand && Number.isFinite(overrides.profileGoldRebalBand)) {
+            const band = overrides.profileGoldRebalBand;
             if (Number.isFinite(band)) dom.inputs.rebalancingBand.value = band;
         }
 

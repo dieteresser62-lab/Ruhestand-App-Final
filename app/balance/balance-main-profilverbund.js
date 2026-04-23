@@ -19,6 +19,7 @@ import {
 } from '../profile/profilverbund-balance.js';
 import { renderProfilverbundProfileSelector, toggleProfilverbundMode } from '../profile/profilverbund-balance-ui.js';
 import { shouldResetGuardrailState } from './balance-guardrail-reset.js';
+import { applyThreeBucketLogic, appendBondReplenishment, isBondCategory, sumBondBucketValuation } from '../../engine/transactions/three-bucket-logic.mjs';
 
 export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS }) {
     const refreshProfilverbundBalance = () => {
@@ -77,6 +78,16 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
     };
 
     const runProfilverbundProfileSimulations = (sharedInput, profiles) => {
+        // Calculate total equity across all profiles for prorating bond targets
+        const totalHouseholdEquity = profiles.reduce((sum, entry) => {
+            const input = buildProfileEngineInput(sharedInput, entry);
+                const equityOnly = (input.detailledTranches || []).reduce((trancheSum, t) => {
+                    const isBond = isBondCategory(t.type) || isBondCategory(t.category);
+                    return trancheSum + (!isBond ? (Number(t.marketValue) || 0) : 0);
+                }, 0);
+            return sum + equityOnly;
+        }, 0);
+
         const runs = profiles.map(entry => {
             const input = buildProfileEngineInput(sharedInput, entry);
             const prevInputs = entry?.balanceState?.inputs || null;
@@ -91,6 +102,47 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
             if (result?.error) {
                 throw result.error;
             }
+
+            let finalAction = result.ui?.action || {};
+            if (input.decumulation && input.decumulation.mode === '3_bucket_jilge' && result.ui && result.ui.action) {
+                const market = {
+                    realReturnEq: (Number(result.newState?.marketData?.returns?.realEq) || 0),
+                    sKey: result.ui?.market?.sKey || 'neutral'
+                };
+                const bondBucketBefore = sumBondBucketValuation(input.detailledTranches || []);
+                const jahresEntnahmeTarget = Math.max(0, input.floorBedarf - (input.renteAktiv ? (input.renteMonatlich * 12) : 0)) + Math.max(0, input.flexBedarf);
+                const threeBucketResult = applyThreeBucketLogic(
+                    input.detailledTranches || [],
+                    input,
+                    market,
+                    result.ui.action,
+                    market.realReturnEq,
+                    bondBucketBefore
+                );
+
+                // Prorate the target factor based on this profile's share of total household equity
+                const profileEquity = (input.detailledTranches || []).reduce((trancheSum, t) => {
+                    const isBond = isBondCategory(t.type) || isBondCategory(t.category);
+                    return trancheSum + (!isBond ? (Number(t.marketValue) || 0) : 0);
+                }, 0);
+                const equityShare = totalHouseholdEquity > 0 ? (profileEquity / totalHouseholdEquity) : 0;
+                const proratedEntnahmeTarget = jahresEntnahmeTarget * equityShare;
+
+                // For simplicity, we apply the refill independently to each profile.
+                const replenishResult = appendBondReplenishment(
+                    input.detailledTranches || [],
+                    input,
+                    threeBucketResult.updatedAction,
+                    market.realReturnEq,
+                    proratedEntnahmeTarget,
+                    bondBucketBefore, // This is individual bond bucket
+                    market
+                );
+
+                finalAction = replenishResult.updatedAction;
+                result.ui.action = finalAction;
+            }
+
             return {
                 profileId: entry.profileId,
                 name: entry.name || entry.profileId,
@@ -124,8 +176,9 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
             acc.gold += uses.gold || 0;
             acc.aktien += uses.aktien || 0;
             acc.geldmarkt += uses.geldmarkt || 0;
+            acc.bonds += uses.bonds || 0;
             return acc;
-        }, { liquiditaet: 0, gold: 0, aktien: 0, geldmarkt: 0 });
+        }, { liquiditaet: 0, gold: 0, aktien: 0, geldmarkt: 0, bonds: 0 });
 
         return {
             type: hasTransaction ? 'TRANSACTION' : 'NONE',
@@ -133,7 +186,8 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
             anweisungKlasse,
             nettoErlös: runs.reduce((sum, run) => sum + (run.ui?.action?.nettoErlös || 0), 0),
             steuer: runs.reduce((sum, run) => sum + (run.ui?.action?.steuer || 0), 0),
-            verwendungen: mergedUses
+            verwendungen: mergedUses,
+            quellen: runs.flatMap(run => run.ui?.action?.quellen || [])
         };
     };
 

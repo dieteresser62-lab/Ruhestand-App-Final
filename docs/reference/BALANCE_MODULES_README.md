@@ -117,7 +117,7 @@ Event-Hub der Anwendung.
   - `handleReset()` – Reset mit Bestätigung
   - `handleBedarfAnpassungClick(e)` – inflationsbedingte Anpassung
   - `handleNachruecken()` / `handleUndoNachruecken()` – Marktdatenpflege
-  - `handleJahresUpdate()` – **Jahres-Update mit Online-API-Zugriff:** Ruft automatisch Inflationsdaten (ECB → World Bank → OECD Fallback-Kette) und ETF-Kurse (VWCE.DE via Yahoo Finance über lokalen Proxy) ab, führt Nachrücken durch und aktualisiert ATH. Zeigt detailliertes Protokoll mit Datenquellen und Werten.
+  - `handleJahresUpdate()` – **Jahres-Update mit Online-API-Zugriff:** Ruft automatisch Inflationsdaten (ECB → World Bank → OECD), ETF-Kurse (VWCE.DE via Yahoo Finance über lokalen Proxy) und CAPE (Yale -> Mirror -> letzter lokaler Stand) ab, führt Nachrücken durch und aktualisiert ATH. Zeigt detailliertes Protokoll mit Datenquellen und Werten.
   - `handleExport()` / `handleImport(e)` / `handleCsvImport(e)` – Datenimporte/-exporte
   - `handleJahresabschluss()` – Snapshot & Jahreswechsel
   - `handleSnapshotActions(e)` – Snapshot verwalten (restore/delete)
@@ -196,6 +196,7 @@ Marktdaten-Updates für das „Nachrücken"-Workflow.
   - `handleNachruecken()` – Verschiebt Vorjahreswerte und aktualisiert ATH
   - `handleUndoNachruecken()` – Macht Nachrücken rückgängig
   - `handleNachrueckenMitETF()` – Holt VWCE.DE-Kurs via Yahoo-Proxy und führt Nachrücken durch
+  - `handleFetchCapeAuto()` – Holt US-Shiller-CAPE via Yale/Mirror/r.jina.ai mit lokalem Fallback und persistiert `capeMeta`
 
 **Dependencies:** `balance-config.js`, `balance-renderer.js`
 
@@ -217,8 +218,8 @@ UI-Modal für die Anzeige der Jahres-Update Ergebnisse.
 Koordiniert den komplexen Jahres-Update Workflow.
 
 **Exports:**
-- `createAnnualOrchestrator({ dom, debouncedUpdate, handleFetchInflation, handleNachrueckenMitETF, showUpdateResultModal, setLastUpdateResults })`
-  - `handleJahresUpdate()` – Orchestriert: Alter erhöhen → Inflation → ETF → Protokoll
+- `createAnnualOrchestrator({ dom, debouncedUpdate, handleFetchInflation, handleNachrueckenMitETF, handleFetchCapeAuto, showUpdateResultModal, setLastUpdateResults })`
+  - `handleJahresUpdate()` – Orchestriert: Alter erhöhen → Inflation → ETF → CAPE → Protokoll
 
 **Dependencies:** `balance-config.js`, `balance-renderer.js`, `balance-storage.js`
 
@@ -288,4 +289,3 @@ app/balance/balance-main.js
 ```
 
 Die Module kommunizieren über definierte Schnittstellen; Änderungen lassen sich damit auf einzelne Komponenten begrenzen.
-

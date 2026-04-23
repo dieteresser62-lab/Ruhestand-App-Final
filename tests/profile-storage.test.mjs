@@ -26,9 +26,13 @@ import {
     getProfileData,
     setProfileVerbundMembership,
     getActiveProfileId,
+    hasProfileScopedDataInLocalStorage,
     ensureProfileRegistry,
+    bootstrapProfileContext,
     exportProfilesBundle,
-    importProfilesBundle
+    exportProfilesBundleToWindowName,
+    importProfilesBundle,
+    importProfilesBundleFromWindowName
 } from '../app/profile/profile-storage.js';
 import { CONFIG } from '../app/balance/balance-config.js';
 
@@ -47,9 +51,11 @@ function createLocalStorageMock() {
 }
 
 const prevLocalStorage = global.localStorage;
+const prevWindow = global.window;
 
 try {
     global.localStorage = createLocalStorageMock();
+    global.window = { name: '' };
 
     // ========== Default Profile Tests ==========
 
@@ -289,6 +295,73 @@ try {
     }
     console.log('✓ updateProfileData merges OK');
 
+    // Test 17b: saveCurrentProfileFromLocalStorage persists profile asset keys immediately
+    console.log('Test 17b: immediate persistence of profile-scoped keys');
+    {
+        localStorage.clear();
+        ensureProfileRegistry();
+
+        localStorage.setItem('depot_tranchen', JSON.stringify([{ trancheId: 't1', marketValue: 12345 }]));
+        localStorage.setItem('profile_tagesgeld', '42000');
+
+        const saved = saveCurrentProfileFromLocalStorage();
+        assert(saved === true, 'Sofortiges Speichern sollte erfolgreich sein');
+
+        const data = getProfileData(getCurrentProfileId());
+        assert(data !== null, 'Aktives Profil sollte Daten haben');
+        assert(data.depot_tranchen !== null, 'Tranchen sollten im Profil gespeichert werden');
+        assert(data.profile_tagesgeld === '42000', 'Profil-Tagesgeld sollte im Profil gespeichert werden');
+    }
+    console.log('✓ immediate persistence of profile-scoped keys OK');
+
+    // Test 17c: hasProfileScopedDataInLocalStorage guards empty bootstrap states
+    console.log('Test 17c: detect live profile-scoped data');
+    {
+        localStorage.clear();
+        ensureProfileRegistry();
+
+        assert(hasProfileScopedDataInLocalStorage() === false, 'Leerer Live-Storage sollte als leer erkannt werden');
+
+        localStorage.setItem('profile_tagesgeld', '1000');
+        assert(hasProfileScopedDataInLocalStorage() === true, 'Profil-Key im Live-Storage sollte erkannt werden');
+
+        localStorage.removeItem('profile_tagesgeld');
+        localStorage.setItem('unrelated_key', 'x');
+        assert(hasProfileScopedDataInLocalStorage() === false, 'Nicht-profilbezogene Keys duerfen nicht zaehlen');
+    }
+    console.log('✓ detect live profile-scoped data OK');
+
+    // Test 17d: bootstrap loads current profile by default
+    console.log('Test 17d: bootstrap loads current profile by default');
+    {
+        localStorage.clear();
+        const profile = createProfile('Bootstrap');
+        updateProfileData(profile.id, { profile_tagesgeld: '5000' });
+        setCurrentProfileId(profile.id);
+
+        const result = bootstrapProfileContext();
+
+        assert(result.action === 'loaded', 'Default-Bootstrap sollte Profil in Live-Storage laden');
+        assert(localStorage.getItem('profile_tagesgeld') === '5000', 'Aktuelles Profil sollte in den Live-Storage geladen werden');
+        assert(getActiveProfileId() === profile.id, 'Geladenes Profil sollte als aktiv markiert werden');
+    }
+    console.log('✓ bootstrap loads current profile by default OK');
+
+    // Test 17e: bootstrap can preserve live profile data for current active profile
+    console.log('Test 17e: bootstrap preserves live data when requested');
+    {
+        localStorage.clear();
+        ensureProfileRegistry();
+        localStorage.setItem('profile_tagesgeld', '9999');
+        localStorage.setItem('rs_active_profile', getCurrentProfileId());
+
+        const result = bootstrapProfileContext({ preserveLiveProfileData: true });
+
+        assert(result.action === 'saved', 'Bootstrap sollte vorhandene Live-Daten speichern statt sie zu überschreiben');
+        assert(getProfileData(getCurrentProfileId()).profile_tagesgeld === '9999', 'Live-Daten sollten ins aktuelle Profil persistiert werden');
+    }
+    console.log('✓ bootstrap preserves live data when requested OK');
+
     // ========== belongsToHousehold Tests ==========
 
     // Test 18: setProfileVerbundMembership
@@ -383,6 +456,26 @@ try {
         assert(localStorage.getItem('enableWorkerTelemetry') === 'true', 'Global enableWorkerTelemetry sollte gesetzt sein');
     }
     console.log('✓ Import with globals OK');
+
+    // Test 21b: Export/Import via window.name
+    console.log('Test 21b: Import via window.name');
+    {
+        localStorage.clear();
+        global.window.name = '';
+        ensureProfileRegistry();
+        localStorage.setItem('profile_tagesgeld', '777');
+        saveCurrentProfileFromLocalStorage();
+
+        const exported = exportProfilesBundleToWindowName();
+        assert(exported === true, 'Export nach window.name sollte erfolgreich sein');
+        assert(global.window.name.includes('RUHESTAND_PROFILE_BUNDLE:'), 'window.name sollte Bundle-Prefix enthalten');
+
+        localStorage.clear();
+        const imported = importProfilesBundleFromWindowName();
+        assert(imported.ok === true, 'Import aus window.name sollte erfolgreich sein');
+        assert(localStorage.getItem('profile_tagesgeld') === '777', 'Profil-Daten sollten aus window.name wiederhergestellt werden');
+    }
+    console.log('✓ Import via window.name OK');
 
     // Test 22: Import invalid registry
     console.log('Test 22: Import invalid registry');
@@ -531,6 +624,7 @@ try {
 
 } finally {
     if (prevLocalStorage === undefined) delete global.localStorage; else global.localStorage = prevLocalStorage;
+    if (prevWindow === undefined) delete global.window; else global.window = prevWindow;
 }
 
 console.log('--- Profile Storage Tests Completed ---');

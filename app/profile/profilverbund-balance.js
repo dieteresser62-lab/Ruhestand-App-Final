@@ -7,8 +7,13 @@
  */
 // @ts-check
 
-import { CONFIG } from '../balance/balance-config.js';
 import { listProfiles, getProfileData } from './profile-storage.js';
+import {
+    parseProfileOverridesFromData,
+    parseStoredBalanceStateFromData,
+    parseStoredTranchesFromData,
+    hasProfileOverrides
+} from './profile-state.js';
 
 const DEFAULT_TAX_RATE = 0.25 * (1 + 0.055);
 
@@ -16,53 +21,6 @@ function readNumber(value, fallback = 0) {
     if (value === null || value === undefined || value === '') return fallback;
     const n = Number(String(value).replace(',', '.'));
     return Number.isFinite(n) ? n : fallback;
-}
-
-function parseBalanceState(profileData) {
-    if (!profileData || typeof profileData !== 'object') return null;
-    const raw = profileData[CONFIG.STORAGE.LS_KEY];
-    if (!raw) return null;
-    try {
-        const parsed = JSON.parse(raw);
-        return parsed && typeof parsed === 'object' ? parsed : null;
-    } catch {
-        return null;
-    }
-}
-
-function parseProfileOverrides(profileData) {
-    if (!profileData || typeof profileData !== 'object') return {};
-    const hasRenteAktiv = Object.prototype.hasOwnProperty.call(profileData, 'profile_rente_aktiv');
-    const hasGoldAktiv = Object.prototype.hasOwnProperty.call(profileData, 'profile_gold_aktiv');
-    return {
-        profileTagesgeld: readNumber(profileData.profile_tagesgeld, null),
-        profileRenteAktiv: hasRenteAktiv
-            ? String(profileData.profile_rente_aktiv || '').toLowerCase() === 'true'
-            : null,
-        profileRenteMonatlich: readNumber(profileData.profile_rente_monatlich, null),
-        profileSonstigeEinkuenfte: readNumber(profileData.profile_sonstige_einkuenfte, null),
-        profileGoldAktiv: hasGoldAktiv
-            ? String(profileData.profile_gold_aktiv || '').toLowerCase() === 'true'
-            : null,
-        profileGoldZiel: readNumber(profileData.profile_gold_ziel_pct, null),
-        profileGoldFloor: readNumber(profileData.profile_gold_floor_pct, null),
-        profileGoldSteuerfrei: Object.prototype.hasOwnProperty.call(profileData, 'profile_gold_steuerfrei')
-            ? String(profileData.profile_gold_steuerfrei || '').toLowerCase() === 'true'
-            : null,
-        profileGoldRebalBand: readNumber(profileData.profile_gold_rebal_band, null)
-    };
-}
-
-function parseTranches(profileData) {
-    if (!profileData || typeof profileData !== 'object') return [];
-    const raw = profileData.depot_tranchen;
-    if (!raw) return [];
-    try {
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch {
-        return [];
-    }
 }
 
 function normalizeBalanceInputs(inputs, overrides = {}) {
@@ -213,11 +171,12 @@ export function loadProfilverbundProfiles() {
     const selected = profiles.filter(p => p.belongsToHousehold !== false);
     return selected.map(meta => {
         const data = getProfileData(meta.id);
-        const balanceState = parseBalanceState(data);
-        const overrides = parseProfileOverrides(data);
-        const normalized = normalizeBalanceInputs(balanceState?.inputs, overrides);
+        const balanceState = parseStoredBalanceStateFromData(data);
+        const overrides = parseProfileOverridesFromData(data);
+        const tranches = parseStoredTranchesFromData(data);
+        const hasFallbackData = hasProfileOverrides(overrides) || tranches.length > 0;
+        const normalized = normalizeBalanceInputs(balanceState?.inputs || (hasFallbackData ? {} : null), overrides);
         if (!normalized) return null;
-        const tranches = parseTranches(data);
         const split = resolveTrancheSplitTotals(tranches);
         const hasTranches = tranches.length > 0 && (split.altValue + split.neuValue + split.goldValue + split.moneyValue) > 0;
         if (hasTranches) {

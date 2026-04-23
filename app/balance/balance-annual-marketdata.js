@@ -15,7 +15,9 @@ import { StorageManager } from './balance-storage.js';
 const CAPE_PLAUSIBILITY_MIN = 5;
 const CAPE_PLAUSIBILITY_MAX = 80;
 const CAPE_STALE_MONTHS = 18;
-const CAPE_FETCH_TIMEOUT_MS = 12000;
+const CAPE_FETCH_TIMEOUT_MS = 20000;
+const LOCAL_PROXY_FETCH_TIMEOUT_MS = 8000;
+const LOCAL_PROXY_FETCH_RETRIES = 3;
 
 const CAPE_SOURCES = {
     PRIMARY: {
@@ -98,9 +100,76 @@ async function fetchTextWithTimeout(url, timeoutMs = CAPE_FETCH_TIMEOUT_MS) {
             throw new Error(`HTTP ${response.status}`);
         }
         return await response.text();
+    } catch (err) {
+        const message = String(err?.message || '');
+        if (err?.name === 'AbortError' || message.includes('signal is aborted')) {
+            throw new Error(`Timeout nach ${timeoutMs} ms`);
+        }
+        throw err;
     } finally {
         clearTimeout(timer);
     }
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function isRetriableProxyError(err) {
+    const message = String(err?.message || '').toLowerCase();
+    return (
+        err?.name === 'AbortError' ||
+        message.includes('failed to fetch') ||
+        message.includes('networkerror') ||
+        message.includes('load failed') ||
+        message.includes('fetch failed') ||
+        message.includes('signal is aborted') ||
+        message.includes('http 502') ||
+        message.includes('http 503') ||
+        message.includes('http 504')
+    );
+}
+
+async function fetchJsonWithTimeout(url, timeoutMs) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const response = await fetch(url, {
+            cache: 'no-store',
+            signal: controller.signal
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        return await response.json();
+    } catch (err) {
+        const message = String(err?.message || '');
+        if (err?.name === 'AbortError' || message.includes('signal is aborted')) {
+            throw new Error(`Timeout nach ${timeoutMs} ms`);
+        }
+        throw err;
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+async function fetchLocalProxyJsonWithRetry(url, {
+    retries = LOCAL_PROXY_FETCH_RETRIES,
+    timeoutMs = LOCAL_PROXY_FETCH_TIMEOUT_MS
+} = {}) {
+    let lastError = null;
+    for (let attempt = 0; attempt < retries; attempt++) {
+        try {
+            return await fetchJsonWithTimeout(url, timeoutMs);
+        } catch (err) {
+            lastError = err;
+            if (!isRetriableProxyError(err) || attempt === retries - 1) {
+                throw err;
+            }
+            await sleep(250 * (attempt + 1));
+        }
+    }
+    throw lastError || new Error('Proxy request failed');
 }
 
 export function createMarketdataHandlers({
@@ -181,12 +250,9 @@ export function createMarketdataHandlers({
         };
         try {
             const proxyUrl = `${LOCAL_YAHOO_PROXY}/chart?symbol=${encodeURIComponent(ticker)}&period1=${startTime}&period2=${targetTime}&interval=1d`;
-            const response = await fetch(proxyUrl);
-            if (response.ok) {
-                const data = await response.json();
-                const parsed = parseYahooResponse(data, 'Yahoo Finance (lokaler Proxy)');
-                if (parsed) return parsed;
-            }
+            const data = await fetchLocalProxyJsonWithRetry(proxyUrl);
+            const parsed = parseYahooResponse(data, 'Yahoo Finance (lokaler Proxy)');
+            if (parsed) return parsed;
         } catch (err) {
             // Yahoo Finance via local proxy failed, try fallback
         }
@@ -227,12 +293,9 @@ export function createMarketdataHandlers({
         for (const proxy of proxyEntries) {
             try {
                 const proxyUrl = buildProxyUrl(proxy.template, yahooUrl);
-                const response = await fetch(proxyUrl);
-                if (response.ok) {
-                    const data = await response.json();
-                    const parsed = parseYahooResponse(data, proxy.name);
-                    if (parsed) return parsed;
-                }
+                const data = await fetchLocalProxyJsonWithRetry(proxyUrl);
+                const parsed = parseYahooResponse(data, proxy.name);
+                if (parsed) return parsed;
             } catch (err) {
                 // Yahoo Finance via proxy failed, try next
             }

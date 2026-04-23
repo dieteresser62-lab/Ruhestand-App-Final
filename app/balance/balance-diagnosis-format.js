@@ -58,6 +58,18 @@ export function formatDiagnosisPayload(raw) {
             status
         };
     });
+
+    // NEU: 3-Bucket Jilge Diagnostics in Guardrails injizieren
+    if (raw.threeBucket && raw.threeBucket.is3Bucket) {
+        const tb = raw.threeBucket;
+        guardrails.push({
+            name: '3-Bucket Jilge',
+            value: tb.isBadYear ? 'Börsencrash erkannt (Verkauf Anleihen)' : 'Normaljahr (Verkauf Aktien)',
+            threshold: tb.isBadYear ? 'Crash-Modus' : 'Standard-Modus',
+            status: tb.isBadYear ? 'warn' : 'ok'
+        });
+    }
+
     const safeKeyParams = { ...(raw.keyParams || {}) };
     const ensureNumberOrNull = (value) => (typeof value === 'number' && isFinite(value)) ? value : null;
     safeKeyParams.aktuelleFlexRate = ensureNumberOrNull(safeKeyParams.aktuelleFlexRate);

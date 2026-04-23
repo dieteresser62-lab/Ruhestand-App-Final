@@ -96,6 +96,17 @@ if ($VerboseMode) {
 }
 & npm run sync-dist
 
+$requiredDistFiles = @(
+    'dist/types/strategy-options.js',
+    'dist/types/profile-types.js'
+)
+foreach ($requiredFile in $requiredDistFiles) {
+    $fullPath = Join-Path $repoRoot $requiredFile
+    if (-not (Test-Path $fullPath)) {
+        throw "Required dist asset missing after sync: '$requiredFile'. Check scripts/sync-dist.ps1 excludes."
+    }
+}
+
 if ($VerboseMode) {
     Write-Host 'Step 2/3: Running Tauri build.'
 }

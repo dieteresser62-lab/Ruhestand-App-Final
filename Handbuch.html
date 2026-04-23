@@ -786,9 +786,9 @@
                             können.</li>
                         <li>Für Live-Daten (Inflation, Kurse) ist eine Internetverbindung notwendig; die Simulation
                             funktioniert auch offline.</li>
-                        <li>Online-ETF-Kurse benötigen Node.js, da der lokale Yahoo-Proxy über
-                            <code>start_suite.cmd</code> gestartet wird; ohne Node.js läuft die Suite weiter, nur der
-                            Kurs-Download ist deaktiviert.</li>
+                        <li>Online-ETF-Kurse benötigen in der Browser-Variante Node.js, da der lokale Yahoo-Proxy über
+                            <code>start_suite.cmd</code> gestartet wird; die Tauri-EXE bringt diesen Proxy selbst mit.
+                            Ohne Node.js läuft die Browser-Suite weiter, nur der Kurs-Download ist dort deaktiviert.</li>
                         <li>Beenden Sie die lokalen Dienste mit <code>stop_suite.cmd</code>, wenn der Browser
                             geschlossen wird.</li>
                     </ul>
@@ -1397,7 +1397,8 @@
                         <li><strong>Inflation:</strong> EZB/World Bank/OECD (Fallback: manuelle Eingabe im
                             Jahres-Update).</li>
                         <li><strong>Marktdaten:</strong> Shiller-CAPE-Zeitreihe und ETF-Schlusskurse (z.B. VWCE.DE via
-                            Yahoo über lokalen Proxy) gemäß Konfiguration.</li>
+                            Yahoo über lokalen Proxy) gemäß Konfiguration; in der EXE laufen externe Abrufe direkt
+                            aus der Tauri-App über die freigegebenen Datenquellen.</li>
                         <li><strong>Simulationsannahmen:</strong> Rendite-/Volatilitätsparameter und Korrelationen in
                             den <code>simulator-*</code>-Modulen dokumentiert.</li>
                     </ul>

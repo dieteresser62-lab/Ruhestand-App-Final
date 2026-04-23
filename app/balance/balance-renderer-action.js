@@ -284,6 +284,7 @@ export class ActionRenderer {
             'gold': 'Gold',
             'aktien_neu': 'Aktien (neu)',
             'aktien_alt': 'Aktien (alt)',
+            'anleihe': 'Anleihen (Bonds)',
             'liquiditaet': 'Liquidität (Cash)',
             'geldmarkt': 'Geldmarkt-ETF'
         };
@@ -314,6 +315,7 @@ export class ActionRenderer {
         if (action.verwendungen?.gold > 0) verwendungenItems.push(createRow('Kauf von Gold:', UIUtils.formatCurrency(action.verwendungen.gold)));
         if (action.verwendungen?.aktien > 0) verwendungenItems.push(createRow('Kauf von Aktien:', UIUtils.formatCurrency(action.verwendungen.aktien)));
         if (action.verwendungen?.geldmarkt > 0) verwendungenItems.push(createRow('Kauf von Geldmarkt-ETF:', UIUtils.formatCurrency(action.verwendungen.geldmarkt)));
+        if (action.verwendungen?.bonds > 0) verwendungenItems.push(createRow('Kauf von Anleihen (Bonds):', UIUtils.formatCurrency(action.verwendungen.bonds)));
 
         const profilverbundActionResults = (typeof window !== 'undefined') ? window.__profilverbundActionResults : null;
         const hasProfilverbundActions = profilverbundActionResults && Array.isArray(profilverbundActionResults) && profilverbundActionResults.length > 0;
@@ -323,7 +325,7 @@ export class ActionRenderer {
             const quellenTotal = (Array.isArray(entryAction?.quellen) ? entryAction.quellen : [])
                 .reduce((sum, q) => sum + (q?.brutto || 0), 0);
             const uses = entryAction?.verwendungen || {};
-            const usesTotal = (uses.liquiditaet || 0) + (uses.gold || 0) + (uses.aktien || 0) + (uses.geldmarkt || 0);
+            const usesTotal = (uses.liquiditaet || 0) + (uses.gold || 0) + (uses.aktien || 0) + (uses.geldmarkt || 0) + (uses.bonds || 0);
             return quellenTotal > 0 || usesTotal > 0 || (entryAction?.steuer || 0) > 0 || (entryAction?.nettoErlös || 0) > 0;
         };
         const hasProfilverbundMaterialActions = hasProfilverbundActions
@@ -381,6 +383,7 @@ export class ActionRenderer {
                 if (uses.gold > 0) verwendungenItems.push(createRow(`- ${entryName}: Kauf von Gold`, UIUtils.formatCurrency(uses.gold)));
                 if (uses.aktien > 0) verwendungenItems.push(createRow(`- ${entryName}: Kauf von Aktien`, UIUtils.formatCurrency(uses.aktien)));
                 if (uses.geldmarkt > 0) verwendungenItems.push(createRow(`- ${entryName}: Kauf von Geldmarkt-ETF`, UIUtils.formatCurrency(uses.geldmarkt)));
+                if (uses.bonds > 0) verwendungenItems.push(createRow(`- ${entryName}: Kauf von Anleihen (Bonds)`, UIUtils.formatCurrency(uses.bonds)));
                 if (uses.liquiditaet > minVisibleUse) verwendungenItems.push(createRow(`- ${entryName}: Zufluss Liquiditaet`, UIUtils.formatCurrency(uses.liquiditaet)));
             });
         } else if (hasProfilverbundProfiles) {
@@ -471,6 +474,7 @@ export class ActionRenderer {
                 { key: 'gold', label: 'Kauf von Gold' },
                 { key: 'aktien', label: 'Kauf von Aktien' },
                 { key: 'geldmarkt', label: 'Kauf von Geldmarkt-ETF' },
+                { key: 'bonds', label: 'Kauf von Anleihen (Bonds)' },
                 { key: 'liquiditaet', label: 'Zufluss Liquiditaet' }
             ];
             const usageWeights = sourceTotals.some(total => total > 0) ? sourceTotals : totalAssets;
