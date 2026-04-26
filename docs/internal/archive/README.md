@@ -4,6 +4,7 @@ Namenskonvention: `YYYY-feature`.
 
 ## Verfuegbare Archive
 
+- `2026-Refactoring/`
 - `2026-dynamic-flex/`
 - `2025-profilverbund-balance/`
 - `2025-webworkers-rollout/`

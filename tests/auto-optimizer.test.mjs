@@ -46,8 +46,97 @@ try {
     const { isValidCandidate } = await import('../app/simulator/auto-optimize-params.js');
     const { checkConstraints, getObjectiveValue } = await import('../app/simulator/auto-optimize-metrics.js');
     const { CandidateCache, tieBreaker } = await import('../app/simulator/auto-optimize-utils.js');
+    const { applyChampionToForm } = await import('../app/simulator/auto-optimize-apply.js');
+    const { readAutoOptimizeConfigFromUI } = await import('../app/simulator/auto-optimize-config-ui.js');
+    const { AUTO_OPTIMIZE_PRESETS } = await import('../app/simulator/auto-optimize-presets.js');
+    const { formatAutoOptimizeProgress } = await import('../app/simulator/auto-optimize-renderer.js');
     const { rng } = await import('../app/simulator/simulator-utils.js');
     const { runAutoOptimize } = await import('../app/simulator/auto_optimize.js');
+
+    // ========== Auto-Optimize UI Helper Tests ==========
+
+    // Test 0a: Presets bleiben DOM-frei importierbar
+    console.log('Test 0a: UI presets importierbar');
+    {
+        assert(AUTO_OPTIMIZE_PRESETS.standard.params.length === 3, 'Standard-Preset sollte drei Parameter enthalten');
+        assert(AUTO_OPTIMIZE_PRESETS.dynamicFlexBalanced.dynamicFlexMode === 'force_on', 'Dynamic-Flex-Preset sollte Force-On setzen');
+    }
+    console.log('✓ UI presets OK');
+
+    // Test 0b: Config-Reader liest DOM-Mock und validiert Dynamic-Flex-Modus
+    console.log('Test 0b: UI config reader');
+    {
+        const paramBlock = {
+            querySelector(selector) {
+                const values = {
+                    '.ao-param-key': { value: 'horizonYears' },
+                    '.ao-param-min': { value: '24' },
+                    '.ao-param-max': { value: '36' },
+                    '.ao-param-step': { value: '1' }
+                };
+                return values[selector] || null;
+            }
+        };
+        const controls = {
+            ao_metric: { value: 'EndWealth_P50' },
+            ao_direction: { value: 'max' },
+            ao_quantile: { value: '50' },
+            ao_parameters_container: { querySelectorAll: () => [paramBlock] },
+            ao_runs_per_candidate: { value: '2000' },
+            ao_seeds_train: { value: '5' },
+            ao_seeds_test: { value: '2' },
+            ao_c_sr99: { checked: true },
+            ao_c_noex: { checked: true },
+            ao_c_ts45: { checked: false },
+            ao_c_dd55: { checked: false },
+            ao_dynamic_flex_mode: { value: 'force_on' },
+            dynamicFlex: { checked: false }
+        };
+        const doc = { getElementById: (id) => controls[id] || null };
+        const config = readAutoOptimizeConfigFromUI(doc);
+        assertEqual(config.params.horizonYears.min, 24, 'Config-Reader sollte Param-Min lesen');
+        assertEqual(config.dynamicFlexMode, 'force_on', 'Config-Reader sollte Dynamic-Flex-Modus normalisieren');
+
+        controls.ao_dynamic_flex_mode.value = 'inherit';
+        let dynamicFlexError = null;
+        try {
+            readAutoOptimizeConfigFromUI(doc);
+        } catch (err) {
+            dynamicFlexError = err;
+        }
+        assert(dynamicFlexError && /Dynamic-Flex Parameter/.test(dynamicFlexError.message), 'Dynamic-Flex-Parameter sollten bei effektiv AUS abgelehnt werden');
+    }
+    console.log('✓ UI config reader OK');
+
+    // Test 0c: Progress-Formatter und Apply-Mapping
+    console.log('Test 0c: UI renderer/apply helpers');
+    {
+        assert(
+            formatAutoOptimizeProgress({ stage: 'quick_filter', progress: 5, total: 10 }).includes('50%'),
+            'Progress-Formatter sollte Prozent anzeigen'
+        );
+
+        const events = [];
+        const controls = {
+            runwayMinMonths: { value: '', dispatchEvent: (event) => events.push(['runwayMinMonths', event.type]) },
+            goGoMultiplier: { value: '', dispatchEvent: (event) => events.push(['goGoMultiplier', event.type]) },
+            goGoActive: { checked: false, dispatchEvent: (event) => events.push(['goGoActive', event.type]) }
+        };
+        const doc = { getElementById: (id) => controls[id] || null };
+        applyChampionToForm({
+            championCfg: { runwayMinM: 24, goGoMultiplier: 1.1 },
+            doc,
+            EventCtor: class {
+                constructor(type) {
+                    this.type = type;
+                }
+            }
+        });
+        assertEqual(controls.runwayMinMonths.value, 24, 'Apply sollte runwayMinM auf Formularfeld schreiben');
+        assertEqual(controls.goGoActive.checked, true, 'Apply sollte goGoActive bei goGoMultiplier aktivieren');
+        assert(events.some(([id]) => id === 'goGoActive'), 'Apply sollte Change-Events dispatchen');
+    }
+    console.log('✓ UI renderer/apply helpers OK');
 
     // ========== Latin Hypercube Sampling Tests ==========
 

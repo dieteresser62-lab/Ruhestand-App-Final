@@ -1,4 +1,8 @@
-import { buildStartYearCdf, pickStartYearIndex } from '../app/simulator/monte-carlo-runner.js';
+import {
+    buildStartYearCdf,
+    pickMonteCarloStartYearIndex,
+    pickStartYearIndex
+} from '../app/simulator/mc-year-sampling.js';
 import { annualData } from '../app/simulator/simulator-data.js';
 import { prepareHistoricalData } from '../app/simulator/simulator-portfolio.js';
 
@@ -69,6 +73,39 @@ prepareHistoricalData();
     }
 
     console.log('✅ Estimated years can be excluded from start-year sampling');
+}
+
+// --- TEST 5: CAPE Sampling Uses Candidate Years ---
+{
+    const idx = pickMonteCarloStartYearIndex({
+        rand: () => 0,
+        inputs: { capeRatio: 20, marketCapeRatio: 0 },
+        annualData,
+        useCapeSampling: true,
+        excludeEstimatedHistory: false,
+        minStartYearIndex: 4
+    });
+    assert(idx >= 0 && idx < annualData.length, 'CAPE sampling should return a valid index');
+    assert(annualData[idx].jahr >= 1925, 'CAPE sampling should map to a historical year');
+
+    console.log('✅ CAPE sampling returns valid candidate index');
+}
+
+// --- TEST 6: CAPE Sampling Falls Back Without CAPE ---
+{
+    const idx = pickMonteCarloStartYearIndex({
+        rand: () => 0.5,
+        inputs: { capeRatio: 0, marketCapeRatio: 0 },
+        annualData,
+        useCapeSampling: true,
+        excludeEstimatedHistory: false,
+        startYearCdf: null,
+        minStartYearIndex: 4
+    });
+    const expected = 4 + Math.floor(0.5 * (annualData.length - 4));
+    assert(idx === expected, 'CAPE sampling without CAPE should fall back to uniform start year');
+
+    console.log('✅ CAPE sampling fallback without CAPE works');
 }
 
 console.log('--- Monte-Carlo Start-Year Sampling Tests Completed ---');

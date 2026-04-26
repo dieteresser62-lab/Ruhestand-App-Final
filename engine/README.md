@@ -16,7 +16,16 @@ engine/
 ├── analyzers/
 │   └── MarketAnalyzer.mjs        # Marktanalyse & Regime-Klassifikation
 ├── planners/
-│   └── SpendingPlanner.mjs       # Guardrails & Entnahmeplanung
+│   ├── SpendingPlanner.mjs       # Guardrails & Entnahmeplanung
+│   ├── alarm-policy.mjs          # Alarm-Aktivierung und Deeskalation
+│   ├── final-rate-policy.mjs     # Finale jährliche Flex-Rate-Delta-Limits
+│   ├── flex-budget-policy.mjs    # Flex-Budget-Cap, Recharge und Min-Rate
+│   ├── flex-rate-policy.mjs      # Flex-Rate, S-Kurve und harte Caps
+│   ├── spending-diagnosis.mjs    # Diagnose-Shape, Guardrail-Uebersicht und Runway-Ziel
+│   ├── spending-guardrails.mjs   # Recovery-/Caution-Guardrails und Budget-Floor
+│   ├── spending-policy-pipeline.mjs # Policy-Reihenfolge nach initialer Flex-Rate
+│   ├── spending-policy-helpers.mjs # Reine Helper fuer Quantisierung, S-Kurven, Flex-Anteil
+│   └── wealth-reduction.mjs      # Vermoegensbasierte Reduktionsdaempfung
 ├── transactions/
 │   ├── TransactionEngine.mjs     # Transaktionslogik & Liquiditätsziele
 │   ├── transaction-action.mjs    # Orchestrierung der Transaktionsentscheidungen
@@ -41,6 +50,15 @@ engine/
 | `validators/InputValidator.mjs` | `InputValidator` | Validierung der Benutzereingaben |
 | `analyzers/MarketAnalyzer.mjs` | `MarketAnalyzer` | Regimeerkennung & Kennzahlen |
 | `planners/SpendingPlanner.mjs` | `SpendingPlanner` | Guardrails, Diagnose, Glättung, Flex-S-Kurve, harte Caps, Flex-Budget, vermögensbasierte Flex-Dämpfung (Flex-Bedarf + Gesamtvermögen) |
+| `planners/alarm-policy.mjs` | `{ evaluateAlarmConditions, shouldDeescalateInPeak, shouldDeescalateInRecovery }` | Alarm-Aktivierung, Peak-/Recovery-Deeskalation und Wealth-Sufficient-Unterdrueckung |
+| `planners/final-rate-policy.mjs` | `{ applyFinalRateLimits }` | Finale jährliche Flex-Rate-Delta-Limits |
+| `planners/flex-budget-policy.mjs` | `{ applyFlexBudgetCap }` | Flex-Budget-Cap, Topfverbrauch, Recharge und Min-Rate |
+| `planners/flex-rate-policy.mjs` | `{ calculateFlexRate, applyFlexShareCurve }` | Flex-Rate-Berechnung, Alarmmodus, S-Kurve und harte Bear-/Runway-Caps |
+| `planners/spending-diagnosis.mjs` | `{ buildSpendingDiagnosis, resolveRunwayTarget }` | Finale Spending-Diagnose, Guardrail-Uebersicht, Key-Parameter-Kopie und Runway-Ziel |
+| `planners/spending-guardrails.mjs` | `{ applyGuardrails }` | Recovery-Cap, Caution-Inflationscap, Budget-Floor und Guardrail-Diagnosen |
+| `planners/spending-policy-pipeline.mjs` | `{ applySpendingPolicyPipeline }` | Guardrails, Flex-Budget und finale Rate-Limits in stabiler Reihenfolge |
+| `planners/spending-policy-helpers.mjs` | `{ quantizeMonthly, smoothstep, calcFlexShare, calculateFinalWithdrawal }` | Reine Helper fuer Spending-Policies |
+| `planners/wealth-reduction.mjs` | `{ calculateWealthAdjustedReductionFactor }` | Vermoegensbasierte Daempfung der Flex-Reduktion |
 | `transactions/TransactionEngine.mjs` | `TransactionEngine` | Liquiditätsziele, Rebalancing |
 | `core.mjs` | `{ EngineAPI, _internal_calculateModel }` | Öffentliche API + interner Pipeline-Entry |
 

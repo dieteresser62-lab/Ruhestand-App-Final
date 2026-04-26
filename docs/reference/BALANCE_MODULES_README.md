@@ -92,15 +92,16 @@ Renderlogik für KPIs, Guardrails, Diagnose, Toasts und Theme-Umschaltung.
 **Helper-Module (ausgelagert):**
 - `balance-renderer-summary.js` – KPIs, Marktstatus, Liquiditätsbalken
 - `balance-renderer-action.js` – Handlungsempfehlungen & Cash-Rebalancing
+  - gruppiert Transaktionen zusätzlich nach Zweck (`Liquidität`, `Gold`, `Aktien`, `Geldmarkt`, `Bonds`, `Steuer`, `Rest/Puffer`)
   - zeigt finale Settlement-Steuer (`action.steuer`) inkl. optionaler Aufschlüsselung
     (`taxBeforeLossCarry`, `taxAfterLossCarry`, `taxSavedByLossCarry`)
 - `balance-renderer-diagnosis.js` – Diagnose-Chips, Guardrails, Kennzahlen
-- `balance-diagnosis-format.js` – Diagnose-Payload normalisieren
+- `balance-diagnosis-format.js` – Diagnose-Payload normalisieren, inklusive Grenzfalltexten wie `Exakt auf Mindestniveau`
 - `balance-diagnosis-chips.js` – Diagnose-Chips (Runway, Quote, Drawdown)
 - `balance-diagnosis-decision-tree.js` – Entscheidungsbaum
-- `balance-diagnosis-guardrails.js` – Guardrail-Karten
-- `balance-diagnosis-transaction.js` – Transaktionsdiagnostik (Status, Schwellen)
-- `balance-diagnosis-keyparams.js` – Schlüsselkennzahlen
+- `balance-diagnosis-guardrails.js` – Guardrail-Karten mit Schwellenwert- und Grenzfallhinweisen
+- `balance-diagnosis-transaction.js` – Transaktionsdiagnostik (Status, Schwellen, `Warum kein Goldkauf?`)
+- `balance-diagnosis-keyparams.js` – Schlüsselkennzahlen, inklusive VPW-Trennung in Rahmen, freigegebenen Flex und nicht genutzten Spielraum
 
 ---
 
@@ -148,19 +149,28 @@ Einstiegspunkt und Orchestrator.
 **Helper-Module (ausgelagert):**
 - `balance-main-profile-sync.js` – Profilwerte in Balance-Inputs spiegeln
 - `balance-main-profilverbund.js` – Profilverbund-Simulationen & UI-Handling
+- `balance-update-pipeline.js` – Engine-Last-State, Renderer-/Diagnose-Payload, Persistenzentscheidung und Ausgabenbudget.
+- `balance-action-postprocessor.js` – Profilverbund-Action-Merge und Single-3-Bucket-Postprocessing.
 
 ---
 
-## 8. `balance-expenses.js`
+## 8. `balance-expenses*.js`
 Ausgaben-Check für monatliche CSV-Importe und Budgettracking.
 
 **Exports:**
-- `initExpensesTab(domRefs)` – initialisiert Tabellenaufbau, Detaildialog und Jahr-Selector
-- `updateExpensesBudget({ monthlyBudget, annualBudget })` – übernimmt Budgetwerte aus der Balance-Berechnung
-- `rollExpensesYear()` – schaltet auf das nächste Ausgabenjahr (Historie bleibt erhalten)
+- `balance-expenses.js`
+  - `initExpensesTab(domRefs)` – initialisiert Tabellenaufbau, Detaildialog und Jahr-Selector
+  - `updateExpensesBudget({ monthlyBudget, annualBudget })` – übernimmt Budgetwerte aus der Balance-Berechnung
+  - `rollExpensesYear()` – schaltet auf das nächste Ausgabenjahr (Historie bleibt erhalten)
+
+**Module:**
+- `balance-expenses.js` – Controller/Fassade fuer Initialisierung, Event-Wiring, Import-/Delete-Flows und oeffentliche API.
+- `balance-expenses-storage.js` – localStorage-Schema `balance_expenses_v1`, Jahr-/Monat-Container und aktive Jahr-Auswahl.
+- `balance-expenses-csv.js` – CSV-Parser mit Delimiter-Erkennung (`;`, `,`, `Tab`) und Betragsnormalisierung.
+- `balance-expenses-metrics.js` – Monats-, Jahres-, Median-, Forecast- und Soll/Ist-Kennzahlen ohne DOM/localStorage.
+- `balance-expenses-renderer.js` – Year-Select, Tabelle, Summary-Karten und Detaildialog.
 
 **Funktionen:**
-- CSV-Parser mit Delimiter-Erkennung (`;`, `,`, `Tab`) und Betragsnormalisierung.
 - Monatliche Ablage pro Profil und Jahr in `localStorage` (`balance_expenses_v1`).
 - Budgetmonitoring:
   - Monatsampel (`ok/warn/bad`) mit 5%-Warnschwelle
@@ -169,7 +179,7 @@ Ausgaben-Check für monatliche CSV-Importe und Budgettracking.
   - Soll/Ist auf Basis importierter Monate
 - Detaildialog mit sortierter Kategorieliste und „Top 3 Kategorien“.
 
-**Dependencies:** `balance-utils.js`, `balance-renderer.js`, `app/profile/profilverbund-balance.js`
+**Dependencies:** `balance-utils.js`, `balance-renderer.js`, `app/profile/profilverbund-balance.js`, `balance-expenses-*.js`
 
 ---
 

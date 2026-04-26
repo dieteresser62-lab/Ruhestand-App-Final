@@ -1,4 +1,6 @@
 import { simulateOneYear } from '../app/simulator/simulator-engine-direct.js';
+import { applyForcedSaleLiquidityCoverage, applyPayoutFallbackSale, reduceAcrossTranches } from '../app/simulator/simulator-forced-sale.js';
+import { addTaxRawAggregate, applySimulatorTaxRecompute, buildTaxRawAggregate } from '../app/simulator/simulator-tax-recompute.js';
 import { settleTaxYear } from '../engine/tax-settlement.mjs';
 import { prepareHistoricalData } from '../app/simulator/simulator-portfolio.js';
 
@@ -130,6 +132,116 @@ function makeStubEngine({ monthlyWithdrawal, actionTax, actionTaxableRaw = 1000 
             }
         })
     };
+}
+
+// 0) Direct helper tests for raw aggregate and recompute mutation contract.
+{
+    const aggregate = buildTaxRawAggregate({
+        sumRealizedGainSigned: '100',
+        sumTaxableAfterTqfSigned: '50'
+    });
+    addTaxRawAggregate(aggregate, {
+        sumRealizedGainSigned: -40,
+        sumTaxableAfterTqfSigned: -20
+    }, 0.5);
+    assertClose(aggregate.sumRealizedGainSigned, 80, 1e-9, 'Raw aggregate should add scaled realized gains');
+    assertClose(aggregate.sumTaxableAfterTqfSigned, 40, 1e-9, 'Raw aggregate should add scaled taxable gains');
+
+    const actionResult = {
+        steuer: 100,
+        taxSettlement: { existing: true },
+        taxRawAggregate: { sumRealizedGainSigned: 100, sumTaxableAfterTqfSigned: 100 }
+    };
+    const spendingNewState = {};
+    const recompute = applySimulatorTaxRecompute({
+        didForcedSale: true,
+        actionResult,
+        spendingNewState,
+        taxStatePrev: { lossCarry: 0 },
+        combinedTaxRawAggregate: aggregate,
+        sparerPauschbetrag: 0,
+        kirchensteuerSatz: 0,
+        forcedSaleScaleApplied: 0.5
+    });
+    const expected = settleTaxYear({
+        taxStatePrev: { lossCarry: 0 },
+        rawAggregate: aggregate,
+        sparerPauschbetrag: 0,
+        kirchensteuerSatz: 0
+    });
+    assertClose(recompute.totalTaxesThisYear, expected.taxDue, 1e-9, 'Direct recompute should return settlement tax');
+    assert(actionResult.taxSettlement.recomputedWithForcedSales === true, 'Direct recompute should mark forced recompute');
+    assert(actionResult.taxSettlement.forcedSaleScaleApplied === 0.5, 'Direct recompute should preserve forced sale scale');
+    assert(spendingNewState.taxState, 'Direct recompute should update next tax state');
+}
+
+// 0b) Direct forced-sale liquidity coverage helper mutates portfolio and tax aggregate.
+{
+    const fifoTranches = [
+        { marketValue: 100, costBasis: 80, purchaseDate: '2020-01-01' },
+        { marketValue: 100, costBasis: 50, purchaseDate: '2010-01-01' }
+    ];
+    const reduced = reduceAcrossTranches(fifoTranches, 120, true);
+    assertClose(reduced, 120, 1e-9, 'Fallback reducer should cover requested amount');
+    assertClose(fifoTranches[1].marketValue, 0, 1e-9, 'Fallback reducer should reduce oldest tranche first');
+    assertClose(fifoTranches[0].marketValue, 80, 1e-9, 'Fallback reducer should continue with next tranche');
+
+    const portfolio = {
+        depotTranchesAktien: [{
+            marketValue: 100000,
+            costBasis: 50000,
+            type: 'aktien_alt',
+            category: 'equity',
+            purchaseDate: '2000-01-01',
+            tqf: 0.3
+        }],
+        depotTranchesGold: [],
+        liquiditaet: 0
+    };
+    const combinedTaxRawAggregate = buildTaxRawAggregate();
+    const coverage = applyForcedSaleLiquidityCoverage({
+        forcedShortfall: 10000,
+        portfolio,
+        engineInput: {
+            sparerPauschbetrag: 0,
+            kirchensteuerSatz: 0,
+            goldAktiv: false,
+            depotwertAlt: 100000,
+            depotwertNeu: 0,
+            goldWert: 0
+        },
+        market: { sKey: 'bear_deep' },
+        is3Bucket: false,
+        isBadYear: false,
+        depotTranchesAktien: portfolio.depotTranchesAktien,
+        depotTranchesGold: portfolio.depotTranchesGold,
+        equityBeforeForced: 100000,
+        goldBeforeForced: 0,
+        combinedTaxRawAggregate
+    });
+    assert(coverage.didForcedSale === true, 'Forced coverage should mark forced sale');
+    assert(coverage.liquiditaetDelta > 0, 'Forced coverage should add liquidity');
+    assert(portfolio.depotTranchesAktien[0].marketValue < 100000, 'Forced coverage should reduce portfolio value');
+    assert(combinedTaxRawAggregate.sumRealizedGainSigned > 0, 'Forced coverage should add realized gain to tax aggregate');
+
+    const payoutPortfolio = {
+        depotTranchesAktien: [{ marketValue: 20000, costBasis: 15000, type: 'aktien_alt', purchaseDate: '2000-01-01' }],
+        depotTranchesGold: []
+    };
+    const fallback = applyPayoutFallbackSale({
+        jahresEntnahmeEffektiv: 5000,
+        netFloorYear: 10000,
+        liquiditaet: 0,
+        payout: 5000,
+        is3Bucket: false,
+        isBadYear: false,
+        depotTranchesAktien: payoutPortfolio.depotTranchesAktien,
+        depotTranchesGold: payoutPortfolio.depotTranchesGold,
+        formatRuinNumber: value => Math.round(value)
+    });
+    assert(fallback.isRuin === false, 'Payout fallback should avoid ruin when assets can cover floor');
+    assertClose(fallback.liquiditaet, 0, 1e-9, 'Payout fallback should spend the fallback sale on the floor');
+    assertClose(payoutPortfolio.depotTranchesAktien[0].marketValue, 15000, 1e-9, 'Payout fallback should reduce assets by missing floor amount');
 }
 
 // 1) Forced sale path: settlement must be recomputed with combined raw aggregate.

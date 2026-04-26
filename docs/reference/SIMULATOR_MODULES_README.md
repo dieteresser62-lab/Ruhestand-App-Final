@@ -43,10 +43,9 @@ Koordiniert die Monte-Carlo-Simulation und verbindet DOM-Interaktion mit der rei
 
 ---
 
-## 3. `monte-carlo-runner.js` (~420 Zeilen)
+## 3. `monte-carlo-runner.js`
 DOM-freie Simulation, die alle Runs, KPI-Arrays und Pflegemetriken berechnet.
 
-**Hauptfunktionen / Exporte:**
 **Hauptfunktionen / Exporte:**
 - `runMonteCarloSimulation()` – Führt die komplette Simulation aus, sammelt Worst-Run-Logs, Pflege-KPIs und aggregierte Kennzahlen.
 - Implementiert Ruin-Logik (Depot < 100€) und Ansparphase-Übergang.
@@ -54,7 +53,64 @@ DOM-freie Simulation, die alle Runs, KPI-Arrays und Pflegemetriken berechnet.
 
 **Einbindung:** Wird ausschließlich aus `simulator-monte-carlo.js` aufgerufen. Erwartet fertige Eingaben und Callbacks (Progress, Szenario-Analyzer) und nutzt `simulator-engine-wrapper.js` (delegiert an Direct Engine) für die Jahr-für-Jahr-Logik.
 
-**Dependencies:** `simulator-engine-wrapper.js`, `simulator-portfolio.js`, `simulator-results.js` (Portfolio-Helpers), `simulator-sweep-utils.js`, `simulator-utils.js`, `simulator-data.js`, `cape-utils.js`.
+**Dependencies:** `mc-run-context.js`, `mc-year-sampling.js`, `mc-life-events.js`, `mc-stress-tracker.js`, `mc-log-builder.js`, `mc-run-metrics.js`, `simulator-engine-wrapper.js`, `simulator-portfolio.js`, `simulator-results.js` (Portfolio-Helpers), `simulator-sweep-utils.js`, `simulator-utils.js`, `simulator-data.js`.
+
+## 3a. `mc-run-context.js`
+DOM-freie Chunk-Kontext-Erzeugung fuer den Monte-Carlo-Runner.
+
+**Hauptfunktionen / Exporte:**
+- `createMonteCarloRunContext()` – bereitet RunRange, RNG-Modus, Legacy-RNG, Stress-Master, Buffers, Progress-Intervall, LogIndexSet und Sampling-Konfiguration vor.
+
+**Einbindung:** Wird von `monte-carlo-runner.js` vor der Run-Schleife genutzt. Sampling-Algorithmen bleiben im Runner, damit der erste Refactoring-Slice keine Startjahr-Logik verschiebt.
+
+## 3b. `mc-year-sampling.js`
+DOM-freie Startjahr- und CAPE-Sampling-Logik fuer Monte-Carlo.
+
+**Hauptfunktionen / Exporte:**
+- `buildStartYearCdf()` / `pickStartYearIndex()` – CDF-Aufbau und deterministische Startjahrwahl fuer FILTER/RECENCY/UNIFORM.
+- `buildYearSamplingConfig()` – gewichtete Sampling-Konfiguration fuer Startjahr und laufende Jahresdaten.
+- `pickMonteCarloStartYearIndex()` – per-Run-Auswahl inklusive CAPE-Kandidaten und Fallback.
+
+**Einbindung:** Wird von `mc-run-context.js` fuer die Sampling-Konfiguration und von `monte-carlo-runner.js` fuer die Startjahrwahl je Run genutzt.
+
+## 3c. `mc-life-events.js`
+DOM-freie Life-State-Initialisierung fuer Monte-Carlo.
+
+**Hauptfunktionen / Exporte:**
+- `createMonteCarloLifeState()` – erzeugt Care-Meta, Partnerstatus, Care-RNGs, Alive-Initialwerte und HouseholdContext fuer einen Run.
+- `updateMonteCarloLifeEventsForYear()` – testbarer Jahresupdate-Helper fuer Pflege-/Sterblichkeitslogik; im produktiven Runner wird die Jahreslogik aktuell aus Performance-Gruenden weiterhin lokal im Hot Path ausgefuehrt.
+
+**Einbindung:** `monte-carlo-runner.js` nutzt die State-Initialisierung vor der Jahresschleife. Weitere Life-Events-Extraktion muss den Monte-Carlo-Benchmark bestehen.
+
+## 3d. `mc-stress-tracker.js`
+DOM-freie Stress-Metrik-Kapselung fuer Monte-Carlo.
+
+**Hauptfunktionen / Exporte:**
+- `createMonteCarloStressTracker()` – initialisiert Stress-Jahre, Portfolio-Serie, Cut-Year-Zaehler, Real-Withdrawal-Liste und Recovery-Status.
+- `recordMonteCarloStressYear()` – schreibt pro Simulationsjahr nur bei aktivem Stress die Stress-Metriken fort.
+- `writeMonteCarloStressMetrics()` – schreibt die bestehenden Stress-Buffer (`stress_maxDrawdowns`, `stress_timeQuoteAbove45`, `stress_cutYears`, `stress_CaR_P10_Real`, `stress_recoveryYears`).
+
+**Einbindung:** Wird von `monte-carlo-runner.js` pro Run initialisiert und nach erfolgreichem Jahreslauf bzw. beim finalen Buffer-Schreiben genutzt. Worker-Payloads bleiben unveraendert.
+
+## 3e. `mc-log-builder.js`
+DOM-freie Logzeilen-Builder fuer Monte-Carlo.
+
+**Hauptfunktionen / Exporte:**
+- `buildMonteCarloRuinLogRow()` – baut die Ruin-Logzeile mit stabilen Legacy-, Alive- und Care-Feldern.
+- `buildMonteCarloYearLogRow()` – erweitert normale Jahres-Logdaten um Alive-, Care-, VPW- und Payout-Erklaerfelder.
+- `buildMonteCarloDeathLogRow()` – baut den finalen Todesfall-Logeintrag inklusive Portfolio-Snapshot.
+
+**Einbindung:** Wird von `monte-carlo-runner.js` nur bei aktivem `currentRunLog` genutzt. Feldnamen und Worst-Run-/CSV-kompatible Shapes bleiben stabil. Entnahme-/Payout-/VPW-Felder werden additiv transportiert und im UI nur bei detailliertem Log sichtbar gemacht.
+
+## 3f. `mc-run-metrics.js`
+DOM-freie Run-Ende-Metrikfortschreibung fuer Monte-Carlo.
+
+**Hauptfunktionen / Exporte:**
+- `createMonteCarloRunMetrics()` – initialisiert Pflege-Listen, Care-Year-Arrays, Worst-Run-Container, `runMeta` und globale Zaehler.
+- `recordMonteCarloRunOutcome()` – schreibt pro Run Ergebnisbuffer, Pflege-Listen, Safety-Run-Zaehler, Worst-Run-Auswahl und `runMeta` fort.
+- `finalizeMonteCarloRunMetrics()` – baut die bestehenden `totals`, `lists`, Worst-Runs, `allRealWithdrawalsSample` und `runMeta` fuer die Chunk-Rueckgabe.
+
+**Einbindung:** Wird von `monte-carlo-runner.js` am Run-Ende genutzt. Buffer-Namen, Worker-Payloads, Aggregat-Shape und `runMeta` bleiben kompatibel.
 
 ---
 
@@ -179,6 +235,16 @@ Kernlogik für Jahr-für-Jahr-Simulation (Direct Engine).
 - `computeHouseholdFlexFactor()` (Helpers) – Flex-Reduktion bei Pflege
 - `initMcRunState()` (Helpers) – initialisiert Zustand für einen MC-Lauf
 
+**Ausgelagerte Jahreslogik:**
+- `simulator-year-portfolio.js` – DOM-freie Markt-/Portfoliofortschreibung, Renditen und Marktfenster.
+- `simulator-household-pension.js` – DOM-freie Renten-/Haushaltsberechnung inklusive Witwenrente.
+- `simulator-engine-input.js` – DOM-freies Mapping von Simulator-Jahreswerten auf den `EngineAPI.simulateSingleYear()`-Input.
+- `simulator-accumulation-year.js` – DOM-freier frueher Rueckgabepfad fuer Ansparjahre inklusive Sparrate, Cash-Zins, Anspar-Rebalancing und Logdaten.
+- `simulator-tax-recompute.js` – DOM-freie Normalisierung von Tax-Rohaggregaten und finales Settlement-Recompute nach Simulator-Zusatzverkaeufen.
+- `simulator-forced-sale.js` – DOM-freie Forced-Sale-Liquiditaetsdeckung vor/nach Auszahlung inklusive Forced-Sale-Scale, Bond-Verkaufsdelta, Payout-Fallback und FIFO-Fallback.
+- `simulator-bond-refill.js` – DOM-freie Bond-Refill-/3-Bucket-Nachsteuerung fuer gute Jahre inklusive Auto-Bond-Tranche, Equity-Verkauf und Refill-Deltas.
+- `simulator-year-result.js` – DOM-freier Builder fuer finalen Rueckgabewert, naechsten State, UI-Payload, Jahreslog, 3-Bucket-Logshape sowie flache Entnahme-/Payout-/VPW-Erklaerfelder.
+
 **Dependencies:** `simulator-utils.js`, `simulator-data.js`, `EngineAPI` (engine.js)
 
 ---
@@ -196,6 +262,7 @@ Aggregation der Monte-Carlo-Ausgabe, Orchestrierung von KPI-Berechnung und Rende
 **Features:**
 - Dropdown für 30 Szenario-Logs (charakteristische + zufällige)
 - Checkboxen für Pflege-Details und detailliertes Log
+- Detailspalten fuer Entnahme-/Payout-/VPW-Transparenz (`EntPlan`, `EntEff`, `VPW€`, `VPWFlex`, `StatFlex`, `Liq>P`, `Liq<P`, `Liq>Z`, `Port>P`, `PortEnd`)
 - JSON/CSV-Export für ausgewählte Szenarien
 - Pflege-KPI-Dashboard mit Dual-Care-Metriken
 - enthält zusätzlich Metriken für `taxSavedByLossCarry` aus Sweep/MC-Ergebnissen
@@ -231,7 +298,7 @@ Auto-Optimierung für Parameter (LHS + Verfeinerung) und UI-Bedienung. Details s
 
 **Hauptfunktionen / Exporte:**
 - `runAutoOptimize()` – Orchestriert den 3-stufigen Prozess (Coarse -> Refinement -> Final).
-- UI-Integration (Start, Progress, Ergebnisdarstellung) in `auto_optimize_ui.js`.
+- UI-Integration in `auto_optimize_ui.js` als Fassade fuer Initialisierung, Event-Wiring, Run-Flow und Parameter-Management.
 
 **Modul-Split:**
 Die Logik wurde in spezialisierte Module zerlegt, um Wartbarkeit und Testbarkeit zu erhöhen:
@@ -242,6 +309,11 @@ Die Logik wurde in spezialisierte Module zerlegt, um Wartbarkeit und Testbarkeit
 - `auto-optimize-sampling.js` – Algorithmen für die Kandidatengenerierung (Latin Hypercube, Nachbarschaft).
 - `auto-optimize-utils.js` – Hilfsfunktionen (Caching, Logging, ID-Generierung).
 - `auto-optimize-params.js` – Definition der Parameter-Räume und Mapping (UI <-> Intern).
+- `auto-optimize-presets.js` – DOM-freie Preset-Definitionen fuer die UI.
+- `auto-optimize-param-meta.js` – Parameter-Optionen, Labels, Units, Dynamic-Flex-Keys und Apply-Mapping.
+- `auto-optimize-config-ui.js` – Liest und validiert die UI-Konfiguration fuer `runAutoOptimize()`.
+- `auto-optimize-renderer.js` – Rendert Parameterbloecke, Progress-Texte, Ergebnis-HTML und Apply-Erfolgsmeldung.
+- `auto-optimize-apply.js` – Uebernimmt Champion-Parameter in die Simulator-Formularfelder.
 
 **Dependencies:** `simulator-portfolio.js`, `monte-carlo-runner.js`, `simulator-engine-helpers.js`, `workers/worker-pool.js`.
 
@@ -361,8 +433,8 @@ Aggregiert Profildaten zu Simulator-Inputs für Multi-Profil-Setups.
 
 ---
 
-## 25. `profile-storage.js` (~290 Zeilen)
-Profil-Registry und Persistenz-Layer für Multi-User-Verwaltung.
+## 25. `profile-storage.js` / `profile-key-policy.js` / `profile-registry.js` / `profile-live-storage.js` / `profile-bundle-io.js`
+Profil-Registry und Persistenz-Layer für Multi-User-Verwaltung. `profile-storage.js` bleibt die kompatible Fassade; `profile-key-policy.js` kapselt die Erkennung profilbezogener localStorage-Keys; `profile-registry.js` kapselt Registry-Parsing, Current-Profile-Key, Metadaten, CRUD und Profildaten-Merge; `profile-live-storage.js` kapselt Snapshot, Clear, Load und Live-Data-Erkennung; `profile-bundle-io.js` kapselt Bundle-Import/-Export und `window.name`-Transfer.
 
 **Hauptfunktionen:**
 - `listProfiles()` / `getProfileMeta()` / `getProfileData()` – Profil-Registry-Zugriff
@@ -377,7 +449,7 @@ Profil-Registry und Persistenz-Layer für Multi-User-Verwaltung.
 - Alle Keys mit Prefix `sim_` (Simulator-Inputs)
 - Snapshots mit Prefix `rs_snapshot_`
 
-**Dependencies:** `balance-config.js`
+**Dependencies:** `profile-state.js`, `profile-key-policy.js`, `profile-registry.js`, `profile-live-storage.js`, `profile-bundle-io.js`
 
 ---
 
@@ -605,7 +677,13 @@ app/simulator/simulator-main.js
 ### Monte-Carlo-Simulation
 1. `simulator-main.js`: UI-Bootstrap ruft `runMonteCarlo` aus `simulator-monte-carlo.js` auf.
 2. `simulator-monte-carlo.js`: Erstellt die UI-Fassade, normalisiert Eingaben/Witwen-Optionen und delegiert an den Runner.
-3. `monte-carlo-runner.js`: Führt die reinen Simulationen durch (inkl. Pflege-KPIs) und nutzt `simulator-engine-wrapper.js` für die Jahresschleifen.
+3. `mc-run-context.js`: Bereitet Chunk-Kontext, RNG, Buffers, Sampling-Konfiguration und Progress-Intervall vor.
+4. `mc-year-sampling.js`: Liefert Startjahr-/CAPE-Sampling und CDF-/Sampler-Helfer.
+5. `mc-life-events.js`: Initialisiert den Run-Life-State fuer Care-Meta, Partnerstatus, Care-RNGs und HouseholdContext.
+6. `mc-stress-tracker.js`: Kapselt Stress-Metrik-Initialisierung, Jahresfortschreibung und Buffer-Schreibung.
+7. `mc-log-builder.js`: Baut Ruin-, Jahres- und Todesfall-Logzeilen mit zentralen Alive-/Care-Feldern.
+8. `mc-run-metrics.js`: Schreibt Run-Ende-KPIs, Pflege-Listen, Worst-Runs und `runMeta` fort.
+9. `monte-carlo-runner.js`: Führt die reinen Simulationen durch (inkl. Pflege-KPIs) und nutzt `simulator-engine-wrapper.js` für die Jahresschleifen.
 4. `scenario-analyzer.js`: Zeichnet Worst/Perzentil-/Pflege-/Zufalls-Szenarien während der Runs auf.
 5. `simulator-results.js`: `displayMonteCarloResults()` zeigt Aggregationen und Szenario-Logs an.
 
@@ -638,6 +716,7 @@ Nach jeder Monte-Carlo-Simulation werden 30 Szenarien gespeichert:
 - Alle Log-Zeilen pro Szenario
 - Metadaten: Endvermögen, Failed-Status, Lebensdauer, Pflege-Status
 - Export als JSON/CSV möglich
+- Detaillierter Logmodus zeigt additive Entnahme-/Payout-/VPW-Spalten. Normalmodus und bestehende Export-Shapes bleiben kompatibel.
 
 ---
 
@@ -649,7 +728,11 @@ Nach jeder Monte-Carlo-Simulation werden 30 Szenarien gespeichert:
 - **Sweep-Voreinstellungen:** `initSweepDefaultsWithLocalStorageFallback()` in `simulator-sweep.js` lädt Defaults, liest `localStorage` und setzt Guardrails (Whitelist/Blocklist). Erwartet Zugriff auf Sweep-Formularfelder und das Toggle.
 - **Backtest-Setup:** `initializeBacktestUI()` in `simulator-backtest.js` verknüpft Zeitraum-/Startknöpfe, ruft `runBacktest()` und nutzt `renderBacktestLog()`/`exportBacktestLogData()` für Ausgabe. Erwartet vorhandene DOM-IDs des Backtest-Tabs.
 - **Monte-Carlo-Start:** `runMonteCarlo()` in `simulator-monte-carlo.js` liest `mcAnzahl`, `mcDauer`, `mcBlockSize`, `mcSeed`, `mcMethode`, `mcStartYearMode`, `mcStartYearFilter`, `mcStartYearHalfLife` sowie Progress-UI (`mc-progress-bar*`). Liefert nach Abschluss aggregierte Ergebnisse an `displayMonteCarloResults()`.
-- **Startjahr-Sampling:** `monte-carlo-runner.js` nutzt optional `FILTER` (harte Grenze) oder `RECENCY` (Half-Life). Die Gewichtung wirkt auf Startjahr und laufende Jahresdaten; CAPE-Sampling hat Vorrang vor Gewichtung.
+- **Startjahr-Sampling:** `mc-run-context.js` bereitet die Sampling-Konfiguration vor; `mc-year-sampling.js` kapselt `FILTER` (harte Grenze), `RECENCY` (Half-Life), `UNIFORM` und CAPE-Kandidaten. Die Gewichtung wirkt auf Startjahr und laufende Jahresdaten; CAPE-Sampling hat Vorrang vor Gewichtung.
+- **Life-State:** `mc-life-events.js` initialisiert Care-Meta, Partnerstatus, Care-RNGs und HouseholdContext. Die Jahreslogik bleibt im Runner-Hot-Path, bis eine vollstaendige Extraktion den Benchmark stabil erfuellt.
+- **Stress-Metriken:** `mc-stress-tracker.js` kapselt Portfolio-Drawdown, Quote-Above-4.5, Cut-Years, Real-CaR und Recovery-Years fuer Stress-Presets. Die bestehenden Worker-Buffer und Aggregatnamen bleiben stabil.
+- **Logzeilen:** `mc-log-builder.js` vereinheitlicht Ruin-, Jahres- und Todesfall-Logs. Builder laufen nur fuer tatsaechlich geloggte Runs. Backtest-Logs und Monte-Carlo-Scenario-Logs verwenden dieselbe Semantik fuer Entnahme-/Payout-/VPW-Felder.
+- **Run-Metriken:** `mc-run-metrics.js` kapselt Ergebnisbuffer, Pflege-Listen, Safety-Run-Zaehler, Worst-Run-Auswahl und `runMeta` am Run-Ende.
 
 ---
 

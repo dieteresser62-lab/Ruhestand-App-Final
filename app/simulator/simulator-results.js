@@ -343,7 +343,6 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         { key: 'pflege_flex_faktor', header: 'FlexPfl%', width: 8, fmt: (v, row) => (row.pflege_aktiv ? formatPctOrDash(v) : '—') },
         { key: 'CareP1_Cost', header: 'P1€', width: 7, fmt: formatCurrencyShortLog, title: 'Zusätzliche Pflege-Kosten P1' },
         { key: 'CareP2_Cost', header: 'P2€', width: 7, fmt: formatCurrencyShortLog, title: 'Zusätzliche Pflege-Kosten P2' },
-        { key: 'CareP2_Cost', header: 7, fmt: formatCurrencyShortLog, title: 'Zusätzliche Pflege-Kosten P2' },
     ];
 
     const activeCareCols = options.showCareDetails ? (options.logDetailLevel === 'detailed' ? careColsDetailed : careColsMinimal) : [];
@@ -438,6 +437,11 @@ export function getWorstRunColumnDefinitions(opts = {}) {
     }
 
     const detailCols = options.logDetailLevel === 'detailed' ? [
+        { key: 'entnahme_plan', header: 'EntPlan', width: 8, fmt: formatCurrencyShortLog },
+        { key: 'entnahme_effektiv', header: 'EntEff', width: 8, fmt: formatCurrencyShortLog },
+        { key: 'vpw_total', header: 'VPW€', width: 8, fmt: formatCurrencyShortLog },
+        { key: 'vpw_dynamic_flex', header: 'VPWFlex', width: 8, fmt: formatCurrencyShortLog },
+        { key: 'static_flex_baseline', header: 'StatFlex', width: 8, fmt: formatCurrencyShortLog },
         { key: 'vpw.vpwRate', header: 'VPW%', width: 5, fmt: v => (Number.isFinite(v) ? formatPercentValue(v * 100, { fractionDigits: 1, invalid: '' }) : '') },
         { key: 'vpw.horizonYears', header: 'Hor', width: 4, fmt: v => (Number.isFinite(v) ? Math.round(v) : '') },
         {
@@ -456,6 +460,11 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         { key: 'floor_aus_depot', header: 'FloorDep', width: 8, fmt: formatCurrencyShortLog },
         { key: 'lossCarryEnd', header: 'VTopf', width: 8, fmt: formatCurrencyShortLog },
         { key: 'taxSavedByLossCarry', header: 'StSave', width: 8, fmt: formatCurrencyShortLog },
+        { key: 'liq_before_payout', header: 'Liq>P', width: 9, fmt: formatCurrencyShortLog },
+        { key: 'liq_after_payout', header: 'Liq<P', width: 9, fmt: formatCurrencyShortLog },
+        { key: 'liq_after_interest', header: 'Liq>Z', width: 9, fmt: formatCurrencyShortLog },
+        { key: 'portfolio_total_before_payout', header: 'Port>P', width: 9, fmt: formatCurrencyShortLog },
+        { key: 'portfolio_total_end', header: 'PortEnd', width: 9, fmt: formatCurrencyShortLog },
         { key: 'liqStart', header: 'Liq@rC-', width: 9, fmt: formatCurrencyShortLog },
         { key: 'cashInterestEarned', header: 'Zins€', width: 7, fmt: formatCurrencyShortLog },
         { key: 'liqEnd', header: 'Liq@rC+', width: 9, fmt: formatCurrencyShortLog },

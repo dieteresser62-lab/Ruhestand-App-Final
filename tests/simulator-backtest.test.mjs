@@ -166,6 +166,11 @@ try {
         const hints = rows.map(r => r?.vpwFallbackHint);
         assert(hints.every(h => typeof h === 'string' && h.length > 0), 'Each row should include VPW fallback hint');
         assert(hints.every(h => h === 'ok'), 'Active dynamic-flex rows should not report fallback in this scenario');
+        assert(rows.every(r => Number.isFinite(Number(r.row?.entnahme_plan))), 'Backtest rows should expose planned withdrawal');
+        assert(rows.every(r => Number.isFinite(Number(r.row?.entnahme_effektiv))), 'Backtest rows should expose effective withdrawal');
+        assert(rows.every(r => Number.isFinite(Number(r.row?.liq_before_payout))), 'Backtest rows should expose liquidity before payout');
+        assert(rows.every(r => Number.isFinite(Number(r.row?.liq_after_payout))), 'Backtest rows should expose liquidity after payout');
+        assert(rows.every(r => Number.isFinite(Number(r.row?.portfolio_total_end))), 'Backtest rows should expose end portfolio total');
     }
 
     // --- TEST 7: Dynamic Flex off exposes explicit hint ---

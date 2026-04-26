@@ -64,6 +64,7 @@ setupDom();
             goGoMultiplier: 1.0,
             gesamtwert: 2150000,
             vpwTotal: 112000,
+            staticFlexBaseline: 42000,
             dynamicFlex: 86000
         }
     });
@@ -74,6 +75,10 @@ setupDom();
     assert(txt.includes('ER(CAPE)'), 'ER(CAPE) metric should be rendered');
     assert(txt.includes('Go-Go-Phase'), 'Go-Go metric should be rendered');
     assert(txt.includes('VPW-Basisvermögen'), 'VPW basis wealth metric should be rendered');
+    assert(txt.includes('VPW-Rahmen'), 'VPW frame metric should be rendered');
+    assert(txt.includes('Statischer Flex-Bedarf'), 'Static flex baseline should be rendered');
+    assert(txt.includes('Flex freigegeben'), 'Released flex metric should be rendered');
+    assert(txt.includes('Nicht genutzter Rahmen'), 'Unused VPW room should be rendered');
 }
 
 {

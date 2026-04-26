@@ -218,6 +218,8 @@ global.document = {
     assert(renderedText.includes('Steuern nach Verlusttopf:'), 'Should render tax-after-loss-carry row');
     assert(renderedText.includes('Steuerersparnis Verlusttopf:'), 'Should render tax-saved row');
     assert(renderedText.includes('Steuern (final, Settlement)'), 'Should render final settlement tax row label');
+    assert(renderedText.includes('Plan nach Zweck'), 'Should render purpose summary section');
+    assert(renderedText.includes('Steuerzahlung:'), 'Purpose summary should include tax payment');
 }
 
 // Zero settlement values should be hidden to stay consistent with other 0-row filters.

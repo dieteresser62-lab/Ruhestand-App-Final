@@ -2442,8 +2442,9 @@ Die Balance-App zeigt 8 VPW-Metriken im Diagnose-Panel (`balance-diagnosis-keypa
 | ER(CAPE) | CAPE-basierte Nominalrendite | — |
 | Go-Go-Phase | Status + Multiplikator | — |
 | VPW-Basisvermögen | Gesamtvermögen für VPW-Formel | — |
-| VPW-Total | Vermögen × Rate × Go-Go | — |
-| VPW-Flex (abgeleitet) | VPW-Total minus Floor | — |
+| VPW-Rahmen | Vermögen × Rate × Go-Go; maximal freigegebener Rahmen, keine Konsumpflicht | — |
+| Flex freigegeben | VPW-Rahmen minus netto Floor, nach Safety-/Reentry-Logik | — |
+| Nicht genutzter Rahmen | VPW-Rahmen minus empfohlene Entnahme | — |
 
 **Feature-Gate:** Dynamic Flex wird in der Balance-App nur aktiviert, wenn `capeRatio > 0` (CAPE-Daten müssen vorliegen).
 

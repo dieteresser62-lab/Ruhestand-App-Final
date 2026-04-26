@@ -89,6 +89,9 @@ Funktion runMonteCarlo():
      - WENN (Worker genutzt):
          - Re-Run dieser spezifischen Indizes (seriell/schnell), um vollständige Logs zu generieren
            (Worker senden keine Logs, um Performance zu sparen)
+     - Ergänze im detaillierten Log die Payout-Zeitpunkte:
+         Liquidität vor Auszahlung, Liquidität nach Auszahlung,
+         Liquidität nach Zins, Portfolio vor Auszahlung, Portfolio Jahresende
 
   5. Finales Rendering
      - Berechne Gesamt-Statistiken (Erfolgsquote, Mediane)
@@ -120,6 +123,7 @@ Funktion runHistoricalBacktest():
 
      - ENGINE-Aufruf (simulateOneYear)
          - Berechne Entnahme, Steuern, Transaktionen
+         - Erfasse Payout-Zeitpunkte für das detaillierte Log
          - Engine liefert Settlement inkl. taxRawAggregate
          - Wende Markt-Rendite an
          - Aktualisiere `simState` (neues Vermögen, taxState)
@@ -138,6 +142,7 @@ Funktion runHistoricalBacktest():
 
      - Logging
          - Füge Jahresergebnis zur Log-Tabelle hinzu (HTML)
+         - Nutze dieselben Entnahme-/Payout-/VPW-Felder wie das Monte-Carlo-Scenario-Log
          - Sammle Statistiken (Steuern, Kürzungsjahre, taxSavedByLossCarry)
 
   4. Abschluss

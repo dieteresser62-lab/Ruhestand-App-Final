@@ -297,12 +297,19 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 - Refill-Cap Hint im Bear Market
 - Korrekte Farbcodierung (ok/warn/danger)
 
+#### `balance-diagnosis-format.test.mjs`
+**Zweck:** Testet Normalisierung der Entscheidungsdiagnose.
+- Exakt erreichte Mindestschwellen werden als ok bewertet
+- Grenzfallhinweise wie „Exakt auf Mindestniveau“ werden gesetzt
+- Knappe Sicherheitsabstände bleiben warn
+
 #### `balance-diagnosis-transaction.test.mjs`
 **Zweck:** Testet Transaktions-Diagnose-Rendering.
 - Empty State bei null-Diagnostics
 - Guardrail-Block → danger Status
 - Cap active → warn Status
 - Tranchenauswahl-Rendering mit Details
+- Gold-„Warum nicht?“-Hinweis bei sichtbarem Ziel ohne Goldkauf
 
 #### `balance-renderer-summary.test.mjs`
 **Zweck:** Testet Summary-Rendering.
@@ -543,6 +550,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `balance-binder-snapshots.test.mjs` | ~160 | Snapshot-Erstellung/-Restore |
 | `balance-diagnosis-chips.test.mjs` | ~70 | Diagnose-Chip-Rendering |
 | `balance-diagnosis-decision-tree.test.mjs` | ~100 | Entscheidungsbaum-Logik |
+| `balance-diagnosis-format.test.mjs` | ~40 | Diagnose-Normalisierung und Grenzfalltexte |
 | `balance-diagnosis-guardrails.test.mjs` | ~100 | Guardrail-Chips |
 | `balance-diagnosis-transaction.test.mjs` | ~100 | Transaktions-Diagnose |
 | `balance-reader.test.mjs` | ~640 | DOM-Input-Lesen, Overrides |

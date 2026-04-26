@@ -13,7 +13,7 @@ export function createDiagnosisHandlers({ dom, appState }) {
     const generateDiagnosisText = (diagnosis) => {
         if (!diagnosis) return "Keine Diagnose-Daten verfügbar.";
 
-        let text = `===== KI-Diagnose für Ruhestand-Balancing =====\n`;
+        let text = `===== Entscheidungsdiagnose für Ruhestand-Balancing =====\n`;
         text += `Version: ${CONFIG.APP.VERSION}\n`;
         text += `Zeitstempel: ${new Date(appState.lastUpdateTimestamp).toLocaleString('de-DE')}\n\n`;
         text += `--- Status-Übersicht ---\n`;
@@ -180,10 +180,16 @@ export function createDiagnosisHandlers({ dom, appState }) {
                 text += `VPW-Basisvermögen: ${UIUtils.formatCurrency(vpw.gesamtwert)}\n`;
             }
             if (typeof vpw.vpwTotal === 'number' && isFinite(vpw.vpwTotal)) {
-                text += `VPW-Total: ${UIUtils.formatCurrency(vpw.vpwTotal)}\n`;
+                text += `VPW-Rahmen: ${UIUtils.formatCurrency(vpw.vpwTotal)}\n`;
+            }
+            if (typeof vpw.staticFlexBaseline === 'number' && isFinite(vpw.staticFlexBaseline)) {
+                text += `Statischer Flex-Bedarf: ${UIUtils.formatCurrency(vpw.staticFlexBaseline)}\n`;
             }
             if (typeof vpw.dynamicFlex === 'number' && isFinite(vpw.dynamicFlex)) {
-                text += `VPW-Flex (abgeleitet): ${UIUtils.formatCurrency(vpw.dynamicFlex)}\n`;
+                text += `Flex freigegeben: ${UIUtils.formatCurrency(vpw.dynamicFlex)}\n`;
+            }
+            if (typeof diagnosis.keyParams.jahresentnahme === 'number' && isFinite(diagnosis.keyParams.jahresentnahme)) {
+                text += `Empfohlene Entnahme: ${UIUtils.formatCurrency(diagnosis.keyParams.jahresentnahme)}\n`;
             }
             const warnings = [];
             if (typeof vpw.expectedRealReturn === 'number' && isFinite(vpw.expectedRealReturn) && vpw.expectedRealReturn < 0) {

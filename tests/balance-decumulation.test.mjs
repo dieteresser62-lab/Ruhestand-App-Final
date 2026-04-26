@@ -1,4 +1,10 @@
 import { initUIReader, UIReader } from '../app/balance/balance-reader.js';
+import { postprocessBalanceAction } from '../app/balance/balance-action-postprocessor.js';
+import {
+    buildBalanceRendererPayload,
+    calculateExpensesBudget,
+    enrichBalanceDiagnosisPayload
+} from '../app/balance/balance-update-pipeline.js';
 
 console.log('--- Balance Decumulation Tests ---');
 
@@ -140,6 +146,52 @@ console.log('Test 3: applyStoredInputs lädt auch den neuen flachen Shape');
     assertEqual(dom.inputs.drawdownTrigger.value, 17, 'Neuer drawdown trigger wird geladen');
     assertEqual(dom.inputs.bondRefillThreshold.value, 9, 'Neuer refill threshold wird geladen');
     assertEqual(documentElements.threeBucketConfigGroup.style.display, 'grid', '3-Bucket bleibt sichtbar');
+}
+
+console.log('Test 4: Balance-Update-Pipeline-Helfer bauen Payloads ohne Seiteneffekte');
+{
+    const modelResult = {
+        ui: {
+            action: { transactionDiagnostics: { source: 'engine' } },
+            vpw: { rate: 0.04 },
+            spending: { monatlicheEntnahme: 1800 }
+        }
+    };
+    const input = { aktuellesAlter: 67 };
+    const rendererPayload = buildBalanceRendererPayload(modelResult, input);
+    assertEqual(rendererPayload.input, input, 'Renderer-Payload referenziert Input');
+    assertEqual(rendererPayload.spending.monatlicheEntnahme, 1800, 'Renderer-Payload behält UI-Daten');
+
+    const diagnosis = enrichBalanceDiagnosisPayload({
+        formattedDiagnosis: { keyParams: {} },
+        modelResult,
+        threeBucketDiagnosis: { is3Bucket: true }
+    });
+    assertEqual(diagnosis.transactionDiagnostics.source, 'engine', 'Diagnose übernimmt Transaction Diagnostics');
+    assertEqual(diagnosis.keyParams.vpw.rate, 0.04, 'Diagnose übernimmt VPW-Daten');
+    assertEqual(diagnosis.threeBucket.is3Bucket, true, 'Diagnose übernimmt 3-Bucket-Daten');
+
+    const budget = calculateExpensesBudget({ fixedIncomeAnnual: 12000, monthlyWithdrawal: 1800 });
+    assertEqual(budget.monthlyBudget, 2800, 'Ausgabenbudget addiert fixe Einkünfte pro Monat');
+    assertEqual(budget.annualBudget, 33600, 'Jahresbudget leitet sich aus Monatsbudget ab');
+}
+
+console.log('Test 5: Action-Postprocessor merged Profilverbund ohne 3-Bucket');
+{
+    const modelResult = { ui: { action: { type: 'NONE' } } };
+    const runs = [{ ui: { action: { type: 'TRANSACTION', nettoErlös: 1000 } } }];
+    const result = postprocessBalanceAction({
+        inputData: { decumulation: { mode: 'standard' } },
+        modelResult,
+        profilverbundRuns: runs,
+        mergeProfilverbundActions: (receivedRuns) => ({
+            type: receivedRuns[0].ui.action.type,
+            nettoErlös: receivedRuns[0].ui.action.nettoErlös
+        })
+    });
+    assertEqual(modelResult.ui.action.type, 'TRANSACTION', 'Postprocessor ersetzt Action durch Profilverbund-Merge');
+    assertEqual(modelResult.ui.action.nettoErlös, 1000, 'Postprocessor übernimmt Merge-Ergebnis');
+    assertEqual(result.threeBucketDiagnosis, null, 'Ohne 3-Bucket gibt es keine 3-Bucket-Diagnose');
 }
 
 console.log('--- Balance Decumulation Tests Completed ---');

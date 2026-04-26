@@ -1,5 +1,6 @@
 
 import { SpendingPlanner } from '../engine/planners/SpendingPlanner.mjs';
+import { calcFlexShare, quantizeMonthly, smoothstep } from '../engine/planners/spending-policy-helpers.mjs';
 import { CONFIG } from '../engine/config.mjs';
 
 console.log('--- Spending Quantization Tests ---');
@@ -16,6 +17,7 @@ const INPUT = { inflation: 2 };
     CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED = true;
 
     // Tier 1 (< 2000): Step 50
+    assertEqual(quantizeMonthly(1832, 'floor'), 1800, 'helper 1832 -> 1800');
     assertEqual(SpendingPlanner._quantizeMonthly(1832, 'floor'), 1800, '1832 -> 1800');
     assertEqual(SpendingPlanner._quantizeMonthly(1849, 'floor'), 1800, '1849 -> 1800');
     assertEqual(SpendingPlanner._quantizeMonthly(1851, 'floor'), 1850, '1851 -> 1850');
@@ -28,6 +30,12 @@ const INPUT = { inflation: 2 };
     assertEqual(SpendingPlanner._quantizeMonthly(6100, 'floor'), 6000, '6100 -> 6000');
     assertEqual(SpendingPlanner._quantizeMonthly(6240, 'floor'), 6000, '6240 -> 6000');
     assertEqual(SpendingPlanner._quantizeMonthly(6260, 'floor'), 6250, '6260 -> 6250');
+    assertEqual(quantizeMonthly(1832, 'ceil'), 1850, 'helper ceil 1832 -> 1850');
+    assertEqual(smoothstep(-1), 0, 'smoothstep clamps lower bound');
+    assertEqual(smoothstep(0.5), 0.5, 'smoothstep midpoint');
+    assertEqual(smoothstep(2), 1, 'smoothstep clamps upper bound');
+    assertEqual(calcFlexShare({ floor: 30000, flex: 10000 }), 0.25, 'flex share should use flex / total');
+    assertEqual(calcFlexShare({ floor: 0, flex: 0 }), 0, 'empty budget should have no flex share');
 
     console.log('✅ Helper Logic Passed');
 }

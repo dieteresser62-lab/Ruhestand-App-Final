@@ -1,5 +1,9 @@
 
 import { updateCareMeta, computeHouseholdFlexFactor, makeDefaultCareMeta } from '../app/simulator/simulator-engine-helpers.js';
+import {
+    createMonteCarloLifeState,
+    updateMonteCarloLifeEventsForYear
+} from '../app/simulator/mc-life-events.js';
 // Note: sampleCareGrade is not exported directly, but updateCareMeta uses it. 
 // We will test sampling implicitly via updateCareMeta or export it if needed.
 // Actually, sampleCareGrade IS NOT exported. I have to rely on updateCareMeta.
@@ -15,6 +19,12 @@ function createMockRng(sequence) {
         if (index >= sequence.length) return 0.5;
         return sequence[index++];
     };
+}
+
+function createForkableMockRng(sequence, forkSequence = [0.99]) {
+    const rand = createMockRng(sequence);
+    rand.fork = () => createMockRng([...forkSequence]);
+    return rand;
 }
 
 // --- Helper: Basic Inputs for Care Logic ---
@@ -156,6 +166,38 @@ function getCareInputs() {
     assertClose(result.mortalityFactor, 1.5, 0.001, 'Mortality factor should update to grade 2 config');
 
     console.log('✅ Deterministic grade progression passed');
+}
+
+// --- TEST 5: Monte-Carlo Life Event State and Mortality ---
+{
+    const inputs = {
+        ...getCareInputs(),
+        pflegefallLogikAktivieren: false,
+        startAlter: 80,
+        geschlecht: 'm',
+        partner: { aktiv: false },
+        accumulationPhase: { enabled: false },
+        transitionYear: 0
+    };
+    const rand = createForkableMockRng([0.0], [0.99]);
+    const lifeState = createMonteCarloLifeState(inputs, rand);
+    const year = updateMonteCarloLifeEventsForYear(
+        lifeState,
+        inputs,
+        { mode: 'stop', percent: 0, marriageOffsetYears: 0, minMarriageYears: 0 },
+        0,
+        { jahr: 2024, inflation: 0 },
+        0,
+        null,
+        false,
+        rand
+    );
+
+    assert(lifeState.p1Alive === false, 'Life event update should apply mortality outside accumulation');
+    assert(lifeState.runEndedBecauseAllDied === true, 'Single-person run should end when P1 dies');
+    assert(year.householdContext.p1Alive === false, 'Household context should expose P1 death');
+    assertClose(year.effectiveFlexFactor, 0, 0.001, 'No living persons should produce zero effective flex');
+    console.log('✅ Monte-Carlo life event mortality works');
 }
 
 console.log('--- Care Logic Tests Completed ---');

@@ -1,6 +1,22 @@
 import { EngineAPI } from '../engine/index.mjs';
 import { mergeHeatmap, appendArray } from '../app/simulator/simulator-monte-carlo.js';
 import { MC_HEATMAP_BINS, pickWorstRun, createMonteCarloBuffers, buildMonteCarloAggregates, runMonteCarloChunk } from '../app/simulator/monte-carlo-runner.js';
+import { createMonteCarloRunContext } from '../app/simulator/mc-run-context.js';
+import {
+    createMonteCarloStressTracker,
+    recordMonteCarloStressYear,
+    writeMonteCarloStressMetrics
+} from '../app/simulator/mc-stress-tracker.js';
+import {
+    buildMonteCarloDeathLogRow,
+    buildMonteCarloRuinLogRow,
+    buildMonteCarloYearLogRow
+} from '../app/simulator/mc-log-builder.js';
+import {
+    createMonteCarloRunMetrics,
+    finalizeMonteCarloRunMetrics,
+    recordMonteCarloRunOutcome
+} from '../app/simulator/mc-run-metrics.js';
 
 console.log('--- Simulator Monte Carlo Tests ---');
 
@@ -134,6 +150,62 @@ function buildBasicInputs() {
     assert(chunk.totals.totalSimulatedYears >= 0, 'Totals should be present');
 }
 
+// --- TEST 6a: Monte-Carlo run context creation ---
+{
+    const inputs = buildBasicInputs();
+    const monteCarloParams = {
+        anzahl: 10,
+        maxDauer: 2,
+        blockSize: 1,
+        seed: 42,
+        methode: 'block',
+        rngMode: 'per-run-seed',
+        startYearMode: 'UNIFORM'
+    };
+    const context = createMonteCarloRunContext({
+        inputs,
+        monteCarloParams,
+        runRange: { start: 2, count: 4 },
+        logIndices: [2, 4],
+        buildYearSamplingConfig: () => ({ marker: 'sampling' }),
+        buildStartYearCdf: () => null,
+        resolveMinStartYearIndex: () => 4
+    });
+
+    assertEqual(context.runStart, 2, 'Context should preserve run start');
+    assertEqual(context.runCount, 4, 'Context should preserve run count');
+    assertEqual(context.buffers.finalOutcomes.length, 4, 'Context buffers should match run count');
+    assert(context.logIndexSet.has(2) && context.logIndexSet.has(4), 'Context should build log index set');
+    assertEqual(context.yearSamplingConfig.marker, 'sampling', 'Context should use injected sampling config');
+    assertEqual(context.minStartYearIndex, 4, 'Context should resolve min start index');
+}
+
+// --- TEST 6b: Monte-Carlo run context rejects legacy chunking ---
+{
+    let didThrow = false;
+    try {
+        createMonteCarloRunContext({
+            inputs: buildBasicInputs(),
+            monteCarloParams: {
+                anzahl: 10,
+                maxDauer: 2,
+                blockSize: 1,
+                seed: 42,
+                methode: 'block',
+                rngMode: 'legacy-stream',
+                startYearMode: 'UNIFORM'
+            },
+            runRange: { start: 1, count: 4 },
+            buildYearSamplingConfig: () => null,
+            buildStartYearCdf: () => null,
+            resolveMinStartYearIndex: () => 4
+        });
+    } catch (error) {
+        didThrow = true;
+    }
+    assert(didThrow, 'Legacy-stream mode should reject non-zero chunk starts');
+}
+
 // --- TEST 7: Aggregates calculation ---
 {
     const totalRuns = 3;
@@ -198,6 +270,144 @@ function buildBasicInputs() {
     assertClose(aggregates.extraKPI.timeShareQuoteAbove45, 0.2, 0.0001, 'Time share above 4.5 should match');
     assertClose(aggregates.extraKPI.dynamicFlexSafety.yearShareStage1plus, 0.3, 0.0001, 'Safety stage1+ year share should match');
     assertClose(aggregates.extraKPI.dynamicFlexSafety.yearShareStage2, 0.1, 0.0001, 'Safety stage2 year share should match');
+}
+
+// --- TEST 7b: Monte-Carlo stress tracker ---
+{
+    const tracker = createMonteCarloStressTracker({ preset: { years: 2 } }, 1000);
+    recordMonteCarloStressYear(tracker, 0, 900, {
+        entnahmequote: 0.05,
+        entscheidung: { kuerzungProzent: 12 },
+        jahresentnahme_real: 100
+    });
+    recordMonteCarloStressYear(tracker, 1, 800, {
+        entnahmequote: 0.03,
+        entscheidung: { kuerzungProzent: 0 },
+        jahresentnahme_real: 200
+    });
+    recordMonteCarloStressYear(tracker, 2, 780, {
+        entnahmequote: 0.034,
+        entscheidung: { kuerzungProzent: 0 },
+        jahresentnahme_real: 150
+    });
+
+    const maxDD = new Float64Array(1);
+    const quoteAbove45 = new Float64Array(1);
+    const cutYears = new Uint16Array(1);
+    const car = new Float64Array(1);
+    const recoveryYears = new Uint16Array(1);
+    writeMonteCarloStressMetrics(tracker, 0, maxDD, quoteAbove45, cutYears, car, recoveryYears);
+
+    assert(maxDD[0] > 0, 'Stress tracker should write max drawdown');
+    assertClose(quoteAbove45[0], 50, 1e-9, 'Stress tracker should write quote-above-4.5 share');
+    assert(cutYears[0] === 1, 'Stress tracker should count cut years');
+    assert(car[0] > 0, 'Stress tracker should write real-withdrawal CaR');
+    assert(recoveryYears[0] === 1, 'Stress tracker should write recovery years');
+}
+
+// --- TEST 7c: Monte-Carlo log builders ---
+{
+    const lifeLogContext = {
+        hasPartner: true,
+        p1Alive: true,
+        p2Alive: false,
+        careMetaP1: {
+            active: true,
+            grade: 2,
+            gradeLabel: 'PG2',
+            zusatzFloorZiel: 1200,
+            zusatzFloorDelta: 300,
+            flexFactor: 0.7,
+            kumulierteKosten: 500,
+            log_floor_anchor: 100,
+            log_maxfloor_anchor: 200,
+            log_cap_zusatz: 300,
+            log_delta_flex: 0.1
+        },
+        careMetaP2: null,
+        p1ActiveThisYear: true,
+        p2ActiveThisYear: false
+    };
+    const ruinRow = buildMonteCarloRuinLogRow({
+        simulationsJahr: 2,
+        yearData: { jahr: 2001, inflation: 0.02 },
+        inputs: { rente1: 1000, rente2: 200 },
+        lifeLogContext
+    });
+    const normalRow = buildMonteCarloYearLogRow({
+        simulationsJahr: 0,
+        yearData: { jahr: 2000, inflation: 0.01 },
+        result: {
+            logData: {
+                aktionUndGrund: 'OK',
+                taxSavedByLossCarry: 12,
+                entnahme_plan: 100,
+                entnahme_effektiv: 90,
+                liq_before_payout: 500,
+                liq_after_payout: 410
+            },
+            ui: { vpw: { horizonYears: 30 } }
+        },
+        lifeLogContext
+    });
+    const deathRow = buildMonteCarloDeathLogRow({
+        deathLogContext: { jahr: 4, histJahr: 2003, inflation: 0.03 },
+        currentRunLogLength: 3,
+        portfolioSnapshot: { depotTranchesAktien: [], depotTranchesGold: [], liquiditaet: 42 },
+        inputs: { rente1: 1000, rente2: 200 },
+        lifeLogContext
+    });
+
+    assert(ruinRow.aktionUndGrund === '>>> RUIN <<<', 'Ruin log builder should set ruin marker');
+    assert(normalRow.taxSavedByLossCarry === 12, 'Year log builder should preserve result log fields');
+    assert(normalRow.entnahme_plan === 100 && normalRow.liq_after_payout === 410, 'Year log builder should preserve payout transparency fields');
+    assert(normalRow.CareP1_Active === 1 && normalRow.CareP2_Active === 0, 'Year log builder should write care activity fields');
+    assert(deathRow.aktionUndGrund.includes('Alle Personen verstorben'), 'Death log builder should set death marker');
+    assert(deathRow.Person2Alive === 0, 'Death log builder should preserve partner alive flag');
+}
+
+// --- TEST 7d: Monte-Carlo run metrics ---
+{
+    const metrics = createMonteCarloRunMetrics(1);
+    const buffers = createMonteCarloBuffers(1);
+    recordMonteCarloRunOutcome(metrics, {
+        i: 0,
+        runIdx: 7,
+        buffers,
+        simState: { portfolio: { liquiditaet: 1000 } },
+        failed: false,
+        lebensdauer: 3,
+        jahreOhneFlex: 1,
+        kpiJahreMitKuerzungDieserLauf: 2,
+        kpiMaxKuerzungDieserLauf: 12,
+        totalTaxesThisRun: 99,
+        totalTaxSavedByLossCarryThisRun: 11,
+        depotOnlyStart: 1000,
+        depotOnlyEnd: 800,
+        ruinOrDepleted: false,
+        careEverActive: true,
+        triggeredAge: 70,
+        triggeredAgeP2: 72,
+        p1CareYears: 2,
+        p2CareYears: 1,
+        bothCareYears: 1,
+        hasPartner: true,
+        careMetaP1: { zusatzFloorZiel: 1000 },
+        careMetaP2: { zusatzFloorZiel: 500 },
+        runSafetyStage1Ever: true,
+        runSafetyStage2Ever: false,
+        currentRunLog: [{ jahr: 1 }]
+    });
+    const finalized = finalizeMonteCarloRunMetrics(metrics);
+
+    assertEqual(buffers.kpiLebensdauer[0], 3, 'Run metrics should write lifespan buffer');
+    assertEqual(buffers.kpiKuerzungsjahre[0], 2, 'Run metrics should write cut-years buffer');
+    assertEqual(finalized.totals.pflegeTriggeredCount, 1, 'Run metrics should count care-triggered runs');
+    assertEqual(finalized.totals.runsSafetyStage1Triggered, 1, 'Run metrics should count safety stage 1 runs');
+    assertEqual(finalized.lists.entryAges[0], 70, 'Run metrics should store P1 care entry age');
+    assertEqual(finalized.lists.entryAgesP2[0], 72, 'Run metrics should store P2 care entry age');
+    assertEqual(finalized.runMeta[0].totalCareYears, 3, 'Run metrics should write runMeta care years');
+    assertEqual(finalized.worstRun.runIdx, 7, 'Run metrics should update worst run');
 }
 
 // --- TEST 8: Chunk merge consistency (split vs full) ---
@@ -515,6 +725,14 @@ const emptyLists = {
     assert(horizons.length >= 3, 'Dynamic flex MC rows should include VPW horizons');
     assert(horizons[1] <= horizons[0], 'MC horizon should not increase year-over-year (y1->y2)');
     assert(horizons[2] <= horizons[1], 'MC horizon should not increase year-over-year (y2->y3)');
+    const payoutRows = rows.filter(row => Number.isFinite(Number(row?.entnahme_plan)));
+    assert(payoutRows.length >= 3, 'Dynamic flex MC rows should expose payout transparency fields');
+    for (const row of payoutRows.slice(0, 3)) {
+        assert(Number.isFinite(Number(row.entnahme_effektiv)), 'Payout row should expose effective withdrawal');
+        assert(Number.isFinite(Number(row.liq_before_payout)), 'Payout row should expose liquidity before payout');
+        assert(Number.isFinite(Number(row.liq_after_payout)), 'Payout row should expose liquidity after payout');
+        assert(Number.isFinite(Number(row.portfolio_total_end)), 'Payout row should expose end portfolio total');
+    }
 }
 
 // --- TEST 15: taxSavedByLossCarry is deterministic with fixed seed ---

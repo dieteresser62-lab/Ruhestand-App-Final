@@ -244,6 +244,11 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal', options =
 
     if (isDetailed) {
         columns.push(
+            { header: 'EntPlan', width: 8, key: 'row.entnahme_plan', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'EntEff', width: 8, key: 'row.entnahme_effektiv', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'VPW€', width: 8, key: 'row.vpw_total', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'VPWFlex', width: 8, key: 'row.vpw_dynamic_flex', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'StatFlex', width: 8, key: 'row.static_flex_baseline', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
             {
                 header: 'VPW%',
                 width: 5,
@@ -383,6 +388,11 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal', options =
         columns.push(
             { header: 'VTopf', width: 8, key: 'row.lossCarryEnd', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
             { header: 'StSave', width: 8, key: 'row.taxSavedByLossCarry', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'Liq>P', width: 9, key: 'row.liq_before_payout', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'Liq<P', width: 9, key: 'row.liq_after_payout', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'Liq>Z', width: 9, key: 'row.liq_after_interest', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'Port>P', width: 9, key: 'row.portfolio_total_before_payout', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'PortEnd', width: 9, key: 'row.portfolio_total_end', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
             { header: 'Liq@rC-', width: 9, key: 'row.liqStart', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
             { header: 'Zins€', width: 7, key: 'row.cashInterestEarned', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
             { header: 'Liq@rC+', width: 9, key: 'row.liqEnd', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },

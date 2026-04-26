@@ -23,12 +23,18 @@ import { initTranchenStatus, syncTranchenToInputs } from '../tranches/depot-tran
 import { loadProfilverbundProfiles } from '../profile/profilverbund-balance.js';
 import { createProfilverbundHandlers } from './balance-main-profilverbund.js';
 import { createProfileSyncHandlers } from './balance-main-profile-sync.js';
-import { shouldResetGuardrailState } from './balance-guardrail-reset.js';
 import { UIUtils } from './balance-utils.js';
 import { initExpensesTab, updateExpensesBudget } from './balance-expenses.js';
 import { initDynamicFlexControls } from '../simulator/simulator-main-dynamic-flex.js';
-import { applyThreeBucketLogic, sumBondBucketValuation, appendBondReplenishment } from '../../engine/transactions/three-bucket-logic.mjs';
 import { PROFILE_VALUE_KEYS } from '../profile/profile-state.js';
+import { postprocessBalanceAction } from './balance-action-postprocessor.js';
+import {
+    buildBalanceRendererPayload,
+    calculateExpensesBudget,
+    enrichBalanceDiagnosisPayload,
+    persistBalanceUpdate,
+    prepareEngineLastState
+} from './balance-update-pipeline.js';
 
 // ==================================================================================
 // APPLICATION STATE & DOM REFERENCES
@@ -192,13 +198,7 @@ function update() {
         // Die externe Engine (engine.js) berechnet alle Werte
         // Input: Benutzereingaben + letzter State
         // Output: {input, newState, diagnosis, ui} oder {error}
-        // Reset guardrail history if key inputs changed.
-        const shouldResetState = shouldResetGuardrailState(persistentState.inputs, inputData);
-        const previousLastState = persistentState.lastState || null;
-        const preservedTaxState = previousLastState?.taxState
-            ? { taxState: previousLastState.taxState }
-            : null;
-        const lastState = shouldResetState ? preservedTaxState : previousLastState;
+        const lastState = prepareEngineLastState(persistentState, inputData);
         const modelResult = window.EngineAPI.simulateSingleYear(inputData, lastState);
 
         // 4. Handle Engine Response
@@ -206,100 +206,49 @@ function update() {
         if (modelResult.error) {
             throw modelResult.error;
         }
-        if (profilverbundRuns && modelResult.ui) {
-            modelResult.ui.action = profilverbundHandlers.mergeProfilverbundActions(profilverbundRuns);
-        }
-
-        // --- 3-BUCKET JILGE INTEGRATION ---
-        let finalAction = modelResult.ui?.action || {};
-        let threeBucketDiagnosis = null;
-
-        if (inputData.decumulation && inputData.decumulation.mode === '3_bucket_jilge' && modelResult.ui && modelResult.ui.action) {
-            const market = {
-                realReturnEq: (Number(modelResult.newState?.marketData?.returns?.realEq) || 0),
-                sKey: modelResult.ui?.market?.sKey || 'neutral'
-            };
-            const bondBucketBefore = sumBondBucketValuation(inputData.detailledTranches || []);
-
-            const threeBucketResult = applyThreeBucketLogic(
-                inputData.detailledTranches || [],
-                inputData,
-                market,
-                modelResult.ui.action,
-                market.realReturnEq,
-                bondBucketBefore
-            );
-
-            // Note: The actual bond replenishment (selling equity to buy bonds) is handled separately:
-            // - For Profilverbund (Couples): Inside balance-main-profilverbund.js (each person independently)
-            // - For Singles: We still need to do it here
-
-            if (!profilverbundRuns) {
-                const jahresEntnahmeTarget = Math.max(0, inputData.floorBedarf - (inputData.renteAktiv ? (inputData.renteMonatlich * 12) : 0)) + Math.max(0, inputData.flexBedarf);
-                const replenishResult = appendBondReplenishment(
-                    inputData.detailledTranches || [],
-                    inputData,
-                    threeBucketResult.updatedAction,
-                    market.realReturnEq,
-                    jahresEntnahmeTarget,
-                    bondBucketBefore,
-                    market
-                );
-
-                finalAction = replenishResult.updatedAction;
-                modelResult.ui.action = finalAction; // Overwrite for renderer
-            }
-
-            threeBucketDiagnosis = threeBucketResult.threeBucketState;
-        }
-        // ----------------------------------
+        const { threeBucketDiagnosis } = postprocessBalanceAction({
+            inputData,
+            modelResult,
+            profilverbundRuns,
+            mergeProfilverbundActions: profilverbundHandlers.mergeProfilverbundActions
+        });
 
         // 5. Prepare data for Renderer
         // Kombiniert Engine-Output mit Eingaben für vollständige UI-Darstellung
-        const uiDataForRenderer = {
-            ...modelResult.ui,
-            input: inputData
-        };
+        const uiDataForRenderer = buildBalanceRendererPayload(modelResult, inputData);
 
         // 6. Render & Save
         // Rendert alle UI-Komponenten: Summary, Liquiditätsbalken, Handlungsanweisung, etc.
         UIRenderer.render(uiDataForRenderer);
 
         // Bereitet Diagnose-Daten auf und rendert das Diagnose-Panel
-        const formattedDiagnosis = UIRenderer.formatDiagnosisPayload(modelResult.diagnosis);
-
-        // Design-Note: Die Transaktionsdiagnostik wird unverändert aus der Engine übernommen,
-        // damit UI und Export dieselben Kennzahlen nutzen können.
-        if (formattedDiagnosis && modelResult.ui?.action?.transactionDiagnostics) {
-            formattedDiagnosis.transactionDiagnostics = modelResult.ui.action.transactionDiagnostics;
-        }
-        if (formattedDiagnosis && modelResult.ui?.vpw) {
-            formattedDiagnosis.keyParams = formattedDiagnosis.keyParams || {};
-            formattedDiagnosis.keyParams.vpw = modelResult.ui.vpw;
-        }
-        if (formattedDiagnosis && threeBucketDiagnosis) {
-            formattedDiagnosis.threeBucket = threeBucketDiagnosis;
-        }
+        const formattedDiagnosis = enrichBalanceDiagnosisPayload({
+            formattedDiagnosis: UIRenderer.formatDiagnosisPayload(modelResult.diagnosis),
+            modelResult,
+            threeBucketDiagnosis
+        });
 
         appState.diagnosisData = formattedDiagnosis;
         UIRenderer.renderDiagnosis(appState.diagnosisData);
 
         // Speichert Eingaben und neuen Zustand
         // Persist per-profile states to keep each profile's guardrails stable.
-        if (profilverbundRuns) {
-            profilverbundHandlers.persistProfilverbundProfileStates(profilverbundRuns);
-        } else {
-            StorageManager.saveState({ ...persistentState, inputs: inputData, lastState: modelResult.newState });
-        }
+        persistBalanceUpdate({
+            profilverbundRuns,
+            profilverbundHandlers,
+            storageManager: StorageManager,
+            persistentState,
+            inputData,
+            modelResult
+        });
 
         profilverbundHandlers.refreshProfilverbundBalance();
 
         const fixedIncomeAnnual = UIUtils.parseCurrency(dom.inputs.fixedIncomeAnnual?.value || 0);
-        const monatlicheEntnahme = (typeof modelResult.ui?.spending?.monatlicheEntnahme === 'number' && isFinite(modelResult.ui.spending.monatlicheEntnahme))
-            ? modelResult.ui.spending.monatlicheEntnahme
-            : 0;
-        const monthlyBudget = monatlicheEntnahme + (fixedIncomeAnnual / 12);
-        const annualBudget = monthlyBudget * 12;
+        const { monthlyBudget, annualBudget } = calculateExpensesBudget({
+            fixedIncomeAnnual,
+            monthlyWithdrawal: modelResult.ui?.spending?.monatlicheEntnahme
+        });
         updateExpensesBudget({ monthlyBudget, annualBudget });
 
     } catch (error) {

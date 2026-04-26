@@ -77,6 +77,9 @@ export function buildTransactionDiagnostics(transactionDiag) {
 
     thresholdCards.forEach(card => fragment.appendChild(card));
 
+    const explanationCards = buildWhyNotCards(transactionDiag);
+    explanationCards.forEach(card => fragment.appendChild(card));
+
     if (Array.isArray(transactionDiag.selectedTranches) && transactionDiag.selectedTranches.length > 0) {
         const rows = transactionDiag.selectedTranches.map(item => {
             const labelParts = [];
@@ -128,6 +131,62 @@ function determineTransactionStatus(diag) {
         : 'Keine Einschränkungen gemeldet';
 
     return { status, label, subtitle };
+}
+
+function buildWhyNotCards(diag) {
+    const cards = [];
+    const goldRows = buildGoldWhyNotRows(diag);
+    if (goldRows.length) {
+        cards.push(createTransactionCard({
+            title: 'Warum kein Goldkauf?',
+            subtitle: 'Nicht jede Zielabweichung ist ein sofortiger Kaufauftrag.',
+            rows: goldRows
+        }, 'info'));
+    }
+    return cards;
+}
+
+function buildGoldWhyNotRows(diag) {
+    const thresholds = diag?.goldThresholds || {};
+    const targetPct = Number(thresholds.targetPct || 0);
+    const minGoldReserve = Number(thresholds.minGoldReserve || 0);
+    const targetGoldValue = Number(thresholds.targetGoldValue || 0);
+    const currentGoldValue = Number(thresholds.currentGoldValue || 0);
+    const potentialGoldUse = Number(diag?.potentialTrade?.goldUse || 0);
+
+    if (!(targetPct > 0 || minGoldReserve > 0 || targetGoldValue > 0)) {
+        return [];
+    }
+    if (potentialGoldUse > 0) {
+        return [];
+    }
+
+    let reason = 'Gold-Ziel wird beobachtet, löst aber aktuell keinen Kauf aus.';
+    const reasonKey = (diag?.blockReason || 'none').toLowerCase();
+    const underMinReserve = minGoldReserve > 0 && currentGoldValue < minGoldReserve;
+    const underTarget = targetGoldValue > 0 && currentGoldValue < targetGoldValue;
+
+    if (reasonKey === 'liquidity_sufficient') {
+        reason = 'Keine Transaktion nötig: Liquidität und Rebalancing-Regeln lösen aktuell keinen Kaufauftrag aus.';
+    } else if (reasonKey === 'min_trade') {
+        reason = 'Zielabweichung liegt unter Mindestgröße bzw. Hysterese; kein kleiner Einzelkauf.';
+    } else if (reasonKey === 'guardrail_block' || reasonKey === 'cap_active') {
+        reason = 'Liquiditäts-/Guardrail-Schutz hat Vorrang vor Gold-Aufbau.';
+    } else if (underMinReserve || underTarget) {
+        reason = 'Gold liegt unter Ziel, aber Kauf wird erst bei ausreichender freier Liquidität und relevanter Rebalancing-Abweichung vorgeschlagen.';
+    }
+
+    const rows = [{ label: 'Grund', value: reason }];
+    if (Number.isFinite(currentGoldValue)) {
+        rows.push({ label: 'Aktueller Goldwert', value: UIUtils.formatCurrency(currentGoldValue) });
+    }
+    if (targetGoldValue > 0) {
+        rows.push({ label: 'Zielwert Gold', value: UIUtils.formatCurrency(targetGoldValue) });
+    }
+    if (minGoldReserve > 0) {
+        rows.push({ label: 'Mindestreserve Gold', value: UIUtils.formatCurrency(minGoldReserve) });
+    }
+    return rows;
 }
 
 function createTransactionCard(config, status = 'info') {

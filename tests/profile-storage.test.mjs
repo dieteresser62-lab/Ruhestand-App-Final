@@ -34,6 +34,29 @@ import {
     importProfilesBundle,
     importProfilesBundleFromWindowName
 } from '../app/profile/profile-storage.js';
+import {
+    isProfileScopedKey,
+    listProfileScopedKeys
+} from '../app/profile/profile-key-policy.js';
+import {
+    captureProfileData,
+    clearProfileScopedKeys,
+    hasProfileScopedDataInLocalStorage as hasLiveProfileScopedData,
+    loadProfileDataIntoLocalStorage as loadLiveProfileData
+} from '../app/profile/profile-live-storage.js';
+import {
+    exportProfilesBundle as exportBundleDirect,
+    exportProfilesBundleToWindowName as exportBundleToWindowNameDirect,
+    importProfilesBundle as importBundleDirect,
+    importProfilesBundleFromWindowName as importBundleFromWindowNameDirect
+} from '../app/profile/profile-bundle-io.js';
+import {
+    createProfile as createRegistryProfile,
+    ensureDefaultProfile as ensureRegistryDefaultProfile,
+    getProfileRegistry,
+    listProfiles as listRegistryProfiles,
+    updateProfileData as updateRegistryProfileData
+} from '../app/profile/profile-registry.js';
 import { CONFIG } from '../app/balance/balance-config.js';
 
 console.log('--- Profile Storage Tests ---');
@@ -82,6 +105,143 @@ try {
         assert(profiles.length === 1, 'Mehrfaches Aufrufen sollte nur 1 Default-Profil erzeugen');
     }
     console.log('✓ ensureProfileRegistry idempotent OK');
+
+    // Test 2b: Profile key policy
+    console.log('Test 2b: Profile key policy');
+    {
+        localStorage.clear();
+        localStorage.setItem('sim_test_key', '123');
+        localStorage.setItem('sim.test.key', '456');
+        localStorage.setItem(CONFIG.STORAGE.LS_KEY, '{"inputs":{}}');
+        localStorage.setItem('etfProxyUrl', 'global');
+
+        assert(isProfileScopedKey('sim_test_key') === true, 'sim_ keys should be profile-scoped');
+        assert(isProfileScopedKey('sim.test.key') === true, 'sim. keys should be profile-scoped');
+        assert(isProfileScopedKey(CONFIG.STORAGE.LS_KEY) === true, 'Balance state key should be profile-scoped');
+        assert(isProfileScopedKey('etfProxyUrl') === false, 'Global proxy key should not be profile-scoped');
+
+        const keys = listProfileScopedKeys(localStorage);
+        assert(keys.includes('sim_test_key'), 'Scoped keys should include sim_ key');
+        assert(keys.includes('sim.test.key'), 'Scoped keys should include sim. key');
+        assert(keys.includes(CONFIG.STORAGE.LS_KEY), 'Scoped keys should include balance state key');
+        assert(!keys.includes('etfProxyUrl'), 'Scoped keys should exclude global proxy key');
+    }
+    console.log('✓ Profile key policy OK');
+
+    // Test 2c: Profile registry module
+    console.log('Test 2c: Profile registry module');
+    {
+        localStorage.clear();
+        localStorage.setItem('sim_registry_seed', 'seed');
+
+        const registry = ensureRegistryDefaultProfile({
+            captureProfileData: () => ({ sim_registry_seed: localStorage.getItem('sim_registry_seed') })
+        });
+        assert(registry.profiles.default, 'Registry module should create default profile');
+        assert(registry.profiles.default.data.sim_registry_seed === 'seed', 'Default profile should use capture callback');
+
+        const profile = createRegistryProfile('Registry Test', {
+            captureProfileData: () => ({})
+        });
+        assert(profile.id === 'registry-test', 'Registry module should slugify profile names');
+
+        updateRegistryProfileData(profile.id, { sim_registry_seed: 'patched' }, {
+            captureProfileData: () => ({})
+        });
+        const storedRegistry = getProfileRegistry();
+        assert(storedRegistry.profiles[profile.id].data.sim_registry_seed === 'patched', 'Registry module should merge profile data');
+
+        const profiles = listRegistryProfiles({
+            captureProfileData: () => ({})
+        });
+        assert(profiles.some(p => p.id === profile.id), 'Registry module should list created profiles');
+    }
+    console.log('✓ Profile registry module OK');
+
+    // Test 2d: Profile live storage module
+    console.log('Test 2d: Profile live storage module');
+    {
+        localStorage.clear();
+        localStorage.setItem('sim_live_key', '123');
+        localStorage.setItem(CONFIG.STORAGE.LS_KEY, '{"inputs":{"x":1}}');
+        localStorage.setItem('etfProxyUrl', 'global');
+
+        const snapshot = captureProfileData(localStorage);
+        assert(snapshot.sim_live_key === '123', 'Live storage snapshot should include sim_ keys');
+        assert(snapshot[CONFIG.STORAGE.LS_KEY] === '{"inputs":{"x":1}}', 'Live storage snapshot should include balance state');
+        assert(!Object.prototype.hasOwnProperty.call(snapshot, 'etfProxyUrl'), 'Live storage snapshot should exclude globals');
+        assert(hasLiveProfileScopedData(localStorage) === true, 'Live storage should detect scoped data');
+
+        clearProfileScopedKeys(localStorage);
+        assert(localStorage.getItem('sim_live_key') === null, 'Live storage clear should remove sim_ keys');
+        assert(localStorage.getItem(CONFIG.STORAGE.LS_KEY) === null, 'Live storage clear should remove balance state');
+        assert(localStorage.getItem('etfProxyUrl') === 'global', 'Live storage clear should preserve globals');
+        assert(hasLiveProfileScopedData(localStorage) === false, 'Live storage should be empty after clear');
+
+        loadLiveProfileData({
+            sim_live_key: '456',
+            [CONFIG.STORAGE.LS_KEY]: '{"inputs":{"x":2}}',
+            etfProxyUrl: 'must-not-load',
+            sim_null_key: null
+        }, localStorage);
+        assert(localStorage.getItem('sim_live_key') === '456', 'Live storage load should restore scoped data');
+        assert(localStorage.getItem(CONFIG.STORAGE.LS_KEY) === '{"inputs":{"x":2}}', 'Live storage load should restore balance state');
+        assert(localStorage.getItem('etfProxyUrl') === 'global', 'Live storage load should not overwrite globals');
+        assert(localStorage.getItem('sim_null_key') === null, 'Live storage load should skip null values');
+    }
+    console.log('✓ Profile live storage module OK');
+
+    // Test 2e: Profile bundle IO module
+    console.log('Test 2e: Profile bundle IO module');
+    {
+        localStorage.clear();
+        ensureRegistryDefaultProfile({
+            captureProfileData: () => ({})
+        });
+        createRegistryProfile('Bundle IO', {
+            captureProfileData: () => ({})
+        });
+        localStorage.setItem('etfProxyUrl', 'https://bundle.example');
+
+        let saved = false;
+        const bundle = exportBundleDirect({
+            storage: localStorage,
+            saveCurrentProfile: () => { saved = true; }
+        });
+        assert(saved === true, 'Bundle IO export should invoke save callback');
+        assert(bundle.registry && bundle.registry.profiles.default, 'Bundle IO export should include registry');
+        assert(bundle.globals.etfProxyUrl === 'https://bundle.example', 'Bundle IO export should include globals');
+
+        const windowRef = { name: '' };
+        const exported = exportBundleToWindowNameDirect({
+            storage: localStorage,
+            windowRef
+        });
+        assert(exported === true, 'Bundle IO window export should succeed');
+        assert(windowRef.name.startsWith('RUHESTAND_PROFILE_BUNDLE:'), 'Bundle IO window export should use stable prefix');
+
+        localStorage.clear();
+        let loadedId = null;
+        const imported = importBundleDirect(bundle, {
+            storage: localStorage,
+            loadProfileIntoLocalStorage: (id) => {
+                loadedId = id;
+                return true;
+            }
+        });
+        assert(imported.ok === true, 'Bundle IO import should succeed');
+        assert(loadedId === bundle.currentProfileId, 'Bundle IO import should load current profile');
+        assert(localStorage.getItem('etfProxyUrl') === 'https://bundle.example', 'Bundle IO import should restore globals');
+
+        localStorage.clear();
+        const importedFromWindow = importBundleFromWindowNameDirect({
+            storage: localStorage,
+            windowRef,
+            loadProfileIntoLocalStorage: () => true
+        });
+        assert(importedFromWindow.ok === true, 'Bundle IO window import should succeed');
+    }
+    console.log('✓ Profile bundle IO module OK');
 
     // ========== Create Profile Tests ==========
 

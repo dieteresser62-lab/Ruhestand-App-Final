@@ -47,7 +47,7 @@ Die Engine besteht aus zentralen ES-Modulen, die von `build-engine.mjs` zu `engi
 
 1. **`engine/validators/InputValidator.mjs`** – prüft sämtliche Eingaben auf Vollständigkeit, Wertebereiche und Konsistenz. Liefert strukturierte Fehlermeldungen.
 2. **`engine/analyzers/MarketAnalyzer.mjs`** – klassifiziert Marktregime, berechnet Drawdowns und leitet Kennzahlen für Guardrails ab.
-3. **`engine/planners/SpendingPlanner.mjs`** – steuert Guardrails, Glättung der Flex-Rate, Alarmstatus, S-Kurven-Dämpfung nach Flex-Anteil, harte Caps (Bär/Runway), Flex-Budget-Cap (Euro-basiert) sowie die vermögensbasierte Dämpfung der Flex-Kürzung (abhängig von jährlichem Flex-Bedarf und Gesamtvermögen) und erstellt Diagnoseeinträge.
+3. **`engine/planners/SpendingPlanner.mjs`** – orchestriert die Entnahmeplanung aus State, Alarm, initialer Flex-Rate, Policy-Pipeline, Entnahmeberechnung, Result und Diagnose. Reine Policy-Helper liegen in `engine/planners/spending-policy-helpers.mjs`, die vermögensbasierte Reduktionsdämpfung in `engine/planners/wealth-reduction.mjs`, Alarm-Aktivierung und Deeskalation in `engine/planners/alarm-policy.mjs`, Flex-Rate/S-Kurve/harte Caps in `engine/planners/flex-rate-policy.mjs`, Flex-Budget-Cap/Recharge/Min-Rate in `engine/planners/flex-budget-policy.mjs`, Recovery-/Caution-Guardrails und Budget-Floor in `engine/planners/spending-guardrails.mjs`, finale Rate-Limits in `engine/planners/final-rate-policy.mjs`, die stabile Post-Flex-Policy-Reihenfolge in `engine/planners/spending-policy-pipeline.mjs`, finale Diagnose- und Runway-Ziel-Strukturen in `engine/planners/spending-diagnosis.mjs`.
 
 ### Flex-Reduktion: Reihenfolge der Caps/Limits
 
@@ -110,25 +110,37 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 * `app/balance/balance-utils.js` – Formatierungs- und Hilfsfunktionen (shared-formatting, Threshold-Zugriff).
 * `app/balance/balance-storage.js` – Persistenzschicht für `localStorage` und File-System-Snapshots.
 * `app/balance/balance-reader.js` – liest Benutzerinputs aus dem DOM und setzt UI-Side-Effects.
-* `app/balance/balance-renderer.js` – Darstellung der Ergebnisse (Summary, Guardrails, Diagnose, Toasts, Themes).
+* `app/balance/balance-renderer.js` – Darstellung der Ergebnisse (Summary, Guardrails, Entscheidungsdiagnose, Toasts, Themes).
 * `app/balance/balance-binder.js` – Event-Hub mit Tastenkürzeln, Import/Export, Snapshots, Debug-Modus.
 * `app/balance/balance-main.js` – Orchestrator: initiiert Module, führt `update()` aus und spricht `EngineAPI` an.
+* `app/balance/balance-update-pipeline.js` / `balance-action-postprocessor.js` – Pipeline-Helfer fuer Last-State-Vorbereitung, Action-/3-Bucket-Postprocessing, Renderer-/Diagnose-Payload, Persistenz und Ausgabenbudget.
 * `app/balance/balance-annual-marketdata.js` – Online-Marktdaten für Jahreswechsel (Inflation, ETF, CAPE inkl. Fallback-Kette).
 * `app/balance/balance-annual-orchestrator.js` / `app/balance/balance-annual-modal.js` – nicht-blockierende Jahreswechsel-Pipeline und Ergebnisprotokoll.
-* `app/balance/balance-expenses.js` – Ausgaben-Check: CSV-Import pro Monat/Profil, Monats-/Jahresbudgets, Prognose, Soll/Ist, Detaildialog und Jahrumschaltung.
+* `app/balance/balance-expenses.js` – Controller/Fassade fuer den Ausgaben-Check: Initialisierung, Event-Wiring, CSV-Import-Ablauf und Jahrumschaltung.
+* `app/balance/balance-expenses-storage.js` / `balance-expenses-csv.js` / `balance-expenses-metrics.js` / `balance-expenses-renderer.js` – Storage, CSV-Parsing, Kennzahlen und DOM-Rendering des Ausgaben-Checks.
 
 ### Ablauf einer Aktualisierung
 
 1. `balance-binder.js` reagiert auf Eingaben (Formular, Tastenkürzel, Buttons) und ruft `debouncedUpdate()` auf.
 2. `balance-reader.js` sammelt alle Inputs und gibt ein strukturiertes Objekt zurück.
-3. `balance-main.js` reicht die Inputs an `EngineAPI.simulateSingleYear()` weiter.
-4. Die Engine liefert Ergebnisse/Diagnose/Fehler.
-5. `balance-renderer.js` aktualisiert UI-Komponenten und Statusanzeigen.
-6. `balance-storage.js` persistiert den Zustand und verwaltet Snapshots.
+3. `balance-update-pipeline.js` bereitet den Engine-Last-State vor, inklusive Guardrail-Reset und Tax-State-Erhalt.
+4. `balance-main.js` reicht die Inputs an `EngineAPI.simulateSingleYear()` weiter.
+5. `balance-action-postprocessor.js` merged Profilverbund-Actions und kapselt Single-3-Bucket-Postprocessing.
+6. `balance-renderer.js` aktualisiert UI-Komponenten und Statusanzeigen mit dem Pipeline-Payload.
+7. `balance-update-pipeline.js` kapselt Diagnose-Anreicherung, Persistenzentscheidung und Ausgabenbudget.
+
+### Entscheidungsdiagnose (Balance)
+
+Die Balance-App bezeichnet das Diagnose-Panel als `Entscheidungsdiagnose`, um die regelbasierte, pruefbare Logik klar von einer Blackbox-Interpretation abzugrenzen.
+
+* `balance-diagnosis-format.js` normalisiert Guardrail-Zustaende und fuegt Grenzfallhinweise hinzu. Exakt erfuellte Mindestschwellen werden als `ok` behandelt und mit Texten wie `Exakt auf Mindestniveau` erklaert.
+* `balance-diagnosis-transaction.js` rendert Transaktionsstatus, Schwellen und Erklaerkarten wie `Warum kein Goldkauf?`, wenn Zielwerte sichtbar sind, aber keine Aktion ausgelöst wird.
+* `balance-diagnosis-keyparams.js` trennt Dynamic-Flex-Begriffe in `VPW-Rahmen`, `Statischer Flex-Bedarf`, `Flex freigegeben` und `Nicht genutzter Rahmen`, damit ein hoher VPW-Rahmen nicht als Konsumauftrag missverstanden wird.
+* `balance-renderer-action.js` zeigt weiterhin Quellen und Verwendungen, ergänzt aber eine aggregierte Sicht `Plan nach Zweck` fuer Liquiditaet, Gold, Aktien, Geldmarkt, Bonds, Steuer und Rest/Puffer.
 
 ### Ausgaben-Check (Balance)
 
-`app/balance/balance-expenses.js` verwaltet einen separaten lokalen Datenspeicher (`balance_expenses_v1`) mit Jahrescontainer:
+Der Ausgaben-Check verwendet einen separaten lokalen Datenspeicher (`balance_expenses_v1`) mit Jahrescontainer. Der Controller liegt in `app/balance/balance-expenses.js`; Storage-, CSV-, Metrik- und Rendering-Details sind in `balance-expenses-*` Module ausgelagert:
 
 * `years[YYYY].months[1..12].profiles[profileId]` speichert importierte Kategorien je Monat/Profil.
 * `activeYear` steuert, welches Jahr im Tab angezeigt wird.
@@ -161,18 +173,26 @@ Der Jahreswechsel ruft CAPE automatisiert und fehlertolerant ab:
 
 * `app/simulator/simulator-main.js` – zentrale Steuerung, Parameter-Sweep-Logik, Self-Tests.
 * `app/simulator/simulator-monte-carlo.js` – UI-Koordinator für Monte-Carlo (liest Inputs, setzt Progress, orchestriert Runner/Analyzer) inkl. Worker-Orchestrierung.
+* `app/simulator/mc-run-context.js` – DOM-freie Chunk-Kontext-Erzeugung fuer Monte-Carlo (RunRange, RNG-Modus, Buffers, Progress-Intervall, LogIndexSet und Sampling-Konfiguration).
+* `app/simulator/mc-year-sampling.js` – DOM-freie Startjahr-/CAPE-Sampling-Logik fuer Monte-Carlo inklusive FILTER-/RECENCY-CDF, Uniform-Fallback und Estimated-History-Filter.
+* `app/simulator/mc-life-events.js` – DOM-freie Life-State-Initialisierung fuer Monte-Carlo (Care-Meta, Partnerstatus, Care-RNGs, Alive-Initialwerte, HouseholdContext); per-year Life-Events bleiben aus Performance-Gruenden im Runner-Hot-Path.
+* `app/simulator/mc-stress-tracker.js` – DOM-freie Stress-Metrik-Kapselung fuer Monte-Carlo (Stress-Drawdown, Quote-Above-4.5, Cut-Years, Real-CaR, Recovery-Years) bei stabilen Worker-Buffer-Namen.
+* `app/simulator/mc-log-builder.js` – DOM-freie Monte-Carlo-Logzeilen-Builder fuer Ruin-, Jahres- und Todesfall-Logs mit zentralen Alive-/Care-Feldern.
+* `app/simulator/mc-run-metrics.js` – DOM-freie Run-Ende-Metrikfortschreibung fuer Monte-Carlo (Ergebnisbuffer, Pflege-Listen, Safety-Run-Zaehler, Worst-Runs, `runMeta`).
 * `app/simulator/monte-carlo-runner.js` – DOM-freie Simulation (Jahresschleife, Pflege-KPIs) auf Basis von `simulator-engine-wrapper.js`. Unterstützt nun auch eine **Ansparphase** mit dynamischem Übergang in die Rentenphase (via `effectiveTransitionYear`).
 * `app/simulator/monte-carlo-ui.js` – UI-Fassade für Progressbar/Parameter-Lesen; erlaubt Callbacks ohne DOM-Leaks.
 * `app/simulator/scenario-analyzer.js` – wählt während der Simulation 30 Szenarien (Worst, Perzentile, Pflege, Zufall) aus.
 
 * `app/simulator/simulator-engine-wrapper.js` – Facade für Engine-Aufrufe (verwendet nun `simulator-engine-direct.js`).
 * `app/simulator/simulator-engine-direct.js` – Direkte Anbindung an die EngineAPI, ersetzt den alten Adapter.
+* `app/simulator/simulator-year-portfolio.js` / `simulator-household-pension.js` / `simulator-engine-input.js` / `simulator-accumulation-year.js` / `simulator-tax-recompute.js` / `simulator-forced-sale.js` / `simulator-bond-refill.js` / `simulator-year-result.js` – DOM-freie Hilfsmodule fuer Markt-/Portfoliofortschreibung, Renten-/Haushaltsberechnung, EngineAPI-Input-Mapping, Ansparjahre, Tax-Recompute, Forced-Sale-Liquiditaetsdeckung inklusive Payout-Fallback, Bond-Refill und finalen Rueckgabe-/Logdatenaufbau innerhalb eines Simulationsjahres. `simulator-year-result.js` erzeugt dabei auch die flachen Entnahme-/Payout-/VPW-Logfelder fuer Scenario- und Backtest-Ausgaben.
 * `app/simulator/simulator-portfolio.js` – Initialisierung, Portfolio-Berechnungen, Stress-Kontexte.
 * `app/simulator/simulator-results.js` – Aggregiert MC-Ausgaben und delegiert an `results-metrics.js` / `results-renderers.js` / `results-formatting.js`.
 * `app/simulator/simulator-sweep.js` – Sweep-Logik inkl. Whitelist/Blocklist, Heatmap und Worker-Orchestrierung.
 * `app/simulator/sweep-runner.js` – DOM-freier Sweep-Runner (kombinierbar in Worker-Jobs).
 * `app/simulator/simulator-optimizer.js` – Auto-Optimize-Kernlogik mit 3-stufiger Optimierung (Coarse Grid → Refinement → Final Verification).
-* `app/simulator/auto_optimize.js` / `app/simulator/auto_optimize_ui.js` – Auto-Optimize UI-Integration inkl. Worker-Parallelisierung, Preset-Konfigurationen und Champion-Config-Output (1-7 dynamische Parameter).
+* `app/simulator/auto_optimize.js` – Auto-Optimize-Orchestrator inkl. Worker-Parallelisierung, Kandidatenbewertung und Champion-Auswahl.
+* `app/simulator/auto_optimize_ui.js` und `app/simulator/auto-optimize-{presets,param-meta,config-ui,renderer,apply}.js` – Auto-Optimize UI-Fassade, Preset-Konfigurationen, Config-Parsing, Ergebnis-Rendering und Champion-Apply-Flow (1-7 dynamische Parameter).
 * `app/simulator/simulator-heatmap.js` – SVG-Rendering für Parameter-Sweeps inkl. Warnhinweise bei Verstößen.
 * `app/simulator/simulator-utils.js` – Zufallszahlengenerator, Statistikfunktionen, Parser (Formatierung über `app/shared/shared-formatting.js`).
 * `app/shared/shared-formatting.js` – gemeinsame Formatter für Balance und Simulator (Währung, Prozent, Monate).
@@ -184,7 +204,7 @@ Dynamic-Flex ist entlang der Simulator-Pipeline konsistent aktiviert:
 
 * UI/Profile: `app/simulator/simulator-main-dynamic-flex.js`, `app/simulator/simulator-profile-inputs.js`.
 * Input-Layer: `app/simulator/simulator-portfolio-inputs.js` normalisiert `dynamicFlex`, `horizonYears`, `horizonMethod`, `survivalQuantile`, `goGoMultiplier`.
-* Backtest/MC: `app/simulator/monte-carlo-runner.js` berechnet den Horizont pro Simulationsjahr neu (Alter steigt im Loop).
+* Backtest/MC: `app/simulator/mc-run-context.js` bereitet den Chunk-Kontext vor; `app/simulator/mc-life-events.js` initialisiert den Life-State; `app/simulator/mc-stress-tracker.js` kapselt Stress-Metriken; `app/simulator/mc-log-builder.js` baut Monte-Carlo-Logzeilen; `app/simulator/mc-run-metrics.js` schreibt Run-Ende-Metriken fort; `app/simulator/monte-carlo-runner.js` berechnet den Horizont pro Simulationsjahr neu (Alter steigt im Loop).
 * Worker-Parität: `workers/mc-worker.js` erhält dieselben Dynamic-Flex Inputs; Seed/Chunking bleiben deterministisch.
 * Sweep/Heatmap: `app/simulator/sweep-runner.js` validiert Invariants; invalid Kombinationen werden markiert statt gerechnet.
 
@@ -211,6 +231,7 @@ Die Parallelisierung basiert auf Web-Workern und einer gemeinsamen Pool-Schicht:
 **Logs und Szenarioauswahl**
 * Worker-Läufe sammeln nur aggregierte Daten; detaillierte Logs werden in einem zweiten, seriellen Pass für ausgewählte Runs erstellt.
 * `ScenarioAnalyzer` wählt Worst-/Perzentil-/Pflege- und Zufalls-Szenarien aus.
+* Monte-Carlo-Scenario-Logs und Backtest-Logs nutzen dieselben additiven Entnahme-/Payout-/VPW-Felder (`entnahme_plan`, `entnahme_effektiv`, `vpw_total`, `vpw_dynamic_flex`, `static_flex_baseline`, `liq_before_payout`, `liq_after_payout`, `liq_after_interest`, `portfolio_total_before_payout`, `portfolio_total_end`). Renderer zeigen diese Spalten nur im detaillierten Logmodus; die Normalansicht bleibt unveraendert.
 
 **Performance-Details**
 * Chunk-Größe wird über ein Zeitbudget dynamisch angepasst (glatt gefiltert), um kurze und lange Jobs auszugleichen.
@@ -276,7 +297,7 @@ Die Worker-Pools bieten ein opt-in Telemetrie-System für lokale Performance-Ana
   - 15 charakteristische Szenarien: Vermögens-Perzentile (Worst, P5-P95, Best), Pflege-Extremfälle (längste Dauer, höchste Kosten, frühester Eintritt), Risiko-Szenarien (längste Lebensdauer, maximale Kürzung)
   - 15 zufällige Szenarien: gleichmäßig über alle Runs verteilt für typisches Verhalten
 * Dropdown-Auswahl mit Endvermögen und Pflege-Status pro Szenario
-* Checkboxen für Pflege-Details und detailliertes Log, JSON/CSV-Export【F:simulator-results.js†L269-L427】【F:simulator-main.js†L1039-L1129】
+* Checkboxen für Pflege-Details und detailliertes Log, JSON/CSV-Export; detaillierte Logs enthalten zusaetzlich die konsistenten Entnahme-/Payout-/VPW-Felder fuer Monte-Carlo-Scenario-Log und Backtest.【F:simulator-results.js†L269-L427】【F:simulator-main.js†L1039-L1129】
 
 ---
 
@@ -287,7 +308,11 @@ Die Worker-Pools bieten ein opt-in Telemetrie-System für lokale Performance-Ana
 Die Simulator-Eingaben können aus mehreren Profilen aggregiert werden:
 
 **Module:**
-- `app/profile/profile-storage.js` – Profil-Registry und Persistenz-Layer
+- `app/profile/profile-storage.js` – Profil-Registry und Persistenz-Fassade
+- `app/profile/profile-key-policy.js` – Erkennung profilbezogener localStorage-Keys fuer Snapshot, Clear und Restore
+- `app/profile/profile-registry.js` – Registry-Parsing, Current-Profile-Key, Profil-Metadaten, CRUD und Profildaten-Merge
+- `app/profile/profile-live-storage.js` – Snapshot, Clear, Load und Live-Data-Erkennung fuer profilbezogene localStorage-Keys
+- `app/profile/profile-bundle-io.js` – Bundle-Import/-Export, globale Profil-Transfer-Keys und `window.name`-Handoff
 - `app/profile/profile-manager.js` – UI-Steuerung für Profilverwaltung (index.html)
 - `app/simulator/simulator-profile-inputs.js` – Profilaggregation und Simulator-Input-Mapping
 

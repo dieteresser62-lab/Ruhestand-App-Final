@@ -1,6 +1,5 @@
 import {
     applySaleToPortfolio,
-    buildInputsCtxFromPortfolio,
     buyGold,
     buyStocksNeu,
     initializePortfolio,
@@ -9,18 +8,24 @@ import {
     sumDepot
 } from './simulator-portfolio.js';
 import { resolveProfileKey } from './simulator-heatmap.js';
-import { calculateTargetLiquidityBalanceLike, buildDetailedTranchesFromPortfolio, euros, normalizeHouseholdContext, resolveCapeRatio } from './simulator-engine-direct-utils.js';
-import { shortenReasonText } from './simulator-utils.js';
-import { calculateSaleAndTax } from '../../engine/transactions/sale-engine.mjs';
-import { settleTaxYear } from '../../engine/tax-settlement.mjs';
+import { euros, normalizeHouseholdContext, resolveCapeRatio } from './simulator-engine-direct-utils.js';
 import { CONFIG } from '../../engine/config.mjs';
 import { STRATEGY_OPTIONS } from '../../types/strategy-options.js';
 import {
     getThreeBucketInputs,
-    sumBondBucketValuation,
-    applyThreeBucketLogic,
-    isBondCategory
+    applyThreeBucketLogic
 } from '../../engine/transactions/three-bucket-logic.mjs';
+import {
+    applyAnnualReturnsToPortfolio,
+    buildCurrentYearMarketData
+} from './simulator-year-portfolio.js';
+import { calculateHouseholdPensionForYear } from './simulator-household-pension.js';
+import { buildSimulatorEngineInput } from './simulator-engine-input.js';
+import { isAccumulationYear, simulateAccumulationYear } from './simulator-accumulation-year.js';
+import { applySimulatorTaxRecompute, buildTaxRawAggregate } from './simulator-tax-recompute.js';
+import { applyForcedSaleLiquidityCoverage, applyPayoutFallbackSale } from './simulator-forced-sale.js';
+import { applyBondRefillPostprocessing } from './simulator-bond-refill.js';
+import { buildSimulatorYearResult } from './simulator-year-result.js';
 
 const formatInteger = (value) => Number.isFinite(value) ? Math.round(value) : 0;
 
@@ -107,10 +112,6 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const threeBucketInput = getThreeBucketInputs(inputs);
     const is3Bucket = threeBucketInput.is3Bucket;
 
-    const rA = isFinite(yearData.rendite) ? yearData.rendite : 0;
-    const rG = isFinite(yearData.gold_eur_perf) ? yearData.gold_eur_perf / 100 : 0;
-    const rC = isFinite(yearData.zinssatz) ? yearData.zinssatz / 100 : 0;
-
     let bondSaleAmount = 0;
     let bondRefillGross = 0;
     let bondRefillNet = 0;
@@ -118,22 +119,20 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     let equityPreserved = 0;
     let unmetLiquidity = 0;
     let isBadYear = false;
-    const bondBucketBefore = sumBondBucketValuation(depotTranchesAktien);
-    const equityBeforeReturn = sumDepot({ depotTranchesAktien });
-    const goldBeforeReturn = sumDepot({ depotTranchesGold });
-
-    // Renditen anwenden
-    for (let i = 0; i < depotTranchesAktien.length; i++) {
-        const trancheReturn = (isBondCategory(depotTranchesAktien[i].type) || isBondCategory(depotTranchesAktien[i].category)) ? threeBucketInput.bondNominalReturn : rA;
-        depotTranchesAktien[i].marketValue *= (1 + trancheReturn);
-    }
-    for (let i = 0; i < depotTranchesGold.length; i++) {
-        depotTranchesGold[i].marketValue *= (1 + rG);
-    }
-    const equityAfterReturn = sumDepot({ depotTranchesAktien });
-    const goldAfterReturn = sumDepot({ depotTranchesGold });
-
-    const resolvedCapeRatio = resolveCapeRatio(yearData.capeRatio, inputs.capeRatio, inputs.marketCapeRatio ?? marketDataHist.capeRatio);
+    const {
+        rA,
+        rG,
+        rC,
+        bondBucketBefore,
+        equityBeforeReturn,
+        goldBeforeReturn,
+        equityAfterReturn,
+        goldAfterReturn
+    } = applyAnnualReturnsToPortfolio({ portfolio, yearData, threeBucketInput });
+    const {
+        resolvedCapeRatio,
+        marketDataCurrentYear
+    } = buildCurrentYearMarketData({ yearData, inputs, marketDataHist, rA });
 
     // FIX (Redux): Calculate current market end value for Regime Detection
     // Shift the historical window by 1 year so 'endeVJ' reflects the value AFTER this year's returns.
@@ -145,290 +144,70 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     // CRITICAL FIX: Always calculate synthetically!
     // We cannot use HISTORICAL_DATA[yearData.jahr] because in Monte Carlo, the sampled year 
     // has an absolute index value unrelated to the current synthetic simulation state.
-    const marketEnd = marketDataHist.endeVJ * (1 + rA);
-
-    const marketDataCurrentYear = {
-        ...marketDataHist,
-        inflation: yearData.inflation,
-        capeRatio: resolvedCapeRatio,
-        endeVJ_3: marketDataHist.endeVJ_2,
-        endeVJ_2: marketDataHist.endeVJ_1,
-        endeVJ_1: marketDataHist.endeVJ,
-        endeVJ: marketEnd
-    };
-
     // ==========================================
     // ANSPARPHASE-LOGIK (unverändert, da keine Engine-Aufrufe)
     // ==========================================
-    const isAccumulationYear = inputs.accumulationPhase?.enabled && yearIndex < (inputs.transitionYear || 0);
-
-    if (isAccumulationYear) {
-        // Sparrate berechnen
-        let sparrateThisYear = inputs.accumulationPhase.sparrate * 12;
-
-        if (inputs.accumulationPhase.sparrateIndexing === 'inflation' && currentState.accumulationState) {
-            const lastYearSparrate = currentState.accumulationState.sparrateThisYear || (inputs.accumulationPhase.sparrate * 12);
-            sparrateThisYear = lastYearSparrate * (1 + yearData.inflation / 100);
-        } else if (inputs.accumulationPhase.sparrateIndexing === 'wage' && currentState.accumulationState) {
-            const lastYearSparrate = currentState.accumulationState.sparrateThisYear || (inputs.accumulationPhase.sparrate * 12);
-            const wageGrowth = yearData.lohn || 2.0;
-            sparrateThisYear = lastYearSparrate * (1 + wageGrowth / 100);
-        }
-
-        // Shadow Pension Tracking
-        const rentAdjPct = inputs.rentAdjPct || 0;
-        const currentP1 = currentState.currentAnnualPension || 0;
-        const currentP2 = currentState.currentAnnualPension2 || 0;
-        const nextP1 = currentP1 * (1 + rentAdjPct / 100);
-        const nextP2 = currentP2 * (1 + rentAdjPct / 100);
-
-        // Cash-Zinsen
-        cashZinsen = euros(liquiditaet * rC);
-        liquiditaet += cashZinsen;
-        liqNachZins = euros(liquiditaet);
-
-        // Sparrate hinzufügen
-        liquiditaet += sparrateThisYear;
-
-        // Rebalancing
-        const zielLiquiditaet = calculateTargetLiquidityBalanceLike(
+    if (isAccumulationYear(inputs, yearIndex)) {
+        return simulateAccumulationYear({
+            currentState,
             inputs,
+            yearData,
+            yearIndex,
+            portfolio,
+            liquiditaet,
+            initialLiqStart,
+            rA,
+            rG,
+            rC,
+            bondBucketBefore,
             marketDataCurrentYear,
-            effectiveBaseFloor,
+            marketDataHist,
+            resolvedCapeRatio,
+            baseFloor,
             baseFlex,
-            currentAnnualPension + currentAnnualPension2
-        );
-        const ueberschuss = liquiditaet - zielLiquiditaet;
-
-        let kaufAktTotal = 0;
-        let kaufGldTotal = 0;
-
-        if (ueberschuss > 500) {
-            const targetEq = inputs.targetEq || 60;
-            const goldZielProzent = inputs.goldAktiv ? (inputs.goldZielProzent || 0) : 0;
-
-            const aktienAnteil = (targetEq / 100);
-            const goldAnteil = (goldZielProzent / 100);
-            const gesamtAnteil = aktienAnteil + goldAnteil;
-
-            if (gesamtAnteil > 0) {
-                const aktienBetrag = ueberschuss * (aktienAnteil / gesamtAnteil);
-                const goldBetrag = ueberschuss * (goldAnteil / gesamtAnteil);
-
-                if (aktienBetrag > 0) {
-                    buyStocksNeu(portfolio, aktienBetrag);
-                    liquiditaet -= aktienBetrag;
-                    kaufAktTotal = aktienBetrag;
-                }
-                if (goldBetrag > 0 && inputs.goldAktiv) {
-                    buyGold(portfolio, goldBetrag);
-                    liquiditaet -= goldBetrag;
-                    kaufGldTotal = goldBetrag;
-                }
-            }
-        }
-
-        portfolio.liquiditaet = euros(liquiditaet);
-
-        const newAccumulationState = currentState.accumulationState ? {
-            yearsSaved: currentState.accumulationState.yearsSaved + 1,
-            totalContributed: euros(currentState.accumulationState.totalContributed + sparrateThisYear),
-            sparrateThisYear: euros(sparrateThisYear)
-        } : null;
-
-        const naechsterBaseFloor = euros(baseFloor * (1 + yearData.inflation / 100));
-        const naechsterBaseFlex = euros(baseFlex * (1 + yearData.inflation / 100));
-        const naechsterFlexBudgetAnnual = euros(baseFlexBudgetAnnual * (1 + yearData.inflation / 100));
-        const naechsterFlexBudgetRecharge = euros(baseFlexBudgetRecharge * (1 + yearData.inflation / 100));
-
-        const marketEnd = marketDataHist.endeVJ * (1 + rA);
-        const newAth = Math.max(marketDataHist.ath, marketEnd);
-        const jahreSeitAth = (marketEnd < newAth) ? marketDataHist.jahreSeitAth + 1 : 0;
-
-        const newMarketDataHist = {
-            endeVJ: marketEnd,
-            endeVJ_1: marketDataHist.endeVJ,
-            endeVJ_2: marketDataHist.endeVJ_1,
-            endeVJ_3: marketDataHist.endeVJ_2,
-            ath: newAth,
-            jahreSeitAth: jahreSeitAth,
-            inflation: yearData.inflation,
-            capeRatio: resolvedCapeRatio
-        };
-
-        const depotwertGesamt = sumDepot(portfolio);
-        const totalWealth = depotwertGesamt + portfolio.liquiditaet;
-        const wertAktien = sumDepot({ depotTranchesAktien: portfolio.depotTranchesAktien });
-        const wertGold = sumDepot({ depotTranchesGold: portfolio.depotTranchesGold });
-
-        return {
-            newState: {
-                portfolio,
-                baseFloor: naechsterBaseFloor,
-                baseFlex: naechsterBaseFlex,
-                baseFlexBudgetAnnual: naechsterFlexBudgetAnnual,
-                baseFlexBudgetRecharge: naechsterFlexBudgetRecharge,
-                lastState: null,
-                currentAnnualPension: nextP1,
-                currentAnnualPension2: nextP2,
-                marketDataHist: newMarketDataHist,
-                samplerState: currentState.samplerState,
-                widowPensionP1: 0,
-                widowPensionP2: 0,
-                accumulationState: newAccumulationState,
-                transitionYear: currentState.transitionYear
-            },
-            totalTaxesThisYear: 0,
-            logData: {
-                jahr: yearIndex + 1,
-                histJahr: yearData.jahr,
-                alter: inputs.startAlter + yearIndex,
-                inflation: yearData.inflation,
-                entscheidung: {
-                    kuerzungProzent: 0,
-                    monatlicheEntnahme: 0,
-                    jahresEntnahme: 0,
-                    kuerzungQuelle: 'none',
-                    flexRate: 1.0,
-                    runwayMonths: Infinity
-                },
-                FlexRatePct: 1.0,
-                CutReason: 'none',
-                Alarm: false,
-                Regime: 'accumulation',
-                QuoteEndPct: 0,
-                RunwayCoveragePct: (zielLiquiditaet > 0 ? (portfolio.liquiditaet / zielLiquiditaet) * 100 : Infinity),
-                RealReturnEquityPct: ((1 + rA) / (1 + yearData.inflation / 100) - 1),
-                RealReturnGoldPct: ((1 + rG) / (1 + yearData.inflation / 100) - 1),
-                entnahmequote: 0,
-                steuern_gesamt: 0,
-                vk: { vkAkt: 0, vkGld: 0, vkBnd: 0, stAkt: 0, stGld: 0, stBnd: 0, vkGes: 0, stGes: 0 },
-                kaufAkt: euros(kaufAktTotal),
-                kaufGld: euros(kaufGldTotal),
-                wertAktien: euros(wertAktien),
-                wertGold: euros(wertGold),
-                liquiditaet: euros(portfolio.liquiditaet),
-                liqStart: euros(initialLiqStart),
-                cashInterestEarned: euros(cashZinsen),
-                liqEnd: euros(liqNachZins),
-                aktionUndGrund: `Sparrate: ${euros(sparrateThisYear)}€ / Kauf A: ${euros(kaufAktTotal)}€ / Kauf G: ${euros(kaufGldTotal)}€`,
-                usedSPB: 0,
-                floor_brutto: 0,
-                pension_annual: 0,
-                rente1: 0,
-                rente2: 0,
-                renteSum: 0,
-                floor_aus_depot: 0,
-                flex_brutto: 0,
-                flex_erfuellt_nominal: 0,
-                inflation_factor_cum: 1,
-                jahresentnahme_real: 0,
-                pflege_aktiv: false,
-                pflege_zusatz_floor: 0,
-                pflege_zusatz_floor_delta: 0,
-                pflege_flex_faktor: 1,
-                pflege_kumuliert: 0,
-                pflege_grade: null,
-                pflege_grade_label: '',
-                pflege_delta_flex: 0,
-                WidowBenefitP1: 0,
-                WidowBenefitP2: 0,
-                NeedLiq: 0,
-                GuardGold: 0,
-                GuardEq: 0,
-                GuardNote: 'accumulation_phase',
-                Person1Alive: householdCtx.p1Alive ? 1 : 0,
-                Person2Alive: householdCtx.p2Alive ? 1 : 0,
-                pflege_floor_anchor: 0,
-                pflege_maxfloor_anchor: 0,
-                pflege_cap_zusatz: 0,
-                CareP1_Active: 0,
-                CareP1_Cost: 0,
-                CareP1_Grade: null,
-                CareP1_GradeLabel: '',
-                CareP2_Active: 0,
-                CareP2_Cost: 0,
-                CareP2_Grade: null,
-                CareP2_GradeLabel: '',
-                threeBucket: {
-                    isBadYear,
-                    bondBucketBefore: euros(bondBucketBefore),
-                    bondBucketAfter: euros(sumBondBucketValuation(portfolio.depotTranchesAktien)),
-                    bondRefillGross: 0,
-                    bondRefillNet: 0,
-                    bondRefillTax: 0,
-                    bondSaleAmount: 0,
-                    equityPreserved: 0
-                }
-            }
-        };
+            baseFlexBudgetAnnual,
+            baseFlexBudgetRecharge,
+            effectiveBaseFloor,
+            currentAnnualPension,
+            currentAnnualPension2,
+            householdCtx,
+            isBadYear
+        });
     }
 
     // ==========================================
     // ENTNAHMEPHASE-LOGIK - DIREKTE ENGINE API
     // ==========================================
 
-    const rentAdjPct = inputs.rentAdjPct || 0;
-
-    // Rente Person 1
-    const currentAgeP1 = inputs.startAlter + yearIndex;
-    const r1StartOffsetYears = Math.max(0, Number(inputs.renteStartOffsetJahre) || 0);
-    let rente1BruttoEigen = 0;
-    let widowBenefitP1ThisYear = 0;
-
-    if (p1Alive && yearIndex >= r1StartOffsetYears) {
-        rente1BruttoEigen = currentAnnualPension;
-    }
-
-    if (p1Alive && widowBenefits.p1FromP2) {
-        widowBenefitP1ThisYear = widowPensionP1;
-    }
-
-    const rente1_brutto = rente1BruttoEigen + widowBenefitP1ThisYear;
-    const rente1 = rente1_brutto;
-
-    // Rente Person 2
-    let rente2BruttoEigen = 0;
-    let widowBenefitP2ThisYear = 0;
-    let rente2_brutto = 0;
-    let rente2 = 0;
-
-    if (inputs.partner?.aktiv && p2Alive) {
-        const partnerStartOffsetYears = Math.max(0, Number(inputs.partner.startInJahren) || 0);
-        if (yearIndex >= partnerStartOffsetYears) {
-            rente2BruttoEigen = currentAnnualPension2;
-
-            if (inputs.partner.steuerquotePct > 0) {
-                rente2 = rente2BruttoEigen * (1 - inputs.partner.steuerquotePct / 100);
-            } else {
-                rente2 = rente2BruttoEigen;
-            }
-            rente2 = Math.max(0, rente2);
-        }
-    }
-
-    if (p2Alive && widowBenefits.p2FromP1) {
-        widowBenefitP2ThisYear = widowPensionP2;
-    }
-
-    rente2_brutto = rente2BruttoEigen + widowBenefitP2ThisYear;
-    if (widowBenefitP2ThisYear > 0) {
-        rente2 += widowBenefitP2ThisYear;
-    }
-
-    // Calculate TOTAL household pension income (both persons)
-    const renteSum = rente1 + rente2;
-    const pensionAnnual = renteSum;
+    const pensionResult = calculateHouseholdPensionForYear({
+        inputs,
+        yearIndex,
+        currentAnnualPension,
+        currentAnnualPension2,
+        widowPensionP1,
+        widowPensionP2,
+        p1Alive,
+        p2Alive,
+        widowBenefits,
+        effectiveBaseFloor,
+        baseFlex,
+        temporaryFlexFactor
+    });
+    const {
+        rentAdjPct,
+        rente1,
+        rente2,
+        renteSum,
+        pensionAnnual,
+        pensionSurplus,
+        inflatedFloor,
+        inflatedFlex
+    } = pensionResult;
 
     // FIX: Do NOT add pension to liquidity explicitly!
     // The Engine nets pension against usage (monatlicheEntnahme = Bedarf - Pension).
     // Adding it here would count it twice (once as reduced withdrawal, once as cash injection).
     // liquiditaet += pensionAnnual;  <-- REMOVED
-
-    // Use TOTAL pension to calculate household floor/flex coverage
-    const pensionSurplus = Math.max(0, pensionAnnual - effectiveBaseFloor);
-    const inflatedFloor = Math.max(0, effectiveBaseFloor - pensionAnnual);
-    const inflatedFlex = Math.max(0, (baseFlex * temporaryFlexFactor) - pensionSurplus);
 
     const depotwertGesamt = sumDepot(portfolio);
     const totalWealth = depotwertGesamt + liquiditaet;
@@ -441,59 +220,22 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     // DIREKTE ENGINE API - SINGLE CALL
     // ==========================================
 
-    // Baue EngineAPI-Input auf - WICHTIG: Verwende buildInputsCtxFromPortfolio() wie der Adapter!
-    // FIX: Pass FULL pension for correct context (though we override specific fields below)
-    const inputsCtx = buildInputsCtxFromPortfolio(inputs, portfolio, {
-        pensionAnnual: pensionAnnual,  // FIX: Total Hosehold Pension
-        marketData: marketDataCurrentYear
+    const { engineInput, detailedTranches } = buildSimulatorEngineInput({
+        inputs,
+        portfolio,
+        marketDataCurrentYear,
+        marketDataHist,
+        yearData,
+        yearIndex,
+        liquiditaet,
+        effectiveBaseFloor,
+        baseFlex,
+        temporaryFlexFactor,
+        baseFlexBudgetAnnual,
+        baseFlexBudgetRecharge,
+        pensionAnnual,
+        resolvedCapeRatio
     });
-
-    const detailedTranches = buildDetailedTranchesFromPortfolio(portfolio);
-    const engineInput = {
-        ...inputsCtx,
-        aktuelleLiquiditaet: liquiditaet, // FIX: Override with tracked local liquidity (inputsCtx has stale portfolio cash)
-        aktuellesAlter: inputs.startAlter + yearIndex,
-        inflation: yearData.inflation,
-
-        // FIX: Engine expects GROSS Floor/Flex and TOTAL Pension to do its own netting calculation.
-        // If we pass Net Floor (inflatedFloor), Engine subtracts pension AGAIN, leading to zero demand.
-        floorBedarf: effectiveBaseFloor,
-        flexBedarf: baseFlex * temporaryFlexFactor,
-        flexBudgetAnnual: baseFlexBudgetAnnual,
-        flexBudgetYears: inputs.flexBudgetYears ?? 0,
-        flexBudgetRecharge: baseFlexBudgetRecharge,
-
-        // FIX: Ensure Engine knows about the Total Pension used for netting
-        renteAktiv: pensionAnnual > 0,
-        renteMonatlich: pensionAnnual / 12,
-
-        capeRatio: resolvedCapeRatio,
-        marketCapeRatio: resolvedCapeRatio,
-
-        // DEFAULT VALUES TO PREVENT NaN (Fix for Bug 4: Liquidity Evaporation)
-        rebalancingBand: inputs.rebalancingBand ?? 35,
-        targetEq: inputs.targetEq ?? 60,
-        goldZielProzent: inputs.goldAktiv ? (inputs.goldZielProzent ?? 10) : 0,
-        maxSkimPctOfEq: inputs.maxSkimPctOfEq ?? 5,
-        maxBearRefillPctOfEq: inputs.maxBearRefillPctOfEq ?? 5,
-        runwayTargetMonths: inputs.runwayTargetMonths ?? 36,
-        runwayMinMonths: inputs.runwayMinMonths ?? 12,
-
-        // WICHTIG: Historische Marktdaten für Regime-Erkennung (ATH, Drawdown)
-        // FIX für 2008-Diskrepanz:
-        // Die Engine entscheidet "am Ende des Jahres" (oder Anfang des nächsten) über Rebalancing.
-        // Daher muss sie den aktuellen Marktstand (nach Crash) kennen.
-        // Wir nutzen 'marketDataCurrentYear', das den aktuellen Kurs als 'endeVJ' enthält.
-        endeVJ: marketDataCurrentYear.endeVJ || 0,
-        endeVJ_1: marketDataCurrentYear.endeVJ_1 || 0,
-        endeVJ_2: marketDataCurrentYear.endeVJ_2 || 0,
-        endeVJ_3: marketDataCurrentYear.endeVJ_3 || 0,
-        ath: marketDataCurrentYear.ath || marketDataHist.ath || 0,
-        jahreSeitAth: marketDataCurrentYear.jahreSeitAth || marketDataHist.jahreSeitAth || 0
-    };
-    if (detailedTranches.length) {
-        engineInput.detailledTranches = detailedTranches;
-    }
 
 
     // **HAUPTUNTERSCHIED**: Ein einziger Engine-Aufruf statt 3-5 Adapter-Aufrufe
@@ -511,10 +253,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const market = fullResult.ui.market;
     const zielLiquiditaet = fullResult.ui.zielLiquiditaet;
     const spendingNewState = fullResult.newState;
-    const actionRawAggregate = {
-        sumRealizedGainSigned: Number(actionResult?.taxRawAggregate?.sumRealizedGainSigned) || 0,
-        sumTaxableAfterTqfSigned: Number(actionResult?.taxRawAggregate?.sumTaxableAfterTqfSigned) || 0
-    };
+    const actionRawAggregate = buildTaxRawAggregate(actionResult?.taxRawAggregate);
     combinedTaxRawAggregate = { ...actionRawAggregate };
 
     // 3-Bucket Override
@@ -528,10 +267,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     );
 
     Object.assign(actionResult, updatedAction);
-    combinedTaxRawAggregate = {
-        sumRealizedGainSigned: Number(actionResult?.taxRawAggregate?.sumRealizedGainSigned) || 0,
-        sumTaxableAfterTqfSigned: Number(actionResult?.taxRawAggregate?.sumTaxableAfterTqfSigned) || 0
-    };
+    combinedTaxRawAggregate = buildTaxRawAggregate(actionResult?.taxRawAggregate);
 
     const allQuellen = Array.isArray(actionResult.quellen) ? actionResult.quellen : [];
     let saleQuellen = allQuellen.filter(q => q?.kind && q.kind !== 'liquiditaet');
@@ -638,127 +374,24 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const forcedShortfall = Math.max(0, totalLiqNeed - liquiditaet);
     const equityBeforeForced = equityAfterSalesAction;
     const goldBeforeForced = goldAfterSalesAction;
-    if (forcedShortfall > 0) {
-        // FIX: Build CURRENT tranches from portfolio (not stale engineInput.detailledTranches)
-        // This ensures we use up-to-date marketValue after any prior sales in this year
-        const currentTranches = buildDetailedTranchesFromPortfolio(portfolio);
-        const forcedTranches = (is3Bucket && isBadYear)
-            ? currentTranches.filter(t => isBondCategory(t))
-            : currentTranches;
-        if (is3Bucket && isBadYear) {
-            const availableBond = forcedTranches.reduce((sum, t) => sum + (Number(t.marketValue) || 0), 0);
-            if (availableBond + 1e-6 < forcedShortfall) {
-                unmetLiquidity += Math.max(0, forcedShortfall - availableBond);
-            }
-        }
-        const forcedInputWithCurrentTranches = {
-            ...engineInput,
-            detailledTranches: (is3Bucket && isBadYear)
-                ? forcedTranches
-                : (forcedTranches.length > 0 ? forcedTranches : undefined),
-            // Also update the fallback fields with current values
-            depotwertAlt: sumDepot({ depotTranchesAktien: depotTranchesAktien.filter(t => t.type === 'aktien_alt') }),
-            depotwertNeu: sumDepot({ depotTranchesAktien: depotTranchesAktien.filter(t => t.type === 'aktien_neu') }),
-            goldWert: sumDepot({ depotTranchesGold })
-        };
-        const forcedSale = calculateSaleAndTax(forcedShortfall, forcedInputWithCurrentTranches, { minGold: 0 }, market, true);
-        const forcedBrutto = forcedSale.bruttoVerkaufGesamt || 0;
-        if (forcedBrutto > 0) {
-            const baseBreakdown = Array.isArray(forcedSale.breakdown) && forcedSale.breakdown.length > 0
-                ? forcedSale.breakdown
-                : [{
-                    kind: (is3Bucket && isBadYear) ? 'anleihe' : 'aktien_alt',
-                    brutto: forcedBrutto,
-                    steuer: forcedSale.steuerGesamt || 0,
-                    netto: forcedSale.achievedRefill || 0,
-                    trancheId: null,
-                    isin: null,
-                    name: null
-                }];
-            const fallbackBreakdown = baseBreakdown.map(item => ({
-                ...item,
-                trancheId: null,
-                isin: null,
-                name: null
-            }));
-            applySaleToPortfolio(portfolio, { ...forcedSale, breakdown: fallbackBreakdown });
-            const equityAfterForced = sumDepot({ depotTranchesAktien });
-            const goldAfterForced = sumDepot({ depotTranchesGold });
-            const forcedExecutedEq = Math.max(0, equityBeforeForced - equityAfterForced);
-            const forcedExecutedGld = Math.max(0, goldBeforeForced - goldAfterForced);
-            const forcedExecutedTotal = forcedExecutedEq + forcedExecutedGld;
-            const forcedScale = forcedBrutto > 0 ? Math.min(1, forcedExecutedTotal / forcedBrutto) : 0;
-            forcedSaleScaleApplied = forcedScale;
-            liquiditaet += (forcedSale.achievedRefill || 0) * forcedScale;
-            bondSaleAmount += fallbackBreakdown.reduce((sum, item) => {
-                const kind = String(item?.kind || '').toLowerCase();
-                return isBondKind(kind) ? (sum + (Number(item?.brutto) || 0) * forcedScale) : sum;
-            }, 0);
-            // Only executed (realized) sales are tax-relevant.
-            // Non-executed planned emergency sales must not affect loss-carry.
-            combinedTaxRawAggregate.sumRealizedGainSigned += (forcedSale.taxRawAggregate?.sumRealizedGainSigned || 0) * forcedScale;
-            combinedTaxRawAggregate.sumTaxableAfterTqfSigned += (forcedSale.taxRawAggregate?.sumTaxableAfterTqfSigned || 0) * forcedScale;
-            didForcedSale = true;
-        } else {
-            const fallbackBreakdown = [{
-                kind: (is3Bucket && isBadYear) ? 'anleihe' : 'aktien_alt',
-                brutto: forcedShortfall,
-                steuer: 0,
-                netto: forcedShortfall,
-                trancheId: null,
-                isin: null,
-                name: null
-            }];
-            applySaleToPortfolio(portfolio, { steuerGesamt: 0, bruttoVerkaufGesamt: forcedShortfall, achievedRefill: forcedShortfall, breakdown: fallbackBreakdown });
-            const equityAfterForced = sumDepot({ depotTranchesAktien });
-            const goldAfterForced = sumDepot({ depotTranchesGold });
-            const forcedExecutedEq = Math.max(0, equityBeforeForced - equityAfterForced);
-            const forcedExecutedGld = Math.max(0, goldBeforeForced - goldAfterForced);
-            const forcedExecutedTotal = forcedExecutedEq + forcedExecutedGld;
-            liquiditaet += Math.min(forcedShortfall, forcedExecutedTotal);
-        }
-    }
-
-    if (forcedShortfall > 0) {
-        const equityAfterForcedFallback = sumDepot({ depotTranchesAktien });
-        const goldAfterForcedFallback = sumDepot({ depotTranchesGold });
-        const forcedExecutedEq = Math.max(0, equityBeforeForced - equityAfterForcedFallback);
-        const forcedExecutedGld = Math.max(0, goldBeforeForced - goldAfterForcedFallback);
-        const forcedExecutedTotal = forcedExecutedEq + forcedExecutedGld;
-        if (forcedExecutedTotal < 1) {
-            const reduceAcrossTranches = (tranches, amount, useFifo) => {
-                let remaining = Number(amount) || 0;
-                if (!Array.isArray(tranches) || remaining <= 0) return 0;
-                const ordered = useFifo
-                    ? [...tranches].sort((a, b) => new Date(a.purchaseDate || '1900-01-01') - new Date(b.purchaseDate || '1900-01-01'))
-                    : tranches;
-                let reduced = 0;
-                for (const t of ordered) {
-                    if (remaining <= 0) break;
-                    const mv = Number(t.marketValue) || 0;
-                    if (mv <= 0) continue;
-                    const reduction = Math.min(remaining, mv);
-                    const reductionRatio = mv > 0 ? reduction / mv : 0;
-                    t.costBasis -= t.costBasis * reductionRatio;
-                    t.marketValue -= reduction;
-                    remaining -= reduction;
-                    reduced += reduction;
-                }
-                return reduced;
-            };
-            if (is3Bucket && isBadYear) {
-                const reducedBond = reduceAcrossTranches(depotTranchesAktien.filter(t => isBondCategory(t)), forcedShortfall, true);
-                liquiditaet += Math.min(forcedShortfall, reducedBond);
-                bondSaleAmount += reducedBond;
-                unmetLiquidity += Math.max(0, forcedShortfall - reducedBond);
-            } else {
-                const reducedEq = reduceAcrossTranches(depotTranchesAktien, forcedShortfall, true);
-                const remaining = Math.max(0, forcedShortfall - reducedEq);
-                const reducedGld = reduceAcrossTranches(depotTranchesGold, remaining, false);
-                liquiditaet += Math.min(forcedShortfall, reducedEq + reducedGld);
-            }
-        }
-    }
+    const forcedCoverage = applyForcedSaleLiquidityCoverage({
+        forcedShortfall,
+        portfolio,
+        engineInput,
+        market,
+        is3Bucket,
+        isBadYear,
+        depotTranchesAktien,
+        depotTranchesGold,
+        equityBeforeForced,
+        goldBeforeForced,
+        combinedTaxRawAggregate
+    });
+    liquiditaet += forcedCoverage.liquiditaetDelta;
+    bondSaleAmount += forcedCoverage.bondSaleAmountDelta;
+    unmetLiquidity += forcedCoverage.unmetLiquidityDelta;
+    didForcedSale = didForcedSale || forcedCoverage.didForcedSale;
+    forcedSaleScaleApplied = forcedCoverage.forcedSaleScaleApplied ?? forcedSaleScaleApplied;
 
     const equityAfterSales = sumDepot({ depotTranchesAktien });
     const goldAfterSales = sumDepot({ depotTranchesGold });
@@ -786,122 +419,50 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
     // Auszahlung (begrenzt auf verfügbare Liquidität)
     // Hinweis: jahresEntnahmeTarget wurde bereits oben für forcedShortfall berechnet
+    const liqBeforePayout = euros(liquiditaet);
+    const portfolioTotalBeforePayout = euros(totalWealthAvailable);
     const payout = Math.min(liquiditaet, jahresEntnahmeTarget);
     liquiditaet -= payout;
+    const liqAfterPayout = euros(liquiditaet);
     const jahresEntnahmeEffektiv = payout;
 
-    // FIX: If payout is less than needed floor, but we HAVE enough total wealth (checked above),
-    // we must force additional sales to cover the floor. This handles cases where the
-    // forcedShortfall mechanism didn't sell enough due to stale data or other edge cases.
-    if (jahresEntnahmeEffektiv + 1e-6 < netFloorYear) {
-        const additionalNeeded = netFloorYear - jahresEntnahmeEffektiv;
-        const currentEquity = sumDepot({ depotTranchesAktien });
-        const currentGold = sumDepot({ depotTranchesGold });
-
-        // Only declare RUIN if there truly isn't enough total wealth
-        if (currentEquity + currentGold < additionalNeeded) {
-            return {
-                isRuin: true,
-                reason: `Entnahme (${formatInteger(jahresEntnahmeEffektiv)}) < Floor (${formatInteger(netFloorYear)}) und nicht genug Assets`
-            };
-        }
-
-        // Force emergency sale to cover shortfall
-        const reduceAcrossTranches = (tranches, amount, useFifo) => {
-            let remaining = Number(amount) || 0;
-            if (!Array.isArray(tranches) || remaining <= 0) return 0;
-            const ordered = useFifo
-                ? [...tranches].sort((a, b) => new Date(a.purchaseDate || '1900-01-01') - new Date(b.purchaseDate || '1900-01-01'))
-                : tranches;
-            let reduced = 0;
-            for (const t of ordered) {
-                if (remaining <= 0) break;
-                const mv = Number(t.marketValue) || 0;
-                if (mv <= 0) continue;
-                const reduction = Math.min(remaining, mv);
-                const reductionRatio = mv > 0 ? reduction / mv : 0;
-                t.costBasis -= t.costBasis * reductionRatio;
-                t.marketValue -= reduction;
-                remaining -= reduction;
-                reduced += reduction;
-            }
-            return reduced;
+    const payoutFallback = applyPayoutFallbackSale({
+        jahresEntnahmeEffektiv,
+        netFloorYear,
+        liquiditaet,
+        payout,
+        is3Bucket,
+        isBadYear,
+        depotTranchesAktien,
+        depotTranchesGold,
+        formatRuinNumber: formatInteger
+    });
+    if (payoutFallback.isRuin) {
+        return {
+            isRuin: true,
+            reason: payoutFallback.reason
         };
-
-        let totalReduced = 0;
-        if (is3Bucket && isBadYear) {
-            const reducedBond = reduceAcrossTranches(depotTranchesAktien.filter(t => isBondCategory(t)), additionalNeeded, true);
-            totalReduced = reducedBond;
-            bondSaleAmount += reducedBond;
-            unmetLiquidity += Math.max(0, additionalNeeded - reducedBond);
-        } else {
-            // Sell from equity first, then gold
-            const reducedEq = reduceAcrossTranches(depotTranchesAktien, additionalNeeded, true);
-            const remainingAfterEq = Math.max(0, additionalNeeded - reducedEq);
-            const reducedGld = reduceAcrossTranches(depotTranchesGold, remainingAfterEq, false);
-            totalReduced = reducedEq + reducedGld;
-        }
-
-        // Add the sold amount to liquidity and then pay out
-        liquiditaet += payout; // Undo the payout subtraction
-        liquiditaet += totalReduced; // Add new sales
-        const newPayout = Math.min(liquiditaet, netFloorYear);
-        liquiditaet -= newPayout;
-        // Note: We continue with reduced payout but don't declare RUIN since we have the wealth
     }
+    liquiditaet = payoutFallback.liquiditaet;
+    bondSaleAmount += payoutFallback.bondSaleAmountDelta;
+    unmetLiquidity += payoutFallback.unmetLiquidityDelta;
 
-    if (is3Bucket && !isBadYear && threeBucketInput.bondTargetFactor > 0) {
-        const bondTarget = Math.max(0, threeBucketInput.bondTargetFactor * jahresEntnahmeTarget);
-        const currentBondValue = sumBondBucketValuation(depotTranchesAktien);
-        const bondDeficit = Math.max(0, bondTarget - currentBondValue);
-        const refillThreshold = Number.isFinite(threeBucketInput.bondRefillThresholdPct)
-            ? (bondTarget * (threeBucketInput.bondRefillThresholdPct / 100))
-            : 0;
-        if (bondDeficit > refillThreshold) {
-            let bondTranche = depotTranchesAktien.find(t => isBondCategory(t.type) || isBondCategory(t.category));
-            if (!bondTranche) {
-                bondTranche = {
-                    type: 'anleihe', category: 'bonds',
-                    marketValue: 0, costBasis: 0,
-                    isin: 'BOND_BUCKET_AUTO', name: 'Auto-Bond-Puffer'
-                };
-                depotTranchesAktien.push(bondTranche);
-            }
-            const equityOnly = depotTranchesAktien.reduce((sum, t) => sum + (!(isBondCategory(t.type) || isBondCategory(t.category)) ? (Number(t.marketValue) || 0) : 0), 0);
-            const equityGuardMin = Math.max(jahresEntnahmeTarget, netFloorYear);
-            const maxRefillNet = Math.max(0, equityOnly - equityGuardMin);
-            if (maxRefillNet > 0) {
-                const requestedNet = Math.min(bondDeficit, maxRefillNet);
-                const refillTranches = buildDetailedTranchesFromPortfolio(portfolio).filter(t => !(isBondCategory(t.type) || isBondCategory(t.category)) && String(t.category || '') === 'equity');
-                if (requestedNet > 0 && refillTranches.length > 0) {
-                    const refillSale = calculateSaleAndTax(requestedNet, {
-                        ...engineInput,
-                        detailledTranches: refillTranches,
-                        depotwertAlt: sumDepot({ depotTranchesAktien: depotTranchesAktien.filter(t => t.type === 'aktien_alt') }),
-                        depotwertNeu: sumDepot({ depotTranchesAktien: depotTranchesAktien.filter(t => t.type === 'aktien_neu') }),
-                        goldWert: 0
-                    }, { minGold: 0 }, market, false);
-                    const refillNet = Math.max(0, refillSale.achievedRefill || 0);
-                    if ((refillSale.bruttoVerkaufGesamt || 0) > 0 && refillNet > 0) {
-                        applySaleToPortfolio(portfolio, {
-                            ...refillSale,
-                            breakdown: Array.isArray(refillSale.breakdown) ? refillSale.breakdown : []
-                        });
-                        liquiditaet += refillNet;
-                        bondTranche.marketValue += refillNet;
-                        bondTranche.costBasis += refillNet;
-                        liquiditaet = Math.max(0, liquiditaet - refillNet);
-                        bondRefillGross += Number(refillSale.bruttoVerkaufGesamt) || 0;
-                        bondRefillNet += refillNet;
-                        bondRefillTax += Number(refillSale.steuerGesamt) || 0;
-                        combinedTaxRawAggregate.sumRealizedGainSigned += Number(refillSale.taxRawAggregate?.sumRealizedGainSigned) || 0;
-                        combinedTaxRawAggregate.sumTaxableAfterTqfSigned += Number(refillSale.taxRawAggregate?.sumTaxableAfterTqfSigned) || 0;
-                        didForcedSale = true;
-                    }
-                }
-            }
-        }
-    }
+    const bondRefill = applyBondRefillPostprocessing({
+        is3Bucket,
+        isBadYear,
+        threeBucketInput,
+        jahresEntnahmeTarget,
+        netFloorYear,
+        portfolio,
+        depotTranchesAktien,
+        engineInput,
+        market,
+        combinedTaxRawAggregate
+    });
+    bondRefillGross += bondRefill.bondRefillGrossDelta;
+    bondRefillNet += bondRefill.bondRefillNetDelta;
+    bondRefillTax += bondRefill.bondRefillTaxDelta;
+    didForcedSale = didForcedSale || bondRefill.didForcedSale;
 
     // Rebalancing bei Überschuss
     // HINWEIS: Die Logik wurde in die TransactionEngine (determineAction) verschoben,
@@ -939,197 +500,84 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         steuerGesamt: actionResult.steuer || 0
     }) : { vkAkt: 0, vkGld: 0, vkBnd: 0, stAkt: 0, stGld: 0, stBnd: 0, vkGes: 0, stGes: 0 };
 
-    if (didForcedSale) {
-        const recomputedSettlement = settleTaxYear({
-            taxStatePrev,
-            rawAggregate: combinedTaxRawAggregate,
-            sparerPauschbetrag: engineInput.sparerPauschbetrag,
-            kirchensteuerSatz: engineInput.kirchensteuerSatz
-        });
-        actionResult.steuer = recomputedSettlement.taxDue;
-        actionResult.taxSettlement = {
-            ...recomputedSettlement.details,
-            recomputedWithForcedSales: true,
-            forcedSaleScaleApplied: forcedSaleScaleApplied
-        };
-        actionResult.taxRawAggregate = { ...combinedTaxRawAggregate };
-        if (spendingNewState && typeof spendingNewState === 'object') {
-            spendingNewState.taxState = recomputedSettlement.taxStateNext;
-        }
-    } else if (actionResult?.taxSettlement && typeof actionResult.taxSettlement === 'object') {
-        actionResult.taxSettlement = {
-            ...actionResult.taxSettlement,
-            recomputedWithForcedSales: false,
-            forcedSaleScaleApplied: null
-        };
-    }
-    totalTaxesThisYear = Number(actionResult?.steuer) || 0;
+    ({ totalTaxesThisYear } = applySimulatorTaxRecompute({
+        didForcedSale,
+        actionResult,
+        spendingNewState,
+        taxStatePrev,
+        combinedTaxRawAggregate,
+        sparerPauschbetrag: engineInput.sparerPauschbetrag,
+        kirchensteuerSatz: engineInput.kirchensteuerSatz,
+        forcedSaleScaleApplied
+    }));
 
-    const kaufAktTotal = buyEqAmount + kaufAkt;
-    const totalGoldKauf = buyGoldAmount + kaufGld;
-
-    let aktionText = shortenReasonText(
-        actionResult.transactionDiagnostics?.blockReason || 'none',
-        actionResult.title || market.szenarioText
-    );
-    if (totalGoldKauf > 0) aktionText += " / Rebal.(G+)";
-    if (kaufAktTotal > 0) aktionText += " / Rebal.(A+)";
-
-    const inflFactorThisYear = 1 + (yearData.inflation / 100);
-    const naechsterBaseFloor = baseFloor * inflFactorThisYear;
-    const naechsterBaseFlex = baseFlex * inflFactorThisYear;
-    const naechsterFlexBudgetAnnual = baseFlexBudgetAnnual * inflFactorThisYear;
-    const naechsterFlexBudgetRecharge = baseFlexBudgetRecharge * inflFactorThisYear;
-
-    const widowAdjFactor = 1 + (rentAdjPct / 100);
-    const nextWidowPensionP1 = widowBenefits.p1FromP2 ? Math.max(0, widowPensionP1 * widowAdjFactor) : 0;
-    const nextWidowPensionP2 = widowBenefits.p2FromP1 ? Math.max(0, widowPensionP2 * widowAdjFactor) : 0;
-
-    const nextAnnualPension = currentAnnualPension * (1 + rentAdjPct / 100);
-    const nextAnnualPension2 = currentAnnualPension2 * (1 + rentAdjPct / 100);
-
-
-
-    const nextPortfolio = { ...portfolio, liquiditaet };
-    const bondBucketAfter = sumBondBucketValuation(nextPortfolio.depotTranchesAktien);
-
-    return {
-        isRuin: false,
-        portfolio: nextPortfolio,
-        ui: {
-            spending: spendingResult,
-            action: actionResult,
-            market: { sKey: spendingNewState.lastMarketSKey, ...yearData }, // Approximation
-            vpw: fullResult.ui.vpw || null,
-            zielLiquiditaet: 0, // Not tracked here?
-            liquiditaet: { // Mock structure for UI compatibility
-                vorher: initialLiqStart,
-                nachher: liquiditaet,
-                deckungNachher: (jahresEntnahmePlan > 0) ? ((liquiditaet / jahresEntnahmePlan) * 100) : 100
-            },
-            runway: { months: 999 } // Mock
-        },
-        newState: {
-            portfolio: nextPortfolio,
-            baseFloor: naechsterBaseFloor,
-            baseFlex: naechsterBaseFlex,
-            baseFlexBudgetAnnual: naechsterFlexBudgetAnnual,
-            baseFlexBudgetRecharge: naechsterFlexBudgetRecharge,
-            lastState: spendingNewState,
-            currentAnnualPension: nextAnnualPension,
-            currentAnnualPension2: nextAnnualPension2,
-            marketDataHist: newMarketDataHist,
-            samplerState: currentState.samplerState,
-            widowPensionP1: nextWidowPensionP1,
-            widowPensionP2: nextWidowPensionP2
-        },
-        logData: {
-            entscheidung: {
-                ...spendingResult,
-                jahresEntnahme: jahresEntnahmeEffektiv,
-                jahresEntnahme_plan: jahresEntnahmePlan,
-                runwayMonths: fullResult.ui.runway?.months || Infinity,
-                kuerzungProzent: spendingResult.kuerzungProzent
-            },
-            FlexRatePct: spendingResult.details?.flexRate || 1.0,
-            MinFlexRatePct: spendingResult.details?.minFlexRatePct ?? null,
-            WealthRedF: Number.isFinite(spendingResult.details?.wealthReductionFactor)
-                ? spendingResult.details.wealthReductionFactor * 100
-                : null,
-            WealthQuoteUsedPct: Number.isFinite(spendingResult.details?.entnahmequoteUsed)
-                ? spendingResult.details.entnahmequoteUsed * 100
-                : null,
-            CutReason: spendingResult.kuerzungQuelle || 'none',
-            Alarm: spendingNewState.alarmActive || false,
-            Regime: spendingNewState.lastMarketSKey || 'unknown',
-            QuoteEndPct: (spendingResult.details?.entnahmequoteDepot || 0) * 100,
-            RunwayCoveragePct: fullResult.ui.liquiditaet?.deckungNachher || 100,
-            RealReturnEquityPct: (1 + rA) / (1 + yearData.inflation / 100) - 1,
-            RealReturnGoldPct: (1 + rG) / (1 + yearData.inflation / 100) - 1,
-            NominalReturnEquityPct: rA,
-            NominalReturnGoldPct: rG,
-            entnahmequote: depotwertGesamt > 0 ? (jahresEntnahmeEffektiv / depotwertGesamt) : 0,
-            steuern_gesamt: totalTaxesThisYear,
-            vk,
-            kaufAkt: kaufAktTotal,
-            kaufGld: totalGoldKauf,
-            wertAktien: sumDepot({ depotTranchesAktien }),
-            wertGold: sumDepot({ depotTranchesGold }),
-            liquiditaet,
-            eq_before_return: equityBeforeReturn,
-            eq_after_return: equityAfterReturn,
-            eq_after_sales: equityAfterSales,
-            eq_after_buys: equityAfterBuys,
-            gold_before_return: goldBeforeReturn,
-            gold_after_return: goldAfterReturn,
-            gold_after_sales: goldAfterSales,
-            gold_after_buys: goldAfterBuys,
-            netTradeEq: equityAfterReturn - equityAfterBuys,
-            executedSaleEq: equityAfterReturn - equityAfterSales,
-            liqStart: initialLiqStart,
-            cashInterestEarned: cashZinsen,
-            liqEnd: liqNachZins,
-            zielLiquiditaet: zielLiquiditaet || 0,
-            bondBucketAfter,
-            bondRefillGross,
-            bondRefillNet,
-            bondRefillTax,
-            bondSaleAmount,
-            aktionUndGrund: aktionText,
-            usedSPB: actionResult?.taxSettlement?.spbUsedThisYear || actionResult.pauschbetragVerbraucht || 0,
-            floor_brutto: effectiveBaseFloor,
-            pension_annual: pensionAnnual,
-            rente1,
-            rente2,
-            renteSum,
-            floor_aus_depot: inflatedFloor,
-            flex_brutto: inflatedFlex,
-            flex_erfuellt_nominal: jahresEntnahmeEffektiv > inflatedFloor ? jahresEntnahmeEffektiv - inflatedFloor : 0,
-            inflation_factor_cum: spendingNewState.cumulativeInflationFactor || 1,
-            jahresentnahme_real: jahresEntnahmeEffektiv / (spendingNewState.cumulativeInflationFactor || 1),
-            pflege_aktiv: pflegeMeta?.active ?? false,
-            pflege_zusatz_floor: pflegeMeta?.zusatzFloorZiel ?? 0,
-            pflege_zusatz_floor_delta: pflegeMeta?.zusatzFloorDelta ?? 0,
-            pflege_flex_faktor: pflegeMeta?.flexFactor ?? 1.0,
-            pflege_kumuliert: pflegeMeta?.kumulierteKosten ?? 0,
-            pflege_grade: pflegeMeta?.grade ?? null,
-            pflege_grade_label: pflegeMeta?.gradeLabel ?? '',
-            pflege_delta_flex: pflegeMeta?.log_delta_flex ?? 0,
-            WidowBenefitP1: widowBenefits.p1FromP2 ? widowPensionP1 : 0,
-            WidowBenefitP2: widowBenefits.p2FromP1 ? widowPensionP2 : 0,
-            NeedLiq: 0,
-            GuardGold: 0,
-            GuardEq: 0,
-            GuardNote: guardReason,
-            Person1Alive: p1Alive ? 1 : 0,
-            Person2Alive: p2Alive ? 1 : 0,
-            lossCarryEnd: Number(spendingNewState?.taxState?.lossCarry) || 0,
-            taxSavedByLossCarry: Number(actionResult?.taxSettlement?.taxSavedByLossCarry) || 0,
-            pflege_floor_anchor: pflegeMeta?.log_floor_anchor ?? 0,
-            pflege_maxfloor_anchor: pflegeMeta?.log_maxfloor_anchor ?? 0,
-            pflege_cap_zusatz: pflegeMeta?.log_cap_zusatz ?? 0,
-            CareP1_Active: 0,
-            CareP1_Cost: 0,
-            CareP1_Grade: null,
-            CareP1_GradeLabel: '',
-            CareP2_Active: 0,
-            CareP2_Cost: 0,
-            CareP2_Grade: null,
-            CareP2_GradeLabel: '',
-            threeBucket: {
-                isBadYear,
-                bondBucketBefore: euros(bondBucketBefore),
-                bondBucketAfter: euros(bondBucketAfter),
-                bondRefillGross: euros(bondRefillGross),
-                bondRefillNet: euros(bondRefillNet),
-                bondRefillTax: euros(bondRefillTax),
-                bondSaleAmount: euros(bondSaleAmount),
-                equityPreserved: euros(equityPreserved),
-                unmetLiquidity: euros(unmetLiquidity)
-            }
-        },
-        totalTaxesThisYear
-    };
+    return buildSimulatorYearResult({
+        portfolio,
+        liquiditaet,
+        spendingResult,
+        actionResult,
+        market,
+        spendingNewState,
+        yearData,
+        fullResult,
+        currentState,
+        newMarketDataHist,
+        initialLiqStart,
+        jahresEntnahmePlan,
+        jahresEntnahmeEffektiv,
+        liqBeforePayout,
+        liqAfterPayout,
+        portfolioTotalBeforePayout,
+        buyEqAmount,
+        buyGoldAmount,
+        kaufAkt,
+        kaufGld,
+        baseFloor,
+        baseFlex,
+        baseFlexBudgetAnnual,
+        baseFlexBudgetRecharge,
+        pensionResult,
+        rA,
+        rG,
+        depotwertGesamt,
+        totalTaxesThisYear,
+        vk,
+        depotTranchesAktien,
+        depotTranchesGold,
+        equityBeforeReturn,
+        equityAfterReturn,
+        equityAfterSales,
+        equityAfterBuys,
+        goldBeforeReturn,
+        goldAfterReturn,
+        goldAfterSales,
+        goldAfterBuys,
+        cashZinsen,
+        liqNachZins,
+        zielLiquiditaet,
+        bondBucketBefore,
+        bondRefillGross,
+        bondRefillNet,
+        bondRefillTax,
+        bondSaleAmount,
+        effectiveBaseFloor,
+        pensionAnnual,
+        rente1,
+        rente2,
+        renteSum,
+        inflatedFloor,
+        inflatedFlex,
+        pflegeMeta,
+        widowBenefits,
+        widowPensionP1,
+        widowPensionP2,
+        p1Alive,
+        p2Alive,
+        guardReason,
+        isBadYear,
+        equityPreserved,
+        unmetLiquidity
+    });
 }
 
 // Exportiere alle Helper-Funktionen die auch von simulator-engine.js exportiert werden

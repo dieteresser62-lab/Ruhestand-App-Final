@@ -96,6 +96,27 @@ try {
         assert(text.includes('ETF A'), 'Tranche row should include name');
     }
 
+    // --- TEST 5: Gold why-not explanation ---
+    {
+        const diag = {
+            wasTriggered: false,
+            blockReason: 'liquidity_sufficient',
+            blockedAmount: 0,
+            potentialTrade: { direction: 'Keine Aktion', netAmount: 0 },
+            goldThresholds: {
+                currentGoldValue: 0,
+                minGoldReserve: 25000,
+                targetGoldValue: 50000,
+                targetPct: 5
+            }
+        };
+        const fragment = buildTransactionDiagnostics(diag);
+        const text = collectText(fragment);
+        assert(text.includes('Warum kein Goldkauf?'), 'Gold no-buy explanation should be rendered');
+        assert(text.includes('Nicht jede Zielabweichung'), 'Gold no-buy subtitle should explain target vs action');
+        assert(text.includes('Aktueller Goldwert'), 'Gold no-buy card should show current value');
+    }
+
     console.log('✅ Balance diagnosis transaction tests passed');
 } finally {
     if (previousDocument === undefined) delete global.document; else global.document = previousDocument;

@@ -1,4 +1,7 @@
 import { initExpensesTab, updateExpensesBudget, rollExpensesYear } from '../app/balance/balance-expenses.js';
+import { parseCategoryCsv, parseExpenseAmount, splitCsvLine } from '../app/balance/balance-expenses-csv.js';
+import { computeSpent, computeYearStats } from '../app/balance/balance-expenses-metrics.js';
+import { createEmptyExpensesStore, getExpensesMonthData, getExpensesYearData } from '../app/balance/balance-expenses-storage.js';
 import assert from 'node:assert/strict';
 
 console.log('--- Balance Expenses Tests ---');
@@ -280,6 +283,28 @@ const prevDocument = global.document;
 const prevConfirm = global.confirm;
 
 try {
+    // 0) Extrahierte DOM-freie Module: CSV, Metriken und Storage-Shape
+    assert.deepEqual(splitCsvLine('"A;B";"C""D"', ';'), ['A;B', 'C"D'], 'CSV-Split sollte Quotes und escaped Quotes behandeln');
+    assertClose(parseExpenseAmount('1.234,56 €'), 1234.56, 1e-9, 'DE-Betragsformat sollte korrekt parsen');
+    assertClose(parseExpenseAmount('1,234.56'), 1234.56, 1e-9, 'EN-Betragsformat sollte korrekt parsen');
+    const parsedCategories = parseCategoryCsv([
+        'Kategorie;Betrag',
+        'Miete;-1.000,00',
+        'Miete;-250,50',
+        'Ignore;abc'
+    ].join('\n'));
+    assertClose(parsedCategories.Miete, -1250.5, 1e-9, 'CSV-Parser sollte Kategorien aggregieren');
+
+    const emptyStore = createEmptyExpensesStore(2026);
+    const yearData = getExpensesYearData(emptyStore, 2026);
+    getExpensesMonthData(yearData, 1).profiles.default = { categories: { Miete: -1000 } };
+    getExpensesMonthData(yearData, 2).profiles.default = { categories: { Versicherung: -1040 } };
+    const stats = computeYearStats({ yearData, annualBudget: 12000, monthlyBudget: 1000 });
+    assertEqual(computeSpent({ A: -20, B: 5 }).spent, 15, 'computeSpent sollte Vorzeichen-symmetrisch summieren');
+    assertEqual(stats.monthsWithData, 2, 'Metriken sollten Datenmonate zählen');
+    assertEqual(stats.ytdBudget, 2000, 'YTD-Budget sollte nur Datenmonate berücksichtigen');
+    assertClose(stats.annualForecast, 12240, 1e-9, 'Forecast sollte ab 2 Monaten den Median nutzen');
+
     global.localStorage = new MockLocalStorage();
     global.window = { localStorage: global.localStorage };
     global.document = new MockDocument();
@@ -291,7 +316,7 @@ try {
     initExpensesTab(dom);
     updateExpensesBudget({ monthlyBudget: 1000, annualBudget: 12000 });
 
-    // 0) Performance: refreshTableValues darf nur einmal auf STORAGE lesen
+    // 1) Performance: refreshTableValues darf nur einmal auf STORAGE lesen
     const originalGetItem = global.localStorage.getItem.bind(global.localStorage);
     let storageReads = 0;
     global.localStorage.getItem = function (key) {
@@ -302,14 +327,14 @@ try {
     assertEqual(storageReads, 1, 'refreshTableValues-Zyklus sollte STORAGE nur einmal laden');
     global.localStorage.getItem = originalGetItem;
 
-    // 1) Ein Datenmonat => Ø/Monat
+    // 2) Ein Datenmonat => Ø/Monat
     assert(dom.expenses.forecastSub.textContent.includes('Ø/Monat'), 'Forecast sollte bei 1 Datenmonat mit Durchschnitt arbeiten');
     assert(dom.expenses.forecastSub.textContent.includes('Datenmonate: 1/12'), 'Forecast-Unterzeile sollte 1 Datenmonat anzeigen');
     const janTotal = dom.expenses.table.querySelector('[data-month-total="1"] [data-role="total"]');
     assert(janTotal && janTotal.classList.contains('budget-ok'), 'Januar-Gesamt sollte bei Budgettreffer als OK markiert sein');
     assert(dom.expenses.ytdValue.classList.contains('budget-ok'), 'YTD sollte bei exaktem Soll als OK markiert sein');
 
-    // 2) Zwei Datenmonate => Median + 5%-Warnzone
+    // 3) Zwei Datenmonate => Median + 5%-Warnzone
     seedMonth(2026, 2, { 'Versicherung': -1040 });
     updateExpensesBudget({ monthlyBudget: 1000, annualBudget: 12000 });
     assert(dom.expenses.forecastSub.textContent.includes('Median/Monat'), 'Forecast sollte ab 2 Datenmonaten den Median nutzen');
@@ -319,7 +344,7 @@ try {
     const febTotal = dom.expenses.table.querySelector('[data-month-total="2"] [data-role="total"]');
     assert(febTotal && febTotal.classList.contains('budget-warn'), 'Februar-Gesamt in 5%-Band sollte Warnstatus haben');
 
-    // 3) CSV-Import: Aggregation + DE-Zahlenformat
+    // 4) CSV-Import: Aggregation + DE-Zahlenformat
     const importBtn = {
         dataset: { action: 'import', month: '3', profile: 'default' }
     };
@@ -353,7 +378,7 @@ try {
     assertClose(marchCategories.Versicherungen, -1500.5, 1e-9, 'CSV-Import sollte Kategorien aggregieren');
     assertClose(marchCategories.Krankenkasse, -99.5, 1e-9, 'CSV-Import sollte DE-Format korrekt parsen');
 
-    // 3b) Delete: vorhandene Monatsdaten entfernen
+    // 4b) Delete: vorhandene Monatsdaten entfernen
     let confirmMessage = null;
     global.confirm = (msg) => {
         confirmMessage = msg;
@@ -378,7 +403,7 @@ try {
     assertEqual(deleteBtn.tabIndex, -1, 'Unsichtbarer Delete-Button darf nicht per Tastatur erreichbar sein');
     assertEqual(deleteBtn.ariaHidden, 'true', 'Unsichtbarer Delete-Button sollte für Assistive Tech verborgen sein');
 
-    // 3c) Delete-No-Op: nicht vorhandener Eintrag über Handler-Pfad
+    // 4c) Delete-No-Op: nicht vorhandener Eintrag über Handler-Pfad
     const beforeNoOp = JSON.stringify(readStore());
     global.confirm = () => true;
     const phantomDeleteBtn = {
@@ -392,7 +417,7 @@ try {
     const afterNoOp = JSON.stringify(readStore());
     assertEqual(afterNoOp, beforeNoOp, 'Delete ohne vorhandenen Eintrag muss No-Op sein');
 
-    // 4) Jahresabschluss: neues Jahr aktiv, Historie bleibt
+    // 5) Jahresabschluss: neues Jahr aktiv, Historie bleibt
     const newYear = rollExpensesYear();
     assertEqual(newYear, 2027, 'rollExpensesYear sollte auf Folgejahr wechseln');
     const rolledStore = readStore();

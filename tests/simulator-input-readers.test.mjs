@@ -1,0 +1,132 @@
+import { readCareInputs } from '../app/simulator/simulator-input-care.js';
+import { parseBoundedNumber } from '../app/simulator/simulator-input-dom.js';
+import { readPartnerInputs, readPensionInputs, readWidowOptions } from '../app/simulator/simulator-input-pension.js';
+import {
+    normalizeDecumulationMode,
+    readAccumulationInputs,
+    readDecumulationInputs,
+    readDynamicFlexInputs
+} from '../app/simulator/simulator-input-strategy.js';
+import { readTrancheInputs } from '../app/simulator/simulator-input-tranches.js';
+import { STRATEGY_OPTIONS } from '../types/strategy-options.js';
+
+console.log('--- Simulator Input Reader Tests ---');
+
+function createDocumentMock(values = {}) {
+    return {
+        getElementById(id) {
+            if (!Object.prototype.hasOwnProperty.call(values, id)) return null;
+            const entry = values[id];
+            if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+                return {
+                    value: entry.value ?? '',
+                    checked: entry.checked ?? false
+                };
+            }
+            return { value: entry, checked: false };
+        }
+    };
+}
+
+console.log('Test 1: bounded parser handles comma and clamps');
+{
+    assertEqual(parseBoundedNumber('1,75', 0, 1, 2), 1.75, 'Comma decimal should parse');
+    assertEqual(parseBoundedNumber('99', 0, 1, 2), 2, 'Value should clamp to max');
+    assertEqual(parseBoundedNumber('x', 7, 1, 2), 7, 'Invalid value should fallback');
+}
+console.log('✓ bounded parser OK');
+
+console.log('Test 2: pension readers preserve legacy fallbacks');
+{
+    const doc = createDocumentMock({
+        startAlter: '66',
+        geschlecht: 'm',
+        startSPB: '1200',
+        kirchensteuerSatz: '9',
+        renteMonatlich: '1800',
+        renteStartOffsetJahre: '2',
+        r2Brutto: '24000',
+        widowPensionMode: 'percent',
+        widowPensionPct: '55',
+        widowMarriageOffsetYears: '3',
+        widowMinMarriageYears: '5'
+    });
+    const p1 = readPensionInputs(doc);
+    const p2 = readPartnerInputs(doc);
+    const widow = readWidowOptions(doc).widowOptions;
+
+    assertEqual(p1.startAlter, 66, 'P1 start age should fallback to legacy startAlter');
+    assertEqual(p1.geschlecht, 'm', 'P1 gender should fallback to legacy geschlecht');
+    assertEqual(p1.kirchensteuerSatz, 0.09, 'Church tax should convert pct to ratio');
+    assertEqual(p2.partner.monatsrente, 2000, 'P2 monthly pension should migrate from annual legacy value');
+    assertEqual(p2.partner.brutto, 24000, 'P2 legacy brutto alias should remain annualized');
+    assertEqual(widow.percent, 0.55, 'Widow percent should normalize to ratio');
+    assertEqual(widow.marriageOffsetYears, 3, 'Widow marriage offset should parse');
+    assertEqual(widow.minMarriageYears, 5, 'Widow minimum marriage years should parse');
+}
+console.log('✓ pension legacy fallbacks OK');
+
+console.log('Test 3: tranche reader prioritizes profile override');
+{
+    const override = [{ trancheId: 'override', marketValue: 1 }];
+    const storage = {
+        getItem() {
+            return JSON.stringify([{ trancheId: 'storage', marketValue: 2 }]);
+        }
+    };
+    const result = readTrancheInputs({
+        win: { __profilverbundTranchenOverride: override, __profilverbundPreferAggregates: false },
+        storage
+    });
+    assertEqual(result.detailledTranches[0].trancheId, 'override', 'Override should win over storage');
+
+    const aggregateResult = readTrancheInputs({
+        win: { __profilverbundPreferAggregates: true },
+        storage
+    });
+    assertEqual(aggregateResult.detailledTranches, null, 'Prefer aggregates should skip localStorage tranches');
+}
+console.log('✓ tranche priority OK');
+
+console.log('Test 4: strategy readers preserve bounds and normalization');
+{
+    const doc = createDocumentMock({
+        dynamicFlex: { checked: true },
+        horizonMethod: 'invalid',
+        horizonYears: '120',
+        survivalQuantile: '0.1',
+        goGoActive: { checked: true },
+        goGoMultiplier: '2',
+        marketCapeRatio: '31.4',
+        entnahmeStrategie: 'vpw',
+        enableAccumulationPhase: { checked: true },
+        accumulationDurationYears: '4',
+        accumulationSparrate: '500',
+        sparrateIndexing: 'inflation'
+    });
+    const dynamicFlex = readDynamicFlexInputs(doc);
+    const decumulation = readDecumulationInputs(doc).decumulation;
+    const accumulation = readAccumulationInputs({ startAlter: 63, doc });
+
+    assertEqual(dynamicFlex.horizonMethod, 'survival_quantile', 'Invalid horizon method should fallback');
+    assertEqual(dynamicFlex.horizonYears, 60, 'Horizon should clamp to max');
+    assertEqual(dynamicFlex.survivalQuantile, 0.5, 'Quantile should clamp to min');
+    assertEqual(dynamicFlex.goGoMultiplier, 1.5, 'Go-Go multiplier should clamp to max');
+    assertEqual(dynamicFlex.capeRatio, 31.4, 'CAPE alias should be in sync');
+    assertEqual(decumulation.mode, STRATEGY_OPTIONS.STANDARD, 'Legacy strategy mode should normalize to standard');
+    assertEqual(normalizeDecumulationMode(STRATEGY_OPTIONS.THREE_BUCKET_JILGE), STRATEGY_OPTIONS.THREE_BUCKET_JILGE, '3-bucket mode should remain supported');
+    assertEqual(accumulation.transitionYear, 4, 'Accumulation transition should use duration');
+    assertEqual(accumulation.transitionAge, 67, 'Transition age should add duration to start age');
+}
+console.log('✓ strategy readers OK');
+
+console.log('Test 5: care reader tolerates missing DOM fields');
+{
+    const care = readCareInputs({ gender: 'w', doc: createDocumentMock() });
+    assertEqual(care.pflegefallLogikAktivieren, false, 'Missing care toggle should default to false');
+    assert(care.pflegeGradeConfigs && typeof care.pflegeGradeConfigs === 'object', 'Care grade config should exist');
+    assertEqual(care.pflegeKostenDrift, 0.035, 'Care drift should use default ratio');
+}
+console.log('✓ care reader missing DOM defaults OK');
+
+console.log('✅ Simulator input reader tests passed');

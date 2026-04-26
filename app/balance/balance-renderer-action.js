@@ -280,6 +280,28 @@ export class ActionRenderer {
             return row;
         };
 
+        const buildPurposeSummary = () => {
+            const uses = action?.verwendungen || {};
+            const rows = [];
+            const add = (label, amount) => {
+                if (typeof amount === 'number' && isFinite(amount) && amount > minVisibleUse) {
+                    rows.push(createRow(label, UIUtils.formatCurrency(amount)));
+                }
+            };
+            add('Liquidität auffüllen:', uses.liquiditaet || 0);
+            add('Gold-Ziel aufbauen:', uses.gold || 0);
+            add('Aktienquote herstellen:', uses.aktien || 0);
+            add('Geldmarkt/Zieltopf aufbauen:', uses.geldmarkt || 0);
+            add('Anleihen-Zieltopf aufbauen:', uses.bonds || 0);
+            if (displaySteuer > 0) {
+                rows.push(createRow('Steuerzahlung:', UIUtils.formatCurrency(displaySteuer)));
+            }
+            const totalUses = (uses.liquiditaet || 0) + (uses.gold || 0) + (uses.aktien || 0) + (uses.geldmarkt || 0) + (uses.bonds || 0);
+            const rest = Math.max(0, displayNetto - totalUses);
+            add('Rest/Puffer:', rest);
+            return rows;
+        };
+
         const quellenMap = {
             'gold': 'Gold',
             'aktien_neu': 'Aktien (neu)',
@@ -534,8 +556,12 @@ export class ActionRenderer {
             quellenSummaryRows.push(createRow('Steuerersparnis Verlusttopf:', UIUtils.formatCurrency(taxSavedByLossCarry)));
         }
 
+        const purposeSummaryRows = buildPurposeSummary();
+        wrapper.append(title);
+        if (purposeSummaryRows.length > 0) {
+            wrapper.appendChild(createSection('Plan nach Zweck', purposeSummaryRows));
+        }
         wrapper.append(
-            title,
             createSection(`A. Quellen (Netto: ${UIUtils.formatCurrency(displayNetto)})`, [
                 ...quellenSummaryRows,
                 ...quellenItems

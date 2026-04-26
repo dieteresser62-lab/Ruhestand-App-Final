@@ -38,7 +38,9 @@ export function determineAction(p, helpers) {
             maxSkimPctOfEq: input.maxSkimPctOfEq ?? 1.0
         },
         goldThresholds: {
+            currentGoldValue: input.goldWert || 0,
             minGoldReserve: minGold,
+            targetGoldValue: normalizedGoldTargetValue(input, depotwertGesamt + aktuelleLiquiditaet),
             targetPct: input.goldZielProzent || 0,
             maxBearRefillPctOfEq: input.maxBearRefillPctOfEq ?? 0.5
         },
@@ -465,4 +467,11 @@ export function determineAction(p, helpers) {
         diagnosisEntries: actionDetails.diagnosisEntries,
         transactionDiagnostics
     };
+}
+
+function normalizedGoldTargetValue(input, totalWealth) {
+    if (!input?.goldAktiv || !(input.goldZielProzent > 0) || !(totalWealth > 0)) {
+        return 0;
+    }
+    return totalWealth * (input.goldZielProzent / 100);
 }

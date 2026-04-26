@@ -1,4 +1,6 @@
 import { simulateOneYear } from '../app/simulator/simulator-engine-direct.js';
+import { applyBondRefillPostprocessing } from '../app/simulator/simulator-bond-refill.js';
+import { buildTaxRawAggregate } from '../app/simulator/simulator-tax-recompute.js';
 
 console.log('--- 3-Bucket Refill Tests ---');
 
@@ -99,6 +101,44 @@ function baseState(portfolio) {
 }
 
 {
+    const portfolio = {
+        depotTranchesAktien: [
+            { type: 'aktien_neu', category: 'equity', marketValue: 150000, costBasis: 150000, tqf: 0.3 }
+        ],
+        depotTranchesGold: [],
+        depotTranchesGeldmarkt: [],
+        liquiditaet: 0
+    };
+    const combinedTaxRawAggregate = buildTaxRawAggregate();
+    const refill = applyBondRefillPostprocessing({
+        is3Bucket: true,
+        isBadYear: false,
+        threeBucketInput: { bondTargetFactor: 5, bondRefillThresholdPct: null },
+        jahresEntnahmeTarget: 12000,
+        netFloorYear: 12000,
+        portfolio,
+        depotTranchesAktien: portfolio.depotTranchesAktien,
+        engineInput: {
+            sparerPauschbetrag: 0,
+            kirchensteuerSatz: 0,
+            goldAktiv: false,
+            depotwertAlt: 0,
+            depotwertNeu: 150000,
+            goldWert: 0
+        },
+        market: { sKey: 'hot_neutral' },
+        combinedTaxRawAggregate
+    });
+    const autoBond = portfolio.depotTranchesAktien.find(t => t.isin === 'BOND_BUCKET_AUTO');
+    const equity = portfolio.depotTranchesAktien.find(t => t.category === 'equity');
+    assert(autoBond, 'direct refill should create bond tranche');
+    assertClose(autoBond.marketValue, refill.bondRefillNetDelta, 1e-6, 'direct refill should add net amount to bond market value');
+    assertClose(autoBond.costBasis, autoBond.marketValue, 1e-6, 'direct refill should add net amount to bond cost basis');
+    assert(equity.marketValue < 150000, 'direct refill should sell equity');
+    assert(refill.didForcedSale === true, 'direct refill should request tax recompute');
+}
+
+{
     const state = baseState({
         depotTranchesAktien: [
             { type: 'aktien_neu', category: 'equity', marketValue: 100000, costBasis: 100000, tqf: 0.3 },
@@ -190,4 +230,3 @@ function baseState(portfolio) {
 }
 
 console.log('✅ 3-Bucket refill tests passed');
-

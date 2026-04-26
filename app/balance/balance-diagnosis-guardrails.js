@@ -21,6 +21,12 @@ export function buildGuardrails(guardrailData = []) {
         threshold.className = 'threshold';
         threshold.textContent = `Schwelle: ${g.threshold}`;
         card.append(name, value, threshold);
+        if (g.note) {
+            const note = document.createElement('div');
+            note.className = 'threshold';
+            note.textContent = g.note;
+            card.appendChild(note);
+        }
         fragment.appendChild(card);
     });
     return fragment;

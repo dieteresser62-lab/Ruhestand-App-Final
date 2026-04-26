@@ -13,12 +13,18 @@ export function formatDiagnosisPayload(raw) {
     if (!raw) return null;
     const formatted = { ...raw };
     const guardrails = Array.isArray(raw.guardrails) ? raw.guardrails : [];
+    const isAtLeast = (value, threshold) => value >= threshold;
+    const isAtMost = (value, threshold) => value <= threshold;
     formatted.guardrails = guardrails.map(g => {
         const rule = g.rule || 'max';
         let status = 'ok';
-        if ((rule === 'max' && g.value > g.threshold) || (rule === 'min' && g.value < g.threshold)) {
+        const thresholdNote = buildThresholdNote(g, rule);
+        if ((rule === 'max' && !isAtMost(g.value, g.threshold)) || (rule === 'min' && !isAtLeast(g.value, g.threshold))) {
             status = 'danger';
-        } else if ((rule === 'max' && g.value > g.threshold * 0.90) || (rule === 'min' && g.value < g.threshold * 1.10)) {
+        } else if (
+            (rule === 'max' && g.value < g.threshold && g.value > g.threshold * 0.90) ||
+            (rule === 'min' && g.value > g.threshold && g.value < g.threshold * 1.10)
+        ) {
             status = 'warn';
         }
         const formatVal = (value, type, opts = {}) => {
@@ -55,7 +61,8 @@ export function formatDiagnosisPayload(raw) {
             name: g.name,
             value: formattedValue,
             threshold: formattedThreshold,
-            status
+            status,
+            note: thresholdNote
         };
     });
 
@@ -78,4 +85,21 @@ export function formatDiagnosisPayload(raw) {
     safeKeyParams.jahresentnahme = ensureNumberOrNull(safeKeyParams.jahresentnahme);
     formatted.keyParams = safeKeyParams;
     return formatted;
+}
+
+function buildThresholdNote(g, rule) {
+    if (!g || typeof g.value !== 'number' || !isFinite(g.value) || typeof g.threshold !== 'number' || !isFinite(g.threshold)) {
+        return null;
+    }
+    const epsilon = Math.max(1e-9, Math.abs(g.threshold) * 1e-9);
+    if (Math.abs(g.value - g.threshold) <= epsilon) {
+        return rule === 'min' ? 'Exakt auf Mindestniveau.' : 'Exakt auf Obergrenze.';
+    }
+    if (rule === 'min' && g.value > g.threshold && g.value < g.threshold * 1.10) {
+        return 'Knapp über Mindestniveau; Sicherheitsabstand gering.';
+    }
+    if (rule === 'max' && g.value < g.threshold && g.value > g.threshold * 0.90) {
+        return 'Knapp unter Obergrenze; Sicherheitsabstand gering.';
+    }
+    return null;
 }

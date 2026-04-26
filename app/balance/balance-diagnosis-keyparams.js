@@ -198,16 +198,31 @@ export function buildKeyParams(params = {}) {
         }
         if (typeof vpw.vpwTotal === 'number' && isFinite(vpw.vpwTotal)) {
             pushMetric({
-                label: 'VPW-Total',
+                label: 'VPW-Rahmen',
                 value: UIUtils.formatCurrency(vpw.vpwTotal),
-                meta: 'Vermögen × VPW-Rate × Go-Go'
+                meta: 'Maximal freigegebener VPW-Rahmen, keine Konsumpflicht'
+            });
+        }
+        if (typeof vpw.staticFlexBaseline === 'number' && isFinite(vpw.staticFlexBaseline)) {
+            pushMetric({
+                label: 'Statischer Flex-Bedarf',
+                value: UIUtils.formatCurrency(vpw.staticFlexBaseline),
+                meta: 'Flex-Bedarf ohne VPW-Neuberechnung'
             });
         }
         if (typeof vpw.dynamicFlex === 'number' && isFinite(vpw.dynamicFlex)) {
             pushMetric({
-                label: 'VPW-Flex (abgeleitet)',
+                label: 'Flex freigegeben',
                 value: UIUtils.formatCurrency(vpw.dynamicFlex),
-                meta: 'VPW-Total abzüglich netto Floor'
+                meta: 'Zusätzlicher Spielraum nach netto Floor und Sicherheitslogik'
+            });
+        }
+        if (typeof params.jahresentnahme === 'number' && isFinite(params.jahresentnahme) && typeof vpw.vpwTotal === 'number' && isFinite(vpw.vpwTotal)) {
+            const unusedRoom = Math.max(0, vpw.vpwTotal - params.jahresentnahme);
+            pushMetric({
+                label: 'Nicht genutzter Rahmen',
+                value: UIUtils.formatCurrency(unusedRoom),
+                meta: 'VPW-Rahmen minus empfohlene Entnahme'
             });
         }
     }
