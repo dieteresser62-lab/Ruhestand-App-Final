@@ -2,7 +2,12 @@
 
 Dieses Verzeichnis enthaelt interne Arbeitsdokumente und Archivmaterial zu abgeschlossenen Umsetzungsphasen.
 
-Aktuell gibt es keine aktiven Refactoring-Arbeitsdokumente im Wurzelverzeichnis. Das abgeschlossene Refactoring-Projekt 2026 liegt im Archiv.
+Aktive interne Uebersichten:
+
+- `PROJEKTUEBERSICHT.md` - detaillierte technische und organisatorische Projektuebersicht.
+- `BALANCE_DIAGNOSIS_UX_SLICE.md` - interne UX-Slice-Dokumentation zur Balance-Entscheidungsdiagnose.
+
+Das abgeschlossene Refactoring-Projekt 2026 liegt im Archiv.
 
 ## Archive
 
