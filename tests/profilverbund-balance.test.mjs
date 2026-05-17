@@ -2,6 +2,8 @@
 
 import {
     aggregateProfilverbundInputs,
+    buildProfilverbundAssetSummary,
+    buildProfilverbundProfileSummaries,
     calculateTaxPerEuro,
     calculateWithdrawalDistribution,
     loadProfilverbundProfiles,
@@ -133,6 +135,61 @@ global.localStorage = createLocalStorageMock();
     assertEqual(result.remaining, 0, 'Remaining should be zero when assets cover need');
 }
 
+// --- TEST 4b: Runway-first Distribution ---
+{
+    console.log('\n📋 Test 4b: runway-first distribution');
+    const aggregated = { netWithdrawal: 1000 };
+    const profileInputs = [
+        {
+            profileId: 'a',
+            name: 'A',
+            inputs: { depotwertAlt: 5000, tagesgeld: 0, geldmarktEtf: 0, runwayTargetMonths: 36 }
+        },
+        {
+            profileId: 'b',
+            name: 'B',
+            inputs: { depotwertAlt: 5000, tagesgeld: 0, geldmarktEtf: 0, runwayTargetMonths: 12 }
+        }
+    ];
+    const result = calculateWithdrawalDistribution(profileInputs, aggregated, 'runway_first');
+    const a = result.items.find(item => item.profileId === 'a');
+    const b = result.items.find(item => item.profileId === 'b');
+    assertClose(a.withdrawalAmount, 750, 0.001, 'Profile A should get 75% by runway target weight');
+    assertClose(b.withdrawalAmount, 250, 0.001, 'Profile B should get 25% by runway target weight');
+    assertEqual(result.remaining, 0, 'Runway-first distribution should allocate full need');
+}
+
+// --- TEST 4c: Cash first before tranche sales ---
+{
+    console.log('\n📋 Test 4c: tax optimized cash first and tranche sale');
+    const aggregated = { netWithdrawal: 220 };
+    const profileInputs = [
+        {
+            profileId: 'a',
+            name: 'A',
+            inputs: {
+                depotwertAlt: 500,
+                depotwertNeu: 0,
+                costBasisAlt: 450,
+                costBasisNeu: 0,
+                tagesgeld: 100,
+                geldmarktEtf: 50
+            },
+            tranches: [
+                { trancheId: 'old-low', marketValue: 200, costBasis: 190, category: 'equity', purchaseDate: '2010-01-01' },
+                { trancheId: 'new-high', marketValue: 200, costBasis: 100, category: 'equity', purchaseDate: '2020-01-01' }
+            ]
+        }
+    ];
+    const result = calculateWithdrawalDistribution(profileInputs, aggregated, 'tax_optimized');
+    const item = result.items[0];
+    assertClose(item.cashUsed, 150, 0.001, 'Distribution should consume Tagesgeld and Geldmarkt first');
+    assertClose(item.sellAmount, 70, 0.001, 'Only remaining need should be sold from tranches');
+    assertEqual(item.tranches.length, 1, 'Only one tranche should be needed after cash usage');
+    assertEqual(item.tranches[0].tranche.trancheId, 'old-low', 'Lower-tax tranche should be selected first');
+    assertClose(item.tranches[0].sellAmount, 70, 0.001, 'Tranche sale should cover remaining need');
+}
+
 // --- TEST 5: Tranche Selection ---
 {
     console.log('\n📋 Test 5: selectTranchesForSale');
@@ -190,6 +247,50 @@ global.localStorage = createLocalStorageMock();
     assertEqual(loaded.inputs.depotwertAlt, 100000, 'Equity-Tranche sollte als Depotwert übernommen werden');
     assertEqual(loaded.inputs.geldmarktEtf, 15000, 'Money-Market-Tranche sollte übernommen werden');
     assertEqual(loaded.tranches.length, 2, 'Tranchen sollten erhalten bleiben');
+}
+
+// --- TEST 8: Asset summaries prefer detailed tranches over aggregate fields ---
+{
+    console.log('\n📋 Test 8: asset summaries avoid double counting tranches');
+    const profileInputs = [
+        {
+            profileId: 'a',
+            name: 'A',
+            inputs: {
+                tagesgeld: 10,
+                geldmarktEtf: 999,
+                depotwertAlt: 999,
+                depotwertNeu: 999,
+                goldWert: 999,
+                costBasisAlt: 999,
+                costBasisNeu: 999,
+                goldCost: 999,
+                renteAktiv: true,
+                renteMonatlich: 100
+            },
+            tranches: [
+                { trancheId: 'alt', marketValue: 100, costBasis: 70, type: 'aktien_alt' },
+                { trancheId: 'neu', marketValue: 50, costBasis: 45, type: 'aktien_neu' },
+                { trancheId: 'gold', marketValue: 20, costBasis: 15, category: 'gold', type: 'gold' },
+                { trancheId: 'mm', marketValue: 30, costBasis: 30, category: 'money_market', type: 'geldmarkt' }
+            ]
+        }
+    ];
+
+    const summary = buildProfilverbundAssetSummary(profileInputs);
+    assertEqual(summary.totalDepotAlt, 100, 'Summary should use alt tranche value');
+    assertEqual(summary.totalDepotNeu, 50, 'Summary should use neu tranche value');
+    assertEqual(summary.totalGold, 20, 'Summary should use gold tranche value');
+    assertEqual(summary.totalGeldmarkt, 30, 'Summary should use money-market tranche value');
+    assertEqual(summary.totalTagesgeld, 10, 'Summary should still include Tagesgeld input');
+    assertEqual(summary.totalCostAlt, 70, 'Summary should use alt tranche cost basis');
+
+    const profileSummary = buildProfilverbundProfileSummaries(profileInputs)[0];
+    assertEqual(profileSummary.depotAlt, 100, 'Profile summary should use alt tranche value');
+    assertEqual(profileSummary.depotNeu, 50, 'Profile summary should use neu tranche value');
+    assertEqual(profileSummary.gold, 20, 'Profile summary should use gold tranche value');
+    assertEqual(profileSummary.geldmarkt, 30, 'Profile summary should use money-market tranche value');
+    assertEqual(profileSummary.totalAssets, 210, 'Profile summary should not double-count aggregate asset fields');
 }
 
 global.localStorage = prevLocalStorage;

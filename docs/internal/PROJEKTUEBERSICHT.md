@@ -1,6 +1,6 @@
 # Projektuebersicht RuhestandsApp
 
-**Stand:** 2026-04-30  
+**Stand:** 2026-05-12
 **Zweck:** Interne Orientierung fuer Entwicklung, Review, Refactoring und Onboarding in diesem Repository.
 
 ## Kurzprofil
@@ -13,7 +13,7 @@ Die Anwendung ist bewusst lokal-first:
 - Persistenz primaer ueber `localStorage` und optionale Dateisnapshots,
 - optionale Live-Daten fuer Inflation, CAPE und ETF-Kurse,
 - deterministische Kernlogik in `engine/`, `app/simulator/` und `workers/`,
-- generierte Artefakte wie `engine.js`, `dist/` und `RuheStandSuite.exe` sind nicht der primaere Bearbeitungsort.
+- generierte Artefakte wie `engine.js`, `dist/` und `RuhestandSuite.exe` sind nicht der primaere Bearbeitungsort.
 
 ## Einstiegspunkte
 
@@ -271,7 +271,7 @@ Rahmen:
 - Runner: `tests/run-tests.mjs`
 - Einzelrunner: `tests/run-single.mjs`
 - Testdateien: `*.test.mjs`
-- Statistik laut `tests/README.md`: 57 Testdateien, 1000+ Assertions
+- Statistik laut aktueller Abschlussvalidierung: 74 Testdateien, 1639 Assertions
 
 Wichtige Testgruppen:
 
@@ -307,6 +307,7 @@ Interne Dokumente:
 
 - `docs/internal/README.md`: interne Doku-Startseite.
 - `docs/internal/BALANCE_DIAGNOSIS_UX_SLICE.md`: aktive/interne UX-Slice-Dokumentation.
+- `docs/internal/archive/2026-engine-tax-golden-cases/`: abgeschlossener Plan zur Absicherung von Engine-, Steuer-, Tranchen- und Settlement-Golden-Cases.
 - `docs/internal/archive/`: abgeschlossene Refactorings, Dynamic-Flex, Profilverbund, Webworker-Rollout, Adapter-Elimination und historische Agenten-/Gemini-Notizen.
 
 Bei Aenderungen an Architektur, Modulzuschnitt, Build-/Startpfaden oder Nutzer-Workflows muessen die betroffenen Referenzen synchronisiert werden.
@@ -315,7 +316,7 @@ Bei Aenderungen an Architektur, Modulzuschnitt, Build-/Startpfaden oder Nutzer-W
 
 1. In Quellmodulen arbeiten, nicht in generierten Artefakten.
 2. `engine.js` nur per `npm run build:engine` erzeugen.
-3. `dist/` und `RuheStandSuite.exe` nur anfassen, wenn Build-/Release-Artefakte explizit Teil des Auftrags sind.
+3. `dist/` und `RuhestandSuite.exe` nur anfassen, wenn Build-/Release-Artefakte explizit Teil des Auftrags sind.
 4. DOM-freie Kernlogik bevorzugt in Runner-/Engine-/Helper-Module auslagern.
 5. UI-Bootstrap-Dateien schlank halten und neue Features an passende Fachmodule delegieren.
 6. Shared-Formatter und Feature-Flags in `app/shared/` zentral halten.
@@ -327,12 +328,76 @@ Bei Aenderungen an Architektur, Modulzuschnitt, Build-/Startpfaden oder Nutzer-W
 | Bereich | Typische Risiken | Pruefpunkte |
 | --- | --- | --- |
 | Engine | Regressions in Entnahme-, Guardrail- oder Steuerlogik | Engine-Tests, Settlement-Tests, Build-ID, API-Version |
-| Simulator | Nichtdeterminismus, Worker/Seriell-Abweichungen, Logshape-Brueche | `worker-parity`, MC-Tests, Scenario-Logs, Seeds |
-| Balance | Persistenz-/Jahreswechsel-Fehler, Diagnose-Missverstaendnisse | Storage-, Annual-, Diagnosis- und Smoke-Tests |
-| Profilverbund | Falsche Aggregation, Profilgrenzen bei Transaktionen | Profilverbund-Tests, Tranchensummen, Verteilungsmodus |
+| Simulator | Nichtdeterminismus, Worker/Seriell-Abweichungen, Logshape-Brueche | `worker-parity`, MC-Tests, Scenario-Logs, Seeds; Status: Paritaets-Slice umgesetzt 2026-05-11 |
+| Balance | Persistenz-/Jahreswechsel-Fehler, Diagnose-Missverstaendnisse | Storage-, Annual-, Diagnosis- und Smoke-Tests; Status: Workflow-Hardening umgesetzt 2026-05-12 |
+| Profilverbund | Falsche Aggregation, Profilgrenzen bei Transaktionen | Profilverbund-Tests, Tranchensummen, Verteilungsmodus; Status: Contract-Slice umgesetzt 2026-05-12 |
 | Tranchen/Steuern | FIFO-/TQF-/LossCarry-Fehler | `transaction-tax`, `tax-settlement`, `depot-tranches` |
 | Tauri | CSP, fehlende Assets, Proxy-/Live-Daten-Zugriff | `tauri.conf.json`, `sync-dist`, Tauri-Build |
 | Doku | Widersprueche zwischen README, Technical und Modul-READMEs | Doku-Sync bei Architektur-/Workflow-Aenderungen |
+
+### Gewichtung der Risiken
+
+Die Gewichtung kombiniert fachlichen Schaden, Eintrittswahrscheinlichkeit und Erkennbarkeit im Review. Hoehere Werte sollen zuerst abgesichert werden.
+
+| Rang | Bereich | Gewicht | Begruendung |
+| --- | --- | ---: | --- |
+| 1 | Engine | 25% | Zentrale Berechnungslogik mit direktem Einfluss auf Entnahmen, Steuern, Guardrails und viele Folgepfade. Fehler sind fachlich teuer und koennen in UI-Reviews leicht uebersehen werden. |
+| 2 | Tranchen/Steuern | 20% | FIFO, TQF, LossCarry und Settlement bestimmen reale Steuer- und Depotwirkungen. Kleine Rundungs- oder Reihenfolgefehler koennen grosse Ergebnisabweichungen erzeugen. |
+| 3 | Simulator | 18% | Monte-Carlo, Worker-Paritaet und deterministische Seeds sind stark verzweigt. Abweichungen zwischen seriellen und parallelen Pfaden untergraben strategische Aussagen. |
+| 4 | Balance | 14% | Jahreswechsel, Persistenz und Diagnose sind operative Nutzer-Workflows. Fehler fallen oft erst beim Uebergang zwischen Jahren oder nach gespeicherten Profilen auf. |
+| 5 | Profilverbund | 10% | Aggregationen und Profilgrenzen verbinden mehrere Module. Das Risiko ist hoch, aber meist gezielter isolierbar als Engine- oder Steuerlogik. |
+| 6 | Tauri | 8% | Desktop-spezifische Risiken betreffen Packaging, CSP, Assets und Live-Daten. Sie sind wichtig fuer Auslieferung, aber weniger zentral fuer die fachliche Korrektheit. |
+| 7 | Doku | 5% | Inkonsistente Doku bremst Review und Onboarding. Der direkte Produktschaden ist geringer, aber Doku-Sync muss bei Architektur- und Workflow-Aenderungen mitlaufen. |
+
+### Plan zur Risikoreduktion
+
+1. **Baseline sichern - umgesetzt 2026-05-12**
+   - Aktuellen Teststatus dokumentieren: `npm test`.
+   - Bei Engine-Aenderungen zusaetzlich `npm run build:engine`.
+   - Bekannte offene Findings als kurze Review-Liste in `docs/internal/` oder im jeweiligen Arbeitsauftrag festhalten.
+   - Umgesetzt als Querschnitt in den abgeschlossenen Simulator-, Balance-, Profilverbund-/Tranchen- und Engine-/Tax-Slices; aktuellster Nachweis: `npm run build:engine` und komplette Suite mit 74 Testdateien / 1639 Assertions / 0 Fehlern im Detailprotokoll `docs/internal/archive/2026-engine-tax-golden-cases/ENGINE_TAX_GOLDEN_CASES_PLAN.md`.
+
+2. **Engine und Steuern zuerst stabilisieren - umgesetzt 2026-05-12**
+   - Kritische Contracts erfassen: `EngineAPI`, Settlement-Ausgaben, Transaktions- und Steuerobjekte.
+   - Regressionstests fuer Entnahmeplanung, Guardrails, LossCarry, FIFO/TQF und Jahres-Settlement priorisieren.
+   - Golden-Case-Szenarien fuer typische Haushalts-, Depot- und Steuerfaelle pflegen, damit Refactorings sofort fachlich sichtbar werden.
+   - Umgesetzt durch den Engine-/Tax-Golden-Cases-Slice mit Settlement-, FIFO/TQF-, LossCarry-, Core-Engine-, Simulator-Recompute- und Mehrprofil-Herkunftsfaellen; Detailprotokoll: `docs/internal/archive/2026-engine-tax-golden-cases/ENGINE_TAX_GOLDEN_CASES_PLAN.md`.
+
+3. **Simulator-Paritaet absichern - umgesetzt 2026-05-11**
+   - Worker- und Serienpfade mit identischen Seeds, Optionen und Scenario-Logs vergleichen.
+   - Monte-Carlo-, Sweep- und Auto-Optimize-Runner auf stabile Logshape und deterministische Ergebnisstruktur pruefen.
+   - Bei jeder Runner-Aenderung mindestens fokussierte Paritaets- und MC-Tests ausfuehren.
+   - Umgesetzt durch erweiterte `worker-parity`-Tests, `auto-optimize-worker-contract` und Doku-Sync; Detailprotokoll: `docs/internal/archive/2026-simulator-worker-parity/SIMULATOR_WORKER_PARITY_PLAN.md`.
+
+4. **Balance-Workflows pruefbar machen - umgesetzt 2026-05-12**
+   - Jahreswechsel, Storage-Migrationen, Diagnose-Ausgaben und Smoke-Pfade als zusammenhaengende Review-Slice behandeln.
+   - Persistierte Testprofile nur synthetisch halten und keine lokalen Finanzdaten in Tests oder Doku uebernehmen.
+   - UI-nahe Logik weiter in testbare Helper und DOM-freie Runner auslagern, wenn ein Workflow wiederholt Fehler erzeugt.
+   - Umgesetzt durch `balance-annual-workflow-contract`, `balance-storage-contract`, `balance-diagnosis-copy-contract`, einen Fix fuer den doppelten Diagnose-Copytext-Statusblock und Abschlussvalidierung mit 74 Testdateien / 1563 Assertions / 0 Fehlern; Detailprotokoll: `docs/internal/archive/2026-balance-workflow-hardening/BALANCE_WORKFLOW_HARDENING_PLAN.md`.
+
+5. **Profilverbund und Modulgrenzen kontrollieren - umgesetzt 2026-05-12**
+   - Profilwechsel, Aggregation, Verteilungsmodus und Tranchenuebernahme mit expliziten Grenzfaellen testen.
+   - Datenvertraege zwischen `app/profile/`, `app/tranches/`, Balance und Simulator vor Codeaenderungen benennen.
+   - Bei Contract-Aenderungen README, Technical und Modul-READMEs im selben Arbeitsgang aktualisieren.
+   - Umgesetzt durch Bundle-Tranchen-Contract, `runway_first`-/Cash-vor-Tranchen-Verteilung, Asset-Summary-Doppelzaehlungs-Tests, Simulator-Tranchen-Merge mit `sourceProfileId`, einen Fix fuer Null-Marktwert-Tranchen-Fallback und Abschlussvalidierung mit 74 Testdateien / 1597 Assertions / 0 Fehlern; Detailprotokoll: `docs/internal/archive/2026-profilverbund-tranchen-contracts/PROFILVERBUND_TRANCHEN_CONTRACTS_PLAN.md`.
+
+6. **Engine-/Tax-Golden-Cases absichern - umgesetzt 2026-05-12**
+   - Haushalts- und Depot-Golden-Cases fuer FIFO/TQF/LossCarry und Settlement definieren.
+   - Profil-/Tranchen-Herkunft (`sourceProfileId`) in steuernahe Szenarien aufnehmen.
+   - Verlustpositionen, Gold-/Geldmarkt-Tranchen und Notfallverkauf-Recompute als gezielte Contract-Faelle behandeln.
+   - Umgesetzt durch Settlement-, FIFO/TQF-, Core-Settlement-, Simulator-Recompute- und Mehrprofil-Herkunfts-Golden-Cases; `sale-engine` bewahrt `sourceProfileId` in `breakdown[]`; Abschlussvalidierung mit 74 Testdateien / 1639 Assertions / 0 Fehlern; Detailprotokoll: `docs/internal/archive/2026-engine-tax-golden-cases/ENGINE_TAX_GOLDEN_CASES_PLAN.md`.
+
+7. **Tauri als Release-Gate behandeln - umgesetzt 2026-05-12 / Build-Validierung lokal blockiert**
+   - Nach relevanten Asset-, CSP-, Proxy- oder Startpfad-Aenderungen `npm run sync-dist` und den Tauri-Build pruefen.
+   - `src-tauri/tauri.conf.json` gegen die tatsaechlichen Einstiegspunkte und erlaubten Ressourcen abgleichen.
+   - Desktop-spezifische Fehler getrennt von Browser-Fehlern dokumentieren, damit fachliche Regressionssuche nicht vermischt wird.
+   - Umgesetzt durch `sync-dist`-Exitcode-/Asset-Validierung, Build-Orchestrator-Preflight, kanonischen Zielnamen `RuhestandSuite.exe`, erweiterten Tauri-CSP-Test, Rust-Unit-Tests fuer den Yahoo-Proxy, Doku-Sync und Desktop-Smoke-Checkliste; Detailprotokoll: `docs/internal/2026-tauri-release-gate/TAURI_RELEASE_GATE_PLAN.md`.
+   - Voller lokaler `build-tauri.bat`-Lauf bleibt bis zur Reparatur der lokalen npm-Installation blockiert (`npm-cli.js` fehlt).
+
+8. **Doku-Sync als Abschlusskriterium nutzen**
+   - Jede Architektur-, Workflow-, Build- oder Contract-Aenderung gegen `README.md`, `docs/reference/TECHNICAL.md` und die Modul-READMEs spiegeln.
+   - Projektregeln in `AGENTS.md`, `CODEX.md`, `CLAUDE.md` und `GEMINI.md` widerspruchsfrei halten.
+   - Am Ende groesserer Arbeiten kurz notieren, welche Referenzen bewusst nicht geaendert wurden und warum.
 
 ## Schneller Einstieg fuer neue Arbeit
 

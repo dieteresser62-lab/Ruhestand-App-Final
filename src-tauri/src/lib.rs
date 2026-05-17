@@ -256,3 +256,85 @@ pub fn run() {
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn cors_origin_allows_tauri_and_local_origins() {
+    assert_eq!(allowed_cors_origin("null"), "null");
+    assert_eq!(allowed_cors_origin("tauri://localhost"), "tauri://localhost");
+    assert_eq!(allowed_cors_origin("https://tauri.localhost"), "https://tauri.localhost");
+    assert_eq!(allowed_cors_origin("http://localhost:8000"), "http://localhost:8000");
+    assert_eq!(allowed_cors_origin("http://127.0.0.1:8000"), "http://127.0.0.1:8000");
+    assert_eq!(allowed_cors_origin("http://localhost"), "http://localhost");
+    assert_eq!(allowed_cors_origin("http://127.0.0.1"), "http://127.0.0.1");
+  }
+
+  #[test]
+  fn cors_origin_rejects_external_origins() {
+    assert_eq!(allowed_cors_origin("https://example.com"), "null");
+    assert_eq!(allowed_cors_origin("http://192.168.1.10:8000"), "null");
+    assert_eq!(allowed_cors_origin("https://localhost.evil.example"), "null");
+  }
+
+  #[test]
+  fn parse_query_decodes_values_and_empty_params() {
+    let params = parse_query("symbol=VWCE.DE&q=hello%20world&empty=");
+
+    assert_eq!(params.get("symbol").map(String::as_str), Some("VWCE.DE"));
+    assert_eq!(params.get("q").map(String::as_str), Some("hello world"));
+    assert_eq!(params.get("empty").map(String::as_str), Some(""));
+  }
+
+  #[test]
+  fn quote_and_chart_price_extractors_pick_positive_prices() {
+    let quote = json!({
+      "quoteResponse": {
+        "result": [
+          { "regularMarketPrice": 123.45 }
+        ]
+      }
+    });
+    assert_eq!(pick_quote_price(&quote), Some(123.45));
+
+    let chart = json!({
+      "chart": {
+        "result": [
+          {
+            "meta": { "regularMarketPrice": 0.0 },
+            "indicators": {
+              "quote": [
+                { "close": [null, 98.7, 101.2] }
+              ]
+            }
+          }
+        ]
+      }
+    });
+    assert_eq!(pick_chart_price(&chart), Some(101.2));
+  }
+
+  #[test]
+  fn gbp_quote_normalization_only_applies_to_london_pence_prices() {
+    let gbp_data = json!({
+      "chart": {
+        "result": [
+          { "meta": { "currency": "GBp" } }
+        ]
+      }
+    });
+    let eur_data = json!({
+      "chart": {
+        "result": [
+          { "meta": { "currency": "EUR" } }
+        ]
+      }
+    });
+
+    assert_eq!(normalize_gbp_price("VWRL.L", &gbp_data, 1000.0), 10.0);
+    assert_eq!(normalize_gbp_price("VWRL.L", &eur_data, 1000.0), 1000.0);
+    assert_eq!(normalize_gbp_price("VWCE.DE", &gbp_data, 1000.0), 1000.0);
+  }
+}

@@ -175,6 +175,47 @@ function makeStubEngine({ monthlyWithdrawal, actionTax, actionTaxableRaw = 1000 
     assert(spendingNewState.taxState, 'Direct recompute should update next tax state');
 }
 
+// 0a) Direct recompute consumes existing loss carry before SPB/final tax.
+{
+    const aggregate = buildTaxRawAggregate({
+        sumRealizedGainSigned: 7000,
+        sumTaxableAfterTqfSigned: 6000
+    });
+    const actionResult = {
+        steuer: 999,
+        taxSettlement: { existing: true },
+        taxRawAggregate: { sumRealizedGainSigned: 0, sumTaxableAfterTqfSigned: 0 }
+    };
+    const spendingNewState = { taxState: { lossCarry: 2000 } };
+    const recompute = applySimulatorTaxRecompute({
+        didForcedSale: true,
+        actionResult,
+        spendingNewState,
+        taxStatePrev: { lossCarry: 2000 },
+        combinedTaxRawAggregate: aggregate,
+        sparerPauschbetrag: 1000,
+        kirchensteuerSatz: 0.09,
+        forcedSaleScaleApplied: 1
+    });
+    const keSt = 0.25 * (1 + 0.055 + 0.09);
+    assertClose(actionResult.taxSettlement.lossCarryStart, 2000, 1e-9,
+        'Forced recompute should expose starting loss carry');
+    assertClose(actionResult.taxSettlement.taxBaseBeforeCarry, 5000, 1e-9,
+        'Forced recompute should expose baseline tax base before loss carry');
+    assertClose(actionResult.taxSettlement.taxBaseAfterCarry, 3000, 1e-9,
+        'Forced recompute should consume loss carry before SPB/final tax');
+    assertClose(actionResult.steuer, 3000 * keSt, 0.01,
+        'Forced recompute should set action tax to final settlement tax');
+    assertClose(recompute.totalTaxesThisYear, actionResult.steuer, 1e-9,
+        'Simulator yearly tax should come from recomputed action tax');
+    assertClose(actionResult.taxSettlement.taxSavedByLossCarry, 2000 * keSt, 0.01,
+        'Forced recompute should expose tax saved by loss carry');
+    assertClose(spendingNewState.taxState.lossCarry, 0, 1e-9,
+        'Forced recompute should update next simulator tax state');
+    assertClose(actionResult.taxRawAggregate.sumTaxableAfterTqfSigned, 6000, 1e-9,
+        'Forced recompute should copy combined raw aggregate to action');
+}
+
 // 0b) Direct forced-sale liquidity coverage helper mutates portfolio and tax aggregate.
 {
     const fifoTranches = [

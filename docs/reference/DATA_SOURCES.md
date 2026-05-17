@@ -1,5 +1,19 @@
 # Data Sources And Provenance
 
+## Optional live data
+
+Live data is optional. The suite remains usable without internet access; failed live-data fetches must degrade to existing local values, user-visible warnings, or disabled quote updates instead of blocking the local app.
+
+| Source | Endpoint / path | Used for | Runtime path |
+| --- | --- | --- | --- |
+| Yahoo Finance | Local proxy `http://127.0.0.1:8787` / `http://localhost:8787` | ETF and quote updates such as `VWCE.DE` | Browser: Node proxy from `start_suite.*`; Tauri: integrated Rust proxy in `src-tauri/src/lib.rs` |
+| ECB Data API | `https://data-api.ecb.europa.eu` | Inflation fallback chain | Direct fetch from browser/Tauri WebView |
+| World Bank API | `https://api.worldbank.org` | Inflation fallback chain | Direct fetch from browser/Tauri WebView |
+| OECD stats | `https://stats.oecd.org` | Inflation fallback chain | Direct fetch from browser/Tauri WebView |
+| Yale/CAPE mirror access | `https://r.jina.ai` | CAPE fallback fetches | Direct fetch from browser/Tauri WebView |
+
+Tauri release builds allow these live-data targets explicitly in `src-tauri/tauri.conf.json` under `app.security.csp.connect-src`. New external live-data sources must be added there and documented in this file in the same change.
+
 ## Historical market dataset (`app/simulator/simulator-data.js`)
 
 - Coverage: `1925-2024`

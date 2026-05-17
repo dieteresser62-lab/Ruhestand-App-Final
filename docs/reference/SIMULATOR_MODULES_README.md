@@ -303,7 +303,7 @@ Auto-Optimierung für Parameter (LHS + Verfeinerung) und UI-Bedienung. Details s
 **Modul-Split:**
 Die Logik wurde in spezialisierte Module zerlegt, um Wartbarkeit und Testbarkeit zu erhöhen:
 
-- `auto-optimize-worker.js` – Der Worker-To-Main-Adapter. Führt Kandidaten-Evaluationen im Worker aus.
+- `auto-optimize-worker.js` – Der Worker-To-Main-Adapter. Nutzt den gemeinsamen `workers/mc-worker.js`-Jobtyp `job`, merged MC-Buffers/Heatmap/Totals/Listen fuer Kandidaten-Evaluationen und faellt bei Worker-Fehlern auf seriell zurueck.
 - `auto-optimize-evaluate.js` – Bewertet Kandidaten anhand der Zielfunktion (Score-Berechnung).
 - `auto-optimize-metrics.js` – Definiert Metriken (Success Rate, Median End Wealth) und Constraints.
 - `auto-optimize-sampling.js` – Algorithmen für die Kandidatengenerierung (Latin Hypercube, Nachbarschaft).
@@ -425,7 +425,9 @@ Aggregiert Profildaten zu Simulator-Inputs für Multi-Profil-Setups.
 
 **Besonderheiten:**
 - Gold-Validierung: `goldAktiv` nur true wenn `goldZielProzent > 0`
-- Tranchen-Aggregation: Fügt detaillierte Tranchen aller Profile zusammen
+- Tranchen-Aggregation: Fügt detaillierte Tranchen aller Profile zusammen, versieht IDs mit Profilpräfix und setzt `sourceProfileId`
+- Verkaufs-Herkunft: Engine-`breakdown[]` bewahrt `sourceProfileId`; Portfolio-Reduktionen laufen ueber die profilbezogene `trancheId`, damit identische Positionen aus verschiedenen Profilen nicht vermischt werden
+- Tranchensummen: Plausible Detailtranchen bestimmen `startVermoegen` zusammen mit Liquidität; Null-Marktwert-Tranchen fallen mit Warnung auf aggregierte Startwerte zurück
 - Fallback-Logik: Nutzt Balance-Werte wenn Simulator-Felder leer sind
 - Gewichtete Mittelung für Steuersätze, Aktienquote und Rebalancing-Parameter
 

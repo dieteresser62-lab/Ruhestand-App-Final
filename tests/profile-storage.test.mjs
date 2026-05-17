@@ -637,6 +637,36 @@ try {
     }
     console.log('✓ Import via window.name OK');
 
+    // Test 21c: Export/Import preserves current profile tranches
+    console.log('Test 21c: Export/Import preserves current profile tranches');
+    {
+        localStorage.clear();
+        ensureProfileRegistry();
+        const tranches = [
+            { trancheId: 't1', marketValue: 12345, costBasis: 10000, type: 'aktien_alt' },
+            { trancheId: 'g1', marketValue: 5000, costBasis: 4000, type: 'gold', category: 'gold' }
+        ];
+        localStorage.setItem('depot_tranchen', JSON.stringify(tranches));
+        localStorage.setItem('profile_tagesgeld', '32100');
+
+        const bundle = exportProfilesBundle();
+        const currentId = bundle.currentProfileId;
+        assert(bundle.registry.profiles[currentId].data.depot_tranchen !== undefined,
+            'Bundle sollte aktuelle Profil-Tranchen enthalten');
+
+        localStorage.clear();
+        const imported = importProfilesBundle(bundle);
+        assert(imported.ok === true, 'Import mit Profil-Tranchen sollte erfolgreich sein');
+        assertEqual(localStorage.getItem('profile_tagesgeld'), '32100',
+            'Import sollte Profilwerte wieder in Live-Storage laden');
+
+        const restored = JSON.parse(localStorage.getItem('depot_tranchen'));
+        assertEqual(restored.length, 2, 'Import sollte alle Tranchen wiederherstellen');
+        assertEqual(restored[0].trancheId, 't1', 'Erste Tranche sollte erhalten bleiben');
+        assertEqual(restored[1].type, 'gold', 'Gold-Tranche sollte erhalten bleiben');
+    }
+    console.log('✓ Export/Import preserves current profile tranches OK');
+
     // Test 22: Import invalid registry
     console.log('Test 22: Import invalid registry');
     {

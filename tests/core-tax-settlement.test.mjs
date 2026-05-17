@@ -38,21 +38,55 @@ const baseInput = {
 };
 
 {
+    const lastState = { taxState: { lossCarry: 5000 } };
+    const lastStateBefore = JSON.stringify(lastState);
     const result = EngineAPI.simulateSingleYear(
         { ...baseInput },
-        { taxState: { lossCarry: 5000 } }
+        lastState
     );
     assert(!result.error, 'Core run with preloaded tax state should succeed');
     assert(result.newState && result.newState.taxState, 'newState.taxState should be present');
     assert(result.ui && result.ui.action, 'ui.action should exist');
     assert(result.ui.action.taxRawAggregate, 'ui.action.taxRawAggregate should be exposed');
     assert(result.ui.action.taxSettlement, 'ui.action.taxSettlement should be exposed');
+
+    assertClose(result.ui.action.taxRawAggregate.sumRealizedGainSigned, 15000, 0.001,
+        'Core tax raw aggregate should expose realized gain from sale');
+    assertClose(result.ui.action.taxRawAggregate.sumTaxableAfterTqfSigned, 15000, 0.001,
+        'Core tax raw aggregate should expose taxable signed gain from sale');
+    assertClose(result.ui.action.taxSettlement.lossCarryStart, 5000, 0.001,
+        'Core settlement should expose starting loss carry');
+    assertClose(result.ui.action.taxSettlement.taxBaseBeforeCarry, 14000, 0.001,
+        'Core settlement should expose pre-loss-carry tax base after SPB');
+    assertClose(result.ui.action.taxSettlement.taxBaseAfterCarry, 9000, 0.001,
+        'Core settlement should expose final tax base after loss carry and SPB');
+    assertClose(result.ui.action.taxSettlement.taxSavedByLossCarry, 1318.75, 0.001,
+        'Core settlement should expose tax saved by loss carry');
     assertClose(
         result.ui.action.steuer || 0,
         result.ui.action.taxSettlement.taxAfterLossCarry || 0,
         0.001,
         'action.steuer should equal settlement tax'
     );
+    assertClose(result.ui.action.steuer || 0, 2373.75, 0.001,
+        'Core action tax should be final settlement tax after loss carry');
+    assertClose(result.newState.taxState.lossCarry, 0, 0.001,
+        'Core should deplete loss carry when annual taxable base is sufficient');
+    assertEqual(JSON.stringify(lastState), lastStateBefore, 'Core run must not mutate previous tax state');
+}
+
+{
+    const result = EngineAPI.simulateSingleYear(
+        { ...baseInput },
+        { taxState: { lossCarry: 20000 } }
+    );
+    assert(!result.error, 'Core run with over-covering loss carry should succeed');
+    assertClose(result.ui.action.taxSettlement.signedAfterCarry, -5000, 0.001,
+        'Core settlement should keep negative signed base after over-covering loss carry');
+    assertClose(result.ui.action.steuer || 0, 0, 0.001,
+        'Over-covering loss carry should reduce final core tax to zero');
+    assertClose(result.newState.taxState.lossCarry, 5000, 0.001,
+        'Core should carry forward unused loss carry');
 }
 
 {

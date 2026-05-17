@@ -82,8 +82,10 @@ try {
 
     // Test 3: No source available, stored fallback should be used.
     {
+        const recentCapeAsOf = new Date();
+        recentCapeAsOf.setMonth(recentCapeAsOf.getMonth() - 6);
         localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify({
-            capeMeta: { capeRatio: 27.4, capeAsOf: '2024-10-01', capeSource: 'stored_last_value' }
+            capeMeta: { capeRatio: 27.4, capeAsOf: recentCapeAsOf.toISOString().slice(0, 10), capeSource: 'stored_last_value' }
         }));
         global.fetch = mockFetchWithSequence([
             new Error('primary down'),

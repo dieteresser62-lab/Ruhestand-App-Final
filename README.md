@@ -246,14 +246,15 @@ Die Anwendung ist bewusst minimalistisch gehalten, hat aber für den vollen Funk
 
 * Die Balance- und Simulator-Module nutzen native ES6-Imports. Änderungen an einzelnen Modulen werden nach dem Speichern direkt beim nächsten Reload geladen.
 * Engine-Anpassungen erfolgen in den Modulen unter `engine/`. Nach Anpassungen `npm run build:engine` ausführen und die Größe der generierten `engine.js` kontrollieren.
-* Der Windows-Release-Build läuft über `build-tauri.bat` bzw. `scripts/build-tauri.ps1`: zuerst `npm run sync-dist`, dann `npm run tauri:build`, danach wird die erzeugte EXE ins Repo-Root kopiert.
-* Für schnelle QA bitte `npm test` einmal durchlaufen lassen.
+* Der Windows-Release-Build bleibt ein bewusst manueller Schritt über `build-tauri.bat` bzw. `scripts/build-tauri.ps1` nach grüner Suite. Das Skript prüft die Build-Voraussetzungen, erzeugt `dist/` frisch via `npm run sync-dist`, validiert zentrale Assets, führt `npm run tauri:build` aus und kopiert nur eine plausibilisierte EXE als `RuhestandSuite.exe` ins Repo-Root.
+* Für schnelle QA bitte `npm test` einmal durchlaufen lassen. Wenn lokal `npm` defekt ist, kann die fachliche Suite direkt mit `node tests/run-tests.mjs` validiert werden; der Tauri-Release-Build selbst benötigt weiterhin ein funktionierendes `npm`.
 
 ## Abschluss-Checkliste
 
 * **Dokumentation synchron halten:** Nach Engine-Änderungen oder neuen Simulator-Modulen (z. B. Monte-Carlo-Runner/UI/Analyzer) README, `docs/reference/TECHNICAL.md` und `docs/reference/SIMULATOR_MODULES_README.md` aktualisieren.
 * **Konsole sauber halten:** Vor dem Release auskommentierten Code entfernen, damit Nutzer:innen keine unnötigen Meldungen im Browser-Log sehen.
 * **Tauri/Web-Worker:** Die Parallelisierung nutzt Web Worker mit Transferables (kein SharedArrayBuffer). Das funktioniert in Tauri als EXE, sofern die Worker-Skripte gebündelt und per `new URL(..., import.meta.url)` erreichbar sind. CSP/Asset-Bundling sollten Worker-Module erlauben.
+* **Desktop-Smoke nach EXE-Build:** Nach `build-tauri.bat` kurz Startseite/Profilverwaltung, Balance, Simulator, Tranchenmanager, Handbuch, Worker-Pfade sowie optionale Live-Daten und Offline-Fallbacks prüfen.
 
 ---
 

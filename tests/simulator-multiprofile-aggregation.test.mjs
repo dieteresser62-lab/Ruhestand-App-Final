@@ -109,6 +109,7 @@ const profileInputs = [
     });
     const result = combineSimulatorProfiles(extended, 'a');
     assert(result.warnings.some(msg => msg.includes('Mehr als 2 Profile')), 'Warning should mention >2 profiles');
+    assertEqual(result.combined.startVermoegen, 350000, 'Financial assets from third profile should remain included');
 }
 
 {
@@ -148,4 +149,74 @@ const profileInputs = [
     assert(!warningText.includes('Dynamic-Flex Survival-Quantil unterscheidet sich'), 'No dynamic-flex quantile warning expected');
     assert(!warningText.includes('Dynamic-Flex Go-Go Aktivierung unterscheidet sich'), 'No dynamic-flex go-go warning expected');
     assert(!warningText.includes('Dynamic-Flex Go-Go Multiplikator unterscheidet sich'), 'No dynamic-flex multiplier warning expected');
+}
+
+{
+    console.log('\n📋 Test 4: Detailed tranches merge with unique profile-scoped ids');
+    const withTranches = [
+        {
+            profileId: 'a',
+            name: 'A',
+            inputs: {
+                ...profileInputs[0].inputs,
+                startVermoegen: 999999,
+                tagesgeld: 10000,
+                geldmarktEtf: 5000,
+                detailledTranches: [
+                    { trancheId: 'shared', marketValue: 80000, costBasis: 60000, type: 'aktien_alt' }
+                ]
+            }
+        },
+        {
+            profileId: 'b',
+            name: 'B',
+            inputs: {
+                ...profileInputs[1].inputs,
+                startVermoegen: 999999,
+                tagesgeld: 20000,
+                geldmarktEtf: 0,
+                detailledTranches: [
+                    { trancheId: 'shared', marketValue: 50000, costBasis: 45000, type: 'aktien_alt' },
+                    { trancheId: 'gold', marketValue: 10000, costBasis: 9000, type: 'gold', category: 'gold' }
+                ]
+            }
+        }
+    ];
+
+    const result = combineSimulatorProfiles(withTranches, 'a');
+    const tranches = result.combined.detailledTranches;
+    assertEqual(tranches.length, 3, 'All profile tranches should be merged');
+    assertEqual(tranches[0].trancheId, 'a:shared', 'First profile tranche id should be profile-scoped');
+    assertEqual(tranches[1].trancheId, 'b:shared', 'Second profile tranche id should be profile-scoped');
+    assertEqual(tranches[2].sourceProfileId, 'b', 'Merged tranche should keep sourceProfileId');
+    assertEqual(result.combined.startVermoegen, 175000,
+        'Startvermoegen should come from tranche market values plus liquidity');
+}
+
+{
+    console.log('\n📋 Test 5: Zero-market tranches fall back to aggregate assets');
+    const withEmptyTranches = [
+        {
+            profileId: 'a',
+            name: 'A',
+            inputs: {
+                ...profileInputs[0].inputs,
+                startVermoegen: 100000,
+                depotwertAlt: 90000,
+                tagesgeld: 0,
+                geldmarktEtf: 0,
+                detailledTranches: [
+                    { trancheId: 'empty', marketValue: 0, costBasis: 0, type: 'aktien_alt' }
+                ]
+            }
+        }
+    ];
+
+    const result = combineSimulatorProfiles(withEmptyTranches, 'a');
+    assert(result.warnings.some(msg => msg.includes('Tranchen ohne Marktwert')),
+        'Zero-market tranches should produce a warning');
+    assertEqual(result.combined.detailledTranches, null,
+        'Zero-market tranches should be dropped from combined simulator inputs');
+    assertEqual(result.combined.startVermoegen, 100000,
+        'Zero-market tranches should fall back to aggregate start assets');
 }

@@ -44,7 +44,7 @@
 | **Simulator** | Monte-Carlo-Simulation, Parameter-Sweeps, Auto-Optimize, Dynamic Flex | 43 Module, ~14.500 LOC |
 | **Engine** | Kern-Berechnungslogik, Guardrails, Steuern | 13 Module, ~3.600 LOC |
 | **Workers** | Parallelisierung für MC-Simulation | 3 Module, ~600 LOC |
-| **Tests** | Unit- und Integrationstests | 57 Testdateien, ~10.500 LOC, 1000+ Assertions |
+| **Tests** | Unit- und Integrationstests | 74 Testdateien, 1639 Assertions |
 | **Sonstige** | Profile, Tranchen, Utilities | ~20 Module, ~2.500 LOC |
 
 *Hinweis: Code-Zeilenangaben (z.B. `SpendingPlanner.mjs:326`) können bei zukünftigen Änderungen abweichen. Die Algorithmen-Beschreibungen bleiben konzeptionell gültig.*
@@ -1026,7 +1026,7 @@ FLEX_RATE_FINAL_LIMITS: {
 
 ## B.4 Test-Suite (erweitert Januar 2026)
 
-**Übersicht:** Die Test-Suite wurde signifikant erweitert auf **57 Testdateien** mit **1000+ Assertions**.
+**Übersicht:** Die Test-Suite wurde signifikant erweitert auf **74 Testdateien** mit **1639 Assertions**.
 
 ### B.4.1 Test-Inventar
 

@@ -523,10 +523,11 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
         const totals = sumTrancheTotals(mergedTranches);
         const trancheTotal = totals.equity + totals.gold + totals.moneyMarket;
         const trancheWithCash = trancheTotal + sumTagesgeld + sumGeldmarkt;
-        combined.startVermoegen = trancheWithCash;
         if (trancheWithCash <= 0) {
             warnings.push('Tranchen ohne Marktwert erkannt; Additiv nutzt Aggregat.');
             combined.detailledTranches = null;
+        } else {
+            combined.startVermoegen = trancheWithCash;
         }
     }
 

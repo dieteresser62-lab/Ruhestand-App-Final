@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 57 Testdateien mit 1000+ Assertions
+**Test-Statistik:** 74 Testdateien mit 1639 Assertions
 
 ## Directory Structure
 
@@ -67,6 +67,13 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 **Zweck:** Robustheitstests gegen Edge Cases und fehlerhafte Eingaben.
 - **Inflation:** Zero inflation, hohe Inflation (50%), out-of-range (>50%)
 - **Marktextreme:** 100% Jahresperformance, 0% Return
+
+#### `tauri-csp.test.mjs`
+**Zweck:** Contract-Test fuer Tauri-Release-Konfiguration und CSP.
+- Prüft `frontendDist`, Produktname und Fensterbasis.
+- Validiert erlaubte Live-Datenziele fuer Yahoo-Proxy, ECB, World Bank, OECD und CAPE via `r.jina.ai`.
+- Prüft Worker-, Script-, Style- und Font-CSP sowie bewusst gesetztes `dangerousDisableAssetCspModification`.
+- Stellt sicher, dass die in `tauri.conf.json` referenzierten Bundle-Icons existieren.
 - **Ungültige Werte:** Negative Assets, NaN/Infinity, fehlende Pflichtfelder
 - **Grenzwerte:** Extreme hohe Werte (>100M), leeres Portfolio
 - **Alter:** Out-of-range (5 Jahre, >120 Jahre)
@@ -121,6 +128,7 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 - **Zwei Gewinnquoten:** `gainQuotePlan` (≥ 0) vs. `gainQuoteSigned` (mit Vorzeichen für Verlustpositionen)
 - **TQF-Symmetrie:** Teilfreistellung wird symmetrisch auf Verluste angewandt (§ 22 InvStG)
 - **Roh-Aggregate:** `sumRealizedGainSigned`, `sumTaxableAfterTqfSigned` für Settlement
+- **Profilherkunft:** Detailtranchen-Verkaeufe bewahren profilbezogene `trancheId` und `sourceProfileId`
 
 #### `tax-settlement.test.mjs`
 **Zweck:** Validiert das Jahres-Settlement (Verlustverrechnungstopf).
@@ -229,6 +237,12 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 - **Tie-Breaker:** Höhere Success Rate, niedrigerer Drawdown
 - **Champion-Findung:** Konvergenz nahe Optimum
 
+#### `auto-optimize-worker-contract.test.mjs`
+**Zweck:** Testet den Worker-Merge-Contract des Auto-Optimize-MC-Pfads.
+- Mock-Worker führt echte `runMonteCarloChunk()`-Jobs aus
+- Vergleicht Auto-Optimize-Worker-Merge mit seriellem MC-Aggregat
+- Prüft `failCount`, P10/P50/P90, Erschöpfungsquote und Stress-Zeitanteil
+
 ### 6. Balance-App Module
 
 #### `balance-smoke.test.mjs`
@@ -259,12 +273,28 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 - **deleteSnapshot:** Entfernung aus localStorage
 - **Fehlerbehandlung:** Ungültiges JSON, leerer Storage
 
+#### `balance-storage-contract.test.mjs`
+**Zweck:** Testet reale StorageManager-Contracts gegen `app/balance/balance-storage.js`.
+- **Migration:** Inflations-State wird bereinigt und Migrations-Flag gesetzt
+- **TaxState:** `lastState.taxState.lossCarry` wird ergänzt, repariert oder erhalten
+- **StorageError:** Ungültiges State-JSON wirft den echten Fehler-Typ
+- **Restore-Filter:** Full-localStorage-Restore übernimmt nur erlaubte App-Keys
+- **Snapshot:** `createSnapshot()` schreibt Full-localStorage-Payload mit bereinigtem Label
+
 #### `balance-annual-inflation.test.mjs`
 **Zweck:** Testet die jährliche Inflationsanpassung.
 - **Kumulative Inflation:** 2% über 10 Jahre → Faktor ~1.22
 - **Bedarfsanpassung:** Floor und Flex werden skaliert
 - **Negative Inflation:** Wird ignoriert (kein Faktor-Rückgang)
 - **lastInflationAppliedAtAge:** Tracking des letzten Anwendungsalters
+
+#### `balance-annual-workflow-contract.test.mjs`
+**Zweck:** Testet die operativen Jahresworkflow-Contracts.
+- **Jahresupdate-Orchestrator:** Reihenfolge Alter → Inflation → ETF → CAPE → Update
+- **Result-Shape:** CAPE-Fehlerdetails, altes/neues Alter, gespeichertes Log
+- **Profil-Save:** Jahresupdate schreibt den aktuellen Profil-Snapshot
+- **Jahresabschluss:** Snapshot nach Jahresfortschreibung und vor Ausgaben-Rollover
+- **Snapshot-Refresh:** Snapshot-Liste wird nach Abschluss neu gerendert
 
 #### `balance-binder-snapshots.test.mjs`
 **Zweck:** Testet Snapshot-Erstellung und -Wiederherstellung.
@@ -279,6 +309,12 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 - **formatChipValue:** Null/undefined/leerer String → Fallback
 - **getChipColor:** Threshold-basierte Farbzuordnung (ok/warn/danger)
 - **createChip:** DOM-Struktur mit Status-Klasse und Tooltip
+
+#### `balance-diagnosis-copy-contract.test.mjs`
+**Zweck:** Testet den kopierbaren Diagnose-Exporttext.
+- **Statusblock:** Status-Übersicht wird nicht doppelt ausgegeben
+- **Transaktionsdiagnostik:** Blockgrund, geplante Aktion und Grenzwerte werden lesbar exportiert
+- **Dynamic Flex:** VPW-Block, Sicherheitsmodus und Warnsignale bleiben im Copytext erhalten
 
 #### `balance-diagnosis-decision-tree.test.mjs`
 **Zweck:** Testet den Entscheidungsbaum für Diagnose.
@@ -383,7 +419,10 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 - **calculateWithdrawalDistribution:**
   - Proportional: Nach Depot-Anteil
   - Tax-optimized: Niedrigste Steuer zuerst
+  - Runway-first: Nach Runway-Zielgewichten
+  - Cash-first: Tagesgeld/Geldmarkt vor Tranchenauswahl
 - **selectTranchesForSale:** FIFO + Steueroptimierung
+- **Asset-Summaries:** Detailtranchen ersetzen aggregierte Assetwerte ohne Doppelzählung
 
 #### `profilverbund-profile-gold-overrides.test.mjs`
 **Zweck:** Testet Gold-Parameter-Overrides aus Profil-Storage.
@@ -396,7 +435,9 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 **Zweck:** Testet Simulator-Profile-Kombination.
 - **combineSimulatorProfiles:** Vermögens-/Bedarfs-Summen
 - Primary/Partner-Aufteilung bei 2 Profilen
-- Warning bei >2 Profilen
+- Warning bei >2 Profilen, während finanzielle Summen erhalten bleiben
+- Detailtranchen-Merge mit profilbezogenen IDs und `sourceProfileId`
+- Null-Marktwert-Tranchen fallen mit Warnung auf aggregierte Startwerte zurück
 
 ### 9. Utilities & Hilfsfunktionen
 
@@ -442,6 +483,7 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
   - FIFO-Reduktion über Matching-Tranchen
   - Proportionale Kostenbasis-Reduktion
   - Mehrere Kategorien (Aktien, Gold, Geldmarkt)
+  - Profilbezogene Tranche-IDs verhindern Cost-Basis-Vermischung bei identischen Positionen aus verschiedenen Profilen
 
 ### 11. Worker-Pool & Parallelisierung
 
@@ -546,9 +588,12 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | Datei | Lines | Zweck |
 |-------|-------|-------|
 | `auto-optimizer.test.mjs` | ~500 | 3-stufige Optimierung, LHS, Constraints |
+| `auto-optimize-worker-contract.test.mjs` | ~260 | Auto-Optimize Worker-Merge-Contract |
 | `balance-annual-inflation.test.mjs` | ~130 | Jährliche Inflationsanpassung |
+| `balance-annual-workflow-contract.test.mjs` | ~180 | Jahresupdate-/Jahresabschluss-Workflow-Contracts |
 | `balance-binder-snapshots.test.mjs` | ~160 | Snapshot-Erstellung/-Restore |
 | `balance-diagnosis-chips.test.mjs` | ~70 | Diagnose-Chip-Rendering |
+| `balance-diagnosis-copy-contract.test.mjs` | ~100 | Kopierbarer Diagnose-Exporttext |
 | `balance-diagnosis-decision-tree.test.mjs` | ~100 | Entscheidungsbaum-Logik |
 | `balance-diagnosis-format.test.mjs` | ~40 | Diagnose-Normalisierung und Grenzfalltexte |
 | `balance-diagnosis-guardrails.test.mjs` | ~100 | Guardrail-Chips |
@@ -556,6 +601,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `balance-reader.test.mjs` | ~640 | DOM-Input-Lesen, Overrides |
 | `balance-renderer-summary.test.mjs` | ~50 | Summary-Rendering |
 | `balance-smoke.test.mjs` | ~340 | End-to-End Smoke-Test |
+| `balance-storage-contract.test.mjs` | ~180 | Echte StorageManager-Migrationen und Snapshot-Contracts |
 | `balance-storage.test.mjs` | ~490 | localStorage-Persistenz |
 | `care-meta.test.mjs` | ~200 | Pflegefall-Logik |
 | `core-engine.test.mjs` | ~150 | EngineAPI-Basisvalidierung |
@@ -570,8 +616,8 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `monte-carlo-sampling.test.mjs` | ~200 | Bootstrap, Regime-Transitions |
 | `monte-carlo-startyear.test.mjs` | ~100 | Startjahr-Auswahl |
 | `portfolio.test.mjs` | ~100 | Portfolio-Operationen |
-| `profile-storage.test.mjs` | ~540 | Profil-Registry CRUD |
-| `profilverbund-balance.test.mjs` | ~150 | Multi-Profil Aggregation |
+| `profile-storage.test.mjs` | ~570 | Profil-Registry CRUD, Bundle-Tranchen |
+| `profilverbund-balance.test.mjs` | ~230 | Multi-Profil Aggregation, Entnahmeverteilung, Asset-Summaries |
 | `profilverbund-profile-gold-overrides.test.mjs` | ~160 | Gold-Parameter-Overrides |
 | `scenario-analyzer.test.mjs` | ~95 | Szenario-Tags, Vergleich |
 | `scenarios.test.mjs` | ~150 | Komplexe Lebenspfade |
@@ -580,7 +626,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `simulator-headless.test.mjs` | ~125 | Headless 2000-2024 |
 | `simulator-heatmap.test.mjs` | ~60 | Heatmap-Rendering |
 | `simulator-monte-carlo.test.mjs` | ~460 | MC-Kern, Buffers, Merge |
-| `simulator-multiprofile-aggregation.test.mjs` | ~115 | Simulator Multi-Profil |
+| `simulator-multiprofile-aggregation.test.mjs` | ~190 | Simulator Multi-Profil, Tranchen-Merge |
 | `simulator-sweep.test.mjs` | ~470 | Parameter-Sweep |
 | `simulator-tax-settlement.test.mjs` | ~180 | Simulator Settlement-Recompute |
 | `spending-planner.test.mjs` | ~200 | Entnahme-Logik |
@@ -592,5 +638,5 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `tax-settlement.test.mjs` | ~70 | Jahres-Settlement, Verlusttopf |
 | `transaction-tax.test.mjs` | ~340 | Steuerberechnung, Roh-Aggregate |
 | `utils.test.mjs` | ~100 | Hilfsfunktionen |
-| `worker-parity.test.mjs` | ~150 | Worker-Chunk-Parity |
+| `worker-parity.test.mjs` | ~750 | Worker-Chunk-Parity |
 | `worker-pool.test.mjs` | ~670 | Worker-Pool-Lifecycle |

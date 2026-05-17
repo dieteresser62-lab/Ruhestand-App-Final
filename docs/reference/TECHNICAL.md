@@ -37,7 +37,35 @@ Wichtig für Live-Daten:
 * ETF-Kurse laufen in der EXE über den in `src-tauri/src/lib.rs` gestarteten lokalen Yahoo-Proxy auf `127.0.0.1:8787`.
 * Inflation (ECB, World Bank, OECD) und CAPE (`r.jina.ai` -> Yale/Mirror) laufen in der EXE direkt aus der Tauri-WebView.
 * Die dafür nötigen Ziele stehen explizit in `src-tauri/tauri.conf.json` unter `app.security.csp.connect-src`.
+* Web-Worker laufen aus dem gebündelten Frontend und bleiben über `worker-src 'self' blob:` erlaubt.
+* `dangerousDisableAssetCspModification` ist bewusst gesetzt, damit die handgepflegte CSP aus `tauri.conf.json` unverändert gilt und nicht durch Tauri-Asset-Rewrites erweitert wird. Breite Einträge wie `unsafe-inline`, `unsafe-eval` und Inline-Styles bleiben nur wegen bestehender HTML-/Modul-Patterns erlaubt und sind kein Freibrief fuer neue externe Quellen.
 * In der Browser-Variante wird der Yahoo-Proxy weiterhin über `start_suite.cmd` / `start_suite.ps1` gestartet und benötigt dafür Node.js.
+
+**Tauri-Yahoo-Proxy-Contract (`src-tauri/src/lib.rs`):**
+
+* Bindet nur auf `127.0.0.1:8787`.
+* Endpunkte:
+  * `/quote?symbol=...` -> aktueller Preis, bevorzugt Yahoo Chart API, Fallback Quote API.
+  * `/search?q=...` -> Yahoo-Suche.
+  * `/chart?symbol=...&period1=...&period2=...&interval=...` -> Yahoo Chart API.
+* CORS erlaubt Tauri-Urspruenge (`null`, `tauri://localhost`, `https://tauri.localhost`, `http://tauri.localhost`) sowie lokale Entwicklungsurspruenge auf `localhost`/`127.0.0.1`. Externe Origins erhalten `Access-Control-Allow-Origin: null`.
+* Fehler werden als JSON gemeldet: fehlende Parameter mit `400`, nicht gefundene Preise mit `404`, Upstream-/JSON-Fehler mit `502`.
+* London-Preise in GBp/GBX werden fuer `.L`-Symbole auf Pfund normalisiert.
+* Wenn Port `8787` bereits belegt ist, wird der Proxy-Start geloggt abgebrochen; die Tauri-App selbst startet weiter, ETF-Live-Kurse koennen dann aber nicht ueber den integrierten Proxy geladen werden.
+
+**Manuelle Desktop-Smoke-Checks nach `build-tauri.bat`:**
+
+Nach einem erfolgreichen manuellen EXE-Build sollte die erzeugte `RuhestandSuite.exe` kurz geprueft werden:
+
+1. EXE startet ohne separates lokales Webserver- oder Node-Proxy-Setup.
+2. Startseite/Profilverwaltung laedt.
+3. Balance-App laedt, fuehrt eine Aktualisierung aus und zeigt keine Asset-/Engine-Fehler.
+4. Simulator laedt; ein kleiner Monte-Carlo- oder Backtest-Smoke-Lauf startet ohne Worker-Fehler.
+5. Tranchenmanager laedt leere oder synthetische Tranchen ohne Fehler.
+6. Handbuch laedt.
+7. Optionaler Live-Daten-Check mit Internet: ETF-Kurs via integriertem Proxy, Inflation/CAPE via freigegebene Endpunkte.
+8. Optionaler Offline-Check: Ohne Internet darf die App nicht hart abbrechen; Live-Daten-Fetches muessen als Fallback/Warnung degradieren.
+9. Keine Log-/Console-Hinweise auf fehlende `dist`-Assets oder blockierte Worker.
 
 ---
 
@@ -79,6 +107,7 @@ stop
 ```
 4. **`engine/transactions/TransactionEngine.mjs`** – leitet Ziel-Liquidität ab, steuert Puffer-Schutz und führt **Gap-basiertes Surplus-Rebalancing** (Investition nur bis Ziel-Allokation) durch.
    - Unterteilt in `engine/transactions/transaction-action.mjs`, `transaction-opportunistic.mjs`, `transaction-surplus.mjs`, `sale-engine.mjs` und `transaction-utils.mjs` für Entscheidungslogik, Rebalancing-Pfade, Verkauf/Steuern und Hilfsfunktionen.
+   - Detailtranchen-Verkaeufe geben `trancheId` und `sourceProfileId` in `breakdown[]` weiter, damit mehrprofilige Tranchen spaeter eindeutig und ohne Cost-Basis-Vermischung reduziert werden koennen.
 5. **`engine/core.mjs`** – orchestriert die oben genannten Module, exponiert `EngineAPI` (Version 31) und erzeugt Diagnose-/UI-Strukturen.
 6. **`engine/tax-settlement.mjs`** – zentrale Jahressteuer-Settlement-Logik (Verlusttopf, SPB, finale Steuer).
 7. **`engine/config.mjs`** – zentrale Konfiguration (Schwellenwerte, Regime-Mapping, Profile). Generiert zur Build-Zeit eine eindeutige Build-ID.
@@ -219,10 +248,10 @@ Dynamic-Flex ist entlang der Simulator-Pipeline konsistent aktiviert:
 Die Parallelisierung basiert auf Web-Workern und einer gemeinsamen Pool-Schicht:
 
 * `workers/worker-pool.js` verwaltet einen Pool fester Worker-Instanzen, verteilt Jobs und ersetzt defekte Worker.
-* `workers/mc-worker.js` hostet die DOM-freien Runner (`monte-carlo-runner.js`, `sweep-runner.js`, `auto-optimize-worker.js`) und verarbeitet Job-Typen (`init`, `job`, `sweep-init`, `sweep`, `optimize-init`, `optimize-batch`).
+* `workers/mc-worker.js` hostet die DOM-freien Runner fuer Monte Carlo und Sweep (`monte-carlo-runner.js`, `sweep-runner.js`) und verarbeitet Job-Typen (`init`, `job`, `sweep-init`, `sweep`).
 * `simulator-monte-carlo.js` orchestriert die Worker-Jobs, führt Chunking (Zeitbudget) durch, aggregiert Ergebnisse und fällt bei Stalls auf seriell zurück.
 * `simulator-sweep.js` verteilt Parameter-Kombinationen auf Worker-Chunks und aggregiert Sweep-Metriken (Fallback seriell).
-* `auto_optimize.js` nutzt den gleichen Pool für Kandidaten-Batches ohne Chunking-Overhead (ein Batch = viele Runs).
+* `auto_optimize.js` bewertet Kandidaten in Promise-Batches; `auto-optimize-worker.js` nutzt denselben `workers/mc-worker.js`-Jobtyp `job` wie Monte Carlo, merged MC-Buffers/Heatmap/Totals/Listen selbst und faellt bei Worker-Fehlern auf seriell zurueck.
 
 **Determinismus/Seeding**
 * Jeder Run erhält einen deterministischen Seed (`per-run-seed`), damit Chunking/Worker keine Ergebnisse verändert.
@@ -335,7 +364,9 @@ Profile (localStorage) → app/profile/profile-storage.js
 
 **Profilverbund (Simulator):**
 - Gemeinsame Simulation mit kombinierten Inputs
-- Tranchen der aktiven Profile werden zusammengeführt
+- Tranchen der aktiven Profile werden zusammengeführt, mit Profilpräfix eindeutig gemacht und behalten `sourceProfileId`
+- Engine-Verkaufsaufschluesselungen behalten diese Herkunft in `breakdown[].sourceProfileId`; Portfolio-Reduktion erfolgt ueber die eindeutige profilbezogene `trancheId`.
+- Plausible Detailtranchen bestimmen das kombinierte Startvermögen zusammen mit Liquidität; Null-Marktwert-Tranchen fallen mit Warnung auf aggregierte Startwerte zurück
 - Personen/Renten werden aus der Profilwahl abgeleitet (kein separater Partner-Tab)
 
 ### Profilverbund-Verteilung (Balance-App)
@@ -344,6 +375,7 @@ Profile (localStorage) → app/profile/profile-storage.js
 - `tax_optimized`: Profil mit geringerer Steuerlast zuerst
 - `proportional`: Nach Vermögensanteil (Default)
 - `runway_first`: Profil mit größerer Runway trägt mehr
+- Entnahmen nutzen Cash/Geldmarkt vor Tranchenauswahl; Asset-Summaries verwenden Detailtranchen statt aggregierte Depotwerte, wenn Detailtranchen vorhanden sind.
 
 ### Gold-Validierung
 

@@ -1,6 +1,6 @@
 import { EngineAPI } from '../engine/index.mjs';
 import { prepareHistoricalDataOnce } from '../app/simulator/simulator-engine-helpers.js';
-import { createMonteCarloBuffers, MC_HEATMAP_BINS, runMonteCarloChunk, buildMonteCarloAggregates } from '../app/simulator/monte-carlo-runner.js';
+import { createMonteCarloBuffers, MC_HEATMAP_BINS, pickWorstRun, runMonteCarloChunk, buildMonteCarloAggregates } from '../app/simulator/monte-carlo-runner.js';
 import { runSweepChunk } from '../app/simulator/sweep-runner.js';
 
 // Engine API is expected to live on window in browser-mode code.
@@ -35,6 +35,168 @@ function mergeHeatmap(target, source) {
         if (!sourceRow) continue;
         for (let i = 0; i < targetRow.length; i++) {
             targetRow[i] += sourceRow[i] || 0;
+        }
+    }
+}
+
+const MC_BUFFER_KEYS = [
+    'finalOutcomes',
+    'taxOutcomes',
+    'kpiLebensdauer',
+    'kpiKuerzungsjahre',
+    'kpiMaxKuerzung',
+    'volatilities',
+    'maxDrawdowns',
+    'depotErschoepft',
+    'alterBeiErschoepfung',
+    'anteilJahreOhneFlex',
+    'stress_maxDrawdowns',
+    'stress_timeQuoteAbove45',
+    'stress_cutYears',
+    'stress_CaR_P10_Real',
+    'stress_recoveryYears'
+];
+
+const MC_TOTAL_KEYS = [
+    'failCount',
+    'pflegeTriggeredCount',
+    'totalSimulatedYears',
+    'totalYearsQuoteAbove45',
+    'totalYearsSafetyStage1plus',
+    'totalYearsSafetyStage2',
+    'shortfallWithCareCount',
+    'shortfallNoCareProxyCount',
+    'p2TriggeredCount',
+    'runsSafetyStage1Triggered',
+    'runsSafetyStage2Triggered',
+    'totalTaxSavedByLossCarry'
+];
+
+const MC_LIST_KEYS = [
+    'entryAges',
+    'entryAgesP2',
+    'careDepotCosts',
+    'endWealthWithCareList',
+    'endWealthNoCareList',
+    'p1CareYearsTriggered',
+    'p2CareYearsTriggered',
+    'bothCareYearsOverlapTriggered',
+    'maxAnnualCareSpendTriggered'
+];
+
+function createMergedMonteCarloState(totalRuns) {
+    return {
+        buffers: createMonteCarloBuffers(totalRuns),
+        heatmap: Array(10).fill(0).map(() => new Uint32Array(MC_HEATMAP_BINS.length - 1)),
+        totals: Object.fromEntries(MC_TOTAL_KEYS.map(key => [key, 0])),
+        lists: Object.fromEntries(MC_LIST_KEYS.map(key => [key, []])),
+        allRealWithdrawalsSample: [],
+        worstRun: null,
+        worstRunCare: null,
+        runMeta: []
+    };
+}
+
+function mergeMonteCarloChunk(state, chunk, start) {
+    for (const key of MC_BUFFER_KEYS) {
+        assert(chunk.buffers[key] !== undefined, `Chunk buffer missing ${key}`);
+        assert(state.buffers[key] !== undefined, `Merged buffer missing ${key}`);
+        state.buffers[key].set(chunk.buffers[key], start);
+    }
+
+    mergeHeatmap(state.heatmap, chunk.heatmap);
+
+    for (const key of MC_TOTAL_KEYS) {
+        state.totals[key] += chunk.totals[key] || 0;
+    }
+
+    for (const key of MC_LIST_KEYS) {
+        appendArray(state.lists[key], chunk.lists[key]);
+    }
+    appendArray(state.allRealWithdrawalsSample, chunk.allRealWithdrawalsSample);
+    appendArray(state.runMeta, chunk.runMeta);
+
+    state.worstRun = pickWorstRun(state.worstRun, chunk.worstRun);
+    state.worstRunCare = pickWorstRun(state.worstRunCare, chunk.worstRunCare);
+}
+
+function buildAggregatesFromState(inputs, totalRuns, state) {
+    return buildMonteCarloAggregates({
+        inputs,
+        totalRuns,
+        buffers: state.buffers,
+        heatmap: state.heatmap,
+        bins: MC_HEATMAP_BINS,
+        totals: state.totals,
+        lists: state.lists,
+        allRealWithdrawalsSample: state.allRealWithdrawalsSample
+    });
+}
+
+function sumHeatmap(heatmap) {
+    let sum = 0;
+    for (const row of heatmap || []) {
+        for (const value of row || []) sum += value || 0;
+    }
+    return sum;
+}
+
+function sortedNumericJson(values) {
+    return JSON.stringify([...(values || [])].map(Number).sort((a, b) => a - b));
+}
+
+function assertMonteCarloTotalsEqual(fullTotals, mergedTotals, prefix) {
+    for (const key of MC_TOTAL_KEYS) {
+        assertClose(fullTotals[key] || 0, mergedTotals[key] || 0, 1e-6, `${prefix} total ${key} mismatch`);
+    }
+}
+
+function assertMonteCarloListShapesEqual(fullLists, mergedLists, prefix) {
+    for (const key of MC_LIST_KEYS) {
+        assert((fullLists[key] || []).length === (mergedLists[key] || []).length, `${prefix} list ${key} length mismatch`);
+        assertEqual(sortedNumericJson(mergedLists[key]), sortedNumericJson(fullLists[key]), `${prefix} list ${key} values mismatch`);
+    }
+}
+
+const SWEEP_METRIC_KEYS = [
+    'successProbFloor',
+    'p10EndWealth',
+    'p25EndWealth',
+    'medianEndWealth',
+    'p75EndWealth',
+    'meanEndWealth',
+    'maxEndWealth',
+    'worst5Drawdown',
+    'minRunwayObserved'
+];
+
+function sortSweepResults(results) {
+    return [...(results || [])].sort((a, b) => a.comboIdx - b.comboIdx);
+}
+
+function assertSweepResultsEqual(fullResults, splitResults, prefix) {
+    const fullSorted = sortSweepResults(fullResults);
+    const splitSorted = sortSweepResults(splitResults);
+    assert(fullSorted.length === splitSorted.length, `${prefix} result length mismatch`);
+
+    for (let i = 0; i < fullSorted.length; i++) {
+        const full = fullSorted[i];
+        const split = splitSorted[i];
+        assertEqual(split.comboIdx, full.comboIdx, `${prefix} comboIdx mismatch at ${i}`);
+        assertEqual(JSON.stringify(split.params), JSON.stringify(full.params), `${prefix} params mismatch for combo ${full.comboIdx}`);
+        assertEqual(
+            Boolean(split.metrics?.invalidCombination),
+            Boolean(full.metrics?.invalidCombination),
+            `${prefix} invalid flag mismatch for combo ${full.comboIdx}`
+        );
+        assertEqual(
+            String(split.metrics?.invalidReason || ''),
+            String(full.metrics?.invalidReason || ''),
+            `${prefix} invalid reason mismatch for combo ${full.comboIdx}`
+        );
+
+        for (const key of SWEEP_METRIC_KEYS) {
+            assertClose(split.metrics?.[key] || 0, full.metrics?.[key] || 0, 1e-6, `${prefix} metric ${key} mismatch for combo ${full.comboIdx}`);
         }
     }
 }
@@ -298,6 +460,127 @@ console.log('✅ Sweep split parity passed');
     throw e;
 }
 
+// Test 2b: Sweep uneven split parity with invalid combinations and input isolation
+try {
+    const sweepConfig = {
+        anzahlRuns: 18,
+        maxDauer: 18,
+        blockSize: 4,
+        baseSeed: 2026,
+        methode: 'block',
+        rngMode: 'per-run-seed'
+    };
+    const paramCombinations = [
+        { runwayMin: 18, runwayTarget: 30, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0 },
+        { runwayMin: 24, runwayTarget: 36, targetEq: 70, rebalBand: 6, maxSkimPct: 12, maxBearRefillPct: 6, goldTargetPct: 5 },
+        { runwayMin: 42, runwayTarget: 30, targetEq: 55, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0 },
+        { runwayMin: 30, runwayTarget: 42, targetEq: 50, rebalBand: 4, maxSkimPct: 8, maxBearRefillPct: 4, goldTargetPct: 0 },
+        { runwayMin: 24, runwayTarget: 36, targetEq: 65, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 35 },
+        { runwayMin: 12, runwayTarget: 24, targetEq: 80, rebalBand: 8, maxSkimPct: 15, maxBearRefillPct: 8, goldTargetPct: 10 }
+    ];
+    const baseSnapshot = JSON.stringify(baseInputs);
+
+    const fullSweep = runSweepChunk({
+        baseInputs,
+        paramCombinations,
+        comboRange: { start: 0, count: paramCombinations.length },
+        sweepConfig
+    });
+    assertEqual(JSON.stringify(baseInputs), baseSnapshot, 'Sweep full run should not mutate baseInputs');
+
+    const splitRanges = [
+        { start: 0, count: 1 },
+        { start: 1, count: 3 },
+        { start: 4, count: 2 }
+    ];
+    const splitResults = [];
+    let splitP2VarianceCount = 0;
+    for (const range of splitRanges) {
+        const split = runSweepChunk({
+            baseInputs,
+            paramCombinations,
+            comboRange: range,
+            sweepConfig
+        });
+        splitResults.push(...split.results);
+        splitP2VarianceCount += split.p2VarianceCount;
+        assertEqual(JSON.stringify(baseInputs), baseSnapshot, `Sweep split ${range.start}:${range.count} should not mutate baseInputs`);
+    }
+
+    assertSweepResultsEqual(fullSweep.results, splitResults, 'Uneven Sweep');
+    assertEqual(fullSweep.p2VarianceCount, splitP2VarianceCount, 'Uneven Sweep p2VarianceCount mismatch');
+
+    const invalidReasons = sortSweepResults(splitResults)
+        .filter(item => item.metrics?.invalidCombination)
+        .map(item => String(item.metrics.invalidReason || ''));
+    assert(invalidReasons.length === 2, 'Uneven Sweep should retain two invalid combinations');
+    assert(invalidReasons.some(reason => reason.includes('runwayMin')), 'Uneven Sweep should retain runway invalid reason');
+    assert(invalidReasons.some(reason => reason.includes('goldTargetPct')), 'Uneven Sweep should retain gold target invalid reason');
+
+    console.log('✅ Uneven Sweep split parity with invalid combinations passed');
+} catch (e) {
+    console.error('❌ Uneven Sweep split parity with invalid combinations failed', e);
+    throw e;
+}
+
+// Test 2c: Sweep Dynamic-Flex invalid shape parity across split ranges
+try {
+    const dynamicBase = {
+        ...baseInputs,
+        dynamicFlex: true,
+        horizonMethod: 'survival_quantile',
+        horizonYears: 30,
+        survivalQuantile: 0.85,
+        goGoActive: false,
+        goGoMultiplier: 1.0
+    };
+    const sweepConfig = {
+        anzahlRuns: 12,
+        maxDauer: 12,
+        blockSize: 4,
+        baseSeed: 3030,
+        methode: 'block',
+        rngMode: 'per-run-seed'
+    };
+    const paramCombinations = [
+        { runwayMin: 18, runwayTarget: 30, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, survivalQuantile: 0.9 },
+        { runwayMin: 18, runwayTarget: 30, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, survivalQuantile: 0.2 },
+        { runwayMin: 18, runwayTarget: 30, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, goGoMultiplier: 1.2 },
+        { runwayMin: 18, runwayTarget: 30, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, horizonYears: 45 }
+    ];
+
+    const fullSweep = runSweepChunk({
+        baseInputs: dynamicBase,
+        paramCombinations,
+        comboRange: { start: 0, count: paramCombinations.length },
+        sweepConfig
+    });
+    const splitA = runSweepChunk({
+        baseInputs: dynamicBase,
+        paramCombinations,
+        comboRange: { start: 0, count: 2 },
+        sweepConfig
+    });
+    const splitB = runSweepChunk({
+        baseInputs: dynamicBase,
+        paramCombinations,
+        comboRange: { start: 2, count: 2 },
+        sweepConfig
+    });
+
+    assertSweepResultsEqual(fullSweep.results, [...splitA.results, ...splitB.results], 'Dynamic Sweep invalid');
+    assertEqual(fullSweep.p2VarianceCount, splitA.p2VarianceCount + splitB.p2VarianceCount, 'Dynamic Sweep p2VarianceCount mismatch');
+    assert(fullSweep.results[1].metrics.invalidCombination === true, 'Dynamic Sweep should mark invalid quantile');
+    assert(fullSweep.results[2].metrics.invalidCombination === true, 'Dynamic Sweep should mark invalid go-go multiplier');
+    assert(fullSweep.results[0].metrics.invalidCombination !== true, 'Dynamic Sweep should keep valid quantile valid');
+    assert(fullSweep.results[3].metrics.invalidCombination !== true, 'Dynamic Sweep should keep valid horizon valid');
+
+    console.log('✅ Dynamic-Flex Sweep invalid-shape parity passed');
+} catch (e) {
+    console.error('❌ Dynamic-Flex Sweep invalid-shape parity failed', e);
+    throw e;
+}
+
 // Test 3: Dynamic-Flex parity incl. VPW log payload (serial full vs split chunks)
 try {
     const dynamicInputs = {
@@ -448,6 +731,185 @@ try {
     console.log('✅ Dynamic-Flex MC parity passed');
 } catch (e) {
     console.error('❌ Dynamic-Flex MC parity failed', e);
+    throw e;
+}
+
+// Test 4: Monte-Carlo uneven chunk parity with complete merge contracts
+try {
+    const monteCarloParams = {
+        anzahl: 37,
+        maxDauer: 24,
+        blockSize: 4,
+        seed: 98765,
+        methode: 'block',
+        rngMode: 'per-run-seed'
+    };
+
+    const fullChunk = await runMonteCarloChunk({
+        inputs: baseInputs,
+        monteCarloParams,
+        widowOptions,
+        useCapeSampling: false,
+        runRange: { start: 0, count: monteCarloParams.anzahl },
+        engine: EngineAPI
+    });
+
+    const splitRanges = [
+        { start: 0, count: 7 },
+        { start: 7, count: 16 },
+        { start: 23, count: 14 }
+    ];
+    const merged = createMergedMonteCarloState(monteCarloParams.anzahl);
+
+    for (const range of splitRanges) {
+        const chunk = await runMonteCarloChunk({
+            inputs: baseInputs,
+            monteCarloParams,
+            widowOptions,
+            useCapeSampling: false,
+            runRange: range,
+            engine: EngineAPI
+        });
+        mergeMonteCarloChunk(merged, chunk, range.start);
+    }
+
+    const fullAggregates = buildMonteCarloAggregates({
+        inputs: baseInputs,
+        totalRuns: monteCarloParams.anzahl,
+        buffers: fullChunk.buffers,
+        heatmap: fullChunk.heatmap,
+        bins: fullChunk.bins,
+        totals: fullChunk.totals,
+        lists: fullChunk.lists,
+        allRealWithdrawalsSample: fullChunk.allRealWithdrawalsSample
+    });
+    const mergedAggregates = buildAggregatesFromState(baseInputs, monteCarloParams.anzahl, merged);
+
+    for (const key of MC_BUFFER_KEYS) {
+        assert(merged.buffers[key].length === monteCarloParams.anzahl, `Uneven MC merged buffer ${key} length mismatch`);
+    }
+    assertMonteCarloTotalsEqual(fullChunk.totals, merged.totals, 'Uneven MC');
+    assertMonteCarloListShapesEqual(fullChunk.lists, merged.lists, 'Uneven MC');
+    assertEqual(sumHeatmap(merged.heatmap), sumHeatmap(fullChunk.heatmap), 'Uneven MC heatmap total should match');
+    assertEqual(JSON.stringify(merged.allRealWithdrawalsSample), JSON.stringify(fullChunk.allRealWithdrawalsSample), 'Uneven MC withdrawal sample should match');
+    assertClose(fullAggregates.finalOutcomes.p10, mergedAggregates.finalOutcomes.p10, 1e-6, 'Uneven MC p10 mismatch');
+    assertClose(fullAggregates.finalOutcomes.p50, mergedAggregates.finalOutcomes.p50, 1e-6, 'Uneven MC p50 mismatch');
+    assertClose(fullAggregates.finalOutcomes.p90, mergedAggregates.finalOutcomes.p90, 1e-6, 'Uneven MC p90 mismatch');
+    assertClose(fullAggregates.depotErschoepfungsQuote, mergedAggregates.depotErschoepfungsQuote, 1e-6, 'Uneven MC depletion mismatch');
+    assert(merged.worstRun?.runIdx === fullChunk.worstRun?.runIdx, 'Uneven MC worst run index mismatch');
+    assertClose(merged.worstRun?.finalVermoegen, fullChunk.worstRun?.finalVermoegen, 1e-6, 'Uneven MC worst run wealth mismatch');
+
+    console.log('✅ Uneven Monte-Carlo chunk parity passed');
+} catch (e) {
+    console.error('❌ Uneven Monte-Carlo chunk parity failed', e);
+    throw e;
+}
+
+// Test 5: Monte-Carlo logshape parity across chunk boundaries
+try {
+    const dynamicInputs = {
+        ...baseInputs,
+        startAlter: 52,
+        dynamicFlex: true,
+        horizonMethod: 'mean',
+        horizonYears: 32,
+        capeRatio: 28,
+        marketCapeRatio: 28
+    };
+    const monteCarloParams = {
+        anzahl: 37,
+        maxDauer: 8,
+        blockSize: 4,
+        seed: 24680,
+        methode: 'block',
+        rngMode: 'per-run-seed'
+    };
+    const logIndices = [0, 8, 24, 36];
+
+    const fullChunk = await runMonteCarloChunk({
+        inputs: dynamicInputs,
+        monteCarloParams,
+        widowOptions,
+        useCapeSampling: false,
+        runRange: { start: 0, count: monteCarloParams.anzahl },
+        logIndices,
+        engine: EngineAPI
+    });
+
+    const splitRanges = [
+        { start: 0, count: 7 },
+        { start: 7, count: 16 },
+        { start: 23, count: 14 }
+    ];
+    const merged = createMergedMonteCarloState(monteCarloParams.anzahl);
+
+    for (const range of splitRanges) {
+        const chunk = await runMonteCarloChunk({
+            inputs: dynamicInputs,
+            monteCarloParams,
+            widowOptions,
+            useCapeSampling: false,
+            runRange: range,
+            logIndices,
+            engine: EngineAPI
+        });
+        mergeMonteCarloChunk(merged, chunk, range.start);
+    }
+
+    const fullByIndex = new Map((fullChunk.runMeta || []).map(meta => [meta.index, meta]));
+    const mergedByIndex = new Map((merged.runMeta || []).map(meta => [meta.index, meta]));
+    const requiredRowFields = [
+        'jahr',
+        'histJahr',
+        'inflation',
+        'entnahme_effektiv',
+        'liq_before_payout',
+        'liq_after_payout',
+        'portfolio_total_end',
+        'taxSavedByLossCarry',
+        'Person1Alive',
+        'vpw'
+    ];
+
+    assert(fullChunk.runMeta.length === monteCarloParams.anzahl, 'Full logshape runMeta length mismatch');
+    assert(merged.runMeta.length === monteCarloParams.anzahl, 'Merged logshape runMeta length mismatch');
+    assertEqual(
+        JSON.stringify([...mergedByIndex.keys()].sort((a, b) => a - b)),
+        JSON.stringify([...fullByIndex.keys()].sort((a, b) => a - b)),
+        'Logshape runMeta indices should match'
+    );
+
+    for (const runIdx of logIndices) {
+        const fullMeta = fullByIndex.get(runIdx);
+        const mergedMeta = mergedByIndex.get(runIdx);
+        assert(fullMeta, `Full log meta missing run ${runIdx}`);
+        assert(mergedMeta, `Merged log meta missing run ${runIdx}`);
+        assertEqual(mergedMeta.index, fullMeta.index, `Log meta index mismatch for run ${runIdx}`);
+        assertEqual(mergedMeta.logDataRows.length, fullMeta.logDataRows.length, `Log row count mismatch for run ${runIdx}`);
+        assert(mergedMeta.logDataRows.length > 0, `Log rows should be captured for run ${runIdx}`);
+
+        for (let rowIdx = 0; rowIdx < fullMeta.logDataRows.length; rowIdx++) {
+            const fullRow = fullMeta.logDataRows[rowIdx];
+            const mergedRow = mergedMeta.logDataRows[rowIdx];
+            for (const field of requiredRowFields) {
+                assert(field in mergedRow, `Merged log row missing ${field} for run ${runIdx}`);
+                assert(field in fullRow, `Full log row missing ${field} for run ${runIdx}`);
+            }
+            assertEqual(mergedRow.jahr, fullRow.jahr, `Log jahr mismatch for run ${runIdx}, row ${rowIdx}`);
+            assertEqual(mergedRow.histJahr, fullRow.histJahr, `Log histJahr mismatch for run ${runIdx}, row ${rowIdx}`);
+            assertClose(mergedRow.entnahme_effektiv, fullRow.entnahme_effektiv, 1e-6, `Log entnahme mismatch for run ${runIdx}, row ${rowIdx}`);
+            assertClose(mergedRow.portfolio_total_end, fullRow.portfolio_total_end, 1e-6, `Log portfolio total mismatch for run ${runIdx}, row ${rowIdx}`);
+            assertEqual(
+                JSON.stringify(mergedRow.vpw || null),
+                JSON.stringify(fullRow.vpw || null),
+                `Log VPW payload mismatch for run ${runIdx}, row ${rowIdx}`
+            );
+        }
+    }
+
+    console.log('✅ Monte-Carlo logshape chunk-boundary parity passed');
+} catch (e) {
+    console.error('❌ Monte-Carlo logshape chunk-boundary parity failed', e);
     throw e;
 }
 

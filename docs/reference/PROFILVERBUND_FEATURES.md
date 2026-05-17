@@ -33,6 +33,7 @@ Der Profilverbund verbindet mehrere Profile zu einer gemeinsamen Analyse. Es gib
 ## Hinweise
 - Gold-Strategie ist pro Profil gepflegt; die Kombination nutzt nur Profile mit aktivem Gold und Ziel > 0.
 - Bei unplausiblen Tranchensummen faellt der Simulator auf aggregierte Werte zurueck.
+- Kombinierte Simulator-Tranchen erhalten profilbezogene IDs und `sourceProfileId`, damit spaetere Steuer-/Portfolio-Pfade die Herkunft nachvollziehen koennen.
 - Legacy-Keys wie `belongsToHousehold` und `household_withdrawal_mode` bleiben intern bestehen, sind aber UI-seitig nicht sichtbar.
 
 ## Beteiligte Module
@@ -55,8 +56,8 @@ Der Profilverbund verbindet mehrere Profile zu einer gemeinsamen Analyse. Es gib
 - `tests/profilverbund-balance.test.mjs` – Aggregation und Verteilungslogik
 - `tests/profilverbund-profile-gold-overrides.test.mjs` – Gold-Strategie bei Profilkombination
 - `tests/profile-storage.test.mjs` – Persistenz und Profilwechsel
+- `tests/simulator-multiprofile-aggregation.test.mjs` – Simulator-Kombination und Tranchen-Merge
 
-## Verwandte Dokumentation
 ## Verwandte Dokumentation
 - `README.md` → Abschnitt "Profilverbund (Multi-Profil)"
 - `TECHNICAL.md` → Abschnitt "Multi-Profil Simulator"

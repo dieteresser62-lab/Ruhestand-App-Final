@@ -334,4 +334,169 @@ const baseContext = { saleBudgets: {} }; // No budget limits
 
     console.log('✅ TQF symmetry on loss raw aggregate works');
 }
+
+// --- TEST 10: Mixed gain/loss detailed tranches preserve signed raw aggregate ---
+{
+    const input = getBaseInputs();
+    input.depotwertAlt = 0;
+    input.costBasisAlt = 0;
+    input.depotwertNeu = 0;
+    input.costBasisNeu = 0;
+    input.sparerPauschbetrag = 0;
+    input.tqfAlt = 0.30;
+
+    input.detailledTranches = [
+        {
+            trancheId: 'loss-lot',
+            isin: 'ETF-MIX',
+            name: 'Loss Lot',
+            type: 'aktien_alt',
+            category: 'equity',
+            marketValue: 1000,
+            costBasis: 1300,
+            tqf: 0.30,
+            purchaseDate: '2020-01-01'
+        },
+        {
+            trancheId: 'gain-lot',
+            isin: 'ETF-MIX',
+            name: 'Gain Lot',
+            type: 'aktien_alt',
+            category: 'equity',
+            marketValue: 1000,
+            costBasis: 500,
+            tqf: 0.30,
+            purchaseDate: '2021-01-01'
+        }
+    ];
+
+    const result = TransactionEngine.calculateSaleAndTax(
+        2000,
+        input,
+        { ...baseContext, forceGrossSellAmount: 2000 },
+        baseMarket,
+        false
+    );
+
+    const expectedRealized = -300 + 500;
+    const expectedTaxableAfterTqf = (-300 * 0.70) + (500 * 0.70);
+    const expectedPlanTax = 500 * 0.70 * 0.25 * 1.055;
+
+    assertClose(result.bruttoVerkaufGesamt, 2000, 0.01, 'Mixed lots should both be sold by gross target');
+    assertClose(result.sumRealizedGainSigned, expectedRealized, 0.01, 'Mixed sale should preserve signed realized aggregate');
+    assertClose(result.sumTaxableAfterTqfSigned, expectedTaxableAfterTqf, 0.01, 'Mixed sale should preserve signed TQF aggregate');
+    assertClose(result.steuerGesamt, expectedPlanTax, 0.01, 'Plan tax should apply only to positive gain lot');
+
+    console.log('✅ Mixed gain/loss detailed lots preserve signed raw aggregate');
+}
+
+// --- TEST 11: Detailed gold tranche uses its own TQF contract, not equity TQF ---
+{
+    const input = getBaseInputs();
+    input.depotwertAlt = 0;
+    input.costBasisAlt = 0;
+    input.depotwertNeu = 0;
+    input.costBasisNeu = 0;
+    input.sparerPauschbetrag = 0;
+
+    input.detailledTranches = [
+        {
+            trancheId: 'gold-taxed',
+            isin: 'GOLD',
+            name: 'Gold Taxed',
+            type: 'gold',
+            category: 'gold',
+            marketValue: 1000,
+            costBasis: 400,
+            tqf: 0,
+            purchaseDate: '2022-01-01'
+        },
+        {
+            trancheId: 'equity-tqf',
+            isin: 'ETF',
+            name: 'Equity TQF',
+            type: 'aktien_alt',
+            category: 'equity',
+            marketValue: 1000,
+            costBasis: 400,
+            tqf: 0.30,
+            purchaseDate: '2022-01-01'
+        }
+    ];
+
+    const goldOnly = TransactionEngine.calculateSaleAndTax(
+        1000,
+        input,
+        { ...baseContext, forceGrossSellAmount: 1000 },
+        { sKey: 'bear_deep' },
+        true
+    );
+    const equityOnly = TransactionEngine.calculateSaleAndTax(
+        1000,
+        { ...input, detailledTranches: [input.detailledTranches[1]] },
+        { ...baseContext, forceGrossSellAmount: 1000 },
+        baseMarket,
+        false
+    );
+
+    const expectedGoldTax = 600 * 0.25 * 1.055;
+    const expectedEquityTax = 600 * 0.70 * 0.25 * 1.055;
+
+    assertEqual(goldOnly.breakdown[0].kind, 'gold', 'Emergency sale should use detailed gold lot first');
+    assertClose(goldOnly.steuerGesamt, expectedGoldTax, 0.01, 'Detailed gold should not inherit equity TQF');
+    assertClose(equityOnly.steuerGesamt, expectedEquityTax, 0.01, 'Detailed equity should keep 30% TQF');
+
+    console.log('✅ Detailed gold and equity TQF contracts stay separate');
+}
+
+// --- TEST 12: Detailed tranche sale preserves sourceProfileId for auditability ---
+{
+    const input = getBaseInputs();
+    input.depotwertAlt = 0;
+    input.costBasisAlt = 0;
+    input.depotwertNeu = 0;
+    input.costBasisNeu = 0;
+    input.sparerPauschbetrag = 0;
+
+    input.detailledTranches = [
+        {
+            trancheId: 'profile-a:shared',
+            sourceProfileId: 'profile-a',
+            isin: 'ETF-SAME',
+            name: 'ETF Shared',
+            type: 'aktien_alt',
+            category: 'equity',
+            marketValue: 1000,
+            costBasis: 900,
+            tqf: 0.30,
+            purchaseDate: '2020-01-01'
+        },
+        {
+            trancheId: 'profile-b:shared',
+            sourceProfileId: 'profile-b',
+            isin: 'ETF-SAME',
+            name: 'ETF Shared',
+            type: 'aktien_alt',
+            category: 'equity',
+            marketValue: 1000,
+            costBasis: 800,
+            tqf: 0.30,
+            purchaseDate: '2021-01-01'
+        }
+    ];
+
+    const result = TransactionEngine.calculateSaleAndTax(
+        1000,
+        input,
+        { ...baseContext, forceGrossSellAmount: 1000 },
+        baseMarket,
+        false
+    );
+
+    assert(result.breakdown.length >= 1, 'Detailed sale should produce at least one breakdown row');
+    assertEqual(result.breakdown[0].trancheId, 'profile-a:shared', 'Sale breakdown should preserve exact profile-scoped tranche id');
+    assertEqual(result.breakdown[0].sourceProfileId, 'profile-a', 'Sale breakdown should preserve exact sourceProfileId');
+
+    console.log('✅ Detailed tranche sale preserves sourceProfileId');
+}
 console.log('--- Transaction Tax Tests Completed ---');

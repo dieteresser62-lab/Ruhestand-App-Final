@@ -145,6 +145,7 @@ export function calculateSaleAndTax(requestedRefill, input, context, market, isE
             finalBreakdown.push({
                 kind: tranche.kind,
                 trancheId: tranche.trancheId || null,
+                sourceProfileId: tranche.sourceProfileId || null,
                 name: tranche.name || null,
                 isin: tranche.isin || null,
                 purchaseDate: tranche.purchaseDate || null,

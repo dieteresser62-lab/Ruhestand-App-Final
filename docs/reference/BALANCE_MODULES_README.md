@@ -271,6 +271,10 @@ Kernlogik für den Profilverbund (Multi-Profil-Modus).
 - `proportional` – Nach Vermögensanteil
 - `runway_first` – Nach Runway-Zielen gewichtet
 
+**Tranchen-/Cash-Contract:**
+- Entnahmen nutzen zuerst Tagesgeld und Geldmarkt, bevor ein Verkauf aus Detailtranchen geplant wird.
+- Detailtranchen ersetzen in Asset-Summaries die aggregierten Depot-/Gold-/Geldmarktwerte, damit Werte nicht doppelt gezählt werden.
+
 **Dependencies:** `balance-config.js`, `app/profile/profile-storage.js`
 
 ---

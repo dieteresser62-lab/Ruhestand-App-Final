@@ -30,11 +30,6 @@ export function createDiagnosisHandlers({ dom, appState }) {
         const formatRunwayValue = (value, fractionDigits = 1, invalid = '∞') => UIUtils.formatMonths(value, { fractionDigits, invalid, suffix: 'Monate' });
         const runwayLine = `Runway: ${formatRunwayValue(runwayMonate)} (Ziel: ${formatRunwayValue(runwayTarget, 0, 'n/a')}) -> Status: ${(diagnosis.general.runwayStatus || 'unbekannt').toUpperCase()} | Quelle: ${runwaySourceInfo.label}`;
         text += `${runwayLine}\nQuelle-Details: ${runwaySourceInfo.description}\n\n`;
-        text += `--- Status-Übersicht ---\n`;
-        text += `Marktregime: ${diagnosis.general.marketSzenario}\n`;
-        text += `Alarm-Modus: ${diagnosis.general.alarmActive ? 'AKTIV' : 'Inaktiv'}\n`;
-        text += `Entnahmequote: ${UIUtils.formatPercentRatio(diagnosis.keyParams.entnahmequoteDepot, { fractionDigits: 2, invalid: 'n/a' })}\n`;
-        text += `Realer Drawdown: ${UIUtils.formatPercentRatio(-diagnosis.keyParams.realerDepotDrawdown, { fractionDigits: 1, invalid: 'n/a' })}\n\n`;
         text += `--- Entscheidungsbaum (Warum?) ---\n`;
         diagnosis.decisionTree.forEach(item => {
             if (dom.diagnosis.filterToggle.checked && item.status === 'inactive') return;

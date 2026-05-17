@@ -53,6 +53,24 @@ console.log('--- Tax Settlement Tests ---');
 }
 
 {
+    const prev = { lossCarry: 2000 };
+    const result = settleTaxYear({
+        taxStatePrev: prev,
+        rawAggregate: { sumTaxableAfterTqfSigned: 6000, sumRealizedGainSigned: 7000 },
+        sparerPauschbetrag: 1000,
+        kirchensteuerSatz: 0.09
+    });
+    const keSt = 0.25 * (1 + 0.055 + 0.09);
+    assertClose(result.details.lossCarryStart, 2000, 1e-9, 'Details should expose starting loss carry');
+    assertClose(result.details.taxBaseBeforeCarry, 5000, 1e-9, 'Baseline tax base should apply SPB before loss carry view');
+    assertClose(result.details.taxBaseAfterCarry, 3000, 1e-9, 'Final tax base should apply loss carry before SPB');
+    assertClose(result.taxDue, 3000 * keSt, 0.01, 'Partial loss carry should still leave final tax due');
+    assertClose(result.details.taxBeforeLossCarry, 5000 * keSt, 0.01, 'Details should expose baseline tax before loss carry');
+    assertClose(result.details.taxSavedByLossCarry, 2000 * keSt, 0.01, 'Details should expose tax saved by loss carry');
+    assertClose(result.taxStateNext.lossCarry, 0, 1e-9, 'Partial consumption should deplete loss carry');
+}
+
+{
     const prev = { lossCarry: 250 };
     const prevClone = JSON.stringify(prev);
     settleTaxYear({

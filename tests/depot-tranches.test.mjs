@@ -120,4 +120,54 @@ console.log('--- Depot Tranchen Tests ---');
     assertClose(portfolio.depotTranchesGeldmarkt[0].marketValue, 60, 0.001, 'Geldmarkt tranche reduced');
 }
 
+// --- TEST 8: Profile-scoped tranche ids keep profile cost basis isolated ---
+{
+    const portfolio = {
+        depotTranchesAktien: [
+            {
+                trancheId: 'profile-a:shared',
+                sourceProfileId: 'profile-a',
+                type: 'aktien_alt',
+                name: 'ETF Shared',
+                isin: 'SAME',
+                purchaseDate: '2020-01-01',
+                marketValue: 100,
+                costBasis: 80
+            },
+            {
+                trancheId: 'profile-b:shared',
+                sourceProfileId: 'profile-b',
+                type: 'aktien_alt',
+                name: 'ETF Shared',
+                isin: 'SAME',
+                purchaseDate: '2020-01-01',
+                marketValue: 100,
+                costBasis: 40
+            }
+        ],
+        depotTranchesGold: [],
+        depotTranchesGeldmarkt: []
+    };
+    const saleResult = {
+        breakdown: [
+            {
+                kind: 'aktien_alt',
+                trancheId: 'profile-b:shared',
+                sourceProfileId: 'profile-b',
+                brutto: 50,
+                steuer: 0
+            }
+        ]
+    };
+
+    applySaleToPortfolio(portfolio, saleResult);
+
+    const profileA = portfolio.depotTranchesAktien[0];
+    const profileB = portfolio.depotTranchesAktien[1];
+    assertClose(profileA.marketValue, 100, 0.001, 'Profile A tranche should remain untouched');
+    assertClose(profileA.costBasis, 80, 0.001, 'Profile A cost basis should remain untouched');
+    assertClose(profileB.marketValue, 50, 0.001, 'Profile B tranche should be reduced by exact id');
+    assertClose(profileB.costBasis, 20, 0.001, 'Profile B cost basis should be reduced proportionally');
+}
+
 console.log('--- Depot Tranchen Tests Completed ---');
