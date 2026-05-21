@@ -2,10 +2,10 @@
 
 **Technische Dokumentation der DIY-Software für Ruhestandsplanung**
 
-**Version:** Engine API v31.0, Build 2025-12-22
-**Stand:** Februar 2026
-**Zuletzt validiert (Codebasis):** 2026-02-12
-**Codeumfang:** ~37.000 LOC (JavaScript ES6 Module)
+**Dokumentstand:** 2026-05-20
+**Geprüfte Codebasis:** lokale Arbeitskopie vom 2026-05-20
+**Engine API:** v31.0
+**Codeumfang:** Momentaufnahme, siehe Komponenten-Tabelle
 **Lizenz:** MIT
 
 ---
@@ -36,18 +36,18 @@
 
 ## Komponenten
 
-*Metriken in dieser Tabelle sind stichtagsbezogene Schätzwerte (validiert am 2026-02-06).*
+*Momentaufnahme der lokalen Arbeitskopie vom 2026-05-20. Modul- und Zeilenzahlen sind Orientierungshilfen, nicht normative Architekturgrenzen. Dieses Dokument beschreibt die Architektur und die fachlichen Zusammenhänge eigenständig; spezialisierte Referenzen (`TECHNICAL.md`, Modul-READMEs, `engine/README.md`, `tests/README.md`) dienen als ergänzende Detail- und Exportkataloge.*
 
-| Komponente | Zweck | Codeumfang |
-|------------|-------|------------|
-| **Balance-App** | Jahresplanung: Liquidität, Entnahme, Steuern, Transaktionen, Ausgaben-Check | 28 Module, ~6.100 LOC |
-| **Simulator** | Monte-Carlo-Simulation, Parameter-Sweeps, Auto-Optimize, Dynamic Flex | 43 Module, ~14.500 LOC |
-| **Engine** | Kern-Berechnungslogik, Guardrails, Steuern | 13 Module, ~3.600 LOC |
-| **Workers** | Parallelisierung für MC-Simulation | 3 Module, ~600 LOC |
-| **Tests** | Unit- und Integrationstests | 74 Testdateien, 1639 Assertions |
-| **Sonstige** | Profile, Tranchen, Utilities | ~20 Module, ~2.500 LOC |
+| Komponente | Zweck | Momentaufnahme |
+|------------|-------|----------------|
+| **Balance-App** | Jahresplanung: Liquidität, Entnahme, Steuern, Transaktionen, Ausgaben-Check | 34 JS-Module unter `app/balance/`, ca. 5.889 Zeilen |
+| **Simulator** | Monte-Carlo-Simulation, Parameter-Sweeps, Auto-Optimize, Dynamic Flex | 86 JS-Module unter `app/simulator/`, ca. 14.740 Zeilen |
+| **Engine** | Kern-Berechnungslogik, Guardrails, Steuern | 24 MJS-Module unter `engine/`, ca. 4.240 Zeilen |
+| **Workers** | Parallelisierung für MC/Sweep/Optimizer-Pfade | 3 JS-Module unter `workers/`, ca. 757 Zeilen |
+| **Tests** | Unit- und Integrationstests | 74 `*.test.mjs` Dateien; 1659 Assertions im Lauf vom 2026-05-20 |
+| **Profile, Tranchen, Shared** | Profilverwaltung, Profilverbund, Tranchenstatus, gemeinsame Utilities | JS-Module unter `app/profile/`, `app/tranches/`, `app/shared/`, zusammen ca. 2.959 Zeilen |
 
-*Hinweis: Code-Zeilenangaben (z.B. `SpendingPlanner.mjs:326`) können bei zukünftigen Änderungen abweichen. Die Algorithmen-Beschreibungen bleiben konzeptionell gültig.*
+*Hinweis: Dieses Dokument beschreibt Konzepte und Architekturentscheidungen. Für konkrete Implementierungsdetails gelten die genannten Module und Tests als Referenz; exakte Code-Zeilen werden bewusst vermieden, weil sie nach Refactorings schnell veralten.*
 
 ## Hauptfunktionen
 
@@ -59,7 +59,7 @@ Die Ruhestand-Suite kombiniert folgende Funktionen:
 4. **Multi-Profil-Unterstützung** für Paare mit getrennten Depots und **Witwenrente**
 5. **Tranchen-Management** mit FIFO-Steueroptimierung und Online-Kursaktualisierung
 6. **Balance-App** für operative Jahresplanung mit Online-Datenabruf
-7. **Simulator** mit Monte-Carlo, historischem Backtest, Parameter-Sweeps und 4-stufiger Auto-Optimierung
+7. **Simulator** mit Monte-Carlo, historischem Backtest, Parameter-Sweeps und mehrphasiger Auto-Optimierung
 8. **Historische Daten ab 1925** mit Stress-Szenarien (Große Depression, WWII)
 9. **Optionale Ansparphase** für vollständige Lebenszyklus-Modellierung
 10. **Rentensystem** für 1-2 Personen mit verschiedenen Indexierungsarten
@@ -82,19 +82,24 @@ Die Suite basiert auf einer spezifischen Anlagephilosophie und ist für Nutzer k
 
 | Asset-Klasse | Umsetzung | Rolle im Portfolio |
 |--------------|-----------|-------------------|
-| **Liquidität** | Geldmarkt-ETF (z.B. €STR-basiert) | Laufende Entnahmen, Notreserve, Runway-Puffer |
-| **Aktien** | Breit gestreuter Welt-ETF (z.B. Vanguard FTSE All-World, MSCI World) | Langfristiger Vermögensaufbau und -erhalt |
-| **Gold** | Physisch oder ETC | Krisenabsicherung, Rebalancing-Quelle in Bärenmärkten |
+| **Liquidität** | Tagesgeld/Giro-nahe Liquidität und Geldmarkt-ETF (z.B. €STR-basiert) | Laufende Entnahmen, Notreserve, Runway-Puffer |
+| **Aktien** | Breit gestreuter Aktien-ETF (z.B. Vanguard FTSE All-World, MSCI World, ACWI) | Langfristiger Vermögensaufbau und -erhalt |
+| **Gold** | Physisch, ETC oder vergleichbarer Gold-Baustein | Krisenabsicherung, Rebalancing-Quelle in Bärenmärkten |
+| **Bonds / Anleihen** | Optional im Modus **3-Bucket Jilge**: Anleihen-ETF bzw. Bond-Tranchen | Zusätzlicher defensiver Puffer zwischen Liquidität und Aktien; in schlechten Jahren vorrangige Verkaufsquelle, in guten Jahren Zieltopf zum Wiederauffüllen |
+
+Die Grundstrategie bleibt ein einfaches, passives Portfolio aus Liquidität, Aktien-ETF und optional Gold. Der per Strategieauswahl aktivierbare Modus **3-Bucket Jilge** erweitert dieses Modell um einen Bond-/Anleihen-Bucket. Bonds sind damit kein allgemeines Multi-Asset-Modell beliebiger Rentenpapiere, sondern ein regelbasierter Zieltopf innerhalb der Entnahmelogik.
 
 ### Kernprinzipien
 
-1. **Passive, breit diversifizierte Aktienanlage:** Die Suite geht von einem einzelnen, global gestreuten Aktien-ETF aus – keine Einzelaktien, keine Sektorwetten, keine aktive Titelauswahl.
+1. **Passive, breit diversifizierte Aktienanlage:** Die Suite geht von einem oder wenigen global gestreuten Aktien-ETFs aus – keine Einzelaktien, keine Sektorwetten, keine aktive Titelauswahl.
 
 2. **Liquiditätsmanagement über Geldmarkt-ETF:** Statt klassischem Tagesgeld bei Banken wird Liquidität in Geldmarkt-ETFs gehalten, die täglich handelbar sind und aktuell marktnahe Zinsen bieten.
 
 3. **Gold als antizyklischer Puffer:** Gold dient nicht primär der Rendite, sondern als Stabilitätsanker. In Bärenmärkten, wenn Aktien fallen, kann Gold zur Liquiditätsbeschaffung verkauft werden, ohne Aktien zu ungünstigen Kursen liquidieren zu müssen.
 
-4. **Regelbasierte Entnahme:** Guardrails und Marktregime-Erkennung steuern die Entnahmen automatisch – keine diskretionären Timing-Entscheidungen.
+4. **Optionaler 3-Bucket-Jilge-Puffer:** Im 3-Bucket-Modus kommen Bonds/Anleihen-ETF als zusätzlicher defensiver Puffer hinzu. Die Logik kann in schlechten Jahren Bond-Bestände statt Aktien heranziehen und in guten Jahren den Bond-Zieltopf wieder auffüllen.
+
+5. **Regelbasierte Entnahme:** Guardrails, Marktregime-Erkennung und optionale 3-Bucket-Regeln steuern die Entnahmen automatisch – keine diskretionären Timing-Entscheidungen.
 
 ### Für wen die Suite geeignet ist
 
@@ -102,16 +107,17 @@ Die Suite basiert auf einer spezifischen Anlagephilosophie und ist für Nutzer k
 ✅ Nutzer von Welt-ETFs (MSCI World, FTSE All-World, ACWI)
 ✅ Anleger, die Geldmarkt-ETFs als Liquiditätsinstrument nutzen
 ✅ Investoren mit optionaler Gold-Beimischung zur Diversifikation
+✅ Nutzer, die im 3-Bucket-Jilge-Modus einen defensiven Bond-/Anleihen-ETF-Puffer modellieren möchten
 ✅ Ruheständler, die regelbasierte Entnahmestrategien bevorzugen
 
 ### Für wen die Suite nicht geeignet ist
 
 ❌ **Einzelaktien-Investoren:** Keine Unterstützung für Stock-Picking oder Dividendenstrategien mit Einzeltiteln
-❌ **Anleihen-Portfolios:** Keine Modellierung von Staatsanleihen, Unternehmensanleihen oder Rentenfonds (außer Geldmarkt)
+❌ **Komplexe Anleihen-Portfolios:** Keine detaillierte Modellierung einzelner Staatsanleihen, Unternehmensanleihen, Laufzeiten, Kupons, Duration-Profile oder Zinskurven. Unterstützt ist ein vereinfachter Bond-/Anleihen-ETF-Bucket im 3-Bucket-Jilge-Modus.
 ❌ **Immobilien-Investoren:** Keine Integration von Mieteinnahmen oder Immobilienwerten
 ❌ **Krypto-Anleger:** Keine Unterstützung für Bitcoin, Ethereum oder andere Kryptowährungen
 ❌ **Aktive Trader:** Keine Unterstützung für Market-Timing, Optionen oder gehebelte Produkte
-❌ **Multi-Asset-Strategien:** Keine Modellierung komplexer Portfolios mit vielen Asset-Klassen
+❌ **Freie Multi-Asset-Strategien:** Keine Modellierung komplexer Portfolios mit beliebig vielen Asset-Klassen jenseits der unterstützten Bausteine Liquidität, Aktien-ETF, Gold und optionalem Bond-Bucket.
 
 ### Warum diese Einschränkung?
 
@@ -119,7 +125,7 @@ Die Fokussierung auf ein einfaches, aber robustes Anlagemodell ermöglicht:
 
 - **Präzise Steuerberechnung:** Die deutsche Kapitalertragssteuer wird exakt für ETFs mit Teilfreistellung modelliert
 - **Zuverlässige historische Simulation:** Die Monte-Carlo-Daten basieren auf MSCI-World-ähnlichen Renditereihen
-- **Klare Entscheidungslogik:** Guardrails und Rebalancing-Regeln sind auf das Drei-Säulen-Modell (Aktien-ETF, Geldmarkt, Gold) abgestimmt
+- **Klare Entscheidungslogik:** Guardrails, Rebalancing- und 3-Bucket-Regeln sind auf wenige Bausteine abgestimmt: Aktien-ETF, Geldmarkt/Liquidität, Gold und optional Bonds
 - **Geringere Komplexität:** Weniger Stellschrauben bedeuten weniger Fehlkonfiguration
 
 *Wer einem anderen Anlagemodell folgt, sollte prüfen, ob die Annahmen der Suite auf das eigene Portfolio übertragbar sind.*
@@ -130,12 +136,13 @@ Die Fokussierung auf ein einfaches, aber robustes Anlagemodell ermöglicht:
 - **Single vs. Haushalt:** Das Dokument beschreibt sowohl Einzelprofil- als auch Profilverbund-Flows. Aussagen zur Zielgruppe und zu Workflows gelten für beide Modi.
 - **Codebezug:** Codezeilen-/LOC-Angaben dienen der Orientierung und sind nicht normativ. Bei Abweichungen gilt immer der aktuelle Code im Repository.
 - **Abgrenzung zu `TECHNICAL.md`:** `TECHNICAL.md` dient als kompakte Betriebs- und Entwicklerreferenz. Dieses Dokument enthält die vertiefte fachliche Herleitung, Designentscheidungen und Vergleichskapitel.
+- **Doku-Scope:** Dieses Dokument muss als eigenständige Architektur- und Fachlektüre ausreichen. Spezialisierte Referenzen liefern ergänzende Exportlisten, Betriebsdetails und Testinventare, ersetzen aber nicht die konzeptionelle Beschreibung hier.
 
 ## Release-Checkliste (Dokumentpflege)
 
 Vor jedem Release oder größeren Merge diese Punkte aktualisieren:
 
-1. **Metadaten aktualisieren:** `Version`, `Stand`, `Zuletzt validiert`.
+1. **Metadaten aktualisieren:** `Dokumentstand`, `Geprüfte Codebasis`, `Engine API`.
 2. **Bestandszahlen prüfen:** Modulanzahlen, Testdateien, LOC-Schätzwerte, Build-Hinweise.
 3. **Codeverweise verifizieren:** Dateinamen, Funktionsnamen und Modulzuordnungen (insb. bei Refactorings).
 4. **Zeitfenster prüfen:** Historische Datenräume in MC/Backtest auf Konsistenz prüfen und klar abgrenzen.
@@ -143,52 +150,84 @@ Vor jedem Release oder größeren Merge diese Punkte aktualisieren:
 6. **Quellenabschnitte aktualisieren:** Externe Vergleiche/Forschung mit Stand und ggf. Versionshinweis versehen.
 7. **Smoke-Review durchführen:** Dokument auf doppelte/obsolete Aussagen und widersprüchliche Zahlen durchsuchen.
 
+Reproduzierbare Inventarpruefung fuer die Komponenten-Tabelle:
+
+```powershell
+(Get-ChildItem app\balance -Filter *.js).Count
+(Get-ChildItem app\simulator -Filter *.js).Count
+(Get-ChildItem engine -Recurse -Filter *.mjs).Count
+(Get-ChildItem workers -Filter *.js).Count
+Get-ChildItem tests -Filter *.test.mjs | Measure-Object | Select-Object -ExpandProperty Count
+Get-ChildItem app\balance -Filter *.js | Get-Content | Measure-Object -Line
+Get-ChildItem app\simulator -Filter *.js | Get-Content | Measure-Object -Line
+Get-ChildItem engine -Recurse -Filter *.mjs | Get-Content | Measure-Object -Line
+Get-ChildItem workers -Filter *.js | Get-Content | Measure-Object -Line
+Get-ChildItem app\profile,app\tranches,app\shared -Filter *.js | Get-Content | Measure-Object -Line
+```
+
 ---
 
 # Technische Architektur
 
 ## B.1 Drei-Schichten-Architektur
 
+Die Suite besteht heute nicht mehr nur aus zwei HTML-Oberflächen mit wenigen Begleitmodulen. Neben Balance und Simulator gibt es zentrale Einstiegsseiten für Profilverwaltung, Tranchenverwaltung und Handbuch; die UI-nahe Logik ist in thematische ES-Module aufgeteilt. Die Engine bleibt die gemeinsame deterministische Rechenschicht, `engine.js` ist daraus generiert.
+
+### B.1.0 Aktuelle Top-Level-Struktur
+
+| Bereich | Pfade | Rolle |
+|---------|-------|-------|
+| **Start- und Oberflächen-HTML** | `index.html`, `Balance.html`, `Simulator.html`, `depot-tranchen-manager.html`, `Handbuch.html` | Einstieg, Profilverwaltung, Jahresplanung, Simulation, Tranchenpflege, lokale Hilfe |
+| **Balance-App** | `app/balance/`, `css/balance.css` | Operative Jahresplanung, Diagnose, Jahresupdate, Ausgaben-Check, Profilverbund-Anbindung |
+| **Simulator** | `app/simulator/`, `simulator.css` | Monte Carlo, Backtest, Sweep, Auto-Optimize, Pflege/Rente/Portfolio-UI, DOM-freie Jahreslogik |
+| **Profil/Verbund/Tranchen** | `app/profile/`, `app/tranches/` | Profilregistry, Profilwechsel, Profilverbund-Aggregation, Tranchenstatus und Tranchenmanager |
+| **Shared Utilities** | `app/shared/`, `types/` | Formatter, Feature-Flags, Security-Utilities, gemeinsame Typ-/Contract-Hilfen |
+| **Engine-Quellen** | `engine/` | ESM-Quelle für Validierung, Marktanalyse, Spending-Policies, Steuer-/Transaktionslogik |
+| **Generierte Engine** | `engine.js` | Browser-Bundle bzw. Modul-Fallback der Engine; nicht manuell bearbeiten |
+| **Workers** | `workers/`, `app/simulator/worker-job-runner.js` | Parallele MC-/Sweep-/Optimizer-Jobs mit seriellen Fallbacks |
+| **Desktop-Paketierung** | `src-tauri/`, `dist/`, `scripts/` | Tauri-WebView, integrierter Yahoo-Proxy, Sync-/Build-Skripte |
+| **Tests und Doku** | `tests/`, `docs/reference/`, `docs/internal/` | Regressionstests, Referenzdoku, interne Arbeitspläne |
+
+### B.1.1 Laufzeitschichten
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    PRÄSENTATIONSSCHICHT                     │
-├──────────────────────────┬──────────────────────────────────┤
-│      Balance-App         │           Simulator              │
-│  ┌─────────────────────┐ │  ┌────────────────────────────┐  │
-│  │ balance-main.js     │ │  │ simulator-main.js          │  │
-│  │ balance-reader.js   │ │  │ simulator-portfolio.js     │  │
-│  │ balance-renderer.js │ │  │ simulator-monte-carlo.js   │  │
-│  │ balance-binder.js   │ │  │ simulator-sweep.js         │  │
-│  │ balance-storage.js  │ │  │ simulator-results.js       │  │
-│  └─────────────────────┘ │  └────────────────────────────┘  │
-├──────────────────────────┴──────────────────────────────────┤
-│                      LOGIKSCHICHT                           │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │                    engine.js (Bundle)                  │ │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌────────────────┐ │ │
-│  │  │ InputValid. │→ │MarketAnalyz.│→ │SpendingPlanner │ │ │
-│  │  └─────────────┘  └─────────────┘  └────────────────┘ │ │
-│  │                          ↓                             │ │
-│  │  ┌─────────────────────────────────────────────────┐  │ │
-│  │  │           TransactionEngine                      │  │ │
-│  │  │  ┌──────────┐ ┌──────────┐ ┌──────────────────┐ │  │ │
-│  │  │  │liquidity │ │ sale-    │ │ gold-rebalance   │ │  │ │
-│  │  │  │-planner  │ │ engine   │ │                  │ │  │ │
-│  │  │  └──────────┘ └──────────┘ └──────────────────┘ │  │ │
-│  │  └─────────────────────────────────────────────────┘  │ │
-│  └────────────────────────────────────────────────────────┘ │
+├──────────────┬──────────────┬──────────────┬────────────────┤
+│ index.html   │ Balance.html │ Simulator    │ Tranchen/      │
+│ Profil- und  │ Jahresplan,  │ Monte Carlo, │ Handbuch       │
+│ Startseite   │ Diagnose     │ Backtest     │ Zusatzseiten   │
+├──────────────┴──────────────┴──────────────┴────────────────┤
+│ app/balance/  app/simulator/  app/profile/  app/tranches/   │
+│ app/shared/   types/                                           │
+├─────────────────────────────────────────────────────────────┤
+│                     ENGINE-SCHICHT                           │
+│  engine/ (ESM-Quelle)  ── build-engine.mjs ──>  engine.js     │
+│                                                             │
+│  InputValidator → MarketAnalyzer → Spending-Policies         │
+│        ↓                 ↓                 ↓                 │
+│  Tax Settlement ← TransactionEngine ← Sale/3-Bucket-Logik     │
 ├─────────────────────────────────────────────────────────────┤
 │                   PARALLELISIERUNG                          │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │                 Worker Pool (8 Worker)                 │ │
-│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │ │
-│  │  │mc-worker │ │mc-worker │ │mc-worker │ │mc-worker │  │ │
-│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘  │ │
-│  └────────────────────────────────────────────────────────┘ │
+│  workers/worker-pool.js  workers/mc-worker.js               │
+│  workers/worker-telemetry.js  app/simulator/*worker*        │
+│  MC, Sweep und Auto-Optimize nutzen Worker mit Fallbacks     │
+├─────────────────────────────────────────────────────────────┤
+│                   AUSLIEFERUNG / LAUFZEIT                   │
+│  Browser über lokalen Webserver oder Tauri aus dist/         │
+│  Optionale Live-Daten: lokaler Yahoo-Proxy + CSP-Allowlist   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## B.1.1 Tauri Desktop-App (Portable EXE)
+**Aktuelle Bestandszahlen (2026-05-20):**
+
+- `app/balance/`: 34 JS-Module
+- `app/simulator/`: 86 JS-Module
+- `engine/`: 24 MJS-Module
+- `workers/`: 3 JS-Module
+- `tests/`: 74 Testdateien
+
+## B.1.2 Tauri Desktop-App (Portable EXE)
 
 ### Was ist Tauri?
 
@@ -204,7 +243,7 @@ Vor jedem Release oder größeren Merge diese Punkte aktualisieren:
 
 ### Ruhestand-Suite als Desktop-App
 
-Die Suite wird als **native Desktop-App** für alle Plattformen ausgeliefert (siehe auch B.1.2 für Details zu macOS/Linux):
+Die Suite wird als **native Desktop-App** für alle Plattformen ausgeliefert (siehe auch B.1.3 für Details zu macOS/Linux):
 
 | Plattform | Format | Größe |
 |-----------|--------|-------|
@@ -228,6 +267,7 @@ src-tauri/
 ```json
 {
   "productName": "RuhestandSuite",
+  "version": "0.1.0",
   "identifier": "com.dieter.ruhestandsapp",
   "build": {
     "frontendDist": "../dist"
@@ -235,8 +275,10 @@ src-tauri/
   "app": {
     "security": {
       "csp": {
-        "connect-src": "'self' http://127.0.0.1:8787 https://data-api.ecb.europa.eu https://api.worldbank.org https://stats.oecd.org https://r.jina.ai"
-      }
+        "connect-src": "'self' http://127.0.0.1:8787 http://localhost:8787 https://data-api.ecb.europa.eu https://api.worldbank.org https://stats.oecd.org https://r.jina.ai",
+        "worker-src": "'self' blob:"
+      },
+      "dangerousDisableAssetCspModification": true
     },
     "windows": [{
       "title": "RuhestandsApp",
@@ -259,6 +301,20 @@ src-tauri/
 | **Performance** | Natives Fenster, kein Browser-Overhead |
 | **Leichtgewichtig** | ~8-12 MB statt ~200 MB bei Electron-Apps |
 
+### Live-Daten in Browser und Tauri
+
+Live-Daten sind optional. Ohne Netzwerk, blockierte Endpunkte oder fehlenden Proxy muss die Suite mit lokalen/manuellen Werten weiterlaufen und Fehler sichtbar protokollieren, statt das Planungsjahr zu blockieren.
+
+| Quelle | Pfad | Laufzeit |
+|--------|------|----------|
+| Yahoo Finance | lokaler Proxy `http://127.0.0.1:8787` bzw. `http://localhost:8787` | Browser: Node-Proxy aus `start_suite.*`; Tauri: integrierter Rust-Proxy in `src-tauri/src/lib.rs` |
+| ECB Data API | `https://data-api.ecb.europa.eu` | direkter Fetch aus Browser/Tauri-WebView |
+| World Bank API | `https://api.worldbank.org` | direkter Fetch aus Browser/Tauri-WebView |
+| OECD stats | `https://stats.oecd.org` | direkter Fetch aus Browser/Tauri-WebView |
+| CAPE/Yale-Mirror | `https://r.jina.ai` | direkter Fetch aus Browser/Tauri-WebView |
+
+Die Tauri-CSP in `src-tauri/tauri.conf.json` muss diese Ziele explizit unter `app.security.csp.connect-src` erlauben. Neue externe Live-Datenquellen müssen gleichzeitig in `docs/reference/DATA_SOURCES.md` dokumentiert und in der CSP ergänzt werden.
+
 ### Build-Prozess
 
 ```bash
@@ -267,17 +323,26 @@ build-tauri.bat
 
 # Entspricht intern:
 # 1) npm run sync-dist
-# 2) npm run tauri:build
-# 3) Copy src-tauri/target/release/ruhestand_suite.exe -> RuheStandSuite.exe
+# 2) dist/ validieren
+# 3) npm run tauri:build
+# 4) Copy src-tauri/target/release/ruhestand_suite.exe -> RuhestandSuite.exe
 ```
+
+Der gleiche Build-Pfad ist als npm-Skript verfügbar:
+
+```bash
+npm run build-tauri-exe
+```
+
+`scripts/build-tauri.ps1` prüft vor dem Build `npm`, Rust/Cargo, den MSVC-Toolchain-Zugriff und nach dem Sync zentrale `dist/`-Assets. Der Build nutzt immer `dist/` als Frontend-Eingang; `scripts/sync-dist.ps1` kopiert die Laufzeitdateien frisch und schließt Entwicklungs-, Test-, Doku- und Release-Artefakte aus. Änderungen an `engine/` müssen vorher mit `npm run build:engine` in `engine.js` übertragen werden; für CI/Release steht `npm run build:engine:strict` bereit.
 
 **Output je nach Plattform:**
 - **Windows (Build-Artefakt):** `src-tauri/target/release/ruhestand_suite.exe`
-- **Windows (kopiertes Repo-Root-Artefakt):** `RuheStandSuite.exe`
+- **Windows (kopiertes Repo-Root-Artefakt):** `RuhestandSuite.exe`
 - **macOS:** `src-tauri/target/release/bundle/macos/RuhestandSuite.app`
 - **Linux:** `src-tauri/target/release/bundle/appimage/RuhestandSuite.AppImage`
 
-*Für detaillierte Build-Anleitungen aller Plattformen siehe Abschnitt B.1.2.*
+*Für detaillierte Build-Anleitungen aller Plattformen siehe Abschnitt B.1.3.*
 
 ### Technische Details
 
@@ -289,7 +354,7 @@ build-tauri.bat
 
 ---
 
-## B.1.2 Plattformunabhängigkeit
+## B.1.3 Plattformunabhängigkeit
 
 Die Ruhestand-Suite ist plattformübergreifend nutzbar und kann auf Windows, macOS und Linux ausgeführt werden. Es gibt drei Ausführungsmethoden mit unterschiedlichen Anforderungen.
 
@@ -307,12 +372,15 @@ Die Tauri-Konfiguration (`bundle.targets: "all"`) unterstützt alle Plattformen:
 
 **Windows:**
 ```bash
-npm run tauri:build
-# Output: src-tauri/target/release/RuhestandSuite.exe (~8 MB)
+npm run build-tauri-exe
+# Output: RuhestandSuite.exe im Repo-Root
 ```
+
+Für reine Tauri-Bundles ohne Kopierschritt kann direkt `npm run sync-dist` und danach `npm run tauri:build` verwendet werden. Das rohe Windows-Build-Artefakt heißt durch den Rust-Crate-Namen `src-tauri/target/release/ruhestand_suite.exe`.
 
 **macOS:**
 ```bash
+npm run sync-dist
 npm run tauri:build
 # Output: src-tauri/target/release/bundle/macos/RuhestandSuite.app
 # Optional: .dmg Installer
@@ -320,6 +388,7 @@ npm run tauri:build
 
 **Linux:**
 ```bash
+npm run sync-dist
 npm run tauri:build
 # Output: src-tauri/target/release/bundle/appimage/RuhestandSuite.AppImage
 # Alternativ: .deb Paket für Debian/Ubuntu
@@ -434,633 +503,520 @@ npx serve -p 8000
 
 ---
 
-## B.2 Balance-App: Detaillierte Modul-Analyse
+## B.2 Balance-App: Architektur und Modulzuschnitt
 
-### B.2.1 Hauptmodule
+Die Balance-App ist die operative Jahresplanungsoberfläche. Sie beantwortet jedes Jahr dieselbe praktische Frage: Welche Entnahme ist unter den aktuellen Markt-, Steuer-, Liquiditäts- und Profilbedingungen sinnvoll, welche Transaktionen sind dafür nötig und welche Diagnose erklärt die Entscheidung? Dafür liest sie Profil- und UI-Daten, ruft die gemeinsame `EngineAPI` für ein einzelnes Planungsjahr auf, bereitet Handlungsempfehlungen und Diagnose-Payloads auf und persistiert Eingaben, Guardrail-/Steuerzustand, Snapshots und Ausgabenhistorie.
 
-*LOC-/Zeilenangaben sind stichtagsbezogen (validiert am 2026-02-06).*
+Der Detailkatalog in `docs/reference/BALANCE_MODULES_README.md` ergänzt diese Beschreibung mit Exportlisten. Die fachliche Architektur steht hier: Balance ist eine UI-nahe Orchestrierungsschicht um die deterministische Engine, nicht selbst der Ort für Steuer-, Guardrail- oder Marktregime-Kernlogik.
 
-| Modul | LOC | Verantwortung | Evidenz |
-|-------|-----|---------------|---------|
-| `balance-main.js` | 409 | Orchestrierung, Init, Update-Zyklus | `update()` |
-| `balance-reader.js` | 278 | DOM-Input-Lesung, Tranchen-Aggregation | `readAllInputs()` |
-| `balance-renderer.js` | 156 | Render-Facade, delegiert an Sub-Renderer | `render()` |
-| `balance-binder.js` | 244 | Event-Handler, Keyboard-Shortcuts | `bindUI()` |
-| `balance-storage.js` | 399 | localStorage, File System API, Snapshots | `createSnapshot()` |
+### B.2.1 Modulcluster
 
-### B.2.2 Update-Zyklus (vereinfachter Pseudocode)
+| Cluster | Module | Verantwortung |
+|---------|--------|---------------|
+| **Bootstrap und Orchestrierung** | `balance-main.js`, `balance-main-profile-sync.js`, `balance-main-profilverbund.js`, `balance-update-pipeline.js`, `balance-action-postprocessor.js` | App-Initialisierung, Engine-Handshake, Update-Zyklus, Profilwerte in Inputs spiegeln, Profilverbund-Läufe, Renderer-/Persistenz-Payloads, Action-Nachbearbeitung |
+| **Konfiguration und Utilities** | `balance-config.js`, `balance-utils.js` | App-Konfiguration, Engine-Versionserwartung, Fehlerklassen, Währungs-/Zahlen-/Prozentformatierung, Zugriff auf Engine-Konfiguration |
+| **Input und Persistenz** | `balance-reader.js`, `balance-storage.js`, `balance-guardrail-reset.js` | DOM-Input-Lesen, Input-Side-Effects, localStorage, Snapshot-Handling, Erhalt von `lastState.taxState`, Reset-Erkennung für Guardrail-Historie |
+| **Event-Binding und Workflows** | `balance-binder.js`, `balance-binder-annual.js`, `balance-binder-imports.js`, `balance-binder-snapshots.js`, `balance-binder-diagnosis.js` | Event-Hub, Tabs, Keyboard-Shortcuts, Import/Export, Snapshot-Aktionen, Diagnose-Kopie, Jahresabschluss und Jahresupdate |
+| **Jahresupdate und Live-Daten** | `balance-annual-inflation.js`, `balance-annual-marketdata.js`, `balance-annual-modal.js`, `balance-annual-orchestrator.js` | Inflation, ETF-/CAPE-Abruf, Marktdaten-Nachrücken, ATH-Aktualisierung, Ergebnis-/Fehlerprotokoll |
+| **Rendering** | `balance-renderer.js`, `balance-renderer-summary.js`, `balance-renderer-action.js`, `balance-renderer-diagnosis.js` | Summary, Marktstatus, Liquiditätsbalken, Handlungsempfehlungen, Steuer-/Cash-Aufschlüsselung, Diagnose-Container |
+| **Diagnose** | `balance-diagnosis-format.js`, `balance-diagnosis-chips.js`, `balance-diagnosis-decision-tree.js`, `balance-diagnosis-guardrails.js`, `balance-diagnosis-keyparams.js`, `balance-diagnosis-transaction.js` | Diagnose-Payload normalisieren, Status-Chips, Entscheidungsbaum, Guardrail-Karten, VPW-/Key-Parameter, Transaktionsdiagnostik |
+| **Ausgaben-Check** | `balance-expenses.js`, `balance-expenses-storage.js`, `balance-expenses-csv.js`, `balance-expenses-metrics.js`, `balance-expenses-renderer.js` | Monatsweise CSV-Importe pro Profil, Budgetvergleich, Median-basierte Jahreshochrechnung, Summary/Tabelle/Detaildialog, Storage `balance_expenses_v1` |
+| **Profilverbund-Anbindung** | `app/profile/profilverbund-balance.js`, `app/profile/profilverbund-balance-ui.js`, Profilmodule unter `app/profile/` | Profilauswahl, Multi-Profil-Aggregation, Entnahmeverteilung, Asset-Summaries, Profilwerte in Balance-Inputs |
+| **Tranchen-Anbindung** | `app/tranches/depot-tranchen-status.js`, `app/tranches/*manager*.js`, `depot-tranchen-manager.html` | Detailtranchen laden, aggregieren, in Inputs synchronisieren, Kursaktualisierung und Status-Badge bereitstellen |
 
-*Hinweis: Der folgende Ablauf ist bewusst vereinfacht und beschreibt die Kernschritte, nicht den exakten Codepfad jeder Hilfsfunktion.*
+**Aktueller Bestand (2026-05-20):** 34 JS-Module unter `app/balance/`. Profilverbund-, Profil- und Tranchenmodule liegen bewusst außerhalb dieses Ordners und werden von Balance genutzt.
+
+### B.2.1a Zentrale Modulverantwortung
+
+| Modul | Rolle im System | Wichtigste Verträge |
+|-------|-----------------|---------------------|
+| `balance-main.js` | Einstiegspunkt der Balance-App | Initialisiert DOM-Referenzen, Storage, Reader, Renderer, Binder und Profilverbund; prüft `EngineAPI.getVersion()` gegen `REQUIRED_ENGINE_API_VERSION_PREFIX`; stellt `update()` und `debouncedUpdate()` bereit |
+| `balance-reader.js` | Input-Grenze zwischen DOM und Modell | Normalisiert Währungen, Prozentwerte, Checkboxen und abhängige Panels; liefert ein Engine-kompatibles Inputobjekt; übernimmt gespeicherte Inputs wieder ins Formular |
+| `balance-storage.js` | Persistenzgrenze der Jahresplanung | Lädt/speichert Eingaben und `lastState`; migriert ältere lokale Daten; verwaltet Snapshots; erhält `taxState.lossCarry`, damit Verlustvorträge nicht durch Guardrail-Resets verschwinden |
+| `balance-update-pipeline.js` | Fachliche UI-Pipeline nach dem Engine-Call | Formt Engine-Ergebnisse in Render-, Diagnose-, Budget- und Persistenzpayloads um; entscheidet, welche Teile persistiert und welche nur angezeigt werden |
+| `balance-action-postprocessor.js` | Nachbearbeitung der Handlungsempfehlung | Merged Profilverbund-Actions und ergänzt Single-3-Bucket-Postprocessing, ohne die Engine-Entscheidung selbst zu ersetzen |
+| `balance-binder.js` | Event-Hub | Bindet Formularänderungen, Tabs, Reset, Jahresabschluss, Import/Export, Snapshot-Aktionen, Diagnose-Kopie und Jahresupdate-Handler |
+| `balance-renderer.js` | Render-Fassade | Verteilt die Darstellung auf Summary, Action und Diagnose; kapselt Toasts, Fehlermeldungen und Theme-Anwendung |
+
+Damit bleibt die Richtung klar: Reader und Storage übersetzen Randbedingungen in Daten, `balance-main.js` orchestriert, die Engine rechnet, Pipeline/Postprocessor bereiten auf, Renderer zeigen an, Binder verdrahtet Nutzeraktionen.
+
+### B.2.2 Update-Zyklus
+
+Der Balance-Update-Zyklus ist in `balance-main.js` und `balance-update-pipeline.js` aufgeteilt. Vereinfacht:
 
 ```javascript
 function update() {
-    // 1. Read Inputs
-    profileSyncHandlers.syncProfileDerivedInputs();
+    syncProfileDerivedInputs();
     const inputData = UIReader.readAllInputs();
 
-    // 2. Load State (Guardrail-History)
     const persistentState = StorageManager.loadState();
-    const shouldResetState = shouldResetGuardrailState(persistentState.inputs, inputData);
+    const lastState = shouldResetGuardrailState(persistentState.inputs, inputData)
+        ? preserveTaxStateOnly(persistentState.lastState)
+        : persistentState.lastState;
 
-    // 3. Profilverbund (Multi-Profil)
-    const profilverbundRuns = (profilverbundProfiles.length > 1)
-        ? profilverbundHandlers.runProfilverbundProfileSimulations(...)
-        : null;
-
-    // 4. Engine Call
-    const lastState = shouldResetState ? null : persistentState.lastState;
+    const profilverbundRuns = maybeRunProfilverbundProfiles(inputData);
     const modelResult = window.EngineAPI.simulateSingleYear(inputData, lastState);
-    if (profilverbundRuns) {
-        modelResult.ui.action = profilverbundHandlers.mergeProfilverbundActions(profilverbundRuns);
-    }
+    const uiPayload = buildBalanceUiPayload(modelResult, profilverbundRuns);
 
-    // 5. Render
-    UIRenderer.render({...modelResult.ui, input: inputData});
-    UIRenderer.renderDiagnosis(appState.diagnosisData);
-
-    // 6. Persist
-    StorageManager.saveState({...persistentState, inputs: inputData, lastState: modelResult.newState});
+    UIRenderer.render(uiPayload);
+    UIRenderer.renderDiagnosis(uiPayload.diagnosis);
+    updateExpensesBudget(uiPayload.budget);
+    StorageManager.saveState(buildPersistedState(persistentState, inputData, modelResult));
 }
 ```
 
-### B.2.3 Renderer-Architektur
+Wichtige Verträge:
 
-| Sub-Renderer | Datei | Verantwortung |
-|--------------|-------|---------------|
-| `SummaryRenderer` | `balance-renderer-summary.js` | Mini-Summary, Liquiditätsbalken, Marktstatus |
-| `ActionRenderer` | `balance-renderer-action.js` | Aktionsbox mit Quellen/Verwendungen (496 LOC) |
-| `DiagnosisRenderer` | `balance-renderer-diagnosis.js` | Chips, Entscheidungsbaum, Guardrails, KeyParams |
+- `EngineAPI.simulateSingleYear()` bleibt der zentrale Rechenaufruf.
+- `balance-update-pipeline.js` bündelt Last-State, Diagnose-, Renderer- und Persistenzentscheidungen.
+- `balance-action-postprocessor.js` ergänzt Profilverbund-Action-Merges und Single-3-Bucket-Postprocessing.
+- Steuerzustand (`lastState.taxState`, insbesondere `lossCarry`) wird bei Guardrail-Resets erhalten, sofern nur die Guardrail-Historie invalidiert wird.
 
-### B.2.4 Diagnose-System
+### B.2.2a Zustands- und Reset-Logik
 
-```
-DiagnosisRenderer
-├── buildDiagnosisChips()      → Status-Badges (Alarm, Vorsicht, Normal)
-├── buildDecisionTree()        → Schrittweise Engine-Entscheidungen
-├── buildGuardrails()          → Schwellenwert-Visualisierung
-├── buildTransactionDiagnostics() → Verkaufsreihenfolge, Steuern
-└── buildKeyParams()           → Schlüsselkennzahlen-Grid
-```
+Balance unterscheidet bewusst zwischen **Eingaben**, **Engine-Folgezustand** und **historischem Steuerzustand**:
 
-### B.2.5 Storage & Persistenz
+- Eingaben beschreiben das aktuelle Planungsjahr: Bedarf, Vermögen, Renten, Tranchen, Marktdaten, Guardrail- und VPW-Parameter.
+- `lastState` enthält Engine-Folgewerte aus Vorjahren, z. B. ATH-/Guardrail-Historie, geglättete Dynamic-Flex-Werte und Steuerzustand.
+- `balance-guardrail-reset.js` erkennt Eingriffe, die historische Guardrail-Aussagen fachlich entwerten würden, etwa starke Änderungen bei Bedarf, Vermögen, Rentenstatus oder Marktdaten.
+- Ein Reset bedeutet nicht automatisch „alles vergessen“: Steuerliche Verlustvorträge bleiben erhalten, weil sie reale, jahresübergreifende Steuerhistorie abbilden.
 
-| Feature | Implementierung | Evidenz |
-|---------|-----------------|---------|
-| **localStorage** | Hauptspeicher für State | `balance-storage.js:73-94` |
-| **File System API** | Snapshots in Verzeichnis | `balance-storage.js:304-318` |
-| **IndexedDB** | Persistente Directory-Handles | `balance-storage.js:34-61` |
-| **Migration** | Bereinigung fehlerhafter Werte | `balance-storage.js:108-122` |
+Diese Trennung ist wichtig, weil die Balance-App operativ genutzt wird: Nutzer können reale Depot- und Bedarfswerte korrigieren, ohne dadurch steuerliche Vorträge oder Snapshots unabsichtlich zu verlieren.
 
-### B.2.6 Online-Daten-Abruf (balance-annual-marketdata.js)
+### B.2.3 Rendering und Diagnose
 
-| Datenquelle | API | Fallback |
-|-------------|-----|----------|
-| ETF-Kurse (VWCE.DE) | Yahoo Finance via lokalem Proxy | Optional: Custom Proxy (`etfProxyUrl`/`etfProxyUrls`) |
-| Inflation | ECB/World Bank/OECD | Manuell |
+`balance-renderer.js` ist die Fassade. Die eigentliche Darstellung ist auf Summary-, Action- und Diagnosemodule verteilt:
 
-### B.2.7 Keyboard-Shortcuts
+| Bereich | Module | Inhalt |
+|---------|--------|--------|
+| **Summary** | `balance-renderer-summary.js` | KPIs, Marktstatus, Liquiditätsbalken |
+| **Action** | `balance-renderer-action.js` | Quellen/Verwendungen, Transaktionen, Cash-Rebalancing, finale Steuer inklusive Verlusttopf-Effekten |
+| **Diagnosis** | `balance-renderer-diagnosis.js`, `balance-diagnosis-*` | Chips, Entscheidungsbaum, Guardrails, KeyParams, Transaktionsdiagnose, kopierbarer Diagnose-Export |
 
-| Shortcut | Funktion | Evidenz |
-|----------|----------|---------|
-| `Alt+J` | Jahresabschluss | `balance-binder.js:107-110` |
-| `Alt+E` | Export | `balance-binder.js:113-116` |
-| `Alt+I` | Import | `balance-binder.js:119-122` |
-| `Alt+N` | Marktdaten nachrücken | `balance-binder.js:125-128` |
+Die Diagnosemodule vermeiden inzwischen einen großen Renderer-Monolithen. Neue Diagnosebausteine gehören in ein thematisches `balance-diagnosis-*` Modul; `balance-renderer-diagnosis.js` bleibt die Integrationsschicht.
 
-### B.2.8 Profil-Management-System
+Die Diagnose ist fachlich Teil der Entscheidung, nicht bloß Debug-Ausgabe. Sie erklärt:
 
-Die Suite implementiert ein vollständiges **Profil-Management-System** für Multi-Personen-Haushalte.
+- warum ein Marktregime gewählt wurde,
+- welche Guardrails ausgelöst oder nicht ausgelöst haben,
+- wie Floor, Flex, VPW-Rahmen und freigegebener Flex zusammenhängen,
+- warum bestimmte Transaktionen geplant oder unterlassen wurden,
+- welche Steuer- und Verlusttopf-Effekte in der finalen Handlungsempfehlung stecken.
 
-**Architektur:**
+Für Nutzer ist damit nachvollziehbar, ob die App wegen Liquidität, Marktregime, Steueroptimierung, Gold-/Geldmarktgewichtung oder Budgetgrenzen handelt.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Profil-Storage-Layer                      │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐ │
-│  │ profile-storage │→ │ profile-manager │→ │ profilverbund│ │
-│  │     .js         │  │      .js        │  │ -balance.js  │ │
-│  │  (CRUD, I/O)    │  │   (UI-Facade)   │  │ (Aggregation)│ │
-│  └─────────────────┘  └─────────────────┘  └─────────────┘ │
-└─────────────────────────────────────────────────────────────┘
-```
+### B.2.4 Persistenz, Snapshots und Importe
 
-**CRUD-Operationen** (`profile-storage.js`):
+| Speicherbereich | Modul(e) | Inhalt |
+|-----------------|----------|--------|
+| **Balance-State** | `balance-storage.js` | Eingaben, `lastState`, Snapshots, Migrationen, File-System-Handles |
+| **Profil-State** | `app/profile/profile-storage.js`, `profile-key-policy.js`, `profile-live-storage.js`, `profile-bundle-io.js` | Profilregistry, aktive Profile, profilbezogene localStorage-Isolation, Bundle-Import/-Export |
+| **Ausgaben-State** | `balance-expenses-storage.js` | Jahres-/Monatscontainer je Profil unter `balance_expenses_v1` |
+| **Tranchen-State** | `app/tranches/*`, Profilbundle | Depot-Tranchen, Kurs-/Statusdaten, Profilherkunft bei Multi-Profil-Setups |
+| **Import/Export/Snapshots** | `balance-binder-imports.js`, `balance-binder-snapshots.js` | JSON-Import/-Export, Snapshot-Erstellung/-Restore, CSV-Importpfade |
 
-| Operation | Funktion | Beschreibung |
-|-----------|----------|--------------|
-| **Create** | `createProfile(name)` | Erzeugt neues Profil mit Slug-ID |
-| **Read** | `getProfileData(id)` | Lädt Profil-Daten aus Registry |
-| **Update** | `saveCurrentProfileFromLocalStorage()` | Speichert aktuellen State |
-| **Delete** | `deleteProfile(id)` | Löscht Profil (außer letztes) |
-| **Switch** | `switchProfile(id)` | Wechselt aktives Profil |
-| **Export** | `exportProfilesBundle()` | JSON-Backup aller Profile |
-| **Import** | `importProfilesBundle(bundle)` | Restore aus Backup |
+Für CSV-Ausgabenimporte liegt Parsing in `balance-expenses-csv.js`, Kennzahlenberechnung in `balance-expenses-metrics.js` und DOM-Ausgabe in `balance-expenses-renderer.js`.
 
-**Profilbezogene Keys** (automatisch isoliert pro Profil):
-```javascript
-const FIXED_KEYS = new Set([
-    'depot_tranchen',           // Tranchen-Daten
-    'profile_tagesgeld',        // Cash-Bestände
-    'profile_rente_aktiv',      // Renten-Flags
-    'profile_rente_monatlich',  // Renten-Beträge
-    'profile_gold_aktiv',       // Gold-Konfiguration
-    // ... weitere profilspezifische Keys
-]);
-```
+Snapshot und Profilpersistenz sind unterschiedliche Ebenen. Snapshots sichern den aktuellen Arbeitsstand der Balance-App für Backup/Restore. Profile isolieren dagegen wiederkehrende Haushalts- oder Personenstände. In Multi-Profil-Setups dürfen diese Ebenen nicht vermischt werden: ein Profilwechsel soll profilbezogene Eingaben laden, ein Snapshot soll einen konkreten Arbeitsstand wiederherstellen.
 
-**Profilverbund-Aggregation** (`profilverbund-balance.js`):
+### B.2.5 Jahresupdate und Live-Daten
 
-Das System aggregiert mehrere Profile zu einem Gesamt-Haushalt:
+Der frühere Binder-Monolith ist in Jahresupdate-Module zerlegt:
 
-```javascript
-export function aggregateProfilverbundInputs(profileInputs) {
-    // Summiert: Floor, Flex, Renten, Depot-Werte
-    // Minimiert: Runway-Targets (konservativstes Profil)
-    return {
-        totalFloor,      // Summe aller Floor-Bedarfe
-        totalFlex,       // Summe aller Flex-Bedarfe
-        totalRenteJahr,  // Summe aller Renteneinkünfte
-        totalAssets,     // Summe aller Vermögenswerte
-        netWithdrawal    // Bedarf minus Renten
-    };
-}
-```
+| Modul | Aufgabe |
+|-------|---------|
+| `balance-annual-inflation.js` | Bedarfe und kumulierte Inflation fortschreiben, Inflationsdaten via ECB -> World Bank -> OECD holen |
+| `balance-annual-marketdata.js` | ETF-Kurse über Yahoo-Proxy holen, CAPE via Yale/Mirror/r.jina.ai-Fallback abrufen, ATH/Nachrücken aktualisieren |
+| `balance-annual-modal.js` | Ergebnis- und Fehlerprotokoll anzeigen |
+| `balance-annual-orchestrator.js` | Jahresupdate sequenzieren: Alter, Inflation, ETF, CAPE, Protokoll |
+| `balance-binder-annual.js` | Binder-Integration und Event-Anbindung für die Jahresupdate-Handlers |
 
-**Entnahme-Verteilungsmodi:**
+Live-Daten bleiben optional. Ohne Netzwerk oder Proxy läuft die Balance-App mit manuellen Eingaben und lokal gespeicherten Werten weiter.
 
-| Modus | Algorithmus | Anwendungsfall |
-|-------|-------------|----------------|
-| `tax_optimized` | Greedy nach niedrigster Steuerlast | Standard für Steueroptimierung |
-| `proportional` | Anteilig nach Vermögen | Gleichmäßige Belastung |
-| `runway_first` | Nach Runway-Zielen gewichtet | Liquiditäts-Priorisierung |
+Das Jahresupdate ist als kontrollierter Jahreswechsel gedacht, nicht als automatische Marktmeinung. Es führt mehrere technische Schritte zusammen:
+
+1. Alters- und Jahreswerte werden fortgeschrieben.
+2. Bedarfe können über Inflation angepasst werden.
+3. ETF- und Tranchenpreise können über den lokalen Proxy aktualisiert werden.
+4. CAPE kann für Dynamic Flex automatisch nachgezogen werden.
+5. ATH-/Marktdaten werden aktualisiert und protokolliert.
+
+Jeder Abruf hat Fallbacks oder manuelle Alternativen. Fehler in Live-Daten sollen das Planungsjahr nicht blockieren, sondern sichtbar protokolliert werden.
+
+### B.2.6 Profilverbund und Tranchen
+
+Balance nutzt dieselbe Profilbasis wie Simulator und Startseite:
+
+- Die Profilverwaltung liegt unter `app/profile/`; `index.html` ist der zentrale Einstieg für Profil-/Haushaltsverwaltung.
+- `balance-main-profile-sync.js` spiegelt Profilwerte in Balance-Inputs.
+- `balance-main-profilverbund.js` und `app/profile/profilverbund-balance.js` führen Multi-Profil-Läufe aus, aggregieren Bedarf/Renten/Vermögen und verteilen Entnahmen.
+- Detailtranchen ersetzen aggregierte Depotwerte in Asset-Summaries, wenn plausible Tranchen vorhanden sind, damit Werte nicht doppelt gezählt werden.
+- Entnahmen nutzen Cash/Geldmarkt vor Detailtranchenauswahl; Detailverkäufe behalten Tranche und Profilherkunft für spätere Steuer-/Portfolio-Pfade.
+
+Die Tranchenverwaltung selbst ist in `depot-tranchen-manager.html` und `app/tranches/` gekapselt. Balance konsumiert den daraus synchronisierten Status und die aggregierten Werte.
+
+**Profilverbund-Aggregation:** Balance führt mehrere Profile zu einem Haushalt zusammen. Dabei werden Bedarfe, Renten und Vermögenswerte addiert; konservative Parameter wie Liquiditätsziele oder Risiko-Defaults dürfen nicht durch einfache Mittelwerte verwässert werden. Für die Entnahmeverteilung stehen fachlich drei Modi im Vordergrund:
+
+| Modus | Prinzip | Zweck |
+|-------|---------|-------|
+| `tax_optimized` | Profile/Tranchen mit niedriger erwarteter Steuerlast zuerst | Standard für steuerarme Entnahmen |
+| `proportional` | Entnahme nach Vermögensanteil | gleichmäßigere Belastung der Profile |
+| `runway_first` | Liquiditäts-/Runway-Ziele priorisieren | Haushalte mit unterschiedlich gefüllten Cash-Puffern |
+
+**Tranchen-Contract:** Detailtranchen sind mehr als UI-Komfort. Sie liefern Marktwert, Einstand, Kaufdatum, Kategorie, Teilfreistellung und Profilherkunft. Daraus ergeben sich steueroptimierte Verkaufsreihenfolgen und korrekte Asset-Summaries. Bei mehrprofiligen Haushalten müssen `trancheId` und `sourceProfileId` erhalten bleiben, damit spätere Reduktionen nicht versehentlich Cost-Basis oder Profilherkunft vermischen.
+
+### B.2.7 Ausgaben-Check
+
+Der Ausgaben-Check verbindet Jahresplanung mit tatsächlichen monatlichen Ausgaben:
+
+- CSV-Import pro Profil und Monat.
+- Speicherung unter `balance_expenses_v1` mit Jahres- und Monatscontainern.
+- Monatliche Ampel mit 5%-Warnschwelle.
+- Jahresverbrauch, Restbudget, Soll/Ist für importierte Monate.
+- Jahreshochrechnung: ab zwei Datenmonaten Median statt Mittelwert.
+- Profilverbund-Ansicht mit Profilspalten und aggregierter Gesamtspalte.
+- Jahresabschlussintegration über `rollExpensesYear()`.
+
+Die Modulgrenzen sind bewusst DOM-frei, wo möglich: Parsing und Kennzahlen lassen sich isoliert testen; Rendering und Event-Wiring bleiben in eigenen Modulen.
+
+Der Ausgaben-Check ist fachlich die Brücke zwischen geplanter Jahresentnahme und realem Cashflow. Er ersetzt nicht die Engine-Entnahmeentscheidung, sondern prüft, ob der reale Verbrauch zur geplanten Budgetlogik passt. Die Median-Hochrechnung ist bewusst robuster als ein einfacher Durchschnitt, weil einzelne Sonderausgaben einen Jahresforecast sonst stark verzerren würden.
 
 ---
 
-### B.2.9 Depot-Tranchen-Verwaltung
+## B.3 Simulator: Architektur und Modulzuschnitt
 
-Die Suite ermöglicht **detailliertes Tranchen-Management** mit FIFO-basierter Steueroptimierung.
+Der Simulator ist die explorative Oberfläche der Suite. Während die Balance-App ein konkretes Planungsjahr operativ entscheidet, untersucht der Simulator ganze Lebenspfade: stochastisch per Monte Carlo, deterministisch per historischem Backtest, systematisch per Parameter-Sweep und automatisch per Auto-Optimize. Er nutzt dieselbe Engine-API wie Balance, ergänzt aber eigene Jahreslogik für Portfoliofortschreibung, Pflege-/Rentenereignisse, Ansparphase, Forced Sales, 3-Bucket-Bond-Puffer und Ergebnisaggregation.
 
-**Hauptkomponenten:**
+Der Simulator ist deshalb nicht nur ein UI-Wrapper um `EngineAPI.simulateSingleYear()`. Er baut pro Simulationsjahr den passenden Haushalts-, Portfolio- und Marktkontext, ruft die Engine für die Entnahmeentscheidung auf und verarbeitet danach simulator-spezifische Effekte wie Auszahlung, Notverkäufe, Bond-Refill, Steuer-Recompute und Jahreslog.
 
-| Datei | LOC | Funktion |
-|-------|-----|----------|
-| `depot-tranchen-manager.html` | ~400 | Standalone-UI für Tranchenverwaltung |
-| `depot-tranchen-status.js` | 432 | Status-Berechnung, Aggregation, UI-Sync |
+### B.3.1 Modulcluster
 
-**Tranchen-Datenmodell:**
+| Cluster | Module | Verantwortung |
+|---------|--------|---------------|
+| **Bootstrap und UI-Fassade** | `simulator-main.js`, `simulator-main-init.js`, `simulator-main-tabs.js`, `simulator-main-input-persist.js`, `simulator-main-reset.js` | App-Start, Engine-Handshake, Tab-/Button-Bindings, Persistenz gemeinsamer Eingaben, Reset-Flow |
+| **UI-Fachmodule** | `simulator-ui-pflege.js`, `simulator-ui-rente.js`, `simulator-main-partner.js`, `simulator-main-accumulation.js`, `simulator-main-dynamic-flex.js`, `simulator-main-3bucket.js`, `simulator-main-stress.js`, `simulator-main-sweep-ui.js` | Pflege-, Renten-, Partner-, Anspar-, Dynamic-Flex-, 3-Bucket-, Stress- und Sweep-spezifische UI-Logik |
+| **Input-Layer** | `simulator-input-dom.js`, `simulator-input-care.js`, `simulator-input-pension.js`, `simulator-input-strategy.js`, `simulator-input-tranches.js`, `simulator-profile-inputs.js` | DOM-Inputs normalisieren, Profilverbund in Simulator-Inputs mappen, Strategie-/Pflege-/Renten-/Tranchenparameter strukturieren |
+| **Portfolio und Tranchen** | `simulator-portfolio.js`, `simulator-portfolio-*.js`, `simulator-portfolio-tranches.js`, `simulator-portfolio-chart.js`, `simulator-year-portfolio.js` | Startportfolio, Detailtranchen, Renditefortschreibung, Aktien/Gold/Bonds, Anzeige und Reduktion von Portfolio-Bausteinen |
+| **Jahressimulation** | `simulator-engine-wrapper.js`, `simulator-engine-direct.js`, `simulator-engine-input.js`, `simulator-engine-direct-utils.js`, `simulator-year-result.js`, `simulator-household-pension.js`, `simulator-accumulation-year.js` | Jahr-für-Jahr-Simulation, Engine-Input-Mapping, Rente/Witwenlogik, Ansparjahre, Ergebnis- und Logshape |
+| **Sondersituationen nach Engine-Call** | `simulator-forced-sale.js`, `simulator-tax-recompute.js`, `simulator-bond-refill.js` | Liquiditätsdeckung nach Auszahlung, Forced Sales, Gesamt-Settlement-Recompute, 3-Bucket-Bond-Verkauf und Wiederauffüllung |
+| **Monte Carlo** | `simulator-monte-carlo.js`, `monte-carlo-runner.js`, `monte-carlo-ui.js`, `mc-run-context.js`, `mc-year-sampling.js`, `mc-life-events.js`, `mc-stress-tracker.js`, `mc-log-builder.js`, `mc-run-metrics.js`, `monte-carlo-aggregates.js`, `monte-carlo-runner-utils.js`, `scenario-analyzer.js` | Run-Orchestrierung, deterministische Seeds, Startjahr-/CAPE-Sampling, Life-State, Stressmetriken, Logs, KPIs, Szenarioauswahl |
+| **Backtest, Sweep und Optimierung** | `simulator-backtest.js`, `simulator-sweep.js`, `sweep-runner.js`, `simulator-sweep-utils.js`, `simulator-heatmap.js`, `simulator-optimizer.js`, `simulator-visualization.js`, `auto_optimize*.js` | Historische Pfade, Sensitivitätsraster, Worker-kompatible Sweep-Runs, Heatmaps, Sensitivität/Pareto, automatische Parameteroptimierung |
+| **Ergebnisdarstellung** | `simulator-results.js`, `results-metrics.js`, `results-renderers.js`, `results-formatting.js`, `simulator-formatting.js`, `simulator-main-helpers.js` | KPI-Karten, Szenario-/Backtest-Logs, CSV/JSON-Export, Spaltenkonfiguration, Formatierung |
+| **Daten und Shared Utilities** | `simulator-data.js`, `simulator-utils.js`, `cape-utils.js`, `app/shared/shared-formatting.js` | Historische Daten, Mortalität/Pflege/Stress-Presets, RNG/Statistik, CAPE-Kandidaten, gemeinsame Formatter |
+
+**Aktueller Bestand (2026-05-20):** 86 JS-Module unter `app/simulator/`. Profil-, Tranchen- und Shared-Module liegen teilweise außerhalb des Simulator-Ordners, sind aber Teil des fachlichen Datenflusses.
+
+### B.3.2 Hauptflüsse
+
+Der Simulator hat vier zentrale Ausführungspfade:
+
+1. **Monte Carlo:** Viele Runs über zufällig oder gewichtet gezogene historische Jahre. Ergebnisse sind Verteilungen, Perzentile, Stressmetriken und ausgewählte Szenario-Logs.
+2. **Historischer Backtest:** Ein deterministischer Pfad über echte historische Jahre. Ergebnis ist ein nachvollziehbarer Jahreslog für die Frage, ob ein Plan durch konkrete Sequenzen wie 2000-2003 oder 2008 getragen hätte.
+3. **Parameter-Sweep:** Systematisches Raster über erlaubte Parameter. Ergebnis sind Sensitivitäten, Heatmaps und Vergleichstabellen.
+4. **Auto-Optimize:** Kandidatengenerierung, Bewertung und Verfeinerung zur Suche nach robusten Parameterkombinationen unter Zielmetriken und Constraints.
+
+Alle vier Pfade teilen dieselbe Jahreslogik, soweit möglich. Das reduziert fachliche Drift: Pflege, Rente, Steuer-Recompute, Dynamic Flex, 3-Bucket und Portfoliofortschreibung sollen im Backtest nicht anders funktionieren als in Monte Carlo oder Sweep.
+
+### B.3.3 Jahr-für-Jahr-Pipeline
+
+Die Kernpipeline eines Simulatorjahres sieht konzeptionell so aus:
 
 ```javascript
-const tranche = {
-    id: "uuid",
-    name: "VWCE.DE Sparplan Jan 2020",
-    type: "aktien_neu",        // oder: aktien_alt, gold, geldmarkt
-    category: "equity",        // oder: gold, money_market
-    shares: 50,                // Anzahl Anteile
-    purchasePrice: 85.00,      // Kaufpreis pro Anteil
-    currentPrice: 120.00,      // Aktueller Kurs
-    purchaseDate: "2020-01-15",
-    marketValue: 6000,         // Marktwert (berechnet oder manuell)
-    costBasis: 4250,           // Einstand (berechnet oder manuell)
-    tqf: 0.30                  // Teilfreistellung (30% für Aktienfonds)
-};
-```
+function simulateSimulatorYear(state, inputs, yearData, yearIndex) {
+    applyAnnualReturnsToPortfolio(state.portfolio, yearData, inputs.decumulation);
+    const household = computeHouseholdPensionAndLifeState(state, inputs, yearData);
 
-**Aggregations-Algorithmus** (`depot-tranchen-status.js:244-310`):
+    if (isAccumulationYear(state, inputs)) {
+        return simulateAccumulationYear(state, inputs, yearData);
+    }
 
-```javascript
-export function calculateAggregatedValues(tranches) {
-    // Gruppiert nach Kategorie
-    let altbestand = { marketValue: 0, costBasis: 0 };
-    let neubestand = { marketValue: 0, costBasis: 0 };
-    let geldmarkt  = { marketValue: 0, costBasis: 0 };
-    let gold       = { marketValue: 0, costBasis: 0 };
+    const engineInput = buildEngineInput({
+        state, inputs, yearData, household, portfolio: state.portfolio
+    });
+    const engineResult = EngineAPI.simulateSingleYear(engineInput, state.lastEngineState);
 
-    tranches.forEach(t => {
-        // Klassifizierung nach type/category/tqf
-        if (type === 'aktien_alt' || tqf === 1.0) {
-            altbestand.marketValue += mv;
-        } else if (type === 'aktien_neu') {
-            neubestand.marketValue += mv;
-        }
-        // ... weitere Kategorien
+    const payoutResult = applyPayoutAndForcedSales({
+        engineResult, portfolio: state.portfolio, inputs, yearData
+    });
+    const taxResult = recomputeTaxSettlementIfNeeded({
+        engineResult, payoutResult, taxStatePrev: state.taxState
+    });
+    const bondRefill = applyThreeBucketBondRefillIfNeeded({
+        engineResult, portfolio: state.portfolio, inputs, yearData
     });
 
-    return { depotwertAlt, depotwertNeu, geldmarktEtf, goldWert, ... };
+    return buildSimulatorYearResult({
+        engineResult, payoutResult, taxResult, bondRefill, household, yearData
+    });
 }
 ```
 
-**Online-Aktualisierung der Kurse:**
+Wichtige Verträge:
 
-Die Tranchen-Kurse können über verschiedene Quellen aktualisiert werden:
+- Die Engine entscheidet über Entnahme, Guardrails, Marktregime, Ziel-Liquidität und reguläre Transaktionen.
+- Der Simulator führt danach reale Simulationsmechanik aus: Auszahlung, Portfoliofortschreibung, Notverkäufe, Bonds-Puffer, Pflege-/Rentenstatus und Logs.
+- Wenn nach dem Engine-Call zusätzliche Verkäufe nötig werden, wird die Steuer aggregiert neu berechnet, damit Sparer-Pauschbetrag und Verlusttopf nicht doppelt verbraucht werden.
+- Der Jahreslog enthält additive Erklärfelder zu Entnahme, Payout, Liquidität, VPW, Steuer und 3-Bucket, ohne die Normalansicht zu überfrachten.
 
-| Quelle | API | Unterstützte Assets |
-|--------|-----|---------------------|
-| Yahoo Finance | Lokaler Proxy (`tools/yahoo-proxy.cjs`) | ETFs, Aktien |
-| Custom Proxy | Konfigurierbar via `localStorage` (`etfProxyUrl`/`etfProxyUrls`) | ETFs, Aktien |
-| Manuell | Eingabefeld | Alle |
+### B.3.4 Monte Carlo, Sampling und Workers
 
-**Automatische Synchronisation:**
+Monte Carlo ist in eine UI-Schicht (`simulator-monte-carlo.js`, `monte-carlo-ui.js`) und eine DOM-freie Rechenschicht (`monte-carlo-runner.js` plus `mc-*` Module) getrennt. Pro Run werden Seed, Startjahr, Stresskontext, Pflege-/Partnerstatus und Logauswahl deterministisch initialisiert. Dadurch darf Chunking oder Worker-Aufteilung die Ergebnisse nicht verändern.
 
-```javascript
-export function initTranchenStatus(containerId) {
-    // Initial rendern
-    renderTranchenStatusBadge(containerId);
-    syncTranchenToInputs({ silent: true });
+Die Sampling-Logik umfasst:
 
-    // Cross-Tab-Sync via localStorage-Event
-    window.addEventListener('storage', (e) => {
-        if (e.key === 'depot_tranchen') {
-            syncTranchenToInputs({ silent: true });
-        }
-    });
+| Modus | Bedeutung |
+|-------|-----------|
+| `UNIFORM` | Startjahre und Folgejahre historisch gleichgewichtet |
+| `CAPE` | Auswahl über CAPE-nahe historische Startjahre mit Fallback-Toleranzen |
+| `FILTER` | harte Begrenzung, z. B. Ausschluss früher Nachkriegsjahre |
+| `RECENCY` | exponentielle Gewichtung jüngerer Historie über Half-Life |
+| `block_bootstrap` | Blöcke zusammenhängender Jahre zur Erhaltung von Autokorrelation |
+| `regime` | Markov-artige Regime-Transitions auf Basis historischer Regime |
 
-    // Periodische Aktualisierung (alle 5 Sekunden)
-    setInterval(() => renderTranchenStatusBadge(containerId), 5000);
-}
-```
+Workers werden für Monte Carlo, Sweep und Auto-Optimize eingesetzt. `workers/worker-pool.js` steuert Queue, Chunking und Fallbacks; `workers/mc-worker.js` führt Worker-Jobs aus; Telemetrie ist optional und dev-only. Detaillierte Logs werden bewusst nicht für jeden Run im Worker transportiert, sondern nur für ausgewählte Szenarien aufgebaut.
 
-**Steueroptimierte Verkaufsreihenfolge** (`profilverbund-balance.js:334-373`):
+### B.3.5 Portfolio, 3-Bucket und Bonds
 
-```javascript
-export function selectTranchesForSale(tranches, targetAmount, taxRate) {
-    const candidates = tranches
-        .filter(t => resolveTrancheCategory(t) === 'equity')
-        .map(t => ({
-            tranche: t,
-            taxPerEuro: computeProfitRatio(t) * taxRate,
-            purchaseStamp: normalizeTrancheDate(t)
-        }));
+Der Simulator modelliert das Portfolio nicht nur als Gesamtwert. Detailtranchen tragen Kategorie, Marktwert, Cost Basis, TQF, Typ und Profilherkunft. Aktien, Gold, Geldmarkt/Liquidität und optional Bonds werden unterschiedlich fortgeschrieben und verkauft.
 
-    // Sortierung: 1. Niedrigste Steuerlast, 2. FIFO (älteste zuerst)
-    candidates.sort((a, b) => {
-        if (a.taxPerEuro !== b.taxPerEuro) return a.taxPerEuro - b.taxPerEuro;
-        return a.purchaseStamp - b.purchaseStamp;
-    });
+Der Strategie-Modus `3_bucket_jilge` erweitert die Entnahmelogik um einen Bond-/Anleihen-Bucket:
 
-    // Greedy-Auswahl bis Zielbetrag erreicht
-    // ...
-}
-```
+- In schlechten Jahren können Bond-Tranchen bevorzugt verkauft werden, um Aktienverkäufe zu vermeiden.
+- In guten Jahren kann der Bond-Zieltopf wieder aufgefüllt werden.
+- `bondTargetFactor` steuert die Zielgröße des Bond-Puffers.
+- `bondRefillThreshold` kann eine Wiederauffüllschwelle definieren.
+- Logs und CSVs zeigen in diesem Modus Bond-Verkäufe, Bond-Refill und `Bonds/Puffer` separat.
+
+Fachlich ist das kein freies Rentenportfolio mit Duration-/Kuponmodell. Es ist ein defensiver Pufferbaustein innerhalb der Entnahmestrategie. Diese Abgrenzung muss mit dem Anlagemodell in der Übersicht konsistent bleiben.
+
+### B.3.6 Profilverbund, Rente, Pflege und Ansparphase
+
+`simulator-profile-inputs.js` überführt aktive Profile in ein kombiniertes Simulator-Inputobjekt. Dabei werden Bedarfe, Vermögen, Renten, Gold-Parameter und Tranchen zusammengeführt; Tranchen erhalten profilbezogene IDs und `sourceProfileId`, damit Verkäufe später korrekt auf Ursprungsprofile zurückgeführt werden können.
+
+Renten- und Haushaltslogik sind als wiederkehrende Jahreslogik gekapselt:
+
+- Rente 1 und Rente 2 haben eigene Start-, Steuer- und Indexierungsparameter.
+- Indexierung kann fix, inflations- oder lohnbezogen erfolgen.
+- Witwenrente wird über Haushaltsstatus und Partnerereignisse modelliert.
+- Pflegeereignisse haben eigene Eintrittswahrscheinlichkeiten, Progression, Kosten, Dauer und Mortalitätsmultiplikatoren.
+- Dual-Care-Metriken erfassen simultane Pflegejahre und maximale/kumulative Pflegekosten.
+
+Die Ansparphase ist ein eigener Vor-Ruhestandsmodus: vor der Transition werden Sparraten und Marktrenditen fortgeschrieben, aber keine regulären Entnahmen gerechnet. Pflegeeintritt kann die Ansparphase vorzeitig beenden und in die Entnahmelogik wechseln.
+
+### B.3.7 Ergebnis- und Logsystem
+
+Ergebnisse sind bewusst mehrschichtig:
+
+- KPI-Karten zeigen robuste Zusammenfassungen wie Erfolgsquote, Perzentile, Kürzungsjahre, Depoterschöpfung, Steuerersparnis aus Verlusttopf und Pflegekennzahlen.
+- Szenario-Logs zeigen ausgewählte Runs: Worst, Perzentile, Pflegefälle, lange Lebensdauer, hohe Kürzung und Zufallssamples.
+- Backtest-Logs zeigen den deterministischen historischen Jahrespfad.
+- Sweep- und Optimizer-Ausgaben zeigen Parameterwirkung, Heatmaps, Sensitivität, Pareto-Frontier und Champion-Parameter.
+- Detailmodus ergänzt technische Spalten zu Entnahme/Payout/VPW/Liquidität/Bonds, ohne die Normalansicht zu verändern.
+
+Diese Trennung ist fachlich wichtig: Der Simulator soll nicht nur eine Erfolgsquote liefern, sondern erklären, welche Pfade scheitern, wodurch Kürzungen entstehen und welche Parameter die Robustheit wirklich treiben.
 
 ---
 
-### B.2.10 Ausgaben-Check (balance-expenses.js)
+## B.4 Engine: Kernlogik und Verträge
 
-Das **Ausgaben-Check-Modul** ermöglicht die Kontrolle tatsächlicher monatlicher Ausgaben gegen das geplante Budget. Es schlägt die Brücke zwischen der jährlichen Entnahmeplanung und dem realen Cashflow-Management.
+Die Engine ist die deterministische Rechenschicht der Suite. Balance und Simulator liefern ihr ein normalisiertes Jahres-Inputobjekt und einen optionalen Vorjahreszustand; die Engine liefert daraus eine einjährige Entnahmeentscheidung, Diagnose, Transaktionsvorschlag, finale Jahressteuer und neuen Folgezustand. Sie besitzt bewusst keine DOM-Abhängigkeiten und wird aus `engine/index.mjs` per `build-engine.mjs` in das Browser-Artefakt `engine.js` gebündelt.
 
-**Architektur:**
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Ausgaben-Check                            │
-├─────────────────────────────────────────────────────────────┤
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────┐ │
-│  │ CSV-Import      │→ │ Kategorien-     │→ │ Budget-     │ │
-│  │ (Kontoauszüge)  │  │ Aggregation     │  │ Vergleich   │ │
-│  └─────────────────┘  └─────────────────┘  └─────────────┘ │
-│           ↓                    ↓                    ↓       │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │                   Visualisierung                      │   │
-│  │  • Jahres-Summary (4 Cards)                          │   │
-│  │  • Monats-Tabelle (12 Zeilen × Profile)              │   │
-│  │  • Ampel-Farbcodierung (OK/Warnung/Überschritten)    │   │
-│  │  • Detail-Dialog (Top-3 + alle Kategorien)           │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-```
-
-**Hauptfunktionen:**
-
-| Funktion | Beschreibung | Evidenz |
-|----------|--------------|---------|
-| `initExpensesTab()` | Initialisierung, Event-Binding, Jahresauswahl | `balance-expenses.js:625-633` |
-| `parseCategoryCsv()` | CSV-Parser mit flexiblem Delimiter (`;`, `\t`, `,`) | `balance-expenses.js:175-206` |
-| `computeYearStats()` | Berechnet Jahres- und YTD-Statistiken | `balance-expenses.js:291-330` |
-| `updateSummary()` | Aktualisiert die 4 Summary-Cards | `balance-expenses.js:219-289` |
-| `openDetails()` | Öffnet Detail-Dialog mit Top-3 Kategorien | `balance-expenses.js:483-550` |
-
-**Datenmodell:**
-
-```javascript
-const store = {
-    version: 1,
-    activeYear: 2026,
-    years: {
-        "2026": {
-            months: {
-                "1": {  // Januar
-                    profiles: {
-                        "profil-1": {
-                            categories: {
-                                "Lebensmittel": 450.00,
-                                "Mobilität": 180.00,
-                                "Freizeit": 320.00,
-                                // ...
-                            },
-                            updatedAt: "2026-01-31T12:00:00.000Z"
-                        }
-                    }
-                }
-            }
-        }
-    }
-};
-```
-
-**CSV-Import-Algorithmus:**
-
-```javascript
-function parseCategoryCsv(text) {
-    // 1. Delimiter erkennen (häufigstes Zeichen: ; | \t | ,)
-    const delimiter = detectDelimiter(lines[0]);
-
-    // 2. Header parsen (sucht "Kategorie" und "Betrag")
-    const header = splitCsvLine(lines[0], delimiter);
-    let categoryIndex = header.findIndex(h => h.includes('kategorie'));
-    let amountIndex = header.findIndex(h => h.includes('betrag'));
-
-    // 3. Kategorien aggregieren
-    const categories = {};
-    for (let i = 1; i < lines.length; i++) {
-        const category = row[categoryIndex];
-        const amount = parseAmount(row[amountIndex]);  // DE/US-Format
-        categories[category] = (categories[category] || 0) + amount;
-    }
-
-    return categories;
-}
-```
-
-**Hochrechnung-Algorithmus (Median-basiert):**
-
-```javascript
-function computeYearStats(currentMonth) {
-    // Ab 2 Monaten: Median statt Durchschnitt (robust gegen Ausreißer)
-    const forecastBase = monthsWithData >= 2 ? medianMonthly : avgMonthly;
-    const annualForecast = forecastBase * 12;
-
-    return {
-        annualForecast,         // Hochrechnung aufs Jahr
-        ytdUsed,                // Verbrauch in Importmonaten
-        ytdBudget,              // Soll-Budget für Importmonate
-        ytdDelta                // Abweichung vom Soll
-    };
-}
-```
-
-**Ampel-Farbcodierung:**
-
-| Status | Kriterium | CSS-Klasse |
-|--------|-----------|------------|
-| ✅ Grün | Ausgaben ≤ Budget | `budget-ok` |
-| ⚠️ Gelb | Budget < Ausgaben ≤ 105% | `budget-warn` |
-| 🔴 Rot | Ausgaben > 105% Budget | `budget-bad` |
-
-**Integration mit Profilverbund:**
-
-Das Modul arbeitet mit dem Profilverbund zusammen:
-- Jedes Profil hat eine eigene Spalte in der Monats-Tabelle
-- CSV-Import erfolgt pro Profil und Monat
-- Die "Gesamt"-Spalte aggregiert alle Profile
-
-**Jahresabschluss-Integration:**
-
-```javascript
-export function rollExpensesYear() {
-    const nextYear = state.year + 1;
-    setYear(nextYear);  // Wechselt zum nächsten Jahr
-    return nextYear;
-}
-```
-
-Wird automatisch vom Jahresabschluss-Handler (`balance-binder-snapshots.js`) aufgerufen.
-
-**Persistenz:**
-
-| Aspekt | Implementierung |
-|--------|-----------------|
-| Storage-Key | `balance_expenses_v1` |
-| Format | JSON mit Versions-Header |
-| Scope | Alle Jahre, alle Profile |
-| Größe | Typisch 5-20 KB pro Jahr |
-
----
-
-## B.3 Engine: Detaillierte Modul-Analyse
-
-### B.3.1 Modulstruktur
+### B.4.1 Modulstruktur
 
 ```
 engine/
-├── core.mjs              (459 LOC) → Orchestrierung, EngineAPI, VPW-Berechnung (erweitert!)
-├── config.mjs            (286 LOC) → Zentrale Konfiguration inkl. DYNAMIC_FLEX (erweitert)
-├── errors.mjs            (~50 LOC) → Fehlerklassen
-├── tax-settlement.mjs    (~80 LOC) → Jahres-Settlement (Verlusttopf, SPB, finale Steuer)
+├── config.mjs                         → Schwellen, Profile, Texte, Engine-Version
+├── core.mjs                           → Orchestrierung, EngineAPI, Input-Normalisierung, VPW
+├── errors.mjs                         → AppError, ValidationError, FinancialCalculationError
+├── index.mjs                          → Bundle-/ESM-Entry, Re-Export von EngineAPI
+├── tax-settlement.mjs                 → Jahres-Settlement: Verlusttopf, SPB, finale Steuer
 ├── validators/
-│   └── InputValidator.mjs (199 LOC) → Input-Validierung inkl. Dynamic-Flex (erweitert)
+│   └── InputValidator.mjs             → Plausibilisierung der Jahresinputs
 ├── analyzers/
-│   └── MarketAnalyzer.mjs (160 LOC) → Marktregime-Klassifikation
+│   └── MarketAnalyzer.mjs             → Marktregime, Stagflation, CAPE-Erwartungsrendite
 ├── planners/
-│   └── SpendingPlanner.mjs (1076 LOC) → Guardrails, Flex-Rate, Budget-System (erweitert!)
+│   ├── SpendingPlanner.mjs            → Fassade der Entnahmeplanung
+│   ├── alarm-policy.mjs               → Alarm-Aktivierung und Deeskalation
+│   ├── flex-rate-policy.mjs           → Flex-Rate, Glättung, S-Kurve, harte Caps
+│   ├── flex-budget-policy.mjs         → mehrjähriger Flex-Kürzungstopf
+│   ├── final-rate-policy.mjs          → finale jährliche Änderungsgrenzen
+│   ├── spending-guardrails.mjs        → Recovery-/Caution-Guardrails, Budget-Floor
+│   ├── spending-policy-pipeline.mjs   → stabile Reihenfolge der Spending-Regeln
+│   ├── spending-diagnosis.mjs         → Diagnose-Shape, Runway-Ziel, Key-Parameter
+│   ├── spending-policy-helpers.mjs    → Quantisierung, S-Kurven, Hilfsformeln
+│   └── wealth-reduction.mjs           → Dämpfung bei niedriger Entnahmequote
 └── transactions/
-    ├── TransactionEngine.mjs (47 LOC) → Facade
-    ├── transaction-action.mjs (456 LOC) → Transaktions-Entscheidungslogik
-    ├── transaction-opportunistic.mjs (323 LOC) → Opportunistisches Rebalancing
-    ├── transaction-surplus.mjs (149 LOC) → Überschuss-Handling
-    ├── transaction-utils.mjs (237 LOC) → Transaktions-Hilfsfunktionen
-    ├── sale-engine.mjs      (333 LOC) → Verkäufe, Steuern
-    └── liquidity-planner.mjs (~150 LOC) → Liquiditäts-Targeting
+    ├── TransactionEngine.mjs          → Fassade für Liquidität, Verkäufe, Rebalancing
+    ├── transaction-action.mjs         → Entscheidung: Notfüllung, Refill, Verkauf, keine Aktion
+    ├── transaction-opportunistic.mjs  → opportunistisches Rebalancing in guten Märkten
+    ├── transaction-surplus.mjs        → Anlage überschüssiger Liquidität
+    ├── transaction-utils.mjs          → Ziel-Liquidität, Gewichtung, Quantisierung, Mindesttrade
+    ├── sale-engine.mjs                → steuerbewusste Verkäufe und Tranchenreihenfolge
+    └── three-bucket-logic.mjs         → 3-Bucket-Jilge: Bond-Verkauf und Bond-Refill
 ```
 
-### B.3.2 Engine-Datenfluss (core.mjs:32-228)
+Die frühere Dokumentation nannte noch ein separates `liquidity-planner.mjs`. Dieses Modul existiert im aktuellen Stand nicht; Ziel-Liquidität und Liquiditäts-Gates liegen in `transaction-utils.mjs` und werden über `TransactionEngine.calculateTargetLiquidity()` aufgerufen.
+
+### B.4.2 Öffentliche API
+
+`EngineAPI` stellt einen kleinen, stabilen Vertrag bereit:
+
+| Methode | Zweck |
+|---------|-------|
+| `getVersion()` | liefert API-Version und Build-ID |
+| `getConfig()` | liefert die zentrale Engine-Konfiguration |
+| `analyzeMarket(input)` | führt nur die Marktanalyse aus |
+| `calculateTargetLiquidity(profil, market, inflatedBedarf)` | berechnet das Liquiditätsziel für Profil und Marktregime |
+| `simulateSingleYear(input, lastState)` | führt die vollständige Jahresrechnung aus |
+
+`simulateSingleYear()` ist der Normalpfad für Balance, Simulator und Tests. Fehler werden als `AppError`-/`ValidationError`-Objekte im Ergebnis zurückgegeben, nicht als ungefangene UI-Ausnahme.
+
+### B.4.3 Jahrespipeline in `core.mjs`
+
+Die Engine normalisiert zuerst Strategie- und VPW-Felder. Das ist wichtig, weil ältere UI-/Testpfade noch Aliaswerte liefern können. `decumulation.mode` wird auf `standard` oder `3_bucket_jilge` begrenzt; `drawdownTrigger`, `bondTargetFactor` und `bondRefillThreshold` erhalten sinnvolle Defaults aus `CONFIG`.
 
 ```javascript
-function _internal_calculateModel(input, lastState) {
-    // 1. Validierung
-    const validationResult = InputValidator.validate(input);
-    if (!validationResult.valid) return { error: new ValidationError(...) };
+function _internal_calculateModel(rawInput, lastState) {
+    const input = normalize(rawInput);
+    const taxStatePrev = lastState?.taxState ?? { lossCarry: 0 };
 
-    // 2. Grundwerte berechnen
-    const aktuelleLiquiditaet = input.tagesgeld + input.geldmarktEtf;
-    const depotwertGesamt = input.depotwertAlt + input.depotwertNeu +
-        (input.goldAktiv ? input.goldWert : 0);
-
-    // 3. Marktanalyse
+    validate(input);
+    const profil = resolveRiskProfile(input.risikoprofil);
+    const aktuelleLiquiditaet = input.aktuelleLiquiditaet ?? input.tagesgeld + input.geldmarktEtf;
+    const depotwertGesamt = input.depotwertAlt + input.depotwertNeu + optionalGold(input);
     const market = MarketAnalyzer.analyzeMarket(input);
 
-    // 4. Dynamic Flex (VPW) — optional
-    if (input.dynamicFlex) {
-        const expectedRealReturn = _calculateExpectedRealReturn({ input, lastState });
-        const vpwRate = _berechneEntnahmeRate(expectedRealReturn, input.horizonYears);
-        const vpwTotal = gesamtwert * vpwRate * (input.goGoActive ? input.goGoMultiplier : 1);
-        inflatedBedarf.flex = Math.max(0, vpwTotal - inflatedBedarf.floor);
-    }
+    const inflatedBedarf = calculateFloorAndFlexAfterPension(input);
+    applyDynamicFlexVpwIfEnabled({ input, market, lastState, inflatedBedarf });
 
-    // 5. Ausgabenplanung mit Guardrails
-    const { spendingResult, newState, diagnosis } = SpendingPlanner.determineSpending({
+    const spending = SpendingPlanner.determineSpending({
         market, lastState, inflatedBedarf, runwayMonate, profil, depotwertGesamt, gesamtwert, renteJahr, input
     });
 
-    // 6. Ziel-Liquidität
     const zielLiquiditaet = TransactionEngine.calculateTargetLiquidity(profil, market, inflatedBedarf, input);
-
-    // 7. Transaktions-Bestimmung
     const action = TransactionEngine.determineAction({
-        aktuelleLiquiditaet, depotwertGesamt, zielLiquiditaet, market, spending: spendingResult, minGold, profil, input
+        aktuelleLiquiditaet, depotwertGesamt, zielLiquiditaet, market,
+        spending: spending.spendingResult, minGold, profil, input
     });
 
-    // 8. Steuer-Settlement (Jahresabschluss)
     const taxSettlement = settleTaxYear({
-        taxStatePrev: lastState?.taxState ?? { lossCarry: 0 },
+        taxStatePrev,
         rawAggregate: action.taxRawAggregate,
-        sparerPauschbetrag, kirchensteuerSatz
+        sparerPauschbetrag: input.sparerPauschbetrag,
+        kirchensteuerSatz: input.kirchensteuerSatz
     });
-    action.steuer = taxSettlement.taxDue;          // Settlement überschreibt Plan-Steuer
-    newState.taxState = taxSettlement.taxStateNext; // lossCarry fortschreiben
 
-    return { input, newState, diagnosis, ui: resultForUI };
+    action.steuer = taxSettlement.taxDue;
+    spending.newState.taxState = taxSettlement.taxStateNext;
+    updateDynamicFlexSafetyState(spending.newState);
+
+    return { input, newState: spending.newState, diagnosis, ui };
 }
 ```
 
-### B.3.3 MarketAnalyzer: 7 Szenarien (MarketAnalyzer.mjs:59-152)
+Die Sale-Engine liefert während der Transaktionsplanung noch eine Plansteuer, damit Nettoverkaufsmengen bestimmt werden können. Die offizielle Jahressteuer entsteht danach zentral im Settlement. Dadurch werden Sparer-Pauschbetrag, Verlustvortrag und mehrere Verkaufsquellen nicht mehrfach oder widersprüchlich verrechnet.
 
-| Szenario | Kriterium | Code-Zeile |
-|----------|-----------|------------|
-| `peak_hot` | ATH erreicht UND 1-Jahres-Performance ≥ 10% | 83 |
-| `peak_stable` | ATH erreicht UND 1-Jahres-Performance < 10% | 83 |
-| `bear_deep` | ATH-Abstand > 20% | 88 |
-| `recovery` | ATH-Abstand > 10% UND 1Y-Perf > 10% UND Monate > 6 | 92 |
-| `corr_young` | ATH-Abstand ≤ 15% UND Monate ≤ 6 | 94 |
-| `side_long` | Alles andere (Seitwärtsmarkt) | 100 |
-| `recovery_in_bear` | Bear/Recovery + (1Y-Perf ≥ 15% ODER Rally ≥ 30%) | 112-118 |
+### B.4.4 Marktanalyse
 
-**Zusätzlich:**
-- **Stagflation-Erkennung:** Inflation ≥ 4% UND Real-Rendite < 0 (Zeile 122-128)
-- **CAPE-Bewertung:** 4 Stufen (günstig/fair/teuer/sehr teuer) mit erwarteten Renditen (Zeile 28-51)
+`MarketAnalyzer` klassifiziert ein Jahr in operative Regime. Diese Regime steuern nicht direkt eine starre Entnahme, sondern liefern Kontext für SpendingPlanner, Ziel-Liquidität, Rebalancing und Diagnose.
 
-### B.3.4 SpendingPlanner: Guardrail-System (erweitert)
+| Regime | Bedeutung |
+|--------|-----------|
+| `peak_hot` | neues Hoch mit starker 1-Jahres-Performance |
+| `peak_stable` | neues Hoch ohne Überhitzung |
+| `bear_deep` | deutlicher realer Drawdown gegenüber ATH |
+| `recovery` | Erholung nach Drawdown mit positiver Dynamik |
+| `corr_young` | junge Korrektur, noch kein tiefer Bärenmarkt |
+| `side_long` | seitwärts/neutral, kein stärkeres Signal |
+| `recovery_in_bear` | Erholungsrally innerhalb oder nach Bärenmarkt |
 
-**Hinweis:** Der SpendingPlanner wurde signifikant erweitert (659 → 1076 LOC) mit neuen Algorithmen.
+Zusätzlich erkennt die Analyse Stagflation über hohe Inflation bei negativer Realrendite und berechnet aus CAPE-Daten eine erwartete Aktienrendite. Diese erwartete Rendite fließt vor allem in Dynamic Flex/VPW ein.
 
-**Alarm-Aktivierung** (SpendingPlanner.mjs:326-341):
-```javascript
-// Nur im bear_deep aktivieren
-const shouldActivateAlarm =
-    scenario === 'bear_deep' &&
-    ((entnahmequoteDepot > ALARM.withdrawalRate && runwayMonths < 24) ||
-     realDrawdown > ALARM.realDrawdown);
-```
+### B.4.5 SpendingPlanner und Dynamic Flex
 
-**Flex-Rate-Glättung** (SpendingPlanner.mjs:389-440):
-```javascript
-const ALPHA = 0.35;  // Glättungsfaktor
-const maxUp = isRecoveryOrPeak ? 4.5 : 2.5;    // pp/Jahr
-const maxDown = isBearDeep ? 6.0 : 3.5;        // pp/Jahr (geändert: 10.0 → 6.0, sanfter)
+Der SpendingPlanner ist heute keine einzelne monolithische Guardrail-Funktion mehr. `SpendingPlanner.mjs` ist die Fassade, die mehrere Policy-Module in stabiler Reihenfolge ausführt:
 
-smoothedFlexRate = ALPHA * newRate + (1 - ALPHA) * oldRate;
-smoothedFlexRate = clamp(smoothedFlexRate, oldRate - maxDown, oldRate + maxUp);
-```
+1. Vorjahreszustand laden oder initialisieren: Flex-Rate, realer Vermögens-Peak, Inflation, Alarmstatus.
+2. Alarmbedingungen prüfen: tiefer Bärenmarkt, hohe Entnahmequote, Runway-Stress oder realer Drawdown.
+3. Initiale Flex-Rate berechnen: Marktregime, Glättung und Alarmverhalten.
+4. Spending-Policy-Pipeline anwenden: Guardrails, Flex-Budget, finale Rate-Limits.
+5. Jahresentnahme quantisieren und Diagnose erzeugen.
 
-### B.3.5 SpendingPlanner: Neue Algorithmen (Januar 2026)
+Dynamic Flex ist ein vorgeschalteter VPW-Pfad. Bei aktivem `dynamicFlex` berechnet die Engine aus Gesamtvermögen, Resthorizont, CAPE-basierter erwarteter Realrendite, Gold-/Safe-Asset-Anteil und optionalem Go-Go-Multiplikator einen dynamischen Flex-Bedarf. Der Floor bleibt geschützt; VPW ersetzt nur den flexiblen Teil. Eine Sicherheitsstufe kann Go-Go deaktivieren oder Dynamic Flex temporär auf statischen Flex zurücksetzen, wenn Alarm-, Runway- oder Drawdown-Signale zu stark werden.
 
-**1. Wealth-Adjusted Reduction** (config.mjs:106-111):
-```javascript
-WEALTH_ADJUSTED_REDUCTION: {
-    SAFE_WITHDRAWAL_RATE: 0.015,   // Unter 1.5%: keine marktbedingte Reduktion
-    FULL_WITHDRAWAL_RATE: 0.035   // Ab 3.5%: volle Reduktion
-}
-```
-*Funktion:* Bei niedriger Entnahmequote (<1.5%) werden Markt-Regime-Kürzungen gedämpft (Smoothstep-Interpolation).
+Die wichtigsten fachlichen Bremsen sind:
 
-**2. Flex-Budget-System** (config.mjs:112-132):
-```javascript
-FLEX_BUDGET: {
-    ENABLED: true,
-    DEFAULT_MAX_YEARS: 5,              // 5-Jahres-"Topf"
-    DEFAULT_RECHARGE_FRACTION: 0.7,    // 70% Recharge in guten Zeiten
-    ACTIVE_REGIMES: ['bear_deep', 'recovery_in_bear'],
-    REGIME_WEIGHTS: { bear_deep: 1.0, recovery_in_bear: 0.5 },
-    MIN_RATE_BASE_PCT: { bear_deep: 5, recovery_in_bear: 5 },
-    MIN_RATE_FLOOR_SLOPE_PCT: { bear_deep: 60, recovery_in_bear: 60 }
-}
-```
-*Funktion:* Zeit-basierter "Topf" begrenzt kumulative Kürzungen über 5 Jahre, verhindert Überreaktion bei langen Bärenmärkten.
+| Mechanismus | Zweck |
+|-------------|-------|
+| Wealth-Adjusted Reduction | geringe Entnahmequoten werden weniger stark gekürzt |
+| Flex-Budget | mehrjähriger Topf begrenzt kumulative Flex-Kürzungen in Stressphasen |
+| Flex-Share S-Curve | verhindert überharte Kürzungen, wenn Flex nur einen Teil des Gesamtbedarfs ausmacht |
+| Runway-/Hard-Caps | begrenzen Entnahmen bei schwacher Liquiditätsdeckung |
+| Final Rate Limits | begrenzen jährliche Sprünge der Flex-Rate nach allen Policies |
 
-**3. Flex-Share S-Curve** (config.mjs:133-138):
-```javascript
-FLEX_SHARE_S_CURVE: {
-    ENABLED: true,
-    K: 0.8,    // Cap-Stärke (0..1)
-    A: 14.0,   // Steilheit der S-Kurve
-    B: 0.52    // Knickpunkt (Flex-Anteil 0..1)
-}
-```
-*Funktion:* Sigmoid-basierte Dämpfung bei hohem Flex-Anteil. Verhindert extreme Kürzungen wenn Flex > 50% des Gesamtbedarfs ausmacht.
+### B.4.6 Transaktions- und Steuerlogik
 
-**4. Hard Caps für Flex-Rate** (config.mjs:139-150):
-```javascript
-FLEX_RATE_HARD_CAPS: {
-    BEAR_DEEP_MAX_RATE: 70,           // Max. Flex-Rate im tiefen Bärenmarkt
-    FLEX_SHARE_RELIEF_MAX_PP: 15,     // Entlastung bei geringem Flex-Anteil
-    RUNWAY_COVERAGE_CAPS: [
-        { maxCoverage: 1.20, maxRate: 70 },  // <120% Runway → max 70%
-        { maxCoverage: 1.05, maxRate: 60 },  // <105% Runway → max 60%
-        { maxCoverage: 0.90, maxRate: 50 }   // <90% Runway  → max 50%
-    ]
-}
-```
-*Funktion:* Harte Obergrenzen basierend auf Runway-Deckung. Verhindert zu aggressive Ausgaben bei kritischer Liquidität.
+`TransactionEngine` entscheidet nach der Entnahmeplanung, ob eine Handlung nötig ist. Die Reihenfolge ist fachlich wichtig:
 
-**5. Final Rate Limits** (config.mjs:151-157):
-```javascript
-FLEX_RATE_FINAL_LIMITS: {
-    MAX_UP_PP: 12.0,               // Max. Anstieg nach allen Caps
-    MAX_DOWN_PP: 12.0,             // Max. Rückgang nach allen Caps
-    MAX_DOWN_IN_BEAR_PP: 10.0,     // Sanfterer Abbau im Bärenmarkt
-    RELAX_MAX_DOWN_PP: 20.0        // Max. Relaxierung bei hohem Vermögen
-}
-```
-*Funktion:* Post-Guardrail Rate-Limitierung als letzte Sicherheitsstufe.
+- Bei echter Runway- oder Floor-Gefahr darf eine Notfüllung auch Mindesttrade-Grenzen ignorieren.
+- Im Bärenmarkt schützt die Logik zuerst Liquidität und kann Gold-Floors für Notverkäufe lockern.
+- In Peak-/neutralen Märkten kann opportunistisch Liquidität oder Gold wieder aufgebaut werden.
+- Bei überschüssiger Liquidität kann `transaction-surplus.mjs` Investitionsvorschläge erzeugen.
+- Wenn keine Schwelle ausgelöst wird, liefert die Engine bewusst `type: 'NONE'`.
+
+Verkäufe laufen über `sale-engine.mjs`. Bei Detailtranchen werden `trancheId`, `sourceProfileId`, `isin`, Kaufdatum, Cost Basis und TQF mitgeführt. Die Reihenfolge ist steuerbewusst:
+
+- Aktien/ETF werden primär nach niedriger effektiver Steuerlast sortiert.
+- Gold wird nach Kaufdatum FIFO behandelt und kann nach Spekulationsfrist steuerfrei sein.
+- Bonds/Anleihen werden als eigene Kategorie erkannt (`bond`, `bonds`, `anleihe`).
+- Im defensiven Kontext können Gold/Bonds vor Aktien genutzt werden.
+
+Die Sale-Engine gibt Rohaggregate (`sumRealizedGainSigned`, `sumTaxableAfterTqfSigned`) zurück. `tax-settlement.mjs` verrechnet diese Rohdaten mit Verlustvortrag und Sparer-Pauschbetrag und schreibt `taxState.lossCarry` in `newState` fort.
+
+### B.4.7 3-Bucket-Jilge in der Engine
+
+Der Strategie-Modus `3_bucket_jilge` ist in der Engine normalisiert und die gemeinsame Bond-Logik liegt in `transactions/three-bucket-logic.mjs`. Fachlich bedeutet das:
+
+- Bonds/Anleihen-Tranchen werden über Typ oder Kategorie erkannt.
+- In schlechten Aktienjahren unterhalb des konfigurierten Drawdown-Triggers kann die Logik geplante Aktienverkäufe durch Bond-Verkäufe ersetzen.
+- In guten Jahren kann ein Bond-Zieltopf anhand `bondTargetFactor * jahresentnahmeTarget` wieder aufgefüllt werden.
+- `bondRefillThreshold` verhindert Kleinstumschichtungen.
+- Bond-Verkäufe liefern dieselben Steuer-Rohaggregate wie andere Verkäufe und gehen damit ins Jahres-Settlement ein.
+
+Balance und Simulator nutzen die gleiche Erkennung für Bond-Tranchen. Der Simulator ergänzt nach dem Engine-Call eigene Bond-Refill-/Payout-Mechanik, aber die Klassifikation und Verkaufssystematik bleibt identisch.
 
 ---
 
-## B.4 Test-Suite (erweitert Januar 2026)
+## B.5 Test-Suite und Validierungsregeln
 
-**Übersicht:** Die Test-Suite wurde signifikant erweitert auf **74 Testdateien** mit **1639 Assertions**.
+**Übersicht:** Die Test-Suite umfasst in der geprüften Arbeitskopie **74 `*.test.mjs`-Dateien**. Der Lauf vom 2026-05-20 ergab **1659 Assertions**, alle erfolgreich. Die Tests laufen ohne Jest/Mocha über native Node.js-ESM-Module und eigene globale Assertions (`assert`, `assertEqual`, `assertClose`).
 
-### B.4.1 Test-Inventar
+### B.5.1 Test-Inventar
 
-| Kategorie | Dateien | LOC | Fokus |
-|-----------|---------|-----|-------|
-| **Engine Core** | `core-engine.test.mjs`, `engine-robustness.test.mjs` | ~390 | Engine-Orchestrierung, Edge Cases |
-| **Transaktionen** | `transaction-*.test.mjs` (5) | ~755 | Verkäufe, ATH, Rebal, Gold, Quantisierung |
-| **Steuern** | `transaction-tax.test.mjs`, `tax-settlement.test.mjs`, `core-tax-settlement.test.mjs`, `simulator-tax-settlement.test.mjs` | ~500 | Steuerberechnung, Settlement, Verlustvortrag |
-| **Worker** | `worker-parity.test.mjs`, `worker-pool.test.mjs` | ~820 | Determinismus, Pool-Lifecycle |
-| **Spending** | `spending-*.test.mjs` (2) | ~280 | Guardrails, Quantisierung |
-| **Monte-Carlo** | `simulator-monte-carlo.test.mjs`, `monte-carlo-*.test.mjs` (2) | ~760 | MC-Kern, Sampling, Startjahr |
-| **Pflegefall** | `care-meta.test.mjs` | ~200 | Pflegegrad-Modell |
-| **Profilverbund** | `profilverbund-*.test.mjs` (3), `profile-storage.test.mjs` | ~1000 | Multi-Profil, Storage |
-| **Balance-App** | `balance-*.test.mjs` (10) | ~2300 | Smoke, Reader, Storage, Diagnosis, Annual |
-| **Simulator** | `simulator-*.test.mjs` (4) | ~1000 | Sweep, Backtest, Heatmap, Multi-Profile |
-| **Dynamic Flex** | `vpw-dynamic-flex.test.mjs`, `dynamic-flex-horizon.test.mjs` | ~270 | VPW-Formel, Horizont, Glättung, Go-Go |
-| **Scenarios** | `scenarios.test.mjs`, `scenario-analyzer.test.mjs` | ~245 | Komplexe Lebenspfade |
-| **Utilities** | `utils.test.mjs`, `formatting.test.mjs`, `feature-flags.test.mjs` | ~280 | Hilfsfunktionen |
+| Kategorie | Repräsentative Dateien | Fokus |
+|-----------|------------------------|-------|
+| **Engine Core & Validation** | `core-engine.test.mjs`, `engine-robustness.test.mjs`, `market-analyzer.test.mjs`, `historical-data-robustness.test.mjs`, `tauri-csp.test.mjs` | EngineAPI-Vertrag, Fehlerrobustheit, Marktregime, historische Daten, Tauri-CSP |
+| **Spending, VPW und 3-Bucket** | `spending-planner.test.mjs`, `spending-quantization.test.mjs`, `vpw-dynamic-flex.test.mjs`, `dynamic-flex-horizon.test.mjs`, `3bucket-config.test.mjs`, `3bucket-refill.test.mjs` | Guardrails, Rundung, VPW-Horizonte, Dynamic-Flex-Safety, 3-Bucket-Parameter und Bond-Refill |
+| **Transaktionen, Steuern, Tranchen** | `transaction-*.test.mjs`, `tax-settlement.test.mjs`, `core-tax-settlement.test.mjs`, `depot-tranches.test.mjs`, `tranchen-manager-*.test.mjs` | Verkäufe, Rebalancing, Gold/Liquidität, Rohaggregate, Jahres-Settlement, Cost-Basis- und Tranchenverwaltung |
+| **Balance-App** | `balance-smoke.test.mjs`, `balance-reader.test.mjs`, `balance-storage*.test.mjs`, `balance-annual-*.test.mjs`, `balance-diagnosis-*.test.mjs`, `balance-expenses.test.mjs`, `balance-renderer-*.test.mjs` | Initialisierung, DOM-Input, Storage/Snapshots, Jahresupdate, CAPE, Diagnose, Ausgaben-Check, Rendering |
+| **Simulator, Monte Carlo, Sweep, Optimierung** | `simulation.test.mjs`, `simulator-*.test.mjs`, `monte-carlo-*.test.mjs`, `auto-optimizer.test.mjs`, `auto-optimize-worker-contract.test.mjs`, `scenario-analyzer.test.mjs`, `scenarios.test.mjs`, `care-meta.test.mjs`, `portfolio.test.mjs` | Jahresloops, Backtest, MC-Sampling, Worker-Merge, Sweep, mehrphasige Auto-Optimize-Pipeline, Pflege, Szenarien, Portfolio |
+| **Profile und Profilverbund** | `profile-storage.test.mjs`, `profile-state.test.mjs`, `profile-navigation.test.mjs`, `profile-asset-values.test.mjs`, `profilverbund-*.test.mjs`, `simulator-multiprofile-aggregation.test.mjs` | Profilregistry, Navigation/State, Assetwerte, Multi-Profil-Aggregation, profilbezogene Tranchen |
+| **Worker, Utilities und Formatierung** | `worker-parity.test.mjs`, `worker-pool.test.mjs`, `utils.test.mjs`, `formatting.test.mjs`, `feature-flags.test.mjs` | deterministische Worker-Parität, Pool-Lifecycle, RNG/Statistik, Formatter, Feature-Flags |
 
-### B.4.2 Neue Test-Kategorien (seit Januar 2026)
+### B.5.2 Ausführung und Validierung
 
-| Testdatei | LOC | Neue Abdeckung |
-|-----------|-----|----------------|
-| `profile-storage.test.mjs` | 540 | Profil-Registry CRUD, Import/Export |
-| `simulator-monte-carlo.test.mjs` | 460 | Heatmap Merge, Buffer-Strukturen, Perzentile |
-| `simulator-sweep.test.mjs` | 470 | Parameter-Sweep, Whitelist/Blocklist |
-| `worker-pool.test.mjs` | 670 | Worker-Lifecycle, Queue, Telemetrie |
-| `auto-optimizer.test.mjs` | 500 | LHS, Nachbarschaft, Constraints, Cache |
-| `balance-reader.test.mjs` | 640 | DOM-Lesen, Profile-Overrides, Gold-Defaults |
-| `balance-storage.test.mjs` | 490 | localStorage, Migrations, Snapshots |
-| `vpw-dynamic-flex.test.mjs` | 232 | VPW-Formel, Rate-Clamping, Smoothing, Go-Go, Bear-Flex |
-| `dynamic-flex-horizon.test.mjs` | 38 | Sterbetafel-Horizonte, Single/Joint, Mean/Quantil |
+| Zweck | Kommando | Wann verwenden |
+|-------|----------|----------------|
+| Gesamtsuite | `npm test` | Default nach Codeänderungen und vor Release/EXE-Build |
+| Direkter Runner | `node tests/run-tests.mjs` | Fallback, wenn `npm` lokal defekt ist |
+| Einzeltest | `node tests/run-single.mjs <testfile>` | fokussierte Fehlersuche; im Ergebnis berichten, dass nicht die ganze Suite lief |
+| Quick-Subset | `QUICK_TESTS=1 npm test` | schneller Parity-Check, ersetzt keinen Release-Lauf |
+| Engine-Bundle | `npm run build:engine` | zusätzlich nach Änderungen an `engine/` oder öffentlicher `EngineAPI` |
+| Strict Engine-Build | `npm run build:engine:strict` | CI/Release, damit fehlendes `esbuild` nicht still auf Fallback geht |
 
-### B.4.3 Worker-Parity-Test
+Für reine Dokumentationsänderungen ist kein Testlauf erforderlich, sofern keine Code- oder Build-Artefakte geändert wurden. Wenn Dokumentation jedoch konkrete Assertion-Zahlen oder Testausgaben behauptet, müssen diese Zahlen aus einem aktuellen Runner-Lauf stammen oder ausdrücklich als nicht neu verifiziert gekennzeichnet werden.
+
+### B.5.3 Worker-Parity-Test
 
 Validiert Determinismus zwischen Main-Thread und Worker:
 ```javascript
@@ -1070,16 +1026,18 @@ const workerResult = await runInWorker({ seed: 12345, runs: 100 });
 assertEqual(mainResult.successRate, workerResult.successRate);
 ```
 
-### B.4.4 Test-Prioritäten
+Worker- und Optimizer-Pfade sind kritisch, weil Monte Carlo, Sweep und Auto-Optimize Ergebnisse chunkweise berechnen. `worker-parity.test.mjs` und `auto-optimize-worker-contract.test.mjs` sichern, dass Chunking, Worker-Merge und serielle Ausführung fachlich dieselben Aggregate liefern.
+
+### B.5.4 Test-Prioritäten
 
 | Priorität | Kategorie | Kritikalität |
 |-----------|-----------|--------------|
 | 1 | Finanz-Kern (Spending, Tax, Liquidity) | ⚠️ Kritisch |
-| 2 | Algorithmen (MC, Market, Care) | ⚠️ Hoch |
-| 3 | Transaktions-Details | Mittel |
-| 4 | UI & Persistenz | Mittel |
-| 5 | Integration & Parity | Mittel |
-| 6 | Utilities & Sweep | Niedrig |
+| 2 | EngineAPI, Settlement, 3-Bucket, Dynamic Flex | ⚠️ Hoch |
+| 3 | Algorithmen (MC, Market, Care, Sweep, Auto-Optimize) | Hoch |
+| 4 | Profilverbund, Profile, Tranchen | Mittel |
+| 5 | Balance-/Simulator-UI-Contracts und Persistenz | Mittel |
+| 6 | Worker-Parity, Utilities, Formatter, Feature-Flags | Mittel |
 
 ---
 
@@ -1096,7 +1054,7 @@ Das Floor-Flex-Modell trennt den Bedarf in zwei Komponenten:
 | **Floor** | Nicht verhandelbarer Grundbedarf | Miete, Versicherungen, Lebensmittel |
 | **Flex** | Optionaler Zusatzbedarf | Reisen, Hobbys, Luxus |
 
-**Implementierung** (SpendingPlanner.mjs:85-120):
+**Implementierungskonzept** (siehe `SpendingPlanner.mjs`):
 ```javascript
 const inflatedBedarf = {
     floor: Math.max(0, input.floorBedarf * cumulativeInflationFactor - renteJahr),
@@ -1122,7 +1080,7 @@ const totalSpending = inflatedBedarf.floor + actualFlex;
 | `bear_deep` | 50-70% | Tiefer Bärenmarkt |
 | `recovery_in_bear` | 60-75% | Rally im Bärenmarkt (Vorsicht!) |
 
-**Entnahmequoten-Anpassung** (SpendingPlanner.mjs:240-280):
+**Entnahmequoten-Anpassung** (konzeptionell, siehe `SpendingPlanner.mjs`):
 ```javascript
 const withdrawalRate = totalSpending / depotValue;
 
@@ -1137,7 +1095,7 @@ if (withdrawalRate > 0.055) {
 
 ### C.1.3 Glättungsalgorithmus
 
-**Exponentieller Glättung** (config.mjs:101-107):
+**Exponentielle Glättung** (siehe `config.mjs`):
 ```javascript
 SPENDING_MODEL: {
     FLEX_RATE_SMOOTHING_ALPHA: 0.35,     // Glättungsfaktor
@@ -1157,7 +1115,7 @@ SPENDING_MODEL: {
 
 ### C.1.4 Recovery-Guardrail
 
-**ATH-Gap-basierte Kürzung** (config.mjs:147-163):
+**ATH-Gap-basierte Kürzung** (siehe `config.mjs`):
 ```javascript
 RECOVERY_GUARDRAILS: {
     CURB_RULES: [
@@ -1171,7 +1129,7 @@ RECOVERY_GUARDRAILS: {
 
 ### C.1.5 Alarm-Eskalation und Deeskalation
 
-**Eskalations-Logik** (SpendingPlanner.mjs:326-341):
+**Eskalations-Logik** (konzeptionell, siehe `SpendingPlanner.mjs`):
 ```javascript
 function shouldActivateAlarm(context) {
     if (context.scenario !== 'bear_deep') return false;
@@ -1184,7 +1142,7 @@ function shouldActivateAlarm(context) {
 }
 ```
 
-**Deeskalations-Logik** (SpendingPlanner.mjs:260-322):
+**Deeskalations-Logik** (konzeptionell, siehe `SpendingPlanner.mjs`):
 ```javascript
 function shouldDeactivateAlarm(context, alarmHistory) {
     if (context.scenario.startsWith('peak')) {
@@ -1210,15 +1168,15 @@ function shouldDeactivateAlarm(context, alarmHistory) {
 
 | Steuerart | Satz | Implementierung |
 |-----------|------|-----------------|
-| **Abgeltungssteuer** | 25% | `sale-engine.mjs:6` |
-| **Solidaritätszuschlag** | 5.5% auf KESt | `sale-engine.mjs:6` |
+| **Abgeltungssteuer** | 25% | `sale-engine.mjs` |
+| **Solidaritätszuschlag** | 5.5% auf KESt | `sale-engine.mjs` |
 | **Kirchensteuer** | 8-9% auf KESt | `input.kirchensteuerSatz` |
 | **Teilfreistellung** | 30% für Aktienfonds | `tranche.tqf` |
 | **Sparer-Pauschbetrag** | 1.000€ (Single) / 2.000€ (Paar) | `input.sparerPauschbetrag` |
 
 ### C.2.2 Steuerberechnung pro Tranche
 
-**Vollständiger Algorithmus** (sale-engine.mjs:54-116):
+**Algorithmus** (vereinfacht, siehe `sale-engine.mjs`):
 ```javascript
 function calculateTaxForSale(tranche, sellAmount, input, remainingSPB) {
     // 1. Gewinnquote berechnen
@@ -1260,7 +1218,7 @@ function calculateTaxForSale(tranche, sellAmount, input, remainingSPB) {
 
 ### C.2.3 Steueroptimierte Verkaufsreihenfolge
 
-**Sortieralgorithmus** (sale-engine.mjs:227-255):
+**Sortieralgorithmus** (vereinfacht, siehe `sale-engine.mjs`):
 ```javascript
 function getSellOrder(tranches, input) {
     return Object.keys(tranches).sort((keyA, keyB) => {
@@ -1357,12 +1315,12 @@ function settleTaxYear({ taxStatePrev, rawAggregate, sparerPauschbetrag, kirchen
 
 ### C.3.1 Sampling-Strategien
 
-**Strategie 1: Zufälliges Jahr (UNIFORM)** (monte-carlo-runner.js:190)
+**Strategie 1: Zufälliges Jahr (UNIFORM)**
 ```javascript
 startYearIndex = Math.floor(rand() * annualData.length);
 ```
 
-**Strategie 2: CAPE-Sampling** (monte-carlo-runner.js:177-191)
+**Strategie 2: CAPE-Sampling**
 ```javascript
 if (useCapeSampling && inputs.marketCapeRatio > 0) {
     const candidates = getStartYearCandidates(inputs.marketCapeRatio, annualData);
@@ -1389,7 +1347,7 @@ function sampleNextYearData(state, method, blockSize, rand, stressCtx) {
 }
 ```
 
-**Strategie 4: Regime-basiert** (simulator-data.js:294-320)
+**Strategie 4: Regime-basiert**
 ```javascript
 REGIME_TRANSITIONS = {
     BULL: { BULL: 0.65, BEAR: 0.10, SIDEWAYS: 0.20, STAGFLATION: 0.05 },
@@ -1398,7 +1356,7 @@ REGIME_TRANSITIONS = {
 };
 ```
 
-### C.3.1a Neue Startjahr-Sampling-Modi (Januar 2026)
+### C.3.1a Startjahr-Sampling-Modi
 
 **Strategie 5: FILTER Mode** (monte-carlo-runner.js)
 ```javascript
@@ -1444,17 +1402,20 @@ function pickFromSampler(cdf, rand) {
 | CAPE | CAPE-Band-Match | Aktuelle Bewertung berücksichtigen |
 | FILTER | Ausschluss Jahre | Konservativ ohne "Golden Age" |
 | RECENCY | Exponentiell | Jüngere Marktstruktur bevorzugen |
+| BLOCK_BOOTSTRAP | Sequenzielle Blöcke | Autokorrelation und Krisencluster erhalten |
+
+Die Startjahr- und Folgejahrlogik liegt in `mc-year-sampling.js`, `mc-run-context.js` und `monte-carlo-runner.js`. Über `mcExcludeEstimatedHistory` kann die geschätzte Erweiterung 1925-1949 aus dem Monte-Carlo-Sampling ausgeschlossen werden; dann beginnt die gezogene Historie faktisch ab 1950.
 
 ### C.3.2 Stress-Presets
 
-**9 vordefinierte Stress-Szenarien** (simulator-data.js:162-290):
+**9 vordefinierte Stress-Szenarien** (siehe `simulator-data.js`):
 
 | Preset | Typ | Jahre | Parameter |
 |--------|-----|-------|-----------|
 | `STAGFLATION_70s` | conditional_bootstrap | 7 | Inflation ≥ 7%, Real-Rendite ≤ -2% |
 | `DOUBLE_BEAR_00s` | conditional_bootstrap | 6 | Real-Rendite ≤ -8%, Min-Cluster 2 |
-| `GREAT_DEPRESSION_29_33` | conditional_bootstrap | 5 | Jahre 1929-1933 (neu!) |
-| `WWII_40s` | conditional_bootstrap | 7 | Jahre 1939-1945 (neu!) |
+| `GREAT_DEPRESSION_29_33` | conditional_bootstrap | 5 | Jahre 1929-1933 |
+| `WWII_40s` | conditional_bootstrap | 7 | Jahre 1939-1945 |
 | `STAGFLATION_SUPER` | hybrid | 8 | 70er + künstlich -3% μ |
 | `INFLATION_SPIKE_3Y` | parametric | 3 | μ = -5%, σ × 1.5, Inflation ≥ 7% |
 | `FORCED_DRAWDOWN_3Y` | parametric_sequence | 3 | -25%, -20%, -15% |
@@ -1467,22 +1428,22 @@ function pickFromSampler(cdf, rand) {
 
 ### C.3.3 Historische Daten
 
-**Datenbasis** (simulator-data.js:56-132):
+**Datenbasis und Provenienz** (siehe `simulator-data.js` und `DATA_SOURCES.md`):
 
-| Feld | Quelle | Zeitraum |
-|------|--------|----------|
-| `msci_eur` | MSCI World EUR (rekonstruiert ab 1925) | 1925-2024 |
-| `inflation_de` | Statistisches Bundesamt | 1925-2024 |
-| `zinssatz_de` | Bundesbank | 1925-2024 |
-| `lohn_de` | Lohnentwicklung DE | 1925-2024 |
-| `gold_eur_perf` | Gold in EUR | 1961-2024 |
-| `cape` | Shiller CAPE | 1925-2024 |
+| Feld | Dokumentierter Status | Zeitraum |
+|------|-----------------------|----------|
+| `msci_eur` | MSCI-World-EUR-ähnlicher Indexlevel; exakte Variante (`Price`, `Net TR`, `Gross TR`) ist noch nicht vollständig dokumentiert | 1925-2024 |
+| `inflation_de` | deutsche Inflationsreihe bzw. Proxy | 1925-2024 |
+| `zinssatz_de` | deutscher Kurz-/Zinsproxy | 1925-2024 |
+| `lohn_de` | deutsche Lohnentwicklungsreihe bzw. Proxy | 1925-2024 |
+| `gold_eur_perf` | Gold-EUR-Performance; frühe Jahre enthalten Null-Fallbacks und müssen quellenfachlich weiter geklärt werden | 1925-2024, belastbarer ab späterer Historie |
+| `cape` | CAPE-/Shiller-Bewertungsproxy | 1925-2024 |
 
-**Daten-Validierung `msci_eur`:**
-*   **Zeitraum 2012–2023:** Die Werte stimmen exakt (auf 2 Nachkommastellen) mit dem **MSCI World Net Total Return EUR** überein.
-*   **Zeitraum vor 2000:** Die langfristige CAGR (1978–2024) von ~7.8% liegt unter dem typischen langfristigen Total-Return-Schnitt (~10%).
-*   **Diagnose:** Es handelt sich um eine **hybride Datenreihe**. Die jüngere Historie ist präzise (Net Return), während die älteren Daten (insb. die Extrapolationen) konservativ modelliert sind (vermutlich Price Index oder starke Währungseffekte).
-*   **Bewertung:** Für die Simulation ist dies **vorteilhaft konservativ**. Die "fehlende Rendite" in der Historie wirkt wie ein impliziter Puffer gegen Sequenzrisiken (Sequence of Returns Risk). Ein expliziter Abzug von TER oder Dividenden ist daher **nicht** notwendig, da die Datenbasis bereits eine Sicherheitsmarge enthält.
+**Provenienz-Hinweis `msci_eur`:**
+*   Die Reihe wird im Code als MSCI-World-EUR-ähnlicher Proxy behandelt; die genaue Indexvariante ist ausdrücklich noch nicht vollständig belegt.
+*   Die Jahre 1925-1949 sind eine geschätzte Erweiterung und auf den 1950er-Basiswert normalisiert. Sie dienen vor allem der Abbildung extremer Sequenzrisiken.
+*   Deshalb macht dieses Dokument keine harte Aussage mehr, dass Teilperioden exakt einem bestimmten MSCI-Net-Total-Return-Index entsprechen. Der Klärpunkt steht in `DATA_SOURCES.md`.
+*   Für konservative Läufe kann die geschätzte Frühhistorie per Monte-Carlo-Option ausgeschlossen oder über Filter/Recency-Gewichtung schwächer gewichtet werden.
 
 **Hinweis Balance-App:** In der Balance-App werden reale Depotstände und ETF-Kurse verwendet; TER ist dort bereits im NAV eingepreist. Ein zusätzlicher TER-Abzug wäre doppelt.
 
@@ -1510,7 +1471,7 @@ function pickFromSampler(cdf, rand) {
 
 ### C.3.4 Determinismus
 
-**Per-Run-Seeding** (simulator-utils.js:96-103):
+**Per-Run-Seeding** (siehe `simulator-utils.js`):
 ```javascript
 export function makeRunSeed(baseSeed, comboIdx, runIdx) {
     const base = normalizeSeed(baseSeed);
@@ -1528,7 +1489,7 @@ export function makeRunSeed(baseSeed, comboIdx, runIdx) {
 
 ### C.4.1 Datengrundlage
 
-**Quelle:** BARMER Pflegereport 2024 (dokumentiert in simulator-data.js:6-12)
+**Quelle:** BARMER Pflegereport 2024, in `simulator-data.js` als geglättete Pflegegrad-/Altersannahmen dokumentiert.
 
 ### C.4.2 Altersabhängige Eintrittswahrscheinlichkeiten
 
@@ -1541,12 +1502,11 @@ export function makeRunSeed(baseSeed, comboIdx, runIdx) {
 | 85 | 8.5% | 5.5% | 3.2% | 1.50% | 0.70% | 19.4% |
 | 90 | 12.0% | 8.0% | 5.0% | 2.80% | 1.20% | 29.0% |
 
-**Evidenz:** `simulator-data.js:43-51`
+**Evidenz:** `PFLEGE_GRADE_PROBABILITIES` in `simulator-data.js`.
 
 ### C.4.3 Progressionsmodell
 
 ```javascript
-// simulator-data.js:35-41
 PFLEGE_GRADE_PROGRESSION_PROBABILITIES = {
     1: 0.15,  // PG1 → PG2: 15% pro Jahr
     2: 0.12,  // PG2 → PG3: 12% pro Jahr
@@ -1586,7 +1546,7 @@ function calcCareCost(careMeta, inputs) {
 
 ### C.4.5 Dual-Care für Paare
 
-**Separate RNG-Streams** (monte-carlo-runner.js:216-217):
+**Separate RNG-Streams** (konzeptionell, siehe `monte-carlo-runner.js`):
 ```javascript
 const rngCareP1 = rand.fork('CARE_P1');
 const rngCareP2 = careMetaP2 ? rand.fork('CARE_P2') : null;
@@ -1613,7 +1573,7 @@ const rngCareP2 = careMetaP2 ? rand.fork('CARE_P2') : null;
 
 ### C.5.1 Dynamisches Runway-Ziel
 
-**Regime-abhängige Ziel-Runway** (config.mjs:76-89):
+**Regime-abhängige Ziel-Runway** (siehe `config.mjs`):
 
 | Regime | Ziel-Runway | Begründung |
 |--------|-------------|------------|
@@ -1654,7 +1614,7 @@ if (scenario.startsWith('peak') && equityOverweight > rebalBand) {
 
 ### C.5.3 Anti-Pseudo-Accuracy
 
-**Quantisierung** (config.mjs:115-133):
+**Quantisierung** (siehe `config.mjs`):
 
 | Betrag | Rundung |
 |--------|---------|
@@ -1686,7 +1646,7 @@ Die Simulator-Komponente unterstützt eine optionale **Ansparphase** vor dem Ruh
 | `sparrate` | Monatliche Sparrate in € | 2.000 |
 | `sparrateIndexing` | Dynamisierung der Sparrate | `inflation`, `wage`, `none` |
 
-**Implementierung** (simulator-portfolio-inputs.js:180-200):
+**Implementierung** (siehe `simulator-portfolio-inputs.js`):
 ```javascript
 const accumulationPhase = {
     enabled: accumulationPhaseEnabled,
@@ -1699,7 +1659,7 @@ const transitionYear = accumulationPhaseEnabled ? accumulationDurationYears : 0;
 
 ### C.6.3 Simulationslogik
 
-**Während der Ansparphase** (simulator-engine-direct.js:137-210):
+**Während der Ansparphase** (siehe `simulator-engine-direct.js`):
 - Kein Mortalitätsrisiko (Person lebt noch)
 - Keine Entnahmen aus dem Depot
 - Jährliche Einzahlung = `sparrate × 12`
@@ -1720,7 +1680,6 @@ const isAccumulationYear = yearIndex < effectiveTransitionYear;
 - Entnahmelogik übernimmt ab diesem Jahr
 
 ```javascript
-// monte-carlo-runner.js:453-455
 if (inputs.accumulationPhase?.enabled && simulationsJahr < effectiveTransitionYear) {
     // Sofortiger Wechsel bei Pflegeeintritt
     effectiveTransitionYear = simulationsJahr;
@@ -1795,7 +1754,7 @@ Nach dem Tod eines Partners kann der Überlebende einen Teil der Partnerrente er
 - `widowOptions.marriageOffsetYears`: Ehe-Unterschied in Jahren
 - `widowOptions.benefitFraction`: Anteil der Partnerrente (z.B. 0.55 für 55%)
 
-**Implementierung** (monte-carlo-runner.js:383-384):
+**Implementierung** (konzeptionell, siehe `monte-carlo-runner.js`):
 ```javascript
 let widowBenefitActiveForP1 = false; // P1 erhält Witwenrente nach P2
 let widowBenefitActiveForP2 = false; // P2 erhält Witwenrente nach P1
@@ -1832,11 +1791,13 @@ Neben der Monte-Carlo-Simulation bietet die Suite einen **deterministischen hist
 | Aspekt | Monte Carlo | Historischer Backtest |
 |--------|-------------|----------------------|
 | Datenquelle | Zufällige Stichproben aus Historie | Exakte historische Sequenz |
-| Zeitraum | Beliebig lang | 1951-2024 (begrenzt) |
+| Zeitraum | Simulationsdauer gemäß Eingabe; Sampling aus 1925-2024, optional ohne geschätzte Jahre <1950 | 1951-2024 |
 | Ergebnis | Verteilung (Perzentile) | Ein deterministischer Pfad |
 | Anwendung | Risikobewertung | Validierung ("Hätte mein Plan 2008 überlebt?") |
 
-### C.8.2 Implementierung (`simulator-backtest.js`)
+Die Abgrenzung ist absichtlich: Die Monte-Carlo-Datenbasis enthält auch die geschätzte Erweiterung 1925-1949. Der Backtest startet dagegen erst 1951, weil er für Renditen, ATH-/Trendkontext und historische Reihen Vorjahreswerte ab 1950 benötigt und einen nachvollziehbaren deterministischen Pfad über die belastbarere Basishistorie zeigen soll.
+
+### C.8.2 Implementierung (siehe `simulator-backtest.js`)
 
 **Hauptfunktion:**
 ```javascript
@@ -1851,7 +1812,7 @@ export function runBacktest() {
         return;
     }
 
-    // Historische Serien aufbauen
+    // Historische Serien ab 1950 aufbauen; der Simulationspfad startet ab 1951.
     const backtestCtx = {
         series: {
             wageGrowth: histYears.map(y => HISTORICAL_DATA[y].lohn_de),
@@ -1932,7 +1893,7 @@ Der **Parameter Sweep** ermöglicht die systematische Untersuchung, wie verschie
 
 ### C.9.2 Sweep-Parameter
 
-**Konfigurierbare Parameter** (`simulator-sweep.js:269-277`):
+**Konfigurierbare Parameter** (siehe `simulator-sweep.js`):
 
 | Parameter | Input-ID | Beschreibung | Beispiel-Range |
 |-----------|----------|--------------|----------------|
@@ -2079,7 +2040,7 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
 
 ### C.10.1 Grundkonzept
 
-**Auto-Optimize** ist ein **4-stufiger Optimierungsalgorithmus**, der automatisch geeignete Parameterkombinationen ermittelt. Im Vergleich zu einem exhaustiven Sweep reduziert er die Anzahl zu prüfender Kombinationen.
+**Auto-Optimize** ist ein **mehrphasiger Optimierungsalgorithmus**, der automatisch geeignete Parameterkombinationen ermittelt. Im Vergleich zu einem exhaustiven Sweep reduziert er die Anzahl zu prüfender Kombinationen durch LHS-Sampling, Quick-Filter, volle Evaluation, lokale Verfeinerung und separate Validierung.
 
 **Architektur:**
 
@@ -2087,9 +2048,9 @@ export function renderSweepHeatmapSVG(sweepResults, metricKey, xParam, yParam, x
 ┌─────────────────────────────────────────────────────────────────┐
 │                      Auto-Optimize Pipeline                      │
 ├─────────────────────────────────────────────────────────────────┤
-│  Phase 1a: Latin Hypercube Sampling (100 Samples)               │
+│  Kandidaten: Latin Hypercube Sampling (100 Samples)             │
 │      ↓                                                          │
-│  Phase 1b: Quick-Filter (200 Runs × 2 Seeds) → Top-50           │
+│  Phase 1:  Quick-Filter (200 Runs × 2 Seeds) → Top-50           │
 │      ↓                                                          │
 │  Phase 2:  Volle Evaluation (Top-50) → Constraint-Check         │
 │      ↓                                                          │
@@ -2158,7 +2119,7 @@ const constraints = [
 
 ### C.10.4 Lokale Verfeinerung
 
-**Nachbarschafts-Generierung** (`auto-optimize-sampling.js:80-97`):
+**Nachbarschafts-Generierung** (siehe `auto-optimize-sampling.js`):
 
 ```javascript
 export function generateNeighborsReduced(candidate, ranges) {
@@ -2225,7 +2186,16 @@ export class CandidateCache {
 }
 ```
 
-**Batch-Parallelisierung:**
+**Parallelisierung:**
+
+Auto-Optimize nutzt zwei Ebenen:
+
+1. `auto_optimize.js` bewertet Kandidaten in kleinen Batches per `Promise.all`, damit mehrere Kandidaten parallel laufen können.
+2. Die eigentliche Monte-Carlo-Bewertung eines Kandidaten läuft über `auto-optimize-evaluate.js` in `runMonteCarloAutoOptimize()`. Dort nutzt `auto-optimize-worker.js` einen wiederverwendeten `WorkerPool` mit `workers/mc-worker.js`, adaptiver Chunk-Größe und den UI-Werten `mcWorkerCount`/`mcWorkerBudget`.
+
+Wenn Web Worker nicht verfügbar sind oder der Worker-Pfad fehlschlägt, fällt Auto-Optimize auf serielle `runMonteCarloChunk()`-Ausführung zurück. Der Worker-Contract wird über `auto-optimize-worker-contract.test.mjs` abgesichert.
+
+**Kandidaten-Batches:**
 ```javascript
 const BATCH_SIZE = 4;  // Parallel evaluation
 
@@ -2300,7 +2270,7 @@ flexBedarf = max(0, Gesamtvermögen × VPW-Rate × GoGo-Multiplikator − Floor)
 
 **Architekturentscheidung:** Die Horizont-Berechnung (Sterbetafeln) liegt in der App-Schicht (`simulator-engine-helpers.js`). Die Engine erhält nur `horizonYears` als Zahl und bleibt damit demographik-agnostisch.
 
-### C.11.2 VPW-Formel (`core.mjs:62-69`)
+### C.11.2 VPW-Formel (Engine)
 
 Die VPW-Rate ist die PMT-Formel (Annuitätenfaktor) der Finanzmathematik:
 
@@ -2318,7 +2288,7 @@ function _berechneEntnahmeRate(realReturn, horizonYears) {
 
 **Ergebnis:** Bei `realReturn = 2%` und `horizonYears = 20` ergibt sich eine VPW-Rate von ~6.12%.
 
-### C.11.3 Erwartete Realrendite (`core.mjs:71-92`)
+### C.11.3 Erwartete Realrendite (Engine)
 
 Die erwartete Realrendite wird als **gewichteter Durchschnitt** der Asset-Klassen berechnet, per EMA geglättet und auf [0%, 5%] geclippt:
 
@@ -2366,7 +2336,7 @@ Der Horizont wird aus **deutschen Periodensterbetafeln** (`MORTALITY_TABLE` in `
 - **Joint:** Horizont basiert auf dem längsten verbleibenden Leben beider Personen (max)
 
 **Monte-Carlo-Integration:** Im MC-Lauf wird der Horizont **pro Simulationsjahr** neu berechnet:
-- Alter inkrementiertgiert sich
+- Alter steigt je Simulationsjahr
 - Bei Tod einer Person: Fallback auf Single-Life-Horizont der überlebenden Person
 - Implementierung: `computeDynamicFlexHorizonForYear()` in `monte-carlo-runner.js`
 
@@ -2385,7 +2355,7 @@ vpwTotal = gesamtwert * vpwRate * (goGoActive ? goGoMultiplier : 1.0);
 
 **Validierung:** `goGoMultiplier > MAX_GO_GO_MULTIPLIER` (1.5) erzeugt einen `ValidationError` — keine stille Clampung.
 
-### C.11.6 Konfiguration (`config.mjs:154-164`)
+### C.11.6 Konfiguration (Engine-Konfiguration)
 
 ```javascript
 DYNAMIC_FLEX: {
@@ -2414,7 +2384,7 @@ Input → Validation → Market Analysis → [VPW: Flex-Override] → SpendingPl
 3. Alle bestehenden Guardrails (FlexRate 0-100%, Alarm-Modus, Hard Caps) wirken weiterhin auf den VPW-abgeleiteten Flex
 
 **Diagnostik:** Das Ergebnisobjekt enthält immer `ui.vpw` mit:
-- `status`: `'active'` | `'disabled'` | `'contract_ready'`
+- `status`: `'active'` | `'disabled'` | `'contract_ready'` | `'safety_static_flex'`
 - `vpwRate`, `expectedRealReturn`, `vpwTotal`, `dynamicFlex`, `gesamtwert`
 - `horizonYears`, `horizonMethod`, `survivalQuantile`
 - `goGoActive`, `goGoMultiplier`
@@ -2560,7 +2530,7 @@ rt
 | **Tranchen-Management** | ✅ FIFO+Online | ❌ | ⚠️ | ❌ | ❌ | ❌ |
 | **Parameter-Sweeps** | ✅ Heatmap | ❌ | ❌ | ⚠️ | ❌ | ❌ |
 | **Dynamic Flex (VPW)** | ✅ CAPE+Sterbetafel | ❌ | ❌ | ❌ | ❌ | ⚠️ RMD |
-| **Auto-Optimize** | ✅ 4-stufig LHS | ❌ | ❌ | ✅ | ❌ | ❌ |
+| **Auto-Optimize** | ✅ LHS + Quick/Refine/Validate | ❌ | ❌ | ✅ | ❌ | ❌ |
 | **Ausgaben-Check** | ✅ CSV+Median | ❌ | ❌ | ❌ | ❌ | ❌ |
 | **Offline** | ✅ | ⚠️ ($799) | ❌ | ✅ (Gold) | ✅ | ✅ |
 | **Desktop-App** | ✅ Tauri (8 MB) | ❌ | ❌ | ✅ Excel | ❌ | ❌ |
@@ -2576,7 +2546,7 @@ rt
 3. **7-stufige Marktregime-Erkennung** — In den betrachteten kostenlosen Tools in dieser Form nicht enthalten
 4. **Risk-Based Guardrails** — Implementiert den Kitces-Ansatz statt klassischer Guyton-Klinger
 5. **Tranchen-Management mit Online-Kursen** — Einzelpositionen mit FIFO-Steueroptimierung und automatischer Kursabfrage
-6. **4-stufige Auto-Optimierung (LHS)** — Latin Hypercube Sampling + Quick-Filter + Lokale Verfeinerung + Train/Test-Validierung
+6. **Mehrphasige Auto-Optimierung (LHS)** — Latin Hypercube Sampling + Quick-Filter + volle Evaluation + lokale Verfeinerung + Train/Test-Validierung
 7. **Parameter-Sweep mit Heatmap-Visualisierung** — Sensitivitätsanalyse mit SVG-basierter Viridis-Heatmap und Invarianten-Prüfung
 8. **Historischer Backtest mit DE-Daten** — Deterministische Simulation 1951-2024 mit deutscher Inflation und Lohnentwicklung
 9. **Portable Tauri-Desktop-App** — ~8 MB EXE, keine Installation, läuft von USB-Stick
@@ -2667,40 +2637,37 @@ rt
 
 # Appendix: Modul-Inventar
 
-## Engine-Module (13)
+*Hinweis: Dieser Appendix wird in den Folgepaketen gegen die spezialisierten Modul-READMEs aktualisiert und neu geclustert. Exakte aktuelle Bestandszahlen stehen in der Komponenten- und B.1-Übersicht.*
 
-| Modul | LOC | Funktion |
-|-------|-----|----------|
-| `core.mjs` | 459 | Orchestrierung, EngineAPI, VPW-Berechnung **(erweitert!)** |
-| `config.mjs` | 286 | Zentrale Konfiguration inkl. DYNAMIC_FLEX **(erweitert)** |
-| `errors.mjs` | ~50 | Fehlerklassen |
-| `index.mjs` | ~30 | Modul-Exports |
-| `InputValidator.mjs` | 199 | Input-Validierung inkl. Dynamic-Flex **(erweitert)** |
-| `MarketAnalyzer.mjs` | 160 | Marktregime-Klassifikation |
-| `SpendingPlanner.mjs` | **1076** | Guardrails, Flex-Rate, Budget-System **(erweitert!)** |
-| `TransactionEngine.mjs` | 47 | Facade für Transaktionen |
-| `transaction-action.mjs` | 456 | Transaktions-Entscheidungslogik |
-| `transaction-opportunistic.mjs` | 323 | Opportunistisches Rebalancing |
-| `transaction-surplus.mjs` | 149 | Überschuss-Handling |
-| `transaction-utils.mjs` | 237 | Transaktions-Hilfsfunktionen |
-| `sale-engine.mjs` | 333 | Verkäufe, Steuern, Roh-Aggregate |
-| `tax-settlement.mjs` | ~80 | Jahres-Settlement (Verlusttopf, SPB, finale Steuer) **(neu!)** |
+## Engine-Module (Auswahl)
 
-## Simulator-Module (43 Module, Auswahl)
+| Modul/Gruppe | Funktion |
+|--------------|----------|
+| `core.mjs` | Orchestrierung, EngineAPI, Input-Normalisierung, Dynamic-Flex/VPW, Steuer-Settlement-Anbindung |
+| `config.mjs` | Zentrale Konfiguration für Schwellenwerte, Profile, Texte, Spending-Modell und Build-ID |
+| `errors.mjs`, `index.mjs` | Fehlerklassen und Bundle-/ESM-Entry |
+| `validators/InputValidator.mjs` | Plausibilisierung von Jahresinputs, Dynamic-Flex-Feldern und persistiertem Steuerzustand |
+| `analyzers/MarketAnalyzer.mjs` | Marktregime, Drawdown, Stagflation und CAPE-Erwartungsrendite |
+| `planners/SpendingPlanner.mjs` + Policy-Module | Entnahmeplanung aus State, Alarm, Flex-Rate, Guardrails, Flex-Budget, finalen Rate-Limits und Diagnose |
+| `transactions/TransactionEngine.mjs` + `transaction-*` | Ziel-Liquidität, Runway-/Floor-Notfüllung, opportunistisches Rebalancing, Surplus-Investments |
+| `transactions/sale-engine.mjs` | Steuerbewusste Verkäufe, Tranchenreihenfolge, Rohaggregate für Settlement |
+| `transactions/three-bucket-logic.mjs` | 3-Bucket-Jilge: Bond-Erkennung, Bond-Verkauf in schlechten Jahren, Bond-Refill in guten Jahren |
+| `tax-settlement.mjs` | Finale Jahressteuer mit Verlustvortrag, Sparer-Pauschbetrag und `taxState.lossCarry` |
 
-| Modul | LOC | Funktion |
-|-------|-----|----------|
-| `monte-carlo-runner.js` | ~985 | DOM-freie MC-Simulation, Dynamic-Flex-Horizont **(erweitert!)** |
-| `simulator-sweep.js` | ~500 | Parameter-Sweeps |
-| `simulator-optimizer.js` | ~500 | 3-stufige Optimierung |
-| `simulator-data.js` | ~450 | Historische Daten 1925-2024, 9 Stress-Presets |
-| `simulator-utils.js` | 260 | RNG, Quantile, Parser |
-| `simulator-portfolio-pension.js` | ~65 | Rentenberechnung, Indexierung |
-| `simulator-main-accumulation.js` | ~80 | Ansparphase-Steuerung |
-| `simulator-engine-direct.js` | ~350 | Engine-Direktzugriff, Ansparlogik |
-| `simulator-ui-rente.js` | ~100 | Renten-UI (Rente1/Rente2) |
-| `simulator-main-dynamic-flex.js` | ~180 | Dynamic-Flex-UI, Presets, Sync **(neu!)** |
-| `simulator-engine-helpers.js` | ~250 | Sterbetafel-Horizonte (Mean/Quantil, Single/Joint) **(erweitert!)** |
+## Simulator-Module (Cluster)
+
+| Cluster | Zentrale Module | Funktion |
+|---------|-----------------|----------|
+| Bootstrap/UI-Fassade | `simulator-main.js`, `simulator-main-init.js`, `simulator-main-tabs.js`, `simulator-main-input-persist.js` | App-Start, Button-/Tab-Verdrahtung, Eingabepersistenz, Engine-Handshake |
+| Fach-UI | `simulator-ui-pflege.js`, `simulator-ui-rente.js`, `simulator-main-accumulation.js`, `simulator-main-dynamic-flex.js`, `simulator-main-3bucket.js`, `simulator-main-stress.js` | Pflege-, Renten-, Anspar-, VPW-, 3-Bucket- und Stress-Konfiguration |
+| Input-Mapping | `simulator-input-*.js`, `simulator-profile-inputs.js` | DOM-/Profildaten in strukturierte Simulator-Inputs übersetzen |
+| Portfolio/Tranchen | `simulator-portfolio*.js`, `simulator-year-portfolio.js`, `simulator-portfolio-tranches.js` | Startportfolio, Detailtranchen, Aktien/Gold/Bonds, Renditefortschreibung und Verkäufe |
+| Jahressimulation | `simulator-engine-direct.js`, `simulator-engine-wrapper.js`, `simulator-engine-input.js`, `simulator-household-pension.js`, `simulator-accumulation-year.js`, `simulator-year-result.js` | Engine-Aufruf je Jahr, Rente/Witwenlogik, Ansparphase, Ergebnis- und Logshape |
+| Nachsteuerung | `simulator-forced-sale.js`, `simulator-tax-recompute.js`, `simulator-bond-refill.js` | Forced Sales, Steuer-Recompute nach Zusatzverkäufen, 3-Bucket-Bond-Refill |
+| Monte Carlo | `simulator-monte-carlo.js`, `monte-carlo-runner.js`, `mc-*.js`, `monte-carlo-aggregates.js`, `scenario-analyzer.js` | Runs, Sampling, Life-State, Stressmetriken, Logs und Aggregation |
+| Backtest/Sweep/Optimize | `simulator-backtest.js`, `simulator-sweep.js`, `sweep-runner.js`, `simulator-heatmap.js`, `auto_optimize*.js`, `simulator-visualization.js` | Historische Pfade, Sensitivitätsraster, Heatmaps, Optimierung, Pareto/Sensitivity |
+| Ergebnisdarstellung | `simulator-results.js`, `results-metrics.js`, `results-renderers.js`, `results-formatting.js`, `simulator-main-helpers.js` | KPI-Karten, Szenario-/Backtest-Logs, CSV/JSON-Export, Tabellenformatierung |
+| Daten/Utilities | `simulator-data.js`, `simulator-utils.js`, `cape-utils.js` | Historische Daten, Pflege-/Mortalitätsdaten, Stress-Presets, RNG/Statistik, CAPE-Auswahl |
 
 ## Worker-Module (3)
 
@@ -2710,19 +2677,19 @@ rt
 | `mc-worker.js` | ~150 | Monte-Carlo Worker-Thread |
 | `auto-optimize-worker.js` | ~80 | Optimizer-Worker |
 
-## Balance-App Module (28 Module, Auswahl)
+## Balance-App Module (Auswahl)
 
 | Modul | LOC | Funktion |
 |-------|-----|----------|
 | `balance-main.js` | ~500 | Orchestrierung, Update-Zyklus |
 | `balance-reader.js` | ~300 | DOM-Input-Lesung |
 | `balance-storage.js` | ~400 | localStorage, Snapshots |
-| `balance-expenses.js` | **646** | Ausgaben-Check mit CSV-Import, Budget-Tracking **(neu!)** |
+| `balance-expenses.js` | **646** | Ausgaben-Check mit CSV-Import, Budget-Tracking |
 | `balance-guardrail-reset.js` | ~70 | Auto-Reset bei kritischen Änderungen |
 | `balance-annual-*.js` (4) | ~400 | Jahresabschluss, Inflation, Marktdaten |
 | `balance-diagnosis-*.js` (7) | ~840 | Chips, Entscheidungsbaum, Guardrails, VPW-Keyparams **(erweitert!)** |
 
-## Profil- und Tranchen-Module (6)
+## Profil- und Tranchen-Module (Auswahl)
 
 | Modul | LOC | Funktion |
 |-------|-----|----------|
@@ -2751,7 +2718,7 @@ rt
 4. **Block-Bootstrap** (`monte-carlo-runner.js:sampleNextYearData`)
 5. **Worker-Pool mit adaptivem Chunking** (`worker-pool.js`)
 6. **Pflegegrad-Progression** (`simulator-data.js:PFLEGE_GRADE_PROGRESSION_PROBABILITIES`)
-7. **4-Stage-Optimization** (`simulator-optimizer.js`, `auto-optimize-sampling.js`)
+7. **Mehrphasige Auto-Optimize-Pipeline** (`auto_optimize.js`, `auto-optimize-sampling.js`)
 8. **FIFO-Steueroptimierung** (`sale-engine.mjs:getSellOrder`)
 9. **Wealth-Adjusted Reduction** (`SpendingPlanner.mjs`)
 10. **Flex-Budget-System** (`SpendingPlanner.mjs`)
@@ -2761,21 +2728,21 @@ rt
 14. **Renten-Indexierung** (`simulator-portfolio-pension.js:computeRentAdjRate`)
 15. **Witwenrente** (`monte-carlo-runner.js:widowBenefitActive`)
 16. **Great Depression/WWII Stress-Presets** (`simulator-data.js`)
-17. **Latin Hypercube Sampling** (`auto-optimize-sampling.js:latinHypercubeSample`) **(neu!)**
-18. **Historischer Backtest** (`simulator-backtest.js:runBacktest`) **(neu!)**
-19. **Profilverbund-Aggregation** (`profilverbund-balance.js:aggregateProfilverbundInputs`) **(neu!)**
-20. **Tranchen-FIFO-Selektion** (`profilverbund-balance.js:selectTranchesForSale`) **(neu!)**
-21. **Multi-Objective-Optimierung** (`simulator-optimizer.js:findBestParametersMultiObjective`) **(neu!)**
-22. **Constraint-Based-Optimierung** (`simulator-optimizer.js:findBestParametersWithConstraints`) **(neu!)**
-23. **Sweep-Heatmap-Rendering** (`simulator-heatmap.js:renderSweepHeatmapSVG`) **(neu!)**
-24. **Verlustverrechnungstopf** (`tax-settlement.mjs:settleTaxYear`) — Jahres-Settlement mit Verlustvortrag, SPB und Gesamt-Recompute **(neu!)**
-24. **P2-Invarianz-Prüfung** (`simulator-sweep-utils.js:areP2InvariantsEqual`) **(neu!)**
-25. **Ausgaben-Check CSV-Parser** (`balance-expenses.js:parseCategoryCsv`) **(neu!)**
-26. **Median-basierte Hochrechnung** (`balance-expenses.js:computeYearStats`) **(neu!)**
-27. **VPW-Annuitätenformel** (`core.mjs:_berechneEntnahmeRate`) **(neu!)**
-28. **CAPE-basierte Realrendite mit EMA-Glättung** (`core.mjs:_calculateExpectedRealReturn`) **(neu!)**
-29. **Sterbetafel-Horizont (Single/Joint, Mean/Quantil)** (`simulator-engine-helpers.js`) **(neu!)**
-30. **Dynamischer MC-Horizont pro Simulationsjahr** (`monte-carlo-runner.js:computeDynamicFlexHorizonForYear`) **(neu!)**
+17. **Latin Hypercube Sampling** (`auto-optimize-sampling.js:latinHypercubeSample`)
+18. **Historischer Backtest** (`simulator-backtest.js:runBacktest`)
+19. **Profilverbund-Aggregation** (`profilverbund-balance.js:aggregateProfilverbundInputs`)
+20. **Tranchen-FIFO-Selektion** (`profilverbund-balance.js:selectTranchesForSale`)
+21. **Multi-Objective-Optimierung** (`simulator-optimizer.js:findBestParametersMultiObjective`)
+22. **Constraint-Based-Optimierung** (`simulator-optimizer.js:findBestParametersWithConstraints`)
+23. **Sweep-Heatmap-Rendering** (`simulator-heatmap.js:renderSweepHeatmapSVG`)
+24. **Verlustverrechnungstopf** (`tax-settlement.mjs:settleTaxYear`) — Jahres-Settlement mit Verlustvortrag, SPB und Gesamt-Recompute
+24. **P2-Invarianz-Prüfung** (`simulator-sweep-utils.js:areP2InvariantsEqual`)
+25. **Ausgaben-Check CSV-Parser** (`balance-expenses-csv.js:parseCategoryCsv`)
+26. **Median-basierte Hochrechnung** (`balance-expenses-metrics.js:computeYearStats`)
+27. **VPW-Annuitätenformel** (`core.mjs:_berechneEntnahmeRate`)
+28. **CAPE-basierte Realrendite mit EMA-Glättung** (`core.mjs:_calculateExpectedRealReturn`)
+29. **Sterbetafel-Horizont (Single/Joint, Mean/Quantil)** (`simulator-engine-helpers.js`)
+30. **Dynamischer MC-Horizont pro Simulationsjahr** (`monte-carlo-runner.js:computeDynamicFlexHorizonForYear`)
 
 ---
 
@@ -2803,4 +2770,4 @@ rt
 
 ---
 
-*Technische Dokumentation der Ruhestand-Suite. Code-Zeilenangaben beziehen sich auf Engine API v31.0 und können bei zukünftigen Änderungen abweichen. Algorithmen-Beschreibungen bleiben konzeptionell gültig. Stand: Februar 2026.*
+*Technische Dokumentation der Ruhestand-Suite. Algorithmen-Beschreibungen sind konzeptionell; konkrete Implementierungsdetails stehen in den genannten Modulen und Tests. Dokumentstand: 2026-05-20.*

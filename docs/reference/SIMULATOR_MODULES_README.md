@@ -297,7 +297,7 @@ Rendering-Layer für KPI-Karten, Tabellen und Badges.
 Auto-Optimierung für Parameter (LHS + Verfeinerung) und UI-Bedienung. Details siehe: `docs/reference/AUTO_OPTIMIZE_DETAILS.md`.
 
 **Hauptfunktionen / Exporte:**
-- `runAutoOptimize()` – Orchestriert den 3-stufigen Prozess (Coarse -> Refinement -> Final).
+- `runAutoOptimize()` – Orchestriert den mehrphasigen Prozess (LHS-Kandidaten -> Quick-Filter -> volle Evaluation -> Refinement -> Validierung).
 - UI-Integration in `auto_optimize_ui.js` als Fassade fuer Initialisierung, Event-Wiring, Run-Flow und Parameter-Management.
 
 **Modul-Split:**

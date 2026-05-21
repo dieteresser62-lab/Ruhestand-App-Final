@@ -32,6 +32,7 @@ engine/
 │   ├── transaction-opportunistic.mjs  # Opportunistisches Rebalancing (Refill)
 │   ├── transaction-surplus.mjs   # Surplus-Investments (Cash-Abbau)
 │   ├── sale-engine.mjs           # Verkauf/Steuer/Tranchensortierung
+│   ├── three-bucket-logic.mjs    # 3-Bucket-Jilge: Bond-Verkauf und Bond-Refill
 │   └── transaction-utils.mjs     # Ziel-Liquidität, Quantisierung, Min-Trade
 └── validators/
     └── InputValidator.mjs        # Eingabevalidierung
@@ -60,6 +61,7 @@ engine/
 | `planners/spending-policy-helpers.mjs` | `{ quantizeMonthly, smoothstep, calcFlexShare, calculateFinalWithdrawal }` | Reine Helper fuer Spending-Policies |
 | `planners/wealth-reduction.mjs` | `{ calculateWealthAdjustedReductionFactor }` | Vermoegensbasierte Daempfung der Flex-Reduktion |
 | `transactions/TransactionEngine.mjs` | `TransactionEngine` | Liquiditätsziele, Rebalancing |
+| `transactions/three-bucket-logic.mjs` | `{ getThreeBucketInputs, applyThreeBucketLogic, appendBondReplenishment }` | 3-Bucket-Jilge-Logik fuer Bond-Verkauf, Bond-Refill und Bond-Klassifikation |
 | `core.mjs` | `{ EngineAPI, _internal_calculateModel }` | Öffentliche API + interner Pipeline-Entry |
 
 
@@ -68,6 +70,10 @@ engine/
 ### Verkaufs-/Tranchen-Contract
 
 `transactions/sale-engine.mjs` baut fuer detaillierte Tranchen eine `breakdown[]`-Liste. Neben Verkaufsbetrag, Steuer- und Rohgewinnfeldern bleiben `trancheId` und, falls vorhanden, `sourceProfileId` erhalten. Mehrprofilige Simulator-Inputs koennen dadurch gleichartige Positionen aus unterschiedlichen Profilen eindeutig auf die urspruengliche Profil-Tranche zurueckfuehren.
+
+### 3-Bucket-Jilge-Contract
+
+`transactions/three-bucket-logic.mjs` normalisiert die Strategieparameter fuer `3_bucket_jilge`, erkennt Bond-/Anleihen-Tranchen ueber Typ oder Kategorie (`bond`, `bonds`, `anleihe`) und stellt gemeinsame Funktionen fuer Bond-Verkauf in schlechten Jahren sowie Bond-Wiederauffuellung in guten Jahren bereit. Die Funktionen liefern dieselben Verkaufs- und Steuer-Rohaggregate wie regulaere Verkäufe, damit `tax-settlement.mjs` die finale Jahressteuer konsistent berechnen kann.
 
 ### Dynamic-Flex Vertragsfelder (`simulateSingleYear`)
 

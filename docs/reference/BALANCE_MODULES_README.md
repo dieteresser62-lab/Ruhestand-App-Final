@@ -1,10 +1,10 @@
 # Balance-App – Modulübersicht
 
-Die Balance-App besteht aus 30 ES6-Modulen unter `app/balance/`. Das folgende Dokument fasst Verantwortung, Exporte und wichtige Abhängigkeiten zusammen.
+Die Balance-App besteht aus 34 ES6-Modulen unter `app/balance/`. Das folgende Dokument fasst Verantwortung, Exporte und wichtige Abhängigkeiten zusammen.
 Dateinamen werden unten kurz ohne Präfix genannt; tatsächlicher Pfad ist in der Regel `app/balance/<datei>.js`.
 Ausnahmen: Profilverbund-Module liegen unter `app/profile/`, Shared-Formatter unter `app/shared/`.
 
-**Stand:** Januar 2026
+**Stand:** 2026-05-20
 
 ---
 

@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 74 Testdateien mit 1639 Assertions
+**Test-Statistik:** 74 Testdateien mit 1659 Assertions (verifiziert mit `npm test` am 2026-05-20)
 
 ## Directory Structure
 
@@ -227,8 +227,9 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 - **runSweepChunk:** Ausführung und Determinismus
 
 #### `auto-optimizer.test.mjs`
-**Zweck:** Testet die 3-stufige Auto-Optimierung.
+**Zweck:** Testet die mehrphasige Auto-Optimierung.
 - **Latin Hypercube Sampling:** Gleichmäßige Verteilung im Parameterraum
+- **Quick-/Full-Evaluation:** Kandidaten werden vor der vollständigen Bewertung vorgefiltert
 - **Nachbarschafts-Generierung:** generateNeighborsReduced
 - **Kandidaten-Validierung:** isValidCandidate (Runway-Invariante, Gold-Cap, Grenzen)
 - **Constraint-Prüfung:** checkConstraints (SR99, NOEX, TS45, DD55)
@@ -587,18 +588,26 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 
 | Datei | Lines | Zweck |
 |-------|-------|-------|
-| `auto-optimizer.test.mjs` | ~500 | 3-stufige Optimierung, LHS, Constraints |
+| `3bucket-config.test.mjs` | ~90 | 3-Bucket-Konfiguration und Engine-Input-Mapping |
+| `3bucket-refill.test.mjs` | ~160 | Bond-Refill und 3-Bucket-Nachsteuerung |
+| `auto-optimizer.test.mjs` | ~500 | Mehrphasige Optimierung, LHS, Constraints |
 | `auto-optimize-worker-contract.test.mjs` | ~260 | Auto-Optimize Worker-Merge-Contract |
+| `balance-annual-cape.test.mjs` | ~140 | CAPE-Abruf, Fallback und Jahresupdate-Contract |
 | `balance-annual-inflation.test.mjs` | ~130 | Jährliche Inflationsanpassung |
 | `balance-annual-workflow-contract.test.mjs` | ~180 | Jahresupdate-/Jahresabschluss-Workflow-Contracts |
 | `balance-binder-snapshots.test.mjs` | ~160 | Snapshot-Erstellung/-Restore |
+| `balance-decumulation.test.mjs` | ~120 | Entnahmemodus-/3-Bucket-Input der Balance-App |
 | `balance-diagnosis-chips.test.mjs` | ~70 | Diagnose-Chip-Rendering |
 | `balance-diagnosis-copy-contract.test.mjs` | ~100 | Kopierbarer Diagnose-Exporttext |
 | `balance-diagnosis-decision-tree.test.mjs` | ~100 | Entscheidungsbaum-Logik |
 | `balance-diagnosis-format.test.mjs` | ~40 | Diagnose-Normalisierung und Grenzfalltexte |
 | `balance-diagnosis-guardrails.test.mjs` | ~100 | Guardrail-Chips |
+| `balance-diagnosis-keyparams.test.mjs` | ~90 | Key-Parameter- und VPW-Diagnosefelder |
 | `balance-diagnosis-transaction.test.mjs` | ~100 | Transaktions-Diagnose |
+| `balance-dynamic-flex-gate.test.mjs` | ~100 | Dynamic-Flex-Gating in Balance |
+| `balance-expenses.test.mjs` | ~180 | Ausgaben-Check, CSV, Storage und Kennzahlen |
 | `balance-reader.test.mjs` | ~640 | DOM-Input-Lesen, Overrides |
+| `balance-renderer-action.test.mjs` | ~120 | Action-Rendering, Quellen/Verwendungen |
 | `balance-renderer-summary.test.mjs` | ~50 | Summary-Rendering |
 | `balance-smoke.test.mjs` | ~340 | End-to-End Smoke-Test |
 | `balance-storage-contract.test.mjs` | ~180 | Echte StorageManager-Migrationen und Snapshot-Contracts |
@@ -607,6 +616,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `core-engine.test.mjs` | ~150 | EngineAPI-Basisvalidierung |
 | `core-tax-settlement.test.mjs` | ~70 | Core Settlement-Integration |
 | `depot-tranches.test.mjs` | ~130 | FIFO-Verkäufe, Steuer |
+| `dynamic-flex-horizon.test.mjs` | ~40 | Sterbetafel-Horizonte, Single/Joint, Mean/Quantil |
 | `engine-robustness.test.mjs` | ~240 | Edge Cases, Fehlereingaben |
 | `feature-flags.test.mjs` | ~60 | Feature-Flag-System |
 | `formatting.test.mjs` | ~120 | Formatierungsfunktionen |
@@ -616,27 +626,39 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `monte-carlo-sampling.test.mjs` | ~200 | Bootstrap, Regime-Transitions |
 | `monte-carlo-startyear.test.mjs` | ~100 | Startjahr-Auswahl |
 | `portfolio.test.mjs` | ~100 | Portfolio-Operationen |
+| `profile-asset-values.test.mjs` | ~80 | Profil-Assetwerte und Aggregation |
+| `profile-navigation.test.mjs` | ~100 | Profilnavigation und UI-State |
+| `profile-state.test.mjs` | ~100 | Profilzustand und Storage-Contracts |
 | `profile-storage.test.mjs` | ~570 | Profil-Registry CRUD, Bundle-Tranchen |
 | `profilverbund-balance.test.mjs` | ~230 | Multi-Profil Aggregation, Entnahmeverteilung, Asset-Summaries |
 | `profilverbund-profile-gold-overrides.test.mjs` | ~160 | Gold-Parameter-Overrides |
 | `scenario-analyzer.test.mjs` | ~95 | Szenario-Tags, Vergleich |
 | `scenarios.test.mjs` | ~150 | Komplexe Lebenspfade |
 | `simulation.test.mjs` | ~200 | Simulations-Integration |
+| `simulator-3bucket-ui-e2e.test.mjs` | ~130 | 3-Bucket-UI-Integration im Simulator |
 | `simulator-backtest.test.mjs` | ~150 | Historischer Backtest |
+| `simulator-dynamic-flex-persistence.test.mjs` | ~110 | Persistenz von Dynamic-Flex-Inputs |
 | `simulator-headless.test.mjs` | ~125 | Headless 2000-2024 |
 | `simulator-heatmap.test.mjs` | ~60 | Heatmap-Rendering |
+| `simulator-input-readers.test.mjs` | ~160 | DOM-freie Simulator-Input-Reader |
+| `simulator-log-columns.test.mjs` | ~110 | Logspalten für Entnahme, VPW, Bonds und Steuer |
 | `simulator-monte-carlo.test.mjs` | ~460 | MC-Kern, Buffers, Merge |
 | `simulator-multiprofile-aggregation.test.mjs` | ~190 | Simulator Multi-Profil, Tranchen-Merge |
 | `simulator-sweep.test.mjs` | ~470 | Parameter-Sweep |
 | `simulator-tax-settlement.test.mjs` | ~180 | Simulator Settlement-Recompute |
 | `spending-planner.test.mjs` | ~200 | Entnahme-Logik |
 | `spending-quantization.test.mjs` | ~80 | Entnahme-Rundung |
+| `tauri-csp.test.mjs` | ~130 | Tauri-CSP, Live-Daten-Endpunkte und Icons |
 | `transaction-engine-ath.test.mjs` | ~160 | ATH-Verhalten |
 | `transaction-engine-rebal.test.mjs` | ~105 | Gold-Rebalancing |
 | `transaction-gold-liquidity.test.mjs` | ~90 | Gold vs. Liquidität |
 | `transaction-quantization.test.mjs` | ~250 | Transaktions-Rundung |
 | `tax-settlement.test.mjs` | ~70 | Jahres-Settlement, Verlusttopf |
+| `tranchen-manager-modal.test.mjs` | ~120 | Tranchenmanager-Modal und Form-Parsing |
+| `tranchen-manager-renderer.test.mjs` | ~100 | Tranchenmanager-Rendering |
+| `tranchen-manager-state.test.mjs` | ~120 | Tranchenmanager-State und Derived Values |
 | `transaction-tax.test.mjs` | ~340 | Steuerberechnung, Roh-Aggregate |
 | `utils.test.mjs` | ~100 | Hilfsfunktionen |
+| `vpw-dynamic-flex.test.mjs` | ~230 | VPW-Formel, Smoothing, Safety und Go-Go |
 | `worker-parity.test.mjs` | ~750 | Worker-Chunk-Parity |
 | `worker-pool.test.mjs` | ~670 | Worker-Pool-Lifecycle |

@@ -6,6 +6,8 @@ Aktive interne Uebersichten:
 
 - `PROJEKTUEBERSICHT.md` - detaillierte technische und organisatorische Projektuebersicht.
 - `BALANCE_DIAGNOSIS_UX_SLICE.md` - interne UX-Slice-Dokumentation zur Balance-Entscheidungsdiagnose.
+- `ARCHITEKTUR_UND_FACHKONZEPT_REVISION_PLAN.md` - Plan zur Aktualisierung des grossen Architektur- und Fachkonzeptdokuments.
+- `PFLEGEBUCKET_GELDMARKT_RESERVE_PLAN.md` - Umsetzungskonzept fuer einen optionalen Pflegebucket als gesperrte Geldmarkt-ETF-Reserve.
 - `2026-tauri-release-gate/TAURI_RELEASE_GATE_PLAN.md` - aktiver Plan zur Absicherung des manuellen Tauri-/EXE-Release-Gates.
 
 Abgeschlossene Umsetzungen liegen im Archiv.

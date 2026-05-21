@@ -8,7 +8,7 @@ Die Optimierung ist modular aufgebaut und nutzt Web Worker für parallele Berech
 
 ### Module
 
-*   **`auto_optimize.js`**: Haupt-Orchestrator. Steuert den Ablauf der Optimierung (LHS -> Verfeinerung -> Finalisierung).
+*   **`auto_optimize.js`**: Haupt-Orchestrator. Steuert den Ablauf der Optimierung (LHS -> Quick-Filter -> volle Evaluation -> Verfeinerung -> Validierung).
 *   **`auto_optimize_ui.js`**: UI-Integration. Verbindet den Orchestrator mit dem DOM (Progressbars, Ergebnisanzeige, Abbruch).
 *   **`auto-optimize-worker.js`**: Der Worker-Code. Führt die eigentlichen Monte-Carlo-Simulationen für eine Menge von Kandidaten durch.
 *   **`auto-optimize-sampling.js`**: Algorithmen für die Generierung von Parameter-Kandidaten (Latin Hypercube Sampling, Nachbarschaftssuche).
@@ -19,22 +19,32 @@ Die Optimierung ist modular aufgebaut und nutzt Web Worker für parallele Berech
 
 ## Algorithmus
 
-Die Optimierung verläuft in drei Phasen ("Stages"):
+Die Optimierung verläuft mehrphasig. LHS erzeugt zuerst den Kandidatenraum; danach folgen Quick-Filter, volle Evaluation, lokale Verfeinerung und finale Validierung.
 
-### Stage 1: Coarse Search (Grobe Suche)
+### Stage 0: Candidate Generation (LHS)
 - **Methode**: Latin Hypercube Sampling (LHS).
-- **Ziel**: Den gesamten Parameterraum gleichmäßig, aber zufällig abtasten, um vielversprechende Regionen zu finden.
-- **Details**: Es werden z.B. 50-200 Kandidaten (abhängig von der Anzahl der Parameter) generiert und mit einer geringen Anzahl von Simulationen (z.B. 250 Runs) schnell bewertet.
+- **Ziel**: Den gesamten Parameterraum gleichmäßig, aber zufällig abtasten.
+- **Details**: Es werden Kandidaten generiert und vorgefiltert, bevor teure Monte-Carlo-Bewertungen starten.
 
-### Stage 2: Refinement (Verfeinerung)
-- **Methode**: Lokale Suche um die besten Kandidaten aus Stage 1.
+### Stage 1: Quick Filter
+- **Methode**: Reduzierte Run-Zahl und wenige Trainings-Seeds.
+- **Ziel**: Offensichtlich schwache Kandidaten früh aussortieren.
+- **Details**: Constraints werden hier wegen hoher Varianz noch nicht hart angewendet.
+
+### Stage 2: Full Evaluation
+- **Methode**: Volle Evaluation der Top-Kandidaten aus dem Quick-Filter.
+- **Ziel**: Objective und Constraints belastbarer bewerten.
+- **Details**: Nur Kandidaten, die Constraints erfüllen, gehen in die weitere Sortierung.
+
+### Stage 3: Refinement (Verfeinerung)
+- **Methode**: Lokale Suche um die besten vollständig evaluierten Kandidaten.
 - **Ziel**: Das lokale Optimum in den identifizierten Regionen finden.
-- **Details**: Die Top-Kandidaten aus Stage 1 werden ausgewählt. Für jeden werden neue Kandidaten in der unmittelbaren "Nachbarschaft" generiert. Diese werden mit höherer Genauigkeit (z.B. 1000 Runs) evaluiert.
+- **Details**: Für Top-Kandidaten werden neue Kandidaten in der unmittelbaren "Nachbarschaft" generiert und erneut bewertet.
 
-### Stage 3: Final Verification (Validierung)
-- **Methode**: Präzisionsmessung des besten Kandidaten.
-- **Ziel**: Statistisch signifikante Absicherung des Ergebnisses.
-- **Details**: Der "Champion" aus Stage 2 wird mit der vollen Anzahl an Simulationen (z.B. 5000 oder wie im UI eingestellt) erneut gerechnet, um die finalen Metriken zu bestätigen.
+### Stage 4: Final Verification (Validierung)
+- **Methode**: Prüfung der Top-Kandidaten auf separaten Test-Seeds.
+- **Ziel**: Overfitting auf Trainings-Seeds reduzieren.
+- **Details**: Der Champion wird anhand der Test-Objective gewählt; Train- und Test-Metriken bleiben unterscheidbar.
 
 ## Parallelisierung
 
