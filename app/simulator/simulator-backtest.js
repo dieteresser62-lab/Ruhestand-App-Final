@@ -435,6 +435,15 @@ export function runBacktest() {
         };
 
         document.getElementById('simulationResults').style.display = 'block';
+        const lastLogRow = logRows[logRows.length - 1] || {};
+        const healthBucketSummary = lastLogRow.health_bucket_enabled
+            ? `
+            <div class="summary-item"><strong>Pflegebucket</strong><span>${formatCurrency(lastLogRow.health_bucket_end || 0)}</span></div>
+            <div class="summary-item"><strong>Pflegebucket-Zieldeckung</strong><span>${Number.isFinite(Number(lastLogRow.health_bucket_real_coverage_pct))
+                ? formatPercentValue(Number(lastLogRow.health_bucket_real_coverage_pct), { fractionDigits: 0, invalid: '—' })
+                : '—'}</span></div>
+            <div class="summary-item"><strong>Pflegebucket-Ziellücke</strong><span>${formatCurrency(lastLogRow.health_bucket_target_gap || 0)}</span></div>`
+            : '';
         document.getElementById('simulationSummary').innerHTML = `
          <div class="summary-grid">
             <div class="summary-item"><strong>Startvermögen</strong><span>${formatCurrency(inputs.startVermoegen)}</span></div>
@@ -443,6 +452,7 @@ export function runBacktest() {
             <div class="summary-item"><strong>Max. Kürzungsdauer</strong><span>${maxKuerzungStreak} Jahre</span></div>
             <div class="summary-item"><strong>Jahre mit Kürzung (>10%)</strong><span>${jahreMitKuerzung} von ${endJahr - startJahr + 1}</span></div>
             <div class="summary-item tax"><strong>Gezahlte Steuern</strong><span>${formatCurrency(totalSteuern)}</span></div>
+            ${healthBucketSummary}
         </div>`;
         renderBacktestLog();
     } catch (error) {

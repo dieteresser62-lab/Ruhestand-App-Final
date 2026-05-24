@@ -38,13 +38,25 @@ assertEqual(normalizeDecumulationMode('3_bucket_jilge'), STRATEGY_OPTIONS.THREE_
         sim_p1StartAlter: '65',
         sim_p1Geschlecht: 'm',
         sim_startFloorBedarf: '24000',
-        sim_startFlexBedarf: '6000'
+        sim_startFlexBedarf: '6000',
+        profile_health_bucket: JSON.stringify({
+            enabled: true,
+            initialAmount: 150000,
+            assetSource: 'money_market_first_then_cash',
+            triggerMinGrade: 4,
+            triggerMode: 'OR',
+            coverageMode: 'care_additional_floor_only',
+            returnMode: 'cash_return',
+            targetMode: 'inflation_indexed_diagnostic'
+        })
     };
     const built = buildSimulatorInputsFromProfileData(profileData);
     assertEqual(built.decumulation.mode, STRATEGY_OPTIONS.THREE_BUCKET_JILGE, 'profile mapping should preserve 3-bucket mode');
     assertEqual(built.decumulation.bondTargetFactor, 5, 'profile mapping should read bondTargetFactor');
     assertEqual(built.decumulation.drawdownTrigger, 15, 'profile mapping should read drawdownTrigger as entered');
     assertEqual(built.decumulation.bondRefillThreshold, 2.5, 'profile mapping should read bondRefillThreshold');
+    assertEqual(built.healthBucket.enabled, true, 'profile mapping should expose health bucket');
+    assertEqual(built.healthBucketInitialAmount, 150000, 'profile mapping should expose flat health bucket amount');
 }
 
 {

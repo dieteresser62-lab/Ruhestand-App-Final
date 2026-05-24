@@ -66,6 +66,7 @@ const dom = {
         minGoldDisplay: document.getElementById('minGoldDisplay'),
         entnahmeDetailsContent: document.getElementById('entnahmeDetailsContent'),
         entnahmeBreakdown: document.getElementById('entnahme-breakdown'),
+        healthBucketSummary: document.getElementById('healthBucketSummary'),
         snapshotList: document.getElementById('snapshotList'),
         printFooter: document.getElementById('print-footer')
     },
@@ -225,6 +226,7 @@ function update() {
         const formattedDiagnosis = enrichBalanceDiagnosisPayload({
             formattedDiagnosis: UIRenderer.formatDiagnosisPayload(modelResult.diagnosis),
             modelResult,
+            inputData,
             threeBucketDiagnosis
         });
 

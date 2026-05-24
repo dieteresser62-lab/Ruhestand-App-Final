@@ -69,7 +69,15 @@ function bindProfileValueInputs() {
         'profileGoldZiel',
         'profileGoldFloor',
         'profileGoldBand',
-        'profileGoldSteuerfrei'
+        'profileGoldSteuerfrei',
+        'profileHealthBucketEnabled',
+        'profileHealthBucketInitialAmount',
+        'profileHealthBucketAssetSource',
+        'profileHealthBucketTriggerMinGrade',
+        'profileHealthBucketTriggerMode',
+        'profileHealthBucketCoverageMode',
+        'profileHealthBucketReturnMode',
+        'profileHealthBucketTargetMode'
     ];
     inputIds.forEach(id => {
         const el = byId(id);

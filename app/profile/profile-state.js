@@ -22,9 +22,30 @@ export const PROFILE_VALUE_KEYS = {
 };
 
 export const PROFILE_TRANCHES_KEY = 'depot_tranchen';
+export const PROFILE_HEALTH_BUCKET_KEY = 'profile_health_bucket';
+
+export const DEFAULT_PROFILE_HEALTH_BUCKET = Object.freeze({
+    enabled: false,
+    initialAmount: 150000,
+    assetSource: 'money_market_first_then_cash',
+    triggerMinGrade: 4,
+    triggerMode: 'OR',
+    coverageMode: 'care_additional_floor_only',
+    returnMode: 'cash_return',
+    targetMode: 'inflation_indexed_diagnostic'
+});
+
+const HEALTH_BUCKET_OPTIONS = Object.freeze({
+    assetSource: new Set(['money_market_first_then_cash']),
+    triggerMode: new Set(['OR', 'AND']),
+    coverageMode: new Set(['care_additional_floor_only', 'floor_when_care_active']),
+    returnMode: new Set(['cash_return']),
+    targetMode: new Set(['inflation_indexed_diagnostic', 'nominal_fixed'])
+});
 
 export const PROFILE_SCOPED_FIXED_KEYS = [
     PROFILE_TRANCHES_KEY,
+    PROFILE_HEALTH_BUCKET_KEY,
     ...Object.values(PROFILE_VALUE_KEYS),
     'showCareDetails',
     'logDetailLevel',
@@ -62,6 +83,60 @@ export function readStoredProfileNumber(storage, key, fallback = null) {
 
 export function readStoredProfileBool(storage, key, fallback = null) {
     return parseStoredBool(readStoredProfileValue(storage, key), fallback);
+}
+
+function parseStoredJson(raw, fallback = null) {
+    if (raw === null || raw === undefined || raw === '') return fallback;
+    if (typeof raw === 'object') return raw;
+    try {
+        const parsed = JSON.parse(String(raw));
+        return parsed && typeof parsed === 'object' ? parsed : fallback;
+    } catch {
+        return fallback;
+    }
+}
+
+function normalizeOption(raw, allowed, fallback, transform = value => value) {
+    const value = raw === null || raw === undefined || raw === ''
+        ? fallback
+        : transform(String(raw).trim());
+    return allowed.has(value) ? value : fallback;
+}
+
+function clampNumber(value, min, max, fallback) {
+    const n = parseStoredNumber(value, fallback);
+    const safe = Number.isFinite(n) ? n : fallback;
+    return Math.max(min, Math.min(max, safe));
+}
+
+export function normalizeProfileHealthBucket(raw = {}) {
+    const source = raw && typeof raw === 'object' ? raw : {};
+    const defaults = DEFAULT_PROFILE_HEALTH_BUCKET;
+    return {
+        enabled: parseStoredBool(source.enabled, defaults.enabled),
+        initialAmount: Math.max(0, parseStoredNumber(source.initialAmount, defaults.initialAmount)),
+        assetSource: normalizeOption(source.assetSource, HEALTH_BUCKET_OPTIONS.assetSource, defaults.assetSource),
+        triggerMinGrade: Math.round(clampNumber(source.triggerMinGrade, 1, 5, defaults.triggerMinGrade)),
+        triggerMode: normalizeOption(source.triggerMode, HEALTH_BUCKET_OPTIONS.triggerMode, defaults.triggerMode, value => value.toUpperCase()),
+        coverageMode: normalizeOption(source.coverageMode, HEALTH_BUCKET_OPTIONS.coverageMode, defaults.coverageMode),
+        returnMode: normalizeOption(source.returnMode, HEALTH_BUCKET_OPTIONS.returnMode, defaults.returnMode),
+        targetMode: normalizeOption(source.targetMode, HEALTH_BUCKET_OPTIONS.targetMode, defaults.targetMode)
+    };
+}
+
+export function parseProfileHealthBucketFromData(data) {
+    if (!data || typeof data !== 'object') return normalizeProfileHealthBucket();
+    return normalizeProfileHealthBucket(parseStoredJson(data[PROFILE_HEALTH_BUCKET_KEY], {}));
+}
+
+export function readProfileHealthBucketFromStorage(storage = localStorage) {
+    return parseProfileHealthBucketFromData({
+        [PROFILE_HEALTH_BUCKET_KEY]: readStoredProfileValue(storage, PROFILE_HEALTH_BUCKET_KEY)
+    });
+}
+
+export function serializeProfileHealthBucket(value) {
+    return JSON.stringify(normalizeProfileHealthBucket(value));
 }
 
 export function parseProfileOverridesFromData(data) {

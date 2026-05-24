@@ -68,7 +68,10 @@ export function buildSimulatorYearResult({
     guardReason,
     isBadYear,
     equityPreserved,
-    unmetLiquidity
+    unmetLiquidity,
+    healthBucketCoverage = null,
+    healthBucketInterest = null,
+    healthBucketDiagnostics = null
 }) {
     const kaufAktTotal = buyEqAmount + kaufAkt;
     const totalGoldKauf = buyGoldAmount + kaufGld;
@@ -90,7 +93,12 @@ export function buildSimulatorYearResult({
     const bondBucketAfter = sumBondBucketValuation(nextPortfolio.depotTranchesAktien);
     const wertAktien = sumDepot({ depotTranchesAktien });
     const wertGold = sumDepot({ depotTranchesGold });
-    const portfolioTotalEnd = euros(wertAktien + wertGold + liquiditaet);
+    const healthBucketEnd = euros(Number(nextPortfolio.healthBucketGeldmarkt) || 0);
+    const portfolioActiveEnd = euros(wertAktien + wertGold + liquiditaet);
+    const portfolioTotalEnd = euros(portfolioActiveEnd + healthBucketEnd);
+    const healthBucketWarnings = Array.isArray(nextPortfolio.healthBucketMeta?.warnings)
+        ? nextPortfolio.healthBucketMeta.warnings
+        : [];
     const vpw = fullResult.ui.vpw || null;
 
     return {
@@ -158,6 +166,21 @@ export function buildSimulatorYearResult({
             liq_after_payout: liqAfterPayout,
             liq_after_interest: liqNachZins,
             portfolio_total_before_payout: portfolioTotalBeforePayout,
+            portfolio_active_end: portfolioActiveEnd,
+            health_bucket_enabled: !!healthBucketDiagnostics?.enabled,
+            health_bucket_start: euros(healthBucketCoverage?.startAmount ?? healthBucketInterest?.startAmount),
+            health_bucket_triggered: !!healthBucketCoverage?.triggered,
+            health_bucket_reason: healthBucketCoverage?.reason || '',
+            health_bucket_eligible_need: euros(healthBucketCoverage?.eligibleNeed),
+            health_bucket_used: euros(healthBucketCoverage?.used),
+            health_bucket_uncovered_need: euros(healthBucketCoverage?.uncoveredNeed),
+            health_bucket_interest: euros(healthBucketInterest?.interest),
+            health_bucket_end: healthBucketEnd,
+            health_bucket_target_nominal: euros(healthBucketDiagnostics?.nominalTarget),
+            health_bucket_target_inflation_adjusted: euros(healthBucketDiagnostics?.inflationAdjustedTarget),
+            health_bucket_real_coverage_pct: healthBucketDiagnostics?.realCoveragePct ?? null,
+            health_bucket_target_gap: euros(healthBucketDiagnostics?.targetGap),
+            health_bucket_warning: healthBucketWarnings.join(' | '),
             portfolio_total_end: portfolioTotalEnd,
             steuern_gesamt: totalTaxesThisYear,
             vk,

@@ -44,16 +44,16 @@ Koordiniert die Monte-Carlo-Simulation und verbindet DOM-Interaktion mit der rei
 ---
 
 ## 3. `monte-carlo-runner.js`
-DOM-freie Simulation, die alle Runs, KPI-Arrays und Pflegemetriken berechnet.
+DOM-freie Simulation, die alle Runs, KPI-Arrays, Pflegemetriken und Pflegebucket-Metriken berechnet.
 
 **Hauptfunktionen / Exporte:**
-- `runMonteCarloSimulation()` – Führt die komplette Simulation aus, sammelt Worst-Run-Logs, Pflege-KPIs und aggregierte Kennzahlen.
+- `runMonteCarloSimulation()` – Führt die komplette Simulation aus, sammelt Worst-Run-Logs, Pflege-KPIs, Pflegebucket-KPIs und aggregierte Kennzahlen.
 - Implementiert Ruin-Logik (Depot < 100€) und Ansparphase-Übergang.
 - Aggregiert zusätzlich `taxSavedByLossCarry` (gesamt und pro Run), damit Steuerersparnis aus Verlustvorträgen auswertbar bleibt.
 
 **Einbindung:** Wird ausschließlich aus `simulator-monte-carlo.js` aufgerufen. Erwartet fertige Eingaben und Callbacks (Progress, Szenario-Analyzer) und nutzt `simulator-engine-wrapper.js` (delegiert an Direct Engine) für die Jahr-für-Jahr-Logik.
 
-**Dependencies:** `mc-run-context.js`, `mc-year-sampling.js`, `mc-life-events.js`, `mc-stress-tracker.js`, `mc-log-builder.js`, `mc-run-metrics.js`, `simulator-engine-wrapper.js`, `simulator-portfolio.js`, `simulator-results.js` (Portfolio-Helpers), `simulator-sweep-utils.js`, `simulator-utils.js`, `simulator-data.js`.
+**Dependencies:** `mc-run-context.js`, `mc-year-sampling.js`, `mc-life-events.js`, `mc-stress-tracker.js`, `mc-log-builder.js`, `mc-run-metrics.js`, `simulator-engine-wrapper.js`, `simulator-portfolio.js`, `simulator-health-bucket.js`, `simulator-results.js` (Portfolio-Helpers), `simulator-sweep-utils.js`, `simulator-utils.js`, `simulator-data.js`.
 
 ## 3a. `mc-run-context.js`
 DOM-freie Chunk-Kontext-Erzeugung fuer den Monte-Carlo-Runner.
@@ -80,7 +80,7 @@ DOM-freie Life-State-Initialisierung fuer Monte-Carlo.
 - `createMonteCarloLifeState()` – erzeugt Care-Meta, Partnerstatus, Care-RNGs, Alive-Initialwerte und HouseholdContext fuer einen Run.
 - `updateMonteCarloLifeEventsForYear()` – testbarer Jahresupdate-Helper fuer Pflege-/Sterblichkeitslogik; im produktiven Runner wird die Jahreslogik aktuell aus Performance-Gruenden weiterhin lokal im Hot Path ausgefuehrt.
 
-**Einbindung:** `monte-carlo-runner.js` nutzt die State-Initialisierung vor der Jahresschleife. Weitere Life-Events-Extraktion muss den Monte-Carlo-Benchmark bestehen.
+**Einbindung:** `monte-carlo-runner.js` nutzt die State-Initialisierung vor der Jahresschleife. Der erzeugte `householdContext.care`-Block transportiert `careMetaP1` und `careMetaP2` fuer Pflegebucket-Trigger ohne Signaturaenderung von `simulateOneYear()`. Weitere Life-Events-Extraktion muss den Monte-Carlo-Benchmark bestehen.
 
 ## 3d. `mc-stress-tracker.js`
 DOM-freie Stress-Metrik-Kapselung fuer Monte-Carlo.
@@ -107,10 +107,10 @@ DOM-freie Run-Ende-Metrikfortschreibung fuer Monte-Carlo.
 
 **Hauptfunktionen / Exporte:**
 - `createMonteCarloRunMetrics()` – initialisiert Pflege-Listen, Care-Year-Arrays, Worst-Run-Container, `runMeta` und globale Zaehler.
-- `recordMonteCarloRunOutcome()` – schreibt pro Run Ergebnisbuffer, Pflege-Listen, Safety-Run-Zaehler, Worst-Run-Auswahl und `runMeta` fort.
-- `finalizeMonteCarloRunMetrics()` – baut die bestehenden `totals`, `lists`, Worst-Runs, `allRealWithdrawalsSample` und `runMeta` fuer die Chunk-Rueckgabe.
+- `recordMonteCarloRunOutcome()` – schreibt pro Run Ergebnisbuffer, Pflege-Listen, Pflegebucket-Nutzung/Erschoepfung, Safety-Run-Zaehler, Worst-Run-Auswahl und `runMeta` fort.
+- `finalizeMonteCarloRunMetrics()` – baut die bestehenden `totals`, `lists`, Worst-Runs, `allRealWithdrawalsSample` und `runMeta` inklusive Pflegebucket-Zaehlern und -Listen fuer die Chunk-Rueckgabe.
 
-**Einbindung:** Wird von `monte-carlo-runner.js` am Run-Ende genutzt. Buffer-Namen, Worker-Payloads, Aggregat-Shape und `runMeta` bleiben kompatibel.
+**Einbindung:** Wird von `monte-carlo-runner.js` am Run-Ende genutzt. Buffer-Namen, Worker-Payloads, Aggregat-Shape und `runMeta` bleiben kompatibel; Pflegebucket-Metriken sind additive Felder.
 
 ---
 
@@ -228,6 +228,7 @@ Kernlogik für Jahr-für-Jahr-Simulation (Direct Engine).
 **Hauptfunktionen:**
 - `simulateSingleYear()` (Direct) – simuliert ein Jahr via EngineAPI
 - Recompute-Pfad für Notfallverkäufe: kombiniert reguläre + Notfall-Rohaggregate und rechnet Settlement mit `taxStatePrev` neu.
+- Pflegebucket-Pfad: nutzt `simulator-health-bucket.js` nach der Engine-Entscheidung und vor `applyForcedSaleLiquidityCoverage()`, damit zweckgebundene Geldmarkt-/Cash-Reserve Pflege-Liquiditätslücken deckt, bevor Risikoanlagen notverkauft werden.
 - `sampleNextYearData()` (Helpers) – sampelt nächstes Jahr (historisch/Regime/Block)
 - `makeDefaultCareMeta()` / `updateCareMeta()` (Helpers) – Pflegefall-Zustandsmaschine
 - `calcCareCost()` (Helpers) – berechnet Pflege-Kosten nach Grad
@@ -242,6 +243,7 @@ Kernlogik für Jahr-für-Jahr-Simulation (Direct Engine).
 - `simulator-accumulation-year.js` – DOM-freier frueher Rueckgabepfad fuer Ansparjahre inklusive Sparrate, Cash-Zins, Anspar-Rebalancing und Logdaten.
 - `simulator-tax-recompute.js` – DOM-freie Normalisierung von Tax-Rohaggregaten und finales Settlement-Recompute nach Simulator-Zusatzverkaeufen.
 - `simulator-forced-sale.js` – DOM-freie Forced-Sale-Liquiditaetsdeckung vor/nach Auszahlung inklusive Forced-Sale-Scale, Bond-Verkaufsdelta, Payout-Fallback und FIFO-Fallback.
+- `simulator-health-bucket.js` – DOM-freier Pflegebucket-Trigger, Deckungsbedarf, Verbrauch, Verzinsung, Zieldeckungsdiagnose und Warnungsweitergabe.
 - `simulator-bond-refill.js` – DOM-freie Bond-Refill-/3-Bucket-Nachsteuerung fuer gute Jahre inklusive Auto-Bond-Tranche, Equity-Verkauf und Refill-Deltas.
 - `simulator-year-result.js` – DOM-freier Builder fuer finalen Rueckgabewert, naechsten State, UI-Payload, Jahreslog, 3-Bucket-Logshape sowie flache Entnahme-/Payout-/VPW-Erklaerfelder.
 
@@ -266,6 +268,7 @@ Aggregation der Monte-Carlo-Ausgabe, Orchestrierung von KPI-Berechnung und Rende
 - JSON/CSV-Export für ausgewählte Szenarien
 - Pflege-KPI-Dashboard mit Dual-Care-Metriken
 - enthält zusätzlich Metriken für `taxSavedByLossCarry` aus Sweep/MC-Ergebnissen
+- enthält zusätzlich Pflegebucket-KPIs aus MC-Ergebnissen: Nutzungsquote, Erschoepfungsquote, Median-/P90-Nutzung, Median-Restbucket, Zieldeckung und Zielluecke
 
 **Dependencies:** `simulator-utils.js`, `simulator-heatmap.js`, `simulator-data.js`, `results-metrics.js`, `results-renderers.js`, `results-formatting.js`.
 
@@ -277,6 +280,7 @@ Berechnet alle KPIs (Perzentile, Quoten, Pflege-Kosten/Overlap, Shortfall-Deltas
 **Hauptfunktionen:**
 - `computeKpiCards()` / `computeScenarioSummary()` – strukturierte KPI-Objekte für Renderer.
 - Rendert u. a. die KPI `Ø Steuerersparnis Verlusttopf` auf Basis von `extraKPI.lossCarryTaxSavings.perRunMean`.
+- Rendert Pflegebucket-Kennzahlen, wenn `extraKPI.healthBucket` vorhanden ist.
 
 **Dependencies:** `results-formatting.js`, `simulator-utils.js`.
 
@@ -361,19 +365,26 @@ Portfolio-Initialisierung, Renten- und Stress-Kontexte.
 **Hauptfunktionen:**
 - `getCommonInputs()` – liest alle Portfolio-/Strategie-Inputs
 - `updateStartPortfolioDisplay()` – UI-Display für Start-Allokation
-- `initializePortfolio()` / `initializePortfolioDetailed()` – Tranchen-Setup
+- `initializePortfolio()` / `initializePortfolioDetailed()` – Tranchen-Setup inklusive optionalem Pflegebucket-Carve-Out nach Profilverbund-Merge
 - `computeRentAdjRate()` / `computePensionNext()` – Rentenanpassungslogik
 - `buildStressContext()` / `applyStressOverride()` – Stresstest-Szenarien
 
 **Helper-Module (ausgelagert):**
 - `simulator-portfolio-inputs.js` – DOM-Input-Parsing
 - `simulator-portfolio-display.js` – Start-Portfolio-UI
-- `simulator-portfolio-init.js` – Portfolio-Tranchen
+- `simulator-portfolio-init.js` – Portfolio-Tranchen und Pflegebucket-Carve-Out aus Geldmarkt-Tranchen, ungetranchtem Geldmarkt und Tagesgeld
 - `simulator-portfolio-historical.js` – Regime-Daten vorbereiten
 - `simulator-portfolio-pension.js` – Rentenberechnungen
 - `simulator-portfolio-stress.js` – Stress-Presets/Overrides
 - `simulator-portfolio-tranches.js` – FIFO/Tax/Portfolio-Updates
 - `simulator-portfolio-format.js` – Zahlformatierung
+
+**Pflegebucket-Contract in `simulator-portfolio-init.js`:**
+- Der Carve-Out läuft erst auf dem aggregierten Haushaltsportfolio, nicht pro Einzelprofil.
+- Quellenreihenfolge: `depotTranchesGeldmarkt` per FIFO, danach ungetranchter `geldmarktEtf`, danach `tagesgeld`.
+- Ungültige oder fehlende Kaufdaten verwenden einen stabilen FIFO-Fallback, damit manuelle JSON-Importe die Sortierung nicht destabilisieren.
+- `geldmarktEtf`, `tagesgeld` und `liquiditaet` werden konsistent reduziert.
+- `healthBucketGeldmarkt`, `healthBucketTranches`, `healthBucketCashAmount` und `healthBucketMeta.warnings` dokumentieren die Ausgliederung und eventuelle Kappung.
 
 **Dependencies:** `simulator-data.js`
 
@@ -428,6 +439,7 @@ Aggregiert Profildaten zu Simulator-Inputs für Multi-Profil-Setups.
 - Tranchen-Aggregation: Fügt detaillierte Tranchen aller Profile zusammen, versieht IDs mit Profilpräfix und setzt `sourceProfileId`
 - Verkaufs-Herkunft: Engine-`breakdown[]` bewahrt `sourceProfileId`; Portfolio-Reduktionen laufen ueber die profilbezogene `trancheId`, damit identische Positionen aus verschiedenen Profilen nicht vermischt werden
 - Tranchensummen: Plausible Detailtranchen bestimmen `startVermoegen` zusammen mit Liquidität; Null-Marktwert-Tranchen fallen mit Warnung auf aggregierte Startwerte zurück
+- Pflegebucket: liest `profile_health_bucket`, normalisiert die Definition und nutzt bei Multi-Profil-Setups das Primary-Profil als Haushaltsdefinition. Abweichende sekundäre Definitionen werden als Warnung transportiert.
 - Fallback-Logik: Nutzt Balance-Werte wenn Simulator-Felder leer sind
 - Gewichtete Mittelung für Steuersätze, Aktienquote und Rebalancing-Parameter
 
@@ -547,6 +559,7 @@ Aggregation aller Monte-Carlo-Ergebnisse nach Abschluss der Simulation.
 - `volatilities`, `maxDrawdowns`: P50, P90
 - `extraKPI`: timeShareQuoteAbove45, consumptionAtRiskP10Real, Pflege-KPIs
 - `extraKPI.lossCarryTaxSavings`: `total`, `perRunMean`
+- `extraKPI.healthBucket`: Nutzungs-/Erschoepfungsquote, Nutzungssummen, Restbucket, Zieldeckung, Zielluecke und Bucket-Zinsen
 - `stressKPI`: maxDD, timeShareAbove45, cutYears, CaR, recoveryYears
 - `pflegeResults`: entryRate, entryAge, shortfallRate, endWealth, depotCosts, Dual-Care-KPIs
 

@@ -118,12 +118,15 @@ try {
         assert(isProfileScopedKey('sim_test_key') === true, 'sim_ keys should be profile-scoped');
         assert(isProfileScopedKey('sim.test.key') === true, 'sim. keys should be profile-scoped');
         assert(isProfileScopedKey(CONFIG.STORAGE.LS_KEY) === true, 'Balance state key should be profile-scoped');
+        assert(isProfileScopedKey('profile_health_bucket') === true, 'Health bucket key should be profile-scoped');
         assert(isProfileScopedKey('etfProxyUrl') === false, 'Global proxy key should not be profile-scoped');
 
         const keys = listProfileScopedKeys(localStorage);
         assert(keys.includes('sim_test_key'), 'Scoped keys should include sim_ key');
         assert(keys.includes('sim.test.key'), 'Scoped keys should include sim. key');
         assert(keys.includes(CONFIG.STORAGE.LS_KEY), 'Scoped keys should include balance state key');
+        localStorage.setItem('profile_health_bucket', '{"enabled":true}');
+        assert(listProfileScopedKeys(localStorage).includes('profile_health_bucket'), 'Scoped keys should include health bucket');
         assert(!keys.includes('etfProxyUrl'), 'Scoped keys should exclude global proxy key');
     }
     console.log('✓ Profile key policy OK');

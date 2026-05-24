@@ -93,6 +93,10 @@ export function updateMonteCarloLifeEventsForYear(
         householdContext.p2Alive = false;
         householdContext.widowBenefits.p1FromP2 = false;
         householdContext.widowBenefits.p2FromP1 = false;
+        householdContext.care = {
+            p1: lifeState.careMetaP1,
+            p2: null
+        };
 
         const year = lifeState.year;
         year.ageP1 = ageP1;
@@ -203,6 +207,10 @@ export function updateMonteCarloLifeEventsForYear(
     householdContext.p2Alive = lifeState.hasPartner ? lifeState.p2Alive : false;
     householdContext.widowBenefits.p1FromP2 = lifeState.widowBenefitActiveForP1;
     householdContext.widowBenefits.p2FromP1 = lifeState.widowBenefitActiveForP2;
+    householdContext.care = {
+        p1: careMetaP1,
+        p2: careMetaP2
+    };
 
     const year = lifeState.year;
     year.ageP1 = ageP1;

@@ -83,6 +83,11 @@ function setupDom(inputOverrides = {}) {
 console.log('Test 1: readAllInputs liefert flache Decumulation-Felder');
 {
     mockLocalStorage.clear();
+    mockLocalStorage.setItem('profile_health_bucket', JSON.stringify({
+        enabled: true,
+        initialAmount: 150000,
+        triggerMinGrade: 4
+    }));
     const dom = setupDom();
     const result = UIReader.readAllInputs();
 
@@ -91,6 +96,8 @@ console.log('Test 1: readAllInputs liefert flache Decumulation-Felder');
     assertEqual(result.decumulation.drawdownTrigger, 18, 'Drawdown trigger ist flach gespeichert');
     assertEqual(result.decumulation.bondRefillThreshold, 12, 'Bond refill threshold ist flach gespeichert');
     assert(!('threeBucket' in result.decumulation), 'Es wird kein verschachteltes threeBucket-Objekt mehr erzeugt');
+    assertEqual(result.healthBucket.enabled, true, 'Balance liest Pflegebucket aus dem Profil');
+    assertEqual(result.healthBucketInitialAmount, 150000, 'Balance stellt flachen Pflegebucket-Betrag bereit');
     assertEqual(documentElements.threeBucketConfigGroup.style.display, '', 'Lesen allein verändert die Sichtbarkeit nicht');
     void dom;
 }
@@ -155,20 +162,34 @@ console.log('Test 4: Balance-Update-Pipeline-Helfer bauen Payloads ohne Seitenef
             action: { transactionDiagnostics: { source: 'engine' } },
             vpw: { rate: 0.04 },
             spending: { monatlicheEntnahme: 1800 }
+        },
+        diagnosis: {
+            keyParams: {
+                cumulativeInflationFactor: 1.2
+            }
         }
     };
-    const input = { aktuellesAlter: 67 };
+    const input = {
+        aktuellesAlter: 67,
+        tagesgeld: 50000,
+        geldmarktEtf: 120000,
+        healthBucket: { enabled: true, initialAmount: 150000, targetMode: 'inflation_indexed_diagnostic' }
+    };
     const rendererPayload = buildBalanceRendererPayload(modelResult, input);
     assertEqual(rendererPayload.input, input, 'Renderer-Payload referenziert Input');
     assertEqual(rendererPayload.spending.monatlicheEntnahme, 1800, 'Renderer-Payload behält UI-Daten');
+    assertEqual(rendererPayload.healthBucketDiagnostics.lockedAmount, 150000, 'Renderer-Payload enthält Pflegebucket-Zweckbindung');
+    assertEqual(rendererPayload.healthBucketDiagnostics.operativeLiquidity, 20000, 'Renderer-Payload zeigt operative Liquidität nach Zweckbindung');
 
     const diagnosis = enrichBalanceDiagnosisPayload({
         formattedDiagnosis: { keyParams: {} },
         modelResult,
+        inputData: input,
         threeBucketDiagnosis: { is3Bucket: true }
     });
     assertEqual(diagnosis.transactionDiagnostics.source, 'engine', 'Diagnose übernimmt Transaction Diagnostics');
     assertEqual(diagnosis.keyParams.vpw.rate, 0.04, 'Diagnose übernimmt VPW-Daten');
+    assertEqual(diagnosis.keyParams.healthBucket.lockedAmount, 150000, 'Diagnose übernimmt Pflegebucket-Daten');
     assertEqual(diagnosis.threeBucket.is3Bucket, true, 'Diagnose übernimmt 3-Bucket-Daten');
 
     const budget = calculateExpensesBudget({ fixedIncomeAnnual: 12000, monthlyWithdrawal: 1800 });

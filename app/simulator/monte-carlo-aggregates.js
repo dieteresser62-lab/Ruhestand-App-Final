@@ -42,7 +42,11 @@ export function buildMonteCarloAggregates({
         p2TriggeredCount,
         runsSafetyStage1Triggered = 0,
         runsSafetyStage2Triggered = 0,
-        totalTaxSavedByLossCarry = 0
+        totalTaxSavedByLossCarry = 0,
+        healthBucketEnabledCount = 0,
+        healthBucketUsedCount = 0,
+        healthBucketDepletedCount = 0,
+        totalHealthBucketUsed = 0
     } = totals;
     const {
         entryAges,
@@ -53,7 +57,12 @@ export function buildMonteCarloAggregates({
         p1CareYearsTriggered,
         p2CareYearsTriggered,
         bothCareYearsOverlapTriggered,
-        maxAnnualCareSpendTriggered
+        maxAnnualCareSpendTriggered,
+        healthBucketUsedAmounts = [],
+        healthBucketEndAmounts = [],
+        healthBucketCoveragePct = [],
+        healthBucketTargetGaps = [],
+        healthBucketInterestAmounts = []
     } = lists;
 
     const successfulOutcomes = [];
@@ -114,6 +123,20 @@ export function buildMonteCarloAggregates({
             lossCarryTaxSavings: {
                 total: totalTaxSavedByLossCarry || 0,
                 perRunMean: totalRuns > 0 ? (totalTaxSavedByLossCarry / totalRuns) : 0
+            },
+            healthBucket: {
+                enabledRatePct: totalRuns > 0 ? (healthBucketEnabledCount / totalRuns) * 100 : 0,
+                usedRatePct: totalRuns > 0 ? (healthBucketUsedCount / totalRuns) * 100 : 0,
+                depletedRatePct: healthBucketEnabledCount > 0 ? (healthBucketDepletedCount / healthBucketEnabledCount) * 100 : 0,
+                usedRuns: healthBucketUsedCount || 0,
+                depletedRuns: healthBucketDepletedCount || 0,
+                totalUsed: totalHealthBucketUsed || 0,
+                usedMedian: healthBucketUsedAmounts.length ? quantile(healthBucketUsedAmounts, 0.5) : 0,
+                usedP90: healthBucketUsedAmounts.length ? quantile(healthBucketUsedAmounts, 0.9) : 0,
+                endMedian: healthBucketEndAmounts.length ? quantile(healthBucketEndAmounts, 0.5) : 0,
+                coverageMedianPct: healthBucketCoveragePct.length ? quantile(healthBucketCoveragePct, 0.5) : null,
+                targetGapMedian: healthBucketTargetGaps.length ? quantile(healthBucketTargetGaps, 0.5) : 0,
+                interestMedian: healthBucketInterestAmounts.length ? quantile(healthBucketInterestAmounts, 0.5) : 0
             },
             pflege: pflegeResults
         },

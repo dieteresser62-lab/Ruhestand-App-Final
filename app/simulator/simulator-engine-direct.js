@@ -26,6 +26,11 @@ import { applySimulatorTaxRecompute, buildTaxRawAggregate } from './simulator-ta
 import { applyForcedSaleLiquidityCoverage, applyPayoutFallbackSale } from './simulator-forced-sale.js';
 import { applyBondRefillPostprocessing } from './simulator-bond-refill.js';
 import { buildSimulatorYearResult } from './simulator-year-result.js';
+import {
+    applyHealthBucketCoverage,
+    applyHealthBucketInterest,
+    buildHealthBucketDiagnostics
+} from './simulator-health-bucket.js';
 
 const formatInteger = (value) => Number.isFinite(value) ? Math.round(value) : 0;
 
@@ -371,9 +376,21 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const jahresEntnahmeTarget = Math.max(jahresEntnahmePlan, netFloorYear);
     const minLiqAfterPayout = netFloorYear / 12; // 1 Monat Mindest-Liquidität nach Auszahlung
     const totalLiqNeed = jahresEntnahmeTarget + minLiqAfterPayout;
-    const forcedShortfall = Math.max(0, totalLiqNeed - liquiditaet);
+    let forcedShortfall = Math.max(0, totalLiqNeed - liquiditaet);
     const equityBeforeForced = equityAfterSalesAction;
     const goldBeforeForced = goldAfterSalesAction;
+    const healthBucketCoverage = applyHealthBucketCoverage({
+        inputs,
+        portfolio,
+        householdContext: householdCtx,
+        pflegeMeta,
+        forcedShortfall,
+        careFloorAddition
+    });
+    if (healthBucketCoverage.used > 0) {
+        liquiditaet += healthBucketCoverage.used;
+        forcedShortfall = Math.max(0, forcedShortfall - healthBucketCoverage.used);
+    }
     const forcedCoverage = applyForcedSaleLiquidityCoverage({
         forcedShortfall,
         portfolio,
@@ -478,6 +495,12 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     liquiditaet = euros(liqBasisForInterest * (1 + rC));
     liqNachZins = euros(liquiditaet);
     if (!isFinite(liquiditaet)) liquiditaet = 0;
+    const healthBucketInterest = applyHealthBucketInterest({ inputs, portfolio, rC });
+    const healthBucketDiagnostics = buildHealthBucketDiagnostics({
+        inputs,
+        portfolio,
+        cumulativeInflationFactor: spendingNewState.cumulativeInflationFactor || 1
+    });
 
     const floorCoveredByPension = inflatedFloor === 0;
     const guardReason = floorCoveredByPension ? "floor_covered_by_pension" : "engine_guard_primary";
@@ -576,7 +599,10 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         guardReason,
         isBadYear,
         equityPreserved,
-        unmetLiquidity
+        unmetLiquidity,
+        healthBucketCoverage,
+        healthBucketInterest,
+        healthBucketDiagnostics
     });
 }
 

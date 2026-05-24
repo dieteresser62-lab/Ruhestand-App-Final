@@ -205,17 +205,24 @@ export function buildStressMetrics(stressKPI) {
  */
 export function buildCareMetrics(results, inputs) {
     const care = results?.extraKPI?.pflege;
-    if (!care || !inputs?.pflegefallLogikAktivieren) {
+    const healthBucket = results?.extraKPI?.healthBucket;
+    const hasCareMetrics = care && inputs?.pflegefallLogikAktivieren;
+    const hasHealthBucketMetrics = healthBucket && (inputs?.healthBucketEnabled || inputs?.healthBucket?.enabled);
+    if (!hasCareMetrics && !hasHealthBucketMetrics) {
         return null;
     }
 
-    const cards = [
-        buildCareEntryCard('Pflegefall-Eintrittsquote P1', care.entryRatePct, 'Anteil der Simulationen, in denen Person 1 Pflegefall eintritt.'),
-        buildCareEntryCard('Median Eintrittsalter P1', safeAge(care.entryAgeMedian), 'Typisches Alter bei Eintritt des Pflegefalls Person 1.', 'Jahre'),
-        buildCareEntryCard('Median Pflegejahre P1', safeAge(care.p1CareYears), 'Typische Anzahl Jahre in Pflege (Person 1).', 'Jahre')
-    ];
+    const cards = [];
 
-    if (inputs.partner?.aktiv) {
+    if (hasCareMetrics) {
+        cards.push(
+            buildCareEntryCard('Pflegefall-Eintrittsquote P1', care.entryRatePct, 'Anteil der Simulationen, in denen Person 1 Pflegefall eintritt.'),
+            buildCareEntryCard('Median Eintrittsalter P1', safeAge(care.entryAgeMedian), 'Typisches Alter bei Eintritt des Pflegefalls Person 1.', 'Jahre'),
+            buildCareEntryCard('Median Pflegejahre P1', safeAge(care.p1CareYears), 'Typische Anzahl Jahre in Pflege (Person 1).', 'Jahre')
+        );
+    }
+
+    if (hasCareMetrics && inputs.partner?.aktiv) {
         cards.push(
             buildCareEntryCard('Pflegefall-Eintrittsquote P2', care.p2EntryRatePct, 'Anteil der Simulationen, in denen Person 2 Pflegefall eintritt.'),
             buildCareEntryCard('Median Eintrittsalter P2', safeAge(care.p2EntryAgeMedian), 'Typisches Alter bei Eintritt des Pflegefalls Person 2.', 'Jahre'),
@@ -225,14 +232,28 @@ export function buildCareMetrics(results, inputs) {
         );
     }
 
-    cards.push(
-        buildCareEntryCard('Bedingte Shortfall-Rate', care.shortfallRate_condCare, 'Anteil der Fehlschläge, wenn ein Pflegefall eingetreten ist.', '%'),
-        buildCareEntryCard('Shortfall-Rate (o. Pflege)', care.shortfallRate_noCareProxy, 'Geschätzte Fehlschlag-Rate ohne Pflegefall-Eintritt.', '%'),
-        buildCareEntryCard('Median Endvermögen (m. Pflege)', care.endwealthWithCare_median, 'Typisches Endvermögen unter Berücksichtigung des Pflegerisikos.', null, true, true),
-        buildCareEntryCard('Median Endvermögen (o. Pflege)', care.endwealthNoCare_median, 'Geschätztes typisches Endvermögen ohne die Last des Pflegefalls.', null, true, true),
-        buildCareEntryCard('Median Gesamtkosten (Depot)', care.depotCosts_median, 'Typische Summe der aus dem Depot finanzierten Pflege-Mehrkosten (betroffene Läufe).', null, true, true),
-        buildCareEntryCard('Median-Vermögensdifferenz', care.shortfallDelta_vs_noCare, 'Unterschied im medianen Endvermögen (ohne Pflege minus mit Pflege).', null, true, true)
-    );
+    if (hasCareMetrics) {
+        cards.push(
+            buildCareEntryCard('Bedingte Shortfall-Rate', care.shortfallRate_condCare, 'Anteil der Fehlschläge, wenn ein Pflegefall eingetreten ist.', '%'),
+            buildCareEntryCard('Shortfall-Rate (o. Pflege)', care.shortfallRate_noCareProxy, 'Geschätzte Fehlschlag-Rate ohne Pflegefall-Eintritt.', '%'),
+            buildCareEntryCard('Median Endvermögen (m. Pflege)', care.endwealthWithCare_median, 'Typisches Endvermögen unter Berücksichtigung des Pflegerisikos.', null, true, true),
+            buildCareEntryCard('Median Endvermögen (o. Pflege)', care.endwealthNoCare_median, 'Geschätztes typisches Endvermögen ohne die Last des Pflegefalls.', null, true, true),
+            buildCareEntryCard('Median Gesamtkosten (Depot)', care.depotCosts_median, 'Typische Summe der aus dem Depot finanzierten Pflege-Mehrkosten (betroffene Läufe).', null, true, true),
+            buildCareEntryCard('Median-Vermögensdifferenz', care.shortfallDelta_vs_noCare, 'Unterschied im medianen Endvermögen (ohne Pflege minus mit Pflege).', null, true, true)
+        );
+    }
+
+    if (hasHealthBucketMetrics) {
+        cards.push(
+            buildCareEntryCard('Pflegebucket genutzt', healthBucket.usedRatePct, 'Anteil der Monte-Carlo-Läufe mit mindestens einer Entnahme aus dem Pflegebucket.', '%'),
+            buildCareEntryCard('Pflegebucket erschöpft', healthBucket.depletedRatePct, 'Anteil der Läufe mit aktivem Bucket, in denen die Reserve am Ende aufgebraucht ist.', '%'),
+            buildCareEntryCard('Median Bucket-Nutzung', healthBucket.usedMedian, 'Typische Bucket-Entnahme in Läufen mit Nutzung.', null, true, true),
+            buildCareEntryCard('P90 Bucket-Nutzung', healthBucket.usedP90, 'Hohe, aber nicht extreme Bucket-Entnahme über die Läufe mit Nutzung.', null, true, true),
+            buildCareEntryCard('Median Restbucket', healthBucket.endMedian, 'Typischer verbleibender Pflegebucket am Laufende.', null, true, true),
+            buildCareEntryCard('Median Zieldeckung', healthBucket.coverageMedianPct, 'Typische reale Deckung relativ zum inflationsangepassten Bucket-Ziel.', '%'),
+            buildCareEntryCard('Median Ziellücke', healthBucket.targetGapMedian, 'Typische Lücke zum inflationsangepassten Bucket-Ziel.', null, true, true)
+        );
+    }
 
     return { cards };
 }

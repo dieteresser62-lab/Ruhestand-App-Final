@@ -9,7 +9,7 @@
 
 export { getCommonInputs } from './simulator-portfolio-inputs.js';
 export { updateStartPortfolioDisplay } from './simulator-portfolio-display.js';
-export { initializePortfolio, initializePortfolioDetailed } from './simulator-portfolio-init.js';
+export { initializePortfolio, initializePortfolioDetailed, carveOutHealthBucketFromPortfolio } from './simulator-portfolio-init.js';
 export { prepareHistoricalData } from './simulator-portfolio-historical.js';
 export { computeYearlyPension, computePensionNext, computeRentAdjRate } from './simulator-portfolio-pension.js';
 export { buildStressContext, applyStressOverride } from './simulator-portfolio-stress.js';

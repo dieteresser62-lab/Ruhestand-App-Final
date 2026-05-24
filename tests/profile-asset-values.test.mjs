@@ -25,11 +25,20 @@ console.log('Test 1: normalize derives renteAktiv from incomes');
         renteMonatlich: '1000',
         sonstigeEinkuenfte: '250',
         goldAktiv: 'true',
-        goldSteuerfrei: 'false'
+        goldSteuerfrei: 'false',
+        healthBucket: {
+            enabled: 'true',
+            initialAmount: '175000',
+            triggerMinGrade: '4',
+            triggerMode: 'or'
+        }
     });
     assertEqual(values.renteAktiv, true, 'Rente aktiv should derive from positive monthly income');
     assertEqual(values.goldAktiv, true, 'Gold active should parse');
     assertEqual(values.goldSteuerfrei, false, 'Gold tax flag should parse');
+    assertEqual(values.healthBucket.enabled, true, 'Health bucket active should parse');
+    assertEqual(values.healthBucket.initialAmount, 175000, 'Health bucket amount should parse');
+    assertEqual(values.healthBucket.triggerMode, 'OR', 'Health bucket trigger mode should normalize');
 }
 console.log('✓ normalize derives renteAktiv OK');
 
@@ -69,11 +78,24 @@ console.log('Test 3: save writes normalized profile keys');
         goldZiel: 7.5,
         goldFloor: 1,
         goldBand: 25,
-        goldSteuerfrei: true
+        goldSteuerfrei: true,
+        healthBucket: {
+            enabled: true,
+            initialAmount: 150000,
+            assetSource: 'money_market_first_then_cash',
+            triggerMinGrade: 4,
+            triggerMode: 'OR',
+            coverageMode: 'care_additional_floor_only',
+            returnMode: 'cash_return',
+            targetMode: 'inflation_indexed_diagnostic'
+        }
     }, storage);
     assertEqual(saved.renteAktiv, true, 'save should normalize renteAktiv');
     assertEqual(storage.getItem('profile_tagesgeld'), '30000', 'Tagesgeld should be stored');
     assertEqual(storage.getItem('profile_rente_aktiv'), 'true', 'Derived renteAktiv should be stored');
     assertEqual(storage.getItem('profile_gold_rebal_band'), '25', 'Gold band should be stored');
+    const healthBucket = JSON.parse(storage.getItem('profile_health_bucket'));
+    assertEqual(healthBucket.enabled, true, 'Health bucket should be stored');
+    assertEqual(healthBucket.initialAmount, 150000, 'Health bucket amount should be stored');
 }
 console.log('✓ save writes normalized profile keys OK');

@@ -30,7 +30,11 @@ const hasHeader = (cols, header) => cols.some(col => col?.header === header);
     assert(hasHeader(detailedCols, 'Liq<P'), 'Backtest detailed should include liquidity after payout');
     assert(hasHeader(detailedCols, 'Liq>Z'), 'Backtest detailed should include liquidity after interest');
     assert(hasHeader(detailedCols, 'Port>P'), 'Backtest detailed should include portfolio before payout');
+    assert(hasHeader(detailedCols, 'PortAkt'), 'Backtest detailed should include active portfolio end value');
     assert(hasHeader(detailedCols, 'PortEnd'), 'Backtest detailed should include portfolio end value');
+    assert(hasHeader(detailedCols, 'HBEnd'), 'Backtest detailed should include health bucket end value');
+    assert(hasHeader(detailedCols, 'HBDeck%'), 'Backtest detailed should include health bucket real coverage');
+    assert(hasHeader(detailedCols, 'HBWarn'), 'Backtest detailed should include health bucket warning');
 }
 
 {
@@ -58,7 +62,11 @@ const hasHeader = (cols, header) => cols.some(col => col?.header === header);
     assert(hasHeader(detailedCols, 'Liq<P'), 'Worst-run detailed should include liquidity after payout');
     assert(hasHeader(detailedCols, 'Liq>Z'), 'Worst-run detailed should include liquidity after interest');
     assert(hasHeader(detailedCols, 'Port>P'), 'Worst-run detailed should include portfolio before payout');
+    assert(hasHeader(detailedCols, 'PortAkt'), 'Worst-run detailed should include active portfolio end value');
     assert(hasHeader(detailedCols, 'PortEnd'), 'Worst-run detailed should include portfolio end value');
+    assert(hasHeader(detailedCols, 'HBEnd'), 'Worst-run detailed should include health bucket end value');
+    assert(hasHeader(detailedCols, 'HBDeck%'), 'Worst-run detailed should include health bucket real coverage');
+    assert(hasHeader(detailedCols, 'HBWarn'), 'Worst-run detailed should include health bucket warning');
 }
 
 console.log('✅ Simulator log columns tests passed');

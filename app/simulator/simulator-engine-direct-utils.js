@@ -58,6 +58,10 @@ export function normalizeHouseholdContext(context) {
         widowBenefits: {
             p1FromP2: !!context?.widowBenefits?.p1FromP2,
             p2FromP1: !!context?.widowBenefits?.p2FromP1
+        },
+        care: {
+            p1: context?.care?.p1 ?? context?.careMetaP1 ?? null,
+            p2: context?.care?.p2 ?? context?.careMetaP2 ?? null
         }
     };
 }

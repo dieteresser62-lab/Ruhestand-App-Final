@@ -52,6 +52,14 @@ const appState = {
                 vpwTotal: 65000,
                 staticFlexBaseline: 36000,
                 dynamicFlex: 52000
+            },
+            healthBucket: {
+                enabled: true,
+                lockedAmount: 150000,
+                operativeLiquidity: 40000,
+                targetCoveragePct: 75,
+                targetGap: 50000,
+                releaseReason: 'Balance zeigt den Pflegebucket nur als Zweckbindung.'
             }
         },
         decisionTree: [
@@ -94,6 +102,8 @@ assert(text.includes('Gold-Grenzen:'), 'Copytext sollte Gold-Grenzen ausgeben');
 assert(text.includes('--- Dynamic Flex (VPW) ---'), 'Copytext sollte VPW-Block enthalten');
 assert(text.includes('VPW-Sicherheitsmodus: Stufe 2'), 'Copytext sollte VPW-Sicherheitsmodus ausgeben');
 assert(text.includes('Warnsignale:'), 'Copytext sollte VPW-Warnsignale ausgeben');
+assert(text.includes('automatische Freigabe: Nein'), 'Copytext sollte die Balance-Freigabepolicy ausgeben');
+assert(text.includes('Pflegebucket-Policy:'), 'Copytext sollte die Pflegebucket-Policy begruenden');
 
 console.log('Balance diagnosis copy contract tests passed');
 console.log('--- Balance Diagnosis Copy Contract Tests Completed ---');

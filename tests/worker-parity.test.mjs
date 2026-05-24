@@ -69,7 +69,11 @@ const MC_TOTAL_KEYS = [
     'p2TriggeredCount',
     'runsSafetyStage1Triggered',
     'runsSafetyStage2Triggered',
-    'totalTaxSavedByLossCarry'
+    'totalTaxSavedByLossCarry',
+    'healthBucketEnabledCount',
+    'healthBucketUsedCount',
+    'healthBucketDepletedCount',
+    'totalHealthBucketUsed'
 ];
 
 const MC_LIST_KEYS = [
@@ -81,7 +85,12 @@ const MC_LIST_KEYS = [
     'p1CareYearsTriggered',
     'p2CareYearsTriggered',
     'bothCareYearsOverlapTriggered',
-    'maxAnnualCareSpendTriggered'
+    'maxAnnualCareSpendTriggered',
+    'healthBucketUsedAmounts',
+    'healthBucketEndAmounts',
+    'healthBucketCoveragePct',
+    'healthBucketTargetGaps',
+    'healthBucketInterestAmounts'
 ];
 
 function createMergedMonteCarloState(totalRuns) {
@@ -294,27 +303,8 @@ try {
     const mergedBuffers = createMonteCarloBuffers(monteCarloParams.anzahl);
     // Keep merged structures identical to the worker aggregation path.
     const mergedHeatmap = Array(10).fill(0).map(() => new Uint32Array(MC_HEATMAP_BINS.length - 1));
-    const mergedLists = {
-        entryAges: [],
-        entryAgesP2: [],
-        careDepotCosts: [],
-        endWealthWithCareList: [],
-        endWealthNoCareList: [],
-        p1CareYearsTriggered: [],
-        p2CareYearsTriggered: [],
-        bothCareYearsOverlapTriggered: [],
-        maxAnnualCareSpendTriggered: []
-    };
-    const mergedTotals = {
-        failCount: 0,
-        pflegeTriggeredCount: 0,
-        totalSimulatedYears: 0,
-        totalYearsQuoteAbove45: 0,
-        shortfallWithCareCount: 0,
-        shortfallNoCareProxyCount: 0,
-        p2TriggeredCount: 0,
-        totalTaxSavedByLossCarry: 0
-    };
+    const mergedLists = Object.fromEntries(MC_LIST_KEYS.map(key => [key, []]));
+    const mergedTotals = Object.fromEntries(MC_TOTAL_KEYS.map(key => [key, 0]));
     const mergedWithdrawals = [];
 
     // Merge-Helper: entspricht der Worker-Chunk-Akkumulation im echten Lauf.
@@ -338,24 +328,13 @@ try {
 
         mergeHeatmap(mergedHeatmap, chunk.heatmap);
 
-        mergedTotals.failCount += chunk.totals.failCount;
-        mergedTotals.pflegeTriggeredCount += chunk.totals.pflegeTriggeredCount;
-        mergedTotals.totalSimulatedYears += chunk.totals.totalSimulatedYears;
-        mergedTotals.totalYearsQuoteAbove45 += chunk.totals.totalYearsQuoteAbove45;
-        mergedTotals.shortfallWithCareCount += chunk.totals.shortfallWithCareCount;
-        mergedTotals.shortfallNoCareProxyCount += chunk.totals.shortfallNoCareProxyCount;
-        mergedTotals.p2TriggeredCount += chunk.totals.p2TriggeredCount;
-        mergedTotals.totalTaxSavedByLossCarry += chunk.totals.totalTaxSavedByLossCarry || 0;
+        for (const key of MC_TOTAL_KEYS) {
+            mergedTotals[key] += chunk.totals[key] || 0;
+        }
 
-        appendArray(mergedLists.entryAges, chunk.lists.entryAges);
-        appendArray(mergedLists.entryAgesP2, chunk.lists.entryAgesP2);
-        appendArray(mergedLists.careDepotCosts, chunk.lists.careDepotCosts);
-        appendArray(mergedLists.endWealthWithCareList, chunk.lists.endWealthWithCareList);
-        appendArray(mergedLists.endWealthNoCareList, chunk.lists.endWealthNoCareList);
-        appendArray(mergedLists.p1CareYearsTriggered, chunk.lists.p1CareYearsTriggered);
-        appendArray(mergedLists.p2CareYearsTriggered, chunk.lists.p2CareYearsTriggered);
-        appendArray(mergedLists.bothCareYearsOverlapTriggered, chunk.lists.bothCareYearsOverlapTriggered);
-        appendArray(mergedLists.maxAnnualCareSpendTriggered, chunk.lists.maxAnnualCareSpendTriggered);
+        for (const key of MC_LIST_KEYS) {
+            appendArray(mergedLists[key], chunk.lists[key]);
+        }
         appendArray(mergedWithdrawals, chunk.allRealWithdrawalsSample);
     };
 
@@ -633,27 +612,8 @@ try {
 
     const mergedBuffers = createMonteCarloBuffers(monteCarloParams.anzahl);
     const mergedHeatmap = Array(10).fill(0).map(() => new Uint32Array(MC_HEATMAP_BINS.length - 1));
-    const mergedLists = {
-        entryAges: [],
-        entryAgesP2: [],
-        careDepotCosts: [],
-        endWealthWithCareList: [],
-        endWealthNoCareList: [],
-        p1CareYearsTriggered: [],
-        p2CareYearsTriggered: [],
-        bothCareYearsOverlapTriggered: [],
-        maxAnnualCareSpendTriggered: []
-    };
-    const mergedTotals = {
-        failCount: 0,
-        pflegeTriggeredCount: 0,
-        totalSimulatedYears: 0,
-        totalYearsQuoteAbove45: 0,
-        shortfallWithCareCount: 0,
-        shortfallNoCareProxyCount: 0,
-        p2TriggeredCount: 0,
-        totalTaxSavedByLossCarry: 0
-    };
+    const mergedLists = Object.fromEntries(MC_LIST_KEYS.map(key => [key, []]));
+    const mergedTotals = Object.fromEntries(MC_TOTAL_KEYS.map(key => [key, 0]));
     const mergedWithdrawals = [];
 
     const mergeChunk = (chunk, start) => {
@@ -674,23 +634,12 @@ try {
         mergedBuffers.stress_CaR_P10_Real.set(chunkBuffers.stress_CaR_P10_Real, start);
         mergedBuffers.stress_recoveryYears.set(chunkBuffers.stress_recoveryYears, start);
         mergeHeatmap(mergedHeatmap, chunk.heatmap);
-        mergedTotals.failCount += chunk.totals.failCount;
-        mergedTotals.pflegeTriggeredCount += chunk.totals.pflegeTriggeredCount;
-        mergedTotals.totalSimulatedYears += chunk.totals.totalSimulatedYears;
-        mergedTotals.totalYearsQuoteAbove45 += chunk.totals.totalYearsQuoteAbove45;
-        mergedTotals.shortfallWithCareCount += chunk.totals.shortfallWithCareCount;
-        mergedTotals.shortfallNoCareProxyCount += chunk.totals.shortfallNoCareProxyCount;
-        mergedTotals.p2TriggeredCount += chunk.totals.p2TriggeredCount;
-        mergedTotals.totalTaxSavedByLossCarry += chunk.totals.totalTaxSavedByLossCarry || 0;
-        appendArray(mergedLists.entryAges, chunk.lists.entryAges);
-        appendArray(mergedLists.entryAgesP2, chunk.lists.entryAgesP2);
-        appendArray(mergedLists.careDepotCosts, chunk.lists.careDepotCosts);
-        appendArray(mergedLists.endWealthWithCareList, chunk.lists.endWealthWithCareList);
-        appendArray(mergedLists.endWealthNoCareList, chunk.lists.endWealthNoCareList);
-        appendArray(mergedLists.p1CareYearsTriggered, chunk.lists.p1CareYearsTriggered);
-        appendArray(mergedLists.p2CareYearsTriggered, chunk.lists.p2CareYearsTriggered);
-        appendArray(mergedLists.bothCareYearsOverlapTriggered, chunk.lists.bothCareYearsOverlapTriggered);
-        appendArray(mergedLists.maxAnnualCareSpendTriggered, chunk.lists.maxAnnualCareSpendTriggered);
+        for (const key of MC_TOTAL_KEYS) {
+            mergedTotals[key] += chunk.totals[key] || 0;
+        }
+        for (const key of MC_LIST_KEYS) {
+            appendArray(mergedLists[key], chunk.lists[key]);
+        }
         appendArray(mergedWithdrawals, chunk.allRealWithdrawalsSample);
     };
 

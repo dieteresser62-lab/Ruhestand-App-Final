@@ -258,6 +258,11 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
             inputData.goldCost = assetSummary.totalGoldCost;
             inputData.renteAktiv = totalRenteMonatlich > 0;
             inputData.renteMonatlich = totalRenteMonatlich;
+            if (assetSummary.primaryHealthBucket) {
+                inputData.healthBucket = assetSummary.primaryHealthBucket;
+                inputData.healthBucketEnabled = assetSummary.primaryHealthBucket.enabled;
+                inputData.healthBucketInitialAmount = assetSummary.primaryHealthBucket.initialAmount;
+            }
 
             const aggregated = aggregateProfilverbundInputs(profilverbundProfiles, {
                 floorBedarf: inputData.floorBedarf,

@@ -119,6 +119,8 @@ try {
         portfolio: {
             depotTranchesAktien: [{ marketValue: 100000, costBasis: 80000, type: 'aktien_alt', category: 'equity' }],
             depotTranchesGold: [{ marketValue: 10000, costBasis: 9000, type: 'gold', category: 'gold' }],
+            healthBucketGeldmarkt: 150000,
+            healthBucketTranches: [{ marketValue: 150000, costBasis: 150000, type: 'geldmarkt', category: 'money_market' }],
             liquiditaet: 999
         },
         marketDataCurrentYear: {
@@ -148,7 +150,9 @@ try {
     assertClose(engineInput.renteMonatlich, 1500, 1e-9, 'Engine input should pass monthly household pension');
     assertClose(engineInput.goldZielProzent, 12, 1e-9, 'Engine input should preserve active gold target');
     assertClose(engineInput.endeVJ, 110, 1e-9, 'Engine input should use current market window');
+    assert(engineInput.aktuelleLiquiditaet !== 175000, 'Engine input must not add locked health bucket to operating liquidity');
     assert(engineInput.detailledTranches.length === 2, 'Engine input should include detailed tranches');
+    assert(!engineInput.detailledTranches.some(t => t?.category === 'money_market'), 'Engine input should not include locked health bucket tranches');
     assert(detailedTranches.length === 2, 'Detailed tranche return should match engine input');
     console.log('✅ Extracted EngineAPI input mapping passed');
 } catch (e) {
@@ -225,6 +229,10 @@ try {
     const portfolio = {
         depotTranchesAktien: [{ marketValue: 100000, costBasis: 90000, type: 'aktien_alt', category: 'equity' }],
         depotTranchesGold: [],
+        healthBucketGeldmarkt: 30000,
+        healthBucketMeta: {
+            warnings: ['Pflegebucket auf verfuegbare Liquiditaet gekappt: 30000 von 40000 EUR.']
+        },
         liquiditaet: 0
     };
     const result = buildSimulatorYearResult({
@@ -316,7 +324,10 @@ try {
     assert(result.logData.liq_after_payout === 20000, 'Year result should expose liquidity after payout');
     assert(result.logData.liq_after_interest === 20000, 'Year result should expose liquidity after interest');
     assert(result.logData.portfolio_total_before_payout === 132000, 'Year result should expose portfolio total before payout');
-    assert(result.logData.portfolio_total_end === 120000, 'Year result should expose portfolio total at year end');
+    assert(result.logData.portfolio_active_end === 120000, 'Year result should expose active portfolio total at year end');
+    assert(result.logData.health_bucket_end === 30000, 'Year result should expose locked health bucket at year end');
+    assert(result.logData.health_bucket_warning.includes('gekappt'), 'Year result should expose health bucket warnings');
+    assert(result.logData.portfolio_total_end === 150000, 'Year result should expose portfolio total including health bucket at year end');
     assert(result.logData.threeBucket.bondBucketAfter === 0, 'Year result should expose three-bucket log shape');
     console.log('✅ Extracted year result builder passed');
 } catch (e) {
@@ -401,6 +412,75 @@ try {
     console.log('✅ Simulation run-through passed');
 } catch (e) {
     console.error('Test 1 Failed', e);
+    throw e;
+}
+
+// Test 1b: Health bucket covers eligible care shortfall before forced sale
+try {
+    const careState = {
+        portfolio: {
+            depotTranchesAktien: [{ marketValue: 100000, costBasis: 90000, type: 'aktien_alt', category: 'equity' }],
+            depotTranchesGold: [],
+            healthBucketConfig: {
+                enabled: true,
+                initialAmount: 20000,
+                triggerMinGrade: 4,
+                triggerMode: 'OR',
+                coverageMode: 'care_additional_floor_only',
+                returnMode: 'cash_return',
+                targetMode: 'inflation_indexed_diagnostic'
+            },
+            healthBucketGeldmarkt: 20000,
+            healthBucketTranches: [
+                { trancheId: 'hb-care', marketValue: 20000, costBasis: 20000, type: 'geldmarkt', category: 'money_market' }
+            ],
+            healthBucketCashAmount: 0,
+            liquiditaet: 0
+        },
+        baseFloor: 24000,
+        baseFlex: 0,
+        lastState: null,
+        currentAnnualPension: 0,
+        marketDataHist: startHistoricalData,
+        widowPensionP1: 0,
+        widowPensionP2: 0
+    };
+    const careMeta = {
+        active: true,
+        grade: 4,
+        gradeLabel: 'Pflegegrad 4',
+        zusatzFloorZiel: 12000,
+        zusatzFloorDelta: 12000,
+        flexFactor: 0.2
+    };
+    const careInputs = {
+        ...inputs,
+        startFlexBedarf: 0,
+        healthBucket: careState.portfolio.healthBucketConfig,
+        healthBucketEnabled: true
+    };
+    const result = simulateOneYear(
+        careState,
+        careInputs,
+        { ...yearDataNormal, rendite: 0, zinssatz: 0 },
+        0,
+        careMeta,
+        12000,
+        {
+            p1Alive: true,
+            p2Alive: false,
+            widowBenefits: { p1FromP2: false, p2FromP1: false },
+            care: { p1: careMeta, p2: null }
+        }
+    );
+    assert(!result.isRuin, 'Health bucket scenario should not ruin');
+    assertClose(result.logData.health_bucket_used, 12000, 1e-9, 'Health bucket should cover eligible care shortfall');
+    assertClose(result.newState.portfolio.healthBucketGeldmarkt, 8000, 1e-9, 'Health bucket should be reduced by used amount');
+    assertClose(result.logData.health_bucket_end, 8000, 1e-9, 'Year log should expose remaining health bucket');
+    assert(result.logData.health_bucket_triggered === true, 'Year log should expose health bucket trigger');
+    console.log('✅ Health bucket annual integration passed');
+} catch (e) {
+    console.error('Test 1b Failed', e);
     throw e;
 }
 

@@ -1,5 +1,5 @@
 
-import { buyGold, buyStocksNeu, sumDepot, initializePortfolio, getCommonInputs } from '../app/simulator/simulator-portfolio.js';
+import { buyGold, buyStocksNeu, sumDepot, initializePortfolio, initializePortfolioDetailed, getCommonInputs } from '../app/simulator/simulator-portfolio.js';
 
 console.log('--- Portfolio Logic Tests ---');
 
@@ -182,6 +182,143 @@ function teardownMockDOM() {
     } finally {
         teardownMockDOM();
     }
+}
+
+// Test 6: Pflegebucket carve-out from aggregate money market and cash
+{
+    const portfolio = initializePortfolio({
+        startVermoegen: 300000,
+        depotwertAlt: 100000,
+        einstandAlt: 80000,
+        tagesgeld: 50000,
+        geldmarktEtf: 120000,
+        goldAktiv: false,
+        healthBucket: {
+            enabled: true,
+            initialAmount: 150000,
+            assetSource: 'money_market_first_then_cash',
+            triggerMinGrade: 4,
+            triggerMode: 'OR',
+            coverageMode: 'care_additional_floor_only',
+            returnMode: 'cash_return',
+            targetMode: 'inflation_indexed_diagnostic'
+        }
+    });
+
+    assertEqual(portfolio.healthBucketGeldmarkt, 150000, 'Health bucket should carve requested amount');
+    assertEqual(portfolio.geldmarktEtf, 0, 'Money market should be used first');
+    assertEqual(portfolio.tagesgeld, 20000, 'Cash should cover remaining bucket amount');
+    assertEqual(portfolio.liquiditaet, 20000, 'Operational liquidity should exclude health bucket');
+    assertEqual(portfolio.healthBucketCashAmount, 30000, 'Cash carve-out should be tracked');
+    assertEqual(portfolio.healthBucketTranches.length, 1, 'Carved money-market tranche should be tracked');
+    console.log('✅ Health bucket aggregate carve-out works');
+}
+
+// Test 7: Pflegebucket carve-out reduces detailed money-market tranches FIFO
+{
+    const portfolio = initializePortfolioDetailed({
+        tagesgeld: 20000,
+        geldmarktEtf: 0,
+        detailledTranches: [
+            {
+                trancheId: 'gm-new',
+                category: 'money_market',
+                type: 'geldmarkt',
+                marketValue: 70000,
+                costBasis: 63000,
+                purchaseDate: '2022-01-01'
+            },
+            {
+                trancheId: 'gm-old',
+                category: 'money_market',
+                type: 'geldmarkt',
+                marketValue: 60000,
+                costBasis: 60000,
+                purchaseDate: '2020-01-01'
+            },
+            {
+                trancheId: 'eq',
+                category: 'equity',
+                type: 'aktien_alt',
+                marketValue: 100000,
+                costBasis: 80000,
+                purchaseDate: '2019-01-01'
+            }
+        ],
+        healthBucket: {
+            enabled: true,
+            initialAmount: 100000
+        }
+    });
+
+    assertEqual(portfolio.healthBucketGeldmarkt, 100000, 'Detailed carve-out should fill requested amount');
+    assertEqual(portfolio.geldmarktEtf, 30000, 'Remaining money market should stay operational');
+    assertEqual(portfolio.liquiditaet, 50000, 'Operational liquidity should be cash plus remaining money market');
+    assertEqual(portfolio.depotTranchesGeldmarkt.length, 1, 'Fully carved FIFO tranche should be removed');
+    assertEqual(portfolio.depotTranchesGeldmarkt[0].trancheId, 'gm-new', 'Newer tranche should remain after FIFO carve-out');
+    assertEqual(portfolio.depotTranchesGeldmarkt[0].marketValue, 30000, 'Newer tranche should be partially reduced');
+    assertEqual(portfolio.healthBucketTranches.length, 2, 'Bucket should remember carved source lots');
+    assertEqual(portfolio.healthBucketTranches[0].trancheId, 'gm-old', 'Oldest tranche should be carved first');
+    assertEqual(portfolio.healthBucketTranches[1].marketValue, 40000, 'Second tranche should be partially carved');
+    console.log('✅ Health bucket detailed FIFO carve-out works');
+}
+
+// Test 8: Pflegebucket caps when money market and cash are insufficient
+{
+    const portfolio = initializePortfolio({
+        startVermoegen: 100000,
+        depotwertAlt: 0,
+        einstandAlt: 0,
+        tagesgeld: 20000,
+        geldmarktEtf: 50000,
+        goldAktiv: false,
+        healthBucket: {
+            enabled: true,
+            initialAmount: 100000
+        }
+    });
+
+    assertEqual(portfolio.healthBucketGeldmarkt, 70000, 'Health bucket should cap to available liquid assets');
+    assertEqual(portfolio.healthBucketMeta.capped, true, 'Capped bucket should be flagged');
+    assertEqual(portfolio.healthBucketMeta.shortfall, 30000, 'Shortfall should be tracked');
+    assert(portfolio.healthBucketMeta.warnings.length === 1, 'Capped bucket should produce one warning');
+    assertEqual(portfolio.liquiditaet, 0, 'All liquid assets should be carved when capped');
+    console.log('✅ Health bucket capped carve-out works');
+}
+
+// Test 9: Pflegebucket FIFO remains stable with invalid purchase dates
+{
+    const portfolio = initializePortfolioDetailed({
+        tagesgeld: 0,
+        geldmarktEtf: 0,
+        detailledTranches: [
+            {
+                trancheId: 'gm-valid',
+                category: 'money_market',
+                type: 'geldmarkt',
+                marketValue: 50000,
+                costBasis: 50000,
+                purchaseDate: '2024-01-01'
+            },
+            {
+                trancheId: 'gm-invalid',
+                category: 'money_market',
+                type: 'geldmarkt',
+                marketValue: 50000,
+                costBasis: 50000,
+                purchaseDate: 'kein-datum'
+            }
+        ],
+        healthBucket: {
+            enabled: true,
+            initialAmount: 50000
+        }
+    });
+
+    assertEqual(portfolio.healthBucketTranches.length, 1, 'Invalid-date tranche should still be carved deterministically');
+    assertEqual(portfolio.healthBucketTranches[0].trancheId, 'gm-invalid', 'Invalid date should fall back to FIFO baseline date');
+    assertEqual(portfolio.depotTranchesGeldmarkt[0].trancheId, 'gm-valid', 'Valid later tranche should remain operational');
+    console.log('✅ Health bucket invalid-date FIFO fallback works');
 }
 
 console.log('--- Portfolio Logic Tests Completed ---');

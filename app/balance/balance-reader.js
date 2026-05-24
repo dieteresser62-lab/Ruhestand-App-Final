@@ -20,6 +20,7 @@ import {
     PROFILE_TRANCHES_KEY,
     PROFILE_VALUE_KEYS,
     parseStoredTranchesFromData,
+    readProfileHealthBucketFromStorage,
     readProfileOverridesFromStorage
 } from '../profile/profile-state.js';
 
@@ -114,6 +115,7 @@ export const UIReader = {
         const profileGoldFloor = profileOverrides.profileGoldFloor;
         const profileGoldSteuerfrei = profileOverrides.profileGoldSteuerfrei;
         const profileGoldRebalBand = profileOverrides.profileGoldRebalBand;
+        const healthBucket = readProfileHealthBucketFromStorage(localStorage);
         // Lade detaillierte Tranchen aus localStorage (falls vorhanden)
         const detailledTranches = parseStoredTranchesFromData({
             [PROFILE_TRANCHES_KEY]: localStorage.getItem(PROFILE_TRANCHES_KEY)
@@ -239,6 +241,15 @@ export const UIReader = {
                 drawdownTrigger: Number.isFinite(drawdownTrigger) ? drawdownTrigger : 15.0,
                 bondRefillThreshold: Number.isFinite(bondRefillThreshold) ? bondRefillThreshold : null
             },
+            healthBucket,
+            healthBucketEnabled: healthBucket.enabled,
+            healthBucketInitialAmount: healthBucket.initialAmount,
+            healthBucketAssetSource: healthBucket.assetSource,
+            healthBucketTriggerMinGrade: healthBucket.triggerMinGrade,
+            healthBucketTriggerMode: healthBucket.triggerMode,
+            healthBucketCoverageMode: healthBucket.coverageMode,
+            healthBucketReturnMode: healthBucket.returnMode,
+            healthBucketTargetMode: healthBucket.targetMode,
             profilName: val('profilName') || '',
             // NEU: Detaillierte Tranchen für FIFO und präzise Steuerberechnung
             detailledTranches: detailledTranches.length ? detailledTranches : null

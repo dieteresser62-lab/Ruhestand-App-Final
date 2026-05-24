@@ -1,7 +1,13 @@
 // @ts-check
 
 import { CONFIG } from '../balance/balance-config.js';
-import { PROFILE_VALUE_KEYS } from './profile-state.js';
+import {
+    PROFILE_HEALTH_BUCKET_KEY,
+    PROFILE_VALUE_KEYS,
+    normalizeProfileHealthBucket,
+    readProfileHealthBucketFromStorage,
+    serializeProfileHealthBucket
+} from './profile-state.js';
 
 export const DEFAULT_PROFILE_ASSET_VALUES = {
     tagesgeld: 0,
@@ -13,7 +19,8 @@ export const DEFAULT_PROFILE_ASSET_VALUES = {
     goldZiel: 7.5,
     goldFloor: 1,
     goldBand: 25,
-    goldSteuerfrei: false
+    goldSteuerfrei: false,
+    healthBucket: normalizeProfileHealthBucket()
 };
 
 function readNumber(raw, fallback = 0) {
@@ -51,12 +58,14 @@ export function normalizeProfileAssetValues(values = {}) {
         goldZiel: readNumber(values.goldZiel, DEFAULT_PROFILE_ASSET_VALUES.goldZiel),
         goldFloor: readNumber(values.goldFloor, DEFAULT_PROFILE_ASSET_VALUES.goldFloor),
         goldBand: readNumber(values.goldBand, DEFAULT_PROFILE_ASSET_VALUES.goldBand),
-        goldSteuerfrei: readBool(values.goldSteuerfrei, false)
+        goldSteuerfrei: readBool(values.goldSteuerfrei, false),
+        healthBucket: normalizeProfileHealthBucket(values.healthBucket)
     };
 }
 
 export function loadProfileAssetValues(storage = localStorage) {
     const storedInputs = readProfileStoredInputs(storage);
+    const healthBucket = readProfileHealthBucketFromStorage(storage);
     const tagesgeldRaw = storage.getItem(PROFILE_VALUE_KEYS.tagesgeld);
     const renteMonatlichRaw = storage.getItem(PROFILE_VALUE_KEYS.renteMonatlich);
     const sonstigeEinkuenfteRaw = storage.getItem(PROFILE_VALUE_KEYS.sonstigeEinkuenfte);
@@ -76,7 +85,8 @@ export function loadProfileAssetValues(storage = localStorage) {
         goldZiel: goldZielRaw !== null ? goldZielRaw : storedInputs.goldZielProzent,
         goldFloor: goldFloorRaw !== null ? goldFloorRaw : storedInputs.goldFloorProzent,
         goldBand: goldBandRaw !== null ? goldBandRaw : storedInputs.rebalancingBand,
-        goldSteuerfrei: goldSteuerfreiRaw !== null ? goldSteuerfreiRaw : storedInputs.goldSteuerfrei
+        goldSteuerfrei: goldSteuerfreiRaw !== null ? goldSteuerfreiRaw : storedInputs.goldSteuerfrei,
+        healthBucket
     });
 }
 
@@ -100,6 +110,14 @@ export function applyProfileAssetValuesToDom(values, doc = document) {
     assign('profileGoldFloor', normalized.goldFloor);
     assign('profileGoldBand', normalized.goldBand);
     assign('profileGoldSteuerfrei', normalized.goldSteuerfrei, v => v ? 'true' : 'false');
+    assign('profileHealthBucketEnabled', normalized.healthBucket.enabled, v => v ? 'true' : 'false');
+    assign('profileHealthBucketInitialAmount', normalized.healthBucket.initialAmount);
+    assign('profileHealthBucketAssetSource', normalized.healthBucket.assetSource);
+    assign('profileHealthBucketTriggerMinGrade', normalized.healthBucket.triggerMinGrade);
+    assign('profileHealthBucketTriggerMode', normalized.healthBucket.triggerMode);
+    assign('profileHealthBucketCoverageMode', normalized.healthBucket.coverageMode);
+    assign('profileHealthBucketReturnMode', normalized.healthBucket.returnMode);
+    assign('profileHealthBucketTargetMode', normalized.healthBucket.targetMode);
 }
 
 export function readProfileAssetValuesFromDom(doc = document) {
@@ -113,7 +131,17 @@ export function readProfileAssetValuesFromDom(doc = document) {
         goldZiel: read('profileGoldZiel'),
         goldFloor: read('profileGoldFloor'),
         goldBand: read('profileGoldBand'),
-        goldSteuerfrei: read('profileGoldSteuerfrei')
+        goldSteuerfrei: read('profileGoldSteuerfrei'),
+        healthBucket: {
+            enabled: read('profileHealthBucketEnabled'),
+            initialAmount: read('profileHealthBucketInitialAmount'),
+            assetSource: read('profileHealthBucketAssetSource'),
+            triggerMinGrade: read('profileHealthBucketTriggerMinGrade'),
+            triggerMode: read('profileHealthBucketTriggerMode'),
+            coverageMode: read('profileHealthBucketCoverageMode'),
+            returnMode: read('profileHealthBucketReturnMode'),
+            targetMode: read('profileHealthBucketTargetMode')
+        }
     });
 }
 
@@ -129,5 +157,6 @@ export function saveProfileAssetValues(values, storage = localStorage) {
     storage.setItem(PROFILE_VALUE_KEYS.goldFloor, String(normalized.goldFloor));
     storage.setItem(PROFILE_VALUE_KEYS.goldRebalBand, String(normalized.goldBand));
     storage.setItem(PROFILE_VALUE_KEYS.goldSteuerfrei, normalized.goldSteuerfrei ? 'true' : 'false');
+    storage.setItem(PROFILE_HEALTH_BUCKET_KEY, serializeProfileHealthBucket(normalized.healthBucket));
     return normalized;
 }

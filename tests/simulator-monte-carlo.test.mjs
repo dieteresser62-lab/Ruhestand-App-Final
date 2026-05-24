@@ -237,7 +237,11 @@ function buildBasicInputs() {
         shortfallNoCareProxyCount: 0,
         p2TriggeredCount: 0,
         runsSafetyStage1Triggered: 1,
-        runsSafetyStage2Triggered: 1
+        runsSafetyStage2Triggered: 1,
+        healthBucketEnabledCount: 2,
+        healthBucketUsedCount: 1,
+        healthBucketDepletedCount: 1,
+        totalHealthBucketUsed: 5000
     };
     const lists = {
         entryAges: [],
@@ -248,7 +252,12 @@ function buildBasicInputs() {
         p1CareYearsTriggered: [],
         p2CareYearsTriggered: [],
         bothCareYearsOverlapTriggered: [],
-        maxAnnualCareSpendTriggered: []
+        maxAnnualCareSpendTriggered: [],
+        healthBucketUsedAmounts: [5000],
+        healthBucketEndAmounts: [0, 20000],
+        healthBucketCoveragePct: [0, 80],
+        healthBucketTargetGaps: [30000, 10000],
+        healthBucketInterestAmounts: [250]
     };
     const allRealWithdrawalsSample = [100, 200];
 
@@ -270,6 +279,10 @@ function buildBasicInputs() {
     assertClose(aggregates.extraKPI.timeShareQuoteAbove45, 0.2, 0.0001, 'Time share above 4.5 should match');
     assertClose(aggregates.extraKPI.dynamicFlexSafety.yearShareStage1plus, 0.3, 0.0001, 'Safety stage1+ year share should match');
     assertClose(aggregates.extraKPI.dynamicFlexSafety.yearShareStage2, 0.1, 0.0001, 'Safety stage2 year share should match');
+    assertClose(aggregates.extraKPI.healthBucket.usedRatePct, (1 / 3) * 100, 0.0001, 'Health bucket used rate should match');
+    assertClose(aggregates.extraKPI.healthBucket.depletedRatePct, 50, 0.0001, 'Health bucket depletion rate should match');
+    assertClose(aggregates.extraKPI.healthBucket.totalUsed, 5000, 0.0001, 'Health bucket total used should match');
+    assertClose(aggregates.extraKPI.healthBucket.coverageMedianPct, 40, 0.0001, 'Health bucket coverage median should match');
 }
 
 // --- TEST 7b: Monte-Carlo stress tracker ---
@@ -396,6 +409,12 @@ function buildBasicInputs() {
         careMetaP2: { zusatzFloorZiel: 500 },
         runSafetyStage1Ever: true,
         runSafetyStage2Ever: false,
+        healthBucketEnabledThisRun: true,
+        healthBucketUsedThisRun: 12000,
+        healthBucketEndThisRun: 8000,
+        healthBucketCoveragePctThisRun: 40,
+        healthBucketTargetGapThisRun: 12000,
+        healthBucketInterestThisRun: 80,
         currentRunLog: [{ jahr: 1 }]
     });
     const finalized = finalizeMonteCarloRunMetrics(metrics);
@@ -406,6 +425,9 @@ function buildBasicInputs() {
     assertEqual(finalized.totals.runsSafetyStage1Triggered, 1, 'Run metrics should count safety stage 1 runs');
     assertEqual(finalized.lists.entryAges[0], 70, 'Run metrics should store P1 care entry age');
     assertEqual(finalized.lists.entryAgesP2[0], 72, 'Run metrics should store P2 care entry age');
+    assertEqual(finalized.totals.healthBucketUsedCount, 1, 'Run metrics should count health bucket usage');
+    assertEqual(finalized.lists.healthBucketUsedAmounts[0], 12000, 'Run metrics should store health bucket usage');
+    assertEqual(finalized.runMeta[0].healthBucketEnd, 8000, 'Run metrics should write health bucket meta');
     assertEqual(finalized.runMeta[0].totalCareYears, 3, 'Run metrics should write runMeta care years');
     assertEqual(finalized.worstRun.runIdx, 7, 'Run metrics should update worst run');
 }

@@ -10,6 +10,7 @@
 import { listProfiles, getProfileData } from './profile-storage.js';
 import {
     parseProfileOverridesFromData,
+    parseProfileHealthBucketFromData,
     parseStoredBalanceStateFromData,
     parseStoredTranchesFromData,
     hasProfileOverrides
@@ -173,6 +174,7 @@ export function loadProfilverbundProfiles() {
         const data = getProfileData(meta.id);
         const balanceState = parseStoredBalanceStateFromData(data);
         const overrides = parseProfileOverridesFromData(data);
+        const healthBucket = parseProfileHealthBucketFromData(data);
         const tranches = parseStoredTranchesFromData(data);
         const hasFallbackData = hasProfileOverrides(overrides) || tranches.length > 0;
         const normalized = normalizeBalanceInputs(balanceState?.inputs || (hasFallbackData ? {} : null), overrides);
@@ -192,6 +194,7 @@ export function loadProfilverbundProfiles() {
             profileId: meta.id,
             name: meta.name || meta.id,
             inputs: normalized,
+            healthBucket,
             tranches,
             balanceState
         };
@@ -441,10 +444,11 @@ export function buildProfilverbundAssetSummary(profileInputs) {
         totalCostNeu: 0,
         totalGoldCost: 0,
         totalRenteMonatlich: 0,
-        mergedTranches: []
+        mergedTranches: [],
+        primaryHealthBucket: null
     };
 
-    list.forEach(entry => {
+    list.forEach((entry, idx) => {
         const inputs = entry.inputs || {};
         const tranches = Array.isArray(entry.tranches) ? entry.tranches : [];
         const split = resolveTrancheSplitTotals(tranches);
@@ -473,6 +477,9 @@ export function buildProfilverbundAssetSummary(profileInputs) {
 
         if (tranches.length) {
             summary.mergedTranches.push(...tranches);
+        }
+        if (idx === 0 && entry.healthBucket) {
+            summary.primaryHealthBucket = entry.healthBucket;
         }
     });
 

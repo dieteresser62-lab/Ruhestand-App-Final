@@ -12,6 +12,7 @@ import { UIUtils } from './balance-utils.js';
 export function buildKeyParams(params = {}) {
     const metrics = [];
     const vpw = (params && typeof params.vpw === 'object') ? params.vpw : null;
+    const healthBucket = (params && typeof params.healthBucket === 'object') ? params.healthBucket : null;
 
     const formatCurrencySafe = (value) => {
         if (typeof value !== 'number' || !isFinite(value)) {
@@ -223,6 +224,24 @@ export function buildKeyParams(params = {}) {
                 label: 'Nicht genutzter Rahmen',
                 value: UIUtils.formatCurrency(unusedRoom),
                 meta: 'VPW-Rahmen minus empfohlene Entnahme'
+            });
+        }
+    }
+
+    if (healthBucket?.enabled) {
+        pushMetric({
+            label: 'Pflegebucket',
+            value: UIUtils.formatCurrency(healthBucket.lockedAmount || 0),
+            meta: `Operativ frei: ${UIUtils.formatCurrency(healthBucket.operativeLiquidity || 0)}; keine automatische Freigabe`
+        });
+        if (typeof healthBucket.targetCoveragePct === 'number' && isFinite(healthBucket.targetCoveragePct)) {
+            pushMetric({
+                label: 'Pflegebucket-Zieldeckung',
+                value: UIUtils.formatPercentValue(healthBucket.targetCoveragePct, { fractionDigits: 0, invalid: 'n/a' }),
+                meta: healthBucket.targetGap > 0
+                    ? `Kaufkraftlücke: ${UIUtils.formatCurrency(healthBucket.targetGap)}`
+                    : 'Inflationsziel gedeckt',
+                trend: healthBucket.targetGap > 0 ? 'down' : 'up'
             });
         }
     }

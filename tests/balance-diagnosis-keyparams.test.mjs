@@ -66,6 +66,13 @@ setupDom();
             vpwTotal: 112000,
             staticFlexBaseline: 42000,
             dynamicFlex: 86000
+        },
+        healthBucket: {
+            enabled: true,
+            lockedAmount: 150000,
+            operativeLiquidity: 40000,
+            targetCoveragePct: 75,
+            targetGap: 50000
         }
     });
     const txt = flattenText(grid);
@@ -79,6 +86,9 @@ setupDom();
     assert(txt.includes('Statischer Flex-Bedarf'), 'Static flex baseline should be rendered');
     assert(txt.includes('Flex freigegeben'), 'Released flex metric should be rendered');
     assert(txt.includes('Nicht genutzter Rahmen'), 'Unused VPW room should be rendered');
+    assert(txt.includes('Pflegebucket'), 'Health bucket metric should be rendered');
+    assert(txt.includes('Pflegebucket-Zieldeckung'), 'Health bucket target coverage should be rendered');
+    assert(txt.includes('keine automatische Freigabe'), 'Health bucket policy should be visible');
 }
 
 {

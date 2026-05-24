@@ -198,7 +198,14 @@ function Assert-TauriBuildPrerequisites {
     Assert-CommandExists -CommandName 'rustup' -InstallHint 'Install Rust via rustup (https://rustup.rs/).'
     Assert-CommandExists -CommandName 'cargo' -InstallHint 'Install Rust toolchain via rustup.'
 
-    $rustVersionOutput = & rustc -vV 2>$null
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $rustVersionOutput = & rustc -vV 2>$null
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
     if (-not $rustVersionOutput) {
         throw "Unable to execute 'rustc -vV'. Ensure Rust toolchain is installed correctly."
     }

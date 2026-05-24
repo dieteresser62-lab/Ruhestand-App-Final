@@ -2,6 +2,10 @@ import { buyGold, buyStocksNeu, sumDepot } from './simulator-portfolio.js';
 import { calculateTargetLiquidityBalanceLike, euros } from './simulator-engine-direct-utils.js';
 import { buildNextMarketDataHist } from './simulator-year-portfolio.js';
 import { sumBondBucketValuation } from '../../engine/transactions/three-bucket-logic.mjs';
+import {
+    applyHealthBucketInterest,
+    buildHealthBucketDiagnostics
+} from './simulator-health-bucket.js';
 
 export function isAccumulationYear(inputs, yearIndex) {
     return Boolean(inputs.accumulationPhase?.enabled && yearIndex < (inputs.transitionYear || 0));
@@ -55,6 +59,12 @@ export function simulateAccumulationYear({
     liquiditaet += cashZinsen;
     liqNachZins = euros(liquiditaet);
     liquiditaet += sparrateThisYear;
+    const healthBucketInterest = applyHealthBucketInterest({ inputs, portfolio, rC });
+    const healthBucketDiagnostics = buildHealthBucketDiagnostics({
+        inputs,
+        portfolio,
+        cumulativeInflationFactor: currentState.lastState?.cumulativeInflationFactor || 1
+    });
 
     const zielLiquiditaet = calculateTargetLiquidityBalanceLike(
         inputs,
@@ -103,6 +113,9 @@ export function simulateAccumulationYear({
     const newMarketDataHist = buildNextMarketDataHist({ marketDataHist, yearData, rA, resolvedCapeRatio });
     const wertAktien = sumDepot({ depotTranchesAktien: portfolio.depotTranchesAktien });
     const wertGold = sumDepot({ depotTranchesGold: portfolio.depotTranchesGold });
+    const healthBucketWarnings = Array.isArray(portfolio.healthBucketMeta?.warnings)
+        ? portfolio.healthBucketMeta.warnings
+        : [];
 
     return {
         newState: {
@@ -154,6 +167,17 @@ export function simulateAccumulationYear({
             liqStart: euros(initialLiqStart),
             cashInterestEarned: euros(cashZinsen),
             liqEnd: euros(liqNachZins),
+            portfolio_active_end: euros(wertAktien + wertGold + portfolio.liquiditaet),
+            health_bucket_start: euros(healthBucketInterest.startAmount),
+            health_bucket_used: 0,
+            health_bucket_interest: euros(healthBucketInterest.interest),
+            health_bucket_end: euros(healthBucketDiagnostics.currentAmount),
+            health_bucket_target_nominal: euros(healthBucketDiagnostics.nominalTarget),
+            health_bucket_target_inflation_adjusted: euros(healthBucketDiagnostics.inflationAdjustedTarget),
+            health_bucket_real_coverage_pct: healthBucketDiagnostics.realCoveragePct,
+            health_bucket_target_gap: euros(healthBucketDiagnostics.targetGap),
+            health_bucket_warning: healthBucketWarnings.join(' | '),
+            portfolio_total_end: euros(wertAktien + wertGold + portfolio.liquiditaet + healthBucketDiagnostics.currentAmount),
             aktionUndGrund: `Sparrate: ${euros(sparrateThisYear)}€ / Kauf A: ${euros(kaufAktTotal)}€ / Kauf G: ${euros(kaufGldTotal)}€`,
             usedSPB: 0,
             floor_brutto: 0,

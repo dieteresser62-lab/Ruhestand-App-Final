@@ -84,7 +84,55 @@ const profileInputs = [
 }
 
 {
-    console.log('\n📋 Test 2: More than two profiles warning');
+    console.log('\n📋 Test 2: Health bucket remains primary household setting');
+    const withHealthBucketDiffs = [
+        {
+            profileId: 'a',
+            name: 'A',
+            inputs: {
+                ...profileInputs[0].inputs,
+                healthBucket: {
+                    enabled: true,
+                    initialAmount: 150000,
+                    assetSource: 'money_market_first_then_cash',
+                    triggerMinGrade: 4,
+                    triggerMode: 'OR',
+                    coverageMode: 'care_additional_floor_only',
+                    returnMode: 'cash_return',
+                    targetMode: 'inflation_indexed_diagnostic'
+                },
+                healthBucketEnabled: true,
+                healthBucketInitialAmount: 150000
+            }
+        },
+        {
+            profileId: 'b',
+            name: 'B',
+            inputs: {
+                ...profileInputs[1].inputs,
+                healthBucket: {
+                    enabled: false,
+                    initialAmount: 100000,
+                    assetSource: 'money_market_first_then_cash',
+                    triggerMinGrade: 5,
+                    triggerMode: 'AND',
+                    coverageMode: 'floor_when_care_active',
+                    returnMode: 'cash_return',
+                    targetMode: 'nominal_fixed'
+                }
+            }
+        }
+    ];
+
+    const result = combineSimulatorProfiles(withHealthBucketDiffs, 'a');
+    assertEqual(result.combined.healthBucket.initialAmount, 150000,
+        'Primary profile health bucket should be retained');
+    assert(result.warnings.some(msg => msg.includes('Pflegebucket-Konfiguration')),
+        'Differing health bucket configs should warn');
+}
+
+{
+    console.log('\n📋 Test 3: More than two profiles warning');
     const extended = profileInputs.concat({
         profileId: 'c',
         name: 'C',
@@ -113,7 +161,7 @@ const profileInputs = [
 }
 
 {
-    console.log('\n📋 Test 3: Dynamic-Flex profile differences should not produce household warning');
+    console.log('\n📋 Test 4: Dynamic-Flex profile differences should not produce household warning');
     const withDynamicDiffs = [
         {
             profileId: 'a',
@@ -152,7 +200,7 @@ const profileInputs = [
 }
 
 {
-    console.log('\n📋 Test 4: Detailed tranches merge with unique profile-scoped ids');
+    console.log('\n📋 Test 5: Detailed tranches merge with unique profile-scoped ids');
     const withTranches = [
         {
             profileId: 'a',
@@ -194,7 +242,7 @@ const profileInputs = [
 }
 
 {
-    console.log('\n📋 Test 5: Zero-market tranches fall back to aggregate assets');
+    console.log('\n📋 Test 6: Zero-market tranches fall back to aggregate assets');
     const withEmptyTranches = [
         {
             profileId: 'a',

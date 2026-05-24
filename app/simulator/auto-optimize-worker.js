@@ -113,7 +113,12 @@ export async function runMonteCarloAutoOptimize({ inputs, widowOptions, monteCar
         p1CareYearsTriggered: [],
         p2CareYearsTriggered: [],
         bothCareYearsOverlapTriggered: [],
-        maxAnnualCareSpendTriggered: []
+        maxAnnualCareSpendTriggered: [],
+        healthBucketUsedAmounts: [],
+        healthBucketEndAmounts: [],
+        healthBucketCoveragePct: [],
+        healthBucketTargetGaps: [],
+        healthBucketInterestAmounts: []
     };
     const allRealWithdrawalsSample = [];
     const totals = {
@@ -128,7 +133,11 @@ export async function runMonteCarloAutoOptimize({ inputs, widowOptions, monteCar
         p2TriggeredCount: 0,
         runsSafetyStage1Triggered: 0,
         runsSafetyStage2Triggered: 0,
-        totalTaxSavedByLossCarry: 0
+        totalTaxSavedByLossCarry: 0,
+        healthBucketEnabledCount: 0,
+        healthBucketUsedCount: 0,
+        healthBucketDepletedCount: 0,
+        totalHealthBucketUsed: 0
     };
 
     let nextRunIdx = 0;
@@ -217,6 +226,10 @@ export async function runMonteCarloAutoOptimize({ inputs, widowOptions, monteCar
             totals.runsSafetyStage1Triggered += result.totals.runsSafetyStage1Triggered || 0;
             totals.runsSafetyStage2Triggered += result.totals.runsSafetyStage2Triggered || 0;
             totals.totalTaxSavedByLossCarry += result.totals.totalTaxSavedByLossCarry || 0;
+            totals.healthBucketEnabledCount += result.totals.healthBucketEnabledCount || 0;
+            totals.healthBucketUsedCount += result.totals.healthBucketUsedCount || 0;
+            totals.healthBucketDepletedCount += result.totals.healthBucketDepletedCount || 0;
+            totals.totalHealthBucketUsed += result.totals.totalHealthBucketUsed || 0;
 
             appendArray(lists.entryAges, result.lists.entryAges);
             appendArray(lists.entryAgesP2, result.lists.entryAgesP2);
@@ -227,6 +240,11 @@ export async function runMonteCarloAutoOptimize({ inputs, widowOptions, monteCar
             appendArray(lists.p2CareYearsTriggered, result.lists.p2CareYearsTriggered);
             appendArray(lists.bothCareYearsOverlapTriggered, result.lists.bothCareYearsOverlapTriggered);
             appendArray(lists.maxAnnualCareSpendTriggered, result.lists.maxAnnualCareSpendTriggered);
+            appendArray(lists.healthBucketUsedAmounts, result.lists.healthBucketUsedAmounts);
+            appendArray(lists.healthBucketEndAmounts, result.lists.healthBucketEndAmounts);
+            appendArray(lists.healthBucketCoveragePct, result.lists.healthBucketCoveragePct);
+            appendArray(lists.healthBucketTargetGaps, result.lists.healthBucketTargetGaps);
+            appendArray(lists.healthBucketInterestAmounts, result.lists.healthBucketInterestAmounts);
             appendArray(allRealWithdrawalsSample, result.allRealWithdrawalsSample);
 
             if (elapsedMs > 0) {

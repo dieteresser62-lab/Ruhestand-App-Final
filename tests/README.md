@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 74 Testdateien mit 1659 Assertions (verifiziert mit `npm test` am 2026-05-20)
+**Test-Statistik:** 76 Testdateien mit 1748 Assertions (verifiziert mit `npm test` am 2026-05-23)
 
 ## Directory Structure
 
@@ -214,6 +214,16 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 - **Dual-Household:** Flex-Budget-Anpassung bei Pflege beider Partner
 - Pflegegrade (PG 0-5) und ambulant vs. stationär
 
+### Pflegebucket
+**Datei:** `health-bucket.test.mjs`
+
+**Zweck:** Testet die gesperrte Geldmarkt-/Cash-Reserve fuer Pflegefaelle.
+- **Trigger:** Mindestpflegegrad, `OR`-/`AND`-Modus und P1/P2-Care-Metadaten ueber `householdContext.care`.
+- **Deckung:** `care_additional_floor_only` und `floor_when_care_active`.
+- **Air Gap:** Bucket-Betraege werden nicht als freie operative Liquiditaet behandelt.
+- **Verbrauch:** FIFO-Reduktion der Bucket-Tranchen, Restbetrag und Warnungen.
+- **Diagnose:** Verzinsung mit `rC`, inflationsindexierter Zielwert, Zieldeckung und Ziel-Luecke.
+
 ### 5. Parameter-Sweep & Optimierung
 
 #### `simulator-sweep.test.mjs`
@@ -354,6 +364,14 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 - calculateTotals: Werte werden preserved
 - renderSummary: DOM-Updates mit Formatierung
 
+### Pflegebucket-Diagnose
+**Dateien:** `balance-health-bucket.test.mjs`, `balance-decumulation.test.mjs`, `balance-diagnosis-keyparams.test.mjs`, `balance-diagnosis-copy-contract.test.mjs`, `balance-renderer-summary.test.mjs`, `balance-smoke.test.mjs`
+
+**Zweck:** Sichert die Balance-App als reinen Consumer der Pflegebucket-Profildefinition.
+- **Diagnosewerte:** Brutto-Liquiditaet, Pflege-Zweckbindung, operative Liquiditaet, Zieldeckung und Ziel-Luecke.
+- **Policy:** `releasePolicy='diagnostic_only'`, `releaseAllowed=false`, `releasedAmount=0`.
+- **UI/Copytext:** Summary, Key-Parameter und Diagnose-Export weisen die Zweckbindung und die fehlende automatische Freigabe aus.
+
 ### 7. Simulator Module
 
 #### `simulation.test.mjs`
@@ -438,6 +456,7 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 - Primary/Partner-Aufteilung bei 2 Profilen
 - Warning bei >2 Profilen, während finanzielle Summen erhalten bleiben
 - Detailtranchen-Merge mit profilbezogenen IDs und `sourceProfileId`
+- Pflegebucket-Definition des Primary-Profils gilt als Haushaltsdefinition; abweichende sekundäre Definitionen erzeugen Warnungen
 - Null-Marktwert-Tranchen fallen mit Warnung auf aggregierte Startwerte zurück
 
 ### 9. Utilities & Hilfsfunktionen
@@ -597,6 +616,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `balance-annual-workflow-contract.test.mjs` | ~180 | Jahresupdate-/Jahresabschluss-Workflow-Contracts |
 | `balance-binder-snapshots.test.mjs` | ~160 | Snapshot-Erstellung/-Restore |
 | `balance-decumulation.test.mjs` | ~120 | Entnahmemodus-/3-Bucket-Input der Balance-App |
+| `balance-health-bucket.test.mjs` | ~110 | Pflegebucket-Diagnose und diagnostic-only Policy in Balance |
 | `balance-diagnosis-chips.test.mjs` | ~70 | Diagnose-Chip-Rendering |
 | `balance-diagnosis-copy-contract.test.mjs` | ~100 | Kopierbarer Diagnose-Exporttext |
 | `balance-diagnosis-decision-tree.test.mjs` | ~100 | Entscheidungsbaum-Logik |
@@ -613,6 +633,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `balance-storage-contract.test.mjs` | ~180 | Echte StorageManager-Migrationen und Snapshot-Contracts |
 | `balance-storage.test.mjs` | ~490 | localStorage-Persistenz |
 | `care-meta.test.mjs` | ~200 | Pflegefall-Logik |
+| `health-bucket.test.mjs` | ~160 | Pflegebucket-Trigger, Deckung, Verzinsung und Diagnose |
 | `core-engine.test.mjs` | ~150 | EngineAPI-Basisvalidierung |
 | `core-tax-settlement.test.mjs` | ~70 | Core Settlement-Integration |
 | `depot-tranches.test.mjs` | ~130 | FIFO-Verkäufe, Steuer |

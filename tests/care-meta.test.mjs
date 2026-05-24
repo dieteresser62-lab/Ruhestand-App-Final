@@ -196,6 +196,7 @@ function getCareInputs() {
     assert(lifeState.p1Alive === false, 'Life event update should apply mortality outside accumulation');
     assert(lifeState.runEndedBecauseAllDied === true, 'Single-person run should end when P1 dies');
     assert(year.householdContext.p1Alive === false, 'Household context should expose P1 death');
+    assert(year.householdContext.care.p1 === lifeState.careMetaP1, 'Household context should preserve P1 care metadata');
     assertClose(year.effectiveFlexFactor, 0, 0.001, 'No living persons should produce zero effective flex');
     console.log('✅ Monte-Carlo life event mortality works');
 }

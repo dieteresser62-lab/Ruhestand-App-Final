@@ -45,6 +45,7 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 * Diagnoseansicht mit Guardrails, Entscheidungsbaum und Key-Performance-Parametern.
 * **Depot-Tranchen-Manager:** Detaillierte Tranchen werden automatisch geladen und für steueroptimierte Verkäufe genutzt.
 * **Profil-Verwaltung:** Optionales Namensfeld zur Unterscheidung von Snapshots (z. B. "Max" vs. "Partnerin") für effektive Mehr-Personen-Planung.
+* **Pflegebucket-Diagnose:** Liest die in der Profilpflege definierte gesperrte Geldmarkt-/Cash-Reserve und zeigt Brutto-Liquidität, Pflege-Zweckbindung, operative Liquidität und inflationsbezogene Zieldeckung. In der Balance-App ist der Bucket aktuell bewusst `diagnostic_only`; es erfolgt keine automatische operative Freigabe.
 * Tastenkürzel u. a. für Jahresabschluss (`Alt` + `J`), Import (`Alt` + `I`), Export (`Alt` + `E`) und Marktdaten nachrücken (`Alt` + `N`).
 
 ### Simulator
@@ -61,6 +62,7 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 * Checkboxen für Pflege-Details und detailliertes Log, JSON/CSV-Export für ausgewählte Szenarien.
 * **Tranchen-Integration:** Steueroptimierte Verkäufe mit detaillierten Depot-Positionen (Balance/Simulator teilen dieselben Tranchen).
 * Notfallverkäufe werden steuerlich per Gesamt-Settlement-Recompute mit den regulären Verkäufen des Jahres konsistent verrechnet.
+* **Pflegebucket als gesperrte Geldmarkt-/Cash-Reserve:** Der Simulator gliedert den optionalen Bucket nach dem Profilverbund-Merge aus Geldmarkt-Tranchen, ungetranchtem Geldmarkt und Tagesgeld aus. Die Engine sieht nur die operative Liquidität; der Bucket kann erst bei Pflege-Trigger vor Forced Sales Liquiditätslücken decken.
 
 #### Schrittfolge für den Simulator (Simulator.html)
 1. **Profile wählen & Rahmendaten:** Im Tab „Rahmendaten“ die gewünschten Profile aktivieren. Die Vermögenswerte und Renten werden automatisch aggregiert und schreibgeschützt angezeigt.
@@ -134,6 +136,20 @@ Die Suite kann mehrere Profile als Profilverbund gleichzeitig auswerten. Es gibt
 * Gold-Strategie wird pro Profil gepflegt und in Balance/Simulator übernommen.
 * Tranchen werden aus den aktiven Profilen zusammengeführt.
 * Detaillierte Designdokumentation siehe `docs/reference/PROFILVERBUND_FEATURES.md`
+
+#### Pflegebucket
+
+Der Pflegebucket ist eine optionale, zweckgebundene Selbstversicherungsreserve für schwere Pflegefälle. Er wird nicht als normale Liquidität, Runway-Puffer oder frei konsumierbares VPW-Vermögen behandelt.
+
+**Source of Truth:** Die Definition liegt in der Profilpflege (`profile_health_bucket`) und wird von Simulator und Balance-App gelesen. Im Profilverbund gilt das Hauptprofil als maßgebliche Haushaltsdefinition; abweichende sekundäre Profildefinitionen erzeugen Warnungen.
+
+**Simulator-Wirkung:** Beim Start wird der Bucket nach dem Profilverbund-Merge aus cash-nahen Quellen ausgegliedert: zuerst Geldmarkt-Tranchen per FIFO, dann ungetranchter Geldmarkt, danach Tagesgeld. Reicht die verfügbare Geldmarkt-/Cash-Liquidität nicht aus, wird der Bucket gekappt und im Log gewarnt. Der Engine-Air-Gap sorgt dafür, dass VPW, Runway, Ziel-Liquidität und Transaktionen nur mit operativer Liquidität rechnen.
+
+**Freigabe:** Der Bucket wird nur bei definiertem Pflege-Trigger genutzt, standardmäßig ab Pflegegrad 4 im Modus `OR` für Person 1 oder Person 2. Der Standard `care_additional_floor_only` deckt nur pflegebedingte Zusatzlücken; `floor_when_care_active` kann den gesamten Floor-Shortfall bei aktivem Trigger decken.
+
+**Diagnose:** Jahreslogs, Backtests und Monte Carlo zeigen Start, Nutzung, Verzinsung, Restbetrag, Trigger, reale Zieldeckung und inflationsindexierte Ziellücke. Der inflationsangepasste Zielwert ist eine Diagnosegröße; Version 1 füllt den Bucket nicht automatisch wieder auf.
+
+**Steuervereinfachung:** Der Bucket-Verbrauch wird in Version 1 als cash-like Reserve modelliert. Geldmarkt-Tranchen werden beim Carve-Out nachvollziehbar geführt, aber Bucket-Verbrauch erzeugt noch keine eigenen Tax-Aggregate.
 
 ### Gemeinsame Engine
 * Modulare ES-Module (`engine/`) kapseln Validierung, Marktanalyse, Ausgabenplanung und Transaktionslogik.

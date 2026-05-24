@@ -2,8 +2,8 @@
 
 **Technische Dokumentation der DIY-Software für Ruhestandsplanung**
 
-**Dokumentstand:** 2026-05-20
-**Geprüfte Codebasis:** lokale Arbeitskopie vom 2026-05-20
+**Dokumentstand:** 2026-05-23
+**Geprüfte Codebasis:** lokale Arbeitskopie vom 2026-05-23
 **Engine API:** v31.0
 **Codeumfang:** Momentaufnahme, siehe Komponenten-Tabelle
 **Lizenz:** MIT
@@ -36,15 +36,15 @@
 
 ## Komponenten
 
-*Momentaufnahme der lokalen Arbeitskopie vom 2026-05-20. Modul- und Zeilenzahlen sind Orientierungshilfen, nicht normative Architekturgrenzen. Dieses Dokument beschreibt die Architektur und die fachlichen Zusammenhänge eigenständig; spezialisierte Referenzen (`TECHNICAL.md`, Modul-READMEs, `engine/README.md`, `tests/README.md`) dienen als ergänzende Detail- und Exportkataloge.*
+*Momentaufnahme der lokalen Arbeitskopie vom 2026-05-23. Modul- und Zeilenzahlen sind Orientierungshilfen, nicht normative Architekturgrenzen. Dieses Dokument beschreibt die Architektur und die fachlichen Zusammenhänge eigenständig; spezialisierte Referenzen (`TECHNICAL.md`, Modul-READMEs, `engine/README.md`, `tests/README.md`) dienen als ergänzende Detail- und Exportkataloge.*
 
 | Komponente | Zweck | Momentaufnahme |
 |------------|-------|----------------|
-| **Balance-App** | Jahresplanung: Liquidität, Entnahme, Steuern, Transaktionen, Ausgaben-Check | 34 JS-Module unter `app/balance/`, ca. 5.889 Zeilen |
-| **Simulator** | Monte-Carlo-Simulation, Parameter-Sweeps, Auto-Optimize, Dynamic Flex | 86 JS-Module unter `app/simulator/`, ca. 14.740 Zeilen |
+| **Balance-App** | Jahresplanung: Liquidität, Entnahme, Steuern, Transaktionen, Ausgaben-Check, Pflegebucket-Diagnose | 35 JS-Module unter `app/balance/` |
+| **Simulator** | Monte-Carlo-Simulation, Parameter-Sweeps, Auto-Optimize, Dynamic Flex, Pflegebucket-Wirklogik | 87 JS-Module unter `app/simulator/` |
 | **Engine** | Kern-Berechnungslogik, Guardrails, Steuern | 24 MJS-Module unter `engine/`, ca. 4.240 Zeilen |
 | **Workers** | Parallelisierung für MC/Sweep/Optimizer-Pfade | 3 JS-Module unter `workers/`, ca. 757 Zeilen |
-| **Tests** | Unit- und Integrationstests | 74 `*.test.mjs` Dateien; 1659 Assertions im Lauf vom 2026-05-20 |
+| **Tests** | Unit- und Integrationstests | 76 `*.test.mjs` Dateien; 1748 Assertions im Lauf vom 2026-05-23 |
 | **Profile, Tranchen, Shared** | Profilverwaltung, Profilverbund, Tranchenstatus, gemeinsame Utilities | JS-Module unter `app/profile/`, `app/tranches/`, `app/shared/`, zusammen ca. 2.959 Zeilen |
 
 *Hinweis: Dieses Dokument beschreibt Konzepte und Architekturentscheidungen. Für konkrete Implementierungsdetails gelten die genannten Module und Tests als Referenz; exakte Code-Zeilen werden bewusst vermieden, weil sie nach Refactorings schnell veralten.*
@@ -67,6 +67,7 @@ Die Ruhestand-Suite kombiniert folgende Funktionen:
 12. **Ausgaben-Check** zur Kontrolle monatlicher Ausgaben gegen das Budget mit CSV-Import, Hochrechnung und Ampel-Visualisierung
 13. **Dynamic-Flex (VPW)** mit CAPE-basierter Renditeerwartung, Sterbetafeln, EMA-Glättung und Go-Go-Phase; integriert in Balance-App, Backtest, Monte Carlo, Sweep und Auto-Optimize
 14. **Auto-CAPE im Jahreswechsel** (US-Shiller-CAPE mit Fallback-Kette und non-blocking Fehlerbehandlung)
+15. **Pflegebucket** als gesperrte Geldmarkt-/Cash-Reserve mit Profildefinition, Simulator-Air-Gap, Pflegegrad-Trigger, Monte-Carlo-KPIs und Balance-Diagnose
 
 ## Bekannte Einschränkungen
 
@@ -219,13 +220,13 @@ Die Suite besteht heute nicht mehr nur aus zwei HTML-Oberflächen mit wenigen Be
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Aktuelle Bestandszahlen (2026-05-20):**
+**Aktuelle Bestandszahlen (2026-05-23):**
 
-- `app/balance/`: 34 JS-Module
-- `app/simulator/`: 86 JS-Module
+- `app/balance/`: 35 JS-Module
+- `app/simulator/`: 87 JS-Module
 - `engine/`: 24 MJS-Module
 - `workers/`: 3 JS-Module
-- `tests/`: 74 Testdateien
+- `tests/`: 76 Testdateien
 
 ## B.1.2 Tauri Desktop-App (Portable EXE)
 
@@ -524,7 +525,7 @@ Der Detailkatalog in `docs/reference/BALANCE_MODULES_README.md` ergänzt diese B
 | **Profilverbund-Anbindung** | `app/profile/profilverbund-balance.js`, `app/profile/profilverbund-balance-ui.js`, Profilmodule unter `app/profile/` | Profilauswahl, Multi-Profil-Aggregation, Entnahmeverteilung, Asset-Summaries, Profilwerte in Balance-Inputs |
 | **Tranchen-Anbindung** | `app/tranches/depot-tranchen-status.js`, `app/tranches/*manager*.js`, `depot-tranchen-manager.html` | Detailtranchen laden, aggregieren, in Inputs synchronisieren, Kursaktualisierung und Status-Badge bereitstellen |
 
-**Aktueller Bestand (2026-05-20):** 34 JS-Module unter `app/balance/`. Profilverbund-, Profil- und Tranchenmodule liegen bewusst außerhalb dieses Ordners und werden von Balance genutzt.
+**Aktueller Bestand (2026-05-23):** 35 JS-Module unter `app/balance/`. Profilverbund-, Profil- und Tranchenmodule liegen bewusst außerhalb dieses Ordners und werden von Balance genutzt.
 
 ### B.2.1a Zentrale Modulverantwortung
 
@@ -704,7 +705,7 @@ Der Simulator ist deshalb nicht nur ein UI-Wrapper um `EngineAPI.simulateSingleY
 | **Ergebnisdarstellung** | `simulator-results.js`, `results-metrics.js`, `results-renderers.js`, `results-formatting.js`, `simulator-formatting.js`, `simulator-main-helpers.js` | KPI-Karten, Szenario-/Backtest-Logs, CSV/JSON-Export, Spaltenkonfiguration, Formatierung |
 | **Daten und Shared Utilities** | `simulator-data.js`, `simulator-utils.js`, `cape-utils.js`, `app/shared/shared-formatting.js` | Historische Daten, Mortalität/Pflege/Stress-Presets, RNG/Statistik, CAPE-Kandidaten, gemeinsame Formatter |
 
-**Aktueller Bestand (2026-05-20):** 86 JS-Module unter `app/simulator/`. Profil-, Tranchen- und Shared-Module liegen teilweise außerhalb des Simulator-Ordners, sind aber Teil des fachlichen Datenflusses.
+**Aktueller Bestand (2026-05-23):** 87 JS-Module unter `app/simulator/`. Profil-, Tranchen- und Shared-Module liegen teilweise außerhalb des Simulator-Ordners, sind aber Teil des fachlichen Datenflusses.
 
 ### B.3.2 Hauptflüsse
 
@@ -989,7 +990,7 @@ Balance und Simulator nutzen die gleiche Erkennung für Bond-Tranchen. Der Simul
 
 ## B.5 Test-Suite und Validierungsregeln
 
-**Übersicht:** Die Test-Suite umfasst in der geprüften Arbeitskopie **74 `*.test.mjs`-Dateien**. Der Lauf vom 2026-05-20 ergab **1659 Assertions**, alle erfolgreich. Die Tests laufen ohne Jest/Mocha über native Node.js-ESM-Module und eigene globale Assertions (`assert`, `assertEqual`, `assertClose`).
+**Übersicht:** Die Test-Suite umfasst in der geprüften Arbeitskopie **76 `*.test.mjs`-Dateien**. Der Lauf vom 2026-05-23 ergab **1748 Assertions**, alle erfolgreich. Die Tests laufen ohne Jest/Mocha über native Node.js-ESM-Module und eigene globale Assertions (`assert`, `assertEqual`, `assertClose`).
 
 ### B.5.1 Test-Inventar
 
@@ -999,7 +1000,7 @@ Balance und Simulator nutzen die gleiche Erkennung für Bond-Tranchen. Der Simul
 | **Spending, VPW und 3-Bucket** | `spending-planner.test.mjs`, `spending-quantization.test.mjs`, `vpw-dynamic-flex.test.mjs`, `dynamic-flex-horizon.test.mjs`, `3bucket-config.test.mjs`, `3bucket-refill.test.mjs` | Guardrails, Rundung, VPW-Horizonte, Dynamic-Flex-Safety, 3-Bucket-Parameter und Bond-Refill |
 | **Transaktionen, Steuern, Tranchen** | `transaction-*.test.mjs`, `tax-settlement.test.mjs`, `core-tax-settlement.test.mjs`, `depot-tranches.test.mjs`, `tranchen-manager-*.test.mjs` | Verkäufe, Rebalancing, Gold/Liquidität, Rohaggregate, Jahres-Settlement, Cost-Basis- und Tranchenverwaltung |
 | **Balance-App** | `balance-smoke.test.mjs`, `balance-reader.test.mjs`, `balance-storage*.test.mjs`, `balance-annual-*.test.mjs`, `balance-diagnosis-*.test.mjs`, `balance-expenses.test.mjs`, `balance-renderer-*.test.mjs` | Initialisierung, DOM-Input, Storage/Snapshots, Jahresupdate, CAPE, Diagnose, Ausgaben-Check, Rendering |
-| **Simulator, Monte Carlo, Sweep, Optimierung** | `simulation.test.mjs`, `simulator-*.test.mjs`, `monte-carlo-*.test.mjs`, `auto-optimizer.test.mjs`, `auto-optimize-worker-contract.test.mjs`, `scenario-analyzer.test.mjs`, `scenarios.test.mjs`, `care-meta.test.mjs`, `portfolio.test.mjs` | Jahresloops, Backtest, MC-Sampling, Worker-Merge, Sweep, mehrphasige Auto-Optimize-Pipeline, Pflege, Szenarien, Portfolio |
+| **Simulator, Monte Carlo, Sweep, Optimierung** | `simulation.test.mjs`, `simulator-*.test.mjs`, `monte-carlo-*.test.mjs`, `auto-optimizer.test.mjs`, `auto-optimize-worker-contract.test.mjs`, `scenario-analyzer.test.mjs`, `scenarios.test.mjs`, `care-meta.test.mjs`, `health-bucket.test.mjs`, `portfolio.test.mjs` | Jahresloops, Backtest, MC-Sampling, Worker-Merge, Sweep, mehrphasige Auto-Optimize-Pipeline, Pflege, Pflegebucket, Szenarien, Portfolio |
 | **Profile und Profilverbund** | `profile-storage.test.mjs`, `profile-state.test.mjs`, `profile-navigation.test.mjs`, `profile-asset-values.test.mjs`, `profilverbund-*.test.mjs`, `simulator-multiprofile-aggregation.test.mjs` | Profilregistry, Navigation/State, Assetwerte, Multi-Profil-Aggregation, profilbezogene Tranchen |
 | **Worker, Utilities und Formatierung** | `worker-parity.test.mjs`, `worker-pool.test.mjs`, `utils.test.mjs`, `formatting.test.mjs`, `feature-flags.test.mjs` | deterministische Worker-Parität, Pool-Lifecycle, RNG/Statistik, Formatter, Feature-Flags |
 
@@ -1566,6 +1567,86 @@ const rngCareP2 = careMetaP2 ? rand.fork('CARE_P2') : null;
 | PG3 | 2.0× (100% erhöht) |
 | PG4 | 2.5× (150% erhöht) |
 | PG5 | 3.0× (200% erhöht) |
+
+### C.4.7 Pflegebucket als algorithmische Zweckbindung
+
+Der Pflegebucket erweitert die Pflegefall-Modellierung um eine optionale Selbstversicherungsreserve. Er ist keine zusätzliche Renditestrategie und keine Pflegeversicherung, sondern ein separater Haushalts-State: ein Geldmarkt-/Cash-Betrag, der für die normale Entnahmeplanung gesperrt wird und erst bei schwerem Pflegefall in den Jahreslauf eingreifen darf.
+
+**Fachlicher Zweck:**
+
+- Pflegekosten entstehen sprunghaft und oft spät im Lebenspfad.
+- Eine normale Liquiditätsreserve würde VPW, Runway und flexible Entnahmen erhöhen, obwohl der Betrag strategisch nicht konsumierbar ist.
+- Die Zweckbindung reduziert die operative Entnahmebasis und senkt damit in normalen Jahren den Konsumspielraum leicht.
+- In Pflegejahren kann die Reserve Notverkäufe aus Aktien/Gold vermeiden oder verringern.
+
+**Datenmodell:**
+
+```javascript
+healthBucket: {
+  enabled: boolean,
+  initialAmount: number,
+  assetSource: 'money_market_first_then_cash',
+  triggerMinGrade: 4,
+  triggerMode: 'OR' | 'AND',
+  coverageMode: 'care_additional_floor_only' | 'floor_when_care_active',
+  returnMode: 'cash_return',
+  targetMode: 'inflation_indexed_diagnostic'
+}
+```
+
+Die Definition liegt in der Profilpflege. Im Profilverbund gilt das Primary-Profil als Haushaltsdefinition; abweichende sekundäre Profildefinitionen werden gewarnt, aber nicht gemischt.
+
+**Carve-Out-Algorithmus:**
+
+1. Profile lesen und zum Haushalt aggregieren.
+2. Startportfolio inklusive Detailtranchen initialisieren.
+3. Pflegebucket aus cash-nahen Quellen ausgliedern:
+   - Geldmarkt-Tranchen per FIFO nach Kaufdatum,
+   - bei ungültigem Kaufdatum stabiler Fallback,
+   - danach ungetranchter Geldmarkt,
+   - danach Tagesgeld/Cash.
+4. `healthBucketGeldmarkt`, `healthBucketTranches`, `healthBucketCashAmount` und `healthBucketMeta` setzen.
+5. Operative Liquidität, Geldmarkt und Tagesgeld um den ausgegliederten Betrag reduzieren.
+
+Aktien, Gold und Bonds werden in Version 1 nicht automatisch umgeschichtet. Reicht Geldmarkt/Cash nicht aus, wird der Bucket auf den verfügbaren Betrag gekappt und als Warnung in Log und UI transportiert.
+
+**Engine-Air-Gap:**
+
+Der Bucket wird nicht als `aktuelleLiquiditaet` an die Engine gegeben. Dadurch wirken VPW, Guardrails, Runway-Ziel, Ziel-Liquidität und Transaktionslogik nur auf frei verfügbares Vermögen. Fachlich entspricht das einem Liability-Matching-Baustein: Die Pflegeverpflichtung wird vom Konsumportfolio separiert.
+
+**Trigger-Algorithmus:**
+
+```javascript
+function isHealthBucketTriggered({ careP1, careP2, minGrade, mode }) {
+  const p1 = careP1?.active && careP1?.grade >= minGrade;
+  const p2 = careP2?.active && careP2?.grade >= minGrade;
+  return mode === 'AND' ? p1 && p2 : p1 || p2;
+}
+```
+
+Die individuellen Pflege-Metadaten laufen über `householdContext.care.p1` und `.p2`, damit P1/P2-Trigger auch im Mehrpersonen-Haushalt korrekt funktionieren.
+
+**Deckungsalgorithmus:**
+
+Der Standard `care_additional_floor_only` begrenzt die Nutzung auf pflegebedingte Zusatzlücken. Damit wird verhindert, dass der Bucket normale Lebenshaltungskosten quersubventioniert. Der alternative Modus `floor_when_care_active` erlaubt bei aktivem Pflege-Trigger die Deckung des gesamten Floor-Shortfalls, wenn die praktische Trennung zwischen Basisbedarf und Pflegebedarf im Jahr zu grob ist.
+
+Der Einbaupunkt liegt vor der Forced-Sale-Logik. Wenn der Trigger aktiv ist, erhöht der genutzte Bucket-Betrag die operative Liquidität und reduziert den Notverkaufsbedarf. Erst ein verbleibender Shortfall führt zu Verkäufen aus Risikoanlagen.
+
+**Inflationsdiagnose:**
+
+Der Zielbetrag kann inflationsindexiert ausgewiesen werden:
+
+```javascript
+targetInflationAdjusted = initialAmount * cumulativeInflationFactor;
+realCoveragePct = bucketEnd / targetInflationAdjusted;
+targetGap = max(0, targetInflationAdjusted - bucketEnd);
+```
+
+Dies ist bewusst eine Diagnose, kein automatisches Refill. Die Suite zeigt Kaufkraftlücke und reale Zieldeckung, schichtet aber nicht automatisch zurück in den Bucket.
+
+**Steuerliche Modellgrenze:**
+
+Version 1 behandelt den Bucket-Verbrauch cash-like. Die ausgegliederten Geldmarkt-Tranchen behalten Herkunft und Cost Basis für Transparenz, aber der Verbrauch erzeugt noch keine eigenen Tax-Aggregate. Das ist eine dokumentierte Vereinfachung; eine spätere Variante kann Bucket-Verkäufe in das bestehende Jahres-Settlement integrieren.
 
 ---
 
@@ -2526,6 +2607,7 @@ rt
 | **Dynamische Guardrails** | ✅ 7 Regime | ❌ | ❌ | ⚠️ | ✅ | ❌ |
 | **DE-Steuern (vollst.)** | ✅ | ⚠️ | ❌ | ❌ | ❌ | ❌ |
 | **Pflegefall-Modell** | ✅ PG1-5 | ⚠️ | ⚠️ | ⚠️ | ❌ | ❌ |
+| **Pflegebucket / Selbstversicherung** | ✅ gesperrte Geldmarkt-/Cash-Reserve | ⚠️ allgemeine Healthcare-Budgets | ⚠️ allgemeine Healthcare-Budgets | ⚠️ Healthcare-Modul | ❌ | ❌ |
 | **Multi-Profil** | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
 | **Tranchen-Management** | ✅ FIFO+Online | ❌ | ⚠️ | ❌ | ❌ | ❌ |
 | **Parameter-Sweeps** | ✅ Heatmap | ❌ | ❌ | ⚠️ | ❌ | ❌ |
@@ -2554,6 +2636,29 @@ rt
 11. **Ausgaben-Check mit CSV-Import** — Monatliches Budget-Tracking gegen Floor+Flex, Median-basierte Hochrechnung, Ampel-Visualisierung, Profilverbund-Integration
 12. **Echte Multi-Plattform-Unterstützung** — Native Desktop-Apps für Windows (.exe), macOS (.app) und Linux (AppImage/deb) aus einer Codebasis, plus Browser-Fallback mit Start-Scripts
 13. **Dynamic Flex (VPW) mit Sterbetafeln** — Variable Percentage Withdrawal mit CAPE-basierter Renditeerwartung, EMA-Glättung, Mortality-Table-Horizont (Single/Joint, Mean/Quantil) und Go-Go-Phase. Integriert in Balance-App, Backtest, Monte Carlo, Parameter-Sweep und Auto-Optimize. Kein anderes verglichenes Tool kombiniert VPW mit Guardrails und deutscher Steuer.
+14. **Pflegebucket mit Engine-Air-Gap** — Zweckgebundene Geldmarkt-/Cash-Reserve wird aus der VPW-/Runway-Basis herausgerechnet, bei Pflegegrad-Triggern freigegeben und in Backtest/Monte Carlo separat ausgewiesen.
+
+## D.5 Einordnung des Pflegebuckets
+
+Der Pflegebucket liegt zwischen klassischer Liquiditätsreserve, mentalem Zweckkonto und Versicherungslösung:
+
+| Ansatz | Wirkung | Vorteil | Grenze |
+|--------|---------|---------|--------|
+| Normale Liquidität | zählt vollständig für Runway/Entnahme | einfach, jederzeit verfügbar | kann Konsumspielraum überschätzen, wenn Geld mental für Pflege reserviert ist |
+| Notgroschen | grobe Reserve außerhalb der Planung | robust gegen kurzfristige Schocks | meist nicht mit Pflegegrad, Inflation und Monte Carlo verknüpft |
+| Geldmarkt-ETF-Reserve | risikoarm, liquide, verzinst | passt zur Bucket-Quelle | steuerliche Detailbehandlung bei Verkäufen muss modelliert werden |
+| Pflegezusatzversicherung | Risikotransfer an Versicherer | kann extreme Pflegekosten abdecken | Prämien, Bedingungen, Annahme-/Leistungsrisiken, keine direkte Portfoliointegration |
+| Pflegebucket der Suite | algorithmisch gesperrte Selbstversicherung | Air Gap gegen VPW-Überfreigabe, weniger Forced Sales in Stressjahren | keine Garantie, Opportunitätskosten, Version 1 ohne automatisches Refill |
+
+Die Stärke des Buckets ist nicht, dass er mehr Vermögen erzeugt. Er erhöht Modelltreue, wenn ein Haushalt einen Teil des Geldmarkts strategisch nicht konsumieren will. Bei hohem Gesamtvermögen kann er aus reiner Erfolgsquotensicht unnötig wirken; aus Governance-Sicht kann er dennoch sinnvoll sein, weil er Pflegekosten nicht erst im Krisenjahr aus Risikoanlagen finanzieren muss.
+
+**Trade-offs:**
+
+- Die operative VPW-/Runway-Basis sinkt, dadurch sind normale Flex-Entnahmen etwas niedriger.
+- Das Renditepotenzial sinkt gegenüber einer vollständigen Risikoanlage.
+- In Pflege- und Crashkombinationen kann die Notverkaufsquote sinken.
+- Extreme Pflege-, Langlebigkeits- oder Marktpfade werden nicht garantiert abgefangen.
+- Der inflationsindexierte Zielwert verhindert Selbsttäuschung über reale Kaufkraft, löst aber keinen automatischen Nachfüllmechanismus aus.
 
 ---
 
@@ -2633,6 +2738,25 @@ rt
 
 **Status:** ✅ VPW implementiert mit CAPE-basierter Rendite, Sterbetafel-Horizont, EMA-Glättung und vollständiger Guardrail-Integration
 
+## E.7 Pflegebucket, Mental Accounting und Self-Insurance
+
+Der Pflegebucket verbindet mehrere Forschungs- und Praxislinien, ohne selbst eine versicherungsmathematisch kalibrierte Pflegeversicherung zu sein.
+
+**Liquiditätsreserven und Sequence-of-Returns-Risk:** In der Entnahmephase reduzieren risikoarme Reserven den Zwang, Risikoanlagen in schlechten Marktphasen zu verkaufen. Der Pflegebucket nutzt diese Logik gezielt für Pflegejahre: Erst wenn ein Pflegegrad-Trigger vorliegt, darf die Reserve Forced Sales ersetzen. Dadurch wirkt er besonders in Pfaden, in denen Pflegekosten und schlechte Märkte zusammenfallen.
+
+**Mental Accounting:** Haushalte reservieren oft mental Kapital für bestimmte Risiken. Wenn eine Simulation dieses Kapital als frei verfügbare Liquidität behandelt, überschätzt sie Flex-Spielraum und VPW-Basis. Der Air-Gap-Ansatz bildet diese Zweckbindung algorithmisch ab: Das Geld existiert im Gesamtvermögen, aber nicht im Konsumportfolio.
+
+**Self-Insurance vs. Versicherung:** Der Bucket ist Selbstversicherung. Er vermeidet Prämien und Vertragsrisiken, aber das Risiko bleibt beim Haushalt. Eine Pflegezusatzversicherung kann Tail-Risiken transferieren; der Bucket kann nur bis zur reservierten Höhe leisten. Für hohe Vermögen kann Selbstversicherung rational sein, wenn die Opportunitätskosten akzeptiert werden. Für kleinere Vermögen kann sie zu viel Kapital binden und dennoch nicht ausreichend schützen.
+
+**Heuristischer Charakter:** Der Startbetrag ist eine Planungsannahme, keine aktuarische Prämienkalkulation. Pflegekosten, Leistungsänderungen der Pflegeversicherung, regionale Heimkosten, Dauer, Steuerlast und familiäre Unterstützung bleiben unsicher. Die Suite macht diese Unsicherheit sichtbar, indem sie Nutzung, Erschöpfung, Zieldeckung und Ziellücke über Monte Carlo ausweist.
+
+**Modellgrenzen in Version 1:**
+
+- Kein automatisches Refill des inflationsindexierten Zielwerts.
+- Bucket-Verbrauch wird cash-like vereinfacht und noch nicht als eigener Geldmarkt-ETF-Verkauf im Tax-Settlement verbucht.
+- Balance zeigt den Bucket diagnostisch, entsperrt ihn aber nicht automatisch, solange kein aktueller Pflegegrad-Ist-Zustand gepflegt wird.
+- Die fachliche Angemessenheit hängt vom Vermögensspielraum ab: Bei sehr hohem Vermögen ist der Bucket eher Governance und Stresshygiene; bei engem Vermögen kann er normale Entnahmen zu stark drücken.
+
 ---
 
 # Appendix: Modul-Inventar
@@ -2662,7 +2786,7 @@ rt
 | Fach-UI | `simulator-ui-pflege.js`, `simulator-ui-rente.js`, `simulator-main-accumulation.js`, `simulator-main-dynamic-flex.js`, `simulator-main-3bucket.js`, `simulator-main-stress.js` | Pflege-, Renten-, Anspar-, VPW-, 3-Bucket- und Stress-Konfiguration |
 | Input-Mapping | `simulator-input-*.js`, `simulator-profile-inputs.js` | DOM-/Profildaten in strukturierte Simulator-Inputs übersetzen |
 | Portfolio/Tranchen | `simulator-portfolio*.js`, `simulator-year-portfolio.js`, `simulator-portfolio-tranches.js` | Startportfolio, Detailtranchen, Aktien/Gold/Bonds, Renditefortschreibung und Verkäufe |
-| Jahressimulation | `simulator-engine-direct.js`, `simulator-engine-wrapper.js`, `simulator-engine-input.js`, `simulator-household-pension.js`, `simulator-accumulation-year.js`, `simulator-year-result.js` | Engine-Aufruf je Jahr, Rente/Witwenlogik, Ansparphase, Ergebnis- und Logshape |
+| Jahressimulation | `simulator-engine-direct.js`, `simulator-engine-wrapper.js`, `simulator-engine-input.js`, `simulator-household-pension.js`, `simulator-accumulation-year.js`, `simulator-health-bucket.js`, `simulator-year-result.js` | Engine-Aufruf je Jahr, Rente/Witwenlogik, Ansparphase, Pflegebucket, Ergebnis- und Logshape |
 | Nachsteuerung | `simulator-forced-sale.js`, `simulator-tax-recompute.js`, `simulator-bond-refill.js` | Forced Sales, Steuer-Recompute nach Zusatzverkäufen, 3-Bucket-Bond-Refill |
 | Monte Carlo | `simulator-monte-carlo.js`, `monte-carlo-runner.js`, `mc-*.js`, `monte-carlo-aggregates.js`, `scenario-analyzer.js` | Runs, Sampling, Life-State, Stressmetriken, Logs und Aggregation |
 | Backtest/Sweep/Optimize | `simulator-backtest.js`, `simulator-sweep.js`, `sweep-runner.js`, `simulator-heatmap.js`, `auto_optimize*.js`, `simulator-visualization.js` | Historische Pfade, Sensitivitätsraster, Heatmaps, Optimierung, Pareto/Sensitivity |
@@ -2683,6 +2807,7 @@ rt
 |-------|-----|----------|
 | `balance-main.js` | ~500 | Orchestrierung, Update-Zyklus |
 | `balance-reader.js` | ~300 | DOM-Input-Lesung |
+| `balance-health-bucket.js` | ~120 | Pflegebucket-Diagnose, freie vs. gesperrte Liquidität, diagnostic-only Policy |
 | `balance-storage.js` | ~400 | localStorage, Snapshots |
 | `balance-expenses.js` | **646** | Ausgaben-Check mit CSV-Import, Budget-Tracking |
 | `balance-guardrail-reset.js` | ~70 | Auto-Reset bei kritischen Änderungen |
@@ -2770,4 +2895,4 @@ rt
 
 ---
 
-*Technische Dokumentation der Ruhestand-Suite. Algorithmen-Beschreibungen sind konzeptionell; konkrete Implementierungsdetails stehen in den genannten Modulen und Tests. Dokumentstand: 2026-05-20.*
+*Technische Dokumentation der Ruhestand-Suite. Algorithmen-Beschreibungen sind konzeptionell; konkrete Implementierungsdetails stehen in den genannten Modulen und Tests. Dokumentstand: 2026-05-23.*

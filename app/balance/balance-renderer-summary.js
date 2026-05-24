@@ -53,6 +53,7 @@ export class SummaryRenderer {
      */
     renderOverview(ui = {}) {
         this.renderMiniSummary(ui);
+        this.renderHealthBucket(ui.healthBucketDiagnostics);
 
         // Defensiver Zugriff: Jeder Bereich wird nur befüllt, wenn die Daten vorhanden sind.
         if (this.dom?.outputs?.depotwert && typeof ui.depotwertGesamt === 'number') {
@@ -190,6 +191,53 @@ export class SummaryRenderer {
 
         if (this.dom?.outputs?.miniSummary) {
             this.dom.outputs.miniSummary.replaceChildren(fragment);
+        }
+    }
+
+    renderHealthBucket(diagnostics = null) {
+        const container = this.dom?.outputs?.healthBucketSummary;
+        if (!container) return;
+        container.replaceChildren();
+        if (!diagnostics?.enabled) {
+            container.style.display = 'none';
+            return;
+        }
+
+        container.style.display = 'grid';
+        const makeItem = (label, value, meta = '') => {
+            const item = document.createElement('div');
+            item.className = 'health-bucket-item';
+            const labelEl = document.createElement('span');
+            labelEl.className = 'label';
+            labelEl.textContent = label;
+            const valueEl = document.createElement('strong');
+            valueEl.textContent = value;
+            item.append(labelEl, valueEl);
+            if (meta) {
+                const metaEl = document.createElement('small');
+                metaEl.textContent = meta;
+                item.append(metaEl);
+            }
+            return item;
+        };
+
+        const coverage = diagnostics.targetCoveragePct === null
+            ? 'n/a'
+            : UIUtils.formatPercentValue(diagnostics.targetCoveragePct, { fractionDigits: 0, invalid: 'n/a' });
+        container.append(
+            makeItem('Pflegebucket', UIUtils.formatCurrency(diagnostics.lockedAmount), `Ziel: ${UIUtils.formatCurrency(diagnostics.targetInflationAdjusted)}`),
+            makeItem('Operative Liquidität', UIUtils.formatCurrency(diagnostics.operativeLiquidity), `Brutto: ${UIUtils.formatCurrency(diagnostics.grossLiquidity)}`),
+            makeItem('Zieldeckung', coverage, diagnostics.targetGap > 0 ? `Lücke: ${UIUtils.formatCurrency(diagnostics.targetGap)}` : 'Ziel gedeckt')
+        );
+        const policy = document.createElement('div');
+        policy.className = 'health-bucket-policy';
+        policy.textContent = diagnostics.releaseReason || 'Keine automatische Pflegebucket-Freigabe in Balance.';
+        container.appendChild(policy);
+        if (diagnostics.warning) {
+            const warning = document.createElement('div');
+            warning.className = 'health-bucket-warning';
+            warning.textContent = diagnostics.warning;
+            container.appendChild(warning);
         }
     }
 

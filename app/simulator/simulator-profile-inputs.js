@@ -11,6 +11,7 @@ import { SUPPORTED_PFLEGE_GRADES } from './simulator-data.js';
 import { STRATEGY_OPTIONS } from '../../types/strategy-options.js';
 import {
     PROFILE_VALUE_KEYS,
+    parseProfileHealthBucketFromData,
     parseProfileOverridesFromData,
     parseStoredBalanceInputsFromData,
     parseStoredTranchesFromData
@@ -143,6 +144,7 @@ export function buildSimulatorInputsFromProfileData(profileData) {
     const trancheTotals = sumTrancheTotals(detailedTranches);
     const grade1Config = pflegeGradeConfigs[1] || { zusatz: 0, flexCut: 1 };
     const overrides = parseProfileOverridesFromData(profileData);
+    const healthBucket = parseProfileHealthBucketFromData(profileData);
     const goldOverrides = {
         goldAktiv: overrides.profileGoldAktiv,
         goldZielProzent: overrides.profileGoldZiel,
@@ -277,6 +279,15 @@ export function buildSimulatorInputsFromProfileData(profileData) {
         pflegeMaxDauer: readInt(profileData, simKey('pflegeMaxDauer'), 10),
         pflegeKostenDrift: readNumber(profileData, simKey('pflegeKostenDrift'), 0) / 100,
         pflegeRegionalZuschlag: readNumber(profileData, simKey('pflegeRegionalZuschlag'), 0) / 100,
+        healthBucket,
+        healthBucketEnabled: healthBucket.enabled,
+        healthBucketInitialAmount: healthBucket.initialAmount,
+        healthBucketAssetSource: healthBucket.assetSource,
+        healthBucketTriggerMinGrade: healthBucket.triggerMinGrade,
+        healthBucketTriggerMode: healthBucket.triggerMode,
+        healthBucketCoverageMode: healthBucket.coverageMode,
+        healthBucketReturnMode: healthBucket.returnMode,
+        healthBucketTargetMode: healthBucket.targetMode,
         decumulation: {
             mode: decumulationMode,
             bondTargetFactor: Number.isFinite(bondTargetFactor) ? Math.max(0, bondTargetFactor) : null,
@@ -398,6 +409,15 @@ function ensureValueMatch(list, selector) {
     if (!list.length) return true;
     const first = selector(list[0]);
     return list.every(item => selector(item) === first);
+}
+
+function stableStringify(value) {
+    if (!value || typeof value !== 'object') return JSON.stringify(value);
+    const sorted = {};
+    Object.keys(value).sort().forEach(key => {
+        sorted[key] = value[key];
+    });
+    return JSON.stringify(sorted);
 }
 
 function profileAssetTotal(inputs) {
@@ -539,6 +559,9 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
     }
     if (!ensureValueMatch(inputsList, i => i.pflegeModellTyp)) {
         warnings.push('Pflege-Modell unterscheidet sich zwischen Profilen. Es wird das Hauptprofil verwendet.');
+    }
+    if (!ensureValueMatch(inputsList, i => stableStringify(i.healthBucket || null))) {
+        warnings.push('Pflegebucket-Konfiguration unterscheidet sich zwischen Profilen. Es wird das Hauptprofil verwendet.');
     }
     // Dynamic-Flex-Parameter werden im Simulator explizit aus den aktuellen Rahmendaten
     // gelesen und nicht aus Profil-Differenzen im Profilverbund abgeleitet.

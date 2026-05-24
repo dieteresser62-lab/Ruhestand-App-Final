@@ -260,7 +260,13 @@ export function runSweepChunk({
 
                 const { zusatzFloor: careFloor } = calcCareCost(careMeta, null);
 
-                const result = simulateOneYear(simState, adjustedInputs, yearData, simulationsJahr, careMeta, careFloor, null, 1.0, engine);
+                const householdContext = {
+                    p1Alive: true,
+                    p2Alive: false,
+                    widowBenefits: { p1FromP2: false, p2FromP1: false },
+                    care: { p1: careMeta, p2: null }
+                };
+                const result = simulateOneYear(simState, adjustedInputs, yearData, simulationsJahr, careMeta, careFloor, householdContext, 1.0, engine);
 
                 if (result?.error) {
                     const firstFieldError = Array.isArray(result.error?.errors) && result.error.errors.length > 0

@@ -15,11 +15,20 @@ export function createMonteCarloRunMetrics(runCount) {
         totalYearsSafetyStage1plus: 0,
         totalYearsSafetyStage2: 0,
         totalTaxSavedByLossCarry: 0,
+        healthBucketEnabledCount: 0,
+        healthBucketUsedCount: 0,
+        healthBucketDepletedCount: 0,
+        totalHealthBucketUsed: 0,
         entryAges: [],
         entryAgesP2: [],
         careDepotCosts: [],
         endWealthWithCareList: [],
         endWealthNoCareList: [],
+        healthBucketUsedAmounts: [],
+        healthBucketEndAmounts: [],
+        healthBucketCoveragePct: [],
+        healthBucketTargetGaps: [],
+        healthBucketInterestAmounts: [],
         p1CareYearsArr: new Uint16Array(runCount),
         p2CareYearsArr: new Uint16Array(runCount),
         bothCareYearsArr: new Uint16Array(runCount),
@@ -61,6 +70,12 @@ export function recordMonteCarloRunOutcome(metrics, {
     careMetaP2,
     runSafetyStage1Ever,
     runSafetyStage2Ever,
+    healthBucketEnabledThisRun = false,
+    healthBucketUsedThisRun = 0,
+    healthBucketEndThisRun = 0,
+    healthBucketCoveragePctThisRun = null,
+    healthBucketTargetGapThisRun = 0,
+    healthBucketInterestThisRun = 0,
     currentRunLog
 }) {
     const {
@@ -108,6 +123,23 @@ export function recordMonteCarloRunOutcome(metrics, {
     if (p2CareYears > 0) metrics.p2TriggeredCount++;
     if (runSafetyStage1Ever) metrics.runsSafetyStage1Triggered++;
     if (runSafetyStage2Ever) metrics.runsSafetyStage2Triggered++;
+    if (healthBucketEnabledThisRun) {
+        metrics.healthBucketEnabledCount++;
+        metrics.healthBucketEndAmounts.push(healthBucketEndThisRun);
+        metrics.healthBucketTargetGaps.push(healthBucketTargetGapThisRun);
+        if (Number.isFinite(Number(healthBucketCoveragePctThisRun))) {
+            metrics.healthBucketCoveragePct.push(Number(healthBucketCoveragePctThisRun));
+        }
+        if (healthBucketEndThisRun <= 0) metrics.healthBucketDepletedCount++;
+    }
+    if (healthBucketUsedThisRun > 0) {
+        metrics.healthBucketUsedCount++;
+        metrics.healthBucketUsedAmounts.push(healthBucketUsedThisRun);
+        metrics.totalHealthBucketUsed += healthBucketUsedThisRun;
+    }
+    if (healthBucketInterestThisRun > 0) {
+        metrics.healthBucketInterestAmounts.push(healthBucketInterestThisRun);
+    }
 
     metrics.runMeta.push({
         index: runIdx,
@@ -117,6 +149,10 @@ export function recordMonteCarloRunOutcome(metrics, {
         careEverActive,
         totalCareYears: p1CareYears + p2CareYears,
         totalCareCosts: Math.max(0, depotOnlyStart - depotOnlyEnd),
+        healthBucketUsed: healthBucketUsedThisRun,
+        healthBucketEnd: healthBucketEndThisRun,
+        healthBucketCoveragePct: healthBucketCoveragePctThisRun,
+        healthBucketTargetGap: healthBucketTargetGapThisRun,
         maxKuerzung: kpiMaxKuerzungDieserLauf,
         jahreOhneFlex,
         logDataRows: currentRunLog ? [...currentRunLog] : [],
@@ -175,7 +211,11 @@ export function finalizeMonteCarloRunMetrics(metrics) {
             p2TriggeredCount: metrics.p2TriggeredCount,
             runsSafetyStage1Triggered: metrics.runsSafetyStage1Triggered,
             runsSafetyStage2Triggered: metrics.runsSafetyStage2Triggered,
-            totalTaxSavedByLossCarry: metrics.totalTaxSavedByLossCarry
+            totalTaxSavedByLossCarry: metrics.totalTaxSavedByLossCarry,
+            healthBucketEnabledCount: metrics.healthBucketEnabledCount,
+            healthBucketUsedCount: metrics.healthBucketUsedCount,
+            healthBucketDepletedCount: metrics.healthBucketDepletedCount,
+            totalHealthBucketUsed: metrics.totalHealthBucketUsed
         },
         lists: {
             entryAges: metrics.entryAges,
@@ -186,7 +226,12 @@ export function finalizeMonteCarloRunMetrics(metrics) {
             p1CareYearsTriggered: metrics.p1CareYearsTriggered,
             p2CareYearsTriggered: metrics.p2CareYearsTriggered,
             bothCareYearsOverlapTriggered: metrics.bothCareYearsOverlapTriggered,
-            maxAnnualCareSpendTriggered: metrics.maxAnnualCareSpendTriggered
+            maxAnnualCareSpendTriggered: metrics.maxAnnualCareSpendTriggered,
+            healthBucketUsedAmounts: metrics.healthBucketUsedAmounts,
+            healthBucketEndAmounts: metrics.healthBucketEndAmounts,
+            healthBucketCoveragePct: metrics.healthBucketCoveragePct,
+            healthBucketTargetGaps: metrics.healthBucketTargetGaps,
+            healthBucketInterestAmounts: metrics.healthBucketInterestAmounts
         },
         allRealWithdrawalsSample: metrics.allRealWithdrawalsSample,
         worstRun,

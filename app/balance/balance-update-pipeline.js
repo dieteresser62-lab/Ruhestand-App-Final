@@ -5,6 +5,7 @@
 "use strict";
 
 import { shouldResetGuardrailState } from './balance-guardrail-reset.js';
+import { buildBalanceHealthBucketDiagnostics } from './balance-health-bucket.js';
 
 export function prepareEngineLastState(persistentState = {}, inputData = {}) {
     const previousLastState = persistentState.lastState || null;
@@ -17,13 +18,15 @@ export function prepareEngineLastState(persistentState = {}, inputData = {}) {
 }
 
 export function buildBalanceRendererPayload(modelResult = {}, inputData = {}) {
+    const cumulativeInflationFactor = modelResult?.diagnosis?.keyParams?.cumulativeInflationFactor;
     return {
         ...(modelResult.ui || {}),
-        input: inputData
+        input: inputData,
+        healthBucketDiagnostics: buildBalanceHealthBucketDiagnostics(inputData, { cumulativeInflationFactor })
     };
 }
 
-export function enrichBalanceDiagnosisPayload({ formattedDiagnosis, modelResult = {}, threeBucketDiagnosis = null }) {
+export function enrichBalanceDiagnosisPayload({ formattedDiagnosis, modelResult = {}, inputData = {}, threeBucketDiagnosis = null }) {
     if (!formattedDiagnosis) return formattedDiagnosis;
     if (modelResult.ui?.action?.transactionDiagnostics) {
         formattedDiagnosis.transactionDiagnostics = modelResult.ui.action.transactionDiagnostics;
@@ -32,6 +35,11 @@ export function enrichBalanceDiagnosisPayload({ formattedDiagnosis, modelResult 
         formattedDiagnosis.keyParams = formattedDiagnosis.keyParams || {};
         formattedDiagnosis.keyParams.vpw = modelResult.ui.vpw;
     }
+    formattedDiagnosis.keyParams = formattedDiagnosis.keyParams || {};
+    formattedDiagnosis.keyParams.healthBucket = buildBalanceHealthBucketDiagnostics(
+        inputData,
+        { cumulativeInflationFactor: formattedDiagnosis.keyParams.cumulativeInflationFactor }
+    );
     if (threeBucketDiagnosis) {
         formattedDiagnosis.threeBucket = threeBucketDiagnosis;
     }
@@ -55,4 +63,3 @@ export function calculateExpensesBudget({ fixedIncomeAnnual = 0, monthlyWithdraw
         annualBudget: monthlyBudget * 12
     };
 }
-

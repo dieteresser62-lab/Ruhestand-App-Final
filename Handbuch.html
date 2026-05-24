@@ -374,6 +374,8 @@
                         </li>
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-tranchen">Depot-Tranchen</a>
                         </li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#simulator-pflegebucket">Pflegebucket</a>
+                        </li>
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-start">Simulation starten</a>
                         </li>
                         <li><a class="toc-link" data-tab-target="manual" href="#simulator-ergebnisse">Ergebnisse
@@ -389,6 +391,8 @@
                         <li><a class="toc-link" data-tab-target="manual" href="#balance-jahresupdate">Jahres-Update</a>
                         </li>
                         <li><a class="toc-link" data-tab-target="manual" href="#balance-diagnose">Diagnose</a></li>
+                        <li><a class="toc-link" data-tab-target="manual" href="#balance-pflegebucket">Pflegebucket</a>
+                        </li>
                         <li><a class="toc-link" data-tab-target="manual"
                                 href="#balance-handlungsschritte">Handlungsschritte</a></li>
                         <li><a class="toc-link" data-tab-target="manual" href="#balance-kapitalfluss">Kapitalfluss</a>
@@ -894,6 +898,30 @@
                             </li>
                         </ul>
                     </div>
+                    <div class="detail-block" id="simulator-pflegebucket">
+                        <h3>Pflegebucket</h3>
+                        <p>Der Pflegebucket ist eine optional gesperrte Geldmarkt-/Cash-Reserve für schwere
+                            Pflegefälle. Er wird in der Profilpflege definiert und im Simulator nicht als freie
+                            Liquidität behandelt.</p>
+                        <ul
+                            style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Wo pflegen:</strong> In der Profil-/Tranchenpflege als
+                                „Pflegebucket“ aktivieren und Zielbetrag, Mindestpflegegrad sowie Deckungsmodus
+                                festlegen.</li>
+                            <li><strong>Quelle:</strong> Der Simulator bildet den Bucket zuerst aus
+                                Geldmarkt-Tranchen, danach aus ungetranchtem Geldmarkt und zuletzt aus Tagesgeld.
+                                Aktien, Gold und Bonds werden dafür nicht automatisch verkauft.</li>
+                            <li><strong>Wirkung:</strong> VPW, Runway und Ziel-Liquidität rechnen nur mit operativer
+                                Liquidität. Der gesperrte Betrag erhöht daher nicht den normalen Konsumspielraum.</li>
+                            <li><strong>Freigabe:</strong> Bei aktivem Pflege-Trigger kann der Bucket vor
+                                Notverkäufen Liquiditätslücken decken. Standard ist Pflegegrad 4 oder höher bei
+                                Person 1 oder Person 2.</li>
+                            <li><strong>Warnungen:</strong> Reichen Geldmarkt/Cash beim Start nicht aus, wird der
+                                Bucket gekappt und im Log als Warnung angezeigt.</li>
+                            <li><strong>Inflation:</strong> Der inflationsangepasste Zielwert ist eine Diagnose. Die
+                                Suite zeigt Zieldeckung und Lücke, füllt den Bucket aber nicht automatisch nach.</li>
+                        </ul>
+                    </div>
                     <div class="detail-block" id="simulator-start">
                         <h3>Simulation starten</h3>
                         <p>Klicken Sie auf <strong>"Simulation starten"</strong>. Die Engine berechnet mehrere hundert
@@ -1050,6 +1078,22 @@
                             Nachvollziehbarkeit im Diagnosebereich „Schlüsselparameter“: Status, VPW-Rate, Horizont,
                             ER(CAPE), ER(real), Go-Go-Status, VPW-Basisvermögen, VPW-Rahmen, freigegebenen Flex und
                             nicht genutzten Rahmen. Die Hauptansicht bleibt bewusst kompakt.</p>
+                    </div>
+                    <div class="detail-block" id="balance-pflegebucket">
+                        <h3>Pflegebucket</h3>
+                        <p>Die Balance-App liest dieselbe Pflegebucket-Definition aus dem Profil und zeigt sie als
+                            Zweckbindung neben der freien Liquidität. Sie entsperrt den Bucket in Version 1 nicht
+                            automatisch.</p>
+                        <ul
+                            style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Anzeige:</strong> Brutto-Liquidität, gesperrter Pflegebetrag, operative
+                                Liquidität, Zieldeckung und Ziellücke erscheinen in Übersicht und Diagnose.</li>
+                            <li><strong>Keine automatische Freigabe:</strong> Balance kennt derzeit keinen aktuellen
+                                Pflegegrad-Ist-Zustand. Deshalb bleibt die Policy <code>diagnostic_only</code>.</li>
+                            <li><strong>Jahresplanung:</strong> Reale Pflegeausgaben tragen Sie weiterhin über Bedarf
+                                und Jahresplanung ein. Die Zweckbindung zeigt, welcher Liquiditätsanteil nicht normal
+                                verfügbar ist.</li>
+                        </ul>
                     </div>
                     <div class="detail-block" id="balance-handlungsschritte">
                         <h3>Handlungsschritte</h3>
@@ -1257,6 +1301,8 @@
                         <li><strong>Profil löschen:</strong> Profil auswählen und löschen (mit Sicherheitsabfrage).</li>
                         <li><strong>Backup erstellen/importieren:</strong> Die gesamte Profil-Registry als JSON
                             exportieren oder wiederherstellen.</li>
+                        <li><strong>Pflegebucket:</strong> Optionalen Pflegebucket als Haushaltsreserve im Profil
+                            pflegen. Bei Paaren ist das Hauptprofil die maßgebliche Definition.</li>
                     </ul>
                     <div class="tip-box"
                         style="background: #e8f4f8; padding: 1rem; border-radius: 8px; margin-top: 1rem;">
@@ -1272,6 +1318,8 @@
                             aktiv).</li>
                         <li><strong>Aggregation:</strong> Tagesgeld, Geldmarkt, Depot, Gold und Renten werden summiert.
                         </li>
+                        <li><strong>Pflegebucket:</strong> Die Balance-App zeigt den Pflegebucket als gesperrte
+                            Zweckbindung und zieht ihn nicht als automatische Entnahmequelle heran.</li>
                         <li><strong>Verteilungsmodus:</strong> Steueroptimiert, proportional oder runway-first.</li>
                         <li><strong>Handlungsschritte:</strong> Quellen/Verwendungen werden pro Profil getrennt
                             dargestellt.</li>
@@ -1286,6 +1334,9 @@
                             gefüllt.</li>
                         <li><strong>Personen & Renten:</strong> Ergeben sich automatisch aus den Profilen (kein
                             separater Tab).</li>
+                        <li><strong>Pflegebucket:</strong> Der Simulator übernimmt die Definition des Hauptprofils,
+                            gliedert den Bucket erst nach der Haushaltsaggregation aus und warnt bei abweichenden
+                            sekundären Profildefinitionen.</li>
                     </ol>
                     <div class="warning-box"
                         style="background: #fff3cd; padding: 1rem; border-radius: 8px; margin-top: 1rem; border-left: 4px solid var(--warning-color);">
@@ -1301,6 +1352,8 @@
                             aktiv UND Zielwert > 0 nutzt.</li>
                         <li><strong>Tranchen-Warnung:</strong> Bei stark abweichender Tranchensumme wird im Simulator
                             auf Aggregatwerte zurückgegriffen.</li>
+                        <li><strong>Pflegebucket-Warnung:</strong> Wenn nicht genug Geldmarkt/Cash für den gewünschten
+                            Bucket vorhanden ist, wird der Bucket gekappt und die Warnung im Simulator sichtbar.</li>
                         <li><strong>Zu wenige aktive Profile:</strong> Mit nur einem Profil entspricht der Profilverbund
                             der Einzelplanung.</li>
                     </ul>

@@ -1,10 +1,10 @@
 # Balance-App – Modulübersicht
 
-Die Balance-App besteht aus 34 ES6-Modulen unter `app/balance/`. Das folgende Dokument fasst Verantwortung, Exporte und wichtige Abhängigkeiten zusammen.
+Die Balance-App besteht aus 35 ES6-Modulen unter `app/balance/`. Das folgende Dokument fasst Verantwortung, Exporte und wichtige Abhängigkeiten zusammen.
 Dateinamen werden unten kurz ohne Präfix genannt; tatsächlicher Pfad ist in der Regel `app/balance/<datei>.js`.
 Ausnahmen: Profilverbund-Module liegen unter `app/profile/`, Shared-Formatter unter `app/shared/`.
 
-**Stand:** 2026-05-20
+**Stand:** 2026-05-23
 
 ---
 
@@ -68,7 +68,9 @@ Liest UI-Eingaben und kümmert sich um UI-Side-Effects.
   - `applyStoredInputs(storedInputs)`
   - `applySideEffectsFromInputs()` – zeigt/verbirgt Panels (z. B. Gold, zweite Rente)
 
-**Dependencies:** `balance-utils.js`
+**Pflegebucket:** Liest die Profildefinition `profile_health_bucket` als optionalen Haushaltsbaustein. Die eigentliche Diagnose wird nicht im Reader berechnet, sondern an `balance-health-bucket.js` delegiert.
+
+**Dependencies:** `balance-utils.js`, `balance-health-bucket.js`
 
 ---
 
@@ -91,6 +93,7 @@ Renderlogik für KPIs, Guardrails, Diagnose, Toasts und Theme-Umschaltung.
 
 **Helper-Module (ausgelagert):**
 - `balance-renderer-summary.js` – KPIs, Marktstatus, Liquiditätsbalken
+  - zeigt bei aktivem Pflegebucket Brutto-Liquidität, gesperrte Pflege-Zweckbindung, operative Liquidität, reale Zieldeckung und Ziel-Lücke
 - `balance-renderer-action.js` – Handlungsempfehlungen & Cash-Rebalancing
   - gruppiert Transaktionen zusätzlich nach Zweck (`Liquidität`, `Gold`, `Aktien`, `Geldmarkt`, `Bonds`, `Steuer`, `Rest/Puffer`)
   - zeigt finale Settlement-Steuer (`action.steuer`) inkl. optionaler Aufschlüsselung
@@ -102,6 +105,24 @@ Renderlogik für KPIs, Guardrails, Diagnose, Toasts und Theme-Umschaltung.
 - `balance-diagnosis-guardrails.js` – Guardrail-Karten mit Schwellenwert- und Grenzfallhinweisen
 - `balance-diagnosis-transaction.js` – Transaktionsdiagnostik (Status, Schwellen, `Warum kein Goldkauf?`)
 - `balance-diagnosis-keyparams.js` – Schlüsselkennzahlen, inklusive VPW-Trennung in Rahmen, freigegebenen Flex und nicht genutzten Spielraum
+  - ergänzt Pflegebucket-Diagnose und weist `diagnostic_only` aus, wenn keine automatische Freigabe erfolgt
+
+---
+
+## 5a. `balance-health-bucket.js`
+DOM-freie Diagnose des Pflegebuckets in der Balance-App.
+
+**Hauptfunktionen / Contract:**
+- Liest eine normalisierte `healthBucket`-Definition aus den Profil-/Reader-Daten.
+- Berechnet Brutto-Liquidität, gesperrten Betrag, operative Liquidität, Zieldeckung und Ziellücke.
+- Unterscheidet Herkunft aus Geldmarkt und Cash, soweit diese Werte im Profil-/Balance-Kontext verfügbar sind.
+- Setzt die V1-Policy explizit auf `releasePolicy: 'diagnostic_only'`, `releaseAllowed: false` und `releasedAmount: 0`.
+- Liefert Warnungen/Hinweise für Kappung, fehlende Zieldeckung und fehlende operative Freigabe.
+
+**Abgrenzung:**
+Balance entsperrt den Pflegebucket derzeit nicht automatisch. Dafür fehlt ein belastbarer aktueller Pflegegrad-Ist-Zustand in der Jahresplanung. Reale Pflegeausgaben werden weiterhin über Bedarf/Jahresplanung eingegeben; der Bucket wird transparent als Zweckbindung neben der freien Liquidität gezeigt.
+
+**Dependencies:** Keine DOM-Abhängigkeit; nutzt nur übergebene Input-/Profilwerte.
 
 ---
 
@@ -151,6 +172,8 @@ Einstiegspunkt und Orchestrator.
 - `balance-main-profilverbund.js` – Profilverbund-Simulationen & UI-Handling
 - `balance-update-pipeline.js` – Engine-Last-State, Renderer-/Diagnose-Payload, Persistenzentscheidung und Ausgabenbudget.
 - `balance-action-postprocessor.js` – Profilverbund-Action-Merge und Single-3-Bucket-Postprocessing.
+
+**Pflegebucket:** Der Update-Zyklus reicht die im Reader erzeugte Pflegebucket-Diagnose an Summary, Key-Parameter und Diagnose-Copytext weiter. Die Engine-Eingaben und die Handlungsempfehlung werden dadurch nicht operativ verändert.
 
 ---
 
@@ -274,6 +297,7 @@ Kernlogik für den Profilverbund (Multi-Profil-Modus).
 **Tranchen-/Cash-Contract:**
 - Entnahmen nutzen zuerst Tagesgeld und Geldmarkt, bevor ein Verkauf aus Detailtranchen geplant wird.
 - Detailtranchen ersetzen in Asset-Summaries die aggregierten Depot-/Gold-/Geldmarktwerte, damit Werte nicht doppelt gezählt werden.
+- Der Pflegebucket wird als Haushaltsdefinition aus dem Primary-Profil gelesen und in Balance nur diagnostisch ausgewiesen. Er ist keine zusätzliche Entnahmequelle im Verteilungsmodus.
 
 **Dependencies:** `balance-config.js`, `app/profile/profile-storage.js`
 
@@ -298,6 +322,7 @@ app/balance/balance-main.js
   ├─ app/balance/balance-utils.js
   ├─ app/balance/balance-storage.js
   ├─ app/balance/balance-reader.js
+  │    └─ app/balance/balance-health-bucket.js
   ├─ app/balance/balance-renderer.js
   └─ app/balance/balance-binder.js
 ```

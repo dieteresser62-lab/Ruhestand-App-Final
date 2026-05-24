@@ -312,6 +312,12 @@ export async function runMonteCarloChunk({
         let retirementYearCounter = 0; // Track years in retirement for heatmap alignment
         let runSafetyStage1Ever = false;
         let runSafetyStage2Ever = false;
+        let healthBucketEnabledThisRun = false;
+        let healthBucketUsedThisRun = 0;
+        let healthBucketEndThisRun = 0;
+        let healthBucketCoveragePctThisRun = null;
+        let healthBucketTargetGapThisRun = 0;
+        let healthBucketInterestThisRun = 0;
 
         for (let simulationsJahr = 0; simulationsJahr < maxDauer; simulationsJahr++) {
             lebensdauer = simulationsJahr + 1;
@@ -414,6 +420,10 @@ export async function runMonteCarloChunk({
             householdContext.p2Alive = hasPartner ? p2Alive : false;
             householdContext.widowBenefits.p1FromP2 = widowBenefitActiveForP1;
             householdContext.widowBenefits.p2FromP1 = widowBenefitActiveForP2;
+            householdContext.care = {
+                p1: careMetaP1,
+                p2: careMetaP2
+            };
 
             if (runEndedBecauseAllDied) break;
 
@@ -474,6 +484,20 @@ export async function runMonteCarloChunk({
                 simState = result.newState;
                 totalTaxesThisRun += result.totalTaxesThisYear;
                 totalTaxSavedByLossCarryThisRun += Number(result.logData?.taxSavedByLossCarry) || 0;
+                if (result.logData?.health_bucket_enabled) {
+                    healthBucketEnabledThisRun = true;
+                }
+                healthBucketUsedThisRun += Number(result.logData?.health_bucket_used) || 0;
+                healthBucketInterestThisRun += Number(result.logData?.health_bucket_interest) || 0;
+                if (Number.isFinite(Number(result.logData?.health_bucket_end))) {
+                    healthBucketEndThisRun = Number(result.logData.health_bucket_end);
+                }
+                if (Number.isFinite(Number(result.logData?.health_bucket_real_coverage_pct))) {
+                    healthBucketCoveragePctThisRun = Number(result.logData.health_bucket_real_coverage_pct);
+                }
+                if (Number.isFinite(Number(result.logData?.health_bucket_target_gap))) {
+                    healthBucketTargetGapThisRun = Number(result.logData.health_bucket_target_gap);
+                }
                 if (result.logData.entscheidung.kuerzungProzent >= 10) kpiJahreMitKuerzungDieserLauf++;
                 kpiMaxKuerzungDieserLauf = Math.max(kpiMaxKuerzungDieserLauf, result.logData.entscheidung.kuerzungProzent);
 
@@ -596,6 +620,12 @@ export async function runMonteCarloChunk({
             careMetaP2,
             runSafetyStage1Ever,
             runSafetyStage2Ever,
+            healthBucketEnabledThisRun,
+            healthBucketUsedThisRun,
+            healthBucketEndThisRun,
+            healthBucketCoveragePctThisRun,
+            healthBucketTargetGapThisRun,
+            healthBucketInterestThisRun,
             currentRunLog
         });
     }

@@ -147,7 +147,8 @@
             font-size: 12px;
         }
 
-        .gold-row {
+        .gold-row,
+        .health-bucket-row {
             grid-column: 1 / -1;
             display: grid;
             grid-template-columns: repeat(5, minmax(140px, 1fr));
@@ -155,7 +156,8 @@
         }
 
         @media (max-width: 980px) {
-            .gold-row {
+            .gold-row,
+            .health-bucket-row {
                 grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             }
         }
@@ -416,6 +418,64 @@
                     <select id="profileGoldSteuerfrei">
                         <option value="false">Nein</option>
                         <option value="true">Ja</option>
+                    </select>
+                </div>
+            </div>
+            <div class="health-bucket-row">
+                <div class="form-group">
+                    <label for="profileHealthBucketEnabled">Pflegebucket aktiv</label>
+                    <select id="profileHealthBucketEnabled">
+                        <option value="false">Nein</option>
+                        <option value="true">Ja</option>
+                    </select>
+                    <small>Profilweite Reserve fuer Simulator und Balance.</small>
+                </div>
+                <div class="form-group">
+                    <label for="profileHealthBucketInitialAmount">Zielbetrag (€)</label>
+                    <input type="number" id="profileHealthBucketInitialAmount" step="1000" min="0" placeholder="150000">
+                    <small>Diagnostisch inflationsindexiert, nominal gehalten.</small>
+                </div>
+                <div class="form-group">
+                    <label for="profileHealthBucketAssetSource">Quelle</label>
+                    <select id="profileHealthBucketAssetSource">
+                        <option value="money_market_first_then_cash">Geldmarkt-ETF, dann Tagesgeld</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="profileHealthBucketTriggerMinGrade">Trigger ab Pflegegrad</label>
+                    <select id="profileHealthBucketTriggerMinGrade">
+                        <option value="1">PG1</option>
+                        <option value="2">PG2</option>
+                        <option value="3">PG3</option>
+                        <option value="4">PG4</option>
+                        <option value="5">PG5</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="profileHealthBucketTriggerMode">Haushalts-Trigger</label>
+                    <select id="profileHealthBucketTriggerMode">
+                        <option value="OR">P1 oder P2</option>
+                        <option value="AND">P1 und P2</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="profileHealthBucketCoverageMode">Deckungsmodus</label>
+                    <select id="profileHealthBucketCoverageMode">
+                        <option value="care_additional_floor_only">Nur Pflege-Mehrkosten</option>
+                        <option value="floor_when_care_active">Floor-Shortfall bei Pflege</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="profileHealthBucketReturnMode">Verzinsung</label>
+                    <select id="profileHealthBucketReturnMode">
+                        <option value="cash_return">Geldmarkt-/Cash-Rendite</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="profileHealthBucketTargetMode">Inflationssicht</label>
+                    <select id="profileHealthBucketTargetMode">
+                        <option value="inflation_indexed_diagnostic">Zielwert inflationsindexiert anzeigen</option>
+                        <option value="nominal_fixed">Nominal fix</option>
                     </select>
                 </div>
             </div>

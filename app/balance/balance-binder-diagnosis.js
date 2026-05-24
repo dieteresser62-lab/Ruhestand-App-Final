@@ -133,6 +133,22 @@ export function createDiagnosisHandlers({ dom, appState }) {
         if (typeof diagnosis.keyParams.jahresentnahme === 'number') {
             text += `Jahresentnahme (brutto): ${UIUtils.formatCurrency(diagnosis.keyParams.jahresentnahme)}\n`;
         }
+        const healthBucket = diagnosis.keyParams?.healthBucket;
+        if (healthBucket?.enabled) {
+            text += `Pflegebucket: ${UIUtils.formatCurrency(healthBucket.lockedAmount || 0)} gesperrt`;
+            text += `, operative Liquidität ${UIUtils.formatCurrency(healthBucket.operativeLiquidity || 0)}`;
+            text += `, automatische Freigabe: Nein`;
+            if (typeof healthBucket.targetCoveragePct === 'number' && isFinite(healthBucket.targetCoveragePct)) {
+                text += `, Zieldeckung ${UIUtils.formatPercentValue(healthBucket.targetCoveragePct, { fractionDigits: 0, invalid: 'n/a' })}`;
+            }
+            if (healthBucket.targetGap > 0) {
+                text += `, Ziellücke ${UIUtils.formatCurrency(healthBucket.targetGap)}`;
+            }
+            text += `\n`;
+            if (healthBucket.releaseReason) {
+                text += `Pflegebucket-Policy: ${healthBucket.releaseReason}\n`;
+            }
+        }
         const vpw = diagnosis.keyParams?.vpw;
         if (vpw && typeof vpw === 'object') {
             text += `\n--- Dynamic Flex (VPW) ---\n`;
