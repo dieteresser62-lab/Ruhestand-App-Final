@@ -34,8 +34,9 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 ## Funktionen im Überblick
 
 ### Balance-App
-* Speichert Eingaben dauerhaft im `localStorage` und erzeugt auf Wunsch Dateisnapshots (File System Access API).
-* Importiert/Exportiert Portfolios als JSON und liest Marktdaten aus CSV-Dateien ein.
+* Speichert Eingaben ueber die zentrale Persistenz-Facade; im Browser ist IndexedDB die lokale Source of Truth, Tauri nutzt eine JSON-Datei im App-Datenverzeichnis.
+* Komplett-Backup und Komplett-Import liegen zentral auf der Startseite unter `Profile > Erweitert`; Jahresabschluss-Snapshots bleiben als fachlicher Sicherungspunkt erhalten.
+* Liest Marktdaten und Ausgaben aus CSV-Dateien ein.
 * **Jahres-Update mit Online-Datenabruf:** Automatischer Abruf von Inflationsdaten (ECB, World Bank, OECD) und ETF-Kursen (VWCE.DE via Yahoo Finance über lokalen Proxy), automatisches Nachrücken der Marktdaten und ATH-Update. Detailliertes Update-Protokoll zeigt Datenquellen und abgerufene Werte.
 * **Auto-CAPE im Jahreswechsel:** US-Shiller-CAPE wird im Jahresupdate automatisch geladen (Fallback: Yale → Mirror → letzter gespeicherter Wert). CAPE-Fehler blockieren den Jahreswechsel nicht.
 * **Ausgaben-Check (monatlich):** CSV-Import pro Monat und Profil, Budgetkontrolle je Monat, Detailansicht mit Top-3-Kategorien, Jahreshochrechnung (ab 2 Datenmonaten mit Median), Soll/Ist auf Basis importierter Monate sowie Jahres-Historie per Jahr-Auswahl.
@@ -46,7 +47,7 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 * **Depot-Tranchen-Manager:** Detaillierte Tranchen werden automatisch geladen und für steueroptimierte Verkäufe genutzt.
 * **Profil-Verwaltung:** Optionales Namensfeld zur Unterscheidung von Snapshots (z. B. "Max" vs. "Partnerin") für effektive Mehr-Personen-Planung.
 * **Pflegebucket-Diagnose:** Liest die in der Profilpflege definierte gesperrte Geldmarkt-/Cash-Reserve und zeigt Brutto-Liquidität, Pflege-Zweckbindung, operative Liquidität und inflationsbezogene Zieldeckung. In der Balance-App ist der Bucket aktuell bewusst `diagnostic_only`; es erfolgt keine automatische operative Freigabe.
-* Tastenkürzel u. a. für Jahresabschluss (`Alt` + `J`), Import (`Alt` + `I`), Export (`Alt` + `E`) und Marktdaten nachrücken (`Alt` + `N`).
+* Tastenkürzel u. a. für Jahresabschluss (`Alt` + `J`) und Marktdaten nachrücken (`Alt` + `N`).
 
 ### Simulator
 * Monte-Carlo-Simulationen mit unterschiedlichen Renditequellen (historisch, Regime, Block-Bootstrap) inkl. Worker-Parallelisierung. Historische Daten reichen bis 1925 (Schwarze-Schwan-Phase optional per Filter/Recency abgewichtbar).
@@ -235,7 +236,7 @@ Die Anwendung ist bewusst minimalistisch gehalten, hat aber für den vollen Funk
 1. `RuhestandSuite.exe` aus dem Repository oder Release-Download in einen beliebigen Ordner kopieren.
 2. Per Doppelklick starten; die Tauri-App öffnet die Oberfläche direkt aus dem gebündelten `dist/`-Stand.
 3. Optionale Live-Datenzugriffe funktionieren, wenn eine Internetverbindung besteht; ETF-Kurse laufen über den integrierten lokalen Proxy, Inflation und CAPE direkt über freigegebene externe Endpunkte. Ohne Internet läuft die App vollständig lokal weiter.
-4. Eigene Szenarien und Snapshots werden im Benutzerprofil gespeichert; bei Bedarf kann die EXE samt Konfigurationsordner als Backup kopiert werden.
+4. Eigene Szenarien und Snapshots werden im Benutzerprofil als Tauri-App-Daten gespeichert; der Wechsel zwischen Browser und EXE laeuft ueber das zentrale Komplettbackup auf der Startseite.
 
 ### Option 2: Browser-basierte Nutzung
 

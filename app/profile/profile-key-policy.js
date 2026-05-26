@@ -1,5 +1,6 @@
 import { CONFIG } from '../balance/balance-config.js';
 import { PROFILE_SCOPED_FIXED_KEYS } from './profile-state.js';
+import { persistenceStorage } from '../shared/persistence-facade.js';
 
 const FIXED_KEYS = new Set(PROFILE_SCOPED_FIXED_KEYS);
 
@@ -24,7 +25,7 @@ export function isProfileScopedKey(key) {
     return false;
 }
 
-export function listProfileScopedKeys(storage = localStorage) {
+export function listProfileScopedKeys(storage = persistenceStorage) {
     const keys = new Set();
 
     FIXED_KEYS.forEach(key => {

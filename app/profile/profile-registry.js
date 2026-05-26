@@ -1,6 +1,7 @@
 // @ts-check
 
 import { PROFILE_STORAGE_KEYS } from './profile-state.js';
+import { persistenceStorage } from '../shared/persistence-facade.js';
 
 export const PROFILE_VERSION = 1;
 
@@ -28,7 +29,7 @@ export function createEmptyProfileRegistry() {
     return { version: PROFILE_VERSION, profiles: {} };
 }
 
-export function getProfileRegistry(storage = localStorage) {
+export function getProfileRegistry(storage = persistenceStorage) {
     // Registry-Shape: { version, profiles: { [id]: { meta, data } } }
     const raw = storage.getItem(PROFILE_STORAGE_KEY);
     if (!raw) {
@@ -48,7 +49,7 @@ export function getProfileRegistry(storage = localStorage) {
     }
 }
 
-export function saveProfileRegistry(registry, storage = localStorage) {
+export function saveProfileRegistry(registry, storage = persistenceStorage) {
     try {
         storage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(registry));
         return true;
@@ -60,7 +61,7 @@ export function saveProfileRegistry(registry, storage = localStorage) {
 
 export function ensureDefaultProfile(options = {}) {
     const {
-        storage = localStorage,
+        storage = persistenceStorage,
         captureProfileData = () => ({})
     } = options;
 
@@ -84,12 +85,12 @@ export function ensureDefaultProfile(options = {}) {
     return registry;
 }
 
-export function getCurrentProfileId(storage = localStorage) {
+export function getCurrentProfileId(storage = persistenceStorage) {
     ensureDefaultProfile({ storage });
     return storage.getItem(CURRENT_PROFILE_KEY) || 'default';
 }
 
-export function setCurrentProfileId(id, storage = localStorage) {
+export function setCurrentProfileId(id, storage = persistenceStorage) {
     storage.setItem(CURRENT_PROFILE_KEY, id);
 }
 
@@ -115,7 +116,7 @@ export function getProfileData(id, options = {}) {
 
 export function createProfile(name, options = {}) {
     const {
-        storage = localStorage
+        storage = persistenceStorage
     } = options;
     const registry = ensureDefaultProfile(options);
     const base = slugify(name);
@@ -138,7 +139,7 @@ export function createProfile(name, options = {}) {
 
 export function renameProfile(id, name, options = {}) {
     const {
-        storage = localStorage
+        storage = persistenceStorage
     } = options;
     const registry = ensureDefaultProfile(options);
     if (!registry.profiles[id]) return null;
@@ -150,7 +151,7 @@ export function renameProfile(id, name, options = {}) {
 
 export function setProfileVerbundMembership(profileId, belongs, options = {}) {
     const {
-        storage = localStorage
+        storage = persistenceStorage
     } = options;
     const registry = ensureDefaultProfile(options);
     if (!registry.profiles[profileId]) return false;
@@ -161,7 +162,7 @@ export function setProfileVerbundMembership(profileId, belongs, options = {}) {
 
 export function deleteProfile(id, options = {}) {
     const {
-        storage = localStorage
+        storage = persistenceStorage
     } = options;
     const registry = ensureDefaultProfile(options);
     if (!registry.profiles[id]) return false;
@@ -178,7 +179,7 @@ export function deleteProfile(id, options = {}) {
 
 export function replaceProfileData(id, data, options = {}) {
     const {
-        storage = localStorage
+        storage = persistenceStorage
     } = options;
     const registry = ensureDefaultProfile(options);
     if (!registry.profiles[id]) return false;
@@ -189,7 +190,7 @@ export function replaceProfileData(id, data, options = {}) {
 
 export function updateProfileData(id, patch, options = {}) {
     const {
-        storage = localStorage
+        storage = persistenceStorage
     } = options;
     const registry = ensureDefaultProfile(options);
     if (!registry.profiles[id]) return false;

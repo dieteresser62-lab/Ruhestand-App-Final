@@ -20,10 +20,11 @@ import {
 import { renderProfilverbundProfileSelector, toggleProfilverbundMode } from '../profile/profilverbund-balance-ui.js';
 import { shouldResetGuardrailState } from './balance-guardrail-reset.js';
 import { applyThreeBucketLogic, appendBondReplenishment, isBondCategory, sumBondBucketValuation } from '../../engine/transactions/three-bucket-logic.mjs';
+import { persistenceStorage } from '../shared/persistence-facade.js';
 
 export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS }) {
     const refreshProfilverbundBalance = () => {
-        const mode = localStorage.getItem(PROFILVERBUND_STORAGE_KEYS.mode) || 'tax_optimized';
+        const mode = persistenceStorage.getItem(PROFILVERBUND_STORAGE_KEYS.mode) || 'tax_optimized';
 
         saveCurrentProfileFromLocalStorage();
         const profileInputs = loadProfilverbundProfiles();
@@ -199,7 +200,7 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
                 [CONFIG.STORAGE.LS_KEY]: JSON.stringify(nextState)
             });
             if (run.profileId === getCurrentProfileId()) {
-                localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify(nextState));
+                persistenceStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify(nextState));
             }
         });
     };
@@ -222,13 +223,13 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
         const refreshedProfiles = listProfiles();
         renderProfilverbundProfileSelector(refreshedProfiles, 'profilverbund-profile-list');
 
-        const storedMode = localStorage.getItem(PROFILVERBUND_STORAGE_KEYS.mode) || 'tax_optimized';
+        const storedMode = persistenceStorage.getItem(PROFILVERBUND_STORAGE_KEYS.mode) || 'tax_optimized';
 
         modeSelect.value = storedMode;
         toggleProfilverbundMode(true);
 
         modeSelect.addEventListener('change', () => {
-            localStorage.setItem(PROFILVERBUND_STORAGE_KEYS.mode, modeSelect.value);
+            persistenceStorage.setItem(PROFILVERBUND_STORAGE_KEYS.mode, modeSelect.value);
             refreshProfilverbundBalance();
         });
 
@@ -271,7 +272,7 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
                 flexBudgetYears: inputData.flexBudgetYears,
                 flexBudgetRecharge: inputData.flexBudgetRecharge
             });
-            window.__profilverbundDistribution = calculateWithdrawalDistribution(profilverbundProfiles, aggregated, localStorage.getItem(PROFILVERBUND_STORAGE_KEYS.mode) || 'tax_optimized');
+            window.__profilverbundDistribution = calculateWithdrawalDistribution(profilverbundProfiles, aggregated, persistenceStorage.getItem(PROFILVERBUND_STORAGE_KEYS.mode) || 'tax_optimized');
             window.__profilverbundProfileSummaries = buildProfilverbundProfileSummaries(profilverbundProfiles);
         } else {
             window.__profilverbundDistribution = null;

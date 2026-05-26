@@ -108,7 +108,7 @@ Der Backtest läuft strikt sequentiell über historische Marktdaten (1950 - Heut
 ```text
 Funktion runHistoricalBacktest():
   1. Validierung
-     - Prüfe Start/Endjahr (1950-2024)
+     - Prüfe Start/Endjahr (1950-2025)
 
   2. Initialisierung State
      - `simState` auf Startwerte setzen (Vermögen, Allokation)

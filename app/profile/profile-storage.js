@@ -8,6 +8,7 @@
 // @ts-check
 
 import { PROFILE_STORAGE_KEYS } from './profile-state.js';
+import { persistenceStorage } from '../shared/persistence-facade.js';
 import {
     exportProfilesBundle as exportProfilesBundleFromIo,
     exportProfilesBundleToWindowName as exportProfilesBundleToWindowNameFromIo,
@@ -92,7 +93,7 @@ export function loadProfileIntoLocalStorage(id) {
     const profile = registry.profiles[id];
     if (!profile) return false;
     loadProfileDataIntoLocalStorage(profile.data);
-    localStorage.setItem(ACTIVE_PROFILE_KEY, id);
+    persistenceStorage.setItem(ACTIVE_PROFILE_KEY, id);
     return true;
 }
 
@@ -111,7 +112,7 @@ export function switchProfile(id) {
 }
 
 export function getActiveProfileId() {
-    return localStorage.getItem(ACTIVE_PROFILE_KEY);
+    return persistenceStorage.getItem(ACTIVE_PROFILE_KEY);
 }
 
 export function ensureProfileRegistry() {
@@ -125,7 +126,7 @@ export function bootstrapProfileContext(options = {}) {
     } = options;
 
     let importResult = { ok: false, message: 'window.name import disabled' };
-    if (importFromWindowName && !localStorage.getItem(PROFILE_STORAGE_KEY)) {
+    if (importFromWindowName && !persistenceStorage.getItem(PROFILE_STORAGE_KEY)) {
         importResult = importProfilesBundleFromWindowName();
     }
 

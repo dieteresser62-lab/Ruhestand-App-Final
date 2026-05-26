@@ -4,13 +4,15 @@
  */
 "use strict";
 
+import { persistenceStorage } from '../shared/persistence-facade.js';
+
 export const EXPENSES_STORAGE_KEY = 'balance_expenses_v1';
 
 export function createEmptyExpensesStore(activeYear = new Date().getFullYear()) {
     return { version: 1, activeYear, years: {} };
 }
 
-export function loadExpensesStore(storage = globalThis.localStorage) {
+export function loadExpensesStore(storage = persistenceStorage) {
     try {
         const raw = storage?.getItem(EXPENSES_STORAGE_KEY);
         if (!raw) return createEmptyExpensesStore();
@@ -24,7 +26,7 @@ export function loadExpensesStore(storage = globalThis.localStorage) {
     }
 }
 
-export function saveExpensesStore(store, storage = globalThis.localStorage) {
+export function saveExpensesStore(store, storage = persistenceStorage) {
     storage?.setItem(EXPENSES_STORAGE_KEY, JSON.stringify(store));
 }
 
@@ -44,14 +46,14 @@ export function getExpensesMonthData(yearData, month) {
     return yearData.months[key];
 }
 
-export function setExpensesActiveYear(year, storage = globalThis.localStorage) {
+export function setExpensesActiveYear(year, storage = persistenceStorage) {
     const store = loadExpensesStore(storage);
     store.activeYear = year;
     getExpensesYearData(store, year);
     saveExpensesStore(store, storage);
 }
 
-export function resolveExpensesInitialYear(storage = globalThis.localStorage, fallback = new Date().getFullYear()) {
+export function resolveExpensesInitialYear(storage = persistenceStorage, fallback = new Date().getFullYear()) {
     const store = loadExpensesStore(storage);
     const activeYear = Number(store.activeYear);
     return Number.isFinite(activeYear) ? activeYear : fallback;
@@ -65,4 +67,3 @@ export function listExpensesYears({ store, activeYear, currentYear = new Date().
     });
     return Array.from(years).sort((a, b) => a - b);
 }
-

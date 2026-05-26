@@ -50,11 +50,13 @@ import { displaySweepResults, runParameterSweep } from './simulator-sweep.js';
 import { exportBacktestLogData, renderBacktestLog, runBacktest } from './simulator-backtest.js';
 import { initializeSimulatorApp } from './simulator-main-init.js';
 import { runSweepSelfTest } from './simulator-main-sweep-selftest.js';
+import { init as initPersistence } from '../shared/persistence-facade.js';
 
 /**
  * DOM-Initialisierung und Event-Handler
  */
-window.onload = function () {
+window.onload = async function () {
+    await initPersistence();
     initializeSimulatorApp();
 };
 

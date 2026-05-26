@@ -26,6 +26,7 @@ import { createProfileSyncHandlers } from './balance-main-profile-sync.js';
 import { UIUtils } from './balance-utils.js';
 import { initExpensesTab, updateExpensesBudget } from './balance-expenses.js';
 import { initDynamicFlexControls } from '../simulator/simulator-main-dynamic-flex.js';
+import { init as initPersistence } from '../shared/persistence-facade.js';
 import { PROFILE_VALUE_KEYS } from '../profile/profile-state.js';
 import { postprocessBalanceAction } from './balance-action-postprocessor.js';
 import {
@@ -341,7 +342,8 @@ function initVersionHandshake() {
  * - UIRenderer: Rendert alle UI-Komponenten
  * - UIBinder: Event-Handler für alle Interaktionen
  */
-function init() {
+async function init() {
+    await initPersistence();
     try {
         // 1. Engine Handshake
         // Prüft ob engine.js geladen ist und die Version kompatibel ist

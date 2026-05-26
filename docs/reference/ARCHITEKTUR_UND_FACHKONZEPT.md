@@ -1433,12 +1433,12 @@ Die Startjahr- und Folgejahrlogik liegt in `mc-year-sampling.js`, `mc-run-contex
 
 | Feld | Dokumentierter Status | Zeitraum |
 |------|-----------------------|----------|
-| `msci_eur` | MSCI-World-EUR-ähnlicher Indexlevel; exakte Variante (`Price`, `Net TR`, `Gross TR`) ist noch nicht vollständig dokumentiert | 1925-2024 |
-| `inflation_de` | deutsche Inflationsreihe bzw. Proxy | 1925-2024 |
-| `zinssatz_de` | deutscher Kurz-/Zinsproxy | 1925-2024 |
-| `lohn_de` | deutsche Lohnentwicklungsreihe bzw. Proxy | 1925-2024 |
-| `gold_eur_perf` | Gold-EUR-Performance; frühe Jahre enthalten Null-Fallbacks und müssen quellenfachlich weiter geklärt werden | 1925-2024, belastbarer ab späterer Historie |
-| `cape` | CAPE-/Shiller-Bewertungsproxy | 1925-2024 |
+| `msci_eur` | MSCI-World-EUR-ähnlicher Indexlevel; exakte Variante (`Price`, `Net TR`, `Gross TR`) ist noch nicht vollständig dokumentiert | 1925-2025 |
+| `inflation_de` | deutsche Inflationsreihe bzw. Proxy | 1925-2025 |
+| `zinssatz_de` | deutscher Kurz-/Zinsproxy | 1925-2025 |
+| `lohn_de` | deutsche Lohnentwicklungsreihe bzw. Proxy | 1925-2025 |
+| `gold_eur_perf` | Gold-EUR-Performance; frühe Jahre enthalten Null-Fallbacks und müssen quellenfachlich weiter geklärt werden | 1925-2025, belastbarer ab späterer Historie |
+| `cape` | CAPE-/Shiller-Bewertungsproxy | 1925-2025 |
 
 **Provenienz-Hinweis `msci_eur`:**
 *   Die Reihe wird im Code als MSCI-World-EUR-ähnlicher Proxy behandelt; die genaue Indexvariante ist ausdrücklich noch nicht vollständig belegt.
@@ -1448,7 +1448,7 @@ Die Startjahr- und Folgejahrlogik liegt in `mc-year-sampling.js`, `mc-run-contex
 
 **Hinweis Balance-App:** In der Balance-App werden reale Depotstände und ETF-Kurse verwendet; TER ist dort bereits im NAV eingepreist. Ein zusätzlicher TER-Abzug wäre doppelt.
 
-**Erweiterte Datenbasis (1925-2024):**
+**Erweiterte Datenbasis (1925-2025):**
 *   **Erweiterung:** Die Daten wurden ab Januar 2026 von 1950 auf **1925** erweitert.
 *   **Rekonstruktion 1925-1949:** MSCI-Levels wurden aus US-Marktdaten rekonstruiert und auf den 1950er-Basiswert normalisiert.
 *   **Zweck:** Ermöglicht Stress-Tests mit historisch extremen Perioden (Große Depression, Zweiter Weltkrieg).
@@ -1459,7 +1459,7 @@ Die Startjahr- und Folgejahrlogik liegt in `mc-year-sampling.js`, `mc-run-contex
 *   **Risiko:** Da die Monte-Carlo-Simulation zufällige Blöcke aus der Historie zieht, besteht das Risiko, dass "Wirtschaftswunder"-Phasen eine zu optimistische Erwartungshaltung erzeugen.
 *   **Empfehlung:** Für eine konservative Planung ("Stress-Test") kann die Datenbasis erst ab **1970** (Beginn Stagflation) oder **1978** (Präzisere Daten) genutzt werden. Die neuen Stress-Presets "Great Depression" und "WWII" bieten zusätzliche Extremszenarien.
 
-**Verteilung der Regime (1925-2024):**
+**Verteilung der Regime (1925-2025):**
 
 | Regime | Jahre | Anteil |
 |--------|-------|--------|
@@ -1872,7 +1872,7 @@ Neben der Monte-Carlo-Simulation bietet die Suite einen **deterministischen hist
 | Aspekt | Monte Carlo | Historischer Backtest |
 |--------|-------------|----------------------|
 | Datenquelle | Zufällige Stichproben aus Historie | Exakte historische Sequenz |
-| Zeitraum | Simulationsdauer gemäß Eingabe; Sampling aus 1925-2024, optional ohne geschätzte Jahre <1950 | 1951-2024 |
+| Zeitraum | Simulationsdauer gemäß Eingabe; Sampling aus 1925-2025, optional ohne geschätzte Jahre <1950 | 1951-2025 |
 | Ergebnis | Verteilung (Perzentile) | Ein deterministischer Pfad |
 | Anwendung | Risikobewertung | Validierung ("Hätte mein Plan 2008 überlebt?") |
 
@@ -1887,8 +1887,8 @@ export function runBacktest() {
     const startJahr = parseInt(document.getElementById('simStartJahr').value);
     const endJahr = parseInt(document.getElementById('simEndJahr').value);
 
-    // Validierung: 1951-2024
-    if (startJahr < 1951 || endJahr > 2024 || startJahr >= endJahr) {
+    // Validierung: 1951-2025
+    if (startJahr < 1951 || endJahr > 2025 || startJahr >= endJahr) {
         alert('Fehler: Bitte gültigen Zeitraum eingeben.');
         return;
     }
@@ -2603,7 +2603,7 @@ rt
 |---------|----------------|---------------|--------|---------|---------|-----|
 | **Preis** | Kostenlos | $9-799 | $0-144 | $0-119 | Kostenlos | Kostenlos |
 | **Monte Carlo** | ✅ 4 Methoden | ✅ | ✅ | ✅ | ❌ | ✅ |
-| **Historischer Backtest** | ✅ 1951-2024 | ⚠️ | ❌ | ✅ | ✅ | ✅ |
+| **Historischer Backtest** | ✅ 1951-2025 | ⚠️ | ❌ | ✅ | ✅ | ✅ |
 | **Dynamische Guardrails** | ✅ 7 Regime | ❌ | ❌ | ⚠️ | ✅ | ❌ |
 | **DE-Steuern (vollst.)** | ✅ | ⚠️ | ❌ | ❌ | ❌ | ❌ |
 | **Pflegefall-Modell** | ✅ PG1-5 | ⚠️ | ⚠️ | ⚠️ | ❌ | ❌ |
@@ -2630,7 +2630,7 @@ rt
 5. **Tranchen-Management mit Online-Kursen** — Einzelpositionen mit FIFO-Steueroptimierung und automatischer Kursabfrage
 6. **Mehrphasige Auto-Optimierung (LHS)** — Latin Hypercube Sampling + Quick-Filter + volle Evaluation + lokale Verfeinerung + Train/Test-Validierung
 7. **Parameter-Sweep mit Heatmap-Visualisierung** — Sensitivitätsanalyse mit SVG-basierter Viridis-Heatmap und Invarianten-Prüfung
-8. **Historischer Backtest mit DE-Daten** — Deterministische Simulation 1951-2024 mit deutscher Inflation und Lohnentwicklung
+8. **Historischer Backtest mit DE-Daten** — Deterministische Simulation 1951-2025 mit deutscher Inflation und Lohnentwicklung
 9. **Portable Tauri-Desktop-App** — ~8 MB EXE, keine Installation, läuft von USB-Stick
 10. **Offline-Betrieb und Open Source** — Daten verbleiben lokal auf dem Rechner
 11. **Ausgaben-Check mit CSV-Import** — Monatliches Budget-Tracking gegen Floor+Flex, Median-basierte Hochrechnung, Ampel-Visualisierung, Profilverbund-Integration

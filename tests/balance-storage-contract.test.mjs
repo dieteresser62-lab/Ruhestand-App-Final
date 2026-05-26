@@ -1,5 +1,7 @@
 import { CONFIG, StorageError } from '../app/balance/balance-config.js';
 import { StorageManager } from '../app/balance/balance-storage.js';
+import { createLocalStorageAdapter } from '../app/shared/persistence-adapter-localstorage.js';
+import { resetPersistenceForTests } from '../app/shared/persistence-facade.js';
 
 console.log('--- Balance Storage Contract Tests ---');
 
@@ -42,13 +44,19 @@ function snapshotKeys(storage, prefix = CONFIG.STORAGE.SNAPSHOT_PREFIX) {
     return keys;
 }
 
+function installMockLocalStorage() {
+    global.localStorage = new MockLocalStorage();
+    resetPersistenceForTests(createLocalStorageAdapter(() => global.localStorage));
+    return global.localStorage;
+}
+
 const prevLocalStorage = global.localStorage;
 const prevLocation = global.location;
 
 try {
     console.log('Test 1: real migration sanitizes inflation state and creates taxState');
     {
-        global.localStorage = new MockLocalStorage();
+        installMockLocalStorage();
         localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify({
             inputs: { floorBedarf: 24000 },
             lastState: {
@@ -67,7 +75,7 @@ try {
 
     console.log('Test 2: taxState is repaired even when migration flag already exists');
     {
-        global.localStorage = new MockLocalStorage();
+        installMockLocalStorage();
         localStorage.setItem(CONFIG.STORAGE.MIGRATION_FLAG, '1');
         localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify({
             lastState: {
@@ -86,7 +94,7 @@ try {
 
     console.log('Test 3: valid taxState.lossCarry is preserved');
     {
-        global.localStorage = new MockLocalStorage();
+        installMockLocalStorage();
         localStorage.setItem(CONFIG.STORAGE.MIGRATION_FLAG, '1');
         localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify({
             lastState: {
@@ -101,7 +109,7 @@ try {
 
     console.log('Test 4: invalid storage JSON throws StorageError');
     {
-        global.localStorage = new MockLocalStorage();
+        installMockLocalStorage();
         localStorage.setItem(CONFIG.STORAGE.LS_KEY, 'nicht-json{{{');
 
         let thrown = null;
@@ -117,7 +125,7 @@ try {
     console.log('Test 5: snapshot restore filters non-app keys and keeps snapshot source');
     {
         let reloadCount = 0;
-        global.localStorage = new MockLocalStorage();
+        installMockLocalStorage();
         global.location = { reload: () => { reloadCount += 1; } };
 
         const snapshotKey = `${CONFIG.STORAGE.SNAPSHOT_PREFIX}2026-05-12T10:00:00.000Z--Contract`;
@@ -150,7 +158,7 @@ try {
 
     console.log('Test 6: real createSnapshot stores full localStorage payload with sanitized label');
     {
-        global.localStorage = new MockLocalStorage();
+        installMockLocalStorage();
         localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify({ inputs: { floorBedarf: 24000 } }));
         localStorage.setItem('depot_tranchen', JSON.stringify([{ id: 't2' }]));
 
@@ -168,6 +176,7 @@ try {
 
     console.log('Balance storage contract tests passed');
 } finally {
+    resetPersistenceForTests(createLocalStorageAdapter());
     if (prevLocation === undefined) delete global.location; else global.location = prevLocation;
     if (prevLocalStorage === undefined) delete global.localStorage; else global.localStorage = prevLocalStorage;
 }

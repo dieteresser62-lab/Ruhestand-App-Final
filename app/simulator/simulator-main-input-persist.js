@@ -2,6 +2,7 @@
 
 import { SUPPORTED_PFLEGE_GRADES } from './simulator-data.js';
 import { updateStartPortfolioDisplay } from './simulator-portfolio.js';
+import { persistenceStorage } from '../shared/persistence-facade.js';
 
 const CARE_GRADE_FIELD_IDS = SUPPORTED_PFLEGE_GRADES.flatMap(grade => [
     `pflegeStufe${grade}Zusatz`,
@@ -26,8 +27,8 @@ export function initInputPersistence() {
         if (element) {
             // Persistence Logic
             const storageKey = 'sim_' + id;
-            const storedVal = localStorage.getItem(storageKey);
-            // noPersist allows specific fields to opt out of localStorage.
+            const storedVal = persistenceStorage.getItem(storageKey);
+            // noPersist allows specific fields to opt out of persisted storage.
             if (!element.dataset.noPersist && storedVal !== null && storedVal !== "") {
                 if (element.type === 'checkbox') {
                     element.checked = (storedVal === 'true');
@@ -42,9 +43,9 @@ export function initInputPersistence() {
                 // Save to Storage
                 if (!element.dataset.noPersist) {
                     if (element.type === 'checkbox') {
-                        localStorage.setItem(storageKey, element.checked);
+                        persistenceStorage.setItem(storageKey, element.checked);
                     } else if (element.type !== 'radio') {
-                        localStorage.setItem(storageKey, element.value);
+                        persistenceStorage.setItem(storageKey, element.value);
                     }
                 }
                 // Trigger UI Update

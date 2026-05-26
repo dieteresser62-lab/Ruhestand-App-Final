@@ -22,9 +22,10 @@ import { renderSweepHeatmapSVG } from './simulator-heatmap.js';
 import { WorkerPool } from '../../workers/worker-pool.js';
 import { WorkerJobRunner } from './worker-job-runner.js';
 import { buildSweepInputs, runSweepChunk } from './sweep-runner.js';
+import { persistenceStorage } from '../shared/persistence-facade.js';
 
 /**
- * Initialisiert Sweep-Inputfelder und synchronisiert sie mit localStorage.
+ * Initialisiert Sweep-Inputfelder und synchronisiert sie mit der Persistenz-Facade.
  *
  * Jeder Eintrag im Mapping wird beim Laden mit einem evtl. gespeicherten Wert
  * vorbelegt. Änderungen werden defensiv sowohl auf "change" als auch
@@ -51,14 +52,14 @@ export function initSweepDefaultsWithLocalStorageFallback() {
             continue;
         }
 
-        const persistedValue = localStorage.getItem(storageKey);
+        const persistedValue = persistenceStorage.getItem(storageKey);
         if (persistedValue !== null && persistedValue !== undefined && persistedValue !== '') {
             element.value = persistedValue;
         }
 
         // Speichere Änderungen unabhängig davon, ob das Event über Enter oder Tippen ausgelöst wurde.
-        element.addEventListener('change', () => localStorage.setItem(storageKey, element.value));
-        element.addEventListener('input', () => localStorage.setItem(storageKey, element.value));
+        element.addEventListener('change', () => persistenceStorage.setItem(storageKey, element.value));
+        element.addEventListener('input', () => persistenceStorage.setItem(storageKey, element.value));
     }
 }
 

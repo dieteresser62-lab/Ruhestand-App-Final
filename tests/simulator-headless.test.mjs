@@ -63,7 +63,7 @@ let currentState = {
 console.log(`Starting Simulation. Initial Liq: ${currentState.portfolio.liquiditaet}`);
 
 (async () => {
-    for (let year = 2000; year <= 2024; year++) {
+    for (let year = 2000; year <= 2025; year++) {
         const marketData = annualData.find(d => d.jahr === year);
         if (!marketData) {
             console.warn(`Keine Marktdaten für ${year}, Stop.`);

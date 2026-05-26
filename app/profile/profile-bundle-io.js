@@ -3,6 +3,7 @@
 import { PROFILE_STORAGE_KEYS } from './profile-state.js';
 import { PROFILE_VERSION, getProfileRegistry } from './profile-registry.js';
 import { loadProfileDataIntoLocalStorage } from './profile-live-storage.js';
+import { persistenceStorage } from '../shared/persistence-facade.js';
 
 export const WINDOW_NAME_BUNDLE_PREFIX = 'RUHESTAND_PROFILE_BUNDLE:';
 
@@ -15,7 +16,7 @@ function nowIso() {
     return new Date().toISOString();
 }
 
-function loadProfileFromRegistryIntoStorage(id, storage = localStorage) {
+function loadProfileFromRegistryIntoStorage(id, storage = persistenceStorage) {
     const registry = getProfileRegistry(storage);
     const profile = registry.profiles[id];
     if (!profile) return false;
@@ -26,7 +27,7 @@ function loadProfileFromRegistryIntoStorage(id, storage = localStorage) {
 
 export function exportProfilesBundle(options = {}) {
     const {
-        storage = localStorage,
+        storage = persistenceStorage,
         saveCurrentProfile = null
     } = options;
 
@@ -71,7 +72,7 @@ export function exportProfilesBundleToWindowName(options = {}) {
 
 export function importProfilesBundle(bundle, options = {}) {
     const {
-        storage = localStorage,
+        storage = persistenceStorage,
         loadProfileIntoLocalStorage = (id) => loadProfileFromRegistryIntoStorage(id, storage)
     } = options;
 

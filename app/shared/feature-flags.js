@@ -3,8 +3,10 @@
  * Purpose: Global configuration for enabling/disabling application features and engine modes.
  *          Manages 'adapter' vs 'direct' engine mode and performance monitoring.
  * Usage: Imported by engine modules to check features.
- * Dependencies: None
+ * Dependencies: persistence-facade.js
  */
+import { persistenceStorage } from './persistence-facade.js';
+
 const DEFAULT_FLAGS = {
     // Engine Mode: 'adapter' oder 'direct'
     engineMode: 'adapter',
@@ -34,8 +36,13 @@ class FeatureFlags {
             direct: { totalTime: 0, count: 0, errors: 0 }
         };
 
-        // Load from localStorage if available
+        // Load once during module import, then refresh after async persistence init.
         this.loadFromStorage();
+        if (typeof globalThis.addEventListener === 'function') {
+            globalThis.addEventListener('persistence:initialized', () => {
+                this.loadFromStorage();
+            });
+        }
     }
 
     /**
@@ -285,30 +292,26 @@ class FeatureFlags {
     }
 
     /**
-     * Save flags to localStorage
+     * Save flags to persisted storage
      * @private
      */
     saveToStorage() {
-        if (typeof localStorage !== 'undefined') {
-            try {
-                localStorage.setItem('featureFlags', JSON.stringify(this.flags));
-            } catch (e) { }
-        }
+        try {
+            persistenceStorage.setItem('featureFlags', JSON.stringify(this.flags));
+        } catch (e) { }
     }
 
     /**
-     * Load flags from localStorage
+     * Load flags from persisted storage
      * @private
      */
     loadFromStorage() {
-        if (typeof localStorage !== 'undefined') {
-            try {
-                const stored = localStorage.getItem('featureFlags');
-                if (stored) {
-                    this.flags = { ...DEFAULT_FLAGS, ...JSON.parse(stored) };
-                }
-            } catch (e) { }
-        }
+        try {
+            const stored = persistenceStorage.getItem('featureFlags');
+            if (stored) {
+                this.flags = { ...DEFAULT_FLAGS, ...JSON.parse(stored) };
+            }
+        } catch (e) { }
     }
 
     /**
@@ -352,5 +355,3 @@ if (typeof window !== 'undefined') {
 }
 
 export default featureFlags;
-
-

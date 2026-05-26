@@ -1,6 +1,7 @@
 // @ts-check
 
 import { CONFIG } from '../balance/balance-config.js';
+import { persistenceStorage } from '../shared/persistence-facade.js';
 
 export const PROFILE_STORAGE_KEYS = {
     registry: 'rs_profiles_v1',
@@ -129,7 +130,7 @@ export function parseProfileHealthBucketFromData(data) {
     return normalizeProfileHealthBucket(parseStoredJson(data[PROFILE_HEALTH_BUCKET_KEY], {}));
 }
 
-export function readProfileHealthBucketFromStorage(storage = localStorage) {
+export function readProfileHealthBucketFromStorage(storage = persistenceStorage) {
     return parseProfileHealthBucketFromData({
         [PROFILE_HEALTH_BUCKET_KEY]: readStoredProfileValue(storage, PROFILE_HEALTH_BUCKET_KEY)
     });
@@ -175,7 +176,7 @@ export function parseProfileOverridesFromData(data) {
     };
 }
 
-export function readProfileOverridesFromStorage(storage = localStorage) {
+export function readProfileOverridesFromStorage(storage = persistenceStorage) {
     return parseProfileOverridesFromData({
         [PROFILE_VALUE_KEYS.tagesgeld]: readStoredProfileValue(storage, PROFILE_VALUE_KEYS.tagesgeld),
         [PROFILE_VALUE_KEYS.renteAktiv]: readStoredProfileValue(storage, PROFILE_VALUE_KEYS.renteAktiv),

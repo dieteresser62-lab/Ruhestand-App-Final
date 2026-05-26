@@ -1,5 +1,7 @@
 "use strict";
 
+import { persistenceStorage } from '../shared/persistence-facade.js';
+
 export function initAccumulationControls() {
     const enableAccumulationPhase = document.getElementById('enableAccumulationPhase');
     const accumulationPhaseDetails = document.getElementById('accumulationPhaseDetails');
@@ -39,7 +41,7 @@ export function initAccumulationControls() {
             const enabled = enableAccumulationPhase.checked;
             // Toggle details panel and persist the flag.
             accumulationPhaseDetails.style.display = enabled ? 'block' : 'none';
-            localStorage.setItem('sim_accumulationPhaseEnabled', enabled ? '1' : '0');
+            persistenceStorage.setItem('sim_accumulationPhaseEnabled', enabled ? '1' : '0');
             if (enabled) {
                 updateAccumulationCalculations();
             }
@@ -55,12 +57,12 @@ export function initAccumulationControls() {
 
     accumInputs.forEach(({ el, key }) => {
         if (el) {
-            const saved = localStorage.getItem(key);
+            const saved = persistenceStorage.getItem(key);
             if (saved !== null && saved !== "") {
                 el.value = saved;
             }
             el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => {
-                localStorage.setItem(key, el.value);
+                persistenceStorage.setItem(key, el.value);
             });
         }
     });

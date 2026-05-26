@@ -1,5 +1,8 @@
 console.log('--- Feature Flags Tests ---');
 
+import { createLocalStorageAdapter } from '../app/shared/persistence-adapter-localstorage.js';
+import { init, resetPersistenceForTests } from '../app/shared/persistence-facade.js';
+
 function createLocalStorageMock() {
     const store = new Map();
     return {
@@ -12,11 +15,44 @@ function createLocalStorageMock() {
     };
 }
 
+function createMemoryAdapter(initial = {}) {
+    const store = new Map(Object.entries(initial).map(([key, value]) => [key, String(value)]));
+    return {
+        async open() {},
+        async loadAll() {
+            return Object.fromEntries(store.entries());
+        },
+        async saveBatch({ upserts = [], deletes = [] } = {}) {
+            deletes.forEach(key => store.delete(String(key)));
+            upserts.forEach(([key, value]) => store.set(String(key), String(value)));
+        }
+    };
+}
+
 const prevLocalStorage = global.localStorage;
+const prevAddEventListener = globalThis.addEventListener;
+const prevDispatchEvent = globalThis.dispatchEvent;
+const prevCustomEvent = globalThis.CustomEvent;
 try {
     global.localStorage = createLocalStorageMock();
+    const listeners = new Map();
+    globalThis.addEventListener = (type, handler) => {
+        const list = listeners.get(type) || [];
+        list.push(handler);
+        listeners.set(type, list);
+    };
+    globalThis.dispatchEvent = (event) => {
+        (listeners.get(event.type) || []).forEach(handler => handler(event));
+        return true;
+    };
+    globalThis.CustomEvent = class {
+        constructor(type) {
+            this.type = type;
+        }
+    };
+    resetPersistenceForTests(createLocalStorageAdapter(() => global.localStorage));
 
-    const { featureFlags, getDefaultFlags, isEnabled, toggleFlag } = await import('../app/shared/feature-flags.js');
+    const { featureFlags, getDefaultFlags, isEnabled, toggleFlag } = await import(`../app/shared/feature-flags.js?test=${Date.now()}`);
 
     // --- TEST 1: Defaults ---
     {
@@ -49,9 +85,24 @@ try {
         assert(threw, 'toggleFlag should throw for unknown flag');
     }
 
+    // --- TEST 4: Reload after async persistence initialization ---
+    {
+        resetPersistenceForTests(createMemoryAdapter({
+            featureFlags: JSON.stringify({ useWorkers: false, debugLogging: true })
+        }));
+        await init();
+
+        assertEqual(isEnabled('useWorkers'), false, 'persistence:initialized reloads flags from initialized backend');
+        assertEqual(featureFlags.getAllFlags().debugLogging, true, 'persistence:initialized reloads additional backend flags');
+    }
+
     console.log('✅ Feature flags tests passed');
 } finally {
+    resetPersistenceForTests(createLocalStorageAdapter());
     if (prevLocalStorage === undefined) delete global.localStorage; else global.localStorage = prevLocalStorage;
+    if (prevAddEventListener === undefined) delete globalThis.addEventListener; else globalThis.addEventListener = prevAddEventListener;
+    if (prevDispatchEvent === undefined) delete globalThis.dispatchEvent; else globalThis.dispatchEvent = prevDispatchEvent;
+    if (prevCustomEvent === undefined) delete globalThis.CustomEvent; else globalThis.CustomEvent = prevCustomEvent;
 }
 
 console.log('--- Feature Flags Tests Completed ---');

@@ -8,6 +8,7 @@
 "use strict";
 
 import { EUR_NO_DEC_FORMATTER } from '../shared/shared-formatting.js';
+import { persistenceStorage } from '../shared/persistence-facade.js';
 
 function resolveTrancheMarketValue(tranche) {
     // Priorität: expliziter MarketValue > Shares * CurrentPrice.
@@ -93,7 +94,7 @@ export function getTranchenStatus() {
             };
         }
 
-        const saved = localStorage.getItem('depot_tranchen');
+        const saved = persistenceStorage.getItem('depot_tranchen');
         if (!saved) {
             return {
                 loaded: false,

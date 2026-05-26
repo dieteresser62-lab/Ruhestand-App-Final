@@ -42,7 +42,7 @@ Formatierungs- und Hilfsfunktionen für die UI.
 ---
 
 ## 3. `balance-storage.js`
-Persistenzschicht für `localStorage` und File-System-Snapshots.
+Persistenzschicht fuer Balance-State ueber `app/shared/persistence-facade.js` und File-System-Snapshots. Im Browser nutzt die Facade seit Phase 2 IndexedDB als lokale Source of Truth und migriert erlaubte Legacy-Keys automatisch aus `localStorage`; in Tauri nutzt sie seit Phase 3 eine JSON-Datei im App-Datenverzeichnis und migriert erlaubte Legacy-Keys aus der WebView-`localStorage`-Ablage. Feature-Code nutzt weiter die synchrone Storage-like API.
 
 **Exports:**
 - `initStorageManager(domRefs, state, renderer)` – initialisiert Abhängigkeiten
@@ -52,7 +52,7 @@ Persistenzschicht für `localStorage` und File-System-Snapshots.
   - `createSnapshot(handle)` / `restoreSnapshot(key, handle)` / `deleteSnapshot(key, handle)`
   - `connectFolder()` – öffnet File-System-Handle
 
-**Dependencies:** `balance-config.js` (Konfiguration & Fehlerklassen)
+**Dependencies:** `balance-config.js` (Konfiguration & Fehlerklassen), `app/shared/persistence-facade.js`
 
 **Hinweis Steuerzustand:** `lastState.taxState.lossCarry` wird migriert/defaulted und bei Guardrail-Resets erhalten.
 
@@ -188,13 +188,13 @@ Ausgaben-Check für monatliche CSV-Importe und Budgettracking.
 
 **Module:**
 - `balance-expenses.js` – Controller/Fassade fuer Initialisierung, Event-Wiring, Import-/Delete-Flows und oeffentliche API.
-- `balance-expenses-storage.js` – localStorage-Schema `balance_expenses_v1`, Jahr-/Monat-Container und aktive Jahr-Auswahl.
+- `balance-expenses-storage.js` – Persistenzschema `balance_expenses_v1`, Jahr-/Monat-Container und aktive Jahr-Auswahl.
 - `balance-expenses-csv.js` – CSV-Parser mit Delimiter-Erkennung (`;`, `,`, `Tab`) und Betragsnormalisierung.
 - `balance-expenses-metrics.js` – Monats-, Jahres-, Median-, Forecast- und Soll/Ist-Kennzahlen ohne DOM/localStorage.
 - `balance-expenses-renderer.js` – Year-Select, Tabelle, Summary-Karten und Detaildialog.
 
 **Funktionen:**
-- Monatliche Ablage pro Profil und Jahr in `localStorage` (`balance_expenses_v1`).
+- Monatliche Ablage pro Profil und Jahr ueber die Persistenz-Facade (`balance_expenses_v1`).
 - Budgetmonitoring:
   - Monatsampel (`ok/warn/bad`) mit 5%-Warnschwelle
   - Jahresverbrauch, Restbudget

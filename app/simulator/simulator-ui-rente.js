@@ -1,7 +1,9 @@
 "use strict";
 
+import { persistenceStorage } from '../shared/persistence-facade.js';
+
 /**
- * Initialisiert die Renten-spezifische UI (Person 1 und Partner) und synchronisiert sie mit localStorage.
+ * Initialisiert die Renten-spezifische UI (Person 1 und Partner) und synchronisiert sie mit der Persistenz-Facade.
  *
  * Annahmen zu gespeicherten Werten:
  * - Alle Werte werden als String in localStorage abgelegt und unverändert in die Input-Felder geschrieben.
@@ -96,7 +98,7 @@ export function initRente2ConfigWithLocalStorage() {
         return; // Ohne Checkbox oder Rente-2-Section macht weitere Initialisierung keinen Sinn.
     }
 
-    const savedAktiv = localStorage.getItem(storageKeys.aktiv);
+    const savedAktiv = persistenceStorage.getItem(storageKeys.aktiv);
     chkPartnerAktiv.checked = savedAktiv === "1";
     sectionRente2.style.display = chkPartnerAktiv.checked ? "block" : "none";
 
@@ -138,7 +140,7 @@ function applyInitialValueWithPersistence(element, storageKey, defaultValue, eve
         return; // Defensive Guard: Element existiert nicht.
     }
 
-    const storedValue = localStorage.getItem(storageKey);
+    const storedValue = persistenceStorage.getItem(storageKey);
     // Leere Strings, null oder undefined sollen zum Default führen.
     const valueToApply = storedValue !== null && storedValue !== undefined && storedValue !== "" ? storedValue : defaultValue;
     element.value = valueToApply;
@@ -146,7 +148,7 @@ function applyInitialValueWithPersistence(element, storageKey, defaultValue, eve
     // Alle angegebenen Events lösen ein Speichern aus.
     eventTypes.forEach(eventType => {
         // Persist raw string values to avoid locale parsing issues.
-        element.addEventListener(eventType, () => localStorage.setItem(storageKey, element.value));
+        element.addEventListener(eventType, () => persistenceStorage.setItem(storageKey, element.value));
     });
 }
 
@@ -162,19 +164,19 @@ function migrateRentAdjustmentIfNeeded(rentAdjustmentInput, storageKeys) {
         return; // Keine UI vorhanden, daher keine Migration nötig.
     }
 
-    const currentValue = localStorage.getItem(storageKeys.rentAdjPct);
+    const currentValue = persistenceStorage.getItem(storageKeys.rentAdjPct);
     // Nur migrieren, wenn kein aktueller Wert gesetzt ist.
     if (currentValue && currentValue !== "") {
         return;
     }
 
-    const oldAdjustment = localStorage.getItem(storageKeys.anpassung_OLD);
+    const oldAdjustment = persistenceStorage.getItem(storageKeys.anpassung_OLD);
     if (!oldAdjustment || oldAdjustment === "") {
         return;
     }
 
     // Wert direkt übernehmen, da es sich ebenfalls um einen Prozentwert handelt.
-    localStorage.setItem(storageKeys.rentAdjPct, oldAdjustment);
+    persistenceStorage.setItem(storageKeys.rentAdjPct, oldAdjustment);
 }
 
 /**
@@ -189,12 +191,12 @@ function migrateMonthlyPensionIfNeeded(monthlyPensionInput, storageKeys) {
         return; // Ohne Input kein Bedarf.
     }
 
-    let savedMonthly = localStorage.getItem(storageKeys.r2Monatsrente);
+    let savedMonthly = persistenceStorage.getItem(storageKeys.r2Monatsrente);
     if (savedMonthly && savedMonthly !== "" && savedMonthly !== "0") {
         return; // Bereits ein gültiger Monatswert vorhanden.
     }
 
-    const legacyAnnual = localStorage.getItem(storageKeys.r2Brutto_OLD);
+    const legacyAnnual = persistenceStorage.getItem(storageKeys.r2Brutto_OLD);
     const legacyValue = legacyAnnual ? parseFloat(legacyAnnual) : NaN;
     if (Number.isNaN(legacyValue) || legacyValue <= 0) {
         return; // Kein migrierbarer Legacy-Wert vorhanden.
@@ -202,7 +204,7 @@ function migrateMonthlyPensionIfNeeded(monthlyPensionInput, storageKeys) {
 
     // Legacy-Wert von Jahres- auf Monatsbetrag umrechnen und runden.
     savedMonthly = String(Math.round(legacyValue / 12));
-    localStorage.setItem(storageKeys.r2Monatsrente, savedMonthly);
+    persistenceStorage.setItem(storageKeys.r2Monatsrente, savedMonthly);
 }
 
 /**

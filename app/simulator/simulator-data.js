@@ -1,7 +1,7 @@
 /**
  * Module: Simulator Data
  * Purpose: Central repository for static simulation data.
- *          Includes historical market data (1925-2024), mortality tables,
+ *          Includes historical market data (1925-2025), mortality tables,
  *          care grades/probabilities, and stress test presets.
  * Usage: Imported by various simulator modules (historical, stress, etc.).
  * Dependencies: None (pure data)
@@ -20,7 +20,7 @@ export const ESTIMATED_HISTORY_CUTOFF_YEAR = 1950;
  */
 export const DATASET_META = Object.freeze({
   historicalData: {
-    coverageYears: [1925, 2024],
+    coverageYears: [1925, 2025],
     estimatedYears: [ESTIMATED_HISTORY_MIN_YEAR, ESTIMATED_HISTORY_MAX_YEAR],
     estimatedHistoryCutoffYear: ESTIMATED_HISTORY_CUTOFF_YEAR,
     notes: [
@@ -107,12 +107,12 @@ export const PFLEGE_GRADE_PROBABILITIES = {
 };
 
 /**
- * Historische Marktdaten (1925-2024)
+ * Historische Marktdaten (1925-2025)
  *
  * Hinweis zu `msci_eur`:
  * - Die Index-Variante (Price vs. Net vs. Gross Total Return) ist aktuell
  *   nicht dokumentiert.
- * - Die CAGR der Reihe (1978-2024) liegt bei ~7.9%, was eher zu einem
+ * - Die CAGR der Reihe (1978-2025) liegt bei ~7.8%, was eher zu einem
  *   Price Index passt (Total Return waere typischerweise ~10%+ in EUR).
  * - Im Zweifel ist das konservativ; bitte Quelle/Variante dokumentieren,
  *   sobald bekannt (z.B. MSCI World Index EUR Price/Net/Gross).
@@ -223,7 +223,8 @@ export const HISTORICAL_DATA = {
   2021: { msci_eur: 2260.4, inflation_de: 3.1, zinssatz_de: -0.5, lohn_de: 3, gold_eur_perf: -5.2, cape: 34.5 },
   2022: { msci_eur: 1960.9, inflation_de: 6.9, zinssatz_de: 1.25, lohn_de: 4, gold_eur_perf: 5.7, cape: 37.0 },
   2023: { msci_eur: 2318.9, inflation_de: 5.9, zinssatz_de: 3.5, lohn_de: 6, gold_eur_perf: 12.1, cape: 28.3 },
-  2024: { msci_eur: 2500, inflation_de: 2.5, zinssatz_de: 3.75, lohn_de: 3, gold_eur_perf: 15, cape: 31.0 }
+  2024: { msci_eur: 2500, inflation_de: 2.5, zinssatz_de: 3.75, lohn_de: 3, gold_eur_perf: 15, cape: 31.0 },
+  2025: { msci_eur: 2633.8, inflation_de: 2.2, zinssatz_de: 2.0, lohn_de: 4.2, gold_eur_perf: 47.6, cape: 37.1 }
 };
 
 // Normalize 1925-1949 MSCI levels to connect smoothly to the 1950 base.

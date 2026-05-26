@@ -150,12 +150,12 @@ export function runBacktest() {
         const inputs = getCommonInputs();
         const startJahr = parseInt(document.getElementById('simStartJahr').value);
         const endJahr = parseInt(document.getElementById('simEndJahr').value);
-        if (startJahr < 1951 || endJahr > 2024 || startJahr >= endJahr) {
-            alert(`Fehler: Bitte einen gültigen Zeitraum eingeben.\n- Der Zeitraum muss zwischen 1951 und 2024 liegen.`);
+        if (startJahr < 1951 || endJahr > 2025 || startJahr >= endJahr) {
+            alert(`Fehler: Bitte einen gültigen Zeitraum eingeben.\n- Der Zeitraum muss zwischen 1951 und 2025 liegen.`);
             document.getElementById('btButton').disabled = false; return;
         }
 
-        // Historische Reihen als Arrays aufbauen (1970-2024)
+        // Historische Reihen als Arrays aufbauen (ab 1950)
         const histYears = Object.keys(HISTORICAL_DATA).map(Number).sort((a, b) => a - b).filter(y => y >= 1950);
         const wageGrowthArray = histYears.map(y => HISTORICAL_DATA[y].lohn_de || 0);
         const inflationPctArray = histYears.map(y => HISTORICAL_DATA[y].inflation_de || 0);

@@ -1,8 +1,10 @@
 // @ts-check
 
 import { initProfileSubpageLifecycle } from './profile-navigation.js';
+import { init as initPersistence } from '../shared/persistence-facade.js';
 
-function initProfileBridge() {
+async function initProfileBridge() {
+    await initPersistence();
     initProfileSubpageLifecycle();
 }
 

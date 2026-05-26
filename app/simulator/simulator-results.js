@@ -7,6 +7,7 @@ import { renderSummary, renderKpiDashboard, renderStressSection, renderHeatmap, 
 import { showToast } from './simulator-main-helpers.js';
 import { EngineAPI } from '../../engine/index.mjs';
 import { STRATEGY_OPTIONS } from '../../types/strategy-options.js';
+import { persistenceStorage } from '../shared/persistence-facade.js';
 
 const formatPercent = (value, digits = 1) => formatPercentValue(Number(value) || 0, { fractionDigits: digits, invalid: '0.0%' });
 const formatPercentFromRatio = (value, digits = 1) => formatPercentRatio(Number(value) || 0, { fractionDigits: digits, invalid: '0.0%' });
@@ -29,13 +30,13 @@ export const BACKTEST_LOG_DETAIL_KEY = 'backtestLogDetailLevel';
  * @returns {('normal'|'detailed')} Sanitized detail level, defaults to 'normal'.
  */
 export function loadDetailLevel(storageKey, legacyKey = LEGACY_LOG_DETAIL_KEY) {
-    const stored = localStorage.getItem(storageKey);
+    const stored = persistenceStorage.getItem(storageKey);
     if (stored === 'detailed' || stored === 'normal') {
         return stored;
     }
 
     if (legacyKey) {
-        const legacy = localStorage.getItem(legacyKey);
+        const legacy = persistenceStorage.getItem(legacyKey);
         if (legacy === 'detailed') return 'detailed';
     }
 
@@ -52,9 +53,9 @@ export function loadDetailLevel(storageKey, legacyKey = LEGACY_LOG_DETAIL_KEY) {
  */
 export function persistDetailLevel(storageKey, level) {
     const sanitizedLevel = level === 'detailed' ? 'detailed' : 'normal';
-    localStorage.setItem(storageKey, sanitizedLevel);
+    persistenceStorage.setItem(storageKey, sanitizedLevel);
     if (storageKey !== LEGACY_LOG_DETAIL_KEY) {
-        localStorage.removeItem(LEGACY_LOG_DETAIL_KEY);
+        persistenceStorage.removeItem(LEGACY_LOG_DETAIL_KEY);
     }
     return sanitizedLevel;
 }
@@ -147,7 +148,7 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
 
             if (scenario && scenario.logDataRows && scenario.logDataRows.length > 0) {
                 // Respect persisted detail toggles for care and log verbosity.
-                const showCareDetails = (localStorage.getItem('showCareDetails') === '1');
+                const showCareDetails = (persistenceStorage.getItem('showCareDetails') === '1');
                 const logDetailLevel = loadDetailLevel(WORST_LOG_DETAIL_KEY);
                 output.innerHTML = renderWorstRunLog(scenario.logDataRows, caR, {
                     showCareDetails: showCareDetails,
@@ -173,9 +174,9 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
         const logDetailCheckbox = document.getElementById('toggle-log-detail');
 
         if (careDetailsCheckbox) {
-            careDetailsCheckbox.checked = (localStorage.getItem('showCareDetails') === '1');
+            careDetailsCheckbox.checked = (persistenceStorage.getItem('showCareDetails') === '1');
             careDetailsCheckbox.addEventListener('change', () => {
-                localStorage.setItem('showCareDetails', careDetailsCheckbox.checked ? '1' : '0');
+                persistenceStorage.setItem('showCareDetails', careDetailsCheckbox.checked ? '1' : '0');
                 renderSelectedScenario();
             });
         }

@@ -23,6 +23,7 @@ import {
     readProfileHealthBucketFromStorage,
     readProfileOverridesFromStorage
 } from '../profile/profile-state.js';
+import { persistenceStorage } from '../shared/persistence-facade.js';
 
 // Module-level DOM reference
 let dom = null;
@@ -89,7 +90,7 @@ export const UIReader = {
         const checked = (id) => dom.inputs[id] ? dom.inputs[id].checked : false;
         const readPersistedCapeRatio = () => {
             try {
-                const raw = localStorage.getItem(CONFIG.STORAGE.LS_KEY);
+                const raw = persistenceStorage.getItem(CONFIG.STORAGE.LS_KEY);
                 if (!raw) return null;
                 const parsed = JSON.parse(raw);
                 const direct = Number(parsed?.capeMeta?.capeRatio);
@@ -103,22 +104,22 @@ export const UIReader = {
         };
 
         // Profilwerte (localStorage) überschreiben DOM-Werte, wenn vorhanden.
-        const profileOverrides = readProfileOverridesFromStorage(localStorage);
+        const profileOverrides = readProfileOverridesFromStorage(persistenceStorage);
         const profileTagesgeld = profileOverrides.profileTagesgeld;
         const profileRenteAktiv = profileOverrides.profileRenteAktiv;
         const profileRenteMonatlich = profileOverrides.profileRenteMonatlich;
         const profileSonstigeEinkuenfte = profileOverrides.profileSonstigeEinkuenfte;
-        const profileAlterRaw = localStorage.getItem(PROFILE_VALUE_KEYS.alter);
+        const profileAlterRaw = persistenceStorage.getItem(PROFILE_VALUE_KEYS.alter);
         const profileAlter = profileAlterRaw === null ? null : UIUtils.parseCurrency(profileAlterRaw);
         const profileGoldAktiv = profileOverrides.profileGoldAktiv;
         const profileGoldZiel = profileOverrides.profileGoldZiel;
         const profileGoldFloor = profileOverrides.profileGoldFloor;
         const profileGoldSteuerfrei = profileOverrides.profileGoldSteuerfrei;
         const profileGoldRebalBand = profileOverrides.profileGoldRebalBand;
-        const healthBucket = readProfileHealthBucketFromStorage(localStorage);
+        const healthBucket = readProfileHealthBucketFromStorage(persistenceStorage);
         // Lade detaillierte Tranchen aus localStorage (falls vorhanden)
         const detailledTranches = parseStoredTranchesFromData({
-            [PROFILE_TRANCHES_KEY]: localStorage.getItem(PROFILE_TRANCHES_KEY)
+            [PROFILE_TRANCHES_KEY]: persistenceStorage.getItem(PROFILE_TRANCHES_KEY)
         });
 
         // Falls Tranchen vorhanden sind, nutzen wir die aggregierten Werte als Wahrheit.

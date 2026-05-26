@@ -14,6 +14,7 @@
  */
 
 import { CONFIG, StorageError } from './balance-config.js';
+import { persistenceStorage } from '../shared/persistence-facade.js';
 
 // Module-level references to be injected
 let dom = null;
@@ -79,7 +80,7 @@ export const StorageManager = {
      */
     loadState() {
         try {
-            const data = localStorage.getItem(CONFIG.STORAGE.LS_KEY);
+            const data = persistenceStorage.getItem(CONFIG.STORAGE.LS_KEY);
             const parsed = data ? JSON.parse(data) : {};
             return this._runMigrations(parsed);
         } catch (e) {
@@ -95,7 +96,7 @@ export const StorageManager = {
      */
     saveState(state) {
         try {
-            localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify(state));
+            persistenceStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify(state));
         } catch (e) {
             throw new StorageError("Fehler beim Speichern des Zustands im LocalStorage.", { originalError: e });
         }
@@ -125,7 +126,7 @@ export const StorageManager = {
             payload.lastState = state;
             return payload;
         };
-        if (localStorage.getItem(CONFIG.STORAGE.MIGRATION_FLAG)) {
+        if (persistenceStorage.getItem(CONFIG.STORAGE.MIGRATION_FLAG)) {
             return ensureTaxState(data);
         }
 
@@ -139,7 +140,7 @@ export const StorageManager = {
             }
             data.lastState = state;
         }
-        localStorage.setItem(CONFIG.STORAGE.MIGRATION_FLAG, '1');
+        persistenceStorage.setItem(CONFIG.STORAGE.MIGRATION_FLAG, '1');
         return ensureTaxState(data);
     },
 
@@ -148,8 +149,8 @@ export const StorageManager = {
      * Entfernt localStorage-Einträge für State und Migrations-Flag
      */
     resetState() {
-        localStorage.removeItem(CONFIG.STORAGE.LS_KEY);
-        localStorage.removeItem(CONFIG.STORAGE.MIGRATION_FLAG);
+        persistenceStorage.removeItem(CONFIG.STORAGE.LS_KEY);
+        persistenceStorage.removeItem(CONFIG.STORAGE.MIGRATION_FLAG);
     },
 
     /**
@@ -205,7 +206,8 @@ export const StorageManager = {
                 }
             } else {
                 statusEl.textContent = 'Speicherort: Browser (localStorage)';
-                snapshots = Object.keys(localStorage)
+                snapshots = Array.from({ length: persistenceStorage.length }, (_, i) => persistenceStorage.key(i))
+                    .filter(Boolean)
                     .filter(key => key.startsWith(CONFIG.STORAGE.SNAPSHOT_PREFIX))
                     .map(key => {
                         const rawSuffix = key.replace(CONFIG.STORAGE.SNAPSHOT_PREFIX, '');
@@ -281,10 +283,10 @@ export const StorageManager = {
      */
     async createSnapshot(handle, label = '') {
         const localSnapshot = {};
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
+        for (let i = 0; i < persistenceStorage.length; i++) {
+            const key = persistenceStorage.key(i);
             if (!key) continue;
-            localSnapshot[key] = localStorage.getItem(key);
+            localSnapshot[key] = persistenceStorage.getItem(key);
         }
         if (Object.keys(localSnapshot).length === 0) {
             throw new StorageError("Keine Daten zum Sichern vorhanden.");
@@ -315,7 +317,7 @@ export const StorageManager = {
             // We keep the chronological key structure for LS to maintain sorting
             const labelPart = safeLabel ? `--${safeLabel}` : '';
             const key = CONFIG.STORAGE.SNAPSHOT_PREFIX + new Date().toISOString() + labelPart;
-            localStorage.setItem(key, JSON.stringify(currentData));
+            persistenceStorage.setItem(key, JSON.stringify(currentData));
         }
     },
 
@@ -367,7 +369,7 @@ export const StorageManager = {
             const file = await fileHandle.getFile();
             snapshotData = JSON.parse(await file.text());
         } else {
-            rawSnapshot = localStorage.getItem(key);
+            rawSnapshot = persistenceStorage.getItem(key);
             snapshotData = JSON.parse(rawSnapshot);
         }
         if (!snapshotData || typeof snapshotData !== "object") {
@@ -384,14 +386,14 @@ export const StorageManager = {
                 'etfProxyUrl'
             ];
             const isAllowedKey = (k) => ALLOWED_KEY_PREFIXES.some(prefix => k.startsWith(prefix));
-            localStorage.clear();
+            persistenceStorage.clear();
             Object.entries(snapshotData.localStorage).forEach(([lsKey, value]) => {
                 if (isAllowedKey(lsKey)) {
-                    localStorage.setItem(lsKey, value);
+                    persistenceStorage.setItem(lsKey, value);
                 }
             });
             if (!handle && rawSnapshot && key) {
-                localStorage.setItem(key, rawSnapshot);
+                persistenceStorage.setItem(key, rawSnapshot);
             }
         } else {
             this.saveState(snapshotData);
@@ -415,7 +417,7 @@ export const StorageManager = {
         if (handle) {
             await handle.removeEntry(key);
         } else {
-            localStorage.removeItem(key);
+            persistenceStorage.removeItem(key);
         }
         this.renderSnapshots(dom.outputs.snapshotList, dom.controls.snapshotStatus, handle);
         UIRenderer.toast('Snapshot gelöscht.');

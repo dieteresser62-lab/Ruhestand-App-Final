@@ -3,8 +3,95 @@
 use log::LevelFilter;
 use serde_json::json;
 use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
+use std::sync::Mutex;
 use std::thread;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tauri::{Emitter, Manager};
 use tiny_http::{Header, Method, Response, Server, StatusCode};
+
+const APP_STATE_FILENAME: &str = "ruhestand_suite_data.json";
+
+struct CloseState {
+  allow_close: Mutex<bool>,
+  close_pending: Mutex<bool>,
+}
+
+fn app_state_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+  let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+  fs::create_dir_all(&app_dir).map_err(|e| e.to_string())?;
+  Ok(app_dir.join(APP_STATE_FILENAME))
+}
+
+#[tauri::command]
+fn load_app_state(app: tauri::AppHandle) -> Result<String, String> {
+  let file_path = app_state_path(&app)?;
+  if !file_path.exists() {
+    return Ok(String::new());
+  }
+  fs::read_to_string(&file_path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn save_app_state(app: tauri::AppHandle, content: String) -> Result<(), String> {
+  let file_path = app_state_path(&app)?;
+  let tmp_path = file_path.with_extension("json.tmp");
+  let bak_path = file_path.with_extension("json.bak");
+
+  fs::write(&tmp_path, content).map_err(|e| e.to_string())?;
+  if file_path.exists() {
+    let _ = fs::copy(&file_path, &bak_path);
+    fs::remove_file(&file_path).map_err(|e| e.to_string())?;
+  }
+  if let Err(err) = fs::rename(&tmp_path, &file_path) {
+    if bak_path.exists() && !file_path.exists() {
+      let _ = fs::rename(&bak_path, &file_path);
+    }
+    return Err(err.to_string());
+  }
+  let _ = fs::remove_file(&bak_path);
+  Ok(())
+}
+
+#[tauri::command]
+fn quarantine_app_state(app: tauri::AppHandle) -> Result<String, String> {
+  let file_path = app_state_path(&app)?;
+  if !file_path.exists() {
+    return Ok(String::new());
+  }
+  let timestamp = SystemTime::now()
+    .duration_since(UNIX_EPOCH)
+    .map_err(|e| e.to_string())?
+    .as_secs();
+  let quarantine_path = file_path.with_file_name(format!(
+    "ruhestand_suite_data.corrupt.{}.json",
+    timestamp
+  ));
+  fs::rename(&file_path, &quarantine_path).map_err(|e| e.to_string())?;
+  Ok(quarantine_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn confirm_app_close(window: tauri::Window, state: tauri::State<'_, CloseState>) -> Result<(), String> {
+  let mut allow_close = state.allow_close.lock().map_err(|e| e.to_string())?;
+  *allow_close = true;
+  drop(allow_close);
+  if let Ok(mut close_pending) = state.close_pending.lock() {
+    *close_pending = false;
+  }
+  window.close().map_err(|e| e.to_string())
+}
+
+fn allow_window_close(window: &tauri::Window, state: &CloseState) {
+  if let Ok(mut allow_close) = state.allow_close.lock() {
+    *allow_close = true;
+  }
+  if let Ok(mut close_pending) = state.close_pending.lock() {
+    *close_pending = false;
+  }
+  let _ = window.close();
+}
 
 fn allowed_cors_origin(origin: &str) -> &str {
   match origin {
@@ -241,6 +328,16 @@ fn start_yahoo_proxy() {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
+    .manage(CloseState {
+      allow_close: Mutex::new(false),
+      close_pending: Mutex::new(false),
+    })
+    .invoke_handler(tauri::generate_handler![
+      load_app_state,
+      save_app_state,
+      quarantine_app_state,
+      confirm_app_close
+    ])
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -252,6 +349,40 @@ pub fn run() {
 
       thread::spawn(start_yahoo_proxy);
       Ok(())
+    })
+    .on_window_event(|window, event| {
+      if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+        if let Some(state) = window.try_state::<CloseState>() {
+          let mut allow_close = state.allow_close.lock().unwrap_or_else(|e| e.into_inner());
+          if *allow_close {
+            *allow_close = false;
+            if let Ok(mut close_pending) = state.close_pending.lock() {
+              *close_pending = false;
+            }
+            return;
+          }
+          drop(allow_close);
+
+          let mut close_pending = state.close_pending.lock().unwrap_or_else(|e| e.into_inner());
+          if *close_pending {
+            api.prevent_close();
+            return;
+          }
+          *close_pending = true;
+        }
+        api.prevent_close();
+        let _ = window.emit("ruhestand://close-requested", json!({}));
+        let fallback_window = window.clone();
+        thread::spawn(move || {
+          thread::sleep(Duration::from_secs(3));
+          if let Some(state) = fallback_window.try_state::<CloseState>() {
+            let close_pending = state.close_pending.lock().map(|pending| *pending).unwrap_or(false);
+            if close_pending {
+              allow_window_close(&fallback_window, &state);
+            }
+          }
+        });
+      }
     })
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

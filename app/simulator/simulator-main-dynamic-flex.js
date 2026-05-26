@@ -1,5 +1,7 @@
 "use strict";
 
+import { persistenceStorage } from '../shared/persistence-facade.js';
+
 const DYNAMIC_FLEX_PRESETS = {
     off: {
         dynamicFlex: false,
@@ -144,15 +146,14 @@ export function initDynamicFlexControls(options = {}) {
     const enableLocalPersistence = options.enableLocalPersistence !== false;
     const persist = () => {
         if (!enableLocalPersistence) return;
-        if (typeof localStorage === 'undefined') return;
         DYNAMIC_FLEX_PERSIST_IDS.forEach(id => {
             const el = document.getElementById(id);
             if (!el || el.dataset.noPersist) return;
             const key = storagePrefix + id;
             if (el.type === 'checkbox') {
-                localStorage.setItem(key, el.checked ? 'true' : 'false');
+                persistenceStorage.setItem(key, el.checked ? 'true' : 'false');
             } else if (el.type !== 'radio') {
-                localStorage.setItem(key, String(el.value));
+                persistenceStorage.setItem(key, String(el.value));
             }
         });
     };

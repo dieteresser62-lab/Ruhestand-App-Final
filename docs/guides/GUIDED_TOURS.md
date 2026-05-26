@@ -494,7 +494,7 @@ Die Werte werden aus deinem Profil übernommen:
 ### Schritt 6: Backtest als Realitäts-Check
 
 1. Tab **"Backtesting"**
-2. Zeitraum wählen (z.B. 2000-2024)
+2. Zeitraum wählen (z.B. 2000-2025)
 3. Klick auf **"Backtest starten"**
 4. Zeigt: Hätte dein Plan die echte Geschichte überlebt?
 

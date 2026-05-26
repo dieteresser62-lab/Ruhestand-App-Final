@@ -382,7 +382,7 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 
 #### `simulator-headless.test.mjs`
 **Zweck:** Headless Full-Backtest ohne Browser.
-- 2000-2024 Simulation mit realen Marktdaten
+- 2000-2025 Simulation mit realen Marktdaten
 - Validiert dass Liquidität nie negativ wird
 - State-Persistence über Jahre hinweg
 
@@ -659,7 +659,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `simulator-3bucket-ui-e2e.test.mjs` | ~130 | 3-Bucket-UI-Integration im Simulator |
 | `simulator-backtest.test.mjs` | ~150 | Historischer Backtest |
 | `simulator-dynamic-flex-persistence.test.mjs` | ~110 | Persistenz von Dynamic-Flex-Inputs |
-| `simulator-headless.test.mjs` | ~125 | Headless 2000-2024 |
+| `simulator-headless.test.mjs` | ~125 | Headless 2000-2025 |
 | `simulator-heatmap.test.mjs` | ~60 | Heatmap-Rendering |
 | `simulator-input-readers.test.mjs` | ~160 | DOM-freie Simulator-Input-Reader |
 | `simulator-log-columns.test.mjs` | ~110 | Logspalten für Entnahme, VPW, Bonds und Steuer |

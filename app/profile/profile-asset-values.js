@@ -8,6 +8,7 @@ import {
     readProfileHealthBucketFromStorage,
     serializeProfileHealthBucket
 } from './profile-state.js';
+import { persistenceStorage } from '../shared/persistence-facade.js';
 
 export const DEFAULT_PROFILE_ASSET_VALUES = {
     tagesgeld: 0,
@@ -34,7 +35,7 @@ function readBool(raw, fallback = false) {
     return String(raw).toLowerCase() === 'true';
 }
 
-export function readProfileStoredInputs(storage = localStorage) {
+export function readProfileStoredInputs(storage = persistenceStorage) {
     const raw = storage.getItem(CONFIG.STORAGE.LS_KEY);
     if (!raw) return {};
     try {
@@ -63,7 +64,7 @@ export function normalizeProfileAssetValues(values = {}) {
     };
 }
 
-export function loadProfileAssetValues(storage = localStorage) {
+export function loadProfileAssetValues(storage = persistenceStorage) {
     const storedInputs = readProfileStoredInputs(storage);
     const healthBucket = readProfileHealthBucketFromStorage(storage);
     const tagesgeldRaw = storage.getItem(PROFILE_VALUE_KEYS.tagesgeld);
@@ -145,7 +146,7 @@ export function readProfileAssetValuesFromDom(doc = document) {
     });
 }
 
-export function saveProfileAssetValues(values, storage = localStorage) {
+export function saveProfileAssetValues(values, storage = persistenceStorage) {
     const normalized = normalizeProfileAssetValues(values);
     storage.setItem(PROFILE_VALUE_KEYS.tagesgeld, String(normalized.tagesgeld));
     storage.setItem(PROFILE_VALUE_KEYS.renteAktiv, normalized.renteAktiv ? 'true' : 'false');

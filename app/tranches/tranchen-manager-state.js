@@ -1,6 +1,7 @@
 // @ts-check
 
 import { PROFILE_TRANCHES_KEY } from '../profile/profile-state.js';
+import { persistenceStorage } from '../shared/persistence-facade.js';
 
 export function generateTrancheId() {
     const rand = Math.random().toString(36).slice(2, 8);
@@ -30,12 +31,12 @@ export function calculateTrancheDerivedValues(tranche) {
     };
 }
 
-export function saveTranchesToStorage(tranchen, storage = localStorage) {
+export function saveTranchesToStorage(tranchen, storage = persistenceStorage) {
     storage.setItem(PROFILE_TRANCHES_KEY, JSON.stringify(tranchen));
     return tranchen;
 }
 
-export function loadTranchesFromStorage(storage = localStorage) {
+export function loadTranchesFromStorage(storage = persistenceStorage) {
     const saved = storage.getItem(PROFILE_TRANCHES_KEY);
     if (!saved) return [];
     try {

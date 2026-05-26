@@ -83,9 +83,9 @@ export const UIBinder = {
         }
         dom.controls.btnNachruecken.addEventListener('click', this.handleNachruecken.bind(this));
         dom.controls.btnUndoNachruecken.addEventListener('click', this.handleUndoNachruecken.bind(this));
-        dom.controls.exportBtn.addEventListener('click', this.handleExport.bind(this));
-        dom.controls.importBtn.addEventListener('click', () => dom.controls.importFile.click());
-        dom.controls.importFile.addEventListener('change', this.handleImport.bind(this));
+        dom.controls.exportBtn?.addEventListener('click', this.handleExport.bind(this));
+        dom.controls.importBtn?.addEventListener('click', () => dom.controls.importFile?.click());
+        dom.controls.importFile?.addEventListener('change', this.handleImport.bind(this));
         dom.controls.btnCsvImport.addEventListener('click', () => dom.controls.csvFileInput.click());
         dom.controls.csvFileInput.addEventListener('change', this.handleCsvImport.bind(this));
         dom.controls.jahresabschlussBtn.addEventListener('click', this.handleJahresabschluss.bind(this));
@@ -117,15 +117,15 @@ export const UIBinder = {
             return;
         }
 
-        // Alt+E: Export
-        if (e.altKey && e.key === 'e') {
+        // Alt+E: Export, falls der optionale Button vorhanden ist.
+        if (e.altKey && e.key === 'e' && dom.controls.exportBtn) {
             e.preventDefault();
             dom.controls.exportBtn.click();
             return;
         }
 
-        // Alt+I: Import
-        if (e.altKey && e.key === 'i') {
+        // Alt+I: Import, falls der optionale Button vorhanden ist.
+        if (e.altKey && e.key === 'i' && dom.controls.importBtn) {
             e.preventDefault();
             dom.controls.importBtn.click();
             return;

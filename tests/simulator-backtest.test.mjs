@@ -57,10 +57,10 @@ try {
 
     const baseInputs = {
         simStartJahr: 2000,
-        simEndJahr: 2024,
-        simStartVermoegen: 500000,
-        depotwertAlt: 500000,
-        einstandAlt: 400000,
+        simEndJahr: 2025,
+        simStartVermoegen: 2000000,
+        depotwertAlt: 2000000,
+        einstandAlt: 1600000,
         tagesgeld: 20000,
         geldmarktEtf: 0,
         startFloorBedarf: 24000,
@@ -89,7 +89,7 @@ try {
         goldSteuerfrei: 'false'
     };
 
-    // --- TEST 1: Determinism (2000-2024) ---
+    // --- TEST 1: Determinism (2000-2025) ---
     {
         global.document = createMockDocument(baseInputs);
         global.document.getElementById('monteCarloResults').style.display = 'none';
@@ -105,7 +105,9 @@ try {
         runBacktest();
         const secondRows = (window.globalBacktestData?.rows || []).map(r => [r.jahr, r.wertAktien, r.wertGold, r.liquiditaet]);
 
-        assertEqual(JSON.stringify(firstRows), JSON.stringify(secondRows), 'Backtest 2000-2024 should be deterministic');
+        assertEqual(JSON.stringify(firstRows), JSON.stringify(secondRows), 'Backtest 2000-2025 should be deterministic');
+        assertEqual(firstRows.length, 26, 'Backtest should contain 26 yearly results for 2000-2025');
+        assertEqual(window.globalBacktestData?.rows?.at(-1)?.jahr, 2025, 'Last backtest year should be 2025');
     }
 
     // --- TEST 2: Startjahr-Filterung ---

@@ -375,6 +375,48 @@
             }
         }
 
+        .recovery-banner {
+            width: 90%;
+            max-width: 900px;
+            background: rgba(192, 57, 43, 0.08);
+            border: 2px dashed #c0392b;
+            border-radius: var(--border-radius);
+            padding: 20px;
+            margin: 20px auto 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            box-shadow: 0 10px 25px rgba(192, 57, 43, 0.1);
+            animation: slideDown 0.4s ease-out;
+            z-index: 1000;
+        }
+
+        .recovery-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #c0392b;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .recovery-message {
+            font-size: 0.95rem;
+            color: #2c3e50;
+            line-height: 1.5;
+        }
+
+        .recovery-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        @keyframes slideDown {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
         @media (max-width: 768px) {
             h1 {
                 font-size: 2.5rem;
@@ -411,10 +453,12 @@
         <details class="profile-advanced">
             <summary>Erweitert</summary>
             <div class="profile-row">
-                <button class="profile-button secondary" id="profileExportBtn">Backup exportieren</button>
-                <button class="profile-button secondary" id="profileImportBtn">Backup importieren</button>
-                <input id="profileImportFile" type="file" accept="application/json,.json" style="display:none">
+                <button class="profile-button secondary" id="fullBackupBtn">Backup exportieren</button>
+                <button class="profile-button secondary" id="fullBackupImportBtn">Backup importieren</button>
+                <input id="fullBackupImportFile" type="file" accept="application/json,.json" style="display:none">
             </div>
+            <div class="profile-status" id="persistenceBackupInfo"></div>
+            <div class="profile-status" id="fullBackupStatus"></div>
             <div class="profile-row">
                 <input id="profileNameInput" type="text" placeholder="Neues Profil (Name)">
                 <button class="profile-button" id="profileCreateBtn">Anlegen</button>
@@ -508,6 +552,67 @@
     </footer>
 
     <script type="module" src="app/profile/profile-manager.js"></script>
+    <script type="module">
+        import { init as initPersistence, PersistenceFacade } from './app/shared/persistence-facade.js';
+        import {
+            bindFullBackupButton,
+            bindFullBackupImport,
+            renderPersistenceBackupInfo
+        } from './app/shared/persistence-backup.js';
+
+        await initPersistence();
+        bindFullBackupButton();
+        bindFullBackupImport();
+
+        const infoTarget = document.getElementById('persistenceBackupInfo');
+        renderPersistenceBackupInfo(infoTarget);
+
+        const status = PersistenceFacade.getPersistenceStatus();
+        if (status.migrationWarning) {
+            const banner = document.createElement('div');
+            banner.className = 'recovery-banner';
+
+            const title = document.createElement('div');
+            title.className = 'recovery-title';
+            title.textContent = '⚠️ Speicher-Wiederherstellung (Recovery-Modus)';
+            banner.appendChild(title);
+
+            const msg = document.createElement('div');
+            msg.className = 'recovery-message';
+            msg.textContent = status.migrationWarning.message;
+            if (status.migrationWarning.quarantinePath) {
+                msg.textContent += ` (Sicherungsdatei unter: ${status.migrationWarning.quarantinePath})`;
+            }
+            banner.appendChild(msg);
+
+            const actions = document.createElement('div');
+            actions.className = 'recovery-actions';
+
+            const importBtn = document.createElement('button');
+            importBtn.className = 'profile-button';
+            importBtn.textContent = 'Backup importieren';
+            importBtn.addEventListener('click', () => {
+                document.getElementById('fullBackupImportFile').click();
+            });
+            actions.appendChild(importBtn);
+
+            const dismissBtn = document.createElement('button');
+            dismissBtn.className = 'profile-button secondary';
+            dismissBtn.textContent = 'Schliessen';
+            dismissBtn.addEventListener('click', () => {
+                banner.style.display = 'none';
+            });
+            actions.appendChild(dismissBtn);
+
+            banner.appendChild(actions);
+
+            const hero = document.querySelector('.hero');
+            if (hero) {
+                hero.parentNode.insertBefore(banner, hero.nextSibling);
+            }
+        }
+    </script>
+
 
     <div id="devTools" style="display:none; position:fixed; bottom:10px; right:10px; background:#333; color:#fff; padding:10px; border-radius:5px; z-index:9999;">
         <label>

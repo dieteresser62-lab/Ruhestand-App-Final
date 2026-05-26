@@ -8,11 +8,10 @@ import {
     renameProfile,
     deleteProfile,
     switchProfile,
-    saveCurrentProfileFromLocalStorage,
-    exportProfilesBundle,
-    importProfilesBundle
+    saveCurrentProfileFromLocalStorage
 } from './profile-storage.js';
 import { initProfileIndexLifecycle } from './profile-navigation.js';
+import { init as initPersistence } from '../shared/persistence-facade.js';
 
 function byId(id) {
     return document.getElementById(id);
@@ -42,7 +41,8 @@ function setStatus(statusEl, message, kind = '') {
     statusEl.dataset.kind = kind;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    await initPersistence();
     initProfileIndexLifecycle();
 
     const profileSelect = byId('profileSelect');
@@ -51,14 +51,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const renameBtn = byId('profileRenameBtn');
     const deleteBtn = byId('profileDeleteBtn');
     const saveBtn = byId('profileSaveBtn');
-    const exportBtn = byId('profileExportBtn');
-    const importBtn = byId('profileImportBtn');
-    const importFile = byId('profileImportFile');
     const activeBadge = byId('activeProfileBadge');
     const statusEl = byId('profileStatus');
     let isSwitching = false;
 
-    if (!profileSelect || !profileNameInput || !createBtn || !renameBtn || !deleteBtn || !exportBtn || !importBtn || !importFile || !activeBadge || !statusEl) {
+    if (!profileSelect || !profileNameInput || !createBtn || !renameBtn || !deleteBtn || !activeBadge || !statusEl) {
         return;
     }
 
@@ -148,44 +145,5 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             setStatus(statusEl, 'Loeschen fehlgeschlagen.', 'error');
         }
-    });
-
-    exportBtn.addEventListener('click', () => {
-        const bundle = exportProfilesBundle();
-        const json = JSON.stringify(bundle, null, 2);
-        const blob = new Blob([json], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `ruhestand-profiles-${new Date().toISOString().slice(0, 10)}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        setStatus(statusEl, 'Backup exportiert.', 'ok');
-    });
-
-    importBtn.addEventListener('click', () => {
-        importFile.value = '';
-        importFile.click();
-    });
-
-    importFile.addEventListener('change', () => {
-        const file = importFile.files && importFile.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-            try {
-                const payload = JSON.parse(String(reader.result || ''));
-                const result = importProfilesBundle(payload);
-                if (!result.ok) {
-                    setStatus(statusEl, result.message || 'Import fehlgeschlagen.', 'error');
-                    return;
-                }
-                refresh();
-                setStatus(statusEl, 'Backup importiert. Seite ggf. neu laden.', 'ok');
-            } catch (err) {
-                setStatus(statusEl, `Import fehlgeschlagen: ${err.message}`, 'error');
-            }
-        };
-        reader.readAsText(file);
     });
 });

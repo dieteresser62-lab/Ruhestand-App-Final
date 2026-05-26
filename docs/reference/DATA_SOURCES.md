@@ -16,9 +16,9 @@ Tauri release builds allow these live-data targets explicitly in `src-tauri/taur
 
 ## Historical market dataset (`app/simulator/simulator-data.js`)
 
-- Coverage: `1925-2024`
+- Coverage: `1925-2025`
 - Estimated history segment: `1925-1949`
-- Baseline segment: `1950-2024`
+- Baseline segment: `1950-2025`
 
 ## Important notes
 

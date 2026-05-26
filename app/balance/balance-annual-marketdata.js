@@ -11,6 +11,7 @@
 import { AppError } from './balance-config.js';
 import { UIRenderer } from './balance-renderer.js';
 import { StorageManager } from './balance-storage.js';
+import { persistenceStorage } from '../shared/persistence-facade.js';
 
 const CAPE_PLAUSIBILITY_MIN = 5;
 const CAPE_PLAUSIBILITY_MAX = 80;
@@ -264,7 +265,7 @@ export function createMarketdataHandlers({
             return `${template}${encodeURIComponent(targetUrl)}`;
         };
         const proxyEntries = [];
-        const rawCustomProxy = localStorage.getItem('etfProxyUrls') || localStorage.getItem('etfProxyUrl');
+        const rawCustomProxy = persistenceStorage.getItem('etfProxyUrls') || persistenceStorage.getItem('etfProxyUrl');
         if (rawCustomProxy) {
             let customList = [];
             try {

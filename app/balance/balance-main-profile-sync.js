@@ -11,11 +11,12 @@ import { UIReader } from './balance-reader.js';
 import { UIUtils } from './balance-utils.js';
 import { loadProfilverbundProfiles, buildProfilverbundAssetSummary } from '../profile/profilverbund-balance.js';
 import { readProfileOverridesFromStorage } from '../profile/profile-state.js';
+import { persistenceStorage } from '../shared/persistence-facade.js';
 
 export function createProfileSyncHandlers({ dom, PROFILE_VALUE_KEYS }) {
     const syncProfileDerivedInputs = () => {
-        const overrides = readProfileOverridesFromStorage(localStorage);
-        const alterRaw = localStorage.getItem(PROFILE_VALUE_KEYS.alter);
+        const overrides = readProfileOverridesFromStorage(persistenceStorage);
+        const alterRaw = persistenceStorage.getItem(PROFILE_VALUE_KEYS.alter);
 
         const profilverbundProfiles = loadProfilverbundProfiles();
         if (profilverbundProfiles.length > 0) {
