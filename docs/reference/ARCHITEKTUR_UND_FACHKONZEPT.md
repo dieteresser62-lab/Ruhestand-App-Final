@@ -172,7 +172,7 @@ Get-ChildItem app\profile,app\tranches,app\shared -Filter *.js | Get-Content | M
 
 ## B.1 Drei-Schichten-Architektur
 
-Die Suite besteht heute nicht mehr nur aus zwei HTML-Oberflächen mit wenigen Begleitmodulen. Neben Balance und Simulator gibt es zentrale Einstiegsseiten für Profilverwaltung, Tranchenverwaltung und Handbuch; die UI-nahe Logik ist in thematische ES-Module aufgeteilt. Die Engine bleibt die gemeinsame deterministische Rechenschicht, `engine.js` ist daraus generiert.
+Die Suite umfasst mehrere HTML-Oberflächen und Begleitmodule: Neben Balance und Simulator gibt es Einstiegsseiten für Profilverwaltung, Tranchenverwaltung und Handbuch; die UI-nahe Logik ist in thematische ES-Module aufgeteilt. Die Engine bildet die gemeinsame deterministische Rechenschicht, `engine.js` ist daraus generiert.
 
 ### B.1.0 Aktuelle Top-Level-Struktur
 
@@ -594,7 +594,7 @@ Diese Trennung ist wichtig, weil die Balance-App operativ genutzt wird: Nutzer k
 | **Action** | `balance-renderer-action.js` | Quellen/Verwendungen, Transaktionen, Cash-Rebalancing, finale Steuer inklusive Verlusttopf-Effekten |
 | **Diagnosis** | `balance-renderer-diagnosis.js`, `balance-diagnosis-*` | Chips, Entscheidungsbaum, Guardrails, KeyParams, Transaktionsdiagnose, kopierbarer Diagnose-Export |
 
-Die Diagnosemodule vermeiden inzwischen einen großen Renderer-Monolithen. Neue Diagnosebausteine gehören in ein thematisches `balance-diagnosis-*` Modul; `balance-renderer-diagnosis.js` bleibt die Integrationsschicht.
+Die Diagnosemodule sind in thematische Untermodule aufgeteilt, um einen großen Renderer-Monolithen zu vermeiden. Neue Diagnosebausteine gehören in ein thematisches `balance-diagnosis-*` Modul; `balance-renderer-diagnosis.js` dient als Integrationsschicht.
 
 Die Diagnose ist fachlich Teil der Entscheidung, nicht bloß Debug-Ausgabe. Sie erklärt:
 
@@ -622,7 +622,7 @@ Snapshot und Profilpersistenz sind unterschiedliche Ebenen. Snapshots sichern de
 
 ### B.2.5 Jahresupdate und Live-Daten
 
-Der frühere Binder-Monolith ist in Jahresupdate-Module zerlegt:
+Das Jahresupdate ist in separate Module aufgeteilt:
 
 | Modul | Aufgabe |
 |-------|---------|
@@ -856,7 +856,7 @@ engine/
     └── three-bucket-logic.mjs         → 3-Bucket-Jilge: Bond-Verkauf und Bond-Refill
 ```
 
-Die frühere Dokumentation nannte noch ein separates `liquidity-planner.mjs`. Dieses Modul existiert im aktuellen Stand nicht; Ziel-Liquidität und Liquiditäts-Gates liegen in `transaction-utils.mjs` und werden über `TransactionEngine.calculateTargetLiquidity()` aufgerufen.
+Ziel-Liquidität und Liquiditäts-Gates liegen in `transaction-utils.mjs` und werden über `TransactionEngine.calculateTargetLiquidity()` aufgerufen.
 
 ### B.4.2 Öffentliche API
 
@@ -935,7 +935,7 @@ Zusätzlich erkennt die Analyse Stagflation über hohe Inflation bei negativer R
 
 ### B.4.5 SpendingPlanner und Dynamic Flex
 
-Der SpendingPlanner ist heute keine einzelne monolithische Guardrail-Funktion mehr. `SpendingPlanner.mjs` ist die Fassade, die mehrere Policy-Module in stabiler Reihenfolge ausführt:
+Der SpendingPlanner führt mehrere Policy-Module in stabiler Reihenfolge aus, wobei `SpendingPlanner.mjs` als Fassade dient:
 
 1. Vorjahreszustand laden oder initialisieren: Flex-Rate, realer Vermögens-Peak, Inflation, Alarmstatus.
 2. Alarmbedingungen prüfen: tiefer Bärenmarkt, hohe Entnahmequote, Runway-Stress oder realer Drawdown.
