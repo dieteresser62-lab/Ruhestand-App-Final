@@ -2521,7 +2521,7 @@ Die Balance-App zeigt 8 VPW-Metriken im Diagnose-Panel (`balance-diagnosis-keypa
 ## D.1 Kommerzielle Retirement Planner (2025/2026)
 
 ### D.1.1 ProjectionLab
-rt
+
 | Aspekt | Details |
 |--------|---------|
 | **Preis** | $9/Monat (Premium), $799 Lifetime |
