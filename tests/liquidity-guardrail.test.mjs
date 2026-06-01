@@ -185,4 +185,25 @@ function getBaseParams() {
     console.log('✅ Coverage Gap Trigger passed');
 }
 
+// --- TEST 4: Pension-covered floor should not trigger crisis refill for optional flex runway ---
+{
+    const params = getBaseParams();
+    params.market.sKey = 'recovery_in_bear';
+    params.market.szenarioText = 'Erholung im Bärenmarkt';
+    params.zielLiquiditaet = 100000;
+    params.aktuelleLiquiditaet = 25000;
+    params.input.tagesgeld = 25000;
+    params.input.floorBedarf = 30000;
+    params.input.flexBedarf = 25000;
+    params.input.renteAktiv = true;
+    params.input.renteMonatlich = 3000; // 36k pension covers the 30k floor.
+
+    const result = TransactionEngine.determineAction(params);
+
+    assert(result.type === 'NONE', `Should not sell in bear recovery for optional flex runway only. Title: ${result.title}`);
+    assert(!result.title.includes('Runway-Notfüllung'), `Should not label optional flex runway as crisis refill. Title: ${result.title}`);
+
+    console.log('✅ Pension-covered floor suppresses optional flex crisis refill passed');
+}
+
 console.log('--- Liquidity Guardrail Tests Completed ---');

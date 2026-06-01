@@ -1,6 +1,7 @@
 import { simulateOneYear } from '../app/simulator/simulator-engine-direct.js';
 import { applyBondRefillPostprocessing } from '../app/simulator/simulator-bond-refill.js';
 import { buildTaxRawAggregate } from '../app/simulator/simulator-tax-recompute.js';
+import { sumDepot } from '../app/simulator/simulator-portfolio.js';
 
 console.log('--- 3-Bucket Refill Tests ---');
 
@@ -139,6 +140,80 @@ function baseState(portfolio) {
 }
 
 {
+    const portfolio = {
+        depotTranchesAktien: [
+            { type: 'ETF', category: 'equity', marketValue: 200000, costBasis: 150000, tqf: 0.3 }
+        ],
+        depotTranchesGold: [],
+        depotTranchesGeldmarkt: [],
+        liquiditaet: 0
+    };
+    const beforeTotal = sumDepot({ depotTranchesAktien: portfolio.depotTranchesAktien });
+    const combinedTaxRawAggregate = buildTaxRawAggregate();
+    const refill = applyBondRefillPostprocessing({
+        is3Bucket: true,
+        isBadYear: false,
+        threeBucketInput: { bondTargetFactor: 5, bondRefillThresholdPct: null },
+        jahresEntnahmeTarget: 12000,
+        netFloorYear: 12000,
+        portfolio,
+        depotTranchesAktien: portfolio.depotTranchesAktien,
+        engineInput: {
+            sparerPauschbetrag: 0,
+            kirchensteuerSatz: 0,
+            goldAktiv: false,
+            depotwertAlt: 0,
+            depotwertNeu: 200000,
+            goldWert: 0
+        },
+        market: { sKey: 'hot_neutral' },
+        combinedTaxRawAggregate
+    });
+    const afterTotal = sumDepot({ depotTranchesAktien: portfolio.depotTranchesAktien });
+    const equity = portfolio.depotTranchesAktien.find(t => t.category === 'equity');
+    assert(refill.bondRefillNetDelta > 0, 'ETF refill should execute');
+    assert(equity.marketValue < 200000, 'ETF-kind equity should be reduced by bond refill sale');
+    assertClose(afterTotal, beforeTotal - refill.bondRefillTaxDelta, 1e-6, 'ETF bond refill should conserve wealth apart from tax');
+}
+
+{
+    const portfolio = {
+        depotTranchesAktien: [
+            { type: 'custom-world-fund', category: 'equity', marketValue: 200000, costBasis: 150000, tqf: 0.3 }
+        ],
+        depotTranchesGold: [],
+        depotTranchesGeldmarkt: [],
+        liquiditaet: 0
+    };
+    const beforeTotal = sumDepot({ depotTranchesAktien: portfolio.depotTranchesAktien });
+    const combinedTaxRawAggregate = buildTaxRawAggregate();
+    const refill = applyBondRefillPostprocessing({
+        is3Bucket: true,
+        isBadYear: false,
+        threeBucketInput: { bondTargetFactor: 5, bondRefillThresholdPct: null },
+        jahresEntnahmeTarget: 12000,
+        netFloorYear: 12000,
+        portfolio,
+        depotTranchesAktien: portfolio.depotTranchesAktien,
+        engineInput: {
+            sparerPauschbetrag: 0,
+            kirchensteuerSatz: 0,
+            goldAktiv: false,
+            depotwertAlt: 0,
+            depotwertNeu: 200000,
+            goldWert: 0
+        },
+        market: { sKey: 'hot_neutral' },
+        combinedTaxRawAggregate
+    });
+    const afterTotal = sumDepot({ depotTranchesAktien: portfolio.depotTranchesAktien });
+    const equity = portfolio.depotTranchesAktien.find(t => t.category === 'equity');
+    assert(refill.bondRefillNetDelta > 0, 'Category-equity refill should execute');
+    assert(equity.marketValue < 200000, 'Category-equity sale should reduce unknown equity kind');
+    assertClose(afterTotal, beforeTotal - refill.bondRefillTaxDelta, 1e-6, 'Category-equity bond refill should conserve wealth apart from tax');
+}
+
+{
     const state = baseState({
         depotTranchesAktien: [
             { type: 'aktien_neu', category: 'equity', marketValue: 100000, costBasis: 100000, tqf: 0.3 },
@@ -221,12 +296,51 @@ function baseState(portfolio) {
         spending: { monatlicheEntnahme: 0 },
         action: { type: 'HOLD', quellen: [], nettoErlös: 0, steuer: 0 }
     });
-    const yearData = { rendite: -0.3, gold_eur_perf: 0, zinssatz: 0, inflation: 2, jahr: 2015 };
+    const yearData = { rendite: -0.3, gold_eur_perf: 0, zinssatz: 3, inflation: 2, jahr: 2015 };
     const result = simulateOneYear(state, inputs, yearData, 0, null, 0, null, 1, engine);
     const bond = result.newState.portfolio.depotTranchesAktien.find(t => t.type === 'anleihe');
     const equity = result.newState.portfolio.depotTranchesAktien.find(t => t.type === 'aktien_neu');
-    assertClose(bond.marketValue, 10200, 1e-6, 'bond tranche must use fixed nominal return of +2%');
+    assertClose(bond.marketValue, 10300, 1e-6, 'bond tranche must use yearData zinssatz return');
     assertClose(equity.marketValue, 70000, 1e-6, 'equity tranche must still use market return');
+}
+
+{
+    const state = baseState({
+        depotTranchesAktien: [
+            { type: 'aktien_neu', category: 'equity', marketValue: 200000, costBasis: 180000, tqf: 0.3 },
+            { type: 'aktien_neu', category: 'bonds', marketValue: 50000, costBasis: 50000, tqf: 0.0 }
+        ],
+        depotTranchesGold: [],
+        depotTranchesGeldmarkt: [],
+        liquiditaet: 100000,
+        tagesgeld: 100000,
+        geldmarktEtf: 0
+    });
+    const inputs = baseInputs({
+        decumulation: {
+            mode: '3_bucket_jilge',
+            bondTargetFactor: 0,
+            drawdownTrigger: 80,
+            bondRefillThreshold: null
+        }
+    });
+    const engine = createMockEngine({
+        spending: { monatlicheEntnahme: 0 },
+        action: {
+            type: 'TRANSACTION',
+            quellen: [{ kind: 'aktien_neu', brutto: 50000, steuer: 0, netto: 50000 }],
+            nettoErlös: 50000,
+            steuer: 0,
+            verwendungen: { gold: 0, aktien: 0 }
+        }
+    });
+    const yearData = { rendite: 0, gold_eur_perf: 0, zinssatz: 0, inflation: 0, jahr: 2021 };
+    const result = simulateOneYear(state, inputs, yearData, 0, null, 0, null, 1, engine);
+    const bond = result.newState.portfolio.depotTranchesAktien.find(t => t.category === 'bonds');
+    const equity = result.newState.portfolio.depotTranchesAktien.find(t => t.category === 'equity');
+    assertClose(bond.marketValue, 50000, 1e-6, 'equity transaction must not sell legacy-typed bond tranche');
+    assertClose(equity.marketValue, 150000, 1e-6, 'equity transaction should reduce equity tranche only');
+    assertClose(result.logData.portfolio_total_end, 326000, 1e-6, 'asset sale should conserve total wealth apart from floor payout');
 }
 
 console.log('✅ 3-Bucket refill tests passed');

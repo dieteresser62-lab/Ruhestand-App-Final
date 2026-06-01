@@ -183,6 +183,7 @@ export function runBacktest() {
             portfolio: initializePortfolio(inputs),
             baseFloor: inputs.startFloorBedarf,
             baseFlex: inputs.startFlexBedarf,
+            baseMinimumFlexAnnual: inputs.minimumFlexAnnual || 0,
             baseFlexBudgetAnnual: inputs.flexBudgetAnnual || 0,
             baseFlexBudgetRecharge: inputs.flexBudgetRecharge || 0,
             lastState: null,
@@ -499,14 +500,8 @@ export function renderBacktestLog() {
     document.getElementById('simulationLog').innerHTML = html;
     const chartContainer = document.getElementById('portfolioCompositionChart');
     if (chartContainer) {
-        const mode = String(window.globalBacktestData?.decumulationMode || '').toLowerCase();
-        if (mode === STRATEGY_OPTIONS.THREE_BUCKET_JILGE) {
-            chartContainer.style.display = 'block';
-            renderThreeBucketPortfolioChart(chartContainer, logRows);
-        } else {
-            chartContainer.style.display = 'none';
-            chartContainer.innerHTML = '';
-        }
+        chartContainer.style.display = 'block';
+        renderThreeBucketPortfolioChart(chartContainer, logRows);
     }
 }
 

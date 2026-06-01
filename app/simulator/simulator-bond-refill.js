@@ -4,6 +4,8 @@ import { addTaxRawAggregate } from './simulator-tax-recompute.js';
 import { calculateSaleAndTax } from '../../engine/transactions/sale-engine.mjs';
 import { isBondCategory, sumBondBucketValuation } from '../../engine/transactions/three-bucket-logic.mjs';
 
+export const BOND_REFILL_PATCH_VERSION = 'bond-refill-equity-sale-guard-20260531-1';
+
 function findOrCreateBondTranche(depotTranchesAktien) {
     let bondTranche = depotTranchesAktien.find(t => isBondCategory(t.type) || isBondCategory(t.category));
     if (!bondTranche) {
@@ -18,6 +20,33 @@ function findOrCreateBondTranche(depotTranchesAktien) {
         depotTranchesAktien.push(bondTranche);
     }
     return bondTranche;
+}
+
+function sumEquityOnly(depotTranchesAktien) {
+    return (Array.isArray(depotTranchesAktien) ? depotTranchesAktien : []).reduce((sum, tranche) => {
+        const isBond = isBondCategory(tranche?.type) || isBondCategory(tranche?.category);
+        return isBond ? sum : sum + (Number(tranche?.marketValue) || 0);
+    }, 0);
+}
+
+function forceReduceEquityTranches(depotTranchesAktien, amount) {
+    let remaining = Number(amount) || 0;
+    if (!(remaining > 0) || !Array.isArray(depotTranchesAktien)) return 0;
+    let reduced = 0;
+    for (const tranche of depotTranchesAktien) {
+        if (remaining <= 1e-6) break;
+        const isBond = isBondCategory(tranche?.type) || isBondCategory(tranche?.category);
+        if (isBond) continue;
+        const marketValue = Number(tranche?.marketValue) || 0;
+        if (!(marketValue > 0)) continue;
+        const reduction = Math.min(remaining, marketValue);
+        const ratio = marketValue > 0 ? reduction / marketValue : 0;
+        tranche.costBasis = (Number(tranche.costBasis) || 0) * (1 - ratio);
+        tranche.marketValue = marketValue - reduction;
+        reduced += reduction;
+        remaining -= reduction;
+    }
+    return reduced;
 }
 
 /**
@@ -104,10 +133,23 @@ export function applyBondRefillPostprocessing({
         };
     }
 
+    const refillBreakdown = Array.isArray(refillSale.breakdown)
+        ? refillSale.breakdown.map(item => ({
+            ...item,
+            category: item?.category || 'equity'
+        }))
+        : [];
+    const equityBeforeSale = sumEquityOnly(depotTranchesAktien);
     applySaleToPortfolio(portfolio, {
         ...refillSale,
-        breakdown: Array.isArray(refillSale.breakdown) ? refillSale.breakdown : []
+        breakdown: refillBreakdown
     });
+    const expectedGrossReduction = Number(refillSale.bruttoVerkaufGesamt) || 0;
+    const equityReduction = Math.max(0, equityBeforeSale - sumEquityOnly(depotTranchesAktien));
+    const saleShortfallGross = Math.max(0, expectedGrossReduction - equityReduction);
+    if (saleShortfallGross > 0.01) {
+        forceReduceEquityTranches(depotTranchesAktien, saleShortfallGross);
+    }
     bondTranche.marketValue += refillNet;
     bondTranche.costBasis += refillNet;
     addTaxRawAggregate(combinedTaxRawAggregate, refillSale.taxRawAggregate);
@@ -116,6 +158,8 @@ export function applyBondRefillPostprocessing({
         bondRefillGrossDelta: Number(refillSale.bruttoVerkaufGesamt) || 0,
         bondRefillNetDelta: refillNet,
         bondRefillTaxDelta: Number(refillSale.steuerGesamt) || 0,
-        didForcedSale: true
+        didForcedSale: true,
+        debugVersion: BOND_REFILL_PATCH_VERSION,
+        saleShortfallGross
     };
 }

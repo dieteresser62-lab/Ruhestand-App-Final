@@ -15,6 +15,9 @@ function buildAreaPath(pointsTop, pointsBottom) {
 
 export function renderThreeBucketPortfolioChart(container, rows) {
     if (!container) return;
+    if (typeof document === 'undefined' || typeof document.createElementNS !== 'function') {
+        return;
+    }
     container.innerHTML = '';
     const series = (Array.isArray(rows) ? rows : [])
         .map((entry, index) => {
@@ -22,8 +25,9 @@ export function renderThreeBucketPortfolioChart(container, rows) {
             const bond = toNumber(row.bondBucketAfter ?? row.threeBucket?.bondBucketAfter);
             const equityTotal = toNumber(entry?.wertAktien ?? row.wertAktien);
             const etf = Math.max(0, equityTotal - bond);
+            const gold = toNumber(entry?.wertGold ?? row.wertGold);
             const liq = toNumber(entry?.liquiditaet ?? row.liquiditaet);
-            return { index, etf, bond, liq, total: etf + bond + liq };
+            return { index, etf, bond, gold, liq, total: etf + bond + gold + liq };
         })
         .filter(item => item.total > 0);
     if (!series.length) return;
@@ -41,6 +45,8 @@ export function renderThreeBucketPortfolioChart(container, rows) {
     const etfBottom = [];
     const bondTop = [];
     const bondBottom = [];
+    const goldTop = [];
+    const goldBottom = [];
     const liqTop = [];
     const liqBottom = [];
 
@@ -48,14 +54,17 @@ export function renderThreeBucketPortfolioChart(container, rows) {
         const x = xScale(idx);
         const etfYTop = yScale(item.etf);
         const bondYTop = yScale(item.etf + item.bond);
+        const goldYTop = yScale(item.etf + item.bond + item.gold);
         const liqYTop = yScale(item.total);
         const zeroY = yScale(0);
         etfTop.push({ x, y: etfYTop });
         etfBottom.push({ x, y: zeroY });
         bondTop.push({ x, y: bondYTop });
         bondBottom.push({ x, y: etfYTop });
+        goldTop.push({ x, y: goldYTop });
+        goldBottom.push({ x, y: bondYTop });
         liqTop.push({ x, y: liqYTop });
-        liqBottom.push({ x, y: bondYTop });
+        liqBottom.push({ x, y: goldYTop });
     });
 
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -72,6 +81,7 @@ export function renderThreeBucketPortfolioChart(container, rows) {
     };
     addPath(buildAreaPath(etfTop, etfBottom), '#2563eb');
     addPath(buildAreaPath(bondTop, bondBottom), '#f59e0b');
+    addPath(buildAreaPath(goldTop, goldBottom), '#ca8a04');
     addPath(buildAreaPath(liqTop, liqBottom), '#16a34a');
 
     container.appendChild(svg);
@@ -101,6 +111,7 @@ export function renderThreeBucketPortfolioChart(container, rows) {
     };
     legend.appendChild(createLegendItem('ETF', '#2563eb'));
     legend.appendChild(createLegendItem('Bonds/Puffer', '#f59e0b'));
+    legend.appendChild(createLegendItem('Gold', '#ca8a04'));
     legend.appendChild(createLegendItem('Liquidität', '#16a34a'));
     container.appendChild(legend);
 }

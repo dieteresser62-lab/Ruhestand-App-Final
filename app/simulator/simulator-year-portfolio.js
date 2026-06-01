@@ -30,7 +30,7 @@ export function applyAnnualReturnsToPortfolio({ portfolio, yearData, threeBucket
     for (let i = 0; i < depotTranchesAktien.length; i++) {
         const tranche = depotTranchesAktien[i];
         const isBond = isBondCategory(tranche.type) || isBondCategory(tranche.category);
-        const trancheReturn = isBond ? threeBucketInput.bondNominalReturn : rA;
+        const trancheReturn = isBond ? rC : rA;
         tranche.marketValue *= (1 + trancheReturn);
     }
     for (let i = 0; i < depotTranchesGold.length; i++) {
@@ -85,4 +85,3 @@ export function buildNextMarketDataHist({ marketDataHist, yearData, rA, resolved
         capeRatio: resolvedCapeRatio
     };
 }
-

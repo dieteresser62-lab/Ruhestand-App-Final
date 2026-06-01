@@ -46,7 +46,7 @@ try {
         threeBucketInput: { bondNominalReturn: 0.03 }
     });
     assertClose(portfolio.depotTranchesAktien[0].marketValue, 1100, 1e-9, 'Equity tranche should apply equity return');
-    assertClose(portfolio.depotTranchesAktien[1].marketValue, 515, 1e-9, 'Bond tranche should apply bond return');
+    assertClose(portfolio.depotTranchesAktien[1].marketValue, 510, 1e-9, 'Bond tranche should apply yearData zinssatz return');
     assertClose(portfolio.depotTranchesGold[0].marketValue, 210, 1e-9, 'Gold tranche should apply gold return');
     assertClose(progression.equityBeforeReturn, 1500, 1e-9, 'Progression should report equity before return');
     assertClose(progression.goldAfterReturn, 210, 1e-9, 'Progression should report gold after return');
@@ -137,6 +137,7 @@ try {
         liquiditaet: 25000,
         effectiveBaseFloor: 30000,
         baseFlex: 12000,
+        baseMinimumFlexAnnual: 3000,
         temporaryFlexFactor: 0.5,
         baseFlexBudgetAnnual: 4000,
         baseFlexBudgetRecharge: 500,
@@ -147,6 +148,7 @@ try {
     assert(engineInput.aktuellesAlter === 69, 'Engine input should advance current age');
     assertClose(engineInput.floorBedarf, 30000, 1e-9, 'Engine input should pass gross floor');
     assertClose(engineInput.flexBedarf, 6000, 1e-9, 'Engine input should apply temporary flex factor');
+    assertClose(engineInput.minimumFlexAnnual, 1500, 1e-9, 'Engine input should apply same temporary factor to minimum flex');
     assertClose(engineInput.renteMonatlich, 1500, 1e-9, 'Engine input should pass monthly household pension');
     assertClose(engineInput.goldZielProzent, 12, 1e-9, 'Engine input should preserve active gold target');
     assertClose(engineInput.endeVJ, 110, 1e-9, 'Engine input should use current market window');
@@ -204,6 +206,7 @@ try {
         resolvedCapeRatio: 20,
         baseFloor: 120000,
         baseFlex: 0,
+        baseMinimumFlexAnnual: 1000,
         baseFlexBudgetAnnual: 0,
         baseFlexBudgetRecharge: 0,
         effectiveBaseFloor: 120000,
@@ -215,6 +218,7 @@ try {
     assertClose(result.newState.portfolio.liquiditaet, 2246, 1e-9, 'Accumulation should add cash interest and indexed savings');
     assertClose(result.newState.accumulationState.sparrateThisYear, 1236, 1e-9, 'Accumulation should index savings by inflation');
     assertClose(result.newState.accumulationState.totalContributed, 3636, 1e-9, 'Accumulation should track total contributions');
+    assertClose(result.newState.baseMinimumFlexAnnual, 1030, 1e-9, 'Accumulation should index minimum flex by inflation');
     assertClose(result.newState.currentAnnualPension, 12240, 1e-9, 'Accumulation should index shadow pension P1');
     assert(result.logData.Regime === 'accumulation', 'Accumulation log should use accumulation regime');
     assert(result.logData.GuardNote === 'accumulation_phase', 'Accumulation log should mark guard note');
@@ -314,7 +318,10 @@ try {
         guardReason: 'engine_guard_primary',
         isBadYear: false,
         equityPreserved: 0,
-        unmetLiquidity: 0
+        unmetLiquidity: 0,
+        balanceTrace: [
+            { phase: 'after_payout', total: 120000, equity: 100000, bonds: 0, gold: 0, cash: 20000 }
+        ]
     });
     assert(result.newState.baseFloor === 24480, 'Year result should inflate next base floor');
     assert(result.logData.entscheidung.jahresEntnahme === 12000, 'Year result should expose effective annual withdrawal');
@@ -325,6 +332,8 @@ try {
     assert(result.logData.liq_after_interest === 20000, 'Year result should expose liquidity after interest');
     assert(result.logData.portfolio_total_before_payout === 132000, 'Year result should expose portfolio total before payout');
     assert(result.logData.portfolio_active_end === 120000, 'Year result should expose active portfolio total at year end');
+    assert(result.logData.portfolio_flow_delta === 0, 'Year result should expose raw active portfolio flow delta');
+    assert(result.logData.balance_trace[0].phase === 'after_payout', 'Year result should expose raw balance trace phases');
     assert(result.logData.health_bucket_end === 30000, 'Year result should expose locked health bucket at year end');
     assert(result.logData.health_bucket_warning.includes('gekappt'), 'Year result should expose health bucket warnings');
     assert(result.logData.portfolio_total_end === 150000, 'Year result should expose portfolio total including health bucket at year end');
@@ -403,6 +412,9 @@ try {
     assert(!result.isRuin, 'Normal year should not be ruin');
     assert(result.newState !== undefined, 'Should return newState');
     assert(result.logData !== undefined, 'Should return logData');
+    assert(Array.isArray(result.logData.balance_trace), 'Should return balance trace diagnostics');
+    assert(result.logData.balance_trace.some(entry => entry.phase === 'after_cash_interest'), 'Balance trace should include final cash interest phase');
+    assert(Math.abs(result.logData.portfolio_flow_delta) < 1, 'Balance flow delta should stay near zero in normal year');
 
     // Check inflation adjustment (Floor inflates yearly).
     const expectedFloor = 24000 * 1.02;

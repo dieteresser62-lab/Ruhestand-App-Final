@@ -59,6 +59,8 @@ function _normalizeEngineInput(rawInput) {
     if (!Number.isFinite(input.goGoMultiplier)) {
         input.goGoMultiplier = 1.0;
     }
+    const minimumFlexAnnual = Number(input.minimumFlexAnnual);
+    input.minimumFlexAnnual = Number.isFinite(minimumFlexAnnual) ? minimumFlexAnnual : 0;
 
     const decumulationRaw = (input.decumulation && typeof input.decumulation === 'object')
         ? input.decumulation
@@ -197,18 +199,23 @@ function _buildSafetySignals(params) {
         realerDepotDrawdown,
         runwayMonate,
         minRunwayMonths,
-        kuerzungProzent
+        kuerzungProzent,
+        safetyStage,
+        threeBucketActive
     } = params;
     const cfg = CONFIG.SPENDING_MODEL?.DYNAMIC_FLEX_SAFETY || {};
     const hasRunwayCrisis = Number.isFinite(runwayMonate) && Number.isFinite(minRunwayMonths) && runwayMonate < minRunwayMonths;
     const hasCriticalStress = alarmActive || hasRunwayCrisis;
+    const stage = _sanitizeSafetyStage(safetyStage);
+    const ignoreStage2SelfCut = stage >= 2 && !hasCriticalStress;
+    const ignoreStage2DrawdownForRecovery = ignoreStage2SelfCut && threeBucketActive === true;
 
     let score = 0;
     if (alarmActive) score += 2;
     if (Number.isFinite(entnahmequoteDepot) && entnahmequoteDepot >= CONFIG.THRESHOLDS.CAUTION.withdrawalRate) score += 1;
     if (Number.isFinite(realerDepotDrawdown) && realerDepotDrawdown >= CONFIG.THRESHOLDS.ALARM.realDrawdown) score += 1;
     if (hasRunwayCrisis) score += 1;
-    if (Number.isFinite(kuerzungProzent) && kuerzungProzent >= (Number(cfg.HARD_CUT_PCT) || 35)) score += 1;
+    if (!ignoreStage2SelfCut && Number.isFinite(kuerzungProzent) && kuerzungProzent >= (Number(cfg.HARD_CUT_PCT) || 35)) score += 1;
 
     const badThreshold = Number(cfg.BAD_SCORE_THRESHOLD) || 2;
     const severeThreshold = Number(cfg.SEVERE_SCORE_THRESHOLD) || 4;
@@ -219,11 +226,15 @@ function _buildSafetySignals(params) {
     const goodWithdrawal = Number(cfg.GOOD_WITHDRAWAL_RATE) || 0.04;
     const goodDrawdown = Number(cfg.GOOD_DRAWDOWN) || 0.15;
     const goodCut = Number(cfg.GOOD_CUT_PCT) || 15;
+    const hasAcceptableCutForRecovery = ignoreStage2SelfCut ||
+        (Number.isFinite(kuerzungProzent) && kuerzungProzent <= goodCut);
+    const hasAcceptableDrawdownForRecovery = ignoreStage2DrawdownForRecovery ||
+        (Number.isFinite(realerDepotDrawdown) && realerDepotDrawdown <= goodDrawdown);
     const isGood = !alarmActive &&
         Number.isFinite(entnahmequoteDepot) && entnahmequoteDepot <= goodWithdrawal &&
-        Number.isFinite(realerDepotDrawdown) && realerDepotDrawdown <= goodDrawdown &&
+        hasAcceptableDrawdownForRecovery &&
         Number.isFinite(runwayMonate) && Number.isFinite(minRunwayMonths) && runwayMonate >= (minRunwayMonths + runwayHeadroom) &&
-        Number.isFinite(kuerzungProzent) && kuerzungProzent <= goodCut;
+        hasAcceptableCutForRecovery;
 
     return { score, isBad, isSevere, isGood, hasCriticalStress };
 }
@@ -535,6 +546,24 @@ function _internal_calculateModel(input, lastState) {
     diagnosis.keyParams = diagnosis.keyParams || {};
     diagnosis.keyParams.taxSettlement = taxSettlement.details;
 
+    // 10. Liquidität nach Transaktion berechnen
+    // Berücksichtigt Depot-Verkäufe zur Liquiditäts-Auffüllung
+    const liqNachTransaktion = aktuelleLiquiditaet + (action.verwendungen?.liquiditaet || 0);
+    const jahresGesamtbedarf = inflatedBedarf.floor + inflatedBedarf.flex;
+
+    // KPI: Liquiditätsdeckung relativ zum Zielwert vor/nach Transaktion
+    // Wird als Diagnose-KPI und für die UI wiederverwendet, deshalb einmalig berechnet
+    const computeCoverage = (liquiditaetWert) => (zielLiquiditaet > 0)
+        ? (liquiditaetWert / zielLiquiditaet) * 100
+        : 100;
+    const deckungVorher = computeCoverage(aktuelleLiquiditaet);
+    const deckungNachher = computeCoverage(liqNachTransaktion);
+
+    // Neue Runway nach Transaktion berechnen
+    const runwayMonths = (jahresGesamtbedarf > 0)
+        ? (liqNachTransaktion / (jahresGesamtbedarf / 12))
+        : Infinity;
+
     const safetyUpdate = _updateVpwSafetyState({
         lastState,
         requestedDynamicFlex: vpwEffectiveSettings.requestedDynamicFlex,
@@ -542,9 +571,11 @@ function _internal_calculateModel(input, lastState) {
             alarmActive: diagnosis?.general?.alarmActive === true,
             entnahmequoteDepot: diagnosis?.keyParams?.entnahmequoteDepot,
             realerDepotDrawdown: diagnosis?.keyParams?.realerDepotDrawdown,
-            runwayMonate: reichweiteMonate,
+            runwayMonate: runwayMonths,
             minRunwayMonths: profil?.minRunwayMonths,
-            kuerzungProzent: spendingResult?.kuerzungProzent
+            kuerzungProzent: spendingResult?.kuerzungProzent,
+            safetyStage: vpwEffectiveSettings.stage,
+            threeBucketActive: normalizedInput.decumulation?.mode === STRATEGY_OPTIONS.THREE_BUCKET_JILGE
         }
     });
     const reentryRampYears = Math.max(1, Number(dynamicFlexSafetyCfg.REENTRY_RAMP_YEARS) || 3);
@@ -567,6 +598,8 @@ function _internal_calculateModel(input, lastState) {
     diagnosis.general.dynamicFlexSafetyStableStreak = safetyUpdate.stableStreak;
     diagnosis.general.dynamicFlexSafetyTransition = safetyUpdate.transition;
     diagnosis.general.dynamicFlexSafetyReentryRemaining = nextReentryRemaining;
+    diagnosis.general.dynamicFlexSafetyRunwayMonate = runwayMonths;
+    diagnosis.general.runwayMonateVorTransaktion = reichweiteMonate;
     diagnosis.general.dynamicFlexGoGoSuppressed = vpwEffectiveSettings.goGoSuppressed;
     diagnosis.general.dynamicFlexSuppressed = vpwEffectiveSettings.dynamicFlexSuppressed;
     if (safetyUpdate.transition === 'up') {
@@ -599,24 +632,6 @@ function _internal_calculateModel(input, lastState) {
             severity: 'guardrail'
         });
     }
-
-    // 10. Liquidität nach Transaktion berechnen
-    // Berücksichtigt Depot-Verkäufe zur Liquiditäts-Auffüllung
-    const liqNachTransaktion = aktuelleLiquiditaet + (action.verwendungen?.liquiditaet || 0);
-    const jahresGesamtbedarf = inflatedBedarf.floor + inflatedBedarf.flex;
-
-    // KPI: Liquiditätsdeckung relativ zum Zielwert vor/nach Transaktion
-    // Wird als Diagnose-KPI und für die UI wiederverwendet, deshalb einmalig berechnet
-    const computeCoverage = (liquiditaetWert) => (zielLiquiditaet > 0)
-        ? (liquiditaetWert / zielLiquiditaet) * 100
-        : 100;
-    const deckungVorher = computeCoverage(aktuelleLiquiditaet);
-    const deckungNachher = computeCoverage(liqNachTransaktion);
-
-    // Neue Runway nach Transaktion berechnen
-    const runwayMonths = (jahresGesamtbedarf > 0)
-        ? (liqNachTransaktion / (jahresGesamtbedarf / 12))
-        : Infinity;
 
     // 11. Runway-Status bestimmen
     // - 'ok': Runway >= Ziel (z.B. 36+ Monate)

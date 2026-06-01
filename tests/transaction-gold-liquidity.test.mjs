@@ -57,18 +57,32 @@ function getBaseParams() {
     };
 }
 
-// --- TEST 1: No gold buy when liquidity below target ---
+// --- TEST 1: Gold buy allowed when liquidity is below target but not critical ---
 {
     const params = getBaseParams();
     const result = TransactionEngine.determineAction(params);
 
     assert(result.type !== 'NONE', 'Should trigger a transaction when liquidity is below target');
-    assert(!(result.verwendungen?.gold > 0), 'Should not buy gold while liquidity gap exists');
+    assert(result.verwendungen?.gold > 0, 'Should allow gold rebuild when cash is below target but not critical');
 
-    console.log('✅ Gold buy blocked under liquidity gap passed');
+    console.log('✅ Gold buy allowed under non-critical liquidity gap passed');
 }
 
-// --- TEST 2: Gold buy allowed when liquidity surplus exists ---
+// --- TEST 2: No gold buy when liquidity is critical ---
+{
+    const params = getBaseParams();
+    params.aktuelleLiquiditaet = 5000;
+    params.input.tagesgeld = 5000;
+
+    const result = TransactionEngine.determineAction(params);
+
+    assert(result.type !== 'NONE', 'Should trigger a transaction when liquidity is critical');
+    assert(!(result.verwendungen?.gold > 0), 'Should not buy gold while liquidity is critical');
+
+    console.log('✅ Gold buy blocked under critical liquidity passed');
+}
+
+// --- TEST 3: Gold buy allowed when liquidity surplus exists ---
 {
     const params = getBaseParams();
     // Flip to surplus cash to ensure gold purchases are allowed.

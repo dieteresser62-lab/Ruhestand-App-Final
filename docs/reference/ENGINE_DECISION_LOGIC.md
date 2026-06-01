@@ -177,7 +177,7 @@ Wichtige Parameter:
 | `drawdownTrigger` | Schwelle fuer Bad Year |
 | `bondTargetFactor` | Ziel: Faktor mal Jahresentnahme |
 | `bondRefillThreshold` | Toleranz, ab wann Refill erfolgt |
-| `bondNominalReturn` | feste Bond-Rendite im Simulator |
+| `bondNominalReturn` | Legacy-Default aus der 3-Bucket-Konfiguration; der Simulator bewertet Bond-Tranchen mit dem jeweiligen `yearData.zinssatz` |
 
 ## 7. Simulator-Zusatzlogik
 
@@ -237,4 +237,3 @@ flowchart TD
 Diese Punkte sind keine Fehlerbeschreibung, sondern markieren Stellen, an denen
 fachliche Zielsetzung und technische Implementierung bewusst abgeglichen werden
 sollten.
-

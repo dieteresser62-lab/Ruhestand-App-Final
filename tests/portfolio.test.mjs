@@ -1,5 +1,5 @@
 
-import { buyGold, buyStocksNeu, sumDepot, initializePortfolio, initializePortfolioDetailed, getCommonInputs } from '../app/simulator/simulator-portfolio.js';
+import { applySaleToPortfolio, buyGold, buyStocksNeu, sumDepot, initializePortfolio, initializePortfolioDetailed, getCommonInputs } from '../app/simulator/simulator-portfolio.js';
 
 console.log('--- Portfolio Logic Tests ---');
 
@@ -319,6 +319,50 @@ function teardownMockDOM() {
     assertEqual(portfolio.healthBucketTranches[0].trancheId, 'gm-invalid', 'Invalid date should fall back to FIFO baseline date');
     assertEqual(portfolio.depotTranchesGeldmarkt[0].trancheId, 'gm-valid', 'Valid later tranche should remain operational');
     console.log('✅ Health bucket invalid-date FIFO fallback works');
+}
+
+// Test 10: Bond tranches with legacy equity type stay out of equity sales
+{
+    const portfolio = {
+        depotTranchesAktien: [
+            { type: 'aktien_neu', category: 'equity', marketValue: 100000, costBasis: 80000, tqf: 0.3 },
+            { type: 'aktien_neu', category: 'bonds', marketValue: 50000, costBasis: 50000, tqf: 0 }
+        ],
+        depotTranchesGold: [],
+        depotTranchesGeldmarkt: []
+    };
+
+    applySaleToPortfolio(portfolio, {
+        breakdown: [{ kind: 'aktien_neu', brutto: 30000 }]
+    });
+
+    const equity = portfolio.depotTranchesAktien.find(t => t.category === 'equity');
+    const bond = portfolio.depotTranchesAktien.find(t => t.category === 'bonds');
+    assertEqual(equity.marketValue, 70000, 'Equity sale should reduce only equity tranche');
+    assertEqual(bond.marketValue, 50000, 'Equity sale must not reduce bond tranche with legacy equity type');
+    console.log('✅ Bond tranches stay out of equity sales');
+}
+
+// Test 11: Detailed portfolio normalizes bond category to bond type
+{
+    const portfolio = initializePortfolioDetailed({
+        tagesgeld: 0,
+        geldmarktEtf: 0,
+        detailledTranches: [
+            {
+                trancheId: 'legacy-bond',
+                category: 'bonds',
+                type: 'aktien_neu',
+                marketValue: 50000,
+                costBasis: 50000
+            }
+        ]
+    });
+
+    const bond = portfolio.depotTranchesAktien[0];
+    assertEqual(bond.category, 'bonds', 'Bond category should be preserved');
+    assertEqual(bond.type, 'anleihe', 'Bond category should normalize type to anleihe');
+    console.log('✅ Bond category normalizes to bond type');
 }
 
 console.log('--- Portfolio Logic Tests Completed ---');

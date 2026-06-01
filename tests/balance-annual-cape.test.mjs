@@ -58,8 +58,11 @@ try {
     // Test 1: Primary source success.
     {
         updateCalls = 0;
+        const now = new Date();
+        const primaryDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const primaryDateStr = `${primaryDate.getFullYear()}.${String(primaryDate.getMonth() + 1).padStart(2, '0')}`;
         global.fetch = mockFetchWithSequence([
-            okTextResponse('2024.12 foo bar 31.2')
+            okTextResponse(`${primaryDateStr} foo bar 31.2`)
         ]);
         const result = await handlers.handleFetchCapeAuto();
         assertEqual(result.capeFetchStatus, 'ok_primary', 'primary source should succeed');
@@ -70,9 +73,12 @@ try {
     // Test 2: Primary fails, mirror succeeds.
     {
         updateCalls = 0;
+        const now = new Date();
+        const mirrorDate = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+        const mirrorDateStr = `${mirrorDate.getFullYear()}.${String(mirrorDate.getMonth() + 1).padStart(2, '0')}`;
         global.fetch = mockFetchWithSequence([
             new Error('primary down'),
-            okTextResponse('2024.11 x y 29.8')
+            okTextResponse(`${mirrorDateStr} x y 29.8`)
         ]);
         const result = await handlers.handleFetchCapeAuto();
         assertEqual(result.capeFetchStatus, 'ok_fallback_mirror', 'mirror should be used as fallback');

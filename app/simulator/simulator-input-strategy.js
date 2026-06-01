@@ -50,6 +50,7 @@ export function readBasePortfolioInputs(doc = globalThis.document) {
         zielLiquiditaet: tagesgeld + geldmarktEtf,
         startFloorBedarf: readNumber('startFloorBedarf', 0, doc) || 0,
         startFlexBedarf: readNumber('startFlexBedarf', 0, doc) || 0,
+        minimumFlexAnnual: readNumber('minimumFlexAnnual', 0, doc) || 0,
         flexBudgetAnnual: readNumber('flexBudgetAnnual', 0, doc) || 0,
         flexBudgetYears: readNumber('flexBudgetYears', 0, doc) || 0,
         flexBudgetRecharge: readNumber('flexBudgetRecharge', 0, doc) || 0,

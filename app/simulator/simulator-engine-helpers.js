@@ -132,6 +132,7 @@ export function initMcRunState(inputs, startYearIndex) {
         portfolio: startPortfolio,
         baseFloor: inputs.startFloorBedarf,
         baseFlex: inputs.startFlexBedarf,
+        baseMinimumFlexAnnual: inputs.minimumFlexAnnual || 0,
         baseFlexBudgetAnnual: inputs.flexBudgetAnnual || 0,
         baseFlexBudgetRecharge: inputs.flexBudgetRecharge || 0,
         lastState: { taxState: { lossCarry: 0 } },

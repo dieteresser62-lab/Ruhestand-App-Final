@@ -8,6 +8,7 @@ import {
 import { applyFinalRateLimits } from '../engine/planners/final-rate-policy.mjs';
 import { applyFlexBudgetCap } from '../engine/planners/flex-budget-policy.mjs';
 import { applyFlexShareCurve, calculateFlexRate } from '../engine/planners/flex-rate-policy.mjs';
+import { applyMinimumFlexFloor } from '../engine/planners/minimum-flex-policy.mjs';
 import { buildSpendingDiagnosis, resolveRunwayTarget } from '../engine/planners/spending-diagnosis.mjs';
 import { applyGuardrails } from '../engine/planners/spending-guardrails.mjs';
 import { applySpendingPolicyPipeline } from '../engine/planners/spending-policy-pipeline.mjs';
@@ -504,6 +505,87 @@ function clone(value) {
     console.log('✅ Flex-budget policy: min-rate works');
 }
 
+// --- TEST 3h: Minimum-flex policy direct helper ---
+{
+    const inflatedBedarf = { floor: 24000, flex: 20000 };
+    const input = { minimumFlexAnnual: 10000 };
+    const decisions = [];
+    const beforeBedarf = JSON.stringify(inflatedBedarf);
+    const beforeInput = JSON.stringify(input);
+    const result = applyMinimumFlexFloor(
+        20,
+        { inflatedBedarf, input, alarmStatus: { active: false } },
+        (step, impact, status, severity = 'info') => decisions.push({ step, impact, status, severity })
+    );
+    const delegated = SpendingPlanner._applyMinimumFlexFloor(
+        20,
+        { inflatedBedarf, input, alarmStatus: { active: false } },
+        () => {}
+    );
+
+    assert(result.applied === true, 'Minimum flex should apply when effective flex is below floor');
+    assertClose(result.requiredRate, 50, 0.0001, 'Minimum flex should calculate required rate from inflated flex');
+    assertClose(result.rate, 50, 0.0001, 'Minimum flex should lift rate to required rate');
+    assert(result.status === 'applied', 'Minimum flex should report applied status');
+    assert(decisions.some(d => d.step === 'Mindest-Flex'), 'Minimum flex should be logged');
+    assert(JSON.stringify(inflatedBedarf) === beforeBedarf, 'Minimum flex must not mutate inflatedBedarf');
+    assert(JSON.stringify(input) === beforeInput, 'Minimum flex must not mutate input');
+    assertClose(delegated.rate, result.rate, 0.0001, 'Planner minimum-flex delegate should match policy');
+
+    const zero = applyMinimumFlexFloor(20, { inflatedBedarf, input: { minimumFlexAnnual: 0 }, alarmStatus: { active: false } }, () => {});
+    assert(zero.status === 'inactive_zero' && zero.rate === 20, 'Minimum flex zero should leave rate unchanged');
+
+    const noFlex = applyMinimumFlexFloor(20, { inflatedBedarf: { floor: 24000, flex: 0 }, input, alarmStatus: { active: false } }, () => {});
+    assert(noFlex.status === 'not_needed' && noFlex.rate === 20, 'Minimum flex should not divide by zero when flex need is zero');
+
+    const alarm = applyMinimumFlexFloor(20, { inflatedBedarf, input, alarmStatus: { active: true } }, () => {});
+    assert(alarm.status === 'blocked_emergency' && alarm.rate === 20, 'Minimum flex should not lift during alarm mode');
+
+    const lowLiquidityEnoughWealth = applyMinimumFlexFloor(
+        20,
+        {
+            inflatedBedarf,
+            input,
+            alarmStatus: { active: false },
+            runwayMonate: 1,
+            profil: { minRunwayMonths: 24 },
+            gesamtwert: 120000
+        },
+        () => {}
+    );
+    assert(lowLiquidityEnoughWealth.applied === true, 'Low current liquidity alone should not block minimum flex when total wealth is sufficient');
+
+    const runwayEmergency = applyMinimumFlexFloor(
+        20,
+        {
+            inflatedBedarf,
+            input,
+            alarmStatus: { active: false },
+            profil: { minRunwayMonths: 24 },
+            gesamtwert: 70000
+        },
+        () => {}
+    );
+    assert(runwayEmergency.status === 'blocked_emergency', 'Minimum flex should block when minimum runway cannot be restored');
+    assert(runwayEmergency.blockReason === 'minimum_runway_not_restorable', 'Runway emergency should expose block reason');
+
+    const floorEmergency = applyMinimumFlexFloor(
+        20,
+        {
+            inflatedBedarf,
+            input,
+            alarmStatus: { active: false },
+            profil: { minRunwayMonths: 0 },
+            gesamtwert: 30000
+        },
+        () => {}
+    );
+    assert(floorEmergency.status === 'blocked_emergency', 'Minimum flex should block when floor plus minimum flex is not covered');
+    assert(floorEmergency.blockReason === 'floor_minimum_flex_not_covered', 'Floor emergency should expose block reason');
+
+    console.log('✅ Minimum-flex policy helper works');
+}
+
 // --- TEST 4: Budget Floor Protection ---
 {
     // Scenario: high spending pressure (bear), but floor MUST be paid.
@@ -519,7 +601,7 @@ function clone(value) {
     const spending = result.spendingResult.details.endgueltigeEntnahme;
     assert(spending >= 24000, 'Must pay at least the nominal floor');
 
-console.log('✅ Budget Floor Protection works');
+    console.log('✅ Budget Floor Protection works');
 }
 
 // --- TEST 5: Wealth-adjusted reduction factor (net withdrawal) ---
@@ -668,6 +750,78 @@ console.log('✅ Budget Floor Protection works');
     assert(decisions.some(d => String(d.step).includes('Flex-Budget')), 'Policy pipeline should log flex-budget decision');
     assertClose(delegated.flexRate, result.flexRate, 0.0001, 'Planner policy-pipeline delegate should match module');
     console.log('✅ Spending policy pipeline delegate works');
+}
+
+// --- TEST 10aa: Spending policy pipeline applies minimum flex before budget and final limits ---
+{
+    const params = getBaseParams();
+    params.market.sKey = 'hot_neutral';
+    params.inflatedBedarf = { floor: 24000, flex: 20000 };
+    params.input = {
+        ...params.input,
+        floorBedarf: 24000,
+        flexBedarf: 20000,
+        minimumFlexAnnual: 10000,
+        flexBudgetAnnual: 0,
+        flexBudgetYears: 0,
+        flexBudgetRecharge: 0
+    };
+    const state = clone(params.lastState);
+    state.flexRate = 50;
+    state.keyParams.entnahmequoteDepot = CONFIG.THRESHOLDS.CAUTION.withdrawalRate;
+    const initialPolicyResult = { geglätteteFlexRate: 20, kuerzungQuelle: 'Profil' };
+    const decisions = [];
+    const result = applySpendingPolicyPipeline(
+        state,
+        { active: false, newlyTriggered: false },
+        params,
+        (step, impact, status, severity = 'info') => decisions.push({ step, impact, status, severity }),
+        initialPolicyResult
+    );
+
+    assertClose(result.flexRate, 50, 0.0001, 'Minimum flex should lift the pipeline rate before final limits when within max-up');
+    assert(state.keyParams.minimumFlexStatus === 'applied', 'Minimum flex status should be applied');
+    assertClose(state.keyParams.minimumFlexRequiredRate, 50, 0.0001, 'Pipeline should store minimum flex required rate');
+    assert(decisions.some(d => d.step === 'Mindest-Flex'), 'Pipeline should log minimum flex');
+
+    const budgetParams = clone(params);
+    budgetParams.market.sKey = 'bear_deep';
+    budgetParams.input.flexBudgetAnnual = 6000;
+    budgetParams.input.flexBudgetYears = 2;
+    const budgetState = clone(params.lastState);
+    budgetState.flexRate = 20;
+    budgetState.flexBudgetBalanceYears = 2;
+    budgetState.keyParams.entnahmequoteDepot = CONFIG.THRESHOLDS.CAUTION.withdrawalRate;
+    budgetState.keyParams.realerDepotDrawdown = 0.30;
+    const budgetResult = applySpendingPolicyPipeline(
+        budgetState,
+        { active: false, newlyTriggered: false },
+        budgetParams,
+        () => {},
+        initialPolicyResult
+    );
+    assert(budgetResult.flexRate < 50, 'Flex-budget/final limits should be allowed to reduce a minimum-flex lift');
+    assert(budgetState.keyParams.minimumFlexStatus === 'limited_by_flex_budget', 'Minimum flex should report flex-budget limitation');
+
+    const smoothParams = clone(params);
+    smoothParams.input.flexBudgetAnnual = 0;
+    const smoothState = clone(params.lastState);
+    smoothState.flexRate = 20;
+    smoothState.keyParams.entnahmequoteDepot = CONFIG.THRESHOLDS.CAUTION.withdrawalRate;
+    const smoothResult = applySpendingPolicyPipeline(
+        smoothState,
+        { active: false, newlyTriggered: false },
+        smoothParams,
+        () => {},
+        { geglätteteFlexRate: 20, kuerzungQuelle: 'Profil' }
+    );
+    assertClose(smoothResult.flexRate, 32, 0.0001, 'Final-rate limits should smooth a large minimum-flex lift');
+    assert(
+        smoothState.keyParams.minimumFlexStatus === 'applied_limited_by_final_smoothing',
+        'Minimum flex should report final smoothing limitation'
+    );
+
+    console.log('✅ Spending policy pipeline minimum-flex ordering works');
 }
 
 // --- TEST 10b: Final withdrawal helper quantizes and derives effective flex ---

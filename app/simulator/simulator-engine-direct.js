@@ -13,7 +13,8 @@ import { CONFIG } from '../../engine/config.mjs';
 import { STRATEGY_OPTIONS } from '../../types/strategy-options.js';
 import {
     getThreeBucketInputs,
-    applyThreeBucketLogic
+    applyThreeBucketLogic,
+    sumBondBucketValuation
 } from '../../engine/transactions/three-bucket-logic.mjs';
 import {
     applyAnnualReturnsToPortfolio,
@@ -85,6 +86,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         portfolio,
         baseFloor,
         baseFlex,
+        baseMinimumFlexAnnual = 0,
         baseFlexBudgetAnnual = 0,
         baseFlexBudgetRecharge = 0,
         lastState,
@@ -134,6 +136,28 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         equityAfterReturn,
         goldAfterReturn
     } = applyAnnualReturnsToPortfolio({ portfolio, yearData, threeBucketInput });
+    const balanceTrace = [];
+    const snapshotBalance = (phase, extra = {}) => {
+        const equityAndBonds = euros(sumDepot({ depotTranchesAktien }));
+        const bonds = euros(sumBondBucketValuation(depotTranchesAktien));
+        const gold = euros(sumDepot({ depotTranchesGold }));
+        const cash = euros(liquiditaet);
+        balanceTrace.push({
+            phase,
+            total: euros(equityAndBonds + gold + cash),
+            equity: euros(equityAndBonds - bonds),
+            bonds,
+            gold,
+            cash,
+            ...extra
+        });
+    };
+    snapshotBalance('after_returns', {
+        rA,
+        rG,
+        rC,
+        bondBucketBefore: euros(bondBucketBefore)
+    });
     const {
         resolvedCapeRatio,
         marketDataCurrentYear
@@ -170,6 +194,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             resolvedCapeRatio,
             baseFloor,
             baseFlex,
+            baseMinimumFlexAnnual,
             baseFlexBudgetAnnual,
             baseFlexBudgetRecharge,
             effectiveBaseFloor,
@@ -235,6 +260,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         liquiditaet,
         effectiveBaseFloor,
         baseFlex,
+        baseMinimumFlexAnnual,
         temporaryFlexFactor,
         baseFlexBudgetAnnual,
         baseFlexBudgetRecharge,
@@ -361,6 +387,13 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         buyEqAmount = (actionResult.verwendungen?.aktien || 0) * saleScale;
         liquiditaet += Math.max(0, actualNettoErlos - actualReinvested);
     }
+    snapshotBalance('after_action_sales', {
+        plannedSaleBrutto: euros(plannedSaleBrutto),
+        nettoErlos: euros(actionResult.nettoErlös),
+        cashSpend: euros(cashSpend),
+        buyEqAmount: euros(buyEqAmount),
+        buyGoldAmount: euros(buyGoldAmount)
+    });
 
     const jahresEntnahme = spendingResult.monatlicheEntnahme * 12;
     const jahresEntnahmePlan = jahresEntnahme;
@@ -409,6 +442,11 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     unmetLiquidity += forcedCoverage.unmetLiquidityDelta;
     didForcedSale = didForcedSale || forcedCoverage.didForcedSale;
     forcedSaleScaleApplied = forcedCoverage.forcedSaleScaleApplied ?? forcedSaleScaleApplied;
+    snapshotBalance('after_forced_sales', {
+        forcedShortfall: euros(forcedShortfall),
+        liquiditaetDelta: euros(forcedCoverage.liquiditaetDelta),
+        healthBucketUsed: euros(healthBucketCoverage.used)
+    });
 
     const equityAfterSales = sumDepot({ depotTranchesAktien });
     const goldAfterSales = sumDepot({ depotTranchesGold });
@@ -422,6 +460,10 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     }
     let equityAfterBuys = sumDepot({ depotTranchesAktien });
     let goldAfterBuys = sumDepot({ depotTranchesGold });
+    snapshotBalance('after_buys', {
+        buyEqAmount: euros(buyEqAmount),
+        buyGoldAmount: euros(buyGoldAmount)
+    });
 
     const totalWealthAvailable = equityAfterBuys + goldAfterBuys + liquiditaet;
     if (totalWealthAvailable + 1e-6 < netFloorYear) {
@@ -442,6 +484,11 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     liquiditaet -= payout;
     const liqAfterPayout = euros(liquiditaet);
     const jahresEntnahmeEffektiv = payout;
+    snapshotBalance('after_payout', {
+        payout: euros(payout),
+        jahresEntnahmeTarget: euros(jahresEntnahmeTarget),
+        portfolioTotalBeforePayout
+    });
 
     const payoutFallback = applyPayoutFallbackSale({
         jahresEntnahmeEffektiv,
@@ -480,6 +527,13 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     bondRefillNet += bondRefill.bondRefillNetDelta;
     bondRefillTax += bondRefill.bondRefillTaxDelta;
     didForcedSale = didForcedSale || bondRefill.didForcedSale;
+    snapshotBalance('after_bond_refill', {
+        bondRefillGross: euros(bondRefill.bondRefillGrossDelta),
+        bondRefillNet: euros(bondRefill.bondRefillNetDelta),
+        bondRefillTax: euros(bondRefill.bondRefillTaxDelta),
+        bondRefillDebugVersion: bondRefill.debugVersion || '',
+        bondRefillSaleShortfallGross: euros(bondRefill.saleShortfallGross)
+    });
 
     // Rebalancing bei Überschuss
     // HINWEIS: Die Logik wurde in die TransactionEngine (determineAction) verschoben,
@@ -495,6 +549,10 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     liquiditaet = euros(liqBasisForInterest * (1 + rC));
     liqNachZins = euros(liquiditaet);
     if (!isFinite(liquiditaet)) liquiditaet = 0;
+    snapshotBalance('after_cash_interest', {
+        cashInterestEarned: euros(cashZinsen),
+        liqBasisForInterest
+    });
     const healthBucketInterest = applyHealthBucketInterest({ inputs, portfolio, rC });
     const healthBucketDiagnostics = buildHealthBucketDiagnostics({
         inputs,
@@ -557,6 +615,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         kaufGld,
         baseFloor,
         baseFlex,
+        baseMinimumFlexAnnual,
         baseFlexBudgetAnnual,
         baseFlexBudgetRecharge,
         pensionResult,
@@ -583,6 +642,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         bondRefillNet,
         bondRefillTax,
         bondSaleAmount,
+        bondRefillDebugVersion: bondRefill.debugVersion || '',
+        bondRefillSaleShortfallGross: euros(bondRefill.saleShortfallGross),
         effectiveBaseFloor,
         pensionAnnual,
         rente1,
@@ -602,7 +663,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         unmetLiquidity,
         healthBucketCoverage,
         healthBucketInterest,
-        healthBucketDiagnostics
+        healthBucketDiagnostics,
+        balanceTrace
     });
 }
 

@@ -214,6 +214,11 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal', options =
     const isThreeBucket = strategyMode === STRATEGY_OPTIONS.THREE_BUCKET_JILGE;
     const formatPercent = (value, decimals = 1) => formatPercentValue(Number(value) || 0, { fractionDigits: decimals, invalid: '0.0%' });
     const formatPercentInt = (value) => formatPercentValue(Math.round(Number(value) || 0), { fractionDigits: 0, invalid: '0%' });
+    const traceTotal = (row, phase) => {
+        const trace = Array.isArray(row?.row?.balance_trace) ? row.row.balance_trace : [];
+        const entry = trace.find(item => item?.phase === phase);
+        return Number(entry?.total);
+    };
 
     const columns = [
         { header: 'Jahr', width: 4, key: 'jahr', valueFormatter: v => v ?? '', align: 'right' },
@@ -311,7 +316,14 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal', options =
                 key: 'vpw.expectedRealReturn',
                 valueFormatter: v => (Number.isFinite(v) ? formatPercentRatio(v, { fractionDigits: 1, invalid: '' }) : ''),
                 align: 'right'
-            }
+            },
+            { header: 'SafSc', width: 5, key: 'row.safety_score', valueFormatter: v => (Number.isFinite(v) ? Math.round(v) : ''), align: 'right' },
+            { header: 'RiskSt', width: 6, key: 'row.safety_risk_streak', valueFormatter: v => (Number.isFinite(v) ? Math.round(v) : ''), align: 'right' },
+            { header: 'StabSt', width: 6, key: 'row.safety_stable_streak', valueFormatter: v => (Number.isFinite(v) ? Math.round(v) : ''), align: 'right' },
+            { header: 'SafTr', width: 5, key: 'row.safety_transition', valueFormatter: v => (v || '').substring(0, 5), align: 'left' },
+            { header: 'DDreal%', width: 7, key: 'row.safety_real_drawdown_pct', valueFormatter: v => (Number.isFinite(v) ? formatPercent(v) : ''), align: 'right' },
+            { header: 'RunPre', width: 6, key: 'row.safety_runway_pre_months', valueFormatter: v => (Number.isFinite(v) ? Number(v).toFixed(1) : ''), align: 'right' },
+            { header: 'RunPost', width: 7, key: 'row.safety_runway_post_months', valueFormatter: v => (Number.isFinite(v) ? Number(v).toFixed(1) : ''), align: 'right' }
         );
     }
 
@@ -394,6 +406,10 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal', options =
             { header: 'Port>P', width: 9, key: 'row.portfolio_total_before_payout', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
             { header: 'PortAkt', width: 9, key: 'row.portfolio_active_end', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
             { header: 'PortEnd', width: 9, key: 'row.portfolio_total_end', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'FlowΔ', width: 9, key: 'row.portfolio_flow_delta', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'TrAct', width: 9, extractor: row => traceTotal(row, 'after_action_sales'), valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'TrPay', width: 9, extractor: row => traceTotal(row, 'after_payout'), valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+            { header: 'TrBond', width: 9, extractor: row => traceTotal(row, 'after_bond_refill'), valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
             { header: 'HBStart', width: 9, key: 'row.health_bucket_start', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
             { header: 'HBUse', width: 8, key: 'row.health_bucket_used', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
             { header: 'HBZins', width: 8, key: 'row.health_bucket_interest', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },

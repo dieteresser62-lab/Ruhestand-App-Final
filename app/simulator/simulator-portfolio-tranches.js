@@ -88,7 +88,14 @@ export function applySaleToPortfolio(portfolio, saleResult) {
     if (!saleResult || !saleResult.breakdown) return;
     // Normalize asset kinds to keep legacy names compatible.
     const normalizeKind = (kind) => String(kind || '').toLowerCase();
-    const isEquityKind = (kind) => kind.startsWith('aktien') || kind === 'equity' || kind === 'stocks' || kind === 'stock';
+    const isEquityKind = (kind) => kind.startsWith('aktien')
+        || kind === 'equity'
+        || kind === 'stocks'
+        || kind === 'stock'
+        || kind === 'etf'
+        || kind.includes('etf')
+        || kind === 'fonds'
+        || kind === 'fund';
     const isGoldKind = (kind) => kind.startsWith('gold');
     const isBondSaleKind = (kind) => isBondKind(kind) || kind === 'bonds';
     const isMoneyKind = (kind) => kind.startsWith('geldmarkt') || kind === 'money_market' || kind === 'money market';
@@ -164,13 +171,22 @@ export function applySaleToPortfolio(portfolio, saleResult) {
         let tranche = findTrancheById(saleItem.trancheId);
         if (!tranche) {
             const kind = normalizeKind(saleItem.kind);
-            const tranches = isEquityKind(kind) || isBondSaleKind(kind)
+            const category = normalizeKind(saleItem.category);
+            const isEquitySale = isEquityKind(kind) || category === 'equity';
+            const isBondSale = isBondSaleKind(kind) || category === 'bonds';
+            const tranches = isEquitySale || isBondSale
                 ? portfolio.depotTranchesAktien
                 : (isGoldKind(kind) ? portfolio.depotTranchesGold : (isMoneyKind(kind) ? portfolio.depotTranchesGeldmarkt : null));
             if (tranches && tranches.length) {
                 const normalizedType = normalizeKind(saleItem.kind);
-                const matchingByType = tranches.filter(t => normalizeKind(t.type) === normalizedType);
-                const pool = matchingByType.length ? matchingByType : tranches;
+                const assetPool = isEquitySale
+                    ? tranches.filter(t => !isBondKind(t?.type) && !isBondKind(t?.category))
+                    : (isBondSale
+                        ? tranches.filter(t => isBondKind(t?.type) || isBondKind(t?.category))
+                        : tranches);
+                const matchingByType = assetPool.filter(t => normalizeKind(t.type) === normalizedType);
+                const pool = matchingByType.length ? matchingByType : assetPool;
+                if (!pool.length) return;
                 const metaMatches = findTranchesByMeta(pool, saleItem);
                 if (metaMatches.length > 1) {
                     // Distribute across identical-name/ISIN tranches to prevent repeated hits on the first match.

@@ -356,4 +356,109 @@ function vpwRate(r, n) {
     assert(reentryRun.ui.vpw.dynamicFlex < reentryRun.ui.vpw.rawDynamicFlex, 'damped flex should be below raw VPW flex');
 }
 
+// Test 15: Stage 2 must not block its own recovery through the static-flex cut.
+{
+    const recoveryInput = {
+        ...baseInput,
+        depotwertAlt: 3900000,
+        depotwertNeu: 0,
+        tagesgeld: 400000,
+        goldWert: 100000,
+        goldAktiv: true,
+        goldZielProzent: 7.5,
+        goldFloorProzent: 1,
+        goldCost: 100000,
+        floorBedarf: 24000,
+        flexBedarf: 12000,
+        dynamicFlex: true,
+        horizonYears: 24,
+        marketCapeRatio: 24,
+        goGoActive: true,
+        goGoMultiplier: 1.1,
+        endeVJ: 110,
+        endeVJ_1: 105,
+        endeVJ_2: 100,
+        endeVJ_3: 95,
+        ath: 110,
+        jahreSeitAth: 0
+    };
+    let state = {
+        initialized: true,
+        flexRate: 20,
+        alarmActive: false,
+        cumulativeInflationFactor: 1,
+        peakRealVermoegen: 3000000,
+        vpwSafetyStage: 2,
+        vpwSafetyRiskStreak: 0,
+        vpwSafetyStableStreak: 0,
+        vpwSafetyReentryRemaining: 0
+    };
+    const runs = [];
+    for (let i = 0; i < 3; i += 1) {
+        const yearRun = EngineAPI.simulateSingleYear(recoveryInput, state);
+        runs.push(yearRun);
+        state = yearRun.newState;
+    }
+    assert(runs[0].ui.spending.kuerzungProzent >= 35, 'recovery fixture should retain a high static-flex cut');
+    assertEqual(runs[0].newState.vpwSafetyStableStreak, 1, 'healthy stage-2 year should count as stable despite self-imposed cut');
+    assertEqual(runs[1].newState.vpwSafetyStage, 1, 'second stable year should de-escalate from stage 2 to stage 1');
+    assertEqual(runs[2].ui.vpw.status, 'active', 'stage 1 should reactivate VPW after stage-2 recovery');
+}
+
+// Test 16: 3-bucket stage 2 recovery should not be blocked by protected drawdown alone.
+{
+    const recoveryInput = {
+        ...baseInput,
+        depotwertAlt: 1900000,
+        depotwertNeu: 0,
+        tagesgeld: 300000,
+        goldWert: 100000,
+        goldAktiv: true,
+        goldZielProzent: 7.5,
+        goldFloorProzent: 1,
+        goldCost: 100000,
+        floorBedarf: 24000,
+        flexBedarf: 12000,
+        dynamicFlex: true,
+        horizonYears: 24,
+        marketCapeRatio: 24,
+        goGoActive: true,
+        goGoMultiplier: 1.1,
+        decumulation: {
+            mode: '3_bucket_jilge',
+            bondTargetFactor: 5,
+            drawdownTrigger: 15,
+            bondRefillThreshold: null
+        },
+        endeVJ: 110,
+        endeVJ_1: 105,
+        endeVJ_2: 100,
+        endeVJ_3: 95,
+        ath: 110,
+        jahreSeitAth: 0
+    };
+    let state = {
+        initialized: true,
+        flexRate: 20,
+        alarmActive: false,
+        cumulativeInflationFactor: 1,
+        peakRealVermoegen: 4000000,
+        vpwSafetyStage: 2,
+        vpwSafetyRiskStreak: 0,
+        vpwSafetyStableStreak: 0,
+        vpwSafetyReentryRemaining: 0
+    };
+    const runs = [];
+    for (let i = 0; i < 3; i += 1) {
+        const yearRun = EngineAPI.simulateSingleYear(recoveryInput, state);
+        runs.push(yearRun);
+        state = yearRun.newState;
+    }
+    assert(runs[0].diagnosis.keyParams.realerDepotDrawdown > 0.25, 'fixture should retain a deep drawdown');
+    assert(runs[0].diagnosis.general.runwayMonate >= 24, 'fixture should have sufficient runway');
+    assertEqual(runs[0].newState.vpwSafetyStableStreak, 1, '3-bucket protected drawdown should count as stable in stage 2');
+    assertEqual(runs[1].newState.vpwSafetyStage, 1, '3-bucket protected drawdown should de-escalate from stage 2');
+    assertEqual(runs[2].ui.vpw.status, 'active', 'VPW should reactivate after 3-bucket protected recovery');
+}
+
 console.log('--- VPW Dynamic Flex Tests Completed ---');

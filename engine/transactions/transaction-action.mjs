@@ -121,6 +121,9 @@ export function determineAction(p, helpers) {
             ? (aktuelleLiquiditaet / zielLiquiditaet)
             : 1;
         const runwayCoverageThreshold = CONFIG.THRESHOLDS.STRATEGY.runwayCoverageMinPct || 0;
+        const absoluteMinLiq = CONFIG.THRESHOLDS.STRATEGY.absoluteMinLiquidity || 10000;
+        const isFloorCoveredByIncome = floorBedarfNetto <= 0;
+        const hasCoreCashShortfall = aktuelleLiquiditaet < absoluteMinLiq;
         const guardrailActivationThreshold =
             CONFIG.THRESHOLDS.STRATEGY.runwayGuardrailActivationPct
             ?? runwayCoverageThreshold
@@ -136,8 +139,10 @@ export function determineAction(p, helpers) {
         // Floor-Runway kann irreführend hoch sein wenn Pension den Großteil des Floors deckt
         const hasFloorRunwayGap = currentFloorRunwayMonths < runwayMinThresholdMonths;
         const hasTotalRunwayGap = currentRunwayMonths < runwayMinThresholdMonths;
-        const hasRunwayGap = hasFloorRunwayGap || hasTotalRunwayGap;
-        const hasCoverageGap = zielLiquiditaetsdeckung < guardrailActivationThreshold;
+        const hasRunwayGap = hasFloorRunwayGap ||
+            (hasTotalRunwayGap && (!isFloorCoveredByIncome || hasCoreCashShortfall));
+        const hasCoverageGap = zielLiquiditaetsdeckung < guardrailActivationThreshold &&
+            (!isFloorCoveredByIncome || hasCoreCashShortfall);
         const monthlyBaselineNeed = (gesamtjahresbedarf / 12);
         const guardrailTargetEuro = Math.max(
             runwayMinThresholdMonths * monthlyBaselineNeed,
@@ -152,10 +157,9 @@ export function determineAction(p, helpers) {
         // Gold aufschieben ist riskant, da der nächste Bär jederzeit kommen kann.
         // AUSNAHME: Bei extrem kritischer Liquidität (unter absolutem Minimum oder < 25% Deckung)
         // muss der Guardrail trotzdem greifen, um Liquiditätsengpass zu verhindern.
-        const absoluteMinLiq = CONFIG.THRESHOLDS.STRATEGY.absoluteMinLiquidity || 10000;
         const isCriticalLiquidityForGuardrail =
             aktuelleLiquiditaet < absoluteMinLiq ||
-            zielLiquiditaetsdeckung < 0.25;
+            (!isFloorCoveredByIncome && zielLiquiditaetsdeckung < 0.25);
         // Nicht-Peak: Guardrail bei Coverage-Lücke oder Runway-Lücke
         const hasGuardrailGap = (isPeakRegime && !isCriticalLiquidityForGuardrail)
             ? false
@@ -282,6 +286,7 @@ export function determineAction(p, helpers) {
             const opportunisticResult = buildOpportunisticRefill({
                 aktuelleLiquiditaet,
                 zielLiquiditaet,
+                sicherheitsPuffer,
                 investiertesKapital,
                 aktienwert,
                 input,

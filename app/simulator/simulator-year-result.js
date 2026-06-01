@@ -26,6 +26,7 @@ export function buildSimulatorYearResult({
     kaufGld,
     baseFloor,
     baseFlex,
+    baseMinimumFlexAnnual = 0,
     baseFlexBudgetAnnual,
     baseFlexBudgetRecharge,
     pensionResult,
@@ -52,6 +53,8 @@ export function buildSimulatorYearResult({
     bondRefillNet,
     bondRefillTax,
     bondSaleAmount,
+    bondRefillDebugVersion = '',
+    bondRefillSaleShortfallGross = 0,
     effectiveBaseFloor,
     pensionAnnual,
     rente1,
@@ -71,7 +74,8 @@ export function buildSimulatorYearResult({
     unmetLiquidity,
     healthBucketCoverage = null,
     healthBucketInterest = null,
-    healthBucketDiagnostics = null
+    healthBucketDiagnostics = null,
+    balanceTrace = []
 }) {
     const kaufAktTotal = buyEqAmount + kaufAkt;
     const totalGoldKauf = buyGoldAmount + kaufGld;
@@ -96,10 +100,26 @@ export function buildSimulatorYearResult({
     const healthBucketEnd = euros(Number(nextPortfolio.healthBucketGeldmarkt) || 0);
     const portfolioActiveEnd = euros(wertAktien + wertGold + liquiditaet);
     const portfolioTotalEnd = euros(portfolioActiveEnd + healthBucketEnd);
+    const portfolioFlowDelta = portfolioActiveEnd - (
+        euros(portfolioTotalBeforePayout) - euros(jahresEntnahmeEffektiv) - euros(bondRefillTax) + euros(cashZinsen)
+    );
+    const normalizedBalanceTrace = Array.isArray(balanceTrace)
+        ? balanceTrace.map(entry => ({
+            ...entry,
+            phase: String(entry?.phase || ''),
+            total: euros(entry?.total),
+            equity: euros(entry?.equity),
+            bonds: euros(entry?.bonds),
+            gold: euros(entry?.gold),
+            cash: euros(entry?.cash)
+        }))
+        : [];
     const healthBucketWarnings = Array.isArray(nextPortfolio.healthBucketMeta?.warnings)
         ? nextPortfolio.healthBucketMeta.warnings
         : [];
     const vpw = fullResult.ui.vpw || null;
+    const safetyDiagnosis = fullResult.diagnosis?.general || {};
+    const keyParams = fullResult.diagnosis?.keyParams || {};
 
     return {
         isRuin: false,
@@ -121,6 +141,7 @@ export function buildSimulatorYearResult({
             portfolio: nextPortfolio,
             baseFloor: baseFloor * inflFactorThisYear,
             baseFlex: baseFlex * inflFactorThisYear,
+            baseMinimumFlexAnnual: baseMinimumFlexAnnual * inflFactorThisYear,
             baseFlexBudgetAnnual: baseFlexBudgetAnnual * inflFactorThisYear,
             baseFlexBudgetRecharge: baseFlexBudgetRecharge * inflFactorThisYear,
             lastState: spendingNewState,
@@ -162,11 +183,21 @@ export function buildSimulatorYearResult({
             vpw_total: Number.isFinite(vpw?.vpwTotal) ? vpw.vpwTotal : null,
             vpw_dynamic_flex: Number.isFinite(vpw?.dynamicFlex) ? vpw.dynamicFlex : null,
             static_flex_baseline: Number.isFinite(vpw?.staticFlexBaseline) ? vpw.staticFlexBaseline : null,
+            safety_stage_current: Number.isFinite(safetyDiagnosis.dynamicFlexSafetyStage) ? safetyDiagnosis.dynamicFlexSafetyStage : null,
+            safety_score: Number.isFinite(safetyDiagnosis.dynamicFlexSafetyScore) ? safetyDiagnosis.dynamicFlexSafetyScore : null,
+            safety_risk_streak: Number.isFinite(safetyDiagnosis.dynamicFlexSafetyRiskStreak) ? safetyDiagnosis.dynamicFlexSafetyRiskStreak : null,
+            safety_stable_streak: Number.isFinite(safetyDiagnosis.dynamicFlexSafetyStableStreak) ? safetyDiagnosis.dynamicFlexSafetyStableStreak : null,
+            safety_transition: safetyDiagnosis.dynamicFlexSafetyTransition || '',
+            safety_runway_pre_months: Number.isFinite(safetyDiagnosis.runwayMonateVorTransaktion) ? safetyDiagnosis.runwayMonateVorTransaktion : null,
+            safety_runway_post_months: Number.isFinite(safetyDiagnosis.dynamicFlexSafetyRunwayMonate) ? safetyDiagnosis.dynamicFlexSafetyRunwayMonate : null,
+            safety_real_drawdown_pct: Number.isFinite(keyParams.realerDepotDrawdown) ? keyParams.realerDepotDrawdown * 100 : null,
             liq_before_payout: liqBeforePayout,
             liq_after_payout: liqAfterPayout,
             liq_after_interest: liqNachZins,
             portfolio_total_before_payout: portfolioTotalBeforePayout,
             portfolio_active_end: portfolioActiveEnd,
+            portfolio_flow_delta: portfolioFlowDelta,
+            balance_trace: normalizedBalanceTrace,
             health_bucket_enabled: !!healthBucketDiagnostics?.enabled,
             health_bucket_start: euros(healthBucketCoverage?.startAmount ?? healthBucketInterest?.startAmount),
             health_bucket_triggered: !!healthBucketCoverage?.triggered,
@@ -257,6 +288,8 @@ export function buildSimulatorYearResult({
                 bondRefillNet: euros(bondRefillNet),
                 bondRefillTax: euros(bondRefillTax),
                 bondSaleAmount: euros(bondSaleAmount),
+                bondRefillDebugVersion,
+                bondRefillSaleShortfallGross: euros(bondRefillSaleShortfallGross),
                 equityPreserved: euros(equityPreserved),
                 unmetLiquidity: euros(unmetLiquidity)
             }

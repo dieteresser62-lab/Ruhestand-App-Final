@@ -10,6 +10,7 @@ import { evaluateAlarmConditions, shouldDeescalateInPeak, shouldDeescalateInReco
 import { applyFinalRateLimits } from './final-rate-policy.mjs';
 import { applyFlexBudgetCap } from './flex-budget-policy.mjs';
 import { applyFlexShareCurve, calculateFlexRate } from './flex-rate-policy.mjs';
+import { applyMinimumFlexFloor } from './minimum-flex-policy.mjs';
 import { buildSpendingDiagnosis, resolveRunwayTarget } from './spending-diagnosis.mjs';
 import { applyGuardrails } from './spending-guardrails.mjs';
 import { applySpendingPolicyPipeline } from './spending-policy-pipeline.mjs';
@@ -52,6 +53,10 @@ export const SpendingPlanner = {
 
     _applyFlexBudgetCap(flexRate, inflatedBedarf, input, state, market, addDecision) {
         return applyFlexBudgetCap(flexRate, inflatedBedarf, input, state, market, addDecision);
+    },
+
+    _applyMinimumFlexFloor(flexRate, context, addDecision) {
+        return applyMinimumFlexFloor(flexRate, context, addDecision);
     },
 
     _applyFinalRateLimits(prevFlexRate, nextFlexRate, market, addDecision, wealthFactor = 1) {

@@ -190,7 +190,7 @@ export function initializePortfolioDetailed(inputs) {
             } else if (category === 'money_market') {
                 normalizedType = 'geldmarkt';
             } else if (category === 'bonds' || isBond) {
-                normalizedType = rawType || 'anleihe';
+                normalizedType = 'anleihe';
                 category = 'bonds';
             } else if (category === 'equity') {
                 if (rawType === 'aktien_neu' || rawType === 'aktien_alt') {

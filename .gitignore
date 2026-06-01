@@ -53,3 +53,8 @@ test_output.txt
 Aufgabe.md
 aufgabe.md
 feedback.md
+
+# Local scratch and settings
+scratch/
+.obsidian/
+*.log

@@ -191,6 +191,7 @@ export const UIReader = {
             aktuellesAlter: Number.isFinite(profileAlter) ? profileAlter : (parseInt(val('aktuellesAlter')) || 0),
             floorBedarf: num('floorBedarf'),
             flexBedarf: num('flexBedarf'),
+            minimumFlexAnnual: num('minimumFlexAnnual'),
             flexBudgetAnnual: num('flexBudgetAnnual'),
             flexBudgetYears: parseFloat(val('flexBudgetYears')) || 0,
             flexBudgetRecharge: num('flexBudgetRecharge'),

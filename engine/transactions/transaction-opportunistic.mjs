@@ -10,6 +10,7 @@ import { CONFIG } from '../config.mjs';
 export function buildOpportunisticRefill({
     aktuelleLiquiditaet,
     zielLiquiditaet,
+    sicherheitsPuffer,
     investiertesKapital,
     aktienwert,
     input,
@@ -61,8 +62,10 @@ export function buildOpportunisticRefill({
             goldVerkaufBedarf = Math.max(0, input.goldWert - goldZielwert);
         }
     }
-    if (liquiditaetsBedarf > 0 && goldKaufBedarf > 0) {
-        // Kein Gold-Kauf aus Verkäufen, solange Liquidität unter Ziel ist.
+    const isGoldBuyCashCritical = aktuelleLiquiditaet < (sicherheitsPuffer || 0) || belowAbsoluteFloor;
+    if (isGoldBuyCashCritical && goldKaufBedarf > 0) {
+        // Gold-Aufbau nur in echten Cash-Krisen blockieren. Eine normale
+        // Unterschreitung des Ziel-Runways darf Asset-Rebalancing nicht dauerhaft verhindern.
         goldKaufBedarf = Math.min(goldKaufBedarf, surplusCash);
     }
 

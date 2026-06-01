@@ -261,6 +261,11 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         if (value == null || !isFinite(value)) return fallback;
         return `${Math.round(value * 100)}%`;
     };
+    const traceTotal = (row, phase) => {
+        const trace = Array.isArray(row?.balance_trace) ? row.balance_trace : [];
+        const entry = trace.find(item => item?.phase === phase);
+        return Number(entry?.total);
+    };
 
     const baseCols = [];
     baseCols.push({ key: 'jahr', header: 'Jahr', width: 4 });
@@ -467,6 +472,10 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         { key: 'portfolio_total_before_payout', header: 'Port>P', width: 9, fmt: formatCurrencyShortLog },
         { key: 'portfolio_active_end', header: 'PortAkt', width: 9, fmt: formatCurrencyShortLog },
         { key: 'portfolio_total_end', header: 'PortEnd', width: 9, fmt: formatCurrencyShortLog },
+        { key: 'portfolio_flow_delta', header: 'FlowΔ', width: 9, fmt: formatCurrencyShortLog },
+        { key: null, header: 'TrAct', width: 9, fmt: (v, row) => formatCurrencyShortLog(traceTotal(row, 'after_action_sales')) },
+        { key: null, header: 'TrPay', width: 9, fmt: (v, row) => formatCurrencyShortLog(traceTotal(row, 'after_payout')) },
+        { key: null, header: 'TrBond', width: 9, fmt: (v, row) => formatCurrencyShortLog(traceTotal(row, 'after_bond_refill')) },
         { key: 'health_bucket_start', header: 'HBStart', width: 9, fmt: formatCurrencyShortLog },
         { key: 'health_bucket_used', header: 'HBUse', width: 8, fmt: formatCurrencyShortLog },
         { key: 'health_bucket_interest', header: 'HBZins', width: 8, fmt: formatCurrencyShortLog },

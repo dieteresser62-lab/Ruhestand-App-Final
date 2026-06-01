@@ -21,6 +21,7 @@ engine/
 │   ├── final-rate-policy.mjs     # Finale jährliche Flex-Rate-Delta-Limits
 │   ├── flex-budget-policy.mjs    # Flex-Budget-Cap, Recharge und Min-Rate
 │   ├── flex-rate-policy.mjs      # Flex-Rate, S-Kurve und harte Caps
+│   ├── minimum-flex-policy.mjs   # Bedingte Mindest-Flex-Untergrenze
 │   ├── spending-diagnosis.mjs    # Diagnose-Shape, Guardrail-Uebersicht und Runway-Ziel
 │   ├── spending-guardrails.mjs   # Recovery-/Caution-Guardrails und Budget-Floor
 │   ├── spending-policy-pipeline.mjs # Policy-Reihenfolge nach initialer Flex-Rate
@@ -55,6 +56,7 @@ engine/
 | `planners/final-rate-policy.mjs` | `{ applyFinalRateLimits }` | Finale jährliche Flex-Rate-Delta-Limits |
 | `planners/flex-budget-policy.mjs` | `{ applyFlexBudgetCap }` | Flex-Budget-Cap, Topfverbrauch, Recharge und Min-Rate |
 | `planners/flex-rate-policy.mjs` | `{ calculateFlexRate, applyFlexShareCurve }` | Flex-Rate-Berechnung, Alarmmodus, S-Kurve und harte Bear-/Runway-Caps |
+| `planners/minimum-flex-policy.mjs` | `{ applyMinimumFlexFloor }` | Bedingte Mindest-Flex-Untergrenze als Rate nach Guardrails und vor Flex-Budget |
 | `planners/spending-diagnosis.mjs` | `{ buildSpendingDiagnosis, resolveRunwayTarget }` | Finale Spending-Diagnose, Guardrail-Uebersicht, Key-Parameter-Kopie und Runway-Ziel |
 | `planners/spending-guardrails.mjs` | `{ applyGuardrails }` | Recovery-Cap, Caution-Inflationscap, Budget-Floor und Guardrail-Diagnosen |
 | `planners/spending-policy-pipeline.mjs` | `{ applySpendingPolicyPipeline }` | Guardrails, Flex-Budget und finale Rate-Limits in stabiler Reihenfolge |
@@ -85,6 +87,10 @@ Bei aktivem Dynamic-Flex (`dynamicFlex=true`) werden folgende Eingaben genutzt:
 
 Ausgabe für UI/Diagnostik erfolgt in `result.ui.vpw` (u. a. `enabled`, `horizonYears`, `vpwRate`, `expectedRealReturn`, `status`).
 Bei `dynamicFlex=false` bleibt das bisherige Flex-Verhalten unverändert.
+
+### Mindest-Flex Vertragsfeld (`simulateSingleYear`)
+
+`minimumFlexAnnual` ist ein optionaler nicht-negativer Jahresbetrag. Fehlende, leere oder nicht numerische Werte werden als `0` normalisiert. Werte über `flexBedarf` werden als Validierungsfehler abgelehnt, damit der Flex-Bedarf die fachliche Obergrenze bleibt. Die Spending-Wirkung erfolgt in `applyMinimumFlexFloor()` als Rate nach Guardrails und vor Flex-Budget; `0` verändert bestehende Simulationen nicht. Die Anhebung wird bei Alarm oder unzureichender Gesamtvermoegens-/Runway-Deckung blockiert und mit `minimumFlexStatus` / `minimumFlexBlockReason` diagnostiziert.
 
 ---
 

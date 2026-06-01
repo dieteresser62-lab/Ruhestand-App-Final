@@ -11,6 +11,7 @@ export function buildSimulatorEngineInput({
     liquiditaet,
     effectiveBaseFloor,
     baseFlex,
+    baseMinimumFlexAnnual = 0,
     temporaryFlexFactor,
     baseFlexBudgetAnnual,
     baseFlexBudgetRecharge,
@@ -32,6 +33,7 @@ export function buildSimulatorEngineInput({
         // Engine expects gross demand and total pension; it performs netting internally.
         floorBedarf: effectiveBaseFloor,
         flexBedarf: baseFlex * temporaryFlexFactor,
+        minimumFlexAnnual: baseMinimumFlexAnnual * temporaryFlexFactor,
         flexBudgetAnnual: baseFlexBudgetAnnual,
         flexBudgetYears: inputs.flexBudgetYears ?? 0,
         flexBudgetRecharge: baseFlexBudgetRecharge,

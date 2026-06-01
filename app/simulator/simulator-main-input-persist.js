@@ -12,7 +12,7 @@ const CARE_GRADE_FIELD_IDS = SUPPORTED_PFLEGE_GRADES.flatMap(grade => [
 
 export function initInputPersistence() {
     const allInputs = [
-        'startFloorBedarf', 'startFlexBedarf', 'flexBudgetAnnual', 'flexBudgetYears', 'flexBudgetRecharge', 'marketCapeRatio',
+        'startFloorBedarf', 'startFlexBedarf', 'minimumFlexAnnual', 'flexBudgetAnnual', 'flexBudgetYears', 'flexBudgetRecharge', 'marketCapeRatio',
         'dynamicFlexPreset', 'dynamicFlexShowAdvanced',
         'dynamicFlex', 'horizonMethod', 'horizonYears', 'survivalQuantile', 'goGoActive', 'goGoMultiplier',
         'p1StartAlter', 'p1Geschlecht', 'p1SparerPauschbetrag', 'p1KirchensteuerPct',

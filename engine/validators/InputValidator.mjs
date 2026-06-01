@@ -61,12 +61,20 @@ const InputValidator = {
     // 3. Vermögenswerte dürfen nicht negativ sein
     // Prüft alle Depot- und Kostenbasis-Felder
     ['tagesgeld', 'geldmarktEtf', 'depotwertAlt', 'depotwertNeu', 'goldWert',
-        'floorBedarf', 'flexBedarf', 'flexBudgetAnnual', 'flexBudgetRecharge',
+        'floorBedarf', 'flexBedarf', 'minimumFlexAnnual', 'flexBudgetAnnual', 'flexBudgetRecharge',
         'costBasisAlt', 'costBasisNeu', 'goldCost', 'sparerPauschbetrag'].forEach(field => {
             if (input[field] != null) {
                 check(!Number.isFinite(input[field]) || input[field] < 0, field, 'Wert muss eine gültige nicht-negative Zahl sein.');
             }
         });
+
+    if (Number.isFinite(input.minimumFlexAnnual) && Number.isFinite(input.flexBedarf)) {
+        check(
+            input.minimumFlexAnnual > input.flexBedarf,
+            'minimumFlexAnnual',
+            'Mindest-Flex p.a. darf nicht größer als Flex Bedarf p.a. sein.'
+        );
+    }
 
     // Marktdaten dürfen nicht negativ sein
     ['endeVJ', 'endeVJ_1', 'endeVJ_2', 'endeVJ_3', 'ath'].forEach(field => {

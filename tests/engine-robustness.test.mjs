@@ -218,7 +218,45 @@ function assertFiniteNumber(value, label) {
     assertFiniteNumber(result.ui?.spending?.monatlicheEntnahme, 'monatlicheEntnahme (zero wealth)');
 }
 
-// --- TEST 13: Age > 120 years ---
+// --- TEST 13: minimumFlexAnnual missing/zero/invalid keeps current behavior ---
+{
+    const withoutMinimumFlex = EngineAPI.simulateSingleYear({ ...baseInput }, null);
+    const zeroMinimumFlex = EngineAPI.simulateSingleYear({ ...baseInput, minimumFlexAnnual: 0 }, null);
+    const invalidMinimumFlex = EngineAPI.simulateSingleYear({ ...baseInput, minimumFlexAnnual: 'abc' }, null);
+    assert(!withoutMinimumFlex.error, 'Missing minimumFlexAnnual should be accepted');
+    assert(!zeroMinimumFlex.error, 'minimumFlexAnnual=0 should be accepted');
+    assert(!invalidMinimumFlex.error, 'Invalid minimumFlexAnnual should fall back to 0');
+    assertEqual(
+        zeroMinimumFlex.ui?.spending?.jahresEntnahme,
+        withoutMinimumFlex.ui?.spending?.jahresEntnahme,
+        'minimumFlexAnnual=0 should not change annual spending'
+    );
+    assertEqual(
+        invalidMinimumFlex.ui?.spending?.jahresEntnahme,
+        withoutMinimumFlex.ui?.spending?.jahresEntnahme,
+        'Invalid minimumFlexAnnual should behave like 0'
+    );
+}
+
+// --- TEST 14: minimumFlexAnnual validation rejects negative and above flexBedarf ---
+{
+    const originalError = console.error;
+    console.error = () => {};
+    try {
+        const negative = EngineAPI.simulateSingleYear({ ...baseInput, minimumFlexAnnual: -1 }, null);
+        const aboveFlex = EngineAPI.simulateSingleYear({ ...baseInput, minimumFlexAnnual: baseInput.flexBedarf + 1 }, null);
+        assert(negative.error instanceof ValidationError, 'Negative minimumFlexAnnual should return ValidationError');
+        assert(aboveFlex.error instanceof ValidationError, 'minimumFlexAnnual > flexBedarf should return ValidationError');
+        assert(
+            aboveFlex.error.errors?.some(e => e.fieldId === 'minimumFlexAnnual'),
+            'ValidationError should point to minimumFlexAnnual'
+        );
+    } finally {
+        console.error = originalError;
+    }
+}
+
+// --- TEST 15: Age > 120 years ---
 {
     const originalError = console.error;
     console.error = () => {};

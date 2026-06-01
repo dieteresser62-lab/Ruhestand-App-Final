@@ -41,6 +41,7 @@ try {
             inflation: { value: '2' },
             floorBedarf: { value: '1000' },
             flexBedarf: { value: '500' },
+            minimumFlexAnnual: { value: '250' },
             flexBudgetAnnual: { value: '300' },
             flexBudgetRecharge: { value: '200' }
         },
@@ -74,6 +75,7 @@ try {
     {
         dom.inputs.floorBedarf.value = '1000';
         dom.inputs.flexBedarf.value = '500';
+        dom.inputs.minimumFlexAnnual.value = '250';
         dom.inputs.flexBudgetAnnual.value = '300';
         dom.inputs.flexBudgetRecharge.value = '200';
         dom.inputs.inflation.value = '2';
@@ -81,8 +83,10 @@ try {
         // Inputs werden im DOM angepasst (Strings), dann geparst.
         const floor = UIUtils.parseCurrency(dom.inputs.floorBedarf.value);
         const flex = UIUtils.parseCurrency(dom.inputs.flexBedarf.value);
+        const minimumFlex = UIUtils.parseCurrency(dom.inputs.minimumFlexAnnual.value);
         assertClose(floor, 1020, 0.01, 'Floor should be adjusted by inflation');
         assertClose(flex, 510, 0.01, 'Flex should be adjusted by inflation');
+        assertClose(minimumFlex, 255, 0.01, 'Minimum flex should be adjusted by inflation');
     }
 
     // --- TEST 3: Negative inflation handled (no reduction) ---
