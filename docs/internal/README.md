@@ -12,6 +12,7 @@ Abgeschlossene Umsetzungen liegen im Archiv.
 ## Archive
 
 - `archive/2026-Refactoring/`
+- `archive/2026-architektur-review/`
 - `archive/2026-architektur-revision/`
 - `archive/2026-balance-diagnosis-ux/`
 - `archive/2026-balance-workflow-hardening/`

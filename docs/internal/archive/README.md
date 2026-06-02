@@ -5,6 +5,7 @@ Namenskonvention: `YYYY-feature`.
 ## Verfuegbare Archive
 
 - `2026-Refactoring/`
+- `2026-architektur-review/`
 - `2026-architektur-revision/`
 - `2026-balance-diagnosis-ux/`
 - `2026-balance-workflow-hardening/`
