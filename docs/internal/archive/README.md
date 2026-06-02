@@ -5,10 +5,14 @@ Namenskonvention: `YYYY-feature`.
 ## Verfuegbare Archive
 
 - `2026-Refactoring/`
+- `2026-architektur-revision/`
+- `2026-balance-diagnosis-ux/`
 - `2026-balance-workflow-hardening/`
 - `2026-dynamic-flex/`
 - `2026-engine-tax-golden-cases/`
 - `2026-mindest-flex/`
+- `2026-persistence-migration/`
+- `2026-pflegebucket-geldmarkt/`
 - `2026-profilverbund-tranchen-contracts/`
 - `2026-simulator-worker-parity/`
 - `2025-profilverbund-balance/`
