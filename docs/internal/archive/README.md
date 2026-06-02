@@ -15,6 +15,7 @@ Namenskonvention: `YYYY-feature`.
 - `2026-pflegebucket-geldmarkt/`
 - `2026-profilverbund-tranchen-contracts/`
 - `2026-simulator-worker-parity/`
+- `2026-tauri-release-gate/`
 - `2025-profilverbund-balance/`
 - `2025-webworkers-rollout/`
 - `2025-adapter-elimination/`

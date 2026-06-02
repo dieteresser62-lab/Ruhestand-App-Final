@@ -6,7 +6,6 @@ Aktive interne Uebersichten:
 
 - `PROJEKTUEBERSICHT.md` - detaillierte technische und organisatorische Projektuebersicht.
 - `BALANCE_JAHRESABSCHLUSS_SNAPSHOT_PLAN.md` - Konzept/Plan fuer getrennte Snapshot-Ablage ohne Ordnerbindung.
-- `2026-tauri-release-gate/TAURI_RELEASE_GATE_PLAN.md` - aktiver Plan zur Absicherung des manuellen Tauri-/EXE-Release-Gates.
 
 Abgeschlossene Umsetzungen liegen im Archiv.
 
@@ -23,6 +22,7 @@ Abgeschlossene Umsetzungen liegen im Archiv.
 - `archive/2026-pflegebucket-geldmarkt/`
 - `archive/2026-profilverbund-tranchen-contracts/`
 - `archive/2026-simulator-worker-parity/`
+- `archive/2026-tauri-release-gate/`
 - `archive/2025-profilverbund-balance/`
 - `archive/2025-webworkers-rollout/`
 - `archive/2025-adapter-elimination/`
