@@ -748,4 +748,79 @@ console.log('Test 27: runSweepChunk - Gueltige Dynamic-Flex Grenzwerte');
     console.log('✓ runSweepChunk Gueltige Dynamic-Flex Grenzwerte OK');
 }
 
+// Test 28: runSweepChunk - Mindest-Flex wird in Sweep-Laeufen akzeptiert
+console.log('Test 28: runSweepChunk - Mindest-Flex wird in Sweep-Laeufen akzeptiert');
+{
+    prepareHistoricalDataOnce();
+
+    const baseInputs = {
+        startAlter: 65,
+        geschlecht: 'm',
+        startVermoegen: 500000,
+        depotwertAlt: 480000,
+        einstandAlt: 400000,
+        tagesgeld: 20000,
+        geldmarktEtf: 0,
+        zielLiquiditaet: 20000,
+        startFloorBedarf: 24000,
+        startFlexBedarf: 12000,
+        minimumFlexAnnual: 9000,
+        flexBudgetAnnual: 0,
+        flexBudgetRecharge: 0,
+        targetEq: 60,
+        rebalBand: 5,
+        maxSkimPctOfEq: 10,
+        maxBearRefillPctOfEq: 5,
+        runwayMinMonths: 24,
+        runwayTargetMonths: 36,
+        goldAktiv: false,
+        goldZielProzent: 0,
+        goldFloorProzent: 0,
+        goldSteuerfrei: true,
+        dynamicFlex: true,
+        horizonMethod: 'survival_quantile',
+        horizonYears: 10,
+        survivalQuantile: 0.85,
+        goGoActive: false,
+        goGoMultiplier: 1.0,
+        startSPB: 1000,
+        kirchensteuerSatz: 0,
+        rentAdjMode: 'fix',
+        rentAdjPct: 0,
+        renteMonatlich: 0,
+        renteStartOffsetJahre: 0,
+        marketCapeRatio: 35,
+        stressPreset: 'NONE',
+        pflegefallLogikAktivieren: false,
+        partner: { aktiv: false },
+        accumulationPhase: { enabled: false },
+        transitionYear: 0
+    };
+
+    const paramCombinations = [
+        { runwayMin: 18, runwayTarget: 24, targetEq: 60, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0 }
+    ];
+
+    const sweepConfig = {
+        anzahlRuns: 4,
+        maxDauer: 6,
+        blockSize: 1,
+        baseSeed: 2005,
+        methode: 'block',
+        rngMode: 'per-run-seed'
+    };
+
+    const { results } = runSweepChunk({
+        baseInputs,
+        paramCombinations,
+        comboRange: { start: 0, count: 1 },
+        sweepConfig
+    });
+
+    assert(results[0].metrics.invalidCombination !== true, 'Mindest-Flex-Sweep sollte gueltig bleiben');
+    assert(typeof results[0].metrics.successProbFloor === 'number', 'Mindest-Flex-Sweep sollte Metriken berechnen');
+    assert(Number.isFinite(results[0].metrics.meanEndWealth), 'Mindest-Flex-Sweep sollte end wealth aggregieren');
+    console.log('✓ runSweepChunk Mindest-Flex akzeptiert OK');
+}
+
 console.log('--- Simulator Sweep Tests Abgeschlossen ---');

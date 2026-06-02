@@ -50,6 +50,11 @@ setupDom();
         currentRealVermoegen: 950000,
         cumulativeInflationFactor: 1.25,
         jahresentnahme: 48000,
+        minimumFlexAnnual: 10000,
+        minimumFlexStatus: 'applied',
+        minimumFlexRequiredRate: 50,
+        minimumFlexEffectiveBefore: 4000,
+        minimumFlexEffectiveAfter: 10000,
         vpw: {
             enabled: true,
             status: 'active',
@@ -86,6 +91,9 @@ setupDom();
     assert(txt.includes('Statischer Flex-Bedarf'), 'Static flex baseline should be rendered');
     assert(txt.includes('Flex freigegeben'), 'Released flex metric should be rendered');
     assert(txt.includes('Nicht genutzter Rahmen'), 'Unused VPW room should be rendered');
+    assert(txt.includes('Mindest-Flex p.a.'), 'Minimum flex metric should be rendered');
+    assert(txt.includes('Mindest-Flex Rate'), 'Minimum flex required rate should be rendered');
+    assert(txt.includes('Mindest-Flex Effekt'), 'Minimum flex effect should be rendered');
     assert(txt.includes('Pflegebucket'), 'Health bucket metric should be rendered');
     assert(txt.includes('Pflegebucket-Zieldeckung'), 'Health bucket target coverage should be rendered');
     assert(txt.includes('keine automatische Freigabe'), 'Health bucket policy should be visible');
@@ -114,6 +122,21 @@ setupDom();
     assert(realCard?.dataset?.trend === 'down', 'Negative ER(real) should be marked as warning trend');
     const txt = flattenText(grid);
     assert(txt.includes('Warnsignal'), 'Warning hint text should be visible');
+}
+
+{
+    const grid = buildKeyParams({
+        minimumFlexAnnual: 10000,
+        minimumFlexStatus: 'blocked_emergency',
+        minimumFlexBlockReason: 'minimum_runway_not_restorable',
+        minimumFlexRequiredRate: 50,
+        minimumFlexEffectiveBefore: 4000,
+        minimumFlexEffectiveAfter: 4000
+    });
+    const card = findCardByLabel(grid, 'Mindest-Flex p.a.');
+    const txt = flattenText(grid);
+    assert(card?.dataset?.trend === 'down', 'Blocked minimum flex should be marked as warning trend');
+    assert(txt.includes('Mindest-Runway nicht wiederherstellbar'), 'Minimum flex block reason should be visible');
 }
 
 console.log('✅ Balance diagnosis keyparams tests passed');

@@ -33,6 +33,9 @@ const appState = {
             cumulativeInflationFactor: 1.18,
             aktuelleFlexRate: 78,
             minFlexRatePct: 65,
+            minimumFlexAnnual: 10000,
+            minimumFlexStatus: 'blocked_emergency',
+            minimumFlexBlockReason: 'minimum_runway_not_restorable',
             kuerzungProzent: 22,
             jahresentnahme: 42000,
             vpw: {
@@ -102,6 +105,8 @@ assert(text.includes('Gold-Grenzen:'), 'Copytext sollte Gold-Grenzen ausgeben');
 assert(text.includes('--- Dynamic Flex (VPW) ---'), 'Copytext sollte VPW-Block enthalten');
 assert(text.includes('VPW-Sicherheitsmodus: Stufe 2'), 'Copytext sollte VPW-Sicherheitsmodus ausgeben');
 assert(text.includes('Warnsignale:'), 'Copytext sollte VPW-Warnsignale ausgeben');
+assert(text.includes('Mindest-Flex p.a.:'), 'Copytext sollte Mindest-Flex ausgeben');
+assert(text.includes('Mindest-Runway nicht wiederherstellbar'), 'Copytext sollte Mindest-Flex-Blockgrund ausgeben');
 assert(text.includes('automatische Freigabe: Nein'), 'Copytext sollte die Balance-Freigabepolicy ausgeben');
 assert(text.includes('Pflegebucket-Policy:'), 'Copytext sollte die Pflegebucket-Policy begruenden');
 

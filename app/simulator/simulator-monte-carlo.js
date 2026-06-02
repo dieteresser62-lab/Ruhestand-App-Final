@@ -10,6 +10,7 @@ import { buildMonteCarloAggregates, createMonteCarloBuffers, MC_HEATMAP_BINS, pi
 import { WorkerJobRunner } from './worker-job-runner.js';
 import { featureFlags } from '../shared/feature-flags.js';
 import { WorkerPool } from '../../workers/worker-pool.js';
+import { formatSimulatorValidationError, validateSimulatorInputs } from './simulator-input-validation.js';
 
 const formatMs = (value, digits = 0) => `${Number(value).toFixed(digits)} ms`;
 const formatSpeedup = (value, digits = 2) => `${Number(value).toFixed(digits)}x`;
@@ -321,7 +322,7 @@ export async function runMonteCarlo() {
 
     try {
         prepareHistoricalDataOnce();
-        const inputs = getCommonInputs();
+        const inputs = validateSimulatorInputs(getCommonInputs());
         const widowOptions = normalizeWidowOptions(inputs.widowOptions);
         const {
             anzahl,
@@ -495,7 +496,7 @@ export async function runMonteCarlo() {
         displayMonteCarloResults(aggregatedResults, anzahl, failCount, worstRun, {}, {}, pflegeTriggeredCount, inputs, worstRunCare, scenarioLogs);
     } catch (e) {
         console.error("Monte-Carlo Simulation Failed:", e);
-        ui.showError(e);
+        ui.showError(formatSimulatorValidationError(e));
     } finally {
         await ui.finishProgress();
         ui.enableStart();

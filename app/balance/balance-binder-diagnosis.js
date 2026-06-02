@@ -127,6 +127,29 @@ export function createDiagnosisHandlers({ dom, appState }) {
         if (typeof diagnosis.keyParams.minFlexRatePct === 'number') {
             text += `Flex-Min-Rate: ${UIUtils.formatPercentValue(diagnosis.keyParams.minFlexRatePct, { fractionDigits: 1, invalid: 'n/a' })}\n`;
         }
+        if (typeof diagnosis.keyParams.minimumFlexAnnual === 'number') {
+            const statusLabels = {
+                inactive_zero: 'Nicht gesetzt',
+                not_needed: 'Nicht benötigt',
+                applied: 'Angewandt',
+                applied_limited_by_final_smoothing: 'Geglättet angewandt',
+                blocked_emergency: 'Blockiert',
+                limited_by_flex_budget: 'Durch Flex-Budget begrenzt'
+            };
+            const blockReasonLabels = {
+                alarm_active: 'Alarmmodus aktiv',
+                no_open_flex_need: 'kein offener Flex-Bedarf',
+                floor_minimum_flex_not_covered: 'Floor-/Mindest-Flex-Deckung unzureichend',
+                minimum_runway_not_restorable: 'Mindest-Runway nicht wiederherstellbar'
+            };
+            const minFlexStatus = diagnosis.keyParams.minimumFlexStatus || 'inactive_zero';
+            const minFlexBlockReason = diagnosis.keyParams.minimumFlexBlockReason || null;
+            text += `Mindest-Flex p.a.: ${UIUtils.formatCurrency(diagnosis.keyParams.minimumFlexAnnual)} (${statusLabels[minFlexStatus] || minFlexStatus}`;
+            if (minFlexBlockReason) {
+                text += `: ${blockReasonLabels[minFlexBlockReason] || minFlexBlockReason}`;
+            }
+            text += `)\n`;
+        }
         if (typeof diagnosis.keyParams.kuerzungProzent === 'number') {
             text += `Kürzung ggü. Flex-Bedarf: ${UIUtils.formatPercentValue(diagnosis.keyParams.kuerzungProzent, { fractionDigits: 1, invalid: 'n/a' })}\n`;
         }

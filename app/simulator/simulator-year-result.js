@@ -162,6 +162,12 @@ export function buildSimulatorYearResult({
             },
             FlexRatePct: spendingResult.details?.flexRate || 1.0,
             MinFlexRatePct: spendingResult.details?.minFlexRatePct ?? null,
+            minimumFlexAnnual: Number.isFinite(keyParams.minimumFlexAnnual) ? keyParams.minimumFlexAnnual : 0,
+            minimumFlexStatus: keyParams.minimumFlexStatus || 'inactive_zero',
+            minimumFlexBlockReason: keyParams.minimumFlexBlockReason || '',
+            minimumFlexRequiredRate: Number.isFinite(keyParams.minimumFlexRequiredRate) ? keyParams.minimumFlexRequiredRate : null,
+            minimumFlexEffectiveBefore: Number.isFinite(keyParams.minimumFlexEffectiveBefore) ? keyParams.minimumFlexEffectiveBefore : null,
+            minimumFlexEffectiveAfter: Number.isFinite(keyParams.minimumFlexEffectiveAfter) ? keyParams.minimumFlexEffectiveAfter : null,
             WealthRedF: Number.isFinite(spendingResult.details?.wealthReductionFactor)
                 ? spendingResult.details.wealthReductionFactor * 100
                 : null,

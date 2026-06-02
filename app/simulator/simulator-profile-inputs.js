@@ -241,6 +241,7 @@ export function buildSimulatorInputsFromProfileData(profileData) {
         zielLiquiditaet: tagesgeld + readNumber(profileData, simKey('geldmarktEtf'), 0),
         startFloorBedarf: readNumber(profileData, simKey('startFloorBedarf'), 0),
         startFlexBedarf: readNumber(profileData, simKey('startFlexBedarf'), 0),
+        minimumFlexAnnual: readNumber(profileData, simKey('minimumFlexAnnual'), 0),
         flexBudgetAnnual: readNumber(profileData, simKey('flexBudgetAnnual'), 0),
         flexBudgetYears: readNumber(profileData, simKey('flexBudgetYears'), 0),
         flexBudgetRecharge: readNumber(profileData, simKey('flexBudgetRecharge'), 0),
@@ -345,6 +346,9 @@ export function buildSimulatorInputsFromProfileData(profileData) {
     }
     if ((!baseInputs.startFlexBedarf || baseInputs.startFlexBedarf <= 0) && balanceInputs) {
         baseInputs.startFlexBedarf = Number(balanceInputs.flexBedarf) || baseInputs.startFlexBedarf;
+    }
+    if ((!baseInputs.minimumFlexAnnual || baseInputs.minimumFlexAnnual <= 0) && balanceInputs) {
+        baseInputs.minimumFlexAnnual = Number(balanceInputs.minimumFlexAnnual) || baseInputs.minimumFlexAnnual;
     }
     if ((!baseInputs.flexBudgetAnnual || baseInputs.flexBudgetAnnual <= 0) && balanceInputs) {
         baseInputs.flexBudgetAnnual = Number(balanceInputs.flexBudgetAnnual) || baseInputs.flexBudgetAnnual;
@@ -477,6 +481,7 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
     const sumEinstandAlt = sumNumbers(inputsList, i => i.einstandAlt || 0);
     const sumFloor = sumNumbers(inputsList, i => i.startFloorBedarf || 0);
     const sumFlex = sumNumbers(inputsList, i => i.startFlexBedarf || 0);
+    const sumMinimumFlex = sumNumbers(inputsList, i => i.minimumFlexAnnual || 0);
     const sumFlexBudgetAnnual = sumNumbers(inputsList, i => i.flexBudgetAnnual || 0);
     const sumFlexBudgetRecharge = sumNumbers(inputsList, i => i.flexBudgetRecharge || 0);
     const minFlexBudgetYears = inputsList.reduce((minVal, i) => {
@@ -502,6 +507,12 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
         zielLiquiditaet: sumTagesgeld + sumGeldmarkt,
         startFloorBedarf: sumFloor,
         startFlexBedarf: sumFlex,
+        minimumFlexAnnual: sumMinimumFlex,
+        minimumFlexProfiles: profileInputs.map(entry => ({
+            profileId: entry.profileId,
+            name: entry.name || entry.profileId,
+            minimumFlexAnnual: Number(entry.inputs?.minimumFlexAnnual) || 0
+        })),
         flexBudgetAnnual: sumFlexBudgetAnnual,
         flexBudgetRecharge: sumFlexBudgetRecharge,
         flexBudgetYears: minFlexBudgetYears || 0,

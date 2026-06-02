@@ -39,7 +39,7 @@ export function shouldResetGuardrailState(prevInputs, nextInputs) {
     };
 
     // Bedarf: Reset erst bei spürbaren Änderungen, um "Reset-Rauschen" zu vermeiden.
-    const needChanged = ['floorBedarf', 'flexBedarf']
+    const needChanged = ['floorBedarf', 'flexBedarf', 'minimumFlexAnnual']
         .some(key => changedNumber(key, { abs: 1000, rel: 0.1 }));
 
     // Vermögen: größere Schwelle, da Depotwerte stärker schwanken.

@@ -757,7 +757,52 @@ const emptyLists = {
     }
 }
 
-// --- TEST 15: taxSavedByLossCarry is deterministic with fixed seed ---
+// --- TEST 15: Serial MC forwards minimumFlexAnnual and affects withdrawals ---
+{
+    const baseInputs = {
+        ...buildBasicInputs(),
+        startVermoegen: 500000,
+        depotwertAlt: 480000,
+        einstandAlt: 400000,
+        tagesgeld: 20000,
+        startFlexBedarf: 12000,
+        flexBudgetAnnual: 0,
+        dynamicFlex: true,
+        horizonYears: 10,
+        marketCapeRatio: 35,
+        capeRatio: 35
+    };
+    const monteCarloParams = {
+        anzahl: 1,
+        maxDauer: 6,
+        blockSize: 1,
+        seed: 2005,
+        methode: 'block',
+        rngMode: 'per-run-seed',
+        startYearMode: 'UNIFORM'
+    };
+    const runChunk = (minimumFlexAnnual) => runMonteCarloChunk({
+        inputs: { ...baseInputs, minimumFlexAnnual },
+        monteCarloParams,
+        widowOptions: { mode: 'stop', percent: 0, marriageOffsetYears: 0, minMarriageYears: 0 },
+        useCapeSampling: false,
+        runRange: { start: 0, count: 1 },
+        logIndices: [0],
+        engine: EngineAPI
+    });
+
+    const withMinimumFlex = await runChunk(9000);
+    const withoutMinimumFlex = await runChunk(0);
+    const withRows = withMinimumFlex.runMeta?.[0]?.logDataRows || [];
+    const withoutRows = withoutMinimumFlex.runMeta?.[0]?.logDataRows || [];
+    const sumWithdrawals = (rows) => rows.reduce((sum, row) => sum + (Number(row?.entscheidung?.jahresEntnahme) || 0), 0);
+
+    assert(withRows.length > 0 && withoutRows.length > 0, 'MC minimum-flex comparison should produce log rows');
+    assert(sumWithdrawals(withRows) > sumWithdrawals(withoutRows), 'MC should withdraw more when minimum flex is set');
+    assert(withRows.some(row => row?.minimumFlexStatus === 'applied'), 'MC log should expose applied minimum-flex status');
+}
+
+// --- TEST 16: taxSavedByLossCarry is deterministic with fixed seed ---
 {
     const inputs = {
         ...buildBasicInputs(),

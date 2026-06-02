@@ -4,7 +4,7 @@ Die Balance-App besteht aus 35 ES6-Modulen unter `app/balance/`. Das folgende Do
 Dateinamen werden unten kurz ohne Präfix genannt; tatsächlicher Pfad ist in der Regel `app/balance/<datei>.js`.
 Ausnahmen: Profilverbund-Module liegen unter `app/profile/`, Shared-Formatter unter `app/shared/`.
 
-**Stand:** 2026-05-23
+**Stand:** 2026-06-01
 
 ---
 
@@ -70,6 +70,8 @@ Liest UI-Eingaben und kümmert sich um UI-Side-Effects.
 
 **Pflegebucket:** Liest die Profildefinition `profile_health_bucket` als optionalen Haushaltsbaustein. Die eigentliche Diagnose wird nicht im Reader berechnet, sondern an `balance-health-bucket.js` delegiert.
 
+**Mindest-Flex:** Liest `minimumFlexAnnual` aus dem Feld `Mindest-Flex p.a. (EUR)` und gibt den Wert unverändert an die Engine weiter. Das Feld wird wie Floor, Flex und Flex-Budget inflationiert.
+
 **Dependencies:** `balance-utils.js`, `balance-health-bucket.js`
 
 ---
@@ -106,6 +108,7 @@ Renderlogik für KPIs, Guardrails, Diagnose, Toasts und Theme-Umschaltung.
 - `balance-diagnosis-transaction.js` – Transaktionsdiagnostik (Status, Schwellen, `Warum kein Goldkauf?`)
 - `balance-diagnosis-keyparams.js` – Schlüsselkennzahlen, inklusive VPW-Trennung in Rahmen, freigegebenen Flex und nicht genutzten Spielraum
   - ergänzt Pflegebucket-Diagnose und weist `diagnostic_only` aus, wenn keine automatische Freigabe erfolgt
+  - zeigt Mindest-Flex-Betrag, Status, Blockiergrund, erforderliche Rate und Effekt vor/nach dem Policy-Schritt
 
 ---
 
@@ -170,7 +173,7 @@ Einstiegspunkt und Orchestrator.
 **Helper-Module (ausgelagert):**
 - `balance-main-profile-sync.js` – Profilwerte in Balance-Inputs spiegeln
 - `balance-main-profilverbund.js` – Profilverbund-Simulationen & UI-Handling
-- `balance-update-pipeline.js` – Engine-Last-State, Renderer-/Diagnose-Payload, Persistenzentscheidung und Ausgabenbudget.
+- `balance-update-pipeline.js` – Mindest-Flex-Validierung, Engine-Last-State, Renderer-/Diagnose-Payload, Persistenzentscheidung und Ausgabenbudget.
 - `balance-action-postprocessor.js` – Profilverbund-Action-Merge und Single-3-Bucket-Postprocessing.
 
 **Pflegebucket:** Der Update-Zyklus reicht die im Reader erzeugte Pflegebucket-Diagnose an Summary, Key-Parameter und Diagnose-Copytext weiter. Die Engine-Eingaben und die Handlungsempfehlung werden dadurch nicht operativ verändert.

@@ -86,6 +86,7 @@ export function applyMinimumFlexFloor(flexRate, context = {}, addDecision = () =
         rate: initialRate,
         applied: false,
         status: 'inactive_zero',
+        minimumFlexAnnual,
         requiredRate: 0,
         effectiveFlexBefore,
         effectiveFlexAfter: effectiveFlexBefore,
@@ -154,6 +155,7 @@ export function applyMinimumFlexFloor(flexRate, context = {}, addDecision = () =
 export function writeMinimumFlexDiagnostics(state, result, statusOverride = null) {
     if (!state?.keyParams || !result) return;
     state.keyParams.minimumFlexStatus = statusOverride || result.status;
+    state.keyParams.minimumFlexAnnual = Number.isFinite(result.minimumFlexAnnual) ? result.minimumFlexAnnual : 0;
     state.keyParams.minimumFlexBlockReason = result.blockReason || null;
     state.keyParams.minimumFlexRequiredRate = Number.isFinite(result.requiredRate) ? result.requiredRate : 0;
     state.keyParams.minimumFlexEffectiveBefore = Number.isFinite(result.effectiveFlexBefore) ? result.effectiveFlexBefore : 0;

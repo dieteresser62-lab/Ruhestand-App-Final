@@ -39,6 +39,18 @@ const hasHeader = (cols, header) => cols.some(col => col?.header === header);
     assert(hasHeader(detailedCols, 'HBEnd'), 'Backtest detailed should include health bucket end value');
     assert(hasHeader(detailedCols, 'HBDeck%'), 'Backtest detailed should include health bucket real coverage');
     assert(hasHeader(detailedCols, 'HBWarn'), 'Backtest detailed should include health bucket warning');
+    assert(hasHeader(normalCols, 'MinFlex€'), 'Backtest normal should include minimum flex amount');
+    assert(hasHeader(normalCols, 'MinFSt'), 'Backtest normal should include minimum flex status');
+    assert(hasHeader(detailedCols, 'MinFBlock'), 'Backtest detailed should include minimum flex block reason');
+    assert(hasHeader(detailedCols, 'MinFEff'), 'Backtest detailed should include minimum flex effect amount');
+
+    const noGoldNormalCols = buildBacktestColumnDefinitions('normal', { goldAktiv: false });
+    const noGoldDetailedCols = buildBacktestColumnDefinitions('detailed', { goldAktiv: false });
+    assert(!hasHeader(noGoldNormalCols, 'Pf.Gld%'), 'Backtest normal should hide gold return when gold is inactive');
+    assert(!hasHeader(noGoldNormalCols, 'Handl.G'), 'Backtest normal should hide gold trades when gold is inactive');
+    assert(!hasHeader(noGoldNormalCols, 'Gold'), 'Backtest normal should hide gold value when gold is inactive');
+    assert(!hasHeader(noGoldDetailedCols, 'GuardG'), 'Backtest detailed should hide gold guard column when gold is inactive');
+    assert(!hasHeader(noGoldDetailedCols, 'Gld_vorR'), 'Backtest detailed should hide gold detail columns when gold is inactive');
 }
 
 {
@@ -75,6 +87,18 @@ const hasHeader = (cols, header) => cols.some(col => col?.header === header);
     assert(hasHeader(detailedCols, 'HBEnd'), 'Worst-run detailed should include health bucket end value');
     assert(hasHeader(detailedCols, 'HBDeck%'), 'Worst-run detailed should include health bucket real coverage');
     assert(hasHeader(detailedCols, 'HBWarn'), 'Worst-run detailed should include health bucket warning');
+    assert(hasHeader(normalCols, 'MinFlex€'), 'Worst-run normal should include minimum flex amount');
+    assert(hasHeader(normalCols, 'MinFSt'), 'Worst-run normal should include minimum flex status');
+    assert(hasHeader(detailedCols, 'MinFBlock'), 'Worst-run detailed should include minimum flex block reason');
+    assert(hasHeader(detailedCols, 'MinFEff'), 'Worst-run detailed should include minimum flex effect amount');
+
+    const noGoldNormalCols = getWorstRunColumnDefinitions({ logDetailLevel: 'normal', goldAktiv: false });
+    const noGoldDetailedCols = getWorstRunColumnDefinitions({ logDetailLevel: 'detailed', goldAktiv: false });
+    assert(!hasHeader(noGoldNormalCols, 'Pf.Gld%'), 'Worst-run normal should hide gold return when gold is inactive');
+    assert(!hasHeader(noGoldNormalCols, 'Handl.G'), 'Worst-run normal should hide gold trades when gold is inactive');
+    assert(!hasHeader(noGoldNormalCols, 'Gold'), 'Worst-run normal should hide gold value when gold is inactive');
+    assert(!hasHeader(noGoldDetailedCols, 'GuardG'), 'Worst-run detailed should hide gold guard column when gold is inactive');
+    assert(!hasHeader(noGoldDetailedCols, 'Gld_vorR'), 'Worst-run detailed should hide gold detail columns when gold is inactive');
 }
 
 console.log('✅ Simulator log columns tests passed');

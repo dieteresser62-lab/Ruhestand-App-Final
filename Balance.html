@@ -177,12 +177,18 @@
                 <div id="tab-settings" class="tab-panel">
                     <fieldset>
                         <legend>Bedarfsplanung</legend>
-                        <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
+                        <div class="form-grid">
                             <div class="form-group"> <label for="floorBedarf">Floor-Bedarf (€/Jahr)</label> <input
                                     id="floorBedarf" class="currency" type="text" inputmode="numeric" value="12000">
                             </div>
                             <div class="form-group"> <label for="flexBedarf">Flex-Bedarf (€/Jahr)</label> <input
                                     id="flexBedarf" class="currency" type="text" inputmode="numeric" value="24000">
+                            </div>
+                            <div class="form-group">
+                                <label for="minimumFlexAnnual">Mindest-Flex p.a. (EUR)</label>
+                                <input id="minimumFlexAnnual" class="currency" type="text" inputmode="numeric"
+                                    value="0"
+                                    title="Bedingte Untergrenze fuer Flex-Ausgaben in kuerzenden Safety-/Guardrail-Phasen; ersetzt nicht den Floor.">
                             </div>
                         </div>
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr 1fr; margin-top: 12px;">

@@ -2,6 +2,8 @@
 
 Die Simulator-App ist inzwischen in mehrere spezialisierte ES6-Module zerlegt. Die zentralen Abläufe (Monte-Carlo, Sweep, Backtests, Pflege-UI) leben nicht mehr als Monolith in `simulator-main.js`, sondern wurden in klar abgegrenzte Dateien ausgelagert. Dieses Dokument beschreibt Zweck, Haupt-Exports, Einbindungspunkte und die gewünschte Aufteilung neuer Features.
 
+**Stand:** 2026-06-01
+
 **Pfadkonvention:** Simulator-Module liegen unter `app/simulator/`, Profilmodule unter `app/profile/`, Shared-Utilities unter `app/shared/`, Tranchen-Status unter `app/tranches/`. Im Dokument werden Dateinamen aus Lesbarkeit meist ohne Präfix genannt.
 
 ---
@@ -24,6 +26,7 @@ UI-Orchestrierung und Klammer um die ausgelagerten Feature-Module. Registriert E
 - `simulator-main-sweep-ui.js` – Sweep-UI + Grid-Size
 - `simulator-main-tabs.js` – Tab-Umschaltung
 - `simulator-main-profiles.js` – Profilverbund-Auswahl
+- `simulator-input-validation.js` – DOM-freie Validierung gemeinsamer Simulator-Inputs, aktuell `minimumFlexAnnual <= startFlexBedarf`
 - `simulator-main-reset.js` – Reset-Button
 - `simulator-main-stress.js` – Stress-Preset-Select
 - `simulator-main-partner.js` – Partner-UI Toggle
@@ -36,6 +39,7 @@ Koordiniert die Monte-Carlo-Simulation und verbindet DOM-Interaktion mit der rei
 
 **Hauptfunktionen / Exporte:**
 - `runMonteCarlo()` – liest UI-Parameter, orchestriert `monte-carlo-runner.js` und Web-Worker-Jobs und aktualisiert Progress/UI (Default: 8 Worker, 500 ms Job-Budget).
+- Validiert vor dem Start, dass `Mindest-Flex p.a.` den `Flex-Bedarf p.a.` nicht uebersteigt.
 
 **Einbindung:** Wird von `simulator-main.js` importiert und im UI-Bootstrap an den Start-Button (`#mcButton`) gekoppelt. Alle Monte-Carlo-spezifischen Anpassungen sollten hier erfolgen, damit `simulator-main.js` schlank bleibt.
 
@@ -176,6 +180,7 @@ Historische Backtests inkl. UI-Integration und Log-Export.
 - `initializeBacktestUI()` – verdrahtet UI-Buttons und persistiert Nutzereinstellungen.
 - `runBacktest()` – führt Jahres-Simulation mit echten Daten aus.
 - `renderBacktestLog()` / `exportBacktestLogData()` – Darstellung und CSV-Download.
+- Backtest-Logs zeigen Mindest-Flex-Betrag und Status; im Detailmodus zusaetzlich Blockgrund und effektiven Mindest-Flex-Wert nach der Policy.
 
 **Einbindung:** Wird in `initializeUI()` importiert und an die Backtest-Controls gekoppelt. Nutzt `simulator-main-helpers.js` für Formatierung/Export.
 
@@ -240,6 +245,7 @@ Kernlogik für Jahr-für-Jahr-Simulation (Direct Engine).
 - `simulator-year-portfolio.js` – DOM-freie Markt-/Portfoliofortschreibung, Renditen und Marktfenster.
 - `simulator-household-pension.js` – DOM-freie Renten-/Haushaltsberechnung inklusive Witwenrente.
 - `simulator-engine-input.js` – DOM-freies Mapping von Simulator-Jahreswerten auf den `EngineAPI.simulateSingleYear()`-Input.
+- `minimumFlexAnnual` wird wie `startFlexBedarf` als nominal fortgeschriebener Jahreswert in den Engine-Input gemappt und im Jahresstate inflationiert.
 - `simulator-accumulation-year.js` – DOM-freier frueher Rueckgabepfad fuer Ansparjahre inklusive Sparrate, Cash-Zins, Anspar-Rebalancing und Logdaten.
 - `simulator-tax-recompute.js` – DOM-freie Normalisierung von Tax-Rohaggregaten und finales Settlement-Recompute nach Simulator-Zusatzverkaeufen.
 - `simulator-forced-sale.js` – DOM-freie Forced-Sale-Liquiditaetsdeckung vor/nach Auszahlung inklusive Forced-Sale-Scale, Bond-Verkaufsdelta, Payout-Fallback und FIFO-Fallback.
@@ -265,6 +271,7 @@ Aggregation der Monte-Carlo-Ausgabe, Orchestrierung von KPI-Berechnung und Rende
 - Dropdown für 30 Szenario-Logs (charakteristische + zufällige)
 - Checkboxen für Pflege-Details und detailliertes Log
 - Detailspalten fuer Entnahme-/Payout-/VPW-Transparenz (`EntPlan`, `EntEff`, `VPW€`, `VPWFlex`, `StatFlex`, `Liq>P`, `Liq<P`, `Liq>Z`, `Port>P`, `PortEnd`)
+- Mindest-Flex-Spalten: `MinFlex€`, `MinFSt` sowie im Detailmodus `MinFBlock` und `MinFEff`
 - JSON/CSV-Export für ausgewählte Szenarien
 - Pflege-KPI-Dashboard mit Dual-Care-Metriken
 - enthält zusätzlich Metriken für `taxSavedByLossCarry` aus Sweep/MC-Ergebnissen
@@ -441,6 +448,7 @@ Aggregiert Profildaten zu Simulator-Inputs für Multi-Profil-Setups.
 - Tranchensummen: Plausible Detailtranchen bestimmen `startVermoegen` zusammen mit Liquidität; Null-Marktwert-Tranchen fallen mit Warnung auf aggregierte Startwerte zurück
 - Pflegebucket: liest `profile_health_bucket`, normalisiert die Definition und nutzt bei Multi-Profil-Setups das Primary-Profil als Haushaltsdefinition. Abweichende sekundäre Definitionen werden als Warnung transportiert.
 - Fallback-Logik: Nutzt Balance-Werte wenn Simulator-Felder leer sind
+- Mindest-Flex bleibt profilbezogen: `minimumFlexAnnual` wird aus Profil-Simulatorwerten oder Balance-Fallbacks gelesen, im kombinierten Haushaltslauf addiert und als `minimumFlexProfiles` nachvollziehbar transportiert.
 - Gewichtete Mittelung für Steuersätze, Aktienquote und Rebalancing-Parameter
 
 **Dependencies:** `simulator-data.js`, `balance-config.js`
@@ -772,4 +780,4 @@ Nach jeder Monte-Carlo-Simulation werden 30 Szenarien gespeichert:
 
 ---
 
-**Last Updated:** 2026-01-21
+**Last Updated:** 2026-06-01

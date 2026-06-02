@@ -153,7 +153,8 @@ export function displayMonteCarloResults(results, anzahl, failCount, worstRun, r
                 output.innerHTML = renderWorstRunLog(scenario.logDataRows, caR, {
                     showCareDetails: showCareDetails,
                     logDetailLevel: logDetailLevel,
-                    strategyMode: inputs?.decumulation?.mode || STRATEGY_OPTIONS.STANDARD
+                    strategyMode: inputs?.decumulation?.mode || STRATEGY_OPTIONS.STANDARD,
+                    goldAktiv: inputs?.goldAktiv
                 });
                 output.style.display = 'block';
                 exportButtons.style.display = 'flex';
@@ -256,6 +257,7 @@ export function getWorstRunColumnDefinitions(opts = {}) {
     const options = { showCareDetails: false, logDetailLevel: 'normal', ...opts };
     const strategyMode = String(options.strategyMode || '').toLowerCase();
     const isThreeBucket = strategyMode === STRATEGY_OPTIONS.THREE_BUCKET_JILGE;
+    const showGoldColumns = options.goldAktiv !== false;
 
     const formatPctOrDash = (value, fallback = '—') => {
         if (value == null || !isFinite(value)) return fallback;
@@ -359,6 +361,8 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         { key: 'WealthRedF', header: 'WRed%', width: 5, fmt: v => `${Math.round(v || 0)}%` },
         { key: 'WealthQuoteUsedPct', header: 'WQ%', width: 4, fmt: v => `${Math.round(v || 0)}%` },
         { key: 'flex_erfuellt_nominal', header: 'Flex', width: 7, fmt: formatCurrencyShortLog },
+        { key: 'minimumFlexAnnual', header: 'MinFlex€', width: 8, fmt: formatCurrencyShortLog },
+        { key: 'minimumFlexStatus', header: 'MinFSt', width: 10, fmt: v => (v || '').substring(0, 10) },
         {
             key: 'Regime', header: 'Markt', width: 12,
             fmt: (v, row) => {
@@ -462,6 +466,8 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         { key: 'vpw.capeRatioUsed', header: 'CAPE', width: 6, fmt: v => (Number.isFinite(v) ? Number(v).toFixed(1) : '') },
         { key: 'vpw.expectedReturnCape', header: 'ER(CAPE)', width: 8, fmt: v => (Number.isFinite(v) ? formatPercentRatio(v, { fractionDigits: 1, invalid: '' }) : '') },
         { key: 'vpw.expectedRealReturn', header: 'ER(real)', width: 8, fmt: v => (Number.isFinite(v) ? formatPercentRatio(v, { fractionDigits: 1, invalid: '' }) : '') },
+        { key: 'minimumFlexBlockReason', header: 'MinFBlock', width: 16, fmt: v => (v || '').substring(0, 16) },
+        { key: 'minimumFlexEffectiveAfter', header: 'MinFEff', width: 8, fmt: formatCurrencyShortLog },
         { key: 'jahresentnahme_real', header: 'Entn_real', width: 9, fmt: formatCurrencyShortLog },
         { key: 'floor_aus_depot', header: 'FloorDep', width: 8, fmt: formatCurrencyShortLog },
         { key: 'lossCarryEnd', header: 'VTopf', width: 8, fmt: formatCurrencyShortLog },
@@ -511,7 +517,15 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         { key: 'gold_after_buys', header: 'Gld_nachK', width: 9, fmt: formatCurrencyShortLog }
     ] : [];
 
-    return [...baseCols, ...activeCareCols, ...finalCols, ...detailCols, ...guardCols];
+    const columns = [...baseCols, ...activeCareCols, ...finalCols, ...detailCols, ...guardCols];
+    if (!showGoldColumns) {
+        const hiddenGoldHeaders = new Set([
+            'Pf.Gld%', 'Handl.G', 'Gold', 'GuardG',
+            'Gld_vorR', 'Gld_nachR', 'Gld_nachV', 'Gld_nachK'
+        ]);
+        return columns.filter(col => !hiddenGoldHeaders.has(col.header));
+    }
+    return columns;
 }
 
 /**

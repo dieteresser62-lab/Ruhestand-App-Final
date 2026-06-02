@@ -212,6 +212,7 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal', options =
     const isDetailed = detailLevel === 'detailed';
     const strategyMode = String(options?.strategyMode || '').toLowerCase();
     const isThreeBucket = strategyMode === STRATEGY_OPTIONS.THREE_BUCKET_JILGE;
+    const showGoldColumns = options?.goldAktiv !== false;
     const formatPercent = (value, decimals = 1) => formatPercentValue(Number(value) || 0, { fractionDigits: decimals, invalid: '0.0%' });
     const formatPercentInt = (value) => formatPercentValue(Math.round(Number(value) || 0), { fractionDigits: 0, invalid: '0%' });
     const traceTotal = (row, phase) => {
@@ -244,7 +245,9 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal', options =
         { header: 'MinF%', width: 5, key: 'row.MinFlexRatePct', valueFormatter: v => formatPercentInt(v), align: 'right' },
         { header: 'WRed%', width: 5, key: 'row.WealthRedF', valueFormatter: v => formatPercentInt(v), align: 'right' },
         { header: 'WQ%', width: 4, key: 'row.WealthQuoteUsedPct', valueFormatter: v => formatPercentInt(v), align: 'right' },
-        { header: 'Flex€', width: 7, key: 'row.flex_erfuellt_nominal', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' }
+        { header: 'Flex€', width: 7, key: 'row.flex_erfuellt_nominal', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+        { header: 'MinFlex€', width: 8, key: 'row.minimumFlexAnnual', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
+        { header: 'MinFSt', width: 10, key: 'row.minimumFlexStatus', valueFormatter: v => (v || '').substring(0, 10), align: 'left' }
     );
 
     if (isDetailed) {
@@ -321,6 +324,8 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal', options =
             { header: 'RiskSt', width: 6, key: 'row.safety_risk_streak', valueFormatter: v => (Number.isFinite(v) ? Math.round(v) : ''), align: 'right' },
             { header: 'StabSt', width: 6, key: 'row.safety_stable_streak', valueFormatter: v => (Number.isFinite(v) ? Math.round(v) : ''), align: 'right' },
             { header: 'SafTr', width: 5, key: 'row.safety_transition', valueFormatter: v => (v || '').substring(0, 5), align: 'left' },
+            { header: 'MinFBlock', width: 16, key: 'row.minimumFlexBlockReason', valueFormatter: v => (v || '').substring(0, 16), align: 'left' },
+            { header: 'MinFEff', width: 8, key: 'row.minimumFlexEffectiveAfter', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
             { header: 'DDreal%', width: 7, key: 'row.safety_real_drawdown_pct', valueFormatter: v => (Number.isFinite(v) ? formatPercent(v) : ''), align: 'right' },
             { header: 'RunPre', width: 6, key: 'row.safety_runway_pre_months', valueFormatter: v => (Number.isFinite(v) ? Number(v).toFixed(1) : ''), align: 'right' },
             { header: 'RunPost', width: 7, key: 'row.safety_runway_post_months', valueFormatter: v => (Number.isFinite(v) ? Number(v).toFixed(1) : ''), align: 'right' }
@@ -436,6 +441,14 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal', options =
             { header: 'Gld_nachV', width: 9, key: 'row.gold_after_sales', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
             { header: 'Gld_nachK', width: 9, key: 'row.gold_after_buys', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' }
         );
+    }
+
+    if (!showGoldColumns) {
+        const hiddenGoldHeaders = new Set([
+            'Pf.Gld%', 'Handl.G', 'Gold', 'GuardG',
+            'Gld_vorR', 'Gld_nachR', 'Gld_nachV', 'Gld_nachK'
+        ]);
+        return columns.filter(col => !hiddenGoldHeaders.has(col.header));
     }
 
     return columns;

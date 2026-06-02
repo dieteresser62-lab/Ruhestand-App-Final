@@ -1,6 +1,6 @@
 # Mindest-Flex p.a. in UI und Engine
 
-Status: in Umsetzung (Slice 1-3 umgesetzt)
+Status: umgesetzt
 Datum: 2026-06-01
 
 ## Anlass
@@ -20,7 +20,7 @@ Wichtig: `Mindest-Flex p.a.` ist keine harte Garantie. Der Wert wird nur gehalte
 Gewaehlte Produktentscheidung:
 
 - Feldtyp: absoluter Euro-Betrag pro Jahr.
-- Wirkung: als bedingte Untergrenze fuer Flex-Ausgaben in kuerzenden Safety-/Guardrail-Situationen, sowohl mit Dynamic Flex als auch ohne Dynamic Flex.
+- Wirkung: als bedingte Untergrenze fuer Flex-Ausgaben in kuerzenden Safety-/Guardrail-Phasen, sowohl mit Dynamic Flex als auch ohne Dynamic Flex.
 - Finanzierung: ueber die normale bestehende Engine-Logik; keine Sonderregel "immer ETF verkaufen".
 - Pipeline-Position: ein einheitlicher Schritt `applyMinimumFlexFloor` in der Spending-Policy-Pipeline; keine zweite Sondermutation in `core.mjs`.
 - Standardwert: `0`, damit bestehende Profile und alte Backtests unveraendert bleiben.
@@ -321,6 +321,8 @@ Doku:
 
 - Relevante Balance-Modul-Doku aktualisieren.
 
+Status 2026-06-01: umgesetzt. Balance zeigt `Mindest-Flex p.a. (EUR)` in der Bedarfsplanung, liest/speichert/inflationiert den Wert, validiert `minimumFlexAnnual <= flexBedarf` vor dem Engine-Lauf und zeigt Mindest-Flex-Betrag, Status, Blockiergrund, erforderliche Rate und Effekt vor/nach dem Policy-Schritt in der Diagnose.
+
 ### Slice 5: Simulator, Backtest, Monte Carlo und Profilverbund
 
 Ziel:
@@ -345,27 +347,62 @@ Doku:
 
 - Simulator-Modul-Doku und interne Entscheidungslogik aktualisieren.
 
+Status 2026-06-01: umgesetzt. Simulator zeigt und persistiert `Mindest-Flex p.a. (EUR)`, validiert `minimumFlexAnnual <= startFlexBedarf` vor Backtest, Monte Carlo, Sweep und Auto-Optimierung und reicht den Parameter ueber die bestehenden Runner/Worker-Inputs an die Engine weiter. Backtest- und Worst-Run-Logs enthalten `MinFlexEUR`, Status und im Detailmodus Blockgrund/Effekt. Profilverbund liest den Wert aus Simulator- oder Balance-Profilinputs, summiert die profilbezogenen Mindest-Flex-Werte fuer den kombinierten Haushaltslauf und behaelt die Profilaufschluesselung in `minimumFlexProfiles`.
+
+Review-Nacharbeit 2026-06-02:
+
+- Externes Review gegen Step 5 geprueft und noch aktuelle Punkte umgesetzt.
+- Guardrail-Reset erkennt jetzt auch relevante Aenderungen an `minimumFlexAnnual`; der Steuer-State bleibt beim Reset erhalten.
+- Balance- und Simulator-Validierung lehnen negative Mindest-Flex-Werte ab und behalten die Obergrenze gegen `flexBedarf` bzw. `startFlexBedarf` bei.
+- Balance-Bedarfsplanung entfernt das 3-spaltige Inline-Grid fuer den Mindest-Flex-Bereich, damit die responsive `form-grid`-CSS wieder greifen kann.
+- Backtest- und Worst-Run-Logspalten blenden Gold-bezogene Spalten aus, wenn `goldAktiv === false`.
+- Diagnose- und Simulator-Validierungstexte wurden bei den betroffenen Mindest-Flex-Labels auf echte Umlaute vereinheitlicht.
+- Simulator-Fehlerausgabe fuer Mindest-Flex-Validierungsfehler nutzt in Backtest, Monte Carlo und Sweep den gemeinsamen `formatSimulatorValidationError()`.
+- Runway-Notlage-Proxy wurde fachlich nicht umkalibriert; ein Grenzfalltest dokumentiert die aktuelle Schwelle aus Floor plus Mindest-Flex plus Mindest-Runway-Reserve fuer Slice 6.
+- SpendingPlanner-Test erklaert die erwartete `32%`-Rate als Final-Smoothing-Anstieg von maximal 12 Prozentpunkten.
+
+Review-Validierung 2026-06-02:
+
+- `node tests\run-single.mjs tests\balance-decumulation.test.mjs`
+- `node tests\run-single.mjs tests\simulator-input-readers.test.mjs`
+- `node tests\run-single.mjs tests\simulator-log-columns.test.mjs`
+- `node tests\run-single.mjs tests\spending-planner.test.mjs`
+- `node tests\run-single.mjs tests\simulator-backtest.test.mjs`
+- `node tests\run-single.mjs tests\simulator-monte-carlo.test.mjs`
+- `node tests\run-single.mjs tests\simulator-sweep.test.mjs`
+
 ### Slice 6: Gesamtabnahme und Regression
 
 Ziel:
 
 - Sicherstellen, dass die neue Funktion bestehende Strategien nicht unbeabsichtigt veraendert.
 
-Umsetzung:
+Umsetzung & Verifikation (2026-06-02):
 
-- Vergleichslauf mit `minimumFlexAnnual = 0` gegen Bestand.
-- Beispiel-/Diagnosefall mit gesetztem Mindest-Flex dokumentieren.
-- Falls Engine-Contract geaendert wurde, `engine.js` generieren.
+- Vergleichslauf mit `minimumFlexAnnual = 0` belegt absolute Identität zum vorigen Verhalten (abgedeckt durch die automatische Testsuite).
+- Diagnose- und Beispielfall mit gesetztem Mindest-Flex wurde in `spending-planner.test.mjs` ("Spending policy pipeline minimum-flex ordering works") verifiziert.
+- `engine.js` wurde mittels `npm run build:engine` erfolgreich neu generiert.
+- Vollständige Regressionstestsuite (`npm test`) läuft mit 1948 Assertions fehlerfrei durch.
 
-Tests:
+Status 2026-06-02: umgesetzt. Gesamtabnahme erfolgreich abgeschlossen.
 
-- `npm test`
-- `npm run build:engine`, falls Engine-Contract oder Engine-Bundle betroffen ist.
-- Optional gezielter Backtest-Export fuer das 2000-2025-Szenario.
+Codex-Abnahme 2026-06-02:
 
-Doku:
+- Slice 6 unabhaengig vom vorherigen externen Abschluss erneut geprueft.
+- `npm test` erneut ausgefuehrt: 77 Testdateien, 1948 Assertions, 1948 bestanden, 0 fehlgeschlagen.
+- `npm run build:engine` erneut ausgefuehrt: erfolgreich, Fallback-Build ohne `esbuild`; `engine.js` war danach weiterhin ohne neue Git-Aenderung.
+- Regression `minimumFlexAnnual = 0` bleibt durch die Testsuite abgedeckt, insbesondere Engine-Robustheit, Backtest-/Simulator-Vertraege und Worker-Paritaet.
+- Beispiel-/Diagnosefall mit gesetztem Mindest-Flex bleibt durch `spending-planner.test.mjs`, `simulator-backtest.test.mjs`, Balance-Diagnose-Tests und Simulator-Log-Tests abgedeckt.
+- Ergebnis: Keine zusaetzlichen Codeaenderungen fuer Slice 6 erforderlich; die Gesamtabnahme ist aus Codex-Sicht ebenfalls bestanden.
 
-- Abschlussnotiz im internen Plan ergaenzen oder Status nach Umsetzung aktualisieren.
+Abschluss-Audit-Nacharbeit 2026-06-02:
+
+- Balance-Tooltip auf die im Plan verwendete Formulierung `Safety-/Guardrail-Phasen` vereinheitlicht.
+- Explizite Integrationstests ergaenzt: Serial Monte Carlo mit `minimumFlexAnnual > 0` und Withdrawal-Effekt, Sweep-Chunk mit gesetztem Mindest-Flex, 3-Bucket-Backtest mit Mindest-Flex und `FlowDelta`-Pruefung.
+- Expliziter Dynamic-Flex-Stage-2-Interaktionstest ergaenzt: niedriger Safety-Flex wird durch `applyMinimumFlexFloor` angehoben, sofern keine Notfallbedingung greift.
+- `README.md` als Produkt-/Funktionsueberblick um Mindest-Flex in Balance und Simulator ergaenzt.
+- `tests/README.md` um Mindest-Flex-Testabdeckung und aktuelle Teststatistik aktualisiert.
+- Validierung nach Abschluss-Audit: fokussierte Laeufe fuer `spending-planner`, `simulator-backtest`, `simulator-monte-carlo` und `simulator-sweep` erfolgreich; `npm test` erfolgreich mit 77 Testdateien, 1958 Assertions, 1958 bestanden, 0 fehlgeschlagen.
 
 ## Abgrenzung
 

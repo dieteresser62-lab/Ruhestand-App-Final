@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 76 Testdateien mit 1748 Assertions (verifiziert mit `npm test` am 2026-05-23)
+**Test-Statistik:** 77 Testdateien mit 1958 Assertions (verifiziert mit `npm test` am 2026-06-02)
 
 ## Directory Structure
 
@@ -99,6 +99,7 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 - **Flex-Rate Smoothing:** Validiert den Glättungsalgorithmus für Flex-Anteile
 - **Budget Floor Protection:** Stellt sicher dass Mindest-Entnahmen geschützt sind
 - **Guardrail-Integration:** Tests für Ceiling/Floor-Mechanismen
+- **Mindest-Flex:** Prüft Contract, Notfall-/Runway-Blockaden, Pipeline-Ordering vor Flex-Budget/Final-Limits sowie die Interaktion mit niedrigem Dynamic-Flex-Stage-2-Safety-Flex.
 
 #### `spending-quantization.test.mjs`
 **Zweck:** Testet die Anti-Pseudo-Accuracy-Rundungslogik für Entnahmen.
@@ -206,6 +207,7 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 - **Determinismus:** Gleicher Seed → gleiche Ergebnisse
 - **Ruin-Zählung:** Übereinstimmung mit finalOutcomes ≤ 0
 - **Perzentile:** P10 < P50 < P90 Ordnung
+- **Mindest-Flex:** Serial-MC-Lauf mit `minimumFlexAnnual > 0` inklusive Withdrawal-Effekt und Logstatus.
 
 #### `care-meta.test.mjs`
 **Zweck:** Validiert die Pflegefall-Logik.
@@ -235,6 +237,7 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 - **normalizeWidowOptions:** Default-Werte und Normalisierung
 - **buildSweepInputs:** Parameter-Überschreibung
 - **runSweepChunk:** Ausführung und Determinismus
+- **Mindest-Flex:** Sweep-Chunk mit gesetztem `minimumFlexAnnual` bleibt gueltig und berechnet Metriken.
 
 #### `auto-optimizer.test.mjs`
 **Zweck:** Testet die mehrphasige Auto-Optimierung.
@@ -393,6 +396,7 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 - **Historische Daten:** Inflation aus HISTORICAL_DATA
 - **yearlyResults:** Länge entspricht (end-start+1)
 - **finalWealth:** Stimmt mit letztem Jahreseintrag überein
+- **Mindest-Flex:** Stresstest 2005-2014 mit hoeheren Entnahmen, angewandtem Logstatus und FlowDelta-Pruefung inklusive 3-Bucket-Modus.
 
 #### `simulator-heatmap.test.mjs`
 **Zweck:** Testet Heatmap-Rendering.

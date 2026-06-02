@@ -3,8 +3,11 @@ import { postprocessBalanceAction } from '../app/balance/balance-action-postproc
 import {
     buildBalanceRendererPayload,
     calculateExpensesBudget,
-    enrichBalanceDiagnosisPayload
+    enrichBalanceDiagnosisPayload,
+    prepareEngineLastState,
+    validateBalanceInputs
 } from '../app/balance/balance-update-pipeline.js';
+import { ValidationError } from '../app/balance/balance-config.js';
 
 console.log('--- Balance Decumulation Tests ---');
 
@@ -64,6 +67,7 @@ function setupDom(inputOverrides = {}) {
             aktuellesAlter: new MockElement('input', '67'),
             floorBedarf: new MockElement('input', '24000'),
             flexBedarf: new MockElement('input', '12000'),
+            minimumFlexAnnual: new MockElement('input', '6000'),
             renteAktiv: new MockElement('select', 'ja'),
             renteMonatlich: new MockElement('input', '1500'),
             entnahmeStrategie: new MockElement('select', '3_bucket_jilge'),
@@ -95,6 +99,7 @@ console.log('Test 1: readAllInputs liefert flache Decumulation-Felder');
     assertEqual(result.decumulation.bondTargetFactor, 4.5, 'Bond target factor ist flach gespeichert');
     assertEqual(result.decumulation.drawdownTrigger, 18, 'Drawdown trigger ist flach gespeichert');
     assertEqual(result.decumulation.bondRefillThreshold, 12, 'Bond refill threshold ist flach gespeichert');
+    assertEqual(result.minimumFlexAnnual, 6000, 'Mindest-Flex wird gelesen');
     assert(!('threeBucket' in result.decumulation), 'Es wird kein verschachteltes threeBucket-Objekt mehr erzeugt');
     assertEqual(result.healthBucket.enabled, true, 'Balance liest Pflegebucket aus dem Profil');
     assertEqual(result.healthBucketInitialAmount, 150000, 'Balance stellt flachen Pflegebucket-Betrag bereit');
@@ -197,7 +202,38 @@ console.log('Test 4: Balance-Update-Pipeline-Helfer bauen Payloads ohne Seitenef
     assertEqual(budget.annualBudget, 33600, 'Jahresbudget leitet sich aus Monatsbudget ab');
 }
 
-console.log('Test 5: Action-Postprocessor merged Profilverbund ohne 3-Bucket');
+console.log('Test 5: Mindest-Flex Validierung blockiert Werte oberhalb Flex-Bedarf');
+{
+    validateBalanceInputs({ minimumFlexAnnual: 12000, flexBedarf: 12000 });
+    let thrown = null;
+    try {
+        validateBalanceInputs({ minimumFlexAnnual: 12001, flexBedarf: 12000 });
+    } catch (error) {
+        thrown = error;
+    }
+    assert(thrown instanceof ValidationError, 'Mindest-Flex oberhalb Flex-Bedarf erzeugt ValidationError');
+    assert(thrown.errors.some(e => e.fieldId === 'minimumFlexAnnual'), 'ValidationError markiert minimumFlexAnnual');
+    assert(thrown.errors.some(e => e.fieldId === 'flexBedarf'), 'ValidationError markiert flexBedarf');
+
+    let negative = null;
+    try {
+        validateBalanceInputs({ minimumFlexAnnual: -1, flexBedarf: 12000 });
+    } catch (error) {
+        negative = error;
+    }
+    assert(negative instanceof ValidationError, 'Negativer Mindest-Flex erzeugt ValidationError');
+    assert(negative.errors.some(e => e.fieldId === 'minimumFlexAnnual'), 'Negative Validierung markiert minimumFlexAnnual');
+
+    const lastState = { flexRate: 50, peakRealVermoegen: 100000, taxState: { lossCarry: 42 } };
+    const prepared = prepareEngineLastState(
+        { inputs: { floorBedarf: 24000, flexBedarf: 12000, minimumFlexAnnual: 0 }, lastState },
+        { floorBedarf: 24000, flexBedarf: 12000, minimumFlexAnnual: 2000 }
+    );
+    assert(prepared !== lastState, 'Mindest-Flex-Änderung setzt Guardrail-State zurück');
+    assertEqual(prepared.taxState.lossCarry, 42, 'TaxState bleibt beim Guardrail-Reset erhalten');
+}
+
+console.log('Test 6: Action-Postprocessor merged Profilverbund ohne 3-Bucket');
 {
     const modelResult = { ui: { action: { type: 'NONE' } } };
     const runs = [{ ui: { action: { type: 'TRANSACTION', nettoErlös: 1000 } } }];

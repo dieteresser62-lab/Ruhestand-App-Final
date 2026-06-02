@@ -6,6 +6,36 @@
 
 import { shouldResetGuardrailState } from './balance-guardrail-reset.js';
 import { buildBalanceHealthBucketDiagnostics } from './balance-health-bucket.js';
+import { ValidationError } from './balance-config.js';
+
+export function validateBalanceInputs(inputData = {}) {
+    const errors = [];
+    const minimumFlexAnnual = Number(inputData.minimumFlexAnnual);
+    const flexBedarf = Number(inputData.flexBedarf);
+    if (Number.isFinite(minimumFlexAnnual) && minimumFlexAnnual < 0) {
+        errors.push({
+            fieldId: 'minimumFlexAnnual',
+            message: 'Mindest-Flex p.a. darf nicht negativ sein.'
+        });
+    }
+    if (
+        Number.isFinite(minimumFlexAnnual) &&
+        Number.isFinite(flexBedarf) &&
+        minimumFlexAnnual > flexBedarf
+    ) {
+        errors.push({
+            fieldId: 'minimumFlexAnnual',
+            message: 'Mindest-Flex p.a. darf nicht größer als Flex-Bedarf p.a. sein.'
+        });
+        errors.push({
+            fieldId: 'flexBedarf',
+            message: 'Flex-Bedarf p.a. ist die Obergrenze für Mindest-Flex.'
+        });
+    }
+    if (errors.length > 0) {
+        throw new ValidationError(errors);
+    }
+}
 
 export function prepareEngineLastState(persistentState = {}, inputData = {}) {
     const previousLastState = persistentState.lastState || null;

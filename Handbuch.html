@@ -500,8 +500,8 @@
                         <div class="step-number">1</div>
                         <div class="step-content">
                             <h3>Rahmendaten prüfen</h3>
-                            <p>Profil(e) auswählen, Floor/Flex-Bedarf setzen und Personen/Renten in der Sektion
-                                "Personen & Rente" kontrollieren.</p>
+                            <p>Profil(e) auswählen, Floor/Flex-Bedarf setzen, optional einen Mindest-Flex p.a.
+                                festlegen und Personen/Renten in der Sektion "Personen & Rente" kontrollieren.</p>
                         </div>
                     </li>
                     <li class="step-item">
@@ -932,7 +932,8 @@
                                 Depotwerte.</li>
                             <li><strong>Guardrails:</strong> Bei negativen Pfaden werden automatische Sicherheitsnetze
                                 (z.B. Mindest-Cash, variable Ausgabenbremsen) ausgelöst und in den Ergebnissen als
-                                Ereignis markiert.</li>
+                                Ereignis markiert. Ein gesetzter Mindest-Flex kann gekürzte flexible Ausgaben anheben,
+                                wird aber bei Notlage oder Alarm blockiert.</li>
                             <li><strong>Fehlerabfang:</strong> Eingaben werden validiert (keine negativen Sparraten,
                                 Ausgaben &lt;= erreichbare Einnahmen). Fehlende Pflichtfelder werden direkt im UI
                                 hervorgehoben.</li>
@@ -949,6 +950,9 @@
                                 den Verlauf Ihrer Entnahmen.</li>
                             <li><strong>Vergleich nutzen:</strong> Nutzen Sie Backtests für den Abgleich mit
                                 Monte-Carlo-Metriken (z.B. Runway-Stabilität).</li>
+                            <li><strong>Mindest-Flex-Transparenz:</strong> Die Spalten MinFlex€ und MinFSt zeigen, ob
+                                und mit welchem Status die Untergrenze für flexible Ausgaben berücksichtigt wurde. Im
+                                Detailmodus erscheinen zusätzlich MinFBlock und MinFEff.</li>
                             <li><strong>Dynamic-Flex-Transparenz:</strong> VPW-Spalten (u.a. VPW%, Hor, VPWSt,
                                 ER(CAPE), ER(real)) sowie Payout-Spalten wie EntPlan, EntEff, Liq&gt;P, Liq&lt;P,
                                 Port&gt;P und PortEnd erscheinen nur im <em>detaillierten</em> Logmodus, damit die
@@ -988,6 +992,9 @@
                                 einen Blick.</li>
                             <li><strong>Detail-Filter:</strong> Pflege-Details und detailliertes Log können per
                                 Checkbox ein- oder ausgeblendet werden.</li>
+                            <li><strong>Mindest-Flex im Log:</strong> MinFlex€ und MinFSt bleiben auch im Normalmodus
+                                sichtbar; Blockgrund und Effektbetrag erscheinen im Detailmodus. Gold-Spalten werden
+                                ausgeblendet, wenn das Goldmodul inaktiv ist.</li>
                             <li><strong>Dynamic-Flex im Log:</strong> VPW- und Payout-Felder werden im Szenario-Log nur
                                 in der Detailansicht eingeblendet; im Normalmodus bleiben sie ausgeblendet. Scenario-Log
                                 und Backtesting nutzen dieselben Begriffe, z.B. EntPlan, EntEff, VPW€, VPWFlex,
@@ -1056,7 +1063,7 @@
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
                             <li><strong>Automatisch aktualisiert:</strong> Inflation (ECB/World Bank/OECD),
-                                daraus abgeleitete Floor- und Flex-Bedarfe, Altersfelder beider Personen sowie
+                                daraus abgeleitete Floor-, Flex- und Mindest-Flex-Bedarfe, Altersfelder beider Personen sowie
                                 Markt-Kontext (CAPE-Rotation, ATH-Status, Shiller-Daten nachgerückt).</li>
                             <li><strong>Manuell zu prüfen:</strong> aktuelle Depotwerte (Aktien, Anleihen,
                                 ETFs), Cash- und Tagesgeldstände. Korrigieren Sie Tippfehler sofort, damit Guardrails
@@ -1077,7 +1084,9 @@
                         <p style="color: var(--text-light);">Bei aktivem Dynamic Flex (VPW) finden Sie die
                             Nachvollziehbarkeit im Diagnosebereich „Schlüsselparameter“: Status, VPW-Rate, Horizont,
                             ER(CAPE), ER(real), Go-Go-Status, VPW-Basisvermögen, VPW-Rahmen, freigegebenen Flex und
-                            nicht genutzten Rahmen. Die Hauptansicht bleibt bewusst kompakt.</p>
+                            nicht genutzten Rahmen. Ein gesetzter Mindest-Flex wird dort ebenfalls mit Betrag, Status,
+                            erforderlicher Rate, Blockiergrund und Effekt vor/nach dem Policy-Schritt angezeigt. Die
+                            Hauptansicht bleibt bewusst kompakt.</p>
                     </div>
                     <div class="detail-block" id="balance-pflegebucket">
                         <h3>Pflegebucket</h3>
@@ -1236,8 +1245,8 @@
                             Rebalancing-Bedarf, danach CAPE- oder Drawdown-Bremse. Jeder Knoten zeigt den getesteten
                             Schwellenwert.</li>
                         <li><strong>KPIs oben rechts:</strong> Runway (Monate), aktuelle Aktienquote, Floor/Flex-Bedarf,
-                            Drawdown zum Allzeithoch, CAPE-Ampel. Grenzfälle wie exakt erreichte Mindestwerte werden
-                            textlich erklärt.</li>
+                            Mindest-Flex-Status, Drawdown zum Allzeithoch, CAPE-Ampel. Grenzfälle wie exakt erreichte
+                            Mindestwerte werden textlich erklärt.</li>
                         <li><strong>Handlungsanweisungen unten links:</strong> Liste der nötigen Schritte inkl.
                             Beträge, z.B. „Aktien verkaufen 18.000 € → Geldmarkt“. Der Plan wird zusätzlich nach Zweck
                             gruppiert, damit Liquiditätsaufbau, Rebalancing, Steuerzahlung und Rest/Puffer sofort
@@ -1524,6 +1533,13 @@
                         detaillierten Scenario- oder Backtest-Log die Spalten VPW€, VPWFlex, EntPlan, EntEff,
                         Liq&gt;P/Liq&lt;P sowie Port&gt;P/PortEnd. Passen Sie das Preset bei Bedarf defensiver an.</dd>
 
+                    <dt>Was bedeutet Mindest-Flex p.a.?</dt>
+                    <dd>Der Mindest-Flex ist eine optionale Untergrenze für flexible Ausgaben in gekürzten
+                        Safety-/Guardrail-Jahren. Er ersetzt nicht den Floor und garantiert keine Entnahme in echten
+                        Notlagen. Wenn ausreichend Gesamtvermögen vorhanden ist, hebt die Engine die Flex-Rate so weit
+                        an, dass mindestens dieser Flex-Betrag erreicht wird; bei Alarm, fehlender Floor-Deckung oder
+                        nicht wiederherstellbarem Mindest-Runway wird die Anhebung blockiert.</dd>
+
                     <dt>Muss ich Depot-Tranchen pflegen?</dt>
                     <dd>Ja, für korrekte Steuerberechnungen sind Tranchen notwendig. Ohne Tranchen nutzt die Suite
                         vereinfachte Schätzwerte; für verlässliche Handlungsschritte sollten Sie Tranchen erfassen.</dd>
@@ -1609,6 +1625,12 @@ Ausgabe-Konto erhält Monatsbedarf aus Geldmarkt</pre>
                         berücksichtigt sowohl die Höhe des jährlichen Flex-Bedarfs als auch das Gesamtvermögen (hohes
                         Vermögen dämpft die Kürzung). Beispiel: 1.500 € Floor + 700 € Flex = 2.200 € Monatsbedarf → 12
                         Monate Runway = 26.400 € Cash.</dd>
+
+                    <dt><a class="toc-link" data-tab-target="manual" href="#balance-diagnose">Mindest-Flex p.a.</a></dt>
+                    <dd>Optionale Untergrenze für den ausgezahlten Flex-Anteil in gekürzten Jahren. Beispiel:
+                        12.000 € Flex-Bedarf und 6.000 € Mindest-Flex bedeuten, dass die Flex-Rate mindestens 50%
+                        erreichen müsste, sofern keine Notfallblocker greifen. Diagnose und Logs zeigen Status,
+                        Blockgrund und effektiven Betrag.</dd>
 
                     <dt><a class="toc-link" data-tab-target="manual" href="#balance-diagnose">Rebalancing-Distanz</a>
                     </dt>

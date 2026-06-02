@@ -4,9 +4,11 @@ import { readPartnerInputs, readPensionInputs, readWidowOptions } from '../app/s
 import {
     normalizeDecumulationMode,
     readAccumulationInputs,
+    readBasePortfolioInputs,
     readDecumulationInputs,
     readDynamicFlexInputs
 } from '../app/simulator/simulator-input-strategy.js';
+import { SimulatorValidationError, validateSimulatorInputs } from '../app/simulator/simulator-input-validation.js';
 import { readTrancheInputs } from '../app/simulator/simulator-input-tranches.js';
 import { STRATEGY_OPTIONS } from '../types/strategy-options.js';
 
@@ -128,5 +130,43 @@ console.log('Test 5: care reader tolerates missing DOM fields');
     assertEqual(care.pflegeKostenDrift, 0.035, 'Care drift should use default ratio');
 }
 console.log('✓ care reader missing DOM defaults OK');
+
+console.log('Test 6: base reader and validator handle minimum flex');
+{
+    const doc = createDocumentMock({
+        tagesgeld: '10.000',
+        geldmarktEtf: '5.000',
+        simStartVermoegen: '100.000',
+        depotwertAlt: '85',
+        einstandAlt: '70',
+        startFloorBedarf: '24000',
+        startFlexBedarf: '12000',
+        minimumFlexAnnual: '6000',
+        goldAllokationAktiv: 'false'
+    });
+    const base = readBasePortfolioInputs(doc);
+    assertEqual(base.minimumFlexAnnual, 6000, 'Mindest-Flex sollte aus dem Simulator-DOM gelesen werden');
+    validateSimulatorInputs(base);
+
+    let thrown = null;
+    try {
+        validateSimulatorInputs({ startFlexBedarf: 12000, minimumFlexAnnual: 12001 });
+    } catch (error) {
+        thrown = error;
+    }
+    assert(thrown instanceof SimulatorValidationError, 'Mindest-Flex > Flex-Bedarf sollte validieren');
+    assert(thrown.errors.some(e => e.fieldId === 'minimumFlexAnnual'), 'Fehler markiert minimumFlexAnnual');
+    assert(thrown.errors.some(e => e.fieldId === 'startFlexBedarf'), 'Fehler markiert startFlexBedarf');
+
+    let negative = null;
+    try {
+        validateSimulatorInputs({ startFlexBedarf: 12000, minimumFlexAnnual: -1 });
+    } catch (error) {
+        negative = error;
+    }
+    assert(negative instanceof SimulatorValidationError, 'Negativer Mindest-Flex sollte validieren');
+    assert(negative.errors.some(e => e.fieldId === 'minimumFlexAnnual'), 'Negativer Fehler markiert minimumFlexAnnual');
+}
+console.log('✓ minimum flex reader/validator OK');
 
 console.log('✅ Simulator input reader tests passed');

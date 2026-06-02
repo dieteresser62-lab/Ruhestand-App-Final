@@ -65,6 +65,7 @@ try {
         geldmarktEtf: 0,
         startFloorBedarf: 24000,
         startFlexBedarf: 6000,
+        minimumFlexAnnual: 0,
         flexBudgetAnnual: 0,
         flexBudgetRecharge: 0,
         marketCapeRatio: 20,
@@ -190,6 +191,87 @@ try {
         assert(rows.length === 2, 'Dynamic flex off scenario should create two rows');
         assert(rows.every(r => r?.vpw?.status === 'disabled'), 'VPW status should be disabled when dynamic flex is off');
         assert(rows.every(r => r?.vpwFallbackHint === 'dynamic_flex_off'), 'Hint should explicitly mark dynamic flex off mode');
+    }
+
+    // --- TEST 8: Mindest-Flex increases stressed withdrawals without flow drift ---
+    {
+        global.document = createMockDocument({
+            ...baseInputs,
+            simStartJahr: 2005,
+            simEndJahr: 2014,
+            simStartVermoegen: 500000,
+            depotwertAlt: 480000,
+            einstandAlt: 400000,
+            tagesgeld: 20000,
+            startFlexBedarf: 12000,
+            minimumFlexAnnual: 9000,
+            flexBudgetAnnual: 0,
+            marketCapeRatio: 35,
+            dynamicFlex: 'true',
+            horizonYears: 10
+        });
+        global.document.getElementById('dynamicFlex').checked = true;
+        global.document.getElementById('monteCarloResults').style.display = 'none';
+        runBacktest();
+        const withMinimumFlexRows = window.globalBacktestData?.rows || [];
+        const withMinimumFlexTotal = withMinimumFlexRows.reduce((sum, r) => sum + (r.entscheidung?.jahresEntnahme || 0), 0);
+
+        global.document = createMockDocument({
+            ...baseInputs,
+            simStartJahr: 2005,
+            simEndJahr: 2014,
+            simStartVermoegen: 500000,
+            depotwertAlt: 480000,
+            einstandAlt: 400000,
+            tagesgeld: 20000,
+            startFlexBedarf: 12000,
+            minimumFlexAnnual: 0,
+            flexBudgetAnnual: 0,
+            marketCapeRatio: 35,
+            dynamicFlex: 'true',
+            horizonYears: 10
+        });
+        global.document.getElementById('dynamicFlex').checked = true;
+        global.document.getElementById('monteCarloResults').style.display = 'none';
+        runBacktest();
+        const withoutMinimumFlexRows = window.globalBacktestData?.rows || [];
+        const withoutMinimumFlexTotal = withoutMinimumFlexRows.reduce((sum, r) => sum + (r.entscheidung?.jahresEntnahme || 0), 0);
+
+        assert(withMinimumFlexTotal > withoutMinimumFlexTotal, 'Mindest-Flex should increase 2005-2014 withdrawals');
+        assert(withMinimumFlexRows.some(r => r.row?.minimumFlexStatus === 'applied'), 'Backtest log should expose applied minimum-flex status');
+        assert(withMinimumFlexRows.every(r => Math.abs(Number(r.row?.portfolio_flow_delta) || 0) < 1), 'FlowDelta should remain near zero with minimum flex');
+    }
+
+    // --- TEST 9: 3-Bucket and Mindest-Flex stay balanced in backtest accounting ---
+    {
+        global.document = createMockDocument({
+            ...baseInputs,
+            simStartJahr: 2005,
+            simEndJahr: 2014,
+            simStartVermoegen: 500000,
+            depotwertAlt: 360000,
+            einstandAlt: 300000,
+            tagesgeld: 20000,
+            geldmarktEtf: 120000,
+            initialBondBucket: 120000,
+            startFlexBedarf: 12000,
+            minimumFlexAnnual: 9000,
+            flexBudgetAnnual: 0,
+            marketCapeRatio: 35,
+            entnahmeStrategie: '3_bucket_jilge',
+            bondTargetFactor: 2,
+            drawdownTrigger: 20,
+            bondRefillThreshold: 1.5
+        });
+        global.document.getElementById('dynamicFlex').checked = false;
+        global.document.getElementById('monteCarloResults').style.display = 'none';
+        runBacktest();
+
+        const rows = window.globalBacktestData?.rows || [];
+        assert(rows.length === 10, '3-Bucket minimum-flex backtest should create ten rows');
+        assertEqual(window.globalBacktestData?.decumulationMode, '3_bucket_jilge', 'Backtest should run in 3-Bucket mode');
+        assert(rows.some(r => r.row?.minimumFlexStatus === 'applied'), '3-Bucket log should expose applied minimum-flex status');
+        assert(rows.every(r => Math.abs(Number(r.row?.portfolio_flow_delta) || 0) < 1), '3-Bucket FlowDelta should remain near zero with minimum flex');
     }
 
     console.log('✅ Simulator backtest tests passed');

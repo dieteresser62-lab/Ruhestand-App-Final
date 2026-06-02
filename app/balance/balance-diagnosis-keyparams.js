@@ -86,6 +86,54 @@ export function buildKeyParams(params = {}) {
         });
     }
 
+    if (typeof params.minimumFlexAnnual === 'number' && isFinite(params.minimumFlexAnnual)) {
+        const statusLabels = {
+            inactive_zero: 'Nicht gesetzt',
+            not_needed: 'Nicht benötigt',
+            applied: 'Angewandt',
+            applied_limited_by_final_smoothing: 'Geglättet angewandt',
+            blocked_emergency: 'Blockiert',
+            limited_by_flex_budget: 'Durch Flex-Budget begrenzt'
+        };
+        const blockReasonLabels = {
+            alarm_active: 'Alarmmodus aktiv',
+            no_open_flex_need: 'kein offener Flex-Bedarf',
+            floor_minimum_flex_not_covered: 'Floor-/Mindest-Flex-Deckung unzureichend',
+            minimum_runway_not_restorable: 'Mindest-Runway nicht wiederherstellbar'
+        };
+        const status = params.minimumFlexStatus || 'inactive_zero';
+        const blockReason = params.minimumFlexBlockReason || null;
+        const trend = status === 'blocked_emergency' ? 'down'
+            : (status === 'applied' ? 'up' : 'neutral');
+        pushMetric({
+            label: 'Mindest-Flex p.a.',
+            value: UIUtils.formatCurrency(params.minimumFlexAnnual),
+            meta: blockReason
+                ? `${statusLabels[status] || status}: ${blockReasonLabels[blockReason] || blockReason}`
+                : (statusLabels[status] || status),
+            trend
+        });
+        if (typeof params.minimumFlexRequiredRate === 'number' && isFinite(params.minimumFlexRequiredRate) && params.minimumFlexAnnual > 0) {
+            pushMetric({
+                label: 'Mindest-Flex Rate',
+                value: UIUtils.formatPercentValue(params.minimumFlexRequiredRate, { fractionDigits: 1, invalid: null }),
+                meta: 'Erforderliche Flex-Rate für den gesetzten Mindest-Flex'
+            });
+        }
+        if (
+            typeof params.minimumFlexEffectiveBefore === 'number' && isFinite(params.minimumFlexEffectiveBefore) &&
+            typeof params.minimumFlexEffectiveAfter === 'number' && isFinite(params.minimumFlexEffectiveAfter) &&
+            params.minimumFlexAnnual > 0
+        ) {
+            pushMetric({
+                label: 'Mindest-Flex Effekt',
+                value: `${UIUtils.formatCurrency(params.minimumFlexEffectiveBefore)} -> ${UIUtils.formatCurrency(params.minimumFlexEffectiveAfter)}`,
+                meta: 'Effektiver Flex vor/nach Mindest-Flex-Schritt',
+                trend
+            });
+        }
+    }
+
     if (typeof params.kuerzungProzent === 'number' && isFinite(params.kuerzungProzent)) {
         const trend = params.kuerzungProzent > 0 ? 'down' : params.kuerzungProzent < 0 ? 'up' : 'neutral';
         pushMetric({

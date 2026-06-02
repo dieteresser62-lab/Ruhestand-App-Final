@@ -9,6 +9,7 @@
 
 import { deepClone, normalizeWidowOptions } from './simulator-sweep-utils.js';
 import { runMonteCarloAutoOptimize } from './auto-optimize-worker.js';
+import { validateSimulatorInputs } from './simulator-input-validation.js';
 
 /**
  * Führt eine MC-Simulation für einen Kandidaten aus
@@ -71,6 +72,7 @@ export async function evaluateCandidate(candidate, baseInputs, runsPerCandidate,
         }
     }
 
+    validateSimulatorInputs(inputs);
     // Normalisiere Widow Options
     const widowOptions = normalizeWidowOptions(inputs.widowOptions);
 

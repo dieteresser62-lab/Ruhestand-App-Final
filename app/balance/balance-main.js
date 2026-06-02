@@ -34,7 +34,8 @@ import {
     calculateExpensesBudget,
     enrichBalanceDiagnosisPayload,
     persistBalanceUpdate,
-    prepareEngineLastState
+    prepareEngineLastState,
+    validateBalanceInputs
 } from './balance-update-pipeline.js';
 
 // ==================================================================================
@@ -169,6 +170,7 @@ function update() {
         // 1. Read Inputs & State
         // Liest alle Formular-Eingaben und den letzten gespeicherten Zustand
         const inputData = UIReader.readAllInputs();
+        validateBalanceInputs(inputData);
         const profilverbundProfiles = loadProfilverbundProfiles();
         profilverbundHandlers.updateProfilverbundGlobals(profilverbundProfiles, inputData);
 

@@ -18,6 +18,7 @@ import {
     persistDetailLevel,
     portfolioTotal
 } from './simulator-results.js';
+import { formatSimulatorValidationError, validateSimulatorInputs } from './simulator-input-validation.js';
 import {
     buildBacktestColumnDefinitions,
     computeAdjPctForYear,
@@ -147,7 +148,7 @@ export function runBacktest() {
         // Reuse MC extra KPIs when available for context in the log UI.
         const extraKPI = document.getElementById('monteCarloResults').style.display === 'block' ? (window.lastMcRunExtraKPI || {}) : {};
         document.getElementById('btButton').disabled = true;
-        const inputs = getCommonInputs();
+        const inputs = validateSimulatorInputs(getCommonInputs());
         const startJahr = parseInt(document.getElementById('simStartJahr').value);
         const endJahr = parseInt(document.getElementById('simEndJahr').value);
         if (startJahr < 1951 || endJahr > 2025 || startJahr >= endJahr) {
@@ -227,7 +228,9 @@ export function runBacktest() {
             "MinF%".padStart(5),
             "WRed%".padStart(5),
             "WQ%".padStart(4),
-            "Flex€".padStart(7)
+            "Flex€".padStart(7),
+            "MinFlex€".padStart(8),
+            "MinFSt".padEnd(10)
         );
         if (logDetailLevel === 'detailed') {
             headerCols.push(
@@ -367,7 +370,9 @@ export function runBacktest() {
                 formatPercentInteger(row.MinFlexRatePct || 0, 5),
                 formatPercentInteger(row.WealthRedF || 0, 5),
                 formatPercentInteger(row.WealthQuoteUsedPct || 0, 4),
-                formatCurrencyShortLog(row.flex_erfuellt_nominal).padStart(7)
+                formatCurrencyShortLog(row.flex_erfuellt_nominal).padStart(7),
+                formatCurrencyShortLog(row.minimumFlexAnnual || 0).padStart(8),
+                String(row.minimumFlexStatus || '').substring(0, 10).padEnd(10)
             );
             if (logDetailLevel === 'detailed') {
                 const vpw = result.ui?.vpw || null;
@@ -432,7 +437,8 @@ export function runBacktest() {
         window.globalBacktestData = {
             rows: logRows,
             startJahr,
-            decumulationMode: inputs?.decumulation?.mode || STRATEGY_OPTIONS.STANDARD
+            decumulationMode: inputs?.decumulation?.mode || STRATEGY_OPTIONS.STANDARD,
+            goldAktiv: inputs?.goldAktiv
         };
 
         document.getElementById('simulationResults').style.display = 'block';
@@ -457,7 +463,7 @@ export function runBacktest() {
         </div>`;
         renderBacktestLog();
     } catch (error) {
-        alert("Ein Fehler ist im Backtest aufgetreten:\n\n" + error.message + "\n" + error.stack);
+        alert("Ein Fehler ist im Backtest aufgetreten:\n\n" + formatSimulatorValidationError(error) + "\n" + (error.stack || ''));
         console.error("Fehler in runBacktest():", error);
     } finally { document.getElementById('btButton').disabled = false; }
 }
@@ -474,7 +480,8 @@ export function renderBacktestLog() {
     const logDetailLevel = loadDetailLevel(BACKTEST_LOG_DETAIL_KEY, LEGACY_LOG_DETAIL_KEY);
     const { rows: logRows } = window.globalBacktestData;
     const columns = buildBacktestColumnDefinitions(logDetailLevel, {
-        strategyMode: window.globalBacktestData?.decumulationMode
+        strategyMode: window.globalBacktestData?.decumulationMode,
+        goldAktiv: window.globalBacktestData?.goldAktiv
     });
 
     // Generate HTML table
@@ -519,7 +526,8 @@ export function exportBacktestLogData(format = 'json') {
 
     const detailLevel = loadDetailLevel(BACKTEST_LOG_DETAIL_KEY, LEGACY_LOG_DETAIL_KEY);
     const columns = buildBacktestColumnDefinitions(detailLevel, {
-        strategyMode: backtestData?.decumulationMode
+        strategyMode: backtestData?.decumulationMode,
+        goldAktiv: backtestData?.goldAktiv
     });
     const timestamp = new Date().toISOString().replace(/[:]/g, '-');
     const filenameBase = `backtest-log-${timestamp}`;

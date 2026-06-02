@@ -2,8 +2,8 @@
 
 **Technische Dokumentation der DIY-Software für Ruhestandsplanung**
 
-**Dokumentstand:** 2026-05-23
-**Geprüfte Codebasis:** lokale Arbeitskopie vom 2026-05-23
+**Dokumentstand:** 2026-06-02
+**Geprüfte Codebasis:** lokale Arbeitskopie vom 2026-06-02
 **Engine API:** v31.0
 **Codeumfang:** Momentaufnahme, siehe Komponenten-Tabelle
 **Lizenz:** MIT
@@ -36,7 +36,7 @@
 
 ## Komponenten
 
-*Momentaufnahme der lokalen Arbeitskopie vom 2026-05-23. Modul- und Zeilenzahlen sind Orientierungshilfen, nicht normative Architekturgrenzen. Dieses Dokument beschreibt die Architektur und die fachlichen Zusammenhänge eigenständig; spezialisierte Referenzen (`TECHNICAL.md`, Modul-READMEs, `engine/README.md`, `tests/README.md`) dienen als ergänzende Detail- und Exportkataloge.*
+*Momentaufnahme der lokalen Arbeitskopie vom 2026-06-02. Modul- und Zeilenzahlen sind Orientierungshilfen, nicht normative Architekturgrenzen. Dieses Dokument beschreibt die Architektur und die fachlichen Zusammenhänge eigenständig; spezialisierte Referenzen (`TECHNICAL.md`, Modul-READMEs, `engine/README.md`, `tests/README.md`) dienen als ergänzende Detail- und Exportkataloge.*
 
 | Komponente | Zweck | Momentaufnahme |
 |------------|-------|----------------|
@@ -44,7 +44,7 @@
 | **Simulator** | Monte-Carlo-Simulation, Parameter-Sweeps, Auto-Optimize, Dynamic Flex, Pflegebucket-Wirklogik | 87 JS-Module unter `app/simulator/` |
 | **Engine** | Kern-Berechnungslogik, Guardrails, Steuern | 24 MJS-Module unter `engine/`, ca. 4.240 Zeilen |
 | **Workers** | Parallelisierung für MC/Sweep/Optimizer-Pfade | 3 JS-Module unter `workers/`, ca. 757 Zeilen |
-| **Tests** | Unit- und Integrationstests | 76 `*.test.mjs` Dateien; 1748 Assertions im Lauf vom 2026-05-23 |
+| **Tests** | Unit- und Integrationstests | 77 `*.test.mjs` Dateien; 1948 Assertions im Lauf vom 2026-06-02 |
 | **Profile, Tranchen, Shared** | Profilverwaltung, Profilverbund, Tranchenstatus, gemeinsame Utilities | JS-Module unter `app/profile/`, `app/tranches/`, `app/shared/`, zusammen ca. 2.959 Zeilen |
 
 *Hinweis: Dieses Dokument beschreibt Konzepte und Architekturentscheidungen. Für konkrete Implementierungsdetails gelten die genannten Module und Tests als Referenz; exakte Code-Zeilen werden bewusst vermieden, weil sie nach Refactorings schnell veralten.*
@@ -68,6 +68,7 @@ Die Ruhestand-Suite kombiniert folgende Funktionen:
 13. **Dynamic-Flex (VPW)** mit CAPE-basierter Renditeerwartung, Sterbetafeln, EMA-Glättung und Go-Go-Phase; integriert in Balance-App, Backtest, Monte Carlo, Sweep und Auto-Optimize
 14. **Auto-CAPE im Jahreswechsel** (US-Shiller-CAPE mit Fallback-Kette und non-blocking Fehlerbehandlung)
 15. **Pflegebucket** als gesperrte Geldmarkt-/Cash-Reserve mit Profildefinition, Simulator-Air-Gap, Pflegegrad-Trigger, Monte-Carlo-KPIs und Balance-Diagnose
+16. **Mindest-Flex p.a.** als optionale Untergrenze für Flex-Ausgaben in gekürzten Safety-/Guardrail-Jahren; ratenbasiert, validiert gegen den Flex-Bedarf und in Balance, Simulator, Backtest, Monte Carlo, Sweep, Auto-Optimize und Profilverbund integriert
 
 ## Bekannte Einschränkungen
 
@@ -940,16 +941,19 @@ Der SpendingPlanner führt mehrere Policy-Module in stabiler Reihenfolge aus, wo
 1. Vorjahreszustand laden oder initialisieren: Flex-Rate, realer Vermögens-Peak, Inflation, Alarmstatus.
 2. Alarmbedingungen prüfen: tiefer Bärenmarkt, hohe Entnahmequote, Runway-Stress oder realer Drawdown.
 3. Initiale Flex-Rate berechnen: Marktregime, Glättung und Alarmverhalten.
-4. Spending-Policy-Pipeline anwenden: Guardrails, Flex-Budget, finale Rate-Limits.
+4. Spending-Policy-Pipeline anwenden: Guardrails, Mindest-Flex, Flex-Budget, finale Rate-Limits.
 5. Jahresentnahme quantisieren und Diagnose erzeugen.
 
 Dynamic Flex ist ein vorgeschalteter VPW-Pfad. Bei aktivem `dynamicFlex` berechnet die Engine aus Gesamtvermögen, Resthorizont, CAPE-basierter erwarteter Realrendite, Gold-/Safe-Asset-Anteil und optionalem Go-Go-Multiplikator einen dynamischen Flex-Bedarf. Der Floor bleibt geschützt; VPW ersetzt nur den flexiblen Teil. Eine Sicherheitsstufe kann Go-Go deaktivieren oder Dynamic Flex temporär auf statischen Flex zurücksetzen, wenn Alarm-, Runway- oder Drawdown-Signale zu stark werden.
+
+Der optionale `minimumFlexAnnual` ist kein zweiter Floor und mutiert den Bedarf nicht. Er wird nach den Guardrails als Mindest-Effektivbetrag für den Flex-Anteil interpretiert: Wenn die berechnete Flex-Rate weniger als diesen Betrag freigeben würde, hebt `applyMinimumFlexFloor()` die Rate bis zur erforderlichen Mindest-Flex-Rate an. Danach dürfen Flex-Budget-Cap und finale Rate-Limits die Anhebung weiterhin begrenzen. Notfallbedingungen blockieren die Anhebung bei aktivem Alarm, fehlender Gesamtvermögensdeckung für Floor plus Mindest-Flex oder wenn der Mindest-Runway nach dem Proxy nicht wiederherstellbar wäre.
 
 Die wichtigsten fachlichen Bremsen sind:
 
 | Mechanismus | Zweck |
 |-------------|-------|
 | Wealth-Adjusted Reduction | geringe Entnahmequoten werden weniger stark gekürzt |
+| Mindest-Flex p.a. | optionale Untergrenze für Flex-Ausgaben, ohne den Floor zu verändern |
 | Flex-Budget | mehrjähriger Topf begrenzt kumulative Flex-Kürzungen in Stressphasen |
 | Flex-Share S-Curve | verhindert überharte Kürzungen, wenn Flex nur einen Teil des Gesamtbedarfs ausmacht |
 | Runway-/Hard-Caps | begrenzen Entnahmen bei schwacher Liquiditätsdeckung |
@@ -1160,6 +1164,35 @@ function shouldDeactivateAlarm(context, alarmHistory) {
     return false;
 }
 ```
+
+### C.1.6 Mindest-Flex p.a.
+
+`Mindest-Flex p.a.` ist eine optionale Untergrenze für flexible Ausgaben in Jahren, in denen Safety-/Guardrail-Regeln den Flex-Anteil stark kürzen würden. Fachlich soll damit ein Mindestmaß an Lebensqualität modelliert werden, ohne den nicht verhandelbaren Floor zu erhöhen.
+
+Eigenschaften:
+
+- Der Wert wird in Balance und Simulator als Jahresbetrag gepflegt und gegen den jeweiligen Flex-Bedarf validiert (`minimumFlexAnnual <= flexBedarf` bzw. `<= startFlexBedarf`).
+- Negative Werte werden abgelehnt; ungültige oder leere Werte fallen in Engine-Pfaden defensiv auf 0 zurück.
+- Die Engine setzt den Mindest-Flex ratenbasiert um: `requiredRate = minimumFlexAnnual / inflatedBedarf.flex`.
+- Der Bedarf selbst bleibt unverändert; Diagnose und Logs zeigen Status, erforderliche Rate, Blockiergrund und effektiven Flex vor/nach dem Policy-Schritt.
+- Guardrail-Resets erkennen relevante Änderungen am Mindest-Flex, erhalten aber den steuerlichen Zustand (`lastState.taxState`).
+- Profilverbund addiert profilbezogene Mindest-Flex-Werte für den Haushaltslauf und transportiert die Aufschlüsselung in `minimumFlexProfiles`.
+
+Policy-Reihenfolge:
+
+1. Alarm und Guardrails bestimmen zunächst die gekürzte Flex-Rate.
+2. Mindest-Flex kann diese Rate anheben, wenn kein Notfallblocker greift.
+3. Flex-Budget-Cap und finale Rate-Limits laufen danach weiter und können die Anhebung begrenzen.
+
+Notfallblocker:
+
+| Blocker | Wirkung |
+|---------|---------|
+| Aktiver Alarm | Mindest-Flex wird nicht angehoben |
+| Gesamtvermögen deckt Floor + Mindest-Flex nicht | Blockierstatus `floor_minimum_flex_not_covered` |
+| Mindest-Runway wäre nach Proxy nicht wiederherstellbar | Blockierstatus `minimum_runway_not_restorable` |
+
+Backtest- und Monte-Carlo-Logs enthalten `MinFlex€` und `MinFSt`; im Detailmodus zusätzlich `MinFBlock` und `MinFEff`. Gold-bezogene Logspalten werden ausgeblendet, wenn das Goldmodul inaktiv ist.
 
 ---
 
@@ -2612,6 +2645,7 @@ Die Balance-App zeigt 8 VPW-Metriken im Diagnose-Panel (`balance-diagnosis-keypa
 | **Tranchen-Management** | ✅ FIFO+Online | ❌ | ⚠️ | ❌ | ❌ | ❌ |
 | **Parameter-Sweeps** | ✅ Heatmap | ❌ | ❌ | ⚠️ | ❌ | ❌ |
 | **Dynamic Flex (VPW)** | ✅ CAPE+Sterbetafel | ❌ | ❌ | ❌ | ❌ | ⚠️ RMD |
+| **Mindest-Flex p.a.** | ⚠️ experimentelle Komfort-Untergrenze | ❌ | ❌ | ❌ | ❌ | ❌ |
 | **Auto-Optimize** | ✅ LHS + Quick/Refine/Validate | ❌ | ❌ | ✅ | ❌ | ❌ |
 | **Ausgaben-Check** | ✅ CSV+Median | ❌ | ❌ | ❌ | ❌ | ❌ |
 | **Offline** | ✅ | ⚠️ ($799) | ❌ | ✅ (Gold) | ✅ | ✅ |
@@ -2637,6 +2671,7 @@ Die Balance-App zeigt 8 VPW-Metriken im Diagnose-Panel (`balance-diagnosis-keypa
 12. **Echte Multi-Plattform-Unterstützung** — Native Desktop-Apps für Windows (.exe), macOS (.app) und Linux (AppImage/deb) aus einer Codebasis, plus Browser-Fallback mit Start-Scripts
 13. **Dynamic Flex (VPW) mit Sterbetafeln** — Variable Percentage Withdrawal mit CAPE-basierter Renditeerwartung, EMA-Glättung, Mortality-Table-Horizont (Single/Joint, Mean/Quantil) und Go-Go-Phase. Integriert in Balance-App, Backtest, Monte Carlo, Parameter-Sweep und Auto-Optimize. Kein anderes verglichenes Tool kombiniert VPW mit Guardrails und deutscher Steuer.
 14. **Pflegebucket mit Engine-Air-Gap** — Zweckgebundene Geldmarkt-/Cash-Reserve wird aus der VPW-/Runway-Basis herausgerechnet, bei Pflegegrad-Triggern freigegeben und in Backtest/Monte Carlo separat ausgewiesen.
+15. **Mindest-Flex p.a. als experimentelle Komfort-Policy** — Nutzerdefinierte Untergrenze für flexible Ausgaben in gekürzten Guardrail-/Safety-Jahren. Diese konkrete Regel ist eine Novität der Suite und nicht als wissenschaftlich validierte Entnahmestrategie belegt; sie wird deshalb transparent als nachgelagerte, notfallbegrenzte Policy behandelt.
 
 ## D.5 Einordnung des Pflegebuckets
 
@@ -2705,19 +2740,30 @@ Die Stärke des Buckets ist nicht, dass er mehr Vermögen erzeugt. Er erhöht Mo
 | Volatility Trade-off | ✅ Dokumentiert | ✅ Flex-Rate-Glättung |
 | Lifetime Income | Guardrails #1 | ✅ Implementiert |
 
-## E.4 Bootstrap-Methodik
+## E.4 Mindest-Flex p.a.: Einordnung als nicht validierte Novität
+
+`Mindest-Flex p.a.` ist keine direkt aus der Literatur übernommene Entnahmeregel. Die Policy verbindet mehrere etablierte Konzepte, geht in ihrer konkreten Form aber über den belegten Forschungsstand hinaus:
+
+- **Floor-and-Upside / Floor-Flex:** Die Trennung von nicht verhandelbarem Floor und flexiblem Konsum ist anschlussfähig an Floor-and-Upside-Logik. Mindest-Flex erhöht den Floor jedoch bewusst nicht, sondern definiert nur eine Komfort-Untergrenze für den flexiblen Anteil.
+- **Risk-Based Guardrails:** Die Policy wirkt nach den Guardrails und kann sehr starke Flex-Kürzungen abmildern. Sie ersetzt keine Guardrails und bleibt Alarm-, Runway- und Vermögensdeckungsprüfungen untergeordnet.
+- **Behavioral Finance und Konsumglättung:** Haushalte akzeptieren Entnahmepläne oft besser, wenn Mindeststandards für Lebensqualität transparent sind. Diese Plausibilität ist verhaltensökonomisch anschlussfähig, aber für die konkrete Regel nicht empirisch validiert.
+- **VPW / Dynamic Flex:** Mindest-Flex kann besonders bei VPW- oder Safety-Pfaden als Gegenpol zu sehr niedrigen Flex-Freigaben dienen. Das ist eine Nutzerpräferenz-Kalibrierung, kein Bestandteil klassischer VPW-Modelle.
+
+**Status:** ⚠️ experimentelle, praxisorientierte Policy. Sie darf Flex-Kürzungen abmildern, ist aber keine garantierte Mindestrente, keine Versicherung und kein wissenschaftlich belegter SWR-Verbesserer. Deshalb dokumentiert die Suite Status, Blockiergrund und Effekt im Diagnose-/Logsystem und validiert die Regel gegen den Flex-Bedarf.
+
+## E.5 Bootstrap-Methodik
 
 **Stand der Forschung:** Block-Bootstrap erhält Autokorrelation; Stationary Bootstrap (Politis/Romano) wird in der Literatur häufig als geeignete Alternative eingeordnet.
 
 **Status:** ✅ Block-Bootstrap implementiert, ⚠️ kein Stationary Bootstrap
 
-## E.5 Fat Tails / Regime Switching
+## E.6 Fat Tails / Regime Switching
 
 **Stand der Forschung:** Student-t oder GARCH erfassen Tail-Risiken besser als Normalverteilung.
 
 **Status:** Regime-Switching via Markov-Chain implementiert; keine expliziten Fat Tails im Return-Modell
 
-## E.6 VPW / Variable Percentage Withdrawal
+## E.7 VPW / Variable Percentage Withdrawal
 
 **Quellen:**
 - [Bogleheads: Variable Percentage Withdrawal](https://www.bogleheads.org/wiki/Variable_percentage_withdrawal) — Grundkonzept und PMT-Formel
@@ -2738,7 +2784,7 @@ Die Stärke des Buckets ist nicht, dass er mehr Vermögen erzeugt. Er erhöht Mo
 
 **Status:** ✅ VPW implementiert mit CAPE-basierter Rendite, Sterbetafel-Horizont, EMA-Glättung und vollständiger Guardrail-Integration
 
-## E.7 Pflegebucket, Mental Accounting und Self-Insurance
+## E.8 Pflegebucket, Mental Accounting und Self-Insurance
 
 Der Pflegebucket verbindet mehrere Forschungs- und Praxislinien, ohne selbst eine versicherungsmathematisch kalibrierte Pflegeversicherung zu sein.
 

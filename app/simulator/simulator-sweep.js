@@ -23,6 +23,7 @@ import { WorkerPool } from '../../workers/worker-pool.js';
 import { WorkerJobRunner } from './worker-job-runner.js';
 import { buildSweepInputs, runSweepChunk } from './sweep-runner.js';
 import { persistenceStorage } from '../shared/persistence-facade.js';
+import { formatSimulatorValidationError, validateSimulatorInputs } from './simulator-input-validation.js';
 
 /**
  * Initialisiert Sweep-Inputfelder und synchronisiert sie mit der Persistenz-Facade.
@@ -300,7 +301,7 @@ export async function runParameterSweep() {
 
         // Basis-Inputs nur EINMAL lesen und einfrieren (Deep Clone)
         // Clone once so each combo can be safely overridden without side effects.
-        const baseInputs = deepClone(getCommonInputs());
+        const baseInputs = deepClone(validateSimulatorInputs(getCommonInputs()));
         const anzahlRuns = parseInt(document.getElementById('mcAnzahl').value) || 100;
         const maxDauer = parseInt(document.getElementById('mcDauer').value) || 35;
         const blockSize = parseInt(document.getElementById('mcBlockSize').value) || 5;
@@ -360,7 +361,7 @@ export async function runParameterSweep() {
         document.getElementById('paretoButton').style.display = 'inline-block';
     } catch (error) {
         // Bewusste, knappe Nutzerwarnung – ergänzt mit Hinweis für Entwickler.
-        alert("Fehler im Parameter-Sweep:\n\n" + error.message);
+        alert("Fehler im Parameter-Sweep:\n\n" + formatSimulatorValidationError(error));
         console.error('Parameter-Sweep Fehler:', error);
 
         // Reset UI on error (damit der Nutzer einen neuen Versuch starten kann)

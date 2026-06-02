@@ -180,6 +180,9 @@ function applyCombinedInputsToUI(combined, selectedCount) {
     syncDynamicFlexPresetSelection();
     refreshDynamicFlexControls();
     refreshThreeBucketControls();
+    setValue('startFloorBedarf', combined.startFloorBedarf || 0);
+    setValue('startFlexBedarf', combined.startFlexBedarf || 0);
+    setValue('minimumFlexAnnual', combined.minimumFlexAnnual || 0);
     setValue('marketCapeRatio', combined.marketCapeRatio || 0);
 
     setValue('p1StartAlter', combined.startAlter || 0);

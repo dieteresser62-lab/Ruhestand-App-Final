@@ -16,6 +16,7 @@ const profileInputs = [
             einstandAlt: 50000,
             startFloorBedarf: 12000,
             startFlexBedarf: 6000,
+            minimumFlexAnnual: 0,
             renteMonatlich: 1000,
             startAlter: 65,
             geschlecht: 'm',
@@ -46,6 +47,7 @@ const profileInputs = [
             einstandAlt: 120000,
             startFloorBedarf: 10000,
             startFlexBedarf: 4000,
+            minimumFlexAnnual: 2500,
             renteMonatlich: 500,
             startAlter: 63,
             geschlecht: 'w',
@@ -76,6 +78,10 @@ const profileInputs = [
     assertEqual(combined.startVermoegen, 300000, 'Startvermoegen should sum across profiles');
     assertEqual(combined.startFloorBedarf, 22000, 'Floor Bedarf should sum across profiles');
     assertEqual(combined.startFlexBedarf, 10000, 'Flex Bedarf should sum across profiles');
+    assertEqual(combined.minimumFlexAnnual, 2500, 'Mindest-Flex should sum across profiles');
+    assertEqual(combined.minimumFlexProfiles.length, 2, 'Mindest-Flex profile split should be kept');
+    assertEqual(combined.minimumFlexProfiles[0].minimumFlexAnnual, 0, 'Profile A minimum flex split should be 0');
+    assertEqual(combined.minimumFlexProfiles[1].minimumFlexAnnual, 2500, 'Profile B minimum flex split should be retained');
     assertEqual(combined.renteMonatlich, 1000, 'Primary rent should remain after partner split');
     assertEqual(combined.partner.monatsrente, 500, 'Partner rent should reflect secondary profile');
     assertEqual(combined.partner.aktiv, true, 'Partner should be active for 2 profiles');

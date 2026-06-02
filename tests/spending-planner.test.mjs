@@ -568,6 +568,7 @@ function clone(value) {
     );
     assert(runwayEmergency.status === 'blocked_emergency', 'Minimum flex should block when minimum runway cannot be restored');
     assert(runwayEmergency.blockReason === 'minimum_runway_not_restorable', 'Runway emergency should expose block reason');
+    assertClose(runwayEmergency.emergency.requiredWealthForRunway, 102000, 0.0001, 'Runway proxy documents floor+minimum-flex plus 24-month reserve');
 
     const floorEmergency = applyMinimumFlexFloor(
         20,
@@ -815,6 +816,7 @@ function clone(value) {
         () => {},
         { geglätteteFlexRate: 20, kuerzungQuelle: 'Profil' }
     );
+    // 32% = vorher geglättete 20% + max. 12 Prozentpunkte Final-Smoothing-Anstieg.
     assertClose(smoothResult.flexRate, 32, 0.0001, 'Final-rate limits should smooth a large minimum-flex lift');
     assert(
         smoothState.keyParams.minimumFlexStatus === 'applied_limited_by_final_smoothing',
@@ -822,6 +824,41 @@ function clone(value) {
     );
 
     console.log('✅ Spending policy pipeline minimum-flex ordering works');
+}
+
+// --- TEST 10ab: Dynamic-Flex Stage 2 safety rate can be lifted by minimum flex ---
+{
+    const params = getBaseParams();
+    params.market.sKey = 'bear_soft';
+    params.inflatedBedarf = { floor: 24000, flex: 20000 };
+    params.input = {
+        ...params.input,
+        dynamicFlex: true,
+        floorBedarf: 24000,
+        flexBedarf: 20000,
+        minimumFlexAnnual: 10000,
+        flexBudgetAnnual: 0,
+        flexBudgetYears: 0,
+        flexBudgetRecharge: 0
+    };
+    const state = clone(params.lastState);
+    state.flexRate = 20;
+    state.keyParams.entnahmequoteDepot = CONFIG.THRESHOLDS.CAUTION.withdrawalRate;
+    const result = applySpendingPolicyPipeline(
+        state,
+        { active: false, newlyTriggered: false },
+        params,
+        () => {},
+        { geglätteteFlexRate: 20, kuerzungQuelle: 'Dynamic-Flex Safety Stage 2' }
+    );
+
+    assert(result.flexRate > 20, 'Minimum flex should lift a low Dynamic-Flex Stage 2 safety rate');
+    assertClose(state.keyParams.minimumFlexRequiredRate, 50, 0.0001, 'Stage 2 scenario should compute the minimum-flex rate');
+    assert(
+        ['applied', 'applied_limited_by_final_smoothing'].includes(state.keyParams.minimumFlexStatus),
+        'Stage 2 scenario should expose an applied minimum-flex status'
+    );
+    console.log('✅ Dynamic-Flex Stage 2 minimum-flex interaction works');
 }
 
 // --- TEST 10b: Final withdrawal helper quantizes and derives effective flex ---

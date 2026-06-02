@@ -41,6 +41,7 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 * **Auto-CAPE im Jahreswechsel:** US-Shiller-CAPE wird im Jahresupdate automatisch geladen (Fallback: Yale → Mirror → letzter gespeicherter Wert). CAPE-Fehler blockieren den Jahreswechsel nicht.
 * **Ausgaben-Check (monatlich):** CSV-Import pro Monat und Profil, Budgetkontrolle je Monat, Detailansicht mit Top-3-Kategorien, Jahreshochrechnung (ab 2 Datenmonaten mit Median), Soll/Ist auf Basis importierter Monate sowie Jahres-Historie per Jahr-Auswahl.
 * **Jahresabschluss + Ausgaben-Historie:** Beim Jahresabschluss wechselt der Ausgaben-Check automatisch auf das nächste Jahr; Vorjahre bleiben vollständig einsehbar.
+* **Mindest-Flex p.a.:** Optionale, bedingte Untergrenze fuer Flex-Ausgaben in kuerzenden Safety-/Guardrail-Phasen; sie ersetzt nicht den Floor und wird in Diagnose sowie Kopiertext transparent ausgewiesen.
 * Nutzt die Engine v31 zur Marktanalyse, Entnahmeplanung und Liquiditätssteuerung.
 * Jahresübergreifende Verlustverrechnung (Verlusttopf) ist integriert; die finale Steuer stammt aus dem Jahres-Settlement.
 * Diagnoseansicht mit Guardrails, Entscheidungsbaum und Key-Performance-Parametern.
@@ -54,6 +55,7 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 * Monte-Carlo-Runner ist DOM-frei modularisiert; Chunk-Kontext, Startjahr-/CAPE-Sampling, Life-State-Initialisierung, Stress-Metriken, Logzeilen-Builder und Run-Metriken liegen in eigenen Simulator-Modulen.
 * **Parameter-Sweep mit Auto-Optimize:** Whitelist-Ansatz, Deep-Clones und Wächterlogik für Zwei-Personen-Setups. Worker-Parallelisierung fuer Sweep und Auto-Optimize, mehrphasige Optimierung mit LHS, Quick-Filter, voller Evaluation, Refinement und Validierung (~8-10x schneller), dynamische Parameter-UI (1-7 Parameter), Preset-Konfigurationen und Champion-Config-Output für die Strategiefindung. Details siehe `docs/reference/AUTO_OPTIMIZE_DETAILS.md`.
 * **Dynamic-Flex (VPW) Profile:** Profilsteuerung (`Aus`, `Defensiv`, `Ausgewogen`, `Offensiv`) mit optionalen erweiterten Parametern für `horizonYears`, `survivalQuantile` und `goGoMultiplier`.
+* **Mindest-Flex p.a.:** Wird in Backtest, Monte Carlo, Sweep und Profilverbund bis in die Engine durchgereicht; Scenario-/Backtest-Logs zeigen Status, Blockiergrund und effektive Mindest-Flex-Wirkung.
 * **Auto-Optimize Dynamic-Flex-Modus:** `inherit`, `force_on`, `force_off`; Dynamic-Flex-Parameter sind nur bei effektiv aktivem Dynamic-Flex optimierbar, inklusive Safety-Guards gegen zu aggressive Lösungen.
 * **Workflow-Transparenz:** Die Hauptabläufe (Balance, Monte-Carlo, Backtest) sind nun als Pseudo-Code dokumentiert: `docs/reference/WORKFLOW_PSEUDOCODE.md`.
 * **Log-Transparenz für Entnahmen:** Detaillierte Monte-Carlo-Scenario-Logs und Backtest-Logs zeigen additive Payout-/VPW-Erklärfelder (`EntPlan`, `EntEff`, `VPW€`, `VPWFlex`, `Liq>P`, `Liq<P`, `Port>P`, `PortEnd`), damit hohe Dynamic-Flex-Entnahmen nachvollziehbar bleiben.
