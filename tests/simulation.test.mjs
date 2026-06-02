@@ -239,7 +239,7 @@ try {
         },
         liquiditaet: 0
     };
-    const result = buildSimulatorYearResult({
+    const yearResultArgs = {
         portfolio,
         liquiditaet: 20000,
         spendingResult: {
@@ -322,7 +322,8 @@ try {
         balanceTrace: [
             { phase: 'after_payout', total: 120000, equity: 100000, bonds: 0, gold: 0, cash: 20000 }
         ]
-    });
+    };
+    const result = buildSimulatorYearResult(yearResultArgs);
     assert(result.newState.baseFloor === 24480, 'Year result should inflate next base floor');
     assert(result.logData.entscheidung.jahresEntnahme === 12000, 'Year result should expose effective annual withdrawal');
     assert(result.logData.entnahme_plan === 12000, 'Year result should expose planned withdrawal');
@@ -338,6 +339,19 @@ try {
     assert(result.logData.health_bucket_warning.includes('gekappt'), 'Year result should expose health bucket warnings');
     assert(result.logData.portfolio_total_end === 150000, 'Year result should expose portfolio total including health bucket at year end');
     assert(result.logData.threeBucket.bondBucketAfter === 0, 'Year result should expose three-bucket log shape');
+
+    const invalidInflationResult = buildSimulatorYearResult({
+        ...yearResultArgs,
+        yearData: { ...yearResultArgs.yearData, inflation: undefined },
+        baseMinimumFlexAnnual: 1000,
+        baseFlexBudgetAnnual: 4000,
+        baseFlexBudgetRecharge: 500
+    });
+    assert(Number.isFinite(invalidInflationResult.newState.baseFloor), 'Invalid withdrawal inflation should not create NaN floor');
+    assert(Number.isFinite(invalidInflationResult.newState.baseFlex), 'Invalid withdrawal inflation should not create NaN flex');
+    assert(Number.isFinite(invalidInflationResult.newState.baseMinimumFlexAnnual), 'Invalid withdrawal inflation should not create NaN minimum flex');
+    assert(invalidInflationResult.newState.baseFloor >= 0, 'Invalid withdrawal inflation should keep floor non-negative');
+    assert(invalidInflationResult.newState.baseMinimumFlexAnnual >= 0, 'Invalid withdrawal inflation should keep minimum flex non-negative');
     console.log('✅ Extracted year result builder passed');
 } catch (e) {
     console.error('Test 0e Failed', e);

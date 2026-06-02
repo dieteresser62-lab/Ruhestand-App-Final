@@ -438,7 +438,10 @@ export function runBacktest() {
             rows: logRows,
             startJahr,
             decumulationMode: inputs?.decumulation?.mode || STRATEGY_OPTIONS.STANDARD,
-            goldAktiv: inputs?.goldAktiv
+            goldAktiv: inputs?.goldAktiv,
+            minimumFlexProfiles: Array.isArray(inputs?.minimumFlexProfiles)
+                ? inputs.minimumFlexProfiles.map(entry => ({ ...entry }))
+                : []
         };
 
         document.getElementById('simulationResults').style.display = 'block';

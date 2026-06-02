@@ -265,11 +265,17 @@ try {
         });
         global.document.getElementById('dynamicFlex').checked = false;
         global.document.getElementById('monteCarloResults').style.display = 'none';
+        global.window.__profilverbundMinimumFlexProfiles = [
+            { profileId: 'a', name: 'A', minimumFlexAnnual: 0 },
+            { profileId: 'b', name: 'B', minimumFlexAnnual: 9000 }
+        ];
         runBacktest();
 
         const rows = window.globalBacktestData?.rows || [];
         assert(rows.length === 10, '3-Bucket minimum-flex backtest should create ten rows');
         assertEqual(window.globalBacktestData?.decumulationMode, '3_bucket_jilge', 'Backtest should run in 3-Bucket mode');
+        assertEqual(window.globalBacktestData?.minimumFlexProfiles?.length, 2, 'Backtest should retain profile-level minimum-flex split');
+        assertEqual(window.globalBacktestData?.minimumFlexProfiles?.[1]?.minimumFlexAnnual, 9000, 'Backtest should expose profile B minimum flex');
         assert(rows.some(r => r.row?.minimumFlexStatus === 'applied'), '3-Bucket log should expose applied minimum-flex status');
         assert(rows.every(r => Math.abs(Number(r.row?.portfolio_flow_delta) || 0) < 1), '3-Bucket FlowDelta should remain near zero with minimum flex');
     }

@@ -22,6 +22,7 @@ import { readTrancheInputs } from './simulator-input-tranches.js';
  * Sammelt alle Eingabewerte aus dem UI
  */
 export function getCommonInputs() {
+    const win = typeof window !== 'undefined' ? window : null;
     const trancheInputs = readTrancheInputs();
     const baseInputs = readBasePortfolioInputs();
     const pensionInputs = readPensionInputs();
@@ -33,7 +34,7 @@ export function getCommonInputs() {
     const strategyInputs = readStrategyInputs();
     const accumulationInputs = readAccumulationInputs({ startAlter: pensionInputs.startAlter });
 
-    return {
+    const result = {
         ...baseInputs,
         ...dynamicFlexInputs,
         ...pensionInputs,
@@ -45,4 +46,14 @@ export function getCommonInputs() {
         ...accumulationInputs,
         ...trancheInputs
     };
+
+    if (typeof window !== 'undefined' && window.__profilverbundMinFlexProfilesOverride) {
+        result.minimumFlexProfiles = window.__profilverbundMinFlexProfilesOverride;
+    }
+
+    if (Array.isArray(win?.__profilverbundMinimumFlexProfiles)) {
+        result.minimumFlexProfiles = win.__profilverbundMinimumFlexProfiles.map(entry => ({ ...entry }));
+    }
+
+    return result;
 }

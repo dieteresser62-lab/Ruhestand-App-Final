@@ -58,15 +58,24 @@ const InputValidator = {
         'Inflation außerhalb plausibler Grenzen (-10% bis 50%).'
     );
 
-    // 3. Vermögenswerte dürfen nicht negativ sein
+    // 3. Pflicht-Bedarfe und Vermögenswerte dürfen nicht negativ sein
+    ['floorBedarf', 'flexBedarf'].forEach(field => {
+        check(!Number.isFinite(input[field]), field, 'Pflichtfeld muss eine gültige Zahl sein.');
+    });
+
     // Prüft alle Depot- und Kostenbasis-Felder
     ['tagesgeld', 'geldmarktEtf', 'depotwertAlt', 'depotwertNeu', 'goldWert',
-        'floorBedarf', 'flexBedarf', 'minimumFlexAnnual', 'flexBudgetAnnual', 'flexBudgetRecharge',
+        'minimumFlexAnnual', 'flexBudgetAnnual', 'flexBudgetRecharge',
         'costBasisAlt', 'costBasisNeu', 'goldCost', 'sparerPauschbetrag'].forEach(field => {
             if (input[field] != null) {
                 check(!Number.isFinite(input[field]) || input[field] < 0, field, 'Wert muss eine gültige nicht-negative Zahl sein.');
             }
         });
+    ['floorBedarf', 'flexBedarf'].forEach(field => {
+        if (Number.isFinite(input[field])) {
+            check(input[field] < 0, field, 'Wert muss eine gültige nicht-negative Zahl sein.');
+        }
+    });
 
     if (Number.isFinite(input.minimumFlexAnnual) && Number.isFinite(input.flexBedarf)) {
         check(

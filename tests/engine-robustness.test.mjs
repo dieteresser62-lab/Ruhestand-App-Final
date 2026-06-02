@@ -191,10 +191,11 @@ function assertFiniteNumber(value, label) {
         delete input.startAlter;
         delete input.aktuellesAlter;
         delete input.floorBedarf;
+        delete input.flexBedarf;
         const result = EngineAPI.simulateSingleYear(input, null);
-        const hasValidationError = result?.error instanceof ValidationError;
-        // Fehlende Pflichtfelder dürfen zu ValidationError führen, aber nicht crashen.
-        assert(hasValidationError || !result?.error, 'Missing required fields should not crash');
+        assert(result?.error instanceof ValidationError, 'Missing required spending fields should return ValidationError');
+        assert(result.error.errors?.some(e => e.fieldId === 'floorBedarf'), 'Missing floorBedarf should be reported');
+        assert(result.error.errors?.some(e => e.fieldId === 'flexBedarf'), 'Missing flexBedarf should be reported');
         assert(result, 'Missing required fields should return a result object');
     } finally {
         console.error = originalError;

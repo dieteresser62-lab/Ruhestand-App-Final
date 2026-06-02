@@ -42,6 +42,33 @@ function _coalesceCapeRatio(input) {
 
 function _normalizeEngineInput(rawInput) {
     const input = { ...(rawInput || {}) };
+
+    const normalizeNum = (val, fallback = 0) => {
+        const n = Number(val);
+        return Number.isFinite(n) ? n : fallback;
+    };
+
+    input.depotwertAlt = normalizeNum(input.depotwertAlt, 0);
+    input.depotwertNeu = normalizeNum(input.depotwertNeu, 0);
+    input.goldWert = normalizeNum(input.goldWert, 0);
+    input.tagesgeld = normalizeNum(input.tagesgeld, 0);
+    input.geldmarktEtf = normalizeNum(input.geldmarktEtf, 0);
+    input.costBasisAlt = normalizeNum(input.costBasisAlt, 0);
+    input.costBasisNeu = normalizeNum(input.costBasisNeu, 0);
+    input.goldCost = normalizeNum(input.goldCost, 0);
+    input.sparerPauschbetrag = normalizeNum(input.sparerPauschbetrag, 0);
+    input.kirchensteuerSatz = normalizeNum(input.kirchensteuerSatz, 0);
+
+    input.aktuellesAlter = normalizeNum(input.aktuellesAlter, 65);
+    input.startAlter = normalizeNum(input.startAlter, input.aktuellesAlter);
+    input.inflation = normalizeNum(input.inflation, 0);
+    input.runwayMinMonths = normalizeNum(input.runwayMinMonths, 24);
+    input.runwayTargetMonths = normalizeNum(input.runwayTargetMonths, 36);
+    input.targetEq = normalizeNum(input.targetEq, 60);
+    input.rebalBand = normalizeNum(input.rebalBand, 5);
+    input.maxSkimPctOfEq = normalizeNum(input.maxSkimPctOfEq, 0);
+    input.maxBearRefillPctOfEq = normalizeNum(input.maxBearRefillPctOfEq, 0);
+
     const capeRatio = _coalesceCapeRatio(input);
     if (capeRatio !== undefined) {
         input.capeRatio = capeRatio;

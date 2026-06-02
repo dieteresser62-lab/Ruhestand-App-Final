@@ -97,6 +97,9 @@ export function initSimulatorProfileSelection() {
             const override = Array.isArray(combined.detailledTranches) ? combined.detailledTranches : null;
             window.__profilverbundTranchenOverride = override;
             window.__profilverbundPreferAggregates = !override;
+            window.__profilverbundMinimumFlexProfiles = Array.isArray(combined.minimumFlexProfiles)
+                ? combined.minimumFlexProfiles
+                : null;
         }
 
         applyCombinedInputsToUI(combined, selected.length);

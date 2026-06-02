@@ -404,6 +404,14 @@ Abschluss-Audit-Nacharbeit 2026-06-02:
 - `tests/README.md` um Mindest-Flex-Testabdeckung und aktuelle Teststatistik aktualisiert.
 - Validierung nach Abschluss-Audit: fokussierte Laeufe fuer `spending-planner`, `simulator-backtest`, `simulator-monte-carlo` und `simulator-sweep` erfolgreich; `npm test` erfolgreich mit 77 Testdateien, 1958 Assertions, 1958 bestanden, 0 fehlgeschlagen.
 
+Weitere Review-Nacharbeit 2026-06-02:
+
+- Profilgenaue Mindest-Flex-Aufteilung `minimumFlexProfiles` bleibt nach Profilverbund-Aggregation als separater Window-Override erhalten, wird von `getCommonInputs()` wieder an die Simulator-Inputs angehaengt und im Backtest-Ergebnis `globalBacktestData.minimumFlexProfiles` sichtbar gehalten; der aggregierte DOM-Wert `minimumFlexAnnual` bleibt die wirksame Engine-Summe.
+- Engine-Validierung haertet die Pflichtfelder `floorBedarf` und `flexBedarf`: fehlende oder nicht-finite Werte erzeugen jetzt einen `ValidationError`, statt spaeter `NaN` in Bedarf, Runway oder Entnahmeplanung zu erzeugen.
+- Entnahmephasen-Fortschreibung der Basiswerte nutzt wie die Ansparphase `euros(...)` fuer `baseFloor`, `baseFlex`, `baseMinimumFlexAnnual`, `baseFlexBudgetAnnual` und `baseFlexBudgetRecharge`, damit ungueltige Inflationsfaktoren nicht als negative oder `NaN`-State-Werte weiterlaufen.
+- Regressionstests ergaenzt fuer Pflichtfeld-Validation, Profilverbund-MinFlex-Split in `getCommonInputs()` und Backtest-Ergebnis sowie Entnahmephasen-Inflationssicherung.
+- Validierung: `node tests\run-single.mjs tests\engine-robustness.test.mjs`, `node tests\run-single.mjs tests\simulator-input-readers.test.mjs`, `node tests\run-single.mjs tests\simulation.test.mjs`, `node tests\run-single.mjs tests\simulator-backtest.test.mjs`, `npm test` mit 77 Testdateien/1966 Assertions/0 Fehlern und `npm run build:engine` erfolgreich.
+
 ## Abgrenzung
 
 Nicht Teil dieses Plans:

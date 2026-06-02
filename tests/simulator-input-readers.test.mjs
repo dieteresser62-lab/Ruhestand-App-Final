@@ -10,6 +10,7 @@ import {
 } from '../app/simulator/simulator-input-strategy.js';
 import { SimulatorValidationError, validateSimulatorInputs } from '../app/simulator/simulator-input-validation.js';
 import { readTrancheInputs } from '../app/simulator/simulator-input-tranches.js';
+import { getCommonInputs } from '../app/simulator/simulator-portfolio-inputs.js';
 import { STRATEGY_OPTIONS } from '../types/strategy-options.js';
 
 console.log('--- Simulator Input Reader Tests ---');
@@ -168,5 +169,43 @@ console.log('Test 6: base reader and validator handle minimum flex');
     assert(negative.errors.some(e => e.fieldId === 'minimumFlexAnnual'), 'Negativer Fehler markiert minimumFlexAnnual');
 }
 console.log('✓ minimum flex reader/validator OK');
+
+console.log('Test 7: getCommonInputs preserves profilverbund minimum-flex split');
+{
+    const previousWindow = global.window;
+    const previousDocument = global.document;
+    try {
+        global.window = {
+            __profilverbundMinimumFlexProfiles: [
+                { profileId: 'a', name: 'A', minimumFlexAnnual: 0 },
+                { profileId: 'b', name: 'B', minimumFlexAnnual: 2500 }
+            ],
+            __profilverbundPreferAggregates: true
+        };
+        global.document = createDocumentMock({
+            tagesgeld: '10.000',
+            geldmarktEtf: '5.000',
+            simStartVermoegen: '100.000',
+            depotwertAlt: '85',
+            einstandAlt: '70',
+            startFloorBedarf: '24000',
+            startFlexBedarf: '12000',
+            minimumFlexAnnual: '2500',
+            goldAllokationAktiv: 'false',
+            p1StartAlter: '65',
+            p1Geschlecht: 'm'
+        });
+        const inputs = getCommonInputs();
+        assertEqual(inputs.minimumFlexAnnual, 2500, 'Aggregierter Mindest-Flex sollte im DOM-Wert bleiben');
+        assertEqual(inputs.minimumFlexProfiles.length, 2, 'Profilgenaue Mindest-Flex-Aufteilung sollte erhalten bleiben');
+        assertEqual(inputs.minimumFlexProfiles[1].minimumFlexAnnual, 2500, 'Profil B Mindest-Flex sollte erhalten bleiben');
+        inputs.minimumFlexProfiles[1].minimumFlexAnnual = 1;
+        assertEqual(global.window.__profilverbundMinimumFlexProfiles[1].minimumFlexAnnual, 2500, 'getCommonInputs sollte den Profil-Split kopieren');
+    } finally {
+        if (previousWindow === undefined) delete global.window; else global.window = previousWindow;
+        if (previousDocument === undefined) delete global.document; else global.document = previousDocument;
+    }
+}
+console.log('✓ profilverbund minimum-flex split preserved OK');
 
 console.log('✅ Simulator input reader tests passed');

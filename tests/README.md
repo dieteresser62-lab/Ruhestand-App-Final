@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 77 Testdateien mit 1958 Assertions (verifiziert mit `npm test` am 2026-06-02)
+**Test-Statistik:** 77 Testdateien mit 1966 Assertions (verifiziert mit `npm test` am 2026-06-02)
 
 ## Directory Structure
 
@@ -75,6 +75,7 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 - Prüft Worker-, Script-, Style- und Font-CSP sowie bewusst gesetztes `dangerousDisableAssetCspModification`.
 - Stellt sicher, dass die in `tauri.conf.json` referenzierten Bundle-Icons existieren.
 - **Ungültige Werte:** Negative Assets, NaN/Infinity, fehlende Pflichtfelder
+- **Pflichtbedarfe:** Fehlende `floorBedarf`/`flexBedarf` werden als `ValidationError` gemeldet.
 - **Grenzwerte:** Extreme hohe Werte (>100M), leeres Portfolio
 - **Alter:** Out-of-range (5 Jahre, >120 Jahre)
 - Stellt sicher dass ValidationErrors sauber zurückgegeben werden (kein Crash)
@@ -397,6 +398,7 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 - **yearlyResults:** Länge entspricht (end-start+1)
 - **finalWealth:** Stimmt mit letztem Jahreseintrag überein
 - **Mindest-Flex:** Stresstest 2005-2014 mit hoeheren Entnahmen, angewandtem Logstatus und FlowDelta-Pruefung inklusive 3-Bucket-Modus.
+- **Profilverbund-Transparenz:** Backtest-Ergebnis behaelt die profilgenaue `minimumFlexProfiles`-Aufteilung.
 
 #### `simulator-heatmap.test.mjs`
 **Zweck:** Testet Heatmap-Rendering.
