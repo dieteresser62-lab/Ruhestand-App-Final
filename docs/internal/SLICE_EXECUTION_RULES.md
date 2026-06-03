@@ -41,9 +41,10 @@ Bevor ein neues Feature oder Refactoring implementiert wird, entwirft Codex das 
 - Der Agent schlaegt die Slices im Hauptplan vor und erstellt die jeweilige Slice-MD vor Beginn der Arbeiten selbststaendig.
 - Nach Abschluss wird das Ergebnis in der Slice-MD dokumentiert und in der uebergeordneten Arbeitsplan-MD zurueckdokumentiert.
 
-## Diff-Risiko vor Coding
+## Git-Status und Diff-Risiko vor Coding
 
-Vor jedem Umsetzungsslice muss Codex vor dem ersten Code-Edit einen Diff-Risiko-Block ausgeben:
+Vor dem Start eines neuen Umsetzungsslices muss Codex zuerst `git status --short` ausführen und dokumentieren, um sicherzustellen, dass die Arbeitsumgebung sauber ist.
+Erst danach gibt Codex vor dem ersten Code-Edit einen Diff-Risiko-Block aus:
 
 ```text
 Geplante Dateien:
@@ -70,6 +71,10 @@ Es gelten die Stop-Regeln aus `AGENTS.md`.
 
 Bei Widerspruechen zwischen dieser Datei und `AGENTS.md` gilt `AGENTS.md`. Diese Datei darf die Stop-Regeln nur konkretisieren, nicht abschwaechen oder anderslautend duplizieren.
 
+## Red-State-Contract-Regel
+
+Bewusst rote Contract-Slices (z.B. für Test-driven Development einer Schnittstelle) dürfen nur als temporärer Zustand entstehen. Sie müssen eine explizite Folge-Slice benennen, die den Red-State wieder grün macht. Solange ein erwarteter roter Test existiert, dürfen keine fachlich unabhängigen Slices begonnen werden. Dies verhindert, dass unabhängige Fehler unter dem Deckmantel bereits roter Tests unbemerkt bleiben.
+
 ## Slice-MD Inhalt
 
 Jede Slice-MD enthaelt mindestens:
@@ -89,7 +94,8 @@ Jede Slice-MD enthaelt mindestens:
 ## Commit und GitHub
 
 - Nach erfolgreicher Beendigung eines Slice durch Codex prüft Gemini (Antigravity) die Änderungen.
-- Sobald das Review von Gemini und dem Nutzer **positiv ausfällt (Freigabe erteilt)**, führt Gemini (Antigravity) als Review-Abnahme sofort den **lokalen Git-Commit** aus (z. B. `git commit -m "slice-04: facade contract done"`). Codex selbst erstellt keine Commits.
+- Sobald das Review von Gemini und dem Nutzer **positiv ausfällt (Freigabe erteilt)**, führt Gemini (Antigravity) als Review-Abnahme sofort den **lokalen Git-Commit** aus. Codex selbst erstellt keine Commits.
+- **Sicherheitsprüfung vor Commit:** Vor dem Commit MUSS Gemini `git status --short` ausführen und die Dateiliste dokumentieren. Diese Liste wird explizit gegen den Slice-Scope und die geänderten Dateien in der Slice-MD abgeglichen. Unerwartete Dateien (wie Logs, temporäre Testdateien oder unbeabsichtigte Modifikationen) blockieren den Commit sofort, bis sie entfernt/korrigiert sind.
 - Dies stellt einen sicheren Speicherpunkt für eventuelle Rollbacks der folgenden Slices dar.
 - Ein **Push nach GitHub** (bzw. die Freigabe des Remote-Branches) erfolgt erst nach ausdrücklicher Freigabe des Nutzers, niemals automatisch.
 - Die Slice-MD muss vor dem Commit den tatsächlichen Stand dokumentieren.
@@ -99,10 +105,17 @@ Jede Slice-MD enthaelt mindestens:
 
 Da die Agenten (Codex, Gemini und Claude) keinen direkten flüchtigen Speicher teilen, wird der Kommunikationsfluss strukturiert über die Slice-Dateien gelenkt:
 
-1. **Codex** schließt die Implementierung ab, trägt die Testergebnisse in die Slice-MD ein und fordert den Nutzer zum Review auf.
+1. **Codex** schließt die Implementierung ab, trägt die Testergebnisse in die Slice-MD in einer Sektion `## Ergebnisse` ein, ergänzt die Entscheidungstabelle am Ende und fordert den Nutzer zum Review auf.
 2. **Gemini** (und optional **Claude Code**) liest die geänderten Dateien und die Slice-MD und dokumentiert die Kritikpunkte direkt in der Slice-MD unter einer Sektion `## Review-Feedback von Gemini` (bzw. `## Review-Feedback von Claude`).
 3. **Codex** liest beim nächsten Start dieses Review-Feedback ein, behebt die Schwachstellen und dokumentiert seine Antworten/Korrekturen unter `## Review-Antworten von Codex` (bzw. `## Review-Antworten auf Claude-Feedback`).
 4. Dieser Zyklus wiederholt sich, bis Gemini (und ggf. Claude) grünes Licht gibt.
+5. **Entscheidungstabelle:** Am Ende jeder Slice-MD muss eine kompakte Entscheidungstabelle gepflegt werden, um Review-Diskussionen strukturiert und übersichtlich abzuschließen:
+
+### Review-Entscheidungen
+
+| ID | Quelle | Finding | Entscheidung | Umsetzung |
+|---|---|---|---|---|
+| G-01 | Gemini | ... | angenommen / abgelehnt | erledigt / Begründung |
 
 ## Rollback
 
