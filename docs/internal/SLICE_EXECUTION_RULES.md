@@ -110,7 +110,7 @@ Jede Slice-MD enthaelt mindestens:
 Da die Agenten (Codex, Gemini und Claude) keinen direkten flüchtigen Speicher teilen, wird der Kommunikationsfluss strukturiert über die Slice-Dateien gelenkt:
 
 1. **Codex** schließt die Implementierung ab, trägt die Testergebnisse in die Slice-MD in einer Sektion `## Ergebnisse` ein, ergänzt die Entscheidungstabelle am Ende und fordert den Nutzer zum Review auf.
-2. **Gemini** (und optional **Claude Code**) liest die geänderten Dateien und die Slice-MD und dokumentiert die Kritikpunkte direkt in der Slice-MD unter einer Sektion `## Review-Feedback von Gemini` (bzw. `## Review-Feedback von Claude`).
+2. **Gemini** (und optional **Claude Code**) liest die geänderten Dateien und die Slice-MD. Dabei gelten die Review-Grundsätze aus `AGENTS.md` und die spezifischen Pflichten aus `GEMINI.md` bzw. `CLAUDE.md`. Der Reviewer dokumentiert die Kritikpunkte direkt in der Slice-MD unter einer Sektion `## Review-Feedback von Gemini` (bzw. `## Review-Feedback von Claude`).
 3. **Codex** liest beim nächsten Start dieses Review-Feedback ein, behebt die Schwachstellen und dokumentiert seine Antworten/Korrekturen unter `## Review-Antworten von Codex` (bzw. `## Review-Antworten auf Claude-Feedback`).
 4. Dieser Zyklus wiederholt sich, bis Gemini (und ggf. Claude) grünes Licht gibt.
 5. **Entscheidungstabelle:** Am Ende jeder Slice-MD muss eine kompakte Entscheidungstabelle gepflegt werden, um Review-Diskussionen strukturiert und übersichtlich abzuschließen:
@@ -120,6 +120,25 @@ Da die Agenten (Codex, Gemini und Claude) keinen direkten flüchtigen Speicher t
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
 |---|---|---|---|---|
 | G-01 | Gemini | ... | angenommen / abgelehnt | erledigt / Begründung |
+
+### Pflichtstruktur für Review-Feedback
+
+Jedes Review-Feedback (in `## Review-Feedback von Gemini` oder `## Review-Feedback von Claude`) muss folgende Struktur einhalten:
+
+1. **Prüfdimensionen** (jeweils mit konkreten Befunden oder „geprüft, keine Schwachstelle"):
+   - Korrektheit vs. Akzeptanzkriterien
+   - Vertragstreue (bestehende Contracts/Interfaces)
+   - Fehlerbehandlung (ungültige Eingaben, IO-Fehler, Rejection-Pfade)
+   - Seiteneffekte (Module außerhalb Slice-Scope)
+   - Was könnte brechen? (realistisches Versagensszenario)
+2. **Findings** (nummeriert, z. B. G-01, G-02 / C-01, C-02)
+3. **Pre-Mortem:** „Angenommen, diese Implementierung verursacht in 3 Monaten einen Fehler – was ist die wahrscheinlichste Ursache?"
+4. **Review-Ergebnis:**
+   - Status: freigegeben / blockiert
+   - Blocker: (Liste oder „keine")
+   - Restrisiken: (Liste)
+
+**Hinweis:** Zusammenfassende Bewertungen (positiv oder negativ) dürfen erst NACH der Finding-Dokumentation ausgesprochen werden. Lobende Formulierungen vor Abschluss der Analyse sind unzulässig.
 
 ## Rollback
 
