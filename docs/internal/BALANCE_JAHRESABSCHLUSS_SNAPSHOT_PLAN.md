@@ -1,595 +1,526 @@
-# Balance Jahresabschluss-Snapshots: getrennte Snapshot-Ablage ohne Ordnerbindung
+# Balance Jahresabschluss-Snapshots: implementierungsreifer Plan
 
-**Stand:** 2026-05-27
-**Status:** Arbeitsdokument / reviewfaehiger Umsetzungsplan
-**Ziel:** Jahresabschluss-Snapshots sollen ohne Nutzer-Ordnerfreigabe funktionieren, aber nicht die aktive Arbeitsdaten-Datei bzw. den aktiven IndexedDB-Record-Store bei jeder Eingabe vergroessern.
+**Stand:** 2026-06-02  
+**Status:** Arbeitsdokument / implementierungsreifer Umsetzungsplan  
+**Ausgangspunkt:** Quelltextstand 2026-06-02, bisheriger Plan vom 2026-05-27 und Review-Kritik vom 2026-06-02
+**Slice-Regeln:** Umsetzung nur nach `docs/internal/SLICE_EXECUTION_RULES.md`
 
-## Kurzfassung
+## Ziel
 
-Die erste Planfassung wollte Snapshots als normale Records mit Prefix `ruhestandsmodell_snapshot_` im aktiven `persistenceStorage` ablegen. Das loest zwar das UI-Problem der Ordnerfreigabe, fuehrt aber zu einem Architekturproblem:
+Jahresabschluss-Snapshots sollen ohne Nutzer-Ordnerfreigabe funktionieren und trotzdem strikt getrennt von aktiven Arbeitsdaten bleiben.
 
-- Tauri speichert aktive Arbeitsdaten in `ruhestand_suite_data.json`.
-- Der Tauri-Adapter serialisiert beim Flush das gesamte In-Memory-Objekt.
-- Wenn Snapshots in derselben Datei liegen, wird bei jeder normalen Eingabe auch das komplette Snapshot-Archiv wieder serialisiert und geschrieben.
+Der Nutzer klickt im Balance-Modul weiterhin auf **Jahresabschluss**. Intern wird zuerst ein Snapshot des unveraenderten Live-Stands erzeugt. Erst nach erfolgreichem Snapshot laufen Inflation, Alters-/Jahresfortschreibung, Ausgaben-Rollover und Live-Flush.
 
-Der korrigierte Zielpfad ist deshalb:
+## Harte Entscheidungen
 
-- Aktive Arbeitsdaten bleiben in der bestehenden Persistenz-Fassade.
-- Snapshots bekommen eine getrennte Snapshot-Ablage.
-- Tauri nutzt eine separate Datei, z. B. `ruhestand_suite_snapshots.json`.
-- Browser/IndexedDB nutzt in der bestehenden Datenbank `ruhestand-suite` einen separaten Object Store `snapshots`.
-- `localStorage` bleibt nur Legacy-/Fallback-Pfad und darf nicht der Massstab fuer die Desktop-Architektur sein.
+1. Snapshots werden nicht in `ruhestand_suite_data.json` gespeichert.
+2. Snapshots werden nicht als normale Records im aktiven `persistenceStorage`/Live-Store gespeichert.
+3. Ein Jahresabschluss-Snapshot entsteht immer vor jeder Jahresabschluss-Mutation.
+4. Restore loescht nie pauschal den kompletten Speicher.
+5. Standard-Restore erhaelt die globale Profil-Registry und spielt nur das Snapshot-Profil zurueck, wenn diese Profil-ID aktuell existiert.
+6. Tauri- und IndexedDB-Snapshot-Pfade werden ueber die bestehende Persistenz-Fassade delegiert, nicht durch parallele Runtime-Erkennung im Balance-Modul.
+7. Ein fehlgeschlagener Snapshot bricht den Jahresabschluss ab. Es gibt keinen stillen Fallback auf "trotzdem fortfahren".
 
-Der normale Jahresabschluss bleibt fuer Nutzer ein einzelner Klick ohne Ordnerdialog. Intern wird aber nicht mehr das aktive Arbeitsdaten-Bundle mit historischen Snapshots vermischt.
+## Aktueller Codezustand
 
-## Harte Designentscheidungen
+Die folgenden Punkte sind aktuell tatsaechlich so im Code vorhanden und muessen geaendert werden:
 
-1. **Snapshots werden nicht in `ruhestand_suite_data.json` gespeichert.**
-   Diese Datei bleibt fuer aktive Arbeitsdaten optimiert.
+- `app/balance/balance-binder-snapshots.js`: `handleJahresabschluss()` ruft zuerst `applyAnnualInflation()`, dann `debouncedUpdate()`, wartet 300 ms und erstellt erst danach den Snapshot.
+- `app/balance/balance-storage.js`: `createSnapshot()` liest alle Keys aus `persistenceStorage` und speichert `snapshotType: "full-localstorage"`.
+- `app/balance/balance-storage.js`: ohne verbundenen Ordner werden Snapshots unter `CONFIG.STORAGE.SNAPSHOT_PREFIX` im Live-Store abgelegt.
+- `app/balance/balance-storage.js`: `restoreSnapshot()` nutzt fuer `full-localstorage` aktuell `persistenceStorage.clear()` und schreibt erlaubte Keys danach zurueck.
+- `app/shared/persistence-key-policy.js`: es existiert nur `isAllowedPersistenceImportKey()` plus `listAllowedPersistenceImportKeys()`. Snapshot-spezifische Policy-Funktionen muessen neu gebaut werden.
+- `app/shared/persistence-adapter-indexeddb.js`: DB `ruhestand-suite` ist Version 1 mit Stores `kv` und `metadata`; es gibt noch keinen Store `snapshots`.
+- `src-tauri/src/lib.rs`: Tauri schreibt nur `ruhestand_suite_data.json`; Snapshot-Datei und Target-Parametrisierung existieren noch nicht.
 
-2. **Snapshots werden nicht im aktiven `persistenceStorage`-Record-Set gespeichert.**
-   Die bestehende Fassade bleibt fuer Live-Daten, nicht fuer historische Archive.
+Wichtig zur Alterslogik:
 
-3. **Der Jahresabschluss-Snapshot entsteht immer vor jeder Mutation.**
-   Vor `applyAnnualInflation()`, vor Altersfortschreibung, vor Ausgaben-Rollover und vor sonstigen Jahresupdate-Mutationen.
-
-4. **Restore loescht nie pauschal den kompletten Speicher.**
-   Es werden nur explizit erlaubte Live-Keys ersetzt. Snapshot-Archiv, andere technische Stores und nicht betroffene Daten bleiben erhalten.
-
-5. **Profil-Registry-Restore ist eine eigene fachliche Entscheidung.**
-   Ein Snapshot darf die globale Profil-Registry nicht still auf einen historischen Stand zuruecksetzen, wenn dadurch spaeter angelegte Profile verloren gehen koennen.
-
-## Ausgangslage
-
-### Relevante Module
-
-| Datei | Aktuelle Rolle |
-| --- | --- |
-| `app/balance/balance-storage.js` | Laedt/speichert Balance-State, initialisiert Snapshots, rendert Snapshot-Liste, erstellt/restored/loescht Snapshots |
-| `app/balance/balance-binder-snapshots.js` | Bindet Jahresabschluss und Snapshot-Aktionen an UI-Events |
-| `app/shared/persistence-facade.js` | Runtime-neutrale Persistenz-Fassade fuer aktive Arbeitsdaten |
-| `app/shared/persistence-adapter-tauri.js` | Adapter fuer `ruhestand_suite_data.json` |
-| `app/shared/persistence-key-policy.js` | Zentrale Policy fuer erlaubte Persistenz-Keys, soweit bereits vorhanden |
-| `src-tauri/src/lib.rs` | Rust-Commands fuer Tauri-Dateizugriff |
-| `Balance.html` | Snapshot-UI, Buttontexte und Statusanzeige |
-
-### Aktueller Snapshot-Ablauf
-
-`StorageManager.createSnapshot(handle, label)` liest aktuell alle Keys aus `persistenceStorage`.
-
-Wenn `handle` gesetzt ist, wird eine JSON-Datei in den verbundenen Ordner geschrieben. Ohne `handle` wird der Snapshot als Record mit Prefix `CONFIG.STORAGE.SNAPSHOT_PREFIX` im selben Storage abgelegt.
-
-`StorageManager.restoreSnapshot(key, handle)` nutzt bei Full-LocalStorage-Snapshots aktuell `persistenceStorage.clear()` und schreibt erlaubte Keys wieder zurueck. Das ist fuer getrennte Dateien noch kontrollierbar, waere aber bei eingebetteten Snapshots ein Datenverlust-Bug, weil andere Snapshots geloescht wuerden.
-
-### Kernprobleme
-
-1. **Performance-Bloat:** Snapshots im Live-Store vergroessern jeden normalen Flush.
-2. **Restore-Datenverlust:** `clear()` wuerde bei gemeinsamem Store auch die Snapshot-Historie entfernen.
-3. **Falscher Snapshot-Zeitpunkt:** Ein Snapshot nach Alters-/Inflationsfortschreibung ist kein Rueckfallpunkt fuer das alte Jahr und kann bei erneutem Jahresabschluss zu Doppel-Fortschreibung fuehren.
-4. **Profil-Registry-Risiko:** Restore historischer Snapshots kann spaeter angelegte Profile loeschen, wenn die globale Registry blind ueberschrieben wird.
+- Der Snapshot-Handler selbst erhoeht das Alter nicht sichtbar.
+- Die Altersfortschreibung liegt im Jahresupdate-Orchestrator (`app/balance/balance-annual-orchestrator.js`) und ist nicht sauber mit dem Jahresabschluss-Snapshot-Flow gekoppelt.
+- Die Umsetzung muss daher explizit klaeren, welche Jahresabschluss-Mutation das Alter erhoeht. Der Contract-Test muss die konkret implementierte Reihenfolge pruefen, nicht nur eine abstrakte "Altersfortschreibung" behaupten.
 
 ## Zielarchitektur
 
-### Aktive Daten vs. Snapshot-Archiv
-
 ```text
-Feature-Module
-  -> PersistenceFacade
-      -> aktive Arbeitsdaten
-      -> delegiert Snapshot-Operationen an denselben aktiven Adapter
-      -> Tauri: ruhestand_suite_data.json
-      -> Browser: IndexedDB Live-Store
+Balance UI / StorageManager
+  -> SnapshotArchive
+      -> normalisiert fachliche Snapshot-Payloads
+      -> setzt ID, Metadaten und Schema
+      -> nutzt Snapshot-Key-Policy
+      -> delegiert Persistenz an PersistenceFacade
 
-SnapshotArchive
-  -> historische Sicherungspunkte
-  -> ruft PersistenceFacade.listSnapshots/readSnapshot/writeSnapshot/deleteSnapshot auf
-  -> Facade delegiert an optionale Adapter-Methoden
-      -> Tauri-Adapter: ruhestand_suite_snapshots.json
-      -> IndexedDB-Adapter: DB ruhestand-suite, Object Store snapshots
-      -> Legacy: bestehende File-System-Snapshot-Dateien und alte localStorage-Snapshot-Records lesbar halten
+PersistenceFacade
+  -> aktive Arbeitsdaten: bestehende Sync-/Flush-API
+  -> Snapshot-Archiv: optionale Adaptermethoden
+
+Adapter
+  -> Tauri: ruhestand_suite_data.json + ruhestand_suite_snapshots.json
+  -> Browser IndexedDB: DB ruhestand-suite, Stores kv/metadata/snapshots
+  -> localStorage: Legacy-/Fallback-Pfad, nicht Zielarchitektur
 ```
 
-### Tauri-Dateimodell
+Layer-Regel:
 
-Aktive Daten:
+- `app/shared/snapshot-archive.js` enthaelt nur runtime-neutrale Snapshot-Archivlogik.
+- Balance-spezifische Capture-/Restore-Kontexte werden aus `app/balance/` uebergeben.
+- `app/shared/` importiert keine Module aus `app/balance/`.
+- `SnapshotArchive` ruft keine Tauri-IPC-Funktionen direkt auf und oeffnet IndexedDB nicht selbst.
 
-```text
-<AppData>/RuhestandSuite/ruhestand_suite_data.json
-```
+## Kanonisches Snapshot-Schema
 
-Snapshots:
-
-```text
-<AppData>/RuhestandSuite/ruhestand_suite_snapshots.json
-```
-
-Moegliches Snapshot-Dateiformat:
+Alle neuen Snapshots verwenden exakt dieses kanonische Format. Tauri-Datei und IndexedDB-Store speichern dieselben Snapshot-Objekte. Die Archivdatei kapselt nur die Liste.
 
 ```json
 {
   "schemaVersion": 1,
-  "savedAt": "2026-05-27T10:00:00.000Z",
-  "snapshots": [
-    {
-      "id": "ja-2026-05-27T10-00-00-000Z",
-      "createdAt": "2026-05-27T10:00:00.000Z",
-      "label": "Profilname",
-      "kind": "annual-close-pre-mutation",
-      "activeProfileId": "default",
-      "activeProfileName": "Profilname",
-      "recordCount": 42,
-      "records": {
-        "ruhestandsmodellValues_v29_guardrails": "...",
-        "depot_tranchen": "...",
-        "balance_expenses_v1": "..."
-      },
-      "restoreScope": {
-        "profileRegistryMode": "preserve-by-default",
-        "profileLiveDataMode": "restore-only-if-active-profile-still-exists"
-      }
-    }
-  ]
-}
-```
-
-Die Datei wird nur bei expliziten Snapshot-Aktionen gelesen/geschrieben:
-
-- Jahresabschluss-Snapshot erstellen
-- Snapshot-Liste anzeigen oder aktualisieren
-- Snapshot wiederherstellen
-- Snapshot loeschen
-- optional exportieren/importieren
-
-Normale Eingaben im UI duerfen diese Datei nicht anfassen.
-
-Skalierung der Sammeldatei:
-
-- Fuer diesen Slice ist eine Sammeldatei akzeptabel, weil Snapshot-Aktionen selten sind.
-- `listSnapshots()` darf aber nicht die vollstaendigen `records` an die UI weiterreichen. Der Tauri-Adapter soll einen leichten Index aus `id`, `createdAt`, `label`, `kind`, `activeProfileId`, `activeProfileName`, `recordCount` und ggf. Groesse liefern.
-- `readSnapshot(id)` laedt erst bei Restore/Export den vollstaendigen Snapshot inklusive `records`.
-- Sobald die Snapshot-Anzahl zweistellig wird oder die Datei merklich waechst, ist Einzeldatei-Archivierung pro Snapshot der empfohlene naechste Schritt, nicht nur eine beliebige Option.
-
-### Browser-/IndexedDB-Modell
-
-Der Browserpfad soll ebenfalls getrennt sein:
-
-- Live-Daten bleiben im bestehenden IndexedDB-Backend der `PersistenceFacade`.
-- Snapshots liegen in derselben IndexedDB-Datenbank `ruhestand-suite`, aber in einem separaten Object Store `snapshots`.
-- Die bestehende IndexedDB-Version `1` wird auf `2` erhoeht.
-- `onupgradeneeded` legt neben `kv` und `metadata` zusaetzlich `snapshots` an.
-- Snapshot-Werte werden nur bei expliziten Snapshot-Aktionen geladen.
-- Es wird keine zweite IndexedDB-Datenbank eingefuehrt. Dadurch bleiben Initialisierung, Upgrade-Lifecycle und `versionchange`-Handling an einer Stelle.
-- Das `versionchange`-Handling darf andere offene Tabs nicht still kaputt machen:
-  - Wenn ein alter Tab eine Version-1-Verbindung verliert, muss der Nutzer eine sichtbare Meldung erhalten, z. B. "App-Datenbank wurde aktualisiert, bitte diesen Tab neu laden."
-  - Alternativ darf der Tab nach gesichertem Live-Flush automatisch neu laden.
-  - Ein stilles `db.close()` ohne UI-Signal ist nicht ausreichend.
-  - Der Adapter muss nach `versionchange` intern als veraltet markiert werden. Weitere Lese-/Schreibaufrufe duerfen nicht versuchen, die bereits migrierte DB erneut zu oeffnen, sondern muessen mit einer klaren Meldung abbrechen, z. B. "Datenbankverbindung veraltet, bitte neu laden."
-
-Falls IndexedDB nicht verfuegbar ist:
-
-- bestehender `localStorage`-Fallback kann fuer geringe Datenmengen erhalten bleiben,
-- UI sollte dann klar signalisieren, dass die Snapshot-Ablage nur ein Fallback ist,
-- dieser Fallback darf die Tauri-/IndexedDB-Architektur nicht bestimmen.
-
-## Snapshot-Datenmodell
-
-Neue Payload:
-
-```json
-{
+  "id": "ja-2026-06-02T18-00-00-000Z",
   "snapshotType": "persistence-records-v1",
-  "createdAt": "2026-05-27T10:00:00.000Z",
   "kind": "annual-close-pre-mutation",
+  "createdAt": "2026-06-02T18:00:00.000Z",
   "label": "Profilname",
   "activeProfileId": "default",
   "activeProfileName": "Profilname",
   "recordCount": 42,
-  "records": {}
+  "records": {
+    "ruhestandsmodellValues_v29_guardrails": "...",
+    "depot_tranchen": "...",
+    "balance_expenses_v1": "..."
+  },
+  "restoreScope": {
+    "profileRegistryMode": "preserve-by-default",
+    "profileLiveDataMode": "restore-only-if-active-profile-still-exists"
+  }
 }
 ```
 
-Rueckwaertskompatibilitaet:
+Tauri-Archivdatei:
 
-- Alte Datei-Snapshots mit `snapshotType: "full-localstorage"` bleiben lesbar.
-- Alte interne `ruhestandsmodell_snapshot_*`-Records werden fuer Migration/Anzeige gelesen, aber nicht als neuer Standard fortgeschrieben.
-
-Ausgeschlossen:
-
-- Snapshot-Archivdaten selbst
-- alte `ruhestandsmodell_snapshot_*`-Records
-- temporaere Debug-/Telemetry-/Systemdaten ohne fachlichen Wiederherstellungswert
-
-## Snapshot-Zeitpunkt im Jahresabschluss
-
-Der Snapshot-Zeitpunkt ist nicht optional:
-
-1. Nutzer klickt **Jahresabschluss**.
-2. Nutzer bestaetigt.
-3. App erzeugt Snapshot des unveraenderten aktuellen Stands.
-4. Erst danach laufen:
-   - `applyAnnualInflation()`
-   - Altersfortschreibung
-   - `debouncedUpdate()` bzw. expliziter Update/Flush
-   - `rollExpensesYear()`
-   - weitere Jahresabschluss-Mutationen
-5. App rendert neu und aktualisiert die Snapshot-Liste.
-
-Begruendung:
-
-- Der Snapshot ist ein Rueckfallpunkt vor einer kritischen Aktion.
-- Ein Snapshot nach Inflation/Alterung wuerde bereits den neuen Jahresstand enthalten.
-- Bei spaeterem Restore und erneutem Jahresabschluss koennte sonst Alter/Inflation doppelt angewendet werden.
-
-Akzeptanzkriterium:
-
-- Ein Contract-Test muss die Reihenfolge pruefen: `createSnapshot` vor jeder Jahresabschluss-Mutation.
-
-## Restore-Semantik
-
-### Grundregel
-
-Restore ersetzt nur fachliche Live-Daten, nie das Snapshot-Archiv.
-
-Verboten:
-
-```js
-persistenceStorage.clear()
+```json
+{
+  "schemaVersion": 1,
+  "savedAt": "2026-06-02T18:00:00.000Z",
+  "snapshots": []
+}
 ```
 
-Erlaubt:
+Feldregeln:
+
+- `schemaVersion`: Formatversion des Snapshot-Objekts.
+- `id`: vom `SnapshotArchive` erzeugt; stabiler Archiv-Key.
+- `snapshotType`: fuer neue Snapshots immer `persistence-records-v1`.
+- `kind`: fuer Jahresabschluss `annual-close-pre-mutation`; manuelle Snapshots koennen spaeter eigene Kinds erhalten.
+- `createdAt`: ISO-Zeitpunkt des Capture-Zeitpunkts.
+- `activeProfileId`: aus `rs_current_profile` bzw. Registry-Kontext. Fehlt sie, ist der Snapshot nicht standard-restore-faehig.
+- `activeProfileName`: optional aus Registry-Meta ableiten.
+- `recordCount`: muss `Object.keys(records).length` entsprechen.
+- `restoreScope`: Bestandteil des kanonischen Formats. Fuer Slice 1 wird nur der Standard-Restore umgesetzt.
+
+Leseregeln:
+
+- Reader akzeptieren `schemaVersion: 1`.
+- Unbekannte hoehere `schemaVersion` wird nicht restored und mit klarer Meldung abgebrochen.
+- `recordCount` wird beim Lesen gegen `records` validiert.
+- `createdAt` darf nicht ungueltig sein. Plausibilitaet in der Zukunft ist nur Warnung, kein harter Fehler.
+- Korrupte Tauri-Snapshot-Datei wird isoliert quarantined; Live-Daten bleiben unberuehrt.
+
+## Snapshot-Key-Policy
+
+Die Policy wird vor Archiv- und Restore-Umbau implementiert. Sie ist ein harter Vorgänger fuer alle folgenden Pakete.
+
+Modul: `app/shared/persistence-key-policy.js`
+
+Neue Exporte:
 
 ```js
-PersistenceFacade.clearAllowedSync(isAllowedSnapshotRestoreLiveKey)
+isAllowedSnapshotCaptureKey(key)
+isAllowedSnapshotRestoreLiveKey(key, options)
+isSnapshotProfileScopedKey(key)
+isSnapshotGlobalDomainKey(key)
+isSnapshotTechnicalKey(key)
+isProfileRegistryKey(key)
+isProfileScopedFixedKey(key)
+isLegacySnapshotKey(key)
 ```
 
-oder eine aequivalente gezielte Loesch-/Replace-Operation.
+Regeln:
 
-### Profil-Registry und Profil-Keys
+- Capture nimmt fachliche Live-Daten auf, inklusive Profil-Registry, aber keine Snapshot-Archivdaten.
+- Capture nimmt keine Legacy-Snapshot-Keys (`ruhestandsmodell_snapshot_*`) in neue Snapshots auf.
+- Standard-Restore schreibt keine Profil-Registry blind zurueck.
+- Standard-Restore schreibt feste profilbezogene Live-Keys nur, wenn `snapshot.activeProfileId` in der aktuellen Registry existiert.
+- Migration-/Schema-Marker, die fachliche Datenmigration steuern, werden bewusst kategorisiert. Schema-gekoppelte Marker duerfen nicht versehentlich aus dem aktuellen Live-Stand erhalten bleiben, wenn der Snapshot einen aelteren Datenstand wiederherstellt.
+- Technische Debug-/Telemetry-/UI-Keys werden nur restored, wenn sie explizit fachlich relevant sind.
 
-Die globale Profil-Registry (`rs_profiles_*`) ist riskant:
+Optionen fuer `isAllowedSnapshotRestoreLiveKey(key, options)`:
 
-- Ein alter Snapshot kann Profile enthalten, die heute nicht mehr vollstaendig sind.
-- Ein alter Snapshot kann Profile nicht enthalten, die nach dem Snapshot angelegt wurden.
-- Blindes Ueberschreiben kann Daten anderer Profile loeschen.
-- Profilwerte liegen nicht als `profile_<profileId>`-Keys im Speicher. Die Live-Keys sind feste Keys wie `profile_tagesgeld`, `profile_rente_monatlich`, `profile_aktuelles_alter`, `depot_tranchen` und `profile_health_bucket`.
-- Beim Profilwechsel werden diese festen Live-Keys geloescht und mit den Daten des neu gewaehlten Profils befuellt.
-- Die Daten aller Profile liegen gebuendelt in `rs_profiles_v1.profiles[id].data`.
-- Deshalb muss der Snapshot die zum Capture-Zeitpunkt aktive Profil-ID explizit als Metadatum speichern.
+```js
+{
+  mode: "standard" | "full",
+  snapshotActiveProfileId: "default",
+  currentRegistry: {},
+  allowProfileRegistry: false
+}
+```
 
-Deshalb gilt fuer den ersten Umsetzungsslice:
+## Konsistenz- und Fehlermodell
 
-- `rs_profiles_*` wird im Snapshot gesichert, damit Full-Restore technisch moeglich bleibt.
-- Restore ueberschreibt die globale Profil-Registry standardmaessig nicht blind.
-- Capture speichert `activeProfileId` und optional `activeProfileName` aus `rs_current_profile` bzw. Registry-Meta.
-- Standard-Restore prueft, ob `snapshot.activeProfileId` in der aktuellen Registry existiert.
-- Wenn `snapshot.activeProfileId` existiert:
-  - feste Live-Profil-Keys duerfen aus dem Snapshot in den Live-Bereich zurueckgespielt werden,
-  - `rs_current_profile` und `rs_active_profile` werden auf `snapshot.activeProfileId` gesetzt,
-  - die aktuelle Registry bleibt erhalten,
-  - die Registry-Daten fuer dieses Profil sollen nach erfolgreichem Live-Restore mit den wiederhergestellten Live-Keys aktualisiert werden, analog `saveCurrentProfileFromLocalStorage()`.
-- Wenn `snapshot.activeProfileId` nicht mehr existiert:
-  - Standard-Restore bricht den profilgebundenen Restore ab,
-  - der Nutzer erhaelt eine klare Meldung, dass das Snapshot-Profil nicht mehr existiert,
-  - neuere Profile und aktuelle Profilauswahl bleiben unberuehrt.
-- Profile, die nach dem Snapshot neu angelegt wurden, bleiben im Standard-Restore immer erhalten.
-- Wenn ein Full-Restore der Profil-Registry angeboten wird, braucht er eine explizite Warnung und Bestaetigung.
+### Jahresabschluss
 
-Moegliche Restore-Modi:
+Reihenfolge:
 
-| Modus | Verhalten |
-| --- | --- |
-| Standard | Live-Daten fuer `snapshot.activeProfileId` wiederherstellen, sofern diese Profil-ID in der aktuellen Registry existiert; Registry sonst erhalten |
-| Full Restore | Alle im Snapshot enthaltenen fachlichen Keys inklusive Profil-Registry wiederherstellen, nur nach expliziter Warnung |
-| Preview/Merge spaeter | Unterschiede anzeigen und gezielt uebernehmen |
+1. Label und Kontext lesen.
+2. Nutzerbestaetigung einholen.
+3. Ausstehende UI-Eingaben synchron in den Live-State uebernehmen.
+4. `await PersistenceFacade.flush()` ausfuehren.
+5. Snapshot-Capture aus dem geflushten Live-Stand erstellen.
+6. Snapshot in das separate Archiv schreiben.
+7. Erst danach Jahresabschluss-Mutationen ausfuehren:
+   - konkret implementierte Alters-/Jahresfortschreibung,
+   - `applyAnnualInflation()`,
+   - `rollExpensesYear()`,
+   - weitere definierte Jahresabschluss-Mutationen.
+8. `await PersistenceFacade.flush()` fuer Live-Daten.
+9. UI neu rendern und Snapshot-Liste aktualisieren.
 
-Der erste Slice sollte mindestens Standard und optional Full Restore mit Warnung definieren. Preview/Merge ist spaeter sinnvoll, aber nicht Pflicht.
+Fehlerfaelle:
 
-## Umsetzungspakete
+- Vorab-Flush fehlschlaegt: kein Snapshot, keine Mutation.
+- Snapshot-Capture fehlschlaegt: keine Mutation.
+- Snapshot-Write fehlschlaegt: keine Mutation.
+- Mutation nach erfolgreichem Snapshot fehlschlaegt: Snapshot bleibt als Pre-Mutation-Rueckfallpunkt erhalten; Live-Daten koennen teilweise mutiert sein und werden ueber UI-Fehlerpfad gemeldet.
+- Live-Flush nach Mutation fehlschlaegt: Dirty-State bleibt in der Facade markiert; Nutzer erhaelt Fehler. Snapshot bleibt gueltig.
 
-### Paket 1: Snapshot-Methoden in Facade und Adaptervertrag einfuehren
+Akzeptierter Worst Case:
 
-Ziel: Snapshot-Speicherung wird logisch von aktiven Arbeitsdaten getrennt, nutzt aber denselben aktiven Runtime-Adapter der `PersistenceFacade`. `SnapshotArchive` darf keine eigene Parallel-Infrastruktur fuer Tauri-IPC, IndexedDB-Open/Upgrade oder Runtime-Erkennung aufbauen.
+- Snapshot erfolgreich, Live-Mutation oder Live-Flush fehlgeschlagen. Das ist akzeptabel, weil der Snapshot den Stand vor dem kritischen Schritt enthaelt.
 
-Arbeiten:
+Nicht akzeptiert:
 
-- Adaptervertrag optional erweitern:
-  - `listSnapshots()`
-  - `readSnapshot(id)`
-  - `writeSnapshot(snapshot)`
-  - `deleteSnapshot(id)`
-  - `migrateLegacySnapshotsIfNeeded()` optional
-- `PersistenceFacade` ergaenzt delegierende Methoden:
-  - `listSnapshots()`
-  - `readSnapshot(id)`
-  - `writeSnapshot(snapshot)`
-  - `deleteSnapshot(id)`
-  - `migrateLegacySnapshotsIfNeeded()` optional
-- Neues Modul `app/shared/snapshot-archive.js` oder `app/balance/balance-snapshot-archive.js` bleibt fachlich schlank:
-  - normalisiert Snapshot-Payloads,
-  - setzt IDs/Metadaten,
-  - delegiert Persistenz an `PersistenceFacade.*Snapshot*`.
-- Tauri-IPC-Details bleiben in `persistence-adapter-tauri.js`.
-- IndexedDB-Open/Upgrade/Transactions bleiben in `persistence-adapter-indexeddb.js`.
-- Legacy-Fallback bleibt adapter- oder migrationsnah gekapselt.
+- Live-Mutation ohne vorher erfolgreichen Snapshot.
+- Snapshot nach Mutation.
 
-Akzeptanzkriterien:
+### Restore
 
-- Normale `PersistenceFacade.flush()`-Operationen kennen das Snapshot-Archiv nicht.
-- Snapshot-Aktionen koennen ohne Ordnerdialog laufen.
-- Tests koennen das Archiv mit einem In-Memory-Adapter betreiben.
-- `SnapshotArchive` enthaelt keine eigene IndexedDB-Open-Logik und ruft Tauri `invoke` nicht direkt auf.
-- Alle runtime-spezifischen Snapshot-Operationen liegen im jeweiligen aktiven Adapter.
+Standard-Restore muss all-or-nothing fuer Live-Records sein.
 
-### Paket 2: Tauri-State-Commands parametrisieren
+Algorithmus:
 
-Ziel: Tauri schreibt Snapshots in eine separate Datei, ohne die Rust-IPC-Pfade fuer Laden, Speichern und Quarantaene zu duplizieren.
+1. Snapshot lesen und validieren.
+2. `recordCount`, `schemaVersion`, `snapshotType`, `records` validieren.
+3. Aktuelle Registry lesen.
+4. Wenn `snapshot.activeProfileId` nicht in der aktuellen Registry existiert: Standard-Restore abbrechen.
+5. Aktuelles Profil via bestehender Profil-Fassade sichern (`saveCurrentProfileFromLocalStorage()` oder Nachfolger).
+6. Erlaubte Delete-/Upsert-Sets berechnen, ohne den Live-Store schon zu veraendern.
+7. Bei IndexedDB: Delete und Upsert in einer `readwrite`-Transaktion gegen `kv` ausfuehren.
+8. Bei Tauri/Facade-Memcache: vor Veraenderung ein In-Memory-Backup der betroffenen Keys bilden; bei Fehler Memcache wiederherstellen und Flush-Fehler melden.
+9. `rs_current_profile` und `rs_active_profile` auf `snapshot.activeProfileId` setzen.
+10. Wiederhergestellte Live-Profil-Keys in `registry.profiles[snapshot.activeProfileId].data` speichern.
+11. `await PersistenceFacade.flush()`.
+12. `location.reload()`.
 
-Arbeiten in `src-tauri/src/lib.rs`:
+Full Restore:
 
-- Konstante `SNAPSHOT_STATE_FILENAME: &str = "ruhestand_suite_snapshots.json";`
-- Bestehende Pfadlogik verallgemeinern:
-  - `resolve_state_filename(target: Option<&str>) -> Result<&'static str, String>`
-  - erlaubte Targets: `live`, `snapshots`
-  - unbekannte Targets muessen mit Fehler abbrechen, niemals freie Dateinamen akzeptieren.
-- Bestehende Commands parametrisieren statt neue fast identische Commands anzulegen:
-  - `load_app_state(app, target: Option<String>)`
-  - `save_app_state(app, content: String, target: Option<String>)`
-  - `quarantine_app_state(app, target: Option<String>)`
-- Default ohne `target` bleibt `live`, damit bestehende Frontend-Aufrufe kompatibel bleiben.
-- Atomisches Schreiben, `.bak`-Handling und Quarantaene bleiben ein gemeinsamer Codepfad.
-- Der bestehende Tauri-Schliessmechanismus (`confirm_app_close`) bleibt auf Live-Daten beschraenkt:
-  - Snapshot-Schreibvorgaenge sind explizite, abgeschlossene Nutzeraktionen.
-  - Es gibt keinen debounced Snapshot-Flush, der beim Schliessen nachgezogen werden muesste.
-  - Kein zusaetzlicher Snapshot-Flush wird in den Close-Handler eingebaut.
+- In Slice 1 optional.
+- Wenn umgesetzt, nur mit expliziter Warnung.
+- Full Restore darf Profil-Registry ueberschreiben, muss aber vorher ein aktuelles Backup anbieten oder mindestens die Auswirkungen im Dialog benennen.
 
-Akzeptanzkriterien:
+Fehlende Keys in alten Snapshots:
 
-- `ruhestand_suite_data.json` bleibt ohne Snapshot-Archiv.
-- `ruhestand_suite_snapshots.json` wird nur durch Snapshot-Aktionen geaendert.
-- Korrupte Snapshot-Datei kann isoliert behandelt werden, ohne aktive Arbeitsdaten zu verlieren.
-- Es gibt keine duplizierten Rust-Commands fuer Live- und Snapshot-Datei.
-- Kein Tauri-Command akzeptiert beliebige Pfade oder Dateinamen aus dem Frontend.
-- `confirm_app_close` wartet weiterhin nur auf den Live-Daten-Flush; Snapshot-Aktionen muessen selbst atomisch abgeschlossen sein.
+- Profilgebundene und globale fachliche Keys, die in der aktuellen App existieren, aber im Snapshot fehlen, werden im Standard-Restore geloescht, wenn die Policy sie als Teil des Snapshot-Scopes klassifiziert.
+- Technische Keys ausserhalb des Snapshot-Scopes bleiben erhalten.
+- UI-Zustand, Fenster-/Layoutgroessen, Debug-Flags, Telemetry-Schalter und aehnliche technische App-Zustaende muessen ueber `isSnapshotTechnicalKey()` bzw. die Restore-Policy ausdruecklich als "behalten" klassifiziert werden, sofern sie keinen fachlichen Wiederherstellungswert haben.
+- Diese Loeschregel muss getestet werden, damit alte Snapshots nicht halb mit neuem Live-Zustand gemischt werden.
 
-### Paket 3: IndexedDB-Snapshot-Store in bestehender DB
+Multi-Tab-Restore:
 
-Ziel: Browser nutzt getrennten Snapshot-Store.
+- Slice 1 muss keinen vollstaendigen Distributed Mutex bauen.
+- Es muss aber ein Restore-In-Progress-Marker im aktiven Backend existieren:
+  - IndexedDB: Metadata-Record mit kurzer TTL, z. B. 60 Sekunden.
+  - Tauri: In-Memory-/Adapter-Flag waehrend der Operation.
+- Ein zweiter Restore in derselben Laufzeit muss mit klarer Meldung abbrechen.
+- Cross-Tab-Konflikte werden als bekanntes Restrisiko dokumentiert, solange kein Browser-Lock mit Ablauf/Recovery umgesetzt ist.
 
-Arbeiten:
+## Tauri-Implementierung
 
-- `app/shared/persistence-adapter-indexeddb.js` von Version `1` auf `2` anheben.
-- Store-Konstante `SNAPSHOT_STORE = 'snapshots'` ergaenzen.
-- `ensureStore(upgradeDb, SNAPSHOT_STORE)` in `onupgradeneeded` ergaenzen.
-- Adaptermethoden `listSnapshots/readSnapshot/writeSnapshot/deleteSnapshot` nutzen dieselbe Datenbank `ruhestand-suite`, aber Transaktionen gegen den Store `snapshots`.
-- Snapshot-Liste nur aus diesem Store laden.
-- Snapshot-Payloads als strukturierte Objekte speichern, nicht als aktive Live-Records.
-- Optional alte `ruhestandsmodell_snapshot_*`-Records aus dem Live-Store lesen und migrieren.
-- `versionchange`-Handling des bestehenden Adapters erweitern:
-  - DB-Verbindung schliessen wie bisher,
-  - internes Flag setzen, z. B. `outdated = true`,
-  - `ensureOpen()`, `saveBatch()`, `writeMetadata()` und Snapshot-Methoden muessen dieses Flag vor jedem neuen Open-/Write-Versuch pruefen,
-  - bei `outdated === true` sofort mit einer klaren, UI-faehigen Fehlermeldung abbrechen, z. B. "Datenbankverbindung veraltet, bitte neu laden",
-  - zusaetzlich sichtbares UI-Signal oder Event ausloesen, damit Nutzer den Tab neu laden,
-  - optional automatischer Reload nach erfolgreichem Live-Flush,
-  - kein stiller Zustand, in dem der naechste Flush nur intern fehlschlaegt.
+Dateien:
 
-Akzeptanzkriterien:
+- Live: `<AppData>/RuhestandSuite/ruhestand_suite_data.json`
+- Snapshots: `<AppData>/RuhestandSuite/ruhestand_suite_snapshots.json`
 
-- Live-Store-Flush wird durch Snapshot-Anzahl nicht groesser.
-- Snapshot-Liste funktioniert im Browser ohne File System Access API.
-- IndexedDB-Fehler laufen ueber UI-Fehlerpfad.
-- Es wird keine zweite IndexedDB-Datenbank fuer Snapshots angelegt.
-- Offene alte Tabs erhalten bei `versionchange` eine klare Meldung oder werden kontrolliert neu geladen.
-- Ein alter Tab oeffnet nach `versionchange` nicht still eine neue Verbindung gegen die bereits aktualisierte DB, sondern bricht weitere Adapteraufrufe bewusst mit Reload-Hinweis ab.
+Rust-Zielmodell:
 
-### Paket 4: Snapshot-Key-Policy zentralisieren
+```rust
+enum StateTarget {
+  Live,
+  Snapshots,
+}
 
-Ziel: Snapshot-Erstellung und Restore nutzen explizite, getestete Key-Regeln.
+impl StateTarget {
+  fn filename(&self) -> &'static str { ... }
+  fn quarantine_prefix(&self) -> &'static str { ... }
+}
+```
 
-Arbeiten:
+Commands:
 
-- In `app/shared/persistence-key-policy.js` oder einem neuen Modul definieren:
-  - `isAllowedSnapshotCaptureKey(key)`
-  - `isAllowedSnapshotRestoreLiveKey(key, options)`
-  - `isSnapshotProfileScopedKey(key)`
-  - `isSnapshotGlobalDomainKey(key)`
-  - `isSnapshotTechnicalKey(key)`
-  - `isProfileRegistryKey(key)`
-  - `isProfileScopedFixedKey(key)`
-  - `isLegacySnapshotKey(key)`
-- Capture darf Profil-Registry aufnehmen, Restore darf sie im Standardmodus erhalten.
-- Legacy-Snapshot-Keys werden nie in neue Snapshots aufgenommen.
-- Capture muss `activeProfileId` aus `rs_current_profile` bzw. der Profile-Registry in die Snapshot-Metadaten schreiben.
-- Standard-Restore braucht aktuelle Registry, `snapshot.activeProfileId` und die Liste der festen profilbezogenen Live-Keys als Kontext.
-- Die Key-Policy unterscheidet drei Kategorien:
-  - Profilgebundene Live-Keys: feste Keys aus `PROFILE_SCOPED_FIXED_KEYS`, z. B. `profile_tagesgeld`, `profile_health_bucket`, `depot_tranchen`.
-  - Globale fachliche Keys: z. B. `CONFIG.STORAGE.LS_KEY`, `balance_expenses_*`, `household_withdrawal_mode`, schema-gekoppelte Migrationsmarker wie `CONFIG.STORAGE.MIGRATION_FLAG` bzw. alle `migration_*`-Keys und andere fachliche App-Zustaende, die nicht zu einem einzelnen Profil gehoeren.
-  - Technische/Umgebungs-Keys: z. B. Snapshot-Keys, Debug-/Log-Level, `featureFlags`, `etfProxyUrl` und aehnliche Konfiguration, die nicht direkt das Datenschema der wiederhergestellten Modelldaten beschreiben.
-- Standard-Restore stellt profilgebundene Live-Keys und globale fachliche Keys wieder her.
-- Technische/Umgebungs-Keys werden im Standard-Restore nicht blind ueberschrieben; sie bleiben Full-Restore oder expliziten Einzelentscheidungen vorbehalten.
-- Schema-gekoppelte Migrationsmarker sind keine rein technischen Keys. Sie muessen beim Standard-Restore wie globale fachliche Keys behandelt werden:
-  - aktuelle Live-Marker werden beim gezielten Restore geloescht,
-  - Marker aus dem Snapshot werden geschrieben,
-  - fehlen Marker im Snapshot, bleiben sie nach dem Restore bewusst fehlend, damit nach dem Reload ausstehende Migrationen wieder korrekt laufen koennen.
+```rust
+load_app_state(app, target: Option<String>) -> Result<String, String>
+save_app_state(app, content: String, target: Option<String>) -> Result<(), String>
+quarantine_app_state(app, target: Option<String>) -> Result<String, String>
+```
 
-Akzeptanzkriterien:
+Target-Parsing:
 
-- Keine Snapshot-in-Snapshot-Aufnahme.
-- Kein pauschales Restore der Profil-Registry im Standardmodus.
-- Standard-Restore spielt feste Profil-Live-Keys nur zurueck, wenn `snapshot.activeProfileId` in der aktuellen Registry existiert.
-- `rs_current_profile` und `rs_active_profile` werden im Standard-Restore nur auf `snapshot.activeProfileId` gesetzt, wenn diese ID aktuell existiert.
-- Standard-Restore stellt globale fachliche Keys nach Policy wieder her, technische/Umgebungs-Keys aber nicht blind.
-- Migrationsmarker, die an das Datenschema gekoppelt sind, werden im Standard-Restore mit dem Snapshot-Stand synchronisiert und nicht aus dem aktuellen Live-Bestand behalten.
-- Tests decken erlaubte, ausgeschlossene und profilbezogene Keys ab.
+- Command-Handler konvertieren `target: Option<String>` robust ueber `target.as_deref()` in `StateTarget`.
+- `None` und `Some("live")` werden zu `StateTarget::Live`.
+- `Some("snapshots")` wird zu `StateTarget::Snapshots`.
+- Alle anderen Strings liefern `Err(...)`; es darf kein `unwrap()`, kein `panic!()` und kein freier Pfad-Fallback entstehen.
 
-### Paket 5: `StorageManager.createSnapshot()` umbauen
+Regeln:
 
-Ziel: Jahresabschluss schreibt in `SnapshotArchive`, nicht in den Live-Store.
+- `None` und `"live"` bedeuten Live-Datei.
+- `"snapshots"` bedeutet Snapshot-Datei.
+- Unbekannte Targets brechen mit Fehler ab.
+- Kein Command akzeptiert freie Pfade oder Dateinamen aus dem Frontend.
+- `.tmp`/`.bak`/`rename`-Pattern bleibt gemeinsamer Codepfad.
+- Quarantaene fuer Snapshot-Datei erzeugt `ruhestand_suite_snapshots.corrupt.<timestamp>.json`.
+- `confirm_app_close` bleibt auf Live-Flush beschraenkt. Snapshot-Aktionen schreiben sofort und abgeschlossen.
 
-Arbeiten:
+Pflichttests:
 
-- Vor Capture sicherstellen, dass aktive Dirty-Daten konsistent sind:
-  - alle noch fokussierten/ausstehenden UI-Eingaben synchron in das State-Objekt bzw. die Live-Persistenz uebernehmen,
-  - ausstehende Debounce-Persistenz nicht abwarten lassen, sondern explizit `await PersistenceFacade.flush()` ausfuehren,
-  - Snapshot-Capture darf erst aus der Persistenz lesen, wenn dieser Flush erfolgreich abgeschlossen ist.
-- Records ueber zentrale Capture-Policy aus `PersistenceFacade.exportAllSync()` oder `persistenceStorage` lesen.
-- Aktive Profil-ID und Profilname aus `rs_current_profile` und `rs_profiles_v1` aufloesen und in Snapshot-Metadaten speichern.
-- Snapshot-Payload `persistence-records-v1` erstellen.
-- Ueber `SnapshotArchive.writeSnapshot()` schreiben; dieses delegiert an `PersistenceFacade.writeSnapshot()`.
-- File-System-Handle nicht mehr als Standardpfad verwenden.
+- `StateTarget` akzeptiert nur `live`, `snapshots`, `None`.
+- Unbekannte Targets werden abgelehnt.
+- Live- und Snapshot-Datei werden auf unterschiedliche Dateinamen aufgeloest.
+- Quarantaene nutzt den passenden Prefix.
 
-Akzeptanzkriterien:
+## IndexedDB-Implementierung
 
-- Snapshot-Erstellung veraendert `ruhestand_suite_data.json` nur, wenn vorher Dirty-Live-Daten geflusht werden muessen.
-- Snapshot-Erstellung enthaelt die unmittelbar vor dem Klick eingegebenen Werte, auch wenn der normale Debounce-Timer noch nicht gelaufen waere.
-- Das Snapshot-Archiv wird separat geschrieben.
-- Snapshot enthaelt keine alten Snapshots.
-- Snapshot enthaelt `activeProfileId`; ohne gueltige Profil-ID muss die UI/Fehlerbehandlung den Snapshot als nicht standard-restore-faehig behandeln.
+Modul: `app/shared/persistence-adapter-indexeddb.js`
 
-### Paket 6: `renderSnapshots()`, `restoreSnapshot()`, `deleteSnapshot()` umbauen
+Ziel:
 
-Ziel: UI-Aktionen arbeiten gegen `SnapshotArchive`.
+- DB: `ruhestand-suite`
+- Version: `2`
+- Stores: `kv`, `metadata`, `snapshots`
 
-Arbeiten:
+Upgrade:
 
+- `onupgradeneeded` legt fehlende Stores idempotent an.
+- `request.onblocked` muss eine UI-faehige Meldung vorbereiten oder zumindest ein klares Promise-Reject erzeugen.
+- `request.onupgradeneeded` ist der Zeitpunkt des Upgrades. Der erste neue Adapter-Open nach Deployment loest ihn aus.
+
+`versionchange`:
+
+- Bestehende Verbindung schliessen.
+- `outdated = true` setzen.
+- Ein Event `persistence:outdated` dispatchen, falls `dispatchEvent` verfuegbar ist.
+- Weitere `ensureOpen()`, `saveBatch()`, `writeMetadata()` und Snapshot-Methoden brechen sofort mit `"Datenbankverbindung veraltet, bitte diesen Tab neu laden."` ab.
+- Kein stilles Neuoeffnen aus einem alten Tab.
+
+`blocked`:
+
+- `request.onblocked` wird behandelt.
+- Es wird ein UI-faehiger Fehler bzw. Event `persistence:upgrade-blocked` erzeugt.
+- Der Nutzer soll den anderen Tab schliessen oder neu laden.
+
+Snapshot-Methoden:
+
+```js
+listSnapshots()
+readSnapshot(id)
+writeSnapshot(snapshot)
+deleteSnapshot(id)
+migrateLegacySnapshotsIfNeeded()
+```
+
+Transaktionen:
+
+- Snapshot-Archivoperationen nutzen Store `snapshots`.
+- Standard-Restore gegen Live-Keys nutzt eine `readwrite`-Transaktion gegen `kv`, damit Delete/Upsert atomar sind.
+- Wenn Metadata fuer Restore-Lock beteiligt ist, Store `metadata` in dieselbe Transaktion aufnehmen, soweit technisch sinnvoll.
+
+Tests:
+
+- Fake-IndexedDB-Unit-Test fuer Version 2 und Store-Anlage.
+- Test fuer `versionchange`: `outdated` wird gesetzt, weitere Calls brechen ab.
+- Test fuer `blocked`: Fehler/Event wird gesetzt.
+- Manuelle Browser-Verifikation fuer echte Multi-Tab-Szenarien, sofern kein Playwright/Puppeteer eingefuehrt wird.
+
+## PersistenceFacade-Erweiterung
+
+Neue Methoden:
+
+```js
+listSnapshots()
+readSnapshot(id)
+writeSnapshot(snapshot)
+deleteSnapshot(id)
+migrateLegacySnapshotsIfNeeded()
+replaceLiveRecords(records, options)
+```
+
+`replaceLiveRecords(records, options)` ist der Restore-freundliche All-or-Nothing-Pfad:
+
+```js
+{
+  deleteKeys: [],
+  upserts: [],
+  allowKey: isAllowedSnapshotRestoreLiveKey,
+  restoreLock: true
+}
+```
+
+Fallback:
+
+- Wenn ein Adapter keine Snapshot-Methoden anbietet, nutzt die Facade nur fuer Legacy/localStorage den bisherigen Fallback.
+- Tauri und IndexedDB muessen Snapshot-Methoden implementieren; sonst gilt Slice 1 als unvollstaendig.
+
+## SnapshotArchive
+
+Neues Modul: `app/shared/snapshot-archive.js`
+
+Aufgaben:
+
+- `createSnapshot({ label, kind, records, activeProfileId, activeProfileName })`
+- `captureCurrentRecords({ keys, getItem })`
+- `listSnapshots()`
+- `readSnapshot(id)`
+- `writeSnapshot(snapshot)`
+- `deleteSnapshot(id)`
+- `validateSnapshot(snapshot)`
+- `toSnapshotIndexEntry(snapshot)`
+
+Nicht-Aufgaben:
+
+- Kein DOM-Zugriff.
+- Kein Tauri-IPC.
+- Kein IndexedDB-Open.
+- Keine Balance-spezifische Profil-Ermittlung.
+
+## StorageManager- und UI-Umbau
+
+`app/balance/balance-storage.js`:
+
+- `createSnapshot(handle, label)` wird durch Archivpfad ersetzt.
+- `handle` ist nicht mehr Standardpfad fuer Jahresabschluss.
+- Manuelle Ordner-Snapshots bleiben optionaler Legacy-/Exportpfad.
 - `renderSnapshots()` liest `SnapshotArchive.listSnapshots()`.
-- Status zeigt getrennte Ablage:
-  - Tauri: `Speicherort: App-Speicher (separates Snapshot-Archiv)`
-  - Browser: `Speicherort: Browser-Speicher (IndexedDB Snapshot-Archiv)`
-- `restoreSnapshot()` liest Snapshot aus Archiv.
-- Restore:
-  - kein `persistenceStorage.clear()`
-  - nur erlaubte Live-Keys entfernen/ersetzen
-  - Snapshot-Archiv unangetastet lassen
-  - Profil-Registry im Standardmodus erhalten
-  - feste profilbezogene Live-Keys nur wiederherstellen, wenn `snapshot.activeProfileId` in der aktuellen Registry existiert
-  - `rs_current_profile` und `rs_active_profile` nur auf `snapshot.activeProfileId` setzen, wenn diese ID aktuell existiert
-  - nach erfolgreichem Standard-Restore die Registry-Daten des betroffenen Profils mit den wiederhergestellten Live-Keys aktualisieren
-  - nach Restore `PersistenceFacade.flush()`
-  - danach `location.reload()`
-- `deleteSnapshot()` loescht nur Archiv-Eintrag.
-- Standard-Restore muss als harte Reihenfolge implementiert werden:
-  1. `saveCurrentProfileFromLocalStorage()` ausfuehren, damit ungespeicherte Live-Daten des aktuell aktiven Profils in der Registry landen.
-  2. Pruefen, ob `snapshot.activeProfileId` in der aktuellen Registry existiert. Wenn nicht, Standard-Restore abbrechen.
-  3. Erlaubte profilgebundene Live-Keys und globale fachliche Live-Keys gezielt loeschen.
-  4. Snapshot-Werte fuer erlaubte profilgebundene Live-Keys und globale fachliche Keys schreiben.
-  5. `rs_current_profile` und `rs_active_profile` auf `snapshot.activeProfileId` setzen.
-  6. `saveCurrentProfileFromLocalStorage()` erneut ausfuehren, damit die wiederhergestellten Live-Keys in `registry.profiles[snapshot.activeProfileId].data` persistiert werden.
-  7. `PersistenceFacade.flush()` ausfuehren.
-  8. `location.reload()` ausloesen.
+- `restoreSnapshot()` liest aus Archiv und nutzt Standard-Restore-Semantik.
+- `deleteSnapshot()` loescht nur einen Archiv-Eintrag.
 
-Akzeptanzkriterien:
+Status-Texte:
 
-- Restore loescht keine anderen Snapshots.
-- Delete loescht genau einen Snapshot.
-- Profil-Registry wird im Standardmodus nicht still zurueckgesetzt.
-- Nach dem Snapshot angelegte Profile bleiben im Standard-Restore erhalten.
-- Wenn `snapshot.activeProfileId` nicht mehr existiert, werden profilgebundene Live-Keys nicht still in das aktuell ausgewaehlte Profil geschrieben.
-- Ungespeicherte Live-Daten des vor Restore aktiven Profils gehen nicht verloren, weil sie vor dem Ueberschreiben in die Registry gesichert werden.
-- `registry.profiles[snapshot.activeProfileId].data` enthaelt nach Restore die wiederhergestellten Live-Profil-Keys.
+- Tauri: `Speicherort: App-Speicher (separates Snapshot-Archiv)`
+- Browser IndexedDB: `Speicherort: Browser-Speicher (IndexedDB Snapshot-Archiv)`
+- localStorage-Fallback: `Speicherort: Browser-Fallback (localStorage, begrenzte Snapshot-Ablage)`
 
-### Paket 7: Jahresabschluss-Reihenfolge korrigieren
+`Balance.html`:
 
-Ziel: Snapshot entsteht vor jeder Jahresabschluss-Mutation.
+- Default-Text `Speicherort: Browser (localStorage)` ersetzen.
+- Ordner verbinden aus dem normalen Jahresabschluss-Workflow entfernen oder nach Erweitert verschieben.
+- UI unterscheidet internes Snapshot-Archiv und manuellen Export/Import.
 
-Arbeiten in `app/balance/balance-binder-snapshots.js`:
+## Legacy-Migration
 
-- Reihenfolge von `handleJahresabschluss()` anpassen:
-  1. Label lesen
-  2. bestaetigen
-  3. ausstehende UI-Eingaben synchron in den Live-State uebernehmen
-  4. `await PersistenceFacade.flush()` ausfuehren, damit der Snapshot den letzten Eingabestand sieht
-  5. Snapshot erstellen
-  6. Inflation/Alter/Jahresupdate ausfuehren
-  7. Ausgabenjahr rollen
-  8. Live-Daten flushen
-  9. UI/Snapshot-Liste aktualisieren
-- Fehlerverhalten:
-  - Wenn der Vorab-Flush vor dem Snapshot fehlschlaegt, wird der gesamte Jahresabschluss ebenfalls abgebrochen.
-  - Wenn `createSnapshot()` bzw. `SnapshotArchive.writeSnapshot()` fehlschlaegt, wird der gesamte Jahresabschluss abgebrochen.
-  - Danach duerfen `applyAnnualInflation()`, Altersfortschreibung, `rollExpensesYear()` und Live-Flush nicht laufen.
-  - Nutzer erhalten eine klare Meldung, z. B. "Jahresabschluss abgebrochen - Snapshot konnte nicht erstellt werden."
-  - Ein optionales "Trotzdem fortfahren?" darf nur als explizite zweite Nutzerentscheidung implementiert werden, nie als stiller Fallback.
-- Toast-Text anpassen: Snapshot als Sicherung vor Jahresabschluss bezeichnen.
+Legacy-Quellen:
 
-Akzeptanzkriterien:
+1. Alte Datei-Snapshots aus verbundenem Ordner.
+2. Alte interne `ruhestandsmodell_snapshot_*`-Records.
+3. Alte Browser-DB `snapshotDB` mit Directory-Handle.
 
-- Test beweist: `createSnapshot` kommt vor `applyAnnualInflation`.
-- Test beweist: unmittelbar vor dem Klick geaenderte Eingabewerte werden vor Snapshot-Capture synchronisiert und geflusht.
-- Restore eines Jahresabschluss-Snapshots fuehrt bei erneutem Jahresabschluss nicht zu Doppel-Inflation aus demselben Abschlussstand.
-- Test beweist: Wenn Snapshot-Erstellung fehlschlaegt, wird keine Jahresabschluss-Mutation ausgefuehrt.
+Migration alter `full-localstorage`-Snapshots:
 
-### Paket 8: UI und Texte bereinigen
+1. Payload lesen.
+2. `activeProfileId` aus `payload.localStorage["rs_current_profile"]` extrahieren, falls vorhanden.
+3. Falls kein `rs_current_profile` vorhanden und Snapshot erkennbar vor Profilverbund liegt: `activeProfileId = "default"`.
+4. `activeProfileName` aus `payload.localStorage["rs_profiles_v1"].profiles[activeProfileId].meta.name` ableiten, falls moeglich.
+5. Wenn keine gueltige `activeProfileId` ableitbar ist: Snapshot migrieren, aber als nicht standard-restore-faehig markieren.
+6. Records ueber Capture-Policy filtern; Legacy-Snapshot-Keys nicht uebernehmen.
+7. Neues kanonisches Snapshot-Objekt schreiben.
+8. Migrationsergebnis melden.
 
-Ziel: Nutzer brauchen keinen Ordner fuer den normalen Jahresabschluss.
+Verifikationsgate:
 
-Arbeiten:
+- Migration liefert einen Report:
+  - `migratedCount`
+  - `skippedCount`
+  - `notStandardRestorableCount`
+  - `errors[]`
+- Alte Records werden nur nach erfolgreicher Migration und sicherer Markierung geloescht.
+- Keine automatische Bereinigung ohne Report.
 
-- `Balance.html` pruefen:
-  - **Ordner verbinden** aus normalem Jahresabschluss-/Snapshot-Workflow entfernen oder nach **Erweitert** verschieben.
-  - Hilfetexte auf getrenntes App-Snapshot-Archiv umstellen.
-  - Full-Restore-Warnung fuer Profil-Registry vorbereiten, falls Full Restore angeboten wird.
-- Optional Groessen-/Anzahl-Hinweis anzeigen, aber nicht als Pflicht fuer ersten Slice.
+`snapshotDB`-Cleanup:
 
-Akzeptanzkriterien:
+- Idempotent nach erfolgreicher Initialisierung des neuen SnapshotArchive.
+- Marker in Metadata: `legacySnapshotDbCleanup.completedAt`.
+- Fehler blockieren den App-Start nicht, werden aber geloggt.
 
-- Jahresabschluss ist ohne Ordnerauswahl nutzbar.
-- UI unterscheidet automatisches Snapshot-Archiv und manuelle Exportfunktionen.
+## Rollback-Strategie
 
-### Paket 9: Legacy-Migration und Rueckwaertskompatibilitaet
+Browser/IndexedDB:
 
-Ziel: Bestehende Snapshots bleiben nutzbar.
+- Nach Upgrade auf DB-Version 2 kann alter Code, der Version 1 oeffnet, durch Browser-Verhalten blockiert werden.
+- Rollback auf alten Code ist deshalb nicht garantiert verlustfrei.
+- Vor Release muss ein manueller Exportpfad fuer Live-Daten und Snapshots dokumentiert sein.
+- Rollback-Hinweis: "Nach IndexedDB-Schema-Upgrade ist ein Code-Rollback nur mit manuellem Datenexport/import sicher."
 
-Arbeiten:
+Tauri:
 
-- Alte Datei-Snapshots aus verbundenem Ordner optional importierbar lassen.
-- Alte interne `ruhestandsmodell_snapshot_*`-Records erkennen.
-- Beim Start oder beim Oeffnen der Snapshot-Liste optional migrieren:
-  - alten Snapshot lesen,
-  - `activeProfileId` aus `localStorage["rs_current_profile"]` im alten `full-localstorage`-Payload extrahieren, falls vorhanden,
-  - wenn kein `rs_current_profile` vorhanden ist, aber der Snapshot aus der Vor-Profilverbund-Zeit stammt, `activeProfileId` auf `"default"` setzen,
-  - `activeProfileName` optional aus `localStorage["rs_profiles_v1"].profiles[activeProfileId].meta.name` ableiten,
-  - wenn keine `activeProfileName` ableitbar ist und `activeProfileId === "default"` gesetzt wurde, einen neutralen Namen wie `"Default"` verwenden oder den Namen leer lassen,
-  - nur wenn trotz dieser Fallback-Regel keine gueltige `activeProfileId` bestimmt werden kann, Snapshot als nicht standard-restore-faehig markieren und nur Full Restore/Import anbieten,
-  - ins neue SnapshotArchive schreiben,
-  - alten Live-Record nur nach erfolgreicher Migration und ggf. Nutzerbestaetigung entfernen.
-- `full-localstorage` beim Restore weiter unterstuetzen.
-- Alte IndexedDB-Datenbank `snapshotDB` bereinigen:
-  - Diese DB wurde bisher nur fuer File System Access Directory Handles genutzt.
-  - Wenn der Ordnerpfad nicht mehr Standard ist, soll einmalig `indexedDB.deleteDatabase('snapshotDB')` ausgefuehrt werden.
-  - Cleanup erst nach erfolgreicher Initialisierung des neuen SnapshotArchive markieren, z. B. in Metadata `legacySnapshotDbCleanup.completedAt`.
-  - Fehler beim Loeschen duerfen den App-Start nicht blockieren, muessen aber im Debug/Console-Pfad sichtbar sein.
-  - Wenn der optionale Ordner-Export spaeter weiter existiert, darf er nicht mehr von der alten `snapshotDB` als Pflichtpfad abhaengen.
+- Alte Tauri-Version ignoriert `ruhestand_suite_snapshots.json`; Live-Daten bleiben lesbar, solange `ruhestand_suite_data.json` unveraendert bleibt.
+- Neue Snapshots sind nach Rollback nicht im alten UI sichtbar.
+- Vor produktivem Rollout muss dokumentiert sein, dass Snapshot-Archiv separat gesichert werden kann.
 
-Akzeptanzkriterien:
+## Tests
 
-- Nutzer verlieren bestehende Snapshots nicht.
-- Migration erzeugt keine Duplikate.
-- Kein automatisches Loeschen alter Snapshot-Records ohne sichere Migrationsmarkierung.
-- Migrierte alte Snapshots erhalten nach Moeglichkeit `activeProfileId` aus ihrem eigenen Payload.
-- Alte Vor-Profilverbund-Snapshots ohne `rs_current_profile` erhalten `activeProfileId: "default"`, damit sie im normalen Standard-Restore-Pfad nutzbar bleiben.
-- Alte Snapshots ohne ableitbare oder per Fallback bestimmbare `activeProfileId` werden nicht still per Standard-Restore wiederhergestellt.
-- Die alte Browser-Datenbank `snapshotDB` wird nach Migration/Cleanup nicht weiter benoetigt.
-- Cleanup ist idempotent und bricht die App bei Browserfehlern nicht ab.
+Pflicht-Unit-/Contract-Tests:
 
-### Paket 10: Tests
+- `tests/balance-annual-workflow-contract.test.mjs`
+  - Snapshot vor `applyAnnualInflation()`.
+  - Snapshot vor konkreter Alters-/Jahresfortschreibung.
+  - Vorab-Flush vor Snapshot.
+  - Fehler bei Vorab-Flush oder Snapshot verhindert jede Mutation.
+- `tests/balance-binder-snapshots.test.mjs`
+  - Create/List/Delete/Restore ueber `SnapshotArchive`.
+  - Keine Snapshot-in-Snapshot-Aufnahme.
+  - Restore loescht keine Snapshot-Historie.
+- Neuer `tests/snapshot-archive.test.mjs`
+  - Schema-Normalisierung.
+  - ID-Erzeugung.
+  - `recordCount`-Validierung.
+  - Index ohne `records`.
+- Neuer Policy-Test
+  - Capture-/Restore-Key-Policy.
+  - Profil-Registry im Standard-Restore erhalten.
+  - Legacy-Snapshot-Keys ausgeschlossen.
+  - Fehlende fachliche Keys werden bei Restore geloescht.
+  - Fehlende technische Keys wie UI-/Layoutzustand, Fensterdaten, Debug-Flags und Telemetry-Schalter bleiben erhalten, wenn sie von `isSnapshotTechnicalKey()` als technisch klassifiziert werden.
+- Neuer Persistenz-Facade-Test
+  - Snapshot-Methoden delegieren an Adapter.
+  - `replaceLiveRecords()` ist fuer Fake-Adapter all-or-nothing.
+- Neuer IndexedDB-Test
+  - Version 2 legt `kv`, `metadata`, `snapshots` an.
+  - `versionchange` setzt `outdated`.
+  - `blocked` wird behandelt.
+  - Snapshot-Store bleibt getrennt vom Live-Store.
+- Neuer Tauri/Rust-Test
+  - Target-Validierung.
+  - `target.as_deref()`-Parsing akzeptiert nur `None`, `"live"` und `"snapshots"` und gibt fuer unbekannte Strings `Err(...)` zurueck.
+  - Dateinamen fuer live/snapshots.
+  - Quarantaene-Prefix.
+- Neuer Legacy-Test
+  - `activeProfileId` aus altem Payload.
+  - Fallback `"default"` fuer Vor-Profilverbund.
+  - nicht standard-restore-faehig ohne gueltige Profil-ID.
+  - Migrationsreport.
 
-Mindestens zu aktualisieren oder zu ergaenzen:
+Manuelle Browser-Verifikation, falls kein Browser-Testframework eingefuehrt wird:
 
-| Testdatei | Erwartete Abdeckung |
-| --- | --- |
-| `tests/balance-binder-snapshots.test.mjs` | SnapshotArchive-Create/List/Delete/Restore, keine Snapshot-in-Snapshot-Aufnahme |
-| `tests/balance-annual-workflow-contract.test.mjs` | UI-Eingaben vor Snapshot synchronisieren, Vorab-Flush, `createSnapshot` vor `applyAnnualInflation`, Rollover danach, Abort bei Flush-/Snapshot-Fehler |
-| neuer SnapshotArchive-Test | Delegation ueber `PersistenceFacade`/Adaptermethoden, In-Memory-Fake, getrennte Live-/Archivdaten |
-| neuer Tauri-Snapshot-Index-Test | `listSnapshots()` liefert nur Metadaten ohne `records`; `readSnapshot(id)` liefert Vollpayload |
-| neuer IndexedDB-Upgrade-Test | DB `ruhestand-suite` Version 2 enthaelt `kv`, `metadata`, `snapshots`; keine zweite Snapshot-DB; `versionchange` signalisiert Reload/Tab-Hinweis und setzt Adapter auf `outdated`, weitere Calls brechen klar ab |
-| neuer Policy-Test | Capture-/Restore-Key-Policy, `activeProfileId`, Key-Kategorien, schema-gekoppelte `migration_*`-Marker als globale fachliche Keys, Standard-Restore nur bei existierender Profil-ID |
-| neuer Profil-Restore-Test | aktuelles Profil wird vor Restore gespeichert; Snapshot-Profil-Registrydaten werden nach Restore aktualisiert |
-| Legacy-activeProfile-Test | `activeProfileId` wird aus altem `full-localstorage`-Payload extrahiert, bei Vor-Profilverbund-Snapshots auf `"default"` gesetzt oder nur dann als nicht standard-restore-faehig markiert, wenn kein gueltiger Fallback moeglich ist |
-| Legacy-Cleanup-Test | `snapshotDB`-Cleanup idempotent und nicht blockierend |
-| ggf. Tauri-Command-Test/Rust-Test | parametrisierte Targets `live`/`snapshots`, separate Dateien, atomisches Schreiben, Quarantine |
+- Zwei Tabs oeffnen.
+- Neuer Tab loest IndexedDB-Upgrade auf Version 2 aus.
+- Alter Tab zeigt Reload-Hinweis oder bricht weitere Writes klar ab.
+- `blocked`-Fall pruefen, soweit reproduzierbar.
 
-Mindestens auszufuehren:
+Auszufuehren:
 
 ```powershell
 node tests\run-single.mjs tests\balance-binder-snapshots.test.mjs
@@ -597,111 +528,191 @@ node tests\run-single.mjs tests\balance-annual-workflow-contract.test.mjs
 node tests\run-tests.mjs
 ```
 
-Wenn `src-tauri/src/lib.rs` geaendert wird, zusaetzlich:
+Wenn `src-tauri/src/lib.rs` geaendert wird:
 
 ```powershell
 npm run tauri:build
 ```
 
-oder ein gezielter Rust-/Tauri-Test, falls vorhanden.
+oder ein gezielter Rust-Test, falls verfuegbar und schneller.
 
-### Paket 11: Dokumentation
+## Dokumentations-Sync
 
 Zu aktualisieren:
 
 - `README.md`
-  - Jahresabschluss-Snapshots ohne Ordnerfreigabe beschreiben.
-  - getrennte aktive Daten und Snapshot-Archiv knapp erlaeutern.
+  - Jahresabschluss-Snapshots ohne Ordnerfreigabe.
+  - File System Access API nur noch fuer manuellen Export/Import, nicht fuer normale Snapshots.
 - `docs/reference/TECHNICAL.md`
-  - Persistenz- und Snapshot-Architektur aktualisieren.
+  - Persistenzarchitektur mit getrenntem Snapshot-Archiv.
+  - IndexedDB Version 2 / Store `snapshots`.
+  - Tauri-Dateien live vs. snapshots.
 - `docs/reference/BALANCE_MODULES_README.md`
-  - Rolle von `balance-storage.js`, `balance-binder-snapshots.js` und SnapshotArchive aktualisieren.
-- `docs/internal/PERSISTENCE_MIGRATION_PLAN.md`
+  - Rolle von `balance-storage.js`, `balance-binder-snapshots.js`, `SnapshotArchive`.
+- `docs/internal/PROJEKTUEBERSICHT.md`
+  - Aussage "Persistenz primaer ueber localStorage und optionale Dateisnapshots" aktualisieren.
+- `docs/internal/archive/2026-persistence-migration/PERSISTENCE_MIGRATION_PLAN.md`
   - Entscheidung dokumentieren: Snapshots nicht in `ruhestand_suite_data.json`.
+  - Hinweis auf separates Snapshot-Archiv und Rollback-Folgen.
 
-## Nicht-Ziele fuer diesen Slice
+Nicht korrekt:
 
-- Keine Cloud-Synchronisation.
-- Keine Verschluesselung der Snapshot-Datei.
-- Keine SQLite-Migration.
-- Kein komplexes Profil-Merge-UI im ersten Slice.
-- Keine Entfernung manueller Export-/Importpfade, solange Legacy-Kompatibilitaet gebraucht wird.
-- Kein Build der Tauri-EXE, ausser die konkrete Umsetzung verlangt es.
+- `docs/internal/PERSISTENCE_MIGRATION_PLAN.md` existiert aktuell nicht und darf nicht als Zielpfad genannt werden.
 
-## Risiken und Gegenmassnahmen
+## Umsetzungspakete
 
-| Risiko | Auswirkung | Gegenmassnahme |
-| --- | --- | --- |
-| Snapshots landen wieder im Live-Store | Typing-Lag, grosse Live-Datei, unnoetige Writes | separate SnapshotArchive-Abstraktion und Tests, `ruhestand_suite_data.json` darf keine neuen Snapshot-Records erhalten |
-| Restore loescht Snapshot-Historie | Verlust historischer Sicherungen | kein `clear()`, nur `clearAllowedSync`/gezielter Replace von Live-Keys |
-| Snapshot nach Mutation | Doppel-Inflation/Doppel-Alterung nach Restore und erneutem Abschluss | Snapshot vor jeder Mutation, Contract-Test |
-| Profil-Registry oder falsche Profil-Live-Keys werden blind ueberschrieben | Verlust spaeter angelegter Profile oder Snapshot fuer Profil A landet in Profil B | Standard-Restore erhaelt Registry und spielt feste Profil-Live-Keys nur zurueck, wenn `snapshot.activeProfileId` aktuell existiert |
-| Aktuell aktives Profil verliert ungespeicherte Live-Daten beim Restore | Datenverlust nach Profilwechsel vor Snapshot-Restore | vor jedem Standard-Restore `saveCurrentProfileFromLocalStorage()` ausfuehren |
-| Snapshot-Profil wird nur live, aber nicht in Registry aktualisiert | Reload oder Profilwechsel kann wieder alte Registry-Daten laden | nach Schreiben der Snapshot-Live-Keys `rs_current_profile` setzen und erneut `saveCurrentProfileFromLocalStorage()` ausfuehren |
-| Globale fachliche und technische Keys werden vermischt | unerwuenschte Aenderung von Einstellungen oder fehlende fachliche Wiederherstellung | Policy-Kategorien fuer profilgebundene, globale fachliche und technische Keys |
-| Migrationsmarker bleiben aus aktuellem Live-Stand erhalten | alte Snapshot-Daten ueberspringen nach Reload noetige Schema-Migrationen | schema-gekoppelte `migration_*`-Marker als globale fachliche Keys behandeln, beim Restore loeschen und aus Snapshot neu schreiben bzw. bewusst fehlen lassen |
-| Alte Snapshots ohne `activeProfileId` werden falsch standard-restored | Snapshot wird in falsches aktives Profil geschrieben | `activeProfileId` aus altem Payload extrahieren; bei Vor-Profilverbund-Snapshots `"default"` setzen; nur ohne gueltigen Fallback Standard-Restore sperren |
-| Alte Snapshots werden unlesbar | Upgrade-Regression | `full-localstorage` weiter unterstuetzen, Legacy-Migration |
-| Zwei Speicherpfade driften auseinander | inkonsistente UI/Fehlerpfade | SnapshotArchive delegiert ueber Facade an aktiven Adapter, Adapter-Tests |
-| SnapshotArchive dupliziert Runtime-Logik | zweite IndexedDB-/IPC-Implementierung, Race Conditions | optionale Snapshot-Methoden im Adaptervertrag, keine direkte Runtime-Logik im Archive |
-| Alte `snapshotDB` bleibt als Datenmuell bestehen | unklare Browser-Altlasten und alte Directory-Handles | einmaliger idempotenter Cleanup nach SnapshotArchive-Initialisierung |
-| Tauri-Snapshot-Sammeldatei wird gross | seltene Snapshot-Aktionen werden langsamer, `listSnapshots()` laedt zu viel | `listSnapshots()` liefert leichten Index ohne `records`; Einzeldateien als empfohlener naechster Schritt ab zweistelliger Snapshot-Zahl |
-| IndexedDB-Version 2 kollidiert mit offenem altem Tab | stiller Flush-Fehler oder verlorene Eingabe in altem Tab | `versionchange` setzt Adapter auf `outdated`, zeigt Reload-Hinweis oder fuehrt kontrollierten Reload nach Flush aus; weitere Calls brechen klar ab |
-| Jahresabschluss-Snapshot verpasst letzte Eingabe | Snapshot enthaelt Stand vor den letzten Tastenschlaegen | vor Snapshot-Capture UI synchronisieren und `await PersistenceFacade.flush()` erzwingen |
-| Snapshot-Erstellung schlaegt beim Jahresabschluss fehl | Jahresabschluss wuerde ohne Sicherung mutieren | Jahresabschluss hart abbrechen; Mutationen nur nach erfolgreichem Snapshot |
-| Unnoetiger Snapshot-Flush im Tauri-Close-Handler | komplexerer Shutdown-Flow ohne Nutzen | bewusst kein Snapshot-Flush bei `confirm_app_close`; Snapshot-Aktionen muessen sofort atomisch schreiben |
+Jedes Paket wird vor Umsetzung als eigene Slice-MD dokumentiert. Vor dem ersten Code-Edit ist der Diff-Risiko-Block aus `docs/internal/SLICE_EXECUTION_RULES.md` auszugeben. Nach Abschluss werden Ergebnis, Tests, Abweichungen und Freigabestatus in der Slice-MD sowie in diesem Arbeitsplan dokumentiert.
+
+Hinweis zur Nummerierung und zum aktuellen Stand: Dieser Plan enthaelt noch eine alte 0-basierte Vorarbeit als `Paket 0`. Nach der aktualisierten Agent-Regel beginnen neue Umsetzungs-, Paket- und Slice-Nummern immer bei 1. Real umgesetzt wurde bereits `SLICE_BALANCE_SNAPSHOTS_01_KEY_POLICY.md` fuer Key-Policy. Die vorbereitenden Contracts aus dem bisherigen `Paket 0` wurden danach als `docs/internal/SLICE_BALANCE_SNAPSHOTS_02_PREPARATORY_CONTRACTS.md` nachgezogen, damit keine neue 0-basierte Slice-Datei entsteht.
+
+### Paket 0: Vorbereitende Contracts
+
+Slice-Dokument: `docs/internal/SLICE_BALANCE_SNAPSHOTS_02_PREPARATORY_CONTRACTS.md`  
+Branch: `codex-balance-snapshot-key-policy`  
+Status: nachgezogen, erwartungsgemaess rot; wurde erst nach Slice 1 umgesetzt.
+
+- Bestehende Jahresabschluss-Tests auf gewuenschte neue Reihenfolge umstellen.
+- Failing Tests fuer Snapshot-vor-Mutation, Snapshot-Fehler-bricht-ab und Key-Policy anlegen.
+
+Akzeptanz:
+
+- Tests schlagen vor Implementierung gezielt fehl.
+
+### Paket 1: Key-Policy
+
+Slice-Dokument: `docs/internal/SLICE_BALANCE_SNAPSHOTS_01_KEY_POLICY.md`  
+Branch: `codex-balance-snapshot-key-policy`  
+Status: abgeschlossen, nicht committed; Branch nur lokal angelegt, GitHub-Veroeffentlichung ohne Freigabe ausstehend.
+
+- Snapshot-Policy-Funktionen implementieren.
+- Tests fuer Capture, Restore, Profil-Registry, Legacy-Snapshot-Keys und technische Keys.
+
+Abhaengig von: Paket 0.
+
+### Paket 2: SnapshotArchive
+
+Slice-Dokument: `docs/internal/SLICE_BALANCE_SNAPSHOTS_03_SNAPSHOT_ARCHIVE.md`  
+Branch: `codex-balance-snapshot-key-policy`  
+Status: abgeschlossen, nicht committed; Branch nur lokal angelegt, GitHub-Veroeffentlichung ohne Freigabe ausstehend.
+
+- `app/shared/snapshot-archive.js` erstellen.
+- Kanonisches Schema, Validierung, Index-Erzeugung, Delegation an Facade.
+- In-Memory-Fake-Adapter-Test.
+
+Abhaengig von: Paket 1.
+
+### Paket 3: PersistenceFacade-Adaptervertrag
+
+Slice-Dokument: `docs/internal/SLICE_BALANCE_SNAPSHOTS_04_PERSISTENCE_FACADE_CONTRACT.md`  
+Branch: `codex-balance-snapshot-key-policy`  
+Status: abgeschlossen, nicht committed; Branch nur lokal angelegt, GitHub-Veroeffentlichung ohne Freigabe ausstehend.
+
+- Snapshot-Methoden und `replaceLiveRecords()` ergaenzen.
+- Fake-Adapter und localStorage-Legacy-Fallback anpassen.
+
+Abhaengig von: Paket 2.
+
+### Paket 4: Tauri-Ziel `snapshots`
+
+Slice-Dokument: `docs/internal/SLICE_BALANCE_SNAPSHOTS_05_TAURI_SNAPSHOT_TARGET.md`  
+Branch: `codex-balance-snapshot-key-policy`  
+Status: abgeschlossen, nicht committed; Branch nur lokal angelegt, GitHub-Veroeffentlichung ohne Freigabe ausstehend.
+
+- `StateTarget` in Rust.
+- Commands parametrisieren.
+- Tauri-Adapter nutzt `target: "snapshots"` fuer Archiv.
+- Rust-/Tauri-Tests.
+
+Abhaengig von: Paket 3.
+
+### Paket 5: IndexedDB Store `snapshots`
+
+- Version auf 2.
+- Store `snapshots`.
+- `blocked`, `versionchange`, `outdated`.
+- Snapshot-Methoden im Adapter.
+
+Abhaengig von: Paket 3.
+
+### Paket 6: StorageManager auf SnapshotArchive
+
+- Create/List/Read/Delete/Restore umbauen.
+- Kein `persistenceStorage.clear()` im Restore.
+- Standard-Restore mit Profil-ID-Pruefung.
+
+Abhaengig von: Pakete 1 bis 5.
+
+### Paket 7: Jahresabschluss-Reihenfolge
+
+- Vorab-Sync/Flush.
+- Snapshot schreiben.
+- Danach definierte Jahresabschluss-Mutationen.
+- Fehlerpfade.
+
+Abhaengig von: Paket 6.
+
+### Paket 8: Legacy-Migration
+
+- Alte File-Snapshots und `ruhestandsmodell_snapshot_*`.
+- `activeProfileId`-Fallbacks.
+- Migrationsreport.
+- `snapshotDB`-Cleanup.
+
+Abhaengig von: Paket 6.
+
+### Paket 9: UI-Texte und Exportpfad
+
+- Status-Texte.
+- Ordner verbinden nach Erweitert oder Export/Import verschieben.
+- Restore-Warnungen.
+
+Abhaengig von: Paket 6.
+
+### Paket 10: Dokumentation und Gates
+
+- README, TECHNICAL, BALANCE_MODULES, PROJEKTUEBERSICHT, archivierter Persistence-Plan.
+- Tests vollstaendig ausfuehren.
+- Tauri-Build oder Rust-Test nach Rust-Aenderungen.
+
+Abhaengig von: Pakete 4 bis 9.
 
 ## Review-Checkliste
 
-- [ ] Gibt es eine getrennte Snapshot-Ablage fuer Tauri?
-- [ ] Gibt es in der bestehenden IndexedDB `ruhestand-suite` einen separaten Store `snapshots` statt einer zweiten DB?
-- [ ] Bleibt `ruhestand_suite_data.json` frei von neuen Snapshot-Archivdaten?
-- [ ] Nutzen Tauri-Commands parametrisierte Targets statt duplizierter Snapshot-Commands?
-- [ ] Sind Snapshot-Operationen als optionale Adaptermethoden implementiert und ueber `PersistenceFacade` delegiert?
-- [ ] Enthaelt `SnapshotArchive` keine eigene IndexedDB-Open-Logik und keine direkten Tauri-IPC-Aufrufe?
-- [ ] Wird das Snapshot-Archiv nur bei Snapshot-Aktionen gelesen/geschrieben?
-- [ ] Liefert `listSnapshots()` einen leichten Index ohne vollstaendige `records`?
-- [ ] Setzt der IndexedDB-Adapter bei `versionchange` ein `outdated`-Flag und blockiert weitere Open-/Write-Versuche mit klarer Reload-Meldung?
-- [ ] Wird beim Restore kein `persistenceStorage.clear()` verwendet?
-- [ ] Bleiben andere Snapshots beim Restore erhalten?
-- [ ] Entsteht der Jahresabschluss-Snapshot vor `applyAnnualInflation()` und vor Altersfortschreibung?
-- [ ] Bricht der Jahresabschluss ab, wenn Snapshot-Erstellung fehlschlaegt?
-- [ ] Wird die Profil-Registry im Standard-Restore erhalten?
-- [ ] Speichert jeder neue Snapshot `activeProfileId` und optional `activeProfileName`?
-- [ ] Spielt Standard-Restore profilgebundene Live-Keys nur zurueck, wenn `snapshot.activeProfileId` in der aktuellen Registry existiert?
-- [ ] Speichert Standard-Restore vor dem Ueberschreiben zuerst das aktuell aktive Profil?
-- [ ] Aktualisiert Standard-Restore nach dem Schreiben die Registry-Daten von `snapshot.activeProfileId`?
-- [ ] Unterscheidet die Restore-Policy profilgebundene, globale fachliche und technische Keys?
-- [ ] Behandelt die Restore-Policy schema-gekoppelte `migration_*`-Marker als globale fachliche Keys, nicht als zu erhaltende technische Keys?
-- [ ] Verhindert Standard-Restore, dass ein Snapshot fuer Profil A still in Profil B geschrieben wird?
-- [ ] Gibt es eine explizite Warnung fuer Full Restore der Profil-Registry?
-- [ ] Informiert `versionchange` alte Browser-Tabs sichtbar oder laedt kontrolliert neu?
-- [ ] Bleibt `confirm_app_close` bewusst auf Live-Daten beschraenkt?
-- [ ] Wird die alte Browser-DB `snapshotDB` idempotent bereinigt?
-- [ ] Extrahiert die Legacy-Migration `activeProfileId` aus alten `full-localstorage`-Snapshots, falls moeglich?
-- [ ] Setzt die Legacy-Migration fuer Vor-Profilverbund-Snapshots ohne `rs_current_profile` `activeProfileId` auf `"default"`?
-- [ ] Synchronisiert und flusht der Jahresabschluss ausstehende UI-Eingaben, bevor der Snapshot erstellt wird?
-- [ ] Bleiben alte `full-localstorage`-Snapshots wiederherstellbar?
-- [ ] Sind Create, List, Restore, Delete und Jahresabschluss-Reihenfolge getestet?
+- [ ] Neue Snapshots landen nie im Live-Store.
+- [ ] `ruhestand_suite_data.json` bleibt frei von Snapshot-Archivdaten.
+- [ ] Tauri nutzt `ruhestand_suite_snapshots.json`.
+- [ ] IndexedDB hat Store `snapshots` in DB `ruhestand-suite` Version 2.
+- [ ] `blocked` und `versionchange` sind behandelt.
+- [ ] `SnapshotArchive` enthaelt keine Runtime-Logik.
+- [ ] `PersistenceFacade` delegiert Snapshot-Methoden an Adapter.
+- [ ] `listSnapshots()` liefert keinen Vollpayload mit `records`.
+- [ ] Snapshot-Schema ist eindeutig und validiert.
+- [ ] `recordCount` wird geprueft.
+- [ ] Restore nutzt kein pauschales `clear()`.
+- [ ] Restore ist fuer Live-Records all-or-nothing oder rollbackfaehig.
+- [ ] Standard-Restore erhaelt Profil-Registry.
+- [ ] Standard-Restore prueft `snapshot.activeProfileId`.
+- [ ] Fehlende fachliche Keys werden gemaess Policy behandelt.
+- [ ] Jahresabschluss-Snapshot entsteht vor Inflation und vor konkreter Alters-/Jahresmutation.
+- [ ] Jahresabschluss bricht bei Snapshot-Fehler ohne Mutation ab.
+- [ ] Legacy-Migration liefert einen Report.
+- [ ] Alte Snapshots bleiben lesbar oder werden als nicht standard-restore-faehig markiert.
+- [ ] Doku-Pfade sind korrekt.
+- [ ] Rollback-Einschraenkungen sind dokumentiert.
 
-## Empfohlene Umsetzungsreihenfolge
+## Nicht-Ziele fuer Slice 1
 
-1. Adaptervertrag und `PersistenceFacade` um optionale Snapshot-Methoden erweitern.
-2. SnapshotArchive als schlanke Fach-/Normalisierungsschicht mit In-Memory-Testadapter definieren.
-3. Key-Policy fuer Capture/Restore inklusive Profil-Registry- und `activeProfileId`-Regel testen.
-4. Tauri-State-Commands fuer `live`/`snapshots` parametrisieren und im Tauri-Adapter nutzen.
-5. IndexedDB `ruhestand-suite` auf Version 2 mit Store `snapshots` erweitern und im IndexedDB-Adapter nutzen.
-6. `StorageManager` auf SnapshotArchive umstellen.
-7. Jahresabschluss-Reihenfolge auf Snapshot-vor-Mutation korrigieren.
-8. Standard-Restore fuer feste Profil-Live-Keys anhand `snapshot.activeProfileId` mit Vorher-/Nachher-Profilsicherung implementieren.
-9. UI-Texte und Ordnerbutton bereinigen.
-10. Legacy-Lesepfad fuer alte Snapshots erhalten und `snapshotDB` bereinigen.
-11. Tests und Doku-Sync ausfuehren.
+- Keine Cloud-Synchronisation.
+- Keine Verschluesselung des Snapshot-Archivs.
+- Keine SQLite-Migration.
+- Kein komplexes Profil-Merge-UI.
+- Keine automatische Retention-Policy; optional nur UI-Warnung bei vielen Snapshots.
+- Kein Build der Tauri-EXE, ausser der konkrete Umsetzungsauftrag verlangt es.
 
-## Spaetere Ausbaustufe
+## Spaetere Ausbaustufen
 
-- Manuelle Aktion **Snapshot exportieren** fuer einzelne Archiv-Eintraege.
-- Manuelle Aktion **Snapshot importieren**.
-- Aufbewahrungsregeln, z. B. "letzte 10 Snapshots behalten".
-- Preview/Merge fuer Profil-Registry und Multi-Profil-Daten.
-- Physische Einzeldateien pro Snapshot statt Sammeldatei sind der empfohlene naechste Schritt, sobald Snapshot-Anzahl oder Archivgroesse zweistellig bzw. merklich wird.
+- Einzeldatei pro Snapshot statt Sammeldatei, wenn Archivgroesse merklich waechst.
+- Retention: z. B. letzte 30 bis 60 Snapshots behalten oder manuelle Archivierung.
+- Snapshot exportieren/importieren pro Eintrag.
+- Preview/Merge fuer Profil-Registry.
+- Browser-Level-Automation mit Playwright/Puppeteer fuer Multi-Tab-IDB-Upgrades.

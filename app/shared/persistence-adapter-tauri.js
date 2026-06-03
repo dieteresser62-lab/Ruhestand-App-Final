@@ -5,6 +5,11 @@ const DEFAULT_STATE = Object.freeze({
     records: {},
     metadata: {}
 });
+const DEFAULT_SNAPSHOT_ARCHIVE = Object.freeze({
+    schemaVersion: 1,
+    snapshots: []
+});
+const SNAPSHOT_TARGET = 'snapshots';
 
 function getInvoke(options = {}) {
     if (typeof options.invoke === 'function') return options.invoke;
@@ -44,13 +49,62 @@ function serializeState(state) {
     }, null, 2);
 }
 
+function normalizeSnapshotArchive(raw) {
+    if (!raw) return { ...DEFAULT_SNAPSHOT_ARCHIVE, snapshots: [] };
+    const parsed = JSON.parse(String(raw));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error('Tauri-Snapshot-Archiv ist ungueltig.');
+    }
+    if (Number(parsed.schemaVersion) !== 1) {
+        throw new Error(`Tauri-Snapshot-Archiv-Schema ${parsed.schemaVersion} wird nicht unterstuetzt.`);
+    }
+    if (!Array.isArray(parsed.snapshots)) {
+        throw new Error('Tauri-Snapshot-Archiv enthaelt keine gueltige Snapshot-Liste.');
+    }
+    return {
+        schemaVersion: 1,
+        savedAt: parsed.savedAt ? String(parsed.savedAt) : '',
+        snapshots: parsed.snapshots.filter(snapshot => snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot))
+    };
+}
+
+function serializeSnapshotArchive(archive) {
+    return JSON.stringify({
+        schemaVersion: 1,
+        savedAt: new Date().toISOString(),
+        snapshots: archive.snapshots || []
+    }, null, 2);
+}
+
+function toSnapshotIndexEntry(snapshot) {
+    const { records, ...indexEntry } = snapshot || {};
+    return indexEntry;
+}
+
 export function createTauriJsonFileAdapter(options = {}) {
     let invoke = null;
     let state = { ...DEFAULT_STATE, records: Object.create(null), metadata: Object.create(null) };
+    let snapshotArchive = { ...DEFAULT_SNAPSHOT_ARCHIVE, snapshots: [] };
     let opened = false;
+    let snapshotsOpened = false;
 
     async function persist() {
         await invoke('save_app_state', { content: serializeState(state) });
+    }
+
+    async function ensureSnapshotsOpen() {
+        if (snapshotsOpened) return;
+        if (!invoke) invoke = getInvoke(options);
+        const raw = await invoke('load_app_state', { target: SNAPSHOT_TARGET });
+        snapshotArchive = normalizeSnapshotArchive(raw);
+        snapshotsOpened = true;
+    }
+
+    async function persistSnapshots() {
+        await invoke('save_app_state', {
+            target: SNAPSHOT_TARGET,
+            content: serializeSnapshotArchive(snapshotArchive)
+        });
     }
 
     return {
@@ -98,6 +152,43 @@ export function createTauriJsonFileAdapter(options = {}) {
         async writeMetadata(key, value) {
             state.metadata[String(key)] = value;
             await persist();
+        },
+        async listSnapshots() {
+            await ensureSnapshotsOpen();
+            return snapshotArchive.snapshots.map(toSnapshotIndexEntry);
+        },
+        async readSnapshot(id) {
+            await ensureSnapshotsOpen();
+            const snapshotId = String(id || '');
+            const snapshot = snapshotArchive.snapshots.find(entry => String(entry?.id || '') === snapshotId);
+            if (!snapshot) {
+                throw new Error(`Snapshot ${snapshotId} wurde nicht gefunden.`);
+            }
+            return snapshot;
+        },
+        async writeSnapshot(snapshot) {
+            await ensureSnapshotsOpen();
+            const snapshotId = String(snapshot?.id || '');
+            if (!snapshotId) {
+                throw new Error('Snapshot-ID fehlt.');
+            }
+            const snapshots = snapshotArchive.snapshots.filter(entry => String(entry?.id || '') !== snapshotId);
+            snapshots.push(snapshot);
+            snapshotArchive = { ...snapshotArchive, snapshots };
+            await persistSnapshots();
+            return true;
+        },
+        async deleteSnapshot(id) {
+            await ensureSnapshotsOpen();
+            const snapshotId = String(id || '');
+            const snapshots = snapshotArchive.snapshots.filter(entry => String(entry?.id || '') !== snapshotId);
+            if (snapshots.length === snapshotArchive.snapshots.length) return false;
+            snapshotArchive = { ...snapshotArchive, snapshots };
+            await persistSnapshots();
+            return true;
+        },
+        async migrateLegacySnapshotsIfNeeded() {
+            return { migratedCount: 0, skippedCount: 0, notStandardRestorableCount: 0, errors: [] };
         },
         async quarantine() {
             if (!invoke) invoke = getInvoke(options);

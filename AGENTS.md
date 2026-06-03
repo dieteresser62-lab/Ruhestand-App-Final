@@ -10,6 +10,14 @@
 - Desktop-Paketierung läuft über Tauri in `src-tauri/`.
 - Generierte Artefakte sind insbesondere `engine.js`, `dist/` und `RuheStandSuite.exe`; diese sind nicht der primäre Bearbeitungsort.
 
+## Arbeitsdokumente und Branches
+- Ein Arbeitsdokument ist ein zu implementierendes neues Feature oder ein komplexes Refactoring unter `docs/internal/`.
+- Arbeiten aus einem Arbeitsdokument müssen vor der ersten Umsetzung auf einem eigenen Feature-Branch beginnen.
+- Der Feature-Branch ist im Arbeitsdokument bzw. Arbeitsplan zu dokumentieren.
+- Wenn GitHub-Zugriff verfügbar und freigegeben ist, wird der Feature-Branch zu Beginn auf GitHub veröffentlicht; andernfalls wird dokumentiert, dass der Branch nur lokal angelegt wurde bzw. die Veröffentlichung noch aussteht.
+- Empfohlene Branch-Namen sind sprechend und präfixiert, z. B. `feature/<kurzname>` oder bei Codex-Branches `codex/<kurzname>`.
+- Umsetzungs-, Paket- und Slice-Nummern beginnen immer bei 1. Keine neuen Arbeitsplaene, Paketlisten oder Slice-Dateien mit 0-basierter Nummerierung anlegen.
+
 ## Source of Truth
 - Laufzeit- und Build-Kommandos: `package.json`
 - Produkt- und Funktionsüberblick: `README.md`
@@ -25,6 +33,10 @@
   - `CLAUDE.md`
   - `CODEX.md`
   - `GEMINI.md`
+
+## Rollenverteilung
+- **Antigravity (Gemini):** Agiert ausschliesslich als **superkritischer Reviewer & Analyst**. Hat Lesezugriff auf Applikationscode, darf diesen aber niemals modifizieren. Erstellt/aktualisiert Pläne, Slices, Dokumentationen und Reviews.
+- **Codex:** Agiert als **Implementer** und technischer Reviewer. Nimmt die eigentlichen Code-Aenderungen auf Feature-Branches vor und führt lokale Commits nach erfolgreichen Reviews durch.
 
 ## Ausführung
 - Start implementation/review immediately for actionable tasks.
@@ -42,6 +54,17 @@
   - `workers/` und DOM-freie Runner für parallele Rechenpfade.
 - `engine.js` nie manuell editieren; Änderungen an `engine/` laufen über `build-engine.mjs`.
 - `dist/` und `RuheStandSuite.exe` nur anfassen, wenn der Auftrag explizit Build-, Sync- oder Release-Artefakte umfasst.
+- Für in Slices geplante Arbeiten gelten zusätzlich die Slice-Regeln in `docs/internal/SLICE_EXECUTION_RULES.md`: 1-basierte Nummerierung, eigener Feature-Branch, eigene Slice-MD, Diff-Risiko vor Coding, Stop-Regeln, Abschlussdokumentation, lokaler Git-Commit nach erfolgreichem Review, Freigabe vor Push und Rückdokumentation im Arbeitsplan.
+
+## Agent Stop Rules
+- Stoppe und frage nach, wenn mehr als 5 Dateien geändert werden müssten.
+- Stoppe und frage nach, wenn Tests nicht ausführbar sind oder die notwendige Validierung nicht sinnvoll ersetzbar ist.
+- Stoppe und frage nach, wenn ein Contract unklar ist.
+- Stoppe und frage nach, wenn bestehende Engine-Semantik verändert werden müsste.
+- Stoppe und frage nach, wenn Snapshot-/Backtest-Ergebnisse unerwartet abweichen.
+- Stoppe und frage nach, wenn FlowDelta auffällig wird.
+- Stoppe und frage nach, wenn UI und Engine unterschiedliche Parameternamen verwenden.
+- Stoppe und frage nach, wenn `minimumFlexAnnual` irgendwo still begrenzt statt validiert wird.
 
 ## Validierung
 - Default: `npm test`

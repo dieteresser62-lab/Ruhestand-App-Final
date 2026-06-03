@@ -7,6 +7,8 @@
 ## Shared Rules
 - Follow the execution, validation, safety, and marker contract defined in `AGENTS.md`.
 - Keep this file consistent with `CODEX.md` and `GEMINI.md`.
+- For work driven by an internal Arbeitsdokument for a new feature or complex refactoring, require a dedicated feature branch before implementation and ensure the branch is documented in the plan; GitHub publication requires available/approved permission.
+- Number implementation packages, slices, and related working-plan entries starting at 1; do not create new 0-based package or slice numbering.
 
 ## Claude-Specific Output Duties
 - In review/confirmation steps, emit phase-based approval markers (primarily `PHASE1_APPROVAL` or `PHASE2_APPROVAL`) exactly as required by the prompt.

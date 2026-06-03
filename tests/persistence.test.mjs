@@ -17,7 +17,13 @@ import {
     importAll,
     init,
     keysSync,
+    listSnapshots,
+    readSnapshot,
+    writeSnapshot,
+    deleteSnapshot,
+    migrateLegacySnapshotsIfNeeded,
     persistenceStorage,
+    replaceLiveRecords,
     removeItemSync,
     resetPersistenceForTests,
     resetPersistenceRuntimeForTests,
@@ -593,18 +599,25 @@ try {
 
     console.log('Test 13: Tauri JSON adapter stores records via Rust commands');
     {
-        let fileContent = '';
+        let liveFileContent = '';
+        let snapshotFileContent = '';
         const calls = [];
         const adapter = createTauriJsonFileAdapter({
             invoke: async (command, args = {}) => {
                 calls.push([command, args]);
-                if (command === 'load_app_state') return fileContent;
+                if (command === 'load_app_state') {
+                    return args.target === 'snapshots' ? snapshotFileContent : liveFileContent;
+                }
                 if (command === 'save_app_state') {
-                    fileContent = args.content;
+                    if (args.target === 'snapshots') {
+                        snapshotFileContent = args.content;
+                    } else {
+                        liveFileContent = args.content;
+                    }
                     return null;
                 }
                 if (command === 'quarantine_app_state') {
-                    fileContent = '';
+                    liveFileContent = '';
                     return 'corrupt-file.json';
                 }
                 throw new Error(`unknown command ${command}`);
@@ -622,7 +635,38 @@ try {
         await adapter.saveBatch({ upserts: [], deletes: ['alpha'] });
         loaded = await adapter.loadAll();
         assertEqual(loaded.alpha, undefined, 'Tauri Adapter loescht Records');
-        assert(calls.some(([command]) => command === 'save_app_state'), 'Tauri Adapter ruft save_app_state auf');
+        assert(calls.some(([command, args]) => command === 'save_app_state' && !args.target), 'Tauri Adapter schreibt Live-State ohne explizites Target');
+
+        const snapshot = {
+            id: 'snapshot_2026-06-03T10-00-00-000Z--Tauri',
+            schemaVersion: 1,
+            snapshotType: 'balance-annual-close-v1',
+            label: 'Tauri',
+            createdAt: '2026-06-03T10:00:00.000Z',
+            activeProfileId: 'default',
+            recordCount: 1,
+            records: { balance_expenses_v1: '{}' }
+        };
+        await adapter.writeSnapshot(snapshot);
+        const listedSnapshots = await adapter.listSnapshots();
+        assertEqual(listedSnapshots.length, 1, 'Tauri Adapter listet Snapshot-Index aus separatem Target');
+        assertEqual(listedSnapshots[0].records, undefined, 'Snapshot-Index enthaelt keinen Vollpayload');
+        const readSnapshot = await adapter.readSnapshot(snapshot.id);
+        assertEqual(readSnapshot.records.balance_expenses_v1, '{}', 'Tauri Adapter liest Vollsnapshot aus separatem Target');
+        assert(snapshotFileContent.includes(snapshot.id), 'Snapshot-Datei enthaelt Snapshot-ID');
+        assert(!liveFileContent.includes(snapshot.id), 'Live-Datei enthaelt keine Snapshot-Archivdaten');
+        assert(
+            calls.some(([command, args]) => command === 'save_app_state' && args.target === 'snapshots'),
+            'Tauri Adapter schreibt Snapshot-Archiv mit target snapshots'
+        );
+        assert(
+            calls.some(([command, args]) => command === 'load_app_state' && args.target === 'snapshots'),
+            'Tauri Adapter laedt Snapshot-Archiv mit target snapshots'
+        );
+        const deleted = await adapter.deleteSnapshot(snapshot.id);
+        assertEqual(deleted, true, 'Tauri Adapter loescht vorhandenen Snapshot');
+        const deletedAgain = await adapter.deleteSnapshot(snapshot.id);
+        assertEqual(deletedAgain, false, 'Tauri Adapter meldet fehlenden Snapshot beim zweiten Delete');
     }
 
     console.log('Test 14: Tauri JSON adapter quarantines corrupt state');
@@ -808,6 +852,119 @@ try {
         assertEqual(getItemSync('concurrency_key2'), 'new_val', 'Concurrent write is preserved after failed flush');
         assert(getDirtyState().dirtyKeys.includes('concurrency_key2'), 'Key is in dirty list');
         assert(!getDirtyState().deletedKeys.includes('concurrency_key2'), 'Key is not in deleted list');
+    }
+
+    console.log('Test 22: snapshot facade methods delegate to adapter contract');
+    {
+        const calls = [];
+        const adapter = {
+            name: 'snapshot-memory',
+            async open() {},
+            async loadAll() { return {}; },
+            async saveBatch() {},
+            async listSnapshots() {
+                calls.push('list');
+                return [{ id: 's1', createdAt: '2026-06-03T10:00:00.000Z' }];
+            },
+            async readSnapshot(id) {
+                calls.push(`read:${id}`);
+                return { id, records: { a: '1' } };
+            },
+            async writeSnapshot(snapshot) {
+                calls.push(`write:${snapshot.id}`);
+            },
+            async deleteSnapshot(id) {
+                calls.push(`delete:${id}`);
+            },
+            async migrateLegacySnapshotsIfNeeded() {
+                calls.push('migrate');
+                return { migratedCount: 1, skippedCount: 0, notStandardRestorableCount: 0, errors: [] };
+            }
+        };
+        resetPersistenceForTests(adapter);
+        await init();
+
+        const listed = await listSnapshots();
+        const read = await readSnapshot('s1');
+        await writeSnapshot({ id: 's2' });
+        await deleteSnapshot('s1');
+        const migrationReport = await migrateLegacySnapshotsIfNeeded();
+
+        assertEqual(listed[0].id, 's1', 'listSnapshots delegiert an Adapter');
+        assertEqual(read.records.a, '1', 'readSnapshot delegiert an Adapter');
+        assertEqual(migrationReport.migratedCount, 1, 'Legacy-Migration delegiert an Adapter');
+        assertEqual(calls.join(','), 'list,read:s1,write:s2,delete:s1,migrate', 'Snapshot-Methoden werden in erwarteter Reihenfolge delegiert');
+    }
+
+    console.log('Test 23: localStorage facade fallback stores snapshots outside normal records');
+    {
+        const storage = new MockStorage();
+        global.localStorage = storage;
+        resetPersistenceForTests(createLocalStorageAdapter(() => global.localStorage));
+        await init();
+
+        await writeSnapshot({
+            id: 'local-snapshot',
+            createdAt: '2026-06-03T10:00:00.000Z',
+            records: { [CONFIG.STORAGE.LS_KEY]: '{}' }
+        });
+        const listed = await listSnapshots();
+        const read = await readSnapshot('local-snapshot');
+        const deleted = await deleteSnapshot('local-snapshot');
+        const migrationReport = await migrateLegacySnapshotsIfNeeded();
+
+        assertEqual(listed.length, 1, 'localStorage-Fallback listet Snapshot');
+        assertEqual(listed[0].records, undefined, 'localStorage-Fallback listet nur Indexdaten');
+        assertEqual(read.records[CONFIG.STORAGE.LS_KEY], '{}', 'localStorage-Fallback liest Vollsnapshot');
+        assertEqual(deleted, true, 'localStorage-Fallback loescht Snapshot');
+        assertEqual((await listSnapshots()).length, 0, 'localStorage-Fallback ist nach Delete leer');
+        assertEqual(migrationReport.migratedCount, 0, 'localStorage-Fallback liefert neutralen Migrationsreport');
+        assert(storage.getItem('rs_snapshot_archive_v1'), 'Snapshot-Fallback nutzt separaten Archiv-Key');
+    }
+
+    console.log('Test 24: replaceLiveRecords applies allowKey and rolls back cache on failure');
+    {
+        const adapter = createMemoryAdapter({ keep: 'old', remove: 'gone', blocked: 'stay' }, { failSave: true });
+        resetPersistenceForTests(adapter);
+        await init();
+
+        let thrown = false;
+        try {
+            await replaceLiveRecords({}, {
+                deleteKeys: ['remove', 'blocked'],
+                upserts: [['keep', 'new'], ['added', '1'], ['blocked', 'changed']],
+                allowKey: (key) => key !== 'blocked'
+            });
+        } catch {
+            thrown = true;
+        }
+
+        assertEqual(thrown, true, 'replaceLiveRecords gibt Adapterfehler weiter');
+        assertEqual(getItemSync('keep'), 'old', 'Rollback stellt geaenderten Cache-Key wieder her');
+        assertEqual(getItemSync('remove'), 'gone', 'Rollback stellt geloeschten Cache-Key wieder her');
+        assertEqual(getItemSync('added'), null, 'Rollback entfernt neuen Cache-Key');
+        assertEqual(getItemSync('blocked'), 'stay', 'allowKey blockiert Delete und Upsert');
+        assertEqual(adapter.store.get('keep'), 'old', 'Fehlgeschlagener Fake-Adapter bleibt unveraendert');
+    }
+
+    console.log('Test 25: replaceLiveRecords writes filtered live records all-or-nothing on success');
+    {
+        const adapter = createMemoryAdapter({ remove: 'old', blocked: 'stay' });
+        resetPersistenceForTests(adapter);
+        await init();
+
+        const result = await replaceLiveRecords({}, {
+            deleteKeys: ['remove', 'blocked'],
+            upserts: [['added', 2], ['blocked', 'changed']],
+            allowKey: (key) => key !== 'blocked'
+        });
+
+        assertEqual(result.ok, true, 'replaceLiveRecords meldet Erfolg');
+        assertEqual(getItemSync('remove'), null, 'Erlaubter Delete ist im Cache sichtbar');
+        assertEqual(getItemSync('added'), '2', 'Erlaubter Upsert ist im Cache sichtbar');
+        assertEqual(getItemSync('blocked'), 'stay', 'Nicht erlaubter Key bleibt erhalten');
+        assertEqual(adapter.store.has('remove'), false, 'Erlaubter Delete ist im Adapter sichtbar');
+        assertEqual(adapter.store.get('added'), '2', 'Erlaubter Upsert ist im Adapter sichtbar');
     }
 
     console.log('Persistence tests passed');
