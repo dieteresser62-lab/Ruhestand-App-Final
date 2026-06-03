@@ -79,7 +79,7 @@ Jede Slice-MD enthaelt mindestens:
 ## Commit und GitHub
 
 - Nach erfolgreicher Beendigung eines Slice durch Codex prüft Gemini (Antigravity) die Änderungen.
-- Sobald das Review von Gemini und dem Nutzer **positiv ausfällt (Freigabe erteilt)**, führt Codex sofort einen **lokalen Git-Commit** durch (z. B. `git commit -m "slice-04: facade contract done"`).
+- Sobald das Review von Gemini und dem Nutzer **positiv ausfällt (Freigabe erteilt)**, führt Gemini (Antigravity) als Review-Abnahme sofort den **lokalen Git-Commit** aus (z. B. `git commit -m "slice-04: facade contract done"`). Codex selbst erstellt keine Commits.
 - Dies stellt einen sicheren Speicherpunkt für eventuelle Rollbacks der folgenden Slices dar.
 - Ein **Push nach GitHub** (bzw. die Freigabe des Remote-Branches) erfolgt erst nach ausdrücklicher Freigabe des Nutzers, niemals automatisch.
 - Die Slice-MD muss vor dem Commit den tatsächlichen Stand dokumentieren.
