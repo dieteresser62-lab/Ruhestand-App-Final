@@ -26,7 +26,7 @@ Bevor ein neues Feature oder Refactoring implementiert wird, entwirft Codex das 
 1. **Erstellung:** Codex entwirft den Plan als Autor und beschreibt Ziele, Architektur, offene Fragen und die 1-basierten Umsetzungspakete.
 2. **Review:** Gemini (Antigravity) und optional Claude Code lesen das Arbeitsdokument. Sie tragen ihre Kritik, Risikobewertungen und offenen Fragen direkt am Ende des Arbeitsdokuments unter der Sektion `## Review-Feedback von Gemini` (bzw. `## Review-Feedback von Claude`) ein.
 3. **Korrektur:** Codex überarbeitet den Plan basierend auf diesem Feedback und dokumentiert seine Antworten unter `## Review-Antworten von Codex` am Ende des Plans.
-4. **Freigabe:** Erst wenn Gemini das Review-Feedback als gelöst markiert und der Status auf `implementierungsreif` gesetzt ist (Freigabe erteilt), darf der Feature-Branch gestartet und die Slice-Umsetzung begonnen werden.
+4. **Freigabe & Commit:** Erst wenn Gemini das Review-Feedback als gelöst markiert und der Status auf `implementierungsreif` gesetzt ist (Freigabe erteilt), wird das finale Arbeitsdokument in Git committet und auf GitHub in den passenden Feature-Branch gepusht. Erst danach darf die Slice-Umsetzung begonnen werden.
 
 ## Ablage
 
