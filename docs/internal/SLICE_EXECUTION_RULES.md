@@ -19,6 +19,15 @@ Rollenverteilung:
 - Wenn GitHub-Zugriff verfuegbar und freigegeben ist, wird der Feature-Branch zu Beginn auf GitHub veroeffentlicht. Wenn das nicht moeglich ist, wird im Arbeitsplan dokumentiert, dass der Branch lokal ist bzw. die GitHub-Veroeffentlichung noch aussteht.
 - Empfohlene Branch-Namen sind sprechend und praefixiert, z. B. `feature/<kurzname>` oder bei Codex-Branches `codex/<kurzname>`.
 
+## Review von Arbeitsdokumenten (Planungsphase)
+
+Bevor ein neues Feature oder Refactoring implementiert wird, entwirft Codex das Arbeitsdokument (z. B. `BALANCE_JAHRESABSCHLUSS_SNAPSHOT_PLAN.md`) unter `docs/internal/`. Auch hier wird ein strukturierter Kommunikationsfluss auf Planebene etabliert:
+
+1. **Erstellung:** Codex entwirft den Plan als Autor und beschreibt Ziele, Architektur, offene Fragen und die 1-basierten Umsetzungspakete.
+2. **Review:** Gemini (Antigravity) und optional Claude Code lesen das Arbeitsdokument. Sie tragen ihre Kritik, Risikobewertungen und offenen Fragen direkt am Ende des Arbeitsdokuments unter der Sektion `## Review-Feedback von Gemini` (bzw. `## Review-Feedback von Claude`) ein.
+3. **Korrektur:** Codex überarbeitet den Plan basierend auf diesem Feedback und dokumentiert seine Antworten unter `## Review-Antworten von Codex` am Ende des Plans.
+4. **Freigabe:** Erst wenn Gemini das Review-Feedback als gelöst markiert und der Status auf `implementierungsreif` gesetzt ist (Freigabe erteilt), darf der Feature-Branch gestartet und die Slice-Umsetzung begonnen werden.
+
 ## Ablage
 
 - Jeder Slice bekommt eine eigene MD-Datei unter `docs/internal/`.
