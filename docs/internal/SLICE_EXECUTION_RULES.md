@@ -1,6 +1,6 @@
 # Slice Execution Rules
 
-**Stand:** 2026-06-02  
+**Stand:** 2026-06-03  
 **Status:** verbindliche interne Arbeitsregel fuer geplante Umsetzungsslices
 
 ## Zweck
