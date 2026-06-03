@@ -627,6 +627,10 @@ Abhaengig von: Paket 3.
 
 ### Paket 5: IndexedDB Store `snapshots`
 
+Slice-Dokument: `docs/internal/SLICE_BALANCE_SNAPSHOTS_06_INDEXEDDB_SNAPSHOT_STORE.md`  
+Branch: `codex-balance-snapshot-key-policy`  
+Status: abgeschlossen, freigegeben durch Gemini; bereit fuer Commit.
+
 - Version auf 2.
 - Store `snapshots`.
 - `blocked`, `versionchange`, `outdated`.

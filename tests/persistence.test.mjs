@@ -112,7 +112,7 @@ function nextTick() {
     return new Promise(resolve => setTimeout(resolve, 0));
 }
 
-function createFakeIndexedDB() {
+function createFakeIndexedDB(options = {}) {
     class FakeObjectStore {
         constructor(store) {
             this.store = store;
@@ -156,40 +156,65 @@ function createFakeIndexedDB() {
     }
 
     class FakeTransaction {
-        constructor(db, storeName) {
+        constructor(db, storeNames) {
             this.db = db;
-            this.storeName = storeName;
+            this.storeNames = Array.isArray(storeNames) ? storeNames : [storeNames];
             setTimeout(() => this.oncomplete?.(), 0);
         }
         objectStore(storeName) {
-            return new FakeObjectStore(this.db.stores.get(storeName));
+            if (!this.storeNames.includes(storeName)) {
+                throw new Error(`Store ${storeName} ist nicht Teil der Transaktion.`);
+            }
+            const store = this.db.stores.get(storeName);
+            if (!store) throw new Error(`Store ${storeName} existiert nicht.`);
+            return new FakeObjectStore(store);
         }
     }
 
     class FakeDatabase {
         constructor() {
             this.stores = new Map();
+            this.version = 0;
+            this.closed = false;
             this.objectStoreNames = {
                 contains: (name) => this.stores.has(name)
             };
         }
         createObjectStore(name) {
+            if (this.stores.has(name)) return;
             this.stores.set(name, new Map());
         }
-        transaction(storeName) {
-            return new FakeTransaction(this, storeName);
+        transaction(storeNames) {
+            if (this.closed) throw new Error('Database is closed');
+            return new FakeTransaction(this, storeNames);
         }
-        close() {}
+        close() {
+            this.closed = true;
+        }
+        reopen() {
+            this.closed = false;
+        }
+        triggerVersionChange() {
+            this.onversionchange?.();
+        }
     }
 
     const db = new FakeDatabase();
     return {
         db,
-        open() {
+        open(_name, version = 1) {
             const request = {};
             setTimeout(() => {
+                if (options.blocked) {
+                    request.onblocked?.();
+                    return;
+                }
+                db.reopen();
                 request.result = db;
-                request.onupgradeneeded?.();
+                if (version > db.version) {
+                    db.version = version;
+                    request.onupgradeneeded?.();
+                }
                 request.onsuccess?.();
             }, 0);
             return request;
@@ -200,6 +225,8 @@ function createFakeIndexedDB() {
 const prevLocalStorage = global.localStorage;
 const prevWindow = global.window;
 const prevDocument = global.document;
+const prevDispatchEvent = global.dispatchEvent;
+const prevCustomEvent = global.CustomEvent;
 
 try {
     console.log('Test 1: runtime detection');
@@ -570,8 +597,10 @@ try {
         });
 
         await adapter.open();
+        assertEqual(fakeIndexedDB.db.version, 2, 'IndexedDB Adapter oeffnet Version 2');
         assert(fakeIndexedDB.db.stores.has('kv'), 'IndexedDB Adapter erstellt kv Store');
         assert(fakeIndexedDB.db.stores.has('metadata'), 'IndexedDB Adapter erstellt metadata Store');
+        assert(fakeIndexedDB.db.stores.has('snapshots'), 'IndexedDB Adapter erstellt snapshots Store');
 
         await adapter.saveBatch({
             upserts: [['a', '1'], ['b', 2]],
@@ -595,6 +624,101 @@ try {
         await adapter.writeMetadata('migration', { done: true });
         const metadata = await adapter.readMetadata('migration');
         assertEqual(metadata.done, true, 'IndexedDB Adapter liest Metadata getrennt vom KV-Store');
+
+        const snapshot = {
+            id: 'snapshot_2026-06-03T10-00-00-000Z--IndexedDB',
+            schemaVersion: 1,
+            snapshotType: 'persistence-records-v1',
+            label: 'IndexedDB',
+            createdAt: '2026-06-03T10:00:00.000Z',
+            activeProfileId: 'default',
+            recordCount: 1,
+            records: { balance_expenses_v1: '{}' }
+        };
+        await adapter.writeSnapshot(snapshot);
+        assert(fakeIndexedDB.db.stores.get('snapshots').has(snapshot.id), 'IndexedDB Adapter schreibt Snapshot in separaten Store');
+        assert(!fakeIndexedDB.db.stores.get('kv').has(snapshot.id), 'Snapshot-ID landet nicht im Live-KV-Store');
+        const listedSnapshots = await adapter.listSnapshots();
+        assertEqual(listedSnapshots.length, 1, 'IndexedDB Adapter listet Snapshot-Index');
+        assertEqual(listedSnapshots[0].records, undefined, 'IndexedDB Snapshot-Index enthaelt keinen Vollpayload');
+        const readSnapshot = await adapter.readSnapshot(snapshot.id);
+        assertEqual(readSnapshot.records.balance_expenses_v1, '{}', 'IndexedDB Adapter liest Vollsnapshot');
+        const deletedSnapshot = await adapter.deleteSnapshot(snapshot.id);
+        assertEqual(deletedSnapshot, true, 'IndexedDB Adapter loescht vorhandenen Snapshot');
+        const deletedAgain = await adapter.deleteSnapshot(snapshot.id);
+        assertEqual(deletedAgain, false, 'IndexedDB Adapter meldet fehlenden Snapshot beim zweiten Delete');
+
+        const replaceResult = await adapter.replaceLiveRecords({}, {
+            deleteKeys: ['b'],
+            upserts: [['d', 4]]
+        });
+        assertEqual(replaceResult.ok, true, 'IndexedDB Adapter ersetzt Live-Records ueber eigenen Contract');
+        const afterReplace = await adapter.loadAll();
+        assertEqual(afterReplace.b, undefined, 'IndexedDB replaceLiveRecords loescht Live-Key');
+        assertEqual(afterReplace.d, '4', 'IndexedDB replaceLiveRecords schreibt Live-Upsert');
+
+        const migrationReport = await adapter.migrateLegacySnapshotsIfNeeded();
+        assertEqual(migrationReport.migratedCount, 0, 'IndexedDB Snapshot-Migration liefert neutralen Report');
+    }
+
+    console.log('Test 12b: IndexedDB adapter handles versionchange as outdated');
+    {
+        const events = [];
+        global.CustomEvent = class {
+            constructor(type, options = {}) {
+                this.type = type;
+                this.detail = options.detail;
+            }
+        };
+        global.dispatchEvent = (event) => {
+            events.push(event);
+            return true;
+        };
+        const fakeIndexedDB = createFakeIndexedDB();
+        const adapter = createIndexedDbAdapter({
+            indexedDB: fakeIndexedDB,
+            dbName: 'versionchange-test'
+        });
+
+        await adapter.open();
+        fakeIndexedDB.db.triggerVersionChange();
+
+        let thrown = false;
+        try {
+            await adapter.loadAll();
+        } catch (err) {
+            thrown = err?.code === 'indexeddb-outdated';
+        }
+        assertEqual(thrown, true, 'IndexedDB Adapter blockiert Calls nach versionchange');
+        assert(events.some(event => event.type === 'persistence:outdated'), 'IndexedDB Adapter dispatcht Outdated-Event');
+    }
+
+    console.log('Test 12c: IndexedDB adapter rejects blocked upgrades');
+    {
+        const events = [];
+        global.CustomEvent = class {
+            constructor(type, options = {}) {
+                this.type = type;
+                this.detail = options.detail;
+            }
+        };
+        global.dispatchEvent = (event) => {
+            events.push(event);
+            return true;
+        };
+        const adapter = createIndexedDbAdapter({
+            indexedDB: createFakeIndexedDB({ blocked: true }),
+            dbName: 'blocked-upgrade-test'
+        });
+
+        let thrown = false;
+        try {
+            await adapter.open();
+        } catch (err) {
+            thrown = err?.code === 'indexeddb-upgrade-blocked';
+        }
+        assertEqual(thrown, true, 'IndexedDB Adapter lehnt blockiertes Upgrade klar ab');
+        assert(events.some(event => event.type === 'persistence:upgrade-blocked'), 'IndexedDB Adapter dispatcht Upgrade-Blocked-Event');
     }
 
     console.log('Test 13: Tauri JSON adapter stores records via Rust commands');
@@ -973,6 +1097,8 @@ try {
     if (prevLocalStorage === undefined) delete global.localStorage; else global.localStorage = prevLocalStorage;
     if (prevWindow === undefined) delete global.window; else global.window = prevWindow;
     if (prevDocument === undefined) delete global.document; else global.document = prevDocument;
+    if (prevDispatchEvent === undefined) delete global.dispatchEvent; else global.dispatchEvent = prevDispatchEvent;
+    if (prevCustomEvent === undefined) delete global.CustomEvent; else global.CustomEvent = prevCustomEvent;
 }
 
 console.log('--- Persistence Tests Completed ---');
