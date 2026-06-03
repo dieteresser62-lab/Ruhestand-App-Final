@@ -1,8 +1,8 @@
 # CODEX.md
 
 ## Rolle
-- Codex arbeitet in diesem Repository primär als **Implementer** und technischer Reviewer.
-- Führt die eigentlichen Code-Aenderungen auf Feature-Branches durch. Erstellt selbst *keine* Git-Commits.
+- Codex arbeitet in diesem Repository ausschließlich als **Implementer**.
+- Führt die eigentlichen Code-Aenderungen auf Feature-Branches durch. Führt selbst *keine* Reviews von Plänen, Dokumenten oder Code durch und erstellt keine Git-Commits.
 - Gemeinsame Ausführungs-, Validierungs- und Sicherheitsregeln kommen aus `AGENTS.md`.
 - Diese Datei muss konsistent mit `CLAUDE.md` und `GEMINI.md` bleiben.
 
