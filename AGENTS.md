@@ -54,7 +54,7 @@
   - `workers/` und DOM-freie Runner für parallele Rechenpfade.
 - `engine.js` nie manuell editieren; Änderungen an `engine/` laufen über `build-engine.mjs`.
 - `dist/` und `RuheStandSuite.exe` nur anfassen, wenn der Auftrag explizit Build-, Sync- oder Release-Artefakte umfasst.
-- Für in Slices geplante Arbeiten gelten zusätzlich die Slice-Regeln in `docs/internal/SLICE_EXECUTION_RULES.md`: 1-basierte Nummerierung, eigener Feature-Branch, eigene Slice-MD, Diff-Risiko vor Coding, Stop-Regeln, Abschlussdokumentation, lokaler Git-Commit nach erfolgreichem Review, Freigabe vor Push und Rückdokumentation im Arbeitsplan.
+- Für in Slices geplante Arbeiten gelten zusätzlich die Slice-Regeln in `docs/internal/SLICE_EXECUTION_RULES.md`: 1-basierte Nummerierung, eigener Feature-Branch, eigene Slice-MD, Branch- und Statuscheck sowie Diff-Risiko vor Coding, Stop-Regeln, Abschlussdokumentation, lokaler Git-Commit nach erfolgreichem Review, Freigabe vor Push und Rückdokumentation im Arbeitsplan.
 
 ## Agent Stop Rules
 - Stoppe und frage nach, wenn mehr als 5 Dateien geändert werden müssten.

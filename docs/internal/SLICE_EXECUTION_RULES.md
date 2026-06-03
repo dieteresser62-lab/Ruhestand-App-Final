@@ -41,9 +41,12 @@ Bevor ein neues Feature oder Refactoring implementiert wird, entwirft Codex das 
 - Der Agent schlaegt die Slices im Hauptplan vor und erstellt die jeweilige Slice-MD vor Beginn der Arbeiten selbststaendig.
 - Nach Abschluss wird das Ergebnis in der Slice-MD dokumentiert und in der uebergeordneten Arbeitsplan-MD zurueckdokumentiert.
 
-## Git-Status und Diff-Risiko vor Coding
+## Git-Status, Branch-Check und Diff-Risiko vor Coding
 
-Vor dem Start eines neuen Umsetzungsslices muss Codex zuerst `git status --short` ausführen und dokumentieren, um sicherzustellen, dass die Arbeitsumgebung sauber ist.
+Vor dem Start eines neuen Umsetzungsslices muss Codex zuerst den aktuellen Branch ermitteln und prüfen:
+1. `git branch --show-current` ausführen.
+2. `git status --short` ausführen.
+Beide Ausgaben müssen in der Slice-MD dokumentiert werden. Wenn der aktive Branch nicht zum im übergeordneten Arbeitsdokument definierten Feature-Branch passt, MUSS Codex stoppen und nachfragen.
 Erst danach gibt Codex vor dem ersten Code-Edit einen Diff-Risiko-Block aus:
 
 ```text
@@ -81,8 +84,9 @@ Jede Slice-MD enthaelt mindestens:
 
 - Feature-Branch und GitHub-Status.
 - Ziel des Slice.
+- Akzeptanzkriterien des Slice (fachliche und funktionale Kriterien, die erfüllt sein müssen, unabhängig von reinen Unit-Tests).
 - Scope und Nicht-Scope.
-- Diff-Risiko-Block.
+- Diff-Risiko-Block (inkl. dokumentiertem Git-Branch und Git-Status vor Start).
 - Geplante Tests.
 - Durchgefuehrte Änderungen.
 - Ausgefuehrte Tests mit Ergebnis.
