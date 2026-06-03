@@ -21,9 +21,9 @@ Der Nutzer klickt im Balance-Modul weiterhin auf **Jahresabschluss**. Intern wir
 6. Tauri- und IndexedDB-Snapshot-Pfade werden ueber die bestehende Persistenz-Fassade delegiert, nicht durch parallele Runtime-Erkennung im Balance-Modul.
 7. Ein fehlgeschlagener Snapshot bricht den Jahresabschluss ab. Es gibt keinen stillen Fallback auf "trotzdem fortfahren".
 
-## Aktueller Codezustand
+## Ausgangszustand Zu Planbeginn
 
-Die folgenden Punkte sind aktuell tatsaechlich so im Code vorhanden und muessen geaendert werden:
+Die folgenden Punkte waren zu Planbeginn tatsaechlich so im Code vorhanden und muessen im Verlauf der Slices geaendert werden:
 
 - `app/balance/balance-binder-snapshots.js`: `handleJahresabschluss()` ruft zuerst `applyAnnualInflation()`, dann `debouncedUpdate()`, wartet 300 ms und erstellt erst danach den Snapshot.
 - `app/balance/balance-storage.js`: `createSnapshot()` liest alle Keys aus `persistenceStorage` und speichert `snapshotType: "full-localstorage"`.
@@ -640,6 +640,10 @@ Abhaengig von: Paket 3.
 
 ### Paket 6: StorageManager auf SnapshotArchive
 
+Slice-Dokument: `docs/internal/SLICE_BALANCE_SNAPSHOTS_07_STORAGE_MANAGER_ARCHIVE.md`
+Branch: `codex-balance-snapshot-key-policy`
+Status: abgeschlossen, Review ausstehend.
+
 - Create/List/Read/Delete/Restore umbauen.
 - Kein `persistenceStorage.clear()` im Restore.
 - Standard-Restore mit Profil-ID-Pruefung.
@@ -692,11 +696,11 @@ Abhaengig von: Pakete 4 bis 9.
 - [ ] `listSnapshots()` liefert keinen Vollpayload mit `records`.
 - [ ] Snapshot-Schema ist eindeutig und validiert.
 - [ ] `recordCount` wird geprueft.
-- [ ] Restore nutzt kein pauschales `clear()`.
-- [ ] Restore ist fuer Live-Records all-or-nothing oder rollbackfaehig.
-- [ ] Standard-Restore erhaelt Profil-Registry.
-- [ ] Standard-Restore prueft `snapshot.activeProfileId`.
-- [ ] Fehlende fachliche Keys werden gemaess Policy behandelt.
+- [x] Restore nutzt kein pauschales `clear()`.
+- [x] Restore ist fuer Live-Records all-or-nothing oder rollbackfaehig.
+- [x] Standard-Restore erhaelt Profil-Registry.
+- [x] Standard-Restore prueft `snapshot.activeProfileId`.
+- [x] Fehlende fachliche Keys werden gemaess Policy behandelt.
 - [ ] Jahresabschluss-Snapshot entsteht vor Inflation und vor konkreter Alters-/Jahresmutation.
 - [ ] Jahresabschluss bricht bei Snapshot-Fehler ohne Mutation ab.
 - [ ] Legacy-Migration liefert einen Report.
