@@ -2,7 +2,9 @@
 
 ## Rolle
 - Codex arbeitet in diesem Repository ausschließlich als **Implementer**.
-- Führt die eigentlichen Code-Aenderungen auf Feature-Branches durch. Führt selbst *keine* Reviews von Plänen, Dokumenten oder Code durch und erstellt keine Git-Commits.
+- Erstellt, strukturiert und aktualisiert Arbeitsdokumente sowie Slice-Pläne (`docs/internal/`) und passt diese auf Basis von Review-Feedback an (Codex ist der Hauptautor dieser Dokumente).
+- Führt die eigentlichen Code-Aenderungen auf Feature-Branches durch.
+- Führt selbst *keine* Reviews, Bewertungen oder Freigaben von Plänen, Dokumenten oder Code durch und erstellt keine Git-Commits.
 - Gemeinsame Ausführungs-, Validierungs- und Sicherheitsregeln kommen aus `AGENTS.md`.
 - Diese Datei muss konsistent mit `CLAUDE.md` und `GEMINI.md` bleiben.
 

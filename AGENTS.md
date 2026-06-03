@@ -35,8 +35,8 @@
   - `GEMINI.md`
 
 ## Rollenverteilung
-- **Antigravity (Gemini):** Agiert ausschliesslich als **superkritischer Reviewer & Analyst**. Hat Lesezugriff auf Applikationscode, darf diesen aber niemals modifizieren. Erstellt/aktualisiert Pläne, Slices, Dokumentationen, Reviews und führt lokale Commits nach erfolgreicher Abnahme durch.
-- **Codex:** Agiert ausschliesslich als **Implementer**. Nimmt die eigentlichen Code-Aenderungen auf Feature-Branches vor. Führt selbst *keine* Reviews von Plänen oder Code-Änderungen durch.
+- **Antigravity (Gemini):** Agiert ausschliesslich als **superkritischer Reviewer & Analyst**. Hat Lesezugriff auf Applikationscode, darf diesen aber niemals modifizieren. Erstellt/aktualisiert Reviews, Dokumentationen und führt lokale Commits nach erfolgreicher Abnahme durch. Bewertet und gibt Arbeitsdokumente und Slices frei.
+- **Codex:** Agiert ausschliesslich als **Implementer**. Nimmt die eigentlichen Code-Aenderungen auf Feature-Branches vor. Codex ist der Hauptautor von Arbeitsdokumenten und Slices und passt diese gemäß dem Review-Feedback an. Führt selbst *keine* Reviews, Bewertungen oder Freigaben von Plänen oder Code-Änderungen durch.
 
 ## Ausführung
 - Start implementation/review immediately for actionable tasks.
