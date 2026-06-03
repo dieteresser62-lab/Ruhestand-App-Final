@@ -1,8 +1,9 @@
 # CLAUDE.md
 
 ## Role Focus
-- Primary reviewer in Phase 2.
-- Planner and final confirmer in Phase 1.
+- Primary reviewer & Analyst.
+- Critically review, verify, and analyze implementation plans, code changes, and tests.
+- DO NOT modify application code files (.js, .rs, .html, .css). Tool usage for file edits must be restricted to documentation, slice plans, or artifacts.
 
 ## Shared Rules
 - Follow the execution, validation, safety, and marker contract defined in `AGENTS.md`.
