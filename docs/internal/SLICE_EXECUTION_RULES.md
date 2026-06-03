@@ -10,6 +10,7 @@ Diese Regeln gelten fuer alle groesseren Umsetzungspakete, die in Slices geplant
 Rollenverteilung:
 - **Codex (Implementer):** Implementiert den Code auf dem Feature-Branch. Erstellt die Slice-MD-Dateien vor Beginn der Arbeiten.
 - **Antigravity / Gemini (Reviewer):** Agiert als **superkritischer Reviewer & Analyst**. Prüft die Slices, Pläne und Testergebnisse äußerst kritisch auf theoretische und praktische Lücken. Hat Lesezugriff auf Applikationscode und schreibt/editiert nur Dokumentation oder Pläne.
+- **Claude Code (optionaler Reviewer):** Kann bei Bedarf/Verfügbarkeit als zweiter Reviewer herangezogen werden, um Pläne und Codeänderungen ebenfalls kritisch zu prüfen und Feedback zu hinterlassen.
 
 ## Feature-Branch vor Umsetzung
 
@@ -96,12 +97,12 @@ Jede Slice-MD enthaelt mindestens:
 
 ## Kommunikation zwischen Agenten (Review-Zyklus)
 
-Da die Agenten (Codex und Gemini) keinen direkten flüchtigen Speicher teilen, wird der Kommunikationsfluss strukturiert über die Slice-Dateien gelenkt:
+Da die Agenten (Codex, Gemini und Claude) keinen direkten flüchtigen Speicher teilen, wird der Kommunikationsfluss strukturiert über die Slice-Dateien gelenkt:
 
 1. **Codex** schließt die Implementierung ab, trägt die Testergebnisse in die Slice-MD ein und fordert den Nutzer zum Review auf.
-2. **Gemini** liest die geänderten Dateien und die Slice-MD und dokumentiert seine Kritikpunkte direkt in der Slice-MD unter einer Sektion `## Review-Feedback von Gemini`.
-3. **Codex** liest beim nächsten Start dieses Review-Feedback ein, behebt die Schwachstellen und dokumentiert seine Antworten/Korrekturen unter `## Review-Antworten von Codex`.
-4. Dieser Zyklus wiederholt sich, bis Gemini grünes Licht gibt.
+2. **Gemini** (und optional **Claude Code**) liest die geänderten Dateien und die Slice-MD und dokumentiert die Kritikpunkte direkt in der Slice-MD unter einer Sektion `## Review-Feedback von Gemini` (bzw. `## Review-Feedback von Claude`).
+3. **Codex** liest beim nächsten Start dieses Review-Feedback ein, behebt die Schwachstellen und dokumentiert seine Antworten/Korrekturen unter `## Review-Antworten von Codex` (bzw. `## Review-Antworten auf Claude-Feedback`).
+4. Dieser Zyklus wiederholt sich, bis Gemini (und ggf. Claude) grünes Licht gibt.
 
 ## Rollback
 
