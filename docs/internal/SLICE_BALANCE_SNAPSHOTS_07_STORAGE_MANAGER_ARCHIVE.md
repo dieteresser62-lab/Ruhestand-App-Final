@@ -138,20 +138,23 @@ Alle StorageManager-, SnapshotArchive-, Persistence- und Snapshot-Key-Policy-Tes
 
 ## Freigabestatus
 
-**Freigegeben durch Gemini.** Die Akzeptanzkriterien wurden erfolgreich verifiziert und alle Tests sind im erwarteten Zustand.
+**Freigegeben durch Claude und Gemini.** Die Akzeptanzkriterien wurden erfolgreich verifiziert und alle Tests sind im erwarteten Zustand.
 
 ## Review-Entscheidungen
 
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
 |---|---|---|---|---|
-| G-01 | Gemini | JSDoc-Dokumentation beschreibt `handle` als aktiv genutzt, obwohl es tot ist. | Angenommen | Wird in Paket 9 (Export-Cleanups) bereinigt. |
-| G-02 | Gemini | `handle`-Weiterreichung an `renderSnapshots` etc. ist toter Code. | Angenommen | Wird in Paket 9 bereinigt. |
-| G-03 | Gemini | Registry-Deep-Clone via `JSON.parse(JSON.stringify(...))` ohne Fehlerbehandlung. | Angenommen | Unkritisch für aktuelle Registry-Datenstruktur. |
-| G-04 | Gemini | `kind` ist hartcodiert auf `annualClosePreMutation` für alle Snapshots. | Angenommen | Wird in Paket 9 bei manuellem Export parametrisiert. |
-| G-05 | Gemini | Kein dedizierter Testfall für null-Registry bei `restoreSnapshot`. | Angenommen | Verhalten ist korrekt; Testlücke unkritisch. |
-| G-06 | Gemini | `saveCurrentProfileFromLocalStorage()` wird vor Capture/Restore ausgeführt. | Angenommen | Korrektes und gewünschtes Verhalten. |
+| C-01 | Claude | JSDoc-Dokumentation beschreibt `handle` als aktiv genutzt, obwohl es tot ist. | Angenommen | Wird in Paket 9 (Export-Cleanups) bereinigt. |
+| C-02 | Claude | `handle`-Weiterreichung an `renderSnapshots` etc. ist toter Code. | Angenommen | Wird in Paket 9 bereinigt. |
+| C-03 | Claude | Registry-Deep-Clone via `JSON.parse(JSON.stringify(...))` ohne Fehlerbehandlung. | Angenommen | Unkritisch für aktuelle Registry-Datenstruktur. |
+| C-04 | Claude | `kind` ist hartcodiert auf `annualClosePreMutation` für alle Snapshots. | Angenommen | Wird in Paket 9 bei manuellem Export parametrisiert. |
+| C-05 | Claude | Kein dedizierter Testfall für null-Registry bei `restoreSnapshot`. | Angenommen | Verhalten ist korrekt; Testlücke unkritisch. |
+| C-06 | Claude | `saveCurrentProfileFromLocalStorage()` wird vor Capture/Restore ausgeführt. | Angenommen | Korrektes und gewünschtes Verhalten. |
+| G-01 | Gemini | Cache-Rollback bei replaceLiveRecords-Fehler clears dirty/deleted lists without retrying, leaving concurrent memory cache updates un-flushed if no page reload happens. | Angenommen | Unkritisch, da restoreSnapshot direkt location.reload() aufruft, sollte aber für generische Facade-Aufrufe dokumentiert bleiben. |
+| G-02 | Gemini | Multi-Tab-Locking ist im Facade-Adapter-Vertrag vorbereitet (restoreLock), aber nicht aktiv über BroadcastChannel o.ä. synchronisiert. | Angenommen | Bekanntes Restrisiko der aktuellen Multi-Tab-Architektur. |
 
 ## Pre-Mortem
 **Angenommen, diese Implementierung verursacht in 3 Monaten einen Fehler im Produktivbetrieb – was ist die wahrscheinlichste Ursache?**
 Ein Nutzer hat ein altes Legacy-Profil (vor Einführung des Profilverbunds), das keinen `rs_profiles_v1`-Registry-Key besitzt, und versucht einen älteren Snapshot wiederherzustellen, der noch auf ein `default`-Profil verweist, das in seiner neuen Registry fehlt. Der Standard-Restore bricht in diesem Fall ab, um Datenverlust zu vermeiden. Dies wird durch die Migration in Paket 8 gelöst.
+
 
