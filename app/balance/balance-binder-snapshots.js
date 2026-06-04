@@ -48,7 +48,8 @@ export function createSnapshotHandlers({
             try {
                 if (restoreBtn) {
                     const key = restoreBtn.dataset.key;
-                    if (confirm(`Snapshot "${key.replace('.json', '')}" wiederherstellen? Alle aktuellen Eingaben gehen verloren.`)) {
+                    const snapshotName = key.replace('.json', '');
+                    if (confirm(`Snapshot "${snapshotName}" wiederherstellen?\n\nStandard-Restore setzt das aktive Profil und die Balance-Daten auf den Snapshot-Stand. Andere Profile, technische Einstellungen und die Snapshot-Historie bleiben erhalten.`)) {
                         await StorageManager.restoreSnapshot(key, appState.snapshotHandle);
                     }
                 }

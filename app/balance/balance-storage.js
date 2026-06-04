@@ -51,9 +51,9 @@ function getPersistenceKeys() {
 
 function getSnapshotStatusText() {
     const backend = PersistenceFacade.getPersistenceStatus().backend;
-    if (backend === 'Tauri JSON File') return 'Speicherort: App-Speicher (separates Snapshot-Archiv)';
-    if (backend === 'IndexedDB') return 'Speicherort: Browser-Speicher (IndexedDB Snapshot-Archiv)';
-    return 'Speicherort: Browser-Fallback (localStorage, begrenzte Snapshot-Ablage)';
+    if (backend === 'Tauri JSON File') return 'Internes Snapshot-Archiv: App-Speicher (separates snapshots-Target)';
+    if (backend === 'IndexedDB') return 'Internes Snapshot-Archiv: Browser-Speicher (IndexedDB Store snapshots)';
+    return 'Internes Snapshot-Archiv: Browser-Fallback (localStorage, begrenzte Ablage)';
 }
 
 function formatSnapshotName(entry) {
@@ -310,6 +310,13 @@ export const StorageManager = {
             const li = document.createElement('li');
             const nameSpan = document.createElement('span');
             nameSpan.textContent = formatSnapshotName(entry);
+            if (!entry.standardRestorable) {
+                const restoreHint = document.createElement('small');
+                restoreHint.textContent = 'Standard-Restore nur nach Profilzuordnung moeglich.';
+                restoreHint.style.display = 'block';
+                restoreHint.style.color = 'var(--muted-text)';
+                nameSpan.appendChild(restoreHint);
+            }
 
             const actionsSpan = document.createElement('span');
             actionsSpan.className = 'snapshot-actions';

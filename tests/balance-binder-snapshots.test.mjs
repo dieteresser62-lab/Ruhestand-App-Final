@@ -26,7 +26,11 @@ const prevSetTimeout = global.setTimeout;
 
 try {
     global.localStorage = createLocalStorageMock();
-    global.confirm = () => true;
+    let lastConfirmMessage = '';
+    global.confirm = (message = '') => {
+        lastConfirmMessage = String(message);
+        return true;
+    };
     global.location = { reload: () => {} };
     global.setTimeout = (fn) => { fn(); return 0; };
 
@@ -113,6 +117,8 @@ try {
         const event = { target: { closest: (sel) => (sel === '.restore-snapshot' ? restoreBtn : null) } };
         await handlers.handleSnapshotActions(event);
 
+        assert(lastConfirmMessage.includes('Standard-Restore setzt das aktive Profil'), 'restore confirmation should describe standard restore scope');
+        assert(lastConfirmMessage.includes('Snapshot-Historie bleiben erhalten'), 'restore confirmation should mention preserved snapshot history');
         assertEqual(localStorage.getItem('depot_tranchen'), 'restored_value', 'restoreSnapshot should restore localStorage data');
         assertEqual(localStorage.getItem('profile_tagesgeld'), null, 'restoreSnapshot should delete missing fachliche profile keys');
         assertEqual(localStorage.getItem('ui_panel_state'), 'keep-me', 'restoreSnapshot should keep technical UI keys');
@@ -120,6 +126,57 @@ try {
         const registry = JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEYS.registry));
         assert(registry.profiles.other, 'restoreSnapshot should preserve other registry profiles');
         assertEqual(registry.profiles.default.data.depot_tranchen, 'restored_value', 'restoreSnapshot should update restored profile data in current registry');
+    }
+
+    // --- TEST 3b: renderSnapshots marks non-standard-restorable entries ---
+    {
+        const prevListSnapshots = SnapshotArchive.listSnapshots;
+        SnapshotArchive.listSnapshots = async () => [{
+            id: 'legacy-no-profile',
+            label: 'Legacy',
+            createdAt: new Date('2026-01-01T00:00:00Z').toISOString(),
+            standardRestorable: false
+        }];
+        const doc = {
+            createElement(tagName) {
+                const element = {
+                    tagName,
+                    children: [],
+                    dataset: {},
+                    style: {},
+                    className: '',
+                    type: '',
+                    textContent: '',
+                    append(...children) { this.children.push(...children); },
+                    appendChild(child) { this.children.push(child); }
+                };
+                return element;
+            },
+            createDocumentFragment() {
+                return {
+                    children: [],
+                    appendChild(child) { this.children.push(child); }
+                };
+            }
+        };
+        const prevDocument = global.document;
+        global.document = doc;
+        const listEl = { children: [], replaceChildren(...children) { this.children = children; } };
+        const statusEl = { textContent: '' };
+
+        await prevRenderSnapshots.call(StorageManager, listEl, statusEl, null);
+
+        const collectText = (node) => {
+            if (!node) return '';
+            const own = node.textContent || '';
+            const childText = Array.isArray(node.children) ? node.children.map(collectText).join(' ') : '';
+            return `${own} ${childText}`.trim();
+        };
+        const renderedText = listEl.children.map(collectText).join(' ');
+        assert(renderedText.includes('Standard-Restore nur nach Profilzuordnung'), 'non-standard-restorable snapshots should render a restore hint');
+        assert(statusEl.textContent.includes('Internes Snapshot-Archiv'), 'snapshot status should describe internal archive');
+        SnapshotArchive.listSnapshots = prevListSnapshots;
+        if (prevDocument === undefined) delete global.document; else global.document = prevDocument;
     }
 
     // --- TEST 4: Fehlerhafte Snapshots werden abgefangen ---

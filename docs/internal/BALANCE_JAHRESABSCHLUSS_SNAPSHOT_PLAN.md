@@ -683,6 +683,10 @@ Abhaengig von: Paket 6.
 
 ### Paket 9: UI-Texte und Exportpfad
 
+Slice-Dokument: `docs/internal/SLICE_BALANCE_SNAPSHOTS_10_UI_EXPORT_PATH.md`
+Branch: `codex-balance-snapshot-key-policy`
+Status: abgeschlossen, freigegeben durch Claude und Gemini; bereit fuer Commit.
+
 - Status-Texte.
 - Ordner verbinden nach Erweitert oder Export/Import verschieben.
 - Restore-Warnungen.
