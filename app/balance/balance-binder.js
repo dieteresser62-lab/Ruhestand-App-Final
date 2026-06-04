@@ -21,6 +21,7 @@ import { createAnnualHandlers } from './balance-binder-annual.js';
 import { createImportExportHandlers } from './balance-binder-imports.js';
 import { createDiagnosisHandlers } from './balance-binder-diagnosis.js';
 import { createSnapshotHandlers } from './balance-binder-snapshots.js';
+import { PersistenceFacade } from '../shared/persistence-facade.js';
 
 // Module-level references
 let dom = null;
@@ -52,7 +53,11 @@ export function initUIBinder(domRefs, state, updateFn, debouncedUpdateFn) {
         dom,
         appState,
         debouncedUpdate,
-        applyAnnualInflation: annual.applyAnnualInflation
+        applyAnnualInflation: annual.applyAnnualInflation,
+        flushLiveState: async ({ sync = true } = {}) => {
+            if (sync) update();
+            await PersistenceFacade.flush();
+        }
     });
     handlers = { annual, imports, diagnosis, snapshots };
 }

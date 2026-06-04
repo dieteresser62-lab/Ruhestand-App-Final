@@ -652,6 +652,10 @@ Abhaengig von: Pakete 1 bis 5.
 
 ### Paket 7: Jahresabschluss-Reihenfolge
 
+Slice-Dokument: `docs/internal/SLICE_BALANCE_SNAPSHOTS_08_ANNUAL_CLOSE_ORDER.md`
+Branch: `codex-balance-snapshot-key-policy`
+Status: abgeschlossen, freigegeben durch Gemini.
+
 - Vorab-Sync/Flush.
 - Snapshot schreiben.
 - Danach definierte Jahresabschluss-Mutationen.
@@ -701,8 +705,8 @@ Abhaengig von: Pakete 4 bis 9.
 - [x] Standard-Restore erhaelt Profil-Registry.
 - [x] Standard-Restore prueft `snapshot.activeProfileId`.
 - [x] Fehlende fachliche Keys werden gemaess Policy behandelt.
-- [ ] Jahresabschluss-Snapshot entsteht vor Inflation und vor konkreter Alters-/Jahresmutation.
-- [ ] Jahresabschluss bricht bei Snapshot-Fehler ohne Mutation ab.
+- [x] Jahresabschluss-Snapshot entsteht vor Inflation und vor konkreter Alters-/Jahresmutation.
+- [x] Jahresabschluss bricht bei Snapshot-Fehler ohne Mutation ab.
 - [ ] Legacy-Migration liefert einen Report.
 - [ ] Alte Snapshots bleiben lesbar oder werden als nicht standard-restore-faehig markiert.
 - [ ] Doku-Pfade sind korrekt.

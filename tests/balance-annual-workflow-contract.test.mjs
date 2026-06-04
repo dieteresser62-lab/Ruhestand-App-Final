@@ -147,16 +147,21 @@ try {
             appState,
             applyAnnualInflation: () => { calls.push('applyAnnualInflation'); },
             debouncedUpdate: () => { calls.push('debouncedUpdate'); },
-            flushLiveState: async () => { calls.push('flushLiveState'); }
+            rollExpensesYearFn: () => {
+                calls.push('rollExpensesYear');
+                return 2027;
+            },
+            flushLiveState: async (options = {}) => { calls.push(`flushLiveState:${JSON.stringify(options)}`); }
         });
 
         await handlers.handleJahresabschluss();
 
         assertEqual(
-            calls.slice(0, 5).join('|'),
-            'flushLiveState|createSnapshot|toast:Jahresabschluss-Snapshot "Jahr 2026" erfolgreich erstellt.|applyAnnualInflation|debouncedUpdate',
-            'Jahresabschluss flusht Live-Daten und schreibt Snapshot vor Inflation/Jahresmutation'
+            calls.slice(0, 6).join('|'),
+            'flushLiveState:{"sync":true}|createSnapshot|toast:Jahresabschluss-Snapshot "Jahr 2026" erfolgreich erstellt.|applyAnnualInflation|rollExpensesYear|flushLiveState:{"sync":true}',
+            'Jahresabschluss flusht Live-Daten, schreibt Snapshot vor Mutation und flusht nach allen Mutationen'
         );
+        assert(!calls.includes('debouncedUpdate'), 'Jahresabschluss wartet nicht mehr auf einen fragilen Debounce-Timer');
         assert(calls.some(call => call.startsWith('toast:Ausgaben-Check auf ')), 'Jahresabschluss meldet Ausgaben-Rollover');
         assertEqual(calls[calls.length - 1], 'renderSnapshots', 'Snapshot-Liste wird nach Abschluss neu gerendert');
         assertEqual(createSnapshotArgs.handle, appState.snapshotHandle, 'Snapshot nutzt den aktiven Snapshot-Handle');
@@ -205,7 +210,11 @@ try {
             appState,
             applyAnnualInflation: () => { calls.push('applyAnnualInflation'); },
             debouncedUpdate: () => { calls.push('debouncedUpdate'); },
-            flushLiveState: async () => { calls.push('flushLiveState'); }
+            rollExpensesYearFn: () => {
+                calls.push('rollExpensesYear');
+                return 2027;
+            },
+            flushLiveState: async (options = {}) => { calls.push(`flushLiveState:${JSON.stringify(options)}`); }
         });
 
         await handlers.handleJahresabschluss();
@@ -213,8 +222,126 @@ try {
         assert(handledError, 'Snapshot-Fehler wird ueber den UI-Fehlerpfad gemeldet');
         assert(!calls.includes('applyAnnualInflation'), 'Snapshot-Fehler verhindert Inflation/Jahresmutation');
         assert(!calls.includes('debouncedUpdate'), 'Snapshot-Fehler verhindert Live-Update nach Mutation');
+        assert(!calls.includes('rollExpensesYear'), 'Snapshot-Fehler verhindert Ausgaben-Rollover-Mutation');
         assert(!calls.some(call => call.startsWith('toast:Ausgaben-Check auf ')), 'Snapshot-Fehler verhindert Ausgaben-Rollover');
         assert(!calls.includes('renderSnapshots'), 'Snapshot-Fehler rendert keine erfolgreiche Snapshot-Liste');
+    }
+
+    console.log('Test 4: Jahresabschluss aborts without snapshot when pre-flush fails');
+    {
+        const calls = [];
+        let handledError = null;
+
+        global.localStorage = createLocalStorageMock();
+        global.confirm = () => true;
+        global.setTimeout = (fn, delay) => {
+            calls.push(`timeout:${delay}`);
+            fn();
+            return 0;
+        };
+        UIRenderer.toast = (message) => {
+            calls.push(`toast:${message}`);
+        };
+        UIRenderer.handleError = (error) => {
+            handledError = error;
+        };
+        StorageManager.createSnapshot = async () => {
+            calls.push('createSnapshot');
+        };
+        StorageManager.renderSnapshots = async () => {
+            calls.push('renderSnapshots');
+        };
+
+        const dom = {
+            inputs: { profilName: { value: 'Jahr 2026' } },
+            outputs: { snapshotList: { id: 'snapshotList' } },
+            controls: { snapshotStatus: { id: 'snapshotStatus' } }
+        };
+        const appState = { snapshotHandle: { name: 'snapshots' } };
+
+        const handlers = createSnapshotHandlers({
+            dom,
+            appState,
+            applyAnnualInflation: () => { calls.push('applyAnnualInflation'); },
+            debouncedUpdate: () => { calls.push('debouncedUpdate'); },
+            rollExpensesYearFn: () => {
+                calls.push('rollExpensesYear');
+                return 2027;
+            },
+            flushLiveState: async (options = {}) => {
+                calls.push(`flushLiveState:${JSON.stringify(options)}`);
+                throw new Error('flush failed');
+            }
+        });
+
+        await handlers.handleJahresabschluss();
+
+        assert(handledError, 'Vorab-Flush-Fehler wird ueber den UI-Fehlerpfad gemeldet');
+        assert(!calls.includes('createSnapshot'), 'Vorab-Flush-Fehler verhindert Snapshot-Erstellung');
+        assert(!calls.includes('applyAnnualInflation'), 'Vorab-Flush-Fehler verhindert Inflation/Jahresmutation');
+        assert(!calls.includes('debouncedUpdate'), 'Vorab-Flush-Fehler verhindert Live-Update nach Mutation');
+        assert(!calls.includes('rollExpensesYear'), 'Vorab-Flush-Fehler verhindert Ausgaben-Rollover-Mutation');
+        assert(!calls.some(call => call.startsWith('toast:Ausgaben-Check auf ')), 'Vorab-Flush-Fehler verhindert Ausgaben-Rollover');
+        assert(!calls.includes('renderSnapshots'), 'Vorab-Flush-Fehler rendert keine erfolgreiche Snapshot-Liste');
+    }
+
+    console.log('Test 5: Jahresabschluss keeps snapshot and reports error when post-mutation flush fails');
+    {
+        const calls = [];
+        let handledError = null;
+
+        global.localStorage = createLocalStorageMock();
+        global.confirm = () => true;
+        global.setTimeout = (fn, delay) => {
+            calls.push(`timeout:${delay}`);
+            fn();
+            return 0;
+        };
+        UIRenderer.toast = (message) => {
+            calls.push(`toast:${message}`);
+        };
+        UIRenderer.handleError = (error) => {
+            handledError = error;
+        };
+        StorageManager.createSnapshot = async () => {
+            calls.push('createSnapshot');
+        };
+        StorageManager.renderSnapshots = async () => {
+            calls.push('renderSnapshots');
+        };
+
+        const dom = {
+            inputs: { profilName: { value: 'Jahr 2026' } },
+            outputs: { snapshotList: { id: 'snapshotList' } },
+            controls: { snapshotStatus: { id: 'snapshotStatus' } }
+        };
+        const appState = { snapshotHandle: { name: 'snapshots' } };
+        let flushCount = 0;
+
+        const handlers = createSnapshotHandlers({
+            dom,
+            appState,
+            applyAnnualInflation: () => { calls.push('applyAnnualInflation'); },
+            debouncedUpdate: () => { calls.push('debouncedUpdate'); },
+            rollExpensesYearFn: () => {
+                calls.push('rollExpensesYear');
+                return 2027;
+            },
+            flushLiveState: async (options = {}) => {
+                flushCount += 1;
+                calls.push(`flushLiveState:${JSON.stringify(options)}`);
+                if (flushCount === 2) throw new Error('post flush failed');
+            }
+        });
+
+        await handlers.handleJahresabschluss();
+
+        assert(handledError, 'Post-Mutations-Flush-Fehler wird ueber den UI-Fehlerpfad gemeldet');
+        assert(calls.includes('createSnapshot'), 'Post-Mutations-Flush-Fehler laesst den Pre-Mutation-Snapshot bestehen');
+        assert(calls.includes('applyAnnualInflation'), 'Post-Mutations-Flush-Fehler passiert nach Inflation');
+        assert(calls.includes('rollExpensesYear'), 'Post-Mutations-Flush-Fehler passiert nach Ausgaben-Rollover');
+        assert(!calls.includes('renderSnapshots'), 'Post-Mutations-Flush-Fehler rendert keine erfolgreiche Snapshot-Liste');
+        assert(!calls.some(call => call.startsWith('toast:Ausgaben-Check auf ')), 'Post-Mutations-Flush-Fehler meldet keinen erfolgreichen Ausgaben-Rollover');
     }
 
     console.log('Balance annual workflow contract tests passed');
