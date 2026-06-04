@@ -554,6 +554,11 @@ Zu aktualisieren:
 - `docs/internal/archive/2026-persistence-migration/PERSISTENCE_MIGRATION_PLAN.md`
   - Entscheidung dokumentieren: Snapshots nicht in `ruhestand_suite_data.json`.
   - Hinweis auf separates Snapshot-Archiv und Rollback-Folgen.
+- `docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md`
+  - Anpassung von Kapitel B.2.4 und Tabellen an das neue kanonische Snapshot-Archiv.
+- `Handbuch.html`
+  - Aktualisierung der Anleitung bezüglich des ordnerlosen Jahresabschluss-Workflows.
+
 
 Nicht korrekt:
 
@@ -686,7 +691,7 @@ Abhaengig von: Paket 6.
 
 ### Paket 10: Dokumentation und Gates
 
-- README, TECHNICAL, BALANCE_MODULES, PROJEKTUEBERSICHT, archivierter Persistence-Plan.
+- README, TECHNICAL, BALANCE_MODULES, PROJEKTUEBERSICHT, ARCHITEKTUR_UND_FACHKONZEPT, Handbuch.html, archivierter Persistence-Plan.
 - Tests vollstaendig ausfuehren.
 - Tauri-Build oder Rust-Test nach Rust-Aenderungen.
 
