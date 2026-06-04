@@ -1,5 +1,50 @@
 // @ts-check
 
+import { CONFIG } from '../balance/balance-config.js';
+
+const SNAPSHOT_SCHEMA_VERSION = 1;
+const SNAPSHOT_TYPE = 'persistence-records-v1';
+const SNAPSHOT_KIND_MANUAL = 'manual';
+const PROFILE_STORAGE_KEYS = Object.freeze({
+    registry: 'rs_profiles_v1',
+    current: 'rs_current_profile',
+    active: 'rs_active_profile'
+});
+const LEGACY_MIGRATION_MARKER_KEYS = Object.freeze({
+    target: 'ruhestandsapp_migrated_to_target',
+    completedAt: 'ruhestandsapp_migration_completed_at',
+    checksum: 'ruhestandsapp_migration_checksum'
+});
+const SNAPSHOT_CAPTURE_EXACT_KEYS = new Set([
+    CONFIG.STORAGE.LS_KEY,
+    CONFIG.STORAGE.MIGRATION_FLAG,
+    PROFILE_STORAGE_KEYS.registry,
+    PROFILE_STORAGE_KEYS.current,
+    PROFILE_STORAGE_KEYS.active,
+    'etfProxyUrl',
+    'etfProxyUrls',
+    'household_withdrawal_mode',
+    ...Object.values(LEGACY_MIGRATION_MARKER_KEYS),
+    'depot_tranchen',
+    'profile_health_bucket',
+    'profile_tagesgeld',
+    'profile_rente_aktiv',
+    'profile_rente_monatlich',
+    'profile_sonstige_einkuenfte',
+    'profile_aktuelles_alter',
+    'profile_gold_aktiv',
+    'profile_gold_ziel_pct',
+    'profile_gold_floor_pct',
+    'profile_gold_steuerfrei',
+    'profile_gold_rebal_band',
+    'showCareDetails',
+    'logDetailLevel',
+    'worstLogDetailLevel',
+    'backtestLogDetailLevel'
+]);
+const SNAPSHOT_DOMAIN_PREFIXES = ['sim_', 'sim.', 'balance_expenses_'];
+const TECHNICAL_EXACT_KEYS = new Set(['enableWorkerTelemetry', 'featureFlags']);
+const TECHNICAL_PREFIXES = ['debug_', 'layout_', 'telemetry_', 'ui_', 'window_'];
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: 1,
     records: {},
@@ -81,6 +126,97 @@ function toSnapshotIndexEntry(snapshot) {
     return indexEntry;
 }
 
+function isLegacySnapshotKey(key) {
+    return String(key || '').startsWith(CONFIG.STORAGE.SNAPSHOT_PREFIX);
+}
+
+function isSnapshotTechnicalKey(key) {
+    const normalized = String(key || '');
+    if (TECHNICAL_EXACT_KEYS.has(normalized)) return true;
+    return TECHNICAL_PREFIXES.some(prefix => normalized.startsWith(prefix));
+}
+
+function isAllowedSnapshotCaptureKey(key) {
+    const normalized = String(key || '');
+    if (!normalized || isLegacySnapshotKey(normalized) || isSnapshotTechnicalKey(normalized)) return false;
+    if (SNAPSHOT_CAPTURE_EXACT_KEYS.has(normalized)) return true;
+    return SNAPSHOT_DOMAIN_PREFIXES.some(prefix => normalized.startsWith(prefix));
+}
+
+function parseJsonObject(raw, fallback = null) {
+    if (!raw) return fallback;
+    try {
+        const parsed = JSON.parse(String(raw));
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : fallback;
+    } catch {
+        return fallback;
+    }
+}
+
+function parseLegacySnapshot(raw) {
+    const parsed = parseJsonObject(raw, null);
+    if (parsed?.snapshotType !== 'full-localstorage' || !parsed.localStorage || typeof parsed.localStorage !== 'object') {
+        return null;
+    }
+    return parsed;
+}
+
+function getProfileNameFromLegacyRecords(records, activeProfileId) {
+    const registry = parseJsonObject(records[PROFILE_STORAGE_KEYS.registry], null);
+    return String(registry?.profiles?.[activeProfileId]?.meta?.name || '');
+}
+
+function resolveLegacyActiveProfileId(records) {
+    const explicit = String(records[PROFILE_STORAGE_KEYS.current] || records[PROFILE_STORAGE_KEYS.active] || '');
+    if (explicit) return explicit;
+    if (!records[PROFILE_STORAGE_KEYS.registry]) return 'default';
+    return '';
+}
+
+function asIsoDate(value) {
+    const date = value ? new Date(value) : new Date();
+    if (!Number.isFinite(date.getTime())) return new Date().toISOString();
+    return date.toISOString();
+}
+
+function buildCanonicalSnapshotFromLegacy(key, legacySnapshot) {
+    const sourceRecords = legacySnapshot.localStorage || {};
+    const records = Object.create(null);
+    Object.entries(sourceRecords).forEach(([recordKey, value]) => {
+        const normalizedKey = String(recordKey || '');
+        if (!isAllowedSnapshotCaptureKey(normalizedKey)) return;
+        if (value === null || value === undefined) return;
+        records[normalizedKey] = String(value);
+    });
+    const activeProfileId = resolveLegacyActiveProfileId(sourceRecords);
+    const label = legacySnapshot.label || String(key || '').replace(CONFIG.STORAGE.SNAPSHOT_PREFIX, '');
+    return {
+        schemaVersion: SNAPSHOT_SCHEMA_VERSION,
+        id: String(key || '').replace(CONFIG.STORAGE.SNAPSHOT_PREFIX, 'snapshot_legacy_') || undefined,
+        snapshotType: SNAPSHOT_TYPE,
+        label,
+        kind: SNAPSHOT_KIND_MANUAL,
+        createdAt: asIsoDate(legacySnapshot.timestamp || legacySnapshot.createdAt),
+        activeProfileId,
+        activeProfileName: activeProfileId ? getProfileNameFromLegacyRecords(sourceRecords, activeProfileId) : '',
+        recordCount: Object.keys(records).length,
+        records,
+        restoreScope: {
+            profileRegistryMode: 'preserve-by-default',
+            profileLiveDataMode: 'restore-only-if-active-profile-still-exists'
+        }
+    };
+}
+
+function createLegacyMigrationReport() {
+    return {
+        migratedCount: 0,
+        skippedCount: 0,
+        notStandardRestorableCount: 0,
+        errors: []
+    };
+}
+
 export function createTauriJsonFileAdapter(options = {}) {
     let invoke = null;
     let state = { ...DEFAULT_STATE, records: Object.create(null), metadata: Object.create(null) };
@@ -154,6 +290,7 @@ export function createTauriJsonFileAdapter(options = {}) {
             await persist();
         },
         async listSnapshots() {
+            await this.migrateLegacySnapshotsIfNeeded();
             await ensureSnapshotsOpen();
             return snapshotArchive.snapshots.map(toSnapshotIndexEntry);
         },
@@ -188,7 +325,40 @@ export function createTauriJsonFileAdapter(options = {}) {
             return true;
         },
         async migrateLegacySnapshotsIfNeeded() {
-            return { migratedCount: 0, skippedCount: 0, notStandardRestorableCount: 0, errors: [] };
+            if (!opened) await this.open();
+            await ensureSnapshotsOpen();
+            const report = createLegacyMigrationReport();
+            const legacyKeys = Object.keys(state.records || {}).filter(isLegacySnapshotKey);
+            let liveChanged = false;
+            let snapshotsChanged = false;
+
+            legacyKeys.forEach(legacyKey => {
+                try {
+                    const legacySnapshot = parseLegacySnapshot(state.records[legacyKey]);
+                    if (!legacySnapshot) {
+                        report.skippedCount += 1;
+                        return;
+                    }
+                    const canonical = buildCanonicalSnapshotFromLegacy(legacyKey, legacySnapshot);
+                    const exists = snapshotArchive.snapshots.some(entry => String(entry?.id || '') === canonical.id);
+                    if (exists) {
+                        report.skippedCount += 1;
+                    } else {
+                        snapshotArchive.snapshots.push(canonical);
+                        delete state.records[legacyKey];
+                        liveChanged = true;
+                        snapshotsChanged = true;
+                        report.migratedCount += 1;
+                    }
+                    if (!canonical.activeProfileId) report.notStandardRestorableCount += 1;
+                } catch (err) {
+                    report.errors.push({ key: legacyKey, message: err?.message || String(err) });
+                }
+            });
+
+            if (snapshotsChanged) await persistSnapshots();
+            if (liveChanged) await persist();
+            return report;
         },
         async quarantine() {
             if (!invoke) invoke = getInvoke(options);

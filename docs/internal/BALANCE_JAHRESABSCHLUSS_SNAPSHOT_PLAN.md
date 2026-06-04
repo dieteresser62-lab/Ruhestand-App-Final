@@ -665,6 +665,10 @@ Abhaengig von: Paket 6.
 
 ### Paket 8: Legacy-Migration
 
+Slice-Dokument: `docs/internal/SLICE_BALANCE_SNAPSHOTS_09_LEGACY_MIGRATION.md`
+Branch: `codex-balance-snapshot-key-policy`
+Status: abgeschlossen, Review ausstehend.
+
 - Alte File-Snapshots und `ruhestandsmodell_snapshot_*`.
 - `activeProfileId`-Fallbacks.
 - Migrationsreport.
@@ -707,8 +711,8 @@ Abhaengig von: Pakete 4 bis 9.
 - [x] Fehlende fachliche Keys werden gemaess Policy behandelt.
 - [x] Jahresabschluss-Snapshot entsteht vor Inflation und vor konkreter Alters-/Jahresmutation.
 - [x] Jahresabschluss bricht bei Snapshot-Fehler ohne Mutation ab.
-- [ ] Legacy-Migration liefert einen Report.
-- [ ] Alte Snapshots bleiben lesbar oder werden als nicht standard-restore-faehig markiert.
+- [x] Legacy-Migration liefert einen Report.
+- [x] Alte Snapshots bleiben lesbar oder werden als nicht standard-restore-faehig markiert.
 - [ ] Doku-Pfade sind korrekt.
 - [ ] Rollback-Einschraenkungen sind dokumentiert.
 

@@ -40,6 +40,7 @@ import {
     normalizeFullPersistenceBackup
 } from '../app/shared/persistence-backup.js';
 import { CONFIG } from '../app/balance/balance-config.js';
+import { PROFILE_STORAGE_KEYS } from '../app/profile/profile-state.js';
 
 console.log('--- Persistence Tests ---');
 
@@ -215,6 +216,17 @@ function createFakeIndexedDB(options = {}) {
                     db.version = version;
                     request.onupgradeneeded?.();
                 }
+                request.onsuccess?.();
+            }, 0);
+            return request;
+        },
+        deleteDatabase(name) {
+            const request = {};
+            setTimeout(() => {
+                if (name === 'snapshotDB') {
+                    db.deletedSnapshotDb = true;
+                }
+                request.result = true;
                 request.onsuccess?.();
             }, 0);
             return request;
@@ -721,6 +733,69 @@ try {
         assert(events.some(event => event.type === 'persistence:upgrade-blocked'), 'IndexedDB Adapter dispatcht Upgrade-Blocked-Event');
     }
 
+    console.log('Test 12d: IndexedDB adapter migrates legacy full-localstorage snapshots and cleans snapshotDB');
+    {
+        const fakeIndexedDB = createFakeIndexedDB();
+        const adapter = createIndexedDbAdapter({
+            indexedDB: fakeIndexedDB,
+            dbName: 'legacy-snapshot-migration-test'
+        });
+        const legacyKey = `${CONFIG.STORAGE.SNAPSHOT_PREFIX}2026-legacy`;
+        const nonRestorableKey = `${CONFIG.STORAGE.SNAPSHOT_PREFIX}2026-no-profile`;
+        await adapter.open();
+        await adapter.saveBatch({
+            upserts: [
+                [legacyKey, JSON.stringify({
+                    snapshotType: 'full-localstorage',
+                    label: 'Legacy Profil',
+                    timestamp: '2026-06-01T08:00:00.000Z',
+                    localStorage: {
+                        [CONFIG.STORAGE.LS_KEY]: '{"inputs":{"alter":66}}',
+                        [PROFILE_STORAGE_KEYS.current]: 'default',
+                        [PROFILE_STORAGE_KEYS.registry]: JSON.stringify({
+                            profiles: {
+                                default: { meta: { name: 'Standard' }, data: {} }
+                            }
+                        }),
+                        [`${CONFIG.STORAGE.SNAPSHOT_PREFIX}nested`]: 'must-not-migrate',
+                        ui_panel_state: 'technical-keep-out'
+                    }
+                })],
+                [nonRestorableKey, JSON.stringify({
+                    snapshotType: 'full-localstorage',
+                    createdAt: '2026-06-02T08:00:00.000Z',
+                    localStorage: {
+                        [CONFIG.STORAGE.LS_KEY]: '{"inputs":{"alter":67}}',
+                        [PROFILE_STORAGE_KEYS.registry]: JSON.stringify({ profiles: {} })
+                    }
+                })]
+            ],
+            deletes: []
+        });
+
+        const report = await adapter.migrateLegacySnapshotsIfNeeded();
+        const snapshots = await adapter.listSnapshots();
+        const migrated = await adapter.readSnapshot('snapshot_legacy_2026-legacy');
+        const nonRestorable = await adapter.readSnapshot('snapshot_legacy_2026-no-profile');
+        const liveRecords = await adapter.loadAll();
+        const cleanupMarker = await adapter.readMetadata('legacySnapshotDbCleanup');
+
+        assertEqual(report.migratedCount, 2, 'IndexedDB Migration migriert beide Legacy-Snapshots');
+        assertEqual(report.skippedCount, 0, 'IndexedDB Migration ueberspringt keine gueltigen Legacy-Snapshots');
+        assertEqual(report.notStandardRestorableCount, 1, 'IndexedDB Migration markiert Snapshot ohne Profil-ID als nicht standard-restore-faehig');
+        assertEqual(report.errors.length, 0, 'IndexedDB Migration bleibt fehlerfrei');
+        assertEqual(snapshots.length, 2, 'IndexedDB Migration listet migrierte Snapshots im Archiv');
+        assertEqual(migrated.activeProfileId, 'default', 'IndexedDB Migration uebernimmt aktive Profil-ID');
+        assertEqual(migrated.activeProfileName, 'Standard', 'IndexedDB Migration uebernimmt Profilnamen');
+        assertEqual(migrated.records[CONFIG.STORAGE.LS_KEY], '{"inputs":{"alter":66}}', 'IndexedDB Migration uebernimmt fachliche Records');
+        assertEqual(migrated.records[`${CONFIG.STORAGE.SNAPSHOT_PREFIX}nested`], undefined, 'IndexedDB Migration filtert verschachtelte Legacy-Snapshot-Keys');
+        assertEqual(migrated.records.ui_panel_state, undefined, 'IndexedDB Migration filtert technische UI-Keys');
+        assertEqual(nonRestorable.activeProfileId, '', 'IndexedDB Migration laesst nicht ableitbare Profil-ID leer');
+        assertEqual(liveRecords[legacyKey], undefined, 'IndexedDB Migration loescht erfolgreich migrierten Legacy-Key aus Live-KV');
+        assertEqual(fakeIndexedDB.db.deletedSnapshotDb, true, 'IndexedDB Migration bereinigt alte snapshotDB');
+        assert(cleanupMarker.completedAt, 'IndexedDB Migration schreibt Cleanup-Marker');
+    }
+
     console.log('Test 13: Tauri JSON adapter stores records via Rust commands');
     {
         let liveFileContent = '';
@@ -791,6 +866,56 @@ try {
         assertEqual(deleted, true, 'Tauri Adapter loescht vorhandenen Snapshot');
         const deletedAgain = await adapter.deleteSnapshot(snapshot.id);
         assertEqual(deletedAgain, false, 'Tauri Adapter meldet fehlenden Snapshot beim zweiten Delete');
+    }
+
+    console.log('Test 13b: Tauri JSON adapter migrates legacy full-localstorage snapshots out of live state');
+    {
+        let snapshotFileContent = '';
+        let liveFileContent = JSON.stringify({
+            schemaVersion: 1,
+            records: {
+                [`${CONFIG.STORAGE.SNAPSHOT_PREFIX}tauri-legacy`]: JSON.stringify({
+                    snapshotType: 'full-localstorage',
+                    label: 'Tauri Legacy',
+                    createdAt: '2026-06-03T08:00:00.000Z',
+                    localStorage: {
+                        [CONFIG.STORAGE.LS_KEY]: '{"inputs":{"alter":68}}'
+                    }
+                })
+            },
+            metadata: {}
+        });
+        const adapter = createTauriJsonFileAdapter({
+            invoke: async (command, args = {}) => {
+                if (command === 'load_app_state') {
+                    return args.target === 'snapshots' ? snapshotFileContent : liveFileContent;
+                }
+                if (command === 'save_app_state') {
+                    if (args.target === 'snapshots') {
+                        snapshotFileContent = args.content;
+                    } else {
+                        liveFileContent = args.content;
+                    }
+                    return null;
+                }
+                throw new Error(`unknown command ${command}`);
+            }
+        });
+
+        await adapter.open();
+        const report = await adapter.migrateLegacySnapshotsIfNeeded();
+        const snapshots = await adapter.listSnapshots();
+        const migrated = await adapter.readSnapshot('snapshot_legacy_tauri-legacy');
+        const live = await adapter.loadAll();
+
+        assertEqual(report.migratedCount, 1, 'Tauri Migration migriert Legacy-Snapshot');
+        assertEqual(report.notStandardRestorableCount, 0, 'Tauri Migration nutzt default-Fallback fuer Vor-Profilverbund-Snapshot');
+        assertEqual(snapshots.length, 1, 'Tauri Migration schreibt Snapshot ins separate Archiv');
+        assertEqual(migrated.activeProfileId, 'default', 'Tauri Migration setzt default-Fallback');
+        assertEqual(migrated.records[CONFIG.STORAGE.LS_KEY], '{"inputs":{"alter":68}}', 'Tauri Migration uebernimmt fachliche Records');
+        assertEqual(live[`${CONFIG.STORAGE.SNAPSHOT_PREFIX}tauri-legacy`], undefined, 'Tauri Migration entfernt Legacy-Key aus Live-State');
+        assert(!liveFileContent.includes(`${CONFIG.STORAGE.SNAPSHOT_PREFIX}tauri-legacy`), 'Tauri Live-Datei enthaelt keinen Legacy-Snapshot-Key mehr');
+        assert(snapshotFileContent.includes('snapshot_legacy_tauri-legacy'), 'Tauri Snapshot-Datei enthaelt kanonischen Snapshot');
     }
 
     console.log('Test 14: Tauri JSON adapter quarantines corrupt state');
