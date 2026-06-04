@@ -1,6 +1,7 @@
 // @ts-check
 
 import { CONFIG } from '../balance/balance-config.js';
+import { isAllowedSnapshotCaptureKey, isLegacySnapshotKey } from './persistence-key-policy.js';
 
 const SNAPSHOT_SCHEMA_VERSION = 1;
 const SNAPSHOT_TYPE = 'persistence-records-v1';
@@ -10,41 +11,6 @@ const PROFILE_STORAGE_KEYS = Object.freeze({
     current: 'rs_current_profile',
     active: 'rs_active_profile'
 });
-const LEGACY_MIGRATION_MARKER_KEYS = Object.freeze({
-    target: 'ruhestandsapp_migrated_to_target',
-    completedAt: 'ruhestandsapp_migration_completed_at',
-    checksum: 'ruhestandsapp_migration_checksum'
-});
-const SNAPSHOT_CAPTURE_EXACT_KEYS = new Set([
-    CONFIG.STORAGE.LS_KEY,
-    CONFIG.STORAGE.MIGRATION_FLAG,
-    PROFILE_STORAGE_KEYS.registry,
-    PROFILE_STORAGE_KEYS.current,
-    PROFILE_STORAGE_KEYS.active,
-    'etfProxyUrl',
-    'etfProxyUrls',
-    'household_withdrawal_mode',
-    ...Object.values(LEGACY_MIGRATION_MARKER_KEYS),
-    'depot_tranchen',
-    'profile_health_bucket',
-    'profile_tagesgeld',
-    'profile_rente_aktiv',
-    'profile_rente_monatlich',
-    'profile_sonstige_einkuenfte',
-    'profile_aktuelles_alter',
-    'profile_gold_aktiv',
-    'profile_gold_ziel_pct',
-    'profile_gold_floor_pct',
-    'profile_gold_steuerfrei',
-    'profile_gold_rebal_band',
-    'showCareDetails',
-    'logDetailLevel',
-    'worstLogDetailLevel',
-    'backtestLogDetailLevel'
-]);
-const SNAPSHOT_DOMAIN_PREFIXES = ['sim_', 'sim.', 'balance_expenses_'];
-const TECHNICAL_EXACT_KEYS = new Set(['enableWorkerTelemetry', 'featureFlags']);
-const TECHNICAL_PREFIXES = ['debug_', 'layout_', 'telemetry_', 'ui_', 'window_'];
 const DEFAULT_STATE = Object.freeze({
     schemaVersion: 1,
     records: {},
@@ -126,23 +92,6 @@ function toSnapshotIndexEntry(snapshot) {
     return indexEntry;
 }
 
-function isLegacySnapshotKey(key) {
-    return String(key || '').startsWith(CONFIG.STORAGE.SNAPSHOT_PREFIX);
-}
-
-function isSnapshotTechnicalKey(key) {
-    const normalized = String(key || '');
-    if (TECHNICAL_EXACT_KEYS.has(normalized)) return true;
-    return TECHNICAL_PREFIXES.some(prefix => normalized.startsWith(prefix));
-}
-
-function isAllowedSnapshotCaptureKey(key) {
-    const normalized = String(key || '');
-    if (!normalized || isLegacySnapshotKey(normalized) || isSnapshotTechnicalKey(normalized)) return false;
-    if (SNAPSHOT_CAPTURE_EXACT_KEYS.has(normalized)) return true;
-    return SNAPSHOT_DOMAIN_PREFIXES.some(prefix => normalized.startsWith(prefix));
-}
-
 function parseJsonObject(raw, fallback = null) {
     if (!raw) return fallback;
     try {
@@ -206,6 +155,13 @@ function buildCanonicalSnapshotFromLegacy(key, legacySnapshot) {
             profileLiveDataMode: 'restore-only-if-active-profile-still-exists'
         }
     };
+}
+
+function getCanonicalLegacySnapshotId(id) {
+    const normalized = String(id || '');
+    return isLegacySnapshotKey(normalized)
+        ? normalized.replace(CONFIG.STORAGE.SNAPSHOT_PREFIX, 'snapshot_legacy_')
+        : normalized;
 }
 
 function createLegacyMigrationReport() {
@@ -297,7 +253,11 @@ export function createTauriJsonFileAdapter(options = {}) {
         async readSnapshot(id) {
             await ensureSnapshotsOpen();
             const snapshotId = String(id || '');
-            const snapshot = snapshotArchive.snapshots.find(entry => String(entry?.id || '') === snapshotId);
+            let snapshot = snapshotArchive.snapshots.find(entry => String(entry?.id || '') === getCanonicalLegacySnapshotId(snapshotId));
+            if (!snapshot) {
+                await this.migrateLegacySnapshotsIfNeeded();
+                snapshot = snapshotArchive.snapshots.find(entry => String(entry?.id || '') === getCanonicalLegacySnapshotId(snapshotId));
+            }
             if (!snapshot) {
                 throw new Error(`Snapshot ${snapshotId} wurde nicht gefunden.`);
             }
@@ -329,8 +289,8 @@ export function createTauriJsonFileAdapter(options = {}) {
             await ensureSnapshotsOpen();
             const report = createLegacyMigrationReport();
             const legacyKeys = Object.keys(state.records || {}).filter(isLegacySnapshotKey);
-            let liveChanged = false;
-            let snapshotsChanged = false;
+            const nextSnapshots = [...snapshotArchive.snapshots];
+            const migratedLegacyKeys = [];
 
             legacyKeys.forEach(legacyKey => {
                 try {
@@ -340,14 +300,12 @@ export function createTauriJsonFileAdapter(options = {}) {
                         return;
                     }
                     const canonical = buildCanonicalSnapshotFromLegacy(legacyKey, legacySnapshot);
-                    const exists = snapshotArchive.snapshots.some(entry => String(entry?.id || '') === canonical.id);
+                    const exists = nextSnapshots.some(entry => String(entry?.id || '') === canonical.id);
                     if (exists) {
                         report.skippedCount += 1;
                     } else {
-                        snapshotArchive.snapshots.push(canonical);
-                        delete state.records[legacyKey];
-                        liveChanged = true;
-                        snapshotsChanged = true;
+                        nextSnapshots.push(canonical);
+                        migratedLegacyKeys.push(legacyKey);
                         report.migratedCount += 1;
                     }
                     if (!canonical.activeProfileId) report.notStandardRestorableCount += 1;
@@ -356,8 +314,20 @@ export function createTauriJsonFileAdapter(options = {}) {
                 }
             });
 
-            if (snapshotsChanged) await persistSnapshots();
-            if (liveChanged) await persist();
+            if (migratedLegacyKeys.length > 0) {
+                const previousArchive = snapshotArchive;
+                snapshotArchive = { ...snapshotArchive, snapshots: nextSnapshots };
+                try {
+                    await persistSnapshots();
+                } catch (err) {
+                    snapshotArchive = previousArchive;
+                    throw err;
+                }
+                migratedLegacyKeys.forEach(legacyKey => {
+                    delete state.records[legacyKey];
+                });
+                await persist();
+            }
             return report;
         },
         async quarantine() {

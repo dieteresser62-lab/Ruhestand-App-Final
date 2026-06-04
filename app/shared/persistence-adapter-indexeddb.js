@@ -1,6 +1,7 @@
 // @ts-check
 
 import { CONFIG } from '../balance/balance-config.js';
+import { isAllowedSnapshotCaptureKey, isLegacySnapshotKey } from './persistence-key-policy.js';
 
 const SNAPSHOT_SCHEMA_VERSION = 1;
 const SNAPSHOT_TYPE = 'persistence-records-v1';
@@ -10,41 +11,6 @@ const PROFILE_STORAGE_KEYS = Object.freeze({
     current: 'rs_current_profile',
     active: 'rs_active_profile'
 });
-const LEGACY_MIGRATION_MARKER_KEYS = Object.freeze({
-    target: 'ruhestandsapp_migrated_to_target',
-    completedAt: 'ruhestandsapp_migration_completed_at',
-    checksum: 'ruhestandsapp_migration_checksum'
-});
-const SNAPSHOT_CAPTURE_EXACT_KEYS = new Set([
-    CONFIG.STORAGE.LS_KEY,
-    CONFIG.STORAGE.MIGRATION_FLAG,
-    PROFILE_STORAGE_KEYS.registry,
-    PROFILE_STORAGE_KEYS.current,
-    PROFILE_STORAGE_KEYS.active,
-    'etfProxyUrl',
-    'etfProxyUrls',
-    'household_withdrawal_mode',
-    ...Object.values(LEGACY_MIGRATION_MARKER_KEYS),
-    'depot_tranchen',
-    'profile_health_bucket',
-    'profile_tagesgeld',
-    'profile_rente_aktiv',
-    'profile_rente_monatlich',
-    'profile_sonstige_einkuenfte',
-    'profile_aktuelles_alter',
-    'profile_gold_aktiv',
-    'profile_gold_ziel_pct',
-    'profile_gold_floor_pct',
-    'profile_gold_steuerfrei',
-    'profile_gold_rebal_band',
-    'showCareDetails',
-    'logDetailLevel',
-    'worstLogDetailLevel',
-    'backtestLogDetailLevel'
-]);
-const SNAPSHOT_DOMAIN_PREFIXES = ['sim_', 'sim.', 'balance_expenses_'];
-const TECHNICAL_EXACT_KEYS = new Set(['enableWorkerTelemetry', 'featureFlags']);
-const TECHNICAL_PREFIXES = ['debug_', 'layout_', 'telemetry_', 'ui_', 'window_'];
 const DEFAULT_DB_NAME = 'ruhestand-suite';
 const DEFAULT_DB_VERSION = 2;
 const KV_STORE = 'kv';
@@ -52,6 +18,7 @@ const METADATA_STORE = 'metadata';
 const SNAPSHOT_STORE = 'snapshots';
 const LEGACY_SNAPSHOT_DB_NAME = 'snapshotDB';
 const LEGACY_SNAPSHOT_DB_CLEANUP_METADATA_KEY = 'legacySnapshotDbCleanup';
+const LEGACY_SNAPSHOT_MIGRATION_METADATA_KEY = 'legacySnapshotMigration';
 const OUTDATED_MESSAGE = 'Datenbankverbindung veraltet, bitte diesen Tab neu laden.';
 const UPGRADE_BLOCKED_MESSAGE = 'IndexedDB-Upgrade blockiert. Bitte andere RuhestandSuite-Tabs schliessen oder neu laden.';
 
@@ -103,23 +70,6 @@ function createUpgradeBlockedError() {
 function toSnapshotIndexEntry(snapshot) {
     const { records, ...indexEntry } = snapshot || {};
     return indexEntry;
-}
-
-function isLegacySnapshotKey(key) {
-    return String(key || '').startsWith(CONFIG.STORAGE.SNAPSHOT_PREFIX);
-}
-
-function isSnapshotTechnicalKey(key) {
-    const normalized = String(key || '');
-    if (TECHNICAL_EXACT_KEYS.has(normalized)) return true;
-    return TECHNICAL_PREFIXES.some(prefix => normalized.startsWith(prefix));
-}
-
-function isAllowedSnapshotCaptureKey(key) {
-    const normalized = String(key || '');
-    if (!normalized || isLegacySnapshotKey(normalized) || isSnapshotTechnicalKey(normalized)) return false;
-    if (SNAPSHOT_CAPTURE_EXACT_KEYS.has(normalized)) return true;
-    return SNAPSHOT_DOMAIN_PREFIXES.some(prefix => normalized.startsWith(prefix));
 }
 
 function parseJsonObject(raw, fallback = null) {
@@ -185,6 +135,13 @@ function buildCanonicalSnapshotFromLegacy(key, legacySnapshot) {
             profileLiveDataMode: 'restore-only-if-active-profile-still-exists'
         }
     };
+}
+
+function getCanonicalLegacySnapshotId(id) {
+    const normalized = String(id || '');
+    return isLegacySnapshotKey(normalized)
+        ? normalized.replace(CONFIG.STORAGE.SNAPSHOT_PREFIX, 'snapshot_legacy_')
+        : normalized;
 }
 
 function createLegacyMigrationReport() {
@@ -338,7 +295,11 @@ export function createIndexedDbAdapter(options = {}) {
             const snapshotId = String(id || '');
             const database = await ensureOpen();
             const store = getStore(database, SNAPSHOT_STORE);
-            const row = await requestToPromise(store.get(snapshotId));
+            let row = await requestToPromise(store.get(getCanonicalLegacySnapshotId(snapshotId)));
+            if (!row) {
+                await this.migrateLegacySnapshotsIfNeeded();
+                row = await requestToPromise(store.get(getCanonicalLegacySnapshotId(snapshotId)));
+            }
             const snapshot = row?.snapshot || row;
             if (!snapshot) {
                 throw new Error(`Snapshot ${snapshotId} wurde nicht gefunden.`);
@@ -379,51 +340,65 @@ export function createIndexedDbAdapter(options = {}) {
             assertUsable();
             const database = await ensureOpen();
             const report = createLegacyMigrationReport();
+            const migrationMarker = await this.readMetadata(LEGACY_SNAPSHOT_MIGRATION_METADATA_KEY);
             const kvStore = getStore(database, KV_STORE);
             const snapshotStore = getStore(database, SNAPSHOT_STORE);
             const legacyRows = [];
-            const cursorRequest = kvStore.openCursor();
 
-            await new Promise((resolve, reject) => {
-                cursorRequest.onsuccess = () => {
-                    const cursor = cursorRequest.result;
-                    if (!cursor) {
-                        resolve(true);
-                        return;
-                    }
-                    const row = cursor.value;
-                    if (isLegacySnapshotKey(row?.key)) legacyRows.push(row);
-                    cursor.continue();
-                };
-                cursorRequest.onerror = () => reject(cursorRequest.error || new Error('IndexedDB legacy snapshot cursor failed'));
-            });
+            if (!migrationMarker?.completedAt) {
+                const cursorRequest = kvStore.openCursor();
 
-            for (const row of legacyRows) {
-                const legacyKey = String(row.key || '');
-                try {
-                    const legacySnapshot = parseLegacySnapshot(row.value);
-                    if (!legacySnapshot) {
-                        report.skippedCount += 1;
-                        continue;
+                await new Promise((resolve, reject) => {
+                    cursorRequest.onsuccess = () => {
+                        const cursor = cursorRequest.result;
+                        if (!cursor) {
+                            resolve(true);
+                            return;
+                        }
+                        const row = cursor.value;
+                        if (isLegacySnapshotKey(row?.key)) legacyRows.push(row);
+                        cursor.continue();
+                    };
+                    cursorRequest.onerror = () => reject(cursorRequest.error || new Error('IndexedDB legacy snapshot cursor failed'));
+                });
+
+                for (const row of legacyRows) {
+                    const legacyKey = String(row.key || '');
+                    try {
+                        const legacySnapshot = parseLegacySnapshot(row.value);
+                        if (!legacySnapshot) {
+                            report.skippedCount += 1;
+                            continue;
+                        }
+                        const canonical = buildCanonicalSnapshotFromLegacy(legacyKey, legacySnapshot);
+                        const existing = await requestToPromise(snapshotStore.get(canonical.id));
+                        if (existing) {
+                            report.skippedCount += 1;
+                        } else {
+                            const transaction = database.transaction([SNAPSHOT_STORE, KV_STORE], 'readwrite');
+                            transaction.objectStore(SNAPSHOT_STORE).put({
+                                key: canonical.id,
+                                snapshot: canonical,
+                                updatedAt: new Date().toISOString()
+                            });
+                            transaction.objectStore(KV_STORE).delete(legacyKey);
+                            await transactionDone(transaction);
+                            report.migratedCount += 1;
+                        }
+                        if (!canonical.activeProfileId) report.notStandardRestorableCount += 1;
+                    } catch (err) {
+                        report.errors.push({ key: legacyKey, message: err?.message || String(err) });
                     }
-                    const canonical = buildCanonicalSnapshotFromLegacy(legacyKey, legacySnapshot);
-                    const existing = await requestToPromise(snapshotStore.get(canonical.id));
-                    if (existing) {
-                        report.skippedCount += 1;
-                    } else {
-                        const transaction = database.transaction([SNAPSHOT_STORE, KV_STORE], 'readwrite');
-                        transaction.objectStore(SNAPSHOT_STORE).put({
-                            key: canonical.id,
-                            snapshot: canonical,
-                            updatedAt: new Date().toISOString()
-                        });
-                        transaction.objectStore(KV_STORE).delete(legacyKey);
-                        await transactionDone(transaction);
-                        report.migratedCount += 1;
-                    }
-                    if (!canonical.activeProfileId) report.notStandardRestorableCount += 1;
-                } catch (err) {
-                    report.errors.push({ key: legacyKey, message: err?.message || String(err) });
+                }
+
+                if (report.errors.length === 0) {
+                    await this.writeMetadata(LEGACY_SNAPSHOT_MIGRATION_METADATA_KEY, {
+                        completedAt: new Date().toISOString(),
+                        scannedCount: legacyRows.length,
+                        migratedCount: report.migratedCount,
+                        skippedCount: report.skippedCount,
+                        notStandardRestorableCount: report.notStandardRestorableCount
+                    });
                 }
             }
 

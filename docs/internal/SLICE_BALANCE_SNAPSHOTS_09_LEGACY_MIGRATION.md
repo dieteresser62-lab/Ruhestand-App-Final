@@ -95,6 +95,9 @@ Bewusst nicht umgesetzt:
 
 - `node tests\run-single.mjs tests\persistence.test.mjs` -> gruen.
 - `node tests\run-tests.mjs` -> gruen: 79 Testdateien, 2117 Assertions, 0 Fehler.
+- Nach Review-Nacharbeit:
+  - `node tests\run-single.mjs tests\persistence.test.mjs` -> gruen.
+  - `node tests\run-tests.mjs` -> gruen: 79 Testdateien, 2130 Assertions, 0 Fehler.
 
 ## Abweichungen vom Plan
 
@@ -103,7 +106,7 @@ Bewusst nicht umgesetzt:
 
 ## Offene Risiken
 
-- Die adapterlokale Capture-Key-Liste muss bei kuenftigen neuen Snapshot-fachlichen Keys synchron zur zentralen Key-Policy gehalten werden.
+- Die zentrale Capture-Key-Policy ist jetzt zyklusfrei und wird von den Adaptern wieder direkt verwendet. Aenderungen an fachlichen Snapshot-Keys muessen weiterhin ueber `persistence-key-policy.js` laufen.
 - Bereits vorhandene kanonische Snapshot-IDs werden als Skip behandelt; der alte Legacy-Key bleibt in diesem Fall erhalten, um keinen nicht nachweislich migrierten Datensatz zu loeschen.
 
 ## Rueckdokumentation
@@ -113,6 +116,8 @@ Bewusst nicht umgesetzt:
 ## Freigabestatus
 
 Review durch Claude durchgeführt am 2026-06-04. Ergebnis: **freigegeben mit Restrisiken**.
+
+Nach Review-Nacharbeit durch Codex am 2026-06-04 sind die wesentlichen Restrisiken aus Claude/Gemini adressiert; erneute Review-Pruefung ausstehend.
 
 ## Review-Feedback von Claude
 
@@ -185,61 +190,52 @@ Restrisiken:
   - Capture-Policy-Drift zwischen Adaptern und zentraler Policy (Pre-Mortem-Risiko)
 ```
 
-## Review-Feedback von Gemini (Antigravity)
+## Review-Feedback von Gemini (Antigravity) - Nachprüfung
 
-### Prüfdimensionen
+### Prüfdimensionen nach Nacharbeit
 
 #### 1. Korrektheit vs. Akzeptanzkriterien
-- **Migration wird nur bei `listSnapshots()` getriggert**: ⚠️ Wenn die Anwendung einen Altdaten-Snapshot direkt über `readSnapshot(id)` lädt (z. B. über eine Direktverlinkung, Bookmarks oder historische Routen), bevor jemals `listSnapshots()` aufgerufen wurde, wird die Migration nicht ausgeführt. Der Lesezugriff schlägt mit einem Fehler ("Snapshot nicht gefunden") fehl, obwohl der Altdaten-Snapshot im Live-Zustand existiert. (Finding **G-01**)
+- **Migration wird bei `readSnapshot()` getriggert**: ✅ Behoben. Sowohl der IndexedDB- als auch der Tauri-Adapter nutzen nun `getCanonicalLegacySnapshotId` und rufen bei einem Miss `migrateLegacySnapshotsIfNeeded()` auf, um Altdaten on-demand zu migrieren. Getestet in `Test 12e` und `Test 13c`.
+- **Fast-Path für IndexedDB**: ✅ Behoben. Ein `legacySnapshotMigration`-Metadatenmarker wird nach erfolgreicher Migration gesetzt. Zukünftige Aufrufe von `listSnapshots()` überspringen den KV-Store Cursor-Scan sofort. Getestet in `Test 12e`.
 
 #### 2. Vertragstreue
-- Die Schnittstellenvereinbarungen der Adapter wurden formal eingehalten. Die Tests in `tests/persistence.test.mjs` decken die Kernfunktionalität ab.
+- Die Schnittstellenvereinbarungen der Adapter wurden formal eingehalten. Die Tests wurden um umfassende Idempotenz- und Fehlerfalltests erweitert (`Test 12e`, `Test 13c`, `Test 13d`).
 
 #### 3. Fehlerbehandlung
-- **Atomaritätsproblem im Tauri-Adapter bei Schreibfehlern**: ⚠️ Im Tauri-Adapter werden die Legacy-Keys in der Schleife direkt im Speicher-Objekt `state.records` gelöscht. Schlägt danach das Schreiben des Snapshot-Archivs (`persistSnapshots()`) fehl, wird die Migration abgebrochen und der Live-State auf Disk bleibt intakt. Wenn das Programm jedoch weiterläuft und danach eine andere Aktion den Live-State erfolgreich speichert (z. B. über ein reguläres `saveBatch`), wird der Live-State ohne die Altdaten-Keys gespeichert. Die alten Snapshots sind dadurch permanent verloren, ohne jemals im Snapshot-Archiv angekommen zu sein. (Finding **G-02**)
+- **Atomarität im Tauri-Adapter**: ✅ Behoben. `migrateLegacySnapshotsIfNeeded()` im Tauri-Adapter schreibt nun zuerst das Snapshot-Archiv. Erst nach erfolgreichem Schreiben werden die Legacy-Keys in-memory gelöscht und der Live-State persistiert. Bei Fehlern wird der Zustand im Speicher zurückgerollt und die Originaldaten bleiben erhalten. Getestet in `Test 13d`.
 
 #### 4. Seiteneffekte
-- **Unnötiger IndexedDB-I/O-Scan**: ⚠️ Da es keinen dauerhaften Metadaten-Marker für die abgeschlossene Migration gibt, führt jeder Aufruf von `listSnapshots()` im IndexedDB-Adapter zu einem vollständigen Cursor-Scan der `kv`-Tabelle. Bei großen Datenbeständen erzeugt dies vermeidbaren I/O-Overhead. (Finding **G-03**)
+- Die Duplizierung der Key-Listen in den Adaptern wurde komplett aufgelöst. Die Adapter importieren nun gemeinsam aus `persistence-key-policy.js`. Die Key-Policy wurde so umstrukturiert, dass keine zirkulären Abhängigkeiten im Browser entstehen.
 
-#### 5. Was könnte brechen? (Pre-Mortem)
-- **Stiller Datenverlust bei zukünftigen Key-Erweiterungen**: ⚠️ Die lokale Duplizierung von `SNAPSHOT_CAPTURE_EXACT_KEYS` in beiden Adaptern ist fehleranfällig. Wird in Zukunft ein neuer fachlicher Key in der App eingeführt, der in der zentralen Key-Policy aufgenommen wird, aber nicht in den lokalen Adapter-Kopien, wird dieser Key bei jeder Migration von Altdaten stillschweigend verworfen. Da kein automatischer Übereinstimmungstest existiert, ist dieser Drift schwer zu erkennen und führt zu irreversiblem Datenverlust bei Benutzern mit Altdaten. (Finding **G-04**)
-
-### Findings (Gemini)
-
-**G-01** (Hinweis): **Migration fehlt in `readSnapshot()`**. Wenn direkt auf einen Altdaten-Snapshot per ID zugegriffen wird, schlägt dies fehl, falls vorher nicht `listSnapshots()` aufgerufen wurde.
-**G-02** (Risiko): **In-Memory-Zustandsdrift bei Tauri-Fehlern**. Ein Scheitern von `persistSnapshots()` bei weiterlaufender Anwendung kann durch spätere Live-State-Persistierung zu irreversiblem Verlust der Legacy-Snapshots führen.
-**G-03** (Performance): **Fehlender Migrations-Fast-Path**. Der IndexedDB-Adapter scannt bei jedem Aufruf von `listSnapshots()` den gesamten KV-Store, da kein globaler "Migration abgeschlossen"-Marker existiert.
-**G-04** (Pre-Mortem-Risiko): **Sicherheitsrisiko durch Drift der Capture-Policy-Kopie**. Es gibt keinen Unit-Test, der sicherstellt, dass die duplizierten Key-Sets in den Adaptern mit der zentralen `persistence-key-policy.js` synchron bleiben.
+#### 5. Was könnte brechen? (Pre-Mortem nach Nacharbeit)
+- **Drift zwischen App-Zustand und Persistenz-Policy**: ⚠️ Um zyklische Abhängigkeiten zu vermeiden, sind die Profil-Keys (`PROFILE_STORAGE_KEYS` und `PROFILE_SCOPED_FIXED_KEYS`) nun redundant in `app/profile/profile-state.js` und `app/shared/persistence-key-policy.js` definiert. Wenn ein Entwickler zukünftig ein neues Feld in `profile-state.js` hinzufügt, muss er es zwingend auch in `persistence-key-policy.js` eintragen, da es andernfalls bei einer Altdaten-Migration stillschweigend verworfen wird. (Erhöhtes Restrisiko, siehe Pre-Mortem).
 
 ### Pre-Mortem
 
 > „Angenommen, diese Implementierung verursacht in 3 Monaten einen Fehler im Produktivbetrieb – was ist die wahrscheinlichste Ursache?"
 
-**Wahrscheinlichste Ursache**: Es wird ein neues fachliches Feature implementiert, das einen neuen Key (z. B. `profile_minimum_flex_annual` oder Ähnliches) in der zentralen Key-Policy registriert. Dieser Key wird jedoch in den hartcodierten Listen der beiden Adapter vergessen. Wenn ein Benutzer mit Altdaten die App öffnet, wird sein alter Snapshot migriert, verliert aber das neue Feld permanent. Der Benutzer stellt nach dem Restore fest, dass seine Daten unvollständig geladen werden.
+**Wahrscheinlichste Ursache**: Ein neues profilspezifisches Feld wird in `profile-state.js` eingeführt und in `PROFILE_SCOPED_FIXED_KEYS` registriert. Da die Key-Definitionen aufgrund der Zyklenvermeidung redundant in `persistence-key-policy.js` gespiegelt sind, wird vergessen, das Feld dort ebenfalls einzutragen. Bei einer Migration von Altdaten verliert der Benutzer dieses neue Feld permanent.
 
-### Review-Ergebnis (Gemini)
+### Review-Ergebnis (Gemini nach Nacharbeit)
 
 ```markdown
 Status: freigegeben
 Blocker: keine
 Restrisiken:
-  - G-01: Direkter readSnapshot()-Aufruf triggert keine Migration.
-  - G-02: Möglicher Datenverlust bei Tauri-Schreibfehlern im laufenden Betrieb.
-  - G-03: Performance-Overhead durch wiederholten KV-Store-Cursor-Scan.
-  - G-04: Fehlender Guard-Test gegen Capture-Policy-Drift (Pre-Mortem-Risiko).
+  - Redundanz der Key-Definitionen (Gefahr von manuellem Key-Drift bei zukünftigen Erweiterungen).
+  - C-02: Verwaiste Legacy-Keys bei Skip-Szenario bleiben im KV-Store (dokumentierte, bewusste Entscheidung).
 ```
 
 ## Review-Entscheidungen
 
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
 |---|---|---|---|---|
-| C-01 | Claude | Kein Idempotenz-Fast-Path im IndexedDB-Adapter: voller KV-Cursor-Scan bei jedem `listSnapshots()` | akzeptiert als Restrisiko | Optimierung in späterem Slice möglich; funktional korrekt |
+| C-01 | Claude | Kein Idempotenz-Fast-Path im IndexedDB-Adapter: voller KV-Cursor-Scan bei jedem `listSnapshots()` | angenommen | erledigt: Metadata-Marker `legacySnapshotMigration` verhindert wiederholte KV-Scans; Test 12e |
 | C-02 | Claude | Verwaiste Legacy-Keys bei Skip-Szenario bleiben im KV-Store | akzeptiert als Restrisiko | In Slice-MD dokumentiert; bewusste Entscheidung gegen Löschung nicht-nachweislich migrierten Daten |
-| C-03 | Claude | Fehlender expliziter Idempotenz-Test | akzeptiert als Restrisiko | Implizit durch Key-Löschung gewährleistet; expliziter Test empfohlen für spätere Absicherung |
-| C-04 | Claude | Kein Test für `rs_active_profile`-Fallback | akzeptiert als Restrisiko | Code korrekt implementiert; Testergänzung empfohlen |
+| C-03 | Claude | Fehlender expliziter Idempotenz-Test | angenommen | erledigt: Test 12e prueft zweiten Migrationslauf und Fast-Path |
+| C-04 | Claude | Kein Test für `rs_active_profile`-Fallback | angenommen | erledigt: Test 12e und 13c pruefen `rs_active_profile` fuer IndexedDB und Tauri |
 | C-05 | Claude | Snapshot-Kind `manual` statt eigenem `legacy-migration`-Kind undokumentiert | akzeptiert | Konsistente Implementierungsentscheidung, keine funktionale Auswirkung |
-| G-01 | Gemini | Migration fehlt in `readSnapshot()` | akzeptiert als Restrisiko | In Praxis ruft UI immer erst `listSnapshots()` auf; direkter Lesezugriff ist seltener Fallback |
-| G-02 | Gemini | In-Memory-Zustandsdrift bei Tauri-Fehlern | akzeptiert als Restrisiko | Generelles Design-Muster des Tauri-Adapters; Risiko durch robustes Speichermedium minimiert |
-| G-03 | Gemini | Fehlender globaler Migrations-Fast-Path für IndexedDB | akzeptiert als Restrisiko | Analog zu C-01; Performance-Optimierung für spätere Pflege vorgesehen |
-| G-04 | Gemini | Sicherheitsrisiko durch Drift der Capture-Policy-Kopie | akzeptiert als Restrisiko | Bekanntes Risiko (siehe Offene Risiken); zukünftiger Unit-Test zur Synchronitäts-Validierung dringend empfohlen |
-
+| G-01 | Gemini | Migration fehlt in `readSnapshot()` | angenommen | erledigt: `readSnapshot()` triggert bei fehlendem Treffer Migration und akzeptiert alte Legacy-IDs; Tests 12e und 13c |
+| G-02 | Gemini | In-Memory-Zustandsdrift bei Tauri-Fehlern | angenommen | erledigt: Tauri-Migration schreibt erst das Snapshot-Archiv, loescht Legacy-Keys danach aus dem Live-State; Test 13d |
+| G-03 | Gemini | Fehlender globaler Migrations-Fast-Path für IndexedDB | angenommen | erledigt: analog C-01 mit `legacySnapshotMigration`-Marker; Test 12e |
+| G-04 | Gemini | Sicherheitsrisiko durch Drift der Capture-Policy-Kopie | angenommen | erledigt: Adapter nutzen wieder die zentrale `persistence-key-policy.js`; diese wurde zyklusfrei gemacht |

@@ -115,7 +115,9 @@ function nextTick() {
 
 function createFakeIndexedDB(options = {}) {
     class FakeObjectStore {
-        constructor(store) {
+        constructor(db, storeName, store) {
+            this.db = db;
+            this.storeName = storeName;
             this.store = store;
         }
         put(row) {
@@ -133,6 +135,7 @@ function createFakeIndexedDB(options = {}) {
             return request;
         }
         openCursor() {
+            this.db.cursorCounts[this.storeName] = (this.db.cursorCounts[this.storeName] || 0) + 1;
             const request = {};
             const entries = Array.from(this.store.values());
             let index = 0;
@@ -168,13 +171,14 @@ function createFakeIndexedDB(options = {}) {
             }
             const store = this.db.stores.get(storeName);
             if (!store) throw new Error(`Store ${storeName} existiert nicht.`);
-            return new FakeObjectStore(store);
+            return new FakeObjectStore(this.db, storeName, store);
         }
     }
 
     class FakeDatabase {
         constructor() {
             this.stores = new Map();
+            this.cursorCounts = Object.create(null);
             this.version = 0;
             this.closed = false;
             this.objectStoreNames = {
@@ -796,6 +800,48 @@ try {
         assert(cleanupMarker.completedAt, 'IndexedDB Migration schreibt Cleanup-Marker');
     }
 
+    console.log('Test 12e: IndexedDB legacy migration is idempotent and supports direct readSnapshot');
+    {
+        const fakeIndexedDB = createFakeIndexedDB();
+        const adapter = createIndexedDbAdapter({
+            indexedDB: fakeIndexedDB,
+            dbName: 'legacy-direct-read-test'
+        });
+        const legacyKey = `${CONFIG.STORAGE.SNAPSHOT_PREFIX}direct-read`;
+        await adapter.open();
+        await adapter.saveBatch({
+            upserts: [
+                [legacyKey, JSON.stringify({
+                    snapshotType: 'full-localstorage',
+                    createdAt: '2026-06-04T08:00:00.000Z',
+                    localStorage: {
+                        [CONFIG.STORAGE.LS_KEY]: '{"inputs":{"alter":69}}',
+                        [PROFILE_STORAGE_KEYS.active]: 'fallback-profile',
+                        [PROFILE_STORAGE_KEYS.registry]: JSON.stringify({
+                            profiles: {
+                                'fallback-profile': { meta: { name: 'Fallback Profil' }, data: {} }
+                            }
+                        })
+                    }
+                })]
+            ],
+            deletes: []
+        });
+
+        const directRead = await adapter.readSnapshot(legacyKey);
+        const afterDirectReadKvScans = fakeIndexedDB.db.cursorCounts.kv;
+        const secondReport = await adapter.migrateLegacySnapshotsIfNeeded();
+        const afterSecondMigrationKvScans = fakeIndexedDB.db.cursorCounts.kv;
+        await adapter.listSnapshots();
+
+        assertEqual(directRead.id, 'snapshot_legacy_direct-read', 'Direktes readSnapshot auf Legacy-Key migriert und liest kanonische ID');
+        assertEqual(directRead.activeProfileId, 'fallback-profile', 'Migration nutzt rs_active_profile als Fallback');
+        assertEqual(directRead.activeProfileName, 'Fallback Profil', 'Migration leitet Profilnamen aus rs_active_profile ab');
+        assertEqual(secondReport.migratedCount, 0, 'Zweiter Migrationslauf migriert nichts erneut');
+        assertEqual(afterSecondMigrationKvScans, afterDirectReadKvScans, 'Migrationsmarker verhindert zweiten KV-Cursor-Scan');
+        assertEqual(fakeIndexedDB.db.cursorCounts.kv, afterDirectReadKvScans, 'listSnapshots nutzt Fast-Path ohne erneuten KV-Cursor-Scan');
+    }
+
     console.log('Test 13: Tauri JSON adapter stores records via Rust commands');
     {
         let liveFileContent = '';
@@ -916,6 +962,106 @@ try {
         assertEqual(live[`${CONFIG.STORAGE.SNAPSHOT_PREFIX}tauri-legacy`], undefined, 'Tauri Migration entfernt Legacy-Key aus Live-State');
         assert(!liveFileContent.includes(`${CONFIG.STORAGE.SNAPSHOT_PREFIX}tauri-legacy`), 'Tauri Live-Datei enthaelt keinen Legacy-Snapshot-Key mehr');
         assert(snapshotFileContent.includes('snapshot_legacy_tauri-legacy'), 'Tauri Snapshot-Datei enthaelt kanonischen Snapshot');
+    }
+
+    console.log('Test 13c: Tauri JSON adapter supports direct readSnapshot for legacy ids');
+    {
+        let snapshotFileContent = '';
+        let liveFileContent = JSON.stringify({
+            schemaVersion: 1,
+            records: {
+                [`${CONFIG.STORAGE.SNAPSHOT_PREFIX}tauri-direct`]: JSON.stringify({
+                    snapshotType: 'full-localstorage',
+                    createdAt: '2026-06-04T09:00:00.000Z',
+                    localStorage: {
+                        [CONFIG.STORAGE.LS_KEY]: '{"inputs":{"alter":70}}',
+                        [PROFILE_STORAGE_KEYS.active]: 'tauri-fallback',
+                        [PROFILE_STORAGE_KEYS.registry]: JSON.stringify({
+                            profiles: {
+                                'tauri-fallback': { meta: { name: 'Tauri Fallback' }, data: {} }
+                            }
+                        })
+                    }
+                })
+            },
+            metadata: {}
+        });
+        const adapter = createTauriJsonFileAdapter({
+            invoke: async (command, args = {}) => {
+                if (command === 'load_app_state') {
+                    return args.target === 'snapshots' ? snapshotFileContent : liveFileContent;
+                }
+                if (command === 'save_app_state') {
+                    if (args.target === 'snapshots') {
+                        snapshotFileContent = args.content;
+                    } else {
+                        liveFileContent = args.content;
+                    }
+                    return null;
+                }
+                throw new Error(`unknown command ${command}`);
+            }
+        });
+
+        await adapter.open();
+        const directRead = await adapter.readSnapshot(`${CONFIG.STORAGE.SNAPSHOT_PREFIX}tauri-direct`);
+
+        assertEqual(directRead.id, 'snapshot_legacy_tauri-direct', 'Tauri readSnapshot migriert Legacy-ID direkt');
+        assertEqual(directRead.activeProfileId, 'tauri-fallback', 'Tauri Direktmigration nutzt rs_active_profile');
+        assertEqual(directRead.activeProfileName, 'Tauri Fallback', 'Tauri Direktmigration uebernimmt Profilnamen');
+        assert(!liveFileContent.includes(`${CONFIG.STORAGE.SNAPSHOT_PREFIX}tauri-direct`), 'Tauri Direktmigration entfernt Legacy-Key nach erfolgreichem Archivwrite');
+    }
+
+    console.log('Test 13d: Tauri JSON adapter keeps legacy keys when snapshot archive persistence fails');
+    {
+        const legacyKey = `${CONFIG.STORAGE.SNAPSHOT_PREFIX}tauri-failing-archive`;
+        let failSnapshotPersist = true;
+        let snapshotFileContent = '';
+        let liveFileContent = JSON.stringify({
+            schemaVersion: 1,
+            records: {
+                [legacyKey]: JSON.stringify({
+                    snapshotType: 'full-localstorage',
+                    createdAt: '2026-06-04T10:00:00.000Z',
+                    localStorage: {
+                        [CONFIG.STORAGE.LS_KEY]: '{"inputs":{"alter":71}}'
+                    }
+                })
+            },
+            metadata: {}
+        });
+        const adapter = createTauriJsonFileAdapter({
+            invoke: async (command, args = {}) => {
+                if (command === 'load_app_state') {
+                    return args.target === 'snapshots' ? snapshotFileContent : liveFileContent;
+                }
+                if (command === 'save_app_state') {
+                    if (args.target === 'snapshots') {
+                        if (failSnapshotPersist) throw new Error('snapshot persist failed');
+                        snapshotFileContent = args.content;
+                    } else {
+                        liveFileContent = args.content;
+                    }
+                    return null;
+                }
+                throw new Error(`unknown command ${command}`);
+            }
+        });
+
+        await adapter.open();
+        let thrown = false;
+        try {
+            await adapter.migrateLegacySnapshotsIfNeeded();
+        } catch (err) {
+            thrown = err?.message === 'snapshot persist failed';
+        }
+        const liveAfterFailure = await adapter.loadAll();
+        await adapter.saveBatch({ upserts: [['after_failure', 'still-safe']], deletes: [] });
+
+        assertEqual(thrown, true, 'Tauri Migration gibt Snapshot-Archivfehler weiter');
+        assert(liveAfterFailure[legacyKey], 'Tauri Memory-State behaelt Legacy-Key nach Archivfehler');
+        assert(liveFileContent.includes(legacyKey), 'Spaeterer Live-State-Save verliert Legacy-Key nach Archivfehler nicht');
+        failSnapshotPersist = false;
     }
 
     console.log('Test 14: Tauri JSON adapter quarantines corrupt state');

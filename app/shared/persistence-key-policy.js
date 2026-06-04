@@ -1,10 +1,35 @@
 // @ts-check
 
 import { CONFIG } from '../balance/balance-config.js';
-import {
-    PROFILE_SCOPED_FIXED_KEYS,
-    PROFILE_STORAGE_KEYS
-} from '../profile/profile-state.js';
+
+const PROFILE_STORAGE_KEYS = Object.freeze({
+    registry: 'rs_profiles_v1',
+    current: 'rs_current_profile',
+    active: 'rs_active_profile'
+});
+
+const PROFILE_VALUE_KEYS = Object.freeze({
+    tagesgeld: 'profile_tagesgeld',
+    renteAktiv: 'profile_rente_aktiv',
+    renteMonatlich: 'profile_rente_monatlich',
+    sonstigeEinkuenfte: 'profile_sonstige_einkuenfte',
+    alter: 'profile_aktuelles_alter',
+    goldAktiv: 'profile_gold_aktiv',
+    goldZiel: 'profile_gold_ziel_pct',
+    goldFloor: 'profile_gold_floor_pct',
+    goldSteuerfrei: 'profile_gold_steuerfrei',
+    goldRebalBand: 'profile_gold_rebal_band'
+});
+
+const PROFILE_SCOPED_FIXED_KEYS = [
+    'depot_tranchen',
+    'profile_health_bucket',
+    ...Object.values(PROFILE_VALUE_KEYS),
+    'showCareDetails',
+    'logDetailLevel',
+    'worstLogDetailLevel',
+    'backtestLogDetailLevel'
+];
 
 export const LEGACY_MIGRATION_MARKER_KEYS = Object.freeze({
     target: 'ruhestandsapp_migrated_to_target',
