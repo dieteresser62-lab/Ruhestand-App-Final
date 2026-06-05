@@ -2,7 +2,7 @@
 
 **Feature-Branch:** `codex-balance-snapshot-key-policy`  
 **GitHub-Status:** Branch lokal/remote vorhanden; keine weitere Veroeffentlichung ohne Freigabe  
-**Status:** abgeschlossen, Review ausstehend
+**Status:** abgeschlossen und freigegeben
 
 ## Ziel
 
@@ -126,7 +126,7 @@ Rollback-Strategie:
 
 ## Freigabestatus
 
-Review durch Gemini blockiert / Nachbesserung erforderlich.
+Review durch Gemini erfolgreich abgeschlossen.
 
 ### Review-Entscheidungen
 
@@ -134,12 +134,34 @@ Review durch Gemini blockiert / Nachbesserung erforderlich.
 |---|---|---|---|---|
 | REV11-01 | Gemini (Reviewer) | Fehlende UI-Smoke-Tests für Handbuch.html | Akzeptiert, da Handbuch.html nur statischen Text enthält und die HTML-Struktur intakt blieb. | Manuelle Sichtprüfung des Diffs erfolgreich. |
 | REV11-02 | Gemini (Reviewer) | Zukünftiger Drift-Gefahr bei Schema-Änderungen | Akzeptiert, da rein organisatorisches Risiko. Zukünftige Slices müssen Doku-Updates erzwingen. | Als Restrisiko und Pre-Mortem erfasst. |
-| REV11-03 | Gemini (Reviewer) | Veraltete Angaben zu Persistenz-Modellen und fehlende Detailtiefe in ARCHITEKTUR_UND_FACHKONZEPT.md | Muss von Codex behoben werden (Korrektur von B.1.3 & B.2.4 gemäß Reviewer-Vorschlag). | Offen (an Codex übergeben) |
+| REV11-03 | Gemini (Reviewer) | Veraltete Angaben zu Persistenz-Modellen und fehlende Detailtiefe in ARCHITEKTUR_UND_FACHKONZEPT.md | Angenommen. | B.1.3 und B.2.4 ueberarbeitet; Altformulierungen zu Download-/File-System-/localStorage-Snapshot-Migration entfernt. |
+
+## Review-Antworten von Codex
+
+### REV11-03
+
+Umgesetzt in `docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md`:
+
+- B.1.3 `Datenpersistenz ueber Plattformen` ersetzt die alte Plattformtabelle zu `localStorage`, Tauri-Snapshots und Browser-Download-Ordnern durch das tatsaechliche Laufzeitmodell:
+  - Browser: IndexedDB `ruhestand-suite` Version 2, Stores `kv`, `metadata`, `snapshots`.
+  - Tauri: `ruhestand_suite_data.json` fuer Live-Daten und `ruhestand_suite_snapshots.json` fuer das Snapshot-Archiv.
+  - localStorage nur noch als Legacy-Migration/Fallback.
+- B.1.3 `Daten-Migration zwischen Plattformen` nennt jetzt das Komplettbackup unter `Profile > Erweitert` als Austauschweg. Jahresabschluss-Snapshots werden explizit als interne Sicherungspunkte abgegrenzt.
+- B.2.1 und B.2.1a entfernen die irrefuehrende `localStorage`-Beschreibung bei `balance-storage.js` und nennen PersistenceFacade sowie internes Snapshot-Archiv.
+- B.2.4 beschreibt jetzt Live-Persistenz, Snapshot-Archiv und Komplettbackup/Profilbundle als getrennte Ebenen, inklusive Standard-Restore-Grenzen, Pre-Mutation-Jahresabschluss und Legacy-Snapshot-Migration.
+- Appendix-Eintrag zu `balance-storage.js` von `localStorage, Snapshots` auf `PersistenceFacade-Anbindung, Snapshot-Archiv, Legacy-Migration` korrigiert.
+
+Nachkontrolle:
+
+```text
+rg -n "Download-Ordner|Snapshot erstellen|Snapshot laden|File-System-Handles|localStorage, Snapshots|localStorage-Isolation|localStorage\\|\\*\\*|Snapshots \\(Tauri\\)|Snapshots \\(Browser\\)|Snapshot.*Backup/Restore|manuell über DevTools|File-System-Snapshots" docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md
+```
+
+Ergebnis: keine Treffer.
 
 ## Review-Ergebnis
-- Status: blockiert
-- Blocker:
-  - REV11-03: Überarbeitung von `docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md` erforderlich, um widersprüchliche Angaben zu localStorage/Snapshots zu beseitigen und das neue Speicher- und Restore-Konzept detailliert zu dokumentieren.
+- Status: freigegeben
+- Blocker: keine
 - Restrisiken:
   - Zukünftiger Doku-Drift: Zukünftige Schema-Änderungen oder Pfadanpassungen (z.B. Migration auf SQLite) könnten die dokumentierten Pfade/Versionen invalidieren, da keine automatisierte Validierung für Doku existiert.
   - Altsystem-Kompatibilität: Benutzer mit sehr alten/korrupten Snapshot-Ständen haben beim Standard-Restore Einschränkungen (Profilzuordnung).
