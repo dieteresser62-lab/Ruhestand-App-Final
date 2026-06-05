@@ -46,6 +46,7 @@ console.log('✓ shouldHandleProfileHandoff OK');
 console.log('Test 2: bindProfileNavigationHandoff exports on eligible link clicks');
 {
     let exportCount = 0;
+    let flushCount = 0;
     const eligible = createLink({ attrs: { 'data-profile-handoff': '' } });
     const ignored = createLink();
     const root = {
@@ -59,6 +60,10 @@ console.log('Test 2: bindProfileNavigationHandoff exports on eligible link click
         exporter: () => {
             exportCount += 1;
             return true;
+        },
+        flusher: () => {
+            flushCount += 1;
+            return true;
         }
     });
 
@@ -66,11 +71,16 @@ console.log('Test 2: bindProfileNavigationHandoff exports on eligible link click
     eligible.click();
     ignored.click();
     assertEqual(exportCount, 1, 'Only eligible link click should trigger export');
+    assertEqual(flushCount, 1, 'Eligible link click should trigger persistence flush');
 
     const rebound = bindProfileNavigationHandoff({
         root,
         exporter: () => {
             exportCount += 1;
+            return true;
+        },
+        flusher: () => {
+            flushCount += 1;
             return true;
         }
     });
@@ -81,6 +91,7 @@ console.log('✓ bindProfileNavigationHandoff OK');
 console.log('Test 3: installProfilePersistenceHooks only installs once');
 {
     let saveCount = 0;
+    let flushCount = 0;
     const winListeners = new Map();
     const docListeners = new Map();
     const win = {
@@ -102,6 +113,10 @@ console.log('Test 3: installProfilePersistenceHooks only installs once');
         saver: () => {
             saveCount += 1;
             return true;
+        },
+        flusher: () => {
+            flushCount += 1;
+            return true;
         }
     });
     const second = installProfilePersistenceHooks({
@@ -109,6 +124,10 @@ console.log('Test 3: installProfilePersistenceHooks only installs once');
         doc,
         saver: () => {
             saveCount += 1;
+            return true;
+        },
+        flusher: () => {
+            flushCount += 1;
             return true;
         }
     });
@@ -120,6 +139,7 @@ console.log('Test 3: installProfilePersistenceHooks only installs once');
     doc.visibilityState = 'hidden';
     docListeners.get('visibilitychange')();
     assertEqual(saveCount, 2, 'Both persistence hooks should call saver');
+    assertEqual(flushCount, 2, 'Both persistence hooks should flush persistence');
 }
 console.log('✓ installProfilePersistenceHooks OK');
 

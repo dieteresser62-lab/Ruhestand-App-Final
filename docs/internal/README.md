@@ -6,6 +6,7 @@ Aktive interne Uebersichten:
 
 - `PROJEKTUEBERSICHT.md` - detaillierte technische und organisatorische Projektuebersicht.
 - `BALANCE_JAHRESABSCHLUSS_SNAPSHOT_PLAN.md` - Konzept/Plan fuer getrennte Snapshot-Ablage ohne Ordnerbindung.
+- `BUGFIX_INDEXEDDB_PROFILE_GOLD_PERSISTENCE.md` - Bugfix-Dokumentation fuer verlorene Profil-Gold-Aenderungen im Browserlauf mit IndexedDB.
 
 Abgeschlossene Umsetzungen liegen im Archiv.
 
