@@ -1,7 +1,7 @@
 # Balance Jahresabschluss-Snapshots: implementierungsreifer Plan
 
-**Stand:** 2026-06-03  
-**Status:** Arbeitsdokument / implementierungsreifer Umsetzungsplan  
+**Stand:** 2026-06-05  
+**Status:** abgeschlossen und freigegeben  
 **Ausgangspunkt:** Quelltextstand 2026-06-02, bisheriger Plan vom 2026-05-27 und Review-Kritik vom 2026-06-02
 **Slice-Regeln:** Umsetzung nur nach `docs/internal/SLICE_EXECUTION_RULES.md`
 
