@@ -1,6 +1,6 @@
 # Projektuebersicht RuhestandsApp
 
-**Stand:** 2026-05-12
+**Stand:** 2026-06-04
 **Zweck:** Interne Orientierung fuer Entwicklung, Review, Refactoring und Onboarding in diesem Repository.
 
 ## Kurzprofil
@@ -10,7 +10,7 @@ Die RuhestandsApp ist eine lokal lauffaehige Browser-/Tauri-Suite fuer Ruhestand
 Die Anwendung ist bewusst lokal-first:
 
 - keine serverseitige Fachlogik,
-- Persistenz primaer ueber `localStorage` und optionale Dateisnapshots,
+- Persistenz ueber die zentrale Facade: Browser-IndexedDB, Tauri-JSON-Dateien und Legacy-`localStorage` nur als Migration/Fallback,
 - optionale Live-Daten fuer Inflation, CAPE und ETF-Kurse,
 - deterministische Kernlogik in `engine/`, `app/simulator/` und `workers/`,
 - generierte Artefakte wie `engine.js`, `dist/` und `RuhestandSuite.exe` sind nicht der primaere Bearbeitungsort.
@@ -55,7 +55,7 @@ HTML-Einstiegspunkte
   -> UI-Fassaden und Feature-Module in app/
   -> deterministische Runner und Wrapper
   -> EngineAPI aus engine.js bzw. engine/
-  -> lokale Persistenz, Snapshots, Exporte
+  -> lokale Persistenz, internes Snapshot-Archiv, Exporte
 ```
 
 Wichtige Prinzipien:
@@ -110,7 +110,7 @@ Wichtige Module:
 
 - `balance-main.js`: App-Orchestrator, Engine-Version-Handshake, zentrale `update()`-Pipeline.
 - `balance-reader.js`: DOM-Eingaben lesen und Side Effects wie sichtbare Panels anwenden.
-- `balance-storage.js`: `localStorage`, Migrationen, Snapshots und Restore.
+- `balance-storage.js`: PersistenceFacade, internes Snapshot-Archiv, Legacy-Migrationen und Restore.
 - `balance-binder.js`: Event-Hub fuer Buttons, Tastenkombinationen, Import/Export und Jahresabschluss.
 - `balance-renderer.js`: Haupt-Renderer fuer KPIs, Guardrails, Diagnose, Themes und Toasts.
 - `balance-update-pipeline.js`: Last-State, Diagnose-Anreicherung, Persistenzentscheidung und Budgetweitergabe.
@@ -134,6 +134,7 @@ DOM/Input
 Besondere Funktionen:
 
 - Jahres-Update mit Inflation, VWCE.DE-Kurs und Auto-CAPE.
+- Jahresabschluss-Snapshot vor Inflation/Jahresmutation; Browser speichert Snapshots im IndexedDB-Store `snapshots`, Tauri in `ruhestand_suite_snapshots.json`.
 - Ausgaben-Check pro Jahr, Monat und Profil mit Median-Hochrechnung.
 - Entscheidungsdiagnose statt Blackbox-Erklaerung.
 - Profilverbund-Aggregation mit proportionaler, runway-first oder steueroptimierter Entnahmeverteilung.
@@ -200,7 +201,7 @@ Datenquellen:
 - `balance_data`
 - `depot_tranchen`
 - `sim_*`
-- `rs_snapshot_*`
+- `rs_snapshot_*` nur als localStorage-Fallback fuer das interne Snapshot-Archiv; alte `ruhestandsmodell_snapshot_*` werden migriert und nicht mehr in Live-Daten geschrieben
 - Profil-Metadaten und Haushaltszuordnung
 
 Balance verteilt Entnahmen je nach Modus auf Profile. Simulator kombiniert Vermoegen, Bedarfe, Renten, Tranchen und Gold-Parameter zu einem gemeinsamen Input-Objekt.
@@ -271,7 +272,7 @@ Rahmen:
 - Runner: `tests/run-tests.mjs`
 - Einzelrunner: `tests/run-single.mjs`
 - Testdateien: `*.test.mjs`
-- Statistik laut aktueller Abschlussvalidierung: 74 Testdateien, 1639 Assertions
+- Statistik laut aktueller Abschlussvalidierung: 79 Testdateien, 2134 Assertions, 0 Fehler (`npm test`, 2026-06-04)
 
 Wichtige Testgruppen:
 

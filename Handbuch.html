@@ -609,7 +609,7 @@
                     <img src="assets/images/system_overview.svg" alt="Systemübersicht: Balance-App, Simulator und Engine"
                         style="width:100%; max-width: 1100px; border: 1px solid #e0e6ed; border-radius: 12px; box-shadow: var(--card-shadow);">
                     <figcaption style="color: var(--text-light); margin-top: 0.5rem;">Systemübersicht: Balance-App und
-                        Simulator greifen lokal auf die Engine zu; Daten bleiben im Browser.</figcaption>
+                        Simulator greifen lokal auf die Engine zu; Daten bleiben im Browser- oder Tauri-App-Speicher.</figcaption>
                 </figure>
             </div>
 
@@ -1070,6 +1070,22 @@
                                 korrekt greifen.</li>
                             <li><strong>Prozesskette:</strong> Daten abrufen → Inflation anwenden → Guardrails
                                 neu berechnen → Diagnose aktualisieren → Kapitalfluss-Vorschläge anzeigen.</li>
+                        </ul>
+                    </div>
+                    <div class="detail-block" id="balance-snapshots">
+                        <h3>Jahresabschluss-Snapshots</h3>
+                        <p>Beim Jahresabschluss speichert die App zuerst einen Snapshot des aktuellen Stands. Erst
+                            danach werden Inflation, Alter, Ausgabenjahr und weitere Jahreswerte fortgeschrieben.</p>
+                        <ul
+                            style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Ablage:</strong> Browser-Snapshots liegen intern in IndexedDB; die Tauri-EXE
+                                nutzt eine separate Snapshot-Datei im App-Datenverzeichnis.</li>
+                            <li><strong>Backup-Grenze:</strong> Komplettbackup und Import bleiben unter
+                                <code>Profile &gt; Erweitert</code>. Snapshots sind Sicherungspunkte fuer den
+                                Jahresabschluss, kein Ersatz fuer versionierte Backups.</li>
+                            <li><strong>Restore:</strong> Standard-Restore erhaelt die Snapshot-Historie und stellt nur
+                                wieder her, wenn das Snapshot-Profil in der aktuellen Profil-Registry noch existiert.
+                                Er ist kein Profil-Merge.</li>
                         </ul>
                     </div>
                     <div class="detail-block" id="balance-diagnose">

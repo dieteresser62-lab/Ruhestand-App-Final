@@ -538,7 +538,7 @@ oder ein gezielter Rust-Test, falls verfuegbar und schneller.
 
 ## Dokumentations-Sync
 
-Zu aktualisieren:
+Aktualisiert in Slice 11:
 
 - `README.md`
   - Jahresabschluss-Snapshots ohne Ordnerfreigabe.
@@ -550,7 +550,7 @@ Zu aktualisieren:
 - `docs/reference/BALANCE_MODULES_README.md`
   - Rolle von `balance-storage.js`, `balance-binder-snapshots.js`, `SnapshotArchive`.
 - `docs/internal/PROJEKTUEBERSICHT.md`
-  - Aussage "Persistenz primaer ueber localStorage und optionale Dateisnapshots" aktualisieren.
+  - Aussage zu Facade, Browser-IndexedDB, Tauri-JSON-Dateien und Legacy-`localStorage` als Migration/Fallback aktualisiert.
 - `docs/internal/archive/2026-persistence-migration/PERSISTENCE_MIGRATION_PLAN.md`
   - Entscheidung dokumentieren: Snapshots nicht in `ruhestand_suite_data.json`.
   - Hinweis auf separates Snapshot-Archiv und Rollback-Folgen.
@@ -695,6 +695,10 @@ Abhaengig von: Paket 6.
 
 ### Paket 10: Dokumentation und Gates
 
+Slice-Dokument: `docs/internal/SLICE_BALANCE_SNAPSHOTS_11_DOCUMENTATION_GATES.md`
+Branch: `codex-balance-snapshot-key-policy`
+Status: abgeschlossen, Review ausstehend.
+
 - README, TECHNICAL, BALANCE_MODULES, PROJEKTUEBERSICHT, ARCHITEKTUR_UND_FACHKONZEPT, Handbuch.html, archivierter Persistence-Plan.
 - Tests vollstaendig ausfuehren.
 - Tauri-Build oder Rust-Test nach Rust-Aenderungen.
@@ -703,16 +707,16 @@ Abhaengig von: Pakete 4 bis 9.
 
 ## Review-Checkliste
 
-- [ ] Neue Snapshots landen nie im Live-Store.
-- [ ] `ruhestand_suite_data.json` bleibt frei von Snapshot-Archivdaten.
-- [ ] Tauri nutzt `ruhestand_suite_snapshots.json`.
-- [ ] IndexedDB hat Store `snapshots` in DB `ruhestand-suite` Version 2.
-- [ ] `blocked` und `versionchange` sind behandelt.
-- [ ] `SnapshotArchive` enthaelt keine Runtime-Logik.
-- [ ] `PersistenceFacade` delegiert Snapshot-Methoden an Adapter.
-- [ ] `listSnapshots()` liefert keinen Vollpayload mit `records`.
-- [ ] Snapshot-Schema ist eindeutig und validiert.
-- [ ] `recordCount` wird geprueft.
+- [x] Neue Snapshots landen nie im Live-Store.
+- [x] `ruhestand_suite_data.json` bleibt frei von Snapshot-Archivdaten.
+- [x] Tauri nutzt `ruhestand_suite_snapshots.json`.
+- [x] IndexedDB hat Store `snapshots` in DB `ruhestand-suite` Version 2.
+- [x] `blocked` und `versionchange` sind behandelt.
+- [x] `SnapshotArchive` enthaelt keine Runtime-Logik.
+- [x] `PersistenceFacade` delegiert Snapshot-Methoden an Adapter.
+- [x] `listSnapshots()` liefert keinen Vollpayload mit `records`.
+- [x] Snapshot-Schema ist eindeutig und validiert.
+- [x] `recordCount` wird geprueft.
 - [x] Restore nutzt kein pauschales `clear()`.
 - [x] Restore ist fuer Live-Records all-or-nothing oder rollbackfaehig.
 - [x] Standard-Restore erhaelt Profil-Registry.
@@ -722,8 +726,8 @@ Abhaengig von: Pakete 4 bis 9.
 - [x] Jahresabschluss bricht bei Snapshot-Fehler ohne Mutation ab.
 - [x] Legacy-Migration liefert einen Report.
 - [x] Alte Snapshots bleiben lesbar oder werden als nicht standard-restore-faehig markiert.
-- [ ] Doku-Pfade sind korrekt.
-- [ ] Rollback-Einschraenkungen sind dokumentiert.
+- [x] Doku-Pfade sind korrekt.
+- [x] Rollback-Einschraenkungen sind dokumentiert.
 
 ## Nicht-Ziele fuer Slice 1
 

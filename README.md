@@ -34,13 +34,13 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 ## Funktionen im Überblick
 
 ### Balance-App
-* Speichert Eingaben ueber die zentrale Persistenz-Facade; im Browser ist IndexedDB die lokale Source of Truth, Tauri nutzt eine JSON-Datei im App-Datenverzeichnis.
-* Komplett-Backup und Komplett-Import liegen zentral auf der Startseite unter `Profile > Erweitert`; Jahresabschluss-Snapshots bleiben als fachlicher Sicherungspunkt erhalten.
+* Speichert Eingaben ueber die zentrale Persistenz-Facade; im Browser ist IndexedDB die lokale Source of Truth, Tauri nutzt `ruhestand_suite_data.json` im App-Datenverzeichnis.
+* Komplett-Backup und Komplett-Import liegen zentral auf der Startseite unter `Profile > Erweitert`; Jahresabschluss-Snapshots bleiben als fachlicher Sicherungspunkt in einem separaten internen Snapshot-Archiv erhalten.
 * Liest Marktdaten und Ausgaben aus CSV-Dateien ein.
 * **Jahres-Update mit Online-Datenabruf:** Automatischer Abruf von Inflationsdaten (ECB, World Bank, OECD) und ETF-Kursen (VWCE.DE via Yahoo Finance über lokalen Proxy), automatisches Nachrücken der Marktdaten und ATH-Update. Detailliertes Update-Protokoll zeigt Datenquellen und abgerufene Werte.
 * **Auto-CAPE im Jahreswechsel:** US-Shiller-CAPE wird im Jahresupdate automatisch geladen (Fallback: Yale → Mirror → letzter gespeicherter Wert). CAPE-Fehler blockieren den Jahreswechsel nicht.
 * **Ausgaben-Check (monatlich):** CSV-Import pro Monat und Profil, Budgetkontrolle je Monat, Detailansicht mit Top-3-Kategorien, Jahreshochrechnung (ab 2 Datenmonaten mit Median), Soll/Ist auf Basis importierter Monate sowie Jahres-Historie per Jahr-Auswahl.
-* **Jahresabschluss + Ausgaben-Historie:** Beim Jahresabschluss wechselt der Ausgaben-Check automatisch auf das nächste Jahr; Vorjahre bleiben vollständig einsehbar.
+* **Jahresabschluss + Ausgaben-Historie:** Beim Jahresabschluss entsteht zuerst ein Pre-Mutation-Snapshot, danach wechselt der Ausgaben-Check automatisch auf das nächste Jahr; Vorjahre bleiben vollständig einsehbar.
 * **Mindest-Flex p.a.:** Optionale, bedingte Untergrenze fuer Flex-Ausgaben in kuerzenden Safety-/Guardrail-Phasen; sie ersetzt nicht den Floor und wird in Diagnose sowie Kopiertext transparent ausgewiesen.
 * Nutzt die Engine v31 zur Marktanalyse, Entnahmeplanung und Liquiditätssteuerung.
 * Jahresübergreifende Verlustverrechnung (Verlusttopf) ist integriert; die finale Steuer stammt aus dem Jahres-Settlement.
@@ -82,7 +82,7 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 * Prozentwerte im Sweep vergessen zu normalisieren: sicherstellen, dass Quoten in Prozent eingegeben werden (z. B. 60 statt 0.6) oder per Tooltip prüfen; der Simulator clamp’t intern, weist aber auf Fehleingaben hin.
 * Fehlende Pflichtfelder nach Tab-Wechsel: Wenn das UI Inputs deaktiviert (z. B. Rentenprozente bei CPI-Indexierung), zuerst den Anpassungsmodus zurück auf „fix“ stellen oder den Wert via Reset-Button neu laden und anschließend den gewünschten Modus wählen.
 * Konflikte zwischen Partner:inneneingaben (Rente-2-Invarianz): Sweep-Wächter meldet blockierte Felder; Korrektur durch Spiegeln der Einstellungen in beiden Rententabs oder Deaktivierung des Sweep für geschützte Felder.
-* Browser blockiert CSV/JSON-Export oder Snapshots: Pop-up/Download-Berechtigungen prüfen oder alternativen Browser mit File-System-Access-Unterstützung verwenden.
+* Browser blockiert CSV/JSON-Export oder Dateiimporte: Pop-up/Download-Berechtigungen prüfen oder alternativen Browser mit File-System-Access-Unterstützung verwenden.
 
 #### Ansparphase (Accumulation Phase)
 
@@ -214,7 +214,7 @@ Ruhestand-App-Final/
 
 Die Anwendung ist bewusst minimalistisch gehalten, hat aber für den vollen Funktionsumfang folgende Anforderungen:
 
-1.  **Browser:** Ein moderner Browser (Chrome, Edge, Firefox) mit Unterstützung für ES6-Module und die File System Access API (für Snapshots/Speichern).
+1.  **Browser:** Ein moderner Browser (Chrome, Edge, Firefox) mit Unterstützung für ES6-Module und die File System Access API (für Dateiimport/-export; Jahresabschluss-Snapshots liegen intern in IndexedDB).
 2.  **Node.js (Optional):** Für den automatischen Abruf von Online-Kursdaten (ETF-Preise) wird ein lokaler Proxy benötigt. Dieser setzt eine installierte [Node.js](https://nodejs.org/)-Laufzeitumgebung voraus.
     *   *Ohne Node.js:* Die App startet normal, aber der Button "Online-Update" im Tranchen-Manager ist ohne Funktion. Manuelle Kurspflege ist weiterhin möglich.
 
@@ -238,7 +238,7 @@ Die Anwendung ist bewusst minimalistisch gehalten, hat aber für den vollen Funk
 1. `RuhestandSuite.exe` aus dem Repository oder Release-Download in einen beliebigen Ordner kopieren.
 2. Per Doppelklick starten; die Tauri-App öffnet die Oberfläche direkt aus dem gebündelten `dist/`-Stand.
 3. Optionale Live-Datenzugriffe funktionieren, wenn eine Internetverbindung besteht; ETF-Kurse laufen über den integrierten lokalen Proxy, Inflation und CAPE direkt über freigegebene externe Endpunkte. Ohne Internet läuft die App vollständig lokal weiter.
-4. Eigene Szenarien und Snapshots werden im Benutzerprofil als Tauri-App-Daten gespeichert; der Wechsel zwischen Browser und EXE laeuft ueber das zentrale Komplettbackup auf der Startseite.
+4. Eigene Szenarien werden im Benutzerprofil als Tauri-App-Daten gespeichert. Live-Daten liegen in `ruhestand_suite_data.json`, Jahresabschluss-Snapshots separat in `ruhestand_suite_snapshots.json`; der Wechsel zwischen Browser und EXE laeuft ueber das zentrale Komplettbackup auf der Startseite.
 
 ### Option 2: Browser-basierte Nutzung
 
@@ -257,7 +257,7 @@ Die Anwendung ist bewusst minimalistisch gehalten, hat aber für den vollen Funk
 * `stop_suite.cmd` – Beendet eventuell noch laufende Server-Prozesse (Webserver und Proxy).
 * Manuell ohne Proxy: `python dev_server.py --port 8000` (Online-Kurse dann nicht verfügbar).
 
-> **Hinweis:** Einige Funktionen (Snapshots, Dateiimporte) benötigen Browser mit File-System-Access-Unterstützung. In der Browser-Variante benötigt der Yahoo-Proxy Node.js; ohne Node.js läuft die Suite trotzdem, jedoch ohne Online-Kursabruf. Die Tauri-EXE bringt den Proxy selbst mit und benötigt dafür kein separates Node.js.
+> **Hinweis:** Dateiimporte und -exporte benötigen Browser mit passender Datei-/Download-Unterstützung. Jahresabschluss-Snapshots nutzen im Browser das interne IndexedDB-Archiv. In der Browser-Variante benötigt der Yahoo-Proxy Node.js; ohne Node.js läuft die Suite trotzdem, jedoch ohne Online-Kursabruf. Die Tauri-EXE bringt den Proxy selbst mit und benötigt dafür kein separates Node.js.
 
 ---
 
@@ -271,6 +271,7 @@ Die Anwendung ist bewusst minimalistisch gehalten, hat aber für den vollen Funk
 ## Abschluss-Checkliste
 
 * **Dokumentation synchron halten:** Nach Engine-Änderungen oder neuen Simulator-Modulen (z. B. Monte-Carlo-Runner/UI/Analyzer) README, `docs/reference/TECHNICAL.md` und `docs/reference/SIMULATOR_MODULES_README.md` aktualisieren.
+* **Snapshot-/Backup-Grenze beachten:** Komplettbackup/Import ist der Wechselpfad zwischen Browser und EXE. Jahresabschluss-Snapshots sind interne Sicherungspunkte; Standard-Restore erhaelt die Snapshot-Historie, prueft die Profilzuordnung und ersetzt keinen Profil-Merge.
 * **Konsole sauber halten:** Vor dem Release auskommentierten Code entfernen, damit Nutzer:innen keine unnötigen Meldungen im Browser-Log sehen.
 * **Tauri/Web-Worker:** Die Parallelisierung nutzt Web Worker mit Transferables (kein SharedArrayBuffer). Das funktioniert in Tauri als EXE, sofern die Worker-Skripte gebündelt und per `new URL(..., import.meta.url)` erreichbar sind. CSP/Asset-Bundling sollten Worker-Module erlauben.
 * **Desktop-Smoke nach EXE-Build:** Nach `build-tauri.bat` kurz Startseite/Profilverwaltung, Balance, Simulator, Tranchenmanager, Handbuch, Worker-Pfade sowie optionale Live-Daten und Offline-Fallbacks prüfen.

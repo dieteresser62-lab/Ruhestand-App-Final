@@ -2,8 +2,8 @@
 
 **Technische Dokumentation der DIY-Software für Ruhestandsplanung**
 
-**Dokumentstand:** 2026-06-02
-**Geprüfte Codebasis:** lokale Arbeitskopie vom 2026-06-02
+**Dokumentstand:** 2026-06-04
+**Geprüfte Codebasis:** lokale Arbeitskopie vom 2026-06-04
 **Engine API:** v31.0
 **Codeumfang:** Momentaufnahme, siehe Komponenten-Tabelle
 **Lizenz:** MIT
@@ -36,15 +36,15 @@
 
 ## Komponenten
 
-*Momentaufnahme der lokalen Arbeitskopie vom 2026-06-02. Modul- und Zeilenzahlen sind Orientierungshilfen, nicht normative Architekturgrenzen. Dieses Dokument beschreibt die Architektur und die fachlichen Zusammenhänge eigenständig; spezialisierte Referenzen (`TECHNICAL.md`, Modul-READMEs, `engine/README.md`, `tests/README.md`) dienen als ergänzende Detail- und Exportkataloge.*
+*Momentaufnahme der lokalen Arbeitskopie vom 2026-06-04. Modul- und Zeilenzahlen sind Orientierungshilfen, nicht normative Architekturgrenzen. Dieses Dokument beschreibt die Architektur und die fachlichen Zusammenhänge eigenständig; spezialisierte Referenzen (`TECHNICAL.md`, Modul-READMEs, `engine/README.md`, `tests/README.md`) dienen als ergänzende Detail- und Exportkataloge.*
 
 | Komponente | Zweck | Momentaufnahme |
 |------------|-------|----------------|
-| **Balance-App** | Jahresplanung: Liquidität, Entnahme, Steuern, Transaktionen, Ausgaben-Check, Pflegebucket-Diagnose | 35 JS-Module unter `app/balance/` |
+| **Balance-App** | Jahresplanung: Liquidität, Entnahme, Steuern, Transaktionen, Ausgaben-Check, Pflegebucket-Diagnose, Jahresabschluss-Snapshots | 35 JS-Module unter `app/balance/` |
 | **Simulator** | Monte-Carlo-Simulation, Parameter-Sweeps, Auto-Optimize, Dynamic Flex, Pflegebucket-Wirklogik | 87 JS-Module unter `app/simulator/` |
 | **Engine** | Kern-Berechnungslogik, Guardrails, Steuern | 24 MJS-Module unter `engine/`, ca. 4.240 Zeilen |
 | **Workers** | Parallelisierung für MC/Sweep/Optimizer-Pfade | 3 JS-Module unter `workers/`, ca. 757 Zeilen |
-| **Tests** | Unit- und Integrationstests | 77 `*.test.mjs` Dateien; 1948 Assertions im Lauf vom 2026-06-02 |
+| **Tests** | Unit- und Integrationstests | 79 `*.test.mjs` Dateien; 2134 Assertions im Lauf vom 2026-06-04 |
 | **Profile, Tranchen, Shared** | Profilverwaltung, Profilverbund, Tranchenstatus, gemeinsame Utilities | JS-Module unter `app/profile/`, `app/tranches/`, `app/shared/`, zusammen ca. 2.959 Zeilen |
 
 *Hinweis: Dieses Dokument beschreibt Konzepte und Architekturentscheidungen. Für konkrete Implementierungsdetails gelten die genannten Module und Tests als Referenz; exakte Code-Zeilen werden bewusst vermieden, weil sie nach Refactorings schnell veralten.*
@@ -69,6 +69,7 @@ Die Ruhestand-Suite kombiniert folgende Funktionen:
 14. **Auto-CAPE im Jahreswechsel** (US-Shiller-CAPE mit Fallback-Kette und non-blocking Fehlerbehandlung)
 15. **Pflegebucket** als gesperrte Geldmarkt-/Cash-Reserve mit Profildefinition, Simulator-Air-Gap, Pflegegrad-Trigger, Monte-Carlo-KPIs und Balance-Diagnose
 16. **Mindest-Flex p.a.** als optionale Untergrenze für Flex-Ausgaben in gekürzten Safety-/Guardrail-Jahren; ratenbasiert, validiert gegen den Flex-Bedarf und in Balance, Simulator, Backtest, Monte Carlo, Sweep, Auto-Optimize und Profilverbund integriert
+17. **Internes Jahresabschluss-Snapshot-Archiv** mit Pre-Mutation-Snapshots, separatem Browser-/Tauri-Speicher und Standard-Restore mit Profilzuordnungspruefung
 
 ## Bekannte Einschränkungen
 
@@ -183,7 +184,7 @@ Die Suite umfasst mehrere HTML-Oberflächen und Begleitmodule: Neben Balance und
 | **Balance-App** | `app/balance/`, `css/balance.css` | Operative Jahresplanung, Diagnose, Jahresupdate, Ausgaben-Check, Profilverbund-Anbindung |
 | **Simulator** | `app/simulator/`, `simulator.css` | Monte Carlo, Backtest, Sweep, Auto-Optimize, Pflege/Rente/Portfolio-UI, DOM-freie Jahreslogik |
 | **Profil/Verbund/Tranchen** | `app/profile/`, `app/tranches/` | Profilregistry, Profilwechsel, Profilverbund-Aggregation, Tranchenstatus und Tranchenmanager |
-| **Shared Utilities** | `app/shared/`, `types/` | Formatter, Feature-Flags, Security-Utilities, gemeinsame Typ-/Contract-Hilfen |
+| **Shared Utilities** | `app/shared/`, `types/` | Formatter, Feature-Flags, Security-Utilities, PersistenceFacade, SnapshotArchive, gemeinsame Typ-/Contract-Hilfen |
 | **Engine-Quellen** | `engine/` | ESM-Quelle für Validierung, Marktanalyse, Spending-Policies, Steuer-/Transaktionslogik |
 | **Generierte Engine** | `engine.js` | Browser-Bundle bzw. Modul-Fallback der Engine; nicht manuell bearbeiten |
 | **Workers** | `workers/`, `app/simulator/worker-job-runner.js` | Parallele MC-/Sweep-/Optimizer-Jobs mit seriellen Fallbacks |
@@ -221,13 +222,13 @@ Die Suite umfasst mehrere HTML-Oberflächen und Begleitmodule: Neben Balance und
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Aktuelle Bestandszahlen (2026-05-23):**
+**Aktuelle Bestandszahlen (2026-06-04):**
 
 - `app/balance/`: 35 JS-Module
 - `app/simulator/`: 87 JS-Module
 - `engine/`: 24 MJS-Module
 - `workers/`: 3 JS-Module
-- `tests/`: 76 Testdateien
+- `tests/`: 79 Testdateien
 
 ## B.1.2 Tauri Desktop-App (Portable EXE)
 
@@ -994,7 +995,7 @@ Balance und Simulator nutzen die gleiche Erkennung für Bond-Tranchen. Der Simul
 
 ## B.5 Test-Suite und Validierungsregeln
 
-**Übersicht:** Die Test-Suite umfasst in der geprüften Arbeitskopie **76 `*.test.mjs`-Dateien**. Der Lauf vom 2026-05-23 ergab **1748 Assertions**, alle erfolgreich. Die Tests laufen ohne Jest/Mocha über native Node.js-ESM-Module und eigene globale Assertions (`assert`, `assertEqual`, `assertClose`).
+**Übersicht:** Die Test-Suite umfasst in der geprüften Arbeitskopie **79 `*.test.mjs`-Dateien**. Der Lauf vom 2026-06-04 ergab **2134 Assertions**, alle erfolgreich. Die Tests laufen ohne Jest/Mocha über native Node.js-ESM-Module und eigene globale Assertions (`assert`, `assertEqual`, `assertClose`).
 
 ### B.5.1 Test-Inventar
 

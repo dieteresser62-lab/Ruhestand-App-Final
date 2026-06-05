@@ -141,7 +141,7 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 
 * `app/balance/balance-config.js` – Konfiguration, Fehlertypen, Debug-Utilities.
 * `app/balance/balance-utils.js` – Formatierungs- und Hilfsfunktionen (shared-formatting, Threshold-Zugriff).
-* `app/balance/balance-storage.js` – Balance-Persistenz ueber `app/shared/persistence-facade.js` und File-System-Snapshots.
+* `app/balance/balance-storage.js` – Balance-Persistenz ueber `app/shared/persistence-facade.js` und Jahresabschluss-Snapshots ueber das interne Snapshot-Archiv.
 * `app/balance/balance-reader.js` – liest Benutzerinputs aus dem DOM und setzt UI-Side-Effects.
 * `app/balance/balance-health-bucket.js` – liest die Profildefinition des Pflegebuckets und erzeugt eine reine Diagnose zu Brutto-Liquidität, Pflege-Zweckbindung, operativer Liquidität, Zieldeckung und Freigabestatus.
 * `app/balance/balance-renderer.js` – Darstellung der Ergebnisse (Summary, Guardrails, Entscheidungsdiagnose, Toasts, Themes).
@@ -257,14 +257,23 @@ Browser-Persistenz seit Phase 2:
 
 * App-Einstiegspunkte rufen `PersistenceFacade.init()` vor fachlichen Storage-Reads auf.
 * Im Browser wird automatisch IndexedDB genutzt; beim ersten Start migriert die Facade erlaubte Legacy-Keys aus `localStorage`.
+* IndexedDB nutzt die Datenbank `ruhestand-suite` in Version 2 mit den Stores `kv`, `metadata` und `snapshots`. Live-Daten liegen in `kv`; Jahresabschluss-Snapshots liegen im separaten Store `snapshots`.
 * Nach erfolgreicher Migration markieren `ruhestandsapp_migrated_to_target`, `ruhestandsapp_migration_completed_at` und `ruhestandsapp_migration_checksum` den Legacy-Stand.
 * Ist IndexedDB spaeter leer, obwohl der Marker vorhanden ist, wird nicht still aus altem `localStorage` zurueckmigriert; die Facade setzt stattdessen eine Migration-Warnung.
 * Nach `PersistenceFacade.init()` wird `persistence:initialized` gesendet, damit frueh instanziierte Module wie Feature-Flags aus dem aktiven Backend neu laden koennen.
 * Persistenz-Record-Maps werden defensiv als Null-Prototyp-Objekte gefuehrt, damit Daten-Keys wie `__proto__` nicht auf Objekt-Prototypen wirken.
-* Tauri nutzt seit Phase 3 eine JSON-Datei im App-Datenverzeichnis. Die Rust-Seite stellt `load_app_state`, `save_app_state`, `quarantine_app_state` und `confirm_app_close` bereit.
+* Tauri nutzt seit Phase 3 JSON-Dateien im App-Datenverzeichnis. Live-Daten liegen in `ruhestand_suite_data.json`; Jahresabschluss-Snapshots liegen getrennt in `ruhestand_suite_snapshots.json` und werden ueber das Adapter-Target `snapshots` geladen/gespeichert. Die Rust-Seite stellt `load_app_state`, `save_app_state`, `quarantine_app_state` und `confirm_app_close` bereit.
 * Beim ersten Tauri-Start migriert die Facade erlaubte Legacy-Keys aus der WebView-`localStorage`-Ablage in die JSON-Datei und setzt denselben Migrationsmarker mit Target `tauri-json-file`.
 * Beim nativen Fensterschluss verhindert Rust das sofortige Schliessen, sendet ein Frontend-Event, wartet auf den Facade-Flush und schliesst nach `confirm_app_close`. Um Hänger auf Seiten ohne Persistenz (z. B. Handbuch) oder bei WebView-Fehlern zu vermeiden, gibt es einen 3-Sekunden-Fallback in Rust, der das Schließen erzwungen durchführt.
 * Korruptes Tauri-JSON wird quarantiniert; die Facade startet mit leerem Cache und Recovery-Warnung statt eine stille Rueckmigration oder einen White-Screen zu erzeugen.
+
+Snapshot-Archiv seit Jahresabschluss-Snapshot-Slice:
+
+* `app/shared/snapshot-archive.js` definiert das kanonische Schema `persistence-records-v1` mit `schemaVersion`, `id`, `kind`, `createdAt`, `label`, `activeProfileId`, `recordCount`, `records` und `restoreScope`.
+* `listSnapshots()` liefert nur Indexdaten ohne `records`; Vollpayloads werden erst per `readSnapshot(id)` gelesen.
+* Capture schliesst alte Snapshot-Keys aus, damit Archivdaten nie in neue Live-Snapshots eingebettet werden.
+* Standard-Restore schreibt nur erlaubte Live-Keys zurueck, erhaelt Profil-Registry und Snapshot-Historie, setzt das aktive Profil und bricht ab, wenn `snapshot.activeProfileId` in der aktuellen Registry nicht mehr existiert.
+* Legacy-Snapshots mit Prefix `ruhestandsmodell_snapshot_` werden in das kanonische Archiv migriert. Eintraege ohne eindeutige aktive Profilzuordnung bleiben lesbar, werden aber nicht als Standard-Restore-faehig angezeigt.
 
 ### Dynamic-Flex (VPW) Pipeline
 
@@ -518,7 +527,7 @@ definiert werden. Ergebnisse werden gegen diese Limits geprüft und als OK/Verle
 * Engine anpassen → `npm run build:engine` ausführen, anschließend `engine.js` prüfen; für CI/Release `npm run build:engine:strict` nutzen.
 * Desktop-Release auf Windows → `npm run build-tauri-exe` oder `build-tauri.bat`; der Workflow führt `npm run sync-dist`, `npm run tauri:build` und den geprüften Kopierschritt nach `RuhestandSuite.exe` aus.
 * Reine Tauri-Bundles → vor `npm run tauri:build` immer `npm run sync-dist` ausführen, damit `src-tauri/tauri.conf.json` den aktuellen `dist/`-Stand lädt.
-* Snapshot-Funktionen benötigen File-System-Access-API (Chromium).
+* Dateiimporte/-exporte benötigen Browser-Datei-/Download-Unterstuetzung. Jahresabschluss-Snapshots liegen intern im aktiven Persistenzadapter: Browser `IndexedDB` Store `snapshots`, Tauri `ruhestand_suite_snapshots.json`, localStorage-Fallback `rs_snapshot_archive_v1`.
 * Tests/Smoketests: `npm test` führt die gesamte Test-Suite aus, inklusive Headless-Simulationen und Szenario-Checks.
 
 ---
@@ -528,7 +537,7 @@ definiert werden. Ergebnisse werden gegen diese Limits geprüft und als OK/Verle
 * **BALANCE_MODULES_README.md** – Detailtiefe zur Balance-App.
 * **SIMULATOR_MODULES_README.md** – Detaillierte Modulübersicht des Simulators.
 * **engine/README.md** – Engine-spezifische Informationen inkl. Build-Beschreibung.
-* **tests/README.md** – Test-Suite-Dokumentation mit 76 Testdateien.
+* **tests/README.md** – Test-Suite-Dokumentation mit 79 Testdateien.
 * **docs/reference/PROFILVERBUND_FEATURES.md** – Profilverbund-Design und -Module.
 * **docs/internal/archive/2026-dynamic-flex/CAPE_AUTOMATION_CONTRACT.md** – CAPE-Quelle, Fallback-Vertrag und Jahreswechsel-Fehlerszenarien.
 * **docs/internal/archive/2026-dynamic-flex/DYNAMIC_FLEX_ROLLOUT.md** – interner Rollout-Abschluss inkl. finaler Testmatrix.

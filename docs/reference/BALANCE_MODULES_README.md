@@ -4,7 +4,7 @@ Die Balance-App besteht aus 35 ES6-Modulen unter `app/balance/`. Das folgende Do
 Dateinamen werden unten kurz ohne Präfix genannt; tatsächlicher Pfad ist in der Regel `app/balance/<datei>.js`.
 Ausnahmen: Profilverbund-Module liegen unter `app/profile/`, Shared-Formatter unter `app/shared/`.
 
-**Stand:** 2026-06-01
+**Stand:** 2026-06-04
 
 ---
 
@@ -42,7 +42,7 @@ Formatierungs- und Hilfsfunktionen für die UI.
 ---
 
 ## 3. `balance-storage.js`
-Persistenzschicht fuer Balance-State ueber `app/shared/persistence-facade.js` und File-System-Snapshots. Im Browser nutzt die Facade seit Phase 2 IndexedDB als lokale Source of Truth und migriert erlaubte Legacy-Keys automatisch aus `localStorage`; in Tauri nutzt sie seit Phase 3 eine JSON-Datei im App-Datenverzeichnis und migriert erlaubte Legacy-Keys aus der WebView-`localStorage`-Ablage. Feature-Code nutzt weiter die synchrone Storage-like API.
+Persistenzschicht fuer Balance-State ueber `app/shared/persistence-facade.js` und das interne Snapshot-Archiv. Im Browser nutzt die Facade IndexedDB als lokale Source of Truth und migriert erlaubte Legacy-Keys automatisch aus `localStorage`; in Tauri nutzt sie JSON-Dateien im App-Datenverzeichnis und migriert erlaubte Legacy-Keys aus der WebView-`localStorage`-Ablage. Feature-Code nutzt weiter die synchrone Storage-like API.
 
 **Exports:**
 - `initStorageManager(domRefs, state, renderer)` – initialisiert Abhängigkeiten
@@ -50,9 +50,11 @@ Persistenzschicht fuer Balance-State ueber `app/shared/persistence-facade.js` un
   - `loadState()` / `saveState(state)` / `resetState()`
   - `initSnapshots()` / `renderSnapshots(listEl, statusEl, handle)`
   - `createSnapshot(handle)` / `restoreSnapshot(key, handle)` / `deleteSnapshot(key, handle)`
-  - `connectFolder()` – öffnet File-System-Handle
+  - `connectFolder()` – Kompatibilitaets-/UI-Pfad fuer aeltere Ordnerbindung; neue Snapshots liegen im internen Archiv
 
-**Dependencies:** `balance-config.js` (Konfiguration & Fehlerklassen), `app/shared/persistence-facade.js`
+**Dependencies:** `balance-config.js` (Konfiguration & Fehlerklassen), `app/shared/persistence-facade.js`, `app/shared/snapshot-archive.js`
+
+**Snapshot-Archiv:** Jahresabschluss-Snapshots werden als `persistence-records-v1` gespeichert. Browser nutzt die IndexedDB-Datenbank `ruhestand-suite` Version 2 mit separatem Store `snapshots`; Tauri nutzt neben `ruhestand_suite_data.json` die separate Datei `ruhestand_suite_snapshots.json`. `listSnapshots()` zeigt nur Indexdaten ohne Vollpayload. Standard-Restore erhaelt die Snapshot-Historie, bewahrt die Profil-Registry und setzt nur das aktive Profil zurueck, wenn `snapshot.activeProfileId` in der aktuellen Registry existiert.
 
 **Hinweis Steuerzustand:** `lastState.taxState.lossCarry` wird migriert/defaulted und bei Guardrail-Resets erhalten.
 
@@ -153,7 +155,7 @@ Event-Hub der Anwendung.
 **Helper-Module (ausgelagert):**
 - `balance-binder-annual.js` – Jahres-Update, Inflation, ETF-Nachrücken, Modal-Logik
 - `balance-binder-imports.js` – Import/Export/CSV
-- `balance-binder-snapshots.js` – Snapshot-Handling
+- `balance-binder-snapshots.js` – Snapshot-Handling; Jahresabschluss flusht Live-Daten, erstellt den Snapshot vor Inflation/Jahresmutationen und bricht bei Snapshot-Fehlern ohne Mutation ab
 - `balance-binder-diagnosis.js` – Diagnose-Export
 
 ---
