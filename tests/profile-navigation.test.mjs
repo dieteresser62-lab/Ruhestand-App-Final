@@ -2,6 +2,7 @@
 
 import {
     bindProfileNavigationHandoff,
+    installProfileBfcacheRefresh,
     installProfilePersistenceHooks,
     shouldHandleProfileHandoff
 } from '../app/profile/profile-navigation.js';
@@ -142,5 +143,40 @@ console.log('Test 3: installProfilePersistenceHooks only installs once');
     assertEqual(flushCount, 2, 'Both persistence hooks should flush persistence');
 }
 console.log('✓ installProfilePersistenceHooks OK');
+
+console.log('Test 4: installProfileBfcacheRefresh reloads stale browser cache');
+{
+    let reloadCount = 0;
+    const winListeners = new Map();
+    const win = {
+        __rsProfileBfcacheRefreshInstalled: false,
+        addEventListener(type, handler) {
+            winListeners.set(type, handler);
+        }
+    };
+
+    const first = installProfileBfcacheRefresh({
+        win,
+        reload: () => {
+            reloadCount += 1;
+        }
+    });
+    const second = installProfileBfcacheRefresh({
+        win,
+        reload: () => {
+            reloadCount += 1;
+        }
+    });
+
+    assertEqual(first, true, 'First BFCache hook install should register listener');
+    assertEqual(second, false, 'Second BFCache hook install should be ignored');
+
+    winListeners.get('pageshow')({ persisted: false });
+    assertEqual(reloadCount, 0, 'Normal pageshow should not reload');
+
+    winListeners.get('pageshow')({ persisted: true });
+    assertEqual(reloadCount, 1, 'BFCache restore should reload page');
+}
+console.log('✓ installProfileBfcacheRefresh OK');
 
 console.log('✅ Profile navigation lifecycle validated');

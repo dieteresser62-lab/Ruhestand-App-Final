@@ -108,10 +108,33 @@ export function installProfilePersistenceHooks(options = {}) {
     return true;
 }
 
+export function installProfileBfcacheRefresh(options = {}) {
+    const {
+        win = window,
+        reload = () => win?.location?.reload?.()
+    } = options;
+
+    if (!win || typeof win.addEventListener !== 'function') return false;
+    if (win.__rsProfileBfcacheRefreshInstalled) return false;
+
+    win.addEventListener('pageshow', event => {
+        if (event?.persisted) {
+            reload();
+        }
+    });
+
+    win.__rsProfileBfcacheRefreshInstalled = true;
+    return true;
+}
+
 export function initProfileIndexLifecycle(options = {}) {
-    const { root = document } = options;
+    const {
+        root = document,
+        win = window
+    } = options;
     bootstrapProfileContext();
     bindProfileNavigationHandoff({ root });
+    installProfileBfcacheRefresh({ win });
 }
 
 export function initProfileSubpageLifecycle(options = {}) {
@@ -125,4 +148,5 @@ export function initProfileSubpageLifecycle(options = {}) {
         preserveLiveProfileData: true
     });
     installProfilePersistenceHooks({ win, doc });
+    installProfileBfcacheRefresh({ win });
 }
