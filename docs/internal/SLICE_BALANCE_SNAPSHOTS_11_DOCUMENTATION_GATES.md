@@ -126,7 +126,7 @@ Rollback-Strategie:
 
 ## Freigabestatus
 
-Review durch Gemini erfolgreich abgeschlossen.
+Review durch Gemini blockiert / Nachbesserung erforderlich.
 
 ### Review-Entscheidungen
 
@@ -134,10 +134,12 @@ Review durch Gemini erfolgreich abgeschlossen.
 |---|---|---|---|---|
 | REV11-01 | Gemini (Reviewer) | Fehlende UI-Smoke-Tests für Handbuch.html | Akzeptiert, da Handbuch.html nur statischen Text enthält und die HTML-Struktur intakt blieb. | Manuelle Sichtprüfung des Diffs erfolgreich. |
 | REV11-02 | Gemini (Reviewer) | Zukünftiger Drift-Gefahr bei Schema-Änderungen | Akzeptiert, da rein organisatorisches Risiko. Zukünftige Slices müssen Doku-Updates erzwingen. | Als Restrisiko und Pre-Mortem erfasst. |
+| REV11-03 | Gemini (Reviewer) | Veraltete Angaben zu Persistenz-Modellen und fehlende Detailtiefe in ARCHITEKTUR_UND_FACHKONZEPT.md | Muss von Codex behoben werden (Korrektur von B.1.3 & B.2.4 gemäß Reviewer-Vorschlag). | Offen (an Codex übergeben) |
 
 ## Review-Ergebnis
-- Status: freigegeben
-- Blocker: keine
+- Status: blockiert
+- Blocker:
+  - REV11-03: Überarbeitung von `docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md` erforderlich, um widersprüchliche Angaben zu localStorage/Snapshots zu beseitigen und das neue Speicher- und Restore-Konzept detailliert zu dokumentieren.
 - Restrisiken:
   - Zukünftiger Doku-Drift: Zukünftige Schema-Änderungen oder Pfadanpassungen (z.B. Migration auf SQLite) könnten die dokumentierten Pfade/Versionen invalidieren, da keine automatisierte Validierung für Doku existiert.
   - Altsystem-Kompatibilität: Benutzer mit sehr alten/korrupten Snapshot-Ständen haben beim Standard-Restore Einschränkungen (Profilzuordnung).
