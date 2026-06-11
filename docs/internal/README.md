@@ -5,8 +5,8 @@ Dieses Verzeichnis enthaelt interne Arbeitsdokumente und Archivmaterial zu abges
 Aktive interne Uebersichten:
 
 - `PROJEKTUEBERSICHT.md` - detaillierte technische und organisatorische Projektuebersicht.
-- `BALANCE_JAHRESABSCHLUSS_SNAPSHOT_PLAN.md` - Konzept/Plan fuer getrennte Snapshot-Ablage ohne Ordnerbindung.
 - `BUGFIX_INDEXEDDB_PROFILE_GOLD_PERSISTENCE.md` - Bugfix-Dokumentation fuer verlorene Profil-Gold-Aenderungen im Browserlauf mit IndexedDB.
+- `TESTABDECKUNG_ERWEITERUNGSPLAN.md` - Slice-Plan zur messbaren Erweiterung der Testabdeckung.
 
 Abgeschlossene Umsetzungen liegen im Archiv.
 
@@ -16,6 +16,7 @@ Abgeschlossene Umsetzungen liegen im Archiv.
 - `archive/2026-architektur-review/`
 - `archive/2026-architektur-revision/`
 - `archive/2026-balance-diagnosis-ux/`
+- `archive/2026-balance-snapshots/`
 - `archive/2026-balance-workflow-hardening/`
 - `archive/2026-dynamic-flex/`
 - `archive/2026-engine-tax-golden-cases/`

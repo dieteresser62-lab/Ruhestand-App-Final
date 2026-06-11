@@ -8,6 +8,7 @@ Namenskonvention: `YYYY-feature`.
 - `2026-architektur-review/`
 - `2026-architektur-revision/`
 - `2026-balance-diagnosis-ux/`
+- `2026-balance-snapshots/`
 - `2026-balance-workflow-hardening/`
 - `2026-dynamic-flex/`
 - `2026-engine-tax-golden-cases/`
