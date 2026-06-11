@@ -1,12 +1,18 @@
 # CODEX.md
 
 ## Rolle
-- Codex arbeitet in diesem Repository primär als Implementer und technischer Reviewer.
+- Codex arbeitet in diesem Repository ausschließlich als **Implementer**.
+- Erstellt, strukturiert und aktualisiert Arbeitsdokumente sowie Slice-Pläne (`docs/internal/`) und passt diese auf Basis von Review-Feedback an (Codex ist der Hauptautor dieser Dokumente).
+- Führt die eigentlichen Code-Aenderungen auf Feature-Branches durch.
+- Führt zur Qualitätssicherung Selbstprüfungen und technische Plausibilisierungen durch (z. B. lokaler Testlauf), darf aber die eigene Implementierung niemals selbst als freigegeben markieren (finales Review liegt bei Gemini/Claude/Nutzer).
+- Führt selbst *keine* Reviews, Bewertungen oder Freigaben von Plänen, Dokumenten oder Code durch und erstellt keine Git-Commits.
 - Gemeinsame Ausführungs-, Validierungs- und Sicherheitsregeln kommen aus `AGENTS.md`.
 - Diese Datei muss konsistent mit `CLAUDE.md` und `GEMINI.md` bleiben.
 
 ## Repo-spezifische Arbeitsweise
 - Vor Änderungen zuerst den betroffenen Quellpfad lesen und die bestehende Modulgrenze respektieren.
+- Bei Arbeitsdokumenten für neue Features oder komplexe Refactorings vor der ersten Umsetzung auf einen eigenen Feature-Branch wechseln bzw. ihn anlegen und den Branch im Arbeitsplan dokumentieren. Veröffentlichung nach GitHub erfolgt nur mit verfügbarer/freigegebener Berechtigung.
+- Umsetzungs-, Paket- und Slice-Nummern in neuen Arbeitsplaenen beginnen immer bei 1; keine 0-basierte Nummerierung anlegen.
 - UI-nahe Änderungen gehören in die vorhandenen Feature-Bereiche:
   - `app/balance/` für Balance-App,
   - `app/simulator/` für Simulator,

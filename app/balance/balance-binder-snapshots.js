@@ -9,12 +9,18 @@ import { StorageError } from './balance-config.js';
 import { UIRenderer } from './balance-renderer.js';
 import { StorageManager } from './balance-storage.js';
 import { rollExpensesYear } from './balance-expenses.js';
+import { PersistenceFacade } from '../shared/persistence-facade.js';
 
 export function createSnapshotHandlers({
     dom,
     appState,
     debouncedUpdate,
-    applyAnnualInflation
+    applyAnnualInflation,
+    rollExpensesYearFn = rollExpensesYear,
+    flushLiveState = async ({ sync = false } = {}) => {
+        if (sync && typeof debouncedUpdate === 'function') debouncedUpdate();
+        await PersistenceFacade.flush();
+    }
 }) {
     return {
         async handleJahresabschluss() {
@@ -23,13 +29,12 @@ export function createSnapshotHandlers({
             if (!confirm(`Soll der Jahresabschluss ${label ? `"${label}" ` : ''}jetzt erstellt werden?\n\nHinweis: Das aktuelle Alter (+1) und die Inflation werden dabei automatisch fortgeschrieben. Der Ausgaben-Check wird auf das nächste Jahr umgestellt, die Historie bleibt abrufbar.`)) return;
 
             try {
-                applyAnnualInflation();
-                debouncedUpdate();
-                await new Promise(resolve => setTimeout(resolve, 300));
-                // Pass the custom label to createSnapshot
+                await flushLiveState({ sync: true });
                 await StorageManager.createSnapshot(appState.snapshotHandle, label);
                 UIRenderer.toast(`Jahresabschluss-Snapshot ${label ? `"${label}" ` : ''}erfolgreich erstellt.`);
-                const nextYear = rollExpensesYear();
+                applyAnnualInflation();
+                const nextYear = rollExpensesYearFn();
+                await flushLiveState({ sync: true });
                 UIRenderer.toast(`Ausgaben-Check auf ${nextYear} umgestellt.`);
                 await StorageManager.renderSnapshots(dom.outputs.snapshotList, dom.controls.snapshotStatus, appState.snapshotHandle);
             } catch (err) {
@@ -43,7 +48,8 @@ export function createSnapshotHandlers({
             try {
                 if (restoreBtn) {
                     const key = restoreBtn.dataset.key;
-                    if (confirm(`Snapshot "${key.replace('.json', '')}" wiederherstellen? Alle aktuellen Eingaben gehen verloren.`)) {
+                    const snapshotName = key.replace('.json', '');
+                    if (confirm(`Snapshot "${snapshotName}" wiederherstellen?\n\nStandard-Restore setzt das aktive Profil und die Balance-Daten auf den Snapshot-Stand. Andere Profile, technische Einstellungen und die Snapshot-Historie bleiben erhalten.`)) {
                         await StorageManager.restoreSnapshot(key, appState.snapshotHandle);
                     }
                 }

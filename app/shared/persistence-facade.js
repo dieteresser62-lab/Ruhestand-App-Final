@@ -13,6 +13,8 @@ const LEGACY_MIGRATION_MARKER_KEYS = Object.freeze({
     completedAt: 'ruhestandsapp_migration_completed_at',
     checksum: 'ruhestandsapp_migration_checksum'
 });
+const LOCAL_SNAPSHOT_ARCHIVE_KEY = 'rs_snapshot_archive_v1';
+const LOCAL_SNAPSHOT_ARCHIVE_SCHEMA_VERSION = 1;
 const MARKER_KEY_SET = new Set(Object.values(LEGACY_MIGRATION_MARKER_KEYS));
 
 let adapter = createLocalStorageAdapter();
@@ -42,6 +44,56 @@ function toNullPrototypeRecords(records) {
         normalized[String(key)] = String(value);
     });
     return normalized;
+}
+
+function normalizeSnapshotListArchive(raw) {
+    if (!raw) {
+        return {
+            schemaVersion: LOCAL_SNAPSHOT_ARCHIVE_SCHEMA_VERSION,
+            savedAt: '',
+            snapshots: []
+        };
+    }
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error('Snapshot-Archiv ist ungueltig.');
+    }
+    if (Number(parsed.schemaVersion) !== LOCAL_SNAPSHOT_ARCHIVE_SCHEMA_VERSION) {
+        throw new Error(`Snapshot-Archiv-Schema ${parsed.schemaVersion} wird nicht unterstuetzt.`);
+    }
+    if (!Array.isArray(parsed.snapshots)) {
+        throw new Error('Snapshot-Archiv enthaelt keine gueltige Snapshot-Liste.');
+    }
+    return {
+        schemaVersion: LOCAL_SNAPSHOT_ARCHIVE_SCHEMA_VERSION,
+        savedAt: parsed.savedAt ? String(parsed.savedAt) : '',
+        snapshots: parsed.snapshots.filter(snapshot => snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot))
+    };
+}
+
+function serializeSnapshotListArchive(snapshots) {
+    return JSON.stringify({
+        schemaVersion: LOCAL_SNAPSHOT_ARCHIVE_SCHEMA_VERSION,
+        savedAt: new Date().toISOString(),
+        snapshots
+    });
+}
+
+function toSnapshotArchiveIndexEntry(snapshot) {
+    const { records, ...indexEntry } = snapshot || {};
+    return indexEntry;
+}
+
+function isLocalStorageFallbackAdapter(activeAdapter = adapter) {
+    return activeAdapter?.name === 'localStorage';
+}
+
+function requireAdapterMethod(methodName) {
+    const method = adapter?.[methodName];
+    if (typeof method !== 'function') {
+        throw new Error(`Aktiver Persistenzadapter unterstuetzt ${methodName}() nicht.`);
+    }
+    return method.bind(adapter);
 }
 
 function clearScheduledFlush() {
@@ -293,6 +345,143 @@ export async function importAll(bundle, options = {}) {
     return { ok: true, message: 'Import erfolgreich.' };
 }
 
+export async function listSnapshots() {
+    if (typeof adapter?.listSnapshots === 'function') {
+        return adapter.listSnapshots();
+    }
+    if (!isLocalStorageFallbackAdapter()) {
+        throw new Error('Aktiver Persistenzadapter unterstuetzt listSnapshots() nicht.');
+    }
+    const archive = normalizeSnapshotListArchive(getItemSync(LOCAL_SNAPSHOT_ARCHIVE_KEY));
+    return archive.snapshots.map(toSnapshotArchiveIndexEntry);
+}
+
+export async function readSnapshot(id) {
+    if (typeof adapter?.readSnapshot === 'function') {
+        return adapter.readSnapshot(String(id || ''));
+    }
+    if (!isLocalStorageFallbackAdapter()) {
+        throw new Error('Aktiver Persistenzadapter unterstuetzt readSnapshot() nicht.');
+    }
+    const snapshotId = String(id || '');
+    const archive = normalizeSnapshotListArchive(getItemSync(LOCAL_SNAPSHOT_ARCHIVE_KEY));
+    const snapshot = archive.snapshots.find(entry => String(entry?.id || '') === snapshotId);
+    if (!snapshot) {
+        throw new Error(`Snapshot ${snapshotId} wurde nicht gefunden.`);
+    }
+    return snapshot;
+}
+
+export async function writeSnapshot(snapshot) {
+    if (typeof adapter?.writeSnapshot === 'function') {
+        await adapter.writeSnapshot(snapshot);
+        return true;
+    }
+    if (!isLocalStorageFallbackAdapter()) {
+        throw new Error('Aktiver Persistenzadapter unterstuetzt writeSnapshot() nicht.');
+    }
+    const archive = normalizeSnapshotListArchive(getItemSync(LOCAL_SNAPSHOT_ARCHIVE_KEY));
+    const snapshotId = String(snapshot?.id || '');
+    if (!snapshotId) {
+        throw new Error('Snapshot-ID fehlt.');
+    }
+    const nextSnapshots = archive.snapshots.filter(entry => String(entry?.id || '') !== snapshotId);
+    nextSnapshots.push(snapshot);
+    setItemSync(LOCAL_SNAPSHOT_ARCHIVE_KEY, serializeSnapshotListArchive(nextSnapshots));
+    await flush();
+    return true;
+}
+
+export async function deleteSnapshot(id) {
+    if (typeof adapter?.deleteSnapshot === 'function') {
+        await adapter.deleteSnapshot(String(id || ''));
+        return true;
+    }
+    if (!isLocalStorageFallbackAdapter()) {
+        throw new Error('Aktiver Persistenzadapter unterstuetzt deleteSnapshot() nicht.');
+    }
+    const snapshotId = String(id || '');
+    const archive = normalizeSnapshotListArchive(getItemSync(LOCAL_SNAPSHOT_ARCHIVE_KEY));
+    const nextSnapshots = archive.snapshots.filter(entry => String(entry?.id || '') !== snapshotId);
+    if (nextSnapshots.length === archive.snapshots.length) return false;
+    setItemSync(LOCAL_SNAPSHOT_ARCHIVE_KEY, serializeSnapshotListArchive(nextSnapshots));
+    await flush();
+    return true;
+}
+
+export async function migrateLegacySnapshotsIfNeeded() {
+    if (typeof adapter?.migrateLegacySnapshotsIfNeeded === 'function') {
+        return adapter.migrateLegacySnapshotsIfNeeded();
+    }
+    if (isLocalStorageFallbackAdapter()) {
+        return { migratedCount: 0, skippedCount: 0, notStandardRestorableCount: 0, errors: [] };
+    }
+    throw new Error('Aktiver Persistenzadapter unterstuetzt migrateLegacySnapshotsIfNeeded() nicht.');
+}
+
+export async function replaceLiveRecords(records, options = {}) {
+    clearScheduledFlush();
+    await flush();
+
+    const allowKey = typeof options.allowKey === 'function' ? options.allowKey : () => true;
+    const requestedDeleteKeys = Array.isArray(options.deleteKeys) ? options.deleteKeys.map(key => String(key)) : [];
+    const requestedUpserts = Array.isArray(options.upserts)
+        ? options.upserts.map(([key, value]) => [String(key), value])
+        : Object.entries(records || {});
+
+    const deleteKeys = requestedDeleteKeys.filter(key => allowKey(key, options));
+    const upserts = requestedUpserts
+        .filter(([key, value]) => value !== null && value !== undefined && allowKey(String(key), options))
+        .map(([key, value]) => [String(key), String(value)]);
+
+    if (typeof adapter?.replaceLiveRecords === 'function') {
+        const result = await adapter.replaceLiveRecords(records, { ...options, deleteKeys, upserts, allowKey });
+        deleteKeys.forEach(key => {
+            delete memCache[key];
+        });
+        upserts.forEach(([key, value]) => {
+            memCache[key] = value;
+        });
+        dirtyKeys.clear();
+        deletedKeys.clear();
+        lastFlushError = null;
+        return result ?? { ok: true, deletedCount: deleteKeys.length, upsertCount: upserts.length };
+    }
+
+    const affectedKeys = new Set([...deleteKeys, ...upserts.map(([key]) => key)]);
+    const backup = Object.create(null);
+    affectedKeys.forEach(key => {
+        if (hasOwn(memCache, key)) backup[key] = memCache[key];
+    });
+
+    deleteKeys.forEach(key => {
+        delete memCache[key];
+    });
+    upserts.forEach(([key, value]) => {
+        memCache[key] = value;
+    });
+    dirtyKeys.clear();
+    deletedKeys.clear();
+
+    try {
+        await requireAdapterMethod('saveBatch')({ deletes: deleteKeys, upserts });
+        lastFlushError = null;
+        return { ok: true, deletedCount: deleteKeys.length, upsertCount: upserts.length };
+    } catch (err) {
+        affectedKeys.forEach(key => {
+            if (hasOwn(backup, key)) {
+                memCache[key] = backup[key];
+            } else {
+                delete memCache[key];
+            }
+        });
+        dirtyKeys.clear();
+        deletedKeys.clear();
+        lastFlushError = err;
+        throw err;
+    }
+}
+
 export async function flush() {
     clearScheduledFlush();
     if (!initialized) return true;
@@ -446,6 +635,12 @@ export const PersistenceFacade = {
     clearSync,
     exportAllSync,
     importAll,
+    listSnapshots,
+    readSnapshot,
+    writeSnapshot,
+    deleteSnapshot,
+    migrateLegacySnapshotsIfNeeded,
+    replaceLiveRecords,
     flush,
     getDirtyState,
     getPersistenceStatus,

@@ -2,8 +2,8 @@
 
 **Technische Dokumentation der DIY-Software für Ruhestandsplanung**
 
-**Dokumentstand:** 2026-06-02
-**Geprüfte Codebasis:** lokale Arbeitskopie vom 2026-06-02
+**Dokumentstand:** 2026-06-04
+**Geprüfte Codebasis:** lokale Arbeitskopie vom 2026-06-04
 **Engine API:** v31.0
 **Codeumfang:** Momentaufnahme, siehe Komponenten-Tabelle
 **Lizenz:** MIT
@@ -36,15 +36,15 @@
 
 ## Komponenten
 
-*Momentaufnahme der lokalen Arbeitskopie vom 2026-06-02. Modul- und Zeilenzahlen sind Orientierungshilfen, nicht normative Architekturgrenzen. Dieses Dokument beschreibt die Architektur und die fachlichen Zusammenhänge eigenständig; spezialisierte Referenzen (`TECHNICAL.md`, Modul-READMEs, `engine/README.md`, `tests/README.md`) dienen als ergänzende Detail- und Exportkataloge.*
+*Momentaufnahme der lokalen Arbeitskopie vom 2026-06-04. Modul- und Zeilenzahlen sind Orientierungshilfen, nicht normative Architekturgrenzen. Dieses Dokument beschreibt die Architektur und die fachlichen Zusammenhänge eigenständig; spezialisierte Referenzen (`TECHNICAL.md`, Modul-READMEs, `engine/README.md`, `tests/README.md`) dienen als ergänzende Detail- und Exportkataloge.*
 
 | Komponente | Zweck | Momentaufnahme |
 |------------|-------|----------------|
-| **Balance-App** | Jahresplanung: Liquidität, Entnahme, Steuern, Transaktionen, Ausgaben-Check, Pflegebucket-Diagnose | 35 JS-Module unter `app/balance/` |
+| **Balance-App** | Jahresplanung: Liquidität, Entnahme, Steuern, Transaktionen, Ausgaben-Check, Pflegebucket-Diagnose, Jahresabschluss-Snapshots | 35 JS-Module unter `app/balance/` |
 | **Simulator** | Monte-Carlo-Simulation, Parameter-Sweeps, Auto-Optimize, Dynamic Flex, Pflegebucket-Wirklogik | 87 JS-Module unter `app/simulator/` |
 | **Engine** | Kern-Berechnungslogik, Guardrails, Steuern | 24 MJS-Module unter `engine/`, ca. 4.240 Zeilen |
 | **Workers** | Parallelisierung für MC/Sweep/Optimizer-Pfade | 3 JS-Module unter `workers/`, ca. 757 Zeilen |
-| **Tests** | Unit- und Integrationstests | 77 `*.test.mjs` Dateien; 1948 Assertions im Lauf vom 2026-06-02 |
+| **Tests** | Unit- und Integrationstests | 79 `*.test.mjs` Dateien; 2134 Assertions im Lauf vom 2026-06-04 |
 | **Profile, Tranchen, Shared** | Profilverwaltung, Profilverbund, Tranchenstatus, gemeinsame Utilities | JS-Module unter `app/profile/`, `app/tranches/`, `app/shared/`, zusammen ca. 2.959 Zeilen |
 
 *Hinweis: Dieses Dokument beschreibt Konzepte und Architekturentscheidungen. Für konkrete Implementierungsdetails gelten die genannten Module und Tests als Referenz; exakte Code-Zeilen werden bewusst vermieden, weil sie nach Refactorings schnell veralten.*
@@ -69,6 +69,7 @@ Die Ruhestand-Suite kombiniert folgende Funktionen:
 14. **Auto-CAPE im Jahreswechsel** (US-Shiller-CAPE mit Fallback-Kette und non-blocking Fehlerbehandlung)
 15. **Pflegebucket** als gesperrte Geldmarkt-/Cash-Reserve mit Profildefinition, Simulator-Air-Gap, Pflegegrad-Trigger, Monte-Carlo-KPIs und Balance-Diagnose
 16. **Mindest-Flex p.a.** als optionale Untergrenze für Flex-Ausgaben in gekürzten Safety-/Guardrail-Jahren; ratenbasiert, validiert gegen den Flex-Bedarf und in Balance, Simulator, Backtest, Monte Carlo, Sweep, Auto-Optimize und Profilverbund integriert
+17. **Internes Jahresabschluss-Snapshot-Archiv** mit Pre-Mutation-Snapshots, separatem Browser-/Tauri-Speicher und Standard-Restore mit Profilzuordnungspruefung
 
 ## Bekannte Einschränkungen
 
@@ -183,7 +184,7 @@ Die Suite umfasst mehrere HTML-Oberflächen und Begleitmodule: Neben Balance und
 | **Balance-App** | `app/balance/`, `css/balance.css` | Operative Jahresplanung, Diagnose, Jahresupdate, Ausgaben-Check, Profilverbund-Anbindung |
 | **Simulator** | `app/simulator/`, `simulator.css` | Monte Carlo, Backtest, Sweep, Auto-Optimize, Pflege/Rente/Portfolio-UI, DOM-freie Jahreslogik |
 | **Profil/Verbund/Tranchen** | `app/profile/`, `app/tranches/` | Profilregistry, Profilwechsel, Profilverbund-Aggregation, Tranchenstatus und Tranchenmanager |
-| **Shared Utilities** | `app/shared/`, `types/` | Formatter, Feature-Flags, Security-Utilities, gemeinsame Typ-/Contract-Hilfen |
+| **Shared Utilities** | `app/shared/`, `types/` | Formatter, Feature-Flags, Security-Utilities, PersistenceFacade, SnapshotArchive, gemeinsame Typ-/Contract-Hilfen |
 | **Engine-Quellen** | `engine/` | ESM-Quelle für Validierung, Marktanalyse, Spending-Policies, Steuer-/Transaktionslogik |
 | **Generierte Engine** | `engine.js` | Browser-Bundle bzw. Modul-Fallback der Engine; nicht manuell bearbeiten |
 | **Workers** | `workers/`, `app/simulator/worker-job-runner.js` | Parallele MC-/Sweep-/Optimizer-Jobs mit seriellen Fallbacks |
@@ -221,13 +222,13 @@ Die Suite umfasst mehrere HTML-Oberflächen und Begleitmodule: Neben Balance und
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Aktuelle Bestandszahlen (2026-05-23):**
+**Aktuelle Bestandszahlen (2026-06-04):**
 
 - `app/balance/`: 35 JS-Module
 - `app/simulator/`: 87 JS-Module
 - `engine/`: 24 MJS-Module
 - `workers/`: 3 JS-Module
-- `tests/`: 76 Testdateien
+- `tests/`: 79 Testdateien
 
 ## B.1.2 Tauri Desktop-App (Portable EXE)
 
@@ -492,16 +493,19 @@ npx serve -p 8000
 
 ### Datenpersistenz über Plattformen
 
-| Speicherort | Windows | macOS | Linux |
-|-------------|---------|-------|-------|
-| **localStorage** | `%APPDATA%/.../LocalStorage` | `~/Library/WebKit/LocalStorage` | `~/.local/share/.../LocalStorage` |
-| **Snapshots (Tauri)** | Fenstergröße/Position | Native Dateisystem-Dialoge | XDG-Verzeichnisse |
-| **Snapshots (Browser)** | Download-Ordner | Download-Ordner | Download-Ordner |
+Die Anwendung nutzt keine serverseitige Fachlogik. Persistenz wird über `app/shared/persistence-facade.js` gekapselt, damit Balance, Simulator und Profilmodule nicht direkt zwischen Browser-IndexedDB, Tauri-Datei oder Legacy-`localStorage` unterscheiden müssen.
+
+| Laufzeit | Live-Daten | Snapshot-Archiv | Rolle von `localStorage` |
+|----------|------------|------------------|--------------------------|
+| **Browser** | IndexedDB-Datenbank `ruhestand-suite`, Version 2, Store `kv` plus `metadata` | IndexedDB-Store `snapshots` in derselben Datenbank | Legacy-Migration und Fallback, nicht primäre Source of Truth |
+| **Tauri Desktop** | App-Daten-Datei `ruhestand_suite_data.json` | separate App-Daten-Datei `ruhestand_suite_snapshots.json` über Target `snapshots` | WebView-Legacy-Migration beim ersten Tauri-Start |
+| **localStorage-Fallback** | Storage-like Fallback für einfache Browserläufe | `rs_snapshot_archive_v1` als internes Archiv | Nur Fallback/Kompatibilität |
 
 **Daten-Migration zwischen Plattformen:**
-1. Export via "Snapshot erstellen" → JSON-Datei
-2. Auf Zielplattform: Import via "Snapshot laden"
-3. Alternativ: `localStorage`-Keys manuell über DevTools kopieren
+1. Komplettbackup auf der Startseite unter `Profile > Erweitert` exportieren.
+2. Auf der Zielplattform denselben Komplettimport verwenden.
+3. Jahresabschluss-Snapshots sind interne Sicherungspunkte des jeweiligen Persistenzadapters. Sie sind nicht der primäre Austauschweg zwischen Browser und Tauri.
+4. Manuelles Kopieren von `localStorage`-Keys ist nur ein Legacy-/Debug-Pfad und darf nicht als Standardmigration dokumentiert oder empfohlen werden.
 
 ---
 
@@ -517,7 +521,7 @@ Der Detailkatalog in `docs/reference/BALANCE_MODULES_README.md` ergänzt diese B
 |---------|--------|---------------|
 | **Bootstrap und Orchestrierung** | `balance-main.js`, `balance-main-profile-sync.js`, `balance-main-profilverbund.js`, `balance-update-pipeline.js`, `balance-action-postprocessor.js` | App-Initialisierung, Engine-Handshake, Update-Zyklus, Profilwerte in Inputs spiegeln, Profilverbund-Läufe, Renderer-/Persistenz-Payloads, Action-Nachbearbeitung |
 | **Konfiguration und Utilities** | `balance-config.js`, `balance-utils.js` | App-Konfiguration, Engine-Versionserwartung, Fehlerklassen, Währungs-/Zahlen-/Prozentformatierung, Zugriff auf Engine-Konfiguration |
-| **Input und Persistenz** | `balance-reader.js`, `balance-storage.js`, `balance-guardrail-reset.js` | DOM-Input-Lesen, Input-Side-Effects, localStorage, Snapshot-Handling, Erhalt von `lastState.taxState`, Reset-Erkennung für Guardrail-Historie |
+| **Input und Persistenz** | `balance-reader.js`, `balance-storage.js`, `balance-guardrail-reset.js` | DOM-Input-Lesen, Input-Side-Effects, PersistenceFacade-Anbindung, internes Snapshot-Archiv, Erhalt von `lastState.taxState`, Reset-Erkennung für Guardrail-Historie |
 | **Event-Binding und Workflows** | `balance-binder.js`, `balance-binder-annual.js`, `balance-binder-imports.js`, `balance-binder-snapshots.js`, `balance-binder-diagnosis.js` | Event-Hub, Tabs, Keyboard-Shortcuts, Import/Export, Snapshot-Aktionen, Diagnose-Kopie, Jahresabschluss und Jahresupdate |
 | **Jahresupdate und Live-Daten** | `balance-annual-inflation.js`, `balance-annual-marketdata.js`, `balance-annual-modal.js`, `balance-annual-orchestrator.js` | Inflation, ETF-/CAPE-Abruf, Marktdaten-Nachrücken, ATH-Aktualisierung, Ergebnis-/Fehlerprotokoll |
 | **Rendering** | `balance-renderer.js`, `balance-renderer-summary.js`, `balance-renderer-action.js`, `balance-renderer-diagnosis.js` | Summary, Marktstatus, Liquiditätsbalken, Handlungsempfehlungen, Steuer-/Cash-Aufschlüsselung, Diagnose-Container |
@@ -534,7 +538,7 @@ Der Detailkatalog in `docs/reference/BALANCE_MODULES_README.md` ergänzt diese B
 |-------|-----------------|---------------------|
 | `balance-main.js` | Einstiegspunkt der Balance-App | Initialisiert DOM-Referenzen, Storage, Reader, Renderer, Binder und Profilverbund; prüft `EngineAPI.getVersion()` gegen `REQUIRED_ENGINE_API_VERSION_PREFIX`; stellt `update()` und `debouncedUpdate()` bereit |
 | `balance-reader.js` | Input-Grenze zwischen DOM und Modell | Normalisiert Währungen, Prozentwerte, Checkboxen und abhängige Panels; liefert ein Engine-kompatibles Inputobjekt; übernimmt gespeicherte Inputs wieder ins Formular |
-| `balance-storage.js` | Persistenzgrenze der Jahresplanung | Lädt/speichert Eingaben und `lastState`; migriert ältere lokale Daten; verwaltet Snapshots; erhält `taxState.lossCarry`, damit Verlustvorträge nicht durch Guardrail-Resets verschwinden |
+| `balance-storage.js` | Persistenzgrenze der Jahresplanung | Lädt/speichert Eingaben und `lastState` über die PersistenceFacade; migriert ältere lokale Daten; verwaltet das interne Snapshot-Archiv; erhält `taxState.lossCarry`, damit Verlustvorträge nicht durch Guardrail-Resets verschwinden |
 | `balance-update-pipeline.js` | Fachliche UI-Pipeline nach dem Engine-Call | Formt Engine-Ergebnisse in Render-, Diagnose-, Budget- und Persistenzpayloads um; entscheidet, welche Teile persistiert und welche nur angezeigt werden |
 | `balance-action-postprocessor.js` | Nachbearbeitung der Handlungsempfehlung | Merged Profilverbund-Actions und ergänzt Single-3-Bucket-Postprocessing, ohne die Engine-Entscheidung selbst zu ersetzen |
 | `balance-binder.js` | Event-Hub | Bindet Formularänderungen, Tabs, Reset, Jahresabschluss, Import/Export, Snapshot-Aktionen, Diagnose-Kopie und Jahresupdate-Handler |
@@ -611,15 +615,26 @@ Für Nutzer ist damit nachvollziehbar, ob die App wegen Liquidität, Marktregime
 
 | Speicherbereich | Modul(e) | Inhalt |
 |-----------------|----------|--------|
-| **Balance-State** | `balance-storage.js` | Eingaben, `lastState`, Snapshots, Migrationen, File-System-Handles |
-| **Profil-State** | `app/profile/profile-storage.js`, `profile-key-policy.js`, `profile-live-storage.js`, `profile-bundle-io.js` | Profilregistry, aktive Profile, profilbezogene localStorage-Isolation, Bundle-Import/-Export |
+| **Live-State** | `balance-storage.js`, `app/shared/persistence-facade.js`, Adapter unter `app/shared/persistence-adapter-*.js` | Eingaben, `lastState`, Profil-/Simulator-/Tranchen-Records und Metadata im aktiven Backend |
+| **Snapshot-Archiv** | `app/shared/snapshot-archive.js`, `balance-binder-snapshots.js`, Adapter-Snapshot-Methoden | Jahresabschluss- und manuelle Snapshots im kanonischen Format `persistence-records-v1`, getrennt von Live-Daten |
+| **Profil-State** | `app/profile/profile-storage.js`, `profile-key-policy.js`, `profile-live-storage.js`, `profile-bundle-io.js` | Profilregistry, aktive Profile, profilbezogene Live-Daten-Isolation, Bundle-Import/-Export |
 | **Ausgaben-State** | `balance-expenses-storage.js` | Jahres-/Monatscontainer je Profil unter `balance_expenses_v1` |
 | **Tranchen-State** | `app/tranches/*`, Profilbundle | Depot-Tranchen, Kurs-/Statusdaten, Profilherkunft bei Multi-Profil-Setups |
-| **Import/Export/Snapshots** | `balance-binder-imports.js`, `balance-binder-snapshots.js` | JSON-Import/-Export, Snapshot-Erstellung/-Restore, CSV-Importpfade |
+| **Import/Export** | `balance-binder-imports.js`, `app/shared/persistence-backup.js`, `profile-bundle-io.js` | Komplettbackup/-import, Profilbundle, CSV-Importpfade |
 
 Für CSV-Ausgabenimporte liegt Parsing in `balance-expenses-csv.js`, Kennzahlenberechnung in `balance-expenses-metrics.js` und DOM-Ausgabe in `balance-expenses-renderer.js`.
 
-Snapshot und Profilpersistenz sind unterschiedliche Ebenen. Snapshots sichern den aktuellen Arbeitsstand der Balance-App für Backup/Restore. Profile isolieren dagegen wiederkehrende Haushalts- oder Personenstände. In Multi-Profil-Setups dürfen diese Ebenen nicht vermischt werden: ein Profilwechsel soll profilbezogene Eingaben laden, ein Snapshot soll einen konkreten Arbeitsstand wiederherstellen.
+Die Persistenzschicht ist in drei Ebenen getrennt:
+
+1. **Live-Persistenz:** `PersistenceFacade` hält einen synchron lesbaren In-Memory-Cache und schreibt asynchron über den aktiven Adapter. Browser nutzt IndexedDB `ruhestand-suite` Version 2 mit Store `kv`; Tauri nutzt `ruhestand_suite_data.json`.
+2. **Snapshot-Archiv:** `SnapshotArchive` baut und validiert kanonische Snapshots. Browser speichert sie im IndexedDB-Store `snapshots`; Tauri speichert sie in `ruhestand_suite_snapshots.json`; der localStorage-Fallback nutzt `rs_snapshot_archive_v1`. `listSnapshots()` liefert nur Indexdaten ohne `records`.
+3. **Komplettbackup/Profilbundle:** Export/Import ist der Austausch- und Recovery-Pfad zwischen Browser und Tauri. Er liest aus der Live-Persistenz, nicht aus alten Snapshot-Keys.
+
+Der Jahresabschluss erzeugt den Snapshot vor Inflation, Altersfortschreibung und Ausgabenjahr-Rollover. Schlaegt der Pre-Flush oder die Snapshot-Erstellung fehl, wird der Jahresabschluss ohne Mutation abgebrochen. Schlaegt erst der Post-Mutation-Flush fehl, bleibt der Pre-Mutation-Snapshot als Recovery-Punkt erhalten und der Fehler wird gemeldet.
+
+Standard-Restore ist bewusst begrenzt. Er schreibt nur erlaubte Live-Records zurueck, erhaelt die Snapshot-Historie, bewahrt die Profil-Registry, setzt `rs_current_profile`/`rs_active_profile` auf das Snapshot-Profil und bricht ab, wenn `snapshot.activeProfileId` in der aktuellen Registry nicht mehr existiert. Er ist kein Profil-Merge und kein Austauschformat zwischen Geraeten.
+
+Legacy-Snapshots mit Prefix `ruhestandsmodell_snapshot_` werden erkannt und in das kanonische Archiv migriert, sofern sie gueltig und standard-restore-faehig sind. Archivdaten duerfen nicht in neue Live-Snapshots eingebettet werden und gehoeren weder in `ruhestand_suite_data.json` noch in normale Komplettbackup-Records.
 
 ### B.2.5 Jahresupdate und Live-Daten
 
@@ -994,7 +1009,7 @@ Balance und Simulator nutzen die gleiche Erkennung für Bond-Tranchen. Der Simul
 
 ## B.5 Test-Suite und Validierungsregeln
 
-**Übersicht:** Die Test-Suite umfasst in der geprüften Arbeitskopie **76 `*.test.mjs`-Dateien**. Der Lauf vom 2026-05-23 ergab **1748 Assertions**, alle erfolgreich. Die Tests laufen ohne Jest/Mocha über native Node.js-ESM-Module und eigene globale Assertions (`assert`, `assertEqual`, `assertClose`).
+**Übersicht:** Die Test-Suite umfasst in der geprüften Arbeitskopie **79 `*.test.mjs`-Dateien**. Der Lauf vom 2026-06-04 ergab **2134 Assertions**, alle erfolgreich. Die Tests laufen ohne Jest/Mocha über native Node.js-ESM-Module und eigene globale Assertions (`assert`, `assertEqual`, `assertClose`).
 
 ### B.5.1 Test-Inventar
 
@@ -2854,7 +2869,7 @@ Der Pflegebucket verbindet mehrere Forschungs- und Praxislinien, ohne selbst ein
 | `balance-main.js` | ~500 | Orchestrierung, Update-Zyklus |
 | `balance-reader.js` | ~300 | DOM-Input-Lesung |
 | `balance-health-bucket.js` | ~120 | Pflegebucket-Diagnose, freie vs. gesperrte Liquidität, diagnostic-only Policy |
-| `balance-storage.js` | ~400 | localStorage, Snapshots |
+| `balance-storage.js` | ~400 | PersistenceFacade-Anbindung, Snapshot-Archiv, Legacy-Migration |
 | `balance-expenses.js` | **646** | Ausgaben-Check mit CSV-Import, Budget-Tracking |
 | `balance-guardrail-reset.js` | ~70 | Auto-Reset bei kritischen Änderungen |
 | `balance-annual-*.js` (4) | ~400 | Jahresabschluss, Inflation, Marktdaten |

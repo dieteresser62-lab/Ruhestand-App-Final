@@ -21,6 +21,7 @@ import {
     openEditTrancheModal,
     readTrancheFromForm
 } from './tranchen-manager-modal.js';
+import { PersistenceFacade } from '../shared/persistence-facade.js';
 
 const state = {
     tranchen: [],
@@ -38,6 +39,7 @@ function syncGlobalState() {
 function persistTranchen() {
     saveTranchesToStorage(state.tranchen);
     saveCurrentProfileFromLocalStorage();
+    PersistenceFacade.flush().catch(err => console.error('[TranchenManager] Persistenz-Flush fehlgeschlagen:', err));
     syncGlobalState();
 }
 
@@ -52,6 +54,7 @@ function updateActiveProfileLabel() {
 function saveProfileValues() {
     saveProfileAssetValues(readProfileAssetValuesFromDom());
     saveCurrentProfileFromLocalStorage();
+    PersistenceFacade.flush().catch(err => console.error('[TranchenManager] Profilwerte-Flush fehlgeschlagen:', err));
 }
 
 function render() {

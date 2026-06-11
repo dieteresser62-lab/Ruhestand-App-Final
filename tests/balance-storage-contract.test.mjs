@@ -2,6 +2,8 @@ import { CONFIG, StorageError } from '../app/balance/balance-config.js';
 import { StorageManager } from '../app/balance/balance-storage.js';
 import { createLocalStorageAdapter } from '../app/shared/persistence-adapter-localstorage.js';
 import { resetPersistenceForTests } from '../app/shared/persistence-facade.js';
+import { SnapshotArchive, SNAPSHOT_TYPE } from '../app/shared/snapshot-archive.js';
+import { PROFILE_STORAGE_KEYS } from '../app/profile/profile-state.js';
 
 console.log('--- Balance Storage Contract Tests ---');
 
@@ -33,15 +35,6 @@ class MockLocalStorage {
     get length() {
         return this.store.size;
     }
-}
-
-function snapshotKeys(storage, prefix = CONFIG.STORAGE.SNAPSHOT_PREFIX) {
-    const keys = [];
-    for (let i = 0; i < storage.length; i += 1) {
-        const key = storage.key(i);
-        if (key?.startsWith(prefix)) keys.push(key);
-    }
-    return keys;
 }
 
 function installMockLocalStorage() {
@@ -122,56 +115,76 @@ try {
         assert(thrown instanceof StorageError, 'Ungueltiges JSON wirft den echten StorageError');
     }
 
-    console.log('Test 5: snapshot restore filters non-app keys and keeps snapshot source');
+    console.log('Test 5: snapshot restore uses archive and keeps unrelated keys plus snapshot history');
     {
         let reloadCount = 0;
         installMockLocalStorage();
         global.location = { reload: () => { reloadCount += 1; } };
 
-        const snapshotKey = `${CONFIG.STORAGE.SNAPSHOT_PREFIX}2026-05-12T10:00:00.000Z--Contract`;
-        const snapshotPayload = {
-            snapshotType: 'full-localstorage',
+        localStorage.setItem(PROFILE_STORAGE_KEYS.current, 'default');
+        localStorage.setItem(PROFILE_STORAGE_KEYS.active, 'default');
+        localStorage.setItem(PROFILE_STORAGE_KEYS.registry, JSON.stringify({
+            version: 1,
+            currentProfileId: 'default',
+            profiles: {
+                default: { meta: { name: 'Default' }, data: {} },
+                other: { meta: { name: 'Other' }, data: { profile_tagesgeld: '999' } }
+            }
+        }));
+        const snapshot = await SnapshotArchive.createSnapshot({
+            id: 'contract-restore',
+            label: 'Contract',
+            kind: 'manual',
             createdAt: '2026-05-12T10:00:00.000Z',
-            localStorage: {
+            activeProfileId: 'default',
+            activeProfileName: 'Default',
+            records: {
                 [CONFIG.STORAGE.LS_KEY]: JSON.stringify({ inputs: { floorBedarf: 30000 } }),
+                [PROFILE_STORAGE_KEYS.current]: 'default',
+                [PROFILE_STORAGE_KEYS.active]: 'default',
+                [PROFILE_STORAGE_KEYS.registry]: JSON.stringify({ profiles: { default: { data: { profile_tagesgeld: 'snapshot-registry-must-not-win' } } } }),
                 depot_tranchen: JSON.stringify([{ id: 't1', wert: 1000 }]),
                 profile_tagesgeld: '50000',
-                balance_expenses_2026: JSON.stringify({ activeYear: 2026 }),
-                unrelated_private_export: 'must-not-restore'
+                balance_expenses_2026: JSON.stringify({ activeYear: 2026 })
             }
-        };
+        });
 
-        localStorage.setItem(snapshotKey, JSON.stringify(snapshotPayload));
         localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify({ inputs: { floorBedarf: 1 } }));
         localStorage.setItem('unrelated_private_export', 'old');
 
-        await StorageManager.restoreSnapshot(snapshotKey, null);
+        await StorageManager.restoreSnapshot(snapshot.id, null);
 
         assertEqual(JSON.parse(localStorage.getItem(CONFIG.STORAGE.LS_KEY)).inputs.floorBedarf, 30000, 'Restore ersetzt den Balance-State');
         assertEqual(JSON.parse(localStorage.getItem('depot_tranchen'))[0].id, 't1', 'Restore stellt Tranchen wieder her');
         assertEqual(localStorage.getItem('profile_tagesgeld'), '50000', 'Restore stellt Profilwerte wieder her');
         assert(localStorage.getItem('balance_expenses_2026'), 'Restore stellt Ausgaben-Check-Daten wieder her');
-        assertEqual(localStorage.getItem('unrelated_private_export'), null, 'Restore verwirft nicht erlaubte Keys');
-        assert(localStorage.getItem(snapshotKey), 'Restore behaelt den verwendeten Snapshot im Browser-Storage');
+        assertEqual(localStorage.getItem('unrelated_private_export'), 'old', 'Restore laesst nicht erlaubte fremde Keys unveraendert');
+        assert(await SnapshotArchive.readSnapshot(snapshot.id), 'Restore behaelt den verwendeten Snapshot im Archiv');
+        const registry = JSON.parse(localStorage.getItem(PROFILE_STORAGE_KEYS.registry));
+        assert(registry.profiles.other, 'Restore erhaelt andere Profile in der aktuellen Registry');
+        assertEqual(registry.profiles.default.data.profile_tagesgeld, '50000', 'Restore aktualisiert nur die Daten des Snapshot-Profils');
         assertEqual(reloadCount, 1, 'Restore triggert genau einen Reload');
     }
 
-    console.log('Test 6: real createSnapshot stores full localStorage payload with sanitized label');
+    console.log('Test 6: real createSnapshot stores canonical archive snapshot');
     {
         installMockLocalStorage();
         localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify({ inputs: { floorBedarf: 24000 } }));
         localStorage.setItem('depot_tranchen', JSON.stringify([{ id: 't2' }]));
+        localStorage.setItem(PROFILE_STORAGE_KEYS.current, 'default');
+        localStorage.setItem(PROFILE_STORAGE_KEYS.active, 'default');
 
         await StorageManager.createSnapshot(null, 'Profil:/2026?');
 
-        const keys = snapshotKeys(localStorage);
-        assertEqual(keys.length, 1, 'createSnapshot legt genau einen Snapshot-Key an');
-        assert(keys[0].includes('--Profil__2026_'), 'Snapshot-Label wird fuer localStorage-Key bereinigt');
+        const snapshots = await SnapshotArchive.listSnapshots();
+        assertEqual(snapshots.length, 1, 'createSnapshot legt genau einen Archiv-Snapshot an');
+        assertEqual(snapshots[0].records, undefined, 'Snapshot-Index enthaelt keinen Vollpayload');
+        assertEqual(snapshots[0].label, 'Profil:/2026?', 'Snapshot-Label bleibt als Metadatum erhalten');
 
-        const payload = JSON.parse(localStorage.getItem(keys[0]));
-        assertEqual(payload.snapshotType, 'full-localstorage', 'Snapshot nutzt full-localstorage Format');
-        assert(payload.localStorage[CONFIG.STORAGE.LS_KEY], 'Snapshot enthaelt Balance-State');
-        assert(payload.localStorage.depot_tranchen, 'Snapshot enthaelt Tranchen');
+        const payload = await SnapshotArchive.readSnapshot(snapshots[0].id);
+        assertEqual(payload.snapshotType, SNAPSHOT_TYPE, 'Snapshot nutzt kanonisches Format');
+        assert(payload.records[CONFIG.STORAGE.LS_KEY], 'Snapshot enthaelt Balance-State');
+        assert(payload.records.depot_tranchen, 'Snapshot enthaelt Tranchen');
     }
 
     console.log('Balance storage contract tests passed');

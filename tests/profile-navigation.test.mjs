@@ -2,6 +2,7 @@
 
 import {
     bindProfileNavigationHandoff,
+    installProfileBfcacheRefresh,
     installProfilePersistenceHooks,
     shouldHandleProfileHandoff
 } from '../app/profile/profile-navigation.js';
@@ -46,6 +47,7 @@ console.log('✓ shouldHandleProfileHandoff OK');
 console.log('Test 2: bindProfileNavigationHandoff exports on eligible link clicks');
 {
     let exportCount = 0;
+    let flushCount = 0;
     const eligible = createLink({ attrs: { 'data-profile-handoff': '' } });
     const ignored = createLink();
     const root = {
@@ -59,6 +61,10 @@ console.log('Test 2: bindProfileNavigationHandoff exports on eligible link click
         exporter: () => {
             exportCount += 1;
             return true;
+        },
+        flusher: () => {
+            flushCount += 1;
+            return true;
         }
     });
 
@@ -66,11 +72,16 @@ console.log('Test 2: bindProfileNavigationHandoff exports on eligible link click
     eligible.click();
     ignored.click();
     assertEqual(exportCount, 1, 'Only eligible link click should trigger export');
+    assertEqual(flushCount, 1, 'Eligible link click should trigger persistence flush');
 
     const rebound = bindProfileNavigationHandoff({
         root,
         exporter: () => {
             exportCount += 1;
+            return true;
+        },
+        flusher: () => {
+            flushCount += 1;
             return true;
         }
     });
@@ -81,6 +92,7 @@ console.log('✓ bindProfileNavigationHandoff OK');
 console.log('Test 3: installProfilePersistenceHooks only installs once');
 {
     let saveCount = 0;
+    let flushCount = 0;
     const winListeners = new Map();
     const docListeners = new Map();
     const win = {
@@ -102,6 +114,10 @@ console.log('Test 3: installProfilePersistenceHooks only installs once');
         saver: () => {
             saveCount += 1;
             return true;
+        },
+        flusher: () => {
+            flushCount += 1;
+            return true;
         }
     });
     const second = installProfilePersistenceHooks({
@@ -109,6 +125,10 @@ console.log('Test 3: installProfilePersistenceHooks only installs once');
         doc,
         saver: () => {
             saveCount += 1;
+            return true;
+        },
+        flusher: () => {
+            flushCount += 1;
             return true;
         }
     });
@@ -120,7 +140,43 @@ console.log('Test 3: installProfilePersistenceHooks only installs once');
     doc.visibilityState = 'hidden';
     docListeners.get('visibilitychange')();
     assertEqual(saveCount, 2, 'Both persistence hooks should call saver');
+    assertEqual(flushCount, 2, 'Both persistence hooks should flush persistence');
 }
 console.log('✓ installProfilePersistenceHooks OK');
+
+console.log('Test 4: installProfileBfcacheRefresh reloads stale browser cache');
+{
+    let reloadCount = 0;
+    const winListeners = new Map();
+    const win = {
+        __rsProfileBfcacheRefreshInstalled: false,
+        addEventListener(type, handler) {
+            winListeners.set(type, handler);
+        }
+    };
+
+    const first = installProfileBfcacheRefresh({
+        win,
+        reload: () => {
+            reloadCount += 1;
+        }
+    });
+    const second = installProfileBfcacheRefresh({
+        win,
+        reload: () => {
+            reloadCount += 1;
+        }
+    });
+
+    assertEqual(first, true, 'First BFCache hook install should register listener');
+    assertEqual(second, false, 'Second BFCache hook install should be ignored');
+
+    winListeners.get('pageshow')({ persisted: false });
+    assertEqual(reloadCount, 0, 'Normal pageshow should not reload');
+
+    winListeners.get('pageshow')({ persisted: true });
+    assertEqual(reloadCount, 1, 'BFCache restore should reload page');
+}
+console.log('✓ installProfileBfcacheRefresh OK');
 
 console.log('✅ Profile navigation lifecycle validated');

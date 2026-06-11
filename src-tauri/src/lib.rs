@@ -1,6 +1,7 @@
 #![cfg_attr(mobile, tauri::mobile_entry_point)]
 
 use log::LevelFilter;
+use serde::Deserialize;
 use serde_json::json;
 use std::collections::HashMap;
 use std::fs;
@@ -12,21 +13,44 @@ use tauri::{Emitter, Manager};
 use tiny_http::{Header, Method, Response, Server, StatusCode};
 
 const APP_STATE_FILENAME: &str = "ruhestand_suite_data.json";
+const SNAPSHOT_STATE_FILENAME: &str = "ruhestand_suite_snapshots.json";
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+enum StateTarget {
+  Live,
+  Snapshots,
+}
 
 struct CloseState {
   allow_close: Mutex<bool>,
   close_pending: Mutex<bool>,
 }
 
-fn app_state_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+fn state_filename(target: Option<StateTarget>) -> &'static str {
+  match target.unwrap_or(StateTarget::Live) {
+    StateTarget::Live => APP_STATE_FILENAME,
+    StateTarget::Snapshots => SNAPSHOT_STATE_FILENAME,
+  }
+}
+
+fn corrupt_state_filename(target: Option<StateTarget>, timestamp: u64) -> String {
+  let stem = match target.unwrap_or(StateTarget::Live) {
+    StateTarget::Live => "ruhestand_suite_data",
+    StateTarget::Snapshots => "ruhestand_suite_snapshots",
+  };
+  format!("{}.corrupt.{}.json", stem, timestamp)
+}
+
+fn app_state_path(app: &tauri::AppHandle, target: Option<StateTarget>) -> Result<PathBuf, String> {
   let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
   fs::create_dir_all(&app_dir).map_err(|e| e.to_string())?;
-  Ok(app_dir.join(APP_STATE_FILENAME))
+  Ok(app_dir.join(state_filename(target)))
 }
 
 #[tauri::command]
-fn load_app_state(app: tauri::AppHandle) -> Result<String, String> {
-  let file_path = app_state_path(&app)?;
+fn load_app_state(app: tauri::AppHandle, target: Option<StateTarget>) -> Result<String, String> {
+  let file_path = app_state_path(&app, target)?;
   if !file_path.exists() {
     return Ok(String::new());
   }
@@ -34,8 +58,8 @@ fn load_app_state(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-fn save_app_state(app: tauri::AppHandle, content: String) -> Result<(), String> {
-  let file_path = app_state_path(&app)?;
+fn save_app_state(app: tauri::AppHandle, content: String, target: Option<StateTarget>) -> Result<(), String> {
+  let file_path = app_state_path(&app, target)?;
   let tmp_path = file_path.with_extension("json.tmp");
   let bak_path = file_path.with_extension("json.bak");
 
@@ -55,8 +79,8 @@ fn save_app_state(app: tauri::AppHandle, content: String) -> Result<(), String> 
 }
 
 #[tauri::command]
-fn quarantine_app_state(app: tauri::AppHandle) -> Result<String, String> {
-  let file_path = app_state_path(&app)?;
+fn quarantine_app_state(app: tauri::AppHandle, target: Option<StateTarget>) -> Result<String, String> {
+  let file_path = app_state_path(&app, target)?;
   if !file_path.exists() {
     return Ok(String::new());
   }
@@ -64,10 +88,7 @@ fn quarantine_app_state(app: tauri::AppHandle) -> Result<String, String> {
     .duration_since(UNIX_EPOCH)
     .map_err(|e| e.to_string())?
     .as_secs();
-  let quarantine_path = file_path.with_file_name(format!(
-    "ruhestand_suite_data.corrupt.{}.json",
-    timestamp
-  ));
+  let quarantine_path = file_path.with_file_name(corrupt_state_filename(target, timestamp));
   fs::rename(&file_path, &quarantine_path).map_err(|e| e.to_string())?;
   Ok(quarantine_path.to_string_lossy().to_string())
 }
@@ -467,5 +488,24 @@ mod tests {
     assert_eq!(normalize_gbp_price("VWRL.L", &gbp_data, 1000.0), 10.0);
     assert_eq!(normalize_gbp_price("VWRL.L", &eur_data, 1000.0), 1000.0);
     assert_eq!(normalize_gbp_price("VWCE.DE", &gbp_data, 1000.0), 1000.0);
+  }
+
+  #[test]
+  fn state_target_defaults_to_live_file_and_supports_snapshot_file() {
+    assert_eq!(state_filename(None), "ruhestand_suite_data.json");
+    assert_eq!(state_filename(Some(StateTarget::Live)), "ruhestand_suite_data.json");
+    assert_eq!(state_filename(Some(StateTarget::Snapshots)), "ruhestand_suite_snapshots.json");
+  }
+
+  #[test]
+  fn corrupt_state_filename_uses_target_specific_stem() {
+    assert_eq!(
+      corrupt_state_filename(None, 123),
+      "ruhestand_suite_data.corrupt.123.json"
+    );
+    assert_eq!(
+      corrupt_state_filename(Some(StateTarget::Snapshots), 123),
+      "ruhestand_suite_snapshots.corrupt.123.json"
+    );
   }
 }

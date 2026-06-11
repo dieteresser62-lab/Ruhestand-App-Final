@@ -243,6 +243,12 @@ objectStore: metadata
   record:
     key: string
     value: any
+
+objectStore: snapshots
+  keyPath: key
+  record:
+    key: string
+    value: canonical snapshot payload
 ```
 
 Warum zunaechst `kv` statt fachlicher Stores:
@@ -252,6 +258,14 @@ Warum zunaechst `kv` statt fachlicher Stores:
 - Profil-Key-Policy kann weiter genutzt werden
 - Export/Import bleibt trivial
 - spaetere Normalisierung bleibt moeglich
+
+Stand nach Jahresabschluss-Snapshot-Slice:
+
+- Browser-IndexedDB nutzt `ruhestand-suite` Version 2.
+- Live-Daten bleiben im Store `kv`.
+- Jahresabschluss-Snapshots liegen im separaten Store `snapshots`.
+- `listSnapshots()` liefert nur Indexdaten ohne `records`; Vollpayloads werden per `readSnapshot(id)` gelesen.
+- Legacy-Snapshot-Keys werden aus Live-Daten migriert bzw. herausgefiltert, damit `ruhestand_suite_data.json` und Komplettbackup keine Snapshot-Archivdaten aufnehmen.
 
 Spaetere Ausbaustufe:
 
@@ -273,6 +287,7 @@ Vorgeschlagene Datei:
 
 ```text
 <AppData>/RuhestandSuite/ruhestand_suite_data.json
+<AppData>/RuhestandSuite/ruhestand_suite_snapshots.json
 ```
 
 Vorgeschlagenes Format:
@@ -308,6 +323,13 @@ Schreibstrategie:
 - Vor kritischen Aktionen wird `flush()` ausgefuehrt.
 
 SQLite bleibt eine spaetere Option, wenn echte fachliche Tabellen, Abfragen, Indizes oder Sync-Konfliktlogik benoetigt werden.
+
+Aktueller Stand nach Jahresabschluss-Snapshot-Slice:
+
+- `ruhestand_suite_data.json` bleibt das Live-KV-Bundle.
+- `ruhestand_suite_snapshots.json` ist das separate Snapshot-Archiv und wird ueber das Tauri-Target `snapshots` geladen/gespeichert.
+- Legacy-Keys mit Snapshot-Prefix werden aus der Live-Datei in das Archiv migriert; bei erfolgreicher Archivschreibung verschwinden sie aus dem Live-State.
+- Standard-Restore ersetzt Live-Records ueber `replaceLiveRecords()` und bewahrt Snapshot-Historie sowie Profil-Registry. Rollback ist adapterseitig fuer Live-Daten all-or-nothing bzw. cache-rollbackfaehig; bereits angelegte Jahresabschluss-Snapshots bleiben als Recovery-Punkt bestehen.
 
 ### Tauri-Zugriff ueber Custom Rust Commands
 

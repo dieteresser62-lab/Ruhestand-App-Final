@@ -399,11 +399,22 @@
                     </details>
 
                     <details id="snapshot-management" class="details-card" style="margin-top: 25px;">
-                        <summary>Jahresabschluss-Snapshots</summary>
+                        <summary>Archiv & Datenaustausch</summary>
                         <div style="padding: 10px 0 5px 0;">
-                            <button type="button" class="btn btn-sm" id="connectFolderBtn" style="width: 100%;">Lokalen
-                                Snapshot-Ordner verbinden</button>
-                            <div id="snapshotStatus" class="snapshot-status">Speicherort: Browser (localStorage)</div>
+                            <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px;">
+                                <button type="button" class="btn btn-utility btn-sm" id="exportBtn"
+                                    title="Aktuellen Balance-Zustand als JSON-Datei exportieren">Export</button>
+                                <button type="button" class="btn btn-utility btn-sm" id="importBtn"
+                                    title="Balance-Zustand aus JSON-Datei importieren">Import</button>
+                                <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+                            </div>
+                            <details style="margin-bottom: 8px;">
+                                <summary>Erweitert</summary>
+                                <button type="button" class="btn btn-sm" id="connectFolderBtn"
+                                    style="width: 100%; margin-top: 6px;">Lokalen Snapshot-Ordner verbinden</button>
+                            </details>
+                            <div id="snapshotStatus" class="snapshot-status">Internes Snapshot-Archiv: Browser-Fallback
+                                (localStorage)</div>
                         </div>
                         <ul id="snapshotList"
                             style="list-style: none; padding: 10px 0 0 0; margin: 0; font-size: 0.9rem;">

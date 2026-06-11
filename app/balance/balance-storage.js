@@ -14,12 +14,110 @@
  */
 
 import { CONFIG, StorageError } from './balance-config.js';
-import { persistenceStorage } from '../shared/persistence-facade.js';
+import { PersistenceFacade, persistenceStorage } from '../shared/persistence-facade.js';
+import { SnapshotArchive, SNAPSHOT_KINDS } from '../shared/snapshot-archive.js';
+import { isAllowedSnapshotRestoreLiveKey } from '../shared/persistence-key-policy.js';
+import { PROFILE_STORAGE_KEYS } from '../profile/profile-state.js';
+import { isProfileScopedKey } from '../profile/profile-key-policy.js';
+import { saveCurrentProfileFromLocalStorage } from '../profile/profile-storage.js';
 
 // Module-level references to be injected
 let dom = null;
 let appState = null;
 let UIRenderer = null;
+
+function parseJsonObject(raw, fallback = null) {
+    if (!raw) return fallback;
+    try {
+        const parsed = JSON.parse(String(raw));
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : fallback;
+    } catch {
+        return fallback;
+    }
+}
+
+function registryHasProfile(registry, profileId) {
+    if (!profileId || !registry || typeof registry !== 'object') return false;
+    return Boolean(registry.profiles?.[profileId]);
+}
+
+function getProfileNameFromRegistry(registry, profileId) {
+    return String(registry?.profiles?.[profileId]?.meta?.name || '');
+}
+
+function getPersistenceKeys() {
+    return Array.from({ length: persistenceStorage.length }, (_, i) => persistenceStorage.key(i)).filter(Boolean);
+}
+
+function getSnapshotStatusText() {
+    const backend = PersistenceFacade.getPersistenceStatus().backend;
+    if (backend === 'Tauri JSON File') return 'Internes Snapshot-Archiv: App-Speicher (separates snapshots-Target)';
+    if (backend === 'IndexedDB') return 'Internes Snapshot-Archiv: Browser-Speicher (IndexedDB Store snapshots)';
+    return 'Internes Snapshot-Archiv: Browser-Fallback (localStorage, begrenzte Ablage)';
+}
+
+function formatSnapshotName(entry) {
+    const createdAt = new Date(entry.createdAt);
+    const dateText = Number.isFinite(createdAt.getTime())
+        ? createdAt.toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
+        : String(entry.createdAt || entry.id);
+    const label = entry.label || entry.activeProfileName || '';
+    return label ? `${dateText} (${label})` : dateText;
+}
+
+function buildRestoredProfileData(records) {
+    const data = {};
+    Object.entries(records || {}).forEach(([key, value]) => {
+        if (key === PROFILE_STORAGE_KEYS.registry || key === PROFILE_STORAGE_KEYS.current || key === PROFILE_STORAGE_KEYS.active) return;
+        if (!isProfileScopedKey(key)) return;
+        if (value === null || value === undefined) return;
+        data[key] = String(value);
+    });
+    return data;
+}
+
+function buildStandardRestorePlan(snapshot, currentRegistry) {
+    const snapshotActiveProfileId = String(snapshot.activeProfileId || '');
+    if (!registryHasProfile(currentRegistry, snapshotActiveProfileId)) {
+        throw new StorageError(`Das Snapshot-Profil "${snapshotActiveProfileId || 'unbekannt'}" existiert in der aktuellen Profil-Registry nicht mehr.`);
+    }
+
+    const registry = JSON.parse(JSON.stringify(currentRegistry));
+    registry.profiles[snapshotActiveProfileId] = {
+        ...registry.profiles[snapshotActiveProfileId],
+        data: buildRestoredProfileData(snapshot.records)
+    };
+
+    const restoreOptions = {
+        mode: 'standard',
+        snapshotActiveProfileId,
+        currentRegistry
+    };
+    const allowKey = (key) => {
+        if (key === PROFILE_STORAGE_KEYS.registry) return true;
+        return isAllowedSnapshotRestoreLiveKey(key, restoreOptions);
+    };
+    const snapshotKeys = new Set(Object.keys(snapshot.records || {}));
+    const protectedKeys = new Set([
+        PROFILE_STORAGE_KEYS.registry,
+        PROFILE_STORAGE_KEYS.current,
+        PROFILE_STORAGE_KEYS.active
+    ]);
+    const deleteKeys = getPersistenceKeys()
+        .filter(key => !snapshotKeys.has(key))
+        .filter(key => !protectedKeys.has(key))
+        .filter(key => isAllowedSnapshotRestoreLiveKey(key, restoreOptions));
+    const upserts = Object.entries(snapshot.records || {})
+        .filter(([key]) => key !== PROFILE_STORAGE_KEYS.registry)
+        .filter(([key]) => isAllowedSnapshotRestoreLiveKey(key, restoreOptions))
+        .map(([key, value]) => [key, String(value)]);
+
+    upserts.push([PROFILE_STORAGE_KEYS.current, snapshotActiveProfileId]);
+    upserts.push([PROFILE_STORAGE_KEYS.active, snapshotActiveProfileId]);
+    upserts.push([PROFILE_STORAGE_KEYS.registry, JSON.stringify(registry)]);
+
+    return { deleteKeys, upserts, allowKey };
+}
 
 /**
  * Initialisiert den StorageManager mit den notwendigen Abhängigkeiten
@@ -166,7 +264,7 @@ export const StorageManager = {
     async initSnapshots() {
         if (!('showDirectoryPicker' in window)) {
             dom.controls.connectFolderBtn.style.display = 'none';
-            dom.controls.snapshotStatus.textContent = "Speicherort: Browser (File System API nicht unterstützt)";
+            dom.controls.snapshotStatus.textContent = getSnapshotStatusText();
             return;
         }
         try {
@@ -178,11 +276,7 @@ export const StorageManager = {
     },
 
     /**
-     * Rendert die Liste verfügbarer Snapshots im UI
-     *
-     * Lädt Snapshots entweder aus dem verbundenen File-System-Ordner
-     * (falls handle vorhanden) oder aus localStorage. Erstellt für
-     * jeden Snapshot Wiederherstellen- und Löschen-Buttons.
+     * Rendert die Liste verfügbarer Snapshots aus dem internen Snapshot-Archiv.
      *
      * @async
      * @param {HTMLElement} listEl - DOM-Element für die Snapshot-Liste
@@ -197,37 +291,8 @@ export const StorageManager = {
 
         let snapshots = [];
         try {
-            if (handle) {
-                statusEl.textContent = `Verbunden mit: ${handle.name}`;
-                for await (const entry of handle.values()) {
-                    if (entry.kind === 'file' && entry.name.endsWith('.json')) {
-                        snapshots.push({ key: entry.name, name: entry.name.replace('.json', '') });
-                    }
-                }
-            } else {
-                statusEl.textContent = 'Speicherort: Browser (localStorage)';
-                snapshots = Array.from({ length: persistenceStorage.length }, (_, i) => persistenceStorage.key(i))
-                    .filter(Boolean)
-                    .filter(key => key.startsWith(CONFIG.STORAGE.SNAPSHOT_PREFIX))
-                    .map(key => {
-                        const rawSuffix = key.replace(CONFIG.STORAGE.SNAPSHOT_PREFIX, '');
-                        // Check for separator indicating a label we added: '--'
-                        let dateStr = rawSuffix;
-                        let label = '';
-                        if (rawSuffix.includes('--')) {
-                            const parts = rawSuffix.split('--');
-                            dateStr = parts[0];
-                            label = parts.slice(1).join('--'); // Rejoin rest if there were multiple dashes
-                        }
-
-                        let displayName = new Date(dateStr)
-                            .toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' });
-                        if (displayName === 'Invalid Date') displayName = dateStr;
-                        if (label) displayName += ` (${label})`;
-
-                        return { key, name: displayName };
-                    });
-            }
+            statusEl.textContent = getSnapshotStatusText();
+            snapshots = await SnapshotArchive.listSnapshots();
         } catch (err) {
             liLoading.textContent = 'Fehler beim Laden der Snapshots.';
             return;
@@ -240,10 +305,18 @@ export const StorageManager = {
         }
 
         const fragment = document.createDocumentFragment();
-        snapshots.sort((a, b) => b.name.localeCompare(a.name)).forEach(({ key, name }) => {
+        snapshots.forEach(entry => {
+            const key = entry.id;
             const li = document.createElement('li');
             const nameSpan = document.createElement('span');
-            nameSpan.textContent = name;
+            nameSpan.textContent = formatSnapshotName(entry);
+            if (!entry.standardRestorable) {
+                const restoreHint = document.createElement('small');
+                restoreHint.textContent = 'Standard-Restore nur nach Profilzuordnung moeglich.';
+                restoreHint.style.display = 'block';
+                restoreHint.style.color = 'var(--muted-text)';
+                nameSpan.appendChild(restoreHint);
+            }
 
             const actionsSpan = document.createElement('span');
             actionsSpan.className = 'snapshot-actions';
@@ -269,11 +342,7 @@ export const StorageManager = {
     },
 
     /**
-     * Erstellt einen neuen Snapshot des aktuellen Zustands
-     *
-     * Speichert den kompletten Anwendungszustand entweder als JSON-Datei
-     * im verbundenen Verzeichnis (falls handle vorhanden) oder im localStorage.
-     * Der Dateiname enthält einen Zeitstempel im Format: Snapshot_YYYY-MM-DD_HH-MM-SS.json
+     * Erstellt einen neuen kanonischen Snapshot des aktuellen Zustands im internen Archiv.
      *
      * @async
      * @param {FileSystemDirectoryHandle|null} handle - Verzeichnis-Handle oder null
@@ -282,43 +351,23 @@ export const StorageManager = {
      * @throws {StorageError} Wenn keine Daten zum Sichern vorhanden sind
      */
     async createSnapshot(handle, label = '') {
-        const localSnapshot = {};
-        for (let i = 0; i < persistenceStorage.length; i++) {
-            const key = persistenceStorage.key(i);
-            if (!key) continue;
-            localSnapshot[key] = persistenceStorage.getItem(key);
-        }
-        if (Object.keys(localSnapshot).length === 0) {
+        saveCurrentProfileFromLocalStorage();
+        const records = SnapshotArchive.captureCurrentRecords({
+            keys: getPersistenceKeys,
+            getItem: key => persistenceStorage.getItem(key)
+        });
+        if (Object.keys(records).length === 0) {
             throw new StorageError("Keine Daten zum Sichern vorhanden.");
         }
-        const currentData = {
-            snapshotType: 'full-localstorage',
-            createdAt: new Date().toISOString(),
-            localStorage: localSnapshot
-        };
-        const timestamp = new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-');
-
-        // Sanitize label
-        const safeLabel = label ? label.replace(/[^a-zA-Z0-9_\- äöüÄÖÜß]/g, '_').trim() : '';
-
-        if (handle) {
-            // User Format: Profilname & Timestamp -> "Dieter_2025-..."
-            // Fallback: Snapshot_2025-...
-            const prefix = safeLabel ? safeLabel : 'Snapshot';
-            // Ensure separator is clear. If label ends with _, don't add another.
-            const fileName = `${prefix}_${timestamp}.json`;
-
-            const fileHandle = await handle.getFileHandle(fileName, { create: true });
-            const writable = await fileHandle.createWritable();
-            await writable.write(JSON.stringify(currentData, null, 2));
-            await writable.close();
-        } else {
-            // Use '--' as separator for LocalStorage keys to distinguish date from label
-            // We keep the chronological key structure for LS to maintain sorting
-            const labelPart = safeLabel ? `--${safeLabel}` : '';
-            const key = CONFIG.STORAGE.SNAPSHOT_PREFIX + new Date().toISOString() + labelPart;
-            persistenceStorage.setItem(key, JSON.stringify(currentData));
-        }
+        const activeProfileId = SnapshotArchive.getActiveProfileIdFromRecords(records);
+        const registry = parseJsonObject(records[PROFILE_STORAGE_KEYS.registry], null);
+        await SnapshotArchive.createSnapshot({
+            label,
+            kind: SNAPSHOT_KINDS.annualClosePreMutation,
+            records,
+            activeProfileId,
+            activeProfileName: getProfileNameFromRegistry(registry, activeProfileId)
+        });
     },
 
     /**
@@ -350,11 +399,7 @@ export const StorageManager = {
     },
 
     /**
-     * Stellt einen Snapshot wieder her
-     *
-     * Lädt Snapshot-Daten entweder aus einer Datei (falls handle vorhanden)
-     * oder aus localStorage, speichert sie als aktuellen Zustand und lädt
-     * die Seite neu, um die wiederhergestellten Daten anzuzeigen.
+     * Stellt einen kanonischen Archiv-Snapshot per Standard-Restore wieder her.
      *
      * @async
      * @param {string} key - Dateiname oder localStorage-Schlüssel des Snapshots
@@ -362,51 +407,21 @@ export const StorageManager = {
      * @returns {Promise<void>}
      */
     async restoreSnapshot(key, handle) {
-        let snapshotData;
-        let rawSnapshot = null;
-        if (handle) {
-            const fileHandle = await handle.getFileHandle(key);
-            const file = await fileHandle.getFile();
-            snapshotData = JSON.parse(await file.text());
-        } else {
-            rawSnapshot = persistenceStorage.getItem(key);
-            snapshotData = JSON.parse(rawSnapshot);
-        }
-        if (!snapshotData || typeof snapshotData !== "object") {
-            throw new StorageError("Snapshot enthält keine gültigen Daten.");
-        }
-        if (snapshotData.snapshotType === "full-localstorage" && snapshotData.localStorage) {
-            const ALLOWED_KEY_PREFIXES = [
-                'ruhestandsmodellValues_', 'ruhestandsmodell_snapshot_',
-                'migration_', 'rs_profiles_', 'rs_current_profile', 'rs_active_profile',
-                'profile_', 'depot_tranchen', 'featureFlags',
-                'sim_', 'sim.', 'balance_expenses_',
-                'showCareDetails', 'household_withdrawal_mode',
-                'logDetailLevel', 'worstLogDetailLevel', 'backtestLogDetailLevel',
-                'etfProxyUrl'
-            ];
-            const isAllowedKey = (k) => ALLOWED_KEY_PREFIXES.some(prefix => k.startsWith(prefix));
-            persistenceStorage.clear();
-            Object.entries(snapshotData.localStorage).forEach(([lsKey, value]) => {
-                if (isAllowedKey(lsKey)) {
-                    persistenceStorage.setItem(lsKey, value);
-                }
-            });
-            if (!handle && rawSnapshot && key) {
-                persistenceStorage.setItem(key, rawSnapshot);
-            }
-        } else {
-            this.saveState(snapshotData);
-        }
+        saveCurrentProfileFromLocalStorage();
+        const snapshot = await SnapshotArchive.readSnapshot(key);
+        const currentRegistry = parseJsonObject(persistenceStorage.getItem(PROFILE_STORAGE_KEYS.registry), null);
+        const { deleteKeys, upserts, allowKey } = buildStandardRestorePlan(snapshot, currentRegistry);
+        await PersistenceFacade.replaceLiveRecords(snapshot.records, {
+            deleteKeys,
+            upserts,
+            allowKey,
+            restoreLock: true
+        });
         location.reload();
     },
 
     /**
-     * Löscht einen Snapshot
-     *
-     * Entfernt den Snapshot entweder als Datei aus dem verbundenen Verzeichnis
-     * (falls handle vorhanden) oder aus localStorage. Aktualisiert anschließend
-     * die Snapshot-Liste im UI.
+     * Löscht einen Snapshot aus dem internen Archiv und aktualisiert die UI-Liste.
      *
      * @async
      * @param {string} key - Dateiname oder localStorage-Schlüssel des Snapshots
@@ -414,11 +429,7 @@ export const StorageManager = {
      * @returns {Promise<void>}
      */
     async deleteSnapshot(key, handle) {
-        if (handle) {
-            await handle.removeEntry(key);
-        } else {
-            persistenceStorage.removeItem(key);
-        }
+        await SnapshotArchive.deleteSnapshot(key);
         this.renderSnapshots(dom.outputs.snapshotList, dom.controls.snapshotStatus, handle);
         UIRenderer.toast('Snapshot gelöscht.');
     }
