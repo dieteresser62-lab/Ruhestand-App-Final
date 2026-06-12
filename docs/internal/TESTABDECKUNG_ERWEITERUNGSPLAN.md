@@ -282,7 +282,19 @@ Risiken:
 
 **Geplante Slice-Datei:** `docs/internal/SLICE_TEST_COVERAGE_04_BROWSER_SMOKE.md`  
 **Abhaengigkeiten:** Slice 3  
-**Aenderungstyp:** Browser-Test-Infrastruktur
+**Aenderungstyp:** Browser-Test-Infrastruktur  
+**Status:** umgesetzt und freigegeben
+
+Umsetzungsstand 2026-06-12:
+
+- `tests/browser-smoke.test.mjs` implementiert einen lokalen HTTP-Server auf Port `0` (dynamisch) mit MIME-Typ-Mapping.
+- Blockiert externe Hosts und mockt Google Fonts lokal, um Netzwerkunabhängigkeit zu garantieren.
+- Führt Playwright-Smokes für `index.html`, `Balance.html`, `Simulator.html`, `depot-tranchen-manager.html` und `Handbuch.html` aus.
+- Fängt `console.error` und `pageerror` ab und schlägt fehl, wenn Fehler auftreten.
+- `package.json` enthält `test:browser` zur getrennten Ausführung des Gates.
+- `browser-smoke.test.mjs` besitzt einen `isMain`-Guard, so dass es bei `npm test` zwar importiert, aber nicht ausgeführt wird (keine Verlangsamung der Unit-Suite).
+- Review/Freigabe für Slice 4 wurde am 2026-06-12 durch Gemini erteilt.
+
 
 Ziel:
 
@@ -659,7 +671,7 @@ Slices 5, 8, 9 und 10 koennen nach Slice 3 teilweise parallel geplant werden. Sl
 - [ ] Leere Coverage-Daten fuehren nicht zu falschen 100 Prozent.
 - [ ] Test-Runner zaehlt Fehler nicht doppelt und bietet einen isolierten Pfad fuer DOM-nahe Tests.
 - [ ] Alle nicht geladenen Quellmodule sind klassifiziert.
-- [ ] Browser-Einstiege haben echte Playwright-Smoke-Gates mit lokalem HTTP-Testserver.
+- [x] Browser-Einstiege haben echte Playwright-Smoke-Gates mit lokalem HTTP-Testserver. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_04_BROWSER_SMOKE.md`, `tests/browser-smoke.test.mjs`, `npm run test:browser`.
 - [ ] Worker-Einstiegspunkte sind explizit getestet.
 - [ ] Balance-Orchestrierung ist ueber Einstiegsmodule abgedeckt.
 - [ ] Simulator-Orchestrierung ist ueber Einstiegsmodule abgedeckt.
