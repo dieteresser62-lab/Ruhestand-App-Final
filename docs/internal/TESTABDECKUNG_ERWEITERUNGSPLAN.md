@@ -404,7 +404,18 @@ Risiken:
 
 **Geplante Slice-Datei:** `docs/internal/SLICE_TEST_COVERAGE_06_BALANCE_UI_ORCHESTRATION.md`  
 **Abhaengigkeiten:** Slices 1 und 4  
-**Aenderungstyp:** Balance-Integrationstests
+**Aenderungstyp:** Balance-Integrationstests  
+**Status:** umgesetzt und freigegeben
+
+Umsetzungsstand 2026-06-12:
+
+- `tests/balance-ui-orchestration.test.mjs` deckt Balance-UI-Binding, optionale Import-/Export-Control-Pfade, Profilverbund-Hook-Bindings, Import-/CSV-Fehlerfeedback und Profilverbund-Globals ab.
+- Der DOM-nahe Test fuehrt seine Assertions nur bei direktem Aufruf oder via `tests/run-single.mjs` aus; im normalen `npm test` wird er nur importiert, damit die Slice-6-Isolationsregel eingehalten wird.
+- `app/balance/balance-binder.js` verhindert doppelte UI-Bindings pro `initUIBinder()`-Initialisierung.
+- `app/balance/balance-main-profilverbund.js` verhindert doppelte Profilverbund-Listener pro Handler-Instanz.
+- Validierung: `node tests\run-single.mjs tests\balance-ui-orchestration.test.mjs` erfolgreich mit 19 Assertions; `node tests\run-single.mjs tests\balance-smoke.test.mjs` erfolgreich; `node tests\run-single.mjs tests\balance-annual-workflow-contract.test.mjs` erfolgreich mit 45 Assertions; `npm test` erfolgreich mit 85 Testdateien, 2228 Assertions, 0 Fehler, 0 offenen Handles.
+- Review/Freigabe fuer Slice 6 wurde am 2026-06-12 durch Gemini erteilt.
+
 
 Ziel:
 
@@ -677,13 +688,13 @@ Slices 5, 8, 9 und 10 koennen nach Slice 3 teilweise parallel geplant werden. Sl
 
 ## Review-Checkliste
 
-- [ ] Coverage-Report wertet echte Dateien aus.
-- [ ] Leere Coverage-Daten fuehren nicht zu falschen 100 Prozent.
-- [ ] Test-Runner zaehlt Fehler nicht doppelt und bietet einen isolierten Pfad fuer DOM-nahe Tests.
-- [ ] Alle nicht geladenen Quellmodule sind klassifiziert.
+- [x] Coverage-Report wertet echte Dateien aus.
+- [x] Leere Coverage-Daten fuehren nicht zu falschen 100 Prozent.
+- [x] Test-Runner zaehlt Fehler nicht doppelt und bietet einen isolierten Pfad fuer DOM-nahe Tests.
+- [x] Alle nicht geladenen Quellmodule sind klassifiziert.
 - [x] Browser-Einstiege haben echte Playwright-Smoke-Gates mit lokalem HTTP-Testserver. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_04_BROWSER_SMOKE.md`, `tests/browser-smoke.test.mjs`, `npm run test:browser`.
 - [x] Worker-Einstiegspunkte sind explizit getestet. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_05_WORKER_ENTRYPOINTS.md`, `tests/mc-worker-contract.test.mjs`; bestehende Gates `tests/worker-pool.test.mjs`, `tests/worker-parity.test.mjs`, `tests/auto-optimize-worker-contract.test.mjs`.
-- [ ] Balance-Orchestrierung ist ueber Einstiegsmodule abgedeckt.
+- [x] Balance-Orchestrierung ist ueber Einstiegsmodule abgedeckt. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_06_BALANCE_UI_ORCHESTRATION.md`, `tests/balance-ui-orchestration.test.mjs`; bestehende Gates `tests/balance-smoke.test.mjs`, `tests/balance-annual-workflow-contract.test.mjs`.
 - [ ] Simulator-Orchestrierung ist ueber Einstiegsmodule abgedeckt.
 - [ ] Tranchenmanager, Profil-UI und Preisservice haben Contract-Tests.
 - [ ] Finanzkern hat negative Contract-Tests fuer Stop-Regeln.
