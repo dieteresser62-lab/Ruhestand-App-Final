@@ -613,9 +613,10 @@ Risiken:
 
 ### Slice 10: Persistenz-, Migration- und Tauri-Gates
 
-**Geplante Slice-Datei:** `docs/internal/SLICE_TEST_COVERAGE_10_PERSISTENCE_TAURI_GATES.md`  
+**Slice-Datei:** `docs/internal/SLICE_TEST_COVERAGE_10_PERSISTENCE_TAURI_GATES.md`
 **Abhaengigkeiten:** Slice 2  
 **Aenderungstyp:** Adapter-/Release-nahe Tests
+**Status:** umgesetzt
 
 Ziel:
 
@@ -636,6 +637,13 @@ Akzeptanzkriterien:
 - Frontend-Aenderungen an Tauri-Payload-Shapes muessen ein Tauri-/Rust-Gate ausloesen oder explizit begruenden, warum kein Rust-Contract betroffen ist.
 - Release-nahe Tests nennen exakt, wann `npm run tauri:build` oder ein Rust-Test erforderlich ist.
 
+Umsetzung:
+
+- `tests/persistence.test.mjs` prueft IndexedDB-Upgrade, Versionchange-Outdated, Blocked-Upgrade, Legacy-Snapshot-Migration, silent-reversion-Schutz, Tauri-JSON-Adapter, Tauri-Recovery bei korruptem State, Snapshot-Target-Trennung und den automatischen Browser-Fallback auf `localStorage`.
+- Tauri-Payload-Shapes sind im JS-Adapter-Gate konkretisiert: Live-State nutzt `schemaVersion`, `records` und `metadata`; Snapshot-State nutzt `target: "snapshots"` mit `schemaVersion` und `snapshots[]`.
+- `tests/tauri-csp.test.mjs` bleibt das release-nahe Node-Gate fuer Tauri-Konfiguration, CSP, Icons, Package-Skripte und statische Rust-Command-/Rust-Test-Contracts.
+- In diesem Slice wurde `src-tauri/` nicht geaendert; deshalb war kein `npm run tauri:build` erforderlich.
+
 Pflichttests:
 
 ```powershell
@@ -654,6 +662,7 @@ Risiken:
 
 - Tauri-Builds sind langsamer und koennen lokale Toolchain-Probleme offenlegen.
 - Rust-Tests duerfen nicht durch reine Frontend-Tests ersetzt werden, wenn Rust-Code geaendert wird.
+- Das Node-Gate prueft Rust-Command-Praesenz und Payload-Kompatibilitaet statisch bzw. ueber JS-Fakes. Es ersetzt keinen echten Rust-/Tauri-Build, sobald `src-tauri/` geaendert wird.
 
 ### Slice 11: Dokumentation, Gates und Review-Workflow finalisieren
 
@@ -727,7 +736,7 @@ Slices 5, 8, 9 und 10 koennen nach Slice 3 teilweise parallel geplant werden. Sl
 - [x] Simulator-Orchestrierung ist ueber Einstiegsmodule abgedeckt. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_07_SIMULATOR_UI_ORCHESTRATION.md`, `tests/simulator-ui-orchestration.test.mjs`; bestehende Gates `tests/simulator-input-readers.test.mjs`, `tests/simulator-sweep.test.mjs`.
 - [x] Tranchenmanager, Profil-UI und Preisservice haben Contract-Tests. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_08_TRANCHES_PROFILE_PRICE_SERVICE.md`, `tests/tranchen-manager-page.test.mjs`, `tests/tranchen-price-service.test.mjs`, `tests/profile-ui-contract.test.mjs`; bestehende Gates `tests/tranchen-manager-state.test.mjs`.
 - [x] Finanzkern hat negative Contract-Tests fuer Stop-Regeln. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_09_CORE_NEGATIVE_CONTRACTS.md`, `tests/core-negative-contracts.test.mjs`; bestehende Gates `tests/engine-robustness.test.mjs`, `tests/simulator-backtest.test.mjs`.
-- [ ] Persistenz- und Tauri-Gates sind getrennt und reproduzierbar.
+- [x] Persistenz- und Tauri-Gates sind getrennt und reproduzierbar. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_10_PERSISTENCE_TAURI_GATES.md`, `tests/persistence.test.mjs`, `tests/tauri-csp.test.mjs`; bei `src-tauri/`-Aenderungen zusaetzlich `npm run tauri:build`.
 - [ ] Doku beschreibt Standard-, Coverage-, Browser- und Release-nahe Gates.
 - [ ] Coverage-Ausnahmen sind begruendet und reviewfaehig.
 
@@ -739,6 +748,7 @@ Geklaert:
 2. Browser-Smokes laufen ueber einen vom Testskript verwalteten lokalen HTTP-Server.
 3. Neue DOM-nahe UI-Orchestrierungstests laufen isoliert pro Prozess oder ueber Playwright.
 4. `npm test` bleibt die schnelle Standardsuite; Browser- und Tauri-Gates laufen separat, bis Laufzeit und Installationsaufwand bewertet sind.
+5. Tauri/Rust bleibt ein separates Release-nahes Gate: Node-Tests duerfen Rust-Command-Praesenz und JS-Payloads absichern, ersetzen aber keinen Tauri-/Rust-Build bei Aenderungen an `src-tauri/`.
 
 Offen:
 

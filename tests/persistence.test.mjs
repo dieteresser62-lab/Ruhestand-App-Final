@@ -881,6 +881,12 @@ try {
         loaded = await adapter.loadAll();
         assertEqual(loaded.alpha, undefined, 'Tauri Adapter loescht Records');
         assert(calls.some(([command, args]) => command === 'save_app_state' && !args.target), 'Tauri Adapter schreibt Live-State ohne explizites Target');
+        const liveSaves = calls.filter(([command, args]) => command === 'save_app_state' && !args.target);
+        const latestLiveSave = liveSaves[liveSaves.length - 1]?.[1] || {};
+        const latestLivePayload = JSON.parse(latestLiveSave.content);
+        assertEqual(latestLivePayload.schemaVersion, 1, 'Tauri Live-Payload nutzt Schema-Version 1');
+        assertEqual(latestLivePayload.records.beta, '2', 'Tauri Live-Payload serialisiert Records als Strings');
+        assertEqual(latestLivePayload.metadata.migration.done, true, 'Tauri Live-Payload enthaelt Metadata');
 
         const snapshot = {
             id: 'snapshot_2026-06-03T10-00-00-000Z--Tauri',
@@ -908,6 +914,12 @@ try {
             calls.some(([command, args]) => command === 'load_app_state' && args.target === 'snapshots'),
             'Tauri Adapter laedt Snapshot-Archiv mit target snapshots'
         );
+        const snapshotSaves = calls.filter(([command, args]) => command === 'save_app_state' && args.target === 'snapshots');
+        const latestSnapshotSave = snapshotSaves[snapshotSaves.length - 1]?.[1] || {};
+        const latestSnapshotPayload = JSON.parse(latestSnapshotSave.content);
+        assertEqual(latestSnapshotPayload.schemaVersion, 1, 'Tauri Snapshot-Payload nutzt Schema-Version 1');
+        assertEqual(latestSnapshotPayload.snapshots.length, 1, 'Tauri Snapshot-Payload enthaelt Snapshot-Liste');
+        assertEqual(latestSnapshotPayload.snapshots[0].id, snapshot.id, 'Tauri Snapshot-Payload serialisiert kanonische Snapshot-ID');
         const deleted = await adapter.deleteSnapshot(snapshot.id);
         assertEqual(deleted, true, 'Tauri Adapter loescht vorhandenen Snapshot');
         const deletedAgain = await adapter.deleteSnapshot(snapshot.id);
@@ -1360,6 +1372,30 @@ try {
         assertEqual(getItemSync('blocked'), 'stay', 'Nicht erlaubter Key bleibt erhalten');
         assertEqual(adapter.store.has('remove'), false, 'Erlaubter Delete ist im Adapter sichtbar');
         assertEqual(adapter.store.get('added'), '2', 'Erlaubter Upsert ist im Adapter sichtbar');
+    }
+
+    console.log('Test 26: browser runtime falls back to localStorage when IndexedDB is unavailable');
+    {
+        const storage = new MockStorage();
+        storage.setItem(CONFIG.STORAGE.LS_KEY, '{"inputs":{"alter":64}}');
+        storage.setItem('sim_dynamicFlex', 'false');
+        global.localStorage = storage;
+        resetPersistenceRuntimeForTests();
+
+        await init({
+            window: {},
+            localStorage: storage,
+            indexedDB: null
+        });
+
+        assertEqual(getPersistenceStatus().backend, 'localStorage', 'Browser ohne IndexedDB nutzt localStorage-Fallback');
+        assertEqual(getItemSync(CONFIG.STORAGE.LS_KEY), '{"inputs":{"alter":64}}', 'localStorage-Fallback laedt vorhandene Balance-Daten');
+        assertEqual(getItemSync('sim_dynamicFlex'), 'false', 'localStorage-Fallback laedt vorhandene Simulator-Daten');
+        assertEqual(storage.getItem(LEGACY_MIGRATION_MARKER_KEYS.target), null, 'localStorage-Fallback setzt keinen Ziel-Migrationsmarker');
+
+        setItemSync('fallback_write', 'ok');
+        await flush();
+        assertEqual(storage.getItem('fallback_write'), 'ok', 'localStorage-Fallback schreibt ueber Facade zurueck');
     }
 
     console.log('Persistence tests passed');
