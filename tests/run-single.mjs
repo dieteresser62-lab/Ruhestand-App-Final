@@ -1,44 +1,39 @@
-
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { installAssertionGlobals } from './run-tests.mjs';
 
 const testFile = process.argv[2];
 if (!testFile) {
-    console.error("Please provide a test file path (e.g. tests/engine-adapter-parity.test.mjs)");
+    console.error('Please provide a test file path (e.g. tests/engine-adapter-parity.test.mjs)');
     process.exit(1);
 }
 
-// Global Assert Shim
-global.assert = function (condition, message) {
-    if (!condition) {
-        console.error(`❌ FAIL: ${message}`);
-        process.exit(1);
-    } else {
-        console.log(`✅ PASS: ${message}`);
-    }
-};
-global.assertEqual = function (actual, expected, message) {
-    if (actual !== expected) {
-        console.error(`❌ FAIL: ${message} (Expected ${expected}, got ${actual})`);
-        process.exit(1);
-    }
-    console.log(`✅ PASS: ${message}`);
-};
-global.assertClose = (actual, expected, tolerance = 0.001, message) => {
-    if (Math.abs(actual - expected) > tolerance) {
-        console.error(`❌ FAIL: ${message} (Expected ${expected} +/- ${tolerance}, got ${actual})`);
-        process.exit(1);
-    }
-    console.log(`✅ PASS: ${message}`);
-};
-
 async function run() {
+    const counters = installAssertionGlobals({ verbosePasses: true });
+
     try {
-        const fileUrl = pathToFileURL(path.resolve(testFile)).href;
+        const resolvedPath = path.resolve(testFile);
+        const fileUrl = pathToFileURL(resolvedPath).href;
         console.log(`Running ${testFile}...`);
         await import(fileUrl);
-    } catch (e) {
-        console.error(e);
+        console.log('\n' + '='.repeat(40));
+        console.log('SINGLE TEST SUMMARY:');
+        console.log(`Total Assertions: ${counters.total}`);
+        console.log(`Passed: ${counters.passed}`);
+        console.log(`Failed Assertions: ${counters.failedAssertions}`);
+        console.log('Failed Files: 0');
+        console.log('='.repeat(40));
+        process.exit(counters.failedAssertions > 0 ? 1 : 0);
+    } catch (error) {
+        const isAssertionFailure = error?.isTestAssertionError === true;
+        console.error(error?.stack || error);
+        console.log('\n' + '='.repeat(40));
+        console.log('SINGLE TEST SUMMARY:');
+        console.log(`Total Assertions: ${counters.total}`);
+        console.log(`Passed: ${counters.passed}`);
+        console.log(`Failed Assertions: ${counters.failedAssertions}`);
+        console.log(`Failed Files: ${isAssertionFailure ? 0 : 1}`);
+        console.log('='.repeat(40));
         process.exit(1);
     }
 }
