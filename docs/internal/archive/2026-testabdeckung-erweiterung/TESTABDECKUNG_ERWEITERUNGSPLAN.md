@@ -88,13 +88,15 @@ Die Testsuite soll nach Abschluss der Slices folgende Ebenen haben:
 - **Browser-Smoke:** echte Browserausfuehrung der HTML-Einstiege und zentraler UI-Aktionen.
 - **Worker-Entrypoint:** Tests gegen Message-Contracts echter Worker-Dateien.
 - **Runtime-Adapter:** getrennte Tests fuer IndexedDB/localStorage/Tauri-Adaptervertraege.
-- **Coverage-Gates:** reparierte Coverage-Auswertung mit Mindestwerten und expliziten Ausnahmen.
+- **Coverage-Gates:** reparierte Coverage-Auswertung mit Zielwerten, Baseline und expliziten Ausnahmen.
 - **Coverage-Inventar:** dokumentierte Liste bewusst nicht automatisierter Pfade mit manueller Verifikation.
 - **Runner-Hygiene:** sortierte, reproduzierbare Testdatei-Auswahl, korrekte Fehlerzaehlung und isolierte Ausfuehrungsoptionen fuer DOM-nahe Tests.
 
 ## Coverage-Gates
 
-Die finalen Schwellen werden erst nach Slice 2 verbindlich festgelegt. Vorlaeufige Zielwerte:
+Die finalen Schwellen wurden im Rahmen dieses Arbeitspakets nicht verbindlich als Fail-Gate festgelegt. Sie bleiben Zielwerte fuer kuenftige Härtung; der aktuelle Abschlussstand ist eine reproduzierbare Gesamt-Baseline von 72,25% Line-Coverage fuer `app/`, `engine/`, `workers/` und `types/`.
+
+Nicht verbindliche Zielwerte fuer kuenftige Slices:
 
 - `engine/`: mindestens 90 Prozent Line-Coverage, zusaetzlich kritische Branch-/Fehlerpfade dokumentiert.
 - `app/shared/`: mindestens 85 Prozent Line-Coverage.
@@ -109,6 +111,11 @@ Jede Ausnahme muss im Coverage-Inventar stehen:
 - Risiko.
 - Manuelle oder alternative Verifikation.
 - Geplante spaetere Automatisierung oder bewusste Akzeptanz.
+
+Nicht als erreicht behauptet:
+
+- Die 72,25%-Baseline ist ein Gesamtwert und ersetzt keine Bereichsauswertung gegen `engine/`, `app/shared/` oder `workers/`.
+- Solange keine automatisierte Bereichsauswertung mit Fail-Code existiert, duerfen die Zielwerte nicht als Release-Gate oder Erfuellungskriterium kommuniziert werden.
 
 ## Umsetzungsslices
 
@@ -670,7 +677,7 @@ Risiken:
 **Abhaengigkeiten:** Slices 1 bis 10  
 **Aenderungstyp:** Dokumentation und Test-Gates
 
-**Status:** umgesetzt in `docs/internal/SLICE_TEST_COVERAGE_11_DOCUMENTATION_GATES.md`
+**Status:** umgesetzt und freigegeben
 
 Ziel:
 
@@ -709,13 +716,16 @@ Ergebnis:
 
 - `tests/README.md` beschreibt `npm test`, `npm run test:coverage`, `npm run test:browser`, `run-single` und release-nahe Tauri-Gates getrennt.
 - `docs/reference/TECHNICAL.md` und `docs/internal/PROJEKTUEBERSICHT.md` dokumentieren Standard-, Coverage-, Browser- und Tauri-Gates.
+- `docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md` wurde nach Review-Blocker G-S11-02 ebenfalls synchronisiert.
 - Coverage-Baseline: ca. 72,25% Zeilen-Coverage fuer `app/`, `engine/`, `workers/` und `types/`; noch keine harte Mindestschwelle.
 - Bekannte Coverage-Ausnahmen sind dokumentiert: UI-nahe Browserpfade, Wrapper/Re-Exports und Dateien ohne ausfuehrbare Zeilen.
+- `tests/README.md` wurde nach Opus-Gesamtreview um alle 90 Testdateien in der alphabetischen Tabelle vervollstaendigt.
 - `README.md` wurde nicht geaendert, weil keine Package-Kommandos geaendert wurden und die detaillierten Gates in Test-/Technikreferenzen stehen.
+- Review/Freigabe fuer Slice 11 wurde am 2026-06-12 durch Gemini erteilt; der Nutzer hat Slice 11 als released gemeldet.
 
 Risiken:
 
-- Dokumentations-Sync kann Dateien ausserhalb des urspruenglichen Test-Scope betreffen. In Slice 11 blieb der Scope bei 5 Dateien.
+- Dokumentations-Sync kann Dateien ausserhalb des urspruenglichen Test-Scope betreffen. In Slice 11 wurde `docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md` nach Review-Blocker und Nutzerfreigabe zusaetzlich aufgenommen.
 
 ## Reihenfolge und Abhaengigkeiten
 
@@ -766,6 +776,18 @@ Offen bzw. bewusst vertagt:
 2. UI-Module mit niedriger oder 0%-V8-Coverage bleiben reviewpflichtig ueber Browser-Smoke/gezielte Contract-Tests statt pauschaler Node-Testpflicht.
 3. `QUICK_TESTS=1` bleibt deprecated; ein neuer Entwickler-Subset-Befehl wird nicht in diesem Slice eingefuehrt.
 4. Parallelisierung fuer nicht-DOM-nahe Tests bleibt vertagt; die Standardsuite bleibt bewusst sequentiell.
+
+## Gesamtreview Opus nach Release
+
+Opus hat nach Abschluss des Arbeitspakets ein adversariales Gesamtreview dokumentiert. Codex-Antwort:
+
+| ID | Finding | Entscheidung | Umsetzung |
+|---|---|---|---|
+| F-01 | Coverage-Zielwerte `engine/ >= 90%`, `app/shared/ >= 85%`, `workers/ >= 80%` sind nur vorlaeufig; die 72,25%-Baseline ist ein Gesamtwert. | Angenommen. | Coverage-Gates sind als nicht verbindliche Zielwerte und nicht als erreichtes Fail-Gate dokumentiert. |
+| F-02 | Persistenz-Tests simulieren IndexedDB-Blocked/Upgrade-Pfade, aber kein echtes Chromium-Upgrade-Szenario mit Schemawechsel. | Angenommen als Restrisiko. | Bleibt Backlog fuer ein Browser-/Playwright-Persistenzszenario; aktuelle Tests sichern Adapter-Contracts und Fakes. |
+| F-03 | Governance-Aenderungen liegen auf demselben Branch und erschweren den Merge-Review. | Angenommen als Review-Risiko, nicht in diesem Slice bereinigt. | Keine Ruecknahme durch Codex; Reviewer muessen Scope im Diff explizit trennen. |
+| F-04 | `tests/README.md` listete nicht alle 90 Testdateien. | Angenommen. | Alphabetische Testdatei-Tabelle auf 90/90 vervollstaendigt. |
+| F-05 | `npm run test:browser` ist separates Gate und nicht Teil von `npm test`; Browser-Regressionen koennen uebersehen werden, wenn CI/CD es nicht ausfuehrt. | Angenommen. | Separates Gate bleibt bewusst; CI/Release muss `npm run test:browser` explizit ausfuehren. |
 
 ## Nicht-Ziele
 

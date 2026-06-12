@@ -2,7 +2,7 @@
 
 **Feature-Branch:** `codex/test-coverage-expansion`
 **GitHub-Status:** nicht veroeffentlicht in diesem Slice
-**Status:** Review-Fix umgesetzt, erneutes Review ausstehend
+**Status:** umgesetzt und freigegeben
 
 ## Ziel
 

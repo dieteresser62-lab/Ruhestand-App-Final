@@ -40,6 +40,8 @@ npm run test:browser
 
 Das Browser-Gate nutzt Playwright mit einem vom Test verwalteten lokalen HTTP-Server. Es prueft die zentralen Einstiegspunkte (`index.html`, `Balance.html`, `Simulator.html`, `depot-tranchen-manager.html`, `Handbuch.html`) als echte Browser-Smokes. Es ersetzt keine Node-Unit-Tests und laeuft bewusst getrennt von `npm test`.
 
+Wichtig fuer CI/Release: Weil `npm test` dieses Gate nicht ausfuehrt, muss `npm run test:browser` explizit als eigener Job oder Release-Schritt laufen, wenn Browser-Regressionen blockierend sein sollen.
+
 ### Release-nahe Tauri-Gates
 ```bash
 node tests/run-single.mjs tests/tauri-csp.test.mjs
@@ -47,6 +49,8 @@ npm run tauri:build
 ```
 
 `tests/tauri-csp.test.mjs` ist Teil von `npm test` und prueft Tauri-Konfiguration, CSP, Icons, Package-Skripte und statische Rust-Command-Contracts. Sobald `src-tauri/` geaendert wird, muss zusaetzlich ein echter Tauri-/Rust-Build laufen (`npm run tauri:build` oder der manuelle Windows-Release-Pfad). Manuelle Desktop-Smokes nach EXE-Build bleiben manuelle Release-Verifikation und sind kein Ersatz fuer automatisierte Tests.
+
+Persistenz-Hinweis: `persistence.test.mjs` simuliert IndexedDB-Upgrade-, Blocked- und Versionchange-Pfade ueber Fakes. Ein echtes Chromium-Szenario mit Datenbank-Version N -> N+1 und realem Schemawechsel bleibt ein separates Browser-/Playwright-Backlog.
 
 ### Einzelne Testdatei ausführen
 ```bash
@@ -664,10 +668,15 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `balance-smoke.test.mjs` | ~340 | End-to-End Smoke-Test |
 | `balance-storage-contract.test.mjs` | ~180 | Echte StorageManager-Migrationen und Snapshot-Contracts |
 | `balance-storage.test.mjs` | ~490 | localStorage-Persistenz |
+| `balance-ui-orchestration.test.mjs` | ~170 | Balance-UI-Bindings, Import-/Export-Control-Pfade und Profilverbund-Hooks |
+| `browser-smoke.test.mjs` | ~260 | Playwright-Smoke-Gate fuer HTML-Einstiege mit lokalem HTTP-Server |
 | `care-meta.test.mjs` | ~200 | Pflegefall-Logik |
 | `health-bucket.test.mjs` | ~160 | Pflegebucket-Trigger, Deckung, Verzinsung und Diagnose |
 | `core-engine.test.mjs` | ~150 | EngineAPI-Basisvalidierung |
+| `core-negative-contracts.test.mjs` | ~130 | Negative Kern-Contracts fuer Stop-Regel-nahe Fehlerpfade |
 | `core-tax-settlement.test.mjs` | ~70 | Core Settlement-Integration |
+| `coverage-inventory.test.mjs` | ~120 | Coverage-Inventar, Modulklassifikation und ungeladene/runtime-geladene Dateien |
+| `coverage-report.test.mjs` | ~190 | V8-Coverage-Report, Pfadnormalisierung und Leerreport-Fehlerverhalten |
 | `depot-tranches.test.mjs` | ~130 | FIFO-Verkäufe, Steuer |
 | `dynamic-flex-horizon.test.mjs` | ~40 | Sterbetafel-Horizonte, Single/Joint, Mean/Quantil |
 | `engine-robustness.test.mjs` | ~240 | Edge Cases, Fehlereingaben |
@@ -676,15 +685,19 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `historical-data-robustness.test.mjs` | ~60 | Fehlende Marktdaten |
 | `liquidity-guardrail.test.mjs` | ~100 | Liquiditäts-Guardrails |
 | `market-analyzer.test.mjs` | ~150 | Markt-Regime-Klassifizierung |
+| `mc-worker-contract.test.mjs` | ~170 | MC-Worker-Entrypoint, Lifecycle und Fehlervertraege |
 | `monte-carlo-sampling.test.mjs` | ~200 | Bootstrap, Regime-Transitions |
 | `monte-carlo-startyear.test.mjs` | ~100 | Startjahr-Auswahl |
+| `persistence.test.mjs` | ~900 | PersistenceFacade, IndexedDB/localStorage/Tauri-Adapter und Migrationen |
 | `portfolio.test.mjs` | ~100 | Portfolio-Operationen |
 | `profile-asset-values.test.mjs` | ~80 | Profil-Assetwerte und Aggregation |
 | `profile-navigation.test.mjs` | ~100 | Profilnavigation und UI-State |
 | `profile-state.test.mjs` | ~100 | Profilzustand und Storage-Contracts |
 | `profile-storage.test.mjs` | ~570 | Profil-Registry CRUD, Bundle-Tranchen |
+| `profile-ui-contract.test.mjs` | ~160 | Profil-UI-Contracts, Navigation und DOM-nahe Profilaktionen |
 | `profilverbund-balance.test.mjs` | ~230 | Multi-Profil Aggregation, Entnahmeverteilung, Asset-Summaries |
 | `profilverbund-profile-gold-overrides.test.mjs` | ~160 | Gold-Parameter-Overrides |
+| `runner-contract.test.mjs` | ~170 | Test-Runner-Sortierung, Fehlerzaehlung, Isolation und QUICK_TESTS-Deprecation |
 | `scenario-analyzer.test.mjs` | ~95 | Szenario-Tags, Vergleich |
 | `scenarios.test.mjs` | ~150 | Komplexe Lebenspfade |
 | `simulation.test.mjs` | ~200 | Simulations-Integration |
@@ -699,6 +712,9 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `simulator-multiprofile-aggregation.test.mjs` | ~190 | Simulator Multi-Profil, Tranchen-Merge |
 | `simulator-sweep.test.mjs` | ~470 | Parameter-Sweep |
 | `simulator-tax-settlement.test.mjs` | ~180 | Simulator Settlement-Recompute |
+| `simulator-ui-orchestration.test.mjs` | ~230 | Simulator-UI-Bindings, Tabs, Persistenz und Optimizer-Parameteruebernahme |
+| `snapshot-archive.test.mjs` | ~160 | Kanonisches Snapshot-Archiv, Indexeintraege und Restore-Contracts |
+| `snapshot-key-policy.test.mjs` | ~130 | Snapshot-Key-Policy, Restore-Grenzen und technische Key-Ausnahmen |
 | `spending-planner.test.mjs` | ~200 | Entnahme-Logik |
 | `spending-quantization.test.mjs` | ~80 | Entnahme-Rundung |
 | `tauri-csp.test.mjs` | ~130 | Tauri-CSP, Live-Daten-Endpunkte und Icons |
@@ -708,8 +724,10 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `transaction-quantization.test.mjs` | ~250 | Transaktions-Rundung |
 | `tax-settlement.test.mjs` | ~70 | Jahres-Settlement, Verlusttopf |
 | `tranchen-manager-modal.test.mjs` | ~120 | Tranchenmanager-Modal und Form-Parsing |
+| `tranchen-manager-page.test.mjs` | ~170 | Tranchenmanager-Seitenentrypoint, App-Bindings und UI-Contract |
 | `tranchen-manager-renderer.test.mjs` | ~100 | Tranchenmanager-Rendering |
 | `tranchen-manager-state.test.mjs` | ~120 | Tranchenmanager-State und Derived Values |
+| `tranchen-price-service.test.mjs` | ~160 | Preisservice-Proxy, Symbolauflösung, Timeout und degradierter Status |
 | `transaction-tax.test.mjs` | ~340 | Steuerberechnung, Roh-Aggregate |
 | `utils.test.mjs` | ~100 | Hilfsfunktionen |
 | `vpw-dynamic-flex.test.mjs` | ~230 | VPW-Formel, Smoothing, Safety und Go-Go |
