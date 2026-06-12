@@ -516,7 +516,17 @@ Risiken:
 
 **Geplante Slice-Datei:** `docs/internal/SLICE_TEST_COVERAGE_08_TRANCHES_PROFILE_PRICE_SERVICE.md`  
 **Abhaengigkeiten:** Slices 1, 3 und 4 fuer UI-nahe Teile  
-**Aenderungstyp:** UI-/Service-Contract-Tests
+**Aenderungstyp:** UI-/Service-Contract-Tests  
+**Status:** umgesetzt und freigegeben
+
+Umsetzungsstand 2026-06-12:
+
+- `tests/tranchen-manager-page.test.mjs` prueft die Tranchenmanager-Seite mit leerem, gueltigem und korruptem Storage sowie einen dauerhaft offlineen Preisupdate-Pfad, der vorhandene lokale Kursdaten erhaelt und einen sichtbaren Fehlerstatus rendert.
+- `tests/tranchen-price-service.test.mjs` prueft den Proxy-Preisservice mit Fake-Fetch fuer Erfolg, HTTP-Fehler, Timeout/Abort, unvollstaendige Antwort, Symbolsuche und degradierenden Health-Status ohne echte Netzwerkaufrufe.
+- `tests/profile-ui-contract.test.mjs` prueft Profilverbund-Selector und Toggle-UI, die Nicht-Doppelzaehlung detaillierter Tranchen gegen aggregierte Fallback-Felder, kontrolliertes Profilmanager-Fehlerverhalten bei fehlendem Profil und Profile-Bridge-Handoff/Lifecycle mit ungueltigen Handoff-Daten.
+- Validierung: `node tests\run-single.mjs tests\tranchen-manager-state.test.mjs` erfolgreich mit 6 Assertions; `node tests\run-single.mjs tests\tranchen-manager-page.test.mjs` erfolgreich mit 10 Assertions; `node tests\run-single.mjs tests\tranchen-price-service.test.mjs` erfolgreich mit 9 Assertions; `node tests\run-single.mjs tests\profile-ui-contract.test.mjs` erfolgreich mit 14 Assertions; `npm test` erfolgreich mit 89 Testdateien, 2237 Assertions, 0 Fehler, 0 offenen Handles.
+- Review/Freigabe fuer Slice 8 wurde am 2026-06-12 durch Gemini erteilt.
+
 
 Ziel:
 
@@ -706,7 +716,7 @@ Slices 5, 8, 9 und 10 koennen nach Slice 3 teilweise parallel geplant werden. Sl
 - [x] Worker-Einstiegspunkte sind explizit getestet. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_05_WORKER_ENTRYPOINTS.md`, `tests/mc-worker-contract.test.mjs`; bestehende Gates `tests/worker-pool.test.mjs`, `tests/worker-parity.test.mjs`, `tests/auto-optimize-worker-contract.test.mjs`.
 - [x] Balance-Orchestrierung ist ueber Einstiegsmodule abgedeckt. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_06_BALANCE_UI_ORCHESTRATION.md`, `tests/balance-ui-orchestration.test.mjs`; bestehende Gates `tests/balance-smoke.test.mjs`, `tests/balance-annual-workflow-contract.test.mjs`.
 - [x] Simulator-Orchestrierung ist ueber Einstiegsmodule abgedeckt. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_07_SIMULATOR_UI_ORCHESTRATION.md`, `tests/simulator-ui-orchestration.test.mjs`; bestehende Gates `tests/simulator-input-readers.test.mjs`, `tests/simulator-sweep.test.mjs`.
-- [ ] Tranchenmanager, Profil-UI und Preisservice haben Contract-Tests.
+- [x] Tranchenmanager, Profil-UI und Preisservice haben Contract-Tests. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_08_TRANCHES_PROFILE_PRICE_SERVICE.md`, `tests/tranchen-manager-page.test.mjs`, `tests/tranchen-price-service.test.mjs`, `tests/profile-ui-contract.test.mjs`; bestehende Gates `tests/tranchen-manager-state.test.mjs`.
 - [ ] Finanzkern hat negative Contract-Tests fuer Stop-Regeln.
 - [ ] Persistenz- und Tauri-Gates sind getrennt und reproduzierbar.
 - [ ] Doku beschreibt Standard-, Coverage-, Browser- und Release-nahe Gates.
