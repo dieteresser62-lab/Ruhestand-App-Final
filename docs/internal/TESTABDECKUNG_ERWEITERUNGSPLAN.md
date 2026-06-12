@@ -119,7 +119,7 @@ Jeder Slice bekommt vor Umsetzung eine eigene Slice-MD nach `docs/internal/SLICE
 **Geplante Slice-Datei:** `docs/internal/SLICE_TEST_COVERAGE_01_RUNNER_ISOLATION.md`  
 **Abhaengigkeiten:** keine  
 **Aenderungstyp:** Test-Infrastruktur  
-**Status:** umgesetzt und freigegeben
+**Status:** Review-Fix durch Codex umgesetzt, erneutes Review ausstehend
 
 Umsetzungsstand 2026-06-12:
 
@@ -224,7 +224,18 @@ Risiken:
 
 **Geplante Slice-Datei:** `docs/internal/SLICE_TEST_COVERAGE_03_MODULE_INVENTORY.md`  
 **Abhaengigkeiten:** Slice 2  
-**Aenderungstyp:** Test-Infrastruktur und Dokumentation
+**Aenderungstyp:** Test-Infrastruktur und Dokumentation  
+**Status:** umgesetzt und freigegeben
+
+Umsetzungsstand 2026-06-12:
+
+- `tests/coverage-inventory.mjs` erstellt ein reproduzierbares Inventar fuer alle Source-Dateien aus `app/`, `engine/`, `workers/` und `types/`.
+- `tests/coverage-inventory.test.mjs` prueft direkte, transitive, nicht geladene und runtime-geladene Dateien sowie Modulklassen.
+- Aktueller Inventarlauf nach `npm run test:coverage`: 183 Source-Dateien, 82 Testdateien, 24 nicht geladene Dateien.
+- Klassenverteilung nach C-S3-02-Fix: 47 `critical-core`, 92 `deterministic-app`, 38 `ui-entry`, 3 `worker-entry`, 3 `live-io`.
+- Coverage-Status: 147 `runtime-covered`, 8 `runtime-loaded-uncovered`, 4 `runtime-loaded-zero-executable`, 24 `not-loaded`.
+- `app/balance/balance-main.js` ist `runtime-covered` und wird nicht als ungeladen klassifiziert.
+- Gemini-Freigabe fuer Slice 3 wurde am 2026-06-12 erteilt; Claude-Blocker C-S3-02 wurde anschliessend von Codex behoben, erneutes Review steht aus.
 
 Ziel:
 
