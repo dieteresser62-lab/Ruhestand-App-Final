@@ -23,6 +23,8 @@ import { applyThreeBucketLogic, appendBondReplenishment, isBondCategory, sumBond
 import { persistenceStorage } from '../shared/persistence-facade.js';
 
 export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS }) {
+    let profilverbundBound = false;
+
     const refreshProfilverbundBalance = () => {
         const mode = persistenceStorage.getItem(PROFILVERBUND_STORAGE_KEYS.mode) || 'tax_optimized';
 
@@ -206,6 +208,7 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
     };
 
     const initProfilverbundBalance = () => {
+        if (profilverbundBound) return;
         const modeSelect = document.getElementById('profilverbund-withdrawal-mode');
         const profileList = document.getElementById('profilverbund-profile-list');
 
@@ -242,6 +245,7 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
             refreshProfilverbundBalance();
         });
 
+        profilverbundBound = true;
         refreshProfilverbundBalance();
     };
 

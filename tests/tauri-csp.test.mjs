@@ -8,7 +8,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..');
 const tauriConfigPath = path.join(repoRoot, 'src-tauri', 'tauri.conf.json');
+const tauriLibPath = path.join(repoRoot, 'src-tauri', 'src', 'lib.rs');
+const packageJsonPath = path.join(repoRoot, 'package.json');
 const tauriConfig = JSON.parse(fs.readFileSync(tauriConfigPath, 'utf8'));
+const tauriLib = fs.readFileSync(tauriLibPath, 'utf8');
+const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 const security = tauriConfig?.app?.security || {};
 const csp = security?.csp || {};
 const connectSrc = String(csp?.['connect-src'] || '');
@@ -44,6 +48,45 @@ assert(fontSrc.includes('https://fonts.gstatic.com'), 'Tauri CSP should allow Go
 assert(
   security.dangerousDisableAssetCspModification === true,
   'Tauri CSP asset modification is disabled intentionally and must be documented'
+);
+
+assert(packageJson?.scripts?.['tauri:build'] === 'tauri build', 'package.json should expose the raw Tauri build gate');
+assert(
+  packageJson?.scripts?.['build-tauri-exe']?.includes('scripts/build-tauri.ps1'),
+  'package.json should expose the checked Windows EXE release workflow'
+);
+
+for (const commandName of [
+  'load_app_state',
+  'save_app_state',
+  'quarantine_app_state',
+  'confirm_app_close'
+]) {
+  assert(
+    tauriLib.includes(`fn ${commandName}`),
+    `Tauri Rust command should exist: ${commandName}`
+  );
+}
+
+assert(
+  tauriLib.includes('target: Option<StateTarget>'),
+  'Tauri state commands should keep the optional target payload contract'
+);
+assert(
+  tauriLib.includes('StateTarget::Snapshots') && tauriLib.includes('ruhestand_suite_snapshots.json'),
+  'Tauri snapshot target should map to a separate snapshot state file'
+);
+assert(
+  tauriLib.includes('corrupt_state_filename') && tauriLib.includes('.corrupt.'),
+  'Tauri quarantine path should keep a target-specific corrupt-state filename'
+);
+assert(
+  tauriLib.includes('state_target_defaults_to_live_file_and_supports_snapshot_file'),
+  'Tauri Rust unit tests should cover live and snapshot state target filenames'
+);
+assert(
+  tauriLib.includes('corrupt_state_filename_uses_target_specific_stem'),
+  'Tauri Rust unit tests should cover quarantine filename stems'
 );
 
 const iconPaths = tauriConfig?.bundle?.icon || [];

@@ -30,6 +30,7 @@ let update = null;
 let debouncedUpdate = null;
 let lastUpdateResults = null;
 let handlers = null;
+let uiBound = false;
 
 /**
  * Initialisiert den UIBinder mit den notwendigen Abhängigkeiten
@@ -39,6 +40,7 @@ export function initUIBinder(domRefs, state, updateFn, debouncedUpdateFn) {
     appState = state;
     update = updateFn;
     debouncedUpdate = debouncedUpdateFn;
+    uiBound = false;
     const annual = createAnnualHandlers({
         dom,
         appState,
@@ -64,6 +66,7 @@ export function initUIBinder(domRefs, state, updateFn, debouncedUpdateFn) {
 
 export const UIBinder = {
     bindUI() {
+        if (uiBound) return;
         // Keyboard shortcuts
         document.addEventListener('keydown', this.handleKeyboardShortcuts.bind(this));
 
@@ -112,6 +115,7 @@ export const UIBinder = {
         dom.diagnosis.filterToggle.addEventListener('change', (e) => {
             dom.diagnosis.content.classList.toggle('filter-inactive', e.target.checked)
         });
+        uiBound = true;
     },
 
     handleKeyboardShortcuts(e) {
