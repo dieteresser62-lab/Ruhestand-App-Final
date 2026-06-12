@@ -567,7 +567,16 @@ Risiken:
 
 **Geplante Slice-Datei:** `docs/internal/SLICE_TEST_COVERAGE_09_CORE_NEGATIVE_CONTRACTS.md`  
 **Abhaengigkeiten:** Slice 2  
-**Aenderungstyp:** Engine-/Contract-Tests
+**Aenderungstyp:** Engine-/Contract-Tests  
+**Status:** umgesetzt und freigegeben
+
+Umsetzungsstand 2026-06-12:
+
+- `tests/core-negative-contracts.test.mjs` prueft negative Kern-Contracts fuer `minimumFlexAnnual`, Simulator-Feldnamen, NaN/Infinity-Engine-Fallbacks, Steuer-Settlement-Sanitization, Forced-Sale-Recompute mit Verlusttopf/TQF und neutrale nicht-positive Forced-Shortfall-Pfade.
+- Der Slice fuehrt keine neue strikte Runtime-Semantik ein: nicht-numerisches `minimumFlexAnnual` und NaN/Infinity-Assetwerte bleiben als bestehende nicht crashende Null-Fallbacks dokumentiert; negative bzw. oberhalb `flexBedarf` liegende `minimumFlexAnnual`-Werte bleiben Validierungsfehler.
+- Validierung: `node tests\run-single.mjs tests\core-negative-contracts.test.mjs` erfolgreich mit 35 Assertions; `node tests\run-single.mjs tests\engine-robustness.test.mjs` erfolgreich mit 34 Assertions; `node tests\run-single.mjs tests\simulator-backtest.test.mjs` erfolgreich mit 33 Assertions; `npm test` erfolgreich mit 90 Testdateien, 2272 Assertions, 0 Fehlern, 0 offenen Handles.
+- Review/Freigabe fuer Slice 9 wurde am 2026-06-12 durch Gemini erteilt.
+
 
 Ziel:
 
@@ -717,7 +726,7 @@ Slices 5, 8, 9 und 10 koennen nach Slice 3 teilweise parallel geplant werden. Sl
 - [x] Balance-Orchestrierung ist ueber Einstiegsmodule abgedeckt. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_06_BALANCE_UI_ORCHESTRATION.md`, `tests/balance-ui-orchestration.test.mjs`; bestehende Gates `tests/balance-smoke.test.mjs`, `tests/balance-annual-workflow-contract.test.mjs`.
 - [x] Simulator-Orchestrierung ist ueber Einstiegsmodule abgedeckt. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_07_SIMULATOR_UI_ORCHESTRATION.md`, `tests/simulator-ui-orchestration.test.mjs`; bestehende Gates `tests/simulator-input-readers.test.mjs`, `tests/simulator-sweep.test.mjs`.
 - [x] Tranchenmanager, Profil-UI und Preisservice haben Contract-Tests. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_08_TRANCHES_PROFILE_PRICE_SERVICE.md`, `tests/tranchen-manager-page.test.mjs`, `tests/tranchen-price-service.test.mjs`, `tests/profile-ui-contract.test.mjs`; bestehende Gates `tests/tranchen-manager-state.test.mjs`.
-- [ ] Finanzkern hat negative Contract-Tests fuer Stop-Regeln.
+- [x] Finanzkern hat negative Contract-Tests fuer Stop-Regeln. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_09_CORE_NEGATIVE_CONTRACTS.md`, `tests/core-negative-contracts.test.mjs`; bestehende Gates `tests/engine-robustness.test.mjs`, `tests/simulator-backtest.test.mjs`.
 - [ ] Persistenz- und Tauri-Gates sind getrennt und reproduzierbar.
 - [ ] Doku beschreibt Standard-, Coverage-, Browser- und Release-nahe Gates.
 - [ ] Coverage-Ausnahmen sind begruendet und reviewfaehig.
