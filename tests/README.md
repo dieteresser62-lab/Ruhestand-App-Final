@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 79 Testdateien mit 2134 Assertions (verifiziert mit `npm test` am 2026-06-04)
+**Test-Statistik:** 90 Testdateien mit 2294 Assertions (verifiziert mit `npm test` in Slice 10 am 2026-06-12)
 
 ## Directory Structure
 
@@ -14,15 +14,39 @@ This directory contains the comprehensive testing infrastructure for the Ruhesta
 
 ## How to Run Tests
 
-### Alle Tests ausführen
+### Standard-Suite
 ```bash
 npm test
 ```
 
-### Schnelle Tests (Subset)
+`npm test` fuehrt die schnelle Node-Standardsuite ueber `node tests/run-tests.mjs` aus. Die Suite enthaelt DOM-freie Engine-, Balance-, Simulator-, Profil-, Tranchen-, Persistenz-, Worker- und Tauri-Contract-Tests. Browser-Smokes und echte Tauri-Builds sind separate Gates.
+
+### Coverage-Baseline
 ```bash
-QUICK_TESTS=1 npm test
+npm run test:coverage
 ```
+
+Der Coverage-Runner loescht `.coverage/`, startet die Standardsuite mit `NODE_V8_COVERAGE` und schreibt `.coverage/summary.json`. Der Report wertet Projektdateien unter `app/`, `engine/`, `workers/` und `types/` aus. Die aktuelle Baseline aus Slice 11 liegt bei ca. 72,25% Zeilen-Coverage (19352/26784 ausfuehrbare Zeilen); sie ist ein Transparenz- und Review-Gate, noch keine harte Mindestschwelle.
+
+Bekannte Coverage-Ausnahmen:
+- UI-nahe Renderer und Page-Module koennen trotz Browser-Smoke in der V8-Zeilenmetrik niedrig oder 0% erscheinen, wenn ihre Logik nur ueber echte Browserinteraktion relevant ist.
+- Wrapper-/Re-Export-Module wie `engine/index.mjs` koennen niedrige Werte zeigen, obwohl die dahinterliegenden Kernmodule abgedeckt sind.
+- Dateien ohne ausfuehrbare Zeilen werden mit `coveragePct: null` ausgewiesen und nicht als 100%-Abdeckung interpretiert.
+
+### Browser-Smoke-Gate
+```bash
+npm run test:browser
+```
+
+Das Browser-Gate nutzt Playwright mit einem vom Test verwalteten lokalen HTTP-Server. Es prueft die zentralen Einstiegspunkte (`index.html`, `Balance.html`, `Simulator.html`, `depot-tranchen-manager.html`, `Handbuch.html`) als echte Browser-Smokes. Es ersetzt keine Node-Unit-Tests und laeuft bewusst getrennt von `npm test`.
+
+### Release-nahe Tauri-Gates
+```bash
+node tests/run-single.mjs tests/tauri-csp.test.mjs
+npm run tauri:build
+```
+
+`tests/tauri-csp.test.mjs` ist Teil von `npm test` und prueft Tauri-Konfiguration, CSP, Icons, Package-Skripte und statische Rust-Command-Contracts. Sobald `src-tauri/` geaendert wird, muss zusaetzlich ein echter Tauri-/Rust-Build laufen (`npm run tauri:build` oder der manuelle Windows-Release-Pfad). Manuelle Desktop-Smokes nach EXE-Build bleiben manuelle Release-Verifikation und sind kein Ersatz fuer automatisierte Tests.
 
 ### Einzelne Testdatei ausführen
 ```bash
@@ -35,6 +59,8 @@ node tests/run-single.mjs core-engine.test.mjs
 ```bash
 node tests/run-tests.mjs
 ```
+
+`QUICK_TESTS=1` ist deprecated. Fuer schnelle Fehlersuche gezielt `node tests/run-single.mjs <testfile>` oder die im jeweiligen Slice dokumentierten Fokusbefehle verwenden.
 
 ## Assertions Available
 

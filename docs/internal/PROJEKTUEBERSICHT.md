@@ -1,6 +1,6 @@
 # Projektuebersicht RuhestandsApp
 
-**Stand:** 2026-06-04
+**Stand:** 2026-06-12
 **Zweck:** Interne Orientierung fuer Entwicklung, Review, Refactoring und Onboarding in diesem Repository.
 
 ## Kurzprofil
@@ -242,7 +242,8 @@ Relevante Skripte aus `package.json`:
 | --- | --- |
 | `npm test` | gesamte Test-Suite via `node tests/run-tests.mjs` |
 | `node tests/run-single.mjs <datei>` | gezielter Einzeltest |
-| `npm run test:coverage` | Coverage-Runner |
+| `npm run test:coverage` | Coverage-Runner mit frischem `.coverage/` und V8-Report |
+| `npm run test:browser` | Playwright-Smoke-Gate fuer HTML-Einstiege mit lokalem Testserver |
 | `npm run build:engine` | Engine aus `engine/` nach `engine.js` bauen |
 | `npm run build:engine:strict` | Strict Engine-Build fuer CI/Release |
 | `npm run sync-dist` | Frontend nach `dist/` synchronisieren |
@@ -272,7 +273,10 @@ Rahmen:
 - Runner: `tests/run-tests.mjs`
 - Einzelrunner: `tests/run-single.mjs`
 - Testdateien: `*.test.mjs`
-- Statistik laut aktueller Abschlussvalidierung: 79 Testdateien, 2134 Assertions, 0 Fehler (`npm test`, 2026-06-04)
+- Browser-Smoke-Gate: `npm run test:browser`
+- Coverage-Gate: `npm run test:coverage`
+- Statistik laut letzter Abschlussvalidierung: 90 Testdateien, 2294 Assertions, 0 Fehler (`npm test`, 2026-06-12)
+- Coverage-Baseline laut Slice 11: ca. 72,25% Zeilen-Coverage fuer `app/`, `engine/`, `workers/` und `types/`; keine harte Mindestschwelle.
 
 Wichtige Testgruppen:
 
@@ -283,11 +287,16 @@ Wichtige Testgruppen:
 - Profilverbund: `profile-storage`, `profilverbund-balance`, `simulator-multiprofile-aggregation`.
 - Worker und Paritaet: `worker-pool`, `worker-parity`.
 - UI-nahe Module: Balance-Reader, Storage, Renderer, Expenses, Heatmap.
+- Browser-Einstiege: Playwright-Smokes fuer Startseite, Balance, Simulator, Tranchenmanager und Handbuch.
+- Persistenz/Tauri: Browser-Fallback, IndexedDB/localStorage/Tauri-Adapter-Contracts und Tauri-CSP/Command-Contracts.
 
 Validierungsregel:
 
 - Default nach Codeaenderungen: `npm test`.
 - Nach Engine-Aenderungen zusaetzlich `npm run build:engine`.
+- Nach Browser-Einstiegs-, HTML- oder UI-Orchestrierungs-Aenderungen zusaetzlich `npm run test:browser`.
+- Bei Coverage-relevanten Slices oder vor Review-Abschluss `npm run test:coverage` zur Baseline-Aktualisierung.
+- Bei `src-tauri/`-Aenderungen zusaetzlich ein echtes Tauri-/Rust-Gate (`npm run tauri:build` oder der Windows-Release-Pfad).
 - Fuer fokussierte Fehlersuche sind Einzeltests erlaubt; dann muss berichtet werden, dass nicht die ganze Suite lief.
 
 ## Dokumentation

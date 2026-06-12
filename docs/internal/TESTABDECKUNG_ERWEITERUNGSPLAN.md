@@ -670,9 +670,11 @@ Risiken:
 **Abhaengigkeiten:** Slices 1 bis 10  
 **Aenderungstyp:** Dokumentation und Test-Gates
 
+**Status:** umgesetzt in `docs/internal/SLICE_TEST_COVERAGE_11_DOCUMENTATION_GATES.md`
+
 Ziel:
 
-- Die neue Testabdeckungsstrategie in Referenzdoku und Testsuite-Doku verankern.
+- Die neue Testabdeckungsstrategie ist in Referenzdoku und Testsuite-Doku verankert.
 
 Zu aktualisieren:
 
@@ -703,9 +705,17 @@ Je nach vorherigen Slices zusaetzlich:
 npm run tauri:build
 ```
 
+Ergebnis:
+
+- `tests/README.md` beschreibt `npm test`, `npm run test:coverage`, `npm run test:browser`, `run-single` und release-nahe Tauri-Gates getrennt.
+- `docs/reference/TECHNICAL.md` und `docs/internal/PROJEKTUEBERSICHT.md` dokumentieren Standard-, Coverage-, Browser- und Tauri-Gates.
+- Coverage-Baseline: ca. 72,25% Zeilen-Coverage fuer `app/`, `engine/`, `workers/` und `types/`; noch keine harte Mindestschwelle.
+- Bekannte Coverage-Ausnahmen sind dokumentiert: UI-nahe Browserpfade, Wrapper/Re-Exports und Dateien ohne ausfuehrbare Zeilen.
+- `README.md` wurde nicht geaendert, weil keine Package-Kommandos geaendert wurden und die detaillierten Gates in Test-/Technikreferenzen stehen.
+
 Risiken:
 
-- Dokumentations-Sync kann Dateien ausserhalb des urspruenglichen Test-Scope betreffen. Wenn mehr als 5 Dateien geaendert werden muessten, greift die Stop-Regel.
+- Dokumentations-Sync kann Dateien ausserhalb des urspruenglichen Test-Scope betreffen. In Slice 11 blieb der Scope bei 5 Dateien.
 
 ## Reihenfolge und Abhaengigkeiten
 
@@ -737,8 +747,8 @@ Slices 5, 8, 9 und 10 koennen nach Slice 3 teilweise parallel geplant werden. Sl
 - [x] Tranchenmanager, Profil-UI und Preisservice haben Contract-Tests. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_08_TRANCHES_PROFILE_PRICE_SERVICE.md`, `tests/tranchen-manager-page.test.mjs`, `tests/tranchen-price-service.test.mjs`, `tests/profile-ui-contract.test.mjs`; bestehende Gates `tests/tranchen-manager-state.test.mjs`.
 - [x] Finanzkern hat negative Contract-Tests fuer Stop-Regeln. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_09_CORE_NEGATIVE_CONTRACTS.md`, `tests/core-negative-contracts.test.mjs`; bestehende Gates `tests/engine-robustness.test.mjs`, `tests/simulator-backtest.test.mjs`.
 - [x] Persistenz- und Tauri-Gates sind getrennt und reproduzierbar. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_10_PERSISTENCE_TAURI_GATES.md`, `tests/persistence.test.mjs`, `tests/tauri-csp.test.mjs`; bei `src-tauri/`-Aenderungen zusaetzlich `npm run tauri:build`.
-- [ ] Doku beschreibt Standard-, Coverage-, Browser- und Release-nahe Gates.
-- [ ] Coverage-Ausnahmen sind begruendet und reviewfaehig.
+- [x] Doku beschreibt Standard-, Coverage-, Browser- und Release-nahe Gates.
+- [x] Coverage-Ausnahmen sind begruendet und reviewfaehig.
 
 ## Geklaerte Entscheidungen und offene Fragen
 
@@ -750,12 +760,12 @@ Geklaert:
 4. `npm test` bleibt die schnelle Standardsuite; Browser- und Tauri-Gates laufen separat, bis Laufzeit und Installationsaufwand bewertet sind.
 5. Tauri/Rust bleibt ein separates Release-nahes Gate: Node-Tests duerfen Rust-Command-Praesenz und JS-Payloads absichern, ersetzen aber keinen Tauri-/Rust-Build bei Aenderungen an `src-tauri/`.
 
-Offen:
+Offen bzw. bewusst vertagt:
 
-1. Welche Coverage-Schwellen sollen nach reparierter Baseline verbindlich werden?
-2. Welche nicht geladenen UI-Module sind bewusst nur ueber Browser-Smoke zu pruefen und bekommen keine Node-Unit-Tests?
-3. Soll nach Runner-Hygiene ein kleiner, dokumentierter Entwickler-Subset-Befehl als Ersatz fuer `QUICK_TESTS=1` eingefuehrt werden?
-4. Soll mittelbar eine Parallelisierung fuer nicht-DOM-nahe Tests eingefuehrt werden, oder bleibt die Suite bewusst sequentiell?
+1. Verbindliche Coverage-Schwellen werden nach Stabilisierung mehrerer Baselines separat entschieden; Slice 11 setzt nur ein Transparenz-Gate.
+2. UI-Module mit niedriger oder 0%-V8-Coverage bleiben reviewpflichtig ueber Browser-Smoke/gezielte Contract-Tests statt pauschaler Node-Testpflicht.
+3. `QUICK_TESTS=1` bleibt deprecated; ein neuer Entwickler-Subset-Befehl wird nicht in diesem Slice eingefuehrt.
+4. Parallelisierung fuer nicht-DOM-nahe Tests bleibt vertagt; die Standardsuite bleibt bewusst sequentiell.
 
 ## Nicht-Ziele
 

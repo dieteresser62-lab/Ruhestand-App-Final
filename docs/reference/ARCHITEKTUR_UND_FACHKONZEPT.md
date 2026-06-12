@@ -2,8 +2,8 @@
 
 **Technische Dokumentation der DIY-Software für Ruhestandsplanung**
 
-**Dokumentstand:** 2026-06-04
-**Geprüfte Codebasis:** lokale Arbeitskopie vom 2026-06-04
+**Dokumentstand:** 2026-06-12
+**Geprüfte Codebasis:** lokale Arbeitskopie vom 2026-06-12
 **Engine API:** v31.0
 **Codeumfang:** Momentaufnahme, siehe Komponenten-Tabelle
 **Lizenz:** MIT
@@ -36,7 +36,7 @@
 
 ## Komponenten
 
-*Momentaufnahme der lokalen Arbeitskopie vom 2026-06-04. Modul- und Zeilenzahlen sind Orientierungshilfen, nicht normative Architekturgrenzen. Dieses Dokument beschreibt die Architektur und die fachlichen Zusammenhänge eigenständig; spezialisierte Referenzen (`TECHNICAL.md`, Modul-READMEs, `engine/README.md`, `tests/README.md`) dienen als ergänzende Detail- und Exportkataloge.*
+*Momentaufnahme der lokalen Arbeitskopie vom 2026-06-12. Modul- und Zeilenzahlen sind Orientierungshilfen, nicht normative Architekturgrenzen. Dieses Dokument beschreibt die Architektur und die fachlichen Zusammenhänge eigenständig; spezialisierte Referenzen (`TECHNICAL.md`, Modul-READMEs, `engine/README.md`, `tests/README.md`) dienen als ergänzende Detail- und Exportkataloge.*
 
 | Komponente | Zweck | Momentaufnahme |
 |------------|-------|----------------|
@@ -44,7 +44,7 @@
 | **Simulator** | Monte-Carlo-Simulation, Parameter-Sweeps, Auto-Optimize, Dynamic Flex, Pflegebucket-Wirklogik | 87 JS-Module unter `app/simulator/` |
 | **Engine** | Kern-Berechnungslogik, Guardrails, Steuern | 24 MJS-Module unter `engine/`, ca. 4.240 Zeilen |
 | **Workers** | Parallelisierung für MC/Sweep/Optimizer-Pfade | 3 JS-Module unter `workers/`, ca. 757 Zeilen |
-| **Tests** | Unit- und Integrationstests | 79 `*.test.mjs` Dateien; 2134 Assertions im Lauf vom 2026-06-04 |
+| **Tests** | Unit-, Integration-, Browser-Smoke- und Coverage-Gates | 90 `*.test.mjs` Dateien; 2294 Assertions im Lauf vom 2026-06-12; Coverage-Baseline 72,25% |
 | **Profile, Tranchen, Shared** | Profilverwaltung, Profilverbund, Tranchenstatus, gemeinsame Utilities | JS-Module unter `app/profile/`, `app/tranches/`, `app/shared/`, zusammen ca. 2.959 Zeilen |
 
 *Hinweis: Dieses Dokument beschreibt Konzepte und Architekturentscheidungen. Für konkrete Implementierungsdetails gelten die genannten Module und Tests als Referenz; exakte Code-Zeilen werden bewusst vermieden, weil sie nach Refactorings schnell veralten.*
@@ -222,13 +222,13 @@ Die Suite umfasst mehrere HTML-Oberflächen und Begleitmodule: Neben Balance und
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Aktuelle Bestandszahlen (2026-06-04):**
+**Aktuelle Bestandszahlen (2026-06-12):**
 
 - `app/balance/`: 35 JS-Module
 - `app/simulator/`: 87 JS-Module
 - `engine/`: 24 MJS-Module
 - `workers/`: 3 JS-Module
-- `tests/`: 79 Testdateien
+- `tests/`: 90 Testdateien
 
 ## B.1.2 Tauri Desktop-App (Portable EXE)
 
@@ -1009,7 +1009,7 @@ Balance und Simulator nutzen die gleiche Erkennung für Bond-Tranchen. Der Simul
 
 ## B.5 Test-Suite und Validierungsregeln
 
-**Übersicht:** Die Test-Suite umfasst in der geprüften Arbeitskopie **79 `*.test.mjs`-Dateien**. Der Lauf vom 2026-06-04 ergab **2134 Assertions**, alle erfolgreich. Die Tests laufen ohne Jest/Mocha über native Node.js-ESM-Module und eigene globale Assertions (`assert`, `assertEqual`, `assertClose`).
+**Übersicht:** Die Test-Suite umfasst in der geprüften Arbeitskopie **90 `*.test.mjs`-Dateien**. Der Lauf vom 2026-06-12 ergab **2294 Assertions**, alle erfolgreich. Die V8-Coverage-Baseline aus demselben Slice liegt bei **72,25%** (19352/26784 ausfuehrbare Zeilen, 162 Projektdateien). Die Tests laufen ohne Jest/Mocha über native Node.js-ESM-Module und eigene globale Assertions (`assert`, `assertEqual`, `assertClose`).
 
 ### B.5.1 Test-Inventar
 
@@ -1030,11 +1030,15 @@ Balance und Simulator nutzen die gleiche Erkennung für Bond-Tranchen. Der Simul
 | Gesamtsuite | `npm test` | Default nach Codeänderungen und vor Release/EXE-Build |
 | Direkter Runner | `node tests/run-tests.mjs` | Fallback, wenn `npm` lokal defekt ist |
 | Einzeltest | `node tests/run-single.mjs <testfile>` | fokussierte Fehlersuche; im Ergebnis berichten, dass nicht die ganze Suite lief |
-| Quick-Subset | `QUICK_TESTS=1 npm test` | schneller Parity-Check, ersetzt keinen Release-Lauf |
+| Coverage-Baseline | `npm run test:coverage` | Review-/Transparenz-Gate fuer `app/`, `engine/`, `workers/` und `types/`; noch keine harte Mindestschwelle |
+| Browser-Smokes | `npm run test:browser` | Playwright-Gate fuer HTML-Einstiege mit lokalem Testserver; getrennt von `npm test` |
 | Engine-Bundle | `npm run build:engine` | zusätzlich nach Änderungen an `engine/` oder öffentlicher `EngineAPI` |
 | Strict Engine-Build | `npm run build:engine:strict` | CI/Release, damit fehlendes `esbuild` nicht still auf Fallback geht |
+| Tauri/Rust-Gate | `npm run tauri:build` | zusätzlich bei Änderungen an `src-tauri/` oder release-nahen Tauri-Pfaden |
 
 Für reine Dokumentationsänderungen ist kein Testlauf erforderlich, sofern keine Code- oder Build-Artefakte geändert wurden. Wenn Dokumentation jedoch konkrete Assertion-Zahlen oder Testausgaben behauptet, müssen diese Zahlen aus einem aktuellen Runner-Lauf stammen oder ausdrücklich als nicht neu verifiziert gekennzeichnet werden.
+
+`QUICK_TESTS=1` ist deprecated. Fuer schnelle Fehlersuche sollen gezielte `run-single`-Läufe oder die im jeweiligen Slice dokumentierten Fokusbefehle verwendet werden.
 
 ### B.5.3 Worker-Parity-Test
 
