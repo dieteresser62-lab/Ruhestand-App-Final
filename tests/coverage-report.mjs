@@ -1,19 +1,34 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const repoRoot = path.resolve(__dirname, '..');
-const coverageDir = path.join(repoRoot, '.coverage', 'v8');
-const summaryPath = path.join(repoRoot, '.coverage', 'summary.json');
 
-const includeRoots = ['app', 'engine', 'workers'];
+const defaultRepoRoot = path.resolve(__dirname, '..');
+const defaultCoverageDir = path.join(defaultRepoRoot, '.coverage', 'v8');
+const defaultSummaryPath = path.join(defaultRepoRoot, '.coverage', 'summary.json');
+
+const includeRoots = ['app', 'engine', 'workers', 'types'];
 const includeExt = new Set(['.js', '.mjs', '.cjs']);
 
 function isInside(base, target) {
     const rel = path.relative(base, target);
     return rel && !rel.startsWith('..') && !path.isAbsolute(rel);
+}
+
+export function isFileCoverageUrl(url) {
+    if (typeof url !== 'string' || url.length === 0) return false;
+    try {
+        return new URL(url).protocol === 'file:';
+    } catch {
+        return false;
+    }
+}
+
+export function coverageUrlToPath(url) {
+    if (!isFileCoverageUrl(url)) return null;
+    return fileURLToPath(url);
 }
 
 function normalizeRanges(ranges) {
@@ -41,6 +56,59 @@ function normalizeRanges(ranges) {
     return merged;
 }
 
+function normalizeV8Ranges(ranges) {
+    return ranges
+        .filter(r => Number.isFinite(r?.startOffset) && Number.isFinite(r?.endOffset))
+        .map(r => ({
+            start: Math.max(0, r.startOffset | 0),
+            end: Math.max(0, r.endOffset | 0),
+            count: Number.isFinite(r?.count) ? r.count : 0
+        }))
+        .filter(r => r.end > r.start)
+        .sort((a, b) => (a.start - b.start) || (b.end - a.end) || (b.count - a.count));
+}
+
+function effectiveRangesFromV8Ranges(ranges) {
+    const normalized = normalizeV8Ranges(ranges);
+    if (normalized.length === 0) {
+        return { allRanges: [], coveredRanges: [] };
+    }
+
+    const boundaries = [...new Set(normalized.flatMap(r => [r.start, r.end]))]
+        .sort((a, b) => a - b);
+    const executableSegments = [];
+    const coveredSegments = [];
+
+    for (let i = 0; i < boundaries.length - 1; i++) {
+        const start = boundaries[i];
+        const end = boundaries[i + 1];
+        if (end <= start) continue;
+
+        let innermost = null;
+        for (const range of normalized) {
+            if (range.start <= start && range.end >= end) {
+                if (
+                    !innermost ||
+                    (range.end - range.start) < (innermost.end - innermost.start)
+                ) {
+                    innermost = range;
+                }
+            }
+        }
+        if (!innermost) continue;
+
+        executableSegments.push({ start, end });
+        if (innermost.count > 0) {
+            coveredSegments.push({ start, end });
+        }
+    }
+
+    return {
+        allRanges: normalizeRanges(executableSegments.map(r => ({ startOffset: r.start, endOffset: r.end }))),
+        coveredRanges: normalizeRanges(coveredSegments.map(r => ({ startOffset: r.start, endOffset: r.end })))
+    };
+}
+
 function buildLineStarts(source) {
     const starts = [0];
     for (let i = 0; i < source.length; i++) {
@@ -51,6 +119,18 @@ function buildLineStarts(source) {
 
 function intersects(interval, start, end) {
     return interval.start < end && interval.end > start;
+}
+
+function isIntervalFullyCovered(start, end, coveredRanges, startIndex = 0) {
+    let cursor = start;
+    for (let i = startIndex; i < coveredRanges.length && coveredRanges[i].start < end; i++) {
+        const coveredRange = coveredRanges[i];
+        if (coveredRange.end <= cursor) continue;
+        if (coveredRange.start > cursor) return false;
+        cursor = Math.max(cursor, coveredRange.end);
+        if (cursor >= end) return true;
+    }
+    return cursor >= end;
 }
 
 function lineCoverageFromRanges(source, allRanges, coveredRanges) {
@@ -79,22 +159,67 @@ function lineCoverageFromRanges(source, allRanges, coveredRanges) {
         executable++;
 
         while (coveredIdx < coveredRanges.length && coveredRanges[coveredIdx].end <= start) coveredIdx++;
-        let isCovered = false;
+        let hasCovered = false;
+        let hasUncovered = false;
         let scanCovered = coveredIdx;
-        while (scanCovered < coveredRanges.length && coveredRanges[scanCovered].start < end) {
-            if (intersects(coveredRanges[scanCovered], start, end)) {
-                isCovered = true;
-                break;
+        scanAll = allIdx;
+        while (scanAll < allRanges.length && allRanges[scanAll].start < end) {
+            const executableRange = allRanges[scanAll];
+            if (intersects(executableRange, start, end)) {
+                const executableStart = Math.max(executableRange.start, start);
+                const executableEnd = Math.min(executableRange.end, end);
+                while (scanCovered < coveredRanges.length && coveredRanges[scanCovered].end <= executableRange.start) {
+                    scanCovered++;
+                }
+                const executableRangeCovered = isIntervalFullyCovered(
+                    executableStart,
+                    executableEnd,
+                    coveredRanges,
+                    scanCovered
+                );
+                let scanCoveredForRange = scanCovered;
+                while (
+                    scanCoveredForRange < coveredRanges.length &&
+                    coveredRanges[scanCoveredForRange].start < executableRange.end
+                ) {
+                    if (intersects(coveredRanges[scanCoveredForRange], executableStart, executableEnd)) {
+                        hasCovered = true;
+                        break;
+                    }
+                    scanCoveredForRange++;
+                }
+                hasUncovered = hasUncovered || !executableRangeCovered;
             }
-            scanCovered++;
+            scanAll++;
         }
-        if (isCovered) covered++;
+        if (hasCovered && !hasUncovered) covered++;
     }
 
     return { executable, covered };
 }
 
-function collectCoverageEntries() {
+function getConfig(env = process.env) {
+    const repoRoot = env.COVERAGE_REPO_ROOT
+        ? path.resolve(env.COVERAGE_REPO_ROOT)
+        : defaultRepoRoot;
+    const coverageDir = env.COVERAGE_V8_DIR
+        ? path.resolve(env.COVERAGE_V8_DIR)
+        : defaultCoverageDir;
+    const summaryPath = env.COVERAGE_SUMMARY_PATH
+        ? path.resolve(env.COVERAGE_SUMMARY_PATH)
+        : defaultSummaryPath;
+    return { repoRoot, coverageDir, summaryPath };
+}
+
+function createEmptyFileCoverage(source) {
+    return {
+        source,
+        allRanges: [],
+        coveredRanges: []
+    };
+}
+
+export function collectCoverageEntries({ repoRoot, coverageDir } = getConfig()) {
     if (!fs.existsSync(coverageDir)) {
         throw new Error(`Coverage directory not found: ${coverageDir}`);
     }
@@ -107,14 +232,14 @@ function collectCoverageEntries() {
         const results = Array.isArray(payload.result) ? payload.result : [];
 
         for (const entry of results) {
-            if (typeof entry?.url !== 'string' || !entry.url.startsWith('file://')) continue;
-            const filePath = decodeURIComponent(entry.url.replace('file://', ''));
+            const filePath = coverageUrlToPath(entry?.url);
+            if (!filePath) continue;
             const ext = path.extname(filePath);
             if (!includeExt.has(ext)) continue;
             if (!isInside(repoRoot, filePath)) continue;
 
             const rel = path.relative(repoRoot, filePath).replace(/\\/g, '/');
-            const include = includeRoots.some(root => rel.startsWith(`${root}/`));
+            const include = includeRoots.some(root => rel === root || rel.startsWith(`${root}/`));
             if (!include) continue;
 
             const source = typeof entry.source === 'string'
@@ -122,9 +247,8 @@ function collectCoverageEntries() {
                 : (fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : null);
             if (!source) continue;
 
+            const fileCoverage = byFile.get(rel) || createEmptyFileCoverage(source);
             const functions = Array.isArray(entry.functions) ? entry.functions : [];
-            const allRangesRaw = [];
-            const coveredRangesRaw = [];
             for (const fn of functions) {
                 const ranges = Array.isArray(fn?.ranges) ? fn.ranges : [];
                 const hasRootRange = ranges.length > 0 &&
@@ -133,48 +257,65 @@ function collectCoverageEntries() {
                 const isTopLevel = fn?.functionName === '' && hasRootRange;
                 const rangesToUse = isTopLevel ? ranges.slice(1) : ranges;
 
-                for (const r of rangesToUse) {
-                    allRangesRaw.push(r);
-                    if ((r?.count || 0) > 0) coveredRangesRaw.push(r);
-                }
+                const effectiveRanges = effectiveRangesFromV8Ranges(rangesToUse);
+                fileCoverage.allRanges.push(...effectiveRanges.allRanges);
+                fileCoverage.coveredRanges.push(...effectiveRanges.coveredRanges);
             }
-
-            const allRanges = normalizeRanges(allRangesRaw);
-            const coveredRanges = normalizeRanges(coveredRangesRaw);
-            const fileCoverage = lineCoverageFromRanges(source, allRanges, coveredRanges);
-
-            const existing = byFile.get(rel) || { executable: 0, covered: 0 };
-            existing.executable += fileCoverage.executable;
-            existing.covered += fileCoverage.covered;
-            byFile.set(rel, existing);
+            byFile.set(rel, fileCoverage);
         }
     }
 
-    return byFile;
+    const statsByFile = new Map();
+    for (const [rel, fileCoverage] of byFile.entries()) {
+        const allRanges = normalizeRanges(fileCoverage.allRanges.map(r => ({
+            startOffset: r.start,
+            endOffset: r.end
+        })));
+        const coveredRanges = normalizeRanges(fileCoverage.coveredRanges.map(r => ({
+            startOffset: r.start,
+            endOffset: r.end
+        })));
+        statsByFile.set(rel, lineCoverageFromRanges(fileCoverage.source, allRanges, coveredRanges));
+    }
+
+    return statsByFile;
 }
 
 function toPct(covered, total) {
-    if (!total) return 100;
     return (covered / total) * 100;
 }
 
 function formatPct(value) {
+    if (!Number.isFinite(value)) return 'n/a';
     return `${value.toFixed(2)}%`;
 }
 
-function main() {
-    const byFile = collectCoverageEntries();
+export function buildCoverageSummary({ repoRoot, coverageDir, summaryPath } = getConfig()) {
+    const byFile = collectCoverageEntries({ repoRoot, coverageDir });
     const files = [...byFile.entries()]
         .map(([file, stats]) => ({
             file,
             executable: stats.executable,
             covered: stats.covered,
-            pct: toPct(stats.covered, stats.executable)
+            pct: stats.executable > 0 ? toPct(stats.covered, stats.executable) : null
         }))
-        .sort((a, b) => a.pct - b.pct);
+        .sort((a, b) => {
+            if (a.pct === null && b.pct === null) return a.file.localeCompare(b.file, 'en');
+            if (a.pct === null) return 1;
+            if (b.pct === null) return -1;
+            return (a.pct - b.pct) || a.file.localeCompare(b.file, 'en');
+        });
 
     const totalExecutable = files.reduce((sum, f) => sum + f.executable, 0);
     const totalCovered = files.reduce((sum, f) => sum + f.covered, 0);
+
+    if (files.length === 0) {
+        throw new Error('No project coverage data found for app/, engine/, workers/ or types/.');
+    }
+    if (totalExecutable === 0) {
+        throw new Error('Coverage data contains project files but no executable project lines.');
+    }
+
     const totalPct = toPct(totalCovered, totalExecutable);
 
     const summary = {
@@ -188,15 +329,22 @@ function main() {
             file: f.file,
             executableLines: f.executable,
             coveredLines: f.covered,
-            coveragePct: Number(f.pct.toFixed(2))
+            coveragePct: f.pct === null ? null : Number(f.pct.toFixed(2))
         }))
     };
 
+    return { files, summary, summaryPath, repoRoot };
+}
+
+function writeSummary({ files, summary, summaryPath, repoRoot }) {
     fs.mkdirSync(path.dirname(summaryPath), { recursive: true });
     fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
 
     console.log('\nCoverage summary (approx. line coverage from V8 ranges)');
-    console.log(`Total: ${formatPct(totalPct)} (${totalCovered}/${totalExecutable})`);
+    console.log(
+        `Total: ${formatPct(summary.total.coveragePct)} ` +
+        `(${summary.total.coveredLines}/${summary.total.executableLines})`
+    );
     console.log(`Files: ${files.length}`);
     console.log('Worst files:');
     for (const row of files.slice(0, 15)) {
@@ -205,9 +353,17 @@ function main() {
     console.log(`\nWrote ${path.relative(repoRoot, summaryPath)}`);
 }
 
-try {
-    main();
-} catch (error) {
-    console.error('Coverage report failed:', error?.message || error);
-    process.exit(1);
+export function main() {
+    writeSummary(buildCoverageSummary());
+}
+
+const isMain = process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
+
+if (isMain) {
+    try {
+        main();
+    } catch (error) {
+        console.error('Coverage report failed:', error?.message || error);
+        process.exit(1);
+    }
 }

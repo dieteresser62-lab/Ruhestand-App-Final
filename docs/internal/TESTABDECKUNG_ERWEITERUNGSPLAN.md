@@ -118,7 +118,7 @@ Jeder Slice bekommt vor Umsetzung eine eigene Slice-MD nach `docs/internal/SLICE
 
 **Geplante Slice-Datei:** `docs/internal/SLICE_TEST_COVERAGE_01_RUNNER_ISOLATION.md`  
 **Abhaengigkeiten:** keine  
-**Aenderungstyp:** Test-Infrastruktur
+**Aenderungstyp:** Test-Infrastruktur  
 **Status:** umgesetzt und freigegeben
 
 Umsetzungsstand 2026-06-12:
@@ -167,6 +167,18 @@ Risiken:
 **Geplante Slice-Datei:** `docs/internal/SLICE_TEST_COVERAGE_02_COVERAGE_BASELINE.md`  
 **Abhaengigkeiten:** Slice 1  
 **Aenderungstyp:** Test-Infrastruktur
+**Status:** umgesetzt und freigegeben
+
+Umsetzungsstand 2026-06-12:
+
+- `tests/coverage-report.mjs` nutzt fuer `file://`-URLs `fileURLToPath` aus `node:url` und filtert `node:`, `http:`, leere und sonstige Nicht-Datei-URLs vor der Konvertierung.
+- `app/`, `engine/`, `workers/` und `types/` werden ausgewertet; der finale Coverage-Lauf erzeugte `.coverage/summary.json` mit 159 Projektdateien.
+- Reports ohne Projektdateien oder ohne ausfuehrbare Projektzeilen brechen mit Fehler ab.
+- Dateien mit 0 ausfuehrbaren Zeilen bleiben sichtbar und erhalten `coveragePct: null`, statt als `100%` oder `NaN%` zu erscheinen.
+- `tests/coverage-report.test.mjs` deckt Projektdateien aus allen vier Roots, Windows-Pfade mit Leerzeichen, UNC-`file://`, Nicht-Datei-URLs und den Leerreport-Exit-Code ab.
+- Review-Finding G-01 wurde behoben: Verschachtelte V8-Ranges werden pro Script-Eintrag hierarchisch ausgewertet, sodass innere `count: 0`-Ranges nicht mehr durch aeussere ausgefuehrte Funktionsranges als covered erscheinen.
+- Validierung nach Review-Fix: `node tests\run-single.mjs tests\coverage-report.test.mjs` erfolgreich mit 19 Assertions; `npm run test:coverage` erfolgreich mit 81 Testdateien, 2182 Assertions, 0 Fehler, 0 offenen Handles und Coverage-Baseline 72.89 Prozent (19183/26316).
+- Review/Freigabe fuer Slice 2 wurde am 2026-06-12 durch Gemini erteilt.
 
 Ziel:
 
