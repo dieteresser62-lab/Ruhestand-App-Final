@@ -353,7 +353,17 @@ Risiken:
 
 **Geplante Slice-Datei:** `docs/internal/SLICE_TEST_COVERAGE_05_WORKER_ENTRYPOINTS.md`  
 **Abhaengigkeiten:** Slice 3  
-**Aenderungstyp:** Worker-Testabdeckung
+**Aenderungstyp:** Worker-Testabdeckung  
+**Status:** umgesetzt und freigegeben
+
+Umsetzungsstand 2026-06-12:
+
+- `tests/mc-worker-contract.test.mjs` startet einen Node-Worker-Thread-nahen Harness, bildet `self.onmessage`/`self.postMessage` ab und importiert darin den echten Entrypoint `workers/mc-worker.js`.
+- Abgedeckt sind `init`, `dispose`, unbekannte Message-Typen, fehlende Szenario-Caches, gueltige Monte-Carlo-Jobs, Progress-Nachrichten und TypedArray-/ArrayBuffer-nahe Ergebnisstrukturen.
+- Produktionscode blieb unveraendert; `workers/worker-pool.js`, `workers/worker-telemetry.js` und `app/simulator/auto-optimize-worker.js` bleiben ueber bestehende Worker-/Auto-Optimize-Contracts im Gate.
+- Validierung: `node tests\run-single.mjs tests\mc-worker-contract.test.mjs` erfolgreich mit 22 Assertions; `node tests\run-single.mjs tests\worker-pool.test.mjs` erfolgreich mit 40 Assertions; `node tests\run-single.mjs tests\worker-parity.test.mjs` erfolgreich mit 168 Assertions; `npm test` erfolgreich mit 84 Testdateien, 2228 Assertions, 0 Fehler, 0 offenen Handles.
+- Review/Freigabe fuer Slice 5 wurde am 2026-06-12 durch Gemini erteilt.
+
 
 Ziel:
 
@@ -672,7 +682,7 @@ Slices 5, 8, 9 und 10 koennen nach Slice 3 teilweise parallel geplant werden. Sl
 - [ ] Test-Runner zaehlt Fehler nicht doppelt und bietet einen isolierten Pfad fuer DOM-nahe Tests.
 - [ ] Alle nicht geladenen Quellmodule sind klassifiziert.
 - [x] Browser-Einstiege haben echte Playwright-Smoke-Gates mit lokalem HTTP-Testserver. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_04_BROWSER_SMOKE.md`, `tests/browser-smoke.test.mjs`, `npm run test:browser`.
-- [ ] Worker-Einstiegspunkte sind explizit getestet.
+- [x] Worker-Einstiegspunkte sind explizit getestet. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_05_WORKER_ENTRYPOINTS.md`, `tests/mc-worker-contract.test.mjs`; bestehende Gates `tests/worker-pool.test.mjs`, `tests/worker-parity.test.mjs`, `tests/auto-optimize-worker-contract.test.mjs`.
 - [ ] Balance-Orchestrierung ist ueber Einstiegsmodule abgedeckt.
 - [ ] Simulator-Orchestrierung ist ueber Einstiegsmodule abgedeckt.
 - [ ] Tranchenmanager, Profil-UI und Preisservice haben Contract-Tests.
