@@ -458,7 +458,17 @@ Risiken:
 
 **Geplante Slice-Datei:** `docs/internal/SLICE_TEST_COVERAGE_07_SIMULATOR_UI_ORCHESTRATION.md`  
 **Abhaengigkeiten:** Slices 1 und 4  
-**Aenderungstyp:** Simulator-Integrationstests
+**Aenderungstyp:** Simulator-Integrationstests  
+**Status:** umgesetzt und freigegeben
+
+Umsetzungsstand 2026-06-12:
+
+- `tests/simulator-ui-orchestration.test.mjs` laeuft isoliert via `node tests\run-single.mjs tests\simulator-ui-orchestration.test.mjs` und wird bei `npm test` nur importiert.
+- Abgedeckt sind Browser-Entry-Point-Verdrahtung aus `simulator-main.js`, Tab-Wechsel, Reset auf `sim_`-Persistenzkeys, Partner-Toggle, Input-Persistenz, Stress-Preset-Befuellung, sichtbare Sweep-Grid-Warnungen und Optimizer-Parameteruebernahme ohne MC-Lauf.
+- Produktionscode blieb unveraendert.
+- Validierung: `node tests\run-single.mjs tests\simulator-ui-orchestration.test.mjs` erfolgreich mit 25 Assertions; `node tests\run-single.mjs tests\simulator-input-readers.test.mjs` erfolgreich mit 35 Assertions; `node tests\run-single.mjs tests\simulator-sweep.test.mjs` erfolgreich mit 107 Assertions; `npm test` erfolgreich mit 86 Testdateien, 2228 Assertions, 0 Fehler, 0 offenen Handles.
+- Review/Freigabe fuer Slice 7 wurde am 2026-06-12 durch Gemini erteilt.
+
 
 Ziel:
 
@@ -695,7 +705,7 @@ Slices 5, 8, 9 und 10 koennen nach Slice 3 teilweise parallel geplant werden. Sl
 - [x] Browser-Einstiege haben echte Playwright-Smoke-Gates mit lokalem HTTP-Testserver. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_04_BROWSER_SMOKE.md`, `tests/browser-smoke.test.mjs`, `npm run test:browser`.
 - [x] Worker-Einstiegspunkte sind explizit getestet. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_05_WORKER_ENTRYPOINTS.md`, `tests/mc-worker-contract.test.mjs`; bestehende Gates `tests/worker-pool.test.mjs`, `tests/worker-parity.test.mjs`, `tests/auto-optimize-worker-contract.test.mjs`.
 - [x] Balance-Orchestrierung ist ueber Einstiegsmodule abgedeckt. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_06_BALANCE_UI_ORCHESTRATION.md`, `tests/balance-ui-orchestration.test.mjs`; bestehende Gates `tests/balance-smoke.test.mjs`, `tests/balance-annual-workflow-contract.test.mjs`.
-- [ ] Simulator-Orchestrierung ist ueber Einstiegsmodule abgedeckt.
+- [x] Simulator-Orchestrierung ist ueber Einstiegsmodule abgedeckt. Umsetzung: `docs/internal/SLICE_TEST_COVERAGE_07_SIMULATOR_UI_ORCHESTRATION.md`, `tests/simulator-ui-orchestration.test.mjs`; bestehende Gates `tests/simulator-input-readers.test.mjs`, `tests/simulator-sweep.test.mjs`.
 - [ ] Tranchenmanager, Profil-UI und Preisservice haben Contract-Tests.
 - [ ] Finanzkern hat negative Contract-Tests fuer Stop-Regeln.
 - [ ] Persistenz- und Tauri-Gates sind getrennt und reproduzierbar.
