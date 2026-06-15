@@ -1,7 +1,7 @@
 # Arbeitsdokument: CAPE-to-Return kontinuierlich modellieren
 
 **Stand:** 2026-06-15  
-**Status:** Slice 03 Engine-Integration umgesetzt, Review ausstehend
+**Status:** Slice 04 Runner-Paritaet umgesetzt, Review ausstehend
 **Autor:** Codex  
 **Verbesserungspunkt:** 2 - CAPE-to-Return kontinuierlicher modellieren  
 **Geplanter Feature-Branch:** `codex/cape-return-kontinuierlich`  
@@ -304,6 +304,7 @@ Safe-Rate-Contract:
 |---|---|---|---|
 | `SLICE_CAPE_RETURN_02_POLICY_MODULE.md` | freigegeben | `codex/cape-return-kontinuierlich` | Policy-Modul, Config-Defaults und Unit-Tests erstellt; Legacy bleibt Default, keine Engine-Integration; B1/B2 behoben |
 | `SLICE_CAPE_RETURN_03_ENGINE_INTEGRATION.md` | freigegeben | `codex/cape-return-kontinuierlich` | Policy-Modul in `engine/core.mjs` verdrahtet; Legacy bleibt Default; Continuous per Config aktivierbar und in `ui.vpw` diagnostiziert |
+| `SLICE_CAPE_RETURN_04_RUNNER_PARITY.md` | freigegeben | `codex/cape-return-kontinuierlich` | Backtest-, Monte-Carlo- und Sweep-Parität bei aktivierter Continuous-Policy abgesichert; keine UI-/Profil- oder Default-Aenderung |
 
 ### Reviewer-Pruefauftrag
 
@@ -390,3 +391,14 @@ Noch offen.
 | 1 | Gemini | Ungenügende Validierung von `inputCAPE` | Validierung vor `clamp` erzwingen | erledigt: `normalizeCape()`-Contract und Diagnosefelder ergänzt |
 | 2 | Gemini | Safe-Rate-Diskrepanz | Safe-Rate-Zinssatz konfigurierbar an Engine-Standard koppeln | erledigt: `SAFE_REAL_RETURN_MODE` und `safeRealReturnSource` ergänzt |
 | 3 | Gemini | Aktienrendite erst nach Portfolio-Mix geklammert | Aktien- und Portfolio-Realrendite separat klammern | erledigt: zweistufiger Clamp-Contract ergänzt |
+| 4 | Gemini | Stille `NaN`-Ausbreitung bei fehlender Gold-Konfiguration | Absicherung der Summenglieder bei Gewichtung 0 | erledigt in Slice 2 |
+| 5 | Gemini | Fehlende Paritätsabsicherung in MC- und Sweep-Runnern | Validierung der Continuous-Diagnose auf Chunk- und Aggregationsebene | erledigt in Slice 4 |
+
+## Komplettes Review-Feedback der Umsetzung (Slices 1-4)
+- **Status:** freigegeben
+- **Blocker:** keine
+- **Zusammenfassende Bewertung:** Die Implementierung der kontinuierlichen CAPE-Return-Policy wurde erfolgreich als gekapseltes Modul (`vpw-return-policy.mjs`) umgesetzt und in die Engine-Berechnungen integriert. Die Abwärtskompatibilität bleibt gewahrt, da die Policy standardmäßig auf `legacy_step` konfiguriert ist. Nach Behebung der anfänglichen `NaN`-Multiplikations-Findings und Implementierung der Gold-Unit-Tests steht einer finalen Aktivierung (nach UI-Anbindung in Schritt 5) nichts im Wege.
+- **Restrisiken:**
+  - **Unerwartete Dämpfung bei extrem günstigen CAPE-Werten:** Durch die zweistufige Begrenzung der Aktienrendite auf maximal 8 % (was ab CAPE < 15.38 greift) wird eine weitergehende Steigerung der Entnahmeraten bei extremen Bewertungen verhindert. Dies ist zwar fachlich gewollt und konservativ, kann jedoch in Backtests im Vergleich zum Legacy-Modus als verminderte Entnahme wahrgenommen werden.
+- **Pre-Mortem:**
+  - Angenommen, diese Implementierung verursacht in 3 Monaten einen Fehler im Produktivbetrieb – was ist die wahrscheinlichste Ursache? Ein Anwender vergleicht ein historisches Profil im Legacy- und Continuous-Modus. Aufgrund fehlender dynamischer Visualisierung der genutzten safe/gold-Zinssätze im UI führt ein verändertes Verhalten bei der Zinsanpassung zu Erklärungsnot und vermuteten Rechenfehlern.

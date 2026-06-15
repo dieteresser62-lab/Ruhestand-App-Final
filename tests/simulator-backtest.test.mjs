@@ -1,6 +1,7 @@
 import { runBacktest } from '../app/simulator/simulator-backtest.js';
 import { HISTORICAL_DATA } from '../app/simulator/simulator-data.js';
 import { EngineAPI } from '../engine/index.mjs';
+import { CONFIG } from '../engine/config.mjs';
 
 console.log('--- Simulator Backtest Tests ---');
 
@@ -191,6 +192,36 @@ try {
         assert(rows.length === 2, 'Dynamic flex off scenario should create two rows');
         assert(rows.every(r => r?.vpw?.status === 'disabled'), 'VPW status should be disabled when dynamic flex is off');
         assert(rows.every(r => r?.vpwFallbackHint === 'dynamic_flex_off'), 'Hint should explicitly mark dynamic flex off mode');
+    }
+
+    // --- TEST 8: Continuous CAPE policy reaches backtest rows via Engine config ---
+    {
+        const previousPolicy = CONFIG.SPENDING_MODEL.DYNAMIC_FLEX.RETURN_POLICY;
+        CONFIG.SPENDING_MODEL.DYNAMIC_FLEX.RETURN_POLICY = 'cape_continuous';
+        try {
+            global.document = createMockDocument({
+                ...baseInputs,
+                simStartJahr: 2010,
+                simEndJahr: 2012,
+                dynamicFlex: 'true',
+                horizonMethod: 'mean',
+                marketCapeRatio: 20
+            });
+            global.document.getElementById('dynamicFlex').checked = true;
+            global.document.getElementById('goGoActive').checked = false;
+            global.document.getElementById('monteCarloResults').style.display = 'none';
+            runBacktest();
+
+            const rows = window.globalBacktestData?.rows || [];
+            assertEqual(rows.length, 3, 'Continuous CAPE backtest should create three rows');
+            assert(rows.every(r => r?.vpw?.returnPolicy === 'cape_continuous'), 'Backtest VPW rows should expose continuous return policy');
+            assert(rows.every(r => r?.vpw?.expectedReturnSource === 'cape_continuous'), 'Backtest VPW rows should expose continuous return source');
+            assert(rows.every(r => r?.vpw?.capeInputStatus === 'valid'), 'Backtest VPW rows should use valid historical CAPE');
+            assert(rows.every(r => Number.isFinite(Number(r?.vpw?.expectedRealReturn))), 'Backtest VPW rows should expose finite real return');
+            assert(rows.every(r => r?.vpwFallbackHint === 'ok'), 'Continuous CAPE backtest should not trigger fallback hints');
+        } finally {
+            CONFIG.SPENDING_MODEL.DYNAMIC_FLEX.RETURN_POLICY = previousPolicy;
+        }
     }
 
     // --- TEST 8: Mindest-Flex increases stressed withdrawals without flow drift ---

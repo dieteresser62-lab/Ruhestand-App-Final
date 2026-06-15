@@ -1,4 +1,5 @@
 import { EngineAPI } from '../engine/index.mjs';
+import { CONFIG } from '../engine/config.mjs';
 import { prepareHistoricalDataOnce } from '../app/simulator/simulator-engine-helpers.js';
 import { createMonteCarloBuffers, MC_HEATMAP_BINS, pickWorstRun, runMonteCarloChunk, buildMonteCarloAggregates } from '../app/simulator/monte-carlo-runner.js';
 import { runSweepChunk } from '../app/simulator/sweep-runner.js';
@@ -859,6 +860,143 @@ try {
     console.log('✅ Monte-Carlo logshape chunk-boundary parity passed');
 } catch (e) {
     console.error('❌ Monte-Carlo logshape chunk-boundary parity failed', e);
+    throw e;
+}
+
+// Test 6: Continuous CAPE policy stays deterministic across MC and Sweep chunking
+try {
+    const previousPolicy = CONFIG.SPENDING_MODEL.DYNAMIC_FLEX.RETURN_POLICY;
+    CONFIG.SPENDING_MODEL.DYNAMIC_FLEX.RETURN_POLICY = 'cape_continuous';
+    try {
+        const continuousInputs = {
+            ...baseInputs,
+            startAlter: 54,
+            dynamicFlex: true,
+            horizonMethod: 'mean',
+            horizonYears: 30,
+            capeRatio: 20,
+            marketCapeRatio: 20
+        };
+        const monteCarloParams = {
+            anzahl: 16,
+            maxDauer: 7,
+            blockSize: 3,
+            seed: 271828,
+            methode: 'block',
+            rngMode: 'per-run-seed'
+        };
+
+        const fullChunk = await runMonteCarloChunk({
+            inputs: continuousInputs,
+            monteCarloParams,
+            widowOptions,
+            useCapeSampling: false,
+            runRange: { start: 0, count: monteCarloParams.anzahl },
+            logIndices: [0, 7, 15],
+            engine: EngineAPI
+        });
+
+        const splitRanges = [
+            { start: 0, count: 5 },
+            { start: 5, count: 6 },
+            { start: 11, count: 5 }
+        ];
+        const merged = createMergedMonteCarloState(monteCarloParams.anzahl);
+
+        for (const range of splitRanges) {
+            const chunk = await runMonteCarloChunk({
+                inputs: continuousInputs,
+                monteCarloParams,
+                widowOptions,
+                useCapeSampling: false,
+                runRange: range,
+                logIndices: [0, 7, 15],
+                engine: EngineAPI
+            });
+            mergeMonteCarloChunk(merged, chunk, range.start);
+        }
+
+        const fullAggregates = buildMonteCarloAggregates({
+            inputs: continuousInputs,
+            totalRuns: monteCarloParams.anzahl,
+            buffers: fullChunk.buffers,
+            heatmap: fullChunk.heatmap,
+            bins: fullChunk.bins,
+            totals: fullChunk.totals,
+            lists: fullChunk.lists,
+            allRealWithdrawalsSample: fullChunk.allRealWithdrawalsSample
+        });
+        const mergedAggregates = buildAggregatesFromState(continuousInputs, monteCarloParams.anzahl, merged);
+
+        assertMonteCarloTotalsEqual(fullChunk.totals, merged.totals, 'Continuous CAPE MC');
+        assertMonteCarloListShapesEqual(fullChunk.lists, merged.lists, 'Continuous CAPE MC');
+        assertClose(fullAggregates.finalOutcomes.p10, mergedAggregates.finalOutcomes.p10, 1e-6, 'Continuous CAPE MC p10 mismatch');
+        assertClose(fullAggregates.finalOutcomes.p50, mergedAggregates.finalOutcomes.p50, 1e-6, 'Continuous CAPE MC p50 mismatch');
+        assertClose(fullAggregates.depotErschoepfungsQuote, mergedAggregates.depotErschoepfungsQuote, 1e-6, 'Continuous CAPE MC depletion mismatch');
+
+        const fullByIndex = new Map((fullChunk.runMeta || []).map(meta => [meta.index, meta]));
+        const mergedByIndex = new Map((merged.runMeta || []).map(meta => [meta.index, meta]));
+        for (const runIdx of [0, 7, 15]) {
+            const fullRows = fullByIndex.get(runIdx)?.logDataRows || [];
+            const mergedRows = mergedByIndex.get(runIdx)?.logDataRows || [];
+            assert(fullRows.length > 0, `Continuous CAPE MC should log run ${runIdx}`);
+            assertEqual(mergedRows.length, fullRows.length, `Continuous CAPE MC log row count mismatch for run ${runIdx}`);
+            for (let rowIdx = 0; rowIdx < fullRows.length; rowIdx++) {
+                assertEqual(fullRows[rowIdx]?.vpw?.returnPolicy, 'cape_continuous', `Continuous CAPE MC full policy mismatch for run ${runIdx}`);
+                assertEqual(mergedRows[rowIdx]?.vpw?.returnPolicy, 'cape_continuous', `Continuous CAPE MC merged policy mismatch for run ${runIdx}`);
+                assertEqual(
+                    JSON.stringify(mergedRows[rowIdx].vpw || null),
+                    JSON.stringify(fullRows[rowIdx].vpw || null),
+                    `Continuous CAPE MC VPW payload mismatch for run ${runIdx}, row ${rowIdx}`
+                );
+            }
+        }
+
+        const sweepConfig = {
+            anzahlRuns: 10,
+            maxDauer: 10,
+            blockSize: 3,
+            baseSeed: 4040,
+            methode: 'block',
+            rngMode: 'per-run-seed'
+        };
+        const paramCombinations = [
+            { runwayMin: 18, runwayTarget: 30, targetEq: 55, rebalBand: 5, maxSkimPct: 10, maxBearRefillPct: 5, goldTargetPct: 0, horizonYears: 25 },
+            { runwayMin: 24, runwayTarget: 36, targetEq: 65, rebalBand: 6, maxSkimPct: 12, maxBearRefillPct: 6, goldTargetPct: 0, horizonYears: 30 },
+            { runwayMin: 30, runwayTarget: 42, targetEq: 75, rebalBand: 7, maxSkimPct: 14, maxBearRefillPct: 7, goldTargetPct: 5, horizonYears: 35 }
+        ];
+
+        const fullSweep = runSweepChunk({
+            baseInputs: continuousInputs,
+            paramCombinations,
+            comboRange: { start: 0, count: paramCombinations.length },
+            sweepConfig,
+            engine: EngineAPI
+        });
+        const sweepA = runSweepChunk({
+            baseInputs: continuousInputs,
+            paramCombinations,
+            comboRange: { start: 0, count: 1 },
+            sweepConfig,
+            engine: EngineAPI
+        });
+        const sweepB = runSweepChunk({
+            baseInputs: continuousInputs,
+            paramCombinations,
+            comboRange: { start: 1, count: 2 },
+            sweepConfig,
+            engine: EngineAPI
+        });
+
+        assertSweepResultsEqual(fullSweep.results, [...sweepA.results, ...sweepB.results], 'Continuous CAPE Sweep');
+        assertEqual(fullSweep.p2VarianceCount, sweepA.p2VarianceCount + sweepB.p2VarianceCount, 'Continuous CAPE Sweep p2VarianceCount mismatch');
+    } finally {
+        CONFIG.SPENDING_MODEL.DYNAMIC_FLEX.RETURN_POLICY = previousPolicy;
+    }
+
+    console.log('✅ Continuous CAPE runner parity passed');
+} catch (e) {
+    console.error('❌ Continuous CAPE runner parity failed', e);
     throw e;
 }
 
