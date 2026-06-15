@@ -13,6 +13,7 @@ export function buildKeyParams(params = {}) {
     const metrics = [];
     const vpw = (params && typeof params.vpw === 'object') ? params.vpw : null;
     const healthBucket = (params && typeof params.healthBucket === 'object') ? params.healthBucket : null;
+    const runwayTargetSmoothing = (params && typeof params.runwayTargetSmoothing === 'object') ? params.runwayTargetSmoothing : null;
 
     const formatCurrencySafe = (value) => {
         if (typeof value !== 'number' || !isFinite(value)) {
@@ -83,6 +84,18 @@ export function buildKeyParams(params = {}) {
             label: 'Flex-Min-Rate',
             value: UIUtils.formatPercentValue(params.minFlexRatePct, { fractionDigits: 1, invalid: null }),
             meta: 'Regime-Mindestwert'
+        });
+    }
+
+    if (runwayTargetSmoothing) {
+        const smoothingInfo = UIUtils.describeRunwayTargetSmoothing(runwayTargetSmoothing);
+        const trend = runwayTargetSmoothing.smoothingFallback ? 'down'
+            : (runwayTargetSmoothing.smoothingActive ? 'neutral' : 'neutral');
+        pushMetric({
+            label: 'Runway-Ziel',
+            value: UIUtils.formatMonths(runwayTargetSmoothing.targetMonths, { fractionDigits: 1, invalid: 'n/a', suffix: 'Monate' }),
+            meta: smoothingInfo.explanation,
+            trend
         });
     }
 

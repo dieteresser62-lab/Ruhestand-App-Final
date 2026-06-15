@@ -43,6 +43,7 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 * **Jahresabschluss + Ausgaben-Historie:** Beim Jahresabschluss entsteht zuerst ein Pre-Mutation-Snapshot, danach wechselt der Ausgaben-Check automatisch auf das nächste Jahr; Vorjahre bleiben vollständig einsehbar.
 * **Mindest-Flex p.a.:** Optionale, bedingte Untergrenze fuer Flex-Ausgaben in kuerzenden Safety-/Guardrail-Phasen; sie ersetzt nicht den Floor und wird in Diagnose sowie Kopiertext transparent ausgewiesen.
 * Nutzt die Engine v31 zur Marktanalyse, Entnahmeplanung und Liquiditätssteuerung.
+* **Regime-Smoothing-Diagnose:** Kontinuierliche Drawdown-/CAPE-/Runway-Signale ergaenzen die diskreten Marktregime. Die geglaettete Runway-Zielberechnung bleibt per Default deaktiviert (`CONFIG.REGIME_SMOOTHING.TARGETS_ENABLED=false`), kann aber Diagnosefelder fuer Rohziel, Effektivziel, Severity, Fallback und harte Mindestgrenze ausweisen.
 * Jahresübergreifende Verlustverrechnung (Verlusttopf) ist integriert; die finale Steuer stammt aus dem Jahres-Settlement.
 * Diagnoseansicht mit Guardrails, Entscheidungsbaum und Key-Performance-Parametern.
 * **Depot-Tranchen-Manager:** Detaillierte Tranchen werden automatisch geladen und für steueroptimierte Verkäufe genutzt.
@@ -158,6 +159,7 @@ Der Pflegebucket ist eine optionale, zweckgebundene Selbstversicherungsreserve f
 * Modulare ES-Module (`engine/`) kapseln Validierung, Marktanalyse, Ausgabenplanung und Transaktionslogik.
 * `build-engine.mjs` bündelt die Module per `esbuild` (oder Modul-Fallback) zu `engine.js`, das in beiden Oberflächen als `EngineAPI` geladen wird.
 * Konfigurierbare Guardrails, Marktregime-Übersetzungen und Strategien für Liquiditätsziele.
+* Kontinuierliche Regime-Signale sind DOM-frei getestet. Grenzwerte um 10%, 20% und 30% Drawdown werden bei aktivierter Zielwert-Glättung monoton interpoliert; harte Mindest-Runway- und Notfallgrenzen bleiben hart.
 
 ---
 
@@ -178,7 +180,9 @@ Ruhestand-App-Final/
 │   ├── core.mjs
 │   ├── errors.mjs
 │   ├── index.mjs
-│   ├── analyzers/MarketAnalyzer.mjs
+│   ├── analyzers/
+│   │   ├── MarketAnalyzer.mjs
+│   │   └── regime-signals.mjs
 │   ├── planners/
 │   │   ├── SpendingPlanner.mjs
 │   │   ├── alarm-policy.mjs

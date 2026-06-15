@@ -388,6 +388,8 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         { key: 'Alarm', header: 'Alarm', width: 6, fmt: v => (v ? 'AKTIV' : '') },
         { key: 'QuoteEndPct', header: 'Quote%', width: 6, fmt: v => formatPercent(v, 1) },
         { key: 'RunwayCoveragePct', header: 'Runway%', width: 7, fmt: v => formatPercentValue(v || 0, { fractionDigits: 0, invalid: '0%' }) },
+        { key: 'RunwayTargetSmoothedMonths', header: 'RunZiel', width: 7, fmt: v => Number.isFinite(v) ? `${Number(v).toFixed(0)}M` : '' },
+        { key: 'RunwayTargetSeverityPct', header: 'RunSev', width: 6, fmt: v => Number.isFinite(v) ? `${Math.round(v)}%` : '' },
         { key: 'NominalReturnEquityPct', header: 'Pf.Akt%', width: 8, fmt: v => formatPercentFromRatio(v, 1) },
         { key: 'NominalReturnGoldPct', header: 'Pf.Gld%', width: 8, fmt: v => formatPercentFromRatio(v, 1) },
         { key: 'inflation', header: 'Infl.', width: 5, fmt: v => formatPercent(v, 1) },
@@ -500,6 +502,9 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         { key: 'cashInterestEarned', header: 'Zins€', width: 7, fmt: formatCurrencyShortLog },
         { key: 'liqEnd', header: 'Liq@rC+', width: 9, fmt: formatCurrencyShortLog },
         { key: 'zielLiquiditaet', header: 'ZielLiq', width: 8, fmt: formatCurrencyShortLog },
+        { key: 'RunwayTargetRawMonths', header: 'RunRaw', width: 7, fmt: v => Number.isFinite(v) ? `${Number(v).toFixed(0)}M` : '' },
+        { key: 'RunwayTargetHardMinMonths', header: 'RunMin', width: 7, fmt: v => Number.isFinite(v) ? `${Number(v).toFixed(0)}M` : '' },
+        { key: 'RunwayTargetSmoothingFallback', header: 'RunFb', width: 5, fmt: v => (v ? 'ja' : '') },
     ] : [];
 
     const guardCols = options.logDetailLevel === 'detailed' ? [

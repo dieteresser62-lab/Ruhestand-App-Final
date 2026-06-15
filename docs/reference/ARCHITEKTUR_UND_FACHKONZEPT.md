@@ -44,7 +44,7 @@
 | **Simulator** | Monte-Carlo-Simulation, Parameter-Sweeps, Auto-Optimize, Dynamic Flex, Pflegebucket-Wirklogik | 87 JS-Module unter `app/simulator/` |
 | **Engine** | Kern-Berechnungslogik, Guardrails, Steuern | 24 MJS-Module unter `engine/`, ca. 4.240 Zeilen |
 | **Workers** | Parallelisierung für MC/Sweep/Optimizer-Pfade | 3 JS-Module unter `workers/`, ca. 757 Zeilen |
-| **Tests** | Unit-, Integration-, Browser-Smoke- und Coverage-Gates | 90 `*.test.mjs` Dateien; 2294 Assertions im Lauf vom 2026-06-12; Coverage-Baseline 72,25% |
+| **Tests** | Unit-, Integration-, Browser-Smoke- und Coverage-Gates | 91 `*.test.mjs` Dateien; 2382 Assertions im Lauf vom 2026-06-15; Coverage-Baseline 72,25% |
 | **Profile, Tranchen, Shared** | Profilverwaltung, Profilverbund, Tranchenstatus, gemeinsame Utilities | JS-Module unter `app/profile/`, `app/tranches/`, `app/shared/`, zusammen ca. 2.959 Zeilen |
 
 *Hinweis: Dieses Dokument beschreibt Konzepte und Architekturentscheidungen. Für konkrete Implementierungsdetails gelten die genannten Module und Tests als Referenz; exakte Code-Zeilen werden bewusst vermieden, weil sie nach Refactorings schnell veralten.*
@@ -228,7 +228,7 @@ Die Suite umfasst mehrere HTML-Oberflächen und Begleitmodule: Neben Balance und
 - `app/simulator/`: 87 JS-Module
 - `engine/`: 24 MJS-Module
 - `workers/`: 3 JS-Module
-- `tests/`: 90 Testdateien
+- `tests/`: 91 Testdateien
 
 ## B.1.2 Tauri Desktop-App (Portable EXE)
 
@@ -949,6 +949,8 @@ Die Sale-Engine liefert während der Transaktionsplanung noch eine Plansteuer, d
 
 Zusätzlich erkennt die Analyse Stagflation über hohe Inflation bei negativer Realrendite und berechnet aus CAPE-Daten eine erwartete Aktienrendite. Diese erwartete Rendite fließt vor allem in Dynamic Flex/VPW ein.
 
+Kontinuierliche Regime-Signale ergaenzen diese diskreten Labels, ersetzen sie aber nicht. `regime-signals.mjs` berechnet endliche Severity-Werte in `[0, 1]` fuer Drawdown, CAPE und Runway. Die Interpolation ist richtungssensitiv: Drawdown nutzt eine aufsteigende Skala, Runway eine absteigende Skala. Identische Stuetzwerte werden als harte Schwelle behandelt, nicht als Division durch Null. Diese Signale duerfen harte Sicherheitsgrenzen nicht weichzeichnen.
+
 ### B.4.5 SpendingPlanner und Dynamic Flex
 
 Der SpendingPlanner führt mehrere Policy-Module in stabiler Reihenfolge aus, wobei `SpendingPlanner.mjs` als Fassade dient:
@@ -1009,13 +1011,13 @@ Balance und Simulator nutzen die gleiche Erkennung für Bond-Tranchen. Der Simul
 
 ## B.5 Test-Suite und Validierungsregeln
 
-**Übersicht:** Die Test-Suite umfasst in der geprüften Arbeitskopie **90 `*.test.mjs`-Dateien**. Der Lauf vom 2026-06-12 ergab **2294 Assertions**, alle erfolgreich. Die V8-Coverage-Baseline aus demselben Slice liegt bei **72,25%** (19352/26784 ausfuehrbare Zeilen, 162 Projektdateien). Die Tests laufen ohne Jest/Mocha über native Node.js-ESM-Module und eigene globale Assertions (`assert`, `assertEqual`, `assertClose`).
+**Übersicht:** Die Test-Suite umfasst in der geprüften Arbeitskopie **91 `*.test.mjs`-Dateien**. Der Lauf vom 2026-06-15 ergab **2382 Assertions**, alle erfolgreich. Die V8-Coverage-Baseline vom 2026-06-12 liegt bei **72,25%** (19352/26784 ausfuehrbare Zeilen, 162 Projektdateien). Die Tests laufen ohne Jest/Mocha über native Node.js-ESM-Module und eigene globale Assertions (`assert`, `assertEqual`, `assertClose`).
 
 ### B.5.1 Test-Inventar
 
 | Kategorie | Repräsentative Dateien | Fokus |
 |-----------|------------------------|-------|
-| **Engine Core & Validation** | `core-engine.test.mjs`, `engine-robustness.test.mjs`, `market-analyzer.test.mjs`, `historical-data-robustness.test.mjs`, `tauri-csp.test.mjs` | EngineAPI-Vertrag, Fehlerrobustheit, Marktregime, historische Daten, Tauri-CSP |
+| **Engine Core & Validation** | `core-engine.test.mjs`, `engine-robustness.test.mjs`, `market-analyzer.test.mjs`, `regime-signals.test.mjs`, `historical-data-robustness.test.mjs`, `tauri-csp.test.mjs` | EngineAPI-Vertrag, Fehlerrobustheit, Marktregime, kontinuierliche Regime-Signale, historische Daten, Tauri-CSP |
 | **Spending, VPW und 3-Bucket** | `spending-planner.test.mjs`, `spending-quantization.test.mjs`, `vpw-dynamic-flex.test.mjs`, `dynamic-flex-horizon.test.mjs`, `3bucket-config.test.mjs`, `3bucket-refill.test.mjs` | Guardrails, Rundung, VPW-Horizonte, Dynamic-Flex-Safety, 3-Bucket-Parameter und Bond-Refill |
 | **Transaktionen, Steuern, Tranchen** | `transaction-*.test.mjs`, `tax-settlement.test.mjs`, `core-tax-settlement.test.mjs`, `depot-tranches.test.mjs`, `tranchen-manager-*.test.mjs` | Verkäufe, Rebalancing, Gold/Liquidität, Rohaggregate, Jahres-Settlement, Cost-Basis- und Tranchenverwaltung |
 | **Balance-App** | `balance-smoke.test.mjs`, `balance-reader.test.mjs`, `balance-storage*.test.mjs`, `balance-annual-*.test.mjs`, `balance-diagnosis-*.test.mjs`, `balance-expenses.test.mjs`, `balance-renderer-*.test.mjs` | Initialisierung, DOM-Input, Storage/Snapshots, Jahresupdate, CAPE, Diagnose, Ausgaben-Check, Rendering |
@@ -1716,6 +1718,14 @@ Version 1 behandelt den Bucket-Verbrauch cash-like. Die ausgegliederten Geldmark
 | `stagflation` | 60 Monate | 5 Jahre bei Stagflation |
 | `recovery_in_bear` | 48 Monate | 4 Jahre in Rally |
 | `recovery` | 48 Monate | 4 Jahre in Erholung |
+
+Optional kann die TransactionEngine das Runway-Ziel zwischen `hot_neutral` und `bear` interpolieren. Der Default bleibt deaktiviert (`CONFIG.REGIME_SMOOTHING.TARGETS_ENABLED=false`), sodass bestehende Ergebnisse ohne explizite Aktivierung die diskreten Regime-Ziele verwenden. Bei aktivierter Glaettung gilt:
+
+- Drawdown-Severity 0 verwendet das neutrale Ziel, Severity 1 das Stress-Ziel.
+- Werte knapp um 10%, 20% und 30% Drawdown bewegen das Ziel monoton und ohne mehrmonatige Schwelle.
+- Das geglaettete Ziel bleibt zwischen den Profil-Stuetzwerten und unterschreitet die harte Mindest-Runway nicht.
+- Explizite Nutzerziele (`runwayTargetMonths`) umgehen die Zielwert-Glaettung.
+- Diagnose und Logs weisen Rohziel, Effektivziel, Severity-Prozent, Stuetzziele, Fallback und harte Mindestgrenze aus.
 
 ### C.5.2 Refill-Trigger
 

@@ -1,11 +1,34 @@
 # Arbeitsdokument: Langlebigkeitsmodell konservativer machen
 
 **Stand:** 2026-06-14  
-**Status:** Entwurf fuer Review  
+**Status:** Ueberarbeitet nach Review, erneute Pruefung ausstehend  
 **Autor:** Codex  
 **Verbesserungspunkt:** 5 - Langlebigkeitsmodell konservativer machen  
 **Geplanter Feature-Branch:** `codex/langlebigkeitsmodell-konservativer`  
 **GitHub-Status:** Noch nicht veroeffentlicht; vor Umsetzung Freigabe und Branch-Anlage erforderlich.
+
+## Einordnung in Roadmap
+
+Dieses Arbeitsdokument ist Schritt 3 der freigegebenen Roadmap `docs/internal/ROADMAP_ENGINE_STOCHASTIK_VERBESSERUNGEN.md`.
+
+Rolle in der Roadmap:
+
+- Abschluss der deterministischen Engine-Phase vor stochastischen Erweiterungen.
+- Kalibriert den Entnahmehorizont als Gegenstueck zur CAPE-basierten Renditeannahme.
+- Fuehrt direkt in Gate 1 `Baseline-Freeze Engine-Semantik`.
+
+Startvoraussetzungen:
+
+- Schritt 1 `Regime-Uebergaenge glaetten` ist abgeschlossen oder explizit fuer Schritt 3 freigegeben.
+- Schritt 2 `CAPE-to-Return kontinuierlich modellieren` ist abgeschlossen oder explizit fuer Schritt 3 freigegeben.
+- Eigener Feature-Branch gemaess Projektregeln.
+
+Uebergabegate zum Baseline-Freeze:
+
+- Single- und Paarprofile sind fachlich und technisch abgedeckt.
+- Joint-to-Single-Uebergang und Smoothing sind dokumentiert und getestet oder als Pflichttest festgelegt.
+- Interaktion mit Legacy-CAPE und kontinuierlicher CAPE-Policy ist dokumentiert.
+- Nach diesem Schritt darf Stationary Bootstrap erst beginnen, wenn Gate 1 `Baseline-Freeze Engine-Semantik` abgeschlossen ist.
 
 ## Ziel
 
@@ -50,6 +73,16 @@ Vorteile:
 Nachteile:
 
 - Pauschal und nicht kohortenspezifisch.
+- Regressiver Effekt: Ein fixer +2-Jahre-Puffer wirkt bei sehr alten Personen relativ viel staerker als bei jungen Ruhestaendlern.
+
+### Variante A2: Adaptiver Longevity-Puffer
+
+Der Puffer wird nicht als fixer Jahreswert verstanden, sondern alters-/horizontabhaengig abgeleitet. Zwei Review-faehige Optionen:
+
+- **Quantil-Shift:** Erhoehe `survivalQuantile` um z. B. +0,05 bis maximal 0,95 und leite daraus den Horizon neu ab.
+- **Relativer Horizon-Puffer:** Erhoehe den Raw-Horizon um z. B. 5% bis 10%, begrenzt durch Mindest-/Maximaljahre.
+
+Empfehlung nach Review-Feedback: Version 1 soll A2 priorisieren. Der fixe +2-Jahre-Puffer bleibt nur Vergleichsbaseline, nicht bevorzugter Default.
 
 ### Variante B: Kohortentafel-Option
 
@@ -63,7 +96,7 @@ Nachteile:
 
 - Datenquelle, Lizenz, Updateprozess und Doku deutlich komplexer.
 
-Empfehlung fuer Version 1: Variante A als Default- oder Expertenoption, Variante B als spaeteres separates Feature.
+Empfehlung fuer Version 1: Variante A2 als Expertenoption oder vorsichtiger Default-Kandidat; Variante A nur als Vergleichsbaseline; Variante B als spaeteres separates Feature.
 
 ## Vorgeschlagene Architektur
 
@@ -209,16 +242,20 @@ Vergleich:
 
 ### Vorlaeufiger Version-1-Contract
 
-Empfehlung fuer Review: `longevityMode='buffer_years'` als expliziter Contract, aber Default-Entscheidung offen.
+Empfehlung nach Review: `longevityMode='quantile_shift'` oder `relative_horizon_buffer` als bevorzugter Contract; `buffer_years` bleibt nur optionaler Vergleichsmodus.
 
 | Feld | Typ/Grenze | Default-Vorschlag | Bedeutung |
 |---|---|---:|---|
-| `longevityMode` | `'none' | 'buffer_years'` | `buffer_years` oder `none` offen | Aktiviert Horizon-Puffer |
-| `longevityBufferYears` | Zahl 0..10 | 2 | Additiver Puffer auf finalen Horizon |
+| `longevityMode` | `'none' | 'quantile_shift' | 'relative_horizon_buffer' | 'buffer_years'` | `none` bis Review-Freigabe | Aktiviert Langlebigkeitsaufschlag |
+| `longevityQuantileShift` | Zahl 0..0.10 | 0.05 | Erhoeht Survival-Quantil, max. 0.95 |
+| `longevityRelativePct` | Zahl 0..0.20 | 0.05 | Relativer Zuschlag auf Raw-Horizon |
+| `longevityBufferYears` | Ganzzahl 0..10 | 2 | Nur Vergleichs-/Expertenmodus |
 | `horizonYearsRaw` | Diagnose | - | Vor Puffer berechneter Horizon |
 | `horizonYears` | bestehendes Feld | - | Effektiver Horizon nach Puffer und Clamp |
 
-Fuer Paare gilt als bevorzugter Contract: erst Joint-Horizon aus bestehender Logik ableiten, dann den Buffer einmal auf den finalen Horizon anwenden. Keine doppelte Anwendung pro Person.
+Fuer Paare gilt als bevorzugter Contract: erst Joint-Horizon aus bestehender Logik ableiten, dann Longevity-Adjustment genau einmal auf den finalen Horizon anwenden. Keine doppelte Anwendung pro Person.
+
+Beim Uebergang Joint -> Single im Monte-Carlo-Jahreslauf muss ein Re-Entry-/Smoothing-Mechanismus pruefen, ob der effektive Horizon sprunghaft faellt. Falls der absolute Horizon-Delta durch den Statuswechsel groesser als 3 Jahre ist, muss der Plan entweder eine vorhandene Dynamic-Flex-Glattung nutzen oder einen eigenen `longevityTransitionSmoothing`-Contract definieren.
 
 ### Contract-Matrix
 
@@ -233,21 +270,25 @@ Fuer Paare gilt als bevorzugter Contract: erst Joint-Horizon aus bestehender Log
 ### Messbare Akzeptanzkriterien
 
 - `longevityBufferYears=0` erzeugt identische Ergebnisse zur Baseline.
-- Bei Buffer > 0 ist `horizonYears >= horizonYearsRaw`, ausser Max-Clamp greift.
+- Bei aktivem Longevity-Modus ist `horizonYears >= horizonYearsRaw`, ausser Max-Clamp greift.
 - Der effektive Horizon ueberschreitet nie die bestehende Max-Grenze 60.
-- Bei Paaren wird der Buffer genau einmal auf den finalen Haushalts-Horizon angewandt.
+- Bei Paaren wird das Longevity-Adjustment genau einmal auf den finalen Haushalts-Horizon angewandt.
 - Diagnose und Copytext zeigen Raw-Horizon, Buffer und effektiven Horizon.
 - Auto-Optimize darf `longevityBufferYears` in Version 1 nicht als Parameter aufnehmen.
+- `longevityBufferYears` ist Ganzzahl 0..10; negative Werte, Dezimalwerte und nicht-finite Werte sind Validierungsfehler.
+- Worker-Paritaet muss belegen, dass Longevity-Felder in serial und worker identisch wirken.
+- Joint->Single-Uebergang darf keinen unerklaerten Horizon-Sprung groesser als 3 Jahre ohne Diagnose erzeugen.
 
 ### Referenzszenarien
 
 | ID | Haushalt | Buffer | Erwartung |
 |---|---|---:|---|
 | L1 | Single, 65, Dynamic-Flex an | 0 | Baseline identisch |
-| L2 | Single, 65 | 2 | VPW-Rate sinkt oder bleibt bei Clamp gleich |
-| L3 | Paar, 65/63 | 2 | Buffer einmal auf Joint-Horizon |
-| L4 | sehr hoher Raw-Horizon nahe 60 | 5 | Max-Clamp dokumentiert |
-| L5 | Sweep/Auto-Optimize | 2 | Buffer bleibt fixer Sicherheitsparameter |
+| L2 | Single, 65 | Quantil +0,05 | VPW-Rate sinkt oder bleibt bei Clamp gleich |
+| L3 | Paar, 65/63 | Quantil +0,05 | Adjustment einmal auf Joint-Horizon |
+| L4 | sehr hoher Raw-Horizon nahe 60 | relativer Puffer 10% | Max-Clamp dokumentiert |
+| L5 | Sweep/Auto-Optimize | Quantil +0,05 | Longevity bleibt fixer Sicherheitsparameter |
+| L6 | Paarlauf mit Tod eines Partners | Quantil +0,05 | Joint->Single-Uebergang diagnostiziert/geglaettet |
 
 ### Slice-Zuschnitt fuer spaetere Umsetzung
 
@@ -271,7 +312,7 @@ Fuer Paare gilt als bevorzugter Contract: erst Joint-Horizon aus bestehender Log
 3. Welche Maximalgrenze fuer `longevityBufferYears` ist sinnvoll?
 4. Soll Auto-Optimize den Puffer veraendern duerfen oder ist er ein fester Sicherheitsparameter?
 
-## Review-Feedback von Gemini
+### Review-Feedback von Gemini (Erstes Review - blockiert)
 
 ### Adversarieller Review & Systematische Analyse
 
@@ -299,6 +340,41 @@ Fuer Paare gilt als bevorzugter Contract: erst Joint-Horizon aus bestehender Log
 * *Angenommen, diese Implementierung verursacht in 3 Monaten einen Fehler im Produktivbetrieb – was ist die wahrscheinlichste Ursache?*
   * Ein unentdeckter Deserialisierungsfehler im Web-Worker-Pool führt dazu, dass bei Monte-Carlo-Läufen im Hintergrund der Puffer stillschweigend auf `0` (oder `undefined`) fällt, während er in der UI-Berechnung (die synchron auf dem Hauptthread läuft) mit `+2` aktiv bleibt. Dies führt zu einer gravierenden Diskrepanz zwischen den in der UI angezeigten Kennzahlen und den stochastischen MC-Ergebnissen.
 
+## Review-Ergebnis (Erstes Review)
+- Status: blockiert
+- Blocker:
+  - Regressiver Charakter des statischen Puffers.
+  - Verpuffung des Schutzes durch Max-Horizon Clamp (60 Jahre) bei jungen Rentnern.
+  - Fehlende Paar-Dynamik-Absicherung bei Todesfällen (Sprünge beim Übergang).
+  - Unzureichende Web-Worker-Serialisierungsgarantie.
+
+## Review-Feedback von Gemini (Zweites Review - freigegeben)
+
+### 1. Korrektheit
+- **Verteilungs-Gerechtigkeit**: Die Einführung adaptiver Methoden (`quantile_shift` und `relative_horizon_buffer`) löst das Alterseffekt-Paradoxon vollständig. Der Puffer passt sich nun proportional dem Alter und dem verbleibenden Erwartungshorizont an.
+- **Paar-Dynamik**: Der Übergang Joint -> Single wurde durch den neuen `longevityTransitionSmoothing`-Contract abgesichert. 
+
+### 2. Vertragstreue
+- **Worker-Parität**: Die Serialisierung der neuen Parameter und deren Einbindung in die Web-Worker-Tests stellen sicher, dass Simulationsergebnisse über alle Threads hinweg identisch berechnet werden.
+
+### 3. Fehlerbehandlung
+- **Parameter-Klemmen**: Typenprüfung und Wertegrenzen sind als Pflichtprüfungen definiert. Ungültige Werte werfen Fehler statt stillschweigend zu falschem Verhalten zu führen.
+
+### 4. Seiteneffekte
+- **Transition-Smoothing-Konkretisierung (Restrisiko)**: Der Entwurf fordert für den Fall eines Partnersterbens eine Glättung des Horizont-Sprungs, lässt aber offen, wie diese mathematisch berechnet wird ("vorhandene Dynamic-Flex-Glattung nutzen oder eigenen Contract definieren"). Dies birgt das Risiko, dass ad-hoc eine mathematisch instabile Hilfsformel implementiert wird. Die konkrete Berechnungsweise (z. B. lineare Amortisation über maximal 3 Jahre) sollte in Slice 1 festgeschrieben werden.
+- **Inaktivität des Quantil-Shifts bei hohem Basiswert (Restrisiko)**: Wenn ein Anwender das Basis-Mortalitätsquantil bereits auf den Maximalwert von `0.95` konfiguriert hat, bewirkt ein `quantile_shift` von `+0.05` durch die harte 0.95-Kappungsgrenze keine Änderung mehr. Der Puffer verpufft in diesem Fall wirkungslos, was im Diagnosefeld explizit ausgewiesen werden muss (`longevityAppliedShift = 0.00`).
+
+### 5. Was könnte brechen?
+- Es wurden keine verbleibenden Blocker identifiziert.
+
+## Review-Ergebnis (Zweites Review)
+- Status: freigegeben
+- Blocker: keine
+- Restrisiken:
+  - Unspezifizierter Glättungsalgorithmus beim Übergang von Joint- zu Single-Status im MC-Lauf.
+  - Wirkungslose Pufferung bei bereits maximal gewähltem Basis-Mortalitätsquantil (0.95).
+- Pre-Mortem: Angenommen, diese Implementierung verursacht in 3 Monaten einen Fehler im Produktivbetrieb – was ist die wahrscheinlichste Ursache? Die Glättung beim Tod eines Partners führt durch eine Division durch die verbleibenden Jahre (wenn der Partner sehr spät stirbt) zu einer Division durch Null, wodurch der MC-Simulator im Jahr des Todes mit `NaN` abstürzt.
+
 ---
 
 ## Review-Feedback von Claude
@@ -307,14 +383,20 @@ Noch offen.
 
 ## Review-Antworten von Codex
 
-Noch offen.
+### Antwort auf Gemini-Feedback
+
+- **Regressiver Charakter des statischen Puffers:** Angenommen. Der Plan priorisiert jetzt adaptive Varianten (`quantile_shift`, `relative_horizon_buffer`); `buffer_years` bleibt nur Vergleichs-/Expertenmodus.
+- **Max-Horizon-Clamp:** Angenommen. Clamp-Wirkung ist ein eigenes Akzeptanz- und Referenzszenario; Diagnose muss Clamp-Grund ausweisen.
+- **Auto-Optimizer-Kompensation:** Angenommen. Longevity-Parameter sind in Version 1 keine Optimizer-Variablen; Auto-Optimize-Vergleich ist Pflicht in Paket 5.
+- **Worker-Drift:** Angenommen. Worker-Paritaet fuer Longevity-Felder ist Pflicht.
+- **Paar-Dynamik-Spruenge:** Angenommen. Joint->Single-Uebergang braucht Diagnose und ggf. Glattung; ein neues Referenzszenario L6 wurde ergaenzt.
 
 ## Review-Entscheidungen
 
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
 |---|---|---|---|---|
-| F-01 | Gemini | Statischer Puffer ist regressiv (bestraft 85-Jährige mit -25% Entnahme, schützt 55-Jährige kaum mit -5%). | Angenommen. Codex soll prüfen, ob ein adaptiver Puffer (z.B. Erhöhung des survivalQuantile) fachlich vorzuziehen ist. | In Paket 1 zu klären. |
-| F-02 | Gemini | Max-Horizon Clamp (60 Jahre) führt dazu, dass der Puffer für sehr junge Rentner (Alter < 50) wirkungslos verpufft. | Angenommen. Clamp-Verhalten muss in Kombination mit dem Puffer explizit dokumentiert und getestet werden. | In Paket 2 zu integrieren. |
-| F-03 | Gemini | Auto-Optimizer könnte den Puffer durch aggressivere Allokation überkompensieren, was das Risiko erhöht. | Angenommen. Auto-Optimize-Verhalten bei Puffer > 0 muss evaluiert werden. | In Paket 5 zu integrieren. |
-| F-04 | Gemini | Web-Worker-Drift-Gefahr: Parameter müssen zwingend im Worker-Payload serialisiert und im `worker-parity`-Test validiert werden. | Angenommen. `worker-parity.test.mjs` muss dieses Szenario abdecken. | In Paket 3 & 4 zu integrieren. |
-| F-05 | Gemini | Paar-Dynamik-Sprünge beim Tod eines Partners im Simulator-Lauf können Dips erzeugen. | Angenommen. Die jahrweise Anpassung bei Übergang Joint -> Single muss glatt verlaufen. | In Paket 3 zu integrieren. |
+| F-01 | Gemini | Statischer Puffer ist regressiv (bestraft 85-Jährige mit -25% Entnahme, schützt 55-Jährige kaum mit -5%). | Angenommen. Adaptiver Puffer ist vorzuziehen. | erledigt: `quantile_shift` und `relative_horizon_buffer` als bevorzugte Varianten ergänzt |
+| F-02 | Gemini | Max-Horizon Clamp (60 Jahre) führt dazu, dass der Puffer für sehr junge Rentner (Alter < 50) wirkungslos verpufft. | Angenommen. Clamp-Verhalten muss dokumentiert und getestet werden. | erledigt: Clamp-Akzeptanz und Referenzszenario L4 ergänzt |
+| F-03 | Gemini | Auto-Optimizer könnte den Puffer durch aggressivere Allokation überkompensieren, was das Risiko erhöht. | Angenommen. Auto-Optimize-Verhalten bei Puffer > 0 muss evaluiert werden. | erledigt: Longevity nicht optimierbar in V1, Pflichtvergleich in Paket 5 |
+| F-04 | Gemini | Web-Worker-Drift-Gefahr: Parameter müssen im Worker-Payload serialisiert und im `worker-parity`-Test validiert werden. | Angenommen. `worker-parity.test.mjs` muss dieses Szenario abdecken. | erledigt: Worker-Paritaet als Akzeptanzkriterium ergänzt |
+| F-05 | Gemini | Paar-Dynamik-Sprünge beim Tod eines Partners im Simulator-Lauf können Dips erzeugen. | Angenommen. Joint -> Single muss glatt/diagnostiziert verlaufen. | erledigt: Transition-Smoothing-Contract und Referenzszenario L6 ergänzt |

@@ -261,6 +261,14 @@ export const CONFIG = {
         }
     },
 
+    REGIME_SMOOTHING: {
+        TARGETS_ENABLED: false,
+        RUNWAY_TARGETS: {
+            NEUTRAL_REGIME: 'hot_neutral',
+            STRESS_REGIME: 'bear'
+        }
+    },
+
     /**
      * Texte und Mappings für UI-Darstellung
      */

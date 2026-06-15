@@ -55,6 +55,17 @@ setupDom();
         minimumFlexRequiredRate: 50,
         minimumFlexEffectiveBefore: 4000,
         minimumFlexEffectiveAfter: 10000,
+        runwayTargetSmoothing: {
+            smoothingActive: true,
+            smoothingApplied: true,
+            rawTargetMonths: 60,
+            targetMonths: 48,
+            lowerTargetMonths: 36,
+            upperTargetMonths: 60,
+            severity: 0.5,
+            severityPct: 50,
+            hardMinimumMonths: 24
+        },
         vpw: {
             enabled: true,
             status: 'active',
@@ -92,6 +103,9 @@ setupDom();
     assert(txt.includes('Flex freigegeben'), 'Released flex metric should be rendered');
     assert(txt.includes('Nicht genutzter Rahmen'), 'Unused VPW room should be rendered');
     assert(txt.includes('Mindest-Flex p.a.'), 'Minimum flex metric should be rendered');
+    assert(txt.includes('Runway-Ziel'), 'Runway target smoothing metric should be rendered');
+    assert(txt.includes('50% Drawdown-Severity'), 'Runway target smoothing severity should be visible');
+    assert(txt.includes('Harte Mindestgrenze'), 'Runway target smoothing hard minimum should be visible');
     assert(txt.includes('Mindest-Flex Rate'), 'Minimum flex required rate should be rendered');
     assert(txt.includes('Mindest-Flex Effekt'), 'Minimum flex effect should be rendered');
     assert(txt.includes('Pflegebucket'), 'Health bucket metric should be rendered');

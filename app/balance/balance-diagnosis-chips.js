@@ -48,6 +48,7 @@ export function buildDiagnosisChips(d) {
         runwayTargetMonate,
         runwayStatus,
         runwayTargetQuelle,
+        runwayTargetSmoothing,
         deckungVorher,
         deckungNachher
     } = d.general;
@@ -70,12 +71,14 @@ export function buildDiagnosisChips(d) {
     const rStatus = derivedRunwayStatus || fallbackRunwayStatus;
     const formatMonths = (value) => UIUtils.formatMonths(value, { fractionDigits: 0, invalid: '∞' });
     const runwaySourceInfo = UIUtils.describeRunwayTargetSource(runwayTargetQuelle);
+    const runwaySmoothingInfo = UIUtils.describeRunwayTargetSmoothing(runwayTargetSmoothing);
     const runwayChipValue = (typeof runwayTargetMonate === 'number' && isFinite(runwayTargetMonate))
         ? `${formatMonths(runwayMonate)} / ${formatMonths(runwayTargetMonate)}`
         : `${formatMonths(runwayMonate)}`;
     const runwayChipTitle = (typeof runwayTargetMonate === 'number' && isFinite(runwayTargetMonate))
         ? `Aktuelle Runway vs. Ziel (${UIUtils.formatMonths(runwayTargetMonate, { fractionDigits: 0, invalid: 'n/a', suffix: 'Monate' })}).
-Quelle: ${runwaySourceInfo.description}`
+Quelle: ${runwaySourceInfo.description}
+${runwaySmoothingInfo.explanation}`
         : `Aktuelle Runway basierend auf verfügbaren Barmitteln.
 Quelle: ${runwaySourceInfo.description}`;
 
@@ -99,7 +102,9 @@ Quelle: ${runwaySourceInfo.description}`;
     if (runwaySourceInfo?.label) {
         const runwaySourceNote = document.createElement('small');
         runwaySourceNote.className = 'chip-note runway-source-note';
-        runwaySourceNote.textContent = `Runway-Ziel basiert auf: ${runwaySourceInfo.label}`;
+        runwaySourceNote.textContent = runwaySmoothingInfo.active
+            ? `Runway-Ziel basiert auf: ${runwaySourceInfo.label} (${runwaySmoothingInfo.detail})`
+            : `Runway-Ziel basiert auf: ${runwaySourceInfo.label}`;
         fragment.appendChild(runwaySourceNote);
     }
     return fragment;

@@ -112,7 +112,8 @@ export const UIUtils = {
      */
     getThreshold(path, defaultValue) {
         // Sicherer Zugriff auf die Engine-Konfiguration mit Fallbacks
-        const config = window.EngineAPI?.getConfig() || window.Ruhestandsmodell_v30?.CONFIG;
+        const win = (typeof window !== 'undefined') ? window : null;
+        const config = win?.EngineAPI?.getConfig() || win?.Ruhestandsmodell_v30?.CONFIG;
         if (!config || typeof path !== 'string') {
             return defaultValue;
         }
@@ -146,6 +147,10 @@ export const UIUtils = {
                 label: 'Fallback (Minimum)',
                 description: 'Es wurde auf den minimalen Runway-Wert des Profils zurückgegriffen.'
             },
+            'profil:smoothed': {
+                label: 'Profil (geglättet)',
+                description: 'Runway-Ziel wurde zwischen Profil-Stützwerten anhand der Regime-Severity interpoliert.'
+            },
             unknown: fallback,
             legacy: fallback
         };
@@ -159,5 +164,59 @@ export const UIUtils = {
         }
 
         return staticMap[normalized] || fallback;
+    },
+
+    /**
+     * Liefert kompakten UI-Text für geglättete Runway-Ziele.
+     *
+     * @param {object} smoothing - Diagnoseobjekt aus der Engine.
+     * @returns {{ label: string, explanation: string, detail: string, active: boolean }}
+     */
+    describeRunwayTargetSmoothing(smoothing) {
+        const formatM = (value, digits = 0) => formatMonths(value, { fractionDigits: digits, invalid: 'n/a', suffix: 'Monate' });
+        const empty = {
+            label: 'Keine Glättung',
+            explanation: 'Runway-Ziel stammt aus dem diskreten Profil- oder Eingabewert.',
+            detail: '',
+            active: false
+        };
+        if (!smoothing || typeof smoothing !== 'object') {
+            return empty;
+        }
+
+        const target = formatM(smoothing.targetMonths, 1);
+        const raw = formatM(smoothing.rawTargetMonths, 0);
+        const lower = formatM(smoothing.lowerTargetMonths, 0);
+        const upper = formatM(smoothing.upperTargetMonths, 0);
+        const min = formatM(smoothing.hardMinimumMonths ?? smoothing.minRunwayMonths, 0);
+        const severityPct = Number.isFinite(smoothing.severityPct)
+            ? smoothing.severityPct
+            : (Number.isFinite(smoothing.severity) ? Math.round(smoothing.severity * 100) : 0);
+
+        if (smoothing.smoothingActive) {
+            return {
+                label: smoothing.smoothingApplied ? 'Runway-Ziel geglättet' : 'Runway-Glättung aktiv',
+                explanation: `Runway-Ziel: ${target} (${severityPct}% Drawdown-Severity zwischen ${lower} und ${upper}; Rohziel ${raw}). Harte Mindestgrenze: ${min}, nicht geglättet.`,
+                detail: `${severityPct}% zwischen Normalziel ${lower} und Stressziel ${upper}`,
+                active: true
+            };
+        }
+
+        if (smoothing.smoothingFallback) {
+            const reasonLabels = {
+                invalid_discrete_target: 'diskretes Ziel ungültig',
+                invalid_severity: 'Severity nicht berechenbar',
+                incomplete_support_targets: 'Profil-Stützwerte unvollständig'
+            };
+            const reason = reasonLabels[smoothing.fallbackReason] || smoothing.fallbackReason || 'Fallback aktiv';
+            return {
+                label: 'Runway-Glättung im Fallback',
+                explanation: `Glättung wurde nicht angewandt (${reason}); verwendet wird das Rohziel ${raw}. Harte Mindestgrenze: ${min}, nicht geglättet.`,
+                detail: reason,
+                active: false
+            };
+        }
+
+        return empty;
     }
 };

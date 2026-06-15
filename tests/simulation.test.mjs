@@ -256,7 +256,22 @@ try {
         market: { szenarioText: 'test' },
         spendingNewState: { lastMarketSKey: 'BULL', alarmActive: false, cumulativeInflationFactor: 1, taxState: { lossCarry: 0 } },
         yearData: { inflation: 2 },
-        fullResult: { ui: { vpw: null, runway: { months: 24 }, liquiditaet: { deckungNachher: 100 } } },
+        fullResult: {
+            ui: { vpw: null, runway: { months: 24 }, liquiditaet: { deckungNachher: 100 } },
+            diagnosis: {
+                general: {
+                    runwayTargetSmoothing: {
+                        smoothingApplied: true,
+                        smoothingFallback: false,
+                        rawTargetMonths: 60,
+                        targetMonths: 48,
+                        severityPct: 50,
+                        hardMinimumMonths: 24
+                    }
+                },
+                keyParams: {}
+            }
+        },
         currentState: { samplerState: { seed: 1 } },
         newMarketDataHist: { endeVJ: 102 },
         initialLiqStart: 30000,
@@ -334,6 +349,11 @@ try {
     assert(result.logData.portfolio_total_before_payout === 132000, 'Year result should expose portfolio total before payout');
     assert(result.logData.portfolio_active_end === 120000, 'Year result should expose active portfolio total at year end');
     assert(result.logData.portfolio_flow_delta === 0, 'Year result should expose raw active portfolio flow delta');
+    assert(result.logData.RunwayTargetRawMonths === 60, 'Year result should expose raw runway target months');
+    assert(result.logData.RunwayTargetSmoothedMonths === 48, 'Year result should expose smoothed runway target months');
+    assert(result.logData.RunwayTargetSmoothingApplied === true, 'Year result should expose runway smoothing applied flag');
+    assert(result.logData.RunwayTargetSeverityPct === 50, 'Year result should expose runway smoothing severity');
+    assert(result.logData.RunwayTargetHardMinMonths === 24, 'Year result should expose hard minimum runway');
     assert(result.logData.balance_trace[0].phase === 'after_payout', 'Year result should expose raw balance trace phases');
     assert(result.logData.health_bucket_end === 30000, 'Year result should expose locked health bucket at year end');
     assert(result.logData.health_bucket_warning.includes('gekappt'), 'Year result should expose health bucket warnings');

@@ -14,6 +14,7 @@
  */
 import {
     calculateTargetLiquidity,
+    calculateTargetLiquidityDetails,
     computeAppliedMinTradeGate,
     computeCappedRefill,
     computeWeights,
@@ -28,6 +29,7 @@ import { determineAction } from './transaction-action.mjs';
 
 export const TransactionEngine = {
     calculateTargetLiquidity,
+    calculateTargetLiquidityDetails,
     _computeWeights: computeWeights,
     _computeCappedRefill: computeCappedRefill,
     _computeAppliedMinTradeGate: computeAppliedMinTradeGate,

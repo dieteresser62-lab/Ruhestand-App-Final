@@ -22,7 +22,18 @@ const appState = {
             deckungNachher: 105,
             runwayMonate: 18,
             runwayTargetMonate: 36,
-            runwayTargetQuelle: 'dynamic',
+            runwayTargetQuelle: 'profil:smoothed',
+            runwayTargetSmoothing: {
+                smoothingActive: true,
+                smoothingApplied: true,
+                rawTargetMonths: 60,
+                targetMonths: 48,
+                lowerTargetMonths: 36,
+                upperTargetMonths: 60,
+                severity: 0.5,
+                severityPct: 50,
+                hardMinimumMonths: 24
+            },
             runwayStatus: 'warn'
         },
         keyParams: {
@@ -98,6 +109,9 @@ const text = handlers.generateDiagnosisText(appState.diagnosisData);
 
 assertEqual(countOccurrences(text, '--- Status-Übersicht ---'), 1, 'Diagnose-Copytext sollte den Statusblock nur einmal enthalten');
 assert(text.includes('--- Transaktionsdiagnostik ---'), 'Copytext sollte Transaktionsdiagnostik enthalten');
+assert(text.includes('Runway-Ziel-Glättung: Runway-Ziel geglättet'), 'Copytext sollte Runway-Glättung benennen');
+assert(text.includes('50% Drawdown-Severity'), 'Copytext sollte Severity der Runway-Glättung ausgeben');
+assert(text.includes('Harte Mindestgrenze'), 'Copytext sollte harte Mindestgrenze ausgeben');
 assert(text.includes('Status: WARN (Cap begrenzt Trade)'), 'Copytext sollte Blockgrund lesbar uebersetzen');
 assert(text.includes('Geplante Aktion: Verkauf'), 'Copytext sollte geplante Aktion ausgeben');
 assert(text.includes('Aktien-Grenzen:'), 'Copytext sollte Aktien-Grenzen ausgeben');

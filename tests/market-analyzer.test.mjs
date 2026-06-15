@@ -40,6 +40,8 @@ function getBaseMarketInput() {
     const resBear = MarketAnalyzer.analyzeMarket(inputBear);
     assert(resBear.sKey === 'bear_deep', `Expect bear_deep, got ${resBear.sKey}`);
     assertClose(resBear.abstandVomAthProzent, 30, 0.1, 'ATH distance 30%');
+    assertClose(resBear.regimeSignalSeverities.drawdownSeverity, 1, 1e-12, 'MarketAnalyzer exposes drawdown severity without changing regime');
+    assertEqual(resBear.regimeSmoothingFactors.drawdownSeverity.source, 'abstandVomAthProzent', 'MarketAnalyzer exposes drawdown smoothing source');
 
     // Case 3: Recovery (10% down, but >10% Perf)
     const inputRec = getBaseMarketInput();
@@ -75,6 +77,7 @@ function getBaseMarketInput() {
     input.capeRatio = 31;
     const resOver = MarketAnalyzer.analyzeMarket(input);
     assert(resOver.valuationSignal === 'overvalued', `Expect overvalued for CAPE 31 (Got ${resOver.valuationSignal})`);
+    assertClose(resOver.regimeSignalSeverities.capeSeverity, 0.6, 1e-12, 'MarketAnalyzer exposes CAPE severity');
 
     // Case 3: Extreme (e.g. 36)
     input.capeRatio = 36;

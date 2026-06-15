@@ -27,9 +27,14 @@ export function createDiagnosisHandlers({ dom, appState }) {
         const runwayMonate = diagnosis.general.runwayMonate;
         const runwayTarget = diagnosis.general.runwayTargetMonate;
         const runwaySourceInfo = UIUtils.describeRunwayTargetSource(diagnosis.general.runwayTargetQuelle);
+        const runwaySmoothingInfo = UIUtils.describeRunwayTargetSmoothing(diagnosis.general.runwayTargetSmoothing);
         const formatRunwayValue = (value, fractionDigits = 1, invalid = '∞') => UIUtils.formatMonths(value, { fractionDigits, invalid, suffix: 'Monate' });
         const runwayLine = `Runway: ${formatRunwayValue(runwayMonate)} (Ziel: ${formatRunwayValue(runwayTarget, 0, 'n/a')}) -> Status: ${(diagnosis.general.runwayStatus || 'unbekannt').toUpperCase()} | Quelle: ${runwaySourceInfo.label}`;
         text += `${runwayLine}\nQuelle-Details: ${runwaySourceInfo.description}\n\n`;
+        if (diagnosis.general.runwayTargetSmoothing) {
+            text += `Runway-Ziel-Glättung: ${runwaySmoothingInfo.label}\n`;
+            text += `${runwaySmoothingInfo.explanation}\n\n`;
+        }
         text += `--- Entscheidungsbaum (Warum?) ---\n`;
         diagnosis.decisionTree.forEach(item => {
             if (dom.diagnosis.filterToggle.checked && item.status === 'inactive') return;

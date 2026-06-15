@@ -6,6 +6,7 @@
  * Dependencies: engine/config.mjs
  */
 import { CONFIG } from '../config.mjs';
+import { buildRegimeSignalSnapshot } from './regime-signals.mjs';
 /**
  * Normalisiert den übergebenen CAPE-Wert und fällt auf die Konfiguration zurück.
  * @param {number} rawCapeRatio - Optionaler CAPE-Wert aus den Eingaben.
@@ -138,6 +139,11 @@ export const MarketAnalyzer = {
             reasons.push(valuationContext.reasonText);
         }
 
+        const regimeSignalSnapshot = buildRegimeSignalSnapshot({
+            abstandVomAthProzent,
+            capeRatio: valuationContext.capeRatio
+        });
+
         // Szenariotext erstellen
         const szenarioText = (CONFIG.TEXTS.SCENARIO[sKey] || "Unbekannt") +
             (isStagflation ? " (Stagflation)" : "");
@@ -152,7 +158,10 @@ export const MarketAnalyzer = {
             reasons,
             capeRatio: valuationContext.capeRatio,
             valuationSignal: valuationContext.signalKey,
-            expectedReturnCape: valuationContext.expectedReturn
+            expectedReturnCape: valuationContext.expectedReturn,
+            regimeSignalSeverities: regimeSignalSnapshot.severities,
+            regimeSmoothingFactors: regimeSignalSnapshot.factors,
+            regimeSmoothingApplied: regimeSignalSnapshot.smoothingApplied
         };
     }
 };

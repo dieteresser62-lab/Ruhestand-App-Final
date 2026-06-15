@@ -523,12 +523,13 @@ function _internal_calculateModel(input, lastState) {
     // Bestimmt die optimale Liquiditätshöhe basierend auf Profil und Marktsituation
     // Im Bärenmarkt: höhere Liquidität (z.B. 60 Monate)
     // Im Bullenmarkt: niedrigere Liquidität (z.B. 36 Monate)
-    const zielLiquiditaet = TransactionEngine.calculateTargetLiquidity(
+    const targetLiquidityDetails = TransactionEngine.calculateTargetLiquidityDetails(
         profil,
         market,
         inflatedBedarf,
         normalizedInput
     );
+    const zielLiquiditaet = targetLiquidityDetails.targetLiquidity;
 
     // 9. Transaktionsaktion bestimmen
     // Entscheidet, ob und welche Transaktionen notwendig sind:
@@ -677,20 +678,44 @@ function _internal_calculateModel(input, lastState) {
     diagnosis.general.runwayMonate = runwayMonths;
     diagnosis.general.deckungVorher = deckungVorher;
     diagnosis.general.deckungNachher = deckungNachher;
+    const runwayTargetSmoothing = targetLiquidityDetails.runwayTargetDiagnostics || null;
     const validInputRunwayTarget = (typeof normalizedInput.runwayTargetMonths === 'number' && isFinite(normalizedInput.runwayTargetMonths) && normalizedInput.runwayTargetMonths > 0)
         ? normalizedInput.runwayTargetMonths
         : null;
     const hasValidTarget = (typeof diagnosis.general.runwayTargetMonate === 'number' && isFinite(diagnosis.general.runwayTargetMonate));
-    if (!hasValidTarget && validInputRunwayTarget) {
+    if (runwayTargetSmoothing?.targetMonths) {
+        diagnosis.general.runwayTargetMonate = runwayTargetSmoothing.targetMonths;
+    } else if (!hasValidTarget && validInputRunwayTarget) {
         diagnosis.general.runwayTargetMonate = validInputRunwayTarget;
     }
-    if (typeof diagnosis.general.runwayTargetQuelle !== 'string' || !diagnosis.general.runwayTargetQuelle.trim()) {
+    if (runwayTargetSmoothing?.source) {
+        diagnosis.general.runwayTargetQuelle = runwayTargetSmoothing.source;
+    } else if (typeof diagnosis.general.runwayTargetQuelle !== 'string' || !diagnosis.general.runwayTargetQuelle.trim()) {
         diagnosis.general.runwayTargetQuelle = validInputRunwayTarget ? 'input' : 'legacy';
+    }
+    if (runwayTargetSmoothing) {
+        diagnosis.general.runwayTargetSmoothing = runwayTargetSmoothing;
+        diagnosis.general.regimeSmoothingApplied = runwayTargetSmoothing.smoothingApplied;
+        diagnosis.general.regimeSmoothingFallback = runwayTargetSmoothing.smoothingFallback;
+        diagnosis.general.regimeSmoothingFactors = {
+            drawdownSeverity: runwayTargetSmoothing.severity,
+            drawdownSeverityPct: runwayTargetSmoothing.severityPct,
+            lowerTargetMonths: runwayTargetSmoothing.lowerTargetMonths,
+            upperTargetMonths: runwayTargetSmoothing.upperTargetMonths,
+            hardMinimumMonths: runwayTargetSmoothing.hardMinimumMonths
+        };
+        diagnosis.keyParams.runwayTargetSmoothing = runwayTargetSmoothing;
     }
 
     if (Array.isArray(diagnosis.guardrails)) {
         diagnosis.guardrails = diagnosis.guardrails.map(guardrail => {
             if (guardrail && guardrail.type === 'months' && guardrail.rule === 'min' && guardrail.name.startsWith('Runway')) {
+                if (
+                    guardrail.name.startsWith('Runway (vs. Ziel)') &&
+                    Number.isFinite(runwayTargetSmoothing?.targetMonths)
+                ) {
+                    return { ...guardrail, value: runwayMonths, threshold: runwayTargetSmoothing.targetMonths };
+                }
                 return { ...guardrail, value: runwayMonths };
             }
             return guardrail;
