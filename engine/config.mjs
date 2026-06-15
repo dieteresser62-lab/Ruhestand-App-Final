@@ -152,6 +152,7 @@ export const CONFIG = {
             RELAX_MAX_DOWN_PP: 20.0                     // Max. Relaxierung des Final-Down-Limits
         },
         DYNAMIC_FLEX: {
+            RETURN_POLICY: 'legacy_step',                // legacy_step | cape_continuous
             SAFE_ASSET_REAL_RETURN: 0.005,              // 0.5% reale Rendite sichere Anlagen
             GOLD_REAL_RETURN: 0.01,                     // 1.0% reale Rendite Gold
             MIN_HORIZON_YEARS: 1,                       // Mindest-Restlaufzeit
@@ -185,6 +186,22 @@ export const CONFIG = {
             DEFAULT_BOND_REFILL_THRESHOLD: null,
             BOND_NOMINAL_RETURN: 0.02
         }
+    },
+
+    /**
+     * Parameter fuer die optionale kontinuierliche CAPE-to-Return-Policy.
+     * Der Engine-Default bleibt bis zur expliziten Freigabe bei legacy_step.
+     */
+    CAPE_CONTINUOUS: {
+        DEFAULT_CAPE: 20,
+        MIN_CAPE: 0,
+        MAX_CAPE: 100,
+        MIN_REAL_RETURN: -0.015,
+        MAX_REAL_RETURN: 0.07,
+        MIN_EQUITY_REAL_RETURN: -0.03,
+        MAX_EQUITY_REAL_RETURN: 0.08,
+        EQUITY_PREMIUM_ADJUSTMENT: 0.015,
+        SAFE_REAL_RETURN_MODE: 'config_or_zero'
     },
 
     /**

@@ -1,11 +1,11 @@
 # Arbeitsdokument: CAPE-to-Return kontinuierlich modellieren
 
-**Stand:** 2026-06-14  
-**Status:** Ueberarbeitet nach Review, erneute Pruefung ausstehend  
+**Stand:** 2026-06-15  
+**Status:** Paket 2 Slice 1 nachgebessert, erneutes Review ausstehend  
 **Autor:** Codex  
 **Verbesserungspunkt:** 2 - CAPE-to-Return kontinuierlicher modellieren  
 **Geplanter Feature-Branch:** `codex/cape-return-kontinuierlich`  
-**GitHub-Status:** Noch nicht veroeffentlicht; vor Umsetzung Freigabe und Branch-Anlage erforderlich.
+**GitHub-Status:** Feature-Branch lokal angelegt, noch nicht veroeffentlicht.
 
 ## Einordnung in Roadmap
 
@@ -297,6 +297,12 @@ Safe-Rate-Contract:
 3. `SLICE_CAPE_RETURN_03_ENGINE_INTEGRATION.md`: Engine-Integration hinter Legacy-Default.
 4. `SLICE_CAPE_RETURN_04_RUNNER_PARITY.md`: Backtest/MC/Worker/Sweep-Paritaet.
 5. `SLICE_CAPE_RETURN_05_DIAGNOSIS_DOCS.md`: UI-/Log-Erklaerung, Vergleichsreport, Default-Entscheidung.
+
+### Umsetzungsstatus
+
+| Slice | Status | Branch | Ergebnis |
+|---|---|---|---|
+| `SLICE_CAPE_RETURN_02_POLICY_MODULE.md` | freigegeben | `codex/cape-return-kontinuierlich` | Policy-Modul, Config-Defaults und Unit-Tests erstellt; Legacy bleibt Default, keine Engine-Integration; B1/B2 behoben |
 
 ### Reviewer-Pruefauftrag
 
