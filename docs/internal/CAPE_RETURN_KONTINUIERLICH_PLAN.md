@@ -1,7 +1,7 @@
 # Arbeitsdokument: CAPE-to-Return kontinuierlich modellieren
 
 **Stand:** 2026-06-15  
-**Status:** Paket 2 Slice 1 nachgebessert, erneutes Review ausstehend  
+**Status:** Slice 03 Engine-Integration umgesetzt, Review ausstehend
 **Autor:** Codex  
 **Verbesserungspunkt:** 2 - CAPE-to-Return kontinuierlicher modellieren  
 **Geplanter Feature-Branch:** `codex/cape-return-kontinuierlich`  
@@ -303,6 +303,7 @@ Safe-Rate-Contract:
 | Slice | Status | Branch | Ergebnis |
 |---|---|---|---|
 | `SLICE_CAPE_RETURN_02_POLICY_MODULE.md` | freigegeben | `codex/cape-return-kontinuierlich` | Policy-Modul, Config-Defaults und Unit-Tests erstellt; Legacy bleibt Default, keine Engine-Integration; B1/B2 behoben |
+| `SLICE_CAPE_RETURN_03_ENGINE_INTEGRATION.md` | freigegeben | `codex/cape-return-kontinuierlich` | Policy-Modul in `engine/core.mjs` verdrahtet; Legacy bleibt Default; Continuous per Config aktivierbar und in `ui.vpw` diagnostiziert |
 
 ### Reviewer-Pruefauftrag
 

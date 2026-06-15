@@ -1,4 +1,5 @@
 import { EngineAPI } from '../engine/index.mjs';
+import { CONFIG } from '../engine/config.mjs';
 
 console.log('--- VPW Dynamic Flex Tests ---');
 
@@ -59,6 +60,8 @@ function vpwRate(r, n) {
     const expectedFlex = Math.max(0, expectedTotal - 1000);
 
     assertEqual(vpw.status, 'active', 'vpw should be active');
+    assertEqual(vpw.returnPolicy, 'legacy_step', 'legacy policy should remain the default');
+    assertEqual(vpw.expectedReturnSource, 'legacy_cape_step', 'legacy source should identify CAPE step input');
     assertEqual(vpw.gesamtwert, 110000, 'vpw should expose formula basis gesamtwert');
     assertClose(vpw.expectedRealReturn, expectedRealReturn, 1e-9, 'expected real return mismatch');
     assertClose(vpw.vpwRate, expectedRate, 1e-9, 'vpw rate mismatch');
@@ -66,7 +69,38 @@ function vpwRate(r, n) {
     assertClose(vpw.dynamicFlex, expectedFlex, 1e-6, 'dynamic flex mismatch');
 }
 
-// Test 3: Go-Go multiplier beyond contract should fail validation (transparent UX).
+// Test 3: Continuous CAPE policy can be activated explicitly via config.
+{
+    const previousPolicy = CONFIG.SPENDING_MODEL.DYNAMIC_FLEX.RETURN_POLICY;
+    CONFIG.SPENDING_MODEL.DYNAMIC_FLEX.RETURN_POLICY = 'cape_continuous';
+    try {
+        const input = {
+            ...baseInput,
+            dynamicFlex: true,
+            horizonYears: 20,
+            marketCapeRatio: 20,
+            goGoActive: false
+        };
+        const result = EngineAPI.simulateSingleYear(input, null);
+        const vpw = result.ui.vpw;
+        const expectedRealReturn = 0.041; // 60%*(1/20 + 1.5%) + 40%*0.5%
+        const expectedRate = vpwRate(expectedRealReturn, 20);
+
+        assertEqual(vpw.status, 'active', 'continuous VPW should be active');
+        assertEqual(vpw.returnPolicy, 'cape_continuous', 'continuous policy should be exposed in diagnostics');
+        assertEqual(vpw.expectedReturnSource, 'cape_continuous', 'continuous source should identify policy input');
+        assertEqual(vpw.capeInputStatus, 'valid', 'continuous CAPE input should be valid');
+        assertClose(vpw.capePolicyRatioUsed, 20, 1e-12, 'continuous policy should use market CAPE');
+        assertClose(vpw.expectedRealReturnBeforeSmoothing, expectedRealReturn, 1e-12, 'continuous raw target mismatch');
+        assertClose(vpw.expectedRealReturn, expectedRealReturn, 1e-12, 'first continuous year should not smooth without prior state');
+        assertClose(vpw.vpwRate, expectedRate, 1e-12, 'continuous VPW rate mismatch');
+        assertEqual(vpw.safeRealReturnSource, 'config_dynamic_flex', 'safe return source should be diagnosed');
+    } finally {
+        CONFIG.SPENDING_MODEL.DYNAMIC_FLEX.RETURN_POLICY = previousPolicy;
+    }
+}
+
+// Test 4: Go-Go multiplier beyond contract should fail validation (transparent UX).
 {
     const input = {
         ...baseInput,
@@ -81,7 +115,7 @@ function vpwRate(r, n) {
     assertEqual(result.error.name, 'ValidationError', 'invalid goGo multiplier should be rejected by validator');
 }
 
-// Test 4: Real-return clamp lower bound.
+// Test 5: Real-return clamp lower bound.
 {
     const input = {
         ...baseInput,
@@ -95,7 +129,7 @@ function vpwRate(r, n) {
     assertEqual(result.ui.vpw.expectedRealReturn, 0, 'expected real return should clamp at lower bound');
 }
 
-// Test 5: Real-return clamp upper bound.
+// Test 6: Real-return clamp upper bound.
 {
     const input = {
         ...baseInput,
@@ -109,7 +143,7 @@ function vpwRate(r, n) {
     assertEqual(result.ui.vpw.expectedRealReturn, 0.05, 'expected real return should clamp at upper bound');
 }
 
-// Test 6: Smoothing carries over via state.
+// Test 7: Smoothing carries over via state.
 {
     const year1 = EngineAPI.simulateSingleYear({
         ...baseInput,
@@ -135,7 +169,7 @@ function vpwRate(r, n) {
     assert(r2 < 0.038, 'smoothed return should remain below raw target due to smoothing');
 }
 
-// Test 7: Shorter horizon should increase VPW rate.
+// Test 8: Shorter horizon should increase VPW rate.
 {
     const base = {
         ...baseInput,
@@ -148,7 +182,7 @@ function vpwRate(r, n) {
     assert(shortHorizon.ui.vpw.vpwRate > longHorizon.ui.vpw.vpwRate, 'shorter horizon should produce higher VPW rate');
 }
 
-// Test 8: CAPE alias fields should be consistent.
+// Test 9: CAPE alias fields should be consistent.
 {
     const a = EngineAPI.simulateSingleYear({
         ...baseInput,
@@ -168,7 +202,7 @@ function vpwRate(r, n) {
     assertClose(a.ui.vpw.dynamicFlex, b.ui.vpw.dynamicFlex, 1e-6, 'cape alias should produce same flex');
 }
 
-// Test 9: Go-Go active vs inactive should affect VPW total.
+// Test 10: Go-Go active vs inactive should affect VPW total.
 {
     const base = {
         ...baseInput,
@@ -182,7 +216,7 @@ function vpwRate(r, n) {
     assert(on.ui.vpw.vpwTotal > off.ui.vpw.vpwTotal, 'goGo active should increase VPW total');
 }
 
-// Test 10: Smoothing should progress over multiple years.
+// Test 11: Smoothing should progress over multiple years.
 {
     const y1 = EngineAPI.simulateSingleYear({
         ...baseInput,
@@ -210,7 +244,7 @@ function vpwRate(r, n) {
     assert(y3.ui.vpw.expectedRealReturn <= 0.05, 'smoothing should still obey clamp');
 }
 
-// Test 11: Bear scenario should reduce FlexRate below 100 with active VPW.
+// Test 12: Bear scenario should reduce FlexRate below 100 with active VPW.
 {
     const bear = EngineAPI.simulateSingleYear({
         ...baseInput,
@@ -230,7 +264,7 @@ function vpwRate(r, n) {
     assert(Number.isFinite(flexRate) && flexRate < 100, 'bear regime should apply flex reduction under VPW path');
 }
 
-// Test 12: Safety stage 1 should disable Go-Go after repeated bad years.
+// Test 13: Safety stage 1 should disable Go-Go after repeated bad years.
 {
     const stressInput = {
         ...baseInput,
@@ -275,7 +309,7 @@ function vpwRate(r, n) {
     assertEqual(runs[suppressionIdx].ui.vpw.goGoActive, false, 'go-go should be inactive when suppression is applied');
 }
 
-// Test 13: Safety stage 2 should switch Dynamic Flex to static flex.
+// Test 14: Safety stage 2 should switch Dynamic Flex to static flex.
 {
     const stressInput = {
         ...baseInput,
@@ -321,7 +355,7 @@ function vpwRate(r, n) {
     assertEqual(runs[staticFlexIdx].ui.vpw.dynamicFlexSuppressed, true, 'dynamic flex suppression flag should be true');
 }
 
-// Test 14: Re-entry from stage 2 to stage 1 should be damped (no full jump-in).
+// Test 15: Re-entry from stage 2 to stage 1 should be damped (no full jump-in).
 {
     const reentryInput = {
         ...baseInput,
@@ -356,7 +390,7 @@ function vpwRate(r, n) {
     assert(reentryRun.ui.vpw.dynamicFlex < reentryRun.ui.vpw.rawDynamicFlex, 'damped flex should be below raw VPW flex');
 }
 
-// Test 15: Stage 2 must not block its own recovery through the static-flex cut.
+// Test 16: Stage 2 must not block its own recovery through the static-flex cut.
 {
     const recoveryInput = {
         ...baseInput,
@@ -405,7 +439,7 @@ function vpwRate(r, n) {
     assertEqual(runs[2].ui.vpw.status, 'active', 'stage 1 should reactivate VPW after stage-2 recovery');
 }
 
-// Test 16: 3-bucket stage 2 recovery should not be blocked by protected drawdown alone.
+// Test 17: 3-bucket stage 2 recovery should not be blocked by protected drawdown alone.
 {
     const recoveryInput = {
         ...baseInput,

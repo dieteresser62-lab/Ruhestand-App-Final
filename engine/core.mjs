@@ -20,6 +20,7 @@ import MarketAnalyzer from './analyzers/MarketAnalyzer.mjs';
 import SpendingPlanner from './planners/SpendingPlanner.mjs';
 import TransactionEngine from './transactions/TransactionEngine.mjs';
 import { settleTaxYear } from './tax-settlement.mjs';
+import { deriveVpwExpectedRealReturn } from './planners/vpw-return-policy.mjs';
 import { STRATEGY_OPTIONS } from '../types/strategy-options.js';
 
 const DYNAMIC_FLEX_ALLOWED_HORIZON_METHODS = new Set(['mean', 'survival_quantile']);
@@ -138,26 +139,20 @@ const _berechneEntnahmeRate = (realeRendite, horizontJahre) => {
 
 function _calculateExpectedRealReturn(params) {
     const cfg = CONFIG.SPENDING_MODEL.DYNAMIC_FLEX;
-    const inflRate = Number.isFinite(params?.inflation) ? (params.inflation / 100) : 0.02;
-    const equityNominal = Number.isFinite(params?.expectedReturnCape)
-        ? params.expectedReturnCape
-        : (cfg.FALLBACK_REAL_RETURN + inflRate);
-    const eqPct = Number.isFinite(params?.targetEq) ? (params.targetEq / 100) : 0.60;
-    const goldPctRaw = (params?.goldAktiv && Number.isFinite(params?.goldZielProzent))
-        ? (params.goldZielProzent / 100)
-        : 0;
-    const goldPct = _clamp(goldPctRaw, 0, 1);
-    const safePct = Math.max(0, 1 - eqPct - goldPct);
-    const rawReal = (eqPct * (equityNominal - inflRate)) +
-        (goldPct * cfg.GOLD_REAL_RETURN) +
-        (safePct * cfg.SAFE_ASSET_REAL_RETURN);
-    const clampedReal = _clamp(rawReal, cfg.MIN_REAL_RETURN, cfg.MAX_REAL_RETURN);
+    const policyResult = deriveVpwExpectedRealReturn(params);
+    const clampedReal = policyResult.expectedRealReturn;
     const prior = Number.isFinite(params?.lastExpectedRealReturn)
         ? params.lastExpectedRealReturn
         // Erstjahr: kein Vorwert vorhanden -> direkte Uebernahme des geclampten Werts.
         : clampedReal;
     const alpha = _clamp(cfg.EXPECTED_RETURN_SMOOTHING_ALPHA, 0, 1);
-    return prior + alpha * (clampedReal - prior);
+    const smoothedReal = prior + alpha * (clampedReal - prior);
+    return {
+        ...policyResult,
+        expectedRealReturnBeforeSmoothing: clampedReal,
+        expectedRealReturn: smoothedReal,
+        smoothingAlpha: alpha
+    };
 }
 
 function _sanitizeSafetyStage(value) {
@@ -422,7 +417,9 @@ function _internal_calculateModel(input, lastState) {
             dynamicFlexCfg.MIN_HORIZON_YEARS,
             dynamicFlexCfg.MAX_HORIZON_YEARS
         );
-        const expectedRealReturn = _calculateExpectedRealReturn({
+        const vpwReturnPolicy = _calculateExpectedRealReturn({
+            capeRatio: normalizedInput.capeRatio,
+            marketCapeRatio: normalizedInput.marketCapeRatio,
             expectedReturnCape: market.expectedReturnCape,
             inflation: normalizedInput.inflation,
             targetEq: normalizedInput.targetEq,
@@ -430,6 +427,7 @@ function _internal_calculateModel(input, lastState) {
             goldZielProzent: normalizedInput.goldZielProzent,
             lastExpectedRealReturn: vpwExpectedRealReturn
         });
+        const expectedRealReturn = vpwReturnPolicy.expectedRealReturn;
         vpwExpectedRealReturn = expectedRealReturn;
         const vpwRate = _berechneEntnahmeRate(expectedRealReturn, horizonYears);
         let vpwTotal = gesamtwert * vpwRate;
@@ -472,8 +470,20 @@ function _internal_calculateModel(input, lastState) {
             reentryApplied: false,
             reentryBlendWeight: 1,
             reentryRemainingBefore: Math.max(0, Number(vpwSafetyState?.reentryRemaining) || 0),
+            returnPolicy: vpwReturnPolicy.returnPolicy,
+            expectedReturnSource: vpwReturnPolicy.expectedReturnSource,
             capeRatioUsed: Number.isFinite(market?.capeRatio) ? market.capeRatio : null,
             expectedReturnCape: Number.isFinite(market?.expectedReturnCape) ? market.expectedReturnCape : null,
+            capePolicyRatioUsed: Number.isFinite(vpwReturnPolicy.capeRatioUsed) ? vpwReturnPolicy.capeRatioUsed : null,
+            capeInputStatus: vpwReturnPolicy.capeInputStatus || null,
+            safeRealReturn: vpwReturnPolicy.safeRealReturn,
+            safeRealReturnSource: vpwReturnPolicy.safeRealReturnSource,
+            goldRealReturn: vpwReturnPolicy.goldRealReturn,
+            goldRealReturnSource: vpwReturnPolicy.goldRealReturnSource,
+            expectedRealReturnRaw: vpwReturnPolicy.expectedRealReturnRaw,
+            expectedRealReturnClamped: vpwReturnPolicy.expectedRealReturnClamped,
+            expectedRealReturnBeforeSmoothing: vpwReturnPolicy.expectedRealReturnBeforeSmoothing,
+            smoothingAlpha: vpwReturnPolicy.smoothingAlpha,
             expectedRealReturn,
             vpwRate,
             vpwTotal,
