@@ -22,7 +22,8 @@ export function isStationaryBootstrapMethod(method) {
 }
 
 export function normalizeStationaryBootstrapConfig(inputs = {}) {
-    const raw = Number(inputs.expectedBlockLength ?? inputs.blockSize);
+    const safeInputs = inputs || {};
+    const raw = Number(safeInputs.expectedBlockLength ?? safeInputs.blockSize);
     let expectedBlockLength;
     if (!Number.isFinite(raw)) {
         expectedBlockLength = STATIONARY_BOOTSTRAP_DEFAULT_EXPECTED_BLOCK_LENGTH;
@@ -46,10 +47,10 @@ export function normalizeStationaryBootstrapConfig(inputs = {}) {
     };
 }
 
-export function resolveStationaryBootstrapStartPolicy({
-    useCapeSampling = false,
-    startYearMode = 'UNIFORM'
-} = {}) {
+export function resolveStationaryBootstrapStartPolicy(options = {}) {
+    const safeOptions = options || {};
+    const useCapeSampling = safeOptions.useCapeSampling === true;
+    const startYearMode = safeOptions.startYearMode ?? 'UNIFORM';
     const normalizedStartYearMode = ['UNIFORM', 'FILTER', 'RECENCY'].includes(startYearMode)
         ? startYearMode
         : 'UNIFORM';

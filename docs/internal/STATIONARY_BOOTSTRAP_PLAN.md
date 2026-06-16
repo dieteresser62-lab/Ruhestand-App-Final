@@ -1,7 +1,7 @@
 # Arbeitsdokument: Stationary Bootstrap ergaenzen
 
 **Stand:** 2026-06-16  
-**Status:** Slice 1 freigegeben
+**Status:** Slice 2 freigegeben
 **Autor:** Codex  
 **Verbesserungspunkt:** 3 - Stationary Bootstrap ergaenzen  
 **Geplanter Feature-Branch:** `codex/stationary-bootstrap`  
@@ -171,7 +171,7 @@ Stoppen und nachfragen, wenn:
 
 - Worker-Paritaet nicht eindeutig herstellbar ist.
 - CAPE-Sampling und Stationary Bootstrap fachlich kollidieren.
-- Bestehende Methode `block` geaendert werden muesste.
+- Bestehende Methode `block` geaendert werden muessste.
 - MC-Ergebnisse durch Chunking variieren.
 
 ## Validierung
@@ -247,7 +247,7 @@ Sampler-State-Contract:
 ### Slice-Zuschnitt fuer spaetere Umsetzung
 
 1. `SLICE_STATIONARY_BOOTSTRAP_01_CONTRACT.md`: Methodenname, Parameter, CAPE/FILTER/RECENCY-Entscheidung. Status: freigegeben.
-2. `SLICE_STATIONARY_BOOTSTRAP_02_SAMPLER.md`: DOM-freier Sampler und Unit-Tests.
+2. `SLICE_STATIONARY_BOOTSTRAP_02_SAMPLER.md`: DOM-freier Sampler und Unit-Tests. Status: freigegeben.
 3. `SLICE_STATIONARY_BOOTSTRAP_03_RUNNER.md`: Runner-Integration serial.
 4. `SLICE_STATIONARY_BOOTSTRAP_04_WORKER_PARITY.md`: Worker-Payload und Paritaet.
 5. `SLICE_STATIONARY_BOOTSTRAP_05_UI_DOCS.md`: UI, Persistenz, Doku, Browser-Smoke.
