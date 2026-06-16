@@ -16,6 +16,7 @@ import {
     parseStoredBalanceInputsFromData,
     parseStoredTranchesFromData
 } from '../profile/profile-state.js';
+import { LONGEVITY_DEFAULTS, normalizeLongevityMode } from './dynamic-flex-longevity-contract.js';
 
 const DYNAMIC_FLEX_DEFAULTS = {
     HORIZON_METHOD: 'survival_quantile',
@@ -184,6 +185,10 @@ export function buildSimulatorInputsFromProfileData(profileData) {
         1.0,
         1.5
     );
+    const longevityMode = normalizeLongevityMode(readString(profileData, simKey('longevityMode'), LONGEVITY_DEFAULTS.mode));
+    const longevityQuantileShift = readNumber(profileData, simKey('longevityQuantileShift'), LONGEVITY_DEFAULTS.quantileShift);
+    const longevityRelativePct = readNumber(profileData, simKey('longevityRelativePct'), LONGEVITY_DEFAULTS.relativePct);
+    const longevityBufferYears = readNumber(profileData, simKey('longevityBufferYears'), LONGEVITY_DEFAULTS.bufferYears);
     const decumulationRaw = readValue(profileData, 'decumulation');
     const decumulationFromProfile = (decumulationRaw && typeof decumulationRaw === 'object') ? decumulationRaw : null;
     const decumulationMode = normalizeDecumulationMode(
@@ -253,6 +258,10 @@ export function buildSimulatorInputsFromProfileData(profileData) {
         survivalQuantile,
         goGoActive,
         goGoMultiplier,
+        longevityMode,
+        longevityQuantileShift,
+        longevityRelativePct,
+        longevityBufferYears,
         risikoprofil: 'sicherheits-dynamisch',
         goldAktiv,
         goldZielProzent: goldAktiv ? goldZielProzent : 0,
@@ -573,6 +582,14 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
     }
     if (!ensureValueMatch(inputsList, i => stableStringify(i.healthBucket || null))) {
         warnings.push('Pflegebucket-Konfiguration unterscheidet sich zwischen Profilen. Es wird das Hauptprofil verwendet.');
+    }
+    if (!ensureValueMatch(inputsList, i => stableStringify({
+        longevityMode: i.longevityMode || LONGEVITY_DEFAULTS.mode,
+        longevityQuantileShift: Number.isFinite(i.longevityQuantileShift) ? i.longevityQuantileShift : LONGEVITY_DEFAULTS.quantileShift,
+        longevityRelativePct: Number.isFinite(i.longevityRelativePct) ? i.longevityRelativePct : LONGEVITY_DEFAULTS.relativePct,
+        longevityBufferYears: Number.isFinite(i.longevityBufferYears) ? i.longevityBufferYears : LONGEVITY_DEFAULTS.bufferYears
+    }))) {
+        warnings.push('Langlebigkeits-Puffer unterscheidet sich zwischen Profilen. Es wird das Hauptprofil verwendet.');
     }
     // Dynamic-Flex-Parameter werden im Simulator explizit aus den aktuellen Rahmendaten
     // gelesen und nicht aus Profil-Differenzen im Profilverbund abgeleitet.

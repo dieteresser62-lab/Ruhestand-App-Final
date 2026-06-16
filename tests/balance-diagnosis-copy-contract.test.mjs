@@ -53,8 +53,19 @@ const appState = {
                 enabled: true,
                 status: 'active',
                 horizonMethod: 'survival_quantile',
-                horizonYears: 10,
+                horizonYears: 12,
+                horizonYearsRaw: 10,
                 survivalQuantile: 0.9,
+                longevityMode: 'quantile_shift',
+                longevityApplied: true,
+                longevityAppliedShift: 0,
+                longevityAppliedBufferYears: 2,
+                longevityRelativePct: 0,
+                longevityClampReason: 'quantile_cap',
+                survivalQuantileRaw: 0.95,
+                survivalQuantileAdjusted: 0.95,
+                longevityTransitionSmoothingApplied: true,
+                longevityTransitionSmoothingFloor: 11,
                 vpwRate: 0.085,
                 expectedRealReturn: -0.01,
                 expectedReturnCape: 0.052,
@@ -117,6 +128,12 @@ assert(text.includes('Geplante Aktion: Verkauf'), 'Copytext sollte geplante Akti
 assert(text.includes('Aktien-Grenzen:'), 'Copytext sollte Aktien-Grenzen ausgeben');
 assert(text.includes('Gold-Grenzen:'), 'Copytext sollte Gold-Grenzen ausgeben');
 assert(text.includes('--- Dynamic Flex (VPW) ---'), 'Copytext sollte VPW-Block enthalten');
+assert(text.includes('Raw-Horizont: 10 Jahre'), 'Copytext sollte VPW-Raw-Horizont ausgeben');
+assert(text.includes('Langlebigkeits-Puffer: Quantil-Shift'), 'Copytext sollte Longevity-Modus ausgeben');
+assert(text.includes('Longevity-Clamp: Quantil-Cap erreicht'), 'Copytext sollte Longevity-Clamp ausgeben');
+assert(text.includes('Quantil raw/effektiv: 0.95 -> 0.95'), 'Copytext sollte Quantil-Raw/Effektiv ausgeben');
+assert(text.includes('Joint-to-Single-Glättung: 11 Jahre'), 'Copytext sollte Longevity-Smoothing ausgeben');
+assert(text.includes('Longevity-Quantil-Shift ohne Effekt'), 'Copytext sollte wirkungslosen Quantil-Shift warnen');
 assert(text.includes('VPW-Sicherheitsmodus: Stufe 2'), 'Copytext sollte VPW-Sicherheitsmodus ausgeben');
 assert(text.includes('Warnsignale:'), 'Copytext sollte VPW-Warnsignale ausgeben');
 assert(text.includes('Mindest-Flex p.a.:'), 'Copytext sollte Mindest-Flex ausgeben');

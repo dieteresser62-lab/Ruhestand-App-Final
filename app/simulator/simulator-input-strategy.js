@@ -14,6 +14,7 @@ import {
     readNumber,
     readValue
 } from './simulator-input-dom.js';
+import { LONGEVITY_DEFAULTS, normalizeLongevityMode } from './dynamic-flex-longevity-contract.js';
 
 export const DEFAULT_RISIKOPROFIL = 'sicherheits-dynamisch';
 
@@ -85,7 +86,11 @@ export function readDynamicFlexInputs(doc = globalThis.document) {
         horizonYears: readBoundedNumber('horizonYears', DYNAMIC_FLEX_DEFAULTS.HORIZON_YEARS, 1, 60, doc),
         survivalQuantile: readBoundedNumber('survivalQuantile', DYNAMIC_FLEX_DEFAULTS.SURVIVAL_QUANTILE, 0.5, 0.99, doc),
         goGoActive: readChecked('goGoActive', false, doc) === true,
-        goGoMultiplier: readBoundedNumber('goGoMultiplier', DYNAMIC_FLEX_DEFAULTS.GO_GO_MULTIPLIER, 1.0, 1.5, doc)
+        goGoMultiplier: readBoundedNumber('goGoMultiplier', DYNAMIC_FLEX_DEFAULTS.GO_GO_MULTIPLIER, 1.0, 1.5, doc),
+        longevityMode: normalizeLongevityMode(readValue('longevityMode', LONGEVITY_DEFAULTS.mode, doc)),
+        longevityQuantileShift: readNumber('longevityQuantileShift', LONGEVITY_DEFAULTS.quantileShift, doc),
+        longevityRelativePct: readNumber('longevityRelativePct', LONGEVITY_DEFAULTS.relativePct, doc),
+        longevityBufferYears: readNumber('longevityBufferYears', LONGEVITY_DEFAULTS.bufferYears, doc)
     };
 }
 

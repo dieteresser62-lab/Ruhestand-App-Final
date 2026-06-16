@@ -1,11 +1,11 @@
 # Arbeitsdokument: Langlebigkeitsmodell konservativer machen
 
-**Stand:** 2026-06-14  
-**Status:** Ueberarbeitet nach Review, erneute Pruefung ausstehend  
+**Stand:** 2026-06-16  
+**Status:** abgeschlossen, alle Slices freigegeben  
 **Autor:** Codex  
 **Verbesserungspunkt:** 5 - Langlebigkeitsmodell konservativer machen  
 **Geplanter Feature-Branch:** `codex/langlebigkeitsmodell-konservativer`  
-**GitHub-Status:** Noch nicht veroeffentlicht; vor Umsetzung Freigabe und Branch-Anlage erforderlich.
+**GitHub-Status:** Feature-Branch `codex/langlebigkeitsmodell-konservativer` lokal angelegt, noch nicht veroeffentlicht.
 
 ## Einordnung in Roadmap
 
@@ -297,6 +297,21 @@ Beim Uebergang Joint -> Single im Monte-Carlo-Jahreslauf muss ein Re-Entry-/Smoo
 3. `SLICE_LONGEVITY_03_ENGINE_RUNNER.md`: Engine, Backtest, MC, Worker.
 4. `SLICE_LONGEVITY_04_UI_PERSISTENCE.md`: Balance/Simulator Inputs, Diagnose, Copytext.
 5. `SLICE_LONGEVITY_05_OPTIMIZER_DOCS.md`: Optimizer-Grenzen, Vergleichsreport, Doku-Sync.
+
+### Umsetzungsstatus
+
+| Slice | Status | Rueckdokumentation |
+|---|---|---|
+| `SLICE_LONGEVITY_01_CONTRACT.md` | freigegeben mit Findings | Contract-Modul mit Default `none`, erlaubten Modi, V1-Grenzen, Paar-Anwendungsregel `final_household_horizon_once` und Joint-to-Single-Smoothing-Trigger angelegt. Keine Runtime-Verdrahtung in Engine/Runner/UI. |
+| `SLICE_LONGEVITY_02_HORIZON_MODULE.md` | freigegeben | DOM-freier Helper fuer Longevity-Horizon-Adjustments und lineare Joint-to-Single-Floor-Glattung angelegt. `quantile_shift` nutzt eine explizite Recompute-Funktion, damit Single-/Pair-Sterbetafelableitung erst in Slice 3 produktiv verdrahtet wird. `npm test` bestanden. |
+| `SLICE_LONGEVITY_03_ENGINE_RUNNER.md` | freigegeben | Gemeinsamer Runner-Horizon-Resolver fuer Backtest und Monte Carlo angelegt, Engine-Validierung und `ui.vpw`-Diagnose um Longevity-Felder erweitert, MC-Joint-to-Single-Smoothing verdrahtet und Worker-/Chunk-Paritaet fuer Longevity belegt. `npm run build:engine` und `npm test` bestanden. |
+| `SLICE_LONGEVITY_04_UI_PERSISTENCE.md` | freigegeben | Balance und Simulator stellen Longevity-Felder im Dynamic-Flex-Detailbereich bereit, leiten die Werte ueber UI-/Profil-Reader weiter und erweitern den Diagnose-Copytext um Raw-/Effektivhorizont, Clamp und Smoothing. `npm run build:engine` und `npm test` bestanden. |
+| `SLICE_LONGEVITY_05_OPTIMIZER_DOCS.md` | freigegeben | Longevity bleibt in Version 1 fixer Sicherheitsparameter: Auto-Optimize und Sweep bieten keine Longevity-Variationskeys an und koennen sie nicht per Champion-/Kombinationsapply ueberschreiben. Ein deterministischer Vergleich 0/+2/+5 Jahre ist in der Slice-Datei dokumentiert. Der blockierende Doku-Sync fuer `TECHNICAL.md`, `ARCHITEKTUR_UND_FACHKONZEPT.md` und `Handbuch.html` wurde umgesetzt. |
+
+
+
+
+
 
 ### Reviewer-Pruefauftrag
 

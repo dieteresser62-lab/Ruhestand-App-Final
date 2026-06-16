@@ -179,6 +179,18 @@ export function createDiagnosisHandlers({ dom, appState }) {
         }
         const vpw = diagnosis.keyParams?.vpw;
         if (vpw && typeof vpw === 'object') {
+            const longevityModeLabels = {
+                none: 'Aus',
+                quantile_shift: 'Quantil-Shift',
+                relative_horizon_buffer: 'Relativer Horizon-Puffer',
+                buffer_years: 'Fixer Jahrespuffer'
+            };
+            const longevityClampLabels = {
+                none: 'Kein Clamp',
+                quantile_cap: 'Quantil-Cap erreicht',
+                horizon_max: 'Max-Horizon erreicht',
+                horizon_min: 'Min-Horizon erreicht'
+            };
             text += `\n--- Dynamic Flex (VPW) ---\n`;
             const methodLabel = vpw.horizonMethod === 'mean'
                 ? 'Mean'
@@ -194,8 +206,37 @@ export function createDiagnosisHandlers({ dom, appState }) {
             if (typeof vpw.horizonYears === 'number' && isFinite(vpw.horizonYears)) {
                 text += `Horizont: ${Math.round(vpw.horizonYears)} Jahre\n`;
             }
+            if (typeof vpw.horizonYearsRaw === 'number' && isFinite(vpw.horizonYearsRaw)) {
+                text += `Raw-Horizont: ${Math.round(vpw.horizonYearsRaw)} Jahre\n`;
+            }
             if (typeof vpw.survivalQuantile === 'number' && isFinite(vpw.survivalQuantile)) {
                 text += `Survival-Quantil: ${vpw.survivalQuantile.toFixed(2)}\n`;
+            }
+            const longevityMode = vpw.longevityMode || 'none';
+            if (longevityMode !== 'none') {
+                text += `Langlebigkeits-Puffer: ${longevityModeLabels[longevityMode] || longevityMode}\n`;
+                if (typeof vpw.longevityAppliedShift === 'number' && isFinite(vpw.longevityAppliedShift)) {
+                    text += `Angewandter Quantil-Shift: ${vpw.longevityAppliedShift.toFixed(2)}\n`;
+                }
+                if (typeof vpw.longevityRelativePct === 'number' && isFinite(vpw.longevityRelativePct) && vpw.longevityRelativePct > 0) {
+                    text += `Relativer Horizon-Puffer: ${UIUtils.formatPercentRatio(vpw.longevityRelativePct, { fractionDigits: 1, prefixPlus: true, invalid: 'n/a' })}\n`;
+                }
+                if (typeof vpw.longevityAppliedBufferYears === 'number' && isFinite(vpw.longevityAppliedBufferYears)) {
+                    text += `Angewandter Jahrespuffer: ${vpw.longevityAppliedBufferYears.toFixed(1)} Jahre\n`;
+                }
+                if (vpw.longevityClampReason) {
+                    text += `Longevity-Clamp: ${longevityClampLabels[vpw.longevityClampReason] || vpw.longevityClampReason}\n`;
+                }
+                if (typeof vpw.survivalQuantileRaw === 'number' && isFinite(vpw.survivalQuantileRaw)
+                    && typeof vpw.survivalQuantileAdjusted === 'number' && isFinite(vpw.survivalQuantileAdjusted)) {
+                    text += `Quantil raw/effektiv: ${vpw.survivalQuantileRaw.toFixed(2)} -> ${vpw.survivalQuantileAdjusted.toFixed(2)}\n`;
+                }
+                if (vpw.longevityTransitionSmoothingApplied) {
+                    const floor = Number.isFinite(vpw.longevityTransitionSmoothingFloor)
+                        ? `${Math.round(vpw.longevityTransitionSmoothingFloor)} Jahre`
+                        : 'aktiv';
+                    text += `Joint-to-Single-Glättung: ${floor}\n`;
+                }
             }
             if (typeof vpw.vpwRate === 'number' && isFinite(vpw.vpwRate)) {
                 text += `VPW-Rate: ${UIUtils.formatPercentValue(vpw.vpwRate * 100, { fractionDigits: 1, invalid: 'n/a' })}\n`;
@@ -239,6 +280,9 @@ export function createDiagnosisHandlers({ dom, appState }) {
             }
             if (typeof vpw.vpwRate === 'number' && isFinite(vpw.vpwRate) && (vpw.vpwRate * 100) >= 8) {
                 warnings.push('hohe VPW-Rate (>=8%)');
+            }
+            if (vpw.longevityMode === 'quantile_shift' && typeof vpw.longevityAppliedShift === 'number' && isFinite(vpw.longevityAppliedShift) && vpw.longevityAppliedShift <= 0) {
+                warnings.push('Longevity-Quantil-Shift ohne Effekt');
             }
             if (warnings.length > 0) {
                 text += `Warnsignale: ${warnings.join('; ')}\n`;

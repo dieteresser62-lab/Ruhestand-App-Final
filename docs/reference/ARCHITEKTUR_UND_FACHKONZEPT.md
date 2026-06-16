@@ -65,7 +65,7 @@ Die Ruhestand-Suite kombiniert folgende Funktionen:
 10. **Rentensystem** für 1-2 Personen mit verschiedenen Indexierungsarten
 11. **Portable Desktop-App** via Tauri für Windows, macOS und Linux
 12. **Ausgaben-Check** zur Kontrolle monatlicher Ausgaben gegen das Budget mit CSV-Import, Hochrechnung und Ampel-Visualisierung
-13. **Dynamic-Flex (VPW)** mit CAPE-basierter Renditeerwartung, Sterbetafeln, EMA-Glättung und Go-Go-Phase; integriert in Balance-App, Backtest, Monte Carlo, Sweep und Auto-Optimize
+13. **Dynamic-Flex (VPW)** mit CAPE-basierter Renditeerwartung, Sterbetafeln, konservativen Langlebigkeitsaufschlaegen, EMA-Glättung und Go-Go-Phase; integriert in Balance-App, Backtest, Monte Carlo, Sweep und Auto-Optimize
 14. **Auto-CAPE im Jahreswechsel** (US-Shiller-CAPE mit Fallback-Kette und non-blocking Fehlerbehandlung)
 15. **Pflegebucket** als gesperrte Geldmarkt-/Cash-Reserve mit Profildefinition, Simulator-Air-Gap, Pflegegrad-Trigger, Monte-Carlo-KPIs und Balance-Diagnose
 16. **Mindest-Flex p.a.** als optionale Untergrenze für Flex-Ausgaben in gekürzten Safety-/Guardrail-Jahren; ratenbasiert, validiert gegen den Flex-Bedarf und in Balance, Simulator, Backtest, Monte Carlo, Sweep, Auto-Optimize und Profilverbund integriert
@@ -961,7 +961,7 @@ Der SpendingPlanner führt mehrere Policy-Module in stabiler Reihenfolge aus, wo
 4. Spending-Policy-Pipeline anwenden: Guardrails, Mindest-Flex, Flex-Budget, finale Rate-Limits.
 5. Jahresentnahme quantisieren und Diagnose erzeugen.
 
-Dynamic Flex ist ein vorgeschalteter VPW-Pfad. Bei aktivem `dynamicFlex` berechnet die Engine aus Gesamtvermögen, Resthorizont, CAPE-basierter erwarteter Realrendite, Gold-/Safe-Asset-Anteil und optionalem Go-Go-Multiplikator einen dynamischen Flex-Bedarf. Die VPW-Renditeherleitung ist in `engine/planners/vpw-return-policy.mjs` gekapselt: `legacy_step` bleibt Default, `cape_continuous` ist ein expliziter Config-Modus mit robuster CAPE-Normalisierung und separaten Aktien-/Portfolio-Clamps. Der Floor bleibt geschützt; VPW ersetzt nur den flexiblen Teil. Eine Sicherheitsstufe kann Go-Go deaktivieren oder Dynamic Flex temporär auf statischen Flex zurücksetzen, wenn Alarm-, Runway- oder Drawdown-Signale zu stark werden.
+Dynamic Flex ist ein vorgeschalteter VPW-Pfad. Bei aktivem `dynamicFlex` berechnet die Engine aus Gesamtvermögen, Resthorizont, CAPE-basierter erwarteter Realrendite, Gold-/Safe-Asset-Anteil und optionalem Go-Go-Multiplikator einen dynamischen Flex-Bedarf. Die VPW-Renditeherleitung ist in `engine/planners/vpw-return-policy.mjs` gekapselt: `legacy_step` bleibt Default, `cape_continuous` ist ein expliziter Config-Modus mit robuster CAPE-Normalisierung und separaten Aktien-/Portfolio-Clamps. Der Resthorizont kann optional durch Longevity-Modi konservativer gemacht werden: `none` bleibt Default, `quantile_shift`, `relative_horizon_buffer` und `buffer_years` sind explizite Sicherheitsannahmen. Der Floor bleibt geschützt; VPW ersetzt nur den flexiblen Teil. Eine Sicherheitsstufe kann Go-Go deaktivieren oder Dynamic Flex temporär auf statischen Flex zurücksetzen, wenn Alarm-, Runway- oder Drawdown-Signale zu stark werden.
 
 Der optionale `minimumFlexAnnual` ist kein zweiter Floor und mutiert den Bedarf nicht. Er wird nach den Guardrails als Mindest-Effektivbetrag für den Flex-Anteil interpretiert: Wenn die berechnete Flex-Rate weniger als diesen Betrag freigeben würde, hebt `applyMinimumFlexFloor()` die Rate bis zur erforderlichen Mindest-Flex-Rate an. Danach dürfen Flex-Budget-Cap und finale Rate-Limits die Anhebung weiterhin begrenzen. Notfallbedingungen blockieren die Anhebung bei aktivem Alarm, fehlender Gesamtvermögensdeckung für Floor plus Mindest-Flex oder wenn der Mindest-Runway nach dem Proxy nicht wiederherstellbar wäre.
 
@@ -2338,6 +2338,8 @@ Auto-Optimize nutzt zwei Ebenen:
 
 Wenn Web Worker nicht verfügbar sind oder der Worker-Pfad fehlschlägt, fällt Auto-Optimize auf serielle `runMonteCarloChunk()`-Ausführung zurück. Der Worker-Contract wird über `auto-optimize-worker-contract.test.mjs` abgesichert.
 
+**Nicht optimierbare Sicherheitsparameter:** Longevity-Felder (`longevityMode`, `longevityQuantileShift`, `longevityRelativePct`, `longevityBufferYears`) sind in Version 1 keine Auto-Optimize-Parameter. Der Optimierer bewertet Kandidaten mit den Basisinputs des Nutzers, kann diese Sicherheitsannahmen aber weder über die Parameter-Auswahl noch über Champion-Apply verändern. Damit kann Auto-Optimize niedrigere VPW-Freigaben nicht dadurch "wegoptimieren", dass es den Langlebigkeitspuffer abschaltet.
+
 **Kandidaten-Batches:**
 ```javascript
 const BATCH_SIZE = 4;  // Parallel evaluation
@@ -2411,7 +2413,7 @@ Dynamic Flex ersetzt den manuellen Flex-Betrag durch eine **VPW-basierte dynamis
 flexBedarf = max(0, Gesamtvermögen × VPW-Rate × GoGo-Multiplikator − Floor)
 ```
 
-**Architekturentscheidung:** Die Horizont-Berechnung (Sterbetafeln) liegt in der App-Schicht (`simulator-engine-helpers.js`). Die Engine erhält nur `horizonYears` als Zahl und bleibt damit demographik-agnostisch.
+**Architekturentscheidung:** Die Horizont-Berechnung (Sterbetafeln) liegt in der App-Schicht (`simulator-engine-helpers.js` und `dynamic-flex-runner-horizon.js`). Die Engine erhält `horizonYears` als effektiven Wert und optionale `longevityHorizonDiagnostics`; sie bleibt damit demographik-agnostisch, kann aber Raw-/Effektivhorizont und Clamp-Gründe anzeigen.
 
 ### C.11.2 VPW-Formel (Engine)
 
@@ -2497,7 +2499,22 @@ Der Horizont wird aus **deutschen Periodensterbetafeln** (`MORTALITY_TABLE` in `
 **Monte-Carlo-Integration:** Im MC-Lauf wird der Horizont **pro Simulationsjahr** neu berechnet:
 - Alter steigt je Simulationsjahr
 - Bei Tod einer Person: Fallback auf Single-Life-Horizont der überlebenden Person
-- Implementierung: `computeDynamicFlexHorizonForYear()` in `monte-carlo-runner.js`
+- Implementierung: `computeDynamicFlexHorizonForYear()` in `monte-carlo-runner.js`, mit gemeinsamer Auflösung über `dynamic-flex-runner-horizon.js`
+
+### C.11.4a Konservative Langlebigkeitsannahmen
+
+Longevity-Adjustments werden nach der normalen Single-/Joint-Horizon-Ableitung angewandt. Bei Paaren gilt: erst finalen Haushalts-Horizont bestimmen, dann den Langlebigkeitsaufschlag genau einmal anwenden. Es gibt keine doppelte Pufferung pro Person.
+
+| Feld | Bedeutung | V1-Grenze |
+|------|-----------|-----------|
+| `longevityMode` | `none`, `quantile_shift`, `relative_horizon_buffer`, `buffer_years` | Default `none` |
+| `longevityQuantileShift` | Erhoeht das Survival-Quantil, z. B. 0,85 -> 0,90 | 0,00 bis 0,10, gekappt bei 0,95 |
+| `longevityRelativePct` | Relativer Zuschlag auf den Raw-Horizont | 0,00 bis 0,20 |
+| `longevityBufferYears` | Fester Vergleichs-/Expertenpuffer in Jahren | ganze Zahl 0 bis 10 |
+
+`quantile_shift` ist der fachlich bevorzugte Modus, weil er alters- und kohortenabhängig über die Sterbetafel wirkt. `buffer_years` bleibt für Vergleichsrechnungen verfügbar, ist aber nicht der Default. Alle Modi respektieren den bestehenden Max-Horizon von 60 Jahren; wirkungslose Shifts am Quantil-Cap oder Max-Horizon-Clamps werden diagnostiziert.
+
+Beim Monte-Carlo-Übergang von Joint- zu Single-Life kann der effektive Horizont stark fallen. Die Longevity-Pipeline nutzt dafür eine lineare Transition-Floor-Glättung: im ersten Übergangsjahr darf der Horizont nicht stärker als 3 Jahre fallen; der Floor läuft danach über maximal 3 Jahre aus. Die Diagnosefelder `longevityTransitionSmoothingApplied` und `longevityTransitionSmoothingFloor` machen diesen Eingriff sichtbar.
 
 ### C.11.5 Go-Go-Phase
 
@@ -2533,6 +2550,8 @@ DYNAMIC_FLEX: {
 
 Die Continuous-Parameter liegen separat unter `CONFIG.CAPE_CONTINUOUS`. Der Default-Wechsel auf `cape_continuous` ist nicht erfolgt; Backtest-Vergleiche zeigen sichtbare Entnahme-/Endvermoegens-Deltas und brauchen fachliche Freigabe.
 
+Longevity-Grenzen werden in `dynamic-flex-longevity-contract.js` und `engine/validators/InputValidator.mjs` validiert. Ungueltige Werte erzeugen Validierungsfehler; insbesondere wird `longevityBufferYears` nicht still gerundet, sondern muss ganzzahlig sein.
+
 ### C.11.7 Integration in die Berechnungskette
 
 Dynamic Flex greift **vor** dem SpendingPlanner ein:
@@ -2549,6 +2568,7 @@ Input → Validation → Market Analysis → [VPW: Flex-Override] → SpendingPl
 - `status`: `'active'` | `'disabled'` | `'contract_ready'` | `'safety_static_flex'`
 - `vpwRate`, `expectedRealReturn`, `vpwTotal`, `dynamicFlex`, `gesamtwert`
 - `horizonYears`, `horizonMethod`, `survivalQuantile`
+- `horizonYearsRaw`, `longevityMode`, `longevityAppliedShift`, `longevityAppliedBufferYears`, `longevityRelativePct`, `longevityClampReason`, `survivalQuantileRaw`, `survivalQuantileAdjusted`, `longevityTransitionSmoothingApplied`, `longevityTransitionSmoothingFloor`
 - `goGoActive`, `goGoMultiplier`
 - `capeRatioUsed`, `expectedReturnCape`
 - `returnPolicy`, `expectedReturnSource`, `capeInputStatus`
@@ -2562,6 +2582,8 @@ Input → Validation → Market Analysis → [VPW: Flex-Override] → SpendingPl
 | **Konservativ** | survival_quantile | 0.90 | 35 J. | Aus |
 | **Ausgewogen** | survival_quantile | 0.85 | 30 J. | 1.10 |
 | **Offensiv** | mean | — | 25 J. | 1.20 |
+
+Die Presets setzen Longevity bewusst auf `none`. Konservative Langlebigkeitsannahmen sind eine explizite Nutzereinstellung und werden nicht durch Preset-Wechsel heimlich aktiviert.
 
 ### C.11.9 Balance-App-Diagnose
 
@@ -2580,6 +2602,8 @@ Die Balance-App zeigt 8 VPW-Metriken im Diagnose-Panel (`balance-diagnosis-keypa
 | Flex freigegeben | VPW-Rahmen minus netto Floor, nach Safety-/Reentry-Logik | — |
 | Nicht genutzter Rahmen | VPW-Rahmen minus empfohlene Entnahme | — |
 
+Zusaetzlich zeigt der Dynamic-Flex-Copytext bei aktivem Longevity-Modus Raw-Horizont, Effektivhorizont, Modus, angewandten Shift/Puffer, Clamp-Grund und ggf. Transition-Smoothing. Bei `quantile_shift` am Quantil-Cap wird ein wirkungsloser Shift erkennbar statt als Pufferwirkung dargestellt.
+
 **Feature-Gate:** Dynamic Flex wird in der Balance-App nur aktiviert, wenn `capeRatio > 0` (CAPE-Daten müssen vorliegen).
 
 ### C.11.10 Sweep- und Optimizer-Integration
@@ -2589,6 +2613,8 @@ Die Balance-App zeigt 8 VPW-Metriken im Diagnose-Panel (`balance-diagnosis-keypa
 - `survivalQuantile` — Quantil-Variation
 - `goGoMultiplier` — Go-Go-Variation
 
+**Nicht sweep-fähig in V1:** `longevityMode`, `longevityQuantileShift`, `longevityRelativePct` und `longevityBufferYears`. Sweep-Kombinationen erben diese Werte aus den Basisinputs, duerfen sie aber nicht pro Zelle verändern. Dadurch bleibt der Langlebigkeitsaufschlag ein fixer Sicherheitsparameter, waehrend klassische VPW-Parameter weiterhin sensitiviert werden koennen.
+
 **Auto-Optimize-Grenzen:**
 
 | Parameter | Min | Max |
@@ -2596,6 +2622,8 @@ Die Balance-App zeigt 8 VPW-Metriken im Diagnose-Panel (`balance-diagnosis-keypa
 | `horizonYears` | 15 | 45 |
 | `survivalQuantile` | 0.75 | 0.95 |
 | `goGoMultiplier` | 1.0 | 1.35 |
+
+Longevity-Felder sind auch hier nicht optimierbar und werden nicht per Champion-Konfiguration auf Formularfelder angewandt.
 
 ---
 

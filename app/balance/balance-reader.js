@@ -24,6 +24,7 @@ import {
     readProfileOverridesFromStorage
 } from '../profile/profile-state.js';
 import { persistenceStorage } from '../shared/persistence-facade.js';
+import { LONGEVITY_DEFAULTS, normalizeLongevityMode } from '../simulator/dynamic-flex-longevity-contract.js';
 
 // Module-level DOM reference
 let dom = null;
@@ -180,6 +181,10 @@ export const UIReader = {
         const survivalQuantile = Math.max(0.5, Math.min(0.99, parseFloat(val('survivalQuantile')) || 0.85));
         const goGoActive = checked('goGoActive');
         const goGoMultiplier = Math.max(1.0, Math.min(1.5, parseFloat(val('goGoMultiplier')) || 1.0));
+        const longevityMode = normalizeLongevityMode(val('longevityMode') || LONGEVITY_DEFAULTS.mode);
+        const longevityQuantileShiftRaw = parseFloat(val('longevityQuantileShift'));
+        const longevityRelativePctRaw = parseFloat(val('longevityRelativePct'));
+        const longevityBufferYearsRaw = parseFloat(val('longevityBufferYears'));
         // Feature gate for Balance rollout: Dynamic Flex requires a valid CAPE anchor.
         const dynamicFlex = rawDynamicFlex && capeRatio > 0;
 
@@ -237,6 +242,10 @@ export const UIReader = {
             survivalQuantile,
             goGoActive,
             goGoMultiplier,
+            longevityMode,
+            longevityQuantileShift: Number.isFinite(longevityQuantileShiftRaw) ? longevityQuantileShiftRaw : LONGEVITY_DEFAULTS.quantileShift,
+            longevityRelativePct: Number.isFinite(longevityRelativePctRaw) ? longevityRelativePctRaw : LONGEVITY_DEFAULTS.relativePct,
+            longevityBufferYears: Number.isFinite(longevityBufferYearsRaw) ? longevityBufferYearsRaw : LONGEVITY_DEFAULTS.bufferYears,
             decumulation: {
                 mode: val('entnahmeStrategie') || 'standard',
                 bondTargetFactor: Number.isFinite(bondTargetFactor) ? bondTargetFactor : 5.0,

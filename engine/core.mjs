@@ -83,6 +83,12 @@ function _normalizeEngineInput(rawInput) {
     if (!Number.isFinite(input.survivalQuantile)) {
         input.survivalQuantile = 0.85;
     }
+    ['longevityQuantileShift', 'longevityRelativePct', 'longevityBufferYears'].forEach(field => {
+        if (input[field] != null) {
+            const normalized = Number(input[field]);
+            input[field] = Number.isFinite(normalized) ? normalized : input[field];
+        }
+    });
     input.goGoActive = input.goGoActive === true;
     if (!Number.isFinite(input.goGoMultiplier)) {
         input.goGoMultiplier = 1.0;
@@ -152,6 +158,31 @@ function _calculateExpectedRealReturn(params) {
         expectedRealReturnBeforeSmoothing: clampedReal,
         expectedRealReturn: smoothedReal,
         smoothingAlpha: alpha
+    };
+}
+
+function _buildLongevityDiagnostics(input, effectiveHorizon) {
+    const source = (input?.longevityHorizonDiagnostics && typeof input.longevityHorizonDiagnostics === 'object')
+        ? input.longevityHorizonDiagnostics
+        : null;
+    const mode = typeof input?.longevityMode === 'string' ? input.longevityMode : (source?.longevityMode || 'none');
+    const rawHorizon = Number.isFinite(source?.horizonYearsRaw)
+        ? source.horizonYearsRaw
+        : effectiveHorizon;
+    return {
+        horizonYearsRaw: rawHorizon,
+        longevityMode: mode,
+        longevityApplied: source ? source.longevityApplied === true : false,
+        longevityAppliedShift: Number.isFinite(source?.longevityAppliedShift) ? source.longevityAppliedShift : 0,
+        longevityAppliedBufferYears: Number.isFinite(source?.longevityAppliedBufferYears) ? source.longevityAppliedBufferYears : 0,
+        longevityRelativePct: Number.isFinite(source?.longevityRelativePct) ? source.longevityRelativePct : 0,
+        longevityClampReason: source?.longevityClampReason || null,
+        survivalQuantileRaw: Number.isFinite(source?.survivalQuantileRaw) ? source.survivalQuantileRaw : null,
+        survivalQuantileAdjusted: Number.isFinite(source?.survivalQuantileAdjusted) ? source.survivalQuantileAdjusted : null,
+        longevityTransitionSmoothingApplied: source?.longevityTransitionSmoothingApplied === true,
+        longevityTransitionSmoothingFloor: Number.isFinite(source?.longevityTransitionSmoothingFloor)
+            ? source.longevityTransitionSmoothingFloor
+            : null
     };
 }
 
@@ -457,6 +488,7 @@ function _internal_calculateModel(input, lastState) {
             status: 'active',
             gesamtwert: Math.round(gesamtwert),
             horizonYears,
+            ..._buildLongevityDiagnostics(normalizedInput, horizonYears),
             horizonMethod: normalizedInput.horizonMethod,
             survivalQuantile: normalizedInput.survivalQuantile,
             goGoActive: vpwEffectiveSettings.effectiveGoGo,
@@ -753,6 +785,10 @@ function _internal_calculateModel(input, lastState) {
             enabled: vpwEffectiveSettings.effectiveDynamicFlex,
             gesamtwert: Math.round(gesamtwert),
             horizonYears: Number.isFinite(normalizedInput.horizonYears) ? normalizedInput.horizonYears : null,
+            ..._buildLongevityDiagnostics(
+                normalizedInput,
+                Number.isFinite(normalizedInput.horizonYears) ? normalizedInput.horizonYears : null
+            ),
             horizonMethod: normalizedInput.horizonMethod,
             survivalQuantile: Number.isFinite(normalizedInput.survivalQuantile) ? normalizedInput.survivalQuantile : null,
             goGoActive: vpwEffectiveSettings.effectiveGoGo,

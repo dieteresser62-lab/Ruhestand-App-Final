@@ -1,6 +1,7 @@
 "use strict";
 
 import { persistenceStorage } from '../shared/persistence-facade.js';
+import { LONGEVITY_DEFAULTS, normalizeLongevityMode } from './dynamic-flex-longevity-contract.js';
 
 const DYNAMIC_FLEX_PRESETS = {
     off: {
@@ -9,7 +10,8 @@ const DYNAMIC_FLEX_PRESETS = {
         horizonYears: 30,
         survivalQuantile: 0.85,
         goGoActive: false,
-        goGoMultiplier: 1.0
+        goGoMultiplier: 1.0,
+        longevityMode: 'none'
     },
     konservativ: {
         dynamicFlex: true,
@@ -17,7 +19,8 @@ const DYNAMIC_FLEX_PRESETS = {
         horizonYears: 35,
         survivalQuantile: 0.9,
         goGoActive: false,
-        goGoMultiplier: 1.0
+        goGoMultiplier: 1.0,
+        longevityMode: 'none'
     },
     ausgewogen: {
         dynamicFlex: true,
@@ -25,7 +28,8 @@ const DYNAMIC_FLEX_PRESETS = {
         horizonYears: 30,
         survivalQuantile: 0.85,
         goGoActive: true,
-        goGoMultiplier: 1.1
+        goGoMultiplier: 1.1,
+        longevityMode: 'none'
     },
     offensiv: {
         dynamicFlex: true,
@@ -33,7 +37,8 @@ const DYNAMIC_FLEX_PRESETS = {
         horizonYears: 25,
         survivalQuantile: 0.75,
         goGoActive: true,
-        goGoMultiplier: 1.2
+        goGoMultiplier: 1.2,
+        longevityMode: 'none'
     }
 };
 
@@ -63,7 +68,11 @@ const DYNAMIC_FLEX_PERSIST_IDS = [
     'horizonYears',
     'survivalQuantile',
     'goGoActive',
-    'goGoMultiplier'
+    'goGoMultiplier',
+    'longevityMode',
+    'longevityQuantileShift',
+    'longevityRelativePct',
+    'longevityBufferYears'
 ];
 
 function getCurrentDynamicFlexValues() {
@@ -73,7 +82,8 @@ function getCurrentDynamicFlexValues() {
         horizonYears: Number.parseFloat(document.getElementById('horizonYears')?.value) || 30,
         survivalQuantile: Number.parseFloat(document.getElementById('survivalQuantile')?.value) || 0.85,
         goGoActive: document.getElementById('goGoActive')?.checked === true,
-        goGoMultiplier: Number.parseFloat(document.getElementById('goGoMultiplier')?.value) || 1.0
+        goGoMultiplier: Number.parseFloat(document.getElementById('goGoMultiplier')?.value) || 1.0,
+        longevityMode: normalizeLongevityMode(document.getElementById('longevityMode')?.value || LONGEVITY_DEFAULTS.mode)
     };
 }
 
@@ -84,7 +94,8 @@ function isPresetMatch(values, preset) {
         Math.abs(values.horizonYears - preset.horizonYears) < EPS &&
         Math.abs(values.survivalQuantile - preset.survivalQuantile) < EPS &&
         values.goGoActive === preset.goGoActive &&
-        Math.abs(values.goGoMultiplier - preset.goGoMultiplier) < EPS;
+        Math.abs(values.goGoMultiplier - preset.goGoMultiplier) < EPS &&
+        values.longevityMode === preset.longevityMode;
 }
 
 function applyDynamicFlexPreset(presetKey, persistFn) {
@@ -96,6 +107,10 @@ function applyDynamicFlexPreset(presetKey, persistFn) {
     setValue('survivalQuantile', preset.survivalQuantile);
     setChecked('goGoActive', preset.goGoActive);
     setValue('goGoMultiplier', preset.goGoMultiplier);
+    setValue('longevityMode', preset.longevityMode);
+    setValue('longevityQuantileShift', LONGEVITY_DEFAULTS.quantileShift);
+    setValue('longevityRelativePct', LONGEVITY_DEFAULTS.relativePct);
+    setValue('longevityBufferYears', LONGEVITY_DEFAULTS.bufferYears);
     if (typeof persistFn === 'function') persistFn();
 }
 
@@ -118,6 +133,7 @@ export function refreshDynamicFlexControls() {
     const showAdvanced = document.getElementById('dynamicFlexShowAdvanced')?.checked === true;
     const showDetails = showAdvanced || presetValue === 'custom';
     const dynamicFlexEnabled = document.getElementById('dynamicFlex')?.checked === true;
+    const longevityMode = normalizeLongevityMode(document.getElementById('longevityMode')?.value || LONGEVITY_DEFAULTS.mode);
     const goGoActive = document.getElementById('goGoActive')?.checked === true;
     const configContainer = document.getElementById('dynamicFlexConfigGroup');
     const advancedToggleRow = document.getElementById('dynamicFlexAdvancedToggleRow');
@@ -135,6 +151,10 @@ export function refreshDynamicFlexControls() {
     setDisabled('survivalQuantile', !showDetails || !dynamicFlexEnabled);
     setDisabled('goGoActive', !showDetails || !dynamicFlexEnabled);
     setDisabled('goGoMultiplier', !showDetails || !dynamicFlexEnabled || !goGoActive);
+    setDisabled('longevityMode', !showDetails || !dynamicFlexEnabled);
+    setDisabled('longevityQuantileShift', !showDetails || !dynamicFlexEnabled || longevityMode !== 'quantile_shift');
+    setDisabled('longevityRelativePct', !showDetails || !dynamicFlexEnabled || longevityMode !== 'relative_horizon_buffer');
+    setDisabled('longevityBufferYears', !showDetails || !dynamicFlexEnabled || longevityMode !== 'buffer_years');
 
     if (configContainer) {
         configContainer.style.opacity = dynamicFlexEnabled ? '1' : '0.65';
@@ -162,6 +182,7 @@ export function initDynamicFlexControls(options = {}) {
     const presetSelect = document.getElementById('dynamicFlexPreset');
     const showAdvancedToggle = document.getElementById('dynamicFlexShowAdvanced');
     const goGoToggle = document.getElementById('goGoActive');
+    const longevityModeSelect = document.getElementById('longevityMode');
     if (!dynamicFlexToggle) return;
 
     if (presetSelect) {
@@ -195,7 +216,7 @@ export function initDynamicFlexControls(options = {}) {
             persist();
         });
     }
-    ['horizonMethod', 'horizonYears', 'survivalQuantile', 'goGoMultiplier'].forEach(id => {
+    ['horizonMethod', 'horizonYears', 'survivalQuantile', 'goGoMultiplier', 'longevityMode', 'longevityQuantileShift', 'longevityRelativePct', 'longevityBufferYears'].forEach(id => {
         const el = document.getElementById(id);
         if (!el || !presetSelect) return;
         el.addEventListener('input', () => {
@@ -211,6 +232,13 @@ export function initDynamicFlexControls(options = {}) {
     });
     if (goGoToggle && presetSelect) {
         goGoToggle.addEventListener('change', () => {
+            syncDynamicFlexPresetSelection();
+            refreshDynamicFlexControls();
+            persist();
+        });
+    }
+    if (longevityModeSelect && presetSelect) {
+        longevityModeSelect.addEventListener('change', () => {
             syncDynamicFlexPresetSelection();
             refreshDynamicFlexControls();
             persist();

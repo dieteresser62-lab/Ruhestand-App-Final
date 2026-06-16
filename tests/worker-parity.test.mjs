@@ -1000,4 +1000,83 @@ try {
     throw e;
 }
 
+// Test 7: Longevity horizon fields stay deterministic across MC chunking
+try {
+    const longevityInputs = {
+        ...baseInputs,
+        startAlter: 58,
+        dynamicFlex: true,
+        horizonMethod: 'survival_quantile',
+        horizonYears: 30,
+        survivalQuantile: 0.85,
+        capeRatio: 24,
+        marketCapeRatio: 24,
+        longevityMode: 'quantile_shift',
+        longevityQuantileShift: 0.05
+    };
+    const monteCarloParams = {
+        anzahl: 14,
+        maxDauer: 6,
+        blockSize: 3,
+        seed: 60616,
+        methode: 'block',
+        rngMode: 'per-run-seed'
+    };
+    const logIndices = [0, 6, 13];
+
+    const fullChunk = await runMonteCarloChunk({
+        inputs: longevityInputs,
+        monteCarloParams,
+        widowOptions,
+        useCapeSampling: false,
+        runRange: { start: 0, count: monteCarloParams.anzahl },
+        logIndices,
+        engine: EngineAPI
+    });
+
+    const splitRanges = [
+        { start: 0, count: 5 },
+        { start: 5, count: 4 },
+        { start: 9, count: 5 }
+    ];
+    const merged = createMergedMonteCarloState(monteCarloParams.anzahl);
+    for (const range of splitRanges) {
+        const chunk = await runMonteCarloChunk({
+            inputs: longevityInputs,
+            monteCarloParams,
+            widowOptions,
+            useCapeSampling: false,
+            runRange: range,
+            logIndices,
+            engine: EngineAPI
+        });
+        mergeMonteCarloChunk(merged, chunk, range.start);
+    }
+
+    assertMonteCarloTotalsEqual(fullChunk.totals, merged.totals, 'Longevity MC');
+    assertMonteCarloListShapesEqual(fullChunk.lists, merged.lists, 'Longevity MC');
+    const fullByIndex = new Map((fullChunk.runMeta || []).map(meta => [meta.index, meta]));
+    const mergedByIndex = new Map((merged.runMeta || []).map(meta => [meta.index, meta]));
+    for (const runIdx of logIndices) {
+        const fullRows = fullByIndex.get(runIdx)?.logDataRows || [];
+        const mergedRows = mergedByIndex.get(runIdx)?.logDataRows || [];
+        assert(fullRows.length > 0, `Longevity MC should log run ${runIdx}`);
+        assertEqual(mergedRows.length, fullRows.length, `Longevity MC log row count mismatch for run ${runIdx}`);
+        for (let rowIdx = 0; rowIdx < fullRows.length; rowIdx++) {
+            assertEqual(fullRows[rowIdx]?.vpw?.longevityMode, 'quantile_shift', `Longevity MC full mode mismatch for run ${runIdx}`);
+            assertEqual(mergedRows[rowIdx]?.vpw?.longevityMode, 'quantile_shift', `Longevity MC merged mode mismatch for run ${runIdx}`);
+            assertEqual(
+                JSON.stringify(mergedRows[rowIdx].vpw || null),
+                JSON.stringify(fullRows[rowIdx].vpw || null),
+                `Longevity MC VPW payload mismatch for run ${runIdx}, row ${rowIdx}`
+            );
+        }
+    }
+
+    console.log('✅ Longevity runner parity passed');
+} catch (e) {
+    console.error('❌ Longevity runner parity failed', e);
+    throw e;
+}
+
 console.log('--- Worker Parity Tests Completed ---');

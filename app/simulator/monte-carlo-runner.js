@@ -10,7 +10,7 @@
 import { rng, makeRunSeed } from './simulator-utils.js';
 import { BREAK_ON_RUIN, MORTALITY_TABLE, annualData } from './simulator-data.js';
 import { applyStressOverride, computeRentAdjRate } from './simulator-portfolio.js';
-import { simulateOneYear, initMcRunState, sampleNextYearData, computeRunStatsFromSeries, updateCareMeta, calcCareCost, computeCareMortalityMultiplier, computeHouseholdFlexFactor, estimateRemainingLifeYears, estimateJointRemainingLifeYears, estimateSingleRemainingLifeYearsAtQuantile, estimateJointRemainingLifeYearsAtQuantile } from './simulator-engine-wrapper.js';
+import { simulateOneYear, initMcRunState, sampleNextYearData, computeRunStatsFromSeries, updateCareMeta, calcCareCost, computeCareMortalityMultiplier, computeHouseholdFlexFactor } from './simulator-engine-wrapper.js';
 import { portfolioTotal } from './simulator-results.js';
 import { sumDepot } from './simulator-portfolio.js';
 import { cloneStressContext, computeMarriageYearsCompleted } from './simulator-sweep-utils.js';
@@ -40,16 +40,10 @@ import {
     pickMonteCarloStartYearIndex,
     resolveMinStartYearIndex
 } from './mc-year-sampling.js';
+import { resolveDynamicFlexRunnerHorizon } from './dynamic-flex-runner-horizon.js';
 
 export { MC_HEATMAP_BINS, pickWorstRun, createMonteCarloBuffers, buildMonteCarloAggregates };
 export { buildStartYearCdf, pickStartYearIndex } from './mc-year-sampling.js';
-
-const DYNAMIC_FLEX_MIN_HORIZON = 1;
-const DYNAMIC_FLEX_MAX_HORIZON = 60;
-
-function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-}
 
 function resolveMonteCarloCape(yearData, inputs, marketDataHist) {
     const yearCape = Number(yearData?.capeRatio ?? yearData?.cape);
@@ -61,67 +55,6 @@ function resolveMonteCarloCape(yearData, inputs, marketDataHist) {
     const histCape = Number(marketDataHist?.capeRatio);
     if (Number.isFinite(histCape) && histCape > 0) return histCape;
     return 0;
-}
-
-function computeDynamicFlexHorizonForYear(inputs, { yearIndex, ageP1, ageP2, p1Alive, p2Alive }) {
-    // UI/Preset horizon is fallback only; bei aktivem Dynamic-Flex wird jahrweise aus Sterbetafeln neu berechnet.
-    const fallback = clamp(Number(inputs?.horizonYears) || 30, DYNAMIC_FLEX_MIN_HORIZON, DYNAMIC_FLEX_MAX_HORIZON);
-    if (inputs?.dynamicFlex !== true) return fallback;
-    const method = inputs?.horizonMethod || 'survival_quantile';
-    const quantile = clamp(Number(inputs?.survivalQuantile) || 0.85, 0.5, 0.99);
-    const currentAgeP1 = Number.isFinite(ageP1) ? ageP1 : ((Number(inputs?.startAlter) || 65) + yearIndex);
-    const currentAgeP2 = Number.isFinite(ageP2) ? ageP2 : ((Number(inputs?.partner?.startAlter) || currentAgeP1) + yearIndex);
-    const genderP1 = inputs?.geschlecht || 'm';
-    const genderP2 = inputs?.partner?.geschlecht || (genderP1 === 'm' ? 'w' : 'm');
-
-    if (p1Alive && p2Alive && inputs?.partner?.aktiv === true) {
-        if (method === 'mean') {
-            return clamp(
-                estimateJointRemainingLifeYears(genderP1, currentAgeP1, genderP2, currentAgeP2),
-                DYNAMIC_FLEX_MIN_HORIZON,
-                DYNAMIC_FLEX_MAX_HORIZON
-            );
-        }
-        return estimateJointRemainingLifeYearsAtQuantile(
-            genderP1,
-            currentAgeP1,
-            genderP2,
-            currentAgeP2,
-            quantile,
-            { minYears: DYNAMIC_FLEX_MIN_HORIZON, maxYears: DYNAMIC_FLEX_MAX_HORIZON }
-        );
-    }
-    if (p1Alive) {
-        if (method === 'mean') {
-            return clamp(
-                estimateRemainingLifeYears(genderP1, currentAgeP1),
-                DYNAMIC_FLEX_MIN_HORIZON,
-                DYNAMIC_FLEX_MAX_HORIZON
-            );
-        }
-        return estimateSingleRemainingLifeYearsAtQuantile(
-            genderP1,
-            currentAgeP1,
-            quantile,
-            { minYears: DYNAMIC_FLEX_MIN_HORIZON, maxYears: DYNAMIC_FLEX_MAX_HORIZON }
-        );
-    }
-    if (p2Alive) {
-        if (method === 'mean') {
-            return clamp(
-                estimateRemainingLifeYears(genderP2, currentAgeP2),
-                DYNAMIC_FLEX_MIN_HORIZON,
-                DYNAMIC_FLEX_MAX_HORIZON
-            );
-        }
-        return estimateSingleRemainingLifeYearsAtQuantile(
-            genderP2,
-            currentAgeP2,
-            quantile,
-            { minYears: DYNAMIC_FLEX_MIN_HORIZON, maxYears: DYNAMIC_FLEX_MAX_HORIZON }
-        );
-    }
-    return DYNAMIC_FLEX_MIN_HORIZON;
 }
 
 /**
@@ -304,6 +237,10 @@ export async function runMonteCarloChunk({
         let widowBenefitActiveForP1 = false;
         let widowBenefitActiveForP2 = false;
         const householdContext = lifeState.householdContext;
+        let previousDynamicHorizon = null;
+        let wasJointAliveAtPreviousHorizon = hasPartner && p1Alive && p2Alive;
+        let longevityTransitionStartYear = null;
+        let longevityTransitionAnchorHorizon = null;
 
         let stressCtx = cloneStressContext(stressCtxMaster);
 
@@ -437,21 +374,40 @@ export async function runMonteCarloChunk({
             // Berechne dynamische Rentenanpassung basierend auf Modus (fix/wage/cpi)
             const effectiveRentAdjPct = computeRentAdjRate(inputs, yearData);
             const resolvedCapeRatio = resolveMonteCarloCape(yearData, inputs, simState.marketDataHist);
-            const dynamicHorizonYears = computeDynamicFlexHorizonForYear(inputs, {
+            const jointAliveThisYear = hasPartner && p1Alive && p2Alive;
+            if (wasJointAliveAtPreviousHorizon && !jointAliveThisYear && Number.isFinite(previousDynamicHorizon)) {
+                longevityTransitionStartYear = simulationsJahr;
+                longevityTransitionAnchorHorizon = previousDynamicHorizon;
+            } else if (jointAliveThisYear) {
+                longevityTransitionStartYear = null;
+                longevityTransitionAnchorHorizon = null;
+            }
+            const horizonResolution = resolveDynamicFlexRunnerHorizon(inputs, {
                 yearIndex: simulationsJahr,
                 ageP1,
                 ageP2,
                 p1Alive,
-                p2Alive
+                p2Alive,
+                applyTransitionSmoothing: longevityTransitionStartYear !== null,
+                previousHorizon: longevityTransitionAnchorHorizon,
+                yearsSinceTransition: longevityTransitionStartYear === null
+                    ? 0
+                    : simulationsJahr - longevityTransitionStartYear
             });
+            const dynamicHorizonYears = horizonResolution.horizonYears;
             const adjustedInputs = {
                 ...inputs,
                 rentAdjPct: effectiveRentAdjPct,
                 transitionYear: effectiveTransitionYear,
                 capeRatio: resolvedCapeRatio,
                 marketCapeRatio: resolvedCapeRatio,
-                horizonYears: dynamicHorizonYears
+                horizonYears: dynamicHorizonYears,
+                ...(horizonResolution.diagnostics?.longevityMode !== 'none'
+                    ? { longevityHorizonDiagnostics: horizonResolution.diagnostics }
+                    : {})
             };
+            previousDynamicHorizon = dynamicHorizonYears;
+            wasJointAliveAtPreviousHorizon = jointAliveThisYear;
             yearData.capeRatio = resolvedCapeRatio;
 
             // Pass care floor and Flex Factor as separate parameters

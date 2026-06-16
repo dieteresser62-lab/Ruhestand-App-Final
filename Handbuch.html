@@ -957,6 +957,10 @@
                                 ER(CAPE), ER(real)) sowie Payout-Spalten wie EntPlan, EntEff, Liq&gt;P, Liq&lt;P,
                                 Port&gt;P und PortEnd erscheinen nur im <em>detaillierten</em> Logmodus, damit die
                                 Standardansicht kompakt bleibt.</li>
+                            <li><strong>Langlebigkeitsannahmen:</strong> Wenn Sie im Dynamic-Flex-Bereich einen
+                                konservativen Horizont aktivieren, zeigen Diagnose und Detail-Logs den rohen und den
+                                effektiven Horizont sowie Hinweise auf Quantil-, Max-Horizon- oder
+                                Übergangsglättung.</li>
                             <li><strong>Interpretation:</strong> Ein guter Backtest ersetzt keine
                                 Wahrscheinlichkeiten, zeigt aber, ob die Strategie plausible Vergangenheitsszenarien
                                 übersteht.</li>
@@ -999,6 +1003,9 @@
                                 in der Detailansicht eingeblendet; im Normalmodus bleiben sie ausgeblendet. Scenario-Log
                                 und Backtesting nutzen dieselben Begriffe, z.B. EntPlan, EntEff, VPW€, VPWFlex,
                                 Liq&gt;P, Liq&lt;P, Port&gt;P und PortEnd.</li>
+                            <li><strong>Konservativer Horizont:</strong> Bei aktiven Langlebigkeitsannahmen bleibt
+                                sichtbar, ob der VPW-Horizont aus dem Basisquantil, einem relativen Puffer oder einem
+                                festen Vergleichspuffer stammt.</li>
                             <li><strong>Export:</strong> Einzelne Szenarien lassen sich als JSON oder CSV sichern.</li>
                         </ul>
                     </div>
@@ -1024,6 +1031,9 @@
                             <li><strong>Schutzmechanismen:</strong> Whitelist + Rente-2-Invarianz verhindern, dass
                                 Partner-Felder versehentlich verändert werden; Verstöße erscheinen als Heatmap-Badges.
                             </li>
+                            <li><strong>Langlebigkeits-Schutz:</strong> Longevity-Felder sind in Version 1 keine
+                                Sweep- oder Auto-Optimize-Parameter. Der Optimierer bewertet Ihre aktuelle
+                                Sicherheitsannahme, darf sie aber nicht selbst abschalten oder erhöhen.</li>
                         </ul>
                         <figure style="margin-top: 1rem;">
                             <img src="assets/images/monte_carlo_workers.svg" alt="Monte-Carlo Worker-Architektur"
@@ -1549,6 +1559,13 @@
                         detaillierten Scenario- oder Backtest-Log die Spalten VPW€, VPWFlex, EntPlan, EntEff,
                         Liq&gt;P/Liq&lt;P sowie Port&gt;P/PortEnd. Passen Sie das Preset bei Bedarf defensiver an.</dd>
 
+                    <dt>Was bewirkt der konservative Langlebigkeits-Horizont?</dt>
+                    <dd>Der konservative Horizont verlängert bei Dynamic Flex den VPW-Resthorizont, zum Beispiel über
+                        ein höheres Survival-Quantil, einen relativen Horizontpuffer oder einen festen
+                        Vergleichspuffer. Dadurch sinkt die VPW-Rate und es wird weniger flexibler Bedarf freigegeben.
+                        Bei Paaren wird erst der gemeinsame Haushalts-Horizont bestimmt und der Aufschlag danach genau
+                        einmal angewandt. Sweep und Auto-Optimize dürfen diese Sicherheitsannahme nicht variieren.</dd>
+
                     <dt>Was bedeutet Mindest-Flex p.a.?</dt>
                     <dd>Der Mindest-Flex ist eine optionale Untergrenze für flexible Ausgaben in gekürzten
                         Safety-/Guardrail-Jahren. Er ersetzt nicht den Floor und garantiert keine Entnahme in echten
@@ -1569,8 +1586,9 @@
 
                     <dt>Warum blockiert der Parameter-Sweep manche Felder?</dt>
                     <dd>Die Sweep-Logik schützt Partner-Felder (Rente 2) und weitere kritische Eingaben über eine
-                        Whitelist. So bleiben Zweitpersonen-Parameter konsistent. Blockierte Variationen erscheinen
-                        als Heatmap-Badges.</dd>
+                        Whitelist. So bleiben Zweitpersonen-Parameter konsistent. Auch Langlebigkeitsfelder bleiben
+                        feste Sicherheitsannahmen statt Sweep-Variablen. Blockierte Variationen erscheinen als
+                        Heatmap-Badges.</dd>
 
                     <dt>Wie oft sollte ich Rebalancing machen?</dt>
                     <dd>Ein jährlicher Rhythmus (z.B. zum Jahreswechsel) balanciert Aufwand, Steuern und

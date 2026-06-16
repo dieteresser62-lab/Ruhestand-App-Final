@@ -196,6 +196,33 @@ const InputValidator = {
             `goGoMultiplier muss zwischen 1.0 und ${maxGoGoMultiplier.toFixed(1)} liegen.`
         );
     }
+    if (input.longevityMode != null) {
+        const validMode = (
+            input.longevityMode === 'none' ||
+            input.longevityMode === 'quantile_shift' ||
+            input.longevityMode === 'relative_horizon_buffer' ||
+            input.longevityMode === 'buffer_years'
+        );
+        check(!validMode, 'longevityMode', 'longevityMode ist unbekannt.');
+    }
+    checkFiniteRange(
+        input.longevityQuantileShift, 0, 0.10,
+        'longevityQuantileShift',
+        'longevityQuantileShift muss zwischen 0 und 0.10 liegen.'
+    );
+    checkFiniteRange(
+        input.longevityRelativePct, 0, 0.20,
+        'longevityRelativePct',
+        'longevityRelativePct muss zwischen 0 und 0.20 liegen.'
+    );
+    checkFiniteRange(
+        input.longevityBufferYears, 0, 10,
+        'longevityBufferYears',
+        'longevityBufferYears muss zwischen 0 und 10 liegen.'
+    );
+    if (input.longevityBufferYears != null && Number.isFinite(input.longevityBufferYears)) {
+        check(!Number.isInteger(input.longevityBufferYears), 'longevityBufferYears', 'longevityBufferYears muss eine ganze Zahl sein.');
+    }
 
     // CAPE alias contract: both fields are accepted, both must be plausible if present.
     checkFiniteRange(

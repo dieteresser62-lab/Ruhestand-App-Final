@@ -6,12 +6,6 @@ import { simulateOneYear } from './simulator-engine-wrapper.js';
 import { formatCurrency, formatCurrencyShortLog } from './simulator-utils.js';
 import { formatPercentValue } from './simulator-formatting.js';
 import {
-    estimateJointRemainingLifeYears,
-    estimateRemainingLifeYears,
-    estimateSingleRemainingLifeYearsAtQuantile,
-    estimateJointRemainingLifeYearsAtQuantile
-} from './simulator-engine-helpers.js';
-import {
     BACKTEST_LOG_DETAIL_KEY,
     LEGACY_LOG_DETAIL_KEY,
     loadDetailLevel,
@@ -29,10 +23,9 @@ import {
 } from './simulator-main-helpers.js';
 import { renderThreeBucketPortfolioChart } from './simulator-portfolio-chart.js';
 import { STRATEGY_OPTIONS } from '../../types/strategy-options.js';
+import { resolveDynamicFlexRunnerHorizon } from './dynamic-flex-runner-horizon.js';
 
 const HIST_SERIES_START_YEAR = 1950;
-const DYNAMIC_FLEX_MIN_HORIZON = 1;
-const DYNAMIC_FLEX_MAX_HORIZON = 60;
 
 /**
  * Pads a value to the left, ensuring consistent monospace alignment within the textual backtest log.
@@ -66,10 +59,6 @@ function formatPercentInteger(value, targetWidth) {
     return padLeft(formatted, targetWidth);
 }
 
-function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-}
-
 function resolveBacktestCape(yearData, inputs, marketDataHist) {
     const yearCape = Number(yearData?.cape);
     if (Number.isFinite(yearCape) && yearCape > 0) return yearCape;
@@ -80,50 +69,6 @@ function resolveBacktestCape(yearData, inputs, marketDataHist) {
     const histCape = Number(marketDataHist?.capeRatio);
     if (Number.isFinite(histCape) && histCape > 0) return histCape;
     return 0;
-}
-
-function computeDynamicFlexHorizonForYear(inputs, yearIndex) {
-    // UI/Preset horizon is fallback only; bei aktivem Dynamic-Flex wird jahrweise aus Sterbetafeln neu berechnet.
-    if (inputs?.dynamicFlex !== true) {
-        return clamp(Number(inputs?.horizonYears) || 30, DYNAMIC_FLEX_MIN_HORIZON, DYNAMIC_FLEX_MAX_HORIZON);
-    }
-    const currentAgeP1 = (Number(inputs.startAlter) || 65) + yearIndex;
-    const hasPartner = inputs.partner?.aktiv === true;
-    const method = inputs.horizonMethod || 'survival_quantile';
-    const quantile = clamp(Number(inputs.survivalQuantile) || 0.85, 0.5, 0.99);
-
-    if (hasPartner) {
-        const currentAgeP2 = (Number(inputs.partner.startAlter) || currentAgeP1) + yearIndex;
-        if (method === 'mean') {
-            return clamp(
-                estimateJointRemainingLifeYears(inputs.geschlecht || 'm', currentAgeP1, inputs.partner.geschlecht || 'w', currentAgeP2),
-                DYNAMIC_FLEX_MIN_HORIZON,
-                DYNAMIC_FLEX_MAX_HORIZON
-            );
-        }
-        return estimateJointRemainingLifeYearsAtQuantile(
-            inputs.geschlecht || 'm',
-            currentAgeP1,
-            inputs.partner.geschlecht || 'w',
-            currentAgeP2,
-            quantile,
-            { minYears: DYNAMIC_FLEX_MIN_HORIZON, maxYears: DYNAMIC_FLEX_MAX_HORIZON }
-        );
-    }
-
-    if (method === 'mean') {
-        return clamp(
-            estimateRemainingLifeYears(inputs.geschlecht || 'm', currentAgeP1),
-            DYNAMIC_FLEX_MIN_HORIZON,
-            DYNAMIC_FLEX_MAX_HORIZON
-        );
-    }
-    return estimateSingleRemainingLifeYearsAtQuantile(
-        inputs.geschlecht || 'm',
-        currentAgeP1,
-        quantile,
-        { minYears: DYNAMIC_FLEX_MIN_HORIZON, maxYears: DYNAMIC_FLEX_MAX_HORIZON }
-    );
 }
 
 function buildVpwFallbackHint(vpwPayload) {
@@ -275,12 +220,16 @@ export function runBacktest() {
             const adjPct = computeAdjPctForYear(backtestCtx, yearIndex);
 
             // Übergebe die berechnete Anpassungsrate an simulateOneYear
+            const horizonResolution = resolveDynamicFlexRunnerHorizon(inputs, { yearIndex });
             const adjustedInputs = {
                 ...inputs,
                 rentAdjPct: adjPct,
                 capeRatio: resolvedCapeRatio,
                 marketCapeRatio: resolvedCapeRatio,
-                horizonYears: computeDynamicFlexHorizonForYear(inputs, yearIndex)
+                horizonYears: horizonResolution.horizonYears,
+                ...(horizonResolution.diagnostics?.longevityMode !== 'none'
+                    ? { longevityHorizonDiagnostics: horizonResolution.diagnostics }
+                    : {})
             };
             yearData.capeRatio = resolvedCapeRatio;
             const result = simulateOneYear(simState, adjustedInputs, yearData, yearIndex);

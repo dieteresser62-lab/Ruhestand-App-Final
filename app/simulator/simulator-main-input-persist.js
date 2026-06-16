@@ -15,6 +15,7 @@ export function initInputPersistence() {
         'startFloorBedarf', 'startFlexBedarf', 'minimumFlexAnnual', 'flexBudgetAnnual', 'flexBudgetYears', 'flexBudgetRecharge', 'marketCapeRatio',
         'dynamicFlexPreset', 'dynamicFlexShowAdvanced',
         'dynamicFlex', 'horizonMethod', 'horizonYears', 'survivalQuantile', 'goGoActive', 'goGoMultiplier',
+        'longevityMode', 'longevityQuantileShift', 'longevityRelativePct', 'longevityBufferYears',
         'p1StartAlter', 'p1Geschlecht', 'p1SparerPauschbetrag', 'p1KirchensteuerPct',
         'p1Monatsrente', 'p1StartInJahren', 'rentAdjMode', 'rentAdjPct',
         'pflegefallLogikAktivieren', 'pflegeModellTyp', ...CARE_GRADE_FIELD_IDS,
