@@ -641,6 +641,109 @@ const emptyLists = {
     assertClose(sumHeatmap(runA.heatmap), sumHeatmap(runB.heatmap), 0.0001, 'Determinism: heatmap sum should match');
 }
 
+// --- TEST 9a: Stationary Bootstrap serial runner produces deterministic logs ---
+{
+    const inputs = buildBasicInputs();
+    const monteCarloParams = {
+        anzahl: 2,
+        maxDauer: 6,
+        blockSize: 3,
+        seed: 60616,
+        methode: 'stationary',
+        rngMode: 'per-run-seed',
+        startYearMode: 'FILTER',
+        startYearFilter: 1980
+    };
+    const runA = await runMonteCarloChunk({
+        inputs,
+        monteCarloParams,
+        widowOptions: { mode: 'stop', percent: 0, marriageOffsetYears: 0, minMarriageYears: 0 },
+        useCapeSampling: false,
+        runRange: { start: 0, count: 2 },
+        logIndices: [0, 1],
+        engine: EngineAPI
+    });
+    const runB = await runMonteCarloChunk({
+        inputs,
+        monteCarloParams,
+        widowOptions: { mode: 'stop', percent: 0, marriageOffsetYears: 0, minMarriageYears: 0 },
+        useCapeSampling: false,
+        runRange: { start: 0, count: 2 },
+        logIndices: [0, 1],
+        engine: EngineAPI
+    });
+
+    const histYearsA = (runA.runMeta?.[0]?.logDataRows || []).map(row => row.histJahr);
+    const histYearsB = (runB.runMeta?.[0]?.logDataRows || []).map(row => row.histJahr);
+    assert(histYearsA.length >= 4, 'Stationary runner should produce logged historical years');
+    assertEqual(JSON.stringify(histYearsA), JSON.stringify(histYearsB), 'Stationary runner should be deterministic for fixed seed');
+    assert(histYearsA.every(year => Number(year) >= 1980), 'Stationary FILTER starts and continuations should stay in or after the filtered window for this short run');
+}
+
+// --- TEST 9b: Stationary Bootstrap serial full vs split chunks match ---
+{
+    const inputs = buildBasicInputs();
+    const monteCarloParams = {
+        anzahl: 6,
+        maxDauer: 5,
+        blockSize: 2,
+        seed: 7007,
+        methode: 'stationary',
+        rngMode: 'per-run-seed',
+        startYearMode: 'RECENCY',
+        startYearHalfLife: 15
+    };
+
+    const runChunk = (start, count) => runMonteCarloChunk({
+        inputs,
+        monteCarloParams,
+        widowOptions: { mode: 'stop', percent: 0, marriageOffsetYears: 0, minMarriageYears: 0 },
+        useCapeSampling: false,
+        runRange: { start, count },
+        engine: EngineAPI
+    });
+
+    const full = await runChunk(0, 6);
+    const splitA = await runChunk(0, 3);
+    const splitB = await runChunk(3, 3);
+
+    const combinedFinal = Array.from(splitA.buffers.finalOutcomes).concat(Array.from(splitB.buffers.finalOutcomes));
+    const combinedTax = Array.from(splitA.buffers.taxOutcomes).concat(Array.from(splitB.buffers.taxOutcomes));
+    assertEqual(JSON.stringify(combinedFinal), JSON.stringify(Array.from(full.buffers.finalOutcomes)), 'Stationary split vs full final outcomes should match');
+    assertEqual(JSON.stringify(combinedTax), JSON.stringify(Array.from(full.buffers.taxOutcomes)), 'Stationary split vs full tax outcomes should match');
+    assertClose(sumHeatmap(splitA.heatmap) + sumHeatmap(splitB.heatmap), sumHeatmap(full.heatmap), 0.0001, 'Stationary split vs full heatmap sum should match');
+}
+
+// --- TEST 9c: Stationary Bootstrap preserves conditional stress bootstrap priority ---
+{
+    const inputs = {
+        ...buildBasicInputs(),
+        stressPreset: 'GREAT_DEPRESSION_29_33'
+    };
+    const monteCarloParams = {
+        anzahl: 1,
+        maxDauer: 5,
+        blockSize: 3,
+        seed: 2929,
+        methode: 'stationary',
+        rngMode: 'per-run-seed',
+        startYearMode: 'UNIFORM'
+    };
+    const chunk = await runMonteCarloChunk({
+        inputs,
+        monteCarloParams,
+        widowOptions: { mode: 'stop', percent: 0, marriageOffsetYears: 0, minMarriageYears: 0 },
+        useCapeSampling: false,
+        runRange: { start: 0, count: 1 },
+        logIndices: [0],
+        engine: EngineAPI
+    });
+
+    const histYears = (chunk.runMeta?.[0]?.logDataRows || []).map(row => Number(row.histJahr));
+    assert(histYears.length >= 5, 'Stationary stress run should produce the full stress-window log');
+    assert(histYears.slice(0, 5).every(year => year >= 1929 && year <= 1933), 'Conditional stress bootstrap should take priority during the stress window');
+}
+
 // --- TEST 10: Ruin counting matches finalOutcomes <= 0 ---
 {
     const buffers = createMonteCarloBuffers(4);
