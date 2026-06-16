@@ -263,6 +263,14 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         if (value == null || !isFinite(value)) return fallback;
         return `${Math.round(value * 100)}%`;
     };
+    const formatPercentRatioOrEmpty = (value) => (
+        Number.isFinite(value) ? formatPercentRatio(value, { fractionDigits: 1, invalid: '' }) : ''
+    );
+    const shortPolicy = (value) => {
+        if (value === 'cape_continuous') return 'cape_ct';
+        if (value === 'legacy_step') return 'legacy';
+        return (value || '').substring(0, 8);
+    };
     const traceTotal = (row, phase) => {
         const trace = Array.isArray(row?.balance_trace) ? row.balance_trace : [];
         const entry = trace.find(item => item?.phase === phase);
@@ -466,8 +474,15 @@ export function getWorstRunColumnDefinitions(opts = {}) {
         },
         { key: 'vpw.safetyStage', header: 'Safe', width: 4, fmt: v => (Number.isFinite(v) ? Math.round(v) : '') },
         { key: 'vpw.capeRatioUsed', header: 'CAPE', width: 6, fmt: v => (Number.isFinite(v) ? Number(v).toFixed(1) : '') },
-        { key: 'vpw.expectedReturnCape', header: 'ER(CAPE)', width: 8, fmt: v => (Number.isFinite(v) ? formatPercentRatio(v, { fractionDigits: 1, invalid: '' }) : '') },
-        { key: 'vpw.expectedRealReturn', header: 'ER(real)', width: 8, fmt: v => (Number.isFinite(v) ? formatPercentRatio(v, { fractionDigits: 1, invalid: '' }) : '') },
+        { key: 'vpw.returnPolicy', header: 'RetPol', width: 7, fmt: shortPolicy },
+        { key: 'vpw.expectedReturnSource', header: 'RetSrc', width: 12, fmt: v => (v || '').substring(0, 12) },
+        { key: 'vpw.capeInputStatus', header: 'CAPESt', width: 10, fmt: v => (v || '').substring(0, 10) },
+        { key: 'vpw.expectedReturnCape', header: 'ER(CAPE)', width: 8, fmt: v => formatPercentRatioOrEmpty(v) },
+        { key: 'vpw.expectedRealReturn', header: 'ER(real)', width: 8, fmt: v => formatPercentRatioOrEmpty(v) },
+        { key: 'vpw.expectedRealReturnRaw', header: 'ERRaw', width: 7, fmt: v => formatPercentRatioOrEmpty(v) },
+        { key: 'vpw.expectedRealReturnClamped', header: 'ERClamp', width: 7, fmt: v => formatPercentRatioOrEmpty(v) },
+        { key: 'vpw.safeRealReturn', header: 'SafeR', width: 6, fmt: v => formatPercentRatioOrEmpty(v) },
+        { key: 'vpw.safeRealReturnSource', header: 'SafeSrc', width: 12, fmt: v => (v || '').substring(0, 12) },
         { key: 'minimumFlexBlockReason', header: 'MinFBlock', width: 16, fmt: v => (v || '').substring(0, 16) },
         { key: 'minimumFlexEffectiveAfter', header: 'MinFEff', width: 8, fmt: formatCurrencyShortLog },
         { key: 'jahresentnahme_real', header: 'Entn_real', width: 9, fmt: formatCurrencyShortLog },

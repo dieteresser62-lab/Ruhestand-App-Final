@@ -1,7 +1,7 @@
 # Arbeitsdokument: CAPE-to-Return kontinuierlich modellieren
 
 **Stand:** 2026-06-15  
-**Status:** Slice 04 Runner-Paritaet umgesetzt, Review ausstehend
+**Status:** Slice 05 Diagnose/Doku umgesetzt, Review ausstehend
 **Autor:** Codex  
 **Verbesserungspunkt:** 2 - CAPE-to-Return kontinuierlicher modellieren  
 **Geplanter Feature-Branch:** `codex/cape-return-kontinuierlich`  
@@ -305,6 +305,7 @@ Safe-Rate-Contract:
 | `SLICE_CAPE_RETURN_02_POLICY_MODULE.md` | freigegeben | `codex/cape-return-kontinuierlich` | Policy-Modul, Config-Defaults und Unit-Tests erstellt; Legacy bleibt Default, keine Engine-Integration; B1/B2 behoben |
 | `SLICE_CAPE_RETURN_03_ENGINE_INTEGRATION.md` | freigegeben | `codex/cape-return-kontinuierlich` | Policy-Modul in `engine/core.mjs` verdrahtet; Legacy bleibt Default; Continuous per Config aktivierbar und in `ui.vpw` diagnostiziert |
 | `SLICE_CAPE_RETURN_04_RUNNER_PARITY.md` | freigegeben | `codex/cape-return-kontinuierlich` | Backtest-, Monte-Carlo- und Sweep-Parität bei aktivierter Continuous-Policy abgesichert; keine UI-/Profil- oder Default-Aenderung |
+| `SLICE_CAPE_RETURN_05_DIAGNOSIS_DOCS.md` | freigegeben | `codex/cape-return-kontinuierlich` | Detaillierte Backtest-/Scenario-Logspalten fuer Return-Policy-Diagnose, fokussierter Legacy-vs-Continuous-Vergleich und dokumentierte Entscheidung: `legacy_step` bleibt Default |
 
 ### Reviewer-Pruefauftrag
 

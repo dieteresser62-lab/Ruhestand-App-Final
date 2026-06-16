@@ -215,6 +215,14 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal', options =
     const showGoldColumns = options?.goldAktiv !== false;
     const formatPercent = (value, decimals = 1) => formatPercentValue(Number(value) || 0, { fractionDigits: decimals, invalid: '0.0%' });
     const formatPercentInt = (value) => formatPercentValue(Math.round(Number(value) || 0), { fractionDigits: 0, invalid: '0%' });
+    const formatPercentRatioOrEmpty = (value, decimals = 1) => (
+        Number.isFinite(value) ? formatPercentRatio(value, { fractionDigits: decimals, invalid: '' }) : ''
+    );
+    const shortPolicy = (value) => {
+        if (value === 'cape_continuous') return 'cape_ct';
+        if (value === 'legacy_step') return 'legacy';
+        return (value || '').substring(0, 8);
+    };
     const traceTotal = (row, phase) => {
         const trace = Array.isArray(row?.row?.balance_trace) ? row.row.balance_trace : [];
         const entry = trace.find(item => item?.phase === phase);
@@ -307,17 +315,66 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal', options =
                 align: 'right'
             },
             {
+                header: 'RetPol',
+                width: 7,
+                key: 'vpw.returnPolicy',
+                valueFormatter: shortPolicy,
+                align: 'left'
+            },
+            {
+                header: 'RetSrc',
+                width: 12,
+                key: 'vpw.expectedReturnSource',
+                valueFormatter: v => (v || '').substring(0, 12),
+                align: 'left'
+            },
+            {
+                header: 'CAPESt',
+                width: 10,
+                key: 'vpw.capeInputStatus',
+                valueFormatter: v => (v || '').substring(0, 10),
+                align: 'left'
+            },
+            {
                 header: 'ER(CAPE)',
                 width: 8,
                 key: 'vpw.expectedReturnCape',
-                valueFormatter: v => (Number.isFinite(v) ? formatPercentRatio(v, { fractionDigits: 1, invalid: '' }) : ''),
+                valueFormatter: v => formatPercentRatioOrEmpty(v),
                 align: 'right'
             },
             {
                 header: 'ER(real)',
                 width: 8,
                 key: 'vpw.expectedRealReturn',
-                valueFormatter: v => (Number.isFinite(v) ? formatPercentRatio(v, { fractionDigits: 1, invalid: '' }) : ''),
+                valueFormatter: v => formatPercentRatioOrEmpty(v),
+                align: 'right'
+            },
+            {
+                header: 'ERRaw',
+                width: 7,
+                key: 'vpw.expectedRealReturnRaw',
+                valueFormatter: v => formatPercentRatioOrEmpty(v),
+                align: 'right'
+            },
+            {
+                header: 'ERClamp',
+                width: 7,
+                key: 'vpw.expectedRealReturnClamped',
+                valueFormatter: v => formatPercentRatioOrEmpty(v),
+                align: 'right'
+            },
+            {
+                header: 'SafeR',
+                width: 6,
+                key: 'vpw.safeRealReturn',
+                valueFormatter: v => formatPercentRatioOrEmpty(v),
+                align: 'right'
+            },
+            {
+                header: 'SafeSrc',
+                width: 12,
+                key: 'vpw.safeRealReturnSource',
+                valueFormatter: v => (v || '').substring(0, 12),
                 align: 'right'
             },
             { header: 'SafSc', width: 5, key: 'row.safety_score', valueFormatter: v => (Number.isFinite(v) ? Math.round(v) : ''), align: 'right' },

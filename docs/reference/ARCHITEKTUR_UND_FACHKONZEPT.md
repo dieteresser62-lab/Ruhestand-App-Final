@@ -961,7 +961,7 @@ Der SpendingPlanner führt mehrere Policy-Module in stabiler Reihenfolge aus, wo
 4. Spending-Policy-Pipeline anwenden: Guardrails, Mindest-Flex, Flex-Budget, finale Rate-Limits.
 5. Jahresentnahme quantisieren und Diagnose erzeugen.
 
-Dynamic Flex ist ein vorgeschalteter VPW-Pfad. Bei aktivem `dynamicFlex` berechnet die Engine aus Gesamtvermögen, Resthorizont, CAPE-basierter erwarteter Realrendite, Gold-/Safe-Asset-Anteil und optionalem Go-Go-Multiplikator einen dynamischen Flex-Bedarf. Der Floor bleibt geschützt; VPW ersetzt nur den flexiblen Teil. Eine Sicherheitsstufe kann Go-Go deaktivieren oder Dynamic Flex temporär auf statischen Flex zurücksetzen, wenn Alarm-, Runway- oder Drawdown-Signale zu stark werden.
+Dynamic Flex ist ein vorgeschalteter VPW-Pfad. Bei aktivem `dynamicFlex` berechnet die Engine aus Gesamtvermögen, Resthorizont, CAPE-basierter erwarteter Realrendite, Gold-/Safe-Asset-Anteil und optionalem Go-Go-Multiplikator einen dynamischen Flex-Bedarf. Die VPW-Renditeherleitung ist in `engine/planners/vpw-return-policy.mjs` gekapselt: `legacy_step` bleibt Default, `cape_continuous` ist ein expliziter Config-Modus mit robuster CAPE-Normalisierung und separaten Aktien-/Portfolio-Clamps. Der Floor bleibt geschützt; VPW ersetzt nur den flexiblen Teil. Eine Sicherheitsstufe kann Go-Go deaktivieren oder Dynamic Flex temporär auf statischen Flex zurücksetzen, wenn Alarm-, Runway- oder Drawdown-Signale zu stark werden.
 
 Der optionale `minimumFlexAnnual` ist kein zweiter Floor und mutiert den Bedarf nicht. Er wird nach den Guardrails als Mindest-Effektivbetrag für den Flex-Anteil interpretiert: Wenn die berechnete Flex-Rate weniger als diesen Betrag freigeben würde, hebt `applyMinimumFlexFloor()` die Rate bis zur erforderlichen Mindest-Flex-Rate an. Danach dürfen Flex-Budget-Cap und finale Rate-Limits die Anhebung weiterhin begrenzen. Notfallbedingungen blockieren die Anhebung bei aktivem Alarm, fehlender Gesamtvermögensdeckung für Floor plus Mindest-Flex oder wenn der Mindest-Runway nach dem Proxy nicht wiederherstellbar wäre.
 
@@ -2433,7 +2433,9 @@ function _berechneEntnahmeRate(realReturn, horizonYears) {
 
 ### C.11.3 Erwartete Realrendite (Engine)
 
-Die erwartete Realrendite wird als **gewichteter Durchschnitt** der Asset-Klassen berechnet, per EMA geglättet und auf [0%, 5%] geclippt:
+Die erwartete Realrendite wird als **gewichteter Durchschnitt** der Asset-Klassen berechnet, per EMA geglättet und auf [0%, 5%] geclippt. Die Herleitung erfolgt ueber `engine/planners/vpw-return-policy.mjs`.
+
+Im Default `legacy_step` wird die bisherige CAPE-Stufenlogik weiterverwendet:
 
 ```javascript
 // 1. Renditekomponenten
@@ -2454,7 +2456,7 @@ const smoothed = alpha * rawReturn + (1 - alpha) * lastSmoothedReturn;
 return clamp(smoothed, MIN_REAL_RETURN, MAX_REAL_RETURN);  // [0%, 5%]
 ```
 
-**CAPE-Rendite-Mapping (`MarketAnalyzer.mjs`):**
+**Legacy-CAPE-Rendite-Mapping (`MarketAnalyzer.mjs`):**
 
 | CAPE-Bereich | Erwartete Nominalrendite |
 |-------------|-------------------------|
@@ -2462,6 +2464,20 @@ return clamp(smoothed, MIN_REAL_RETURN, MAX_REAL_RETURN);  // [0%, 5%]
 | CAPE 15–20 | 6% |
 | CAPE 20–30 | 5% |
 | CAPE > 30 | 4% |
+
+Im expliziten Modus `cape_continuous` wird statt der Stufen eine kontinuierliche CAPE-Funktion genutzt:
+
+```javascript
+earningsYield = 1 / capeRatioUsed;
+rawEquityRealReturn = earningsYield + EQUITY_PREMIUM_ADJUSTMENT;
+equityRealReturn = clamp(rawEquityRealReturn, MIN_EQUITY_REAL_RETURN, MAX_EQUITY_REAL_RETURN);
+portfolioRealReturn = equityWeight * equityRealReturn
+                    + goldWeight * goldRealReturn
+                    + safeWeight * safeRealReturn;
+expectedRealReturn = clamp(portfolioRealReturn, MIN_REAL_RETURN, MAX_REAL_RETURN);
+```
+
+Ungueltige, fehlende, nicht-endliche, negative oder zu hohe CAPE-Werte fallen nicht in einen guenstigen Clamp, sondern auf `DEFAULT_CAPE` zurueck und setzen `capeInputStatus`/`expectedReturnSource` entsprechend.
 
 ### C.11.4 Horizont-Berechnung (`simulator-engine-helpers.js`)
 
@@ -2502,6 +2518,7 @@ vpwTotal = gesamtwert * vpwRate * (goGoActive ? goGoMultiplier : 1.0);
 
 ```javascript
 DYNAMIC_FLEX: {
+    RETURN_POLICY: 'legacy_step',       // legacy_step | cape_continuous
     SAFE_ASSET_REAL_RETURN: 0.005,   // 0.5% p.a.
     GOLD_REAL_RETURN: 0.01,          // 1.0% p.a.
     MIN_HORIZON_YEARS: 1,
@@ -2513,6 +2530,8 @@ DYNAMIC_FLEX: {
     MAX_GO_GO_MULTIPLIER: 1.5        // Go-Go-Obergrenze
 }
 ```
+
+Die Continuous-Parameter liegen separat unter `CONFIG.CAPE_CONTINUOUS`. Der Default-Wechsel auf `cape_continuous` ist nicht erfolgt; Backtest-Vergleiche zeigen sichtbare Entnahme-/Endvermoegens-Deltas und brauchen fachliche Freigabe.
 
 ### C.11.7 Integration in die Berechnungskette
 
@@ -2532,6 +2551,8 @@ Input → Validation → Market Analysis → [VPW: Flex-Override] → SpendingPl
 - `horizonYears`, `horizonMethod`, `survivalQuantile`
 - `goGoActive`, `goGoMultiplier`
 - `capeRatioUsed`, `expectedReturnCape`
+- `returnPolicy`, `expectedReturnSource`, `capeInputStatus`
+- `expectedRealReturnRaw`, `expectedRealReturnClamped`, `safeRealReturn`, `safeRealReturnSource`
 
 ### C.11.8 UI-Presets (`simulator-main-dynamic-flex.js`)
 

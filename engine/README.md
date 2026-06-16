@@ -86,6 +86,7 @@ Bei aktivem Dynamic-Flex (`dynamicFlex=true`) werden folgende Eingaben genutzt:
 * `capeRatio` (kanonisch; `marketCapeRatio` wird als Alias-Fallback akzeptiert)
 
 Ausgabe für UI/Diagnostik erfolgt in `result.ui.vpw` (u. a. `enabled`, `horizonYears`, `vpwRate`, `expectedRealReturn`, `status`).
+Die erwartete Realrendite laeuft ueber `engine/planners/vpw-return-policy.mjs`. Der Default bleibt `CONFIG.SPENDING_MODEL.DYNAMIC_FLEX.RETURN_POLICY='legacy_step'`; `cape_continuous` ist nur explizit per Config aktiv. Continuous normalisiert ungueltige CAPE-Werte auf den dokumentierten Fallback, klammert Aktien- und Portfolio-Realrendite separat und diagnostiziert `returnPolicy`, `expectedReturnSource`, `capeInputStatus`, `expectedRealReturnRaw`, `expectedRealReturnClamped`, `safeRealReturn` und `safeRealReturnSource`.
 Bei `dynamicFlex=false` bleibt das bisherige Flex-Verhalten unverändert.
 
 ### Mindest-Flex Vertragsfeld (`simulateSingleYear`)
