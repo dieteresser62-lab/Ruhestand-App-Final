@@ -1,7 +1,7 @@
 # Arbeitsdokument: Stationary Bootstrap ergaenzen
 
 **Stand:** 2026-06-16  
-**Status:** Slice 3 freigegeben
+**Status:** Slice 4 freigegeben
 **Autor:** Codex  
 **Verbesserungspunkt:** 3 - Stationary Bootstrap ergaenzen  
 **Geplanter Feature-Branch:** `codex/stationary-bootstrap`  
@@ -249,7 +249,7 @@ Sampler-State-Contract:
 1. `SLICE_STATIONARY_BOOTSTRAP_01_CONTRACT.md`: Methodenname, Parameter, CAPE/FILTER/RECENCY-Entscheidung. Status: freigegeben.
 2. `SLICE_STATIONARY_BOOTSTRAP_02_SAMPLER.md`: DOM-freier Sampler und Unit-Tests. Status: freigegeben.
 3. `SLICE_STATIONARY_BOOTSTRAP_03_RUNNER.md`: Runner-Integration serial. Status: freigegeben.
-4. `SLICE_STATIONARY_BOOTSTRAP_04_WORKER_PARITY.md`: Worker-Payload und Paritaet.
+4. `SLICE_STATIONARY_BOOTSTRAP_04_WORKER_PARITY.md`: Worker-Payload und Paritaet. Status: freigegeben.
 5. `SLICE_STATIONARY_BOOTSTRAP_05_UI_DOCS.md`: UI, Persistenz, Doku, Browser-Smoke.
 
 ### Reviewer-Pruefauftrag

@@ -1,6 +1,7 @@
 import { EngineAPI } from '../engine/index.mjs';
 import { CONFIG } from '../engine/config.mjs';
 import { prepareHistoricalDataOnce } from '../app/simulator/simulator-engine-helpers.js';
+import { annualData } from '../app/simulator/simulator-data.js';
 import { createMonteCarloBuffers, MC_HEATMAP_BINS, pickWorstRun, runMonteCarloChunk, buildMonteCarloAggregates } from '../app/simulator/monte-carlo-runner.js';
 import { runSweepChunk } from '../app/simulator/sweep-runner.js';
 
@@ -1076,6 +1077,96 @@ try {
     console.log('✅ Longevity runner parity passed');
 } catch (e) {
     console.error('❌ Longevity runner parity failed', e);
+    throw e;
+}
+
+// Test 8: Stationary Bootstrap stays deterministic across worker-like chunking, including data-end restarts.
+try {
+    const lastHistoricalYear = annualData[annualData.length - 1]?.jahr;
+    const monteCarloParams = {
+        anzahl: 18,
+        maxDauer: 7,
+        blockSize: 30,
+        seed: 61616,
+        methode: 'stationary',
+        rngMode: 'per-run-seed',
+        startYearMode: 'FILTER',
+        startYearFilter: lastHistoricalYear,
+        startYearHalfLife: 20,
+        excludeEstimatedHistory: false
+    };
+    const logIndices = [0, 8, 17];
+
+    const fullChunk = await runMonteCarloChunk({
+        inputs: baseInputs,
+        monteCarloParams,
+        widowOptions,
+        useCapeSampling: false,
+        runRange: { start: 0, count: monteCarloParams.anzahl },
+        logIndices,
+        engine: EngineAPI
+    });
+
+    const splitRanges = [
+        { start: 0, count: 4 },
+        { start: 4, count: 9 },
+        { start: 13, count: 5 }
+    ];
+    const merged = createMergedMonteCarloState(monteCarloParams.anzahl);
+    for (const range of splitRanges) {
+        const chunk = await runMonteCarloChunk({
+            inputs: baseInputs,
+            monteCarloParams,
+            widowOptions,
+            useCapeSampling: false,
+            runRange: range,
+            logIndices,
+            engine: EngineAPI
+        });
+        mergeMonteCarloChunk(merged, chunk, range.start);
+    }
+
+    const fullAggregates = buildMonteCarloAggregates({
+        inputs: baseInputs,
+        totalRuns: monteCarloParams.anzahl,
+        buffers: fullChunk.buffers,
+        heatmap: fullChunk.heatmap,
+        bins: fullChunk.bins,
+        totals: fullChunk.totals,
+        lists: fullChunk.lists,
+        allRealWithdrawalsSample: fullChunk.allRealWithdrawalsSample
+    });
+    const mergedAggregates = buildAggregatesFromState(baseInputs, monteCarloParams.anzahl, merged);
+
+    assertMonteCarloTotalsEqual(fullChunk.totals, merged.totals, 'Stationary MC');
+    assertMonteCarloListShapesEqual(fullChunk.lists, merged.lists, 'Stationary MC');
+    assertEqual(sumHeatmap(merged.heatmap), sumHeatmap(fullChunk.heatmap), 'Stationary MC heatmap total should match');
+    assertClose(fullAggregates.finalOutcomes.p10, mergedAggregates.finalOutcomes.p10, 1e-6, 'Stationary MC p10 mismatch');
+    assertClose(fullAggregates.finalOutcomes.p50, mergedAggregates.finalOutcomes.p50, 1e-6, 'Stationary MC p50 mismatch');
+    assertClose(fullAggregates.finalOutcomes.p90, mergedAggregates.finalOutcomes.p90, 1e-6, 'Stationary MC p90 mismatch');
+    assertClose(fullAggregates.depotErschoepfungsQuote, mergedAggregates.depotErschoepfungsQuote, 1e-6, 'Stationary MC depletion mismatch');
+
+    const fullByIndex = new Map((fullChunk.runMeta || []).map(meta => [meta.index, meta]));
+    const mergedByIndex = new Map((merged.runMeta || []).map(meta => [meta.index, meta]));
+    for (const runIdx of logIndices) {
+        const fullRows = fullByIndex.get(runIdx)?.logDataRows || [];
+        const mergedRows = mergedByIndex.get(runIdx)?.logDataRows || [];
+        assert(fullRows.length >= 2, `Stationary MC should log multiple data-end years for run ${runIdx}`);
+        assertEqual(mergedRows.length, fullRows.length, `Stationary MC log row count mismatch for run ${runIdx}`);
+        assert(
+            fullRows.every(row => row.histJahr === lastHistoricalYear),
+            `Stationary MC full run ${runIdx} should restart at data end into the filtered last year`
+        );
+        assertEqual(
+            JSON.stringify(mergedRows.map(row => row.histJahr)),
+            JSON.stringify(fullRows.map(row => row.histJahr)),
+            `Stationary MC histJahr sequence mismatch for run ${runIdx}`
+        );
+    }
+
+    console.log('✅ Stationary Bootstrap worker-like chunk parity passed');
+} catch (e) {
+    console.error('❌ Stationary Bootstrap worker-like chunk parity failed', e);
     throw e;
 }
 

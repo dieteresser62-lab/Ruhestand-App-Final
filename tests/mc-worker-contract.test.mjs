@@ -1,6 +1,8 @@
 import { Worker } from 'node:worker_threads';
 import { EngineAPI } from '../engine/index.mjs';
 import { compileScenario, getDataVersion } from '../app/simulator/simulator-engine-helpers.js';
+import { annualData } from '../app/simulator/simulator-data.js';
+import { runMonteCarloChunk } from '../app/simulator/monte-carlo-runner.js';
 
 console.log('--- MC Worker Entrypoint Contract Tests ---');
 
@@ -275,6 +277,89 @@ console.log('Test 4: valid Monte-Carlo job');
             'progress messages should carry jobId and phase'
         );
         console.log('✓ valid Monte-Carlo job OK');
+    } finally {
+        await terminateWorker(worker);
+    }
+}
+
+// Test 5: stationary bootstrap runs through the real worker entrypoint with data-end restarts.
+console.log('Test 5: stationary bootstrap Monte-Carlo job');
+{
+    const worker = createWorkerHarness();
+    try {
+        const inputs = createInputs();
+        const lastHistoricalYear = annualData[annualData.length - 1]?.jahr;
+        const stationaryParams = {
+            anzahl: 6,
+            maxDauer: 7,
+            blockSize: 30,
+            seed: 86420,
+            methode: 'stationary',
+            rngMode: 'per-run-seed',
+            startYearMode: 'FILTER',
+            startYearFilter: lastHistoricalYear,
+            startYearHalfLife: 20,
+            excludeEstimatedHistory: false
+        };
+        const { scenarioKey, compiledScenario } = compileScenario(
+            inputs,
+            widowOptions,
+            stationaryParams.methode,
+            false,
+            inputs.stressPreset
+        );
+
+        await postAndWait(worker, {
+            type: 'init',
+            jobId: 'init-stationary-job',
+            scenarioKey,
+            compiledScenario,
+            dataVersion: getDataVersion()
+        });
+
+        const response = await postAndWait(worker, {
+            type: 'job',
+            jobId: 'stationary-job-1',
+            scenarioKey,
+            runRange: { start: 0, count: stationaryParams.anzahl },
+            monteCarloParams: stationaryParams,
+            useCapeSampling: false,
+            logIndices: [0, 5]
+        });
+        const serial = await runMonteCarloChunk({
+            inputs,
+            widowOptions,
+            monteCarloParams: stationaryParams,
+            useCapeSampling: false,
+            runRange: { start: 0, count: stationaryParams.anzahl },
+            logIndices: [0, 5],
+            engine: EngineAPI
+        });
+
+        const result = response.message;
+        assertEqual(result.type, 'result', 'stationary job should return result');
+        assertEqual(result.jobId, 'stationary-job-1', 'stationary job should echo jobId');
+        assertEqual(result.buffers.finalOutcomes.length, stationaryParams.anzahl, 'stationary finalOutcomes should match run count');
+        assertEqual(
+            JSON.stringify(Array.from(result.buffers.finalOutcomes)),
+            JSON.stringify(Array.from(serial.buffers.finalOutcomes)),
+            'stationary worker finalOutcomes should match serial chunk'
+        );
+        assertEqual(result.totals.failCount, serial.totals.failCount, 'stationary worker failCount should match serial');
+        assertEqual(result.runMeta.length, stationaryParams.anzahl, 'stationary worker runMeta should include all runs');
+        const workerRun0 = (result.runMeta || []).find(meta => meta.index === 0);
+        const serialRun0 = (serial.runMeta || []).find(meta => meta.index === 0);
+        assert(workerRun0?.logDataRows?.length >= 2, 'stationary worker should log repeated data-end samples');
+        assertEqual(
+            JSON.stringify(workerRun0.logDataRows.map(row => row.histJahr)),
+            JSON.stringify(serialRun0.logDataRows.map(row => row.histJahr)),
+            'stationary worker histJahr sequence should match serial'
+        );
+        assert(
+            workerRun0.logDataRows.every(row => row.histJahr === lastHistoricalYear),
+            'stationary worker should keep data-end restarts inside the filtered last year'
+        );
+        console.log('✓ stationary bootstrap Monte-Carlo job OK');
     } finally {
         await terminateWorker(worker);
     }

@@ -169,7 +169,11 @@ export async function runMonteCarloAutoOptimize({ inputs, widowOptions, monteCar
                 blockSize: monteCarloParams.blockSize,
                 seed: monteCarloParams.seed,
                 methode: monteCarloParams.methode,
-                rngMode: monteCarloParams.rngMode || 'per-run-seed'
+                rngMode: monteCarloParams.rngMode || 'per-run-seed',
+                startYearMode: monteCarloParams.startYearMode,
+                startYearFilter: monteCarloParams.startYearFilter,
+                startYearHalfLife: monteCarloParams.startYearHalfLife,
+                excludeEstimatedHistory: monteCarloParams.excludeEstimatedHistory
             },
             useCapeSampling,
             logIndices: []
