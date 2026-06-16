@@ -259,8 +259,8 @@ Pflicht fuer stochastische Schritte 4 bis 5:
 
 | Schritt | Status | Naechstes Gate | Bemerkung |
 |---|---|---|---|
-| 1 Regime-Uebergaenge | geplant | Review-Freigabe Einzelplan | Blocker aus zweitem Review im Einzelplan adressiert |
-| 2 CAPE-to-Return | geplant | Review-Freigabe Einzelplan | Nach Regime-Semantik |
+| 1 Regime-Uebergaenge | erledigt | freigegeben | In `ea863e86` umgesetzt und committed |
+| 2 CAPE-to-Return | erledigt | freigegeben | In Slices 1-5 umgesetzt, reviewed und committed |
 | 3 Langlebigkeit | geplant | Baseline-Freeze | Abschluss der deterministischen Engine-Phase |
 | Gate 1 Baseline-Freeze | offen | Start Stationary Bootstrap | Muss aktiv protokolliert werden |
 | 4 Stationary Bootstrap | geplant | Sampling-Freeze | Erst nach Baseline-Freeze |
