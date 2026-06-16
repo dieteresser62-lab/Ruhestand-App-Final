@@ -1,11 +1,11 @@
 # Arbeitsdokument: Stationary Bootstrap ergaenzen
 
-**Stand:** 2026-06-14  
-**Status:** Ueberarbeitet nach Review, erneute Pruefung ausstehend  
+**Stand:** 2026-06-16  
+**Status:** Slice 1 freigegeben
 **Autor:** Codex  
 **Verbesserungspunkt:** 3 - Stationary Bootstrap ergaenzen  
 **Geplanter Feature-Branch:** `codex/stationary-bootstrap`  
-**GitHub-Status:** Noch nicht veroeffentlicht; vor Umsetzung Freigabe und Branch-Anlage erforderlich.
+**GitHub-Status:** Feature-Branch `codex/stationary-bootstrap` lokal angelegt, noch nicht veroeffentlicht.
 
 ## Einordnung in Roadmap
 
@@ -246,7 +246,7 @@ Sampler-State-Contract:
 
 ### Slice-Zuschnitt fuer spaetere Umsetzung
 
-1. `SLICE_STATIONARY_BOOTSTRAP_01_CONTRACT.md`: Methodenname, Parameter, CAPE/FILTER/RECENCY-Entscheidung.
+1. `SLICE_STATIONARY_BOOTSTRAP_01_CONTRACT.md`: Methodenname, Parameter, CAPE/FILTER/RECENCY-Entscheidung. Status: freigegeben.
 2. `SLICE_STATIONARY_BOOTSTRAP_02_SAMPLER.md`: DOM-freier Sampler und Unit-Tests.
 3. `SLICE_STATIONARY_BOOTSTRAP_03_RUNNER.md`: Runner-Integration serial.
 4. `SLICE_STATIONARY_BOOTSTRAP_04_WORKER_PARITY.md`: Worker-Payload und Paritaet.
