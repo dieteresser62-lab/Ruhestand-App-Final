@@ -46,7 +46,14 @@ export function buildMonteCarloAggregates({
         healthBucketEnabledCount = 0,
         healthBucketUsedCount = 0,
         healthBucketDepletedCount = 0,
-        totalHealthBucketUsed = 0
+        totalHealthBucketUsed = 0,
+        tailRiskRunsActiveCount = 0,
+        tailRiskRunsAppliedCount = 0,
+        tailRiskEventCount = 0,
+        tailRiskEvaluatedYears = 0,
+        tailRiskActiveYears = 0,
+        tailRiskAppliedYears = 0,
+        tailRiskSkippedHistoricalCrisisYears = 0
     } = totals;
     const {
         entryAges,
@@ -137,6 +144,19 @@ export function buildMonteCarloAggregates({
                 coverageMedianPct: healthBucketCoveragePct.length ? quantile(healthBucketCoveragePct, 0.5) : null,
                 targetGapMedian: healthBucketTargetGaps.length ? quantile(healthBucketTargetGaps, 0.5) : 0,
                 interestMedian: healthBucketInterestAmounts.length ? quantile(healthBucketInterestAmounts, 0.5) : 0
+            },
+            tailRisk: {
+                runActiveRatePct: totalRuns > 0 ? (tailRiskRunsActiveCount / totalRuns) * 100 : 0,
+                runAppliedRatePct: totalRuns > 0 ? (tailRiskRunsAppliedCount / totalRuns) * 100 : 0,
+                activeYearShare: tailRiskEvaluatedYears > 0 ? tailRiskActiveYears / tailRiskEvaluatedYears : 0,
+                appliedYearShare: tailRiskEvaluatedYears > 0 ? tailRiskAppliedYears / tailRiskEvaluatedYears : 0,
+                runsActive: tailRiskRunsActiveCount || 0,
+                runsApplied: tailRiskRunsAppliedCount || 0,
+                eventCount: tailRiskEventCount || 0,
+                evaluatedYears: tailRiskEvaluatedYears || 0,
+                activeYears: tailRiskActiveYears || 0,
+                appliedYears: tailRiskAppliedYears || 0,
+                skippedHistoricalCrisisYears: tailRiskSkippedHistoricalCrisisYears || 0
             },
             pflege: pflegeResults
         },

@@ -75,7 +75,14 @@ const MC_TOTAL_KEYS = [
     'healthBucketEnabledCount',
     'healthBucketUsedCount',
     'healthBucketDepletedCount',
-    'totalHealthBucketUsed'
+    'totalHealthBucketUsed',
+    'tailRiskRunsActiveCount',
+    'tailRiskRunsAppliedCount',
+    'tailRiskEventCount',
+    'tailRiskEvaluatedYears',
+    'tailRiskActiveYears',
+    'tailRiskAppliedYears',
+    'tailRiskSkippedHistoricalCrisisYears'
 ];
 
 const MC_LIST_KEYS = [
@@ -1080,7 +1087,96 @@ try {
     throw e;
 }
 
-// Test 8: Stationary Bootstrap stays deterministic across worker-like chunking, including data-end restarts.
+// Test 8: Tail-risk metrics stay deterministic across worker-like chunking.
+try {
+    const tailRiskInputs = {
+        ...baseInputs,
+        tailRiskEnabled: true,
+        tailRiskAnnualProbabilityPct: 5,
+        tailRiskReturnShockPct: -35,
+        tailRiskInflationShockPct: 6,
+        tailRiskDurationYears: 1,
+        tailRiskCooldownYears: 0
+    };
+    const monteCarloParams = {
+        anzahl: 18,
+        maxDauer: 8,
+        blockSize: 1,
+        seed: 7,
+        methode: 'block',
+        rngMode: 'per-run-seed'
+    };
+    const logIndices = [0, 5, 17];
+
+    const fullChunk = await runMonteCarloChunk({
+        inputs: tailRiskInputs,
+        monteCarloParams,
+        widowOptions,
+        useCapeSampling: false,
+        runRange: { start: 0, count: monteCarloParams.anzahl },
+        logIndices,
+        engine: EngineAPI
+    });
+
+    const splitRanges = [
+        { start: 0, count: 4 },
+        { start: 4, count: 7 },
+        { start: 11, count: 7 }
+    ];
+    const merged = createMergedMonteCarloState(monteCarloParams.anzahl);
+    for (const range of splitRanges) {
+        const chunk = await runMonteCarloChunk({
+            inputs: tailRiskInputs,
+            monteCarloParams,
+            widowOptions,
+            useCapeSampling: false,
+            runRange: range,
+            logIndices,
+            engine: EngineAPI
+        });
+        mergeMonteCarloChunk(merged, chunk, range.start);
+    }
+
+    const fullAggregates = buildMonteCarloAggregates({
+        inputs: tailRiskInputs,
+        totalRuns: monteCarloParams.anzahl,
+        buffers: fullChunk.buffers,
+        heatmap: fullChunk.heatmap,
+        bins: fullChunk.bins,
+        totals: fullChunk.totals,
+        lists: fullChunk.lists,
+        allRealWithdrawalsSample: fullChunk.allRealWithdrawalsSample
+    });
+    const mergedAggregates = buildAggregatesFromState(tailRiskInputs, monteCarloParams.anzahl, merged);
+
+    assertMonteCarloTotalsEqual(fullChunk.totals, merged.totals, 'Tail-risk MC');
+    assert(fullChunk.totals.tailRiskEventCount > 0, 'Tail-risk MC should create at least one event');
+    assert(fullChunk.totals.tailRiskActiveYears > 0, 'Tail-risk MC should count active years');
+    assertClose(
+        fullAggregates.extraKPI.tailRisk.runActiveRatePct,
+        mergedAggregates.extraKPI.tailRisk.runActiveRatePct,
+        1e-6,
+        'Tail-risk MC active run rate mismatch'
+    );
+    assertClose(
+        fullAggregates.extraKPI.tailRisk.activeYearShare,
+        mergedAggregates.extraKPI.tailRisk.activeYearShare,
+        1e-6,
+        'Tail-risk MC active year share mismatch'
+    );
+    assertEqual(
+        JSON.stringify(mergedAggregates.extraKPI.tailRisk),
+        JSON.stringify(fullAggregates.extraKPI.tailRisk),
+        'Tail-risk MC aggregate payload should match'
+    );
+
+    console.log('✅ Tail-risk worker-like metrics parity passed');
+} catch (e) {
+    console.error('❌ Tail-risk worker-like metrics parity failed', e);
+    throw e;
+}
+
+// Test 9: Stationary Bootstrap stays deterministic across worker-like chunking, including data-end restarts.
 try {
     const lastHistoricalYear = annualData[annualData.length - 1]?.jahr;
     const monteCarloParams = {

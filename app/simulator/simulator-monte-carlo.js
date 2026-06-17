@@ -151,7 +151,14 @@ async function runMonteCarloWithWorkers({
         healthBucketEnabledCount: 0,
         healthBucketUsedCount: 0,
         healthBucketDepletedCount: 0,
-        totalHealthBucketUsed: 0
+        totalHealthBucketUsed: 0,
+        tailRiskRunsActiveCount: 0,
+        tailRiskRunsAppliedCount: 0,
+        tailRiskEventCount: 0,
+        tailRiskEvaluatedYears: 0,
+        tailRiskActiveYears: 0,
+        tailRiskAppliedYears: 0,
+        tailRiskSkippedHistoricalCrisisYears: 0
     };
 
     let worstRun = null;
@@ -222,6 +229,13 @@ async function runMonteCarloWithWorkers({
             totals.healthBucketUsedCount += result.totals.healthBucketUsedCount || 0;
             totals.healthBucketDepletedCount += result.totals.healthBucketDepletedCount || 0;
             totals.totalHealthBucketUsed += result.totals.totalHealthBucketUsed || 0;
+            totals.tailRiskRunsActiveCount += result.totals.tailRiskRunsActiveCount || 0;
+            totals.tailRiskRunsAppliedCount += result.totals.tailRiskRunsAppliedCount || 0;
+            totals.tailRiskEventCount += result.totals.tailRiskEventCount || 0;
+            totals.tailRiskEvaluatedYears += result.totals.tailRiskEvaluatedYears || 0;
+            totals.tailRiskActiveYears += result.totals.tailRiskActiveYears || 0;
+            totals.tailRiskAppliedYears += result.totals.tailRiskAppliedYears || 0;
+            totals.tailRiskSkippedHistoricalCrisisYears += result.totals.tailRiskSkippedHistoricalCrisisYears || 0;
 
             appendArray(lists.entryAges, result.lists.entryAges);
             appendArray(lists.entryAgesP2, result.lists.entryAgesP2);

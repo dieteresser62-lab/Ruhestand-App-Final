@@ -1,5 +1,6 @@
 import { pickWorstRun } from './monte-carlo-runner-utils.js';
 import { portfolioTotal } from './simulator-results.js';
+import { summarizeTailRiskEvents } from './tail-risk-overlay.js';
 
 export function createMonteCarloRunMetrics(runCount) {
     return {
@@ -19,6 +20,13 @@ export function createMonteCarloRunMetrics(runCount) {
         healthBucketUsedCount: 0,
         healthBucketDepletedCount: 0,
         totalHealthBucketUsed: 0,
+        tailRiskRunsActiveCount: 0,
+        tailRiskRunsAppliedCount: 0,
+        tailRiskEventCount: 0,
+        tailRiskEvaluatedYears: 0,
+        tailRiskActiveYears: 0,
+        tailRiskAppliedYears: 0,
+        tailRiskSkippedHistoricalCrisisYears: 0,
         entryAges: [],
         entryAgesP2: [],
         careDepotCosts: [],
@@ -76,6 +84,7 @@ export function recordMonteCarloRunOutcome(metrics, {
     healthBucketCoveragePctThisRun = null,
     healthBucketTargetGapThisRun = 0,
     healthBucketInterestThisRun = 0,
+    tailRiskEntriesThisRun = null,
     currentRunLog
 }) {
     const {
@@ -140,6 +149,15 @@ export function recordMonteCarloRunOutcome(metrics, {
     if (healthBucketInterestThisRun > 0) {
         metrics.healthBucketInterestAmounts.push(healthBucketInterestThisRun);
     }
+
+    const tailRiskSummary = summarizeTailRiskEvents(tailRiskEntriesThisRun || currentRunLog || []);
+    if (tailRiskSummary.tailRiskActiveYears > 0) metrics.tailRiskRunsActiveCount++;
+    if (tailRiskSummary.tailRiskAppliedYears > 0) metrics.tailRiskRunsAppliedCount++;
+    metrics.tailRiskEventCount += tailRiskSummary.tailRiskEventCount;
+    metrics.tailRiskEvaluatedYears += Array.isArray(tailRiskEntriesThisRun) ? tailRiskEntriesThisRun.length : 0;
+    metrics.tailRiskActiveYears += tailRiskSummary.tailRiskActiveYears;
+    metrics.tailRiskAppliedYears += tailRiskSummary.tailRiskAppliedYears;
+    metrics.tailRiskSkippedHistoricalCrisisYears += tailRiskSummary.tailRiskSkippedHistoricalCrisisYears;
 
     metrics.runMeta.push({
         index: runIdx,
@@ -215,7 +233,14 @@ export function finalizeMonteCarloRunMetrics(metrics) {
             healthBucketEnabledCount: metrics.healthBucketEnabledCount,
             healthBucketUsedCount: metrics.healthBucketUsedCount,
             healthBucketDepletedCount: metrics.healthBucketDepletedCount,
-            totalHealthBucketUsed: metrics.totalHealthBucketUsed
+            totalHealthBucketUsed: metrics.totalHealthBucketUsed,
+            tailRiskRunsActiveCount: metrics.tailRiskRunsActiveCount,
+            tailRiskRunsAppliedCount: metrics.tailRiskRunsAppliedCount,
+            tailRiskEventCount: metrics.tailRiskEventCount,
+            tailRiskEvaluatedYears: metrics.tailRiskEvaluatedYears,
+            tailRiskActiveYears: metrics.tailRiskActiveYears,
+            tailRiskAppliedYears: metrics.tailRiskAppliedYears,
+            tailRiskSkippedHistoricalCrisisYears: metrics.tailRiskSkippedHistoricalCrisisYears
         },
         lists: {
             entryAges: metrics.entryAges,

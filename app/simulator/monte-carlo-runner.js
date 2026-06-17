@@ -298,6 +298,7 @@ export async function runMonteCarloChunk({
         const depotWertHistorie = [portfolioTotal(simState.portfolio)];
         const shouldLogRun = !logIndexSet || logIndexSet.has(runIdx);
         const currentRunLog = shouldLogRun ? [] : null;
+        const tailRiskEntriesThisRun = [];
         let depotNurHistorie = [sumDepot(simState.portfolio)];
         let depotErschoepfungAlterGesetzt = false;
         // Track dynamic transition year (can be shortened by care event)
@@ -353,6 +354,7 @@ export async function runMonteCarloChunk({
                 stressPreset: inputs?.stressPreset
             });
             yearData = tailRiskOverlay.yearData;
+            tailRiskEntriesThisRun.push(tailRiskOverlay);
 
             const ageP1 = inputs.startAlter + simulationsJahr;
             const marriageYearsCompleted = computeMarriageYearsCompleted(simulationsJahr, widowOptions);
@@ -677,6 +679,7 @@ export async function runMonteCarloChunk({
             healthBucketCoveragePctThisRun,
             healthBucketTargetGapThisRun,
             healthBucketInterestThisRun,
+            tailRiskEntriesThisRun,
             currentRunLog
         });
     }
