@@ -208,4 +208,85 @@ console.log('Test 7: getCommonInputs preserves profilverbund minimum-flex split'
 }
 console.log('✓ profilverbund minimum-flex split preserved OK');
 
+console.log('Test 8: getCommonInputs and validator enforce tail-risk UI contract');
+{
+    const previousWindow = global.window;
+    const previousDocument = global.document;
+    try {
+        global.window = {};
+        global.document = createDocumentMock({
+            tagesgeld: '10.000',
+            geldmarktEtf: '5.000',
+            simStartVermoegen: '100.000',
+            depotwertAlt: '85',
+            einstandAlt: '70',
+            startFloorBedarf: '24000',
+            startFlexBedarf: '12000',
+            minimumFlexAnnual: '0',
+            goldAllokationAktiv: 'false',
+            p1StartAlter: '65',
+            p1Geschlecht: 'm',
+            mcDauer: '35',
+            tailRiskEnabled: { checked: true },
+            tailRiskAnnualProbabilityPct: '1.5',
+            tailRiskReturnShockPct: '-35',
+            tailRiskInflationShockPct: '6',
+            tailRiskDurationYears: '3',
+            tailRiskCooldownYears: '10'
+        });
+        const inputs = getCommonInputs();
+        assertEqual(inputs.tailRiskEnabled, true, 'Tail-risk opt-in should be read from checkbox');
+        assertEqual(inputs.tailRiskAnnualProbabilityPct, 1.5, 'Tail-risk probability should parse as number');
+        assertEqual(inputs.tailRiskDurationYears, 3, 'Tail-risk duration should parse as integer');
+        assertEqual(inputs.tailRiskConfigValid, true, 'Valid tail-risk UI config should remain valid');
+        validateSimulatorInputs(inputs);
+
+        global.document = createDocumentMock({
+            startFlexBedarf: '12000',
+            minimumFlexAnnual: '0',
+            mcDauer: '2',
+            tailRiskEnabled: { checked: true },
+            tailRiskAnnualProbabilityPct: '9',
+            tailRiskReturnShockPct: '-35',
+            tailRiskInflationShockPct: '6',
+            tailRiskDurationYears: '3',
+            tailRiskCooldownYears: '10'
+        });
+        const invalidInputs = getCommonInputs();
+        let thrown = null;
+        try {
+            validateSimulatorInputs(invalidInputs);
+        } catch (error) {
+            thrown = error;
+        }
+        assert(thrown instanceof SimulatorValidationError, 'Invalid tail-risk config should block validation');
+        assert(thrown.errors.some(e => e.fieldId === 'tailRiskAnnualProbabilityPct'), 'Probability range error should be reported');
+
+        global.document = createDocumentMock({
+            startFlexBedarf: '12000',
+            minimumFlexAnnual: '0',
+            mcDauer: '2',
+            tailRiskEnabled: { checked: true },
+            tailRiskAnnualProbabilityPct: '1',
+            tailRiskReturnShockPct: '-35',
+            tailRiskInflationShockPct: '6',
+            tailRiskDurationYears: '3',
+            tailRiskCooldownYears: '10'
+        });
+        const invalidHorizonInputs = getCommonInputs();
+        let horizonError = null;
+        try {
+            validateSimulatorInputs(invalidHorizonInputs);
+        } catch (error) {
+            horizonError = error;
+        }
+        assert(horizonError instanceof SimulatorValidationError, 'Tail-risk duration beyond horizon should block validation');
+        assert(horizonError.errors.some(e => e.fieldId === 'tailRiskDurationYears'), 'Duration horizon error should be reported');
+    } finally {
+        if (previousWindow === undefined) delete global.window; else global.window = previousWindow;
+        if (previousDocument === undefined) delete global.document; else global.document = previousDocument;
+    }
+}
+console.log('✓ tail-risk UI contract validation OK');
+
 console.log('✅ Simulator input reader tests passed');

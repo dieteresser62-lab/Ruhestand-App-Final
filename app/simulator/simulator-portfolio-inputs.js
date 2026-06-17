@@ -17,6 +17,33 @@ import {
     readStrategyInputs
 } from './simulator-input-strategy.js';
 import { readTrancheInputs } from './simulator-input-tranches.js';
+import { normalizeTailRiskConfig } from './tail-risk-contract.js';
+
+function readDomValue(id, fallback = '') {
+    const el = typeof document !== 'undefined' ? document.getElementById(id) : null;
+    return el?.value ?? fallback;
+}
+
+function readDomChecked(id, fallback = false) {
+    const el = typeof document !== 'undefined' ? document.getElementById(id) : null;
+    return typeof el?.checked === 'boolean' ? el.checked : fallback;
+}
+
+function readTailRiskInputs() {
+    const tailRiskEnabled = readDomChecked('tailRiskEnabled', false);
+    if (!tailRiskEnabled) {
+        return normalizeTailRiskConfig({ tailRiskEnabled: false });
+    }
+
+    return normalizeTailRiskConfig({
+        tailRiskEnabled,
+        tailRiskAnnualProbabilityPct: readDomValue('tailRiskAnnualProbabilityPct', ''),
+        tailRiskReturnShockPct: readDomValue('tailRiskReturnShockPct', ''),
+        tailRiskInflationShockPct: readDomValue('tailRiskInflationShockPct', ''),
+        tailRiskDurationYears: readDomValue('tailRiskDurationYears', ''),
+        tailRiskCooldownYears: readDomValue('tailRiskCooldownYears', '')
+    });
+}
 
 /**
  * Sammelt alle Eingabewerte aus dem UI
@@ -33,6 +60,7 @@ export function getCommonInputs() {
     const decumulationInputs = readDecumulationInputs();
     const strategyInputs = readStrategyInputs();
     const accumulationInputs = readAccumulationInputs({ startAlter: pensionInputs.startAlter });
+    const tailRiskInputs = readTailRiskInputs();
 
     const result = {
         ...baseInputs,
@@ -44,6 +72,8 @@ export function getCommonInputs() {
         ...widowInputs,
         ...strategyInputs,
         ...accumulationInputs,
+        ...tailRiskInputs,
+        tailRiskHorizonYears: Number.parseInt(readDomValue('mcDauer', ''), 10),
         ...trancheInputs
     };
 

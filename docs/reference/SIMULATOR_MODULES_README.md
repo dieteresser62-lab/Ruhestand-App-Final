@@ -26,7 +26,7 @@ UI-Orchestrierung und Klammer um die ausgelagerten Feature-Module. Registriert E
 - `simulator-main-sweep-ui.js` – Sweep-UI + Grid-Size
 - `simulator-main-tabs.js` – Tab-Umschaltung
 - `simulator-main-profiles.js` – Profilverbund-Auswahl
-- `simulator-input-validation.js` – DOM-freie Validierung gemeinsamer Simulator-Inputs, aktuell `minimumFlexAnnual <= startFlexBedarf`
+- `simulator-input-validation.js` – DOM-freie Validierung gemeinsamer Simulator-Inputs, aktuell `minimumFlexAnnual <= startFlexBedarf` sowie Tail-Risk-Parameter und Horizont-Kompatibilitaet
 - `simulator-main-reset.js` – Reset-Button
 - `simulator-main-stress.js` – Stress-Preset-Select
 - `simulator-main-partner.js` – Partner-UI Toggle
@@ -39,7 +39,7 @@ Koordiniert die Monte-Carlo-Simulation und verbindet DOM-Interaktion mit der rei
 
 **Hauptfunktionen / Exporte:**
 - `runMonteCarlo()` – liest UI-Parameter, orchestriert `monte-carlo-runner.js` und Web-Worker-Jobs und aktualisiert Progress/UI (Default: 8 Worker, 500 ms Job-Budget).
-- Validiert vor dem Start, dass `Mindest-Flex p.a.` den `Flex-Bedarf p.a.` nicht uebersteigt.
+- Validiert vor dem Start, dass `Mindest-Flex p.a.` den `Flex-Bedarf p.a.` nicht uebersteigt und optionale Tail-Risk-Parameter innerhalb des freigegebenen Contracts liegen.
 
 **Einbindung:** Wird von `simulator-main.js` importiert und im UI-Bootstrap an den Start-Button (`#mcButton`) gekoppelt. Alle Monte-Carlo-spezifischen Anpassungen sollten hier erfolgen, damit `simulator-main.js` schlank bleibt.
 
@@ -54,10 +54,22 @@ DOM-freie Simulation, die alle Runs, KPI-Arrays, Pflegemetriken und Pflegebucket
 - `runMonteCarloSimulation()` – Führt die komplette Simulation aus, sammelt Worst-Run-Logs, Pflege-KPIs, Pflegebucket-KPIs und aggregierte Kennzahlen.
 - Implementiert Ruin-Logik (Depot < 100€) und Ansparphase-Übergang.
 - Aggregiert zusätzlich `taxSavedByLossCarry` (gesamt und pro Run), damit Steuerersparnis aus Verlustvorträgen auswertbar bleibt.
+- Wendet optional das Tail-Risk-Overlay nicht-mutierend auf gezogene Jahresdaten an; die Schedule ist an den absoluten `runIdx` und den per-run Seed gekoppelt.
 
 **Einbindung:** Wird ausschließlich aus `simulator-monte-carlo.js` aufgerufen. Erwartet fertige Eingaben und Callbacks (Progress, Szenario-Analyzer) und nutzt `simulator-engine-wrapper.js` (delegiert an Direct Engine) für die Jahr-für-Jahr-Logik.
 
 **Dependencies:** `mc-run-context.js`, `mc-year-sampling.js`, `mc-life-events.js`, `mc-stress-tracker.js`, `mc-log-builder.js`, `mc-run-metrics.js`, `simulator-engine-wrapper.js`, `simulator-portfolio.js`, `simulator-health-bucket.js`, `simulator-results.js` (Portfolio-Helpers), `simulator-sweep-utils.js`, `simulator-utils.js`, `simulator-data.js`.
+
+## 3g. `tail-risk-contract.js` und `tail-risk-overlay.js`
+DOM-freier Contract und Overlay fuer seltene Fat-Tail-/Crash-Ereignisse in Monte Carlo.
+
+**Hauptfunktionen / Exporte:**
+- `normalizeTailRiskConfig()` – normalisiert Opt-in und Parametergrenzen ohne stilles Klemmen ungueltiger User-Werte.
+- `validateTailRiskHorizonCompatibility()` – blockiert Ereignisdauern, die den Simulationshorizont ueberschreiten.
+- `createTailRiskSchedule()` – erzeugt deterministische Ereignisfenster aus Run-Seed, Wahrscheinlichkeit, Dauer und Cooldown.
+- `applyTailRiskOverlay()` – erzeugt effektive Jahresdaten ohne Mutation der historischen Quelle und skippt historische Krisenjahre.
+
+**Einbindung:** `simulator-portfolio-inputs.js` liest die UI-Felder und nutzt den Contract, `simulator-input-validation.js` blockiert ungueltige Werte, `monte-carlo-runner.js` wendet das Overlay im Jahresloop an, `mc-run-metrics.js` und `monte-carlo-aggregates.js` liefern `extraKPI.tailRisk`.
 
 ## 3a. `mc-run-context.js`
 DOM-freie Chunk-Kontext-Erzeugung fuer den Monte-Carlo-Runner.
@@ -112,7 +124,7 @@ DOM-freie Run-Ende-Metrikfortschreibung fuer Monte-Carlo.
 **Hauptfunktionen / Exporte:**
 - `createMonteCarloRunMetrics()` – initialisiert Pflege-Listen, Care-Year-Arrays, Worst-Run-Container, `runMeta` und globale Zaehler.
 - `recordMonteCarloRunOutcome()` – schreibt pro Run Ergebnisbuffer, Pflege-Listen, Pflegebucket-Nutzung/Erschoepfung, Safety-Run-Zaehler, Worst-Run-Auswahl und `runMeta` fort.
-- `finalizeMonteCarloRunMetrics()` – baut die bestehenden `totals`, `lists`, Worst-Runs, `allRealWithdrawalsSample` und `runMeta` inklusive Pflegebucket-Zaehlern und -Listen fuer die Chunk-Rueckgabe.
+- `finalizeMonteCarloRunMetrics()` – baut die bestehenden `totals`, `lists`, Worst-Runs, `allRealWithdrawalsSample` und `runMeta` inklusive Pflegebucket- und Tail-Risk-Zaehlern fuer die Chunk-Rueckgabe.
 
 **Einbindung:** Wird von `monte-carlo-runner.js` am Run-Ende genutzt. Buffer-Namen, Worker-Payloads, Aggregat-Shape und `runMeta` bleiben kompatibel; Pflegebucket-Metriken sind additive Felder.
 
@@ -276,6 +288,7 @@ Aggregation der Monte-Carlo-Ausgabe, Orchestrierung von KPI-Berechnung und Rende
 - Pflege-KPI-Dashboard mit Dual-Care-Metriken
 - enthält zusätzlich Metriken für `taxSavedByLossCarry` aus Sweep/MC-Ergebnissen
 - enthält zusätzlich Pflegebucket-KPIs aus MC-Ergebnissen: Nutzungsquote, Erschoepfungsquote, Median-/P90-Nutzung, Median-Restbucket, Zieldeckung und Zielluecke
+- enthält bei aktivem Tail-Risk-Overlay zusaetzliche KPI-Karten fuer aktive/applizierte Runs, aktive/applizierte Jahresanteile und historische Krisen-Skips; Scenario-Log-JSON/CSV exportiert die Tail-Event-Felder unverkuerzt aus den Row-Daten.
 
 **Dependencies:** `simulator-utils.js`, `simulator-heatmap.js`, `simulator-data.js`, `results-metrics.js`, `results-renderers.js`, `results-formatting.js`.
 
@@ -703,6 +716,7 @@ app/simulator/simulator-main.js
 3. `mc-run-context.js`: Bereitet Chunk-Kontext, RNG, Buffers, Sampling-Konfiguration und Progress-Intervall vor.
 4. `mc-year-sampling.js`: Liefert Startjahr-/CAPE-Sampling und CDF-/Sampler-Helfer.
 5. `mc-life-events.js`: Initialisiert den Run-Life-State fuer Care-Meta, Partnerstatus, Care-RNGs und HouseholdContext.
+6. `tail-risk-overlay.js`: Wendet bei explizitem Opt-in ein deterministisches Tail-Risk-Ereignisfenster auf die gezogenen Jahresdaten an, ohne historische Daten zu mutieren.
 6. `mc-stress-tracker.js`: Kapselt Stress-Metrik-Initialisierung, Jahresfortschreibung und Buffer-Schreibung.
 7. `mc-log-builder.js`: Baut Ruin-, Jahres- und Todesfall-Logzeilen mit zentralen Alive-/Care-Feldern.
 8. `mc-run-metrics.js`: Schreibt Run-Ende-KPIs, Pflege-Listen, Worst-Runs und `runMeta` fort.

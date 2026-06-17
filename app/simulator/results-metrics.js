@@ -76,7 +76,7 @@ export function buildSummaryData({ results, totalRuns, failCount }) {
  * @param {Object} results - Ergebnisobjekt der Monte-Carlo-Simulation.
  * @returns {{ primary: Array<KpiDescriptor>, detailSections: Array<{title: string, kpis: Array<KpiDescriptor>}> }} Struktur für die KPI-Dashboards.
  */
-export function buildKpiDashboard(results) {
+export function buildKpiDashboard(results, inputs = {}) {
     const deQuote = Number(results?.depotErschoepfungsQuote) || 0;
     // Severity thresholds tuned for UI color coding.
     const depotTone = deQuote > 20 ? 'danger' : (deQuote > 5 ? 'warning' : 'success');
@@ -134,6 +134,14 @@ export function buildKpiDashboard(results) {
         detailSections.push({
             title: 'Risiko-Details',
             kpis: risikoKpis
+        });
+    }
+
+    const tailRiskKpis = buildTailRiskKpis(results, inputs);
+    if (tailRiskKpis.length > 0) {
+        detailSections.push({
+            title: 'Tail-Risk-Overlay',
+            kpis: tailRiskKpis
         });
     }
 
@@ -271,7 +279,7 @@ export function buildCareMetrics(results, inputs) {
 export function prepareMonteCarloViewModel({ results, totalRuns, failCount, inputs }) {
     return {
         summaryCards: buildSummaryData({ results, totalRuns, failCount }),
-        kpiDashboard: buildKpiDashboard(results),
+        kpiDashboard: buildKpiDashboard(results, inputs),
         stressMetrics: buildStressMetrics(results?.stressKPI),
         careMetrics: buildCareMetrics(results, inputs),
         heatmapData: {
@@ -378,6 +386,54 @@ function buildRiskKpis(results) {
         }
     }
     return kpis;
+}
+
+function buildTailRiskKpis(results, inputs = {}) {
+    const tailRisk = results?.extraKPI?.tailRisk;
+    if (!tailRisk || inputs?.tailRiskEnabled !== true) {
+        return [];
+    }
+
+    const activeYearsPct = Number.isFinite(tailRisk.activeYearShare)
+        ? tailRisk.activeYearShare * 100
+        : 0;
+    const appliedYearsPct = Number.isFinite(tailRisk.appliedYearShare)
+        ? tailRisk.appliedYearShare * 100
+        : 0;
+    const skipCount = Number(tailRisk.skippedHistoricalCrisisYears) || 0;
+
+    return [
+        {
+            title: 'Tail-Risk-Läufe aktiv',
+            value: formatPercentage(tailRisk.runActiveRatePct),
+            description: 'Anteil der Läufe mit mindestens einem geplanten Tail-Risk-Ereignis.',
+            tone: tailRisk.runActiveRatePct > 0 ? 'warning' : 'default'
+        },
+        {
+            title: 'Tail-Risk angewandt',
+            value: formatPercentage(tailRisk.runAppliedRatePct),
+            description: 'Anteil der Läufe, in denen mindestens ein Schock tatsächlich auf ein Nicht-Krisenjahr angewandt wurde.',
+            tone: tailRisk.runAppliedRatePct > 0 ? 'danger' : 'default'
+        },
+        {
+            title: 'Aktive Tail-Jahre',
+            value: formatPercentage(activeYearsPct),
+            description: `${tailRisk.activeYears || 0} von ${tailRisk.evaluatedYears || 0} simulierten Jahren lagen in einem Tail-Risk-Ereignisfenster.`,
+            tone: activeYearsPct > 0 ? 'warning' : 'default'
+        },
+        {
+            title: 'Applizierte Tail-Jahre',
+            value: formatPercentage(appliedYearsPct),
+            description: `${tailRisk.appliedYears || 0} Jahre erhielten den Return-/Inflationsschock.`,
+            tone: appliedYearsPct > 0 ? 'danger' : 'default'
+        },
+        {
+            title: 'Historische Krisen-Skips',
+            value: formatNumberWithUnit(skipCount),
+            description: 'Geplante Tail-Schocks, die wegen historischer Krisenjahre nicht additiv angewandt wurden.',
+            tone: skipCount > 0 ? 'warning' : 'default'
+        }
+    ];
 }
 
 /**

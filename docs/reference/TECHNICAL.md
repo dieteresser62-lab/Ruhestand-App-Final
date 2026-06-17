@@ -299,6 +299,13 @@ Dynamic-Flex ist entlang der Simulator-Pipeline konsistent aktiviert:
 * Die Gewichtung beeinflusst Startjahr und laufende Jahresdaten (Regime/Block/IID).
 * CAPE-Sampling hat Vorrang; wenn aktiv, wird die Startjahr-Gewichtung ignoriert.
 
+**Tail-Risk-Overlay**
+* Das optionale Fat-Tail-/Crash-Overlay ist im Simulator ein explizites Opt-in und bleibt im Default deaktiviert. Version 1 nutzt Ereignis-Injektion pro Run mit validierten Grenzen: Wahrscheinlichkeit 0-5% p.a., Aktien-Schock -60% bis 0%, Inflationsschock 0-15%, Dauer 1-5 Jahre und Cooldown 0-20 Jahre.
+* `app/simulator/tail-risk-contract.js` normalisiert und validiert die Parameter; `tail-risk-overlay.js` erzeugt pro `runIdx`/Run-Seed eine deterministische Schedule. `monte-carlo-runner.js` wendet das Overlay nicht-mutierend auf die gezogenen Jahresdaten an.
+* Anti-Doppelpessimismus: Historische Krisenjahre (Aktienrendite <= -25%, Inflation >= 8% oder Regime `bear_deep`/`crash`/`stagflation`) erhalten keinen zusaetzlichen Return-Schock. Effektive Aktienrendite ist auf mindestens -65%, effektive Inflation auf maximal 15% begrenzt.
+* Aggregation: `mc-run-metrics.js` sammelt aktive/applizierte/skipped Tail-Jahre log-unabhaengig; Worker-/Chunk-Merge summiert die Totals; `monte-carlo-aggregates.js` stellt `extraKPI.tailRisk` bereit. Die UI zeigt diese Kennzahlen nur bei aktiviertem Overlay.
+* Beispielvergleich: Standardlauf und Tail-Risk-Lauf sollten mit gleicher Run-Zahl, Seed, Methode, CAPE-/Startjahr-Einstellung und Portfolioannahmen verglichen werden. Zu dokumentierende Felder sind Erfolgsquote bzw. Failure Rate, P10/P50/P90-Endvermoegen, Max Drawdown, Real-CaR, `runActiveRatePct`, `runAppliedRatePct`, aktive/applizierte Jahresanteile und historische Krisen-Skips. Erwartung: Standardlauf hat Tail-Risk-KPIs 0; Tail-Risk kann Erfolgsquote und Perzentile verschlechtern und muss als Stressannahme, nicht Prognose, interpretiert werden.
+
 ### Worker-Architektur (Monte Carlo, Sweep, Auto-Optimize)
 
 Die Parallelisierung basiert auf Web-Workern und einer gemeinsamen Pool-Schicht:
@@ -318,6 +325,7 @@ Die Parallelisierung basiert auf Web-Workern und einer gemeinsamen Pool-Schicht:
 * `ScenarioAnalyzer` wählt Worst-/Perzentil-/Pflege- und Zufalls-Szenarien aus.
 * Monte-Carlo-Scenario-Logs und Backtest-Logs nutzen dieselben additiven Entnahme-/Payout-/VPW-Felder (`entnahme_plan`, `entnahme_effektiv`, `vpw_total`, `vpw_dynamic_flex`, `static_flex_baseline`, `liq_before_payout`, `liq_after_payout`, `liq_after_interest`, `portfolio_total_before_payout`, `portfolio_total_end`). Renderer zeigen diese Spalten nur im detaillierten Logmodus; die Normalansicht bleibt unveraendert.
 * Im detaillierten Logmodus werden VPW-Return-Policy-Felder synchron angezeigt: `RetPol`, `RetSrc`, `CAPESt`, `ERRaw`, `ERClamp`, `SafeR`, `SafeSrc`. Damit sind Legacy- und Continuous-Renditeherleitung in Backtest und Scenario-Log vergleichbar.
+* Monte-Carlo-Scenario-Log-Exports schreiben die Row-Struktur unverkuerzt als JSON bzw. mit allen vorhandenen Row-Keys als CSV. Tail-Risk-Felder (`tailRiskActive`, `tailRiskApplied`, Event-ID/-Typ, historische und effektive Return-/Inflationswerte, Skip-Grund) sind dadurch im Export enthalten, sobald ein Scenario-Log aus einem Tail-Risk-Lauf exportiert wird.
 
 **Performance-Details**
 * Chunk-Größe wird über ein Zeitbudget dynamisch angepasst (glatt gefiltert), um kurze und lange Jobs auszugleichen.

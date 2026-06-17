@@ -1,5 +1,7 @@
 "use strict";
 
+import { validateTailRiskHorizonCompatibility } from './tail-risk-contract.js';
+
 export class SimulatorValidationError extends Error {
     constructor(message, errors = []) {
         super(message);
@@ -9,26 +11,51 @@ export class SimulatorValidationError extends Error {
 }
 
 export function validateSimulatorInputs(inputs = {}) {
+    const errors = [];
     const minimumFlexAnnualRaw = Number(inputs.minimumFlexAnnual);
     const minimumFlexAnnual = Number.isFinite(minimumFlexAnnualRaw) ? minimumFlexAnnualRaw : 0;
     const startFlexBedarfRaw = Number(inputs.startFlexBedarf);
     const startFlexBedarf = Number.isFinite(startFlexBedarfRaw) ? startFlexBedarfRaw : 0;
 
     if (minimumFlexAnnual < 0) {
-        throw new SimulatorValidationError(
-            'Mindest-Flex p.a. darf nicht negativ sein.',
-            [
-                { fieldId: 'minimumFlexAnnual', message: 'Mindest-Flex p.a. darf nicht negativ sein.' }
-            ]
-        );
+        errors.push({ fieldId: 'minimumFlexAnnual', message: 'Mindest-Flex p.a. darf nicht negativ sein.' });
     }
     if (minimumFlexAnnual > startFlexBedarf) {
+        errors.push(
+            { fieldId: 'minimumFlexAnnual', message: 'Mindest-Flex p.a. darf nicht größer als Flex-Bedarf p.a. sein.' },
+            { fieldId: 'startFlexBedarf', message: 'Flex-Bedarf p.a. ist die Obergrenze für Mindest-Flex.' }
+        );
+    }
+
+    const tailRiskValidation = validateTailRiskHorizonCompatibility(inputs, inputs.tailRiskHorizonYears);
+    const tailRiskInputErrors = Array.isArray(inputs.tailRiskValidationErrors)
+        ? inputs.tailRiskValidationErrors
+        : [];
+    if (!tailRiskValidation.valid) {
+        for (const error of tailRiskValidation.errors) {
+            errors.push({
+                fieldId: error.fieldId,
+                message: error.message || 'Ungueltiger Tail-Risk-Parameter.'
+            });
+        }
+    }
+    if (tailRiskInputErrors.length > 0) {
+        for (const error of tailRiskInputErrors) {
+            const alreadyReported = errors.some(existing => existing.fieldId === error.fieldId && existing.message === error.message);
+            if (!alreadyReported) {
+                errors.push({
+                    fieldId: error.fieldId,
+                    message: error.message || 'Ungueltiger Tail-Risk-Parameter.'
+                });
+            }
+        }
+    }
+
+    if (errors.length > 0) {
+        const first = errors[0];
         throw new SimulatorValidationError(
-            'Mindest-Flex p.a. darf nicht größer als Flex-Bedarf p.a. sein.',
-            [
-                { fieldId: 'minimumFlexAnnual', message: 'Mindest-Flex p.a. darf nicht größer als Flex-Bedarf p.a. sein.' },
-                { fieldId: 'startFlexBedarf', message: 'Flex-Bedarf p.a. ist die Obergrenze für Mindest-Flex.' }
-            ]
+            first?.message || 'Ungueltige Simulator-Eingaben.',
+            errors
         );
     }
 
