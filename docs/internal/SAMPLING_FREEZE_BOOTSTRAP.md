@@ -1,7 +1,7 @@
 # Sampling-Freeze: Bootstrap Pfadgenerierung
 
 **Freeze-Datum:** 2026-06-17  
-**Commit-Hash:** `a10377f` (bzw. nachfolgender Dokumentations-Commit)  
+**Commit-Hash:** `b7d85b7`  
 **Status:** freigegeben  
 **Autor:** Gemini / Antigravity  
 
@@ -43,5 +43,5 @@ Für die nachfolgende Stress- und Crashmodellierung (Paket 5) wird vereinbart:
 ---
 
 ## 6. Freigabe-Entscheidung
-* **Status:** Freigegeben für Paket 5 (unter der Voraussetzung, dass der Blocker aus dem Baseline-Freeze bezüglich `returnPolicy` behoben ist).
+* **Status:** Freigegeben für Paket 5. Blocker behoben und verifiziert.
 * **Pre-Mortem:** Angenommen, das Zusammenspiel zwischen Stationary Bootstrap und Fat-Tail führt in 3 Monaten zu Fehlern: Die wahrscheinlichste Ursache ist eine asynchrone Handhabung des per-run Seeds bei Web-Worker-Chunking, wenn durch stochastische Crash-Injektionen die Anzahl der RNG-Abrufe zwischen den Pfadgeneratoren auseinanderdriftet.

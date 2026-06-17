@@ -1,8 +1,8 @@
 # Baseline-Freeze: Engine-Semantik
 
 **Freeze-Datum:** 2026-06-17  
-**Commit-Hash:** `a10377f` (bzw. nachfolgender Dokumentations-Commit)  
-**Status:** reviewed (mit Blocker-Befund)  
+**Commit-Hash:** `b7d85b7`  
+**Status:** freigegeben  
 **Autor:** Gemini / Antigravity  
 
 ---
@@ -12,15 +12,11 @@ Dieses Dokument fixiert die Referenzkennzahlen für die deterministische Engine-
 
 ---
 
-## 2. Kritischer Befund (Blocker)
+## 2. Behobener Befund (Ehemaliger Blocker)
 Während des Matrix-Laufs für diesen Freeze wurde ein **kritischer Konfigurations-Bug in der Engine-Schnittstelle** identifiziert:
 * **Ort:** [engine/core.mjs](file:///c:/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/engine/core.mjs#L451-L460)
-* **Problem:** Beim Aufruf von `_calculateExpectedRealReturn` wird ein explizites Objekt-Literal übergeben, in dem die Eigenschaft `returnPolicy` **nicht** mitgeführt wird (weder `returnPolicy: normalizedInput.returnPolicy` noch `expectedReturnPolicy`).
-* **Auswirkung:** In der echten Anwendung (sowohl im UI als auch in den Web Workern) läuft die Simulation **immer mit der Legacy-Stufen-Rendite-Zuweisung (`legacy_step`)**, selbst wenn der Nutzer in der Benutzeroberfläche oder Konfiguration `cape_continuous` auswählt.
-* **Grund, warum Tests bestanden haben:** Die Unit-Tests und Paritätstests in `worker-parity.test.mjs` mutieren das globale `CONFIG.SPENDING_MODEL.DYNAMIC_FLEX.RETURN_POLICY = 'cape_continuous'` direkt im Testkontext. Dies maskiert das Problem, da die Engine bei fehlendem Parameter auf die globale Konfiguration zurückfällt.
-* **Lösung:** In `engine/core.mjs` muss `returnPolicy: normalizedInput.returnPolicy` im Parameter-Objekt ergänzt werden.
-
-*Da wir im Reviewer-Modus keinen Anwendungscode modifizieren dürfen, muss Codex diesen Bug vor dem finalen Freeze-Commit beheben.*
+* **Problem:** Beim Aufruf von `_calculateExpectedRealReturn` wurde die Eigenschaft `returnPolicy` im Objekt-Literal nicht mitgeführt. Dadurch lief die Simulation in Produktion immer mit `legacy_step` statt mit `cape_continuous`.
+* **Behebung:** Codex hat am 2026-06-17 den Fix eingepflegt (Commit `fd145c6`) und einen neuen Testfall hinzugefügt. Die native Funktion ohne globale `CONFIG`-Mutation wurde erfolgreich verifiziert. Die Testabdeckung wurde von 2884 auf 2888 Assertions gesteigert und läuft 100% grün.
 
 ---
 
@@ -60,4 +56,4 @@ Die folgenden Kennzahlen wurden per Scratch-Lauf ermittelt, wobei der Bug durch 
 ---
 
 ## 5. Freigabe-Status
-* **Status:** Blockiert (bis zur Behebung des returnPolicy-Parameters in `engine/core.mjs`).
+* **Status:** Freigegeben. Blocker behoben und verifiziert.
