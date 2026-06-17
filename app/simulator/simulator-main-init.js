@@ -17,7 +17,7 @@ import { initResetButton } from './simulator-main-reset.js';
 import { initPartnerToggle } from './simulator-main-partner.js';
 import { initStressPresetOptions } from './simulator-main-stress.js';
 import { initSimulatorProfileSelection } from './simulator-main-profiles.js';
-import { initMonteCarloStartYearControls } from './monte-carlo-ui.js';
+import { initMonteCarloMethodControls, initMonteCarloStartYearControls } from './monte-carlo-ui.js';
 import { initThreeBucketControls } from './simulator-main-3bucket.js';
 
 /**
@@ -49,12 +49,6 @@ export function initializeSimulatorApp() {
     initThreeBucketControls();
     initializePflegeUIControls();
 
-    const mcMethodeSelect = document.getElementById('mcMethode');
-    mcMethodeSelect.addEventListener('change', () => {
-        // Block size only applies to block bootstrap sampling.
-        document.getElementById('mcBlockSize').disabled = mcMethodeSelect.value !== 'block';
-    });
-
     initRentAdjModeUI();
 
     initPartnerToggle();
@@ -64,9 +58,8 @@ export function initializeSimulatorApp() {
     initializeBacktestUI();
 
     initStressPresetOptions();
+    initMonteCarloMethodControls();
     initMonteCarloStartYearControls();
-
-    document.getElementById('mcBlockSize').disabled = mcMethodeSelect.value !== 'block';
 
     initSweepUIControls();
     initTabSwitching();

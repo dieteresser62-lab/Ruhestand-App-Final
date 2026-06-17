@@ -73,7 +73,7 @@ Die Ruhestand-Suite kombiniert folgende Funktionen:
 
 ## Bekannte Einschränkungen
 
-- Kein Stationary Bootstrap (nur Block-Bootstrap)
+- Stationary Bootstrap ist implementiert, aber noch ohne explizites Fat-Tail-Overlay
 - Keine expliziten Fat Tails im Return-Modell
 - Index-Variante (`msci_eur`) siehe Abschnitt C.3.3
 
@@ -1401,6 +1401,12 @@ function sampleNextYearData(state, method, blockSize, rand, stressCtx) {
     }
 }
 ```
+
+**Strategie 3a: Stationary Bootstrap**
+
+Der Simulator bietet zusaetzlich `stationary` als Stationary Bootstrap nach Politis/Romano an. Das bestehende UI-Feld `mcBlockSize` wird dabei als erwartete Blocklaenge interpretiert. Pro Simulationsjahr wird deterministisch entschieden, ob ein neuer historischer Blockstart gezogen wird (`p = 1 / expectedBlockLength`) oder ob der aktuelle historische Block sequenziell fortgesetzt wird. Am Datenende wird ein neuer Blockstart erzwungen; ein Wrap-around vom letzten zum ersten historischen Jahr findet nicht statt.
+
+Startjahrfilter, Recency-Gewichtung und CAPE-Sampling greifen nur bei neuen Blockstarts. Innerhalb eines laufenden Blocks wird das naechste historische Jahr ohne erneute Gewichtung genutzt, damit lokale Autokorrelation erhalten bleibt. Der Sampler-State wird pro Monte-Carlo-Run initialisiert und ist dadurch mit Worker-Chunks paritaetisch.
 
 **Strategie 4: Regime-basiert**
 ```javascript
@@ -2833,7 +2839,7 @@ Die Stärke des Buckets ist nicht, dass er mehr Vermögen erzeugt. Er erhöht Mo
 
 **Stand der Forschung:** Block-Bootstrap erhält Autokorrelation; Stationary Bootstrap (Politis/Romano) wird in der Literatur häufig als geeignete Alternative eingeordnet.
 
-**Status:** ✅ Block-Bootstrap implementiert, ⚠️ kein Stationary Bootstrap
+**Status:** ✅ Block-Bootstrap und Stationary Bootstrap implementiert. Stationary Bootstrap nutzt variable Blocklaengen mit deterministischem per-run Sampler-State; Fat-Tail-/Crash-Overlays bleiben separat.
 
 ## E.6 Fat Tails / Regime Switching
 

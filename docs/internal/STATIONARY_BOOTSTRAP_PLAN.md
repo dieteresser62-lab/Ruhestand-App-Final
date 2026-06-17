@@ -1,7 +1,7 @@
 # Arbeitsdokument: Stationary Bootstrap ergaenzen
 
 **Stand:** 2026-06-16  
-**Status:** Slice 4 freigegeben
+**Status:** Slice 5 implementiert, Review ausstehend
 **Autor:** Codex  
 **Verbesserungspunkt:** 3 - Stationary Bootstrap ergaenzen  
 **Geplanter Feature-Branch:** `codex/stationary-bootstrap`  
@@ -47,7 +47,7 @@ Relevante Bereiche:
 - `workers/mc-worker.js`: Worker-Payload und Runner-Aufruf.
 - Tests: `monte-carlo-sampling.test.mjs`, `monte-carlo-startyear.test.mjs`, `simulator-monte-carlo.test.mjs`, `worker-parity.test.mjs`.
 
-Die Doku nennt derzeit "Kein Stationary Bootstrap" als bekannte Einschraenkung.
+Die Doku nannte vor Slice 5 "Kein Stationary Bootstrap" als bekannte Einschraenkung; dieser Stand wurde mit Slice 5 aktualisiert.
 
 ## Fachlicher Hintergrund
 
@@ -250,7 +250,7 @@ Sampler-State-Contract:
 2. `SLICE_STATIONARY_BOOTSTRAP_02_SAMPLER.md`: DOM-freier Sampler und Unit-Tests. Status: freigegeben.
 3. `SLICE_STATIONARY_BOOTSTRAP_03_RUNNER.md`: Runner-Integration serial. Status: freigegeben.
 4. `SLICE_STATIONARY_BOOTSTRAP_04_WORKER_PARITY.md`: Worker-Payload und Paritaet. Status: freigegeben.
-5. `SLICE_STATIONARY_BOOTSTRAP_05_UI_DOCS.md`: UI, Persistenz, Doku, Browser-Smoke.
+5. `SLICE_STATIONARY_BOOTSTRAP_05_UI_DOCS.md`: UI, Persistenz, Doku, Browser-Smoke. Status: implementiert, Review ausstehend.
 
 ### Reviewer-Pruefauftrag
 

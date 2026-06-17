@@ -21,7 +21,10 @@ export function initInputPersistence() {
         'pflegefallLogikAktivieren', 'pflegeModellTyp', ...CARE_GRADE_FIELD_IDS,
         'pflegeMaxFloor', 'pflegeRampUp', 'pflegeMinDauer', 'pflegeMaxDauer', 'pflegeKostenDrift',
         'pflegeRegionalZuschlag', 'pflegeKostenStaffelPreset',
-        'entnahmeStrategie', 'bondTargetFactor', 'drawdownTrigger', 'bondRefillThreshold'
+        'entnahmeStrategie', 'bondTargetFactor', 'drawdownTrigger', 'bondRefillThreshold',
+        'mcAnzahl', 'mcDauer', 'mcBlockSize', 'mcSeed', 'mcMethode', 'rngMode',
+        'mcWorkerCount', 'mcWorkerBudget', 'useCapeSampling',
+        'mcStartYearMode', 'mcStartYearFilter', 'mcStartYearHalfLife', 'mcExcludeEstimatedHistory'
     ];
     allInputs.forEach(id => {
         const element = document.getElementById(id);

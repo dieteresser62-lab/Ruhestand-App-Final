@@ -52,7 +52,7 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 * Tastenkürzel u. a. für Jahresabschluss (`Alt` + `J`) und Marktdaten nachrücken (`Alt` + `N`).
 
 ### Simulator
-* Monte-Carlo-Simulationen mit unterschiedlichen Renditequellen (historisch, Regime, Block-Bootstrap) inkl. Worker-Parallelisierung. Historische Daten reichen bis 1925 (Schwarze-Schwan-Phase optional per Filter/Recency abgewichtbar).
+* Monte-Carlo-Simulationen mit unterschiedlichen Renditequellen (historisch, Regime, Block-Bootstrap, Stationary Bootstrap) inkl. Worker-Parallelisierung. Historische Daten reichen bis 1925 (Schwarze-Schwan-Phase optional per Filter/Recency abgewichtbar).
 * Monte-Carlo-Runner ist DOM-frei modularisiert; Chunk-Kontext, Startjahr-/CAPE-Sampling, Life-State-Initialisierung, Stress-Metriken, Logzeilen-Builder und Run-Metriken liegen in eigenen Simulator-Modulen.
 * **Parameter-Sweep mit Auto-Optimize:** Whitelist-Ansatz, Deep-Clones und Wächterlogik für Zwei-Personen-Setups. Worker-Parallelisierung fuer Sweep und Auto-Optimize, mehrphasige Optimierung mit LHS, Quick-Filter, voller Evaluation, Refinement und Validierung (~8-10x schneller), dynamische Parameter-UI (1-7 Parameter), Preset-Konfigurationen und Champion-Config-Output für die Strategiefindung. Details siehe `docs/reference/AUTO_OPTIMIZE_DETAILS.md`.
 * **Dynamic-Flex (VPW) Profile:** Profilsteuerung (`Aus`, `Defensiv`, `Ausgewogen`, `Offensiv`) mit optionalen erweiterten Parametern für `horizonYears`, `survivalQuantile` und `goGoMultiplier`.

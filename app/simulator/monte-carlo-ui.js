@@ -1,5 +1,7 @@
 "use strict";
 
+import { STATIONARY_BOOTSTRAP_METHOD } from './stationary-bootstrap-contract.js';
+
 /**
  * Stellt alle DOM-Interaktionen für die Monte-Carlo-Simulation bereit.
  * Kapselt UI-spezifische Logik (Validierung, Progress-Anzeige, Button-Zustände)
@@ -174,7 +176,11 @@ export function readMonteCarloParameters() {
 
     const anzahl = readIntegerInput('mcAnzahl', 'Anzahl der Simulationen', { min: 1 });
     const maxDauer = readIntegerInput('mcDauer', 'Simulationsdauer in Jahren', { min: 1 });
-    const blockSize = readIntegerInput('mcBlockSize', 'Blockgröße', { min: 1 });
+    const blockSizeDescription = methode === STATIONARY_BOOTSTRAP_METHOD ? 'Erwartete Blocklänge' : 'Blockgröße';
+    const blockSizeOptions = methode === STATIONARY_BOOTSTRAP_METHOD
+        ? { min: 1, max: 30 }
+        : { min: 1 };
+    const blockSize = readIntegerInput('mcBlockSize', blockSizeDescription, blockSizeOptions);
     const seed = readIntegerInput('mcSeed', 'Zufalls-Seed', { defaultValue: 0 });
     const rngModeElement = document.getElementById('rngMode');
     const rngMode = rngModeElement ? rngModeElement.value : 'per-run-seed';
@@ -197,6 +203,34 @@ export function readMonteCarloParameters() {
     const excludeEstimatedHistory = excludeEstimatedHistoryElement?.checked === true;
 
     return { anzahl, maxDauer, blockSize, seed, methode, rngMode, startYearMode, startYearFilter, startYearHalfLife, excludeEstimatedHistory };
+}
+
+export function initMonteCarloMethodControls() {
+    const methodElement = document.getElementById('mcMethode');
+    const blockSizeElement = document.getElementById('mcBlockSize');
+    if (!methodElement || !blockSizeElement) return;
+
+    const blockSizeLabel = document.getElementById('mcBlockSizeLabel');
+    const fixedBlockTitle = 'Länge der historischen Blöcke für Block-Bootstrap';
+    const stationaryTitle = 'Erwartete mittlere Blocklänge für Stationary Bootstrap (1-30 Jahre)';
+    const disabledTitle = 'Nur bei Block-Bootstrap oder Stationary Bootstrap relevant';
+
+    const updateControls = () => {
+        const method = methodElement.value;
+        const usesBlockLength = method === 'block' || method === STATIONARY_BOOTSTRAP_METHOD;
+        blockSizeElement.disabled = !usesBlockLength;
+
+        if (method === STATIONARY_BOOTSTRAP_METHOD) {
+            if (blockSizeLabel) blockSizeLabel.textContent = 'Erwartete Blocklänge (Jahre)';
+            blockSizeElement.title = stationaryTitle;
+        } else {
+            if (blockSizeLabel) blockSizeLabel.textContent = 'Blockgröße (Jahre)';
+            blockSizeElement.title = method === 'block' ? fixedBlockTitle : disabledTitle;
+        }
+    };
+
+    methodElement.addEventListener('change', updateControls);
+    updateControls();
 }
 
 export function initMonteCarloStartYearControls() {

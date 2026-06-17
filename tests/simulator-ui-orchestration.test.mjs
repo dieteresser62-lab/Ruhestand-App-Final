@@ -203,7 +203,8 @@ async function runSimulatorUiOrchestrationTests() {
         stressModule,
         persistModule,
         sweepUiModule,
-        optimizerModule
+        optimizerModule,
+        monteCarloUiModule
     ] = await Promise.all([
         import('../app/simulator/simulator-main.js'),
         import('../app/simulator/simulator-main-tabs.js'),
@@ -212,7 +213,8 @@ async function runSimulatorUiOrchestrationTests() {
         import('../app/simulator/simulator-main-stress.js'),
         import('../app/simulator/simulator-main-input-persist.js'),
         import('../app/simulator/simulator-main-sweep-ui.js'),
-        import('../app/simulator/simulator-optimizer.js')
+        import('../app/simulator/simulator-optimizer.js'),
+        import('../app/simulator/monte-carlo-ui.js')
     ]);
 
     void mainModule;
@@ -353,6 +355,27 @@ async function runSimulatorUiOrchestrationTests() {
         assertEqual(documentRef.getElementById('targetEq').value, 65, 'Optimizer uebernimmt Ziel-Aktienquote');
         assertEqual(documentRef.getElementById('goldZielProzent').value, 5, 'Optimizer uebernimmt Gold-Zielquote');
         assertEqual(documentRef.getElementById('goldAktiv').checked, true, 'Gold wird bei Zielquote > 0 aktiviert');
+    }
+
+    console.log('Test 7: Monte-Carlo method controls expose Stationary Bootstrap block length semantics');
+    {
+        const methodSelect = registerElement(documentRef, 'mcMethode', { tagName: 'select', value: 'regime_markov' });
+        const blockSizeInput = registerElement(documentRef, 'mcBlockSize', { value: '5' });
+        const blockSizeLabel = registerElement(documentRef, 'mcBlockSizeLabel', { tagName: 'label' });
+
+        persistModule.initInputPersistence();
+        monteCarloUiModule.initMonteCarloMethodControls();
+        assertEqual(blockSizeInput.disabled, true, 'Regime-Methoden deaktivieren Blocklaengenfeld');
+        assertEqual(blockSizeLabel.textContent, 'Blockgröße (Jahre)', 'Regime-Methoden behalten neutrales Blockgroessenlabel');
+
+        methodSelect.value = 'stationary';
+        methodSelect.dispatchEvent({ type: 'change' });
+        assertEqual(blockSizeInput.disabled, false, 'Stationary Bootstrap aktiviert Blocklaengenfeld');
+        assertEqual(blockSizeLabel.textContent, 'Erwartete Blocklänge (Jahre)', 'Stationary Bootstrap zeigt erwartete Blocklaenge');
+        assert(blockSizeInput.title.includes('1-30'), 'Stationary Tooltip nennt erlaubten Parameterbereich');
+
+        methodSelect.dispatchEvent({ type: 'change' });
+        assertEqual(persistenceStorage.getItem('sim_mcMethode'), 'stationary', 'MC-Methode wird persistiert');
     }
 
     console.log('Simulator UI orchestration tests passed');
