@@ -449,6 +449,7 @@ function _internal_calculateModel(input, lastState) {
             dynamicFlexCfg.MAX_HORIZON_YEARS
         );
         const vpwReturnPolicy = _calculateExpectedRealReturn({
+            returnPolicy: normalizedInput.returnPolicy,
             capeRatio: normalizedInput.capeRatio,
             marketCapeRatio: normalizedInput.marketCapeRatio,
             expectedReturnCape: market.expectedReturnCape,
