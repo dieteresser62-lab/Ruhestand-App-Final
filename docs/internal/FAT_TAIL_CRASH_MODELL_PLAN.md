@@ -1,7 +1,7 @@
 # Arbeitsdokument: Fat-Tail- und Crash-Modell ergaenzen
 
 **Stand:** 2026-06-17  
-**Status:** Slice 2 implementiert, Review ausstehend  
+**Status:** Slice 3 implementiert, Review ausstehend
 **Autor:** Codex  
 **Verbesserungspunkt:** 4 - Fat-Tail-/Crash-Modell explizit ergaenzen  
 **Geplanter Feature-Branch:** `codex/fat-tail-crash-modell`  
@@ -316,7 +316,8 @@ Keine Mutation von `annualData`.
 | Slice | Status | Branch | Ergebnis |
 |---|---|---|---|
 | `SLICE_TAIL_RISK_01_CONTRACT.md` | freigegeben | `codex/fat-tail-crash-modell` | DOM-freier Contract fuer Ereignis-Injektion, Default `tailRiskEnabled=false`, Parametergrenzen, User-Input-Validierungsfehler, Krisenjahr-Skip-Erkennung, Effektivwert-Clamps und Klippen-Effekt-Test angelegt. Keine Runner-, Worker- oder UI-Verdrahtung. |
-| `SLICE_TAIL_RISK_02_OVERLAY_MODULE.md` | implementiert, Review ausstehend | `codex/fat-tail-crash-modell` | DOM-freies Overlay-Modul mit deterministischer Seed-/Horizont-Schedule, Duration-/Cooldown-Logik, nicht-mutierender Jahresdaten-Anwendung, historischem Krisenjahr-Skip und Event-Zusammenfassung. Keine Runner-, Worker- oder UI-Verdrahtung. |
+| `SLICE_TAIL_RISK_02_OVERLAY_MODULE.md` | freigegeben | `codex/fat-tail-crash-modell` | DOM-freies Overlay-Modul mit deterministischer Seed-/Horizont-Schedule, Duration-/Cooldown-Logik, nicht-mutierender Jahresdaten-Anwendung, historischem Krisenjahr-Skip und Event-Zusammenfassung. Keine Runner-, Worker- oder UI-Verdrahtung. |
+| `SLICE_TAIL_RISK_03_RUNNER_INTEGRATION.md` | implementiert, Review ausstehend | `codex/fat-tail-crash-modell` | Serieller Monte-Carlo-Runner erzeugt pro absolutem `runIdx` eine Tail-Schedule aus `makeRunSeed(seed, 0, runIdx)`, wendet das Overlay vor `simulateOneYear()` nicht-mutierend an und schreibt Tail-Event-/Effektivwert-/Skip-Felder in normale, Ruin- und Death-Logs. Worker, UI, Export und Ergebnis-KPIs bleiben Folge-Slices. |
 
 ### Reviewer-Pruefauftrag
 

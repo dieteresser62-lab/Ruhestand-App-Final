@@ -1,5 +1,26 @@
 import { sumDepot } from './simulator-portfolio.js';
 
+function buildTailRiskLogFields(tailRiskOverlay = null) {
+    return {
+        tailRiskActive: tailRiskOverlay?.tailRiskActive === true,
+        tailRiskApplied: tailRiskOverlay?.tailRiskApplied === true,
+        tailRiskSkippedReason: tailRiskOverlay?.tailRiskSkippedReason ?? null,
+        tailRiskEventType: tailRiskOverlay?.tailRiskEventType ?? null,
+        tailRiskEventId: tailRiskOverlay?.tailRiskEventId ?? null,
+        tailRiskEventYearOffset: tailRiskOverlay?.tailRiskEventYearOffset ?? null,
+        tailRiskReturnShockPct: tailRiskOverlay?.tailRiskReturnShockPct ?? 0,
+        tailRiskInflationShockPct: tailRiskOverlay?.tailRiskInflationShockPct ?? 0,
+        tailRiskHistoricalReturnPct: tailRiskOverlay?.historicalReturnPct ?? null,
+        tailRiskEffectiveReturnPct: tailRiskOverlay?.effectiveReturnPct ?? null,
+        tailRiskHistoricalInflationPct: tailRiskOverlay?.historicalInflationPct ?? null,
+        tailRiskEffectiveInflationPct: tailRiskOverlay?.effectiveInflationPct ?? null,
+        tailRiskHistoricalCrisis: tailRiskOverlay?.historicalCrisis === true,
+        tailRiskHistoricalCrisisReasons: Array.isArray(tailRiskOverlay?.historicalCrisisReasons)
+            ? tailRiskOverlay.historicalCrisisReasons.join(',')
+            : ''
+    };
+}
+
 function buildMonteCarloLifeLogFields({
     hasPartner,
     p1Alive,
@@ -46,12 +67,14 @@ export function buildMonteCarloRuinLogRow({
     simulationsJahr,
     yearData,
     inputs,
-    lifeLogContext
+    lifeLogContext,
+    tailRiskOverlay = null
 }) {
     return {
         jahr: simulationsJahr + 1,
         histJahr: yearData.jahr,
         inflation: yearData.inflation,
+        ...buildTailRiskLogFields(tailRiskOverlay),
         aktionUndGrund: '>>> RUIN <<<',
         wertAktien: 0,
         wertGold: 0,
@@ -80,12 +103,14 @@ export function buildMonteCarloYearLogRow({
     simulationsJahr,
     yearData,
     result,
-    lifeLogContext
+    lifeLogContext,
+    tailRiskOverlay = null
 }) {
     return {
         jahr: simulationsJahr + 1,
         histJahr: yearData.jahr,
         inflation: yearData.inflation,
+        ...buildTailRiskLogFields(tailRiskOverlay),
         ...result.logData,
         ...buildMonteCarloLifeLogFields(lifeLogContext),
         vpw: result.ui?.vpw || null
@@ -103,6 +128,7 @@ export function buildMonteCarloDeathLogRow({
         jahr: deathLogContext?.jahr ?? (currentRunLogLength + 1),
         histJahr: deathLogContext?.histJahr ?? null,
         inflation: deathLogContext?.inflation ?? null,
+        ...buildTailRiskLogFields(deathLogContext?.tailRiskOverlay ?? null),
         aktionUndGrund: '>>> ENDE: Alle Personen verstorben <<<',
         wertAktien: sumDepot({ depotTranchesAktien: portfolioSnapshot.depotTranchesAktien }),
         wertGold: sumDepot({ depotTranchesGold: portfolioSnapshot.depotTranchesGold }),

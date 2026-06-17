@@ -956,4 +956,105 @@ const emptyLists = {
     assert(sampleRow && Number.isFinite(Number(sampleRow.taxSavedByLossCarry)), 'Log rows should expose numeric taxSavedByLossCarry');
 }
 
+// --- TEST 17: Tail-risk overlay is applied and logged in serial MC ---
+{
+    const inputs = {
+        ...buildBasicInputs(),
+        tailRiskEnabled: true,
+        tailRiskAnnualProbabilityPct: 5,
+        tailRiskReturnShockPct: -35,
+        tailRiskInflationShockPct: 6,
+        tailRiskDurationYears: 1,
+        tailRiskCooldownYears: 0
+    };
+    const monteCarloParams = {
+        anzahl: 1,
+        maxDauer: 4,
+        blockSize: 1,
+        seed: 2,
+        methode: 'block',
+        rngMode: 'per-run-seed',
+        startYearMode: 'UNIFORM'
+    };
+    const chunk = await runMonteCarloChunk({
+        inputs,
+        monteCarloParams,
+        widowOptions: { mode: 'stop', percent: 0, marriageOffsetYears: 0, minMarriageYears: 0 },
+        useCapeSampling: false,
+        runRange: { start: 0, count: 1 },
+        logIndices: [0],
+        engine: EngineAPI
+    });
+
+    const rows = chunk.runMeta?.[0]?.logDataRows || [];
+    const activeRows = rows.filter(row => row?.tailRiskActive === true);
+    assert(rows.length >= 4, 'Tail-risk MC run should produce log rows');
+    assertEqual(activeRows.length, 1, 'Seeded serial run should log exactly one active tail-risk year');
+    assertEqual(activeRows[0].jahr, 3, 'Seeded tail-risk event should occur in the expected simulation year');
+    assertEqual(activeRows[0].tailRiskEventType, 'crash_inflation_shock', 'Tail-risk log should expose event type');
+    assertEqual(activeRows[0].tailRiskReturnShockPct, -35, 'Tail-risk log should expose return shock');
+    assertEqual(activeRows[0].tailRiskInflationShockPct, 6, 'Tail-risk log should expose inflation shock');
+    assert(Number.isFinite(Number(activeRows[0].tailRiskEffectiveReturnPct)), 'Tail-risk log should expose effective return');
+    assert(Number.isFinite(Number(activeRows[0].tailRiskEffectiveInflationPct)), 'Tail-risk log should expose effective inflation');
+    assert(rows.some(row => row.tailRiskActive === false), 'Inactive years should expose neutral tail-risk log fields');
+}
+
+// --- TEST 18: Tail-risk schedule is independent of serial chunk boundaries ---
+{
+    const inputs = {
+        ...buildBasicInputs(),
+        tailRiskEnabled: true,
+        tailRiskAnnualProbabilityPct: 5,
+        tailRiskReturnShockPct: -35,
+        tailRiskInflationShockPct: 6,
+        tailRiskDurationYears: 1,
+        tailRiskCooldownYears: 0
+    };
+    const monteCarloParams = {
+        anzahl: 2,
+        maxDauer: 4,
+        blockSize: 1,
+        seed: 7,
+        methode: 'block',
+        rngMode: 'per-run-seed',
+        startYearMode: 'UNIFORM'
+    };
+    const runChunk = (start, count) => runMonteCarloChunk({
+        inputs,
+        monteCarloParams,
+        widowOptions: { mode: 'stop', percent: 0, marriageOffsetYears: 0, minMarriageYears: 0 },
+        useCapeSampling: false,
+        runRange: { start, count },
+        logIndices: [0, 1],
+        engine: EngineAPI
+    });
+
+    const full = await runChunk(0, 2);
+    const splitA = await runChunk(0, 1);
+    const splitB = await runChunk(1, 1);
+    const fullByRun = new Map((full.runMeta || []).map(meta => [meta.index, meta]));
+    const splitByRun = new Map([...splitA.runMeta, ...splitB.runMeta].map(meta => [meta.index, meta]));
+    const tailShape = (meta) => (meta?.logDataRows || []).map(row => ({
+        jahr: row.jahr,
+        histJahr: row.histJahr,
+        tailRiskActive: row.tailRiskActive,
+        tailRiskApplied: row.tailRiskApplied,
+        tailRiskSkippedReason: row.tailRiskSkippedReason,
+        tailRiskEventId: row.tailRiskEventId,
+        tailRiskEventYearOffset: row.tailRiskEventYearOffset,
+        tailRiskEffectiveReturnPct: row.tailRiskEffectiveReturnPct,
+        tailRiskEffectiveInflationPct: row.tailRiskEffectiveInflationPct
+    }));
+
+    for (const runIdx of [0, 1]) {
+        assert(fullByRun.has(runIdx), `Full tail-risk run meta missing run ${runIdx}`);
+        assert(splitByRun.has(runIdx), `Split tail-risk run meta missing run ${runIdx}`);
+        assertEqual(
+            JSON.stringify(tailShape(splitByRun.get(runIdx))),
+            JSON.stringify(tailShape(fullByRun.get(runIdx))),
+            `Tail-risk log shape should be chunk-independent for run ${runIdx}`
+        );
+    }
+}
+
 console.log('--- Simulator Monte Carlo Tests Completed ---');

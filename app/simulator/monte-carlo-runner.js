@@ -22,6 +22,7 @@ import { createMonteCarloLifeState } from './mc-life-events.js';
 import { getStartYearCandidates } from '../shared/cape-utils.js';
 import { STATIONARY_BOOTSTRAP_METHOD, isStationaryBootstrapMethod } from './stationary-bootstrap-contract.js';
 import { createStationaryBootstrapSampler, nextYearSample } from './stationary-bootstrap-sampler.js';
+import { applyTailRiskOverlay, createTailRiskSchedule } from './tail-risk-overlay.js';
 import {
     createMonteCarloStressTracker,
     recordMonteCarloStressYear,
@@ -264,7 +265,9 @@ export async function runMonteCarloChunk({
         let lebensdauer = 0, jahreOhneFlex = 0, triggeredAge = null;
         let careEverActive = false;
 
-        const rand = legacyRand || rng(makeRunSeed(seed, 0, runIdx));
+        const runSeed = makeRunSeed(seed, 0, runIdx);
+        const rand = legacyRand || rng(runSeed);
+        const tailRiskSchedule = createTailRiskSchedule(runSeed, inputs, maxDauer).schedule;
 
         const startYearIndex = pickMonteCarloStartYearIndex({
             rand,
@@ -343,6 +346,13 @@ export async function runMonteCarloChunk({
                 ? nextYearSample(simState.samplerState.stationaryBootstrap).yearData
                 : sampleNextYearData(simState, methode, blockSize, rand, stressCtx);
             yearData = applyStressOverride(yearData, stressCtx, rand);
+            const tailRiskOverlay = applyTailRiskOverlay(yearData, tailRiskSchedule[simulationsJahr] ?? null, {
+                runIdx,
+                simulationsJahr,
+                methode,
+                stressPreset: inputs?.stressPreset
+            });
+            yearData = tailRiskOverlay.yearData;
 
             const ageP1 = inputs.startAlter + simulationsJahr;
             const marriageYearsCompleted = computeMarriageYearsCompleted(simulationsJahr, widowOptions);
@@ -422,7 +432,8 @@ export async function runMonteCarloChunk({
                 deathLogContext = {
                     jahr: simulationsJahr + 1,
                     histJahr: yearData.jahr,
-                    inflation: yearData.inflation
+                    inflation: yearData.inflation,
+                    tailRiskOverlay
                 };
             }
 
@@ -515,7 +526,8 @@ export async function runMonteCarloChunk({
                     simulationsJahr,
                     yearData,
                     inputs,
-                    lifeLogContext
+                    lifeLogContext,
+                    tailRiskOverlay
                 }));
                 if (BREAK_ON_RUIN) break;
             } else {
@@ -590,7 +602,8 @@ export async function runMonteCarloChunk({
                     simulationsJahr,
                     yearData,
                     result,
-                    lifeLogContext
+                    lifeLogContext,
+                    tailRiskOverlay
                 }));
             }
         }
