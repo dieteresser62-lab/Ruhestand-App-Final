@@ -1,7 +1,7 @@
 # Arbeitsdokument: Fat-Tail- und Crash-Modell ergaenzen
 
 **Stand:** 2026-06-17  
-**Status:** Slice 1 implementiert, Review ausstehend  
+**Status:** Slice 2 implementiert, Review ausstehend  
 **Autor:** Codex  
 **Verbesserungspunkt:** 4 - Fat-Tail-/Crash-Modell explizit ergaenzen  
 **Geplanter Feature-Branch:** `codex/fat-tail-crash-modell`  
@@ -315,7 +315,8 @@ Keine Mutation von `annualData`.
 
 | Slice | Status | Branch | Ergebnis |
 |---|---|---|---|
-| `SLICE_TAIL_RISK_01_CONTRACT.md` | implementiert, Review ausstehend | `codex/fat-tail-crash-modell` | DOM-freier Contract fuer Ereignis-Injektion, Default `tailRiskEnabled=false`, Parametergrenzen, User-Input-Validierungsfehler, Krisenjahr-Skip-Erkennung, Effektivwert-Clamps und Klippen-Effekt-Test angelegt. Keine Runner-, Worker- oder UI-Verdrahtung. |
+| `SLICE_TAIL_RISK_01_CONTRACT.md` | freigegeben | `codex/fat-tail-crash-modell` | DOM-freier Contract fuer Ereignis-Injektion, Default `tailRiskEnabled=false`, Parametergrenzen, User-Input-Validierungsfehler, Krisenjahr-Skip-Erkennung, Effektivwert-Clamps und Klippen-Effekt-Test angelegt. Keine Runner-, Worker- oder UI-Verdrahtung. |
+| `SLICE_TAIL_RISK_02_OVERLAY_MODULE.md` | implementiert, Review ausstehend | `codex/fat-tail-crash-modell` | DOM-freies Overlay-Modul mit deterministischer Seed-/Horizont-Schedule, Duration-/Cooldown-Logik, nicht-mutierender Jahresdaten-Anwendung, historischem Krisenjahr-Skip und Event-Zusammenfassung. Keine Runner-, Worker- oder UI-Verdrahtung. |
 
 ### Reviewer-Pruefauftrag
 
