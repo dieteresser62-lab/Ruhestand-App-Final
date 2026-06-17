@@ -261,11 +261,11 @@ Pflicht fuer stochastische Schritte 4 bis 5:
 |---|---|---|---|
 | 1 Regime-Uebergaenge | erledigt | freigegeben | In `ea863e86` umgesetzt und committed |
 | 2 CAPE-to-Return | erledigt | freigegeben | In Slices 1-5 umgesetzt, reviewed und committed |
-| 3 Langlebigkeit | geplant | Baseline-Freeze | Abschluss der deterministischen Engine-Phase |
-| Gate 1 Baseline-Freeze | offen | Start Stationary Bootstrap | Muss aktiv protokolliert werden |
-| 4 Stationary Bootstrap | geplant | Sampling-Freeze | Erst nach Baseline-Freeze |
-| Gate 2 Sampling-Freeze | offen | Start Fat-Tail | Fixiert Pfadgenerierung |
-| 5 Fat-Tail/Crash | geplant | Abschlussreview Roadmap | Letztes Overlay |
+| 3 Langlebigkeit | erledigt | freigegeben | In `bed8d20` umgesetzt und committed |
+| Gate 1 Baseline-Freeze | erledigt | freigegeben | Protokolliert in `BASELINE_FREEZE_ENGINE_SEMANTIK.md` (mit Blocker) |
+| 4 Stationary Bootstrap | erledigt | freigegeben | Slices 1-5 umgesetzt und merged |
+| Gate 2 Sampling-Freeze | erledigt | freigegeben | Protokolliert in `SAMPLING_FREEZE_BOOTSTRAP.md` |
+| 5 Fat-Tail/Crash | geplant | Abschlussreview Roadmap | Start nach Behebung des returnPolicy-Blockers |
 
 ## Getroffene Review-Entscheidungen
 

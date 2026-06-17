@@ -1,7 +1,7 @@
 # Arbeitsdokument: Stationary Bootstrap ergaenzen
 
 **Stand:** 2026-06-16  
-**Status:** Slice 5 implementiert, Review ausstehend
+**Status:** erledigt / freigegeben
 **Autor:** Codex  
 **Verbesserungspunkt:** 3 - Stationary Bootstrap ergaenzen  
 **Geplanter Feature-Branch:** `codex/stationary-bootstrap`  
