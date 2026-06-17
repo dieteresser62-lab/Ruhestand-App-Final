@@ -140,9 +140,9 @@ console.log('Test 3: Simulator profile import and aggregation preserve primary l
         { profileId: 'a', name: 'A', inputs: primary },
         { profileId: 'b', name: 'B', inputs: secondary }
     ], 'a');
-    assertEqual(result.combined.longevityMode, 'quantile_shift', 'Primary profile should lead longevity mode');
-    assertEqual(result.combined.longevityQuantileShift, 0.05, 'Primary profile should lead shift');
-    assert(result.warnings.some(w => w.includes('Langlebigkeits-Puffer')), 'Longevity profile diff should warn');
+    assertEqual(result.combined.longevityMode, 'quantile_shift', 'Primary profile should lead longevity mode in combined data');
+    assertEqual(result.combined.longevityQuantileShift, 0.05, 'Primary profile should lead shift in combined data');
+    assert(!result.warnings.some(w => w.includes('Langlebigkeits-Puffer')), 'Longevity profile diff should not warn because UI keeps current Dynamic-Flex settings');
     console.log('✓ Profile import and aggregation OK');
 }
 

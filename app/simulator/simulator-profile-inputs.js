@@ -583,14 +583,6 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
     if (!ensureValueMatch(inputsList, i => stableStringify(i.healthBucket || null))) {
         warnings.push('Pflegebucket-Konfiguration unterscheidet sich zwischen Profilen. Es wird das Hauptprofil verwendet.');
     }
-    if (!ensureValueMatch(inputsList, i => stableStringify({
-        longevityMode: i.longevityMode || LONGEVITY_DEFAULTS.mode,
-        longevityQuantileShift: Number.isFinite(i.longevityQuantileShift) ? i.longevityQuantileShift : LONGEVITY_DEFAULTS.quantileShift,
-        longevityRelativePct: Number.isFinite(i.longevityRelativePct) ? i.longevityRelativePct : LONGEVITY_DEFAULTS.relativePct,
-        longevityBufferYears: Number.isFinite(i.longevityBufferYears) ? i.longevityBufferYears : LONGEVITY_DEFAULTS.bufferYears
-    }))) {
-        warnings.push('Langlebigkeits-Puffer unterscheidet sich zwischen Profilen. Es wird das Hauptprofil verwendet.');
-    }
     // Dynamic-Flex-Parameter werden im Simulator explizit aus den aktuellen Rahmendaten
     // gelesen und nicht aus Profil-Differenzen im Profilverbund abgeleitet.
 
