@@ -1,11 +1,11 @@
 # Arbeitsdokument: Fat-Tail- und Crash-Modell ergaenzen
 
-**Stand:** 2026-06-14  
-**Status:** Ueberarbeitet nach Review, erneute Pruefung ausstehend  
+**Stand:** 2026-06-17  
+**Status:** Slice 1 implementiert, Review ausstehend  
 **Autor:** Codex  
 **Verbesserungspunkt:** 4 - Fat-Tail-/Crash-Modell explizit ergaenzen  
 **Geplanter Feature-Branch:** `codex/fat-tail-crash-modell`  
-**GitHub-Status:** Noch nicht veroeffentlicht; vor Umsetzung Freigabe und Branch-Anlage erforderlich.
+**GitHub-Status:** Feature-Branch `codex/fat-tail-crash-modell` lokal angelegt, noch nicht veroeffentlicht.
 
 ## Einordnung in Roadmap
 
@@ -310,6 +310,12 @@ Keine Mutation von `annualData`.
 3. `SLICE_TAIL_RISK_03_RUNNER_INTEGRATION.md`: Serial-MC und Logs.
 4. `SLICE_TAIL_RISK_04_WORKER_METRICS.md`: Worker-Payload, Merge, Paritaet.
 5. `SLICE_TAIL_RISK_05_UI_DOCS.md`: UI, Export, Doku, Vergleichsreport.
+
+### Umsetzungsstatus
+
+| Slice | Status | Branch | Ergebnis |
+|---|---|---|---|
+| `SLICE_TAIL_RISK_01_CONTRACT.md` | implementiert, Review ausstehend | `codex/fat-tail-crash-modell` | DOM-freier Contract fuer Ereignis-Injektion, Default `tailRiskEnabled=false`, Parametergrenzen, User-Input-Validierungsfehler, Krisenjahr-Skip-Erkennung, Effektivwert-Clamps und Klippen-Effekt-Test angelegt. Keine Runner-, Worker- oder UI-Verdrahtung. |
 
 ### Reviewer-Pruefauftrag
 
