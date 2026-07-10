@@ -1,7 +1,7 @@
 # Engine Contract Hardening: Spezifikation und Umsetzungsplan
 
 **Stand:** 2026-07-10  
-**Status:** implementierungsreif - Slice 1 in Umsetzung nach Nutzerfreigabe  
+**Status:** implementierungsreif - Slice 3 umgesetzt, Review ausstehend
 **Feature-Branch:** `codex/engine-contract-hardening`  
 **GitHub-Status:** Branch nur lokal; Veroeffentlichung ausstehend und nur nach Nutzerfreigabe  
 **Autor:** Codex (Implementer)  
@@ -217,7 +217,7 @@ Nicht im Scope:
 | Slice | Aenderungsbereich | Abhaengigkeit | Status |
 |---|---|---|---|
 | [Slice 1](SLICE_ENGINE_HARDENING_01_LIQUIDITY_INPUT_CONTRACT.md) | C1 Liquiditaets-Override | Planfreigabe | abgeschlossen |
-| [Slice 3](SLICE_ENGINE_HARDENING_03_MARKET_DATA_FALLBACK.md) | C3 Missing-Market-Fallback | Slice 1 + explizite Semantikfreigabe | geplant |
+| [Slice 3](SLICE_ENGINE_HARDENING_03_MARKET_DATA_FALLBACK.md) | C3 Missing-Market-Fallback | Slice 1 + explizite Semantikfreigabe | abgeschlossen |
 | [Slice 2](SLICE_ENGINE_HARDENING_02_TAX_NET_PROCEEDS_CONTRACT.md) | C2 Core-Einzelverkauf: Reserve/Reconciliation | Slice 3 | geplant |
 | [Slice 8](SLICE_ENGINE_HARDENING_08_SIMULATOR_TAX_RECONCILIATION.md) | C2 Simulator-Mehrfachverkauf: finale Cash-Reconciliation | Slice 2 | geplant |
 | [Slice 4](SLICE_ENGINE_HARDENING_04_INPUT_NORMALIZER_EXTRACTION.md) | C4 Input-Normalizer | - | zurueckgestellt |
@@ -275,7 +275,7 @@ Angenommen, die Umsetzung verursacht in drei Monaten einen Produktivfehler: Am w
 - [ ] Claude-Review eingetragen oder bewusst durch Nutzer abbedungen
 - [x] alle Blocker beantwortet
 - [x] C2-Solver verworfen und durch Reserve-/Reconciliation-Modell ersetzt
-- [ ] C3-Fallback-Semantik ausdruecklich durch Nutzer freigegeben
+- [x] C3-Fallback-Semantik ausdruecklich durch Nutzer freigegeben
 - [x] Status auf `implementierungsreif` gesetzt
 - [x] Plan durch Reviewer/Nutzer freigegeben
 - [x] aktive Reihenfolge `1 -> 3 -> 2 -> 8` durch Reviewer bestaetigt

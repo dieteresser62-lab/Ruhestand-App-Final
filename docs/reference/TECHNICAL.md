@@ -4,6 +4,7 @@ Dieses Dokument beschreibt die Architektur und zentrale Datenflüsse der Ruhesta
 
 **Dokumentrolle:** Operative Entwickler-Referenz für aktuelle Modulzuständigkeiten, Datenflüsse und Laufzeitverhalten.
 **Abgrenzung:** Vertiefte fachliche Herleitungen, Marktvergleiche und Forschungsabgleich stehen in `ARCHITEKTUR_UND_FACHKONZEPT.md`.
+**Dokumentstand:** 2026-07-04; Codeabgleich bis Commit-Stand 2026-06-17 und lokale Arbeitskopie.
 
 ---
 
@@ -14,10 +15,12 @@ Dieses Dokument beschreibt die Architektur und zentrale Datenflüsse der Ruhesta
 | Komponente | Dateien | Zweck |
 |------------|---------|-------|
 | Balance-App | `Balance.html`, `app/balance/*.js`, `css/balance.css` | Jahresabschluss, Liquiditäts- und Entnahmeplanung, Diagnosen, Ausgaben-Check mit Jahreshistorie |
-| Simulator | `Simulator.html`, `app/simulator/*.js`, `simulator.css` | Monte-Carlo-Simulationen, Parameter-Sweeps, Pflegefall-Szenarien, Pflegebucket-Wirklogik |
+| Simulator | `Simulator.html`, `app/simulator/*.js`, `simulator.css` | Monte Carlo, Backtest, Sweeps, Auto-Optimize, Stationary Bootstrap, Tail-Risk-Stresstest, Pflegefall- und Pflegebucket-Wirklogik |
 | Profil/Verbund | `index.html`, `app/profile/*.js`, `app/tranches/*.js` | Profilverwaltung, Profilverbund, Tranchen-Sync, Pflegebucket-Definition |
 | Shared | `app/shared/*.js` | Gemeinsame Formatter, Feature-Flags, CAPE-Helfer, Persistenz-Facade |
-| Engine | `engine/` (ESM) → `engine.js` | Validierung, Marktanalyse, Spending- und Transaktionslogik |
+| Engine | `engine/` (ESM) → `engine.js` | Validierung, Marktanalyse, diskrete und kontinuierliche Regime-Signale, VPW-Rendite-Policy, Spending- und Transaktionslogik |
+
+**Inventarstand 2026-07-04:** 35 Balance-, 95 Simulator-, 30 Profil/Tranchen/Shared-, 27 Engine- und 3 Worker-Quellmodule sowie 101 `*.test.mjs`-Dateien. Diese Zahlen sind Orientierungswerte; Pfade und Contracts sind normativ, nicht die Anzahl der Dateien.
 
 Alle Skripte sind ES6-Module. Die Engine wird per `build-engine.mjs` mit esbuild (oder Modul-Fallback) gebündelt und stellt eine globale `EngineAPI` bereit.  
 Für CI/Release ist Strict-Mode vorgesehen (`npm run build:engine:strict`), der ohne `esbuild` fehlschlägt.
@@ -74,7 +77,7 @@ Nach einem erfolgreichen manuellen EXE-Build sollte die erzeugte `RuhestandSuite
 Die Engine besteht aus zentralen ES-Modulen, die von `build-engine.mjs` zu `engine.js` zusammengeführt werden. Die Reihenfolge entspricht zugleich der internen Verarbeitungskette:
 
 1. **`engine/validators/InputValidator.mjs`** – prüft sämtliche Eingaben auf Vollständigkeit, Wertebereiche und Konsistenz. Liefert strukturierte Fehlermeldungen.
-2. **`engine/analyzers/MarketAnalyzer.mjs`** – klassifiziert Marktregime, berechnet Drawdowns und leitet Kennzahlen für Guardrails ab. Additiv liefert `engine/analyzers/regime-signals.mjs` kontinuierliche Signal-Severities fuer Drawdown, CAPE und Runway. Die Stuetzwerte bleiben richtungssensitiv: aufsteigende Skalen wie Drawdown und absteigende Skalen wie Runway duerfen nicht per `Math.min`/`Math.max` sortiert werden.
+2. **`engine/analyzers/MarketAnalyzer.mjs`** – klassifiziert Marktregime, berechnet Drawdowns und leitet Kennzahlen für Guardrails ab. `marketDataStatus` unterscheidet `missing`, `partial` und `complete`; ohne positive endliche Werte fuer aktuellen Kurs und ATH bleiben ATH-Abstand und `seiATH` `null`, und fehlende Kerndaten verwenden `side_long` statt eines falschen ATH-Signals. CAPE bleibt unabhaengig auswertbar. Additiv liefert `engine/analyzers/regime-signals.mjs` kontinuierliche Signal-Severities fuer Drawdown, CAPE und Runway. Die Stuetzwerte bleiben richtungssensitiv: aufsteigende Skalen wie Drawdown und absteigende Skalen wie Runway duerfen nicht per `Math.min`/`Math.max` sortiert werden.
    - `engine/planners/vpw-return-policy.mjs` kapselt die erwartete VPW-Realrendite. `legacy_step` bleibt Default; `cape_continuous` ist ein expliziter Config-Modus mit robuster CAPE-Normalisierung, separaten Aktien-/Portfolio-Clamps und Diagnosefeldern.
 3. **`engine/planners/SpendingPlanner.mjs`** – orchestriert die Entnahmeplanung aus State, Alarm, initialer Flex-Rate, Policy-Pipeline, Entnahmeberechnung, Result und Diagnose. Reine Policy-Helper liegen in `engine/planners/spending-policy-helpers.mjs`, die vermögensbasierte Reduktionsdämpfung in `engine/planners/wealth-reduction.mjs`, Alarm-Aktivierung und Deeskalation in `engine/planners/alarm-policy.mjs`, Flex-Rate/S-Kurve/harte Caps in `engine/planners/flex-rate-policy.mjs`, Mindest-Flex in `engine/planners/minimum-flex-policy.mjs`, Flex-Budget-Cap/Recharge/Min-Rate in `engine/planners/flex-budget-policy.mjs`, Recovery-/Caution-Guardrails und Budget-Floor in `engine/planners/spending-guardrails.mjs`, finale Rate-Limits in `engine/planners/final-rate-policy.mjs`, die stabile Post-Flex-Policy-Reihenfolge in `engine/planners/spending-policy-pipeline.mjs`, finale Diagnose- und Runway-Ziel-Strukturen in `engine/planners/spending-diagnosis.mjs`.
 

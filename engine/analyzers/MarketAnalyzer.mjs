@@ -50,6 +50,10 @@ function deriveCapeAssessment(rawCapeRatio) {
     };
 }
 
+function isPositiveFinite(value) {
+    return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
 export const MarketAnalyzer = {
     /**
      * Analysiert den Markt basierend auf historischen Daten
@@ -59,19 +63,27 @@ export const MarketAnalyzer = {
     analyzeMarket(input) {
         const { endeVJ, endeVJ_1, endeVJ_2, endeVJ_3, ath, jahreSeitAth, inflation, capeRatio } = input;
 
-        // Abstand vom ATH berechnen
-        const abstandVomAthProzent = (ath > 0 && endeVJ > 0)
+        const hasCurrentValue = isPositiveFinite(endeVJ);
+        const hasAthValue = isPositiveFinite(ath);
+        const hasPreviousValue = isPositiveFinite(endeVJ_1);
+        const hasAthBasis = hasCurrentValue && hasAthValue;
+        const marketDataStatus = !hasCurrentValue || (!hasAthValue && !hasPreviousValue)
+            ? 'missing'
+            : (hasAthValue && hasPreviousValue ? 'complete' : 'partial');
+
+        // Ohne gueltige ATH-Basis ist der Abstand fachlich unbekannt, nicht 0.
+        const abstandVomAthProzent = hasAthBasis
             ? ((ath - endeVJ) / ath) * 100
-            : 0;
+            : null;
 
         // 1-Jahres-Performance
-        const perf1Y = (endeVJ_1 > 0)
+        const perf1Y = (hasCurrentValue && hasPreviousValue)
             ? ((endeVJ - endeVJ_1) / endeVJ_1) * 100
             : 0;
 
         // Monate seit ATH
         let monateSeitAth = jahreSeitAth * 12;
-        if (abstandVomAthProzent > 0 && jahreSeitAth === 0) {
+        if (hasAthBasis && abstandVomAthProzent > 0 && jahreSeitAth === 0) {
             monateSeitAth = 12;
         }
 
@@ -80,7 +92,12 @@ export const MarketAnalyzer = {
 
         // Entscheidungsreihenfolge ist bewusst: ATH-Situation zuerst, dann tiefer Bär,
         // dann Erholung / junge Korrektur, sonst Seitwärtsphase.
-        if (abstandVomAthProzent <= 0) {
+        if (!hasAthBasis) {
+            sKey = 'side_long';
+            reasons.push(marketDataStatus === 'missing'
+                ? 'Marktdaten fehlen; neutraler Fallback aktiv'
+                : 'ATH-Daten fehlen; neutraler Fallback aktiv');
+        } else if (abstandVomAthProzent <= 0) {
             // Neues Allzeithoch
             sKey = (perf1Y >= 10) ? 'peak_hot' : 'peak_stable';
             reasons.push('Neues Allzeithoch');
@@ -106,7 +123,7 @@ export const MarketAnalyzer = {
         // Prüfung auf Erholung im Bärenmarkt
         // Innerhalb von Bear/Recovery zusätzlich prüfen, ob eine Erholung
         // nur ein Rally-Intermezzo im Bärenmarkt ist (höherer Risiko-Mode).
-        if (sKey === 'bear_deep' || sKey === 'recovery') {
+        if (hasPreviousValue && (sKey === 'bear_deep' || sKey === 'recovery')) {
             const last4years = [endeVJ, endeVJ_1, endeVJ_2, endeVJ_3].filter(v => v > 0);
             const lowPoint = last4years.length > 0 ? Math.min(...last4years) : 0;
             const rallyFromLow = lowPoint > 0
@@ -151,7 +168,8 @@ export const MarketAnalyzer = {
         return {
             perf1Y,
             abstandVomAthProzent,
-            seiATH: (100 - abstandVomAthProzent) / 100,
+            seiATH: hasAthBasis ? (100 - abstandVomAthProzent) / 100 : null,
+            marketDataStatus,
             sKey,
             isStagflation,
             szenarioText,

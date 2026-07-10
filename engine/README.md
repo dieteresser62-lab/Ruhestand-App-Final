@@ -69,6 +69,10 @@ engine/
 
 `EngineAPI` stellt die Methoden `getVersion()`, `getConfig()`, `analyzeMarket()`, `calculateTargetLiquidity()` und `simulateSingleYear()` bereit.
 
+### Marktdatenqualitaets-Contract
+
+`MarketAnalyzer` exponiert `marketDataStatus` als `missing`, `partial` oder `complete`. Ein ATH-/Drawdown-Signal setzt endliche positive Werte fuer `endeVJ` und `ath` voraus. Ohne diese Basis bleiben `abstandVomAthProzent` und `seiATH` fachlich unbekannt (`null`); fehlende Kerndaten verwenden `side_long` als operativen Fallback und duerfen nicht als neues Allzeithoch diagnostiziert werden. Ein gueltiger CAPE-Wert wird davon unabhaengig ausgewertet.
+
 ### Verkaufs-/Tranchen-Contract
 
 `transactions/sale-engine.mjs` baut fuer detaillierte Tranchen eine `breakdown[]`-Liste. Neben Verkaufsbetrag, Steuer- und Rohgewinnfeldern bleiben `trancheId` und, falls vorhanden, `sourceProfileId` erhalten. Mehrprofilige Simulator-Inputs koennen dadurch gleichartige Positionen aus unterschiedlichen Profilen eindeutig auf die urspruengliche Profil-Tranche zurueckfuehren.
