@@ -119,6 +119,8 @@ stop
    - Bond-/Anleihen-Tranchen werden ueber Typ oder Kategorie erkannt und im Modus `3_bucket_jilge` als defensiver Zwischenpuffer fuer schlechte Jahre und Bond-Refill in guten Jahren verwendet.
 5. **`engine/core.mjs`** – orchestriert die oben genannten Module, exponiert `EngineAPI` (Version 31) und erzeugt Diagnose-/UI-Strukturen.
 6. **`engine/tax-settlement.mjs`** – zentrale Jahressteuer-Settlement-Logik (Verlusttopf, SPB, finale Steuer).
+
+Der Core reconciled den ersten Asset-Verkauf eines Jahres gegen das finale Jahres-Settlement. `steuerPlanGesamt` und `nettoErlösPlan` sichern die konservative Verkaufsplanung, `steuer` bleibt die finale Jahressteuer, und `taxCashAdjustment` gibt eine nicht benoetigte Steuerreserve genau einmal an `verwendungen.liquiditaet` zurueck. `bruttoVerkaufGesamt - steuer`, `nettoErlös` und die Summe der Verwendungen bleiben dadurch cashseitig konsistent. Die Steuer-/Nettofelder in `quellen` bzw. `breakdown[]` bleiben bewusst Planattribution. Die Reconciliation zusaetzlicher Simulator-Forced-Sales ist ein separater Mehrfachverkaufs-Contract.
 7. **`engine/config.mjs`** – zentrale Konfiguration (Schwellenwerte, Regime-Mapping, Profile). Generiert zur Build-Zeit eine eindeutige Build-ID.
 8. **`engine/errors.mjs`** – Fehlerklassen (`AppError`, `ValidationError`, `FinancialCalculationError`).
 

@@ -3,7 +3,7 @@
 **Feature-Branch:** `codex/engine-contract-hardening`  
 **GitHub-Status:** nur lokal; Push ausstehend  
 **Plan:** [ENGINE_CONTRACT_HARDENING_PLAN.md](ENGINE_CONTRACT_HARDENING_PLAN.md)  
-**Status:** implementiert - Review ausstehend
+**Status:** freigegeben - Reviewer-Commit ausstehend
 **Aenderungsbereich:** Punkt 1 / Contract C2 Mehrfachverkauf
 
 ## Ziel
@@ -165,7 +165,7 @@ Tatsaechliche Reservefelder, Reconciliation-Zeitpunkt, 10-Jahres-Ergebnis und Re
 - [x] Implementierung abgeschlossen
 - [x] 10-Jahres-Invariante und Full Suite gruen
 - [x] Gemini-Review
-- [ ] Nutzerfreigabe
+- [x] Nutzerfreigabe
 
 ## Review-Feedback von Gemini
 

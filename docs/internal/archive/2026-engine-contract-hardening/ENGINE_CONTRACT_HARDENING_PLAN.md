@@ -1,7 +1,7 @@
 # Engine Contract Hardening: Spezifikation und Umsetzungsplan
 
 **Stand:** 2026-07-10  
-**Status:** Slice 8 implementiert - Gesamt-Review ausstehend
+**Status:** alle aktiven Slices freigegeben - Reviewer-Commit fuer Slice 8 ausstehend
 **Feature-Branch:** `codex/engine-contract-hardening`  
 **GitHub-Status:** Branch nur lokal; Veroeffentlichung ausstehend und nur nach Nutzerfreigabe  
 **Autor:** Codex (Implementer)  
