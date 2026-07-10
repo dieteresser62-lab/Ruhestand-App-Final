@@ -148,7 +148,39 @@ function createDocumentMock(values = {}) {
     assert(Number.isFinite(result.ui?.spending?.monatlicheEntnahme), 'NaN/Infinity asset input should still produce finite spending');
 }
 
-// --- TEST 5: tax settlement sanitizes invalid tax state and raw aggregates without mutation ---
+// --- TEST 5: aktuelleLiquiditaet is a strict optional number override ---
+{
+    for (const missingValue of [undefined, null]) {
+        const result = EngineAPI.simulateSingleYear(
+            { ...baseEngineInput, aktuelleLiquiditaet: missingValue },
+            null
+        );
+        assert(!result.error, 'Missing liquidity override should use the legacy fallback');
+        assertEqual(result.input.aktuelleLiquiditaet, undefined, 'Missing liquidity override should be removed from normalized input');
+        assert(Number.isFinite(result.ui.runway.months), 'Fallback liquidity should produce finite runway');
+    }
+
+    for (const value of [0, 25000]) {
+        const result = EngineAPI.simulateSingleYear(
+            { ...baseEngineInput, aktuelleLiquiditaet: value },
+            null
+        );
+        assert(!result.error, 'Finite non-negative liquidity override should be accepted');
+        assertEqual(result.input.aktuelleLiquiditaet, value, 'Accepted liquidity override should remain a number');
+        assert(Number.isFinite(result.ui.runway.months), 'Accepted liquidity override should produce finite runway');
+        assert(Number.isFinite(result.ui.liquiditaet.deckungVorher), 'Accepted liquidity override should produce finite coverage');
+    }
+
+    for (const value of ['50000', '50.000,00', '50000.00', '', 'ungültig', Number.NaN, Infinity, -Infinity, -1]) {
+        const result = withMutedValidationLog(() => EngineAPI.simulateSingleYear(
+            { ...baseEngineInput, aktuelleLiquiditaet: value },
+            null
+        ));
+        assertValidationField(result.error, 'aktuelleLiquiditaet', `Invalid liquidity override ${String(value)}`);
+    }
+}
+
+// --- TEST 6: tax settlement sanitizes invalid tax state and raw aggregates without mutation ---
 {
     const prev = { lossCarry: Number.POSITIVE_INFINITY };
     const prevBefore = JSON.stringify(prev);
@@ -169,7 +201,7 @@ function createDocumentMock(values = {}) {
     assertEqual(result.details.sumRealizedGainSigned, 0, 'Invalid realized aggregate should sanitize to zero');
 }
 
-// --- TEST 6: forced-sale recompute uses loss carry and TQF-adjusted signed aggregate ---
+// --- TEST 7: forced-sale recompute uses loss carry and TQF-adjusted signed aggregate ---
 {
     const aggregate = buildTaxRawAggregate({
         sumRealizedGainSigned: 10000,
@@ -201,7 +233,7 @@ function createDocumentMock(values = {}) {
     assertEqual(actionResult.taxRawAggregate.sumTaxableAfterTqfSigned, 7000, 'Forced-sale path should preserve TQF-adjusted aggregate');
 }
 
-// --- TEST 7: non-positive forced shortfall is a neutral no-sale path ---
+// --- TEST 8: non-positive forced shortfall is a neutral no-sale path ---
 {
     const portfolio = {
         depotTranchesAktien: [{ marketValue: 1000, costBasis: 800, type: 'aktien_alt', purchaseDate: '2020-01-01' }],

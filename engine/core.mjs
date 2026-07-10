@@ -60,6 +60,12 @@ function _normalizeEngineInput(rawInput) {
     input.sparerPauschbetrag = normalizeNum(input.sparerPauschbetrag, 0);
     input.kirchensteuerSatz = normalizeNum(input.kirchensteuerSatz, 0);
 
+    // Optional simulator/test override: absent values retain the legacy
+    // tagesgeld + geldmarktEtf fallback; explicit values stay raw for validation.
+    if (input.aktuelleLiquiditaet == null) {
+        delete input.aktuelleLiquiditaet;
+    }
+
     input.aktuellesAlter = normalizeNum(input.aktuellesAlter, 65);
     input.startAlter = normalizeNum(input.startAlter, input.aktuellesAlter);
     input.inflation = normalizeNum(input.inflation, 0);

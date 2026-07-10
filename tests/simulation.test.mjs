@@ -145,6 +145,7 @@ try {
         resolvedCapeRatio: 21
     });
     assertClose(engineInput.aktuelleLiquiditaet, 25000, 1e-9, 'Engine input should use tracked liquidity override');
+    assert(typeof engineInput.aktuelleLiquiditaet === 'number', 'Engine input liquidity override should be a number');
     assert(engineInput.aktuellesAlter === 69, 'Engine input should advance current age');
     assertClose(engineInput.floorBedarf, 30000, 1e-9, 'Engine input should pass gross floor');
     assertClose(engineInput.flexBedarf, 6000, 1e-9, 'Engine input should apply temporary flex factor');
@@ -156,6 +157,25 @@ try {
     assert(engineInput.detailledTranches.length === 2, 'Engine input should include detailed tranches');
     assert(!engineInput.detailledTranches.some(t => t?.category === 'money_market'), 'Engine input should not include locked health bucket tranches');
     assert(detailedTranches.length === 2, 'Detailed tranche return should match engine input');
+
+    const { engineInput: zeroLiquidityInput } = buildSimulatorEngineInput({
+        inputs: { startAlter: 65, goldAktiv: false, targetEq: 70 },
+        portfolio: { depotTranchesAktien: [], depotTranchesGold: [], liquiditaet: 999 },
+        marketDataCurrentYear: { endeVJ: 110, endeVJ_1: 100, endeVJ_2: 90, endeVJ_3: 80, ath: 120, jahreSeitAth: 2 },
+        marketDataHist: { ath: 100, jahreSeitAth: 1 },
+        yearData: { inflation: 2 },
+        yearIndex: 0,
+        liquiditaet: 0,
+        effectiveBaseFloor: 30000,
+        baseFlex: 12000,
+        temporaryFlexFactor: 1,
+        baseFlexBudgetAnnual: 0,
+        baseFlexBudgetRecharge: 0,
+        pensionAnnual: 0,
+        resolvedCapeRatio: 21
+    });
+    assert(typeof zeroLiquidityInput.aktuelleLiquiditaet === 'number', 'Zero liquidity override should remain a number');
+    assertEqual(zeroLiquidityInput.aktuelleLiquiditaet, 0, 'Zero liquidity override should be preserved');
     console.log('✅ Extracted EngineAPI input mapping passed');
 } catch (e) {
     console.error('Test 0c Failed', e);
