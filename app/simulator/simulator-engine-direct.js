@@ -23,7 +23,7 @@ import {
 import { calculateHouseholdPensionForYear } from './simulator-household-pension.js';
 import { buildSimulatorEngineInput } from './simulator-engine-input.js';
 import { isAccumulationYear, simulateAccumulationYear } from './simulator-accumulation-year.js';
-import { applySimulatorTaxRecompute, buildTaxRawAggregate } from './simulator-tax-recompute.js';
+import { addTaxRawAggregate, applySimulatorTaxRecompute, buildTaxRawAggregate } from './simulator-tax-recompute.js';
 import { applyForcedSaleLiquidityCoverage, applyPayoutFallbackSale } from './simulator-forced-sale.js';
 import { applyBondRefillPostprocessing } from './simulator-bond-refill.js';
 import { buildSimulatorYearResult } from './simulator-year-result.js';
@@ -116,6 +116,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     let combinedTaxRawAggregate = null;
     let didForcedSale = false;
     let forcedSaleScaleApplied = null;
+    let regularSaleScale = 1;
+    let forcedTaxReserved = 0;
     const threeBucketInput = getThreeBucketInputs(inputs);
     const is3Bucket = threeBucketInput.is3Bucket;
 
@@ -374,17 +376,22 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         buyEqAmount = actionResult.verwendungen?.aktien || 0;
     }
 
-    // Aktualisiere Liquidität nach Transaktionen
-    if (hasSales && actionResult.nettoErlös > 0) {
-        const reinvestedPlanned = (actionResult.verwendungen?.gold || 0) + (actionResult.verwendungen?.aktien || 0);
+    if (hasSales) {
         const executedEqSale = Math.max(0, equityAfterReturn - equityAfterSalesAction);
         const executedGldSale = Math.max(0, goldAfterReturn - goldAfterSalesAction);
         const executedTotalSale = executedEqSale + executedGldSale;
-        const saleScale = plannedSaleBrutto > 0 ? Math.min(1, executedTotalSale / plannedSaleBrutto) : 0;
-        const actualNettoErlos = (actionResult.nettoErlös || 0) * saleScale;
-        const actualReinvested = reinvestedPlanned * saleScale;
-        buyGoldAmount = (actionResult.verwendungen?.gold || 0) * saleScale;
-        buyEqAmount = (actionResult.verwendungen?.aktien || 0) * saleScale;
+        regularSaleScale = plannedSaleBrutto > 0 ? Math.min(1, executedTotalSale / plannedSaleBrutto) : 0;
+        combinedTaxRawAggregate = buildTaxRawAggregate();
+        addTaxRawAggregate(combinedTaxRawAggregate, actionResult?.taxRawAggregate, regularSaleScale);
+    }
+
+    // Aktualisiere Liquidität nach Transaktionen
+    if (hasSales && actionResult.nettoErlös > 0) {
+        const reinvestedPlanned = (actionResult.verwendungen?.gold || 0) + (actionResult.verwendungen?.aktien || 0);
+        const actualNettoErlos = (actionResult.nettoErlös || 0) * regularSaleScale;
+        const actualReinvested = reinvestedPlanned * regularSaleScale;
+        buyGoldAmount = (actionResult.verwendungen?.gold || 0) * regularSaleScale;
+        buyEqAmount = (actionResult.verwendungen?.aktien || 0) * regularSaleScale;
         liquiditaet += Math.max(0, actualNettoErlos - actualReinvested);
     }
     snapshotBalance('after_action_sales', {
@@ -442,6 +449,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     unmetLiquidity += forcedCoverage.unmetLiquidityDelta;
     didForcedSale = didForcedSale || forcedCoverage.didForcedSale;
     forcedSaleScaleApplied = forcedCoverage.forcedSaleScaleApplied ?? forcedSaleScaleApplied;
+    forcedTaxReserved += forcedCoverage.forcedTaxReservedDelta;
     snapshotBalance('after_forced_sales', {
         forcedShortfall: euros(forcedShortfall),
         liquiditaetDelta: euros(forcedCoverage.liquiditaetDelta),
@@ -519,13 +527,14 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         netFloorYear,
         portfolio,
         depotTranchesAktien,
-        engineInput,
+        engineInput: { ...engineInput, sparerPauschbetrag: 0 },
         market,
         combinedTaxRawAggregate
     });
     bondRefillGross += bondRefill.bondRefillGrossDelta;
     bondRefillNet += bondRefill.bondRefillNetDelta;
     bondRefillTax += bondRefill.bondRefillTaxDelta;
+    forcedTaxReserved += bondRefill.bondRefillTaxDelta;
     didForcedSale = didForcedSale || bondRefill.didForcedSale;
     snapshotBalance('after_bond_refill', {
         bondRefillGross: euros(bondRefill.bondRefillGrossDelta),
@@ -575,13 +584,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         inflation: yearData.inflation
     };
 
-    // Verkäufe zusammenfassen
-    const vk = actionResult.quellen ? summarizeSalesByAsset({
-        breakdown: actionResult.quellen,
-        steuerGesamt: actionResult.steuer || 0
-    }) : { vkAkt: 0, vkGld: 0, vkBnd: 0, stAkt: 0, stGld: 0, stBnd: 0, vkGes: 0, stGes: 0 };
-
-    ({ totalTaxesThisYear } = applySimulatorTaxRecompute({
+    const taxReconciliation = applySimulatorTaxRecompute({
         didForcedSale,
         actionResult,
         spendingNewState,
@@ -589,8 +592,23 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         combinedTaxRawAggregate,
         sparerPauschbetrag: engineInput.sparerPauschbetrag,
         kirchensteuerSatz: engineInput.kirchensteuerSatz,
-        forcedSaleScaleApplied
-    }));
+        forcedSaleScaleApplied,
+        regularSaleScale,
+        forcedTaxReserved
+    });
+    totalTaxesThisYear = taxReconciliation.totalTaxesThisYear;
+    liquiditaet += taxReconciliation.taxCashAdjustment;
+    snapshotBalance('after_tax_reconciliation', {
+        regularSaleScale,
+        forcedTaxReserved: euros(forcedTaxReserved),
+        taxCashAdjustment: euros(taxReconciliation.taxCashAdjustment)
+    });
+
+    // Verkäufe erst nach der finalen Jahressteuer zusammenfassen.
+    const vk = actionResult.quellen ? summarizeSalesByAsset({
+        breakdown: actionResult.quellen,
+        steuerGesamt: actionResult.steuer || 0
+    }) : { vkAkt: 0, vkGld: 0, vkBnd: 0, stAkt: 0, stGld: 0, vkGes: 0, stGes: 0 };
 
     return buildSimulatorYearResult({
         portfolio,

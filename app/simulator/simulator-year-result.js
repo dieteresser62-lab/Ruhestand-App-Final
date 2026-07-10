@@ -100,8 +100,13 @@ export function buildSimulatorYearResult({
     const healthBucketEnd = euros(Number(nextPortfolio.healthBucketGeldmarkt) || 0);
     const portfolioActiveEnd = euros(wertAktien + wertGold + liquiditaet);
     const portfolioTotalEnd = euros(portfolioActiveEnd + healthBucketEnd);
+    const taxCashAdjustment = euros(actionResult?.taxSettlement?.taxCashAdjustment);
     const portfolioFlowDelta = portfolioActiveEnd - (
-        euros(portfolioTotalBeforePayout) - euros(jahresEntnahmeEffektiv) - euros(bondRefillTax) + euros(cashZinsen)
+        euros(portfolioTotalBeforePayout)
+        - euros(jahresEntnahmeEffektiv)
+        - euros(bondRefillTax)
+        + euros(cashZinsen)
+        + taxCashAdjustment
     );
     const normalizedBalanceTrace = Array.isArray(balanceTrace)
         ? balanceTrace.map(entry => ({
@@ -209,6 +214,7 @@ export function buildSimulatorYearResult({
             portfolio_total_before_payout: portfolioTotalBeforePayout,
             portfolio_active_end: portfolioActiveEnd,
             portfolio_flow_delta: portfolioFlowDelta,
+            tax_cash_adjustment: taxCashAdjustment,
             balance_trace: normalizedBalanceTrace,
             health_bucket_enabled: !!healthBucketDiagnostics?.enabled,
             health_bucket_start: euros(healthBucketCoverage?.startAmount ?? healthBucketInterest?.startAmount),

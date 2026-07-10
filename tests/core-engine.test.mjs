@@ -40,6 +40,11 @@ try {
     assert(result.ui !== undefined, 'Should have UI result');
     assert(result.newState !== undefined, 'Should have newState');
     assert(result.newState.lastMarketSKey !== undefined, 'Market regime should be defined');
+    assertEqual(result.newState.lastMarketSKey, 'side_long', 'Missing market prices should use side_long fallback');
+    assertEqual(result.ui.market.marketDataStatus, 'missing', 'Core should expose missing market-data status');
+    assertEqual(result.ui.market.abstandVomAthProzent, null, 'Core should preserve unknown ATH distance');
+    assertEqual(result.ui.market.seiATH, null, 'Core should preserve unknown ATH ratio');
+    assert(!result.ui.market.reasons.includes('Neues Allzeithoch'), 'Core must not diagnose ATH for missing prices');
     console.log(`   Detailed Regime detected: ${result.newState.lastMarketSKey}`);
 
     console.log('✅ optimizeSpending structure valid');

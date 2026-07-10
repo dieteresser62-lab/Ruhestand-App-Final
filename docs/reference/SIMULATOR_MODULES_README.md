@@ -2,7 +2,7 @@
 
 Die Simulator-App ist inzwischen in mehrere spezialisierte ES6-Module zerlegt. Die zentralen Abläufe (Monte-Carlo, Sweep, Backtests, Pflege-UI) leben nicht mehr als Monolith in `simulator-main.js`, sondern wurden in klar abgegrenzte Dateien ausgelagert. Dieses Dokument beschreibt Zweck, Haupt-Exports, Einbindungspunkte und die gewünschte Aufteilung neuer Features.
 
-**Stand:** 2026-06-01
+**Stand:** 2026-07-04 (einschliesslich Langlebigkeit, Stationary Bootstrap und Tail-Risk-Overlay)
 
 **Pfadkonvention:** Simulator-Module liegen unter `app/simulator/`, Profilmodule unter `app/profile/`, Shared-Utilities unter `app/shared/`, Tranchen-Status unter `app/tranches/`. Im Dokument werden Dateinamen aus Lesbarkeit meist ohne Präfix genannt.
 
@@ -259,11 +259,11 @@ Kernlogik für Jahr-für-Jahr-Simulation (Direct Engine).
 - `simulator-engine-input.js` – DOM-freies Mapping von Simulator-Jahreswerten auf den `EngineAPI.simulateSingleYear()`-Input.
 - `minimumFlexAnnual` wird wie `startFlexBedarf` als nominal fortgeschriebener Jahreswert in den Engine-Input gemappt und im Jahresstate inflationiert.
 - `simulator-accumulation-year.js` – DOM-freier frueher Rueckgabepfad fuer Ansparjahre inklusive Sparrate, Cash-Zins, Anspar-Rebalancing und Logdaten.
-- `simulator-tax-recompute.js` – DOM-freie Normalisierung von Tax-Rohaggregaten und finales Settlement-Recompute nach Simulator-Zusatzverkaeufen.
-- `simulator-forced-sale.js` – DOM-freie Forced-Sale-Liquiditaetsdeckung vor/nach Auszahlung inklusive Forced-Sale-Scale, Bond-Verkaufsdelta, Payout-Fallback und FIFO-Fallback.
+- `simulator-tax-recompute.js` – DOM-freie Normalisierung von Tax-Rohaggregaten und finales Settlement-Recompute nach Simulator-Zusatzverkaeufen. Skaliert die regulaere Cash-Reserve konsistent, kumuliert Forced-Sale-Reserven und liefert die genau einmal cashwirksame Differenz zur finalen Jahressteuer; Reserveunterdeckungen unter -0,01 EUR sind Contract-Fehler.
+- `simulator-forced-sale.js` – DOM-freie Forced-Sale-Liquiditaetsdeckung vor/nach Auszahlung inklusive Forced-Sale-Scale, skalierter Plansteuerreserve ohne erneuten SPB, Bond-Verkaufsdelta, Payout-Fallback und FIFO-Fallback.
 - `simulator-health-bucket.js` – DOM-freier Pflegebucket-Trigger, Deckungsbedarf, Verbrauch, Verzinsung, Zieldeckungsdiagnose und Warnungsweitergabe.
 - `simulator-bond-refill.js` – DOM-freie Bond-Refill-/3-Bucket-Nachsteuerung fuer gute Jahre inklusive Auto-Bond-Tranche, Equity-Verkauf und Refill-Deltas.
-- `simulator-year-result.js` – DOM-freier Builder fuer finalen Rueckgabewert, naechsten State, UI-Payload, Jahreslog, 3-Bucket-Logshape sowie flache Entnahme-/Payout-/VPW-Erklaerfelder.
+- `simulator-year-result.js` – DOM-freier Builder fuer finalen Rueckgabewert, naechsten State, UI-Payload, Jahreslog, 3-Bucket-Logshape sowie flache Entnahme-/Payout-/VPW-Erklaerfelder. Die FlowDelta-Bilanz umfasst die nach Auszahlung gebuchte Steuer-Reconciliation.
 
 **Dependencies:** `simulator-utils.js`, `simulator-data.js`, `EngineAPI` (engine.js)
 

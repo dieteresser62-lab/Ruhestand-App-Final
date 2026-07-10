@@ -22,20 +22,39 @@ export function applySimulatorTaxRecompute({
     combinedTaxRawAggregate,
     sparerPauschbetrag,
     kirchensteuerSatz,
-    forcedSaleScaleApplied = null
+    forcedSaleScaleApplied = null,
+    regularSaleScale = 1,
+    forcedTaxReserved = 0
 }) {
-    if (didForcedSale) {
+    const normalizedRegularSaleScale = Math.max(0, Math.min(1, Number(regularSaleScale) || 0));
+    const regularTaxReserved = (Number(actionResult?.steuer) || 0) * normalizedRegularSaleScale;
+    const normalizedForcedTaxReserved = Math.max(0, Number(forcedTaxReserved) || 0);
+    const taxReservedTotal = regularTaxReserved + normalizedForcedTaxReserved;
+    const shouldRecompute = didForcedSale || normalizedRegularSaleScale < 1 - 1e-9;
+
+    if (shouldRecompute) {
         const recomputedSettlement = settleTaxYear({
             taxStatePrev,
             rawAggregate: combinedTaxRawAggregate,
             sparerPauschbetrag,
             kirchensteuerSatz
         });
+        const taxCashAdjustment = taxReservedTotal - recomputedSettlement.taxDue;
+        if (taxCashAdjustment < -0.01) {
+            throw new Error(
+                `Simulator-Steuerreserve-Contract verletzt: finale Steuer uebersteigt Reserven um ${Math.abs(taxCashAdjustment).toFixed(2)} EUR.`
+            );
+        }
         actionResult.steuer = recomputedSettlement.taxDue;
         actionResult.taxSettlement = {
             ...recomputedSettlement.details,
-            recomputedWithForcedSales: true,
-            forcedSaleScaleApplied
+            recomputedWithForcedSales: Boolean(didForcedSale),
+            forcedSaleScaleApplied,
+            regularSaleScale: normalizedRegularSaleScale,
+            regularTaxReserved,
+            forcedTaxReserved: normalizedForcedTaxReserved,
+            taxReservedTotal,
+            taxCashAdjustment
         };
         actionResult.taxRawAggregate = { ...combinedTaxRawAggregate };
         if (spendingNewState && typeof spendingNewState === 'object') {
@@ -43,7 +62,8 @@ export function applySimulatorTaxRecompute({
         }
         return {
             totalTaxesThisYear: Number(actionResult?.steuer) || 0,
-            recomputedSettlement
+            recomputedSettlement,
+            taxCashAdjustment
         };
     }
 
@@ -51,12 +71,18 @@ export function applySimulatorTaxRecompute({
         actionResult.taxSettlement = {
             ...actionResult.taxSettlement,
             recomputedWithForcedSales: false,
-            forcedSaleScaleApplied: null
+            forcedSaleScaleApplied: null,
+            regularSaleScale: normalizedRegularSaleScale,
+            regularTaxReserved,
+            forcedTaxReserved: 0,
+            taxReservedTotal: regularTaxReserved,
+            taxCashAdjustment: 0
         };
     }
 
     return {
         totalTaxesThisYear: Number(actionResult?.steuer) || 0,
-        recomputedSettlement: null
+        recomputedSettlement: null,
+        taxCashAdjustment: 0
     };
 }

@@ -69,9 +69,15 @@ engine/
 
 `EngineAPI` stellt die Methoden `getVersion()`, `getConfig()`, `analyzeMarket()`, `calculateTargetLiquidity()` und `simulateSingleYear()` bereit.
 
+### Marktdatenqualitaets-Contract
+
+`MarketAnalyzer` exponiert `marketDataStatus` als `missing`, `partial` oder `complete`. Ein ATH-/Drawdown-Signal setzt endliche positive Werte fuer `endeVJ` und `ath` voraus. Ohne diese Basis bleiben `abstandVomAthProzent` und `seiATH` fachlich unbekannt (`null`); fehlende Kerndaten verwenden `side_long` als operativen Fallback und duerfen nicht als neues Allzeithoch diagnostiziert werden. Ein gueltiger CAPE-Wert wird davon unabhaengig ausgewertet.
+
 ### Verkaufs-/Tranchen-Contract
 
 `transactions/sale-engine.mjs` baut fuer detaillierte Tranchen eine `breakdown[]`-Liste. Neben Verkaufsbetrag, Steuer- und Rohgewinnfeldern bleiben `trancheId` und, falls vorhanden, `sourceProfileId` erhalten. Mehrprofilige Simulator-Inputs koennen dadurch gleichartige Positionen aus unterschiedlichen Profilen eindeutig auf die urspruengliche Profil-Tranche zurueckfuehren.
+
+Im Core-Einzelverkauf bleiben `breakdown[].steuer` und `breakdown[].netto` die Planattribution des konservativen Gross-ups. Die Top-Level-Felder trennen diese Planung von der finalen Cash-Wahrheit: `bruttoVerkaufGesamt`, `steuerPlanGesamt` und `nettoErlösPlan` beschreiben den Verkauf vor Jahres-Settlement; `steuer` kommt aus `tax-settlement.mjs`, und `taxCashAdjustment = steuerPlanGesamt - steuer` wird genau einmal `verwendungen.liquiditaet` zugeschlagen. Dadurch gelten mit 0,01 EUR Toleranz `bruttoVerkaufGesamt - steuer = nettoErlös` und `sum(verwendungen) = nettoErlös`. Nicht-Verkaufsaktionen exponieren die neuen Verkaufs-/Steuerfelder neutral mit `0`.
 
 ### 3-Bucket-Jilge-Contract
 

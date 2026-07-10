@@ -77,6 +77,17 @@ const InputValidator = {
         }
     });
 
+    // This optional override belongs to the engine contract, not to locale-aware UI parsing.
+    if (input.aktuelleLiquiditaet != null) {
+        check(
+            typeof input.aktuelleLiquiditaet !== 'number' ||
+            !Number.isFinite(input.aktuelleLiquiditaet) ||
+            input.aktuelleLiquiditaet < 0,
+            'aktuelleLiquiditaet',
+            'Aktuelle Liquidität muss eine gültige nicht-negative Zahl sein.'
+        );
+    }
+
     if (Number.isFinite(input.minimumFlexAnnual) && Number.isFinite(input.flexBedarf)) {
         check(
             input.minimumFlexAnnual > input.flexBedarf,

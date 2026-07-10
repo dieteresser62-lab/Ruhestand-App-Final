@@ -67,7 +67,8 @@ export function applyForcedSaleLiquidityCoverage({
             bondSaleAmountDelta: 0,
             unmetLiquidityDelta: 0,
             didForcedSale: false,
-            forcedSaleScaleApplied: null
+            forcedSaleScaleApplied: null,
+            forcedTaxReservedDelta: 0
         };
     }
 
@@ -76,6 +77,7 @@ export function applyForcedSaleLiquidityCoverage({
     let unmetLiquidityDelta = 0;
     let didForcedSale = false;
     let forcedSaleScaleApplied = null;
+    let forcedTaxReservedDelta = 0;
 
     const currentTranches = buildDetailedTranchesFromPortfolio(portfolio);
     const forcedTranches = (is3Bucket && isBadYear)
@@ -91,6 +93,9 @@ export function applyForcedSaleLiquidityCoverage({
 
     const forcedInputWithCurrentTranches = {
         ...engineInput,
+        // The annual allowance was already applied by the regular engine action.
+        // Simulator-induced follow-up sales therefore reserve tax without SPB.
+        sparerPauschbetrag: 0,
         detailledTranches: (is3Bucket && isBadYear)
             ? forcedTranches
             : (forcedTranches.length > 0 ? forcedTranches : undefined),
@@ -118,6 +123,7 @@ export function applyForcedSaleLiquidityCoverage({
         const forcedScale = forcedBrutto > 0 ? Math.min(1, forcedExecutedTotal / forcedBrutto) : 0;
 
         forcedSaleScaleApplied = forcedScale;
+        forcedTaxReservedDelta += (Number(forcedSale.steuerGesamt) || 0) * forcedScale;
         liquiditaetDelta += (forcedSale.achievedRefill || 0) * forcedScale;
         bondSaleAmountDelta += fallbackBreakdown.reduce((sum, item) => {
             const kind = String(item?.kind || '').toLowerCase();
@@ -173,7 +179,8 @@ export function applyForcedSaleLiquidityCoverage({
         bondSaleAmountDelta,
         unmetLiquidityDelta,
         didForcedSale,
-        forcedSaleScaleApplied
+        forcedSaleScaleApplied,
+        forcedTaxReservedDelta
     };
 }
 

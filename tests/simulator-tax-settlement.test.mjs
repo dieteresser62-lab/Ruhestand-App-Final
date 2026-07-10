@@ -172,7 +172,74 @@ function makeStubEngine({ monthlyWithdrawal, actionTax, actionTaxableRaw = 1000 
     assertClose(recompute.totalTaxesThisYear, expected.taxDue, 1e-9, 'Direct recompute should return settlement tax');
     assert(actionResult.taxSettlement.recomputedWithForcedSales === true, 'Direct recompute should mark forced recompute');
     assert(actionResult.taxSettlement.forcedSaleScaleApplied === 0.5, 'Direct recompute should preserve forced sale scale');
+    assertClose(actionResult.taxSettlement.taxReservedTotal, 100, 1e-9,
+        'Direct recompute should expose the cash-effective regular tax reserve');
+    assertClose(recompute.taxCashAdjustment, 100 - expected.taxDue, 1e-9,
+        'Direct recompute should return the reserve release for operative cash');
     assert(spendingNewState.taxState, 'Direct recompute should update next tax state');
+}
+
+// 0aa) A partially executed regular sale scales reserve and raw aggregate alike.
+{
+    const regularSaleScale = 0.5;
+    const combinedTaxRawAggregate = buildTaxRawAggregate();
+    addTaxRawAggregate(combinedTaxRawAggregate, {
+        sumRealizedGainSigned: 4000,
+        sumTaxableAfterTqfSigned: 2800
+    }, regularSaleScale);
+    const actionResult = {
+        steuer: 500,
+        taxSettlement: {},
+        taxRawAggregate: {}
+    };
+    const recompute = applySimulatorTaxRecompute({
+        didForcedSale: false,
+        actionResult,
+        spendingNewState: {},
+        taxStatePrev: { lossCarry: 0 },
+        combinedTaxRawAggregate,
+        sparerPauschbetrag: 1000,
+        kirchensteuerSatz: 0,
+        regularSaleScale
+    });
+    const expected = settleTaxYear({
+        taxStatePrev: { lossCarry: 0 },
+        rawAggregate: combinedTaxRawAggregate,
+        sparerPauschbetrag: 1000,
+        kirchensteuerSatz: 0
+    });
+    assertClose(actionResult.taxRawAggregate.sumTaxableAfterTqfSigned, 1400, 1e-9,
+        'Partial regular sale should expose the scaled taxable raw aggregate');
+    assertClose(actionResult.taxSettlement.regularTaxReserved, 250, 1e-9,
+        'Partial regular sale should scale the cash-effective tax reserve');
+    assert(actionResult.taxSettlement.recomputedWithForcedSales === false,
+        'Partial regular sale alone should recompute without claiming a forced sale');
+    assertClose(recompute.taxCashAdjustment, 250 - expected.taxDue, 1e-9,
+        'Partial regular sale should reconcile scaled reserve against scaled settlement');
+}
+
+// 0ab) An underfunded reserve is a hard contract error, not another cash withdrawal.
+{
+    let error = null;
+    try {
+        applySimulatorTaxRecompute({
+            didForcedSale: true,
+            actionResult: { steuer: 0, taxSettlement: {}, taxRawAggregate: {} },
+            spendingNewState: {},
+            taxStatePrev: { lossCarry: 0 },
+            combinedTaxRawAggregate: buildTaxRawAggregate({
+                sumRealizedGainSigned: 1000,
+                sumTaxableAfterTqfSigned: 1000
+            }),
+            sparerPauschbetrag: 0,
+            kirchensteuerSatz: 0,
+            forcedTaxReserved: 0
+        });
+    } catch (caught) {
+        error = caught;
+    }
+    assert(error instanceof Error && error.message.includes('Simulator-Steuerreserve-Contract verletzt'),
+        'Reserve underfunding below tolerance should stop the simulator contract');
 }
 
 // 0a) Direct recompute consumes existing loss carry before SPB/final tax.
@@ -244,7 +311,7 @@ function makeStubEngine({ monthlyWithdrawal, actionTax, actionTaxableRaw = 1000 
         forcedShortfall: 10000,
         portfolio,
         engineInput: {
-            sparerPauschbetrag: 0,
+            sparerPauschbetrag: 100000,
             kirchensteuerSatz: 0,
             goldAktiv: false,
             depotwertAlt: 100000,
@@ -262,8 +329,25 @@ function makeStubEngine({ monthlyWithdrawal, actionTax, actionTaxableRaw = 1000 
     });
     assert(coverage.didForcedSale === true, 'Forced coverage should mark forced sale');
     assert(coverage.liquiditaetDelta > 0, 'Forced coverage should add liquidity');
+    assert(coverage.forcedTaxReservedDelta > 0, 'Forced coverage should expose its scaled plan-tax reserve');
     assert(portfolio.depotTranchesAktien[0].marketValue < 100000, 'Forced coverage should reduce portfolio value');
     assert(combinedTaxRawAggregate.sumRealizedGainSigned > 0, 'Forced coverage should add realized gain to tax aggregate');
+    const forcedGrossExecuted = 100000 - portfolio.depotTranchesAktien[0].marketValue;
+    const forcedAction = { steuer: 0, taxSettlement: {}, taxRawAggregate: {} };
+    const forcedReconciliation = applySimulatorTaxRecompute({
+        didForcedSale: true,
+        actionResult: forcedAction,
+        spendingNewState: {},
+        taxStatePrev: { lossCarry: 0 },
+        combinedTaxRawAggregate,
+        sparerPauschbetrag: 0,
+        kirchensteuerSatz: 0,
+        forcedTaxReserved: coverage.forcedTaxReservedDelta,
+        forcedSaleScaleApplied: coverage.forcedSaleScaleApplied
+    });
+    assertClose(coverage.liquiditaetDelta + forcedReconciliation.taxCashAdjustment,
+        forcedGrossExecuted - forcedAction.steuer, 0.01,
+        'Forced-sale gross minus final tax should equal reconciled sale cash');
 
     const payoutPortfolio = {
         depotTranchesAktien: [{ marketValue: 20000, costBasis: 15000, type: 'aktien_alt', purchaseDate: '2000-01-01' }],
@@ -295,6 +379,11 @@ function makeStubEngine({ monthlyWithdrawal, actionTax, actionTaxableRaw = 1000 
     assert(!result.isRuin, 'Forced-sale scenario should still return a valid result');
     assert(result.ui?.action?.taxSettlement?.recomputedWithForcedSales === true, 'Forced-sale scenario must mark recompute=true');
     assert(result.ui?.action?.steuer < 100, 'Forced-sale recompute should reduce tax in this loss scenario');
+    assert(result.ui?.action?.taxSettlement?.taxReservedTotal >= result.ui?.action?.steuer,
+        'Forced-sale scenario should reserve at least the final tax');
+    assertClose(result.ui.action.taxSettlement.taxCashAdjustment,
+        result.ui.action.taxSettlement.taxReservedTotal - result.ui.action.steuer, 0.01,
+        'Forced-sale scenario should expose exactly one reserve reconciliation');
 
     const expectedTax = settleTaxYear({
         taxStatePrev: { lossCarry: 0 },
@@ -324,6 +413,63 @@ function makeStubEngine({ monthlyWithdrawal, actionTax, actionTaxableRaw = 1000 
     assert(result.ui?.action?.taxSettlement?.recomputedWithForcedSales === false, 'No-forced-sale scenario must keep recompute=false');
     assert(result.ui?.action?.steuer === 77, 'No-forced-sale scenario should keep engine settlement tax');
     assert(result.totalTaxesThisYear === 77, 'Year tax should come from action.steuer directly');
+    assertClose(result.ui.action.taxSettlement.taxCashAdjustment, 0, 1e-9,
+        'Scale-1 year without forced sale should not run simulator cash reconciliation');
+}
+
+// 3) Ten deterministic years reconcile reserves without cumulative tax/cash drift.
+{
+    const yearlyRawTaxable = [4000, -3000, 2500, 6000, -1500, 3200, 0, 5000, -2500, 4500];
+    let taxState = { lossCarry: 0 };
+    let cumulativeReserved = 0;
+    let cumulativeTaxDue = 0;
+    let cumulativeCashAdjustment = 0;
+    let sawForcedSale = false;
+    let sawLossYear = false;
+
+    yearlyRawTaxable.forEach((taxableRaw, yearIndex) => {
+        const didForcedSale = yearIndex % 3 === 0;
+        const regularSaleScale = yearIndex === 5 ? 0.6 : 1;
+        const regularTaxReserved = taxableRaw > 0 ? 1200 * regularSaleScale : 0;
+        const forcedTaxReserved = didForcedSale && taxableRaw > 0 ? 500 : 0;
+        const aggregate = buildTaxRawAggregate({
+            sumRealizedGainSigned: taxableRaw,
+            sumTaxableAfterTqfSigned: taxableRaw
+        });
+        const actionResult = {
+            steuer: regularSaleScale > 0 ? regularTaxReserved / regularSaleScale : 0,
+            taxSettlement: {},
+            taxRawAggregate: {}
+        };
+        const spendingNewState = {};
+        const result = applySimulatorTaxRecompute({
+            didForcedSale,
+            actionResult,
+            spendingNewState,
+            taxStatePrev: taxState,
+            combinedTaxRawAggregate: aggregate,
+            sparerPauschbetrag: 1000,
+            kirchensteuerSatz: 0,
+            regularSaleScale,
+            forcedTaxReserved,
+            forcedSaleScaleApplied: didForcedSale ? 1 : null
+        });
+
+        taxState = spendingNewState.taxState || taxState;
+        cumulativeReserved += regularTaxReserved + forcedTaxReserved;
+        cumulativeTaxDue += result.totalTaxesThisYear;
+        cumulativeCashAdjustment += result.taxCashAdjustment;
+        sawForcedSale ||= didForcedSale;
+        sawLossYear ||= taxableRaw < 0;
+        assertClose(result.taxCashAdjustment,
+            regularTaxReserved + forcedTaxReserved - result.totalTaxesThisYear, 0.01,
+            `Year ${yearIndex + 1} should reconcile reserve and final tax exactly once`);
+    });
+
+    assert(sawForcedSale, 'Ten-year sequence should contain forced sales');
+    assert(sawLossYear, 'Ten-year sequence should contain loss years');
+    assertClose(cumulativeCashAdjustment, cumulativeReserved - cumulativeTaxDue, 0.01,
+        'Ten-year sequence should have no cumulative tax/cash drift');
 }
 
 console.log('✅ Simulator tax settlement tests passed');

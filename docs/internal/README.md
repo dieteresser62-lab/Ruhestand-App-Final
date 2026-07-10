@@ -19,6 +19,7 @@ Abgeschlossene Umsetzungen liegen im Archiv.
 - `archive/2026-balance-snapshots/`
 - `archive/2026-balance-workflow-hardening/`
 - `archive/2026-dynamic-flex/`
+- `archive/2026-engine-contract-hardening/`
 - `archive/2026-engine-tax-golden-cases/`
 - `archive/2026-mindest-flex/`
 - `archive/2026-persistence-migration/`
