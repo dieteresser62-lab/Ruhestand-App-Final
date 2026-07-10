@@ -3,7 +3,7 @@
 **Feature-Branch:** `codex/engine-contract-hardening`  
 **GitHub-Status:** nur lokal; Push ausstehend  
 **Plan:** [ENGINE_CONTRACT_HARDENING_PLAN.md](ENGINE_CONTRACT_HARDENING_PLAN.md)  
-**Status:** ueberarbeitet - abhaengig von Slice 3, erneutes Review erforderlich  
+**Status:** implementiert - Review ausstehend
 **Aenderungsbereich:** Punkt 1 / Contract C2
 
 ## Ziel
@@ -100,6 +100,37 @@ Rollback-Strategie:
 
 Branch und Status muessen vor Coding erneut wortgetreu erfasst werden.
 
+Tatsaechlicher Check unmittelbar vor Coding am 2026-07-10:
+
+```text
+Branch: codex/engine-contract-hardening
+Status:
+ M README.md
+ M docs/internal/README.md
+ M docs/internal/archive/README.md
+ M docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md
+ M docs/reference/SIMULATOR_MODULES_README.md
+ M node_modules/.package-lock.json
+ M tests/README.md
+ ?? node_modules/.bin/playwright
+ ?? node_modules/.bin/playwright-core
+ ?? node_modules/.bin/playwright-core.cmd
+ ?? node_modules/.bin/playwright-core.ps1
+ ?? node_modules/.bin/playwright.cmd
+ ?? node_modules/.bin/playwright.ps1
+ ?? node_modules/playwright-core/
+ ?? node_modules/playwright/
+```
+
+Diese vorbestehenden Aenderungen wurden nicht zurueckgesetzt. Die Slice-Aenderung in der bereits modifizierten `tests/README.md` beschraenkt sich auf den Abschnitt `core-tax-settlement.test.mjs`.
+
+Baseline vor dem ersten Code-Edit:
+
+- `core-tax-settlement.test.mjs`: 22/22 Assertions gruen.
+- `simulator-backtest.test.mjs`: 39/39 Assertions gruen.
+- Headless-Backtest 2000-2025: 26 Jahre, Liquiditaet Ende 2025 = 413.996 EUR.
+- Golden LossCarry 5.000 EUR: Brutto 30.000 EUR, Plansteuer 3.692,50 EUR, finale Steuer 2.373,75 EUR, vor Slice 2 ausgewiesenes Netto-Cash 26.307,50 EUR.
+
 ## Geplante Tests
 
 ```text
@@ -116,15 +147,27 @@ Golden Cases: kein LossCarry, teilweiser LossCarry, ueberdeckender LossCarry und
 
 ## Durchgefuehrte Aenderungen
 
-Noch keine.
+- `engine/core.mjs` sichert Plansteuer und Plan-Netto vor dem Settlement, exponiert `bruttoVerkaufGesamt`, `steuerPlanGesamt`, `nettoErlösPlan` und `taxCashAdjustment` und gibt die Differenz genau einmal an die Liquiditaetsverwendung zurueck.
+- Ein `taxCashAdjustment < -0,01 EUR` bricht als explizite Contract-Verletzung ab.
+- No-Transaction-Actions erhalten neutrale Verkaufs-, Steuer- und Verwendungsfelder.
+- `tests/core-tax-settlement.test.mjs` deckt alle Golden Cases, Cash-Invarianten, Runway, Non-Mutation und signierte Verlust-/Mischtranchen ab.
+- Contract-Semantik ist in `engine/README.md`, `docs/reference/TECHNICAL.md` und `tests/README.md` dokumentiert.
+- `engine.js` wurde mit `npm run build:engine` geprueft; der Modul-Fallback-Wrapper blieb inhaltlich unveraendert.
 
 ## Ausgefuehrte Tests mit Ergebnis
 
-Noch keine.
+- `node tests/run-single.mjs tests/core-tax-settlement.test.mjs`: 73/73 Assertions gruen.
+- `node tests/run-single.mjs tests/transaction-tax.test.mjs`: 26/26 Assertions gruen.
+- `node tests/run-single.mjs tests/simulator-tax-settlement.test.mjs`: 32/32 Assertions gruen.
+- `node tests/run-single.mjs tests/transaction-quantization.test.mjs`: gruen.
+- `node tests/run-single.mjs tests/worker-parity.test.mjs`: 354/354 Assertions gruen.
+- `npm run build:engine`: erfolgreich; vorgesehener Fallback-Build ohne esbuild.
+- `npm test`: 101 Testdateien, 3.113/3.113 Assertions, 0 Fehler, 0 offene Handles.
+- Headless-Backtest 2000-2025 nach Coding: 26 Jahre, Liquiditaet Ende 2025 = 416.201 EUR. Das Delta von +2.205 EUR beginnt mit dem ersten steuerlich reconcilierten Verkaufsjahr und entspricht freigegebenen Steuerreserven; keine unerwartete Abweichung ausserhalb der spezifizierten Fallklasse.
 
 ## Abweichungen vom Plan
 
-Keine; Slice noch nicht gestartet.
+- `engine.js` wurde generiert/geprueft, blieb als Modul-Fallback-Wrapper aber unveraendert und erscheint deshalb nicht im Diff.
 
 ## Offene Risiken
 
@@ -134,14 +177,14 @@ Keine; Slice noch nicht gestartet.
 
 ## Rueckdokumentation
 
-Hauptplan um Reserve-/Reconciliation-Felder und Golden-Case-Ergebnisse ergaenzen. Feldsemantik in `engine/README.md` und technischer Referenz dokumentieren.
+Hauptplanstatus, Reserve-/Reconciliation-Felder, Golden-Case-Ergebnisse, Engine-README, technische Referenz und Tests-README wurden aktualisiert.
 
 ## Freigabestatus
 
-- [ ] Reserve-/Reconciliation-Modell durch Reviewer bestaetigt
-- [ ] Branch-/Statuscheck aktualisiert
-- [ ] Implementierung abgeschlossen
-- [ ] Full Suite und Engine-Build gruen
+- [x] Reserve-/Reconciliation-Modell durch Reviewer bestaetigt
+- [x] Branch-/Statuscheck aktualisiert
+- [x] Implementierung abgeschlossen
+- [x] Full Suite und Engine-Build gruen
 - [x] Gemini-Review
 - [ ] Nutzerfreigabe
 

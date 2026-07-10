@@ -1,7 +1,7 @@
 # Engine Contract Hardening: Spezifikation und Umsetzungsplan
 
 **Stand:** 2026-07-10  
-**Status:** implementierungsreif - Slice 3 umgesetzt, Review ausstehend
+**Status:** implementierungsreif - Slice 2 umgesetzt, Review ausstehend
 **Feature-Branch:** `codex/engine-contract-hardening`  
 **GitHub-Status:** Branch nur lokal; Veroeffentlichung ausstehend und nur nach Nutzerfreigabe  
 **Autor:** Codex (Implementer)  
@@ -218,7 +218,7 @@ Nicht im Scope:
 |---|---|---|---|
 | [Slice 1](SLICE_ENGINE_HARDENING_01_LIQUIDITY_INPUT_CONTRACT.md) | C1 Liquiditaets-Override | Planfreigabe | abgeschlossen |
 | [Slice 3](SLICE_ENGINE_HARDENING_03_MARKET_DATA_FALLBACK.md) | C3 Missing-Market-Fallback | Slice 1 + explizite Semantikfreigabe | abgeschlossen |
-| [Slice 2](SLICE_ENGINE_HARDENING_02_TAX_NET_PROCEEDS_CONTRACT.md) | C2 Core-Einzelverkauf: Reserve/Reconciliation | Slice 3 | geplant |
+| [Slice 2](SLICE_ENGINE_HARDENING_02_TAX_NET_PROCEEDS_CONTRACT.md) | C2 Core-Einzelverkauf: Reserve/Reconciliation | Slice 3 | abgeschlossen |
 | [Slice 8](SLICE_ENGINE_HARDENING_08_SIMULATOR_TAX_RECONCILIATION.md) | C2 Simulator-Mehrfachverkauf: finale Cash-Reconciliation | Slice 2 | geplant |
 | [Slice 4](SLICE_ENGINE_HARDENING_04_INPUT_NORMALIZER_EXTRACTION.md) | C4 Input-Normalizer | - | zurueckgestellt |
 | [Slice 5](SLICE_ENGINE_HARDENING_05_VPW_SAFETY_EXTRACTION.md) | C4 VPW-Safety | - | zurueckgestellt |
@@ -226,6 +226,8 @@ Nicht im Scope:
 | [Slice 7](SLICE_ENGINE_HARDENING_07_RESULT_BUILDER_DOCS.md) | C4 Result-Builder | - | zurueckgestellt |
 
 Verbindliche Ausfuehrungsreihenfolge: `1 -> 3 -> 2 -> 8`. Danach erneutes Gesamt-Review. Slices 4 bis 7 duerfen in diesem Vorhaben nicht gestartet werden. Es gibt keine bewusst rote Contract-Slice; jeder aktive Slice muss gruen enden.
+
+Slice-2-Ergebnis: Der Core-Einzelverkauf exponiert die Planwerte `steuerPlanGesamt` und `nettoErlösPlan`, die finale Cash-Anpassung `taxCashAdjustment` sowie `bruttoVerkaufGesamt`. Im 5.000-EUR-LossCarry-Golden-Case bleiben 30.000 EUR Bruttoverkauf und 3.692,50 EUR Plansteuer stabil; die finale Steuer betraegt 2.373,75 EUR und 1.318,75 EUR werden genau einmal als Liquiditaet freigegeben. Kein LossCarry, ueberdeckender LossCarry, No-Transaction sowie reine Verlust- und gemischte Tranchen sind durch Invariantentests abgedeckt. Die Full Suite ist mit 3.113/3.113 Assertions gruen; der Simulator-Mehrfachverkaufsabschluss bleibt Scope von Slice 8.
 
 ## Globale Validierung
 

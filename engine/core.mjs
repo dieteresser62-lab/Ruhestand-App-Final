@@ -615,6 +615,44 @@ function _internal_calculateModel(input, lastState) {
         sparerPauschbetrag: normalizedInput.sparerPauschbetrag,
         kirchensteuerSatz: normalizedInput.kirchensteuerSatz
     });
+    const hasAssetSale = Array.isArray(action?.quellen) && action.quellen.some(
+        source => source?.kind && source.kind !== 'liquiditaet'
+    );
+    const steuerPlanGesamt = hasAssetSale ? (Number(action.steuer) || 0) : 0;
+    const nettoErloesPlan = hasAssetSale ? (Number(action.nettoErlös) || 0) : 0;
+    const bruttoVerkaufGesamt = hasAssetSale
+        ? action.quellen.reduce(
+            (summe, source) => summe + (source?.kind === 'liquiditaet' ? 0 : (Number(source?.brutto) || 0)),
+            0
+        )
+        : 0;
+    const taxCashAdjustment = hasAssetSale
+        ? steuerPlanGesamt - taxSettlement.taxDue
+        : 0;
+
+    if (taxCashAdjustment < -0.01) {
+        throw new Error(
+            `Steuerreserve-Contract verletzt: finale Steuer uebersteigt Planreserve um ${Math.abs(taxCashAdjustment).toFixed(2)} EUR.`
+        );
+    }
+
+    const verwendungen = {
+        liquiditaet: Number(action?.verwendungen?.liquiditaet) || 0,
+        gold: Number(action?.verwendungen?.gold) || 0,
+        aktien: Number(action?.verwendungen?.aktien) || 0
+    };
+    if (hasAssetSale) {
+        verwendungen.liquiditaet += taxCashAdjustment;
+        action.nettoErlös = nettoErloesPlan + taxCashAdjustment;
+    } else if (action?.type === 'NONE') {
+        action.nettoErlös = 0;
+    }
+
+    action.bruttoVerkaufGesamt = bruttoVerkaufGesamt;
+    action.steuerPlanGesamt = steuerPlanGesamt;
+    action.nettoErlösPlan = nettoErloesPlan;
+    action.taxCashAdjustment = taxCashAdjustment;
+    action.verwendungen = verwendungen;
     action.taxRawAggregate = actionRawAggregate;
     action.taxSettlement = taxSettlement.details;
     // NOTE: action is passed by reference to the UI payload below.
