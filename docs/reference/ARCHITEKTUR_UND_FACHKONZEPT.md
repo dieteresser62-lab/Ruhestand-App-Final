@@ -2,8 +2,8 @@
 
 **Technische Dokumentation der DIY-Software für Ruhestandsplanung**
 
-**Dokumentstand:** 2026-06-12
-**Geprüfte Codebasis:** lokale Arbeitskopie vom 2026-06-12
+**Dokumentstand:** 2026-07-04
+**Geprüfte Codebasis:** Commit-Stand bis 2026-06-17, abgeglichen mit der lokalen Arbeitskopie am 2026-07-04
 **Engine API:** v31.0
 **Codeumfang:** Momentaufnahme, siehe Komponenten-Tabelle
 **Lizenz:** MIT
@@ -41,10 +41,10 @@
 | Komponente | Zweck | Momentaufnahme |
 |------------|-------|----------------|
 | **Balance-App** | Jahresplanung: Liquidität, Entnahme, Steuern, Transaktionen, Ausgaben-Check, Pflegebucket-Diagnose, Jahresabschluss-Snapshots | 35 JS-Module unter `app/balance/` |
-| **Simulator** | Monte-Carlo-Simulation, Parameter-Sweeps, Auto-Optimize, Dynamic Flex, Pflegebucket-Wirklogik | 87 JS-Module unter `app/simulator/` |
-| **Engine** | Kern-Berechnungslogik, Guardrails, Steuern | 24 MJS-Module unter `engine/`, ca. 4.240 Zeilen |
+| **Simulator** | Monte-Carlo-Simulation, Parameter-Sweeps, Auto-Optimize, Dynamic Flex, Stationary Bootstrap, Tail-Risk-Overlay, Pflegebucket-Wirklogik | 95 JS-Module unter `app/simulator/` |
+| **Engine** | Kern-Berechnungslogik, Guardrails, Steuern, kontinuierliche Regime-Signale und VPW-Rendite-Policy | 27 MJS-Module unter `engine/` |
 | **Workers** | Parallelisierung für MC/Sweep/Optimizer-Pfade | 3 JS-Module unter `workers/`, ca. 757 Zeilen |
-| **Tests** | Unit-, Integration-, Browser-Smoke- und Coverage-Gates | 91 `*.test.mjs` Dateien; 2382 Assertions im Lauf vom 2026-06-15; Coverage-Baseline 72,25% |
+| **Tests** | Unit-, Integration-, Browser-Smoke- und Coverage-Gates | 101 `*.test.mjs` Dateien; Assertions- und Coverage-Zahlen sind laufbezogen und werden in `tests/README.md` gepflegt |
 | **Profile, Tranchen, Shared** | Profilverwaltung, Profilverbund, Tranchenstatus, gemeinsame Utilities | JS-Module unter `app/profile/`, `app/tranches/`, `app/shared/`, zusammen ca. 2.959 Zeilen |
 
 *Hinweis: Dieses Dokument beschreibt Konzepte und Architekturentscheidungen. Für konkrete Implementierungsdetails gelten die genannten Module und Tests als Referenz; exakte Code-Zeilen werden bewusst vermieden, weil sie nach Refactorings schnell veralten.*
@@ -70,12 +70,31 @@ Die Ruhestand-Suite kombiniert folgende Funktionen:
 15. **Pflegebucket** als gesperrte Geldmarkt-/Cash-Reserve mit Profildefinition, Simulator-Air-Gap, Pflegegrad-Trigger, Monte-Carlo-KPIs und Balance-Diagnose
 16. **Mindest-Flex p.a.** als optionale Untergrenze für Flex-Ausgaben in gekürzten Safety-/Guardrail-Jahren; ratenbasiert, validiert gegen den Flex-Bedarf und in Balance, Simulator, Backtest, Monte Carlo, Sweep, Auto-Optimize und Profilverbund integriert
 17. **Internes Jahresabschluss-Snapshot-Archiv** mit Pre-Mutation-Snapshots, separatem Browser-/Tauri-Speicher und Standard-Restore mit Profilzuordnungspruefung
+18. **Stationary Bootstrap** mit variablen Blocklaengen, deterministischem Run-State und Worker-Paritaet als Alternative zum festen Block-Bootstrap
+19. **Kontinuierliche Regime-Signale** fuer Drawdown, CAPE und Runway; die geglaettete Runway-Zielsteuerung ist additiv und standardmaessig deaktiviert
+20. **Tail-Risk-/Crash-Overlay** als expliziter, standardmaessig deaktivierter Monte-Carlo-Stresstest mit Anti-Doppelpessimismus, eigenen KPIs und exportierbaren Ereignisfeldern
 
 ## Bekannte Einschränkungen
 
-- Stationary Bootstrap ist implementiert, aber noch ohne explizites Fat-Tail-Overlay
-- Keine expliziten Fat Tails im Return-Modell
+- Das Tail-Risk-Overlay ist eine synthetische Ereignis-Injektion fuer Monte Carlo, kein kalibriertes GARCH-/Student-t-Modell und keine Prognose. Es ist standardmaessig deaktiviert.
+- Historische Krisen und synthetische Tail-Risk-Ereignisse werden durch eine Skip-Regel gegen doppelte Return-Schocks geschuetzt; diese Heuristik ersetzt keine gemeinsame statistische Kalibrierung beider Risikomodelle.
+- Kontinuierliche Runway-Zielglaettung und die kontinuierliche CAPE-Rendite-Policy sind vorhanden, bleiben aber opt-in. Die diskreten Bestandsdefaults bleiben dadurch reproduzierbar.
 - Index-Variante (`msci_eur`) siehe Abschnitt C.3.3
+
+## Nachgezogene Entwicklungspakete seit dem Dokumentstand 2026-06-12
+
+Die Bestandsaufnahme vom 2026-07-04 hat die abgeschlossenen Arbeitsdokumente unter `docs/internal/archive/` gegen Code und Referenzen abgeglichen. Fuer den fachlichen und technischen Gesamtstand sind vor allem folgende Pakete relevant:
+
+| Paket | Ergebnis im aktuellen System | Architektur-/Fachauswirkung |
+|-------|------------------------------|-----------------------------|
+| Testabdeckung-Erweiterung | Node-Standardsuite, V8-Coverage, Playwright-Browser-Smokes, Worker-/UI-/Persistenz-Gates | Tests sind ein mehrstufiges Gate; Coverage ist kein Ersatz fuer Browser- oder Tauri-Validierung |
+| Konservatives Langlebigkeitsmodell | optionale Quantil-, relative und feste Horizontpuffer; Joint-to-Single-Glaettung | Demographische Horizontableitung bleibt in der App-Schicht; die Engine erhaelt den effektiven Horizont plus Diagnose |
+| Kontinuierliche CAPE-Rendite | `cape_continuous` neben `legacy_step` | Policy ist in `vpw-return-policy.mjs` gekapselt; kein Default-Wechsel, da fachlich relevante Ergebnisdeltas bestehen |
+| Regime-Uebergangs-Glaettung | kontinuierliche Severity-Signale und optional interpoliertes Runway-Ziel | Diskrete Regime und harte Sicherheitsgrenzen bleiben autoritativ; Zielglaettung ist per Feature-Config aus |
+| Stationary Bootstrap | variable Blocklaengen mit deterministischem Sampler-State | neue MC-Samplingmethode `stationary`; Filter/Recency/CAPE greifen nur an Blockstarts |
+| Tail-Risk-/Crash-Modell V1 | deterministisches Ereignis-Overlay, Anti-Doppelpessimismus, KPIs und Logexport | getrennte Stressschicht nach historischem Sampling; nur Monte Carlo, opt-in, keine Mutation der Quelldaten |
+
+Die Detailvertraege stehen in den jeweiligen Fachabschnitten dieses Dokuments. Die archivierten Plaene bleiben Entstehungs- und Entscheidungsnachweis, sind aber keine Laufzeit-Source-of-Truth.
 
 ## Anlagephilosophie und Eignung
 
@@ -225,10 +244,10 @@ Die Suite umfasst mehrere HTML-Oberflächen und Begleitmodule: Neben Balance und
 **Aktuelle Bestandszahlen (2026-06-12):**
 
 - `app/balance/`: 35 JS-Module
-- `app/simulator/`: 87 JS-Module
-- `engine/`: 24 MJS-Module
+- `app/simulator/`: 95 JS-Module
+- `engine/`: 27 MJS-Module
 - `workers/`: 3 JS-Module
-- `tests/`: 91 Testdateien
+- `tests/`: 101 `*.test.mjs`-Dateien
 
 ## B.1.2 Tauri Desktop-App (Portable EXE)
 
@@ -716,12 +735,12 @@ Der Simulator ist deshalb nicht nur ein UI-Wrapper um `EngineAPI.simulateSingleY
 | **Portfolio und Tranchen** | `simulator-portfolio.js`, `simulator-portfolio-*.js`, `simulator-portfolio-tranches.js`, `simulator-portfolio-chart.js`, `simulator-year-portfolio.js` | Startportfolio, Detailtranchen, Renditefortschreibung, Aktien/Gold/Bonds, Anzeige und Reduktion von Portfolio-Bausteinen |
 | **Jahressimulation** | `simulator-engine-wrapper.js`, `simulator-engine-direct.js`, `simulator-engine-input.js`, `simulator-engine-direct-utils.js`, `simulator-year-result.js`, `simulator-household-pension.js`, `simulator-accumulation-year.js` | Jahr-für-Jahr-Simulation, Engine-Input-Mapping, Rente/Witwenlogik, Ansparjahre, Ergebnis- und Logshape |
 | **Sondersituationen nach Engine-Call** | `simulator-forced-sale.js`, `simulator-tax-recompute.js`, `simulator-bond-refill.js` | Liquiditätsdeckung nach Auszahlung, Forced Sales, Gesamt-Settlement-Recompute, 3-Bucket-Bond-Verkauf und Wiederauffüllung |
-| **Monte Carlo** | `simulator-monte-carlo.js`, `monte-carlo-runner.js`, `monte-carlo-ui.js`, `mc-run-context.js`, `mc-year-sampling.js`, `mc-life-events.js`, `mc-stress-tracker.js`, `mc-log-builder.js`, `mc-run-metrics.js`, `monte-carlo-aggregates.js`, `monte-carlo-runner-utils.js`, `scenario-analyzer.js` | Run-Orchestrierung, deterministische Seeds, Startjahr-/CAPE-Sampling, Life-State, Stressmetriken, Logs, KPIs, Szenarioauswahl |
+| **Monte Carlo** | `simulator-monte-carlo.js`, `monte-carlo-runner.js`, `monte-carlo-ui.js`, `mc-run-context.js`, `mc-year-sampling.js`, `stationary-bootstrap-contract.js`, `stationary-bootstrap-sampler.js`, `tail-risk-contract.js`, `tail-risk-overlay.js`, `mc-life-events.js`, `mc-stress-tracker.js`, `mc-log-builder.js`, `mc-run-metrics.js`, `monte-carlo-aggregates.js`, `monte-carlo-runner-utils.js`, `scenario-analyzer.js` | Run-Orchestrierung, deterministische Seeds, Startjahr-/CAPE-/Bootstrap-Sampling, Tail-Risk-Overlay, Life-State, Stressmetriken, Logs, KPIs, Szenarioauswahl |
 | **Backtest, Sweep und Optimierung** | `simulator-backtest.js`, `simulator-sweep.js`, `sweep-runner.js`, `simulator-sweep-utils.js`, `simulator-heatmap.js`, `simulator-optimizer.js`, `simulator-visualization.js`, `auto_optimize*.js` | Historische Pfade, Sensitivitätsraster, Worker-kompatible Sweep-Runs, Heatmaps, Sensitivität/Pareto, automatische Parameteroptimierung |
 | **Ergebnisdarstellung** | `simulator-results.js`, `results-metrics.js`, `results-renderers.js`, `results-formatting.js`, `simulator-formatting.js`, `simulator-main-helpers.js` | KPI-Karten, Szenario-/Backtest-Logs, CSV/JSON-Export, Spaltenkonfiguration, Formatierung |
 | **Daten und Shared Utilities** | `simulator-data.js`, `simulator-utils.js`, `cape-utils.js`, `app/shared/shared-formatting.js` | Historische Daten, Mortalität/Pflege/Stress-Presets, RNG/Statistik, CAPE-Kandidaten, gemeinsame Formatter |
 
-**Aktueller Bestand (2026-05-23):** 87 JS-Module unter `app/simulator/`. Profil-, Tranchen- und Shared-Module liegen teilweise außerhalb des Simulator-Ordners, sind aber Teil des fachlichen Datenflusses.
+**Aktueller Bestand (2026-07-04):** 95 JS-Module unter `app/simulator/`. Profil-, Tranchen- und Shared-Module liegen teilweise außerhalb des Simulator-Ordners, sind aber Teil des fachlichen Datenflusses.
 
 ### B.3.2 Hauptflüsse
 
@@ -788,6 +807,7 @@ Die Sampling-Logik umfasst:
 | `FILTER` | harte Begrenzung, z. B. Ausschluss früher Nachkriegsjahre |
 | `RECENCY` | exponentielle Gewichtung jüngerer Historie über Half-Life |
 | `block_bootstrap` | Blöcke zusammenhängender Jahre zur Erhaltung von Autokorrelation |
+| `stationary` | variable Blocklaengen; Neustartwahrscheinlichkeit `1 / erwartete Blocklaenge`, deterministisch pro Run |
 | `regime` | Markov-artige Regime-Transitions auf Basis historischer Regime |
 
 Workers werden für Monte Carlo, Sweep und Auto-Optimize eingesetzt. `workers/worker-pool.js` steuert Queue, Chunking und Fallbacks; `workers/mc-worker.js` führt Worker-Jobs aus; Telemetrie ist optional und dev-only. Detaillierte Logs werden bewusst nicht für jeden Run im Worker transportiert, sondern nur für ausgewählte Szenarien aufgebaut.
@@ -1011,7 +1031,7 @@ Balance und Simulator nutzen die gleiche Erkennung für Bond-Tranchen. Der Simul
 
 ## B.5 Test-Suite und Validierungsregeln
 
-**Übersicht:** Die Test-Suite umfasst in der geprüften Arbeitskopie **91 `*.test.mjs`-Dateien**. Der Lauf vom 2026-06-15 ergab **2382 Assertions**, alle erfolgreich. Die V8-Coverage-Baseline vom 2026-06-12 liegt bei **72,25%** (19352/26784 ausfuehrbare Zeilen, 162 Projektdateien). Die Tests laufen ohne Jest/Mocha über native Node.js-ESM-Module und eigene globale Assertions (`assert`, `assertEqual`, `assertClose`).
+**Übersicht:** Die Test-Suite umfasst in der geprüften Arbeitskopie **101 `*.test.mjs`-Dateien**. Assertions und Coverage sind Ergebnisse eines konkreten Laufs und werden deshalb nicht als dauerhafte Architekturkennzahl festgeschrieben; aktuelle Baselines und Gate-Kommandos stehen in `tests/README.md`. Die Tests laufen ohne Jest/Mocha über native Node.js-ESM-Module und eigene globale Assertions (`assert`, `assertEqual`, `assertClose`).
 
 ### B.5.1 Test-Inventar
 
@@ -1022,6 +1042,7 @@ Balance und Simulator nutzen die gleiche Erkennung für Bond-Tranchen. Der Simul
 | **Transaktionen, Steuern, Tranchen** | `transaction-*.test.mjs`, `tax-settlement.test.mjs`, `core-tax-settlement.test.mjs`, `depot-tranches.test.mjs`, `tranchen-manager-*.test.mjs` | Verkäufe, Rebalancing, Gold/Liquidität, Rohaggregate, Jahres-Settlement, Cost-Basis- und Tranchenverwaltung |
 | **Balance-App** | `balance-smoke.test.mjs`, `balance-reader.test.mjs`, `balance-storage*.test.mjs`, `balance-annual-*.test.mjs`, `balance-diagnosis-*.test.mjs`, `balance-expenses.test.mjs`, `balance-renderer-*.test.mjs` | Initialisierung, DOM-Input, Storage/Snapshots, Jahresupdate, CAPE, Diagnose, Ausgaben-Check, Rendering |
 | **Simulator, Monte Carlo, Sweep, Optimierung** | `simulation.test.mjs`, `simulator-*.test.mjs`, `monte-carlo-*.test.mjs`, `auto-optimizer.test.mjs`, `auto-optimize-worker-contract.test.mjs`, `scenario-analyzer.test.mjs`, `scenarios.test.mjs`, `care-meta.test.mjs`, `health-bucket.test.mjs`, `portfolio.test.mjs` | Jahresloops, Backtest, MC-Sampling, Worker-Merge, Sweep, mehrphasige Auto-Optimize-Pipeline, Pflege, Pflegebucket, Szenarien, Portfolio |
+| **Neue stochastische und VPW-Contracts** | `stationary-bootstrap-contract.test.mjs`, `stationary-bootstrap-sampler.test.mjs`, `tail-risk-contract.test.mjs`, `tail-risk-overlay.test.mjs`, `longevity-*.test.mjs`, `vpw-return-policy.test.mjs`, `regime-signals.test.mjs` | Parametergrenzen, deterministische Schedules/Sampler, Nicht-Mutation, Anti-Doppelpessimismus, Horizontpuffer, CAPE-Fallbacks und kontinuierliche Signale |
 | **Profile und Profilverbund** | `profile-storage.test.mjs`, `profile-state.test.mjs`, `profile-navigation.test.mjs`, `profile-asset-values.test.mjs`, `profilverbund-*.test.mjs`, `simulator-multiprofile-aggregation.test.mjs` | Profilregistry, Navigation/State, Assetwerte, Multi-Profil-Aggregation, profilbezogene Tranchen |
 | **Worker, Utilities und Formatierung** | `worker-parity.test.mjs`, `worker-pool.test.mjs`, `utils.test.mjs`, `formatting.test.mjs`, `feature-flags.test.mjs` | deterministische Worker-Parität, Pool-Lifecycle, RNG/Statistik, Formatter, Feature-Flags |
 
@@ -1053,6 +1074,8 @@ assertEqual(mainResult.successRate, workerResult.successRate);
 ```
 
 Worker- und Optimizer-Pfade sind kritisch, weil Monte Carlo, Sweep und Auto-Optimize Ergebnisse chunkweise berechnen. `worker-parity.test.mjs` und `auto-optimize-worker-contract.test.mjs` sichern, dass Chunking, Worker-Merge und serielle Ausführung fachlich dieselben Aggregate liefern.
+
+Der aktuelle Paritaetstest umfasst explizit auch Continuous-CAPE, Langlebigkeits-Horizonte, Stationary Bootstrap und Tail-Risk-Metriken. Die fachliche Aussage ist begrenzt: Paritaet beweist gleiche Berechnung in seriellen und gechunkten Pfaden, nicht die empirische Guete der Modellannahmen.
 
 ### B.5.4 Test-Prioritäten
 
@@ -2729,6 +2752,10 @@ Longevity-Felder sind auch hier nicht optimierbar und werden nicht per Champion-
 | **Tranchen-Management** | ✅ FIFO+Online | ❌ | ⚠️ | ❌ | ❌ | ❌ |
 | **Parameter-Sweeps** | ✅ Heatmap | ❌ | ❌ | ⚠️ | ❌ | ❌ |
 | **Dynamic Flex (VPW)** | ✅ CAPE+Sterbetafel | ❌ | ❌ | ❌ | ❌ | ⚠️ RMD |
+| **Konservativer Langlebigkeitsaufschlag** | ✅ Quantil/relativ/feste Jahre | nicht separat ausgewiesen | Longevity-Alter als Planannahme | nicht separat ausgewiesen | ❌ | ❌ |
+| **MC-Sampling transparent waehlbar** | ✅ historisch/CAPE/Block/Stationary/Regime | historische und zufaellige Simulation oeffentlich beschrieben | Normalverteilungs-MC, 1.000 Laeufe | historische Analyse + MC | ❌ nur historische Sequenzen | mehrere MC-Modelle |
+| **Explizites Tail-Risk-/Crash-Overlay** | ✅ opt-in, Ereignis-KPIs | in ausgewerteter Produktdoku nicht separat ausgewiesen | Bear-Market-Szenario manuell; MC normalverteilt dokumentiert | in ausgewerteter Produktdoku nicht separat ausgewiesen | ❌ | in ausgewerteter Produktdoku nicht separat ausgewiesen |
+| **Kontinuierliche Regime-/Runway-Signale** | ✅ opt-in Zielglaettung | nicht separat ausgewiesen | erfolgsquotenbasierte Spending Guardrails dokumentiert | nicht separat ausgewiesen | strategieabhaengig | nicht separat ausgewiesen |
 | **Mindest-Flex p.a.** | ⚠️ experimentelle Komfort-Untergrenze | ❌ | ❌ | ❌ | ❌ | ❌ |
 | **Auto-Optimize** | ✅ LHS + Quick/Refine/Validate | ❌ | ❌ | ✅ | ❌ | ❌ |
 | **Ausgaben-Check** | ✅ CSV+Median | ❌ | ❌ | ❌ | ❌ | ❌ |
@@ -2756,6 +2783,12 @@ Longevity-Felder sind auch hier nicht optimierbar und werden nicht per Champion-
 13. **Dynamic Flex (VPW) mit Sterbetafeln** — Variable Percentage Withdrawal mit CAPE-basierter Renditeerwartung, EMA-Glättung, Mortality-Table-Horizont (Single/Joint, Mean/Quantil) und Go-Go-Phase. Integriert in Balance-App, Backtest, Monte Carlo, Parameter-Sweep und Auto-Optimize. Kein anderes verglichenes Tool kombiniert VPW mit Guardrails und deutscher Steuer.
 14. **Pflegebucket mit Engine-Air-Gap** — Zweckgebundene Geldmarkt-/Cash-Reserve wird aus der VPW-/Runway-Basis herausgerechnet, bei Pflegegrad-Triggern freigegeben und in Backtest/Monte Carlo separat ausgewiesen.
 15. **Mindest-Flex p.a. als experimentelle Komfort-Policy** — Nutzerdefinierte Untergrenze für flexible Ausgaben in gekürzten Guardrail-/Safety-Jahren. Diese konkrete Regel ist eine Novität der Suite und nicht als wissenschaftlich validierte Entnahmestrategie belegt; sie wird deshalb transparent als nachgelagerte, notfallbegrenzte Policy behandelt.
+16. **Stationary Bootstrap mit Worker-Paritaet** — Variable historische Blocklaengen sind neben festem Block-Bootstrap, CAPE-, Recency- und Regime-Sampling explizit waehlbar. Der Vorteil ist methodische Transparenz, nicht automatisch bessere Prognoseguete.
+17. **Tail-Risk-Overlay mit Ereignisdiagnose** — Seltene Crash-/Inflationsereignisse koennen als opt-in Stresstest injiziert und ueber aktive, angewandte und wegen historischer Krisen uebersprungene Ereignisse nachvollzogen werden. Der Vergleich belegt keine Exklusivitaet gegen nicht oeffentlich dokumentierte Konkurrenzfunktionen.
+18. **Konservative Langlebigkeitsannahmen als gesperrte Sicherheitsparameter** — Quantil-, relative und feste Horizontpuffer wirken auf den finalen Haushalts-Horizont und koennen nicht durch Sweep oder Auto-Optimize wegoptimiert werden.
+19. **Kontinuierliche Signale bei diskreten Sicherheitsgrenzen** — Drawdown, CAPE und Runway koennen Zielwerte stetig erklaeren, ohne harte Mindest-Runways oder diskrete Krisenregeln aufzuweichen; die Zielglaettung bleibt fuer Bestandskompatibilitaet standardmaessig aus.
+
+**Vergleichsgrenze:** Die Matrix vergleicht nur oeffentlich dokumentierte Funktionen der ausgewerteten Produktquellen. „Nicht separat ausgewiesen“ bedeutet nicht, dass eine interne Funktion sicher fehlt. Insbesondere sind Sampling-Verfahren, Verteilungsannahmen und Stresslogik kommerzieller Produkte oft nur teilweise offengelegt und deshalb nicht belastbar auf Implementierungsniveau vergleichbar.
 
 ## D.5 Einordnung des Pflegebuckets
 
@@ -2841,11 +2874,15 @@ Die Stärke des Buckets ist nicht, dass er mehr Vermögen erzeugt. Er erhöht Mo
 
 **Status:** ✅ Block-Bootstrap und Stationary Bootstrap implementiert. Stationary Bootstrap nutzt variable Blocklaengen mit deterministischem per-run Sampler-State; Fat-Tail-/Crash-Overlays bleiben separat.
 
+**Einordnung:** Stationary Bootstrap verbessert gegenueber IID-Sampling die Abbildung lokaler Abhaengigkeiten, erzeugt aber keine neuen Extremrenditen ausserhalb der historischen Stichprobe. Deshalb bleibt das Tail-Risk-Overlay eine getrennte Stressannahme. Ein kombinierter Lauf muss als Szenarioanalyse interpretiert werden, nicht als statistisch kalibrierte Wahrscheinlichkeitsprognose.
+
 ## E.6 Fat Tails / Regime Switching
 
 **Stand der Forschung:** Student-t oder GARCH erfassen Tail-Risiken besser als Normalverteilung.
 
-**Status:** Regime-Switching via Markov-Chain implementiert; keine expliziten Fat Tails im Return-Modell
+**Status:** Regime-Switching via Markov-Chain und ein separates Tail-Risk-/Crash-Overlay V1 sind implementiert. Das Overlay injiziert seltene, begrenzte Aktien- und Inflationsschocks als expliziten Monte-Carlo-Stresstest. Es ist kein parametrisch kalibriertes Fat-Tail-Return-Modell, bleibt standardmaessig deaktiviert und ueberspringt historische Krisenjahre, um offensichtliche Doppelschocks zu vermeiden.
+
+**Vergleichsrelevanz:** Gegenueber normalverteilungsbasierten Monte-Carlo-Modellen macht die Suite die zusaetzliche Tail-Annahme sichtbar und abschaltbar. Gegenueber rein historischen Simulationen kann sie bislang unbeobachtete Schockkombinationen untersuchen, bezahlt dies aber mit subjektiv gesetzten Wahrscheinlichkeit-, Schock-, Dauer- und Cooldown-Parametern. Ein schlechteres Ergebnis mit Overlay ist daher ein Sensitivitaetsbefund, keine empirisch geschaetzte Ausfallwahrscheinlichkeit.
 
 ## E.7 VPW / Variable Percentage Withdrawal
 
@@ -2998,6 +3035,11 @@ Der Pflegebucket verbindet mehrere Forschungs- und Praxislinien, ohne selbst ein
 28. **CAPE-basierte Realrendite mit EMA-Glättung** (`core.mjs:_calculateExpectedRealReturn`)
 29. **Sterbetafel-Horizont (Single/Joint, Mean/Quantil)** (`simulator-engine-helpers.js`)
 30. **Dynamischer MC-Horizont pro Simulationsjahr** (`monte-carlo-runner.js:computeDynamicFlexHorizonForYear`)
+31. **Kontinuierliche Regime-Signale** (`regime-signals.mjs:buildRegimeSignalSnapshot`)
+32. **Kontinuierliche CAPE-Rendite-Policy** (`vpw-return-policy.mjs:deriveVpwExpectedRealReturn`)
+33. **Konservative Langlebigkeitsanpassung** (`dynamic-flex-longevity-horizon.js`)
+34. **Stationary-Bootstrap-Sampler** (`stationary-bootstrap-sampler.js:nextYearSample`)
+35. **Tail-Risk-Ereignisplan und Overlay** (`tail-risk-overlay.js:createTailRiskSchedule`, `applyTailRiskOverlay`)
 
 ---
 
@@ -3010,6 +3052,7 @@ Der Pflegebucket verbindet mehrere Forschungs- und Praxislinien, ohne selbst ein
 - [Pralana](https://pralanaretirementcalculator.com/) | [Review](https://www.caniretireyet.com/pralana-online-retirement-calculator-review/)
 - [Portfolio Visualizer Monte Carlo](https://www.portfoliovisualizer.com/monte-carlo-simulation)
 - [FI Calc](https://ficalc.app/)
+- [Boldin: Monte-Carlo-Methodik](https://help.boldin.com/en/articles/5805671-boldin-s-monte-carlo-simulation)
 - [White Coat Investor: Best Retirement Calculators 2025](https://www.whitecoatinvestor.com/best-retirement-calculators-2025/)
 
 ### Forschung
@@ -3025,4 +3068,4 @@ Der Pflegebucket verbindet mehrere Forschungs- und Praxislinien, ohne selbst ein
 
 ---
 
-*Technische Dokumentation der Ruhestand-Suite. Algorithmen-Beschreibungen sind konzeptionell; konkrete Implementierungsdetails stehen in den genannten Modulen und Tests. Dokumentstand: 2026-05-23.*
+*Technische Dokumentation der Ruhestand-Suite. Algorithmen-Beschreibungen sind konzeptionell; konkrete Implementierungsdetails stehen in den genannten Modulen und Tests. Dokumentstand: 2026-07-04.*

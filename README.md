@@ -11,7 +11,7 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 
 ## Release-Stand
 
-**Aktueller Stand:** 2026-02-15  
+**Aktueller Dokumentationsstand:** 2026-07-04
 **Changelog:** siehe [CHANGELOG.md](CHANGELOG.md)
 
 ---

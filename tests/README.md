@@ -4,7 +4,9 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 90 Testdateien mit 2294 Assertions (verifiziert mit `npm test` in Slice 10 am 2026-06-12)
+**Test-Statistik:** 101 Testdateien mit 2996 erfolgreichen Assertions, 0 fehlgeschlagene Dateien und 0 offene Handles (verifiziert mit `npm test` am 2026-07-04).
+
+Die Zahl beschreibt nur die Node-Standardsuite. `npm run test:browser`, `npm run test:coverage` und ein echter Tauri-Build sind getrennte Gates und in den 2996 Assertions nicht enthalten.
 
 ## Directory Structure
 
@@ -84,6 +86,18 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 ---
 
 ## Test Coverage Areas
+
+### Neuentwicklungen seit Juni 2026
+
+| Entwicklungsbereich | Direkte Tests | Zusaetzliche Integrations-/Paritaetsdeckung |
+|---------------------|---------------|--------------------------------------------|
+| Kontinuierliche Regime-Signale | `regime-signals.test.mjs` | `spending-planner.test.mjs`, Engine-/Diagnose-Contracts |
+| Kontinuierliche CAPE-Return-Policy | `vpw-return-policy.test.mjs` | `core-engine.test.mjs`, `worker-parity.test.mjs`, Balance-Diagnose-Tests |
+| Konservatives Langlebigkeitsmodell | `longevity-contract.test.mjs`, `longevity-horizon.test.mjs` | `longevity-engine-runner.test.mjs`, `longevity-ui-persistence.test.mjs`, `longevity-optimizer-docs.test.mjs`, `worker-parity.test.mjs` |
+| Stationary Bootstrap | `stationary-bootstrap-contract.test.mjs`, `stationary-bootstrap-sampler.test.mjs` | `mc-worker-contract.test.mjs`, `worker-parity.test.mjs` |
+| Tail-Risk-/Crash-Overlay | `tail-risk-contract.test.mjs`, `tail-risk-overlay.test.mjs` | `simulator-input-readers.test.mjs`, `simulator-monte-carlo.test.mjs`, `worker-parity.test.mjs` |
+
+Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-Integration und Worker-/Chunk-Paritaet. Sie belegen keine empirische Kalibrierung des Tail-Risk-Modells und keine Prognoseguete gegen unbekannte kuenftige Marktdaten.
 
 ### 1. Engine Core & Validation
 
@@ -174,6 +188,9 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 **Zweck:** End-to-End-Integration Settlement in Engine.
 - **taxState-Fortschreibung:** `lastState.taxState.lossCarry` wird korrekt propagiert
 - **action.steuer:** Enthält Settlement-Steuer (nicht Sale-Plan-Steuer)
+- **Reserve-Reconciliation:** Plansteuer, Plan-Netto, finale Steuer und einmalige Liquiditaetsgutschrift erfuellen die Cash-Invarianten
+- **Golden Cases:** Kein, teilweiser und ueberdeckender LossCarry sowie No-Transaction
+- **Signierte Tranchen:** Reine Verluste und gemischte Gewinn-/Verlusttranchen bleiben endlich und vorzeichengetreu
 - **taxRawAggregate:** Roh-Aggregate in UI-Ausgabe vorhanden
 - **Default-Robustheit:** `lastState: {}` ohne taxState funktioniert
 
@@ -182,6 +199,9 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 - **Notfallverkauf-Recompute:** Bei Forced Sales werden reguläre + Notfall-Aggregate kombiniert und Settlement neu berechnet
 - **Kein-Notfall-Regression:** Ohne Forced Sale bleibt Engine-Settlement unverändert
 - **Steuerkonsistenz:** `totalTaxesThisYear` kommt aus Settlement
+- **Ausfuehrungsskalierung:** Regulaere Reserve und Rohaggregate verwenden denselben `regularSaleScale`; Forced-Sale-Plansteuer wird ohne zweiten SPB skaliert reserviert
+- **Cash-Reconciliation:** `taxReservedTotal - taxDueFinal` wird genau einmal als `taxCashAdjustment` gebucht
+- **Mehrjahresinvariante:** Zehn deterministische Gewinn-/Verlustjahre mit regulaeren und erzwungenen Verkaeufen zeigen keine kumulative Steuer-/Cash-Drift
 
 #### `transaction-engine-ath.test.mjs`
 **Zweck:** Testet Transaktionsverhalten bei All-Time-High.
