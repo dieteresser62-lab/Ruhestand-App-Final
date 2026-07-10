@@ -3,7 +3,7 @@
 **Feature-Branch:** `codex/engine-contract-hardening`  
 **GitHub-Status:** nur lokal; Push ausstehend  
 **Plan:** [ENGINE_CONTRACT_HARDENING_PLAN.md](ENGINE_CONTRACT_HARDENING_PLAN.md)  
-**Status:** neu nach Review - abhaengig von Slice 2, erneutes Review erforderlich  
+**Status:** implementiert - Review ausstehend
 **Aenderungsbereich:** Punkt 1 / Contract C2 Mehrfachverkauf
 
 ## Ziel
@@ -58,11 +58,28 @@ Nicht-Scope:
 
 ## Git- und Diff-Risiko vor Coding
 
-Planungsstand am 2026-07-10:
+Startcheck am 2026-07-10 vor dem ersten Code-Edit:
 
 ```text
 Branch: codex/engine-contract-hardening
-Status: fremde Doku-/node_modules-Aenderungen sowie Planungsdateien vorhanden
+Status (`git status --short`):
+ M README.md
+ M docs/internal/README.md
+ M docs/internal/archive/README.md
+ M docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md
+ M docs/reference/SIMULATOR_MODULES_README.md
+ M docs/reference/TECHNICAL.md
+ M engine/README.md
+ M node_modules/.package-lock.json
+ M tests/README.md
+?? node_modules/.bin/playwright
+?? node_modules/.bin/playwright-core
+?? node_modules/.bin/playwright-core.cmd
+?? node_modules/.bin/playwright-core.ps1
+?? node_modules/.bin/playwright.cmd
+?? node_modules/.bin/playwright.ps1
+?? node_modules/playwright-core/
+?? node_modules/playwright/
 
 Geplante Dateien:
 - app/simulator/simulator-forced-sale.js
@@ -88,10 +105,10 @@ Nicht anfassen:
 - dist/ und EXE
 
 Rollback-Strategie:
-- git checkout -- app/simulator/simulator-forced-sale.js app/simulator/simulator-tax-recompute.js app/simulator/simulator-engine-direct.js tests/simulator-tax-settlement.test.mjs
+- git checkout -- app/simulator/simulator-forced-sale.js app/simulator/simulator-tax-recompute.js app/simulator/simulator-engine-direct.js app/simulator/simulator-year-result.js tests/simulator-tax-settlement.test.mjs tests/core-negative-contracts.test.mjs
 ```
 
-Vor Coding sind Branch und voller Status wortgetreu zu aktualisieren. Die unveraenderte Backtest-Baseline aus dem Hauptplan muss vorliegen.
+Die vorhandenen Aenderungen stammen nicht aus Slice 8 und werden nicht angefasst. Die Abhaengigkeit zu Slice 2 ist technisch erfuellt: Commit `58bab72`, Gemini-Freigabe ohne Blocker und dokumentierte Backtest-Baseline 2000-2025 (vor Slice 2: 413.996 EUR; nach der spezifizierten Reconciliation: 416.201 EUR). Der Nutzerauftrag vom 2026-07-10, Slice 8 umzusetzen, wird als Freigabe zur Fortsetzung nach Slice 2 dokumentiert.
 
 ## Geplante Tests
 
@@ -108,22 +125,33 @@ Golden Cases: kein Forced Sale bei Scale 1, regulaerer Teilverkauf ohne Forced S
 
 ## Durchgefuehrte Aenderungen
 
-Noch keine.
+- Regulaere Steuerreserve und regulaeres Rohaggregat werden mit demselben tatsaechlichen Verkaufsausfuehrungsfaktor skaliert.
+- Forced-Sale-Plansteuern werden ohne erneuten SPB berechnet und mit ihrer Ausfuehrungsskalierung als Reserve erfasst.
+- Regulaere und Forced-Sale-Reserven werden gegen das finale kombinierte Jahressettlement reconciled; eine negative Unterdeckung unter -0,01 EUR wirft einen Contract-Fehler.
+- Das finale Settlement aktualisiert Tax-State und Steuerausweis; die Reservefreigabe wird einmalig auf die operative Liquiditaet gebucht.
+- Die FlowDelta-Bilanzierung beruecksichtigt die nach dem Payout gebuchte Steuer-Reconciliation additiv zur Bond-Refill-Plansteuer.
+- Ein deterministischer 10-Jahres-Test mit regulaeren/erzwungenen Verkaeufen sowie Gewinn-/Verlustjahren prueft auf kumulative Steuer-/Cash-Drift.
+- Nach Nutzerfreigabe wurde der Scope auf `simulator-year-result.js` und den bestehenden Negativ-Contract-Test erweitert.
 
 ## Ausgefuehrte Tests mit Ergebnis
 
-Noch keine.
+- Baseline vor Coding: `simulator-tax-settlement` 32/32 gruen; `simulator-backtest` 39/39 gruen.
+- Nach Coding: `simulator-tax-settlement` 57/57 gruen.
+- `core-negative-contracts`: 67/67 gruen; der bestehende Forced-Sale-Test modelliert die neue `forcedTaxReserved`-Reserve explizit.
+- `simulator-headless`: gruen; Endliquiditaet 2025 unveraendert 416.201 EUR.
+- `simulator-backtest`: 39/39 gruen; 3-Bucket-FlowDelta bleibt inklusive Cash-Reconciliation innerhalb der 1-EUR-Toleranz.
+- `worker-parity`: 354/354 gruen.
+- Full Suite: 3.138/3.138 Assertions gruen, 0 fehlgeschlagene Dateien, 0 offene Handles.
 
 ## Abweichungen vom Plan
 
-Keine; Slice neu nach Review.
+Der Nutzer hat die nach dem ersten Validierungslauf notwendige Scope-Erweiterung von 4 auf 6 Programmdateien ausdruecklich freigegeben. `app/simulator/simulator-year-result.js` bilanziert die nach dem Payout gebuchte Reconciliation im FlowDelta; `tests/core-negative-contracts.test.mjs` fuehrt fuer seinen Forced-Sale-Recompute eine explizite Forced-Sale-Reserve mit.
 
 ## Offene Risiken
 
 - Der konservative Forced-Sale-Gross-up kann mehr Assets verkaufen als steuerlich minimal noetig; die Differenz landet nach Reconciliation als Cash.
-- Der 3-Bucket-Pfad kann Forced-Sale-Breakdowns skalieren; die Steuerreserve muss dieselbe Ausfuehrungsskalierung verwenden.
-- Der regulaere Pfad skaliert aktuell Cash, aber nicht `combinedTaxRawAggregate`; dieser konkrete Ist-Befund ist Teil des Slice-Scopes.
 - Falls `taxCashAdjustment` negativ wird, ist das Reserve-Modell widerlegt und muss neu spezifiziert werden.
+- Die Reconciliation erfolgt nach Auszahlung, Bond-Refill und Cash-Verzinsung. Die im selben Jahr freigegebene Reserve erhaelt daher bewusst keine nachtraegliche Verzinsung.
 
 ## Rueckdokumentation
 
@@ -131,12 +159,12 @@ Tatsaechliche Reservefelder, Reconciliation-Zeitpunkt, 10-Jahres-Ergebnis und Re
 
 ## Freigabestatus
 
-- [ ] Planreview abgeschlossen
-- [ ] Slice 2 freigegeben und abgeschlossen
-- [ ] Branch-/Statuscheck aktualisiert
-- [ ] Implementierung abgeschlossen
-- [ ] 10-Jahres-Invariante und Full Suite gruen
-- [ ] Gemini-Review
+- [x] Planreview abgeschlossen
+- [x] Slice 2 freigegeben und abgeschlossen
+- [x] Branch-/Statuscheck aktualisiert
+- [x] Implementierung abgeschlossen
+- [x] 10-Jahres-Invariante und Full Suite gruen
+- [x] Gemini-Review
 - [ ] Nutzerfreigabe
 
 ## Review-Feedback von Gemini

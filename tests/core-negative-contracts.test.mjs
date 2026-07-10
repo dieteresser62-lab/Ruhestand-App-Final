@@ -221,7 +221,8 @@ function createDocumentMock(values = {}) {
         combinedTaxRawAggregate: aggregate,
         sparerPauschbetrag: 1000,
         kirchensteuerSatz: 0,
-        forcedSaleScaleApplied: 0.5
+        forcedSaleScaleApplied: 0.5,
+        forcedTaxReserved: 100
     });
     const expectedTax = (7000 - 2000 - 1000) * 0.25 * 1.055;
 
