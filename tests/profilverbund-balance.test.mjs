@@ -4,6 +4,7 @@ import {
     aggregateProfilverbundInputs,
     buildProfilverbundAssetSummary,
     buildProfilverbundProfileSummaries,
+    calculateHouseholdWithdrawalNeed,
     calculateTaxPerEuro,
     calculateWithdrawalDistribution,
     loadProfilverbundProfiles,
@@ -291,6 +292,48 @@ global.localStorage = createLocalStorageMock();
     assertEqual(profileSummary.gold, 20, 'Profile summary should use gold tranche value');
     assertEqual(profileSummary.geldmarkt, 30, 'Profile summary should use money-market tranche value');
     assertEqual(profileSummary.totalAssets, 210, 'Profile summary should not double-count aggregate asset fields');
+}
+
+// --- TEST 9: Household need counts shared spending and all income exactly once ---
+{
+    console.log('\n📋 Test 9: household withdrawal need is calculated once');
+    const profiles = [
+        { profileId: 'a', inputs: { floorBedarf: 99999, flexBedarf: 99999, renteAktiv: true, renteMonatlich: 1000 } },
+        { profileId: 'b', inputs: { floorBedarf: 99999, flexBedarf: 99999, renteAktiv: true, renteMonatlich: 500 } }
+    ];
+    const need = calculateHouseholdWithdrawalNeed(profiles, { floorBedarf: 40000, flexBedarf: 10000 });
+    assertEqual(need.grossNeed, 50000, 'Household floor and flex overrides should be used once');
+    assertEqual(need.incomeAnnual, 18000, 'Different profile incomes should be counted once');
+    assertEqual(need.netWithdrawal, 32000, 'Net withdrawal should subtract household income once');
+}
+
+// --- TEST 10: Proportional allocation is cent-exact and deterministic ---
+{
+    console.log('\n📋 Test 10: proportional cent rounding');
+    const profiles = [
+        { profileId: 'a', inputs: { depotwertAlt: 1 } },
+        { profileId: 'b', inputs: { depotwertAlt: 1 } },
+        { profileId: 'c', inputs: { depotwertAlt: 1 } }
+    ];
+    const result = calculateWithdrawalDistribution(profiles, { netWithdrawal: 100 }, 'proportional');
+    assertEqual(result.items[0].withdrawalAmount, 33.34, 'First stable profile should receive the rounding cent');
+    assertEqual(result.items[1].withdrawalAmount, 33.33, 'Second profile should receive its cent-exact share');
+    assertEqual(result.items[2].withdrawalAmount, 33.33, 'Third profile should receive its cent-exact share');
+    assertClose(result.items.reduce((sum, item) => sum + item.withdrawalAmount, 0), 100, 0.001, 'Rounded shares should preserve total need');
+}
+
+// --- TEST 11: Need without financeable assets remains visible ---
+{
+    console.log('\n📋 Test 11: zero assets fail closed');
+    const profiles = [
+        { profileId: 'a', inputs: { depotwertAlt: 0, tagesgeld: 0, runwayTargetMonths: 36 } },
+        { profileId: 'b', inputs: { depotwertAlt: 0, tagesgeld: 0, runwayTargetMonths: 12 } }
+    ];
+    ['tax_optimized', 'proportional', 'runway_first'].forEach(mode => {
+        const result = calculateWithdrawalDistribution(profiles, { netWithdrawal: 1000 }, mode);
+        assertEqual(result.remaining, 1000, `${mode} should retain unfinanceable household need`);
+        assertEqual(result.items.reduce((sum, item) => sum + item.withdrawalAmount, 0), 0, `${mode} should not invent allocations`);
+    });
 }
 
 global.localStorage = prevLocalStorage;

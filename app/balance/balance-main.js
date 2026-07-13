@@ -183,10 +183,21 @@ function update() {
         }
 
         const persistentState = StorageManager.loadState();
+        const lastState = prepareEngineLastState(persistentState, inputData);
 
         // Profilverbund runs are computed only for multi-profile households.
-        const profilverbundRuns = (profilverbundProfiles.length > 1)
-            ? profilverbundHandlers.runProfilverbundProfileSimulations(inputData, profilverbundProfiles)
+        const isMultiProfileHousehold = profilverbundProfiles.length > 1;
+        const householdStateSource = profilverbundProfiles
+            .find(entry => entry?.balanceState?.profilverbundHouseholdLastState)
+            ?.balanceState || persistentState;
+        const householdLastState = isMultiProfileHousehold
+            ? prepareEngineLastState({
+                inputs: householdStateSource.profilverbundHouseholdInputs,
+                lastState: householdStateSource.profilverbundHouseholdLastState
+            }, inputData)
+            : null;
+        const profilverbundRuns = isMultiProfileHousehold
+            ? profilverbundHandlers.runProfilverbundProfileSimulations(inputData, profilverbundProfiles, householdLastState)
             : null;
         if (!profilverbundRuns && typeof window !== 'undefined') {
             window.__profilverbundActionResults = null;
@@ -202,8 +213,8 @@ function update() {
         // Die externe Engine (engine.js) berechnet alle Werte
         // Input: Benutzereingaben + letzter State
         // Output: {input, newState, diagnosis, ui} oder {error}
-        const lastState = prepareEngineLastState(persistentState, inputData);
-        const modelResult = window.EngineAPI.simulateSingleYear(inputData, lastState);
+        const modelResult = profilverbundRuns?.householdResult
+            || window.EngineAPI.simulateSingleYear(inputData, lastState);
 
         // 4. Handle Engine Response
         // Bei Fehler: Exception werfen für einheitliches Error-Handling

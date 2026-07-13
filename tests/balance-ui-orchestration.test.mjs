@@ -459,6 +459,79 @@ async function runBalanceUiOrchestrationTests() {
         assertEqual(window.__profilverbundProfileSummaries, null, 'Leerer Profilverbund loescht alte Profilzusammenfassung');
     }
 
+    console.log('Test 5: Profilverbund decides household spending once and finances only allocated shares');
+    {
+        const documentRef = new MockDocument();
+        const localStorageRef = createLocalStorageMock();
+        installBrowserGlobals(documentRef, localStorageRef);
+        PersistenceFacade.resetPersistenceForTests();
+        localStorageRef.setItem('profilverbund_mode_test', 'proportional');
+
+        const engineCalls = [];
+        window.EngineAPI = {
+            simulateSingleYear(input, lastState) {
+                engineCalls.push({ input: { ...input }, lastState });
+                const isHouseholdCall = engineCalls.length === 1;
+                return {
+                    newState: { call: engineCalls.length },
+                    diagnosis: {},
+                    ui: {
+                        spending: { monatlicheEntnahme: isHouseholdCall ? 3000 : (input.floorBedarf / 12) },
+                        action: { type: 'NONE', verwendungen: {}, quellen: [] }
+                    }
+                };
+            }
+        };
+
+        const handlers = createProfilverbundHandlers({
+            dom: { inputs: {} },
+            PROFILVERBUND_STORAGE_KEYS: { mode: 'profilverbund_mode_test' }
+        });
+        const sharedInput = {
+            floorBedarf: 40000,
+            flexBedarf: 10000,
+            renteAktiv: true,
+            renteMonatlich: 1500,
+            dynamicFlex: true,
+            minimumFlexAnnual: 5000
+        };
+        const profiles = [
+            {
+                profileId: 'a',
+                name: 'A',
+                inputs: { depotwertAlt: 300000, renteAktiv: true, renteMonatlich: 1000 },
+                tranches: [],
+                balanceState: { inputs: {}, lastState: { taxState: { year: 1 } } }
+            },
+            {
+                profileId: 'b',
+                name: 'B',
+                inputs: { depotwertAlt: 100000, renteAktiv: true, renteMonatlich: 500 },
+                tranches: [],
+                balanceState: { inputs: {}, lastState: { taxState: { year: 1 } } }
+            }
+        ];
+
+        const runs = handlers.runProfilverbundProfileSimulations(sharedInput, profiles, { household: true });
+
+        assertEqual(engineCalls.length, 3, 'Engine runs once for household and once per financing profile');
+        assertEqual(engineCalls[0].lastState.household, true, 'Household run receives household guardrail state');
+        assertEqual(runs.householdResult.ui.spending.monatlicheEntnahme, 3000, 'Household result remains available to the main orchestrator');
+        assertClose(runs.distribution.totalNeed, 36000, 0.001, 'Final household spending drives allocation');
+        assertClose(runs[0].input.floorBedarf, 27000, 0.001, 'Profile A finances its proportional share');
+        assertClose(runs[1].input.floorBedarf, 9000, 0.001, 'Profile B finances its proportional share');
+        assertClose(runs[0].input.floorBedarf + runs[1].input.floorBedarf, 36000, 0.001, 'Profile shares preserve household decision');
+        runs.forEach(run => {
+            assertEqual(run.input.flexBedarf, 0, 'Profile engine receives no second flex budget');
+            assertEqual(run.input.renteAktiv, false, 'Profile engine does not subtract income again');
+            assertEqual(run.input.renteMonatlich, 0, 'Profile engine receives no repeated income');
+            assertEqual(run.input.dynamicFlex, false, 'Profile engine cannot make another Dynamic-Flex decision');
+            assertEqual(run.input.minimumFlexAnnual, 0, 'Profile engine cannot reapply minimum flex');
+        });
+        assertEqual(runs[0].persistedInput.renteMonatlich, 1000, 'Original profile income remains in persisted inputs');
+        assertEqual(runs[1].persistedInput.renteMonatlich, 500, 'Second profile income remains in persisted inputs');
+    }
+
     console.log('Balance UI orchestration tests passed');
     console.log('--- Balance UI Orchestration Tests Completed ---');
 }

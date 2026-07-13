@@ -63,7 +63,7 @@
 - Für in Slices geplante Arbeiten gelten zusätzlich die Slice-Regeln in `docs/internal/SLICE_EXECUTION_RULES.md`: 1-basierte Nummerierung, eigener Feature-Branch, eigene Slice-MD, Branch- und Statuscheck sowie Diff-Risiko vor Coding, Stop-Regeln, Abschlussdokumentation, lokaler Git-Commit nach erfolgreichem Review, Freigabe vor Push und Rückdokumentation im Arbeitsplan.
 
 ## Agent Stop Rules
-- Stoppe und frage nach, wenn mehr als 5 Programmdateien (z. B. `.js`, `.mjs`, `.html`, `.css`, `.rs`, `.json`-Konfigurationen; ausgenommen reine Markdown-Dokumente wie `.md`) geändert werden müssten.
+- Stoppe und frage nach, wenn mehr als 10 Programmdateien (z. B. `.js`, `.mjs`, `.html`, `.css`, `.rs`, `.json`-Konfigurationen; ausgenommen reine Markdown-Dokumente wie `.md`) geändert werden müssten.
 - Stoppe und frage nach, wenn Tests nicht ausführbar sind oder die notwendige Validierung nicht sinnvoll ersetzbar ist.
 - Stoppe und frage nach, wenn ein Contract unklar ist.
 - Stoppe und frage nach, wenn bestehende Engine-Semantik verändert werden müsste.

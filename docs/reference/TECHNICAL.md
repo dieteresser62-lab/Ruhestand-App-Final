@@ -165,8 +165,8 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 1. `balance-binder.js` reagiert auf Eingaben (Formular, Tastenkürzel, Buttons) und ruft `debouncedUpdate()` auf.
 2. `balance-reader.js` sammelt alle Inputs und gibt ein strukturiertes Objekt zurück.
 3. `balance-update-pipeline.js` bereitet den Engine-Last-State vor, inklusive Guardrail-Reset und Tax-State-Erhalt.
-4. `balance-main.js` reicht die Inputs an `EngineAPI.simulateSingleYear()` weiter.
-5. `balance-action-postprocessor.js` merged Profilverbund-Actions und kapselt Single-3-Bucket-Postprocessing.
+4. `balance-main.js` reicht die Inputs an `EngineAPI.simulateSingleYear()` weiter. Im Multi-Profil-Fall entsteht genau ein Haushaltslauf; dessen entschiedene Jahresentnahme wird danach centgenau auf feste Profil-Finanzierungsinputs verteilt und nicht erneut als Flex-/Einkommensentscheidung gerechnet.
+5. `balance-action-postprocessor.js` merged die Profil-Finanzierungs-Actions und kapselt Single-3-Bucket-Postprocessing.
 6. `balance-renderer.js` aktualisiert UI-Komponenten und Statusanzeigen mit dem Pipeline-Payload.
 7. `balance-update-pipeline.js` kapselt Diagnose-Anreicherung, Persistenzentscheidung und Ausgabenbudget.
 
@@ -519,6 +519,8 @@ Profile (PersistenceFacade; aktuell Legacy-localStorage-Backend) → app/profile
 - Personen/Renten werden aus der Profilwahl abgeleitet (kein separater Partner-Tab)
 
 ### Profilverbund-Verteilung (Balance-App)
+
+Floor, Flex, Dynamic Flex sowie Renten und sonstige Einkuenfte werden genau einmal im Haushalts-Engine-Lauf verarbeitet. Das Haushaltsresultat ist zugleich das gerenderte Hauptergebnis. Nur die entschiedene Netto-Jahresentnahme wird anschließend auf Profile verteilt; deren Engine-Inputs enthalten einen festen Floor-Finanzierungsanteil und weder Flex noch erneut anzurechnendes Einkommen. Nicht allokierbarer Bedarf blockiert die Profil-Läufe. Haushalts-Guardrail-State und profilbezogener Steuer-State werden getrennt gespeichert.
 
 **Verteilungsmodi:**
 - `tax_optimized`: Profil mit geringerer Steuerlast zuerst

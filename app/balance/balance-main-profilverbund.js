@@ -13,13 +13,14 @@ import { listProfiles, saveCurrentProfileFromLocalStorage, setProfileVerbundMemb
 import {
     loadProfilverbundProfiles,
     aggregateProfilverbundInputs,
+    calculateHouseholdWithdrawalNeed,
     calculateWithdrawalDistribution,
     buildProfilverbundAssetSummary,
     buildProfilverbundProfileSummaries
 } from '../profile/profilverbund-balance.js';
 import { renderProfilverbundProfileSelector, toggleProfilverbundMode } from '../profile/profilverbund-balance-ui.js';
 import { shouldResetGuardrailState } from './balance-guardrail-reset.js';
-import { applyThreeBucketLogic, appendBondReplenishment, isBondCategory, sumBondBucketValuation } from '../../engine/transactions/three-bucket-logic.mjs';
+import { applyThreeBucketLogic, appendBondReplenishment, sumBondBucketValuation } from '../../engine/transactions/three-bucket-logic.mjs';
 import { persistenceStorage } from '../shared/persistence-facade.js';
 
 export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS }) {
@@ -80,19 +81,52 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
         return output;
     };
 
-    const runProfilverbundProfileSimulations = (sharedInput, profiles) => {
-        // Calculate total equity across all profiles for prorating bond targets
-        const totalHouseholdEquity = profiles.reduce((sum, entry) => {
-            const input = buildProfileEngineInput(sharedInput, entry);
-                const equityOnly = (input.detailledTranches || []).reduce((trancheSum, t) => {
-                    const isBond = isBondCategory(t.type) || isBondCategory(t.category);
-                    return trancheSum + (!isBond ? (Number(t.marketValue) || 0) : 0);
-                }, 0);
-            return sum + equityOnly;
-        }, 0);
+    const buildProfileFundingInput = (sharedInput, entry, withdrawalAmount) => ({
+        ...buildProfileEngineInput(sharedInput, entry),
+        floorBedarf: withdrawalAmount,
+        flexBedarf: 0,
+        renteAktiv: false,
+        renteMonatlich: 0,
+        fixedIncomeAnnual: 0,
+        dynamicFlex: false,
+        goGoActive: false,
+        minimumFlexAnnual: 0,
+        flexBudgetAnnual: 0,
+        flexBudgetYears: 0,
+        flexBudgetRecharge: 0
+    });
+
+    const runProfilverbundProfileSimulations = (sharedInput, profiles, householdLastState = null) => {
+        const householdNeed = calculateHouseholdWithdrawalNeed(profiles, {
+            floorBedarf: sharedInput.floorBedarf,
+            flexBedarf: sharedInput.flexBedarf,
+            flexBudgetAnnual: sharedInput.flexBudgetAnnual,
+            flexBudgetYears: sharedInput.flexBudgetYears,
+            flexBudgetRecharge: sharedInput.flexBudgetRecharge
+        });
+        const householdResult = window.EngineAPI.simulateSingleYear(sharedInput, householdLastState);
+        if (householdResult?.error) {
+            throw householdResult.error;
+        }
+        const decidedAnnualWithdrawal = Number(householdResult?.ui?.spending?.monatlicheEntnahme) * 12;
+        if (!Number.isFinite(decidedAnnualWithdrawal) || decidedAnnualWithdrawal < 0) {
+            throw new Error('Profilverbund: Haushalts-Engine lieferte keinen gueltigen Entnahmebedarf.');
+        }
+
+        const distribution = calculateWithdrawalDistribution(
+            profiles,
+            { ...householdNeed, netWithdrawal: decidedAnnualWithdrawal },
+            persistenceStorage.getItem(PROFILVERBUND_STORAGE_KEYS.mode) || 'tax_optimized'
+        );
+        const allocatedTotal = distribution.items.reduce((sum, item) => sum + (item.withdrawalAmount || 0), 0);
+        if (distribution.remaining > 0.01 || Math.abs(allocatedTotal - distribution.totalNeed) > 0.01) {
+            throw new Error(`Profilverbund: ${distribution.remaining.toFixed(2)} EUR Haushaltsbedarf konnten keinem Profil zugeordnet werden.`);
+        }
+        const allocationByProfile = new Map(distribution.items.map(item => [item.profileId, item.withdrawalAmount]));
 
         const runs = profiles.map(entry => {
-            const input = buildProfileEngineInput(sharedInput, entry);
+            const persistedInput = buildProfileEngineInput(sharedInput, entry);
+            const input = buildProfileFundingInput(sharedInput, entry, allocationByProfile.get(entry.profileId) || 0);
             const prevInputs = entry?.balanceState?.inputs || null;
             const previousLastState = entry?.balanceState?.lastState || null;
             const preservedTaxState = previousLastState?.taxState
@@ -113,7 +147,7 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
                     sKey: result.ui?.market?.sKey || 'neutral'
                 };
                 const bondBucketBefore = sumBondBucketValuation(input.detailledTranches || []);
-                const jahresEntnahmeTarget = Math.max(0, input.floorBedarf - (input.renteAktiv ? (input.renteMonatlich * 12) : 0)) + Math.max(0, input.flexBedarf);
+                const jahresEntnahmeTarget = Math.max(0, input.floorBedarf);
                 const threeBucketResult = applyThreeBucketLogic(
                     input.detailledTranches || [],
                     input,
@@ -123,21 +157,12 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
                     bondBucketBefore
                 );
 
-                // Prorate the target factor based on this profile's share of total household equity
-                const profileEquity = (input.detailledTranches || []).reduce((trancheSum, t) => {
-                    const isBond = isBondCategory(t.type) || isBondCategory(t.category);
-                    return trancheSum + (!isBond ? (Number(t.marketValue) || 0) : 0);
-                }, 0);
-                const equityShare = totalHouseholdEquity > 0 ? (profileEquity / totalHouseholdEquity) : 0;
-                const proratedEntnahmeTarget = jahresEntnahmeTarget * equityShare;
-
-                // For simplicity, we apply the refill independently to each profile.
                 const replenishResult = appendBondReplenishment(
                     input.detailledTranches || [],
                     input,
                     threeBucketResult.updatedAction,
                     market.realReturnEq,
-                    proratedEntnahmeTarget,
+                    jahresEntnahmeTarget,
                     bondBucketBefore, // This is individual bond bucket
                     market
                 );
@@ -150,6 +175,7 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
                 profileId: entry.profileId,
                 name: entry.name || entry.profileId,
                 input,
+                persistedInput,
                 ui: result.ui,
                 newState: result.newState,
                 balanceState: entry.balanceState
@@ -157,6 +183,7 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
         });
 
         if (typeof window !== 'undefined') {
+            window.__profilverbundDistribution = distribution;
             window.__profilverbundActionResults = runs.map(run => ({
                 profileId: run.profileId,
                 name: run.name,
@@ -166,6 +193,9 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
                 targetLiquidity: run.ui?.zielLiquiditaet
             }));
         }
+        runs.householdResult = householdResult;
+        runs.householdInput = { ...sharedInput };
+        runs.distribution = distribution;
         return runs;
     };
 
@@ -197,7 +227,13 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
     const persistProfilverbundProfileStates = (runs) => {
         runs.forEach(run => {
             const existing = (run.balanceState && typeof run.balanceState === 'object') ? run.balanceState : {};
-            const nextState = { ...existing, inputs: run.input, lastState: run.newState };
+            const nextState = {
+                ...existing,
+                inputs: run.persistedInput || run.input,
+                lastState: run.newState,
+                profilverbundHouseholdInputs: runs.householdInput || existing.profilverbundHouseholdInputs,
+                profilverbundHouseholdLastState: runs.householdResult?.newState || existing.profilverbundHouseholdLastState
+            };
             updateProfileData(run.profileId, {
                 [CONFIG.STORAGE.LS_KEY]: JSON.stringify(nextState)
             });
