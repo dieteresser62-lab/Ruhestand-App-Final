@@ -56,8 +56,13 @@ export function initUIBinder(domRefs, state, updateFn, debouncedUpdateFn) {
         appState,
         debouncedUpdate,
         applyAnnualInflation: annual.applyAnnualInflation,
+        runAnnualUpdate: annual.handleJahresUpdate,
+        validateLiveState: () => update({ persist: false }),
         flushLiveState: async ({ sync = true } = {}) => {
-            if (sync) update();
+            const result = sync ? update() : { ok: true };
+            if (!result?.ok) {
+                throw result?.error || new Error('Balance-Zustand konnte nicht validiert und gespeichert werden.');
+            }
             await PersistenceFacade.flush();
         }
     });
@@ -210,12 +215,12 @@ export const UIBinder = {
     },
 
     /**
-     * Führt den vollständigen Jahres-Update-Prozess aus (Inflation abrufen, Marktdaten nachrücken, Alter erhöhen)
-     * und rendert anschließend das Ergebnis-Modal.
-     * @returns {Promise<void>} Kein Rückgabewert; UI wird direkt aktualisiert.
+     * Startet den gemeinsamen fail-safe Jahresprozess. Jahres-Update und Jahresabschluss
+     * teilen dadurch Perioden-ID, Snapshot und Idempotenz-Sperre.
+     * @returns {Promise<Object|undefined>} Ergebnis des Jahresprozess-Coordinators.
      */
     async handleJahresUpdate() {
-        return handlers.annual.handleJahresUpdate();
+        return handlers.snapshots.handleJahresabschluss();
     },
 
     /**

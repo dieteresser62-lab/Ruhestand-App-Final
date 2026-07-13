@@ -1,7 +1,7 @@
 # Balance-App-Hardening: Arbeitsplan
 
 **Stand:** 2026-07-13  
-**Status:** implementierungsreif; Slice 01 erledigt, Slice 02 erledigt  
+**Status:** implementierungsreif; Slice 01, 02 und 03 erledigt
 **Feature-Branch:** `codex/balance-app-hardening`  
 **GitHub-Status:** lokal vorhanden; `git ls-remote --heads origin refs/heads/codex/balance-app-hardening` lieferte am 2026-07-13 keinen Remote-Branch; keine Veroeffentlichung ohne ausdrueckliche Freigabe  
 **Autor:** Codex  
@@ -94,7 +94,7 @@ Jahresprozess
 | -: | - | - | - | -: | - |
 | 1 | [Profilverbund-Bedarfsallokation](./SLICE_BALANCE_HARDENING_01_PROFILVERBUND_ALLOCATION.md) | P0 | keine; D-01 entschieden | 5 | erledigt |
 | 2 | [Jahresperioden-Contract](./SLICE_BALANCE_HARDENING_02_ANNUAL_PERIOD_CONTRACT.md) | P0 | keine | 2 | erledigt |
-| 3 | [Fail-safe Jahresprozess-Integration](./SLICE_BALANCE_HARDENING_03_ANNUAL_WORKFLOW_COMMIT.md) | P0 | 02 | 5 | geplant |
+| 3 | [Fail-safe Jahresprozess-Integration](./SLICE_BALANCE_HARDENING_03_ANNUAL_WORKFLOW_COMMIT.md) | P0 | 02 | 5 | erledigt |
 | 4 | [Marktdaten-Stichtag](./SLICE_BALANCE_HARDENING_04_MARKETDATA_ASOF.md) | P0 | 02 | 2 | geplant |
 | 5 | [Inflations-Contract](./SLICE_BALANCE_HARDENING_05_INFLATION_CONTRACT.md) | P1 | 02 | 3 | geplant |
 | 6 | [Persistente Profilmitgliedschaft](./SLICE_BALANCE_HARDENING_06_PROFILE_MEMBERSHIP.md) | P1 | 01 | 3 | geplant |
@@ -226,6 +226,8 @@ Zusatzlich zu `AGENTS.md` und `SLICE\_EXECUTION\_RULES.md` wird gestoppt, wenn:
 | 2026-07-13 | Slice 01 durch Gemini freigegeben und committed | Commit `dabd3d8`; keine Blocker, dokumentierte Restrisiken G1-01 bis G1-03 |
 | 2026-07-13 | Slice 02 durch Codex implementiert | Reiner Jahresperioden-/Legacy-/Recovery-Contract; fokussiert 52/52, Gesamtsuite 3203/3203; Code-Review ausstehend |
 | 2026-07-13 | Slice 02 durch Gemini freigegeben und committed | Commit; keine Blocker, Restrisiken G2-01 bis G2-02 |
+| 2026-07-13 | Slice 03 durch Codex implementiert | Beide Jahres-Buttons auf Perioden-Coordinator vereinheitlicht; Snapshot-/Recovery-Phasen, Idempotenz und Doppelklick-Sperre integriert; fokussiert 52/52 + 28/28 + 23/23 + 24/24, Gesamtsuite 3186/3186 und Browser-Smoke gruen; Code-Review ausstehend |
+| 2026-07-13 | Slice 03 durch Gemini freigegeben und committed | Commit; keine Blocker, Restrisiken G3-01 bis G3-03 |
 
 
 ## Review-Feedback von Gemini
@@ -622,5 +624,3 @@ STATUS: DONE
 | F-R12 | Gemini | ENGINE\_VERSION nicht gefunden (Minor) | angenommen | realen `ENGINE_API_VERSION`-/`getVersion()`-Contract in Slice 07 dokumentiert |
 | F-R13 | Gemini | Gesamtkomplexitaet | zur Kenntnis genommen | sequentielle Slice-Freigabe bleibt verbindlich |
 | F-R14 | Gemini | Scope-Dateien plausibel | zur Kenntnis genommen | keine Engine-Datei im Scope |
-
-

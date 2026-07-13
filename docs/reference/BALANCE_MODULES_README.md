@@ -16,12 +16,12 @@ Die folgende Inventur wurde vor dem Balance-App-Hardening direkt gegen `app/bala
 | `balance-annual-inflation.js` | Inflationsabruf und Bedarfs-/Faktorfortschreibung |
 | `balance-annual-marketdata.js` | ETF-, ATH-, CAPE- und Nachruecken-Workflow |
 | `balance-annual-modal.js` | Ergebnisdialog des Jahresupdates |
-| `balance-annual-orchestrator.js` | Reihenfolge und Ergebnisstatus des Jahresupdates |
+| `balance-annual-orchestrator.js` | Reihenfolge und explizites Erfolgs-/Fehlerresultat des Jahresupdates |
 | `balance-annual-period.js` | DOM-freier Jahresperioden-, Legacy- und Recovery-Contract |
 | `balance-binder-annual.js` | Fassade fuer Annual-Handler |
 | `balance-binder-diagnosis.js` | Diagnose-Export und Copytext |
 | `balance-binder-imports.js` | Balance-JSON- und Markt-CSV-Import/Export |
-| `balance-binder-snapshots.js` | Jahresabschluss- und Snapshot-Aktionen |
+| `balance-binder-snapshots.js` | Periodengebundener Jahresprozess-Coordinator, Recovery und Snapshot-Aktionen |
 | `balance-binder.js` | zentraler UI-Event-Hub |
 | `balance-config.js` | App-Konfiguration, Engine-Versionsanforderung und Fehlertypen |
 | `balance-diagnosis-chips.js` | Diagnose-Chips |
@@ -189,7 +189,7 @@ Event-Hub der Anwendung.
   - `handleReset()` – Reset mit Bestätigung
   - `handleBedarfAnpassungClick(e)` – inflationsbedingte Anpassung
   - `handleNachruecken()` / `handleUndoNachruecken()` – Marktdatenpflege
-  - `handleJahresUpdate()` – **Jahres-Update mit Online-API-Zugriff:** Ruft automatisch Inflationsdaten (ECB → World Bank → OECD), ETF-Kurse (VWCE.DE via Yahoo Finance über lokalen Proxy) und CAPE (Yale -> Mirror -> letzter lokaler Stand) ab, führt Nachrücken durch und aktualisiert ATH. Zeigt detailliertes Protokoll mit Datenquellen und Werten.
+  - `handleJahresUpdate()` – startet denselben fail-safe, periodengebundenen Coordinator wie der Jahresabschluss-Button; Online-Abrufe, Writes und Abschluss teilen dadurch Snapshot, In-Flight-Sperre und Perioden-ID.
   - `handleExport()` / `handleImport(e)` / `handleCsvImport(e)` – Datenimporte/-exporte
   - `handleJahresabschluss()` – Snapshot & Jahreswechsel
   - `handleSnapshotActions(e)` – Snapshot verwalten (restore/delete)
@@ -200,7 +200,7 @@ Event-Hub der Anwendung.
 **Helper-Module (ausgelagert):**
 - `balance-binder-annual.js` – Jahres-Update, Inflation, ETF-Nachrücken, Modal-Logik
 - `balance-binder-imports.js` – Import/Export/CSV
-- `balance-binder-snapshots.js` – Snapshot-Handling; Jahresabschluss flusht Live-Daten, erstellt den Snapshot vor Inflation/Jahresmutationen und bricht bei Snapshot-Fehlern ohne Mutation ab
+- `balance-binder-snapshots.js` – Snapshot-Handling und Jahresprozess-Coordinator; validiert den Live-State, flusht, bestaetigt den Snapshot vor fachlichen Writes und persistiert bei Teilfehlern Snapshot-ID sowie Recovery-Phase
 - `balance-binder-diagnosis.js` – Diagnose-Export
 
 ---
@@ -309,6 +309,8 @@ Koordiniert den komplexen Jahres-Update Workflow.
 ---
 
 ### 9.5 `balance-annual-period.js`
+
+Definiert den DOM-freien Jahresperioden-Contract. `balance-binder-snapshots.js` integriert ihn in beide Jahres-Buttons und speichert die Metadaten im Balance-State unter `annualPeriodMetadata`. Wiederholte Perioden und Doppelklicks starten keine zweite Mutation; `incomplete_recovery` blockiert bis zur Wiederherstellung des referenzierten Snapshots.
 DOM- und persistenzfreier Contract fuer das abgeschlossene Kalenderjahr. Er erzeugt die stabile ID `calendar-year:<YYYY>`, plant Alter, Inflation, Marktdaten und Ausgaben-Rollover fuer dieselbe Periode und beschreibt die Zustaende `ready`, `already_committed`, `incomplete_recovery`, `legacy_confirmation_required` und `invalid`.
 
 **Exports:**

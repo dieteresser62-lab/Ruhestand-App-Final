@@ -160,7 +160,7 @@ const profileSyncHandlers = createProfileSyncHandlers({
  * - Import von Daten
  * - Jahresabschluss
  */
-function update() {
+function update({ persist = true } = {}) {
     try {
         UIRenderer.clearError();
 
@@ -179,7 +179,7 @@ function update() {
             UIRenderer.clearError();
             // Optionally clear results or show specific "Start" message
             // For now, just return to keep UI clean
-            return;
+            return { ok: true, skipped: true };
         }
 
         const persistentState = StorageManager.loadState();
@@ -249,16 +249,18 @@ function update() {
 
         // Speichert Eingaben und neuen Zustand
         // Persist per-profile states to keep each profile's guardrails stable.
-        persistBalanceUpdate({
-            profilverbundRuns,
-            profilverbundHandlers,
-            storageManager: StorageManager,
-            persistentState,
-            inputData,
-            modelResult
-        });
+        if (persist) {
+            persistBalanceUpdate({
+                profilverbundRuns,
+                profilverbundHandlers,
+                storageManager: StorageManager,
+                persistentState,
+                inputData,
+                modelResult
+            });
 
-        profilverbundHandlers.refreshProfilverbundBalance();
+            profilverbundHandlers.refreshProfilverbundBalance();
+        }
 
         const fixedIncomeAnnual = UIUtils.parseCurrency(dom.inputs.fixedIncomeAnnual?.value || 0);
         const { monthlyBudget, annualBudget } = calculateExpensesBudget({
@@ -267,9 +269,12 @@ function update() {
         });
         updateExpensesBudget({ monthlyBudget, annualBudget });
 
+        return { ok: true, inputData, modelResult };
+
     } catch (error) {
         console.error("Update-Fehler:", error);
         UIRenderer.handleError(error);
+        return { ok: false, error };
     }
 }
 

@@ -21,7 +21,7 @@ export function createAnnualOrchestrator({
     showUpdateResultModal,
     setLastUpdateResults
 }) {
-    const handleJahresUpdate = async () => {
+    const handleJahresUpdate = async ({ failOnStepError = false } = {}) => {
         const btn = dom.controls.btnJahresUpdate;
         const originalText = btn.innerHTML;
         const startTime = Date.now();
@@ -106,6 +106,9 @@ export function createAnnualOrchestrator({
             // Zeige Modal nur bei Fehlern, sonst Toast
             if (results.errors.length > 0) {
                 showUpdateResultModal(results);
+                if (failOnStepError) {
+                    return { ok: false, results };
+                }
             } else {
                 const capeStatus = results.cape?.capeFetchStatus || '';
                 if (capeStatus === 'ok_primary' || capeStatus === 'ok_fallback_mirror') {
@@ -120,9 +123,12 @@ export function createAnnualOrchestrator({
                 }
             }
 
+            return { ok: results.errors.length === 0, results };
+
         } catch (err) {
             console.error('Jahres-Update fehlgeschlagen:', err);
             UIRenderer.handleError(new AppError('Jahres-Update fehlgeschlagen.', { originalError: err }));
+            return { ok: false, error: err, results };
         } finally {
             btn.disabled = false;
             btn.innerHTML = originalText;
