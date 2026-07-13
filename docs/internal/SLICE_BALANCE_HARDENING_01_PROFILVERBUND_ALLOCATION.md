@@ -2,7 +2,7 @@
 
 **Feature-Branch:** `codex/balance-app-hardening`  
 **GitHub-Status:** lokal; Remote-Pruefung am 2026-07-13 ergab keinen gleichnamigen Branch  
-**Status:** implementiert; Code-Review/Freigabe ausstehend  
+**Status:** erledigt; durch Gemini freigegeben und als `dabd3d8` committed
 **Prioritaet:** P0
 
 ## Ziel
@@ -117,7 +117,7 @@ Status, Scope-Erweiterung, Testresultate und Haushalts-/Finanzierungsinvarianten
 
 ## Freigabestatus
 
-Arbeitsdokument durch den Nutzer am 2026-07-13 freigegeben. Codex-Implementierung abgeschlossen; Code-Review und Freigabe durch Gemini/Claude/Nutzer stehen aus.
+Arbeitsdokument durch den Nutzer am 2026-07-13 freigegeben. Gemini hat die Implementierung ohne Blocker freigegeben; lokaler Abschluss-Commit: `dabd3d8`.
 
 ## Review-Feedback von Gemini
 

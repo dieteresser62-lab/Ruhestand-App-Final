@@ -1,7 +1,7 @@
 # Balance-App-Hardening: Arbeitsplan
 
 **Stand:** 2026-07-13  
-**Status:** implementierungsreif; Slice 01 implementiert, Code-Review/Freigabe ausstehend  
+**Status:** implementierungsreif; Slice 01 erledigt, Slice 02 erledigt  
 **Feature-Branch:** `codex/balance-app-hardening`  
 **GitHub-Status:** lokal vorhanden; `git ls-remote --heads origin refs/heads/codex/balance-app-hardening` lieferte am 2026-07-13 keinen Remote-Branch; keine Veroeffentlichung ohne ausdrueckliche Freigabe  
 **Autor:** Codex  
@@ -93,7 +93,7 @@ Jahresprozess
 | Nr. | Slice | Prioritaet | Abhaengigkeit | Programmdateien max. | Status |
 | -: | - | - | - | -: | - |
 | 1 | [Profilverbund-Bedarfsallokation](./SLICE_BALANCE_HARDENING_01_PROFILVERBUND_ALLOCATION.md) | P0 | keine; D-01 entschieden | 5 | erledigt |
-| 2 | [Jahresperioden-Contract](./SLICE_BALANCE_HARDENING_02_ANNUAL_PERIOD_CONTRACT.md) | P0 | keine | 2 | geplant |
+| 2 | [Jahresperioden-Contract](./SLICE_BALANCE_HARDENING_02_ANNUAL_PERIOD_CONTRACT.md) | P0 | keine | 2 | erledigt |
 | 3 | [Fail-safe Jahresprozess-Integration](./SLICE_BALANCE_HARDENING_03_ANNUAL_WORKFLOW_COMMIT.md) | P0 | 02 | 5 | geplant |
 | 4 | [Marktdaten-Stichtag](./SLICE_BALANCE_HARDENING_04_MARKETDATA_ASOF.md) | P0 | 02 | 2 | geplant |
 | 5 | [Inflations-Contract](./SLICE_BALANCE_HARDENING_05_INFLATION_CONTRACT.md) | P1 | 02 | 3 | geplant |
@@ -223,6 +223,9 @@ Zusatzlich zu `AGENTS.md` und `SLICE\_EXECUTION\_RULES.md` wird gestoppt, wenn:
 | 2026-07-13 | Fachentscheidung D-01 durch Nutzer getroffen | Variante A verbindlich: Haushalts-Spending einmal bestimmen, nur Nettoentnahme auf Finanzierungsprofile verteilen; zweites Review bleibt ausstehend |
 | 2026-07-13 | Arbeitsdokument durch Nutzer freigegeben; Slice 01 gestartet | Scope nach Startanalyse um `balance-main.js` auf 5 Programmdateien erweitert; allgemeine Stop-Grenze zuvor auf 10 angehoben |
 | 2026-07-13 | Slice 01 durch Codex implementiert | Haushalts-Spending einmal ausgefuehrt; centgenaue Profilfinanzierung; fokussierte Tests 96/96, Gesamtsuite 3151/3151 und Browser-Smoke gruen; Code-Review ausstehend |
+| 2026-07-13 | Slice 01 durch Gemini freigegeben und committed | Commit `dabd3d8`; keine Blocker, dokumentierte Restrisiken G1-01 bis G1-03 |
+| 2026-07-13 | Slice 02 durch Codex implementiert | Reiner Jahresperioden-/Legacy-/Recovery-Contract; fokussiert 52/52, Gesamtsuite 3203/3203; Code-Review ausstehend |
+| 2026-07-13 | Slice 02 durch Gemini freigegeben und committed | Commit; keine Blocker, Restrisiken G2-01 bis G2-02 |
 
 
 ## Review-Feedback von Gemini

@@ -1,6 +1,6 @@
 # Balance-App – Modulübersicht
 
-Die Balance-App besteht aus 35 ES6-Modulen unter `app/balance/`. Das folgende Dokument fasst Verantwortung, Exporte und wichtige Abhängigkeiten zusammen.
+Die Balance-App besteht aus 36 ES6-Modulen unter `app/balance/`. Das folgende Dokument fasst Verantwortung, Exporte und wichtige Abhängigkeiten zusammen.
 Dateinamen werden unten kurz ohne Präfix genannt; tatsächlicher Pfad ist in der Regel `app/balance/<datei>.js`.
 Ausnahmen: Profilverbund-Module liegen unter `app/profile/`, Shared-Formatter unter `app/shared/`.
 
@@ -17,6 +17,7 @@ Die folgende Inventur wurde vor dem Balance-App-Hardening direkt gegen `app/bala
 | `balance-annual-marketdata.js` | ETF-, ATH-, CAPE- und Nachruecken-Workflow |
 | `balance-annual-modal.js` | Ergebnisdialog des Jahresupdates |
 | `balance-annual-orchestrator.js` | Reihenfolge und Ergebnisstatus des Jahresupdates |
+| `balance-annual-period.js` | DOM-freier Jahresperioden-, Legacy- und Recovery-Contract |
 | `balance-binder-annual.js` | Fassade fuer Annual-Handler |
 | `balance-binder-diagnosis.js` | Diagnose-Export und Copytext |
 | `balance-binder-imports.js` | Balance-JSON- und Markt-CSV-Import/Export |
@@ -48,7 +49,7 @@ Die folgende Inventur wurde vor dem Balance-App-Hardening direkt gegen `app/bala
 | `balance-update-pipeline.js` | Validierung, Last-State, Diagnose und Persistenzentscheidung |
 | `balance-utils.js` | Zahlen-/Waehrungsformatierung und UI-Hilfen |
 
-**Inventurergebnis:** 35 von 35 Dateien erfasst. Das geplante Modul `balance-annual-period.js` aus dem Hardening-Slice 02 ist noch nicht vorhanden und daher nicht Teil dieser Ist-Inventur.
+**Inventurergebnis:** 36 von 36 Dateien erfasst.
 
 ---
 
@@ -304,6 +305,20 @@ Koordiniert den komplexen Jahres-Update Workflow.
   - `handleJahresUpdate()` – Orchestriert: Alter erhöhen → Inflation → ETF → CAPE → Protokoll
 
 **Dependencies:** `balance-config.js`, `balance-renderer.js`, `balance-storage.js`
+
+---
+
+### 9.5 `balance-annual-period.js`
+DOM- und persistenzfreier Contract fuer das abgeschlossene Kalenderjahr. Er erzeugt die stabile ID `calendar-year:<YYYY>`, plant Alter, Inflation, Marktdaten und Ausgaben-Rollover fuer dieselbe Periode und beschreibt die Zustaende `ready`, `already_committed`, `incomplete_recovery`, `legacy_confirmation_required` und `invalid`.
+
+**Exports:**
+- Schema-, Status- und Legacy-Entscheidungskonstanten
+- `deriveCompletedCalendarYear(referenceDate)` / `createAnnualPeriodId(targetYear)`
+- `createAnnualPeriodMetadata()` / `preflightAnnualPeriod()` / `createAnnualPeriodPlan()`
+- `checkAnnualPeriodCommit()` / `startAnnualPeriodCommit()` / `completeAnnualPeriodCommit()`
+- `resolveLegacyAnnualPeriod()` – explizite Baseline ohne Alter-/Datumsheuristik
+
+**Dependencies:** Keine (Pure Logic)
 
 ---
 
