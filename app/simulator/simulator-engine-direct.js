@@ -97,6 +97,15 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         widowPensionP2 = 0
     } = currentState;
 
+    const sampledYear = Number(yearData?.jahr);
+    const deterministicYear = Number.isInteger(sampledYear) && sampledYear >= 1 && sampledYear <= 9999
+        ? sampledYear
+        : Math.min(9999, Math.max(1, 2000 + (Number(yearIndex) || 0)));
+    portfolio.simulationDate = `${String(deterministicYear).padStart(4, '0')}-12-31`;
+    if (inputs.simulationSourceProfileId) {
+        portfolio.simulationSourceProfileId = String(inputs.simulationSourceProfileId);
+    }
+
     const effectiveBaseFloor = baseFloor + careFloorAddition;
     currentAnnualPension2 = currentAnnualPension2 || 0;
     widowPensionP1 = Math.max(0, widowPensionP1 || 0);

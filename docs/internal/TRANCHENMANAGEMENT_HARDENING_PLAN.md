@@ -103,8 +103,8 @@ Der Preisservice liefert ein Objekt statt einer bloßen Zahl. Browser-Node-Proxy
 | 3 | [Persistenz und Recovery](./SLICE_TRANCHENMANAGEMENT_03_PERSISTENCE_RECOVERY.md) | valid/empty/corrupt/unavailable, Flush, Profil-Handoff | Slice 02 | 9 | freigegeben |
 | 4 | [CRUD, UX und Accessibility](./SLICE_TRANCHENMANAGEMENT_04_CRUD_UX_ACCESSIBILITY.md) | sichere Eingabe und bedienbare Darstellung | Slice 03 | 10 | freigegeben |
 | 5 | [Quote- und Währungscontract](./SLICE_TRANCHENMANAGEMENT_05_QUOTE_CURRENCY_RESILIENCE.md) | EUR-/Stichtagscontract, Batch und Proxyparität | Slice 02, 03 | 8 | freigegeben |
-| 6 | [Balance-, Status- und Steuerparität](./SLICE_TRANCHENMANAGEMENT_06_BALANCE_STATUS_TAX_PARITY.md) | Einheiten, TQF, Status und Klassifikation | Slice 02, 03 | 9 | umgesetzt; Review ausstehend |
-| 7 | [Simulator-Provenienz und Lot-Invarianten](./SLICE_TRANCHENMANAGEMENT_07_SIMULATOR_PROVENANCE_LOTS.md) | Herkunft, Geldmarkt und In-Memory-Lots | Slice 02, 06 | 10 | geplant |
+| 6 | [Balance-, Status- und Steuerparität](./SLICE_TRANCHENMANAGEMENT_06_BALANCE_STATUS_TAX_PARITY.md) | Einheiten, TQF, Status und Klassifikation | Slice 02, 03 | 9 | freigegeben |
+| 7 | [Simulator-Provenienz und Lot-Invarianten](./SLICE_TRANCHENMANAGEMENT_07_SIMULATOR_PROVENANCE_LOTS.md) | Herkunft, Geldmarkt und In-Memory-Lots | Slice 02, 06 | 10 | freigegeben |
 | 8 | [Reconciliation-Workflow](./SLICE_TRANCHENMANAGEMENT_08_RECONCILIATION_WORKFLOW.md) | bestätigte reale Bestandsfortschreibung idempotent umsetzen | Slice 03, 06, 07 | 9 | geplant |
 | 9 | [E2E, Migration und Dokumentation](./SLICE_TRANCHENMANAGEMENT_09_E2E_MIGRATION_DOCUMENTATION.md) | vollständige Gates und Doku-Sync | Slices 01-08 | 6 (5 Tests + Handbuch-HTML), plus Markdown | geplant |
 
@@ -176,7 +176,8 @@ Die Reihenfolge ist verbindlich, solange das Planreview sie nicht ändert. Für 
   gekennzeichnete Tabellencontainer scrollt. Rücklink und Profilanzeige tragen die
   tatsächlich geladene Profil-ID.
 - Verifiziert: 104 Node-Testdateien, 4117/4117 Assertions, 0 Fehler, 0 offene
-  Handles sowie elf grüne Browser-Smoke-Szenarien. Review und Freigabe stehen aus.
+  Handles sowie elf grüne Browser-Smoke-Szenarien. Slice 04 ist freigegeben und
+  als Commit `e554062` vorhanden.
 
 ### Rückdokumentation Slice 05
 
@@ -195,8 +196,8 @@ Die Reihenfolge ist verbindlich, solange das Planreview sie nicht ändert. Für 
   werden mit genau einem bestaetigten Commit gespeichert; Fehler behalten den alten
   Kurs und ein Batch ohne Erfolg schreibt nicht.
 - Verifiziert: 104 Node-Testdateien, 4204/4204 Assertions, 0 Fehler, 0 offene
-  Handles; elf grüne Browser-Smoke-Szenarien; 8/8 Rust-Tests. Review und Freigabe
-  stehen aus.
+  Handles; elf grüne Browser-Smoke-Szenarien; 8/8 Rust-Tests. Slice 05 ist
+  freigegeben und als Commit `e29d348` vorhanden.
 
 ### Rückdokumentation Slice 06
 
@@ -216,8 +217,31 @@ Die Reihenfolge ist verbindlich, solange das Planreview sie nicht ändert. Für 
 - Direkte Produktionstests ersetzen die bisherige lokale Aggregationskopie als
   Nachweis. Verifiziert: 105 Node-Testdateien, 4253/4253 Assertions, 0 Fehler,
   0 offene Handles sowie elf grüne Browser-Smoke-Szenarien. Snapshot-, Backtest-
-  und FlowDelta-Gates blieben ohne unerwartete Abweichung. Review und Freigabe
-  stehen aus.
+  und FlowDelta-Gates blieben ohne unerwartete Abweichung. Slice 06 ist freigegeben
+  und als Commit `0b0063e` vorhanden.
+
+### Rückdokumentation Slice 07
+
+- Der Simulator trennt Profil- und Simulationszustand an zwei tiefen Kopiergrenzen:
+  beim Profilverbund-Override und vor der Portfolio-Initialisierung. Verschachtelte
+  Profilobjekte bleiben nach Verkauf, Wiederholung und Engine-Lauf unveraendert.
+- Profilinterne IDs werden beim Haushaltsmerge mit der Profil-ID eindeutig gemacht;
+  `sourceProfileId` bleibt als explizite Provenienz bis zum Engine-/Verkaufs-
+  Breakdown erhalten. Die In-Memory-Aufloesung verwendet nur exakte IDs plus
+  Provenienz und kein Suffixparsing.
+- Explizites `[]` bleibt leer, korrupte Inputs enden strukturiert fail-closed und
+  Detail-Geldmarkt ersetzt den ueberlappenden Aggregatwert vollstaendig. Dadurch
+  werden weder Startvermoegen noch Liquiditaet doppelt erfasst.
+- Teilverkaeufe reduzieren Marktwert, Cost Basis und vorhandene Stueckzahl im
+  selben Verhaeltnis. Vollverkaeufe markieren Lots als `sold` und entfernen sie
+  aus folgenden Engine-Inputs; doppelte Breakdown-Eintraege koennen kein zweites
+  Lot treffen.
+- Jeder simulierte Kauf erzeugt ein eigenes kanonisches `simlot:`-Lot mit
+  deterministischer ID, Simulationsdatum, Profilherkunft und Cost Basis. Legacy-
+  Aggregatlagen erhalten stabile `simbase:`-IDs vor dem Engine-Aufruf.
+- Verifiziert: 106 Node-Testdateien, 4298/4298 Assertions, 0 Fehler und 0 offene
+  Handles. Direkt-/Worker-Paritaet (354/354), Snapshots, historischer Backtest und
+  FlowDelta blieben ohne unerwartete Abweichung. Review und Freigabe stehen aus.
 
 ## GAP-Zuordnung
 
@@ -358,7 +382,7 @@ Ausstehend. Pflichtstruktur analog Gemini mit IDs `C-01`, `C-02`, ...
 ## Review-Antworten von Codex
 
 - **G-01 angenommen:** O-04 trennt künftig `corrupt` von transientem `unavailable`. Nur ein syntaktisch oder fachlich beschädigter, tatsächlich gelesener Payload führt in Recovery. Der Rohpayload bleibt unverändert und kann ausschließlich hinter einer bewussten lokalen Aktion angezeigt und kopiert werden; IO-/IDB-/Tauri-Rejections bieten Retry, aber keinen Reset. Slice 03 und dessen Negativtests werden entsprechend ergänzt.
-- **G-02 angenommen:** Slice 07 erhält eine zwingende Deep-Copy-Grenze vor jeder Simulationsmutation. Die Implementierung verwendet `structuredClone` oder eine nachweislich äquivalente DOM-freie Kopie; Referenzisolations-Tests beweisen, dass Profil-, UI- und Persistenzobjekte nach Simulation unverändert bleiben.
+- **G-02 umgesetzt:** Slice 07 zieht zwingende Deep-Copy-Grenzen vor Haushaltsmerge und Portfolio-Mutation. Referenzisolations-Tests beweisen, dass Profil-, UI- und Persistenzobjekte nach Simulation unverändert bleiben.
 - **G-03 angenommen:** O-03 und O-05 legen EUR-only plus Teilerfolg fest. Slice 05 weist jede abgelehnte Tranche mit maschinenlesbarem Fehlercode und sichtbarem Grund aus, beispielsweise `UNSUPPORTED_CURRENCY: USD`; alte Kurse bleiben erhalten.
 - **G-04 angenommen:** Die Enginegrenze liefert beziehungsweise wirft einen strukturierten Validierungsfehler mit Feld-/Tranchekontext. Der aufrufende UI-Pfad fängt ihn ab, beendet die Berechnung kontrolliert und zeigt einen blockierenden Hinweis. Stiller Absturz, leeres Fallback und Endlosschleife sind explizite Negativtests in Slices 02 und 04.
 
@@ -369,6 +393,6 @@ Die Antworten ändern den Gemini-Status nicht eigenmächtig. Plan und Slices ble
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
 | --- | --- | --- | --- | --- |
 | G-01 | Gemini | Transiente Persistenzfehler und korrupter Payload unzureichend getrennt | angenommen | Slice 03 freigegeben und als Commit `13328fa` vorhanden |
-| G-02 | Gemini | Simulator benötigt zwingende Deep-Copy-Grenze | angenommen | Plan und Slice 07 konkretisiert; Code ausstehend |
+| G-02 | Gemini | Simulator benötigt zwingende Deep-Copy-Grenze | angenommen | in Slice 07 umgesetzt; Review ausstehend |
 | G-03 | Gemini | Abgelehnte Fremdwährungsquotes benötigen sichtbaren Grund | angenommen | O-03/O-05 und Slice 05 konkretisiert; Code ausstehend |
 | G-04 | Gemini | Engine-Validierungsfehler muss strukturiert in der UI ankommen | angenommen | Contract in Slice 02 und blockierender Manager-UI-Pfad in Slice 04 implementiert; Review ausstehend |

@@ -232,7 +232,32 @@ Damit ist TM-01 kein theoretisches Risiko. Die Behebung verändert das Verhalten
 - Verifikation: 105 Node-Testdateien mit 4253/4253 Assertions, 0 Fehlern und
   0 offenen Handles sowie elf grüne Browser-Smoke-Szenarien. Golden Cases,
   Snapshots, historischer Backtest und FlowDelta blieben ohne unerwartete
-  Abweichung. Review und Freigabe von Slice 06 stehen aus.
+  Abweichung. Slice 06 ist freigegeben und als Commit `0b0063e` vorhanden.
+
+### Rückdokumentation Slice 07
+
+- Der Slice-07-Anteil von TM-03/TM-07 ist implementiert: Simulator-Reader,
+  Haushaltsmerge, Portfolio und direkter Engine-Input erhalten die kanonische
+  Klassifikation und `sourceProfileId`. Gleichlautende profilinterne IDs werden
+  profilbezogen eindeutig; die Verkaufsauflösung nutzt die exakte ID plus
+  Provenienz und kein Suffixparsing.
+- TM-08 ist im Simulator implementiert: Bei expliziten Detailtranchen ersetzt die
+  Detail-Geldmarktsumme den ueberlappenden `geldmarktEtf`-Aggregatwert. Explizites
+  `[]` bleibt leer, korrupte Inputs brechen strukturiert ab, und weder
+  Startvermoegen noch Liquiditaet addieren dieselbe Position doppelt.
+- TM-14 ist implementiert: Teilverkaeufe reduzieren Marktwert, Cost Basis und
+  vorhandene Stueckzahl proportional; Vollverkaeufe markieren Lots als `sold`.
+  Simulierte Kaeufe erzeugen getrennte `simlot:`-Lots mit deterministischer ID,
+  Simulationsdatum, Profilherkunft und kanonischer Klassifikation. Legacy-
+  Aggregatlagen erhalten stabile `simbase:`-IDs vor dem Engine-Aufruf.
+- Der Slice-07-Anteil von TM-17 ist implementiert: Direkte Tests belegen
+  Profilkollisionen, Geldmarkt-Deduplizierung, verschachtelte Referenzisolation,
+  Teil-/Vollverkauf, wiederholbare Kauf-IDs und den unveraenderten Originalinput.
+  Die querschnittliche Browser-/Migrationskette bleibt wie geplant Slice 09.
+- Verifikation: 106 Node-Testdateien mit 4298/4298 Assertions, 0 Fehlern und
+  0 offenen Handles. Direkt-/Worker-Paritaet (354/354), Snapshots, historischer
+  Backtest und FlowDelta blieben ohne unerwartete Abweichung. Review und Freigabe
+  von Slice 07 stehen aus.
 
 Diese Tests werden erweitert oder als Regression-Gates verwendet; parallele Test-Doppelungen sind nicht vorgesehen.
 
@@ -306,6 +331,6 @@ Der Blockstatus wird nicht durch Codex aufgehoben; Gemini-Nachreview und Claude-
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
 | --- | --- | --- | --- | --- |
 | G-01 | Gemini | Corrupt und transiente Persistenzfehler trennen | angenommen | Slice 03 freigegeben und als Commit `13328fa` vorhanden |
-| G-02 | Gemini | Deep-Copy-Garantie für Simulator-Lots | angenommen | Slice 07 konkretisiert; Code ausstehend |
+| G-02 | Gemini | Deep-Copy-Garantie für Simulator-Lots | angenommen | in Slice 07 umgesetzt; Review ausstehend |
 | G-03 | Gemini | Sichtbares Feedback für abgelehnte Quotes | angenommen | O-03/O-05 und Slice 05 konkretisiert; Code ausstehend |
 | G-04 | Gemini | Strukturierte Engine-Validierungsfehler in der UI | angenommen | Contract in Slice 02 und blockierender Manager-UI-Pfad in Slice 04 implementiert; Review ausstehend |

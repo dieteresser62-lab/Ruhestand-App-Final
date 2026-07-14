@@ -6,6 +6,7 @@ console.log('--- Portfolio Logic Tests ---');
 // --- Helper: Mock DOM ---
 // allows us to verify getCommonInputs() logic
 function setupMockDOM(valuesMap) {
+    global.window = { __profilverbundPreferAggregates: true };
     global.document = {
         getElementById: (id) => {
             const entry = valuesMap[id];
@@ -23,6 +24,7 @@ function setupMockDOM(valuesMap) {
 // Helper: Clear Mock
 function teardownMockDOM() {
     delete global.document;
+    delete global.window;
 }
 
 // Test 1: sumDepot
@@ -39,24 +41,32 @@ function teardownMockDOM() {
 // Test 2: buyGold
 {
     const portfolio = {
-        depotTranchesGold: []
+        depotTranchesGold: [],
+        simulationSourceProfileId: 'profile-a',
+        simulationDate: '2035-12-31'
     };
     // Erster Kauf erstellt Tranche.
     buyGold(portfolio, 100);
     assertEqual(portfolio.depotTranchesGold.length, 1, 'Should add gold tranche');
     assertEqual(portfolio.depotTranchesGold[0].marketValue, 100, 'Should have correct value');
 
-    // Zweiter Kauf soll in bestehende Tranche aggregieren.
+    const firstId = portfolio.depotTranchesGold[0].trancheId;
+    // Jeder weitere Kauf bleibt als eigenes Simulationslot erhalten.
     buyGold(portfolio, 50);
-    assertEqual(portfolio.depotTranchesGold.length, 1, 'Should merge into existing tranche');
-    assertEqual(portfolio.depotTranchesGold[0].marketValue, 150, 'Should sum up value');
+    assertEqual(portfolio.depotTranchesGold.length, 2, 'Should create a separate gold lot');
+    assertEqual(portfolio.depotTranchesGold[1].marketValue, 50, 'Second lot should keep its own value');
+    assert(portfolio.depotTranchesGold[1].trancheId !== firstId, 'Simulation lot ids should be unique');
+    assertEqual(portfolio.depotTranchesGold[1].purchaseDate, '2035-12-31', 'Simulation lot should keep simulation date');
+    assertEqual(portfolio.depotTranchesGold[1].sourceProfileId, 'profile-a', 'Simulation lot should keep profile origin');
     console.log('✅ buyGold works');
 }
 
 // Test 3: buyStocksNeu
 {
     const portfolio = {
-        depotTranchesAktien: []
+        depotTranchesAktien: [],
+        simulationSourceProfileId: 'profile-a',
+        simulationDate: '2035-12-31'
     };
     buyStocksNeu(portfolio, 100);
     assertEqual(portfolio.depotTranchesAktien.length, 1, 'Should add stock tranche');
@@ -65,11 +75,12 @@ function teardownMockDOM() {
     const oldTranche = { type: 'aktien_alt', marketValue: 500 };
     portfolio.depotTranchesAktien.push(oldTranche);
 
-    // Neue Käufe addieren nur zur "neu"-Tranche.
+    // Neue Käufe erzeugen getrennte "neu"-Tranchen.
     buyStocksNeu(portfolio, 50);
-    const neu = portfolio.depotTranchesAktien.find(t => t.type === 'aktien_neu');
-    assertEqual(neu.marketValue, 150, 'Should add to neu tranche');
-    assertEqual(portfolio.depotTranchesAktien.length, 2, 'Should keep old tranche');
+    const neu = portfolio.depotTranchesAktien.filter(t => t.type === 'aktien_neu');
+    assertEqual(neu.reduce((sum, tranche) => sum + tranche.marketValue, 0), 150, 'New lots should preserve total purchase value');
+    assertEqual(neu.length, 2, 'Each stock purchase should remain a separate lot');
+    assertEqual(portfolio.depotTranchesAktien.length, 3, 'Should keep old tranche and both simulated lots');
     console.log('✅ buyStocksNeu works');
 }
 
@@ -343,26 +354,29 @@ function teardownMockDOM() {
     console.log('✅ Bond tranches stay out of equity sales');
 }
 
-// Test 11: Detailed portfolio normalizes bond category to bond type
+// Test 11: Detailed portfolio rejects category/type mismatches
 {
-    const portfolio = initializePortfolioDetailed({
-        tagesgeld: 0,
-        geldmarktEtf: 0,
-        detailledTranches: [
-            {
-                trancheId: 'legacy-bond',
-                category: 'bonds',
-                type: 'aktien_neu',
-                marketValue: 50000,
-                costBasis: 50000
-            }
-        ]
-    });
+    let mismatchError = null;
+    try {
+        initializePortfolioDetailed({
+            tagesgeld: 0,
+            geldmarktEtf: 0,
+            detailledTranches: [
+                {
+                    trancheId: 'legacy-bond',
+                    category: 'bonds',
+                    type: 'aktien_neu',
+                    marketValue: 50000,
+                    costBasis: 50000
+                }
+            ]
+        });
+    } catch (error) {
+        mismatchError = error;
+    }
 
-    const bond = portfolio.depotTranchesAktien[0];
-    assertEqual(bond.category, 'bonds', 'Bond category should be preserved');
-    assertEqual(bond.type, 'anleihe', 'Bond category should normalize type to anleihe');
-    console.log('✅ Bond category normalizes to bond type');
+    assertEqual(mismatchError?.code, 'TRANCHE_VALIDATION_FAILED', 'Category/type mismatch should fail closed');
+    console.log('✅ Bond category/type mismatch is rejected');
 }
 
 console.log('--- Portfolio Logic Tests Completed ---');
