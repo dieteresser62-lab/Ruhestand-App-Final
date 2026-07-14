@@ -256,11 +256,7 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
             return;
         }
 
-        profiles.forEach(profile => {
-            setProfileVerbundMembership(profile.id, true);
-        });
-        const refreshedProfiles = listProfiles();
-        renderProfilverbundProfileSelector(refreshedProfiles, 'profilverbund-profile-list');
+        renderProfilverbundProfileSelector(profiles, 'profilverbund-profile-list');
 
         const storedMode = persistenceStorage.getItem(PROFILVERBUND_STORAGE_KEYS.mode) || 'tax_optimized';
 

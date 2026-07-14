@@ -7,6 +7,7 @@ import { CONFIG } from '../app/balance/balance-config.js';
 import { UIRenderer } from '../app/balance/balance-renderer.js';
 import { StorageManager } from '../app/balance/balance-storage.js';
 import { PersistenceFacade } from '../app/shared/persistence-facade.js';
+import { loadProfilverbundProfiles } from '../app/profile/profilverbund-balance.js';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -348,12 +349,59 @@ async function runBalanceUiOrchestrationTests() {
         assertEqual(updateCalls, 0, 'Input-Event loest keinen direkten Update-Pfad aus');
     }
 
-    console.log('Test 2: Profilverbund init binds profile controls once');
+    console.log('Test 2: Profilverbund init preserves membership and excludes opted-out profiles');
     {
         const documentRef = new MockDocument();
         const localStorageRef = createLocalStorageMock();
         installBrowserGlobals(documentRef, localStorageRef);
         PersistenceFacade.resetPersistenceForTests();
+
+        const includedState = {
+            inputs: {
+                tagesgeld: 10000,
+                depotwertAlt: 90000,
+                costBasisAlt: 80000,
+                renteAktiv: false,
+                renteMonatlich: 0
+            }
+        };
+        const partnerState = {
+            inputs: {
+                tagesgeld: 20000,
+                depotwertAlt: 180000,
+                costBasisAlt: 160000,
+                renteAktiv: false,
+                renteMonatlich: 0
+            }
+        };
+        const excludedState = {
+            inputs: {
+                tagesgeld: 900000,
+                depotwertAlt: 900000,
+                costBasisAlt: 100000,
+                renteAktiv: true,
+                renteMonatlich: 5000
+            }
+        };
+        const createdAt = '2026-01-01T00:00:00.000Z';
+        localStorageRef.setItem('rs_profiles_v1', JSON.stringify({
+            version: 1,
+            profiles: {
+                included: {
+                    meta: { id: 'included', name: 'Im Haushalt', createdAt, updatedAt: createdAt, belongsToHousehold: true },
+                    data: {}
+                },
+                partner: {
+                    meta: { id: 'partner', name: 'Partner', createdAt, updatedAt: createdAt, belongsToHousehold: true },
+                    data: {}
+                },
+                excluded: {
+                    meta: { id: 'excluded', name: 'Ausgeschlossen', createdAt, updatedAt: createdAt, belongsToHousehold: false },
+                    data: {}
+                }
+            }
+        }));
+        localStorageRef.setItem('rs_current_profile', 'included');
 
         const modeSelect = documentRef.register(new MockElement('profilverbund-withdrawal-mode', 'select'));
         const profileList = documentRef.register(new MockElement('profilverbund-profile-list'));
@@ -368,6 +416,68 @@ async function runBalanceUiOrchestrationTests() {
 
         assertEqual((modeSelect.listeners.change || []).length, 1, 'Profilverbund-Modus wird nur einmal gebunden');
         assertEqual((profileList.listeners.change || []).length, 1, 'Profilverbund-Profilliste wird nur einmal gebunden');
+
+        const registryAfterReload = JSON.parse(localStorageRef.getItem('rs_profiles_v1'));
+        assertEqual(registryAfterReload.profiles.excluded.meta.belongsToHousehold, false,
+            'Initialisierung erhaelt den gespeicherten Opt-out-Zustand');
+        const excludedCheckbox = profileList.children
+            .map(row => row.children[0])
+            .find(checkbox => checkbox?.dataset?.profileId === 'excluded');
+        assert(excludedCheckbox, 'Ausgeschlossenes Profil wird im Selektor dargestellt');
+        assertEqual(excludedCheckbox.checked, false, 'Checkbox spiegelt den gespeicherten Opt-out-Zustand');
+
+        registryAfterReload.profiles.included.data[CONFIG.STORAGE.LS_KEY] = JSON.stringify(includedState);
+        registryAfterReload.profiles.partner.data[CONFIG.STORAGE.LS_KEY] = JSON.stringify(partnerState);
+        registryAfterReload.profiles.excluded.data[CONFIG.STORAGE.LS_KEY] = JSON.stringify(excludedState);
+        localStorageRef.setItem('rs_profiles_v1', JSON.stringify(registryAfterReload));
+
+        const selectedProfiles = loadProfilverbundProfiles();
+        assertEqual(selectedProfiles.length, 2, 'Nur ausgewaehlte Profile werden fuer den Profilverbund geladen');
+        assertEqual(selectedProfiles[0].profileId, 'included', 'Opt-out-Profil wird nicht in Aggregate uebernommen');
+        assertEqual(selectedProfiles[1].profileId, 'partner', 'Zweites Haushaltsprofil bleibt im Profilverbund');
+
+        const aggregateInput = {
+            floorBedarf: 1200,
+            flexBedarf: 0,
+            flexBudgetAnnual: 0,
+            flexBudgetYears: 0,
+            flexBudgetRecharge: 0
+        };
+        handlers.updateProfilverbundGlobals(selectedProfiles, aggregateInput);
+        assertEqual(aggregateInput.tagesgeld, 30000, 'Opt-out-Vermoegen beeinflusst das Haushaltsaggregat nicht');
+        assertEqual(aggregateInput.renteMonatlich, 0, 'Opt-out-Einkommen beeinflusst das Haushaltsaggregat nicht');
+
+        const engineCalls = [];
+        window.EngineAPI = {
+            simulateSingleYear(input) {
+                engineCalls.push({ ...input });
+                const householdCall = engineCalls.length === 1;
+                return {
+                    newState: { call: engineCalls.length },
+                    diagnosis: {},
+                    ui: {
+                        spending: { monatlicheEntnahme: householdCall ? 100 : (input.floorBedarf / 12) },
+                        action: {
+                            type: householdCall ? 'NONE' : 'TRANSACTION',
+                            nettoErlös: householdCall ? 0 : input.floorBedarf,
+                            steuer: 0,
+                            verwendungen: {},
+                            quellen: householdCall
+                                ? []
+                                : [{ profileId: engineCalls.length === 2 ? 'included' : 'partner' }]
+                        }
+                    }
+                };
+            }
+        };
+        const runs = handlers.runProfilverbundProfileSimulations(aggregateInput, selectedProfiles);
+        const mergedAction = handlers.mergeProfilverbundActions(runs);
+
+        assertEqual(engineCalls.length, 3, 'Engine laeuft nur fuer Haushalt und zwei ausgewaehlte Profile');
+        assertEqual(runs.length, 2, 'Opt-out-Profil erzeugt keinen Profil-Run');
+        assertEqual(mergedAction.quellen.length, 2, 'Zusammengefuehrte Action enthaelt keine Opt-out-Quelle');
+        assertEqual(mergedAction.quellen[0].profileId, 'included', 'Erste Action stammt vom ausgewaehlten Profil');
+        assertEqual(mergedAction.quellen[1].profileId, 'partner', 'Zweite Action stammt vom ausgewaehlten Partnerprofil');
     }
 
     console.log('Test 3: JSON and CSV import failures report through UI error feedback');
