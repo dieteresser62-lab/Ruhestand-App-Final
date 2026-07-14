@@ -31,7 +31,7 @@ Floor, Flex, Renten und sonstige Einkuenfte werden einmal auf Haushaltsebene ver
 
 ## Scope
 
-Programmdateien, maximal 5 (Scope-Erweiterung nach Anhebung der allgemeinen Stop-Grenze auf 10):
+Programmdateien, maximal 5 (Scope-Erweiterung nach Anhebung der allgemeinen Stop-Grenze gemaess AGENTS.md):
 
 - `app/profile/profilverbund-balance.js`
 - `app/balance/balance-main-profilverbund.js`
@@ -103,7 +103,7 @@ npm test
 ## Abweichungen vom Plan
 
 - `app/balance/balance-main.js` musste als fuenfte Programmdatei aufgenommen werden. Nur der Hauptorchestrator kann den einmaligen Haushaltslauf fuer das Hauptergebnis wiederverwenden und dadurch einen doppelten Haushaltsentscheid vermeiden.
-- Die Erweiterung erfolgte nach ausdruecklicher Anhebung der allgemeinen Stop-Grenze in `AGENTS.md` von 5 auf 10 Programmdateien.
+- Die Erweiterung erfolgte nach Anpassung der allgemeinen Stop-Grenze in `AGENTS.md`.
 
 ## Offene Risiken
 

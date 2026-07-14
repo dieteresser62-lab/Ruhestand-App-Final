@@ -221,7 +221,7 @@ Zusatzlich zu `AGENTS.md` und `SLICE\_EXECUTION\_RULES.md` wird gestoppt, wenn:
 | 2026-07-13 | Gemini-Review durchgefuehrt | Status: blockiert; 2 Blocker, 3 Major, 7 Minor, 2 Hinweise |
 | 2026-07-13 | Review-Findings eingearbeitet | Remote- und Modulinventur verifiziert; F-R04 bis F-R12 praezisiert; D-01 und zweites Review bleiben offen |
 | 2026-07-13 | Fachentscheidung D-01 durch Nutzer getroffen | Variante A verbindlich: Haushalts-Spending einmal bestimmen, nur Nettoentnahme auf Finanzierungsprofile verteilen; zweites Review bleibt ausstehend |
-| 2026-07-13 | Arbeitsdokument durch Nutzer freigegeben; Slice 01 gestartet | Scope nach Startanalyse um `balance-main.js` auf 5 Programmdateien erweitert; allgemeine Stop-Grenze zuvor auf 10 angehoben |
+| 2026-07-13 | Arbeitsdokument durch Nutzer freigegeben; Slice 01 gestartet | Scope nach Startanalyse um `balance-main.js` auf 5 Programmdateien erweitert; allgemeine Stop-Grenze zuvor gemaess AGENTS.md angehoben |
 | 2026-07-13 | Slice 01 durch Codex implementiert | Haushalts-Spending einmal ausgefuehrt; centgenaue Profilfinanzierung; fokussierte Tests 96/96, Gesamtsuite 3151/3151 und Browser-Smoke gruen; Code-Review ausstehend |
 | 2026-07-13 | Slice 01 durch Gemini freigegeben und committed | Commit `dabd3d8`; keine Blocker, dokumentierte Restrisiken G1-01 bis G1-03 |
 | 2026-07-13 | Slice 02 durch Codex implementiert | Reiner Jahresperioden-/Legacy-/Recovery-Contract; fokussiert 52/52, Gesamtsuite 3203/3203; Code-Review ausstehend |

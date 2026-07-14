@@ -75,7 +75,7 @@ Keine.
 
 ## Offene Risiken
 
-- Eine Signaturaenderung von `loadExpensesStore()` ist ein Interface-Break. Wenn die erneute Aufrufer-Inventur weitere Produktionsmodule oder insgesamt mehr als fuenf Programmdateien ergibt, wird vor dem Edit gestoppt und der Slice geteilt.
+- Eine Signaturaenderung von `loadExpensesStore()` ist ein Interface-Break. Wenn die erneute Aufrufer-Inventur weitere Produktionsmodule ergibt und dadurch die Stop-Regel in `AGENTS.md` verletzt wird, wird vor dem Edit gestoppt und der Slice geteilt.
 
 ## Rueckdokumentation
 
@@ -91,7 +91,7 @@ Ausstehend.
 
 ## Review-Antworten von Codex
 
-F-R09 wurde angenommen. Die aktuelle Aufruferinventur ist dokumentiert; sie wird vor Coding wiederholt. Ein kompatibler Result-Pfad und die Fuenf-Dateien-Stop-Regel sind verbindlich.
+F-R09 wurde angenommen. Die aktuelle Aufruferinventur ist dokumentiert; sie wird vor Coding wiederholt. Ein kompatibler Result-Pfad und die Stop-Regel gemaess `AGENTS.md` sind verbindlich.
 
 ## Review-Entscheidungen
 

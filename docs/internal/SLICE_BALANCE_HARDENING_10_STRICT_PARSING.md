@@ -77,7 +77,7 @@ Keine.
 
 ## Offene Risiken
 
-- Der gemeinsame Parser hat mehr Aufrufer als der Slice-Scope. Wenn kompatible Einfuehrung nicht mit fuenf Programmdateien moeglich ist, stoppen und in zwei Slices teilen.
+- Der gemeinsame Parser hat mehr Aufrufer als der Slice-Scope. Wenn die kompatible Einfuehrung die Stop-Regel in `AGENTS.md` verletzt, stoppen und in zwei Slices teilen.
 
 ## Rueckdokumentation
 

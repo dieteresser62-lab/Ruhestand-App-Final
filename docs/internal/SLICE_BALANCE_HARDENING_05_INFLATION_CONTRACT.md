@@ -21,11 +21,13 @@ Alle Inflationsquellen liefern denselben Kalenderjahres-Contract mit Timeout, Da
 
 ## Scope
 
-Programmdateien, maximal 3:
+Programmdateien, nach Nutzerklarstellung am 2026-07-14 maximal 5 (unterhalb der Stop-Grenze in AGENTS.md):
 
 - `app/balance/balance-annual-inflation.js`
 - `tests/balance-annual-inflation.test.mjs`
 - `tests/balance-annual-workflow-contract.test.mjs`
+- `src-tauri/tauri.conf.json`
+- `tests/tauri-csp.test.mjs`
 
 ## Nicht-Scope
 
@@ -35,11 +37,37 @@ Programmdateien, maximal 3:
 
 ## Diff-Risiko vor Start
 
-Planungs-Branch vor Coding erneut pruefen. Fremde `node_modules`-Aenderungen nicht anfassen.  
-Aenderungstiefe: **riskant**, weil Bedarf und historischer Faktor betroffen sind.  
-Gefaehrdete Tests: Inflation, Annual Workflow, Spending/Guardrails indirekt.  
-Nicht anfassen: `engine/`, globale Runtime-/Proxy-Konfiguration.  
-Rollback: Scope-Dateien per `git checkout --`.
+Startcheck am 2026-07-14:
+
+```text
+git branch --show-current
+codex/balance-app-hardening
+
+git status --short
+?? node_modules/.bin/playwright
+?? node_modules/.bin/playwright-core
+?? node_modules/.bin/playwright-core.cmd
+?? node_modules/.bin/playwright-core.ps1
+?? node_modules/.bin/playwright.cmd
+?? node_modules/.bin/playwright.ps1
+?? node_modules/playwright-core/
+?? node_modules/playwright/
+```
+
+Geplante Dateien:
+- `app/balance/balance-annual-inflation.js`
+- `tests/balance-annual-inflation.test.mjs`
+- `tests/balance-annual-workflow-contract.test.mjs`
+- `src-tauri/tauri.conf.json`
+- `tests/tauri-csp.test.mjs`
+- reine Rueckdokumentation in Slice-, Hauptplan- und Datenquellen-Doku
+
+Voraussichtliche Aenderungstiefe: **riskant**, weil Bedarf und historischer Faktor betroffen sind.  
+Gefaehrdete bestehende Tests: Inflation, Annual Workflow, Spending/Guardrails indirekt.  
+Nicht anfassen: `engine/`, globale Runtime-/Proxy-Konfiguration ausser der eng begrenzten OECD-CSP-Aktualisierung und die fremden ungetrackten `node_modules`-Dateien.  
+Rollback: Scope-Dateien und geaenderte Bestandsdokumente gezielt per `git checkout -- <datei>`; eine neu angelegte Datei duerfte nur nach Freigabe entfernt werden.
+
+Es greift keine Stop-Regel: Branch und Contract sind eindeutig, der erweiterte Scope bleibt mit fuenf Programmdateien unter der Grenze in AGENTS.md und die geplanten Tests sind ausfuehrbar.
 
 ## Umsetzungsschritte
 
@@ -67,11 +95,21 @@ Noch keine.
 
 ## Abweichungen vom Plan
 
-Keine.
+### Stop-Grund vor Code-Umsetzung (2026-07-14)
+
+Die offizielle OECD-Dokumentation bestaetigt, dass die bisherigen OECD.Stat-Endpunkte unter `stats.oecd.org` seit dem 1. Juli 2024 abgeschaltet sind. Der gepflegte Nachfolger liegt unter `https://sdmx.oecd.org`. Die Tauri-CSP erlaubt derzeit nur `https://stats.oecd.org`; ein Wechsel ohne Anpassung von `src-tauri/tauri.conf.json` wuerde daher im Desktop-Build blockiert.
+
+Eine funktionsfaehige Umsetzung erfordert voraussichtlich die enge Scope-Erweiterung um:
+
+- `src-tauri/tauri.conf.json` (OECD-Ziel auf `https://sdmx.oecd.org` aktualisieren),
+- `tests/tauri-csp.test.mjs` (CSP-Regression auf das aktuelle Ziel aktualisieren).
+
+Damit sind fuenf statt der urspruenglich geplanten drei Programmdateien betroffen. Der Nutzer hat am 2026-07-14 klargestellt, dass die Stop-Grenze gemaess AGENTS.md eingehalten wird. Die Umsetzung wird daher mit der eng auf das OECD-Ziel begrenzten CSP-Aktualisierung fortgesetzt.
 
 ## Offene Risiken
 
 - Falls keine Quelle dieselbe Jahreskennzahl liefert, ist eine fachliche Nutzerentscheidung erforderlich; keine automatische Mischsemantik.
+- OECD ist ohne freigegebene CSP-/Test-Anpassung im Tauri-Build nicht ueber den aktuellen offiziellen Endpunkt erreichbar.
 
 ## Rueckdokumentation
 
