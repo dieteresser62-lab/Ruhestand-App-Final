@@ -9,6 +9,7 @@ $repoRoot = Split-Path -Parent $scriptDir
 Set-Location $repoRoot
 
 $releaseExeName = 'RuhestandSuite.exe'
+$releaseArchiveDirName = 'release-archive'
 $minimumExeSizeBytes = 1MB
 
 function Invoke-CheckedCommand {
@@ -247,6 +248,34 @@ function Assert-ReleaseExecutable {
     }
 }
 
+function Backup-ExistingReleaseExecutable {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if (-not (Test-Path $Path)) {
+        return $null
+    }
+
+    $existingExe = Get-Item $Path
+    $archiveDir = Join-Path $repoRoot $releaseArchiveDirName
+    New-Item -Path $archiveDir -ItemType Directory -Force | Out-Null
+
+    $timestamp = Get-Date -Format 'yyyy-MM-dd_HH-mm-ss-fff'
+    $archiveName = '{0}_{1}{2}' -f [System.IO.Path]::GetFileNameWithoutExtension($releaseExeName), $timestamp, [System.IO.Path]::GetExtension($releaseExeName)
+    $archivePath = Join-Path $archiveDir $archiveName
+
+    Copy-Item -Path $Path -Destination $archivePath
+
+    $archivedExe = Get-Item $archivePath
+    if ($archivedExe.Length -ne $existingExe.Length) {
+        throw "Archived EXE size mismatch. Source: $($existingExe.Length) bytes; archive: $($archivedExe.Length) bytes."
+    }
+
+    return $archivePath
+}
+
 if ($VerboseMode) {
     Write-Host 'Starting Tauri build workflow...' -ForegroundColor Cyan
 }
@@ -273,6 +302,10 @@ $sourceExe = Join-Path $repoRoot 'src-tauri\target\release\ruhestand_suite.exe'
 Assert-ReleaseExecutable -Path $sourceExe -BuildStartedAt $buildStartedAt
 
 $destExe = Join-Path $repoRoot $releaseExeName
+$archivedExe = Backup-ExistingReleaseExecutable -Path $destExe
+if ($VerboseMode -and $archivedExe) {
+    Write-Host "Archived previous release EXE as '$archivedExe'." -ForegroundColor Green
+}
 Copy-Item -Path $sourceExe -Destination $destExe -Force
 Assert-ReleaseExecutable -Path $destExe -BuildStartedAt $buildStartedAt
 

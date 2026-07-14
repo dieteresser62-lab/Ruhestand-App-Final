@@ -10,9 +10,11 @@ const repoRoot = path.resolve(__dirname, '..');
 const tauriConfigPath = path.join(repoRoot, 'src-tauri', 'tauri.conf.json');
 const tauriLibPath = path.join(repoRoot, 'src-tauri', 'src', 'lib.rs');
 const packageJsonPath = path.join(repoRoot, 'package.json');
+const tauriBuildScriptPath = path.join(repoRoot, 'scripts', 'build-tauri.ps1');
 const tauriConfig = JSON.parse(fs.readFileSync(tauriConfigPath, 'utf8'));
 const tauriLib = fs.readFileSync(tauriLibPath, 'utf8');
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+const tauriBuildScript = fs.readFileSync(tauriBuildScriptPath, 'utf8');
 const security = tauriConfig?.app?.security || {};
 const csp = security?.csp || {};
 const connectSrc = String(csp?.['connect-src'] || '');
@@ -55,6 +57,16 @@ assert(packageJson?.scripts?.['tauri:build'] === 'tauri build', 'package.json sh
 assert(
   packageJson?.scripts?.['build-tauri-exe']?.includes('scripts/build-tauri.ps1'),
   'package.json should expose the checked Windows EXE release workflow'
+);
+assert(
+  tauriBuildScript.includes("$releaseArchiveDirName = 'release-archive'") &&
+    tauriBuildScript.includes('Backup-ExistingReleaseExecutable -Path $destExe'),
+  'Windows EXE release workflow should archive an existing root EXE before replacement'
+);
+assert(
+  tauriBuildScript.indexOf('Backup-ExistingReleaseExecutable -Path $destExe') <
+    tauriBuildScript.indexOf('Copy-Item -Path $sourceExe -Destination $destExe -Force'),
+  'Existing root EXE should be archived before the new release EXE is copied'
 );
 
 for (const commandName of [

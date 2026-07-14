@@ -33,7 +33,8 @@ Die Desktop-App lädt das Frontend direkt aus `dist/` (`src-tauri/tauri.conf.jso
 2. `scripts/build-tauri.ps1`
 3. `npm run sync-dist`
 4. `npm run tauri:build`
-5. Kopie der erzeugten Binary nach `RuhestandSuite.exe`
+5. Archivierung einer vorhandenen `RuhestandSuite.exe` unter `release-archive/RuhestandSuite_yyyy-MM-dd_HH-mm-ss-fff.exe`
+6. Kopie der erzeugten Binary nach `RuhestandSuite.exe`
 
 Wichtig für Live-Daten:
 
@@ -570,7 +571,7 @@ definiert werden. Ergebnisse werden gegen diese Limits geprüft und als OK/Verle
 ## Build- und Laufzeit-Hinweise
 
 * Engine anpassen → `npm run build:engine` ausführen, anschließend `engine.js` prüfen; für CI/Release `npm run build:engine:strict` nutzen.
-* Desktop-Release auf Windows → `npm run build-tauri-exe` oder `build-tauri.bat`; der Workflow führt `npm run sync-dist`, `npm run tauri:build` und den geprüften Kopierschritt nach `RuhestandSuite.exe` aus.
+* Desktop-Release auf Windows → `npm run build-tauri-exe` oder `build-tauri.bat`; der Workflow führt `npm run sync-dist`, `npm run tauri:build`, die zeitgestempelte Sicherung einer vorhandenen EXE unter `release-archive/` und den geprüften Kopierschritt nach `RuhestandSuite.exe` aus.
 * Reine Tauri-Bundles → vor `npm run tauri:build` immer `npm run sync-dist` ausführen, damit `src-tauri/tauri.conf.json` den aktuellen `dist/`-Stand lädt.
 * Dateiimporte/-exporte benötigen Browser-Datei-/Download-Unterstuetzung. Jahresabschluss-Snapshots liegen intern im aktiven Persistenzadapter: Browser `IndexedDB` Store `snapshots`, Tauri `ruhestand_suite_snapshots.json`, localStorage-Fallback `rs_snapshot_archive_v1`.
 * Tests/Smoketests:

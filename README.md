@@ -273,7 +273,7 @@ Die Anwendung ist bewusst minimalistisch gehalten, hat aber für den vollen Funk
 
 * Die Balance- und Simulator-Module nutzen native ES6-Imports. Änderungen an einzelnen Modulen werden nach dem Speichern direkt beim nächsten Reload geladen.
 * Engine-Anpassungen erfolgen in den Modulen unter `engine/`. Nach Anpassungen `npm run build:engine` ausführen und die Größe der generierten `engine.js` kontrollieren.
-* Der Windows-Release-Build bleibt ein bewusst manueller Schritt über `build-tauri.bat` bzw. `scripts/build-tauri.ps1` nach grüner Suite. Das Skript prüft die Build-Voraussetzungen, erzeugt `dist/` frisch via `npm run sync-dist`, validiert zentrale Assets, führt `npm run tauri:build` aus und kopiert nur eine plausibilisierte EXE als `RuhestandSuite.exe` ins Repo-Root.
+* Der Windows-Release-Build bleibt ein bewusst manueller Schritt über `build-tauri.bat` bzw. `scripts/build-tauri.ps1` nach grüner Suite. Das Skript prüft die Build-Voraussetzungen, erzeugt `dist/` frisch via `npm run sync-dist`, validiert zentrale Assets und führt `npm run tauri:build` aus. Vor dem abschließenden Kopieren einer plausibilisierten neuen `RuhestandSuite.exe` ins Repo-Root wird eine vorhandene Vorgängerversion unter `release-archive/RuhestandSuite_yyyy-MM-dd_HH-mm-ss-fff.exe` archiviert.
 * Für schnelle QA bitte `npm test` einmal durchlaufen lassen. Kritische Browserabläufe werden zusätzlich mit `npm run test:browser` geprüft; `npm run test:coverage` aktualisiert die transparente V8-Coverage-Baseline. Wenn lokal `npm` defekt ist, kann die fachliche Suite direkt mit `node tests/run-tests.mjs` validiert werden; der Tauri-Release-Build selbst benötigt weiterhin ein funktionierendes `npm`.
 
 ## Abschluss-Checkliste

@@ -347,7 +347,8 @@ build-tauri.bat
 # 1) npm run sync-dist
 # 2) dist/ validieren
 # 3) npm run tauri:build
-# 4) Copy src-tauri/target/release/ruhestand_suite.exe -> RuhestandSuite.exe
+# 4) Vorhandene RuhestandSuite.exe zeitgestempelt unter release-archive/ sichern
+# 5) Copy src-tauri/target/release/ruhestand_suite.exe -> RuhestandSuite.exe
 ```
 
 Der gleiche Build-Pfad ist als npm-Skript verfügbar:
@@ -356,7 +357,7 @@ Der gleiche Build-Pfad ist als npm-Skript verfügbar:
 npm run build-tauri-exe
 ```
 
-`scripts/build-tauri.ps1` prüft vor dem Build `npm`, Rust/Cargo, den MSVC-Toolchain-Zugriff und nach dem Sync zentrale `dist/`-Assets. Der Build nutzt immer `dist/` als Frontend-Eingang; `scripts/sync-dist.ps1` kopiert die Laufzeitdateien frisch und schließt Entwicklungs-, Test-, Doku- und Release-Artefakte aus. Änderungen an `engine/` müssen vorher mit `npm run build:engine` in `engine.js` übertragen werden; für CI/Release steht `npm run build:engine:strict` bereit.
+`scripts/build-tauri.ps1` prüft vor dem Build `npm`, Rust/Cargo, den MSVC-Toolchain-Zugriff und nach dem Sync zentrale `dist/`-Assets. Der Build nutzt immer `dist/` als Frontend-Eingang; `scripts/sync-dist.ps1` kopiert die Laufzeitdateien frisch und schließt Entwicklungs-, Test-, Doku- und Release-Artefakte aus. Vor dem Ersetzen im Repo-Root wird eine vorhandene `RuhestandSuite.exe` unter `release-archive/RuhestandSuite_yyyy-MM-dd_HH-mm-ss-fff.exe` archiviert. Änderungen an `engine/` müssen vorher mit `npm run build:engine` in `engine.js` übertragen werden; für CI/Release steht `npm run build:engine:strict` bereit.
 
 **Output je nach Plattform:**
 - **Windows (Build-Artefakt):** `src-tauri/target/release/ruhestand_suite.exe`

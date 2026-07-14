@@ -30,6 +30,7 @@ dist/
 
 # Executables
 *.exe
+release-archive/
 
 # Screenshots
 Screenshots/
