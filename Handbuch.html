@@ -476,8 +476,9 @@
                         <div class="step-number">3</div>
                         <div class="step-content">
                             <h3>Tranchen erfassen</h3>
-                            <p>Depot-Tranchen im Tranchen-Manager pflegen. Diese Daten sind die Basis für FIFO,
-                                Teilfreistellung und steueroptimierte Verkäufe.</p>
+                            <p>Im gewählten Profil Depot-Tranchen im Profil-Assets-Manager pflegen und die sichtbare
+                                Profil-ID prüfen. Diese Daten sind die Basis für Teilfreistellung und steueroptimierte
+                                Verkäufe. Empfehlungen verändern den Realbestand nicht.</p>
                         </div>
                     </li>
                 </ol>
@@ -885,17 +886,21 @@
                     </div>
                     <div class="detail-block" id="simulator-tranchen">
                         <h3>Depot-Tranchen-Manager</h3>
-                        <p>Für eine realistische Steuerberechnung können Sie Ihre ETF-Positionen als einzelne
-                            Tranchen pflegen. Für korrekte Steuerberechnungen sind Tranchen notwendig; ohne Tranchen
-                            arbeitet der Simulator mit groben Schätzungen. Der Simulator nutzt die Tranchen automatisch
-                            für Verkäufe und Steuerabzüge.</p>
+                        <p>Für eine realistische Steuerberechnung können Sie Depotpositionen im gewählten Profil als
+                            einzelne Tranchen pflegen. Ein valider Detailbestand ermöglicht lotbezogene Verkäufe und
+                            Steuerabzüge; ein explizit leerer Bestand nutzt die vereinfachte Aggregatsicht. Korrupte
+                            oder widersprüchliche Daten blockieren sichtbar. Der Simulator arbeitet auf tiefen Kopien
+                            und verändert den Realbestand nicht.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Öffnen:</strong> Button "Depot-Tranchen Manager öffnen" im Vermögen-Block.</li>
-                            <li><strong>Speichern:</strong> Tranchen werden lokal im Browser gespeichert (localStorage).
-                            </li>
-                            <li><strong>Wirkung:</strong> Verkäufe werden steueroptimiert aus den Tranchen ausgewählt.
-                            </li>
+                            <li><strong>Öffnen:</strong> Profil auf der Startseite wählen und „Profil-Assets Manager“
+                                öffnen.</li>
+                            <li><strong>Speichern:</strong> Die zentrale Persistenz nutzt im Browser IndexedDB und in
+                                der Desktop-App eine lokale Tauri-Datei; die Statusanzeige bestätigt den Flush.</li>
+                            <li><strong>Wirkung:</strong> Simulierte Verkäufe werden steueroptimiert aus Kopien der
+                                Tranchen ausgewählt und behalten ihre Profilherkunft.</li>
+                            <li><strong>Backup:</strong> Das zentrale Komplettbackup unter „Profile &gt; Erweitert“
+                                verwenden; es gibt keinen separaten Tranchen-Teilimport/-export.</li>
                         </ul>
                     </div>
                     <div class="detail-block" id="simulator-pflegebucket">
@@ -1192,16 +1197,18 @@
 
                     <div class="detail-block" id="balance-tranchen">
                         <h3>Depot-Tranchen-Manager</h3>
-                        <p>In der Balance-App fließen detaillierte Tranchen direkt in die Handlungsschritte ein. Das
-                            sorgt für realistische Steuerabschätzungen und eine klare Zuordnung, welche Positionen
-                            verkauft werden sollen.</p>
+                        <p>In der Balance-App fließen valide detaillierte Tranchen direkt in die Handlungsschritte ein.
+                            Das sorgt für realistische Steuerabschätzungen und eine klare Zuordnung, welche Positionen
+                            verkauft werden sollen. Die Empfehlung selbst bleibt schreibfrei.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                            <li><strong>Aktivierung:</strong> Tranchen im Manager pflegen und "Werte übernehmen".</li>
+                            <li><strong>Aktivierung:</strong> Profil auf der Startseite wählen, Tranchen im
+                                Profil-Assets-Manager pflegen und den bestätigten Speicherstatus abwarten.</li>
                             <li><strong>Verkaufsauswahl:</strong> Steueroptimierte Reihenfolge (geringste Steuerlast
                                 zuerst).</li>
-                            <li><strong>Hinweis:</strong> Die App zeigt die ausgewählten Tranchen im Diagnose-Panel.
-                            </li>
+                            <li><strong>Reale Ausführung:</strong> Erst nach dem Brokerverkauf im Manager Vorschau und
+                                separate Bestätigung des Reconcile-Schritts durchführen. Eine identische Action-ID wird
+                                nur einmal angewandt.</li>
                         </ul>
                         <p style="color: var(--text-light); margin-top: 0.5rem;">Ohne gepflegte Tranchen fallen die
                             Steuerwerte auf eine vereinfachte Schätzung zurück.</p>
@@ -1329,13 +1336,14 @@
                     <p style="color: var(--text-light); margin-top: 10px;">Die Profilverwaltung finden Sie auf der
                         Startseite (<code>index.html</code>):</p>
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
-                        <li><strong>Profil erstellen:</strong> Geben Sie einen Namen ein und klicken Sie auf "Neues
-                            Profil".</li>
-                        <li><strong>Zwischen Profilen wechseln:</strong> Profil auswählen und "Aktivieren" klicken.</li>
+                        <li><strong>Profil erstellen:</strong> Unter „Erweitert“ einen Namen eingeben und „Anlegen“
+                            wählen.</li>
+                        <li><strong>Zwischen Profilen wechseln:</strong> Profil in der Auswahlliste wählen; die App
+                            speichert das bisherige Profil und lädt das neue.</li>
                         <li><strong>Profil umbenennen:</strong> Neuen Namen eingeben und "Umbenennen" klicken.</li>
                         <li><strong>Profil löschen:</strong> Profil auswählen und löschen (mit Sicherheitsabfrage).</li>
-                        <li><strong>Backup erstellen/importieren:</strong> Die gesamte Profil-Registry als JSON
-                            exportieren oder wiederherstellen.</li>
+                        <li><strong>Backup erstellen/importieren:</strong> Unter „Erweitert“ ein zentrales
+                            Komplettbackup aller Persistenzdaten exportieren oder wiederherstellen.</li>
                         <li><strong>Pflegebucket:</strong> Optionalen Pflegebucket als Haushaltsreserve im Profil
                             pflegen. Bei Paaren ist das Hauptprofil die maßgebliche Definition.</li>
                     </ul>
@@ -1385,8 +1393,8 @@
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
                         <li><strong>Gold-Allokation inkonsistent:</strong> Gold wird nur genutzt, wenn ein Profil Gold
                             aktiv UND Zielwert > 0 nutzt.</li>
-                        <li><strong>Tranchen-Warnung:</strong> Bei stark abweichender Tranchensumme wird im Simulator
-                            auf Aggregatwerte zurückgegriffen.</li>
+                        <li><strong>Tranchen-Warnung:</strong> Ein explizit leerer Bestand bleibt leer; korrupte,
+                            doppelte oder widersprüchlich klassifizierte Lots blockieren die Berechnung fail-closed.</li>
                         <li><strong>Pflegebucket-Warnung:</strong> Wenn nicht genug Geldmarkt/Cash für den gewünschten
                             Bucket vorhanden ist, wird der Bucket gekappt und die Warnung im Simulator sichtbar.</li>
                         <li><strong>Zu wenige aktive Profile:</strong> Mit nur einem Profil entspricht der Profilverbund
@@ -1574,8 +1582,9 @@
                         nicht wiederherstellbarem Mindest-Runway wird die Anhebung blockiert.</dd>
 
                     <dt>Muss ich Depot-Tranchen pflegen?</dt>
-                    <dd>Ja, für korrekte Steuerberechnungen sind Tranchen notwendig. Ohne Tranchen nutzt die Suite
-                        vereinfachte Schätzwerte; für verlässliche Handlungsschritte sollten Sie Tranchen erfassen.</dd>
+                    <dd>Für lotgenaue Steuer- und Verkaufsschätzungen ja. Ein explizit leerer Bestand nutzt bewusst
+                        die vereinfachte Aggregatsicht. Korrupte Daten werden nicht als leer interpretiert, sondern
+                        blockieren mit einem Recovery-Hinweis.</dd>
 
                     <dt>Was ist der Verlustverrechnungstopf?</dt>
                     <dd>Wenn Sie in einem Jahr Kapitalverluste realisieren (z.B. durch Verkauf bei niedrigeren

@@ -8,6 +8,7 @@ Aktive interne Uebersichten:
 - `SLICE_EXECUTION_RULES.md` - verbindlicher Review-, Branch-, Risiko- und Abnahmeprozess fuer Slices.
 - `TRANCHENMANAGEMENT_GAP_ANALYSE.md` - priorisierte Bestandsaufnahme des Tranchenmanagements mit Evidenz und verbindlichen Nutzerentscheidungen.
 - `TRANCHENMANAGEMENT_HARDENING_PLAN.md` - daraus abgeleiteter 1-basierter Arbeitsplan mit neun Review-Slices.
+- Die oeffentliche Abschlussreferenz des Arbeitsplans liegt unter `../reference/TRANCHEN_MODULES_README.md`; die Nutzeranleitung unter `../guides/MULTI-TRANCHEN-ANLEITUNG.md`.
 
 Abgeschlossene Umsetzungen und fruehere Arbeitsplaene liegen im Archiv.
 

@@ -4,7 +4,7 @@
 **Autor:** Codex (Bestandsaufnahme und Planentwurf, keine Review-Freigabe)
 **Feature-Branch:** `codex/tranchenmanagement-hardening`
 **GitHub-Status:** nur lokal angelegt; Veröffentlichung ausstehend und nur nach Nutzerfreigabe
-**Status:** freigegeben (Gemini-Review abgeschlossen, Claude-Review ausstehend)
+**Status:** GAP-Analyse freigegeben; Slice 09 implementiert, finales Code-/Gesamtreview ausstehend
 
 ## Zweck und Abgrenzung
 
@@ -278,6 +278,26 @@ Damit ist TM-01 kein theoretisches Risiko. Die Behebung verändert das Verhalten
   0 offenen Handles sowie elf gruene Browser-Smoke-Szenarien. Review und
   Freigabe von Slice 08 stehen aus.
 
+### Rückdokumentation Slice 09
+
+- TM-17 ist für den geplanten Abschlussumfang implementiert: Der Browser-Smoke
+  verbindet den echten Profil-Handoff mit Manager-CRUD, Quote, Reload, Balance,
+  Simulator, Profilisolation, Reconcile und Recovery. Die Legacy-Matrix läuft über
+  den produktiven Facade-Migrationspfad und prüft Determinismus, Idempotenz und
+  Rohdatenerhalt.
+- TM-21 ist implementiert: Die Mehrtranchen-Anleitung enthält nur synthetische
+  Beispiele, verweist auf den zentralen Komplettbackup-Pfad und beschreibt keine
+  entfernten Teilimport-/LocalStorage-Controls. Handbuch, Architektur-, Workflow-,
+  Modul- und Testreferenzen sind auf den aktuellen Vertrag synchronisiert; die
+  neue `docs/reference/TRANCHEN_MODULES_README.md` ist zentral verlinkt.
+- TM-22 ist durch Lifecycle-Unit-Tests und den wiederholten Browserpfad abgedeckt;
+  Reload, Profilwechsel, Reconcile-Duplikat und Dialog-Neuöffnung erzeugen keine
+  doppelte Mutation oder Listenerwirkung.
+- Verifikation: 107 Testdateien entdeckt, 106 im Node-Gate ausgeführt, 4410/4410
+  Assertions, 0 Fehler und 0 offene Handles; 13 grüne Browser-Smoke-Szenarien;
+  Coverage 72,25% (26529/36717 Zeilen in 195 Dateien). Umsetzung abgeschlossen,
+  finales Review und Freigabe stehen aus.
+
 Diese Tests werden erweitert oder als Regression-Gates verwendet; parallele Test-Doppelungen sind nicht vorgesehen.
 
 ## Nutzerentscheidungen für das Planreview
@@ -350,6 +370,6 @@ Der Blockstatus wird nicht durch Codex aufgehoben; Gemini-Nachreview und Claude-
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
 | --- | --- | --- | --- | --- |
 | G-01 | Gemini | Corrupt und transiente Persistenzfehler trennen | angenommen | Slice 03 freigegeben und als Commit `13328fa` vorhanden |
-| G-02 | Gemini | Deep-Copy-Garantie für Simulator-Lots | angenommen | in Slice 07 umgesetzt; Review ausstehend |
-| G-03 | Gemini | Sichtbares Feedback für abgelehnte Quotes | angenommen | O-03/O-05 und Slice 05 konkretisiert; Code ausstehend |
-| G-04 | Gemini | Strukturierte Engine-Validierungsfehler in der UI | angenommen | Contract in Slice 02 und blockierender Manager-UI-Pfad in Slice 04 implementiert; Review ausstehend |
+| G-02 | Gemini | Deep-Copy-Garantie für Simulator-Lots | angenommen | in Slice 07 umgesetzt; Abschluss-E2E in Slice 09 grün; finales Review ausstehend |
+| G-03 | Gemini | Sichtbares Feedback für abgelehnte Quotes | angenommen | in Slice 05 umgesetzt; Teilerfolg/Offline im Slice-09-Browsergate grün |
+| G-04 | Gemini | Strukturierte Engine-Validierungsfehler in der UI | angenommen | Contract in Slice 02 und blockierender Manager-UI-Pfad in Slice 04 implementiert; Abschlussgates grün, finales Review ausstehend |

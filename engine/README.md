@@ -75,7 +75,9 @@ engine/
 
 ### Verkaufs-/Tranchen-Contract
 
-`transactions/sale-engine.mjs` baut fuer detaillierte Tranchen eine `breakdown[]`-Liste. Neben Verkaufsbetrag, Steuer- und Rohgewinnfeldern bleiben `trancheId` und, falls vorhanden, `sourceProfileId` erhalten. Mehrprofilige Simulator-Inputs koennen dadurch gleichartige Positionen aus unterschiedlichen Profilen eindeutig auf die urspruengliche Profil-Tranche zurueckfuehren.
+`transactions/sale-engine.mjs` baut fuer detaillierte Tranchen eine `breakdown[]`-Liste. Die Eingangsgrenze erwartet die kanonische, disjunkte Kategorie-/Typ-Matrix aus `types/tranche-contract.js`; doppelte Lot-IDs und widerspruechliche Klassifikationen werden vor der Berechnung abgelehnt. Neben Verkaufsbetrag, Steuer- und Rohgewinnfeldern bleiben `trancheId` und, falls vorhanden, `sourceProfileId` erhalten. Mehrprofilige Simulator-Inputs koennen dadurch gleichartige Positionen aus unterschiedlichen Profilen eindeutig auf die urspruengliche Profil-Tranche zurueckfuehren.
+
+Die Engine plant nur. Sie schreibt weder Empfehlungen noch simulierte Lotmutationen in `depot_tranchen`. Eine reale Bestandsfortschreibung erfolgt ausschliesslich nach Broker-Ausfuehrung ueber den bestaetigten Reconcile-Pfad des Profil-Assets-Managers. Siehe `../docs/reference/TRANCHEN_MODULES_README.md`.
 
 Im Core-Einzelverkauf bleiben `breakdown[].steuer` und `breakdown[].netto` die Planattribution des konservativen Gross-ups. Die Top-Level-Felder trennen diese Planung von der finalen Cash-Wahrheit: `bruttoVerkaufGesamt`, `steuerPlanGesamt` und `nettoErlösPlan` beschreiben den Verkauf vor Jahres-Settlement; `steuer` kommt aus `tax-settlement.mjs`, und `taxCashAdjustment = steuerPlanGesamt - steuer` wird genau einmal `verwendungen.liquiditaet` zugeschlagen. Dadurch gelten mit 0,01 EUR Toleranz `bruttoVerkaufGesamt - steuer = nettoErlös` und `sum(verwendungen) = nettoErlös`. Nicht-Verkaufsaktionen exponieren die neuen Verkaufs-/Steuerfelder neutral mit `0`.
 

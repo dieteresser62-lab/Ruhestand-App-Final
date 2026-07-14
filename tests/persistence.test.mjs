@@ -45,6 +45,7 @@ import {
     commitTrancheReconciliation,
     readReconciliationHistory
 } from '../app/tranches/tranche-reconciliation.js';
+import { loadTranchesFromStorage } from '../app/tranches/tranchen-manager-state.js';
 
 console.log('--- Persistence Tests ---');
 
@@ -1193,6 +1194,78 @@ try {
         assert(storage.getItem(LEGACY_MIGRATION_MARKER_KEYS.completedAt), 'Migration setzt Zeitstempel-Marker');
         assert(storage.getItem(LEGACY_MIGRATION_MARKER_KEYS.checksum), 'Migration setzt Checksum-Marker');
         assertEqual(getPersistenceStatus().backend, 'IndexedDB', 'Aktives Backend ist IndexedDB');
+    }
+
+    console.log('Test 17b: tranche legacy migration matrix is deterministic and raw-preserving');
+    {
+        const legacyBase = {
+            name: 'Synthetischer Altbestand',
+            shares: 2,
+            purchasePrice: 90,
+            type: 'aktien_neu',
+            tqf: 0.3
+        };
+        const cases = [
+            {
+                name: 'valid legacy classification and generated id',
+                raw: JSON.stringify([{ ...legacyBase, kind: 'aktien_neu', type: undefined }]),
+                expectedStatus: 'valid'
+            },
+            {
+                name: 'missing optional fields',
+                raw: JSON.stringify([{ ...legacyBase, id: 'legacy-optional' }]),
+                expectedStatus: 'valid'
+            },
+            {
+                name: 'contradictory category and type',
+                raw: JSON.stringify([{ ...legacyBase, id: 'legacy-mismatch', category: 'gold' }]),
+                expectedStatus: 'corrupt'
+            },
+            {
+                name: 'duplicate ids',
+                raw: JSON.stringify([
+                    { ...legacyBase, id: 'legacy-duplicate' },
+                    { ...legacyBase, id: 'legacy-duplicate', name: 'Zweiter synthetischer Altbestand' }
+                ]),
+                expectedStatus: 'corrupt'
+            },
+            { name: 'explicit empty override', raw: '[]', expectedStatus: 'empty' },
+            { name: 'corrupt raw payload', raw: '{not-json', expectedStatus: 'corrupt' }
+        ];
+
+        for (const [index, testCase] of cases.entries()) {
+            const storage = new MockStorage();
+            storage.setItem('depot_tranchen', testCase.raw);
+            const adapter = createIndexedDbAdapter({
+                indexedDB: createFakeIndexedDB(),
+                dbName: `tranche-migration-matrix-${index}`
+            });
+            resetPersistenceForTests(adapter);
+
+            await init({ localStorage: storage });
+
+            assertEqual(
+                getItemSync('depot_tranchen'),
+                testCase.raw,
+                `${testCase.name}: Facade-Migration muss Rohbytes unveraendert uebernehmen`
+            );
+            const facadeStorage = { getItem: key => getItemSync(key) };
+            const first = loadTranchesFromStorage(facadeStorage);
+            const second = loadTranchesFromStorage(facadeStorage);
+            assertEqual(first.status, testCase.expectedStatus, `${testCase.name}: erwarteter Ladezustand`);
+            assertEqual(second.status, first.status, `${testCase.name}: wiederholtes Laden bleibt idempotent`);
+            assertEqual(getItemSync('depot_tranchen'), testCase.raw, `${testCase.name}: Laden darf Migration nicht zurueckschreiben`);
+
+            if (first.status === 'valid') {
+                assertEqual(JSON.stringify(second.tranches), JSON.stringify(first.tranches), `${testCase.name}: kanonische Ausgabe ist deterministisch`);
+                assert(first.tranches.every(tranche => tranche.schemaVersion === 1), `${testCase.name}: Ausgabe verwendet Schema 1`);
+            } else if (first.status === 'corrupt') {
+                assertEqual(first.raw, testCase.raw, `${testCase.name}: nicht automatisch behebbare Daten bleiben raw-preserving`);
+                assertEqual(first.tranches, null, `${testCase.name}: korrupte Daten duerfen keine Teilmigration liefern`);
+            } else {
+                assertEqual(first.tranches.length, 0, `${testCase.name}: leeres Override bleibt explizit leer`);
+            }
+        }
     }
 
     console.log('Test 18: browser migration blocks silent reversion when IndexedDB is empty after migration');

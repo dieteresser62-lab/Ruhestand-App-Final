@@ -58,6 +58,7 @@ import {
     updateProfileData as updateRegistryProfileData
 } from '../app/profile/profile-registry.js';
 import { CONFIG } from '../app/balance/balance-config.js';
+import { loadTranchesFromStorage } from '../app/tranches/tranchen-manager-state.js';
 
 console.log('--- Profile Storage Tests ---');
 
@@ -573,6 +574,54 @@ try {
         assert(getActiveProfileId() === emptyProfile.id, 'Leeres Zielprofil sollte als tatsächlich geladen markiert werden');
     }
     console.log('✓ explicit empty tranche override OK');
+
+    // Test 17g: Profile switches preserve legacy/corrupt tranche payloads until an explicit save
+    console.log('Test 17g: profile-bound tranche migration remains raw-preserving');
+    {
+        localStorage.clear();
+        ensureProfileRegistry();
+        const legacyRaw = JSON.stringify([{
+            id: 'legacy-profile-lot',
+            name: 'Synthetischer Altbestand',
+            shares: 2,
+            purchasePrice: 80,
+            kind: 'aktien_alt',
+            tqf: 0.3
+        }]);
+        const corruptRaw = JSON.stringify([{
+            id: 'legacy-profile-mismatch',
+            name: 'Widerspruechlicher Altbestand',
+            shares: 1,
+            purchasePrice: 100,
+            currentPrice: 110,
+            category: 'gold',
+            type: 'aktien_neu',
+            tqf: 0.3
+        }]);
+        const legacyProfile = createProfile('Legacy Browserprofil');
+        const corruptProfile = createProfile('Corrupt Browserprofil');
+        updateProfileData(legacyProfile.id, { depot_tranchen: legacyRaw });
+        updateProfileData(corruptProfile.id, { depot_tranchen: corruptRaw });
+
+        assert(switchProfile(legacyProfile.id) === true, 'Legacy-Profil sollte ladbar sein');
+        assertEqual(localStorage.getItem('depot_tranchen'), legacyRaw, 'Profilwechsel darf Legacy-Rohpayload nicht implizit umschreiben');
+        const firstLegacyLoad = loadTranchesFromStorage(localStorage);
+        const secondLegacyLoad = loadTranchesFromStorage(localStorage);
+        assertEqual(firstLegacyLoad.status, 'valid', 'Gueltiger Altbestand sollte kanonisch lesbar sein');
+        assertEqual(JSON.stringify(secondLegacyLoad.tranches), JSON.stringify(firstLegacyLoad.tranches), 'Wiederholte Legacy-Normalisierung sollte deterministisch sein');
+        assertEqual(localStorage.getItem('depot_tranchen'), legacyRaw, 'Lesemigration bleibt auch bei Wiederholung mutationsfrei');
+
+        assert(switchProfile(corruptProfile.id) === true, 'Widerspruechliches Profil sollte in Recovery ladbar bleiben');
+        assertEqual(localStorage.getItem('depot_tranchen'), corruptRaw, 'Profilwechsel muss widerspruechlichen Rohpayload erhalten');
+        const corruptLoad = loadTranchesFromStorage(localStorage);
+        assertEqual(corruptLoad.status, 'corrupt', 'Kategorie-/Typ-Widerspruch muss fail-closed enden');
+        assertEqual(corruptLoad.raw, corruptRaw, 'Recovery muss den exakten Profil-Rohpayload bereitstellen');
+
+        assert(switchProfile(legacyProfile.id) === true, 'Rueckwechsel zum Legacy-Profil sollte gelingen');
+        assert(switchProfile(corruptProfile.id) === true, 'Erneuter Wechsel zum Recovery-Profil sollte gelingen');
+        assertEqual(localStorage.getItem('depot_tranchen'), corruptRaw, 'Profil-Roundtrip darf Recovery-Rohdaten nicht veraendern');
+    }
+    console.log('✓ profile-bound raw-preserving migration OK');
 
     // ========== belongsToHousehold Tests ==========
 

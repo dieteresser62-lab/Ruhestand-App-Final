@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 103 entdeckte Testdateien, davon 102 im Node-Gate ausgeführt, mit 3939 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (verifiziert mit `npm test` am 2026-07-14). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen.
+**Test-Statistik:** 107 entdeckte Testdateien, davon 106 im Node-Gate ausgeführt, mit 4410 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (verifiziert mit `npm test` am 2026-07-14). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen.
 
 Die Zahl beschreibt nur die Node-Standardsuite. `npm run test:browser`, `npm run test:coverage` und ein echter Tauri-Build sind getrennte Gates und in den Assertions nicht enthalten.
 
@@ -37,9 +37,9 @@ Jede tatsaechlich ausgefuehrte Datei muss mindestens eine gezaehlte Assertion li
 npm run test:coverage
 ```
 
-Der Coverage-Runner loescht `.coverage/`, startet die Standardsuite mit `NODE_V8_COVERAGE` und schreibt `.coverage/summary.json`. Der Report wertet Projektdateien unter `app/`, `engine/`, `workers/` und `types/` aus. Die aktuelle Baseline aus Tranchenmanagement-Slice 01 liegt bei 71,20% Zeilen-Coverage (24563/34499 ausfuehrbare Zeilen in 193 Dateien); sie ist ein Transparenz- und Review-Gate, noch keine harte Mindestschwelle.
+Der Coverage-Runner loescht `.coverage/`, startet die Standardsuite mit `NODE_V8_COVERAGE` und schreibt `.coverage/summary.json`. Der Report wertet Projektdateien unter `app/`, `engine/`, `workers/` und `types/` aus. Die aktuelle Baseline aus Tranchenmanagement-Slice 09 liegt bei 72,25% Zeilen-Coverage (26529/36717 ausfuehrbare Zeilen in 195 Dateien); sie ist ein Transparenz- und Review-Gate, noch keine harte Mindestschwelle.
 
-Der Prozentwert ist gegenueber der vorherigen Baseline trotz 1540 zusaetzlich abgedeckter Zeilen niedriger, weil die nun wirklich ausgefuehrten isolierten Tests weitere Laufzeitmodule und damit 3394 zusaetzliche ausfuehrbare Zeilen in den Nenner aufnehmen. `app/tranches/tranchen-manager-page.js` ist nicht mehr false-green bei 0%, sondern erreicht 51,30% (118/230 Zeilen).
+Das Coverage-Inventar fuehrt zentrale Tranchenmodule auch bei 0% sichtbar auf und markiert einen geladenen, aber nicht ausgefuehrten Page-Pfad als `runtime-loaded-uncovered`. `app/tranches/tranchen-manager-page.js` ist im aktuellen Node-Coverage-Lauf mit 60,35% (621/1029 Zeilen) erfasst; der separate Browser-Smoke bleibt fuer echte DOM- und Navigationspfade erforderlich.
 
 Bekannte Coverage-Ausnahmen:
 - UI-nahe Renderer und Page-Module koennen trotz Browser-Smoke in der V8-Zeilenmetrik niedrig oder 0% erscheinen, wenn ihre Logik nur ueber echte Browserinteraktion relevant ist.
@@ -51,7 +51,7 @@ Bekannte Coverage-Ausnahmen:
 npm run test:browser
 ```
 
-Das Browser-Gate nutzt Playwright mit einem vom Test verwalteten lokalen HTTP-Server. Jeder Fall erhaelt einen isolierten Browser-Context und eine eigene Storage-Baseline. Neben den zentralen Einstiegspunkten (`index.html`, `Balance.html`, `Simulator.html`, `depot-tranchen-manager.html`, `Handbuch.html`) prueft es in `Balance.html` Profilabwahl nach Reload, Engine-Mismatch, mutationsfreien Jahres-Preflight, sichtbare korrupte Ausgaben, sichtbaren Import-Reject sowie einen Doppelklick mit genau einem Jahrescommit und Recovery-Snapshot. Inflation, Yahoo-Proxy und CAPE werden deterministisch geroutet; andere externe Requests werden blockiert. Es ersetzt keine Node-Unit-Tests und laeuft bewusst getrennt von `npm test`.
+Das Browser-Gate nutzt Playwright mit einem vom Test verwalteten lokalen HTTP-Server. Jeder Fall erhaelt einen isolierten Browser-Context und eine eigene Storage-Baseline. Neben den zentralen Einstiegspunkten (`index.html`, `Balance.html`, `Simulator.html`, `depot-tranchen-manager.html`, `Handbuch.html`) prueft es in `Balance.html` Profilabwahl nach Reload, Engine-Mismatch, mutationsfreien Jahres-Preflight, sichtbare korrupte Ausgaben, sichtbaren Import-Reject sowie einen Doppelklick mit genau einem Jahrescommit und Recovery-Snapshot. Die Tranchenkette deckt mit synthetischen Profilen A/B Manager-Handoff, CRUD, Dialogfokus und Tastaturbedienung, EUR-Quote, Reload, 390-Pixel-Layout, schreibfreie Balance-/Simulatorlaeufe, bestaetigten Reconcile genau einmal, Quote-Teilerfolg/Offline und raw-preserving Corrupt-Recovery ab. Inflation, Yahoo-Proxy und CAPE werden deterministisch geroutet; andere externe Requests werden blockiert. Es ersetzt keine Node-Unit-Tests und laeuft bewusst getrennt von `npm test`.
 
 Wichtig fuer CI/Release: Weil `npm test` dieses Gate nicht ausfuehrt, muss `npm run test:browser` explizit als eigener Job oder Release-Schritt laufen, wenn Browser-Regressionen blockierend sein sollen.
 

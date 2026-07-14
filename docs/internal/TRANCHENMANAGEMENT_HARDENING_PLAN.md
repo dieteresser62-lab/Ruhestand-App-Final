@@ -3,7 +3,7 @@
 **Stand:** 2026-07-14
 **Feature-Branch:** `codex/tranchenmanagement-hardening`
 **GitHub-Status:** lokal angelegt; Veröffentlichung ausstehend und nur nach Nutzerfreigabe
-**Status:** implementierungsreif (Gemini-Review abgeschlossen, Claude-Review ausstehend)
+**Status:** Slice 09 implementiert; finales Code-/Gesamtreview und Freigabe ausstehend
 **GAP-Grundlage:** [TRANCHENMANAGEMENT_GAP_ANALYSE.md](./TRANCHENMANAGEMENT_GAP_ANALYSE.md)
 
 ## Zweck
@@ -106,7 +106,7 @@ Der Preisservice liefert ein Objekt statt einer bloßen Zahl. Browser-Node-Proxy
 | 6 | [Balance-, Status- und Steuerparität](./SLICE_TRANCHENMANAGEMENT_06_BALANCE_STATUS_TAX_PARITY.md) | Einheiten, TQF, Status und Klassifikation | Slice 02, 03 | 9 | freigegeben |
 | 7 | [Simulator-Provenienz und Lot-Invarianten](./SLICE_TRANCHENMANAGEMENT_07_SIMULATOR_PROVENANCE_LOTS.md) | Herkunft, Geldmarkt und In-Memory-Lots | Slice 02, 06 | 10 | freigegeben |
 | 8 | [Reconciliation-Workflow](./SLICE_TRANCHENMANAGEMENT_08_RECONCILIATION_WORKFLOW.md) | bestätigte reale Bestandsfortschreibung idempotent umsetzen | Slice 03, 06, 07 | 9 | freigegeben |
-| 9 | [E2E, Migration und Dokumentation](./SLICE_TRANCHENMANAGEMENT_09_E2E_MIGRATION_DOCUMENTATION.md) | vollständige Gates und Doku-Sync | Slices 01-08 | 6 (5 Tests + Handbuch-HTML), plus Markdown | geplant |
+| 9 | [E2E, Migration und Dokumentation](./SLICE_TRANCHENMANAGEMENT_09_E2E_MIGRATION_DOCUMENTATION.md) | vollständige Gates und Doku-Sync | Slices 01-08 | 6 (5 Tests + Handbuch-HTML), plus Markdown | freigegeben |
 
 Die Reihenfolge ist verbindlich, solange das Planreview sie nicht ändert. Für Slice 08 ist durch O-09 der explizite Reconcile-Workflow festgelegt; eine rein beratende No-Code-Variante ist nicht mehr Teil dieses Plans.
 
@@ -266,6 +266,25 @@ Die Reihenfolge ist verbindlich, solange das Planreview sie nicht ändert. Für 
   Bestaetigung, persistentem Audit und Action-ID-Duplikat. Review und Freigabe
   stehen aus.
 
+### Rückdokumentation Slice 09
+
+- Der produktive Browserpfad deckt temporär isolierte Profile, CRUD, EUR-Quote,
+  Reload, Profilwechsel, Tastaturbedienung, 390-Pixel-Layout, read-only Balance und
+  Simulator, bestätigten Reconcile genau einmal, Teilerfolg/Offline sowie
+  raw-preserving Corrupt-Recovery ab.
+- Persistenz- und Profiltests durchlaufen die unterstützte Legacy-Matrix über den
+  tatsächlichen LocalStorage-zu-Facade-Migrationspfad. Gültige Daten werden
+  deterministisch normalisiert; Mismatch, Duplikate und korrupte Rohpayloads
+  bleiben unverändert und brechen fail-closed ab.
+- Das Coverage-Inventar führt die zentralen Tranchenmodule explizit und kann einen
+  geladenen 0-%-Pagepfad nicht als abgedeckt ausweisen. Die neue zentrale
+  Tranchenreferenz und die bereinigte Nutzeranleitung synchronisieren Ownership,
+  Daten-, Persistenz-, Quote-, Consumer- und Reconcile-Grenzen.
+- Verifiziert: 107 Testdateien entdeckt, 106 im Node-Gate ausgeführt, 4410/4410
+  Assertions, 0 Fehler und 0 offene Handles; 13 grüne Browser-Smoke-Szenarien;
+  Coverage 72,25% (26529/36717 Zeilen in 195 Dateien). Finales Review und
+  Freigabe stehen aus.
+
 ## GAP-Zuordnung
 
 | Slice | GAPs |
@@ -416,6 +435,6 @@ Die Antworten ändern den Gemini-Status nicht eigenmächtig. Plan und Slices ble
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
 | --- | --- | --- | --- | --- |
 | G-01 | Gemini | Transiente Persistenzfehler und korrupter Payload unzureichend getrennt | angenommen | Slice 03 freigegeben und als Commit `13328fa` vorhanden |
-| G-02 | Gemini | Simulator benötigt zwingende Deep-Copy-Grenze | angenommen | in Slice 07 umgesetzt; Review ausstehend |
-| G-03 | Gemini | Abgelehnte Fremdwährungsquotes benötigen sichtbaren Grund | angenommen | O-03/O-05 und Slice 05 konkretisiert; Code ausstehend |
-| G-04 | Gemini | Engine-Validierungsfehler muss strukturiert in der UI ankommen | angenommen | Contract in Slice 02 und blockierender Manager-UI-Pfad in Slice 04 implementiert; Review ausstehend |
+| G-02 | Gemini | Simulator benötigt zwingende Deep-Copy-Grenze | angenommen | in Slice 07 umgesetzt; Abschluss-E2E in Slice 09 grün; finales Review ausstehend |
+| G-03 | Gemini | Abgelehnte Fremdwährungsquotes benötigen sichtbaren Grund | angenommen | in Slice 05 umgesetzt; Teilerfolg/Offline im Slice-09-Browsergate grün |
+| G-04 | Gemini | Engine-Validierungsfehler muss strukturiert in der UI ankommen | angenommen | Contract in Slice 02 und blockierender Manager-UI-Pfad in Slice 04 implementiert; Abschlussgates grün, finales Review ausstehend |

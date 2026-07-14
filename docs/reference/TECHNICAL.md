@@ -4,7 +4,7 @@ Dieses Dokument beschreibt die Architektur und zentrale Datenflüsse der Ruhesta
 
 **Dokumentrolle:** Operative Entwickler-Referenz für aktuelle Modulzuständigkeiten, Datenflüsse und Laufzeitverhalten.
 **Abgrenzung:** Vertiefte fachliche Herleitungen, Marktvergleiche und Forschungsabgleich stehen in `ARCHITEKTUR_UND_FACHKONZEPT.md`.
-**Dokumentstand:** 2026-07-14; Codeabgleich bis Slice Tranchenmanagement 08 in der lokalen Arbeitskopie.
+**Dokumentstand:** 2026-07-14; Codeabgleich bis Slice Tranchenmanagement 09 in der lokalen Arbeitskopie.
 
 ---
 
@@ -16,11 +16,12 @@ Dieses Dokument beschreibt die Architektur und zentrale Datenflüsse der Ruhesta
 |------------|---------|-------|
 | Balance-App | `Balance.html`, `app/balance/*.js`, `css/balance.css` | Jahresabschluss, Liquiditäts- und Entnahmeplanung, Diagnosen, Ausgaben-Check mit Jahreshistorie |
 | Simulator | `Simulator.html`, `app/simulator/*.js`, `simulator.css` | Monte Carlo, Backtest, Sweeps, Auto-Optimize, Stationary Bootstrap, Tail-Risk-Stresstest, Pflegefall- und Pflegebucket-Wirklogik |
-| Profil/Verbund | `index.html`, `app/profile/*.js`, `app/tranches/*.js` | Profilverwaltung, Profilverbund, Tranchen-Sync, bestaetigter Realbestandsabgleich, Pflegebucket-Definition |
+| Profil/Verbund | `index.html`, `app/profile/*.js` | Profilverwaltung, Handoff/Flush, Profilverbund und Pflegebucket-Definition |
+| Tranchen | `depot-tranchen-manager.html`, `types/tranche-contract.js`, `app/tranches/*.js` | Kanonischer Lotvertrag, CRUD/Recovery, EUR-Quotes, Consumerstatus und bestaetigter Realbestandsabgleich |
 | Shared | `app/shared/*.js` | Gemeinsame Formatter, Feature-Flags, CAPE-Helfer, Persistenz-Facade |
 | Engine | `engine/` (ESM) → `engine.js` | Validierung, Marktanalyse, diskrete und kontinuierliche Regime-Signale, VPW-Rendite-Policy, Spending- und Transaktionslogik |
 
-**Inventarstand 2026-07-04:** 35 Balance-, 95 Simulator-, 30 Profil/Tranchen/Shared-, 27 Engine- und 3 Worker-Quellmodule sowie 101 `*.test.mjs`-Dateien. Diese Zahlen sind Orientierungswerte; Pfade und Contracts sind normativ, nicht die Anzahl der Dateien.
+Die Pfade und Contracts sind normativ; volatile Modul- und Testdateizaehler stehen im Coverage-Inventar statt in dieser Architekturreferenz.
 
 Alle Skripte sind ES6-Module. Die Engine wird per `build-engine.mjs` mit esbuild (oder Modul-Fallback) gebündelt und stellt eine globale `EngineAPI` bereit.  
 Für CI/Release ist Strict-Mode vorgesehen (`npm run build:engine:strict`), der ohne `esbuild` fehlschlägt.
@@ -550,7 +551,7 @@ Die Simulator-Eingaben können aus mehreren Profilen aggregiert werden:
 ### Datenfluss
 
 ```
-Profile (PersistenceFacade; aktuell Legacy-localStorage-Backend) → app/profile/profile-storage.js
+Profile (PersistenceFacade; Browser IndexedDB / Tauri JSON / Legacy-Fallback) → app/profile/profile-storage.js
                         ↓
           buildSimulatorInputsFromProfileData()
                         ↓
@@ -568,7 +569,8 @@ Profile (PersistenceFacade; aktuell Legacy-localStorage-Backend) → app/profile
 - Gemeinsame Simulation mit kombinierten Inputs
 - Tranchen der aktiven Profile werden zusammengeführt, mit Profilpräfix eindeutig gemacht und behalten `sourceProfileId`
 - Engine-Verkaufsaufschluesselungen behalten diese Herkunft in `breakdown[].sourceProfileId`; Portfolio-Reduktion erfolgt ueber die eindeutige profilbezogene `trancheId`.
-- Plausible Detailtranchen bestimmen das kombinierte Startvermögen zusammen mit Liquidität; Null-Marktwert-Tranchen fallen mit Warnung auf aggregierte Startwerte zurück
+- Valide Detailtranchen bestimmen das kombinierte Startvermögen zusammen mit Liquidität und ersetzen ueberlappende Aggregate. Korrupte, doppelte oder widerspruechlich klassifizierte Profilpayloads blockieren fail-closed.
+- Vor Haushaltsmerge und Portfolioinitialisierung entstehen tiefe Kopien; simulierte Verkaeufe und `simlot:`-Kaeufe schreiben nie in den profilgebundenen Realbestand zurueck.
 - Personen/Renten werden aus der Profilwahl abgeleitet (kein separater Partner-Tab)
 
 ### Profilverbund-Verteilung (Balance-App)
@@ -621,6 +623,7 @@ definiert werden. Ergebnisse werden gegen diese Limits geprüft und als OK/Verle
 
 * **BALANCE_MODULES_README.md** – Detailtiefe zur Balance-App.
 * **SIMULATOR_MODULES_README.md** – Detaillierte Modulübersicht des Simulators.
+* **TRANCHEN_MODULES_README.md** – Kanonischer Tranchen-, Persistenz-, Quote-, Consumer- und Reconcile-Vertrag.
 * **engine/README.md** – Engine-spezifische Informationen inkl. Build-Beschreibung.
 * **tests/README.md** – Test-Suite-Dokumentation mit Standard-, Coverage-, Browser- und Tauri-Gates.
 * **docs/reference/PROFILVERBUND_FEATURES.md** – Profilverbund-Design und -Module.

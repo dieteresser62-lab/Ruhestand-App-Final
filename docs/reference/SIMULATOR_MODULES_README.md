@@ -402,7 +402,7 @@ Portfolio-Initialisierung, Renten- und Stress-Kontexte.
 **Pflegebucket-Contract in `simulator-portfolio-init.js`:**
 - Der Carve-Out läuft erst auf dem aggregierten Haushaltsportfolio, nicht pro Einzelprofil.
 - Quellenreihenfolge: `depotTranchesGeldmarkt` per FIFO, danach ungetranchter `geldmarktEtf`, danach `tagesgeld`.
-- Ungültige oder fehlende Kaufdaten verwenden einen stabilen FIFO-Fallback, damit manuelle JSON-Importe die Sortierung nicht destabilisieren.
+- Fehlende Kaufdaten unterstuetzter Legacy-Lots verwenden einen stabilen FIFO-Fallback. Syntaktisch oder fachlich korrupte Profilpayloads erreichen die Portfolioinitialisierung nicht.
 - `geldmarktEtf`, `tagesgeld` und `liquiditaet` werden konsistent reduziert.
 - `healthBucketGeldmarkt`, `healthBucketTranches`, `healthBucketCashAmount` und `healthBucketMeta.warnings` dokumentieren die Ausgliederung und eventuelle Kappung.
 
@@ -451,14 +451,15 @@ Historische Daten (inkl. 1925-1949 Schwarze-Schwan-Erweiterung), Mortalitätstaf
 Aggregiert Profildaten zu Simulator-Inputs für Multi-Profil-Setups.
 
 **Hauptfunktionen:**
-- `buildSimulatorInputsFromProfileData()` – liest Profildaten (localStorage) und baut vollständige Simulator-Inputs
+- `buildSimulatorInputsFromProfileData()` – liest Profildaten aus der Profilregistry hinter der zentralen Persistenz-Facade und baut vollständige Simulator-Inputs
 - `combineSimulatorProfiles()` – aggregiert mehrere Profile zu einem kombinierten Input-Objekt (1–2 Personen)
 
 **Besonderheiten:**
 - Gold-Validierung: `goldAktiv` nur true wenn `goldZielProzent > 0`
 - Tranchen-Aggregation: Fügt detaillierte Tranchen aller Profile zusammen, versieht IDs mit Profilpräfix und setzt `sourceProfileId`
 - Verkaufs-Herkunft: Engine-`breakdown[]` bewahrt `sourceProfileId`; Portfolio-Reduktionen laufen ueber die profilbezogene `trancheId`, damit identische Positionen aus verschiedenen Profilen nicht vermischt werden
-- Tranchensummen: Plausible Detailtranchen bestimmen `startVermoegen` zusammen mit Liquidität; Null-Marktwert-Tranchen fallen mit Warnung auf aggregierte Startwerte zurück
+- Referenzisolation: Profilinputs werden vor Haushaltsmerge und Portfolioinitialisierung tiefenkopiert. Teilverkaeufe reduzieren Stueckzahl, Marktwert und Cost Basis proportional; simulierte Kaeufe erzeugen eigene `simlot:`-Lots.
+- Tranchensummen: Valide Detailtranchen bestimmen `startVermoegen` zusammen mit Liquiditaet und ersetzen ueberlappende Aggregate. Korrupte oder widerspruechliche Payloads blockieren fail-closed.
 - Pflegebucket: liest `profile_health_bucket`, normalisiert die Definition und nutzt bei Multi-Profil-Setups das Primary-Profil als Haushaltsdefinition. Abweichende sekundäre Definitionen werden als Warnung transportiert.
 - Fallback-Logik: Nutzt Balance-Werte wenn Simulator-Felder leer sind
 - Mindest-Flex bleibt profilbezogen: `minimumFlexAnnual` wird aus Profil-Simulatorwerten oder Balance-Fallbacks gelesen, im kombinierten Haushaltslauf addiert und als `minimumFlexProfiles` nachvollziehbar transportiert.
@@ -469,7 +470,7 @@ Aggregiert Profildaten zu Simulator-Inputs für Multi-Profil-Setups.
 ---
 
 ## 25. `profile-storage.js` / `profile-key-policy.js` / `profile-registry.js` / `profile-live-storage.js` / `profile-bundle-io.js`
-Profil-Registry und Persistenz-Layer für Multi-User-Verwaltung. `profile-storage.js` bleibt die kompatible Fassade; `profile-key-policy.js` kapselt die Erkennung profilbezogener localStorage-Keys; `profile-registry.js` kapselt Registry-Parsing, Current-Profile-Key, Metadaten, CRUD und Profildaten-Merge; `profile-live-storage.js` kapselt Snapshot, Clear, Load und Live-Data-Erkennung; `profile-bundle-io.js` kapselt Bundle-Import/-Export und `window.name`-Transfer.
+Profil-Registry und Persistenz-Layer für Multi-User-Verwaltung. `profile-storage.js` bleibt die kompatible Fassade; `profile-key-policy.js` kapselt die Erkennung profilbezogener Persistenz-Keys; `profile-registry.js` kapselt Registry-Parsing, Current-Profile-Key, Metadaten, CRUD und Profildaten-Merge; `profile-live-storage.js` kapselt Snapshot, Clear, Load und Live-Data-Erkennung; `profile-bundle-io.js` kapselt zentralen Bundle-Import/-Export und `window.name`-Transfer.
 
 **Hauptfunktionen:**
 - `listProfiles()` / `getProfileMeta()` / `getProfileData()` – Profil-Registry-Zugriff
