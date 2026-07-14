@@ -2,7 +2,7 @@
 
 **Geplanter Feature-Branch:** `codex/profilverbund-action-consistency`  
 **GitHub-Status:** Branch noch nicht angelegt oder veroeffentlicht  
-**Status:** Entwurf; Review und Freigabe ausstehend  
+**Status:** Entwurf nach kritischem Review; erneutes Gemini-Review und Freigabe ausstehend
 **Prioritaet:** P0  
 **Ursprung:** Regression aus `SLICE_BALANCE_HARDENING_01_PROFILVERBUND_ALLOCATION.md`  
 **Umfang:** ein 1-basiertes Umsetzungspaket (`Paket 1`)
@@ -75,11 +75,13 @@ Die bestehende Verteilung sortiert ganze Profile nach einer geschaetzten Steuerl
 
 ### Household first
 
-1. Die Haushalts-Engine trifft genau eine Spending-, Ziel-Liquiditaets- und Transaktionsentscheidung.
-2. `modelResult.ui.action` des Haushaltslaufs ist der verbindliche Plan nach Zweck.
-3. Die Profilverbundlogik darf diesen Plan nur auf ausfuehrende Profile und konkrete Quellen aufteilen.
-4. Die Summe der profilbezogenen Teilplaene muss den Haushaltplan centgenau bzw. innerhalb maximal 0,01 EUR reproduzieren.
-5. Die Profilzuordnung darf keinen Zweck hinzufuegen, der in der Haushaltsaktion nicht enthalten ist.
+1. Die Haushalts-Engine trifft genau eine Spending- und Ziel-Liquiditaetsentscheidung.
+2. Richtung und Netto-Verwendungen der finalisierten Haushaltsaktion sind der verbindliche Plan nach Zweck.
+3. Quellen, Steuerreserve und Steuerzustand der vorlaeufigen Haushalts-Engine-Aktion sind im Multi-Profil-Fall noch nicht final, weil Verlusttopf, Sparer-Pauschbetrag, Kirchensteuer und Tranchenbesitz profilbezogen sind.
+4. Die 3-Bucket-Logik finalisiert die Haushaltszwecke genau einmal, bevor eine Profilattribution beginnt.
+5. Die Profilverbundlogik darf den finalisierten Haushaltsplan nur auf ausfuehrende Profile und konkrete Quellen aufteilen.
+6. Die Summe der profilbezogenen Teilplaene muss den finalisierten Haushaltsplan centgenau bzw. innerhalb maximal 0,01 EUR reproduzieren.
+7. Die Profilzuordnung darf keinen Zweck hinzufuegen, der in der finalisierten Haushaltsaktion nicht enthalten ist.
 
 ### Keine gegenlaeufige Zusatzaktion
 
@@ -119,6 +121,39 @@ Dabei gelten mindestens:
 - stabile, deterministische Tie-Breaker verwenden;
 - nicht finanzierbare Restbetraege fail-closed melden.
 
+### Profilbezogener Steuerzustand
+
+Der Haushaltsplan ist fuer die Netto-Zwecke verbindlich; der steuerliche Jahresabschluss wird dagegen je Profil aus den tatsaechlich attribuierten Verkaeufen neu berechnet.
+
+Fuer jedes beteiligte Profil gilt:
+
+1. Jede attribuierte Verkaufstranche traegt unveraendert `sourceProfileId` und die fuer die Steuerberechnung notwendigen Rohdaten.
+2. Aus allen final attribuierten Verkaeufen des Profils werden `sumRealizedGainSigned` und `sumTaxableAfterTqfSigned` gebildet. Gegenkaeufe und reine Liquiditaetsquellen duerfen diese Aggregate nicht veraendern.
+3. `taxStatePrev` stammt ausschliesslich aus `entry.balanceState.lastState.taxState` des betreffenden Profils.
+4. `sparerPauschbetrag` und `kirchensteuerSatz` stammen aus dem persistierten Input desselben Profils.
+5. Nach Abschluss der Attribution wird `settleTaxYear()` aus `engine/tax-settlement.mjs` genau einmal je Profil mit dessen finalem Rohaggregat aufgerufen.
+6. `taxStateNext` ersetzt den von einer verworfenen oder rein technischen Profil-Engine-Aktion erzeugten Steuerzustand. Andere bestehende Profil-Last-State-Felder werden nicht durch kuenstliche Funding-Inputs fortgeschrieben.
+7. Ein Profil ohne attribuierten Verkauf wird mit einem Null-Rohaggregat reconciliert; sein vorhandener `lossCarry` muss dadurch exakt erhalten bleiben.
+8. Die finale Haushaltsaktion weist als Steuer die Summe der profilbezogenen `taxDue`-Werte aus. Diese Summe ist der finale Haushalts-Steuerwert; der vorlaeufige Steuerwert des Haushalts-Engine-Laufs darf im Multi-Profil-Fall nicht als verbindlich behandelt werden.
+9. `finalAction.taxRawAggregate` entspricht der Summe der finalen Profil-Rohaggregate. Zusaetzlich bleiben die Einzel-Settlements profilbezogen diagnostizierbar.
+10. Bruttoquellen, finale Steuer und Nettoerloes muessen die verbindlichen Netto-Verwendungen weiterhin innerhalb 0,01 EUR finanzieren. Reicht eine vorlaeufige Steuerreserve nach dem profilbezogenen Settlement nicht aus, wird nicht still gekuerzt: Die Quellenplanung wird mit dem finalen Steuercontract neu berechnet oder der Lauf bricht fail-closed ab.
+
+Die Implementierung orientiert sich am bestehenden Recompute-Muster aus `app/simulator/simulator-tax-recompute.js`, ohne Simulatorcode in die Balance-App zu kopieren und ohne `engine/tax-settlement.mjs` zu veraendern.
+
+### 3-Bucket genau einmal
+
+Im Profilverbund gilt folgende feste Reihenfolge:
+
+1. Alle Haushaltstranchen werden als nicht mutierende Kopien mit `sourceProfileId` und Profilname zu einem Haushaltspool zusammengefuehrt.
+2. Die Haushalts-Engine erzeugt die vorlaeufige Haushaltsaktion.
+3. `applyThreeBucketLogic()` und danach `appendBondReplenishment()` werden, soweit fachlich aktiv, genau einmal auf diese Haushaltsaktion und den vollstaendigen Haushaltstranchenpool angewendet.
+4. Das Ergebnis ist die finalisierte Haushaltsaktion nach Zweck und die einzige 3-Bucket-Diagnosequelle.
+5. Erst danach werden Quellen und Verwendungen auf Profile attribuiert und die profilbezogenen Steuerabschluesse berechnet.
+6. Die Profilschleife darf weder `applyThreeBucketLogic()` noch `appendBondReplenishment()` aufrufen und keine eigenen Bond-Ziele erzeugen.
+7. `postprocessBalanceAction()` darf im Profilverbund keine zweite 3-Bucket-Nachbearbeitung ausfuehren. Es uebernimmt die bereits finalisierte/attribuierte Aktion und die einmalig erzeugte Haushaltsdiagnose.
+
+Roh-Steueraggregate aus Bond- oder Ersatzverkaeufen werden erst nach dieser einmaligen 3-Bucket-Finalisierung den besitzenden Profilen zugeordnet. Damit kann derselbe Verkauf weder doppelt besteuert noch doppelt in `lossCarry` eingerechnet werden.
+
 ## Synthetischer Regressionsfall
 
 Die Tests verwenden ausschliesslich synthetische Daten, beispielsweise:
@@ -157,6 +192,13 @@ Erwartetes Ergebnis:
 12. Standard- und 3-Bucket-Modus bleiben ohne doppelte Nachbearbeitung konsistent.
 13. Kein Engine-Contract und keine Engine-Semantik werden fuer diesen Bugfix veraendert.
 14. Reale Profilnamen, Exporte oder Finanzwerte werden nicht in Tests, Snapshots oder Dokumentation uebernommen.
+15. Jede finale Verkaufstranche ist genau einem Profil zugeordnet und geht genau einmal in dessen Steuer-Rohaggregat ein.
+16. `settleTaxYear()` wird nach finaler Attribution genau einmal je beteiligtem Profil aufgerufen; `taxStateNext` wird vor der Persistenz in den Profilzustand geschrieben.
+17. Ein Profil ohne Verkauf behaelt seinen bisherigen `lossCarry` centgenau.
+18. Die Summe der finalen Profilsteuern entspricht `finalAction.steuer` innerhalb 0,01 EUR; der vorlaeufige Haushalts-Steuerwert wird im Profilverbund nicht faelschlich weiterverwendet.
+19. Summe aus Bruttoquellen minus finaler Profilsteuern finanziert die finalen Netto-Verwendungen innerhalb 0,01 EUR oder der Lauf bricht fail-closed ab.
+20. Im 3-Bucket-Profilverbund werden Bond-Ersatzverkauf bzw. Bond-Wiederauffuellung und ihre Roh-Steueraggregate nachweislich nur einmal erzeugt.
+21. Persistierte Profil-Last-States enthalten keinen Steuerzustand aus verworfenen Profilaktionen oder kuenstlichen Funding-Inputs.
 
 ## Umsetzungspaket 1
 
@@ -167,12 +209,18 @@ Haushaltsaktion und profilbezogene Ausfuehrung in einem einzigen konsistenten Ac
 ### Vorgesehener Ansatz
 
 1. Einen DOM-freien Helper fuer Netto-Liquiditaets-Cashflow und Action-Invarianten definieren.
-2. Die verbindliche Haushaltsaktion vor jeder Profilattribution unveraendert sichern.
-3. Profilquellen deterministisch auf die benoetigten Haushaltszwecke verteilen.
-4. Profil-Engine-Ergebnisse nicht mehr als neue, unabhaengige Rebalancing-Aktionen in den Haushaltsplan summieren.
-5. Nach der Attribution die Summen- und Richtungsinvarianten fail-closed pruefen.
-6. `deckungNachher` und betroffene Diagnosewerte aus der tatsaechlich final gerenderten Aktion berechnen.
-7. Profilbezogene Darstellung beibehalten, ohne den Haushaltsgesamtplan zu veraendern.
+2. Beim Aufbau des Haushaltspools jede kopierte Tranche mit stabiler Profilprovenienz (`sourceProfileId`, Profilname) versehen, ohne gespeicherte Tranchenobjekte zu mutieren.
+3. Die vorlaeufige Haushaltsaktion einmalig durch die Haushalts-3-Bucket-Logik finalisieren und Diagnose sowie Action gemeinsam speichern.
+4. Die verbindlichen Netto-Zwecke dieser finalisierten Haushaltsaktion vor jeder Profilattribution unveraendert sichern.
+5. Profilquellen deterministisch auf die benoetigten Haushaltszwecke verteilen; Profil-Engine-Ergebnisse nicht mehr als neue, unabhaengige Rebalancing-Aktionen summieren.
+6. Aus den final attribuierten Verkaufstranchen je Profil ein signiertes Steuer-Rohaggregat bilden.
+7. Je Profil `settleTaxYear()` mit dessen vorherigem `taxState`, Sparer-Pauschbetrag und Kirchensteuersatz ausfuehren; finale Profilsteuer und `taxStateNext` in den Ausfuehrungscontract aufnehmen.
+8. Bruttoquellen nach dem finalen Profil-Settlement gegen die verbindlichen Netto-Verwendungen reconciliieren. Unterdeckung oder nicht konvergierende Steuerreserve fuehrt fail-closed zum Abbruch.
+9. Persistenz so umstellen, dass bestehende Profil-Last-State-Felder erhalten und nur der aus tatsaechlich attribuierten Verkaeufen berechnete `taxStateNext` fortgeschrieben wird.
+10. In Profilschleife und Postprocessor jede zweite 3-Bucket-Ausfuehrung entfernen bzw. fuer den Profilverbund blockieren.
+11. Nach der Attribution Summen-, Steuer-, Provenienz- und Richtungsinvarianten fail-closed pruefen.
+12. `deckungNachher` und betroffene Diagnosewerte aus der tatsaechlich final gerenderten Aktion berechnen.
+13. Profilbezogene Darstellung beibehalten, ohne den Haushaltsgesamtplan zu veraendern.
 
 ### Voraussichtlicher Programmdatei-Scope
 
@@ -185,6 +233,12 @@ Maximal 7 Programmdateien; die genaue Liste ist vor Coding im Diff-Risiko-Block 
 - `tests/profilverbund-balance.test.mjs`
 - `tests/balance-ui-orchestration.test.mjs`
 - `tests/balance-decumulation.test.mjs`
+
+Nur lesend/wiederverwendet, nicht zu aendern:
+
+- `engine/tax-settlement.mjs`
+- `engine/transactions/sale-engine.mjs`
+- `engine/transactions/three-bucket-logic.mjs`
 
 ### Dokumentations-Scope
 
@@ -213,6 +267,9 @@ Zusaetzlich zu `AGENTS.md` wird vor der Umsetzung gestoppt und nachgefragt, wenn
 - unklar bleibt, ob bzw. unter welchen Bedingungen Liquiditaet zwischen Profilen wirtschaftlich als gemeinsamer Haushaltspuffer behandelt werden darf;
 - 3-Bucket-, Gold- oder Bond-Aktionen nicht ohne neue gegenlaeufige Zwecke attribuiert werden koennen;
 - Steuer-Summen zwischen Haushaltsaktion und Profilattribution nicht centgenau reconciliert werden koennen;
+- eine finale attribuierte Verkaufstranche keine eindeutige `sourceProfileId` besitzt;
+- `taxStatePrev`, Sparer-Pauschbetrag oder Kirchensteuersatz nicht eindeutig dem verkaufenden Profil zugeordnet werden koennen;
+- eine Steuer-Neuberechnung eine hoehere Steuer als die reservierte Quelle ergibt und die Netto-Verwendung nicht deterministisch neu geplant werden kann;
 - bestehende Backtests oder Snapshots unerwartet abweichen;
 - UI und Engine fuer denselben Zweck unterschiedliche Feldnamen oder Vorzeichen verwenden.
 
@@ -231,6 +288,16 @@ Zusaetzlich zu `AGENTS.md` wird vor der Umsetzung gestoppt und nachgefragt, wenn
 - `proportional` und `runway_first` aendern nur die Attribution.
 - Single-Profil-Pfad bleibt unveraendert.
 - Standard- und 3-Bucket-Pfad wenden die finale Aktion genau einmal nach.
+- Profil A mit bestehendem Verlusttopf und attribuiertem Gewinnverkauf verbraucht seinen `lossCarry` exakt gemaess `settleTaxYear()`.
+- Ein attribuierter Verlustverkauf erhoeht nur den Verlusttopf des verkaufenden Profils.
+- Profile ohne Verkauf behalten ihren Verlusttopf unveraendert.
+- Sparer-Pauschbetrag und Kirchensteuer werden je Profil aus dessen Input verwendet.
+- Summe der Profilsteuern entspricht der Steuer der finalen Haushaltsaktion; der vorlaeufige Haushalts-Steuerwert wird nicht uebernommen.
+- Jede Verkaufstranche geht genau einmal in das Rohaggregat ihres Quellprofils ein.
+- Persistenz speichert `taxStateNext` aus der final attribuierten Aktion und nicht aus einer verworfenen Profil-Engine-Aktion.
+- 3-Bucket im schlechten Jahr ersetzt Aktienverkaeufe genau einmal durch Bond-Verkaeufe.
+- 3-Bucket im guten Jahr fuegt eine Bond-Wiederauffuellung genau einmal hinzu.
+- 3-Bucket-Roh-Steueraggregate werden genau einmal einem Profil zugerechnet und genau einmal settled.
 
 ### Auszufuehrende Testkommandos
 
@@ -282,6 +349,7 @@ Noch keine.
 ## Offene Risiken
 
 - Der bestehende Profilverbund-Pfad nutzt Profil-Engine-Laeufe zugleich fuer Transaktionsplanung, Steuerzustand und Persistenz. Die Korrektur muss diese Verantwortlichkeiten trennen, ohne Steuerhistorie zu verlieren.
+- Der vorlaeufige Haushalts-Steuerwert kann wegen profilbezogener Verlusttoepfe, Pauschbetraege und Kirchensteuer von der Summe der finalen Profilsteuern abweichen. Deshalb sind nur die final reconcilierten Profilsteuern fuer Anzeige und Persistenz verbindlich.
 - Haushaltsaktionen koennen neben Liquiditaet auch Gold, Aktien und Bonds als Zwecke enthalten. Die Attribution muss alle vorhandenen Zwecke erhalten.
 - Der aktuelle KPI `deckungNachher` wird vor dem spaeteren Ersetzen der Action berechnet. Eine reine Renderer-Korrektur wuerde die fachlich falsche Aktion nur kosmetisch kaschieren und ist unzulaessig.
 - Eine globale Steueroptimierung ueber Profilgrenzen darf keine implizite rechtliche Vermoegensuebertragung erfinden. Falls der bestehende Produktcontract hierzu keine eindeutige Aussage enthaelt, greift die Stop-Regel.
@@ -346,13 +414,34 @@ Noch ausstehend.
 
 ## Review-Antworten von Codex
 
-Arbeitsdokument und Freigabe zur Umsetzung erhalten. Die kritischen Findings G-P0-01 (Neuberechnung des Verlustvortrags mittels `settleTaxYear` je Profil auf Basis der attribuierten Verkäufe) und G-P0-02 (Verhinderung der 3-Bucket-Doppelausführung) werden vollständig in den Umsetzungsentwurf integriert. Wir warten auf die Nutzerfreigabe zum Anlegen des Feature-Branches und Starten des Codings.
+### Antwort auf G-P0-01
+
+Angenommen und im Fachcontract, in den Akzeptanzkriterien, im Umsetzungspaket, im Scope, in den Stop-Regeln und in den geplanten Tests konkretisiert.
+
+- Das finale signierte Rohaggregat wird je Profil ausschliesslich aus dessen tatsaechlich attribuierten Verkaufstranchen gebildet.
+- `settleTaxYear()` wird danach genau einmal je Profil mit profilbezogenem `taxStatePrev`, Sparer-Pauschbetrag und Kirchensteuersatz ausgefuehrt.
+- Der daraus entstehende `taxStateNext` wird vor der Persistenz in den erhaltenen Profil-Last-State geschrieben; Steuerzustand und sonstige Guardrail-Felder einer verworfenen technischen Profilaktion werden nicht uebernommen.
+- Finale Haushaltssteuer ist die Summe der Profil-Settlements. Der vorlaeufige Haushalts-Steuerwert ist wegen getrennter Verlusttoepfe und Pauschbetraege nicht verbindlich.
+- Bruttoquellen, Steuer und Netto-Verwendungen werden nach dem Settlement centgenau reconciliert oder fail-closed abgebrochen.
+
+### Antwort auf G-P0-02
+
+Angenommen und mit einer verbindlichen Ausfuehrungsreihenfolge konkretisiert.
+
+- 3-Bucket wird einmal auf der vorlaeufigen Haushaltsaktion und dem vollstaendigen, profilmarkierten Haushaltstranchenpool ausgefuehrt.
+- Erst die so finalisierte Haushaltsaktion wird auf Profile attribuiert.
+- Profilschleife und Profilverbund-Postprocessor duerfen keine zweite 3-Bucket-Ausfuehrung oder eigene Bond-Ziele erzeugen.
+- Bond-Verkaeufe und Bond-Wiederauffuellungen gehen genau einmal in Quellen, Verwendungen, Diagnose und profilbezogene Steuer-Rohaggregate ein.
+
+### Statuskorrektur
+
+Die aktuelle Nutzerrueckmeldung stellt klar, dass Gemini wegen der kritischen Findings keine Freigabe erteilt hat. Ungeachtet der widerspruechlichen Formulierung `freigegeben zur Umsetzung` im bestehenden Gemini-Block wird der effektive Planstatus deshalb als **nicht freigegeben** gefuehrt. Nach diesen Korrekturen ist ein erneutes Gemini-Review erforderlich; Coding, Branchanlage, Commit und Push bleiben ausstehend.
 
 ## Review-Entscheidungen
 
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
 |---|---|---|---|---|
 | U-01 | Nutzer | Drastisch gegenlaeufige Profilaktionen trotz Haushalts-Liquiditaetsluecke | angenommen | P0-Arbeitsdokument erstellt; Implementierung ausstehend |
-| G-P0-01 | Gemini | Drift des steuerlichen Verlusttopfs | angenommen | Verlustvortrag wird nach Attribution je Profil neu berechnet |
-| G-P0-02 | Gemini | Doppelte 3-Bucket-Ausführung | angenommen | 3-Bucket-Modus läuft im Profilverbund nur einmal auf Haushaltsebene |
-
+| G-P0-01 | Gemini | Drift des steuerlichen Verlusttopfs | angenommen | Profilbezogener Raw-Aggregate-/Settlement-/Persistenz-Contract und Tests im Plan konkretisiert; Implementierung ausstehend |
+| G-P0-02 | Gemini | Doppelte 3-Bucket-Ausführung | angenommen | Einmalige Haushaltsausfuehrung vor Attribution samt Diagnose-/Steuercontract und Tests konkretisiert; Implementierung ausstehend |
+| U-02 | Nutzer | Gemini erteilt wegen kritischer Findings keine Freigabe | angenommen | Freigabestatus auf nicht freigegeben korrigiert; erneutes Gemini-Review erforderlich |
