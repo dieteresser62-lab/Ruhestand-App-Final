@@ -4,7 +4,7 @@ Dieses Dokument beschreibt die Architektur und zentrale Datenflüsse der Ruhesta
 
 **Dokumentrolle:** Operative Entwickler-Referenz für aktuelle Modulzuständigkeiten, Datenflüsse und Laufzeitverhalten.
 **Abgrenzung:** Vertiefte fachliche Herleitungen, Marktvergleiche und Forschungsabgleich stehen in `ARCHITEKTUR_UND_FACHKONZEPT.md`.
-**Dokumentstand:** 2026-07-04; Codeabgleich bis Commit-Stand 2026-06-17 und lokale Arbeitskopie.
+**Dokumentstand:** 2026-07-14; Codeabgleich bis Slice Tranchenmanagement 08 in der lokalen Arbeitskopie.
 
 ---
 
@@ -16,7 +16,7 @@ Dieses Dokument beschreibt die Architektur und zentrale Datenflüsse der Ruhesta
 |------------|---------|-------|
 | Balance-App | `Balance.html`, `app/balance/*.js`, `css/balance.css` | Jahresabschluss, Liquiditäts- und Entnahmeplanung, Diagnosen, Ausgaben-Check mit Jahreshistorie |
 | Simulator | `Simulator.html`, `app/simulator/*.js`, `simulator.css` | Monte Carlo, Backtest, Sweeps, Auto-Optimize, Stationary Bootstrap, Tail-Risk-Stresstest, Pflegefall- und Pflegebucket-Wirklogik |
-| Profil/Verbund | `index.html`, `app/profile/*.js`, `app/tranches/*.js` | Profilverwaltung, Profilverbund, Tranchen-Sync, Pflegebucket-Definition |
+| Profil/Verbund | `index.html`, `app/profile/*.js`, `app/tranches/*.js` | Profilverwaltung, Profilverbund, Tranchen-Sync, bestaetigter Realbestandsabgleich, Pflegebucket-Definition |
 | Shared | `app/shared/*.js` | Gemeinsame Formatter, Feature-Flags, CAPE-Helfer, Persistenz-Facade |
 | Engine | `engine/` (ESM) → `engine.js` | Validierung, Marktanalyse, diskrete und kontinuierliche Regime-Signale, VPW-Rendite-Policy, Spending- und Transaktionslogik |
 
@@ -174,6 +174,41 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 5. `profilverbund-action-attribution.js` attribuiert die finalen Quellen und Verwendungen auf Profile, reconciliert die Profilsteuern und aktualisiert die Liquiditaets-KPIs. Es gibt keine technischen Profil-Engine-Laeufe. `balance-action-postprocessor.js` fuehrt nur im Single-Profil-Pfad 3-Bucket aus und reicht die Profilverbund-Aktion unveraendert weiter.
 6. `balance-renderer.js` aktualisiert UI-Komponenten und Statusanzeigen mit dem Pipeline-Payload.
 7. `balance-update-pipeline.js` kapselt Diagnose-Anreicherung, Persistenzentscheidung und Ausgabenbudget. `update()` gibt maschinenlesbar `success`, `validation_error`, `engine_error` oder `blocked` zurueck; `ok` bleibt als Kompatibilitaetswert fuer bestehende Jahresabschluss- und Importaufrufer erhalten. Persistenz ist nur im `success`-Pfad erlaubt.
+
+### Empfehlung und realer Tranchenbestand
+
+Balance- und Simulatorergebnisse sind beratende Rechenergebnisse. Berechnung,
+Rendering, Seitenwechsel und Jahres-Update schreiben niemals Verkaufsempfehlungen
+in `depot_tranchen` zurueck. `Balance.html` verweist deshalb nach einer tatsaechlichen
+Broker-Ausfuehrung auf den getrennten Profil-Assets-Manager.
+
+Der einzige produktive Pfad fuer eine reale Verkaufsfortschreibung liegt in
+`app/tranches/tranche-reconciliation.js` und der bestaetigenden UI in
+`app/tranches/tranchen-manager-page.js`:
+
+1. Die Eingabe nennt `profileId`, `trancheId` und eine stabile `actionId` explizit;
+   Namen, Praefixe und Stringsuffixe werden nicht zur Aufloesung verwendet.
+2. Eine reine Vorschau zeigt alten Bestand, tatsaechliche Stueckzahl,
+   Bruttoerloes, Kosten, Nettoerloes und resultierenden Bestand. Abbruch und
+   identische Wiederholung sind schreibfrei.
+3. Erst die separate Dauerbestaetigung reduziert bei einem Teilverkauf
+   Stueckzahl, Marktwert und Cost Basis proportional. Ein Vollverkauf entfernt
+   genau das gewaehlte Lot; negative Restwerte und Ueberverkaeufe sind blockiert.
+4. Vor jedem Write muessen aktives Profil, aktuelles Profil, Profilregistry,
+   Live-Tranchenpayload und der bei der Vorschau gelesene Payload zusammenpassen.
+   Ein Profilwechsel oder veralteter Stand bricht fail-closed ab.
+5. Live-Bestand, profilgebundener Bestand und Idempotenz-/Auditdatensatz werden
+   ueber die bestehende `PersistenceFacade` in einem Flush geschrieben. Bei
+   Flushfehler werden die vorherigen Cachewerte wiederhergestellt und dieselbe
+   bestaetigte Aktion bleibt retryfaehig.
+
+Der datensparsame Verlauf liegt als `trancheReconciliation` auf oberster Ebene
+der bestehenden Profilregistry `rs_profiles_v1`. Er enthaelt Action-, Profil- und
+Tranche-ID, Ausfuehrungstag, tatsaechliche Menge/Erloes/Kosten, optional die vom
+Nutzer erfasste Empfehlungsreferenz, resultierende Stueckzahl und Commit-Zeit.
+Tranchennamen, ISIN, Ticker, Notizen oder exportierte Rohdaten werden nicht
+dupliziert. Eine identische `actionId` mit denselben Daten ist ein No-op; dieselbe
+ID mit abweichenden Daten ist ein Konflikt.
 
 ### Entscheidungsdiagnose (Balance)
 

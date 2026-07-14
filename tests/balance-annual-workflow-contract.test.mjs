@@ -73,6 +73,17 @@ try {
         global.localStorage = createLocalStorageMock();
         seedBalanceState();
         localStorage.setItem('profile_tagesgeld', '50000');
+        const confirmedTranches = JSON.stringify([{
+            trancheId: 'annual-read-only-lot',
+            name: 'Synthetischer Bestand',
+            shares: 5,
+            purchasePrice: 80,
+            currentPrice: 100,
+            category: 'equity',
+            type: 'aktien_neu',
+            tqf: 0.3
+        }]);
+        localStorage.setItem('depot_tranchen', confirmedTranches);
         global.setTimeout = (fn, delay) => { calls.push(`timeout:${delay}`); fn(); return 0; };
         UIRenderer.toast = () => {};
         UIRenderer.handleError = error => { throw error; };
@@ -106,6 +117,8 @@ try {
         assertEqual(result.results.inflation.fetchStatus, 'ok_primary_ecb', 'Jahresupdate bewahrt den Inflations-Fetch-Status');
         assertEqual(modalResults.errors[0].step, 'CAPE', 'Fehlerprotokoll behaelt stabilen Step-Namen');
         assertEqual(dom.controls.btnJahresUpdate.disabled, false, 'Button-Sperre wird im finally geloest');
+        assertEqual(localStorage.getItem('depot_tranchen'), confirmedTranches,
+            'Beratendes Jahresupdate darf den realen Tranchenbestand nicht veraendern');
     }
 
     console.log('Test 2: successful commit follows preflight, snapshot, writes, validation and completion');

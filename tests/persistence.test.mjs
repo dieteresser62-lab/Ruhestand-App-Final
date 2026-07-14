@@ -41,6 +41,10 @@ import {
 } from '../app/shared/persistence-backup.js';
 import { CONFIG } from '../app/balance/balance-config.js';
 import { PROFILE_STORAGE_KEYS } from '../app/profile/profile-state.js';
+import {
+    commitTrancheReconciliation,
+    readReconciliationHistory
+} from '../app/tranches/tranche-reconciliation.js';
 
 console.log('--- Persistence Tests ---');
 
@@ -1423,6 +1427,72 @@ try {
         setItemSync('fallback_write', 'ok');
         await flush();
         assertEqual(storage.getItem('fallback_write'), 'ok', 'localStorage-Fallback schreibt ueber Facade zurueck');
+    }
+
+    console.log('Test 27: reconciliation persists live lot and audit in one facade batch');
+    {
+        const trancheRaw = JSON.stringify([{
+            schemaVersion: 1,
+            trancheId: 'facade-lot',
+            name: 'Synthetischer Bestand',
+            isin: '',
+            ticker: 'FACADE.DE',
+            shares: 2,
+            purchasePrice: 80,
+            currentPrice: 100,
+            purchaseDate: '2020-01-02',
+            category: 'equity',
+            type: 'aktien_neu',
+            tqf: 0.3,
+            notes: ''
+        }]);
+        const registryRaw = JSON.stringify({
+            version: 1,
+            profiles: {
+                default: {
+                    meta: { id: 'default', name: 'Default' },
+                    data: { depot_tranchen: trancheRaw }
+                }
+            }
+        });
+        const batches = [];
+        const adapter = createMemoryAdapter({
+            depot_tranchen: trancheRaw,
+            [PROFILE_STORAGE_KEYS.registry]: registryRaw,
+            [PROFILE_STORAGE_KEYS.current]: 'default',
+            [PROFILE_STORAGE_KEYS.active]: 'default'
+        });
+        const originalSaveBatch = adapter.saveBatch.bind(adapter);
+        adapter.saveBatch = async batch => {
+            batches.push(batch);
+            return originalSaveBatch(batch);
+        };
+        resetPersistenceForTests(adapter);
+        await init();
+
+        const result = await commitTrancheReconciliation({
+            profileId: 'default',
+            expectedTranchesRaw: trancheRaw,
+            action: {
+                actionId: 'facade-order-1',
+                profileId: 'default',
+                trancheId: 'facade-lot',
+                executedAt: '2026-07-14',
+                sharesSold: 1,
+                grossProceeds: 100,
+                fees: 1
+            }
+        }, { clock: () => '2026-07-14T12:00:00.000Z' });
+
+        assertEqual(result.status, 'applied', 'Facade-Reconcile wird bestaetigt');
+        assertEqual(batches.length, 1, 'Live-Bestand und Registry werden in genau einem Flush geschrieben');
+        const upsertKeys = batches[0].upserts.map(([key]) => key);
+        assert(upsertKeys.includes('depot_tranchen'), 'Facade-Batch enthaelt den Live-Tranchenbestand');
+        assert(upsertKeys.includes(PROFILE_STORAGE_KEYS.registry), 'Facade-Batch enthaelt Profilbestand und Audit');
+        assertEqual(JSON.parse(adapter.store.get('depot_tranchen'))[0].shares, 1,
+            'Adapter enthaelt den resultierenden Stueckbestand');
+        assertEqual(readReconciliationHistory(adapter.store.get(PROFILE_STORAGE_KEYS.registry)).length, 1,
+            'Adapter enthaelt die stabile Action-ID fuer Reload-Idempotenz');
     }
 
     console.log('Persistence tests passed');

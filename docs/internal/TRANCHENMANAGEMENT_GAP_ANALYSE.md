@@ -63,7 +63,7 @@ Die grüne Gesamtsuite ist kein Gegenbeleg zu den GAPs: `tests/tranchen-manager-
 | TM-12 | P1 | Status-, Override- und Cross-Tab-Vertrag ist inkonsistent. | Leeres Override fällt auf Storage zurück (`depot-tranchen-status.js:61-102`); `[]` gilt gespeichert als geladen; Sync hört auf `storage` plus Polling (`:417-432`), nicht auf IndexedDB/Tauri-Ereignisse. | Falscher „FIFO aktiv“-Status, veraltete Anzeige oder Datenleck aus dem aktuellen Profil in eine leere Haushaltsauswahl. | Explizite Quelle/Empty-Semantik und Refresh-Vertrag in Slices 03 und 06. |
 | TM-13 | P1 | Lot-Identität und FIFO-Gruppe sind nicht vollständig modelliert. | ID aus Zeit + Zufall (`tranchen-manager-state.js:6-9`), keine Duplikatprüfung; kein Depot-/Broker-/Instrumentgruppenfeld im Typ. | Doppelte IDs und globales FIFO über eigentlich getrennte Depots sind nicht sicher unterscheidbar. | Stabile ID-Regel; Entscheidung zu `accountId`/`instrumentId` in Slice 02. |
 | TM-14 | P1 | Simulator-Verkäufe reduzieren Marktwert/Cost Basis, aber nicht Stückzahl; Käufe werden in vorhandene Lots eingemischt. | `simulator-portfolio-tranches.js:154-166,204-209,293-315`. | Nach dem ersten Verkauf/Kauf widersprechen sich Stückzahl, Preis, Marktwert, Kaufdatum und FIFO-Lot. | Lot-Mutationsinvarianten und neue Simulationslots in Slice 07. |
-| TM-15 | P1 | Ausgeführte oder bestätigte reale Verkäufe werden nicht mit `depot_tranchen` reconciled. | Manager ist einziger produktiver Writer; Jahresworkflow reduziert den persistierten Lotbestand nicht (`balance-annual-orchestrator.js:95-100`). | Spätere Jahre können bereits veräußerte Bestände erneut verwenden. | Nutzerentscheidung O-09: expliziter, bestätigter und idempotenter Reconcile-Schritt in Slice 08; keine automatische Mutation. |
+| TM-15 | P1 | Ausgeführte oder bestätigte reale Verkäufe wurden nicht mit `depot_tranchen` reconciled. | Slice 08: reine Vorschau plus separat bestätigter Writer in `tranche-reconciliation.js`; stabiler Action-Verlauf in `rs_profiles_v1`. | Ohne manuelle Erfassung nach Broker-Ausführung bleibt der Realbestand unverändert; gleichzeitige externe Depotänderungen benötigen weiterhin eine neue Vorschau. | Implementiert: expliziter, profilgebundener, idempotenter Reconcile-Schritt; Balance/Simulator bleiben schreibfrei. Review ausstehend. |
 | TM-16 | P1 | Das Standard-Testgate kann entdeckte Dateien ohne Assertions grün melden. | Guard in `tranchen-manager-page.test.mjs:166-170,250-259`; Runner in `tests/run-tests.mjs:107-130`; Coverage Manager-Page 0 %. | Kritische Managerpfade erscheinen in der Suite abgesichert, obwohl sie nicht laufen. | Isolationsmanifest/Assertion-Gate und reproduzierbare Baseline in Slice 01. |
 | TM-17 | P1 | Direkte Produktionspfade und echte End-to-End-Ketten fehlen in Tests. | `depot-tranchen-status.js` nur 33,91 %; `balance-reader.test.mjs:109-145` testet eine lokale Nachbildung; Browser-Smoke öffnet nur den Dialog (`browser-smoke.test.mjs:403-412`). | Contract-Drift zwischen Manager, Persistenz, Balance, Simulator und Engine bleibt unentdeckt. | Direkte Contract-Tests in Slices 06/07 und Browser-/Migrationsketten in Slice 09. |
 | TM-18 | P1 | Profilwerte autosaven bei jedem `input`, ohne den HTML-Gültigkeitszustand als Save-Gate zu nutzen. | `tranchen-manager-page.js:65-94`; Normalisierung in `profile-asset-values.js:23-45`; mehrere Felder sind nicht Teil eines Submit-Forms. | Negative oder Zwischenwerte können während der Eingabe persistiert werden; Flush pro Tastendruck. | Validierter, debouncter Commit und sichtbarer Fehlerstatus in Slice 04. |
@@ -258,6 +258,25 @@ Damit ist TM-01 kein theoretisches Risiko. Die Behebung verändert das Verhalten
   0 offenen Handles. Direkt-/Worker-Paritaet (354/354), Snapshots, historischer
   Backtest und FlowDelta blieben ohne unerwartete Abweichung. Review und Freigabe
   von Slice 07 stehen aus.
+
+### Rückdokumentation Slice 08
+
+- TM-15 ist implementiert: Nur der explizite Manager-Workflow darf nach
+  schreibfreier Vorschau und gesonderter Dauerbestaetigung `depot_tranchen`
+  veraendern. Balance-Berechnung, Simulator und Jahresworkflow besitzen keinen
+  Reconcile-Writer und sind durch Regressionen als schreibfrei belegt.
+- `profileId`, `trancheId` und `actionId` sind Pflicht-IDs. Profilkontextwechsel,
+  veraltete Payloads, unbekannte Lots, Ueberverkaeufe und abweichende
+  Wiederverwendung einer Action-ID werden vor dem Write blockiert.
+- Teil-/Vollverkauf, Empfehlung/Ist-Abweichung, exakt einmaliger Facade-Flush,
+  Restore/Retry und Reload-Idempotenz sind direkt getestet. Der Auditdatensatz
+  dupliziert weder Name, ISIN, Ticker, Notizen noch Exportrohwerte.
+- Der Browser-Smoke fuehrt den produktiven UI-Pfad von Lotanlage ueber Vorschau
+  und Bestaetigung bis zum persistenten Bestand/Audit aus und belegt, dass dieselbe
+  Action-ID kein zweites Mal angewendet wird.
+- Verifikation: 107 Node-Testdateien mit 4358/4358 Assertions, 0 Fehlern und
+  0 offenen Handles sowie elf gruene Browser-Smoke-Szenarien. Review und
+  Freigabe von Slice 08 stehen aus.
 
 Diese Tests werden erweitert oder als Regression-Gates verwendet; parallele Test-Doppelungen sind nicht vorgesehen.
 

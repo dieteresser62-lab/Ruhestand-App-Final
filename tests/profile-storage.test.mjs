@@ -477,6 +477,36 @@ try {
     }
     console.log('✓ immediate persistence of profile-scoped keys OK');
 
+    // Test 17bb: top-level reconciliation history survives normal profile saves
+    console.log('Test 17bb: reconciliation history survives profile saves');
+    {
+        localStorage.clear();
+        ensureProfileRegistry();
+        const registry = JSON.parse(localStorage.getItem('rs_profiles_v1'));
+        registry.trancheReconciliation = {
+            schemaVersion: 1,
+            actions: [{
+                schemaVersion: 1,
+                actionId: 'synthetic-order-1',
+                profileId: 'default',
+                trancheId: 'synthetic-lot-1',
+                executedAt: '2026-07-14',
+                actual: { sharesSold: 1, grossProceeds: 100, fees: 1, netProceeds: 99 },
+                result: { beforeShares: 2, remainingShares: 1, trancheRemoved: false }
+            }]
+        };
+        localStorage.setItem('rs_profiles_v1', JSON.stringify(registry));
+        localStorage.setItem('profile_tagesgeld', '43000');
+
+        assert(saveCurrentProfileFromLocalStorage() === true, 'Normaler Profilsave sollte erfolgreich sein');
+        const savedRegistry = JSON.parse(localStorage.getItem('rs_profiles_v1'));
+        assert(savedRegistry.trancheReconciliation.actions.length === 1,
+            'Profilwerte-Save darf den globalen Idempotenz-/Auditverlauf nicht entfernen');
+        assert(savedRegistry.trancheReconciliation.actions[0].actionId === 'synthetic-order-1',
+            'Stabile Action-ID bleibt bei spaeteren Profilsaves erhalten');
+    }
+    console.log('✓ reconciliation history preservation OK');
+
     // Test 17c: hasProfileScopedDataInLocalStorage guards empty bootstrap states
     console.log('Test 17c: detect live profile-scoped data');
     {

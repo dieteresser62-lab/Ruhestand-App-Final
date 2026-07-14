@@ -257,6 +257,103 @@
             font-size: 12px;
         }
 
+        .reconciliation-panel {
+            min-width: 0;
+            margin-bottom: 24px;
+            padding: 18px;
+            border: 2px solid #805ad5;
+            border-radius: 10px;
+            background: #faf5ff;
+        }
+
+        .reconciliation-panel h2 {
+            margin-bottom: 8px;
+            color: #44337a;
+            font-size: 20px;
+        }
+
+        .reconciliation-intro {
+            margin-bottom: 16px;
+            color: #4a5568;
+            line-height: 1.5;
+        }
+
+        .reconciliation-form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 12px;
+        }
+
+        .reconciliation-form-grid .form-group {
+            margin-bottom: 0;
+        }
+
+        .reconciliation-recommendation,
+        .reconciliation-actions,
+        .reconciliation-status,
+        .reconciliation-preview {
+            grid-column: 1 / -1;
+        }
+
+        .reconciliation-recommendation {
+            padding: 10px 0;
+        }
+
+        .reconciliation-recommendation summary {
+            cursor: pointer;
+            color: #553c9a;
+            font-weight: 600;
+        }
+
+        .reconciliation-recommendation-fields {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .reconciliation-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 4px;
+        }
+
+        .reconciliation-status {
+            min-height: 20px;
+            color: #4a5568;
+            font-weight: 600;
+        }
+
+        .reconciliation-status[data-kind="error"] {
+            color: #9b2c2c;
+        }
+
+        .reconciliation-status[data-kind="ok"] {
+            color: #276749;
+        }
+
+        .reconciliation-preview {
+            margin-top: 4px;
+            padding: 14px;
+            border: 1px solid #b794f4;
+            border-radius: 8px;
+            background: white;
+        }
+
+        .reconciliation-preview[hidden],
+        .reconciliation-actions button[hidden] {
+            display: none;
+        }
+
+        .reconciliation-preview pre {
+            margin: 0 0 14px;
+            overflow-wrap: anywhere;
+            white-space: pre-wrap;
+            color: #2d3748;
+            font: 14px/1.55 inherit;
+        }
+
         .gold-row,
         .health-bucket-row {
             min-width: 0;
@@ -717,6 +814,69 @@
         <div class="stats" id="stats"></div>
 
         <div id="tranchenTable"></div>
+
+        <section class="reconciliation-panel" aria-labelledby="reconciliationTitle">
+            <h2 id="reconciliationTitle">Tatsächliche Broker-Ausführung abgleichen</h2>
+            <p class="reconciliation-intro">
+                Balance und Simulator liefern ausschließlich Empfehlungen und verändern den Realbestand nie automatisch.
+                Erfassen Sie hier erst nach der tatsächlichen Broker-Ausführung die realen Daten. Eine Vorschau ist
+                schreibfrei; nur die gesonderte Bestätigung ändert den profilgebundenen Tranchenbestand dauerhaft.
+            </p>
+            <form id="reconciliationForm" class="reconciliation-form-grid">
+                <div class="form-group">
+                    <label for="reconcileActionId">Stabile Action-ID *</label>
+                    <input id="reconcileActionId" type="text" maxlength="128" autocomplete="off" required
+                        placeholder="z. B. Broker-Order-ID">
+                    <small>Dieselbe ID verhindert eine doppelte Anwendung nach Reload oder Retry.</small>
+                </div>
+                <div class="form-group">
+                    <label for="reconcileTrancheId">Tranche (exakte ID) *</label>
+                    <select id="reconcileTrancheId" required>
+                        <option value="">Keine Tranche verfügbar</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="reconcileExecutedAt">Ausführungstag *</label>
+                    <input id="reconcileExecutedAt" type="date" required>
+                </div>
+                <div class="form-group">
+                    <label for="reconcileSharesSold">Tatsächlich verkaufte Stücke *</label>
+                    <input id="reconcileSharesSold" type="number" min="0.000000000001" step="any" required>
+                </div>
+                <div class="form-group">
+                    <label for="reconcileGrossProceeds">Tatsächlicher Bruttoerlös (€) *</label>
+                    <input id="reconcileGrossProceeds" type="number" min="0.01" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label for="reconcileFees">Tatsächliche Kosten (€) *</label>
+                    <input id="reconcileFees" type="number" min="0" step="0.01" value="0" required>
+                </div>
+                <details class="reconciliation-recommendation">
+                    <summary>Optionale Empfehlung zum Abweichungsvergleich erfassen</summary>
+                    <div class="reconciliation-recommendation-fields">
+                        <div class="form-group">
+                            <label for="reconcileRecommendedShares">Empfohlene Stückzahl</label>
+                            <input id="reconcileRecommendedShares" type="number" min="0.000000000001" step="any">
+                        </div>
+                        <div class="form-group">
+                            <label for="reconcileRecommendedGross">Empfohlener Bruttoerlös (€)</label>
+                            <input id="reconcileRecommendedGross" type="number" min="0" step="0.01">
+                        </div>
+                    </div>
+                </details>
+                <div class="reconciliation-actions">
+                    <button id="reconciliationPreviewBtn" type="submit" class="btn-secondary">Schreibfreie Vorschau</button>
+                </div>
+                <div id="reconciliationStatus" class="reconciliation-status" role="status" aria-live="polite"></div>
+                <div id="reconciliationPreview" class="reconciliation-preview" hidden>
+                    <pre id="reconciliationPreviewContent"></pre>
+                    <div class="reconciliation-actions">
+                        <button id="reconciliationCancelBtn" type="button" class="btn-secondary" hidden>Abbrechen – nichts ändern</button>
+                        <button id="reconciliationConfirmBtn" type="button" class="btn-danger" hidden>Dauerhafte Bestandsänderung bestätigen</button>
+                    </div>
+                </div>
+            </form>
+        </section>
     </div>
 
     <!-- Modal für Tranche hinzufügen/bearbeiten -->

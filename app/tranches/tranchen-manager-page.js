@@ -39,6 +39,11 @@ import {
     showTrancheFormError
 } from './tranchen-manager-modal.js';
 import { PersistenceFacade, persistenceStorage } from '../shared/persistence-facade.js';
+import {
+    commitTrancheReconciliation,
+    previewTrancheReconciliation,
+    TrancheReconciliationError
+} from './tranche-reconciliation.js';
 
 const state = {
     tranchen: [],
@@ -58,6 +63,10 @@ const state = {
     persistenceMessage: '',
     persistenceError: '',
     rawRevealed: false,
+    reconciliationPreview: null,
+    pendingReconciliation: null,
+    reconciliationStatus: '',
+    reconciliationError: '',
     profileId: null,
     boundDocument: null,
     loader: loadTranchesFromStorage
@@ -66,6 +75,17 @@ const state = {
 const PROFILE_SAVE_DEBOUNCE_MS = 300;
 const QUOTE_BATCH_CONCURRENCY = 3;
 const QUOTE_BATCH_TIMEOUT_MS = 12000;
+
+const RECONCILIATION_INPUT_IDS = [
+    'reconcileActionId',
+    'reconcileTrancheId',
+    'reconcileExecutedAt',
+    'reconcileSharesSold',
+    'reconcileGrossProceeds',
+    'reconcileFees',
+    'reconcileRecommendedShares',
+    'reconcileRecommendedGross'
+];
 
 const PROFILE_INPUT_IDS = [
     'profileTagesgeld',
@@ -123,6 +143,7 @@ function syncGlobalState() {
 function render() {
     renderTranchenStats(byId('stats'), state.tranchen);
     renderTranchenTable(byId('tranchenTable'), state.tranchen);
+    renderReconciliationState();
     syncGlobalState();
 }
 
@@ -180,6 +201,7 @@ function processingIsBlocked() {
     return state.commitInFlight
         || state.profileCommitInFlight
         || Boolean(state.quoteBatchPromise)
+        || Boolean(state.pendingReconciliation)
         || state.loadStatus === 'corrupt'
         || state.loadStatus === 'unavailable';
 }
@@ -190,6 +212,10 @@ function setManagerControlsBlocked(blocked) {
         'updatePricesBtn',
         'proxyHealthBtn',
         'clearTranchesBtn',
+        'reconciliationPreviewBtn',
+        'reconciliationConfirmBtn',
+        'reconciliationCancelBtn',
+        ...RECONCILIATION_INPUT_IDS,
         ...PROFILE_INPUT_IDS
     ].forEach(id => {
         const element = byId(id);
@@ -217,7 +243,9 @@ function renderPersistenceState() {
 
     if (recovery) recovery.hidden = !isCorrupt;
     if (retryLoad) retryLoad.hidden = !isUnavailable;
-    if (retrySave) retrySave.hidden = !state.pendingCommit && !state.pendingProfileValues;
+    if (retrySave) retrySave.hidden = !state.pendingCommit
+        && !state.pendingProfileValues
+        && !state.pendingReconciliation;
     setManagerControlsBlocked(processingIsBlocked());
 
     if (state.commitInFlight || state.profileCommitInFlight) {
@@ -252,6 +280,256 @@ function renderPersistenceState() {
             : 'Für dieses Profil sind keine Tranchen gespeichert.',
         'ok'
     );
+}
+
+function formatReconciliationNumber(value, options = {}) {
+    if (value === null || value === undefined || !Number.isFinite(Number(value))) return '-';
+    const { currency = false, maximumFractionDigits = currency ? 2 : 6 } = options;
+    return new Intl.NumberFormat('de-DE', {
+        ...(currency ? { style: 'currency', currency: 'EUR' } : {}),
+        maximumFractionDigits
+    }).format(Number(value));
+}
+
+function localIsoDate(date = new Date()) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function setReconciliationStatus(message = '', kind = '') {
+    const target = byId('reconciliationStatus');
+    if (!target) return;
+    target.textContent = message;
+    target.dataset.kind = kind;
+}
+
+function renderReconciliationOptions() {
+    const select = byId('reconcileTrancheId');
+    if (!select || typeof document.createElement !== 'function') return;
+    const previousValue = select.value;
+    select.replaceChildren?.();
+    if (!select.replaceChildren) select.innerHTML = '';
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = state.tranchen.length > 0
+        ? 'Tranche über ID auswählen'
+        : 'Keine Tranche verfügbar';
+    select.appendChild(placeholder);
+    state.tranchen.forEach(tranche => {
+        const option = document.createElement('option');
+        option.value = tranche.trancheId;
+        option.textContent = `${tranche.name || 'Tranche'} — ${tranche.trancheId}`;
+        select.appendChild(option);
+    });
+    select.value = state.tranchen.some(tranche => tranche.trancheId === previousValue)
+        ? previousValue
+        : '';
+}
+
+function renderReconciliationPreview() {
+    const container = byId('reconciliationPreview');
+    const content = byId('reconciliationPreviewContent');
+    const confirmButton = byId('reconciliationConfirmBtn');
+    const cancelButton = byId('reconciliationCancelBtn');
+    const preview = state.reconciliationPreview?.preview || null;
+    if (container) container.hidden = !preview;
+    if (confirmButton) {
+        confirmButton.hidden = !preview;
+        confirmButton.disabled = processingIsBlocked() || preview?.status !== 'ready';
+    }
+    if (cancelButton) {
+        cancelButton.hidden = !preview;
+        cancelButton.disabled = state.commitInFlight;
+    }
+    if (!content) return;
+    if (!preview) {
+        content.textContent = '';
+        return;
+    }
+
+    const action = preview.action;
+    const after = preview.after;
+    const lines = [
+        `Profil-ID: ${action.profileId}`,
+        `Tranche-ID: ${action.trancheId}`,
+        `Action-ID: ${action.actionId}`,
+        `Ausführungstag: ${action.executedAt}`,
+        '',
+        `Ist-Bestand vorher: ${formatReconciliationNumber(preview.before?.shares)} Stück · ${formatReconciliationNumber(preview.before?.marketValue, { currency: true })} Marktwert · ${formatReconciliationNumber(preview.before?.costBasis, { currency: true })} Einstandskosten`,
+        `Tatsächliche Ausführung: ${formatReconciliationNumber(preview.execution?.sharesSold)} Stück · ${formatReconciliationNumber(preview.execution?.grossProceeds, { currency: true })} Brutto · ${formatReconciliationNumber(preview.execution?.fees, { currency: true })} Kosten · ${formatReconciliationNumber(preview.execution?.netProceeds, { currency: true })} Netto`,
+        after
+            ? `Resultierender Bestand: ${formatReconciliationNumber(after.shares)} Stück · ${formatReconciliationNumber(after.marketValue, { currency: true })} Marktwert · ${formatReconciliationNumber(after.costBasis, { currency: true })} Einstandskosten`
+            : 'Resultierender Bestand: Tranche vollständig verkauft und entfernt.'
+    ];
+    if (preview.deviation) {
+        const deviations = [];
+        if (Object.prototype.hasOwnProperty.call(preview.deviation, 'sharesSold')) {
+            deviations.push(`${formatReconciliationNumber(preview.deviation.sharesSold)} Stück`);
+        }
+        if (Object.prototype.hasOwnProperty.call(preview.deviation, 'grossProceeds')) {
+            deviations.push(formatReconciliationNumber(preview.deviation.grossProceeds, { currency: true }));
+        }
+        lines.push(`Abweichung zur optional erfassten Empfehlung: ${deviations.join(' · ')}`);
+    } else {
+        lines.push('Empfehlungsvergleich: keine Referenz erfasst; tatsächliche Ausführung bleibt maßgeblich.');
+    }
+    if (preview.status === 'duplicate') {
+        lines.push('', 'Diese Action-ID wurde mit denselben Ausführungsdaten bereits angewendet. Es erfolgt keine weitere Bestandsänderung.');
+    }
+    content.textContent = lines.join('\n');
+}
+
+function renderReconciliationState() {
+    const form = byId('reconciliationForm');
+    if (!form) return;
+    renderReconciliationOptions();
+    const dateInput = byId('reconcileExecutedAt');
+    if (dateInput && !dateInput.value) dateInput.value = localIsoDate();
+    const previewButton = byId('reconciliationPreviewBtn');
+    if (previewButton) previewButton.disabled = processingIsBlocked() || state.tranchen.length === 0;
+    renderReconciliationPreview();
+    if (state.reconciliationError) {
+        setReconciliationStatus(state.reconciliationError, 'error');
+    } else if (state.reconciliationStatus) {
+        setReconciliationStatus(state.reconciliationStatus, 'ok');
+    } else {
+        setReconciliationStatus(
+            'Empfehlungen aus Balance und Simulator sind schreibfrei. Nur diese separat bestätigte tatsächliche Ausführung verändert den Realbestand.',
+            ''
+        );
+    }
+}
+
+function readOptionalNumber(id) {
+    const raw = byId(id)?.value;
+    return raw === '' || raw === null || raw === undefined ? null : Number(raw);
+}
+
+function readReconciliationActionFromDom() {
+    const recommendedShares = readOptionalNumber('reconcileRecommendedShares');
+    const recommendedGross = readOptionalNumber('reconcileRecommendedGross');
+    return {
+        actionId: byId('reconcileActionId')?.value || '',
+        profileId: state.profileId || '',
+        trancheId: byId('reconcileTrancheId')?.value || '',
+        executedAt: byId('reconcileExecutedAt')?.value || '',
+        sharesSold: readOptionalNumber('reconcileSharesSold'),
+        grossProceeds: readOptionalNumber('reconcileGrossProceeds'),
+        fees: readOptionalNumber('reconcileFees') ?? 0,
+        recommendation: recommendedShares === null && recommendedGross === null
+            ? null
+            : {
+                ...(recommendedShares !== null ? { sharesSold: recommendedShares } : {}),
+                ...(recommendedGross !== null ? { grossProceeds: recommendedGross } : {})
+            }
+    };
+}
+
+function clearReconciliationPreview({ resetForm = false } = {}) {
+    state.reconciliationPreview = null;
+    state.reconciliationError = '';
+    if (resetForm) {
+        byId('reconciliationForm')?.reset?.();
+        const dateInput = byId('reconcileExecutedAt');
+        if (dateInput) dateInput.value = localIsoDate();
+    }
+    renderReconciliationState();
+}
+
+function createReconciliationPreview(event) {
+    event?.preventDefault?.();
+    if (processingIsBlocked()) return false;
+    state.reconciliationStatus = '';
+    state.reconciliationError = '';
+    try {
+        const action = readReconciliationActionFromDom();
+        const preview = previewTrancheReconciliation({
+            profileId: state.profileId,
+            tranches: state.confirmedTranches,
+            action,
+            registry: readStoredValue(PROFILE_STORAGE_KEYS.registry)
+        });
+        state.reconciliationPreview = {
+            profileId: state.profileId,
+            action,
+            expectedTranchesRaw: state.confirmedRaw,
+            preview
+        };
+        state.reconciliationStatus = preview.status === 'duplicate'
+            ? 'Action-ID bereits identisch verarbeitet; der Bestand bleibt unverändert.'
+            : 'Vorschau erstellt. Prüfen Sie Profil-ID, Tranche-ID und tatsächliche Brokerdaten vor der dauerhaften Bestätigung.';
+        renderReconciliationState();
+        return true;
+    } catch (error) {
+        state.reconciliationPreview = null;
+        state.reconciliationError = error instanceof TrancheReconciliationError
+            ? error.message
+            : 'Die Reconcile-Vorschau konnte nicht erstellt werden.';
+        renderReconciliationState();
+        return false;
+    }
+}
+
+async function executeReconciliation(pending, { requireConfirmation = true } = {}) {
+    if (!pending || state.commitInFlight || state.profileCommitInFlight) return false;
+    if (requireConfirmation) {
+        const confirmed = confirm(
+            `Tatsächliche Ausführung ${pending.action.actionId} für Profil ${pending.profileId} und Tranche ${pending.action.trancheId} dauerhaft anwenden? Der reale Bestand wird dabei geändert.`
+        );
+        if (!confirmed) return false;
+    }
+
+    state.commitInFlight = true;
+    state.persistenceMessage = '';
+    state.persistenceError = '';
+    state.reconciliationError = '';
+    state.reconciliationStatus = '';
+    renderPersistenceState();
+    renderReconciliationState();
+    try {
+        const result = await commitTrancheReconciliation({
+            profileId: pending.profileId,
+            action: pending.action,
+            expectedTranchesRaw: pending.expectedTranchesRaw
+        });
+        state.pendingReconciliation = null;
+        if (result.status === 'duplicate') {
+            state.reconciliationStatus = 'Action-ID war bereits identisch verarbeitet. Es wurde nichts erneut verändert.';
+            state.persistenceMessage = 'Keine Bestandsänderung: Ausführung war bereits bestätigt.';
+            state.reconciliationPreview = { ...pending, preview: result.preview };
+            return true;
+        }
+        state.tranchen = result.tranches;
+        state.confirmedTranches = result.tranches;
+        state.confirmedRaw = JSON.stringify(result.tranches);
+        state.loadStatus = result.tranches.length > 0 ? 'valid' : 'empty';
+        state.reconciliationPreview = null;
+        state.reconciliationStatus = 'Tatsächliche Ausführung dauerhaft bestätigt und Realbestand aktualisiert.';
+        state.persistenceMessage = 'Reconcile-Commit dauerhaft gespeichert.';
+        clearReconciliationPreview({ resetForm: true });
+        return true;
+    } catch (error) {
+        state.tranchen = state.confirmedTranches;
+        state.pendingReconciliation = pending;
+        state.reconciliationError = error instanceof TrancheReconciliationError
+            ? `${error.message}${error.retryable ? ' Retry ist möglich.' : ''}`
+            : 'Die Ausführung konnte nicht dauerhaft gespeichert werden. Retry ist möglich.';
+        state.persistenceError = 'Reconcile wurde nicht dauerhaft bestätigt. Der letzte bestätigte Bestand bleibt sichtbar.';
+        return false;
+    } finally {
+        state.commitInFlight = false;
+        render();
+        renderPersistenceState();
+    }
+}
+
+function confirmReconciliation() {
+    const pending = state.reconciliationPreview;
+    if (!pending || pending.preview?.status !== 'ready') return Promise.resolve(false);
+    return executeReconciliation(pending);
 }
 
 function updateActiveProfileLabel(profileId = state.profileId) {
@@ -771,6 +1049,10 @@ function applyLoadResult(result) {
     state.persistenceMessage = '';
     state.persistenceError = '';
     state.pendingCommit = null;
+    state.pendingReconciliation = null;
+    state.reconciliationPreview = null;
+    state.reconciliationStatus = '';
+    state.reconciliationError = '';
     clearRawPreview();
 
     if (result?.status === 'valid' || result?.status === 'empty') {
@@ -796,6 +1078,10 @@ function retryLoad() {
 }
 
 async function retryPendingCommit() {
+    if (state.pendingReconciliation) {
+        await executeReconciliation(state.pendingReconciliation, { requireConfirmation: false });
+        return;
+    }
     if (state.pendingCommit) {
         const pending = state.pendingCommit;
         await persistTranchen(pending.tranches, pending);
@@ -819,6 +1105,18 @@ function bindControls() {
     byId('resetCorruptPayloadBtn')?.addEventListener('click', () => resetCorruptPayload());
     byId('retryTrancheLoadBtn')?.addEventListener('click', retryLoad);
     byId('retryTrancheSaveBtn')?.addEventListener('click', () => retryPendingCommit());
+    byId('reconciliationForm')?.addEventListener('submit', createReconciliationPreview);
+    byId('reconciliationConfirmBtn')?.addEventListener('click', () => confirmReconciliation());
+    byId('reconciliationCancelBtn')?.addEventListener('click', () => clearReconciliationPreview());
+    RECONCILIATION_INPUT_IDS.forEach(id => {
+        byId(id)?.addEventListener('input', () => {
+            if (!state.reconciliationPreview) return;
+            state.reconciliationPreview = null;
+            state.reconciliationStatus = '';
+            state.reconciliationError = 'Eingaben wurden nach der Vorschau geändert. Bitte eine neue Vorschau erstellen.';
+            renderReconciliationState();
+        });
+    });
     byId('tranchenTable')?.addEventListener('click', event => {
         if (processingIsBlocked()) return;
         const target = event.target.closest('[data-action]');
@@ -873,6 +1171,10 @@ function resetRuntimeState(profileId) {
     state.persistenceMessage = '';
     state.persistenceError = '';
     state.rawRevealed = false;
+    state.reconciliationPreview = null;
+    state.pendingReconciliation = null;
+    state.reconciliationStatus = '';
+    state.reconciliationError = '';
     state.profileId = profileId;
 }
 

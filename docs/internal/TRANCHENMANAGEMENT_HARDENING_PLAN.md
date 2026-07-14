@@ -105,7 +105,7 @@ Der Preisservice liefert ein Objekt statt einer bloßen Zahl. Browser-Node-Proxy
 | 5 | [Quote- und Währungscontract](./SLICE_TRANCHENMANAGEMENT_05_QUOTE_CURRENCY_RESILIENCE.md) | EUR-/Stichtagscontract, Batch und Proxyparität | Slice 02, 03 | 8 | freigegeben |
 | 6 | [Balance-, Status- und Steuerparität](./SLICE_TRANCHENMANAGEMENT_06_BALANCE_STATUS_TAX_PARITY.md) | Einheiten, TQF, Status und Klassifikation | Slice 02, 03 | 9 | freigegeben |
 | 7 | [Simulator-Provenienz und Lot-Invarianten](./SLICE_TRANCHENMANAGEMENT_07_SIMULATOR_PROVENANCE_LOTS.md) | Herkunft, Geldmarkt und In-Memory-Lots | Slice 02, 06 | 10 | freigegeben |
-| 8 | [Reconciliation-Workflow](./SLICE_TRANCHENMANAGEMENT_08_RECONCILIATION_WORKFLOW.md) | bestätigte reale Bestandsfortschreibung idempotent umsetzen | Slice 03, 06, 07 | 9 | geplant |
+| 8 | [Reconciliation-Workflow](./SLICE_TRANCHENMANAGEMENT_08_RECONCILIATION_WORKFLOW.md) | bestätigte reale Bestandsfortschreibung idempotent umsetzen | Slice 03, 06, 07 | 9 | freigegeben |
 | 9 | [E2E, Migration und Dokumentation](./SLICE_TRANCHENMANAGEMENT_09_E2E_MIGRATION_DOCUMENTATION.md) | vollständige Gates und Doku-Sync | Slices 01-08 | 6 (5 Tests + Handbuch-HTML), plus Markdown | geplant |
 
 Die Reihenfolge ist verbindlich, solange das Planreview sie nicht ändert. Für Slice 08 ist durch O-09 der explizite Reconcile-Workflow festgelegt; eine rein beratende No-Code-Variante ist nicht mehr Teil dieses Plans.
@@ -242,6 +242,29 @@ Die Reihenfolge ist verbindlich, solange das Planreview sie nicht ändert. Für 
 - Verifiziert: 106 Node-Testdateien, 4298/4298 Assertions, 0 Fehler und 0 offene
   Handles. Direkt-/Worker-Paritaet (354/354), Snapshots, historischer Backtest und
   FlowDelta blieben ohne unerwartete Abweichung. Review und Freigabe stehen aus.
+
+### Rückdokumentation Slice 08
+
+- `app/tranches/tranche-reconciliation.js` trennt die reine Vorschau vom
+  bestaetigten Persistenzpfad. Profil, Tranche und Ausfuehrung werden nur ueber
+  explizite IDs aufgeloest; veraltete Vorschauen, Profilwechsel, Ueberverkaeufe,
+  unbekannte Lots und kollidierende Action-IDs brechen fail-closed ab.
+- Teilverkaeufe reduzieren Stueckzahl, Marktwert und Cost Basis proportional;
+  Vollverkaeufe entfernen genau das gewaehlte Lot. Tatsaechliche Brokerwerte
+  bleiben von einer optional erfassten Empfehlung getrennt und Abweichungen sind
+  in Vorschau und Audit sichtbar.
+- Live-Lot, profilgebundener Lotbestand und der datensparsame Action-Verlauf in
+  `rs_profiles_v1.trancheReconciliation` werden mit einem Facade-Flush
+  bestaetigt. Identische Wiederholung ist ein No-op; Flush-Rejection stellt den
+  vorherigen Cache-/Registry-Stand wieder her und bleibt retryfaehig.
+- Balance und Simulator bleiben schreibfrei. Balance kennzeichnet die
+  Produktgrenze und verweist nach realer Broker-Ausfuehrung auf den
+  Profil-Assets-Manager; dort sind Vorschau, Abbruch und dauerhafte Bestaetigung
+  getrennte Schritte.
+- Verifiziert: 107 Node-Testdateien, 4358/4358 Assertions, 0 Fehler und 0 offene
+  Handles sowie elf gruene Browser-Smoke-Szenarien inklusive Vorschau,
+  Bestaetigung, persistentem Audit und Action-ID-Duplikat. Review und Freigabe
+  stehen aus.
 
 ## GAP-Zuordnung
 

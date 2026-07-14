@@ -486,6 +486,50 @@ async function runTranchesSmoke(browser, baseUrl) {
     const afterEditId = JSON.parse(afterEditRow.value)[0].trancheId;
     assert(afterEditId === beforeEditId, 'Editieren muss die Tranche-ID stabil halten');
 
+    await page.locator('#reconcileActionId').fill('browser-order-1');
+    await page.locator('#reconcileTrancheId').selectOption(afterEditId);
+    await page.locator('#reconcileExecutedAt').fill('2026-07-14');
+    await page.locator('#reconcileSharesSold').fill('1');
+    await page.locator('#reconcileGrossProceeds').fill('97');
+    await page.locator('#reconcileFees').fill('2');
+    await page.locator('.reconciliation-recommendation').evaluate(details => { details.open = true; });
+    await page.locator('#reconcileRecommendedShares').fill('0.8');
+    await page.locator('#reconcileRecommendedGross').fill('90');
+    await page.locator('#reconciliationPreviewBtn').click();
+    await page.locator('#reconciliationPreview').waitFor({ state: 'visible' });
+    const previewText = await page.locator('#reconciliationPreviewContent').textContent();
+    assert(previewText.includes(afterEditId) && previewText.includes('browser-order-1'),
+        'Reconcile-Vorschau muss exakte Profil-/Tranche-/Action-Identitaet zeigen');
+    assert(previewText.includes('Resultierender Bestand') && previewText.includes('Abweichung'),
+        'Reconcile-Vorschau muss resultierenden Bestand und Empfehlungsabweichung zeigen');
+    await page.locator('#reconciliationConfirmBtn').click();
+    await page.locator('#reconciliationStatus').filter({ hasText: 'dauerhaft bestätigt' }).waitFor();
+
+    const reconciledRow = await readIndexedDb(page, 'kv', 'depot_tranchen');
+    assert(JSON.parse(reconciledRow.value)[0].shares === 1,
+        'Bestaetigte tatsaechliche Ausfuehrung muss den persistenten Stueckbestand reduzieren');
+    const reconciledRegistryRow = await readIndexedDb(page, 'kv', 'rs_profiles_v1');
+    const reconciledRegistry = JSON.parse(reconciledRegistryRow.value);
+    assert(reconciledRegistry.trancheReconciliation.actions[0].actionId === 'browser-order-1',
+        'Bestaetigung muss stabile Action-ID fuer Reload-Idempotenz speichern');
+
+    await page.locator('#reconcileActionId').fill('browser-order-1');
+    await page.locator('#reconcileTrancheId').selectOption(afterEditId);
+    await page.locator('#reconcileExecutedAt').fill('2026-07-14');
+    await page.locator('#reconcileSharesSold').fill('1');
+    await page.locator('#reconcileGrossProceeds').fill('97');
+    await page.locator('#reconcileFees').fill('2');
+    await page.locator('.reconciliation-recommendation').evaluate(details => { details.open = true; });
+    await page.locator('#reconcileRecommendedShares').fill('0.8');
+    await page.locator('#reconcileRecommendedGross').fill('90');
+    await page.locator('#reconciliationPreviewBtn').click();
+    await page.locator('#reconciliationStatus').filter({ hasText: 'bereits identisch verarbeitet' }).waitFor();
+    assert(await page.locator('#reconciliationConfirmBtn').isDisabled(),
+        'Identische Action-ID darf keine zweite Bestaetigung anbieten');
+    const duplicateRow = await readIndexedDb(page, 'kv', 'depot_tranchen');
+    assert(JSON.parse(duplicateRow.value)[0].shares === 1,
+        'Identische Action-ID darf den Bestand nicht ein zweites Mal reduzieren');
+
     await page.setViewportSize({ width: 390, height: 844 });
     const mobileLayout = await page.evaluate(() => {
         const scroller = document.querySelector('.table-scroll');
