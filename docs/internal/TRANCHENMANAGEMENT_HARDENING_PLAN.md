@@ -101,7 +101,7 @@ Der Preisservice liefert ein Objekt statt einer bloßen Zahl. Browser-Node-Proxy
 | 1 | [Test-Gate und Baseline](./SLICE_TRANCHENMANAGEMENT_01_TEST_GATE_BASELINE.md) | assertionslose False-Green-Pfade schließen | Planfreigabe | 5 | freigegeben |
 | 2 | [Kanonischer Datencontract](./SLICE_TRANCHENMANAGEMENT_02_CANONICAL_DATA_CONTRACT.md) | Schema, Klassifikation und Doppelverkauf beheben | Slice 01 | 11 nach Nutzerfreigabe; `engine.js` ohne Diff | freigegeben |
 | 3 | [Persistenz und Recovery](./SLICE_TRANCHENMANAGEMENT_03_PERSISTENCE_RECOVERY.md) | valid/empty/corrupt/unavailable, Flush, Profil-Handoff | Slice 02 | 9 | freigegeben |
-| 4 | [CRUD, UX und Accessibility](./SLICE_TRANCHENMANAGEMENT_04_CRUD_UX_ACCESSIBILITY.md) | sichere Eingabe und bedienbare Darstellung | Slice 03 | 10 | geplant |
+| 4 | [CRUD, UX und Accessibility](./SLICE_TRANCHENMANAGEMENT_04_CRUD_UX_ACCESSIBILITY.md) | sichere Eingabe und bedienbare Darstellung | Slice 03 | 10 | implementiert, Review ausstehend |
 | 5 | [Quote- und Währungscontract](./SLICE_TRANCHENMANAGEMENT_05_QUOTE_CURRENCY_RESILIENCE.md) | EUR-/Stichtagscontract, Batch und Proxyparität | Slice 02, 03 | 8 | geplant |
 | 6 | [Balance-, Status- und Steuerparität](./SLICE_TRANCHENMANAGEMENT_06_BALANCE_STATUS_TAX_PARITY.md) | Einheiten, TQF, Status und Klassifikation | Slice 02, 03 | 9 | geplant |
 | 7 | [Simulator-Provenienz und Lot-Invarianten](./SLICE_TRANCHENMANAGEMENT_07_SIMULATOR_PROVENANCE_LOTS.md) | Herkunft, Geldmarkt und In-Memory-Lots | Slice 02, 06 | 10 | geplant |
@@ -156,8 +156,27 @@ Die Reihenfolge ist verbindlich, solange das Planreview sie nicht ändert. Für 
 - Initialisierung, BFCache und Tab-Rückkehr sind idempotent beziehungsweise laden
   den Profilkontext neu. Ein explizites leeres Profil-Override bleibt leer.
 - Verifiziert: 104 Node-Testdateien, 4082/4082 Assertions, 0 Fehler, 0 offene
-  Handles; elf grüne Browser-Smoke-Szenarien. Slice 03 ist implementiert, aber
-  noch nicht durch Gemini/Nutzer freigegeben.
+  Handles; elf grüne Browser-Smoke-Szenarien. Slice 03 ist durch Gemini und Nutzer
+  freigegeben und als Commit `13328fa` vorhanden.
+
+### Rückdokumentation Slice 04
+
+- Der Modal- und Save-Pfad validiert endliche positive Tranchewerte, TQF und die
+  kanonische Kategorie-/Typ-Matrix vor jeder Mutation. Strukturierte Fehler bleiben
+  blockierend sichtbar und enthalten Fehlercode, Feld und soweit vorhanden Lot-ID.
+- Neue IDs werden bei Kollision erneut erzeugt; Edit-IDs bleiben stabil und die
+  Collection-Grenze blockiert Duplikate weiterhin vor jedem Storage-Write.
+- Profilwerte besitzen eine strikte vollständige Validierung, eine 300-ms-Entprellung
+  und eine serielle Nachspeicherung bei langsamen Flushs. Ungültige Zwischenstände
+  verändern weder sichtbaren bestätigten Zustand noch Persistenz.
+- Dialogrolle, zugänglicher Name, initialer Fokus, Fokusfalle, Escape/Fokus-Rückgabe,
+  Live-Regionen und benannte Icon-Aktionen sind umgesetzt. Gold und Kategorie/Typ
+  werden eindeutig angezeigt; negative Renditen enthalten kein `+-`.
+- Bei 390 CSS-Pixeln bleibt das Dokument ohne horizontalen Overflow; nur der
+  gekennzeichnete Tabellencontainer scrollt. Rücklink und Profilanzeige tragen die
+  tatsächlich geladene Profil-ID.
+- Verifiziert: 104 Node-Testdateien, 4117/4117 Assertions, 0 Fehler, 0 offene
+  Handles sowie elf grüne Browser-Smoke-Szenarien. Review und Freigabe stehen aus.
 
 ## GAP-Zuordnung
 
@@ -308,7 +327,7 @@ Die Antworten ändern den Gemini-Status nicht eigenmächtig. Plan und Slices ble
 
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
 | --- | --- | --- | --- | --- |
-| G-01 | Gemini | Transiente Persistenzfehler und korrupter Payload unzureichend getrennt | angenommen | Slice 03 implementiert und technisch validiert; Review ausstehend |
+| G-01 | Gemini | Transiente Persistenzfehler und korrupter Payload unzureichend getrennt | angenommen | Slice 03 freigegeben und als Commit `13328fa` vorhanden |
 | G-02 | Gemini | Simulator benötigt zwingende Deep-Copy-Grenze | angenommen | Plan und Slice 07 konkretisiert; Code ausstehend |
 | G-03 | Gemini | Abgelehnte Fremdwährungsquotes benötigen sichtbaren Grund | angenommen | O-03/O-05 und Slice 05 konkretisiert; Code ausstehend |
-| G-04 | Gemini | Engine-Validierungsfehler muss strukturiert in der UI ankommen | angenommen | Slices 02/04 konkretisiert; Code ausstehend |
+| G-04 | Gemini | Engine-Validierungsfehler muss strukturiert in der UI ankommen | angenommen | Contract in Slice 02 und blockierender Manager-UI-Pfad in Slice 04 implementiert; Review ausstehend |

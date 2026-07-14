@@ -29,6 +29,8 @@ class MockElement {
         this.style = { display: '' };
         this.listeners = {};
         this.children = [];
+        this.attributes = new Map();
+        this.options = [];
         this.classList = new MockClassList();
     }
     addEventListener(type, handler) {
@@ -39,6 +41,11 @@ class MockElement {
         this.children.push(child);
         return child;
     }
+    setAttribute(name, value) { this.attributes.set(name, String(value)); }
+    removeAttribute(name) { this.attributes.delete(name); }
+    getAttribute(name) { return this.attributes.get(name) ?? null; }
+    focus() { if (global.document) global.document.activeElement = this; }
+    querySelectorAll() { return []; }
     async click() {
         const results = (this.listeners.click || []).map(handler => handler({ target: this, preventDefault() {} }));
         await Promise.all(results);
@@ -55,6 +62,7 @@ class MockDocument {
         this.created = [];
         this.listeners = {};
         this.visibilityState = 'visible';
+        this.activeElement = null;
     }
     createElement(tagName) {
         const element = new MockElement('', tagName);
@@ -110,15 +118,18 @@ function createTranchenPageDom() {
     const doc = new MockDocument();
     [
         'activeProfileName',
+        'managerBackLink',
         'stats',
         'tranchenTable',
         'priceUpdateStatus',
         'tranchePersistenceStatus',
+        'profileValidationStatus',
         'trancheRecoveryActions',
         'corruptPayloadPreview',
         'modalTitle',
         'trancheModal',
         'trancheForm',
+        'trancheFormError',
         'name',
         'isin',
         'ticker',
@@ -147,7 +158,19 @@ function createTranchenPageDom() {
         const tagName = id.includes('Aktiv') || id.includes('Steuerfrei') || id.includes('Mode') || id.includes('Source') || id.includes('Enabled') ? 'select' : 'input';
         doc.register(new MockElement(id, tagName));
     });
+    doc.getElementById('category').value = 'equity';
+    doc.getElementById('type').value = 'aktien_neu';
+    doc.getElementById('type').options = ['aktien_alt', 'aktien_neu', 'anleihe', 'geldmarkt', 'gold']
+        .map(value => ({ value, disabled: false, hidden: false }));
     return doc;
+}
+
+async function waitFor(predicate, message, timeoutMs = 1500) {
+    const started = Date.now();
+    while (!predicate()) {
+        if (Date.now() - started > timeoutMs) throw new Error(message);
+        await new Promise(resolve => setTimeout(resolve, 20));
+    }
 }
 
 function installGlobals(documentRef, storageRef) {
@@ -374,7 +397,11 @@ async function runTranchenManagerPageTests() {
 
         failSave = true;
         doc.getElementById('profileTagesgeld').value = '777';
-        await doc.getElementById('profileTagesgeld').listeners.input[0]();
+        doc.getElementById('profileTagesgeld').listeners.input[0]();
+        await waitFor(
+            () => doc.getElementById('retryTrancheSaveBtn').hidden === false,
+            'Debounced profile flush rejection should expose retry'
+        );
         assertEqual(doc.getElementById('profileTagesgeld').value, 0, 'Profile flush rejection should restore confirmed visible value');
         assertEqual(adapterStore.has('profile_tagesgeld'), false, 'Profile flush rejection must not change adapter state');
         assertEqual(doc.getElementById('retryTrancheSaveBtn').hidden, false, 'Profile flush rejection should expose retry');
@@ -385,6 +412,80 @@ async function runTranchenManagerPageTests() {
         assertEqual(doc.getElementById('retryTrancheSaveBtn').hidden, true, 'Profile retry should clear pending action');
     }
     console.log('✓ flush failure recovery OK');
+
+    console.log('Test 6: profile input gate ignores invalid intermediates and commits only latest valid value');
+    {
+        const storageRef = createLocalStorageMock();
+        const doc = createTranchenPageDom();
+        installGlobals(doc, storageRef);
+        PersistenceFacade.resetPersistenceForTests();
+
+        await initTranchenManagerPage({ profileId: 'default' });
+        const input = doc.getElementById('profileTagesgeld');
+        input.value = '';
+        input.listeners.input[0]();
+        await new Promise(resolve => setTimeout(resolve, 350));
+        assertEqual(persistenceStorage.getItem('profile_tagesgeld'), null, 'Blank intermediate value must not be persisted');
+        assertEqual(doc.getElementById('profileValidationStatus').hidden, false, 'Invalid intermediate should be announced');
+
+        input.value = '100';
+        input.listeners.input[0]();
+        input.value = '200';
+        input.listeners.input[0]();
+        await waitFor(
+            () => persistenceStorage.getItem('profile_tagesgeld') === '200',
+            'Latest debounced profile value should be persisted'
+        );
+        assertEqual(persistenceStorage.getItem('profile_tagesgeld'), '200', 'Rapid input should commit only the latest complete value');
+        assertEqual(doc.getElementById('profileValidationStatus').hidden, true, 'Valid values should clear validation status');
+
+        input.value = '-5';
+        input.listeners.input[0]();
+        await new Promise(resolve => setTimeout(resolve, 350));
+        assertEqual(persistenceStorage.getItem('profile_tagesgeld'), '200', 'Negative input must leave confirmed state unchanged');
+    }
+    console.log('✓ profile validation and debounce gate OK');
+
+    console.log('Test 7: valid input queued during a slow flush is committed automatically');
+    {
+        const adapterStore = new Map();
+        let saveCalls = 0;
+        let releaseFirstSave;
+        const firstSaveGate = new Promise(resolve => { releaseFirstSave = resolve; });
+        const adapter = {
+            name: 'slow-profile-memory',
+            async open() {},
+            async loadAll() { return Object.fromEntries(adapterStore); },
+            async saveBatch(batch) {
+                saveCalls += 1;
+                if (saveCalls === 1) await firstSaveGate;
+                batch.deletes.forEach(key => adapterStore.delete(key));
+                batch.upserts.forEach(([key, value]) => adapterStore.set(key, String(value)));
+            }
+        };
+        const storageRef = createLocalStorageMock();
+        const doc = createTranchenPageDom();
+        installGlobals(doc, storageRef);
+        PersistenceFacade.resetPersistenceForTests(adapter);
+        await PersistenceFacade.init();
+        await initTranchenManagerPage({ profileId: 'default' });
+
+        const input = doc.getElementById('profileTagesgeld');
+        input.value = '100';
+        input.listeners.input[0]();
+        await waitFor(() => saveCalls === 1, 'First debounced profile flush should start');
+        input.value = '200';
+        input.listeners.input[0]();
+        await new Promise(resolve => setTimeout(resolve, 350));
+        releaseFirstSave();
+        await waitFor(
+            () => saveCalls >= 2 && adapterStore.get('profile_tagesgeld') === '200',
+            'Queued profile value should flush after the in-flight commit'
+        );
+        assertEqual(adapterStore.get('profile_tagesgeld'), '200', 'Queued profile value should become the confirmed value');
+        assertEqual(doc.getElementById('retryTrancheSaveBtn').hidden, true, 'Successful queued save should not require manual retry');
+    }
+    console.log('✓ slow-flush profile queue OK');
 
     console.log('✅ Tranchen manager page contract validated');
     console.log('--- Tranchen Manager Page Tests Completed ---');

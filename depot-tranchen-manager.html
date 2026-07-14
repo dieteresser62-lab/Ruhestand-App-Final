@@ -19,12 +19,33 @@
         }
 
         .container {
+            width: 100%;
+            min-width: 0;
             max-width: 1400px;
             margin: 0 auto;
             background: white;
             border-radius: 12px;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
             padding: 30px;
+        }
+
+        .manager-navigation {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .manager-back-link {
+            color: #4c51bf;
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .manager-back-link:hover,
+        .manager-back-link:focus-visible {
+            text-decoration: underline;
         }
 
         h1 {
@@ -157,6 +178,20 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
 
+        button:focus-visible,
+        a:focus-visible,
+        [tabindex="0"]:focus-visible {
+            outline: 3px solid #2b6cb0;
+            outline-offset: 3px;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+            transform: none;
+            box-shadow: none;
+        }
+
         .btn-primary {
             background: #667eea;
             color: white;
@@ -185,6 +220,7 @@
         }
 
         .profile-values {
+            min-width: 0;
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 12px;
@@ -205,6 +241,17 @@
             margin: 0;
         }
 
+        .profile-validation-status {
+            grid-column: 1 / -1;
+            color: #9b2c2c;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .profile-validation-status[hidden] {
+            display: none;
+        }
+
         .profile-values small {
             color: #718096;
             font-size: 12px;
@@ -212,6 +259,7 @@
 
         .gold-row,
         .health-bucket-row {
+            min-width: 0;
             grid-column: 1 / -1;
             display: grid;
             grid-template-columns: repeat(5, minmax(140px, 1fr));
@@ -246,8 +294,34 @@
 
         table {
             width: 100%;
+            min-width: 1080px;
             border-collapse: collapse;
+            margin: 0;
+        }
+
+        #tranchenTable {
+            min-width: 0;
+        }
+
+        .table-scroll {
+            max-width: 100%;
+            overflow-x: auto;
+            overscroll-behavior-inline: contain;
             margin-bottom: 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+        }
+
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
         }
 
         th, td {
@@ -296,6 +370,17 @@
             color: #1976d2;
         }
 
+        .badge-gold {
+            background: #fff8dc;
+            color: #8a6116;
+        }
+
+        .classification-category {
+            display: inline-block;
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+
         .badge-steuerfrei {
             background: #f3e5f5;
             color: #7b1fa2;
@@ -336,6 +421,25 @@
             width: 90%;
             max-height: 90vh;
             overflow-y: auto;
+        }
+
+        .form-error {
+            margin: 12px 0 18px;
+            padding: 12px;
+            border: 1px solid #feb2b2;
+            border-radius: 6px;
+            background: #fff5f5;
+            color: #9b2c2c;
+            font-weight: 600;
+        }
+
+        .form-error[hidden] {
+            display: none;
+        }
+
+        [aria-invalid="true"] {
+            border-color: #c53030 !important;
+            box-shadow: 0 0 0 3px rgba(197, 48, 48, 0.15) !important;
         }
 
         .form-group {
@@ -386,6 +490,16 @@
             background: #e53e3e;
         }
 
+        .table-actions {
+            white-space: nowrap;
+        }
+
+        .icon-action {
+            padding: 6px 10px;
+            font-size: 12px;
+            margin-right: 5px;
+        }
+
         .empty-state {
             text-align: center;
             padding: 60px 20px;
@@ -407,10 +521,51 @@
             font-size: 12px;
             margin-top: 10px;
         }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 8px;
+            }
+
+            .container {
+                padding: 16px;
+                border-radius: 8px;
+            }
+
+            h1 {
+                font-size: 23px;
+            }
+
+            .manager-navigation,
+            .controls,
+            .form-actions {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .profile-values,
+            .gold-row,
+            .health-bucket-row {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .stat-card {
+                padding: 16px;
+            }
+
+            .modal-content {
+                width: calc(100% - 16px);
+                padding: 18px;
+                max-height: calc(100vh - 16px);
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <nav class="manager-navigation" aria-label="Manager-Navigation">
+            <a id="managerBackLink" class="manager-back-link" href="index.html">← Zurück zur Profilübersicht</a>
+        </nav>
         <h1>📊 Profil-Assets Manager</h1>
         <p class="subtitle">Verwalten Sie Tranchen, Tagesgeld und Rente pro Profil fuer praezise Planung</p>
 
@@ -421,7 +576,7 @@
             <button id="clearTranchesBtn" class="btn-danger">🗑️ Alle löschen</button>
         </div>
 
-        <div id="priceUpdateStatus" class="hint"></div>
+        <div id="priceUpdateStatus" class="hint" role="status" aria-live="polite"></div>
 
         <section class="persistence-panel" aria-labelledby="tranchePersistenceStatus">
             <div id="tranchePersistenceStatus" class="persistence-status" role="status" aria-live="polite"></div>
@@ -441,14 +596,15 @@
 
         <div class="profile-values">
             <h3>Profilwerte: <span id="activeProfileName">-</span></h3>
+            <div id="profileValidationStatus" class="profile-validation-status" role="alert" aria-live="assertive" hidden></div>
             <div class="form-group">
                 <label for="profileTagesgeld">Tagesgeld (€)</label>
-                <input type="number" id="profileTagesgeld" step="1" min="0" placeholder="0">
+                <input type="number" id="profileTagesgeld" step="1" min="0" placeholder="0" required>
                 <small>Wird in der Balance-App als Tagesgeld genutzt.</small>
             </div>
             <div class="form-group">
                 <label for="profileAlter">Aktuelles Alter</label>
-                <input type="number" id="profileAlter" step="1" min="0" placeholder="0">
+                <input type="number" id="profileAlter" step="1" min="0" placeholder="0" required>
                 <small>Wird in Balance automatisch verwendet.</small>
             </div>
             <div class="form-group">
@@ -461,12 +617,12 @@
             </div>
             <div class="form-group">
                 <label for="profileRenteMonatlich">Monatliche Rente (Netto, €)</label>
-                <input type="number" id="profileRenteMonatlich" step="1" min="0" placeholder="0">
+                <input type="number" id="profileRenteMonatlich" step="1" min="0" placeholder="0" required>
                 <small>Wird mit sonstigen Einkuenften summiert.</small>
             </div>
             <div class="form-group">
                 <label for="profileSonstigeEinkuenfte">Sonstige Einkuenfte (Monat, €)</label>
-                <input type="number" id="profileSonstigeEinkuenfte" step="1" min="0" placeholder="0">
+                <input type="number" id="profileSonstigeEinkuenfte" step="1" min="0" placeholder="0" required>
                 <small>Gehalt, Unterhalt, sonstige Zufluesse.</small>
             </div>
             <div class="gold-row">
@@ -480,15 +636,15 @@
                 </div>
                 <div class="form-group">
                     <label for="profileGoldZiel">Gold Ziel-Anteil (%)</label>
-                    <input type="number" id="profileGoldZiel" step="0.1" min="0" max="100" placeholder="7.5">
+                    <input type="number" id="profileGoldZiel" step="0.1" min="0" max="100" placeholder="7.5" required>
                 </div>
                 <div class="form-group">
                     <label for="profileGoldFloor">Gold Floor-Anteil (%)</label>
-                    <input type="number" id="profileGoldFloor" step="0.1" min="0" max="100" placeholder="1">
+                    <input type="number" id="profileGoldFloor" step="0.1" min="0" max="100" placeholder="1" required>
                 </div>
                 <div class="form-group">
                     <label for="profileGoldBand">Rebal. Band (%)</label>
-                    <input type="number" id="profileGoldBand" step="0.1" min="0" max="100" placeholder="25">
+                    <input type="number" id="profileGoldBand" step="0.1" min="0" max="100" placeholder="25" required>
                 </div>
                 <div class="form-group">
                     <label for="profileGoldSteuerfrei">Gold-Verkaeufe steuerfrei</label>
@@ -509,7 +665,7 @@
                 </div>
                 <div class="form-group">
                     <label for="profileHealthBucketInitialAmount">Zielbetrag (€)</label>
-                    <input type="number" id="profileHealthBucketInitialAmount" step="1000" min="0" placeholder="150000">
+                    <input type="number" id="profileHealthBucketInitialAmount" step="1000" min="0" placeholder="150000" required>
                     <small>Diagnostisch inflationsindexiert, nominal gehalten.</small>
                 </div>
                 <div class="form-group">
@@ -564,9 +720,10 @@
     </div>
 
     <!-- Modal für Tranche hinzufügen/bearbeiten -->
-    <div class="modal" id="trancheModal">
-        <div class="modal-content">
+    <div class="modal" id="trancheModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="trancheFormError" aria-hidden="true">
+        <div class="modal-content" role="document">
             <h2 id="modalTitle">Neue Tranche hinzufügen</h2>
+            <div id="trancheFormError" class="form-error" role="alert" aria-live="assertive" hidden></div>
             <form id="trancheForm">
                 <div class="form-group">
                     <label for="name">Name / Bezeichnung *</label>
@@ -588,17 +745,17 @@
 
                 <div class="form-group">
                     <label for="shares">Anzahl Stücke *</label>
-                    <input type="number" id="shares" step="0.001" required>
+                    <input type="number" id="shares" step="any" min="0.000001" required>
                 </div>
 
                 <div class="form-group">
                     <label for="purchasePrice">Kaufpreis pro Stück (€) *</label>
-                    <input type="number" id="purchasePrice" step="0.01" required>
+                    <input type="number" id="purchasePrice" step="any" min="0.000001" required>
                 </div>
 
                 <div class="form-group">
                     <label for="currentPrice">Aktueller Kurs (€)</label>
-                    <input type="number" id="currentPrice" step="0.01">
+                    <input type="number" id="currentPrice" step="any" min="0.000001">
                 </div>
 
                 <div class="form-group">
@@ -629,7 +786,7 @@
 
                 <div class="form-group">
                     <label for="tqf">Teilfreistellung / Steuerfreiheit (0.0 = voll steuerpflichtig, 1.0 = steuerfrei)</label>
-                    <input type="number" id="tqf" step="0.01" min="0" max="1" value="0.30">
+                    <input type="number" id="tqf" step="0.01" min="0" max="1" value="0.30" required>
                     <small style="color: #718096; display: block; margin-top: 5px;">
                         0.30 = 30% Teilfreistellung (Standard Aktienfonds)<br>
                         1.0 = 100% steuerfrei (Altbestand vor 2009)

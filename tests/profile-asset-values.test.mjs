@@ -3,7 +3,10 @@
 import {
     loadProfileAssetValues,
     normalizeProfileAssetValues,
-    saveProfileAssetValues
+    ProfileAssetValuesValidationError,
+    readProfileAssetValuesFromDom,
+    saveProfileAssetValues,
+    validateProfileAssetValues
 } from '../app/profile/profile-asset-values.js';
 import { CONFIG } from '../app/balance/balance-config.js';
 
@@ -99,3 +102,75 @@ console.log('Test 3: save writes normalized profile keys');
     assertEqual(healthBucket.initialAmount, 150000, 'Health bucket amount should be stored');
 }
 console.log('✓ save writes normalized profile keys OK');
+
+function createValidProfileValues() {
+    return {
+        tagesgeld: '30000',
+        renteMonatlich: '800',
+        sonstigeEinkuenfte: '200',
+        alter: '67',
+        goldAktiv: 'true',
+        goldZiel: '7.5',
+        goldFloor: '1',
+        goldBand: '25',
+        goldSteuerfrei: 'false',
+        healthBucket: {
+            enabled: 'true',
+            initialAmount: '150000',
+            assetSource: 'money_market_first_then_cash',
+            triggerMinGrade: '4',
+            triggerMode: 'OR',
+            coverageMode: 'care_additional_floor_only',
+            returnMode: 'cash_return',
+            targetMode: 'inflation_indexed_diagnostic'
+        }
+    };
+}
+
+console.log('Test 4: strict validation rejects negative, blank and non-finite inputs');
+{
+    for (const [field, value] of [['tagesgeld', '-1'], ['alter', ''], ['goldZiel', 'Infinity']]) {
+        let error = null;
+        try {
+            validateProfileAssetValues({ ...createValidProfileValues(), [field]: value });
+        } catch (caught) {
+            error = caught;
+        }
+        assert(error instanceof ProfileAssetValuesValidationError, `${field} should fail strict validation`);
+        assert(error.errors.some(item => item.field === field), `${field} should retain field context`);
+    }
+}
+console.log('✓ strict profile validation OK');
+
+console.log('Test 5: DOM reader rejects an intermediate blank without producing NaN defaults');
+{
+    const values = createValidProfileValues();
+    const byId = {
+        profileTagesgeld: values.tagesgeld,
+        profileRenteMonatlich: '',
+        profileSonstigeEinkuenfte: values.sonstigeEinkuenfte,
+        profileAlter: values.alter,
+        profileGoldAktiv: values.goldAktiv,
+        profileGoldZiel: values.goldZiel,
+        profileGoldFloor: values.goldFloor,
+        profileGoldBand: values.goldBand,
+        profileGoldSteuerfrei: values.goldSteuerfrei,
+        profileHealthBucketEnabled: values.healthBucket.enabled,
+        profileHealthBucketInitialAmount: values.healthBucket.initialAmount,
+        profileHealthBucketAssetSource: values.healthBucket.assetSource,
+        profileHealthBucketTriggerMinGrade: values.healthBucket.triggerMinGrade,
+        profileHealthBucketTriggerMode: values.healthBucket.triggerMode,
+        profileHealthBucketCoverageMode: values.healthBucket.coverageMode,
+        profileHealthBucketReturnMode: values.healthBucket.returnMode,
+        profileHealthBucketTargetMode: values.healthBucket.targetMode
+    };
+    let error = null;
+    try {
+        readProfileAssetValuesFromDom({ getElementById: id => ({ value: byId[id] }) });
+    } catch (caught) {
+        error = caught;
+    }
+    assert(error instanceof ProfileAssetValuesValidationError, 'Intermediate blank should block the DOM read');
+    assert(error.errors.some(item => item.field === 'renteMonatlich'), 'Blank field should be identified');
+}
+console.log('✓ intermediate DOM input validation OK');

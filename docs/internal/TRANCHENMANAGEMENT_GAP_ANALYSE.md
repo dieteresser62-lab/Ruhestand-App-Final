@@ -167,8 +167,27 @@ Damit ist TM-01 kein theoretisches Risiko. Die Behebung verändert das Verhalten
   sind idempotent. Abschluss-E2E und querschnittlicher Dispose-Nachweis bleiben
   wie geplant in Slice 09.
 - Verifikation: 104 Node-Testdateien mit 4082/4082 Assertions, 0 Fehlern und
-  0 offenen Handles sowie elf grüne Browser-Smoke-Szenarien. Die Umsetzung ist
-  noch nicht adversarial reviewed oder freigegeben.
+  0 offenen Handles sowie elf grüne Browser-Smoke-Szenarien. Slice 03 ist durch
+  Gemini und Nutzer freigegeben und als Commit `13328fa` vorhanden.
+
+### Rückdokumentation Slice 04
+
+- TM-18 ist implementiert: Profilwerte werden vollständig und streng auf endliche,
+  nichtnegative Zahlen beziehungsweise bestehende Prozent-/Enum-Grenzen geprüft.
+  Ein 300-ms-Debounce und eine serielle Queue verhindern Tastatur-Zwischenstände,
+  `NaN`-Fallbacks, Flush pro Tastendruck und Verlust des jüngsten gültigen Werts.
+- Der Slice-04-Anteil von TM-20 ist implementiert: Das Modal besitzt Dialogrolle,
+  zugänglichen Namen, initialen Fokus, Fokusfalle, Escape und Fokus-Rückgabe. Fehler-
+  und Save-Status sind Live-Regionen; Icon-Aktionen haben eindeutige Namen.
+- Kategorie und Typ bieten nur kanonische Paare an. Gold wird als Gold ausgewiesen,
+  negative Renditen enthalten kein `+-`, und ein leerer Bestand behauptet keine
+  aktive FIFO-Verarbeitung.
+- Rücklink und Profilkennung beziehen sich auf dasselbe tatsächlich geladene Profil.
+  Bei 390 CSS-Pixeln bleibt der Dokument-Viewport overflowfrei; die breite Tabelle
+  bewegt sich nur innerhalb des beschrifteten Tabellencontainers.
+- Verifikation: 104 Node-Testdateien mit 4117/4117 Assertions, 0 Fehlern und
+  0 offenen Handles sowie elf grüne Browser-Smoke-Szenarien. Review und Freigabe
+  von Slice 04 stehen aus; der Statusvorzeichen-Anteil von TM-20 folgt in Slice 06.
 
 Diese Tests werden erweitert oder als Regression-Gates verwendet; parallele Test-Doppelungen sind nicht vorgesehen.
 
@@ -241,7 +260,7 @@ Der Blockstatus wird nicht durch Codex aufgehoben; Gemini-Nachreview und Claude-
 
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
 | --- | --- | --- | --- | --- |
-| G-01 | Gemini | Corrupt und transiente Persistenzfehler trennen | angenommen | Slice 03 implementiert und technisch validiert; Review ausstehend |
+| G-01 | Gemini | Corrupt und transiente Persistenzfehler trennen | angenommen | Slice 03 freigegeben und als Commit `13328fa` vorhanden |
 | G-02 | Gemini | Deep-Copy-Garantie für Simulator-Lots | angenommen | Slice 07 konkretisiert; Code ausstehend |
 | G-03 | Gemini | Sichtbares Feedback für abgelehnte Quotes | angenommen | O-03/O-05 und Slice 05 konkretisiert; Code ausstehend |
-| G-04 | Gemini | Strukturierte Engine-Validierungsfehler in der UI | angenommen | Slices 02/04 konkretisiert; Code ausstehend |
+| G-04 | Gemini | Strukturierte Engine-Validierungsfehler in der UI | angenommen | Contract in Slice 02 und blockierender Manager-UI-Pfad in Slice 04 implementiert; Review ausstehend |

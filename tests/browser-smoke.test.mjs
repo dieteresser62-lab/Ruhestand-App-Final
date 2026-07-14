@@ -405,9 +405,72 @@ async function runTranchesSmoke(browser, baseUrl) {
     const { page } = smoke;
     await page.locator('h1').filter({ hasText: 'Profil-Assets Manager' }).waitFor({ state: 'visible' });
     await page.locator('#tranchenTable').waitFor({ state: 'visible' });
+    assert(!(await page.locator('#tranchenTable').textContent()).includes('FIFO aktiv'), 'Leerer Manager darf FIFO nicht als aktiv melden');
+    const profileContext = await page.evaluate(() => ({
+        label: document.getElementById('activeProfileName')?.dataset.profileId,
+        back: document.getElementById('managerBackLink')?.dataset.profileId
+    }));
+    assert(profileContext.label === profileContext.back, 'Rücknavigation und sichtbare Profilkennung müssen dasselbe Profil referenzieren');
+
     await page.locator('#addTrancheBtn').click();
     await page.locator('#trancheModal.active').waitFor({ state: 'visible' });
     await page.locator('#modalTitle').filter({ hasText: 'Neue Tranche' }).waitFor({ state: 'visible' });
+    assert(await page.locator('#trancheModal').getAttribute('role') === 'dialog', 'Editor muss als Dialog ausgezeichnet sein');
+    assert(await page.locator('#trancheModal').getAttribute('aria-modal') === 'true', 'Editor muss modal ausgezeichnet sein');
+    assert(await page.evaluate(() => document.activeElement?.id) === 'name', 'Dialog muss den initialen Fokus auf den Namen setzen');
+    await page.keyboard.press('Shift+Tab');
+    assert(await page.evaluate(() => document.activeElement?.textContent?.trim()) === 'Speichern', 'Fokusfalle muss rückwärts zum letzten Dialogelement springen');
+    await page.keyboard.press('Escape');
+    assert(await page.evaluate(() => document.activeElement?.id) === 'addTrancheBtn', 'Escape muss Fokus an den Auslöser zurückgeben');
+
+    await page.locator('#addTrancheBtn').click();
+    await page.locator('#name').fill('Gold Reserve');
+    await page.locator('#shares').fill('-1');
+    await page.locator('#purchasePrice').fill('100');
+    await page.locator('#currentPrice').fill('90');
+    await page.locator('#category').selectOption('gold');
+    await page.locator('#tqf').fill('1');
+    const typeState = await page.locator('#type').evaluate(select => ({
+        value: select.value,
+        enabled: Array.from(select.options).filter(option => !option.disabled && !option.hidden).map(option => option.value)
+    }));
+    assert(typeState.value === 'gold' && typeState.enabled.join(',') === 'gold', 'Gold darf nur mit kanonischem Gold-Typ angeboten werden');
+    await page.locator('#trancheForm').evaluate(form => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    await page.locator('#trancheFormError').filter({ hasText: 'Stückzahl' }).waitFor({ state: 'visible' });
+
+    await page.locator('#shares').fill('2');
+    await page.locator('#trancheForm button[type="submit"]').click();
+    const row = page.locator('.tranche-row');
+    await row.filter({ hasText: 'Gold Reserve' }).waitFor({ state: 'visible' });
+    const rowText = await row.textContent();
+    assert(rowText.includes('Gold-ETC') && !rowText.includes('Geldmarkt'), 'Gold muss in der Tabelle als Gold klassifiziert sein');
+    assert(await row.locator('[data-action="edit-tranche"]').getAttribute('aria-label'), 'Edit-Icon benötigt einen zugänglichen Namen');
+    assert(await row.locator('[data-action="delete-tranche"]').getAttribute('aria-label'), 'Delete-Icon benötigt einen zugänglichen Namen');
+
+    const beforeEditRow = await readIndexedDb(page, 'kv', 'depot_tranchen');
+    const beforeEditId = JSON.parse(beforeEditRow.value)[0].trancheId;
+    await row.locator('[data-action="edit-tranche"]').click();
+    await page.locator('#currentPrice').fill('95');
+    await page.locator('#trancheForm button[type="submit"]').click();
+    await page.locator('#tranchePersistenceStatus').filter({ hasText: 'aktualisiert' }).waitFor();
+    const afterEditRow = await readIndexedDb(page, 'kv', 'depot_tranchen');
+    const afterEditId = JSON.parse(afterEditRow.value)[0].trancheId;
+    assert(afterEditId === beforeEditId, 'Editieren muss die Tranche-ID stabil halten');
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const mobileLayout = await page.evaluate(() => {
+        const scroller = document.querySelector('.table-scroll');
+        return {
+            documentWidth: document.documentElement.scrollWidth,
+            viewportWidth: document.documentElement.clientWidth,
+            tableScrolls: Boolean(scroller && scroller.scrollWidth > scroller.clientWidth)
+        };
+    });
+    assert(mobileLayout.documentWidth <= mobileLayout.viewportWidth, `390px-Viewport darf Dokument nicht horizontal überlaufen: ${JSON.stringify(mobileLayout)}`);
+    assert(mobileLayout.tableScrolls, 'Erforderliche Tabellenbewegung muss im Tabellencontainer liegen');
+
+    await page.locator('[data-action="delete-tranche"]').click();
+    await page.locator('#tranchenTable').filter({ hasText: 'Keine Tranchen vorhanden' }).waitFor();
     smoke.assertNoErrors();
     await smoke.close();
 }

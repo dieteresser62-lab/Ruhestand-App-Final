@@ -15,8 +15,10 @@ import {
 import {
     applyProfileAssetValuesToDom,
     loadProfileAssetValues,
+    ProfileAssetValuesValidationError,
     readProfileAssetValuesFromDom,
-    saveProfileAssetValues
+    saveProfileAssetValues,
+    validateProfileAssetValues
 } from '../profile/profile-asset-values.js';
 import {
     calculateTrancheDerivedValues,
@@ -27,10 +29,14 @@ import {
 import { renderTranchenStats, renderTranchenTable } from './tranchen-manager-renderer.js';
 import { checkProxyHealth, fetchProxyPrice, fetchProxySymbol, LOCAL_YAHOO_PROXY } from './tranchen-price-service.js';
 import {
+    bindTrancheModalLifecycle,
+    clearTrancheFormError,
     closeTrancheModal,
+    formatTrancheValidationError,
     openCreateTrancheModal,
     openEditTrancheModal,
-    readTrancheFromForm
+    readTrancheFromForm,
+    showTrancheFormError
 } from './tranchen-manager-modal.js';
 import { PersistenceFacade, persistenceStorage } from '../shared/persistence-facade.js';
 
@@ -45,6 +51,7 @@ const state = {
     pendingCommit: null,
     profileCommitInFlight: false,
     pendingProfileValues: null,
+    profileSaveTimer: null,
     persistenceMessage: '',
     persistenceError: '',
     rawRevealed: false,
@@ -52,6 +59,8 @@ const state = {
     boundDocument: null,
     loader: loadTranchesFromStorage
 };
+
+const PROFILE_SAVE_DEBOUNCE_MS = 300;
 
 const PROFILE_INPUT_IDS = [
     'profileTagesgeld',
@@ -77,6 +86,26 @@ const PROFILE_ASSET_STORAGE_KEYS = [
     ...Object.values(PROFILE_VALUE_KEYS),
     PROFILE_HEALTH_BUCKET_KEY
 ];
+
+const PROFILE_ERROR_DOM_IDS = Object.freeze({
+    tagesgeld: 'profileTagesgeld',
+    renteMonatlich: 'profileRenteMonatlich',
+    sonstigeEinkuenfte: 'profileSonstigeEinkuenfte',
+    alter: 'profileAlter',
+    goldAktiv: 'profileGoldAktiv',
+    goldZiel: 'profileGoldZiel',
+    goldFloor: 'profileGoldFloor',
+    goldBand: 'profileGoldBand',
+    goldSteuerfrei: 'profileGoldSteuerfrei',
+    'healthBucket.enabled': 'profileHealthBucketEnabled',
+    'healthBucket.initialAmount': 'profileHealthBucketInitialAmount',
+    'healthBucket.assetSource': 'profileHealthBucketAssetSource',
+    'healthBucket.triggerMinGrade': 'profileHealthBucketTriggerMinGrade',
+    'healthBucket.triggerMode': 'profileHealthBucketTriggerMode',
+    'healthBucket.coverageMode': 'profileHealthBucketCoverageMode',
+    'healthBucket.returnMode': 'profileHealthBucketReturnMode',
+    'healthBucket.targetMode': 'profileHealthBucketTargetMode'
+});
 
 function byId(id) {
     return document.getElementById(id);
@@ -117,6 +146,29 @@ function setPersistenceStatus(message, kind = '') {
     if (!target) return;
     target.textContent = message;
     target.dataset.kind = kind;
+}
+
+function clearProfileValidationStatus() {
+    const status = byId('profileValidationStatus');
+    if (status) {
+        status.textContent = '';
+        status.hidden = true;
+    }
+    Object.values(PROFILE_ERROR_DOM_IDS).forEach(id => byId(id)?.removeAttribute?.('aria-invalid'));
+}
+
+function showProfileValidationStatus(error) {
+    clearProfileValidationStatus();
+    const first = error?.errors?.[0];
+    const status = byId('profileValidationStatus');
+    const message = first?.message || 'Die Profilwerte sind unvollständig oder ungültig.';
+    if (status) {
+        status.textContent = `Profilwerte nicht gespeichert: ${message}`;
+        status.hidden = false;
+    }
+    const field = first ? byId(PROFILE_ERROR_DOM_IDS[first.field]) : null;
+    field?.setAttribute?.('aria-invalid', 'true');
+    return message;
 }
 
 function processingIsBlocked() {
@@ -208,35 +260,50 @@ function updateActiveProfileLabel(profileId = state.profileId) {
     const id = profileId || '-';
     label.textContent = `${meta?.name || id} (${id})`;
     label.dataset.profileId = id;
+    const backLink = byId('managerBackLink');
+    if (backLink) {
+        backLink.dataset.profileId = id;
+        backLink.setAttribute?.('aria-label', `Zurück zur Profilübersicht für ${meta?.name || id} (${id})`);
+    }
 }
 
 async function saveProfileValues(values = readProfileAssetValuesFromDom()) {
+    let validatedValues;
+    try {
+        validatedValues = validateProfileAssetValues(values);
+        clearProfileValidationStatus();
+    } catch (error) {
+        if (error instanceof ProfileAssetValuesValidationError) showProfileValidationStatus(error);
+        return false;
+    }
     if (state.profileCommitInFlight) {
-        state.pendingProfileValues = values;
+        state.pendingProfileValues = validatedValues;
         return false;
     }
     if (state.commitInFlight || state.loadStatus === 'corrupt' || state.loadStatus === 'unavailable') return false;
 
+    state.pendingProfileValues = null;
     const previousValues = new Map(PROFILE_ASSET_STORAGE_KEYS.map(key => [key, readStoredValue(key)]));
     const previousRegistryRaw = readStoredValue(PROFILE_STORAGE_KEYS.registry);
     state.profileCommitInFlight = true;
     state.persistenceMessage = '';
     state.persistenceError = '';
+    let succeeded = false;
     renderPersistenceState();
 
     try {
-        saveProfileAssetValues(values);
+        saveProfileAssetValues(validatedValues);
         if (!saveCurrentProfileFromLocalStorage()) {
             throw new Error('PROFILE_SAVE_FAILED');
         }
         await PersistenceFacade.flush();
-        state.pendingProfileValues = null;
         state.persistenceMessage = 'Profilwerte dauerhaft gespeichert.';
+        succeeded = true;
         return true;
     } catch {
         previousValues.forEach((value, key) => restoreStoredValue(key, value));
         restoreStoredValue(PROFILE_STORAGE_KEYS.registry, previousRegistryRaw);
-        state.pendingProfileValues = values;
+        state.pendingProfileValues = validatedValues;
         state.persistenceError = 'Profilwerte konnten nicht dauerhaft gespeichert werden. Der bestätigte Stand wurde wiederhergestellt; Retry ist möglich.';
         try {
             applyProfileAssetValuesToDom(loadProfileAssetValues());
@@ -246,8 +313,37 @@ async function saveProfileValues(values = readProfileAssetValuesFromDom()) {
         return false;
     } finally {
         state.profileCommitInFlight = false;
+        const queuedValues = succeeded ? state.pendingProfileValues : null;
+        if (queuedValues) state.pendingProfileValues = null;
         renderPersistenceState();
+        if (queuedValues) queueMicrotask(() => void saveProfileValues(queuedValues));
     }
+}
+
+function scheduleProfileValuesSave() {
+    if (state.profileSaveTimer !== null) {
+        clearTimeout(state.profileSaveTimer);
+        state.profileSaveTimer = null;
+    }
+
+    let values;
+    try {
+        values = readProfileAssetValuesFromDom();
+        clearProfileValidationStatus();
+    } catch (error) {
+        if (error instanceof ProfileAssetValuesValidationError) {
+            showProfileValidationStatus(error);
+            state.pendingProfileValues = null;
+            renderPersistenceState();
+        }
+        return false;
+    }
+
+    state.profileSaveTimer = setTimeout(() => {
+        state.profileSaveTimer = null;
+        void saveProfileValues(values);
+    }, PROFILE_SAVE_DEBOUNCE_MS);
+    return true;
 }
 
 function bindProfileValueInputs() {
@@ -256,25 +352,25 @@ function bindProfileValueInputs() {
         if (!el) return;
         const eventName = el.tagName.toLowerCase() === 'select' ? 'change' : 'input';
         el.addEventListener(eventName, () => {
-            const savePromise = saveProfileValues();
+            const scheduled = scheduleProfileValuesSave();
             renderTranchenStats(byId('stats'), state.tranchen);
-            return savePromise;
+            return scheduled;
         });
     });
 }
 
-function addTranche() {
+function addTranche(event) {
     if (processingIsBlocked()) return;
     state.editingIndex = -1;
-    openCreateTrancheModal();
+    openCreateTrancheModal(document, event?.currentTarget || event?.target || null);
 }
 
-function editTranche(index) {
+function editTranche(index, opener = null) {
     if (processingIsBlocked()) return;
     state.editingIndex = index;
     const tranche = state.tranchen[index];
     if (!tranche) return;
-    openEditTrancheModal(tranche);
+    openEditTrancheModal(tranche, document, opener);
 }
 
 async function persistTranchen(nextTranches, options = {}) {
@@ -290,8 +386,10 @@ async function persistTranchen(nextTranches, options = {}) {
     let normalized;
     try {
         normalized = normalizeTranches(nextTranches);
-    } catch {
-        state.persistenceError = 'Die Änderung verletzt den Tranchenvertrag und wurde nicht gespeichert.';
+    } catch (error) {
+        const detail = formatTrancheValidationError(error);
+        state.persistenceError = `Die Änderung verletzt den Tranchenvertrag und wurde nicht gespeichert. ${detail}`;
+        if (byId('trancheModal')?.classList?.contains?.('active')) showTrancheFormError(error);
         renderPersistenceState();
         return false;
     }
@@ -343,7 +441,9 @@ async function persistTranchen(nextTranches, options = {}) {
 
 async function deleteTranche(index) {
     if (processingIsBlocked()) return;
-    if (!confirm('Tranche wirklich löschen?')) return;
+    const tranche = state.tranchen[index];
+    if (!tranche) return;
+    if (!confirm(`Tranche „${tranche.name || tranche.trancheId}“ wirklich dauerhaft löschen?`)) return;
     const nextTranches = state.tranchen.filter((_, itemIndex) => itemIndex !== index);
     await persistTranchen(nextTranches, { successMessage: 'Tranche dauerhaft gelöscht.' });
 }
@@ -351,11 +451,22 @@ async function deleteTranche(index) {
 async function saveTranche(event) {
     event.preventDefault();
     if (processingIsBlocked()) return;
+    clearTrancheFormError();
 
     const existingId = (state.editingIndex >= 0 && state.tranchen[state.editingIndex])
         ? state.tranchen[state.editingIndex].trancheId
         : null;
-    const tranche = readTrancheFromForm(existingId);
+    let tranche;
+    try {
+        tranche = readTrancheFromForm(existingId, document, {
+            existingIds: state.tranchen.map(item => item.trancheId)
+        });
+    } catch (error) {
+        showTrancheFormError(error);
+        state.persistenceError = `Tranche nicht gespeichert. ${formatTrancheValidationError(error)}`;
+        renderPersistenceState();
+        return false;
+    }
     const nextTranches = [...state.tranchen];
 
     if (state.editingIndex >= 0) {
@@ -364,7 +475,7 @@ async function saveTranche(event) {
         nextTranches.push(tranche);
     }
 
-    await persistTranchen(nextTranches, {
+    return persistTranchen(nextTranches, {
         successMessage: existingId ? 'Tranche dauerhaft aktualisiert.' : 'Tranche dauerhaft angelegt.',
         onSuccess: () => closeTrancheModal()
     });
@@ -531,6 +642,7 @@ async function retryPendingCommit() {
 }
 
 function bindControls() {
+    bindTrancheModalLifecycle();
     byId('addTrancheBtn')?.addEventListener('click', addTranche);
     byId('updatePricesBtn')?.addEventListener('click', () => updatePrices());
     byId('proxyHealthBtn')?.addEventListener('click', () => checkProxyHealth(byId('priceUpdateStatus')));
@@ -548,7 +660,7 @@ function bindControls() {
         if (!target) return;
         const index = Number(target.dataset.index);
         if (!Number.isFinite(index)) return;
-        if (target.dataset.action === 'edit-tranche') editTranche(index);
+        if (target.dataset.action === 'edit-tranche') editTranche(index, target);
         if (target.dataset.action === 'delete-tranche') void deleteTranche(index);
     });
 
@@ -577,6 +689,7 @@ function resolveActiveProfileId(explicitProfileId) {
 }
 
 function resetRuntimeState(profileId) {
+    if (state.profileSaveTimer !== null) clearTimeout(state.profileSaveTimer);
     state.tranchen = [];
     state.confirmedTranches = [];
     state.confirmedRaw = null;
@@ -587,6 +700,7 @@ function resetRuntimeState(profileId) {
     state.pendingCommit = null;
     state.profileCommitInFlight = false;
     state.pendingProfileValues = null;
+    state.profileSaveTimer = null;
     state.persistenceMessage = '';
     state.persistenceError = '';
     state.rawRevealed = false;
