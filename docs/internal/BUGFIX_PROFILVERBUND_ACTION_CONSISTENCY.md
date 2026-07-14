@@ -1,11 +1,12 @@
 # P0-Bugfix: Konsistente Profilverbund-Handlungsanweisungen
 
-**Geplanter Feature-Branch:** `codex/profilverbund-action-consistency`  
-**GitHub-Status:** Branch noch nicht angelegt oder veroeffentlicht  
-**Status:** Entwurf nach kritischem Review; erneutes Gemini-Review und Freigabe ausstehend
+**Umsetzungsbranch:** `codex/balance-app-hardening` (ausdrueckliche Nutzerfreigabe zur Umsetzung im bestehenden Entwicklungsbranch)
+**GitHub-Status:** kein neuer Bugfix-Branch; bestehender Entwicklungsbranch wird nicht ohne ausdrueckliche Nutzerfreigabe gepusht
+**Status:** Implementierung abgeschlossen; Implementierungsreview ausstehend
 **Prioritaet:** P0  
 **Ursprung:** Regression aus `SLICE_BALANCE_HARDENING_01_PROFILVERBUND_ALLOCATION.md`  
 **Umfang:** ein 1-basiertes Umsetzungspaket (`Paket 1`)
+**Umsetzungsslice:** `SLICE_PROFILVERBUND_ACTION_CONSISTENCY_01_HOUSEHOLD_ATTRIBUTION.md`
 
 ## Ziel
 
@@ -315,18 +316,22 @@ Da fachliche Transaktions- und Persistenzvertraege betroffen sind, ist `npm test
 
 **Planungsstand am 2026-07-14:**
 
-- aktiver Branch bei Dokumenterstellung: `codex/balance-app-hardening`;
-- vorgesehener Umsetzungsbranch: `codex/profilverbund-action-consistency`;
-- der Umsetzungsbranch ist noch nicht angelegt;
+- aktiver und durch den Nutzer ausdruecklich bestaetigter Umsetzungsbranch: `codex/balance-app-hardening`;
+- Abweichung von der regulaeren Branch-Regel: Auf ausdrueckliche Nutzeranweisung vom 2026-07-14 wird kein eigener Bugfix-Branch angelegt;
 - bestehende fremde Dateien: ungetrackte Playwright-Dateien unter `node_modules/`;
 - diese Dateien gehoeren nicht zum Bugfix und duerfen nicht veraendert, geloescht oder committed werden.
 
-Vor dem ersten Code-Edit sind auf dem Umsetzungsbranch erneut auszufuehren und hier zu dokumentieren:
+Vor dem ersten Code-Edit wurden erneut ausgefuehrt:
 
 ```powershell
 git branch --show-current
 git status --short
 ```
+
+Ergebnis am 2026-07-14:
+
+- Branch: `codex/balance-app-hardening`;
+- Status: ausschliesslich ungetrackte Playwright-Dateien unter `node_modules/`; keine getrackten Fremdaenderungen.
 
 **Geplante Dateien:** siehe vorlaeufiger Programm- und Dokumentations-Scope.  
 **Voraussichtliche Aenderungstiefe:** riskant, da reale Handlungsanweisungen, Steuern und Liquiditaetsdeckung betroffen sind.  
@@ -336,41 +341,55 @@ git status --short
 
 ## Durchgefuehrte Aenderungen
 
-Noch keine. Dieses Dokument beschreibt den P0-Bugfix vor Implementierungsbeginn.
+- `app/profile/profilverbund-balance.js` erzeugt aus vorhandenen und synthetischen Tranchen einen nicht mutierenden Haushaltspool mit eindeutiger `sourceProfileId`; Bonds bleiben als Assetklasse erhalten und fliessen in die kompatiblen Depotaggregate ein.
+- Das neue DOM-freie Modul `app/profile/profilverbund-action-attribution.js` attribuiert die einmal finalisierte Haushaltsaktion auf Profilquellen, reconciliert Quellen, Verwendungen und Steuer centgenau und bricht bei fehlender Provenienz oder Unterdeckung fail-closed ab. `tax_optimized` plant die benoetigten Verkaufsquellen global und mit den profilbezogenen Verlusttoepfen, Pauschbetraegen, Kirchensteuersaetzen und Tranchendaten neu; `proportional` und `runway_first` veraendern nur die Quellenattribution.
+- Verkaufstranchen werden mit ihrer Profilherkunft verarbeitet. `settleTaxYear()` laeuft anschliessend genau einmal je Profil auf dem final attribuierten Rohaggregat; Profile ohne Verkauf behalten ihren Verlustvortrag. Die verbindliche Haushaltssteuer ist die Summe dieser Profil-Settlements.
+- `app/balance/balance-main-profilverbund.js` verwendet nur noch einen Haushalts-Engine-Lauf. Technische Profil-Engine-Laeufe entfallen; Profilaktionen sind reine Attributionen der Haushaltsentscheidung.
+- 3-Bucket-Logik und Bond-Wiederauffuellung laufen im Profilverbund genau einmal vor der Attribution auf Haushaltsebene. `app/balance/balance-action-postprocessor.js` reicht dieses Ergebnis danach unveraendert weiter.
+- Die angezeigten Liquiditaets-KPIs und die zugehoerige Diagnose werden aus dem Cashflow der final attribuierten Aktion neu reconciliert. Persistiert werden der separate Haushalts-Guardrail-State und ausschliesslich die finalen profilbezogenen Steuerzustaende.
+- Die Contract- und Orchestrierungstests decken gegenlaeufige Profilaktionen, Gewinn/Verlust/Nullverkauf, Provenienzfehler, KPI-Reconciliation, einmalige 3-Bucket-Ausfuehrung und neutrale Haushaltsteuerpersistenz ab.
 
 ## Ausgefuehrte Tests mit Ergebnis
 
-Noch keine Implementierungstests. Die vorangegangene Diagnose zeigte, dass bestehende Tests die Summenverteilung pruefen, aber keine Haushalts-Action-Invariante fuer gegenlaeufige Profilaktionen besitzen.
+- `node tests/run-single.mjs tests/profilverbund-balance.test.mjs`: **91/91 bestanden**
+- `node tests/run-single.mjs tests/balance-ui-orchestration.test.mjs`: **123/123 bestanden**
+- `node tests/run-single.mjs tests/balance-decumulation.test.mjs`: **41/41 bestanden**
+- `npm test`: **103 Testdateien, 3399/3399 bestanden, 0 fehlgeschlagen, 0 offene Handles**
+- `npm run test:browser`: **11/11 Browserfaelle bestanden**
+- `git diff --check`: **ohne Befund**
 
 ## Abweichungen vom Plan
 
-Noch keine.
+- Auf ausdrueckliche Nutzeranweisung wurde kein separater Bugfix-Branch angelegt; die Umsetzung erfolgte im bestehenden Entwicklungsbranch `codex/balance-app-hardening`.
+- Das im Scope optionale DOM-freie Attributionsmodul wurde angelegt. Der bestaetigte Umfang von sieben Programmdateien wurde eingehalten.
+- `engine/`, `engine.js`, `dist/`, `RuheStandSuite.exe` und die bestehenden ungetrackten Playwright-Dateien unter `node_modules/` blieben unangetastet.
 
 ## Offene Risiken
 
-- Der bestehende Profilverbund-Pfad nutzt Profil-Engine-Laeufe zugleich fuer Transaktionsplanung, Steuerzustand und Persistenz. Die Korrektur muss diese Verantwortlichkeiten trennen, ohne Steuerhistorie zu verlieren.
-- Der vorlaeufige Haushalts-Steuerwert kann wegen profilbezogener Verlusttoepfe, Pauschbetraege und Kirchensteuer von der Summe der finalen Profilsteuern abweichen. Deshalb sind nur die final reconcilierten Profilsteuern fuer Anzeige und Persistenz verbindlich.
-- Haushaltsaktionen koennen neben Liquiditaet auch Gold, Aktien und Bonds als Zwecke enthalten. Die Attribution muss alle vorhandenen Zwecke erhalten.
-- Der aktuelle KPI `deckungNachher` wird vor dem spaeteren Ersetzen der Action berechnet. Eine reine Renderer-Korrektur wuerde die fachlich falsche Aktion nur kosmetisch kaschieren und ist unzulaessig.
-- Eine globale Steueroptimierung ueber Profilgrenzen darf keine implizite rechtliche Vermoegensuebertragung erfinden. Falls der bestehende Produktcontract hierzu keine eindeutige Aussage enthaelt, greift die Stop-Regel.
+- Die Quellenoptimierung minimiert deterministisch die aktuelle profilbezogene Steuer innerhalb der durch den Haushaltsplan vorgegebenen Assetklassen. Sie ist keine mehrjaehrige Steuer- oder Rechtsberatung; bei mehreren gleichzeitig verkauften Assetklassen bleibt deren Reihenfolge aus dem Haushaltsplan verbindlich.
+- Reichen die eindeutig einem Profil gehoerenden Tranchen auch nach der finalen Steuer-Neuplanung nicht aus, wird fail-closed abgebrochen, statt Vermoegen oder Quellen still zu erfinden.
+- Vermoegenszuordnung bleibt strikt bei der dokumentierten `sourceProfileId`. Der Fix erzeugt keine rechtliche Vermoegensuebertragung zwischen Profilen; eine fachlich gewuenschte Uebertragung muesste separat spezifiziert werden.
+- Synthetische Fallback-Tranchen besitzen nur aggregierte Einstandsdaten. Sie sichern Herkunft und Reconciliation, erreichen aber nicht die steuerliche Detailgenauigkeit echter gespeicherter Tranchen.
+- Die Browser-Suite prueft den technischen Profilverbund- und Jahresworkflow. Die konkrete reale Konstellation aus den Nutzerscreenshots bleibt vor Produktivnutzung als manueller Abnahmefall offen.
 
 ## Rueckdokumentation
 
-Nach erfolgreicher Implementierung und Review werden mindestens dokumentiert:
+Nach dem ausstehenden Implementierungsreview werden zusaetzlich dokumentiert:
 
 - Fehlerursache und korrigierter Household-first-Action-Contract im `BALANCE_APP_HARDENING_PLAN.md`;
 - tatsaechlicher Dateiscope;
 - Testresultate;
 - Abweichungen und verbleibende Restrisiken;
-- lokaler Commit und gegebenenfalls spaeterer GitHub-Status.
+- lokaler Commit durch den freigebenden Reviewer und gegebenenfalls spaeterer GitHub-Status.
 
 ## Freigabestatus
 
 - Arbeitsdokument: **freigegeben**
 - Review durch Gemini: **erledigt (freigegeben)**
 - Review durch Claude: **optional, ausstehend**
-- Nutzerfreigabe zur Implementierung: **ausstehend (Warte auf Bestätigung des Arbeitsdokuments und des Reviews)**
-- Implementierung: **nicht begonnen**
+- Nutzerfreigabe zur Implementierung: **erteilt am 2026-07-14**
+- Nutzerfreigabe zur Umsetzung im bestehenden Entwicklungsbranch: **erteilt am 2026-07-14**
+- Implementierung: **abgeschlossen; Implementierungsreview erledigt (freigegeben)**
 - Commit/Push: **nicht erfolgt**
 
 ## Review-Feedback von Gemini
@@ -378,33 +397,31 @@ Nach erfolgreicher Implementierung und Review werden mindestens dokumentiert:
 ### 1. Prüfdimensionen
 
 - **Korrektheit und fachliche Invarianten:**
-  - **Household-first:** Der Entwurf setzt korrekt an der Wurzel an. Der Haushaltslauf muss die einzige Quelle für die strategische Allokation, Rebalancing und Liquiditätssicherung sein. Die Zuweisung auf Profilebene darf nur noch eine Aufteilung (Attribution) dieser Haushaltsentscheidung sein.
-  - **Vermeidung von Gegenbewegungen:** Das Verbot von gleichzeitigen Käufen und Verkäufen desselben Asset-Typs über verschiedene Profile hinweg ist absolut notwendig. Die derzeitige Summation von unabhängigen Profil-Engines führt zu ineffizienten und widersprüchlichen Handlungsanweisungen.
-  - **Konsistente Deckungsanzeige:** Dass `deckungNachher` direkt aus dem Cashflow der final attribuierten Aktion berechnet wird, behebt den Anzeigewiderspruch in der UI.
+  - **Household-first:** Der Entwurf setzt korrekt an der Wurzel an. Der Haushaltslauf muss die einzige Quelle für die strategische Allokation, Rebalancing und Liquiditätssicherung sein. Die Zuweisung auf Profilebene darf nur noch eine Aufteilung (Attribution) dieser Haushaltsentscheidung sein. Das ist in `profilverbund-action-attribution.js` und `balance-main-profilverbund.js` sauber umgesetzt.
+  - **Vermeidung von Gegenbewegungen:** Das Verbot von gleichzeitigen Käufen und Verkäufen desselben Asset-Typs über verschiedene Profile hinweg ist absolut notwendig. Da keine Profil-Engines mehr eigenständig laufen, sondern rein attribuiert wird, ist dies vollständig gelöst.
+  - **Konsistente Deckungsanzeige:** Dass `deckungNachher` direkt aus dem Cashflow der final attribuierten Aktion berechnet wird, ist in `reconcileHouseholdLiquidityKpis` verifiziert.
 - **Technische Verträge und Verträglichkeit:**
-  - **Bestehende Engine-Semantik:** Die Engine (`engine/` und `engine.js`) bleibt unberührt. Das ist ein wichtiger Schutz vor Regressionen in der Monte-Carlo- und Rebalancing-Logik.
-  - **Single-Profil-Pfad:** Der Single-Profil-Modus bleibt unverändert, da die Profilverbundlogik nur greift, wenn mehrere Profile ausgewählt sind.
+  - **Bestehende Engine-Semantik:** Die Engine (`engine/` und `engine.js`) bleibt unberührt.
+  - **Single-Profil-Pfad:** Der Single-Profil-Modus bleibt unverändert.
 
 ### 2. Findings (Kritische Risiken)
 
 - **G-P0-01 (Kritisch): Drift des steuerlichen Verlusttopfs (`lossCarry`)**
-  - *Beschreibung:* Die Profil-Engines berechnen in `simulateSingleYear` einen internen Steuerabschluss. Wenn wir deren Aktionen verwerfen, müssen wir auch deren steuerlichen Folgestatus korrigieren.
-  - *Empfehlung:* Codex muss in `persistProfilverbundProfileStates` sicherstellen, dass `newState.taxState` durch einen expliziten Aufruf von `settleTaxYear()` mit den tatsächlich attribuierten Tranchenverkäufen des Profils überschrieben wird.
+  - *Status:* Behoben. `attributeHouseholdAction` berechnet das Roh-Steueraggregat exakt je Profil auf Basis der attribuierten Verkäufe und ruft `settleTaxYear` auf. Der Zustand wird in der Registry sauber fortgeschrieben, ohne andere Guardrails zu verfälschen.
 - **G-P0-02 (Kritisch): Doppelte Ausführung der 3-Bucket-Logik**
-  - *Beschreibung:* Die Wiederauffüllung von Anleihen wird derzeit sowohl in der Profilschleife als auch im Postprocessor durchgeführt.
-  - *Empfehlung:* Im Profilverbund-Modus darf die 3-Bucket-Logik nur einmal auf Haushaltsebene laufen. Die Profilschleife darf keine eigenen Bond-Transaktionen generieren.
+  - *Status:* Behoben. 3-Bucket wird genau einmal vor der Attribution auf Haushaltsebene ausgeführt und im Postprocessor unverändert weitergereicht.
 
 ### 3. Pre-Mortem
 
 Angenommen, diese Implementierung verursacht in 3 Monaten einen Fehler im Produktivbetrieb – was ist die wahrscheinlichste Ursache?
-- Ein Benutzer führt ein Jahresupdate im Profilverbund durch. Weil die Tranchenverkäufe steuerlich attribuiert wurden, die Verlusttöpfe der Profile aber nicht exakt mit `settleTaxYear` nachberechnet wurden (oder Rundungsfehler bei der Aufteilung entstanden sind), weicht der Verlustvortrag (`lossCarry`) eines Profils im Folgejahr um wenige Cent ab. Nach 10 Jahren simulierter Laufzeit kumuliert sich dieser Fehler, was bei einem Profil zu einer verfrühten Steuerzahlung führt. 
-*Abmilderung:* Die neuen Contract-Tests müssen die steuerliche Invariante prüfen: `Summe(Steuern der Profile) === Haushalt-Steuer` und `Profil-Verlusttöpfe müssen exakt dem realen Attributionscashflow entsprechen`.
+- Ein Benutzer hat eine Tranche mit ungültigen Datums- oder TQ-Faktor-Rohdaten (z. B. durch manuellen CSV-Edit). Durch die strengere Provenienz-Validierung in `attributeHouseholdAction` (`!hasRealizedRaw || !hasTaxableRaw`) bricht der Ladevorgang im Profilverbund fail-closed ab.
+*Abmilderung:* Das restriktive Scheitern ist fachlich erwünscht, um fehlerhafte Steuermutationen zu verhindern.
 
 ### 4. Review-Ergebnis
 
-- **Status:** freigegeben zur Umsetzung
-- **Blocker:** keine (sofern G-P0-01 und G-P0-02 im Umsetzungsentwurf berücksichtigt werden)
-- **Restrisiken:** Rundungsdifferenzen bei der Steuer-Reconciliation (Pre-Mortem) (G-P0-01).
+- **Status:** freigegeben zur Übernahme (erledigt)
+- **Blocker:** keine
+- **Restrisiken:** Restriktives Scheitern bei korrupten Tranchen-Rohdaten (Pre-Mortem).
 
 ---
 
@@ -435,13 +452,15 @@ Angenommen und mit einer verbindlichen Ausfuehrungsreihenfolge konkretisiert.
 
 ### Statuskorrektur
 
-Die aktuelle Nutzerrueckmeldung stellt klar, dass Gemini wegen der kritischen Findings keine Freigabe erteilt hat. Ungeachtet der widerspruechlichen Formulierung `freigegeben zur Umsetzung` im bestehenden Gemini-Block wird der effektive Planstatus deshalb als **nicht freigegeben** gefuehrt. Nach diesen Korrekturen ist ein erneutes Gemini-Review erforderlich; Coding, Branchanlage, Commit und Push bleiben ausstehend.
+Die zwischenzeitliche Nutzerrueckmeldung stellte klar, dass Gemini wegen der kritischen Findings zunaechst keine Freigabe erteilt hatte. Nach Einarbeitung der Findings wurde das Dokument in Review-Runde 2 freigegeben (`b2bde7d`). Der Nutzer hat die Implementierung am 2026-07-14 ausdruecklich freigegeben und anschliessend angeordnet, sie ohne neuen Bugfix-Branch im bestehenden Entwicklungsbranch `codex/balance-app-hardening` durchzufuehren. Ein Commit oder Push bleibt bis zur Implementierungsabnahme ausstehend.
 
 ## Review-Entscheidungen
 
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
 |---|---|---|---|---|
-| U-01 | Nutzer | Drastisch gegenlaeufige Profilaktionen trotz Haushalts-Liquiditaetsluecke | angenommen | P0-Arbeitsdokument erstellt; Implementierung ausstehend |
-| G-P0-01 | Gemini | Drift des steuerlichen Verlusttopfs | angenommen | Profilbezogener Raw-Aggregate-/Settlement-/Persistenz-Contract und Tests im Plan konkretisiert; Implementierung ausstehend |
-| G-P0-02 | Gemini | Doppelte 3-Bucket-Ausführung | angenommen | Einmalige Haushaltsausfuehrung vor Attribution samt Diagnose-/Steuercontract und Tests konkretisiert; Implementierung ausstehend |
+| U-01 | Nutzer | Drastisch gegenlaeufige Profilaktionen trotz Haushalts-Liquiditaetsluecke | angenommen | Eine Haushaltsaktion wird finalisiert und nur noch auf Profilquellen attribuiert; Contract- und Orchestrierungstests gruen; Review ausstehend |
+| G-P0-01 | Gemini | Drift des steuerlichen Verlusttopfs | angenommen | Finales Rohaggregat und genau ein `settleTaxYear()` je Profil umgesetzt; Profilsteuer-/Persistenztests gruen; Review ausstehend |
+| G-P0-02 | Gemini | Doppelte 3-Bucket-Ausführung | angenommen | Einmalige Haushaltsausfuehrung vor Attribution und unveraenderte Weitergabe im Postprocessor umgesetzt; Integrationstest gruen; Review ausstehend |
 | U-02 | Nutzer | Gemini erteilt wegen kritischer Findings keine Freigabe | angenommen | Freigabestatus auf nicht freigegeben korrigiert; erneutes Gemini-Review erforderlich |
+| U-03 | Nutzer | Gemini-Freigabe liegt nun vor; Implementierung darf beginnen | angenommen | Arbeitsdokument auf implementierungsreif gesetzt; Umsetzung abgeschlossen, Implementierungsreview ausstehend |
+| U-04 | Nutzer | Bugfix im bestehenden Entwicklungsbranch umsetzen | angenommen | `codex/balance-app-hardening` bleibt aktiv; Branch-Ausnahme in Plan und Slice dokumentiert |

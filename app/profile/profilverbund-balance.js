@@ -133,6 +133,14 @@ function resolveTrancheSplitTotals(tranches) {
             return;
         }
 
+        if (category === 'bonds' || type.includes('bond') || type.includes('anleihe')) {
+            // Bonds remain part of the legacy "neu" depot total while their detailed
+            // category is preserved for the one-time household 3-bucket logic.
+            totals.neuValue += marketValue;
+            totals.neuCost += costBasis;
+            return;
+        }
+
         if (type === 'aktien_alt') {
             totals.altValue += marketValue;
             totals.altCost += costBasis;
@@ -164,6 +172,75 @@ function normalizeTrancheDate(tranche) {
     if (!raw) return Number.POSITIVE_INFINITY;
     const parsed = Date.parse(raw);
     return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
+}
+
+function buildSyntheticProfileTranches(entry) {
+    const inputs = entry?.inputs || {};
+    const profileId = entry?.profileId;
+    const profileName = entry?.name || profileId;
+    const definitions = [
+        {
+            suffix: 'aktien_alt',
+            type: 'aktien_alt',
+            category: 'equity',
+            marketValue: inputs.depotwertAlt,
+            costBasis: inputs.costBasisAlt,
+            tqf: inputs.tqfAlt
+        },
+        {
+            suffix: 'aktien_neu',
+            type: 'aktien_neu',
+            category: 'equity',
+            marketValue: inputs.depotwertNeu,
+            costBasis: inputs.costBasisNeu,
+            tqf: inputs.tqfNeu
+        },
+        {
+            suffix: 'gold',
+            type: 'gold',
+            category: 'gold',
+            marketValue: inputs.goldWert,
+            costBasis: inputs.goldCost,
+            tqf: inputs.goldSteuerfrei ? 1 : 0
+        },
+        {
+            suffix: 'geldmarkt',
+            type: 'geldmarkt',
+            category: 'money_market',
+            marketValue: inputs.geldmarktEtf,
+            costBasis: inputs.geldmarktEtf,
+            tqf: 0
+        }
+    ];
+    return definitions
+        .filter(definition => readNumber(definition.marketValue, 0) > 0)
+        .map(definition => ({
+            trancheId: `profilverbund:${profileId}:${definition.suffix}`,
+            name: `${profileName} ${definition.suffix}`,
+            type: definition.type,
+            category: definition.category,
+            marketValue: readNumber(definition.marketValue, 0),
+            costBasis: readNumber(definition.costBasis, 0),
+            tqf: readNumber(definition.tqf, 0),
+            sourceProfileId: profileId,
+            sourceProfileName: profileName,
+            syntheticProfileFallback: true
+        }));
+}
+
+export function buildProfileOwnedTranches(entry) {
+    const profileId = entry?.profileId;
+    if (!profileId) {
+        throw new Error('Profilverbund: Profil ohne eindeutige Profil-ID kann keine Tranchen bereitstellen.');
+    }
+    const profileName = entry?.name || profileId;
+    const tranches = Array.isArray(entry?.tranches) ? entry.tranches : [];
+    if (!tranches.length) return buildSyntheticProfileTranches(entry);
+    return tranches.map(tranche => ({
+        ...tranche,
+        sourceProfileId: profileId,
+        sourceProfileName: profileName
+    }));
 }
 
 // Lade alle Profile, die zum Profilverbund gehören
@@ -504,9 +581,7 @@ export function buildProfilverbundAssetSummary(profileInputs) {
             summary.totalGoldCost += inputs.goldCost || 0;
         }
 
-        if (tranches.length) {
-            summary.mergedTranches.push(...tranches);
-        }
+        summary.mergedTranches.push(...buildProfileOwnedTranches(entry));
         if (idx === 0 && entry.healthBucket) {
             summary.primaryHealthBucket = entry.healthBucket;
         }

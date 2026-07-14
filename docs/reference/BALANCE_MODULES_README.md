@@ -12,7 +12,7 @@ Die folgende Inventur wurde vor dem Balance-App-Hardening direkt gegen `app/bala
 
 | Datei | Primaere Verantwortung |
 |---|---|
-| `balance-action-postprocessor.js` | Action-Merge und 3-Bucket-Nachbearbeitung |
+| `balance-action-postprocessor.js` | Single-Profil-3-Bucket-Nachbearbeitung und Weitergabe der finalen Profilverbund-Aktion |
 | `balance-annual-inflation.js` | Inflationsabruf und Bedarfs-/Faktorfortschreibung |
 | `balance-annual-marketdata.js` | ETF-, ATH-, CAPE- und Nachruecken-Workflow |
 | `balance-annual-modal.js` | Ergebnisdialog des Jahresupdates |
@@ -38,7 +38,7 @@ Die folgende Inventur wurde vor dem Balance-App-Hardening direkt gegen `app/bala
 | `balance-guardrail-reset.js` | Reset-Entscheidung bei relevanten Inputaenderungen |
 | `balance-health-bucket.js` | DOM-freie Pflegebucket-Diagnose |
 | `balance-main-profile-sync.js` | Profilwerte in Balance-DOM synchronisieren |
-| `balance-main-profilverbund.js` | Profilverbund-Engine-Laeufe, Merge und UI-Anbindung |
+| `balance-main-profilverbund.js` | Haushalts-Engine-Lauf, einmalige 3-Bucket-Verarbeitung, Profilattribution und UI-Anbindung |
 | `balance-main.js` | Bootstrap und zentrale Update-Pipeline |
 | `balance-reader.js` | DOM-Eingaben und profil-/tranchenbezogene Overrides lesen |
 | `balance-renderer-action.js` | Handlungsempfehlung und Profilquellen rendern |
@@ -221,9 +221,9 @@ Einstiegspunkt und Orchestrator.
 
 **Helper-Module (ausgelagert):**
 - `balance-main-profile-sync.js` – Profilwerte in Balance-Inputs spiegeln
-- `balance-main-profilverbund.js` – Profilverbund-Simulationen & UI-Handling
+- `balance-main-profilverbund.js` – einmalige Haushalts-Simulation, Profilattribution & UI-Handling
 - `balance-update-pipeline.js` – Engine-Handshake/-Gate, Update-Ergebnisvertrag, Mindest-Flex-Validierung, Engine-Last-State, Renderer-/Diagnose-Payload, Persistenzentscheidung und Ausgabenbudget.
-- `balance-action-postprocessor.js` – Profilverbund-Action-Merge und Single-3-Bucket-Postprocessing.
+- `balance-action-postprocessor.js` – Single-Profil-3-Bucket-Postprocessing; im Profilverbund unveraenderte Weitergabe der bereits finalisierten Haushaltsaktion.
 
 **Pflegebucket:** Der Update-Zyklus reicht die im Reader erzeugte Pflegebucket-Diagnose an Summary, Key-Parameter und Diagnose-Copytext weiter. Die Engine-Eingaben und die Handlungsempfehlung werden dadurch nicht operativ verändert.
 
@@ -364,26 +364,44 @@ Kernlogik für den Profilverbund (Multi-Profil-Modus).
 - `buildProfilverbundProfileSummaries(profileInputs)` – Einzelprofil-Übersichten
 
 **Verteilungsmodi:**
-- `tax_optimized` – Greedy: Profile mit niedrigster Steuerlast zuerst
-- `proportional` – Nach Vermögensanteil
-- `runway_first` – Nach Runway-Zielen gewichtet
+- `tax_optimized` – globale, deterministische Verkaufsquellenwahl nach aktuellem marginalem Profilsteuerwert; Verlusttopf, Sparer-Pauschbetrag, Kirchensteuer, Kostenbasis und Teilfreistellung bleiben eigentuemerbezogen
+- `proportional` – Quellenattribution nach Vermoegensanteil, innerhalb eines Profils steuerarm sortiert
+- `runway_first` – Quellenattribution nach Runway-Zielen gewichtet, innerhalb eines Profils steuerarm sortiert
 
 **Haushalts-/Finanzierungscontract:**
-- `balance-main.js` fuehrt im Multi-Profil-Fall genau einen Haushalts-Engine-Lauf fuer Floor, Flex, Dynamic Flex und Einkommen aus und verwendet dieses Ergebnis zugleich fuer Rendering und Profilfinanzierung.
-- Die entschiedene Jahresentnahme wird centgenau auf die Finanzierungsprofile verteilt. Nicht allokierbarer Restbedarf bricht vor den Profil-Läufen fail-closed ab.
-- Profil-Engine-Läufe erhalten nur `floorBedarf = Finanzierungsanteil`; Flex, Dynamic Flex, Mindest-Flex und Einkommen sind dort deaktiviert, damit keine zweite Spending- oder Einkommensentscheidung entsteht.
-- Haushalts-Guardrail-State und Profil-/Steuer-State werden getrennt persistiert. Die unveränderten Profil-Eingaben werden nicht durch den technischen Finanzierungsinput ersetzt.
+- `balance-main.js` fuehrt im Multi-Profil-Fall genau einen Haushalts-Engine-Lauf fuer Floor, Flex, Dynamic Flex, Einkommen und Transaktionsplanung aus.
+- Der Engine-Lauf erhaelt einen vollstaendigen Haushaltstranchenpool mit eindeutiger `sourceProfileId`. Die 3-Bucket-Logik und Bond-Wiederauffuellung finalisieren diese Haushaltsaktion genau einmal.
+- Danach finden keine Profil-Engine-Laeufe statt. Die Profile erhalten ausschliesslich Quellen- und Verwendungsattributionen der finalen Haushaltsaktion; die Verteilungsmodi steuern diese Attribution, aber keine zweite Spending- oder Assetentscheidung.
+- Quellen, Verwendungen und die Summe der finalen Profilsteuern muessen innerhalb 0,01 EUR reconciliert sein. Fehlende Herkunft oder nicht finanzierbare Restbetraege blockieren fail-closed.
+- Haushalts-Guardrail-State und Profil-Steuer-State werden getrennt persistiert. Je Profil wird nur der aus den final attribuierten Verkaeufen berechnete `taxState` ersetzt; sonstige Profil-Last-State-Felder bleiben erhalten.
 
 **Tranchen-/Cash-Contract:**
 - Entnahmen nutzen zuerst Tagesgeld und Geldmarkt, bevor ein Verkauf aus Detailtranchen geplant wird.
-- Detailtranchen ersetzen in Asset-Summaries die aggregierten Depot-/Gold-/Geldmarktwerte, damit Werte nicht doppelt gezählt werden.
+- Vorhandene Detailtranchen werden ohne Mutation mit Profilherkunft kopiert. Fehlen Detailtranchen, entstehen profilmarkierte synthetische Fallback-Tranchen aus den aggregierten Werten.
+- Detailtranchen ersetzen in Asset-Summaries die aggregierten Depot-/Gold-/Geldmarktwerte, damit Werte nicht doppelt gezählt werden. Bonds behalten ihre Assetklasse und fliessen fuer Legacy-Kompatibilitaet zugleich in die Depotaggregate ein.
 - Der Pflegebucket wird als Haushaltsdefinition aus dem Primary-Profil gelesen und in Balance nur diagnostisch ausgewiesen. Er ist keine zusätzliche Entnahmequelle im Verteilungsmodus.
 
 **Dependencies:** `balance-config.js`, `app/profile/profile-storage.js`
 
 ---
 
-### 11.2 `profilverbund-balance-ui.js`
+### 11.2 `profilverbund-action-attribution.js`
+
+DOM-freier Contract zwischen finaler Haushaltsaktion, Profilquellen, Steuerzustand und Liquiditaets-KPIs.
+
+**Aufgaben:**
+- validiert die eindeutige Profilherkunft aller Verkaufsquellen und attribuiert Cash- und Assetquellen ohne gegenlaeufige Zusatztransaktion;
+- plant die fuer die Haushaltszwecke erforderlichen Verkaufstranchen je vorgegebener Assetklasse neu; `tax_optimized` vergleicht die aktuelle marginale Steuer ueber alle geeigneten Profile, die beiden gewichteten Modi begrenzen jede Quelle auf den Bestand ihres Eigentuemers;
+- aggregiert die finalen steuerlichen Rohwerte je Profil und ruft `settleTaxYear()` genau einmal je Profil auf;
+- reconciliert Bruttoquellen, Profilsteuern und Nettoverwendungen innerhalb der Cent-Toleranz;
+- erzeugt Profilaktionen als reine Aufschluesselung der Haushaltsaktion;
+- berechnet Deckung und Runway aus dem Cashflow der final gerenderten Aktion neu und aktualisiert die zugehoerige Diagnose.
+
+**Dependencies:** `engine/tax-settlement.mjs`, `profilverbund-balance.js`
+
+---
+
+### 11.3 `profilverbund-balance-ui.js`
 DOM-Operationen für die Profilverbund-UI.
 
 **Exports:**

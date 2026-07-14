@@ -382,7 +382,8 @@ async function runBalanceUiOrchestrationTests() {
                 costBasisAlt: 80000,
                 renteAktiv: false,
                 renteMonatlich: 0
-            }
+            },
+            lastState: { guardrailMarker: 'included-keep', taxState: { lossCarry: 111 } }
         };
         const partnerState = {
             inputs: {
@@ -391,7 +392,8 @@ async function runBalanceUiOrchestrationTests() {
                 costBasisAlt: 160000,
                 renteAktiv: false,
                 renteMonatlich: 0
-            }
+            },
+            lastState: { guardrailMarker: 'partner-keep', taxState: { lossCarry: 222 } }
         };
         const excludedState = {
             inputs: {
@@ -470,20 +472,17 @@ async function runBalanceUiOrchestrationTests() {
         window.EngineAPI = {
             simulateSingleYear(input) {
                 engineCalls.push({ ...input });
-                const householdCall = engineCalls.length === 1;
                 return {
                     newState: { call: engineCalls.length },
                     diagnosis: {},
                     ui: {
-                        spending: { monatlicheEntnahme: householdCall ? 100 : (input.floorBedarf / 12) },
+                        spending: { monatlicheEntnahme: 100 },
                         action: {
-                            type: householdCall ? 'NONE' : 'TRANSACTION',
-                            nettoErlös: householdCall ? 0 : input.floorBedarf,
+                            type: 'NONE',
+                            nettoErlös: 0,
                             steuer: 0,
                             verwendungen: {},
-                            quellen: householdCall
-                                ? []
-                                : [{ profileId: engineCalls.length === 2 ? 'included' : 'partner' }]
+                            quellen: []
                         }
                     }
                 };
@@ -492,11 +491,31 @@ async function runBalanceUiOrchestrationTests() {
         const runs = handlers.runProfilverbundProfileSimulations(aggregateInput, selectedProfiles);
         const mergedAction = handlers.mergeProfilverbundActions(runs);
 
-        assertEqual(engineCalls.length, 3, 'Engine laeuft nur fuer Haushalt und zwei ausgewaehlte Profile');
+        assertEqual(engineCalls.length, 1, 'Engine laeuft im Profilverbund ausschliesslich fuer den Haushalt');
         assertEqual(runs.length, 2, 'Opt-out-Profil erzeugt keinen Profil-Run');
-        assertEqual(mergedAction.quellen.length, 2, 'Zusammengefuehrte Action enthaelt keine Opt-out-Quelle');
-        assertEqual(mergedAction.quellen[0].profileId, 'included', 'Erste Action stammt vom ausgewaehlten Profil');
-        assertEqual(mergedAction.quellen[1].profileId, 'partner', 'Zweite Action stammt vom ausgewaehlten Partnerprofil');
+        assertEqual(mergedAction.quellen.length, 0, 'Haushalt ohne Handlungsbedarf erhaelt keine erfundene Profilquelle');
+        assertEqual(engineCalls[0].detailledTranches.length, 2, 'Haushaltslauf erhaelt synthetische Tranchen der zwei ausgewaehlten Profile');
+        assert(engineCalls[0].detailledTranches.every(tranche => tranche.sourceProfileId !== 'excluded'),
+            'Opt-out-Profil gelangt nicht in den Haushaltstranchenpool');
+        assert(engineCalls[0].detailledTranches.some(tranche => tranche.sourceProfileId === 'included'),
+            'Erstes ausgewaehltes Profil besitzt eindeutige Quellenprovenienz');
+        assert(engineCalls[0].detailledTranches.some(tranche => tranche.sourceProfileId === 'partner'),
+            'Zweites ausgewaehltes Profil besitzt eindeutige Quellenprovenienz');
+
+        handlers.persistProfilverbundProfileStates(runs);
+        const registryAfterPersistence = JSON.parse(localStorageRef.getItem('rs_profiles_v1'));
+        const includedPersisted = JSON.parse(registryAfterPersistence.profiles.included.data[CONFIG.STORAGE.LS_KEY]);
+        const partnerPersisted = JSON.parse(registryAfterPersistence.profiles.partner.data[CONFIG.STORAGE.LS_KEY]);
+        assertEqual(includedPersisted.lastState.guardrailMarker, 'included-keep',
+            'Persistenz erhaelt Profil-Guardrails statt eines technischen Profil-Engine-State');
+        assertClose(includedPersisted.lastState.taxState.lossCarry, 111, 0.001,
+            'Persistenz schreibt den attribuierten No-Sale-Steuerzustand des ersten Profils');
+        assertClose(partnerPersisted.lastState.taxState.lossCarry, 222, 0.001,
+            'Persistenz schreibt den attribuierten No-Sale-Steuerzustand des zweiten Profils');
+        assertEqual(includedPersisted.profilverbundHouseholdLastState.call, 1,
+            'Gemeinsamer Haushalts-Guardrail-State bleibt separat erhalten');
+        assertClose(includedPersisted.profilverbundHouseholdLastState.taxState.lossCarry, 0, 0.001,
+            'Nicht autoritativer Haushalts-Steuerzustand wird vor der Persistenz neutralisiert');
     }
 
     console.log('Test 3: Balance import schema, legacy migration and fail-safe orchestration');
@@ -846,35 +865,112 @@ async function runBalanceUiOrchestrationTests() {
                 name: 'A',
                 inputs: { depotwertAlt: 300000, renteAktiv: true, renteMonatlich: 1000 },
                 tranches: [],
-                balanceState: { inputs: {}, lastState: { taxState: { year: 1 } } }
+                balanceState: { inputs: {}, lastState: { taxState: { lossCarry: 100 } } }
             },
             {
                 profileId: 'b',
                 name: 'B',
                 inputs: { depotwertAlt: 100000, renteAktiv: true, renteMonatlich: 500 },
                 tranches: [],
-                balanceState: { inputs: {}, lastState: { taxState: { year: 1 } } }
+                balanceState: { inputs: {}, lastState: { taxState: { lossCarry: 200 } } }
             }
         ];
 
         const runs = handlers.runProfilverbundProfileSimulations(sharedInput, profiles, { household: true });
 
-        assertEqual(engineCalls.length, 3, 'Engine runs once for household and once per financing profile');
+        assertEqual(engineCalls.length, 1, 'Engine runs exactly once for the household');
         assertEqual(engineCalls[0].lastState.household, true, 'Household run receives household guardrail state');
         assertEqual(runs.householdResult.ui.spending.monatlicheEntnahme, 3000, 'Household result remains available to the main orchestrator');
         assertClose(runs.distribution.totalNeed, 36000, 0.001, 'Final household spending drives allocation');
-        assertClose(runs[0].input.floorBedarf, 27000, 0.001, 'Profile A finances its proportional share');
-        assertClose(runs[1].input.floorBedarf, 9000, 0.001, 'Profile B finances its proportional share');
-        assertClose(runs[0].input.floorBedarf + runs[1].input.floorBedarf, 36000, 0.001, 'Profile shares preserve household decision');
-        runs.forEach(run => {
-            assertEqual(run.input.flexBedarf, 0, 'Profile engine receives no second flex budget');
-            assertEqual(run.input.renteAktiv, false, 'Profile engine does not subtract income again');
-            assertEqual(run.input.renteMonatlich, 0, 'Profile engine receives no repeated income');
-            assertEqual(run.input.dynamicFlex, false, 'Profile engine cannot make another Dynamic-Flex decision');
-            assertEqual(run.input.minimumFlexAnnual, 0, 'Profile engine cannot reapply minimum flex');
-        });
+        assertClose(runs[0].ui.spending.monatlicheEntnahme, 2250, 0.001, 'Profile A receives only a display attribution of household spending');
+        assertClose(runs[1].ui.spending.monatlicheEntnahme, 750, 0.001, 'Profile B receives only a display attribution of household spending');
+        assertClose(runs[0].input.floorBedarf, 40000, 0.001, 'Profile persistence is not replaced by an artificial funding floor');
+        assertClose(runs[1].input.floorBedarf, 40000, 0.001, 'Second profile persistence is not replaced by an artificial funding floor');
+        assertEqual(runs[0].input.dynamicFlex, true, 'No technical profile input disables household Dynamic Flex');
+        assertEqual(runs[1].input.minimumFlexAnnual, 5000, 'No technical profile input clears the minimum flex contract');
+        assertClose(runs[0].newState.taxState.lossCarry, 100, 0.001, 'Profile without sale preserves its own loss carry');
+        assertClose(runs[1].newState.taxState.lossCarry, 200, 0.001, 'Second profile without sale preserves its own loss carry');
         assertEqual(runs[0].persistedInput.renteMonatlich, 1000, 'Original profile income remains in persisted inputs');
         assertEqual(runs[1].persistedInput.renteMonatlich, 500, 'Second profile income remains in persisted inputs');
+    }
+
+    console.log('Test 6b: Profilverbund applies bad-year 3-bucket replacement once at household level');
+    {
+        const documentRef = new MockDocument();
+        const localStorageRef = createLocalStorageMock();
+        installBrowserGlobals(documentRef, localStorageRef);
+        PersistenceFacade.resetPersistenceForTests();
+        localStorageRef.setItem('profilverbund_mode_test', 'tax_optimized');
+
+        let engineCalls = 0;
+        window.EngineAPI = {
+            simulateSingleYear() {
+                engineCalls += 1;
+                return {
+                    newState: { marketData: { returns: { realEq: -0.2 } } },
+                    diagnosis: { general: {} },
+                    ui: {
+                        spending: { monatlicheEntnahme: 1000 },
+                        market: { sKey: 'bear_deep' },
+                        zielLiquiditaet: 20000,
+                        action: {
+                            type: 'TRANSACTION',
+                            title: 'Aktienverkauf',
+                            nettoErlös: 10000,
+                            steuer: 0,
+                            quellen: [{
+                                kind: 'aktien_neu',
+                                sourceProfileId: 'equity-owner',
+                                brutto: 10000,
+                                netto: 10000,
+                                steuer: 0,
+                                realizedGainSigned: 0,
+                                taxableAfterTqfSigned: 0
+                            }],
+                            verwendungen: { liquiditaet: 10000, gold: 0, aktien: 0 },
+                            taxRawAggregate: { sumRealizedGainSigned: 0, sumTaxableAfterTqfSigned: 0 }
+                        }
+                    }
+                };
+            }
+        };
+        const handlers = createProfilverbundHandlers({
+            dom: { inputs: {} },
+            PROFILVERBUND_STORAGE_KEYS: { mode: 'profilverbund_mode_test' }
+        });
+        const profiles = [
+            {
+                profileId: 'bond-owner',
+                name: 'Bond Owner',
+                inputs: { depotwertNeu: 50000, tagesgeld: 0, renteAktiv: false, sparerPauschbetrag: 1000, kirchensteuerSatz: 0 },
+                tranches: [{ trancheId: 'bond-1', type: 'anleihe', category: 'bonds', marketValue: 50000, costBasis: 50000, tqf: 0 }],
+                balanceState: { lastState: { taxState: { lossCarry: 0 } } }
+            },
+            {
+                profileId: 'equity-owner',
+                name: 'Equity Owner',
+                inputs: { depotwertNeu: 100000, tagesgeld: 0, renteAktiv: false, sparerPauschbetrag: 1000, kirchensteuerSatz: 0 },
+                tranches: [{ trancheId: 'equity-1', type: 'aktien_neu', category: 'equity', marketValue: 100000, costBasis: 90000, tqf: 0.3 }],
+                balanceState: { lastState: { taxState: { lossCarry: 0 } } }
+            }
+        ];
+        const runs = handlers.runProfilverbundProfileSimulations({
+            floorBedarf: 12000,
+            flexBedarf: 0,
+            tagesgeld: 0,
+            geldmarktEtf: 0,
+            decumulation: { mode: '3_bucket_jilge', drawdownTrigger: -0.15, bondTargetFactor: 5 },
+            sparerPauschbetrag: 1000,
+            kirchensteuerSatz: 0
+        }, profiles);
+
+        assertEqual(engineCalls, 1, '3-bucket Profilverbund performs no profile-engine reruns');
+        assertEqual(runs.threeBucketDiagnosis.isBadYear, true, 'Household diagnosis records the bad-year replacement');
+        assertEqual(runs.finalAction.quellen.length, 1, 'Household replacement produces one final source');
+        assertEqual(runs.finalAction.quellen[0].sourceProfileId, 'bond-owner', 'Bond sale keeps exact profile ownership');
+        assertEqual(runs.finalAction.quellen[0].kind, 'anleihe', 'Final action replaces the equity sale with a bond sale');
+        assertEqual(runs.finalAction.quellen.some(source => source.kind === 'aktien_neu'), false,
+            'No second profile action reintroduces the blocked equity sale');
     }
 
     console.log('Test 7: Engine handshake and update result contracts fail closed');

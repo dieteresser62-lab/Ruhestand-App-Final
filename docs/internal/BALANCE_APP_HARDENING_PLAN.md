@@ -1,7 +1,7 @@
 # Balance-App-Hardening: Arbeitsplan
 
 **Stand:** 2026-07-14  
-**Status:** implementierungsreif; alle Slices 01 bis 11 erledigt  
+**Status:** Slices 01 bis 11 erledigt; P0-Profilverbund-Regressionsfix implementiert, Implementierungsreview ausstehend
 
 **Feature-Branch:** `codex/balance-app-hardening`  
 **GitHub-Status:** lokal vorhanden; `git ls-remote --heads origin refs/heads/codex/balance-app-hardening` lieferte am 2026-07-13 keinen Remote-Branch; keine Veroeffentlichung ohne ausdrueckliche Freigabe  
@@ -28,7 +28,7 @@ Die Balance-App soll fuer reale Jahresplanung einen eindeutigen, wiederholsicher
 
 ## Verbindliche Leitentscheidungen
 
-1. Die Engine bleibt Source of Truth fuer genau einen fachlich vollstaendigen Single-Year-Input. Haushaltsverteilung wird vor dem Engine-Aufruf in DOM-freier Balance-/Profil-Logik aufgeloest.
+1. Die Engine bleibt Source of Truth fuer genau einen fachlich vollstaendigen Single-Year-Haushaltsinput. Die daraus finalisierte Haushaltsaktion wird anschliessend in DOM-freier Profilverbundlogik auf konkrete Profilquellen attribuiert; es gibt keine weiteren Profil-Engine-Laeufe.
 
 2. Ein Jahresprozess besitzt eine stabile Perioden-ID, zum Beispiel das abgeschlossene Kalenderjahr. Wiederholung derselben Periode darf keine zweite Mutation ausloesen.
 
@@ -48,7 +48,9 @@ Die Balance-App soll fuer reale Jahresplanung einen eindeutigen, wiederholsicher
 
 10. Legacy-Daten ohne Perioden-ID werden nicht aus Alter oder unsicheren Datumsfeldern als `already_committed` erraten. Der erste neue Jahresprozess liefert `legacy_confirmation_required`; der Nutzer bestaetigt einmalig Zielperiode und ob diese bereits abgeschlossen wurde. Erst diese Bestaetigung erzeugt die Baseline-Metadaten.
 
-11. **Fachentscheidung D-01, entschieden am 2026-07-13 – Variante A:** Floor, Flex, Renten und sonstige Einkuenfte werden genau einmal auf Haushaltsebene verarbeitet. Erst der daraus resultierende gemeinsame Nettoentnahmebedarf wird gemaess dem gewaehlten Finanzierungsmodus auf Profile verteilt. Profil-Engine-Laeufe erhalten nur ihren Finanzierungsanteil und duerfen keine zweite Spending-, Floor-/Flex- oder Einkommensanrechnung erzeugen. Floor und Flex werden nicht als eigenstaendige Profilbudgets allokiert.
+11. **Fachentscheidung D-01, entschieden am 2026-07-13 – Variante A, durch den P0-Regressionsfix praezisiert:** Floor, Flex, Renten, sonstige Einkuenfte und die strategische Transaktionsentscheidung werden genau einmal auf Haushaltsebene verarbeitet. Die finalisierte Haushaltsaktion wird gemaess dem gewaehlten Finanzierungsmodus auf die konkreten Profilquellen attribuiert. Profil-Engine-Laeufe entfallen vollstaendig; Floor und Flex werden nicht als eigenstaendige Profilbudgets allokiert.
+
+12. **P0-Action-Contract, 2026-07-14:** Jede Verkaufstranche besitzt eine eindeutige `sourceProfileId`; 3-Bucket und Bond-Wiederauffuellung laufen im Profilverbund genau einmal vor der Attribution. Profilsteuern entstehen anschliessend genau einmal aus den final attribuierten Verkaeufen. Die angezeigten Liquiditaets-KPIs werden aus dem Cashflow derselben finalen Aktion abgeleitet. Fehlende Herkunft, Unterdeckung oder eine Reconciliation-Abweichung ueber 0,01 EUR blockieren fail-closed.
 
 ## Ausgangsbefunde und Zuordnung
 
@@ -72,12 +74,13 @@ Die Balance-App soll fuer reale Jahresplanung einen eindeutigen, wiederholsicher
 ## Architektur-Zielbild
 
 ```
-Profilverbund  
-  -\> Haushaltsbedarf und profilbezogene Ressourcen normalisieren  
-  -\> deterministische Profilallokation  
-  -\> genau ein Engine-Input je Profil mit zugeordnetem Bedarf  
-  -\> Haushaltsinvarianten pruefen  
-  -\> Actions zusammenfuehren  
+Profilverbund
+  -\> Haushaltsbedarf und profilmarkierte Ressourcen normalisieren
+  -\> genau ein Haushalts-Engine-Lauf
+  -\> 3-Bucket/Bond-Logik genau einmal auf Haushaltsebene
+  -\> finale Haushaltsaktion auf Profilquellen attribuieren
+  -\> Profilsteuern und Haushaltsinvarianten reconciliieren
+  -\> dieselbe finale Aktion und daraus abgeleitete KPIs rendern
   
 Jahresprozess  
   -\> Perioden-ID und Ist-Zustand lesen  
@@ -104,13 +107,18 @@ Jahresprozess
 | 9 | [Korrupte Persistenz sichtbar behandeln](./SLICE_BALANCE_HARDENING_09_CORRUPT_DATA_RECOVERY.md) | P1 | 08 | 5 | erledigt |
 | 10 | [Striktes Zahlen- und CSV-Parsing](./SLICE_BALANCE_HARDENING_10_STRICT_PARSING.md) | P2 | 04, 05, 08 | 7 | erledigt |
 | 11 | [Browser-E2E und Dokumentationsgates](./SLICE_BALANCE_HARDENING_11_E2E_DOCUMENTATION.md) | P2 | 01-10 | 1 | erledigt |
+| P0-Fix | [Profilverbund-Action-Consistency](./SLICE_PROFILVERBUND_ACTION_CONSISTENCY_01_HOUSEHOLD_ATTRIBUTION.md) | P0 | Regression aus 01 | 7 | implementiert; Implementierungsreview ausstehend |
 
 
 ## Globale Akzeptanzkriterien
 
 - Zwei Profile mit zusammen 50.000 EUR Haushaltsbedarf erhalten zusammen exakt 50.000 EUR zugeordneten Bedarf, nicht 100.000 EUR.
 
-- Summierte Profil-Action und Steuerreserve verletzen keine definierte Haushaltsinvariante.
+- Die summierten Profilattributionen reproduzieren die finalisierte Haushaltsaktion je Zweck innerhalb 0,01 EUR und erzeugen keine gegenlaeufige Transaktion.
+
+- Die Haushaltssteuer entspricht der Summe der genau einmal aus den final attribuierten Verkaeufen berechneten Profilsteuern.
+
+- Die angezeigte Liquiditaetsdeckung und Runway-Diagnose werden aus dem Cashflow der final gerenderten Aktion abgeleitet.
 
 - Ein Jahresprozess fuer dieselbe Perioden-ID ist idempotent.
 
@@ -141,6 +149,12 @@ Jahresprozess
 - Nicht ausgewaehlte Profile beeinflussen weder Assets noch Renten, Bedarf, Diagnose oder Action.
 
 - Jede Quelle/Verwendung bleibt einem `profileId` zuordenbar.
+
+- 3-Bucket-Logik und Bond-Wiederauffuellung laufen im Profilverbund genau einmal auf Haushaltsebene.
+
+- Profilaktionen sind reine Attributionen und duerfen keine Zwecke oder gegenlaeufigen Assettransaktionen erfinden.
+
+- Profilbezogene Verlustvortraege werden nur aus den final attribuierten Verkaeufen fortgeschrieben; Profile ohne Verkauf behalten ihren Zustand.
 
 ### Jahresprozess
 
@@ -254,6 +268,7 @@ Zusatzlich zu `AGENTS.md` und `SLICE\_EXECUTION\_RULES.md` wird gestoppt, wenn:
 | 2026-07-14 | Nutzer gibt Wiedereroeffnung fuer Slice-11-Blocker frei | Slice 08 darf den File-Input-Restore korrigieren; Snapshot-/Jahresprozess-Scope darf Handle-DB-Migration und blockierte Legacy-DB-Bereinigung korrigieren. Erweiterter Gesamtumfang bleibt unter der projektweiten 10-Programmdateien-Grenze. |
 | 2026-07-14 | Slice 11 und autorisierte Wiedereroeffnungen durch Codex implementiert | File-Input-Reject ohne Page-Error; dedizierte Handle-DB mit Legacy-Uebernahme; blockierter Cleanup begrenzt/retry-faehig; Altersfortschreibung gegen Profil-Sync gesichert. Browser-Gate mit 11 isolierten Faellen gruen, Gesamtsuite 3363/3363 ohne offene Handles, Coverage 74,02 % (23023/31105). Referenzen und Slice-Status synchronisiert; adversariales Review/Freigabe ausstehend. |
 | 2026-07-14 | Slice 11 durch Gemini freigegeben und committed | Commit; keine Blocker, Restrisiko G11-01 |
+| 2026-07-14 | P0-Profilverbund-Regressionsfix durch Nutzer freigegeben und im bestehenden Entwicklungsbranch implementiert | Eine finalisierte Haushaltsaktion mit profilmarkierten Quellen; keine Profil-Engine-Laeufe oder gegenlaeufigen Profilaktionen; globale profilsteuer-aware Quellenplanung; profilbezogener Steuerabschluss; einmalige 3-Bucket-Verarbeitung; KPI-Reconciliation. Fokussiert 91/91 + 123/123 + 41/41, Gesamtsuite 3399/3399 ohne offene Handles und Browser-Gate 11/11 gruen; Implementierungsreview und Commit ausstehend. |
 
 
 ## Review-Feedback von Gemini

@@ -155,7 +155,8 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 * `app/balance/balance-renderer.js` – Darstellung der Ergebnisse (Summary, Guardrails, Entscheidungsdiagnose, Toasts, Themes).
 * `app/balance/balance-binder.js` – Event-Hub mit Tastenkürzeln, schema-validiertem Balance-Import/Export, Snapshots und Debug-Modus.
 * `app/balance/balance-main.js` – Orchestrator: initiiert Module, bindet beim Start einen kompatiblen Engine-Vertrag und führt `update()` aus.
-* `app/balance/balance-update-pipeline.js` / `balance-action-postprocessor.js` – Fail-closed Engine-Handshake und Update-Statusvertrag sowie Pipeline-Helfer fuer Last-State-Vorbereitung, Action-/3-Bucket-Postprocessing, Renderer-/Diagnose-Payload, Persistenz und Ausgabenbudget.
+* `app/balance/balance-update-pipeline.js` / `balance-action-postprocessor.js` – Fail-closed Engine-Handshake und Update-Statusvertrag sowie Pipeline-Helfer fuer Last-State-Vorbereitung, Single-Profil-Action-/3-Bucket-Postprocessing, unveraenderte Weitergabe finaler Profilverbund-Actions, Renderer-/Diagnose-Payload, Persistenz und Ausgabenbudget.
+* `app/profile/profilverbund-action-attribution.js` – DOM-freie Profilattribution der finalen Haushaltsaktion inklusive globaler profilsteuer-aware Quellenplanung, Provenienzvalidierung, profilbezogenem Steuerabschluss, Quellen-/Verwendungs-Reconciliation und Abgleich der Liquiditaets-KPIs.
 * `app/balance/balance-annual-marketdata.js` – Online-Marktdaten für Jahreswechsel: periodengebundener ETF-Jahresendkurs mit fail-closed Yahoo-Validierung und `annualMarketDataMeta` sowie davon unabhängiger CAPE-Fallback-Contract.
 * `app/balance/balance-annual-period.js` – reiner Jahresperioden-Contract mit stabiler `calendar-year:<YYYY>`-ID, Legacy-Baseline, Planvalidierung, Doppel-Commit-Schutz und Recovery-Metadaten.
 * `app/balance/balance-annual-orchestrator.js` / `app/balance/balance-annual-modal.js` – Jahreswechsel-Pipeline mit explizitem `ok`-/Fehlerergebnis und Ergebnisprotokoll; die Altersfortschreibung schreibt vor dem Profil-Sync auch `profile_aktuelles_alter`.
@@ -168,8 +169,8 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 1. `balance-binder.js` reagiert auf Eingaben (Formular, Tastenkürzel, Buttons) und ruft `debouncedUpdate()` auf.
 2. `balance-reader.js` sammelt alle Inputs und gibt ein strukturiertes Objekt zurück.
 3. `balance-update-pipeline.js` prueft den beim Bootstrap gebundenen `EngineAPI.getVersion()`-/`simulateSingleYear()`-Contract und bereitet den Engine-Last-State inklusive Guardrail-Reset und Tax-State-Erhalt vor. Fehlende, inkompatible oder nach dem Handshake ausgetauschte Engines blockieren vor dem Lesen, Berechnen und Persistieren; ein laufender Script-Tag wird nicht nachtraeglich fuer Cache-Busting umgeschrieben.
-4. `balance-main.js` reicht die Inputs erst nach erfolgreichem Gate an `EngineAPI.simulateSingleYear()` weiter. Im Multi-Profil-Fall entsteht genau ein Haushaltslauf; dessen entschiedene Jahresentnahme wird danach centgenau auf feste Profil-Finanzierungsinputs verteilt und nicht erneut als Flex-/Einkommensentscheidung gerechnet.
-5. `balance-action-postprocessor.js` merged die Profil-Finanzierungs-Actions und kapselt Single-3-Bucket-Postprocessing.
+4. `balance-main.js` reicht die Inputs erst nach erfolgreichem Gate an `EngineAPI.simulateSingleYear()` weiter. Im Multi-Profil-Fall entsteht genau ein Haushaltslauf mit dem profilmarkierten Haushaltstranchenpool; dessen Aktion wird genau einmal durch die Haushalts-3-Bucket-/Bond-Logik finalisiert.
+5. `profilverbund-action-attribution.js` attribuiert die finalen Quellen und Verwendungen auf Profile, reconciliert die Profilsteuern und aktualisiert die Liquiditaets-KPIs. Es gibt keine technischen Profil-Engine-Laeufe. `balance-action-postprocessor.js` fuehrt nur im Single-Profil-Pfad 3-Bucket aus und reicht die Profilverbund-Aktion unveraendert weiter.
 6. `balance-renderer.js` aktualisiert UI-Komponenten und Statusanzeigen mit dem Pipeline-Payload.
 7. `balance-update-pipeline.js` kapselt Diagnose-Anreicherung, Persistenzentscheidung und Ausgabenbudget. `update()` gibt maschinenlesbar `success`, `validation_error`, `engine_error` oder `blocked` zurueck; `ok` bleibt als Kompatibilitaetswert fuer bestehende Jahresabschluss- und Importaufrufer erhalten. Persistenz ist nur im `success`-Pfad erlaubt.
 
@@ -536,13 +537,16 @@ Profile (PersistenceFacade; aktuell Legacy-localStorage-Backend) → app/profile
 
 ### Profilverbund-Verteilung (Balance-App)
 
-Floor, Flex, Dynamic Flex sowie Renten und sonstige Einkuenfte werden genau einmal im Haushalts-Engine-Lauf verarbeitet. Das Haushaltsresultat ist zugleich das gerenderte Hauptergebnis. Nur die entschiedene Netto-Jahresentnahme wird anschließend auf Profile verteilt; deren Engine-Inputs enthalten einen festen Floor-Finanzierungsanteil und weder Flex noch erneut anzurechnendes Einkommen. Nicht allokierbarer Bedarf blockiert die Profil-Läufe. Haushalts-Guardrail-State und profilbezogener Steuer-State werden getrennt gespeichert.
+Floor, Flex, Dynamic Flex, Renten, sonstige Einkuenfte und die strategische Transaktionsentscheidung werden genau einmal im Haushalts-Engine-Lauf verarbeitet. Der Lauf erhaelt einen vollstaendigen, nicht mutierend kopierten Tranchenpool mit `sourceProfileId`. 3-Bucket und Bond-Wiederauffuellung laufen danach genau einmal auf Haushaltsebene. Das so finalisierte Haushaltsresultat ist die einzige gerenderte Handlungsempfehlung.
+
+Profilaktionen sind anschliessend reine Attributionen dieser Haushaltsaktion. Sie duerfen weder neue Kauf-/Verkaufszwecke noch gegenlaeufige Transaktionen erzeugen. Jede Verkaufstranche behaelt ihre Profilherkunft; je Profil wird aus dem finalen Rohaggregat genau ein Steuerabschluss berechnet. Die Haushaltssteuer ist die Summe der Profilsteuern. Quellen, Steuer und Nettoverwendungen muessen innerhalb 0,01 EUR reconciliert sein, sonst blockiert der Pfad fail-closed. Die Liquiditaetsdeckung und Runway-Diagnose werden aus dem Cashflow der finalen Aktion abgeleitet. Haushalts-Guardrail-State und profilbezogener Steuer-State werden getrennt gespeichert.
 
 **Verteilungsmodi:**
-- `tax_optimized`: Profil mit geringerer Steuerlast zuerst
-- `proportional`: Nach Vermögensanteil (Default)
-- `runway_first`: Profil mit größerer Runway trägt mehr
-- Entnahmen nutzen Cash/Geldmarkt vor Tranchenauswahl; Asset-Summaries verwenden Detailtranchen statt aggregierte Depotwerte, wenn Detailtranchen vorhanden sind.
+- `tax_optimized`: geeignete Verkaufstranchen werden global nach aktueller marginaler Profilsteuer gewählt; Verlusttopf, Pauschbetrag, Kirchensteuer, Kostenbasis und Teilfreistellung bleiben dem Eigentuemer zugeordnet
+- `proportional`: Quellenattribution nach Vermögensanteil (Default)
+- `runway_first`: Quellenattribution nach Runway-Ziel
+- Die Modi beeinflussen die Quellenattribution und die reine Anzeigeaufteilung, nicht die Haushaltszwecke.
+- Entnahmen nutzen Cash/Geldmarkt vor Tranchenauswahl; Asset-Summaries verwenden Detailtranchen statt aggregierte Depotwerte, wenn Detailtranchen vorhanden sind. Synthetische Fallback-Tranchen bleiben profilmarkiert.
 
 ### Gold-Validierung
 
