@@ -103,7 +103,7 @@ Der Preisservice liefert ein Objekt statt einer bloßen Zahl. Browser-Node-Proxy
 | 3 | [Persistenz und Recovery](./SLICE_TRANCHENMANAGEMENT_03_PERSISTENCE_RECOVERY.md) | valid/empty/corrupt/unavailable, Flush, Profil-Handoff | Slice 02 | 9 | freigegeben |
 | 4 | [CRUD, UX und Accessibility](./SLICE_TRANCHENMANAGEMENT_04_CRUD_UX_ACCESSIBILITY.md) | sichere Eingabe und bedienbare Darstellung | Slice 03 | 10 | freigegeben |
 | 5 | [Quote- und Währungscontract](./SLICE_TRANCHENMANAGEMENT_05_QUOTE_CURRENCY_RESILIENCE.md) | EUR-/Stichtagscontract, Batch und Proxyparität | Slice 02, 03 | 8 | freigegeben |
-| 6 | [Balance-, Status- und Steuerparität](./SLICE_TRANCHENMANAGEMENT_06_BALANCE_STATUS_TAX_PARITY.md) | Einheiten, TQF, Status und Klassifikation | Slice 02, 03 | 9 | geplant |
+| 6 | [Balance-, Status- und Steuerparität](./SLICE_TRANCHENMANAGEMENT_06_BALANCE_STATUS_TAX_PARITY.md) | Einheiten, TQF, Status und Klassifikation | Slice 02, 03 | 9 | umgesetzt; Review ausstehend |
 | 7 | [Simulator-Provenienz und Lot-Invarianten](./SLICE_TRANCHENMANAGEMENT_07_SIMULATOR_PROVENANCE_LOTS.md) | Herkunft, Geldmarkt und In-Memory-Lots | Slice 02, 06 | 10 | geplant |
 | 8 | [Reconciliation-Workflow](./SLICE_TRANCHENMANAGEMENT_08_RECONCILIATION_WORKFLOW.md) | bestätigte reale Bestandsfortschreibung idempotent umsetzen | Slice 03, 06, 07 | 9 | geplant |
 | 9 | [E2E, Migration und Dokumentation](./SLICE_TRANCHENMANAGEMENT_09_E2E_MIGRATION_DOCUMENTATION.md) | vollständige Gates und Doku-Sync | Slices 01-08 | 6 (5 Tests + Handbuch-HTML), plus Markdown | geplant |
@@ -196,6 +196,27 @@ Die Reihenfolge ist verbindlich, solange das Planreview sie nicht ändert. Für 
   Kurs und ein Batch ohne Erfolg schreibt nicht.
 - Verifiziert: 104 Node-Testdateien, 4204/4204 Assertions, 0 Fehler, 0 offene
   Handles; elf grüne Browser-Smoke-Szenarien; 8/8 Rust-Tests. Review und Freigabe
+  stehen aus.
+
+### Rückdokumentation Slice 06
+
+- Status und Balance-Reader unterscheiden `not_loaded`, `empty`, `valid` und
+  `error`. Nur ein valider nichtleerer Bestand aktiviert FIFO; ein korrupter
+  Bestand fällt nicht auf DOM-, Aggregate- oder aktuellen Profilbestand zurück.
+- Ein explizites leeres Haushalts-/Profil-Override bleibt als `[]` erhalten,
+  unterdrückt veraltete Balance-Aggregate und erzeugt keine synthetischen Lots.
+- Balance, Profilverbund, Action-Attribution und Statusaggregation verwenden die
+  disjunkte Kategorie-/Typ-Matrix aus Slice 02. Geldmarkt und Gold werden nicht als
+  Aktienbestand doppelt gezählt; ein Widerspruch endet fail-closed.
+- `kirchensteuerSatz` bleibt von der Balance-UI bis zur Steuerberechnung die
+  Dezimalrate `0.08` beziehungsweise `0.09`. Die steuerorientierte Auswahl bezieht
+  lotbezogene TQF ein; fehlende TQF wird nicht mehr still als 30 % geraten.
+- Negative Statusrenditen werden ohne `+-` dargestellt. Geldmarkt-Synchronisation
+  ersetzt den Aggregatwert und addiert keine zweite Position.
+- Direkte Produktionstests ersetzen die bisherige lokale Aggregationskopie als
+  Nachweis. Verifiziert: 105 Node-Testdateien, 4253/4253 Assertions, 0 Fehler,
+  0 offene Handles sowie elf grüne Browser-Smoke-Szenarien. Snapshot-, Backtest-
+  und FlowDelta-Gates blieben ohne unerwartete Abweichung. Review und Freigabe
   stehen aus.
 
 ## GAP-Zuordnung

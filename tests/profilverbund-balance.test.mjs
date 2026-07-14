@@ -21,6 +21,7 @@ import {
     ensureProfileRegistry,
     updateProfileData
 } from '../app/profile/profile-storage.js';
+import { CONFIG } from '../app/balance/balance-config.js';
 
 console.log('--- Profilverbund Balance Tests ---');
 
@@ -97,10 +98,16 @@ global.localStorage = createLocalStorageMock();
         depotwertNeu: 0,
         costBasisAlt: 50,
         costBasisNeu: 0,
-        kirchensteuerSatz: 9
+        kirchensteuerSatz: 0.09
     };
     const taxPerEuro = calculateTaxPerEuro(inputs);
     assertClose(taxPerEuro, 0.143125, 0.0001, 'Tax per euro should reflect gain ratio and tax rate');
+    assertClose(
+        calculateTaxPerEuro({ ...inputs, kirchensteuerSatz: 0.08 }),
+        0.141875,
+        0.0001,
+        'Balance UI church-tax ratio 0.08 should be interpreted exactly once'
+    );
 }
 
 // --- TEST 3: Proportional Distribution ---
@@ -183,8 +190,8 @@ global.localStorage = createLocalStorageMock();
                 geldmarktEtf: 50
             },
             tranches: [
-                { trancheId: 'old-low', marketValue: 200, costBasis: 190, category: 'equity', purchaseDate: '2010-01-01' },
-                { trancheId: 'new-high', marketValue: 200, costBasis: 100, category: 'equity', purchaseDate: '2020-01-01' }
+                { trancheId: 'old-low', marketValue: 200, costBasis: 190, type: 'aktien_neu', category: 'equity', tqf: 0, purchaseDate: '2010-01-01' },
+                { trancheId: 'new-high', marketValue: 200, costBasis: 100, type: 'aktien_neu', category: 'equity', tqf: 0, purchaseDate: '2020-01-01' }
             ]
         }
     ];
@@ -201,8 +208,8 @@ global.localStorage = createLocalStorageMock();
 {
     console.log('\n📋 Test 5: selectTranchesForSale');
     const tranches = [
-        { marketValue: 100, costBasis: 90, category: 'equity', purchaseDate: '2020-01-01' },
-        { marketValue: 100, costBasis: 10, category: 'equity', purchaseDate: '2019-01-01' }
+        { marketValue: 100, costBasis: 90, type: 'aktien_neu', category: 'equity', tqf: 0, purchaseDate: '2020-01-01' },
+        { marketValue: 100, costBasis: 10, type: 'aktien_neu', category: 'equity', tqf: 0, purchaseDate: '2019-01-01' }
     ];
     const selections = selectTranchesForSale(tranches, 150);
     assertEqual(selections.length, 2, 'Two tranches should be used to reach target');
@@ -214,11 +221,11 @@ global.localStorage = createLocalStorageMock();
 {
     console.log('\n📋 Test 6: selectTranchesForSale mixed categories');
     const tranches = [
-        { marketValue: 100, costBasis: 90, category: 'equity', purchaseDate: '2010-01-01', name: 'A' }, // low tax, older
-        { marketValue: 50, costBasis: 45, category: 'equity', purchaseDate: '2020-01-01', name: 'B' },  // low tax, newer
-        { marketValue: 100, costBasis: 50, category: 'equity', purchaseDate: '2015-01-01', name: 'C' }, // higher tax
-        { marketValue: 80, costBasis: 80, category: 'gold', purchaseDate: '2012-01-01', name: 'Gold' },
-        { marketValue: 60, costBasis: 60, category: 'money_market', purchaseDate: '2011-01-01', name: 'MM' }
+        { marketValue: 100, costBasis: 90, type: 'aktien_neu', category: 'equity', tqf: 0, purchaseDate: '2010-01-01', name: 'A' }, // low tax, older
+        { marketValue: 50, costBasis: 45, type: 'aktien_neu', category: 'equity', tqf: 0, purchaseDate: '2020-01-01', name: 'B' },  // low tax, newer
+        { marketValue: 100, costBasis: 50, type: 'aktien_neu', category: 'equity', tqf: 0, purchaseDate: '2015-01-01', name: 'C' }, // higher tax
+        { marketValue: 80, costBasis: 80, type: 'gold', category: 'gold', tqf: 0, purchaseDate: '2012-01-01', name: 'Gold' },
+        { marketValue: 60, costBasis: 60, type: 'geldmarkt', category: 'money_market', tqf: 0, purchaseDate: '2011-01-01', name: 'MM' }
     ];
 
     const selections = selectTranchesForSale(tranches, 120);
@@ -227,6 +234,17 @@ global.localStorage = createLocalStorageMock();
     assertEqual(selections[1].tranche.name, 'B', 'Second low-tax tranche should fill remaining');
     assertEqual(selections[0].sellAmount, 100, 'First tranche fully sold');
     assertEqual(selections[1].sellAmount, 20, 'Second tranche partially sold to reach target');
+}
+
+// --- TEST 6b: Teilfreistellung beeinflusst die steuerorientierte Auswahl ---
+{
+    console.log('\n📋 Test 6b: TQF-aware tranche selection');
+    const selections = selectTranchesForSale([
+        { trancheId: 'no-tqf', type: 'aktien_neu', category: 'equity', marketValue: 100, costBasis: 50, tqf: 0, purchaseDate: '2010-01-01' },
+        { trancheId: 'tqf-30', type: 'aktien_neu', category: 'equity', marketValue: 100, costBasis: 50, tqf: 0.30, purchaseDate: '2020-01-01' }
+    ], 100);
+    assertEqual(selections[0].tranche.trancheId, 'tqf-30', '30% TQF should beat an otherwise identical taxable lot');
+    assertClose(selections[0].taxAmount, 100 * 0.5 * 0.7 * 0.26375, 0.0001, 'Selection tax should use the confirmed lot TQF');
 }
 
 // --- TEST 7: Profiles without saved balance state still load via overrides/tranches ---
@@ -240,8 +258,8 @@ global.localStorage = createLocalStorageMock();
         profile_tagesgeld: '25000',
         profile_rente_monatlich: '1200',
         depot_tranchen: JSON.stringify([
-            { trancheId: 't1', marketValue: 100000, costBasis: 80000, category: 'equity', type: 'aktien_alt' },
-            { trancheId: 't2', marketValue: 15000, costBasis: 15000, category: 'money_market', type: 'geldmarkt' }
+            { trancheId: 't1', name: 'Alt ETF', shares: 100, purchasePrice: 800, currentPrice: 1000, category: 'equity', type: 'aktien_alt', tqf: 0 },
+            { trancheId: 't2', name: 'Money Market', shares: 15, purchasePrice: 1000, currentPrice: 1000, category: 'money_market', type: 'geldmarkt', tqf: 0 }
         ])
     });
 
@@ -254,6 +272,44 @@ global.localStorage = createLocalStorageMock();
     assertEqual(loaded.inputs.depotwertAlt, 100000, 'Equity-Tranche sollte als Depotwert übernommen werden');
     assertEqual(loaded.inputs.geldmarktEtf, 15000, 'Money-Market-Tranche sollte übernommen werden');
     assertEqual(loaded.tranches.length, 2, 'Tranchen sollten erhalten bleiben');
+}
+
+// --- TEST 7b: Explicit empty profile tranches never synthesize stale balance holdings ---
+{
+    console.log('\n📋 Test 7b: explicit empty profile tranche override');
+    localStorage.clear();
+    ensureProfileRegistry();
+    const profile = createProfile('Explizit leer');
+    updateProfileData(profile.id, {
+        [CONFIG.STORAGE.LS_KEY]: JSON.stringify({
+            inputs: {
+                depotwertAlt: 90000,
+                depotwertNeu: 80000,
+                geldmarktEtf: 70000,
+                goldWert: 60000,
+                costBasisAlt: 50000,
+                costBasisNeu: 40000,
+                goldCost: 30000
+            }
+        }),
+        depot_tranchen: '[]'
+    });
+
+    const loaded = loadProfilverbundProfiles().find(entry => entry.profileId === profile.id);
+    assert(loaded, 'Explicit empty profile should remain part of the household');
+    assertEqual(loaded.trancheStatus, 'empty', 'Explicit [] should retain the empty status');
+    assertEqual(loaded.inputs.depotwertAlt, 0, 'Explicit [] must clear stale aggregate equity');
+    assertEqual(loaded.inputs.geldmarktEtf, 0, 'Explicit [] must clear stale aggregate money market');
+    assertEqual(buildProfileOwnedTranches(loaded).length, 0, 'Explicit [] must not create synthetic fallback lots');
+
+    updateProfileData(profile.id, { depot_tranchen: 'nicht-json{{' });
+    let corruptError = null;
+    try {
+        loadProfilverbundProfiles();
+    } catch (error) {
+        corruptError = error;
+    }
+    assertEqual(corruptError?.code, 'TRANCHE_STORAGE_CORRUPT', 'Corrupt profile tranches must fail closed instead of falling back');
 }
 
 // --- TEST 8: Asset summaries prefer detailed tranches over aggregate fields ---
@@ -369,6 +425,7 @@ global.localStorage = createLocalStorageMock();
             brutto: 40000,
             steuer: 0,
             netto: 40000,
+            tqf: 0,
             realizedGainSigned: 0,
             taxableAfterTqfSigned: 0
         }],
@@ -409,10 +466,12 @@ global.localStorage = createLocalStorageMock();
         quellen: [
             {
                 kind: 'aktien_neu', sourceProfileId: 'gain', brutto: 10000, steuer: 0, netto: 10000,
+                tqf: 0.30,
                 realizedGainSigned: 5000, taxableAfterTqfSigned: 3500
             },
             {
                 kind: 'aktien_neu', sourceProfileId: 'loss', brutto: 5000, steuer: 0, netto: 5000,
+                tqf: 0.30,
                 realizedGainSigned: -1000, taxableAfterTqfSigned: -700
             }
         ],
@@ -574,7 +633,7 @@ global.localStorage = createLocalStorageMock();
             inputs: { depotwertNeu: 0, tagesgeld: 0, geldmarktEtf: 20000, sparerPauschbetrag: 0, kirchensteuerSatz: 0 },
             tranches: [{
                 trancheId: 'legacy-money-market', name: 'Overnight Rate ETF',
-                type: 'aktien_neu', category: 'money_market',
+                type: 'geldmarkt', category: 'money_market',
                 marketValue: 20000, costBasis: 20000, tqf: 0
             }],
             balanceState: { lastState: { taxState: { lossCarry: 0 } } }
@@ -592,12 +651,26 @@ global.localStorage = createLocalStorageMock();
 
     const result = attributeHouseholdAction({ householdAction, profiles, mode: 'tax_optimized' });
     assertEqual(result.finalAction.quellen.length, 1, 'The unchanged household purpose should need one equity source');
-    assertEqual(result.finalAction.quellen[0].trancheId, 'real-equity', 'Explicit money-market category must override a stale equity type');
+    assertEqual(result.finalAction.quellen[0].trancheId, 'real-equity', 'Canonical money-market lot must not become an equity sale');
     assertEqual(result.finalAction.quellen[0].sourceProfileId, 'equity-owner', 'Money-market owner must not receive an equity sale');
     assertClose(calculateActionLiquidityDelta({
         quellen: [{ kind: 'geldmarkt', category: 'money_market', brutto: 10000 }],
         verwendungen: { liquiditaet: 10000 }
     }), 0, 0.001, 'Moving money market to cash must not increase total household liquidity');
+
+    const mismatchedProfiles = profiles.map(profile => profile.profileId !== 'money-market-owner'
+        ? profile
+        : {
+            ...profile,
+            tranches: profile.tranches.map(tranche => ({ ...tranche, type: 'aktien_neu' }))
+        });
+    let mismatchError = null;
+    try {
+        attributeHouseholdAction({ householdAction, profiles: mismatchedProfiles, mode: 'tax_optimized' });
+    } catch (error) {
+        mismatchError = error;
+    }
+    assertEqual(mismatchError?.code, 'TRANCHE_VALIDATION_FAILED', 'Contradictory category/type pairs must fail closed');
 }
 
 // --- TEST 10: Proportional allocation is cent-exact and deterministic ---

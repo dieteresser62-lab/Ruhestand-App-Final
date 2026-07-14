@@ -210,6 +210,30 @@ Damit ist TM-01 kein theoretisches Risiko. Die Behebung verändert das Verhalten
   0 offenen Handles, elf grüne Browser-Smoke-Szenarien und 8/8 Rust-Tests. Review
   und Freigabe von Slice 05 stehen aus.
 
+### Rückdokumentation Slice 06
+
+- Der Slice-06-Anteil von TM-03 ist implementiert: Balance-Reader,
+  Statusaggregation und Profilverbund klassifizieren über den gemeinsamen Contract
+  und übernehmen dessen normalisierte Marktwerte, Cost Basis und TQF.
+- TM-06 ist implementiert: `0.08`/`0.09` bleiben Dezimalraten und werden nicht
+  erneut durch 100 geteilt. TQF reduziert die steuerorientierte Lotkennzahl; eine
+  fehlende TQF wird in der Attribution nicht still durch 30 % ersetzt.
+- Der Slice-06-Anteil von TM-08 ist implementiert: Geldmarkt wird in Status und
+  Haushaltsattribution genau einer Liquiditätsklasse zugeordnet; die Sync-Funktion
+  ersetzt den Aggregatwert, statt eine Detailposition hinzuzurechnen. Die
+  Simulator-Lot-Invarianten bleiben planmäßig Slice 07.
+- TM-12 ist für die Slice-Akzeptanz implementiert: `not_loaded`, `empty`, `valid`
+  und `error` sind sichtbar getrennt; ein leeres Haushalts-/Profil-Override bleibt
+  leer und korrupte Daten fallen nicht auf aktuellen Profilbestand oder DOM zurück.
+- Der Slice-06-Anteil von TM-17/TM-20 ist implementiert: Der Produktionsreader und
+  der echte Status-/Sync-Pfad werden direkt getestet; negative Renditen enthalten
+  kein doppeltes Vorzeichen. Die querschnittliche E2E-/Migrationskette folgt in
+  Slice 09.
+- Verifikation: 105 Node-Testdateien mit 4253/4253 Assertions, 0 Fehlern und
+  0 offenen Handles sowie elf grüne Browser-Smoke-Szenarien. Golden Cases,
+  Snapshots, historischer Backtest und FlowDelta blieben ohne unerwartete
+  Abweichung. Review und Freigabe von Slice 06 stehen aus.
+
 Diese Tests werden erweitert oder als Regression-Gates verwendet; parallele Test-Doppelungen sind nicht vorgesehen.
 
 ## Nutzerentscheidungen für das Planreview

@@ -91,6 +91,29 @@ const baseContext = { saleBudgets: {} }; // No budget limits
     console.log('✅ KESt Logic works');
 }
 
+// --- TEST 1b: Kirchensteuer-Einheit aus der Balance-UI ---
+{
+    for (const kirchensteuerSatz of [0.08, 0.09]) {
+        const input = getBaseInputs();
+        input.kirchensteuerSatz = kirchensteuerSatz;
+        const result = TransactionEngine.calculateSaleAndTax(
+            20000,
+            input,
+            baseContext,
+            baseMarket,
+            false
+        );
+        const expectedTax = 10000 * 0.25 * (1 + 0.055 + kirchensteuerSatz);
+        assertClose(
+            result.steuerGesamt,
+            expectedTax,
+            0.01,
+            `Church-tax ratio ${kirchensteuerSatz} should be interpreted exactly once`
+        );
+    }
+    console.log('✅ Balance UI church-tax decimal unit matches the engine contract');
+}
+
 // --- TEST 2: Teilfreistellung (TQF) ---
 {
     const input = getBaseInputs();

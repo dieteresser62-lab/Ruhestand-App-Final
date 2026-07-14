@@ -9,6 +9,25 @@
 
 import { EUR_NO_DEC_FORMATTER } from '../shared/shared-formatting.js';
 import { persistenceStorage } from '../shared/persistence-facade.js';
+import { loadTranchesFromStorage } from './tranchen-manager-state.js';
+import {
+    classifyTranche,
+    normalizeTrancheCollection
+} from '../../types/tranche-contract.js';
+
+export const TRANCHE_STATUS_STATES = Object.freeze({
+    NOT_LOADED: 'not_loaded',
+    EMPTY: 'empty',
+    VALID: 'valid',
+    ERROR: 'error'
+});
+
+function emptyWarnings() {
+    return {
+        missingMarketValueCount: 0,
+        missingCostBasisCount: 0
+    };
+}
 
 function resolveTrancheMarketValue(tranche) {
     // Priorität: expliziter MarketValue > Shares * CurrentPrice.
@@ -55,110 +74,92 @@ function hasCostBasisInput(tranche) {
 }
 
 
+function summarizeValidTranches(tranches, source) {
+    let missingMarketValueCount = 0;
+    let missingCostBasisCount = 0;
+    const totalValue = tranches.reduce((sum, tranche) => {
+        if (!hasMarketValueInput(tranche)) missingMarketValueCount += 1;
+        return sum + resolveTrancheMarketValue(tranche);
+    }, 0);
+    const totalCost = tranches.reduce((sum, tranche) => {
+        if (!hasCostBasisInput(tranche)) missingCostBasisCount += 1;
+        return sum + resolveTrancheCostBasis(tranche);
+    }, 0);
+    const totalGain = totalValue - totalCost;
+    return {
+        state: TRANCHE_STATUS_STATES.VALID,
+        source,
+        loaded: true,
+        count: tranches.length,
+        totalValue,
+        totalCost,
+        totalGain,
+        gainPct: totalCost > 0 ? (totalGain / totalCost) * 100 : 0,
+        tranches,
+        warnings: {
+            missingMarketValueCount,
+            missingCostBasisCount
+        },
+        errorCode: null,
+        error: null
+    };
+}
+
+function createNonValidStatus(state, source, errorCode = null) {
+    return {
+        state,
+        source,
+        loaded: false,
+        count: 0,
+        totalValue: 0,
+        totalCost: 0,
+        totalGain: 0,
+        gainPct: 0,
+        tranches: [],
+        warnings: emptyWarnings(),
+        errorCode,
+        error: errorCode
+    };
+}
+
 /**
- * Lädt Tranchen aus localStorage und gibt Statistiken zurück
+ * Liefert den expliziten Status des kanonischen Tranchenbestands.
+ * Ein Profilverbund-Override hat auch als leeres Array Vorrang vor dem
+ * aktuell im Profil-Storage liegenden Bestand.
  */
-export function getTranchenStatus() {
-    try {
-        const override = (typeof window !== 'undefined') ? window.__profilverbundTranchenOverride : null;
-        if (Array.isArray(override) && override.length > 0) {
-            const tranches = override;
-            let missingMarketValueCount = 0;
-            let missingCostBasisCount = 0;
-            const totalValue = tranches.reduce((sum, t) => {
-                if (!hasMarketValueInput(t)) {
-                    missingMarketValueCount += 1;
-                }
-                return sum + resolveTrancheMarketValue(t);
-            }, 0);
-            const totalCost = tranches.reduce((sum, t) => {
-                if (!hasCostBasisInput(t)) {
-                    missingCostBasisCount += 1;
-                }
-                return sum + resolveTrancheCostBasis(t);
-            }, 0);
-            const totalGain = totalValue - totalCost;
-            const gainPct = totalCost > 0 ? (totalGain / totalCost) * 100 : 0;
-            return {
-                loaded: true,
-                count: tranches.length,
-                totalValue,
-                totalCost,
-                totalGain,
-                gainPct,
-                tranches,
-                warnings: {
-                    missingMarketValueCount,
-                    missingCostBasisCount
-                }
-            };
+export function getTranchenStatus({ storage = persistenceStorage } = {}) {
+    const override = (typeof window !== 'undefined') ? window.__profilverbundTranchenOverride : null;
+    if (Array.isArray(override)) {
+        if (override.length === 0) {
+            return createNonValidStatus(TRANCHE_STATUS_STATES.EMPTY, 'override');
         }
-
-        const saved = persistenceStorage.getItem('depot_tranchen');
-        if (!saved) {
-            return {
-                loaded: false,
-                count: 0,
-                totalValue: 0,
-                totalCost: 0,
-                totalGain: 0,
-                gainPct: 0,
-                tranches: [],
-                warnings: {
-                    missingMarketValueCount: 0,
-                    missingCostBasisCount: 0
-                }
-            };
+        try {
+            const tranches = normalizeTrancheCollection(override, { mode: 'engine' });
+            return summarizeValidTranches(tranches, 'override');
+        } catch (error) {
+            return createNonValidStatus(
+                TRANCHE_STATUS_STATES.ERROR,
+                'override',
+                error?.code || 'TRANCHE_OVERRIDE_INVALID'
+            );
         }
-
-        const tranches = JSON.parse(saved);
-        let missingMarketValueCount = 0;
-        let missingCostBasisCount = 0;
-        const totalValue = tranches.reduce((sum, t) => {
-            if (!hasMarketValueInput(t)) {
-                missingMarketValueCount += 1;
-            }
-            return sum + resolveTrancheMarketValue(t);
-        }, 0);
-        const totalCost = tranches.reduce((sum, t) => {
-            if (!hasCostBasisInput(t)) {
-                missingCostBasisCount += 1;
-            }
-            return sum + resolveTrancheCostBasis(t);
-        }, 0);
-        const totalGain = totalValue - totalCost;
-        const gainPct = totalCost > 0 ? (totalGain / totalCost) * 100 : 0;
-
-        return {
-            loaded: true,
-            count: tranches.length,
-            totalValue,
-            totalCost,
-            totalGain,
-            gainPct,
-            tranches,
-            warnings: {
-                missingMarketValueCount,
-                missingCostBasisCount
-            }
-        };
-    } catch (err) {
-        console.error('Fehler beim Laden der Tranchen-Status:', err);
-        return {
-            loaded: false,
-            count: 0,
-            totalValue: 0,
-            totalCost: 0,
-            totalGain: 0,
-            gainPct: 0,
-            tranches: [],
-            warnings: {
-                missingMarketValueCount: 0,
-                missingCostBasisCount: 0
-            },
-            error: err.message
-        };
     }
+
+    const loaded = loadTranchesFromStorage(storage);
+    if (loaded.status === 'valid') {
+        return summarizeValidTranches(loaded.tranches, 'storage');
+    }
+    if (loaded.status === 'empty') {
+        const state = loaded.raw === null || loaded.raw === ''
+            ? TRANCHE_STATUS_STATES.NOT_LOADED
+            : TRANCHE_STATUS_STATES.EMPTY;
+        return createNonValidStatus(state, 'storage');
+    }
+    return createNonValidStatus(
+        TRANCHE_STATUS_STATES.ERROR,
+        'storage',
+        loaded.errorCode || 'TRANCHE_STORAGE_ERROR'
+    );
 }
 
 /**
@@ -176,21 +177,44 @@ export function renderTranchenStatusBadge(containerId) {
 
     const status = getTranchenStatus();
 
-    if (!status.loaded) {
+    if (status.state !== TRANCHE_STATUS_STATES.VALID) {
+        const variants = {
+            [TRANCHE_STATUS_STATES.NOT_LOADED]: {
+                icon: 'ℹ️',
+                title: 'Keine detaillierten Tranchen geladen',
+                detail: 'Nutzen Sie das vereinfachte Alt/Neu-Modell.',
+                background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+                color: '#555'
+            },
+            [TRANCHE_STATUS_STATES.EMPTY]: {
+                icon: 'ℹ️',
+                title: 'Tranchenbestand ist leer',
+                detail: 'FIFO ist erst mit mindestens einer gültigen Tranche aktiv.',
+                background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+                color: '#555'
+            },
+            [TRANCHE_STATUS_STATES.ERROR]: {
+                icon: '⚠️',
+                title: 'Tranchenbestand ist fehlerhaft',
+                detail: 'Die Daten werden nicht als leerer Bestand oder Alt/Neu-Fallback verwendet.',
+                background: 'linear-gradient(135deg, #fff1f1 0%, #ffd6d6 100%)',
+                color: '#8a1f1f'
+            }
+        };
+        const variant = variants[status.state] || variants[TRANCHE_STATUS_STATES.ERROR];
         container.innerHTML = `
             <div style="
                 padding: 10px 15px;
-                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                background: ${variant.background};
                 border-radius: 8px;
                 margin-top: 10px;
                 text-align: center;
                 font-size: 0.9rem;
-                color: #555;
+                color: ${variant.color};
             ">
-                ℹ️ <strong>Keine detaillierten Tranchen geladen</strong><br>
+                ${variant.icon} <strong>${variant.title}</strong><br>
                 <span style="font-size: 0.85rem;">
-                    Nutzen Sie das vereinfachte Alt/Neu-Modell.
-                    Tranchenverwaltung erfolgt ueber die Startseite (Index.html).
+                    ${variant.detail}
                 </span>
             </div>
         `;
@@ -226,7 +250,7 @@ export function renderTranchenStatusBadge(containerId) {
                 </div>
                 <div>
                     <div style="opacity: 0.8;">Gewinn</div>
-                    <div style="font-weight: 600; font-size: 0.95rem;">+${status.gainPct.toFixed(1)}%</div>
+                    <div style="font-weight: 600; font-size: 0.95rem;">${status.gainPct > 0 ? '+' : ''}${status.gainPct.toFixed(1)}%</div>
                 </div>
             </div>
 
@@ -244,10 +268,17 @@ export function renderTranchenStatusBadge(containerId) {
  */
 export function calculateAggregatedValues(tranchesOverride = null) {
     const status = Array.isArray(tranchesOverride)
-        ? { loaded: tranchesOverride.length > 0, count: tranchesOverride.length, tranches: tranchesOverride }
+        ? (tranchesOverride.length > 0
+            ? summarizeValidTranches(normalizeTrancheCollection(tranchesOverride, { mode: 'engine' }), 'argument')
+            : createNonValidStatus(TRANCHE_STATUS_STATES.EMPTY, 'argument'))
         : getTranchenStatus();
 
-    if (!status.loaded || status.count === 0) {
+    if (status.state === TRANCHE_STATUS_STATES.ERROR) {
+        const error = new Error('Der Tranchenbestand ist fehlerhaft und kann nicht aggregiert werden.');
+        error.code = status.errorCode || 'TRANCHE_STATUS_ERROR';
+        throw error;
+    }
+    if (status.state !== TRANCHE_STATUS_STATES.VALID) {
         return null;
     }
 
@@ -261,10 +292,10 @@ export function calculateAggregatedValues(tranchesOverride = null) {
     status.tranches.forEach(t => {
         const mv = resolveTrancheMarketValue(t);
         const cb = resolveTrancheCostBasis(t);
-        const type = t.type || t.kind || '';
-        const category = t.category || '';
+        const type = t.type;
+        const category = classifyTranche(t, { allowLegacy: true });
 
-        if (category === 'bonds' || type === 'anleihe' || String(type).includes('bond') || String(category).includes('bond')) {
+        if (category === 'bonds') {
             // Also adding to neubestand for backwards compatibility, 
             // but tracking bonds independently for the UI.
             neubestand.marketValue += mv;
@@ -274,41 +305,30 @@ export function calculateAggregatedValues(tranchesOverride = null) {
             return;
         }
 
-        if (type === 'gold' || category === 'gold') {
+        if (category === 'gold') {
             gold.marketValue += mv;
             gold.costBasis += cb;
             return;
         }
 
-        if (type === 'geldmarkt' || category === 'money_market') {
+        if (category === 'money_market') {
             geldmarkt.marketValue += mv;
             geldmarkt.costBasis += cb;
             return;
         }
 
-        if (type === 'aktien_alt') {
+        if (category === 'equity' && type === 'aktien_alt') {
             altbestand.marketValue += mv;
             altbestand.costBasis += cb;
             return;
         }
 
-        if (type === 'aktien_neu') {
+        if (category === 'equity' && type === 'aktien_neu') {
             neubestand.marketValue += mv;
             neubestand.costBasis += cb;
             return;
         }
 
-        if (category === 'equity') {
-            const isAltByTax = Number(t.tqf) === 1;
-            if (isAltByTax) {
-                altbestand.marketValue += mv;
-                altbestand.costBasis += cb;
-            } else {
-                neubestand.marketValue += mv;
-                neubestand.costBasis += cb;
-            }
-            return;
-        }
     });
 
     return {
@@ -334,7 +354,16 @@ export function syncTranchenToInputs(options = {}) {
     if (preferAggregates && !Array.isArray(override)) {
         return false;
     }
-    const values = calculateAggregatedValues(override);
+    const status = getTranchenStatus();
+    if (status.state === TRANCHE_STATUS_STATES.ERROR) {
+        if (!silent) {
+            alert('Der Tranchenbestand ist fehlerhaft und wurde nicht synchronisiert.');
+        }
+        return false;
+    }
+    const values = status.state === TRANCHE_STATUS_STATES.VALID
+        ? calculateAggregatedValues(status.tranches)
+        : null;
 
     if (!values) {
         if (!silent) {
