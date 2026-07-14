@@ -310,18 +310,12 @@ await new Promise(resolve => setTimeout(resolve, 100));
 // --- 4. Verify ---
 
 // Verify Engine was called (init calls update())
-if (simulateCallCount !== 1) {
-    throw new Error(`EngineAPI.simulateSingleYear call count: Expected 1, got ${simulateCallCount}`);
-}
+assertEqual(simulateCallCount, 1, 'EngineAPI.simulateSingleYear should run exactly once during init');
 
 // Verify Footer
 const footer = document.getElementById('print-footer');
-if (!footer.textContent.includes("Engine: 31.0")) {
-    throw new Error(`Footer text incorrect. Got: '${footer.textContent}'`);
-}
-if (document.engineScript.src !== 'engine.js') {
-    throw new Error(`Engine script source was changed after handshake: ${document.engineScript.src}`);
-}
+assert(footer.textContent.includes("Engine: 31.0"), `Footer should expose Engine 31.0, got '${footer.textContent}'`);
+assertEqual(document.engineScript.src, 'engine.js', 'Engine script source should remain stable after handshake');
 
 // --- 5. Test Interaction ---
 console.log("Testing Input Change Trigger...");
@@ -342,9 +336,7 @@ formCheck.dispatchEvent(evt);
 // Wait for debounce (300ms)
 await new Promise(resolve => setTimeout(resolve, 310));
 
-if (simulateCallCount !== 2) {
-    throw new Error(`EngineAPI.simulateSingleYear call count after input: Expected 2, got ${simulateCallCount}`);
-}
+assertEqual(simulateCallCount, 2, 'Debounced input should trigger exactly one additional engine call');
 
 console.log("Testing machine-readable update results and fail-closed persistence...");
 
@@ -359,27 +351,21 @@ const assertMinimumFlexReject = (rawValue, expectedMessages) => {
     const validationCallsBefore = simulateCallCount;
     const writesBeforeValidation = storageWrites.length;
     const validationResult = balanceMain.update();
-    if (validationResult.ok || validationResult.status !== 'validation_error') {
-        throw new Error(`Validation error for ${rawValue || '<leer>'} returned unexpected result: ${JSON.stringify(validationResult)}`);
-    }
-    if (simulateCallCount !== validationCallsBefore) {
-        throw new Error(`Validation error for ${rawValue || '<leer>'} called EngineAPI.simulateSingleYear unexpectedly.`);
-    }
-    if (storageWrites.length !== writesBeforeValidation) {
-        throw new Error(`Validation error for ${rawValue || '<leer>'} persisted data unexpectedly.`);
-    }
-    if (input.value !== rawValue) {
-        throw new Error(`Validation error changed the visible minimumFlexAnnual value from ${rawValue} to ${input.value}.`);
-    }
+    assert(
+        !validationResult.ok && validationResult.status === 'validation_error',
+        `Invalid minimum flex ${rawValue || '<leer>'} should return validation_error`
+    );
+    assertEqual(simulateCallCount, validationCallsBefore, `Invalid minimum flex ${rawValue || '<leer>'} should not call the engine`);
+    assertEqual(storageWrites.length, writesBeforeValidation, `Invalid minimum flex ${rawValue || '<leer>'} should not persist data`);
+    assertEqual(input.value, rawValue, `Invalid minimum flex ${rawValue || '<leer>'} should remain visible without clamping`);
     const messages = validationResult.error?.errors?.map(entry => entry.message) || [];
     expectedMessages.forEach(message => {
-        if (!messages.includes(message)) {
-            throw new Error(`Validation error for ${rawValue || '<leer>'} misses message: ${message}`);
-        }
+        assert(messages.includes(message), `Invalid minimum flex ${rawValue || '<leer>'} should include message: ${message}`);
     });
-    if (!document.getElementById('error-container').textContent.includes('Einige Eingaben sind ungültig')) {
-        throw new Error('Validation error was not rendered through the normal UI error path.');
-    }
+    assert(
+        document.getElementById('error-container').textContent.includes('Einige Eingaben sind ungültig'),
+        'Validation error should use the normal UI error path'
+    );
 };
 
 assertMinimumFlexReject('-1', ['Mindest-Flex p.a. darf nicht negativ sein.']);
@@ -393,12 +379,11 @@ document.getElementById('minimumFlexAnnual').value = '0';
 
 engineFailure = new Error('Simulierter Engine-Fehler');
 const engineResult = balanceMain.update();
-if (engineResult.ok || engineResult.status !== 'engine_error') {
-    throw new Error(`Engine error returned unexpected result: ${JSON.stringify(engineResult)}`);
-}
-if (!document.getElementById('error-container').textContent.includes('Simulierter Engine-Fehler')) {
-    throw new Error('Engine error was not rendered through the normal UI error path.');
-}
+assert(!engineResult.ok && engineResult.status === 'engine_error', 'Engine failures should return engine_error');
+assert(
+    document.getElementById('error-container').textContent.includes('Simulierter Engine-Fehler'),
+    'Engine error should use the normal UI error path'
+);
 engineFailure = null;
 
 let incompatibleCalls = 0;
@@ -411,24 +396,17 @@ global.window.EngineAPI = {
 };
 const writesBeforeBlocked = storageWrites.length;
 const blockedResult = balanceMain.update();
-if (blockedResult.ok || blockedResult.status !== 'blocked' || blockedResult.reason !== 'contract_changed') {
-    throw new Error(`Incompatible engine returned unexpected result: ${JSON.stringify(blockedResult)}`);
-}
-if (incompatibleCalls !== 0) {
-    throw new Error('Incompatible EngineAPI.simulateSingleYear was called.');
-}
-if (storageWrites.length !== writesBeforeBlocked) {
-    throw new Error('Blocked engine update wrote Balance or profile state.');
-}
+assert(
+    !blockedResult.ok && blockedResult.status === 'blocked' && blockedResult.reason === 'contract_changed',
+    'Incompatible engine should return the contract_changed block reason'
+);
+assertEqual(incompatibleCalls, 0, 'Incompatible EngineAPI should not execute simulateSingleYear');
+assertEqual(storageWrites.length, writesBeforeBlocked, 'Blocked engine update should not persist Balance or profile state');
 
 delete global.window.EngineAPI;
 const missingResult = balanceMain.update();
-if (missingResult.ok || missingResult.status !== 'blocked') {
-    throw new Error(`Missing engine returned unexpected result: ${JSON.stringify(missingResult)}`);
-}
-if (storageWrites.length !== writesBeforeBlocked) {
-    throw new Error('Missing engine update wrote Balance or profile state.');
-}
+assert(!missingResult.ok && missingResult.status === 'blocked', 'Missing engine should block the update');
+assertEqual(storageWrites.length, writesBeforeBlocked, 'Missing engine update should not persist Balance or profile state');
 
 global.window.EngineAPI = compatibleEngine;
 

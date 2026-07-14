@@ -92,7 +92,7 @@ Der Preisservice liefert ein Objekt statt einer bloßen Zahl. Browser-Node-Proxy
 
 | Nr. | Slice | Hauptziel | Abhängigkeit | Max. geplante Programmdateien | Status |
 | ---: | --- | --- | --- | ---: | --- |
-| 1 | [Test-Gate und Baseline](./SLICE_TRANCHENMANAGEMENT_01_TEST_GATE_BASELINE.md) | assertionslose False-Green-Pfade schließen | Planfreigabe | 5 | geplant |
+| 1 | [Test-Gate und Baseline](./SLICE_TRANCHENMANAGEMENT_01_TEST_GATE_BASELINE.md) | assertionslose False-Green-Pfade schließen | Planfreigabe | 5 | freigegeben |
 | 2 | [Kanonischer Datencontract](./SLICE_TRANCHENMANAGEMENT_02_CANONICAL_DATA_CONTRACT.md) | Schema, Klassifikation und Doppelverkauf beheben | Slice 01 | 10 inklusive generiertem `engine.js` | geplant |
 | 3 | [Persistenz und Recovery](./SLICE_TRANCHENMANAGEMENT_03_PERSISTENCE_RECOVERY.md) | valid/empty/corrupt/unavailable, Flush, Profil-Handoff | Slice 02 | 9 | geplant |
 | 4 | [CRUD, UX und Accessibility](./SLICE_TRANCHENMANAGEMENT_04_CRUD_UX_ACCESSIBILITY.md) | sichere Eingabe und bedienbare Darstellung | Slice 03 | 10 | geplant |
@@ -103,6 +103,14 @@ Der Preisservice liefert ein Objekt statt einer bloßen Zahl. Browser-Node-Proxy
 | 9 | [E2E, Migration und Dokumentation](./SLICE_TRANCHENMANAGEMENT_09_E2E_MIGRATION_DOCUMENTATION.md) | vollständige Gates und Doku-Sync | Slices 01-08 | 6 (5 Tests + Handbuch-HTML), plus Markdown | geplant |
 
 Die Reihenfolge ist verbindlich, solange das Planreview sie nicht ändert. Für Slice 08 ist durch O-09 der explizite Reconcile-Workflow festgelegt; eine rein beratende No-Code-Variante ist nicht mehr Teil dieses Plans.
+
+### Rückdokumentation Slice 01
+
+- Der Node-Runner erzwingt pro ausgefuehrter Datei mindestens eine Assertion und berichtet Modus sowie Assertionzahl.
+- DOM-/global-nahe Tests, insbesondere `tranchen-manager-page.test.mjs`, laufen isoliert; das Browser-Smoke-Gate wird mit `npm run test:browser` als separates Pflichtgate ausgewiesen.
+- Verifizierte Baseline: 103 Dateien entdeckt, 102 ausgefuehrt, 3939 Assertions, 0 Fehler, 0 offene Handles.
+- Coverage-Baseline: 71,20% (24563/34499 Zeilen, 193 Dateien); `tranchen-manager-page.js` 51,30% statt 0%.
+- Slice 01 ist implementiert, aber noch nicht durch Gemini/Nutzer freigegeben. Slice 02 bleibt bis zur Freigabe blockiert.
 
 ## GAP-Zuordnung
 

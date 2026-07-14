@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 103 Testdateien mit 3363 erfolgreichen Assertions, 0 fehlgeschlagene Dateien und 0 offene Handles (verifiziert mit `npm test` am 2026-07-14).
+**Test-Statistik:** 103 entdeckte Testdateien, davon 102 im Node-Gate ausgeführt, mit 3939 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (verifiziert mit `npm test` am 2026-07-14). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen.
 
 Die Zahl beschreibt nur die Node-Standardsuite. `npm run test:browser`, `npm run test:coverage` und ein echter Tauri-Build sind getrennte Gates und in den Assertions nicht enthalten.
 
@@ -12,6 +12,7 @@ Die Zahl beschreibt nur die Node-Standardsuite. `npm run test:browser`, `npm run
 
 - `run-tests.mjs` - Der benutzerdefinierte Test-Runner
 - `run-single.mjs` - Führt eine einzelne Testdatei aus
+- `legacy-assertion-loader.mjs` - Zaehlt in explizit benannten Alt-Tests lokale bzw. Node-Assertions ueber den gemeinsamen Runner-Contract
 - `*.test.mjs` - Testdateien (werden automatisch vom Runner erkannt)
 
 ## How to Run Tests
@@ -23,12 +24,22 @@ npm test
 
 `npm test` fuehrt die schnelle Node-Standardsuite ueber `node tests/run-tests.mjs` aus. Die Suite enthaelt DOM-freie Engine-, Balance-, Simulator-, Profil-, Tranchen-, Persistenz-, Worker- und Tauri-Contract-Tests. Browser-Smokes und echte Tauri-Builds sind separate Gates.
 
+Der Runner sortiert alle Dateien deterministisch und meldet fuer jede Datei Modus und Assertionzahl. Die Ausfuehrungspolicy steht explizit in `TEST_EXECUTION_POLICY`:
+
+- `in-process`: DOM-freie Standardtests teilen den schnellen Hauptprozess.
+- `isolated`: DOM-/Browser-Globals, Worker-Mocks oder legacy Assertion-Helper laufen in einem eigenen Kindprozess; dessen Assertionzahlen gehen in die Gesamtsumme ein.
+- `separate-gate`: `browser-smoke.test.mjs` wird nicht still importiert, sondern mit dem Pflichtbefehl `npm run test:browser` ausgewiesen.
+
+Jede tatsaechlich ausgefuehrte Datei muss mindestens eine gezaehlte Assertion liefern. Null Assertions beenden sowohl `npm test` als auch `run-single.mjs` mit Fehler. Der Legacy-Loader gilt nur fuer die im Policy-Manifest benannten Dateien; unbekannte Import-only-Tests erhalten keinen stillen Ausnahmeweg.
+
 ### Coverage-Baseline
 ```bash
 npm run test:coverage
 ```
 
-Der Coverage-Runner loescht `.coverage/`, startet die Standardsuite mit `NODE_V8_COVERAGE` und schreibt `.coverage/summary.json`. Der Report wertet Projektdateien unter `app/`, `engine/`, `workers/` und `types/` aus. Die aktuelle Baseline aus Slice 11 liegt bei ca. 74,02% Zeilen-Coverage (23023/31105 ausfuehrbare Zeilen); sie ist ein Transparenz- und Review-Gate, noch keine harte Mindestschwelle.
+Der Coverage-Runner loescht `.coverage/`, startet die Standardsuite mit `NODE_V8_COVERAGE` und schreibt `.coverage/summary.json`. Der Report wertet Projektdateien unter `app/`, `engine/`, `workers/` und `types/` aus. Die aktuelle Baseline aus Tranchenmanagement-Slice 01 liegt bei 71,20% Zeilen-Coverage (24563/34499 ausfuehrbare Zeilen in 193 Dateien); sie ist ein Transparenz- und Review-Gate, noch keine harte Mindestschwelle.
+
+Der Prozentwert ist gegenueber der vorherigen Baseline trotz 1540 zusaetzlich abgedeckter Zeilen niedriger, weil die nun wirklich ausgefuehrten isolierten Tests weitere Laufzeitmodule und damit 3394 zusaetzliche ausfuehrbare Zeilen in den Nenner aufnehmen. `app/tranches/tranchen-manager-page.js` ist nicht mehr false-green bei 0%, sondern erreicht 51,30% (118/230 Zeilen).
 
 Bekannte Coverage-Ausnahmen:
 - UI-nahe Renderer und Page-Module koennen trotz Browser-Smoke in der V8-Zeilenmetrik niedrig oder 0% erscheinen, wenn ihre Logik nur ueber echte Browserinteraktion relevant ist.
@@ -60,6 +71,8 @@ node tests/run-single.mjs <testfile>
 # Beispiel:
 node tests/run-single.mjs core-engine.test.mjs
 ```
+
+`run-single.mjs` verwendet dieselbe dateibasierte Isolations-/Legacy-Assertion-Policy wie die Standardsuite und scheitert ebenfalls bei null Assertions.
 
 ### Direkte Ausführung
 ```bash
@@ -717,7 +730,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `profile-ui-contract.test.mjs` | ~160 | Profil-UI-Contracts, Navigation und DOM-nahe Profilaktionen |
 | `profilverbund-balance.test.mjs` | ~230 | Multi-Profil Aggregation, Entnahmeverteilung, Asset-Summaries |
 | `profilverbund-profile-gold-overrides.test.mjs` | ~160 | Gold-Parameter-Overrides |
-| `runner-contract.test.mjs` | ~170 | Test-Runner-Sortierung, Fehlerzaehlung, Isolation und QUICK_TESTS-Deprecation |
+| `runner-contract.test.mjs` | ~260 | Test-Runner-Sortierung, Null-Assertion-Gate, Isolation, separate Gates, Legacy-Zaehler und QUICK_TESTS-Deprecation |
 | `scenario-analyzer.test.mjs` | ~95 | Szenario-Tags, Vergleich |
 | `scenarios.test.mjs` | ~150 | Komplexe Lebenspfade |
 | `simulation.test.mjs` | ~200 | Simulations-Integration |
