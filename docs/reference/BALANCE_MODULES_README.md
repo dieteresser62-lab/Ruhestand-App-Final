@@ -234,13 +234,13 @@ Ausgaben-Check für monatliche CSV-Importe und Budgettracking.
 
 **Exports:**
 - `balance-expenses.js`
-  - `initExpensesTab(domRefs)` – initialisiert Tabellenaufbau, Detaildialog und Jahr-Selector
+  - `initExpensesTab(domRefs, options?)` – initialisiert Tabellenaufbau, Detaildialog und Jahr-Selector; gibt beim Start den Store-Status zurueck und rendert Korruption als gesperrten Recovery-Zustand
   - `updateExpensesBudget({ monthlyBudget, annualBudget })` – übernimmt Budgetwerte aus der Balance-Berechnung
   - `rollExpensesYear()` – schaltet auf das nächste Ausgabenjahr (Historie bleibt erhalten)
 
 **Module:**
-- `balance-expenses.js` – Controller/Fassade fuer Initialisierung, Event-Wiring, Import-/Delete-Flows und oeffentliche API.
-- `balance-expenses-storage.js` – Persistenzschema `balance_expenses_v1`, Jahr-/Monat-Container und aktive Jahr-Auswahl.
+- `balance-expenses.js` – Controller/Fassade fuer Initialisierung, Event-Wiring, Import-/Delete-Flows, Recovery-Export und bestaetigten Korruptions-Reset.
+- `balance-expenses-storage.js` – Persistenzschema `balance_expenses_v1`, expliziter `ok`-/`empty`-/`corrupt`-Ladevertrag, schreibgesperrter Korruptionspfad, Recovery-Dokument und Jahr-/Monat-Container.
 - `balance-expenses-csv.js` – CSV-Parser mit Delimiter-Erkennung (`;`, `,`, `Tab`) und Betragsnormalisierung.
 - `balance-expenses-metrics.js` – Monats-, Jahres-, Median-, Forecast- und Soll/Ist-Kennzahlen ohne DOM/localStorage.
 - `balance-expenses-renderer.js` – Year-Select, Tabelle, Summary-Karten und Detaildialog.
@@ -253,6 +253,8 @@ Ausgaben-Check für monatliche CSV-Importe und Budgettracking.
   - Jahreshochrechnung (ab 2 Datenmonaten Median statt Mittelwert)
   - Soll/Ist auf Basis importierter Monate
 - Detaildialog mit sortierter Kategorieliste und „Top 3 Kategorien“.
+- Ein JSON-/Shape-Fehler liefert ueber `loadExpensesStoreResult()` einen strukturierten `corrupt`-Status samt unveraendertem Rohinhalt. Der kompatible `loadExpensesStore()` wirft in diesem Fall, statt einen Leerzustand zu erfinden.
+- Die Recovery-UI nennt Ausgabenbereich und Backend. Ein Reset bleibt bis zum erfolgreichen Rohdatenexport gesperrt, verlangt danach eine explizite Bestaetigung und gilt erst nach erfolgreichem Facade-Flush als abgeschlossen; Abbruch und Flush-Fehler lassen den Store im gesperrten Recovery-Zustand.
 
 **Dependencies:** `balance-utils.js`, `balance-renderer.js`, `app/profile/profilverbund-balance.js`, `balance-expenses-*.js`
 

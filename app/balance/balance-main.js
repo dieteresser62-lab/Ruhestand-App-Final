@@ -26,7 +26,7 @@ import { createProfileSyncHandlers } from './balance-main-profile-sync.js';
 import { UIUtils } from './balance-utils.js';
 import { initExpensesTab, updateExpensesBudget } from './balance-expenses.js';
 import { initDynamicFlexControls } from '../simulator/simulator-main-dynamic-flex.js';
-import { init as initPersistence } from '../shared/persistence-facade.js';
+import { getPersistenceStatus, init as initPersistence } from '../shared/persistence-facade.js';
 import { PROFILE_VALUE_KEYS } from '../profile/profile-state.js';
 import { postprocessBalanceAction } from './balance-action-postprocessor.js';
 import {
@@ -339,6 +339,26 @@ export function initVersionHandshake() {
     }
 }
 
+export function renderPersistenceStartupWarning(status, target = dom.containers.versionAlert) {
+    const warning = status?.migrationWarning;
+    if (!warning || !target) return false;
+
+    const backend = String(status.backend || 'unknown');
+    const warningMessage = warning.code === 'tauri-state-corrupt'
+        ? 'Gespeicherter Zustand konnte nicht sicher geladen werden.'
+        : (warning.message || 'Gespeicherte Daten konnten nicht sicher uebernommen werden.');
+    const quarantineHint = warning.quarantinePath
+        ? ' Die beschaedigte Quelldatei wurde durch den Persistenzadapter quarantiniert.'
+        : '';
+    target.textContent = `Persistenzwarnung - betroffener Datenbereich: Gesamtspeicher; Backend: ${backend}. ${warningMessage}${quarantineHint} Ohne ausdrueckliche Recovery- oder Reset-Entscheidung werden keine Altdaten ersetzt.`;
+    target.dataset.kind = 'persistence-warning';
+    target.style.display = 'block';
+    target.style.backgroundColor = 'var(--warning-color)';
+    target.style.color = '#000';
+    target.tabIndex = -1;
+    return true;
+}
+
 /**
  * Initialisiert die Anwendung - Entry Point
  *
@@ -361,6 +381,7 @@ export function initVersionHandshake() {
  */
 export async function init() {
     await initPersistence();
+    const persistenceStatus = getPersistenceStatus();
     let engineHandshake;
     try {
         // 1. Engine Handshake
@@ -371,6 +392,7 @@ export async function init() {
         console.error("Initialisierung abgebrochen wegen Engine-Fehler.");
         return createUpdateFailureResult(e, { phase: 'engine_gate' });
     }
+    renderPersistenceStartupWarning(persistenceStatus);
 
     // 2. Populate DOM inputs
     // Sammelt alle input/select-Elemente mit ID in dom.inputs{}

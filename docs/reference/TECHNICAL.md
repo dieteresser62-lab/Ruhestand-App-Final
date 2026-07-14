@@ -160,8 +160,8 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 * `app/balance/balance-annual-period.js` – reiner Jahresperioden-Contract mit stabiler `calendar-year:<YYYY>`-ID, Legacy-Baseline, Planvalidierung, Doppel-Commit-Schutz und Recovery-Metadaten.
 * `app/balance/balance-annual-orchestrator.js` / `app/balance/balance-annual-modal.js` – Jahreswechsel-Pipeline mit explizitem `ok`-/Fehlerergebnis und Ergebnisprotokoll.
 * `app/balance/balance-binder-snapshots.js` – Laufzeit-Coordinator fuer beide Jahres-Buttons: nebenwirkungsarme Engine-Vorpruefung, Pre-Mutation-Flush, validierter Recovery-Snapshot, persistierte Phasen `snapshot_confirmed`/`writes_started`/`validating`, fachliche Writes, Post-Write-Validierung und finaler Flush. Ein Pending-Commit blockiert weitere Jahresprozesse bis zum Snapshot-Restore.
-* `app/balance/balance-expenses.js` – Controller/Fassade fuer den Ausgaben-Check: Initialisierung, Event-Wiring, CSV-Import-Ablauf und Jahrumschaltung.
-* `app/balance/balance-expenses-storage.js` / `balance-expenses-csv.js` / `balance-expenses-metrics.js` / `balance-expenses-renderer.js` – Storage, CSV-Parsing, Kennzahlen und DOM-Rendering des Ausgaben-Checks.
+* `app/balance/balance-expenses.js` – Controller/Fassade fuer den Ausgaben-Check: Initialisierung, Event-Wiring, CSV-Import-Ablauf, Jahrumschaltung und gesperrte Korruptions-Recovery-UI.
+* `app/balance/balance-expenses-storage.js` / `balance-expenses-csv.js` / `balance-expenses-metrics.js` / `balance-expenses-renderer.js` – expliziter `ok`-/`empty`-/`corrupt`-Storagevertrag mit Recovery-Dokument, CSV-Parsing, Kennzahlen und DOM-Rendering des Ausgaben-Checks.
 
 ### Ablauf einer Aktualisierung
 
@@ -190,6 +190,8 @@ Der Ausgaben-Check verwendet einen separaten lokalen Datenspeicher (`balance_exp
 * `years[YYYY].months[1..12].profiles[profileId]` speichert importierte Kategorien je Monat/Profil.
 * `activeYear` steuert, welches Jahr im Tab angezeigt wird.
 * Beim Jahresabschluss muss der Ausgaben-Check auf dem abgeschlossenen Vorjahr stehen. Nach erfolgreicher Periodenvalidierung wird er auf `activeYear + 1` gestellt; bestehende Jahresdaten bleiben unverändert als Historie erhalten.
+* JSON-, Schema- und Storage-Lesefehler werden nicht als leerer Store normalisiert. Der Rohinhalt bleibt unveraendert, normale Writes sind gesperrt und die UI nennt Datenbereich sowie aktives Backend.
+* Der Reset ist zweistufig: Recovery-Rohdaten exportieren, dann explizit bestaetigen. Erst ein erfolgreicher Persistenz-Flush verlaesst den Recovery-Zustand; bei Flush-/Quota-Fehler wird der korrupte Rohinhalt im aktiven Store wiederhergestellt.
 
 Die Kennzahlen im Tab berechnen sich wie folgt:
 
@@ -277,7 +279,7 @@ Browser-Persistenz seit Phase 2:
 * Tauri nutzt seit Phase 3 JSON-Dateien im App-Datenverzeichnis. Live-Daten liegen in `ruhestand_suite_data.json`; Jahresabschluss-Snapshots liegen getrennt in `ruhestand_suite_snapshots.json` und werden ueber das Adapter-Target `snapshots` geladen/gespeichert. Die Rust-Seite stellt `load_app_state`, `save_app_state`, `quarantine_app_state` und `confirm_app_close` bereit.
 * Beim ersten Tauri-Start migriert die Facade erlaubte Legacy-Keys aus der WebView-`localStorage`-Ablage in die JSON-Datei und setzt denselben Migrationsmarker mit Target `tauri-json-file`.
 * Beim nativen Fensterschluss verhindert Rust das sofortige Schliessen, sendet ein Frontend-Event, wartet auf den Facade-Flush und schliesst nach `confirm_app_close`. Um Hänger auf Seiten ohne Persistenz (z. B. Handbuch) oder bei WebView-Fehlern zu vermeiden, gibt es einen 3-Sekunden-Fallback in Rust, der das Schließen erzwungen durchführt.
-* Korruptes Tauri-JSON wird quarantiniert; die Facade startet mit leerem Cache und Recovery-Warnung statt eine stille Rueckmigration oder einen White-Screen zu erzeugen.
+* Korruptes Tauri-JSON wird quarantiniert; die Facade startet mit leerem Cache und Recovery-Warnung statt eine stille Rueckmigration oder einen White-Screen zu erzeugen. `Balance.html` rendert `getPersistenceStatus().migrationWarning` beim Start mit betroffenem Gesamtspeicher, Backend und Recovery-Hinweis, ohne den lokalen Quarantaenepfad auszugeben.
 
 Snapshot-Archiv seit Jahresabschluss-Snapshot-Slice:
 

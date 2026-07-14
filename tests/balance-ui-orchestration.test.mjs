@@ -710,7 +710,40 @@ async function runBalanceUiOrchestrationTests() {
         assert(errors[0].message.includes('automatisch wiederhergestellt'), 'Rollback-Erfolg nennt Ursache und Wiederherstellung');
     }
 
-    console.log('Test 4: Profilverbund globals are set and cleared without stale data');
+    console.log('Test 4: Balance startup renders persistence migration warnings with backend and recovery guidance');
+    {
+        const documentRef = new MockDocument();
+        const localStorageRef = createLocalStorageMock();
+        installBrowserGlobals(documentRef, localStorageRef);
+        PersistenceFacade.resetPersistenceForTests();
+
+        const { renderPersistenceStartupWarning } = await import('../app/balance/balance-main.js');
+        const warningTarget = new MockElement('persistenceWarning');
+        const shown = renderPersistenceStartupWarning({
+            backend: 'Tauri JSON Test',
+            migrationWarning: {
+                code: 'tauri-state-corrupt',
+                message: 'Gespeicherter Zustand konnte nicht sicher geladen werden.',
+                quarantinePath: 'quarantine-reference'
+            }
+        }, warningTarget);
+
+        assertEqual(shown, true, 'MigrationWarning wird als sichtbarer Startup-Status behandelt');
+        assertEqual(warningTarget.style.display, 'block', 'Startup-Warnung wird sichtbar geschaltet');
+        assertEqual(warningTarget.dataset.kind, 'persistence-warning', 'Startup-Warnung ist maschinenlesbar typisiert');
+        assert(warningTarget.textContent.includes('Gesamtspeicher'), 'Startup-Warnung nennt den betroffenen Datenbereich');
+        assert(warningTarget.textContent.includes('Tauri JSON Test'), 'Startup-Warnung nennt das aktive Backend');
+        assert(warningTarget.textContent.includes('quarantiniert'), 'Startup-Warnung verweist auf die vorhandene Adapterquarantaene');
+        assert(warningTarget.textContent.includes('Recovery- oder Reset-Entscheidung'), 'Startup-Warnung nennt den sicheren Nutzerentscheid');
+        assertEqual(warningTarget.textContent.includes('quarantine-reference'), false, 'Startup-Warnung leakt keinen lokalen Quarantaenepfad');
+        assertEqual(
+            renderPersistenceStartupWarning({ backend: 'IndexedDB', migrationWarning: null }, new MockElement()),
+            false,
+            'Ohne MigrationWarning wird kein falscher Warnzustand erzeugt'
+        );
+    }
+
+    console.log('Test 5: Profilverbund globals are set and cleared without stale data');
     {
         const documentRef = new MockDocument();
         const localStorageRef = createLocalStorageMock();
@@ -760,7 +793,7 @@ async function runBalanceUiOrchestrationTests() {
         assertEqual(window.__profilverbundProfileSummaries, null, 'Leerer Profilverbund loescht alte Profilzusammenfassung');
     }
 
-    console.log('Test 5: Profilverbund decides household spending once and finances only allocated shares');
+    console.log('Test 6: Profilverbund decides household spending once and finances only allocated shares');
     {
         const documentRef = new MockDocument();
         const localStorageRef = createLocalStorageMock();
@@ -833,7 +866,7 @@ async function runBalanceUiOrchestrationTests() {
         assertEqual(runs[1].persistedInput.renteMonatlich, 500, 'Second profile income remains in persisted inputs');
     }
 
-    console.log('Test 6: Engine handshake and update result contracts fail closed');
+    console.log('Test 7: Engine handshake and update result contracts fail closed');
     {
         const compatibleEngine = {
             getVersion: () => ({ api: '31.7', build: 'test-build' }),

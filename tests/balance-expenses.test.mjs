@@ -1,7 +1,18 @@
 import { initExpensesTab, updateExpensesBudget, rollExpensesYear } from '../app/balance/balance-expenses.js';
 import { parseCategoryCsv, parseExpenseAmount, splitCsvLine } from '../app/balance/balance-expenses-csv.js';
 import { computeSpent, computeYearStats } from '../app/balance/balance-expenses-metrics.js';
-import { createEmptyExpensesStore, getExpensesMonthData, getExpensesYearData } from '../app/balance/balance-expenses-storage.js';
+import {
+    createEmptyExpensesStore,
+    createExpensesCorruptionRecoveryDocument,
+    EXPENSES_STORE_STATUS,
+    ExpensesStoreCorruptionError,
+    getExpensesMonthData,
+    getExpensesYearData,
+    loadExpensesStore,
+    loadExpensesStoreResult,
+    resetCorruptExpensesStore,
+    saveExpensesStore
+} from '../app/balance/balance-expenses-storage.js';
 import assert from 'node:assert/strict';
 
 console.log('--- Balance Expenses Tests ---');
@@ -309,6 +320,56 @@ try {
     global.window = { localStorage: global.localStorage };
     global.document = new MockDocument();
 
+    // 0b) Korrupte Persistenz bleibt sichtbar und ist bis zu einer bestaetigten Recovery gesperrt.
+    const corruptRaw = '{"version":1,"years":';
+    global.localStorage.setItem(STORAGE_KEY, corruptRaw);
+    const corruptResult = loadExpensesStoreResult(global.localStorage);
+    assertEqual(corruptResult.status, EXPENSES_STORE_STATUS.CORRUPT, 'Parsefehler liefert strukturierten Korruptionsstatus');
+    assertEqual(corruptResult.error.code, 'expenses-store-json-invalid', 'Korruptionsstatus nennt einen stabilen Fehlercode');
+    assertEqual(corruptResult.raw, corruptRaw, 'Korruptionsstatus bewahrt den bytegleichen Rohinhalt');
+    const invalidShapeStorage = new MockLocalStorage();
+    invalidShapeStorage.setItem(STORAGE_KEY, '{"version":1,"years":[]}');
+    assertEqual(
+        loadExpensesStoreResult(invalidShapeStorage).error.code,
+        'expenses-store-years-invalid',
+        'Ein syntaktisch gueltiger, aber unbrauchbarer Store wird ebenfalls als korrupt gemeldet'
+    );
+    assertEqual(
+        loadExpensesStoreResult({ getItem() { throw new Error('Test-Lesefehler'); } }).error.code,
+        'expenses-store-read-failed',
+        'Storage-Lesefehler werden strukturiert und ohne erfundenen Leerzustand gemeldet'
+    );
+    assert.throws(
+        () => loadExpensesStore(global.localStorage),
+        ExpensesStoreCorruptionError,
+        'Kompatibilitaetsloader darf Korruption nicht als leeren Store ausgeben'
+    );
+    assert.throws(
+        () => saveExpensesStore(createEmptyExpensesStore(2026), global.localStorage),
+        ExpensesStoreCorruptionError,
+        'Normaler Schreibpfad bleibt bei Korruption gesperrt'
+    );
+    assertEqual(global.localStorage.getItem(STORAGE_KEY), corruptRaw, 'Gesperrter Schreibpfad laesst Rohinhalt unveraendert');
+
+    const recoveryDocument = createExpensesCorruptionRecoveryDocument(corruptResult, {
+        backend: 'Test-Backend',
+        exportedAt: '2026-07-14T10:00:00.000Z'
+    });
+    assertEqual(recoveryDocument.affectedArea, 'Ausgaben-Check', 'Recovery-Dokument nennt den betroffenen Datenbereich');
+    assertEqual(recoveryDocument.backend, 'Test-Backend', 'Recovery-Dokument nennt das Backend');
+    assertEqual(recoveryDocument.raw, corruptRaw, 'Recovery-Dokument enthaelt den unveraenderten Rohinhalt');
+    assert.throws(
+        () => resetCorruptExpensesStore(corruptResult, { storage: global.localStorage, activeYear: 2026 }),
+        /exportiert oder quarantiniert/,
+        'Reset ohne bestaetigte Rohdatensicherung bleibt gesperrt'
+    );
+    resetCorruptExpensesStore(corruptResult, {
+        storage: global.localStorage,
+        activeYear: 2026,
+        rawPreserved: true
+    });
+    assertEqual(JSON.parse(global.localStorage.getItem(STORAGE_KEY)).activeYear, 2026, 'Expliziter Reset erzeugt erst nach Recovery-Freigabe einen leeren Store');
+
     writeStore({ version: 1, activeYear: 2026, years: { '2026': { months: {} } } });
     seedMonth(2026, 1, { 'Miete': -1000 });
 
@@ -427,6 +488,92 @@ try {
     assertEqual(Object.keys(rolledStore.years['2027'].months || {}).length, 0, 'Folgejahr sollte ohne Monatsdaten starten');
     assertEqual(dom.expenses.yearSelect.value, '2027', 'Jahr-Select sollte nach Roll auf Folgejahr springen');
     assertEqual(dom.expenses.ytdSub.textContent, 'Soll: —', 'YTD-Soll sollte im leeren Folgejahr nicht auf Kalender, sondern Datenmonate basieren');
+
+    // 6) Recovery-UI: Bereich/Backend und sichere Optionen; kein Reset ohne Export+Bestaetigung.
+    global.localStorage.setItem(STORAGE_KEY, corruptRaw);
+    const cancelledDom = createDomRefs();
+    const cancelledInit = initExpensesTab(cancelledDom, {
+        storage: global.localStorage,
+        getPersistenceStatus: () => ({ backend: 'IndexedDB-Test' }),
+        downloadRecovery: async () => {},
+        confirmReset: () => true,
+        now: () => new Date('2026-07-14T10:00:00.000Z')
+    });
+    assertEqual(cancelledInit.status, EXPENSES_STORE_STATUS.CORRUPT, 'Expenses-Init gibt Korruptionsstatus an den Aufrufer zurueck');
+    const cancelledPanel = cancelledDom.expenses.table.querySelector('[data-expenses-recovery="corrupt"]');
+    const cancelledMessage = cancelledPanel?.querySelector('[data-role="expenses-recovery-message"]');
+    assert(cancelledPanel, 'Korruption rendert einen sichtbaren Recovery-Bereich');
+    assert(cancelledMessage?.textContent.includes('Ausgaben-Check'), 'Recovery-UI nennt den betroffenen Datenbereich');
+    assert(cancelledMessage?.textContent.includes('IndexedDB-Test'), 'Recovery-UI nennt das aktive Backend');
+    const cancelButton = cancelledPanel.querySelector('[data-action="expenses-recovery-cancel"]');
+    cancelButton.click();
+    assertEqual(global.localStorage.getItem(STORAGE_KEY), corruptRaw, 'Abbrechen veraendert den korrupten Rohinhalt nicht');
+    assert(
+        cancelledDom.expenses.table.querySelector('[data-role="expenses-recovery-cancelled"]'),
+        'Abbrechen zeigt den weiterhin gesperrten Zustand an'
+    );
+
+    let downloadedRecovery = null;
+    let downloadedFilename = '';
+    let approveReset = false;
+    let failResetFlush = true;
+    const resetPrompts = [];
+    const recoveryDom = createDomRefs();
+    initExpensesTab(recoveryDom, {
+        storage: global.localStorage,
+        getPersistenceStatus: () => ({ backend: 'IndexedDB-Test' }),
+        downloadRecovery: async (document, filename) => {
+            downloadedRecovery = document;
+            downloadedFilename = filename;
+        },
+        confirmReset: (message) => {
+            resetPrompts.push(message);
+            return approveReset;
+        },
+        flush: async () => {
+            if (failResetFlush) throw new Error('Test-Quota');
+        },
+        now: () => new Date('2026-07-14T10:00:00.000Z')
+    });
+    let recoveryPanel = recoveryDom.expenses.table.querySelector('[data-expenses-recovery="corrupt"]');
+    const resetBeforeExport = recoveryPanel.querySelector('[data-action="expenses-recovery-reset"]');
+    assertEqual(resetBeforeExport.disabled, true, 'Reset bleibt vor einem Recovery-Export sichtbar, aber gesperrt');
+    resetBeforeExport.click();
+    assertEqual(resetPrompts.length, 0, 'Gesperrter Reset fragt nicht nach Bestaetigung');
+    assertEqual(global.localStorage.getItem(STORAGE_KEY), corruptRaw, 'Gesperrter Reset ueberschreibt keine Daten');
+
+    recoveryPanel.querySelector('[data-action="expenses-recovery-export"]').click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assertEqual(downloadedRecovery.raw, corruptRaw, 'UI-Recovery exportiert den bytegleichen Rohinhalt');
+    assert(downloadedFilename.startsWith('balance-ausgaben-recovery-2026-07-14'), 'Recovery-Dateiname ist datiert und generisch');
+    recoveryPanel = recoveryDom.expenses.table.querySelector('[data-expenses-recovery="corrupt"]');
+    const resetAfterExport = recoveryPanel.querySelector('[data-action="expenses-recovery-reset"]');
+    assertEqual(resetAfterExport.disabled, false, 'Erfolgreicher Recovery-Export schaltet Reset frei');
+
+    resetAfterExport.click();
+    assertEqual(resetPrompts.length, 1, 'Reset verlangt eine explizite Bestaetigung');
+    assertEqual(global.localStorage.getItem(STORAGE_KEY), corruptRaw, 'Abgelehnter Reset laesst Rohinhalt unveraendert');
+    approveReset = true;
+    resetAfterExport.click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assertEqual(global.localStorage.getItem(STORAGE_KEY), corruptRaw, 'Quota-/Flush-Fehler stellt den korrupten Rohinhalt im aktiven Store wieder her');
+    assert(
+        recoveryDom.expenses.table.querySelector('[data-expenses-recovery="corrupt"]'),
+        'Quota-/Flush-Fehler bleibt im sichtbaren Recovery-Zustand'
+    );
+
+    failResetFlush = false;
+    recoveryDom.expenses.table.querySelector('[data-action="expenses-recovery-reset"]').click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const resetStore = JSON.parse(global.localStorage.getItem(STORAGE_KEY));
+    assertEqual(resetPrompts.length, 3, 'Jeder Reset-Versuch nutzt einen eigenen Bestaetigungsschritt');
+    assertEqual(resetStore.version, 1, 'Bestaetigter Reset erzeugt einen gueltigen Ausgabenstore');
+    assertEqual(Object.keys(resetStore.years).length, 0, 'Bestaetigter Reset startet ohne erfundene Finanzdaten');
+    assertEqual(
+        recoveryDom.expenses.table.querySelector('[data-expenses-recovery="corrupt"]'),
+        null,
+        'Nach bestaetigtem Reset wird der gesperrte Recovery-Bereich verlassen'
+    );
 
     console.log('✅ Balance expenses tests passed');
 } finally {
