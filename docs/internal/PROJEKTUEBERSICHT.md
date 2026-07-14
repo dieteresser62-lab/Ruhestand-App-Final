@@ -1,6 +1,6 @@
 # Projektuebersicht RuhestandsApp
 
-**Stand:** 2026-06-12
+**Stand:** 2026-07-14
 **Zweck:** Interne Orientierung fuer Entwicklung, Review, Refactoring und Onboarding in diesem Repository.
 
 ## Kurzprofil
@@ -110,7 +110,7 @@ Wichtige Module:
 
 - `balance-main.js`: App-Orchestrator, Engine-Version-Handshake, zentrale `update()`-Pipeline.
 - `balance-reader.js`: DOM-Eingaben lesen und Side Effects wie sichtbare Panels anwenden.
-- `balance-storage.js`: PersistenceFacade, internes Snapshot-Archiv, Legacy-Migrationen und Restore.
+- `balance-storage.js`: PersistenceFacade, internes Snapshot-Archiv, Legacy-Migrationen und Restore; das optionale Browser-Verzeichnis-Handle liegt getrennt vom historischen `snapshotDB`-Cleanup.
 - `balance-binder.js`: Event-Hub fuer Buttons, Tastenkombinationen, Import/Export und Jahresabschluss.
 - `balance-renderer.js`: Haupt-Renderer fuer KPIs, Guardrails, Diagnose, Themes und Toasts.
 - `balance-update-pipeline.js`: Last-State, Diagnose-Anreicherung, Persistenzentscheidung und Budgetweitergabe.
@@ -134,7 +134,7 @@ DOM/Input
 Besondere Funktionen:
 
 - Jahres-Update mit Inflation, VWCE.DE-Kurs und Auto-CAPE.
-- Jahresabschluss-Snapshot vor Inflation/Jahresmutation; Browser speichert Snapshots im IndexedDB-Store `snapshots`, Tauri in `ruhestand_suite_snapshots.json`.
+- Jahresabschluss-Snapshot vor Inflation/Jahresmutation; Browser speichert Snapshots im IndexedDB-Store `snapshots`, Tauri in `ruhestand_suite_snapshots.json`. Alter und aktiver Profilwert werden in demselben Jahresworkflow fortgeschrieben.
 - Ausgaben-Check pro Jahr, Monat und Profil mit Median-Hochrechnung.
 - Entscheidungsdiagnose statt Blackbox-Erklaerung.
 - Profilverbund-Aggregation mit proportionaler, runway-first oder steueroptimierter Entnahmeverteilung.
@@ -275,8 +275,8 @@ Rahmen:
 - Testdateien: `*.test.mjs`
 - Browser-Smoke-Gate: `npm run test:browser`
 - Coverage-Gate: `npm run test:coverage`
-- Statistik laut letzter Abschlussvalidierung: 90 Testdateien, 2294 Assertions, 0 Fehler (`npm test`, 2026-06-12)
-- Coverage-Baseline laut Slice 11: ca. 72,25% Zeilen-Coverage fuer `app/`, `engine/`, `workers/` und `types/`; keine harte Mindestschwelle.
+- Statistik laut Slice-11-Abschlussvalidierung: 103 Testdateien, 3363 Assertions, 0 Fehler und 0 offene Handles (`npm test`, 2026-07-14).
+- Coverage-Baseline laut Slice 11: ca. 74,02% Zeilen-Coverage (23023/31105) fuer `app/`, `engine/`, `workers/` und `types/`; keine harte Mindestschwelle.
 
 Wichtige Testgruppen:
 
@@ -287,7 +287,7 @@ Wichtige Testgruppen:
 - Profilverbund: `profile-storage`, `profilverbund-balance`, `simulator-multiprofile-aggregation`.
 - Worker und Paritaet: `worker-pool`, `worker-parity`.
 - UI-nahe Module: Balance-Reader, Storage, Renderer, Expenses, Heatmap.
-- Browser-Einstiege: Playwright-Smokes fuer Startseite, Balance, Simulator, Tranchenmanager und Handbuch.
+- Browser-Einstiege und Balance-Workflows: isolierte Playwright-Smokes fuer Startseite, Balance, Simulator, Tranchenmanager und Handbuch sowie Membership-Reload, Engine-Gate, Jahres-Preflight/-Doppelklick, Import-Reject und korrupte Ausgaben mit deterministischen Netzwerkrouten.
 - Persistenz/Tauri: Browser-Fallback, IndexedDB/localStorage/Tauri-Adapter-Contracts und Tauri-CSP/Command-Contracts.
 
 Validierungsregel:

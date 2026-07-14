@@ -2,7 +2,7 @@
 
 **Feature-Branch:** `codex/balance-app-hardening`  
 **GitHub-Status:** lokal; Remote-Pruefung am 2026-07-13 ergab keinen gleichnamigen Branch  
-**Status:** durch Codex implementiert; Review/Freigabe ausstehend
+**Status:** erledigt; durch Gemini freigegeben und als `297e473` committed
 
 **Prioritaet:** P2  
 **Abhaengigkeit:** Slices 04, 05 und 08
@@ -123,7 +123,7 @@ Erledigt: akzeptierte Zahlen-/CSV-Formate, Pflichtfelder, Reject-Verhalten und K
 
 ## Freigabestatus
 
-Implementierung und technische Selbstpruefung abgeschlossen. Review/Freigabe durch Gemini und Nutzer ausstehend; Codex markiert die eigene Implementierung nicht als freigegeben und erstellt keinen Commit.
+Gemini hat die Implementierung ohne Blocker freigegeben; lokaler Abschluss-Commit: `297e473`.
 
 ## Review-Feedback von Gemini
 

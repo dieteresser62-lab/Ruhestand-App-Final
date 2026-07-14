@@ -2,7 +2,7 @@
 
 **Feature-Branch:** `codex/balance-app-hardening`  
 **GitHub-Status:** lokal; Remote-Pruefung am 2026-07-13 ergab keinen gleichnamigen Branch  
-**Status:** implementiert, Review/Freigabe ausstehend
+**Status:** erledigt; durch Gemini freigegeben und als `81b3544` committed
 **Prioritaet:** P1  
 **Abhaengigkeit:** Slice 03
 
@@ -113,7 +113,7 @@ Keine Scope- oder Vertragsabweichung. Der im Slice alternativ formulierte Cache-
 
 ## Freigabestatus
 
-Nicht freigegeben.
+Gemini hat die Implementierung ohne Blocker freigegeben; lokaler Abschluss-Commit: `81b3544`.
 
 ## Review-Feedback von Gemini
 

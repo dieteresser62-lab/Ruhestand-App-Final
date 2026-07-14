@@ -2,7 +2,7 @@
 
 **Feature-Branch:** `codex/balance-app-hardening`  
 **GitHub-Status:** lokal; Remote-Pruefung am 2026-07-13 ergab keinen gleichnamigen Branch  
-**Status:** implementiert; Code-Review/Freigabe ausstehend
+**Status:** Wiedereroeffnung umgesetzt; erneutes Review/Freigabe ausstehend
 **Prioritaet:** P0  
 **Abhaengigkeit:** Slice 02 freigegeben und gruen
 
@@ -68,6 +68,27 @@ Rollback: die vier bestehenden Quellmodule, den Contract-Test und die Dokumentat
 4. In-Flight-Sperre und Perioden-Idempotenz ergaenzen.
 5. Fehler vor/nach Commit und Wiederholungen als Contract-Tests abdecken.
 
+## Wiedereroeffnung des Snapshot-Scope am 2026-07-14
+
+Der Nutzer hat die Rueckkehr aus Slice 11 in den Snapshot-/Jahresprozess-Scope ausdruecklich freigegeben. Vor dem neuen Produktcode-Edit wurde erneut geprueft:
+
+- aktiver Branch: `codex/balance-app-hardening`;
+- versionierte Aenderungen vor Wiedereroeffnung: Hauptplan, Slice 11 und `tests/browser-smoke.test.mjs` aus der laufenden Slice-11-Umsetzung;
+- fremder Arbeitsbaumzustand: weiterhin ausschliesslich unversionierte Playwright-Dateien unter `node_modules/`;
+- neuer Befund S11-B02: `StorageManager._idbHelper` haelt `snapshotDB` offen, waehrend der IndexedDB-Adapter dieselbe Legacy-Datenbank loeschen will; der Jahresabschluss wartet dadurch vor dem Recovery-Snapshot unbegrenzt.
+
+Vom Nutzer autorisierte Scope-Erweiterung gegenueber dem historischen Nicht-Scope:
+
+- `app/balance/balance-storage.js`;
+- `app/balance/balance-annual-orchestrator.js`;
+- `app/shared/persistence-adapter-indexeddb.js`;
+- `tests/balance-annual-workflow-contract.test.mjs`;
+- `tests/balance-storage-contract.test.mjs`;
+- `tests/persistence.test.mjs`;
+- `tests/browser-smoke.test.mjs` als uebergeordnetes Slice-11-Gate.
+
+Aenderungstiefe: riskant wegen Migration eines gespeicherten File-System-Verzeichnis-Handles und Blocked-Delete-Verhalten. Gefaehrdet sind Snapshot-Migration, Persistence und Jahresabschluss-E2E. Nicht anfassen: Engine, fachliche Jahresperioden-Semantik, ETF-/Inflationsparser, `engine.js`, `dist/` und Release-Artefakte. Rollback: die drei neuen Snapshot-/Persistence-Dateien gezielt per `git checkout --`; die Slice-11-Browserdatei bleibt erhalten.
+
 ## Geplante Tests
 
 ```powershell
@@ -90,6 +111,9 @@ npm run test:browser
 - Snapshot-/Quota-Fehler vor Commit erzeugen keine fachliche Mutation. Fehler nach bestaetigtem Snapshot bewahren Snapshot-ID und Recovery-Phase, zeigen einen Recovery-Hinweis und blockieren Wiederholungen.
 - Eine Handler-lokale In-Flight-Sperre blockiert Doppelklicks; `lastCommittedPeriod` blockiert spaetere Wiederholungen derselben Periode.
 - README und technische Balance-Referenzen wurden auf den gemeinsamen fail-safe Jahresprozess synchronisiert.
+- Die historische `snapshotDB` wird nicht mehr dauerhaft fuer Verzeichnis-Handles offengehalten. Ein vorhandenes `snapshotDirHandle` wird in `ruhestand-suite-snapshot-handles` kopiert und die Legacy-Verbindung vor der Archivbereinigung geschlossen.
+- Ein blockiertes Legacy-DB-Delete beendet die Migration mit sichtbarem, retry-faehigem Report statt auf unbestimmte Zeit zu warten; der Cleanup-Marker entsteht nur nach erfolgreichem Delete.
+- Der reale Browserlauf deckte nach Loesung der Snapshot-Blockade einen weiteren Jahresworkflow-Fehler auf: Der Profil-Sync setzte das neue Alter zurueck. Der Orchestrator persistiert `profile_aktuelles_alter` nun unmittelbar mit der Altersfortschreibung, sodass Post-Write-Flush und Profil-Registry bei `+1` bleiben.
 
 ## Ausgefuehrte Tests mit Ergebnis
 
@@ -101,10 +125,13 @@ npm run test:browser
 - Der Headless-Backtest 2000-2025 blieb bei 416.201 EUR.
 - `npm run test:browser`: `index.html`, `Balance.html`, `Simulator.html`, `depot-tranchen-manager.html` und `Handbuch.html` gruen.
 - `git diff --check`: erfolgreich, keine Whitespace-Fehler.
+- Wiedereroeffnung: `balance-annual-workflow-contract.test.mjs` 31/31, `balance-storage-contract.test.mjs` 41/41 und `persistence.test.mjs` 205/205 Assertions gruen.
+- Wiedereroeffnung: Das vollstaendige Browser-Gate ist gruen; Doppelklick liefert eine `in_flight`-Meldung, genau einen Recovery-Snapshot, Alter `+1`, Folgejahr und genau eine `lastCommittedPeriod`.
+- Wiedereroeffnung: finale Gesamtsuite 3363/3363 Assertions, 0 fehlgeschlagene Dateien, 0 offene Handles; Coverage-Lauf ebenfalls 3363/3363 und 74,02 % (23023/31105).
 
 ## Abweichungen vom Plan
 
-- Keine Scope- oder Dateizahlabweichung: vier bestehende Quellmodule und die vorgesehene Contract-Testdatei wurden geaendert.
+- Die historische Umsetzung blieb im damaligen Scope. Die vom Nutzer autorisierte Wiedereroeffnung umfasst wegen des erst hinter S11-B02 erreichbaren Profil-Sync-Fehlers zusaetzlich `balance-annual-orchestrator.js` und dessen Contract-Test. Der gesamte Slice-11-Programmumfang bleibt mit neun Dateien unter der projektweiten Stop-Grenze.
 - Die konkrete Snapshot-ID wird ohne Aenderung von `balance-storage.js` durch Vorher-/Nachher-Inventur des kanonischen Archivs und anschliessenden Payload-Readback bestaetigt.
 - Externe Online-Abrufe bleiben wegen der bestehenden Handler-Vertraege fachliche Writes nach dem Snapshot. Der in Akzeptanzkriterium 1 genannte Update-/Validierungsfehler bezieht sich auf die explizite lokale `update()`-/Engine-Vorpruefung; Online-Teilfehler nach Snapshot fuehren fail-safe zu `incomplete_recovery`.
 
@@ -112,15 +139,16 @@ npm run test:browser
 
 - Multi-Key-ACID ist nicht erreichbar und nicht Ziel. Ein Adapterausfall waehrend des finalen Metadaten-Flushs kann im Backend einen aelteren `pendingCommit` hinterlassen; dieser Zustand ist absichtlich recovery-pflichtig.
 - Die bestehende Inflations- und Marktdatenlogik leitet ihr Bezugsjahr noch aus dem Systemdatum ab. Deshalb blockiert Slice 03 abweichende UI-Jahre; Slice 04/05 muessen die explizite Planperiode bis in die Datenhandler tragen.
-- Der Browser-Smoke prueft Seitenstart und Konsolenfehler, aber noch keinen echten Klickablauf mit Online-Fallbacks; dieser E2E-Vertrag bleibt Slice 11.
+- Ein alter, parallel geoeffneter Tab kann das Legacy-DB-Cleanup weiter blockieren. Der Jahresprozess bleibt dann lauffaehig und der fehlende Cleanup-Marker erzwingt einen spaeteren Retry; die Alt-Datenbank kann bis zum Schliessen des Tabs bestehen bleiben.
+- Die Handle-Migration ist mit einem strukturierten IndexedDB-Fake getestet; der Browser-E2E prueft den zuvor blockierten realen IndexedDB-Ablauf, aber kein echtes Betriebssystem-Verzeichnis-Handle.
 
 ## Rueckdokumentation
 
-Status, Commit-Reihenfolge, Teststand und Recovery-Verhalten sind im Hauptplan, in `README.md`, `TECHNICAL.md` und `BALANCE_MODULES_README.md` dokumentiert.
+Status, Commit-Reihenfolge, Handle-DB-Migration, blockierter Cleanup, Alters-/Profil-Sync, Teststand und Recovery-Verhalten sind im Hauptplan, in `README.md`, `TECHNICAL.md` und `BALANCE_MODULES_README.md` dokumentiert.
 
 ## Freigabestatus
 
-Codex-Implementierung abgeschlossen; Code-Review und Freigabe durch Gemini/Claude/Nutzer stehen aus.
+Die urspruengliche Slice-03-Implementierung wurde durch Gemini freigegeben und als `ddb33ef` committed. Die am 2026-07-14 autorisierten Wiedereroeffnungsfixes sind implementiert und technisch validiert, aber noch nicht adversarial reviewed oder freigegeben.
 
 ## Review-Feedback von Gemini
 

@@ -101,7 +101,7 @@ Persistenzschicht fuer Balance-State ueber `app/shared/persistence-facade.js` un
 
 **Dependencies:** `balance-config.js` (Konfiguration & Fehlerklassen), `app/shared/persistence-facade.js`, `app/shared/snapshot-archive.js`
 
-**Snapshot-Archiv:** Jahresabschluss- und Import-Recovery-Snapshots werden als `persistence-records-v1` gespeichert. Import-Recovery-Punkte tragen den Kind-Wert `balance-import-recovery` und werden vor dem ersten Balance-Replace geschrieben und zurueckgelesen. Browser nutzt die IndexedDB-Datenbank `ruhestand-suite` Version 2 mit separatem Store `snapshots`; Tauri nutzt neben `ruhestand_suite_data.json` die separate Datei `ruhestand_suite_snapshots.json`. `listSnapshots()` zeigt nur Indexdaten ohne Vollpayload. Standard-Restore erhaelt die Snapshot-Historie, bewahrt die Profil-Registry und setzt nur das aktive Profil zurueck, wenn `snapshot.activeProfileId` in der aktuellen Registry existiert.
+**Snapshot-Archiv:** Jahresabschluss- und Import-Recovery-Snapshots werden als `persistence-records-v1` gespeichert. Import-Recovery-Punkte tragen den Kind-Wert `balance-import-recovery` und werden vor dem ersten Balance-Replace geschrieben und zurueckgelesen. Browser nutzt die IndexedDB-Datenbank `ruhestand-suite` Version 2 mit separatem Store `snapshots`; Tauri nutzt neben `ruhestand_suite_data.json` die separate Datei `ruhestand_suite_snapshots.json`. Ein optionales File-System-Verzeichnis-Handle liegt getrennt in `ruhestand-suite-snapshot-handles`; ein vorhandenes Handle aus der historischen `snapshotDB` wird uebernommen und die Legacy-Verbindung danach geschlossen. Blockiert ein anderer Tab deren Cleanup, setzt der Adapter keinen falschen Marker und setzt die Bereinigung bei einem spaeteren Lauf fort, ohne die Snapshot-Liste aufzuhalten. `listSnapshots()` zeigt nur Indexdaten ohne Vollpayload. Standard-Restore erhaelt die Snapshot-Historie, bewahrt die Profil-Registry und setzt nur das aktive Profil zurueck, wenn `snapshot.activeProfileId` in der aktuellen Registry existiert.
 
 **Hinweis Steuerzustand:** `lastState.taxState.lossCarry` wird migriert/defaulted und bei Guardrail-Resets erhalten.
 
@@ -201,7 +201,7 @@ Event-Hub der Anwendung.
 
 **Helper-Module (ausgelagert):**
 - `balance-binder-annual.js` – Jahres-Update, Inflation, ETF-Nachrücken, Modal-Logik
-- `balance-binder-imports.js` – erzeugt `balance-state`-Exports mit stabiler App-ID und `schemaVersion: 1`; akzeptiert nur dieses Format oder die explizit migrierten v21.1-/v22.0-Legacy-Envelopes. Vor dem Replace validiert es Pflichtwerte und `lastState`, fuehrt `update({ persist: false })` aus und wertet den Slice-07-Ergebnisvertrag aus. Nach Recovery/Replace muss das persistente `update()` erfolgreich sein; andernfalls werden Storage und sichtbare Eingaben automatisch zurueckgerollt.
+- `balance-binder-imports.js` – erzeugt `balance-state`-Exports mit stabiler App-ID und `schemaVersion: 1`; akzeptiert nur dieses Format oder die explizit migrierten v21.1-/v22.0-Legacy-Envelopes. Vor dem Replace validiert es Pflichtwerte und `lastState`, fuehrt `update({ persist: false })` aus und wertet den Slice-07-Ergebnisvertrag aus. Nach Recovery/Replace muss das persistente `update()` erfolgreich sein; andernfalls werden Storage und sichtbare Eingaben automatisch zurueckgerollt. File-Inputs werden dabei nie auf einen nichtleeren Wert restauriert, weil Browser nur das programmgesteuerte Leeren erlauben.
 - `balance-binder-snapshots.js` – Snapshot-Handling und Jahresprozess-Coordinator; validiert den Live-State, flusht, bestaetigt den Snapshot vor fachlichen Writes und persistiert bei Teilfehlern Snapshot-ID sowie Recovery-Phase
 - `balance-binder-diagnosis.js` – Diagnose-Export
 
@@ -309,9 +309,9 @@ Koordiniert den komplexen Jahres-Update Workflow.
 
 **Exports:**
 - `createAnnualOrchestrator({ dom, debouncedUpdate, handleFetchInflation, handleNachrueckenMitETF, handleFetchCapeAuto, showUpdateResultModal, setLastUpdateResults })`
-  - `handleJahresUpdate()` – Orchestriert: Alter erhöhen → Inflation → ETF → CAPE → Protokoll
+  - `handleJahresUpdate()` – Orchestriert: Alter erhoehen und im aktiven Profil persistieren → Inflation → ETF → CAPE → Protokoll
 
-**Dependencies:** `balance-config.js`, `balance-renderer.js`, `balance-storage.js`
+**Dependencies:** `balance-config.js`, `balance-renderer.js`, `balance-storage.js`, `profile-state.js`, `profile-storage.js`, `persistence-facade.js`
 
 ---
 

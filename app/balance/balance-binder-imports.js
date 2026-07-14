@@ -392,18 +392,21 @@ export function normalizeBalanceImportDocument(document) {
 }
 
 function captureInputUiState(inputs = {}) {
-    return Object.fromEntries(Object.entries(inputs).map(([key, element]) => [key, {
-        value: element?.value,
-        checked: element?.checked,
-        disabled: element?.disabled
-    }]));
+    return Object.fromEntries(Object.entries(inputs).map(([key, element]) => {
+        const state = {
+            checked: element?.checked,
+            disabled: element?.disabled
+        };
+        if (element?.type !== 'file') state.value = element?.value;
+        return [key, state];
+    }));
 }
 
 function restoreInputUiState(inputs = {}, snapshot = {}) {
     Object.entries(snapshot).forEach(([key, state]) => {
         const element = inputs[key];
         if (!element) return;
-        if (state.value !== undefined) element.value = state.value;
+        if (element.type !== 'file' && state.value !== undefined) element.value = state.value;
         if (state.checked !== undefined) element.checked = state.checked;
         if (state.disabled !== undefined) element.disabled = state.disabled;
     });

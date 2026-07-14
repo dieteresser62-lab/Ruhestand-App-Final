@@ -29,6 +29,10 @@ Fallback order is ECB, World Bank, then OECD. Each request has its own eight-sec
 
 Positive inflation and deflation use the same multiplicative rule: `next = previous * (1 + rate / 100)`. Negative rates are not silently clamped to zero. A positive previous value and the cumulative factor must remain finite and greater than zero; optional need fields that already equal zero remain zero.
 
+## Deterministic browser tests
+
+`npm run test:browser` does not depend on the live providers above. Playwright intercepts the annual workflow requests and supplies deterministic ECB-fallback, World Bank, Yahoo-proxy, and CAPE fixtures. All other external requests are blocked, so the annual preflight and one-time commit contracts remain reproducible offline.
+
 ## Historical market dataset (`app/simulator/simulator-data.js`)
 
 - Coverage: `1925-2025`

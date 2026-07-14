@@ -22,6 +22,10 @@ import { isProfileScopedKey } from '../profile/profile-key-policy.js';
 import { saveCurrentProfileFromLocalStorage } from '../profile/profile-storage.js';
 
 export const BALANCE_IMPORT_RECOVERY_KIND = 'balance-import-recovery';
+const SNAPSHOT_HANDLE_DB_NAME = 'ruhestand-suite-snapshot-handles';
+const LEGACY_SNAPSHOT_HANDLE_DB_NAME = 'snapshotDB';
+const SNAPSHOT_HANDLE_STORE_NAME = 'handles';
+const SNAPSHOT_DIRECTORY_HANDLE_KEY = 'snapshotDirHandle';
 
 // Module-level references to be injected
 let dom = null;
@@ -202,30 +206,86 @@ export const StorageManager = {
      */
     _idbHelper: {
         db: null,
-        open() {
+        openPromise: null,
+        migrationPromise: null,
+        _openDatabase(name, { createHandleStore = false } = {}) {
             return new Promise((resolve, reject) => {
-                if (this.db) return resolve();
-                const request = indexedDB.open('snapshotDB', 1);
-                request.onupgradeneeded = e => e.target.result.createObjectStore('handles');
-                request.onsuccess = e => { this.db = e.target.result; resolve(); };
-                request.onerror = e => reject(e.target.error);
+                const request = indexedDB.open(name, 1);
+                request.onupgradeneeded = () => {
+                    if (createHandleStore && !request.result.objectStoreNames.contains(SNAPSHOT_HANDLE_STORE_NAME)) {
+                        request.result.createObjectStore(SNAPSHOT_HANDLE_STORE_NAME);
+                    }
+                };
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error || new Error(`IndexedDB ${name} konnte nicht geoeffnet werden.`));
             });
+        },
+        _read(database, key) {
+            if (!database.objectStoreNames.contains(SNAPSHOT_HANDLE_STORE_NAME)) return Promise.resolve(undefined);
+            return new Promise((resolve, reject) => {
+                const request = database.transaction(SNAPSHOT_HANDLE_STORE_NAME).objectStore(SNAPSHOT_HANDLE_STORE_NAME).get(key);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error || new Error('Verzeichnis-Handle konnte nicht gelesen werden.'));
+            });
+        },
+        _write(database, key, value) {
+            return new Promise((resolve, reject) => {
+                const request = database.transaction(SNAPSHOT_HANDLE_STORE_NAME, 'readwrite')
+                    .objectStore(SNAPSHOT_HANDLE_STORE_NAME)
+                    .put(value, key);
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error || new Error('Verzeichnis-Handle konnte nicht gespeichert werden.'));
+            });
+        },
+        async _migrateLegacyDirectoryHandle() {
+            const currentHandle = await this._read(this.db, SNAPSHOT_DIRECTORY_HANDLE_KEY);
+            if (currentHandle !== undefined) return;
+
+            let legacyDb = null;
+            try {
+                legacyDb = await this._openDatabase(LEGACY_SNAPSHOT_HANDLE_DB_NAME);
+                const legacyHandle = await this._read(legacyDb, SNAPSHOT_DIRECTORY_HANDLE_KEY);
+                if (legacyHandle !== undefined) {
+                    await this._write(this.db, SNAPSHOT_DIRECTORY_HANDLE_KEY, legacyHandle);
+                }
+            } finally {
+                legacyDb?.close?.();
+            }
+        },
+        async open() {
+            if (!this.openPromise) {
+                this.openPromise = this._openDatabase(SNAPSHOT_HANDLE_DB_NAME, { createHandleStore: true })
+                    .then(database => {
+                        this.db = database;
+                        this.db.onversionchange = () => {
+                            this.db?.close?.();
+                            this.db = null;
+                            this.openPromise = null;
+                            this.migrationPromise = null;
+                        };
+                    })
+                    .catch(error => {
+                        this.openPromise = null;
+                        throw error;
+                    });
+            }
+            await this.openPromise;
+            if (!this.migrationPromise) {
+                this.migrationPromise = this._migrateLegacyDirectoryHandle()
+                    .catch(error => {
+                        this.migrationPromise = null;
+                        throw error;
+                    });
+            }
+            await this.migrationPromise;
         },
         async get(key) {
             await this.open();
-            return new Promise((res, rej) => {
-                const req = this.db.transaction('handles').objectStore('handles').get(key);
-                req.onsuccess = e => res(e.target.result);
-                req.onerror = e => rej(e.target.error);
-            });
+            return this._read(this.db, key);
         },
         async set(key, val) {
             await this.open();
-            return new Promise((res, rej) => {
-                const req = this.db.transaction('handles', 'readwrite').objectStore('handles').put(val, key);
-                req.onsuccess = () => res();
-                req.onerror = e => rej(e.target.error);
-            });
+            return this._write(this.db, key, val);
         }
     },
 

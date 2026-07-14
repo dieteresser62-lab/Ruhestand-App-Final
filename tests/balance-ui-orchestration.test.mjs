@@ -612,10 +612,21 @@ async function runBalanceUiOrchestrationTests() {
             debouncedUpdate: () => {}
         });
 
+        let badJsonFileValue = 'C:\\fakepath\\invalid.json';
         const badJsonTarget = {
+            type: 'file',
             files: [{ text: async () => '{bad json' }],
-            value: 'selected'
+            get value() {
+                return badJsonFileValue;
+            },
+            set value(nextValue) {
+                if (nextValue !== '') {
+                    throw new Error('File inputs may only be cleared programmatically.');
+                }
+                badJsonFileValue = nextValue;
+            }
         };
+        dom.inputs.importFile = badJsonTarget;
         await handlers.handleImport({ target: badJsonTarget });
 
         const badCsvTarget = {

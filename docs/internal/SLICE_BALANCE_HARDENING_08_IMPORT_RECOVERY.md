@@ -2,7 +2,7 @@
 
 **Feature-Branch:** `codex/balance-app-hardening`  
 **GitHub-Status:** lokal; Remote-Pruefung am 2026-07-13 ergab keinen gleichnamigen Branch  
-**Status:** implementiert, Review/Freigabe ausstehend
+**Status:** Wiedereroeffnung umgesetzt; erneutes Review/Freigabe ausstehend
 **Prioritaet:** P1  
 **Abhaengigkeit:** Slice 07
 
@@ -61,6 +61,23 @@ Programmdateien, maximal 4:
 4. Update-Ergebnis aus Slice 07 fuer den Dry-Run verwenden.
 5. Negative und Rollback-Tests ergaenzen.
 
+## Wiedereroeffnung am 2026-07-14
+
+Der Nutzer hat die Rueckkehr aus Slice 11 in Slice 08 ausdruecklich freigegeben. Vor dem neuen Produktcode-Edit wurde erneut geprueft:
+
+- aktiver Branch: `codex/balance-app-hardening`;
+- versionierte Aenderungen vor Wiedereroeffnung: Hauptplan, Slice 11 und `tests/browser-smoke.test.mjs` aus der laufenden Slice-11-Umsetzung;
+- fremder Arbeitsbaumzustand: weiterhin ausschliesslich unversionierte Playwright-Dateien unter `node_modules/`;
+- neuer Befund S11-B01: Der Reject-Pfad versucht den nichtleeren Wert eines File-Inputs wiederherzustellen und erzeugt in Chromium einen Page-Error vor der sichtbaren Fehlermeldung.
+
+Erweiterter Scope der Wiedereroeffnung:
+
+- `app/balance/balance-binder-imports.js`;
+- `tests/balance-ui-orchestration.test.mjs`;
+- `tests/browser-smoke.test.mjs` als uebergeordnetes Slice-11-Gate.
+
+Aenderungstiefe: klein, aber sicherheitsrelevant fuer den fail-closed Import-Reject. Nicht anfassen: Importformat, Recovery-Snapshot-Reihenfolge, Engine-Vertrag und Payload-Validierung. Rollback: die zwei Slice-08-Produkt-/Testdateien gezielt per `git checkout --`; die Slice-11-Browserdatei bleibt erhalten.
+
 ## Geplante Tests
 
 ```powershell
@@ -81,6 +98,7 @@ npm test
 - Das persistente Abschluss-`update()` muss erneut erfolgreich sein. Bei einem spaeten Fehler liest `rollbackImportReplace()` den bestaetigten Recovery-Snapshot und stellt alle darin erfassten erlaubten Live-Daten sowie der Handler den vorherigen sichtbaren DOM-Zustand wieder her.
 - Snapshot-/Quota-/Adapterfehler blockieren vor dem Replace. Importfehler enthalten feste Ursache und Handlungsoption, aber weder Rohpayload noch Parserdetails.
 - Tests fuer aktuelles Format, beide Legacy-Vertraege, falsche App/Version/Shape/Kernwerte, Dry-Run, Reihenfolge, Quota-Stop, Recovery-Inhalt und automatischen Voll-Rollback ergaenzt.
+- Wiedereroeffnungsfix S11-B01: UI-Snapshots erfassen fuer Datei-Inputs keinen `value`; die Restore-Logik ueberspringt deren Wert zusaetzlich defensiv. `#importFile` wird im `finally` nur geleert, sodass Chromium den sicheren Reject-Pfad nicht mehr mit einem Page-Error abbricht.
 
 ## Ausgefuehrte Tests mit Ergebnis
 
@@ -92,10 +110,13 @@ npm test
 - `npm run test:browser` -> `index.html`, `Balance.html`, `Simulator.html`, `depot-tranchen-manager.html` und `Handbuch.html` gruen.
 - `node --check` fuer beide geaenderten Quellmodule und beide geaenderten Testdateien -> gruen.
 - `git diff --check` -> gruen.
+- Wiedereroeffnung: `balance-ui-orchestration.test.mjs` 115/115 Assertions gruen; ein Browser-nahes File-Input-Mock verbietet dabei wie Chromium jeden nichtleeren programmgesteuerten Wert.
+- Wiedereroeffnung: Der echte Browserfall mit `File`/`DataTransfer` zeigt den JSON-Reject sichtbar, behaelt Eingaben und Jahresmetadaten und erzeugt weder Recovery-Snapshot noch Console-/Page-Error.
+- Wiedereroeffnung: finale Gesamtsuite 3363/3363 Assertions, 0 fehlgeschlagene Dateien, 0 offene Handles; Coverage-Lauf ebenfalls 3363/3363 und 74,02 % (23023/31105).
 
 ## Abweichungen vom Plan
 
-- Kein Programmdatei-Scope erweitert; exakt die vier geplanten Programmdateien wurden geaendert.
+- Die historische Umsetzung blieb bei vier Programmdateien. Die autorisierte Wiedereroeffnung aendert nur `balance-binder-imports.js`, den bestehenden UI-Contract-Test und das uebergeordnete Slice-11-Browser-Gate.
 - Zusaetzlich zu Slice- und Hauptplan werden `docs/reference/TECHNICAL.md` und `docs/reference/BALANCE_MODULES_README.md` synchronisiert, weil Importformat, Modulverantwortung und Recovery-Workflow einen dokumentierten App-Vertrag bilden.
 - Der Export wurde innerhalb von Umsetzungsschritt 1 ebenfalls fail-closed abgesichert, damit die App keine v1-Datei erzeugt, die ihre eigene Importvalidierung ablehnen wuerde.
 
@@ -104,16 +125,16 @@ npm test
 - Der localStorage-Fallback kann bei knapper Quota keinen Recovery-Snapshot schreiben; der Import blockiert dann bewusst vor dem Replace. IndexedDB/Tauri nutzen getrennte Snapshot-Ablagen, koennen aber ebenfalls bei Adapter-/Berechtigungsfehlern blockieren.
 - Nur die historisch nachgewiesenen v21.1-/v22.0-Envelopes werden migriert. Aeltere oder manuell veraenderte Dateien benoetigen eine gesonderte, versionierte Migration und werden nicht heuristisch geraten.
 - `appVersion` ist informativ; die Kompatibilitaetsentscheidung erfolgt ueber `schemaVersion`. Eine spaetere Schemaaenderung benoetigt eine neue explizite Migration.
-- Der echte native Dateiauswahldialog ist noch kein eigener Browser-E2E-Fall; die Handler-/File-Contracts sind DOM-nah getestet, das uebergeordnete Browser-E2E-Gate folgt in Slice 11.
+- Der Browser-E2E erzeugt eine echte `File`-/`FileList`-Situation per `DataTransfer`, oeffnet aber nicht den betriebssystemspezifischen Dateiauswahldialog. Dieser UI-Chrome bleibt manuell zu pruefen; der DOM- und Reject-Contract ist automatisiert.
 
 ## Rueckdokumentation
 
 - Importformat, Versionierung, Legacy-Grenze, Dry-Run/Replace-Reihenfolge und Recovery-/Rollback-Vertrag sind im Hauptplan dokumentiert.
-- Technische Modul- und Persistenzreferenzen sind in `docs/reference/TECHNICAL.md` und `docs/reference/BALANCE_MODULES_README.md` synchronisiert.
+- Technische Modul- und Persistenzreferenzen sind in `docs/reference/TECHNICAL.md` und `docs/reference/BALANCE_MODULES_README.md` synchronisiert; Slice 11 dokumentiert den realen Browser-Reject.
 
 ## Freigabestatus
 
-Nicht freigegeben; Implementierung abgeschlossen, adversariales Review durch Gemini/Claude/Nutzer ausstehend.
+Die urspruengliche Slice-08-Implementierung wurde durch Gemini freigegeben und als `d3fd712` committed. Der am 2026-07-14 autorisierte File-Input-Fix ist implementiert und technisch validiert, aber noch nicht adversarial reviewed oder freigegeben.
 
 ## Review-Feedback von Gemini
 

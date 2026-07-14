@@ -29,6 +29,15 @@ function requestToPromise(request) {
     });
 }
 
+function deleteDatabaseToPromise(indexedDb, name) {
+    return new Promise((resolve, reject) => {
+        const request = indexedDb.deleteDatabase(name);
+        request.onsuccess = () => resolve({ deleted: true, blocked: false });
+        request.onerror = () => reject(request.error || new Error('IndexedDB database deletion failed'));
+        request.onblocked = () => resolve({ deleted: false, blocked: true });
+    });
+}
+
 function transactionDone(transaction) {
     return new Promise((resolve, reject) => {
         transaction.oncomplete = () => resolve(true);
@@ -405,12 +414,18 @@ export function createIndexedDbAdapter(options = {}) {
             const cleanupMarker = await this.readMetadata(LEGACY_SNAPSHOT_DB_CLEANUP_METADATA_KEY);
             if (!cleanupMarker?.completedAt && indexedDb?.deleteDatabase) {
                 try {
-                    const deleteRequest = indexedDb.deleteDatabase(LEGACY_SNAPSHOT_DB_NAME);
-                    await requestToPromise(deleteRequest);
-                    await this.writeMetadata(LEGACY_SNAPSHOT_DB_CLEANUP_METADATA_KEY, {
-                        completedAt: new Date().toISOString(),
-                        dbName: LEGACY_SNAPSHOT_DB_NAME
-                    });
+                    const cleanup = await deleteDatabaseToPromise(indexedDb, LEGACY_SNAPSHOT_DB_NAME);
+                    if (cleanup.deleted) {
+                        await this.writeMetadata(LEGACY_SNAPSHOT_DB_CLEANUP_METADATA_KEY, {
+                            completedAt: new Date().toISOString(),
+                            dbName: LEGACY_SNAPSHOT_DB_NAME
+                        });
+                    } else {
+                        report.errors.push({
+                            key: LEGACY_SNAPSHOT_DB_NAME,
+                            message: 'Legacy-Snapshot-Datenbank ist durch eine offene Verbindung blockiert; die Bereinigung wird spaeter erneut versucht.'
+                        });
+                    }
                 } catch (err) {
                     report.errors.push({ key: LEGACY_SNAPSHOT_DB_NAME, message: err?.message || String(err) });
                 }

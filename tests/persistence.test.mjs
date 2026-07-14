@@ -227,6 +227,10 @@ function createFakeIndexedDB(options = {}) {
         deleteDatabase(name) {
             const request = {};
             setTimeout(() => {
+                if (options.deleteBlocked && name === 'snapshotDB') {
+                    request.onblocked?.();
+                    return;
+                }
                 if (name === 'snapshotDB') {
                     db.deletedSnapshotDb = true;
                 }
@@ -840,6 +844,29 @@ try {
         assertEqual(secondReport.migratedCount, 0, 'Zweiter Migrationslauf migriert nichts erneut');
         assertEqual(afterSecondMigrationKvScans, afterDirectReadKvScans, 'Migrationsmarker verhindert zweiten KV-Cursor-Scan');
         assertEqual(fakeIndexedDB.db.cursorCounts.kv, afterDirectReadKvScans, 'listSnapshots nutzt Fast-Path ohne erneuten KV-Cursor-Scan');
+    }
+
+    console.log('Test 12f: blocked legacy snapshotDB cleanup remains bounded and retryable');
+    {
+        const fakeIndexedDB = createFakeIndexedDB({ deleteBlocked: true });
+        const adapter = createIndexedDbAdapter({
+            indexedDB: fakeIndexedDB,
+            dbName: 'legacy-snapshot-cleanup-blocked-test'
+        });
+        await adapter.open();
+
+        const outcome = await Promise.race([
+            adapter.migrateLegacySnapshotsIfNeeded().then(report => ({ report })),
+            new Promise(resolve => setTimeout(() => resolve({ timedOut: true }), 100))
+        ]);
+        const cleanupMarker = await adapter.readMetadata('legacySnapshotDbCleanup');
+
+        assertEqual(outcome.timedOut, undefined, 'Blockiertes snapshotDB-Cleanup haengt die Migration nicht auf');
+        assert(
+            outcome.report.errors.some(error => error.key === 'snapshotDB'),
+            'Blockiertes snapshotDB-Cleanup wird im Migrationsreport sichtbar'
+        );
+        assertEqual(cleanupMarker, null, 'Blockiertes snapshotDB-Cleanup setzt keinen falschen Abschlussmarker');
     }
 
     console.log('Test 13: Tauri JSON adapter stores records via Rust commands');

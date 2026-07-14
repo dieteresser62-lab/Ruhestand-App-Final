@@ -11,6 +11,7 @@ import { CONFIG } from '../app/balance/balance-config.js';
 import { UIRenderer } from '../app/balance/balance-renderer.js';
 import { StorageManager } from '../app/balance/balance-storage.js';
 import { SnapshotArchive } from '../app/shared/snapshot-archive.js';
+import { PROFILE_VALUE_KEYS } from '../app/profile/profile-state.js';
 
 console.log('--- Balance Annual Workflow Contract Tests ---');
 
@@ -100,6 +101,7 @@ try {
         const result = await orchestrator.handleJahresUpdate({ failOnStepError: true });
         assertEqual(result.ok, false, 'Fehlerhafter Teilschritt liefert explizit ok=false');
         assertEqual(dom.inputs.aktuellesAlter.value, '68', 'Jahresupdate erhoeht das Alter genau einmal');
+        assertEqual(localStorage.getItem(PROFILE_VALUE_KEYS.alter), '68', 'Jahresupdate persistiert das neue Alter vor dem Profil-Sync');
         assertEqual(result.results.inflation.year, TARGET_YEAR, 'Jahresupdate bewahrt das Inflations-Zieljahr');
         assertEqual(result.results.inflation.fetchStatus, 'ok_primary_ecb', 'Jahresupdate bewahrt den Inflations-Fetch-Status');
         assertEqual(modalResults.errors[0].step, 'CAPE', 'Fehlerprotokoll behaelt stabilen Step-Namen');

@@ -2,7 +2,7 @@
 
 **Feature-Branch:** `codex/balance-app-hardening`  
 **GitHub-Status:** lokal; Remote-Pruefung am 2026-07-13 ergab keinen gleichnamigen Branch  
-**Status:** implementiert, Review/Freigabe ausstehend
+**Status:** erledigt; durch Gemini freigegeben und als `b1d931b` committed
 **Prioritaet:** P1  
 **Abhaengigkeit:** Slice 02
 
@@ -136,7 +136,7 @@ Damit sind fuenf statt der urspruenglich geplanten drei Programmdateien betroffe
 
 ## Freigabestatus
 
-Nicht freigegeben.
+Gemini hat die Implementierung ohne Blocker freigegeben; lokaler Abschluss-Commit: `b1d931b`.
 
 ## Review-Feedback von Gemini
 

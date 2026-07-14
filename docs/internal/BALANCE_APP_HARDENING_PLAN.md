@@ -1,7 +1,7 @@
 # Balance-App-Hardening: Arbeitsplan
 
 **Stand:** 2026-07-14  
-**Status:** implementierungsreif; Slice 01, 02, 03, 04, 05, 06, 07, 08, 09 und 10 erledigt
+**Status:** implementierungsreif; alle Slices 01 bis 11 erledigt  
 
 **Feature-Branch:** `codex/balance-app-hardening`  
 **GitHub-Status:** lokal vorhanden; `git ls-remote --heads origin refs/heads/codex/balance-app-hardening` lieferte am 2026-07-13 keinen Remote-Branch; keine Veroeffentlichung ohne ausdrueckliche Freigabe  
@@ -95,7 +95,7 @@ Jahresprozess
 | -: | - | - | - | -: | - |
 | 1 | [Profilverbund-Bedarfsallokation](./SLICE_BALANCE_HARDENING_01_PROFILVERBUND_ALLOCATION.md) | P0 | keine; D-01 entschieden | 5 | erledigt |
 | 2 | [Jahresperioden-Contract](./SLICE_BALANCE_HARDENING_02_ANNUAL_PERIOD_CONTRACT.md) | P0 | keine | 2 | erledigt |
-| 3 | [Fail-safe Jahresprozess-Integration](./SLICE_BALANCE_HARDENING_03_ANNUAL_WORKFLOW_COMMIT.md) | P0 | 02 | 5 | erledigt |
+| 3 | [Fail-safe Jahresprozess-Integration](./SLICE_BALANCE_HARDENING_03_ANNUAL_WORKFLOW_COMMIT.md) | P0 | 02 | 5 | urspruenglich erledigt; Wiedereroeffnungsfix umgesetzt, Review ausstehend |
 | 4 | [Marktdaten-Stichtag](./SLICE_BALANCE_HARDENING_04_MARKETDATA_ASOF.md) | P0 | 02 | 5 | erledigt |
 | 5 | [Inflations-Contract](./SLICE_BALANCE_HARDENING_05_INFLATION_CONTRACT.md) | P1 | 02 | 5 | erledigt |
 | 6 | [Persistente Profilmitgliedschaft](./SLICE_BALANCE_HARDENING_06_PROFILE_MEMBERSHIP.md) | P1 | 01 | 3 | erledigt |
@@ -103,7 +103,7 @@ Jahresprozess
 | 8 | [Schema-validierter Balance-Import](./SLICE_BALANCE_HARDENING_08_IMPORT_RECOVERY.md) | P1 | 07 | 4 | erledigt |
 | 9 | [Korrupte Persistenz sichtbar behandeln](./SLICE_BALANCE_HARDENING_09_CORRUPT_DATA_RECOVERY.md) | P1 | 08 | 5 | erledigt |
 | 10 | [Striktes Zahlen- und CSV-Parsing](./SLICE_BALANCE_HARDENING_10_STRICT_PARSING.md) | P2 | 04, 05, 08 | 7 | erledigt |
-| 11 | [Browser-E2E und Dokumentationsgates](./SLICE_BALANCE_HARDENING_11_E2E_DOCUMENTATION.md) | P2 | 01-10 | 1 | geplant |
+| 11 | [Browser-E2E und Dokumentationsgates](./SLICE_BALANCE_HARDENING_11_E2E_DOCUMENTATION.md) | P2 | 01-10 | 1 | erledigt |
 
 
 ## Globale Akzeptanzkriterien
@@ -250,6 +250,10 @@ Zusatzlich zu `AGENTS.md` und `SLICE\_EXECUTION\_RULES.md` wird gestoppt, wenn:
 | 2026-07-14 | Slice 09 durch Gemini freigegeben und committed | Commit; keine Blocker, Restrisiko G9-01 |
 | 2026-07-14 | Slice 10 durch Codex implementiert | Strukturierter DE-/EN-Zahlenparser; feldbezogene Reader-Pflichtvalidierung; vollstaendige Markt-CSV-Jahres-/Kalenderpruefung inklusive Schalttag; fail-closed Ausgaben-CSV mit Null-Prototyp-Kategorien und Zeilenzusammenfassung; Mindest-Flex-Reject behaelt den Rohwert und blockiert Engine/Persistenz ohne Clamp. Scope nach Nutzerhinweis innerhalb der aktuellen 10-Dateien-Grenze auf 7 erweitert. Fokussiert Reader 94/94, Formatting 19/19, UI 115/115, Decumulation 38/38, Expenses und Smoke gruen; Gesamtsuite 3356/3356 und Browser-Smoke fuer alle fuenf Einstiegspunkte gruen; Code-Review ausstehend. |
 | 2026-07-14 | Slice 10 durch Gemini freigegeben und committed | Commit; keine Blocker, Restrisiko G10-01 |
+| 2026-07-14 | Slice 11 durch Codex begonnen und blockiert | E2E-Datei mit isolierten Contexts und deterministischen Netzwerkrouten auf 453 Zeilen erweitert. Neun Browserfaelle gruen; Import-Reject erzeugt wegen File-Input-Restore einen Page-Error (Rueckkehr Slice 08), Jahresabschluss blockiert wegen offener `snapshotDB`-Verbindung vor dem Recovery-Snapshot (Rueckkehr Snapshot-/Jahresprozess-Scope). Node-Suite und Coverage jeweils 3356/3356 gruen, Coverage 73,91 %. Keine Produktivcode-Aenderung ohne Scope-Freigabe. |
+| 2026-07-14 | Nutzer gibt Wiedereroeffnung fuer Slice-11-Blocker frei | Slice 08 darf den File-Input-Restore korrigieren; Snapshot-/Jahresprozess-Scope darf Handle-DB-Migration und blockierte Legacy-DB-Bereinigung korrigieren. Erweiterter Gesamtumfang bleibt unter der projektweiten 10-Programmdateien-Grenze. |
+| 2026-07-14 | Slice 11 und autorisierte Wiedereroeffnungen durch Codex implementiert | File-Input-Reject ohne Page-Error; dedizierte Handle-DB mit Legacy-Uebernahme; blockierter Cleanup begrenzt/retry-faehig; Altersfortschreibung gegen Profil-Sync gesichert. Browser-Gate mit 11 isolierten Faellen gruen, Gesamtsuite 3363/3363 ohne offene Handles, Coverage 74,02 % (23023/31105). Referenzen und Slice-Status synchronisiert; adversariales Review/Freigabe ausstehend. |
+| 2026-07-14 | Slice 11 durch Gemini freigegeben und committed | Commit; keine Blocker, Restrisiko G11-01 |
 
 
 ## Review-Feedback von Gemini
