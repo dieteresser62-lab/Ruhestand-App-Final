@@ -203,7 +203,8 @@ async function runTranchenManagerPageTests() {
             purchasePrice: 100,
             currentPrice: 120,
             category: 'equity',
-            type: 'aktien_neu'
+            type: 'aktien_neu',
+            tqf: 0.3
         }]));
         persistenceStorage.setItem('profile_tagesgeld', '12345');
 

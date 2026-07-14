@@ -2,6 +2,10 @@
 
 import { PROFILE_TRANCHES_KEY } from '../profile/profile-state.js';
 import { persistenceStorage } from '../shared/persistence-facade.js';
+import {
+    calculateCanonicalTrancheValues,
+    normalizeTrancheCollection
+} from '../../types/tranche-contract.js';
 
 export function generateTrancheId() {
     const rand = Math.random().toString(36).slice(2, 8);
@@ -9,31 +13,17 @@ export function generateTrancheId() {
 }
 
 export function normalizeTranches(items) {
-    if (!Array.isArray(items)) return [];
-    return items.map((t) => {
-        const existingId = t && (t.trancheId || t.id);
-        return {
-            ...t,
-            trancheId: existingId || generateTrancheId()
-        };
-    });
+    return normalizeTrancheCollection(items, { mode: 'persisted' });
 }
 
 export function calculateTrancheDerivedValues(tranche) {
-    const shares = Number(tranche?.shares) || 0;
-    const purchasePrice = Number(tranche?.purchasePrice) || 0;
-    const currentPrice = Number(tranche?.currentPrice) || purchasePrice;
-    return {
-        ...tranche,
-        currentPrice,
-        marketValue: shares * currentPrice,
-        costBasis: shares * purchasePrice
-    };
+    return calculateCanonicalTrancheValues(tranche);
 }
 
 export function saveTranchesToStorage(tranchen, storage = persistenceStorage) {
-    storage.setItem(PROFILE_TRANCHES_KEY, JSON.stringify(tranchen));
-    return tranchen;
+    const normalized = normalizeTranches(tranchen);
+    storage.setItem(PROFILE_TRANCHES_KEY, JSON.stringify(normalized));
+    return normalized;
 }
 
 export function loadTranchesFromStorage(storage = persistenceStorage) {
@@ -42,6 +32,14 @@ export function loadTranchesFromStorage(storage = persistenceStorage) {
     try {
         return normalizeTranches(JSON.parse(saved));
     } catch {
-        return [];
+        const parsed = (() => {
+            try {
+                return JSON.parse(saved);
+            } catch {
+                return null;
+            }
+        })();
+        if (parsed === null) return [];
+        return normalizeTranches(parsed);
     }
 }

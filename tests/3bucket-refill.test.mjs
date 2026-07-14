@@ -142,7 +142,7 @@ function baseState(portfolio) {
 {
     const portfolio = {
         depotTranchesAktien: [
-            { type: 'ETF', category: 'equity', marketValue: 200000, costBasis: 150000, tqf: 0.3 }
+            { type: 'aktien_neu', category: 'equity', marketValue: 200000, costBasis: 150000, tqf: 0.3 }
         ],
         depotTranchesGold: [],
         depotTranchesGeldmarkt: [],
@@ -171,15 +171,15 @@ function baseState(portfolio) {
     });
     const afterTotal = sumDepot({ depotTranchesAktien: portfolio.depotTranchesAktien });
     const equity = portfolio.depotTranchesAktien.find(t => t.category === 'equity');
-    assert(refill.bondRefillNetDelta > 0, 'ETF refill should execute');
-    assert(equity.marketValue < 200000, 'ETF-kind equity should be reduced by bond refill sale');
-    assertClose(afterTotal, beforeTotal - refill.bondRefillTaxDelta, 1e-6, 'ETF bond refill should conserve wealth apart from tax');
+    assert(refill.bondRefillNetDelta > 0, 'Canonical equity refill should execute');
+    assert(equity.marketValue < 200000, 'Canonical equity should be reduced by bond refill sale');
+    assertClose(afterTotal, beforeTotal - refill.bondRefillTaxDelta, 1e-6, 'Equity bond refill should conserve wealth apart from tax');
 }
 
 {
     const portfolio = {
         depotTranchesAktien: [
-            { type: 'custom-world-fund', category: 'equity', marketValue: 200000, costBasis: 150000, tqf: 0.3 }
+            { type: 'aktien_neu', category: 'equity', marketValue: 200000, costBasis: 150000, tqf: 0.3 }
         ],
         depotTranchesGold: [],
         depotTranchesGeldmarkt: [],
@@ -208,9 +208,9 @@ function baseState(portfolio) {
     });
     const afterTotal = sumDepot({ depotTranchesAktien: portfolio.depotTranchesAktien });
     const equity = portfolio.depotTranchesAktien.find(t => t.category === 'equity');
-    assert(refill.bondRefillNetDelta > 0, 'Category-equity refill should execute');
-    assert(equity.marketValue < 200000, 'Category-equity sale should reduce unknown equity kind');
-    assertClose(afterTotal, beforeTotal - refill.bondRefillTaxDelta, 1e-6, 'Category-equity bond refill should conserve wealth apart from tax');
+    assert(refill.bondRefillNetDelta > 0, 'Canonical category-equity refill should execute');
+    assert(equity.marketValue < 200000, 'Canonical category-equity sale should reduce the equity lot');
+    assertClose(afterTotal, beforeTotal - refill.bondRefillTaxDelta, 1e-6, 'Canonical equity bond refill should conserve wealth apart from tax');
 }
 
 {
@@ -308,7 +308,7 @@ function baseState(portfolio) {
     const state = baseState({
         depotTranchesAktien: [
             { type: 'aktien_neu', category: 'equity', marketValue: 200000, costBasis: 180000, tqf: 0.3 },
-            { type: 'aktien_neu', category: 'bonds', marketValue: 50000, costBasis: 50000, tqf: 0.0 }
+            { type: 'anleihe', category: 'bonds', marketValue: 50000, costBasis: 50000, tqf: 0.0 }
         ],
         depotTranchesGold: [],
         depotTranchesGeldmarkt: [],
@@ -338,7 +338,7 @@ function baseState(portfolio) {
     const result = simulateOneYear(state, inputs, yearData, 0, null, 0, null, 1, engine);
     const bond = result.newState.portfolio.depotTranchesAktien.find(t => t.category === 'bonds');
     const equity = result.newState.portfolio.depotTranchesAktien.find(t => t.category === 'equity');
-    assertClose(bond.marketValue, 50000, 1e-6, 'equity transaction must not sell legacy-typed bond tranche');
+    assertClose(bond.marketValue, 50000, 1e-6, 'equity transaction must not sell canonical bond tranche');
     assertClose(equity.marketValue, 150000, 1e-6, 'equity transaction should reduce equity tranche only');
     assertClose(result.logData.portfolio_total_end, 326000, 1e-6, 'asset sale should conserve total wealth apart from floor payout');
 }

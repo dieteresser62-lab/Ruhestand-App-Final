@@ -63,9 +63,15 @@ Nach Abschluss aller Slices gilt:
 
 ### Kanonischer Contract
 
-Ein neues DOM-freies Modul unter `types/` soll Validierung, Legacy-Normalisierung, disjunkte Assetklassifikation und stabile Ergebnisobjekte bereitstellen. `types/strategy-options.js` zeigt bereits, dass `app/` und `engine/` gemeinsame reine Contracts aus `types/` importieren können.
+Das neue DOM-freie Modul `types/tranche-contract.js` stellt Validierung,
+Legacy-Normalisierung, disjunkte Assetklassifikation und stabile Ergebnisobjekte
+für Manager und Engine bereit. `types/strategy-options.js` zeigt ebenfalls, dass
+`app/` und `engine/` gemeinsame reine Contracts aus `types/` importieren können.
 
-Der Plan schreibt noch keinen endgültigen Dateinamen fest; vorgesehen ist `types/tranche-contract.js`. Vor dem ersten Code-Edit prüft Slice 02, ob `build-engine.mjs` diesen Import ohne Sonderpfad bündelt. Falls nicht, greift die Stop-Regel und die Modulgrenze wird im Review neu entschieden.
+Der Modulimport ist über `build-engine.mjs`, die Node-Suite und das Browser-Gate
+verifiziert. Lokal war kein `esbuild` installiert; deshalb blieb der bereits
+versionierte Modul-Fallback in `engine.js` bytegleich. Ein echter Bundlelauf bleibt
+als Build-Restrisiko dokumentiert.
 
 ### Persistenzzustand
 
@@ -93,7 +99,7 @@ Der Preisservice liefert ein Objekt statt einer bloßen Zahl. Browser-Node-Proxy
 | Nr. | Slice | Hauptziel | Abhängigkeit | Max. geplante Programmdateien | Status |
 | ---: | --- | --- | --- | ---: | --- |
 | 1 | [Test-Gate und Baseline](./SLICE_TRANCHENMANAGEMENT_01_TEST_GATE_BASELINE.md) | assertionslose False-Green-Pfade schließen | Planfreigabe | 5 | freigegeben |
-| 2 | [Kanonischer Datencontract](./SLICE_TRANCHENMANAGEMENT_02_CANONICAL_DATA_CONTRACT.md) | Schema, Klassifikation und Doppelverkauf beheben | Slice 01 | 10 inklusive generiertem `engine.js` | geplant |
+| 2 | [Kanonischer Datencontract](./SLICE_TRANCHENMANAGEMENT_02_CANONICAL_DATA_CONTRACT.md) | Schema, Klassifikation und Doppelverkauf beheben | Slice 01 | 11 nach Nutzerfreigabe; `engine.js` ohne Diff | freigegeben |
 | 3 | [Persistenz und Recovery](./SLICE_TRANCHENMANAGEMENT_03_PERSISTENCE_RECOVERY.md) | valid/empty/corrupt/unavailable, Flush, Profil-Handoff | Slice 02 | 9 | geplant |
 | 4 | [CRUD, UX und Accessibility](./SLICE_TRANCHENMANAGEMENT_04_CRUD_UX_ACCESSIBILITY.md) | sichere Eingabe und bedienbare Darstellung | Slice 03 | 10 | geplant |
 | 5 | [Quote- und Währungscontract](./SLICE_TRANCHENMANAGEMENT_05_QUOTE_CURRENCY_RESILIENCE.md) | EUR-/Stichtagscontract, Batch und Proxyparität | Slice 02, 03 | 8 | geplant |
@@ -110,7 +116,28 @@ Die Reihenfolge ist verbindlich, solange das Planreview sie nicht ändert. Für 
 - DOM-/global-nahe Tests, insbesondere `tranchen-manager-page.test.mjs`, laufen isoliert; das Browser-Smoke-Gate wird mit `npm run test:browser` als separates Pflichtgate ausgewiesen.
 - Verifizierte Baseline: 103 Dateien entdeckt, 102 ausgefuehrt, 3939 Assertions, 0 Fehler, 0 offene Handles.
 - Coverage-Baseline: 71,20% (24563/34499 Zeilen, 193 Dateien); `tranchen-manager-page.js` 51,30% statt 0%.
-- Slice 01 ist implementiert, aber noch nicht durch Gemini/Nutzer freigegeben. Slice 02 bleibt bis zur Freigabe blockiert.
+- Slice 01 ist durch Gemini und Nutzer freigegeben; die Abhängigkeit für Slice 02 war damit erfüllt.
+
+### Rückdokumentation Slice 02
+
+- `types/tranche-contract.js` definiert Lot-Schema v1, den unterstützten Legacy-Stand
+  v0, disjunkte Kategorie-/Typ-Paare, strukturierte Feldfehler und die Trennung von
+  Persistenz-, Ableitungs- und Merge-Provenienzfeldern.
+- Manager-State und Form-Reader normalisieren über denselben Contract. Leere TQF,
+  unbekannte Versionen, doppelte IDs, nicht endliche Werte und ungültige Datumswerte
+  werden nicht still korrigiert.
+- Die Engine validiert `detailledTranches` erneut. Mismatch-, Duplikat- und
+  Nicht-Array-Fälle brechen kontrolliert mit `TRANCHE_VALIDATION_FAILED` ab; jede
+  gültige Lot-ID kann höchstens einmal in der Sell-Order vorkommen.
+- Der nachgewiesene 100-EUR-Mismatch kann keinen 150-EUR-Breakdown mehr erzeugen.
+  Gültige Steuer-, Snapshot-, Settlement-, Backtest-, Worker- und Browser-Gates
+  bleiben grün.
+- Verifiziert: 104 Node-Testdateien, 4034/4034 Assertions, 0 Fehler, 0 offene
+  Handles; elf Browser-Smoke-Szenarien; historischer Backtest und FlowDelta ohne
+  unerwartete Abweichung.
+- Nach Eintritt der Dateilimit-Stop-Regel hat der Nutzer die Erweiterung auf elf
+  Programmdiffs ausdrücklich freigegeben. Slice 02 ist implementiert, aber noch
+  nicht durch Gemini/Nutzer freigegeben.
 
 ## GAP-Zuordnung
 

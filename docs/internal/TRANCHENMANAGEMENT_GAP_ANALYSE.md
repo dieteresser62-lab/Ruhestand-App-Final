@@ -122,6 +122,31 @@ Damit ist TM-01 kein theoretisches Risiko. Die Behebung verändert das Verhalten
 - FIFO-/Steuer-/LossCarry-Golden-Cases in `tests/depot-tranches.test.mjs`, `tests/transaction-tax.test.mjs` und Settlement-Tests.
 - Zentrale Komplettbackups über die Persistenzschicht; kein stilles Wiederbeleben alter Teilbackup-Buttons.
 
+## Rückdokumentation Slice 02: Kanonischer Datencontract
+
+**Status:** implementiert; adversariales Review und Nutzerfreigabe ausstehend.
+
+- Der gemeinsame DOM-freie Contract liegt unter `types/tranche-contract.js` und
+  verwendet pro Lot `schemaVersion: 1`. Fehlende Versionen sind ausschließlich der
+  unterstützte Legacy-Stand v0; andere Versionen werden blockiert.
+- Zulässige Paare sind ausschließlich `equity ↔ aktien_alt|aktien_neu`,
+  `bonds ↔ anleihe`, `money_market ↔ geldmarkt` und `gold ↔ gold`.
+- v0 migriert `id` nach `trancheId`, `kind` nach `type`, eine aus dem eindeutigen
+  Typ ableitbare Kategorie, fehlende abgeleitete Werte und technisch eindeutige
+  Engine-Null-Platzhalter. Fehlende TQF und mehrdeutige Typen werden nicht geraten.
+- ISIN, Ticker, Datum, IDs, Finanzwerte und TQF werden mutationsfrei normalisiert
+  beziehungsweise mit Code, Feld, Index und Lot-ID validiert. `sourceProfileId`
+  bleibt Merge-/Engine-Provenienz und wird nicht profilintern persistiert.
+- Die Sale-Engine baut disjunkte Assetlisten, blockiert doppelte IDs und ungültige
+  Collections und dedupliziert die finale Sell-Order. Der reproduzierte TM-01-Fall
+  endet damit vor der Berechnung in einem strukturierten Validierungsfehler.
+- TM-01 und der Contractkern von TM-02/TM-13 sind implementiert. Die vollständige
+  Consumer-Parität von TM-03 sowie FIFO-/Provenienzverwendung folgen weiterhin in
+  den vorgesehenen Slices 06 und 07; Recovery folgt in Slice 03.
+- Verifikation: `npm test` mit 4034/4034 Assertions, `npm run test:browser` mit elf
+  Smoke-Szenarien, Engine-Build über den vorhandenen Modul-Fallback sowie grüne
+  Worker-, Snapshot-, Settlement- und Backtest-/FlowDelta-Gates.
+
 Diese Tests werden erweitert oder als Regression-Gates verwendet; parallele Test-Doppelungen sind nicht vorgesehen.
 
 ## Nutzerentscheidungen für das Planreview

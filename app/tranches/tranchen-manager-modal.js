@@ -1,6 +1,7 @@
 // @ts-check
 
 import { calculateTrancheDerivedValues, generateTrancheId } from './tranchen-manager-state.js';
+import { normalizeTranche } from '../../types/tranche-contract.js';
 
 function byId(doc, id) {
     return doc.getElementById(id);
@@ -45,18 +46,23 @@ export function closeTrancheModal(doc = document) {
 }
 
 export function readTrancheFromForm(existingId = null, doc = document) {
-    return calculateTrancheDerivedValues({
+    const purchasePrice = Number(byId(doc, 'purchasePrice').value);
+    const currentPriceInput = byId(doc, 'currentPrice').value.trim();
+    const tqfInput = byId(doc, 'tqf').value.trim();
+    const derived = calculateTrancheDerivedValues({
+        schemaVersion: 1,
         trancheId: existingId || generateTrancheId(),
         name: byId(doc, 'name').value,
         isin: byId(doc, 'isin').value,
         ticker: byId(doc, 'ticker').value,
-        shares: parseFloat(byId(doc, 'shares').value),
-        purchasePrice: parseFloat(byId(doc, 'purchasePrice').value),
-        currentPrice: parseFloat(byId(doc, 'currentPrice').value) || parseFloat(byId(doc, 'purchasePrice').value),
+        shares: Number(byId(doc, 'shares').value),
+        purchasePrice,
+        currentPrice: currentPriceInput === '' ? purchasePrice : Number(currentPriceInput),
         purchaseDate: byId(doc, 'purchaseDate').value,
         category: byId(doc, 'category').value,
         type: byId(doc, 'type').value,
-        tqf: parseFloat(byId(doc, 'tqf').value),
+        tqf: tqfInput === '' ? '' : Number(tqfInput),
         notes: byId(doc, 'notes').value
     });
+    return normalizeTranche(derived, { mode: 'persisted' });
 }

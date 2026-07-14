@@ -6,6 +6,7 @@ import {
     openEditTrancheModal,
     readTrancheFromForm
 } from '../app/tranches/tranchen-manager-modal.js';
+import { TrancheValidationError } from '../types/tranche-contract.js';
 
 console.log('--- Tranchen Manager Modal Tests ---');
 
@@ -98,3 +99,45 @@ console.log('Test 4: close modal removes active class');
     assertEqual(doc.getElementById('trancheModal').classList.has('active'), false, 'Close modal should remove active class');
 }
 console.log('✓ close modal removes active class OK');
+
+console.log('Test 5: form reader rejects category/type mismatch with field context');
+{
+    const doc = createDocumentMock();
+    doc.getElementById('name').value = 'Mismatch';
+    doc.getElementById('shares').value = '1';
+    doc.getElementById('purchasePrice').value = '100';
+    doc.getElementById('currentPrice').value = '100';
+    doc.getElementById('category').value = 'equity';
+    doc.getElementById('type').value = 'anleihe';
+    doc.getElementById('tqf').value = '0';
+    let error = null;
+    try {
+        readTrancheFromForm('mismatch-id', doc);
+    } catch (caught) {
+        error = caught;
+    }
+    assert(error instanceof TrancheValidationError, 'Mismatch should throw contract validation error');
+    assert(error.errors.some(item => item.code === 'TRANCHE_CLASSIFICATION_MISMATCH'), 'Mismatch should expose stable error code');
+    assert(error.errors.some(item => item.trancheId === 'mismatch-id' && item.field === 'category'), 'Mismatch should expose tranche and field context');
+}
+console.log('✓ form mismatch validation OK');
+
+console.log('Test 6: blank TQF is not converted to zero');
+{
+    const doc = createDocumentMock();
+    doc.getElementById('name').value = 'ETF';
+    doc.getElementById('shares').value = '1';
+    doc.getElementById('purchasePrice').value = '100';
+    doc.getElementById('category').value = 'equity';
+    doc.getElementById('type').value = 'aktien_neu';
+    doc.getElementById('tqf').value = '';
+    let error = null;
+    try {
+        readTrancheFromForm('tqf-id', doc);
+    } catch (caught) {
+        error = caught;
+    }
+    assert(error instanceof TrancheValidationError, 'Blank TQF should throw contract validation error');
+    assert(error.errors.some(item => item.field === 'tqf'), 'Blank TQF should retain field context');
+}
+console.log('✓ blank TQF validation OK');
