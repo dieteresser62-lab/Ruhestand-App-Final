@@ -27,19 +27,41 @@ export function saveTranchesToStorage(tranchen, storage = persistenceStorage) {
 }
 
 export function loadTranchesFromStorage(storage = persistenceStorage) {
-    const saved = storage.getItem(PROFILE_TRANCHES_KEY);
-    if (!saved) return [];
+    let raw;
     try {
-        return normalizeTranches(JSON.parse(saved));
+        raw = storage.getItem(PROFILE_TRANCHES_KEY);
     } catch {
-        const parsed = (() => {
-            try {
-                return JSON.parse(saved);
-            } catch {
-                return null;
-            }
-        })();
-        if (parsed === null) return [];
-        return normalizeTranches(parsed);
+        return Object.freeze({
+            status: 'unavailable',
+            tranches: null,
+            raw: null,
+            errorCode: 'TRANCHE_STORAGE_UNAVAILABLE'
+        });
+    }
+
+    if (raw === null || raw === '') {
+        return Object.freeze({
+            status: 'empty',
+            tranches: Object.freeze([]),
+            raw,
+            errorCode: null
+        });
+    }
+
+    try {
+        const tranches = normalizeTranches(JSON.parse(raw));
+        return Object.freeze({
+            status: tranches.length > 0 ? 'valid' : 'empty',
+            tranches: Object.freeze(tranches),
+            raw,
+            errorCode: null
+        });
+    } catch {
+        return Object.freeze({
+            status: 'corrupt',
+            tranches: null,
+            raw,
+            errorCode: 'TRANCHE_STORAGE_CORRUPT'
+        });
     }
 }

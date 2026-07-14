@@ -124,7 +124,7 @@ Damit ist TM-01 kein theoretisches Risiko. Die Behebung verändert das Verhalten
 
 ## Rückdokumentation Slice 02: Kanonischer Datencontract
 
-**Status:** implementiert; adversariales Review und Nutzerfreigabe ausstehend.
+**Status:** freigegeben.
 
 - Der gemeinsame DOM-freie Contract liegt unter `types/tranche-contract.js` und
   verwendet pro Lot `schemaVersion: 1`. Fehlende Versionen sind ausschließlich der
@@ -142,10 +142,33 @@ Damit ist TM-01 kein theoretisches Risiko. Die Behebung verändert das Verhalten
   endet damit vor der Berechnung in einem strukturierten Validierungsfehler.
 - TM-01 und der Contractkern von TM-02/TM-13 sind implementiert. Die vollständige
   Consumer-Parität von TM-03 sowie FIFO-/Provenienzverwendung folgen weiterhin in
-  den vorgesehenen Slices 06 und 07; Recovery folgt in Slice 03.
+  den vorgesehenen Slices 06 und 07; die Recovery-Grenze ist in Slice 03
+  implementiert.
 - Verifikation: `npm test` mit 4034/4034 Assertions, `npm run test:browser` mit elf
   Smoke-Szenarien, Engine-Build über den vorhandenen Modul-Fallback sowie grüne
   Worker-, Snapshot-, Settlement- und Backtest-/FlowDelta-Gates.
+
+### Rückdokumentation Slice 03
+
+- TM-04 ist implementiert: Der Loader schreibt beim Lesen nicht, trennt
+  `valid`/`empty`/`corrupt`/`unavailable`, bewahrt korrupte Rohstrings und blockiert
+  Verarbeitung bis zur bewussten Recovery.
+- TM-09/TM-10 sind implementiert: Der Manager-Handoff wartet auf den Flush der
+  Profilwahl; Manageränderungen und Profilwerte besitzen bestätigten Commit,
+  sichtbaren Rollback und Retry statt vorzeitigem Erfolg.
+- Der Slice-03-Anteil von TM-12 ist implementiert: Explizites `[]` bleibt leer,
+  Profil-ID/-Name werden am tatsächlichen Active-Profil angezeigt und Tab-/BFCache-
+  Rückkehr lädt den Kontext ohne doppelte Listener neu. Die statusbezogene
+  Consumer-Parität bleibt wie geplant in Slice 06.
+- TM-19 ist implementiert: Der tote unversionierte Teilimport/-export und seine
+  Phantom-Testcontrols sind entfernt; ausschließlich der zentrale versionierte
+  Komplettbackup-/Restore-Pfad bleibt bestehen.
+- Der Slice-03-Anteil von TM-22 ist implementiert: Manager- und Profil-Lifecycle
+  sind idempotent. Abschluss-E2E und querschnittlicher Dispose-Nachweis bleiben
+  wie geplant in Slice 09.
+- Verifikation: 104 Node-Testdateien mit 4082/4082 Assertions, 0 Fehlern und
+  0 offenen Handles sowie elf grüne Browser-Smoke-Szenarien. Die Umsetzung ist
+  noch nicht adversarial reviewed oder freigegeben.
 
 Diese Tests werden erweitert oder als Regression-Gates verwendet; parallele Test-Doppelungen sind nicht vorgesehen.
 
@@ -218,7 +241,7 @@ Der Blockstatus wird nicht durch Codex aufgehoben; Gemini-Nachreview und Claude-
 
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
 | --- | --- | --- | --- | --- |
-| G-01 | Gemini | Corrupt und transiente Persistenzfehler trennen | angenommen | Plan/Slice 03 konkretisiert; Code ausstehend |
+| G-01 | Gemini | Corrupt und transiente Persistenzfehler trennen | angenommen | Slice 03 implementiert und technisch validiert; Review ausstehend |
 | G-02 | Gemini | Deep-Copy-Garantie für Simulator-Lots | angenommen | Slice 07 konkretisiert; Code ausstehend |
 | G-03 | Gemini | Sichtbares Feedback für abgelehnte Quotes | angenommen | O-03/O-05 und Slice 05 konkretisiert; Code ausstehend |
 | G-04 | Gemini | Strukturierte Engine-Validierungsfehler in der UI | angenommen | Slices 02/04 konkretisiert; Code ausstehend |

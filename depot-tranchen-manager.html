@@ -45,6 +45,69 @@
             font-size: 12px;
         }
 
+        .persistence-panel {
+            margin-bottom: 20px;
+            padding: 14px 16px;
+            border: 1px solid #cbd5e0;
+            border-radius: 8px;
+            background: #f8fafc;
+        }
+
+        .persistence-status {
+            color: #2d3748;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .persistence-status[data-kind="error"] {
+            color: #9b2c2c;
+        }
+
+        .persistence-status[data-kind="pending"] {
+            color: #744210;
+        }
+
+        .recovery-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-top: 14px;
+        }
+
+        .recovery-actions[hidden],
+        .recovery-actions button[hidden],
+        .raw-payload[hidden] {
+            display: none;
+        }
+
+        .recovery-link {
+            display: inline-flex;
+            align-items: center;
+            min-height: 38px;
+            padding: 8px 14px;
+            border-radius: 6px;
+            background: #718096;
+            color: white;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .raw-payload {
+            flex-basis: 100%;
+            max-height: 220px;
+            overflow: auto;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            padding: 12px;
+            border-radius: 6px;
+            background: #1a202c;
+            color: #edf2f7;
+            font: 12px/1.4 Consolas, monospace;
+            user-select: text;
+        }
+
         .controls {
             display: flex;
             gap: 10px;
@@ -360,6 +423,22 @@
 
         <div id="priceUpdateStatus" class="hint"></div>
 
+        <section class="persistence-panel" aria-labelledby="tranchePersistenceStatus">
+            <div id="tranchePersistenceStatus" class="persistence-status" role="status" aria-live="polite"></div>
+            <div id="trancheRecoveryActions" class="recovery-actions" hidden>
+                <a class="recovery-link" href="index.html">Abbrechen und zur Startseite</a>
+                <a class="recovery-link" href="index.html#fullBackupImportBtn">Zentrales Backup wiederherstellen</a>
+                <button id="revealCorruptPayloadBtn" class="btn-secondary" type="button">Rohdaten lokal anzeigen</button>
+                <button id="copyCorruptPayloadBtn" class="btn-secondary" type="button" hidden>Rohdaten kopieren</button>
+                <button id="resetCorruptPayloadBtn" class="btn-danger" type="button">Beschädigte Daten zurücksetzen</button>
+                <pre id="corruptPayloadPreview" class="raw-payload" hidden></pre>
+            </div>
+            <div class="recovery-actions">
+                <button id="retryTrancheLoadBtn" class="btn-secondary" type="button" hidden>Speicher erneut lesen</button>
+                <button id="retryTrancheSaveBtn" class="btn-secondary" type="button" hidden>Speichern erneut versuchen</button>
+            </div>
+        </section>
+
         <div class="profile-values">
             <h3>Profilwerte: <span id="activeProfileName">-</span></h3>
             <div class="form-group">
@@ -577,7 +656,7 @@
 
         window.addEventListener('DOMContentLoaded', async () => {
             await initPersistence();
-            initTranchenManagerPage();
+            await initTranchenManagerPage();
         });
     </script>
 </body>

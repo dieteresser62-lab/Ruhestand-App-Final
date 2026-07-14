@@ -23,9 +23,15 @@ function createLink({ href = 'Balance.html', attrs = {}, dataset = {} } = {}) {
         addEventListener(type, handler) {
             listeners.set(type, handler);
         },
-        click() {
+        async click() {
             const handler = listeners.get('click');
-            if (handler) handler();
+            const event = {
+                defaultPrevented: false,
+                preventDefault() { this.defaultPrevented = true; }
+            };
+            this.lastEvent = event;
+            if (handler) await handler(event);
+            return event;
         }
     };
 }
@@ -56,6 +62,7 @@ console.log('Test 2: bindProfileNavigationHandoff exports on eligible link click
         }
     };
 
+    const win = { location: { href: 'index.html' } };
     const bound = bindProfileNavigationHandoff({
         root,
         exporter: () => {
@@ -65,14 +72,17 @@ console.log('Test 2: bindProfileNavigationHandoff exports on eligible link click
         flusher: () => {
             flushCount += 1;
             return true;
-        }
+        },
+        win
     });
 
     assertEqual(bound, 1, 'Only eligible links should be bound');
-    eligible.click();
-    ignored.click();
+    const event = await eligible.click();
+    await ignored.click();
     assertEqual(exportCount, 1, 'Only eligible link click should trigger export');
     assertEqual(flushCount, 1, 'Eligible link click should trigger persistence flush');
+    assertEqual(event.defaultPrevented, true, 'Eligible navigation should wait for confirmed flush');
+    assertEqual(win.location.href, 'Balance.html', 'Successful flush should navigate to target');
 
     const rebound = bindProfileNavigationHandoff({
         root,
@@ -88,6 +98,53 @@ console.log('Test 2: bindProfileNavigationHandoff exports on eligible link click
     assertEqual(rebound, 0, 'Already bound links should not be bound twice');
 }
 console.log('✓ bindProfileNavigationHandoff OK');
+
+console.log('Test 2b: manager handoff skips raw bundle export and blocks failed navigation');
+{
+    let exportCount = 0;
+    let flushCount = 0;
+    let failureCount = 0;
+    let releaseFlush;
+    const pendingFlush = new Promise(resolve => { releaseFlush = resolve; });
+    const managerLink = createLink({
+        href: 'depot-tranchen-manager.html',
+        attrs: { 'data-profile-handoff': '' },
+        dataset: { profileHandoffExport: 'false' }
+    });
+    const root = { querySelectorAll: () => [managerLink] };
+    const win = { location: { href: 'index.html' } };
+
+    bindProfileNavigationHandoff({
+        root,
+        exporter: () => { exportCount += 1; return true; },
+        flusher: () => { flushCount += 1; return pendingFlush; },
+        onFailure: () => { failureCount += 1; },
+        win
+    });
+
+    const clickPromise = managerLink.click();
+    assertEqual(managerLink.lastEvent.defaultPrevented, true, 'Manager click should prevent early navigation');
+    assertEqual(win.location.href, 'index.html', 'Navigation should remain pending before flush');
+    assertEqual(exportCount, 0, 'Manager handoff must not copy profile payload to window.name');
+    assertEqual(flushCount, 1, 'Manager handoff should flush selected profile');
+    releaseFlush(true);
+    await clickPromise;
+    assertEqual(win.location.href, 'depot-tranchen-manager.html', 'Confirmed flush should navigate to manager');
+
+    const failingLink = createLink({ attrs: { 'data-profile-handoff': '' } });
+    const failingWin = { location: { href: 'index.html' } };
+    bindProfileNavigationHandoff({
+        root: { querySelectorAll: () => [failingLink] },
+        exporter: () => true,
+        flusher: async () => { throw new Error('offline'); },
+        onFailure: () => { failureCount += 1; },
+        win: failingWin
+    });
+    await failingLink.click();
+    assertEqual(failingWin.location.href, 'index.html', 'Flush rejection should block navigation');
+    assertEqual(failureCount, 1, 'Flush rejection should invoke visible failure handler');
+}
+console.log('✓ manager handoff ordering and failure contract OK');
 
 console.log('Test 3: installProfilePersistenceHooks only installs once');
 {

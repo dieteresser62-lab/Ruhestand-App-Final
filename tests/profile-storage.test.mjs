@@ -525,6 +525,25 @@ try {
     }
     console.log('✓ bootstrap preserves live data when requested OK');
 
+    // Test 17f: Explicit empty tranche override never falls back to stale live data
+    console.log('Test 17f: explicit empty tranche override');
+    {
+        localStorage.clear();
+        ensureProfileRegistry();
+        localStorage.setItem('depot_tranchen', JSON.stringify([{ trancheId: 'profile-a' }]));
+        saveCurrentProfileFromLocalStorage();
+
+        const emptyProfile = createProfile('Leer');
+        updateProfileData(emptyProfile.id, { depot_tranchen: '[]' });
+        setCurrentProfileId(emptyProfile.id);
+
+        const result = bootstrapProfileContext();
+        assert(result.action === 'loaded', 'Leeres Zielprofil sollte explizit geladen werden');
+        assert(localStorage.getItem('depot_tranchen') === '[]', 'Explizites [] darf nicht auf Live-Tranchen des vorherigen Profils zurückfallen');
+        assert(getActiveProfileId() === emptyProfile.id, 'Leeres Zielprofil sollte als tatsächlich geladen markiert werden');
+    }
+    console.log('✓ explicit empty tranche override OK');
+
     // ========== belongsToHousehold Tests ==========
 
     // Test 18: setProfileVerbundMembership

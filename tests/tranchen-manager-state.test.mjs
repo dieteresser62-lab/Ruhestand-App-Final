@@ -12,12 +12,17 @@ console.log('--- Tranchen Manager State Tests ---');
 
 function createLocalStorageMock() {
     const store = new Map();
-    return {
+    const storage = {
+        setCalls: 0,
         getItem: (key) => (store.has(key) ? store.get(key) : null),
-        setItem: (key, value) => { store.set(String(key), String(value)); },
+        setItem: (key, value) => {
+            storage.setCalls += 1;
+            store.set(String(key), String(value));
+        },
         removeItem: (key) => { store.delete(key); },
         clear: () => { store.clear(); }
     };
+    return storage;
 }
 
 function validLegacyTranche(overrides = {}) {
@@ -63,11 +68,38 @@ console.log('Test 3: loadTranchesFromStorage normalizes persisted entries');
     const storage = createLocalStorageMock();
     storage.setItem('depot_tranchen', JSON.stringify([validLegacyTranche()]));
     const loaded = loadTranchesFromStorage(storage);
-    assertEqual(loaded.length, 1, 'One tranche should load');
-    assert(loaded[0].trancheId.startsWith('tranche_legacy_'), 'Loaded tranche should be normalized with id');
-    assertEqual(loaded[0].marketValue, 600, 'Loaded tranche should recompute derived market value');
+    assertEqual(loaded.status, 'valid', 'Non-empty canonical storage should report valid');
+    assertEqual(loaded.tranches.length, 1, 'One tranche should load');
+    assert(loaded.tranches[0].trancheId.startsWith('tranche_legacy_'), 'Loaded tranche should be normalized with id');
+    assertEqual(loaded.tranches[0].marketValue, 600, 'Loaded tranche should recompute derived market value');
 }
 console.log('✓ loadTranchesFromStorage normalizes persisted entries OK');
+
+console.log('Test 3b: load reports empty, corrupt and unavailable without mutation');
+{
+    const emptyStorage = createLocalStorageMock();
+    const empty = loadTranchesFromStorage(emptyStorage);
+    assertEqual(empty.status, 'empty', 'Missing storage should report empty');
+    assertEqual(emptyStorage.setCalls, 0, 'Pure empty load must not write');
+
+    const corruptStorage = createLocalStorageMock();
+    const corruptRaw = '{invalid-json';
+    corruptStorage.setItem('depot_tranchen', corruptRaw);
+    const writesBeforeLoad = corruptStorage.setCalls;
+    const corrupt = loadTranchesFromStorage(corruptStorage);
+    assertEqual(corrupt.status, 'corrupt', 'Invalid payload should report corrupt');
+    assert(corrupt.raw === corruptRaw, 'Corrupt payload should be retained byte-for-byte');
+    assertEqual(corruptStorage.setCalls, writesBeforeLoad, 'Corrupt load must not write');
+    assert(corruptStorage.getItem('depot_tranchen') === corruptRaw, 'Corrupt live payload must remain unchanged');
+
+    const unavailable = loadTranchesFromStorage({
+        getItem() { throw new Error('storage offline'); },
+        setItem() { throw new Error('must not write'); }
+    });
+    assertEqual(unavailable.status, 'unavailable', 'Read rejection should report unavailable');
+    assertEqual(unavailable.raw, null, 'Unavailable read must not invent a raw payload');
+}
+console.log('✓ explicit load-state contract OK');
 
 console.log('Test 4: save validates and persists only canonical records');
 {

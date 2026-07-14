@@ -100,7 +100,7 @@ Der Preisservice liefert ein Objekt statt einer bloßen Zahl. Browser-Node-Proxy
 | ---: | --- | --- | --- | ---: | --- |
 | 1 | [Test-Gate und Baseline](./SLICE_TRANCHENMANAGEMENT_01_TEST_GATE_BASELINE.md) | assertionslose False-Green-Pfade schließen | Planfreigabe | 5 | freigegeben |
 | 2 | [Kanonischer Datencontract](./SLICE_TRANCHENMANAGEMENT_02_CANONICAL_DATA_CONTRACT.md) | Schema, Klassifikation und Doppelverkauf beheben | Slice 01 | 11 nach Nutzerfreigabe; `engine.js` ohne Diff | freigegeben |
-| 3 | [Persistenz und Recovery](./SLICE_TRANCHENMANAGEMENT_03_PERSISTENCE_RECOVERY.md) | valid/empty/corrupt/unavailable, Flush, Profil-Handoff | Slice 02 | 9 | geplant |
+| 3 | [Persistenz und Recovery](./SLICE_TRANCHENMANAGEMENT_03_PERSISTENCE_RECOVERY.md) | valid/empty/corrupt/unavailable, Flush, Profil-Handoff | Slice 02 | 9 | freigegeben |
 | 4 | [CRUD, UX und Accessibility](./SLICE_TRANCHENMANAGEMENT_04_CRUD_UX_ACCESSIBILITY.md) | sichere Eingabe und bedienbare Darstellung | Slice 03 | 10 | geplant |
 | 5 | [Quote- und Währungscontract](./SLICE_TRANCHENMANAGEMENT_05_QUOTE_CURRENCY_RESILIENCE.md) | EUR-/Stichtagscontract, Batch und Proxyparität | Slice 02, 03 | 8 | geplant |
 | 6 | [Balance-, Status- und Steuerparität](./SLICE_TRANCHENMANAGEMENT_06_BALANCE_STATUS_TAX_PARITY.md) | Einheiten, TQF, Status und Klassifikation | Slice 02, 03 | 9 | geplant |
@@ -136,8 +136,28 @@ Die Reihenfolge ist verbindlich, solange das Planreview sie nicht ändert. Für 
   Handles; elf Browser-Smoke-Szenarien; historischer Backtest und FlowDelta ohne
   unerwartete Abweichung.
 - Nach Eintritt der Dateilimit-Stop-Regel hat der Nutzer die Erweiterung auf elf
-  Programmdiffs ausdrücklich freigegeben. Slice 02 ist implementiert, aber noch
-  nicht durch Gemini/Nutzer freigegeben.
+  Programmdiffs ausdrücklich freigegeben. Slice 02 ist durch Gemini und Nutzer
+  freigegeben und als Commit `acd6905` vorhanden.
+
+### Rückdokumentation Slice 03
+
+- Der Tranchen-Loader liefert `valid`, `empty`, `corrupt` oder `unavailable` ohne
+  Lade-Write. Korrupte Rohdaten bleiben unverändert; transiente Lesefehler bieten
+  nur Retry und keinen Reset.
+- Manageränderungen und Profilwerte gelten erst nach bestätigtem Flush. Bei
+  Rejection werden der letzte bestätigte sichtbare Stand und die zugehörigen
+  Cache-/Registry-Werte wiederhergestellt; ausstehende Änderungen sind retrybar.
+- Die blockierende Recovery-UI bietet Startseitenabbruch, zentralen
+  Komplettbackup-Restore, bewusstes lokales Anzeigen/Kopieren und bestätigten
+  Reset. Toter Tranchen-Teilimport/-export und Test-Phantom-Controls sind entfernt.
+- Der Manager-Handoff flusht die gewählte Profilidentität vor Navigation und
+  verzichtet für diesen Link auf eine automatische `window.name`-Payloadkopie.
+  Der Manager zeigt Name und ID des tatsächlich geladenen Profils.
+- Initialisierung, BFCache und Tab-Rückkehr sind idempotent beziehungsweise laden
+  den Profilkontext neu. Ein explizites leeres Profil-Override bleibt leer.
+- Verifiziert: 104 Node-Testdateien, 4082/4082 Assertions, 0 Fehler, 0 offene
+  Handles; elf grüne Browser-Smoke-Szenarien. Slice 03 ist implementiert, aber
+  noch nicht durch Gemini/Nutzer freigegeben.
 
 ## GAP-Zuordnung
 
@@ -288,7 +308,7 @@ Die Antworten ändern den Gemini-Status nicht eigenmächtig. Plan und Slices ble
 
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
 | --- | --- | --- | --- | --- |
-| G-01 | Gemini | Transiente Persistenzfehler und korrupter Payload unzureichend getrennt | angenommen | Plan und Slice 03 konkretisiert; Code ausstehend |
+| G-01 | Gemini | Transiente Persistenzfehler und korrupter Payload unzureichend getrennt | angenommen | Slice 03 implementiert und technisch validiert; Review ausstehend |
 | G-02 | Gemini | Simulator benötigt zwingende Deep-Copy-Grenze | angenommen | Plan und Slice 07 konkretisiert; Code ausstehend |
 | G-03 | Gemini | Abgelehnte Fremdwährungsquotes benötigen sichtbaren Grund | angenommen | O-03/O-05 und Slice 05 konkretisiert; Code ausstehend |
 | G-04 | Gemini | Engine-Validierungsfehler muss strukturiert in der UI ankommen | angenommen | Slices 02/04 konkretisiert; Code ausstehend |

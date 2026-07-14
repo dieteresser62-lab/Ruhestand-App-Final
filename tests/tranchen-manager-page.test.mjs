@@ -22,6 +22,8 @@ class MockElement {
         this.textContent = '';
         this.innerHTML = '';
         this.checked = false;
+        this.disabled = false;
+        this.hidden = false;
         this.type = '';
         this.dataset = {};
         this.style = { display: '' };
@@ -37,8 +39,9 @@ class MockElement {
         this.children.push(child);
         return child;
     }
-    click() {
-        (this.listeners.click || []).forEach(handler => handler({ target: this, preventDefault() {} }));
+    async click() {
+        const results = (this.listeners.click || []).map(handler => handler({ target: this, preventDefault() {} }));
+        await Promise.all(results);
     }
     closest(selector) {
         if (selector === '[data-action]' && this.dataset.action) return this;
@@ -50,6 +53,8 @@ class MockDocument {
     constructor() {
         this.elements = new Map();
         this.created = [];
+        this.listeners = {};
+        this.visibilityState = 'visible';
     }
     createElement(tagName) {
         const element = new MockElement('', tagName);
@@ -62,6 +67,10 @@ class MockDocument {
     }
     getElementById(id) {
         return this.elements.get(id) || null;
+    }
+    addEventListener(type, handler) {
+        if (!this.listeners[type]) this.listeners[type] = [];
+        this.listeners[type].push(handler);
     }
 }
 
@@ -104,6 +113,9 @@ function createTranchenPageDom() {
         'stats',
         'tranchenTable',
         'priceUpdateStatus',
+        'tranchePersistenceStatus',
+        'trancheRecoveryActions',
+        'corruptPayloadPreview',
         'modalTitle',
         'trancheModal',
         'trancheForm',
@@ -123,10 +135,13 @@ function createTranchenPageDom() {
         'addTrancheBtn',
         'updatePricesBtn',
         'proxyHealthBtn',
-        'exportTranchesBtn',
-        'importTranchesBtn',
         'clearTranchesBtn',
-        'closeTrancheModalBtn'
+        'closeTrancheModalBtn',
+        'revealCorruptPayloadBtn',
+        'copyCorruptPayloadBtn',
+        'resetCorruptPayloadBtn',
+        'retryTrancheLoadBtn',
+        'retryTrancheSaveBtn'
     ].forEach(id => doc.register(new MockElement(id, 'button')));
     profileInputIds.forEach(id => {
         const tagName = id.includes('Aktiv') || id.includes('Steuerfrei') || id.includes('Mode') || id.includes('Source') || id.includes('Enabled') ? 'select' : 'input';
@@ -137,7 +152,14 @@ function createTranchenPageDom() {
 
 function installGlobals(documentRef, storageRef) {
     global.document = documentRef;
-    global.window = { tranchen: null, localStorage: storageRef };
+    global.window = {
+        tranchen: null,
+        localStorage: storageRef,
+        location: {
+            reloadCount: 0,
+            reload() { this.reloadCount += 1; }
+        }
+    };
     global.localStorage = storageRef;
     global.confirm = () => true;
     global.alert = () => {};
@@ -180,12 +202,13 @@ async function runTranchenManagerPageTests() {
         installGlobals(doc, storageRef);
         PersistenceFacade.resetPersistenceForTests();
 
-        initTranchenManagerPage();
+        await initTranchenManagerPage();
         await PersistenceFacade.flush();
 
         assertEqual(window.tranchen.length, 0, 'Empty storage should expose empty tranche list');
         assert(doc.getElementById('tranchenTable').innerHTML.includes('Keine Tranchen vorhanden'), 'Empty state should be rendered');
         assert(doc.getElementById('stats').innerHTML.includes('Anzahl Tranchen'), 'Stats container should be rendered');
+        assertEqual(persistenceStorage.getItem('depot_tranchen'), null, 'Pure empty load must not create a tranche key');
     }
     console.log('✓ empty storage initialization OK');
 
@@ -213,7 +236,7 @@ async function runTranchenManagerPageTests() {
             throw new Error('offline');
         };
         try {
-            initTranchenManagerPage();
+            await initTranchenManagerPage();
             await doc.getElementById('updatePricesBtn').listeners.click[0]();
             await PersistenceFacade.flush();
         } finally {
@@ -224,25 +247,144 @@ async function runTranchenManagerPageTests() {
         assertEqual(window.tranchen[0].currentPrice, 120, 'Offline price update must preserve existing local price');
         assert(doc.getElementById('priceUpdateStatus').textContent.includes('fehlgeschlagen'), 'Offline update should render degraded status');
         assertEqual(doc.getElementById('profileTagesgeld').value, 12345, 'Profile values should be applied to DOM');
+        assert(doc.getElementById('activeProfileName').textContent.includes('(default)'), 'Loaded profile label should include actual id');
     }
     console.log('✓ valid storage and offline price degradation OK');
 
-    console.log('Test 3: page initializes corrupt tranche storage as empty state');
+    console.log('Test 3: corrupt storage remains untouched until explicit recovery');
     {
         const storageRef = createLocalStorageMock();
         const doc = createTranchenPageDom();
         installGlobals(doc, storageRef);
         PersistenceFacade.resetPersistenceForTests();
-        persistenceStorage.setItem('depot_tranchen', '{bad json');
 
-        initTranchenManagerPage();
+        const corruptRaw = '{bad json';
+        persistenceStorage.setItem('depot_tranchen', corruptRaw);
+
+        await initTranchenManagerPage();
         await PersistenceFacade.flush();
 
-        assertEqual(window.tranchen.length, 0, 'Corrupt tranche storage should fall back to empty list');
-        assertEqual(persistenceStorage.getItem('depot_tranchen'), '[]', 'Corrupt storage should be normalized after init');
-        assert(doc.getElementById('tranchenTable').innerHTML.includes('Keine Tranchen vorhanden'), 'Corrupt storage should render empty state');
+        assertEqual(window.tranchen.length, 0, 'Corrupt profile must not expose processable tranches');
+        assert(persistenceStorage.getItem('depot_tranchen') === corruptRaw, 'Corrupt storage must remain byte-for-byte unchanged');
+        assertEqual(doc.getElementById('trancheRecoveryActions').hidden, false, 'Corrupt state should expose reviewed recovery actions');
+        assertEqual(doc.getElementById('retryTrancheLoadBtn').hidden, true, 'Corrupt state should not use unavailable retry');
+        assertEqual(doc.getElementById('addTrancheBtn').disabled, true, 'Corrupt state should block normal processing');
+        assertEqual(doc.getElementById('corruptPayloadPreview').hidden, true, 'Raw payload must not be shown automatically');
+        assertEqual(doc.getElementById('corruptPayloadPreview').textContent, '', 'Raw payload must not enter DOM before local action');
+
+        await doc.getElementById('revealCorruptPayloadBtn').click();
+        assert(doc.getElementById('corruptPayloadPreview').textContent === corruptRaw, 'Explicit reveal should show unchanged raw payload');
+
+        await doc.getElementById('resetCorruptPayloadBtn').click();
+        assertEqual(persistenceStorage.getItem('depot_tranchen'), '[]', 'Explicit confirmed reset should persist an empty override');
+        assertEqual(doc.getElementById('trancheRecoveryActions').hidden, true, 'Successful reset should leave recovery mode');
     }
-    console.log('✓ corrupt storage initialization OK');
+    console.log('✓ corrupt storage recovery contract OK');
+
+    console.log('Test 4: unavailable reload preserves last confirmed state and listeners');
+    {
+        const storageRef = createLocalStorageMock();
+        const doc = createTranchenPageDom();
+        installGlobals(doc, storageRef);
+        PersistenceFacade.resetPersistenceForTests();
+        persistenceStorage.setItem('depot_tranchen', JSON.stringify([{
+            trancheId: 'confirmed',
+            name: 'Confirmed',
+            shares: 1,
+            purchasePrice: 100,
+            currentPrice: 100,
+            category: 'equity',
+            type: 'aktien_neu',
+            tqf: 0.3
+        }]));
+
+        await initTranchenManagerPage({ profileId: 'default' });
+        const listenerCount = doc.getElementById('addTrancheBtn').listeners.click.length;
+        await initTranchenManagerPage({
+            profileId: 'default',
+            loader: () => ({ status: 'unavailable', tranches: null, raw: null })
+        });
+
+        assertEqual(window.tranchen.length, 1, 'Unavailable reload should retain last confirmed visible state');
+        assertEqual(window.tranchen[0].trancheId, 'confirmed', 'Unavailable reload must not switch profile data');
+        assertEqual(doc.getElementById('retryTrancheLoadBtn').hidden, false, 'Unavailable state should expose retry');
+        assertEqual(doc.getElementById('trancheRecoveryActions').hidden, true, 'Unavailable state must not expose reset');
+        assertEqual(doc.getElementById('addTrancheBtn').listeners.click.length, listenerCount, 'Repeated init must not duplicate listeners');
+
+        doc.visibilityState = 'hidden';
+        doc.listeners.visibilitychange[0]();
+        doc.visibilityState = 'visible';
+        doc.listeners.visibilitychange[0]();
+        assertEqual(window.location.reloadCount, 1, 'Return from another tab should reload manager context once');
+    }
+    console.log('✓ unavailable and lifecycle contract OK');
+
+    console.log('Test 5: failed flush keeps confirmed state and supports retry');
+    {
+        const initialRaw = JSON.stringify([{
+            trancheId: 'persisted',
+            schemaVersion: 1,
+            name: 'Persisted',
+            isin: '',
+            ticker: '',
+            shares: 1,
+            purchasePrice: 100,
+            currentPrice: 100,
+            purchaseDate: '',
+            category: 'equity',
+            type: 'aktien_neu',
+            tqf: 0.3,
+            notes: '',
+            costBasis: 100,
+            marketValue: 100,
+            gainLoss: 0,
+            gainLossPct: 0
+        }]);
+        const adapterStore = new Map([['depot_tranchen', initialRaw]]);
+        let failSave = true;
+        const adapter = {
+            name: 'retry-memory',
+            async open() {},
+            async loadAll() { return Object.fromEntries(adapterStore); },
+            async saveBatch(batch) {
+                if (failSave) throw new Error('offline');
+                batch.deletes.forEach(key => adapterStore.delete(key));
+                batch.upserts.forEach(([key, value]) => adapterStore.set(key, String(value)));
+            }
+        };
+        const storageRef = createLocalStorageMock();
+        const doc = createTranchenPageDom();
+        installGlobals(doc, storageRef);
+        PersistenceFacade.resetPersistenceForTests(adapter);
+        await PersistenceFacade.init();
+
+        await initTranchenManagerPage({ profileId: 'default' });
+        await doc.getElementById('clearTranchesBtn').click();
+
+        assertEqual(window.tranchen.length, 1, 'Flush rejection should keep confirmed tranche visible');
+        assertEqual(adapterStore.get('depot_tranchen'), initialRaw, 'Flush rejection must not change confirmed adapter state');
+        assertEqual(doc.getElementById('retryTrancheSaveBtn').hidden, false, 'Flush rejection should expose retry');
+        assert(!doc.getElementById('tranchePersistenceStatus').textContent.includes('dauerhaft gelöscht'), 'Flush rejection must not report success');
+
+        failSave = false;
+        await doc.getElementById('retryTrancheSaveBtn').click();
+        assertEqual(window.tranchen.length, 0, 'Successful retry should apply pending delete');
+        assertEqual(adapterStore.get('depot_tranchen'), '[]', 'Successful retry should durably persist empty state');
+        assertEqual(doc.getElementById('retryTrancheSaveBtn').hidden, true, 'Successful retry should clear pending action');
+
+        failSave = true;
+        doc.getElementById('profileTagesgeld').value = '777';
+        await doc.getElementById('profileTagesgeld').listeners.input[0]();
+        assertEqual(doc.getElementById('profileTagesgeld').value, 0, 'Profile flush rejection should restore confirmed visible value');
+        assertEqual(adapterStore.has('profile_tagesgeld'), false, 'Profile flush rejection must not change adapter state');
+        assertEqual(doc.getElementById('retryTrancheSaveBtn').hidden, false, 'Profile flush rejection should expose retry');
+
+        failSave = false;
+        await doc.getElementById('retryTrancheSaveBtn').click();
+        assertEqual(adapterStore.get('profile_tagesgeld'), '777', 'Profile retry should durably persist pending value');
+        assertEqual(doc.getElementById('retryTrancheSaveBtn').hidden, true, 'Profile retry should clear pending action');
+    }
+    console.log('✓ flush failure recovery OK');
 
     console.log('✅ Tranchen manager page contract validated');
     console.log('--- Tranchen Manager Page Tests Completed ---');
