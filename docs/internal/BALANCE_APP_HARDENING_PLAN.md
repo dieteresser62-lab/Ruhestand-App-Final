@@ -1,7 +1,7 @@
 # Balance-App-Hardening: Arbeitsplan
 
 **Stand:** 2026-07-14
-**Status:** implementierungsreif; Slice 01, 02, 03, 04, 05 und 06 erledigt
+**Status:** implementierungsreif; Slice 01, 02, 03, 04, 05, 06 und 07 erledigt
 **Feature-Branch:** `codex/balance-app-hardening`  
 **GitHub-Status:** lokal vorhanden; `git ls-remote --heads origin refs/heads/codex/balance-app-hardening` lieferte am 2026-07-13 keinen Remote-Branch; keine Veroeffentlichung ohne ausdrueckliche Freigabe  
 **Autor:** Codex  
@@ -98,7 +98,7 @@ Jahresprozess
 | 4 | [Marktdaten-Stichtag](./SLICE_BALANCE_HARDENING_04_MARKETDATA_ASOF.md) | P0 | 02 | 5 | erledigt |
 | 5 | [Inflations-Contract](./SLICE_BALANCE_HARDENING_05_INFLATION_CONTRACT.md) | P1 | 02 | 5 | erledigt |
 | 6 | [Persistente Profilmitgliedschaft](./SLICE_BALANCE_HARDENING_06_PROFILE_MEMBERSHIP.md) | P1 | 01 | 3 | erledigt |
-| 7 | [Engine-Gate und Update-Ergebnis](./SLICE_BALANCE_HARDENING_07_ENGINE_UPDATE_GATE.md) | P1 | 03 | 4 | geplant |
+| 7 | [Engine-Gate und Update-Ergebnis](./SLICE_BALANCE_HARDENING_07_ENGINE_UPDATE_GATE.md) | P1 | 03 | 4 | erledigt |
 | 8 | [Schema-validierter Balance-Import](./SLICE_BALANCE_HARDENING_08_IMPORT_RECOVERY.md) | P1 | 07 | 4 | geplant |
 | 9 | [Korrupte Persistenz sichtbar behandeln](./SLICE_BALANCE_HARDENING_09_CORRUPT_DATA_RECOVERY.md) | P1 | 08 | 5 | geplant |
 | 10 | [Striktes Zahlen- und CSV-Parsing](./SLICE_BALANCE_HARDENING_10_STRICT_PARSING.md) | P2 | 04, 05, 08 | 5 | geplant |
@@ -233,6 +233,8 @@ Zusatzlich zu `AGENTS.md` und `SLICE\_EXECUTION\_RULES.md` wird gestoppt, wenn:
 | 2026-07-14 | Slice 05 durch Gemini freigegeben und committed | Commit; keine Blocker, Restrisiko G5-01 |
 | 2026-07-14 | Slice 06 durch Codex implementiert | Pauschalen Membership-Reset beim Balance-Start entfernt; gespeichertes Opt-out und Checkboxzustand bleiben erhalten; bestehender Neu-/Legacy-Default `true` ohne Registry-Migration abgesichert; ausgeschlossene Profile bleiben aus Aggregaten, Profil-Runs und Action-Quellen entfernt. Fokussiert 51/51 + 127/127 + 58/58, Gesamtsuite 3291/3291; Code-Review ausstehend |
 | 2026-07-14 | Slice 06 durch Gemini freigegeben und committed | Commit; keine Blocker, Restrisiko G6-01 |
+| 2026-07-14 | Slice 07 durch Codex implementiert | Engine-Major-Gate bindet den erfolgreichen `getVersion()`-/`simulateSingleYear()`-Contract fail-closed; nachtraeglicher Engine-Austausch, fehlende und inkompatible Engines blockieren Berechnung und Persistenz. `update()` liefert `success`, `validation_error`, `engine_error` oder `blocked`; spaetes Script-`src`-Umschreiben entfernt. Fokussiert Smoke gruen + 63/63 + 30/30, Gesamtsuite 3291/3291 und Browser-Smoke fuer alle fuenf Einstiegspunkte gruen; Code-Review ausstehend |
+| 2026-07-14 | Slice 07 durch Gemini freigegeben und committed | Commit; keine Blocker, Restrisiko G7-01 |
 
 
 ## Review-Feedback von Gemini

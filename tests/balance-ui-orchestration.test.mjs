@@ -3,9 +3,16 @@ import { fileURLToPath } from 'node:url';
 import { UIBinder, initUIBinder } from '../app/balance/balance-binder.js';
 import { createImportExportHandlers } from '../app/balance/balance-binder-imports.js';
 import { createProfilverbundHandlers } from '../app/balance/balance-main-profilverbund.js';
-import { CONFIG } from '../app/balance/balance-config.js';
+import { CONFIG, ValidationError } from '../app/balance/balance-config.js';
 import { UIRenderer } from '../app/balance/balance-renderer.js';
 import { StorageManager } from '../app/balance/balance-storage.js';
+import {
+    BALANCE_UPDATE_STATUS,
+    assertActiveEngineHandshake,
+    createEngineHandshake,
+    createUpdateFailureResult,
+    createUpdateSuccessResult
+} from '../app/balance/balance-update-pipeline.js';
 import { PersistenceFacade } from '../app/shared/persistence-facade.js';
 import { loadProfilverbundProfiles } from '../app/profile/profilverbund-balance.js';
 
@@ -640,6 +647,66 @@ async function runBalanceUiOrchestrationTests() {
         });
         assertEqual(runs[0].persistedInput.renteMonatlich, 1000, 'Original profile income remains in persisted inputs');
         assertEqual(runs[1].persistedInput.renteMonatlich, 500, 'Second profile income remains in persisted inputs');
+    }
+
+    console.log('Test 6: Engine handshake and update result contracts fail closed');
+    {
+        const compatibleEngine = {
+            getVersion: () => ({ api: '31.7', build: 'test-build' }),
+            simulateSingleYear: () => ({ newState: {}, ui: {}, diagnosis: {} })
+        };
+        const handshake = createEngineHandshake(compatibleEngine, '31.');
+        assertEqual(handshake.version.api, '31.7', 'Kompatible Engine-Major-Version besteht den Handshake');
+        assertEqual(assertActiveEngineHandshake(handshake, compatibleEngine), compatibleEngine,
+            'Aktiver Handshake liefert exakt die gebundene Engine zurueck');
+
+        const captureGateError = callback => {
+            try {
+                callback();
+                return null;
+            } catch (error) {
+                return error;
+            }
+        };
+        const missingEngine = captureGateError(() => createEngineHandshake(undefined, '31.'));
+        assertEqual(missingEngine?.reason, 'missing_engine', 'Fehlende Engine wird fail-closed abgewiesen');
+
+        const incompleteEngine = captureGateError(() => createEngineHandshake({
+            getVersion: () => ({ api: '31.7' }),
+            simulateSingleYear: () => ({})
+        }, '31.'));
+        assertEqual(incompleteEngine?.reason, 'invalid_version', 'Unvollstaendige Versionsantwort wird abgewiesen');
+
+        const incompatibleEngine = captureGateError(() => createEngineHandshake({
+            getVersion: () => ({ api: '30.9', build: 'old-build' }),
+            simulateSingleYear: () => ({})
+        }, '31.'));
+        assertEqual(incompatibleEngine?.reason, 'incompatible_version', 'Inkompatible Engine-Major-Version wird abgewiesen');
+
+        const replacedContract = captureGateError(() => assertActiveEngineHandshake(handshake, {
+            ...compatibleEngine
+        }));
+        assertEqual(replacedContract?.reason, 'contract_changed', 'Engine-Austausch nach dem Handshake blockiert das Update');
+
+        const validationResult = createUpdateFailureResult(
+            new ValidationError([{ fieldId: 'floorBedarf', message: 'ungueltig' }]),
+            { phase: 'validation' }
+        );
+        assertEqual(validationResult.status, BALANCE_UPDATE_STATUS.VALIDATION_ERROR,
+            'Eingabefehler liefern validation_error');
+
+        const engineResult = createUpdateFailureResult(new Error('Engine fehlgeschlagen'), { phase: 'engine' });
+        assertEqual(engineResult.status, BALANCE_UPDATE_STATUS.ENGINE_ERROR,
+            'Engine-Ausfuehrungsfehler liefern engine_error');
+
+        const blockedResult = createUpdateFailureResult(replacedContract, { phase: 'engine_gate' });
+        assertEqual(blockedResult.status, BALANCE_UPDATE_STATUS.BLOCKED,
+            'Engine-Gate-Fehler liefern blocked');
+        assertEqual(blockedResult.reason, 'contract_changed', 'Blocked-Ergebnis behaelt den maschinenlesbaren Gate-Grund');
+
+        const successResult = createUpdateSuccessResult({ marker: true });
+        assertEqual(successResult.status, BALANCE_UPDATE_STATUS.SUCCESS, 'Erfolgreiches Update liefert success');
+        assertEqual(successResult.ok, true, 'Success-Status bleibt mit bestehendem ok-Contract kompatibel');
     }
 
     console.log('Balance UI orchestration tests passed');

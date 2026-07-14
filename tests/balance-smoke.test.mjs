@@ -99,6 +99,8 @@ class MockDocument {
     constructor() {
         this.elements = {};
         this.listeners = {};
+        this.engineScript = new MockElement('engine-script', 'script');
+        this.engineScript.src = 'engine.js';
     }
 
     createElement(tagName) {
@@ -125,6 +127,9 @@ class MockDocument {
     querySelector(selector) {
         if (selector === '.form-column') {
             return this.getElementById('input-form-container');
+        }
+        if (selector === 'script[src^="engine.js"]') {
+            return this.engineScript;
         }
         // Return a dummy element
         return new MockElement('dummy-query');
@@ -170,12 +175,17 @@ class MockEvent {
 }
 
 // Setup Global Context
+const localStorageData = new Map();
+const storageWrites = [];
 const localStorageMock = {
-    getItem: () => null,
-    setItem: () => { },
-    removeItem: () => { },
-    key: () => null,
-    length: 0
+    getItem: key => localStorageData.get(String(key)) ?? null,
+    setItem: (key, value) => {
+        localStorageData.set(String(key), String(value));
+        storageWrites.push(String(key));
+    },
+    removeItem: key => localStorageData.delete(String(key)),
+    key: index => Array.from(localStorageData.keys())[index] ?? null,
+    get length() { return localStorageData.size; }
 };
 
 global.window = {
@@ -189,8 +199,9 @@ global.Event = MockEvent;
 
 // Mock EngineAPI
 let simulateCallCount = 0;
-global.window.EngineAPI = {
-    getVersion: () => ({ api: "1.0.0", build: "TEST-BUILD" }),
+let engineFailure = null;
+const compatibleEngine = {
+    getVersion: () => ({ api: "31.0", build: "TEST-BUILD" }),
     getConfig: () => ({
         THRESHOLDS: {
             STRATEGY: { cashRebalanceThreshold: 2500 },
@@ -200,6 +211,7 @@ global.window.EngineAPI = {
     }),
     simulateSingleYear: (input, lastState) => {
         simulateCallCount++;
+        if (engineFailure) throw engineFailure;
         return {
             input,
             newState: {},
@@ -257,6 +269,7 @@ global.window.EngineAPI = {
         };
     }
 };
+global.window.EngineAPI = compatibleEngine;
 
 // Mock console
 const originalConsoleError = console.error;
@@ -272,8 +285,9 @@ console.info = () => { };
 const modulePath = path.join(rootDir, 'app', 'balance', 'balance-main.js');
 const moduleUrl = new URL(`file:///${modulePath.replace(/\\/g, '/')}`).href;
 
+let balanceMain;
 try {
-    await import(moduleUrl);
+    balanceMain = await import(moduleUrl);
 } catch (e) {
     originalConsoleError("Failed to import module:", e);
     throw e;
@@ -300,8 +314,11 @@ if (simulateCallCount !== 1) {
 
 // Verify Footer
 const footer = document.getElementById('print-footer');
-if (!footer.textContent.includes("Engine: 1.0.0")) {
+if (!footer.textContent.includes("Engine: 31.0")) {
     throw new Error(`Footer text incorrect. Got: '${footer.textContent}'`);
+}
+if (document.engineScript.src !== 'engine.js') {
+    throw new Error(`Engine script source was changed after handshake: ${document.engineScript.src}`);
 }
 
 // --- 5. Test Interaction ---
@@ -326,6 +343,68 @@ await new Promise(resolve => setTimeout(resolve, 310));
 if (simulateCallCount !== 2) {
     throw new Error(`EngineAPI.simulateSingleYear call count after input: Expected 2, got ${simulateCallCount}`);
 }
+
+console.log("Testing machine-readable update results and fail-closed persistence...");
+
+const successResult = balanceMain.update({ persist: false });
+if (!successResult.ok || successResult.status !== 'success') {
+    throw new Error(`Successful update returned unexpected result: ${JSON.stringify(successResult)}`);
+}
+
+document.getElementById('minimumFlexAnnual').value = '-1';
+const validationCallsBefore = simulateCallCount;
+const validationResult = balanceMain.update();
+if (validationResult.ok || validationResult.status !== 'validation_error') {
+    throw new Error(`Validation error returned unexpected result: ${JSON.stringify(validationResult)}`);
+}
+if (simulateCallCount !== validationCallsBefore) {
+    throw new Error('Validation error called EngineAPI.simulateSingleYear unexpectedly.');
+}
+if (!document.getElementById('error-container').textContent.includes('Einige Eingaben sind ungültig')) {
+    throw new Error('Validation error was not rendered through the normal UI error path.');
+}
+document.getElementById('minimumFlexAnnual').value = '0';
+
+engineFailure = new Error('Simulierter Engine-Fehler');
+const engineResult = balanceMain.update();
+if (engineResult.ok || engineResult.status !== 'engine_error') {
+    throw new Error(`Engine error returned unexpected result: ${JSON.stringify(engineResult)}`);
+}
+if (!document.getElementById('error-container').textContent.includes('Simulierter Engine-Fehler')) {
+    throw new Error('Engine error was not rendered through the normal UI error path.');
+}
+engineFailure = null;
+
+let incompatibleCalls = 0;
+global.window.EngineAPI = {
+    getVersion: () => ({ api: '30.9', build: 'OLD-BUILD' }),
+    simulateSingleYear: () => {
+        incompatibleCalls++;
+        return {};
+    }
+};
+const writesBeforeBlocked = storageWrites.length;
+const blockedResult = balanceMain.update();
+if (blockedResult.ok || blockedResult.status !== 'blocked' || blockedResult.reason !== 'contract_changed') {
+    throw new Error(`Incompatible engine returned unexpected result: ${JSON.stringify(blockedResult)}`);
+}
+if (incompatibleCalls !== 0) {
+    throw new Error('Incompatible EngineAPI.simulateSingleYear was called.');
+}
+if (storageWrites.length !== writesBeforeBlocked) {
+    throw new Error('Blocked engine update wrote Balance or profile state.');
+}
+
+delete global.window.EngineAPI;
+const missingResult = balanceMain.update();
+if (missingResult.ok || missingResult.status !== 'blocked') {
+    throw new Error(`Missing engine returned unexpected result: ${JSON.stringify(missingResult)}`);
+}
+if (storageWrites.length !== writesBeforeBlocked) {
+    throw new Error('Missing engine update wrote Balance or profile state.');
+}
+
+global.window.EngineAPI = compatibleEngine;
 
 console.log("✅ Balance App Smoke Test Completed Successfully.");
 

@@ -210,9 +210,9 @@ Einstiegspunkt und Orchestrator.
 
 **Aufgaben:**
 - Initialisiert DOM-Referenzen, Module und Anwendungszustand.
-- Prüft Engine-Kompatibilität (`initVersionHandshake`).
-- Definiert `update()` / `debouncedUpdate()` und reicht Eingaben an `EngineAPI.simulateSingleYear()` weiter.
-- Übergibt Engine-Ergebnisse an Renderer und Storage.
+- Bindet einen kompatiblen Engine-Vertrag (`initVersionHandshake`) und blockiert fehlende, inkompatible oder nachtraeglich ausgetauschte Engines.
+- Definiert `update()` / `debouncedUpdate()`, liefert `success`, `validation_error`, `engine_error` oder `blocked` und reicht Eingaben nur nach erfolgreichem Gate an `EngineAPI.simulateSingleYear()` weiter.
+- Übergibt erfolgreiche Engine-Ergebnisse an Renderer und Storage; blockierte und fehlerhafte Ergebnisse werden nicht persistiert.
 - Erhält bei Guardrail-Resets den steuerlichen Zustand (`lastState.taxState`) explizit.
 
 **Dependencies:** alle oben genannten Module sowie die globale `EngineAPI`.
@@ -220,7 +220,7 @@ Einstiegspunkt und Orchestrator.
 **Helper-Module (ausgelagert):**
 - `balance-main-profile-sync.js` – Profilwerte in Balance-Inputs spiegeln
 - `balance-main-profilverbund.js` – Profilverbund-Simulationen & UI-Handling
-- `balance-update-pipeline.js` – Mindest-Flex-Validierung, Engine-Last-State, Renderer-/Diagnose-Payload, Persistenzentscheidung und Ausgabenbudget.
+- `balance-update-pipeline.js` – Engine-Handshake/-Gate, Update-Ergebnisvertrag, Mindest-Flex-Validierung, Engine-Last-State, Renderer-/Diagnose-Payload, Persistenzentscheidung und Ausgabenbudget.
 - `balance-action-postprocessor.js` – Profilverbund-Action-Merge und Single-3-Bucket-Postprocessing.
 
 **Pflegebucket:** Der Update-Zyklus reicht die im Reader erzeugte Pflegebucket-Diagnose an Summary, Key-Parameter und Diagnose-Copytext weiter. Die Engine-Eingaben und die Handlungsempfehlung werden dadurch nicht operativ verändert.

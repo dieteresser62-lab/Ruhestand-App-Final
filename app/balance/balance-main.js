@@ -30,8 +30,14 @@ import { init as initPersistence } from '../shared/persistence-facade.js';
 import { PROFILE_VALUE_KEYS } from '../profile/profile-state.js';
 import { postprocessBalanceAction } from './balance-action-postprocessor.js';
 import {
+    BALANCE_UPDATE_STATUS,
+    assertActiveEngineHandshake,
     buildBalanceRendererPayload,
     calculateExpensesBudget,
+    createBlockedUpdateResult,
+    createEngineHandshake,
+    createUpdateFailureResult,
+    createUpdateSuccessResult,
     enrichBalanceDiagnosisPayload,
     persistBalanceUpdate,
     prepareEngineLastState,
@@ -47,7 +53,8 @@ const appState = {
     snapshotHandle: null,
     diagnosisData: null,
     lastUpdateTimestamp: null,
-    lastMarktData: null
+    lastMarktData: null,
+    engineHandshake: null
 };
 
 const PROFILVERBUND_STORAGE_KEYS = {
@@ -160,8 +167,10 @@ const profileSyncHandlers = createProfileSyncHandlers({
  * - Import von Daten
  * - Jahresabschluss
  */
-function update({ persist = true } = {}) {
+export function update({ persist = true } = {}) {
+    let phase = 'engine_gate';
     try {
+        const engineApi = assertActiveEngineHandshake(appState.engineHandshake, window.EngineAPI);
         UIRenderer.clearError();
 
         // Keep profile-derived values in sync before reading inputs.
@@ -169,6 +178,7 @@ function update({ persist = true } = {}) {
 
         // 1. Read Inputs & State
         // Liest alle Formular-Eingaben und den letzten gespeicherten Zustand
+        phase = 'validation';
         const inputData = UIReader.readAllInputs();
         validateBalanceInputs(inputData);
         const profilverbundProfiles = loadProfilverbundProfiles();
@@ -177,9 +187,7 @@ function update({ persist = true } = {}) {
         // Check for empty/initial state to avoid validation errors
         if (!inputData.aktuellesAlter || inputData.aktuellesAlter === 0) {
             UIRenderer.clearError();
-            // Optionally clear results or show specific "Start" message
-            // For now, just return to keep UI clean
-            return { ok: true, skipped: true };
+            return createBlockedUpdateResult('initial_state');
         }
 
         const persistentState = StorageManager.loadState();
@@ -196,6 +204,7 @@ function update({ persist = true } = {}) {
                 lastState: householdStateSource.profilverbundHouseholdLastState
             }, inputData)
             : null;
+        phase = 'engine';
         const profilverbundRuns = isMultiProfileHousehold
             ? profilverbundHandlers.runProfilverbundProfileSimulations(inputData, profilverbundProfiles, householdLastState)
             : null;
@@ -214,13 +223,17 @@ function update({ persist = true } = {}) {
         // Input: Benutzereingaben + letzter State
         // Output: {input, newState, diagnosis, ui} oder {error}
         const modelResult = profilverbundRuns?.householdResult
-            || window.EngineAPI.simulateSingleYear(inputData, lastState);
+            || engineApi.simulateSingleYear(inputData, lastState);
 
         // 4. Handle Engine Response
         // Bei Fehler: Exception werfen für einheitliches Error-Handling
+        if (!modelResult || typeof modelResult !== 'object') {
+            throw new Error('EngineAPI.simulateSingleYear() liefert kein Ergebnisobjekt.');
+        }
         if (modelResult.error) {
             throw modelResult.error;
         }
+        phase = 'render';
         const { threeBucketDiagnosis } = postprocessBalanceAction({
             inputData,
             modelResult,
@@ -247,9 +260,18 @@ function update({ persist = true } = {}) {
         appState.diagnosisData = formattedDiagnosis;
         UIRenderer.renderDiagnosis(appState.diagnosisData);
 
-        // Speichert Eingaben und neuen Zustand
-        // Persist per-profile states to keep each profile's guardrails stable.
-        if (persist) {
+        const fixedIncomeAnnual = UIUtils.parseCurrency(dom.inputs.fixedIncomeAnnual?.value || 0);
+        const { monthlyBudget, annualBudget } = calculateExpensesBudget({
+            fixedIncomeAnnual,
+            monthlyWithdrawal: modelResult.ui?.spending?.monatlicheEntnahme
+        });
+        updateExpensesBudget({ monthlyBudget, annualBudget });
+
+        const result = createUpdateSuccessResult({ inputData, modelResult });
+
+        // Persistenz ist ausschliesslich nach erfolgreicher Validierung und Engine-Ausfuehrung erlaubt.
+        if (persist && result.status === BALANCE_UPDATE_STATUS.SUCCESS) {
+            phase = 'persistence';
             persistBalanceUpdate({
                 profilverbundRuns,
                 profilverbundHandlers,
@@ -262,19 +284,12 @@ function update({ persist = true } = {}) {
             profilverbundHandlers.refreshProfilverbundBalance();
         }
 
-        const fixedIncomeAnnual = UIUtils.parseCurrency(dom.inputs.fixedIncomeAnnual?.value || 0);
-        const { monthlyBudget, annualBudget } = calculateExpensesBudget({
-            fixedIncomeAnnual,
-            monthlyWithdrawal: modelResult.ui?.spending?.monatlicheEntnahme
-        });
-        updateExpensesBudget({ monthlyBudget, annualBudget });
-
-        return { ok: true, inputData, modelResult };
+        return result;
 
     } catch (error) {
         console.error("Update-Fehler:", error);
         UIRenderer.handleError(error);
-        return { ok: false, error };
+        return createUpdateFailureResult(error, { phase });
     }
 }
 
@@ -300,43 +315,27 @@ function debouncedUpdate() {
  *
  * @throws {Error} Wenn Engine nicht geladen oder ungültig
  */
-function initVersionHandshake() {
+export function initVersionHandshake() {
+    appState.engineHandshake = null;
     try {
-        if (typeof window.EngineAPI === 'undefined' || typeof window.EngineAPI.getVersion !== 'function') {
-            throw new Error("EngineAPI (engine.js) konnte nicht geladen werden oder ist ungültig.");
+        const handshake = createEngineHandshake(window.EngineAPI, REQUIRED_ENGINE_API_VERSION_PREFIX);
+        appState.engineHandshake = handshake;
+        const alertBanner = dom.containers.versionAlert;
+        if (alertBanner) {
+            alertBanner.textContent = '';
+            alertBanner.style.display = 'none';
         }
-
-        const version = window.EngineAPI.getVersion();
-        if (!version || typeof version.api !== 'string' || typeof version.build !== 'string') {
-            throw new Error("EngineAPI.getVersion() liefert ein ungültiges Format.");
-        }
-
-        // Version Handshake
-        if (!version.api.startsWith(REQUIRED_ENGINE_API_VERSION_PREFIX)) {
-            const alertBanner = dom.containers.versionAlert;
-            alertBanner.textContent = `WARNUNG: Veraltete Engine-Version erkannt (Geladen: ${version.api}, Erwartet: ${REQUIRED_ENGINE_API_VERSION_PREFIX}x). Die App ist möglicherweise instabil. Bitte aktualisieren Sie die Engine-Datei (engine.js).`;
+        return handshake;
+    } catch (e) {
+        const alertBanner = dom.containers.versionAlert;
+        if (alertBanner) {
+            alertBanner.textContent = `FATALER FEHLER: ${e.message} Die Anwendung kann nicht gestartet werden.`;
             alertBanner.style.display = 'block';
+            alertBanner.style.backgroundColor = 'var(--danger-color)';
+            alertBanner.style.color = 'white';
             alertBanner.tabIndex = -1;
         }
-
-        // Cache-Busting
-        const scriptTag = document.querySelector('script[src^="engine.js"]');
-        if (scriptTag && version.build) {
-            const newSrc = `engine.js?v=${version.build}`;
-            if (scriptTag.src !== newSrc) {
-                scriptTag.src = newSrc;
-            }
-        }
-
-    } catch (e) {
-        // Harter Fehler, wenn die Engine fehlt
-        const alertBanner = dom.containers.versionAlert;
-        alertBanner.textContent = `FATALER FEHLER: ${e.message}. Die Anwendung kann nicht gestartet werden.`;
-        alertBanner.style.display = 'block';
-        alertBanner.style.backgroundColor = 'var(--danger-color)';
-        alertBanner.style.color = 'white';
-        alertBanner.tabIndex = -1;
-        throw new Error("Engine Load Failed");
+        throw e;
     }
 }
 
@@ -360,16 +359,17 @@ function initVersionHandshake() {
  * - UIRenderer: Rendert alle UI-Komponenten
  * - UIBinder: Event-Handler für alle Interaktionen
  */
-async function init() {
+export async function init() {
     await initPersistence();
+    let engineHandshake;
     try {
         // 1. Engine Handshake
         // Prüft ob engine.js geladen ist und die Version kompatibel ist
-        initVersionHandshake();
-        console.info("Engine ready and handshake successful.", window.EngineAPI.getVersion());
+        engineHandshake = initVersionHandshake();
+        console.info("Engine ready and handshake successful.", engineHandshake.version);
     } catch (e) {
         console.error("Initialisierung abgebrochen wegen Engine-Fehler.");
-        return;
+        return createUpdateFailureResult(e, { phase: 'engine_gate' });
     }
 
     // 2. Populate DOM inputs
@@ -388,7 +388,7 @@ async function init() {
 
     // 5. Set version info
     // Zeigt UI- und Engine-Version im Print-Footer
-    dom.outputs.printFooter.textContent = `UI: ${CONFIG.APP.VERSION} | Engine: ${window.EngineAPI.getVersion().api}`;
+    dom.outputs.printFooter.textContent = `UI: ${CONFIG.APP.VERSION} | Engine: ${engineHandshake.version.api}`;
 
     // 6. Load and apply saved state
     // Lädt letzten Zustand aus localStorage und wendet ihn auf die Formular-Felder an
@@ -410,13 +410,14 @@ async function init() {
 
     // 9. Initial update
     // Führt ersten Berechnungs- und Render-Zyklus durch
-    update();
+    const initialUpdateResult = update();
 
     // 10. Initialize Depot-Tranchen Status Badge
     // Zeigt Status der geladenen detaillierten Tranchen an
     initTranchenStatus('tranchenStatusBadge');
 
     profilverbundHandlers.initProfilverbundBalance();
+    return initialUpdateResult;
 }
 
 // ==================================================================================
