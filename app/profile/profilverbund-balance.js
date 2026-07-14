@@ -133,6 +133,14 @@ function resolveTrancheSplitTotals(tranches) {
             return;
         }
 
+        if (category === 'bonds' || type.includes('bond') || type.includes('anleihe')) {
+            // Bonds remain part of the legacy "neu" depot total while their detailed
+            // category is preserved for the one-time household 3-bucket logic.
+            totals.neuValue += marketValue;
+            totals.neuCost += costBasis;
+            return;
+        }
+
         if (type === 'aktien_alt') {
             totals.altValue += marketValue;
             totals.altCost += costBasis;
@@ -164,6 +172,75 @@ function normalizeTrancheDate(tranche) {
     if (!raw) return Number.POSITIVE_INFINITY;
     const parsed = Date.parse(raw);
     return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
+}
+
+function buildSyntheticProfileTranches(entry) {
+    const inputs = entry?.inputs || {};
+    const profileId = entry?.profileId;
+    const profileName = entry?.name || profileId;
+    const definitions = [
+        {
+            suffix: 'aktien_alt',
+            type: 'aktien_alt',
+            category: 'equity',
+            marketValue: inputs.depotwertAlt,
+            costBasis: inputs.costBasisAlt,
+            tqf: inputs.tqfAlt
+        },
+        {
+            suffix: 'aktien_neu',
+            type: 'aktien_neu',
+            category: 'equity',
+            marketValue: inputs.depotwertNeu,
+            costBasis: inputs.costBasisNeu,
+            tqf: inputs.tqfNeu
+        },
+        {
+            suffix: 'gold',
+            type: 'gold',
+            category: 'gold',
+            marketValue: inputs.goldWert,
+            costBasis: inputs.goldCost,
+            tqf: inputs.goldSteuerfrei ? 1 : 0
+        },
+        {
+            suffix: 'geldmarkt',
+            type: 'geldmarkt',
+            category: 'money_market',
+            marketValue: inputs.geldmarktEtf,
+            costBasis: inputs.geldmarktEtf,
+            tqf: 0
+        }
+    ];
+    return definitions
+        .filter(definition => readNumber(definition.marketValue, 0) > 0)
+        .map(definition => ({
+            trancheId: `profilverbund:${profileId}:${definition.suffix}`,
+            name: `${profileName} ${definition.suffix}`,
+            type: definition.type,
+            category: definition.category,
+            marketValue: readNumber(definition.marketValue, 0),
+            costBasis: readNumber(definition.costBasis, 0),
+            tqf: readNumber(definition.tqf, 0),
+            sourceProfileId: profileId,
+            sourceProfileName: profileName,
+            syntheticProfileFallback: true
+        }));
+}
+
+export function buildProfileOwnedTranches(entry) {
+    const profileId = entry?.profileId;
+    if (!profileId) {
+        throw new Error('Profilverbund: Profil ohne eindeutige Profil-ID kann keine Tranchen bereitstellen.');
+    }
+    const profileName = entry?.name || profileId;
+    const tranches = Array.isArray(entry?.tranches) ? entry.tranches : [];
+    if (!tranches.length) return buildSyntheticProfileTranches(entry);
+    return tranches.map(tranche => ({
+        ...tranche,
+        sourceProfileId: profileId,
+        sourceProfileName: profileName
+    }));
 }
 
 // Lade alle Profile, die zum Profilverbund gehören
@@ -283,6 +360,17 @@ export function aggregateProfilverbundInputs(profileInputs, overrides = {}) {
     };
 }
 
+// Ermittelt den gemeinsamen Haushaltsbedarf, bevor Finanzierungsprofile betrachtet werden.
+export function calculateHouseholdWithdrawalNeed(profileInputs, overrides = {}) {
+    const aggregated = aggregateProfilverbundInputs(profileInputs, overrides);
+    return {
+        ...aggregated,
+        grossNeed: aggregated.totalBedarf,
+        incomeAnnual: aggregated.totalRenteJahr,
+        netWithdrawal: Math.max(0, aggregated.totalBedarf - aggregated.totalRenteJahr)
+    };
+}
+
 // Berechne Steuerlast pro Euro für ein Profil
 export function calculateTaxPerEuro(inputs) {
     if (!inputs) return 0;
@@ -337,7 +425,8 @@ export function selectTranchesForSale(tranches, targetAmount, taxRate = DEFAULT_
 // Berechne Entnahmeverteilung nach Modus
 export function calculateWithdrawalDistribution(profileInputs, aggregated, mode = 'tax_optimized') {
     const list = Array.isArray(profileInputs) ? profileInputs : [];
-    const totalNeed = Math.max(0, aggregated?.netWithdrawal || 0);
+    const totalNeedCents = Math.max(0, Math.round((Number(aggregated?.netWithdrawal) || 0) * 100));
+    const totalNeed = totalNeedCents / 100;
     if (list.length === 0 || totalNeed <= 0) {
         return { items: [], totalNeed, remaining: totalNeed, totalTaxEstimate: 0, mode };
     }
@@ -364,37 +453,54 @@ export function calculateWithdrawalDistribution(profileInputs, aggregated, mode 
         };
     });
 
-    let remaining = totalNeed;
+    let remainingCents = totalNeedCents;
     let allocations = [];
 
     if (mode === 'tax_optimized') {
         // Greedy: zuerst Profile mit geringster Steuerlast pro Euro bedienen.
-        const sorted = entries.slice().sort((a, b) => a.taxPerEuro - b.taxPerEuro);
+        const sorted = entries.slice().sort((a, b) => {
+            if (a.taxPerEuro !== b.taxPerEuro) return a.taxPerEuro - b.taxPerEuro;
+            return String(a.profileId).localeCompare(String(b.profileId));
+        });
         allocations = sorted.map(entry => {
-            const maxShare = entry.assets || 0;
-            const amount = Math.max(0, Math.min(remaining, maxShare));
-            remaining -= amount;
-            return { entry, amount };
+            const maxShareCents = Math.max(0, Math.round((entry.assets || 0) * 100));
+            const amountCents = Math.max(0, Math.min(remainingCents, maxShareCents));
+            remainingCents -= amountCents;
+            return { entry, amountCents };
         });
     } else {
         // Proportional nach Vermögen oder (runway_first) nach Runway-Zielen.
         const weights = entries.map(entry => {
             if (mode === 'runway_first') {
-                return Math.max(0, entry.runwayTargetMonths || 0);
+                return entry.assets > 0 ? Math.max(0, entry.runwayTargetMonths || 0) : 0;
             }
             return Math.max(0, entry.assets || 0);
         });
         const totalWeight = weights.reduce((sum, val) => sum + val, 0);
-        allocations = entries.map((entry, idx) => {
-            const pct = totalWeight > 0 ? weights[idx] / totalWeight : 0;
-            const amount = totalNeed * pct;
-            return { entry, amount };
-        });
-        remaining = 0;
+        if (totalWeight > 0) {
+            const raw = entries.map((entry, idx) => {
+                const exactCents = totalNeedCents * (weights[idx] / totalWeight);
+                const amountCents = Math.floor(exactCents);
+                return { entry, amountCents, fraction: exactCents - amountCents, index: idx };
+            });
+            let roundingRest = totalNeedCents - raw.reduce((sum, item) => sum + item.amountCents, 0);
+            raw.slice()
+                .sort((a, b) => (b.fraction - a.fraction) || (a.index - b.index))
+                .forEach(item => {
+                    if (roundingRest <= 0) return;
+                    item.amountCents += 1;
+                    roundingRest -= 1;
+                });
+            allocations = raw;
+            remainingCents = 0;
+        } else {
+            allocations = entries.map(entry => ({ entry, amountCents: 0 }));
+        }
     }
 
     let totalTaxEstimate = 0;
-    const items = allocations.map(({ entry, amount }) => {
+    const items = allocations.map(({ entry, amountCents }) => {
+        const amount = amountCents / 100;
         // Cash zuerst nutzen (Tagesgeld/Geldmarkt), Verkauf nur für Restbedarf.
         const tagesgeldAvailable = entry.inputs?.tagesgeld || 0;
         const geldmarktInput = entry.inputs?.geldmarktEtf || 0;
@@ -429,7 +535,7 @@ export function calculateWithdrawalDistribution(profileInputs, aggregated, mode 
         };
     });
 
-    return { items, totalNeed, remaining, totalTaxEstimate, mode };
+    return { items, totalNeed, remaining: remainingCents / 100, totalTaxEstimate, mode };
 }
 
 export function buildProfilverbundAssetSummary(profileInputs) {
@@ -475,9 +581,7 @@ export function buildProfilverbundAssetSummary(profileInputs) {
             summary.totalGoldCost += inputs.goldCost || 0;
         }
 
-        if (tranches.length) {
-            summary.mergedTranches.push(...tranches);
-        }
+        summary.mergedTranches.push(...buildProfileOwnedTranches(entry));
         if (idx === 0 && entry.healthBucket) {
             summary.primaryHealthBucket = entry.healthBucket;
         }

@@ -7,27 +7,164 @@
 import { persistenceStorage } from '../shared/persistence-facade.js';
 
 export const EXPENSES_STORAGE_KEY = 'balance_expenses_v1';
+export const EXPENSES_STORE_STATUS = Object.freeze({
+    OK: 'ok',
+    EMPTY: 'empty',
+    CORRUPT: 'corrupt'
+});
+
+const EXPENSES_RECOVERY_APP_ID = 'ruhe-stand-suite.balance';
+const EXPENSES_RECOVERY_SCHEMA = 'balance-expenses-corrupt-recovery';
+
+export class ExpensesStoreCorruptionError extends Error {
+    constructor(result) {
+        super(result?.error?.message || 'Der Ausgabenstore ist beschaedigt.');
+        this.name = 'ExpensesStoreCorruptionError';
+        this.code = result?.error?.code || 'expenses-store-corrupt';
+        this.status = EXPENSES_STORE_STATUS.CORRUPT;
+    }
+}
 
 export function createEmptyExpensesStore(activeYear = new Date().getFullYear()) {
     return { version: 1, activeYear, years: {} };
 }
 
-export function loadExpensesStore(storage = persistenceStorage) {
+function createCorruptionResult(raw, code, message) {
+    return {
+        status: EXPENSES_STORE_STATUS.CORRUPT,
+        store: null,
+        raw,
+        error: { code, message }
+    };
+}
+
+function isRecord(value) {
+    return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+export function loadExpensesStoreResult(storage = persistenceStorage) {
+    let raw;
     try {
-        const raw = storage?.getItem(EXPENSES_STORAGE_KEY);
-        if (!raw) return createEmptyExpensesStore();
-        const parsed = JSON.parse(raw);
-        if (!parsed || typeof parsed !== 'object') return createEmptyExpensesStore();
-        if (!parsed.years || typeof parsed.years !== 'object') parsed.years = {};
-        if (!parsed.activeYear) parsed.activeYear = new Date().getFullYear();
-        return parsed;
+        raw = storage?.getItem(EXPENSES_STORAGE_KEY);
     } catch {
-        return createEmptyExpensesStore();
+        return createCorruptionResult(
+            null,
+            'expenses-store-read-failed',
+            'Der gespeicherte Ausgabenbereich konnte nicht gelesen werden.'
+        );
     }
+
+    if (raw === null || raw === undefined) {
+        return {
+            status: EXPENSES_STORE_STATUS.EMPTY,
+            store: createEmptyExpensesStore(),
+            raw: null,
+            error: null
+        };
+    }
+
+    let parsed;
+    try {
+        parsed = JSON.parse(raw);
+    } catch {
+        return createCorruptionResult(
+            raw,
+            'expenses-store-json-invalid',
+            'Die gespeicherten Ausgabendaten enthalten kein gueltiges JSON.'
+        );
+    }
+
+    if (!isRecord(parsed)) {
+        return createCorruptionResult(
+            raw,
+            'expenses-store-root-invalid',
+            'Die gespeicherten Ausgabendaten haben keinen gueltigen Objektaufbau.'
+        );
+    }
+    if (parsed.version !== undefined && Number(parsed.version) !== 1) {
+        return createCorruptionResult(
+            raw,
+            'expenses-store-version-unsupported',
+            'Die gespeicherten Ausgabendaten verwenden eine nicht unterstuetzte Version.'
+        );
+    }
+    if (parsed.years !== undefined && !isRecord(parsed.years)) {
+        return createCorruptionResult(
+            raw,
+            'expenses-store-years-invalid',
+            'Die gespeicherten Ausgabenjahre haben keinen gueltigen Objektaufbau.'
+        );
+    }
+
+    const activeYear = Number(parsed.activeYear);
+    const store = {
+        ...parsed,
+        version: 1,
+        activeYear: Number.isFinite(activeYear) && activeYear > 0
+            ? activeYear
+            : new Date().getFullYear(),
+        years: parsed.years || {}
+    };
+    return {
+        status: EXPENSES_STORE_STATUS.OK,
+        store,
+        raw,
+        error: null
+    };
+}
+
+export function loadExpensesStore(storage = persistenceStorage) {
+    const result = loadExpensesStoreResult(storage);
+    if (result.status === EXPENSES_STORE_STATUS.CORRUPT) {
+        throw new ExpensesStoreCorruptionError(result);
+    }
+    return result.store;
 }
 
 export function saveExpensesStore(store, storage = persistenceStorage) {
+    const current = loadExpensesStoreResult(storage);
+    if (current.status === EXPENSES_STORE_STATUS.CORRUPT) {
+        throw new ExpensesStoreCorruptionError(current);
+    }
     storage?.setItem(EXPENSES_STORAGE_KEY, JSON.stringify(store));
+}
+
+export function createExpensesCorruptionRecoveryDocument(result, options = {}) {
+    if (result?.status !== EXPENSES_STORE_STATUS.CORRUPT || typeof result.raw !== 'string') {
+        throw new Error('Fuer diesen Ausgabenstore stehen keine exportierbaren Korruptionsrohdaten bereit.');
+    }
+    return {
+        appId: EXPENSES_RECOVERY_APP_ID,
+        schema: EXPENSES_RECOVERY_SCHEMA,
+        schemaVersion: 1,
+        exportedAt: options.exportedAt || new Date().toISOString(),
+        affectedArea: 'Ausgaben-Check',
+        backend: String(options.backend || 'unknown'),
+        corruption: {
+            code: result.error?.code || 'expenses-store-corrupt',
+            message: result.error?.message || 'Der Ausgabenstore ist beschaedigt.'
+        },
+        raw: result.raw
+    };
+}
+
+export function resetCorruptExpensesStore(result, options = {}) {
+    const storage = options.storage || persistenceStorage;
+    if (result?.status !== EXPENSES_STORE_STATUS.CORRUPT || typeof result.raw !== 'string') {
+        throw new Error('Der Ausgabenstore kann nicht als bestaetigter Korruptionsfall zurueckgesetzt werden.');
+    }
+    if (options.rawPreserved !== true && !options.quarantineReference) {
+        throw new Error('Vor dem Zuruecksetzen muss der korrupte Rohinhalt exportiert oder quarantiniert sein.');
+    }
+
+    const currentRaw = storage?.getItem(EXPENSES_STORAGE_KEY);
+    if (currentRaw !== result.raw) {
+        throw new Error('Die gespeicherten Ausgabendaten haben sich seit der Recovery-Anzeige geaendert. Bitte neu laden.');
+    }
+
+    const emptyStore = createEmptyExpensesStore(options.activeYear);
+    storage?.setItem(EXPENSES_STORAGE_KEY, JSON.stringify(emptyStore));
+    return emptyStore;
 }
 
 export function getExpensesYearData(store, year) {

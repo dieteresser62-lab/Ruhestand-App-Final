@@ -10,9 +10,11 @@ const repoRoot = path.resolve(__dirname, '..');
 const tauriConfigPath = path.join(repoRoot, 'src-tauri', 'tauri.conf.json');
 const tauriLibPath = path.join(repoRoot, 'src-tauri', 'src', 'lib.rs');
 const packageJsonPath = path.join(repoRoot, 'package.json');
+const tauriBuildScriptPath = path.join(repoRoot, 'scripts', 'build-tauri.ps1');
 const tauriConfig = JSON.parse(fs.readFileSync(tauriConfigPath, 'utf8'));
 const tauriLib = fs.readFileSync(tauriLibPath, 'utf8');
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+const tauriBuildScript = fs.readFileSync(tauriBuildScriptPath, 'utf8');
 const security = tauriConfig?.app?.security || {};
 const csp = security?.csp || {};
 const connectSrc = String(csp?.['connect-src'] || '');
@@ -33,7 +35,8 @@ assert(connectSrc.includes('http://127.0.0.1:8787'), 'Tauri CSP should allow the
 assert(connectSrc.includes('http://localhost:8787'), 'Tauri CSP should allow localhost Yahoo proxy fallback');
 assert(connectSrc.includes('https://data-api.ecb.europa.eu'), 'Tauri CSP should allow ECB inflation fetches');
 assert(connectSrc.includes('https://api.worldbank.org'), 'Tauri CSP should allow World Bank inflation fetches');
-assert(connectSrc.includes('https://stats.oecd.org'), 'Tauri CSP should allow OECD inflation fetches');
+assert(connectSrc.includes('https://sdmx.oecd.org'), 'Tauri CSP should allow current OECD SDMX inflation fetches');
+assert(!connectSrc.includes('https://stats.oecd.org'), 'Tauri CSP should not retain the retired OECD.Stat host');
 assert(connectSrc.includes('https://r.jina.ai'), 'Tauri CSP should allow CAPE fetches via r.jina.ai');
 
 assert(workerSrc.includes("'self'"), 'Tauri CSP should allow bundled worker modules');
@@ -54,6 +57,16 @@ assert(packageJson?.scripts?.['tauri:build'] === 'tauri build', 'package.json sh
 assert(
   packageJson?.scripts?.['build-tauri-exe']?.includes('scripts/build-tauri.ps1'),
   'package.json should expose the checked Windows EXE release workflow'
+);
+assert(
+  tauriBuildScript.includes("$releaseArchiveDirName = 'release-archive'") &&
+    tauriBuildScript.includes('Backup-ExistingReleaseExecutable -Path $destExe'),
+  'Windows EXE release workflow should archive an existing root EXE before replacement'
+);
+assert(
+  tauriBuildScript.indexOf('Backup-ExistingReleaseExecutable -Path $destExe') <
+    tauriBuildScript.indexOf('Copy-Item -Path $sourceExe -Destination $destExe -Force'),
+  'Existing root EXE should be archived before the new release EXE is copied'
 );
 
 for (const commandName of [

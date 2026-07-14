@@ -15,6 +15,7 @@ function calculateAnnualWithdrawalTarget(inputData = {}) {
 export function postprocessBalanceAction({ inputData, modelResult, profilverbundRuns, mergeProfilverbundActions }) {
     if (profilverbundRuns && modelResult.ui) {
         modelResult.ui.action = mergeProfilverbundActions(profilverbundRuns);
+        return { threeBucketDiagnosis: profilverbundRuns.threeBucketDiagnosis || null };
     }
 
     if (
@@ -41,19 +42,16 @@ export function postprocessBalanceAction({ inputData, modelResult, profilverbund
         bondBucketBefore
     );
 
-    if (!profilverbundRuns) {
-        const replenishResult = appendBondReplenishment(
-            tranches,
-            inputData,
-            threeBucketResult.updatedAction,
-            market.realReturnEq,
-            calculateAnnualWithdrawalTarget(inputData),
-            bondBucketBefore,
-            market
-        );
-        modelResult.ui.action = replenishResult.updatedAction;
-    }
+    const replenishResult = appendBondReplenishment(
+        tranches,
+        inputData,
+        threeBucketResult.updatedAction,
+        market.realReturnEq,
+        calculateAnnualWithdrawalTarget(inputData),
+        bondBucketBefore,
+        market
+    );
+    modelResult.ui.action = replenishResult.updatedAction;
 
     return { threeBucketDiagnosis: threeBucketResult.threeBucketState };
 }
-

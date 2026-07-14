@@ -251,6 +251,37 @@ console.log('Test 6: Action-Postprocessor merged Profilverbund ohne 3-Bucket');
     assertEqual(result.threeBucketDiagnosis, null, 'Ohne 3-Bucket gibt es keine 3-Bucket-Diagnose');
 }
 
+console.log('Test 7: Profilverbund übernimmt einmalige Haushalts-3-Bucket-Diagnose ohne zweite Ausführung');
+{
+    const householdDiagnosis = { is3Bucket: true, isBadYear: true, bondSaleAmount: 25000 };
+    const finalizedAction = {
+        type: 'TRANSACTION',
+        nettoErlös: 25000,
+        quellen: [{ kind: 'anleihe', brutto: 25000, netto: 25000, steuer: 0 }],
+        verwendungen: { liquiditaet: 25000 }
+    };
+    const runs = [];
+    runs.finalAction = finalizedAction;
+    runs.threeBucketDiagnosis = householdDiagnosis;
+    const modelResult = { ui: { action: { type: 'NONE' } } };
+    let mergeCalls = 0;
+    const result = postprocessBalanceAction({
+        inputData: {
+            decumulation: { mode: '3_bucket_jilge' },
+            detailledTranches: [{ type: 'anleihe', marketValue: 50000 }]
+        },
+        modelResult,
+        profilverbundRuns: runs,
+        mergeProfilverbundActions: receivedRuns => {
+            mergeCalls += 1;
+            return receivedRuns.finalAction;
+        }
+    });
+    assertEqual(mergeCalls, 1, 'Finalisierte Haushaltsaktion wird genau einmal übernommen');
+    assertEqual(modelResult.ui.action, finalizedAction, 'Postprocessor ersetzt die attribuierte Haushaltsaktion nicht erneut');
+    assertEqual(result.threeBucketDiagnosis, householdDiagnosis, 'Einmalige Haushaltsdiagnose wird unverändert weitergereicht');
+}
+
 console.log('--- Balance Decumulation Tests Completed ---');
 
 global.document = originalDocument;

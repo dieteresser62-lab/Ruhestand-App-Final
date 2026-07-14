@@ -1,5 +1,17 @@
 "use strict";
 
+import {
+    NUMBER_PARSE_ERROR_CODES,
+    UIUtils as ActualUIUtils,
+    parseLocalizedNumber
+} from '../app/balance/balance-utils.js';
+import { parseBalanceCurrencyInput } from '../app/balance/balance-reader.js';
+import { ValidationError } from '../app/balance/balance-config.js';
+import {
+    MarketCsvImportError,
+    parseMarketDataCsv
+} from '../app/balance/balance-binder-imports.js';
+
 /**
  * Tests für balance-reader.js
  * - UIReader.readAllInputs() mit Mock-DOM
@@ -281,6 +293,137 @@ const mockLocalStorage = new MockLocalStorage();
 global.localStorage = mockLocalStorage;
 
 // ===== TESTS =====
+
+// Test 0: Produktiver Zahlen- und Markt-CSV-Parser arbeitet strikt und fail-closed.
+console.log('Test 0: Striktes Zahlen- und Markt-CSV-Parsing');
+{
+    const validNumbers = [
+        ['1.234,56 €', 1234.56],
+        ['1,234.56', 1234.56],
+        ['1 234,56', 1234.56],
+        ['-12,5', -12.5],
+        ['0', 0]
+    ];
+    validNumbers.forEach(([raw, expected]) => {
+        const result = ActualUIUtils.parseCurrencyResult(raw);
+        assertEqual(result.valid, true, `${raw} sollte vollstaendig akzeptiert werden`);
+        assertClose(result.value, expected, 1e-9, `${raw} sollte exakt normalisiert werden`);
+    });
+
+    const optionalMissing = parseLocalizedNumber('', { required: false });
+    assertEqual(optionalMissing.valid, true, 'Leerer optionaler Wert bleibt ein gueltiges Missing');
+    assertEqual(optionalMissing.value, null, 'Missing bleibt von der gueltigen Zahl 0 unterscheidbar');
+    assertEqual(ActualUIUtils.parseCurrencyResult('0').value, 0, 'Gueltige Null wird nicht als Missing behandelt');
+
+    const invalidNumbers = [
+        ['12abc', NUMBER_PARSE_ERROR_CODES.INVALID_FORMAT],
+        ['1,23.4', NUMBER_PARSE_ERROR_CODES.AMBIGUOUS_SEPARATOR],
+        ['Infinity', NUMBER_PARSE_ERROR_CODES.NON_FINITE],
+        ['', NUMBER_PARSE_ERROR_CODES.REQUIRED]
+    ];
+    invalidNumbers.forEach(([raw, expectedCode]) => {
+        const result = ActualUIUtils.parseCurrencyResult(raw);
+        assertEqual(result.valid, false, `${raw || '<leer>'} sollte abgewiesen werden`);
+        assertEqual(result.error.code, expectedCode, `${raw || '<leer>'} sollte einen strukturierten Fehler liefern`);
+    });
+
+    assertEqual(ActualUIUtils.parseCurrency('12abc'), 0, 'Legacy-Zahlenaufrufer behalten vorerst den kompatiblen 0-Fallback');
+
+    const expectFieldError = (fieldId, raw, expectedCode, expectedMessage) => {
+        let error = null;
+        try {
+            parseBalanceCurrencyInput(fieldId, raw);
+        } catch (caught) {
+            error = caught;
+        }
+        assertEqual(error instanceof ValidationError, true, `${fieldId} liefert einen feldbezogenen ValidationError`);
+        assertEqual(error.errors[0].fieldId, fieldId, `${fieldId} bleibt im Fehler erhalten`);
+        assertEqual(error.errors[0].code, expectedCode, `${fieldId} behaelt den Parsercode`);
+        assertEqual(error.errors[0].message, expectedMessage, `${fieldId} liefert den erwarteten Nutzertext`);
+    };
+    expectFieldError(
+        'minimumFlexAnnual',
+        '',
+        NUMBER_PARSE_ERROR_CODES.REQUIRED,
+        'Mindest-Flex p.a. darf nicht leer sein.'
+    );
+    expectFieldError(
+        'minimumFlexAnnual',
+        'Infinity',
+        NUMBER_PARSE_ERROR_CODES.NON_FINITE,
+        'Mindest-Flex p.a. muss eine endliche Zahl sein.'
+    );
+    expectFieldError(
+        'floorBedarf',
+        '12abc',
+        NUMBER_PARSE_ERROR_CODES.INVALID_FORMAT,
+        'Floor-Bedarf p.a. enthaelt keine gueltige vollstaendige Zahl.'
+    );
+    assertEqual(parseBalanceCurrencyInput('tagesgeld', ''), 0, 'Leeres optionales Waehrungsfeld bleibt kompatibel bei 0');
+    assertEqual(parseBalanceCurrencyInput('minimumFlexAnnual', '0'), 0, 'Gueltige Mindest-Flex-Null bleibt von Missing unterscheidbar');
+
+    const parsedMarket = parseMarketDataCsv([
+        'Datum;Schluss',
+        '14.07.2023;100,00',
+        '14.07.2024;120,00',
+        '14.07.2025;150,00',
+        '14.07.2026;140,00'
+    ].join('\n'));
+    assertEqual(parsedMarket.rowCount, 4, 'Markt-CSV zaehlt alle validierten Datenzeilen');
+    assertEqual(parsedMarket.values.endeVJ, 140, 'Markt-CSV uebernimmt den letzten Schlusswert');
+    assertEqual(parsedMarket.values.endeVJ_1, 150, 'Markt-CSV bindet VJ-1 an das korrekte Zieljahr');
+    assertEqual(parsedMarket.values.endeVJ_2, 120, 'Markt-CSV bindet VJ-2 an das korrekte Zieljahr');
+    assertEqual(parsedMarket.values.endeVJ_3, 100, 'Markt-CSV bindet VJ-3 an das korrekte Zieljahr');
+    assertEqual(parsedMarket.values.ath, 150, 'Markt-CSV ermittelt das historische Schlusskursmaximum');
+
+    const leapDayMarket = parseMarketDataCsv([
+        'Datum;Schluss',
+        '28.02.2021;100',
+        '28.02.2022;110',
+        '28.02.2023;120',
+        '01.03.2023;999',
+        '29.02.2024;140'
+    ].join('\n'));
+    assertEqual(leapDayMarket.values.endeVJ_1, 120, 'Schalttag-Stichtag faellt im Nicht-Schaltjahr auf den 28. Februar zurueck');
+
+    const expectMarketError = (csv, code, message) => {
+        let error = null;
+        try {
+            parseMarketDataCsv(csv);
+        } catch (caught) {
+            error = caught;
+        }
+        assertEqual(error instanceof MarketCsvImportError, true, message);
+        assertEqual(error.code, code, `${message}: stabiler Fehlercode`);
+        return error;
+    };
+
+    const invalidDate = expectMarketError([
+        'Datum;Schluss',
+        '14.07.2023;100',
+        '14.07.2024;120',
+        '14.07.2025;130',
+        '31.02.2026;140'
+    ].join('\n'), 'market_csv_invalid_rows', 'Ungueltige Kalenderdaten werden abgewiesen');
+    assertEqual(invalidDate.details.rejectedRows[0].lineNumber, 5, 'Kalenderfehler nennt die exakte CSV-Zeile');
+
+    const missingYear = expectMarketError([
+        'Datum;Schluss',
+        '14.07.2023;100',
+        '14.07.2025;130',
+        '14.07.2026;140'
+    ].join('\n'), 'market_csv_missing_years', 'Unvollstaendige Jahresreihen werden abgewiesen');
+    assertEqual(missingYear.details.missingYears.join(','), '2024', 'Fehler nennt exakt das fehlende Zieljahr');
+
+    expectMarketError([
+        'Datum;Schluss',
+        '14.07.2023;100',
+        '14.07.2024;120',
+        '14.07.2025;130',
+        '14.07.2026;12abc'
+    ].join('\n'), 'market_csv_invalid_rows', 'Teilstrings in Marktdaten werden nicht akzeptiert');
+    console.log('✓ Striktes Zahlen- und Markt-CSV-Parsing OK');
+}
 
 // Test 1: readAllInputs - Basis mit DOM-Werten
 console.log('Test 1: readAllInputs - Basis mit DOM-Werten');

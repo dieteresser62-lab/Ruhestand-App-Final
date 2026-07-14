@@ -11,6 +11,132 @@ import {
     formatMonths
 } from '../shared/shared-formatting.js';
 
+export const NUMBER_PARSE_ERROR_CODES = Object.freeze({
+    REQUIRED: 'number_required',
+    INVALID_FORMAT: 'number_invalid_format',
+    AMBIGUOUS_SEPARATOR: 'number_ambiguous_separator',
+    NON_FINITE: 'number_non_finite'
+});
+
+function numberParseFailure(code, message) {
+    return {
+        valid: false,
+        value: null,
+        error: { code, message }
+    };
+}
+
+/**
+ * Parst ein vollstaendiges deutsches oder englisches Zahlenformat.
+ * Einzelne Separatoren mit exakt drei Nachkommastellen gelten aus
+ * Kompatibilitaetsgruenden als Tausendertrenner (z. B. 1.234 / 1,234).
+ *
+ * @param {unknown} rawValue - Zu pruefender Rohwert.
+ * @param {{ required?: boolean, allowCurrencySymbol?: boolean }} options - Parseroptionen.
+ * @returns {{ valid: boolean, value: number|null, error: { code: string, message: string }|null }}
+ */
+export function parseLocalizedNumber(rawValue, { required = true, allowCurrencySymbol = true } = {}) {
+    if (typeof rawValue === 'number') {
+        return Number.isFinite(rawValue)
+            ? { valid: true, value: rawValue, error: null }
+            : numberParseFailure(NUMBER_PARSE_ERROR_CODES.NON_FINITE, 'Der Zahlenwert muss endlich sein.');
+    }
+
+    if (rawValue === null || rawValue === undefined || String(rawValue).trim() === '') {
+        return required
+            ? numberParseFailure(NUMBER_PARSE_ERROR_CODES.REQUIRED, 'Ein erforderlicher Zahlenwert fehlt.')
+            : { valid: true, value: null, error: null };
+    }
+
+    let text = String(rawValue)
+        .replace(/[\u00a0\u202f]/g, ' ')
+        .trim();
+
+    if (/^[+-]?infinity$/i.test(text)) {
+        return numberParseFailure(NUMBER_PARSE_ERROR_CODES.NON_FINITE, 'Der Zahlenwert muss endlich sein.');
+    }
+
+    if (allowCurrencySymbol) {
+        const hasPrefix = text.startsWith('€');
+        const hasSuffix = text.endsWith('€');
+        if (hasPrefix && hasSuffix) {
+            return numberParseFailure(NUMBER_PARSE_ERROR_CODES.INVALID_FORMAT, 'Das Waehrungssymbol darf nur einmal am Rand stehen.');
+        }
+        if (hasPrefix) text = text.slice(1).trim();
+        if (hasSuffix) text = text.slice(0, -1).trim();
+    }
+    if (text.includes('€')) {
+        return numberParseFailure(NUMBER_PARSE_ERROR_CODES.INVALID_FORMAT, 'Das Waehrungssymbol steht an einer ungueltigen Position.');
+    }
+
+    let sign = '';
+    if (text.startsWith('+') || text.startsWith('-')) {
+        sign = text[0];
+        text = text.slice(1);
+    }
+    if (!text || /[^\d., ]/.test(text)) {
+        return numberParseFailure(NUMBER_PARSE_ERROR_CODES.INVALID_FORMAT, 'Der Wert ist kein vollstaendiges Zahlenformat.');
+    }
+
+    let normalized = null;
+    if (text.includes(' ')) {
+        const spacedNumber = /^([1-9]\d{0,2}(?: \d{3})+)(?:([,.])(\d+))?$/.exec(text);
+        if (!spacedNumber) {
+            return numberParseFailure(NUMBER_PARSE_ERROR_CODES.INVALID_FORMAT, 'Leerzeichen muessen gueltige Tausendergruppen trennen.');
+        }
+        normalized = spacedNumber[1].replace(/ /g, '');
+        if (spacedNumber[3]) normalized += `.${spacedNumber[3]}`;
+    } else {
+        const commaCount = (text.match(/,/g) || []).length;
+        const dotCount = (text.match(/\./g) || []).length;
+
+        if (commaCount > 0 && dotCount > 0) {
+            const german = /^(?:0|[1-9]\d{0,2}(?:\.\d{3})+),(\d+)$/.exec(text);
+            const english = /^(?:0|[1-9]\d{0,2}(?:,\d{3})+)\.(\d+)$/.exec(text);
+            if (german) {
+                normalized = `${text.slice(0, text.lastIndexOf(',')).replace(/\./g, '')}.${german[1]}`;
+            } else if (english) {
+                normalized = `${text.slice(0, text.lastIndexOf('.')).replace(/,/g, '')}.${english[1]}`;
+            } else {
+                return numberParseFailure(NUMBER_PARSE_ERROR_CODES.AMBIGUOUS_SEPARATOR, 'Punkt und Komma sind nicht eindeutig als Tausender- und Dezimaltrenner angeordnet.');
+            }
+        } else if (commaCount > 0 || dotCount > 0) {
+            const separator = commaCount > 0 ? ',' : '.';
+            const parts = text.split(separator);
+            if (parts.some(part => !/^\d+$/.test(part))) {
+                return numberParseFailure(NUMBER_PARSE_ERROR_CODES.INVALID_FORMAT, 'Der Zahlenwert enthaelt einen unvollstaendigen Separator.');
+            }
+            if (parts.length > 2) {
+                const grouped = /^[1-9]\d{0,2}(?:[.,]\d{3})+$/.test(text);
+                if (!grouped) {
+                    return numberParseFailure(NUMBER_PARSE_ERROR_CODES.AMBIGUOUS_SEPARATOR, 'Mehrere Separatoren muessen vollstaendige Tausendergruppen bilden.');
+                }
+                normalized = parts.join('');
+            } else {
+                const [integerPart, fractionPart] = parts;
+                const isLegacyThousands = integerPart !== '0'
+                    && integerPart.length <= 3
+                    && !integerPart.startsWith('0')
+                    && fractionPart.length === 3;
+                normalized = isLegacyThousands
+                    ? `${integerPart}${fractionPart}`
+                    : `${integerPart}.${fractionPart}`;
+            }
+        } else if (/^\d+$/.test(text)) {
+            normalized = text;
+        }
+    }
+
+    if (normalized === null) {
+        return numberParseFailure(NUMBER_PARSE_ERROR_CODES.INVALID_FORMAT, 'Der Wert ist kein vollstaendiges Zahlenformat.');
+    }
+
+    const value = Number(`${sign}${normalized}`);
+    return Number.isFinite(value)
+        ? { valid: true, value, error: null }
+        : numberParseFailure(NUMBER_PARSE_ERROR_CODES.NON_FINITE, 'Der Zahlenwert muss endlich sein.');
+}
+
 /**
  * ===================================================================================
  * BALANCE-APP UTILITY FUNKTIONEN
@@ -64,39 +190,28 @@ export const UIUtils = {
     formatMonths,
 
     /**
-     * Parst einen Währungs-String zu einer Zahl
-     * Unterstützt deutsches Format (1.234,56) und englisches Format (1,234.56)
-     * @param {string} str - Zu parsender String
-     * @returns {number} Geparste Zahl oder 0 bei Fehler
+     * Liefert den strukturierten Parser-Contract fuer deutsche/englische Zahlen.
+     * Null bleibt von fehlenden oder ungueltigen Werten unterscheidbar.
+     */
+    parseCurrencyResult: (str, options = {}) => parseLocalizedNumber(str, {
+        required: options.required ?? true,
+        allowCurrencySymbol: options.allowCurrencySymbol ?? true
+    }),
+
+    /**
+     * Kompatibler Zahlen-Rueckgabepfad fuer bestehende Aufrufer.
+     * Kritische Pfade muessen den strukturierten Result-Contract verwenden;
+     * Legacy-Aufrufer behalten vorerst ihren bisherigen 0-Fallback.
+     *
+     * @param {unknown} str - Zu parsender Wert.
+     * @returns {number} Vollstaendig geparste Zahl oder Legacy-Fallback 0.
      */
     parseCurrency: str => {
-        if (!str) return 0;
-        const raw = String(str).trim().replace(/\s/g, '');
-        if (!raw) return 0;
-        const lastComma = raw.lastIndexOf(',');
-        const lastDot = raw.lastIndexOf('.');
-        let normalized = raw;
-        if (lastComma !== -1 && lastDot !== -1) {
-            if (lastComma > lastDot) {
-                // Comma is decimal separator: 1.234,56
-                normalized = raw.replace(/\./g, '').replace(',', '.');
-            } else {
-                // Dot is decimal separator: 1,234.56
-                normalized = raw.replace(/,/g, '');
-            }
-        } else if (lastComma !== -1) {
-            // Only comma present: 1234,56
-            normalized = raw.replace(/\./g, '').replace(',', '.');
-        } else if (lastDot !== -1) {
-            // Only dot present: 1.234 (thousands) or 12.5 (decimal)
-            const parts = raw.split('.');
-            const tail = parts[parts.length - 1];
-            if (tail.length === 3) {
-                normalized = raw.replace(/\./g, '');
-            }
-        }
-        const n = parseFloat(normalized);
-        return isFinite(n) ? n : 0;
+        const result = parseLocalizedNumber(str, {
+            required: true,
+            allowCurrencySymbol: true
+        });
+        return result.valid ? result.value : 0;
     },
 
     /**

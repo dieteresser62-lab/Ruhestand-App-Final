@@ -1,10 +1,55 @@
 # Balance-App – Modulübersicht
 
-Die Balance-App besteht aus 35 ES6-Modulen unter `app/balance/`. Das folgende Dokument fasst Verantwortung, Exporte und wichtige Abhängigkeiten zusammen.
+Die Balance-App besteht aus 36 ES6-Modulen unter `app/balance/`. Das folgende Dokument fasst Verantwortung, Exporte und wichtige Abhängigkeiten zusammen.
 Dateinamen werden unten kurz ohne Präfix genannt; tatsächlicher Pfad ist in der Regel `app/balance/<datei>.js`.
 Ausnahmen: Profilverbund-Module liegen unter `app/profile/`, Shared-Formatter unter `app/shared/`.
 
-**Stand:** 2026-06-04
+**Stand:** 2026-07-14
+
+## Vollstaendige Datei-Inventur
+
+Die folgende Inventur wurde vor dem Balance-App-Hardening direkt gegen `app/balance/` abgeglichen. Sie ist die verbindliche Scope-Kontrolle fuer die geplanten Slices; gruppierte Detailbeschreibungen folgen darunter.
+
+| Datei | Primaere Verantwortung |
+|---|---|
+| `balance-action-postprocessor.js` | Single-Profil-3-Bucket-Nachbearbeitung und Weitergabe der finalen Profilverbund-Aktion |
+| `balance-annual-inflation.js` | Inflationsabruf und Bedarfs-/Faktorfortschreibung |
+| `balance-annual-marketdata.js` | ETF-, ATH-, CAPE- und Nachruecken-Workflow |
+| `balance-annual-modal.js` | Ergebnisdialog des Jahresupdates |
+| `balance-annual-orchestrator.js` | Reihenfolge und explizites Erfolgs-/Fehlerresultat des Jahresupdates |
+| `balance-annual-period.js` | DOM-freier Jahresperioden-, Legacy- und Recovery-Contract |
+| `balance-binder-annual.js` | Fassade fuer Annual-Handler |
+| `balance-binder-diagnosis.js` | Diagnose-Export und Copytext |
+| `balance-binder-imports.js` | Versionierter Balance-JSON-Import/Export mit Dry-Run/Recovery sowie Markt-CSV-Import |
+| `balance-binder-snapshots.js` | Periodengebundener Jahresprozess-Coordinator, Recovery und Snapshot-Aktionen |
+| `balance-binder.js` | zentraler UI-Event-Hub |
+| `balance-config.js` | App-Konfiguration, Engine-Versionsanforderung und Fehlertypen |
+| `balance-diagnosis-chips.js` | Diagnose-Chips |
+| `balance-diagnosis-decision-tree.js` | Entscheidungsbaum-Darstellung |
+| `balance-diagnosis-format.js` | Normalisierung des Diagnose-Payloads |
+| `balance-diagnosis-guardrails.js` | Guardrail-Diagnosekarten |
+| `balance-diagnosis-keyparams.js` | Schluesselparameter und VPW-/Mindest-Flex-Diagnose |
+| `balance-diagnosis-transaction.js` | Transaktionsdiagnostik und Blockgruende |
+| `balance-expenses-csv.js` | Parser fuer kategorisierte Ausgaben-CSV |
+| `balance-expenses-metrics.js` | DOM-freie Ausgabenkennzahlen und Forecasts |
+| `balance-expenses-renderer.js` | Ausgabentabelle, Summary und Detaildialog |
+| `balance-expenses-storage.js` | Ausgabenstore und Jahres-/Monatscontainer |
+| `balance-expenses.js` | Controller/Fassade des Ausgaben-Checks |
+| `balance-guardrail-reset.js` | Reset-Entscheidung bei relevanten Inputaenderungen |
+| `balance-health-bucket.js` | DOM-freie Pflegebucket-Diagnose |
+| `balance-main-profile-sync.js` | Profilwerte in Balance-DOM synchronisieren |
+| `balance-main-profilverbund.js` | Haushalts-Engine-Lauf, einmalige 3-Bucket-Verarbeitung, Profilattribution und UI-Anbindung |
+| `balance-main.js` | Bootstrap und zentrale Update-Pipeline |
+| `balance-reader.js` | DOM-Eingaben und profil-/tranchenbezogene Overrides lesen |
+| `balance-renderer-action.js` | Handlungsempfehlung und Profilquellen rendern |
+| `balance-renderer-diagnosis.js` | Diagnose-Teilrenderer koordinieren |
+| `balance-renderer-summary.js` | Summary, Liquiditaet, Marktstatus und Bedarf rendern |
+| `balance-renderer.js` | Renderer-Fassade, Fehler und Theme |
+| `balance-storage.js` | Balance-State, Migration, Snapshot-Archiv, Import-Recovery und Restore |
+| `balance-update-pipeline.js` | Validierung, Last-State, Diagnose und Persistenzentscheidung |
+| `balance-utils.js` | Zahlen-/Waehrungsformatierung und UI-Hilfen |
+
+**Inventurergebnis:** 36 von 36 Dateien erfasst.
 
 ---
 
@@ -48,13 +93,15 @@ Persistenzschicht fuer Balance-State ueber `app/shared/persistence-facade.js` un
 - `initStorageManager(domRefs, state, renderer)` – initialisiert Abhängigkeiten
 - `StorageManager`
   - `loadState()` / `saveState(state)` / `resetState()`
+  - `replaceStateFromImport(state)` – ersetzt nur den schema-validierten Balance-State nach bestaetigtem Import-Recovery-Snapshot
+  - `rollbackImportReplace(receipt)` – stellt bei einem spaeten Importfehler alle im Recovery-Snapshot erfassten erlaubten Live-Daten wieder her
   - `initSnapshots()` / `renderSnapshots(listEl, statusEl, handle)`
   - `createSnapshot(handle)` / `restoreSnapshot(key, handle)` / `deleteSnapshot(key, handle)`
   - `connectFolder()` – Kompatibilitaets-/UI-Pfad fuer aeltere Ordnerbindung; neue Snapshots liegen im internen Archiv
 
 **Dependencies:** `balance-config.js` (Konfiguration & Fehlerklassen), `app/shared/persistence-facade.js`, `app/shared/snapshot-archive.js`
 
-**Snapshot-Archiv:** Jahresabschluss-Snapshots werden als `persistence-records-v1` gespeichert. Browser nutzt die IndexedDB-Datenbank `ruhestand-suite` Version 2 mit separatem Store `snapshots`; Tauri nutzt neben `ruhestand_suite_data.json` die separate Datei `ruhestand_suite_snapshots.json`. `listSnapshots()` zeigt nur Indexdaten ohne Vollpayload. Standard-Restore erhaelt die Snapshot-Historie, bewahrt die Profil-Registry und setzt nur das aktive Profil zurueck, wenn `snapshot.activeProfileId` in der aktuellen Registry existiert.
+**Snapshot-Archiv:** Jahresabschluss- und Import-Recovery-Snapshots werden als `persistence-records-v1` gespeichert. Import-Recovery-Punkte tragen den Kind-Wert `balance-import-recovery` und werden vor dem ersten Balance-Replace geschrieben und zurueckgelesen. Browser nutzt die IndexedDB-Datenbank `ruhestand-suite` Version 2 mit separatem Store `snapshots`; Tauri nutzt neben `ruhestand_suite_data.json` die separate Datei `ruhestand_suite_snapshots.json`. Ein optionales File-System-Verzeichnis-Handle liegt getrennt in `ruhestand-suite-snapshot-handles`; ein vorhandenes Handle aus der historischen `snapshotDB` wird uebernommen und die Legacy-Verbindung danach geschlossen. Blockiert ein anderer Tab deren Cleanup, setzt der Adapter keinen falschen Marker und setzt die Bereinigung bei einem spaeteren Lauf fort, ohne die Snapshot-Liste aufzuhalten. `listSnapshots()` zeigt nur Indexdaten ohne Vollpayload. Standard-Restore erhaelt die Snapshot-Historie, bewahrt die Profil-Registry und setzt nur das aktive Profil zurueck, wenn `snapshot.activeProfileId` in der aktuellen Registry existiert.
 
 **Hinweis Steuerzustand:** `lastState.taxState.lossCarry` wird migriert/defaulted und bei Guardrail-Resets erhalten.
 
@@ -144,7 +191,7 @@ Event-Hub der Anwendung.
   - `handleReset()` – Reset mit Bestätigung
   - `handleBedarfAnpassungClick(e)` – inflationsbedingte Anpassung
   - `handleNachruecken()` / `handleUndoNachruecken()` – Marktdatenpflege
-  - `handleJahresUpdate()` – **Jahres-Update mit Online-API-Zugriff:** Ruft automatisch Inflationsdaten (ECB → World Bank → OECD), ETF-Kurse (VWCE.DE via Yahoo Finance über lokalen Proxy) und CAPE (Yale -> Mirror -> letzter lokaler Stand) ab, führt Nachrücken durch und aktualisiert ATH. Zeigt detailliertes Protokoll mit Datenquellen und Werten.
+  - `handleJahresUpdate()` – startet denselben fail-safe, periodengebundenen Coordinator wie der Jahresabschluss-Button; Online-Abrufe, Writes und Abschluss teilen dadurch Snapshot, In-Flight-Sperre und Perioden-ID.
   - `handleExport()` / `handleImport(e)` / `handleCsvImport(e)` – Datenimporte/-exporte
   - `handleJahresabschluss()` – Snapshot & Jahreswechsel
   - `handleSnapshotActions(e)` – Snapshot verwalten (restore/delete)
@@ -154,8 +201,8 @@ Event-Hub der Anwendung.
 
 **Helper-Module (ausgelagert):**
 - `balance-binder-annual.js` – Jahres-Update, Inflation, ETF-Nachrücken, Modal-Logik
-- `balance-binder-imports.js` – Import/Export/CSV
-- `balance-binder-snapshots.js` – Snapshot-Handling; Jahresabschluss flusht Live-Daten, erstellt den Snapshot vor Inflation/Jahresmutationen und bricht bei Snapshot-Fehlern ohne Mutation ab
+- `balance-binder-imports.js` – erzeugt `balance-state`-Exports mit stabiler App-ID und `schemaVersion: 1`; akzeptiert nur dieses Format oder die explizit migrierten v21.1-/v22.0-Legacy-Envelopes. Vor dem Replace validiert es Pflichtwerte und `lastState`, fuehrt `update({ persist: false })` aus und wertet den Slice-07-Ergebnisvertrag aus. Nach Recovery/Replace muss das persistente `update()` erfolgreich sein; andernfalls werden Storage und sichtbare Eingaben automatisch zurueckgerollt. File-Inputs werden dabei nie auf einen nichtleeren Wert restauriert, weil Browser nur das programmgesteuerte Leeren erlauben.
+- `balance-binder-snapshots.js` – Snapshot-Handling und Jahresprozess-Coordinator; validiert den Live-State, flusht, bestaetigt den Snapshot vor fachlichen Writes und persistiert bei Teilfehlern Snapshot-ID sowie Recovery-Phase
 - `balance-binder-diagnosis.js` – Diagnose-Export
 
 ---
@@ -165,18 +212,18 @@ Einstiegspunkt und Orchestrator.
 
 **Aufgaben:**
 - Initialisiert DOM-Referenzen, Module und Anwendungszustand.
-- Prüft Engine-Kompatibilität (`initVersionHandshake`).
-- Definiert `update()` / `debouncedUpdate()` und reicht Eingaben an `EngineAPI.simulateSingleYear()` weiter.
-- Übergibt Engine-Ergebnisse an Renderer und Storage.
+- Bindet einen kompatiblen Engine-Vertrag (`initVersionHandshake`) und blockiert fehlende, inkompatible oder nachtraeglich ausgetauschte Engines.
+- Definiert `update()` / `debouncedUpdate()`, liefert `success`, `validation_error`, `engine_error` oder `blocked` und reicht Eingaben nur nach erfolgreichem Gate an `EngineAPI.simulateSingleYear()` weiter.
+- Übergibt erfolgreiche Engine-Ergebnisse an Renderer und Storage; blockierte und fehlerhafte Ergebnisse werden nicht persistiert.
 - Erhält bei Guardrail-Resets den steuerlichen Zustand (`lastState.taxState`) explizit.
 
 **Dependencies:** alle oben genannten Module sowie die globale `EngineAPI`.
 
 **Helper-Module (ausgelagert):**
 - `balance-main-profile-sync.js` – Profilwerte in Balance-Inputs spiegeln
-- `balance-main-profilverbund.js` – Profilverbund-Simulationen & UI-Handling
-- `balance-update-pipeline.js` – Mindest-Flex-Validierung, Engine-Last-State, Renderer-/Diagnose-Payload, Persistenzentscheidung und Ausgabenbudget.
-- `balance-action-postprocessor.js` – Profilverbund-Action-Merge und Single-3-Bucket-Postprocessing.
+- `balance-main-profilverbund.js` – einmalige Haushalts-Simulation, Profilattribution & UI-Handling
+- `balance-update-pipeline.js` – Engine-Handshake/-Gate, Update-Ergebnisvertrag, Mindest-Flex-Validierung, Engine-Last-State, Renderer-/Diagnose-Payload, Persistenzentscheidung und Ausgabenbudget.
+- `balance-action-postprocessor.js` – Single-Profil-3-Bucket-Postprocessing; im Profilverbund unveraenderte Weitergabe der bereits finalisierten Haushaltsaktion.
 
 **Pflegebucket:** Der Update-Zyklus reicht die im Reader erzeugte Pflegebucket-Diagnose an Summary, Key-Parameter und Diagnose-Copytext weiter. Die Engine-Eingaben und die Handlungsempfehlung werden dadurch nicht operativ verändert.
 
@@ -187,13 +234,13 @@ Ausgaben-Check für monatliche CSV-Importe und Budgettracking.
 
 **Exports:**
 - `balance-expenses.js`
-  - `initExpensesTab(domRefs)` – initialisiert Tabellenaufbau, Detaildialog und Jahr-Selector
+  - `initExpensesTab(domRefs, options?)` – initialisiert Tabellenaufbau, Detaildialog und Jahr-Selector; gibt beim Start den Store-Status zurueck und rendert Korruption als gesperrten Recovery-Zustand
   - `updateExpensesBudget({ monthlyBudget, annualBudget })` – übernimmt Budgetwerte aus der Balance-Berechnung
   - `rollExpensesYear()` – schaltet auf das nächste Ausgabenjahr (Historie bleibt erhalten)
 
 **Module:**
-- `balance-expenses.js` – Controller/Fassade fuer Initialisierung, Event-Wiring, Import-/Delete-Flows und oeffentliche API.
-- `balance-expenses-storage.js` – Persistenzschema `balance_expenses_v1`, Jahr-/Monat-Container und aktive Jahr-Auswahl.
+- `balance-expenses.js` – Controller/Fassade fuer Initialisierung, Event-Wiring, Import-/Delete-Flows, Recovery-Export und bestaetigten Korruptions-Reset.
+- `balance-expenses-storage.js` – Persistenzschema `balance_expenses_v1`, expliziter `ok`-/`empty`-/`corrupt`-Ladevertrag, schreibgesperrter Korruptionspfad, Recovery-Dokument und Jahr-/Monat-Container.
 - `balance-expenses-csv.js` – CSV-Parser mit Delimiter-Erkennung (`;`, `,`, `Tab`) und Betragsnormalisierung.
 - `balance-expenses-metrics.js` – Monats-, Jahres-, Median-, Forecast- und Soll/Ist-Kennzahlen ohne DOM/localStorage.
 - `balance-expenses-renderer.js` – Year-Select, Tabelle, Summary-Karten und Detaildialog.
@@ -206,6 +253,8 @@ Ausgaben-Check für monatliche CSV-Importe und Budgettracking.
   - Jahreshochrechnung (ab 2 Datenmonaten Median statt Mittelwert)
   - Soll/Ist auf Basis importierter Monate
 - Detaildialog mit sortierter Kategorieliste und „Top 3 Kategorien“.
+- Ein JSON-/Shape-Fehler liefert ueber `loadExpensesStoreResult()` einen strukturierten `corrupt`-Status samt unveraendertem Rohinhalt. Der kompatible `loadExpensesStore()` wirft in diesem Fall, statt einen Leerzustand zu erfinden.
+- Die Recovery-UI nennt Ausgabenbereich und Backend. Ein Reset bleibt bis zum erfolgreichen Rohdatenexport gesperrt, verlangt danach eine explizite Bestaetigung und gilt erst nach erfolgreichem Facade-Flush als abgeschlossen; Abbruch und Flush-Fehler lassen den Store im gesperrten Recovery-Zustand.
 
 **Dependencies:** `balance-utils.js`, `balance-renderer.js`, `app/profile/profilverbund-balance.js`, `balance-expenses-*.js`
 
@@ -227,16 +276,19 @@ Inflation-bezogene Operationen für das jährliche Update.
 ---
 
 ### 9.2 `balance-annual-marketdata.js`
-Marktdaten-Updates für das „Nachrücken"-Workflow.
+Periodengebundene ETF-Jahresenddaten und davon unabhängige CAPE-Updates für den „Nachrücken"-Workflow. Der ETF-Pfad liest `calendar-year:<YYYY>` aus dem laufenden Commit, fragt Yahoo im UTC-Jahresendfenster ab und persistiert den akzeptierten Stichtagscontract unter `annualMarketDataMeta`.
 
 **Exports:**
+- `ANNUAL_MARKET_DATA_META_KEY` / `ANNUAL_MARKET_DATA_SCHEMA_VERSION` – stabiler Persistenzschlüssel und Schema-Version
+- `createAnnualMarketDataRequest(periodId)` – bildet Zieljahr sowie `period1`/exklusives `period2` ohne Systemdatumsableitung
+- `selectAnnualCloseQuote(data, context)` – wählt aus Yahoo-Daten unabhängig von deren Reihenfolge den letzten VWCE.DE-Schlusskurs von 0,50 bis 100.000 EUR vom 27.12. bis 31.12. des Zieljahres
 - `createMarketdataHandlers({ dom, appState, debouncedUpdate, applyAnnualInflation })`
-  - `handleNachruecken()` – Verschiebt Vorjahreswerte und aktualisiert ATH
-  - `handleUndoNachruecken()` – Macht Nachrücken rückgängig
-  - `handleNachrueckenMitETF()` – Holt VWCE.DE-Kurs via Yahoo-Proxy und führt Nachrücken durch
+  - `handleNachruecken()` – verschiebt Vorjahreswerte und aktualisiert ATH; quellenloses manuelles Nachrücken invalidiert veraltete Online-Stichtagsmetadaten
+  - `handleUndoNachruecken()` – macht Nachrücken einschließlich der Stichtagsmetadaten rückgängig
+  - `handleNachrueckenMitETF()` – holt den VWCE.DE-Jahresendkurs via Yahoo-Proxy, prüft den vollständigen laufenden Commit-Kontext vor Fetch und Mutation, führt das Nachrücken durch und speichert Marktdateninputs gemeinsam mit Preis, ISO-Stichtag, Ticker, Quelle, Zieljahr, Perioden-ID sowie der stichtagsgleichen ATH-Auswertung; Fehler nach begonnener Mutation stellen den vorherigen DOM-/State-Stand wieder her
   - `handleFetchCapeAuto()` – Holt US-Shiller-CAPE via Yale/Mirror/r.jina.ai mit lokalem Fallback und persistiert `capeMeta`
 
-**Dependencies:** `balance-config.js`, `balance-renderer.js`
+**Dependencies:** `balance-config.js`, `balance-renderer.js`, `balance-storage.js`, `balance-annual-period.js`, `persistence-facade.js`
 
 ---
 
@@ -257,9 +309,25 @@ Koordiniert den komplexen Jahres-Update Workflow.
 
 **Exports:**
 - `createAnnualOrchestrator({ dom, debouncedUpdate, handleFetchInflation, handleNachrueckenMitETF, handleFetchCapeAuto, showUpdateResultModal, setLastUpdateResults })`
-  - `handleJahresUpdate()` – Orchestriert: Alter erhöhen → Inflation → ETF → CAPE → Protokoll
+  - `handleJahresUpdate()` – Orchestriert: Alter erhoehen und im aktiven Profil persistieren → Inflation → ETF → CAPE → Protokoll
 
-**Dependencies:** `balance-config.js`, `balance-renderer.js`, `balance-storage.js`
+**Dependencies:** `balance-config.js`, `balance-renderer.js`, `balance-storage.js`, `profile-state.js`, `profile-storage.js`, `persistence-facade.js`
+
+---
+
+### 9.5 `balance-annual-period.js`
+
+Definiert den DOM-freien Jahresperioden-Contract. `balance-binder-snapshots.js` integriert ihn in beide Jahres-Buttons und speichert die Metadaten im Balance-State unter `annualPeriodMetadata`. Wiederholte Perioden und Doppelklicks starten keine zweite Mutation; `incomplete_recovery` blockiert bis zur Wiederherstellung des referenzierten Snapshots.
+DOM- und persistenzfreier Contract fuer das abgeschlossene Kalenderjahr. Er erzeugt die stabile ID `calendar-year:<YYYY>`, plant Alter, Inflation, Marktdaten und Ausgaben-Rollover fuer dieselbe Periode und beschreibt die Zustaende `ready`, `already_committed`, `incomplete_recovery`, `legacy_confirmation_required` und `invalid`.
+
+**Exports:**
+- Schema-, Status- und Legacy-Entscheidungskonstanten
+- `deriveCompletedCalendarYear(referenceDate)` / `createAnnualPeriodId(targetYear)`
+- `createAnnualPeriodMetadata()` / `preflightAnnualPeriod()` / `createAnnualPeriodPlan()`
+- `checkAnnualPeriodCommit()` / `startAnnualPeriodCommit()` / `completeAnnualPeriodCommit()`
+- `resolveLegacyAnnualPeriod()` – explizite Baseline ohne Alter-/Datumsheuristik
+
+**Dependencies:** Keine (Pure Logic)
 
 ---
 
@@ -288,6 +356,7 @@ Kernlogik für den Profilverbund (Multi-Profil-Modus).
 **Exports:**
 - `loadProfilverbundProfiles()` – Lädt alle Profile aus dem Haushalt
 - `aggregateProfilverbundInputs(profileInputs, overrides)` – Aggregiert Bedarf, Rente, Depot über Profile
+- `calculateHouseholdWithdrawalNeed(profileInputs, overrides)` – Berechnet Bruttobedarf, Jahreseinkommen und Nettoentnahme einmal auf Haushaltsebene
 - `calculateTaxPerEuro(inputs)` – Berechnet Steuerlast pro Euro für ein Profil
 - `selectTranchesForSale(tranches, targetAmount, taxRate)` – Wählt steueroptimale Tranchen für Verkauf
 - `calculateWithdrawalDistribution(profileInputs, aggregated, mode)` – Verteilt Entnahme nach Modus (tax_optimized, proportional, runway_first)
@@ -295,20 +364,46 @@ Kernlogik für den Profilverbund (Multi-Profil-Modus).
 - `buildProfilverbundProfileSummaries(profileInputs)` – Einzelprofil-Übersichten
 
 **Verteilungsmodi:**
-- `tax_optimized` – Greedy: Profile mit niedrigster Steuerlast zuerst
-- `proportional` – Nach Vermögensanteil
-- `runway_first` – Nach Runway-Zielen gewichtet
+- `tax_optimized` – globale, deterministische Verkaufsquellenwahl nach aktuellem marginalem Profilsteuerwert; Verlusttopf, Sparer-Pauschbetrag, Kirchensteuer, Kostenbasis und Teilfreistellung bleiben eigentuemerbezogen
+- `proportional` – Quellenattribution nach Vermoegensanteil, innerhalb eines Profils steuerarm sortiert
+- `runway_first` – Quellenattribution nach Runway-Zielen gewichtet, innerhalb eines Profils steuerarm sortiert
+
+**Haushalts-/Finanzierungscontract:**
+- `balance-main.js` fuehrt im Multi-Profil-Fall genau einen Haushalts-Engine-Lauf fuer Floor, Flex, Dynamic Flex, Einkommen und Transaktionsplanung aus.
+- Der Engine-Lauf erhaelt einen vollstaendigen Haushaltstranchenpool mit eindeutiger `sourceProfileId`. Die 3-Bucket-Logik und Bond-Wiederauffuellung finalisieren diese Haushaltsaktion genau einmal.
+- Danach finden keine Profil-Engine-Laeufe statt. Die Profile erhalten ausschliesslich Quellen- und Verwendungsattributionen der finalen Haushaltsaktion; die Verteilungsmodi steuern diese Attribution, aber keine zweite Spending- oder Assetentscheidung.
+- Quellen, Verwendungen und die Summe der finalen Profilsteuern muessen innerhalb 0,01 EUR reconciliert sein. Fehlende Herkunft oder nicht finanzierbare Restbetraege blockieren fail-closed.
+- Haushalts-Guardrail-State und Profil-Steuer-State werden getrennt persistiert. Je Profil wird nur der aus den final attribuierten Verkaeufen berechnete `taxState` ersetzt; sonstige Profil-Last-State-Felder bleiben erhalten.
 
 **Tranchen-/Cash-Contract:**
 - Entnahmen nutzen zuerst Tagesgeld und Geldmarkt, bevor ein Verkauf aus Detailtranchen geplant wird.
-- Detailtranchen ersetzen in Asset-Summaries die aggregierten Depot-/Gold-/Geldmarktwerte, damit Werte nicht doppelt gezählt werden.
+- Vorhandene Detailtranchen werden ohne Mutation mit Profilherkunft kopiert. Fehlen Detailtranchen, entstehen profilmarkierte synthetische Fallback-Tranchen aus den aggregierten Werten.
+- Detailtranchen ersetzen in Asset-Summaries die aggregierten Depot-/Gold-/Geldmarktwerte, damit Werte nicht doppelt gezählt werden. Bonds behalten ihre Assetklasse und fliessen fuer Legacy-Kompatibilitaet zugleich in die Depotaggregate ein.
+- Die explizite Kategorie `money_market` hat bei der Attribution Vorrang vor einem widerspruechlichen Legacy-Typ wie `aktien_neu`. Geldmarkt bleibt Haushaltsliquiditaet, ist kein Aktienverkaufskandidat und eine Umschichtung zu Tagesgeld veraendert die Gesamtliquiditaet nicht.
 - Der Pflegebucket wird als Haushaltsdefinition aus dem Primary-Profil gelesen und in Balance nur diagnostisch ausgewiesen. Er ist keine zusätzliche Entnahmequelle im Verteilungsmodus.
 
 **Dependencies:** `balance-config.js`, `app/profile/profile-storage.js`
 
 ---
 
-### 11.2 `profilverbund-balance-ui.js`
+### 11.2 `profilverbund-action-attribution.js`
+
+DOM-freier Contract zwischen finaler Haushaltsaktion, Profilquellen, Steuerzustand und Liquiditaets-KPIs.
+
+**Aufgaben:**
+- validiert die eindeutige Profilherkunft aller Verkaufsquellen und attribuiert Cash- und Assetquellen ohne gegenlaeufige Zusatztransaktion;
+- trennt Geldmarkt als bestehende Haushaltsliquiditaet vor der Klassifikation von Aktien, Gold und Bonds;
+- plant die fuer die Haushaltszwecke erforderlichen Verkaufstranchen je vorgegebener Assetklasse neu; `tax_optimized` vergleicht die aktuelle marginale Steuer ueber alle geeigneten Profile, die beiden gewichteten Modi begrenzen jede Quelle auf den Bestand ihres Eigentuemers;
+- aggregiert die finalen steuerlichen Rohwerte je Profil und ruft `settleTaxYear()` genau einmal je Profil auf;
+- reconciliert Bruttoquellen, Profilsteuern und Nettoverwendungen innerhalb der Cent-Toleranz;
+- erzeugt Profilaktionen als reine Aufschluesselung der Haushaltsaktion;
+- berechnet Deckung und Runway aus dem Cashflow der final gerenderten Aktion neu und aktualisiert die zugehoerige Diagnose.
+
+**Dependencies:** `engine/tax-settlement.mjs`, `profilverbund-balance.js`
+
+---
+
+### 11.3 `profilverbund-balance-ui.js`
 DOM-Operationen für die Profilverbund-UI.
 
 **Exports:**

@@ -34,13 +34,13 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 ## Funktionen im Überblick
 
 ### Balance-App
-* Speichert Eingaben ueber die zentrale Persistenz-Facade; im Browser ist IndexedDB die lokale Source of Truth, Tauri nutzt `ruhestand_suite_data.json` im App-Datenverzeichnis.
+* Speichert Eingaben ueber die zentrale Persistenz-Facade; im Browser ist IndexedDB die lokale Source of Truth, Tauri nutzt `ruhestand_suite_data.json` im App-Datenverzeichnis. Ein optional verbundenes Browser-Snapshot-Verzeichnis wird in einer eigenen Handle-Datenbank gespeichert; bestehende Handles aus der frueheren `snapshotDB` werden einmalig uebernommen, ohne die Snapshot-Archivmigration zu blockieren.
 * Komplett-Backup und Komplett-Import liegen zentral auf der Startseite unter `Profile > Erweitert`; Jahresabschluss-Snapshots bleiben als fachlicher Sicherungspunkt in einem separaten internen Snapshot-Archiv erhalten.
 * Liest Marktdaten und Ausgaben aus CSV-Dateien ein.
-* **Jahres-Update mit Online-Datenabruf:** Automatischer Abruf von Inflationsdaten (ECB, World Bank, OECD) und ETF-Kursen (VWCE.DE via Yahoo Finance über lokalen Proxy), automatisches Nachrücken der Marktdaten und ATH-Update. Detailliertes Update-Protokoll zeigt Datenquellen und abgerufene Werte.
-* **Auto-CAPE im Jahreswechsel:** US-Shiller-CAPE wird im Jahresupdate automatisch geladen (Fallback: Yale → Mirror → letzter gespeicherter Wert). CAPE-Fehler blockieren den Jahreswechsel nicht.
-* **Ausgaben-Check (monatlich):** CSV-Import pro Monat und Profil, Budgetkontrolle je Monat, Detailansicht mit Top-3-Kategorien, Jahreshochrechnung (ab 2 Datenmonaten mit Median), Soll/Ist auf Basis importierter Monate sowie Jahres-Historie per Jahr-Auswahl.
-* **Jahresabschluss + Ausgaben-Historie:** Beim Jahresabschluss entsteht zuerst ein Pre-Mutation-Snapshot, danach wechselt der Ausgaben-Check automatisch auf das nächste Jahr; Vorjahre bleiben vollständig einsehbar.
+* **Fail-safe Jahresprozess mit Online-Datenabruf:** Jahres-Update und Jahresabschluss starten denselben periodengebundenen Ablauf. Nach lokaler Vorprüfung und erfolgreichem Flush entsteht zuerst ein verifizierter Recovery-Snapshot; erst danach werden Alter, Inflationsdaten (ECB, World Bank, OECD), ETF-Kurse (VWCE.DE via Yahoo Finance über lokalen Proxy), CAPE, Bedarf und Ausgabenjahr fortgeschrieben. Das neue Alter wird zugleich im aktiven Profil gespeichert, damit der nachfolgende Profil-Sync es nicht zurücksetzt. Der ETF-Wert für `endeVJ` stammt dabei ausschließlich aus dem letzten verfügbaren Handelstag vom 27. bis 31. Dezember der laufenden Abschlussperiode; Kurs, ISO-Stichtag, Ticker, Quelle und Zieljahr werden gemeinsam gespeichert.
+* **Auto-CAPE im Jahreswechsel:** US-Shiller-CAPE wird im Jahresprozess automatisch geladen (Fallback: Yale → Mirror → letzter gespeicherter Wert). Ein nicht auflösbarer CAPE-/Datenfehler lässt den Recovery-Snapshot und einen sichtbaren unvollständigen Periodenstatus bestehen, statt den Abschluss als erfolgreich zu markieren.
+* **Ausgaben-Check (monatlich):** CSV-Import pro Monat und Profil, Budgetkontrolle je Monat, Detailansicht mit Top-3-Kategorien, Jahreshochrechnung (ab 2 Datenmonaten mit Median), Soll/Ist auf Basis importierter Monate sowie Jahres-Historie per Jahr-Auswahl. Korrupte Ausgabendaten werden nicht als leer interpretiert: Der Bereich bleibt schreibgesperrt und bietet Recovery-Export, bestaetigten Reset oder Abbruch an.
+* **Idempotenter Jahresabschluss + Ausgaben-Historie:** Eine stabile Perioden-ID verhindert Doppelklick- und Wiederholungs-Commits. Der Ausgaben-Check muss auf dem abzuschließenden Vorjahr stehen und wechselt nach erfolgreicher Post-Write-Validierung auf das Folgejahr; Vorjahre bleiben vollständig einsehbar.
 * **Mindest-Flex p.a.:** Optionale, bedingte Untergrenze fuer Flex-Ausgaben in kuerzenden Safety-/Guardrail-Phasen; sie ersetzt nicht den Floor und wird in Diagnose sowie Kopiertext transparent ausgewiesen.
 * Nutzt die Engine v31 zur Marktanalyse, Entnahmeplanung und Liquiditätssteuerung.
 * **Regime-Smoothing-Diagnose:** Kontinuierliche Drawdown-/CAPE-/Runway-Signale ergaenzen die diskreten Marktregime. Die geglaettete Runway-Zielberechnung bleibt per Default deaktiviert (`CONFIG.REGIME_SMOOTHING.TARGETS_ENABLED=false`), kann aber Diagnosefelder fuer Rohziel, Effektivziel, Severity, Fallback und harte Mindestgrenze ausweisen.
@@ -256,7 +256,7 @@ Die Anwendung ist bewusst minimalistisch gehalten, hat aber für den vollen Funk
    * Öffnet den Browser mit der Startseite.
    * Beim Schließen (Ctrl+C oder Fenster schließen) werden beide Prozesse sauber beendet.
 3. `Balance.html` bzw. `Simulator.html` im Browser aufrufen.
-   * Getestet mit Chromium-basierten Browsern und Firefox.
+   * Das automatisierte Browser-Gate läuft mit Chromium; weitere Browser bleiben Teil der manuellen Kompatibilitätsprüfung.
    * Keine Build-Schritte nötig.
 4. Optional: `npm run build:engine` ausführen, wenn Änderungen in `engine/` vorgenommen wurden. Dadurch wird `engine.js` aktualisiert (esbuild-Bundle oder Modul-Fallback).
 5. Für CI/Release: `npm run build:engine:strict` nutzen. Der Build schlägt dann ohne `esbuild` bewusst fehl.
@@ -273,8 +273,8 @@ Die Anwendung ist bewusst minimalistisch gehalten, hat aber für den vollen Funk
 
 * Die Balance- und Simulator-Module nutzen native ES6-Imports. Änderungen an einzelnen Modulen werden nach dem Speichern direkt beim nächsten Reload geladen.
 * Engine-Anpassungen erfolgen in den Modulen unter `engine/`. Nach Anpassungen `npm run build:engine` ausführen und die Größe der generierten `engine.js` kontrollieren.
-* Der Windows-Release-Build bleibt ein bewusst manueller Schritt über `build-tauri.bat` bzw. `scripts/build-tauri.ps1` nach grüner Suite. Das Skript prüft die Build-Voraussetzungen, erzeugt `dist/` frisch via `npm run sync-dist`, validiert zentrale Assets, führt `npm run tauri:build` aus und kopiert nur eine plausibilisierte EXE als `RuhestandSuite.exe` ins Repo-Root.
-* Für schnelle QA bitte `npm test` einmal durchlaufen lassen. Wenn lokal `npm` defekt ist, kann die fachliche Suite direkt mit `node tests/run-tests.mjs` validiert werden; der Tauri-Release-Build selbst benötigt weiterhin ein funktionierendes `npm`.
+* Der Windows-Release-Build bleibt ein bewusst manueller Schritt über `build-tauri.bat` bzw. `scripts/build-tauri.ps1` nach grüner Suite. Das Skript prüft die Build-Voraussetzungen, erzeugt `dist/` frisch via `npm run sync-dist`, validiert zentrale Assets und führt `npm run tauri:build` aus. Vor dem abschließenden Kopieren einer plausibilisierten neuen `RuhestandSuite.exe` ins Repo-Root wird eine vorhandene Vorgängerversion unter `release-archive/RuhestandSuite_yyyy-MM-dd_HH-mm-ss-fff.exe` archiviert.
+* Für schnelle QA bitte `npm test` einmal durchlaufen lassen. Kritische Browserabläufe werden zusätzlich mit `npm run test:browser` geprüft; `npm run test:coverage` aktualisiert die transparente V8-Coverage-Baseline. Wenn lokal `npm` defekt ist, kann die fachliche Suite direkt mit `node tests/run-tests.mjs` validiert werden; der Tauri-Release-Build selbst benötigt weiterhin ein funktionierendes `npm`.
 
 ## Abschluss-Checkliste
 

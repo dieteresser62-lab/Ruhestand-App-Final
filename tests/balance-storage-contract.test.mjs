@@ -1,5 +1,5 @@
 import { CONFIG, StorageError } from '../app/balance/balance-config.js';
-import { StorageManager } from '../app/balance/balance-storage.js';
+import { BALANCE_IMPORT_RECOVERY_KIND, StorageManager } from '../app/balance/balance-storage.js';
 import { createLocalStorageAdapter } from '../app/shared/persistence-adapter-localstorage.js';
 import { resetPersistenceForTests } from '../app/shared/persistence-facade.js';
 import { SnapshotArchive, SNAPSHOT_TYPE } from '../app/shared/snapshot-archive.js';
@@ -43,8 +43,73 @@ function installMockLocalStorage() {
     return global.localStorage;
 }
 
+function createHandleIndexedDb(legacyHandle) {
+    const databases = new Map();
+    const createDatabase = name => {
+        const stores = new Map();
+        const database = {
+            name,
+            closeCalls: 0,
+            objectStoreNames: { contains: storeName => stores.has(storeName) },
+            createObjectStore(storeName) {
+                stores.set(storeName, new Map());
+            },
+            transaction(storeName) {
+                const store = stores.get(storeName);
+                if (!store) throw new Error(`Store ${storeName} fehlt.`);
+                return {
+                    objectStore() {
+                        return {
+                            get(key) {
+                                const request = {};
+                                setTimeout(() => {
+                                    request.result = store.get(String(key));
+                                    request.onsuccess?.();
+                                }, 0);
+                                return request;
+                            },
+                            put(value, key) {
+                                const request = {};
+                                setTimeout(() => {
+                                    store.set(String(key), value);
+                                    request.onsuccess?.();
+                                }, 0);
+                                return request;
+                            }
+                        };
+                    }
+                };
+            },
+            close() {
+                this.closeCalls += 1;
+            },
+            stores
+        };
+        databases.set(name, database);
+        return database;
+    };
+    const legacyDb = createDatabase('snapshotDB');
+    legacyDb.createObjectStore('handles');
+    legacyDb.stores.get('handles').set('snapshotDirHandle', legacyHandle);
+
+    return {
+        databases,
+        open(name) {
+            const request = {};
+            setTimeout(() => {
+                const existed = databases.has(name);
+                request.result = databases.get(name) || createDatabase(name);
+                if (!existed) request.onupgradeneeded?.();
+                request.onsuccess?.();
+            }, 0);
+            return request;
+        }
+    };
+}
+
 const prevLocalStorage = global.localStorage;
 const prevLocation = global.location;
+const prevIndexedDb = global.indexedDB;
 
 try {
     console.log('Test 1: real migration sanitizes inflation state and creates taxState');
@@ -187,9 +252,112 @@ try {
         assert(payload.records.depot_tranchen, 'Snapshot enthaelt Tranchen');
     }
 
+    console.log('Test 7: import replace creates confirmed recovery and rollback restores all captured live data');
+    {
+        installMockLocalStorage();
+        const oldState = { inputs: { aktuellesAlter: 66, floorBedarf: 18000, flexBedarf: 6000 } };
+        const importedState = { inputs: { aktuellesAlter: 67, floorBedarf: 24000, flexBedarf: 12000 } };
+        localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify(oldState));
+        localStorage.setItem(PROFILE_STORAGE_KEYS.current, 'default');
+        localStorage.setItem(PROFILE_STORAGE_KEYS.active, 'default');
+        localStorage.setItem(PROFILE_STORAGE_KEYS.registry, JSON.stringify({
+            version: 1,
+            currentProfileId: 'default',
+            profiles: { default: { meta: { name: 'Default' }, data: {} } }
+        }));
+        localStorage.setItem('profile_tagesgeld', '50000');
+
+        const receipt = await StorageManager.replaceStateFromImport(importedState);
+
+        assertEqual(receipt.ok, true, 'Import-Replace meldet erst nach bestaetigtem Write Erfolg');
+        assertEqual(JSON.parse(localStorage.getItem(CONFIG.STORAGE.LS_KEY)).inputs.floorBedarf, 24000, 'Import-Replace schreibt den validierten Balance-State');
+        const recovery = await SnapshotArchive.readSnapshot(receipt.recoverySnapshotId);
+        assertEqual(recovery.kind, BALANCE_IMPORT_RECOVERY_KIND, 'Recovery-Snapshot ist als Import-Recovery typisiert');
+        assertEqual(JSON.parse(recovery.records[CONFIG.STORAGE.LS_KEY]).inputs.floorBedarf, 18000, 'Recovery-Snapshot enthaelt den Zustand vor dem Replace');
+        assertEqual(recovery.records.profile_tagesgeld, '50000', 'Recovery-Snapshot erfasst profilbezogene Live-Daten');
+
+        localStorage.setItem('profile_tagesgeld', '999');
+        await StorageManager.rollbackImportReplace(receipt);
+
+        assertEqual(JSON.parse(localStorage.getItem(CONFIG.STORAGE.LS_KEY)).inputs.floorBedarf, 18000, 'Rollback stellt den vorherigen Balance-State wieder her');
+        assertEqual(localStorage.getItem('profile_tagesgeld'), '50000', 'Rollback stellt auch erfasste profilbezogene Live-Daten wieder her');
+        assert(await SnapshotArchive.readSnapshot(receipt.recoverySnapshotId), 'Rollback behaelt den Recovery-Snapshot fuer weitere Wiederherstellung');
+    }
+
+    console.log('Test 8: failed recovery snapshot blocks replace without changing Balance live state');
+    {
+        installMockLocalStorage();
+        const oldStateRaw = JSON.stringify({ inputs: { aktuellesAlter: 66, floorBedarf: 18000, flexBedarf: 6000 } });
+        localStorage.setItem(CONFIG.STORAGE.LS_KEY, oldStateRaw);
+        const originalCreateSnapshot = SnapshotArchive.createSnapshot;
+        SnapshotArchive.createSnapshot = async () => {
+            throw new Error('simulated quota failure');
+        };
+
+        let thrown = null;
+        try {
+            await StorageManager.replaceStateFromImport({
+                inputs: { aktuellesAlter: 67, floorBedarf: 24000, flexBedarf: 12000 }
+            });
+        } catch (error) {
+            thrown = error;
+        } finally {
+            SnapshotArchive.createSnapshot = originalCreateSnapshot;
+        }
+
+        assert(thrown instanceof StorageError, 'Recovery-Fehler wird als kontrollierter StorageError gemeldet');
+        assertEqual(localStorage.getItem(CONFIG.STORAGE.LS_KEY), oldStateRaw, 'Ohne bestaetigten Recovery-Snapshot bleibt der Balance-State bytegleich');
+    }
+
+    console.log('Test 9: recovery without profile context restores the full allowlisted snapshot');
+    {
+        installMockLocalStorage();
+        const oldState = { inputs: { aktuellesAlter: 66, floorBedarf: 18000, flexBedarf: 6000 } };
+        localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify(oldState));
+        localStorage.setItem('balance_expenses_2026', JSON.stringify({ marker: 'before-import' }));
+
+        const receipt = await StorageManager.replaceStateFromImport({
+            inputs: { aktuellesAlter: 67, floorBedarf: 24000, flexBedarf: 12000 }
+        });
+        const recovery = await SnapshotArchive.readSnapshot(receipt.recoverySnapshotId);
+        assertEqual(recovery.activeProfileId, '', 'Recovery ohne Profilkontext bleibt explizit ohne Profil-ID');
+
+        localStorage.setItem('balance_expenses_2026', JSON.stringify({ marker: 'after-import' }));
+        localStorage.setItem('profile_tagesgeld', '999');
+        await StorageManager.rollbackImportReplace(receipt);
+
+        assertEqual(JSON.parse(localStorage.getItem(CONFIG.STORAGE.LS_KEY)).inputs.floorBedarf, 18000, 'Full-Fallback stellt den alten Balance-State wieder her');
+        assertEqual(JSON.parse(localStorage.getItem('balance_expenses_2026')).marker, 'before-import', 'Full-Fallback stellt weitere erlaubte Snapshot-Daten wieder her');
+        assertEqual(localStorage.getItem('profile_tagesgeld'), null, 'Full-Fallback entfernt nach dem Snapshot neu entstandene erlaubte Live-Daten');
+    }
+
+    console.log('Test 10: legacy directory handle migrates to a dedicated IndexedDB and releases snapshotDB');
+    {
+        const legacyHandle = { kind: 'directory', name: 'Snapshots' };
+        const indexedDb = createHandleIndexedDb(legacyHandle);
+        global.indexedDB = indexedDb;
+        const helper = StorageManager._idbHelper;
+        helper.db = null;
+        helper.openPromise = null;
+        helper.migrationPromise = null;
+
+        const migratedHandle = await helper.get('snapshotDirHandle');
+        const migratedStore = indexedDb.databases.get('ruhestand-suite-snapshot-handles')?.stores.get('handles');
+
+        assertEqual(migratedHandle.name, 'Snapshots', 'Legacy-Ordner-Handle bleibt nach Migration lesbar');
+        assertEqual(migratedStore?.get('snapshotDirHandle')?.name, 'Snapshots', 'Ordner-Handle liegt in der dedizierten Handle-Datenbank');
+        assertEqual(indexedDb.databases.get('snapshotDB').closeCalls, 1, 'Legacy snapshotDB wird nach dem Readback geschlossen');
+
+        helper.db?.close?.();
+        helper.db = null;
+        helper.openPromise = null;
+        helper.migrationPromise = null;
+    }
+
     console.log('Balance storage contract tests passed');
 } finally {
     resetPersistenceForTests(createLocalStorageAdapter());
+    if (prevIndexedDb === undefined) delete global.indexedDB; else global.indexedDB = prevIndexedDb;
     if (prevLocation === undefined) delete global.location; else global.location = prevLocation;
     if (prevLocalStorage === undefined) delete global.localStorage; else global.localStorage = prevLocalStorage;
 }

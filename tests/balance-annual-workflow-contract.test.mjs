@@ -1,358 +1,300 @@
 import { createAnnualOrchestrator } from '../app/balance/balance-annual-orchestrator.js';
-import { createSnapshotHandlers } from '../app/balance/balance-binder-snapshots.js';
+import {
+    ANNUAL_PERIOD_METADATA_KEY,
+    createSnapshotHandlers
+} from '../app/balance/balance-binder-snapshots.js';
+import {
+    LEGACY_PERIOD_DECISION,
+    deriveCompletedCalendarYear
+} from '../app/balance/balance-annual-period.js';
 import { CONFIG } from '../app/balance/balance-config.js';
 import { UIRenderer } from '../app/balance/balance-renderer.js';
 import { StorageManager } from '../app/balance/balance-storage.js';
+import { SnapshotArchive } from '../app/shared/snapshot-archive.js';
+import { PROFILE_VALUE_KEYS } from '../app/profile/profile-state.js';
 
 console.log('--- Balance Annual Workflow Contract Tests ---');
+
+const TARGET_YEAR = deriveCompletedCalendarYear(new Date());
+const NEXT_YEAR = TARGET_YEAR + 1;
 
 function createLocalStorageMock() {
     const store = new Map();
     return {
-        getItem: (key) => (store.has(String(key)) ? store.get(String(key)) : null),
+        getItem: key => (store.has(String(key)) ? store.get(String(key)) : null),
         setItem: (key, value) => { store.set(String(key), String(value)); },
-        removeItem: (key) => { store.delete(String(key)); },
+        removeItem: key => { store.delete(String(key)); },
         clear: () => { store.clear(); },
-        key: (index) => Array.from(store.keys())[index] || null,
+        key: index => Array.from(store.keys())[index] || null,
         get length() { return store.size; }
     };
 }
 
-const prevLocalStorage = global.localStorage;
-const prevConfirm = global.confirm;
-const prevSetTimeout = global.setTimeout;
-const prevToast = UIRenderer.toast;
-const prevHandleError = UIRenderer.handleError;
-const prevCreateSnapshot = StorageManager.createSnapshot;
-const prevRenderSnapshots = StorageManager.renderSnapshots;
+function seedBalanceState() {
+    localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify({
+        inputs: { aktuellesAlter: 67, floorBedarf: 24000 },
+        lastState: { cumulativeInflationFactor: 1 }
+    }));
+}
+
+function createAnnualDom() {
+    return {
+        inputs: {
+            profilName: { value: `Jahr ${TARGET_YEAR}` },
+            aktuellesAlter: { value: '67' }
+        },
+        expenses: { yearSelect: { value: String(TARGET_YEAR) } },
+        outputs: { snapshotList: { id: 'snapshotList' } },
+        controls: {
+            snapshotStatus: { id: 'snapshotStatus' },
+            btnJahresUpdate: { disabled: false, innerHTML: 'Jahres-Update' },
+            btnJahresUpdateLog: { disabled: true }
+        }
+    };
+}
+
+const previous = {
+    localStorage: global.localStorage,
+    confirm: global.confirm,
+    setTimeout: global.setTimeout,
+    toast: UIRenderer.toast,
+    handleError: UIRenderer.handleError,
+    createSnapshot: StorageManager.createSnapshot,
+    renderSnapshots: StorageManager.renderSnapshots,
+    listSnapshots: SnapshotArchive.listSnapshots,
+    readSnapshot: SnapshotArchive.readSnapshot
+};
 
 try {
-    console.log('Test 1: Jahresupdate orchestrates age, handlers, results and profile save');
+    console.log('Test 1: Jahresupdate returns a stable result and reports step errors');
     {
         const calls = [];
-        const toasts = [];
         let modalResults = null;
-        let lastUpdateResults = null;
-
         global.localStorage = createLocalStorageMock();
-        global.setTimeout = (fn, delay) => {
-            calls.push(`timeout:${delay}`);
-            fn();
-            return 0;
-        };
-        UIRenderer.toast = (message) => { toasts.push(message); };
-        UIRenderer.handleError = (error) => {
-            throw error;
-        };
-
-        localStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify({
-            inputs: { floorBedarf: 24000 },
-            lastState: { cumulativeInflationFactor: 1 }
-        }));
+        seedBalanceState();
         localStorage.setItem('profile_tagesgeld', '50000');
-
-        const dom = {
-            inputs: {
-                aktuellesAlter: { value: '67' }
-            },
-            controls: {
-                btnJahresUpdate: { disabled: false, innerHTML: 'Jahres-Update' },
-                btnJahresUpdateLog: { disabled: true }
-            }
+        global.setTimeout = (fn, delay) => { calls.push(`timeout:${delay}`); fn(); return 0; };
+        UIRenderer.toast = () => {};
+        UIRenderer.handleError = error => { throw error; };
+        const dom = createAnnualDom();
+        const inflationContract = {
+            rate: 2.1,
+            year: TARGET_YEAR,
+            source: 'ECB (HICP)',
+            dataAsOf: '2026-01-30T11:15:00Z',
+            fetchStatus: 'ok_primary_ecb',
+            metric: 'consumer_prices_all_items_annual_average_growth_pct'
         };
-
         const orchestrator = createAnnualOrchestrator({
             dom,
             debouncedUpdate: () => { calls.push('debouncedUpdate'); },
-            handleFetchInflation: async () => {
-                calls.push('inflation');
-                assertEqual(dom.inputs.aktuellesAlter.value, '68', 'Alter wird vor Inflationsabruf erhoeht');
-                return { status: 'ok', inflation: 2.1 };
-            },
-            handleNachrueckenMitETF: async () => {
-                calls.push('etf');
-                return { status: 'ok', moved: true };
-            },
-            handleFetchCapeAuto: async () => {
-                calls.push('cape');
-                return {
-                    capeFetchStatus: 'error_no_source_no_stored',
-                    errors: ['primary source failed']
-                };
-            },
-            showUpdateResultModal: (results) => { modalResults = results; },
-            setLastUpdateResults: (results) => { lastUpdateResults = results; }
+            handleFetchInflation: async () => { calls.push('inflation'); return inflationContract; },
+            handleNachrueckenMitETF: async () => { calls.push('etf'); return { status: 'ok' }; },
+            handleFetchCapeAuto: async () => ({
+                capeFetchStatus: 'error_no_source_no_stored',
+                errors: ['primary source failed']
+            }),
+            showUpdateResultModal: results => { modalResults = results; },
+            setLastUpdateResults: () => {}
         });
 
-        await orchestrator.handleJahresUpdate();
-
-        assertEqual(dom.inputs.aktuellesAlter.value, '68', 'Jahresupdate erhoeht das Alter um ein Jahr');
-        assertEqual(dom.controls.btnJahresUpdate.disabled, false, 'Jahresupdate-Button wird wieder aktiviert');
-        assertEqual(dom.controls.btnJahresUpdate.innerHTML, 'Jahres-Update', 'Jahresupdate-Buttontext wird wiederhergestellt');
-        assertEqual(dom.controls.btnJahresUpdateLog.disabled, false, 'Log-Button wird nach Update aktiviert');
-        assertEqual(calls.join('|'), 'inflation|timeout:500|etf|cape|debouncedUpdate', 'Jahresupdate haelt die erwartete Handler-Reihenfolge ein');
-        assert(modalResults, 'CAPE-Fehler oeffnet das Ergebnis-Modal');
-        assertEqual(modalResults.errors.length, 1, 'CAPE-Fehler wird im Result-Shape gesammelt');
-        assertEqual(modalResults.errors[0].step, 'CAPE', 'CAPE-Fehler hat stabilen Step-Namen');
-        assert(modalResults.errors[0].error.includes('primary source failed'), 'CAPE-Fehlerdetails werden weitergegeben');
-        assert(lastUpdateResults, 'Result-Shape wird fuer erneute Log-Anzeige gespeichert');
-        assertEqual(lastUpdateResults.age.old, 67, 'Result-Shape enthaelt altes Alter');
-        assertEqual(lastUpdateResults.age.new, 68, 'Result-Shape enthaelt neues Alter');
-        assertEqual(JSON.parse(localStorage.getItem(CONFIG.STORAGE.LS_KEY)).ageAdjustedForInflation, 68, 'Age-adjusted State wird gespeichert');
-
-        const registry = JSON.parse(localStorage.getItem('rs_profiles_v1'));
-        assert(registry?.profiles?.default?.data?.profile_tagesgeld, 'Jahresupdate speichert aktuellen Profil-Snapshot');
-        assertEqual(toasts[0], 'Starte Jahres-Update...', 'Jahresupdate startet mit Status-Toast');
+        const result = await orchestrator.handleJahresUpdate({ failOnStepError: true });
+        assertEqual(result.ok, false, 'Fehlerhafter Teilschritt liefert explizit ok=false');
+        assertEqual(dom.inputs.aktuellesAlter.value, '68', 'Jahresupdate erhoeht das Alter genau einmal');
+        assertEqual(localStorage.getItem(PROFILE_VALUE_KEYS.alter), '68', 'Jahresupdate persistiert das neue Alter vor dem Profil-Sync');
+        assertEqual(result.results.inflation.year, TARGET_YEAR, 'Jahresupdate bewahrt das Inflations-Zieljahr');
+        assertEqual(result.results.inflation.fetchStatus, 'ok_primary_ecb', 'Jahresupdate bewahrt den Inflations-Fetch-Status');
+        assertEqual(modalResults.errors[0].step, 'CAPE', 'Fehlerprotokoll behaelt stabilen Step-Namen');
+        assertEqual(dom.controls.btnJahresUpdate.disabled, false, 'Button-Sperre wird im finally geloest');
     }
 
-    console.log('Test 2: Jahresabschluss flushes and creates snapshot before annual mutations');
+    console.log('Test 2: successful commit follows preflight, snapshot, writes, validation and completion');
     {
         const calls = [];
-        const toasts = [];
-        let createSnapshotArgs = null;
-        let renderArgs = null;
-
+        const dom = createAnnualDom();
         global.localStorage = createLocalStorageMock();
+        seedBalanceState();
         global.confirm = () => true;
-        global.setTimeout = (fn, delay) => {
-            calls.push(`timeout:${delay}`);
-            fn();
-            return 0;
-        };
-        UIRenderer.toast = (message) => {
-            calls.push(`toast:${message}`);
-            toasts.push(message);
-        };
-        UIRenderer.handleError = (error) => {
-            throw error;
-        };
-        StorageManager.createSnapshot = async (handle, label) => {
-            calls.push('createSnapshot');
-            createSnapshotArgs = { handle, label };
-        };
-        StorageManager.renderSnapshots = async (list, status, handle) => {
-            calls.push('renderSnapshots');
-            renderArgs = { list, status, handle };
-        };
-
-        const dom = {
-            inputs: { profilName: { value: 'Jahr 2026' } },
-            outputs: { snapshotList: { id: 'snapshotList' } },
-            controls: { snapshotStatus: { id: 'snapshotStatus' } }
-        };
-        const appState = { snapshotHandle: { name: 'snapshots' } };
+        UIRenderer.toast = message => { calls.push(`toast:${message}`); };
+        UIRenderer.handleError = error => { throw error; };
+        SnapshotArchive.listSnapshots = async () => [];
+        SnapshotArchive.readSnapshot = async id => ({ id, records: { balance: '{}' } });
+        StorageManager.createSnapshot = async () => { calls.push('snapshot'); return { id: `snapshot-${TARGET_YEAR}` }; };
+        StorageManager.renderSnapshots = async () => { calls.push('render'); };
 
         const handlers = createSnapshotHandlers({
             dom,
-            appState,
-            applyAnnualInflation: () => { calls.push('applyAnnualInflation'); },
-            debouncedUpdate: () => { calls.push('debouncedUpdate'); },
-            rollExpensesYearFn: () => {
-                calls.push('rollExpensesYear');
-                return 2027;
+            appState: { snapshotHandle: null },
+            getTargetYear: () => TARGET_YEAR,
+            getLegacyDecision: () => LEGACY_PERIOD_DECISION.NOT_COMMITTED,
+            validateLiveState: () => { calls.push('validate-pre'); return { ok: true }; },
+            runAnnualUpdate: async () => {
+                calls.push('annual-update');
+                dom.inputs.aktuellesAlter.value = '68';
+                return { ok: true };
             },
-            flushLiveState: async (options = {}) => { calls.push(`flushLiveState:${JSON.stringify(options)}`); }
+            applyAnnualInflation: () => { calls.push('inflation-write'); },
+            rollExpensesYearFn: () => { calls.push('expenses-write'); return NEXT_YEAR; },
+            flushLiveState: async ({ sync = false } = {}) => { calls.push(`flush:${sync}`); }
         });
 
-        await handlers.handleJahresabschluss();
+        const result = await handlers.handleJahresabschluss();
+        const metadata = StorageManager.loadState()[ANNUAL_PERIOD_METADATA_KEY];
+        assertEqual(result.status, 'already_committed', 'Erfolgreicher Coordinator liefert committed-Status');
+        assertEqual(metadata.lastCommittedPeriod, `calendar-year:${TARGET_YEAR}`, 'Perioden-ID wird nach finalem Flush committed');
+        assertEqual(metadata.pendingCommit, null, 'Erfolgreicher Abschluss entfernt Recovery-Marker');
+        assert(calls.indexOf('validate-pre') < calls.indexOf('snapshot'), 'Vorpruefung liegt vor Snapshot');
+        assert(calls.indexOf('snapshot') < calls.indexOf('annual-update'), 'Snapshot liegt vor erster fachlicher Jahresmutation');
+        assert(calls.indexOf('annual-update') < calls.indexOf('inflation-write'), 'Jahresupdate liegt vor Inflationsfortschreibung');
+        assert(calls.indexOf('inflation-write') < calls.indexOf('expenses-write'), 'Inflation liegt vor Ausgaben-Rollover');
+        assertEqual(calls[calls.length - 1], 'render', 'Snapshot-Liste wird erst nach erfolgreichem Commit gerendert');
 
-        assertEqual(
-            calls.slice(0, 6).join('|'),
-            'flushLiveState:{"sync":true}|createSnapshot|toast:Jahresabschluss-Snapshot "Jahr 2026" erfolgreich erstellt.|applyAnnualInflation|rollExpensesYear|flushLiveState:{"sync":true}',
-            'Jahresabschluss flusht Live-Daten, schreibt Snapshot vor Mutation und flusht nach allen Mutationen'
-        );
-        assert(!calls.includes('debouncedUpdate'), 'Jahresabschluss wartet nicht mehr auf einen fragilen Debounce-Timer');
-        assert(calls.some(call => call.startsWith('toast:Ausgaben-Check auf ')), 'Jahresabschluss meldet Ausgaben-Rollover');
-        assertEqual(calls[calls.length - 1], 'renderSnapshots', 'Snapshot-Liste wird nach Abschluss neu gerendert');
-        assertEqual(createSnapshotArgs.handle, appState.snapshotHandle, 'Snapshot nutzt den aktiven Snapshot-Handle');
-        assertEqual(createSnapshotArgs.label, 'Jahr 2026', 'Snapshot nutzt den Profilnamen als Label');
-        assertEqual(renderArgs.list, dom.outputs.snapshotList, 'renderSnapshots erhaelt die Snapshot-Liste');
-        assertEqual(renderArgs.status, dom.controls.snapshotStatus, 'renderSnapshots erhaelt den Snapshot-Status');
-        assertEqual(renderArgs.handle, appState.snapshotHandle, 'renderSnapshots nutzt den aktiven Snapshot-Handle');
-        assert(toasts[0].includes('Jahresabschluss-Snapshot'), 'Erster Abschluss-Toast bestaetigt den Snapshot');
+        const duplicate = await handlers.handleJahresabschluss();
+        assertEqual(duplicate.status, 'already_committed', 'Wiederholung derselben Periode ist idempotent');
+        assertEqual(calls.filter(call => call === 'snapshot').length, 1, 'Wiederholung erzeugt keinen zweiten Snapshot');
     }
 
-    console.log('Test 3: Jahresabschluss aborts without mutation when snapshot creation fails');
+    console.log('Test 3: failed preflight aborts before snapshot and annual writes');
     {
         const calls = [];
-        let handledError = null;
-
         global.localStorage = createLocalStorageMock();
+        seedBalanceState();
         global.confirm = () => true;
-        global.setTimeout = (fn, delay) => {
-            calls.push(`timeout:${delay}`);
-            fn();
-            return 0;
-        };
-        UIRenderer.toast = (message) => {
-            calls.push(`toast:${message}`);
-        };
-        UIRenderer.handleError = (error) => {
-            handledError = error;
-        };
-        StorageManager.createSnapshot = async () => {
-            calls.push('createSnapshot');
-            throw new Error('snapshot failed');
-        };
-        StorageManager.renderSnapshots = async () => {
-            calls.push('renderSnapshots');
-        };
-
-        const dom = {
-            inputs: { profilName: { value: 'Jahr 2026' } },
-            outputs: { snapshotList: { id: 'snapshotList' } },
-            controls: { snapshotStatus: { id: 'snapshotStatus' } }
-        };
-        const appState = { snapshotHandle: { name: 'snapshots' } };
-
+        UIRenderer.toast = () => {};
+        UIRenderer.handleError = () => {};
+        StorageManager.createSnapshot = async () => { calls.push('snapshot'); return { id: 'unexpected' }; };
         const handlers = createSnapshotHandlers({
-            dom,
-            appState,
-            applyAnnualInflation: () => { calls.push('applyAnnualInflation'); },
-            debouncedUpdate: () => { calls.push('debouncedUpdate'); },
-            rollExpensesYearFn: () => {
-                calls.push('rollExpensesYear');
-                return 2027;
-            },
-            flushLiveState: async (options = {}) => { calls.push(`flushLiveState:${JSON.stringify(options)}`); }
+            dom: createAnnualDom(),
+            appState: { snapshotHandle: null },
+            getTargetYear: () => TARGET_YEAR,
+            getLegacyDecision: () => LEGACY_PERIOD_DECISION.NOT_COMMITTED,
+            validateLiveState: () => ({ ok: false, error: new Error('invalid inputs') }),
+            runAnnualUpdate: async () => { calls.push('annual-update'); return { ok: true }; },
+            applyAnnualInflation: () => { calls.push('inflation-write'); },
+            rollExpensesYearFn: () => { calls.push('expenses-write'); return NEXT_YEAR; },
+            flushLiveState: async () => {}
         });
-
         await handlers.handleJahresabschluss();
-
-        assert(handledError, 'Snapshot-Fehler wird ueber den UI-Fehlerpfad gemeldet');
-        assert(!calls.includes('applyAnnualInflation'), 'Snapshot-Fehler verhindert Inflation/Jahresmutation');
-        assert(!calls.includes('debouncedUpdate'), 'Snapshot-Fehler verhindert Live-Update nach Mutation');
-        assert(!calls.includes('rollExpensesYear'), 'Snapshot-Fehler verhindert Ausgaben-Rollover-Mutation');
-        assert(!calls.some(call => call.startsWith('toast:Ausgaben-Check auf ')), 'Snapshot-Fehler verhindert Ausgaben-Rollover');
-        assert(!calls.includes('renderSnapshots'), 'Snapshot-Fehler rendert keine erfolgreiche Snapshot-Liste');
+        assert(!calls.includes('snapshot'), 'Fehlgeschlagene Vorpruefung verhindert Snapshot');
+        assert(!calls.includes('annual-update'), 'Fehlgeschlagene Vorpruefung verhindert Jahresupdate');
+        assert(!calls.includes('inflation-write') && !calls.includes('expenses-write'), 'Fehlgeschlagene Vorpruefung verhindert fachliche Writes');
     }
 
-    console.log('Test 4: Jahresabschluss aborts without snapshot when pre-flush fails');
+    console.log('Test 4: snapshot quota failure aborts without fachliche mutation');
     {
         const calls = [];
-        let handledError = null;
-
         global.localStorage = createLocalStorageMock();
+        seedBalanceState();
         global.confirm = () => true;
-        global.setTimeout = (fn, delay) => {
-            calls.push(`timeout:${delay}`);
-            fn();
-            return 0;
-        };
-        UIRenderer.toast = (message) => {
-            calls.push(`toast:${message}`);
-        };
-        UIRenderer.handleError = (error) => {
-            handledError = error;
-        };
-        StorageManager.createSnapshot = async () => {
-            calls.push('createSnapshot');
-        };
-        StorageManager.renderSnapshots = async () => {
-            calls.push('renderSnapshots');
-        };
-
-        const dom = {
-            inputs: { profilName: { value: 'Jahr 2026' } },
-            outputs: { snapshotList: { id: 'snapshotList' } },
-            controls: { snapshotStatus: { id: 'snapshotStatus' } }
-        };
-        const appState = { snapshotHandle: { name: 'snapshots' } };
-
+        UIRenderer.toast = () => {};
+        UIRenderer.handleError = () => {};
+        SnapshotArchive.listSnapshots = async () => [];
+        StorageManager.createSnapshot = async () => { calls.push('snapshot'); throw new Error('QuotaExceededError'); };
         const handlers = createSnapshotHandlers({
-            dom,
-            appState,
-            applyAnnualInflation: () => { calls.push('applyAnnualInflation'); },
-            debouncedUpdate: () => { calls.push('debouncedUpdate'); },
-            rollExpensesYearFn: () => {
-                calls.push('rollExpensesYear');
-                return 2027;
-            },
-            flushLiveState: async (options = {}) => {
-                calls.push(`flushLiveState:${JSON.stringify(options)}`);
-                throw new Error('flush failed');
-            }
+            dom: createAnnualDom(),
+            appState: { snapshotHandle: null },
+            getTargetYear: () => TARGET_YEAR,
+            getLegacyDecision: () => LEGACY_PERIOD_DECISION.NOT_COMMITTED,
+            validateLiveState: () => ({ ok: true }),
+            runAnnualUpdate: async () => { calls.push('annual-update'); return { ok: true }; },
+            applyAnnualInflation: () => { calls.push('inflation-write'); },
+            rollExpensesYearFn: () => { calls.push('expenses-write'); return NEXT_YEAR; },
+            flushLiveState: async () => {}
         });
-
-        await handlers.handleJahresabschluss();
-
-        assert(handledError, 'Vorab-Flush-Fehler wird ueber den UI-Fehlerpfad gemeldet');
-        assert(!calls.includes('createSnapshot'), 'Vorab-Flush-Fehler verhindert Snapshot-Erstellung');
-        assert(!calls.includes('applyAnnualInflation'), 'Vorab-Flush-Fehler verhindert Inflation/Jahresmutation');
-        assert(!calls.includes('debouncedUpdate'), 'Vorab-Flush-Fehler verhindert Live-Update nach Mutation');
-        assert(!calls.includes('rollExpensesYear'), 'Vorab-Flush-Fehler verhindert Ausgaben-Rollover-Mutation');
-        assert(!calls.some(call => call.startsWith('toast:Ausgaben-Check auf ')), 'Vorab-Flush-Fehler verhindert Ausgaben-Rollover');
-        assert(!calls.includes('renderSnapshots'), 'Vorab-Flush-Fehler rendert keine erfolgreiche Snapshot-Liste');
+        const result = await handlers.handleJahresabschluss();
+        assertEqual(result.status, 'invalid', 'Snapshot-Fehler vor Commit liefert fail-closed Status ohne Recovery-Behauptung');
+        assert(!calls.includes('annual-update'), 'Quota-Fehler verhindert Jahresupdate');
+        assert(!calls.includes('inflation-write') && !calls.includes('expenses-write'), 'Quota-Fehler verhindert fachliche Writes');
     }
 
-    console.log('Test 5: Jahresabschluss keeps snapshot and reports error when post-mutation flush fails');
+    console.log('Test 5: post-snapshot failure keeps snapshot id and recovery phase');
     {
         const calls = [];
-        let handledError = null;
-
+        const dom = createAnnualDom();
         global.localStorage = createLocalStorageMock();
+        seedBalanceState();
         global.confirm = () => true;
-        global.setTimeout = (fn, delay) => {
-            calls.push(`timeout:${delay}`);
-            fn();
-            return 0;
-        };
-        UIRenderer.toast = (message) => {
-            calls.push(`toast:${message}`);
-        };
-        UIRenderer.handleError = (error) => {
-            handledError = error;
-        };
-        StorageManager.createSnapshot = async () => {
-            calls.push('createSnapshot');
-        };
-        StorageManager.renderSnapshots = async () => {
-            calls.push('renderSnapshots');
-        };
-
-        const dom = {
-            inputs: { profilName: { value: 'Jahr 2026' } },
-            outputs: { snapshotList: { id: 'snapshotList' } },
-            controls: { snapshotStatus: { id: 'snapshotStatus' } }
-        };
-        const appState = { snapshotHandle: { name: 'snapshots' } };
-        let flushCount = 0;
-
+        UIRenderer.toast = () => {};
+        UIRenderer.handleError = () => {};
+        SnapshotArchive.listSnapshots = async () => [];
+        SnapshotArchive.readSnapshot = async id => ({ id, records: { balance: '{}' } });
+        StorageManager.createSnapshot = async () => { calls.push('snapshot'); return { id: 'snapshot-recovery' }; };
+        StorageManager.renderSnapshots = async () => { calls.push('render'); };
         const handlers = createSnapshotHandlers({
             dom,
-            appState,
-            applyAnnualInflation: () => { calls.push('applyAnnualInflation'); },
-            debouncedUpdate: () => { calls.push('debouncedUpdate'); },
-            rollExpensesYearFn: () => {
-                calls.push('rollExpensesYear');
-                return 2027;
+            appState: { snapshotHandle: null },
+            getTargetYear: () => TARGET_YEAR,
+            getLegacyDecision: () => LEGACY_PERIOD_DECISION.NOT_COMMITTED,
+            validateLiveState: () => ({ ok: true }),
+            runAnnualUpdate: async () => {
+                dom.inputs.aktuellesAlter.value = '68';
+                return { ok: false, error: new Error('market data failed') };
             },
-            flushLiveState: async (options = {}) => {
-                flushCount += 1;
-                calls.push(`flushLiveState:${JSON.stringify(options)}`);
-                if (flushCount === 2) throw new Error('post flush failed');
-            }
+            applyAnnualInflation: () => { calls.push('inflation-write'); },
+            rollExpensesYearFn: () => { calls.push('expenses-write'); return NEXT_YEAR; },
+            flushLiveState: async () => {}
         });
+        const result = await handlers.handleJahresabschluss();
+        const metadata = StorageManager.loadState()[ANNUAL_PERIOD_METADATA_KEY];
+        assertEqual(result.status, 'incomplete_recovery', 'Fehler nach Snapshot bleibt recovery-pflichtig');
+        assertEqual(metadata.pendingCommit.snapshotId, 'snapshot-recovery', 'Recovery-Marker bewahrt bestaetigte Snapshot-ID');
+        assertEqual(metadata.pendingCommit.phase, 'writes_started', 'Recovery-Marker zeigt letzte persistierte Write-Phase');
+        assert(!calls.includes('inflation-write') && !calls.includes('expenses-write'), 'Fehlerhaftes Jahresupdate stoppt weitere Writes');
+        assert(!calls.includes('render'), 'Fehlerpfad rendert keinen erfolgreichen Abschluss');
+        const blockedRetry = await handlers.handleJahresabschluss();
+        assertEqual(blockedRetry.status, 'incomplete_recovery', 'Pending-Commit blockiert einen erneuten Jahresprozess');
+        assertEqual(calls.filter(call => call === 'snapshot').length, 1, 'Recovery-Sperre erzeugt keinen weiteren Snapshot');
+    }
 
-        await handlers.handleJahresabschluss();
-
-        assert(handledError, 'Post-Mutations-Flush-Fehler wird ueber den UI-Fehlerpfad gemeldet');
-        assert(calls.includes('createSnapshot'), 'Post-Mutations-Flush-Fehler laesst den Pre-Mutation-Snapshot bestehen');
-        assert(calls.includes('applyAnnualInflation'), 'Post-Mutations-Flush-Fehler passiert nach Inflation');
-        assert(calls.includes('rollExpensesYear'), 'Post-Mutations-Flush-Fehler passiert nach Ausgaben-Rollover');
-        assert(!calls.includes('renderSnapshots'), 'Post-Mutations-Flush-Fehler rendert keine erfolgreiche Snapshot-Liste');
-        assert(!calls.some(call => call.startsWith('toast:Ausgaben-Check auf ')), 'Post-Mutations-Flush-Fehler meldet keinen erfolgreichen Ausgaben-Rollover');
+    console.log('Test 6: in-flight guard rejects a double click');
+    {
+        global.localStorage = createLocalStorageMock();
+        seedBalanceState();
+        global.confirm = () => true;
+        UIRenderer.toast = () => {};
+        UIRenderer.handleError = () => {};
+        SnapshotArchive.listSnapshots = async () => [];
+        SnapshotArchive.readSnapshot = async id => ({ id, records: { balance: '{}' } });
+        StorageManager.createSnapshot = async () => ({ id: 'snapshot-in-flight' });
+        StorageManager.renderSnapshots = async () => {};
+        let releaseUpdate;
+        const updateGate = new Promise(resolve => { releaseUpdate = resolve; });
+        const dom = createAnnualDom();
+        const handlers = createSnapshotHandlers({
+            dom,
+            appState: { snapshotHandle: null },
+            getTargetYear: () => TARGET_YEAR,
+            getLegacyDecision: () => LEGACY_PERIOD_DECISION.NOT_COMMITTED,
+            validateLiveState: () => ({ ok: true }),
+            runAnnualUpdate: async () => {
+                await updateGate;
+                dom.inputs.aktuellesAlter.value = '68';
+                return { ok: true };
+            },
+            applyAnnualInflation: () => {},
+            rollExpensesYearFn: () => NEXT_YEAR,
+            flushLiveState: async () => {}
+        });
+        const first = handlers.handleJahresabschluss();
+        await Promise.resolve();
+        await Promise.resolve();
+        const second = await handlers.handleJahresabschluss();
+        assertEqual(second.status, 'in_flight', 'Doppelklick wird waehrend laufendem Commit abgewiesen');
+        releaseUpdate();
+        await first;
     }
 
     console.log('Balance annual workflow contract tests passed');
 } finally {
-    if (prevRenderSnapshots === undefined) delete StorageManager.renderSnapshots; else StorageManager.renderSnapshots = prevRenderSnapshots;
-    if (prevCreateSnapshot === undefined) delete StorageManager.createSnapshot; else StorageManager.createSnapshot = prevCreateSnapshot;
-    UIRenderer.handleError = prevHandleError;
-    UIRenderer.toast = prevToast;
-    if (prevSetTimeout === undefined) delete global.setTimeout; else global.setTimeout = prevSetTimeout;
-    if (prevConfirm === undefined) delete global.confirm; else global.confirm = prevConfirm;
-    if (prevLocalStorage === undefined) delete global.localStorage; else global.localStorage = prevLocalStorage;
+    StorageManager.createSnapshot = previous.createSnapshot;
+    StorageManager.renderSnapshots = previous.renderSnapshots;
+    SnapshotArchive.listSnapshots = previous.listSnapshots;
+    SnapshotArchive.readSnapshot = previous.readSnapshot;
+    UIRenderer.handleError = previous.handleError;
+    UIRenderer.toast = previous.toast;
+    if (previous.setTimeout === undefined) delete global.setTimeout; else global.setTimeout = previous.setTimeout;
+    if (previous.confirm === undefined) delete global.confirm; else global.confirm = previous.confirm;
+    if (previous.localStorage === undefined) delete global.localStorage; else global.localStorage = previous.localStorage;
 }
 
 console.log('--- Balance Annual Workflow Contract Tests Completed ---');

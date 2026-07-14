@@ -33,11 +33,13 @@ Die Desktop-App lädt das Frontend direkt aus `dist/` (`src-tauri/tauri.conf.jso
 2. `scripts/build-tauri.ps1`
 3. `npm run sync-dist`
 4. `npm run tauri:build`
-5. Kopie der erzeugten Binary nach `RuhestandSuite.exe`
+5. Archivierung einer vorhandenen `RuhestandSuite.exe` unter `release-archive/RuhestandSuite_yyyy-MM-dd_HH-mm-ss-fff.exe`
+6. Kopie der erzeugten Binary nach `RuhestandSuite.exe`
 
 Wichtig für Live-Daten:
 
 * ETF-Kurse laufen in der EXE über den in `src-tauri/src/lib.rs` gestarteten lokalen Yahoo-Proxy auf `127.0.0.1:8787`.
+* Im Jahresprozess kommt das ETF-Zieljahr aus `annualPeriodMetadata.pendingCommit.periodId`. Vor dem Fetch werden Schema-Version, Phase `writes_started`, Snapshot-ID, letzte Commit-Periode und bereits abgeschlossenes Zieljahr validiert. Der Chart-Abruf verwendet das UTC-Fenster 27.12. bis zum exklusiven 01.01. des Folgejahres und akzeptiert nur den letzten VWCE.DE-Schlusskurs von 0,50 bis 100.000 EUR vom 27.12. bis 31.12. des Zieljahres. Marktdateninputs und `annualMarketDataMeta` werden gemeinsam gespeichert; Metadaten führen Preis, ISO-Stichtag, Ticker, Quelle, Zieljahr, Perioden-ID und die stichtagsgleiche ATH-Auswertung. Fehler nach begonnener Marktdatenmutation rollen den lokalen DOM-/State-Schritt zurück, während der Jahres-Coordinator zusätzlich seinen Recovery-Snapshot behält.
 * Inflation (ECB, World Bank, OECD) und CAPE (`r.jina.ai` -> Yale/Mirror) laufen in der EXE direkt aus der Tauri-WebView.
 * Die dafür nötigen Ziele stehen explizit in `src-tauri/tauri.conf.json` unter `app.security.csp.connect-src`.
 * Web-Worker laufen aus dem gebündelten Frontend und bleiben über `worker-src 'self' blob:` erlaubt.
@@ -148,27 +150,30 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 
 * `app/balance/balance-config.js` – Konfiguration, Fehlertypen, Debug-Utilities.
 * `app/balance/balance-utils.js` – Formatierungs- und Hilfsfunktionen (shared-formatting, Threshold-Zugriff).
-* `app/balance/balance-storage.js` – Balance-Persistenz ueber `app/shared/persistence-facade.js` und Jahresabschluss-Snapshots ueber das interne Snapshot-Archiv.
+* `app/balance/balance-storage.js` – Balance-Persistenz ueber `app/shared/persistence-facade.js`, Jahresabschluss-Snapshots sowie bestaetigte `balance-import-recovery`-Punkte mit automatischem Import-Rollback ueber das interne Snapshot-Archiv.
 * `app/balance/balance-reader.js` – liest Benutzerinputs aus dem DOM und setzt UI-Side-Effects.
 * `app/balance/balance-health-bucket.js` – liest die Profildefinition des Pflegebuckets und erzeugt eine reine Diagnose zu Brutto-Liquidität, Pflege-Zweckbindung, operativer Liquidität, Zieldeckung und Freigabestatus.
 * `app/balance/balance-renderer.js` – Darstellung der Ergebnisse (Summary, Guardrails, Entscheidungsdiagnose, Toasts, Themes).
-* `app/balance/balance-binder.js` – Event-Hub mit Tastenkürzeln, Import/Export, Snapshots, Debug-Modus.
-* `app/balance/balance-main.js` – Orchestrator: initiiert Module, führt `update()` aus und spricht `EngineAPI` an.
-* `app/balance/balance-update-pipeline.js` / `balance-action-postprocessor.js` – Pipeline-Helfer fuer Last-State-Vorbereitung, Action-/3-Bucket-Postprocessing, Renderer-/Diagnose-Payload, Persistenz und Ausgabenbudget.
-* `app/balance/balance-annual-marketdata.js` – Online-Marktdaten für Jahreswechsel (Inflation, ETF, CAPE inkl. Fallback-Kette).
-* `app/balance/balance-annual-orchestrator.js` / `app/balance/balance-annual-modal.js` – nicht-blockierende Jahreswechsel-Pipeline und Ergebnisprotokoll.
-* `app/balance/balance-expenses.js` – Controller/Fassade fuer den Ausgaben-Check: Initialisierung, Event-Wiring, CSV-Import-Ablauf und Jahrumschaltung.
-* `app/balance/balance-expenses-storage.js` / `balance-expenses-csv.js` / `balance-expenses-metrics.js` / `balance-expenses-renderer.js` – Storage, CSV-Parsing, Kennzahlen und DOM-Rendering des Ausgaben-Checks.
+* `app/balance/balance-binder.js` – Event-Hub mit Tastenkürzeln, schema-validiertem Balance-Import/Export, Snapshots und Debug-Modus.
+* `app/balance/balance-main.js` – Orchestrator: initiiert Module, bindet beim Start einen kompatiblen Engine-Vertrag und führt `update()` aus.
+* `app/balance/balance-update-pipeline.js` / `balance-action-postprocessor.js` – Fail-closed Engine-Handshake und Update-Statusvertrag sowie Pipeline-Helfer fuer Last-State-Vorbereitung, Single-Profil-Action-/3-Bucket-Postprocessing, unveraenderte Weitergabe finaler Profilverbund-Actions, Renderer-/Diagnose-Payload, Persistenz und Ausgabenbudget.
+* `app/profile/profilverbund-action-attribution.js` – DOM-freie Profilattribution der finalen Haushaltsaktion inklusive globaler profilsteuer-aware Quellenplanung, Provenienzvalidierung, profilbezogenem Steuerabschluss, Quellen-/Verwendungs-Reconciliation und Abgleich der Liquiditaets-KPIs.
+* `app/balance/balance-annual-marketdata.js` – Online-Marktdaten für Jahreswechsel: periodengebundener ETF-Jahresendkurs mit fail-closed Yahoo-Validierung und `annualMarketDataMeta` sowie davon unabhängiger CAPE-Fallback-Contract.
+* `app/balance/balance-annual-period.js` – reiner Jahresperioden-Contract mit stabiler `calendar-year:<YYYY>`-ID, Legacy-Baseline, Planvalidierung, Doppel-Commit-Schutz und Recovery-Metadaten.
+* `app/balance/balance-annual-orchestrator.js` / `app/balance/balance-annual-modal.js` – Jahreswechsel-Pipeline mit explizitem `ok`-/Fehlerergebnis und Ergebnisprotokoll; die Altersfortschreibung schreibt vor dem Profil-Sync auch `profile_aktuelles_alter`.
+* `app/balance/balance-binder-snapshots.js` – Laufzeit-Coordinator fuer beide Jahres-Buttons: nebenwirkungsarme Engine-Vorpruefung, Pre-Mutation-Flush, validierter Recovery-Snapshot, persistierte Phasen `snapshot_confirmed`/`writes_started`/`validating`, fachliche Writes, Post-Write-Validierung und finaler Flush. Ein Pending-Commit blockiert weitere Jahresprozesse bis zum Snapshot-Restore.
+* `app/balance/balance-expenses.js` – Controller/Fassade fuer den Ausgaben-Check: Initialisierung, Event-Wiring, CSV-Import-Ablauf, Jahrumschaltung und gesperrte Korruptions-Recovery-UI.
+* `app/balance/balance-expenses-storage.js` / `balance-expenses-csv.js` / `balance-expenses-metrics.js` / `balance-expenses-renderer.js` – expliziter `ok`-/`empty`-/`corrupt`-Storagevertrag mit Recovery-Dokument, CSV-Parsing, Kennzahlen und DOM-Rendering des Ausgaben-Checks.
 
 ### Ablauf einer Aktualisierung
 
 1. `balance-binder.js` reagiert auf Eingaben (Formular, Tastenkürzel, Buttons) und ruft `debouncedUpdate()` auf.
 2. `balance-reader.js` sammelt alle Inputs und gibt ein strukturiertes Objekt zurück.
-3. `balance-update-pipeline.js` bereitet den Engine-Last-State vor, inklusive Guardrail-Reset und Tax-State-Erhalt.
-4. `balance-main.js` reicht die Inputs an `EngineAPI.simulateSingleYear()` weiter.
-5. `balance-action-postprocessor.js` merged Profilverbund-Actions und kapselt Single-3-Bucket-Postprocessing.
+3. `balance-update-pipeline.js` prueft den beim Bootstrap gebundenen `EngineAPI.getVersion()`-/`simulateSingleYear()`-Contract und bereitet den Engine-Last-State inklusive Guardrail-Reset und Tax-State-Erhalt vor. Fehlende, inkompatible oder nach dem Handshake ausgetauschte Engines blockieren vor dem Lesen, Berechnen und Persistieren; ein laufender Script-Tag wird nicht nachtraeglich fuer Cache-Busting umgeschrieben.
+4. `balance-main.js` reicht die Inputs erst nach erfolgreichem Gate an `EngineAPI.simulateSingleYear()` weiter. Im Multi-Profil-Fall entsteht genau ein Haushaltslauf mit dem profilmarkierten Haushaltstranchenpool; dessen Aktion wird genau einmal durch die Haushalts-3-Bucket-/Bond-Logik finalisiert.
+5. `profilverbund-action-attribution.js` attribuiert die finalen Quellen und Verwendungen auf Profile, reconciliert die Profilsteuern und aktualisiert die Liquiditaets-KPIs. Es gibt keine technischen Profil-Engine-Laeufe. `balance-action-postprocessor.js` fuehrt nur im Single-Profil-Pfad 3-Bucket aus und reicht die Profilverbund-Aktion unveraendert weiter.
 6. `balance-renderer.js` aktualisiert UI-Komponenten und Statusanzeigen mit dem Pipeline-Payload.
-7. `balance-update-pipeline.js` kapselt Diagnose-Anreicherung, Persistenzentscheidung und Ausgabenbudget.
+7. `balance-update-pipeline.js` kapselt Diagnose-Anreicherung, Persistenzentscheidung und Ausgabenbudget. `update()` gibt maschinenlesbar `success`, `validation_error`, `engine_error` oder `blocked` zurueck; `ok` bleibt als Kompatibilitaetswert fuer bestehende Jahresabschluss- und Importaufrufer erhalten. Persistenz ist nur im `success`-Pfad erlaubt.
 
 ### Entscheidungsdiagnose (Balance)
 
@@ -186,7 +191,9 @@ Der Ausgaben-Check verwendet einen separaten lokalen Datenspeicher (`balance_exp
 
 * `years[YYYY].months[1..12].profiles[profileId]` speichert importierte Kategorien je Monat/Profil.
 * `activeYear` steuert, welches Jahr im Tab angezeigt wird.
-* Beim Jahresabschluss wird der Ausgaben-Check auf `activeYear + 1` gestellt; bestehende Jahresdaten bleiben unverändert als Historie erhalten.
+* Beim Jahresabschluss muss der Ausgaben-Check auf dem abgeschlossenen Vorjahr stehen. Nach erfolgreicher Periodenvalidierung wird er auf `activeYear + 1` gestellt; bestehende Jahresdaten bleiben unverändert als Historie erhalten.
+* JSON-, Schema- und Storage-Lesefehler werden nicht als leerer Store normalisiert. Der Rohinhalt bleibt unveraendert, normale Writes sind gesperrt und die UI nennt Datenbereich sowie aktives Backend.
+* Der Reset ist zweistufig: Recovery-Rohdaten exportieren, dann explizit bestaetigen. Erst ein erfolgreicher Persistenz-Flush verlaesst den Recovery-Zustand; bei Flush-/Quota-Fehler wird der korrupte Rohinhalt im aktiven Store wiederhergestellt.
 
 Die Kennzahlen im Tab berechnen sich wie folgt:
 
@@ -267,6 +274,7 @@ Browser-Persistenz seit Phase 2:
 * App-Einstiegspunkte rufen `PersistenceFacade.init()` vor fachlichen Storage-Reads auf.
 * Im Browser wird automatisch IndexedDB genutzt; beim ersten Start migriert die Facade erlaubte Legacy-Keys aus `localStorage`.
 * IndexedDB nutzt die Datenbank `ruhestand-suite` in Version 2 mit den Stores `kv`, `metadata` und `snapshots`. Live-Daten liegen in `kv`; Jahresabschluss-Snapshots liegen im separaten Store `snapshots`.
+* Das optionale File-System-Verzeichnis-Handle liegt getrennt in `ruhestand-suite-snapshot-handles`/`handles`. Beim ersten Zugriff wird ein vorhandenes `snapshotDirHandle` aus der historischen `snapshotDB` kopiert und die Legacy-Verbindung vor deren Archiv-Cleanup geschlossen.
 * Nach erfolgreicher Migration markieren `ruhestandsapp_migrated_to_target`, `ruhestandsapp_migration_completed_at` und `ruhestandsapp_migration_checksum` den Legacy-Stand.
 * Ist IndexedDB spaeter leer, obwohl der Marker vorhanden ist, wird nicht still aus altem `localStorage` zurueckmigriert; die Facade setzt stattdessen eine Migration-Warnung.
 * Nach `PersistenceFacade.init()` wird `persistence:initialized` gesendet, damit frueh instanziierte Module wie Feature-Flags aus dem aktiven Backend neu laden koennen.
@@ -274,7 +282,7 @@ Browser-Persistenz seit Phase 2:
 * Tauri nutzt seit Phase 3 JSON-Dateien im App-Datenverzeichnis. Live-Daten liegen in `ruhestand_suite_data.json`; Jahresabschluss-Snapshots liegen getrennt in `ruhestand_suite_snapshots.json` und werden ueber das Adapter-Target `snapshots` geladen/gespeichert. Die Rust-Seite stellt `load_app_state`, `save_app_state`, `quarantine_app_state` und `confirm_app_close` bereit.
 * Beim ersten Tauri-Start migriert die Facade erlaubte Legacy-Keys aus der WebView-`localStorage`-Ablage in die JSON-Datei und setzt denselben Migrationsmarker mit Target `tauri-json-file`.
 * Beim nativen Fensterschluss verhindert Rust das sofortige Schliessen, sendet ein Frontend-Event, wartet auf den Facade-Flush und schliesst nach `confirm_app_close`. Um Hänger auf Seiten ohne Persistenz (z. B. Handbuch) oder bei WebView-Fehlern zu vermeiden, gibt es einen 3-Sekunden-Fallback in Rust, der das Schließen erzwungen durchführt.
-* Korruptes Tauri-JSON wird quarantiniert; die Facade startet mit leerem Cache und Recovery-Warnung statt eine stille Rueckmigration oder einen White-Screen zu erzeugen.
+* Korruptes Tauri-JSON wird quarantiniert; die Facade startet mit leerem Cache und Recovery-Warnung statt eine stille Rueckmigration oder einen White-Screen zu erzeugen. `Balance.html` rendert `getPersistenceStatus().migrationWarning` beim Start mit betroffenem Gesamtspeicher, Backend und Recovery-Hinweis, ohne den lokalen Quarantaenepfad auszugeben.
 
 Snapshot-Archiv seit Jahresabschluss-Snapshot-Slice:
 
@@ -283,6 +291,16 @@ Snapshot-Archiv seit Jahresabschluss-Snapshot-Slice:
 * Capture schliesst alte Snapshot-Keys aus, damit Archivdaten nie in neue Live-Snapshots eingebettet werden.
 * Standard-Restore schreibt nur erlaubte Live-Keys zurueck, erhaelt Profil-Registry und Snapshot-Historie, setzt das aktive Profil und bricht ab, wenn `snapshot.activeProfileId` in der aktuellen Registry nicht mehr existiert.
 * Legacy-Snapshots mit Prefix `ruhestandsmodell_snapshot_` werden in das kanonische Archiv migriert. Eintraege ohne eindeutige aktive Profilzuordnung bleiben lesbar, werden aber nicht als Standard-Restore-faehig angezeigt.
+* Das anschliessende Loeschen der historischen `snapshotDB` ist begrenzt: Ein `onblocked` beendet den Lauf mit einem retry-faehigen Report statt `listSnapshots()` oder den Jahresprozess aufzuhalten; erst ein erfolgreicher Delete schreibt den Cleanup-Marker.
+
+Balance-JSON-Import seit Hardening-Slice 08:
+
+* Das aktuelle Dateiformat verwendet `appId: "ruhe-stand-suite.balance"`, `schema: "balance-state"`, `schemaVersion: 1`, die informative `appVersion`, `exportedAt` und `payload`.
+* Pflichtfelder `inputs.aktuellesAlter`, `inputs.floorBedarf` und `inputs.flexBedarf`, nichtnegative finanzielle Kernwerte, Mindest-Flex-Grenze sowie optionale `lastState`-Kernwerte werden rein validiert, bevor DOM oder Persistenz erreicht werden. Unversionierte Rohobjekte werden nicht als Legacy erraten.
+* Explizite Legacy-Migration existiert nur fuer die frueher exportierten Envelopes v21.1 und v22.0 mit passender App-ID. Historische Inflations-/Tax-State-Fehlwerte werden in diesem benannten Migrationspfad normalisiert; unbekannte Versionen blockieren.
+* Ablauf: Datei parsen und normalisieren -> importierte Eingaben temporaer anwenden -> `update({ persist: false })` muss `ok: true` liefern -> Facade flushen -> Recovery-Snapshot schreiben und zuruecklesen -> nur `CONFIG.STORAGE.LS_KEY` per `replaceLiveRecords()` ersetzen -> persistentes `update()` muss erfolgreich sein. Ein spaeter Fehler stellt den vollstaendigen Recovery-Snapshot und den vorherigen DOM-Zustand wieder her.
+* Snapshot-/Quota-/Adapterfehler blockieren vor dem Balance-Replace. Fehlermeldungen verwenden feste Ursachen und Handlungsoptionen; Rohpayloads und Parserdetails werden nicht angezeigt.
+* Der Reject-Rollback restauriert Werte normaler Inputs, aber nie einen nichtleeren Wert eines Datei-Inputs. Der Browser darf `#importFile` nur auf den leeren Wert zuruecksetzen; dadurch bleibt die sichere Fehlermeldung auch bei nativem File-Input-Verhalten erreichbar.
 
 ### Dynamic-Flex (VPW) Pipeline
 
@@ -520,11 +538,16 @@ Profile (PersistenceFacade; aktuell Legacy-localStorage-Backend) → app/profile
 
 ### Profilverbund-Verteilung (Balance-App)
 
+Floor, Flex, Dynamic Flex, Renten, sonstige Einkuenfte und die strategische Transaktionsentscheidung werden genau einmal im Haushalts-Engine-Lauf verarbeitet. Der Lauf erhaelt einen vollstaendigen, nicht mutierend kopierten Tranchenpool mit `sourceProfileId`. 3-Bucket und Bond-Wiederauffuellung laufen danach genau einmal auf Haushaltsebene. Das so finalisierte Haushaltsresultat ist die einzige gerenderte Handlungsempfehlung.
+
+Profilaktionen sind anschliessend reine Attributionen dieser Haushaltsaktion. Sie duerfen weder neue Kauf-/Verkaufszwecke noch gegenlaeufige Transaktionen erzeugen. Jede Verkaufstranche behaelt ihre Profilherkunft; je Profil wird aus dem finalen Rohaggregat genau ein Steuerabschluss berechnet. Die Haushaltssteuer ist die Summe der Profilsteuern. Quellen, Steuer und Nettoverwendungen muessen innerhalb 0,01 EUR reconciliert sein, sonst blockiert der Pfad fail-closed. Die Liquiditaetsdeckung und Runway-Diagnose werden aus dem Cashflow der finalen Aktion abgeleitet. Haushalts-Guardrail-State und profilbezogener Steuer-State werden getrennt gespeichert.
+
 **Verteilungsmodi:**
-- `tax_optimized`: Profil mit geringerer Steuerlast zuerst
-- `proportional`: Nach Vermögensanteil (Default)
-- `runway_first`: Profil mit größerer Runway trägt mehr
-- Entnahmen nutzen Cash/Geldmarkt vor Tranchenauswahl; Asset-Summaries verwenden Detailtranchen statt aggregierte Depotwerte, wenn Detailtranchen vorhanden sind.
+- `tax_optimized`: geeignete Verkaufstranchen werden global nach aktueller marginaler Profilsteuer gewählt; Verlusttopf, Pauschbetrag, Kirchensteuer, Kostenbasis und Teilfreistellung bleiben dem Eigentuemer zugeordnet
+- `proportional`: Quellenattribution nach Vermögensanteil (Default)
+- `runway_first`: Quellenattribution nach Runway-Ziel
+- Die Modi beeinflussen die Quellenattribution und die reine Anzeigeaufteilung, nicht die Haushaltszwecke.
+- Entnahmen nutzen Cash/Geldmarkt vor Tranchenauswahl; Asset-Summaries verwenden Detailtranchen statt aggregierte Depotwerte, wenn Detailtranchen vorhanden sind. Synthetische Fallback-Tranchen bleiben profilmarkiert.
 
 ### Gold-Validierung
 
@@ -548,13 +571,13 @@ definiert werden. Ergebnisse werden gegen diese Limits geprüft und als OK/Verle
 ## Build- und Laufzeit-Hinweise
 
 * Engine anpassen → `npm run build:engine` ausführen, anschließend `engine.js` prüfen; für CI/Release `npm run build:engine:strict` nutzen.
-* Desktop-Release auf Windows → `npm run build-tauri-exe` oder `build-tauri.bat`; der Workflow führt `npm run sync-dist`, `npm run tauri:build` und den geprüften Kopierschritt nach `RuhestandSuite.exe` aus.
+* Desktop-Release auf Windows → `npm run build-tauri-exe` oder `build-tauri.bat`; der Workflow führt `npm run sync-dist`, `npm run tauri:build`, die zeitgestempelte Sicherung einer vorhandenen EXE unter `release-archive/` und den geprüften Kopierschritt nach `RuhestandSuite.exe` aus.
 * Reine Tauri-Bundles → vor `npm run tauri:build` immer `npm run sync-dist` ausführen, damit `src-tauri/tauri.conf.json` den aktuellen `dist/`-Stand lädt.
 * Dateiimporte/-exporte benötigen Browser-Datei-/Download-Unterstuetzung. Jahresabschluss-Snapshots liegen intern im aktiven Persistenzadapter: Browser `IndexedDB` Store `snapshots`, Tauri `ruhestand_suite_snapshots.json`, localStorage-Fallback `rs_snapshot_archive_v1`.
 * Tests/Smoketests:
   * `npm test` fuehrt die schnelle Node-Standardsuite aus.
   * `npm run test:coverage` erzeugt die V8-Coverage-Baseline fuer `app/`, `engine/`, `workers/` und `types/`.
-  * `npm run test:browser` fuehrt Playwright-Smokes fuer die HTML-Einstiege mit lokalem Testserver aus.
+  * `npm run test:browser` fuehrt isolierte Playwright-Contexts fuer alle HTML-Einstiege sowie Balance-Contracts zu Profilabwahl/Reload, Engine-Mismatch, Jahres-Preflight, Doppelklick/Einmal-Commit, Import-Reject und korrupter Ausgabenpersistenz aus. Inflation, Yahoo-Proxy und CAPE werden deterministisch geroutet; andere externe Requests sind blockiert.
   * Bei Aenderungen an `src-tauri/` ist zusaetzlich ein echter Tauri-/Rust-Build erforderlich, typischerweise `npm run tauri:build` oder der Windows-Release-Pfad.
 
 ---

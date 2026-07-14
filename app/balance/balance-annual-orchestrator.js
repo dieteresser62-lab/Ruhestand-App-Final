@@ -11,6 +11,8 @@ import { AppError } from './balance-config.js';
 import { UIRenderer } from './balance-renderer.js';
 import { StorageManager } from './balance-storage.js';
 import { saveCurrentProfileFromLocalStorage } from '../profile/profile-storage.js';
+import { PROFILE_VALUE_KEYS } from '../profile/profile-state.js';
+import { persistenceStorage } from '../shared/persistence-facade.js';
 
 export function createAnnualOrchestrator({
     dom,
@@ -21,7 +23,7 @@ export function createAnnualOrchestrator({
     showUpdateResultModal,
     setLastUpdateResults
 }) {
-    const handleJahresUpdate = async () => {
+    const handleJahresUpdate = async ({ failOnStepError = false } = {}) => {
         const btn = dom.controls.btnJahresUpdate;
         const originalText = btn.innerHTML;
         const startTime = Date.now();
@@ -46,6 +48,7 @@ export function createAnnualOrchestrator({
             const currentAge = parseInt(dom.inputs.aktuellesAlter.value) || 0;
             const newAge = currentAge + 1;
             dom.inputs.aktuellesAlter.value = newAge.toString();
+            persistenceStorage.setItem(PROFILE_VALUE_KEYS.alter, String(newAge));
             results.age.new = newAge;
 
             // State aktualisieren: Das neue Alter gilt als "inflationsbereinigt"
@@ -106,6 +109,9 @@ export function createAnnualOrchestrator({
             // Zeige Modal nur bei Fehlern, sonst Toast
             if (results.errors.length > 0) {
                 showUpdateResultModal(results);
+                if (failOnStepError) {
+                    return { ok: false, results };
+                }
             } else {
                 const capeStatus = results.cape?.capeFetchStatus || '';
                 if (capeStatus === 'ok_primary' || capeStatus === 'ok_fallback_mirror') {
@@ -120,9 +126,12 @@ export function createAnnualOrchestrator({
                 }
             }
 
+            return { ok: results.errors.length === 0, results };
+
         } catch (err) {
             console.error('Jahres-Update fehlgeschlagen:', err);
             UIRenderer.handleError(new AppError('Jahres-Update fehlgeschlagen.', { originalError: err }));
+            return { ok: false, error: err, results };
         } finally {
             btn.disabled = false;
             btn.innerHTML = originalText;

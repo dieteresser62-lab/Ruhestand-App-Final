@@ -5,6 +5,7 @@ Dieses Verzeichnis enthaelt interne Arbeitsdokumente und Archivmaterial zu abges
 Aktive interne Uebersichten:
 
 - `PROJEKTUEBERSICHT.md` - detaillierte technische und organisatorische Projektuebersicht.
+- `BALANCE_APP_HARDENING_PLAN.md` - aktiver 1-basierter Slice-Plan fuer Profilverbund-, Jahresprozess-, Datenintegritaets- und Validierungs-Findings der Balance-App.
 - `BUGFIX_INDEXEDDB_PROFILE_GOLD_PERSISTENCE.md` - Bugfix-Dokumentation fuer verlorene Profil-Gold-Aenderungen im Browserlauf mit IndexedDB.
 - `TESTABDECKUNG_ERWEITERUNGSPLAN.md` - Slice-Plan zur messbaren Erweiterung der Testabdeckung.
 

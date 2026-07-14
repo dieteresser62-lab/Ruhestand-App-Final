@@ -549,6 +549,42 @@ try {
     }
     console.log('✓ setProfileVerbundMembership OK');
 
+    // Test 18b: Legacy profiles without membership use the documented default
+    console.log('Test 18b: Legacy membership default');
+    {
+        localStorage.clear();
+        localStorage.setItem('rs_profiles_v1', JSON.stringify({
+            version: 1,
+            profiles: {
+                legacy: {
+                    meta: {
+                        id: 'legacy',
+                        name: 'Legacy',
+                        createdAt: '2025-01-01T00:00:00.000Z',
+                        updatedAt: '2025-01-01T00:00:00.000Z'
+                    },
+                    data: {}
+                }
+            }
+        }));
+        localStorage.setItem('rs_current_profile', 'legacy');
+
+        const legacy = listProfiles().find(profile => profile.id === 'legacy');
+        assert(legacy?.belongsToHousehold === true,
+            'Legacy-Profil ohne Wert sollte beim Lesen den Default true erhalten');
+
+        const persistedRegistry = JSON.parse(localStorage.getItem('rs_profiles_v1'));
+        assert(!Object.prototype.hasOwnProperty.call(
+            persistedRegistry.profiles.legacy.meta,
+            'belongsToHousehold'
+        ), 'Legacy-Default sollte ohne pauschale Registry-Migration gelten');
+
+        const newProfile = createProfile('Neues Haushaltsprofil');
+        assert(newProfile.belongsToHousehold === true,
+            'Neu angelegtes Profil sollte belongsToHousehold=true explizit speichern');
+    }
+    console.log('✓ Legacy membership default OK');
+
     // Test 19: listProfiles includes belongsToHousehold
     console.log('Test 19: listProfiles includes belongsToHousehold');
     {
