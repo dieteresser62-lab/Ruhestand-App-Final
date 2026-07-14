@@ -1,0 +1,259 @@
+# Tranchenmanagement-Hardening: Arbeitsdokument
+
+**Stand:** 2026-07-14
+**Feature-Branch:** `codex/tranchenmanagement-hardening`
+**GitHub-Status:** lokal angelegt; Veröffentlichung ausstehend und nur nach Nutzerfreigabe
+**Status:** implementierungsreif (Gemini-Review abgeschlossen, Claude-Review ausstehend)
+**GAP-Grundlage:** [TRANCHENMANAGEMENT_GAP_ANALYSE.md](./TRANCHENMANAGEMENT_GAP_ANALYSE.md)
+
+## Zweck
+
+Dieses Arbeitsdokument plant die Härtung des Tranchenmanagements als durchgängigen Vertrag zwischen Manager, Profilpersistenz, Balance, Simulator und Engine. Es schließt belegte Datenverlust-, Doppelzählungs-, Steuer-, Herkunfts-, Kurs- und Bedienlücken in voneinander reviewbaren Slices.
+
+Vor einer Umsetzung müssen Gemini und optional Claude den Plan nach den adversarialen Review-Regeln prüfen. Codex darf den Status nicht selbst auf `implementierungsreif` setzen.
+
+## Ausgangslage
+
+- Die aktuelle Node-Suite und das vorhandene Browser-Gate sind grün.
+- Der normale Runner führt die Assertions des Manager-Page-Tests dennoch nicht aus; Coverage für `tranchen-manager-page.js` ist 0 %.
+- Ein Kategorie-/Typ-Mismatch erzeugt reproduzierbar eine doppelte Engine-Sell-Order und einen Verkauf über den vorhandenen Lotwert hinaus.
+- Korrupter Tranche-Storage wird aktuell beim Managerstart überschrieben.
+- Profilherkunft, Geldmarkt-Aggregation, Kirchensteuer-Einheit und Quote-Währung sind entlang der Verbraucher nicht durchgängig konsistent.
+- Nutzer- und Referenzdokumentation bildet Persistenz, Backup, Workflow und aktuellen Modulschnitt nicht zuverlässig ab.
+
+Die vollständige Evidenz und Priorisierung steht in der GAP-Analyse.
+
+## Zielbild
+
+Nach Abschluss aller Slices gilt:
+
+1. Ein kanonischer, versionierter und DOM-freier Tranche-Contract ist die gemeinsame Quelle für Validierung und Klassifikation.
+2. Ungültige Kategorie-/Typ-Paare, doppelte IDs und nicht endliche Finanzwerte erreichen keine Berechnung.
+3. Die Engine kann dieselbe Lot-ID nicht mehrfach in einer Sell-Order verwenden.
+4. Corrupt/empty/valid sind getrennte Persistenzzustände; Lesen ist mutationsfrei und Recovery ist explizit.
+5. Manager-Saves sind bestätigt, profilgebunden und bei Fehler sichtbar wiederholbar.
+6. Quote-Updates sind währungs- und stichtagsbewusst, abbrechbar und race-frei.
+7. Balance, Status und Simulator verwenden dieselbe Assetklasse, TQF-, Einheiten- und Provenienzsemantik.
+8. Simulator-Lots bleiben nach Verkäufen und Käufen intern konsistent.
+9. Der reale Bestandsabgleich ist entweder ausdrücklich beratend oder als bestätigter Reconcile-Workflow umgesetzt; es gibt keine stille Mutation.
+10. Node-, Browser-, Persistenz- und Tauri-nahe Gates decken die vollständige Kette ab.
+11. Nutzer- und Referenzdokumentation ist aktuell, synthetisch und frei von privaten Finanzbeispielen.
+
+## Nicht-Ziele
+
+- Keine allgemeine Neuentwicklung der Steuer-, LossCarry-, Settlement-, VPW- oder 3-Bucket-Semantik.
+- Keine automatische steuerrechtliche Ableitung von TQF oder Altbestandsstatus.
+- Keine FX-Engine, sofern das Planreview nicht ausdrücklich von EUR-only abweicht.
+- Keine brechende Umbenennung des bestehenden Feldes `detailledTranches`.
+- Kein Release-Build, kein `dist/`-Sync und keine Änderung an `RuheStandSuite.exe`.
+- Keine echten Depotdaten, Exporte, Logs oder Screenshots in Tests und Dokumentation.
+
+## Verbindliche Querschnittsinvarianten
+
+- Assetklassifikation ist disjunkt und zentral.
+- Persistierte Lots sind profilintern eindeutig; kombinierte Lots tragen eindeutige ID plus `sourceProfileId`.
+- `marketValue`, `costBasis`, `shares`, Preise und TQF sind endlich und erfüllen die im Contract festgelegten Grenzen.
+- Kein stilles Clamping fachlich relevanter Werte; ungültige Daten werden mit Feldfehlern abgelehnt.
+- Aggregatwerte sind Fallback oder Detailquelle, niemals beides für denselben Anteil.
+- Preisfehler verändern vorhandene Kurse nicht.
+- Kein sichtbarer Erfolg vor bestätigtem Persistenz-Flush.
+- Keine bewusst roten Tests über eine Slice-Grenze hinweg.
+
+## Vorgeschlagene Architektur
+
+### Kanonischer Contract
+
+Ein neues DOM-freies Modul unter `types/` soll Validierung, Legacy-Normalisierung, disjunkte Assetklassifikation und stabile Ergebnisobjekte bereitstellen. `types/strategy-options.js` zeigt bereits, dass `app/` und `engine/` gemeinsame reine Contracts aus `types/` importieren können.
+
+Der Plan schreibt noch keinen endgültigen Dateinamen fest; vorgesehen ist `types/tranche-contract.js`. Vor dem ersten Code-Edit prüft Slice 02, ob `build-engine.mjs` diesen Import ohne Sonderpfad bündelt. Falls nicht, greift die Stop-Regel und die Modulgrenze wird im Review neu entschieden.
+
+### Persistenzzustand
+
+Der Loader liefert kein nacktes Array mehr, sondern einen auswertbaren Zustand:
+
+```text
+valid   -> normalisierte Lots + optionale Legacy-Hinweise
+empty   -> bewusst kein Bestand
+corrupt -> Rohpayload bleibt erhalten, keine Berechnung, Recovery erforderlich
+unavailable -> transienter IO-/Adapterfehler, keine Mutation, Retry erforderlich
+```
+
+Schreibende Aktionen sind getrennt vom Laden und schließen erst nach erfolgreichem Flush ab. `corrupt` und `unavailable` dürfen nicht ineinander überführt werden: Ein vorübergehender IndexedDB-/Tauri-Fehler bietet keinen Reset an. Bei `corrupt` ist der Rohpayload nur nach einer ausdrücklichen lokalen Aktion anzeig- und kopierbar; er gelangt nie automatisch in Logs oder Dokumentation.
+
+### Verbraucher
+
+Manager, Status, Profilverbund und Simulator verwenden denselben normalisierten Shape. Die Engine validiert ihre öffentliche Grenze zusätzlich fail-closed; sie vertraut nicht allein auf UI-Validierung.
+
+### Quote-Contract
+
+Der Preisservice liefert ein Objekt statt einer bloßen Zahl. Browser-Node-Proxy und Tauri-Proxy müssen dasselbe Shape liefern. Der vorgeschlagene erste Scope akzeptiert nur EUR-Quotes; Nicht-EUR bleibt manuell pflegbar, wird aber nicht automatisch als EUR übernommen.
+
+## Slice-Reihenfolge
+
+| Nr. | Slice | Hauptziel | Abhängigkeit | Max. geplante Programmdateien | Status |
+| ---: | --- | --- | --- | ---: | --- |
+| 1 | [Test-Gate und Baseline](./SLICE_TRANCHENMANAGEMENT_01_TEST_GATE_BASELINE.md) | assertionslose False-Green-Pfade schließen | Planfreigabe | 5 | geplant |
+| 2 | [Kanonischer Datencontract](./SLICE_TRANCHENMANAGEMENT_02_CANONICAL_DATA_CONTRACT.md) | Schema, Klassifikation und Doppelverkauf beheben | Slice 01 | 10 inklusive generiertem `engine.js` | geplant |
+| 3 | [Persistenz und Recovery](./SLICE_TRANCHENMANAGEMENT_03_PERSISTENCE_RECOVERY.md) | valid/empty/corrupt/unavailable, Flush, Profil-Handoff | Slice 02 | 9 | geplant |
+| 4 | [CRUD, UX und Accessibility](./SLICE_TRANCHENMANAGEMENT_04_CRUD_UX_ACCESSIBILITY.md) | sichere Eingabe und bedienbare Darstellung | Slice 03 | 10 | geplant |
+| 5 | [Quote- und Währungscontract](./SLICE_TRANCHENMANAGEMENT_05_QUOTE_CURRENCY_RESILIENCE.md) | EUR-/Stichtagscontract, Batch und Proxyparität | Slice 02, 03 | 8 | geplant |
+| 6 | [Balance-, Status- und Steuerparität](./SLICE_TRANCHENMANAGEMENT_06_BALANCE_STATUS_TAX_PARITY.md) | Einheiten, TQF, Status und Klassifikation | Slice 02, 03 | 9 | geplant |
+| 7 | [Simulator-Provenienz und Lot-Invarianten](./SLICE_TRANCHENMANAGEMENT_07_SIMULATOR_PROVENANCE_LOTS.md) | Herkunft, Geldmarkt und In-Memory-Lots | Slice 02, 06 | 10 | geplant |
+| 8 | [Reconciliation-Workflow](./SLICE_TRANCHENMANAGEMENT_08_RECONCILIATION_WORKFLOW.md) | bestätigte reale Bestandsfortschreibung idempotent umsetzen | Slice 03, 06, 07 | 9 | geplant |
+| 9 | [E2E, Migration und Dokumentation](./SLICE_TRANCHENMANAGEMENT_09_E2E_MIGRATION_DOCUMENTATION.md) | vollständige Gates und Doku-Sync | Slices 01-08 | 6 (5 Tests + Handbuch-HTML), plus Markdown | geplant |
+
+Die Reihenfolge ist verbindlich, solange das Planreview sie nicht ändert. Für Slice 08 ist durch O-09 der explizite Reconcile-Workflow festgelegt; eine rein beratende No-Code-Variante ist nicht mehr Teil dieses Plans.
+
+## GAP-Zuordnung
+
+| Slice | GAPs |
+| --- | --- |
+| 01 | TM-16, Grundlage für TM-17 |
+| 02 | TM-01, TM-02, TM-03, TM-13 |
+| 03 | TM-04, TM-09, TM-10, TM-12, TM-19, TM-22 |
+| 04 | TM-18, TM-20 |
+| 05 | TM-05, TM-11 |
+| 06 | TM-03, TM-06, TM-08, TM-12, TM-17, TM-20 |
+| 07 | TM-03, TM-07, TM-08, TM-14, TM-17 |
+| 08 | TM-15 |
+| 09 | TM-17, TM-21, TM-22 und Abschlussgates aller P0/P1-GAPs |
+
+## Globale Akzeptanzkriterien
+
+- Jede GAP-ID ist durch Code/Test/Dokumentation geschlossen oder mit Nutzerentscheidung bewusst als akzeptiertes Restrisiko markiert.
+- Synthetische Mismatch-Tranche kann nicht doppelt verkauft werden.
+- Corrupt-Storage-Test belegt Rohdatenerhalt und verhindert Leerüberschreibung.
+- Nicht-EUR-Quote wird nicht als EUR persistiert.
+- `sourceProfileId` bleibt bis Engine-Breakdown erhalten.
+- Geldmarkt wird im Simulator genau einmal gezählt.
+- Kirchensteuer- und TQF-Tests verwenden die reale UI-Einheit.
+- Lotmutationen halten Stückzahl-/Wert-/Cost-Basis-Invarianten.
+- Der Manager-Page-Test läuft im Standardgate tatsächlich mit Assertions.
+- Browser-E2E deckt Add/Edit/Delete, Reload, Profil A/B, Recovery, Online-Teilerfolg und Offlinefall ab.
+- Keine privaten Finanzdaten verbleiben in der Tranchenanleitung.
+- `npm test` und `npm run test:browser` sind grün; Engineänderungen zusätzlich `npm run build:engine` und relevante Backtests/Snapshots ohne unerwartete Abweichung.
+
+## Teststrategie
+
+### Pro Slice
+
+- Zuerst fokussierte Tests der geänderten Contracts.
+- Danach `npm test` bei jeder Änderung an Persistenz-, Profil-, Tranchen-, Consumer- oder Engine-Verträgen.
+- Browseränderungen zusätzlich `npm run test:browser`.
+- Änderungen an `engine/` oder öffentlicher EngineAPI zusätzlich `npm run build:engine`.
+- Änderungen an `src-tauri/src/lib.rs` zusätzlich fokussierter Rust-Testlauf; kein EXE-Release-Build ohne separaten Nutzerauftrag.
+
+### Abschluss
+
+```powershell
+npm test
+npm run test:browser
+npm run test:coverage
+```
+
+Zusätzlich abhängig vom tatsächlichen Diff:
+
+```powershell
+npm run build:engine
+cargo test --manifest-path src-tauri/Cargo.toml
+```
+
+Coverage ist ein Navigationssignal, kein alleiniges Abnahmekriterium. Entscheidend sind die fachlichen Akzeptanzkriterien und Negativfälle.
+
+## Stop- und Eskalationskriterien
+
+Zusätzlich zu `AGENTS.md` und `SLICE_EXECUTION_RULES.md` gilt:
+
+- Stop, wenn ein Slice mehr als zehn Programmdateien benötigt; neu schneiden und Nutzer fragen.
+- Stop bei unerwarteter Änderung von Snapshot-/Backtest-Ergebnissen oder FlowDelta.
+- Stop, wenn die Engine-Semantik über die belegte Deduplizierung/Validierung hinaus verändert werden müsste.
+- Stop, wenn UI und Engine unterschiedliche Feldnamen oder Assetklassen benötigen.
+- Stop, wenn TQF, Kirchensteuer, Altbestand oder Reconciliation eine neue fachliche/steuerrechtliche Entscheidung erfordern.
+- Stop, wenn Recovery Rohdaten nicht sicher erhalten kann.
+- Stop, wenn Node- und Tauri-Proxy keinen identischen Quote-Contract erreichen, ohne den Slice-Scope zu überschreiten.
+- Stop, wenn Tests nicht ausführbar sind oder eine erforderliche Browser-/Tauri-Validierung nicht sinnvoll ersetzbar ist.
+- `minimumFlexAnnual` bleibt außerhalb des Scopes und darf nirgends still begrenzt werden.
+
+## Branch-, Commit- und Reviewablauf
+
+1. Planreview durch Gemini und optional Claude.
+2. Codex beantwortet Findings in diesem Dokument.
+3. Gemini setzt erst nach gelösten Findings den Status auf `implementierungsreif`.
+4. Vor jedem Slice: frischer Branch-/Statuscheck und Diff-Risiko-Block in der Slice-MD.
+5. Codex implementiert und dokumentiert Tests; Codex erteilt keine Freigabe und erstellt keinen Commit.
+6. Gemini prüft Slice und Scope, führt nach Nutzerfreigabe den lokalen Commit aus.
+7. Push nur nach ausdrücklicher Nutzerfreigabe.
+
+## Verbindliche Nutzerentscheidungen
+
+Alle Entscheidungen wurden am 2026-07-14 durch den Nutzer getroffen. Die Detailformulierungen stehen in der GAP-Analyse; für die Umsetzung gilt:
+
+| ID | Festlegung |
+| --- | --- |
+| O-01 | Strikte Kategorie-/Typ-Matrix; beide Felder bleiben erhalten. |
+| O-02 | TQF wird manuell bestätigt und gespeichert; keine stille Ableitung. |
+| O-03 | Ausschließlich EUR; keine Fremdwährungs- oder FX-Automatik. |
+| O-04 | Corrupt fail-closed mit Recovery; transiente IO-Fehler separat und ohne Reset. |
+| O-05 | Teilerfolge, alte Kurse bei Fehler, ein bestätigter Batch-Commit. |
+| O-06 | Teilimport/-export entfernen; zentrale Komplettsicherung ist maßgeblich. |
+| O-07 | `sourceProfileId` beim Merge ergänzen und end-to-end erhalten. |
+| O-08 | Ein logisches Depot je Profil; FIFO nur je Instrument innerhalb dieses Profils. |
+| O-09 | Expliziter, bestätigter und idempotenter Reconcile-Schritt. |
+| O-10 | `detailledTranches` bleibt unverändert der einzige kanonische Feldname. |
+
+## Review-Feedback von Gemini
+
+### 1. Prüfdimensionen
+
+* **Korrektheit vs. Akzeptanzkriterien:** Der Arbeitsplan adressiert die identifizierten Risiken in einer logischen und 1-basierten Reihenfolge (Slices 01 bis 09). Die Integration der Tests in Slice 01 ist ein notwendiger erster Schritt. Die Akzeptanzkriterien sind verifizierbar formuliert, vernachlässigen jedoch teilweise die detaillierte UX-Reaktion auf Persistenz- und Validierungsausfälle.
+* **Vertragstreue:** Die Schnittstellen zwischen Manager, Profilpersistenz, Balance, Simulator und Engine sind stark betroffen. Die Einführung von `types/tranche-contract.js` ist vertragskonform, erfordert aber ein strenges Import-Handling, das die Engine-Bündelung nicht gefährdet.
+* **Fehlerbehandlung:** Der Plan sieht Recovery-Zustände vor, aber es fehlt eine genaue Definition, was bei partiell fehlgeschlagenen API-Abfragen (Batch-Updates) passiert. Ein totaler Abbruch bei einem einzelnen Ticker-Fehler muss verhindert werden.
+* **Seiteneffekte:** Simulator-Läufe verändern Lot-Objekte im Arbeitsspeicher. Wenn diese nicht isoliert (deep-copied) sind, lecken die Mutationen in das globale State-Management.
+* **Was könnte brechen?** Die Synchronisation zwischen dem `geldmarktEtf`-Eingabefeld und den Detailtranchen ist hochgradig fehleranfällig. Wenn hier nicht an einer einzigen Stelle dedupliziert wird, kommt es zu doppelten Vermögenswerten in der Simulation.
+
+### 2. Findings
+
+* **G-01 (Transiente Persistenzfehler vs. Datenverlust):** Wenn der Recovery-Prozess bei korruptem Speicher direkt einen Reset/Quarantäne anbietet, riskieren Nutzer permanenten Datenverlust bei nur vorübergehenden IDB-Sperren.
+  * *Forderung:* Der Recovery-Modus muss den rohen Payload als auslesbaren, kopierbaren Text anzeigen, damit Nutzer ihre Daten manuell sichern können.
+* **G-02 (Simulator Deep-Copy-Pflicht):** Da der Simulator In-Memory-Mutationen auf den Lots durchführt, besteht die Gefahr, dass Lot-Objektreferenzen in andere UI- oder Statemodule zurückfließen.
+  * *Forderung:* Der Simulator muss die Tranchen initial zwingend tiefenkopieren (`structuredClone`), bevor er Berechnungen startet.
+* **G-03 (Währungs- und Kurs-Fehlermeldungen):** Wenn Kurse in Fremdwährungen (USD, GBP, GBp) geladen werden, werden sie verworfen. Ohne ein sichtbares Feedback vermuten Nutzer einen Systemfehler.
+  * *Forderung:* Abgelehnte Kurse müssen im Batch-Ergebnis explizit protokolliert und mit dem Grund (z. B. "Währung USD nicht unterstützt") im UI dargestellt werden.
+* **G-04 (Fehler-Feedback der Engine-Validierung):** Wenn die Engine im Notfall (fail-closed) Berechnungen blockiert, weil widersprüchliche Tranchendaten übergeben wurden, muss dieser Fehler strukturiert in der UI gemeldet werden.
+  * *Forderung:* Es darf kein stiller Absturz oder unendliche Schleife auftreten; die UI muss den Validierungsfehler der Engine als blockierenden Hinweis ausgeben.
+
+### 3. Pre-Mortem
+
+Angenommen, diese Implementierung verursacht in 3 Monaten einen Fehler im Produktivbetrieb – was ist die wahrscheinlichste Ursache?
+> Ein unbemerktes Durchsickern einer modifizierten Lot-Referenz aus dem Monte-Carlo-Simulator in den globalen Anwendungs-State. Nach einer Simulation sind die Stückzahlen oder Marktwerte der Tranchen im Speicher modifiziert (z. B. auf 0 reduziert). Der Nutzer wechselt auf die Tranchen-Seite und speichert ab; die geänderten (nullifizierten) Lots werden dauerhaft in die IndexedDB geschrieben, was zu irreversiblem Datenverlust führt.
+
+### 4. Review-Ergebnis
+
+* **Status:** freigegeben
+* **Blocker:** keine
+* **Restrisiken:**
+  * Datenbereinigung von Altdaten, die nicht konform zur neuen Kategorie-Typ-Matrix sind.
+  * Abweichungen zwischen Browser- und Tauri-Umgebung bei der Kursabfrage.
+  * Einhaltung des neuen explicit Reconcile Contracts im realen Betrieb.
+
+## Review-Feedback von Claude
+
+Ausstehend. Pflichtstruktur analog Gemini mit IDs `C-01`, `C-02`, ...
+
+## Review-Antworten von Codex
+
+- **G-01 angenommen:** O-04 trennt künftig `corrupt` von transientem `unavailable`. Nur ein syntaktisch oder fachlich beschädigter, tatsächlich gelesener Payload führt in Recovery. Der Rohpayload bleibt unverändert und kann ausschließlich hinter einer bewussten lokalen Aktion angezeigt und kopiert werden; IO-/IDB-/Tauri-Rejections bieten Retry, aber keinen Reset. Slice 03 und dessen Negativtests werden entsprechend ergänzt.
+- **G-02 angenommen:** Slice 07 erhält eine zwingende Deep-Copy-Grenze vor jeder Simulationsmutation. Die Implementierung verwendet `structuredClone` oder eine nachweislich äquivalente DOM-freie Kopie; Referenzisolations-Tests beweisen, dass Profil-, UI- und Persistenzobjekte nach Simulation unverändert bleiben.
+- **G-03 angenommen:** O-03 und O-05 legen EUR-only plus Teilerfolg fest. Slice 05 weist jede abgelehnte Tranche mit maschinenlesbarem Fehlercode und sichtbarem Grund aus, beispielsweise `UNSUPPORTED_CURRENCY: USD`; alte Kurse bleiben erhalten.
+- **G-04 angenommen:** Die Enginegrenze liefert beziehungsweise wirft einen strukturierten Validierungsfehler mit Feld-/Tranchekontext. Der aufrufende UI-Pfad fängt ihn ab, beendet die Berechnung kontrolliert und zeigt einen blockierenden Hinweis. Stiller Absturz, leeres Fallback und Endlosschleife sind explizite Negativtests in Slices 02 und 04.
+
+Die Antworten ändern den Gemini-Status nicht eigenmächtig. Plan und Slices bleiben bis zum Nachreview blockiert beziehungsweise nicht freigegeben.
+
+## Review-Entscheidungen
+
+| ID | Quelle | Finding | Entscheidung | Umsetzung |
+| --- | --- | --- | --- | --- |
+| G-01 | Gemini | Transiente Persistenzfehler und korrupter Payload unzureichend getrennt | angenommen | Plan und Slice 03 konkretisiert; Code ausstehend |
+| G-02 | Gemini | Simulator benötigt zwingende Deep-Copy-Grenze | angenommen | Plan und Slice 07 konkretisiert; Code ausstehend |
+| G-03 | Gemini | Abgelehnte Fremdwährungsquotes benötigen sichtbaren Grund | angenommen | O-03/O-05 und Slice 05 konkretisiert; Code ausstehend |
+| G-04 | Gemini | Engine-Validierungsfehler muss strukturiert in der UI ankommen | angenommen | Slices 02/04 konkretisiert; Code ausstehend |

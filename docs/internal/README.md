@@ -5,11 +5,11 @@ Dieses Verzeichnis enthaelt interne Arbeitsdokumente und Archivmaterial zu abges
 Aktive interne Uebersichten:
 
 - `PROJEKTUEBERSICHT.md` - detaillierte technische und organisatorische Projektuebersicht.
-- `BALANCE_APP_HARDENING_PLAN.md` - aktiver 1-basierter Slice-Plan fuer Profilverbund-, Jahresprozess-, Datenintegritaets- und Validierungs-Findings der Balance-App.
-- `BUGFIX_INDEXEDDB_PROFILE_GOLD_PERSISTENCE.md` - Bugfix-Dokumentation fuer verlorene Profil-Gold-Aenderungen im Browserlauf mit IndexedDB.
-- `TESTABDECKUNG_ERWEITERUNGSPLAN.md` - Slice-Plan zur messbaren Erweiterung der Testabdeckung.
+- `SLICE_EXECUTION_RULES.md` - verbindlicher Review-, Branch-, Risiko- und Abnahmeprozess fuer Slices.
+- `TRANCHENMANAGEMENT_GAP_ANALYSE.md` - priorisierte Bestandsaufnahme des Tranchenmanagements mit Evidenz und verbindlichen Nutzerentscheidungen.
+- `TRANCHENMANAGEMENT_HARDENING_PLAN.md` - daraus abgeleiteter 1-basierter Arbeitsplan mit neun Review-Slices.
 
-Abgeschlossene Umsetzungen liegen im Archiv.
+Abgeschlossene Umsetzungen und fruehere Arbeitsplaene liegen im Archiv.
 
 ## Archive
 
