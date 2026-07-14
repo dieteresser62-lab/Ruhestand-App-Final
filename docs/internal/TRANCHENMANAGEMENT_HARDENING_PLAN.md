@@ -101,8 +101,8 @@ Der Preisservice liefert ein Objekt statt einer bloßen Zahl. Browser-Node-Proxy
 | 1 | [Test-Gate und Baseline](./SLICE_TRANCHENMANAGEMENT_01_TEST_GATE_BASELINE.md) | assertionslose False-Green-Pfade schließen | Planfreigabe | 5 | freigegeben |
 | 2 | [Kanonischer Datencontract](./SLICE_TRANCHENMANAGEMENT_02_CANONICAL_DATA_CONTRACT.md) | Schema, Klassifikation und Doppelverkauf beheben | Slice 01 | 11 nach Nutzerfreigabe; `engine.js` ohne Diff | freigegeben |
 | 3 | [Persistenz und Recovery](./SLICE_TRANCHENMANAGEMENT_03_PERSISTENCE_RECOVERY.md) | valid/empty/corrupt/unavailable, Flush, Profil-Handoff | Slice 02 | 9 | freigegeben |
-| 4 | [CRUD, UX und Accessibility](./SLICE_TRANCHENMANAGEMENT_04_CRUD_UX_ACCESSIBILITY.md) | sichere Eingabe und bedienbare Darstellung | Slice 03 | 10 | implementiert, Review ausstehend |
-| 5 | [Quote- und Währungscontract](./SLICE_TRANCHENMANAGEMENT_05_QUOTE_CURRENCY_RESILIENCE.md) | EUR-/Stichtagscontract, Batch und Proxyparität | Slice 02, 03 | 8 | geplant |
+| 4 | [CRUD, UX und Accessibility](./SLICE_TRANCHENMANAGEMENT_04_CRUD_UX_ACCESSIBILITY.md) | sichere Eingabe und bedienbare Darstellung | Slice 03 | 10 | freigegeben |
+| 5 | [Quote- und Währungscontract](./SLICE_TRANCHENMANAGEMENT_05_QUOTE_CURRENCY_RESILIENCE.md) | EUR-/Stichtagscontract, Batch und Proxyparität | Slice 02, 03 | 8 | freigegeben |
 | 6 | [Balance-, Status- und Steuerparität](./SLICE_TRANCHENMANAGEMENT_06_BALANCE_STATUS_TAX_PARITY.md) | Einheiten, TQF, Status und Klassifikation | Slice 02, 03 | 9 | geplant |
 | 7 | [Simulator-Provenienz und Lot-Invarianten](./SLICE_TRANCHENMANAGEMENT_07_SIMULATOR_PROVENANCE_LOTS.md) | Herkunft, Geldmarkt und In-Memory-Lots | Slice 02, 06 | 10 | geplant |
 | 8 | [Reconciliation-Workflow](./SLICE_TRANCHENMANAGEMENT_08_RECONCILIATION_WORKFLOW.md) | bestätigte reale Bestandsfortschreibung idempotent umsetzen | Slice 03, 06, 07 | 9 | geplant |
@@ -177,6 +177,26 @@ Die Reihenfolge ist verbindlich, solange das Planreview sie nicht ändert. Für 
   tatsächlich geladene Profil-ID.
 - Verifiziert: 104 Node-Testdateien, 4117/4117 Assertions, 0 Fehler, 0 offene
   Handles sowie elf grüne Browser-Smoke-Szenarien. Review und Freigabe stehen aus.
+
+### Rückdokumentation Slice 05
+
+- Browser-Service, Node-Proxy und Tauri-Proxy liefern denselben normalisierten
+  Quote-Shape mit Symbol, positivem endlichem Preis, Waehrung, UTC-Unixsekunde und
+  Quelle. Symbole folgen dem Yahoo-Format ohne proprietaeren `@exchange`-Suffix.
+- Ausschliesslich EUR wird automatisch uebernommen. Fehlende oder fremde Waehrung,
+  fehlende/alte/zukuenftige Zeit, Symbolabweichung, ungueltiger Preis, unbekanntes
+  Symbol, Rate-Limit, Providerfehler, Timeout und Proxy-Nichterreichbarkeit besitzen
+  stabile Fehlercodes und bleiben im Manager pro Tranche sichtbar.
+- Quotes duerfen maximal sieben Kalendertage alt sein und hoechstens fuenf Minuten
+  in der Zukunft liegen. Browserrequests sind einzeln begrenzt; Node und Tauri
+  begrenzen Yahoo-Upstreamzugriffe auf vier Sekunden.
+- Der Kursbatch ist single-flight, dedupliziert identische Symbole, verarbeitet
+  maximal drei Tranchen parallel und bricht nach zwoelf Sekunden ab. Teilerfolge
+  werden mit genau einem bestaetigten Commit gespeichert; Fehler behalten den alten
+  Kurs und ein Batch ohne Erfolg schreibt nicht.
+- Verifiziert: 104 Node-Testdateien, 4204/4204 Assertions, 0 Fehler, 0 offene
+  Handles; elf grüne Browser-Smoke-Szenarien; 8/8 Rust-Tests. Review und Freigabe
+  stehen aus.
 
 ## GAP-Zuordnung
 

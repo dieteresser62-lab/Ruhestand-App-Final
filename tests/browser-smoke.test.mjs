@@ -143,6 +143,24 @@ async function createPage(browser, label, options = {}) {
             });
             return;
         }
+        if (options.quoteFixtures && url.hostname === '127.0.0.1' && url.port === '8787') {
+            if (url.pathname === '/search') {
+                const query = String(url.searchParams.get('q') || '').trim().toUpperCase();
+                await route.fulfill({ json: { quotes: query ? [{ symbol: query }] : [] } });
+                return;
+            }
+            if (url.pathname === '/quote') {
+                const symbol = String(url.searchParams.get('symbol') || '').trim().toUpperCase();
+                await route.fulfill({ json: {
+                    symbol,
+                    price: 105,
+                    currency: 'EUR',
+                    asOf: Math.floor(Date.now() / 1000),
+                    source: 'yahoo-chart'
+                } });
+                return;
+            }
+        }
         if (options.annualFixtures && url.hostname === '127.0.0.1' && url.port === '8787') {
             await route.fulfill({ json: { chart: { result: [{
                 timestamp: [Math.floor(Date.UTC(2025, 11, 30) / 1000)],
@@ -401,7 +419,7 @@ async function runSimulatorSmoke(browser, baseUrl) {
 }
 
 async function runTranchesSmoke(browser, baseUrl) {
-    const smoke = await openSmokePage(browser, baseUrl, 'depot-tranchen-manager.html');
+    const smoke = await openSmokePage(browser, baseUrl, 'depot-tranchen-manager.html', { quoteFixtures: true });
     const { page } = smoke;
     await page.locator('h1').filter({ hasText: 'Profil-Assets Manager' }).waitFor({ state: 'visible' });
     await page.locator('#tranchenTable').waitFor({ state: 'visible' });
@@ -425,6 +443,7 @@ async function runTranchesSmoke(browser, baseUrl) {
 
     await page.locator('#addTrancheBtn').click();
     await page.locator('#name').fill('Gold Reserve');
+    await page.locator('#ticker').fill('GOLD.DE');
     await page.locator('#shares').fill('-1');
     await page.locator('#purchasePrice').fill('100');
     await page.locator('#currentPrice').fill('90');
@@ -446,6 +465,16 @@ async function runTranchesSmoke(browser, baseUrl) {
     assert(rowText.includes('Gold-ETC') && !rowText.includes('Geldmarkt'), 'Gold muss in der Tabelle als Gold klassifiziert sein');
     assert(await row.locator('[data-action="edit-tranche"]').getAttribute('aria-label'), 'Edit-Icon benötigt einen zugänglichen Namen');
     assert(await row.locator('[data-action="delete-tranche"]').getAttribute('aria-label'), 'Delete-Icon benötigt einen zugänglichen Namen');
+
+    await page.locator('#updatePricesBtn').click();
+    await page.locator('#priceUpdateStatus').filter({ hasText: '1 aktualisiert' }).waitFor();
+    const quoteStatus = await page.locator('#priceUpdateStatus').textContent();
+    assert(
+        quoteStatus.includes('GOLD.DE') && quoteStatus.includes('EUR') &&
+        quoteStatus.includes('yahoo-chart') && quoteStatus.includes('Stichtag'),
+        'Online-Kursupdate muss Symbol, Währung, Quelle und UTC-Stichtag sichtbar halten'
+    );
+    assert((await row.textContent()).includes('105.00 €'), 'Valider EUR-Quote muss den sichtbaren Kurs aktualisieren');
 
     const beforeEditRow = await readIndexedDb(page, 'kv', 'depot_tranchen');
     const beforeEditId = JSON.parse(beforeEditRow.value)[0].trancheId;

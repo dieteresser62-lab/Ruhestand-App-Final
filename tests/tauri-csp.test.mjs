@@ -11,10 +11,14 @@ const tauriConfigPath = path.join(repoRoot, 'src-tauri', 'tauri.conf.json');
 const tauriLibPath = path.join(repoRoot, 'src-tauri', 'src', 'lib.rs');
 const packageJsonPath = path.join(repoRoot, 'package.json');
 const tauriBuildScriptPath = path.join(repoRoot, 'scripts', 'build-tauri.ps1');
+const yahooProxyPath = path.join(repoRoot, 'tools', 'yahoo-proxy.cjs');
+const priceServicePath = path.join(repoRoot, 'app', 'tranches', 'tranchen-price-service.js');
 const tauriConfig = JSON.parse(fs.readFileSync(tauriConfigPath, 'utf8'));
 const tauriLib = fs.readFileSync(tauriLibPath, 'utf8');
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 const tauriBuildScript = fs.readFileSync(tauriBuildScriptPath, 'utf8');
+const yahooProxy = fs.readFileSync(yahooProxyPath, 'utf8');
+const priceService = fs.readFileSync(priceServicePath, 'utf8');
 const security = tauriConfig?.app?.security || {};
 const csp = security?.csp || {};
 const connectSrc = String(csp?.['connect-src'] || '');
@@ -100,6 +104,52 @@ assert(
 assert(
   tauriLib.includes('corrupt_state_filename_uses_target_specific_stem'),
   'Tauri Rust unit tests should cover quarantine filename stems'
+);
+
+for (const contractField of ['symbol', 'price', 'currency', 'asOf', 'source']) {
+  assert(
+    tauriLib.includes(`\"${contractField}\"`) && yahooProxy.includes(contractField),
+    `Tauri and Node proxy should expose canonical quote field: ${contractField}`
+  );
+}
+
+for (const errorCode of [
+  'INVALID_SYMBOL',
+  'SYMBOL_NOT_FOUND',
+  'INVALID_RESPONSE',
+  'INVALID_PRICE',
+  'CURRENCY_MISSING',
+  'UNSUPPORTED_CURRENCY',
+  'AS_OF_MISSING',
+  'QUOTE_STALE',
+  'QUOTE_FROM_FUTURE',
+  'PROVIDER_RATE_LIMITED',
+  'PROVIDER_TIMEOUT',
+  'PROVIDER_UNAVAILABLE'
+]) {
+  assert(tauriLib.includes(errorCode), `Tauri quote path should retain stable error code: ${errorCode}`);
+  assert(yahooProxy.includes(errorCode), `Node quote path should retain stable error code: ${errorCode}`);
+  assert(
+    priceService.includes(errorCode) || ['PROVIDER_TIMEOUT', 'PROVIDER_UNAVAILABLE'].includes(errorCode),
+    `Browser quote path should understand stable error code: ${errorCode}`
+  );
+}
+
+assert(
+  tauriLib.includes('QUOTE_MAX_AGE_SECONDS: u64 = 7 * 24 * 60 * 60') &&
+    yahooProxy.includes('QUOTE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60') &&
+    priceService.includes('QUOTE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60'),
+  'Browser, Node and Tauri quote paths should use the same seven-day UTC age limit'
+);
+assert(
+  tauriLib.includes("matches!(character, '.' | '^' | '=' | '-')") &&
+    yahooProxy.includes('YAHOO_SYMBOL_PATTERN') &&
+    priceService.includes('YAHOO_SYMBOL_PATTERN'),
+  'Browser, Node and Tauri should share the Yahoo symbol alphabet without @exchange suffixes'
+);
+assert(
+  !tauriLib.includes('normalize_gbp_price') && !yahooProxy.includes('normalizeGbpPrice'),
+  'EUR-only proxies must not silently convert GBP or GBX prices'
 );
 
 const iconPaths = tauriConfig?.bundle?.icon || [];

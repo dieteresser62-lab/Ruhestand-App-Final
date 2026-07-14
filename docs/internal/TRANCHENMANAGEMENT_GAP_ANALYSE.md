@@ -189,6 +189,27 @@ Damit ist TM-01 kein theoretisches Risiko. Die Behebung verändert das Verhalten
   0 offenen Handles sowie elf grüne Browser-Smoke-Szenarien. Review und Freigabe
   von Slice 04 stehen aus; der Statusvorzeichen-Anteil von TM-20 folgt in Slice 06.
 
+### Rückdokumentation Slice 05
+
+- TM-05 ist implementiert: Browser, Node und Tauri pruefen denselben Quote-Shape
+  `{ symbol, price, currency, asOf, source }`. Ausschliesslich EUR, positive endliche
+  Preise, ein identisches Yahoo-Symbol ohne `@exchange`, eine Quelle und eine
+  gueltige UTC-Unixsekunde werden automatisch uebernommen.
+- Die Stichtagsregel akzeptiert hoechstens sieben Tage alte Quotes und maximal
+  fuenf Minuten Zukunftsabweichung. USD, GBP, GBX, fehlende Waehrung/Zeit, alte
+  oder zukuenftige Werte und Provider-/Transportfehler bleiben mit stabilen Codes
+  pro Tranche sichtbar; der alte Kurs wird nicht veraendert.
+- TM-11 ist implementiert: Batches sind single-flight, deduplizieren gleiche
+  Symbolabrufe, arbeiten mit Parallelitaet 3, brechen nach zwoelf Sekunden ab und
+  ignorieren spaete Ergebnisse nach Profilwechsel. Alle validen Teilerfolge werden
+  genau einmal bestaetigt persistiert; ein Batch ohne Erfolg schreibt nicht.
+- Node- und Tauri-Upstreamzugriffe enden nach vier Sekunden. Deterministische Tests
+  statt Live-Yahoo belegen Browser-/Node-/Rust-Paritaet, gemischte Batches und den
+  einzigen Write.
+- Verifikation: 104 Node-Testdateien mit 4204/4204 Assertions, 0 Fehlern und
+  0 offenen Handles, elf grüne Browser-Smoke-Szenarien und 8/8 Rust-Tests. Review
+  und Freigabe von Slice 05 stehen aus.
+
 Diese Tests werden erweitert oder als Regression-Gates verwendet; parallele Test-Doppelungen sind nicht vorgesehen.
 
 ## Nutzerentscheidungen für das Planreview

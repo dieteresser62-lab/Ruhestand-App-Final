@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, URL as NodeURL } from 'node:url';
 import { initTranchenManagerPage } from '../app/tranches/tranchen-manager-page.js';
 import { PersistenceFacade, persistenceStorage } from '../app/shared/persistence-facade.js';
 
@@ -274,7 +274,158 @@ async function runTranchenManagerPageTests() {
     }
     console.log('✓ valid storage and offline price degradation OK');
 
-    console.log('Test 3: corrupt storage remains untouched until explicit recovery');
+    console.log('Test 3: mixed quote batch is single-flight, fail-closed and persisted exactly once');
+    {
+        const now = Math.floor(Date.now() / 1000);
+        const initialTranches = [
+            {
+                trancheId: 'eur-a', name: 'EUR A', ticker: 'SAME.DE', shares: 2,
+                purchasePrice: 100, currentPrice: 100, category: 'equity', type: 'aktien_neu', tqf: 0.3
+            },
+            {
+                trancheId: 'eur-b', name: 'EUR B', ticker: 'SAME.DE', shares: 3,
+                purchasePrice: 90, currentPrice: 90, category: 'equity', type: 'aktien_neu', tqf: 0.3
+            },
+            {
+                trancheId: 'usd', name: 'USD Lot', ticker: 'USD.DE', shares: 1,
+                purchasePrice: 80, currentPrice: 80, category: 'equity', type: 'aktien_neu', tqf: 0.3
+            }
+        ];
+        const adapterStore = new Map([['depot_tranchen', JSON.stringify(initialTranches)]]);
+        let trancheWriteBatches = 0;
+        const adapter = {
+            name: 'quote-batch-memory',
+            async open() {},
+            async loadAll() { return Object.fromEntries(adapterStore); },
+            async saveBatch(batch) {
+                if (batch.upserts.some(([key]) => key === 'depot_tranchen')) trancheWriteBatches += 1;
+                batch.deletes.forEach(key => adapterStore.delete(key));
+                batch.upserts.forEach(([key, value]) => adapterStore.set(key, String(value)));
+            }
+        };
+        const storageRef = createLocalStorageMock();
+        const doc = createTranchenPageDom();
+        installGlobals(doc, storageRef);
+        PersistenceFacade.resetPersistenceForTests(adapter);
+        await PersistenceFacade.init();
+        await initTranchenManagerPage({ profileId: 'default' });
+
+        let releaseEurQuote;
+        const eurQuoteGate = new Promise(resolve => { releaseEurQuote = resolve; });
+        const quoteCalls = new Map();
+        const previousFetch = global.fetch;
+        global.fetch = async url => {
+            const parsed = new NodeURL(String(url));
+            if (parsed.pathname === '/search') {
+                const query = parsed.searchParams.get('q');
+                return { ok: true, status: 200, json: async () => ({ quotes: [{ symbol: query }] }) };
+            }
+            const symbol = parsed.searchParams.get('symbol');
+            quoteCalls.set(symbol, (quoteCalls.get(symbol) || 0) + 1);
+            if (symbol === 'SAME.DE') {
+                await eurQuoteGate;
+                return {
+                    ok: true,
+                    status: 200,
+                    json: async () => ({
+                        symbol,
+                        price: 125,
+                        currency: 'EUR',
+                        asOf: now,
+                        source: 'yahoo-chart'
+                    })
+                };
+            }
+            return {
+                ok: false,
+                status: 422,
+                json: async () => ({
+                    status: 'error',
+                    code: 'UNSUPPORTED_CURRENCY',
+                    message: 'Waehrung USD wird nicht unterstuetzt.'
+                })
+            };
+        };
+
+        try {
+            const firstClick = doc.getElementById('updatePricesBtn').listeners.click[0]();
+            const secondClick = doc.getElementById('updatePricesBtn').listeners.click[0]();
+            await waitFor(() => quoteCalls.get('SAME.DE') === 1, 'Duplicate symbol should start exactly one active quote request');
+            assertEqual(doc.getElementById('updatePricesBtn').disabled, true, 'Active quote batch should disable repeated UI action');
+            releaseEurQuote();
+            await Promise.all([firstClick, secondClick]);
+            await PersistenceFacade.flush();
+        } finally {
+            if (previousFetch === undefined) delete global.fetch; else global.fetch = previousFetch;
+        }
+
+        assertEqual(quoteCalls.get('SAME.DE'), 1, 'Same symbol across lots and double click must remain single-flight');
+        assertEqual(window.tranchen.find(item => item.trancheId === 'eur-a').currentPrice, 125, 'First EUR lot should update');
+        assertEqual(window.tranchen.find(item => item.trancheId === 'eur-b').currentPrice, 125, 'Second EUR lot should share result');
+        assertEqual(window.tranchen.find(item => item.trancheId === 'usd').currentPrice, 80, 'Rejected USD lot must retain old price');
+        assertEqual(trancheWriteBatches, 1, 'Mixed successful batch should persist tranche state exactly once');
+        assertEqual(JSON.parse(adapterStore.get('depot_tranchen')).find(item => item.trancheId === 'usd').currentPrice, 80, 'Persisted rejected lot should retain old price');
+        const batchStatus = doc.getElementById('priceUpdateStatus').textContent;
+        assert(batchStatus.includes('2 aktualisiert, 1 fehlgeschlagen'), 'Mixed outcome should remain summarized');
+        assert(batchStatus.includes('UNSUPPORTED_CURRENCY') && batchStatus.includes('USD'), 'Rejected currency code and reason should remain visible');
+        assert(batchStatus.includes('EUR') && batchStatus.includes('yahoo-chart') && batchStatus.includes('Stichtag'), 'Successful quote metadata should remain visible');
+        assertEqual(doc.getElementById('updatePricesBtn').disabled, false, 'Completed batch should re-enable controls');
+    }
+    console.log('✓ quote batch resilience contract OK');
+
+    console.log('Test 4: late quote response after profile switch is ignored');
+    {
+        const now = Math.floor(Date.now() / 1000);
+        const initialRaw = JSON.stringify([{
+            trancheId: 'late', name: 'Late Quote', ticker: 'LATE.DE', shares: 1,
+            purchasePrice: 100, currentPrice: 100, category: 'equity', type: 'aktien_neu', tqf: 0.3
+        }]);
+        const storageRef = createLocalStorageMock();
+        const doc = createTranchenPageDom();
+        installGlobals(doc, storageRef);
+        PersistenceFacade.resetPersistenceForTests();
+        persistenceStorage.setItem('depot_tranchen', initialRaw);
+        await PersistenceFacade.flush();
+        await initTranchenManagerPage({ profileId: 'default' });
+
+        let releaseQuote;
+        let notifyStarted;
+        const quoteGate = new Promise(resolve => { releaseQuote = resolve; });
+        const started = new Promise(resolve => { notifyStarted = resolve; });
+        const previousFetch = global.fetch;
+        global.fetch = async () => {
+            notifyStarted();
+            await quoteGate;
+            return {
+                ok: true,
+                status: 200,
+                json: async () => ({
+                    symbol: 'LATE.DE', price: 150, currency: 'EUR', asOf: now, source: 'yahoo-chart'
+                })
+            };
+        };
+
+        try {
+            const oldBatch = doc.getElementById('updatePricesBtn').listeners.click[0]();
+            await started;
+            initTranchenManagerPage({
+                profileId: 'other',
+                loader: () => ({ status: 'empty', tranches: [], raw: null })
+            });
+            releaseQuote();
+            await oldBatch;
+        } finally {
+            if (previousFetch === undefined) delete global.fetch; else global.fetch = previousFetch;
+        }
+
+        assertEqual(window.tranchen.length, 0, 'Late result must not repopulate the newly selected empty profile');
+        assertEqual(JSON.parse(persistenceStorage.getItem('depot_tranchen'))[0].currentPrice, 100, 'Late result must not persist into the previous profile state');
+        assertEqual(doc.getElementById('priceUpdateStatus').textContent, '', 'Late result must not overwrite the new profile status');
+        assertEqual(doc.getElementById('updatePricesBtn').disabled, false, 'Profile switch should release quote-batch controls');
+    }
+    console.log('✓ late quote invalidation OK');
+
+    console.log('Test 5: corrupt storage remains untouched until explicit recovery');
     {
         const storageRef = createLocalStorageMock();
         const doc = createTranchenPageDom();
@@ -304,7 +455,7 @@ async function runTranchenManagerPageTests() {
     }
     console.log('✓ corrupt storage recovery contract OK');
 
-    console.log('Test 4: unavailable reload preserves last confirmed state and listeners');
+    console.log('Test 6: unavailable reload preserves last confirmed state and listeners');
     {
         const storageRef = createLocalStorageMock();
         const doc = createTranchenPageDom();
@@ -342,7 +493,7 @@ async function runTranchenManagerPageTests() {
     }
     console.log('✓ unavailable and lifecycle contract OK');
 
-    console.log('Test 5: failed flush keeps confirmed state and supports retry');
+    console.log('Test 7: failed flush keeps confirmed state and supports retry');
     {
         const initialRaw = JSON.stringify([{
             trancheId: 'persisted',
@@ -413,7 +564,7 @@ async function runTranchenManagerPageTests() {
     }
     console.log('✓ flush failure recovery OK');
 
-    console.log('Test 6: profile input gate ignores invalid intermediates and commits only latest valid value');
+    console.log('Test 8: profile input gate ignores invalid intermediates and commits only latest valid value');
     {
         const storageRef = createLocalStorageMock();
         const doc = createTranchenPageDom();
@@ -446,7 +597,7 @@ async function runTranchenManagerPageTests() {
     }
     console.log('✓ profile validation and debounce gate OK');
 
-    console.log('Test 7: valid input queued during a slow flush is committed automatically');
+    console.log('Test 9: valid input queued during a slow flush is committed automatically');
     {
         const adapterStore = new Map();
         let saveCalls = 0;

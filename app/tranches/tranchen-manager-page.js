@@ -52,6 +52,9 @@ const state = {
     profileCommitInFlight: false,
     pendingProfileValues: null,
     profileSaveTimer: null,
+    quoteBatchId: 0,
+    quoteBatchController: null,
+    quoteBatchPromise: null,
     persistenceMessage: '',
     persistenceError: '',
     rawRevealed: false,
@@ -61,6 +64,8 @@ const state = {
 };
 
 const PROFILE_SAVE_DEBOUNCE_MS = 300;
+const QUOTE_BATCH_CONCURRENCY = 3;
+const QUOTE_BATCH_TIMEOUT_MS = 12000;
 
 const PROFILE_INPUT_IDS = [
     'profileTagesgeld',
@@ -174,6 +179,7 @@ function showProfileValidationStatus(error) {
 function processingIsBlocked() {
     return state.commitInFlight
         || state.profileCommitInFlight
+        || Boolean(state.quoteBatchPromise)
         || state.loadStatus === 'corrupt'
         || state.loadStatus === 'unavailable';
 }
@@ -487,82 +493,241 @@ async function clearAll() {
     await persistTranchen([], { successMessage: 'Alle Tranchen wurden dauerhaft gelöscht.' });
 }
 
-async function updatePrices() {
-    if (processingIsBlocked()) return;
-    if (!state.tranchen.length) {
-        alert('Keine Tranchen vorhanden.');
-        return;
+function quoteErrorDetails(error, fallbackSymbol) {
+    return {
+        code: typeof error?.code === 'string' ? error.code : 'QUOTE_FAILED',
+        message: error?.message || 'Kursabruf fehlgeschlagen.',
+        symbol: fallbackSymbol || 'unbekannt'
+    };
+}
+
+function selectMostSpecificQuoteError(errors, fallbackSymbol) {
+    const priority = [
+        'UNSUPPORTED_CURRENCY',
+        'CURRENCY_MISSING',
+        'QUOTE_STALE',
+        'QUOTE_FROM_FUTURE',
+        'AS_OF_MISSING',
+        'SYMBOL_MISMATCH',
+        'INVALID_PRICE',
+        'INVALID_RESPONSE',
+        'PROVIDER_RATE_LIMITED',
+        'PROVIDER_TIMEOUT',
+        'PROVIDER_UNAVAILABLE',
+        'PROXY_UNREACHABLE',
+        'REQUEST_TIMEOUT',
+        'REQUEST_ABORTED',
+        'SYMBOL_NOT_FOUND',
+        'INVALID_SYMBOL'
+    ];
+    const selected = priority
+        .map(code => errors.find(item => item?.code === code))
+        .find(Boolean) || errors[0];
+    return quoteErrorDetails(selected, fallbackSymbol);
+}
+
+function formatQuoteTimestamp(asOf) {
+    return new Date(asOf * 1000).toLocaleString('de-DE', {
+        timeZone: 'UTC',
+        timeZoneName: 'short'
+    });
+}
+
+function formatBatchStatus(results, options = {}) {
+    const updated = results.filter(result => result.status === 'updated').length;
+    const failed = results.filter(result => result.status === 'failed').length;
+    const skipped = results.filter(result => result.status === 'skipped').length;
+    const stamp = new Date().toLocaleString('de-DE');
+    const headline = options.persistenceFailed
+        ? `Kurs-Update ${stamp}: ${updated} valide Kurse, aber keine dauerhafte Speicherung; bestaetigter Stand bleibt aktiv.`
+        : `Kurs-Update ${stamp}: ${updated} aktualisiert, ${failed} fehlgeschlagen, ${skipped} ohne Ticker/ISIN.`;
+    const lines = results.map(result => {
+        const label = result.name || result.trancheId || 'Unbenannte Tranche';
+        if (result.status === 'updated') {
+            const quote = result.quote;
+            return `${label} (${quote.symbol}): ${quote.price} ${quote.currency}; Quelle ${quote.source}; Stichtag ${formatQuoteTimestamp(quote.asOf)}.`;
+        }
+        if (result.status === 'skipped') {
+            return `${label}: NO_SYMBOL: Kein Ticker oder ISIN vorhanden.`;
+        }
+        return `${label} (${result.symbol}): ${result.code}: ${result.message}`;
+    });
+    return [headline, ...lines].join('\n');
+}
+
+function createBatchQuoteFetcher(signal) {
+    const quoteRequests = new Map();
+    const searchRequests = new Map();
+    const requestOptions = { signal };
+
+    return {
+        quote(symbol) {
+            const key = String(symbol || '').trim().toUpperCase();
+            if (!quoteRequests.has(key)) {
+                quoteRequests.set(key, fetchProxyPrice(symbol, LOCAL_YAHOO_PROXY, requestOptions));
+            }
+            return quoteRequests.get(key);
+        },
+        search(query, nameHint) {
+            const key = `${String(query || '').trim().toUpperCase()}|${String(nameHint || '').trim().toUpperCase()}`;
+            if (!searchRequests.has(key)) {
+                searchRequests.set(key, fetchProxySymbol(query, LOCAL_YAHOO_PROXY, nameHint, requestOptions));
+            }
+            return searchRequests.get(key);
+        }
+    };
+}
+
+async function resolveTrancheQuote(tranche, fetcher) {
+    const ticker = String(tranche.ticker || '').trim();
+    const isin = String(tranche.isin || '').trim();
+    const symbols = [...new Set([ticker, isin].filter(Boolean))];
+    if (!symbols.length) return { status: 'skipped' };
+
+    const errors = [];
+    for (const symbol of symbols) {
+        try {
+            return { status: 'updated', quote: await fetcher.quote(symbol) };
+        } catch (error) {
+            errors.push(error);
+        }
+
+        try {
+            const resolved = await fetcher.search(symbol, tranche.name);
+            if (resolved) {
+                return { status: 'updated', quote: await fetcher.quote(resolved) };
+            }
+        } catch (error) {
+            errors.push(error);
+        }
     }
 
+    return {
+        status: 'failed',
+        ...selectMostSpecificQuoteError(errors, ticker || isin)
+    };
+}
+
+async function executePriceBatch(batchId, controller) {
     const statusEl = byId('priceUpdateStatus');
-    statusEl.textContent = 'Kurse werden aktualisiert...';
-
-    let updated = 0;
-    let failed = 0;
-    let skipped = 0;
-    const failedSymbols = [];
     const nextTranches = state.tranchen.map(tranche => ({ ...tranche }));
+    const results = new Array(nextTranches.length);
+    const fetcher = createBatchQuoteFetcher(controller.signal);
+    let nextIndex = 0;
+    let completed = 0;
+    let timedOut = false;
+    const batchTimer = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+    }, QUOTE_BATCH_TIMEOUT_MS);
 
-    for (const tranche of nextTranches) {
-        const ticker = (tranche.ticker || '').trim();
-        const isin = (tranche.isin || '').trim();
-        const symbols = [];
-        if (ticker) symbols.push(ticker);
-        if (isin && !symbols.includes(isin)) symbols.push(isin);
-        if (!symbols.length) {
-            skipped += 1;
-            continue;
-        }
-
-        statusEl.textContent = `Kurse werden aktualisiert... (${updated + failed + skipped + 1}/${nextTranches.length})`;
-
-        let price = null;
-        let resolvedSymbol = null;
-
-        for (const symbol of symbols) {
+    statusEl.textContent = `Kurse werden aktualisiert... (0/${nextTranches.length})`;
+    const worker = async () => {
+        while (nextIndex < nextTranches.length && !controller.signal.aborted) {
+            const index = nextIndex;
+            nextIndex += 1;
+            const tranche = nextTranches[index];
+            let result;
             try {
-                price = await fetchProxyPrice(symbol, LOCAL_YAHOO_PROXY);
-                resolvedSymbol = symbol;
-                break;
-            } catch {
-                try {
-                    const lookup = await fetchProxySymbol(symbol, LOCAL_YAHOO_PROXY, tranche.name);
-                    if (lookup) {
-                        price = await fetchProxyPrice(lookup, LOCAL_YAHOO_PROXY);
-                        resolvedSymbol = lookup;
-                        break;
-                    }
-                } catch {
-                    // Ein fehlgeschlagenes Symbol wird im sichtbaren Batchstatus zusammengefasst.
+                result = await resolveTrancheQuote(tranche, fetcher);
+                if (result.status === 'updated') {
+                    const quote = result.quote;
+                    Object.assign(tranche, calculateTrancheDerivedValues({
+                        ...tranche,
+                        ticker: quote.symbol,
+                        currentPrice: quote.price
+                    }));
                 }
+            } catch (error) {
+                result = {
+                    status: 'failed',
+                    ...quoteErrorDetails(error, tranche.ticker || tranche.isin)
+                };
+            }
+            results[index] = {
+                trancheId: tranche.trancheId,
+                name: tranche.name,
+                ...result
+            };
+            completed += 1;
+            if (state.quoteBatchId === batchId) {
+                statusEl.textContent = `Kurse werden aktualisiert... (${completed}/${nextTranches.length})`;
             }
         }
+    };
 
-        if (resolvedSymbol && resolvedSymbol !== ticker) tranche.ticker = resolvedSymbol;
+    try {
+        const workerCount = Math.min(QUOTE_BATCH_CONCURRENCY, nextTranches.length);
+        await Promise.all(Array.from({ length: workerCount }, () => worker()));
+    } finally {
+        clearTimeout(batchTimer);
+    }
 
-        if (!Number.isFinite(price) || price <= 0) {
-            failed += 1;
-            failedSymbols.push(ticker || isin || 'unbekannt');
-            continue;
-        }
+    if (timedOut) {
+        results.forEach((result, index) => {
+            if (result?.status !== 'failed' || result.code !== 'REQUEST_ABORTED') return;
+            results[index] = {
+                ...result,
+                code: 'BATCH_TIMEOUT',
+                message: `Batch-Gesamtdauer von ${QUOTE_BATCH_TIMEOUT_MS / 1000} Sekunden ueberschritten.`
+            };
+        });
+    }
 
-        Object.assign(tranche, calculateTrancheDerivedValues({ ...tranche, currentPrice: price }));
-        updated += 1;
+    for (let index = 0; index < results.length; index += 1) {
+        if (results[index]) continue;
+        const tranche = nextTranches[index];
+        results[index] = {
+            trancheId: tranche.trancheId,
+            name: tranche.name,
+            status: 'failed',
+            code: timedOut ? 'BATCH_TIMEOUT' : 'REQUEST_ABORTED',
+            message: timedOut
+                ? `Batch-Gesamtdauer von ${QUOTE_BATCH_TIMEOUT_MS / 1000} Sekunden ueberschritten.`
+                : 'Kursbatch wurde abgebrochen.',
+            symbol: tranche.ticker || tranche.isin || 'unbekannt'
+        };
+    }
+
+    if (state.quoteBatchId !== batchId || controller.signal.aborted && !timedOut) return false;
+    const updated = results.filter(result => result.status === 'updated').length;
+    if (updated === 0) {
+        statusEl.textContent = formatBatchStatus(results);
+        return false;
     }
 
     const committed = await persistTranchen(nextTranches, {
         successMessage: 'Kursänderungen dauerhaft gespeichert.'
     });
-    if (!committed) {
-        statusEl.textContent = 'Kurswerte konnten nicht dauerhaft gespeichert werden; der bestätigte Stand bleibt aktiv.';
-        return;
+    if (state.quoteBatchId !== batchId) return false;
+    statusEl.textContent = formatBatchStatus(results, { persistenceFailed: !committed });
+    return committed;
+}
+
+function updatePrices() {
+    if (state.quoteBatchPromise) return state.quoteBatchPromise;
+    if (processingIsBlocked()) return Promise.resolve(false);
+    if (!state.tranchen.length) {
+        alert('Keine Tranchen vorhanden.');
+        return Promise.resolve(false);
     }
 
-    const stamp = new Date().toLocaleString('de-DE');
-    const failedNote = failedSymbols.length
-        ? ` Fehlgeschlagen: ${failedSymbols.slice(0, 5).join(', ')}${failedSymbols.length > 5 ? ' ...' : ''}`
-        : '';
-    statusEl.textContent = `Kurs-Update ${stamp}: ${updated} aktualisiert, ${failed} fehlgeschlagen, ${skipped} ohne Ticker/ISIN. (Yahoo Finance)${failedNote}`;
+    const batchId = state.quoteBatchId + 1;
+    const controller = new AbortController();
+    state.quoteBatchId = batchId;
+    state.quoteBatchController = controller;
+
+    let batchPromise;
+    batchPromise = executePriceBatch(batchId, controller).finally(() => {
+        if (state.quoteBatchId === batchId) {
+            state.quoteBatchController = null;
+            state.quoteBatchPromise = null;
+            renderPersistenceState();
+        }
+    });
+    state.quoteBatchPromise = batchPromise;
+    renderPersistenceState();
+    return batchPromise;
 }
 
 function revealCorruptPayload() {
@@ -690,6 +855,8 @@ function resolveActiveProfileId(explicitProfileId) {
 
 function resetRuntimeState(profileId) {
     if (state.profileSaveTimer !== null) clearTimeout(state.profileSaveTimer);
+    state.quoteBatchController?.abort();
+    state.quoteBatchId += 1;
     state.tranchen = [];
     state.confirmedTranches = [];
     state.confirmedRaw = null;
@@ -701,6 +868,8 @@ function resetRuntimeState(profileId) {
     state.profileCommitInFlight = false;
     state.pendingProfileValues = null;
     state.profileSaveTimer = null;
+    state.quoteBatchController = null;
+    state.quoteBatchPromise = null;
     state.persistenceMessage = '';
     state.persistenceError = '';
     state.rawRevealed = false;
@@ -715,6 +884,8 @@ export function initTranchenManagerPage(options = {}) {
 
     if (documentChanged || profileChanged) {
         resetRuntimeState(profileId);
+        const quoteStatus = byId('priceUpdateStatus');
+        if (quoteStatus) quoteStatus.textContent = '';
     }
 
     const result = state.loader();
