@@ -1,9 +1,18 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { UIBinder, initUIBinder } from '../app/balance/balance-binder.js';
-import { createImportExportHandlers } from '../app/balance/balance-binder-imports.js';
+import {
+    BALANCE_EXPORT_APP_ID,
+    BALANCE_EXPORT_SCHEMA,
+    BALANCE_EXPORT_SCHEMA_VERSION,
+    BalanceImportError,
+    createBalanceExportDocument,
+    createImportExportHandlers,
+    normalizeBalanceImportDocument
+} from '../app/balance/balance-binder-imports.js';
 import { createProfilverbundHandlers } from '../app/balance/balance-main-profilverbund.js';
 import { CONFIG, ValidationError } from '../app/balance/balance-config.js';
+import { UIReader } from '../app/balance/balance-reader.js';
 import { UIRenderer } from '../app/balance/balance-renderer.js';
 import { StorageManager } from '../app/balance/balance-storage.js';
 import {
@@ -321,6 +330,9 @@ const prevLoadState = StorageManager.loadState;
 const prevSaveState = StorageManager.saveState;
 const prevResetState = StorageManager.resetState;
 const prevConnectFolder = StorageManager.connectFolder;
+const prevReplaceStateFromImport = StorageManager.replaceStateFromImport;
+const prevRollbackImportReplace = StorageManager.rollbackImportReplace;
+const prevApplyStoredInputs = UIReader.applyStoredInputs;
 
 async function runBalanceUiOrchestrationTests() {
     console.log('--- Balance UI Orchestration Tests ---');
@@ -487,23 +499,116 @@ async function runBalanceUiOrchestrationTests() {
         assertEqual(mergedAction.quellen[1].profileId, 'partner', 'Zweite Action stammt vom ausgewaehlten Partnerprofil');
     }
 
-    console.log('Test 3: JSON and CSV import failures report through UI error feedback');
+    console.log('Test 3: Balance import schema, legacy migration and fail-safe orchestration');
     {
+        const validState = {
+            inputs: {
+                aktuellesAlter: 67,
+                floorBedarf: 24000,
+                flexBedarf: 12000,
+                minimumFlexAnnual: 2000,
+                tagesgeld: 50000
+            },
+            lastState: {
+                cumulativeInflationFactor: 1.08,
+                lastInflationAppliedAtAge: 66,
+                taxState: { lossCarry: 500 }
+            }
+        };
+        const currentDocument = createBalanceExportDocument(validState);
+        assertEqual(currentDocument.appId, BALANCE_EXPORT_APP_ID, 'Export nutzt die stabile Balance-App-ID');
+        assertEqual(currentDocument.schema, BALANCE_EXPORT_SCHEMA, 'Export benennt das Balance-State-Schema');
+        assertEqual(currentDocument.schemaVersion, BALANCE_EXPORT_SCHEMA_VERSION, 'Export nutzt die aktuelle Schema-Version');
+        assert(Number.isFinite(new Date(currentDocument.exportedAt).getTime()), 'Export enthaelt einen gueltigen ISO-Zeitpunkt');
+
+        const normalizedCurrent = normalizeBalanceImportDocument(currentDocument);
+        assertEqual(normalizedCurrent.sourceFormat, 'balance-state-v1', 'Aktuelles Exportformat wird eindeutig erkannt');
+        assertEqual(normalizedCurrent.migrated, false, 'Aktuelles Exportformat wird nicht als Legacy markiert');
+        assertEqual(normalizedCurrent.payload.inputs.floorBedarf, 24000, 'Validierung erhaelt gueltige Kernwerte');
+
+        const legacyDocument = {
+            app: CONFIG.APP.NAME,
+            version: 'v21.1 Refactored (Engine v31)',
+            payload: {
+                ...validState,
+                lastState: {
+                    cumulativeInflationFactor: 9,
+                    lastInflationAppliedAtAge: null,
+                    taxState: { lossCarry: -1 }
+                }
+            }
+        };
+        const normalizedLegacy = normalizeBalanceImportDocument(legacyDocument);
+        assertEqual(normalizedLegacy.sourceFormat, 'legacy-balance-export-v0', 'Unterstuetztes Legacy-Format laeuft ueber explizite Migration');
+        assertEqual(normalizedLegacy.migrated, true, 'Legacy-Import wird als migriert markiert');
+        assertEqual(normalizedLegacy.payload.lastState.cumulativeInflationFactor, 1, 'Legacy-Migration repariert den historischen Inflationsfaktor');
+        assertEqual(normalizedLegacy.payload.lastState.lastInflationAppliedAtAge, 0, 'Legacy-Migration repariert das historische Inflationsalter');
+        assertEqual(normalizedLegacy.payload.lastState.taxState.lossCarry, 0, 'Legacy-Migration repariert den historischen Verlustvortrag');
+
+        const captureImportError = document => {
+            try {
+                normalizeBalanceImportDocument(document);
+                return null;
+            } catch (error) {
+                return error;
+            }
+        };
+        const wrongAppError = captureImportError({ ...currentDocument, appId: 'fremde-app' });
+        assert(wrongAppError instanceof BalanceImportError, 'Falsche App-ID liefert einen kontrollierten Importfehler');
+        assertEqual(wrongAppError.code, 'wrong_app', 'Falsche App-ID ist maschinenlesbar');
+        const wrongVersionError = captureImportError({ ...currentDocument, schemaVersion: 99 });
+        assertEqual(wrongVersionError?.code, 'unsupported_version', 'Nicht unterstuetzte Schema-Version wird blockiert');
+        const wrongShapeError = captureImportError({ inputs: validState.inputs });
+        assertEqual(wrongShapeError?.code, 'unknown_shape', 'Unversionierter Rohzustand wird nicht als Legacy erraten');
+        const invalidCoreError = captureImportError({
+            ...currentDocument,
+            payload: { ...validState, inputs: { ...validState.inputs, floorBedarf: -1 } }
+        });
+        assertEqual(invalidCoreError?.code, 'invalid_core_value', 'Ungueltige finanzielle Kernwerte werden vor der Mutation blockiert');
+        const unsupportedLegacyError = captureImportError({ ...legacyDocument, version: 'v20.0' });
+        assertEqual(unsupportedLegacyError?.code, 'unsupported_legacy_version', 'Nicht explizit migrierbare Legacy-Version wird blockiert');
+        let invalidExportError = null;
+        try {
+            createBalanceExportDocument({});
+        } catch (error) {
+            invalidExportError = error;
+        }
+        assertEqual(invalidExportError?.code, 'invalid_inputs', 'Export erzeugt keine formal aktuelle, aber fachlich ungueltige Datei');
+
         const documentRef = new MockDocument();
         const localStorageRef = createLocalStorageMock();
         installBrowserGlobals(documentRef, localStorageRef);
         PersistenceFacade.resetPersistenceForTests();
 
         const errors = [];
+        const toasts = [];
         UIRenderer.handleError = error => { errors.push(error); };
-        UIRenderer.toast = () => {};
+        UIRenderer.toast = message => { toasts.push(message); };
         StorageManager.saveState = () => {};
         StorageManager.loadState = () => ({ inputs: {} });
+        let replaceCalls = 0;
+        let rollbackCalls = 0;
+        StorageManager.replaceStateFromImport = async payload => {
+            replaceCalls += 1;
+            assertEqual(payload.inputs.floorBedarf, 24000, 'Replace erhaelt nur den validierten Payload');
+            return { ok: true, recoverySnapshotId: 'import-recovery-test' };
+        };
+        StorageManager.rollbackImportReplace = async receipt => {
+            rollbackCalls += 1;
+            assertEqual(receipt.recoverySnapshotId, 'import-recovery-test', 'Rollback nutzt den bestaetigten Recovery-Receipt');
+            return { ok: true };
+        };
 
         const dom = createDomRefs(documentRef);
+        dom.inputs.aktuellesAlter.value = '66';
+        UIReader.applyStoredInputs = inputs => {
+            dom.inputs.aktuellesAlter.value = String(inputs.aktuellesAlter);
+            dom.inputs.tagesgeld.value = String(inputs.tagesgeld || 0);
+        };
+        let updateCalls = 0;
         const handlers = createImportExportHandlers({
             dom,
-            update: () => {},
+            update: () => { updateCalls += 1; return { ok: true, status: 'success' }; },
             debouncedUpdate: () => {}
         });
 
@@ -520,10 +625,89 @@ async function runBalanceUiOrchestrationTests() {
         await handlers.handleCsvImport({ target: badCsvTarget });
 
         assertEqual(errors.length, 2, 'Import- und CSV-Fehler werden ueber handleError gemeldet');
-        assert(errors[0].message.includes('Import fehlgeschlagen'), 'JSON-Import meldet nutzerfaehigen Fehlertext');
+        assert(errors[0].message.includes('kein gültiges JSON'), 'JSON-Import nennt sichere Ursache und Handlungsoption');
         assert(errors[1].message.includes('CSV-Import fehlgeschlagen'), 'CSV-Import meldet nutzerfaehigen Fehlertext');
         assertEqual(badJsonTarget.value, '', 'JSON-Dateiauswahl wird nach Fehler zurueckgesetzt');
         assertEqual(badCsvTarget.value, '', 'CSV-Dateiauswahl wird nach Fehler zurueckgesetzt');
+        assertEqual(replaceCalls, 0, 'Syntaxfehler veraendern keine Live-Daten');
+        assertEqual(updateCalls, 0, 'Syntaxfehler erreichen weder Dry-Run noch persistentes Update');
+
+        errors.length = 0;
+        const wrongAppTarget = {
+            files: [{ text: async () => JSON.stringify({ ...currentDocument, appId: 'fremde-app' }) }],
+            value: 'selected'
+        };
+        await handlers.handleImport({ target: wrongAppTarget });
+        assertEqual(replaceCalls, 0, 'Falsche App-ID erreicht den Replace-Pfad nicht');
+        assertEqual(updateCalls, 0, 'Falsche App-ID erreicht den Engine-Dry-Run nicht');
+        assertEqual(dom.inputs.aktuellesAlter.value, '66', 'Abgewiesener Import laesst die sichtbaren Eingaben unveraendert');
+        assert(errors[0].message.includes('gehört nicht zur Balance-App'), 'App-ID-Fehler enthaelt Ursache ohne Payload-Leak');
+
+        errors.length = 0;
+        const dryRunOptions = [];
+        const dryRunFailHandlers = createImportExportHandlers({
+            dom,
+            update: options => {
+                dryRunOptions.push(options);
+                return { ok: false, status: 'engine_error' };
+            },
+            debouncedUpdate: () => {}
+        });
+        const dryRunFailTarget = {
+            files: [{ text: async () => JSON.stringify(currentDocument) }],
+            value: 'selected'
+        };
+        await dryRunFailHandlers.handleImport({ target: dryRunFailTarget });
+        assertEqual(dryRunOptions.length, 1, 'Fehlgeschlagener Dry-Run fuehrt keinen zweiten Update-Lauf aus');
+        assertEqual(dryRunOptions[0].persist, false, 'Erste Engine-Pruefung ist explizit nicht persistent');
+        assertEqual(replaceCalls, 0, 'Fehlgeschlagener Dry-Run schreibt keine Live-Daten');
+        assertEqual(dom.inputs.aktuellesAlter.value, '66', 'Fehlgeschlagener Dry-Run stellt die sichtbaren Eingaben wieder her');
+        assert(errors[0].message.includes('Live-Daten wurden nicht verändert'), 'Dry-Run-Fehler nennt den unveraenderten Zustand');
+
+        errors.length = 0;
+        const successUpdateOptions = [];
+        const successHandlers = createImportExportHandlers({
+            dom,
+            update: options => {
+                successUpdateOptions.push(options);
+                return { ok: true, status: 'success' };
+            },
+            debouncedUpdate: () => {}
+        });
+        const successTarget = {
+            files: [{ text: async () => JSON.stringify(currentDocument) }],
+            value: 'selected'
+        };
+        await successHandlers.handleImport({ target: successTarget });
+        assertEqual(successUpdateOptions.length, 2, 'Gueltiger Import durchlaeuft Dry-Run und persistentes Abschluss-Update');
+        assertEqual(successUpdateOptions[0].persist, false, 'Gueltiger Import prueft zuerst ohne Persistenz');
+        assertEqual(successUpdateOptions[1], undefined, 'Erst nach Recovery und Replace folgt das persistente Update');
+        assertEqual(replaceCalls, 1, 'Gueltiger Import ersetzt den Balance-State genau einmal');
+        assertEqual(rollbackCalls, 0, 'Erfolgreicher Import benoetigt keinen Rollback');
+        assert(toasts.some(message => message.includes('Recovery-Snapshot')), 'Erfolgsmeldung bestaetigt den Recovery-Punkt');
+
+        dom.inputs.aktuellesAlter.value = '66';
+        errors.length = 0;
+        let finalUpdateCall = 0;
+        const finalFailureHandlers = createImportExportHandlers({
+            dom,
+            update: () => {
+                finalUpdateCall += 1;
+                return finalUpdateCall === 1
+                    ? { ok: true, status: 'success' }
+                    : { ok: false, status: 'engine_error' };
+            },
+            debouncedUpdate: () => {}
+        });
+        const finalFailureTarget = {
+            files: [{ text: async () => JSON.stringify(currentDocument) }],
+            value: 'selected'
+        };
+        await finalFailureHandlers.handleImport({ target: finalFailureTarget });
+        assertEqual(replaceCalls, 2, 'Spaeter Fehler tritt nach genau einem weiteren Replace auf');
+        assertEqual(rollbackCalls, 1, 'Spaeter Abschlussfehler rollt den Import automatisch zurueck');
+        assertEqual(dom.inputs.aktuellesAlter.value, '66', 'Rollback stellt auch die sichtbaren Eingaben wieder her');
+        assert(errors[0].message.includes('automatisch wiederhergestellt'), 'Rollback-Erfolg nennt Ursache und Wiederherstellung');
     }
 
     console.log('Test 4: Profilverbund globals are set and cleared without stale data');
@@ -730,6 +914,9 @@ if (runRequested) {
         if (prevSaveState === undefined) delete StorageManager.saveState; else StorageManager.saveState = prevSaveState;
         if (prevResetState === undefined) delete StorageManager.resetState; else StorageManager.resetState = prevResetState;
         if (prevConnectFolder === undefined) delete StorageManager.connectFolder; else StorageManager.connectFolder = prevConnectFolder;
+        if (prevReplaceStateFromImport === undefined) delete StorageManager.replaceStateFromImport; else StorageManager.replaceStateFromImport = prevReplaceStateFromImport;
+        if (prevRollbackImportReplace === undefined) delete StorageManager.rollbackImportReplace; else StorageManager.rollbackImportReplace = prevRollbackImportReplace;
+        if (prevApplyStoredInputs === undefined) delete UIReader.applyStoredInputs; else UIReader.applyStoredInputs = prevApplyStoredInputs;
         UIRenderer.toast = prevToast;
         UIRenderer.handleError = prevHandleError;
         if (prevBlob === undefined) delete global.Blob; else global.Blob = prevBlob;

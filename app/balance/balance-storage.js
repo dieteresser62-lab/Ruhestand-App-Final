@@ -21,6 +21,8 @@ import { PROFILE_STORAGE_KEYS } from '../profile/profile-state.js';
 import { isProfileScopedKey } from '../profile/profile-key-policy.js';
 import { saveCurrentProfileFromLocalStorage } from '../profile/profile-storage.js';
 
+export const BALANCE_IMPORT_RECOVERY_KIND = 'balance-import-recovery';
+
 // Module-level references to be injected
 let dom = null;
 let appState = null;
@@ -47,6 +49,54 @@ function getProfileNameFromRegistry(registry, profileId) {
 
 function getPersistenceKeys() {
     return Array.from({ length: persistenceStorage.length }, (_, i) => persistenceStorage.key(i)).filter(Boolean);
+}
+
+function hasOwn(value, key) {
+    return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+function captureCurrentSnapshotRecords() {
+    return SnapshotArchive.captureCurrentRecords({
+        keys: getPersistenceKeys,
+        getItem: key => persistenceStorage.getItem(key)
+    });
+}
+
+async function createArchiveSnapshot({ label = '', kind = SNAPSHOT_KINDS.manual, allowEmpty = false } = {}) {
+    const records = captureCurrentSnapshotRecords();
+    if (!allowEmpty && Object.keys(records).length === 0) {
+        throw new StorageError('Keine Daten zum Sichern vorhanden.');
+    }
+    const activeProfileId = SnapshotArchive.getActiveProfileIdFromRecords(records);
+    const registry = parseJsonObject(records[PROFILE_STORAGE_KEYS.registry], null);
+    return SnapshotArchive.createSnapshot({
+        label,
+        kind,
+        records,
+        activeProfileId,
+        activeProfileName: getProfileNameFromRegistry(registry, activeProfileId)
+    });
+}
+
+async function restoreImportRecoverySnapshot(snapshot) {
+    const currentRegistry = parseJsonObject(persistenceStorage.getItem(PROFILE_STORAGE_KEYS.registry), null);
+    if (snapshot.activeProfileId && registryHasProfile(currentRegistry, snapshot.activeProfileId)) {
+        const { deleteKeys, upserts, allowKey } = buildStandardRestorePlan(snapshot, currentRegistry);
+        return PersistenceFacade.replaceLiveRecords(snapshot.records, {
+            deleteKeys,
+            upserts,
+            allowKey,
+            restoreLock: true
+        });
+    }
+
+    const { deleteKeys, upserts, allowKey } = buildFullImportRecoveryPlan(snapshot);
+    return PersistenceFacade.replaceLiveRecords(snapshot.records, {
+        deleteKeys,
+        upserts,
+        allowKey,
+        restoreLock: true
+    });
 }
 
 function getSnapshotStatusText() {
@@ -116,6 +166,19 @@ function buildStandardRestorePlan(snapshot, currentRegistry) {
     upserts.push([PROFILE_STORAGE_KEYS.active, snapshotActiveProfileId]);
     upserts.push([PROFILE_STORAGE_KEYS.registry, JSON.stringify(registry)]);
 
+    return { deleteKeys, upserts, allowKey };
+}
+
+function buildFullImportRecoveryPlan(snapshot) {
+    const restoreOptions = { mode: 'full', allowProfileRegistry: true };
+    const allowKey = key => isAllowedSnapshotRestoreLiveKey(key, restoreOptions);
+    const snapshotKeys = new Set(Object.keys(snapshot.records || {}));
+    const deleteKeys = getPersistenceKeys()
+        .filter(key => !snapshotKeys.has(key))
+        .filter(allowKey);
+    const upserts = Object.entries(snapshot.records || {})
+        .filter(([key]) => allowKey(key))
+        .map(([key, value]) => [key, String(value)]);
     return { deleteKeys, upserts, allowKey };
 }
 
@@ -252,6 +315,91 @@ export const StorageManager = {
     },
 
     /**
+     * Ersetzt ausschliesslich den Balance-State nach bestaetigtem Recovery-Snapshot.
+     * Validierung und Engine-Dry-Run muessen der Aufruferseite bereits gelungen sein.
+     *
+     * @param {Object} state Schema-validierter Balance-State
+     * @returns {Promise<{ok: true, recoverySnapshotId: string}>}
+     */
+    async replaceStateFromImport(state) {
+        if (!state || typeof state !== 'object' || Array.isArray(state)) {
+            throw new StorageError('Der validierte Importzustand ist ungueltig.');
+        }
+
+        let serializedState;
+        try {
+            serializedState = JSON.stringify(state);
+        } catch (error) {
+            throw new StorageError('Der validierte Importzustand konnte nicht serialisiert werden.', { originalError: error });
+        }
+        if (!serializedState) {
+            throw new StorageError('Der validierte Importzustand ist leer.');
+        }
+
+        try {
+            await PersistenceFacade.flush();
+            const previousState = persistenceStorage.getItem(CONFIG.STORAGE.LS_KEY);
+            const recovery = await createArchiveSnapshot({
+                label: `Balance-Import Recovery ${new Date().toISOString()}`,
+                kind: BALANCE_IMPORT_RECOVERY_KIND,
+                allowEmpty: true
+            });
+            const confirmedRecovery = await SnapshotArchive.readSnapshot(recovery.id);
+            const recoveryHasState = hasOwn(confirmedRecovery.records, CONFIG.STORAGE.LS_KEY);
+            if (
+                (previousState === null && recoveryHasState) ||
+                (previousState !== null && confirmedRecovery.records[CONFIG.STORAGE.LS_KEY] !== previousState)
+            ) {
+                throw new StorageError('Der Import-Recovery-Snapshot bildet den aktuellen Balance-State nicht korrekt ab.');
+            }
+
+            await PersistenceFacade.replaceLiveRecords({}, {
+                upserts: [[CONFIG.STORAGE.LS_KEY, serializedState]],
+                allowKey: key => key === CONFIG.STORAGE.LS_KEY
+            });
+
+            if (persistenceStorage.getItem(CONFIG.STORAGE.LS_KEY) !== serializedState) {
+                await restoreImportRecoverySnapshot(confirmedRecovery);
+                throw new StorageError('Der ersetzte Balance-State konnte nicht bestaetigt werden.');
+            }
+
+            return {
+                ok: true,
+                recoverySnapshotId: confirmedRecovery.id
+            };
+        } catch (error) {
+            if (error instanceof StorageError) throw error;
+            throw new StorageError('Recovery-Snapshot oder Balance-Replace ist fehlgeschlagen.', { originalError: error });
+        }
+    },
+
+    /**
+     * Rollt einen bereits gestarteten Import anhand seines bestaetigten Recovery-Snapshots zurueck.
+     *
+     * @param {{recoverySnapshotId?: string}|string} receipt Import-Receipt oder Snapshot-ID
+     * @returns {Promise<{ok: true, recoverySnapshotId: string}>}
+     */
+    async rollbackImportReplace(receipt) {
+        const recoverySnapshotId = typeof receipt === 'string'
+            ? receipt
+            : String(receipt?.recoverySnapshotId || '');
+        if (!recoverySnapshotId) {
+            throw new StorageError('Import-Recovery-Snapshot-ID fehlt.');
+        }
+        try {
+            const snapshot = await SnapshotArchive.readSnapshot(recoverySnapshotId);
+            if (snapshot.kind !== BALANCE_IMPORT_RECOVERY_KIND) {
+                throw new StorageError('Der angegebene Snapshot ist kein Balance-Import-Recovery-Punkt.');
+            }
+            await restoreImportRecoverySnapshot(snapshot);
+            return { ok: true, recoverySnapshotId };
+        } catch (error) {
+            if (error instanceof StorageError) throw error;
+            throw new StorageError('Der Balance-Import konnte nicht automatisch zurueckgerollt werden.', { originalError: error });
+        }
+    },
+
+    /**
      * Initialisiert die Snapshot-Funktionalität
      *
      * Prüft File System Access API-Unterstützung und lädt gespeicherte
@@ -352,21 +500,9 @@ export const StorageManager = {
      */
     async createSnapshot(handle, label = '') {
         saveCurrentProfileFromLocalStorage();
-        const records = SnapshotArchive.captureCurrentRecords({
-            keys: getPersistenceKeys,
-            getItem: key => persistenceStorage.getItem(key)
-        });
-        if (Object.keys(records).length === 0) {
-            throw new StorageError("Keine Daten zum Sichern vorhanden.");
-        }
-        const activeProfileId = SnapshotArchive.getActiveProfileIdFromRecords(records);
-        const registry = parseJsonObject(records[PROFILE_STORAGE_KEYS.registry], null);
-        await SnapshotArchive.createSnapshot({
+        await createArchiveSnapshot({
             label,
-            kind: SNAPSHOT_KINDS.annualClosePreMutation,
-            records,
-            activeProfileId,
-            activeProfileName: getProfileNameFromRegistry(registry, activeProfileId)
+            kind: SNAPSHOT_KINDS.annualClosePreMutation
         });
     },
 

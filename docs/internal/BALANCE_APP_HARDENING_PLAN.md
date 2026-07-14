@@ -1,7 +1,7 @@
 # Balance-App-Hardening: Arbeitsplan
 
-**Stand:** 2026-07-14
-**Status:** implementierungsreif; Slice 01, 02, 03, 04, 05, 06 und 07 erledigt
+**Stand:** 2026-07-14  
+**Status:** implementierungsreif; Slice 01, 02, 03, 04, 05, 06, 07 und 08 erledigt  
 **Feature-Branch:** `codex/balance-app-hardening`  
 **GitHub-Status:** lokal vorhanden; `git ls-remote --heads origin refs/heads/codex/balance-app-hardening` lieferte am 2026-07-13 keinen Remote-Branch; keine Veroeffentlichung ohne ausdrueckliche Freigabe  
 **Autor:** Codex  
@@ -99,7 +99,7 @@ Jahresprozess
 | 5 | [Inflations-Contract](./SLICE_BALANCE_HARDENING_05_INFLATION_CONTRACT.md) | P1 | 02 | 5 | erledigt |
 | 6 | [Persistente Profilmitgliedschaft](./SLICE_BALANCE_HARDENING_06_PROFILE_MEMBERSHIP.md) | P1 | 01 | 3 | erledigt |
 | 7 | [Engine-Gate und Update-Ergebnis](./SLICE_BALANCE_HARDENING_07_ENGINE_UPDATE_GATE.md) | P1 | 03 | 4 | erledigt |
-| 8 | [Schema-validierter Balance-Import](./SLICE_BALANCE_HARDENING_08_IMPORT_RECOVERY.md) | P1 | 07 | 4 | geplant |
+| 8 | [Schema-validierter Balance-Import](./SLICE_BALANCE_HARDENING_08_IMPORT_RECOVERY.md) | P1 | 07 | 4 | erledigt |
 | 9 | [Korrupte Persistenz sichtbar behandeln](./SLICE_BALANCE_HARDENING_09_CORRUPT_DATA_RECOVERY.md) | P1 | 08 | 5 | geplant |
 | 10 | [Striktes Zahlen- und CSV-Parsing](./SLICE_BALANCE_HARDENING_10_STRICT_PARSING.md) | P2 | 04, 05, 08 | 5 | geplant |
 | 11 | [Browser-E2E und Dokumentationsgates](./SLICE_BALANCE_HARDENING_11_E2E_DOCUMENTATION.md) | P2 | 01-10 | 1 | geplant |
@@ -160,6 +160,8 @@ Jahresprozess
 - Ein Recovery-Snapshot darf keine technischen oder persoenlichen Fremddaten aus Tests enthalten.
 
 - Fehlermeldungen enthalten betroffenen Bereich und Handlungsoption, aber keine sensiblen Payloads.
+
+Der aktuelle Balance-Dateivertrag ist `appId: "ruhe-stand-suite.balance"`, `schema: "balance-state"`, `schemaVersion: 1`, `appVersion`, `exportedAt` und `payload`. Unversionierte Rohobjekte werden abgewiesen. Als explizite Legacy-Pfade sind nur die frueheren Balance-Envelopes v21.1 und v22.0 zugelassen und getestet. Ein Import folgt verbindlich der Reihenfolge pure Shape-/Kernwertvalidierung -> Engine-Dry-Run ohne Persistenz -> bestaetigter Snapshot mit Kind `balance-import-recovery` -> einzelner Replace des Balance-State-Keys -> persistentes Erfolgs-Update. Ein spaeter Fehler rollt alle erfassten erlaubten Live-Daten und die sichtbaren Eingaben zurueck; ohne bestaetigten Snapshot findet kein Replace statt.
 
 ## Teststrategie
 
@@ -235,6 +237,8 @@ Zusatzlich zu `AGENTS.md` und `SLICE\_EXECUTION\_RULES.md` wird gestoppt, wenn:
 | 2026-07-14 | Slice 06 durch Gemini freigegeben und committed | Commit; keine Blocker, Restrisiko G6-01 |
 | 2026-07-14 | Slice 07 durch Codex implementiert | Engine-Major-Gate bindet den erfolgreichen `getVersion()`-/`simulateSingleYear()`-Contract fail-closed; nachtraeglicher Engine-Austausch, fehlende und inkompatible Engines blockieren Berechnung und Persistenz. `update()` liefert `success`, `validation_error`, `engine_error` oder `blocked`; spaetes Script-`src`-Umschreiben entfernt. Fokussiert Smoke gruen + 63/63 + 30/30, Gesamtsuite 3291/3291 und Browser-Smoke fuer alle fuenf Einstiegspunkte gruen; Code-Review ausstehend |
 | 2026-07-14 | Slice 07 durch Gemini freigegeben und committed | Commit; keine Blocker, Restrisiko G7-01 |
+| 2026-07-14 | Slice 08 durch Codex implementiert | Aktuelles `balance-state`-v1-Schema und explizite v21.1-/v22.0-Migration; Pflicht-/Kernwertvalidierung; Engine-Dry-Run; bestaetigter `balance-import-recovery`-Snapshot; einzelner Balance-State-Replace und automatischer allowlist-basierter Voll-Rollback bei spaetem Fehler. Fokussiert 106/106 + 38/38 + 21/21 + 202/202 gruen; Gesamtsuite 3305/3305 und Browser-Smoke fuer alle fuenf Einstiegspunkte gruen; Code-Review ausstehend. |
+| 2026-07-14 | Slice 08 durch Gemini freigegeben und committed | Commit; keine Blocker, Restrisiko G8-01 |
 
 
 ## Review-Feedback von Gemini

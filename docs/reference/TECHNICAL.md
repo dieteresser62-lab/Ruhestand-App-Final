@@ -149,11 +149,11 @@ Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`
 
 * `app/balance/balance-config.js` – Konfiguration, Fehlertypen, Debug-Utilities.
 * `app/balance/balance-utils.js` – Formatierungs- und Hilfsfunktionen (shared-formatting, Threshold-Zugriff).
-* `app/balance/balance-storage.js` – Balance-Persistenz ueber `app/shared/persistence-facade.js` und Jahresabschluss-Snapshots ueber das interne Snapshot-Archiv.
+* `app/balance/balance-storage.js` – Balance-Persistenz ueber `app/shared/persistence-facade.js`, Jahresabschluss-Snapshots sowie bestaetigte `balance-import-recovery`-Punkte mit automatischem Import-Rollback ueber das interne Snapshot-Archiv.
 * `app/balance/balance-reader.js` – liest Benutzerinputs aus dem DOM und setzt UI-Side-Effects.
 * `app/balance/balance-health-bucket.js` – liest die Profildefinition des Pflegebuckets und erzeugt eine reine Diagnose zu Brutto-Liquidität, Pflege-Zweckbindung, operativer Liquidität, Zieldeckung und Freigabestatus.
 * `app/balance/balance-renderer.js` – Darstellung der Ergebnisse (Summary, Guardrails, Entscheidungsdiagnose, Toasts, Themes).
-* `app/balance/balance-binder.js` – Event-Hub mit Tastenkürzeln, Import/Export, Snapshots, Debug-Modus.
+* `app/balance/balance-binder.js` – Event-Hub mit Tastenkürzeln, schema-validiertem Balance-Import/Export, Snapshots und Debug-Modus.
 * `app/balance/balance-main.js` – Orchestrator: initiiert Module, bindet beim Start einen kompatiblen Engine-Vertrag und führt `update()` aus.
 * `app/balance/balance-update-pipeline.js` / `balance-action-postprocessor.js` – Fail-closed Engine-Handshake und Update-Statusvertrag sowie Pipeline-Helfer fuer Last-State-Vorbereitung, Action-/3-Bucket-Postprocessing, Renderer-/Diagnose-Payload, Persistenz und Ausgabenbudget.
 * `app/balance/balance-annual-marketdata.js` – Online-Marktdaten für Jahreswechsel: periodengebundener ETF-Jahresendkurs mit fail-closed Yahoo-Validierung und `annualMarketDataMeta` sowie davon unabhängiger CAPE-Fallback-Contract.
@@ -286,6 +286,14 @@ Snapshot-Archiv seit Jahresabschluss-Snapshot-Slice:
 * Capture schliesst alte Snapshot-Keys aus, damit Archivdaten nie in neue Live-Snapshots eingebettet werden.
 * Standard-Restore schreibt nur erlaubte Live-Keys zurueck, erhaelt Profil-Registry und Snapshot-Historie, setzt das aktive Profil und bricht ab, wenn `snapshot.activeProfileId` in der aktuellen Registry nicht mehr existiert.
 * Legacy-Snapshots mit Prefix `ruhestandsmodell_snapshot_` werden in das kanonische Archiv migriert. Eintraege ohne eindeutige aktive Profilzuordnung bleiben lesbar, werden aber nicht als Standard-Restore-faehig angezeigt.
+
+Balance-JSON-Import seit Hardening-Slice 08:
+
+* Das aktuelle Dateiformat verwendet `appId: "ruhe-stand-suite.balance"`, `schema: "balance-state"`, `schemaVersion: 1`, die informative `appVersion`, `exportedAt` und `payload`.
+* Pflichtfelder `inputs.aktuellesAlter`, `inputs.floorBedarf` und `inputs.flexBedarf`, nichtnegative finanzielle Kernwerte, Mindest-Flex-Grenze sowie optionale `lastState`-Kernwerte werden rein validiert, bevor DOM oder Persistenz erreicht werden. Unversionierte Rohobjekte werden nicht als Legacy erraten.
+* Explizite Legacy-Migration existiert nur fuer die frueher exportierten Envelopes v21.1 und v22.0 mit passender App-ID. Historische Inflations-/Tax-State-Fehlwerte werden in diesem benannten Migrationspfad normalisiert; unbekannte Versionen blockieren.
+* Ablauf: Datei parsen und normalisieren -> importierte Eingaben temporaer anwenden -> `update({ persist: false })` muss `ok: true` liefern -> Facade flushen -> Recovery-Snapshot schreiben und zuruecklesen -> nur `CONFIG.STORAGE.LS_KEY` per `replaceLiveRecords()` ersetzen -> persistentes `update()` muss erfolgreich sein. Ein spaeter Fehler stellt den vollstaendigen Recovery-Snapshot und den vorherigen DOM-Zustand wieder her.
+* Snapshot-/Quota-/Adapterfehler blockieren vor dem Balance-Replace. Fehlermeldungen verwenden feste Ursachen und Handlungsoptionen; Rohpayloads und Parserdetails werden nicht angezeigt.
 
 ### Dynamic-Flex (VPW) Pipeline
 

@@ -4,7 +4,7 @@ Die Balance-App besteht aus 36 ES6-Modulen unter `app/balance/`. Das folgende Do
 Dateinamen werden unten kurz ohne Präfix genannt; tatsächlicher Pfad ist in der Regel `app/balance/<datei>.js`.
 Ausnahmen: Profilverbund-Module liegen unter `app/profile/`, Shared-Formatter unter `app/shared/`.
 
-**Stand:** 2026-07-13
+**Stand:** 2026-07-14
 
 ## Vollstaendige Datei-Inventur
 
@@ -20,7 +20,7 @@ Die folgende Inventur wurde vor dem Balance-App-Hardening direkt gegen `app/bala
 | `balance-annual-period.js` | DOM-freier Jahresperioden-, Legacy- und Recovery-Contract |
 | `balance-binder-annual.js` | Fassade fuer Annual-Handler |
 | `balance-binder-diagnosis.js` | Diagnose-Export und Copytext |
-| `balance-binder-imports.js` | Balance-JSON- und Markt-CSV-Import/Export |
+| `balance-binder-imports.js` | Versionierter Balance-JSON-Import/Export mit Dry-Run/Recovery sowie Markt-CSV-Import |
 | `balance-binder-snapshots.js` | Periodengebundener Jahresprozess-Coordinator, Recovery und Snapshot-Aktionen |
 | `balance-binder.js` | zentraler UI-Event-Hub |
 | `balance-config.js` | App-Konfiguration, Engine-Versionsanforderung und Fehlertypen |
@@ -45,7 +45,7 @@ Die folgende Inventur wurde vor dem Balance-App-Hardening direkt gegen `app/bala
 | `balance-renderer-diagnosis.js` | Diagnose-Teilrenderer koordinieren |
 | `balance-renderer-summary.js` | Summary, Liquiditaet, Marktstatus und Bedarf rendern |
 | `balance-renderer.js` | Renderer-Fassade, Fehler und Theme |
-| `balance-storage.js` | Balance-State, Migration, Snapshot-Archiv und Restore |
+| `balance-storage.js` | Balance-State, Migration, Snapshot-Archiv, Import-Recovery und Restore |
 | `balance-update-pipeline.js` | Validierung, Last-State, Diagnose und Persistenzentscheidung |
 | `balance-utils.js` | Zahlen-/Waehrungsformatierung und UI-Hilfen |
 
@@ -93,13 +93,15 @@ Persistenzschicht fuer Balance-State ueber `app/shared/persistence-facade.js` un
 - `initStorageManager(domRefs, state, renderer)` – initialisiert Abhängigkeiten
 - `StorageManager`
   - `loadState()` / `saveState(state)` / `resetState()`
+  - `replaceStateFromImport(state)` – ersetzt nur den schema-validierten Balance-State nach bestaetigtem Import-Recovery-Snapshot
+  - `rollbackImportReplace(receipt)` – stellt bei einem spaeten Importfehler alle im Recovery-Snapshot erfassten erlaubten Live-Daten wieder her
   - `initSnapshots()` / `renderSnapshots(listEl, statusEl, handle)`
   - `createSnapshot(handle)` / `restoreSnapshot(key, handle)` / `deleteSnapshot(key, handle)`
   - `connectFolder()` – Kompatibilitaets-/UI-Pfad fuer aeltere Ordnerbindung; neue Snapshots liegen im internen Archiv
 
 **Dependencies:** `balance-config.js` (Konfiguration & Fehlerklassen), `app/shared/persistence-facade.js`, `app/shared/snapshot-archive.js`
 
-**Snapshot-Archiv:** Jahresabschluss-Snapshots werden als `persistence-records-v1` gespeichert. Browser nutzt die IndexedDB-Datenbank `ruhestand-suite` Version 2 mit separatem Store `snapshots`; Tauri nutzt neben `ruhestand_suite_data.json` die separate Datei `ruhestand_suite_snapshots.json`. `listSnapshots()` zeigt nur Indexdaten ohne Vollpayload. Standard-Restore erhaelt die Snapshot-Historie, bewahrt die Profil-Registry und setzt nur das aktive Profil zurueck, wenn `snapshot.activeProfileId` in der aktuellen Registry existiert.
+**Snapshot-Archiv:** Jahresabschluss- und Import-Recovery-Snapshots werden als `persistence-records-v1` gespeichert. Import-Recovery-Punkte tragen den Kind-Wert `balance-import-recovery` und werden vor dem ersten Balance-Replace geschrieben und zurueckgelesen. Browser nutzt die IndexedDB-Datenbank `ruhestand-suite` Version 2 mit separatem Store `snapshots`; Tauri nutzt neben `ruhestand_suite_data.json` die separate Datei `ruhestand_suite_snapshots.json`. `listSnapshots()` zeigt nur Indexdaten ohne Vollpayload. Standard-Restore erhaelt die Snapshot-Historie, bewahrt die Profil-Registry und setzt nur das aktive Profil zurueck, wenn `snapshot.activeProfileId` in der aktuellen Registry existiert.
 
 **Hinweis Steuerzustand:** `lastState.taxState.lossCarry` wird migriert/defaulted und bei Guardrail-Resets erhalten.
 
@@ -199,7 +201,7 @@ Event-Hub der Anwendung.
 
 **Helper-Module (ausgelagert):**
 - `balance-binder-annual.js` – Jahres-Update, Inflation, ETF-Nachrücken, Modal-Logik
-- `balance-binder-imports.js` – Import/Export/CSV
+- `balance-binder-imports.js` – erzeugt `balance-state`-Exports mit stabiler App-ID und `schemaVersion: 1`; akzeptiert nur dieses Format oder die explizit migrierten v21.1-/v22.0-Legacy-Envelopes. Vor dem Replace validiert es Pflichtwerte und `lastState`, fuehrt `update({ persist: false })` aus und wertet den Slice-07-Ergebnisvertrag aus. Nach Recovery/Replace muss das persistente `update()` erfolgreich sein; andernfalls werden Storage und sichtbare Eingaben automatisch zurueckgerollt.
 - `balance-binder-snapshots.js` – Snapshot-Handling und Jahresprozess-Coordinator; validiert den Live-State, flusht, bestaetigt den Snapshot vor fachlichen Writes und persistiert bei Teilfehlern Snapshot-ID sowie Recovery-Phase
 - `balance-binder-diagnosis.js` – Diagnose-Export
 
