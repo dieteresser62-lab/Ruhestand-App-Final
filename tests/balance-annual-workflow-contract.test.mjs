@@ -76,10 +76,18 @@ try {
         UIRenderer.toast = () => {};
         UIRenderer.handleError = error => { throw error; };
         const dom = createAnnualDom();
+        const inflationContract = {
+            rate: 2.1,
+            year: TARGET_YEAR,
+            source: 'ECB (HICP)',
+            dataAsOf: '2026-01-30T11:15:00Z',
+            fetchStatus: 'ok_primary_ecb',
+            metric: 'consumer_prices_all_items_annual_average_growth_pct'
+        };
         const orchestrator = createAnnualOrchestrator({
             dom,
             debouncedUpdate: () => { calls.push('debouncedUpdate'); },
-            handleFetchInflation: async () => { calls.push('inflation'); return { status: 'ok' }; },
+            handleFetchInflation: async () => { calls.push('inflation'); return inflationContract; },
             handleNachrueckenMitETF: async () => { calls.push('etf'); return { status: 'ok' }; },
             handleFetchCapeAuto: async () => ({
                 capeFetchStatus: 'error_no_source_no_stored',
@@ -92,6 +100,8 @@ try {
         const result = await orchestrator.handleJahresUpdate({ failOnStepError: true });
         assertEqual(result.ok, false, 'Fehlerhafter Teilschritt liefert explizit ok=false');
         assertEqual(dom.inputs.aktuellesAlter.value, '68', 'Jahresupdate erhoeht das Alter genau einmal');
+        assertEqual(result.results.inflation.year, TARGET_YEAR, 'Jahresupdate bewahrt das Inflations-Zieljahr');
+        assertEqual(result.results.inflation.fetchStatus, 'ok_primary_ecb', 'Jahresupdate bewahrt den Inflations-Fetch-Status');
         assertEqual(modalResults.errors[0].step, 'CAPE', 'Fehlerprotokoll behaelt stabilen Step-Namen');
         assertEqual(dom.controls.btnJahresUpdate.disabled, false, 'Button-Sperre wird im finally geloest');
     }

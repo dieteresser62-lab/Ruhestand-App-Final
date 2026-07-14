@@ -2,7 +2,7 @@
 
 **Feature-Branch:** `codex/balance-app-hardening`  
 **GitHub-Status:** lokal; Remote-Pruefung am 2026-07-13 ergab keinen gleichnamigen Branch  
-**Status:** geplant, Review/Freigabe ausstehend  
+**Status:** implementiert, Review/Freigabe ausstehend
 **Prioritaet:** P1  
 **Abhaengigkeit:** Slice 02
 
@@ -82,16 +82,32 @@ Es greift keine Stop-Regel: Branch und Contract sind eindeutig, der erweiterte S
 ```powershell
 node tests\run-single.mjs tests\balance-annual-inflation.test.mjs
 node tests\run-single.mjs tests\balance-annual-workflow-contract.test.mjs
+node tests\run-single.mjs tests\tauri-csp.test.mjs
 npm test
 ```
 
 ## Durchgefuehrte Aenderungen
 
-Noch keine.
+- Gemeinsame Ergebnisstruktur mit `rate`, `year`, `source`, `dataAsOf`, `fetchStatus` und stabiler `metric` eingefuehrt.
+- Zielkennzahl auf deutschen All-items-Verbraucherpreis-Jahresdurchschnitt festgelegt: ECB HICP `AVR`, World Bank `FP.CPI.TOTL.ZG`, OECD national CPI `PA/_T/GY`, jeweils fuer exakt dasselbe abgeschlossene Kalenderjahr.
+- ECB-SDMX-JSON 1.x, World-Bank-JSON und OECD-SDMX-JSON 2.0 werden dimensions- und jahresbezogen validiert; falsche, mehrdeutige oder inkompatible Antworten fallen zur naechsten Quelle durch.
+- Jeder Quellenrequest besitzt einen eigenen 8-Sekunden-Timeout, `AbortController` und garantiertes Timer-Cleanup im `finally`-Pfad.
+- Bedarfsmutationen werden vollstaendig vorbereitet und erst nach Validierung des Ergebnisobjekts ausgefuehrt. Schlagen alle Quellen fehl, bleiben Inflationsfeld, Bedarfe und persistenter Zustand unveraendert.
+- Direkte Bedarfsfortschreibung und kumulierter Faktor verwenden jetzt auch bei Deflation dieselbe multiplikative Formel ohne Nullbegrenzung.
+- Veralteten OECD.Stat-Host durch die aktuelle OECD Data Explorer API ersetzt und die Tauri-CSP samt CSP-Regression angepasst.
+- Der Annual-Workflow-Test bewahrt Zieljahr und Fetch-Status des Inflationsvertrags im Ergebnisprotokoll.
 
 ## Ausgefuehrte Tests mit Ergebnis
 
-Noch keine.
+- Ausgangszustand vor Umsetzung:
+  - `node tests\run-single.mjs tests\balance-annual-inflation.test.mjs` -> 7/7 Assertions gruen.
+  - `node tests\run-single.mjs tests\balance-annual-workflow-contract.test.mjs` -> 28/28 Assertions gruen.
+- Nach Umsetzung:
+  - `node tests\run-single.mjs tests\balance-annual-inflation.test.mjs` -> 34/34 Assertions gruen.
+  - `node tests\run-single.mjs tests\balance-annual-workflow-contract.test.mjs` -> 30/30 Assertions gruen.
+  - `node tests\run-single.mjs tests\tauri-csp.test.mjs` -> 37/37 Assertions gruen.
+  - `npm test` -> 103 Testdateien, 3288/3288 Assertions gruen, 0 fehlgeschlagene Dateien, 0 offene Handles.
+- Reale Einjahresantworten fuer 2025 wurden am 2026-07-14 direkt gegen die offiziellen ECB-, World-Bank- und OECD-Endpunkte geprueft. Dabei wurde der Parser an das tatsaechliche OECD-SDMX-JSON-2.0-Layout (`data.structures`/`data.dataSets`) angeglichen.
 
 ## Abweichungen vom Plan
 
@@ -108,12 +124,15 @@ Damit sind fuenf statt der urspruenglich geplanten drei Programmdateien betroffe
 
 ## Offene Risiken
 
-- Falls keine Quelle dieselbe Jahreskennzahl liefert, ist eine fachliche Nutzerentscheidung erforderlich; keine automatische Mischsemantik.
-- OECD ist ohne freigegebene CSP-/Test-Anpassung im Tauri-Build nicht ueber den aktuellen offiziellen Endpunkt erreichbar.
+- ECB verwendet HICP, World Bank und OECD verwenden nationale CPI-Reihen. Der normalisierte Vertrag ist dieselbe fachliche Jahreskennzahl (All-items-Verbraucherpreisinflation als Jahresdurchschnitt), die Reihen koennen methodisch bedingt dennoch leicht unterschiedliche Werte liefern; die Fallback-Kette bildet keinen Quellenkonsens.
+- `dataAsOf` verwendet die von der Antwort bereitgestellte Aktualisierungs-/Preparation-Zeit; falls eine Quelle keine solche Angabe liefert, wird transparent der Abrufzeitpunkt verwendet.
+- Live-Endpunkte koennen trotz korrektem Contract zeitweise durch CORS, Rate-Limits oder Netzfehler ausfallen; der Fehlerpfad bleibt dann mutationsfrei.
 
 ## Rueckdokumentation
 
-Inflationsdefinition und Quellenfallback im Hauptplan und in `docs/reference/DATA_SOURCES.md` dokumentieren.
+- Hauptplan markiert Slice 05 als implementiert und haelt Testergebnisse sowie den erweiterten Fuenf-Dateien-Scope fest.
+- `docs/reference/DATA_SOURCES.md` dokumentiert Zielkennzahl, exakte Endpunkte, Ergebnisfelder, Fallback, Timeout und Deflationsformel.
+- `docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md` und Tauri-CSP nennen den aktuellen OECD-SDMX-Host.
 
 ## Freigabestatus
 
@@ -121,11 +140,48 @@ Nicht freigegeben.
 
 ## Review-Feedback von Gemini
 
-Ausstehend.
+### 1. Prüfdimensionen
+
+- **Korrektheit vs. Akzeptanzkriterien:**
+  - Alle drei Quellen (ECB, World Bank, OECD) sind auf dieselbe fachliche Kennzahl (All-items Verbraucherpreis-Jahresdurchschnitt) und dasselbe Zieljahr normiert.
+  - SDMX-JSON-Parser (ECB 1.x und OECD 2.0) validieren Dimensionen und Zeiträume strikt.
+  - Jeder Request besitzt einen Timeout von 8 Sekunden, einen `AbortController` und sicheres Timer-Cleanup.
+  - Deflation wirkt multiplikativ und konsistent auf Bedarfe und den kumulierten Faktor (`faktorNeu = faktorAlt * (1 + rate / 100)`).
+  - Bedarfe werden erst nach erfolgreicher Validierung des gesamten Ergebnisobjekts mutiert. Schlagen alle Quellen fehl, bleibt der Zustand mutationsfrei.
+  - Die Tests in `balance-annual-inflation.test.mjs` laufen alle erfolgreich (34/34 Assertions). Die gesamte Testsuite ist mit 3288 Assertions ebenfalls **grün**.
+- **Vertragstreue:**
+  - Die Anpassung von `src-tauri/tauri.conf.json` und `tests/tauri-csp.test.mjs` auf `sdmx.oecd.org` stellt sicher, dass die neue OECD-Schnittstelle im Desktop-Build (Tauri) zulässig ist.
+- **Fehlerbehandlung:**
+  - Robustes Fallback: Schlägt eine Quelle (z. B. wegen Timeout) fehl, wird die nächste Quelle abgefragt. Nur bei totalem Ausfall aller Quellen wird der Prozess mutationsfrei abgebrochen.
+- **Seiteneffekte:**
+  - Die Bedarfsfortschreibung (`applyInflationToBedarfe`) und die kumulierte Fortschreibung (`applyAnnualInflation`) teilen dieselben mathematischen Formeln und Plausibilitätsschranken ([-10%, +50%]).
+- **Was könnte brechen?**
+  - Ein kumulierter Inflationsfaktor über 3.0 (300% kumulierte Inflation) führt bei einem Neustart zu einem stillen Reset auf 1.0 durch eine verbleibende Migration in `StorageManager`. Dies ist jedoch ein geerbtes Verhalten (siehe Finding G5-01).
+
+### 2. Findings
+
+- **G5-01 (Minor): Stiller Reset bei kumulierter Inflation > 300%**
+  - In `app/balance/balance-storage.js`'s `_runMigrations()` wird der kumulierte Inflationsfaktor auf `1` zurückgesetzt, falls er größer als `3` ist. Bei einer sehr langen Simulationsdauer (z. B. 40 Jahre mit 3% Inflation) kann dieser Wert regulär überschritten werden, was zu einem stillen Zurücksetzen führt.
+  - *Empfehlung:* Dies ist ein bestehendes Systemverhalten. Da in Slices 01-11 keine logische Änderung an den Storage-Migrationen selbst vorgesehen ist, sollte diese Grenze als bekanntes Limit erfasst und in einem späteren Optimierungsschritt überarbeitet werden.
+- **G5-02 (Hinweis): OECD SDMX-API Antwortstruktur**
+  - Die Struktur der SDMX-JSON-Antworten der OECD kann sich bei API-Updates ändern. Da das Parsing in `extractSdmxAnnualValue` sehr flexibel aufgebaut ist (sucht sowohl in `series` als auch in `observations`), ist die Stabilität gegenüber kleineren Formatänderungen hoch.
+
+### 3. Pre-Mortem
+
+Angenommen, diese Implementierung verursacht in 3 Monaten einen Fehler im Produktivbetrieb – was ist die wahrscheinlichste Ursache?
+- Die World Bank oder die OECD ändert ihren API-Endpunkt oder schränkt den CORS-Zugriff weiter ein. Da die ECB die HICP-Reihen sehr stabil pflegt, fängt das ECB-Modul den Fehler im Standard-Pfad ab. Fällt jedoch die ECB-API aus und die App versucht das Fallback auf die World Bank oder OECD, führt ein CORS-Fehler oder Endpunkt-Wechsel zu einem Totalausfall der Online-Inflation. In diesem Fall bricht der Jahresprozess kontrolliert (mutationsfrei) mit einer sprechenden Fehlermeldung ab, und der Nutzer muss den Wert manuell eintragen.
+
+### 4. Review-Ergebnis
+
+- **Status:** freigegeben
+- **Blocker:** keine
+- **Restrisiken:** Geerbtes Limit von max. 300% kumulierter Inflation in den Migrationen (G5-01).
+
+---
 
 ## Review-Antworten von Codex
 
-F-R07 wurde angenommen. Die multiplikative Formel, der bestehende Ratenbereich und die Endlichkeits-/Positivitaetsbedingungen sind jetzt Akzeptanzkriterium.
+F-R07 und U-05 sind erfolgreich umgesetzt. Das Review-Feedback von Gemini (G5-01 bis G5-02) wurde zur Kenntnis genommen. Das Restrisiko bezüglich des verbleibenden 300%-Inflations-Resets in den Altsystem-Migrationen wird als geerbtes Systemlimit akzeptiert. Die Stabilität des SDMX-Parser-Fallbacks wird weiter beobachtet. Der Status wird auf freigegeben/erledigt gesetzt.
 
 ## Review-Entscheidungen
 

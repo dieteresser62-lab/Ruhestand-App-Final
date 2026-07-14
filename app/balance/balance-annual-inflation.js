@@ -1,59 +1,418 @@
 /**
  * Module: Balance Annual Inflation
- * Purpose: Handles inflation-related operations, including fetching external inflation data (ECB, World Bank, OECD)
- *          and applying inflation adjustments to user inputs (needs, budget).
- * Usage: Used by balance-binder-annual.js and balance-binder.js to perform annual updates.
- * Dependencies: balance-config.js, balance-utils.js, balance-reader.js, balance-renderer.js, balance-storage.js
+ * Purpose: Fetches one validated calendar-year inflation value and applies it atomically to Balance needs.
+ * Usage: Used by balance-binder-annual.js and balance-binder.js during annual updates and manual adjustments.
+ * Dependencies: balance-config.js, balance-utils.js, balance-renderer.js, balance-storage.js,
+ *               balance-annual-period.js
  */
 "use strict";
 
 import { AppError } from './balance-config.js';
 import { UIUtils } from './balance-utils.js';
-import { UIReader } from './balance-reader.js';
 import { UIRenderer } from './balance-renderer.js';
 import { StorageManager } from './balance-storage.js';
+import { deriveCompletedCalendarYear } from './balance-annual-period.js';
 
-export function createInflationHandlers({ dom, update, debouncedUpdate }) {
-    const applyInflationToBedarfe = () => {
-        const inputData = UIReader.readAllInputs();
-        const infl = inputData.inflation;
-        const currentAge = inputData.aktuellesAlter;
+export const INFLATION_RESULT_METRIC = 'consumer_prices_all_items_annual_average_growth_pct';
 
-        ['floorBedarf', 'flexBedarf', 'minimumFlexAnnual', 'flexBudgetAnnual', 'flexBudgetRecharge'].forEach(id => {
-            const el = dom.inputs[id];
-            if (!el) return;
-            el.value = UIUtils.formatNumber(UIUtils.parseCurrency(el.value) * (1 + infl / 100));
+const INFLATION_RATE_MIN = -10;
+const INFLATION_RATE_MAX = 50;
+const DEFAULT_TIMEOUT_MS = 8000;
+const NEED_INPUT_IDS = Object.freeze([
+    'floorBedarf',
+    'flexBedarf',
+    'minimumFlexAnnual',
+    'flexBudgetAnnual',
+    'flexBudgetRecharge'
+]);
+
+const SOURCE_REQUESTS = Object.freeze([
+    Object.freeze({
+        id: 'ecb',
+        label: 'ECB (HICP)',
+        fetchStatus: 'ok_primary_ecb'
+    }),
+    Object.freeze({
+        id: 'world_bank',
+        label: 'World Bank (CPI)',
+        fetchStatus: 'ok_fallback_world_bank'
+    }),
+    Object.freeze({
+        id: 'oecd',
+        label: 'OECD (CPI)',
+        fetchStatus: 'ok_fallback_oecd'
+    })
+]);
+
+function sourceError(source, fetchStatus, message, originalError = null) {
+    return new AppError(message, {
+        source,
+        fetchStatus,
+        originalError
+    });
+}
+
+function parseFiniteNumber(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function assertInflationRate(value) {
+    const rate = parseFiniteNumber(value);
+    if (rate === null || rate < INFLATION_RATE_MIN || rate > INFLATION_RATE_MAX) {
+        throw new AppError(
+            `Die Inflationsrate muss zwischen ${INFLATION_RATE_MIN} und ${INFLATION_RATE_MAX} Prozent liegen.`
+        );
+    }
+    const factor = 1 + rate / 100;
+    if (!Number.isFinite(factor) || factor <= 0) {
+        throw new AppError('Der Inflationsfaktor muss endlich und groesser als null sein.');
+    }
+    return rate;
+}
+
+function responseHeader(response, name) {
+    try {
+        const value = response?.headers?.get?.(name);
+        return typeof value === 'string' && value.trim() ? value.trim() : null;
+    } catch {
+        return null;
+    }
+}
+
+function resolveDataAsOf(payload, response, now) {
+    const candidates = [
+        payload?.header?.prepared,
+        payload?.meta?.prepared,
+        Array.isArray(payload) ? payload[0]?.lastupdated : null,
+        responseHeader(response, 'last-modified'),
+        responseHeader(response, 'date')
+    ];
+    const sourceValue = candidates.find(value => typeof value === 'string' && value.trim());
+    if (sourceValue) return sourceValue.trim();
+
+    const fetchedAt = now();
+    if (!(fetchedAt instanceof Date) || !Number.isFinite(fetchedAt.getTime())) {
+        throw new AppError('Der Datenstand der Inflationsquelle konnte nicht bestimmt werden.');
+    }
+    return fetchedAt.toISOString();
+}
+
+function dimensionSelectionMatches(dimensions, coordinateKey, expectedDimensions) {
+    if (!Array.isArray(dimensions)) return false;
+    const coordinates = String(coordinateKey).split(':');
+
+    return Object.entries(expectedDimensions).every(([dimensionId, expectedValue]) => {
+        const position = dimensions.findIndex(dimension => dimension?.id === dimensionId);
+        if (position < 0) return false;
+        const valueIndex = Number.parseInt(coordinates[position], 10);
+        const actualValue = dimensions[position]?.values?.[valueIndex]?.id;
+        return actualValue === expectedValue;
+    });
+}
+
+function observationNumber(observation) {
+    const rawValue = Array.isArray(observation) ? observation[0] : observation;
+    return parseFiniteNumber(rawValue);
+}
+
+function extractSdmxAnnualValue(payload, targetYear, expectedDimensions) {
+    const dataSets = payload?.dataSets || payload?.data?.dataSets;
+    const dataSet = dataSets?.[0];
+    const structureIndex = Number.isInteger(dataSet?.structure) ? dataSet.structure : 0;
+    const structure = payload?.structure?.dimensions
+        || payload?.data?.structures?.[structureIndex]?.dimensions;
+    const targetPeriod = String(targetYear);
+    const values = [];
+
+    if (dataSet?.series && structure?.series && structure?.observation) {
+        const timeDimension = structure.observation.find(dimension => dimension?.id === 'TIME_PERIOD');
+        const timeIndex = timeDimension?.values?.findIndex(value => value?.id === targetPeriod) ?? -1;
+        if (timeIndex >= 0) {
+            for (const [seriesKey, series] of Object.entries(dataSet.series)) {
+                if (!dimensionSelectionMatches(structure.series, seriesKey, expectedDimensions)) continue;
+                const value = observationNumber(series?.observations?.[String(timeIndex)]);
+                if (value !== null) values.push(value);
+            }
+        }
+    }
+
+    if (dataSet?.observations && structure?.observation) {
+        const dimensions = structure.observation;
+        const timePosition = dimensions.findIndex(dimension => dimension?.id === 'TIME_PERIOD');
+        for (const [observationKey, observation] of Object.entries(dataSet.observations)) {
+            const coordinates = String(observationKey).split(':');
+            const timeIndex = Number.parseInt(coordinates[timePosition], 10);
+            const period = timePosition >= 0 ? dimensions[timePosition]?.values?.[timeIndex]?.id : null;
+            if (period !== targetPeriod) continue;
+            if (!dimensionSelectionMatches(dimensions, observationKey, expectedDimensions)) continue;
+            const value = observationNumber(observation);
+            if (value !== null) values.push(value);
+        }
+    }
+
+    return values.length === 1 ? values[0] : null;
+}
+
+function validateWorldBankPayload(payload, targetYear) {
+    if (!Array.isArray(payload) || !Array.isArray(payload[1])) return null;
+    const rows = payload[1].filter(row => (
+        row?.indicator?.id === 'FP.CPI.TOTL.ZG'
+        && row?.countryiso3code === 'DEU'
+        && row?.date === String(targetYear)
+        && parseFiniteNumber(row?.value) !== null
+    ));
+    return rows.length === 1 ? Number(rows[0].value) : null;
+}
+
+export function validateInflationResult(result, targetYear) {
+    const rate = assertInflationRate(result?.rate);
+    if (!Number.isInteger(targetYear) || result?.year !== targetYear) {
+        throw new AppError(`Die Inflationsquelle lieferte nicht das Zieljahr ${targetYear}.`);
+    }
+    if (result?.metric !== INFLATION_RESULT_METRIC) {
+        throw new AppError('Die Inflationsquelle lieferte eine inkompatible fachliche Kennzahl.');
+    }
+    if (typeof result?.source !== 'string' || !result.source.trim()) {
+        throw new AppError('Die Inflationsquelle fehlt im Ergebnisobjekt.');
+    }
+    if (typeof result?.dataAsOf !== 'string' || !result.dataAsOf.trim()) {
+        throw new AppError('Der Datenstand fehlt im Ergebnisobjekt.');
+    }
+    if (typeof result?.fetchStatus !== 'string' || !result.fetchStatus.startsWith('ok_')) {
+        throw new AppError('Der Fetch-Status des Inflationsergebnisses ist ungueltig.');
+    }
+
+    return Object.freeze({
+        rate,
+        year: targetYear,
+        source: result.source.trim(),
+        dataAsOf: result.dataAsOf.trim(),
+        fetchStatus: result.fetchStatus,
+        metric: INFLATION_RESULT_METRIC
+    });
+}
+
+export function createInflationHandlers({
+    dom,
+    update,
+    debouncedUpdate,
+    fetchImpl = (...args) => globalThis.fetch(...args),
+    now = () => new Date(),
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    setTimeoutImpl = (...args) => globalThis.setTimeout(...args),
+    clearTimeoutImpl = timeoutId => globalThis.clearTimeout(timeoutId)
+}) {
+    const requestJson = async ({ url, source, accept = 'application/json' }) => {
+        const controller = new AbortController();
+        let timedOut = false;
+        let timeoutId;
+
+        try {
+            timeoutId = setTimeoutImpl(() => {
+                timedOut = true;
+                controller.abort();
+            }, timeoutMs);
+
+            const response = await fetchImpl(url, {
+                headers: { Accept: accept },
+                signal: controller.signal
+            });
+            if (!response?.ok) {
+                throw sourceError(
+                    source,
+                    'http_error',
+                    `${source} antwortete mit HTTP ${response?.status ?? 'unbekannt'}.`
+                );
+            }
+
+            try {
+                return { payload: await response.json(), response };
+            } catch (err) {
+                throw sourceError(source, 'invalid_response', `${source} lieferte kein gueltiges JSON.`, err);
+            }
+        } catch (err) {
+            if (err instanceof AppError) throw err;
+            if (timedOut || (controller.signal.aborted && err?.name === 'AbortError')) {
+                throw sourceError(source, 'timeout', `${source} ueberschritt das Zeitlimit.`, err);
+            }
+            throw sourceError(source, 'request_error', `${source} konnte nicht abgerufen werden.`, err);
+        } finally {
+            if (timeoutId !== undefined) clearTimeoutImpl(timeoutId);
+        }
+    };
+
+    const fetchEcb = async targetYear => {
+        const url = 'https://data-api.ecb.europa.eu/service/data/'
+            + `HICP/A.DE.N.000000.4D0.AVR?startPeriod=${targetYear}&endPeriod=${targetYear}&format=jsondata`;
+        const { payload, response } = await requestJson({ url, source: 'ECB' });
+        const rate = extractSdmxAnnualValue(payload, targetYear, {
+            FREQ: 'A',
+            REF_AREA: 'DE',
+            ICP_ITEM: '000000',
+            ICP_SUFFIX: 'AVR'
         });
+        if (rate === null) {
+            throw sourceError(
+                'ECB',
+                'incompatible_response',
+                `ECB lieferte keinen eindeutigen HICP-Jahresdurchschnitt fuer ${targetYear}.`
+            );
+        }
+        return {
+            rate,
+            year: targetYear,
+            source: SOURCE_REQUESTS[0].label,
+            dataAsOf: resolveDataAsOf(payload, response, now),
+            fetchStatus: SOURCE_REQUESTS[0].fetchStatus,
+            metric: INFLATION_RESULT_METRIC
+        };
+    };
 
-        const state = StorageManager.loadState();
+    const fetchWorldBank = async targetYear => {
+        const url = 'https://api.worldbank.org/v2/country/DEU/indicator/'
+            + `FP.CPI.TOTL.ZG?format=json&date=${targetYear}`;
+        const { payload, response } = await requestJson({ url, source: 'World Bank' });
+        const rate = validateWorldBankPayload(payload, targetYear);
+        if (rate === null) {
+            throw sourceError(
+                'World Bank',
+                'incompatible_response',
+                `World Bank lieferte keinen eindeutigen CPI-Jahresdurchschnitt fuer ${targetYear}.`
+            );
+        }
+        return {
+            rate,
+            year: targetYear,
+            source: SOURCE_REQUESTS[1].label,
+            dataAsOf: resolveDataAsOf(payload, response, now),
+            fetchStatus: SOURCE_REQUESTS[1].fetchStatus,
+            metric: INFLATION_RESULT_METRIC
+        };
+    };
+
+    const fetchOecd = async targetYear => {
+        const url = 'https://sdmx.oecd.org/public/rest/data/'
+            + 'OECD.SDD.TPS,DSD_PRICES@DF_PRICES_ALL,1.0/'
+            + `DEU.A.N.CPI.PA._T.N.GY?startPeriod=${targetYear}&endPeriod=${targetYear}`
+            + '&dimensionAtObservation=AllDimensions&format=jsondata';
+        const { payload, response } = await requestJson({
+            url,
+            source: 'OECD',
+            accept: 'application/vnd.sdmx.data+json;version=2.0.0'
+        });
+        const rate = extractSdmxAnnualValue(payload, targetYear, {
+            REF_AREA: 'DEU',
+            FREQ: 'A',
+            METHODOLOGY: 'N',
+            MEASURE: 'CPI',
+            UNIT_MEASURE: 'PA',
+            EXPENDITURE: '_T',
+            ADJUSTMENT: 'N',
+            TRANSFORMATION: 'GY'
+        });
+        if (rate === null) {
+            throw sourceError(
+                'OECD',
+                'incompatible_response',
+                `OECD lieferte keinen eindeutigen CPI-Jahresdurchschnitt fuer ${targetYear}.`
+            );
+        }
+        return {
+            rate,
+            year: targetYear,
+            source: SOURCE_REQUESTS[2].label,
+            dataAsOf: resolveDataAsOf(payload, response, now),
+            fetchStatus: SOURCE_REQUESTS[2].fetchStatus,
+            metric: INFLATION_RESULT_METRIC
+        };
+    };
+
+    const prepareNeedMutation = rateValue => {
+        const rate = assertInflationRate(rateValue);
+        const factor = 1 + rate / 100;
+        const entries = NEED_INPUT_IDS.flatMap(id => {
+            const element = dom.inputs[id];
+            if (!element) return [];
+            const currentAmount = UIUtils.parseCurrency(element.value);
+            if (!Number.isFinite(currentAmount) || currentAmount < 0) {
+                throw new AppError(`Der Bedarf ${id} ist fuer die Inflationsanpassung ungueltig.`);
+            }
+            const nextAmount = currentAmount * factor;
+            if (
+                !Number.isFinite(nextAmount)
+                || nextAmount < 0
+                || (currentAmount > 0 && nextAmount <= 0)
+            ) {
+                throw new AppError(`Der fortgeschriebene Bedarf ${id} ist ungueltig.`);
+            }
+            return [{ id, element, nextAmount, formattedValue: UIUtils.formatNumber(nextAmount) }];
+        });
+        return { rate, factor, entries };
+    };
+
+    const prepareInflationState = () => {
+        const currentAge = Number.parseInt(dom.inputs.aktuellesAlter?.value, 10);
+        if (!Number.isSafeInteger(currentAge) || currentAge < 0) {
+            throw new AppError('Das aktuelle Alter ist fuer die Inflationsanpassung ungueltig.');
+        }
+        const state = StorageManager.loadState() || {};
+        return { state, currentAge };
+    };
+
+    const commitNeedMutation = (mutation, { inflationInputValue } = {}) => {
+        const { state, currentAge } = prepareInflationState();
+
+        if (inflationInputValue !== undefined) {
+            dom.inputs.inflation.value = inflationInputValue;
+        }
+        mutation.entries.forEach(entry => {
+            entry.element.value = entry.formattedValue;
+        });
         state.ageAdjustedForInflation = currentAge;
         StorageManager.saveState(state);
-
         update();
+    };
+
+    const applyInflationToBedarfe = rateOverride => {
+        const rateValue = rateOverride === undefined ? dom.inputs.inflation?.value : rateOverride;
+        const mutation = prepareNeedMutation(rateValue);
+        commitNeedMutation(mutation);
+        return mutation;
     };
 
     const applyAnnualInflation = () => {
         const state = StorageManager.loadState();
         if (!state || !state.lastState) return;
 
-        const currentAge = parseInt(dom.inputs.aktuellesAlter.value, 10);
-        const lastAppliedAge = state.lastState.lastInflationAppliedAtAge || 0;
+        const currentAge = Number.parseInt(dom.inputs.aktuellesAlter?.value, 10);
+        if (!Number.isSafeInteger(currentAge) || currentAge < 0) {
+            throw new AppError('Das aktuelle Alter ist fuer die kumulierte Inflation ungueltig.');
+        }
+        const lastAppliedAge = Number(state.lastState.lastInflationAppliedAtAge) || 0;
 
         if (currentAge > lastAppliedAge) {
-            const infl = UIReader.readAllInputs().inflation;
-            const fac = Math.max(0, infl) / 100;
-            const oldFactor = state.lastState.cumulativeInflationFactor || 1;
-            state.lastState.cumulativeInflationFactor = oldFactor * (1 + fac);
+            const rate = assertInflationRate(dom.inputs.inflation?.value);
+            const oldFactor = Number(state.lastState.cumulativeInflationFactor ?? 1);
+            if (!Number.isFinite(oldFactor) || oldFactor <= 0) {
+                throw new AppError('Der bisherige kumulierte Inflationsfaktor ist ungueltig.');
+            }
+            const nextFactor = oldFactor * (1 + rate / 100);
+            if (!Number.isFinite(nextFactor) || nextFactor <= 0) {
+                throw new AppError('Der neue kumulierte Inflationsfaktor ist ungueltig.');
+            }
+            state.lastState.cumulativeInflationFactor = nextFactor;
             state.lastState.lastInflationAppliedAtAge = currentAge;
             StorageManager.saveState(state);
-            UIRenderer.toast(`Kumulierte Inflation für Alter ${currentAge} fortgeschrieben.`);
-        } else if (currentAge <= lastAppliedAge) {
-            UIRenderer.toast(`Inflation für Alter ${currentAge} wurde bereits angewendet.`, false);
+            UIRenderer.toast(`Kumulierte Inflation fuer Alter ${currentAge} fortgeschrieben.`);
+        } else {
+            UIRenderer.toast(`Inflation fuer Alter ${currentAge} wurde bereits angewendet.`, false);
         }
     };
 
     const handleFetchInflation = async () => {
-        const btn = dom.controls.btnFetchInflation;  // Kann undefined sein (wenn von Jahres-Update aufgerufen)
+        const btn = dom.controls.btnFetchInflation;
         const originalText = btn?.innerHTML;
 
         try {
@@ -62,139 +421,55 @@ export function createInflationHandlers({ dom, update, debouncedUpdate }) {
                 btn.innerHTML = '⏳ Lade...';
             }
 
-            // Berechne das Vorjahr
-            const currentYear = new Date().getFullYear();
-            const previousYear = currentYear - 1;
+            const targetYear = deriveCompletedCalendarYear(now());
+            if (!Number.isInteger(targetYear)) {
+                throw new AppError('Das Zieljahr fuer die Inflation konnte nicht bestimmt werden.');
+            }
+            if (btn) UIRenderer.toast(`Versuche Inflationsdaten fuer ${targetYear} abzurufen...`);
+
+            const attempts = [];
+            let validatedResult = null;
+            const fetchers = [fetchEcb, fetchWorldBank, fetchOecd];
+
+            for (let index = 0; index < fetchers.length; index++) {
+                try {
+                    validatedResult = validateInflationResult(await fetchers[index](targetYear), targetYear);
+                    break;
+                } catch (err) {
+                    attempts.push({
+                        source: SOURCE_REQUESTS[index].label,
+                        fetchStatus: err?.context?.fetchStatus || 'invalid_response',
+                        error: err?.message || 'Unbekannter Fehler'
+                    });
+                }
+            }
+
+            if (!validatedResult) {
+                throw new AppError(
+                    `Keine kompatiblen Inflationsdaten fuer ${targetYear} gefunden.`,
+                    { attempts }
+                );
+            }
+
+            const mutation = prepareNeedMutation(validatedResult.rate);
+            commitNeedMutation(mutation, { inflationInputValue: validatedResult.rate.toFixed(1) });
+            debouncedUpdate();
 
             if (btn) {
-                UIRenderer.toast(`Versuche Inflationsdaten für ${previousYear} abzurufen...`);
+                const formattedRate = UIUtils.formatPercentValue(
+                    validatedResult.rate,
+                    { fractionDigits: 1, invalid: 'n/a' }
+                );
+                UIRenderer.toast(
+                    `✅ Inflation ${targetYear}: ${formattedRate} (Quelle: ${validatedResult.source})\n`
+                    + 'Bedarfe automatisch angepasst'
+                );
             }
-
-            // Versuche verschiedene APIs nacheinander
-            let inflationRate = null;
-            let source = '';
-
-            // API 1: ECB Statistical Data Warehouse (HICP - Harmonized Index of Consumer Prices)
-            // Deutschland: DEU, HICP All-items, Annual rate of change
-            try {
-                const ecbUrl = `https://data-api.ecb.europa.eu/service/data/ICP/M.DE.N.000000.4.ANR`;
-                const ecbResponse = await fetch(ecbUrl, {
-                    headers: { 'Accept': 'application/json' }
-                });
-
-                if (ecbResponse.ok) {
-                    const ecbData = await ecbResponse.json();
-
-                    // Durchsuche die Zeitreihe nach dem Vorjahr
-                    if (ecbData.dataSets && ecbData.dataSets[0] && ecbData.dataSets[0].series) {
-                        const series = Object.values(ecbData.dataSets[0].series)[0];
-                        if (series && series.observations) {
-                            // Finde die neuesten verfügbaren Daten
-                            const observations = Object.entries(series.observations);
-                            if (observations.length > 0) {
-                                // Nimm den neuesten Wert
-                                const latestObs = observations[observations.length - 1];
-                                inflationRate = parseFloat(latestObs[1][0]);
-                                source = 'ECB (HICP)';
-                            }
-                        }
-                    }
-                }
-            } catch (ecbErr) {
-                // ECB API failed, try next
-            }
-
-            // API 2: World Bank API (Alternative)
-            if (inflationRate === null) {
-                try {
-                    const wbUrl = `https://api.worldbank.org/v2/country/DE/indicator/FP.CPI.TOTL.ZG?format=json&date=${previousYear}`;
-                    const wbResponse = await fetch(wbUrl);
-
-                    if (wbResponse.ok) {
-                        const wbData = await wbResponse.json();
-
-                        if (wbData && wbData[1] && wbData[1].length > 0 && wbData[1][0].value !== null) {
-                            inflationRate = parseFloat(wbData[1][0].value);
-                            source = 'World Bank';
-                        }
-                    }
-                } catch (wbErr) {
-                    // World Bank API failed, try next
-                }
-            }
-
-            // API 3: OECD API (Alternative)
-            if (inflationRate === null) {
-                try {
-                    const oecdUrl = `https://stats.oecd.org/sdmx-json/data/DP_LIVE/.CPI.../OECD?contentType=json&detail=code&separator=.&dimensionAtObservation=allDimensions&startPeriod=${previousYear}&endPeriod=${previousYear}`;
-                    const oecdResponse = await fetch(oecdUrl);
-
-                    if (oecdResponse.ok) {
-                        const oecdData = await oecdResponse.json();
-
-                        // Suche Deutschland in den Daten
-                        if (oecdData.dataSets && oecdData.dataSets[0] && oecdData.dataSets[0].observations) {
-                            // OECD Datenstruktur ist komplex, durchsuche nach DEU
-                            const observations = oecdData.dataSets[0].observations;
-                            for (const [key, value] of Object.entries(observations)) {
-                                // Prüfe ob das Deutschland ist
-                                const indices = key.split(':');
-                                if (oecdData.structure && oecdData.structure.dimensions) {
-                                    const locationDim = oecdData.structure.dimensions.observation.find(d => d.id === 'LOCATION');
-                                    if (locationDim && locationDim.values[parseInt(indices[0])].id === 'DEU') {
-                                        inflationRate = parseFloat(value[0]);
-                                        source = 'OECD';
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } catch (oecdErr) {
-                    // OECD API failed, try next
-                }
-            }
-
-            // Ergebnis verarbeiten
-            if (inflationRate !== null && !isNaN(inflationRate) && isFinite(inflationRate)) {
-                // Setze den Wert im Eingabefeld
-                dom.inputs.inflation.value = inflationRate.toFixed(1);
-                debouncedUpdate();
-
-                // Automatisch Bedarfe anpassen
-                applyInflationToBedarfe();
-
-                if (btn) {
-                    const formattedRate = UIUtils.formatPercentValue(inflationRate, { fractionDigits: 1, invalid: 'n/a' });
-                    UIRenderer.toast(`✅ Inflation ${previousYear}: ${formattedRate} (Quelle: ${source})\nBedarfe automatisch angepasst`);
-                }
-
-                // Rückgabe für Jahres-Update Modal
-                return {
-                    rate: inflationRate,
-                    year: previousYear,
-                    source: source
-                };
-            }
-
-            // Keine Daten gefunden - detailliertes Feedback
-            throw new AppError(
-                `Keine Inflationsdaten für ${previousYear} gefunden.\n\n` +
-                `🔍 Getestete APIs:\n` +
-                `• ECB Statistical Data Warehouse\n` +
-                `• World Bank Data API\n` +
-                `• OECD Statistics API\n\n` +
-                `Mögliche Ursachen:\n` +
-                `• CORS-Blockierung durch Browser\n` +
-                `• Daten für ${previousYear} noch nicht verfügbar\n` +
-                `• API-Endpoints haben sich geändert\n\n` +
-                `💡 Tipp: Öffne die Browser-Konsole (F12) für Details.`
-            );
-
+            return validatedResult;
         } catch (err) {
             console.error('Inflation API Fehler:', err);
             UIRenderer.handleError(new AppError('Inflationsdaten-Abruf fehlgeschlagen.', { originalError: err }));
-            throw err; // Re-throw für Jahres-Update
+            throw err;
         } finally {
             if (btn) {
                 btn.disabled = false;

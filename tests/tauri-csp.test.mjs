@@ -33,7 +33,8 @@ assert(connectSrc.includes('http://127.0.0.1:8787'), 'Tauri CSP should allow the
 assert(connectSrc.includes('http://localhost:8787'), 'Tauri CSP should allow localhost Yahoo proxy fallback');
 assert(connectSrc.includes('https://data-api.ecb.europa.eu'), 'Tauri CSP should allow ECB inflation fetches');
 assert(connectSrc.includes('https://api.worldbank.org'), 'Tauri CSP should allow World Bank inflation fetches');
-assert(connectSrc.includes('https://stats.oecd.org'), 'Tauri CSP should allow OECD inflation fetches');
+assert(connectSrc.includes('https://sdmx.oecd.org'), 'Tauri CSP should allow current OECD SDMX inflation fetches');
+assert(!connectSrc.includes('https://stats.oecd.org'), 'Tauri CSP should not retain the retired OECD.Stat host');
 assert(connectSrc.includes('https://r.jina.ai'), 'Tauri CSP should allow CAPE fetches via r.jina.ai');
 
 assert(workerSrc.includes("'self'"), 'Tauri CSP should allow bundled worker modules');

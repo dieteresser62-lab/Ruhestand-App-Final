@@ -297,7 +297,7 @@ src-tauri/
   "app": {
     "security": {
       "csp": {
-        "connect-src": "'self' http://127.0.0.1:8787 http://localhost:8787 https://data-api.ecb.europa.eu https://api.worldbank.org https://stats.oecd.org https://r.jina.ai",
+        "connect-src": "'self' http://127.0.0.1:8787 http://localhost:8787 https://data-api.ecb.europa.eu https://api.worldbank.org https://sdmx.oecd.org https://r.jina.ai",
         "worker-src": "'self' blob:"
       },
       "dangerousDisableAssetCspModification": true
@@ -332,7 +332,7 @@ Live-Daten sind optional. Ohne Netzwerk, blockierte Endpunkte oder fehlenden Pro
 | Yahoo Finance | lokaler Proxy `http://127.0.0.1:8787` bzw. `http://localhost:8787` | Browser: Node-Proxy aus `start_suite.*`; Tauri: integrierter Rust-Proxy in `src-tauri/src/lib.rs` |
 | ECB Data API | `https://data-api.ecb.europa.eu` | direkter Fetch aus Browser/Tauri-WebView |
 | World Bank API | `https://api.worldbank.org` | direkter Fetch aus Browser/Tauri-WebView |
-| OECD stats | `https://stats.oecd.org` | direkter Fetch aus Browser/Tauri-WebView |
+| OECD Data Explorer API | `https://sdmx.oecd.org` | direkter Fetch aus Browser/Tauri-WebView |
 | CAPE/Yale-Mirror | `https://r.jina.ai` | direkter Fetch aus Browser/Tauri-WebView |
 
 Die Tauri-CSP in `src-tauri/tauri.conf.json` muss diese Ziele explizit unter `app.security.csp.connect-src` erlauben. Neue externe Live-Datenquellen müssen gleichzeitig in `docs/reference/DATA_SOURCES.md` dokumentiert und in der CSP ergänzt werden.
