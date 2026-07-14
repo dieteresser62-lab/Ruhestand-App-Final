@@ -272,16 +272,19 @@ Inflation-bezogene Operationen für das jährliche Update.
 ---
 
 ### 9.2 `balance-annual-marketdata.js`
-Marktdaten-Updates für das „Nachrücken"-Workflow.
+Periodengebundene ETF-Jahresenddaten und davon unabhängige CAPE-Updates für den „Nachrücken"-Workflow. Der ETF-Pfad liest `calendar-year:<YYYY>` aus dem laufenden Commit, fragt Yahoo im UTC-Jahresendfenster ab und persistiert den akzeptierten Stichtagscontract unter `annualMarketDataMeta`.
 
 **Exports:**
+- `ANNUAL_MARKET_DATA_META_KEY` / `ANNUAL_MARKET_DATA_SCHEMA_VERSION` – stabiler Persistenzschlüssel und Schema-Version
+- `createAnnualMarketDataRequest(periodId)` – bildet Zieljahr sowie `period1`/exklusives `period2` ohne Systemdatumsableitung
+- `selectAnnualCloseQuote(data, context)` – wählt aus Yahoo-Daten unabhängig von deren Reihenfolge den letzten VWCE.DE-Schlusskurs von 0,50 bis 100.000 EUR vom 27.12. bis 31.12. des Zieljahres
 - `createMarketdataHandlers({ dom, appState, debouncedUpdate, applyAnnualInflation })`
-  - `handleNachruecken()` – Verschiebt Vorjahreswerte und aktualisiert ATH
-  - `handleUndoNachruecken()` – Macht Nachrücken rückgängig
-  - `handleNachrueckenMitETF()` – Holt VWCE.DE-Kurs via Yahoo-Proxy und führt Nachrücken durch
+  - `handleNachruecken()` – verschiebt Vorjahreswerte und aktualisiert ATH; quellenloses manuelles Nachrücken invalidiert veraltete Online-Stichtagsmetadaten
+  - `handleUndoNachruecken()` – macht Nachrücken einschließlich der Stichtagsmetadaten rückgängig
+  - `handleNachrueckenMitETF()` – holt den VWCE.DE-Jahresendkurs via Yahoo-Proxy, prüft den vollständigen laufenden Commit-Kontext vor Fetch und Mutation, führt das Nachrücken durch und speichert Marktdateninputs gemeinsam mit Preis, ISO-Stichtag, Ticker, Quelle, Zieljahr, Perioden-ID sowie der stichtagsgleichen ATH-Auswertung; Fehler nach begonnener Mutation stellen den vorherigen DOM-/State-Stand wieder her
   - `handleFetchCapeAuto()` – Holt US-Shiller-CAPE via Yale/Mirror/r.jina.ai mit lokalem Fallback und persistiert `capeMeta`
 
-**Dependencies:** `balance-config.js`, `balance-renderer.js`
+**Dependencies:** `balance-config.js`, `balance-renderer.js`, `balance-storage.js`, `balance-annual-period.js`, `persistence-facade.js`
 
 ---
 

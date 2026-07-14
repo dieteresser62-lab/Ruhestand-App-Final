@@ -11,6 +11,10 @@
 import { AppError } from './balance-config.js';
 import { UIRenderer } from './balance-renderer.js';
 import { StorageManager } from './balance-storage.js';
+import {
+    ANNUAL_PERIOD_SCHEMA_VERSION,
+    deriveCompletedCalendarYear
+} from './balance-annual-period.js';
 import { persistenceStorage } from '../shared/persistence-facade.js';
 
 const CAPE_PLAUSIBILITY_MIN = 5;
@@ -19,6 +23,16 @@ const CAPE_STALE_MONTHS = 18;
 const CAPE_FETCH_TIMEOUT_MS = 20000;
 const LOCAL_PROXY_FETCH_TIMEOUT_MS = 8000;
 const LOCAL_PROXY_FETCH_RETRIES = 3;
+const ANNUAL_PERIOD_METADATA_KEY = 'annualPeriodMetadata';
+const ANNUAL_PERIOD_PREFIX = 'calendar-year:';
+const ANNUAL_CLOSE_WINDOW_START_DAY = 27;
+const ANNUAL_CLOSE_WINDOW_END_DAY = 31;
+// Broad VWCE.DE guard: keeps the existing whole-euro UI value positive and rejects proxy scaling failures.
+const ANNUAL_CLOSE_PRICE_MIN = 0.5;
+const ANNUAL_CLOSE_PRICE_MAX = 100000;
+
+export const ANNUAL_MARKET_DATA_META_KEY = 'annualMarketDataMeta';
+export const ANNUAL_MARKET_DATA_SCHEMA_VERSION = 1;
 
 const CAPE_SOURCES = {
     PRIMARY: {
@@ -36,6 +50,85 @@ const CAPE_SOURCES = {
         label: 'Lokaler letzter CAPE-Stand'
     }
 };
+
+function isoDateFromUtcParts(year, month, day) {
+    return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function isPlausibleAnnualClosePrice(value) {
+    return (
+        typeof value === 'number' &&
+        Number.isFinite(value) &&
+        value >= ANNUAL_CLOSE_PRICE_MIN &&
+        value <= ANNUAL_CLOSE_PRICE_MAX
+    );
+}
+
+export function createAnnualMarketDataRequest(periodId) {
+    if (typeof periodId !== 'string' || !periodId.startsWith(ANNUAL_PERIOD_PREFIX)) return null;
+    const yearText = periodId.slice(ANNUAL_PERIOD_PREFIX.length);
+    if (!/^\d{4}$/.test(yearText)) return null;
+    const targetYear = Number(yearText);
+    if (!Number.isInteger(targetYear) || targetYear < 1900 || targetYear > 9999) return null;
+    if (periodId !== `${ANNUAL_PERIOD_PREFIX}${targetYear}`) return null;
+
+    const period1 = Math.floor(Date.UTC(targetYear, 11, ANNUAL_CLOSE_WINDOW_START_DAY) / 1000);
+    const period2 = Math.floor(Date.UTC(targetYear + 1, 0, 1) / 1000);
+    if (!Number.isFinite(period1) || !Number.isFinite(period2)) return null;
+
+    return {
+        periodId,
+        targetYear,
+        windowStart: isoDateFromUtcParts(targetYear, 12, ANNUAL_CLOSE_WINDOW_START_DAY),
+        windowEnd: isoDateFromUtcParts(targetYear, 12, ANNUAL_CLOSE_WINDOW_END_DAY),
+        period1,
+        period2
+    };
+}
+
+export function selectAnnualCloseQuote(data, {
+    targetYear,
+    ticker = 'VWCE.DE',
+    source = 'Yahoo Finance'
+} = {}) {
+    if (!Number.isInteger(targetYear) || targetYear < 1900 || targetYear > 9999) return null;
+    const result = data?.chart?.result?.[0];
+    const timestamps = result?.timestamp;
+    const closes = result?.indicators?.quote?.[0]?.close;
+    if (!Array.isArray(timestamps) || !Array.isArray(closes)) return null;
+
+    let selected = null;
+    const length = Math.min(timestamps.length, closes.length);
+    for (let index = 0; index < length; index += 1) {
+        const timestamp = timestamps[index];
+        const price = closes[index];
+        if (typeof timestamp !== 'number' || !Number.isFinite(timestamp)) continue;
+        if (!isPlausibleAnnualClosePrice(price)) continue;
+
+        const date = new Date(timestamp * 1000);
+        if (!Number.isFinite(date.getTime()) || date.getUTCFullYear() !== targetYear) continue;
+        const month = date.getUTCMonth() + 1;
+        const day = date.getUTCDate();
+        if (
+            month !== 12 ||
+            day < ANNUAL_CLOSE_WINDOW_START_DAY ||
+            day > ANNUAL_CLOSE_WINDOW_END_DAY
+        ) continue;
+
+        if (!selected || timestamp > selected.timestamp) {
+            selected = {
+                price,
+                date,
+                asOf: isoDateFromUtcParts(targetYear, month, day),
+                timestamp,
+                ticker,
+                source,
+                targetYear
+            };
+        }
+    }
+    return selected;
+}
 
 function toNumber(value) {
     const n = Number(value);
@@ -179,7 +272,83 @@ export function createMarketdataHandlers({
     debouncedUpdate,
     applyAnnualInflation
 }) {
+    const readActiveAnnualMarketDataContext = () => {
+        const state = StorageManager.loadState() || {};
+        const metadata = state?.[ANNUAL_PERIOD_METADATA_KEY];
+        const pendingCommit = metadata?.pendingCommit;
+        const periodId = pendingCommit?.periodId;
+        const request = createAnnualMarketDataRequest(periodId);
+        const lastCommittedPeriod = metadata?.lastCommittedPeriod;
+        const lastCommittedRequest = lastCommittedPeriod === null
+            ? null
+            : createAnnualMarketDataRequest(lastCommittedPeriod);
+        const completedYear = deriveCompletedCalendarYear(new Date());
+        const validLastCommittedPeriod = (
+            lastCommittedPeriod === null ||
+            (
+                lastCommittedRequest &&
+                request &&
+                lastCommittedRequest.targetYear < request.targetYear
+            )
+        );
+        const validCommitContext = (
+            metadata &&
+            typeof metadata === 'object' &&
+            !Array.isArray(metadata) &&
+            metadata.schemaVersion === ANNUAL_PERIOD_SCHEMA_VERSION &&
+            pendingCommit &&
+            typeof pendingCommit === 'object' &&
+            !Array.isArray(pendingCommit) &&
+            pendingCommit.phase === 'writes_started' &&
+            typeof pendingCommit.snapshotId === 'string' &&
+            pendingCommit.snapshotId.trim() !== '' &&
+            request &&
+            Number.isInteger(completedYear) &&
+            request.targetYear <= completedYear &&
+            validLastCommittedPeriod
+        );
+        if (!validCommitContext) {
+            throw new AppError(
+                'ETF-Jahresenddaten benoetigen einen gueltigen laufenden Jahres-Commit mit bestaetigtem Snapshot. '
+                + 'Der Marktdatenabruf wurde vor jeder Aenderung abgebrochen.'
+            );
+        }
+        return { state, request };
+    };
+
+    const copyMarketDataMeta = (meta) => {
+        if (!meta || typeof meta !== 'object') return meta;
+        return {
+            ...meta,
+            ath: meta.ath && typeof meta.ath === 'object' ? { ...meta.ath } : meta.ath
+        };
+    };
+
+    const readMarketInputs = () => {
+        const marketInputs = {};
+        ['endeVJ', 'endeVJ_1', 'endeVJ_2', 'endeVJ_3', 'ath', 'jahreSeitAth'].forEach(id => {
+            const value = Number(dom.inputs[id]?.value);
+            if (!Number.isFinite(value)) {
+                throw new AppError(`Das Marktdatenfeld ${id} ist vor der Persistenz ungueltig.`);
+            }
+            marketInputs[id] = value;
+        });
+        return marketInputs;
+    };
+
+    const captureAnnualMarketDataMetaForUndo = (state) => {
+        const present = Object.prototype.hasOwnProperty.call(state, ANNUAL_MARKET_DATA_META_KEY);
+        appState.lastAnnualMarketDataMeta = {
+            present,
+            value: present ? copyMarketDataMeta(state[ANNUAL_MARKET_DATA_META_KEY]) : null
+        };
+    };
+
     const handleNachruecken = () => {
+        const state = StorageManager.loadState() || {};
+        captureAnnualMarketDataMetaForUndo(state);
+        delete state[ANNUAL_MARKET_DATA_META_KEY];
+        StorageManager.saveState(state);
         appState.lastMarktData = {
             endeVJ: dom.inputs.endeVJ.value,
             endeVJ_1: dom.inputs.endeVJ_1.value,
@@ -207,50 +376,41 @@ export function createMarketdataHandlers({
                 dom.inputs[k].value = v;
             });
         }
+        if (appState.lastAnnualMarketDataMeta) {
+            const state = StorageManager.loadState() || {};
+            if (appState.lastAnnualMarketDataMeta.present) {
+                state[ANNUAL_MARKET_DATA_META_KEY] = copyMarketDataMeta(appState.lastAnnualMarketDataMeta.value);
+            } else {
+                delete state[ANNUAL_MARKET_DATA_META_KEY];
+            }
+            state.inputs = {
+                ...(state.inputs && typeof state.inputs === 'object' ? state.inputs : {}),
+                ...readMarketInputs()
+            };
+            StorageManager.saveState(state);
+            delete appState.lastAnnualMarketDataMeta;
+        }
         dom.controls.btnUndoNachruecken.style.display = 'none';
         debouncedUpdate();
     };
 
-    const fetchVanguardETFPrice = async (targetDate) => {
+    const fetchVanguardETFPrice = async (request) => {
         const ticker = 'VWCE.DE'; // Vanguard FTSE All-World in EUR (Xetra)
         const isin = 'IE00BK5BQT80'; // ISIN für alternative APIs
         const LOCAL_YAHOO_PROXY = 'http://127.0.0.1:8787';
-
-        const formatDate = (date) => Math.floor(date.getTime() / 1000); // Unix timestamp
-
-        // Starte am Zieldatum und gehe max. 10 Tage zurück (für Wochenenden/Feiertage)
-        const targetTime = formatDate(targetDate);
-        const startDate = new Date(targetDate);
-        startDate.setDate(startDate.getDate() - 10);
-        const startTime = formatDate(startDate);
+        const { period1, period2, targetYear, windowStart, windowEnd } = request;
 
         // Strategie 1: Yahoo Finance ueber lokalen Proxy
-        const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${startTime}&period2=${targetTime}&interval=1d`;
+        const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?period1=${period1}&period2=${period2}&interval=1d`;
         const parseYahooResponse = (data, sourceLabel) => {
-            if (data.chart?.result?.[0]) {
-                const result = data.chart.result[0];
-                const timestamps = result.timestamp;
-                const quotes = result.indicators.quote[0];
-
-                if (timestamps && quotes?.close) {
-                    // Finde den letzten verfügbaren Schlusskurs
-                    for (let i = timestamps.length - 1; i >= 0; i--) {
-                        const price = quotes.close[i];
-                        if (price !== null && !isNaN(price)) {
-                            return {
-                                price: price,
-                                date: new Date(timestamps[i] * 1000),
-                                ticker: ticker,
-                                source: sourceLabel
-                            };
-                        }
-                    }
-                }
-            }
-            return null;
+            return selectAnnualCloseQuote(data, {
+                targetYear,
+                ticker,
+                source: sourceLabel
+            });
         };
         try {
-            const proxyUrl = `${LOCAL_YAHOO_PROXY}/chart?symbol=${encodeURIComponent(ticker)}&period1=${startTime}&period2=${targetTime}&interval=1d`;
+            const proxyUrl = `${LOCAL_YAHOO_PROXY}/chart?symbol=${encodeURIComponent(ticker)}&period1=${period1}&period2=${period2}&interval=1d`;
             const data = await fetchLocalProxyJsonWithRetry(proxyUrl);
             const parsed = parseYahooResponse(data, 'Yahoo Finance (lokaler Proxy)');
             if (parsed) return parsed;
@@ -306,7 +466,8 @@ export function createMarketdataHandlers({
         throw new AppError(
             `ETF-Daten konnten nicht abgerufen werden.\n\n` +
             `Ticker: ${ticker} (ISIN: ${isin})\n` +
-            `Zieldatum: ${targetDate.toLocaleDateString('de-DE')}\n\n` +
+            `Zieljahr: ${targetYear}\n` +
+            `Gueltiger Jahresendstichtag: ${windowStart} bis ${windowEnd}\n\n` +
             `Getestete APIs:\n` +
             `- Yahoo Finance via lokalem Proxy (localhost:8787)\n` +
             `- Optional: Custom Proxy (localStorage etfProxyUrl/etfProxyUrls)\n\n` +
@@ -321,6 +482,7 @@ export function createMarketdataHandlers({
     const handleNachrueckenMitETF = async () => {
         const btn = dom.controls.btnNachrueckenMitETF;  // Kann undefined sein (wenn von Jahres-Update aufgerufen)
         const originalText = btn?.innerHTML;
+        let rollbackContext = null;
 
         try {
             if (btn) {
@@ -328,16 +490,28 @@ export function createMarketdataHandlers({
                 btn.innerHTML = '⏳ ETF...';
             }
 
-            // Zieldatum: aktuelles Tagesdatum
-            const targetDate = new Date();
+            const { request } = readActiveAnnualMarketDataContext();
 
             if (btn) {
-                const todayLabel = targetDate.toLocaleDateString('de-DE');
-                UIRenderer.toast(`Rufe VWCE.DE Kurs vom ${todayLabel} ab...`);
+                UIRenderer.toast(`Rufe VWCE.DE Jahresendkurs fuer ${request.targetYear} ab...`);
             }
 
             // 1. ETF-Kurs abrufen
-            const etfData = await fetchVanguardETFPrice(targetDate);
+            const etfData = await fetchVanguardETFPrice(request);
+            const etfPrice = Math.round(etfData.price);
+            if (!isPlausibleAnnualClosePrice(etfPrice)) {
+                throw new AppError('Der gelieferte ETF-Jahresendkurs ist nicht plausibel.');
+            }
+
+            // Die laufende Periode darf sich waehrend des asynchronen Abrufs nicht geaendert haben.
+            const activeContext = readActiveAnnualMarketDataContext();
+            const state = activeContext.state;
+            if (activeContext.request.periodId !== request.periodId) {
+                throw new AppError(
+                    'Die laufende Jahresperiode hat sich waehrend des Marktdatenabrufs geaendert. '
+                    + 'Es wurden keine Marktdaten uebernommen.'
+                );
+            }
 
             // 2. Nachrücken durchführen (bestehende Logik)
             if (btn) {
@@ -347,6 +521,8 @@ export function createMarketdataHandlers({
             // Speichere alte Werte für Undo und Rückgabe
             const oldATH = parseFloat(dom.inputs.ath.value) || 0;
             const oldJahreSeitAth = parseInt(dom.inputs.jahreSeitAth.value) || 0;
+            const previousMeta = state[ANNUAL_MARKET_DATA_META_KEY];
+            captureAnnualMarketDataMetaForUndo(state);
 
             appState.lastMarktData = {
                 endeVJ: dom.inputs.endeVJ.value,
@@ -356,6 +532,10 @@ export function createMarketdataHandlers({
                 ath: dom.inputs.ath.value,
                 jahreSeitAth: dom.inputs.jahreSeitAth.value
             };
+            rollbackContext = {
+                state,
+                marketData: { ...appState.lastMarktData }
+            };
 
             // Verschiebe die Werte
             dom.inputs.endeVJ_3.value = dom.inputs.endeVJ_2.value;
@@ -363,7 +543,6 @@ export function createMarketdataHandlers({
             dom.inputs.endeVJ_1.value = dom.inputs.endeVJ.value;
 
             // 3. Neuen ETF-Wert in Ende VJ eintragen (ohne Nachkommastellen)
-            const etfPrice = Math.round(etfData.price);
             dom.inputs.endeVJ.value = etfPrice.toString();
 
             // 4. ATH-Logik anwenden
@@ -374,26 +553,61 @@ export function createMarketdataHandlers({
             let isNewATH = false;
             let newJahreSeitAth = previousJahreSeitAth;
 
-            if (newValue > currentATH) {
-                // Neues Allzeithoch!
-                dom.inputs.ath.value = etfPrice.toString();
+            if (newValue >= currentATH) {
                 dom.inputs.jahreSeitAth.value = '0';
-                isNewATH = true;
                 newJahreSeitAth = 0;
             } else {
-                // Kein neues ATH → Jahre erhöhen
                 newJahreSeitAth = previousJahreSeitAth + 1;
                 dom.inputs.jahreSeitAth.value = newJahreSeitAth.toString();
             }
 
+            if (newValue > currentATH) {
+                // Neues Allzeithoch!
+                dom.inputs.ath.value = etfPrice.toString();
+                isNewATH = true;
+            }
+
+            const newATH = isNewATH ? etfPrice : oldATH;
+            const lastHighAsOf = newValue >= currentATH
+                ? etfData.asOf
+                : previousMeta?.ath?.lastHighAsOf || null;
+            const marketDataMeta = {
+                schemaVersion: ANNUAL_MARKET_DATA_SCHEMA_VERSION,
+                periodId: request.periodId,
+                targetYear: request.targetYear,
+                price: etfPrice,
+                asOf: etfData.asOf,
+                ticker: etfData.ticker,
+                source: etfData.source,
+                ath: {
+                    value: newATH,
+                    yearsSince: newJahreSeitAth,
+                    evaluatedAsOf: etfData.asOf,
+                    lastHighAsOf
+                }
+            };
+
             // 5. Inflation anwenden
             applyAnnualInflation();
 
-            // 6. Update und Feedback
+            // 6. Marktdatenfelder und ihre Metadaten gemeinsam persistieren.
             debouncedUpdate();
+            const persistContext = readActiveAnnualMarketDataContext();
+            if (persistContext.request.periodId !== request.periodId) {
+                throw new AppError('Die laufende Jahresperiode ist vor der Marktdatenpersistenz nicht mehr gueltig.');
+            }
+            const nextState = persistContext.state;
+            nextState.inputs = {
+                ...(nextState.inputs && typeof nextState.inputs === 'object' ? nextState.inputs : {}),
+                ...readMarketInputs()
+            };
+            nextState[ANNUAL_MARKET_DATA_META_KEY] = marketDataMeta;
+            StorageManager.saveState(nextState);
+
+            // 7. Feedback
             dom.controls.btnUndoNachruecken.style.display = 'inline-flex';
 
-            const usedDate = etfData.date.toLocaleDateString('de-DE');
+            const usedDate = etfData.date.toLocaleDateString('de-DE', { timeZone: 'UTC' });
             const athStatus = isNewATH ? '🎯 Neues ATH!' : `Jahre seit ATH: ${newJahreSeitAth}`;
 
             if (btn) {
@@ -406,20 +620,42 @@ export function createMarketdataHandlers({
             }
 
             // Rückgabe für Jahres-Update Modal
-            return {
+            const result = {
                 price: etfPrice,
                 date: usedDate,
+                asOf: etfData.asOf,
                 ticker: etfData.ticker,
                 source: etfData.source,
+                targetYear: request.targetYear,
+                periodId: request.periodId,
                 ath: {
                     old: oldATH,
-                    new: isNewATH ? etfPrice : oldATH,
+                    new: newATH,
                     isNew: isNewATH,
-                    yearsSince: newJahreSeitAth
+                    yearsSince: newJahreSeitAth,
+                    evaluatedAsOf: etfData.asOf,
+                    lastHighAsOf
                 }
             };
+            rollbackContext = null;
+            return result;
 
         } catch (err) {
+            if (rollbackContext) {
+                Object.entries(rollbackContext.marketData).forEach(([key, value]) => {
+                    dom.inputs[key].value = value;
+                });
+                try {
+                    StorageManager.saveState(rollbackContext.state);
+                } catch (rollbackError) {
+                    console.error('Marktdaten-Rollback konnte nicht persistiert werden:', rollbackError);
+                }
+                delete appState.lastMarktData;
+                delete appState.lastAnnualMarketDataMeta;
+                if (dom.controls.btnUndoNachruecken) {
+                    dom.controls.btnUndoNachruecken.style.display = 'none';
+                }
+            }
             console.error('Nachrücken mit ETF fehlgeschlagen:', err);
             UIRenderer.handleError(err);
             throw err; // Re-throw für Jahres-Update
