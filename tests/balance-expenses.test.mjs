@@ -1,5 +1,11 @@
 import { initExpensesTab, updateExpensesBudget, rollExpensesYear } from '../app/balance/balance-expenses.js';
-import { parseCategoryCsv, parseExpenseAmount, splitCsvLine } from '../app/balance/balance-expenses-csv.js';
+import {
+    EXPENSE_CSV_IMPORT_SUMMARY,
+    ExpenseCsvImportError,
+    parseCategoryCsv,
+    parseExpenseAmount,
+    splitCsvLine
+} from '../app/balance/balance-expenses-csv.js';
 import { computeSpent, computeYearStats } from '../app/balance/balance-expenses-metrics.js';
 import {
     createEmptyExpensesStore,
@@ -298,13 +304,61 @@ try {
     assert.deepEqual(splitCsvLine('"A;B";"C""D"', ';'), ['A;B', 'C"D'], 'CSV-Split sollte Quotes und escaped Quotes behandeln');
     assertClose(parseExpenseAmount('1.234,56 €'), 1234.56, 1e-9, 'DE-Betragsformat sollte korrekt parsen');
     assertClose(parseExpenseAmount('1,234.56'), 1234.56, 1e-9, 'EN-Betragsformat sollte korrekt parsen');
+    assert(Number.isNaN(parseExpenseAmount('12abc')), 'Betrag mit angehaengtem Text wird vollstaendig abgewiesen');
+    assert(Number.isNaN(parseExpenseAmount('1,23.4')), 'Mehrdeutige Betragstrenner werden abgewiesen');
+    assert(Number.isNaN(parseExpenseAmount('Infinity')), 'Nicht-endlicher Betrag wird abgewiesen');
     const parsedCategories = parseCategoryCsv([
         'Kategorie;Betrag',
         'Miete;-1.000,00',
-        'Miete;-250,50',
-        'Ignore;abc'
+        'Miete;-250,50'
     ].join('\n'));
     assertClose(parsedCategories.Miete, -1250.5, 1e-9, 'CSV-Parser sollte Kategorien aggregieren');
+    assertEqual(Object.getPrototypeOf(parsedCategories), null, 'Kategorienmap verwendet ein Null-Prototyp-Objekt');
+    assertEqual(parsedCategories[EXPENSE_CSV_IMPORT_SUMMARY].totalRows, 2, 'Erfolgreicher Import liefert eine Zeilenzusammenfassung');
+    assertEqual(parsedCategories[EXPENSE_CSV_IMPORT_SUMMARY].importedRows, 2, 'Zusammenfassung nennt alle importierten Zeilen');
+
+    const reservedCategories = parseCategoryCsv([
+        'Kategorie;Betrag',
+        '__proto__;10',
+        'constructor;20',
+        'toString;30',
+        'importSummary;40'
+    ].join('\n'));
+    assertEqual(reservedCategories.__proto__, 10, 'Reservierter Key __proto__ bleibt eine normale Kategorie');
+    assertEqual(reservedCategories.constructor, 20, 'Reservierter Key constructor bleibt eine normale Kategorie');
+    assertEqual(reservedCategories.toString, 30, 'Reservierter Key toString bleibt eine normale Kategorie');
+    assertEqual(reservedCategories.importSummary, 40, 'Kategorie importSummary kollidiert nicht mit Parsermetadaten');
+    assertEqual(Object.keys(reservedCategories).length, 4, 'Reservierte Keys erzeugen keine Prototyp-Seiteneffekte');
+
+    let rejectedCsvError = null;
+    try {
+        parseCategoryCsv([
+            'Kategorie;Betrag',
+            'Miete;-1000',
+            'Ignorieren;12abc',
+            ';20'
+        ].join('\n'));
+    } catch (error) {
+        rejectedCsvError = error;
+    }
+    assert(rejectedCsvError instanceof ExpenseCsvImportError, 'Ungueltige Zeilen liefern einen strukturierten CSV-Fehler');
+    assertEqual(rejectedCsvError.code, 'expenses_csv_invalid_rows', 'Zeilenfehler hat einen stabilen Fehlercode');
+    assertEqual(rejectedCsvError.details.summary.totalRows, 3, 'Fehlerzusammenfassung nennt die Gesamtzeilen');
+    assertEqual(rejectedCsvError.details.summary.importedRows, 1, 'Fehlerzusammenfassung nennt vorab valide Zeilen');
+    assertEqual(rejectedCsvError.details.summary.rejectedRows.length, 2, 'Fehlerzusammenfassung nennt alle verworfenen Zeilen');
+    assert(rejectedCsvError.message.includes('2 von 3'), 'Nutzertext fasst verworfene Zeilen sichtbar zusammen');
+
+    let ambiguousDelimiterError = null;
+    try {
+        parseCategoryCsv([
+            'Kategorie,Betrag',
+            'Miete,-1.234,56'
+        ].join('\n'));
+    } catch (error) {
+        ambiguousDelimiterError = error;
+    }
+    assertEqual(ambiguousDelimiterError?.code, 'expenses_csv_invalid_rows', 'Nicht quotierter Dezimalseparator darf keine Zusatzspalte erzeugen');
+    assert(ambiguousDelimiterError.message.includes('Spaltenanzahl 3 statt 2'), 'Spaltenfehler wird in der Importzusammenfassung sichtbar');
 
     const emptyStore = createEmptyExpensesStore(2026);
     const yearData = getExpensesYearData(emptyStore, 2026);
@@ -421,8 +475,7 @@ try {
             'Kategorie;Betrag',
             'Versicherungen;-1.200,50',
             'Versicherungen;-300',
-            'Krankenkasse;-99,50',
-            'Ignorieren;abc'
+            'Krankenkasse;-99,50'
         ].join('\n')
     };
     dom.expenses.csvInput.value = 'selected.csv';

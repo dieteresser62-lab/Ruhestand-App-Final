@@ -298,6 +298,8 @@ console.log("Triggering Application Init via DOMContentLoaded...");
 // Pre-fill critical inputs to pass validation in update()
 document.getElementById('aktuellesAlter').value = "65";
 document.getElementById('floorBedarf').value = "30000";
+document.getElementById('flexBedarf').value = "24000";
+document.getElementById('minimumFlexAnnual').value = "0";
 
 const loadEvent = new MockEvent('DOMContentLoaded');
 document.dispatchEvent(loadEvent);
@@ -351,18 +353,42 @@ if (!successResult.ok || successResult.status !== 'success') {
     throw new Error(`Successful update returned unexpected result: ${JSON.stringify(successResult)}`);
 }
 
-document.getElementById('minimumFlexAnnual').value = '-1';
-const validationCallsBefore = simulateCallCount;
-const validationResult = balanceMain.update();
-if (validationResult.ok || validationResult.status !== 'validation_error') {
-    throw new Error(`Validation error returned unexpected result: ${JSON.stringify(validationResult)}`);
-}
-if (simulateCallCount !== validationCallsBefore) {
-    throw new Error('Validation error called EngineAPI.simulateSingleYear unexpectedly.');
-}
-if (!document.getElementById('error-container').textContent.includes('Einige Eingaben sind ungültig')) {
-    throw new Error('Validation error was not rendered through the normal UI error path.');
-}
+const assertMinimumFlexReject = (rawValue, expectedMessages) => {
+    const input = document.getElementById('minimumFlexAnnual');
+    input.value = rawValue;
+    const validationCallsBefore = simulateCallCount;
+    const writesBeforeValidation = storageWrites.length;
+    const validationResult = balanceMain.update();
+    if (validationResult.ok || validationResult.status !== 'validation_error') {
+        throw new Error(`Validation error for ${rawValue || '<leer>'} returned unexpected result: ${JSON.stringify(validationResult)}`);
+    }
+    if (simulateCallCount !== validationCallsBefore) {
+        throw new Error(`Validation error for ${rawValue || '<leer>'} called EngineAPI.simulateSingleYear unexpectedly.`);
+    }
+    if (storageWrites.length !== writesBeforeValidation) {
+        throw new Error(`Validation error for ${rawValue || '<leer>'} persisted data unexpectedly.`);
+    }
+    if (input.value !== rawValue) {
+        throw new Error(`Validation error changed the visible minimumFlexAnnual value from ${rawValue} to ${input.value}.`);
+    }
+    const messages = validationResult.error?.errors?.map(entry => entry.message) || [];
+    expectedMessages.forEach(message => {
+        if (!messages.includes(message)) {
+            throw new Error(`Validation error for ${rawValue || '<leer>'} misses message: ${message}`);
+        }
+    });
+    if (!document.getElementById('error-container').textContent.includes('Einige Eingaben sind ungültig')) {
+        throw new Error('Validation error was not rendered through the normal UI error path.');
+    }
+};
+
+assertMinimumFlexReject('-1', ['Mindest-Flex p.a. darf nicht negativ sein.']);
+assertMinimumFlexReject('', ['Mindest-Flex p.a. darf nicht leer sein.']);
+assertMinimumFlexReject('Infinity', ['Mindest-Flex p.a. muss eine endliche Zahl sein.']);
+assertMinimumFlexReject('24001', [
+    'Mindest-Flex p.a. darf nicht größer als Flex-Bedarf p.a. sein.',
+    'Flex-Bedarf p.a. ist die Obergrenze für Mindest-Flex.'
+]);
 document.getElementById('minimumFlexAnnual').value = '0';
 
 engineFailure = new Error('Simulierter Engine-Fehler');

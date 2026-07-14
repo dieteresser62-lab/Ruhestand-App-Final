@@ -9,6 +9,7 @@ import { CONFIG, AppError, StorageError } from './balance-config.js';
 import { UIReader } from './balance-reader.js';
 import { UIRenderer } from './balance-renderer.js';
 import { StorageManager } from './balance-storage.js';
+import { UIUtils } from './balance-utils.js';
 
 export const BALANCE_EXPORT_APP_ID = 'ruhe-stand-suite.balance';
 export const BALANCE_EXPORT_SCHEMA = 'balance-state';
@@ -61,6 +62,196 @@ export class BalanceImportError extends AppError {
 
 function failImport(code, message) {
     throw new BalanceImportError(code, message);
+}
+
+export class MarketCsvImportError extends AppError {
+    constructor(code, message, details = {}) {
+        super(message, details);
+        this.name = 'MarketCsvImportError';
+        this.code = code;
+        this.details = details;
+    }
+}
+
+function failMarketCsv(code, message, details = {}) {
+    throw new MarketCsvImportError(code, message, details);
+}
+
+function splitMarketCsvLine(line) {
+    const cells = [];
+    let current = '';
+    let inQuotes = false;
+    for (let index = 0; index < line.length; index++) {
+        const char = line[index];
+        if (char === '"') {
+            if (inQuotes && line[index + 1] === '"') {
+                current += '"';
+                index += 1;
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if (char === ';' && !inQuotes) {
+            cells.push(current.trim());
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+    if (inQuotes) {
+        failMarketCsv('market_csv_unclosed_quote', 'Die Markt-CSV enthaelt ein nicht geschlossenes Anfuehrungszeichen.');
+    }
+    cells.push(current.trim());
+    return cells;
+}
+
+function normalizeMarketHeader(value) {
+    return String(value || '')
+        .replace(/^\uFEFF/, '')
+        .trim()
+        .toLocaleLowerCase('de-DE')
+        .replace(/[^a-z0-9äöüß]/g, '');
+}
+
+function parseMarketDate(rawValue) {
+    const match = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(String(rawValue || '').trim());
+    if (!match) return null;
+    const day = Number(match[1]);
+    const month = Number(match[2]);
+    const year = Number(match[3]);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (
+        date.getUTCFullYear() !== year ||
+        date.getUTCMonth() !== month - 1 ||
+        date.getUTCDate() !== day
+    ) {
+        return null;
+    }
+    return date;
+}
+
+/**
+ * Parst eine semikolonseparierte Markt-CSV ohne DOM-Seiteneffekte.
+ * Fuer den letzten Datenstand muessen Vergleichswerte aus jedem der drei
+ * vorangegangenen Kalenderjahre am oder vor dem jeweiligen Stichtag existieren.
+ */
+export function parseMarketDataCsv(text) {
+    const lines = String(text || '')
+        .split(/\r?\n/)
+        .map((line, index) => ({ line: line.trim(), lineNumber: index + 1 }))
+        .filter(entry => entry.line !== '');
+    if (lines.length < 2) {
+        failMarketCsv('market_csv_empty', 'Die Markt-CSV enthaelt keine Datenzeilen.');
+    }
+
+    const header = splitMarketCsvLine(lines[0].line).map(normalizeMarketHeader);
+    const dateHeaders = new Set(['datum', 'date']);
+    const closeHeaders = new Set(['schluss', 'schlusskurs', 'close', 'zuletzt']);
+    const dateIndex = header.findIndex(value => dateHeaders.has(value));
+    const closeIndex = header.findIndex(value => closeHeaders.has(value));
+    const missingHeaders = [];
+    if (dateIndex === -1) missingHeaders.push('Datum/Date');
+    if (closeIndex === -1) missingHeaders.push('Schluss/Close');
+    if (missingHeaders.length > 0) {
+        failMarketCsv(
+            'market_csv_missing_headers',
+            `Der Markt-CSV fehlen Pflichtspalten: ${missingHeaders.join(', ')}.`,
+            { missingHeaders }
+        );
+    }
+
+    const data = [];
+    const rejectedRows = [];
+    const seenDates = new Set();
+    lines.slice(1).forEach(({ line, lineNumber }) => {
+        let columns;
+        try {
+            columns = splitMarketCsvLine(line);
+        } catch (error) {
+            rejectedRows.push({ lineNumber, reason: error.message });
+            return;
+        }
+        if (columns.length !== header.length) {
+            rejectedRows.push({ lineNumber, reason: `Spaltenanzahl ${columns.length} statt ${header.length}` });
+            return;
+        }
+
+        const date = parseMarketDate(columns[dateIndex]);
+        if (!date) {
+            rejectedRows.push({ lineNumber, reason: `ungueltiges Kalenderdatum „${columns[dateIndex] || ''}“` });
+            return;
+        }
+        const closeResult = UIUtils.parseCurrencyResult(columns[closeIndex]);
+        if (!closeResult.valid) {
+            rejectedRows.push({ lineNumber, reason: `ungueltiger Schlusswert (${closeResult.error.code})` });
+            return;
+        }
+        const dateKey = date.toISOString().slice(0, 10);
+        if (seenDates.has(dateKey)) {
+            rejectedRows.push({ lineNumber, reason: `doppeltes Datum ${dateKey}` });
+            return;
+        }
+        seenDates.add(dateKey);
+        data.push({ date, close: closeResult.value });
+    });
+
+    if (rejectedRows.length > 0) {
+        const preview = rejectedRows
+            .slice(0, 5)
+            .map(row => `Zeile ${row.lineNumber}: ${row.reason}`)
+            .join('; ');
+        const remainder = rejectedRows.length > 5 ? `; weitere ${rejectedRows.length - 5}` : '';
+        failMarketCsv(
+            'market_csv_invalid_rows',
+            `Die Markt-CSV enthaelt ${rejectedRows.length} ungueltige Datenzeile(n): ${preview}${remainder}.`,
+            { rejectedRows }
+        );
+    }
+    if (data.length === 0) {
+        failMarketCsv('market_csv_no_valid_rows', 'Die Markt-CSV enthaelt keine gueltigen Datenzeilen.');
+    }
+
+    data.sort((left, right) => left.date - right.date);
+    const lastEntry = data[data.length - 1];
+    const lastDate = lastEntry.date;
+    const historicalEntries = [];
+    const missingYears = [];
+    for (let offset = 1; offset <= 3; offset++) {
+        const targetYear = lastDate.getUTCFullYear() - offset;
+        const targetMonth = lastDate.getUTCMonth();
+        const lastTargetMonthDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+        const targetDay = Math.min(lastDate.getUTCDate(), lastTargetMonthDay);
+        const targetTimestamp = Date.UTC(targetYear, targetMonth, targetDay);
+        const match = data
+            .filter(entry => entry.date.getUTCFullYear() === targetYear && entry.date.getTime() <= targetTimestamp)
+            .at(-1);
+        if (!match) missingYears.push(targetYear);
+        historicalEntries.push(match || null);
+    }
+    if (missingYears.length > 0) {
+        failMarketCsv(
+            'market_csv_missing_years',
+            `Der Markt-CSV fehlen Jahreswerte fuer: ${missingYears.join(', ')}.`,
+            { missingYears }
+        );
+    }
+
+    const ath = data.reduce((best, entry) => entry.close > best.close ? entry : best, data[0]);
+    const yearsSinceAth = ath.close > lastEntry.close + 0.01
+        ? Math.max(0, Math.floor((lastDate.getTime() - ath.date.getTime()) / (1000 * 60 * 60 * 24 * 365.2425)))
+        : 0;
+
+    return {
+        asOfDate: new Date(lastDate),
+        rowCount: data.length,
+        values: {
+            endeVJ: lastEntry.close,
+            endeVJ_1: historicalEntries[0].close,
+            endeVJ_2: historicalEntries[1].close,
+            endeVJ_3: historicalEntries[2].close,
+            ath: ath.close,
+            jahreSeitAth: yearsSinceAth
+        }
+    };
 }
 
 function migrateLegacyStateV0(payload) {
@@ -319,71 +510,7 @@ export function createImportExportHandlers({ dom, debouncedUpdate, update }) {
 
             try {
                 const text = await file.text();
-
-                const parseDate = (dateStr) => {
-                    const parts = dateStr.split('.');
-                    if (parts.length !== 3) return null;
-                    return new Date(parts[2], parseInt(parts[1]) - 1, parts[0]);
-                };
-                const parseValue = (numStr) => {
-                    if (!numStr) return NaN;
-                    return parseFloat(numStr.trim().replace(',', '.'));
-                };
-
-                const data = text.split(/\r?\n/).slice(1).map(line => {
-                    const columns = line.split(';');
-                    if (columns.length < 5) return null;
-                    return {
-                        date: parseDate(columns[0]),
-                        high: parseValue(columns[2]),
-                        close: parseValue(columns[4])
-                    };
-                }).filter(d => d && d.date && !isNaN(d.close))
-                    .sort((a, b) => a.date - b.date);
-
-                if (data.length === 0) throw new Error('Keine gültigen Daten in der CSV gefunden.');
-
-                const lastEntry = data[data.length - 1];
-                const lastDate = lastEntry.date;
-                const endeVjValue = lastEntry.close;
-
-                const findClosestPreviousEntry = (targetDate, allData) => {
-                    let bestEntry = null;
-                    for (let i = allData.length - 1; i >= 0; i--) {
-                        if (allData[i].date <= targetDate) {
-                            bestEntry = allData[i];
-                            break;
-                        }
-                    }
-                    return bestEntry ? bestEntry.close : null;
-                };
-
-                const targetDateVJ1 = new Date(lastDate);
-                targetDateVJ1.setFullYear(lastDate.getFullYear() - 1);
-                const endeVj1Value = findClosestPreviousEntry(targetDateVJ1, data);
-
-                const targetDateVJ2 = new Date(lastDate);
-                targetDateVJ2.setFullYear(lastDate.getFullYear() - 2);
-                const endeVj2Value = findClosestPreviousEntry(targetDateVJ2, data);
-
-                const targetDateVJ3 = new Date(lastDate);
-                targetDateVJ3.setFullYear(lastDate.getFullYear() - 3);
-                const endeVj3Value = findClosestPreviousEntry(targetDateVJ3, data);
-
-                let ath = { value: -Infinity, date: null };
-                data.forEach(d => {
-                    if (d.close > ath.value) {
-                        ath.value = d.close;
-                        ath.date = d.date;
-                    }
-                });
-
-                let jahreSeitAth = 0;
-                if (ath.value > lastEntry.close + 0.01 && ath.date) {
-                    const timeDiff = lastEntry.date.getTime() - ath.date.getTime();
-                    const yearsDiff = timeDiff / (1000 * 3600 * 24 * 365.25);
-                    jahreSeitAth = Math.floor(yearsDiff); // Ganze Jahre ohne Nachkommastellen
-                }
+                const parsed = parseMarketDataCsv(text);
 
                 const updateField = (id, value) => {
                     const el = dom.inputs[id];
@@ -393,18 +520,20 @@ export function createImportExportHandlers({ dom, debouncedUpdate, update }) {
                     }
                 };
 
-                updateField('endeVJ', endeVjValue);
-                updateField('endeVJ_1', endeVj1Value);
-                updateField('endeVJ_2', endeVj2Value);
-                updateField('endeVJ_3', endeVj3Value);
-                updateField('ath', ath.value);
-                updateField('jahreSeitAth', jahreSeitAth < 0 ? 0 : jahreSeitAth);
+                Object.entries(parsed.values).forEach(([fieldId, value]) => updateField(fieldId, value));
 
                 debouncedUpdate();
-                UIRenderer.toast(`CSV importiert: Daten relativ zum ${lastDate.toLocaleDateString('de-DE')} übernommen.`);
+                UIRenderer.toast(`CSV importiert: Daten relativ zum ${parsed.asOfDate.toLocaleDateString('de-DE', { timeZone: 'UTC' })} übernommen.`);
 
             } catch (err) {
-                UIRenderer.handleError(new AppError('CSV-Import fehlgeschlagen.', { originalError: err }));
+                const message = err instanceof MarketCsvImportError
+                    ? `CSV-Import fehlgeschlagen: ${err.message}`
+                    : 'CSV-Import fehlgeschlagen.';
+                UIRenderer.handleError(new AppError(message, {
+                    originalError: err,
+                    code: err?.code || null,
+                    details: err?.details || null
+                }));
             } finally {
                 e.target.value = '';
             }

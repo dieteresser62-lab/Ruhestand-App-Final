@@ -1,7 +1,8 @@
 # Balance-App-Hardening: Arbeitsplan
 
 **Stand:** 2026-07-14  
-**Status:** implementierungsreif; Slice 01, 02, 03, 04, 05, 06, 07, 08 und 09 erledigt  
+**Status:** implementierungsreif; Slice 01, 02, 03, 04, 05, 06, 07, 08, 09 und 10 erledigt
+
 **Feature-Branch:** `codex/balance-app-hardening`  
 **GitHub-Status:** lokal vorhanden; `git ls-remote --heads origin refs/heads/codex/balance-app-hardening` lieferte am 2026-07-13 keinen Remote-Branch; keine Veroeffentlichung ohne ausdrueckliche Freigabe  
 **Autor:** Codex  
@@ -101,7 +102,7 @@ Jahresprozess
 | 7 | [Engine-Gate und Update-Ergebnis](./SLICE_BALANCE_HARDENING_07_ENGINE_UPDATE_GATE.md) | P1 | 03 | 4 | erledigt |
 | 8 | [Schema-validierter Balance-Import](./SLICE_BALANCE_HARDENING_08_IMPORT_RECOVERY.md) | P1 | 07 | 4 | erledigt |
 | 9 | [Korrupte Persistenz sichtbar behandeln](./SLICE_BALANCE_HARDENING_09_CORRUPT_DATA_RECOVERY.md) | P1 | 08 | 5 | erledigt |
-| 10 | [Striktes Zahlen- und CSV-Parsing](./SLICE_BALANCE_HARDENING_10_STRICT_PARSING.md) | P2 | 04, 05, 08 | 5 | geplant |
+| 10 | [Striktes Zahlen- und CSV-Parsing](./SLICE_BALANCE_HARDENING_10_STRICT_PARSING.md) | P2 | 04, 05, 08 | 7 | erledigt |
 | 11 | [Browser-E2E und Dokumentationsgates](./SLICE_BALANCE_HARDENING_11_E2E_DOCUMENTATION.md) | P2 | 01-10 | 1 | geplant |
 
 
@@ -165,6 +166,10 @@ Der aktuelle Balance-Dateivertrag ist `appId: "ruhe-stand-suite.balance"`, `sche
 
 Der Ausgabenstore besitzt seit Slice 09 einen kompatiblen Fail-Closed-Vertrag: `loadExpensesStoreResult()` unterscheidet `ok`, `empty` und `corrupt`; `loadExpensesStore()` wirft bei Korruption, statt einen leeren Store zu liefern. Der Rohinhalt bleibt bis zu einer Nutzerentscheidung bytegleich erhalten. Die Recovery-UI nennt Ausgabenbereich und Backend und bietet Recovery-Export, bestaetigten Reset und Abbruch. Reset ist erst nach Export freigeschaltet und erst nach erfolgreichem Facade-Flush abgeschlossen; ein Flush-/Quota-Fehler stellt den Rohinhalt im aktiven Store wieder her. Zusaetzlich wird `migrationWarning` der Persistence Facade beim Balance-Start sichtbar gerendert, ohne einen lokalen Quarantaenepfad auszugeben.
 
+Seit Slice 10 gilt fuer fachlich kritische Balance-Zahlen der strukturierte Contract `valid/value/error`. Akzeptiert werden vollstaendige vorzeichenbehaftete Ganzzahlen, deutsche Dezimal-/Gruppenformate (`1234,56`, `1.234,56`), englische Formate (`1234.56`, `1,234.56`) und korrekt gruppierte Leerzeichen (`1 234,56`); ein einzelnes `€` darf am Rand stehen. Ein einzelner Punkt oder ein einzelnes Komma mit exakt drei Folgeziffern bleibt als Tausendertrenner definiert. Teilstrings, unvollstaendige oder mehrdeutige Separatorfolgen, `Infinity` und leere Pflichtfelder liefern strukturierte Fehler. `floorBedarf`, `flexBedarf` und `minimumFlexAnnual` sind im Balance-Reader Pflichtfelder; gueltige `0` bleibt von Missing unterscheidbar. Nicht migrierte Legacy-Aufrufer von `parseCurrency()` behalten vorerst ihren bisherigen 0-Fallback, waehrend Reader und CSV-Pfade den strikten Result-Contract verwenden.
+
+Markt-CSV akzeptiert semikolonseparierte Dateien mit `Datum`/`Date` und `Schluss`/`Schlusskurs`/`Close`/`Zuletzt`, vollstaendiger Spaltenzahl und echten `DD.MM.YYYY`-Kalenderdaten. Relativ zum letzten Stichtag muessen Werte aus jedem der drei Vorjahre am oder vor dem entsprechenden Zieldatum existieren; der Fehler nennt fehlende Jahre exakt. Der 29.02. wird in Nicht-Schaltjahren auf den 28.02. abgebildet. Ausgaben-CSV verlangt `Kategorie` und `Betrag`, validiert jede nichtleere Zeile und bricht statt eines stillen Teilimports mit Zeilen-/Importsumme ab. Kategorien werden in einer Null-Prototyp-Map verarbeitet, sodass reservierte Keys keine Prototyp-Seiteneffekte erzeugen.
+
 ## Teststrategie
 
 Je Slice zuerst fokussierte Tests, danach mindestens alle direkt gefaehrdeten Balance-/Profil-/Persistenztests. Nach Contract-Aenderungen an Profil- oder Persistenzdaten ist `npm test` verpflichtend. Browser- und Workflow-Aenderungen erhalten zusaetzlich `npm run test:browser`.
@@ -185,7 +190,7 @@ Zusatzlich zu `AGENTS.md` und `SLICE\_EXECUTION\_RULES.md` wird gestoppt, wenn:
 
 - die korrekte Aufteilung von Floor und Flex im Profilverbund fachlich nicht aus bestehenden Contracts ableitbar ist;
 
-- ein Slice mehr als fuenf Programmdateien benoetigt;
+- ein Slice mehr als zehn Programmdateien benoetigt (aktuelle Grenze aus `AGENTS.md`);
 
 - fuer Idempotenz oder Persistenz die Engine-Semantik veraendert werden muesste;
 
@@ -243,6 +248,8 @@ Zusatzlich zu `AGENTS.md` und `SLICE\_EXECUTION\_RULES.md` wird gestoppt, wenn:
 | 2026-07-14 | Slice 08 durch Gemini freigegeben und committed | Commit; keine Blocker, Restrisiko G8-01 |
 | 2026-07-14 | Slice 09 durch Codex implementiert | Ausgabenstore mit `ok`/`empty`/`corrupt`, schreibgesperrter Korruptionspfad, Recovery-Export vor bestaetigtem Reset, Flush-/Quota-Rollback und sichtbarer Facade-Startup-Warnung. Fokussiert: Expenses gruen, UI 115/115 und Persistence 202/202; Gesamtsuite 3305/3305 und Browser-Smoke fuer alle fuenf Einstiegspunkte gruen; Code-Review ausstehend. |
 | 2026-07-14 | Slice 09 durch Gemini freigegeben und committed | Commit; keine Blocker, Restrisiko G9-01 |
+| 2026-07-14 | Slice 10 durch Codex implementiert | Strukturierter DE-/EN-Zahlenparser; feldbezogene Reader-Pflichtvalidierung; vollstaendige Markt-CSV-Jahres-/Kalenderpruefung inklusive Schalttag; fail-closed Ausgaben-CSV mit Null-Prototyp-Kategorien und Zeilenzusammenfassung; Mindest-Flex-Reject behaelt den Rohwert und blockiert Engine/Persistenz ohne Clamp. Scope nach Nutzerhinweis innerhalb der aktuellen 10-Dateien-Grenze auf 7 erweitert. Fokussiert Reader 94/94, Formatting 19/19, UI 115/115, Decumulation 38/38, Expenses und Smoke gruen; Gesamtsuite 3356/3356 und Browser-Smoke fuer alle fuenf Einstiegspunkte gruen; Code-Review ausstehend. |
+| 2026-07-14 | Slice 10 durch Gemini freigegeben und committed | Commit; keine Blocker, Restrisiko G10-01 |
 
 
 ## Review-Feedback von Gemini

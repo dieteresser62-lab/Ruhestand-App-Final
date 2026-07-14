@@ -15,7 +15,7 @@
 
 import { UIUtils } from './balance-utils.js';
 import { calculateAggregatedValues } from '../tranches/depot-tranchen-status.js';
-import { CONFIG } from './balance-config.js';
+import { CONFIG, ValidationError } from './balance-config.js';
 import {
     PROFILE_TRANCHES_KEY,
     PROFILE_VALUE_KEYS,
@@ -29,6 +29,57 @@ import { LONGEVITY_DEFAULTS, normalizeLongevityMode } from '../simulator/dynamic
 // Module-level DOM reference
 let dom = null;
 let hasLoggedTranchenAggregation = false;
+
+const REQUIRED_BALANCE_CURRENCY_FIELDS = new Set([
+    'floorBedarf',
+    'flexBedarf',
+    'minimumFlexAnnual'
+]);
+
+const BALANCE_CURRENCY_FIELD_LABELS = Object.freeze({
+    floorBedarf: 'Floor-Bedarf p.a.',
+    flexBedarf: 'Flex-Bedarf p.a.',
+    minimumFlexAnnual: 'Mindest-Flex p.a.',
+    flexBudgetAnnual: 'Flex-Budget p.a.',
+    flexBudgetRecharge: 'Flex-Budget-Aufladung',
+    tagesgeld: 'Tagesgeld',
+    geldmarktEtf: 'Geldmarkt-ETF',
+    depotwertAlt: 'Alt-Depot',
+    depotwertNeu: 'Neu-Depot',
+    goldWert: 'Goldwert',
+    renteMonatlich: 'Monatliche Rente',
+    costBasisAlt: 'Kostenbasis Alt-Depot',
+    costBasisNeu: 'Kostenbasis Neu-Depot',
+    goldCost: 'Kostenbasis Gold',
+    sparerPauschbetrag: 'Sparer-Pauschbetrag'
+});
+
+/**
+ * Liest einen Balance-Waehrungswert ueber den strukturierten Parser-Contract.
+ * Pflichtfelder bleiben von optionalen Leerwerten und von der gueltigen 0
+ * unterscheidbar; ungueltige Teilstrings werden feldbezogen abgewiesen.
+ */
+export function parseBalanceCurrencyInput(
+    fieldId,
+    rawValue,
+    { required = REQUIRED_BALANCE_CURRENCY_FIELDS.has(fieldId) } = {}
+) {
+    const result = UIUtils.parseCurrencyResult(rawValue, { required });
+    if (result.valid) return result.value ?? 0;
+
+    const label = BALANCE_CURRENCY_FIELD_LABELS[fieldId] || fieldId;
+    let message = `${label} enthaelt keine gueltige vollstaendige Zahl.`;
+    if (result.error.code === 'number_required') {
+        message = `${label} darf nicht leer sein.`;
+    } else if (result.error.code === 'number_non_finite') {
+        message = `${label} muss eine endliche Zahl sein.`;
+    }
+    throw new ValidationError([{
+        fieldId,
+        message,
+        code: result.error.code
+    }]);
+}
 
 /**
  * Initialisiert den UIReader mit DOM-Referenzen
@@ -86,7 +137,9 @@ export const UIReader = {
      * @property {number} maxBearRefillPctOfEq - Max. Bear-Refill-Prozent von Equity (%)
      */
     readAllInputs() {
-        const num = (id) => dom.inputs[id] ? UIUtils.parseCurrency(dom.inputs[id].value) : 0;
+        const num = (id) => dom.inputs[id]
+            ? parseBalanceCurrencyInput(id, dom.inputs[id].value)
+            : 0;
         const val = (id) => dom.inputs[id] ? dom.inputs[id].value : '';
         const checked = (id) => dom.inputs[id] ? dom.inputs[id].checked : false;
         const readPersistedCapeRatio = () => {
@@ -111,7 +164,10 @@ export const UIReader = {
         const profileRenteMonatlich = profileOverrides.profileRenteMonatlich;
         const profileSonstigeEinkuenfte = profileOverrides.profileSonstigeEinkuenfte;
         const profileAlterRaw = persistenceStorage.getItem(PROFILE_VALUE_KEYS.alter);
-        const profileAlter = profileAlterRaw === null ? null : UIUtils.parseCurrency(profileAlterRaw);
+        const profileAlterResult = profileAlterRaw === null
+            ? null
+            : UIUtils.parseCurrencyResult(profileAlterRaw, { required: false });
+        const profileAlter = profileAlterResult?.valid ? profileAlterResult.value : null;
         const profileGoldAktiv = profileOverrides.profileGoldAktiv;
         const profileGoldZiel = profileOverrides.profileGoldZiel;
         const profileGoldFloor = profileOverrides.profileGoldFloor;
