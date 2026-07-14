@@ -110,16 +110,17 @@ Contract-Faelle:
 
 - `app/profile/profilverbund-balance.js`: vorhandene und synthetische Tranchen werden ohne Mutation mit Profilherkunft in einen vollstaendigen Haushaltspool ueberfuehrt; Bonds bleiben explizit klassifiziert.
 - `app/profile/profilverbund-action-attribution.js` (neu): fail-closed Attribution der finalen Haushaltsaktion, globale profilsteuer-aware Verkaufsquellenplanung fuer `tax_optimized`, gewichtete Quellenattribution fuer `proportional`/`runway_first`, profilbezogene Steuer-Settlements, Quellen-/Verwendungs-Reconciliation und Liquiditaets-KPI-Abgleich.
+- Geldmarktquellen werden als bestehende Haushaltsliquiditaet erkannt und vor den Asset-Verkaufsklassen ausgeschlossen. Eine explizite Kategorie `money_market` kann auch bei einem widerspruechlichen Legacy-Typ `aktien_neu` nicht mehr als Aktienverkaufsquelle attribuiert werden.
 - `app/balance/balance-main-profilverbund.js`: genau ein Haushalts-Engine-Lauf, genau eine Haushalts-3-Bucket-/Bond-Verarbeitung, danach reine Profilattribution ohne technische Profil-Engine-Laeufe; getrennte Guardrail-/Steuerpersistenz.
 - `app/balance/balance-action-postprocessor.js`: im Profilverbund keine zweite 3-Bucket-Ausfuehrung; Weitergabe der bereits finalisierten Haushaltsaktion und Diagnose.
 - `tests/profilverbund-balance.test.mjs`, `tests/balance-ui-orchestration.test.mjs` und `tests/balance-decumulation.test.mjs`: neue Contract-, Integrations- und Regressionsfaelle fuer die acht Akzeptanzkriterien.
 
 ## Ausgefuehrte Tests mit Ergebnis
 
-- `node tests/run-single.mjs tests/profilverbund-balance.test.mjs`: **91/91 bestanden**
+- `node tests/run-single.mjs tests/profilverbund-balance.test.mjs`: **95/95 bestanden**
 - `node tests/run-single.mjs tests/balance-ui-orchestration.test.mjs`: **123/123 bestanden**
 - `node tests/run-single.mjs tests/balance-decumulation.test.mjs`: **41/41 bestanden**
-- `npm test`: **103 Testdateien, 3399/3399 bestanden, 0 fehlgeschlagen, 0 offene Handles**
+- `npm test`: **103 Testdateien, 3403/3403 bestanden, 0 fehlgeschlagen, 0 offene Handles**
 - `npm run test:browser`: **11/11 Browserfaelle bestanden**
 - `git diff --check`: **ohne Befund**
 
@@ -133,7 +134,7 @@ Contract-Faelle:
 - Die Quellenoptimierung ist eine deterministische aktuelle-Jahr-Optimierung innerhalb der vom Haushaltsplan vorgegebenen Assetklassen, keine mehrjaehrige Steuer- oder Rechtsoptimierung.
 - Reichen die eindeutig profilbezogenen Tranchen fuer die final versteuerte Neuplanung nicht aus, bricht die Attribution sichtbar ab und erfindet weder Quelle noch Vermoegensuebertragung.
 - Synthetische Fallback-Tranchen koennen mangels Lot-Details nur aggregierte Einstandswerte tragen.
-- Die reale Screenshot-Konstellation bleibt zusaetzlich zur gruenen automatisierten Suite als manueller Abnahmefall fuer den Implementierungsreview offen.
+- Die reale Screenshot-Konstellation muss nach der aus ihr abgeleiteten Geldmarkt-Nachkorrektur erneut manuell abgenommen werden.
 
 ## Rueckdokumentation
 
@@ -184,7 +185,7 @@ Optional, noch ausstehend.
 
 ## Review-Antworten von Codex
 
-Arbeitsdokument, Implementierungsreview und Freigabe erhalten. Alle Akzeptanzkriterien und Invariantentests sind grün. Wir übergeben die Moduldateien zur Übernahme und zum Commit durch den Reviewer.
+Die nach der ersten Freigabe gemeldete Geldmarkt-Fehlklassifikation ist korrigiert und automatisiert abgesichert. Wegen dieser materiellen Nachkorrektur ist vor einer Übernahme ein erneutes Implementierungsreview erforderlich.
 
 ## Review-Entscheidungen
 
@@ -192,3 +193,4 @@ Arbeitsdokument, Implementierungsreview und Freigabe erhalten. Alle Akzeptanzkri
 |---|---|---|---|---|
 | U-01 | Nutzer | Umsetzung des freigegebenen P0-Bugfixes beginnen | angenommen | Slice angelegt; Implementierung und Tests abgeschlossen, Implementierungsreview ausstehend |
 | U-02 | Nutzer | Keinen eigenen Bugfix-Branch anlegen | angenommen | Bestehender Entwicklungsbranch dokumentiert und beibehalten |
+| U-03 | Nutzer | Geldmarkt-ETF darf weder als Aktie verkauft noch als Zuwachs der Gesamtliquiditaet gewertet werden | angenommen | Kategorie-Prioritaet und Liquiditaetsdelta korrigiert; fokussierte und Gesamttests gruen; erneutes Review ausstehend |

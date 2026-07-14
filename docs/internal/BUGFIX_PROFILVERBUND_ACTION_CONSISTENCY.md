@@ -72,6 +72,10 @@ Betroffene Stelle:
 
 Die bestehende Verteilung sortiert ganze Profile nach einer geschaetzten Steuerlast. Erst innerhalb des ausgewaehlten Profils wird dessen Liquiditaet verwendet. Dadurch kann ein steuerpflichtiger Verkauf in einem Profil vorgesehen werden, obwohl in einem anderen Profil eine besser geeignete Quelle existiert. Die Optimierung darf ausserdem keinen eigenstaendigen Gegenkauf erzeugen.
 
+### 5. Geldmarkt kann bei widerspruechlichem Legacy-Typ als Aktie attribuiert werden
+
+Der erste Implementierungsstand erkannte im DOM-freien Attributor nur Anleihen, Gold und Aktien. Eine explizit als `money_market` kategorisierte Tranche mit einem alten oder widerspruechlichen Typ `aktien_neu` wurde deshalb ueber den Typ als Aktienkandidat eingestuft. Die globale Steueroptimierung konnte dann einen echten Aktienverkauf durch einen steuerarmen Geldmarktverkauf ersetzen. Anschliessend wurde die Umschichtung vom Geldmarkt ins Tagesgeld faelschlich als Zuwachs der Haushaltsliquiditaet gewertet.
+
 ## Verbindlicher Fachcontract
 
 ### Household first
@@ -99,6 +103,7 @@ Fuer jede finale Aktion wird eine DOM-freie Netto-Liquiditaetsaenderung ermittel
 
 - `verwendungen.liquiditaet` erhoeht die Liquiditaet;
 - als Quelle verwendete bestehende Liquiditaet vermindert die Liquiditaet;
+- Geldmarkt und Tagesgeld sind Bestandteile derselben Haushaltsliquiditaet; eine Umschichtung zwischen ihnen veraendert die Gesamtliquiditaet um 0 EUR;
 - Steuern und Nettoerloese muessen mit den ausgewiesenen Verkaufsquellen abgestimmt sein;
 - der Cashflow darf nicht aus UI-Texten abgeleitet werden, sondern aus dem strukturierten Action-Contract.
 
@@ -347,14 +352,15 @@ Ergebnis am 2026-07-14:
 - `app/balance/balance-main-profilverbund.js` verwendet nur noch einen Haushalts-Engine-Lauf. Technische Profil-Engine-Laeufe entfallen; Profilaktionen sind reine Attributionen der Haushaltsentscheidung.
 - 3-Bucket-Logik und Bond-Wiederauffuellung laufen im Profilverbund genau einmal vor der Attribution auf Haushaltsebene. `app/balance/balance-action-postprocessor.js` reicht dieses Ergebnis danach unveraendert weiter.
 - Die angezeigten Liquiditaets-KPIs und die zugehoerige Diagnose werden aus dem Cashflow der final attribuierten Aktion neu reconciliert. Persistiert werden der separate Haushalts-Guardrail-State und ausschliesslich die finalen profilbezogenen Steuerzustaende.
-- Die Contract- und Orchestrierungstests decken gegenlaeufige Profilaktionen, Gewinn/Verlust/Nullverkauf, Provenienzfehler, KPI-Reconciliation, einmalige 3-Bucket-Ausfuehrung und neutrale Haushaltsteuerpersistenz ab.
+- Geldmarktquellen werden vor jeder Aktien-/Gold-/Bond-Klassifikation als bestehende Liquiditaet erkannt. Eine explizite `money_market`-Kategorie hat Vorrang vor einem widerspruechlichen Legacy-Typ `aktien_neu`; solche Tranchen koennen nicht mehr als steueroptimierte Aktienverkaufsquelle ausgewaehlt werden.
+- Die Contract- und Orchestrierungstests decken gegenlaeufige Profilaktionen, Gewinn/Verlust/Nullverkauf, Provenienzfehler, KPI-Reconciliation, einmalige 3-Bucket-Ausfuehrung, neutrale Haushaltsteuerpersistenz und den Geldmarkt-vs.-Aktien-Regressionsfall ab.
 
 ## Ausgefuehrte Tests mit Ergebnis
 
-- `node tests/run-single.mjs tests/profilverbund-balance.test.mjs`: **91/91 bestanden**
+- `node tests/run-single.mjs tests/profilverbund-balance.test.mjs`: **95/95 bestanden**
 - `node tests/run-single.mjs tests/balance-ui-orchestration.test.mjs`: **123/123 bestanden**
 - `node tests/run-single.mjs tests/balance-decumulation.test.mjs`: **41/41 bestanden**
-- `npm test`: **103 Testdateien, 3399/3399 bestanden, 0 fehlgeschlagen, 0 offene Handles**
+- `npm test`: **103 Testdateien, 3403/3403 bestanden, 0 fehlgeschlagen, 0 offene Handles**
 - `npm run test:browser`: **11/11 Browserfaelle bestanden**
 - `git diff --check`: **ohne Befund**
 
@@ -370,7 +376,7 @@ Ergebnis am 2026-07-14:
 - Reichen die eindeutig einem Profil gehoerenden Tranchen auch nach der finalen Steuer-Neuplanung nicht aus, wird fail-closed abgebrochen, statt Vermoegen oder Quellen still zu erfinden.
 - Vermoegenszuordnung bleibt strikt bei der dokumentierten `sourceProfileId`. Der Fix erzeugt keine rechtliche Vermoegensuebertragung zwischen Profilen; eine fachlich gewuenschte Uebertragung muesste separat spezifiziert werden.
 - Synthetische Fallback-Tranchen besitzen nur aggregierte Einstandsdaten. Sie sichern Herkunft und Reconciliation, erreichen aber nicht die steuerliche Detailgenauigkeit echter gespeicherter Tranchen.
-- Die Browser-Suite prueft den technischen Profilverbund- und Jahresworkflow. Die konkrete reale Konstellation aus den Nutzerscreenshots bleibt vor Produktivnutzung als manueller Abnahmefall offen.
+- Die Browser-Suite prueft den technischen Profilverbund- und Jahresworkflow. Die konkrete reale Konstellation aus den Nutzerscreenshots muss nach der Geldmarkt-Korrektur erneut manuell abgenommen werden.
 
 ## Rueckdokumentation
 
@@ -389,7 +395,7 @@ Nach dem ausstehenden Implementierungsreview werden zusaetzlich dokumentiert:
 - Review durch Claude: **optional, ausstehend**
 - Nutzerfreigabe zur Implementierung: **erteilt am 2026-07-14**
 - Nutzerfreigabe zur Umsetzung im bestehenden Entwicklungsbranch: **erteilt am 2026-07-14**
-- Implementierung: **abgeschlossen; Implementierungsreview erledigt (freigegeben)**
+- Implementierung: **einschliesslich Geldmarkt-Nachkorrektur abgeschlossen; Implementierungsreview erledigt (freigegeben)**
 - Commit/Push: **nicht erfolgt**
 
 ## Review-Feedback von Gemini
@@ -464,3 +470,4 @@ Die zwischenzeitliche Nutzerrueckmeldung stellte klar, dass Gemini wegen der kri
 | U-02 | Nutzer | Gemini erteilt wegen kritischer Findings keine Freigabe | angenommen | Freigabestatus auf nicht freigegeben korrigiert; erneutes Gemini-Review erforderlich |
 | U-03 | Nutzer | Gemini-Freigabe liegt nun vor; Implementierung darf beginnen | angenommen | Arbeitsdokument auf implementierungsreif gesetzt; Umsetzung abgeschlossen, Implementierungsreview ausstehend |
 | U-04 | Nutzer | Bugfix im bestehenden Entwicklungsbranch umsetzen | angenommen | `codex/balance-app-hardening` bleibt aktiv; Branch-Ausnahme in Plan und Slice dokumentiert |
+| U-05 | Nutzer | Xtrackers-Geldmarktverkauf wird faelschlich als Aktienverkauf und Liquiditaetsaufbau behandelt | angenommen | `money_market` hat Vorrang vor Legacy-Aktientyp; Geldmarkt-zu-Tagesgeld ergibt 0 EUR Netto-Liquiditaetsaenderung; Regressionstest gruen; erneutes Review ausstehend |

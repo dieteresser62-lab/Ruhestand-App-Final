@@ -556,6 +556,50 @@ global.localStorage = createLocalStorageMock();
     assertClose(proportional.finalAction.nettoErlös, 10000, 0.01, 'Mode may change sources but not the household total');
 }
 
+// --- TEST 17: Money-market tranches never become equity-sale candidates ---
+{
+    console.log('\n📋 Test 17: money-market liquidity is not an equity source');
+    const profiles = [
+        {
+            profileId: 'equity-owner',
+            inputs: { depotwertNeu: 20000, tagesgeld: 0, geldmarktEtf: 0, sparerPauschbetrag: 0, kirchensteuerSatz: 0 },
+            tranches: [{
+                trancheId: 'real-equity', name: 'Real Equity', type: 'aktien_neu', category: 'equity',
+                marketValue: 20000, costBasis: 10000, tqf: 0
+            }],
+            balanceState: { lastState: { taxState: { lossCarry: 0 } } }
+        },
+        {
+            profileId: 'money-market-owner',
+            inputs: { depotwertNeu: 0, tagesgeld: 0, geldmarktEtf: 20000, sparerPauschbetrag: 0, kirchensteuerSatz: 0 },
+            tranches: [{
+                trancheId: 'legacy-money-market', name: 'Overnight Rate ETF',
+                type: 'aktien_neu', category: 'money_market',
+                marketValue: 20000, costBasis: 20000, tqf: 0
+            }],
+            balanceState: { lastState: { taxState: { lossCarry: 0 } } }
+        }
+    ];
+    const householdAction = {
+        type: 'TRANSACTION',
+        quellen: [{
+            kind: 'aktien_neu', category: 'equity', sourceProfileId: 'equity-owner',
+            trancheId: 'real-equity', brutto: 10000, steuer: 1318.75, netto: 8681.25,
+            tqf: 0, realizedGainSigned: 5000, taxableAfterTqfSigned: 5000
+        }],
+        verwendungen: { liquiditaet: 10000 }
+    };
+
+    const result = attributeHouseholdAction({ householdAction, profiles, mode: 'tax_optimized' });
+    assertEqual(result.finalAction.quellen.length, 1, 'The unchanged household purpose should need one equity source');
+    assertEqual(result.finalAction.quellen[0].trancheId, 'real-equity', 'Explicit money-market category must override a stale equity type');
+    assertEqual(result.finalAction.quellen[0].sourceProfileId, 'equity-owner', 'Money-market owner must not receive an equity sale');
+    assertClose(calculateActionLiquidityDelta({
+        quellen: [{ kind: 'geldmarkt', category: 'money_market', brutto: 10000 }],
+        verwendungen: { liquiditaet: 10000 }
+    }), 0, 0.001, 'Moving money market to cash must not increase total household liquidity');
+}
+
 // --- TEST 10: Proportional allocation is cent-exact and deterministic ---
 {
     console.log('\n📋 Test 10: proportional cent rounding');

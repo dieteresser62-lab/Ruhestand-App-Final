@@ -379,6 +379,7 @@ Kernlogik für den Profilverbund (Multi-Profil-Modus).
 - Entnahmen nutzen zuerst Tagesgeld und Geldmarkt, bevor ein Verkauf aus Detailtranchen geplant wird.
 - Vorhandene Detailtranchen werden ohne Mutation mit Profilherkunft kopiert. Fehlen Detailtranchen, entstehen profilmarkierte synthetische Fallback-Tranchen aus den aggregierten Werten.
 - Detailtranchen ersetzen in Asset-Summaries die aggregierten Depot-/Gold-/Geldmarktwerte, damit Werte nicht doppelt gezählt werden. Bonds behalten ihre Assetklasse und fliessen fuer Legacy-Kompatibilitaet zugleich in die Depotaggregate ein.
+- Die explizite Kategorie `money_market` hat bei der Attribution Vorrang vor einem widerspruechlichen Legacy-Typ wie `aktien_neu`. Geldmarkt bleibt Haushaltsliquiditaet, ist kein Aktienverkaufskandidat und eine Umschichtung zu Tagesgeld veraendert die Gesamtliquiditaet nicht.
 - Der Pflegebucket wird als Haushaltsdefinition aus dem Primary-Profil gelesen und in Balance nur diagnostisch ausgewiesen. Er ist keine zusätzliche Entnahmequelle im Verteilungsmodus.
 
 **Dependencies:** `balance-config.js`, `app/profile/profile-storage.js`
@@ -391,6 +392,7 @@ DOM-freier Contract zwischen finaler Haushaltsaktion, Profilquellen, Steuerzusta
 
 **Aufgaben:**
 - validiert die eindeutige Profilherkunft aller Verkaufsquellen und attribuiert Cash- und Assetquellen ohne gegenlaeufige Zusatztransaktion;
+- trennt Geldmarkt als bestehende Haushaltsliquiditaet vor der Klassifikation von Aktien, Gold und Bonds;
 - plant die fuer die Haushaltszwecke erforderlichen Verkaufstranchen je vorgegebener Assetklasse neu; `tax_optimized` vergleicht die aktuelle marginale Steuer ueber alle geeigneten Profile, die beiden gewichteten Modi begrenzen jede Quelle auf den Bestand ihres Eigentuemers;
 - aggregiert die finalen steuerlichen Rohwerte je Profil und ruft `settleTaxYear()` genau einmal je Profil auf;
 - reconciliert Bruttoquellen, Profilsteuern und Nettoverwendungen innerhalb der Cent-Toleranz;

@@ -26,7 +26,14 @@ function sum(values) {
 }
 
 function isLiquiditySource(source) {
-    return source?.kind === 'liquiditaet' || source?.source === 'Liquidität';
+    const category = String(source?.category || '').toLowerCase();
+    const kind = String(source?.type || source?.kind || '').toLowerCase();
+    return source?.source === 'Liquidität'
+        || source?.source === 'Geldmarkt-ETF'
+        || kind === 'liquiditaet'
+        || kind.includes('geldmarkt')
+        || kind.includes('money_market')
+        || category === 'money_market';
 }
 
 function normalizeUses(uses = {}) {
@@ -195,6 +202,10 @@ function allocateLiquiditySources(totalAmount, profiles, mode) {
 function resolveAssetBucket(value = {}) {
     const category = String(value?.category || '').toLowerCase();
     const kind = String(value?.type || value?.kind || '').toLowerCase();
+    // Geldmarkt gehoert bereits zur Haushaltsliquiditaet. Insbesondere darf ein
+    // historisch widerspruechlicher Typ "aktien_neu" die explizite Kategorie
+    // "money_market" nicht zu einer verkaufbaren Aktienquelle hochstufen.
+    if (category === 'money_market' || kind.includes('geldmarkt') || kind.includes('money_market')) return null;
     if (category === 'bonds' || kind.includes('bond') || kind.includes('anleihe')) return 'bonds';
     if (category === 'gold' || kind.includes('gold')) return 'gold';
     if (category === 'equity' || kind.includes('aktien') || kind.includes('equity')) return 'equity';
