@@ -91,6 +91,19 @@ console.log('Test 3: supported v0 records migrate by explicit rules');
     assertEqual(migrated.marketValue, 198, 'Missing legacy market value is derived');
     assertEqual('id' in migrated, false, 'Legacy id alias is removed');
     assertEqual('kind' in migrated, false, 'Legacy kind alias is removed');
+
+    const historicMoneyMarket = normalizeTranche({
+        trancheId: 'legacy-money-market',
+        name: 'Historic Money Market ETF',
+        shares: 2,
+        purchasePrice: 100,
+        currentPrice: 101,
+        category: 'money_market',
+        type: 'aktien_neu',
+        tqf: 0.3
+    });
+    assertEqual(historicMoneyMarket.category, 'money_market', 'Persisted v0 category remains authoritative');
+    assertEqual(historicMoneyMarket.type, 'geldmarkt', 'Historic independent-select equity type migrates to the unique category type');
 }
 
 console.log('Test 4: missing legacy ids are deterministic but collection-unique');
@@ -117,6 +130,29 @@ console.log('Test 5: classification matrix is disjoint and fail-closed');
     assertEqual(error.errors[0].code, 'TRANCHE_CLASSIFICATION_MISMATCH', 'Mismatch has stable field error code');
     assertEqual(error.errors[0].trancheId, 'mismatch', 'Mismatch contains tranche context');
     assertEqual(error.errors[0].field, 'category', 'Mismatch contains field context');
+
+    const schemaOneMismatch = captureValidationError(
+        () => normalizeTranche(validTranche({ category: 'money_market', type: 'aktien_neu' })),
+        'Schema-v1 money-market mismatch'
+    );
+    assert(schemaOneMismatch.errors.some(item => item.code === 'TRANCHE_CLASSIFICATION_MISMATCH'),
+        'Schema-v1 records never use the persisted legacy repair');
+
+    const engineMismatch = captureValidationError(
+        () => normalizeTranche({
+            trancheId: 'legacy-engine-mismatch',
+            name: 'Legacy Engine Mismatch',
+            shares: 1,
+            purchasePrice: 100,
+            currentPrice: 100,
+            category: 'money_market',
+            type: 'aktien_neu',
+            tqf: 0.3
+        }, { mode: 'engine' }),
+        'Legacy engine money-market mismatch'
+    );
+    assert(engineMismatch.errors.some(item => item.code === 'TRANCHE_CLASSIFICATION_MISMATCH'),
+        'Engine-bound legacy records stay fail-closed');
 }
 
 console.log('Test 6: duplicate ids and unknown versions are rejected');

@@ -75,6 +75,29 @@ console.log('Test 3: loadTranchesFromStorage normalizes persisted entries');
 }
 console.log('✓ loadTranchesFromStorage normalizes persisted entries OK');
 
+console.log('Test 3a: historic money-market records from independent selects remain loadable');
+{
+    const storage = createLocalStorageMock();
+    const historicRaw = JSON.stringify([validLegacyTranche({
+        trancheId: 'legacy-money-market',
+        name: 'Historic Money Market ETF',
+        isin: ' IE00TEST0001 ',
+        ticker: ' mmkt.de ',
+        category: 'money_market',
+        type: 'aktien_neu'
+    })]);
+    storage.setItem('depot_tranchen', historicRaw);
+    const writesBeforeLoad = storage.setCalls;
+    const loaded = loadTranchesFromStorage(storage);
+    assertEqual(loaded.status, 'valid', 'Historic manager payload should load instead of entering corrupt recovery');
+    assertEqual(loaded.tranches[0].category, 'money_market', 'Historic category should remain unchanged');
+    assertEqual(loaded.tranches[0].type, 'geldmarkt', 'Historic equity type should migrate to canonical money-market type');
+    assertEqual(loaded.tranches[0].isin, 'IE00TEST0001', 'Historic ISIN whitespace should normalize independently');
+    assertEqual(storage.setCalls, writesBeforeLoad, 'Read-time migration must not write automatically');
+    assertEqual(storage.getItem('depot_tranchen'), historicRaw, 'Read-time migration must preserve the original raw payload');
+}
+console.log('✓ historic money-market migration OK');
+
 console.log('Test 3b: load reports empty, corrupt and unavailable without mutation');
 {
     const emptyStorage = createLocalStorageMock();

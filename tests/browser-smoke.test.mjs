@@ -342,6 +342,49 @@ async function runBalanceMembershipReload(browser, baseUrl) {
     await smoke.close();
 }
 
+async function runBalanceSharedTrancheIds(browser, baseUrl) {
+    const sharedTrancheId = 'shared-browser-lot';
+    const activeProfileTranches = JSON.stringify([createBrowserTranche({
+        trancheId: sharedTrancheId,
+        name: 'Haushalt A Tranche'
+    })]);
+    const storage = {
+        ...createBalanceStorage(2025),
+        ...createBrowserProfileStorage({
+            'browser-household-a': {
+                name: 'Haushalt A',
+                tranchesRaw: activeProfileTranches,
+                tagesgeld: '10000'
+            },
+            'browser-household-b': {
+                name: 'Haushalt B',
+                tranchesRaw: JSON.stringify([createBrowserTranche({
+                    trancheId: sharedTrancheId,
+                    name: 'Haushalt B Tranche',
+                    currentPrice: 110
+                })]),
+                tagesgeld: '20000'
+            }
+        }, 'browser-household-a'),
+        depot_tranchen: activeProfileTranches
+    };
+    const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', { storage });
+    const { page } = smoke;
+    await page.waitForFunction(() => document.querySelectorAll('#profilverbund-profile-list input:checked').length === 2);
+    await page.waitForFunction(() => Array.isArray(window.__profilverbundTranchenOverride)
+        && window.__profilverbundTranchenOverride.length === 2);
+
+    const runtimeIds = await page.evaluate(() => window.__profilverbundTranchenOverride.map(tranche => tranche.trancheId));
+    assert(runtimeIds.includes('browser-household-a:shared-browser-lot'),
+        `Erste Profiltranche braucht eine profilbezogene Laufzeit-ID: ${JSON.stringify(runtimeIds)}`);
+    assert(runtimeIds.includes('browser-household-b:shared-browser-lot'),
+        `Zweite Profiltranche braucht eine eigene Laufzeit-ID: ${JSON.stringify(runtimeIds)}`);
+    const errorText = await page.locator('#error-container').textContent();
+    assert(!errorText.includes('Der Tranchenbestand ist fehlerhaft'), 'Gleiche profilinterne IDs duerfen den Profilverbund nicht blockieren');
+    smoke.assertNoErrors();
+    await smoke.close();
+}
+
 async function runBalanceEngineGate(browser, baseUrl) {
     const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', { engineMismatch: true });
     const banner = smoke.page.locator('#engine-version-alert');
@@ -763,6 +806,7 @@ async function main() {
             ['index.html', runIndexSmoke],
             ['Balance.html', runBalanceSmoke],
             ['Balance membership reload', runBalanceMembershipReload],
+            ['Balance shared tranche ids', runBalanceSharedTrancheIds],
             ['Balance engine gate', runBalanceEngineGate],
             ['Balance annual preflight', runBalanceAnnualPreflight],
             ['Balance corrupt expenses', runBalanceCorruptExpenses],

@@ -34,6 +34,21 @@ const CATEGORY_BY_TYPE = Object.freeze(Object.entries(TRANCHE_CATEGORY_TYPES)
         return result;
     }, {}));
 
+// The former manager exposed category and type as independent selects. Existing
+// unversioned records can therefore carry an equity type after the user selected
+// a non-equity category. Those categories each have exactly one canonical type,
+// so the persisted v0 migration can repair this historic UI state without
+// weakening schema-v1 or engine-bound validation.
+const LEGACY_PERSISTED_TYPE_BY_CATEGORY = Object.freeze({
+    bonds: 'anleihe',
+    money_market: 'geldmarkt',
+    gold: 'gold'
+});
+
+function isLegacyEquityType(type) {
+    return type === 'aktien_alt' || type === 'aktien_neu';
+}
+
 export class TrancheValidationError extends Error {
     constructor(errors) {
         super('Die Tranchendaten sind ungültig.');
@@ -154,14 +169,20 @@ function readNumber(raw, field, errors, context, options = {}) {
     return value;
 }
 
-function normalizeClassification(raw, errors, context, allowLegacy) {
+function normalizeClassification(raw, errors, context, allowLegacy, options = {}) {
+    const { migrateLegacyPersistedType = false } = options;
     const rawType = !isMissing(raw.type)
         ? raw.type
         : (allowLegacy ? raw.kind : undefined);
-    const type = normalizeEnum(rawType);
+    let type = normalizeEnum(rawType);
     const category = normalizeEnum(!isMissing(raw.category)
         ? raw.category
         : (allowLegacy ? CATEGORY_BY_TYPE[type] : undefined));
+
+    const migratedLegacyType = LEGACY_PERSISTED_TYPE_BY_CATEGORY[category];
+    if (allowLegacy && migrateLegacyPersistedType && migratedLegacyType && isLegacyEquityType(type)) {
+        type = migratedLegacyType;
+    }
 
     if (!type) {
         errors.push(fieldError(
@@ -252,7 +273,9 @@ function normalizeOne(raw, options = {}) {
     }
 
     const context = { index, trancheId };
-    const { category, type } = normalizeClassification(raw, errors, context, allowLegacy);
+    const { category, type } = normalizeClassification(raw, errors, context, allowLegacy, {
+        migrateLegacyPersistedType: mode === 'persisted'
+    });
     const name = normalizeText(raw.name);
     if (mode === 'persisted' && !name) {
         errors.push(fieldError(

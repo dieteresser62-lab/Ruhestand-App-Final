@@ -370,7 +370,7 @@ Kernlogik für den Profilverbund (Multi-Profil-Modus).
 
 **Haushalts-/Finanzierungscontract:**
 - `balance-main.js` fuehrt im Multi-Profil-Fall genau einen Haushalts-Engine-Lauf fuer Floor, Flex, Dynamic Flex, Einkommen und Transaktionsplanung aus.
-- Der Engine-Lauf erhaelt einen vollstaendigen Haushaltstranchenpool mit eindeutiger `sourceProfileId`. Die 3-Bucket-Logik und Bond-Wiederauffuellung finalisieren diese Haushaltsaktion genau einmal.
+- Der Engine-Lauf erhaelt einen vollstaendigen Haushaltstranchenpool mit eindeutiger `sourceProfileId`; dessen Laufzeit-`trancheId` ist als `<profileId>:<trancheId>` profilbezogen, ohne die gespeicherte Profiltranche zu veraendern. Die 3-Bucket-Logik und Bond-Wiederauffuellung finalisieren diese Haushaltsaktion genau einmal.
 - Danach finden keine Profil-Engine-Laeufe statt. Die Profile erhalten ausschliesslich Quellen- und Verwendungsattributionen der finalen Haushaltsaktion; die Verteilungsmodi steuern diese Attribution, aber keine zweite Spending- oder Assetentscheidung.
 - Quellen, Verwendungen und die Summe der finalen Profilsteuern muessen innerhalb 0,01 EUR reconciliert sein. Fehlende Herkunft oder nicht finanzierbare Restbetraege blockieren fail-closed.
 - Haushalts-Guardrail-State und Profil-Steuer-State werden getrennt persistiert. Je Profil wird nur der aus den final attribuierten Verkaeufen berechnete `taxState` ersetzt; sonstige Profil-Last-State-Felder bleiben erhalten.
@@ -379,7 +379,7 @@ Kernlogik für den Profilverbund (Multi-Profil-Modus).
 - Entnahmen nutzen zuerst Tagesgeld und Geldmarkt, bevor ein Verkauf aus Detailtranchen geplant wird.
 - Vorhandene Detailtranchen werden ohne Mutation mit Profilherkunft kopiert. Fehlen Detailtranchen, entstehen profilmarkierte synthetische Fallback-Tranchen aus den aggregierten Werten.
 - Detailtranchen ersetzen in Asset-Summaries die aggregierten Depot-/Gold-/Geldmarktwerte, damit Werte nicht doppelt gezählt werden. Bonds behalten ihre Assetklasse und fliessen fuer Legacy-Kompatibilitaet zugleich in die Depotaggregate ein.
-- Kategorie und Typ muessen die disjunkte Matrix aus `types/tranche-contract.js` erfuellen. Ein Paar wie `money_market`/`aktien_neu` wird fail-closed abgelehnt und niemals durch eine Prioritaetsregel still umklassifiziert. Valider Geldmarkt bleibt Haushaltsliquiditaet, ist kein Aktienverkaufskandidat und eine Umschichtung zu Tagesgeld veraendert die Gesamtliquiditaet nicht.
+- Kategorie und Typ muessen die disjunkte Matrix aus `types/tranche-contract.js` erfuellen. Schema-1- und Engine-Paare wie `money_market`/`aktien_neu` werden fail-closed abgelehnt und niemals durch eine Prioritaetsregel still umklassifiziert. Nur der Persistenz-Lesepfad migriert diesen von der frueheren Manager-UI erzeugbaren Zustand bei unversionierten Altbestaenden auf `money_market`/`geldmarkt`. Valider Geldmarkt bleibt Haushaltsliquiditaet, ist kein Aktienverkaufskandidat und eine Umschichtung zu Tagesgeld veraendert die Gesamtliquiditaet nicht.
 - Der Pflegebucket wird als Haushaltsdefinition aus dem Primary-Profil gelesen und in Balance nur diagnostisch ausgewiesen. Er ist keine zusätzliche Entnahmequelle im Verteilungsmodus.
 
 **Dependencies:** `balance-config.js`, `app/profile/profile-storage.js`

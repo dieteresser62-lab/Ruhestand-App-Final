@@ -22,6 +22,7 @@ import {
     updateProfileData
 } from '../app/profile/profile-storage.js';
 import { CONFIG } from '../app/balance/balance-config.js';
+import { normalizeTrancheCollection } from '../types/tranche-contract.js';
 
 console.log('--- Profilverbund Balance Tests ---');
 
@@ -349,7 +350,9 @@ global.localStorage = createLocalStorageMock();
     assertEqual(summary.totalTagesgeld, 10, 'Summary should still include Tagesgeld input');
     assertEqual(summary.totalCostAlt, 70, 'Summary should use alt tranche cost basis');
     assertEqual(summary.mergedTranches[0].sourceProfileId, 'a', 'Merged tranche should retain profile provenance');
+    assertEqual(summary.mergedTranches[0].trancheId, 'a:alt', 'Merged tranche ID should be scoped to its profile');
     assertEqual(profileInputs[0].tranches[0].sourceProfileId, undefined, 'Provenance tagging must not mutate stored tranches');
+    assertEqual(profileInputs[0].tranches[0].trancheId, 'alt', 'Profile scoping must not mutate the persisted tranche ID');
 
     const profileSummary = buildProfilverbundProfileSummaries(profileInputs)[0];
     assertEqual(profileSummary.depotAlt, 100, 'Profile summary should use alt tranche value');
@@ -357,6 +360,40 @@ global.localStorage = createLocalStorageMock();
     assertEqual(profileSummary.gold, 20, 'Profile summary should use gold tranche value');
     assertEqual(profileSummary.geldmarkt, 30, 'Profile summary should use money-market tranche value');
     assertEqual(profileSummary.totalAssets, 250, 'Profile summary should not double-count aggregate asset fields');
+}
+
+// --- TEST 8a: Identical profile-internal tranche IDs remain unique in the household pool ---
+{
+    console.log('\n📋 Test 8a: household tranche IDs are profile-scoped');
+    const sharedTranche = {
+        schemaVersion: 1,
+        trancheId: 'shared-lot',
+        name: 'Shared lot',
+        isin: '',
+        ticker: 'SHARED.DE',
+        shares: 2,
+        purchasePrice: 100,
+        currentPrice: 120,
+        purchaseDate: '2024-01-02',
+        category: 'equity',
+        type: 'aktien_neu',
+        tqf: 0.3,
+        notes: '',
+        marketValue: 240,
+        costBasis: 200
+    };
+    const profileInputs = [
+        { profileId: 'profile-a', name: 'Profile A', inputs: {}, tranches: [{ ...sharedTranche }] },
+        { profileId: 'profile-b', name: 'Profile B', inputs: {}, tranches: [{ ...sharedTranche }] }
+    ];
+
+    const summary = buildProfilverbundAssetSummary(profileInputs);
+    assertEqual(summary.mergedTranches[0].trancheId, 'profile-a:shared-lot', 'First profile should own its runtime tranche ID');
+    assertEqual(summary.mergedTranches[1].trancheId, 'profile-b:shared-lot', 'Second profile should own a distinct runtime tranche ID');
+    const normalized = normalizeTrancheCollection(summary.mergedTranches, { mode: 'engine' });
+    assertEqual(normalized.length, 2, 'Engine validation should accept both profile-owned copies');
+    assertEqual(profileInputs[0].tranches[0].trancheId, 'shared-lot', 'First stored tranche ID must remain unchanged');
+    assertEqual(profileInputs[1].tranches[0].trancheId, 'shared-lot', 'Second stored tranche ID must remain unchanged');
 }
 
 // --- TEST 8b: Profiles without stored tranches receive attributable synthetic fallbacks ---
@@ -597,7 +634,7 @@ global.localStorage = createLocalStorageMock();
         type: 'TRANSACTION',
         quellen: [{
             kind: 'aktien_neu', category: 'equity', sourceProfileId: 'taxable-owner',
-            trancheId: 'taxable-equity', brutto: 10000, steuer: 1318.75, netto: 8681.25,
+            trancheId: 'taxable-owner:taxable-equity', brutto: 10000, steuer: 1318.75, netto: 8681.25,
             tqf: 0, realizedGainSigned: 5000, taxableAfterTqfSigned: 5000
         }],
         verwendungen: { liquiditaet: 10000 }
@@ -643,7 +680,7 @@ global.localStorage = createLocalStorageMock();
         type: 'TRANSACTION',
         quellen: [{
             kind: 'aktien_neu', category: 'equity', sourceProfileId: 'equity-owner',
-            trancheId: 'real-equity', brutto: 10000, steuer: 1318.75, netto: 8681.25,
+            trancheId: 'equity-owner:real-equity', brutto: 10000, steuer: 1318.75, netto: 8681.25,
             tqf: 0, realizedGainSigned: 5000, taxableAfterTqfSigned: 5000
         }],
         verwendungen: { liquiditaet: 10000 }
@@ -651,7 +688,7 @@ global.localStorage = createLocalStorageMock();
 
     const result = attributeHouseholdAction({ householdAction, profiles, mode: 'tax_optimized' });
     assertEqual(result.finalAction.quellen.length, 1, 'The unchanged household purpose should need one equity source');
-    assertEqual(result.finalAction.quellen[0].trancheId, 'real-equity', 'Canonical money-market lot must not become an equity sale');
+    assertEqual(result.finalAction.quellen[0].trancheId, 'equity-owner:real-equity', 'Canonical money-market lot must not become an equity sale');
     assertEqual(result.finalAction.quellen[0].sourceProfileId, 'equity-owner', 'Money-market owner must not receive an equity sale');
     assertClose(calculateActionLiquidityDelta({
         quellen: [{ kind: 'geldmarkt', category: 'money_market', brutto: 10000 }],

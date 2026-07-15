@@ -236,6 +236,7 @@ export function buildProfileOwnedTranches(entry) {
     if (!tranches.length) return buildSyntheticProfileTranches(entry);
     return tranches.map(tranche => ({
         ...tranche,
+        trancheId: `${profileId}:${tranche.trancheId}`,
         sourceProfileId: profileId,
         sourceProfileName: profileName
     }));

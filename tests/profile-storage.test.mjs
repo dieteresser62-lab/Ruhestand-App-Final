@@ -589,7 +589,8 @@ try {
             tqf: 0.3
         }]);
         const corruptRaw = JSON.stringify([{
-            id: 'legacy-profile-mismatch',
+            schemaVersion: 1,
+            trancheId: 'schema-one-profile-mismatch',
             name: 'Widerspruechlicher Altbestand',
             shares: 1,
             purchasePrice: 100,

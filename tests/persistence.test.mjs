@@ -1217,8 +1217,20 @@ try {
                 expectedStatus: 'valid'
             },
             {
-                name: 'contradictory category and type',
-                raw: JSON.stringify([{ ...legacyBase, id: 'legacy-mismatch', category: 'gold' }]),
+                name: 'historic independent-select money-market classification',
+                raw: JSON.stringify([{ ...legacyBase, id: 'legacy-money-market', category: 'money_market' }]),
+                expectedStatus: 'valid',
+                expectedType: 'geldmarkt'
+            },
+            {
+                name: 'schema-one contradictory category and type',
+                raw: JSON.stringify([{
+                    ...legacyBase,
+                    schemaVersion: 1,
+                    trancheId: 'schema-one-mismatch',
+                    currentPrice: 90,
+                    category: 'gold'
+                }]),
                 expectedStatus: 'corrupt'
             },
             {
@@ -1259,6 +1271,9 @@ try {
             if (first.status === 'valid') {
                 assertEqual(JSON.stringify(second.tranches), JSON.stringify(first.tranches), `${testCase.name}: kanonische Ausgabe ist deterministisch`);
                 assert(first.tranches.every(tranche => tranche.schemaVersion === 1), `${testCase.name}: Ausgabe verwendet Schema 1`);
+                if (testCase.expectedType) {
+                    assertEqual(first.tranches[0].type, testCase.expectedType, `${testCase.name}: historischer Typ wird eindeutig migriert`);
+                }
             } else if (first.status === 'corrupt') {
                 assertEqual(first.raw, testCase.raw, `${testCase.name}: nicht automatisch behebbare Daten bleiben raw-preserving`);
                 assertEqual(first.tranches, null, `${testCase.name}: korrupte Daten duerfen keine Teilmigration liefern`);

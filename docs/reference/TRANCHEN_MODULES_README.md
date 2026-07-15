@@ -42,8 +42,10 @@ Eine persistierte Schema-1-Tranche enthaelt:
 
 `marketValue`, `costBasis` und `instrumentId` werden abgeleitet. Persistierte
 Fremdwerte fuer Marktwert/Cost Basis sind nicht die Rechenquelle. Beim
-Profilverbund kommt `sourceProfileId` erst an der Engine-/Simulationsgrenze hinzu;
-der Manager dupliziert es nicht in den Realbestand.
+Profilverbund kommt `sourceProfileId` erst an der Engine-/Simulationsgrenze hinzu.
+Die Laufzeit-`trancheId` wird dort als `<profileId>:<trancheId>` profilbezogen,
+damit gleiche profilinterne IDs im Haushalt eindeutig bleiben. Der Manager
+schreibt weder Provenienz noch die profilbezogene Laufzeit-ID in den Realbestand.
 
 | `category` | Zulaessiger `type` |
 | --- | --- |
@@ -52,9 +54,10 @@ der Manager dupliziert es nicht in den Realbestand.
 | `money_market` | `geldmarkt` |
 | `gold` | `gold` |
 
-Widerspruechliche Paare, doppelte IDs, nicht endliche Finanzwerte, fehlende TQF
-oder unbekannte Schema-Versionen werden gemeinsam und strukturiert abgelehnt.
-Es gibt keine Prioritaetsregel, die einen Widerspruch still korrigiert.
+Widerspruechliche Schema-1-Paare, doppelte IDs, nicht endliche Finanzwerte,
+fehlende TQF oder unbekannte Schema-Versionen werden gemeinsam und strukturiert
+abgelehnt. Es gibt keine Prioritaetsregel, die einen aktuellen Widerspruch still
+korrigiert.
 
 ## 3. Legacy-Migration und Recovery
 
@@ -65,13 +68,19 @@ fehlende Legacy-Kategorie darf eindeutig aus dem Typ abgeleitet werden, ein
 fehlender Legacy-Aktuellkurs aus dem Kaufpreis. Fehlende optionale Text-/Datumsfelder
 bleiben leer.
 
+Die fruehere Manager-UI liess Kategorie und Typ unabhaengig auswaehlen. Deshalb
+migriert der reine Persistenz-Lesepfad bei unversionierten Datensaetzen einen
+alten Aktien-Typ (`aktien_alt`/`aktien_neu`) unter `bonds`, `money_market` oder
+`gold` auf den jeweils einzigen kanonischen Typ. Diese enge Reparatur gilt nicht
+fuer Schema 1, nicht an der Enginegrenze und nicht fuer andere Widersprueche.
+
 Das Laden ist rein lesend und schreibt die normalisierte Darstellung nicht
 automatisch zurueck. Dadurch gilt:
 
 - gueltige Legacy-Daten normalisieren deterministisch und idempotent;
 - `[]` bleibt ein explizit leerer Profilbestand und faellt nicht auf alte Live-Daten zurueck;
-- Kategorie-/Typ-Widerspruch, Duplikat-ID und syntaktisch korrupter JSON-Rohtext
-  enden `corrupt` und bleiben bytegleich erhalten;
+- nicht eindeutig migrierbarer Kategorie-/Typ-Widerspruch, Duplikat-ID und
+  syntaktisch korrupter JSON-Rohtext enden `corrupt` und bleiben bytegleich erhalten;
 - ein IO-/Backendfehler endet separat `unavailable` und bietet Retry, aber keinen Reset.
 
 Im `corrupt`-Zustand blockiert der Manager alle normalen Writes. Nutzer koennen
