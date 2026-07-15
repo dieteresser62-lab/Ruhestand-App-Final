@@ -268,7 +268,9 @@ async function runTranchenManagerPageTests() {
 
         assertEqual(window.tranchen.length, 1, 'Valid storage should load one tranche');
         assertEqual(window.tranchen[0].currentPrice, 120, 'Offline price update must preserve existing local price');
-        assert(doc.getElementById('priceUpdateStatus').textContent.includes('fehlgeschlagen'), 'Offline update should render degraded status');
+        const offlineStatus = doc.getElementById('priceUpdateStatus').textContent;
+        assert(offlineStatus.startsWith('Kurse konnten nicht aktualisiert werden.'), 'Offline update should render a concise failure status');
+        assert(offlineStatus.includes('ETF: Lokaler Kursproxy nicht erreichbar'), 'Offline update should name the affected tranche and understandable reason');
         assertEqual(doc.getElementById('profileTagesgeld').value, 12345, 'Profile values should be applied to DOM');
         assert(doc.getElementById('activeProfileName').textContent.includes('(default)'), 'Loaded profile label should include actual id');
     }
@@ -366,9 +368,9 @@ async function runTranchenManagerPageTests() {
         assertEqual(trancheWriteBatches, 1, 'Mixed successful batch should persist tranche state exactly once');
         assertEqual(JSON.parse(adapterStore.get('depot_tranchen')).find(item => item.trancheId === 'usd').currentPrice, 80, 'Persisted rejected lot should retain old price');
         const batchStatus = doc.getElementById('priceUpdateStatus').textContent;
-        assert(batchStatus.includes('2 aktualisiert, 1 fehlgeschlagen'), 'Mixed outcome should remain summarized');
-        assert(batchStatus.includes('UNSUPPORTED_CURRENCY') && batchStatus.includes('USD'), 'Rejected currency code and reason should remain visible');
-        assert(batchStatus.includes('EUR') && batchStatus.includes('yahoo-chart') && batchStatus.includes('Stichtag'), 'Successful quote metadata should remain visible');
+        assert(batchStatus.startsWith('Kurse teilweise aktualisiert (2 von 3).'), 'Mixed outcome should remain concise and unambiguous');
+        assert(batchStatus.includes('USD Lot: Waehrung USD wird nicht unterstuetzt.'), 'Rejected tranche and understandable reason should remain visible');
+        assert(!batchStatus.includes('yahoo-chart') && !batchStatus.includes('Stichtag'), 'Successful quote metadata should not clutter the status');
         assertEqual(doc.getElementById('updatePricesBtn').disabled, false, 'Completed batch should re-enable controls');
     }
     console.log('✓ quote batch resilience contract OK');

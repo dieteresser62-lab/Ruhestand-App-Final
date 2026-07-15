@@ -578,13 +578,10 @@ async function runTranchesSmoke(browser, baseUrl) {
     assert(await row.locator('[data-action="delete-tranche"]').getAttribute('aria-label'), 'Delete-Icon benötigt einen zugänglichen Namen');
 
     await page.locator('#updatePricesBtn').click();
-    await page.locator('#priceUpdateStatus').filter({ hasText: '1 aktualisiert' }).waitFor();
+    await page.locator('#priceUpdateStatus').filter({ hasText: 'Kurse erfolgreich aktualisiert.' }).waitFor();
     const quoteStatus = await page.locator('#priceUpdateStatus').textContent();
-    assert(
-        quoteStatus.includes('FLOW.DE') && quoteStatus.includes('EUR') &&
-        quoteStatus.includes('yahoo-chart') && quoteStatus.includes('Stichtag'),
-        'Online-Kursupdate muss Symbol, Währung, Quelle und UTC-Stichtag sichtbar halten'
-    );
+    assert(quoteStatus === 'Kurse erfolgreich aktualisiert.',
+        'Online-Kursupdate muss Erfolg ohne technische Kursdetails melden');
     assert((await row.textContent()).includes('105.00 €'), 'Valider EUR-Quote muss den sichtbaren Kurs aktualisieren');
     const quotedRow = await readIndexedDb(page, 'kv', 'depot_tranchen');
     const quotedTranche = JSON.parse(quotedRow.value)[0];
@@ -728,10 +725,12 @@ async function runTranchesQuoteFailureSmoke(browser, baseUrl) {
     const { page } = smoke;
     await page.locator('.tranche-row').nth(1).waitFor({ state: 'visible' });
     await page.locator('#updatePricesBtn').click();
-    await page.locator('#priceUpdateStatus').filter({ hasText: '1 aktualisiert, 1 fehlgeschlagen' }).waitFor();
+    await page.locator('#priceUpdateStatus').filter({ hasText: 'Kurse teilweise aktualisiert (1 von 2).' }).waitFor();
     const status = await page.locator('#priceUpdateStatus').textContent();
-    assert(status.includes('UNSUPPORTED_CURRENCY') && status.includes('Waehrung USD'),
-        'Browser-Teilerfolg muss die verworfene Fremdwährung mit stabilem Grund anzeigen');
+    assert(status.includes('Synthetischer Fremdkurs: Waehrung USD wird nicht unterstuetzt.'),
+        'Browser-Teilerfolg muss betroffene Tranche und verständlichen Grund anzeigen');
+    assert(!status.includes('yahoo-chart') && !status.includes('Stichtag'),
+        'Browser-Teilerfolg darf erfolgreiche Kursmetadaten nicht anzeigen');
     const persisted = JSON.parse((await readIndexedDb(page, 'kv', 'depot_tranchen')).value);
     assert(persisted.find(item => item.trancheId === 'quote-eur').currentPrice === 120,
         'EUR-Teilerfolg muss übernommen werden');
@@ -752,9 +751,10 @@ async function runTranchesQuoteFailureSmoke(browser, baseUrl) {
     });
     await offlineSmoke.page.locator('.tranche-row').waitFor({ state: 'visible' });
     await offlineSmoke.page.locator('#updatePricesBtn').click();
-    await offlineSmoke.page.locator('#priceUpdateStatus').filter({ hasText: '0 aktualisiert, 1 fehlgeschlagen' }).waitFor();
+    await offlineSmoke.page.locator('#priceUpdateStatus').filter({ hasText: 'Kurse konnten nicht aktualisiert werden.' }).waitFor();
     const offlineStatus = await offlineSmoke.page.locator('#priceUpdateStatus').textContent();
-    assert(offlineStatus.includes('PROXY_UNREACHABLE'), 'Browser-Offlinefall muss als Proxy-Nichterreichbarkeit sichtbar sein');
+    assert(offlineStatus.includes('Synthetischer Offline-Kurs: Lokaler Kursproxy nicht erreichbar'),
+        'Browser-Offlinefall muss betroffene Tranche und Proxy-Nichterreichbarkeit anzeigen');
     assert((await readIndexedDb(offlineSmoke.page, 'kv', 'depot_tranchen')).value === offlineRaw,
         'Kompletter Offlinefehler darf keinen bestätigten Kursbestand schreiben');
     offlineSmoke.assertNoErrors(['Failed to load resource: net::ERR_FAILED']);

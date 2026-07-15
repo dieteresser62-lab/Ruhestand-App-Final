@@ -64,8 +64,9 @@ Preis, plausibler UTC-Zeit und ausgewiesener Quelle.
 
 Bei einem Batch koennen einzelne Lots erfolgreich sein und andere fehlschlagen.
 Gueltige Teilerfolge werden gemeinsam gespeichert, fehlgeschlagene Lots behalten
-den alten Kurs. Die Statusanzeige nennt Symbol, Waehrung, Quelle, Stichtag und bei
-Fehlern einen stabilen Grund. Ohne einen gueltigen Quote wird nichts geschrieben.
+den alten Kurs. Die Statusanzeige meldet einen erfolgreichen Lauf knapp; bei
+Fehlern nennt sie nur die betroffene Tranche und den verstaendlichen Grund. Ohne
+einen gueltigen Quote wird nichts geschrieben.
 
 ## 5. Wirkung in Balance und Simulator
 

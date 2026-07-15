@@ -804,33 +804,29 @@ function selectMostSpecificQuoteError(errors, fallbackSymbol) {
     return quoteErrorDetails(selected, fallbackSymbol);
 }
 
-function formatQuoteTimestamp(asOf) {
-    return new Date(asOf * 1000).toLocaleString('de-DE', {
-        timeZone: 'UTC',
-        timeZoneName: 'short'
-    });
+function formatQuoteIssue(result) {
+    const label = result.name || result.trancheId || 'Unbenannte Tranche';
+    const message = result.status === 'skipped'
+        ? 'Ticker oder ISIN fehlt'
+        : String(result.message || 'Kursabruf fehlgeschlagen').trim().replace(/[.\s]+$/, '');
+    return `${label}: ${message}.`;
 }
 
 function formatBatchStatus(results, options = {}) {
     const updated = results.filter(result => result.status === 'updated').length;
-    const failed = results.filter(result => result.status === 'failed').length;
-    const skipped = results.filter(result => result.status === 'skipped').length;
-    const stamp = new Date().toLocaleString('de-DE');
-    const headline = options.persistenceFailed
-        ? `Kurs-Update ${stamp}: ${updated} valide Kurse, aber keine dauerhafte Speicherung; bestaetigter Stand bleibt aktiv.`
-        : `Kurs-Update ${stamp}: ${updated} aktualisiert, ${failed} fehlgeschlagen, ${skipped} ohne Ticker/ISIN.`;
-    const lines = results.map(result => {
-        const label = result.name || result.trancheId || 'Unbenannte Tranche';
-        if (result.status === 'updated') {
-            const quote = result.quote;
-            return `${label} (${quote.symbol}): ${quote.price} ${quote.currency}; Quelle ${quote.source}; Stichtag ${formatQuoteTimestamp(quote.asOf)}.`;
-        }
-        if (result.status === 'skipped') {
-            return `${label}: NO_SYMBOL: Kein Ticker oder ISIN vorhanden.`;
-        }
-        return `${label} (${result.symbol}): ${result.code}: ${result.message}`;
-    });
-    return [headline, ...lines].join('\n');
+    if (options.persistenceFailed) {
+        return 'Kurse konnten nicht aktualisiert werden: Das Speichern ist fehlgeschlagen. Der bisherige Stand bleibt erhalten.';
+    }
+    if (updated === results.length) return 'Kurse erfolgreich aktualisiert.';
+
+    const headline = updated > 0
+        ? `Kurse teilweise aktualisiert (${updated} von ${results.length}).`
+        : 'Kurse konnten nicht aktualisiert werden.';
+    const issues = results
+        .filter(result => result.status !== 'updated')
+        .map(formatQuoteIssue)
+        .join(' ');
+    return `${headline} ${issues}`.trim();
 }
 
 function createBatchQuoteFetcher(signal) {
