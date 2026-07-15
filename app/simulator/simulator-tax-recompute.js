@@ -39,12 +39,16 @@ export function applySimulatorTaxRecompute({
             sparerPauschbetrag,
             kirchensteuerSatz
         });
-        const taxCashAdjustment = taxReservedTotal - recomputedSettlement.taxDue;
-        if (taxCashAdjustment < -0.01) {
+        const rawTaxCashAdjustment = taxReservedTotal - recomputedSettlement.taxDue;
+        if (rawTaxCashAdjustment < -0.01) {
             throw new Error(
-                `Simulator-Steuerreserve-Contract verletzt: finale Steuer uebersteigt Reserven um ${Math.abs(taxCashAdjustment).toFixed(2)} EUR.`
+                `Simulator-Steuerreserve-Contract verletzt: finale Steuer uebersteigt Reserven um ${Math.abs(rawTaxCashAdjustment).toFixed(2)} EUR.`
             );
         }
+        // A tolerated sub-cent reserve difference is only floating-point noise.
+        // Persisting it as negative cash makes the next engine validation fail and
+        // Monte Carlo can then misclassify that validation error as portfolio ruin.
+        const taxCashAdjustment = Math.max(0, rawTaxCashAdjustment);
         actionResult.steuer = recomputedSettlement.taxDue;
         actionResult.taxSettlement = {
             ...recomputedSettlement.details,

@@ -242,6 +242,36 @@ function makeStubEngine({ monthlyWithdrawal, actionTax, actionTaxableRaw = 1000 
         'Reserve underfunding below tolerance should stop the simulator contract');
 }
 
+// 0ac) Floating-point noise must not persist as negative cash into the next MC year.
+{
+    const aggregate = buildTaxRawAggregate({
+        sumRealizedGainSigned: 10000,
+        sumTaxableAfterTqfSigned: 10000
+    });
+    const expected = settleTaxYear({
+        taxStatePrev: { lossCarry: 0 },
+        rawAggregate: aggregate,
+        sparerPauschbetrag: 0,
+        kirchensteuerSatz: 0
+    });
+    const actionResult = { steuer: 0, taxSettlement: {}, taxRawAggregate: {} };
+    const recompute = applySimulatorTaxRecompute({
+        didForcedSale: true,
+        actionResult,
+        spendingNewState: {},
+        taxStatePrev: { lossCarry: 0 },
+        combinedTaxRawAggregate: aggregate,
+        sparerPauschbetrag: 0,
+        kirchensteuerSatz: 0,
+        forcedTaxReserved: expected.taxDue - 1e-12
+    });
+
+    assert(recompute.taxCashAdjustment === 0,
+        'Sub-cent floating-point under-reserve must normalize to zero cash adjustment');
+    assert(actionResult.taxSettlement.taxCashAdjustment === 0,
+        'Settlement diagnostics must not expose a negative-zero cash adjustment');
+}
+
 // 0a) Direct recompute consumes existing loss carry before SPB/final tax.
 {
     const aggregate = buildTaxRawAggregate({
