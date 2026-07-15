@@ -213,9 +213,12 @@ Tranchen sind ein zentrales Bindeglied zwischen UI, Profilverbund, Balance, Simu
 Wichtige Punkte:
 
 - Detailtranchen werden in `depot_tranchen` gespeichert.
-- `app/tranches/` verwaltet Seiten-/Modal-State, Rendering, Status und Kursservice.
-- Balance nutzt Tranchen fuer steueroptimierte Verkaeufe.
-- Simulator fuehrt Tranchen in Profilverbund-Szenarien zusammen.
+- `types/tranche-contract.js` ist die kanonische Source of Truth fuer Schema 1, endliche Werte, TQF und disjunkte Kategorie-/Typ-Paare.
+- `app/tranches/` verwaltet Seiten-/Modal-State, Rendering, fail-closed Status, EUR-Kursservice, Recovery und bestaetigten Reconcile.
+- Persistenz laeuft ueber die zentrale Facade; Browser-`localStorage` ist nur Legacy-/Fallbackpfad. Das zentrale Komplettbackup ersetzt tote Tranchen-Teilimporte/-exporte.
+- Balance nutzt Tranchen fuer steueroptimierte Verkaeufe, schreibt Empfehlungen aber nie in den Realbestand.
+- Simulator fuehrt tiefe Kopien der Profiltranchen zusammen, behaelt `sourceProfileId` und verwirft Simulationsmutationen nach dem Lauf.
+- Reale Brokerverkaeufe werden nur nach Vorschau und separater Bestaetigung mit stabiler `actionId` fortgeschrieben; identische Wiederholung ist ein No-op.
 - Steuerlogik unterscheidet planbare Gewinne, signierte Gewinne/Verluste, Teilfreistellung, Sparer-Pauschbetrag und Verlusttopf.
 - Notfallverkaeufe im Simulator werden ueber Gesamt-Settlement-Recompute mit regulaeren Verkaeufen konsistent verrechnet.
 
@@ -275,8 +278,8 @@ Rahmen:
 - Testdateien: `*.test.mjs`
 - Browser-Smoke-Gate: `npm run test:browser`
 - Coverage-Gate: `npm run test:coverage`
-- Statistik laut Slice-11-Abschlussvalidierung: 103 Testdateien, 3363 Assertions, 0 Fehler und 0 offene Handles (`npm test`, 2026-07-14).
-- Coverage-Baseline laut Slice 11: ca. 74,02% Zeilen-Coverage (23023/31105) fuer `app/`, `engine/`, `workers/` und `types/`; keine harte Mindestschwelle.
+- Statistik laut Tranchenmanagement-Slice-09-Abschlussvalidierung: 107 Testdateien entdeckt, davon 106 im Node-Gate ausgefuehrt, 4410 Assertions, 0 Fehler und 0 offene Handles (`npm test`, 2026-07-14).
+- Coverage-Baseline laut Tranchenmanagement-Slice 09: 72,25% Zeilen-Coverage (26529/36717 in 195 Dateien) fuer `app/`, `engine/`, `workers/` und `types/`; keine harte Mindestschwelle.
 
 Wichtige Testgruppen:
 
@@ -287,7 +290,7 @@ Wichtige Testgruppen:
 - Profilverbund: `profile-storage`, `profilverbund-balance`, `simulator-multiprofile-aggregation`.
 - Worker und Paritaet: `worker-pool`, `worker-parity`.
 - UI-nahe Module: Balance-Reader, Storage, Renderer, Expenses, Heatmap.
-- Browser-Einstiege und Balance-Workflows: isolierte Playwright-Smokes fuer Startseite, Balance, Simulator, Tranchenmanager und Handbuch sowie Membership-Reload, Engine-Gate, Jahres-Preflight/-Doppelklick, Import-Reject und korrupte Ausgaben mit deterministischen Netzwerkrouten.
+- Browser-Einstiege und Workflows: isolierte Playwright-Smokes fuer Startseite, Balance, Simulator, Tranchenmanager und Handbuch sowie Membership-Reload, Engine-Gate, Jahres-Preflight/-Doppelklick, Import-Reject, korrupte Ausgaben, Profil-A/B-Tranchen-CRUD, Quote-Teilerfolg/Offline, mutationsfreie Empfehlung/Simulation, idempotenten Reconcile und Tranchen-Recovery mit deterministischen Netzwerkrouten.
 - Persistenz/Tauri: Browser-Fallback, IndexedDB/localStorage/Tauri-Adapter-Contracts und Tauri-CSP/Command-Contracts.
 
 Validierungsregel:

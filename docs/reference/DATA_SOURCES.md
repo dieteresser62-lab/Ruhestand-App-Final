@@ -14,6 +14,20 @@ Live data is optional. The suite remains usable without internet access; failed 
 
 Tauri release builds allow these live-data targets explicitly in `src-tauri/tauri.conf.json` under `app.security.csp.connect-src`. New external live-data sources must be added there and documented in this file in the same change.
 
+### Tranche quote contract
+
+The tranche manager accepts automatic quotes only when symbol, positive finite
+price, `EUR` currency, UTC Unix timestamp and source are present and consistent.
+Quotes older than seven calendar days or more than five minutes in the future are
+rejected. Foreign currencies are never treated as EUR and no implicit FX
+conversion is performed.
+
+Batch updates are single-flight, deduplicate symbols and use bounded concurrency.
+Valid partial results are persisted in one confirmed commit; failed lots retain
+their previous quote. If every request fails, the stored tranche payload remains
+unchanged. Browser tests route deterministic EUR, foreign-currency and offline
+fixtures through the same local proxy contract.
+
 ## Annual inflation contract
 
 The Balance annual workflow queries the completed calendar year from the annual-period contract. All accepted source responses are normalized to the metric `consumer_prices_all_items_annual_average_growth_pct` and return:
@@ -31,7 +45,7 @@ Positive inflation and deflation use the same multiplicative rule: `next = previ
 
 ## Deterministic browser tests
 
-`npm run test:browser` does not depend on the live providers above. Playwright intercepts the annual workflow requests and supplies deterministic ECB-fallback, World Bank, Yahoo-proxy, and CAPE fixtures. All other external requests are blocked, so the annual preflight and one-time commit contracts remain reproducible offline.
+`npm run test:browser` does not depend on the live providers above. Playwright intercepts the annual workflow requests and supplies deterministic ECB-fallback, World Bank, Yahoo-proxy, CAPE and tranche-quote fixtures. All other external requests are blocked, so annual preflight, one-time commit, tranche partial-success and offline contracts remain reproducible offline.
 
 ## Historical market dataset (`app/simulator/simulator-data.js`)
 

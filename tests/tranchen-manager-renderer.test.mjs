@@ -48,3 +48,37 @@ console.log('Test 3: table renderer returns action markup');
     assert(html.includes('1.200,00'), 'Table html should include formatted market value');
 }
 console.log('✓ table renderer returns action markup OK');
+
+console.log('Test 4: classification, signs and accessibility are unambiguous');
+{
+    const html = buildTranchenTableHtml([{
+        trancheId: 'gold-1',
+        purchaseDate: '2025-01-01',
+        name: 'Gold Reserve',
+        isin: '',
+        ticker: 'GOLD',
+        shares: 2,
+        purchasePrice: 100,
+        currentPrice: 90,
+        costBasis: 200,
+        marketValue: 180,
+        tqf: 1,
+        category: 'gold',
+        type: 'gold'
+    }]);
+    assert(html.includes('Gold-ETC'), 'Gold should be rendered as gold type');
+    assert(!html.includes('>Geldmarkt</span>'), 'Gold should not be labelled as money market');
+    assert(html.includes('-10.00 %'), 'Negative return should contain one leading minus sign');
+    assert(!html.includes('+-'), 'Negative values must never contain plus-minus output');
+    assert(html.includes('aria-label="Tranche Gold Reserve bearbeiten"'), 'Edit icon should have an accessible name');
+    assert(html.includes('aria-label="Tranche Gold Reserve löschen"'), 'Delete icon should have an accessible name');
+    assert(html.includes('class="table-scroll"'), 'Table should render inside its dedicated scroll container');
+}
+console.log('✓ classification and accessible actions OK');
+
+console.log('Test 5: empty state does not claim FIFO activity');
+{
+    const html = buildEmptyTranchenHtml();
+    assert(!html.includes('FIFO aktiv'), 'Empty state must not report FIFO as active');
+}
+console.log('✓ empty FIFO semantics OK');

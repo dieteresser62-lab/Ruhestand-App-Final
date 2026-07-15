@@ -6,12 +6,13 @@ Diese Datei dient als Uebersicht und Bestandsaufnahme fuer die Dokumentation.
 
 - `docs/guides/`
   - Nutzergefuehrte Schritt-fuer-Schritt-Anleitungen.
-  - Aktuell: `docs/guides/GUIDED_TOURS.md`
+  - Aktuell: `docs/guides/GUIDED_TOURS.md` und `docs/guides/MULTI-TRANCHEN-ANLEITUNG.md`
 - `docs/reference/`
   - Stabile Fach- und Technikreferenzen.
   - Dateien:
     - `docs/reference/AUTO_OPTIMIZE_DETAILS.md`
     - `docs/reference/PROFILVERBUND_FEATURES.md`
+    - `docs/reference/TRANCHEN_MODULES_README.md`
     - `docs/reference/WORKFLOW_PSEUDOCODE.md`
 - `docs/internal/`
   - Arbeitsdokumente und Entwurfsartefakte.
@@ -38,7 +39,7 @@ Diese Datei dient als Uebersicht und Bestandsaufnahme fuer die Dokumentation.
 
 - `docs/reference/TECHNICAL.md` (technische Referenz)
 - `docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md` (fachlich-technische Vertiefung)
-- `docs/reference/BALANCE_MODULES_README.md` und `docs/reference/SIMULATOR_MODULES_README.md` (Modulreferenz)
+- `docs/reference/BALANCE_MODULES_README.md`, `docs/reference/SIMULATOR_MODULES_README.md` und `docs/reference/TRANCHEN_MODULES_README.md` (Modulreferenzen)
 
 Diese Root-Dateien bleiben vorerst erhalten, damit bestehende Links und externe Referenzen stabil bleiben.
 

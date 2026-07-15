@@ -2,6 +2,10 @@
 
 import { PROFILE_TRANCHES_KEY } from '../profile/profile-state.js';
 import { persistenceStorage } from '../shared/persistence-facade.js';
+import {
+    calculateCanonicalTrancheValues,
+    normalizeTrancheCollection
+} from '../../types/tranche-contract.js';
 
 export function generateTrancheId() {
     const rand = Math.random().toString(36).slice(2, 8);
@@ -9,39 +13,55 @@ export function generateTrancheId() {
 }
 
 export function normalizeTranches(items) {
-    if (!Array.isArray(items)) return [];
-    return items.map((t) => {
-        const existingId = t && (t.trancheId || t.id);
-        return {
-            ...t,
-            trancheId: existingId || generateTrancheId()
-        };
-    });
+    return normalizeTrancheCollection(items, { mode: 'persisted' });
 }
 
 export function calculateTrancheDerivedValues(tranche) {
-    const shares = Number(tranche?.shares) || 0;
-    const purchasePrice = Number(tranche?.purchasePrice) || 0;
-    const currentPrice = Number(tranche?.currentPrice) || purchasePrice;
-    return {
-        ...tranche,
-        currentPrice,
-        marketValue: shares * currentPrice,
-        costBasis: shares * purchasePrice
-    };
+    return calculateCanonicalTrancheValues(tranche);
 }
 
 export function saveTranchesToStorage(tranchen, storage = persistenceStorage) {
-    storage.setItem(PROFILE_TRANCHES_KEY, JSON.stringify(tranchen));
-    return tranchen;
+    const normalized = normalizeTranches(tranchen);
+    storage.setItem(PROFILE_TRANCHES_KEY, JSON.stringify(normalized));
+    return normalized;
 }
 
 export function loadTranchesFromStorage(storage = persistenceStorage) {
-    const saved = storage.getItem(PROFILE_TRANCHES_KEY);
-    if (!saved) return [];
+    let raw;
     try {
-        return normalizeTranches(JSON.parse(saved));
+        raw = storage.getItem(PROFILE_TRANCHES_KEY);
     } catch {
-        return [];
+        return Object.freeze({
+            status: 'unavailable',
+            tranches: null,
+            raw: null,
+            errorCode: 'TRANCHE_STORAGE_UNAVAILABLE'
+        });
+    }
+
+    if (raw === null || raw === '') {
+        return Object.freeze({
+            status: 'empty',
+            tranches: Object.freeze([]),
+            raw,
+            errorCode: null
+        });
+    }
+
+    try {
+        const tranches = normalizeTranches(JSON.parse(raw));
+        return Object.freeze({
+            status: tranches.length > 0 ? 'valid' : 'empty',
+            tranches: Object.freeze(tranches),
+            raw,
+            errorCode: null
+        });
+    } catch {
+        return Object.freeze({
+            status: 'corrupt',
+            tranches: null,
+            raw,
+            errorCode: 'TRANCHE_STORAGE_CORRUPT'
+        });
     }
 }

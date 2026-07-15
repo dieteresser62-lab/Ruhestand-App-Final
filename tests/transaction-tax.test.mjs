@@ -1,5 +1,6 @@
 
 import { TransactionEngine } from '../engine/transactions/TransactionEngine.mjs';
+import { ValidationError } from '../engine/errors.mjs';
 
 console.log('--- Transaction Tax Tests ---');
 
@@ -88,6 +89,29 @@ const baseContext = { saleBudgets: {} }; // No budget limits
 
     assertClose(tax, expectedTax, 0.01, 'Tax should be 25% + Soli on full profit');
     console.log('✅ KESt Logic works');
+}
+
+// --- TEST 1b: Kirchensteuer-Einheit aus der Balance-UI ---
+{
+    for (const kirchensteuerSatz of [0.08, 0.09]) {
+        const input = getBaseInputs();
+        input.kirchensteuerSatz = kirchensteuerSatz;
+        const result = TransactionEngine.calculateSaleAndTax(
+            20000,
+            input,
+            baseContext,
+            baseMarket,
+            false
+        );
+        const expectedTax = 10000 * 0.25 * (1 + 0.055 + kirchensteuerSatz);
+        assertClose(
+            result.steuerGesamt,
+            expectedTax,
+            0.01,
+            `Church-tax ratio ${kirchensteuerSatz} should be interpreted exactly once`
+        );
+    }
+    console.log('✅ Balance UI church-tax decimal unit matches the engine contract');
 }
 
 // --- TEST 2: Teilfreistellung (TQF) ---
@@ -498,5 +522,62 @@ const baseContext = { saleBudgets: {} }; // No budget limits
     assertEqual(result.breakdown[0].sourceProfileId, 'profile-a', 'Sale breakdown should preserve exact sourceProfileId');
 
     console.log('✅ Detailed tranche sale preserves sourceProfileId');
+}
+
+// --- TEST 13: Invalid mixed classification fails closed ---
+{
+    const input = getBaseInputs();
+    input.detailledTranches = [{
+        trancheId: 'mismatch',
+        type: 'anleihe',
+        category: 'equity',
+        marketValue: 100,
+        costBasis: 100,
+        tqf: 0
+    }];
+    let error = null;
+    try {
+        TransactionEngine.calculateSaleAndTax(150, input, baseContext, baseMarket, false);
+    } catch (caught) {
+        error = caught;
+    }
+    assert(error instanceof ValidationError, 'Mixed classification should fail with engine ValidationError');
+    assertEqual(error.code, 'TRANCHE_VALIDATION_FAILED', 'Engine error should expose stable tranche code');
+    assert(error.errors.some(item => item.code === 'TRANCHE_CLASSIFICATION_MISMATCH'), 'Engine error should retain classification finding');
+    assert(error.errors.some(item => item.trancheId === 'mismatch' && item.field === 'category'), 'Engine error should retain lot and field context');
+    console.log('✅ Invalid mixed classification fails closed before a sale breakdown');
+}
+
+// --- TEST 14: Duplicate detailed lot ids fail closed ---
+{
+    const input = getBaseInputs();
+    input.detailledTranches = [
+        { trancheId: 'duplicate', type: 'aktien_neu', category: 'equity', marketValue: 100, costBasis: 100, tqf: 0 },
+        { trancheId: 'duplicate', type: 'aktien_neu', category: 'equity', marketValue: 100, costBasis: 100, tqf: 0 }
+    ];
+    let error = null;
+    try {
+        TransactionEngine.calculateSaleAndTax(150, input, baseContext, baseMarket, false);
+    } catch (caught) {
+        error = caught;
+    }
+    assert(error instanceof ValidationError, 'Duplicate ids should fail with engine ValidationError');
+    assert(error.errors.some(item => item.code === 'TRANCHE_ID_DUPLICATE'), 'Duplicate id should retain stable field error code');
+    console.log('✅ Duplicate detailed ids fail closed');
+}
+
+// --- TEST 15: Malformed detailed collection does not fall back to aggregates ---
+{
+    const input = getBaseInputs();
+    input.detailledTranches = { trancheId: 'not-an-array' };
+    let error = null;
+    try {
+        TransactionEngine.calculateSaleAndTax(100, input, baseContext, baseMarket, false);
+    } catch (caught) {
+        error = caught;
+    }
+    assert(error instanceof ValidationError, 'Malformed detailed collection should fail with engine ValidationError');
+    assert(error.errors.some(item => item.code === 'TRANCHE_COLLECTION_INVALID'), 'Malformed collection should retain stable contract code');
+    console.log('✅ Malformed detailed collection fails closed');
 }
 console.log('--- Transaction Tax Tests Completed ---');

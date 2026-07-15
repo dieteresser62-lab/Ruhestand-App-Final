@@ -41,6 +41,11 @@ import {
 } from '../app/shared/persistence-backup.js';
 import { CONFIG } from '../app/balance/balance-config.js';
 import { PROFILE_STORAGE_KEYS } from '../app/profile/profile-state.js';
+import {
+    commitTrancheReconciliation,
+    readReconciliationHistory
+} from '../app/tranches/tranche-reconciliation.js';
+import { loadTranchesFromStorage } from '../app/tranches/tranchen-manager-state.js';
 
 console.log('--- Persistence Tests ---');
 
@@ -1191,6 +1196,93 @@ try {
         assertEqual(getPersistenceStatus().backend, 'IndexedDB', 'Aktives Backend ist IndexedDB');
     }
 
+    console.log('Test 17b: tranche legacy migration matrix is deterministic and raw-preserving');
+    {
+        const legacyBase = {
+            name: 'Synthetischer Altbestand',
+            shares: 2,
+            purchasePrice: 90,
+            type: 'aktien_neu',
+            tqf: 0.3
+        };
+        const cases = [
+            {
+                name: 'valid legacy classification and generated id',
+                raw: JSON.stringify([{ ...legacyBase, kind: 'aktien_neu', type: undefined }]),
+                expectedStatus: 'valid'
+            },
+            {
+                name: 'missing optional fields',
+                raw: JSON.stringify([{ ...legacyBase, id: 'legacy-optional' }]),
+                expectedStatus: 'valid'
+            },
+            {
+                name: 'historic independent-select money-market classification',
+                raw: JSON.stringify([{ ...legacyBase, id: 'legacy-money-market', category: 'money_market' }]),
+                expectedStatus: 'valid',
+                expectedType: 'geldmarkt'
+            },
+            {
+                name: 'schema-one contradictory category and type',
+                raw: JSON.stringify([{
+                    ...legacyBase,
+                    schemaVersion: 1,
+                    trancheId: 'schema-one-mismatch',
+                    currentPrice: 90,
+                    category: 'gold'
+                }]),
+                expectedStatus: 'corrupt'
+            },
+            {
+                name: 'duplicate ids',
+                raw: JSON.stringify([
+                    { ...legacyBase, id: 'legacy-duplicate' },
+                    { ...legacyBase, id: 'legacy-duplicate', name: 'Zweiter synthetischer Altbestand' }
+                ]),
+                expectedStatus: 'corrupt'
+            },
+            { name: 'explicit empty override', raw: '[]', expectedStatus: 'empty' },
+            { name: 'corrupt raw payload', raw: '{not-json', expectedStatus: 'corrupt' }
+        ];
+
+        for (const [index, testCase] of cases.entries()) {
+            const storage = new MockStorage();
+            storage.setItem('depot_tranchen', testCase.raw);
+            const adapter = createIndexedDbAdapter({
+                indexedDB: createFakeIndexedDB(),
+                dbName: `tranche-migration-matrix-${index}`
+            });
+            resetPersistenceForTests(adapter);
+
+            await init({ localStorage: storage });
+
+            assertEqual(
+                getItemSync('depot_tranchen'),
+                testCase.raw,
+                `${testCase.name}: Facade-Migration muss Rohbytes unveraendert uebernehmen`
+            );
+            const facadeStorage = { getItem: key => getItemSync(key) };
+            const first = loadTranchesFromStorage(facadeStorage);
+            const second = loadTranchesFromStorage(facadeStorage);
+            assertEqual(first.status, testCase.expectedStatus, `${testCase.name}: erwarteter Ladezustand`);
+            assertEqual(second.status, first.status, `${testCase.name}: wiederholtes Laden bleibt idempotent`);
+            assertEqual(getItemSync('depot_tranchen'), testCase.raw, `${testCase.name}: Laden darf Migration nicht zurueckschreiben`);
+
+            if (first.status === 'valid') {
+                assertEqual(JSON.stringify(second.tranches), JSON.stringify(first.tranches), `${testCase.name}: kanonische Ausgabe ist deterministisch`);
+                assert(first.tranches.every(tranche => tranche.schemaVersion === 1), `${testCase.name}: Ausgabe verwendet Schema 1`);
+                if (testCase.expectedType) {
+                    assertEqual(first.tranches[0].type, testCase.expectedType, `${testCase.name}: historischer Typ wird eindeutig migriert`);
+                }
+            } else if (first.status === 'corrupt') {
+                assertEqual(first.raw, testCase.raw, `${testCase.name}: nicht automatisch behebbare Daten bleiben raw-preserving`);
+                assertEqual(first.tranches, null, `${testCase.name}: korrupte Daten duerfen keine Teilmigration liefern`);
+            } else {
+                assertEqual(first.tranches.length, 0, `${testCase.name}: leeres Override bleibt explizit leer`);
+            }
+        }
+    }
+
     console.log('Test 18: browser migration blocks silent reversion when IndexedDB is empty after migration');
     {
         const storage = new MockStorage();
@@ -1423,6 +1515,72 @@ try {
         setItemSync('fallback_write', 'ok');
         await flush();
         assertEqual(storage.getItem('fallback_write'), 'ok', 'localStorage-Fallback schreibt ueber Facade zurueck');
+    }
+
+    console.log('Test 27: reconciliation persists live lot and audit in one facade batch');
+    {
+        const trancheRaw = JSON.stringify([{
+            schemaVersion: 1,
+            trancheId: 'facade-lot',
+            name: 'Synthetischer Bestand',
+            isin: '',
+            ticker: 'FACADE.DE',
+            shares: 2,
+            purchasePrice: 80,
+            currentPrice: 100,
+            purchaseDate: '2020-01-02',
+            category: 'equity',
+            type: 'aktien_neu',
+            tqf: 0.3,
+            notes: ''
+        }]);
+        const registryRaw = JSON.stringify({
+            version: 1,
+            profiles: {
+                default: {
+                    meta: { id: 'default', name: 'Default' },
+                    data: { depot_tranchen: trancheRaw }
+                }
+            }
+        });
+        const batches = [];
+        const adapter = createMemoryAdapter({
+            depot_tranchen: trancheRaw,
+            [PROFILE_STORAGE_KEYS.registry]: registryRaw,
+            [PROFILE_STORAGE_KEYS.current]: 'default',
+            [PROFILE_STORAGE_KEYS.active]: 'default'
+        });
+        const originalSaveBatch = adapter.saveBatch.bind(adapter);
+        adapter.saveBatch = async batch => {
+            batches.push(batch);
+            return originalSaveBatch(batch);
+        };
+        resetPersistenceForTests(adapter);
+        await init();
+
+        const result = await commitTrancheReconciliation({
+            profileId: 'default',
+            expectedTranchesRaw: trancheRaw,
+            action: {
+                actionId: 'facade-order-1',
+                profileId: 'default',
+                trancheId: 'facade-lot',
+                executedAt: '2026-07-14',
+                sharesSold: 1,
+                grossProceeds: 100,
+                fees: 1
+            }
+        }, { clock: () => '2026-07-14T12:00:00.000Z' });
+
+        assertEqual(result.status, 'applied', 'Facade-Reconcile wird bestaetigt');
+        assertEqual(batches.length, 1, 'Live-Bestand und Registry werden in genau einem Flush geschrieben');
+        const upsertKeys = batches[0].upserts.map(([key]) => key);
+        assert(upsertKeys.includes('depot_tranchen'), 'Facade-Batch enthaelt den Live-Tranchenbestand');
+        assert(upsertKeys.includes(PROFILE_STORAGE_KEYS.registry), 'Facade-Batch enthaelt Profilbestand und Audit');
+        assertEqual(JSON.parse(adapter.store.get('depot_tranchen'))[0].shares, 1,
+            'Adapter enthaelt den resultierenden Stueckbestand');
+        assertEqual(readReconciliationHistory(adapter.store.get(PROFILE_STORAGE_KEYS.registry)).length, 1,
+            'Adapter enthaelt die stabile Action-ID fuer Reload-Idempotenz');
     }
 
     console.log('Persistence tests passed');

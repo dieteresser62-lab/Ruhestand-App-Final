@@ -49,6 +49,50 @@ function createBalanceStorage(activeYear = 2025) {
     };
 }
 
+function createBrowserTranche(overrides = {}) {
+    return {
+        schemaVersion: 1,
+        trancheId: 'browser-lot-1',
+        name: 'Synthetische Browser-Tranche',
+        isin: '',
+        ticker: 'FLOW.DE',
+        shares: 2,
+        purchasePrice: 100,
+        currentPrice: 90,
+        purchaseDate: '2024-01-02',
+        category: 'equity',
+        type: 'aktien_neu',
+        tqf: 0.3,
+        notes: '',
+        ...overrides
+    };
+}
+
+function createBrowserProfileStorage(profiles, currentProfileId) {
+    const registry = {
+        version: 1,
+        profiles: Object.fromEntries(Object.entries(profiles).map(([id, profile]) => [id, {
+            meta: {
+                id,
+                name: profile.name,
+                createdAt: '2026-07-14T00:00:00.000Z',
+                updatedAt: '2026-07-14T00:00:00.000Z',
+                belongsToHousehold: profile.belongsToHousehold !== false
+            },
+            data: {
+                depot_tranchen: profile.tranchesRaw ?? '[]',
+                profile_tagesgeld: profile.tagesgeld ?? '10000',
+                profile_aktuelles_alter: profile.alter ?? '67'
+            }
+        }]))
+    };
+    return {
+        rs_profiles_v1: JSON.stringify(registry),
+        rs_current_profile: currentProfileId,
+        rs_active_profile: currentProfileId
+    };
+}
+
 function assert(condition, message) {
     if (!condition) throw new Error(message);
 }
@@ -142,6 +186,30 @@ async function createPage(browser, label, options = {}) {
                 body: 'window.EngineAPI={getVersion(){return {api:"0.0",build:"e2e-mismatch"}}};'
             });
             return;
+        }
+        if (options.quoteFixtures && url.hostname === '127.0.0.1' && url.port === '8787') {
+            const symbol = String(url.searchParams.get(url.pathname === '/search' ? 'q' : 'symbol') || '').trim().toUpperCase();
+            const fixture = typeof options.quoteFixtures === 'object'
+                ? (options.quoteFixtures[symbol] ?? options.quoteFixtures.default)
+                : options.quoteFixtures;
+            if (fixture === 'offline' || fixture?.offline === true) {
+                await route.abort('failed');
+                return;
+            }
+            if (url.pathname === '/search') {
+                await route.fulfill({ json: { quotes: symbol ? [{ symbol }] : [] } });
+                return;
+            }
+            if (url.pathname === '/quote') {
+                await route.fulfill({ json: {
+                    symbol,
+                    price: fixture?.price ?? 105,
+                    currency: fixture?.currency ?? 'EUR',
+                    asOf: fixture?.asOf ?? Math.floor(Date.now() / 1000),
+                    source: fixture?.source ?? 'yahoo-chart'
+                } });
+                return;
+            }
         }
         if (options.annualFixtures && url.hostname === '127.0.0.1' && url.port === '8787') {
             await route.fulfill({ json: { chart: { result: [{
@@ -274,6 +342,49 @@ async function runBalanceMembershipReload(browser, baseUrl) {
     await smoke.close();
 }
 
+async function runBalanceSharedTrancheIds(browser, baseUrl) {
+    const sharedTrancheId = 'shared-browser-lot';
+    const activeProfileTranches = JSON.stringify([createBrowserTranche({
+        trancheId: sharedTrancheId,
+        name: 'Haushalt A Tranche'
+    })]);
+    const storage = {
+        ...createBalanceStorage(2025),
+        ...createBrowserProfileStorage({
+            'browser-household-a': {
+                name: 'Haushalt A',
+                tranchesRaw: activeProfileTranches,
+                tagesgeld: '10000'
+            },
+            'browser-household-b': {
+                name: 'Haushalt B',
+                tranchesRaw: JSON.stringify([createBrowserTranche({
+                    trancheId: sharedTrancheId,
+                    name: 'Haushalt B Tranche',
+                    currentPrice: 110
+                })]),
+                tagesgeld: '20000'
+            }
+        }, 'browser-household-a'),
+        depot_tranchen: activeProfileTranches
+    };
+    const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', { storage });
+    const { page } = smoke;
+    await page.waitForFunction(() => document.querySelectorAll('#profilverbund-profile-list input:checked').length === 2);
+    await page.waitForFunction(() => Array.isArray(window.__profilverbundTranchenOverride)
+        && window.__profilverbundTranchenOverride.length === 2);
+
+    const runtimeIds = await page.evaluate(() => window.__profilverbundTranchenOverride.map(tranche => tranche.trancheId));
+    assert(runtimeIds.includes('browser-household-a:shared-browser-lot'),
+        `Erste Profiltranche braucht eine profilbezogene Laufzeit-ID: ${JSON.stringify(runtimeIds)}`);
+    assert(runtimeIds.includes('browser-household-b:shared-browser-lot'),
+        `Zweite Profiltranche braucht eine eigene Laufzeit-ID: ${JSON.stringify(runtimeIds)}`);
+    const errorText = await page.locator('#error-container').textContent();
+    assert(!errorText.includes('Der Tranchenbestand ist fehlerhaft'), 'Gleiche profilinterne IDs duerfen den Profilverbund nicht blockieren');
+    smoke.assertNoErrors();
+    await smoke.close();
+}
+
 async function runBalanceEngineGate(browser, baseUrl) {
     const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', { engineMismatch: true });
     const banner = smoke.page.locator('#engine-version-alert');
@@ -401,13 +512,273 @@ async function runSimulatorSmoke(browser, baseUrl) {
 }
 
 async function runTranchesSmoke(browser, baseUrl) {
-    const smoke = await openSmokePage(browser, baseUrl, 'depot-tranchen-manager.html');
+    const profileA = 'browser-slice09-a';
+    const profileB = 'browser-slice09-b';
+    const storage = createBrowserProfileStorage({
+        [profileA]: { name: 'Browserprofil A', tranchesRaw: '[]' },
+        [profileB]: { name: 'Browserprofil B', tranchesRaw: '[]', belongsToHousehold: false }
+    }, profileB);
+    const smoke = await openSmokePage(browser, baseUrl, 'index.html', { storage, quoteFixtures: true });
     const { page } = smoke;
+    await page.locator('#profileSelect').waitFor({ state: 'visible' });
+    await page.locator('#profileSelect').selectOption(profileA);
+    await page.locator('#profileStatus').filter({ hasText: 'Profil gewechselt' }).waitFor({ state: 'visible' });
+    await Promise.all([
+        page.waitForURL(/depot-tranchen-manager\.html$/),
+        page.locator('a[href="depot-tranchen-manager.html"]').click()
+    ]);
     await page.locator('h1').filter({ hasText: 'Profil-Assets Manager' }).waitFor({ state: 'visible' });
     await page.locator('#tranchenTable').waitFor({ state: 'visible' });
+    assert(!(await page.locator('#tranchenTable').textContent()).includes('FIFO aktiv'), 'Leerer Manager darf FIFO nicht als aktiv melden');
+    const profileContext = await page.evaluate(() => ({
+        label: document.getElementById('activeProfileName')?.dataset.profileId,
+        back: document.getElementById('managerBackLink')?.dataset.profileId
+    }));
+    assert(profileContext.label === profileA && profileContext.back === profileA,
+        'Profilwahl, Manager-Kontext und Rücknavigation müssen Profil A referenzieren');
+
     await page.locator('#addTrancheBtn').click();
     await page.locator('#trancheModal.active').waitFor({ state: 'visible' });
     await page.locator('#modalTitle').filter({ hasText: 'Neue Tranche' }).waitFor({ state: 'visible' });
+    assert(await page.locator('#trancheModal').getAttribute('role') === 'dialog', 'Editor muss als Dialog ausgezeichnet sein');
+    assert(await page.locator('#trancheModal').getAttribute('aria-modal') === 'true', 'Editor muss modal ausgezeichnet sein');
+    assert(await page.evaluate(() => document.activeElement?.id) === 'name', 'Dialog muss den initialen Fokus auf den Namen setzen');
+    await page.keyboard.press('Shift+Tab');
+    assert(await page.evaluate(() => document.activeElement?.textContent?.trim()) === 'Speichern', 'Fokusfalle muss rückwärts zum letzten Dialogelement springen');
+    await page.keyboard.press('Escape');
+    assert(await page.evaluate(() => document.activeElement?.id) === 'addTrancheBtn', 'Escape muss Fokus an den Auslöser zurückgeben');
+
+    await page.locator('#addTrancheBtn').click();
+    await page.locator('#name').fill('Synthetische Browser-Tranche');
+    await page.locator('#ticker').fill('FLOW.DE');
+    await page.locator('#shares').fill('-1');
+    await page.locator('#purchasePrice').fill('100');
+    await page.locator('#currentPrice').fill('90');
+    await page.locator('#purchaseDate').fill('2024-01-02');
+    await page.locator('#category').selectOption('equity');
+    await page.locator('#type').selectOption('aktien_neu');
+    await page.locator('#tqf').fill('0.3');
+    const typeState = await page.locator('#type').evaluate(select => ({
+        value: select.value,
+        enabled: Array.from(select.options).filter(option => !option.disabled && !option.hidden).map(option => option.value)
+    }));
+    assert(typeState.value === 'aktien_neu' && typeState.enabled.includes('aktien_alt') && typeState.enabled.includes('aktien_neu'),
+        'Aktienkategorie darf nur die beiden kanonischen Aktientypen anbieten');
+    await page.locator('#trancheForm').evaluate(form => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    await page.locator('#trancheFormError').filter({ hasText: 'Stückzahl' }).waitFor({ state: 'visible' });
+
+    await page.locator('#shares').fill('2');
+    await page.locator('#trancheForm button[type="submit"]').click();
+    const row = page.locator('.tranche-row');
+    await row.filter({ hasText: 'Synthetische Browser-Tranche' }).waitFor({ state: 'visible' });
+    const rowText = await row.textContent();
+    assert(rowText.includes('Aktien') && rowText.includes('Neubestand') && !rowText.includes('Geldmarkt'),
+        'Aktientranche muss kanonisch klassifiziert sein');
+    assert(await row.locator('[data-action="edit-tranche"]').getAttribute('aria-label'), 'Edit-Icon benötigt einen zugänglichen Namen');
+    assert(await row.locator('[data-action="delete-tranche"]').getAttribute('aria-label'), 'Delete-Icon benötigt einen zugänglichen Namen');
+
+    await page.locator('#updatePricesBtn').click();
+    await page.locator('#priceUpdateStatus').filter({ hasText: 'Kurse erfolgreich aktualisiert.' }).waitFor();
+    const quoteStatus = await page.locator('#priceUpdateStatus').textContent();
+    assert(quoteStatus === 'Kurse erfolgreich aktualisiert.',
+        'Online-Kursupdate muss Erfolg ohne technische Kursdetails melden');
+    assert((await row.textContent()).includes('105.00 €'), 'Valider EUR-Quote muss den sichtbaren Kurs aktualisieren');
+    const quotedRow = await readIndexedDb(page, 'kv', 'depot_tranchen');
+    const quotedTranche = JSON.parse(quotedRow.value)[0];
+    assert(quotedTranche.currentPrice === 105 && quotedTranche.marketValue === 210,
+        'Validierter Kurs-/Wertpfad muss Kurs und abgeleiteten Marktwert gemeinsam persistieren');
+
+    const beforeEditRow = await readIndexedDb(page, 'kv', 'depot_tranchen');
+    const beforeEditId = JSON.parse(beforeEditRow.value)[0].trancheId;
+    await row.locator('[data-action="edit-tranche"]').click();
+    await page.locator('#currentPrice').fill('95');
+    await page.locator('#trancheForm button[type="submit"]').click();
+    await page.locator('#tranchePersistenceStatus').filter({ hasText: 'aktualisiert' }).waitFor();
+    const afterEditRow = await readIndexedDb(page, 'kv', 'depot_tranchen');
+    const afterEditId = JSON.parse(afterEditRow.value)[0].trancheId;
+    assert(afterEditId === beforeEditId, 'Editieren muss die Tranche-ID stabil halten');
+
+    await page.reload({ waitUntil: 'load' });
+    await page.locator('.tranche-row').filter({ hasText: 'Synthetische Browser-Tranche' }).waitFor({ state: 'visible' });
+    const afterReloadRow = await readIndexedDb(page, 'kv', 'depot_tranchen');
+    assert(afterReloadRow.value === afterEditRow.value, 'Reload muss den bestätigten Profil-A-Bestand bytegleich laden');
+
+    await page.locator('#managerBackLink').click();
+    await page.locator('h1').filter({ hasText: 'Ruhestand-Apps Suite' }).waitFor({ state: 'visible' });
+    const beforeRecommendationRaw = (await readIndexedDb(page, 'kv', 'depot_tranchen')).value;
+    await page.locator('a[href="Balance.html"]').click();
+    await page.locator('h1').filter({ hasText: 'Ruhestand-Balancing' }).waitFor({ state: 'visible' });
+    await page.locator('#handlungContent').filter({ hasText: /./ }).waitFor({ state: 'visible' });
+    assert((await readIndexedDb(page, 'kv', 'depot_tranchen')).value === beforeRecommendationRaw,
+        'Reine Balance-Empfehlung darf den Realbestand nicht verändern');
+
+    await page.locator('a[href="index.html"]').first().click();
+    await page.locator('h1').filter({ hasText: 'Ruhestand-Apps Suite' }).waitFor({ state: 'visible' });
+    await page.locator('a[href="Simulator.html"]').click();
+    await page.locator('h1').filter({ hasText: 'Ruhestand-Simulator' }).waitFor({ state: 'visible' });
+    await page.waitForLoadState('load');
+    await page.waitForTimeout(250);
+    await page.locator('.tab-btn[data-tab="backtesting"]').click();
+    await page.locator('#btButton').waitFor({ state: 'visible' });
+    await page.locator('#btButton').click();
+    await page.locator('#simulationResults').waitFor({ state: 'visible' });
+    assert((await readIndexedDb(page, 'kv', 'depot_tranchen')).value === beforeRecommendationRaw,
+        'Historische Simulation darf den Realbestand nicht verändern');
+
+    await page.locator('a[href="index.html"]').first().click();
+    await page.locator('#profileSelect').waitFor({ state: 'visible' });
+    await page.locator('#profileSelect').selectOption(profileB);
+    await page.locator('#profileStatus').filter({ hasText: 'Profil gewechselt' }).waitFor({ state: 'visible' });
+    await page.locator('a[href="depot-tranchen-manager.html"]').click();
+    await page.locator('#tranchenTable').filter({ hasText: 'Keine Tranchen vorhanden' }).waitFor({ state: 'visible' });
+    assert(await page.locator('#activeProfileName').getAttribute('data-profile-id') === profileB,
+        'Profil B muss einen isolierten leeren Realbestand anzeigen');
+
+    await page.locator('#managerBackLink').click();
+    await page.locator('#profileSelect').selectOption(profileA);
+    await page.locator('#profileStatus').filter({ hasText: 'Profil gewechselt' }).waitFor({ state: 'visible' });
+    await page.locator('a[href="depot-tranchen-manager.html"]').click();
+    await page.locator('.tranche-row').filter({ hasText: 'Synthetische Browser-Tranche' }).waitFor({ state: 'visible' });
+    assert(await page.locator('#activeProfileName').getAttribute('data-profile-id') === profileA,
+        'Rückwechsel muss exakt den bestätigten Bestand von Profil A laden');
+
+    await page.locator('#reconcileActionId').fill('browser-order-1');
+    await page.locator('#reconcileTrancheId').selectOption(afterEditId);
+    await page.locator('#reconcileExecutedAt').fill('2026-07-14');
+    await page.locator('#reconcileSharesSold').fill('1');
+    await page.locator('#reconcileGrossProceeds').fill('97');
+    await page.locator('#reconcileFees').fill('2');
+    await page.locator('.reconciliation-recommendation').evaluate(details => { details.open = true; });
+    await page.locator('#reconcileRecommendedShares').fill('0.8');
+    await page.locator('#reconcileRecommendedGross').fill('90');
+    await page.locator('#reconciliationPreviewBtn').click();
+    await page.locator('#reconciliationPreview').waitFor({ state: 'visible' });
+    const previewText = await page.locator('#reconciliationPreviewContent').textContent();
+    assert(previewText.includes(afterEditId) && previewText.includes('browser-order-1'),
+        'Reconcile-Vorschau muss exakte Profil-/Tranche-/Action-Identitaet zeigen');
+    assert(previewText.includes('Resultierender Bestand') && previewText.includes('Abweichung'),
+        'Reconcile-Vorschau muss resultierenden Bestand und Empfehlungsabweichung zeigen');
+    await page.locator('#reconciliationConfirmBtn').click();
+    await page.locator('#reconciliationStatus').filter({ hasText: 'dauerhaft bestätigt' }).waitFor();
+
+    const reconciledRow = await readIndexedDb(page, 'kv', 'depot_tranchen');
+    assert(JSON.parse(reconciledRow.value)[0].shares === 1,
+        'Bestaetigte tatsaechliche Ausfuehrung muss den persistenten Stueckbestand reduzieren');
+    const reconciledRegistryRow = await readIndexedDb(page, 'kv', 'rs_profiles_v1');
+    const reconciledRegistry = JSON.parse(reconciledRegistryRow.value);
+    assert(reconciledRegistry.trancheReconciliation.actions[0].actionId === 'browser-order-1',
+        'Bestaetigung muss stabile Action-ID fuer Reload-Idempotenz speichern');
+
+    await page.locator('#reconcileActionId').fill('browser-order-1');
+    await page.locator('#reconcileTrancheId').selectOption(afterEditId);
+    await page.locator('#reconcileExecutedAt').fill('2026-07-14');
+    await page.locator('#reconcileSharesSold').fill('1');
+    await page.locator('#reconcileGrossProceeds').fill('97');
+    await page.locator('#reconcileFees').fill('2');
+    await page.locator('.reconciliation-recommendation').evaluate(details => { details.open = true; });
+    await page.locator('#reconcileRecommendedShares').fill('0.8');
+    await page.locator('#reconcileRecommendedGross').fill('90');
+    await page.locator('#reconciliationPreviewBtn').click();
+    await page.locator('#reconciliationStatus').filter({ hasText: 'bereits identisch verarbeitet' }).waitFor();
+    assert(await page.locator('#reconciliationConfirmBtn').isDisabled(),
+        'Identische Action-ID darf keine zweite Bestaetigung anbieten');
+    const duplicateRow = await readIndexedDb(page, 'kv', 'depot_tranchen');
+    assert(JSON.parse(duplicateRow.value)[0].shares === 1,
+        'Identische Action-ID darf den Bestand nicht ein zweites Mal reduzieren');
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const mobileLayout = await page.evaluate(() => {
+        const scroller = document.querySelector('.table-scroll');
+        return {
+            documentWidth: document.documentElement.scrollWidth,
+            viewportWidth: document.documentElement.clientWidth,
+            tableScrolls: Boolean(scroller && scroller.scrollWidth > scroller.clientWidth)
+        };
+    });
+    assert(mobileLayout.documentWidth <= mobileLayout.viewportWidth, `390px-Viewport darf Dokument nicht horizontal überlaufen: ${JSON.stringify(mobileLayout)}`);
+    assert(mobileLayout.tableScrolls, 'Erforderliche Tabellenbewegung muss im Tabellencontainer liegen');
+
+    await page.locator('[data-action="delete-tranche"]').click();
+    await page.locator('#tranchenTable').filter({ hasText: 'Keine Tranchen vorhanden' }).waitFor();
+    assert((await readIndexedDb(page, 'kv', 'depot_tranchen')).value === '[]',
+        'Bestätigtes Löschen muss nur den temporären Profil-A-Testbestand leeren');
+    smoke.assertNoErrors();
+    await smoke.close();
+}
+
+async function runTranchesQuoteFailureSmoke(browser, baseUrl) {
+    const profileId = 'browser-slice09-quotes';
+    const initialTranches = [
+        createBrowserTranche({ trancheId: 'quote-eur', name: 'Synthetischer EUR-Kurs', ticker: 'EUR.DE', currentPrice: 100 }),
+        createBrowserTranche({ trancheId: 'quote-usd', name: 'Synthetischer Fremdkurs', ticker: 'USD.DE', currentPrice: 80 })
+    ];
+    const storage = createBrowserProfileStorage({
+        [profileId]: { name: 'Browserprofil Kurse', tranchesRaw: JSON.stringify(initialTranches) }
+    }, profileId);
+    const smoke = await openSmokePage(browser, baseUrl, 'depot-tranchen-manager.html', {
+        storage,
+        quoteFixtures: {
+            'EUR.DE': { price: 120, currency: 'EUR' },
+            'USD.DE': { price: 130, currency: 'USD' }
+        }
+    });
+    const { page } = smoke;
+    await page.locator('.tranche-row').nth(1).waitFor({ state: 'visible' });
+    await page.locator('#updatePricesBtn').click();
+    await page.locator('#priceUpdateStatus').filter({ hasText: 'Kurse teilweise aktualisiert (1 von 2).' }).waitFor();
+    const status = await page.locator('#priceUpdateStatus').textContent();
+    assert(status.includes('Synthetischer Fremdkurs: Waehrung USD wird nicht unterstuetzt.'),
+        'Browser-Teilerfolg muss betroffene Tranche und verständlichen Grund anzeigen');
+    assert(!status.includes('yahoo-chart') && !status.includes('Stichtag'),
+        'Browser-Teilerfolg darf erfolgreiche Kursmetadaten nicht anzeigen');
+    const persisted = JSON.parse((await readIndexedDb(page, 'kv', 'depot_tranchen')).value);
+    assert(persisted.find(item => item.trancheId === 'quote-eur').currentPrice === 120,
+        'EUR-Teilerfolg muss übernommen werden');
+    assert(persisted.find(item => item.trancheId === 'quote-usd').currentPrice === 80,
+        'Fremdwährungsfehler muss den alten bestätigten Kurs erhalten');
+    smoke.assertNoErrors();
+    await smoke.close();
+
+    const offlineProfileId = 'browser-slice09-offline';
+    const offlineRaw = JSON.stringify([createBrowserTranche({
+        trancheId: 'quote-offline', name: 'Synthetischer Offline-Kurs', ticker: 'OFFLINE.DE', currentPrice: 77
+    })]);
+    const offlineSmoke = await openSmokePage(browser, baseUrl, 'depot-tranchen-manager.html', {
+        storage: createBrowserProfileStorage({
+            [offlineProfileId]: { name: 'Browserprofil Offline', tranchesRaw: offlineRaw }
+        }, offlineProfileId),
+        quoteFixtures: 'offline'
+    });
+    await offlineSmoke.page.locator('.tranche-row').waitFor({ state: 'visible' });
+    await offlineSmoke.page.locator('#updatePricesBtn').click();
+    await offlineSmoke.page.locator('#priceUpdateStatus').filter({ hasText: 'Kurse konnten nicht aktualisiert werden.' }).waitFor();
+    const offlineStatus = await offlineSmoke.page.locator('#priceUpdateStatus').textContent();
+    assert(offlineStatus.includes('Synthetischer Offline-Kurs: Lokaler Kursproxy nicht erreichbar'),
+        'Browser-Offlinefall muss betroffene Tranche und Proxy-Nichterreichbarkeit anzeigen');
+    assert((await readIndexedDb(offlineSmoke.page, 'kv', 'depot_tranchen')).value === offlineRaw,
+        'Kompletter Offlinefehler darf keinen bestätigten Kursbestand schreiben');
+    offlineSmoke.assertNoErrors(['Failed to load resource: net::ERR_FAILED']);
+    await offlineSmoke.close();
+}
+
+async function runTranchesRecoverySmoke(browser, baseUrl) {
+    const profileId = 'browser-slice09-recovery';
+    const corruptRaw = '{synthetisch-not-json';
+    const storage = createBrowserProfileStorage({
+        [profileId]: { name: 'Browserprofil Recovery', tranchesRaw: corruptRaw }
+    }, profileId);
+    const smoke = await openSmokePage(browser, baseUrl, 'depot-tranchen-manager.html', { storage });
+    const { page } = smoke;
+    await page.locator('#trancheRecoveryActions').waitFor({ state: 'visible' });
+    assert((await readIndexedDb(page, 'kv', 'depot_tranchen')).value === corruptRaw,
+        'Recovery-Start muss korrupten Rohpayload bytegleich erhalten');
+    await page.locator('#revealCorruptPayloadBtn').click();
+    assert(await page.locator('#corruptPayloadPreview').textContent() === corruptRaw,
+        'Bewusstes Anzeigen muss exakt den synthetischen Rohpayload zeigen');
+    await page.locator('#resetCorruptPayloadBtn').click();
+    await page.locator('#tranchePersistenceStatus').filter({ hasText: 'bestätigt zurückgesetzt' }).waitFor({ state: 'visible' });
+    assert((await readIndexedDb(page, 'kv', 'depot_tranchen')).value === '[]',
+        'Bestätigter Recovery-Reset muss den temporären Testbestand explizit leeren');
     smoke.assertNoErrors();
     await smoke.close();
 }
@@ -435,11 +806,14 @@ async function main() {
             ['index.html', runIndexSmoke],
             ['Balance.html', runBalanceSmoke],
             ['Balance membership reload', runBalanceMembershipReload],
+            ['Balance shared tranche ids', runBalanceSharedTrancheIds],
             ['Balance engine gate', runBalanceEngineGate],
             ['Balance annual preflight', runBalanceAnnualPreflight],
             ['Balance corrupt expenses', runBalanceCorruptExpenses],
             ['Simulator.html', runSimulatorSmoke],
             ['depot-tranchen-manager.html', runTranchesSmoke],
+            ['tranche quote partial/offline', runTranchesQuoteFailureSmoke],
+            ['tranche corrupt recovery', runTranchesRecoverySmoke],
             ['Handbuch.html', runManualSmoke],
             ['Balance import reject', runBalanceImportReject],
             ['Balance annual commit', runBalanceAnnualCommit]

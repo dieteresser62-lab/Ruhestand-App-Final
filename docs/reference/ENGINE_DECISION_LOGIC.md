@@ -120,6 +120,11 @@ flowchart TD
 Hinweis: Im Standardfall sagt der Code-Kommentar "Aktien zuerst", der Code
 ordnet aber `bondKeys` vor Aktien ein. Das ist eine fachliche Pruefstelle.
 
+Innerhalb einer Assetklasse werden Detailtranchen nach dem kanonischen
+Kategorie-/Typ-Vertrag validiert und steuerbewusst geordnet. Doppelte IDs oder
+widerspruechliche Paare erreichen die Sale-Engine nicht. `trancheId` und
+`sourceProfileId` bleiben im Breakdown erhalten.
+
 ## 5. Gold-Logik
 
 Gold wird ueber Zielquote, Rebalancing-Band und Floor gesteuert.
@@ -185,6 +190,11 @@ Der Simulator nutzt die Engine pro Jahr, fuehrt danach aber weitere
 Jahresmechaniken aus: Portfolio mutieren, Entnahme auszahlen, Forced Sales und
 Bond-Refill.
 
+Alle Mutationen erfolgen auf tiefen Kopien. Teilverkaeufe reduzieren Stueckzahl,
+Marktwert und Cost Basis desselben Simulationslots; Vollverkaeufe entfernen es,
+und Kaeufe erzeugen neue `simlot:`-Lots. Der profilgebundene Realbestand bleibt
+unveraendert.
+
 ```mermaid
 flowchart TD
     A["Engine simulateSingleYear"] --> B["3-Bucket Override anwenden"]
@@ -214,15 +224,20 @@ Postprocessing fuer Profilverbund und 3-Bucket.
 
 ```mermaid
 flowchart TD
-    A["Balance liest Eingaben"] --> B["Engine simulateSingleYear"]
+    A["Balance liest Profil-/Haushaltsinputs"] --> B["Genau ein Engine simulateSingleYear"]
     B --> C{"Profilverbund aktiv?"}
-    C -- "Ja" --> D["Aktionen je Profil mergen"]
-    C -- "Nein" --> E["Single-Profil-Aktion"]
-    D --> F{"3-Bucket aktiv?"}
-    E --> F
-    F -- "Ja" --> G["3-Bucket-Postprocessing und Diagnose"]
-    F -- "Nein" --> H["Standard-Diagnose"]
+    C -- "Ja" --> D["Haushaltsaktion einmal finalisieren"]
+    C -- "Nein" --> E["Single-Profil-Postprocessing"]
+    D --> F["Quellen, Steuern und Verwendungen auf Profile attribuieren"]
+    E --> G["Diagnose rendern"]
+    F --> G
 ```
+
+Balance-Empfehlung und Simulatorergebnis sind schreibfrei gegen
+`depot_tranchen`. Eine reale Broker-Ausfuehrung wird nur im Profil-Assets-Manager
+ueber Vorschau und separate Bestaetigung reconciliert. Identische `actionId` plus
+identische Daten sind ein No-op; Profilwechsel, Ueberverkauf oder veralteter
+Vorschaustand blockieren.
 
 ## 9. Bekannte fachliche Spannungen
 

@@ -3,8 +3,34 @@
  * Purpose: Calculates tax-efficient sales of assets (Shares, Gold).
  *          Handles FIFO vs Tax-Optimized sorting and capital gains tax (Abgeltungsteuer).
  * Usage: Called by transaction-action.mjs to execute sell orders.
- * Dependencies: None (pure logic)
+ * Dependencies: canonical tranche contract and engine errors (pure logic)
  */
+import {
+    classifyTranche,
+    normalizeTrancheCollection,
+    TrancheValidationError
+} from '../../types/tranche-contract.js';
+import { ValidationError } from '../errors.mjs';
+
+function asEngineTrancheValidationError(error) {
+    if (!(error instanceof TrancheValidationError)) return error;
+    const engineError = new ValidationError(error.errors);
+    engineError.code = error.code;
+    engineError.context = {
+        contract: 'detailledTranches',
+        errors: error.errors
+    };
+    return engineError;
+}
+
+function normalizeDetailedTranches(items) {
+    try {
+        return normalizeTrancheCollection(items, { mode: 'engine' });
+    } catch (error) {
+        throw asEngineTrancheValidationError(error);
+    }
+}
+
 export function calculateSaleAndTax(requestedRefill, input, context, market, isEmergencySale) {
     const forceGrossSellAmount = context && context.forceGrossSellAmount ? Number(context.forceGrossSellAmount) : 0;
 
@@ -181,22 +207,12 @@ export function calculateSaleAndTax(requestedRefill, input, context, market, isE
     let tranches = {};
 
     // Prüfe ob detaillierte Tranchen verfügbar sind (aus Portfolio)
-    if (input.detailledTranches && Array.isArray(input.detailledTranches)) {
+    if (input.detailledTranches !== undefined && input.detailledTranches !== null) {
         // Verwende detaillierte Tranchen
-        input.detailledTranches.forEach((t, idx) => {
-            const baseKey = t.trancheId || t.isin || `tranche_${t.name || 'unnamed'}_${idx}`;
-            let key = baseKey;
-            let suffix = 1;
-            while (tranches[key]) {
-                key = `${baseKey}_${suffix++}`;
-            }
-            tranches[key] = {
+        normalizeDetailedTranches(input.detailledTranches).forEach((t) => {
+            tranches[t.trancheId] = {
                 ...t,
-                trancheId: t.trancheId || null,
-                kind: t.type || t.kind || 'aktien_alt',
-                marketValue: t.marketValue || (t.shares * t.currentPrice) || 0,
-                costBasis: t.costBasis || (t.shares * t.purchasePrice) || 0,
-                tqf: t.tqf ?? 0.30
+                kind: t.type
             };
         });
     } else {
@@ -206,20 +222,26 @@ export function calculateSaleAndTax(requestedRefill, input, context, market, isE
                 marketValue: input.depotwertAlt,
                 costBasis: input.costBasisAlt,
                 tqf: input.tqfAlt,
-                kind: 'aktien_alt'
+                kind: 'aktien_alt',
+                type: 'aktien_alt',
+                category: 'equity'
             },
             aktien_neu: {
                 marketValue: input.depotwertNeu,
                 costBasis: input.costBasisNeu,
                 tqf: input.tqfNeu,
-                kind: 'aktien_neu'
+                kind: 'aktien_neu',
+                type: 'aktien_neu',
+                category: 'equity'
             },
             gold: (input.goldAktiv && input.goldWert > 0)
                 ? {
                     marketValue: input.goldWert,
                     costBasis: input.goldCost,
                     tqf: input.goldSteuerfrei ? 1.0 : 0.0,
-                    kind: 'gold'
+                    kind: 'gold',
+                    type: 'gold',
+                    category: 'gold'
                 }
                 : null
         };
@@ -242,27 +264,27 @@ export function calculateSaleAndTax(requestedRefill, input, context, market, isE
  * Bestimmt Verkaufsreihenfolge (mit FIFO-Unterstützung)
  */
 export function getSellOrder(tranches, market, input, context, isEmergencySale) {
-    const isBondKind = (value) => {
-        const s = String(value || '').toLowerCase();
-        return s.includes('bond') || s.includes('anleihe');
-    };
     // Alle verfügbaren Keys
     const allKeys = Object.keys(tranches);
+    const assetClassByKey = new Map();
+    try {
+        for (const key of allKeys) {
+            const tranche = tranches[key] || {};
+            assetClassByKey.set(key, classifyTranche({
+                ...tranche,
+                trancheId: tranche.trancheId || key,
+                type: tranche.type || tranche.kind || key
+            }, { index: allKeys.indexOf(key) }));
+        }
+    } catch (error) {
+        throw asEngineTrancheValidationError(error);
+    }
 
-    // Separate Aktien- und Gold-Keys
-    const equityKeys = allKeys.filter(k => {
-        const t = tranches[k];
-        return k.startsWith('aktien') || (t.category && t.category === 'equity');
-    });
-    const bondKeys = allKeys.filter(k => {
-        const t = tranches[k];
-        return isBondKind(k) || isBondKind(t?.kind) || isBondKind(t?.type) || isBondKind(t?.category) || t?.category === 'bonds';
-    });
-
-    const goldKeys = allKeys.filter(k => {
-        const t = tranches[k];
-        return k === 'gold' || (t.category && t.category === 'gold');
-    });
+    // Disjunkte Assetklassen: jeder Key kann nur einer Liste angehören.
+    const equityKeys = allKeys.filter(k => assetClassByKey.get(k) === 'equity');
+    const bondKeys = allKeys.filter(k => assetClassByKey.get(k) === 'bonds');
+    const goldKeys = allKeys.filter(k => assetClassByKey.get(k) === 'gold');
+    const uniqueExisting = (keys) => [...new Set(keys)].filter(k => tranches[k]);
 
     // Steuer-optimierte Sortierung für Aktien (geringste Steuerlast zuerst)
     const sortedEquityKeys = [...equityKeys].sort((a, b) => {
@@ -319,7 +341,7 @@ export function getSellOrder(tranches, market, input, context, isEmergencySale) 
     // Im defensiven Kontext: Gold zuerst, dann Aktien (beide FIFO-sortiert)
     if (isDefensiveContext) {
         const order = [...sortedGoldKeys, ...bondKeys, ...sortedEquityKeys];
-        return order.filter(k => tranches[k]);
+        return uniqueExisting(order);
     }
 
     // Gold über Obergrenze? Gold zuerst verkaufen
@@ -336,12 +358,12 @@ export function getSellOrder(tranches, market, input, context, isEmergencySale) 
         const totalGoldValue = sortedGoldKeys.reduce((sum, k) => sum + (tranches[k].marketValue || 0), 0);
 
         if (totalGoldValue > goldObergrenze) {
-            return [...sortedGoldKeys, ...sortedEquityKeys].filter(k => tranches[k]);
+            return uniqueExisting([...sortedGoldKeys, ...sortedEquityKeys]);
         }
     }
 
     // Standard: Aktien zuerst (FIFO), dann Gold (FIFO)
-    return [...bondKeys, ...sortedEquityKeys, ...sortedGoldKeys].filter(k => tranches[k]);
+    return uniqueExisting([...bondKeys, ...sortedEquityKeys, ...sortedGoldKeys]);
 }
 
 /**

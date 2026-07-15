@@ -14,12 +14,14 @@
  */
 
 import { UIUtils } from './balance-utils.js';
-import { calculateAggregatedValues } from '../tranches/depot-tranchen-status.js';
+import {
+    TRANCHE_STATUS_STATES,
+    calculateAggregatedValues,
+    getTranchenStatus
+} from '../tranches/depot-tranchen-status.js';
 import { CONFIG, ValidationError } from './balance-config.js';
 import {
-    PROFILE_TRANCHES_KEY,
     PROFILE_VALUE_KEYS,
-    parseStoredTranchesFromData,
     readProfileHealthBucketFromStorage,
     readProfileOverridesFromStorage
 } from '../profile/profile-state.js';
@@ -127,7 +129,7 @@ export const UIReader = {
      * @property {number} tqfAlt - Teilfreistellungsquote Alt-Depot (%)
      * @property {number} tqfNeu - Teilfreistellungsquote Neu-Depot (%)
      * @property {number} goldCost - Kostenbasis Gold (€)
-     * @property {number} kirchensteuerSatz - Kirchensteuersatz (%)
+     * @property {number} kirchensteuerSatz - Kirchensteuersatz als Dezimalrate (0.08 = 8 %)
      * @property {number} sparerPauschbetrag - Sparerpauschbetrag (€)
      * @property {number} runwayMinMonths - Minimum Liquiditäts-Runway (Monate)
      * @property {number} runwayTargetMonths - Ziel Liquiditäts-Runway (Monate)
@@ -174,22 +176,37 @@ export const UIReader = {
         const profileGoldSteuerfrei = profileOverrides.profileGoldSteuerfrei;
         const profileGoldRebalBand = profileOverrides.profileGoldRebalBand;
         const healthBucket = readProfileHealthBucketFromStorage(persistenceStorage);
-        // Lade detaillierte Tranchen aus localStorage (falls vorhanden)
-        const detailledTranches = parseStoredTranchesFromData({
-            [PROFILE_TRANCHES_KEY]: persistenceStorage.getItem(PROFILE_TRANCHES_KEY)
-        });
+        // Der Statuspfad trennt nicht geladen, explizit leer, gültig und fehlerhaft.
+        // Ein leeres Profilverbund-Override ist kanonisch leer und darf weder auf
+        // DOM-Werte noch auf den aktuell gespeicherten Profilbestand zurückfallen.
+        const trancheStatus = getTranchenStatus();
+        if (trancheStatus.state === TRANCHE_STATUS_STATES.ERROR) {
+            throw new ValidationError([{
+                fieldId: 'detailledTranches',
+                code: trancheStatus.errorCode || 'tranche_status_error',
+                message: 'Der Tranchenbestand ist fehlerhaft und kann nicht für die Berechnung verwendet werden.'
+            }]);
+        }
+        const detailledTranches = trancheStatus.state === TRANCHE_STATUS_STATES.VALID
+            ? trancheStatus.tranches
+            : [];
+        const explicitEmptyOverride = trancheStatus.source === 'override'
+            && trancheStatus.state === TRANCHE_STATUS_STATES.EMPTY;
+        const aggregated = trancheStatus.state === TRANCHE_STATUS_STATES.VALID
+            ? calculateAggregatedValues(detailledTranches)
+            : (explicitEmptyOverride ? {
+                depotwertAlt: 0,
+                costBasisAlt: 0,
+                depotwertNeu: 0,
+                costBasisNeu: 0,
+                geldmarktEtf: 0,
+                goldWert: 0,
+                goldCost: 0,
+                bondsWert: 0,
+                bondsCost: 0
+            } : null);
 
-        // Falls Tranchen vorhanden sind, nutzen wir die aggregierten Werte als Wahrheit.
-        const aggregated = (Array.isArray(detailledTranches) && detailledTranches.length)
-            ? calculateAggregatedValues()
-            : null;
-
-        const useAggregates = aggregated && (
-            aggregated.depotwertAlt > 0 ||
-            aggregated.depotwertNeu > 0 ||
-            aggregated.geldmarktEtf > 0 ||
-            aggregated.goldWert > 0
-        );
+        const useAggregates = aggregated !== null;
 
         if (useAggregates && !hasLoggedTranchenAggregation) {
             hasLoggedTranchenAggregation = true;
@@ -319,7 +336,9 @@ export const UIReader = {
             healthBucketTargetMode: healthBucket.targetMode,
             profilName: val('profilName') || '',
             // NEU: Detaillierte Tranchen für FIFO und präzise Steuerberechnung
-            detailledTranches: detailledTranches.length ? detailledTranches : null
+            detailledTranches: detailledTranches.length
+                ? detailledTranches
+                : (explicitEmptyOverride ? [] : null)
         };
     },
 

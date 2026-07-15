@@ -24,6 +24,102 @@ export const DEFAULT_PROFILE_ASSET_VALUES = {
     healthBucket: normalizeProfileHealthBucket()
 };
 
+const PROFILE_BOOLEAN_FIELDS = new Set(['goldAktiv', 'goldSteuerfrei']);
+const HEALTH_BUCKET_OPTIONS = Object.freeze({
+    assetSource: new Set(['money_market_first_then_cash']),
+    triggerMode: new Set(['OR', 'AND']),
+    coverageMode: new Set(['care_additional_floor_only', 'floor_when_care_active']),
+    returnMode: new Set(['cash_return']),
+    targetMode: new Set(['inflation_indexed_diagnostic', 'nominal_fixed'])
+});
+
+export class ProfileAssetValuesValidationError extends Error {
+    constructor(errors) {
+        super('Die Profilwerte sind ungültig.');
+        this.name = 'ProfileAssetValuesValidationError';
+        this.code = 'PROFILE_ASSET_VALUES_INVALID';
+        this.errors = errors;
+    }
+}
+
+function profileFieldError(field, message, value) {
+    return { code: 'PROFILE_ASSET_FIELD_INVALID', field, message, value };
+}
+
+function readStrictNumber(raw, field, errors, options = {}) {
+    const { min = null, max = null, integer = false } = options;
+    if (raw === null || raw === undefined || String(raw).trim() === '') {
+        errors.push(profileFieldError(field, `${field} ist erforderlich.`, raw));
+        return null;
+    }
+    const value = typeof raw === 'number' ? raw : Number(String(raw).trim());
+    if (!Number.isFinite(value)) {
+        errors.push(profileFieldError(field, `${field} muss eine endliche Zahl sein.`, raw));
+        return null;
+    }
+    if ((min !== null && value < min) || (max !== null && value > max) || (integer && !Number.isInteger(value))) {
+        const interval = min !== null && max !== null
+            ? `zwischen ${min} und ${max}`
+            : min !== null ? `mindestens ${min}` : `höchstens ${max}`;
+        errors.push(profileFieldError(field, `${field} muss ${interval}${integer ? ' und ganzzahlig' : ''} sein.`, raw));
+    }
+    return value;
+}
+
+function readStrictBool(raw, field, errors) {
+    if (raw === true || raw === false) return raw;
+    const value = String(raw ?? '').trim().toLowerCase();
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    errors.push(profileFieldError(field, `${field} muss Ja oder Nein sein.`, raw));
+    return false;
+}
+
+function readStrictOption(raw, field, allowed, errors, transform = value => value) {
+    const value = transform(String(raw ?? '').trim());
+    if (!allowed.has(value)) {
+        errors.push(profileFieldError(field, `${field} enthält keine unterstützte Auswahl.`, raw));
+    }
+    return value;
+}
+
+export function validateProfileAssetValues(values = {}) {
+    const errors = [];
+    const healthBucket = values?.healthBucket && typeof values.healthBucket === 'object'
+        ? values.healthBucket
+        : {};
+    const validated = {
+        tagesgeld: readStrictNumber(values.tagesgeld, 'tagesgeld', errors, { min: 0 }),
+        renteMonatlich: readStrictNumber(values.renteMonatlich, 'renteMonatlich', errors, { min: 0 }),
+        sonstigeEinkuenfte: readStrictNumber(values.sonstigeEinkuenfte, 'sonstigeEinkuenfte', errors, { min: 0 }),
+        alter: readStrictNumber(values.alter, 'alter', errors, { min: 0, integer: true }),
+        goldAktiv: readStrictBool(values.goldAktiv, 'goldAktiv', errors),
+        goldZiel: readStrictNumber(values.goldZiel, 'goldZiel', errors, { min: 0, max: 100 }),
+        goldFloor: readStrictNumber(values.goldFloor, 'goldFloor', errors, { min: 0, max: 100 }),
+        goldBand: readStrictNumber(values.goldBand, 'goldBand', errors, { min: 0, max: 100 }),
+        goldSteuerfrei: readStrictBool(values.goldSteuerfrei, 'goldSteuerfrei', errors),
+        healthBucket: {
+            enabled: readStrictBool(healthBucket.enabled, 'healthBucket.enabled', errors),
+            initialAmount: readStrictNumber(healthBucket.initialAmount, 'healthBucket.initialAmount', errors, { min: 0 }),
+            assetSource: readStrictOption(healthBucket.assetSource, 'healthBucket.assetSource', HEALTH_BUCKET_OPTIONS.assetSource, errors),
+            triggerMinGrade: readStrictNumber(healthBucket.triggerMinGrade, 'healthBucket.triggerMinGrade', errors, { min: 1, max: 5, integer: true }),
+            triggerMode: readStrictOption(healthBucket.triggerMode, 'healthBucket.triggerMode', HEALTH_BUCKET_OPTIONS.triggerMode, errors, value => value.toUpperCase()),
+            coverageMode: readStrictOption(healthBucket.coverageMode, 'healthBucket.coverageMode', HEALTH_BUCKET_OPTIONS.coverageMode, errors),
+            returnMode: readStrictOption(healthBucket.returnMode, 'healthBucket.returnMode', HEALTH_BUCKET_OPTIONS.returnMode, errors),
+            targetMode: readStrictOption(healthBucket.targetMode, 'healthBucket.targetMode', HEALTH_BUCKET_OPTIONS.targetMode, errors)
+        }
+    };
+
+    for (const field of PROFILE_BOOLEAN_FIELDS) {
+        if (typeof validated[field] !== 'boolean') {
+            errors.push(profileFieldError(field, `${field} muss boolesch sein.`, values[field]));
+        }
+    }
+    if (errors.length) throw new ProfileAssetValuesValidationError(errors);
+    validated.renteAktiv = validated.renteMonatlich + validated.sonstigeEinkuenfte > 0;
+    return validated;
+}
+
 function readNumber(raw, fallback = 0) {
     const n = Number(raw);
     return Number.isFinite(n) ? n : fallback;
@@ -123,7 +219,7 @@ export function applyProfileAssetValuesToDom(values, doc = document) {
 
 export function readProfileAssetValuesFromDom(doc = document) {
     const read = (id) => doc.getElementById(id)?.value ?? '';
-    return normalizeProfileAssetValues({
+    return validateProfileAssetValues({
         tagesgeld: read('profileTagesgeld'),
         renteMonatlich: read('profileRenteMonatlich'),
         sonstigeEinkuenfte: read('profileSonstigeEinkuenfte'),
@@ -147,7 +243,7 @@ export function readProfileAssetValuesFromDom(doc = document) {
 }
 
 export function saveProfileAssetValues(values, storage = persistenceStorage) {
-    const normalized = normalizeProfileAssetValues(values);
+    const normalized = validateProfileAssetValues(values);
     storage.setItem(PROFILE_VALUE_KEYS.tagesgeld, String(normalized.tagesgeld));
     storage.setItem(PROFILE_VALUE_KEYS.renteAktiv, normalized.renteAktiv ? 'true' : 'false');
     storage.setItem(PROFILE_VALUE_KEYS.renteMonatlich, String(normalized.renteMonatlich));

@@ -10,46 +10,42 @@ Der Update-Zyklus wird bei jeder Eingabe (debounced) oder beim Start ausgelöst.
 
 ```text
 Funktion update():
-  1. Synchronisierung
-     - Sync Profile-Daten -> Balance-Inputs (wenn Profilverbund aktiv)
+  1. Engine- und Profil-Gate
+     - Pruefe gebundenen EngineAPI-Vertrag
+     - Sync ausgewaehlte Profile -> Haushaltsinputs
+     - Lade profilgebundene Tranchen fail-closed
 
-  2. Inputs Lesen (UIReader)
-     - Lese alle DOM-Felder (Vermögen, Rente, Bedarf)
-     - Lade Profilverbund-Profile (falls vorhanden)
+  2. Inputs und State lesen
+     - Lese DOM-Felder (Vermoegen, Rente, Bedarf)
+     - Lade persistentState ueber PersistenceFacade
+     - Validierungsfehler -> Abbruch ohne Write
 
-  3. Initiale Validierung
-     - Wenn Alter = 0 oder ungültig -> Abbruch
-
-  4. State Laden (StorageManager)
-     - Lade `persistentState` aus localStorage (Guardrail-History, Snapshots)
-
-  5. Profilverbund-Simulation (Optional)
-     - WENN (Profilverbund aktiv):
-         - Über alle Profile iterieren:
-             - Einzel-Simulation durchführen
-         - Ergebnisse aggregieren (Merge Actions)
-
-  6. Bedarfsanpassung UI
-     - Prüfen, ob "Inflationsanpassung" Button nötig ist
-
-  7. ENGINE-Aufruf (Window.EngineAPI)
+  3. Genau ein ENGINE-Aufruf
+     - Bei Profilverbund: baue nicht mutierenden Haushaltstranchenpool
+       mit sourceProfileId
      - result = EngineAPI.simulateSingleYear(inputs, lastState)
        - Engine führt intern Steuer-Settlement durch:
          - Roh-Aggregate aus Verkäufen summieren
          - Verlustvortrag (lastState.taxState.lossCarry) verrechnen
          - SPB anwenden, finale Steuer berechnen
          - Neuen lossCarry in newState.taxState fortschreiben
-     - CATCH Fehler -> Fehler-Display rendern
+     - CATCH strukturierter Fehler -> blockierenden Hinweis rendern
 
-  8. UI-Rendering (UIRenderer)
+  4. Haushaltsaktion finalisieren und attribuieren
+     - 3-Bucket/Bond-Logik genau einmal anwenden
+     - Quellen, Steuern und Verwendungen auf Profile attribuieren
+     - Cent-Reconciliation; Abweichung -> fail-closed
+
+  5. UI-Rendering
      - Render Summary (Vermögen, Reichweite)
      - Render Liquiditäts-Balken
      - Render Handlungsanweisung (Aktien/Gold kaufen/verkaufen)
      - Render Entnahme-Breakdown
      - Render Diagnose-Panel (Entscheidungsbaum, Guardrail-Chips)
 
-  9. Speichern & Cleanup
-     - Save State (Inputs + New State)
+  6. Speichern & Cleanup
+     - Save Planungsstate ueber PersistenceFacade nur bei success
+     - Verkaufsempfehlung niemals in depot_tranchen schreiben
      - Clear Errors
 ```
 
@@ -148,4 +144,35 @@ Funktion runHistoricalBacktest():
   4. Abschluss
      - Zeige Zusammenfassung (Endvermögen, Max Drawdown)
      - Render Log-Tabelle
+     - Verwerfe Simulationskopien; Realbestand bleibt unveraendert
+```
+
+---
+
+## 4. Profil-Assets, Quotes und realer Reconcile
+
+```text
+Startseite -> Profil waehlen:
+  - aktuelles Profil speichern und PersistenceFacade flushen
+  - nur bei Erfolg zum Profil-Assets-Manager navigieren
+
+Manager laden:
+  - depot_tranchen mutationsfrei lesen
+  - empty -> explizit leer
+  - valid -> kanonisch rendern
+  - corrupt -> Writes blockieren, Rohtext erhalten, Recovery anbieten
+  - unavailable -> Retry, kein Reset
+
+CRUD oder Kursbatch:
+  - gesamte Collection validieren
+  - Quote nur mit Symbol + positivem Preis + EUR + UTC-Zeit + Quelle
+  - Teilerfolge in genau einem Commit, Fehler behalten alten Kurs
+  - Facade flushen; bei Fehler bestaetigten Stand wiederherstellen
+
+Reale Brokerausfuehrung:
+  - Action mit profileId + trancheId + actionId normalisieren
+  - Vorschau gegen unveraenderten Live-Rohpayload erzeugen
+  - separate Bestaetigung verlangen
+  - Lot + Profilbestand + Audit in einem Flush schreiben
+  - identische Wiederholung -> No-op; Konflikt/Profilwechsel -> Abbruch
 ```

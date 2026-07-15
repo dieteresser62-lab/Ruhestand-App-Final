@@ -700,7 +700,9 @@ Die Tranchenverwaltung selbst ist in `depot-tranchen-manager.html` und `app/tran
 | `proportional` | Entnahme nach Vermögensanteil | gleichmäßigere Belastung der Profile |
 | `runway_first` | Liquiditäts-/Runway-Ziele priorisieren | Haushalte mit unterschiedlich gefüllten Cash-Puffern |
 
-**Tranchen-Contract:** Detailtranchen sind mehr als UI-Komfort. Sie liefern Marktwert, Einstand, Kaufdatum, Kategorie, Teilfreistellung und Profilherkunft. Daraus ergeben sich steueroptimierte Verkaufsreihenfolgen und korrekte Asset-Summaries. Bei mehrprofiligen Haushalten müssen `trancheId` und `sourceProfileId` erhalten bleiben, damit spätere Reduktionen nicht versehentlich Cost-Basis oder Profilherkunft vermischen.
+**Tranchen-Contract:** Detailtranchen sind mehr als UI-Komfort. `types/tranche-contract.js` erzwingt Schema 1, eindeutige Lot-IDs, endliche Finanzwerte, explizite TQF und eine disjunkte Kategorie-/Typ-Matrix. Marktwert und Einstand werden aus Stueckzahl und Preisen abgeleitet. Gueltige unversionierte Altdaten werden deterministisch gelesen. Der Persistenz-Lesepfad migriert dabei ausschliesslich den von der frueheren Manager-UI erzeugbaren Fall eines alten Aktien-Typs unter einer eindeutigen Nicht-Aktien-Kategorie; Schema 1 und Engine-Eingaben bleiben strikt. Nicht automatisch behebbare Widersprueche, Duplikate und korrupter JSON-Rohtext bleiben unveraendert und blockieren fail-closed. Bei mehrprofiligen Haushalten muessen `trancheId` und `sourceProfileId` erhalten bleiben, damit spaetere Reduktionen nicht versehentlich Cost Basis oder Profilherkunft vermischen.
+
+Balance und Simulator sind schreibfrei gegen den Realbestand. Erst eine tatsaechliche Broker-Ausfuehrung darf im Profil-Assets-Manager nach schreibfreier Vorschau und separater Bestaetigung reconciliert werden. Der Write umfasst Live-Lot, profilgebundenes Lot und datensparsamen Auditverlauf in einem Flush; identische Wiederholungen sind No-ops. Die vollstaendige Modulgrenze steht in `TRANCHEN_MODULES_README.md`.
 
 ### B.2.7 Ausgaben-Check
 
@@ -815,7 +817,7 @@ Workers werden für Monte Carlo, Sweep und Auto-Optimize eingesetzt. `workers/wo
 
 ### B.3.5 Portfolio, 3-Bucket und Bonds
 
-Der Simulator modelliert das Portfolio nicht nur als Gesamtwert. Detailtranchen tragen Kategorie, Marktwert, Cost Basis, TQF, Typ und Profilherkunft. Aktien, Gold, Geldmarkt/Liquidität und optional Bonds werden unterschiedlich fortgeschrieben und verkauft.
+Der Simulator modelliert das Portfolio nicht nur als Gesamtwert. Detailtranchen tragen Kategorie, Marktwert, Cost Basis, TQF, Typ und Profilherkunft. Aktien, Gold, Geldmarkt/Liquidität und optional Bonds werden unterschiedlich fortgeschrieben und verkauft. Zwei tiefe Kopiergrenzen isolieren Profilregistry und UI-State von diesen Mutationen. Teilverkaeufe reduzieren Stueckzahl, Marktwert und Cost Basis proportional; Vollverkaeufe entfernen das Lot und simulierte Kaeufe erzeugen eigene `simlot:`-Lots.
 
 Der Strategie-Modus `3_bucket_jilge` erweitert die Entnahmelogik um einen Bond-/Anleihen-Bucket:
 
@@ -1007,11 +1009,11 @@ Die wichtigsten fachlichen Bremsen sind:
 - Bei überschüssiger Liquidität kann `transaction-surplus.mjs` Investitionsvorschläge erzeugen.
 - Wenn keine Schwelle ausgelöst wird, liefert die Engine bewusst `type: 'NONE'`.
 
-Verkäufe laufen über `sale-engine.mjs`. Bei Detailtranchen werden `trancheId`, `sourceProfileId`, `isin`, Kaufdatum, Cost Basis und TQF mitgeführt. Die Reihenfolge ist steuerbewusst:
+Verkäufe laufen über `sale-engine.mjs`. Die Eingangsgrenze akzeptiert nur kanonisch validierte, eindeutig klassifizierte Lots. Bei Detailtranchen werden `trancheId`, `sourceProfileId`, `isin`, Kaufdatum, Cost Basis und TQF mitgeführt. Die Reihenfolge ist steuerbewusst:
 
 - Aktien/ETF werden primär nach niedriger effektiver Steuerlast sortiert.
 - Gold wird nach Kaufdatum FIFO behandelt und kann nach Spekulationsfrist steuerfrei sein.
-- Bonds/Anleihen werden als eigene Kategorie erkannt (`bond`, `bonds`, `anleihe`).
+- Bonds/Anleihen verwenden kanonisch die Kategorie `bonds` mit Typ `anleihe`.
 - Im defensiven Kontext können Gold/Bonds vor Aktien genutzt werden.
 
 Die Sale-Engine gibt Rohaggregate (`sumRealizedGainSigned`, `sumTaxableAfterTqfSigned`) zurück. `tax-settlement.mjs` verrechnet diese Rohdaten mit Verlustvortrag und Sparer-Pauschbetrag und schreibt `taxState.lossCarry` in `newState` fort.
@@ -2990,6 +2992,8 @@ Der Pflegebucket verbindet mehrere Forschungs- und Praxislinien, ohne selbst ein
 | `profile-manager.js` | 192 | UI-Facade für Profilverwaltung |
 | `profilverbund-balance.js` | 550 | Multi-Profil-Aggregation, Entnahme-Verteilung |
 | `depot-tranchen-status.js` | 432 | Aggregation, UI-Sync, Status-Badge |
+| `types/tranche-contract.js` | variabel | Kanonisches Schema, Klassifikation, Migration und Validierung |
+| `tranche-reconciliation.js` | variabel | Vorschau und bestaetigte idempotente Realbestandsfortschreibung |
 | `balance-main-profile-sync.js` | ~150 | Cross-App-Synchronisation |
 
 ## Tauri Desktop-App (4 Dateien)

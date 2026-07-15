@@ -78,6 +78,7 @@ console.log('--- Coverage Inventory Contract Tests ---');
         const dynamicIdentifierImport = 'await im' + 'port(moduleUrl);';
         writeFile(root, 'tests/direct.test.mjs', [
             "import '../engine/core.mjs';",
+            "import '../app/tranches/tranchen-manager-page.js';",
             `await ${importKeyword}('../app/balance/balance-main.js?smoke=1');`,
             dynamicIdentifierImport
         ].join('\n'));
@@ -104,11 +105,27 @@ console.log('--- Coverage Inventory Contract Tests ---');
         writeFile(root, 'app/tranches/tranchen-price-service.js', `
             export async function fetchPrice() { return null; }
         `);
+        writeFile(root, 'app/tranches/tranchen-manager-page.js', `
+            import { loadTranches } from './tranchen-manager-state.js';
+            import { reconcile } from './tranche-reconciliation.js';
+            export function initPage() { return [loadTranches(), reconcile()]; }
+        `);
+        writeFile(root, 'app/tranches/tranchen-manager-state.js', `
+            import { normalizeTranche } from '../../types/tranche-contract.js';
+            export function loadTranches() { return normalizeTranche({}); }
+        `);
+        writeFile(root, 'app/tranches/tranche-reconciliation.js', `
+            import { normalizeTranche } from '../../types/tranche-contract.js';
+            export function reconcile() { return normalizeTranche({}); }
+        `);
         writeFile(root, 'workers/mc-worker.js', `
             export function onmessage() {}
         `);
         writeFile(root, 'types/profile-types.js', `
             export const PROFILE = 'default';
+        `);
+        writeFile(root, 'types/tranche-contract.js', `
+            export function normalizeTranche(value) { return value; }
         `);
         writeFile(root, 'types/strategy-options.js', `
             export const OPTIONS = [];
@@ -128,6 +145,30 @@ console.log('--- Coverage Inventory Contract Tests ---');
                 coveragePct: 50
             },
             {
+                file: 'app/tranches/tranchen-manager-page.js',
+                executableLines: 4,
+                coveredLines: 0,
+                coveragePct: 0
+            },
+            {
+                file: 'app/tranches/tranchen-manager-state.js',
+                executableLines: 2,
+                coveredLines: 2,
+                coveragePct: 100
+            },
+            {
+                file: 'app/tranches/tranche-reconciliation.js',
+                executableLines: 2,
+                coveredLines: 1,
+                coveragePct: 50
+            },
+            {
+                file: 'types/tranche-contract.js',
+                executableLines: 1,
+                coveredLines: 1,
+                coveragePct: 100
+            },
+            {
                 file: 'workers/mc-worker.js',
                 executableLines: 1,
                 coveredLines: 0,
@@ -143,7 +184,7 @@ console.log('--- Coverage Inventory Contract Tests ---');
 
         const inventory = buildCoverageInventory({ repoRoot: root, coverageSummaryPath });
 
-        assertEqual(inventory.summary.totalFiles, 10, 'Inventory should list every source file from all roots');
+        assertEqual(inventory.summary.totalFiles, 14, 'Inventory should list every source file from all roots');
         assertEqual(inventory.testFileCount, 1, 'Inventory should count .test.mjs files');
         assertEqual(byFile(inventory, 'engine/core.mjs').testReachability, 'direct', 'Static test imports should be direct');
         assertEqual(byFile(inventory, 'engine/tax-settlement.mjs').testReachability, 'transitive', 'Source imports should be transitive');
@@ -155,6 +196,22 @@ console.log('--- Coverage Inventory Contract Tests ---');
         assertEqual(byFile(inventory, 'engine/tax-settlement.mjs').class, 'critical-core', 'Tax modules should be critical-core');
         assertEqual(byFile(inventory, 'app/shared/persistence-facade.js').class, 'critical-core', 'Persistence contracts should be critical-core');
         assertEqual(byFile(inventory, 'app/tranches/tranchen-price-service.js').class, 'live-io', 'Price service should be live-io');
+        const centralTrancheModules = [
+            'app/tranches/tranchen-manager-page.js',
+            'app/tranches/tranchen-manager-state.js',
+            'app/tranches/tranche-reconciliation.js',
+            'app/tranches/tranchen-price-service.js',
+            'types/tranche-contract.js'
+        ];
+        assert(
+            centralTrancheModules.every(file => Boolean(byFile(inventory, file))),
+            'Inventory should report every central tranche contract and page module'
+        );
+        const uncoveredPage = byFile(inventory, 'app/tranches/tranchen-manager-page.js');
+        assertEqual(uncoveredPage.class, 'ui-entry', 'Tranche manager page should be classified as a UI entry');
+        assertEqual(uncoveredPage.coveragePct, 0, 'Fixture should retain the measured zero-percent page path');
+        assertEqual(uncoveredPage.coverageStatus, 'runtime-loaded-uncovered', 'Zero-percent page path must remain visibly uncovered');
+        assert(uncoveredPage.coverageStatus !== 'runtime-covered', 'Zero-percent page path must never be presented as fully tested');
         assertEqual(byFile(inventory, 'app/balance/balance-main.js').class, 'ui-entry', 'Main modules should be ui-entry');
         assertEqual(byFile(inventory, 'app/simulator/simulator-main-init.js').class, 'ui-entry', 'Compound simulator-main modules should be ui-entry');
         assertEqual(byFile(inventory, 'workers/mc-worker.js').class, 'worker-entry', 'Workers should be worker-entry');

@@ -1,6 +1,9 @@
 // @ts-check
 
-import { combineSimulatorProfiles } from '../app/simulator/simulator-profile-inputs.js';
+import {
+    buildSimulatorInputsFromProfileData,
+    combineSimulatorProfiles
+} from '../app/simulator/simulator-profile-inputs.js';
 
 console.log('--- Simulator Multi-Profile Aggregation ---');
 
@@ -217,7 +220,14 @@ const profileInputs = [
                 tagesgeld: 10000,
                 geldmarktEtf: 5000,
                 detailledTranches: [
-                    { trancheId: 'shared', marketValue: 80000, costBasis: 60000, type: 'aktien_alt' }
+                    {
+                        trancheId: 'shared', marketValue: 80000, costBasis: 60000,
+                        type: 'aktien_alt', metadata: { ownerLabel: 'A' }
+                    },
+                    {
+                        trancheId: 'money', marketValue: 7000, costBasis: 7000,
+                        type: 'geldmarkt', category: 'money_market'
+                    }
                 ]
             }
         },
@@ -239,16 +249,21 @@ const profileInputs = [
 
     const result = combineSimulatorProfiles(withTranches, 'a');
     const tranches = result.combined.detailledTranches;
-    assertEqual(tranches.length, 3, 'All profile tranches should be merged');
+    assertEqual(tranches.length, 4, 'All profile tranches should be merged');
     assertEqual(tranches[0].trancheId, 'a:shared', 'First profile tranche id should be profile-scoped');
-    assertEqual(tranches[1].trancheId, 'b:shared', 'Second profile tranche id should be profile-scoped');
-    assertEqual(tranches[2].sourceProfileId, 'b', 'Merged tranche should keep sourceProfileId');
-    assertEqual(result.combined.startVermoegen, 175000,
-        'Startvermoegen should come from tranche market values plus liquidity');
+    assertEqual(tranches[2].trancheId, 'b:shared', 'Second profile tranche id should be profile-scoped');
+    assertEqual(tranches[3].sourceProfileId, 'b', 'Merged tranche should keep sourceProfileId');
+    assertEqual(result.combined.geldmarktEtf, 7000,
+        'Detailed money market should replace the overlapping aggregate value');
+    assertEqual(result.combined.startVermoegen, 177000,
+        'Startvermoegen should include detailed lots and cash exactly once');
+    tranches[0].metadata.ownerLabel = 'mutated';
+    assertEqual(withTranches[0].inputs.detailledTranches[0].metadata.ownerLabel, 'A',
+        'Household merge should deep-copy nested tranche metadata');
 }
 
 {
-    console.log('\n📋 Test 6: Zero-market tranches fall back to aggregate assets');
+    console.log('\n📋 Test 6: Zero-market tranches remain explicit and do not fall back');
     const withEmptyTranches = [
         {
             profileId: 'a',
@@ -267,10 +282,50 @@ const profileInputs = [
     ];
 
     const result = combineSimulatorProfiles(withEmptyTranches, 'a');
-    assert(result.warnings.some(msg => msg.includes('Tranchen ohne Marktwert')),
-        'Zero-market tranches should produce a warning');
-    assertEqual(result.combined.detailledTranches, null,
-        'Zero-market tranches should be dropped from combined simulator inputs');
-    assertEqual(result.combined.startVermoegen, 100000,
-        'Zero-market tranches should fall back to aggregate start assets');
+    assertEqual(result.combined.detailledTranches.length, 1,
+        'Zero-market detail input should remain explicit');
+    assertEqual(result.combined.startVermoegen, 0,
+        'Zero-market detail input must not fall back to aggregate start assets');
+}
+
+{
+    console.log('\n📋 Test 7: Explicit empty and corrupt profile inputs fail closed');
+    const parsedEmpty = buildSimulatorInputsFromProfileData({
+        depot_tranchen: '[]',
+        profile_tagesgeld: '5000',
+        sim_simStartVermoegen: '100000',
+        sim_depotwertAlt: '90000',
+        sim_geldmarktEtf: '5000'
+    });
+    assertEqual(parsedEmpty.trancheInputState, 'empty', 'Profile parser should preserve explicit empty state');
+    assertEqual(parsedEmpty.detailledTranches.length, 0, 'Profile parser should preserve explicit empty list');
+    assertEqual(parsedEmpty.startVermoegen, 5000, 'Profile parser must not restore aggregate assets for explicit empty lots');
+
+    const emptyResult = combineSimulatorProfiles([{
+        profileId: 'a',
+        name: 'A',
+        inputs: {
+            ...profileInputs[0].inputs,
+            startVermoegen: 100000,
+            depotwertAlt: 90000,
+            tagesgeld: 5000,
+            geldmarktEtf: 5000,
+            detailledTranches: [],
+            trancheInputState: 'empty'
+        }
+    }], 'a');
+    assert(Array.isArray(emptyResult.combined.detailledTranches), 'Explicit empty list should remain an array');
+    assertEqual(emptyResult.combined.detailledTranches.length, 0, 'Explicit empty list should remain empty');
+    assertEqual(emptyResult.combined.startVermoegen, 5000, 'Only separate cash should remain for explicit empty lots');
+
+    const parsedCorrupt = buildSimulatorInputsFromProfileData({ depot_tranchen: '{invalid' });
+    assertEqual(parsedCorrupt.trancheInputState, 'corrupt', 'Profile parser should expose corrupt state');
+    const corruptResult = combineSimulatorProfiles([{
+        profileId: 'a',
+        name: 'A',
+        inputs: { ...profileInputs[0].inputs, ...parsedCorrupt }
+    }], 'a');
+    assertEqual(corruptResult.combined, null, 'Corrupt tranche input should block household aggregation');
+    assert(corruptResult.warnings.some(message => message.includes('fehlerhaft')),
+        'Corrupt tranche input should expose a blocking warning');
 }

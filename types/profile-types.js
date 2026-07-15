@@ -161,24 +161,39 @@
  */
 
 /**
- * @typedef {Object} Tranche
- * @property {string=} trancheId
- * @property {string=} id
- * @property {string=} name
- * @property {string=} isin
- * @property {string=} ticker
- * @property {number=} shares
- * @property {number=} purchasePrice
- * @property {string=} purchaseDate
- * @property {number=} currentPrice
- * @property {number=} marketValue
- * @property {number=} costBasis
- * @property {number=} tqf
- * @property {string=} type
- * @property {string=} kind
- * @property {string=} category
- * @property {string=} notes
+ * Canonical persisted tranche fields (schema v1).
+ * Legacy aliases `id` and `kind` are input-only and never canonical output.
+ * @typedef {Object} PersistedTranche
+ * @property {1} schemaVersion
+ * @property {string} trancheId
+ * @property {string} name
+ * @property {string} isin
+ * @property {string} ticker
+ * @property {number} shares
+ * @property {number} purchasePrice
+ * @property {number} currentPrice
+ * @property {string} purchaseDate
+ * @property {'equity'|'bonds'|'money_market'|'gold'} category
+ * @property {'aktien_alt'|'aktien_neu'|'anleihe'|'geldmarkt'|'gold'} type
+ * @property {number} tqf
+ * @property {string} notes
  */
+
+/**
+ * Values derived from canonical persisted fields.
+ * @typedef {Object} DerivedTrancheFields
+ * @property {number} marketValue
+ * @property {number} costBasis
+ * @property {string} instrumentId
+ */
+
+/**
+ * Merge-only provenance; not required for a profile-internal persisted lot.
+ * @typedef {Object} TrancheMergeProvenance
+ * @property {string} sourceProfileId
+ */
+
+/** @typedef {PersistedTranche & DerivedTrancheFields & Partial<TrancheMergeProvenance>} Tranche */
 
 /**
  * @typedef {Object} ProfileData

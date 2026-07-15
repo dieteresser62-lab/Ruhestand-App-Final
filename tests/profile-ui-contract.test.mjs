@@ -183,8 +183,8 @@ async function runProfileUiContractTests() {
             tranches: [
                 { trancheId: 'alt', marketValue: 100, costBasis: 70, type: 'aktien_alt' },
                 { trancheId: 'neu', marketValue: 50, costBasis: 45, type: 'aktien_neu' },
-                { trancheId: 'gold', marketValue: 20, costBasis: 15, category: 'gold' },
-                { trancheId: 'mm', marketValue: 30, costBasis: 30, category: 'money_market' }
+                { trancheId: 'gold', marketValue: 20, costBasis: 15, type: 'gold', category: 'gold' },
+                { trancheId: 'mm', marketValue: 30, costBasis: 30, type: 'geldmarkt', category: 'money_market' }
             ]
         }];
 
@@ -196,6 +196,19 @@ async function runProfileUiContractTests() {
         assertEqual(summary.totalGold, 20, 'Asset summary should use detailed gold tranches');
         assertEqual(summary.totalGeldmarkt, 30, 'Asset summary should use detailed money-market tranches');
         assertEqual(profileSummary.totalAssets, 210, 'Profile summary should not double-count aggregate fallback fields');
+
+        const explicitEmpty = [{
+            profileId: 'empty',
+            inputs: { tagesgeld: 10, depotwertAlt: 999, depotwertNeu: 999, goldWert: 999, geldmarktEtf: 999 },
+            tranches: [],
+            hasExplicitTrancheOverride: true
+        }];
+        const emptySummary = buildProfilverbundAssetSummary(explicitEmpty);
+        const emptyProfileSummary = buildProfilverbundProfileSummaries(explicitEmpty)[0];
+        assertEqual(emptySummary.totalDepotAlt, 0, 'Explicit empty tranches must suppress aggregate equity fallback');
+        assertEqual(emptySummary.totalGeldmarkt, 0, 'Explicit empty tranches must suppress aggregate money-market fallback');
+        assertEqual(emptySummary.mergedTranches.length, 0, 'Explicit empty tranches must not synthesize household lots');
+        assertEqual(emptyProfileSummary.totalAssets, 10, 'Explicit empty tranches should retain only non-tranche cash');
     }
     console.log('✓ Profilverbund asset double-count guard OK');
 

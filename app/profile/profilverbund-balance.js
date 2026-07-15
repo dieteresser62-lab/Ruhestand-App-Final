@@ -9,12 +9,14 @@
 
 import { listProfiles, getProfileData } from './profile-storage.js';
 import {
+    PROFILE_TRANCHES_KEY,
     parseProfileOverridesFromData,
     parseProfileHealthBucketFromData,
     parseStoredBalanceStateFromData,
-    parseStoredTranchesFromData,
     hasProfileOverrides
 } from './profile-state.js';
+import { loadTranchesFromStorage } from '../tranches/tranchen-manager-state.js';
+import { classifyTranche } from '../../types/tranche-contract.js';
 
 const DEFAULT_TAX_RATE = 0.25 * (1 + 0.055);
 
@@ -84,7 +86,7 @@ function profileLiquidity(inputs) {
 }
 
 function computeTaxRate(inputs) {
-    const kirchen = Math.max(0, readNumber(inputs?.kirchensteuerSatz, 0)) / 100;
+    const kirchen = Math.max(0, readNumber(inputs?.kirchensteuerSatz, 0));
     return 0.25 * (1 + 0.055 + kirchen);
 }
 
@@ -95,12 +97,7 @@ function computeProfitRatio(marketValue, costBasis) {
 }
 
 function resolveTrancheCategory(tranche) {
-    const category = String(tranche?.category || '').toLowerCase();
-    const type = String(tranche?.type || '').toLowerCase();
-    if (category) return category;
-    if (type.includes('gold')) return 'gold';
-    if (type.includes('geldmarkt') || type.includes('money')) return 'money_market';
-    return 'equity';
+    return classifyTranche(tranche, { allowLegacy: true });
 }
 
 function resolveTrancheSplitTotals(tranches) {
@@ -119,21 +116,21 @@ function resolveTrancheSplitTotals(tranches) {
         const marketValue = readNumber(tranche.marketValue, 0);
         const costBasis = readNumber(tranche.costBasis, 0);
         const type = String(tranche.type || tranche.kind || '').toLowerCase();
-        const category = String(tranche.category || '').toLowerCase();
+        const category = resolveTrancheCategory(tranche);
 
-        if (category === 'gold' || type.includes('gold')) {
+        if (category === 'gold') {
             totals.goldValue += marketValue;
             totals.goldCost += costBasis;
             return;
         }
 
-        if (category === 'money_market' || type.includes('geldmarkt') || type.includes('money')) {
+        if (category === 'money_market') {
             totals.moneyValue += marketValue;
             totals.moneyCost += costBasis;
             return;
         }
 
-        if (category === 'bonds' || type.includes('bond') || type.includes('anleihe')) {
+        if (category === 'bonds') {
             // Bonds remain part of the legacy "neu" depot total while their detailed
             // category is preserved for the one-time household 3-bucket logic.
             totals.neuValue += marketValue;
@@ -235,12 +232,32 @@ export function buildProfileOwnedTranches(entry) {
     }
     const profileName = entry?.name || profileId;
     const tranches = Array.isArray(entry?.tranches) ? entry.tranches : [];
+    if (entry?.hasExplicitTrancheOverride && tranches.length === 0) return [];
     if (!tranches.length) return buildSyntheticProfileTranches(entry);
     return tranches.map(tranche => ({
         ...tranche,
+        trancheId: `${profileId}:${tranche.trancheId}`,
         sourceProfileId: profileId,
         sourceProfileName: profileName
     }));
+}
+
+function loadProfileTrancheState(data) {
+    const storage = {
+        getItem(key) {
+            if (key !== PROFILE_TRANCHES_KEY || !data || typeof data !== 'object') return null;
+            const raw = data[PROFILE_TRANCHES_KEY];
+            if (raw === null || raw === undefined) return null;
+            return typeof raw === 'string' ? raw : JSON.stringify(raw);
+        }
+    };
+    const state = loadTranchesFromStorage(storage);
+    if (state.status === 'corrupt' || state.status === 'unavailable') {
+        const error = new Error('Profilverbund: Der profilbezogene Tranchenbestand ist fehlerhaft.');
+        error.code = state.errorCode || 'TRANCHE_STORAGE_ERROR';
+        throw error;
+    }
+    return state;
 }
 
 // Lade alle Profile, die zum Profilverbund gehören
@@ -252,13 +269,14 @@ export function loadProfilverbundProfiles() {
         const balanceState = parseStoredBalanceStateFromData(data);
         const overrides = parseProfileOverridesFromData(data);
         const healthBucket = parseProfileHealthBucketFromData(data);
-        const tranches = parseStoredTranchesFromData(data);
-        const hasFallbackData = hasProfileOverrides(overrides) || tranches.length > 0;
+        const trancheState = loadProfileTrancheState(data);
+        const tranches = trancheState.tranches || [];
+        const hasExplicitTrancheOverride = trancheState.raw !== null && trancheState.raw !== '';
+        const hasFallbackData = hasProfileOverrides(overrides) || hasExplicitTrancheOverride;
         const normalized = normalizeBalanceInputs(balanceState?.inputs || (hasFallbackData ? {} : null), overrides);
         if (!normalized) return null;
         const split = resolveTrancheSplitTotals(tranches);
-        const hasTranches = tranches.length > 0 && (split.altValue + split.neuValue + split.goldValue + split.moneyValue) > 0;
-        if (hasTranches) {
+        if (hasExplicitTrancheOverride) {
             normalized.depotwertAlt = split.altValue;
             normalized.depotwertNeu = split.neuValue;
             normalized.goldWert = split.goldValue;
@@ -273,6 +291,8 @@ export function loadProfilverbundProfiles() {
             inputs: normalized,
             healthBucket,
             tranches,
+            hasExplicitTrancheOverride,
+            trancheStatus: hasExplicitTrancheOverride ? trancheState.status : 'not_loaded',
             balanceState
         };
     }).filter(Boolean);
@@ -390,10 +410,11 @@ export function selectTranchesForSale(tranches, targetAmount, taxRate = DEFAULT_
             const marketValue = readNumber(t.marketValue, 0);
             const costBasis = readNumber(t.costBasis, 0);
             const profitRatio = computeProfitRatio(marketValue, costBasis);
+            const tqf = Math.max(0, Math.min(1, readNumber(t.tqf, 0)));
             return {
                 tranche: t,
                 marketValue,
-                taxPerEuro: profitRatio * taxRate,
+                taxPerEuro: profitRatio * (1 - tqf) * taxRate,
                 purchaseStamp: normalizeTrancheDate(t)
             };
         })
@@ -558,7 +579,8 @@ export function buildProfilverbundAssetSummary(profileInputs) {
         const inputs = entry.inputs || {};
         const tranches = Array.isArray(entry.tranches) ? entry.tranches : [];
         const split = resolveTrancheSplitTotals(tranches);
-        const hasTranches = tranches.length > 0 && (split.altValue + split.neuValue + split.goldValue + split.moneyValue) > 0;
+        const hasTranches = entry.hasExplicitTrancheOverride
+            || (tranches.length > 0 && (split.altValue + split.neuValue + split.goldValue + split.moneyValue) > 0);
 
         summary.totalTagesgeld += inputs.tagesgeld || 0;
         summary.totalRenteMonatlich += inputs.renteAktiv ? (inputs.renteMonatlich || 0) : 0;
@@ -596,7 +618,8 @@ export function buildProfilverbundProfileSummaries(profileInputs) {
         const inputs = entry.inputs || {};
         const tranches = Array.isArray(entry.tranches) ? entry.tranches : [];
         const split = resolveTrancheSplitTotals(tranches);
-        const hasTranches = tranches.length > 0 && (split.altValue + split.neuValue + split.goldValue + split.moneyValue) > 0;
+        const hasTranches = entry.hasExplicitTrancheOverride
+            || (tranches.length > 0 && (split.altValue + split.neuValue + split.goldValue + split.moneyValue) > 0);
 
         const depotAlt = hasTranches ? split.altValue : (inputs.depotwertAlt || 0);
         const depotNeu = hasTranches ? split.neuValue : (inputs.depotwertNeu || 0);

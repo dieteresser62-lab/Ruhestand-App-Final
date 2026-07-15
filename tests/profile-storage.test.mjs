@@ -58,6 +58,7 @@ import {
     updateProfileData as updateRegistryProfileData
 } from '../app/profile/profile-registry.js';
 import { CONFIG } from '../app/balance/balance-config.js';
+import { loadTranchesFromStorage } from '../app/tranches/tranchen-manager-state.js';
 
 console.log('--- Profile Storage Tests ---');
 
@@ -477,6 +478,36 @@ try {
     }
     console.log('✓ immediate persistence of profile-scoped keys OK');
 
+    // Test 17bb: top-level reconciliation history survives normal profile saves
+    console.log('Test 17bb: reconciliation history survives profile saves');
+    {
+        localStorage.clear();
+        ensureProfileRegistry();
+        const registry = JSON.parse(localStorage.getItem('rs_profiles_v1'));
+        registry.trancheReconciliation = {
+            schemaVersion: 1,
+            actions: [{
+                schemaVersion: 1,
+                actionId: 'synthetic-order-1',
+                profileId: 'default',
+                trancheId: 'synthetic-lot-1',
+                executedAt: '2026-07-14',
+                actual: { sharesSold: 1, grossProceeds: 100, fees: 1, netProceeds: 99 },
+                result: { beforeShares: 2, remainingShares: 1, trancheRemoved: false }
+            }]
+        };
+        localStorage.setItem('rs_profiles_v1', JSON.stringify(registry));
+        localStorage.setItem('profile_tagesgeld', '43000');
+
+        assert(saveCurrentProfileFromLocalStorage() === true, 'Normaler Profilsave sollte erfolgreich sein');
+        const savedRegistry = JSON.parse(localStorage.getItem('rs_profiles_v1'));
+        assert(savedRegistry.trancheReconciliation.actions.length === 1,
+            'Profilwerte-Save darf den globalen Idempotenz-/Auditverlauf nicht entfernen');
+        assert(savedRegistry.trancheReconciliation.actions[0].actionId === 'synthetic-order-1',
+            'Stabile Action-ID bleibt bei spaeteren Profilsaves erhalten');
+    }
+    console.log('✓ reconciliation history preservation OK');
+
     // Test 17c: hasProfileScopedDataInLocalStorage guards empty bootstrap states
     console.log('Test 17c: detect live profile-scoped data');
     {
@@ -524,6 +555,74 @@ try {
         assert(getProfileData(getCurrentProfileId()).profile_tagesgeld === '9999', 'Live-Daten sollten ins aktuelle Profil persistiert werden');
     }
     console.log('✓ bootstrap preserves live data when requested OK');
+
+    // Test 17f: Explicit empty tranche override never falls back to stale live data
+    console.log('Test 17f: explicit empty tranche override');
+    {
+        localStorage.clear();
+        ensureProfileRegistry();
+        localStorage.setItem('depot_tranchen', JSON.stringify([{ trancheId: 'profile-a' }]));
+        saveCurrentProfileFromLocalStorage();
+
+        const emptyProfile = createProfile('Leer');
+        updateProfileData(emptyProfile.id, { depot_tranchen: '[]' });
+        setCurrentProfileId(emptyProfile.id);
+
+        const result = bootstrapProfileContext();
+        assert(result.action === 'loaded', 'Leeres Zielprofil sollte explizit geladen werden');
+        assert(localStorage.getItem('depot_tranchen') === '[]', 'Explizites [] darf nicht auf Live-Tranchen des vorherigen Profils zurückfallen');
+        assert(getActiveProfileId() === emptyProfile.id, 'Leeres Zielprofil sollte als tatsächlich geladen markiert werden');
+    }
+    console.log('✓ explicit empty tranche override OK');
+
+    // Test 17g: Profile switches preserve legacy/corrupt tranche payloads until an explicit save
+    console.log('Test 17g: profile-bound tranche migration remains raw-preserving');
+    {
+        localStorage.clear();
+        ensureProfileRegistry();
+        const legacyRaw = JSON.stringify([{
+            id: 'legacy-profile-lot',
+            name: 'Synthetischer Altbestand',
+            shares: 2,
+            purchasePrice: 80,
+            kind: 'aktien_alt',
+            tqf: 0.3
+        }]);
+        const corruptRaw = JSON.stringify([{
+            schemaVersion: 1,
+            trancheId: 'schema-one-profile-mismatch',
+            name: 'Widerspruechlicher Altbestand',
+            shares: 1,
+            purchasePrice: 100,
+            currentPrice: 110,
+            category: 'gold',
+            type: 'aktien_neu',
+            tqf: 0.3
+        }]);
+        const legacyProfile = createProfile('Legacy Browserprofil');
+        const corruptProfile = createProfile('Corrupt Browserprofil');
+        updateProfileData(legacyProfile.id, { depot_tranchen: legacyRaw });
+        updateProfileData(corruptProfile.id, { depot_tranchen: corruptRaw });
+
+        assert(switchProfile(legacyProfile.id) === true, 'Legacy-Profil sollte ladbar sein');
+        assertEqual(localStorage.getItem('depot_tranchen'), legacyRaw, 'Profilwechsel darf Legacy-Rohpayload nicht implizit umschreiben');
+        const firstLegacyLoad = loadTranchesFromStorage(localStorage);
+        const secondLegacyLoad = loadTranchesFromStorage(localStorage);
+        assertEqual(firstLegacyLoad.status, 'valid', 'Gueltiger Altbestand sollte kanonisch lesbar sein');
+        assertEqual(JSON.stringify(secondLegacyLoad.tranches), JSON.stringify(firstLegacyLoad.tranches), 'Wiederholte Legacy-Normalisierung sollte deterministisch sein');
+        assertEqual(localStorage.getItem('depot_tranchen'), legacyRaw, 'Lesemigration bleibt auch bei Wiederholung mutationsfrei');
+
+        assert(switchProfile(corruptProfile.id) === true, 'Widerspruechliches Profil sollte in Recovery ladbar bleiben');
+        assertEqual(localStorage.getItem('depot_tranchen'), corruptRaw, 'Profilwechsel muss widerspruechlichen Rohpayload erhalten');
+        const corruptLoad = loadTranchesFromStorage(localStorage);
+        assertEqual(corruptLoad.status, 'corrupt', 'Kategorie-/Typ-Widerspruch muss fail-closed enden');
+        assertEqual(corruptLoad.raw, corruptRaw, 'Recovery muss den exakten Profil-Rohpayload bereitstellen');
+
+        assert(switchProfile(legacyProfile.id) === true, 'Rueckwechsel zum Legacy-Profil sollte gelingen');
+        assert(switchProfile(corruptProfile.id) === true, 'Erneuter Wechsel zum Recovery-Profil sollte gelingen');
+        assertEqual(localStorage.getItem('depot_tranchen'), corruptRaw, 'Profil-Roundtrip darf Recovery-Rohdaten nicht veraendern');
+    }
+    console.log('✓ profile-bound raw-preserving migration OK');
 
     // ========== belongsToHousehold Tests ==========
 

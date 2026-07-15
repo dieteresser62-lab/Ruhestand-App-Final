@@ -1,358 +1,137 @@
-# Multi-Tranchen Portfolio System - Anleitung
-
-## 🎯 Überblick
-
-Das Multi-Tranchen-System ermöglicht die **detaillierte Verwaltung einzelner Depot-Positionen** mit individuellen Kaufpreisen, Kaufdaten und Steuermerkmalen. Dies ist besonders wichtig für:
-
-- **Präzise Steuerberechnung**: Jede Position hat unterschiedliche Gewinnquoten und Teilfreistellungen
-- **Steueroptimierte Verkaufslogik**: Geringste Steuerlast zuerst (Kaufdatum als Tie-Breaker)
-- **Altbestände vor 2009**: Steuerfreie Positionen (Spekulationsfrist) korrekt berücksichtigen
-- **Transparente Simulation**: Realistische Abbildung des tatsächlichen Depots
-
----
-
-## 📁 Dateien
-
-### Neu hinzugefügt:
-1. **`depot-tranchen-manager.html`** - Eigenständiges Tool zur Verwaltung der Tranchen
-2. **`MULTI-TRANCHEN-ANLEITUNG.md`** - Diese Dokumentation
-
-### Erweitert:
-1. **`simulator-portfolio.js`** - Neue Funktion `initializePortfolioDetailed()`
-2. **`engine/transactions/TransactionEngine.mjs`** - steueroptimierte Verkaufslogik
-
----
-
-## 🚀 Schnellstart
-
-### Schritt 1: Depot-Tranchen-Manager öffnen
-
-```bash
-# Öffnen Sie die Datei im Browser:
-depot-tranchen-manager.html
-```
-
-### Schritt 2: Tranchen anpassen
-
-Für jede Position:
-- **Name**: z.B. "SAP SE"
-- **ISIN**: z.B. "DE0007164600"
-- **Stücke**: Anzahl der gehaltenen Anteile
-- **Kaufpreis**: Ursprünglicher Preis pro Stück
-- **Aktueller Kurs**: Heutiger Preis (wird für Marktwert verwendet)
-- **Kaufdatum**: Optional (nur als Tie-Breaker, wenn Steuerlast gleich ist)
-- **TQF (Tax Quota Free)**:
-  - `1.0` = 100% steuerfrei (Altbestände vor 2009)
-  - `0.30` = 30% Teilfreistellung (Standard Aktienfonds)
-  - `0.0` = Voll steuerpflichtig
-
-### Schritt 3: Exportieren
-
-1. Klicken Sie auf **"💾 Export JSON"**
-2. Eine JSON-Datei wird heruntergeladen
-3. Diese Datei enthält alle Ihre Tranchen
-
----
-
-## 🔧 Ihre Depot-Positionen
-
-Basierend auf Ihren Angaben:
-
-| Position | Stücke | Kaufpreis | Gewinn | TQF | Kategorie |
-|----------|--------|-----------|--------|-----|-----------|
-| **SAP SE** | 352 | ca. Jahr 2000 | ? | **1.0** (steuerfrei) | Alt |
-| **UBS MSCI World DLAD** | 1312 | 145,42€ | 121,88% | 0.30 | Alt |
-| **Vanguard FTSE DLD** | 3304 | 72,36€ | 100,94% | 0.30 | Alt |
-| **X(IE)-MSCIACWLDSC 1C** | 3000 | 19,04€ | 136,40% | 0.30 | Alt |
-| **Vanguard FTSE DLA** | 6270 | 135,62€ | 9,82% | 0.30 | Neu |
-| **XTR.II EUR OV.RATE SW.** | 1900 | 147,15€ | 0,67% | 0.30 | Geldmarkt |
-
-### ⚠️ Wichtige Hinweise:
-
-1. **SAP ist steuerfrei** (TQF = 1.0), da vor 2009 gekauft (Altbestand unter Spekulationsfrist)
-2. Für **SAP** sollten Sie einen geschätzten Kaufpreis eingeben oder den aktuellen Marktwert nutzen
-3. Der **Vanguard FTSE DLA (IE00BK5BQT80)** wird als Referenz-Kurs für die Marktbewertung genutzt
-
----
-
-## 🧮 Steueroptimierte Verkaufslogik
-
-### Was bedeutet "steueroptimiert"?
-
-Das System verkauft **zuerst die Tranchen mit der geringsten Steuerlast**. Die Steuerlast ergibt sich aus Gewinnquote, Teilfreistellung (TQF) und Steuersatz. Kaufdatum wird nur als Tie-Breaker genutzt.
-
-### Wie funktioniert es?
-
-1. Alle Tranchen werden nach **Steuerlast pro EUR** sortiert (niedrigste zuerst)
-2. Bei Verkauf wird in dieser Reihenfolge verkauft
-3. **Ausnahme**: Im defensiven Kontext kann Gold priorisiert werden (Asset-Allokation vor Steueroptimierung)
-
-### Beispiel:
-
-Angenommen, Sie muessen 50.000 EUR verkaufen:
-
-```
-Verkaufsreihenfolge (steueroptimiert):
-1. Vanguard DLA Neu (2023) - ~50.000 EUR -> ~600 EUR Steuer
-
-Gesamt: 50.000 EUR brutto, ~49.400 EUR netto
-```
-
--> **Steueroptimierung reduziert hier die Steuerlast deutlich**.
-
-## 📊 Integration in Simulator / Balance App
-
-### ✅ Automatische Integration (BEREITS IMPLEMENTIERT!)
-
-Die Tranchen werden **automatisch** aus dem localStorage geladen, sobald Sie sie im Depot-Tranchen-Manager gespeichert haben.
-
-**So funktioniert es:**
-
-1. **Sie verwalten Tranchen** im Depot-Tranchen-Manager
-2. **Tranchen werden gespeichert** im Browser (localStorage unter Key `depot_tranchen`)
-3. **Balance & Simulator laden automatisch** die Tranchen beim Start
-4. **Status-Badge zeigt** ob Tranchen geladen sind
-
-**Implementierungs-Details:**
-
-```javascript
-// balance-reader.js & simulator-portfolio.js (automatisch):
-const saved = localStorage.getItem('depot_tranchen');
-if (saved) {
-    detailledTranches = JSON.parse(saved);
-    console.log('✅ Detaillierte Depot-Tranchen geladen:', detailledTranches.length, 'Positionen');
-}
-
-// Tranchen werden automatisch in inputs-Objekt eingefügt:
-inputs.detailledTranches = detailledTranches;
-```
-
-**Status-Anzeige:**
-
-In beiden Apps (Balance & Simulator) sehen Sie einen Status-Badge:
-
-- ✅ **Grünes Badge**: "X Tranchen geladen (steueroptimiert)" → Detaillierte Tranchen werden verwendet
-- ℹ️ **Graues Badge**: "Keine detaillierten Tranchen geladen" → Vereinfachtes Alt/Neu-Modell wird verwendet
-
-### Methode 2: JSON-Import
-
-1. Exportieren Sie Ihre Tranchen aus dem Manager
-2. Importieren Sie die JSON-Datei in Ihrer App
-3. Nutzen Sie die Daten für Berechnungen
-
-```javascript
-// JSON laden
-import { DEPOT_TRANCHEN } from './meine-tranchen.json';
-
-// An inputs anhängen
-inputs.detailledTranches = DEPOT_TRANCHEN;
-```
-
-### Methode 3: Direkt in Code
-
-```javascript
-const inputs = {
-    // ... andere Inputs
-    detailledTranches: [
-        {
-            name: "SAP SE",
-            isin: "DE0007164600",
-            shares: 352,
-            purchasePrice: 50,
-            currentPrice: 150,
-            purchaseDate: "2000-06-15",
-            tqf: 1.0,
-            category: "equity",
-            type: "aktien_alt"
-        },
-        // ... weitere Tranchen
-    ]
-};
-```
-
----
-
-## 💾 Persistenz & Speicherung
-
-### Wo werden die Daten gespeichert?
-
-Die Tranchen werden im **Browser-localStorage** gespeichert:
-
-```
-Speicherort: localStorage
-Key: 'depot_tranchen'
-Format: JSON-Array mit allen Tranchen
-```
-
-### Was bedeutet das?
-
-✅ **Vorteile:**
-- Daten bleiben **dauerhaft** gespeichert (auch nach Browser-Neustart)
-- **Keine Cloud** nötig, alles bleibt auf Ihrem Gerät
-- **Schnell** und **offline** verfügbar
-- **Automatisch synchronisiert** zwischen Tabs im selben Browser
-
-⚠️ **Einschränkungen:**
-- Daten sind **pro Browser/Gerät** (Chrome ≠ Firefox ≠ Edge)
-- Daten sind **pro Computer** (Desktop ≠ Laptop ≠ Smartphone)
-- Bei Browser-Cache löschen gehen Daten verloren (siehe Backup!)
-
-### 🔄 Multi-Gerät-Nutzung
-
-**Szenario:** Sie möchten auf mehreren Geräten arbeiten
-
-**Lösung:**
-1. Exportieren Sie Ihre Tranchen als JSON (Button "💾 Export JSON" im Manager)
-2. Speichern Sie die JSON-Datei z.B. in Dropbox/OneDrive/Google Drive
-3. Importieren Sie die Datei auf dem anderen Gerät (Button "📂 Import JSON")
-
-**Empfehlung:** Exportieren Sie regelmäßig als Backup!
-
-### 🔁 Synchronisation zwischen Apps
-
-**Balance.html**, **Simulator.html** und **Depot-Tranchen-Manager** teilen sich denselben localStorage:
-
-```
-Depot-Tranchen-Manager speichert
-              ↓
-      localStorage['depot_tranchen']
-              ↓
-Balance & Simulator laden automatisch
-```
-
-**Live-Update:**
-- Öffnen Sie Balance.html in Tab 1
-- Öffnen Sie Depot-Tranchen-Manager in Tab 2
-- Ändern Sie eine Tranche im Manager
-- Balance.html aktualisiert automatisch alle 5 Sekunden
-
----
-
-## 🧪 Steuerberechnung
-
-### Formel pro Tranche:
-
-```javascript
-Bruttogewinn = Verkaufsbetrag × ((Marktwert - Einstand) / Marktwert)
-GewinnNachTFS = Bruttogewinn × (1 - TQF)
-Steuerbasis = GewinnNachTFS - SparerPauschbetrag
-Steuer = Steuerbasis × KESt (ca. 26,375% mit Soli + ggf. KiSt)
-NettoErlös = Verkaufsbetrag - Steuer
-```
-
-### Beispiel SAP (steuerfrei):
-
-```
-Verkauf: 20.000€
-TQF: 1.0 (100% steuerfrei)
-→ GewinnNachTFS = 0€
-→ Steuer = 0€
-→ NettoErlös = 20.000€
-```
-
-### Beispiel Vanguard DLA (neu, niedriger Gewinn):
-
-```
-Verkauf: 20.000€
-Einstand: 18.215€ (Gewinn: 9,82%)
-Bruttogewinn: 20.000€ × 0.0982 = 1.964€
-TQF: 0.30 (30% Teilfreistellung)
-GewinnNachTFS: 1.964€ × 0.70 = 1.375€
-Steuerbasis: 1.375€ - 1.000€ (SPB) = 375€
-Steuer: 375€ × 0.26375 = ~99€
-NettoErlös: 20.000€ - 99€ = 19.901€
-```
-
----
-
-## 🎨 UI-Anpassungen
-
-### Balance.html anpassen (optional):
-
-Fügen Sie ein neues Panel für detaillierte Tranchen hinzu:
-
-```html
-<div class="form-section">
-    <h3>📊 Depot-Tranchen (erweitert)</h3>
-    <p>Verwalten Sie Ihre Positionen detailliert für präzise Steuerberechnung.</p>
-    <button onclick="window.open('depot-tranchen-manager.html', '_blank')">
-        Tranchen-Manager öffnen
-    </button>
-    <div id="tranchenSummary"></div>
-</div>
-```
-
-### Anzeige der geladenen Tranchen:
-
-```javascript
-function displayTranchenSummary() {
-    const tranches = JSON.parse(localStorage.getItem('depot_tranchen') || '[]');
-    const summary = document.getElementById('tranchenSummary');
-
-    if (tranches.length === 0) {
-        summary.innerHTML = '<p>Keine detaillierten Tranchen geladen.</p>';
-        return;
-    }
-
-    const totalValue = tranches.reduce((sum, t) => sum + t.marketValue, 0);
-    summary.innerHTML = `
-        <p>✅ ${tranches.length} Tranchen geladen</p>
-        <p>Gesamtwert: ${totalValue.toLocaleString('de-DE')} €</p>
-    `;
-}
-```
-
----
-
-## 🐛 Troubleshooting
-
-### Problem: "Tranchen werden nicht geladen"
-
-**Lösung**: Prüfen Sie, ob die Tranchen im localStorage gespeichert sind:
-
-```javascript
-console.log(localStorage.getItem('depot_tranchen'));
-```
-
-### Problem: "Verkaufsreihenfolge stimmt nicht"
-
-**Lösung**: Stellen Sie sicher, dass alle Tranchen ein `purchaseDate` Feld haben. Tranchen ohne Datum werden ans Ende sortiert.
-
-### Problem: "Steuerberechnung weicht ab"
-
-**Lösung**: Prüfen Sie die TQF-Werte:
-- Altbestände vor 2009: TQF = 1.0
-- Aktienfonds: TQF = 0.30
-- Anleihen-ETFs: TQF = 0.15
-
----
-
-## 📞 Nächste Schritte
-
-1. ✅ **Depot-Tranchen-Manager öffnen** und Ihre Positionen eingeben
-2. ✅ **SAP-Position** konfigurieren (TQF = 1.0, geschätzter Kaufpreis)
-3. ✅ **Kaufdaten ergänzen** (optional, nur als Tie-Breaker)
-4. ✅ **Aktuelle Kurse** aktualisieren
-5. ✅ **JSON exportieren** als Backup
-6. ⏳ Integration in Balance.html / Simulator.html (optional)
-
----
-
-## 💡 Tipps
-
-- **Regelmäßig aktualisieren**: Kurse und Positionen sollten regelmäßig aktualisiert werden
-- **Backup**: Exportieren Sie Ihre Tranchen regelmäßig als JSON
-- **Kaufdaten dokumentieren**: Je genauer die Kaufdaten, desto präziser die Simulation
-- **Gold noch kaufen**: Sie haben erwähnt, dass der Gold-ETC noch gekauft werden muss
-
----
-
-## 📚 Weiterführende Informationen
-
-- `simulator-portfolio.js` - Backend-Logik für Portfolio-Verwaltung
-- `engine/transactions/TransactionEngine.mjs` - steueroptimierte Verkaufslogik und Steuerberechnung
-
----
-
-Erstellt: 2026-01-13
-Version: 1.0
+# Profil-Assets und Depot-Tranchen – Anleitung
+
+Mit dem Profil-Assets-Manager pflegen Sie einzelne Depotlots getrennt nach
+Profil. Die Daten verbessern Steuer-, FIFO- und Herkunftsberechnungen in Balance
+und Simulator. Alle Beispiele in dieser Anleitung sind abstrakt; es werden keine
+realen Personen-, Depot- oder Portfoliowerte vorausgesetzt.
+
+## 1. Profil waehlen und Manager oeffnen
+
+1. Oeffnen Sie `index.html` beziehungsweise die Startseite der Desktop-App.
+2. Waehlen Sie das Profil, zu dem der Bestand gehoert.
+3. Oeffnen Sie **Profil-Assets Manager**.
+4. Kontrollieren Sie oben Profilname und Profil-ID, bevor Sie Daten aendern.
+
+Der Wechsel wartet auf die dauerhafte Speicherung der Profilwahl. Bei einer
+Fehlermeldung bleiben Sie auf der Startseite und koennen den Vorgang wiederholen.
+Jedes Profil ist ein eigenes logisches Depot; FIFO wird nur innerhalb dieses
+Profils und Instruments angewandt.
+
+## 2. Eine Tranche anlegen
+
+Waehlen Sie **Neue Tranche** und erfassen Sie:
+
+- einen eindeutigen Namen sowie optional ISIN und Yahoo-Ticker;
+- positive Stueckzahl, Kaufpreis und aktuellen Preis;
+- optional das Kaufdatum im Format `JJJJ-MM-TT`;
+- Kategorie und den dazu passenden Typ;
+- die bewusst bestaetigte Teilfreistellung als Quote, zum Beispiel `0,30` fuer
+  30 Prozent, sofern dies fuer das Instrument tatsaechlich zutrifft;
+- optionale Notizen.
+
+Zulaessige Paare sind:
+
+| Kategorie | Typ |
+| --- | --- |
+| Aktien | Altbestand oder Neubestand |
+| Anleihen | Anleihe |
+| Geldmarkt | Geldmarkt-ETF |
+| Gold | Gold-ETC |
+
+Die App blockiert fehlende oder unendliche Werte, doppelte IDs,
+Kategorie-/Typ-Widersprueche und unbestaetigte TQF. Marktwert und Einstand werden
+aus Stueckzahl und Preisen berechnet. Eine Aenderung gilt erst als dauerhaft, wenn
+die Speicherstatusanzeige den erfolgreichen Abschluss meldet.
+
+## 3. Bearbeiten und loeschen
+
+Die Schaltflaechen in jeder Tabellenzeile besitzen zugaengliche Namen und
+oeffnen Bearbeiten beziehungsweise Loeschen. Beim Bearbeiten bleibt die interne
+Lot-ID stabil. **Alle loeschen** leert nur den Bestand des aktuell angezeigten
+Profils und verlangt eine Bestaetigung.
+
+Der Editor ist per Tastatur bedienbar: Der Fokus bleibt im Dialog, `Escape`
+schliesst ihn und gibt den Fokus an den Ausloeser zurueck. Auf schmalen Displays
+scrollt nur die Tabelle horizontal; die Seite selbst bleibt innerhalb des
+Viewports.
+
+## 4. Kurse aktualisieren
+
+Der Online-Abruf ist optional. Im Browser benoetigt er den lokalen Proxy aus dem
+Suite-Startskript; die Desktop-App verwendet den integrierten Tauri-Pfad.
+Automatisch uebernommen werden nur EUR-Quotes mit passendem Symbol, positivem
+Preis, plausibler UTC-Zeit und ausgewiesener Quelle.
+
+Bei einem Batch koennen einzelne Lots erfolgreich sein und andere fehlschlagen.
+Gueltige Teilerfolge werden gemeinsam gespeichert, fehlgeschlagene Lots behalten
+den alten Kurs. Die Statusanzeige meldet einen erfolgreichen Lauf knapp; bei
+Fehlern nennt sie nur die betroffene Tranche und den verstaendlichen Grund. Ohne
+einen gueltigen Quote wird nichts geschrieben.
+
+## 5. Wirkung in Balance und Simulator
+
+Ein valider nichtleerer Detailbestand aktiviert die lotbezogene Verkaufsplanung.
+Ein explizites `[]` bedeutet dagegen: Dieses Profil besitzt bewusst keine
+Detailtranchen. Korrupte oder nicht lesbare Daten werden nicht als leer behandelt;
+die Berechnung stoppt mit einem sichtbaren Hinweis.
+
+Balance und Simulator unterscheiden Aktien, Bonds, Geldmarkt und Gold disjunkt,
+damit Detailwerte keine Aggregate verdoppeln. Bei mehreren Profilen bleiben die
+Lots ueber `sourceProfileId` ihrem Ursprung zugeordnet.
+
+Wichtig: Empfehlungen und Simulationen veraendern den realen Bestand nicht.
+Backtest, Monte Carlo, Sweep, Optimierung und Balance-Berechnung arbeiten auf
+Kopien beziehungsweise Rechenergebnissen.
+
+## 6. Einen real ausgefuehrten Verkauf abgleichen
+
+Erst nachdem der Verkauf beim Broker tatsaechlich ausgefuehrt wurde:
+
+1. Oeffnen Sie im richtigen Profil den Bereich **Reale Ausfuehrung abgleichen**.
+2. Vergeben Sie eine stabile Action-ID aus Ihrer eigenen, lokalen Zuordnung.
+3. Waehlen Sie die exakte Tranche und erfassen Sie Datum, verkaufte Stuecke,
+   Bruttoerloes und Kosten.
+4. Optional koennen Sie die vorherige Empfehlung zum Vergleich erfassen.
+5. Pruefen Sie die Vorschau mit altem und resultierendem Bestand.
+6. Bestaetigen Sie die dauerhafte Fortschreibung separat.
+
+Teilverkauf reduziert Stueckzahl, Marktwert und Einstand proportional;
+Vollverkauf entfernt genau das gewaehlte Lot. Ueberverkauf, Profilwechsel oder ein
+seit der Vorschau veraenderter Bestand werden blockiert. Eine identische Action-ID
+mit denselben Daten wird nur einmal angewandt; abweichende Daten unter derselben ID
+sind ein Konflikt.
+
+## 7. Backup und Recovery
+
+Verwenden Sie auf der Startseite unter **Profile > Erweitert** das zentrale
+Komplettbackup. Es umfasst die Profilregistry und die zugehoerigen App-Daten. Der
+Tranchenmanager besitzt bewusst keinen separaten Teilimport oder -export.
+
+Bei beschaedigten Tranchendaten blockiert der Manager normale Aenderungen und
+bietet vier kontrollierte Wege:
+
+- zur Startseite abbrechen;
+- ein zentrales Komplettbackup wiederherstellen;
+- den unveraenderten Rohtext bewusst lokal anzeigen und kopieren;
+- den beschaedigten Profilbestand nach ausdruecklicher Bestaetigung auf leer setzen.
+
+Ein voruebergehender Speicherfehler ist kein Korruptionsfall: Er bietet Retry und
+keinen Reset. Im Browser ist IndexedDB die normale lokale Datenquelle, in der
+Desktop-App die Tauri-JSON-Datei. Browser-`localStorage` ist nur
+Legacy-Migrations-/Fallbackpfad und kein empfohlener manueller Backupweg.
+
+## 8. Fehlerhilfe
+
+- **Falsches Profil sichtbar:** Zur Startseite zurueckkehren, korrektes Profil
+  waehlen und den Manager erneut oeffnen.
+- **Kurs bleibt alt:** Den Code und Grund im Kursstatus pruefen; Fremdwaehrungen
+  werden nicht automatisch umgerechnet.
+- **Datenfehler blockiert Berechnung:** Recovery-Hinweis lesen und vor einem Reset
+  das zentrale Backup beziehungsweise den bewusst angezeigten Rohtext sichern.
+- **Speichern fehlgeschlagen:** Nicht neu laden, bevor der sichtbare Stand geklaert
+  ist; Retry verwenden. Die App stellt den letzten bestaetigten Stand wieder her.
+- **Simulation passt nicht zum Depot:** Profilwahl, Kategorie-/Typ-Paare, TQF und
+  Geldmarkt-/Goldklassifikation im Manager pruefen.
+
+Technische Details stehen in
+[`docs/reference/TRANCHEN_MODULES_README.md`](../reference/TRANCHEN_MODULES_README.md).

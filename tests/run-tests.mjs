@@ -9,6 +9,89 @@ const __dirname = path.dirname(__filename);
 export const QUICK_TESTS_DEPRECATED_MESSAGE =
     'QUICK_TESTS=1 is deprecated; use targeted run-single checks or the slice-specific commands instead.';
 
+export const TEST_EXECUTION_POLICY = Object.freeze({
+    'auto-optimize-worker-contract.test.mjs': Object.freeze({
+        mode: 'isolated',
+        instrumentAssertions: true,
+        reason: 'Uses legacy local assertion helpers and worker/browser globals.'
+    }),
+    'balance-expenses.test.mjs': Object.freeze({
+        mode: 'isolated',
+        instrumentAssertions: true,
+        reason: 'Uses node:assert plus legacy helpers and installs DOM/storage mocks.'
+    }),
+    'balance-smoke.test.mjs': Object.freeze({
+        mode: 'isolated',
+        reason: 'Installs a complete Balance DOM and browser-global smoke fixture.'
+    }),
+    'balance-ui-orchestration.test.mjs': Object.freeze({
+        mode: 'isolated',
+        reason: 'Installs extensive DOM and browser-global mocks.'
+    }),
+    'profile-ui-contract.test.mjs': Object.freeze({
+        mode: 'isolated',
+        reason: 'Installs profile lifecycle mocks on browser globals.'
+    }),
+    'health-bucket.test.mjs': Object.freeze({
+        mode: 'isolated',
+        instrumentAssertions: true,
+        reason: 'Uses legacy local assertion helpers.'
+    }),
+    'scenarios.test.mjs': Object.freeze({
+        mode: 'isolated',
+        instrumentAssertions: true,
+        reason: 'Uses legacy local assertion helpers.'
+    }),
+    'simulator-3bucket-ui-e2e.test.mjs': Object.freeze({
+        mode: 'isolated',
+        instrumentAssertions: true,
+        reason: 'Uses legacy local assertions and installs DOM mocks.'
+    }),
+    'simulator-headless.test.mjs': Object.freeze({
+        mode: 'isolated',
+        instrumentAssertions: true,
+        reason: 'Runs the full headless backtest against mutable simulator globals.'
+    }),
+    'simulator-ui-orchestration.test.mjs': Object.freeze({
+        mode: 'isolated',
+        reason: 'Installs simulator DOM and browser-global mocks.'
+    }),
+    'spending-planner.test.mjs': Object.freeze({
+        mode: 'isolated',
+        instrumentAssertions: true,
+        reason: 'Uses legacy local assertion helpers.'
+    }),
+    'tranchen-manager-page.test.mjs': Object.freeze({
+        mode: 'isolated',
+        reason: 'Installs manager-page DOM, storage and browser-global mocks.'
+    }),
+    'transaction-quantization.test.mjs': Object.freeze({
+        mode: 'isolated',
+        instrumentAssertions: true,
+        reason: 'Uses node:assert plus legacy numeric assertion helpers.'
+    }),
+    'browser-smoke.test.mjs': Object.freeze({
+        mode: 'separate-gate',
+        command: 'npm run test:browser',
+        reason: 'Requires Playwright and its managed local HTTP server.'
+    })
+});
+
+export function getTestExecutionPolicy(file, { forceIsolated = false } = {}) {
+    const configured = TEST_EXECUTION_POLICY[file];
+    if (configured?.mode === 'separate-gate') return configured;
+    if (forceIsolated) {
+        return {
+            mode: 'isolated',
+            reason: 'Forced by --isolated or TEST_ISOLATED=1.'
+        };
+    }
+    return configured || {
+        mode: 'in-process',
+        reason: 'DOM-free standard test.'
+    };
+}
+
 export class TestAssertionError extends Error {
     constructor(message) {
         super(message);
@@ -75,6 +158,25 @@ export function installAssertionGlobals(options = {}) {
     global.assert = context.assert;
     global.assertEqual = context.assertEqual;
     global.assertClose = context.assertClose;
+    global.__wrapExternalAssert = assertionApi => new Proxy(assertionApi, {
+        apply(target, thisArg, args) {
+            context.counters.total++;
+            try {
+                const result = Reflect.apply(target, thisArg, args);
+                context.counters.passed++;
+                return result;
+            } catch (error) {
+                context.counters.failedAssertions++;
+                error.isTestAssertionError = true;
+                throw error;
+            }
+        },
+        get(target, property, receiver) {
+            const value = Reflect.get(target, property, receiver);
+            if (typeof value !== 'function') return value;
+            return (...args) => global.__wrapExternalAssert(value)(...args);
+        }
+    });
     return context.counters;
 }
 
@@ -104,12 +206,105 @@ function formatOpenHandles() {
     ));
 }
 
-async function runInProcess({ testDir, files }) {
+function parseSingleTestSummary(output) {
+    const readCount = label => {
+        const match = output.match(new RegExp(`${label}:\\s*(\\d+)`));
+        return match ? Number(match[1]) : null;
+    };
+    const summary = {
+        totalAssertions: readCount('Total Assertions'),
+        passedAssertions: readCount('Passed'),
+        failedAssertions: readCount('Failed Assertions'),
+        failedFiles: readCount('Failed Files')
+    };
+    return Object.values(summary).every(Number.isInteger) ? summary : null;
+}
+
+function printFileResult(file, policy, result) {
+    console.log(
+        `📊 FILE RESULT: ${file} | mode=${policy.mode} | assertions=${result.totalAssertions}` +
+        ` | passed=${result.passedAssertions} | failedAssertions=${result.failedAssertions}` +
+        ` | failedFiles=${result.failedFiles}`
+    );
+}
+
+function runIsolatedFile({ testDir, file, policy }) {
+    const runnerPath = path.join(__dirname, 'run-single.mjs');
+    console.log(`\n📂 Running ${file} in isolated process...`);
+    const filePath = path.join(testDir, file);
+    const child = spawnSync(process.execPath, [runnerPath, filePath], {
+        cwd: path.resolve(__dirname, '..'),
+        encoding: 'utf8',
+        env: process.env
+    });
+    if (child.stdout) process.stdout.write(child.stdout);
+    if (child.stderr) process.stderr.write(child.stderr);
+
+    const output = `${child.stdout || ''}${child.stderr || ''}`;
+    const parsed = parseSingleTestSummary(output);
+    if (child.error || !parsed) {
+        if (child.error) console.error(child.error);
+        console.error(`❌ ${file} did not produce a readable isolated-test summary.`);
+        const result = {
+            totalAssertions: parsed?.totalAssertions ?? 0,
+            passedAssertions: parsed?.passedAssertions ?? 0,
+            failedAssertions: parsed?.failedAssertions ?? 0,
+            failedFiles: Math.max(parsed?.failedFiles ?? 0, 1)
+        };
+        printFileResult(file, policy, result);
+        return result;
+    }
+
+    if (parsed.totalAssertions === 0 && parsed.failedFiles === 0) {
+        console.error(`❌ ${file} completed with zero assertions; no separate-gate policy applies.`);
+        parsed.failedFiles++;
+    } else if (child.status !== 0 && parsed.failedAssertions === 0 && parsed.failedFiles === 0) {
+        console.error(`❌ ${file} exited with status ${child.status} without a reported failure.`);
+        parsed.failedFiles++;
+    }
+    printFileResult(file, policy, parsed);
+    return parsed;
+}
+
+async function runFiles({ testDir, files, forceIsolated = false }) {
     const counters = installAssertionGlobals();
-    let failedFiles = 0;
+    const totals = {
+        totalAssertions: 0,
+        passedAssertions: 0,
+        failedAssertions: 0,
+        failedFiles: 0,
+        separateGates: 0
+    };
+    const addResult = result => {
+        totals.totalAssertions += result.totalAssertions;
+        totals.passedAssertions += result.passedAssertions;
+        totals.failedAssertions += result.failedAssertions;
+        totals.failedFiles += result.failedFiles;
+    };
 
     for (const file of files) {
-        console.log(`\n📂 Running ${file}...`);
+        const policy = getTestExecutionPolicy(file, { forceIsolated });
+        if (policy.mode === 'separate-gate') {
+            console.log(`\n⏭️  ${file} is covered by separate gate: ${policy.command}`);
+            console.log(`   Reason: ${policy.reason}`);
+            printFileResult(file, policy, {
+                totalAssertions: 0,
+                passedAssertions: 0,
+                failedAssertions: 0,
+                failedFiles: 0
+            });
+            totals.separateGates++;
+            continue;
+        }
+
+        if (policy.mode === 'isolated') {
+            addResult(runIsolatedFile({ testDir, file, policy }));
+            continue;
+        }
+
+        console.log(`\n📂 Running ${file} in process...`);
+        const before = { ...counters };
+        let fileFailure = 0;
         try {
             const filePath = path.join(testDir, file);
             const fileUrl = pathToFileURL(filePath).href;
@@ -118,43 +313,24 @@ async function runInProcess({ testDir, files }) {
         } catch (err) {
             console.error(`❌ ${file} failed:`);
             console.error(err);
-            if (!isAssertionFailure(err)) {
-                failedFiles++;
-            }
+            if (!isAssertionFailure(err)) fileFailure++;
         }
+
+        const result = {
+            totalAssertions: counters.total - before.total,
+            passedAssertions: counters.passed - before.passed,
+            failedAssertions: counters.failedAssertions - before.failedAssertions,
+            failedFiles: fileFailure
+        };
+        if (result.totalAssertions === 0 && result.failedFiles === 0) {
+            console.error(`❌ ${file} completed with zero assertions; no separate-gate policy applies.`);
+            result.failedFiles++;
+        }
+        printFileResult(file, policy, result);
+        addResult(result);
     }
 
-    return {
-        totalAssertions: counters.total,
-        passedAssertions: counters.passed,
-        failedAssertions: counters.failedAssertions,
-        failedFiles
-    };
-}
-
-function runIsolated({ testDir, files }) {
-    let failedFiles = 0;
-    const runnerPath = path.join(__dirname, 'run-single.mjs');
-
-    for (const file of files) {
-        console.log(`\n📂 Running ${file} in isolated process...`);
-        const filePath = path.join(testDir, file);
-        const result = spawnSync(process.execPath, [runnerPath, filePath], {
-            cwd: path.resolve(__dirname, '..'),
-            stdio: 'inherit',
-            env: process.env
-        });
-        if (result.status !== 0) {
-            failedFiles++;
-        }
-    }
-
-    return {
-        totalAssertions: null,
-        passedAssertions: null,
-        failedAssertions: 0,
-        failedFiles
-    };
+    return totals;
 }
 
 function printSummary(results, openHandles) {
@@ -162,15 +338,11 @@ function printSummary(results, openHandles) {
 
     console.log('\n' + '='.repeat(40));
     console.log('SUMMARY:');
-    if (results.totalAssertions === null) {
-        console.log('Total Assertions: unavailable in isolated mode');
-        console.log('Passed: unavailable in isolated mode');
-    } else {
-        console.log(`Total Assertions: ${results.totalAssertions}`);
-        console.log(`Passed: ${results.passedAssertions}`);
-    }
+    console.log(`Total Assertions: ${results.totalAssertions}`);
+    console.log(`Passed: ${results.passedAssertions}`);
     console.log(`Failed Assertions: ${results.failedAssertions}`);
     console.log(`Failed Files: ${results.failedFiles}`);
+    console.log(`Separate Gates: ${results.separateGates}`);
     console.log(`Failed: ${failedTotal}`);
     console.log(`Open Handles: ${openHandles.length}`);
     console.log('='.repeat(40));
@@ -203,9 +375,11 @@ export async function runTests({
         console.log('Isolation: enabled (one Node.js process per test file).');
     }
 
-    const results = isolated
-        ? runIsolated({ testDir, files })
-        : await runInProcess({ testDir, files });
+    const results = await runFiles({
+        testDir,
+        files,
+        forceIsolated: isolated
+    });
 
     const openHandles = formatOpenHandles();
     const failedTotal = printSummary(results, openHandles);

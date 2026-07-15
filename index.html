@@ -448,9 +448,9 @@
         <div class="profile-row">
             <label for="profileSelect">Profil waehlen</label>
             <select id="profileSelect"></select>
-            <a class="profile-button manager" href="depot-tranchen-manager.html">Profil-Assets Manager</a>
+            <a class="profile-button manager" href="depot-tranchen-manager.html" data-profile-handoff data-profile-handoff-export="false">Profil-Assets Manager</a>
         </div>
-        <details class="profile-advanced">
+        <details class="profile-advanced" id="profileAdvanced">
             <summary>Erweitert</summary>
             <div class="profile-row">
                 <button class="profile-button secondary" id="fullBackupBtn">Backup exportieren</button>
@@ -563,6 +563,12 @@
         await initPersistence();
         bindFullBackupButton();
         bindFullBackupImport();
+
+        if (window.location.hash === '#fullBackupImportBtn') {
+            const advanced = document.getElementById('profileAdvanced');
+            if (advanced) advanced.open = true;
+            document.getElementById('fullBackupImportBtn')?.focus();
+        }
 
         const infoTarget = document.getElementById('persistenceBackupInfo');
         renderPersistenceBackupInfo(infoTarget);

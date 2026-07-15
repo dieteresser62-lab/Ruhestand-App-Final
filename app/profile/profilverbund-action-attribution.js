@@ -6,6 +6,7 @@
 "use strict";
 
 import { settleTaxYear } from '../../engine/tax-settlement.mjs';
+import { classifyTranche } from '../../types/tranche-contract.js';
 import { buildProfileOwnedTranches } from './profilverbund-balance.js';
 
 const TOLERANCE_EUR = 0.01;
@@ -200,16 +201,18 @@ function allocateLiquiditySources(totalAmount, profiles, mode) {
 }
 
 function resolveAssetBucket(value = {}) {
-    const category = String(value?.category || '').toLowerCase();
-    const kind = String(value?.type || value?.kind || '').toLowerCase();
-    // Geldmarkt gehoert bereits zur Haushaltsliquiditaet. Insbesondere darf ein
-    // historisch widerspruechlicher Typ "aktien_neu" die explizite Kategorie
-    // "money_market" nicht zu einer verkaufbaren Aktienquelle hochstufen.
-    if (category === 'money_market' || kind.includes('geldmarkt') || kind.includes('money_market')) return null;
-    if (category === 'bonds' || kind.includes('bond') || kind.includes('anleihe')) return 'bonds';
-    if (category === 'gold' || kind.includes('gold')) return 'gold';
-    if (category === 'equity' || kind.includes('aktien') || kind.includes('equity')) return 'equity';
-    return null;
+    const category = classifyTranche(value, { allowLegacy: true });
+    // Geldmarkt gehoert bereits zur Haushaltsliquiditaet und wird nicht ein
+    // zweites Mal als verkaufbare Assetquelle angeboten.
+    return category === 'money_market' ? null : category;
+}
+
+function readConfirmedTqf(value) {
+    const tqf = Number(value?.tqf);
+    if (!Number.isFinite(tqf) || tqf < 0 || tqf > 1) {
+        throw new Error('Profilverbund: Verkaufstranche besitzt keine manuell bestätigte TQF zwischen 0 und 1.');
+    }
+    return tqf;
 }
 
 function candidateFromTranche(tranche, profile, index) {
@@ -217,8 +220,7 @@ function candidateFromTranche(tranche, profile, index) {
     const costBasis = Math.max(0, finiteNumber(tranche?.costBasis, finiteNumber(tranche?.shares) * finiteNumber(tranche?.purchasePrice)));
     const bucket = resolveAssetBucket(tranche);
     if (!bucket || marketValue <= EPSILON) return null;
-    const tqfRaw = Number(tranche?.tqf);
-    const tqf = Math.max(0, Math.min(1, Number.isFinite(tqfRaw) ? tqfRaw : 0.3));
+    const tqf = readConfirmedTqf(tranche);
     const realizedRatio = (marketValue - costBasis) / marketValue;
     const taxableRatio = realizedRatio * (1 - tqf);
     const purchaseStamp = tranche?.purchaseDate && Number.isFinite(Date.parse(tranche.purchaseDate))
@@ -249,8 +251,7 @@ function candidateFromPlannedSource(source, profile, index) {
     const capacity = Math.max(0, finiteNumber(source?.brutto));
     const bucket = resolveAssetBucket(source);
     if (!bucket || capacity <= EPSILON) return null;
-    const tqfRaw = Number(source?.tqf);
-    const tqf = Math.max(0, Math.min(1, Number.isFinite(tqfRaw) ? tqfRaw : 0.3));
+    const tqf = readConfirmedTqf(source);
     const realizedRatio = hasFiniteValue(source?.realizedGainSigned)
         ? finiteNumber(source.realizedGainSigned) / capacity
         : finiteNumber(source?.gainQuoteSigned, finiteNumber(source?.gainQuotePlan));

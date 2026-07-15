@@ -14,6 +14,9 @@ use tiny_http::{Header, Method, Response, Server, StatusCode};
 
 const APP_STATE_FILENAME: &str = "ruhestand_suite_data.json";
 const SNAPSHOT_STATE_FILENAME: &str = "ruhestand_suite_snapshots.json";
+const QUOTE_MAX_AGE_SECONDS: u64 = 7 * 24 * 60 * 60;
+const QUOTE_FUTURE_TOLERANCE_SECONDS: u64 = 5 * 60;
+const UPSTREAM_TIMEOUT_SECONDS: u64 = 4;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -166,113 +169,266 @@ fn parse_query(query: &str) -> HashMap<String, String> {
   out
 }
 
-fn fetch_json(url: &str) -> Result<serde_json::Value, String> {
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct QuoteFailure {
+  code: &'static str,
+  message: String,
+  status: u16,
+}
+
+fn quote_failure(code: &'static str, message: impl Into<String>, status: u16) -> QuoteFailure {
+  QuoteFailure { code, message: message.into(), status }
+}
+
+fn quote_error_payload(error: &QuoteFailure) -> serde_json::Value {
+  json!({
+    "status": "error",
+    "code": error.code,
+    "message": error.message,
+  })
+}
+
+fn send_quote_error(request: tiny_http::Request, error: &QuoteFailure) {
+  send_json(request, error.status, quote_error_payload(error));
+}
+
+fn normalize_yahoo_symbol(symbol: &str) -> Result<String, QuoteFailure> {
+  let normalized = symbol.trim().to_ascii_uppercase();
+  let valid = !normalized.is_empty()
+    && normalized.len() <= 32
+    && normalized.chars().all(|character| {
+      character.is_ascii_uppercase()
+        || character.is_ascii_digit()
+        || matches!(character, '.' | '^' | '=' | '-')
+    });
+  if !valid || normalized.contains('@') {
+    return Err(quote_failure(
+      "INVALID_SYMBOL",
+      format!("Ungueltiges Yahoo-Symbol: {}", if normalized.is_empty() { "(leer)" } else { &normalized }),
+      400,
+    ));
+  }
+  Ok(normalized)
+}
+
+fn fetch_json(url: &str) -> Result<serde_json::Value, QuoteFailure> {
   let client = reqwest::blocking::Client::builder()
     .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+    .timeout(Duration::from_secs(UPSTREAM_TIMEOUT_SECONDS))
     .build()
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| quote_failure("PROVIDER_UNAVAILABLE", e.to_string(), 502))?;
 
   let resp = client
     .get(url)
     .header("Accept", "application/json,text/plain,*/*")
     .header("Accept-Language", "en-US,en;q=0.9")
     .send()
-    .map_err(|e| e.to_string())?;
+    .map_err(|error| {
+      if error.is_timeout() {
+        quote_failure("PROVIDER_TIMEOUT", "Yahoo-Timeout nach 4000 ms.", 504)
+      } else {
+        quote_failure("PROVIDER_UNAVAILABLE", error.to_string(), 502)
+      }
+    })?;
 
-  let text = resp.text().map_err(|e| e.to_string())?;
-  serde_json::from_str(&text).map_err(|_| format!("Invalid JSON from Yahoo: {}", &text[..text.len().min(200)]))
-}
-
-fn normalize_gbp_price(symbol: &str, data: &serde_json::Value, price: f64) -> f64 {
-  if !symbol.ends_with(".L") {
-    return price;
+  let status = resp.status().as_u16();
+  if !(200..300).contains(&status) {
+    return Err(match status {
+      404 => quote_failure("SYMBOL_NOT_FOUND", "Yahoo: Symbol nicht gefunden.", 404),
+      429 => quote_failure("PROVIDER_RATE_LIMITED", "Yahoo: Abruflimit erreicht.", 429),
+      500..=599 => quote_failure("PROVIDER_UNAVAILABLE", format!("Yahoo HTTP {}.", status), 502),
+      _ => quote_failure("INVALID_RESPONSE", format!("Yahoo HTTP {}.", status), 502),
+    });
   }
-  let currency = data
-    .pointer("/chart/result/0/meta/currency")
-    .and_then(|v| v.as_str())
-    .unwrap_or("");
-  if currency == "GBp" || currency == "GBX" {
-    return price / 100.0;
-  }
-  price
+
+  let text = resp.text()
+    .map_err(|e| quote_failure("PROVIDER_UNAVAILABLE", e.to_string(), 502))?;
+  serde_json::from_str(&text).map_err(|_| quote_failure(
+    "INVALID_RESPONSE",
+    format!("Ungueltiges JSON von Yahoo: {}", &text[..text.len().min(200)]),
+    502,
+  ))
 }
 
-fn pick_quote_price(data: &serde_json::Value) -> Option<f64> {
-  data.get("quoteResponse")
-    .and_then(|v| v.get("result"))
-    .and_then(|v| v.as_array())
-    .and_then(|arr| arr.first())
-    .and_then(|item| item.get("regularMarketPrice"))
-    .and_then(|v| v.as_f64())
-}
+fn pick_chart_candidate(data: &serde_json::Value) -> serde_json::Value {
+  let result = data.pointer("/chart/result/0").unwrap_or(&serde_json::Value::Null);
+  let meta = result.get("meta").unwrap_or(&serde_json::Value::Null);
+  let mut price = meta.get("regularMarketPrice").and_then(|value| value.as_f64());
+  let mut as_of = meta.get("regularMarketTime").and_then(|value| value.as_u64());
 
-fn pick_chart_price(data: &serde_json::Value) -> Option<f64> {
-  let result = data.get("chart")?.get("result")?.as_array()?.first()?;
-  if let Some(meta) = result.get("meta") {
-    if let Some(price) = meta.get("regularMarketPrice").and_then(|v| v.as_f64()) {
-      if price > 0.0 {
-        return Some(price);
+  if !price.is_some_and(|value| value.is_finite() && value > 0.0) {
+    let closes = result.pointer("/indicators/quote/0/close").and_then(|value| value.as_array());
+    let timestamps = result.get("timestamp").and_then(|value| value.as_array());
+    if let Some(closes) = closes {
+      for index in (0..closes.len()).rev() {
+        let candidate = closes[index].as_f64();
+        if candidate.is_some_and(|value| value.is_finite() && value > 0.0) {
+          price = candidate;
+          as_of = timestamps
+            .and_then(|values| values.get(index))
+            .and_then(|value| value.as_u64());
+          break;
+        }
       }
     }
   }
-  let close = result.get("indicators")?
-    .get("quote")?
-    .as_array()?
-    .first()?
-    .get("close")?
-    .as_array()?;
-  for value in close.iter().rev() {
-    if let Some(price) = value.as_f64() {
-      if price > 0.0 {
-        return Some(price);
-      }
-    }
-  }
-  None
+
+  json!({
+    "symbol": meta.get("symbol").and_then(|value| value.as_str()),
+    "price": price,
+    "currency": meta.get("currency").and_then(|value| value.as_str()),
+    "asOf": as_of,
+    "source": "yahoo-chart",
+  })
 }
 
-fn handle_quote(request: tiny_http::Request, symbol: &str) {
-  let encoded_symbol = urlencoding::encode(symbol);
-  let chart_urls = [
-    format!("https://query1.finance.yahoo.com/v8/finance/chart/{}?interval=1d&range=1d&lang=en-US&region=US&corsDomain=finance.yahoo.com", encoded_symbol),
-    format!("https://query2.finance.yahoo.com/v8/finance/chart/{}?interval=1d&range=1d&lang=en-US&region=US&corsDomain=finance.yahoo.com", encoded_symbol),
+fn pick_quote_candidate(data: &serde_json::Value) -> serde_json::Value {
+  let result = data.pointer("/quoteResponse/result/0").unwrap_or(&serde_json::Value::Null);
+  json!({
+    "symbol": result.get("symbol").and_then(|value| value.as_str()),
+    "price": result.get("regularMarketPrice").and_then(|value| value.as_f64()),
+    "currency": result.get("currency").and_then(|value| value.as_str()),
+    "asOf": result.get("regularMarketTime").and_then(|value| value.as_u64()),
+    "source": "yahoo-quote",
+  })
+}
+
+fn normalize_provider_quote(
+  requested_symbol: &str,
+  candidate: &serde_json::Value,
+  now_seconds: u64,
+) -> Result<serde_json::Value, QuoteFailure> {
+  let requested = normalize_yahoo_symbol(requested_symbol)?;
+  let raw_response_symbol = candidate.get("symbol").and_then(|value| value.as_str()).unwrap_or("");
+  let response_symbol = normalize_yahoo_symbol(raw_response_symbol).map_err(|_| quote_failure(
+    "INVALID_RESPONSE", "Yahoo-Antwort enthaelt kein gueltiges Symbol.", 422
+  ))?;
+  if response_symbol != requested {
+    return Err(quote_failure(
+      "SYMBOL_MISMATCH",
+      format!("Antwortsymbol {} entspricht nicht der Anfrage {}.", response_symbol, requested),
+      422,
+    ));
+  }
+
+  let price = candidate.get("price").and_then(|value| value.as_f64())
+    .filter(|value| value.is_finite() && *value > 0.0)
+    .ok_or_else(|| quote_failure(
+      "INVALID_PRICE", "Yahoo-Antwort enthaelt keinen positiven endlichen Kurs.", 422
+    ))?;
+
+  let currency = candidate.get("currency")
+    .and_then(|value| value.as_str())
+    .unwrap_or("")
+    .trim()
+    .to_ascii_uppercase();
+  if currency.is_empty() {
+    return Err(quote_failure(
+      "CURRENCY_MISSING", "Yahoo-Antwort enthaelt keine eindeutige Waehrung.", 422
+    ));
+  }
+  if currency != "EUR" {
+    return Err(quote_failure(
+      "UNSUPPORTED_CURRENCY", format!("Waehrung {} wird nicht unterstuetzt.", currency), 422
+    ));
+  }
+
+  let as_of = candidate.get("asOf").and_then(|value| value.as_u64()).ok_or_else(|| {
+    if candidate.get("asOf").map_or(true, |value| value.is_null()) {
+      quote_failure("AS_OF_MISSING", "Yahoo-Antwort enthaelt keinen Kursstichtag.", 422)
+    } else {
+      quote_failure("INVALID_AS_OF", "Kursstichtag muss eine positive UTC-Unixsekunde sein.", 422)
+    }
+  })?;
+  if as_of == 0 {
+    return Err(quote_failure(
+      "INVALID_AS_OF", "Kursstichtag muss eine positive UTC-Unixsekunde sein.", 422
+    ));
+  }
+  if as_of > now_seconds.saturating_add(QUOTE_FUTURE_TOLERANCE_SECONDS) {
+    return Err(quote_failure(
+      "QUOTE_FROM_FUTURE", "Kursstichtag liegt unzulaessig weit in der Zukunft.", 422
+    ));
+  }
+  if now_seconds.saturating_sub(as_of) > QUOTE_MAX_AGE_SECONDS {
+    return Err(quote_failure(
+      "QUOTE_STALE", "Kurs ist aelter als sieben Kalendertage.", 422
+    ));
+  }
+
+  let source = candidate.get("source").and_then(|value| value.as_str()).unwrap_or("").trim();
+  if source.is_empty() {
+    return Err(quote_failure(
+      "INVALID_RESPONSE", "Yahoo-Antwort enthaelt keine Kursquelle.", 422
+    ));
+  }
+  Ok(json!({
+    "symbol": response_symbol,
+    "price": price,
+    "currency": currency,
+    "asOf": as_of,
+    "source": source,
+  }))
+}
+
+fn should_stop_quote_fallback(error: &QuoteFailure) -> bool {
+  matches!(error.code, "UNSUPPORTED_CURRENCY" | "SYMBOL_MISMATCH" | "QUOTE_STALE" | "QUOTE_FROM_FUTURE")
+}
+
+fn handle_quote(request: tiny_http::Request, raw_symbol: &str) {
+  let symbol = match normalize_yahoo_symbol(raw_symbol) {
+    Ok(symbol) => symbol,
+    Err(error) => {
+      send_quote_error(request, &error);
+      return;
+    }
+  };
+  let encoded_symbol = urlencoding::encode(&symbol);
+  let attempts: Vec<(String, fn(&serde_json::Value) -> serde_json::Value)> = vec![
+    (
+      format!("https://query1.finance.yahoo.com/v8/finance/chart/{}?interval=1d&range=1d&lang=en-US&region=US&corsDomain=finance.yahoo.com", encoded_symbol),
+      pick_chart_candidate,
+    ),
+    (
+      format!("https://query2.finance.yahoo.com/v8/finance/chart/{}?interval=1d&range=1d&lang=en-US&region=US&corsDomain=finance.yahoo.com", encoded_symbol),
+      pick_chart_candidate,
+    ),
+    (
+      format!("https://query1.finance.yahoo.com/v7/finance/quote?symbols={}", encoded_symbol),
+      pick_quote_candidate,
+    ),
+    (
+      format!("https://query2.finance.yahoo.com/v7/finance/quote?symbols={}", encoded_symbol),
+      pick_quote_candidate,
+    ),
   ];
+  let now_seconds = SystemTime::now()
+    .duration_since(UNIX_EPOCH)
+    .map(|duration| duration.as_secs())
+    .unwrap_or(0);
+  let mut last_error = quote_failure("SYMBOL_NOT_FOUND", "Yahoo: Symbol nicht gefunden.", 404);
 
-  for url in chart_urls.iter() {
-    if let Ok(data) = fetch_json(url) {
-      if let Some(price) = pick_chart_price(&data) {
-        let normalized = normalize_gbp_price(symbol, &data, price);
-        let tz = data.pointer("/chart/result/0/meta/exchangeTimezoneName")
-          .and_then(|v| v.as_str())
-          .unwrap_or("");
-        send_json(request, 200, json!({"price": normalized.to_string(), "source": "chart", "timezone": tz, "data": data}));
+  for (url, pick_candidate) in attempts {
+    match fetch_json(&url).and_then(|data| normalize_provider_quote(&symbol, &pick_candidate(&data), now_seconds)) {
+      Ok(quote) => {
+        send_json(request, 200, quote);
         return;
       }
-    }
-  }
-
-  let quote_urls = [
-    format!("https://query1.finance.yahoo.com/v7/finance/quote?symbols={}", encoded_symbol),
-    format!("https://query2.finance.yahoo.com/v7/finance/quote?symbols={}", encoded_symbol),
-  ];
-
-  for url in quote_urls.iter() {
-    if let Ok(data) = fetch_json(url) {
-      if let Some(price) = pick_quote_price(&data) {
-        send_json(request, 200, json!({"price": price.to_string(), "source": "quote", "data": data}));
-        return;
+      Err(error) => {
+        let stop = should_stop_quote_fallback(&error);
+        last_error = error;
+        if stop { break; }
       }
     }
   }
-
-  send_json(request, 404, json!({"error": "Yahoo: no price"}));
+  send_quote_error(request, &last_error);
 }
 
 fn handle_search(request: tiny_http::Request, query: &str) {
   let url = format!("https://query1.finance.yahoo.com/v1/finance/search?q={}", urlencoding::encode(query));
   match fetch_json(&url) {
     Ok(data) => send_json(request, 200, data),
-    Err(err) => send_json(request, 502, json!({"error": err})),
+    Err(error) => send_quote_error(request, &error),
   }
 }
 
@@ -283,7 +439,7 @@ fn handle_chart(request: tiny_http::Request, symbol: &str, period1: &str, period
   );
   match fetch_json(&url) {
     Ok(data) => send_json(request, 200, data),
-    Err(err) => send_json(request, 502, json!({"error": err})),
+    Err(error) => send_quote_error(request, &error),
   }
 }
 
@@ -320,14 +476,14 @@ fn start_yahoo_proxy() {
         if let Some(symbol) = params.get("symbol") {
           handle_quote(request, symbol);
         } else {
-          send_json(request, 400, json!({"error": "Missing symbol"}));
+          send_quote_error(request, &quote_failure("INVALID_SYMBOL", "Yahoo-Symbol fehlt.", 400));
         }
       }
       "/search" => {
         if let Some(q) = params.get("q") {
           handle_search(request, q);
         } else {
-          send_json(request, 400, json!({"error": "Missing query"}));
+          send_quote_error(request, &quote_failure("INVALID_SEARCH_QUERY", "Suchbegriff fehlt.", 400));
         }
       }
       "/chart" => {
@@ -338,10 +494,10 @@ fn start_yahoo_proxy() {
         if let (Some(symbol), Some(period1), Some(period2)) = (symbol, period1, period2) {
           handle_chart(request, symbol, period1, period2, interval);
         } else {
-          send_json(request, 400, json!({"error": "Missing chart params"}));
+          send_quote_error(request, &quote_failure("INVALID_CHART_QUERY", "Chart-Parameter fehlen.", 400));
         }
       }
-      _ => send_json(request, 404, json!({"error": "Not found"})),
+      _ => send_quote_error(request, &quote_failure("NOT_FOUND", "Route nicht gefunden.", 404)),
     }
   }
 }
@@ -441,21 +597,37 @@ mod tests {
   }
 
   #[test]
-  fn quote_and_chart_price_extractors_pick_positive_prices() {
+  fn quote_extractors_build_complete_candidates_and_normalize_eur() {
+    let now = 1_800_000_000;
     let quote = json!({
       "quoteResponse": {
         "result": [
-          { "regularMarketPrice": 123.45 }
+          {
+            "symbol": "VWCE.DE",
+            "regularMarketPrice": 123.45,
+            "currency": "EUR",
+            "regularMarketTime": now - 60
+          }
         ]
       }
     });
-    assert_eq!(pick_quote_price(&quote), Some(123.45));
+    let normalized_quote = normalize_provider_quote("vwce.de", &pick_quote_candidate(&quote), now).unwrap();
+    assert_eq!(normalized_quote.get("symbol").and_then(|value| value.as_str()), Some("VWCE.DE"));
+    assert_eq!(normalized_quote.get("price").and_then(|value| value.as_f64()), Some(123.45));
+    assert_eq!(normalized_quote.get("currency").and_then(|value| value.as_str()), Some("EUR"));
+    assert_eq!(normalized_quote.get("asOf").and_then(|value| value.as_u64()), Some(now - 60));
+    assert_eq!(normalized_quote.get("source").and_then(|value| value.as_str()), Some("yahoo-quote"));
 
     let chart = json!({
       "chart": {
         "result": [
           {
-            "meta": { "regularMarketPrice": 0.0 },
+            "meta": {
+              "symbol": "VWCE.DE",
+              "regularMarketPrice": 0.0,
+              "currency": "EUR"
+            },
+            "timestamp": [now - 180, now - 120, now - 60],
             "indicators": {
               "quote": [
                 { "close": [null, 98.7, 101.2] }
@@ -465,29 +637,52 @@ mod tests {
         ]
       }
     });
-    assert_eq!(pick_chart_price(&chart), Some(101.2));
+    let chart_candidate = pick_chart_candidate(&chart);
+    assert_eq!(chart_candidate.get("price").and_then(|value| value.as_f64()), Some(101.2));
+    assert_eq!(chart_candidate.get("asOf").and_then(|value| value.as_u64()), Some(now - 60));
   }
 
   #[test]
-  fn gbp_quote_normalization_only_applies_to_london_pence_prices() {
-    let gbp_data = json!({
-      "chart": {
-        "result": [
-          { "meta": { "currency": "GBp" } }
-        ]
-      }
-    });
-    let eur_data = json!({
-      "chart": {
-        "result": [
-          { "meta": { "currency": "EUR" } }
-        ]
-      }
-    });
+  fn quote_contract_rejects_foreign_currency_missing_time_and_stale_values() {
+    let now = 1_800_000_000;
+    for currency in ["USD", "GBP", "GBX"] {
+      let candidate = json!({
+        "symbol": "VWRL.L",
+        "price": 100.0,
+        "currency": currency,
+        "asOf": now - 60,
+        "source": "yahoo-chart"
+      });
+      let error = normalize_provider_quote("VWRL.L", &candidate, now).unwrap_err();
+      assert_eq!(error.code, "UNSUPPORTED_CURRENCY");
+      assert!(error.message.contains(currency));
+    }
 
-    assert_eq!(normalize_gbp_price("VWRL.L", &gbp_data, 1000.0), 10.0);
-    assert_eq!(normalize_gbp_price("VWRL.L", &eur_data, 1000.0), 1000.0);
-    assert_eq!(normalize_gbp_price("VWCE.DE", &gbp_data, 1000.0), 1000.0);
+    let missing_time = json!({
+      "symbol": "VWCE.DE", "price": 100.0, "currency": "EUR", "source": "yahoo-chart"
+    });
+    assert_eq!(
+      normalize_provider_quote("VWCE.DE", &missing_time, now).unwrap_err().code,
+      "AS_OF_MISSING"
+    );
+
+    let stale = json!({
+      "symbol": "VWCE.DE",
+      "price": 100.0,
+      "currency": "EUR",
+      "asOf": now - QUOTE_MAX_AGE_SECONDS - 1,
+      "source": "yahoo-chart"
+    });
+    assert_eq!(
+      normalize_provider_quote("VWCE.DE", &stale, now).unwrap_err().code,
+      "QUOTE_STALE"
+    );
+  }
+
+  #[test]
+  fn yahoo_symbol_contract_rejects_exchange_suffixes() {
+    assert_eq!(normalize_yahoo_symbol(" vwce.de ").unwrap(), "VWCE.DE");
+    assert_eq!(normalize_yahoo_symbol("VWCE@GER").unwrap_err().code, "INVALID_SYMBOL");
   }
 
   #[test]

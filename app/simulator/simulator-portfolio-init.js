@@ -9,6 +9,7 @@
 
 import { parseDisplayNumber } from './simulator-portfolio-format.js';
 import { normalizeProfileHealthBucket } from '../profile/profile-state.js';
+import { classifyTranche } from '../../types/tranche-contract.js';
 
 const FIFO_FALLBACK_DATE_MS = Date.parse('1900-01-01');
 
@@ -22,6 +23,20 @@ function sumMarketValue(tranches) {
     return Array.isArray(tranches)
         ? tranches.reduce((sum, tranche) => sum + (Number(tranche?.marketValue) || 0), 0)
         : 0;
+}
+
+function deepClone(value) {
+    if (typeof structuredClone === 'function') return structuredClone(value);
+    return JSON.parse(JSON.stringify(value));
+}
+
+function firstSourceProfileId(...groups) {
+    for (const group of groups) {
+        if (!Array.isArray(group)) continue;
+        const match = group.find(tranche => String(tranche?.sourceProfileId || '').trim());
+        if (match) return String(match.sourceProfileId).trim();
+    }
+    return null;
 }
 
 function reduceTrancheByAmount(tranche, amount) {
@@ -162,36 +177,24 @@ export function initializePortfolioDetailed(inputs) {
     let depotTranchesGeldmarkt = [];
 
     // Falls detaillierte Tranchen in inputs vorhanden sind, diese verwenden
-    if (inputs.detailledTranches && Array.isArray(inputs.detailledTranches)) {
+    if (Array.isArray(inputs.detailledTranches)) {
+        // Harte Referenzgrenze: Ab hier werden ausschliesslich Simulationskopien mutiert.
+        const simulationTranches = deepClone(inputs.detailledTranches);
         // Sortiere nach Kaufdatum (FIFO)
-        const sortedTranches = [...inputs.detailledTranches].sort((a, b) => toSortableDateMs(a?.purchaseDate) - toSortableDateMs(b?.purchaseDate));
+        const sortedTranches = simulationTranches.sort((a, b) => toSortableDateMs(a?.purchaseDate) - toSortableDateMs(b?.purchaseDate));
 
-        for (const tranche of sortedTranches) {
-            // Normalize type/category across legacy labels.
+        for (const [index, tranche] of sortedTranches.entries()) {
+            // Die kanonische Matrix entscheidet fail-closed ueber die Assetklasse.
             const rawType = String(tranche.type || tranche.kind || '').toLowerCase();
-            const rawCategory = String(tranche.category || '').toLowerCase();
-            const isBond = rawType.includes('bond') || rawType.includes('anleihe') || rawCategory.includes('bond') || rawCategory.includes('anleihe');
-            let category = rawCategory;
-            if (!category) {
-                if (rawType.includes('gold')) {
-                    category = 'gold';
-                } else if (rawType.includes('geldmarkt') || rawType.includes('money')) {
-                    category = 'money_market';
-                } else if (isBond) {
-                    category = 'bonds';
-                } else {
-                    category = 'equity';
-                }
-            }
+            const category = classifyTranche(tranche, { index });
 
             let normalizedType = rawType;
             if (category === 'gold') {
                 normalizedType = 'gold';
             } else if (category === 'money_market') {
                 normalizedType = 'geldmarkt';
-            } else if (category === 'bonds' || isBond) {
+            } else if (category === 'bonds') {
                 normalizedType = 'anleihe';
-                category = 'bonds';
             } else if (category === 'equity') {
                 if (rawType === 'aktien_neu' || rawType === 'aktien_alt') {
                     normalizedType = rawType;
@@ -214,6 +217,7 @@ export function initializePortfolioDetailed(inputs) {
             const marketValue = marketValueRaw > 0 ? marketValueRaw : (shares * currentPrice);
             const costBasis = costBasisRaw > 0 ? costBasisRaw : (shares * purchasePrice);
             const trancheObj = {
+                ...tranche,
                 trancheId: tranche.trancheId || tranche.id || null,
                 name: tranche.name || 'Unbekannt',
                 isin: tranche.isin || '',
@@ -223,10 +227,14 @@ export function initializePortfolioDetailed(inputs) {
                 currentPrice,
                 marketValue,
                 costBasis,
-                tqf: Number(tranche.tqf) ?? 0.30,
+                tqf: Number.isFinite(Number(tranche.tqf))
+                    ? Number(tranche.tqf)
+                    : (category === 'equity' ? 0.30 : 0),
                 type: normalizedType || 'aktien_alt',
                 category
             };
+            delete trancheObj.id;
+            delete trancheObj.kind;
 
             // Kategorisierung
             if (trancheObj.category === 'equity' || trancheObj.category === 'bonds') {
@@ -239,61 +247,13 @@ export function initializePortfolioDetailed(inputs) {
         }
     }
 
-    // Fallback auf alte Logik, wenn keine detaillierten Tranchen vorhanden
-    if (depotTranchesAktien.length === 0) {
-        // Aggregate legacy fields into synthetic tranches.
-        const startLiquiditaet = (inputs.tagesgeld || 0) + (inputs.geldmarktEtf || 0);
-        const flexiblesVermoegen = Math.max(0, inputs.startVermoegen - inputs.depotwertAlt);
-        const investitionsKapitalNeu = Math.max(0, flexiblesVermoegen - startLiquiditaet);
-        const investitionsKapitalGesamt = inputs.depotwertAlt + investitionsKapitalNeu;
-        const zielwertGold = inputs.goldAktiv ? investitionsKapitalGesamt * (inputs.goldZielProzent / 100) : 0;
-        const depotwertNeu = Math.max(0, investitionsKapitalNeu - zielwertGold);
-
-        if (inputs.depotwertAlt > 1) {
-            depotTranchesAktien.push({
-                marketValue: inputs.depotwertAlt,
-                costBasis: inputs.einstandAlt,
-                tqf: 0.30,
-                type: 'aktien_alt',
-                name: 'Altbestand (aggregiert)',
-                purchaseDate: null
-            });
-        }
-        if (depotwertNeu > 1) {
-            depotTranchesAktien.push({
-                marketValue: depotwertNeu,
-                costBasis: depotwertNeu,
-                tqf: 0.30,
-                type: 'aktien_neu',
-                name: 'Neubestand (aggregiert)',
-                purchaseDate: null
-            });
-        }
-        if (inputs.geldmarktEtf > 1) {
-            depotTranchesGeldmarkt.push({
-                marketValue: inputs.geldmarktEtf,
-                costBasis: inputs.geldmarktEtf,
-                tqf: 0,
-                type: 'geldmarkt',
-                name: 'Geldmarkt',
-                purchaseDate: null
-            });
-        }
-        if (zielwertGold > 1) {
-            depotTranchesGold.push({
-                marketValue: zielwertGold,
-                costBasis: zielwertGold,
-                tqf: inputs.goldSteuerfrei ? 1.0 : 0.0,
-                type: 'gold',
-                name: 'Gold',
-                purchaseDate: null
-            });
-        }
-    }
-
     const geldmarktSum = depotTranchesGeldmarkt.reduce((sum, t) => sum + (Number(t.marketValue) || 0), 0);
-    const geldmarktEtf = geldmarktSum > 0 ? geldmarktSum : (inputs.geldmarktEtf || 0);
+    // Bei expliziten Detailtranchen ist der Aggregatwert niemals eine zweite Quelle.
+    const geldmarktEtf = geldmarktSum;
     const tagesgeld = inputs.tagesgeld || 0;
+    const simulationSourceProfileId = inputs.simulationSourceProfileId
+        || firstSourceProfileId(depotTranchesAktien, depotTranchesGold, depotTranchesGeldmarkt)
+        || 'simulation';
 
     return withHealthBucketCarveOut({
         depotTranchesAktien: [...depotTranchesAktien],
@@ -301,7 +261,10 @@ export function initializePortfolioDetailed(inputs) {
         depotTranchesGeldmarkt: [...depotTranchesGeldmarkt],
         liquiditaet: tagesgeld + geldmarktEtf,
         tagesgeld,
-        geldmarktEtf
+        geldmarktEtf,
+        simulationSourceProfileId,
+        simulationGoldTqf: inputs.goldSteuerfrei ? 1 : 0,
+        simulationDate: '1970-01-01'
     }, inputs);
 }
 
@@ -318,6 +281,7 @@ export function initializePortfolio(inputs) {
     let depotTranchesAktien = [];
     let depotTranchesGold = [];
     let depotTranchesGeldmarkt = [];
+    const simulationSourceProfileId = String(inputs.simulationSourceProfileId || 'simulation');
 
     const startLiquiditaet = (inputs.tagesgeld || 0) + (inputs.geldmarktEtf || 0);
     const flexiblesVermoegen = Math.max(0, inputs.startVermoegen - inputs.depotwertAlt);
@@ -327,16 +291,48 @@ export function initializePortfolio(inputs) {
     const depotwertNeu = Math.max(0, investitionsKapitalNeu - zielwertGold);
 
     if (inputs.depotwertAlt > 1) {
-        depotTranchesAktien.push({ marketValue: inputs.depotwertAlt, costBasis: inputs.einstandAlt, tqf: 0.30, type: 'aktien_alt' });
+        depotTranchesAktien.push({
+            trancheId: `simbase:${encodeURIComponent(simulationSourceProfileId)}:aktien_alt`,
+            marketValue: inputs.depotwertAlt,
+            costBasis: inputs.einstandAlt,
+            tqf: 0.30,
+            type: 'aktien_alt',
+            category: 'equity',
+            sourceProfileId: simulationSourceProfileId
+        });
     }
     if (depotwertNeu > 1) {
-        depotTranchesAktien.push({ marketValue: depotwertNeu, costBasis: depotwertNeu, tqf: 0.30, type: 'aktien_neu' });
+        depotTranchesAktien.push({
+            trancheId: `simbase:${encodeURIComponent(simulationSourceProfileId)}:aktien_neu`,
+            marketValue: depotwertNeu,
+            costBasis: depotwertNeu,
+            tqf: 0.30,
+            type: 'aktien_neu',
+            category: 'equity',
+            sourceProfileId: simulationSourceProfileId
+        });
     }
     if (inputs.geldmarktEtf > 1) {
-        depotTranchesGeldmarkt.push({ marketValue: inputs.geldmarktEtf, costBasis: inputs.geldmarktEtf, tqf: 0, type: 'geldmarkt' });
+        depotTranchesGeldmarkt.push({
+            trancheId: `simbase:${encodeURIComponent(simulationSourceProfileId)}:geldmarkt`,
+            marketValue: inputs.geldmarktEtf,
+            costBasis: inputs.geldmarktEtf,
+            tqf: 0,
+            type: 'geldmarkt',
+            category: 'money_market',
+            sourceProfileId: simulationSourceProfileId
+        });
     }
     if (zielwertGold > 1) {
-        depotTranchesGold.push({ marketValue: zielwertGold, costBasis: zielwertGold, tqf: inputs.goldSteuerfrei ? 1.0 : 0.0, type: 'gold' });
+        depotTranchesGold.push({
+            trancheId: `simbase:${encodeURIComponent(simulationSourceProfileId)}:gold`,
+            marketValue: zielwertGold,
+            costBasis: zielwertGold,
+            tqf: inputs.goldSteuerfrei ? 1.0 : 0.0,
+            type: 'gold',
+            category: 'gold',
+            sourceProfileId: simulationSourceProfileId
+        });
     }
 
     return withHealthBucketCarveOut({
@@ -345,6 +341,9 @@ export function initializePortfolio(inputs) {
         depotTranchesGeldmarkt: [...depotTranchesGeldmarkt],
         liquiditaet: (inputs.tagesgeld || 0) + (inputs.geldmarktEtf || 0),
         tagesgeld: inputs.tagesgeld || 0,
-        geldmarktEtf: inputs.geldmarktEtf || 0
+        geldmarktEtf: inputs.geldmarktEtf || 0,
+        simulationSourceProfileId,
+        simulationGoldTqf: inputs.goldSteuerfrei ? 1 : 0,
+        simulationDate: '1970-01-01'
     }, inputs);
 }

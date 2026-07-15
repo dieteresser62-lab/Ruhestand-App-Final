@@ -9,7 +9,7 @@ import {
     readDynamicFlexInputs
 } from '../app/simulator/simulator-input-strategy.js';
 import { SimulatorValidationError, validateSimulatorInputs } from '../app/simulator/simulator-input-validation.js';
-import { readTrancheInputs } from '../app/simulator/simulator-input-tranches.js';
+import { readTrancheInputs, SimulatorTrancheInputError } from '../app/simulator/simulator-input-tranches.js';
 import { getCommonInputs } from '../app/simulator/simulator-portfolio-inputs.js';
 import { STRATEGY_OPTIONS } from '../types/strategy-options.js';
 
@@ -71,7 +71,7 @@ console.log('✓ pension legacy fallbacks OK');
 
 console.log('Test 3: tranche reader prioritizes profile override');
 {
-    const override = [{ trancheId: 'override', marketValue: 1 }];
+    const override = [{ trancheId: 'override', marketValue: 1, metadata: { owner: 'profile-a' } }];
     const storage = {
         getItem() {
             return JSON.stringify([{ trancheId: 'storage', marketValue: 2 }]);
@@ -82,12 +82,37 @@ console.log('Test 3: tranche reader prioritizes profile override');
         storage
     });
     assertEqual(result.detailledTranches[0].trancheId, 'override', 'Override should win over storage');
+    result.detailledTranches[0].metadata.owner = 'mutated';
+    assertEqual(override[0].metadata.owner, 'profile-a', 'Override should be deeply isolated before simulation');
+
+    const explicitEmpty = readTrancheInputs({
+        win: { __profilverbundTranchenOverride: [], __profilverbundPreferAggregates: false },
+        storage
+    });
+    assert(Array.isArray(explicitEmpty.detailledTranches), 'Explicit empty override should remain an array');
+    assertEqual(explicitEmpty.detailledTranches.length, 0, 'Explicit empty override must not fall back to storage');
 
     const aggregateResult = readTrancheInputs({
         win: { __profilverbundPreferAggregates: true },
         storage
     });
     assertEqual(aggregateResult.detailledTranches, null, 'Prefer aggregates should skip localStorage tranches');
+
+    let corruptOverride = null;
+    try {
+        readTrancheInputs({ win: { __profilverbundTranchenOverride: { invalid: true } }, storage });
+    } catch (error) {
+        corruptOverride = error;
+    }
+    assert(corruptOverride instanceof SimulatorTrancheInputError, 'Corrupt override should fail closed');
+
+    let corruptStorage = null;
+    try {
+        readTrancheInputs({ win: {}, storage: { getItem: () => '{invalid' } });
+    } catch (error) {
+        corruptStorage = error;
+    }
+    assert(corruptStorage instanceof SimulatorTrancheInputError, 'Corrupt storage should fail closed instead of using aggregates');
 }
 console.log('✓ tranche priority OK');
 
@@ -213,7 +238,7 @@ console.log('Test 8: getCommonInputs and validator enforce tail-risk UI contract
     const previousWindow = global.window;
     const previousDocument = global.document;
     try {
-        global.window = {};
+        global.window = { __profilverbundPreferAggregates: true };
         global.document = createDocumentMock({
             tagesgeld: '10.000',
             geldmarktEtf: '5.000',

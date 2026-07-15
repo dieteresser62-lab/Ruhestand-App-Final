@@ -5,8 +5,13 @@ import {
     UIUtils as ActualUIUtils,
     parseLocalizedNumber
 } from '../app/balance/balance-utils.js';
-import { parseBalanceCurrencyInput } from '../app/balance/balance-reader.js';
+import {
+    UIReader as ProductionUIReader,
+    initUIReader as initProductionUIReader,
+    parseBalanceCurrencyInput
+} from '../app/balance/balance-reader.js';
 import { ValidationError } from '../app/balance/balance-config.js';
+import { PersistenceFacade } from '../app/shared/persistence-facade.js';
 import {
     MarketCsvImportError,
     parseMarketDataCsv
@@ -751,24 +756,64 @@ console.log('Test 12: Leere Tranchen werden ignoriert');
     console.log('✓ Leere Tranchen OK');
 }
 
-// Test 13: Ungültige Tranchen-JSON
-console.log('Test 13: Ungültige Tranchen-JSON');
+// Test 13: Der echte Balance-Reader nutzt Status, Klassifikation und Leersemantik.
+console.log('Test 13: Produktionsreader für Tranchenstatus und Aggregation');
 {
     mockLocalStorage.clear();
-
-    mockLocalStorage.setItem('depot_tranchen', 'nicht-json{{{');
-
+    PersistenceFacade.resetPersistenceRuntimeForTests();
+    const previousWindow = global.window;
+    const previousDocument = global.document;
     const inputs = {
-        depotwertAlt: new MockElement('input', '100.000')
+        depotwertAlt: new MockElement('input', '999.000'),
+        depotwertNeu: new MockElement('input', '888.000'),
+        geldmarktEtf: new MockElement('input', '777.000'),
+        goldWert: new MockElement('input', '666.000'),
+        costBasisAlt: new MockElement('input', '555.000'),
+        costBasisNeu: new MockElement('input', '444.000'),
+        goldCost: new MockElement('input', '333.000'),
+        kirchensteuerSatz: new MockElement('select', '0.09'),
+        runwayMinMonths: new MockElement('input', '24'),
+        runwayTargetMonths: new MockElement('input', '36'),
+        targetEq: new MockElement('input', '60')
     };
+    global.document = createDocumentMock(inputs);
+    global.window = { __profilverbundTranchenOverride: null };
+    initProductionUIReader({ inputs, controls: {} });
 
-    initUIReader({ inputs, controls: {} });
+    mockLocalStorage.setItem('depot_tranchen', JSON.stringify([
+        { trancheId: 'equity', name: 'Equity', shares: 10, purchasePrice: 80, currentPrice: 100, type: 'aktien_neu', category: 'equity', tqf: 0.30 },
+        { trancheId: 'money', name: 'Money', shares: 5, purchasePrice: 100, currentPrice: 100, type: 'geldmarkt', category: 'money_market', tqf: 0 },
+        { trancheId: 'gold', name: 'Gold', shares: 2, purchasePrice: 90, currentPrice: 100, type: 'gold', category: 'gold', tqf: 0 }
+    ]));
+    const aggregated = ProductionUIReader.readAllInputs();
+    assertEqual(aggregated.depotwertNeu, 1000, 'Production reader should aggregate canonical equity exactly once');
+    assertEqual(aggregated.geldmarktEtf, 500, 'Production reader should keep money market out of equity');
+    assertEqual(aggregated.goldWert, 200, 'Production reader should keep gold out of equity');
+    assertEqual(aggregated.detailledTranches.length, 3, 'Production reader should pass normalized lots to the engine input');
+    assertClose(aggregated.kirchensteuerSatz, 0.09, 1e-9, 'Production reader should preserve the Balance UI decimal church-tax unit');
 
-    const result = UIReader.readAllInputs();
+    global.window.__profilverbundTranchenOverride = [];
+    const explicitEmpty = ProductionUIReader.readAllInputs();
+    assertEqual(explicitEmpty.depotwertNeu, 0, 'Explicit empty household override must suppress the current profile lot');
+    assertEqual(explicitEmpty.geldmarktEtf, 0, 'Explicit empty household override must not reuse a DOM money-market value');
+    assertEqual(explicitEmpty.detailledTranches.length, 0, 'Explicit empty household override should reach the engine as []');
 
-    assertEqual(result.depotwertAlt, 100000, 'Bei ungültigem JSON sollte DOM-Wert verwendet werden');
-    assertEqual(result.detailledTranches, null, 'detailledTranches sollte null sein bei Parse-Fehler');
-    console.log('✓ Ungültige Tranchen-JSON OK');
+    global.window.__profilverbundTranchenOverride = null;
+    mockLocalStorage.setItem('depot_tranchen', 'nicht-json{{{');
+    let corruptError = null;
+    try {
+        ProductionUIReader.readAllInputs();
+    } catch (error) {
+        corruptError = error;
+    }
+    assert(corruptError instanceof ValidationError, 'Corrupt production storage must fail closed');
+    assertEqual(corruptError.errors[0].code, 'TRANCHE_STORAGE_CORRUPT', 'Corrupt production storage should expose its stable status code');
+
+    if (previousWindow === undefined) delete global.window;
+    else global.window = previousWindow;
+    if (previousDocument === undefined) delete global.document;
+    else global.document = previousDocument;
+    console.log('✓ Produktionsreader für Tranchenstatus und Aggregation OK');
 }
 
 // Cleanup

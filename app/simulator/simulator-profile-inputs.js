@@ -10,13 +10,14 @@
 import { SUPPORTED_PFLEGE_GRADES } from './simulator-data.js';
 import { STRATEGY_OPTIONS } from '../../types/strategy-options.js';
 import {
+    PROFILE_TRANCHES_KEY,
     PROFILE_VALUE_KEYS,
     parseProfileHealthBucketFromData,
     parseProfileOverridesFromData,
-    parseStoredBalanceInputsFromData,
-    parseStoredTranchesFromData
+    parseStoredBalanceInputsFromData
 } from '../profile/profile-state.js';
 import { LONGEVITY_DEFAULTS, normalizeLongevityMode } from './dynamic-flex-longevity-contract.js';
+import { classifyTranche } from '../../types/tranche-contract.js';
 
 const DYNAMIC_FLEX_DEFAULTS = {
     HORIZON_METHOD: 'survival_quantile',
@@ -110,24 +111,40 @@ function parsePflegeGradeConfigs(data) {
 }
 
 function parseDetailledTranches(data) {
-    const parsed = parseStoredTranchesFromData(data);
-    return parsed.length ? parsed : null;
+    if (!data || typeof data !== 'object'
+        || !Object.prototype.hasOwnProperty.call(data, PROFILE_TRANCHES_KEY)) {
+        return { state: 'absent', tranches: null };
+    }
+
+    const raw = data[PROFILE_TRANCHES_KEY];
+    if (raw === null || raw === undefined || raw === '') {
+        return { state: 'absent', tranches: null };
+    }
+
+    try {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (!Array.isArray(parsed)) return { state: 'corrupt', tranches: null };
+        return {
+            state: parsed.length > 0 ? 'valid' : 'empty',
+            tranches: parsed
+        };
+    } catch {
+        return { state: 'corrupt', tranches: null };
+    }
 }
 
 function sumTrancheTotals(tranches) {
     const totals = { equity: 0, equityCost: 0, gold: 0, moneyMarket: 0 };
     if (!Array.isArray(tranches)) return totals;
-    tranches.forEach(tranche => {
+    tranches.forEach((tranche, index) => {
         const marketValue = Number(tranche.marketValue) || 0;
         const costBasis = Number(tranche.costBasis) || 0;
-        const category = String(tranche.category || '').toLowerCase();
-        const type = String(tranche.type || '').toLowerCase();
-        // Kategorie bestimmt, wohin die Marktwerte aggregiert werden.
-        if (category === 'gold' || type.includes('gold')) {
+        const category = classifyTranche(tranche, { index });
+        if (category === 'gold') {
             totals.gold += marketValue;
             return;
         }
-        if (category === 'money_market' || type.includes('geldmarkt')) {
+        if (category === 'money_market') {
             totals.moneyMarket += marketValue;
             return;
         }
@@ -141,7 +158,8 @@ export function buildSimulatorInputsFromProfileData(profileData) {
     // Balance-App Inputs (falls vorhanden) liefern Defaults für fehlende Simulator-Werte.
     const balanceInputs = parseStoredBalanceInputsFromData(profileData);
     const pflegeGradeConfigs = parsePflegeGradeConfigs(profileData);
-    const detailedTranches = parseDetailledTranches(profileData);
+    const trancheInput = parseDetailledTranches(profileData);
+    const detailedTranches = trancheInput.tranches;
     const trancheTotals = sumTrancheTotals(detailedTranches);
     const grade1Config = pflegeGradeConfigs[1] || { zusatz: 0, flexCut: 1 };
     const overrides = parseProfileOverridesFromData(profileData);
@@ -323,30 +341,14 @@ export function buildSimulatorInputsFromProfileData(profileData) {
         baseInputs.renteMonatlich = profileRenteMonatlich;
     }
 
-    const hasTranches = Array.isArray(detailedTranches) && detailedTranches.length > 0;
-    if (hasTranches) {
+    const hasDetailedInput = Array.isArray(detailedTranches);
+    if (hasDetailedInput) {
         const trancheSum = trancheTotals.equity + trancheTotals.gold + trancheTotals.moneyMarket;
-        const derivedStart = trancheSum + (baseInputs.tagesgeld || 0) + (baseInputs.geldmarktEtf || 0);
-        if (derivedStart > 0) {
-            baseInputs.startVermoegen = derivedStart;
-        }
-    } else {
-        baseInputs.depotwertAlt = 0;
-        baseInputs.einstandAlt = 0;
-        baseInputs.geldmarktEtf = 0;
-        baseInputs.startVermoegen = (baseInputs.tagesgeld || 0);
-        baseInputs.zielLiquiditaet = baseInputs.startVermoegen;
-    }
-
-    // Tranchen schlagen einzelne Werte nur dann, wenn diese sonst leer/0 wären.
-    if ((!baseInputs.depotwertAlt || baseInputs.depotwertAlt <= 0) && trancheTotals.equity > 0) {
         baseInputs.depotwertAlt = trancheTotals.equity;
-    }
-    if ((!baseInputs.einstandAlt || baseInputs.einstandAlt <= 0) && trancheTotals.equityCost > 0) {
         baseInputs.einstandAlt = trancheTotals.equityCost;
-    }
-    if ((!baseInputs.geldmarktEtf || baseInputs.geldmarktEtf <= 0) && trancheTotals.moneyMarket > 0) {
         baseInputs.geldmarktEtf = trancheTotals.moneyMarket;
+        baseInputs.startVermoegen = trancheSum + (baseInputs.tagesgeld || 0);
+        baseInputs.zielLiquiditaet = (baseInputs.tagesgeld || 0) + trancheTotals.moneyMarket;
     }
 
     // Balance-Inputs nur als Fallback verwenden, um Simulator-Felder zu füllen.
@@ -398,7 +400,8 @@ export function buildSimulatorInputsFromProfileData(profileData) {
         accumulationPhase,
         transitionYear,
         transitionAge,
-        detailledTranches: detailedTranches
+        detailledTranches: detailedTranches,
+        trancheInputState: trancheInput.state
     };
 }
 
@@ -447,35 +450,13 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
 
     const inputsList = profileInputs.map(entry => entry.inputs);
     const warnings = [];
-    const mergedTranches = [];
-    const usedTrancheIds = new Set();
-    const normalizeTranche = (tranche, profileId, seq) => {
-        const normalized = { ...tranche };
-        const rawId = String(normalized.trancheId || normalized.id || '').trim();
-        const baseId = rawId || `tranche_${seq}`;
-        const prefixedId = `${profileId}:${baseId}`;
-        let uniqueId = prefixedId;
-        let suffix = 1;
-        while (usedTrancheIds.has(uniqueId)) {
-            uniqueId = `${prefixedId}_${suffix++}`;
-        }
-        usedTrancheIds.add(uniqueId);
-        normalized.trancheId = uniqueId;
-        normalized.sourceProfileId = profileId;
-        if (normalized.isin) normalized.isin = String(normalized.isin).trim();
-        if (normalized.name) normalized.name = String(normalized.name).trim();
-        if (normalized.type) normalized.type = String(normalized.type).trim();
-        if (normalized.category) normalized.category = String(normalized.category).trim();
-        return normalized;
-    };
-    profileInputs.forEach(entry => {
-        const input = entry?.inputs;
-        if (Array.isArray(input?.detailledTranches) && input.detailledTranches.length > 0) {
-            input.detailledTranches.forEach((tranche, idx) => {
-                mergedTranches.push(normalizeTranche(tranche, entry.profileId || 'profil', idx));
-            });
-        }
-    });
+    const corruptEntry = profileInputs.find(entry => entry?.inputs?.trancheInputState === 'corrupt');
+    if (corruptEntry) {
+        return {
+            combined: null,
+            warnings: [`Tranchendaten fuer Profil ${corruptEntry.name || corruptEntry.profileId || 'unbekannt'} sind fehlerhaft.`]
+        };
+    }
 
     const primaryEntry = profileInputs.find(entry => entry.profileId === primaryProfileId) || profileInputs[0];
     const primaryInputs = primaryEntry?.inputs;
@@ -483,10 +464,45 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
         return { combined: null, warnings: ['Keine gueltigen Profile gefunden.'] };
     }
 
+    const mergedTranches = [];
+    const usedTrancheIds = new Set();
+    const normalizeTranche = (tranche, profileId, seq) => {
+        const normalized = typeof structuredClone === 'function'
+            ? structuredClone(tranche)
+            : JSON.parse(JSON.stringify(tranche));
+        const rawId = String(normalized.trancheId || normalized.id || '').trim();
+        const baseId = rawId || `tranche_${seq}`;
+        const prefixedId = `${profileId}:${baseId}`;
+        if (usedTrancheIds.has(prefixedId)) {
+            throw new Error(`Doppelte Tranche ${baseId} in Profil ${profileId}.`);
+        }
+        usedTrancheIds.add(prefixedId);
+        normalized.trancheId = prefixedId;
+        normalized.sourceProfileId = profileId;
+        if (normalized.isin) normalized.isin = String(normalized.isin).trim();
+        if (normalized.name) normalized.name = String(normalized.name).trim();
+        if (normalized.type) normalized.type = String(normalized.type).trim();
+        if (normalized.category) normalized.category = String(normalized.category).trim();
+        return normalized;
+    };
+    const orderedEntries = [primaryEntry, ...profileInputs.filter(entry => entry !== primaryEntry)];
+    orderedEntries.forEach(entry => {
+        const input = entry?.inputs;
+        if (Array.isArray(input?.detailledTranches)) {
+            input.detailledTranches.forEach((tranche, idx) => {
+                mergedTranches.push(normalizeTranche(tranche, entry.profileId || 'profil', idx));
+            });
+        }
+    });
+    Object.defineProperty(mergedTranches, 'simulationSourceProfileId', {
+        value: primaryEntry.profileId || 'simulation',
+        enumerable: false
+    });
+
     const sumStartVermoegen = sumNumbers(inputsList, i => profileAssetTotal(i));
     const sumDepotwertAlt = sumNumbers(inputsList, i => i.depotwertAlt || 0);
     const sumTagesgeld = sumNumbers(inputsList, i => i.tagesgeld || 0);
-    const sumGeldmarkt = sumNumbers(inputsList, i => i.geldmarktEtf || 0);
+    const sumGeldmarkt = sumNumbers(inputsList, i => Array.isArray(i.detailledTranches) ? 0 : (i.geldmarktEtf || 0));
     const sumEinstandAlt = sumNumbers(inputsList, i => i.einstandAlt || 0);
     const sumFloor = sumNumbers(inputsList, i => i.startFloorBedarf || 0);
     const sumFlex = sumNumbers(inputsList, i => i.startFlexBedarf || 0);
@@ -525,7 +541,8 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
         flexBudgetAnnual: sumFlexBudgetAnnual,
         flexBudgetRecharge: sumFlexBudgetRecharge,
         flexBudgetYears: minFlexBudgetYears || 0,
-        detailledTranches: mergedTranches.length ? mergedTranches : null,
+        detailledTranches: inputsList.some(i => Array.isArray(i.detailledTranches)) ? mergedTranches : null,
+        simulationSourceProfileId: primaryEntry.profileId || 'simulation',
         startSPB: sumNumbers(inputsList, i => i.startSPB || 0),
         kirchensteuerSatz: weightedAverage(inputsList, i => i.kirchensteuerSatz || 0, i => i.startVermoegen || 0, primaryInputs.kirchensteuerSatz || 0),
         targetEq: Math.round(weightedAverage(inputsList, i => i.targetEq || 0, i => i.startVermoegen || 0, primaryInputs.targetEq || 0)),
@@ -559,16 +576,13 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
         transitionAge: primaryInputs.startAlter
     };
 
-    if (mergedTranches.length > 0) {
+    if (combined.detailledTranches) {
         const totals = sumTrancheTotals(mergedTranches);
         const trancheTotal = totals.equity + totals.gold + totals.moneyMarket;
         const trancheWithCash = trancheTotal + sumTagesgeld + sumGeldmarkt;
-        if (trancheWithCash <= 0) {
-            warnings.push('Tranchen ohne Marktwert erkannt; Additiv nutzt Aggregat.');
-            combined.detailledTranches = null;
-        } else {
-            combined.startVermoegen = trancheWithCash;
-        }
+        combined.startVermoegen = trancheWithCash;
+        combined.geldmarktEtf = totals.moneyMarket + sumGeldmarkt;
+        combined.zielLiquiditaet = sumTagesgeld + combined.geldmarktEtf;
     }
 
     if (!ensureValueMatch(inputsList, i => i.rentAdjMode)) {

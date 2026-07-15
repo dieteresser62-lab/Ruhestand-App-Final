@@ -95,20 +95,35 @@ export function calculateTargetLiquidityBalanceLike(inputs, marketData, floorBed
 
 export function buildDetailedTranchesFromPortfolio(portfolio) {
     const list = [];
+    const usedIds = new Set();
+    let generatedSequence = 0;
     const pushTranche = (t, fallbackCategory) => {
         if (!t) return;
+        const marketValue = Number(t.marketValue) || 0;
+        if (marketValue <= 0 || t.simulationLotStatus === 'sold') return;
         const type = t.type || t.kind || '';
         const category = t.category
             || (type === 'gold' ? 'gold' : (type === 'geldmarkt' ? 'money_market' : (fallbackCategory || 'equity')));
+        let trancheId = String(t.trancheId || '').trim();
+        if (!trancheId) {
+            const source = encodeURIComponent(String(t.sourceProfileId || portfolio?.simulationSourceProfileId || 'simulation'));
+            do {
+                generatedSequence += 1;
+                trancheId = `simbase:${source}:${category}:${generatedSequence}`;
+            } while (usedIds.has(trancheId));
+            t.trancheId = trancheId;
+        }
+        usedIds.add(trancheId);
         list.push({
-            trancheId: t.trancheId || null,
+            trancheId,
+            ...(t.sourceProfileId ? { sourceProfileId: String(t.sourceProfileId) } : {}),
             name: t.name || null,
             isin: t.isin || null,
             shares: Number(t.shares) || 0,
             purchasePrice: Number(t.purchasePrice) || 0,
             purchaseDate: t.purchaseDate || null,
             currentPrice: Number(t.currentPrice) || 0,
-            marketValue: Number(t.marketValue) || 0,
+            marketValue,
             costBasis: Number(t.costBasis) || 0,
             tqf: Number.isFinite(Number(t.tqf)) ? Number(t.tqf) : 0.30,
             type: type || (fallbackCategory === 'gold' ? 'gold' : (fallbackCategory === 'money_market' ? 'geldmarkt' : 'aktien_alt')),

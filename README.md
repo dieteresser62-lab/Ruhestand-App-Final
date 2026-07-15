@@ -26,6 +26,7 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 | **[CHANGELOG.md](CHANGELOG.md)** | Alle Nutzer/Entwickler | Änderungen pro Release |
 | **[docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md](docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md)** | Fortgeschrittene | Algorithmen, Fachlogik, Designentscheidungen |
 | **[docs/reference/TECHNICAL.md](docs/reference/TECHNICAL.md)** | Entwickler | Architektur, Build, Debugging |
+| **[docs/reference/TRANCHEN_MODULES_README.md](docs/reference/TRANCHEN_MODULES_README.md)** | Nutzer/Entwickler | Tranchenvertrag, Persistenz, Quotes, Consumer und Reconcile |
 | **[docs/README.md](docs/README.md)** | Autoren/Entwickler | Doku-Struktur und Aufräum-Status |
 | **[docs/internal/archive/2026-dynamic-flex/](docs/internal/archive/2026-dynamic-flex/)** | Entwickler (intern) | Archiv der Dynamic-Flex-Implementierungsunterlagen (Plan, Tickets, Rollout, Baseline, CAPE-Contract) |
 
@@ -46,7 +47,7 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 * **Regime-Smoothing-Diagnose:** Kontinuierliche Drawdown-/CAPE-/Runway-Signale ergaenzen die diskreten Marktregime. Die geglaettete Runway-Zielberechnung bleibt per Default deaktiviert (`CONFIG.REGIME_SMOOTHING.TARGETS_ENABLED=false`), kann aber Diagnosefelder fuer Rohziel, Effektivziel, Severity, Fallback und harte Mindestgrenze ausweisen.
 * Jahresübergreifende Verlustverrechnung (Verlusttopf) ist integriert; die finale Steuer stammt aus dem Jahres-Settlement.
 * Diagnoseansicht mit Guardrails, Entscheidungsbaum und Key-Performance-Parametern.
-* **Depot-Tranchen-Manager:** Detaillierte Tranchen werden automatisch geladen und für steueroptimierte Verkäufe genutzt.
+* **Profil-Assets-Manager:** Detaillierte Tranchen werden profilgebunden, schema-validiert und fuer steueroptimierte Verkaeufe genutzt. Empfehlungen bleiben schreibfrei; reale Brokerverkaeufe werden nur ueber Vorschau plus explizit bestaetigten, idempotenten Reconcile fortgeschrieben.
 * **Profil-Verwaltung:** Optionales Namensfeld zur Unterscheidung von Snapshots (z. B. "Max" vs. "Partnerin") für effektive Mehr-Personen-Planung.
 * **Pflegebucket-Diagnose:** Liest die in der Profilpflege definierte gesperrte Geldmarkt-/Cash-Reserve und zeigt Brutto-Liquidität, Pflege-Zweckbindung, operative Liquidität und inflationsbezogene Zieldeckung. In der Balance-App ist der Bucket aktuell bewusst `diagnostic_only`; es erfolgt keine automatische operative Freigabe.
 * Tastenkürzel u. a. für Jahresabschluss (`Alt` + `J`) und Marktdaten nachrücken (`Alt` + `N`).
@@ -66,7 +67,7 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 * Sweep-Schutz für Partner:innen-Renten inklusive Rente-2-Invarianz und Heatmap-Badges.
 * Szenario-Log-Analyse mit 30 auswählbaren Szenarien: 15 charakteristische (Perzentile, Pflege-Extremfälle, Risiko-Szenarien) und 15 zufällige Samples für typisches Verhalten.
 * Checkboxen für Pflege-Details und detailliertes Log, JSON/CSV-Export für ausgewählte Szenarien.
-* **Tranchen-Integration:** Steueroptimierte Verkäufe mit detaillierten Depot-Positionen (Balance/Simulator teilen dieselben Tranchen).
+* **Tranchen-Integration:** Steueroptimierte Verkäufe mit detaillierten Depot-Positionen. Der Simulator tiefenkopiert profilgebundene Lots, bewahrt `sourceProfileId` und schreibt Simulationsmutationen niemals in den Realbestand zurueck.
 * Notfallverkäufe werden steuerlich per Gesamt-Settlement-Recompute mit den regulären Verkäufen des Jahres konsistent verrechnet.
 * **Pflegebucket als gesperrte Geldmarkt-/Cash-Reserve:** Der Simulator gliedert den optionalen Bucket nach dem Profilverbund-Merge aus Geldmarkt-Tranchen, ungetranchtem Geldmarkt und Tagesgeld aus. Die Engine sieht nur die operative Liquidität; der Bucket kann erst bei Pflege-Trigger vor Forced Sales Liquiditätslücken decken.
 
@@ -143,6 +144,7 @@ Die Suite kann mehrere Profile als Profilverbund gleichzeitig auswerten. Es gibt
 **Wichtige Hinweise:**
 * Gold-Strategie wird pro Profil gepflegt und in Balance/Simulator übernommen.
 * Tranchen werden aus den aktiven Profilen zusammengeführt.
+* Kategorie und Typ folgen einer disjunkten Matrix; korrupte oder widerspruechliche Bestände blockieren fail-closed statt auf einen anderen Bestand zurueckzufallen.
 * Detaillierte Designdokumentation siehe `docs/reference/PROFILVERBUND_FEATURES.md`
 
 #### Pflegebucket
@@ -292,6 +294,7 @@ Die Anwendung ist bewusst minimalistisch gehalten, hat aber für den vollen Funk
 * **docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md** – vertiefte Architektur-, Fach- und Methoden-Dokumentation (inkl. Herleitungen/Abgrenzungen).
 * **docs/reference/BALANCE_MODULES_README.md** – Modulübersicht der Balance-App.
 * **docs/reference/SIMULATOR_MODULES_README.md** – Modulübersicht des Simulators (MC, Sweep, Backtest, UI-Pfade).
+* **docs/reference/TRANCHEN_MODULES_README.md** – zentraler Tranchen-Daten-, Persistenz-, Quote- und Reconcile-Vertrag.
 * **engine/README.md** – Engine-Module und Build-Prozess.
 * **tests/README.md** – Aufbau und Ausführung der Test-Suite.
 * **docs/reference/WORKFLOW_PSEUDOCODE.md** – Ablaufdarstellung zentraler Workflows in Pseudocode.

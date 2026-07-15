@@ -7,18 +7,18 @@ import {
 } from './profile-storage.js';
 import { PersistenceFacade } from '../shared/persistence-facade.js';
 
-function runPersistenceFlush(flusher) {
+async function runPersistenceFlush(flusher) {
     if (typeof flusher !== 'function') return true;
-    try {
-        const result = flusher();
-        if (result && typeof result.catch === 'function') {
-            result.catch(err => console.error('[ProfileNavigation] Persistenz-Flush fehlgeschlagen:', err));
-        }
-        return result;
-    } catch (err) {
-        console.error('[ProfileNavigation] Persistenz-Flush fehlgeschlagen:', err);
-        return false;
-    }
+    const result = await flusher();
+    if (result === false) throw new Error('PERSISTENCE_FLUSH_FAILED');
+    return true;
+}
+
+function showHandoffFailure(root) {
+    const target = root?.getElementById?.('profileStatus');
+    if (!target) return;
+    target.textContent = 'Navigation abgebrochen: Die Profilwahl konnte nicht dauerhaft gespeichert werden. Bitte erneut versuchen.';
+    target.dataset.kind = 'error';
 }
 
 export function shouldHandleProfileHandoff(link) {
@@ -42,7 +42,8 @@ export function bindProfileNavigationHandoff(options = {}) {
         selector = 'a[href][data-profile-handoff]',
         exporter = exportProfilesBundleToWindowName,
         flusher = PersistenceFacade.flush,
-        win = typeof window === 'undefined' ? null : window
+        win = typeof window === 'undefined' ? null : window,
+        onFailure = () => showHandoffFailure(root)
     } = options;
 
     if (!root || typeof root.querySelectorAll !== 'function') return 0;
@@ -53,22 +54,20 @@ export function bindProfileNavigationHandoff(options = {}) {
     links.forEach(link => {
         if (!shouldHandleProfileHandoff(link)) return;
         if (link.dataset?.profileHandoffBound === 'true') return;
-        link.addEventListener('click', (event) => {
-            exporter();
-            const flushResult = runPersistenceFlush(flusher);
+        link.addEventListener('click', async (event) => {
             const href = String(link.getAttribute('href') || '').trim();
-            if (
-                event &&
-                typeof event.preventDefault === 'function' &&
-                flushResult &&
-                typeof flushResult.finally === 'function' &&
-                href &&
-                win?.location
-            ) {
+            if (event && typeof event.preventDefault === 'function' && href && win?.location) {
                 event.preventDefault();
-                flushResult.finally(() => {
-                    win.location.href = href;
-                });
+            }
+            try {
+                if (link.dataset?.profileHandoffExport !== 'false') {
+                    const exported = exporter();
+                    if (exported === false) throw new Error('PROFILE_HANDOFF_EXPORT_FAILED');
+                }
+                await runPersistenceFlush(flusher);
+                if (href && win?.location) win.location.href = href;
+            } catch (error) {
+                onFailure(error, link);
             }
         });
         if (link.dataset) {
@@ -92,8 +91,16 @@ export function installProfilePersistenceHooks(options = {}) {
     if (win.__rsProfilePersistenceHooksInstalled) return false;
 
     const persist = () => {
-        saver();
-        return runPersistenceFlush(flusher);
+        try {
+            saver();
+        } catch (error) {
+            console.error('[ProfileNavigation] Profil-Snapshot fehlgeschlagen:', error);
+            return Promise.resolve(false);
+        }
+        return runPersistenceFlush(flusher).catch(error => {
+            console.error('[ProfileNavigation] Persistenz-Flush fehlgeschlagen:', error);
+            return false;
+        });
     };
 
     win.addEventListener('beforeunload', persist);
@@ -132,9 +139,12 @@ export function initProfileIndexLifecycle(options = {}) {
         root = document,
         win = window
     } = options;
+    if (win?.__rsProfileIndexLifecycleInitialized) return false;
     bootstrapProfileContext();
     bindProfileNavigationHandoff({ root });
     installProfileBfcacheRefresh({ win });
+    if (win) win.__rsProfileIndexLifecycleInitialized = true;
+    return true;
 }
 
 export function initProfileSubpageLifecycle(options = {}) {
@@ -143,10 +153,13 @@ export function initProfileSubpageLifecycle(options = {}) {
         doc = document
     } = options;
 
+    if (win?.__rsProfileSubpageLifecycleInitialized) return false;
     bootstrapProfileContext({
         importFromWindowName: true,
         preserveLiveProfileData: true
     });
     installProfilePersistenceHooks({ win, doc });
     installProfileBfcacheRefresh({ win });
+    if (win) win.__rsProfileSubpageLifecycleInitialized = true;
+    return true;
 }
