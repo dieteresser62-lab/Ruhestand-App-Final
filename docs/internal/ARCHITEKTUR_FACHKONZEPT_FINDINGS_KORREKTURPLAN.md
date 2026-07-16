@@ -1,12 +1,12 @@
 # Korrektur-Arbeitsplan zu den Findings aus Slice 08
 
-**Stand:** 2026-07-16  
-**Status:** Entwurf – Review und Nutzerfreigabe ausstehend  
-**Ausgangsdokument:** `SLICE_ARCHITEKTUR_FACHKONZEPT_08_INTEGRATION_ABSCHLUSS.md`  
-**Betroffenes Hauptdokument:** `docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md`  
-**Planerstellungs-Branch:** `codex/architektur-fachkonzept-doku`  
-**Vorgesehener Umsetzungs-Branch:** `codex/architektur-fachkonzept-korrekturen`  
-**GitHub-Status:** Umsetzungs-Branch noch nicht angelegt oder veröffentlicht  
+**Stand:** 2026-07-16<br>
+**Status:** implementierungsreif – Gemini-Review und Nutzerfreigabe U-K01 am 2026-07-16<br>
+**Ausgangsdokument:** `SLICE_ARCHITEKTUR_FACHKONZEPT_08_INTEGRATION_ABSCHLUSS.md`<br>
+**Betroffenes Hauptdokument:** `docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md`<br>
+**Planerstellungs-Branch:** `codex/architektur-fachkonzept-doku`<br>
+**Vorgesehener Umsetzungs-Branch:** `codex/architektur-fachkonzept-korrekturen`<br>
+**GitHub-Status:** Umsetzungs-Branch lokal angelegt; Veröffentlichung ausstehend<br>
 **Planart:** gemischtes Dokumentations-, Contract-, UI- und
 Validierungsvorhaben
 
@@ -167,6 +167,10 @@ maßgebliche Lizenz nennen. Vor Slice 5 bestätigt der Nutzer dennoch
 ausdrücklich, ob MIT autoritativ ist. Ohne diese Entscheidung wird keine
 Lizenzmetadatei geändert.
 
+**Nutzerentscheidung vom 2026-07-16:** MIT ist die autoritative
+Projektlizenz. Slice 5 darf die Metadaten auf MIT vereinheitlichen, ohne
+Dependency-, Versions- oder sonstige Paketänderungen auszulösen.
+
 ## 5. Scope
 
 ### 5.1 Dokumentationsscope
@@ -207,6 +211,9 @@ Jeder Slice erhält vor Beginn eine eigene Datei nach den Regeln aus
 mit Rückdokumentation in diesen Plan.
 
 ### Slice 1 – Baseline, Messvertrag und Entscheidungsprotokoll
+
+**Slice-Datei:**
+[`SLICE_ARCHITEKTUR_FACHKONZEPT_FINDINGS_01_BASELINE_MESSVERTRAG.md`](SLICE_ARCHITEKTUR_FACHKONZEPT_FINDINGS_01_BASELINE_MESSVERTRAG.md)
 
 **Ziel:** Unveränderliche Ausgangsbasis und alle fachlichen Richtungsentscheide
 vor dem ersten Korrekturedit festlegen.
@@ -298,6 +305,8 @@ voraussichtlich:
 - Pflichtfelder, eindeutige IDs, Datumsformate, lokale Anker und definierte
   nächste Prüfzeitpunkte validieren;
 - einen lokalen Befehl wie `npm run docs:evidence` ergänzen;
+- den Validator über eine gezielte Test-Wrapper-Datei in das reguläre
+  `npm test`-Gate einbinden, ohne Netzwerkzugriff auszulösen;
 - Live-HTTP-Prüfung ausdrücklich getrennt halten;
 - volatile Marktquellen bei Umsetzung erneut aus offiziellen Quellen prüfen;
 - wissenschaftliche/amtliche Quellen nur bei geändertem Daten- oder
@@ -330,6 +339,8 @@ voraussichtlich:
 - README, Hauptdokument und Markt-GAP synchronisieren;
 - GAP-MKT-06 nur nach nachgewiesener Konsistenz schließen;
 - npm- und Cargo-Metadaten lokal plausibilisieren.
+- keine Paketmanager-Installation oder Dependency-Aktualisierung ausführen;
+  im Lockfile ausschließlich den Root-Lizenzwert ändern, sofern erforderlich.
 
 **Akzeptanzkriterien:**
 
@@ -359,6 +370,11 @@ Mischvertrag umsetzen.
   synthetischen Mehrjahresfällen prüfen;
 - erwartete Backtest-/MC-/Optimizer-Deltas vorab gegen eine Baseline
   klassifizieren.
+- Auto-Optimize-Ergebnisse vor und nach der Korrektur mit identischen Seeds
+  und Eingaben vermessen; erwartete Verschiebungen der Zielfunktion getrennt
+  von unerwarteten Ergebnisdeltas dokumentieren;
+- `worker-parity.test.mjs` als Pflichtgate für die Serial-/Worker-Gleichheit
+  ausführen und jede Abweichung als Stop-Grund behandeln.
 
 **Aufgaben bei Route B:**
 
@@ -392,6 +408,9 @@ Mischvertrag umsetzen.
 - kanonischen Einheitenvertrag aus Abschnitt 4.4 implementieren;
 - UI-, Profil-, Persistenz- und Runnerpfad mit 0 %, 3,5 % und Grenzwerten
   testen;
+- das persistierte Profilformat unverändert als Prozentwertvertrag erhalten;
+  die Normalisierung erfolgt ausschließlich in-memory an der festgelegten
+  Input-Grenze; eine JSON-Schemamigration ist Nicht-Scope dieses Slices;
 - nachweisen, dass 3,5 % als Faktor 0,035 und nicht 0,00035 wirken;
 - Pflegekostenpfade und Kappung mit deterministischen Jahren prüfen;
 - Dokumentation und PD-02/MR-Eintrag erst nach Validierung aktualisieren.
@@ -576,14 +595,14 @@ Zusätzlich zu `AGENTS.md` wird gestoppt und nachgefragt, wenn:
 
 | ID | Gegenstand | Voraussetzung | Freigabe durch | Status |
 | --- | --- | --- | --- | --- |
-| U-K01 | dieser Korrekturplan | Review-Feedback eingearbeitet | Nutzer + Reviewer | ausstehend |
-| U-K02 | Dokumenttopologie und Messvertrag | Slice 1 | Nutzer | ausstehend |
+| U-K01 | dieser Korrekturplan | Review-Feedback eingearbeitet | Nutzer + Reviewer | freigegeben am 2026-07-16 |
+| U-K02 | Dokumenttopologie und Messvertrag | Slice 1 | Nutzer | freigegeben am 2026-07-16 |
 | U-K03 | Markt-/Forschungsregister und Haupttextumfang | Slice 2 und 3 | Nutzer + Reviewer | ausstehend |
 | U-K04 | Evidenzvalidator und Aktualitätsvertrag | Slice 4 | Nutzer + Reviewer | ausstehend |
-| U-K05 | autoritative Lizenz | vor Slice 5 | Nutzer | ausstehend |
-| U-K06 | PD-01 Route A oder B und zulässiges Delta | vor Slice 6 | Nutzer | ausstehend |
+| U-K05 | autoritative Lizenz | vor Slice 5 | Nutzer | MIT bestätigt am 2026-07-16 |
+| U-K06 | PD-01 Route A oder B und zulässiges Delta | vor Slice 6 | Nutzer | Route A bestätigt; Delta-Baseline vor Slice 6 ausstehend |
 | U-K07 | Pflegekosten-Einheitenvertrag | vor/mit Slice 7 | Nutzer + Reviewer | ausstehend |
-| U-K08 | PD-03 Labelroute oder neuer KPI-Plan | vor Slice 8 | Nutzer | ausstehend |
+| U-K08 | PD-03 Labelroute oder neuer KPI-Plan | vor Slice 8 | Nutzer | Labelroute bestätigt am 2026-07-16 |
 | U-K09 | Forschungsvalidierungs-Backlog | Slice 9 | Nutzer + Reviewer | ausstehend |
 | U-K10 | Gesamtabschluss | Slice 10, alle Gates grün | Nutzer + Reviewer | ausstehend |
 | U-K11 | Commit und gegebenenfalls Push | U-K10 | Nutzer | ausstehend |
@@ -592,7 +611,7 @@ Zusätzlich zu `AGENTS.md` wird gestoppt und nachgefragt, wenn:
 
 | Slice | Status | Ergebnis |
 | ---: | --- | --- |
-| 1 | geplant | Baseline, Messvertrag, Entscheidungen und Branch-Gate |
+| 1 | freigegeben | Baseline, Messvertrag, Scope-Gates und Branch validiert; MIT und U-K02 bestätigt; Review durch Gemini abgeschlossen am 2026-07-16 |
 | 2 | geplant | Markt-Evidenzregister und kompakter Hauptblock |
 | 3 | geplant | Forschungsregister und kompakter Mechanismusabgleich |
 | 4 | geplant | Evidenzaktualität und statischer Validator |
@@ -618,6 +637,12 @@ Vor dem ersten Edit dieser Plan-Datei am 2026-07-16:
 Der zukünftige Umsetzungs-Branch wird bewusst noch nicht angelegt, weil der
 laufende Dokumentationsstand uncommitted ist. Ein Branchwechsel vor U-08 und
 sicherem Ausgangscommit würde die beiden Vorhaben unnötig vermischen.
+
+Vor Slice 1 wurde der sichere Ausgangscommit
+`ffdc3cb50088752e76f111c149713c7bb0ca0fe4` bestätigt und der lokale
+Umsetzungs-Branch `codex/architektur-fachkonzept-korrekturen` angelegt. Die
+Branch-Veröffentlichung bleibt bis zu einer ausdrücklichen Nutzerfreigabe
+ausstehend.
 
 ## 13. Diff-Risiko der Planerstellung
 
@@ -666,9 +691,30 @@ Das Korrekturvorhaben ist erst abgeschlossen, wenn:
 
 ## Review-Feedback von Gemini
 
-Ausstehend. Das Review muss die Pflichtstruktur aus
-`SLICE_EXECUTION_RULES.md` und die adversarialen Review-Grundsätze aus
-`AGENTS.md` einhalten.
+### 1. Prüfdimensionen & Befunde
+
+1. **Korrektheit:** Der Plan ist fachlich vollständig und übersetzt alle 10 Befunde (`KF-01` bis `KF-10`) in konkrete Korrekturschritte.
+   - *Detailfinding:* Für `KF-06 / PD-01` (Realwertvertrag `jahresentnahme_real`) fehlen im Plan konkrete Vorkehrungen zum Umgang mit den zu erwartenden massiven Deltas bei der Auto-Optimierung. Da sich die Zielfunktion des Optimizers von nominalen Werten auf reale Werte verschiebt, werden sich die Optimierungsergebnisse zwingend verändern. Dies muss in der Validierungsphase von Slice 6 explizit vermessen und dokumentiert werden.
+2. **Vertragstreue:** Der Normalisierungsvertrag für die Pflegekosten-Drift (`KF-07 / PD-02`) wird im Plan korrekt als eingleisige Schranke entworfen.
+   - *Detailfinding:* Es bleibt unklar, ob die Persistenzschicht (gespeicherte JSON-Profile) berührt wird. Wenn Profile weiterhin Prozentwerte (`3.5`) speichern, muss sichergestellt sein, dass die Normalisierung ausschließlich in-memory an den Schnittstellengrenzen erfolgt. Eine Änderung des Persistenz-JSON-Formats muss explizit ausgeschlossen oder als Breaking Change deklariert werden.
+3. **Fehlerbehandlung:**
+   - Der statische Evidenzvalidator (`Slice 4`) darf keine Online-Ressourcen anfordern. Dies wird im Plan durch den Offline-Zwang korrekt abgesichert. Es fehlt jedoch die Festlegung, ob ein Scheitern des Validators das reguläre Testgate `npm test` blockiert. Dies sollte über ein Test-Wrapper-Modul sichergestellt werden.
+4. **Seiteneffekte:**
+   - Die Lizenzvereinheitlichung (`Slice 5`) ändert Konfigurationsdateien wie `package.json` und `Cargo.toml`. Hier ist penibel darauf zu achten, dass keine automatischen Dependency-Upgrades durch Paketmanager-Läufe ausgelöst werden.
+5. **Was könnte brechen?**
+   - Bei der Umsetzung von `PD-01` (Realwertkorrektur) besteht die Gefahr, dass die Berechnungsänderung in der Engine zwar korrekt ist, aber in den parallelisierten MC-Worker-Threads unvollständig serialisiert oder deserialisiert wird, was zu Abweichungen zwischen Single-Thread- und Multi-Thread-Läufen führt. Hier muss das Worker-Paritätsgate aus `worker-parity.test.mjs` intensiv genutzt werden.
+
+### 2. Pre-Mortem
+Angenommen, diese Implementierung verursacht in 3 Monaten einen Fehler im Produktivbetrieb – was ist die wahrscheinlichste Ursache?
+- *Szenario:* Die Normalisierung der Pflegekosten-Drift (`PD-02`) führt bei der Migration älterer Profile zu unbemerkten Konvertierungsfehlern (z. B. doppelte Skalierung beim Laden eines alten Profils, da die UI-Ladeschnittstelle und der Profilmanager unterschiedliche Annahmen treffen), wodurch die Altersvorsorge-Simulationen für Pflegekosten fehlerhafte Pfade berechnen.
+
+## Review-Ergebnis
+- Status: freigegeben
+- Blocker: keine
+- Restrisiken:
+  - *Persistenz-Kompatibilität:* Risiko von Schema-Drifts in alten Benutzerprofilen bei der Pflegekosten-Drift-Bereinigung.
+  - *Optimizer-Deltas:* Verschiebung der mathematischen Maxima bei Sweeps und Optimierungen durch die Realwert-Umstellung von `jahresentnahme_real`.
+- Pre-Mortem: (Siehe Szenario oben – unbemerktes Profil-Konvertierungs-Delta bei `PD-02`).
 
 ## Review-Feedback von Claude
 
@@ -676,11 +722,37 @@ Optional und ausstehend.
 
 ## Review-Antworten von Codex
 
-Werden nach Eingang konkreter Findings ergänzt. Codex erteilt keine
-Eigenfreigabe.
+Die vier Detailfindings wurden angenommen und in den betroffenen Slices
+verbindlich nachgeschärft:
+
+1. Slice 6 erhält eine reproduzierbare Auto-Optimize-Delta-Baseline mit
+   identischen Seeds und Eingaben sowie ein ausdrückliches
+   Worker-Paritätsgate.
+2. Slice 7 hält das persistierte JSON-Profilformat als Prozentwertvertrag
+   unverändert; die Normalisierung erfolgt nur in-memory. Eine
+   Schemamigration ist ausgeschlossen.
+3. Slice 4 bindet den Offline-Validator über eine gezielte Testdatei in
+   `npm test` ein. Eine Netzwerkabhängigkeit bleibt ausgeschlossen.
+4. Slice 5 führt keine Paketinstallation oder Dependency-Aktualisierung aus;
+   ein Lockfile-Diff darf ausschließlich den Root-Lizenzwert betreffen.
+
+Der Nutzer hat den Plan mit dem Auftrag zur Bearbeitung von Slice 1 bestätigt
+und am 2026-07-16 zusätzlich PD-01 Route A sowie die PD-03-Labelroute gewählt.
+Anschließend hat er MIT ausdrücklich als autoritative Projektlizenz bestätigt
+und U-K02 für Dokumenttopologie und Messvertrag freigegeben. Codex
+dokumentiert hier externe Entscheidungen und erteilt keine Eigenfreigabe.
 
 ## Review-Entscheidungen
 
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
 | --- | --- | --- | --- | --- |
-| U-K01 | Nutzer/Reviewer | Korrekturplan | ausstehend | ausstehend |
+| G-01 | Gemini | Auto-Optimize-Deltas bei PD-01 explizit vermessen | angenommen | Slice 6 ergänzt |
+| G-02 | Gemini | Persistenzformat bei PD-02 unverändert halten | angenommen | Slice 7 ergänzt |
+| G-03 | Gemini | Offline-Validator muss das reguläre Testgate blockieren | angenommen | Slice 4 ergänzt |
+| G-04 | Gemini | Lizenzänderung darf keine Dependency-Upgrades auslösen | angenommen | Slice 5 ergänzt |
+| G-05 | Gemini | Worker-Parität bei PD-01 als Pflichtgate nutzen | angenommen | Slice 6 ergänzt |
+| U-K01 | Nutzer/Reviewer | Korrekturplan | freigegeben | erledigt am 2026-07-16 |
+| U-K02 | Nutzer | Dokumenttopologie und Messvertrag | freigegeben | erledigt am 2026-07-16 |
+| U-K05 | Nutzer | autoritative Projektlizenz | MIT | für Slice 5 verbindlich |
+| U-K06 | Nutzer | PD-01 Route | Route A | Route entschieden; Delta-Baseline folgt vor Slice 6 |
+| U-K08 | Nutzer | PD-03 Route | Labelkorrektur | erledigt am 2026-07-16 |
