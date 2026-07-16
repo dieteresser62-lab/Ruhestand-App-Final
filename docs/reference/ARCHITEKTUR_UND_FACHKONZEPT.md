@@ -2,10 +2,11 @@
 
 **Technische Dokumentation der DIY-Software für Ruhestandsplanung**
 
-**Dokumentstand:** 2026-07-04
-**Geprüfte Codebasis:** Commit-Stand bis 2026-06-17, abgeglichen mit der lokalen Arbeitskopie am 2026-07-04
-**Engine API:** v31.0
-**Codeumfang:** Momentaufnahme, siehe Komponenten-Tabelle
+**Dokumentstand:** 2026-07-15 (redaktionell integrierter Abschlussstand nach Architektur-, Fach-, Markt- und Forschungsabgleich)
+**Inhaltlicher Codeabgleich:** Architekturabschnitt B sowie Fachkonzept-, Rechenkonventions- und Modellgrenzen gegen Commit `6ea3e7a` und die lokale Arbeitskopie vom 2026-07-15
+**Reproduzierbarer Inventarstand:** Commit `6ea3e7a` vom 2026-07-15; Ermittlungsweg siehe Release-Checkliste
+**Engine API:** v31.0, Build-ID `2025-12-22_16-35`; acht exponierte Methoden, davon fünf unterstützte operative Methoden und drei deprecated No-op-Kompatibilitäts-Stubs
+**Externer Quellenstand:** Marktvergleich mit Stichtag 2026-07-15; wissenschaftliches Korpus mit 55 Records, Abrufstand 2026-07-15 und abgeschlossenem Mechanismusabgleich MAP-01 bis MAP-17
 **Lizenz:** MIT
 
 ---
@@ -15,6 +16,7 @@
 ## Inhaltsverzeichnis
 
 - [Software-Profil](#software-profil)
+- [Stand und Reproduzierbarkeit](#stand-und-reproduzierbarkeit)
 - [Komponenten](#komponenten)
 - [Hauptfunktionen](#hauptfunktionen)
 - [Bekannte Einschränkungen](#bekannte-einschränkungen)
@@ -22,9 +24,10 @@
 - [Geltungsbereich und Abgrenzung](#geltungsbereich-und-abgrenzung)
 - [Release-Checkliste (Dokumentpflege)](#release-checkliste-dokumentpflege)
 - [Technische Architektur](#technische-architektur)
-- [Fachliche Algorithmen](#fachliche-algorithmen)
+- [Fachkonzept und Rechenkonventionen](#fachkonzept-und-rechenkonventionen)
+- [Annahmen, Modellgrenzen und Validierung](#annahmen-modellgrenzen-und-validierung)
 - [Marktvergleich](#marktvergleich)
-- [Forschungsabgleich](#forschungsabgleich)
+- [Wissenschaftlicher Rahmen, Quellenkorpus und Tiefeneinordnung](#wissenschaftlicher-rahmen-quellenkorpus-und-tiefeneinordnung)
 - [Appendix: Modul-Inventar](#appendix-modul-inventar)
 
 ## Software-Profil
@@ -34,18 +37,45 @@
 - **Lizenz:** MIT
 - **Zielgruppe:** Deutschsprachige Einzelpersonen und Haushalte (inkl. Paare) mit Finanzverständnis
 
+## Stand und Reproduzierbarkeit
+
+Die Aktualitätsstände werden getrennt ausgewiesen, damit ein frischer
+Dateizähler nicht mit einem vollständigen fachlichen Codeabgleich oder einer
+aktuellen externen Recherche verwechselt wird. Die Ausgangsfassung vor dieser
+Überarbeitung hatte 3.076 physische Zeilen. Davon entfielen 904 Zeilen (29,4 %)
+auf die technische Architektur, 1.566 (50,9 %) auf die fachlichen Algorithmen,
+158
+(5,1 %) auf den Marktvergleich, 112 (3,6 %) auf den Forschungsabgleich und 145
+(4,7 %) auf Appendix und Quellen. Die Ermittlung erfolgte am 2026-07-15 über
+die Top-Level-Überschriften und `(Get-Content <datei>).Count`; die restlichen
+191 Zeilen umfassten Dokumentkopf und Übersicht.
+
+Der Abschlussstand verbindet die aktualisierte Inventar- und Metadatenbasis
+mit dem bis zur lokalen Arbeitskopie vom 2026-07-15 geprüften Architektur- und
+Fachstand. Marktvergleich und Forschungsabgleich verwenden getrennte,
+datierte Evidenzsysteme: Produktbefunde gelten nur für Stichprobe,
+Produktstufe, öffentliche Dokumentation und Stichtag; wissenschaftliche
+Quellen werden je Mechanismus mit Suite-Abweichung, Übertragbarkeit, lokaler
+Validierungsgrenze und Restrisiko verknüpft. Weder ein Quellenrecord noch ein
+bestandener lokaler Test ist eine Wirksamkeitsfreigabe.
+
 ## Komponenten
 
-*Momentaufnahme der lokalen Arbeitskopie vom 2026-06-12. Modul- und Zeilenzahlen sind Orientierungshilfen, nicht normative Architekturgrenzen. Dieses Dokument beschreibt die Architektur und die fachlichen Zusammenhänge eigenständig; spezialisierte Referenzen (`TECHNICAL.md`, Modul-READMEs, `engine/README.md`, `tests/README.md`) dienen als ergänzende Detail- und Exportkataloge.*
+*Reproduzierbare Momentaufnahme von Commit `6ea3e7a` am 2026-07-15. Gezählt
+wurden die jeweils angegebenen Dateiendungen mit den Befehlen aus der
+Release-Checkliste. Dateizahlen sind Orientierungshilfen, keine normativen
+Architekturgrenzen. Spezialisierte Referenzen (`TECHNICAL.md`, Modul-READMEs,
+`engine/README.md`, `tests/README.md`) führen die veränderlichen Detail- und
+Exportkataloge.*
 
 | Komponente | Zweck | Momentaufnahme |
 |------------|-------|----------------|
-| **Balance-App** | Jahresplanung: Liquidität, Entnahme, Steuern, Transaktionen, Ausgaben-Check, Pflegebucket-Diagnose, Jahresabschluss-Snapshots | 35 JS-Module unter `app/balance/` |
+| **Balance-App** | Jahresplanung: Liquidität, Entnahme, Steuern, Transaktionen, Ausgaben-Check, Pflegebucket-Diagnose, Jahresabschluss-Snapshots | 36 JS-Module unter `app/balance/` |
 | **Simulator** | Monte-Carlo-Simulation, Parameter-Sweeps, Auto-Optimize, Dynamic Flex, Stationary Bootstrap, Tail-Risk-Overlay, Pflegebucket-Wirklogik | 95 JS-Module unter `app/simulator/` |
 | **Engine** | Kern-Berechnungslogik, Guardrails, Steuern, kontinuierliche Regime-Signale und VPW-Rendite-Policy | 27 MJS-Module unter `engine/` |
-| **Workers** | Parallelisierung für MC/Sweep/Optimizer-Pfade | 3 JS-Module unter `workers/`, ca. 757 Zeilen |
-| **Tests** | Unit-, Integration-, Browser-Smoke- und Coverage-Gates | 101 `*.test.mjs` Dateien; Assertions- und Coverage-Zahlen sind laufbezogen und werden in `tests/README.md` gepflegt |
-| **Profile, Tranchen, Shared** | Profilverwaltung, Profilverbund, Tranchenstatus, gemeinsame Utilities | JS-Module unter `app/profile/`, `app/tranches/`, `app/shared/`, zusammen ca. 2.959 Zeilen |
+| **Workers** | Parallelisierung für MC/Sweep/Optimizer-Pfade | 3 JS-Module unter `workers/` |
+| **Tests** | Unit-, Integration-, Browser-Smoke- und Coverage-Gates | 107 entdeckte `*.test.mjs`-Dateien; davon 106 im Node-Standardgate, Browser-Smoke separat |
+| **Profile, Tranchen, Shared, Types** | Profilverwaltung, Profilverbund, Tranchenstatus, gemeinsame Utilities und Datenverträge | 13 + 7 + 12 JS-Module sowie 3 JS-Module unter `types/` |
 
 *Hinweis: Dieses Dokument beschreibt Konzepte und Architekturentscheidungen. Für konkrete Implementierungsdetails gelten die genannten Module und Tests als Referenz; exakte Code-Zeilen werden bewusst vermieden, weil sie nach Refactorings schnell veralten.*
 
@@ -53,17 +83,19 @@
 
 Die Ruhestand-Suite kombiniert folgende Funktionen:
 
-1. **Vollständige deutsche Kapitalertragssteuer** (Abgeltungssteuer, Soli, KiSt, Teilfreistellung, SPB, steueroptimierte Verkaufsreihenfolge, Verlustverrechnungstopf mit jahresübergreifendem Verlustvortrag)
+1. **Parametrisiertes deutsches Kapitalertragsteuer-Modell** für Verkäufe (Abgeltungssteuer, Soli, vereinfachte KiSt, Teilfreistellung, SPB, modellbasierte Verkaufsreihenfolge und ein gemeinsamer jahresübergreifender Verlustvortrag); keine vollständige Steuererklärung oder automatische Rechtsfortschreibung
 2. **Dynamische Guardrails** mit 7-stufiger Marktregime-Erkennung
 3. **Pflegefall-Modellierung** (PG1-5, Progression, Dual-Care)
 4. **Multi-Profil-Unterstützung** für Paare mit getrennten Depots und **Witwenrente**
-5. **Tranchen-Management** mit FIFO-Steueroptimierung und Online-Kursaktualisierung
+5. **Tranchen-Management** mit steuerorientierter, kontextabhängiger Verkaufsreihenfolge und Online-Kursaktualisierung
 6. **Balance-App** für operative Jahresplanung mit Online-Datenabruf
 7. **Simulator** mit Monte-Carlo, historischem Backtest, Parameter-Sweeps und mehrphasiger Auto-Optimierung
-8. **Historische Daten ab 1925** mit Stress-Szenarien (Große Depression, WWII)
+8. **Historische Datenbasis 1925-2025** mit geschätzter Erweiterung 1925-1949 und darauf aufsetzenden Stress-Szenarien (Große Depression, WWII)
 9. **Optionale Ansparphase** für vollständige Lebenszyklus-Modellierung
 10. **Rentensystem** für 1-2 Personen mit verschiedenen Indexierungsarten
-11. **Portable Desktop-App** via Tauri für Windows, macOS und Linux
+11. **Windows-Desktop-Paketierung** via Tauri sowie browserbasierter Quellbetrieb;
+    macOS- und Linux-Tauri-Ziele sind konfigurierbar, aber in diesem
+    Dokumentstand weder als gebaut noch als ausgeliefert nachgewiesen
 12. **Ausgaben-Check** zur Kontrolle monatlicher Ausgaben gegen das Budget mit CSV-Import, Hochrechnung und Ampel-Visualisierung
 13. **Dynamic-Flex (VPW)** mit CAPE-basierter Renditeerwartung, Sterbetafeln, konservativen Langlebigkeitsaufschlaegen, EMA-Glättung und Go-Go-Phase; integriert in Balance-App, Backtest, Monte Carlo, Sweep und Auto-Optimize
 14. **Auto-CAPE im Jahreswechsel** (US-Shiller-CAPE mit Fallback-Kette und non-blocking Fehlerbehandlung)
@@ -79,11 +111,19 @@ Die Ruhestand-Suite kombiniert folgende Funktionen:
 - Das Tail-Risk-Overlay ist eine synthetische Ereignis-Injektion fuer Monte Carlo, kein kalibriertes GARCH-/Student-t-Modell und keine Prognose. Es ist standardmaessig deaktiviert.
 - Historische Krisen und synthetische Tail-Risk-Ereignisse werden durch eine Skip-Regel gegen doppelte Return-Schocks geschuetzt; diese Heuristik ersetzt keine gemeinsame statistische Kalibrierung beider Risikomodelle.
 - Kontinuierliche Runway-Zielglaettung und die kontinuierliche CAPE-Rendite-Policy sind vorhanden, bleiben aber opt-in. Die diskreten Bestandsdefaults bleiben dadurch reproduzierbar.
-- Index-Variante (`msci_eur`) siehe Abschnitt C.3.3
+- Gebühren, Spreads, Slippage und laufende Produktkosten werden in Engine und Simulator nicht als eigene Cashflows abgezogen. Nur der bestätigte Realbestands-Reconcile erfasst tatsächlich eingegebene Ausführungsgebühren.
+- Alle Planungsbeträge und automatisch akzeptierten Tranchenkurse sind EUR-basiert. Es gibt keine implizite Fremdwährungsumrechnung; Nicht-EUR-Quotes werden abgelehnt.
+- Das Steuermodell bildet einen begrenzten Verkaufskontext ab, nicht die gesamte deutsche Ertrags-, Einkommen- oder Investmentbesteuerung. Rechtliche Parameter werden nicht automatisch aktualisiert.
+- Der als real bezeichnete Simulatorwert `jahresentnahme_real` wird im mehrjährigen Simulatorpfad derzeit nicht mit einem fortgeschriebenen kumulierten Inflationsfaktor deflationiert. Bis zur Codekorrektur ist er dort als nominaler Wert zu behandeln.
+- Der UI-Wert für den zusätzlichen Pflegekostenanstieg wird zwischen Reader und Pflegelogik doppelt prozentual skaliert. Die angezeigten 3,5 % wirken im aktuellen Pfad als 0,035 %; dies ist ein offener Produktmangel, keine fachliche Sollannahme.
+- Indexvariante, geschätzte Frühhistorie und weitere Ergebnisgrenzen stehen in C.3.3 sowie im Annahmen- und Modellrisikoregister.
 
 ## Nachgezogene Entwicklungspakete seit dem Dokumentstand 2026-06-12
 
-Die Bestandsaufnahme vom 2026-07-04 hat die abgeschlossenen Arbeitsdokumente unter `docs/internal/archive/` gegen Code und Referenzen abgeglichen. Fuer den fachlichen und technischen Gesamtstand sind vor allem folgende Pakete relevant:
+Die Bestandsaufnahme wurde im Architekturabgleich bis Commit `6ea3e7a` und zur
+lokalen Arbeitskopie vom 2026-07-15 fortgeschrieben. Archivierte
+Arbeitsdokumente dienen nur als Entscheidungsnachweis; die folgende Einordnung
+wurde gegen aktuelle Module, Tests und aktive Referenzen abgeglichen:
 
 | Paket | Ergebnis im aktuellen System | Architektur-/Fachauswirkung |
 |-------|------------------------------|-----------------------------|
@@ -93,6 +133,11 @@ Die Bestandsaufnahme vom 2026-07-04 hat die abgeschlossenen Arbeitsdokumente unt
 | Regime-Uebergangs-Glaettung | kontinuierliche Severity-Signale und optional interpoliertes Runway-Ziel | Diskrete Regime und harte Sicherheitsgrenzen bleiben autoritativ; Zielglaettung ist per Feature-Config aus |
 | Stationary Bootstrap | variable Blocklaengen mit deterministischem Sampler-State | neue MC-Samplingmethode `stationary`; Filter/Recency/CAPE greifen nur an Blockstarts |
 | Tail-Risk-/Crash-Modell V1 | deterministisches Ereignis-Overlay, Anti-Doppelpessimismus, KPIs und Logexport | getrennte Stressschicht nach historischem Sampling; nur Monte Carlo, opt-in, keine Mutation der Quelldaten |
+| Engine-Contract-Hardening | validierte Eingabegrenzen, strukturierter Ergebnis-/Fehlervertrag und zentrales Steuer-Settlement | `simulateSingleYear()` liefert entweder den vollständigen Erfolgs-Shape oder ein `error`-Envelope; Verkaufsschätzung und finale Jahressteuer sind getrennt |
+| Balance-Workflow-Hardening | gebundener Engine-Handshake, maschinenlesbare Update-Status und periodengebundener Jahresabschluss | inkompatible Engines und fehlerhafte Updates persistieren nicht; ein Jahres-Commit benötigt Preflight, Flush und bestätigten Recovery-Snapshot |
+| Persistenz- und Snapshot-Hardening | Backend-Facade, separates Snapshot-Archiv, Import-Recovery und Korruptionszustände | Live-State, interne Sicherungspunkte und Austausch-Backups besitzen getrennte Ownership und Recovery-Pfade |
+| Profilverbund-Attribution | genau ein Haushalts-Engine-Lauf, danach profilbezogene Quellen-, Steuer- und Verwendungsattribution | Haushalts-Guardrails bleiben gemeinsam; Verlustvortrag, Pauschbetrag, Kirchensteuer, TQF und Cost Basis bleiben eigentümerbezogen |
+| Tranchenmanagement-Hardening | kanonisches Schema, raw-erhaltende Recovery, EUR-Quote-Grenze und bestätigtes Reconcile | Balance, Simulator und Engine planen schreibfrei; nur der Profil-Assets-Manager darf reale Lots nach Brokerausführung fortschreiben |
 
 Die Detailvertraege stehen in den jeweiligen Fachabschnitten dieses Dokuments. Die archivierten Plaene bleiben Entstehungs- und Entscheidungsnachweis, sind aber keine Laufzeit-Source-of-Truth.
 
@@ -121,7 +166,7 @@ Die Grundstrategie bleibt ein einfaches, passives Portfolio aus Liquidität, Akt
 
 4. **Optionaler 3-Bucket-Jilge-Puffer:** Im 3-Bucket-Modus kommen Bonds/Anleihen-ETF als zusätzlicher defensiver Puffer hinzu. Die Logik kann in schlechten Jahren Bond-Bestände statt Aktien heranziehen und in guten Jahren den Bond-Zieltopf wieder auffüllen.
 
-5. **Regelbasierte Entnahme:** Guardrails, Marktregime-Erkennung und optionale 3-Bucket-Regeln steuern die Entnahmen automatisch – keine diskretionären Timing-Entscheidungen.
+5. **Regelbasierte Planung:** Guardrails, Marktregime-Erkennung und optionale 3-Bucket-Regeln erzeugen reproduzierbare Entnahme- und Transaktionsvorschläge. Die tatsächliche Brokerausführung, der bestätigte Realbestandsabgleich und Änderungen der Nutzerparameter bleiben operative Nutzerentscheidungen.
 
 ### Für wen die Suite geeignet ist
 
@@ -145,7 +190,7 @@ Die Grundstrategie bleibt ein einfaches, passives Portfolio aus Liquidität, Akt
 
 Die Fokussierung auf ein einfaches, aber robustes Anlagemodell ermöglicht:
 
-- **Präzise Steuerberechnung:** Die deutsche Kapitalertragssteuer wird exakt für ETFs mit Teilfreistellung modelliert
+- **Nachvollziehbare Steuerplanung:** Verkäufe werden mit Cost Basis, Teilfreistellung, Pauschbetrag, parametrisiertem Steuersatz und gemeinsamem Verlustvortrag modelliert; dies ersetzt keine vollständige steuerliche Veranlagung
 - **Zuverlässige historische Simulation:** Die Monte-Carlo-Daten basieren auf MSCI-World-ähnlichen Renditereihen
 - **Klare Entscheidungslogik:** Guardrails, Rebalancing- und 3-Bucket-Regeln sind auf wenige Bausteine abgestimmt: Aktien-ETF, Geldmarkt/Liquidität, Gold und optional Bonds
 - **Geringere Komplexität:** Weniger Stellschrauben bedeuten weniger Fehlkonfiguration
@@ -164,27 +209,47 @@ Die Fokussierung auf ein einfaches, aber robustes Anlagemodell ermöglicht:
 
 Vor jedem Release oder größeren Merge diese Punkte aktualisieren:
 
-1. **Metadaten aktualisieren:** `Dokumentstand`, `Geprüfte Codebasis`, `Engine API`.
-2. **Bestandszahlen prüfen:** Modulanzahlen, Testdateien, LOC-Schätzwerte, Build-Hinweise.
-3. **Codeverweise verifizieren:** Dateinamen, Funktionsnamen und Modulzuordnungen (insb. bei Refactorings).
-4. **Zeitfenster prüfen:** Historische Datenräume in MC/Backtest auf Konsistenz prüfen und klar abgrenzen.
-5. **Feature-Delta nachziehen:** Neue Features in `Hauptfunktionen`, Architekturabschnitten und Appendix ergänzen.
-6. **Quellenabschnitte aktualisieren:** Externe Vergleiche/Forschung mit Stand und ggf. Versionshinweis versehen.
-7. **Smoke-Review durchführen:** Dokument auf doppelte/obsolete Aussagen und widersprüchliche Zahlen durchsuchen.
+1. **Metadaten aktualisieren:** `Dokumentstand`, `Inhaltlicher Codeabgleich`,
+   `Reproduzierbarer Inventarstand`, `Engine API` und getrennte externe
+   Quellenstände.
+2. **Bestandszahlen prüfen:** Modulanzahlen, Testdateien und Build-Hinweise;
+   volatile LOC-Schätzwerte nicht als Architekturkennzahl fortschreiben.
+3. **Codeverweise verifizieren:** Dateinamen, Funktionsnamen,
+   Modulzuordnungen, öffentliche Engine-Methoden und Persistenzverträge.
+4. **Zeitfenster prüfen:** Historische Datenräume in Monte Carlo und Backtest
+   sowie Daten-, Rekonstruktions- und Fallbackstände klar abgrenzen.
+5. **Feature-Delta nachziehen:** Neue Funktionen in `Hauptfunktionen`, den
+   Architektur-/Fachabschnitten, Annahmen-/Risikoregistern und der Modulkarte
+   ergänzen.
+6. **Marktvergleich aktualisieren:** Produktidentität, untersuchte Stufe,
+   Preis/Lizenz, offizielle Quellen und Evidenzlücken für einen neuen
+   Vergleichsstichtag prüfen; alte Befunde nicht still überschreiben.
+7. **Forschungsabgleich aktualisieren:** neue Literatur- oder amtliche
+   Datenstände versionieren, FOR-Records nachziehen und betroffene MAP-, FR-
+   und FQ-Einträge neu bewerten; Literaturbefunde nicht als Suite-Ergebnisse
+   ausgeben.
+8. **Quellenintegrität prüfen:** zentrale Aussagen quellennahe belegen,
+   MKT-/FOR-IDs eindeutig halten und Abruf-, Publikations- und Datenstand nicht
+   vermischen.
+9. **Navigation prüfen:** Inhaltsverzeichnis, Überschriften, Anker, lokale
+   Links, Tabellen und Querverweise mechanisch kontrollieren.
+10. **Scope- und Smoke-Review durchführen:** Dokument auf doppelte oder
+    obsolete Aussagen, widersprüchliche Zahlen, unbelegte Absolutheiten und
+    unerwartete Nicht-Markdown-Änderungen durchsuchen.
 
 Reproduzierbare Inventarpruefung fuer die Komponenten-Tabelle:
 
 ```powershell
-(Get-ChildItem app\balance -Filter *.js).Count
-(Get-ChildItem app\simulator -Filter *.js).Count
-(Get-ChildItem engine -Recurse -Filter *.mjs).Count
-(Get-ChildItem workers -Filter *.js).Count
-Get-ChildItem tests -Filter *.test.mjs | Measure-Object | Select-Object -ExpandProperty Count
-Get-ChildItem app\balance -Filter *.js | Get-Content | Measure-Object -Line
-Get-ChildItem app\simulator -Filter *.js | Get-Content | Measure-Object -Line
-Get-ChildItem engine -Recurse -Filter *.mjs | Get-Content | Measure-Object -Line
-Get-ChildItem workers -Filter *.js | Get-Content | Measure-Object -Line
-Get-ChildItem app\profile,app\tranches,app\shared -Filter *.js | Get-Content | Measure-Object -Line
+git rev-parse HEAD
+(rg --files app\balance -g '*.js' | Measure-Object).Count
+(rg --files app\simulator -g '*.js' | Measure-Object).Count
+(rg --files app\profile -g '*.js' | Measure-Object).Count
+(rg --files app\tranches -g '*.js' | Measure-Object).Count
+(rg --files app\shared -g '*.js' | Measure-Object).Count
+(rg --files types -g '*.js' | Measure-Object).Count
+(rg --files engine -g '*.mjs' | Measure-Object).Count
+(rg --files workers -g '*.js' | Measure-Object).Count
+(rg --files tests -g '*.test.mjs' | Measure-Object).Count
 ```
 
 ---
@@ -212,320 +277,241 @@ Die Suite umfasst mehrere HTML-Oberflächen und Begleitmodule: Neben Balance und
 
 ### B.1.1 Laufzeitschichten
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    PRÄSENTATIONSSCHICHT                     │
-├──────────────┬──────────────┬──────────────┬────────────────┤
-│ index.html   │ Balance.html │ Simulator    │ Tranchen/      │
-│ Profil- und  │ Jahresplan,  │ Monte Carlo, │ Handbuch       │
-│ Startseite   │ Diagnose     │ Backtest     │ Zusatzseiten   │
-├──────────────┴──────────────┴──────────────┴────────────────┤
-│ app/balance/  app/simulator/  app/profile/  app/tranches/   │
-│ app/shared/   types/                                           │
-├─────────────────────────────────────────────────────────────┤
-│                     ENGINE-SCHICHT                           │
-│  engine/ (ESM-Quelle)  ── build-engine.mjs ──>  engine.js     │
-│                                                             │
-│  InputValidator → MarketAnalyzer → Spending-Policies         │
-│        ↓                 ↓                 ↓                 │
-│  Tax Settlement ← TransactionEngine ← Sale/3-Bucket-Logik     │
-├─────────────────────────────────────────────────────────────┤
-│                   PARALLELISIERUNG                          │
-│  workers/worker-pool.js  workers/mc-worker.js               │
-│  workers/worker-telemetry.js  app/simulator/*worker*        │
-│  MC, Sweep und Auto-Optimize nutzen Worker mit Fallbacks     │
-├─────────────────────────────────────────────────────────────┤
-│                   AUSLIEFERUNG / LAUFZEIT                   │
-│  Browser über lokalen Webserver oder Tauri aus dist/         │
-│  Optionale Live-Daten: lokaler Yahoo-Proxy + CSP-Allowlist   │
-└─────────────────────────────────────────────────────────────┘
+Die drei Schichten sind logische Ownership-Grenzen und nicht jeweils genau ein
+Verzeichnis. Insbesondere enthält `app/simulator/` neben UI-Code auch DOM-freie
+Jahres- und Runnerlogik; `app/shared/` enthält sowohl reine Hilfen als auch
+Persistenzinfrastruktur.
+
+| Logische Schicht | Verantwortliche Bereiche | Darf entscheiden oder schreiben |
+| --- | --- | --- |
+| **1. Interaktion und Workflow** | HTML-Einstiege, Binder und UI-nahe Module unter `app/balance/`, `app/simulator/`, `app/profile/`, `app/tranches/` | liest Nutzeraktionen, orchestriert Workflows, rendert Ergebnisse; schreibt Fachzustand nur über die dafür vorgesehene Ownership-Grenze |
+| **2. Fachlogik und Verträge** | `engine/`, DOM-freie Simulator-Runner, `types/`, reine Policy-/Attributionsmodule | validiert und berechnet deterministisch; besitzt weder DOM- noch Backend-Ownership |
+| **3. Infrastruktur und Zustand** | `app/shared/persistence-*`, `snapshot-archive.js`, Worker-Pool, Laufzeiterkennung, Tauri-Rust-Shell und lokale Daten-Gateways | wählt Adapter, serialisiert und flusht Zustände, isoliert Worker und vermittelt optionale Netzwerkzugriffe |
+
+```text
+Nutzeraktion
+   │
+   ▼
+HTML + Binder + App-Orchestrierung
+   │  normalisierte Eingaben / expliziter Workflowauftrag
+   ▼
+Engine und DOM-freie Fachmodule
+   │  vollständiges Ergebnis oder strukturierter Fehler
+   ▼
+Renderer / Profil- und Tranchenattribution
+   │  nur nach erfolgreichem Contract-Gate
+   ▼
+PersistenceFacade ──> IndexedDB | Tauri-JSON | localStorage-Fallback
+
+Monte Carlo / Sweep / Auto-Optimize
+   └──> Worker-Pool ──> identische DOM-freie Runner ──> serieller Fallback
+
+Optionale Live-Daten
+   └──> lokale Yahoo-Proxy-Grenze oder explizit erlaubte HTTPS-Endpunkte
 ```
 
-**Aktuelle Bestandszahlen (2026-06-12):**
+Worker und Browser/Tauri sind damit keine vierte fachliche Schicht. Worker
+ändern nur die Ausführungstopologie und müssen zum seriellen Pfad deterministisch
+paritätisch bleiben. Browser und Tauri wählen Infrastrukturadapter und
+Netzwerkgrenzen; sie ändern nicht den fachlichen Engine-Vertrag.
 
-- `app/balance/`: 35 JS-Module
+### B.1.1a Ownership- und Schreibgrenzen
+
+| Bereich | Autoritative Verantwortung | Explizite Grenze |
+| --- | --- | --- |
+| **Balance** | aktuelles Planungsjahr, Diagnose, Jahres- und Importworkflow | persistiert nur erfolgreiche Update-Ergebnisse; schreibt keine Empfehlung in den realen Tranchenbestand |
+| **Simulator** | mehrjährige In-Memory-Pfade, Backtest, Monte Carlo, Sweep und Optimierung | mutiert nur tief kopierte Simulationsportfolios; `simlot:`-/`simbase:`-Lots sind kein Realbestand |
+| **Engine** | normalisierte Jahresrechnung, Markt-/Spending-/Transaktionsentscheidung und Einzeljahres-Settlement | kein DOM, kein Netzwerk und kein Persistenzzugriff; liefert Daten oder ein Fehler-Envelope |
+| **Profile/Profilverbund** | Registry, aktive Profile, Haushaltsaggregation und eigentümerbezogene Attribution | ein Haushalts-Engine-Lauf; danach reine Profilaufteilung ohne zweite Spending- oder Transaktionsentscheidung |
+| **Tranchenmanager** | kanonischer profilbezogener Realbestand und bestätigtes Reconcile | einzige produktive Schreibgrenze für tatsächlich ausgeführte Lotverkäufe |
+| **PersistenceFacade** | Laufzeitadapter, synchroner Cache, geordnete Flushes, Live-Replace und Snapshot-Delegation | Feature-Code wählt weder IndexedDB noch Tauri-Dateien direkt; Snapshot-Archiv und Live-State bleiben getrennt |
+
+### B.1.1b Fallback, Fail-safe und Fail-closed
+
+Die drei Begriffe bezeichnen unterschiedliche Reaktionen und dürfen nicht als
+Synonyme verwendet werden:
+
+| Reaktion | Bedeutung in dieser Suite | Beispiele |
+| --- | --- | --- |
+| **Fallback** | Ein definierter Alternativpfad liefert weiterhin ein fachlich gekennzeichnetes Ergebnis. | ECB -> World Bank -> OECD; CAPE-Primary -> Mirror -> gespeicherter Wert; Worker -> serieller Runner; IndexedDB -> ausdrücklich gewählter `localStorage`-Adapter, wenn IndexedDB nicht verfügbar ist. |
+| **Fail-safe** | Der aktuelle oder vorherige Zustand bleibt erhalten beziehungsweise wird als wiederherstellbarer Zustand gesichert; der Vorgang meldet den Fehler sichtbar. | fehlgeschlagene Flush-Batches wieder als dirty/deleted vormerken; Recovery-Snapshot vor Jahreswrites; Rohdaten bei Ausgaben-/Tranchenkorruption erhalten; beschädigte Tauri-Live-Datei quarantänisieren. |
+| **Fail-closed** | Ein mutierender oder fachlich nicht belastbarer Vorgang wird blockiert, bis der Vertrag wieder eindeutig erfüllt ist. | ungültiger Engine-Handshake; `incomplete_recovery`; periodenfremde ETF-Daten; korrupter Tranchen-/Ausgabenstore; fehlende Profilprovenienz oder Haushaltsabweichung über 0,01 EUR. |
+
+Ein Fallback ist nur zulässig, wenn Quelle und Semantik des Ersatzpfads
+feststehen. Das bloße Weiterschreiben mit einem alten, falschen oder
+nicht zuordenbaren Wert ist weder Fallback noch Fail-safe.
+
+**Aktuelle Bestandszahlen (Commit `6ea3e7a`, ermittelt am 2026-07-15):**
+
+- `app/balance/`: 36 JS-Module
 - `app/simulator/`: 95 JS-Module
+- `app/profile/`: 13 JS-Module
+- `app/tranches/`: 7 JS-Module
+- `app/shared/`: 12 JS-Module
+- `types/`: 3 JS-Module
 - `engine/`: 27 MJS-Module
 - `workers/`: 3 JS-Module
-- `tests/`: 101 `*.test.mjs`-Dateien
+- `tests/`: 107 entdeckte `*.test.mjs`-Dateien, davon 106 im
+  Node-Standardgate; `browser-smoke.test.mjs` ist ein separates Pflichtgate
 
-## B.1.2 Tauri Desktop-App (Portable EXE)
+## B.1.2 Desktop-Laufzeit, Release und Netzwerkgrenzen
 
-### Was ist Tauri?
+Tauri kapselt dieselben HTML-/CSS-/ES-Modul-Quellen in einer System-WebView.
+Die Rust-Schicht ersetzt nicht die fachliche Engine. Sie stellt die lokale
+Dateipersistenz, den Loopback-Yahoo-Proxy und den Flush-vor-Schließen-Handshake
+bereit. Das Frontend wird im Desktop-Build ausschließlich aus dem generierten
+`dist/` geladen.
 
-**Tauri** ist ein modernes Framework zur Erstellung von Desktop-Anwendungen mit Web-Technologien (HTML/CSS/JavaScript). Im Gegensatz zu Electron verwendet Tauri:
-
-| Aspekt | Tauri | Electron |
-|--------|-------|----------|
-| **Backend** | Rust (nativ, sicher) | Node.js |
-| **WebView** | System-WebView (Edge/WebKit) | Chromium (gebündelt) |
-| **Binärgröße** | ~3-10 MB | ~150-200 MB |
-| **RAM-Verbrauch** | ~30-50 MB | ~150-300 MB |
-| **Sicherheit** | Sandbox, minimale Permissions | Volle Node.js-Rechte |
-
-### Ruhestand-Suite als Desktop-App
-
-Die Suite wird als **native Desktop-App** für alle Plattformen ausgeliefert (siehe auch B.1.3 für Details zu macOS/Linux):
-
-| Plattform | Format | Größe |
-|-----------|--------|-------|
-| **Windows** | `RuhestandSuite.exe` | ~8 MB |
-| **macOS** | `RuhestandSuite.app` / `.dmg` | ~10 MB |
-| **Linux** | AppImage / `.deb` | ~12 MB |
-
-**Projektstruktur:**
-
+```text
+Quellmodule im Repo
+   └── npm run sync-dist
+         └── validiertes dist/
+               └── Tauri-System-WebView
+                     ├── Engine/Runner wie im Browser
+                     ├── Rust-Kommandos für Live-State/Snapshots
+                     └── Loopback-Proxy 127.0.0.1:8787 -> Yahoo
 ```
+
+**Desktop-relevante Projektstruktur:**
+
+```text
 src-tauri/
-├── Cargo.toml          # Rust-Abhängigkeiten
-├── tauri.conf.json     # App-Konfiguration (Fenster, Permissions)
-├── src/
-│   ├── main.rs         # Rust-Haupteintrag
-│   └── lib.rs          # Tauri-Bindings
-└── icons/              # App-Icons
+├── Cargo.toml
+├── tauri.conf.json       # dist-Eingang, Fenster, Bundleziele und CSP
+├── src/main.rs           # Rust-Einstieg
+├── src/lib.rs            # Persistenzkommandos, Close-Handshake, Yahoo-Proxy
+└── icons/
 ```
 
-**Konfiguration** (`tauri.conf.json`):
-```json
-{
-  "productName": "RuhestandSuite",
-  "version": "0.1.0",
-  "identifier": "com.dieter.ruhestandsapp",
-  "build": {
-    "frontendDist": "../dist"
-  },
-  "app": {
-    "security": {
-      "csp": {
-        "connect-src": "'self' http://127.0.0.1:8787 http://localhost:8787 https://data-api.ecb.europa.eu https://api.worldbank.org https://sdmx.oecd.org https://r.jina.ai",
-        "worker-src": "'self' blob:"
-      },
-      "dangerousDisableAssetCspModification": true
-    },
-    "windows": [{
-      "title": "RuhestandsApp",
-      "width": 1920,
-      "height": 1080,
-      "resizable": true
-    }]
-  }
-}
+### B.1.2a Windows-Releasepfad
+
+Der gepflegte Release-Orchestrator ist Windows-spezifisch:
+
+```text
+grüne, separat nachgewiesene Testgates
+   -> build-tauri.bat oder npm run build-tauri-exe
+   -> Preflight für npm, Rust/Cargo und MSVC
+   -> npm run sync-dist und Assetprüfung
+   -> npm run tauri:build
+   -> Quellartefakt src-tauri/target/release/ruhestand_suite.exe prüfen
+   -> vorhandene Root-EXE zeitgestempelt archivieren
+   -> geprüft nach RuhestandSuite.exe kopieren
+   -> manueller Desktop-Smoke
 ```
 
-### Eigenschaften der Desktop-Version
+Der Build-Orchestrator startet die fachlichen Tests nicht automatisch. Eine
+vorhandene EXE beweist deshalb Artefakterzeugung und Kopie, aber weder einen
+grünen Testlauf noch einen manuellen Funktions-Smoke. In der lokalen
+Arbeitskopie vom 2026-07-15 waren Quell- und Root-Artefakt für Windows
+vorhanden. Ob genau dieses Artefakt extern veröffentlicht wurde, lässt sich aus
+dem Repositoryzustand nicht ableiten und wird hier nicht behauptet.
 
-| Aspekt | Beschreibung |
-|---------|--------------|
-| **Multi-Plattform** | Eine Codebasis für Windows, macOS und Linux |
-| **Portable** | Keine Installation nötig, läuft von USB-Stick (AppImage auf Linux) |
-| **Offline** | Funktioniert ohne Internetverbindung |
-| **Datenschutz** | Keine Daten verlassen den Rechner |
-| **Performance** | Natives Fenster, kein Browser-Overhead |
-| **Leichtgewichtig** | ~8-12 MB statt ~200 MB bei Electron-Apps |
+Änderungen unter `engine/` müssen vor dem Release über `npm run build:engine`
+in `engine.js` übertragen werden; CI-/Releasepfade sollen
+`npm run build:engine:strict` verwenden. `dist/`, das Tauri-Zielverzeichnis und
+die Root-EXE sind generierte Artefakte und keine primären Bearbeitungsorte.
 
-### Live-Daten in Browser und Tauri
+### B.1.2b Netzwerk- und Datenschutzgrenzen
 
-Live-Daten sind optional. Ohne Netzwerk, blockierte Endpunkte oder fehlenden Proxy muss die Suite mit lokalen/manuellen Werten weiterlaufen und Fehler sichtbar protokollieren, statt das Planungsjahr zu blockieren.
+„Lokal gespeichert“ und „ohne jeden Netzwerkverkehr“ sind unterschiedliche
+Aussagen. Die Suite besitzt keine serverseitige Fachlogik und keinen
+automatischen Cloud-Sync. Bei aktivem Netzwerk können jedoch folgende
+Verbindungen entstehen:
 
-| Quelle | Pfad | Laufzeit |
-|--------|------|----------|
-| Yahoo Finance | lokaler Proxy `http://127.0.0.1:8787` bzw. `http://localhost:8787` | Browser: Node-Proxy aus `start_suite.*`; Tauri: integrierter Rust-Proxy in `src-tauri/src/lib.rs` |
-| ECB Data API | `https://data-api.ecb.europa.eu` | direkter Fetch aus Browser/Tauri-WebView |
-| World Bank API | `https://api.worldbank.org` | direkter Fetch aus Browser/Tauri-WebView |
-| OECD Data Explorer API | `https://sdmx.oecd.org` | direkter Fetch aus Browser/Tauri-WebView |
-| CAPE/Yale-Mirror | `https://r.jina.ai` | direkter Fetch aus Browser/Tauri-WebView |
+| Grenze | Übertragene Information | Nicht Teil dieses Pfads |
+| --- | --- | --- |
+| **Yahoo über Loopback-Proxy** | Symbol beziehungsweise Suchbegriff und bei Charts Zeitfenster/Intervall; der Proxy leitet dies an Yahoo weiter | Depotmenge, Cost Basis, Bedarf, Profil- oder Haushaltszustand |
+| **Inflationsquellen** | feste deutsche Reihenkennung und Zieljahr an ECB, World Bank oder OECD | persönliche Finanzdaten |
+| **CAPE-Abruf** | Abruf der fest konfigurierten Yale-/Mirror-Ressource über `r.jina.ai` | Profil- oder Simulationswerte |
+| **Google Fonts** | Stylesheet-/Font-Request mit üblichen Netzwerkmetadaten, wenn die HTML-Seite online lädt | Fachzustand der Suite |
+| **Worker-Telemetrie** | keine Remote-Übertragung; opt-in Laufzeitmessung im lokalen Prozess, in Konsole beziehungsweise manuell exportierbar | kein Analyse-Backend |
+| **Export/Backup** | lokale Datei erst durch ausdrückliche Nutzeraktion | kein automatischer Upload |
 
-Die Tauri-CSP in `src-tauri/tauri.conf.json` muss diese Ziele explizit unter `app.security.csp.connect-src` erlauben. Neue externe Live-Datenquellen müssen gleichzeitig in `docs/reference/DATA_SOURCES.md` dokumentiert und in der CSP ergänzt werden.
+Persistierte Eingaben, Profile, Tranchen und Ergebnisse bleiben im gewählten
+lokalen Backend, solange der Nutzer sie nicht selbst exportiert oder außerhalb
+der Suite weitergibt. Netzwerkprovider sehen dennoch IP-/Transportmetadaten und
+die oben genannten Abrufparameter. Eine pauschale Aussage „keine Daten
+verlassen den Rechner“ wäre deshalb falsch.
 
-### Build-Prozess
+Die Tauri-CSP erlaubt unter `connect-src` nur die dokumentierten lokalen Proxy-
+und HTTPS-Ziele; `worker-src` erlaubt `'self'` und `blob:`. Google-Font-Ziele
+stehen separat unter `style-src`/`font-src`. Die bestehende Policy benötigt noch
+`unsafe-inline` und `unsafe-eval`; das ist eine dokumentierte technische
+Restgrenze und kein allgemeiner Sicherheitsnachweis. Browserbetrieb unterliegt
+zusätzlich den CORS- und Sicherheitsregeln des verwendeten Browsers.
 
-```bash
-# Windows-Shortcut für den Produktivbuild
-build-tauri.bat
+### B.1.2c Offline-Bedeutung und Live-Daten
 
-# Entspricht intern:
-# 1) npm run sync-dist
-# 2) dist/ validieren
-# 3) npm run tauri:build
-# 4) Vorhandene RuhestandSuite.exe zeitgestempelt unter release-archive/ sichern
-# 5) Copy src-tauri/target/release/ruhestand_suite.exe -> RuhestandSuite.exe
-```
+Berechnung, lokale Persistenz und manuelle Eingabe bleiben nach lokalem Laden
+der Assets ohne Internet nutzbar. Google Fonts degradieren auf lokale
+Fallback-Schriften; Live-Kurse, Inflation und CAPE können dann nicht neu
+abgerufen werden. Normale Planung darf dadurch nicht mit einem White-Screen
+oder Datenverlust enden. Ein bereits bestätigter, atomarer Jahresabschluss hat
+jedoch strengere Regeln: Schlägt ein für diesen Commit erforderlicher
+periodengebundener Schritt fehl, wird nicht still mit einem falschen Stichtag
+weitergeschrieben, sondern in den Recovery-Pfad gewechselt (B.2.5).
 
-Der gleiche Build-Pfad ist als npm-Skript verfügbar:
+| Quelle | Laufzeitpfad | Contract-Grenze |
+| --- | --- | --- |
+| Yahoo Finance | Browser: Node-Proxy aus `start_suite.cmd`/`.ps1`; Tauri: Rust-Proxy in `src-tauri/src/lib.rs` | Loopback only; fachliche Quote- und Stichtagsvalidierung vor Write |
+| ECB, World Bank, OECD | direkter HTTPS-Fetch aus Browser/Tauri-WebView | feste Fallback-Reihenfolge, exaktes Zieljahr und gemeinsame Inflationsmetrik |
+| Yale/CAPE-Mirror | direkter HTTPS-Fetch über `r.jina.ai` | Quelle, Stichtag und Fetchstatus werden getrennt persistiert; lokaler Fallback möglich |
 
-```bash
-npm run build-tauri-exe
-```
-
-`scripts/build-tauri.ps1` prüft vor dem Build `npm`, Rust/Cargo, den MSVC-Toolchain-Zugriff und nach dem Sync zentrale `dist/`-Assets. Der Build nutzt immer `dist/` als Frontend-Eingang; `scripts/sync-dist.ps1` kopiert die Laufzeitdateien frisch und schließt Entwicklungs-, Test-, Doku- und Release-Artefakte aus. Vor dem Ersetzen im Repo-Root wird eine vorhandene `RuhestandSuite.exe` unter `release-archive/RuhestandSuite_yyyy-MM-dd_HH-mm-ss-fff.exe` archiviert. Änderungen an `engine/` müssen vorher mit `npm run build:engine` in `engine.js` übertragen werden; für CI/Release steht `npm run build:engine:strict` bereit.
-
-**Output je nach Plattform:**
-- **Windows (Build-Artefakt):** `src-tauri/target/release/ruhestand_suite.exe`
-- **Windows (kopiertes Repo-Root-Artefakt):** `RuhestandSuite.exe`
-- **macOS:** `src-tauri/target/release/bundle/macos/RuhestandSuite.app`
-- **Linux:** `src-tauri/target/release/bundle/appimage/RuhestandSuite.AppImage`
-
-*Für detaillierte Build-Anleitungen aller Plattformen siehe Abschnitt B.1.3.*
-
-### Technische Details
-
-- **Rust-Version:** 1.70+ (für Tauri 2.0)
-- **WebView:** Microsoft Edge WebView2 (Windows), WebKit (macOS/Linux)
-- **Netzwerkpfade:** Lokaler Yahoo-Proxy in Rust auf `127.0.0.1:8787`; Inflation/CAPE direkt aus der WebView über CSP-Allowlist
-- **Build-Input:** Tauri lädt immer den frisch synchronisierten `dist/`-Ordner, nicht die Root-HTML-Dateien direkt
-- **Signierung:** Unsigned (Community-Build), kann mit eigenem Zertifikat signiert werden
+Neue externe Ziele benötigen in derselben Änderung einen Code-/CSP-Abgleich und
+eine Aktualisierung von `docs/reference/DATA_SOURCES.md`.
 
 ---
 
-## B.1.3 Plattformunabhängigkeit
+## B.1.3 Plattform- und Validierungsstatus
 
-Die Ruhestand-Suite ist plattformübergreifend nutzbar und kann auf Windows, macOS und Linux ausgeführt werden. Es gibt drei Ausführungsmethoden mit unterschiedlichen Anforderungen.
+Plattformangaben verwenden in diesem Dokument drei getrennte Reifegrade:
 
-### Übersicht der Ausführungsmethoden
+- **buildbar:** Quellcode, Konfiguration und Host-Toolchain beschreiben einen
+  Build- beziehungsweise Startpfad;
+- **validiert:** der konkrete Pfad besitzt einen datierten automatisierten Test
+  oder manuellen Smoke-Nachweis;
+- **ausgeliefert:** ein benanntes Artefakt wurde tatsächlich über einen
+  dokumentierten Distributionskanal bereitgestellt.
 
-| Methode | Windows | macOS | Linux | Voraussetzungen |
-|---------|---------|-------|-------|-----------------|
-| **Tauri Desktop-App** | ✅ `.exe` | ✅ `.app` | ✅ AppImage/deb | Rust + Tauri CLI |
-| **Start-Script** | ✅ `.ps1`/`.cmd` | ✅ `.sh` | ✅ `.sh` | Node.js (optional für Proxy) |
-| **Browser direkt** | ✅ | ✅ | ✅ | Python 3 oder Node.js für Webserver |
+Ein konfiguriertes Tauri-Bundleziel ist damit nicht automatisch ein validierter
+oder ausgelieferter Desktop-Build.
 
-### Methode 1: Tauri Desktop-App
+| Laufzeit / Plattform | Build- oder Startfähigkeit | Validierungsstand in diesem Repository | Auslieferungsnachweis |
+| --- | --- | --- | --- |
+| **Browser unter Windows** | `start_suite.cmd` und `start_suite.ps1` starten lokalen Webserver und optionalen Yahoo-Proxy | HTML-Einstiege werden automatisiert mit Playwright/Chromium geprüft; Windows bleibt zusätzlich der gepflegte manuelle Nutzungspfad | Quellbetrieb, kein separates Binärartefakt |
+| **Browser unter macOS/Linux** | ES-Module können grundsätzlich über einen beliebigen lokalen HTTP-Server geladen werden; ein `start_suite.sh` gehört nicht zum Repository | keine vollständige OS-/Browser-Matrix nachgewiesen; das Browser-Gate deckt Chromium, nicht jede WebKit-/Firefox-/Datei-API-Variante ab | nicht separat paketiert |
+| **Tauri unter Windows** | dedizierter Releasepfad über `build-tauri.bat`/`npm run build-tauri-exe`; lokale Artefakte waren am 2026-07-15 vorhanden | CSP-, Rust- und Build-Contracts sind testbar; ein manueller Desktop-Smoke muss je Release gesondert dokumentiert werden | aus dem lokalen Git-Status allein nicht ableitbar |
+| **Tauri unter macOS/Linux** | `bundle.targets: "all"` beschreibt Buildabsicht auf einem passenden Host | kein aktueller Build-, Smoke- oder Signierungsnachweis in der geprüften Arbeitskopie | kein in diesem Dokument belegtes `.app`-, `.dmg`-, AppImage- oder `.deb`-Release |
 
-Die Tauri-Konfiguration (`bundle.targets: "all"`) unterstützt alle Plattformen:
+Native Builds sind host- und toolchainabhängig. Die Windows-Orchestrierung ist
+nicht als Cross-Compiler für macOS oder Linux zu lesen. Aussagen wie „native
+Desktop-App für alle Plattformen ausgeliefert“ oder feste Paketgrößen sind ohne
+Artefakt- und Releasebeleg unzulässig.
 
-**Windows:**
-```bash
-npm run build-tauri-exe
-# Output: RuhestandSuite.exe im Repo-Root
-```
+### B.1.3a Browserstart
 
-Für reine Tauri-Bundles ohne Kopierschritt kann direkt `npm run sync-dist` und danach `npm run tauri:build` verwendet werden. Das rohe Windows-Build-Artefakt heißt durch den Rust-Crate-Namen `src-tauri/target/release/ruhestand_suite.exe`.
+Ein HTTP-Ursprung ist erforderlich, weil die Suite native ES-Module und Worker
+lädt; ein direkter `file://`-Start ist kein unterstützter Hauptpfad. Unter
+Windows sind die Repository-Skripte autoritativ. Auf anderen Plattformen kann
+ein lokaler statischer Server verwendet werden, der Yahoo-Proxy und dessen
+Lifecycle müssen dann bei Bedarf separat bereitgestellt werden. Daraus folgt
+keine automatische Kompatibilitätsfreigabe für jede Browser-/OS-Kombination.
 
-**macOS:**
-```bash
-npm run sync-dist
-npm run tauri:build
-# Output: src-tauri/target/release/bundle/macos/RuhestandSuite.app
-# Optional: .dmg Installer
-```
+### B.1.3b Persistenz je Laufzeit
 
-**Linux:**
-```bash
-npm run sync-dist
-npm run tauri:build
-# Output: src-tauri/target/release/bundle/appimage/RuhestandSuite.AppImage
-# Alternativ: .deb Paket für Debian/Ubuntu
-```
+`app/shared/persistence-facade.js` kapselt das Backend, damit Feature-Module
+nicht direkt zwischen Browser-IndexedDB, Tauri-Datei und Fallback unterscheiden.
 
-**Build-Voraussetzungen:**
+| Laufzeit | Live-State | Snapshot-Archiv | Rolle von `localStorage` |
+| --- | --- | --- | --- |
+| **Browser mit IndexedDB** | Datenbank `ruhestand-suite`, Version 2, Store `kv` plus `metadata` | separater Store `snapshots` in derselben Datenbank | einmalige Legacy-Migration, danach nicht primäre Source of Truth |
+| **Tauri** | App-Daten-Datei `ruhestand_suite_data.json` | separate Datei `ruhestand_suite_snapshots.json` über Target `snapshots` | einmalige Migration erlaubter WebView-Legacy-Keys |
+| **Browser-Fallback** | Storage-like Zugriff auf `localStorage` | `rs_snapshot_archive_v1` | Fallback und Kompatibilität, nicht mit IndexedDB gleichzusetzen |
 
-| Plattform | Erforderliche Pakete |
-|-----------|---------------------|
-| **Windows** | Visual Studio Build Tools, WebView2 Runtime |
-| **macOS** | Xcode Command Line Tools, Rust |
-| **Linux** | `libwebkit2gtk-4.1-dev`, `libgtk-3-dev`, `libayatana-appindicator3-dev` |
-
-**Linux-Abhängigkeiten (Debian/Ubuntu):**
-```bash
-sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev \
-  libayatana-appindicator3-dev librsvg2-dev
-```
-
-### Methode 2: Start-Script mit lokalem Webserver
-
-**Windows (PowerShell):**
-```powershell
-# start_suite.ps1 - Startet HttpListener + Yahoo-Proxy
-.\start_suite.ps1
-# Öffnet http://localhost:8000/index.html im Browser
-```
-
-**macOS / Linux (Bash):**
-```bash
-#!/bin/bash
-# start_suite.sh - Equivalent zum PowerShell-Script
-
-PORT=8000
-PROXY_PORT=8787
-
-# Yahoo-Proxy starten (optional, für Online-Kurse)
-if [ -f "tools/yahoo-proxy.cjs" ]; then
-    node tools/yahoo-proxy.cjs &
-    PROXY_PID=$!
-    echo "Yahoo-Proxy gestartet (PID: $PROXY_PID)"
-fi
-
-# Webserver starten (Python 3)
-echo "Starte Webserver auf http://localhost:$PORT/"
-python3 -m http.server $PORT &
-SERVER_PID=$!
-
-# Browser öffnen
-sleep 1
-if command -v xdg-open &> /dev/null; then
-    xdg-open "http://localhost:$PORT/index.html"  # Linux
-elif command -v open &> /dev/null; then
-    open "http://localhost:$PORT/index.html"      # macOS
-fi
-
-# Cleanup bei Ctrl+C
-trap "kill $SERVER_PID $PROXY_PID 2>/dev/null; exit" INT TERM
-wait
-```
-
-**Alternativ mit Node.js:**
-```bash
-# Einfacher Webserver mit npx (keine Installation nötig)
-npx http-server -p 8000 -c-1
-```
-
-### Methode 3: Browser direkt (ohne Script)
-
-Für reine Offline-Nutzung ohne Online-Kursaktualisierung:
-
-```bash
-# macOS / Linux
-cd /pfad/zur/RuhestandsApp
-python3 -m http.server 8000
-# Dann im Browser: http://localhost:8000/Balance.html
-
-# Oder mit Node.js
-npx serve -p 8000
-```
-
-**Hinweis:** Ein lokaler Webserver ist erforderlich, da ES6-Module (`import`/`export`) aus Sicherheitsgründen nicht über `file://`-URLs geladen werden können.
-
-### Plattform-spezifische Hinweise
-
-**macOS:**
-- Bei M1/M2-Macs: Tauri-Build erzeugt Universal Binary (ARM + x86)
-- Gatekeeper kann unsignierte Apps blockieren → Rechtsklick → "Öffnen"
-- WebKit (Safari-Engine) ist systemseitig vorhanden
-
-**Linux:**
-- AppImage ist die portabelste Variante (funktioniert ohne Installation)
-- Für Wayland: `GDK_BACKEND=x11` vor Start setzen, falls WebView-Probleme
-- Auf älteren Distros (z.B. Ubuntu 20.04) ggf. WebKit-Version prüfen
-
-**Chromebook / WSL:**
-- Tauri funktioniert in WSL2 mit WSLg (Windows 11)
-- Alternativ: Browser-Methode mit localhost-Forwarding
-
-### Datenpersistenz über Plattformen
-
-Die Anwendung nutzt keine serverseitige Fachlogik. Persistenz wird über `app/shared/persistence-facade.js` gekapselt, damit Balance, Simulator und Profilmodule nicht direkt zwischen Browser-IndexedDB, Tauri-Datei oder Legacy-`localStorage` unterscheiden müssen.
-
-| Laufzeit | Live-Daten | Snapshot-Archiv | Rolle von `localStorage` |
-|----------|------------|------------------|--------------------------|
-| **Browser** | IndexedDB-Datenbank `ruhestand-suite`, Version 2, Store `kv` plus `metadata` | IndexedDB-Store `snapshots` in derselben Datenbank | Legacy-Migration und Fallback, nicht primäre Source of Truth |
-| **Tauri Desktop** | App-Daten-Datei `ruhestand_suite_data.json` | separate App-Daten-Datei `ruhestand_suite_snapshots.json` über Target `snapshots` | WebView-Legacy-Migration beim ersten Tauri-Start |
-| **localStorage-Fallback** | Storage-like Fallback für einfache Browserläufe | `rs_snapshot_archive_v1` als internes Archiv | Nur Fallback/Kompatibilität |
-
-**Daten-Migration zwischen Plattformen:**
-1. Komplettbackup auf der Startseite unter `Profile > Erweitert` exportieren.
-2. Auf der Zielplattform denselben Komplettimport verwenden.
-3. Jahresabschluss-Snapshots sind interne Sicherungspunkte des jeweiligen Persistenzadapters. Sie sind nicht der primäre Austauschweg zwischen Browser und Tauri.
-4. Manuelles Kopieren von `localStorage`-Keys ist nur ein Legacy-/Debug-Pfad und darf nicht als Standardmigration dokumentiert oder empfohlen werden.
+Der unterstützte Plattformwechsel läuft über das zentrale Komplettbackup und
+den bestätigten Komplettimport. Jahresabschluss-Snapshots sind adapterinterne
+Sicherungspunkte und kein Geräte- oder Profil-Merge-Format. Manuelles Kopieren
+einzelner `localStorage`-Keys ist nur ein Legacy-/Debugpfad.
 
 ---
 
@@ -543,14 +529,14 @@ Der Detailkatalog in `docs/reference/BALANCE_MODULES_README.md` ergänzt diese B
 | **Konfiguration und Utilities** | `balance-config.js`, `balance-utils.js` | App-Konfiguration, Engine-Versionserwartung, Fehlerklassen, Währungs-/Zahlen-/Prozentformatierung, Zugriff auf Engine-Konfiguration |
 | **Input und Persistenz** | `balance-reader.js`, `balance-storage.js`, `balance-guardrail-reset.js` | DOM-Input-Lesen, Input-Side-Effects, PersistenceFacade-Anbindung, internes Snapshot-Archiv, Erhalt von `lastState.taxState`, Reset-Erkennung für Guardrail-Historie |
 | **Event-Binding und Workflows** | `balance-binder.js`, `balance-binder-annual.js`, `balance-binder-imports.js`, `balance-binder-snapshots.js`, `balance-binder-diagnosis.js` | Event-Hub, Tabs, Keyboard-Shortcuts, Import/Export, Snapshot-Aktionen, Diagnose-Kopie, Jahresabschluss und Jahresupdate |
-| **Jahresupdate und Live-Daten** | `balance-annual-inflation.js`, `balance-annual-marketdata.js`, `balance-annual-modal.js`, `balance-annual-orchestrator.js` | Inflation, ETF-/CAPE-Abruf, Marktdaten-Nachrücken, ATH-Aktualisierung, Ergebnis-/Fehlerprotokoll |
+| **Jahresperiode und Live-Daten** | `balance-annual-period.js`, `balance-annual-inflation.js`, `balance-annual-marketdata.js`, `balance-annual-modal.js`, `balance-annual-orchestrator.js`, `balance-binder-snapshots.js` | stabile Kalenderperioden-ID, Doppel-Commit-/Recovery-Status, Inflation, ETF-/CAPE-Abruf, Marktdaten-Nachrücken, Snapshot-gesicherter Commit und Ergebnisprotokoll |
 | **Rendering** | `balance-renderer.js`, `balance-renderer-summary.js`, `balance-renderer-action.js`, `balance-renderer-diagnosis.js` | Summary, Marktstatus, Liquiditätsbalken, Handlungsempfehlungen, Steuer-/Cash-Aufschlüsselung, Diagnose-Container |
 | **Diagnose** | `balance-diagnosis-format.js`, `balance-diagnosis-chips.js`, `balance-diagnosis-decision-tree.js`, `balance-diagnosis-guardrails.js`, `balance-diagnosis-keyparams.js`, `balance-diagnosis-transaction.js` | Diagnose-Payload normalisieren, Status-Chips, Entscheidungsbaum, Guardrail-Karten, VPW-/Key-Parameter, Transaktionsdiagnostik |
 | **Ausgaben-Check** | `balance-expenses.js`, `balance-expenses-storage.js`, `balance-expenses-csv.js`, `balance-expenses-metrics.js`, `balance-expenses-renderer.js` | Monatsweise CSV-Importe pro Profil, Budgetvergleich, Median-basierte Jahreshochrechnung, Summary/Tabelle/Detaildialog, Storage `balance_expenses_v1` |
-| **Profilverbund-Anbindung** | `app/profile/profilverbund-balance.js`, `app/profile/profilverbund-balance-ui.js`, Profilmodule unter `app/profile/` | Profilauswahl, Multi-Profil-Aggregation, Entnahmeverteilung, Asset-Summaries, Profilwerte in Balance-Inputs |
+| **Profilverbund-Anbindung** | `balance-main-profilverbund.js`, `app/profile/profilverbund-balance.js`, `profilverbund-action-attribution.js`, `profilverbund-balance-ui.js` | Profilauswahl, ein Haushalts-Engine-Lauf, finale Quellen-/Steuerattribution, Asset-Summaries und getrennte Haushalts-/Profilzustände |
 | **Tranchen-Anbindung** | `app/tranches/depot-tranchen-status.js`, `app/tranches/*manager*.js`, `depot-tranchen-manager.html` | Detailtranchen laden, aggregieren, in Inputs synchronisieren, Kursaktualisierung und Status-Badge bereitstellen |
 
-**Aktueller Bestand (2026-05-23):** 35 JS-Module unter `app/balance/`. Profilverbund-, Profil- und Tranchenmodule liegen bewusst außerhalb dieses Ordners und werden von Balance genutzt.
+**Aktueller Bestand (Commit `6ea3e7a`, ermittelt am 2026-07-15):** 36 JS-Module unter `app/balance/`. Profilverbund-, Profil- und Tranchenmodule liegen bewusst außerhalb dieses Ordners und werden von Balance genutzt.
 
 ### B.2.1a Zentrale Modulverantwortung
 
@@ -562,7 +548,9 @@ Der Detailkatalog in `docs/reference/BALANCE_MODULES_README.md` ergänzt diese B
 | `balance-update-pipeline.js` | Fachliche UI-Pipeline nach dem Engine-Call | Formt Engine-Ergebnisse in Render-, Diagnose-, Budget- und Persistenzpayloads um; entscheidet, welche Teile persistiert und welche nur angezeigt werden |
 | `balance-action-postprocessor.js` | Nachbearbeitung der Handlungsempfehlung | Merged Profilverbund-Actions und ergänzt Single-3-Bucket-Postprocessing, ohne die Engine-Entscheidung selbst zu ersetzen |
 | `balance-binder.js` | Event-Hub | Bindet Formularänderungen, Tabs, Reset, Jahresabschluss, Import/Export, Snapshot-Aktionen, Diagnose-Kopie und Jahresupdate-Handler |
+| `balance-binder-snapshots.js` | Jahres-Commit-Coordinator | Erzwingt Preflight, synchronen Pre-Flush, validierten Recovery-Snapshot, persistierte Commit-Phasen, Post-Write-Validierung und finalen Abschluss |
 | `balance-renderer.js` | Render-Fassade | Verteilt die Darstellung auf Summary, Action und Diagnose; kapselt Toasts, Fehlermeldungen und Theme-Anwendung |
+| `profilverbund-action-attribution.js` | Haushalts-/Profilgrenze | Attribuiert die bereits finalisierte Haushaltsaktion auf eigentümerbezogene Quellen, führt je Profil genau ein Steuer-Settlement aus und blockiert Reconciliation-Abweichungen |
 
 Damit bleibt die Richtung klar: Reader und Storage übersetzen Randbedingungen in Daten, `balance-main.js` orchestriert, die Engine rechnet, Pipeline/Postprocessor bereiten auf, Renderer zeigen an, Binder verdrahtet Nutzeraktionen.
 
@@ -571,32 +559,55 @@ Damit bleibt die Richtung klar: Reader und Storage übersetzen Randbedingungen i
 Der Balance-Update-Zyklus ist in `balance-main.js` und `balance-update-pipeline.js` aufgeteilt. Vereinfacht:
 
 ```javascript
-function update() {
+async function update({ persist = true } = {}) {
+    const engineApi = assertActiveEngineHandshake(boundHandshake, window.EngineAPI);
     syncProfileDerivedInputs();
     const inputData = UIReader.readAllInputs();
+    validateBalanceInputs(inputData);
 
     const persistentState = StorageManager.loadState();
     const lastState = shouldResetGuardrailState(persistentState.inputs, inputData)
         ? preserveTaxStateOnly(persistentState.lastState)
         : persistentState.lastState;
 
-    const profilverbundRuns = maybeRunProfilverbundProfiles(inputData);
-    const modelResult = window.EngineAPI.simulateSingleYear(inputData, lastState);
+    const profiles = loadProfilverbundProfiles();
+    const profilverbundRuns = profiles.length > 1
+        ? runOneHouseholdSimulationAndAttribute(inputData, profiles)
+        : null;
+    const modelResult = profilverbundRuns?.householdResult
+        ?? engineApi.simulateSingleYear(inputData, lastState);
+    if (modelResult?.error) throw modelResult.error;
+
     const uiPayload = buildBalanceUiPayload(modelResult, profilverbundRuns);
 
     UIRenderer.render(uiPayload);
     UIRenderer.renderDiagnosis(uiPayload.diagnosis);
     updateExpensesBudget(uiPayload.budget);
-    StorageManager.saveState(buildPersistedState(persistentState, inputData, modelResult));
+    if (persist) persistSuccessfulResult(modelResult, profilverbundRuns);
+    return { ok: true, status: 'success', inputData, modelResult };
 }
 ```
 
 Wichtige Verträge:
 
-- `EngineAPI.simulateSingleYear()` bleibt der zentrale Rechenaufruf.
-- `balance-update-pipeline.js` bündelt Last-State, Diagnose-, Renderer- und Persistenzentscheidungen.
-- `balance-action-postprocessor.js` ergänzt Profilverbund-Action-Merges und Single-3-Bucket-Postprocessing.
+- Beim Bootstrap wird die konkrete `EngineAPI`-Objekt-, Versions- und
+  Methodenreferenz gebunden. Eine fehlende, inkompatible oder nachträglich
+  ausgetauschte Engine blockiert bereits vor Input-Lesen, Rechnung und
+  Persistenz; es gibt keinen stillen Cache-Busting-Scriptwechsel.
+- `EngineAPI.simulateSingleYear()` bleibt der zentrale Rechenaufruf. Single-
+  Profile erhalten einen Einzelaufruf; ein Profilverbund erhält genau einen
+  Haushaltsaufruf und danach reine Attributionen, keine technischen
+  Profil-Engine-Läufe.
+- `balance-update-pipeline.js` bündelt Last-State, Diagnose-, Renderer- und
+  Persistenzentscheidungen. Das öffentliche Update-Ergebnis unterscheidet
+  `success`, `validation_error`, `engine_error` und `blocked`; `ok` bleibt der
+  Kompatibilitätswert für Jahres- und Importaufrufer.
+- `balance-action-postprocessor.js` ergänzt 3-Bucket-Postprocessing nur im
+  Single-Profil-Pfad. Die im Profilverbund bereits einmal finalisierte
+  Haushaltsaktion wird unverändert weitergereicht.
 - Steuerzustand (`lastState.taxState`, insbesondere `lossCarry`) wird bei Guardrail-Resets erhalten, sofern nur die Guardrail-Historie invalidiert wird.
+- Persistenz ist ausschließlich im erfolgreichen Pfad erlaubt. Der
+  Import-Dry-Run nutzt denselben Update-Contract mit `persist: false`.
 
 ### B.2.2a Zustands- und Reset-Logik
 
@@ -650,57 +661,238 @@ Die Persistenzschicht ist in drei Ebenen getrennt:
 2. **Snapshot-Archiv:** `SnapshotArchive` baut und validiert kanonische Snapshots. Browser speichert sie im IndexedDB-Store `snapshots`; Tauri speichert sie in `ruhestand_suite_snapshots.json`; der localStorage-Fallback nutzt `rs_snapshot_archive_v1`. `listSnapshots()` liefert nur Indexdaten ohne `records`.
 3. **Komplettbackup/Profilbundle:** Export/Import ist der Austausch- und Recovery-Pfad zwischen Browser und Tauri. Er liest aus der Live-Persistenz, nicht aus alten Snapshot-Keys.
 
+#### B.2.4a Adapter-, Cache- und Flush-Contract
+
+```text
+Feature-Code
+   └── synchrone Storage-like API der PersistenceFacade
+         ├── In-Memory-Cache
+         ├── dirtyKeys / deletedKeys
+         └── serialisierte Flush-Kette
+               ├── Browser mit IndexedDB
+               ├── Tauri JSON File
+               └── localStorage-Fallback
+```
+
+Die Facade wählt das Backend einmal aus der Laufzeit. Erlaubte Legacy-Keys
+werden nur dann automatisch in IndexedDB beziehungsweise Tauri migriert, wenn
+das Ziel leer ist und noch kein passender Migrationsmarker existiert. Ist ein
+bereits migriertes Ziel später leer, wird nicht still wieder aus alten
+`localStorage`-Daten befüllt; stattdessen entsteht eine Recovery-Warnung.
+
+Schreibaufrufe aktualisieren zunächst den synchronen Cache und markieren Keys.
+`flush()` serialisiert konkurrierende Batches. Bei einem Adapterfehler werden
+die noch offenen Änderungen wieder als dirty/deleted vorgemerkt, statt als
+gespeichert zu gelten. `replaceLiveRecords()` arbeitet auf einem explizit
+gefilterten Delete-/Upsert-Satz; bei einem Fehler muss der sichtbare Cache auf
+den vorherigen Satz zurückkehren. Der Tauri-Schließpfad verhindert das
+Fensterschließen kurzzeitig, flusht und bestätigt das Schließen danach über
+`confirm_app_close`.
+
+#### B.2.4b Import- und Recovery-Grenzen
+
+| Vorgang | Vorbedingung und Sicherung | Write-Grenze | Fehlerverhalten |
+| --- | --- | --- | --- |
+| **Balance-Zustandsimport** | aktuelles/Legacy-Schema validieren, Inputs anwenden, kompletter Engine-Dry-Run mit `persist: false`, Pre-Flush und zurückgelesener interner Snapshot `balance-import-recovery` | ersetzt nur den kanonischen Balance-State-Key | nachgelagerte Update-/Bestätigungsfehler lösen automatischen Snapshot-Rollback aus; misslingt dieser, bleibt die Snapshot-ID für manuellen Restore sichtbar |
+| **Komplettimport** | Backup-Typ/Shape prüfen, Nutzerbestätigung und vor dem Replace heruntergeladenes Recovery-Komplettbackup; bei leerem Altbestand darf diese Datei entfallen | ersetzt alle im Bundle zugelassenen Live-Records und lädt die App neu | Recovery-Datei ist ein nutzerverwalteter Wiederimportpfad, kein behaupteter automatischer interner Rollback |
+| **Profilbundle** | profilbezogener Bundle-Contract und Registry-Prüfung | Profil-/Transfer-Keys gemäß Profilmodulen | kein Ersatz für einen Komplettbackup-Restore |
+| **Snapshot-Standard-Restore** | validiertes `persistence-records-v1` und vorhandenes `activeProfileId` in der aktuellen Registry | nur erlaubte Live-Keys des Snapshot-Profils; Registry und Snapshot-Historie bleiben erhalten | fehlende Profilzuordnung oder ungültiger Snapshot blockiert vor dem Replace |
+
 Der Jahresabschluss erzeugt den Snapshot vor Inflation, Altersfortschreibung und Ausgabenjahr-Rollover. Schlaegt der Pre-Flush oder die Snapshot-Erstellung fehl, wird der Jahresabschluss ohne Mutation abgebrochen. Schlaegt erst der Post-Mutation-Flush fehl, bleibt der Pre-Mutation-Snapshot als Recovery-Punkt erhalten und der Fehler wird gemeldet.
 
 Standard-Restore ist bewusst begrenzt. Er schreibt nur erlaubte Live-Records zurueck, erhaelt die Snapshot-Historie, bewahrt die Profil-Registry, setzt `rs_current_profile`/`rs_active_profile` auf das Snapshot-Profil und bricht ab, wenn `snapshot.activeProfileId` in der aktuellen Registry nicht mehr existiert. Er ist kein Profil-Merge und kein Austauschformat zwischen Geraeten.
 
 Legacy-Snapshots mit Prefix `ruhestandsmodell_snapshot_` werden erkannt und in das kanonische Archiv migriert, sofern sie gueltig und standard-restore-faehig sind. Archivdaten duerfen nicht in neue Live-Snapshots eingebettet werden und gehoeren weder in `ruhestand_suite_data.json` noch in normale Komplettbackup-Records.
 
+#### B.2.4c Korruption und Tauri-Quarantäne
+
+Korruption wird nicht einheitlich als „leer“ normalisiert. Der Recovery-Pfad
+hängt von der betroffenen Ownership-Grenze ab:
+
+| Betroffener Bereich | Erkennung | Schutzreaktion |
+| --- | --- | --- |
+| **Tauri-Live-Datei** `ruhestand_suite_data.json` | JSON-Parsing beim Adapter-Open schlägt fehl | Rust versucht die Datei nach `ruhestand_suite_data.corrupt.<timestamp>.json` umzubenennen; die Facade startet ohne stille Legacy-Rückmigration mit leerem Cache und `tauri-state-corrupt`-Warnung. Der lokale Quarantänepfad wird nicht in die Balance-UI kopiert. |
+| **Separates Tauri-Snapshot-Archiv** | ungültiges Archivschema oder JSON beim Öffnen | Fehler wird weitergegeben; der automatische Live-Datei-Quarantänevertrag darf nicht pauschal auf die Snapshot-Datei übertragen werden. |
+| **Ausgaben-Store** `balance_expenses_v1` | JSON-, Shape-, Versions- oder Lesefehler | Status `corrupt`, Rohinhalt bleibt erhalten und normale Writes sind gesperrt. Reset erst nach Recovery-Export und Bestätigung; ein Flushfehler stellt den Rohinhalt wieder her. |
+| **Tranchen-Store** `depot_tranchen` | korrupter JSON-Text, Schema-/Klassifikationsfehler oder doppelte IDs | `corrupt` bleibt raw-erhaltend und schreibgesperrt; Backend-/IO-Fehler heißen separat `unavailable` und bieten Retry statt Reset. |
+
+Die Tauri-Quarantäne priorisiert Startfähigkeit und Datenrettung, ist aber kein
+automatischer fachlicher Restore. Nutzer müssen den Warnzustand prüfen und
+gegebenenfalls ein Komplettbackup importieren. Umgekehrt sind die
+bereichsspezifischen `corrupt`-Zustände fail-closed: Sie erlauben keinen
+normalen Write, solange Recovery oder bestätigter Reset aussteht.
+
 ### B.2.5 Jahresupdate und Live-Daten
 
-Das Jahresupdate ist in separate Module aufgeteilt:
+Der Jahreswechsel ist kein Bündel unabhängiger Buttons mehr. Sowohl
+„Jahres-Update“ als auch „Jahresabschluss“ laufen durch denselben Coordinator in
+`balance-binder-snapshots.js`. Die fachliche Einheit ist das abgeschlossene
+Kalenderjahr mit stabiler ID `calendar-year:<YYYY>`.
 
-| Modul | Aufgabe |
-|-------|---------|
-| `balance-annual-inflation.js` | Bedarfe und kumulierte Inflation fortschreiben, Inflationsdaten via ECB -> World Bank -> OECD holen |
-| `balance-annual-marketdata.js` | ETF-Kurse über Yahoo-Proxy holen, CAPE via Yale/Mirror/r.jina.ai-Fallback abrufen, ATH/Nachrücken aktualisieren |
-| `balance-annual-modal.js` | Ergebnis- und Fehlerprotokoll anzeigen |
-| `balance-annual-orchestrator.js` | Jahresupdate sequenzieren: Alter, Inflation, ETF, CAPE, Protokoll |
-| `balance-binder-annual.js` | Binder-Integration und Event-Anbindung für die Jahresupdate-Handlers |
+| Modul | Vertrag |
+| --- | --- |
+| `balance-annual-period.js` | DOM-/persistenzfreier Plan, Status- und Doppel-Commit-Contract für Alter, Inflation, Marktdaten und Ausgaben-Rollover derselben Periode |
+| `balance-binder-snapshots.js` | In-Flight-Sperre, Preflight, Flush, validierter Recovery-Snapshot, persistierte Commit-Phasen, Post-Write-Prüfung und Abschluss/Recovery |
+| `balance-annual-orchestrator.js` | fachliche Write-Sequenz Alter -> Inflation -> ETF/Nachrücken -> CAPE -> Profil-Sync und Ergebnisprotokoll |
+| `balance-annual-inflation.js` | exaktes Zieljahr, Provider-Fallback und gemeinsame Inflationsmetrik; Bedarfs- und kumulierte Inflationsfortschreibung |
+| `balance-annual-marketdata.js` | periodengebundener ETF-Jahresendkurs, Stichtagsmetadaten, lokaler Rollback sowie davon getrennte CAPE-Provenienz |
+| `balance-annual-modal.js` | sichtbares Protokoll aller Teilschritte und Fehler |
 
-Live-Daten bleiben optional. Ohne Netzwerk oder Proxy läuft die Balance-App mit manuellen Eingaben und lokal gespeicherten Werten weiter.
+#### B.2.5a Perioden- und Statusvertrag
 
-Das Jahresupdate ist als kontrollierter Jahreswechsel gedacht, nicht als automatische Marktmeinung. Es führt mehrere technische Schritte zusammen:
+`annualPeriodMetadata` besitzt Schema 1, `lastCommittedPeriod` und entweder
+`pendingCommit: null` oder einen Recovery-Eintrag mit `periodId`, `snapshotId`
+und einer der Phasen `snapshot_confirmed`, `writes_started`, `validating`.
 
-1. Alters- und Jahreswerte werden fortgeschrieben.
-2. Bedarfe können über Inflation angepasst werden.
-3. ETF- und Tranchenpreise können über den lokalen Proxy aktualisiert werden.
-4. CAPE kann für Dynamic Flex automatisch nachgezogen werden.
-5. ATH-/Marktdaten werden aktualisiert und protokolliert.
+| Status | Bedeutung | Darf mutieren? |
+| --- | --- | --- |
+| `legacy_confirmation_required` | Altdaten besitzen noch keine Periodenmetadaten; Nutzer muss „offen“ oder „bereits abgeschlossen“ bestätigen | nein |
+| `ready` | Zieljahr, Alter, Metadaten und abgeleiteter Plan sind konsistent | erst nach Bestätigung, Flush und Snapshot |
+| `already_committed` | dieselbe Periode wurde vollständig abgeschlossen | nein; idempotenter Erfolgshinweis |
+| `incomplete_recovery` | ein Commit besitzt einen bestätigten Snapshot, ist aber nicht vollständig abgeschlossen | nein; weiterer Jahresprozess bleibt bis Restore blockiert |
+| `invalid` | Jahr, Plan, Schema, Alters- oder Metadatencontract ist verletzt | nein |
 
-Jeder Abruf hat Fallbacks oder manuelle Alternativen. Fehler in Live-Daten sollen das Planungsjahr nicht blockieren, sondern sichtbar protokolliert werden.
+Das UI-Zieljahr muss dem abgeschlossenen Kalenderjahr entsprechen und zugleich
+das aktuell angezeigte Ausgabenjahr sein. Rückwärts-Commits, manipulierte
+abgeleitete Planfelder, fehlende Snapshot-ID und die Wiederholung einer bereits
+abgeschlossenen Periode werden vor neuen Writes abgelehnt.
+
+#### B.2.5b Zustandsfolge des Jahres-Commits
+
+```text
+Vorprüfung
+  - Engine-Handshake und nebenwirkungsarmer Balance-Update-Check
+  - Jahres-ID, Alter, Metadaten, Ziel-/Ausgabenjahr und Doppel-Commit prüfen
+        │
+        ▼
+synchroner Pre-Flush
+        │
+        ▼
+Recovery-Snapshot erzeugen, wiederauflisten, lesen und Records validieren
+        │
+        ▼
+pendingCommit.phase = snapshot_confirmed persistieren
+        │
+        ▼
+pendingCommit.phase = writes_started persistieren
+        │
+        ▼
+fachliche Writes
+  Alter +1 -> Inflation -> periodengebundener ETF/ATH -> CAPE
+  -> kumulierte Inflation -> Ausgabenjahr +1
+        │
+        ▼
+pendingCommit.phase = validating persistieren
+        │
+        ▼
+Alter und Ausgaben-Folgejahr prüfen -> synchroner Post-Write-Flush
+        │
+        ▼
+lastCommittedPeriod setzen, pendingCommit löschen und final flushen
+        │
+        ├── Erfolg: already_committed
+        └── Fehler nach Snapshot: incomplete_recovery -> Snapshot-Restore nötig
+```
+
+Vor dem bestätigten Snapshot ist ein Fehler `invalid` und darf keine fachliche
+Jahresmutation hinterlassen. Nach dem Snapshot bleibt dessen ID in den
+persistierten Metadaten erhalten. Ein erneuter Klick oder App-Neustart darf
+dann keinen zweiten Snapshot und keine zweite Jahresmutation erzeugen. Erst der
+Restore des referenzierten Pre-Mutation-Snapshots hebt die Recovery-Sperre auf.
+Der Marktdatenhandler besitzt zusätzlich einen lokalen DOM-/State-Rollback für
+Fehler während seines eigenen Schritts; dieser ersetzt nicht den übergeordneten
+Jahres-Recovery-Punkt.
+
+#### B.2.5c Stichtage, Fallbacks und Provenienz
+
+„Optional live“ bedeutet, dass normale Planung mit manuell gepflegten oder
+bereits gespeicherten Werten möglich bleibt. Es bedeutet nicht, dass ein
+begonnener atomarer Jahres-Commit ungültige oder periodenfremde Daten still
+akzeptiert.
+
+| Datenbereich | Ziel-/Stichtagscontract | Provenienzfelder | Fehler- und Fallbackverhalten |
+| --- | --- | --- | --- |
+| **Inflation** | exakt das abgeschlossene Zieljahr; normalisiert auf `consumer_prices_all_items_annual_average_growth_pct`, Rate `-10` bis `50` | `rate`, `year`, `source`, `dataAsOf`, `fetchStatus`, `metric` | ECB -> World Bank -> OECD, je eigener Timeout; falsche Reihe/Jahr, Mehrdeutigkeit und unplausible Werte werden verworfen. Scheitern alle Quellen, bleiben Bedarfswerte unverändert und der Jahres-Commit wechselt in Recovery. Deflation wird nicht auf null geklemmt. |
+| **ETF/ATH** | `VWCE.DE`, UTC-Fenster 27.12. bis exklusiv 01.01. des Folgejahres; letzter gültiger Schlusskurs vom 27.-31.12. des Zieljahres, Preis `0,50` bis `100.000` EUR | `annualMarketDataMeta`: Schema, Preis, ISO-`asOf`, Ticker, Quelle, Zieljahr, Perioden-ID sowie stichtagsgleiche ATH-Auswertung | erfordert laufenden Commit in Phase `writes_started` samt Snapshot-ID. Falsches/stales Jahr, leerer Chart, unplausibler Preis oder Proxyfehler blockieren fail-closed; alte Inputs werden lokal zurückgestellt. |
+| **CAPE** | jüngster plausibler Datensatz der konfigurierten Yale-/Mirror-Ressource; nicht an denselben ETF-Stichtag gekoppelt | `capeAsOf`, `capeSource`, `capeFetchStatus`, `capeUpdatedAt` | Primary -> Mirror -> gespeicherter Wert. Ein gespeicherter oder veralteter Wert wird ausdrücklich gekennzeichnet. Ohne Quelle und ohne gespeicherten Wert entsteht ein Teilschrittfehler; beim atomaren Abschluss ist er commit-blockierend. |
+| **Tranchenquotes** | aktueller positiver EUR-Preis, Symbolgleichheit, plausible UTC-Sekunde; höchstens sieben Kalendertage alt und maximal fünf Minuten in der Zukunft | Symbol, Preis, Währung, Quote-Zeit und Quelle im Quote-Ergebnis | Batch dedupliziert Symbole, schreibt gültige Teilerfolge einmal und lässt fehlerhafte Lots unverändert; ohne Erfolg kein Write. Keine implizite FX-Konvertierung. |
+
+`docs/reference/DATA_SOURCES.md` ist die operative Quellen- und
+Provenienzreferenz. Ein Abrufzeitpunkt ersetzt dort nicht den fachlichen
+Datenstichtag (`asOf` beziehungsweise `dataAsOf`).
 
 ### B.2.6 Profilverbund und Tranchen
 
-Balance nutzt dieselbe Profilbasis wie Simulator und Startseite:
+Balance nutzt dieselbe Profilregistry wie Simulator und Startseite.
+`balance-main-profile-sync.js` spiegelt Einzelprofilwerte in die Balance-Inputs;
+`balance-main-profilverbund.js` orchestriert dagegen einen gemeinsamen
+Haushaltslauf. Detailtranchen ersetzen dabei die zugehörigen aggregierten
+Depotwerte, damit Vermögen nicht doppelt gezählt wird. Jede zusammengeführte
+Tranche trägt eine haushaltsweit eindeutige `trancheId` und ihre
+`sourceProfileId`.
 
-- Die Profilverwaltung liegt unter `app/profile/`; `index.html` ist der zentrale Einstieg für Profil-/Haushaltsverwaltung.
-- `balance-main-profile-sync.js` spiegelt Profilwerte in Balance-Inputs.
-- `balance-main-profilverbund.js` und `app/profile/profilverbund-balance.js` führen Multi-Profil-Läufe aus, aggregieren Bedarf/Renten/Vermögen und verteilen Entnahmen.
-- Detailtranchen ersetzen aggregierte Depotwerte in Asset-Summaries, wenn plausible Tranchen vorhanden sind, damit Werte nicht doppelt gezählt werden.
-- Entnahmen nutzen Cash/Geldmarkt vor Detailtranchenauswahl; Detailverkäufe behalten Tranche und Profilherkunft für spätere Steuer-/Portfolio-Pfade.
+```text
+aktive Profile und eigentümerbezogene Tranchen
+        │
+        ▼
+Haushaltsbedarf, Renten, Vermögen und Detailtranchen aggregieren
+        │
+        ▼
+genau ein EngineAPI.simulateSingleYear(householdInput, householdLastState)
+        │
+        ▼
+finale Haushaltsentnahme und Haushaltsverwendungen
+        │
+        ├── optional: 3-Bucket-Aktion einmal auf Haushaltsebene finalisieren
+        ▼
+Entnahme und Quellen auf Profile/Lots attribuieren
+        │
+        ▼
+je Eigentümer genau ein Steuer-Settlement
+        │
+        ▼
+Haushaltssummen und Liquiditäts-KPIs reconciliieren oder fail-closed abbrechen
+```
 
-Die Tranchenverwaltung selbst ist in `depot-tranchen-manager.html` und `app/tranches/` gekapselt. Balance konsumiert den daraus synchronisierten Status und die aggregierten Werte.
+Es gibt im technischen Multi-Profil-Pfad keine nachgelagerten
+Einzelprofil-Engine-Läufe. Die profilbezogenen Ergebnisobjekte sind reine
+Attribution der bereits getroffenen Haushaltsentscheidung; sie dürfen keinen
+zweiten Spending-, Guardrail-, 3-Bucket- oder Transaktionszweck erzeugen.
 
-**Profilverbund-Aggregation:** Balance führt mehrere Profile zu einem Haushalt zusammen. Dabei werden Bedarfe, Renten und Vermögenswerte addiert; konservative Parameter wie Liquiditätsziele oder Risiko-Defaults dürfen nicht durch einfache Mittelwerte verwässert werden. Für die Entnahmeverteilung stehen fachlich drei Modi im Vordergrund:
+**Zustands- und Steuerownership:** Der gemeinsame Engine-Folgezustand hält
+Guardrail-, VPW- und Marktgedächtnis als `profilverbundHouseholdLastState`. Sein
+temporäres Engine-Steuerergebnis wird nicht als gemeinsamer Verlusttopf
+fortgeschrieben. Jedes Profil behält stattdessen seinen eigenen
+`lastState.taxState`, Sparer-Pauschbetrag und Kirchensteuersatz. Nach der
+Quellenattribution wird `settleTaxYear()` je Eigentümer genau einmal auf dessen
+signierte Rohaggregate angewandt; `taxStateNext` geht nur an dieses Profil.
+Haushalts-Guardrail-State und profilbezogene Steuerzustände bleiben damit
+getrennte Sources of Truth.
+
+Für die Entnahme- und Quellenauswahl bestehen drei Modi:
 
 | Modus | Prinzip | Zweck |
 |-------|---------|-------|
-| `tax_optimized` | Profile/Tranchen mit niedriger erwarteter Steuerlast zuerst | Standard für steuerarme Entnahmen |
-| `proportional` | Entnahme nach Vermögensanteil | gleichmäßigere Belastung der Profile |
-| `runway_first` | Liquiditäts-/Runway-Ziele priorisieren | Haushalte mit unterschiedlich gefüllten Cash-Puffern |
+| `tax_optimized` | Profile und konkrete Tranchen nach der marginalen profilbezogenen Steuerwirkung auswählen | Verlusttopf und Pauschbetrag des Eigentümers berücksichtigen |
+| `proportional` | Entnahme nach verfügbarem Vermögensanteil verteilen | Profile proportional belasten |
+| `runway_first` | Profilverteilung nach positiven Runway-Zielgewichten bilden | unterschiedliche Liquiditätspuffer in der Verteilung berücksichtigen |
+
+Die Attribution arbeitet centgenau und fail-closed: Der beschlossene
+Haushaltsbedarf muss vollständig verteilbar sein; jede Verkaufsquelle braucht
+eine bekannte `sourceProfileId` und vollständige signierte Steuerrohwerte; die
+Summe der finalen Nettoquellen muss innerhalb von 0,01 EUR den unveränderten
+Haushaltsverwendungen entsprechen. Fehlende Kapazität, Provenienz oder
+Reconciliation bricht den gesamten Multi-Profil-Pfad ab. Erst nach erfolgreicher
+Attribution werden Haushaltssteuer, Diagnose und Liquiditäts-KPIs aus den
+finalen Quellen neu aufgebaut.
 
 **Tranchen-Contract:** Detailtranchen sind mehr als UI-Komfort. `types/tranche-contract.js` erzwingt Schema 1, eindeutige Lot-IDs, endliche Finanzwerte, explizite TQF und eine disjunkte Kategorie-/Typ-Matrix. Marktwert und Einstand werden aus Stueckzahl und Preisen abgeleitet. Gueltige unversionierte Altdaten werden deterministisch gelesen. Der Persistenz-Lesepfad migriert dabei ausschliesslich den von der frueheren Manager-UI erzeugbaren Fall eines alten Aktien-Typs unter einer eindeutigen Nicht-Aktien-Kategorie; Schema 1 und Engine-Eingaben bleiben strikt. Nicht automatisch behebbare Widersprueche, Duplikate und korrupter JSON-Rohtext bleiben unveraendert und blockieren fail-closed. Bei mehrprofiligen Haushalten muessen `trancheId` und `sourceProfileId` erhalten bleiben, damit spaetere Reduktionen nicht versehentlich Cost Basis oder Profilherkunft vermischen.
+
+Der automatische Quote-Pfad akzeptiert nur positive EUR-Kurse mit Symbol,
+Quelle und plausibler UTC-Zeit. Gültige Teilergebnisse eines deduplizierten
+Batches werden in einem Commit geschrieben; fehlerhafte Lots behalten ihren
+vorherigen Kurs. Eine implizite Fremdwährungsumrechnung ist nicht Teil des
+Contracts.
 
 Balance und Simulator sind schreibfrei gegen den Realbestand. Erst eine tatsaechliche Broker-Ausfuehrung darf im Profil-Assets-Manager nach schreibfreier Vorschau und separater Bestaetigung reconciliert werden. Der Write umfasst Live-Lot, profilgebundenes Lot und datensparsamen Auditverlauf in einem Flush; identische Wiederholungen sind No-ops. Die vollstaendige Modulgrenze steht in `TRANCHEN_MODULES_README.md`.
 
@@ -743,7 +935,7 @@ Der Simulator ist deshalb nicht nur ein UI-Wrapper um `EngineAPI.simulateSingleY
 | **Ergebnisdarstellung** | `simulator-results.js`, `results-metrics.js`, `results-renderers.js`, `results-formatting.js`, `simulator-formatting.js`, `simulator-main-helpers.js` | KPI-Karten, Szenario-/Backtest-Logs, CSV/JSON-Export, Spaltenkonfiguration, Formatierung |
 | **Daten und Shared Utilities** | `simulator-data.js`, `simulator-utils.js`, `cape-utils.js`, `app/shared/shared-formatting.js` | Historische Daten, Mortalität/Pflege/Stress-Presets, RNG/Statistik, CAPE-Kandidaten, gemeinsame Formatter |
 
-**Aktueller Bestand (2026-07-04):** 95 JS-Module unter `app/simulator/`. Profil-, Tranchen- und Shared-Module liegen teilweise außerhalb des Simulator-Ordners, sind aber Teil des fachlichen Datenflusses.
+**Aktueller Bestand (Commit `6ea3e7a`, ermittelt am 2026-07-15):** 95 JS-Module unter `app/simulator/`. Profil-, Tranchen- und Shared-Module liegen teilweise außerhalb des Simulator-Ordners, sind aber Teil des fachlichen Datenflusses.
 
 ### B.3.2 Hauptflüsse
 
@@ -899,7 +1091,7 @@ Ziel-Liquidität und Liquiditäts-Gates liegen in `transaction-utils.mjs` und we
 
 ### B.4.2 Öffentliche API
 
-`EngineAPI` stellt einen kleinen, stabilen Vertrag bereit:
+Der unterstützte fachliche `EngineAPI`-Vertrag umfasst fünf operative Methoden:
 
 | Methode | Zweck |
 |---------|-------|
@@ -909,7 +1101,100 @@ Ziel-Liquidität und Liquiditäts-Gates liegen in `transaction-utils.mjs` und we
 | `calculateTargetLiquidity(profil, market, inflatedBedarf)` | berechnet das Liquiditätsziel für Profil und Marktregime |
 | `simulateSingleYear(input, lastState)` | führt die vollständige Jahresrechnung aus |
 
-`simulateSingleYear()` ist der Normalpfad für Balance, Simulator und Tests. Fehler werden als `AppError`-/`ValidationError`-Objekte im Ergebnis zurückgegeben, nicht als ungefangene UI-Ausnahme.
+`simulateSingleYear()` ist der Normalpfad für Balance, Simulator und Tests. Sein
+Fehler-Envelope ist methodenspezifisch und wird in B.4.2b beschrieben; es darf
+nicht pauschal auf die beiden Rechenhilfen `analyzeMarket()` und
+`calculateTargetLiquidity()` übertragen werden.
+
+Die enumerable Objektoberfläche enthält zusätzlich die drei als `@deprecated`
+markierten No-op-Kompatibilitäts-Stubs `addDecision()`, `updateDecision()` und
+`removeDecision()`. Damit exponiert das Laufzeitobjekt insgesamt acht Methoden,
+obwohl nur die fünf Methoden aus der Tabelle fachlich implementiert und für
+Aufrufer unterstützt sind. Die Stubs haben keine Implementierung, keinen
+Rückgabevertrag und keine fachlichen Seiteneffekte; neue Aufrufer dürfen sie
+nicht verwenden. Ihre spätere Entfernung wäre eine gesonderte Änderung der
+sichtbaren EngineAPI-Oberfläche und benötigt eine eigene Contractentscheidung
+und Validierung.
+
+#### B.4.2a Eingabe- und Vorzustandsvertrag
+
+`simulateSingleYear(rawInput, lastState)` erwartet zwei plain Objects; der
+Vorzustand ist optional. Die Engine hat keinen Speicherzugriff: Aufrufer
+entscheiden erst nach einem erfolgreichen Ergebnis, ob und wohin der gelieferte
+Folgezustand persistiert wird.
+
+| Eingangsbereich | Vertrag |
+| --- | --- |
+| **Rohinput** | `_normalizeEngineInput()` übernimmt kompatible Aliasfelder und definierte Defaults. Numerische Legacy-Vermögensfelder mit `NaN`/`Infinity` werden nach dem bestehenden Kompatibilitätsvertrag auf null normalisiert; daraus folgt keine allgemeine Erlaubnis für beliebige Strings an strikten Feldern. |
+| **Validierung** | `InputValidator.validate()` prüft Pflichtfelder, endliche Werte, Bereiche und fachliche Beziehungen vor der Modellrechnung. Fehler besitzen `fieldId` und `message`. |
+| **Aktuelle Liquidität** | `aktuelleLiquiditaet` ist optional. Fehlt sie, gilt `tagesgeld + geldmarktEtf`; ist sie vorhanden, muss sie eine endliche, nichtnegative Zahl sein. Lokalisierte Zahlstrings gehören in den UI-Parser, nicht in diesen Engine-Vertrag. |
+| **Mindest-Flex** | Ein endlicher numerischer Wert wird als Eingabe validiert: negativ oder größer als `flexBedarf` führt zum Feldfehler, nicht zu einem stillen Clamp. Ein nichtnumerischer Legacy-Wert folgt weiterhin dem ausdrücklich getesteten Kompatibilitätsfallback auf null. |
+| **Detailtranchen** | `detailledTranches` müssen vor Verkauf als kanonische, eindeutig klassifizierte Lots mit stabiler ID, Cost Basis, TQF und gegebenenfalls `sourceProfileId` vorliegen. Ungültige Lots dürfen nicht als aggregierter Ersatzverkauf kaschiert werden. |
+| **Vorzustand** | `lastState` enthält Guardrail-/VPW-Historie und optional `taxState.lossCarry`. Ein fehlender Zustand wird initialisiert; ein Verlustvortrag wird als nichtnegative endliche Größe gelesen. Der Rückgabewert `newState` ist der alleinige Nachfolger für den nächsten Jahresaufruf. |
+
+Normalisierung ist damit ein versionierter Kompatibilitätsschritt, Validierung
+das fachliche Gate. Sie darf nicht dazu verwendet werden, neue ungültige
+Eingaben still in scheinbar gültige Geschäftsparameter umzudeuten.
+
+#### B.4.2b Ergebnis- und Fehlervertrag
+
+| Aufruf | Erfolg | Fehlergrenze |
+| --- | --- | --- |
+| `simulateSingleYear()` | `{ input, newState, diagnosis, ui }`; `input` ist normalisiert, `newState` der Folgezustand, `diagnosis` die Begründung und `ui` das anwendungsnahe Jahresergebnis | `{ error: ValidationError }` bei Feldfehlern; `{ error: AppError }` bei erwarteten oder abgefangenen unerwarteten Enginefehlern. Es gibt kein partielles Erfolgsobjekt. |
+| `analyzeMarket()` | direktes Marktanalyseobjekt | historisch abweichend `{ error: <string> }`; kein `AppError`-Envelope |
+| `calculateTargetLiquidity()` | direkte endliche Zielgröße aus Profil, Markt und Bedarf | keine eigene Catch-/Envelope-Grenze; Aufrufer müssen gültige Vorbedingungen liefern |
+| `getVersion()` / `getConfig()` | Versionsobjekt beziehungsweise Konfiguration | keine fachliche Jahresrechnung |
+
+`ValidationError.errors` ist eine Liste aus `{ fieldId, message }` und wird von
+UI-Aufrufern zur Feldmarkierung ausgewertet. Ein unerwarteter Fehler in
+`simulateSingleYear()` wird in einen allgemeinen `AppError` mit
+`originalError` im Kontext gekapselt. `FinancialCalculationError` existiert als
+spezialisierte Klasse, ist aber kein Versprechen, dass jeder denkbare
+Rechenfehler bereits genau mit diesem Typ klassifiziert wird.
+
+Balance, Simulator und Profilverbund müssen deshalb zuerst `result.error`
+prüfen. Erst ein vollständiger Erfolg darf gerendert oder persistiert werden;
+die Engine selbst kann wegen ihrer IO-Freiheit weder Teilzustand speichern noch
+einen Persistenz-Rollback ausführen.
+
+#### B.4.2c Settlement- und Cash-Reconciliation-Vertrag
+
+```text
+steuerbewusste Verkaufsplanung
+  └── Plansteuer und Nettoerlös zur Mengenermittlung
+        │
+        ▼
+signierte Rohaggregate aller geplanten Verkäufe
+  - sumRealizedGainSigned
+  - sumTaxableAfterTqfSigned
+        │
+        ▼
+settleTaxYear(taxStatePrev, Pauschbetrag, Kirchensteuer)
+        │
+        ├── taxDue + Settlementdetails
+        └── taxStateNext.lossCarry
+        │
+        ▼
+Planreserve gegen finale Steuer reconciliieren
+        │
+        └── action, diagnosis und newState konsistent ausgeben
+```
+
+Die Sale-Engine darf für die Brutto-/Netto-Planung eine vorläufige Steuer
+verwenden. Die offizielle Jahressteuer entsteht danach genau einmal aus den
+signierten Rohaggregaten. Das Settlement verrechnet zuerst den profilbezogenen
+Verlustvortrag, dann den Sparer-Pauschbetrag und anschließend den Steuersatz
+einschließlich Solidaritätszuschlag und konfigurierter Kirchensteuer. Ergebnis
+sind `taxDue`, `taxStateNext` und erklärende `details`.
+
+Im Engine-Jahreslauf wird die Differenz zwischen Planreserve und finaler Steuer
+als `taxCashAdjustment` in die Liquiditätsverwendung zurückgeführt. Übersteigt
+die finale Steuer die Planreserve um mehr als 0,01 EUR, bricht der Contract ab,
+statt eine ungedeckte Verwendung auszugeben. Zusätzliche Forced Sales des
+Simulators lösen einen Gesamt-Recompute über reguläre und erzwungene Verkäufe
+aus; Verlusttopf und Pauschbetrag dürfen nicht zweimal verbraucht werden. Im
+Profilverbund wird dasselbe Settlement nach der Haushaltsentscheidung je
+Eigentümer genau einmal ausgeführt (B.2.6).
 
 ### B.4.3 Jahrespipeline in `core.mjs`
 
@@ -1011,8 +1296,12 @@ Die wichtigsten fachlichen Bremsen sind:
 
 Verkäufe laufen über `sale-engine.mjs`. Die Eingangsgrenze akzeptiert nur kanonisch validierte, eindeutig klassifizierte Lots. Bei Detailtranchen werden `trancheId`, `sourceProfileId`, `isin`, Kaufdatum, Cost Basis und TQF mitgeführt. Die Reihenfolge ist steuerbewusst:
 
-- Aktien/ETF werden primär nach niedriger effektiver Steuerlast sortiert.
-- Gold wird nach Kaufdatum FIFO behandelt und kann nach Spekulationsfrist steuerfrei sein.
+- Aktien/ETF werden primär nach niedriger effektiver Steuerlast und danach nach
+  niedriger nichtnegativer Gewinnquote sortiert; der Datums-Tie-Breaker
+  bevorzugt neuere Lots.
+- Gold wird untereinander nach älterem Kaufdatum zuerst sortiert. Eine
+  modellierte Steuerfreiheit entsteht nur durch das explizite Nutzerflag
+  `goldSteuerfrei`, nicht automatisch aus der Haltedauer.
 - Bonds/Anleihen verwenden kanonisch die Kategorie `bonds` mit Typ `anleihe`.
 - Im defensiven Kontext können Gold/Bonds vor Aktien genutzt werden.
 
@@ -1034,19 +1323,21 @@ Balance und Simulator nutzen die gleiche Erkennung für Bond-Tranchen. Der Simul
 
 ## B.5 Test-Suite und Validierungsregeln
 
-**Übersicht:** Die Test-Suite umfasst in der geprüften Arbeitskopie **101 `*.test.mjs`-Dateien**. Assertions und Coverage sind Ergebnisse eines konkreten Laufs und werden deshalb nicht als dauerhafte Architekturkennzahl festgeschrieben; aktuelle Baselines und Gate-Kommandos stehen in `tests/README.md`. Die Tests laufen ohne Jest/Mocha über native Node.js-ESM-Module und eigene globale Assertions (`assert`, `assertEqual`, `assertClose`).
+**Übersicht:** Die Test-Suite umfasst in Commit `6ea3e7a` **107 entdeckte `*.test.mjs`-Dateien**. Davon führt das Node-Standardgate 106 aus; `browser-smoke.test.mjs` bleibt ein separates Pflichtgate. Die Zahlen wurden am 2026-07-15 per Dateiinventar geprüft; die in `tests/README.md` dokumentierte Runner-Baseline wurde am 2026-07-14 mit `npm test` verifiziert. Assertions und Coverage sind Ergebnisse eines konkreten Laufs und werden deshalb nicht als dauerhafte Architekturkennzahl festgeschrieben. Die Node-Tests laufen ohne Jest/Mocha über native ESM-Module und eigene globale Assertions (`assert`, `assertEqual`, `assertClose`).
 
 ### B.5.1 Test-Inventar
 
 | Kategorie | Repräsentative Dateien | Fokus |
 |-----------|------------------------|-------|
-| **Engine Core & Validation** | `core-engine.test.mjs`, `engine-robustness.test.mjs`, `market-analyzer.test.mjs`, `regime-signals.test.mjs`, `historical-data-robustness.test.mjs`, `tauri-csp.test.mjs` | EngineAPI-Vertrag, Fehlerrobustheit, Marktregime, kontinuierliche Regime-Signale, historische Daten, Tauri-CSP |
+| **Engine Core & Validation** | `core-engine.test.mjs`, `core-negative-contracts.test.mjs`, `engine-robustness.test.mjs`, `market-analyzer.test.mjs`, `regime-signals.test.mjs`, `historical-data-robustness.test.mjs` | EngineAPI-Erfolg/Fehler, strikte optionale Inputs, Fehlerrobustheit, Marktregime und historische Daten |
 | **Spending, VPW und 3-Bucket** | `spending-planner.test.mjs`, `spending-quantization.test.mjs`, `vpw-dynamic-flex.test.mjs`, `dynamic-flex-horizon.test.mjs`, `3bucket-config.test.mjs`, `3bucket-refill.test.mjs` | Guardrails, Rundung, VPW-Horizonte, Dynamic-Flex-Safety, 3-Bucket-Parameter und Bond-Refill |
-| **Transaktionen, Steuern, Tranchen** | `transaction-*.test.mjs`, `tax-settlement.test.mjs`, `core-tax-settlement.test.mjs`, `depot-tranches.test.mjs`, `tranchen-manager-*.test.mjs` | Verkäufe, Rebalancing, Gold/Liquidität, Rohaggregate, Jahres-Settlement, Cost-Basis- und Tranchenverwaltung |
-| **Balance-App** | `balance-smoke.test.mjs`, `balance-reader.test.mjs`, `balance-storage*.test.mjs`, `balance-annual-*.test.mjs`, `balance-diagnosis-*.test.mjs`, `balance-expenses.test.mjs`, `balance-renderer-*.test.mjs` | Initialisierung, DOM-Input, Storage/Snapshots, Jahresupdate, CAPE, Diagnose, Ausgaben-Check, Rendering |
+| **Transaktionen, Steuern, Tranchen** | `transaction-*.test.mjs`, `tax-settlement.test.mjs`, `core-tax-settlement.test.mjs`, `tranche-contract.test.mjs`, `tranche-reconciliation.test.mjs`, `depot-tranches.test.mjs`, `tranchen-manager-*.test.mjs` | Verkäufe, Rohaggregate, Jahres-Settlement, kanonischer Lot-Contract, Cost Basis und bestätigtes idempotentes Realbestands-Reconcile |
+| **Balance-Jahresprozess** | `balance-annual-period.test.mjs`, `balance-annual-workflow-contract.test.mjs`, `balance-binder-snapshots.test.mjs`, `balance-annual-inflation.test.mjs`, `balance-annual-marketdata.test.mjs`, `balance-annual-cape.test.mjs` | Perioden-ID, Doppel-Commit-Sperre, Phasen, Snapshot-Read-back, Recovery sowie Stichtags-/Provenienzverträge |
+| **Persistenz und Recovery** | `persistence.test.mjs`, `snapshot-archive.test.mjs`, `snapshot-key-policy.test.mjs`, `balance-storage-contract.test.mjs`, `profile-storage.test.mjs` | Adapterwahl, Cache/Flush, Migration, Live-Replace, Snapshot-Archiv, Import-/Profilgrenzen und Korruptionszustände |
+| **Balance-App** | `balance-smoke.test.mjs`, `balance-reader.test.mjs`, `balance-diagnosis-*.test.mjs`, `balance-expenses.test.mjs`, `balance-renderer-*.test.mjs` | Initialisierung, DOM-Input, Diagnose, Ausgaben-Check und Rendering |
 | **Simulator, Monte Carlo, Sweep, Optimierung** | `simulation.test.mjs`, `simulator-*.test.mjs`, `monte-carlo-*.test.mjs`, `auto-optimizer.test.mjs`, `auto-optimize-worker-contract.test.mjs`, `scenario-analyzer.test.mjs`, `scenarios.test.mjs`, `care-meta.test.mjs`, `health-bucket.test.mjs`, `portfolio.test.mjs` | Jahresloops, Backtest, MC-Sampling, Worker-Merge, Sweep, mehrphasige Auto-Optimize-Pipeline, Pflege, Pflegebucket, Szenarien, Portfolio |
 | **Neue stochastische und VPW-Contracts** | `stationary-bootstrap-contract.test.mjs`, `stationary-bootstrap-sampler.test.mjs`, `tail-risk-contract.test.mjs`, `tail-risk-overlay.test.mjs`, `longevity-*.test.mjs`, `vpw-return-policy.test.mjs`, `regime-signals.test.mjs` | Parametergrenzen, deterministische Schedules/Sampler, Nicht-Mutation, Anti-Doppelpessimismus, Horizontpuffer, CAPE-Fallbacks und kontinuierliche Signale |
-| **Profile und Profilverbund** | `profile-storage.test.mjs`, `profile-state.test.mjs`, `profile-navigation.test.mjs`, `profile-asset-values.test.mjs`, `profilverbund-*.test.mjs`, `simulator-multiprofile-aggregation.test.mjs` | Profilregistry, Navigation/State, Assetwerte, Multi-Profil-Aggregation, profilbezogene Tranchen |
+| **Profile und Profilverbund** | `profile-storage.test.mjs`, `profile-state.test.mjs`, `profile-navigation.test.mjs`, `profile-asset-values.test.mjs`, `profilverbund-balance.test.mjs`, `profilverbund-profile-gold-overrides.test.mjs`, `simulator-multiprofile-aggregation.test.mjs` | Profilregistry, Navigation/State, genau ein Haushaltslauf, Quellen-/Steuerattribution, Reconciliation, profilbezogene Tranchen und Simulatoraggregation |
 | **Worker, Utilities und Formatierung** | `worker-parity.test.mjs`, `worker-pool.test.mjs`, `utils.test.mjs`, `formatting.test.mjs`, `feature-flags.test.mjs` | deterministische Worker-Parität, Pool-Lifecycle, RNG/Statistik, Formatter, Feature-Flags |
 
 ### B.5.2 Ausführung und Validierung
@@ -1093,30 +1384,169 @@ Der aktuelle Paritaetstest umfasst explizit auch Continuous-CAPE, Langlebigkeits
 
 ---
 
-# Fachliche Algorithmen
+# Fachkonzept und Rechenkonventionen
+
+Dieser Teil beschreibt die fachliche Bedeutung der Eingaben und Ergebnisse.
+Die technische Modulzuordnung steht in Teil B. Zur schnellen Orientierung:
+[Glossar](#verbindliches-glossar),
+[Jahreslauf](#rechnungs--und-ereigniszeitachse),
+[Fachinvarianten](#zentrale-fachinvarianten),
+[Nutzerentscheidungen und Automatik](#nutzerentscheidungen-und-automatische-policies),
+[Floor/Flex](#c1-floor-flex-guardrail-system),
+[Steuern](#c2-steuer-engine),
+[Monte Carlo](#c3-monte-carlo-methodik),
+[Pflege](#c4-pflegefall-modellierung),
+[Liquidität](#c5-liquiditäts-targeting),
+[Rente](#c7-rentensystem-gesetzliche-private-rente),
+[Dynamic Flex](#c11-dynamic-flex-vpw-variable-percentage-withdrawal) und
+[Modellgrenzen](#annahmen-modellgrenzen-und-validierung).
+
+## Verbindliches Glossar
+
+| Begriff | Bedeutung in der Suite | Wichtige Abgrenzung |
+|---------|-------------------------|---------------------|
+| **Bedarf** | Für das jeweilige Modelljahr eingegebener beziehungsweise fortgeschriebener nominaler Jahresbetrag. | Kein statistisch geschätzter Lebensbedarf und keine automatische Ist-Ausgabe. |
+| **Floor** | Nicht verhandelbarer Jahresbedarf. Im Simulator kann der Pflegezusatz den Floor erhöhen. Nach Rentenverrechnung bezeichnet `inflatedBedarf.floor` trotz des historischen Feldnamens den aktuellen nominalen **Netto-Floor**. | Nicht mit freier Liquidität, Mindestreserve oder Gesamtentnahme gleichsetzen. |
+| **Flex-Basis** | Verhandelbarer Jahresbedarf vor Anwendung der Flex-Rate. Bei Dynamic Flex kann VPW diese Basis ersetzen; ein Rentenüberschuss oberhalb des Floor reduziert sie. | Noch nicht der tatsächlich freigegebene Flex-Betrag. |
+| **Effektiver Flex** | Flex-Basis multipliziert mit der nach Policies wirksamen Flex-Rate. | Mindest-Flex, Budgets und Glättung können den Policy-Wert anheben oder begrenzen. |
+| **Nominal** | Geldbetrag in Preisen des betrachteten Modelljahres. | Die Engine erwartet den aktuellen Jahreswert; sie inflationsindexiert den Bedarf nicht nochmals intern. |
+| **Real** | Auf ein Basisjahr deflationierter Betrag. | Nur als real interpretieren, wenn ein kumulierter Inflationsfaktor tatsächlich fortgeschrieben und angewandt wurde; siehe MR-09 beziehungsweise PD-01. |
+| **Runway** | Frei verfügbare Liquidität geteilt durch den aktuellen jährlichen Netto-Bedarf aus Floor und effektivem Flex, ausgedrückt in Monaten. | Keine Überlebenswahrscheinlichkeit und keine garantierte Mindestreichweite des Gesamtvermögens. |
+| **Reserve** | Sammelbegriff, der nur zusammen mit seinem Typ verwendet werden soll: freie Liquidität, Runway-Ziel, Gold-Floor oder Pflegebucket. | Die vier Größen haben unterschiedliche Verfügbarkeit und Rechenwirkung. |
+| **Aktives Gesamtvermögen** | Aktien-, Gold- und freie Liquiditätsbestände, die der Entnahmeplanung zur Verfügung stehen; ein aktivierter Pflegebucket ist herausgerechnet. | Kein vollständiger Haushalts-Net-Worth und kein frei erweiterbares Multi-Asset-Portfolio. |
+| **Erfolg** | Monte-Carlo-Lauf ohne `isRuin` bis zum fachlichen Laufende. Ein Lauf, der wegen Tod aller modellierten Personen endet, gilt ohne vorherigen Ruin als erfolgreich. | Keine Garantie für eine reale Ruhestandsplanung und keine Aussage, dass alle Wunschentnahmen vollständig erfüllt wurden. |
+| **Ruin** | Im Simulator ein Zustand, in dem das aktive Gesamtvermögen nach den vorgesehenen Finanzierungswegen den jährlichen Netto-Floor nicht mehr deckt oder der Auszahlungs-Fallback den Netto-Floor nicht finanzieren kann. | Ein reiner Liquiditätsengpass ist noch kein Ruin, solange Floor-Deckung durch verwertbares aktives Vermögen möglich ist. Validierungsfehler werden im direkten Simulatorpfad ebenfalls als fehlgeschlagener Lauf gezählt. |
+| **Pflegebucket** | Optional abgetrennter, cash-naher Haushalts-State zur Finanzierung definierter Pflegekosten ab einem konfigurierten Pflegegrad. | Außerhalb von VPW-, Runway- und normaler Entnahmebasis; keine Pflegeversicherung und keine automatische Wiederauffüllung. |
+| **Steuerschätzung** | Parametrisiertes Jahres-Settlement aus realisierten, nach Teilfreistellung gewichteten Gewinnen/Verlusten, Verlustvortrag, Sparer-Pauschbetrag und pauschaler KESt/Soli/KiSt-Formel. | Keine vollständige deutsche Steuerveranlagung. |
+
+## Rechnungs- und Ereigniszeitachse
+
+### Simulator: ein Modelljahr
+
+Der Simulator führt Markt-, Lebens- und Finanzereignisse in einer festen
+Reihenfolge aus. Damit ist insbesondere festgelegt, ob ein Wert zum aktuellen
+Jahr oder bereits zum Folgejahr gehört.
+
+| Phase | Fachlicher Schritt | Zeitbezug und Grenze |
+|-------|--------------------|----------------------|
+| 1 | Jahresdatensatz und Zufallsströme bestimmen | Marktjahr, Pflege und Mortalität werden aus den konfigurierten Sampling-/RNG-Pfaden abgeleitet. |
+| 2 | Pflegezustand fortschreiben, danach Mortalität ziehen | Pflege kann die Ansparphase beenden und die Mortalitätsannahme des aktuellen Jahres beeinflussen. Endet der Haushalt durch Tod aller Personen, endet der Lauf vor dem Finanzschritt. |
+| 3 | Renditen auf Anfangsbestände anwenden | Aktien und Gold verwenden die gezogenen Jahresrenditen; der vereinfachte Bond-Bucket verwendet den Cash-Rate-Proxy. |
+| 4 | Aktuellen nominalen Bedarf bilden | Pflegekosten erhöhen gegebenenfalls den Floor. Renten werden zuerst mit dem Floor und ein verbleibender Überschuss mit Flex verrechnet. |
+| 5 | Engine-Planung ausführen | Marktregime, optionales VPW, Guardrails, Mindest-Flex, Liquiditätsziel, geplante Verkäufe und vorläufiges Jahres-Settlement werden ermittelt. |
+| 6 | Plan auf Simulatorbestände anwenden | Geplante Verkäufe und Umschichtungen verändern die simulierten Bestände, nicht die operativen Bestände in Balance. |
+| 7 | Auszahlung sicherstellen | Ein ausgelöster Pflegebucket wird vor erzwungenen Verkäufen eingesetzt; verbleibende Deckungslücken können Forced Sales auslösen. |
+| 8 | Zins, Steuer und Endbestände finalisieren | Freie Liquidität und ein verbleibender Pflegebucket erhalten den Cash-Ertrag. Danach wird das Jahres-Settlement unter Einbezug zusätzlicher Verkäufe aus allen Rohaggregaten neu berechnet und eine Steuerdifferenz im Cash-State reconciliert. |
+| 9 | Folgejahr vorbereiten | Floor, Flex, Mindest-Flex, Flex-Budgets und laufende Renten werden mit der Inflation beziehungsweise Rentenanpassung dieses Jahres für das **nächste** Modelljahr fortgeschrieben. |
+
+Ein innerhalb des Jahres gezogener Tod wirkt sofort auf den weiteren
+Haushaltslauf. Ein daraus entstehender Hinterbliebenenstatus wird jedoch aus
+dem Status am Jahresanfang abgeleitet und aktiviert die Witwen-/Witwerrente
+erst im folgenden Modelljahr. Pflegezustand und bis dahin ermittelte
+Pflegekosten können deshalb noch dem Todesjahr zugeordnet sein.
+
+### Balance: Jahresabschluss
+
+Balance berechnet keine verdeckte Mehrjahresprojektion. Der Nutzer bestätigt
+einen atomaren Jahresabschluss. Dabei werden die Ist-Werte des abgeschlossenen
+Jahres übernommen und nominale Bedarfe mit der bestätigten Jahresinflation für
+das Folgejahr fortgeschrieben. Die Engine erhält danach bereits die aktuellen
+Jahreswerte. Der historische Feldname `inflatedBedarf` bedeutet daher nicht,
+dass die Engine den Bedarf ein zweites Mal mit kumulierter Inflation
+multipliziert.
+
+### Rentenkonvention
+
+Rentenwerte wirken als jährlicher Zufluss gegen den Bedarf: zuerst gegen
+Floor, danach gegen Flex. Die optionale Steuerquote für Person 2 wird als
+pauschaler Abschlag verwendet; für Person 1 existiert in diesem
+Haushaltshelfer kein gleichartiger separater Pauschalabzug. Eingabewerte müssen
+daher bereits zu der vom Nutzer beabsichtigten Netto-/Bruttokonvention passen.
+Eine vollständige Rentenbesteuerung wird nicht modelliert.
+
+## Zentrale Fachinvarianten
+
+1. Jeder Bedarf wird pro Modelljahr genau einmal nominal fortgeschrieben. Die
+   Engine arbeitet mit dem bereits aktuellen Jahreswert.
+2. Pensionen decken zuerst Floor und erst danach Flex; ein Rentenüberschuss
+   erzeugt keinen negativen Floor.
+3. Floor hat Vorrang vor Flex. VPW verändert nur die Flex-Basis und macht den
+   berechneten Rahmen nicht zur Konsumpflicht.
+4. Guardrails und Alarm bestimmen zunächst die Flex-Rate. Mindest-Flex darf sie
+   nur ohne Safety-Blocker anheben; Budget-Caps und finale Glättung bleiben
+   nachgelagert wirksam. `minimumFlexAnnual` wird validiert und nicht still auf
+   einen zulässigen Wert begrenzt.
+5. Der Pflegebucket wird vor VPW-, Runway- und Entnahmeberechnung aus dem
+   aktiven Vermögen entfernt und bei seiner Verwendung nicht nochmals als
+   normaler Verkauf gezählt.
+6. Die finale Jahressteuer entsteht einmal aus dem Gesamt-Settlement aller
+   Verkaufsrohwerte. Zusätzliche Simulatorverkäufe führen zu einem Recompute,
+   damit der Sparer-Pauschbetrag nicht doppelt verbraucht wird.
+7. Eine Empfehlung, Simulation oder Optimierung verändert keine realen
+   Tranchen. Erst bestätigte operative Schritte und Reconciliation aktualisieren
+   Bestände.
+8. Optionale Module müssen im deaktivierten Zustand fachlich neutral bleiben;
+   ihre Diagnose darf keine versteckte Rechenwirkung erzeugen.
+
+Der zentrale Wirkzusammenhang ist:
+
+```text
+aktueller nominaler Floor (+ Pflege) ─┐
+                                      ├─ Rente zuerst gegen Floor, dann Flex
+aktueller nominaler Flex ─────────────┘
+                    │
+                    ├─ optional: VPW ersetzt die Flex-Basis
+                    │             (aktives Vermögen ohne Pflegebucket)
+                    v
+           Marktregime / Alarm / Guardrails
+                    v
+          Mindest-Flex / Budget / Glättung
+                    v
+       Netto-Floor + tatsächlich freigegebener Flex
+                    v
+        Liquiditätsziel / Verkäufe / Steuer-Settlement
+```
+
+## Nutzerentscheidungen und automatische Policies
+
+| Bereich | Nutzer entscheidet | Suite automatisiert bei Aktivierung |
+|---------|--------------------|--------------------------------------|
+| Haushalt und Bedarf | Profile, Floor, Flex, Mindest-Flex, Renten, Laufzeit und Netto-/Bruttokonvention | Haushaltsaggregation und jährliche Fortschreibung gemäß Eingaben |
+| Vermögen | Bestände, Einstandswerte, Asset-Klassifikation, Gold- und Bond-Nutzung | Bewertung, Ziel-Liquidität, regelbasierte Verkaufsvorschläge und Simulatortransaktionen |
+| Risiko und Entnahme | Guardrail-, VPW-, Sampling-, Stress- und Langlebigkeitsparameter | Marktregime, Flex-Rate, VPW-Rahmen, Alarm- und Reentry-Policies |
+| Steuer | Teilfreistellung je Tranche, Sparer-Pauschbetrag, Kirchensteuersatz und Ausgangs-Verlustvortrag | vereinfachtes Jahres-Settlement und steuerorientierte Verkaufsreihenfolge |
+| Pflege | Aktivierung, Kosten, Grade, Übergänge, regionale Faktoren, Bucket und Mortalitätsfaktoren | Pflegeeintritt/-progression, Kostenpfad, Bucket-Einsatz und Mortalitätsziehung im Simulator |
+| Umsetzung | Brokerorders, tatsächliche Gebühren, bestätigte Reconciliation und Übernahme eines Optimierergebnisses | keine autonome Brokeraktion und keine automatische Übernahme in reale Bestände |
 
 ## C.1 Floor-Flex-Guardrail-System
 
 ### C.1.1 Grundkonzept
 
-Das Floor-Flex-Modell trennt den Bedarf in zwei Komponenten:
+Das Floor-Flex-Modell trennt den aktuellen nominalen Jahresbedarf in zwei
+Komponenten:
 
 | Komponente | Beschreibung | Beispiel |
 |------------|--------------|----------|
 | **Floor** | Nicht verhandelbarer Grundbedarf | Miete, Versicherungen, Lebensmittel |
 | **Flex** | Optionaler Zusatzbedarf | Reisen, Hobbys, Luxus |
 
-**Implementierungskonzept** (siehe `SpendingPlanner.mjs`):
-```javascript
-const inflatedBedarf = {
-    floor: Math.max(0, input.floorBedarf * cumulativeInflationFactor - renteJahr),
-    flex: input.flexBedarf * cumulativeInflationFactor
-};
+Die Verrechnung folgt konzeptionell diesem Vertrag; der Pflegezusatz ist im
+Simulator bereits im aktuellen Brutto-Floor enthalten:
 
-// Flex wird mit flexRate (0-100%) multipliziert
-const actualFlex = inflatedBedarf.flex * (flexRate / 100);
-const totalSpending = inflatedBedarf.floor + actualFlex;
+```javascript
+const nettoFloor = Math.max(0, bruttoFloorAktuell - renteJahr);
+const rentenUeberschuss = Math.max(0, renteJahr - bruttoFloorAktuell);
+const flexBasis = Math.max(0, flexBedarfAktuell - rentenUeberschuss);
+
+// Dynamic Flex kann flexBasis zuvor durch den VPW-abgeleiteten Wert ersetzen.
+const actualFlex = flexBasis * (flexRate / 100);
+const totalSpending = nettoFloor + actualFlex;
 ```
+
+Die Namen `inflatedBedarf.floor` und `inflatedBedarf.flex` im Engine-Vertrag
+sind historisch. Sie enthalten im laufenden Aufruf bereits aktuelle nominale,
+nach Rente verrechnete Werte. Die Inflation des betrachteten Jahres wird erst
+beim State-Roll für das Folgejahr angewandt.
 
 ### C.1.2 Flex-Rate-Bestimmung
 
@@ -1245,113 +1675,92 @@ Backtest- und Monte-Carlo-Logs enthalten `MinFlex€` und `MinFSt`; im Detailmod
 
 ## C.2 Steuer-Engine
 
-### C.2.1 Implementierte Steuerarten
+### C.2.1 Implementierte Steuerparameter
 
-| Steuerart | Satz | Implementierung |
-|-----------|------|-----------------|
-| **Abgeltungssteuer** | 25% | `sale-engine.mjs` |
-| **Solidaritätszuschlag** | 5.5% auf KESt | `sale-engine.mjs` |
-| **Kirchensteuer** | 8-9% auf KESt | `input.kirchensteuerSatz` |
-| **Teilfreistellung** | 30% für Aktienfonds | `tranche.tqf` |
-| **Sparer-Pauschbetrag** | 1.000€ (Single) / 2.000€ (Paar) | `input.sparerPauschbetrag` |
+Die Steuer-Engine bildet einen begrenzten Planungsfall ab. Sätze und
+Freibeträge sind Parameter des Rechenlaufs; die Suite leitet weder den
+persönlichen Rechtsstatus noch den jeweils geltenden gesetzlichen Betrag
+automatisch ab.
 
-### C.2.2 Steuerberechnung pro Tranche
+| Modellbestandteil | Rechenvertrag | Grenze |
+|-------------------|---------------|--------|
+| **Kapitalertragsteuer-Basis** | 25% | pauschale Modellkonstante, keine persönliche Veranlagung |
+| **Solidaritätszuschlag** | 5,5% auf die modellierte Kapitalertragsteuer | keine individuelle Freigrenzen-/Erstattungslogik |
+| **Kirchensteuer** | `kirchensteuerSatz` als Nutzerparameter in der Effektivsatzformel | keine Bundesland- oder Religionsableitung |
+| **Teilfreistellung** | `tranche.tqf` je Tranche | kein automatischer Fonds-/Bestandsnachweis |
+| **Sparer-Pauschbetrag** | `sparerPauschbetrag` als Nutzerparameter | nicht fest auf 1.000/2.000 Euro codiert |
+| **Verlustvortrag** | ein kombinierter `lossCarry` | keine getrennten Verlusttöpfe, insbesondere kein eigener Aktienverlusttopf |
 
-**Algorithmus** (vereinfacht, siehe `sale-engine.mjs`):
+Nicht enthalten sind insbesondere Dividenden und Ausschüttungen als eigene
+Zahlungsströme, Vorabpauschale, Quellensteuer, Günstigerprüfung, persönliche
+Einkommensteuer, Sozialabgaben und eine automatische Aktualisierung bei
+Rechtsänderungen.
+
+### C.2.2 Rohwerte je Verkauf und finales Settlement
+
+Die Sale-Engine liefert pro Verkauf signierte Rohwerte. Erst das zentrale
+Jahres-Settlement bestimmt die endgültige modellierte Steuer:
+
 ```javascript
-function calculateTaxForSale(tranche, sellAmount, input, remainingSPB) {
-    // 1. Gewinnquote berechnen
-    const marketValue = tranche.marketValue;
-    const costBasis = tranche.costBasis;
-    const gainFraction = Math.max(0, (marketValue - costBasis) / marketValue);
+gainQuoteSigned = (marketValue - costBasis) / marketValue;
+realizedGainSigned = sellGross * gainQuoteSigned;
+taxableAfterTqfSigned = realizedGainSigned * (1 - tranche.tqf);
 
-    // 2. Bruttogewinn aus Verkauf
-    const grossGain = sellAmount * gainFraction;
-
-    // 3. Teilfreistellung anwenden (30% für Aktienfonds)
-    const taxableBeforeTQF = grossGain;
-    const taxableAfterTQF = taxableBeforeTQF * (1 - tranche.tqf);  // tqf = 0.30
-
-    // 4. Sparer-Pauschbetrag abziehen
-    const spbUsed = Math.min(remainingSPB, taxableAfterTQF);
-    const taxableAfterSPB = taxableAfterTQF - spbUsed;
-
-    // 5. Steuer berechnen
-    const kiSt = input.kirchensteuerSatz || 0;
-    const effectiveTaxRate = 0.25 * (1 + 0.055 + kiSt);  // ~26.375% ohne KiSt
-    const tax = Math.max(0, taxableAfterSPB) * effectiveTaxRate;
-
-    return { tax, spbUsed, netAmount: sellAmount - tax };
-}
+effectiveTaxRate = 0.25 * (1 + 0.055 + kirchensteuerSatz);
 ```
 
-**Beispielrechnung:**
+Verluste behalten dabei ihr Vorzeichen. Für die Mengenplanung existiert
+zusätzlich eine nichtnegative Gewinnquote; sie ist nicht mit dem signierten
+Rohwert des Settlements gleichzusetzen.
+
+**Illustratives Beispiel ohne Verlustvortrag und Kirchensteuer:**
 
 | Schritt | Berechnung | Wert |
 |---------|------------|------|
-| Verkaufsbetrag | — | 10.000 € |
-| Gewinnquote | (10.000 - 7.000) / 10.000 | 30% |
-| Bruttogewinn | 10.000 × 30% | 3.000 € |
-| Nach TQF (30%) | 3.000 × 70% | 2.100 € |
-| Nach SPB (1.000€) | 2.100 - 1.000 | 1.100 € |
-| Steuer (26.375%) | 1.100 × 26.375% | 290,13 € |
-| **Netto-Erlös** | 10.000 - 290,13 | **9.709,87 €** |
+| Verkauf einer vollständig veräußerten Tranche | — | 10.000 € |
+| Modellierter Einstandswert | — | 7.000 € |
+| Signierter realisierter Gewinn | 10.000 − 7.000 | 3.000 € |
+| Nach TQF 30% | 3.000 × 70% | 2.100 € |
+| Nach Nutzer-SPB 1.000 € | 2.100 − 1.000 | 1.100 € |
+| Steuer mit 26,375% | 1.100 × 26,375% | 290,13 € |
+| **Modellierter Nettoerlös** | 10.000 − 290,13 | **9.709,87 €** |
 
-### C.2.3 Steueroptimierte Verkaufsreihenfolge
+Das Beispiel erklärt die Rechenmechanik, nicht die steuerliche Behandlung
+eines konkreten Depots.
 
-**Sortieralgorithmus** (vereinfacht, siehe `sale-engine.mjs`):
-```javascript
-function getSellOrder(tranches, input) {
-    return Object.keys(tranches).sort((keyA, keyB) => {
-        const a = tranches[keyA];
-        const b = tranches[keyB];
+### C.2.3 Regelbasierte Verkaufsreihenfolge
 
-        // 1. Effektive Steuerlast berechnen
-        const taxRateA = calculateEffectiveTaxRate(a, input);
-        const taxRateB = calculateEffectiveTaxRate(b, input);
+Die Reihenfolge ist kontextabhängig und nicht generell FIFO:
 
-        // 2. Niedrigste Steuerlast zuerst
-        if (taxRateA !== taxRateB) return taxRateA - taxRateB;
+- Aktien-Tranchen werden zuerst nach der modellierten Steuerbelastung, dann
+  nach der nichtnegativen Gewinnquote, anschließend nach **neuerem**
+  Kaufdatum und zuletzt stabil nach ID geordnet.
+- Gold-Tranchen werden untereinander nach älterem Kaufdatum zuerst geordnet.
+- Die Reihenfolge der Asset-Klassen hängt von Markt- und
+  Allokationssituation ab. Der defensive Pfad priorisiert Gold, dann Bonds und
+  Aktien; der normale Pfad priorisiert Bonds, danach steuerorientiert
+  sortierte Aktien und zuletzt Gold. Ein Gold-Übergewicht besitzt einen
+  eigenen Abbaupfad.
 
-        // 3. Bei gleicher Steuerlast: Niedrigste Gewinnquote zuerst
-        if (a.gainFraction !== b.gainFraction) return a.gainFraction - b.gainFraction;
+Diese Reihenfolge ist eine Planungs-Policy der Suite. Sie beweist nicht, dass
+ein Broker genau diese Stücke steuerlich zuordnet. Operative Orderausführung,
+Depot-FIFO und tatsächliche Abrechnung bleiben Nutzer- beziehungsweise
+Brokerverantwortung.
 
-        // 4. Tie-Breaker: FIFO (älteste zuerst)
-        return a.purchaseDate - b.purchaseDate;
-    });
-}
-```
+### C.2.4 Explizite Modellflags statt automatische Rechtsprüfung
 
-**Beispiel-Sortierung:**
-
-| Tranche | Gewinnquote | TQF | Eff. Steuerlast | Reihenfolge |
-|---------|-------------|-----|-----------------|-------------|
-| Verlust-Position | -10% | 30% | 0% | 1. |
-| Alt-Depot (2009) | 50% | 30% | 9.2% | 2. |
-| Neu-Depot (2020) | 80% | 30% | 14.7% | 3. |
-| Gold (steuerfrei) | 100% | 100% | 0% | 1. (wenn > 1 Jahr) |
-
-### C.2.4 Sonderfälle
-
-**Gold nach Spekulationsfrist:**
-```javascript
-gold: {
-    tqf: input.goldSteuerfrei ? 1.0 : 0.0,  // 100% steuerfrei nach 1 Jahr
-}
-```
-
-**Altbestand vor 2009:**
-```javascript
-if (purchaseDate < new Date('2009-01-01')) {
-    tranche.tqf = 1.0;  // 100% steuerfrei
-}
-```
+`goldSteuerfrei` und `tranche.tqf` sind Eingaben in den Modellvertrag. Die
+Suite leitet eine Steuerbefreiung weder automatisch aus einer Gold-Haltedauer
+noch aus einem Kaufdatum vor 2009 ab. Das Kaufdatum beeinflusst die
+Verkaufsreihenfolge, ersetzt aber keinen steuerrechtlichen Nachweis. Wer
+Altbestand, Fondsstatus oder eine Steuerfreiheit modelliert, muss den dazu
+passenden Parameter bewusst setzen und fachlich selbst prüfen.
 
 ### C.2.5 Jahres-Settlement mit Verlustverrechnungstopf
 
 Die finale Steuer eines Jahres wird nicht pro Einzelverkauf bestimmt, sondern durch ein zentrales **Jahres-Settlement** (`tax-settlement.mjs`). Die Sale-Engine liefert dafür nur noch Roh-Aggregate (`realizedGainSigned`, `taxableAfterTqfSigned`) pro Verkauf.
 
-**Verrechnungsreihenfolge** (§ 20 Abs. 6 EStG):
+**Modellinterne Verrechnungsreihenfolge:**
 
 1. **Rohsumme bilden:** Alle Gewinne und Verluste des Jahres nach TQF summieren (`sumTaxableAfterTqfSigned`)
 2. **Verlustvortrag verrechnen:** Vorjahres-`lossCarry` von der Summe abziehen
@@ -1372,12 +1781,13 @@ function settleTaxYear({ taxStatePrev, rawAggregate, sparerPauschbetrag, kirchen
 }
 ```
 
-**Wichtige Designentscheidungen:**
+**Wichtige Designentscheidungen und Grenzen:**
 
-- **TQF-Symmetrie:** Teilfreistellung wird symmetrisch auf Gewinne und Verluste angewandt (§ 22 InvStG). Eine Verlustposition mit TQF 30% erzeugt nur 70% anrechenbare Verluste.
+- **TQF-Symmetrie im Modell:** Teilfreistellung wird rechnerisch symmetrisch auf Gewinne und Verluste angewandt. Eine Verlustposition mit TQF 30% erzeugt im Modell nur 70% anrechenbare Verluste.
 - **Zwei Gewinnquoten:** `gainQuotePlan` (≥ 0, für Mengenplanung) und `gainQuoteSigned` (mit Vorzeichen, für Roh-Steuerdaten) in der Sale-Engine.
 - **SPB nur im Settlement:** Der Sparer-Pauschbetrag wird offiziell nur im Jahres-Settlement verbraucht. Die Sale-Engine nutzt SPB weiterhin zur Mengenplanung, aber nicht als finale Steuerlogik.
 - **Kein Feature-Toggle:** `lossCarry = 0` ist der natürliche No-Op-Default.
+- **Ein kombinierter Topf:** Das Modell bildet keine gesetzlichen Trennregeln zwischen verschiedenen Verlustarten vollständig nach.
 
 **State-Persistenz:**
 
@@ -1532,7 +1942,12 @@ Die Startjahr- und Folgejahrlogik liegt in `mc-year-sampling.js`, `mc-run-contex
 *   Deshalb macht dieses Dokument keine harte Aussage mehr, dass Teilperioden exakt einem bestimmten MSCI-Net-Total-Return-Index entsprechen. Der Klärpunkt steht in `DATA_SOURCES.md`.
 *   Für konservative Läufe kann die geschätzte Frühhistorie per Monte-Carlo-Option ausgeschlossen oder über Filter/Recency-Gewichtung schwächer gewichtet werden.
 
-**Hinweis Balance-App:** In der Balance-App werden reale Depotstände und ETF-Kurse verwendet; TER ist dort bereits im NAV eingepreist. Ein zusätzlicher TER-Abzug wäre doppelt.
+**Hinweis Balance-App:** In der Balance-App werden reale Depotstände und
+ETF-Kurse verwendet; eine im veröffentlichten NAV bereits enthaltene TER darf
+dort nicht nochmals pauschal abgezogen werden. Diese Aussage lässt sich nicht
+auf die Simulatorreihe übertragen: Für `msci_eur` ist die genaue
+Price-/Net-/Gross-Return-Variante ungeklärt. Engine und Simulator modellieren
+TER, Spread, Slippage und Transaktionsgebühren nicht als eigene Cashflows.
 
 **Erweiterte Datenbasis (1925-2025):**
 *   **Erweiterung:** Die Daten wurden ab Januar 2026 von 1950 auf **1925** erweitert.
@@ -1570,26 +1985,78 @@ export function makeRunSeed(baseSeed, comboIdx, runIdx) {
 }
 ```
 
+### C.3.5 Erfolg, Ruin und Ergebnisgrenzen
+
+Die Monte-Carlo-Erfolgsquote ist rein modellintern:
+
+```text
+Erfolgsquote = (Anzahl Läufe − failCount) / Anzahl Läufe
+```
+
+`failCount` steigt bei `isRuin`; ein Engine-Validierungsfehler wird im direkten
+Simulatorpfad ebenfalls als fehlgeschlagener Lauf behandelt. Endet der Lauf,
+weil alle modellierten Personen verstorben sind, ist er ohne vorherigen Ruin
+erfolgreich. Die Quote misst daher die Floor-Deckung unter den gewählten
+Parametern und gezogenen Pfaden, nicht die Wahrscheinlichkeit einer Garantie
+in der realen Welt.
+
+Die gleich benannte Optimierungsmetrik besitzt zwei Darstellungsgrenzen:
+Sweep-Ergebnisse führen `successProbFloor` als Prozentwert von 0 bis 100,
+während Auto-Optimize intern ein Verhältnis von 0 bis 1 verwendet. Übergaben
+normalisieren diese Einheiten; Dokumentation und manuelle Auswertung dürfen
+sie nicht ungeprüft mischen.
+
+Weitere Ergebnisgrößen haben bewusst engere Basen:
+
+- `depotErschoepfungsQuote` zählt einen fehlgeschlagenen Lauf oder einen
+  Aktien-plus-Gold-Endbestand von höchstens 100 Euro. Freie Liquidität und
+  Pflegebucket sind in dieser Depot-Teilgröße nicht enthalten. Die UI-Formulierung
+  „Depot vollständig aufgebraucht“ ist deshalb weiter als die Berechnung.
+- `finalOutcomes` verwendet Aktien, Gold und freie Liquidität. Ein verbleibender
+  Pflegebucket wird separat berichtet und ist nicht im Endvermögen enthalten.
+- Der als `jahresentnahme_real` bezeichnete Simulatorwert ist wegen MR-09 im
+  aktuellen Mehrjahrespfad faktisch nominal. Darauf aufbauende reale
+  Entnahme-KPIs sind bis zur Korrektur entsprechend eingeschränkt.
+
+Erfolgsquote, Depoterschöpfung, Endvermögen, Kürzungsjahre, Pflegebucket und
+Drawdown müssen daher gemeinsam gelesen werden. Keine einzelne Kennzahl ist
+ein vollständiges Qualitätsurteil über einen Ruhestandsplan.
+
 ---
 
 ## C.4 Pflegefall-Modellierung
 
 ### C.4.1 Datengrundlage
 
-**Quelle:** BARMER Pflegereport 2024, in `simulator-data.js` als geglättete Pflegegrad-/Altersannahmen dokumentiert.
+`simulator-data.js` bezeichnet den BARMER Pflegereport 2024 als Ausgangspunkt.
+Die im Code hinterlegten Werte sind jedoch keine direkt übernommenen
+Jahresinzidenzen: dokumentiert ist eine interne Umrechnung von Prävalenzen
+unter Annahme einer durchschnittlichen Pflegedauer von vier Jahren sowie eine
+Glättung in Fünfjahres-Altersbuckets. Die Tabelle ist deshalb eine
+**Modellkalibrierung**. Quellenbezug, Umrechnung und Progressionswerte müssen
+getrennt von der rein technischen Implementierung empirisch validiert werden.
 
 ### C.4.2 Altersabhängige Eintrittswahrscheinlichkeiten
 
-| Alter | PG1 | PG2 | PG3 | PG4 | PG5 | Gesamt |
-|-------|-----|-----|-----|-----|-----|--------|
-| 65 | 1.2% | 0.6% | 0.3% | 0.15% | 0.05% | 2.3% |
-| 70 | 2.0% | 1.0% | 0.5% | 0.25% | 0.10% | 3.85% |
-| 75 | 3.5% | 1.8% | 0.9% | 0.45% | 0.20% | 6.85% |
-| 80 | 5.5% | 3.2% | 1.6% | 0.75% | 0.35% | 11.4% |
-| 85 | 8.5% | 5.5% | 3.2% | 1.50% | 0.70% | 19.4% |
-| 90 | 12.0% | 8.0% | 5.0% | 2.80% | 1.20% | 29.0% |
+Der aktuelle Eintrittsalgorithmus zieht ausschließlich einen Neueintritt in
+PG1 oder PG2. PG3 bis PG5 werden danach durch Progression erreicht. Daher ist
+für die effektive Eintrittswahrscheinlichkeit nur die Summe aus PG1 und PG2
+maßgeblich:
 
-**Evidenz:** `PFLEGE_GRADE_PROBABILITIES` in `simulator-data.js`.
+| Altersbucket | PG1-Parameter | PG2-Parameter | Effektiver Eintritt PG1/PG2 p.a. |
+|--------------|---------------|---------------|----------------------------------|
+| 65 | 1,2% | 0,6% | 1,8% |
+| 70 | 2,0% | 1,0% | 3,0% |
+| 75 | 3,5% | 1,8% | 5,3% |
+| 80 | 5,5% | 3,2% | 8,7% |
+| 85 | 8,5% | 5,5% | 14,0% |
+| 90 | 12,0% | 8,0% | 20,0% |
+| 95 | 14,0% | 9,0% | 23,0% |
+
+Unter 65 wird kein Eintritt gezogen; oberhalb des letzten Buckets bleibt der
+95er-Wert wirksam. `PFLEGE_GRADE_PROBABILITIES` enthält zwar zusätzlich
+Spalten für PG3 bis PG5, `sampleCareGrade()` verwendet sie beim Neueintritt
+derzeit nicht.
 
 ### C.4.3 Progressionsmodell
 
@@ -1603,41 +2070,50 @@ PFLEGE_GRADE_PROGRESSION_PROBABILITIES = {
 };
 ```
 
-**Erwartete Zeit bis PG5:**
-- Von PG1: ~6-8 Jahre
-- Von PG2: ~5-7 Jahre
-- Von PG3: ~4-5 Jahre
-- Von PG4: ~2-3 Jahre
+Pro aktivem Pflegejahr ist höchstens ein Übergang in den direkt nächsten Grad
+möglich. Im Eintrittsjahr wird noch keine zusätzliche Progression gezogen;
+sie beginnt ab dem folgenden Pflegejahr. Im chronischen Modus bleibt Pflege
+bis zum Lebensende aktiv. Im akuten Modus endet sie nach der innerhalb der
+Nutzergrenzen gezogenen Dauer. Die Prozentwerte sind Modellparameter, keine
+individuelle Prognose der Zeit bis PG5.
 
 ### C.4.4 Kosten-Modell
 
-```javascript
-function calcCareCost(careMeta, inputs) {
-    if (!careMeta || !careMeta.active) return { zusatzFloor: 0 };
+Kosten, Flex-Level und Mortalitätsfaktor sind je Pflegegrad
+Nutzereinstellungen. Die UI startet mit folgenden Werten; Presets oder
+manuelle Eingaben können sie ändern:
 
-    const baseCosts = {
-        1: inputs.pflegeCostPG1 || 12000,
-        2: inputs.pflegeCostPG2 || 18000,
-        3: inputs.pflegeCostPG3 || 28000,
-        4: inputs.pflegeCostPG4 || 36000,
-        5: inputs.pflegeCostPG5 || 44000
-    };
+| Pflegegrad | Zusatzbedarf p.a. | verbleibendes Flex-Level | max. Mortalitätsfaktor |
+|------------|-------------------|--------------------------|--------------------------|
+| PG1 | 6.000 € | 75% | 0 (= keine Erhöhung) |
+| PG2 | 12.000 € | 25% | 0 (= keine Erhöhung) |
+| PG3 | 18.000 € | 10% | 3,0 |
+| PG4 | 32.000 € | 0% | 5,0 |
+| PG5 | 60.000 € | 0% | 5,0 |
 
-    const regionalFactor = 1 + (inputs.pflegeRegionalZuschlag || 0) / 100;
-    const rampUpFactor = Math.min(1, careMeta.yearsActive / 2);
-    const annualCost = baseCosts[careMeta.grade] * regionalFactor * rampUpFactor;
+Der Zusatzbedarf wird mit Jahresinflation, zusätzlicher Kosten-Drift und
+regionalem Faktor fortgeschrieben. Der bei Eintritt gespeicherte Floor sowie
+der konfigurierte maximale Pflege-Floor bilden einen dynamisch
+inflationsangepassten Cap. Ein Ramp-up wird im aktuellen Code nur dann
+angewandt, wenn der rohe Zielwert oberhalb dieses Caps liegt. Der aktuelle
+Wert `zusatzFloorZiel` wird dem Haushalts-Floor zugerechnet;
+`zusatzFloorDelta` hält davon getrennt nur die positive Veränderung gegenüber
+dem bisherigen Pflege-Zielwert für Diagnose- und kumulative Pflegefelder fest.
+Der Flex-Level wirkt separat auf den Haushalts-Flex.
 
-    return { zusatzFloor: annualCost };
-}
-```
+**Offener Produktmangel PD-02 / Modellrisiko MR-10:** Das UI übergibt die zusätzliche
+Pflegekosten-Drift bereits als Dezimalwert, während `updateCareMeta()` sie
+nochmals durch 100 teilt. Der UI-Default 3,5% wirkt im aktuellen Laufzeitpfad
+deshalb als 0,035%. Bis zu einer Codeentscheidung dokumentiert diese Passage
+sowohl den beabsichtigten UI-Vertrag als auch die tatsächlich beobachtete
+Rechenwirkung; sie erklärt die Abweichung nicht zur Fachsemantik.
 
 ### C.4.5 Dual-Care für Paare
 
-**Separate RNG-Streams** (konzeptionell, siehe `monte-carlo-runner.js`):
-```javascript
-const rngCareP1 = rand.fork('CARE_P1');
-const rngCareP2 = careMetaP2 ? rand.fork('CARE_P2') : null;
-```
+Person 1 und Person 2 besitzen getrennte Pflege-States und personbezogene
+Zufallsziehungen. Die Haushaltslogik kombiniert die Pflege-Flexfaktoren der
+noch lebenden Personen und führt die Kosten beider Personen im Jahresergebnis
+zusammen. Ein Pflegeereignis kann die Ansparphase vorzeitig beenden.
 
 **Simultane Pflege-KPIs:**
 - `bothCareYears`: Jahre mit gleichzeitiger Pflege beider Partner
@@ -1646,13 +2122,18 @@ const rngCareP2 = careMetaP2 ? rand.fork('CARE_P2') : null;
 
 ### C.4.6 Mortalitäts-Multiplikator
 
-| Pflegegrad | Sterblichkeits-Multiplikator |
-|------------|------------------------------|
-| PG1 | 1.2× (20% erhöht) |
-| PG2 | 1.5× (50% erhöht) |
-| PG3 | 2.0× (100% erhöht) |
-| PG4 | 2.5× (150% erhöht) |
-| PG5 | 3.0× (200% erhöht) |
+Der Faktor ist je Pflegegrad konfigurierbar und wird nicht aus einer festen
+internen Tabelle 1,2× bis 3,0× abgeleitet. Ein Wert von 0 oder höchstens 1
+bewirkt keine Erhöhung. Bei einem höheren Zielwert steigt der wirksame Faktor
+über `pflegeRampUp` Jahre linear von 1 bis zum konfigurierten Maximum:
+
+```text
+wirksamer Faktor = 1 + (Ziel-Faktor - 1) × Ramp-Fortschritt
+```
+
+Dieser Faktor multipliziert die alters- und geschlechtsspezifische
+Basismortalität des aktuellen Jahres. Er ist eine Nutzannahme und keine
+individuelle medizinische Prognose.
 
 ### C.4.7 Pflegebucket als algorithmische Zweckbindung
 
@@ -1737,6 +2218,20 @@ Version 1 behandelt den Bucket-Verbrauch cash-like. Die ausgegliederten Geldmark
 ---
 
 ## C.5 Liquiditäts-Targeting
+
+Runway beschreibt die Reichweite der **frei verfügbaren** aktuellen
+Liquidität gegen den aktuellen Netto-Bedarf:
+
+```text
+Monatsbedarf = (Netto-Floor + effektiver Flex) / 12
+Runway-Monate = freie Liquidität / Monatsbedarf
+```
+
+Ein aktivierter Pflegebucket zählt nicht zur freien Liquidität. Runway ist
+damit eine operative Steuergröße für Verkäufe und Liquiditätsauffüllung, keine
+Prognose, wie lange das Gesamtvermögen oder der Haushalt überlebt. Mindest- und
+Ziel-Runway sind Policy-Schwellen; sie stellen keine separat garantierte
+Reserve dar.
 
 ### C.5.1 Dynamisches Runway-Ziel
 
@@ -1883,11 +2378,12 @@ Die Suite modelliert Renteneinkünfte für **1-2 Personen** mit unterschiedliche
 
 | Parameter | Beschreibung | Beispiel |
 |-----------|--------------|----------|
-| `renteMonatlich` | Monatliche Bruttorente | 1.500 € |
-| `rentAdjMode` | Indexierungsart | `fix`, `wage`, `cpi` |
-| `rentAdjPct` | Feste Anpassung (bei `fix`) | 2.0% |
-| `steuerquotePct` | Steuersatz auf Rente | 30% |
-| `renteStartOffset` | Startjahr der Rente (relativ) | 0 |
+| `renteMonatlich` | monatlicher Ausgangswert für Person 1 | 1.500 € |
+| `rentAdjMode` | gemeinsame Indexierungsart | `fix`, `wage`, `cpi` |
+| `rentAdjPct` | feste Anpassung bei `fix` | 2,0% |
+| `renteStartOffsetJahre` | Startjahr der Rente von Person 1 relativ zum Lauf | 0 |
+| `partner.monatsrente` | monatlicher Ausgangswert für Person 2 | 800 € |
+| `partner.steuerquotePct` | optionaler pauschaler Abschlag nur auf die Eigenrente von Person 2 | 20% |
 
 **Implementierung** (simulator-portfolio-pension.js):
 ```javascript
@@ -1905,53 +2401,49 @@ export function computeRentAdjRate(inputs, yearData) {
 
 ### C.7.3 Paar-Modellierung (Rente1 + Rente2)
 
-**Separate Renten für Person 1 und Person 2:**
+Jede Person besitzt eigenen Startzeitpunkt, Ausgangswert und Lebensstatus. Die
+laufenden Renten werden jährlich mit derselben für das Modelljahr aufgelösten
+Anpassungsrate fortgeschrieben. Die aktuelle Haushaltsaggregation lautet:
 
-| Feld | Person 1 | Person 2 |
-|------|----------|----------|
-| Bruttorente | `rente1` | `rente2` |
-| Steuerquote | `p1SteuerquotePct` | `partner.steuerquotePct` |
-| Startalter | `p1StartAlter` | `partnerStartAlter` |
-| Lebenserwartung | `p1LebensErwartung` | `partnerLebensErwartung` |
-
-**Aggregation:**
 ```javascript
 const renteSum = rente1 + rente2;
-const floorBedarf = Math.max(0, inflatedFloor - renteSum);
+const pensionSurplus = Math.max(0, renteSum - bruttoFloorAktuell);
+const nettoFloor = Math.max(0, bruttoFloorAktuell - renteSum);
+const flexNachRente = Math.max(0, flexAktuell - pensionSurplus);
 ```
+
+Der Zufluss wird nicht zusätzlich zur Liquidität gebucht; er senkt den aus dem
+Portfolio zu finanzierenden Bedarf. Eine zusätzliche Cash-Buchung würde ihn
+doppelt zählen.
 
 ### C.7.4 Witwenrente
 
 Nach dem Tod eines Partners kann der Überlebende einen Teil der Partnerrente erhalten.
 
 **Konfiguration:**
-- `widowOptions.enabled`: Aktiviert Witwenrente
-- `widowOptions.marriageOffsetYears`: Ehe-Unterschied in Jahren
-- `widowOptions.benefitFraction`: Anteil der Partnerrente (z.B. 0.55 für 55%)
 
-**Implementierung** (konzeptionell, siehe `monte-carlo-runner.js`):
-```javascript
-let widowBenefitActiveForP1 = false; // P1 erhält Witwenrente nach P2
-let widowBenefitActiveForP2 = false; // P2 erhält Witwenrente nach P1
-```
+- `widowOptions.mode`: `percent` aktiviert den prozentualen Modus; `stop`
+  beendet die Eigenrente des Verstorbenen ohne Hinterbliebenenzahlung.
+- `widowOptions.percent`: Anteil der Partnerrente als Verhältnis von 0 bis 1.
+- `widowOptions.marriageOffsetYears`: modellierter Beginn der Ehe relativ zum
+  Simulationsstart.
+- `widowOptions.minMarriageYears`: erforderliche Mindestdauer der Ehe.
 
-**Berechnungsbeispiel:**
-
-| Jahr | P1 Status | P2 Status | Rente1 | Rente2 | Witwenrente | Gesamt |
-|------|-----------|-----------|--------|--------|-------------|--------|
-| 1 | lebt | lebt | 1.500 € | 800 € | — | 2.300 € |
-| 10 | lebt | **verstorben** | 1.500 € | — | 440 € (55%) | 1.940 € |
-| 15 | lebt | — | 1.650 € | — | 484 € | 2.134 € |
+Die Berechtigung wird gegen den Lebensstatus am Jahresanfang geprüft. Stirbt
+eine Person in der Mortalitätsziehung des aktuellen Modelljahres, beginnt die
+Hinterbliebenenleistung deshalb erst im Folgejahr. Sie wird anschließend mit
+der gemeinsamen Rentenanpassungsrate fortgeschrieben.
 
 ### C.7.5 Steuerbehandlung
 
-- **Besteuerungsanteil:** Je nach Renteneintrittsalter (z.B. 2025: 83%)
-- **Nettoberechnung:** `renteNetto = renteBrutto × (1 - steuerquotePct / 100)`
-- **Witwenrente:** Wird zum steuerpflichtigen Einkommen addiert
-
-**Einschränkungen:**
-- Keine detaillierte Steuerprogression für Renten (vereinfachter Steuersatz)
-- Keine Modellierung von Hinzuverdienst oder Flexirente
+Die Rentenlogik ist keine Rentensteuer-Engine. Person 1 wird ohne separaten
+pauschalen Steuerabzug in den Haushaltszufluss übernommen. Nur die Eigenrente
+von Person 2 kann über `partner.steuerquotePct` pauschal reduziert werden;
+Hinterbliebenenleistungen erhalten in diesem Helper keinen eigenen
+Steuerabzug. Ein Besteuerungsanteil nach Renteneintrittsjahr, Steuerprogression,
+Grundfreibetrag, Kranken-/Pflegeversicherungsbeiträge, Hinzuverdienst und
+Flexirente werden nicht berechnet. Eingaben müssen daher bewusst zur
+gewünschten Netto-/Bruttokonvention passen.
 
 ---
 
@@ -2659,279 +3151,1694 @@ Longevity-Felder sind auch hier nicht optimierbar und werden nicht per Champion-
 
 ---
 
-# Marktvergleich
+# Annahmen, Modellgrenzen und Validierung
 
-## D.1 Kommerzielle Retirement Planner (2025/2026)
+Dieser Teil begrenzt die fachliche Aussagekraft der Suite. Eine technisch
+korrekte Berechnung ist nur eine Wenn-dann-Aussage unter den gewählten Daten,
+Parametern und Policies. Sie ist weder Anlage-, Steuer-, Rechts- oder
+Versicherungsberatung noch eine Zusage künftiger Ergebnisse.
 
-### D.1.1 ProjectionLab
+## Anwendungsrahmen und Zielgruppe
 
-| Aspekt | Details |
-|--------|---------|
-| **Preis** | $9/Monat (Premium), $799 Lifetime |
-| **Website** | [projectionlab.com](https://projectionlab.com/) |
-| **Monte Carlo** | ✅ Ja, mit Multiple Scenarios |
-| **Guardrails** | ❌ Nicht dynamisch |
-| **DE-Steuern** | ⚠️ Basis-Support für Deutschland |
-| **Pflegefall** | ⚠️ Healthcare-Planung, aber kein PG-Modell |
-| **Offline** | ✅ Mit Lifetime ($799) |
-| **Stärken** | Elegantes UI ("Apple-esque"), Multi-Szenario |
-| **Schwächen** | Keine dynamischen Guardrails, teuer für Lifetime |
+Die Suite richtet sich an deutschsprachige Einzelpersonen und Haushalte, die
+eine EUR-basierte Ruhestandsplanung mit überwiegend liquiden, passiven
+Portfolio-Bausteinen nachvollziehen und die Eingaben fachlich selbst prüfen
+können. Geeignete Fragestellungen sind beispielsweise:
 
-**Reviewer-Zitat:** "The most beautiful financial planning tool" – RetireBeforeDad
+- Wie reagieren Floor und Flex auf unterschiedliche Marktsequenzen?
+- Wie verändern Runway, VPW, Guardrails, Rente oder ein Pflegebucket die
+  modellierten Entnahmen?
+- Welche Bandbreiten entstehen in historischen, Monte-Carlo- und
+  Stressläufen?
+- Welche regelbasierten Verkäufe wären nach den modellierten Beständen und
+  Steuerparametern plausibel?
 
-### D.1.2 Boldin (ehemals NewRetirement)
+Außerhalb des belastbaren Anwendungsrahmens liegen eine vollständige
+Finanzplanung über alle Vermögensarten, rechtsverbindliche Steuerberechnung,
+Fremdwährungsportfolios mit FX-Risiko, individuelle medizinische oder
+aktuarielle Prognosen, Versicherungsersatz sowie autonome Broker- oder
+Portfolioverwaltung.
 
-| Aspekt | Details |
-|--------|---------|
-| **Preis** | Kostenlos (Basic), $144/Jahr (Plus) |
-| **Website** | [boldin.com](https://www.boldin.com/) |
-| **Monte Carlo** | ✅ 1.000 Szenarien, AAGR-basiert |
-| **Guardrails** | ❌ Keine dynamischen Guardrails |
-| **DE-Steuern** | ❌ US-fokussiert |
-| **Pflegefall** | ⚠️ Basis-Gesundheitskosten |
-| **Offline** | ❌ Cloud-basiert |
-| **Stärken** | Große Community, Roth-Conversion-Explorer |
-| **Schwächen** | US-zentriert, keine DE-Steuern |
+## Unterstütztes Anlagenmodell
 
-### D.1.3 Pralana
+| Baustein | Modellierte Rolle | Wesentliche Grenze |
+|----------|--------------------|--------------------|
+| **Freie Liquidität** | Auszahlungen, Runway und Transaktionsfinanzierung; Tagesgeld-/Giro-nahe Beträge und Geldmarkt | ein gemeinsamer EUR-basierter Liquiditätsbegriff, keine Bankausfall-/Kontenlogik |
+| **Breite Aktien-ETF-Tranchen** | primärer Rendite- und Verkaufsbaustein mit Einstandswert und Teilfreistellung | keine Einzeltitel-, Sektor-, Faktor- oder Fondsdetail-Simulation |
+| **Gold-Tranchen** | optionaler Diversifikations- und Verkaufsbaustein | vereinfachte Rendite-/Steuerflags, keine Lager-, Spread- oder Produktkosten |
+| **Bond-Bucket** | optionaler Zieltopf der 3-Bucket-Strategie | kein allgemeines Anleihenmodell; Rendite nutzt den historischen Cash-Rate-Proxy statt Laufzeit, Bonität und Zinskurve |
+| **Pflegebucket** | separat zweckgebundener cash-naher State | kein frei konsumierbares Asset, keine Versicherung und keine automatische Wiederauffüllung |
 
-| Aspekt | Details |
-|--------|---------|
-| **Preis** | Kostenlos (Bronze), $99 (Gold), $119/Jahr (Online) |
-| **Website** | [pralanaretirementcalculator.com](https://pralanaretirementcalculator.com/) |
-| **Monte Carlo** | ✅ + Historical Analysis |
-| **Guardrails** | ⚠️ Spending Strategies, aber nicht dynamisch |
-| **DE-Steuern** | ❌ US-fokussiert |
-| **Pflegefall** | ⚠️ Healthcare-Modul |
-| **Offline** | ✅ Gold ist Excel-basiert |
-| **Stärken** | "Most feature-rich planner", optimiert SS/Roth |
-| **Schwächen** | Hohe Lernkurve, US-Steuersystem |
+Nicht modelliert werden insbesondere Immobilien, Kryptoassets, einzelne
+Aktien, frei kombinierbare Sektor-/Faktorstrategien, Optionen und andere
+Derivate, Hebel, Short-Positionen, vollständige Anleiheportfolios sowie
+beliebige zusätzliche Asset-Klassen.
 
-**Reviewer-Zitat:** "By far the most comprehensive of the 18 retirement calculators I tried" – CanIRetireYet
+## Reserven sind nicht austauschbar
 
-## D.2 Kostenlose Tools
+| Reservebegriff | Ist ein separater Bestand? | Verfügbarkeit und Rechenwirkung |
+|----------------|----------------------------|---------------------------------|
+| **Freie Liquidität** | ja | sofort verfügbar; zählt zu Runway, aktivem Vermögen und Auszahlung |
+| **Mindest-/Ziel-Runway** | nein | Policy-Schwelle in Monaten; löst gegebenenfalls Refill aus |
+| **Gold-Floor** | nein | regelbasierte Mindestallokations-/Schutzschwelle für Gold; kein Cash-Puffer |
+| **Pflegebucket** | ja | aus dem aktiven Vermögen separiert; nur nach konfiguriertem Pflege-Trigger verwendbar |
 
-### D.2.1 Portfolio Visualizer
+## Annahmenregister
 
-| Aspekt | Details |
-|--------|---------|
-| **Website** | [portfoliovisualizer.com](https://www.portfoliovisualizer.com/monte-carlo-simulation) |
-| **Monte Carlo** | ✅ 4 Modelle (Historical, Forecast, Statistical, Parameterized) |
-| **Guardrails** | ❌ Nein |
-| **Withdrawal-Strategien** | Fixed, RMD-based, Custom |
-| **Stärken** | Flexibel, viele Asset-Klassen |
-| **Schwächen** | Zeigt nominale Dollars (nicht inflationsbereinigt), keine Steuern |
+| ID | Annahme beziehungsweise Konvention | Wirkung im Modell | Behandlung und verbleibende Grenze |
+|----|-----------------------------------|-------------------|------------------------------------|
+| A-01 | Ein Jahr ist der kleinste Finanz- und Lebensereignisschritt. | Rendite, Inflation, Pflege, Tod, Rente, Entnahme und Steuer werden jahresweise geordnet. | Keine unterjährige Pfad-, Timing- oder Liquiditätssimulation. |
+| A-02 | Floor, Flex und Mindest-Flex sind zu Jahresbeginn aktuelle nominale Beträge. | Die Engine verarbeitet sie ohne erneute interne Inflation; der State-Roll bereitet das Folgejahr vor. | Falsche Basisjahre oder doppelt inflationsbereinigte Nutzereingaben verzerren alle Entnahmen. |
+| A-03 | Renten sind bedarfsmindernde Jahreszuflüsse. | Erst Floor, dann Flex werden verrechnet; keine zusätzliche Cash-Buchung. | Netto-/Bruttokonvention und nur für Person 2 verfügbarer Pauschalabzug müssen bewusst gewählt werden. |
+| A-04 | Historische Jahresreihen dienen als Rendite-, Inflations-, Lohn-, Zins-, Gold- und CAPE-Proxys. | Sampling und Stresslogik erzeugen daraus Modellpfade. | Datenhistorie ist keine Verteilungsgarantie; Quellen- und Rekonstruktionsgrenzen bleiben wirksam. |
+| A-05 | Alle Planungsbeträge und akzeptierten Quotes sind EUR-basiert. | Portfolio, Bedarf, Steuer und Ergebnisse verwenden eine gemeinsame Währung. | Nicht-EUR-Quotes werden abgelehnt; es gibt keine FX-Konvertierung oder Währungsrisikomodellierung. |
+| A-06 | Engine und Simulator ziehen keine separaten Produkt- oder Transaktionskosten ab. | Modellierte Renditen und Verkäufe wirken ohne TER-, Spread-, Slippage- oder Gebühren-Cashflow. | Nur bestätigte Reconciliation kann eine tatsächlich eingegebene Ausführungsgebühr vom Realbestand abziehen. |
+| A-07 | Steuerparameter repräsentieren den vom Nutzer gewählten Planungsfall. | Ein kombiniertes Jahres-Settlement schätzt Steuer und Verlustvortrag. | Kein automatischer Rechtsstatus, keine vollständigen Verlusttöpfe oder Veranlagung. |
+| A-08 | Pflegeeintritt und -progression folgen den hinterlegten Altersbuckets und Übergangsraten. | Ereignisse erhöhen den Floor, senken Flex und können Mortalität sowie Ansparphase verändern. | Kalibrierung ist heuristisch; Kosten, Pflegeleistungen und familiäre Unterstützung sind nicht vollständig abgebildet. |
+| A-09 | Mortalität folgt Periodensterbetafeln und optionalen Pflegefaktoren. | Läufe können personweise oder nach Tod aller Personen enden; VPW-Horizonte werden daraus abgeleitet. | Keine Kohortenprognose, individuelle Gesundheit oder medizinische Diagnose. |
+| A-10 | Der Pflegebucket ist cash-nah, erhält den Cash-Ertrag und wird nicht automatisch aufgefüllt. | Er bleibt außerhalb der normalen Entnahmebasis und wird vor Forced Sales eingesetzt. | Steuerdetails seiner Nutzung und eine reale Versicherungsleistung werden nicht separat modelliert. |
+| A-11 | Der optionale Bond-Bucket darf mit dem Cash-Rate-Proxy verzinst werden. | 3-Bucket-Pfade erhalten einen risikoarmen Zieltopf. | Duration, Kursreaktion, Bonität, Kupon und Zinskurve fehlen. |
+| A-12 | Vorschläge und Simulationstransaktionen sind schreibfrei gegen reale Lots. | Reale Bestände ändern sich erst nach Brokerhandlung und bestätigtem Reconcile. | Abweichungen zwischen Vorschlag, Ausführung, Broker-FIFO und Gebühren bleiben operatives Nutzerrisiko. |
+| A-13 | Gesetze, Produktbedingungen und Datenreihen bleiben unverändert, bis Code, Daten oder Nutzerparameter aktualisiert werden. | Reproduzierbare Läufe verwenden den implementierten Stand. | Es gibt keine automatische Rechts-, Tarif-, Steuer- oder Datenaktualisierung. |
 
-### D.2.2 FI Calc
+## Modellrisikoregister
 
-| Aspekt | Details |
-|--------|---------|
-| **Website** | [ficalc.app](https://ficalc.app/) |
-| **Monte Carlo** | ❌ Historische Simulation (nicht MC) |
-| **Guardrails** | ✅ Ja, als Withdrawal-Strategie |
-| **Stärken** | 100+ Jahre historische Daten, FIRE-fokussiert |
-| **Schwächen** | Keine Monte Carlo, nur historisch |
+| ID | Risiko oder offener Befund | Mögliche Wirkung | Behandlung / Status |
+|----|----------------------------|-----------------|---------------------|
+| MR-01 | Die Jahre 1925–1949 sind geschätzt und auf den 1950er-Level normalisiert. | Extrem- und Sequenzrisiken können durch Rekonstruktion statt beobachteter homogener Reihe geprägt sein. | In `DATA_SOURCES.md` gekennzeichnet; per `mcExcludeEstimatedHistory` oder Startjahrfilter ausschließbar. Bekannte Datenmodellgrenze. |
+| MR-02 | Die genaue Price-/Net-/Gross-Return-Variante von `msci_eur` ist ungeklärt. | Dividenden- und Kostenwirkung der Aktienhistorie ist nicht eindeutig interpretierbar. | Keine Behauptung, TER oder Ausschüttungen seien im Simulator konsistent enthalten. Offener Provenienzpunkt. |
+| MR-03 | TER, Spread, Slippage und Transaktionsgebühren fehlen als Simulator-Cashflows. | Endvermögen und Entnahmefähigkeit können gegenüber realer Umsetzung zu hoch ausfallen. | Sensitivität über konservativere Renditeannahmen möglich, aber kein gleichwertiges Kostenmodell. Bekannte Modellgrenze. |
+| MR-04 | Einwährungsmodell EUR ohne FX. | Fremdwährungsrendite, Hedgingkosten und Wechselkursschwankungen fehlen. | Nur EUR-Planungsfall; Nicht-EUR-Quotes werden abgelehnt. Bekannte Modellgrenze. |
+| MR-05 | Steuer- und Rentensteuerlogik sind bewusst vereinfacht. | Nettoerlös und bedarfsmindernder Rentenzufluss können von realer Veranlagung abweichen. | Nutzerparameter und externe Prüfung erforderlich; keine Rechtsberatung. Bekannte Modellgrenze. |
+| MR-06 | Asset-Universum und Bond-Modell sind eng begrenzt. | Diversifikation, Illiquidität, Duration und produktspezifische Risiken fehlen. | Aussagen nur für die unterstützten Bausteine verwenden. Bekannte Modellgrenze. |
+| MR-07 | Pflege- und Mortalitätsparameter enthalten Kalibrierungs- und Nutzerannahmen. | Eintritt, Dauer, Kosten, Flexverlust und Lebensdauer können stark verschoben werden. | Szenarien und Sensitivitäten statt Einzelprognose; externe Evidenzprüfung erforderlich. Kalibrierungsrisiko. |
+| MR-08 | Erfolg, Depoterschöpfung und Endvermögen verwenden unterschiedliche Nenner und Vermögensbasen. | Einzelne KPI-Labels können eine breitere Aussage nahelegen als berechnet. | Kennzahlen gemeinsam und gemäß Ergebnisregister lesen; UI-Label zur Depoterschöpfung ist als PD-03 offen. |
+| MR-09 | `jahresentnahme_real` wird im Simulatorpfad nicht mit einem fortgeschriebenen kumulierten Inflationsfaktor deflationiert. | Nominale Entnahmen erscheinen als reale Entnahmen; davon abgeleitete reale KPIs sind fehlbezeichnet. | Bis zur Codekorrektur als nominal behandeln. Offener Produktmangel PD-01. |
+| MR-10 | Pflegekosten-Drift wird zwischen UI-Reader und Pflegeberechnung doppelt durch 100 skaliert. | Ein UI-Wert von 3,5% wirkt als 0,035% p.a. | Keine neue Fachsemantik dokumentiert; Code-/UI-Contract muss separat korrigiert werden. Offener Produktmangel PD-02. |
+| MR-11 | Sampling-, Regime-, CAPE-, VPW- und Guardrail-Parameter sind Modellentscheidungen. | Gute Resultate können parameter- oder historienabhängig statt robust sein. | Mehrere Seeds, Methoden, Stresspfade und Sensitivitäten vergleichen. Modell- und Kalibrierungsrisiko. |
+| MR-12 | Nutzereingaben und reale Ausführung liegen außerhalb der Rechenautomatik. | Falsche Einstandswerte, Netto-/Bruttowerte, Steuerflags oder abweichende Brokerorders übertragen sich direkt auf Ergebnisse. | Eingaben, Vorschläge und Reconciliation getrennt prüfen. Operatives Risiko. |
 
-### D.2.3 Deutsche Tools
+## Offene Produktmängel aus dem Fachabgleich
 
-| Tool | Fokus | MC | Guardrails | Bewertung |
-|------|-------|----|-----------:|-----------|
-| **[BVI Entnahme-Rechner](https://www.bvi.de/en/services/calculators/retirement-calculator/)** | Entnahmedauer | ❌ | ❌ | Sehr einfach |
-| **[Pensionfriend](https://pensionfriend.de/)** | GRV-Prognose | ❌ | ❌ | Nur Rente |
-| **[Hypofriend](https://hypofriend.de/en/retirement-calculator-germany)** | Pension Gap | ❌ | ❌ | Nur Gap |
+| ID | Beobachteter Ist-Zustand | Dokumentarische Behandlung | Erforderliche Produktentscheidung |
+|----|--------------------------|-----------------------------|----------------------------------|
+| PD-01 | Der Simulator führt den kumulierten Inflationsfaktor für `jahresentnahme_real` nicht über die Jahre fort. | Wert und abhängige KPIs bis dahin als nominal kennzeichnen und interpretieren. | Faktor korrekt fortschreiben oder KPI/UI eindeutig in nominal umbenennen. |
+| PD-02 | Pflegekosten-Drift wird nach der UI-Normalisierung ein zweites Mal durch 100 geteilt. | Beabsichtigte UI-Einheit und tatsächliche Wirkung nebeneinander dokumentieren. | Prozentvertrag an genau einer Grenze normalisieren und Tests ergänzen. |
+| PD-03 | „Depot vollständig aufgebraucht“ zählt `isRuin` oder Aktien-plus-Gold ≤ 100 €, nicht zwingend freie Liquidität und Pflegebucket. | KPI als enge Depot-Teilgröße erklären. | UI-Label präzisieren oder Berechnungsbasis bewusst erweitern. |
 
-## D.3 Vergleichsmatrix
+Diese Punkte werden in diesem Dokumentationsprojekt nicht durch eine
+nachträgliche Soll-Erklärung geheilt. Ihre Korrektur erfordert einen separaten
+Code-/UI-Auftrag und neue Laufzeitvalidierung.
 
-| Feature | Ruhestand-Suite | ProjectionLab | Boldin | Pralana | FI Calc | PV |
-|---------|----------------|---------------|--------|---------|---------|-----|
-| **Preis** | Kostenlos | $9-799 | $0-144 | $0-119 | Kostenlos | Kostenlos |
-| **Monte Carlo** | ✅ 4 Methoden | ✅ | ✅ | ✅ | ❌ | ✅ |
-| **Historischer Backtest** | ✅ 1951-2025 | ⚠️ | ❌ | ✅ | ✅ | ✅ |
-| **Dynamische Guardrails** | ✅ 7 Regime | ❌ | ❌ | ⚠️ | ✅ | ❌ |
-| **DE-Steuern (vollst.)** | ✅ | ⚠️ | ❌ | ❌ | ❌ | ❌ |
-| **Pflegefall-Modell** | ✅ PG1-5 | ⚠️ | ⚠️ | ⚠️ | ❌ | ❌ |
-| **Pflegebucket / Selbstversicherung** | ✅ gesperrte Geldmarkt-/Cash-Reserve | ⚠️ allgemeine Healthcare-Budgets | ⚠️ allgemeine Healthcare-Budgets | ⚠️ Healthcare-Modul | ❌ | ❌ |
-| **Multi-Profil** | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| **Tranchen-Management** | ✅ FIFO+Online | ❌ | ⚠️ | ❌ | ❌ | ❌ |
-| **Parameter-Sweeps** | ✅ Heatmap | ❌ | ❌ | ⚠️ | ❌ | ❌ |
-| **Dynamic Flex (VPW)** | ✅ CAPE+Sterbetafel | ❌ | ❌ | ❌ | ❌ | ⚠️ RMD |
-| **Konservativer Langlebigkeitsaufschlag** | ✅ Quantil/relativ/feste Jahre | nicht separat ausgewiesen | Longevity-Alter als Planannahme | nicht separat ausgewiesen | ❌ | ❌ |
-| **MC-Sampling transparent waehlbar** | ✅ historisch/CAPE/Block/Stationary/Regime | historische und zufaellige Simulation oeffentlich beschrieben | Normalverteilungs-MC, 1.000 Laeufe | historische Analyse + MC | ❌ nur historische Sequenzen | mehrere MC-Modelle |
-| **Explizites Tail-Risk-/Crash-Overlay** | ✅ opt-in, Ereignis-KPIs | in ausgewerteter Produktdoku nicht separat ausgewiesen | Bear-Market-Szenario manuell; MC normalverteilt dokumentiert | in ausgewerteter Produktdoku nicht separat ausgewiesen | ❌ | in ausgewerteter Produktdoku nicht separat ausgewiesen |
-| **Kontinuierliche Regime-/Runway-Signale** | ✅ opt-in Zielglaettung | nicht separat ausgewiesen | erfolgsquotenbasierte Spending Guardrails dokumentiert | nicht separat ausgewiesen | strategieabhaengig | nicht separat ausgewiesen |
-| **Mindest-Flex p.a.** | ⚠️ experimentelle Komfort-Untergrenze | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Auto-Optimize** | ✅ LHS + Quick/Refine/Validate | ❌ | ❌ | ✅ | ❌ | ❌ |
-| **Ausgaben-Check** | ✅ CSV+Median | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Offline** | ✅ | ⚠️ ($799) | ❌ | ✅ (Gold) | ✅ | ✅ |
-| **Desktop-App** | ✅ Tauri (8 MB) | ❌ | ❌ | ✅ Excel | ❌ | ❌ |
-| **Multi-Plattform** | ✅ Win/Mac/Linux | ⚠️ Web only | ⚠️ Web only | ⚠️ Win only | ✅ Web | ✅ Web |
-| **Open Source** | ✅ MIT | ❌ | ❌ | ❌ | ✅ | ❌ |
+## Ergebnisregister und Interpretationsregeln
 
-## D.4 Differenzierungsmerkmale (im Vergleich zu analysierten Tools)
+| Ergebnisgröße | Berechnungsbasis | Zulässige Aussage | Nicht daraus ableiten |
+|---------------|-------------------|-------------------|----------------------|
+| **Erfolgsquote** | Anteil der Läufe ohne `isRuin`/Validierungsfehler bis Laufende | Robustheit der Floor-Deckung unter genau diesem Szenario | Garantie, vollständige Flex-Erfüllung oder empirische Eintrittswahrscheinlichkeit |
+| **Ruin** | aktive Vermögensdeckung beziehungsweise Auszahlungs-Fallback für Netto-Floor | modellierter Floor-Deckungsbruch | rechtliche Insolvenz oder vollständige Vermögenslosigkeit |
+| **Endvermögen** | Aktien + Gold + freie Liquidität; fehlgeschlagene Läufe werden in Aggregaten mit 0 geführt | Verteilung des verbleibenden aktiven Vermögens | vollständiges Haushaltsvermögen einschließlich Pflegebucket und externer Assets |
+| **Depoterschöpfung** | Fehler/Ruin oder Aktien + Gold ≤ 100 € | enge Risiko-Teilmetrik für das simulierte Depot | dass keinerlei freie Liquidität oder Pflegebucket mehr existiert |
+| **Runway** | freie Liquidität / aktueller Netto-Monatsbedarf | operative Liquiditätsdeckung im aktuellen Modelljahr | Lebensdauer des Gesamtvermögens oder Erfolgswahrscheinlichkeit |
+| **Reale Entnahme** | nominale Entnahme / kumulierter Inflationsfaktor | Basisjahr-Kaufkraft nur bei intaktem Faktor | derzeit im Simulator wegen PD-01 nicht belastbar |
+| **Pflegebucket-KPIs** | separater Start-, Nutzungs-, End- und Deckungs-State | Wirkung der Zweckbindung und Nutzung im Modell | Versicherungsleistung oder garantierte Pflegekostendeckung |
+| **Optimizer-Champion** | Zielfunktion und Constraints über gewählte Train-/Test-Seeds | bester gefundener Kandidat im untersuchten Suchraum | globales Optimum oder automatisch zu übernehmende Empfehlung |
 
-*Hinweis: Dieser Vergleich basiert auf einer Recherche der oben genannten Tools (ProjectionLab, Boldin, Pralana, Portfolio Visualizer, FI Calc). Es können weitere Tools existieren, die nicht analysiert wurden.*
+Für belastbare Nutzung gelten vier Regeln:
 
-1. **Vollständige DE-Kapitalertragssteuer** — Kein anderes verglichenes Tool implementiert Abgeltungssteuer, Soli, KiSt, Teilfreistellung, SPB, steueroptimierte Reihenfolge und jahresübergreifenden Verlustverrechnungstopf
-2. **Pflegefall-Modellierung mit PG1-5** — Kein anderes verglichenes Tool hat ein deutsches Pflegegrad-Modell mit Progression und Dual-Care
-3. **7-stufige Marktregime-Erkennung** — In den betrachteten kostenlosen Tools in dieser Form nicht enthalten
-4. **Risk-Based Guardrails** — Implementiert den Kitces-Ansatz statt klassischer Guyton-Klinger
-5. **Tranchen-Management mit Online-Kursen** — Einzelpositionen mit FIFO-Steueroptimierung und automatischer Kursabfrage
-6. **Mehrphasige Auto-Optimierung (LHS)** — Latin Hypercube Sampling + Quick-Filter + volle Evaluation + lokale Verfeinerung + Train/Test-Validierung
-7. **Parameter-Sweep mit Heatmap-Visualisierung** — Sensitivitätsanalyse mit SVG-basierter Viridis-Heatmap und Invarianten-Prüfung
-8. **Historischer Backtest mit DE-Daten** — Deterministische Simulation 1951-2025 mit deutscher Inflation und Lohnentwicklung
-9. **Portable Tauri-Desktop-App** — ~8 MB EXE, keine Installation, läuft von USB-Stick
-10. **Offline-Betrieb und Open Source** — Daten verbleiben lokal auf dem Rechner
-11. **Ausgaben-Check mit CSV-Import** — Monatliches Budget-Tracking gegen Floor+Flex, Median-basierte Hochrechnung, Ampel-Visualisierung, Profilverbund-Integration
-12. **Echte Multi-Plattform-Unterstützung** — Native Desktop-Apps für Windows (.exe), macOS (.app) und Linux (AppImage/deb) aus einer Codebasis, plus Browser-Fallback mit Start-Scripts
-13. **Dynamic Flex (VPW) mit Sterbetafeln** — Variable Percentage Withdrawal mit CAPE-basierter Renditeerwartung, EMA-Glättung, Mortality-Table-Horizont (Single/Joint, Mean/Quantil) und Go-Go-Phase. Integriert in Balance-App, Backtest, Monte Carlo, Parameter-Sweep und Auto-Optimize. Kein anderes verglichenes Tool kombiniert VPW mit Guardrails und deutscher Steuer.
-14. **Pflegebucket mit Engine-Air-Gap** — Zweckgebundene Geldmarkt-/Cash-Reserve wird aus der VPW-/Runway-Basis herausgerechnet, bei Pflegegrad-Triggern freigegeben und in Backtest/Monte Carlo separat ausgewiesen.
-15. **Mindest-Flex p.a. als experimentelle Komfort-Policy** — Nutzerdefinierte Untergrenze für flexible Ausgaben in gekürzten Guardrail-/Safety-Jahren. Diese konkrete Regel ist eine Novität der Suite und nicht als wissenschaftlich validierte Entnahmestrategie belegt; sie wird deshalb transparent als nachgelagerte, notfallbegrenzte Policy behandelt.
-16. **Stationary Bootstrap mit Worker-Paritaet** — Variable historische Blocklaengen sind neben festem Block-Bootstrap, CAPE-, Recency- und Regime-Sampling explizit waehlbar. Der Vorteil ist methodische Transparenz, nicht automatisch bessere Prognoseguete.
-17. **Tail-Risk-Overlay mit Ereignisdiagnose** — Seltene Crash-/Inflationsereignisse koennen als opt-in Stresstest injiziert und ueber aktive, angewandte und wegen historischer Krisen uebersprungene Ereignisse nachvollzogen werden. Der Vergleich belegt keine Exklusivitaet gegen nicht oeffentlich dokumentierte Konkurrenzfunktionen.
-18. **Konservative Langlebigkeitsannahmen als gesperrte Sicherheitsparameter** — Quantil-, relative und feste Horizontpuffer wirken auf den finalen Haushalts-Horizont und koennen nicht durch Sweep oder Auto-Optimize wegoptimiert werden.
-19. **Kontinuierliche Signale bei diskreten Sicherheitsgrenzen** — Drawdown, CAPE und Runway koennen Zielwerte stetig erklaeren, ohne harte Mindest-Runways oder diskrete Krisenregeln aufzuweichen; die Zielglaettung bleibt fuer Bestandskompatibilitaet standardmaessig aus.
+1. Nominale und reale Werte sowie Prozent- und Verhältnis-Einheiten nicht
+   mischen.
+2. Nie nur Erfolgsquote oder Median betrachten; Tail, Kürzungen, Drawdown,
+   Endvermögen, Depoterschöpfung und Pflegewirkung mitlesen.
+3. Ergebnisse über mehrere Seeds, Sampling-Methoden, Startjahrgrenzen und
+   Stressannahmen vergleichen.
+4. Optimierergebnisse erst nach fachlicher Plausibilisierung bewusst in
+   Eingaben übernehmen; es gibt keine automatische Produktionsübernahme.
 
-**Vergleichsgrenze:** Die Matrix vergleicht nur oeffentlich dokumentierte Funktionen der ausgewerteten Produktquellen. „Nicht separat ausgewiesen“ bedeutet nicht, dass eine interne Funktion sicher fehlt. Insbesondere sind Sampling-Verfahren, Verteilungsannahmen und Stresslogik kommerzieller Produkte oft nur teilweise offengelegt und deshalb nicht belastbar auf Implementierungsniveau vergleichbar.
+## Validierungsstufen
 
-## D.5 Einordnung des Pflegebuckets
+| Stufe | Frage | Geeignete Nachweise | Aussagegrenze |
+|-------|-------|---------------------|----------------|
+| **V1 Contract** | Sind Eingaben, Einheiten, Fehler- und Ergebnis-Shapes konsistent? | Validator-, Contract-, Negativ- und UI-Reader-Tests | beweist keine ökonomische Richtigkeit |
+| **V2 Rechenregression** | Bleiben deterministische Formeln und bekannte Ergebnisse stabil? | Unit-Tests, numerische Fixtures, Backtest-/Snapshot-Vergleich | stabile Altsemantik kann fachlich trotzdem falsch sein |
+| **V3 Pfadparität** | Rechnen Main Thread, Worker, Chunking und Optimizer gleich? | Worker-Paritäts- und Merge-Tests mit identischen Seeds | gleiche Implementierung ist noch keine externe Validierung |
+| **V4 Historische Plausibilität** | Sind Daten, Zeitreihen, Stressphasen und Größenordnungen nachvollziehbar? | Provenienzprüfung, Teilperioden, Rekonstruktionskennzeichen, Sensitivität | historische Passung garantiert keine Zukunft |
+| **V5 Kalibrierung** | Passen Pflege, Mortalität, Steuerannahmen, Regime und Policies zu externer Evidenz und Zielgruppe? | Quellenabgleich, Parameterstudien, Expertenprüfung, Out-of-sample-Vergleiche | bleibt populations- und annahmenabhängig |
+| **V6 Entscheidungsvalidierung** | Ist der konkrete Haushaltsfall mit realen Unterlagen und Umsetzung konsistent? | Nutzerprüfung, Brokerabrechnung, Steuer-/Versicherungsfachprüfung, laufendes Reconcile | kann nicht durch Softwaretests ersetzt werden |
 
-Der Pflegebucket liegt zwischen klassischer Liquiditätsreserve, mentalem Zweckkonto und Versicherungslösung:
-
-| Ansatz | Wirkung | Vorteil | Grenze |
-|--------|---------|---------|--------|
-| Normale Liquidität | zählt vollständig für Runway/Entnahme | einfach, jederzeit verfügbar | kann Konsumspielraum überschätzen, wenn Geld mental für Pflege reserviert ist |
-| Notgroschen | grobe Reserve außerhalb der Planung | robust gegen kurzfristige Schocks | meist nicht mit Pflegegrad, Inflation und Monte Carlo verknüpft |
-| Geldmarkt-ETF-Reserve | risikoarm, liquide, verzinst | passt zur Bucket-Quelle | steuerliche Detailbehandlung bei Verkäufen muss modelliert werden |
-| Pflegezusatzversicherung | Risikotransfer an Versicherer | kann extreme Pflegekosten abdecken | Prämien, Bedingungen, Annahme-/Leistungsrisiken, keine direkte Portfoliointegration |
-| Pflegebucket der Suite | algorithmisch gesperrte Selbstversicherung | Air Gap gegen VPW-Überfreigabe, weniger Forced Sales in Stressjahren | keine Garantie, Opportunitätskosten, Version 1 ohne automatisches Refill |
-
-Die Stärke des Buckets ist nicht, dass er mehr Vermögen erzeugt. Er erhöht Modelltreue, wenn ein Haushalt einen Teil des Geldmarkts strategisch nicht konsumieren will. Bei hohem Gesamtvermögen kann er aus reiner Erfolgsquotensicht unnötig wirken; aus Governance-Sicht kann er dennoch sinnvoll sein, weil er Pflegekosten nicht erst im Krisenjahr aus Risikoanlagen finanzieren muss.
-
-**Trade-offs:**
-
-- Die operative VPW-/Runway-Basis sinkt, dadurch sind normale Flex-Entnahmen etwas niedriger.
-- Das Renditepotenzial sinkt gegenüber einer vollständigen Risikoanlage.
-- In Pflege- und Crashkombinationen kann die Notverkaufsquote sinken.
-- Extreme Pflege-, Langlebigkeits- oder Marktpfade werden nicht garantiert abgefangen.
-- Der inflationsindexierte Zielwert verhindert Selbsttäuschung über reale Kaufkraft, löst aber keinen automatischen Nachfüllmechanismus aus.
+Ein grüner Testlauf belegt V1 bis V3 für die jeweils abgedeckten Pfade. Er ist
+kein wissenschaftlicher Nachweis für Datenqualität, Kalibrierung,
+Prognosefähigkeit oder die Eignung einer konkreten finanziellen Entscheidung.
 
 ---
 
-# Forschungsabgleich
+# Marktvergleich
 
-## E.1 Morningstar 2025: Safe Withdrawal Rates
+**Methodikstand und Vergleichsstichtag:** 2026-07-15. Die Erhebung verwendet
+öffentlich zugängliche offizielle Quellen und die lokale Source of Truth der
+Ruhestand-Suite. Produktstufen, Preise, Funktionsbefunde und Evidenzlücken sind
+auf diesen Stichtag eingefroren.
+Symbolwertungen, Reviewer-Zitate, Gesamtscores und unbeschränkte
+Exklusivitätsaussagen werden nicht verwendet.
 
-**Quelle:** [Morningstar: What's a Safe Retirement Spending Rate for 2025?](https://www.morningstar.com/retirement/whats-safe-retirement-spending-rate-2025)
+## D.1 Erkenntnisziel und Vergleichsgrenze
 
-| Strategie | Starting SWR | Morningstar | Ruhestand-Suite |
-|-----------|--------------|-------------|-----------------|
-| Constant Dollar | 3.9% | ✅ | ✅ Floor |
-| Guardrails | 5.2% | ✅ | ✅ Floor + Flex |
-| RMD-based / VPW | 4.8% | ✅ | ✅ Dynamic Flex (VPW) |
-| Forgo Inflation | 4.3% | ✅ | ❌ |
+Der Vergleich soll nicht beantworten, welches Produkt allgemein „das beste“
+ist. Er untersucht zwei engere Fragen:
 
-**Implementierung:** Floor-Flex implementiert den Guardrails-Ansatz, der laut Morningstar die höchste SWR ermöglicht. Seit Februar 2026 deckt Dynamic Flex (VPW) auch den RMD-basierten Ansatz ab — mit CAPE-basierter Renditeerwartung statt fixer Rate.
+1. Welche Teile eines synthetischen deutschsprachigen Ruhestandshaushalts kann
+   die festgelegte Produktstufe nativ, nur angenähert oder gar nicht
+   modellieren?
+2. Wie transparent, reproduzierbar und operativ nutzbar sind Eingaben,
+   Annahmen, Rechenwege und Ergebnisse für den jeweiligen Zielmarkt?
 
-## E.2 Kitces 2024: Risk-Based Guardrails
+Die Auswertung besteht deshalb aus einer Kriterienmatrix und einer
+Modellierbarkeitskarte des Referenzhaushalts. Unterschiedliche Segmente werden
+zuerst innerhalb ihres eigenen Zwecks interpretiert. Eine Beratersoftware, ein
+staatliches Vorsorgeportal und ein einzelner Entnahmerechner erhalten keine
+gemeinsame Gesamtpunktzahl. Es gibt weder additive Scores noch eine
+segmentübergreifende Rangliste.
 
-**Quelle:** [Kitces: Why Guyton-Klinger Guardrails Are Too Risky](https://www.kitces.com/blog/guyton-klinger-guardrails-retirement-income-rules-risk-based/)
+Vergleichseinheit ist immer das Tupel **Produkt, Produktstufe, Region/Sprache,
+Erhebungsdatum**. Eine Funktion in einer teureren oder institutionellen Stufe
+gilt nicht automatisch als Funktion der untersuchten Stufe. Die
+Ruhestand-Suite wird nach denselben Kriterien betrachtet; lokale Quellmodule
+und Referenzdokumente ersetzen bei ihr jedoch keine externe
+Wirksamkeitsvalidierung.
 
-**Kernaussage:** Klassische Guyton-Klinger-Guardrails führen zu Einkommensreduktionen von bis zu 54% (Stagflation) oder 28% (2008). Risk-Based Guardrails reduzieren dies auf 32% bzw. 3%.
+## D.2 Recherchefenster und reproduzierbarer Stichtag
 
-| Aspekt | Guyton-Klinger | Ruhestand-Suite |
-|--------|----------------|-----------------|
-| Trigger | ±20% Withdrawal Rate | 7 Regime + Schwellen |
-| Anpassung | ±10% (fix) | Adaptive Caps (2.5-10 pp) |
-| Worst-Case (2008) | -28% Einkommen | -3% Einkommen |
-| Worst-Case (Stagflation) | -54% Einkommen | -32% Einkommen |
+Die Erhebung wurde am 2026-07-15 abgeschlossen. Die vorgelagerte Prüfung der
+offiziellen Einstiegsseiten diente nur zur Identifikation von Produkt, Stufe
+und Segment; die Funktionsbewertung stützt sich auf die Quellenrecords in
+D.12. Für spätere Aktualisierungen gelten folgende Regeln:
 
-**Implementierung:** Die Suite implementiert Risk-Based Guardrails:
-- Marktregime-Erkennung statt fixer Withdrawal-Rate-Trigger
-- Adaptive Rate-Change-Caps (2.5-10 pp) statt fixer ±10%
-- Recovery-Guardrails verhindern zu schnelle Erhöhung
+- Die Vollerhebung erfolgt in einem zusammenhängenden Fenster von höchstens
+  14 Kalendertagen.
+- Der letzte Erhebungstag ist der Vergleichsstichtag. An diesem Tag werden
+  volatile Angaben wie Verfügbarkeit, Produktstufen und Preise nochmals
+  geprüft.
+- Jede Quelle erhält ein Abrufdatum im Format `YYYY-MM-DD` in der Zeitzone
+  Europe/Berlin; ein erkennbares Veröffentlichungs- oder Änderungsdatum wird
+  zusätzlich erfasst.
+- Überschreitet die Recherche 14 Tage, werden alle verwendeten
+  Produkt-, Preis- und Funktionsquellen neu geprüft. Nicht erneut erreichbare
+  Aussagen werden als historischer oder nicht mehr verifizierter Stand
+  gekennzeichnet.
+- Spätere Produktänderungen ändern den eingefrorenen Befund nicht rückwirkend.
+  Eine Aktualisierungsnotiz nennt Vergleichsstichtag und nächste Prüfung.
+- Registrierung, Kauf, Testlizenz, Anbieteranfrage oder Verarbeitung realer
+  Finanzdaten erfolgen nicht ohne gesonderte Nutzerfreigabe.
 
-## E.3 Morningstar 2025: Flexible Strategies
+## D.3 Produktsegmente
 
-**Quelle:** [Morningstar: Best Flexible Strategies for Retirement Income](https://www.morningstar.com/retirement/best-flexible-strategies-retirement-income-2)
+| Segment | Abgrenzung | Faire Interpretation |
+| --- | --- | --- |
+| **Consumer Planner** | direkt von Haushalten bedienbare, mehrjährige Finanz- oder Ruhestandsplanung | Vollständigkeit, Szenarien und Verständlichkeit innerhalb der ausgewählten Endkundenstufe vergleichen |
+| **Deutsche Vorsorge-/Entnahmewerkzeuge** | deutschsprachige Portale und Rechner für Vorsorgeansprüche, Rentenlücke oder Kapitalentnahme | schmale Rechen- und Informationszwecke nicht als unvollständige Vollplaner abwerten |
+| **Beratersoftware** | B2B-Plattformen für Berater- und Kundenworkflow | Funktionsbreite, Kollaboration und Auditierbarkeit berücksichtigen; fehlender Endkundenzugang ist keine UX-Niederlage |
+| **Open-Source-/FIRE-Werkzeuge** | frei zugängliche oder quelloffene Werkzeuge mit Schwerpunkt historischer Entnahme- und FIRE-Analyse | Methoden- und Datenklarheit gegen bewusst engeren Haushaltsumfang abwägen |
+| **Offline-/Tabellenlösungen** | lokal nutzbare Desktop- oder Tabellenmodelle | lokale Kontrolle und Prüfbarkeit ebenso erfassen wie Laufzeitabhängigkeiten und Bedienaufwand |
 
-| Aspekt | Forschung | Suite |
-|--------|-----------|-------|
-| Guardrails + Social Security | ✅ Empfohlen | ✅ Rente als Floor-Offset |
-| Volatility Trade-off | ✅ Dokumentiert | ✅ Flex-Rate-Glättung |
-| Lifetime Income | Guardrails #1 | ✅ Implementiert |
+Alle Segmente erhalten denselben Kriterienkatalog. Ist ein Kriterium außerhalb
+des erklärten Produktzwecks, wird es als `nicht anwendbar` geführt und nicht
+negativ gewertet. Der spätere Text trennt daher **Abdeckung** von
+**Zweckerfüllung**.
 
-## E.4 Mindest-Flex p.a.: Einordnung als nicht validierte Novität
+## D.4 Auswahlregeln und Stichprobe
 
-`Mindest-Flex p.a.` ist keine direkt aus der Literatur übernommene Entnahmeregel. Die Policy verbindet mehrere etablierte Konzepte, geht in ihrer konkreten Form aber über den belegten Forschungsstand hinaus:
+### D.4.1 Auswahlverfahren
 
-- **Floor-and-Upside / Floor-Flex:** Die Trennung von nicht verhandelbarem Floor und flexiblem Konsum ist anschlussfähig an Floor-and-Upside-Logik. Mindest-Flex erhöht den Floor jedoch bewusst nicht, sondern definiert nur eine Komfort-Untergrenze für den flexiblen Anteil.
-- **Risk-Based Guardrails:** Die Policy wirkt nach den Guardrails und kann sehr starke Flex-Kürzungen abmildern. Sie ersetzt keine Guardrails und bleibt Alarm-, Runway- und Vermögensdeckungsprüfungen untergeordnet.
-- **Behavioral Finance und Konsumglättung:** Haushalte akzeptieren Entnahmepläne oft besser, wenn Mindeststandards für Lebensqualität transparent sind. Diese Plausibilität ist verhaltensökonomisch anschlussfähig, aber für die konkrete Regel nicht empirisch validiert.
-- **VPW / Dynamic Flex:** Mindest-Flex kann besonders bei VPW- oder Safety-Pfaden als Gegenpol zu sehr niedrigen Flex-Freigaben dienen. Das ist eine Nutzerpräferenz-Kalibrierung, kein Bestandteil klassischer VPW-Modelle.
+Die Stichprobe ist eine bewusste **Maximum-Variation-Stichprobe** und kein
+statistisch repräsentativer Marktquerschnitt. Sie soll unterschiedliche
+Zielgruppen, Rechtsräume, Rechenansätze und Betriebsmodelle sichtbar machen.
+Aus ihr dürfen keine Marktanteils-, Häufigkeits- oder universellen
+Exklusivitätsaussagen abgeleitet werden.
 
-**Status:** ⚠️ experimentelle, praxisorientierte Policy. Sie darf Flex-Kürzungen abmildern, ist aber keine garantierte Mindestrente, keine Versicherung und kein wissenschaftlich belegter SWR-Verbesserer. Deshalb dokumentiert die Suite Status, Blockiergrund und Effekt im Diagnose-/Logsystem und validiert die Regel gegen den Flex-Bedarf.
+Ein Werkzeug wird aufgenommen, wenn:
 
-## E.5 Bootstrap-Methodik
+1. am Rekognoszierungstag eine offizielle Produkt- oder Betreiberseite
+   erreichbar und die untersuchte Stufe benennbar ist;
+2. Ruhestandsplanung, Vorsorgeinformation oder Kapitalentnahme zum
+   ausdrücklichen Kernzweck gehört;
+3. es ein vorgeschriebenes Segment oder einen methodisch eigenständigen Ansatz
+   repräsentiert;
+4. offizielle Quellen eine spätere Prüfung ermöglichen oder gerade die
+   begrenzte öffentliche Dokumentation als relevanter Befund untersuchbar ist;
+5. der Zusatznutzen gegenüber bereits aufgenommenen Produkten den
+   Rechercheaufwand rechtfertigt.
 
-**Stand der Forschung:** Block-Bootstrap erhält Autokorrelation; Stationary Bootstrap (Politis/Romano) wird in der Literatur häufig als geeignete Alternative eingeordnet.
+Ausgeschlossen oder nur als Kontextquelle geführt werden reine Spar-, Kredit-
+oder Portfolioanalysewerkzeuge ohne Haushalts-/Entnahmebezug, doppelte
+Produktstufen, nicht mehr erreichbare Produkte und Werkzeuge, die nur durch
+Sekundärreviews identifizierbar sind. Portfolio Visualizer bleibt damit
+allenfalls eine Kontextquelle für Portfolioanalytik, aber kein Kernprodukt des
+Haushaltsvergleichs. Ein generisches Tabellenblatt ist eine Kontrollidee, kein
+Marktprodukt.
 
-**Status:** ✅ Block-Bootstrap und Stationary Bootstrap implementiert. Stationary Bootstrap nutzt variable Blocklaengen mit deterministischem per-run Sampler-State; Fat-Tail-/Crash-Overlays bleiben separat.
+### D.4.2 Untersuchte Stichprobe
 
-**Einordnung:** Stationary Bootstrap verbessert gegenueber IID-Sampling die Abbildung lokaler Abhaengigkeiten, erzeugt aber keine neuen Extremrenditen ausserhalb der historischen Stichprobe. Deshalb bleibt das Tail-Risk-Overlay eine getrennte Stressannahme. Ein kombinierter Lauf muss als Szenarioanalyse interpretiert werden, nicht als statistisch kalibrierte Wahrscheinlichkeitsprognose.
+Die Tabelle fixiert Stichprobe, Segment, Stufe und Auswahlgrund. Die konkrete
+Funktionsabdeckung folgt aus den datierten Records und Ergebnissen in D.11 bis
+D.17, nicht aus der bloßen Aufnahme eines Produkts.
 
-## E.6 Fat Tails / Regime Switching
+| ID | Segment | Produkt und untersuchte Stufe | Auswahlgrund | Offizieller Einstieg, geprüft am 2026-07-15 |
+| --- | --- | --- | --- | --- |
+| RS-01 | Referenzprodukt | Ruhestand-Suite, lokale Arbeitskopie | Gegenstand des Vergleichs; deutschsprachiger DIY- und Jahresworkflow | lokale Source of Truth dieses Repositorys |
+| CP-01 | Consumer Planner | ProjectionLab Premium | international ausgerichteter DIY-Planer; eine bezahlte Endkundenstufe verhindert den Vergleich einer Vollsuite mit einem absichtlich reduzierten Gratiszugang | [Pricing & Subscriptions](https://projectionlab.com/pricing) |
+| CP-02 | Consumer Planner | Boldin PlannerPlus | ruhestandsspezifischer US-Endkundenplaner mit klar benannter bezahlter Stufe | [Boldin Pricing](https://www.boldin.com/retirement/pricing/) |
+| DE-01 | Deutsches Werkzeug | BVI Entnahme-Rechner, öffentlicher Webzugang | institutioneller deutscher Basisfall für einen Fonds-Auszahlplan | [BVI-Rechner](https://www.bvi.de/service/rechner/) |
+| DE-02 | Deutsches Werkzeug | Finanzfluss Entnahmeplan, öffentlicher Webzugang | verbreiteter deutschsprachiger Endkundenrechner als niedrige Komplexitätsstufe | [Entnahmeplan-Rechner](https://www.finanzfluss.de/rechner/entnahmeplan/) |
+| DE-03 | Deutsches Werkzeug | Digitale Rentenübersicht, öffentlicher Portalzweck | Referenz für deutsche Vorsorgeanspruchs-Aggregation; ausdrücklich kein Vollplaner | [Digitale Rentenübersicht](https://www.rentenuebersicht.de/DE/01_startseite/home_node.html) |
+| AD-01 | Beratersoftware | MoneyGuide, Produktstufe „MoneyGuide“ | zielbasierte Beraterplanung und Berater-Kunden-Workflow als eigener Markt | [MoneyGuide](https://www.moneyguidepro.com/) |
+| AD-02 | Beratersoftware | eMoney Pro | cashflow-orientierte Beraterplanung als methodischer Gegenpol zur zielbasierten Plattform | [eMoney Pro](https://emoneyadvisor.com/products/emoney-pro/) |
+| FR-01 | FIRE-Werkzeug | FI Calc, öffentlicher Webzugang | fokussiertes Entnahmewerkzeug mit öffentlich strukturierter Methodikdokumentation | [FI Calc Guide](https://guide.ficalc.app/) |
+| FR-02 | FIRE-Werkzeug | FIRECalc 3.0, öffentlicher Webzugang | etablierter historischer Sequenzrechner als zweite FIRE-Methodik | [FIRECalc](https://firecalc.com/) |
+| OT-01 | Offline-/Tabellenlösung | Pralana Gold | explizit herunterladbare Excel-Produktstufe und damit eigenständiger Offline-/Tabellenfall | [Pralana](https://pralanaretirementcalculator.com/) |
 
-**Stand der Forschung:** Student-t oder GARCH erfassen Tail-Risiken besser als Normalverteilung.
+Die zehn externen Werkzeuge verteilen sich auf zwei Consumer Planner, drei
+deutsche Werkzeuge, zwei Beraterprodukte, zwei FIRE-Werkzeuge und eine
+Offline-/Tabellenlösung. Die ungleiche Segmentgröße ist beabsichtigt: Der
+deutsche Block enthält einen Entnahmerechner, einen Verbraucherrechner und ein
+Vorsorgeportal mit verschiedenen Zwecken; die schmaleren Segmente werden nicht
+durch ähnliche Varianten künstlich aufgefüllt.
 
-**Status:** Regime-Switching via Markov-Chain und ein separates Tail-Risk-/Crash-Overlay V1 sind implementiert. Das Overlay injiziert seltene, begrenzte Aktien- und Inflationsschocks als expliziten Monte-Carlo-Stresstest. Es ist kein parametrisch kalibriertes Fat-Tail-Return-Modell, bleibt standardmaessig deaktiviert und ueberspringt historische Krisenjahre, um offensichtliche Doppelschocks zu vermeiden.
+### D.4.3 Austausch- und Abbruchregeln
 
-**Vergleichsrelevanz:** Gegenueber normalverteilungsbasierten Monte-Carlo-Modellen macht die Suite die zusaetzliche Tail-Annahme sichtbar und abschaltbar. Gegenueber rein historischen Simulationen kann sie bislang unbeobachtete Schockkombinationen untersuchen, bezahlt dies aber mit subjektiv gesetzten Wahrscheinlichkeit-, Schock-, Dauer- und Cooldown-Parametern. Ein schlechteres Ergebnis mit Overlay ist daher ein Sensitivitaetsbefund, keine empirisch geschaetzte Ausfallwahrscheinlichkeit.
+- Fällt ein Produkt bei einer späteren Aktualisierung weg, wird es nur durch
+  ein Werkzeug desselben Segments und mit dokumentiertem Auswahlgrund ersetzt.
+- Ändert sich der Produktname oder die Stufenstruktur, wird zuerst die
+  Produktidentität geklärt; alte und neue Stufen werden nicht vermischt.
+- Ist ein Beraterprodukt ohne Kauf, Login oder Demo nicht ausreichend
+  dokumentierbar, bleibt es in der Stichprobe und erhält neutrale
+  Dokumentationsbefunde. Ein Vertriebszugang wird nicht fingiert.
+- Mehr als zwei notwendige Ersetzungen oder der Wegfall eines gesamten
+  Segments erzwingen eine neue Stichprobenentscheidung; Ergebnisse
+  verschiedener Stichproben werden nicht still zusammengeführt.
 
-## E.7 VPW / Variable Percentage Withdrawal
+## D.5 Statuslexikon und Evidenzregeln
 
-**Quellen:**
-- [Bogleheads: Variable Percentage Withdrawal](https://www.bogleheads.org/wiki/Variable_percentage_withdrawal) — Grundkonzept und PMT-Formel
-- McClung, M. (2017): *Living Off Your Money* — VPW als dynamische Entnahmestrategie
-- Morningstar 2025: RMD-basierte Strategien erreichen ~4.8% Starting SWR
+### D.5.1 Zellstatus
 
-**Kernaussage:** VPW berechnet jährlich den Entnahmebetrag als Annuität (PMT-Formel) basierend auf Vermögen, erwarteter Rendite und Restlaufzeit. Im Vergleich zu fixen Entnahmeraten passt sich VPW automatisch an Marktschwankungen an und reduziert das Ruinrisiko.
+| Status | Verbindliche Bedeutung | Zulässige Vergabe |
+| --- | --- | --- |
+| **vorhanden** | Die untersuchte Produktstufe deckt den definierten Kern des Kriteriums nativ ab. | offizielle Quelle oder protokollierter Direktbefund bestätigt alle für das Kriterium als verpflichtend markierten Teilfragen |
+| **teilweise** | Ein substanzieller Teil ist vorhanden, aber Umfang, Region, Personenzahl, Zeitachse, Exporttiefe oder Referenzfall erfordern Einschränkung beziehungsweise Workaround. | die unterstützten und fehlenden Teilfragen werden beide ausdrücklich genannt |
+| **nicht öffentlich dokumentiert** | In den protokolliert geprüften offiziellen Quellen wurde keine belastbare Aussage gefunden. | neutraler Informationsbefund nach dem definierten Suchpfad; niemals Synonym für Abwesenheit |
+| **nicht vorhanden** | Die Funktion fehlt in der untersuchten Stufe nachweislich. | nur bei ausdrücklicher offizieller Negativaussage oder reproduziertem Direktbefund; nie allein aus Schweigen ableiten |
+| **nicht anwendbar** | Das Kriterium liegt außerhalb des erklärten Produktzwecks oder der untersuchten Zugriffsebene. | Produktzweck und Begründung werden genannt; der Status fließt in keine negative Wertung ein |
+| **nicht geprüft** | Die Erhebung ist offen, die Quelle blockiert oder ein nicht freigegebener Zugang wäre nötig. | nur als sichtbare Evidenzlücke mit Grund und betroffenem Kriterium zulässig |
 
-| Aspekt | Klassisches VPW | Ruhestand-Suite |
-|--------|----------------|-----------------|
-| Renditeerwartung | Fix (z.B. 4%) | CAPE-basiert, EMA-geglättet, [0%-5%] |
-| Horizont | Fixe Jahre oder Mean-LE | Mean oder Survival-Quantil aus Sterbetafeln |
-| Joint-Life | Selten implementiert | Single + Joint (max beider Horizonte) |
-| Guardrails | Keine | ✅ FlexRate 0-100%, Hard Caps, Alarm |
-| Go-Go-Phase | Nicht Teil von VPW | ✅ Optionaler Multiplikator (1.0–1.5) |
-| Steuer | Nicht integriert | ✅ Vollständige DE-Kapitalertragssteuer |
-| MC-Integration | Meist unabhängig | ✅ Dynamischer Horizont pro Simulationsjahr |
+Eine Zusammenfassung auf Kriterienebene folgt der konservativsten
+pflichtigen Teilfrage: `vorhanden` ist nur bei vollständiger Kernabdeckung
+zulässig; gemischte Kernabdeckung ist `teilweise`. Es werden keine Symbole in
+Punktwerte umgerechnet.
 
-**Status:** ✅ VPW implementiert mit CAPE-basierter Rendite, Sterbetafel-Horizont, EMA-Glättung und vollständiger Guardrail-Integration
+### D.5.2 Evidenzklassen
 
-## E.8 Pflegebucket, Mental Accounting und Self-Insurance
+| Klasse | Quelle | Aussagekraft |
+| --- | --- | --- |
+| **P1** | offizielles Methodenpapier, Handbuch, technische Dokumentation, Rechts-, Preis- oder Lizenzseite | primärer Beleg für Methode, Vertrag, Stufe oder Preis |
+| **P2** | offizielle Produkt-, Feature-, Hilfe- oder FAQ-Seite | Beleg für öffentlich zugesagte Funktion, nicht automatisch für interne Implementierungstiefe |
+| **P3** | direkt beobachtete frei zugängliche Funktion mit protokollierten Eingaben, Stufe und Datum | Beleg für sichtbares Verhalten dieser Zugriffsebene |
+| **P4** | offizielle Demo, Release Note oder Anbieter-Video | ergänzender Beleg; zeitlicher und stufenbezogener Kontext ist Pflicht |
+| **S1** | unabhängiger Test oder Review | nur ergänzend für UX, Lernkurve und Nutzungseindruck; keine alleinige Basis für Funktions- oder Negativaussagen |
+| **I1** | ausdrücklich gekennzeichnete Inferenz | Interpretation aus mehreren Belegen; darf keine Funktion oder Abwesenheit allein begründen |
 
-Der Pflegebucket verbindet mehrere Forschungs- und Praxislinien, ohne selbst eine versicherungsmathematisch kalibrierte Pflegeversicherung zu sein.
+Werbeaussagen und Anbieter-Testimonials bleiben Anbieteraussagen. Wörtliche
+Reviewer-Zitate sind für die Vergleichsmatrix nicht erforderlich. Bei
+widersprüchlichen offiziellen Quellen gewinnt nicht automatisch die neuere
+Marketingseite: Produktstufe, Datum und Aussagekontext werden geklärt oder der
+Befund bleibt offen.
 
-**Liquiditätsreserven und Sequence-of-Returns-Risk:** In der Entnahmephase reduzieren risikoarme Reserven den Zwang, Risikoanlagen in schlechten Marktphasen zu verkaufen. Der Pflegebucket nutzt diese Logik gezielt für Pflegejahre: Erst wenn ein Pflegegrad-Trigger vorliegt, darf die Reserve Forced Sales ersetzen. Dadurch wirkt er besonders in Pfaden, in denen Pflegekosten und schlechte Märkte zusammenfallen.
+## D.6 Einheitlicher Kriterienkatalog
 
-**Mental Accounting:** Haushalte reservieren oft mental Kapital für bestimmte Risiken. Wenn eine Simulation dieses Kapital als frei verfügbare Liquidität behandelt, überschätzt sie Flex-Spielraum und VPW-Basis. Der Air-Gap-Ansatz bildet diese Zweckbindung algorithmisch ab: Das Geld existiert im Gesamtvermögen, aber nicht im Konsumportfolio.
+Jedes Kriterium erhält in D.13 Teilbefunde, Status, Beleg-IDs und eine kurze
+Grenze. Die folgenden Fragen gelten unverändert für alle Produkte; nur
+`nicht anwendbar` schützt schmalere Produktzwecke vor einer sachfremden
+Abwertung.
 
-**Self-Insurance vs. Versicherung:** Der Bucket ist Selbstversicherung. Er vermeidet Prämien und Vertragsrisiken, aber das Risiko bleibt beim Haushalt. Eine Pflegezusatzversicherung kann Tail-Risiken transferieren; der Bucket kann nur bis zur reservierten Höhe leisten. Für hohe Vermögen kann Selbstversicherung rational sein, wenn die Opportunitätskosten akzeptiert werden. Für kleinere Vermögen kann sie zu viel Kapital binden und dennoch nicht ausreichend schützen.
+| ID | Kriterium | Operationalisierte Prüffragen |
+| --- | --- | --- |
+| K-01 | **Fachmodell** | Welche Planart, Zeitgranularität, Real-/Nominalkonvention, Cashflow-Reihenfolge, Asset- und Einkommensarten, Horizonte sowie Erfolgs-/Endzustände sind definiert? |
+| K-02 | **Steuern** | Welche Region und Steuerjahre gelten? Werden Einkommen, Kontotypen, Kapitalgewinne, Kostenbasis/Lots, Verluste, Freibeträge, Teilfreistellung und gemeinsame Veranlagung nativ oder nur pauschal behandelt? |
+| K-03 | **Rente** | Lassen sich mehrere gesetzliche, betriebliche und private Renten je Person mit Beginn, Indexierung, Besteuerung und Hinterbliebenenwirkung abbilden? |
+| K-04 | **Pflege** | Sind Pflege-/Long-Term-Care-Kosten, Eintritt, Dauer/Progression, Personenzuordnung, Versicherung und zweckgebundene Reserve modellierbar? |
+| K-05 | **Haushalt** | Werden Einzelperson und Paar, Eigentum je Person, gemeinsame Bedarfe, Tod, Hinterbliebene und getrennte Zahlungsströme konsistent geführt? |
+| K-06 | **Datenbasis** | Welche Markt-, Inflations-, Mortalitäts- und sonstigen Reihen werden mit Region, Zeitraum, Quelle, Aktualisierung, Rekonstruktion und Importmöglichkeit offengelegt? |
+| K-07 | **Stochastik** | Welche deterministischen, historischen, Monte-Carlo-, Bootstrap- oder Stressverfahren existieren; sind Verteilungen, Korrelationen, Pfadzahl, Seed und Reproduzierbarkeit dokumentiert oder steuerbar? |
+| K-08 | **Transparenz** | Sind Formeln, Defaults, Einheiten, Ereignisreihenfolge, Ergebnisdefinitionen, Versionen, Unsicherheiten und Modellgrenzen auffindbar? |
+| K-09 | **Szenarien** | Können Basisplan, Varianten, zeitlich bestimmte Ereignisse und Stressannahmen gespeichert, kopiert, nebeneinander verglichen und auf den Ausgangsstand zurückgeführt werden? |
+| K-10 | **Optimierung** | Gibt es automatische Suche oder Empfehlungen; sind Zielgröße, Nebenbedingungen, Suchraum, Nutzerbestätigung, Robustheit und In-/Out-of-sample-Grenze erkennbar? |
+| K-11 | **Datenschutz** | Wo werden Finanzdaten verarbeitet und gespeichert; welche Kontoverknüpfungen, Drittanbieter sowie Tracking-, Export-, Lösch- und Aufbewahrungsregeln gelten für die untersuchte Stufe? |
+| K-12 | **Offline-Fähigkeit** | Welche Kernfunktionen laufen nach Installation beziehungsweise Download ohne Netzwerk; welche Anmeldung, Live-Daten, Fonts, Lizenzprüfungen oder Exporte benötigen weiterhin Verbindungen? |
+| K-13 | **Export** | Lassen sich Eingaben, Konfiguration, Jahreswerte, Transaktionen, Ergebnisdaten und Berichte maschinenlesbar oder druckbar exportieren, sichern und gegebenenfalls wieder importieren? |
+| K-14 | **Auditierbarkeit** | Ist ein Ergebnis von Eingabe, Default und Datenquelle über Zwischenschritte bis Ausgabe nachvollziehbar und mit Version, Stichtag und identischen Parametern reproduzierbar? |
+| K-15 | **UX** | Wie klar sind Einstieg, Eingabeaufwand, Validierung, Fehlerbehandlung, Ergebnisinterpretation, Szenariowechsel und Trennung von Basis- und Expertenfunktionen? |
+| K-16 | **Barrierefreiheit** | Sind Tastaturbedienung, Fokus, Labels/Screenreader, Kontrast, Zoom/Reflow und eine offizielle WCAG-/Accessibility-Aussage dokumentiert oder im freigegebenen Zugang prüfbar? |
+| K-17 | **Preis** | Welche exakt untersuchte Stufe, Währung, Abrechnungsperiode, Einführungs-/Verlängerungskondition, Steuerangabe, Testphase und Nutzer-/Mandantengrenze gelten am Stichtag? |
+| K-18 | **Lizenz** | Ist die Software proprietär oder quelloffen; welche Code-, Nutzungs-, Kopier-, Änderungs-, Weitergabe- und Datenrechte sind offiziell ausgewiesen? |
 
-**Heuristischer Charakter:** Der Startbetrag ist eine Planungsannahme, keine aktuarische Prämienkalkulation. Pflegekosten, Leistungsänderungen der Pflegeversicherung, regionale Heimkosten, Dauer, Steuerlast und familiäre Unterstützung bleiben unsicher. Die Suite macht diese Unsicherheit sichtbar, indem sie Nutzung, Erschöpfung, Zieldeckung und Ziellücke über Monte Carlo ausweist.
+Preise werden in der Originalwährung und Originalperiode dokumentiert.
+Monatsangaben dürfen bei verpflichtender Jahreszahlung als Jahresbetrag
+normalisiert werden; Lifetime-Preise werden nicht willkürlich auf Jahre
+verteilt. Eine Euro-Umrechnung erfolgt nur mit benannter Kursquelle und
+Kursdatum. UX und Barrierefreiheit werden nur in tatsächlich zugänglichen
+Oberflächen geprüft; Marketing-Screenshots ersetzen keinen Bedienbefund.
 
-**Modellgrenzen in Version 1:**
+## D.7 Synthetischer Referenzhaushalt
 
-- Kein automatisches Refill des inflationsindexierten Zielwerts.
-- Bucket-Verbrauch wird cash-like vereinfacht und noch nicht als eigener Geldmarkt-ETF-Verkauf im Tax-Settlement verbucht.
-- Balance zeigt den Bucket diagnostisch, entsperrt ihn aber nicht automatisch, solange kein aktueller Pflegegrad-Ist-Zustand gepflegt wird.
-- Die fachliche Angemessenheit hängt vom Vermögensspielraum ab: Bei sehr hohem Vermögen ist der Bucket eher Governance und Stresshygiene; bei engem Vermögen kann er normale Entnahmen zu stark drücken.
+### D.7.1 Zweck und Einheiten
+
+Der Referenzfall ist vollständig erfunden und enthält keine Nutzer- oder
+Produktivdaten. Er prüft **Modellierbarkeit**, nicht die Gleichheit numerischer
+Ergebnisse. Abweichende Datenreihen, Ereignisreihenfolgen und
+Stochastikmodelle machen Erfolgsquoten verschiedener Produkte ohne gesonderte
+Harmonisierung unvergleichbar.
+
+Stichtag ist der 2027-01-01. Alle als „real“ bezeichneten Beträge besitzen die
+Kaufkraft dieses Tages; nominale Festbeträge sind ausdrücklich markiert. Der
+Plan läuft bis 2066-12-31. Gesetzesähnliche Steuersätze sind feste
+Testparameter und keine Aussage über dann geltendes Recht oder individuelle
+Steuerberatung.
+
+### D.7.2 Basisfall RH-01
+
+| Bereich | Festgelegter synthetischer Input |
+| --- | --- |
+| Personen | Person A: 63 Jahre, Ruhestand ab 2027-01-01; Person B: 61 Jahre, Ruhestand ab 2029-01-01; deutscher gemeinsamer Haushalt |
+| Planungshorizont | 40 Kalenderjahre 2027 bis 2066; Basisszenario ohne vorgegebenen Tod |
+| Einkommensbasis | wiederkehrende Erwerbs- und Rentenbeträge sind verfügbare Netto-Cashflows nach Einkommensteuer und Sozialabgaben; Brutto-/Netto-Fähigkeiten werden separat unter K-02 geprüft |
+| Erwerbseinkommen | Person B: 30.000 EUR netto p.a. in 2027 und 2028, danach 0 EUR |
+| Gesetzliche Rente A | 22.800 EUR netto p.a. ab 2029-01-01, jährlich 2 % Indexierung |
+| Gesetzliche Rente B | 17.400 EUR netto p.a. ab 2033-01-01, jährlich 2 % Indexierung |
+| Private Rente A | 4.800 EUR netto p.a. ab 2032-01-01, nominal unverändert |
+| Lebenshaltungs-Floor | 42.000 EUR real p.a., jährlich mit 2 % inflationiert |
+| Flexible Ausgaben | 12.000 EUR real p.a., jährlich mit 2 % inflationiert |
+| Einmalereignis | 35.000 EUR real für eine Gebäudemaßnahme am 2035-01-01 |
+| Aktien-ETF | Marktwert 550.000 EUR; steuerliche Kostenbasis 350.000 EUR |
+| Anleihen | Marktwert 120.000 EUR |
+| freie Liquidität | 60.000 EUR |
+| Gold | Marktwert 40.000 EUR; steuerliche Kostenbasis 30.000 EUR |
+| Pflegevorsorge | 80.000 EUR zweckgebundene cash-/geldmarktnahe Reserve, außerhalb normaler Konsumausgaben |
+| Immobilie | schuldenfreier selbst genutzter Wert 450.000 EUR; nicht zur planmäßigen Entnahme freigegeben |
+| Kostenannahme | 0,25 % p.a. auf investiertes Finanzvermögen, sofern modellierbar |
+| deterministische Kontrollrenditen | Aktien 5,0 %, Anleihen 2,5 %, freie Liquidität/Pflegevorsorge 1,5 %, Gold 2,0 % nominal p.a. |
+| Steuer-Testparameter | 25 % Kapitalertragsteuersatz; Zuschlag 5,5 % auf diese Steuer; 0 % Kirchensteuer; 30 % ETF-Teilfreistellung; 2.000 EUR gemeinsamer Freibetrag; vorstehende Kostenbasen |
+| Entnahmepriorität | laufende Einkommen decken zuerst den Floor, dann flexible Ausgaben; Portfoliomittel decken die Lücke; Pflegevorsorge bleibt bis RH-03 gesperrt |
+
+Wenn ein Produkt Netto- und Bruttoströme nicht sauber trennt, wird kein
+passenderer Wert erfunden. Die Auswertung dokumentiert die notwendige
+Vereinfachung und ihre Richtung. Nicht eingebbare Assetklassen werden nicht
+lautlos einer anderen Klasse zugeschlagen.
+
+### D.7.3 Feste Modellierbarkeitsproben
+
+| ID | Änderung gegenüber RH-01 | Prüffrage |
+| --- | --- | --- |
+| RH-02 Sequenzstress | Aktienrendite 2027: -25 %, 2028: -10 %; Inflation 2027: 6 %, 2028: 4 %; danach Rückkehr zu den Kontrollannahmen | Lassen sich zeitlich bestimmte Markt-/Inflationsschocks und die Entnahmewirkung transparent abbilden? |
+| RH-03 Pflege | Person B erhält ab 2044-01-01 Pflegegrad 3; zusätzlicher Bedarf 24.000 EUR real p.a., 2 % indexiert; zweckgebundene Reserve wird zuerst genutzt | Sind Personenbezug, Pflegeereignis, Kostendynamik und Reservefreigabe nativ oder nur als allgemeine Ausgabe modellierbar? |
+| RH-04 Hinterbliebene | Person A stirbt am 2048-12-31; eigene Renten A enden; ab 2049 erhält B 55 % der gesetzlichen Rente A; gemeinsamer Floor sinkt um 20 %, Flex um 30 % | Werden Tod, verzögerter Hinterbliebenenzufluss und veränderte Haushaltsausgaben konsistent verarbeitet? |
+
+Für jedes Produkt wird je Input und Probe einer von vier
+Modellierbarkeitsbefunden notiert: **nativ**, **mit dokumentiertem Workaround**,
+**nur als grobe Näherung** oder **nicht modellierbar/nicht prüfbar**. Ein
+Workaround darf die fachliche Bedeutung nicht verdecken. Ergebnisse werden
+nur dann numerisch nebeneinandergestellt, wenn Einheit, Zeitpunkt,
+Rendite-/Inflationspfad, Steuerbehandlung, Kosten und Erfolgsdefinition
+tatsächlich harmonisiert sind.
+
+## D.8 Quellen- und Erhebungsprotokoll
+
+### D.8.1 Verbindlicher Suchpfad
+
+Pro Produkt werden, soweit vorhanden, in dieser Reihenfolge geprüft:
+
+1. Produkt- und Stufenseite;
+2. Preis-/Abonnementseite;
+3. Handbuch, Hilfezentrum und Methodenbeschreibung;
+4. Datenschutz, Sicherheit, Unterauftragsverarbeiter und Löschregeln;
+5. Export-, Offline-, Lizenz- und Barrierefreiheitsdokumentation;
+6. frei zugängliche Oberfläche oder offizielle Demo;
+7. erst danach unabhängige Sekundärquellen für subjektive UX-Fragen.
+
+Für `nicht öffentlich dokumentiert` wird der erfolglose Suchweg mit
+Suchbegriffen und geprüften offiziellen Bereichen notiert. Suchmaschinen-
+Snippets gelten nur als Wegweiser, nicht als Beleg. Eine Quelle muss die
+konkrete Behauptung tragen; eine allgemeine Homepage belegt keine spezielle
+Rechenmethode.
+
+### D.8.2 Quellenrecord
+
+Jeder Beleg erhält eine stabile ID nach dem Muster
+`MKT-<PRODUKT>-<NN>` und mindestens folgende Felder:
+
+| Feld | Inhalt |
+| --- | --- |
+| Quellen-ID | stabile ID, zum Beispiel `MKT-PL-01` |
+| Produkt-ID und Stufe | Zuordnung zur Stichprobe und exakt untersuchter Tarif/Version |
+| Betreiber, Titel, URL | offizielle Urheberschaft und direkte Zielseite |
+| Quellentyp/Evidenzklasse | P1 bis P4, S1 oder I1 |
+| Veröffentlichung/Änderung | Datum oder „nicht ausgewiesen“ |
+| Abrufdatum | `YYYY-MM-DD`, Europe/Berlin |
+| Sprache/Region | relevante Locale und Rechtsraum |
+| Kriterien/Behauptung | Kriteriums-ID plus knappe, quellennahe Paraphrase |
+| Fundstelle | Überschrift, Abschnitt oder reproduzierbarer Navigationspfad |
+| Einschränkung | Marketingkontext, Login-/Tarifgrenze, Widerspruch oder offene Frage |
+
+Eine Matrixzelle ohne Quellen-ID ist entweder `nicht geprüft` oder eine klar
+gekennzeichnete Inferenz. Bei dynamischen Seiten werden Titel, Abschnitt,
+Abrufdatum und die kurze Belegparaphrase festgehalten; lange Kopien
+urheberrechtlich geschützter Seiten gehören nicht in das Repository.
+
+## D.9 Auswertung und zulässige Aussagen
+
+Der Ergebnisblock folgt einer festen Reihenfolge:
+
+1. Methoden- und Quellenstand;
+2. Ergebnisse je Segment;
+3. Modellierbarkeit RH-01 bis RH-04;
+4. segmentübergreifende Stärken und Grenzen;
+5. Positionierung und Nicht-Zielsegmente der Ruhestand-Suite;
+6. Evidenzlücken und Aktualisierungsbedarf.
+
+Konkurrenzstärken sind ebenso verpflichtend wie eigene Stärken. Ein
+Differenzierungsmerkmal darf höchstens lauten, dass es **in der untersuchten
+Stichprobe, Produktstufe und öffentlichen Dokumentation am Stichtag** nicht
+gleichartig belegt wurde. `Nicht öffentlich dokumentiert` darf nie zu „kein
+anderes Tool kann das“ verkürzt werden. Implementierungsdetails der
+Ruhestand-Suite belegen außerdem keine bessere Prognosegüte oder bessere reale
+Ruhestandsentscheidungen.
+
+## D.10 Festgelegte Methodenbasis
+
+Die abgeschlossene Methodenbasis umfasst:
+
+- die zehn externen Produkte und jeweils festgelegten Stufen;
+- die fünf Segmentgrenzen;
+- den Kriterienkatalog K-01 bis K-18 samt Statuslexikon;
+- Referenzhaushalt RH-01 und die drei festen Proben RH-02 bis RH-04;
+- Recherchefenster, Quellenrecord und Verzicht auf Gesamtscore/Rangliste.
+
+Erhebung und Auswertung in D.11 bis D.18 verwenden diese Basis unverändert.
+
+## D.11 Erhebungsstand, Zugang, Preis und Lizenz
+
+Die Vollerhebung und die abschließende Volatilitätsprüfung erfolgten am
+2026-07-15. Es wurden weder Konten angelegt noch Testphasen, Käufe,
+Demoanforderungen oder nicht öffentliche Beraterzugänge genutzt. Ein
+öffentlich sichtbarer Rechner wird deshalb nicht automatisch als „kostenlos“
+bezeichnet: Fehlt eine ausdrückliche Preis- oder Vertragsaussage, bleibt der
+Preisstatus neutral. Preise stehen in Originalwährung und Originalperiode;
+Steuern und Wechselkurse wurden nicht ergänzt.
+
+| ID | Untersuchte Stufe und Zugang | Preisstand am 2026-07-15 | Lizenz-/Nutzungsstand | Belege |
+| --- | --- | --- | --- | --- |
+| RS-01 | Ruhestand-Suite, lokale Arbeitskopie dieses Repositorys | kein kommerzieller Tarif untersucht | LICENSE.md enthält MIT; package.json nennt abweichend ISC, Cargo.toml keine Lizenz | MKT-RS-01, MKT-RS-04, MKT-RS-05 |
+| CP-01 | ProjectionLab Premium, regulärer Webtarif | 129 USD pro Jahr | proprietäre, persönliche Nutzung nach Terms; Bestands-Self-Hosting bleibt lauffähig, erhält aber seit 2026 keine Bugfixes oder neue Produktupdates | MKT-PL-01, MKT-PL-08, MKT-PL-09 |
+| CP-02 | Boldin PlannerPlus, regulärer Webtarif | 12 USD pro Monat, 144 USD jährlich abgerechnet, nach 14 Tagen Testphase | persönliche, nicht übertragbare und nicht unterlizenzierbare Nutzung | MKT-BD-01, MKT-BD-09 |
+| DE-01 | BVI Entnahme-Rechner, öffentlicher Webzugang | öffentlich aufrufbar; kein gesonderter Rechner-Tarif dokumentiert | keine Software- oder Weitergabelizenz für den Rechner öffentlich ausgewiesen | MKT-BVI-01, MKT-BVI-99 |
+| DE-02 | Finanzfluss Entnahmeplan, öffentlicher Webzugang | öffentlich aufrufbar; kein gesonderter Rechner-Tarif dokumentiert | allgemeine AGB, aber keine Code- oder Rechnerlizenz ausgewiesen | MKT-FF-01, MKT-FF-03, MKT-FF-99 |
+| DE-03 | Digitale Rentenübersicht, persönliches Online-Portal | freiwillig und kostenfrei | staatlicher Portalzugang; keine Quellcode- oder Weitergabelizenz untersucht | MKT-DR-01, MKT-DR-99 |
+| AD-01 | MoneyGuide, Beraterstufe „MoneyGuide“ | 2.000 USD pro Berater und Jahr | proprietärer Beraterdienst nach veröffentlichten Terms | MKT-MG-01, MKT-MG-04 |
+| AD-02 | eMoney Pro, Beraterplattform | Preis nicht öffentlich dokumentiert; Vertriebszugang erforderlich | Produktlizenzbedingungen im öffentlichen Produktbereich nicht dokumentiert | MKT-EM-01, MKT-EM-99 |
+| FR-01 | FI Calc, öffentlicher Webzugang | kostenlos; freiwillige Unterstützung/Spenden | keine öffentliche Quellcode- oder Weitergabelizenz gefunden | MKT-FI-05, MKT-FI-99 |
+| FR-02 | FIRECalc 3.0, öffentlicher Webzugang | öffentlicher Rechner; Unterstützerfunktionen vorhanden, Betrag nicht ausgewiesen | Copyright-Hinweis, aber keine öffentliche Änderungs-/Weitergabelizenz | MKT-FC-01, MKT-FC-99 |
+| OT-01 | Pralana Gold 2026, herunterladbare Excel-Arbeitsmappe | 99 USD einmalig für die Version 2026 | proprietäre Dauerlizenz für diese Version; eine neue Hauptversion kann erneut kostenpflichtig sein | MKT-PR-02, MKT-PR-07 |
+
+Die Preiszeilen sind keine Total-Cost-of-Ownership-Rechnung. Insbesondere
+Beraterzeit, Excel-Lizenz, lokale Hardware, optionale Dienste, Umsatzsteuer,
+Rabatte und Verlängerungsangebote sind nur einbezogen, wenn die genannte
+Quelle sie ausdrücklich der untersuchten Stufe zuordnet.
+
+## D.12 Quellenrecords der Erhebung
+
+Für alle folgenden externen Records gilt als Abrufdatum 2026-07-15 in
+Europe/Berlin. „Nicht ausgewiesen“ bedeutet, dass auf der aufgerufenen Seite
+kein belastbares Veröffentlichungs- oder Änderungsdatum erkennbar war. Die
+Spalte „Grenze“ verhindert, dass eine Marketing- oder Hilfeseite als
+Wirksamkeitsnachweis gelesen wird. Records mit der Endung 99 sind
+Erhebungsprotokolle der geprüften offiziellen Bereiche und Suchbegriffe. Sie
+sind I1-Evidenz und dürfen ausschließlich einen Befund „nicht öffentlich
+dokumentiert“ oder „nicht geprüft“ tragen, niemals die Abwesenheit einer
+Funktion beweisen.
+
+### D.12.1 Ruhestand-Suite, lokale Arbeitskopie
+
+| Quellen-ID | Klasse | Betreiber, Titel und Fundstelle | Veröffentlichung/Änderung | Sprache/Region | Kriterien und quellennahe Aussage | Grenze |
+| --- | --- | --- | --- | --- | --- | --- |
+| MKT-RS-01 | P1 | Projekt, [README](../../README.md), Funktions-, Betriebs- und Workflowabschnitte | Repository-Stand 2026-07-15 | DE/Deutschland | K-01 bis K-05, K-07, K-09 bis K-15: lokale Kernrechnung, Profile, Steuer-, Pflege-, Simulations-, Optimierungs- und Exportpfade | Selbstdokumentation; kein externer Qualitäts- oder Wirksamkeitsnachweis |
+| MKT-RS-02 | P1 | Projekt, [TECHNICAL.md](TECHNICAL.md), Architektur-, Persistenz-, Worker- und Testverträge | Repository-Stand 2026-07-15 | DE/Deutschland | K-01, K-07 bis K-14: deterministische Contracts, lokale Adapter, Seeds, Worker und Diagnosepfade | Implementierungs- und Testnachweis, keine Entscheidungsvalidierung |
+| MKT-RS-03 | P1 | Projekt, [DATA_SOURCES.md](DATA_SOURCES.md), Quellen- und Fallbacktabellen | Repository-Stand 2026-07-15 | DE/international | K-06, K-11, K-12, K-14: Datenherkunft, Rekonstruktionen, optionale Netzpfade und Grenzen | Datenabdeckung und Rekonstruktionen bleiben modellabhängig |
+| MKT-RS-04 | P1 | Projekt, [LICENSE.md](../../LICENSE.md), „MIT License“ und „No Warranty“ | Copyright 2025 | EN/international | K-17, K-18: MIT-Rechte, Haftungs- und Beratungsgrenze | widerspricht der Lizenzangabe im npm-Manifest |
+| MKT-RS-05 | I1 | Projekt, [package.json](../../package.json) Feld license und [Cargo.toml](../../src-tauri/Cargo.toml) Feld license | Repository-Stand 2026-07-15 | EN/international | K-18: npm nennt ISC, Cargo lässt das Feld leer; Metadaten sind nicht synchron | Cross-Check, keine eigenständige Lizenzgewährung |
+| MKT-RS-99 | P3 | Direkter lokaler Check von Balance.html, Simulator.html, depot-tranchen-manager.html und app-Modulen auf Tastatur-, Fokus-, ARIA- und Szenariopfade | geprüft 2026-07-15 | DE/Deutschland | K-09, K-15, K-16 sowie RH-02 bis RH-04: einzelne A11y-Hilfen, feste Stress-Presets, stochastischer Pflegeeintritt und Witwenlogik | kein vollständiger Bedien-, Screenreader- oder WCAG-Test; keine frei konfigurierbare Ereignisfolge nachgewiesen |
+
+### D.12.2 ProjectionLab Premium
+
+| Quellen-ID | Klasse | Betreiber, Titel und URL | Veröffentlichung/Änderung | Sprache/Region | Kriterien und Fundstelle | Grenze |
+| --- | --- | --- | --- | --- | --- | --- |
+| MKT-PL-01 | P1 | ProjectionLab, [Pricing & Subscriptions](https://projectionlab.com/pricing), Premium-Spalte | nicht ausgewiesen | EN/international | K-01, K-09, K-10, K-13, K-17: Preis, Pläne, What-if, Monte Carlo, Reports und Datenexport | Tarif- und Funktionszusage, kein Tieftest |
+| MKT-PL-02 | P1 | ProjectionLab, [Simulation Engine](https://projectionlab.com/help/simulation-engine), Ablauf und Jahresausgaben | nicht ausgewiesen | EN/international | K-01, K-06 bis K-08, K-14: 365-Tage-Jahr, Cashflow-Ablauf und Jahresergebnisse | keine vollständige Formel- oder Seedoffenlegung |
+| MKT-PL-03 | P2 | ProjectionLab, [Create a New Plan](https://projectionlab.com/help/create-new-plan), Advanced Options und Milestones | veröffentlicht 2025-03-11 | EN/international | K-01, K-04 bis K-09 sowie RH-01 bis RH-03: Personen, Ereignisse, historische Tests und benutzerdefinierte Rendite-/Inflationsfolgen | allgemeine Ereignisse sind keine native Pflegefachlichkeit |
+| MKT-PL-04 | P2 | ProjectionLab, [Tax Analytics](https://projectionlab.com/tax-analytics), Länder-Presets und Tax Analytics | nicht ausgewiesen | EN/international | K-02, K-10: internationale Steuer-Presets einschließlich Deutschland und Steueranalysen | kein Beleg für vollständige deutsche Lot-, Verlusttopf- und Teilfreistellungslogik |
+| MKT-PL-05 | P2 | ProjectionLab, [Life Expectancy Milestone](https://projectionlab.com/help/life-expectancy-milestone), Partner death effects | nicht ausgewiesen | EN/international | K-05 und RH-04: Tod, Vermögensübertragung und Statusänderungen | exakte deutsche Hinterbliebenenregeln nicht belegt |
+| MKT-PL-06 | P2 | ProjectionLab, [Defined Benefit Pension](https://projectionlab.com/help/defined-benefit-pension), Pensionseingabe | nicht ausgewiesen | EN/international | K-03: leistungsdefinierte Renten mit Beginn und Anpassungen | kein vollständiger deutscher Renten-/Steuervertrag |
+| MKT-PL-07 | P1 | ProjectionLab, [Data Security](https://projectionlab.com/help/data-security), Speicherung, Verschlüsselung, Export und Löschen | nicht ausgewiesen | EN/international | K-11: Cloudspeicherung, Schutz-, Export- und Löschangaben | Anbieterangabe; keine unabhängige Sicherheitsprüfung |
+| MKT-PL-08 | P2 | ProjectionLab, [Update on Self-Hosting](https://projectionlab.com/blog/update-on-self-hosting), Web-Fokus und Wartungsende | veröffentlicht 2025-03-06; Bugfix-Support bis 2025-12-31 | EN/international | K-12: bestehende Self-Hosting-Installationen bleiben lauffähig; künftige Updates erscheinen nur für die Web-App | aktueller Pricing-Zugang und Legacy-Self-Hosting dürfen nicht vermischt werden |
+| MKT-PL-09 | P1 | ProjectionLab, [Terms of Service](https://projectionlab.com/terms), Rechte und Dienstnutzung | nicht ausgewiesen | EN/USA | K-18: proprietäre Rechte und Nutzungsbedingungen | keine Aussage zur Planungsqualität |
+| MKT-PL-99 | I1 | Suchprotokoll: Pricing, Help, Security, Privacy, Terms, Changelog; Suchbegriffe care, long-term care, accessibility, WCAG, seed, offline | geprüft 2026-07-15 | EN/international | K-04, K-15, K-16: keine belastbare native Pflege- oder formale Accessibility-/Usability-Aussage im freigegebenen Zugang gefunden | Schweigen ist kein Funktions-Negativbeleg |
+
+### D.12.3 Boldin PlannerPlus
+
+| Quellen-ID | Klasse | Betreiber, Titel und URL | Veröffentlichung/Änderung | Sprache/Region | Kriterien und Fundstelle | Grenze |
+| --- | --- | --- | --- | --- | --- | --- |
+| MKT-BD-01 | P1 | Boldin, [Pricing](https://www.boldin.com/retirement/pricing/), PlannerPlus-Spalte | nicht ausgewiesen | EN/USA | K-01, K-09, K-10, K-13, K-17: Tarif, 250+ Eingaben, Szenarien, Explorers, Charts und Reports | US-Produktmarketing, kein Deutschlandnachweis |
+| MKT-BD-02 | P2 | Boldin Help, [Suitability Outside the US](https://help.boldin.com/en/articles/6509299-is-plannerplus-suitable-for-canadians-or-other-non-us-citizens-planning-for-retirement), Limitations | nicht ausgewiesen | EN/USA | K-02 und RH-01: US-Steuer-, RMD- und Social-Security-Logik; ausländische Steuern nur über manuelle Annahmen/Workarounds | ausdrückliche Regionalgrenze |
+| MKT-BD-03 | P1 | Boldin Help, [Monte Carlo Simulation](https://help.boldin.com/en/articles/5805671-boldin-s-monte-carlo-simulation), Methodik | nicht ausgewiesen | EN/USA | K-07, K-08, K-14: 1.000 Läufe, Normalverteilung, Erfolgsdefinition | kein steuerbarer Seed dokumentiert |
+| MKT-BD-04 | P2 | Boldin Help, [Asset Allocation and Return Assumptions](https://help.boldin.com/en/articles/10563826-how-do-i-account-for-asset-allocation-and-rate-of-return-assumptions), Annahmen | nicht ausgewiesen | EN/USA | K-06 bis K-08: Modellportfolios, historische Basis 1994–2024, Rendite- und Volatilitätsannahmen | einzelne Holdings, Kostenbasis und Transaktionen ausdrücklich noch nicht vollständig abgebildet |
+| MKT-BD-05 | P2 | Boldin Help, [Create and Compare Scenarios](https://help.boldin.com/en/articles/4326642-video-demo-create-and-compare-scenarios), Szenariovergleich | nicht ausgewiesen | EN/USA | K-09: bis zu zehn Szenarien und Vergleich | Video-/Hilfedarstellung, kein eigener Bediencheck |
+| MKT-BD-06 | P2 | Boldin Help, [Long-Term Care Assumptions](https://help.boldin.com/en/articles/5847824-what-are-the-long-term-care-assumptions), LTC-Modell | nicht ausgewiesen | EN/USA | K-04 und RH-03: US-LTC-Kosten, Dauer und Finanzierungsoptionen | kein deutsches Pflegegrad- oder Pflegeversicherungsmodell |
+| MKT-BD-07 | P2 | Boldin Help, [When the First Spouse Passes](https://help.boldin.com/en/articles/9293023-assumptions-when-the-first-spouse-passes), Haushaltsfolgen | nicht ausgewiesen | EN/USA | K-03, K-05 und RH-04: Todesfall, Survivor Income und manuell anzupassende Ausgaben | deutsche Renten- und Haushaltsregeln nicht nativ |
+| MKT-BD-08 | P1 | Boldin, [Privacy Policy](https://www.boldin.com/retirement/privacy-policy/), Datenkategorien, Dienste und Rechte | nicht ausgewiesen | EN/USA | K-11: Verarbeitung, Dienstleister, Aufbewahrung und Löschrechte | Rechtsraum und konkrete Kontoverknüpfungen beachten |
+| MKT-BD-09 | P1 | Boldin, [Terms of Use](https://www.boldin.com/retirement/terms-of-use/), Software License | nicht ausgewiesen | EN/USA | K-18: persönliche, nicht übertragbare, nicht unterlizenzierbare Lizenz; kein Kopieren oder Reverse Engineering | proprietärer Nutzungsvertrag |
+| MKT-BD-99 | I1 | Suchprotokoll: Pricing, Help Center, Privacy, Terms; Suchbegriffe offline, accessibility, WCAG, seed, export data | geprüft 2026-07-15 | EN/USA | K-12, K-15, K-16: kein freigegebener Offlinepfad, keine formale Accessibility-Aussage und kein eigener UX-Test | nur Dokumentationslücke, kein Abwesenheitsbeleg |
+
+### D.12.4 Deutsche Vorsorge- und Entnahmewerkzeuge
+
+| Quellen-ID | Klasse | Produktstufe, Betreiber, Titel und URL | Veröffentlichung/Änderung | Sprache/Region | Kriterien und Fundstelle | Grenze |
+| --- | --- | --- | --- | --- | --- | --- |
+| MKT-BVI-01 | P1 | BVI Entnahme-Rechner, [direkter Rechner](https://www.bvi.de/service/rechner/entnahmerechner/), Eingaben und Methodenhinweis | revidiert 2026-06-15 | DE/Deutschland | K-01, K-02, K-06 bis K-08, K-13 bis K-15: 100.000 Zufallskombinationen historischer Jahresrenditen, Indizes/Zeiträume, Inflation, Kosten, Steuersatz und Ergebnisdownload | Wiederholung kann andere Ergebnisse liefern; keine Seedsteuerung |
+| MKT-BVI-02 | P1 | BVI, [Datenschutz](https://www.bvi.de/datenschutz/), Webzugriff, Logs, Cookies und Betroffenenrechte | zuletzt geändert 2021-02-08 | DE/Deutschland | K-11: Webdatenschutz und Drittanbieterhinweise | nicht rechnerspezifisch; eingegebene Finanzwerte werden nicht gesondert beschrieben |
+| MKT-BVI-99 | I1 | Suchprotokoll: Rechner, Datenschutz, Impressum; Suchbegriffe Preis, Lizenz, offline, accessibility, WCAG, Szenario speichern | geprüft 2026-07-15 | DE/Deutschland | K-09, K-12, K-16 bis K-18: keine belastbaren produktbezogenen Aussagen gefunden | keine Negativaussage |
+| MKT-FF-01 | P3 | Finanzfluss Entnahmeplan, [öffentlicher Rechner](https://www.finanzfluss.de/rechner/entnahmeplan/), Eingaben und Ergebnisdarstellung | nicht ausgewiesen | DE/Deutschland | K-01, K-02, K-06 bis K-08, K-14, K-15: deterministischer Auszahlplan aus Kapital, Rendite, Betrag, Intervall und Kapitalverzehr | Befund gilt nur für diesen Rechner, nicht für andere Finanzfluss-Rechner |
+| MKT-FF-02 | P1 | Finanzfluss, [Datenschutz Website](https://www.finanzfluss.de/datenschutz/website/), Website- und Rechnerzugriff | nicht ausgewiesen | DE/EU | K-11: Website-Datenverarbeitung und Trackingangaben | nicht jede technische Verarbeitung des Rechners separat beschrieben |
+| MKT-FF-03 | P1 | Finanzfluss, [Allgemeine Geschäftsbedingungen](https://www.finanzfluss.de/agb/), allgemeine Nutzung | nicht ausgewiesen | DE/Deutschland | K-17, K-18: allgemeine kostenpflichtige Inhalte und Nutzungsrahmen | kein eigener Tarif oder Softwarelizenztext für den Entnahmeplan |
+| MKT-FF-99 | I1 | Suchprotokoll: Rechner, Datenschutz, AGB; Suchbegriffe Export, CSV, offline, Lizenz, accessibility, WCAG, Szenario | geprüft 2026-07-15 | DE/Deutschland | K-09, K-12, K-13, K-16 bis K-18: keine belastbaren rechnerspezifischen Aussagen gefunden | Schweigen ist kein Abwesenheitsbeleg |
+| MKT-DR-01 | P2 | ZfDR/DRV Bund, [Häufige Fragen](https://www.rentenuebersicht.de/DE/05_haeufig_gestellte_fragen/haeufig_gestellte_fragen_node.html), Zweck, Inhalt, Anmeldung, Export und Sicherheit | nicht ausgewiesen | DE/Deutschland | K-01 bis K-03, K-05, K-06, K-08, K-09, K-11 bis K-15, K-17: Vorsorgeansprüche, Grenzen, Browser/eID, Verschlüsselung, PDF/ZIP/CSV und kostenfreie Nutzung | Portal aggregiert Anbieterwerte; kein vollständiger Haushalts- oder Entnahmeplaner |
+| MKT-DR-02 | P1 | ZfDR/DRV Bund, [FAQ für Vorsorgeeinrichtungen](https://www.rentenuebersicht.de/vorsorgeeinrichtungen/FAQ/faq_node.html), Datenumfang und Verfahren | nicht ausgewiesen | DE/Deutschland | K-03, K-06, K-08, K-14: teilnehmende Einrichtungen, Datensätze, Aktualität und CSV-Inhalte | institutionelle Schnittstellensicht |
+| MKT-DR-03 | P1 | ZfDR/DRV Bund, [Datenbeschreibung Version 10](https://www.rentenuebersicht.de/SharedDocs/Downloads/Datenbeschreibung.html), Downloadseite | Stand 2025-12-18 | DE/Deutschland | K-06, K-08, K-13, K-14: versionierter Datenaustausch | Downloadseite kennzeichnet das PDF selbst als nicht barrierefrei |
+| MKT-DR-04 | P1 | ZfDR/DRV Bund, [Erklärung zur Barrierefreiheit](https://www.rentenuebersicht.de/DE/Service/Footer/Barrierefreiheit/barrierefreiheit_node.html), Vereinbarkeit und nicht barrierefreie Inhalte | Selbstbewertung 2023-04; aktualisiert 2026-01-05 | DE/Deutschland | K-16: Prüfung nach BGG/BITV, EN 301 549 und WCAG 2.1; dokumentierte Restmängel bei Überschriften, Tabreihenfolge, Fehlermeldungen und mobilem Menü | Erklärung gilt für die veröffentlichte Website; authentifizierte Portalabläufe wurden hier nicht selbst geprüft |
+| MKT-DR-99 | I1 | Suchprotokoll: FAQ, Rechtliches, Datenschutz, Barrierefreiheit, Datenbeschreibung; kein Login/eID eingesetzt | geprüft 2026-07-15 | DE/Deutschland | K-15, K-16, K-18: authentifizierte UX und App-Details nicht geprüft; keine Softwarelizenz bewertet | öffentlicher Seitencheck ersetzt keinen Portaltest |
+
+### D.12.5 Beratersoftware
+
+| Quellen-ID | Klasse | Produktstufe, Betreiber, Titel und URL | Veröffentlichung/Änderung | Sprache/Region | Kriterien und Fundstelle | Grenze |
+| --- | --- | --- | --- | --- | --- | --- |
+| MKT-MG-01 | P1 | Envestnet MoneyGuide, [Products & Pricing](https://www.moneyguidepro.com/ifa/home/products), Stufe MoneyGuide | nicht ausgewiesen | EN/USA | K-01 bis K-04, K-09, K-10, K-17: Zielplanung, Health Care Goal, Stress, Distribution, Social Security, Tax Planning und Preis | B2B-Funktionszusage, kein eigener Beraterzugang |
+| MKT-MG-02 | P2 | MoneyGuide, [Frequently Asked Questions](https://www.moneyguidepro.com/ifa/home/faqs), Planaufbau, Monte Carlo und Reports | nicht ausgewiesen | EN/USA | K-01 bis K-10, K-12 bis K-14: Webdienst, historische/projizierte Renditen, Ziele, Einkommen, Steuerkonten, Monte Carlo und PDF | Detailtiefe einzelner Formeln und Seeds begrenzt |
+| MKT-MG-03 | P1 | MoneyGuide, [Security](https://www.moneyguidepro.com/ifa/home/security), Hosting, Verschlüsselung und Backups | nicht ausgewiesen | EN/USA | K-11: Cloud-, Schutz- und Sharing-Angaben | Anbieterangabe, kein Auditbericht ausgewertet |
+| MKT-MG-04 | P1 | MoneyGuide, [Terms of Service](https://www.moneyguidepro.com/ifa/license-agreements/display/MoneyGuidePro), Account- und Nutzungsrechte | nicht ausgewiesen | EN/USA | K-04, K-11, K-18: Beraterkonto, Dienstnutzung, proprietäre Rechte und Datenfeeds | Vertrag für US-Berater; kein Deutschlandprodukt |
+| MKT-MG-99 | I1 | Suchprotokoll: Products, FAQ, Security, Terms; Suchbegriffe accessibility, WCAG, seed, offline, German tax | geprüft 2026-07-15 | EN/USA | K-15, K-16: kein freigegebener UX-Test und keine formale Accessibility-Aussage | B2B-Zugang nicht umgangen |
+| MKT-EM-01 | P2 | eMoney Advisor, [eMoney Pro](https://emoneyadvisor.com/products/emoney-pro/), Cashflow, Client Portal und Decision Center | nicht ausgewiesen | EN/USA | K-01 bis K-03, K-05, K-08 bis K-10, K-13: Cashflowplanung, Kollaboration, What-if und Planvergleich | Marketingseite; interne Methodik nicht vollständig offengelegt |
+| MKT-EM-02 | P2 | eMoney Advisor, [FAQ](https://emoneyadvisor.com/faq/), Plattform, Aggregation und Sicherheit | nicht ausgewiesen | EN/USA | K-05, K-09, K-11, K-13: Portal, Datenaggregation, Integrationen und Schutzangaben | keine stufenscharfe Preis- oder Methodenquelle |
+| MKT-EM-03 | P1 | eMoney Advisor, [Security](https://emoneyadvisor.com/security/), Sicherheitsprogramm | nicht ausgewiesen | EN/USA | K-11: Sicherheits-, Datenschutz- und Governanceaussagen | Anbieterangabe, kein unabhängiger Prüfbericht in dieser Erhebung |
+| MKT-EM-04 | P4 | eMoney Advisor, [Product Comparison PDF](https://emoneyadvisor.com/wp-content/uploads/2021/01/eMoney-Solutions-to-Grow-and-Scale-Your-Business-Product-Comparison.pdf), Pro-Spalte | 2021-01 | EN/USA | K-01 bis K-03, K-07, K-08, K-13, K-14: Cashflow, Steuer-/Estate-Funktionen, Monte Carlo, Stress und Reports | historischer offizieller Beleg; heutige Detailausprägung nicht vollständig verifiziert |
+| MKT-EM-99 | I1 | Suchprotokoll: Product, FAQ, Security, Integrations, Privacy-Bereiche; Suchbegriffe price, license, accessibility, WCAG, offline, care, methodology | geprüft 2026-07-15 | EN/USA | K-04, K-06, K-12, K-15 bis K-18: öffentlich keine stufenscharfen Angaben zu diesen Fragen gefunden oder Zugang nicht freigegeben | neutraler Informationsbefund |
+
+### D.12.6 FIRE-Werkzeuge und Pralana Gold
+
+| Quellen-ID | Klasse | Produktstufe, Betreiber, Titel und URL | Veröffentlichung/Änderung | Sprache/Region | Kriterien und Fundstelle | Grenze |
+| --- | --- | --- | --- | --- | --- | --- |
+| MKT-FI-01 | P1 | FI Calc, [Guide](https://guide.ficalc.app/), Introduction, Configuration und Strategies | nicht ausgewiesen | EN/USA | K-01, K-03 bis K-05, K-07 bis K-10, K-15: historische Entnahmeprüfung, Einkommen, Zusatzausgaben und Strategien | bewusst enger FIRE-/Entnahmezweck |
+| MKT-FI-02 | P1 | FI Calc, [Historical Data Source](https://guide.ficalc.app/how-it-works/historical-data-source/), Shiller-Daten | nicht ausgewiesen | EN/USA | K-06 bis K-08, K-14: US-Daten ab 1871 und Aufbereitung | US-Daten; keine Zukunftsprognose |
+| MKT-FI-03 | P1 | FI Calc, [One Simulation Year](https://guide.ficalc.app/how-it-works/one-simulation-year), Ereignisreihenfolge | nicht ausgewiesen | EN/USA | K-01, K-08, K-14: Entnahme, Wachstum, Gebühren und Rebalancing pro Jahr | vereinfachtes Portfolio- und Steuermodell |
+| MKT-FI-04 | P1 | FI Calc, [Withdrawal Strategies](https://guide.ficalc.app/withdrawal-strategies/), Regelkatalog | nicht ausgewiesen | EN/USA | K-07, K-08, K-10: dokumentierte statische und dynamische Entnahmeregeln | Auswahl von Regeln ist keine automatische Optimierung |
+| MKT-FI-05 | P1 | FI Calc, [FAQ](https://guide.ficalc.app/other/faq), Steuern, Preis und Grenzen | nicht ausgewiesen | EN/USA | K-02, K-07, K-17: keine automatische Steuerrechnung, kein Monte Carlo, kostenloser Zugang | klare Negativaussagen gelten nur für FI Calc |
+| MKT-FI-06 | P1 | FI Calc, [Privacy](https://guide.ficalc.app/privacy), Eingaben und Analytics | nicht ausgewiesen | EN/international | K-11: eingegebene Finanzdaten verlassen das Gerät nicht; Analytics erhält keine Inputs | sagt nicht, dass die Webanwendung vollständig offline startet |
+| MKT-FI-07 | P1 | FI Calc, [Exporting Results](https://guide.ficalc.app/usage-guides/exporting-results), CSV-Export | nicht ausgewiesen | EN/international | K-13: CSV für alle oder einzelne Simulationen | kein vollständiger Backup-/Reimportvertrag belegt |
+| MKT-FI-08 | P1 | FI Calc, [Income](https://guide.ficalc.app/configuration/income), wiederkehrende Einkommensströme | nicht ausgewiesen | EN/USA | K-03, K-05 sowie RH-01/RH-04: Einkommen mit Beginn, Ende und Inflationsanpassung | kein personenspezifischer Renten- oder Survivor-Vertrag |
+| MKT-FI-09 | P1 | FI Calc, [Extra Withdrawals](https://guide.ficalc.app/configuration/extra-withdrawals), zusätzliche Entnahmen | nicht ausgewiesen | EN/USA | K-04, K-05 sowie RH-01/RH-03/RH-04: zeitlich begrenzte zusätzliche Ausgaben | allgemeine Ausgabe, keine Pflegegrad- oder Todesfalllogik |
+| MKT-FI-99 | I1 | Suchprotokoll: Guide, Privacy, FAQ; Suchbegriffe source code, license, offline, PWA, accessibility, WCAG, scenario save | geprüft 2026-07-15 | EN/international | K-09, K-12, K-16, K-18: keine belastbaren Aussagen gefunden | „frei zugänglich“ ist nicht „Open Source“ |
+| MKT-FC-01 | P1 | FIRECalc, [FIRECalc 3.0](https://firecalc.com/), Eingabeseiten, Methodik, Investigate und Copyright | Datenstand bis 2026-01-01; Seite aktualisiert 2026-04-17 | EN/USA | K-01, K-03 bis K-10, K-13 bis K-15, K-17, K-18: historische Startjahre seit 1871, Einkommen, Ausgabenregeln, Zufallsoption und Zielsuche | keine vollständige Steuer-, Seed- oder Weitergabelizenzdokumentation |
+| MKT-FC-02 | P1 | FIRECalc, [Privacy Policy](https://www.firecalc.com/privacy.php), Eingaben, temporäre Dateien und Cookies | nicht ausgewiesen | EN/USA | K-11: Finanzinputs nicht dauerhaft gespeichert; temporäre Serverdateien werden nach 15 Minuten gelöscht | serverseitige Verarbeitung bleibt; kein Offlinebeleg |
+| MKT-FC-99 | I1 | Suchprotokoll: Rechnerseiten, Privacy, Support-/Copyrightbereich; Suchbegriffe tax, seed, offline, license, accessibility, WCAG, scenario save | geprüft 2026-07-15 | EN/USA | K-02, K-09, K-12, K-16 bis K-18: Teilfragen nicht belastbar dokumentiert | keine Negativaussage außer ausdrücklich sichtbaren Eingabebefunden |
+| MKT-PR-01 | P2 | Pralana, [Gold Retirement Calculator](https://pralanaretirementcalculator.com/), Produktumfang und lokale Excel-Nutzung | nicht ausgewiesen | EN/USA | K-01, K-05, K-09, K-11 bis K-13: herunterladbare Arbeitsmappe, drei Szenarien, Windows/Mac und lokale Daten | Excel-Lizenz und Bedienaufwand separat |
+| MKT-PR-02 | P1 | Pralana, [Get PRC](https://pralanaretirementcalculator.com/get-prc/), Gold-Preis und Kaufumfang | nicht ausgewiesen | EN/USA | K-12, K-17: 99 USD einmalig für PRC2026 Gold, Download und aktuelle Updates | neue Hauptversion kann nach Terms erneut kosten |
+| MKT-PR-03 | P2 | Pralana, [Accounts & Portfolios](https://pralanaretirementcalculator.com/accounts-portfolios/), Konten und Assetklassen | nicht ausgewiesen | EN/USA | K-01, K-02, K-05: taxable/deferred/Roth, Kapitalgewinne und bis zu zehn Assetklassen | US-Konto- und Steuerlogik |
+| MKT-PR-04 | P2 | Pralana, [Analysis & Optimization](https://pralanaretirementcalculator.com/analysis-optimization/), Simulations- und Optimierungsarten | nicht ausgewiesen | EN/USA | K-06 bis K-10, K-14 sowie RH-02: deterministisch, Monte Carlo, historisch, Withdrawal-/Roth-/Startalter-Optimierung | öffentliche Seite zeigt nicht jeden Parameter oder Seed |
+| MKT-PR-05 | P2 | Pralana, [Income & Expenses](https://pralanaretirementcalculator.com/income-expenses/), Personen, Pensionen, Survivor und Gesundheit | nicht ausgewiesen | EN/USA | K-02 bis K-05 sowie RH-01, RH-03, RH-04: personenspezifische Ströme, Pensionen, Survivor und Gesundheitsphasen | kein deutsches Pflegegrad- oder Steuerrecht |
+| MKT-PR-06 | P1 | Pralana, [Manuals](https://pralanaretirementcalculator.com/manuals/), Gold-Handbuchzugang | Version 2026 ausgewiesen | EN/USA | K-06 bis K-10, K-13 bis K-15: öffentliches Detailhandbuch | Verhalten der gekauften Mappe nicht selbst ausgeführt |
+| MKT-PR-07 | P1 | Pralana, [Terms](https://pralanaretirementcalculator.com/terms/), Lizenz und Versionen | zuletzt aktualisiert 2025-05-16 | EN/USA | K-17, K-18: proprietäre beschränkte Dauerlizenz für die erworbene Version und mögliche Kosten neuer Versionen | Terms gehen Preis-Marketing bei Lizenzfragen vor |
+| MKT-PR-99 | I1 | Suchprotokoll: Product, Get PRC, Manuals, Terms, Privacy; Suchbegriffe accessibility, WCAG, German tax, care grade, export format | geprüft 2026-07-15 | EN/USA | K-15, K-16 sowie offene Export-/Pflegedetails: ohne Kauf nicht vollständig prüfbar | kein Workbook- oder Accessibility-Test |
+
+## D.13 Kriterienmatrix K-01 bis K-18
+
+Jede Zelle enthält ausschließlich einen Status aus D.5.1 und die tragenden
+Quellen-IDs. „Teilweise“ bedeutet häufig eine andere Region, einen engeren
+Produktzweck oder eine fehlende Teilfrage; es ist kein Punktabzug.
+„Nicht öffentlich dokumentiert“ und „nicht geprüft“ sind ausdrücklich keine
+Negativurteile. Die Tabellen werden weder addiert noch gewichtet.
+In kompakten Zellen erben slash-getrennte Nummern das vollständig genannte
+Präfix: MKT-PL-01/02/03 verweist eindeutig auf MKT-PL-01, MKT-PL-02 und
+MKT-PL-03.
+
+### D.13.1 Referenzprodukt Ruhestand-Suite
+
+| ID | Status und Belege | Wesentliche Abgrenzung |
+| --- | --- | --- |
+| K-01 Fachmodell | vorhanden · MKT-RS-01, MKT-RS-02 | Mehrjahres-, Jahres- und Entnahmemodell mit expliziten Zuständen; kein Anspruch auf vollständige Finanzplanung |
+| K-02 Steuern | teilweise · MKT-RS-01, MKT-RS-02 | deutsche Kapitalertragsteuer, Lots, Verlusttopf und Teilfreistellung; keine vollständige Einkommensteuer-/Sozialabgabenrechnung |
+| K-03 Rente | teilweise · MKT-RS-01, MKT-RS-02 | zwei Personen, Starts, Indexierung und Witwenanteil; keine frei skalierbare Liste aller gesetzlichen, betrieblichen und privaten Verträge |
+| K-04 Pflege | teilweise · MKT-RS-01, MKT-RS-02 | Pflegegrade, Kostenprogression und zweckgebundener Bucket; keine aktuarielle Pflegeversicherung und kein frei fixierbares Eintrittsereignis |
+| K-05 Haushalt | vorhanden · MKT-RS-01, MKT-RS-02 | Profilverbund, getrennte Eigentümer, Tod und Hinterbliebenenpfad sind integriert |
+| K-06 Datenbasis | teilweise · MKT-RS-03 | Quellen, Zeiträume, Fallbacks und Rekonstruktionen sind dokumentiert; nicht jede Reihe ist vollständig beobachtet oder zukunftsrepräsentativ |
+| K-07 Stochastik | vorhanden · MKT-RS-01, MKT-RS-02 | historisch, Bootstrap, Regime, Monte Carlo, Stress und per-run Seeds sind dokumentiert |
+| K-08 Transparenz | vorhanden · MKT-RS-02, MKT-RS-03 | Contracts, Reihenfolgen, Defaults, Logs und Modellgrenzen sind lokal nachvollziehbar |
+| K-09 Szenarien | teilweise · MKT-RS-01, MKT-RS-99 | Backtest, Presets, Sweep und Szenariologs; kein allgemeiner gespeicherter Side-by-side-Planvergleich wie bei Vollplanern |
+| K-10 Optimierung | vorhanden · MKT-RS-01, MKT-RS-02 | Sweep und mehrphasige Auto-Optimize-Pipeline mit Constraints und Diagnose; Ergebnis bleibt modellinterne Suche |
+| K-11 Datenschutz | vorhanden · MKT-RS-01, MKT-RS-03 | lokale Persistenz und manuelle Exporte; optionale Markt-/Inflations-/CAPE- und Font-Netzpfade sind getrennt dokumentiert |
+| K-12 Offline-Fähigkeit | vorhanden · MKT-RS-01, MKT-RS-03 | Kernrechnung und manuelle Daten lokal; Live-Daten und externe Fonts benötigen Netz |
+| K-13 Export | vorhanden · MKT-RS-01, MKT-RS-02 | Komplettbackup sowie JSON-/CSV- und Diagnose-/Logexporte |
+| K-14 Auditierbarkeit | vorhanden · MKT-RS-02, MKT-RS-03 | Versionen, Seeds, Datenquellen, Zwischenschritte und Logs sind weitgehend rückverfolgbar |
+| K-15 UX | teilweise · MKT-RS-01, MKT-RS-99 | geführte Workflows, Validierungen und Hilfen vorhanden; hohe Expertendichte und keine formale Usability-Studie |
+| K-16 Barrierefreiheit | teilweise · MKT-RS-99 | einzelne Tastaturbefehle, Fokus-, ARIA- und Live-Regionen; kein vollständiger WCAG-/Screenreader-Nachweis |
+| K-17 Preis | nicht anwendbar · MKT-RS-01, MKT-RS-04 | lokale Arbeitskopie, keine untersuchte kommerzielle Produktstufe |
+| K-18 Lizenz | teilweise · MKT-RS-04, MKT-RS-05 | MIT-Lizenztext vorhanden, aber npm- und Cargo-Metadaten widersprechen beziehungsweise fehlen |
+
+### D.13.2 Consumer Planner
+
+| ID | ProjectionLab Premium | Boldin PlannerPlus |
+| --- | --- | --- |
+| K-01 Fachmodell | vorhanden · MKT-PL-01/02/03 | vorhanden · MKT-BD-01 |
+| K-02 Steuern | teilweise · MKT-PL-04 | teilweise · MKT-BD-02 |
+| K-03 Rente | teilweise · MKT-PL-05/06 | teilweise · MKT-BD-07 |
+| K-04 Pflege | teilweise · MKT-PL-03/99 | teilweise · MKT-BD-06 |
+| K-05 Haushalt | teilweise · MKT-PL-03/05 | teilweise · MKT-BD-07 |
+| K-06 Datenbasis | teilweise · MKT-PL-02/03 | teilweise · MKT-BD-04 |
+| K-07 Stochastik | teilweise · MKT-PL-02/03 | teilweise · MKT-BD-03/04 |
+| K-08 Transparenz | teilweise · MKT-PL-02/03 | teilweise · MKT-BD-03/04 |
+| K-09 Szenarien | vorhanden · MKT-PL-01/03 | vorhanden · MKT-BD-01/05 |
+| K-10 Optimierung | teilweise · MKT-PL-01/04 | teilweise · MKT-BD-01 |
+| K-11 Datenschutz | vorhanden · MKT-PL-07 | vorhanden · MKT-BD-08 |
+| K-12 Offline-Fähigkeit | teilweise · MKT-PL-08 | nicht öffentlich dokumentiert · MKT-BD-99 |
+| K-13 Export | vorhanden · MKT-PL-01 | teilweise · MKT-BD-01 |
+| K-14 Auditierbarkeit | teilweise · MKT-PL-02 | teilweise · MKT-BD-03/04 |
+| K-15 UX | nicht geprüft · MKT-PL-99 | nicht geprüft · MKT-BD-99 |
+| K-16 Barrierefreiheit | nicht öffentlich dokumentiert · MKT-PL-99 | nicht öffentlich dokumentiert · MKT-BD-99 |
+| K-17 Preis | vorhanden · MKT-PL-01 | vorhanden · MKT-BD-01 |
+| K-18 Lizenz | vorhanden · MKT-PL-09 | vorhanden · MKT-BD-09 |
+
+Bei ProjectionLab bezieht sich „teilweise“ unter K-12 auf den dokumentierten
+Legacy-Zustand: bestehende Self-Hosting-Installationen bleiben lauffähig,
+Bugfix-Support endete am 2025-12-31 und neue Produktupdates erscheinen nur
+noch für die Web-App.
+
+### D.13.3 Deutsche Vorsorge- und Entnahmewerkzeuge
+
+| ID | BVI Entnahme-Rechner | Finanzfluss Entnahmeplan | Digitale Rentenübersicht |
+| --- | --- | --- | --- |
+| K-01 Fachmodell | teilweise · MKT-BVI-01 | teilweise · MKT-FF-01 | teilweise · MKT-DR-01 |
+| K-02 Steuern | teilweise · MKT-BVI-01 | nicht vorhanden · MKT-FF-01 | nicht vorhanden · MKT-DR-01 |
+| K-03 Rente | nicht anwendbar · MKT-BVI-01 | nicht anwendbar · MKT-FF-01 | teilweise · MKT-DR-01/02 |
+| K-04 Pflege | nicht anwendbar · MKT-BVI-01 | nicht anwendbar · MKT-FF-01 | nicht anwendbar · MKT-DR-01 |
+| K-05 Haushalt | nicht anwendbar · MKT-BVI-01 | nicht anwendbar · MKT-FF-01 | teilweise · MKT-DR-01 |
+| K-06 Datenbasis | vorhanden · MKT-BVI-01 | teilweise · MKT-FF-01 | teilweise · MKT-DR-01/02/03 |
+| K-07 Stochastik | teilweise · MKT-BVI-01 | nicht vorhanden · MKT-FF-01 | nicht anwendbar · MKT-DR-01 |
+| K-08 Transparenz | teilweise · MKT-BVI-01 | teilweise · MKT-FF-01 | vorhanden · MKT-DR-01/02/03 |
+| K-09 Szenarien | nicht öffentlich dokumentiert · MKT-BVI-99 | nicht öffentlich dokumentiert · MKT-FF-99 | teilweise · MKT-DR-01 |
+| K-10 Optimierung | nicht anwendbar · MKT-BVI-01 | nicht anwendbar · MKT-FF-01 | nicht anwendbar · MKT-DR-01 |
+| K-11 Datenschutz | teilweise · MKT-BVI-02 | teilweise · MKT-FF-02 | vorhanden · MKT-DR-01 |
+| K-12 Offline-Fähigkeit | nicht öffentlich dokumentiert · MKT-BVI-99 | nicht öffentlich dokumentiert · MKT-FF-99 | nicht vorhanden · MKT-DR-01 |
+| K-13 Export | teilweise · MKT-BVI-01 | nicht öffentlich dokumentiert · MKT-FF-99 | vorhanden · MKT-DR-01/03 |
+| K-14 Auditierbarkeit | teilweise · MKT-BVI-01 | teilweise · MKT-FF-01 | teilweise · MKT-DR-01/02/03 |
+| K-15 UX | teilweise · MKT-BVI-01 | teilweise · MKT-FF-01 | nicht geprüft · MKT-DR-99 |
+| K-16 Barrierefreiheit | nicht öffentlich dokumentiert · MKT-BVI-99 | nicht öffentlich dokumentiert · MKT-FF-99 | teilweise · MKT-DR-03/04/99 |
+| K-17 Preis | nicht öffentlich dokumentiert · MKT-BVI-99 | nicht öffentlich dokumentiert · MKT-FF-03/99 | vorhanden · MKT-DR-01 |
+| K-18 Lizenz | nicht öffentlich dokumentiert · MKT-BVI-99 | nicht öffentlich dokumentiert · MKT-FF-03/99 | nicht anwendbar · MKT-DR-99 |
+
+Die beiden Befunde „nicht vorhanden“ beim Finanzfluss-Rechner gelten nur für
+die sichtbar festgelegte Entnahmeplan-Stufe: Sie besitzt einen deterministischen
+Renditeparameter und keine Steuerfelder. Sie sagen nichts über andere
+Finanzfluss-Rechner aus. Bei der Digitalen Rentenübersicht sind Steuer- und
+Sozialabzüge laut FAQ ausdrücklich nicht Teil der ausgewiesenen Portalwerte.
+
+### D.13.4 Beratersoftware
+
+| ID | MoneyGuide, Stufe MoneyGuide | eMoney Pro |
+| --- | --- | --- |
+| K-01 Fachmodell | vorhanden · MKT-MG-01/02 | vorhanden · MKT-EM-01/04 |
+| K-02 Steuern | teilweise · MKT-MG-01/02 | teilweise · MKT-EM-01/04 |
+| K-03 Rente | teilweise · MKT-MG-01/02 | teilweise · MKT-EM-01/04 |
+| K-04 Pflege | teilweise · MKT-MG-01/04 | nicht öffentlich dokumentiert · MKT-EM-99 |
+| K-05 Haushalt | teilweise · MKT-MG-02 | teilweise · MKT-EM-01/02 |
+| K-06 Datenbasis | teilweise · MKT-MG-02 | nicht öffentlich dokumentiert · MKT-EM-99 |
+| K-07 Stochastik | teilweise · MKT-MG-02 | teilweise · MKT-EM-04 |
+| K-08 Transparenz | teilweise · MKT-MG-02 | teilweise · MKT-EM-01/04 |
+| K-09 Szenarien | vorhanden · MKT-MG-01/02 | vorhanden · MKT-EM-01 |
+| K-10 Optimierung | teilweise · MKT-MG-01/02 | teilweise · MKT-EM-01 |
+| K-11 Datenschutz | vorhanden · MKT-MG-03/04 | vorhanden · MKT-EM-02/03 |
+| K-12 Offline-Fähigkeit | nicht öffentlich dokumentiert · MKT-MG-99 | nicht öffentlich dokumentiert · MKT-EM-99 |
+| K-13 Export | teilweise · MKT-MG-02 | teilweise · MKT-EM-01/04 |
+| K-14 Auditierbarkeit | teilweise · MKT-MG-02 | teilweise · MKT-EM-04 |
+| K-15 UX | nicht geprüft · MKT-MG-99 | nicht geprüft · MKT-EM-99 |
+| K-16 Barrierefreiheit | nicht öffentlich dokumentiert · MKT-MG-99 | nicht öffentlich dokumentiert · MKT-EM-99 |
+| K-17 Preis | vorhanden · MKT-MG-01 | nicht öffentlich dokumentiert · MKT-EM-99 |
+| K-18 Lizenz | vorhanden · MKT-MG-04 | nicht öffentlich dokumentiert · MKT-EM-99 |
+
+„Nicht öffentlich dokumentiert“ bei eMoney ist wegen des nicht freigegebenen
+Berater-/Vertriebszugangs besonders wichtig: Der Befund darf nicht zu
+„eMoney kann das nicht“ verkürzt werden. Der Monte-Carlo- und Reportnachweis
+MKT-EM-04 ist außerdem ein offizielles Dokument von 2021 und deshalb nur als
+teilweiser heutiger Stufennachweis gewertet.
+
+### D.13.5 FIRE-Werkzeuge und Offline-/Tabellenlösung
+
+| ID | FI Calc | FIRECalc 3.0 | Pralana Gold 2026 |
+| --- | --- | --- | --- |
+| K-01 Fachmodell | teilweise · MKT-FI-01/03 | teilweise · MKT-FC-01 | vorhanden · MKT-PR-01 |
+| K-02 Steuern | nicht vorhanden · MKT-FI-05 | nicht öffentlich dokumentiert · MKT-FC-99 | teilweise · MKT-PR-03/05 |
+| K-03 Rente | teilweise · MKT-FI-08 | teilweise · MKT-FC-01 | vorhanden · MKT-PR-05 |
+| K-04 Pflege | teilweise · MKT-FI-09 | teilweise · MKT-FC-01 | teilweise · MKT-PR-05 |
+| K-05 Haushalt | teilweise · MKT-FI-08/09 | teilweise · MKT-FC-01 | vorhanden · MKT-PR-01/05 |
+| K-06 Datenbasis | vorhanden · MKT-FI-02 | vorhanden · MKT-FC-01 | teilweise · MKT-PR-04/06 |
+| K-07 Stochastik | vorhanden · MKT-FI-01/02/03 | teilweise · MKT-FC-01 | teilweise · MKT-PR-04/06 |
+| K-08 Transparenz | vorhanden · MKT-FI-01/03/04/05 | teilweise · MKT-FC-01 | vorhanden · MKT-PR-06 |
+| K-09 Szenarien | nicht öffentlich dokumentiert · MKT-FI-99 | nicht öffentlich dokumentiert · MKT-FC-99 | vorhanden · MKT-PR-01/04 |
+| K-10 Optimierung | nicht anwendbar · MKT-FI-01/04 | teilweise · MKT-FC-01 | vorhanden · MKT-PR-04 |
+| K-11 Datenschutz | vorhanden · MKT-FI-06 | vorhanden · MKT-FC-02 | teilweise · MKT-PR-01/99 |
+| K-12 Offline-Fähigkeit | nicht öffentlich dokumentiert · MKT-FI-99 | nicht öffentlich dokumentiert · MKT-FC-99 | vorhanden · MKT-PR-01/02 |
+| K-13 Export | teilweise · MKT-FI-07 | teilweise · MKT-FC-01 | teilweise · MKT-PR-01/06 |
+| K-14 Auditierbarkeit | vorhanden · MKT-FI-02/03 | teilweise · MKT-FC-01 | vorhanden · MKT-PR-06 |
+| K-15 UX | teilweise · MKT-FI-01 | teilweise · MKT-FC-01 | nicht geprüft · MKT-PR-99 |
+| K-16 Barrierefreiheit | nicht öffentlich dokumentiert · MKT-FI-99 | nicht öffentlich dokumentiert · MKT-FC-99 | nicht öffentlich dokumentiert · MKT-PR-99 |
+| K-17 Preis | vorhanden · MKT-FI-05 | teilweise · MKT-FC-01/99 | vorhanden · MKT-PR-02/07 |
+| K-18 Lizenz | nicht öffentlich dokumentiert · MKT-FI-99 | teilweise · MKT-FC-01/99 | vorhanden · MKT-PR-07 |
+
+FI Calc und FIRECalc werden wegen ihres frei zugänglichen FIRE-/Entnahmezwecks
+in diesem Segment geführt. Aus der Zugänglichkeit folgt keine
+Open-Source-Eigenschaft; für beide wurde keine öffentliche Code- und
+Weitergabelizenz belegt.
+
+## D.14 Segmentbefunde: Stärken und Grenzen
+
+### D.14.1 Consumer Planner
+
+ProjectionLab und Boldin zeigen ihre Stärke in allgemeiner Planerstellung,
+Varianten und Ergebnisdarstellung. ProjectionLab dokumentiert mehrere Pläne,
+What-if-Analysen, Berichte und maschinenlesbare Exporte; seine erweiterten
+Planoptionen erlauben außerdem benutzerdefinierte Rendite- und
+Inflationsfolgen. Boldin dokumentiert bis zu zehn Vergleichsszenarien,
+ruhestandsspezifische Explorers und eine ungewöhnlich konkrete
+Monte-Carlo-Beschreibung mit 1.000 normalverteilten Läufen
+(MKT-PL-01/03, MKT-BD-01/03/05).
+
+Die Regionalgrenze ist unterschiedlich. ProjectionLab bietet internationale
+Steuer-Presets einschließlich Deutschland, ohne damit die vollständige
+deutsche Lot-, Verlusttopf- und Teilfreistellungslogik zu belegen
+(MKT-PL-04). Boldin erklärt ausdrücklich, dass Steuer-, RMD- und
+Social-Security-Logik US-spezifisch ist und andere Länder manuelle
+Workarounds benötigen (MKT-BD-02). Boldins US-LTC- und
+Hinterbliebenenfunktionen sind reale Produktstärken, bilden aber weder
+deutsche Pflegegrade noch deutsches Hinterbliebenenrecht nativ ab
+(MKT-BD-06/07).
+
+### D.14.2 Deutsche Werkzeuge
+
+Die drei deutschen Angebote erfüllen bewusst verschiedene Aufgaben. Der BVI
+Entnahme-Rechner ist fachlich schmal, legt dafür Datenreihen, Zeiträume,
+Inflation, Kosten, Steuersatz und die Ziehung von 100.000 historischen
+Jahreskombinationen öffentlich dar. Seine wiederholten Zufallsergebnisse ohne
+dokumentierten Seed sind weniger reproduzierbar als ein deterministischer
+Backtest (MKT-BVI-01). Der Finanzfluss Entnahmeplan priorisiert einen kleinen,
+verständlichen deterministischen Eingaberaum; die fehlende Haushalts-,
+Steuer- und Ereignistiefe ist für diesen Einzelrechner eine Zweckgrenze, nicht
+der Beleg eines schlechten Vollplaners (MKT-FF-01).
+
+Die Digitale Rentenübersicht besitzt eine Stärke, die kein normaler DIY-Rechner
+ersetzen kann: Sie ruft gesetzliche, betriebliche und private
+Vorsorgeansprüche über teilnehmende Einrichtungen ab, führt sie neutral
+zusammen und exportiert PDF, ZIP und CSV verschlüsselt aus dem persönlichen
+Portal. Sie berechnet jedoch weder eine Versorgungslücke noch Steuern und
+Sozialabgaben und zeigt bereits in Auszahlung befindliche Ansprüche nicht
+mehr an (MKT-DR-01/02). Sie ist damit eine qualifizierte Datenquelle für eine
+Planung, nicht deren Ersatz.
+
+### D.14.3 Beratersoftware
+
+MoneyGuide und eMoney Pro adressieren Berater-Kunden-Kollaboration,
+Datenerfassung und breite Planungsdialoge. MoneyGuide veröffentlicht für die
+untersuchte Stufe Zielplanung, Kundenportal, Healthcare Goal, Stress,
+Retirement Distribution, Social-Security- und Tax-Planning sowie einen
+jährlichen Beraterpreis. Die FAQ ergänzt Plan-Kopien, What-if, Berichte und
+Monte Carlo (MKT-MG-01/02). Diese Breite und der kollaborative Workflow sind
+Stärken gegenüber einer persönlichen lokalen Ein-Nutzer-Suite.
+
+eMoney Pro beschreibt Cashflowplanung, Client Portal, CoPlanner und das
+interaktive Decision Center. Öffentliche aktuelle Angaben zu Preis,
+Datenreihen, Pflege, Offline-Nutzung und Lizenz bleiben aber lückenhaft; der
+detailliertere Monte-Carlo-/Reportbeleg ist von 2021
+(MKT-EM-01/02/04/99). Das begrenzt die öffentliche Vergleichbarkeit, nicht
+notwendigerweise die tatsächliche Beraterfunktion.
+
+### D.14.4 FIRE- und Offline-Werkzeuge
+
+FI Calc besitzt in dieser Stichprobe eine besonders klar strukturierte
+öffentliche Methodendokumentation: Shiller-Daten ab 1871,
+Jahresreihenfolge, zahlreiche Entnahmeregeln, ausdrückliche Steuer- und
+Monte-Carlo-Grenzen sowie CSV-Export sind getrennt beschrieben. Eingegebene
+Finanzdaten verlassen laut Privacy-Seite das Gerät nicht
+(MKT-FI-01 bis MKT-FI-07). Seine Stärke ist die nachvollziehbare historische
+Entnahmefrage, nicht ein vollständiger Paar-, Steuer- oder Pflegehaushalt.
+
+FIRECalc bringt eine lange historische Startjahranalyse, eigene und
+Partner-Sozialleistungen, zusätzliche Einkommen/Ausgaben, mehrere
+Ausgabenregeln und eine Investigate-Zielsuche zusammen. Die öffentliche
+Methodik ist breiter als ein einfacher Endwertrechner, aber Steuer-, Seed-,
+Offline- und Lizenzdetails bleiben offen (MKT-FC-01/02/99).
+
+Pralana Gold ist der stärkste untersuchte Offline-/Tabellen-Gegenpol:
+personenspezifische Cashflows, US-Bundes-/Bundesstaatsteuern, mehrere Konten
+und Assetklassen, deterministische, historische und Monte-Carlo-Analysen,
+drei Szenarien und mehrere Optimierungen laufen in einer heruntergeladenen
+Excel-Arbeitsmappe. Öffentliche Handbücher erhöhen die Prüfbarkeit
+(MKT-PR-01 bis MKT-PR-07). Grenzen für den deutschen Referenzfall sind die
+US-Steuerlogik, fehlende deutsche Pflegegrade und die nicht ohne Kauf
+geprüfte Bedien- und Barrierefreiheit.
+
+### D.14.5 Ruhestand-Suite
+
+Die Ruhestand-Suite verbindet deutsche Kapitalertragsteuer mit Lots,
+Verlusttopf und Teilfreistellung, einen Zwei-Personen-/Witwenpfad,
+Pflegegradmodell und gesperrte Pflegevorsorge mit historischen,
+Bootstrap-, Regime-, Monte-Carlo-, Stress-, Sweep- und
+Optimierungspfaden. Lokale Persistenz, Offline-Kernrechnung,
+maschinenlesbare Exporte und detaillierte Logs stützen eine operative
+Jahresplanung (MKT-RS-01 bis MKT-RS-03). Diese Kombination ist eine
+Produktstärke, aber noch kein externer Nachweis besserer Prognosen oder
+Entscheidungen.
+
+Die Matrix macht zugleich eigene Grenzen sichtbar: persönliche
+Einkommensteuer und Sozialabgaben sind nicht vollständig, Rentenverträge sind
+nicht beliebig skalierbar, allgemeine Einmalereignisse und frei definierte
+Jahrespfade fehlen als durchgängiger Nutzervertrag, der Szenariovergleich ist
+weniger planzentriert als bei ProjectionLab oder Boldin, und formale
+Usability-/WCAG-Nachweise fehlen. Der Pflegeeintritt ist stochastisch statt
+auf ein fixes Referenzdatum setzbar. Zusätzlich widersprechen sich MIT-Text,
+npm-Lizenzmetadatum und leeres Cargo-Lizenzfeld (MKT-RS-04/05/99).
+
+## D.15 Modellierbarkeit des Referenzhaushalts RH-01 bis RH-04
+
+Die folgende Karte beurteilt den vollständigen Fall, nicht einzelne
+Teilfeatures. Der konservativste wesentliche Input bestimmt den Befund.
+„Nativ“ bedeutet, dass die öffentlich dokumentierte Stufe die vorgegebene
+Probe ohne fachliche Umdeutung abbildet. Ein allgemeines Ausgabenfeld ist
+beispielsweise kein natives Pflegegradmodell. Wo ein Kauf, Login oder
+Beraterzugang erforderlich wäre, wird nicht aus Marketingbildern auf
+Bedienbarkeit geschlossen.
+
+| Produktstufe | RH-01 Basisfall | RH-02 Sequenzstress | RH-03 Pflege | RH-04 Hinterbliebene | Begründung und Belege |
+| --- | --- | --- | --- | --- | --- |
+| Ruhestand-Suite | nur als grobe Näherung | nur als grobe Näherung | nur als grobe Näherung | mit dokumentiertem Workaround | Paar, deutsche Kapitalertragsteuer, Gold, Pflegebucket und Witwenanteil sind vorhanden. Das Einmalereignis/Immobilien-Memomodell, die exakt vorgegebene Rendite-/Inflationsfolge und ein fixer Pflegeeintritt sind jedoch keine durchgängigen Nutzereingaben; Tod lässt sich über Lebenserwartung/Witwenparameter annähern. MKT-RS-01/02/99 |
+| ProjectionLab Premium | mit dokumentiertem Workaround | nativ | mit dokumentiertem Workaround | mit dokumentiertem Workaround | Breiter Plan, Personen, Assets, Ereignisse und benutzerdefinierte Rendite-/Inflationsfolgen; deutsche Steuerdetails und Pflegegrad/gesperrte Reserve benötigen Annahmen beziehungsweise allgemeine Ereignisse, Survivor Cashflows eine Anpassung um den Todesmeilenstein. MKT-PL-03/04/05/06 |
+| Boldin PlannerPlus | nur als grobe Näherung | nur als grobe Näherung | mit dokumentiertem Workaround | mit dokumentiertem Workaround | US-Steuer-/RMD-/Social-Security-Modell und fehlende Einzelholding-/Kostenbasistiefe begrenzen RH-01. Szenarien ersetzen keine exakt vorgegebene Jahresfolge; US-LTC und First-Spouse-Passes liefern dokumentierte, aber regionsfremde Workarounds. MKT-BD-02/04/05/06/07 |
+| BVI Entnahme-Rechner | nur als grobe Näherung | nicht modellierbar/nicht prüfbar | nicht modellierbar/nicht prüfbar | nicht modellierbar/nicht prüfbar | Portfolio, Entnahme, Kosten, pauschaler Steuersatz und historische Zufallskombinationen decken nur den Kapitalentnahmeteil ab; Haushalt, fixe Schockfolge, Pflege und Tod fehlen dem erklärten Rechnerzweck. MKT-BVI-01 |
+| Finanzfluss Entnahmeplan | nur als grobe Näherung | nicht modellierbar/nicht prüfbar | nicht modellierbar/nicht prüfbar | nicht modellierbar/nicht prüfbar | Ein Kapitalstock mit fester Rendite und Entnahme kann nur den groben Auszahlplan spiegeln; kein Jahrespfad-, Haushalts-, Pflege- oder Hinterbliebenenvertrag. MKT-FF-01 |
+| Digitale Rentenübersicht | nur als grobe Näherung | nicht modellierbar/nicht prüfbar | nicht modellierbar/nicht prüfbar | nicht modellierbar/nicht prüfbar | Die Portalstärke ist der Teilinput gesetzlicher, betrieblicher und privater Vorsorgeansprüche. Vermögen, Entnahme, Pflege, Steuern und Haushaltsereignisse bilden keinen Gesamtplan. MKT-DR-01/02 |
+| MoneyGuide | mit dokumentiertem Workaround | mit dokumentiertem Workaround | mit dokumentiertem Workaround | mit dokumentiertem Workaround | Goals, What-if, Stress, Healthcare Cost, Asset Ownership und mehrere Einkommen erlauben eine breite US-Beratermodellierung; deutsche Steuer-, Pflegegrad- und Rentendetails müssen außerhalb ihres nativen Rechtsraums angenähert werden. MKT-MG-01/02/04 |
+| eMoney Pro | mit dokumentiertem Workaround | nicht modellierbar/nicht prüfbar | nicht modellierbar/nicht prüfbar | nicht modellierbar/nicht prüfbar | Die öffentliche Cashflow-, Portal- und Decision-Center-Beschreibung trägt einen groben RH-01-Aufbau. Für die drei exakten Proben fehlen ohne Beraterzugang stufenscharfe aktuelle Nachweise. MKT-EM-01/04/99 |
+| FI Calc | nur als grobe Näherung | nur als grobe Näherung | mit dokumentiertem Workaround | mit dokumentiertem Workaround | Portfolio, Einkommen und Extra Withdrawals können Cashflowteile abbilden; US-Historie, fehlende Steuern und fehlender Personenvertrag begrenzen RH-01. Pflege und Tod werden nur als zeitlich gesetzte Zusatzentnahme beziehungsweise endender Einkommensstrom angenähert. MKT-FI-02/05/08/09 |
+| FIRECalc 3.0 | nur als grobe Näherung | nur als grobe Näherung | mit dokumentiertem Workaround | mit dokumentiertem Workaround | Historische Pfade, eigene/Partner-Sozialleistungen und Off-chart Income/Spending erlauben grobe Ereignisabbildung, aber keine deutsche Steuer-, Pflegegrad- oder exakt frei definierte Schockfolge. MKT-FC-01 |
+| Pralana Gold 2026 | mit dokumentiertem Workaround | mit dokumentiertem Workaround | mit dokumentiertem Workaround | mit dokumentiertem Workaround | Personenspezifische Cashflows, Survivor, Gesundheitsphasen, historische/Monte-Carlo-Analysen und Szenarien sind breit; deutsche Steuerparameter, Pflegegrad/Reserve und exakt vorgegebene Schockjahre erfordern Mapping. Die gekaufte Arbeitsmappe wurde nicht ausgeführt. MKT-PR-03/04/05/06/99 |
+
+Nur RH-02 in ProjectionLab ist aufgrund der öffentlich dokumentierten
+benutzerdefinierten Rendite-/Inflationsfolge als nativ eingestuft. Das ist
+keine Gesamtwertung des Produkts. Umgekehrt bedeutet der überwiegend
+näherungsweise RH-Befund der Ruhestand-Suite nicht, dass ihre deutschen
+Steuer- oder Pflegebausteine fehlen; die festen Referenzproben sind strenger
+als ihre derzeitige Ereigniseingabe.
+
+Es werden bewusst keine Ergebnisbeträge oder Erfolgsquoten nebeneinandergestellt.
+Die Produkte unterscheiden sich bei Datenregion, Inflation, Steuerzeitpunkt,
+Entnahmereihenfolge, Gebühren, Mortalität und Erfolgsdefinition. Eine
+scheinpräzise Zahlentabelle würde diese Unterschiede verdecken.
+
+## D.16 Positionierung der Ruhestand-Suite
+
+### D.16.1 Zielgruppe und Nutzenversprechen
+
+Die Ruhestand-Suite ist als lokal betriebene, deutschsprachige
+DIY-Entnahme- und Jahressteuerungsumgebung für Einzelpersonen und
+Paarhaushalte positioniert, die ihre Annahmen selbst pflegen und
+Simulationsergebnisse fachlich hinterfragen können. Ihr Kernnutzen liegt
+nicht in einem einmaligen „Rentenwert“, sondern in der Verbindung aus:
+
+- deutscher kapitalertragsteuerlicher Entnahmelogik auf Lot-/Eigentümerebene;
+- Floor-/Flex-, Liquiditäts-, Guardrail- und Jahresabschlussworkflow;
+- Paar-, Witwen-, Pflegegrad- und zweckgebundener Pflegevorsorgelogik;
+- historischen, stochastischen, Stress-, Sensitivitäts- und
+  Optimierungspfaden;
+- lokaler Datenhaltung, Recovery, Export und detaillierter Diagnose.
+
+Das Produkt ist Planungs- und Lernsoftware, keine Anlage-, Steuer-,
+Versicherungs- oder Pflegeberatung. Modellinterne Erfolgsquoten sind keine
+Garantie.
+
+### D.16.2 Begrenzt zulässige Differenzierung
+
+Am Vergleichsstichtag wurde in der untersuchten Stichprobe und den
+öffentlich dokumentierten Produktstufen keine zweite Stufe belegt, die
+gleichzeitig die konkrete Kombination aus deutscher
+Kapitalertragsteuer/Lot-Herkunft, Pflegegradmodell mit gesperrter lokaler
+Reserve, Paar-/Witwenpfad, mehreren Simulationsmethoden, Auto-Optimierung und
+operativem lokalem Jahresworkflow dokumentiert (Matrix D.13,
+MKT-RS-01 bis MKT-RS-03). Diese Aussage ist eng begrenzt:
+
+- Sie gilt nur für die zehn ausgewählten Produkte, Stufen und öffentlichen
+  Quellen vom 2026-07-15.
+- „Nicht öffentlich dokumentiert“ bei eMoney oder anderen geschlossenen
+  Stufen ist kein Beleg, dass eine Funktion intern fehlt.
+- Pralana ist ebenfalls lokal/offline nutzbar; FI Calc dokumentiert
+  gerätelokale Eingaben. Offline-Fähigkeit allein ist daher kein
+  Exklusivmerkmal (MKT-FI-06, MKT-PR-01/02).
+- ProjectionLab, Boldin, MoneyGuide, eMoney und Pralana besitzen in anderen
+  Dimensionen breitere Plan-, Szenario- oder Kollaborationsfunktionen.
+- Die Kombination belegt weder bessere Prognosegüte noch bessere reale
+  Ruhestandsentscheidungen.
+
+### D.16.3 Wettbewerberstärken, die nicht relativiert werden dürfen
+
+| Stärke außerhalb beziehungsweise oberhalb des aktuellen Suite-Schwerpunkts | Belegter Vergleichsfall | Bedeutung |
+| --- | --- | --- |
+| Planvarianten und Side-by-side-Vergleich | ProjectionLab und Boldin, MKT-PL-01/03, MKT-BD-01/05 | allgemeine Szenarioarbeit ist dort planzentrierter und für Varianten expliziter |
+| Berater-Kunden-Kollaboration und Datenaggregation | MoneyGuide und eMoney, MKT-MG-01/02, MKT-EM-01/02 | professioneller Mehrmandanten-/Portalworkflow ist kein aktueller Suite-Vertrag |
+| Autoritative Vorsorgeanspruchs-Aggregation | Digitale Rentenübersicht, MKT-DR-01/02 | echte Anbieteransprüche sind belastbarer als manuell nacherfasste Planwerte |
+| Fokussierte Einfachheit | Finanzfluss Entnahmeplan und BVI-Rechner, MKT-FF-01, MKT-BVI-01 | ein enger Rechner kann für eine einzelne Frage verständlicher und schneller sein |
+| Öffentlich strukturierte Methodenführung | FI Calc, MKT-FI-01 bis MKT-FI-07 | Datenquelle, Jahresreihenfolge, Strategie und Negativgrenzen sind kompakt zugänglich |
+| Breite lokale Tabellenplanung | Pralana Gold, MKT-PR-01 bis MKT-PR-06 | Cashflow-, US-Steuer-, Szenario- und Optimierungsbreite in Excel übersteigt mehrere Suite-Teilbereiche |
+
+### D.16.4 Eigene Grenzen und strategische Lücken
+
+| ID | Lücke | Evidenz | Positionierungsfolge |
+| --- | --- | --- | --- |
+| GAP-MKT-01 | keine vollständige persönliche Einkommensteuer-/Sozialabgabenrechnung | K-02, MKT-RS-01/02 | Netto-Cashflows und Kapitalertragsteuer klar trennen; keine „vollständige deutsche Steuerplanung“ bewerben |
+| GAP-MKT-02 | keine frei definierbare, versionierte Ereignis- und Jahrespfadliste für Einmalbeträge, Rendite und Inflation | RH-01/RH-02, MKT-RS-99 | feste Referenzschocks nur als Näherung ausweisen; ProjectionLab hat hier einen belegten Vorteil |
+| GAP-MKT-03 | fixer Pflegeeintritt/Grad/Person nicht als deterministische Probe konfigurierbar | RH-03, MKT-RS-01/99 | stochastische Pflegeanalyse nicht als exakter Pflegeplan darstellen |
+| GAP-MKT-04 | allgemeines Speichern, Kopieren und Side-by-side-Vergleichen vollständiger Pläne fehlt | K-09, MKT-RS-01/99 | Sweep/Backtest nicht mit vollwertigem Szenariomanagement gleichsetzen |
+| GAP-MKT-05 | keine formale Usability-, Screenreader- oder WCAG-Prüfung | K-15/K-16, MKT-RS-99 | Barrierefreiheit nur auf Ebene einzelner Hilfen beschreiben |
+| GAP-MKT-06 | Lizenzmetadaten sind widersprüchlich | K-18, MKT-RS-04/05 | vor Veröffentlichung MIT/ISC/Cargo konsistent machen |
+| GAP-MKT-07 | keine autoritative Rentenanspruchs- oder Kontenaggregation | Vergleich mit MKT-DR-01 und MKT-EM-02 | manuelle Eingaben als Nutzerverantwortung kennzeichnen; Import wäre eine separate Produktentscheidung |
+| GAP-MKT-08 | keine externe Prognose-, Kalibrierungs- oder Entscheidungsvalidierung | D.1, MKT-RS-01/02 | Implementierung, Tests und Transparenz nicht als Wirksamkeitsbeleg formulieren |
+
+### D.16.5 Nicht-Zielsegmente
+
+Die Suite ist in ihrer aktuellen Form nicht positioniert als:
+
+- B2B-Beraterplattform mit Mandanten-, Team-, Compliance- und
+  Kundenportalworkflow;
+- staatliche oder anbieterseitig bestätigte Vorsorgeanspruchs-Aggregation;
+- allgemeine internationale Steuer-, Estate- oder Gesamtfinanzplanung;
+- vollautomatische Kontoaggregation oder Depotvollmacht;
+- aktuarielle Pflegeversicherung, medizinische Prognose oder
+  Pflegeleistungsberatung;
+- Ein-Feld-Rechner für Nutzer, die bewusst keine Annahmen- und
+  Ergebnisdetails bearbeiten möchten;
+- Garantie, dass eine bestimmte Entnahme oder Strategie in der Realität
+  erfolgreich ist.
+
+Eine spätere Expansion in eines dieser Segmente wäre ein neuer Produktauftrag
+mit eigenen Daten-, Sicherheits-, Rechts- und UX-Verträgen. Sie wird aus dem
+Marktvergleich nicht still abgeleitet.
+
+## D.17 Evidenzlücken und Aktualisierungsroutine
+
+### D.17.1 Offene Evidenzlücken
+
+| Produktstufe | Wichtigste offene Punkte nach dem Suchpfad | Konsequenz |
+| --- | --- | --- |
+| Ruhestand-Suite | externe Validierung, formale UX/WCAG-Prüfung, konsistente Lizenzmetadaten | keine Qualitäts- oder Accessibility-Überlegenheit behaupten |
+| ProjectionLab Premium | native Pflegefachlichkeit, formale Accessibility, eigener Bediencheck | K-04 teilweise, K-15 nicht geprüft, K-16 nicht öffentlich dokumentiert |
+| Boldin PlannerPlus | unterstützter Offlinepfad, Accessibility, genaue Datenexporttiefe | neutrale Status; US-Regionalgrenze bleibt explizit |
+| BVI Entnahme-Rechner | Szenariospeicherung, Offline, Accessibility, Tarif-/Lizenztext | Schweigen nicht als fehlende Funktion auslegen |
+| Finanzfluss Entnahmeplan | Export, Offline, Accessibility und rechnerspezifische Lizenz | Befund auf sichtbaren Einzelrechner begrenzen |
+| Digitale Rentenübersicht | authentifizierte Portal-UX; die offizielle Accessibility-Selbsterklärung nennt konkrete Restmängel | ohne eID/Login kein Bedienurteil; K-16 bleibt trotz offizieller Erklärung teilweise |
+| MoneyGuide | UX, Accessibility, Seed/Formeldetails hinter Beraterzugang | Funktionsbreite anerkennen, Auditierbarkeit nur teilweise |
+| eMoney Pro | aktueller Preis, Lizenz, Datenbasis, Pflege, Offline, Exporttiefe und Accessibility | besonders viele „nicht öffentlich dokumentiert“-Zellen; keine Negativableitung |
+| FI Calc | Offline-Start, Szenariospeicherung, Accessibility und Code-Lizenz | gerätelokale Eingaben nicht mit vollständigem Offline/Open Source verwechseln |
+| FIRECalc 3.0 | Steuer-, Seed-, Offline-, Szenario-, Accessibility- und Lizenzdetails | historischer Kern belegt, übrige Reichweite neutral |
+| Pralana Gold 2026 | tatsächliche Workbook-UX, Accessibility, Exportdetails und deutsche Mappingtiefe | Kauf wurde nicht durchgeführt; öffentliche Handbücher bleiben P1/P2-Evidenz |
+
+### D.17.2 Pflege des Vergleichs
+
+Der eingefrorene Stichtagsbefund bleibt als historische Version erhalten.
+Eine Aktualisierung überschreibt ihn nicht still, sondern ergänzt Datum,
+geänderte Quelle und Auswirkung auf Matrix beziehungsweise Positionierung.
+
+Regelprüfung:
+
+1. nächste turnusmäßige Prüfung spätestens am 2026-10-15;
+2. zusätzlich vor jeder öffentlichen Markt- oder Differenzierungsaussage,
+   vor einem Release mit Marktbezug und vor dem Slice-8-Gesamtabschluss;
+3. sofortige Prüfung bei Tarif-/Produktumbenennung, Stufenwechsel,
+   eingestelltem Dienst, geänderter Lizenz, neuem Offlinepfad oder
+   wesentlicher Suite-Funktion;
+4. zuerst Produktidentität und Stufe, danach Preis, Terms, Methode,
+   Datenschutz, Export, Offline und Accessibility prüfen;
+5. alle betroffenen MKT-Records mit neuem Abrufdatum und
+   Änderungsnotiz aktualisieren; nicht mehr erreichbare Quellen als
+   historisch markieren, nicht löschen;
+6. Statusänderungen nur mit tragender Quelle durchführen; ein verlorener
+   Link führt zunächst zu „nicht erneut verifiziert“, nicht automatisch zu
+   „nicht vorhanden“;
+7. Referenzfälle RH-01 bis RH-04 erneut prüfen, wenn Ereignis-, Steuer-,
+   Pflege-, Haushalts- oder Szenariofunktionen geändert wurden;
+8. die begrenzte Differenzierung aus D.16.2 nach jeder Statusänderung neu
+   lesen und gegebenenfalls enger formulieren.
+
+## D.18 Ergebnisstand des Marktvergleichs
+
+Der dokumentierte Ergebnisstand umfasst:
+
+- Erhebungsstichtag, Produktstufen, Preis-/Lizenzstand und Quellenrecords;
+- die segmentierten K-01-bis-K-18-Matrizen ohne Score oder Rangliste;
+- die Modellierbarkeitskarte RH-01 bis RH-04;
+- Konkurrenzstärken, eigene Grenzen, strategische Lücken,
+  Ziel-/Nicht-Zielsegmente und Aktualisierungsroutine;
+- die Aussagegrenze, dass Differenzierung nur für Stichprobe, Stufe,
+  öffentliche Evidenz und Stichtag gilt.
+
+Die Aussagen bleiben auf Erhebungsstichtag, untersuchte Stufen und öffentlich
+zugängliche Evidenz begrenzt. D.17 beschreibt die erforderliche
+Aktualisierungsroutine.
+
+---
+
+# Wissenschaftlicher Rahmen, Quellenkorpus und Tiefeneinordnung
+
+**Forschungs- und Quellenstand:** 2026-07-15
+**Zweck dieses Blocks:** Evidenzsystem, Quellenbasis und quellenkritischer
+Mechanismusabgleich; keine Wirksamkeitsfreigabe der Suite
+**Abrufdatum dynamischer Web- und Datenquellen:** 2026-07-15
+
+## E.1 Erkenntnisziel, Aussagegrenze und Nicht-Aussagen
+
+Der Forschungsblock beantwortet drei zentrale Fragen:
+
+1. Welche wissenschaftlichen, institutionellen und amtlichen Quellen sind für
+   die zentralen Mechanismen der Suite einschlägig?
+2. Welche Rolle spielt eine Quelle im Mechanismusabgleich: Methodenursprung,
+   empirischer Befund, Kalibrierungsinput, Gegenbefund oder nur
+   Anwendungskontext?
+3. Welche Abweichungs- und Übertragbarkeitsfragen bestimmen die Einordnung als
+   etabliert, adaptiert, heuristisch oder experimentell?
+
+E.8 bis E.14 führen diesen vorbereitenden Rahmen für die 17 Mechanismen aus
+E.5 aus. Die Einordnung gilt für den dokumentierten Code-, Daten- und
+Quellenstand, nicht zeitlos für jede spätere Parametrisierung.
+
+Die Aufnahme einer Quelle ist **kein** Nachweis, dass die Suite die dort
+untersuchte Methode identisch umsetzt oder deren Ergebnis reproduziert. Eine
+implementierte Formel ist kein Wirksamkeitsnachweis; ein bestandener Test ist
+keine externe Kalibrierung; ein historischer oder simulierter Erfolgsanteil ist
+keine Garantie. Zahlen aus US-, institutionellen oder anderen
+Rechts-/Datenräumen werden nicht ohne erneute Prüfung auf deutsche Haushalte
+übertragen.
+
+## E.2 Verbindliche Evidenztaxonomie
+
+### E.2.1 Quellenklassen
+
+| Code | Quellenklasse | Zulässige Rolle | Nicht ausreichend als alleiniger Beleg für |
+| --- | --- | --- | --- |
+| W1 | peer-reviewte Originalarbeit | Theorie-, Methoden- oder empirischer Primäranker | identische Wirkung einer abgewandelten Suite-Policy |
+| W2 | peer-reviewte Synthese, Review oder Replikation | Forschungsstand, Widersprüche und Robustheitsbild | konkrete Suite-Kalibrierung ohne passende Daten |
+| I1 | amtliche Statistik, Rechts-/Regelquelle oder institutioneller Methodenstandard | deutscher Inputstand, Definition, Governance oder Datenprovenienz | Anlage- oder Entnahmeempfehlung |
+| I2 | institutionelle Forschung mit offengelegter Methode | aktueller Szenario- oder Methodenvergleich | universell gültige Rate oder Produkteignung |
+| P1 | Practitioner Research mit nachvollziehbarer Methode | praxisnaher Methodenursprung oder Vergleich | peer-reviewte externe Validierung |
+| WP | Working Paper oder Preprint | aktueller Gegenentwurf und Forschungsfrage | belastbarer Konsens vor Peer Review |
+| B1 | wissenschaftliches Fachbuch | Theorieintegration und Begriffsrahmen | aktuellen empirischen Parameterstand |
+| C1 | dokumentierte Community-Methode | operationaler Ursprung, Formel- oder Nutzungskonvention | wissenschaftliche Wirksamkeit oder Kalibrierung |
+
+### E.2.2 Evidenzstufen
+
+Die Quellenklasse beschreibt die Herkunft; die Evidenzstufe beschreibt, wie
+stark die Quelle innerhalb dieses Projekts belastet werden darf:
+
+| Stufe | Bedeutung | Verwendung im Dokument |
+| --- | --- | --- |
+| A | W1/W2 oder I1 mit eindeutiger Methode, Version und dauerhaftem Beleg | darf eine Theorie, Methode, amtliche Definition oder Datenreihe tragen |
+| B | I2, P1 oder WP mit transparenter Methode und Grenzen | darf eine begrenzte Forschungs- oder Praxisposition tragen; kein Konsensbeleg |
+| C | B1, C1 oder erklärende Sekundärquelle | darf Begriffe, operative Herkunft oder Kontext ergänzen; nie allein eine Wirksamkeitsaussage tragen |
+
+Stufe A bedeutet nicht automatisch hohe Übertragbarkeit. Eine methodisch starke
+US-Arbeit kann für deutsches Steuer-, Renten- oder Pflegerecht nur strukturell
+relevant sein. Umgekehrt kann eine amtliche deutsche Reihe ein guter
+Kalibrierungsinput sein, ohne eine Entnahmepolicy zu validieren.
+
+### E.2.3 Übertragbarkeit und Quellenrolle
+
+Jedes Mechanismusdossier verwendet zusätzlich eine der folgenden
+Übertragbarkeitsmarkierungen:
+
+| Code | Übertragbarkeit | Bedeutung |
+| --- | --- | --- |
+| T1 | direkt prüfbar | gleicher Methodenbaustein und hinreichend vergleichbare Zielgröße; Abweichungen bleiben offenzulegen |
+| T2 | strukturell | Konzept ist relevant, aber Datenraum, Rechtsraum, Assetset, Horizont oder Zielfunktion weichen ab |
+| T3 | Kontext/Kalibrierung | Quelle liefert Definition, Basisrate oder Szenariokontext, nicht die Policywirkung |
+| T4 | Gegenbefund/Prüfpflicht | Quelle macht eine Robustheits-, Bias- oder Alternativerklärungsprüfung erforderlich |
+
+Eine Quelle kann mehrere Rollen besitzen. Die Dossiers E.9 bis E.11 nennen bei
+jeder zentralen Aussage mindestens `Quellen-ID + Quellenrolle +
+Übertragbarkeit`.
+
+## E.3 Zitier-, Versions- und Aktualitätsstandard
+
+- Peer-reviewte Arbeiten erhalten Autor, Titel, Jahr, Zeitschrift, Band/Seiten
+  soweit verfügbar und DOI als dauerhaften Link.
+- Working Paper erhalten Autor, Titel, Versionsdatum, Repository und
+  dauerhaften Record; sie werden nicht nachträglich als peer-reviewt bezeichnet.
+- Amtliche und institutionelle Quellen erhalten Herausgeber, Titel,
+  Daten-/Berichtsstand, Tabellen- oder Statistikcode soweit verfügbar und
+  Abrufdatum.
+- Dynamische Datenquellen führen Beobachtungsstand und Abrufdatum getrennt.
+- Eine konkrete Zahl wird direkt an ihrer Textstelle belegt und mit
+  Population, Zeitraum, Portfolio, Horizont, Erfolgsdefinition und
+  Modellart kontextualisiert; ein bloßer Eintrag im Korpus genügt nicht.
+- Mehrere Veröffentlichungen desselben Ergebnisses werden nicht als unabhängige
+  Evidenz gezählt. Working Paper und spätere Journalfassung bilden eine
+  Quellenfamilie.
+- Marketing-, Blog- und Community-Texte dürfen nur für dokumentierte
+  Praxispositionen oder operative Herkunft verwendet werden, nicht als
+  unabhängiger Qualitätsnachweis.
+- Direkte Zitate bleiben kurz; der Regelfall ist eine eigenständige Paraphrase
+  mit enger Aussagegrenze.
+
+## E.4 Kuratiertes Quellenkorpus
+
+Das Korpus umfasst 55 eindeutige Records. Es ist eine kuratierte Belegbasis,
+keine erschöpfende systematische Literaturübersicht. Die Spalte „Beitrag und
+Grenze“ beschreibt die Quellenrolle; das Urteil über die konkrete
+Suite-Ausprägung steht in den Dossiers E.9 bis E.11.
+
+### E.4.1 Safe Withdrawal, dynamische Entnahmen, Guardrails, RMD und VPW
+
+| ID | Klasse / Stufe | Quelle | Beitrag und Grenze |
+| --- | --- | --- | --- |
+| FOR-ENT-01 | P1 / B | Bengen (1994), *Determining Withdrawal Rates Using Historical Data*, Journal of Financial Planning 7(4), 171–180, [FPA-Archiv](https://www.financialplanningassociation.org/learning/publications/journal/OCT94-determining-withdrawal-rates-using-historical-data) | Ursprung des historischen, real konstanten Entnahmerahmens; US-Daten, ausgewählte Assets und Worst-History-Logik sind T2/T4, keine zeitlose Universalrate. |
+| FOR-ENT-02 | P1 / B | Guyton (2004), *Decision Rules and Portfolio Management for Retirees*, Journal of Financial Planning, [FPA-Archiv](https://www.financialplanningassociation.org/article/journal/OCT04-decision-rules-and-portfolio-management-retirees-safe-initial-withdrawal-rate-too-safe) | Praxisursprung regelbasierter Inflations-/Portfolioanpassungen; konkrete Regeln und Datenuniversum müssen von Suite-Regeln getrennt werden. |
+| FOR-ENT-03 | P1 / B | Guyton und Klinger (2006), *Decision Rules and Maximum Initial Withdrawal Rates*, Journal of Financial Planning, [Original-PDF](https://www.financialplanningassociation.org/sites/default/files/2021-11/2006%20-%20Guyton%20and%20Klinger%20-%20Decision%20Rules%20and%20SWR%20%281%29.PDF) | Monte-Carlo-Prüfung von Prosperity-/Capital-Preservation-Regeln; T2, da Trigger, Portfolio, Kosten, Steuern und Zielgrößen nicht identisch sind. |
+| FOR-ENT-04 | I2 / B | Blanchett, Kowara und Chen (2012), *Optimal Withdrawal Strategy for Retirement Income Portfolios*, Morningstar Investment Management, [Methodenpapier](https://www.morningstar.com/content/dam/marketing/shared/research/methodology/677951-Optimal_Withdrawal_Strategy_for_Retirement_Income_Portfolios.pdf) | Vergleich variabler Entnahmeregeln mit offengelegter institutioneller Methode; US-Annahmen und Nutzenfunktion begrenzen die Übertragung. |
+| FOR-ENT-05 | W1 / A | Waring und Siegel (2015), *The Only Spending Rule Article You Will Ever Need*, Financial Analysts Journal 71(1), 91–107, [DOI 10.2469/faj.v71.n1.2](https://doi.org/10.2469/faj.v71.n1.2) | Jährlich neu berechnete virtuelle Annuität als wissenschaftlicher Anker für amortisationsbasierte variable Entnahme; schwankender Konsum und Modellannahmen bleiben zentral. |
+| FOR-ENT-06 | I2 / B | Morningstar (2025), *The State of Retirement Income: 2025*, Version 2025-12-03, [Bericht](https://www.morningstar.com/content/cs-assets/v3/assets/blt9415ea4cc4157833/bltb73b87c5d0c70ead/The_State_of_Retirement_Income_2025.pdf) | Aktueller institutioneller Vergleich fixer und flexibler Regeln; Zahlen gelten nur für den ausgewiesenen Horizont, Erfolgsbegriff und die Forward-Looking-Annahmen. |
+| FOR-ENT-07 | W1 / A | Anarkulova, Cederburg, O'Doherty und Sias (2025), *The Safe Withdrawal Rate: Evidence from a Broad Sample of Developed Markets*, Journal of Pension Economics and Finance 24(3), 464–500, [DOI 10.1017/S1474747225000010](https://doi.org/10.1017/S1474747225000010) | Breiter internationaler Gegencheck zu US-zentrierten Entnahmeregeln und Datenbias; Portfolio- und Regeldefinition bleiben für T1/T2 abzugleichen. |
+| FOR-ENT-08 | W1 / A | Clare, Glover, Seaton, Smith und Thomas (2020), *Measuring Sequence of Returns Risk*, Journal of Retirement 8(1), 65–79, [DOI 10.3905/jor.2020.1.066](https://doi.org/10.3905/jor.2020.1.066) | Explizite Messkonzepte für Sequenzrisiko; T2, weil Suite-KPIs und Entnahmevertrag nicht automatisch den vorgeschlagenen Maßen entsprechen. |
+| FOR-ENT-09 | I1 / A | U.S. Internal Revenue Service (2025), *Publication 590-B*, Appendix B, Table III, [amtliche RMD-Regel](https://www.irs.gov/publications/p590b), Abruf 2026-07-15 | Institutioneller Ursprung altersabhängiger RMD-Divisoren; US-Steuerregel, keine deutsche Empfehlung und keine VPW-Validierung. |
+| FOR-ENT-10 | C1 / C | Bogleheads (laufend), *Variable Percentage Withdrawal*, [Methodendokumentation](https://www.bogleheads.org/wiki/Variable_percentage_withdrawal), Abruf 2026-07-15 | Operativer Ursprung des VPW-Tabellen-/Spreadsheet-Ansatzes; Community-Quelle. Wissenschaftliche Anker der Annuitätenrechnung sind separat FOR-ENT-05 und FOR-ENT-09. |
+
+### E.4.2 Floor-and-Upside, Lifecycle Finance, Konsumglättung und Langlebigkeit
+
+| ID | Klasse / Stufe | Quelle | Beitrag und Grenze |
+| --- | --- | --- | --- |
+| FOR-LCF-01 | W1 / A | Yaari (1965), *Uncertain Lifetime, Life Insurance, and the Theory of the Consumer*, Review of Economic Studies 32(2), 137–150, [DOI 10.2307/2296058](https://doi.org/10.2307/2296058) | Grundmodell zu unsicherer Lebensdauer und Annuitisierung; starke Markt-, Nutzen- und Versicherungsannahmen, daher struktureller T2-Anker. |
+| FOR-LCF-02 | W1 / A | Merton (1971), *Optimum Consumption and Portfolio Rules in a Continuous-Time Model*, Journal of Economic Theory 3(4), 373–413, [DOI 10.1016/0022-0531(71)90038-X](https://doi.org/10.1016/0022-0531(71)90038-X) | Theoretischer Ursprung gemeinsamer Konsum-/Portfoliooptimierung; keine direkte Validierung diskreter jährlicher Suite-Regeln. |
+| FOR-LCF-03 | W1 / A | Davies (1981), *Uncertain Lifetime, Consumption, and Dissaving in Retirement*, Journal of Political Economy 89(3), [DOI 10.1086/260986](https://doi.org/10.1086/260986) | Empirisch/theoretischer Anker für vorsichtiges Entsparen bei Lebensdauerunsicherheit; Population und Präferenzannahmen sind T2. |
+| FOR-LCF-04 | W1 / A | Bodie, Merton und Samuelson (1992), *Labor Supply Flexibility and Portfolio Choice in a Life Cycle Model*, Journal of Economic Dynamics and Control 16(3–4), 427–449, [DOI 10.1016/0165-1889(92)90044-F](https://doi.org/10.1016/0165-1889(92)90044-F) | Zeigt die Verknüpfung von Humankapital-/Arbeitsflexibilität, Konsum und Risikoanlage; nur T2 für bereits verrentete Haushalte. |
+| FOR-LCF-05 | W1 / A | Davidoff, Brown und Diamond (2005), *Annuities and Individual Welfare*, American Economic Review 95(5), 1573–1590, [DOI 10.1257/000282805775014281](https://doi.org/10.1257/000282805775014281) | Wohlfahrtsanker für Langlebigkeitsrisikopooling und Grenzen vollständiger Annuitisierung; Suite simuliert keine solche Versicherung. |
+| FOR-LCF-06 | W2 / A | Bodie, Detemple und Rindisbacher (2009), *Life-Cycle Finance and the Design of Pension Plans*, Annual Review of Financial Economics 1, 249–286, [DOI 10.1146/annurev.financial.050708.144317](https://doi.org/10.1146/annurev.financial.050708.144317) | Peer-reviewte Synthese zu Konsum, Sparen, Investieren und Versicherung über den Lebenszyklus; Rahmenquelle, kein Policyparameter. |
+| FOR-LCF-07 | W1 / A | Sexauer, Peskin und Cassidy (2012), *Making Retirement Income Last a Lifetime*, Financial Analysts Journal 68(1), 74–84, [DOI 10.2469/faj.v68.n1.7](https://doi.org/10.2469/faj.v68.n1.7) | Direkter Referenzpunkt für einen Liability-Matching-/Lifetime-Income-Benchmark und eine getrennte Upside-Komponente; Instrumente und US-Versorgungskontext sind nur T2 übertragbar. |
+| FOR-LCF-08 | W1 / A | Blanchett (2023), *Redefining the Optimal Retirement Income Strategy*, Financial Analysts Journal 79(1), 5–16, [DOI 10.1080/0015198X.2022.2129947](https://doi.org/10.1080/0015198X.2022.2129947) | Zerlegt Ausgaben in Bedürfnisse und Wünsche und verbindet sie mit Funded Ratio, dynamischer Entnahme und Nutzenmaß; Modellannahmen und US-Kontext begrenzen die Übertragung auf T2. |
+
+### E.4.3 Bootstrap, Regime, Fat Tails und Stresstests
+
+| ID | Klasse / Stufe | Quelle | Beitrag und Grenze |
+| --- | --- | --- | --- |
+| FOR-STO-01 | W1 / A | Efron (1979), *Bootstrap Methods: Another Look at the Jackknife*, Annals of Statistics 7(1), 1–26, [DOI 10.1214/aos/1176344552](https://doi.org/10.1214/aos/1176344552) | Primäranker des Bootstrap; IID-Grundlage allein rechtfertigt kein Zeitreihen-Sampling. |
+| FOR-STO-02 | W1 / A | Künsch (1989), *The Jackknife and the Bootstrap for General Stationary Observations*, Annals of Statistics 17(3), 1217–1241, [DOI 10.1214/aos/1176347265](https://doi.org/10.1214/aos/1176347265) | Primäranker blockweisen Resamplings abhängiger stationärer Beobachtungen; Blockwahl und Stationarität bleiben Kalibrierungsfragen. |
+| FOR-STO-03 | W1 / A | Politis und Romano (1994), *The Stationary Bootstrap*, Journal of the American Statistical Association 89(428), 1303–1313, [DOI 10.1080/01621459.1994.10476870](https://doi.org/10.1080/01621459.1994.10476870) | Direkter Methodenanker für geometrisch verteilte Blocklängen und stationäre Pseudozeitreihen; keine automatische Gütegarantie für die Suite-Daten. |
+| FOR-STO-04 | W1 / A | Hamilton (1989), *A New Approach to the Economic Analysis of Nonstationary Time Series and the Business Cycle*, Econometrica 57(2), 357–384, [DOI 10.2307/1912559](https://doi.org/10.2307/1912559) | Primäranker diskreter Markov-Regime; Suite-Regime, Übergänge und Zielvariablen müssen eigenständig abgeglichen werden. |
+| FOR-STO-05 | W1 / A | Mandelbrot (1963), *The Variation of Certain Speculative Prices*, Journal of Business 36(4), 394–419, [DOI 10.1086/294632](https://doi.org/10.1086/294632) | Früher Primärbefund schwerer Renditeschwänze; rechtfertigt keine konkrete Tail-Verteilung oder Overlay-Rate. |
+| FOR-STO-06 | W1 / A | Engle (1982), *Autoregressive Conditional Heteroscedasticity with Estimates of the Variance of United Kingdom Inflation*, Econometrica 50(4), 987–1007, [DOI 10.2307/1912773](https://doi.org/10.2307/1912773) | Primäranker zeitvariabler bedingter Varianz; Suite implementiert damit nicht automatisch ARCH. |
+| FOR-STO-07 | W1 / A | Bollerslev (1986), *Generalized Autoregressive Conditional Heteroskedasticity*, Journal of Econometrics 31(3), 307–327, [DOI 10.1016/0304-4076(86)90063-1](https://doi.org/10.1016/0304-4076(86)90063-1) | GARCH-Methodenanker für Volatilitätscluster; dient vor allem als T4-Vergleich zu heuristischen Regime-/Tail-Pfaden. |
+| FOR-STO-08 | W2 / A | Cont (2001), *Empirical Properties of Asset Returns: Stylized Facts and Statistical Issues*, Quantitative Finance 1(2), 223–236, [DOI 10.1080/713665670](https://doi.org/10.1080/713665670) | Synthese zu schweren Tails, Volatilitätsclustering und weiteren Renditefakten; Prüfungskatalog, keine Suite-Kalibrierung. |
+| FOR-STO-09 | I1 / A | Basel Committee on Banking Supervision (2018), *Stress Testing Principles*, [BIS-Publikation](https://www.bis.org/bcbs/publ/d450.htm), Abruf 2026-07-15 | Governance-, Dokumentations- und Challenge-Prinzipien für Stresstests; Bankenstandard, nur strukturell auf Haushaltsmodelle übertragbar. |
+| FOR-STO-10 | I1 / A | Bank of England/PRA (2018, Fassung 2026), *Model Risk Management Principles for Stress Testing*, [Supervisory Statement SS3/18](https://www.bankofengland.co.uk/prudential-regulation/publication/2018/model-risk-management-principles-for-stress-testing-ss), Abruf 2026-07-15 | Unabhängige Validierung, Modellinventar und regelmäßige Challenge als Governance-Anker; keine fachliche Endkundenregel. |
+
+### E.4.4 CAPE, Prognosegrenzen, Backtests, Optimierung und Data Snooping
+
+| ID | Klasse / Stufe | Quelle | Beitrag und Grenze |
+| --- | --- | --- | --- |
+| FOR-VAL-01 | W1 / A | Campbell und Shiller (1988), *Stock Prices, Earnings, and Expected Dividends*, Journal of Finance 43(3), 661–676, [DOI 10.1111/j.1540-6261.1988.tb04598.x](https://doi.org/10.1111/j.1540-6261.1988.tb04598.x) | Primäranker geglätteter realer Gewinne und langfristiger Bewertungsrelationen; keine Einjahres- oder exakte Renditeformel. |
+| FOR-VAL-02 | W1 / A | Campbell und Shiller (1998), *Valuation Ratios and the Long-Run Stock Market Outlook*, Journal of Portfolio Management 24(2), 11–26, [DOI 10.3905/jpm.1998.24.2.11](https://doi.org/10.3905/jpm.1998.24.2.11) | Langfristiger Bewertungs-/Renditekontext; T2/T4 für CAPE-Clamps, EMA und jährliche Policyableitungen. |
+| FOR-VAL-03 | W1 / A | Welch und Goyal (2008), *A Comprehensive Look at the Empirical Performance of Equity Premium Prediction*, Review of Financial Studies 21(4), 1455–1508, [DOI 10.1093/rfs/hhm014](https://doi.org/10.1093/rfs/hhm014) | Out-of-sample-Gegenbefund zu vielen Equity-Premium-Prädiktoren; zentrale T4-Prüfpflicht für CAPE-Policies. |
+| FOR-VAL-04 | W1 / A | Lo und MacKinlay (1990), *Data-Snooping Biases in Tests of Financial Asset Pricing Models*, Review of Financial Studies 3(3), 431–467, [DOI 10.1093/rfs/3.3.431](https://doi.org/10.1093/rfs/3.3.431) | Primäranker dafür, dass datenabhängige Testkonstruktion Inferenz verzerrt; relevant für Sweeps und Parameterauswahl. |
+| FOR-VAL-05 | W1 / A | Sullivan, Timmermann und White (1999), *Data-Snooping, Technical Trading Rule Performance, and the Bootstrap*, Journal of Finance 54(5), 1647–1691, [DOI 10.1111/0022-1082.00163](https://doi.org/10.1111/0022-1082.00163) | Vollständiges Kandidatenuniversum und Data-Snooping-Korrektur als T4-Anker; keine direkte Retirement-Policy. |
+| FOR-VAL-06 | W1 / A | White (2000), *A Reality Check for Data Snooping*, Econometrica 68(5), 1097–1126, [DOI 10.1111/1468-0262.00152](https://doi.org/10.1111/1468-0262.00152) | Statistischer Methodenanker für Mehrfachsuche; Prüfmaßstab dafür, welche Trials die Suite offenlegt oder korrigiert. |
+| FOR-VAL-07 | W1 / A | Cawley und Talbot (2010), *On Over-fitting in Model Selection and Subsequent Selection Bias in Performance Evaluation*, Journal of Machine Learning Research 11, 2079–2107, [Volltext](https://www.jmlr.org/papers/v11/cawley10a.html) | Zeigt Selection Bias auch bei Optimierung eines Validierungskriteriums; direkt relevant für Train/Test- und Champion-Auswahl. |
+| FOR-VAL-08 | W1 / A | Bailey, Borwein, López de Prado und Zhu (2016), *The Probability of Backtest Overfitting*, Journal of Computational Finance 20(4), 39–69, [DOI 10.21314/JCF.2016.322](https://doi.org/10.21314/JCF.2016.322) | Quantifiziert Überanpassungsrisiko bei vielen Strategieversuchen; T2, da Suite-Zielfunktionen und Pfadstruktur abweichen. |
+| FOR-VAL-09 | W1 / A | Harvey, Liu und Zhu (2016), *… and the Cross-Section of Expected Returns*, Review of Financial Studies 29(1), 5–68, [DOI 10.1093/rfs/hhv059](https://doi.org/10.1093/rfs/hhv059) | Multiple-Testing- und Signifikanzproblem als breiter Robustheitsanker für Parameter-/Strategievergleiche. |
+| FOR-VAL-10 | I1 / A | Shiller (laufend), *Online Data: U.S. Stock Markets 1871–Present and CAPE Ratio*, [Yale-Datenseite](https://www.econ.yale.edu/~shiller/data.htm), Abruf 2026-07-15 | Provenienzanker einer verbreiteten CAPE-Reihe samt Rekonstruktionshinweisen; US-Reihe und historische Splices sind keine globale Wahrheit. |
+
+### E.4.5 Pflege, Mental Accounting, Cash-, Bond-, Gold- und Bucket-Strategien
+
+| ID | Klasse / Stufe | Quelle | Beitrag und Grenze |
+| --- | --- | --- | --- |
+| FOR-PFL-01 | W1 / A | Thaler (1985), *Mental Accounting and Consumer Choice*, Marketing Science 4(3), 199–214, [DOI 10.1287/mksc.4.3.199](https://doi.org/10.1287/mksc.4.3.199) | Primäranker mentaler Budgets und Zweckkonten; erklärt mögliche Akzeptanz, validiert aber keinen algorithmischen Air-Gap. |
+| FOR-PFL-02 | W1 / A | Brown und Finkelstein (2007), *Why Is the Market for Long-Term Care Insurance So Small?*, Journal of Public Economics 91(10), 1967–1991, [DOI 10.1016/j.jpubeco.2007.02.010](https://doi.org/10.1016/j.jpubeco.2007.02.010) | Primärbefund zu großem unversichertem Pflegerisiko, Loads und begrenzter Deckung; US-Markt ist nur T2 für Deutschland. |
+| FOR-PFL-03 | W1 / A | Brown und Finkelstein (2008), *The Interaction of Public and Private Insurance: Medicaid and the Long-Term Care Insurance Market*, American Economic Review 98(3), 1083–1102, [DOI 10.1257/aer.98.3.1083](https://doi.org/10.1257/aer.98.3.1083) | Zeigt die Interaktion öffentlicher und privater Pflegeabsicherung; deutsche Pflegeversicherung benötigt eigenen Rechts-/Leistungsabgleich. |
+| FOR-AST-01 | W1 / A | Estrada (2019), *The Bucket Approach for Retirement: A Suboptimal Behavioral Trick?*, Journal of Investing 28(5), 54–68, [DOI 10.3905/joi.2019.1.093](https://doi.org/10.3905/joi.2019.1.093) | Direkter Gegenbefund zu pauschalen Bucket-Vorteilen; wichtig für die Trennung von Verhaltensnutzen, Asset-Allokation und Renditewirkung. |
+| FOR-AST-02 | W1 / A | Baur und Lucey (2010), *Is Gold a Hedge or a Safe Haven?*, Financial Review 45(2), 217–229, [DOI 10.1111/j.1540-6288.2010.00244.x](https://doi.org/10.1111/j.1540-6288.2010.00244.x) | Definiert Hedge/Safe Haven und findet zeit-/marktbedingte Eigenschaften; keine konstante Goldschutzwirkung. |
+| FOR-AST-03 | W1 / A | Erb und Harvey (2013), *The Golden Dilemma*, Financial Analysts Journal 69(4), 10–42, [DOI 10.2469/faj.v69.n4.1](https://doi.org/10.2469/faj.v69.n4.1) | Kritischer Primäranker zu Gold als Inflationsschutz und zu Bewertung; T4 für feste Goldrendite-/Schutzannahmen. |
+| FOR-AST-04 | W1 / A | Anarkulova, Cederburg und O'Doherty (2022), *Stocks for the Long Run? Evidence from a Broad Sample of Developed Markets*, Journal of Financial Economics 143(1), 409–433, [DOI 10.1016/j.jfineco.2021.06.040](https://doi.org/10.1016/j.jfineco.2021.06.040) | Breiter Länderdatensatz gegen Survivorship-/Easy-Data-Bias; fordert naive Langfristsicherheitsannahmen heraus. |
+| FOR-AST-05 | P1 / B | Pfau und Kitces (2014), *Reducing Retirement Risk with a Rising Equity Glide Path*, Journal of Financial Planning 27(1), 38–45, [FPA-Archiv](https://www.financialplanningassociation.org/article/journal/JAN14-reducing-retirement-risk-rising-equity-glide-path) | Praxisstudie zu Sequenzrisiko und Glidepaths; alternative Modell-/Renditeannahmen und Replikationen sind mitzulesen. |
+| FOR-AST-06 | B1 / C | Campbell und Viceira (2002), *Strategic Asset Allocation: Portfolio Choice for Long-Term Investors*, Oxford University Press, [DOI 10.1093/0198296940.001.0001](https://doi.org/10.1093/0198296940.001.0001) | Fachbuchrahmen zu langfristiger Portfolioentscheidung und Hedging; Theorieintegration, kein aktueller Parameterbeleg. |
+| FOR-AST-07 | W1 / A | Markowitz (1952), *Portfolio Selection*, Journal of Finance 7(1), 77–91, [DOI 10.1111/j.1540-6261.1952.tb01525.x](https://doi.org/10.1111/j.1540-6261.1952.tb01525.x) | Grundanker der Rendite-/Varianz-Diversifikation; sagt allein nichts über Entnahmereihenfolge, Tail-Schutz oder deutsche Haushaltsziele. |
+
+### E.4.6 Deutsche amtliche Daten zu Sterblichkeit, Rente, Pflege und Preisen
+
+| ID | Klasse / Stufe | Quelle | Beitrag und Grenze |
+| --- | --- | --- | --- |
+| FOR-DE-01 | I1 / A | Statistisches Bundesamt, *Sterbetafeln 2022/2024*, [Periodensterbetafeln](https://www.destatis.de/DE/Themen/Gesellschaft-Umwelt/Bevoelkerung/Sterbefaelle-Lebenserwartung/Publikationen/_publikationen-innen-periodensterbetafel.html), Stand 2025-07-22, Abruf 2026-07-15 | Aktueller amtlicher Periodenanker nach Alter/Geschlecht; Momentaufnahme ohne künftige Mortalitätsverbesserung. |
+| FOR-DE-02 | I1 / A | Statistisches Bundesamt, *Generationensterbetafeln für Deutschland*, [Methoden- und Modellbericht](https://www.destatis.de/DE/Themen/Gesellschaft-Umwelt/Bevoelkerung/Sterbefaelle-Lebenserwartung/Publikationen/Downloads-Sterbefaelle/kohortensterbetafeln-5126101209004.pdf), Abruf 2026-07-15 | Kohorten-/Periodenunterschied und Modellannahmen als T4-Prüfpflicht für Langlebigkeitshorizonte. |
+| FOR-DE-03 | I1 / A | Statistisches Bundesamt (2024), *Pflegestatistik 2023 – Deutschlandergebnisse*, [Statistischer Bericht](https://www.destatis.de/DE/Themen/Gesellschaft-Umwelt/Gesundheit/Pflege/Publikationen/Downloads-Pflege/statistischer-bericht-pflege-deutschlandergebnisse-5224001239005.html), Abruf 2026-07-15 | Amtlicher Bestands-/Versorgungsanker; Querschnittsbestand ist keine individuelle Eintritts- oder Übergangswahrscheinlichkeit. |
+| FOR-DE-04 | I1 / A | Bundesministerium für Gesundheit, *Pflegeversicherung – Zahlen und Fakten*, Daten bis 2025, [amtliche Datensammlung](https://www.bundesgesundheitsministerium.de/themen/pflege/pflegeversicherung-zahlen-und-fakten), Abruf 2026-07-15 | Pflegegrade, Leistungsempfänger, Leistungen und Finanzierung; Rechts-/Leistungsstand ist volatil und kein Kostenpfadmodell. |
+| FOR-DE-05 | I1 / A | Deutsche Rentenversicherung Bund (2025), *Rentenversicherung in Zeitreihen 2025*, [Publikation](https://www.deutsche-rentenversicherung.de/SharedDocs/Downloads/DE/Statistiken-und-Berichte/statistikpublikationen/rv_in_zeitreihen.pdf?__blob=publicationFile), Abruf 2026-07-15 | Amtliche Zeitreihen zu Versicherten, Rentenbestand/-zugang und Rentenarten; Populationsdaten ersetzen keine individuelle Rentenauskunft. |
+| FOR-DE-06 | I1 / A | Bundesministerium für Arbeit und Soziales (2025), *Rentenversicherungsbericht 2025*, [Bericht](https://www.bmas.de/SharedDocs/Downloads/DE/Rente/rentenversicherungsbericht-2025.html), Abruf 2026-07-15 | Rechts-/Finanzierungs-/Vorausberechnungskontext der gesetzlichen Rente; politische Projektion ist keine garantierte Individualleistung. |
+| FOR-DE-07 | I1 / A | Statistisches Bundesamt, GENESIS-Online Tabelle 61111-0002, *Verbraucherpreisindex: Deutschland, Monate*, [amtliche Tabelle](https://genesis.destatis.de/datenbank/online/table/61111-0002), Stand 2026-06-12, Abruf 2026-07-15 | Preisniveau-/Inflationsanker mit Basis und Revisionsstand; allgemeiner VPI ist kein individueller Rentner- oder Pflegekostenindex. |
+
+## E.5 Mapping-Grundlage des Mechanismusabgleichs
+
+Jeder Mechanismus wird mit den Pflichtfeldern
+`Suite-Mechanismus`, `Implementierungsanker`, `Forschungsanker`,
+`Quellenrolle`, `Übertragbarkeit`, `Abweichung`, `lokale Validierung`,
+`Evidenzstatus`, `Restrisiko` und `offene Prüfung` dokumentiert. Die folgende
+Matrix zeigt die Quellen- und Prüfbasis; die abschließende Einordnung steht in
+E.9 bis E.11.
+
+| MAP-ID | Suite-Mechanismus | Startquellen | Prüfpflicht |
+| --- | --- | --- | --- |
+| MAP-01 | real konstanter Floor / historische Erfolgsanteile | FOR-ENT-01, FOR-ENT-07, FOR-DE-07 | Horizont, Assetset, Inflation, Steuer, Erfolgsdefinition und Deutschlandübertragbarkeit |
+| MAP-02 | Floor-Flex und flexible Entnahme | FOR-ENT-04 bis FOR-ENT-06, FOR-LCF-01 bis FOR-LCF-08 | ob Floor/Upside, Nutzenfunktion und Kürzungsrisiko nur strukturell oder direkt anschließen |
+| MAP-03 | Guardrails und Recovery-Logik | FOR-ENT-02, FOR-ENT-03, FOR-ENT-06 | genaue Trigger-/Anpassungsdifferenz und fehlender Reproduktionsbenchmark |
+| MAP-04 | `minimumFlexAnnual` | FOR-LCF-01 bis FOR-LCF-08, FOR-PFL-01 | Nutzerpräferenz versus Sicherheitsfloor; keine Literaturquelle als direkte Regel ausgeben |
+| MAP-05 | Dynamic Flex / VPW-Annuitätenformel | FOR-ENT-05, FOR-ENT-09, FOR-ENT-10 | Community-VPW, ARVA und RMD getrennt halten; CAPE-/EMA-/Clamp-Adaption ausweisen |
+| MAP-06 | Runway, Liquiditätsziel und 3-Bucket-Logik | FOR-ENT-08, FOR-AST-01, FOR-AST-05 bis FOR-AST-07 | Verhaltenseffekt, Asset-Allokation und tatsächlicher Rendite-/Risikoeffekt trennen |
+| MAP-07 | Goldquote und Gold-Stresswirkung | FOR-AST-02, FOR-AST-03, FOR-AST-07 | Zeitraum-, Markt-, Währungs- und Safe-Haven-Abhängigkeit gegen feste Annahmen prüfen |
+| MAP-08 | IID-/Block-/Stationary-Bootstrap | FOR-STO-01 bis FOR-STO-03, FOR-AST-04 | Stationarität, Blocklänge, Randbehandlung, Datenbreite und neue Extremwerte |
+| MAP-09 | diskrete und geglättete Regime-Signale | FOR-STO-04, FOR-STO-06 bis FOR-STO-08 | ob Suite-Regime geschätzt, heuristisch beschriftet oder kalibriert sind |
+| MAP-10 | Tail-Risk-Overlay und Crash-Plan | FOR-STO-05 bis FOR-STO-10 | Schockrate/-höhe/-dauer, Anti-Doppelpessimismus und Szenario- versus Wahrscheinlichkeitsaussage |
+| MAP-11 | CAPE-Stufen und kontinuierliche CAPE-Policy | FOR-VAL-01 bis FOR-VAL-03, FOR-VAL-10 | Horizontmismatch, US-Daten, EMA/Clamps, Out-of-sample-Güte und Fallbacks |
+| MAP-12 | Backtest | FOR-VAL-04 bis FOR-VAL-09, FOR-AST-04 | Look-ahead, Survivorship/Easy-Data-Bias, Trial-Inventar und echte Out-of-sample-Grenze |
+| MAP-13 | Sweep und Auto-Optimize | FOR-VAL-04 bis FOR-VAL-09 | Mehrfachtests, Zielfunktions-Overfit, Train/Test-Nesting und Champion-Stabilität |
+| MAP-14 | Single-/Joint-Life-Horizont | FOR-LCF-01, FOR-LCF-03, FOR-LCF-05, FOR-DE-01, FOR-DE-02 | Perioden-/Kohortenproblem, Joint-Life-Konstruktion, Quantil und individuelle Heterogenität |
+| MAP-15 | gesetzliche Rente und Witwenanteil | FOR-DE-05, FOR-DE-06 | individuelle Eingabe versus Populationsreihe, Rechtsstand und Hinterbliebenenvertrag |
+| MAP-16 | Pflegeeintritt, Progression und Kosten | FOR-PFL-02, FOR-PFL-03, FOR-DE-03, FOR-DE-04 | Bestandsdaten nicht als Übergangsraten lesen; Kosten-, Dauer- und Leistungsquellen getrennt kalibrieren |
+| MAP-17 | Pflegebucket / algorithmische Zweckbindung | FOR-PFL-01 bis FOR-PFL-03, FOR-AST-01, FOR-DE-03, FOR-DE-04 | Mental Accounting, Selbstversicherung, öffentliche Leistungen und Opportunitätskosten nicht vermischen |
+
+## E.6 Bereinigung des früheren Forschungsstands
+
+Der frühere Forschungsblock war eine knappe Produkt-/Blogzuordnung und erfüllte
+den vorstehenden Standard nicht. Deshalb wurden folgende Aussagen aus dem
+normativen Text entfernt und im Mechanismusabgleich neu geprüft:
+
+- konkrete Morningstar-Entnahmeraten ohne vollständigen Horizont-, Portfolio-,
+  Erfolgs- und Annahmenkontext;
+- Kitces-Werte zu Einkommensrückgängen, die in einer Tabelle fälschlich als
+  eigene Resultate der Ruhestand-Suite lesbar waren;
+- die Gleichsetzung von Floor-Flex mit Guyton-Klinger oder „Risk-Based
+  Guardrails“ allein aufgrund ähnlicher Begriffe;
+- die pauschale Aussage, VPW reduziere das Ruinrisiko, ohne das korrespondierende
+  Konsumkürzungs-, Horizont- und Endvermögensziel zu nennen;
+- die Gleichsetzung von implementiertem Stationary Bootstrap, Regime-Signalen
+  oder Tail-Overlay mit externer Kalibrierung;
+- unbelegte normative Aussagen dazu, für welche Vermögenshöhe Selbstversicherung
+  durch einen Pflegebucket rational sei.
+
+Die Implementierungsbeschreibungen der betreffenden Mechanismen bleiben in
+Teil C erhalten. E.8 bis E.11 ordnen ihre konkrete Suite-Ausprägung anhand von
+E.4 und E.5 als etabliert, adaptiert, heuristisch oder experimentell ein.
+
+## E.7 Bestandteile des Forschungsrahmens
+
+Der Forschungsrahmen besteht aus Quellenklassen, Evidenzstufen und
+Übertragbarkeitscodes (E.2), dem Zitier-/Versionsstandard (E.3), dem Korpus mit
+55 Records (E.4), der Mapping-Grundlage für 17 Mechanismen (E.5) und der
+dokumentierten Bereinigung früherer nicht belastbarer Aussagen (E.6). Diese
+Bausteine tragen den Mechanismusabgleich E.8 bis E.14, ersetzen ihn aber nicht.
+
+## E.8 Einordnungsmaßstab und Gesamtergebnis
+
+### E.8.1 Statusbegriffe auf Mechanismusebene
+
+Die Einordnung bezieht sich auf die **konkrete Suite-Ausprägung**, nicht nur
+auf den Namen einer Methode:
+
+| Status | Bedeutung in diesem Dokument |
+| --- | --- |
+| **etabliert** | Der eingesetzte Methodenbaustein und sein Prüfzweck entsprechen im Wesentlichen einer anerkannten Methode. Daten-, Parameter- und Anwendungsgrenzen bleiben trotzdem offen. |
+| **adaptiert** | Eine anerkannte Methode ist erkennbar, wurde aber für Suite-Ziele, Daten, Regeln oder Haushaltsverträge verändert. Literaturergebnisse sind nicht direkt übertragbar. |
+| **heuristisch** | Die Regel ist fachlich plausibilisiert und technisch reproduzierbar, besitzt aber keinen passenden externen Kalibrierungs- oder Wirkungsnachweis. |
+| **experimentell** | Die Funktion ist ein optionaler Analyse-, Stress- oder Suchpfad. Sie erzeugt Szenarien oder Kandidaten, aber keine belastbare Wahrscheinlichkeits- oder Empfehlungsaussage. |
+
+Ein Status „etabliert“ ist keine Produktempfehlung. Umgekehrt bedeutet
+„heuristisch“ nicht willkürlich: Quellcode, Parameter und Tests können
+transparent sein, obwohl externe Güte oder optimale Parametrisierung fehlen.
+
+### E.8.2 Ergebnisübersicht der 17 Mechanismen
+
+| MAP-ID | Primärstatus der Suite-Ausprägung | Wichtigste Aussagegrenze |
+| --- | --- | --- |
+| MAP-01 | adaptiert | keine universelle „sichere Rate“ aus Suite-Erfolgsanteilen ableiten |
+| MAP-02 | adaptiert | Floor-/Flex-Aufteilung und Kürzungsnutzen sind nicht extern repliziert |
+| MAP-03 | adaptiert, Schwellen heuristisch | Suite-Trigger sind nicht Guyton-Klinger-Trigger |
+| MAP-04 | heuristisch | Mindest-Flex ist eine Präferenz-/Konsumgrenze, kein Sicherheitsfloor |
+| MAP-05 | adaptiert | VPW-Annuitätenkern, Community-VPW, RMD und CAPE-Policy nicht gleichsetzen |
+| MAP-06 | heuristisch | Runway und 3-Bucket-Regeln belegen keinen Rendite- oder Sicherheitsvorteil |
+| MAP-07 | heuristisch | Goldschutz ist zeit-, markt- und währungsabhängig |
+| MAP-08 | adaptiert | Resampling erzeugt keine neuen historischen Extremtypen und braucht Kalibrierung |
+| MAP-09 | heuristisch | beschriftete Zustände sind kein statistisch geschätztes Markov-/ARCH-Modell |
+| MAP-10 | experimentell | Tail-Overlay ist ein Szenariogenerator, keine Ereigniswahrscheinlichkeit |
+| MAP-11 | heuristisch | langfristiger CAPE-Zusammenhang validiert keine jährliche EMA-/Clamp-Policy |
+| MAP-12 | etabliert als Diagnoseverfahren | Backtest ist In-sample-Historienprüfung, keine Zukunftsvalidierung |
+| MAP-13 | experimentell | Kandidatensuche und Train/Test-Split beseitigen Selection Bias nicht |
+| MAP-14 | adaptiert | Periodensterbetafel plus Quantil-/Joint-Konstruktion ist keine Kohortenprognose |
+| MAP-15 | adaptiert | eingegebene Rente und Witwenquote ersetzen keine Rechts- oder Anspruchsprüfung |
+| MAP-16 | heuristisch | Bestandsstatistiken sind keine individuellen Eintritts-/Übergangsraten |
+| MAP-17 | experimentell | Zweckbindung ist keine Versicherung und ihr Nutzen ist nicht extern kalibriert |
+
+### E.8.3 Bedeutung der lokalen Validierung
+
+Die nachfolgenden Dossiers nennen konkrete Module und Tests. Diese Nachweise
+belegen je nach Abdeckung V1 bis V3 aus dem Validierungsregister: Eingabe- und
+Ergebnisverträge, deterministische Rechenregression und Pfadparität. Sie
+belegen **nicht** V5-Kalibrierung oder V6-Entscheidungseignung. Ein getesteter
+Sampler kann statistisch unpassend, eine deterministische Guardrail fachlich
+schlecht kalibriert und eine paritätische Worker-Ausführung auf allen Pfaden
+gleich verzerrt sein.
+
+## E.9 Entnahme-, Konsum- und Asset-Policies
+
+### E.9.1 MAP-01 – real konstanter Floor und historische Erfolgsanteile
+
+| Pflichtfeld | Einordnung |
+| --- | --- |
+| Suite-Mechanismus und Implementierungsanker | Der Nutzer gibt einen jährlichen Floor vor. Simulator und Backtest führen den Bedarf jahresweise fort, verrechnen Rentenzuflüsse und prüfen über `simulator-backtest.js`, `monte-carlo-runner.js` und den Engine-Spendingpfad, ob der Floor aus dem modellierten aktiven Vermögen gedeckt bleibt. |
+| Forschungsanker, Rolle und Übertragbarkeit | FOR-ENT-01 ist der historische Methodenursprung (T2/T4), FOR-ENT-07 ein internationaler Daten-/Bias-Gegencheck (T2/T4), FOR-DE-07 ein deutscher Inflationskontext (T3). |
+| Suite-Umsetzung | Die Erfolgsquote ist der Anteil der Läufe ohne modellierten Floor-Deckungsbruch beziehungsweise Validierungsfehler bis zum jeweiligen Laufende. Der Pfad enthält suiteeigene Steuern, Rente, Liquidität, Gold und optionale Policies. |
+| Abweichung | Es liegt keine Replikation von Bengen oder Anarkulova et al. vor. Assetset, Datenhistorie, Kosten, Steuern, Entnahmezeitpunkt, Laufende und Erfolgsdefinition weichen ab. PD-01 begrenzt zusätzlich die als „real“ bezeichnete Entnahme-KPI, nicht die Existenz des nominal fortgeschriebenen Floor-Vertrags. |
+| Evidenzstatus | **adaptiert**; die Idee einer inflationsbezogenen Mindestentnahme ist etabliert, die Suite-Erfolgsanteile sind jedoch rein modellinterne Wenn-dann-Ergebnisse. |
+| Lokale Validierung | `spending-planner.test.mjs`, `simulator-backtest.test.mjs` und `simulator-monte-carlo.test.mjs` decken Rechen-, Pfad- und Aggregationsverträge ab (V1–V3), nicht eine „sichere“ Anfangsrate. |
+| Restrisiko und offene Prüfung | Jede Rate muss mindestens mit Horizont, Asset-Allokation, Rebalancing, Inflation, Steuer/Kosten, Datenraum und Erfolgsdefinition angegeben werden. Eine deutsche Out-of-sample-Replikation mit eindeutigem Return-Index und Kostenmodell fehlt. |
+
+**Konsequenz für Safe-Withdrawal-Aussagen:** Das Dokument nennt keine
+allgemeingültige sichere Prozentzahl. Ein gleicher Startprozentsatz kann je nach
+30-, 40- oder lebensdauerabhängigem Horizont, Portfolio, Renditereihe,
+Einkommensvolatilität und Erfolgsbegriff eine andere Aussage besitzen. Auch
+eine hohe Suite-Erfolgsquote bedeutet nicht, dass Flex stabil, ein gewünschter
+Nachlass erreicht oder reale Kaufkraft ohne Unterbrechung gehalten wurde.
+
+### E.9.2 MAP-02 – Floor-Flex und flexible Entnahme
+
+| Pflichtfeld | Einordnung |
+| --- | --- |
+| Suite-Mechanismus und Implementierungsanker | `flex-rate-policy.mjs`, `flex-budget-policy.mjs`, `spending-guardrails.mjs` und `core.mjs` trennen priorisierten Floor von kürzbarem Flex und berechnen den Jahresbedarf regelbasiert. |
+| Forschungsanker, Rolle und Übertragbarkeit | FOR-ENT-04 bis FOR-ENT-06 vergleichen variable Entnahmen (T2); FOR-LCF-01 bis FOR-LCF-08 liefern Nutzen-, Konsumglättungs-, Floor/Upside- und Langlebigkeitsrahmen (überwiegend T2/T4). |
+| Suite-Umsetzung | Flex kann nach Markt-, Budget-, Recovery- und optionalen Dynamic-Flex-Regeln sinken oder sich erholen; der Floor bleibt die priorisierte modellierte Bedarfsgröße. |
+| Abweichung | Die Suite optimiert keine explizite Nutzenfunktion, repliziert keinen Liability-Matching- oder Annuitätenbenchmark und garantiert den Floor nicht durch sichere Assets oder Versicherung. „Floor“ bezeichnet Bedarf, nicht einen immunisierten Zahlungsstrom. |
+| Evidenzstatus | **adaptiert**; Trennung von Grundbedarf und Wünschen ist strukturell anschlussfähig, konkrete Kürzungs- und Recovery-Regeln sind suiteeigen. |
+| Lokale Validierung | `spending-planner.test.mjs`, `spending-quantization.test.mjs`, `simulation.test.mjs` und `worker-parity.test.mjs` prüfen Formeln und Pfadgleichheit (V1–V3). |
+| Restrisiko und offene Prüfung | Die binäre Erfolgsquote kann lange oder tiefe Flex-Kürzungen verdecken. Erforderlich sind gemeinsame Auswertungen von Kürzungsjahren, Maximalkürzung, Jahren ohne Flex und Consumption-at-Risk; eine haushaltsspezifische Nutzen- oder Akzeptanzvalidierung fehlt. |
+
+### E.9.3 MAP-03 – Guardrails und Recovery-Logik
+
+| Pflichtfeld | Einordnung |
+| --- | --- |
+| Suite-Mechanismus und Implementierungsanker | `spending-guardrails.mjs`, `flex-rate-policy.mjs`, `MarketAnalyzer.mjs` und die Balance-Diagnose setzen Entnahmequoten-, Inflations-, Drawdown-, Runway- und Recovery-Regeln in einer festen Reihenfolge um. |
+| Forschungsanker, Rolle und Übertragbarkeit | FOR-ENT-02 und FOR-ENT-03 sind Praxisursprünge regelbasierter Guardrails (T2); FOR-ENT-06 liefert einen aktuellen institutionellen Methodenvergleich (T2/T4). |
+| Suite-Umsetzung | Recovery-Caps, vorsichtige Inflationsanpassung, vermögensbezogene Reduktionsfaktoren und definierte Reaktivierungspfade verändern die Flex-Rate; Diagnosefelder machen Trigger und Quelle sichtbar. |
+| Abweichung | Trigger, Schwellen, Marktregime, Floor/Flex-Vertrag, Steuer- und Liquiditätslogik entsprechen weder den Guyton-Klinger-Regeln noch einem veröffentlichten Morningstar-Verfahren. Ähnliche Begriffe begründen keine methodische Identität. |
+| Evidenzstatus | **adaptiert**, mit **heuristisch** kalibrierten Schwellen. |
+| Lokale Validierung | `spending-planner.test.mjs`, `balance-diagnosis-guardrails.test.mjs`, `liquidity-guardrail.test.mjs` und `vpw-dynamic-flex.test.mjs` prüfen Trigger, Diagnosen und Recovery-Pfade (V1–V3). |
+| Restrisiko und offene Prüfung | Ein fehlender externer Reproduktionsbenchmark lässt offen, ob Schwellen robust sind oder historische Besonderheiten ausnutzen. Guardrail-Varianten müssen gegen unveränderte Baselines über getrennte Daten-/Seed-Sets verglichen werden. |
+
+### E.9.4 MAP-04 – `minimumFlexAnnual`
+
+| Pflichtfeld | Einordnung |
+| --- | --- |
+| Suite-Mechanismus und Implementierungsanker | `minimum-flex-policy.mjs` hebt eine zuvor gekürzte Flex-Rate bis zu einem vom Nutzer vorgegebenen Jahresbetrag an, sofern Alarm-, Vermögens- und Runway-Notbremsen nicht blockieren. `InputValidator.mjs` sowie UI-Validatoren lehnen Werte über dem Flex-Bedarf ab, statt sie als neuen Bedarf umzudeuten. |
+| Forschungsanker, Rolle und Übertragbarkeit | FOR-LCF-01 bis FOR-LCF-08 begründen nur strukturell, dass Konsumpräferenzen, Grundbedarf, Wünsche und Langlebigkeitsrisiko gemeinsam betrachtet werden müssen (T2). FOR-PFL-01 liefert Mental-Accounting-Kontext (T2/T3), keine Mindest-Flex-Formel. |
+| Suite-Umsetzung | Der Betrag ist optional und ratenbasiert. Er wirkt nach Guardrails, bleibt auf Flex beschränkt und wird in Notlagen mit explizitem Status und Blockgrund nicht erzwungen. |
+| Abweichung | Es gibt keine Literaturquelle, aus der Betrag, Schwelle oder Notbremsen abgeleitet wurden. Mindest-Flex ist weder existenzieller Floor noch wissenschaftlich ermitteltes Konsumminimum. |
+| Evidenzstatus | **heuristisch**; transparente Nutzerpräferenz mit Sicherheitsblockaden. |
+| Lokale Validierung | `spending-planner.test.mjs`, `core-negative-contracts.test.mjs`, `simulator-input-readers.test.mjs`, `simulator-backtest.test.mjs` und `simulator-sweep.test.mjs` prüfen Validierung, Wirkung und Pfadweitergabe (V1–V3). |
+| Restrisiko und offene Prüfung | Höheres Mindest-Flex kann Endvermögen und spätere Floor-Deckung verschlechtern. Sensitivitäten müssen deshalb Konsumgewinn und zusätzliches Shortfall-Risiko gemeinsam ausweisen; eine pauschale Empfehlung ist unzulässig. |
+
+### E.9.5 MAP-05 – Dynamic Flex / VPW-Annuitätenformel
+
+| Pflichtfeld | Einordnung |
+| --- | --- |
+| Suite-Mechanismus und Implementierungsanker | `core.mjs`, `vpw-return-policy.mjs`, `dynamic-flex-longevity-horizon.js` und `dynamic-flex-runner-horizon.js` berechnen einen horizon- und renditeabhängigen Annuitätenbetrag, begrenzen ihn durch Suite-Sicherheitsstufen und leiten daraus Flex ab. |
+| Forschungsanker, Rolle und Übertragbarkeit | FOR-ENT-05 ist ein wissenschaftlicher Annuitäten-/ARVA-Anker (T1/T2), FOR-ENT-09 dokumentiert US-RMD-Divisoren (T2/T3), FOR-ENT-10 den operativen Community-VPW-Ursprung (T2/C). |
+| Suite-Umsetzung | Die Suite verwendet eine jährlich neu berechnete Annuitätenformel, einen Single-/Joint-Life-Horizont und wahlweise feste beziehungsweise CAPE-beeinflusste erwartete Realrendite; Floor, Flex, Go-Go-Phase und Sicherheits-Fallbacks bleiben suiteeigene Schichten. |
+| Abweichung | Sie implementiert weder die IRS-RMD-Tabelle noch das Bogleheads-Spreadsheet unverändert. CAPE, EMA, Rendite-Clamps, Gold-/Safe-Asset-Beiträge und Recovery-Stufen sind eigene Adaptionen und werden in MAP-11 separat bewertet. |
+| Evidenzstatus | **adaptiert**; der Annuitätenkern ist methodisch anschlussfähig, das gesamte Policy-System nicht extern validiert. |
+| Lokale Validierung | `vpw-dynamic-flex.test.mjs`, `vpw-return-policy.test.mjs`, `dynamic-flex-horizon.test.mjs`, `longevity-engine-runner.test.mjs` und `worker-parity.test.mjs` prüfen Formel-, Horizon-, Recovery- und Pfadverträge (V1–V3). |
+| Restrisiko und offene Prüfung | Eine niedrigere Ruinrate kann durch stärker schwankenden oder sinkenden Konsum erkauft sein. Notwendig ist ein Vergleich gleicher Floor-/Flex-Ziele mit Kürzungstiefe, Kürzungsdauer, Endvermögen und Horizonfehlern statt nur Erfolgsquote. |
+
+### E.9.6 MAP-06 – Runway, Liquiditätsziel und 3-Bucket-Logik
+
+| Pflichtfeld | Einordnung |
+| --- | --- |
+| Suite-Mechanismus und Implementierungsanker | Markt- und Spendingdiagnose bestimmen Mindest-/Ziel-Runway in Monaten. `three-bucket-logic.mjs`, `simulator-bond-refill.js` und Transaktionslogik können im 3-Bucket-Modus Bonds in schlechten Jahren priorisieren und in guten Jahren auffüllen. |
+| Forschungsanker, Rolle und Übertragbarkeit | FOR-ENT-08 liefert Sequenzrisiko-Messkontext (T2), FOR-AST-01 einen direkten Gegenbefund zu pauschalen Bucket-Vorteilen (T4), FOR-AST-05 bis FOR-AST-07 Asset-Allokations- und Diversifikationsrahmen (T2/T4). |
+| Suite-Umsetzung | Runway ist eine Policy-Schwelle, kein separates Vermögen. Der Bond-Bucket ist ein vereinfachter Zieltopf mit Cash-Rate-Proxy; Reihenfolge und Refill sind deterministische Regeln. |
+| Abweichung | Die Suite repliziert weder Estradas Vergleich noch ein optimales Liability-Matching-Portfolio. Duration, Bonität, Kupons, Zinskurve, Produktkosten und Verhaltensnutzen werden nicht ökonomisch bewertet. |
+| Evidenzstatus | **heuristisch**; technisch klar definierte Liquiditäts-/Verkaufsregel ohne nachgewiesenen Rendite- oder Sicherheitsvorteil. |
+| Lokale Validierung | `liquidity-guardrail.test.mjs`, `3bucket-refill.test.mjs`, `3bucket-config.test.mjs`, `simulator-3bucket-ui-e2e.test.mjs` und `worker-parity.test.mjs` prüfen Contracts und deterministische Wirkung (V1–V3). |
+| Restrisiko und offene Prüfung | Cash-/Bond-Puffer können Sequenzstress mindern, aber Opportunitätskosten und Asset-Allokationseffekt überwiegen. Benötigt wird eine Ablationsstudie mit identischer Gesamtallokation, Kosten und Rebalancingregeln. |
+
+### E.9.7 MAP-07 – Goldquote und Gold-Stresswirkung
+
+| Pflichtfeld | Einordnung |
+| --- | --- |
+| Suite-Mechanismus und Implementierungsanker | Portfolio-, Transaktions- und VPW-Module führen Gold als optionalen EUR-Baustein mit Ziel-/Floorquote, eigenem historischen Renditefeld und regelbasierten Käufen/Verkäufen. |
+| Forschungsanker, Rolle und Übertragbarkeit | FOR-AST-02 untersucht Hedge-/Safe-Haven-Eigenschaften (T2/T4), FOR-AST-03 ist ein Gegenbefund zu pauschalem Inflationsschutz (T4), FOR-AST-07 liefert nur den allgemeinen Diversifikationsrahmen (T2). |
+| Suite-Umsetzung | Gold kann in historischen/gesampelten Pfaden diversifizieren und als Verkaufsquelle dienen; Zielquoten und Verkaufsprioritäten sind Nutzereingaben beziehungsweise Suite-Regeln. |
+| Abweichung | Es gibt keine konstante Safe-Haven-Wirkung, keine eigene Währungs-/Produktkostenanalyse und keine externe Kalibrierung der Ziel- oder Floorquote. Physisches Gold, ETCs und andere Vehikel werden ökonomisch zu grob zusammengefasst. |
+| Evidenzstatus | **heuristisch**; Diversifikationsidee etabliert, konkrete Quote und Schutzregel suite-/nutzerspezifisch. |
+| Lokale Validierung | `transaction-gold-liquidity.test.mjs`, `transaction-tax.test.mjs`, `profilverbund-profile-gold-overrides.test.mjs`, `vpw-return-policy.test.mjs` und Portfoliotests prüfen Rechen- und Vertragslogik (V1–V3). |
+| Restrisiko und offene Prüfung | Ergebnis hängt von Zeitraum, Markt, EUR-Umrechnung, Rebalancing, Steuerflag und Krisendefinition ab. Robustheit erfordert Teilperioden-, Ex-Gold- und alternative Quotenvergleiche; ein positiver historischer Pfad ist kein genereller Krisenschutzbeleg. |
+
+## E.10 Stochastik, Regime, CAPE und Validierungswerkzeuge
+
+### E.10.1 MAP-08 – IID-, Block- und Stationary-Bootstrap
+
+| Pflichtfeld | Einordnung |
+| --- | --- |
+| Suite-Mechanismus und Implementierungsanker | `monte-carlo-runner.js` sampelt historische Jahresvektoren IID, in festen Blöcken oder über `stationary-bootstrap-sampler.js` mit geometrisch variierenden Blocklängen. Startjahr-, Recency- und CAPE-Filter greifen nach dem dokumentierten Samplingvertrag an zulässigen Starts. |
+| Forschungsanker, Rolle und Übertragbarkeit | FOR-STO-01 ist der allgemeine Bootstrap-Ursprung (T2), FOR-STO-02 der Blockbootstrap-Anker für abhängige stationäre Beobachtungen (T1/T2), FOR-STO-03 der direkte Stationary-Bootstrap-Anker (T1/T2), FOR-AST-04 eine Datenbreiten-/Survivorship-Prüfpflicht (T4). |
+| Suite-Umsetzung | Vollständige Jahresrecords werden neu angeordnet; der Stationary-Sampler erhält Abhängigkeit innerhalb zufällig langer Blöcke und ist über Seeds und Run-State deterministisch reproduzierbar. |
+| Abweichung | Stationarität, optimale Blocklänge, Filterwirkung und Randbehandlung sind nicht aus den Suite-Daten geschätzt. Das Resampling bleibt auf der vorhandenen Jahreshistorie und erzeugt keine neuen Rendite-/Inflationskombinationen außerhalb beobachteter Records. |
+| Evidenzstatus | **adaptiert**; der Stationary Bootstrap ist etabliert, Datenaufbereitung, Jahresgranularität und Kalibrierung sind suitespezifisch. |
+| Lokale Validierung | `monte-carlo-sampling.test.mjs`, `stationary-bootstrap-sampler.test.mjs`, `stationary-bootstrap-contract.test.mjs`, `monte-carlo-startyear.test.mjs` und `worker-parity.test.mjs` prüfen Determinismus, Verträge und Chunk-Parität (V1–V3). |
+| Restrisiko und offene Prüfung | Abhängigkeiten über längere Horizonte, Strukturbrüche und nicht beobachtete Extremkombinationen können fehlen. Blocklängen-, Filter- und Datensensitivität sowie Vergleiche gegen alternative Modelle sind als V5-Arbeit offen. |
+
+### E.10.2 MAP-09 – diskrete und geglättete Regime-Signale
+
+| Pflichtfeld | Einordnung |
+| --- | --- |
+| Suite-Mechanismus und Implementierungsanker | `MarketAnalyzer.mjs` klassifiziert Marktphasen aus Drawdown-, Jahresend-, CAPE- und weiteren Signalen; `regime-signals.mjs` bildet kontinuierliche Severities. Optional kann daraus ein geglättetes Runway-Ziel entstehen. |
+| Forschungsanker, Rolle und Übertragbarkeit | FOR-STO-04 ist der Anker statistisch geschätzter Markov-Regime (T4), FOR-STO-06 und FOR-STO-07 die Anker bedingter Varianzmodelle (T4), FOR-STO-08 der empirische Prüfungskatalog stilisierter Renditefakten (T4). |
+| Suite-Umsetzung | Regeln und Schwellen sind deterministisch, diagnosefähig und überwiegend auf aktuelle beziehungsweise vergangene Zustandswerte bezogen. Diskrete Sicherheitsgrenzen bleiben autoritativ; geglättete Zielsteuerung ist opt-in. |
+| Abweichung | Es werden keine latenten Zustände, Übergangswahrscheinlichkeiten oder ARCH/GARCH-Parameter geschätzt. Bezeichnungen wie „Regime“ oder „Severity“ sind Policylabels, keine Behauptung eines Hamilton-Modells. |
+| Evidenzstatus | **heuristisch**; fachlich motivierte Zustandsklassifikation mit transparenten Regeln. |
+| Lokale Validierung | `regime-signals.test.mjs`, `spending-planner.test.mjs`, `liquidity-guardrail.test.mjs` und `worker-parity.test.mjs` prüfen Monotonie, Grenzen, Fallbacks und Pfadgleichheit (V1–V3). |
+| Restrisiko und offene Prüfung | Schwellen können falsche Sicherheit, häufige Umschaltungen oder verzögerte Reaktionen erzeugen. Nötig sind Konfusions-/Stabilitätsanalysen gegen vorab definierte Krisenlabels und wirtschaftlich relevante Zielgrößen, ohne nachträgliche Schwellenanpassung. |
+
+### E.10.3 MAP-10 – Tail-Risk-Overlay und Crash-Plan
+
+| Pflichtfeld | Einordnung |
+| --- | --- |
+| Suite-Mechanismus und Implementierungsanker | `tail-risk-contract.js` und `tail-risk-overlay.js` erzeugen bei aktivierter Option deterministische, seedabhängige Schockereignisse mit konfigurierter Häufigkeit, Höhe, Dauer und Erholung. Eine Skip-Regel verhindert ausgewählte Überlagerungen mit bereits als Krise erkannten historischen Records. |
+| Forschungsanker, Rolle und Übertragbarkeit | FOR-STO-05 und FOR-STO-08 belegen schwere Tails/stilisierte Fakten (T2/T4), FOR-STO-06 und FOR-STO-07 liefern alternative Volatilitätsmodelle (T4), FOR-STO-09 und FOR-STO-10 Governance- und Challenge-Prinzipien für Stressmodelle (T2). |
+| Suite-Umsetzung | Das Overlay verändert Monte-Carlo-Jahresdaten nach dem historischen Sampling und führt eigene Ereignis-, Aktivjahres- und Erholungs-KPIs. Es ist standardmäßig deaktiviert. |
+| Abweichung | Schockrate, -höhe, -dauer, Erholung und Anti-Doppelpessimismus sind nicht gemeinsam statistisch kalibriert. Es handelt sich weder um GARCH/Student-t noch um eine geschätzte Crashwahrscheinlichkeit. |
+| Evidenzstatus | **experimentell**; expliziter Szenariogenerator. |
+| Lokale Validierung | `tail-risk-contract.test.mjs`, `tail-risk-overlay.test.mjs` und Tail-Risk-Fälle in `worker-parity.test.mjs` prüfen Inputgrenzen, deterministische Planung, Overlay-Wirkung und Aggregationsparität (V1–V3). |
+| Restrisiko und offene Prüfung | Gleichzeitige Inflation, Zinsen, Gold, Pflege oder Liquidität können inkonsistent zum Aktiencrash bleiben; die Skip-Regel kann Doppelstress sowohl über- als auch unterkorrigieren. Ergebnisse dürfen nur als „unter diesem Stressplan“ und nie als Eintrittswahrscheinlichkeit bezeichnet werden. |
+
+### E.10.4 MAP-11 – CAPE-Stufen und kontinuierliche CAPE-Policy
+
+| Pflichtfeld | Einordnung |
+| --- | --- |
+| Suite-Mechanismus und Implementierungsanker | `MarketAnalyzer.mjs` nutzt diskrete CAPE-Kontexte; `vpw-return-policy.mjs` kann erwartete Realrenditen kontinuierlich aus CAPE ableiten, glätten und begrenzen. `cape-utils.js` und der Balance-Jahrespfad verwalten Auswahl, Fallback und Provenienz. |
+| Forschungsanker, Rolle und Übertragbarkeit | FOR-VAL-01 und FOR-VAL-02 sind Primäranker langfristiger Bewertungsrelationen (T2), FOR-VAL-03 ein zentraler Out-of-sample-Gegenbefund für Renditeprädiktoren (T4), FOR-VAL-10 der Provenienzanker der verwendeten US-CAPE-Reihe (T3/T4). |
+| Suite-Umsetzung | CAPE beeinflusst wahlweise Regime-/VPW-Entscheidungen. Die kontinuierliche Policy ist opt-in; EMA, Renditefunktion, Assetbeiträge und Clamps stabilisieren die jährliche Rechenwirkung und werden diagnostiziert. |
+| Abweichung | Langfristige Bewertungsprognosen werden in eine jährliche Policygröße übersetzt. US-Daten, Rekonstruktions-/Splice-Grenzen, Europa-/EUR-Portfolio und Fallbackwerte erzeugen Horizont- und Datenraummismatch; EMA und Clamps sind keine Literaturparameter. |
+| Evidenzstatus | **heuristisch**; wissenschaftlich anschlussfähiger Bewertungsindikator, aber nicht extern validierte Suite-Renditepolicy. |
+| Lokale Validierung | `vpw-return-policy.test.mjs`, `vpw-dynamic-flex.test.mjs`, `balance-annual-cape.test.mjs` und kontinuierliche CAPE-Fälle in `worker-parity.test.mjs` prüfen Grenzen, Quellenstatus, Fallbacks und Pfadparität (V1–V3). |
+| Restrisiko und offene Prüfung | Forecast-Fehler kann systematisch Konsum verschieben; wiederverwendete historische CAPE-/Renditedaten erlauben Data Snooping. Erforderlich sind vorab festgelegte internationale und zeitlich getrennte Out-of-sample-Vergleiche gegen eine einfache konstante Realrenditepolicy. |
+
+### E.10.5 MAP-12 – historischer Backtest
+
+| Pflichtfeld | Einordnung |
+| --- | --- |
+| Suite-Mechanismus und Implementierungsanker | `simulator-backtest.js` führt die gewählte Policy chronologisch über historische Startjahre und Jahresrecords aus und aggregiert Floor-Erfolg, Vermögen, Drawdown, Runway und weitere Laufgrößen. |
+| Forschungsanker, Rolle und Übertragbarkeit | FOR-VAL-04 bis FOR-VAL-06 und FOR-VAL-09 begründen Data-Snooping-/Mehrfachtest-Prüfpflichten (T4), FOR-VAL-07 und FOR-VAL-08 Selection-/Backtest-Overfitting (T4), FOR-AST-04 Survivorship-/Easy-Data-Bias (T4). |
+| Suite-Umsetzung | Ein einzelner Pfad verwendet die zeitliche Reihenfolge der Records; mehrere Startfenster zeigen Sequenzunterschiede. Die Berechnung ist ein Diagnose- und Regressionswerkzeug, kein Schätzer einer universellen Zukunftswahrscheinlichkeit. |
+| Abweichung | Policy, Parameter, Datenquelle und Auswertungsgrößen wurden unter Kenntnis derselben Historie entwickelt. Eine chronologische Ausführung verhindert nicht den Forscher-Look-ahead bei Regelwahl. Die enge Datenbasis deckt Länderausfälle, Produktkosten und nicht überlebende Märkte nur unvollständig ab. |
+| Evidenzstatus | **etabliert als Diagnoseverfahren**; nicht als unabhängige Wirksamkeitsvalidierung. |
+| Lokale Validierung | `simulator-backtest.test.mjs`, `simulation.test.mjs` und relevante Engine-Regressionstests prüfen Fenster-, Renten-, Mindest-Flex- und Ergebnisverträge (V1–V3). |
+| Restrisiko und offene Prüfung | Wiederholtes Ausprobieren erzeugt ein nicht protokolliertes Trial-Universum. Für stärkere Evidenz wären eingefrorene Regeln, vollständiges Trial-Inventar, unangetastete Holdout-Perioden und breitere Länder-/Indexdaten erforderlich. |
+
+### E.10.6 MAP-13 – Sweep und Auto-Optimize
+
+| Pflichtfeld | Einordnung |
+| --- | --- |
+| Suite-Mechanismus und Implementierungsanker | `simulator-sweep.js`/`sweep-runner.js` prüfen freigegebene Parameterkombinationen. `auto_optimize.js` und die `auto-optimize-*`-Module nutzen Latin Hypercube Sampling, Quick-Filter, Vollbewertung, lokale Nachbarschaftssuche und separate Seed-Sets für ausgewählte Kandidaten. |
+| Forschungsanker, Rolle und Übertragbarkeit | FOR-VAL-04 bis FOR-VAL-06 und FOR-VAL-09 sind Mehrfachtest-/Data-Snooping-Anker (T4); FOR-VAL-07 zeigt Selection Bias trotz Validierungskriterium (T4); FOR-VAL-08 ist ein Backtest-Overfitting-Anker (T2/T4). |
+| Suite-Umsetzung | Kandidaten werden innerhalb eines vom Nutzer gewählten Suchraums anhand modellinterner Objectives und Constraints geordnet. Der Champion wird angezeigt und nur auf bewusste Nutzeraktion in Formfelder übernommen. |
+| Abweichung | Disjunkte Seeds sind keine unabhängige Markt-/Modell-Stichprobe, weil Train und Test aus derselben Datenbasis und demselben Generator stammen. Top-K-Auswahl, lokale Verfeinerung und wiederholte Läufe vergrößern das effektive Trial-Universum; es gibt keine verschachtelte Validierung oder Multiple-Testing-Korrektur. |
+| Evidenzstatus | **experimentell**; Such- und Sensitivitätswerkzeug, keine automatische Empfehlung oder globale Optimierung. |
+| Lokale Validierung | `simulator-sweep.test.mjs`, `auto-optimizer.test.mjs`, `auto-optimize-worker-contract.test.mjs`, `simulator-heatmap.test.mjs` und `worker-parity.test.mjs` prüfen Sampling, Constraints, Cache, Champion-Shape und Ausführungsgleichheit (V1–V3). |
+| Restrisiko und offene Prüfung | Objective- und Zielfunktions-Overfit, Champion-Instabilität und vom Nutzer wiederholt betrachtete Test-Sets bleiben. Erforderlich sind Trial-Logging, verschachtelte oder zeitlich/länderweise Holdouts, Stabilitätsintervalle und ein unveränderter Baselinevergleich. |
+
+## E.11 Langlebigkeit, Rente und Pflege
+
+### E.11.1 MAP-14 – Single-/Joint-Life-Horizont
+
+| Pflichtfeld | Einordnung |
+| --- | --- |
+| Suite-Mechanismus und Implementierungsanker | `dynamic-flex-longevity-horizon.js`, `dynamic-flex-longevity-contract.js` und `dynamic-flex-runner-horizon.js` leiten aus geschlechts-/altersspezifischen Sterbewahrscheinlichkeiten Mean- oder Quantilhorizonte für eine beziehungsweise zwei Personen ab und ergänzen optionale relative oder feste Puffer. |
+| Forschungsanker, Rolle und Übertragbarkeit | FOR-LCF-01, FOR-LCF-03 und FOR-LCF-05 liefern Theorie und empirischen Kontext der unsicheren Lebensdauer beziehungsweise Risikopooling (T2/T4); FOR-DE-01 ist der Periodensterbetafel-Anker (T3); FOR-DE-02 begründet die Kohorten-/Perioden-Prüfpflicht (T4). |
+| Suite-Umsetzung | Der Joint-Life-Horizont berücksichtigt die längere relevante Restlebensdauer im Paar. Quantil, Puffer und Joint-to-Single-Übergang sollen vorsichtige VPW-Horizonte erzeugen; die Engine erhält den bereits aufgelösten effektiven Horizont. |
+| Abweichung | Periodensterblichkeit wird nicht zu einer Kohortenprognose mit künftiger Mortalitätsverbesserung. Individuelle Gesundheit, Bildung, Einkommen, Selektion und Partnerabhängigkeit fehlen; Puffer sind Nutzer-/Policyparameter und kein amtliches Quantilversprechen. |
+| Evidenzstatus | **adaptiert**; etablierte aktuarielle Grundgrößen mit suiteeigener Joint-/Quantil-/Pufferkonstruktion. |
+| Lokale Validierung | `dynamic-flex-horizon.test.mjs`, `longevity-horizon.test.mjs`, `longevity-contract.test.mjs`, `longevity-engine-runner.test.mjs`, `longevity-ui-persistence.test.mjs` und `worker-parity.test.mjs` prüfen Monotonie, Verträge und Pfadweitergabe (V1–V3). |
+| Restrisiko und offene Prüfung | Ein zu kurzer Horizont erhöht aktuelle Entnahme, ein zu langer senkt Konsum; beide Fehler sind asymmetrisch. Offen sind Kohortentafel-/Verbesserungsszenarien, Abhängigkeit der Partnerleben und Kalibrierung der gewählten Quantile gegen Nutzerziele. |
+
+### E.11.2 MAP-15 – gesetzliche Rente und Witwenanteil
+
+| Pflichtfeld | Einordnung |
+| --- | --- |
+| Suite-Mechanismus und Implementierungsanker | `simulator-input-pension.js`, `simulator-household-pension.js` und `simulator-portfolio-pension.js` verarbeiten personbezogene Rentenbeträge, Startzeitpunkte, Indexierung und einen konfigurierten Witwenanteil als bedarfsmindernde Jahreszuflüsse. |
+| Forschungsanker, Rolle und Übertragbarkeit | FOR-DE-05 liefert amtliche Populations- und Rentenzeitreihen (T3), FOR-DE-06 Rechts-, Finanzierungs- und Vorausberechnungskontext (T3/T4). Beide Quellen ersetzen keine individuelle Renteninformation. |
+| Suite-Umsetzung | Beträge und Rechtsannahmen kommen aus Nutzereingaben; Tod, Partnerstatus, Startoffset und konfigurierter Witwenmodus steuern den Jahreszufluss. Nur ein Teilpfad besitzt einen pauschalen Steuerabschlag. |
+| Abweichung | Es gibt keine automatische Berechnung von Entgeltpunkten, Abschlägen, Besteuerungsanteil, Kranken-/Pflegeversicherungsbeiträgen, Freibeträgen oder aktueller Hinterbliebenenprüfung. Der Prozentwert ist ein Szenarioparameter, kein Rechtsanspruch. |
+| Evidenzstatus | **adaptiert**; amtlich anschlussfähige Cashflow-Kategorie mit stark vereinfachtem Haushalts-/Rechtsvertrag. |
+| Lokale Validierung | `simulator-input-readers.test.mjs`, `simulator-headless.test.mjs`, `simulator-monte-carlo.test.mjs`, `simulator-backtest.test.mjs` und `simulation.test.mjs` prüfen Eingabe-, Todes-, Indexierungs- und Jahrespipelineverträge (V1–V3). |
+| Restrisiko und offene Prüfung | Rechtsstand und individuelle Bescheide können erheblich abweichen. Jede Entscheidungssimulation muss Beträge aus aktuellen Unterlagen übernehmen, Brutto/Netto kenntlich machen und Hinterbliebenenregeln extern prüfen; Populationsmittel sind kein zulässiger Ersatz. |
+
+### E.11.3 MAP-16 – Pflegeeintritt, Progression und Kosten
+
+| Pflichtfeld | Einordnung |
+| --- | --- |
+| Suite-Mechanismus und Implementierungsanker | `simulator-data.js` und Pflegehilfen in `simulator-engine-helpers.js` ziehen altersabhängige PG1/PG2-Eintritte, jährliche Progression, akute/chronische Dauer, Kosten-/Flexwirkung und optionale Mortalitätsmultiplikatoren; Paarzustände laufen getrennt. |
+| Forschungsanker, Rolle und Übertragbarkeit | FOR-PFL-02 und FOR-PFL-03 zeigen Pflegerisiko und Versicherungsinteraktion im US-Kontext (T2/T4); FOR-DE-03 liefert deutschen Bestands-/Versorgungskontext (T3/T4); FOR-DE-04 amtliche Leistungs-/Pflegegradkontexte (T3/T4). |
+| Suite-Umsetzung | Hinterlegte Altersbucket-Werte werden als jährliche Neueintritte verwendet; Progression und gradbezogene Kosten/Flex/Mortalität sind Modell- oder Nutzerparameter. Das Dokument weist die interne Prävalenz-zu-Inzidenz-Umrechnung und die Fünfjahresglättung aus. |
+| Abweichung | Querschnittsbestände sind keine individuellen Eintrittsraten. Der im Codekommentar genannte BARMER-Bezug, angenommene vierjährige Pflegedauer, Progressionsraten, Kostenpfade und Mortalitätsfaktoren bilden noch keine reproduzierte externe Kalibrierung. PD-02 verzerrt zudem aktuell die Pflegekosten-Drift im UI-Pfad. |
+| Evidenzstatus | **heuristisch**; relevantes Risiko, aber nicht ausreichend kalibrierter Übergangs-/Kostenprozess. |
+| Lokale Validierung | `care-meta.test.mjs`, `simulator-monte-carlo.test.mjs`, Pflegefälle in `worker-parity.test.mjs` und UI-/Inputtests prüfen Zustands-, Dual-Care-, Kosten- und Aggregationslogik (V1–V3). Sie validieren keine Eintrittsraten. |
+| Restrisiko und offene Prüfung | Eintritt, Dauer, Gradfolge, Versorgungstyp, Eigenanteil, Leistungen, regionale Kosten und Mortalität sind miteinander abhängig. Benötigt werden getrennte Quellen und Kalibrierungen für Bestände, Übergänge, Dauer, Kosten, Leistungen und Tod sowie eine Korrektur/Neubewertung nach PD-02. |
+
+### E.11.4 MAP-17 – Pflegebucket / algorithmische Zweckbindung
+
+| Pflichtfeld | Einordnung |
+| --- | --- |
+| Suite-Mechanismus und Implementierungsanker | `simulator-health-bucket.js`, Portfolio-Carve-out und Balance-Diagnose separieren einen cash-nahen Betrag aus dem aktiven Vermögen. Je nach Pflegegrad-/Paartrigger deckt er Pflege-Zusatzfloor oder Floor-Shortfall vor Forced Sales; es gibt kein automatisches Refill. |
+| Forschungsanker, Rolle und Übertragbarkeit | FOR-PFL-01 erklärt Mental Accounting (T2/T3); FOR-PFL-02 und FOR-PFL-03 liefern Selbstversicherungs-/Versicherungskontext (T2/T4); FOR-AST-01 ist eine Bucket-Gegenprüfung (T4); FOR-DE-03 und FOR-DE-04 liefern deutschen Pflegekontext (T3/T4). |
+| Suite-Umsetzung | Die Zweckbindung schafft einen Engine-Air-Gap: Der Betrag erhöht in normalen Jahren weder Runway noch VPW-Basis und wird erst bei konfiguriertem Trigger nutzbar. KPIs zeigen Nutzung, Erschöpfung, Deckung und Restbetrag. |
+| Abweichung | Mental Accounting kann Verhalten erklären, validiert aber weder Höhe noch Trigger. Der Bucket ist kein Versicherungsvertrag, kein vollständiges Liability Matching und berücksichtigt beim Verbrauch noch keine eigenen Steueraggregate; öffentliche Leistungen und Opportunitätskosten werden nicht optimiert. |
+| Evidenzstatus | **experimentell**; transparente optionale Selbstversicherungs-Policy. |
+| Lokale Validierung | `health-bucket.test.mjs`, `balance-health-bucket.test.mjs`, `simulator-monte-carlo.test.mjs`, `3bucket-config.test.mjs` und Paritätsfälle prüfen Carve-out, Trigger, Deckung, Zins und KPIs (V1–V3). |
+| Restrisiko und offene Prüfung | Der reservierte Betrag kann zu klein sein oder normalen Konsum unnötig beschneiden. Ein belastbarer Vergleich benötigt gleiche Gesamtvermögen, explizite öffentliche/private Leistungsannahmen, Cash-Opportunitätskosten, Steuerwirkung und alternative Trigger-/Refill-Regeln. |
+
+## E.12 Ergebnisinterpretation jenseits der Erfolgsquote
+
+Die Erfolgsquote beantwortet nur, ob der definierte Floor-Deckungsbruch im
+jeweiligen Lauf ausblieb. Eine Strategie darf deshalb nicht anhand einer
+einzelnen Prozentzahl bewertet werden. Für Suite-Vergleiche gilt mindestens
+folgendes Ergebnisbündel:
+
+| Dimension | Heute verfügbare Suite-Größe | Zulässige Aussage | Noch offene Messlücke |
+| --- | --- | --- | --- |
+| **Floor-Verletzung** | `failCount`/Erfolgsquote und `isRuin` | Anteil der Pfade ohne den implementierten binären Deckungsbruch | Höhe, Dauer und kumulierte reale Floor-Lücke werden nicht als vollständige Verteilung ausgewiesen |
+| **Konsumkürzung** | Median Kürzungsjahre, maximale Flex-Kürzung, Anteil Jahre ohne Flex, Consumption-at-Risk | Häufigkeit und Tiefe modellierter Flexeinschränkungen | PD-01 begrenzt reale Entnahmewerte; keine haushaltsspezifische Nutzen-/Akzeptanzschwelle |
+| **Stressdauer** | Stress-Kürzungsjahre und `recoveryYears` für konfigurierte Stressfenster | modellierte Belastungs- und Erholungsdauer unter genau diesem Preset | keine allgemeine Regime-Verweildauer oder vollständige Erholungsverteilung für alle Pfade |
+| **Nachlass/Restvermögen** | P10/P50/P90 des aktiven Endvermögens und Median erfolgreicher Läufe | verbleibendes Aktien-, Gold- und freies Liquiditätsvermögen im Modell | kein Nachlassziel, keine externen Assets, kein vollständiger Pflegebucket-/Immobilien-/Versicherungswert |
+| **Steuerlast** | Median kumulierter Modellsteuern und Verlusttopf-Effekt | Steuerwirkung des implementierten Settlement-Vertrags | keine vollständige Verteilung, Einkommensteuer-/Sozialabgaben-/Rechtslogik und keine vollständigen Produkt-/Transaktionskosten |
+| **Liquiditätsengpass** | Jahres-Runway, Mindest-/Zielwerte, Logs und einzelne Optimizer-/Backtest-Mindestgrößen | operative Cash-Deckung innerhalb des modellierten Jahrespfads | keine einheitliche Monte-Carlo-Verteilung von Tiefe und Dauer aller Runway-Unterschreitungen |
+| **Pflegewirkung** | Eintritt, Pflegejahre, Kosten, bedingte Shortfall-Raten und Pflegebucket-KPIs | Unterschied ausgewählter Modellpfade mit/ohne Pflegeereignis | keine kausale Gegenfaktualität bei gemeinsamem Pfad und keine extern kalibrierte Pflegewahrscheinlichkeit |
+
+Ein Vergleich zweier Policies muss dieselben Daten, Seeds, Horizonte,
+Haushaltsinputs, Kosten- und Steuerannahmen verwenden und sowohl Verbesserung
+als auch Verschlechterung in allen relevanten Dimensionen zeigen. Ein höherer
+Floor-Erfolgsanteil bei deutlich mehr Jahren ohne Flex ist ein Trade-off, kein
+eindeutiger Sieg. Ein höheres Endvermögen kann umgekehrt durch zu geringe
+Entnahme entstehen und ist ohne Konsumziel ebenfalls kein Qualitätsbeweis.
+
+## E.13 Forschungs- und Modellrisikoregister
+
+Dieses Register vertieft MR-01 bis MR-12 um die quellenbasierten Risiken aus
+Slice 07. `hoch` bedeutet, dass ohne zusätzliche V5-Prüfung keine
+Wirksamkeits- oder Parametereignung behauptet werden darf.
+
+| ID | Priorität | Risiko | Betroffene Mechanismen | Mögliche Fehlinterpretation | Erforderliche Behandlung |
+| --- | --- | --- | --- | --- | --- |
+| FR-01 | hoch | Safe-Withdrawal-Kontext fehlt oder wird verkürzt | MAP-01 bis MAP-05 | modellinterne Erfolgsquote wird zur universellen sicheren Rate | Rate immer mit Horizont, Assetset, Daten, Kosten/Steuer und Erfolgsbegriff berichten |
+| FR-02 | hoch | enge/re-konstruierte Historie und ungeklärte Indexvariante | MAP-01, MAP-07 bis MAP-13 | gute Resultate gelten fälschlich als marktübergreifend | MR-01/MR-02 klären; geschätzte Jahre, Teilperioden und internationale Daten getrennt testen |
+| FR-03 | hoch | Kosten-, Steuer- und Rechtsmodell unvollständig | MAP-01 bis MAP-07, MAP-15, MAP-17 | Entnahmefähigkeit und Restvermögen erscheinen zu hoch | Kosten-/Steuersensitivität und externe Rechtsprüfung; MR-03/MR-05 sichtbar halten |
+| FR-04 | mittel | Bootstrap-Stationarität und Blockwahl unkalibriert | MAP-08 | Samplername wird mit statistischer Passung verwechselt | Block-/Filter-Sensitivität, Abhängigkeitsdiagnostik und alternative Modelle vergleichen |
+| FR-05 | mittel | Regimelabels und Schwellen sind nicht geschätzt | MAP-03, MAP-06, MAP-09 | „Regime“ klingt wie validiertes Markov-Modell | Labels als Policyzustände führen; Schwellenstabilität vorab definiert testen |
+| FR-06 | hoch | Tail-Overlay nicht gemeinsam kalibriert | MAP-10 | Eventrate wird als Crashwahrscheinlichkeit gelesen | nur Szenarioaussage; gemeinsame Asset-/Makro-Schocks und Doppelzählung challengen |
+| FR-07 | hoch | CAPE-Horizont-, Datenraum- und Forecast-Mismatch | MAP-05, MAP-11 | geglättete CAPE-Policy gilt als prognostisch validiert | internationale/zeitliche Holdouts und konstante Baseline verwenden |
+| FR-08 | hoch | unbekanntes Trial-Universum und Selection Bias | MAP-12, MAP-13 | bester Champion/Backtest gilt als robust oder optimal | alle Trials protokollieren, nested/locked Holdouts, Stabilitätsintervalle und Baseline |
+| FR-09 | hoch | Perioden-/Kohorten- und Joint-Life-Modellfehler | MAP-05, MAP-14 | VPW-Horizont gilt als individuelle Lebensdauerprognose | Kohorten-/Verbesserungsszenarien, Quantilsensitivität und Partnerabhängigkeit |
+| FR-10 | hoch | Pflegeübergänge, Kosten und Drift unzureichend kalibriert | MAP-16, MAP-17 | Pflege-KPIs wirken wie individuelle Prognosen | Quellenketten je Parameter, PD-02 beheben, externe Kalibrierung und Sensitivität |
+| FR-11 | mittel | Bucket-/Goldwirkung mit Allokationseffekt vermischt | MAP-06, MAP-07, MAP-17 | Zweckkonto oder Verkaufsregel erhält pauschalen Renditevorteil | Ablation bei gleicher Gesamtallokation, Kosten, Rebalancing und Liquidität |
+| FR-12 | hoch | Erfolgsquote dominiert mehrdimensionale Zielkonflikte | alle | tiefe Konsumkürzung, Liquiditätsstress oder Nachlasslücke bleibt unsichtbar | Ergebnisbündel aus E.12 verpflichtend; Shortfalltiefe/-dauer zusätzlich entwickeln |
+
+## E.14 Offene Forschungsfragen und Ergebnisstand
+
+### E.14.1 Priorisierte Forschungsfragen
+
+| ID | Priorität | Frage | Mindestnachweis für eine belastbarere Aussage |
+| --- | --- | --- | --- |
+| FQ-01 | 1 | Wie verändern eindeutig definierte Return-Indizes, Kosten und internationale Daten die Entnahmeergebnisse? | reproduzierbares Datenmanifest, Kostenvertrag und vorab definierte Länder-/Teilperiodenläufe |
+| FQ-02 | 1 | Welche Guardrail-/VPW-/CAPE-Verbesserungen bleiben auf unangetasteten Daten und Seeds bestehen? | eingefrorene Baseline, vollständiges Trial-Log und zeitlich/länderweise Holdouts |
+| FQ-03 | 1 | Wie oft, wie tief und wie lange werden Floor, Flex und Runway verletzt? | Verteilungen für Shortfallhöhe/-dauer, Kürzung und Liquiditätslücke zusätzlich zur Erfolgsquote |
+| FQ-04 | 1 | Welche deutschen Quellen tragen Pflegeeintritt, Übergang, Dauer, Kosten, Leistungen und Mortalität jeweils? | getrennte, versionierte Parameterherkunft und Re-Kalibrierung nach Behebung von PD-02 |
+| FQ-05 | 2 | Welche Bootstrap-Blocklänge und Filter sind für die verfügbaren Jahresdaten vertretbar? | Abhängigkeitsdiagnostik, Sensitivitätsband und Vergleich IID/Block/Stationary |
+| FQ-06 | 2 | Wie lässt sich Tail-Stress ohne inkonsistente oder doppelte Schocks formulieren? | transparent kalibrierte gemeinsame Szenarien, Challenge-Protokoll und Anti-Doppelpessimismus-Test |
+| FQ-07 | 2 | Verbessert die CAPE-Policy Ergebnisse gegenüber einer konstanten Renditeannahme außerhalb der Entwicklungsdaten? | internationale/zeitliche Out-of-sample-Studie mit identischen Haushaltszielen |
+| FQ-08 | 2 | Welchen eigenständigen Effekt haben Gold-, Runway-, Bond- und Pflegebucket-Regeln? | Ablationsdesign mit identischer Gesamtallokation und expliziten Opportunitätskosten |
+| FQ-09 | 2 | Wie empfindlich ist Dynamic Flex gegenüber Kohortenmortalität, Joint-Life-Annahme und Quantil? | Perioden-/Kohorten-/Verbesserungsszenarien und asymmetrische Horizonfehler |
+| FQ-10 | 3 | Welche Konsum- und Nachlass-Trade-offs akzeptieren die tatsächlichen Nutzer? | dokumentierte Präferenzen oder Nutzwertgewichte; keine Ableitung allein aus Portfolio-KPIs |
+
+### E.14.2 Mindeststandard für spätere Wirksamkeitsbehauptungen
+
+Vor einer Formulierung wie „verbessert Robustheit“, „senkt Risiko“ oder
+„optimiert Entnahmen“ müssen mindestens Baseline, Datenmanifest, Kosten- und
+Steuervertrag, vollständiges Trial-Universum, Holdout-Regel, Seeds,
+Ergebnisbündel aus E.12 und negative/instabile Resultate dokumentiert sein.
+Ohne diesen Nachweis sind zulässige Formulierungen auf „implementiert“,
+„technisch getestet“, „im gewählten Szenario beobachtet“ oder „experimentell“
+begrenzt.
+
+### E.14.3 Bereinigung konkreter Altbehauptungen
+
+Die in E.6 genannten Kitces-/Morningstar-Zahlen werden nicht als Suite-Ergebnis
+wiedereingeführt. Es existiert in diesem Dokument kein reproduzierbarer
+Suite-Lauf, der konkrete Literaturwerte zu Einkommensrückgang, sicherer
+Entnahmerate oder Risikoreduktion als eigenes Ergebnis tragen könnte.
+Quellenzahlen dürfen künftig nur mit ihrem Originalurheber sowie vollständigem
+Horizont-, Portfolio-, Daten-, Erfolgs- und Modellkontext erscheinen.
+
+### E.14.4 Redaktioneller Ergebnisstand
+
+Der Forschungsblock umfasst den Mechanismusabgleich MAP-01 bis MAP-17, die
+mehrdimensionale Ergebnisinterpretation, das Forschungs-/Modellrisikoregister
+FR-01 bis FR-12 und die priorisierten Forschungsfragen FQ-01 bis FQ-10. Seine
+Aussagen gelten für den ausgewiesenen Code-, Daten- und Quellenstand; offene
+V4-/V5-Prüfungen bleiben ausdrücklich bestehen.
 
 ---
 
 # Appendix: Modul-Inventar
 
-*Hinweis: Dieser Appendix wird in den Folgepaketen gegen die spezialisierten Modul-READMEs aktualisiert und neu geclustert. Exakte aktuelle Bestandszahlen stehen in der Komponenten- und B.1-Übersicht.*
+*Hinweis: Dieser Appendix ist eine konzeptionelle Modulkarte und keine
+vollständige Datei- oder LOC-Baseline. Seine Auswahl überschneidet sich mit den
+spezialisierten Modul-READMEs; für aktuelle Dateizahlen und veränderliche
+Detailinventare gelten ausschließlich die Komponenten- und B.1-Übersicht samt
+Ermittlungsweg sowie die jeweils zuständige Spezialreferenz.*
 
 ## Engine-Module (Auswahl)
 
@@ -2965,38 +4872,38 @@ Der Pflegebucket verbindet mehrere Forschungs- und Praxislinien, ohne selbst ein
 
 ## Worker-Module (3)
 
-| Modul | LOC | Funktion |
-|-------|-----|----------|
-| `worker-pool.js` | ~400 | Worker-Lifecycle, Chunking |
-| `mc-worker.js` | ~150 | Monte-Carlo Worker-Thread |
-| `auto-optimize-worker.js` | ~80 | Optimizer-Worker |
+| Modul | Funktion |
+|-------|----------|
+| `worker-pool.js` | Worker-Lifecycle, Chunking |
+| `mc-worker.js` | Monte-Carlo Worker-Thread |
+| `auto-optimize-worker.js` | Optimizer-Worker |
 
 ## Balance-App Module (Auswahl)
 
-| Modul | LOC | Funktion |
-|-------|-----|----------|
-| `balance-main.js` | ~500 | Orchestrierung, Update-Zyklus |
-| `balance-reader.js` | ~300 | DOM-Input-Lesung |
-| `balance-health-bucket.js` | ~120 | Pflegebucket-Diagnose, freie vs. gesperrte Liquidität, diagnostic-only Policy |
-| `balance-storage.js` | ~400 | PersistenceFacade-Anbindung, Snapshot-Archiv, Legacy-Migration |
-| `balance-expenses.js` | **646** | Ausgaben-Check mit CSV-Import, Budget-Tracking |
-| `balance-guardrail-reset.js` | ~70 | Auto-Reset bei kritischen Änderungen |
-| `balance-annual-*.js` (4) | ~400 | Jahresabschluss, Inflation, Marktdaten |
-| `balance-diagnosis-*.js` (7) | ~840 | Chips, Entscheidungsbaum, Guardrails, VPW-Keyparams **(erweitert!)** |
+| Modul | Funktion |
+|-------|----------|
+| `balance-main.js` | Orchestrierung, Update-Zyklus |
+| `balance-reader.js` | DOM-Input-Lesung |
+| `balance-health-bucket.js` | Pflegebucket-Diagnose, freie vs. gesperrte Liquidität, diagnostic-only Policy |
+| `balance-storage.js` | PersistenceFacade-Anbindung, Snapshot-Archiv, Legacy-Migration |
+| `balance-expenses.js` | Ausgaben-Check mit CSV-Import, Budget-Tracking |
+| `balance-guardrail-reset.js` | Auto-Reset bei kritischen Änderungen |
+| `balance-annual-*.js` | Jahresabschluss, Inflation, Marktdaten |
+| `balance-diagnosis-*.js` | Chips, Entscheidungsbaum, Guardrails, VPW-Keyparams |
 
 ## Profil- und Tranchen-Module (Auswahl)
 
-| Modul | LOC | Funktion |
-|-------|-----|----------|
-| `profile-storage.js` | 340 | CRUD, Export/Import, Registry-Management |
-| `profile-manager.js` | 192 | UI-Facade für Profilverwaltung |
-| `profilverbund-balance.js` | 550 | Multi-Profil-Aggregation, Entnahme-Verteilung |
-| `depot-tranchen-status.js` | 432 | Aggregation, UI-Sync, Status-Badge |
-| `types/tranche-contract.js` | variabel | Kanonisches Schema, Klassifikation, Migration und Validierung |
-| `tranche-reconciliation.js` | variabel | Vorschau und bestaetigte idempotente Realbestandsfortschreibung |
-| `balance-main-profile-sync.js` | ~150 | Cross-App-Synchronisation |
+| Modul | Funktion |
+|-------|----------|
+| `profile-storage.js` | CRUD, Export/Import, Registry-Management |
+| `profile-manager.js` | UI-Facade für Profilverwaltung |
+| `profilverbund-balance.js` | Multi-Profil-Aggregation, Entnahme-Verteilung |
+| `depot-tranchen-status.js` | Aggregation, UI-Sync, Status-Badge |
+| `types/tranche-contract.js` | Kanonisches Schema, Klassifikation, Migration und Validierung |
+| `tranche-reconciliation.js` | Vorschau und bestaetigte idempotente Realbestandsfortschreibung |
+| `balance-main-profile-sync.js` | Cross-App-Synchronisation |
 
-## Tauri Desktop-App (4 Dateien)
+## Tauri Desktop-App (Kern-Dateien, Auswahl)
 
 | Datei | Sprache | Funktion |
 |-------|---------|----------|
@@ -3005,7 +4912,8 @@ Der Pflegebucket verbindet mehrere Forschungs- und Praxislinien, ohne selbst ein
 | `src-tauri/tauri.conf.json` | JSON | App-Konfiguration (Fenster, Permissions) |
 | `src-tauri/Cargo.toml` | TOML | Rust-Abhängigkeiten |
 
-**Output:** `RuhestandSuite.exe` (~8 MB, portable)
+**Output unter Windows:** `RuhestandSuite.exe`; Dateigröße und ausgelieferter
+Buildstand sind releaseabhängig und keine Architekturkennzahl.
 
 ## Kernalgorithmen
 
@@ -3016,7 +4924,7 @@ Der Pflegebucket verbindet mehrere Forschungs- und Praxislinien, ohne selbst ein
 5. **Worker-Pool mit adaptivem Chunking** (`worker-pool.js`)
 6. **Pflegegrad-Progression** (`simulator-data.js:PFLEGE_GRADE_PROGRESSION_PROBABILITIES`)
 7. **Mehrphasige Auto-Optimize-Pipeline** (`auto_optimize.js`, `auto-optimize-sampling.js`)
-8. **FIFO-Steueroptimierung** (`sale-engine.mjs:getSellOrder`)
+8. **Steuerorientierte Verkaufsreihenfolge** (`sale-engine.mjs:getSellOrder`)
 9. **Wealth-Adjusted Reduction** (`SpendingPlanner.mjs`)
 10. **Flex-Budget-System** (`SpendingPlanner.mjs`)
 11. **Flex-Share S-Curve** (`SpendingPlanner.mjs`)
@@ -3033,44 +4941,55 @@ Der Pflegebucket verbindet mehrere Forschungs- und Praxislinien, ohne selbst ein
 22. **Constraint-Based-Optimierung** (`simulator-optimizer.js:findBestParametersWithConstraints`)
 23. **Sweep-Heatmap-Rendering** (`simulator-heatmap.js:renderSweepHeatmapSVG`)
 24. **Verlustverrechnungstopf** (`tax-settlement.mjs:settleTaxYear`) — Jahres-Settlement mit Verlustvortrag, SPB und Gesamt-Recompute
-24. **P2-Invarianz-Prüfung** (`simulator-sweep-utils.js:areP2InvariantsEqual`)
-25. **Ausgaben-Check CSV-Parser** (`balance-expenses-csv.js:parseCategoryCsv`)
-26. **Median-basierte Hochrechnung** (`balance-expenses-metrics.js:computeYearStats`)
-27. **VPW-Annuitätenformel** (`core.mjs:_berechneEntnahmeRate`)
-28. **CAPE-basierte Realrendite mit EMA-Glättung** (`core.mjs:_calculateExpectedRealReturn`)
-29. **Sterbetafel-Horizont (Single/Joint, Mean/Quantil)** (`simulator-engine-helpers.js`)
-30. **Dynamischer MC-Horizont pro Simulationsjahr** (`monte-carlo-runner.js:computeDynamicFlexHorizonForYear`)
-31. **Kontinuierliche Regime-Signale** (`regime-signals.mjs:buildRegimeSignalSnapshot`)
-32. **Kontinuierliche CAPE-Rendite-Policy** (`vpw-return-policy.mjs:deriveVpwExpectedRealReturn`)
-33. **Konservative Langlebigkeitsanpassung** (`dynamic-flex-longevity-horizon.js`)
-34. **Stationary-Bootstrap-Sampler** (`stationary-bootstrap-sampler.js:nextYearSample`)
-35. **Tail-Risk-Ereignisplan und Overlay** (`tail-risk-overlay.js:createTailRiskSchedule`, `applyTailRiskOverlay`)
+25. **P2-Invarianz-Prüfung** (`simulator-sweep-utils.js:areP2InvariantsEqual`)
+26. **Ausgaben-Check CSV-Parser** (`balance-expenses-csv.js:parseCategoryCsv`)
+27. **Median-basierte Hochrechnung** (`balance-expenses-metrics.js:computeYearStats`)
+28. **VPW-Annuitätenformel** (`core.mjs:_berechneEntnahmeRate`)
+29. **CAPE-basierte Realrendite mit EMA-Glättung** (`core.mjs:_calculateExpectedRealReturn`)
+30. **Sterbetafel-Horizont (Single/Joint, Mean/Quantil)** (`simulator-engine-helpers.js`)
+31. **Dynamischer MC-Horizont pro Simulationsjahr** (`monte-carlo-runner.js:computeDynamicFlexHorizonForYear`)
+32. **Kontinuierliche Regime-Signale** (`regime-signals.mjs:buildRegimeSignalSnapshot`)
+33. **Kontinuierliche CAPE-Rendite-Policy** (`vpw-return-policy.mjs:deriveVpwExpectedRealReturn`)
+34. **Konservative Langlebigkeitsanpassung** (`dynamic-flex-longevity-horizon.js`)
+35. **Stationary-Bootstrap-Sampler** (`stationary-bootstrap-sampler.js:nextYearSample`)
+36. **Tail-Risk-Ereignisplan und Overlay** (`tail-risk-overlay.js:createTailRiskSchedule`, `applyTailRiskOverlay`)
 
 ---
 
 ## Quellen
 
-### Marktvergleich
-- [Rob Berger: 5 Best Retirement Calculators](https://robberger.com/best-retirement-calculators/)
-- [ProjectionLab](https://projectionlab.com/) | [Review](https://marriagekidsandmoney.com/projectionlab-review/)
-- [Boldin](https://www.boldin.com/) | [Review](https://marriagekidsandmoney.com/boldin-review/)
-- [Pralana](https://pralanaretirementcalculator.com/) | [Review](https://www.caniretireyet.com/pralana-online-retirement-calculator-review/)
-- [Portfolio Visualizer Monte Carlo](https://www.portfoliovisualizer.com/monte-carlo-simulation)
-- [FI Calc](https://ficalc.app/)
-- [Boldin: Monte-Carlo-Methodik](https://help.boldin.com/en/articles/5805671-boldin-s-monte-carlo-simulation)
-- [White Coat Investor: Best Retirement Calculators 2025](https://www.whitecoatinvestor.com/best-retirement-calculators-2025/)
+### Produktquellen des Marktvergleichs
 
-### Forschung
-- [Morningstar: Safe Withdrawal Rate 2025](https://www.morningstar.com/retirement/whats-safe-retirement-spending-rate-2025)
-- [Morningstar: Best Flexible Strategies](https://www.morningstar.com/retirement/best-flexible-strategies-retirement-income-2)
-- [Kitces: Why Guyton-Klinger Guardrails Are Too Risky](https://www.kitces.com/blog/guyton-klinger-guardrails-retirement-income-rules-risk-based/)
-- [Kitces: Risk-Based Guardrails](https://www.kitces.com/blog/risk-based-monte-carlo-probability-of-success-guardrails-retirement-distribution-hatchet/)
-- [Bogleheads: Variable Percentage Withdrawal](https://www.bogleheads.org/wiki/Variable_percentage_withdrawal) (VPW/PMT-Grundlage)
+*Abruf jeweils 2026-07-15. Die vollständigen stufenscharfen Quellenrecords
+einschließlich Evidenzklasse, Fundstelle und Einschränkung stehen in D.12;
+die folgenden Links sind die Einstiegspunkte der Stichprobe.*
 
-### Deutsche Quellen
-- [BARMER Pflegereport 2024](https://www.barmer.de/pflegereport) (Pflegefall-Daten)
-- [BVI Entnahme-Rechner](https://www.bvi.de/en/services/calculators/retirement-calculator/)
+- [ProjectionLab: Pricing & Subscriptions](https://projectionlab.com/pricing)
+- [Boldin: Pricing](https://www.boldin.com/retirement/pricing/)
+- [BVI: Rechner](https://www.bvi.de/service/rechner/)
+- [Finanzfluss: Entnahmeplan-Rechner](https://www.finanzfluss.de/rechner/entnahmeplan/)
+- [Digitale Rentenübersicht](https://www.rentenuebersicht.de/DE/01_startseite/home_node.html)
+- [MoneyGuide](https://www.moneyguidepro.com/)
+- [eMoney Pro](https://emoneyadvisor.com/products/emoney-pro/)
+- [FI Calc Guide](https://guide.ficalc.app/)
+- [FIRECalc 3.0](https://firecalc.com/)
+- [Pralana Retirement Calculator](https://pralanaretirementcalculator.com/)
+
+### Forschung und deutsche Referenzdaten
+
+Das vollständige wissenschaftliche Korpus steht mit Quellenklasse,
+Evidenzstufe, dauerhaftem Link, Aussagebeitrag und Übertragbarkeitsgrenze in
+E.4. Es umfasst 55 Records aus peer-reviewter Original- und
+Übersichtsliteratur, amtlichen beziehungsweise institutionellen Quellen,
+Practitioner Research, einem Fachbuch und einem Community-Kontext sowie
+deutschen Referenzdaten. E.5 ordnet diese Quellen 17 Suite-Mechanismen als
+Mapping-Grundlage zu; E.9 bis E.11 führen den Abgleich aus. Diese zentrale
+Record-Liste ersetzt die frühere unspezifische Linksammlung.
 
 ---
 
-*Technische Dokumentation der Ruhestand-Suite. Algorithmen-Beschreibungen sind konzeptionell; konkrete Implementierungsdetails stehen in den genannten Modulen und Tests. Dokumentstand: 2026-07-04.*
+*Technische Dokumentation der Ruhestand-Suite. Algorithmusbeschreibungen sind
+konzeptionell; konkrete Implementierungsdetails stehen in den genannten
+Modulen und Tests. Dokumentstand: 2026-07-15, redaktionell integrierter
+Abschlussstand für Architektur, Fachkonzept, Modellgrenzen, Marktvergleich und
+wissenschaftliche Tiefeneinordnung.*

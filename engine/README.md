@@ -67,7 +67,23 @@ engine/
 | `core.mjs` | `{ EngineAPI, _internal_calculateModel }` | Öffentliche API + interner Pipeline-Entry |
 
 
-`EngineAPI` stellt die Methoden `getVersion()`, `getConfig()`, `analyzeMarket()`, `calculateTargetLiquidity()` und `simulateSingleYear()` bereit.
+### `EngineAPI`-Methodenoberfläche
+
+Das enumerable `EngineAPI`-Objekt exponiert acht Methoden. Fünf davon bilden
+den unterstützten operativen Vertrag; drei weitere bleiben als deprecated
+No-op-Kompatibilitäts-Stubs sichtbar:
+
+| Klasse | Methoden | Vertrag |
+|--------|----------|---------|
+| **Unterstützte operative API** | `getVersion()`, `getConfig()`, `analyzeMarket()`, `calculateTargetLiquidity()`, `simulateSingleYear()` | Fachlich implementierte und für Aufrufer vorgesehene Methoden |
+| **Deprecated Kompatibilitäts-Stubs** | `addDecision()`, `updateDecision()`, `removeDecision()` | Enumerable Legacy-Oberfläche ohne Implementierung, Rückgabewert oder fachliche Seiteneffekte; nicht für neue Aufrufer verwenden |
+
+Damit besteht die exponierte Methodenoberfläche aus acht, der unterstützte
+fachliche Vertrag aus fünf Methoden. Eine spätere Entfernung der drei Stubs
+würde die sichtbare Objektoberfläche ändern und benötigt deshalb eine separate
+EngineAPI-Contractentscheidung samt zugehöriger Validierung. Der separat aus
+`core.mjs` exportierte `_internal_calculateModel` ist kein Mitglied des
+`EngineAPI`-Objekts und bleibt ein interner Pipeline-Einstieg.
 
 ### Marktdatenqualitaets-Contract
 

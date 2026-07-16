@@ -2,7 +2,12 @@
 
 ## Optional live data
 
-Live data is optional. The suite remains usable without internet access; failed live-data fetches must degrade to existing local values, user-visible warnings, or disabled quote updates instead of blocking the local app.
+Live data is optional. The suite remains usable without internet access; failed
+live-data fetches degrade to existing local values, user-visible warnings or a
+disabled quote update instead of making the local application unusable. This
+availability rule is not permission to finish an already confirmed atomic
+annual commit with a missing, stale or wrong-period value: required annual
+steps fail closed and leave the coordinator in its documented recovery path.
 
 | Source | Endpoint / path | Used for | Runtime path |
 | --- | --- | --- | --- |
@@ -11,8 +16,19 @@ Live data is optional. The suite remains usable without internet access; failed 
 | World Bank API | `https://api.worldbank.org/v2/country/DEU/indicator/FP.CPI.TOTL.ZG` | German CPI inflation, annual percentage | Direct fetch from browser/Tauri WebView |
 | OECD Data Explorer API | `https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_PRICES@DF_PRICES_ALL,1.0/DEU.A.N.CPI.PA._T.N.GY` | German national all-items CPI, annual growth rate | Direct fetch from browser/Tauri WebView |
 | Yale/CAPE mirror access | `https://r.jina.ai` | CAPE fallback fetches | Direct fetch from browser/Tauri WebView |
+| Google Fonts | `https://fonts.googleapis.com`, `https://fonts.gstatic.com` | Optional UI fonts | Direct stylesheet/font request; local fallback fonts remain usable offline |
 
-Tauri release builds allow these live-data targets explicitly in `src-tauri/tauri.conf.json` under `app.security.csp.connect-src`. New external live-data sources must be added there and documented in this file in the same change.
+Tauri release builds allow the Yahoo, inflation and CAPE targets explicitly in
+`src-tauri/tauri.conf.json` under `app.security.csp.connect-src`. New external
+live-data sources must be added there and documented in this file in the same
+change. Font hosts use the separate CSP directives described below.
+
+Yahoo requests contain the requested symbol or search term and, for chart data,
+the period and interval. Inflation and CAPE use fixed source identifiers and
+target periods. These paths do not intentionally transmit portfolio quantities,
+cost basis, spending needs or profile state. External providers still receive
+ordinary IP and transport metadata. Google Fonts are governed by the separate
+`style-src` and `font-src` CSP directives rather than `connect-src`.
 
 ### Tranche quote contract
 
@@ -39,9 +55,32 @@ The Balance annual workflow queries the completed calendar year from the annual-
 - `fetchStatus`: `ok_primary_ecb`, `ok_fallback_world_bank`, or `ok_fallback_oecd`;
 - `metric`: the normalized metric identifier above.
 
-Fallback order is ECB, World Bank, then OECD. Each request has its own eight-second timeout and `AbortController`; its timer is cleared on success and failure. Wrong-year, wrong-series, ambiguous, non-finite, or out-of-range observations are rejected before another source is tried. If all sources fail, inflation and need inputs remain unchanged.
+Fallback order is ECB, World Bank, then OECD. Each request has its own eight-second timeout and `AbortController`; its timer is cleared on success and failure. Wrong-year, wrong-series, ambiguous, non-finite, or out-of-range observations are rejected before another source is tried. If all sources fail, inflation and need inputs remain unchanged. Outside the annual coordinator this is a safe no-write result; during a confirmed annual commit the failed step prevents completion and the pre-mutation snapshot remains the recovery boundary.
 
 Positive inflation and deflation use the same multiplicative rule: `next = previous * (1 + rate / 100)`. Negative rates are not silently clamped to zero. A positive previous value and the cumulative factor must remain finite and greater than zero; optional need fields that already equal zero remain zero.
+
+## Annual market-data contract
+
+The annual ETF step is bound to the coordinator's pending period and requires
+phase `writes_started` plus a confirmed recovery snapshot. It requests
+`VWCE.DE` for the UTC window from 27 December of the completed target year up
+to, but excluding, 1 January of the following year. The accepted observation is
+the last valid close dated 27-31 December of that exact target year, with a
+finite EUR price from `0.50` through `100000`.
+
+The persisted `annualMarketDataMeta` records schema, price, ISO `asOf`, ticker,
+source, target year, period ID and the same-cutoff ATH evaluation. Empty charts,
+wrong or stale years, implausible prices and proxy failures fail closed. The
+market-data step restores its previous local input/meta values, while the
+annual coordinator retains the wider snapshot-based recovery responsibility.
+
+CAPE has a separate provenance contract and is not assigned the ETF year-end
+date. It tries the configured primary resource, then its mirror, then an
+existing stored value. `capeAsOf`, `capeSource`, `capeFetchStatus` and
+`capeUpdatedAt` distinguish observation date, provider and retrieval state. A
+stored or stale fallback remains labelled as such. If neither a fetched nor a
+stored value exists, the step fails; inside the atomic annual workflow this is
+commit-blocking.
 
 ## Deterministic browser tests
 

@@ -1,17 +1,24 @@
 # Ruhestand-App-Final
 
-Die Ruhestand-App ist ein vollständig lokal ausführbares Planungstool mit zwei Oberflächen:
+Die Ruhestand-App ist ein lokal betriebenes Planungstool ohne serverseitige
+Fachlogik oder automatischen Cloud-Sync. Sie umfasst zwei Oberflächen:
 
 * **Balance-App** – steuert den jährlichen Entnahmeprozess, verwaltet Liquidität und erzeugt Diagnoseberichte.
 * **Simulator** – führt Monte-Carlo-Simulationen, Parameter-Sweeps und Pflegefall-Szenarien aus.
 
-Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im Browser und teilen sich eine modulare Berechnungs-Engine.
+Beide Anwendungen teilen sich eine modulare Berechnungs-Engine. Der
+Browserbetrieb benötigt keinen Anwendungs-Build, wird wegen ES-Modulen und
+Workern aber über den mitgelieferten lokalen HTTP-Start geöffnet. Kernrechnung,
+manuelle Dateneingabe und lokale Persistenz funktionieren ohne Internet;
+Live-Kurse, Inflations-/CAPE-Abrufe und Google Fonts sind optionale externe
+Netzwerkpfade.
 
 ---
 
 ## Release-Stand
 
-**Aktueller Dokumentationsstand:** 2026-07-04
+**Aktueller Dokumentationsstand:** 2026-07-15
+
 **Changelog:** siehe [CHANGELOG.md](CHANGELOG.md)
 
 ---
@@ -67,7 +74,7 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 * Sweep-Schutz für Partner:innen-Renten inklusive Rente-2-Invarianz und Heatmap-Badges.
 * Szenario-Log-Analyse mit 30 auswählbaren Szenarien: 15 charakteristische (Perzentile, Pflege-Extremfälle, Risiko-Szenarien) und 15 zufällige Samples für typisches Verhalten.
 * Checkboxen für Pflege-Details und detailliertes Log, JSON/CSV-Export für ausgewählte Szenarien.
-* **Tranchen-Integration:** Steueroptimierte Verkäufe mit detaillierten Depot-Positionen. Der Simulator tiefenkopiert profilgebundene Lots, bewahrt `sourceProfileId` und schreibt Simulationsmutationen niemals in den Realbestand zurueck.
+* **Tranchen-Integration:** Steuerorientierte, modellbasierte Verkäufe mit detaillierten Depot-Positionen. Der Simulator tiefenkopiert profilgebundene Lots, bewahrt `sourceProfileId` und schreibt Simulationsmutationen niemals in den Realbestand zurueck.
 * Notfallverkäufe werden steuerlich per Gesamt-Settlement-Recompute mit den regulären Verkäufen des Jahres konsistent verrechnet.
 * **Pflegebucket als gesperrte Geldmarkt-/Cash-Reserve:** Der Simulator gliedert den optionalen Bucket nach dem Profilverbund-Merge aus Geldmarkt-Tranchen, ungetranchtem Geldmarkt und Tagesgeld aus. Die Engine sieht nur die operative Liquidität; der Bucket kann erst bei Pflege-Trigger vor Forced Sales Liquiditätslücken decken.
 
@@ -77,10 +84,10 @@ Beide Anwendungen laufen ohne Build-Tool oder externe Abhängigkeiten direkt im 
 2. **Details & Personen prüfen:** Kontrollieren Sie die aus den Profilen übernommenen Renten und Startalter in der Sektion "Personen & Rente". Erweiterte Einstellungen (z.B. Gold-Strategie) können ebenfalls angepasst werden.
 3. **Monte-Carlo-Simulation:** Im Tab „Monte-Carlo“ Parameter wie Anzahl der Läufe oder Aktienquote justieren (Default ist oft ausreichend) und **Simulation starten** klicken.
 4. **Backtesting (Realitätscheck):** Nutzen Sie den Tab „Backtesting“, um Ihre Strategie gegen historische Marktverläufe (z.B. ab 2000) zu validieren.
-5. **Ergebnisse interpretieren:** In der Ergebnisübersicht die Kennzahl „Erfolgswahrscheinlichkeit“ heranziehen (Ziel > 95%). Heatmaps zeigen Sensitivitäten, und das Szenario-Log bietet Analysen zu typischen und extremen Verläufen (inkl. Pflegekosten). Für hohe Dynamic-Flex-Entnahmen den detaillierten Logmodus aktivieren und Payout-/VPW-Spalten prüfen.
+5. **Ergebnisse interpretieren:** Die als „Erfolgswahrscheinlichkeit“ angezeigte Kennzahl ist die modellinterne Erfolgsquote der gewählten Läufe, keine Garantie. Immer gemeinsam mit P10/P50/P90, Kürzungsjahren, Drawdown, Depoterschöpfung und Pflege-KPIs lesen. Heatmaps zeigen Sensitivitäten, und das Szenario-Log bietet Analysen zu typischen und extremen Verläufen (inkl. Pflegekosten). Für hohe Dynamic-Flex-Entnahmen den detaillierten Logmodus aktivieren und Payout-/VPW-Spalten prüfen.
 6. **Optimierung (Sweep):** Im Tab „Sweep“ können Parameter (z.B. Aktienquote) automatisiert variiert werden, um das Optimum zu finden.
 7. **Dynamic-Flex verifizieren:** Für neue Entnahmelogik zuerst Backtest prüfen, danach Monte Carlo, dann Sweep/Auto-Optimize mit denselben Dynamic-Flex-Einstellungen. Backtest- und Scenario-Log verwenden im detaillierten Modus dieselben Payout-/VPW- und Return-Policy-Begriffe.
-8. **Tail-Risk vergleichen:** Für Stressanalysen zuerst einen Standardlauf ohne Overlay speichern/merken, dann Tail-Risk bewusst aktivieren und Erfolgsquote, P10/P50/P90, Max Drawdown, Real-CaR und Tail-Risk-KPIs vergleichen.
+8. **Tail-Risk vergleichen:** Für Stressanalysen zuerst einen Standardlauf ohne Overlay speichern/merken, dann Tail-Risk bewusst aktivieren und Erfolgsquote, P10/P50/P90, Max Drawdown und Tail-Risk-KPIs vergleichen. Der derzeit als Real-CaR bezeichnete Entnahme-KPI ist wegen des nicht fortgeschriebenen kumulierten Inflationsfaktors faktisch nominal; siehe [offene Produktmängel](docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md#offene-produktmängel-aus-dem-fachabgleich).
 
 **Häufige Eingabefehler und Korrekturen**
 * Negative oder unrealistisch hohe Werte (z. B. `Gesamtvermögen` < 0 oder CAPE > 80) führen zu Warnungen – bitte auf plausible Spannen korrigieren.
@@ -225,8 +232,8 @@ Ruhestand-App-Final/
 Die Anwendung ist bewusst minimalistisch gehalten, hat aber für den vollen Funktionsumfang folgende Anforderungen:
 
 1.  **Browser:** Ein moderner Browser (Chrome, Edge, Firefox) mit Unterstützung für ES6-Module und die File System Access API (für Dateiimport/-export; Jahresabschluss-Snapshots liegen intern in IndexedDB).
-2.  **Node.js (Optional):** Für den automatischen Abruf von Online-Kursdaten (ETF-Preise) wird ein lokaler Proxy benötigt. Dieser setzt eine installierte [Node.js](https://nodejs.org/)-Laufzeitumgebung voraus.
-    *   *Ohne Node.js:* Die App startet normal, aber der Button "Online-Update" im Tranchen-Manager ist ohne Funktion. Manuelle Kurspflege ist weiterhin möglich.
+2.  **Node.js (optional, nur Browservariante):** Für den automatischen Abruf von Online-Kursdaten (ETF-Preise) wird dort ein lokaler Proxy benötigt. Dieser setzt eine installierte [Node.js](https://nodejs.org/)-Laufzeitumgebung voraus. Die Tauri-Variante bringt ihren Loopback-Proxy selbst mit.
+    *   *Ohne Node.js im Browserbetrieb:* Die App startet normal, aber der Button "Online-Update" im Tranchen-Manager ist ohne Funktion. Manuelle Kurspflege ist weiterhin möglich.
 
 ---
 
@@ -235,20 +242,32 @@ Die Anwendung ist bewusst minimalistisch gehalten, hat aber für den vollen Funk
 
 ### Option 1: Standalone-Anwendung
 
-**RuhestandSuite.exe** – portable Standalone-Desktop-Anwendung basierend auf Tauri:
+**RuhestandSuite.exe** – portables Windows-Artefakt auf Basis von Tauri:
 * Keine Installation, kein Installer und keine Administratorrechte erforderlich
-* Direkt ausführbar unter Windows (getestet mit Windows 10/11)
+* Dedizierter Buildpfad für Windows über `build-tauri.bat` beziehungsweise `npm run build-tauri-exe`
 * Beinhaltet beide Apps (Balance & Simulator) in einer nativen Desktop-Umgebung
-* Läuft komplett offline; Internetzugriff wird nur für optionale Live-Daten (Inflation/Kurse) benötigt
-* Download direkt aus dem Repository-Root (`RuhestandSuite.exe`) oder dem GitHub-Release
+* Kernrechnung und lokale Datenhaltung sind offline nutzbar; Live-Kurse, Inflation, CAPE und Webfonts benötigen Netzwerkzugriff
 * Nutzt kein separates lokales Webserver-Setup; das Frontend wird direkt aus `dist/` in der Tauri-WebView geladen
 * Enthaelt einen integrierten Yahoo-Proxy fuer Kurs-Updates (lokaler Port 8787)
 
+Die Tauri-Konfiguration beschreibt zwar Bundleziele für weitere Plattformen,
+im aktuellen Repository ist aber nur der Windows-Releasepfad eigens
+orchestriert. Ein vorhandenes lokales EXE-Artefakt ist noch kein Nachweis für
+einen grünen Testlauf, einen manuellen Desktop-Smoke oder eine Veröffentlichung.
+macOS-/Linux-Desktop-Builds sind hier weder aktuell validiert noch als
+ausgeliefert dokumentiert.
+
 **So nutzen Sie die portable EXE:**
-1. `RuhestandSuite.exe` aus dem Repository oder Release-Download in einen beliebigen Ordner kopieren.
+1. `RuhestandSuite.exe` aus einem ausdrücklich freigegebenen Build oder Release in einen beliebigen Ordner kopieren.
 2. Per Doppelklick starten; die Tauri-App öffnet die Oberfläche direkt aus dem gebündelten `dist/`-Stand.
-3. Optionale Live-Datenzugriffe funktionieren, wenn eine Internetverbindung besteht; ETF-Kurse laufen über den integrierten lokalen Proxy, Inflation und CAPE direkt über freigegebene externe Endpunkte. Ohne Internet läuft die App vollständig lokal weiter.
+3. Optionale Live-Datenzugriffe funktionieren bei Internetverbindung; ETF-Kurse laufen über den integrierten lokalen Proxy, Inflation und CAPE direkt über freigegebene externe Endpunkte. Ohne Internet bleiben lokale Planung und manuelle Werte nutzbar. Ein bereits bestätigter Jahresabschluss kann bei einem fehlgeschlagenen periodengebundenen Datenschritt jedoch bewusst in den Recovery-Zustand wechseln, statt mit einem falschen Stichtag fortzufahren.
 4. Eigene Szenarien werden im Benutzerprofil als Tauri-App-Daten gespeichert. Live-Daten liegen in `ruhestand_suite_data.json`, Jahresabschluss-Snapshots separat in `ruhestand_suite_snapshots.json`; der Wechsel zwischen Browser und EXE laeuft ueber das zentrale Komplettbackup auf der Startseite.
+
+Bei optionalen Abrufen verlassen nur die jeweiligen Requestparameter den
+Rechner: etwa Yahoo-Symbol/Suchbegriff und Zeitfenster oder fest konfigurierte
+Reihen und Zieljahre für Inflation/CAPE. Depotmengen, Cost Basis, Bedarfe und
+Profilzustände werden über diese Pfade nicht absichtlich übertragen. Übliche
+IP-/Transportmetadaten fallen bei externen Providern dennoch an.
 
 ### Option 2: Browser-basierte Nutzung
 

@@ -23,7 +23,7 @@ Dieses Dokument beschreibt die Architektur und zentrale Datenflüsse der Ruhesta
 
 Die Pfade und Contracts sind normativ; volatile Modul- und Testdateizaehler stehen im Coverage-Inventar statt in dieser Architekturreferenz.
 
-Alle Skripte sind ES6-Module. Die Engine wird per `build-engine.mjs` mit esbuild (oder Modul-Fallback) gebündelt und stellt eine globale `EngineAPI` bereit.  
+Alle Skripte sind ES6-Module. Die Engine wird per `build-engine.mjs` mit esbuild (oder Modul-Fallback) gebündelt und stellt eine globale `EngineAPI` bereit.
 Für CI/Release ist Strict-Mode vorgesehen (`npm run build:engine:strict`), der ohne `esbuild` fehlschlägt.
 
 ### Tauri Desktop-Build und Live-Daten
@@ -70,7 +70,7 @@ Nach einem erfolgreichen manuellen EXE-Build sollte die erzeugte `RuhestandSuite
 5. Tranchenmanager laedt leere oder synthetische Tranchen ohne Fehler.
 6. Handbuch laedt.
 7. Optionaler Live-Daten-Check mit Internet: ETF-Kurs via integriertem Proxy, Inflation/CAPE via freigegebene Endpunkte.
-8. Optionaler Offline-Check: Ohne Internet darf die App nicht hart abbrechen; Live-Daten-Fetches muessen als Fallback/Warnung degradieren.
+8. Optionaler Offline-Check: Ohne Internet darf die lokale App nicht unbenutzbar werden; außerhalb eines bestätigten Jahres-Commits degradieren Live-Daten-Fetches als Fallback/Warnung. Ein bereits begonnener atomarer Jahres-Commit bleibt bei einem erforderlichen fehlgeschlagenen Periodenschritt bewusst im Recovery-Pfad, statt falsche Stichtagsdaten zu übernehmen.
 9. Keine Log-/Console-Hinweise auf fehlende `dist`-Assets oder blockierte Worker.
 
 ---
@@ -139,7 +139,12 @@ Input → InputValidator.validate
       → Ergebnisobjekt (UI-Daten, Diagnose, neuer State)
 ```
 
-Die Engine gibt strukturierte Ergebnisse zurück. Fehler werden als `AppError`/`ValidationError` transportiert und von den UIs aufgefangen.
+`simulateSingleYear()` gibt `{ input, newState, diagnosis, ui }` oder ein
+`{ error }`-Envelope mit `ValidationError`/`AppError` zurück. Dieser Vertrag ist
+methodenspezifisch: `analyzeMarket()` verwendet im Fehlerfall historisch
+`{ error: <string> }`, `calculateTargetLiquidity()` besitzt kein eigenes
+Catch-Envelope. Die UIs prüfen den jeweiligen Aufrufvertrag vor Rendering oder
+Persistenz.
 
 ---
 
@@ -363,7 +368,7 @@ Dynamic-Flex ist entlang der Simulator-Pipeline konsistent aktiviert:
 * `app/simulator/tail-risk-contract.js` normalisiert und validiert die Parameter; `tail-risk-overlay.js` erzeugt pro `runIdx`/Run-Seed eine deterministische Schedule. `monte-carlo-runner.js` wendet das Overlay nicht-mutierend auf die gezogenen Jahresdaten an.
 * Anti-Doppelpessimismus: Historische Krisenjahre (Aktienrendite <= -25%, Inflation >= 8% oder Regime `bear_deep`/`crash`/`stagflation`) erhalten keinen zusaetzlichen Return-Schock. Effektive Aktienrendite ist auf mindestens -65%, effektive Inflation auf maximal 15% begrenzt.
 * Aggregation: `mc-run-metrics.js` sammelt aktive/applizierte/skipped Tail-Jahre log-unabhaengig; Worker-/Chunk-Merge summiert die Totals; `monte-carlo-aggregates.js` stellt `extraKPI.tailRisk` bereit. Die UI zeigt diese Kennzahlen nur bei aktiviertem Overlay.
-* Beispielvergleich: Standardlauf und Tail-Risk-Lauf sollten mit gleicher Run-Zahl, Seed, Methode, CAPE-/Startjahr-Einstellung und Portfolioannahmen verglichen werden. Zu dokumentierende Felder sind Erfolgsquote bzw. Failure Rate, P10/P50/P90-Endvermoegen, Max Drawdown, Real-CaR, `runActiveRatePct`, `runAppliedRatePct`, aktive/applizierte Jahresanteile und historische Krisen-Skips. Erwartung: Standardlauf hat Tail-Risk-KPIs 0; Tail-Risk kann Erfolgsquote und Perzentile verschlechtern und muss als Stressannahme, nicht Prognose, interpretiert werden.
+* Beispielvergleich: Standardlauf und Tail-Risk-Lauf sollten mit gleicher Run-Zahl, Seed, Methode, CAPE-/Startjahr-Einstellung und Portfolioannahmen verglichen werden. Zu dokumentierende Felder sind Erfolgsquote bzw. Failure Rate, P10/P50/P90-Endvermoegen, Max Drawdown, der derzeit nur nominal belastbare Real-CaR-Wert, `runActiveRatePct`, `runAppliedRatePct`, aktive/applizierte Jahresanteile und historische Krisen-Skips. Der offene Deflationsbefund ist im Fachkonzept als PD-01 dokumentiert. Erwartung: Standardlauf hat Tail-Risk-KPIs 0; Tail-Risk kann Erfolgsquote und Perzentile verschlechtern und muss als Stressannahme, nicht Prognose, interpretiert werden.
 
 ### Worker-Architektur (Monte Carlo, Sweep, Auto-Optimize)
 

@@ -52,7 +52,11 @@ DOM-freie Simulation, die alle Runs, KPI-Arrays, Pflegemetriken und Pflegebucket
 
 **Hauptfunktionen / Exporte:**
 - `runMonteCarloSimulation()` – Führt die komplette Simulation aus, sammelt Worst-Run-Logs, Pflege-KPIs, Pflegebucket-KPIs und aggregierte Kennzahlen.
-- Implementiert Ruin-Logik (Depot < 100€) und Ansparphase-Übergang.
+- Verarbeitet die `isRuin`-Rückgabe des direkten Jahreslaufs und den
+  Ansparphase-Übergang. Davon getrennt markiert die Ergebnisaggregation einen
+  fehlgeschlagenen Lauf oder Aktien-plus-Gold von höchstens 100 Euro als
+  Depoterschöpfung; freie Liquidität und Pflegebucket gehören nicht zu dieser
+  Teilmetrik.
 - Aggregiert zusätzlich `taxSavedByLossCarry` (gesamt und pro Run), damit Steuerersparnis aus Verlustvorträgen auswertbar bleibt.
 - Wendet optional das Tail-Risk-Overlay nicht-mutierend auf gezogene Jahresdaten an; die Schedule ist an den absoluten `runIdx` und den per-run Seed gekoppelt.
 
