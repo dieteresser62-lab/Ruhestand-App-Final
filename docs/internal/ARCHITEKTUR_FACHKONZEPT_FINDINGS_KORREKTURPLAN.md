@@ -1,7 +1,7 @@
 # Korrektur-Arbeitsplan zu den Findings aus Slice 08
 
 **Stand:** 2026-07-17<br>
-**Status:** in Umsetzung – Slice 2 implementiert; Review ausstehend<br>
+**Status:** in Umsetzung – Slice 3 implementiert; Review ausstehend<br>
 **Ausgangsdokument:** `SLICE_ARCHITEKTUR_FACHKONZEPT_08_INTEGRATION_ABSCHLUSS.md`<br>
 **Betroffenes Hauptdokument:** `docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md`<br>
 **Planerstellungs-Branch:** `codex/architektur-fachkonzept-doku`<br>
@@ -275,6 +275,9 @@ ausdrücklich offen.
 
 ### Slice 3 – Forschungsregister und kompakter Mechanismusabgleich
 
+**Slice-Datei:**
+[`SLICE_ARCHITEKTUR_FACHKONZEPT_FINDINGS_03_FORSCHUNGS_EVIDENZREGISTER.md`](SLICE_ARCHITEKTUR_FACHKONZEPT_FINDINGS_03_FORSCHUNGS_EVIDENZREGISTER.md)
+
 **Ziel:** Quellenkorpus und ausführliche Dossiers auslagern, während das
 Hauptdokument Evidenzstatus, Mechanismusbefunde, Ergebnisgrenzen und Risiken
 eigenständig erklärt.
@@ -297,6 +300,15 @@ eigenständig erklärt.
 - keine Literaturzahl wird zu einem Suite-Ergebnis;
 - der Forschungsblock ist nach dem Messvertrag größer als der Marktblock;
 - offene V4-/V5-Prüfungen bleiben sichtbar.
+
+**Umsetzungsstand 2026-07-17:** Slice 3 ist dokumentarisch implementiert; das
+Review steht aus. Das neue normative Forschungs-Evidenzregister führt 55 von
+55 FOR-Recordzeilen inhaltsgleich mit eindeutigen Ankern und MAP-01 bis
+MAP-17 als inhaltsgleiche Sieben-Pflichtfeld-Dossiers. Der Forschungsblock im
+Hauptdokument umfasst 2.940 Wörter und ist 101 Wörter größer als der
+Marktblock mit 2.839 Wörtern. Gemeinsam belegen beide Blöcke 24,43 Prozent des
+Haupttextnenners. FR-01 bis FR-12 und FQ-01 bis FQ-10 bleiben im Hauptdokument
+normativ geführt; U-K03 bleibt bis zu Review und Nutzerfreigabe offen.
 
 ### Slice 4 – Evidenzaktualität und statischer Dokumentvalidator
 
@@ -609,7 +621,7 @@ Zusätzlich zu `AGENTS.md` wird gestoppt und nachgefragt, wenn:
 | --- | --- | --- | --- | --- |
 | U-K01 | dieser Korrekturplan | Review-Feedback eingearbeitet | Nutzer + Reviewer | freigegeben am 2026-07-16 |
 | U-K02 | Dokumenttopologie und Messvertrag | Slice 1 | Nutzer | freigegeben am 2026-07-16 |
-| U-K03 | Markt-/Forschungsregister und Haupttextumfang | Slice 2 und 3 | Nutzer + Reviewer | ausstehend |
+| U-K03 | Markt-/Forschungsregister und Haupttextumfang | Slice 2 und 3 | Nutzer + Reviewer | freigegeben durch Gemini / Nutzer ausstehend |
 | U-K04 | Evidenzvalidator und Aktualitätsvertrag | Slice 4 | Nutzer + Reviewer | ausstehend |
 | U-K05 | autoritative Lizenz | vor Slice 5 | Nutzer | MIT bestätigt am 2026-07-16 |
 | U-K06 | PD-01 Route A oder B und zulässiges Delta | vor Slice 6 | Nutzer | Route A bestätigt; Delta-Baseline vor Slice 6 ausstehend |
@@ -625,7 +637,7 @@ Zusätzlich zu `AGENTS.md` wird gestoppt und nachgefragt, wenn:
 | ---: | --- | --- |
 | 1 | freigegeben | Baseline, Messvertrag, Scope-Gates und Branch validiert; MIT und U-K02 bestätigt; Review durch Gemini abgeschlossen am 2026-07-16 |
 | 2 | freigegeben | 69 MKT-Records und Kriterienmatrix im normativen Register; Markt-Hauptblock auf 2.839 Wörter verdichtet; Review durch Gemini abgeschlossen am 2026-07-17 |
-| 3 | geplant | Forschungsregister und kompakter Mechanismusabgleich |
+| 3 | freigegeben | 55 FOR-Records und 17 MAP-Dossiers im normativen Register; Forschungsblock 101 Wörter größer als Markt; gemeinsamer Anteil 24,43 %; Review durch Gemini abgeschlossen am 2026-07-17 |
 | 4 | geplant | Evidenzaktualität und statischer Validator |
 | 5 | geplant | konsistente Lizenzmetadaten |
 | 6 | geplant | korrigierter Real-/Nominalvertrag |
