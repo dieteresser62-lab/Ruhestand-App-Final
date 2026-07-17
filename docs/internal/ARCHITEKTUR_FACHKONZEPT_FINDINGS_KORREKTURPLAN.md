@@ -1,7 +1,7 @@
 # Korrektur-Arbeitsplan zu den Findings aus Slice 08
 
-**Stand:** 2026-07-16<br>
-**Status:** implementierungsreif – Gemini-Review und Nutzerfreigabe U-K01 am 2026-07-16<br>
+**Stand:** 2026-07-17<br>
+**Status:** in Umsetzung – Slice 2 implementiert; Review ausstehend<br>
 **Ausgangsdokument:** `SLICE_ARCHITEKTUR_FACHKONZEPT_08_INTEGRATION_ABSCHLUSS.md`<br>
 **Betroffenes Hauptdokument:** `docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md`<br>
 **Planerstellungs-Branch:** `codex/architektur-fachkonzept-doku`<br>
@@ -240,6 +240,9 @@ vor dem ersten Korrekturedit festlegen.
 
 ### Slice 2 – Markt-Evidenzregister und kompakter Hauptblock
 
+**Slice-Datei:**
+[`SLICE_ARCHITEKTUR_FACHKONZEPT_FINDINGS_02_MARKT_EVIDENZREGISTER.md`](SLICE_ARCHITEKTUR_FACHKONZEPT_FINDINGS_02_MARKT_EVIDENZREGISTER.md)
+
 **Ziel:** Vollständige Auditierbarkeit erhalten und den Marktteil im
 Hauptdokument auf Methodik, Kernergebnisse, Positionierung, Grenzen und
 Aktualisierung konzentrieren.
@@ -260,6 +263,15 @@ Aktualisierung konzentrieren.
 - das Hauptdokument bleibt ohne Öffnen des Registers in seinen
   Kernaussagen verständlich;
 - keine neue Rangliste, Gesamtwertung oder Exklusivitätsbehauptung entsteht.
+
+**Umsetzungsstand 2026-07-17:** Slice 2 ist dokumentarisch implementiert; das
+Review steht aus. Das neue normative Register führt 69 von 69 Recordzeilen
+inhaltlich unverändert mit 69 eindeutigen IDs und Ankern. Der Marktblock im
+Hauptdokument sank nach dem Messvertrag von 8.860 auf 2.839 Wörter. Der
+Forschungsblock blieb mit 7.842 Wörtern unverändert und ist nun 5.003 Wörter
+größer. Markt plus Forschung liegen vor Slice 3 noch bei 37,40 % des
+Haupttextnenners; der 20-bis-25-Prozent-Korridor und U-K03 bleiben daher
+ausdrücklich offen.
 
 ### Slice 3 – Forschungsregister und kompakter Mechanismusabgleich
 
@@ -612,7 +624,7 @@ Zusätzlich zu `AGENTS.md` wird gestoppt und nachgefragt, wenn:
 | Slice | Status | Ergebnis |
 | ---: | --- | --- |
 | 1 | freigegeben | Baseline, Messvertrag, Scope-Gates und Branch validiert; MIT und U-K02 bestätigt; Review durch Gemini abgeschlossen am 2026-07-16 |
-| 2 | geplant | Markt-Evidenzregister und kompakter Hauptblock |
+| 2 | freigegeben | 69 MKT-Records und Kriterienmatrix im normativen Register; Markt-Hauptblock auf 2.839 Wörter verdichtet; Review durch Gemini abgeschlossen am 2026-07-17 |
 | 3 | geplant | Forschungsregister und kompakter Mechanismusabgleich |
 | 4 | geplant | Evidenzaktualität und statischer Validator |
 | 5 | geplant | konsistente Lizenzmetadaten |

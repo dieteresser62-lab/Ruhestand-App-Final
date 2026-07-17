@@ -3302,104 +3302,54 @@ Exklusivitätsaussagen werden nicht verwendet.
 
 ## D.1 Erkenntnisziel und Vergleichsgrenze
 
-Der Vergleich soll nicht beantworten, welches Produkt allgemein „das beste“
-ist. Er untersucht zwei engere Fragen:
+Der Vergleich fragt, wie die festgelegte Stufe den synthetischen deutschen
+Referenzhaushalt modelliert und wie transparent, reproduzierbar und operativ
+nutzbar ihre Annahmen, Rechenwege und Ergebnisse sind. Er bestimmt kein
+allgemein „bestes“ Produkt.
 
-1. Welche Teile eines synthetischen deutschsprachigen Ruhestandshaushalts kann
-   die festgelegte Produktstufe nativ, nur angenähert oder gar nicht
-   modellieren?
-2. Wie transparent, reproduzierbar und operativ nutzbar sind Eingaben,
-   Annahmen, Rechenwege und Ergebnisse für den jeweiligen Zielmarkt?
-
-Die Auswertung besteht deshalb aus einer Kriterienmatrix und einer
-Modellierbarkeitskarte des Referenzhaushalts. Unterschiedliche Segmente werden
-zuerst innerhalb ihres eigenen Zwecks interpretiert. Eine Beratersoftware, ein
-staatliches Vorsorgeportal und ein einzelner Entnahmerechner erhalten keine
-gemeinsame Gesamtpunktzahl. Es gibt weder additive Scores noch eine
-segmentübergreifende Rangliste.
-
-Vergleichseinheit ist immer das Tupel **Produkt, Produktstufe, Region/Sprache,
-Erhebungsdatum**. Eine Funktion in einer teureren oder institutionellen Stufe
-gilt nicht automatisch als Funktion der untersuchten Stufe. Die
-Ruhestand-Suite wird nach denselben Kriterien betrachtet; lokale Quellmodule
-und Referenzdokumente ersetzen bei ihr jedoch keine externe
-Wirksamkeitsvalidierung.
+Vergleichseinheit ist **Produkt, Stufe, Region/Sprache und Erhebungsdatum**.
+Segmente werden in ihrem eigenen Zweck interpretiert; es gibt weder Scores
+noch Rangliste. Eine Funktion anderer Stufen wird nicht übertragen. Auch
+lokaler Suite-Code belegt keine externe Wirksamkeit.
 
 ## D.2 Recherchefenster und reproduzierbarer Stichtag
 
-Die Erhebung wurde am 2026-07-15 abgeschlossen. Die vorgelagerte Prüfung der
-offiziellen Einstiegsseiten diente nur zur Identifikation von Produkt, Stufe
-und Segment; die Funktionsbewertung stützt sich auf die Quellenrecords in
-D.12. Für spätere Aktualisierungen gelten folgende Regeln:
-
-- Die Vollerhebung erfolgt in einem zusammenhängenden Fenster von höchstens
-  14 Kalendertagen.
-- Der letzte Erhebungstag ist der Vergleichsstichtag. An diesem Tag werden
-  volatile Angaben wie Verfügbarkeit, Produktstufen und Preise nochmals
-  geprüft.
-- Jede Quelle erhält ein Abrufdatum im Format `YYYY-MM-DD` in der Zeitzone
-  Europe/Berlin; ein erkennbares Veröffentlichungs- oder Änderungsdatum wird
-  zusätzlich erfasst.
-- Überschreitet die Recherche 14 Tage, werden alle verwendeten
-  Produkt-, Preis- und Funktionsquellen neu geprüft. Nicht erneut erreichbare
-  Aussagen werden als historischer oder nicht mehr verifizierter Stand
-  gekennzeichnet.
-- Spätere Produktänderungen ändern den eingefrorenen Befund nicht rückwirkend.
-  Eine Aktualisierungsnotiz nennt Vergleichsstichtag und nächste Prüfung.
-- Registrierung, Kauf, Testlizenz, Anbieteranfrage oder Verarbeitung realer
-  Finanzdaten erfolgen nicht ohne gesonderte Nutzerfreigabe.
+Die Erhebung endete am 2026-07-15. Eine Vollerhebung dauert höchstens 14 Tage;
+am letzten Tag werden Stufe, Verfügbarkeit und Preis erneut geprüft. Records
+führen Abruf- sowie erkennbaren Veröffentlichungs-/Änderungsstand. Längere
+Erhebungen erfordern eine Neuprüfung; verlorene Quellen werden historisch oder
+nicht erneut verifiziert. Kauf, Registrierung, Anbieteranfrage oder reale
+Finanzdaten benötigen gesonderte Freigabe.
 
 ## D.3 Produktsegmente
 
-| Segment | Abgrenzung | Faire Interpretation |
-| --- | --- | --- |
-| **Consumer Planner** | direkt von Haushalten bedienbare, mehrjährige Finanz- oder Ruhestandsplanung | Vollständigkeit, Szenarien und Verständlichkeit innerhalb der ausgewählten Endkundenstufe vergleichen |
-| **Deutsche Vorsorge-/Entnahmewerkzeuge** | deutschsprachige Portale und Rechner für Vorsorgeansprüche, Rentenlücke oder Kapitalentnahme | schmale Rechen- und Informationszwecke nicht als unvollständige Vollplaner abwerten |
-| **Beratersoftware** | B2B-Plattformen für Berater- und Kundenworkflow | Funktionsbreite, Kollaboration und Auditierbarkeit berücksichtigen; fehlender Endkundenzugang ist keine UX-Niederlage |
-| **Open-Source-/FIRE-Werkzeuge** | frei zugängliche oder quelloffene Werkzeuge mit Schwerpunkt historischer Entnahme- und FIRE-Analyse | Methoden- und Datenklarheit gegen bewusst engeren Haushaltsumfang abwägen |
-| **Offline-/Tabellenlösungen** | lokal nutzbare Desktop- oder Tabellenmodelle | lokale Kontrolle und Prüfbarkeit ebenso erfassen wie Laufzeitabhängigkeiten und Bedienaufwand |
-
-Alle Segmente erhalten denselben Kriterienkatalog. Ist ein Kriterium außerhalb
-des erklärten Produktzwecks, wird es als `nicht anwendbar` geführt und nicht
-negativ gewertet. Der spätere Text trennt daher **Abdeckung** von
-**Zweckerfüllung**.
+Die fünf Segmente sind Consumer Planner, deutsche Vorsorge-/Entnahmewerkzeuge,
+Beratersoftware, FIRE-Werkzeuge und Offline-/Tabellenlösungen. Vollplaner
+werden nach Szenarien und Haushaltsbreite, schmale Werkzeuge nach ihrem
+Rechen-/Informationszweck, Beraterprodukte nach Kollaboration und Auditierbarkeit
+und lokale Werkzeuge auch nach Kontrolle und Laufzeitabhängigkeiten gelesen.
+`Nicht anwendbar` schützt sachfremde Zwecke; Abdeckung ist nicht
+Zweckerfüllung.
 
 ## D.4 Auswahlregeln und Stichprobe
 
 ### D.4.1 Auswahlverfahren
 
-Die Stichprobe ist eine bewusste **Maximum-Variation-Stichprobe** und kein
-statistisch repräsentativer Marktquerschnitt. Sie soll unterschiedliche
-Zielgruppen, Rechtsräume, Rechenansätze und Betriebsmodelle sichtbar machen.
-Aus ihr dürfen keine Marktanteils-, Häufigkeits- oder universellen
-Exklusivitätsaussagen abgeleitet werden.
+Die bewusste Maximum-Variation-Stichprobe ist nicht statistisch
+repräsentativ. Sie kontrastiert Zielgruppen, Rechtsräume, Rechenansätze und
+Betriebsmodelle; Marktanteils-, Häufigkeits- und universelle
+Exklusivitätsaussagen sind unzulässig.
 
-Ein Werkzeug wird aufgenommen, wenn:
-
-1. am Rekognoszierungstag eine offizielle Produkt- oder Betreiberseite
-   erreichbar und die untersuchte Stufe benennbar ist;
-2. Ruhestandsplanung, Vorsorgeinformation oder Kapitalentnahme zum
-   ausdrücklichen Kernzweck gehört;
-3. es ein vorgeschriebenes Segment oder einen methodisch eigenständigen Ansatz
-   repräsentiert;
-4. offizielle Quellen eine spätere Prüfung ermöglichen oder gerade die
-   begrenzte öffentliche Dokumentation als relevanter Befund untersuchbar ist;
-5. der Zusatznutzen gegenüber bereits aufgenommenen Produkten den
-   Rechercheaufwand rechtfertigt.
-
-Ausgeschlossen oder nur als Kontextquelle geführt werden reine Spar-, Kredit-
-oder Portfolioanalysewerkzeuge ohne Haushalts-/Entnahmebezug, doppelte
-Produktstufen, nicht mehr erreichbare Produkte und Werkzeuge, die nur durch
-Sekundärreviews identifizierbar sind. Portfolio Visualizer bleibt damit
-allenfalls eine Kontextquelle für Portfolioanalytik, aber kein Kernprodukt des
-Haushaltsvergleichs. Ein generisches Tabellenblatt ist eine Kontrollidee, kein
-Marktprodukt.
+Aufgenommen werden erreichbare, stufenscharf benennbare Werkzeuge mit
+Ruhestands-, Vorsorge- oder Entnahmezweck, eigenständigem Segmentnutzen und
+prüfbaren offiziellen Quellen. Reine Portfolioanalyse, doppelte Stufen,
+nicht erreichbare Produkte und nur sekundär belegte Werkzeuge bleiben
+Kontext, nicht Kernstichprobe.
 
 ### D.4.2 Untersuchte Stichprobe
 
-Die Tabelle fixiert Stichprobe, Segment, Stufe und Auswahlgrund. Die konkrete
-Funktionsabdeckung folgt aus den datierten Records und Ergebnissen in D.11 bis
-D.17, nicht aus der bloßen Aufnahme eines Produkts.
+Die Tabelle fixiert Segment und untersuchte Stufe; Aufnahme allein belegt
+keine Funktion.
 
 | ID | Segment | Produkt und untersuchte Stufe | Auswahlgrund | Offizieller Einstieg, geprüft am 2026-07-15 |
 | --- | --- | --- | --- | --- |
@@ -3415,141 +3365,83 @@ D.17, nicht aus der bloßen Aufnahme eines Produkts.
 | FR-02 | FIRE-Werkzeug | FIRECalc 3.0, öffentlicher Webzugang | etablierter historischer Sequenzrechner als zweite FIRE-Methodik | [FIRECalc](https://firecalc.com/) |
 | OT-01 | Offline-/Tabellenlösung | Pralana Gold | explizit herunterladbare Excel-Produktstufe und damit eigenständiger Offline-/Tabellenfall | [Pralana](https://pralanaretirementcalculator.com/) |
 
-Die zehn externen Werkzeuge verteilen sich auf zwei Consumer Planner, drei
-deutsche Werkzeuge, zwei Beraterprodukte, zwei FIRE-Werkzeuge und eine
-Offline-/Tabellenlösung. Die ungleiche Segmentgröße ist beabsichtigt: Der
-deutsche Block enthält einen Entnahmerechner, einen Verbraucherrechner und ein
-Vorsorgeportal mit verschiedenen Zwecken; die schmaleren Segmente werden nicht
-durch ähnliche Varianten künstlich aufgefüllt.
+Die zehn externen Werkzeuge decken zwei Consumer Planner, drei deutsche
+Werkzeuge, zwei Beraterprodukte, zwei FIRE-Werkzeuge und eine
+Offline-/Tabellenlösung ab.
 
 ### D.4.3 Austausch- und Abbruchregeln
 
-- Fällt ein Produkt bei einer späteren Aktualisierung weg, wird es nur durch
-  ein Werkzeug desselben Segments und mit dokumentiertem Auswahlgrund ersetzt.
-- Ändert sich der Produktname oder die Stufenstruktur, wird zuerst die
-  Produktidentität geklärt; alte und neue Stufen werden nicht vermischt.
-- Ist ein Beraterprodukt ohne Kauf, Login oder Demo nicht ausreichend
-  dokumentierbar, bleibt es in der Stichprobe und erhält neutrale
-  Dokumentationsbefunde. Ein Vertriebszugang wird nicht fingiert.
-- Mehr als zwei notwendige Ersetzungen oder der Wegfall eines gesamten
-  Segments erzwingen eine neue Stichprobenentscheidung; Ergebnisse
-  verschiedener Stichproben werden nicht still zusammengeführt.
+Ersatz erfolgt nur im selben Segment mit dokumentiertem Grund. Produkt- und
+Stufenwechsel werden nicht vermischt; geschlossene Zugänge erzeugen neutrale
+Dokumentationsbefunde. Mehr als zwei Ersetzungen oder der Wegfall eines
+Segments erfordern eine neue Stichprobenentscheidung.
 
 ## D.5 Statuslexikon und Evidenzregeln
 
 ### D.5.1 Zellstatus
 
-| Status | Verbindliche Bedeutung | Zulässige Vergabe |
-| --- | --- | --- |
-| **vorhanden** | Die untersuchte Produktstufe deckt den definierten Kern des Kriteriums nativ ab. | offizielle Quelle oder protokollierter Direktbefund bestätigt alle für das Kriterium als verpflichtend markierten Teilfragen |
-| **teilweise** | Ein substanzieller Teil ist vorhanden, aber Umfang, Region, Personenzahl, Zeitachse, Exporttiefe oder Referenzfall erfordern Einschränkung beziehungsweise Workaround. | die unterstützten und fehlenden Teilfragen werden beide ausdrücklich genannt |
-| **nicht öffentlich dokumentiert** | In den protokolliert geprüften offiziellen Quellen wurde keine belastbare Aussage gefunden. | neutraler Informationsbefund nach dem definierten Suchpfad; niemals Synonym für Abwesenheit |
-| **nicht vorhanden** | Die Funktion fehlt in der untersuchten Stufe nachweislich. | nur bei ausdrücklicher offizieller Negativaussage oder reproduziertem Direktbefund; nie allein aus Schweigen ableiten |
-| **nicht anwendbar** | Das Kriterium liegt außerhalb des erklärten Produktzwecks oder der untersuchten Zugriffsebene. | Produktzweck und Begründung werden genannt; der Status fließt in keine negative Wertung ein |
-| **nicht geprüft** | Die Erhebung ist offen, die Quelle blockiert oder ein nicht freigegebener Zugang wäre nötig. | nur als sichtbare Evidenzlücke mit Grund und betroffenem Kriterium zulässig |
+| Status | Verbindliche Bedeutung |
+| --- | --- |
+| **vorhanden** | offizielle Quelle oder Direktbefund bestätigt den gesamten Kriterienkern nativ |
+| **teilweise** | Kernanteil vorhanden, aber Umfang, Region, Person, Zeit, Export oder Referenzfall ist eingeschränkt; beide Seiten werden benannt |
+| **nicht öffentlich dokumentiert** | offizieller Suchpfad ohne belastbare Aussage; niemals Abwesenheitsbeleg |
+| **nicht vorhanden** | ausdrückliche Negativaussage oder reproduzierter Direktbefund; nie aus Schweigen |
+| **nicht anwendbar** | außerhalb von Produktzweck oder Zugriffsebene; keine negative Wertung |
+| **nicht geprüft** | offen, blockiert oder nur über nicht freigegebenen Zugang prüfbar; Grund ist Pflicht |
 
-Eine Zusammenfassung auf Kriterienebene folgt der konservativsten
-pflichtigen Teilfrage: `vorhanden` ist nur bei vollständiger Kernabdeckung
-zulässig; gemischte Kernabdeckung ist `teilweise`. Es werden keine Symbole in
-Punktwerte umgerechnet.
-
-### D.5.2 Evidenzklassen
-
-| Klasse | Quelle | Aussagekraft |
-| --- | --- | --- |
-| **P1** | offizielles Methodenpapier, Handbuch, technische Dokumentation, Rechts-, Preis- oder Lizenzseite | primärer Beleg für Methode, Vertrag, Stufe oder Preis |
-| **P2** | offizielle Produkt-, Feature-, Hilfe- oder FAQ-Seite | Beleg für öffentlich zugesagte Funktion, nicht automatisch für interne Implementierungstiefe |
-| **P3** | direkt beobachtete frei zugängliche Funktion mit protokollierten Eingaben, Stufe und Datum | Beleg für sichtbares Verhalten dieser Zugriffsebene |
-| **P4** | offizielle Demo, Release Note oder Anbieter-Video | ergänzender Beleg; zeitlicher und stufenbezogener Kontext ist Pflicht |
-| **S1** | unabhängiger Test oder Review | nur ergänzend für UX, Lernkurve und Nutzungseindruck; keine alleinige Basis für Funktions- oder Negativaussagen |
-| **I1** | ausdrücklich gekennzeichnete Inferenz | Interpretation aus mehreren Belegen; darf keine Funktion oder Abwesenheit allein begründen |
-
-Werbeaussagen und Anbieter-Testimonials bleiben Anbieteraussagen. Wörtliche
-Reviewer-Zitate sind für die Vergleichsmatrix nicht erforderlich. Bei
-widersprüchlichen offiziellen Quellen gewinnt nicht automatisch die neuere
-Marketingseite: Produktstufe, Datum und Aussagekontext werden geklärt oder der
-Befund bleibt offen.
+Auf Kriterienebene gilt die konservativste verpflichtende Teilfrage:
+`vorhanden` verlangt vollständige Kernabdeckung, gemischte Abdeckung ist
+`teilweise`. Die Evidenzklassen P1 bis P4, S1 und I1 sowie ihre Grenzen sind
+im [Evidenzregister](MARKTVERGLEICH_EVIDENZREGISTER.md#evidenzklassen-und-pflichtfelder)
+definiert. Werbeaussagen bleiben Anbieteraussagen; Widersprüche werden über
+Stufe, Datum und Kontext geklärt oder bleiben offen.
 
 ## D.6 Einheitlicher Kriterienkatalog
 
-Jedes Kriterium erhält in D.13 Teilbefunde, Status, Beleg-IDs und eine kurze
-Grenze. Die folgenden Fragen gelten unverändert für alle Produkte; nur
-`nicht anwendbar` schützt schmalere Produktzwecke vor einer sachfremden
-Abwertung.
+Alle Produktstufen werden mit denselben 18 Kriterien geprüft. Schmalere
+Werkzeuge erhalten bei sachfremden Fragen `nicht anwendbar`, nicht automatisch
+einen negativen Befund.
 
-| ID | Kriterium | Operationalisierte Prüffragen |
-| --- | --- | --- |
-| K-01 | **Fachmodell** | Welche Planart, Zeitgranularität, Real-/Nominalkonvention, Cashflow-Reihenfolge, Asset- und Einkommensarten, Horizonte sowie Erfolgs-/Endzustände sind definiert? |
-| K-02 | **Steuern** | Welche Region und Steuerjahre gelten? Werden Einkommen, Kontotypen, Kapitalgewinne, Kostenbasis/Lots, Verluste, Freibeträge, Teilfreistellung und gemeinsame Veranlagung nativ oder nur pauschal behandelt? |
-| K-03 | **Rente** | Lassen sich mehrere gesetzliche, betriebliche und private Renten je Person mit Beginn, Indexierung, Besteuerung und Hinterbliebenenwirkung abbilden? |
-| K-04 | **Pflege** | Sind Pflege-/Long-Term-Care-Kosten, Eintritt, Dauer/Progression, Personenzuordnung, Versicherung und zweckgebundene Reserve modellierbar? |
-| K-05 | **Haushalt** | Werden Einzelperson und Paar, Eigentum je Person, gemeinsame Bedarfe, Tod, Hinterbliebene und getrennte Zahlungsströme konsistent geführt? |
-| K-06 | **Datenbasis** | Welche Markt-, Inflations-, Mortalitäts- und sonstigen Reihen werden mit Region, Zeitraum, Quelle, Aktualisierung, Rekonstruktion und Importmöglichkeit offengelegt? |
-| K-07 | **Stochastik** | Welche deterministischen, historischen, Monte-Carlo-, Bootstrap- oder Stressverfahren existieren; sind Verteilungen, Korrelationen, Pfadzahl, Seed und Reproduzierbarkeit dokumentiert oder steuerbar? |
-| K-08 | **Transparenz** | Sind Formeln, Defaults, Einheiten, Ereignisreihenfolge, Ergebnisdefinitionen, Versionen, Unsicherheiten und Modellgrenzen auffindbar? |
-| K-09 | **Szenarien** | Können Basisplan, Varianten, zeitlich bestimmte Ereignisse und Stressannahmen gespeichert, kopiert, nebeneinander verglichen und auf den Ausgangsstand zurückgeführt werden? |
-| K-10 | **Optimierung** | Gibt es automatische Suche oder Empfehlungen; sind Zielgröße, Nebenbedingungen, Suchraum, Nutzerbestätigung, Robustheit und In-/Out-of-sample-Grenze erkennbar? |
-| K-11 | **Datenschutz** | Wo werden Finanzdaten verarbeitet und gespeichert; welche Kontoverknüpfungen, Drittanbieter sowie Tracking-, Export-, Lösch- und Aufbewahrungsregeln gelten für die untersuchte Stufe? |
-| K-12 | **Offline-Fähigkeit** | Welche Kernfunktionen laufen nach Installation beziehungsweise Download ohne Netzwerk; welche Anmeldung, Live-Daten, Fonts, Lizenzprüfungen oder Exporte benötigen weiterhin Verbindungen? |
-| K-13 | **Export** | Lassen sich Eingaben, Konfiguration, Jahreswerte, Transaktionen, Ergebnisdaten und Berichte maschinenlesbar oder druckbar exportieren, sichern und gegebenenfalls wieder importieren? |
-| K-14 | **Auditierbarkeit** | Ist ein Ergebnis von Eingabe, Default und Datenquelle über Zwischenschritte bis Ausgabe nachvollziehbar und mit Version, Stichtag und identischen Parametern reproduzierbar? |
-| K-15 | **UX** | Wie klar sind Einstieg, Eingabeaufwand, Validierung, Fehlerbehandlung, Ergebnisinterpretation, Szenariowechsel und Trennung von Basis- und Expertenfunktionen? |
-| K-16 | **Barrierefreiheit** | Sind Tastaturbedienung, Fokus, Labels/Screenreader, Kontrast, Zoom/Reflow und eine offizielle WCAG-/Accessibility-Aussage dokumentiert oder im freigegebenen Zugang prüfbar? |
-| K-17 | **Preis** | Welche exakt untersuchte Stufe, Währung, Abrechnungsperiode, Einführungs-/Verlängerungskondition, Steuerangabe, Testphase und Nutzer-/Mandantengrenze gelten am Stichtag? |
-| K-18 | **Lizenz** | Ist die Software proprietär oder quelloffen; welche Code-, Nutzungs-, Kopier-, Änderungs-, Weitergabe- und Datenrechte sind offiziell ausgewiesen? |
+| ID | Prüffeld | ID | Prüffeld |
+| --- | --- | --- | --- |
+| K-01 | Fachmodell und Zeitlogik | K-10 | Optimierung und Suchgrenzen |
+| K-02 | Steuerregion und -tiefe | K-11 | Datenschutz und Speicherung |
+| K-03 | Renten je Person | K-12 | Offline-Fähigkeit und Netzreste |
+| K-04 | Pflege, Eintritt und Reserve | K-13 | Export, Backup und Reimport |
+| K-05 | Haushalt, Eigentum, Tod | K-14 | Auditierbarkeit und Reproduktion |
+| K-06 | Datenbasis, Zeitraum, Quelle | K-15 | UX und Fehlerbehandlung |
+| K-07 | Stochastik, Seed, Stress | K-16 | Barrierefreiheit und WCAG-Nachweis |
+| K-08 | Formeln, Defaults, Grenzen | K-17 | Stufe, Währung und Preisperiode |
+| K-09 | Szenarien und Vergleich | K-18 | Lizenz- und Weitergaberechte |
 
-Preise werden in der Originalwährung und Originalperiode dokumentiert.
-Monatsangaben dürfen bei verpflichtender Jahreszahlung als Jahresbetrag
-normalisiert werden; Lifetime-Preise werden nicht willkürlich auf Jahre
-verteilt. Eine Euro-Umrechnung erfolgt nur mit benannter Kursquelle und
-Kursdatum. UX und Barrierefreiheit werden nur in tatsächlich zugänglichen
-Oberflächen geprüft; Marketing-Screenshots ersetzen keinen Bedienbefund.
+Preise bleiben in Originalwährung und -periode; UX und Barrierefreiheit
+werden nur in zugänglichen Oberflächen bewertet. Marketing-Screenshots
+ersetzen keinen Bedienbefund.
 
 ## D.7 Synthetischer Referenzhaushalt
 
 ### D.7.1 Zweck und Einheiten
 
-Der Referenzfall ist vollständig erfunden und enthält keine Nutzer- oder
-Produktivdaten. Er prüft **Modellierbarkeit**, nicht die Gleichheit numerischer
-Ergebnisse. Abweichende Datenreihen, Ereignisreihenfolgen und
-Stochastikmodelle machen Erfolgsquoten verschiedener Produkte ohne gesonderte
-Harmonisierung unvergleichbar.
-
-Stichtag ist der 2027-01-01. Alle als „real“ bezeichneten Beträge besitzen die
-Kaufkraft dieses Tages; nominale Festbeträge sind ausdrücklich markiert. Der
-Plan läuft bis 2066-12-31. Gesetzesähnliche Steuersätze sind feste
-Testparameter und keine Aussage über dann geltendes Recht oder individuelle
-Steuerberatung.
+Der vollständig synthetische Fall prüft Modellierbarkeit, nicht gleiche
+Ergebniszahlen. Stichtag und Kaufkraftbasis sind 2027-01-01, der Horizont
+reicht bis 2066-12-31. Ohne harmonisierte Daten, Ereignisreihenfolge,
+Inflation, Steuer und Erfolgsdefinition werden keine Erfolgsquoten verglichen.
+Die Steuersätze sind feste Testparameter, keine Rechts- oder Steuerberatung.
 
 ### D.7.2 Basisfall RH-01
 
-| Bereich | Festgelegter synthetischer Input |
+| Gruppe | Festgelegter synthetischer Input |
 | --- | --- |
-| Personen | Person A: 63 Jahre, Ruhestand ab 2027-01-01; Person B: 61 Jahre, Ruhestand ab 2029-01-01; deutscher gemeinsamer Haushalt |
-| Planungshorizont | 40 Kalenderjahre 2027 bis 2066; Basisszenario ohne vorgegebenen Tod |
-| Einkommensbasis | wiederkehrende Erwerbs- und Rentenbeträge sind verfügbare Netto-Cashflows nach Einkommensteuer und Sozialabgaben; Brutto-/Netto-Fähigkeiten werden separat unter K-02 geprüft |
-| Erwerbseinkommen | Person B: 30.000 EUR netto p.a. in 2027 und 2028, danach 0 EUR |
-| Gesetzliche Rente A | 22.800 EUR netto p.a. ab 2029-01-01, jährlich 2 % Indexierung |
-| Gesetzliche Rente B | 17.400 EUR netto p.a. ab 2033-01-01, jährlich 2 % Indexierung |
-| Private Rente A | 4.800 EUR netto p.a. ab 2032-01-01, nominal unverändert |
-| Lebenshaltungs-Floor | 42.000 EUR real p.a., jährlich mit 2 % inflationiert |
-| Flexible Ausgaben | 12.000 EUR real p.a., jährlich mit 2 % inflationiert |
-| Einmalereignis | 35.000 EUR real für eine Gebäudemaßnahme am 2035-01-01 |
-| Aktien-ETF | Marktwert 550.000 EUR; steuerliche Kostenbasis 350.000 EUR |
-| Anleihen | Marktwert 120.000 EUR |
-| freie Liquidität | 60.000 EUR |
-| Gold | Marktwert 40.000 EUR; steuerliche Kostenbasis 30.000 EUR |
-| Pflegevorsorge | 80.000 EUR zweckgebundene cash-/geldmarktnahe Reserve, außerhalb normaler Konsumausgaben |
-| Immobilie | schuldenfreier selbst genutzter Wert 450.000 EUR; nicht zur planmäßigen Entnahme freigegeben |
-| Kostenannahme | 0,25 % p.a. auf investiertes Finanzvermögen, sofern modellierbar |
-| deterministische Kontrollrenditen | Aktien 5,0 %, Anleihen 2,5 %, freie Liquidität/Pflegevorsorge 1,5 %, Gold 2,0 % nominal p.a. |
-| Steuer-Testparameter | 25 % Kapitalertragsteuersatz; Zuschlag 5,5 % auf diese Steuer; 0 % Kirchensteuer; 30 % ETF-Teilfreistellung; 2.000 EUR gemeinsamer Freibetrag; vorstehende Kostenbasen |
-| Entnahmepriorität | laufende Einkommen decken zuerst den Floor, dann flexible Ausgaben; Portfoliomittel decken die Lücke; Pflegevorsorge bleibt bis RH-03 gesperrt |
+| Personen | A: 63, Ruhestand 2027; B: 61, Ruhestand 2029; deutscher Paarhaushalt, 40 Jahre, im Basisfall kein vorgegebener Tod |
+| Netto-Cashflows | B: 30.000 EUR Erwerbseinkommen 2027/2028; gesetzliche Rente A 22.800 EUR ab 2029 und B 17.400 EUR ab 2033, je 2 % indexiert; private Rente A 4.800 EUR ab 2032 nominal konstant |
+| Bedarf | Floor 42.000 EUR real und Flex 12.000 EUR real, je 2 % Inflation; Gebäudemaßnahme 35.000 EUR real im Jahr 2035 |
+| Vermögen | Aktien-ETF 550.000/350.000 EUR Marktwert/Kostenbasis; Anleihen 120.000 EUR; Liquidität 60.000 EUR; Gold 40.000/30.000 EUR; gesperrte Pflegevorsorge 80.000 EUR; nicht entnahmefreigegebene Immobilie 450.000 EUR |
+| Rendite/Kosten | nominal Aktien 5,0 %, Anleihen 2,5 %, Liquidität/Pflegevorsorge 1,5 %, Gold 2,0 %; Kosten 0,25 % p.a. auf investiertes Finanzvermögen |
+| Steuer/Priorität | 25 % Kapitalertragsteuer, 5,5 % Zuschlag darauf, keine Kirchensteuer, 30 % ETF-Teilfreistellung, 2.000 EUR gemeinsamer Freibetrag; Einkommen deckt Floor und Flex, Portfolio die Lücke, Pflegevorsorge bleibt bis RH-03 gesperrt |
 
-Wenn ein Produkt Netto- und Bruttoströme nicht sauber trennt, wird kein
-passenderer Wert erfunden. Die Auswertung dokumentiert die notwendige
-Vereinfachung und ihre Richtung. Nicht eingebbare Assetklassen werden nicht
-lautlos einer anderen Klasse zugeschlagen.
+Nicht sauber trennbare Brutto-/Nettoflüsse und fehlende Assetklassen werden
+als Vereinfachung dokumentiert, nicht durch passend erscheinende Werte oder
+stille Umschichtung ersetzt.
 
 ### D.7.3 Feste Modellierbarkeitsproben
 
@@ -3569,46 +3461,17 @@ tatsächlich harmonisiert sind.
 
 ## D.8 Quellen- und Erhebungsprotokoll
 
-### D.8.1 Verbindlicher Suchpfad
+Der Suchpfad läuft von Produkt-/Stufen- und Preisseite über Handbuch und
+Methodik zu Datenschutz, Export, Offline, Lizenz, Barrierefreiheit und
+zugänglicher Oberfläche; Sekundärquellen dienen erst danach subjektiven
+UX-Fragen. Suchmaschinen-Snippets sind nur Wegweiser. Ein erfolgloser
+offizieller Suchweg wird als neutraler `99`-Record protokolliert.
 
-Pro Produkt werden, soweit vorhanden, in dieser Reihenfolge geprüft:
-
-1. Produkt- und Stufenseite;
-2. Preis-/Abonnementseite;
-3. Handbuch, Hilfezentrum und Methodenbeschreibung;
-4. Datenschutz, Sicherheit, Unterauftragsverarbeiter und Löschregeln;
-5. Export-, Offline-, Lizenz- und Barrierefreiheitsdokumentation;
-6. frei zugängliche Oberfläche oder offizielle Demo;
-7. erst danach unabhängige Sekundärquellen für subjektive UX-Fragen.
-
-Für `nicht öffentlich dokumentiert` wird der erfolglose Suchweg mit
-Suchbegriffen und geprüften offiziellen Bereichen notiert. Suchmaschinen-
-Snippets gelten nur als Wegweiser, nicht als Beleg. Eine Quelle muss die
-konkrete Behauptung tragen; eine allgemeine Homepage belegt keine spezielle
-Rechenmethode.
-
-### D.8.2 Quellenrecord
-
-Jeder Beleg erhält eine stabile ID nach dem Muster
-`MKT-<PRODUKT>-<NN>` und mindestens folgende Felder:
-
-| Feld | Inhalt |
-| --- | --- |
-| Quellen-ID | stabile ID, zum Beispiel `MKT-PL-01` |
-| Produkt-ID und Stufe | Zuordnung zur Stichprobe und exakt untersuchter Tarif/Version |
-| Betreiber, Titel, URL | offizielle Urheberschaft und direkte Zielseite |
-| Quellentyp/Evidenzklasse | P1 bis P4, S1 oder I1 |
-| Veröffentlichung/Änderung | Datum oder „nicht ausgewiesen“ |
-| Abrufdatum | `YYYY-MM-DD`, Europe/Berlin |
-| Sprache/Region | relevante Locale und Rechtsraum |
-| Kriterien/Behauptung | Kriteriums-ID plus knappe, quellennahe Paraphrase |
-| Fundstelle | Überschrift, Abschnitt oder reproduzierbarer Navigationspfad |
-| Einschränkung | Marketingkontext, Login-/Tarifgrenze, Widerspruch oder offene Frage |
-
-Eine Matrixzelle ohne Quellen-ID ist entweder `nicht geprüft` oder eine klar
-gekennzeichnete Inferenz. Bei dynamischen Seiten werden Titel, Abschnitt,
-Abrufdatum und die kurze Belegparaphrase festgehalten; lange Kopien
-urheberrechtlich geschützter Seiten gehören nicht in das Repository.
+Jeder Beleg hat die stabile Form `MKT-<PRODUKT>-<NN>` und führt Stufe,
+Betreiber, Ziel, Klasse, Veröffentlichungs-/Abrufstand, Region, Kriterium,
+Paraphrase, Fundstelle und Grenze. Der vollständige Feldvertrag und alle
+Records stehen im [Evidenzregister](MARKTVERGLEICH_EVIDENZREGISTER.md#evidenzklassen-und-pflichtfelder).
+Lange Kopien geschützter Quellentexte bleiben ausgeschlossen.
 
 ## D.9 Auswertung und zulässige Aussagen
 
@@ -3645,432 +3508,99 @@ Erhebung und Auswertung in D.11 bis D.18 verwenden diese Basis unverändert.
 
 Die Vollerhebung und die abschließende Volatilitätsprüfung erfolgten am
 2026-07-15. Es wurden weder Konten angelegt noch Testphasen, Käufe,
-Demoanforderungen oder nicht öffentliche Beraterzugänge genutzt. Ein
-öffentlich sichtbarer Rechner wird deshalb nicht automatisch als „kostenlos“
-bezeichnet: Fehlt eine ausdrückliche Preis- oder Vertragsaussage, bleibt der
-Preisstatus neutral. Preise stehen in Originalwährung und Originalperiode;
-Steuern und Wechselkurse wurden nicht ergänzt.
+Demoanforderungen oder nicht öffentliche Beraterzugänge genutzt. Preise
+stehen in Originalwährung und -periode; Steuern, Wechselkurse und nicht
+ausgewiesene Gesamtkosten wurden nicht ergänzt.
 
-| ID | Untersuchte Stufe und Zugang | Preisstand am 2026-07-15 | Lizenz-/Nutzungsstand | Belege |
-| --- | --- | --- | --- | --- |
-| RS-01 | Ruhestand-Suite, lokale Arbeitskopie dieses Repositorys | kein kommerzieller Tarif untersucht | LICENSE.md enthält MIT; package.json nennt abweichend ISC, Cargo.toml keine Lizenz | MKT-RS-01, MKT-RS-04, MKT-RS-05 |
-| CP-01 | ProjectionLab Premium, regulärer Webtarif | 129 USD pro Jahr | proprietäre, persönliche Nutzung nach Terms; Bestands-Self-Hosting bleibt lauffähig, erhält aber seit 2026 keine Bugfixes oder neue Produktupdates | MKT-PL-01, MKT-PL-08, MKT-PL-09 |
-| CP-02 | Boldin PlannerPlus, regulärer Webtarif | 12 USD pro Monat, 144 USD jährlich abgerechnet, nach 14 Tagen Testphase | persönliche, nicht übertragbare und nicht unterlizenzierbare Nutzung | MKT-BD-01, MKT-BD-09 |
-| DE-01 | BVI Entnahme-Rechner, öffentlicher Webzugang | öffentlich aufrufbar; kein gesonderter Rechner-Tarif dokumentiert | keine Software- oder Weitergabelizenz für den Rechner öffentlich ausgewiesen | MKT-BVI-01, MKT-BVI-99 |
-| DE-02 | Finanzfluss Entnahmeplan, öffentlicher Webzugang | öffentlich aufrufbar; kein gesonderter Rechner-Tarif dokumentiert | allgemeine AGB, aber keine Code- oder Rechnerlizenz ausgewiesen | MKT-FF-01, MKT-FF-03, MKT-FF-99 |
-| DE-03 | Digitale Rentenübersicht, persönliches Online-Portal | freiwillig und kostenfrei | staatlicher Portalzugang; keine Quellcode- oder Weitergabelizenz untersucht | MKT-DR-01, MKT-DR-99 |
-| AD-01 | MoneyGuide, Beraterstufe „MoneyGuide“ | 2.000 USD pro Berater und Jahr | proprietärer Beraterdienst nach veröffentlichten Terms | MKT-MG-01, MKT-MG-04 |
-| AD-02 | eMoney Pro, Beraterplattform | Preis nicht öffentlich dokumentiert; Vertriebszugang erforderlich | Produktlizenzbedingungen im öffentlichen Produktbereich nicht dokumentiert | MKT-EM-01, MKT-EM-99 |
-| FR-01 | FI Calc, öffentlicher Webzugang | kostenlos; freiwillige Unterstützung/Spenden | keine öffentliche Quellcode- oder Weitergabelizenz gefunden | MKT-FI-05, MKT-FI-99 |
-| FR-02 | FIRECalc 3.0, öffentlicher Webzugang | öffentlicher Rechner; Unterstützerfunktionen vorhanden, Betrag nicht ausgewiesen | Copyright-Hinweis, aber keine öffentliche Änderungs-/Weitergabelizenz | MKT-FC-01, MKT-FC-99 |
-| OT-01 | Pralana Gold 2026, herunterladbare Excel-Arbeitsmappe | 99 USD einmalig für die Version 2026 | proprietäre Dauerlizenz für diese Version; eine neue Hauptversion kann erneut kostenpflichtig sein | MKT-PR-02, MKT-PR-07 |
+| Untersuchte Stufe | Region/Zugang | Preisstand 2026-07-15 | Tragender Record |
+| --- | --- | --- | --- |
+| Ruhestand-Suite, lokale Arbeitskopie | DE/lokal | kein kommerzieller Tarif untersucht | [MKT-RS-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-01) |
+| ProjectionLab Premium | international/Web | 129 USD pro Jahr | [MKT-PL-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-pl-01) |
+| Boldin PlannerPlus | USA/Web | 12 USD monatlich, 144 USD jährlich abgerechnet | [MKT-BD-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-bd-01) |
+| BVI Entnahme-Rechner | DE/öffentlich | kein gesonderter Tarif dokumentiert | [MKT-BVI-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-bvi-01) |
+| Finanzfluss Entnahmeplan | DE/öffentlich | kein gesonderter Tarif dokumentiert | [MKT-FF-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-ff-01) |
+| Digitale Rentenübersicht | DE/eID-Portal | freiwillig und kostenfrei | [MKT-DR-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-dr-01) |
+| MoneyGuide | USA/Berater | 2.000 USD pro Berater und Jahr | [MKT-MG-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-mg-01) |
+| eMoney Pro | USA/Berater | nicht öffentlich dokumentiert | [MKT-EM-99](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-em-99) |
+| FI Calc | USA/öffentlich | kostenlos, freiwillige Unterstützung | [MKT-FI-05](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-fi-05) |
+| FIRECalc 3.0 | USA/öffentlich | Unterstützerfunktionen; Betrag offen | [MKT-FC-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-fc-01) |
+| Pralana Gold 2026 | USA/Excel-Download | 99 USD einmalig für Version 2026 | [MKT-PR-02](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-pr-02) |
 
-Die Preiszeilen sind keine Total-Cost-of-Ownership-Rechnung. Insbesondere
-Beraterzeit, Excel-Lizenz, lokale Hardware, optionale Dienste, Umsatzsteuer,
-Rabatte und Verlängerungsangebote sind nur einbezogen, wenn die genannte
-Quelle sie ausdrücklich der untersuchten Stufe zuordnet.
+Lizenz- und Nutzungsgrenzen stehen stufenscharf bei den Records. Für die
+Suite bleibt die Inkonsistenz aus MIT-Text, ISC-npm-Metadatum und leerem
+Cargo-Feld als GAP-MKT-06 sichtbar.
 
 ## D.12 Quellenrecords der Erhebung
 
-Für alle folgenden externen Records gilt als Abrufdatum 2026-07-15 in
-Europe/Berlin. „Nicht ausgewiesen“ bedeutet, dass auf der aufgerufenen Seite
-kein belastbares Veröffentlichungs- oder Änderungsdatum erkennbar war. Die
-Spalte „Grenze“ verhindert, dass eine Marketing- oder Hilfeseite als
-Wirksamkeitsnachweis gelesen wird. Records mit der Endung 99 sind
-Erhebungsprotokolle der geprüften offiziellen Bereiche und Suchbegriffe. Sie
-sind I1-Evidenz und dürfen ausschließlich einen Befund „nicht öffentlich
-dokumentiert“ oder „nicht geprüft“ tragen, niemals die Abwesenheit einer
-Funktion beweisen.
+Die vollständigen 69 MKT-Records mit Produktstufe, Region, Evidenzklasse,
+Veröffentlichungs- beziehungsweise Änderungsstand, Quellenziel,
+Belegparaphrase und Grenze stehen im normativen
+[Marktvergleich-Evidenzregister](MARKTVERGLEICH_EVIDENZREGISTER.md). Jeder
+Record besitzt dort einen stabilen Anker. Für externe Records gilt das
+Abrufdatum 2026-07-15 in Europe/Berlin. Records mit der Endung `99` sind
+neutrale Suchprotokolle und niemals Abwesenheitsbelege.
 
-### D.12.1 Ruhestand-Suite, lokale Arbeitskopie
+## D.13 Kriterienprofil K-01 bis K-18
 
-| Quellen-ID | Klasse | Betreiber, Titel und Fundstelle | Veröffentlichung/Änderung | Sprache/Region | Kriterien und quellennahe Aussage | Grenze |
-| --- | --- | --- | --- | --- | --- | --- |
-| MKT-RS-01 | P1 | Projekt, [README](../../README.md), Funktions-, Betriebs- und Workflowabschnitte | Repository-Stand 2026-07-15 | DE/Deutschland | K-01 bis K-05, K-07, K-09 bis K-15: lokale Kernrechnung, Profile, Steuer-, Pflege-, Simulations-, Optimierungs- und Exportpfade | Selbstdokumentation; kein externer Qualitäts- oder Wirksamkeitsnachweis |
-| MKT-RS-02 | P1 | Projekt, [TECHNICAL.md](TECHNICAL.md), Architektur-, Persistenz-, Worker- und Testverträge | Repository-Stand 2026-07-15 | DE/Deutschland | K-01, K-07 bis K-14: deterministische Contracts, lokale Adapter, Seeds, Worker und Diagnosepfade | Implementierungs- und Testnachweis, keine Entscheidungsvalidierung |
-| MKT-RS-03 | P1 | Projekt, [DATA_SOURCES.md](DATA_SOURCES.md), Quellen- und Fallbacktabellen | Repository-Stand 2026-07-15 | DE/international | K-06, K-11, K-12, K-14: Datenherkunft, Rekonstruktionen, optionale Netzpfade und Grenzen | Datenabdeckung und Rekonstruktionen bleiben modellabhängig |
-| MKT-RS-04 | P1 | Projekt, [LICENSE.md](../../LICENSE.md), „MIT License“ und „No Warranty“ | Copyright 2025 | EN/international | K-17, K-18: MIT-Rechte, Haftungs- und Beratungsgrenze | widerspricht der Lizenzangabe im npm-Manifest |
-| MKT-RS-05 | I1 | Projekt, [package.json](../../package.json) Feld license und [Cargo.toml](../../src-tauri/Cargo.toml) Feld license | Repository-Stand 2026-07-15 | EN/international | K-18: npm nennt ISC, Cargo lässt das Feld leer; Metadaten sind nicht synchron | Cross-Check, keine eigenständige Lizenzgewährung |
-| MKT-RS-99 | P3 | Direkter lokaler Check von Balance.html, Simulator.html, depot-tranchen-manager.html und app-Modulen auf Tastatur-, Fokus-, ARIA- und Szenariopfade | geprüft 2026-07-15 | DE/Deutschland | K-09, K-15, K-16 sowie RH-02 bis RH-04: einzelne A11y-Hilfen, feste Stress-Presets, stochastischer Pflegeeintritt und Witwenlogik | kein vollständiger Bedien-, Screenreader- oder WCAG-Test; keine frei konfigurierbare Ereignisfolge nachgewiesen |
+Die [vollständige Kriterienmatrix](MARKTVERGLEICH_EVIDENZREGISTER.md#kriterienmatrix-k-01-bis-k-18)
+steht beim Quellenregister. Sie verwendet ausschließlich das Statuslexikon
+aus D.5; `teilweise` ist kein Punktabzug und `nicht öffentlich dokumentiert`
+keine Funktionsverneinung. Die folgende Verdichtung zeigt die tragenden
+Befunde ohne Rangliste oder Gewichtung:
 
-### D.12.2 ProjectionLab Premium
-
-| Quellen-ID | Klasse | Betreiber, Titel und URL | Veröffentlichung/Änderung | Sprache/Region | Kriterien und Fundstelle | Grenze |
-| --- | --- | --- | --- | --- | --- | --- |
-| MKT-PL-01 | P1 | ProjectionLab, [Pricing & Subscriptions](https://projectionlab.com/pricing), Premium-Spalte | nicht ausgewiesen | EN/international | K-01, K-09, K-10, K-13, K-17: Preis, Pläne, What-if, Monte Carlo, Reports und Datenexport | Tarif- und Funktionszusage, kein Tieftest |
-| MKT-PL-02 | P1 | ProjectionLab, [Simulation Engine](https://projectionlab.com/help/simulation-engine), Ablauf und Jahresausgaben | nicht ausgewiesen | EN/international | K-01, K-06 bis K-08, K-14: 365-Tage-Jahr, Cashflow-Ablauf und Jahresergebnisse | keine vollständige Formel- oder Seedoffenlegung |
-| MKT-PL-03 | P2 | ProjectionLab, [Create a New Plan](https://projectionlab.com/help/create-new-plan), Advanced Options und Milestones | veröffentlicht 2025-03-11 | EN/international | K-01, K-04 bis K-09 sowie RH-01 bis RH-03: Personen, Ereignisse, historische Tests und benutzerdefinierte Rendite-/Inflationsfolgen | allgemeine Ereignisse sind keine native Pflegefachlichkeit |
-| MKT-PL-04 | P2 | ProjectionLab, [Tax Analytics](https://projectionlab.com/tax-analytics), Länder-Presets und Tax Analytics | nicht ausgewiesen | EN/international | K-02, K-10: internationale Steuer-Presets einschließlich Deutschland und Steueranalysen | kein Beleg für vollständige deutsche Lot-, Verlusttopf- und Teilfreistellungslogik |
-| MKT-PL-05 | P2 | ProjectionLab, [Life Expectancy Milestone](https://projectionlab.com/help/life-expectancy-milestone), Partner death effects | nicht ausgewiesen | EN/international | K-05 und RH-04: Tod, Vermögensübertragung und Statusänderungen | exakte deutsche Hinterbliebenenregeln nicht belegt |
-| MKT-PL-06 | P2 | ProjectionLab, [Defined Benefit Pension](https://projectionlab.com/help/defined-benefit-pension), Pensionseingabe | nicht ausgewiesen | EN/international | K-03: leistungsdefinierte Renten mit Beginn und Anpassungen | kein vollständiger deutscher Renten-/Steuervertrag |
-| MKT-PL-07 | P1 | ProjectionLab, [Data Security](https://projectionlab.com/help/data-security), Speicherung, Verschlüsselung, Export und Löschen | nicht ausgewiesen | EN/international | K-11: Cloudspeicherung, Schutz-, Export- und Löschangaben | Anbieterangabe; keine unabhängige Sicherheitsprüfung |
-| MKT-PL-08 | P2 | ProjectionLab, [Update on Self-Hosting](https://projectionlab.com/blog/update-on-self-hosting), Web-Fokus und Wartungsende | veröffentlicht 2025-03-06; Bugfix-Support bis 2025-12-31 | EN/international | K-12: bestehende Self-Hosting-Installationen bleiben lauffähig; künftige Updates erscheinen nur für die Web-App | aktueller Pricing-Zugang und Legacy-Self-Hosting dürfen nicht vermischt werden |
-| MKT-PL-09 | P1 | ProjectionLab, [Terms of Service](https://projectionlab.com/terms), Rechte und Dienstnutzung | nicht ausgewiesen | EN/USA | K-18: proprietäre Rechte und Nutzungsbedingungen | keine Aussage zur Planungsqualität |
-| MKT-PL-99 | I1 | Suchprotokoll: Pricing, Help, Security, Privacy, Terms, Changelog; Suchbegriffe care, long-term care, accessibility, WCAG, seed, offline | geprüft 2026-07-15 | EN/international | K-04, K-15, K-16: keine belastbare native Pflege- oder formale Accessibility-/Usability-Aussage im freigegebenen Zugang gefunden | Schweigen ist kein Funktions-Negativbeleg |
-
-### D.12.3 Boldin PlannerPlus
-
-| Quellen-ID | Klasse | Betreiber, Titel und URL | Veröffentlichung/Änderung | Sprache/Region | Kriterien und Fundstelle | Grenze |
-| --- | --- | --- | --- | --- | --- | --- |
-| MKT-BD-01 | P1 | Boldin, [Pricing](https://www.boldin.com/retirement/pricing/), PlannerPlus-Spalte | nicht ausgewiesen | EN/USA | K-01, K-09, K-10, K-13, K-17: Tarif, 250+ Eingaben, Szenarien, Explorers, Charts und Reports | US-Produktmarketing, kein Deutschlandnachweis |
-| MKT-BD-02 | P2 | Boldin Help, [Suitability Outside the US](https://help.boldin.com/en/articles/6509299-is-plannerplus-suitable-for-canadians-or-other-non-us-citizens-planning-for-retirement), Limitations | nicht ausgewiesen | EN/USA | K-02 und RH-01: US-Steuer-, RMD- und Social-Security-Logik; ausländische Steuern nur über manuelle Annahmen/Workarounds | ausdrückliche Regionalgrenze |
-| MKT-BD-03 | P1 | Boldin Help, [Monte Carlo Simulation](https://help.boldin.com/en/articles/5805671-boldin-s-monte-carlo-simulation), Methodik | nicht ausgewiesen | EN/USA | K-07, K-08, K-14: 1.000 Läufe, Normalverteilung, Erfolgsdefinition | kein steuerbarer Seed dokumentiert |
-| MKT-BD-04 | P2 | Boldin Help, [Asset Allocation and Return Assumptions](https://help.boldin.com/en/articles/10563826-how-do-i-account-for-asset-allocation-and-rate-of-return-assumptions), Annahmen | nicht ausgewiesen | EN/USA | K-06 bis K-08: Modellportfolios, historische Basis 1994–2024, Rendite- und Volatilitätsannahmen | einzelne Holdings, Kostenbasis und Transaktionen ausdrücklich noch nicht vollständig abgebildet |
-| MKT-BD-05 | P2 | Boldin Help, [Create and Compare Scenarios](https://help.boldin.com/en/articles/4326642-video-demo-create-and-compare-scenarios), Szenariovergleich | nicht ausgewiesen | EN/USA | K-09: bis zu zehn Szenarien und Vergleich | Video-/Hilfedarstellung, kein eigener Bediencheck |
-| MKT-BD-06 | P2 | Boldin Help, [Long-Term Care Assumptions](https://help.boldin.com/en/articles/5847824-what-are-the-long-term-care-assumptions), LTC-Modell | nicht ausgewiesen | EN/USA | K-04 und RH-03: US-LTC-Kosten, Dauer und Finanzierungsoptionen | kein deutsches Pflegegrad- oder Pflegeversicherungsmodell |
-| MKT-BD-07 | P2 | Boldin Help, [When the First Spouse Passes](https://help.boldin.com/en/articles/9293023-assumptions-when-the-first-spouse-passes), Haushaltsfolgen | nicht ausgewiesen | EN/USA | K-03, K-05 und RH-04: Todesfall, Survivor Income und manuell anzupassende Ausgaben | deutsche Renten- und Haushaltsregeln nicht nativ |
-| MKT-BD-08 | P1 | Boldin, [Privacy Policy](https://www.boldin.com/retirement/privacy-policy/), Datenkategorien, Dienste und Rechte | nicht ausgewiesen | EN/USA | K-11: Verarbeitung, Dienstleister, Aufbewahrung und Löschrechte | Rechtsraum und konkrete Kontoverknüpfungen beachten |
-| MKT-BD-09 | P1 | Boldin, [Terms of Use](https://www.boldin.com/retirement/terms-of-use/), Software License | nicht ausgewiesen | EN/USA | K-18: persönliche, nicht übertragbare, nicht unterlizenzierbare Lizenz; kein Kopieren oder Reverse Engineering | proprietärer Nutzungsvertrag |
-| MKT-BD-99 | I1 | Suchprotokoll: Pricing, Help Center, Privacy, Terms; Suchbegriffe offline, accessibility, WCAG, seed, export data | geprüft 2026-07-15 | EN/USA | K-12, K-15, K-16: kein freigegebener Offlinepfad, keine formale Accessibility-Aussage und kein eigener UX-Test | nur Dokumentationslücke, kein Abwesenheitsbeleg |
-
-### D.12.4 Deutsche Vorsorge- und Entnahmewerkzeuge
-
-| Quellen-ID | Klasse | Produktstufe, Betreiber, Titel und URL | Veröffentlichung/Änderung | Sprache/Region | Kriterien und Fundstelle | Grenze |
-| --- | --- | --- | --- | --- | --- | --- |
-| MKT-BVI-01 | P1 | BVI Entnahme-Rechner, [direkter Rechner](https://www.bvi.de/service/rechner/entnahmerechner/), Eingaben und Methodenhinweis | revidiert 2026-06-15 | DE/Deutschland | K-01, K-02, K-06 bis K-08, K-13 bis K-15: 100.000 Zufallskombinationen historischer Jahresrenditen, Indizes/Zeiträume, Inflation, Kosten, Steuersatz und Ergebnisdownload | Wiederholung kann andere Ergebnisse liefern; keine Seedsteuerung |
-| MKT-BVI-02 | P1 | BVI, [Datenschutz](https://www.bvi.de/datenschutz/), Webzugriff, Logs, Cookies und Betroffenenrechte | zuletzt geändert 2021-02-08 | DE/Deutschland | K-11: Webdatenschutz und Drittanbieterhinweise | nicht rechnerspezifisch; eingegebene Finanzwerte werden nicht gesondert beschrieben |
-| MKT-BVI-99 | I1 | Suchprotokoll: Rechner, Datenschutz, Impressum; Suchbegriffe Preis, Lizenz, offline, accessibility, WCAG, Szenario speichern | geprüft 2026-07-15 | DE/Deutschland | K-09, K-12, K-16 bis K-18: keine belastbaren produktbezogenen Aussagen gefunden | keine Negativaussage |
-| MKT-FF-01 | P3 | Finanzfluss Entnahmeplan, [öffentlicher Rechner](https://www.finanzfluss.de/rechner/entnahmeplan/), Eingaben und Ergebnisdarstellung | nicht ausgewiesen | DE/Deutschland | K-01, K-02, K-06 bis K-08, K-14, K-15: deterministischer Auszahlplan aus Kapital, Rendite, Betrag, Intervall und Kapitalverzehr | Befund gilt nur für diesen Rechner, nicht für andere Finanzfluss-Rechner |
-| MKT-FF-02 | P1 | Finanzfluss, [Datenschutz Website](https://www.finanzfluss.de/datenschutz/website/), Website- und Rechnerzugriff | nicht ausgewiesen | DE/EU | K-11: Website-Datenverarbeitung und Trackingangaben | nicht jede technische Verarbeitung des Rechners separat beschrieben |
-| MKT-FF-03 | P1 | Finanzfluss, [Allgemeine Geschäftsbedingungen](https://www.finanzfluss.de/agb/), allgemeine Nutzung | nicht ausgewiesen | DE/Deutschland | K-17, K-18: allgemeine kostenpflichtige Inhalte und Nutzungsrahmen | kein eigener Tarif oder Softwarelizenztext für den Entnahmeplan |
-| MKT-FF-99 | I1 | Suchprotokoll: Rechner, Datenschutz, AGB; Suchbegriffe Export, CSV, offline, Lizenz, accessibility, WCAG, Szenario | geprüft 2026-07-15 | DE/Deutschland | K-09, K-12, K-13, K-16 bis K-18: keine belastbaren rechnerspezifischen Aussagen gefunden | Schweigen ist kein Abwesenheitsbeleg |
-| MKT-DR-01 | P2 | ZfDR/DRV Bund, [Häufige Fragen](https://www.rentenuebersicht.de/DE/05_haeufig_gestellte_fragen/haeufig_gestellte_fragen_node.html), Zweck, Inhalt, Anmeldung, Export und Sicherheit | nicht ausgewiesen | DE/Deutschland | K-01 bis K-03, K-05, K-06, K-08, K-09, K-11 bis K-15, K-17: Vorsorgeansprüche, Grenzen, Browser/eID, Verschlüsselung, PDF/ZIP/CSV und kostenfreie Nutzung | Portal aggregiert Anbieterwerte; kein vollständiger Haushalts- oder Entnahmeplaner |
-| MKT-DR-02 | P1 | ZfDR/DRV Bund, [FAQ für Vorsorgeeinrichtungen](https://www.rentenuebersicht.de/vorsorgeeinrichtungen/FAQ/faq_node.html), Datenumfang und Verfahren | nicht ausgewiesen | DE/Deutschland | K-03, K-06, K-08, K-14: teilnehmende Einrichtungen, Datensätze, Aktualität und CSV-Inhalte | institutionelle Schnittstellensicht |
-| MKT-DR-03 | P1 | ZfDR/DRV Bund, [Datenbeschreibung Version 10](https://www.rentenuebersicht.de/SharedDocs/Downloads/Datenbeschreibung.html), Downloadseite | Stand 2025-12-18 | DE/Deutschland | K-06, K-08, K-13, K-14: versionierter Datenaustausch | Downloadseite kennzeichnet das PDF selbst als nicht barrierefrei |
-| MKT-DR-04 | P1 | ZfDR/DRV Bund, [Erklärung zur Barrierefreiheit](https://www.rentenuebersicht.de/DE/Service/Footer/Barrierefreiheit/barrierefreiheit_node.html), Vereinbarkeit und nicht barrierefreie Inhalte | Selbstbewertung 2023-04; aktualisiert 2026-01-05 | DE/Deutschland | K-16: Prüfung nach BGG/BITV, EN 301 549 und WCAG 2.1; dokumentierte Restmängel bei Überschriften, Tabreihenfolge, Fehlermeldungen und mobilem Menü | Erklärung gilt für die veröffentlichte Website; authentifizierte Portalabläufe wurden hier nicht selbst geprüft |
-| MKT-DR-99 | I1 | Suchprotokoll: FAQ, Rechtliches, Datenschutz, Barrierefreiheit, Datenbeschreibung; kein Login/eID eingesetzt | geprüft 2026-07-15 | DE/Deutschland | K-15, K-16, K-18: authentifizierte UX und App-Details nicht geprüft; keine Softwarelizenz bewertet | öffentlicher Seitencheck ersetzt keinen Portaltest |
-
-### D.12.5 Beratersoftware
-
-| Quellen-ID | Klasse | Produktstufe, Betreiber, Titel und URL | Veröffentlichung/Änderung | Sprache/Region | Kriterien und Fundstelle | Grenze |
-| --- | --- | --- | --- | --- | --- | --- |
-| MKT-MG-01 | P1 | Envestnet MoneyGuide, [Products & Pricing](https://www.moneyguidepro.com/ifa/home/products), Stufe MoneyGuide | nicht ausgewiesen | EN/USA | K-01 bis K-04, K-09, K-10, K-17: Zielplanung, Health Care Goal, Stress, Distribution, Social Security, Tax Planning und Preis | B2B-Funktionszusage, kein eigener Beraterzugang |
-| MKT-MG-02 | P2 | MoneyGuide, [Frequently Asked Questions](https://www.moneyguidepro.com/ifa/home/faqs), Planaufbau, Monte Carlo und Reports | nicht ausgewiesen | EN/USA | K-01 bis K-10, K-12 bis K-14: Webdienst, historische/projizierte Renditen, Ziele, Einkommen, Steuerkonten, Monte Carlo und PDF | Detailtiefe einzelner Formeln und Seeds begrenzt |
-| MKT-MG-03 | P1 | MoneyGuide, [Security](https://www.moneyguidepro.com/ifa/home/security), Hosting, Verschlüsselung und Backups | nicht ausgewiesen | EN/USA | K-11: Cloud-, Schutz- und Sharing-Angaben | Anbieterangabe, kein Auditbericht ausgewertet |
-| MKT-MG-04 | P1 | MoneyGuide, [Terms of Service](https://www.moneyguidepro.com/ifa/license-agreements/display/MoneyGuidePro), Account- und Nutzungsrechte | nicht ausgewiesen | EN/USA | K-04, K-11, K-18: Beraterkonto, Dienstnutzung, proprietäre Rechte und Datenfeeds | Vertrag für US-Berater; kein Deutschlandprodukt |
-| MKT-MG-99 | I1 | Suchprotokoll: Products, FAQ, Security, Terms; Suchbegriffe accessibility, WCAG, seed, offline, German tax | geprüft 2026-07-15 | EN/USA | K-15, K-16: kein freigegebener UX-Test und keine formale Accessibility-Aussage | B2B-Zugang nicht umgangen |
-| MKT-EM-01 | P2 | eMoney Advisor, [eMoney Pro](https://emoneyadvisor.com/products/emoney-pro/), Cashflow, Client Portal und Decision Center | nicht ausgewiesen | EN/USA | K-01 bis K-03, K-05, K-08 bis K-10, K-13: Cashflowplanung, Kollaboration, What-if und Planvergleich | Marketingseite; interne Methodik nicht vollständig offengelegt |
-| MKT-EM-02 | P2 | eMoney Advisor, [FAQ](https://emoneyadvisor.com/faq/), Plattform, Aggregation und Sicherheit | nicht ausgewiesen | EN/USA | K-05, K-09, K-11, K-13: Portal, Datenaggregation, Integrationen und Schutzangaben | keine stufenscharfe Preis- oder Methodenquelle |
-| MKT-EM-03 | P1 | eMoney Advisor, [Security](https://emoneyadvisor.com/security/), Sicherheitsprogramm | nicht ausgewiesen | EN/USA | K-11: Sicherheits-, Datenschutz- und Governanceaussagen | Anbieterangabe, kein unabhängiger Prüfbericht in dieser Erhebung |
-| MKT-EM-04 | P4 | eMoney Advisor, [Product Comparison PDF](https://emoneyadvisor.com/wp-content/uploads/2021/01/eMoney-Solutions-to-Grow-and-Scale-Your-Business-Product-Comparison.pdf), Pro-Spalte | 2021-01 | EN/USA | K-01 bis K-03, K-07, K-08, K-13, K-14: Cashflow, Steuer-/Estate-Funktionen, Monte Carlo, Stress und Reports | historischer offizieller Beleg; heutige Detailausprägung nicht vollständig verifiziert |
-| MKT-EM-99 | I1 | Suchprotokoll: Product, FAQ, Security, Integrations, Privacy-Bereiche; Suchbegriffe price, license, accessibility, WCAG, offline, care, methodology | geprüft 2026-07-15 | EN/USA | K-04, K-06, K-12, K-15 bis K-18: öffentlich keine stufenscharfen Angaben zu diesen Fragen gefunden oder Zugang nicht freigegeben | neutraler Informationsbefund |
-
-### D.12.6 FIRE-Werkzeuge und Pralana Gold
-
-| Quellen-ID | Klasse | Produktstufe, Betreiber, Titel und URL | Veröffentlichung/Änderung | Sprache/Region | Kriterien und Fundstelle | Grenze |
-| --- | --- | --- | --- | --- | --- | --- |
-| MKT-FI-01 | P1 | FI Calc, [Guide](https://guide.ficalc.app/), Introduction, Configuration und Strategies | nicht ausgewiesen | EN/USA | K-01, K-03 bis K-05, K-07 bis K-10, K-15: historische Entnahmeprüfung, Einkommen, Zusatzausgaben und Strategien | bewusst enger FIRE-/Entnahmezweck |
-| MKT-FI-02 | P1 | FI Calc, [Historical Data Source](https://guide.ficalc.app/how-it-works/historical-data-source/), Shiller-Daten | nicht ausgewiesen | EN/USA | K-06 bis K-08, K-14: US-Daten ab 1871 und Aufbereitung | US-Daten; keine Zukunftsprognose |
-| MKT-FI-03 | P1 | FI Calc, [One Simulation Year](https://guide.ficalc.app/how-it-works/one-simulation-year), Ereignisreihenfolge | nicht ausgewiesen | EN/USA | K-01, K-08, K-14: Entnahme, Wachstum, Gebühren und Rebalancing pro Jahr | vereinfachtes Portfolio- und Steuermodell |
-| MKT-FI-04 | P1 | FI Calc, [Withdrawal Strategies](https://guide.ficalc.app/withdrawal-strategies/), Regelkatalog | nicht ausgewiesen | EN/USA | K-07, K-08, K-10: dokumentierte statische und dynamische Entnahmeregeln | Auswahl von Regeln ist keine automatische Optimierung |
-| MKT-FI-05 | P1 | FI Calc, [FAQ](https://guide.ficalc.app/other/faq), Steuern, Preis und Grenzen | nicht ausgewiesen | EN/USA | K-02, K-07, K-17: keine automatische Steuerrechnung, kein Monte Carlo, kostenloser Zugang | klare Negativaussagen gelten nur für FI Calc |
-| MKT-FI-06 | P1 | FI Calc, [Privacy](https://guide.ficalc.app/privacy), Eingaben und Analytics | nicht ausgewiesen | EN/international | K-11: eingegebene Finanzdaten verlassen das Gerät nicht; Analytics erhält keine Inputs | sagt nicht, dass die Webanwendung vollständig offline startet |
-| MKT-FI-07 | P1 | FI Calc, [Exporting Results](https://guide.ficalc.app/usage-guides/exporting-results), CSV-Export | nicht ausgewiesen | EN/international | K-13: CSV für alle oder einzelne Simulationen | kein vollständiger Backup-/Reimportvertrag belegt |
-| MKT-FI-08 | P1 | FI Calc, [Income](https://guide.ficalc.app/configuration/income), wiederkehrende Einkommensströme | nicht ausgewiesen | EN/USA | K-03, K-05 sowie RH-01/RH-04: Einkommen mit Beginn, Ende und Inflationsanpassung | kein personenspezifischer Renten- oder Survivor-Vertrag |
-| MKT-FI-09 | P1 | FI Calc, [Extra Withdrawals](https://guide.ficalc.app/configuration/extra-withdrawals), zusätzliche Entnahmen | nicht ausgewiesen | EN/USA | K-04, K-05 sowie RH-01/RH-03/RH-04: zeitlich begrenzte zusätzliche Ausgaben | allgemeine Ausgabe, keine Pflegegrad- oder Todesfalllogik |
-| MKT-FI-99 | I1 | Suchprotokoll: Guide, Privacy, FAQ; Suchbegriffe source code, license, offline, PWA, accessibility, WCAG, scenario save | geprüft 2026-07-15 | EN/international | K-09, K-12, K-16, K-18: keine belastbaren Aussagen gefunden | „frei zugänglich“ ist nicht „Open Source“ |
-| MKT-FC-01 | P1 | FIRECalc, [FIRECalc 3.0](https://firecalc.com/), Eingabeseiten, Methodik, Investigate und Copyright | Datenstand bis 2026-01-01; Seite aktualisiert 2026-04-17 | EN/USA | K-01, K-03 bis K-10, K-13 bis K-15, K-17, K-18: historische Startjahre seit 1871, Einkommen, Ausgabenregeln, Zufallsoption und Zielsuche | keine vollständige Steuer-, Seed- oder Weitergabelizenzdokumentation |
-| MKT-FC-02 | P1 | FIRECalc, [Privacy Policy](https://www.firecalc.com/privacy.php), Eingaben, temporäre Dateien und Cookies | nicht ausgewiesen | EN/USA | K-11: Finanzinputs nicht dauerhaft gespeichert; temporäre Serverdateien werden nach 15 Minuten gelöscht | serverseitige Verarbeitung bleibt; kein Offlinebeleg |
-| MKT-FC-99 | I1 | Suchprotokoll: Rechnerseiten, Privacy, Support-/Copyrightbereich; Suchbegriffe tax, seed, offline, license, accessibility, WCAG, scenario save | geprüft 2026-07-15 | EN/USA | K-02, K-09, K-12, K-16 bis K-18: Teilfragen nicht belastbar dokumentiert | keine Negativaussage außer ausdrücklich sichtbaren Eingabebefunden |
-| MKT-PR-01 | P2 | Pralana, [Gold Retirement Calculator](https://pralanaretirementcalculator.com/), Produktumfang und lokale Excel-Nutzung | nicht ausgewiesen | EN/USA | K-01, K-05, K-09, K-11 bis K-13: herunterladbare Arbeitsmappe, drei Szenarien, Windows/Mac und lokale Daten | Excel-Lizenz und Bedienaufwand separat |
-| MKT-PR-02 | P1 | Pralana, [Get PRC](https://pralanaretirementcalculator.com/get-prc/), Gold-Preis und Kaufumfang | nicht ausgewiesen | EN/USA | K-12, K-17: 99 USD einmalig für PRC2026 Gold, Download und aktuelle Updates | neue Hauptversion kann nach Terms erneut kosten |
-| MKT-PR-03 | P2 | Pralana, [Accounts & Portfolios](https://pralanaretirementcalculator.com/accounts-portfolios/), Konten und Assetklassen | nicht ausgewiesen | EN/USA | K-01, K-02, K-05: taxable/deferred/Roth, Kapitalgewinne und bis zu zehn Assetklassen | US-Konto- und Steuerlogik |
-| MKT-PR-04 | P2 | Pralana, [Analysis & Optimization](https://pralanaretirementcalculator.com/analysis-optimization/), Simulations- und Optimierungsarten | nicht ausgewiesen | EN/USA | K-06 bis K-10, K-14 sowie RH-02: deterministisch, Monte Carlo, historisch, Withdrawal-/Roth-/Startalter-Optimierung | öffentliche Seite zeigt nicht jeden Parameter oder Seed |
-| MKT-PR-05 | P2 | Pralana, [Income & Expenses](https://pralanaretirementcalculator.com/income-expenses/), Personen, Pensionen, Survivor und Gesundheit | nicht ausgewiesen | EN/USA | K-02 bis K-05 sowie RH-01, RH-03, RH-04: personenspezifische Ströme, Pensionen, Survivor und Gesundheitsphasen | kein deutsches Pflegegrad- oder Steuerrecht |
-| MKT-PR-06 | P1 | Pralana, [Manuals](https://pralanaretirementcalculator.com/manuals/), Gold-Handbuchzugang | Version 2026 ausgewiesen | EN/USA | K-06 bis K-10, K-13 bis K-15: öffentliches Detailhandbuch | Verhalten der gekauften Mappe nicht selbst ausgeführt |
-| MKT-PR-07 | P1 | Pralana, [Terms](https://pralanaretirementcalculator.com/terms/), Lizenz und Versionen | zuletzt aktualisiert 2025-05-16 | EN/USA | K-17, K-18: proprietäre beschränkte Dauerlizenz für die erworbene Version und mögliche Kosten neuer Versionen | Terms gehen Preis-Marketing bei Lizenzfragen vor |
-| MKT-PR-99 | I1 | Suchprotokoll: Product, Get PRC, Manuals, Terms, Privacy; Suchbegriffe accessibility, WCAG, German tax, care grade, export format | geprüft 2026-07-15 | EN/USA | K-15, K-16 sowie offene Export-/Pflegedetails: ohne Kauf nicht vollständig prüfbar | kein Workbook- oder Accessibility-Test |
-
-## D.13 Kriterienmatrix K-01 bis K-18
-
-Jede Zelle enthält ausschließlich einen Status aus D.5.1 und die tragenden
-Quellen-IDs. „Teilweise“ bedeutet häufig eine andere Region, einen engeren
-Produktzweck oder eine fehlende Teilfrage; es ist kein Punktabzug.
-„Nicht öffentlich dokumentiert“ und „nicht geprüft“ sind ausdrücklich keine
-Negativurteile. Die Tabellen werden weder addiert noch gewichtet.
-In kompakten Zellen erben slash-getrennte Nummern das vollständig genannte
-Präfix: MKT-PL-01/02/03 verweist eindeutig auf MKT-PL-01, MKT-PL-02 und
-MKT-PL-03.
-
-### D.13.1 Referenzprodukt Ruhestand-Suite
-
-| ID | Status und Belege | Wesentliche Abgrenzung |
+| Segment | Belegte Stärke im untersuchten Zweck | Wesentliche Grenze |
 | --- | --- | --- |
-| K-01 Fachmodell | vorhanden · MKT-RS-01, MKT-RS-02 | Mehrjahres-, Jahres- und Entnahmemodell mit expliziten Zuständen; kein Anspruch auf vollständige Finanzplanung |
-| K-02 Steuern | teilweise · MKT-RS-01, MKT-RS-02 | deutsche Kapitalertragsteuer, Lots, Verlusttopf und Teilfreistellung; keine vollständige Einkommensteuer-/Sozialabgabenrechnung |
-| K-03 Rente | teilweise · MKT-RS-01, MKT-RS-02 | zwei Personen, Starts, Indexierung und Witwenanteil; keine frei skalierbare Liste aller gesetzlichen, betrieblichen und privaten Verträge |
-| K-04 Pflege | teilweise · MKT-RS-01, MKT-RS-02 | Pflegegrade, Kostenprogression und zweckgebundener Bucket; keine aktuarielle Pflegeversicherung und kein frei fixierbares Eintrittsereignis |
-| K-05 Haushalt | vorhanden · MKT-RS-01, MKT-RS-02 | Profilverbund, getrennte Eigentümer, Tod und Hinterbliebenenpfad sind integriert |
-| K-06 Datenbasis | teilweise · MKT-RS-03 | Quellen, Zeiträume, Fallbacks und Rekonstruktionen sind dokumentiert; nicht jede Reihe ist vollständig beobachtet oder zukunftsrepräsentativ |
-| K-07 Stochastik | vorhanden · MKT-RS-01, MKT-RS-02 | historisch, Bootstrap, Regime, Monte Carlo, Stress und per-run Seeds sind dokumentiert |
-| K-08 Transparenz | vorhanden · MKT-RS-02, MKT-RS-03 | Contracts, Reihenfolgen, Defaults, Logs und Modellgrenzen sind lokal nachvollziehbar |
-| K-09 Szenarien | teilweise · MKT-RS-01, MKT-RS-99 | Backtest, Presets, Sweep und Szenariologs; kein allgemeiner gespeicherter Side-by-side-Planvergleich wie bei Vollplanern |
-| K-10 Optimierung | vorhanden · MKT-RS-01, MKT-RS-02 | Sweep und mehrphasige Auto-Optimize-Pipeline mit Constraints und Diagnose; Ergebnis bleibt modellinterne Suche |
-| K-11 Datenschutz | vorhanden · MKT-RS-01, MKT-RS-03 | lokale Persistenz und manuelle Exporte; optionale Markt-/Inflations-/CAPE- und Font-Netzpfade sind getrennt dokumentiert |
-| K-12 Offline-Fähigkeit | vorhanden · MKT-RS-01, MKT-RS-03 | Kernrechnung und manuelle Daten lokal; Live-Daten und externe Fonts benötigen Netz |
-| K-13 Export | vorhanden · MKT-RS-01, MKT-RS-02 | Komplettbackup sowie JSON-/CSV- und Diagnose-/Logexporte |
-| K-14 Auditierbarkeit | vorhanden · MKT-RS-02, MKT-RS-03 | Versionen, Seeds, Datenquellen, Zwischenschritte und Logs sind weitgehend rückverfolgbar |
-| K-15 UX | teilweise · MKT-RS-01, MKT-RS-99 | geführte Workflows, Validierungen und Hilfen vorhanden; hohe Expertendichte und keine formale Usability-Studie |
-| K-16 Barrierefreiheit | teilweise · MKT-RS-99 | einzelne Tastaturbefehle, Fokus-, ARIA- und Live-Regionen; kein vollständiger WCAG-/Screenreader-Nachweis |
-| K-17 Preis | nicht anwendbar · MKT-RS-01, MKT-RS-04 | lokale Arbeitskopie, keine untersuchte kommerzielle Produktstufe |
-| K-18 Lizenz | teilweise · MKT-RS-04, MKT-RS-05 | MIT-Lizenztext vorhanden, aber npm- und Cargo-Metadaten widersprechen beziehungsweise fehlen |
-
-### D.13.2 Consumer Planner
-
-| ID | ProjectionLab Premium | Boldin PlannerPlus |
-| --- | --- | --- |
-| K-01 Fachmodell | vorhanden · MKT-PL-01/02/03 | vorhanden · MKT-BD-01 |
-| K-02 Steuern | teilweise · MKT-PL-04 | teilweise · MKT-BD-02 |
-| K-03 Rente | teilweise · MKT-PL-05/06 | teilweise · MKT-BD-07 |
-| K-04 Pflege | teilweise · MKT-PL-03/99 | teilweise · MKT-BD-06 |
-| K-05 Haushalt | teilweise · MKT-PL-03/05 | teilweise · MKT-BD-07 |
-| K-06 Datenbasis | teilweise · MKT-PL-02/03 | teilweise · MKT-BD-04 |
-| K-07 Stochastik | teilweise · MKT-PL-02/03 | teilweise · MKT-BD-03/04 |
-| K-08 Transparenz | teilweise · MKT-PL-02/03 | teilweise · MKT-BD-03/04 |
-| K-09 Szenarien | vorhanden · MKT-PL-01/03 | vorhanden · MKT-BD-01/05 |
-| K-10 Optimierung | teilweise · MKT-PL-01/04 | teilweise · MKT-BD-01 |
-| K-11 Datenschutz | vorhanden · MKT-PL-07 | vorhanden · MKT-BD-08 |
-| K-12 Offline-Fähigkeit | teilweise · MKT-PL-08 | nicht öffentlich dokumentiert · MKT-BD-99 |
-| K-13 Export | vorhanden · MKT-PL-01 | teilweise · MKT-BD-01 |
-| K-14 Auditierbarkeit | teilweise · MKT-PL-02 | teilweise · MKT-BD-03/04 |
-| K-15 UX | nicht geprüft · MKT-PL-99 | nicht geprüft · MKT-BD-99 |
-| K-16 Barrierefreiheit | nicht öffentlich dokumentiert · MKT-PL-99 | nicht öffentlich dokumentiert · MKT-BD-99 |
-| K-17 Preis | vorhanden · MKT-PL-01 | vorhanden · MKT-BD-01 |
-| K-18 Lizenz | vorhanden · MKT-PL-09 | vorhanden · MKT-BD-09 |
-
-Bei ProjectionLab bezieht sich „teilweise“ unter K-12 auf den dokumentierten
-Legacy-Zustand: bestehende Self-Hosting-Installationen bleiben lauffähig,
-Bugfix-Support endete am 2025-12-31 und neue Produktupdates erscheinen nur
-noch für die Web-App.
-
-### D.13.3 Deutsche Vorsorge- und Entnahmewerkzeuge
-
-| ID | BVI Entnahme-Rechner | Finanzfluss Entnahmeplan | Digitale Rentenübersicht |
-| --- | --- | --- | --- |
-| K-01 Fachmodell | teilweise · MKT-BVI-01 | teilweise · MKT-FF-01 | teilweise · MKT-DR-01 |
-| K-02 Steuern | teilweise · MKT-BVI-01 | nicht vorhanden · MKT-FF-01 | nicht vorhanden · MKT-DR-01 |
-| K-03 Rente | nicht anwendbar · MKT-BVI-01 | nicht anwendbar · MKT-FF-01 | teilweise · MKT-DR-01/02 |
-| K-04 Pflege | nicht anwendbar · MKT-BVI-01 | nicht anwendbar · MKT-FF-01 | nicht anwendbar · MKT-DR-01 |
-| K-05 Haushalt | nicht anwendbar · MKT-BVI-01 | nicht anwendbar · MKT-FF-01 | teilweise · MKT-DR-01 |
-| K-06 Datenbasis | vorhanden · MKT-BVI-01 | teilweise · MKT-FF-01 | teilweise · MKT-DR-01/02/03 |
-| K-07 Stochastik | teilweise · MKT-BVI-01 | nicht vorhanden · MKT-FF-01 | nicht anwendbar · MKT-DR-01 |
-| K-08 Transparenz | teilweise · MKT-BVI-01 | teilweise · MKT-FF-01 | vorhanden · MKT-DR-01/02/03 |
-| K-09 Szenarien | nicht öffentlich dokumentiert · MKT-BVI-99 | nicht öffentlich dokumentiert · MKT-FF-99 | teilweise · MKT-DR-01 |
-| K-10 Optimierung | nicht anwendbar · MKT-BVI-01 | nicht anwendbar · MKT-FF-01 | nicht anwendbar · MKT-DR-01 |
-| K-11 Datenschutz | teilweise · MKT-BVI-02 | teilweise · MKT-FF-02 | vorhanden · MKT-DR-01 |
-| K-12 Offline-Fähigkeit | nicht öffentlich dokumentiert · MKT-BVI-99 | nicht öffentlich dokumentiert · MKT-FF-99 | nicht vorhanden · MKT-DR-01 |
-| K-13 Export | teilweise · MKT-BVI-01 | nicht öffentlich dokumentiert · MKT-FF-99 | vorhanden · MKT-DR-01/03 |
-| K-14 Auditierbarkeit | teilweise · MKT-BVI-01 | teilweise · MKT-FF-01 | teilweise · MKT-DR-01/02/03 |
-| K-15 UX | teilweise · MKT-BVI-01 | teilweise · MKT-FF-01 | nicht geprüft · MKT-DR-99 |
-| K-16 Barrierefreiheit | nicht öffentlich dokumentiert · MKT-BVI-99 | nicht öffentlich dokumentiert · MKT-FF-99 | teilweise · MKT-DR-03/04/99 |
-| K-17 Preis | nicht öffentlich dokumentiert · MKT-BVI-99 | nicht öffentlich dokumentiert · MKT-FF-03/99 | vorhanden · MKT-DR-01 |
-| K-18 Lizenz | nicht öffentlich dokumentiert · MKT-BVI-99 | nicht öffentlich dokumentiert · MKT-FF-03/99 | nicht anwendbar · MKT-DR-99 |
-
-Die beiden Befunde „nicht vorhanden“ beim Finanzfluss-Rechner gelten nur für
-die sichtbar festgelegte Entnahmeplan-Stufe: Sie besitzt einen deterministischen
-Renditeparameter und keine Steuerfelder. Sie sagen nichts über andere
-Finanzfluss-Rechner aus. Bei der Digitalen Rentenübersicht sind Steuer- und
-Sozialabzüge laut FAQ ausdrücklich nicht Teil der ausgewiesenen Portalwerte.
-
-### D.13.4 Beratersoftware
-
-| ID | MoneyGuide, Stufe MoneyGuide | eMoney Pro |
-| --- | --- | --- |
-| K-01 Fachmodell | vorhanden · MKT-MG-01/02 | vorhanden · MKT-EM-01/04 |
-| K-02 Steuern | teilweise · MKT-MG-01/02 | teilweise · MKT-EM-01/04 |
-| K-03 Rente | teilweise · MKT-MG-01/02 | teilweise · MKT-EM-01/04 |
-| K-04 Pflege | teilweise · MKT-MG-01/04 | nicht öffentlich dokumentiert · MKT-EM-99 |
-| K-05 Haushalt | teilweise · MKT-MG-02 | teilweise · MKT-EM-01/02 |
-| K-06 Datenbasis | teilweise · MKT-MG-02 | nicht öffentlich dokumentiert · MKT-EM-99 |
-| K-07 Stochastik | teilweise · MKT-MG-02 | teilweise · MKT-EM-04 |
-| K-08 Transparenz | teilweise · MKT-MG-02 | teilweise · MKT-EM-01/04 |
-| K-09 Szenarien | vorhanden · MKT-MG-01/02 | vorhanden · MKT-EM-01 |
-| K-10 Optimierung | teilweise · MKT-MG-01/02 | teilweise · MKT-EM-01 |
-| K-11 Datenschutz | vorhanden · MKT-MG-03/04 | vorhanden · MKT-EM-02/03 |
-| K-12 Offline-Fähigkeit | nicht öffentlich dokumentiert · MKT-MG-99 | nicht öffentlich dokumentiert · MKT-EM-99 |
-| K-13 Export | teilweise · MKT-MG-02 | teilweise · MKT-EM-01/04 |
-| K-14 Auditierbarkeit | teilweise · MKT-MG-02 | teilweise · MKT-EM-04 |
-| K-15 UX | nicht geprüft · MKT-MG-99 | nicht geprüft · MKT-EM-99 |
-| K-16 Barrierefreiheit | nicht öffentlich dokumentiert · MKT-MG-99 | nicht öffentlich dokumentiert · MKT-EM-99 |
-| K-17 Preis | vorhanden · MKT-MG-01 | nicht öffentlich dokumentiert · MKT-EM-99 |
-| K-18 Lizenz | vorhanden · MKT-MG-04 | nicht öffentlich dokumentiert · MKT-EM-99 |
-
-„Nicht öffentlich dokumentiert“ bei eMoney ist wegen des nicht freigegebenen
-Berater-/Vertriebszugangs besonders wichtig: Der Befund darf nicht zu
-„eMoney kann das nicht“ verkürzt werden. Der Monte-Carlo- und Reportnachweis
-MKT-EM-04 ist außerdem ein offizielles Dokument von 2021 und deshalb nur als
-teilweiser heutiger Stufennachweis gewertet.
-
-### D.13.5 FIRE-Werkzeuge und Offline-/Tabellenlösung
-
-| ID | FI Calc | FIRECalc 3.0 | Pralana Gold 2026 |
-| --- | --- | --- | --- |
-| K-01 Fachmodell | teilweise · MKT-FI-01/03 | teilweise · MKT-FC-01 | vorhanden · MKT-PR-01 |
-| K-02 Steuern | nicht vorhanden · MKT-FI-05 | nicht öffentlich dokumentiert · MKT-FC-99 | teilweise · MKT-PR-03/05 |
-| K-03 Rente | teilweise · MKT-FI-08 | teilweise · MKT-FC-01 | vorhanden · MKT-PR-05 |
-| K-04 Pflege | teilweise · MKT-FI-09 | teilweise · MKT-FC-01 | teilweise · MKT-PR-05 |
-| K-05 Haushalt | teilweise · MKT-FI-08/09 | teilweise · MKT-FC-01 | vorhanden · MKT-PR-01/05 |
-| K-06 Datenbasis | vorhanden · MKT-FI-02 | vorhanden · MKT-FC-01 | teilweise · MKT-PR-04/06 |
-| K-07 Stochastik | vorhanden · MKT-FI-01/02/03 | teilweise · MKT-FC-01 | teilweise · MKT-PR-04/06 |
-| K-08 Transparenz | vorhanden · MKT-FI-01/03/04/05 | teilweise · MKT-FC-01 | vorhanden · MKT-PR-06 |
-| K-09 Szenarien | nicht öffentlich dokumentiert · MKT-FI-99 | nicht öffentlich dokumentiert · MKT-FC-99 | vorhanden · MKT-PR-01/04 |
-| K-10 Optimierung | nicht anwendbar · MKT-FI-01/04 | teilweise · MKT-FC-01 | vorhanden · MKT-PR-04 |
-| K-11 Datenschutz | vorhanden · MKT-FI-06 | vorhanden · MKT-FC-02 | teilweise · MKT-PR-01/99 |
-| K-12 Offline-Fähigkeit | nicht öffentlich dokumentiert · MKT-FI-99 | nicht öffentlich dokumentiert · MKT-FC-99 | vorhanden · MKT-PR-01/02 |
-| K-13 Export | teilweise · MKT-FI-07 | teilweise · MKT-FC-01 | teilweise · MKT-PR-01/06 |
-| K-14 Auditierbarkeit | vorhanden · MKT-FI-02/03 | teilweise · MKT-FC-01 | vorhanden · MKT-PR-06 |
-| K-15 UX | teilweise · MKT-FI-01 | teilweise · MKT-FC-01 | nicht geprüft · MKT-PR-99 |
-| K-16 Barrierefreiheit | nicht öffentlich dokumentiert · MKT-FI-99 | nicht öffentlich dokumentiert · MKT-FC-99 | nicht öffentlich dokumentiert · MKT-PR-99 |
-| K-17 Preis | vorhanden · MKT-FI-05 | teilweise · MKT-FC-01/99 | vorhanden · MKT-PR-02/07 |
-| K-18 Lizenz | nicht öffentlich dokumentiert · MKT-FI-99 | teilweise · MKT-FC-01/99 | vorhanden · MKT-PR-07 |
-
-FI Calc und FIRECalc werden wegen ihres frei zugänglichen FIRE-/Entnahmezwecks
-in diesem Segment geführt. Aus der Zugänglichkeit folgt keine
-Open-Source-Eigenschaft; für beide wurde keine öffentliche Code- und
-Weitergabelizenz belegt.
+| Ruhestand-Suite | deutsche Kapitalertragsteuer auf Lot-/Eigentümerebene, Paar-/Pflegepfade, mehrere Simulationsarten, lokale Daten und Diagnose ([MKT-RS-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-01), [MKT-RS-02](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-02), [MKT-RS-03](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-03)) | keine vollständige Einkommensteuer, keine freie Ereignisliste, keine externe Wirksamkeits- oder formale WCAG-Prüfung ([MKT-RS-99](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-99)) |
+| Consumer Planner | ProjectionLab und Boldin dokumentieren planzentrierte Varianten, Szenarien und Ergebnisdarstellung ([MKT-PL-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-pl-01), [MKT-PL-03](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-pl-03), [MKT-BD-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-bd-01), [MKT-BD-05](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-bd-05)) | deutsche Steuer-, Pflegegrad- und Hinterbliebenendetails sind nicht vollständig nativ belegt ([MKT-PL-04](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-pl-04), [MKT-BD-02](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-bd-02), [MKT-BD-06](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-bd-06)) |
+| Deutsche Werkzeuge | BVI und Finanzfluss fokussieren Kapitalentnahme; die Digitale Rentenübersicht aggregiert autoritative Vorsorgeansprüche ([MKT-BVI-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-bvi-01), [MKT-FF-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-ff-01), [MKT-DR-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-dr-01)) | die schmalen Produktzwecke sind keine Gesamtplanung; fehlende öffentliche Angaben bleiben neutrale Lücken |
+| Beratersoftware | MoneyGuide und eMoney stützen kollaborative, breite Beraterplanung ([MKT-MG-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-mg-01), [MKT-EM-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-em-01)) | US-Rechtsraum und nicht freigegebene Beraterzugänge begrenzen die stufenscharfe öffentliche Prüfung ([MKT-EM-99](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-em-99)) |
+| FIRE/Offline | FI Calc und FIRECalc dokumentieren historische Entnahmeverfahren; Pralana verbindet lokale Tabellenplanung mit Szenarien und Optimierung ([MKT-FI-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-fi-01), [MKT-FC-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-fc-01), [MKT-PR-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-pr-01), [MKT-PR-04](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-pr-04)) | überwiegend US-Daten/-Steuern, enger Haushaltsumfang oder ohne Kauf ungeprüfte Workbook-UX |
 
 ## D.14 Segmentbefunde: Stärken und Grenzen
 
-### D.14.1 Consumer Planner
+Die Segmente erfüllen verschiedene Zwecke. Consumer Planner sind bei
+Planvarianten und Szenariovergleich stärker; Beratersoftware bei
+Kollaboration und Datenaggregation; deutsche Einzelwerkzeuge bei fokussierter
+Entnahme oder autoritativer Vorsorgeanspruchs-Aggregation; FIRE- und
+Tabellenwerkzeuge bei transparenter historischer Methodik beziehungsweise
+lokaler Modellbreite. Diese Stärken dürfen nicht als Mängel bewertet werden,
+nur weil sie außerhalb des Suite-Schwerpunkts liegen.
 
-ProjectionLab und Boldin zeigen ihre Stärke in allgemeiner Planerstellung,
-Varianten und Ergebnisdarstellung. ProjectionLab dokumentiert mehrere Pläne,
-What-if-Analysen, Berichte und maschinenlesbare Exporte; seine erweiterten
-Planoptionen erlauben außerdem benutzerdefinierte Rendite- und
-Inflationsfolgen. Boldin dokumentiert bis zu zehn Vergleichsszenarien,
-ruhestandsspezifische Explorers und eine ungewöhnlich konkrete
-Monte-Carlo-Beschreibung mit 1.000 normalverteilten Läufen
-(MKT-PL-01/03, MKT-BD-01/03/05).
-
-Die Regionalgrenze ist unterschiedlich. ProjectionLab bietet internationale
-Steuer-Presets einschließlich Deutschland, ohne damit die vollständige
-deutsche Lot-, Verlusttopf- und Teilfreistellungslogik zu belegen
-(MKT-PL-04). Boldin erklärt ausdrücklich, dass Steuer-, RMD- und
-Social-Security-Logik US-spezifisch ist und andere Länder manuelle
-Workarounds benötigen (MKT-BD-02). Boldins US-LTC- und
-Hinterbliebenenfunktionen sind reale Produktstärken, bilden aber weder
-deutsche Pflegegrade noch deutsches Hinterbliebenenrecht nativ ab
-(MKT-BD-06/07).
-
-### D.14.2 Deutsche Werkzeuge
-
-Die drei deutschen Angebote erfüllen bewusst verschiedene Aufgaben. Der BVI
-Entnahme-Rechner ist fachlich schmal, legt dafür Datenreihen, Zeiträume,
-Inflation, Kosten, Steuersatz und die Ziehung von 100.000 historischen
-Jahreskombinationen öffentlich dar. Seine wiederholten Zufallsergebnisse ohne
-dokumentierten Seed sind weniger reproduzierbar als ein deterministischer
-Backtest (MKT-BVI-01). Der Finanzfluss Entnahmeplan priorisiert einen kleinen,
-verständlichen deterministischen Eingaberaum; die fehlende Haushalts-,
-Steuer- und Ereignistiefe ist für diesen Einzelrechner eine Zweckgrenze, nicht
-der Beleg eines schlechten Vollplaners (MKT-FF-01).
-
-Die Digitale Rentenübersicht besitzt eine Stärke, die kein normaler DIY-Rechner
-ersetzen kann: Sie ruft gesetzliche, betriebliche und private
-Vorsorgeansprüche über teilnehmende Einrichtungen ab, führt sie neutral
-zusammen und exportiert PDF, ZIP und CSV verschlüsselt aus dem persönlichen
-Portal. Sie berechnet jedoch weder eine Versorgungslücke noch Steuern und
-Sozialabgaben und zeigt bereits in Auszahlung befindliche Ansprüche nicht
-mehr an (MKT-DR-01/02). Sie ist damit eine qualifizierte Datenquelle für eine
-Planung, nicht deren Ersatz.
-
-### D.14.3 Beratersoftware
-
-MoneyGuide und eMoney Pro adressieren Berater-Kunden-Kollaboration,
-Datenerfassung und breite Planungsdialoge. MoneyGuide veröffentlicht für die
-untersuchte Stufe Zielplanung, Kundenportal, Healthcare Goal, Stress,
-Retirement Distribution, Social-Security- und Tax-Planning sowie einen
-jährlichen Beraterpreis. Die FAQ ergänzt Plan-Kopien, What-if, Berichte und
-Monte Carlo (MKT-MG-01/02). Diese Breite und der kollaborative Workflow sind
-Stärken gegenüber einer persönlichen lokalen Ein-Nutzer-Suite.
-
-eMoney Pro beschreibt Cashflowplanung, Client Portal, CoPlanner und das
-interaktive Decision Center. Öffentliche aktuelle Angaben zu Preis,
-Datenreihen, Pflege, Offline-Nutzung und Lizenz bleiben aber lückenhaft; der
-detailliertere Monte-Carlo-/Reportbeleg ist von 2021
-(MKT-EM-01/02/04/99). Das begrenzt die öffentliche Vergleichbarkeit, nicht
-notwendigerweise die tatsächliche Beraterfunktion.
-
-### D.14.4 FIRE- und Offline-Werkzeuge
-
-FI Calc besitzt in dieser Stichprobe eine besonders klar strukturierte
-öffentliche Methodendokumentation: Shiller-Daten ab 1871,
-Jahresreihenfolge, zahlreiche Entnahmeregeln, ausdrückliche Steuer- und
-Monte-Carlo-Grenzen sowie CSV-Export sind getrennt beschrieben. Eingegebene
-Finanzdaten verlassen laut Privacy-Seite das Gerät nicht
-(MKT-FI-01 bis MKT-FI-07). Seine Stärke ist die nachvollziehbare historische
-Entnahmefrage, nicht ein vollständiger Paar-, Steuer- oder Pflegehaushalt.
-
-FIRECalc bringt eine lange historische Startjahranalyse, eigene und
-Partner-Sozialleistungen, zusätzliche Einkommen/Ausgaben, mehrere
-Ausgabenregeln und eine Investigate-Zielsuche zusammen. Die öffentliche
-Methodik ist breiter als ein einfacher Endwertrechner, aber Steuer-, Seed-,
-Offline- und Lizenzdetails bleiben offen (MKT-FC-01/02/99).
-
-Pralana Gold ist der stärkste untersuchte Offline-/Tabellen-Gegenpol:
-personenspezifische Cashflows, US-Bundes-/Bundesstaatsteuern, mehrere Konten
-und Assetklassen, deterministische, historische und Monte-Carlo-Analysen,
-drei Szenarien und mehrere Optimierungen laufen in einer heruntergeladenen
-Excel-Arbeitsmappe. Öffentliche Handbücher erhöhen die Prüfbarkeit
-(MKT-PR-01 bis MKT-PR-07). Grenzen für den deutschen Referenzfall sind die
-US-Steuerlogik, fehlende deutsche Pflegegrade und die nicht ohne Kauf
-geprüfte Bedien- und Barrierefreiheit.
-
-### D.14.5 Ruhestand-Suite
-
-Die Ruhestand-Suite verbindet deutsche Kapitalertragsteuer mit Lots,
-Verlusttopf und Teilfreistellung, einen Zwei-Personen-/Witwenpfad,
-Pflegegradmodell und gesperrte Pflegevorsorge mit historischen,
-Bootstrap-, Regime-, Monte-Carlo-, Stress-, Sweep- und
-Optimierungspfaden. Lokale Persistenz, Offline-Kernrechnung,
-maschinenlesbare Exporte und detaillierte Logs stützen eine operative
-Jahresplanung (MKT-RS-01 bis MKT-RS-03). Diese Kombination ist eine
-Produktstärke, aber noch kein externer Nachweis besserer Prognosen oder
-Entscheidungen.
-
-Die Matrix macht zugleich eigene Grenzen sichtbar: persönliche
-Einkommensteuer und Sozialabgaben sind nicht vollständig, Rentenverträge sind
-nicht beliebig skalierbar, allgemeine Einmalereignisse und frei definierte
-Jahrespfade fehlen als durchgängiger Nutzervertrag, der Szenariovergleich ist
-weniger planzentriert als bei ProjectionLab oder Boldin, und formale
-Usability-/WCAG-Nachweise fehlen. Der Pflegeeintritt ist stochastisch statt
-auf ein fixes Referenzdatum setzbar. Zusätzlich widersprechen sich MIT-Text,
-npm-Lizenzmetadatum und leeres Cargo-Lizenzfeld (MKT-RS-04/05/99).
+Die Ruhestand-Suite bündelt dagegen deutsche Kapitalertragsteuer auf
+Lot-/Eigentümerebene, Paar-, Witwen- und Pflegepfade, mehrere Simulationsarten
+und einen lokalen Jahresworkflow. Ihre Grenzen bleiben persönliche
+Einkommensteuer, frei definierbare Ereignisfolgen, planzentrierter
+Szenariovergleich, autoritative Datenaggregation und formale UX-/WCAG- sowie
+externe Wirksamkeitsnachweise. Die Belege und stufenscharfen Einschränkungen
+stehen in D.13 und im Evidenzregister; die Positionierungsfolgen folgen in
+D.16.
 
 ## D.15 Modellierbarkeit des Referenzhaushalts RH-01 bis RH-04
 
-Die folgende Karte beurteilt den vollständigen Fall, nicht einzelne
-Teilfeatures. Der konservativste wesentliche Input bestimmt den Befund.
-„Nativ“ bedeutet, dass die öffentlich dokumentierte Stufe die vorgegebene
-Probe ohne fachliche Umdeutung abbildet. Ein allgemeines Ausgabenfeld ist
-beispielsweise kein natives Pflegegradmodell. Wo ein Kauf, Login oder
-Beraterzugang erforderlich wäre, wird nicht aus Marketingbildern auf
-Bedienbarkeit geschlossen.
+Der konservativste wesentliche Input bestimmt den Gesamtbefund. `Nativ`
+verlangt die Probe ohne fachliche Umdeutung; ein allgemeines Ausgabenfeld ist
+kein natives Pflegegradmodell. `N`, `W`, `G` und `O` bedeuten nativ,
+dokumentierter Workaround, grobe Näherung und nicht modellierbar/nicht
+prüfbar.
 
-| Produktstufe | RH-01 Basisfall | RH-02 Sequenzstress | RH-03 Pflege | RH-04 Hinterbliebene | Begründung und Belege |
+| Produktstufe | RH-01 | RH-02 | RH-03 | RH-04 | Entscheidende Grenze |
 | --- | --- | --- | --- | --- | --- |
-| Ruhestand-Suite | nur als grobe Näherung | nur als grobe Näherung | nur als grobe Näherung | mit dokumentiertem Workaround | Paar, deutsche Kapitalertragsteuer, Gold, Pflegebucket und Witwenanteil sind vorhanden. Das Einmalereignis/Immobilien-Memomodell, die exakt vorgegebene Rendite-/Inflationsfolge und ein fixer Pflegeeintritt sind jedoch keine durchgängigen Nutzereingaben; Tod lässt sich über Lebenserwartung/Witwenparameter annähern. MKT-RS-01/02/99 |
-| ProjectionLab Premium | mit dokumentiertem Workaround | nativ | mit dokumentiertem Workaround | mit dokumentiertem Workaround | Breiter Plan, Personen, Assets, Ereignisse und benutzerdefinierte Rendite-/Inflationsfolgen; deutsche Steuerdetails und Pflegegrad/gesperrte Reserve benötigen Annahmen beziehungsweise allgemeine Ereignisse, Survivor Cashflows eine Anpassung um den Todesmeilenstein. MKT-PL-03/04/05/06 |
-| Boldin PlannerPlus | nur als grobe Näherung | nur als grobe Näherung | mit dokumentiertem Workaround | mit dokumentiertem Workaround | US-Steuer-/RMD-/Social-Security-Modell und fehlende Einzelholding-/Kostenbasistiefe begrenzen RH-01. Szenarien ersetzen keine exakt vorgegebene Jahresfolge; US-LTC und First-Spouse-Passes liefern dokumentierte, aber regionsfremde Workarounds. MKT-BD-02/04/05/06/07 |
-| BVI Entnahme-Rechner | nur als grobe Näherung | nicht modellierbar/nicht prüfbar | nicht modellierbar/nicht prüfbar | nicht modellierbar/nicht prüfbar | Portfolio, Entnahme, Kosten, pauschaler Steuersatz und historische Zufallskombinationen decken nur den Kapitalentnahmeteil ab; Haushalt, fixe Schockfolge, Pflege und Tod fehlen dem erklärten Rechnerzweck. MKT-BVI-01 |
-| Finanzfluss Entnahmeplan | nur als grobe Näherung | nicht modellierbar/nicht prüfbar | nicht modellierbar/nicht prüfbar | nicht modellierbar/nicht prüfbar | Ein Kapitalstock mit fester Rendite und Entnahme kann nur den groben Auszahlplan spiegeln; kein Jahrespfad-, Haushalts-, Pflege- oder Hinterbliebenenvertrag. MKT-FF-01 |
-| Digitale Rentenübersicht | nur als grobe Näherung | nicht modellierbar/nicht prüfbar | nicht modellierbar/nicht prüfbar | nicht modellierbar/nicht prüfbar | Die Portalstärke ist der Teilinput gesetzlicher, betrieblicher und privater Vorsorgeansprüche. Vermögen, Entnahme, Pflege, Steuern und Haushaltsereignisse bilden keinen Gesamtplan. MKT-DR-01/02 |
-| MoneyGuide | mit dokumentiertem Workaround | mit dokumentiertem Workaround | mit dokumentiertem Workaround | mit dokumentiertem Workaround | Goals, What-if, Stress, Healthcare Cost, Asset Ownership und mehrere Einkommen erlauben eine breite US-Beratermodellierung; deutsche Steuer-, Pflegegrad- und Rentendetails müssen außerhalb ihres nativen Rechtsraums angenähert werden. MKT-MG-01/02/04 |
-| eMoney Pro | mit dokumentiertem Workaround | nicht modellierbar/nicht prüfbar | nicht modellierbar/nicht prüfbar | nicht modellierbar/nicht prüfbar | Die öffentliche Cashflow-, Portal- und Decision-Center-Beschreibung trägt einen groben RH-01-Aufbau. Für die drei exakten Proben fehlen ohne Beraterzugang stufenscharfe aktuelle Nachweise. MKT-EM-01/04/99 |
-| FI Calc | nur als grobe Näherung | nur als grobe Näherung | mit dokumentiertem Workaround | mit dokumentiertem Workaround | Portfolio, Einkommen und Extra Withdrawals können Cashflowteile abbilden; US-Historie, fehlende Steuern und fehlender Personenvertrag begrenzen RH-01. Pflege und Tod werden nur als zeitlich gesetzte Zusatzentnahme beziehungsweise endender Einkommensstrom angenähert. MKT-FI-02/05/08/09 |
-| FIRECalc 3.0 | nur als grobe Näherung | nur als grobe Näherung | mit dokumentiertem Workaround | mit dokumentiertem Workaround | Historische Pfade, eigene/Partner-Sozialleistungen und Off-chart Income/Spending erlauben grobe Ereignisabbildung, aber keine deutsche Steuer-, Pflegegrad- oder exakt frei definierte Schockfolge. MKT-FC-01 |
-| Pralana Gold 2026 | mit dokumentiertem Workaround | mit dokumentiertem Workaround | mit dokumentiertem Workaround | mit dokumentiertem Workaround | Personenspezifische Cashflows, Survivor, Gesundheitsphasen, historische/Monte-Carlo-Analysen und Szenarien sind breit; deutsche Steuerparameter, Pflegegrad/Reserve und exakt vorgegebene Schockjahre erfordern Mapping. Die gekaufte Arbeitsmappe wurde nicht ausgeführt. MKT-PR-03/04/05/06/99 |
+| Ruhestand-Suite | G | G | G | W | freie Ereignis-/Schockfolge und fixer Pflegeeintritt fehlen ([MKT-RS-99](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-99)) |
+| ProjectionLab Premium | W | N | W | W | deutsche Steuer- und Pflegefachlichkeit nur angenähert ([MKT-PL-03](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-pl-03), [MKT-PL-04](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-pl-04)) |
+| Boldin PlannerPlus | G | G | W | W | US-Steuer-, LTC- und Survivor-Vertrag ([MKT-BD-02](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-bd-02)) |
+| BVI Entnahme-Rechner | G | O | O | O | fokussierter Kapitalentnahmezweck ([MKT-BVI-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-bvi-01)) |
+| Finanzfluss Entnahmeplan | G | O | O | O | deterministischer Einzelrechner ([MKT-FF-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-ff-01)) |
+| Digitale Rentenübersicht | G | O | O | O | Vorsorgeinput statt Gesamtplanung ([MKT-DR-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-dr-01)) |
+| MoneyGuide | W | W | W | W | breite US-Beratermodellierung ([MKT-MG-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-mg-01)) |
+| eMoney Pro | W | O | O | O | Proben ohne Beraterzugang nicht stufenscharf belegt ([MKT-EM-99](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-em-99)) |
+| FI Calc | G | G | W | W | US-Historie, keine Steuer-/Personenlogik ([MKT-FI-05](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-fi-05)) |
+| FIRECalc 3.0 | G | G | W | W | keine deutsche Steuer-/Pflege- oder freie Schockfolge ([MKT-FC-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-fc-01)) |
+| Pralana Gold 2026 | W | W | W | W | US-Mapping; gekaufte Mappe nicht ausgeführt ([MKT-PR-99](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-pr-99)) |
 
-Nur RH-02 in ProjectionLab ist aufgrund der öffentlich dokumentierten
-benutzerdefinierten Rendite-/Inflationsfolge als nativ eingestuft. Das ist
-keine Gesamtwertung des Produkts. Umgekehrt bedeutet der überwiegend
-näherungsweise RH-Befund der Ruhestand-Suite nicht, dass ihre deutschen
-Steuer- oder Pflegebausteine fehlen; die festen Referenzproben sind strenger
-als ihre derzeitige Ereigniseingabe.
-
-Es werden bewusst keine Ergebnisbeträge oder Erfolgsquoten nebeneinandergestellt.
-Die Produkte unterscheiden sich bei Datenregion, Inflation, Steuerzeitpunkt,
-Entnahmereihenfolge, Gebühren, Mortalität und Erfolgsdefinition. Eine
-scheinpräzise Zahlentabelle würde diese Unterschiede verdecken.
+Nur ProjectionLabs RH-02 ist nativ belegt; das ist keine Gesamtwertung. Es
+werden keine Ergebnisbeträge oder Erfolgsquoten verglichen, weil Datenregion,
+Inflation, Steuern, Reihenfolge, Kosten, Mortalität und Erfolgsdefinition
+nicht harmonisiert sind.
 
 ## D.16 Positionierung der Ruhestand-Suite
 
@@ -4078,16 +3608,15 @@ scheinpräzise Zahlentabelle würde diese Unterschiede verdecken.
 
 Die Ruhestand-Suite ist als lokal betriebene, deutschsprachige
 DIY-Entnahme- und Jahressteuerungsumgebung für Einzelpersonen und
-Paarhaushalte positioniert, die ihre Annahmen selbst pflegen und
-Simulationsergebnisse fachlich hinterfragen können. Ihr Kernnutzen liegt
-nicht in einem einmaligen „Rentenwert“, sondern in der Verbindung aus:
+Paarhaushalte positioniert, die Annahmen selbst pflegen und Ergebnisse
+fachlich hinterfragen. Ihr Kernnutzen ist die Verbindung aus:
 
 - deutscher kapitalertragsteuerlicher Entnahmelogik auf Lot-/Eigentümerebene;
 - Floor-/Flex-, Liquiditäts-, Guardrail- und Jahresabschlussworkflow;
 - Paar-, Witwen-, Pflegegrad- und zweckgebundener Pflegevorsorgelogik;
 - historischen, stochastischen, Stress-, Sensitivitäts- und
   Optimierungspfaden;
-- lokaler Datenhaltung, Recovery, Export und detaillierter Diagnose.
+- lokaler Datenhaltung, Recovery, Export und Diagnose.
 
 Das Produkt ist Planungs- und Lernsoftware, keine Anlage-, Steuer-,
 Versicherungs- oder Pflegeberatung. Modellinterne Erfolgsquoten sind keine
@@ -4095,87 +3624,58 @@ Garantie.
 
 ### D.16.2 Begrenzt zulässige Differenzierung
 
-Am Vergleichsstichtag wurde in der untersuchten Stichprobe und den
-öffentlich dokumentierten Produktstufen keine zweite Stufe belegt, die
-gleichzeitig die konkrete Kombination aus deutscher
-Kapitalertragsteuer/Lot-Herkunft, Pflegegradmodell mit gesperrter lokaler
-Reserve, Paar-/Witwenpfad, mehreren Simulationsmethoden, Auto-Optimierung und
-operativem lokalem Jahresworkflow dokumentiert (Matrix D.13,
-MKT-RS-01 bis MKT-RS-03). Diese Aussage ist eng begrenzt:
-
-- Sie gilt nur für die zehn ausgewählten Produkte, Stufen und öffentlichen
-  Quellen vom 2026-07-15.
-- „Nicht öffentlich dokumentiert“ bei eMoney oder anderen geschlossenen
-  Stufen ist kein Beleg, dass eine Funktion intern fehlt.
-- Pralana ist ebenfalls lokal/offline nutzbar; FI Calc dokumentiert
-  gerätelokale Eingaben. Offline-Fähigkeit allein ist daher kein
-  Exklusivmerkmal (MKT-FI-06, MKT-PR-01/02).
-- ProjectionLab, Boldin, MoneyGuide, eMoney und Pralana besitzen in anderen
-  Dimensionen breitere Plan-, Szenario- oder Kollaborationsfunktionen.
-- Die Kombination belegt weder bessere Prognosegüte noch bessere reale
-  Ruhestandsentscheidungen.
+Nur für die zehn ausgewählten Stufen und öffentlichen Quellen vom 2026-07-15
+ist keine zweite Stufe belegt, die deutsche Lot-/Kapitalertragsteuer,
+Pflegegrad mit gesperrter Reserve, Paar-/Witwenpfad, mehrere
+Simulationsmethoden, Auto-Optimierung und lokalen Jahresworkflow kombiniert
+([MKT-RS-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-01),
+[MKT-RS-02](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-02)). Das ist keine
+universelle Exklusivitäts-, Prognosegüte- oder Wirksamkeitsaussage.
+Geschlossene Stufen bleiben unbekannt; Pralana ist ebenfalls lokal und FI
+Calc hält Eingaben gerätelokal. Andere Produkte sind bei Planvarianten,
+Kollaboration, Datenaggregation, Einfachheit oder Methodenführung breiter.
 
 ### D.16.3 Wettbewerberstärken, die nicht relativiert werden dürfen
 
-| Stärke außerhalb beziehungsweise oberhalb des aktuellen Suite-Schwerpunkts | Belegter Vergleichsfall | Bedeutung |
-| --- | --- | --- |
-| Planvarianten und Side-by-side-Vergleich | ProjectionLab und Boldin, MKT-PL-01/03, MKT-BD-01/05 | allgemeine Szenarioarbeit ist dort planzentrierter und für Varianten expliziter |
-| Berater-Kunden-Kollaboration und Datenaggregation | MoneyGuide und eMoney, MKT-MG-01/02, MKT-EM-01/02 | professioneller Mehrmandanten-/Portalworkflow ist kein aktueller Suite-Vertrag |
-| Autoritative Vorsorgeanspruchs-Aggregation | Digitale Rentenübersicht, MKT-DR-01/02 | echte Anbieteransprüche sind belastbarer als manuell nacherfasste Planwerte |
-| Fokussierte Einfachheit | Finanzfluss Entnahmeplan und BVI-Rechner, MKT-FF-01, MKT-BVI-01 | ein enger Rechner kann für eine einzelne Frage verständlicher und schneller sein |
-| Öffentlich strukturierte Methodenführung | FI Calc, MKT-FI-01 bis MKT-FI-07 | Datenquelle, Jahresreihenfolge, Strategie und Negativgrenzen sind kompakt zugänglich |
-| Breite lokale Tabellenplanung | Pralana Gold, MKT-PR-01 bis MKT-PR-06 | Cashflow-, US-Steuer-, Szenario- und Optimierungsbreite in Excel übersteigt mehrere Suite-Teilbereiche |
+Unverkürzt anzuerkennen sind planzentrierte Varianten bei ProjectionLab und
+Boldin, Berater-Kunden-Kollaboration bei MoneyGuide und eMoney, autoritative
+Vorsorgeansprüche der Digitalen Rentenübersicht, die fokussierte Einfachheit
+von BVI und Finanzfluss, FI Calcs öffentliche Methodenführung sowie Pralanas
+breite lokale Tabellenplanung. D.13 verbindet jeden Befund mit seinem Record.
 
 ### D.16.4 Eigene Grenzen und strategische Lücken
 
 | ID | Lücke | Evidenz | Positionierungsfolge |
 | --- | --- | --- | --- |
-| GAP-MKT-01 | keine vollständige persönliche Einkommensteuer-/Sozialabgabenrechnung | K-02, MKT-RS-01/02 | Netto-Cashflows und Kapitalertragsteuer klar trennen; keine „vollständige deutsche Steuerplanung“ bewerben |
-| GAP-MKT-02 | keine frei definierbare, versionierte Ereignis- und Jahrespfadliste für Einmalbeträge, Rendite und Inflation | RH-01/RH-02, MKT-RS-99 | feste Referenzschocks nur als Näherung ausweisen; ProjectionLab hat hier einen belegten Vorteil |
-| GAP-MKT-03 | fixer Pflegeeintritt/Grad/Person nicht als deterministische Probe konfigurierbar | RH-03, MKT-RS-01/99 | stochastische Pflegeanalyse nicht als exakter Pflegeplan darstellen |
-| GAP-MKT-04 | allgemeines Speichern, Kopieren und Side-by-side-Vergleichen vollständiger Pläne fehlt | K-09, MKT-RS-01/99 | Sweep/Backtest nicht mit vollwertigem Szenariomanagement gleichsetzen |
-| GAP-MKT-05 | keine formale Usability-, Screenreader- oder WCAG-Prüfung | K-15/K-16, MKT-RS-99 | Barrierefreiheit nur auf Ebene einzelner Hilfen beschreiben |
-| GAP-MKT-06 | Lizenzmetadaten sind widersprüchlich | K-18, MKT-RS-04/05 | vor Veröffentlichung MIT/ISC/Cargo konsistent machen |
-| GAP-MKT-07 | keine autoritative Rentenanspruchs- oder Kontenaggregation | Vergleich mit MKT-DR-01 und MKT-EM-02 | manuelle Eingaben als Nutzerverantwortung kennzeichnen; Import wäre eine separate Produktentscheidung |
-| GAP-MKT-08 | keine externe Prognose-, Kalibrierungs- oder Entscheidungsvalidierung | D.1, MKT-RS-01/02 | Implementierung, Tests und Transparenz nicht als Wirksamkeitsbeleg formulieren |
+| GAP-MKT-01 | keine vollständige persönliche Einkommensteuer-/Sozialabgabenrechnung | K-02, [MKT-RS-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-01), [MKT-RS-02](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-02) | Netto-Cashflows und Kapitalertragsteuer klar trennen; keine „vollständige deutsche Steuerplanung“ bewerben |
+| GAP-MKT-02 | keine frei definierbare, versionierte Ereignis- und Jahrespfadliste für Einmalbeträge, Rendite und Inflation | RH-01/RH-02, [MKT-RS-99](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-99) | feste Referenzschocks nur als Näherung ausweisen; ProjectionLab hat hier einen belegten Vorteil |
+| GAP-MKT-03 | fixer Pflegeeintritt/Grad/Person nicht als deterministische Probe konfigurierbar | RH-03, [MKT-RS-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-01), [MKT-RS-99](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-99) | stochastische Pflegeanalyse nicht als exakter Pflegeplan darstellen |
+| GAP-MKT-04 | allgemeines Speichern, Kopieren und Side-by-side-Vergleichen vollständiger Pläne fehlt | K-09, [MKT-RS-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-01), [MKT-RS-99](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-99) | Sweep/Backtest nicht mit vollwertigem Szenariomanagement gleichsetzen |
+| GAP-MKT-05 | keine formale Usability-, Screenreader- oder WCAG-Prüfung | K-15/K-16, [MKT-RS-99](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-99) | Barrierefreiheit nur auf Ebene einzelner Hilfen beschreiben |
+| GAP-MKT-06 | Lizenzmetadaten sind widersprüchlich | K-18, [MKT-RS-04](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-04), [MKT-RS-05](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-05) | vor Veröffentlichung MIT/ISC/Cargo konsistent machen |
+| GAP-MKT-07 | keine autoritative Rentenanspruchs- oder Kontenaggregation | [MKT-DR-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-dr-01), [MKT-EM-02](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-em-02) | manuelle Eingaben als Nutzerverantwortung kennzeichnen; Import wäre eine separate Produktentscheidung |
+| GAP-MKT-08 | keine externe Prognose-, Kalibrierungs- oder Entscheidungsvalidierung | D.1, [MKT-RS-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-01), [MKT-RS-02](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-02) | Implementierung, Tests und Transparenz nicht als Wirksamkeitsbeleg formulieren |
 
 ### D.16.5 Nicht-Zielsegmente
 
-Die Suite ist in ihrer aktuellen Form nicht positioniert als:
-
-- B2B-Beraterplattform mit Mandanten-, Team-, Compliance- und
-  Kundenportalworkflow;
-- staatliche oder anbieterseitig bestätigte Vorsorgeanspruchs-Aggregation;
-- allgemeine internationale Steuer-, Estate- oder Gesamtfinanzplanung;
-- vollautomatische Kontoaggregation oder Depotvollmacht;
-- aktuarielle Pflegeversicherung, medizinische Prognose oder
-  Pflegeleistungsberatung;
-- Ein-Feld-Rechner für Nutzer, die bewusst keine Annahmen- und
-  Ergebnisdetails bearbeiten möchten;
-- Garantie, dass eine bestimmte Entnahme oder Strategie in der Realität
-  erfolgreich ist.
-
-Eine spätere Expansion in eines dieser Segmente wäre ein neuer Produktauftrag
-mit eigenen Daten-, Sicherheits-, Rechts- und UX-Verträgen. Sie wird aus dem
-Marktvergleich nicht still abgeleitet.
+Nicht-Ziele sind B2B-Berater- und staatliche Aggregationsplattformen,
+internationale Gesamtsteuer-/Estateplanung, automatische Kontoaggregation,
+Depotvollmacht, aktuarielle Pflege- oder medizinische Prognose, ein
+detailfreier Ein-Feld-Rechner und jede Erfolgsgarantie. Eine Expansion wäre
+ein eigener Produktauftrag mit Daten-, Sicherheits-, Rechts- und
+UX-Verträgen.
 
 ## D.17 Evidenzlücken und Aktualisierungsroutine
 
 ### D.17.1 Offene Evidenzlücken
 
-| Produktstufe | Wichtigste offene Punkte nach dem Suchpfad | Konsequenz |
-| --- | --- | --- |
-| Ruhestand-Suite | externe Validierung, formale UX/WCAG-Prüfung, konsistente Lizenzmetadaten | keine Qualitäts- oder Accessibility-Überlegenheit behaupten |
-| ProjectionLab Premium | native Pflegefachlichkeit, formale Accessibility, eigener Bediencheck | K-04 teilweise, K-15 nicht geprüft, K-16 nicht öffentlich dokumentiert |
-| Boldin PlannerPlus | unterstützter Offlinepfad, Accessibility, genaue Datenexporttiefe | neutrale Status; US-Regionalgrenze bleibt explizit |
-| BVI Entnahme-Rechner | Szenariospeicherung, Offline, Accessibility, Tarif-/Lizenztext | Schweigen nicht als fehlende Funktion auslegen |
-| Finanzfluss Entnahmeplan | Export, Offline, Accessibility und rechnerspezifische Lizenz | Befund auf sichtbaren Einzelrechner begrenzen |
-| Digitale Rentenübersicht | authentifizierte Portal-UX; die offizielle Accessibility-Selbsterklärung nennt konkrete Restmängel | ohne eID/Login kein Bedienurteil; K-16 bleibt trotz offizieller Erklärung teilweise |
-| MoneyGuide | UX, Accessibility, Seed/Formeldetails hinter Beraterzugang | Funktionsbreite anerkennen, Auditierbarkeit nur teilweise |
-| eMoney Pro | aktueller Preis, Lizenz, Datenbasis, Pflege, Offline, Exporttiefe und Accessibility | besonders viele „nicht öffentlich dokumentiert“-Zellen; keine Negativableitung |
-| FI Calc | Offline-Start, Szenariospeicherung, Accessibility und Code-Lizenz | gerätelokale Eingaben nicht mit vollständigem Offline/Open Source verwechseln |
-| FIRECalc 3.0 | Steuer-, Seed-, Offline-, Szenario-, Accessibility- und Lizenzdetails | historischer Kern belegt, übrige Reichweite neutral |
-| Pralana Gold 2026 | tatsächliche Workbook-UX, Accessibility, Exportdetails und deutsche Mappingtiefe | Kauf wurde nicht durchgeführt; öffentliche Handbücher bleiben P1/P2-Evidenz |
+Offen bleiben bei der Suite externe Validierung, formale UX/WCAG-Prüfung und
+konsistente Lizenzmetadaten; bei Web- und Beraterprodukten insbesondere
+geschlossene Bedienpfade, Accessibility, Offline-, Export-, Preis-, Lizenz-
+und Methodendetails. FI Calc und FIRECalc sind nicht allein wegen freien
+Zugangs Open Source; Pralanas Workbook wurde nicht gekauft oder ausgeführt.
+Die stufenscharfen Lücken und Konsequenzen stehen in den `99`-Records und der
+vollständigen Kriterienmatrix. Schweigen bleibt stets neutral.
 
 ### D.17.2 Pflege des Vergleichs
 
@@ -4183,33 +3683,24 @@ Der eingefrorene Stichtagsbefund bleibt als historische Version erhalten.
 Eine Aktualisierung überschreibt ihn nicht still, sondern ergänzt Datum,
 geänderte Quelle und Auswirkung auf Matrix beziehungsweise Positionierung.
 
-Regelprüfung:
-
-1. nächste turnusmäßige Prüfung spätestens am 2026-10-15;
-2. zusätzlich vor jeder öffentlichen Markt- oder Differenzierungsaussage,
-   vor einem Release mit Marktbezug und vor dem Slice-8-Gesamtabschluss;
-3. sofortige Prüfung bei Tarif-/Produktumbenennung, Stufenwechsel,
-   eingestelltem Dienst, geänderter Lizenz, neuem Offlinepfad oder
-   wesentlicher Suite-Funktion;
-4. zuerst Produktidentität und Stufe, danach Preis, Terms, Methode,
-   Datenschutz, Export, Offline und Accessibility prüfen;
-5. alle betroffenen MKT-Records mit neuem Abrufdatum und
-   Änderungsnotiz aktualisieren; nicht mehr erreichbare Quellen als
-   historisch markieren, nicht löschen;
-6. Statusänderungen nur mit tragender Quelle durchführen; ein verlorener
-   Link führt zunächst zu „nicht erneut verifiziert“, nicht automatisch zu
-   „nicht vorhanden“;
-7. Referenzfälle RH-01 bis RH-04 erneut prüfen, wenn Ereignis-, Steuer-,
-   Pflege-, Haushalts- oder Szenariofunktionen geändert wurden;
-8. die begrenzte Differenzierung aus D.16.2 nach jeder Statusänderung neu
-   lesen und gegebenenfalls enger formulieren.
+Nächste turnusmäßige Prüfung ist spätestens 2026-10-15, zusätzlich vor
+öffentlichen Markt-/Differenzierungsaussagen und Releases mit Marktbezug.
+Tarif-, Stufen-, Dienst-, Lizenz-, Offline- oder wesentliche
+Suite-Änderungen lösen eine Sofortprüfung aus: erst Identität/Stufe, dann
+Preis, Terms, Methode, Datenschutz, Export, Offline und Accessibility.
+Betroffene Records erhalten Abrufdatum und Änderungsnotiz; verlorene Quellen
+werden historisch oder `nicht erneut verifiziert`, nicht gelöscht oder als
+Funktionsfehlen gewertet. Statusänderungen brauchen einen Beleg; Änderungen
+an Ereignis-, Steuer-, Pflege-, Haushalts- oder Szenariofunktionen erzwingen
+eine neue RH- und Differenzierungsprüfung.
 
 ## D.18 Ergebnisstand des Marktvergleichs
 
 Der dokumentierte Ergebnisstand umfasst:
 
 - Erhebungsstichtag, Produktstufen, Preis-/Lizenzstand und Quellenrecords;
-- die segmentierten K-01-bis-K-18-Matrizen ohne Score oder Rangliste;
+- die im Evidenzregister geführten K-01-bis-K-18-Matrizen ohne Score oder
+  Rangliste;
 - die Modellierbarkeitskarte RH-01 bis RH-04;
 - Konkurrenzstärken, eigene Grenzen, strategische Lücken,
   Ziel-/Nicht-Zielsegmente und Aktualisierungsroutine;
