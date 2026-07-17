@@ -307,6 +307,10 @@ Berechnet alle KPIs (Perzentile, Quoten, Pflege-Kosten/Overlap, Shortfall-Deltas
 - `computeKpiCards()` / `computeScenarioSummary()` – strukturierte KPI-Objekte für Renderer.
 - Rendert u. a. die KPI `Ø Steuerersparnis Verlusttopf` auf Basis von `extraKPI.lossCarryTaxSavings.perRunMean`.
 - Rendert Pflegebucket-Kennzahlen, wenn `extraKPI.healthBucket` vorhanden ist.
+- `buildKpiDashboard()` bezeichnet `depotErschoepfungsQuote` sichtbar als
+  „Ruin oder Aktien/Gold ≤ 100 €“ und stellt klar, dass freie Liquidität und
+  Pflegebucket nicht zur 100-Euro-Schwelle gehören; technischer Key und
+  Aggregation bleiben unverändert.
 
 **Dependencies:** `results-formatting.js`, `simulator-utils.js`.
 
@@ -583,7 +587,9 @@ Aggregation aller Monte-Carlo-Ergebnisse nach Abschluss der Simulation.
 - `taxOutcomes`: P50
 - `kpiLebensdauer`: Mean
 - `kpiKuerzungsjahre`, `kpiMaxKuerzung`: P50
-- `depotErschoepfungsQuote`, `alterBeiErschoepfung`: P50
+- `depotErschoepfungsQuote`: Anteil der Läufe mit `isRuin` oder
+  Aktien-plus-Gold-Endbestand ≤ 100 Euro;
+  `alterBeiErschoepfung`: P50 des ersten entsprechenden Ereignisalters
 - `volatilities`, `maxDrawdowns`: P50, P90
 - `extraKPI`: timeShareQuoteAbove45, consumptionAtRiskP10Real, Pflege-KPIs
 - `extraKPI.lossCarryTaxSavings`: `total`, `perRunMean`

@@ -2019,8 +2019,9 @@ Weitere Ergebnisgrößen haben bewusst engere Basen:
 
 - `depotErschoepfungsQuote` zählt einen fehlgeschlagenen Lauf oder einen
   Aktien-plus-Gold-Endbestand von höchstens 100 Euro. Freie Liquidität und
-  Pflegebucket sind in dieser Depot-Teilgröße nicht enthalten. Die UI-Formulierung
-  „Depot vollständig aufgebraucht“ ist deshalb weiter als die Berechnung.
+  Pflegebucket sind in dieser Depot-Teilgröße nicht enthalten. Dashboard und
+  Handbuch benennen deshalb ausdrücklich „Ruin oder Aktien/Gold ≤ 100 €“ und
+  grenzen die nicht erfassten Bestände ab.
 - `finalOutcomes` verwendet Aktien, Gold und freie Liquidität. Ein verbleibender
   Pflegebucket wird separat berichtet und ist nicht im Endvermögen enthalten.
 - `jahresentnahme_real` verwendet die effektive nominale Auszahlung und den
@@ -3246,7 +3247,7 @@ beliebige zusätzliche Asset-Klassen.
 | MR-05 | Steuer- und Rentensteuerlogik sind bewusst vereinfacht. | Nettoerlös und bedarfsmindernder Rentenzufluss können von realer Veranlagung abweichen. | Nutzerparameter und externe Prüfung erforderlich; keine Rechtsberatung. Bekannte Modellgrenze. |
 | MR-06 | Asset-Universum und Bond-Modell sind eng begrenzt. | Diversifikation, Illiquidität, Duration und produktspezifische Risiken fehlen. | Aussagen nur für die unterstützten Bausteine verwenden. Bekannte Modellgrenze. |
 | MR-07 | Pflege- und Mortalitätsparameter enthalten Kalibrierungs- und Nutzerannahmen. | Eintritt, Dauer, Kosten, Flexverlust und Lebensdauer können stark verschoben werden. | Szenarien und Sensitivitäten statt Einzelprognose; externe Evidenzprüfung erforderlich. Kalibrierungsrisiko. |
-| MR-08 | Erfolg, Depoterschöpfung und Endvermögen verwenden unterschiedliche Nenner und Vermögensbasen. | Einzelne KPI-Labels können eine breitere Aussage nahelegen als berechnet. | Kennzahlen gemeinsam und gemäß Ergebnisregister lesen; UI-Label zur Depoterschöpfung ist als PD-03 offen. |
+| MR-08 | Erfolg, Depoterschöpfung und Endvermögen verwenden unterschiedliche Nenner und Vermögensbasen. | Einzelne KPI-Labels können eine breitere Aussage nahelegen als berechnet. | Kennzahlen gemeinsam und gemäß Ergebnisregister lesen; das in Korrektur-Slice 8 präzisierte UI-Label nennt Ruin, Aktien/Gold-Schwelle und ausgeschlossene Bestände. |
 | MR-09 | Historisch wurde `jahresentnahme_real` im Simulatorpfad nicht mit einem fortgeschriebenen kumulierten Inflationsfaktor deflationiert. | Nominale Entnahmen erschienen als reale Entnahmen; davon abgeleitete reale KPIs waren fehlbezeichnet. | In Korrektur-Slice 6 behoben: App-State führt den Faktor einschließlich Ansparjahren genau einmal fort; Headless-, Backtest-, MC-, Auto-Optimize- und Worker-Paritätsgates sichern Route A. |
 | MR-10 | Historisch wurde die Pflegekosten-Drift zwischen Input-Reader und Pflegeberechnung doppelt durch 100 skaliert. | Ein UI-Wert von 3,5 % wirkte als 0,035 % p.a. | In Korrektur-Slice 7 behoben: Prozentwerte werden an DOM-/Profil-Grenzen genau einmal normalisiert; Care-, Profil-, Persistenz- und Worker-Paritätsgates sichern Faktor 1,035. Die fachliche Kalibrierung bleibt MR-07/FR-10. |
 | MR-11 | Sampling-, Regime-, CAPE-, VPW- und Guardrail-Parameter sind Modellentscheidungen. | Gute Resultate können parameter- oder historienabhängig statt robust sein. | Mehrere Seeds, Methoden, Stresspfade und Sensitivitäten vergleichen. Modell- und Kalibrierungsrisiko. |
@@ -3258,11 +3259,11 @@ beliebige zusätzliche Asset-Klassen.
 |----|--------------------------|-----------------------------|----------------------------------|
 | PD-01 | Historisch führte der Simulator den kumulierten Inflationsfaktor für `jahresentnahme_real` nicht über die Jahre fort. | Route A ist umgesetzt: effektive Entnahme geteilt durch den aktuellen Faktor; Basis ist das erste Simulatorjahr. | Behoben in Korrektur-Slice 6; Faktor-, Anspar-, Backtest-, MC-, Auto-Optimize- und Worker-Verträge sind lokal validiert. |
 | PD-02 | Historisch wurde die Pflegekosten-Drift nach der Input-Normalisierung ein zweites Mal durch 100 geteilt. | UI/Profil bleiben Prozentwerte; beide Reader normalisieren über denselben In-memory-Vertrag genau einmal auf ein nicht negatives Verhältnis. | Behoben in Korrektur-Slice 7; 0/3,5/100 %, Invalidwerte, mehrjährige Pflegekosten, Cap/Ramp-up und Worker-Parität sind lokal validiert. |
-| PD-03 | „Depot vollständig aufgebraucht“ zählt `isRuin` oder Aktien-plus-Gold ≤ 100 €, nicht zwingend freie Liquidität und Pflegebucket. | KPI als enge Depot-Teilgröße erklären. | UI-Label präzisieren oder Berechnungsbasis bewusst erweitern. |
+| PD-03 | Historisch behauptete die KPI-Beschreibung eine vollständige Depotaufzehrung, obwohl `isRuin` oder Aktien plus Gold ≤ 100 € gezählt werden. | Dashboard und Handbuch nennen die beiden Auslöser sowie den Ausschluss freier Liquidität und des Pflegebuckets aus der 100-€-Schwelle. | Behoben in Korrektur-Slice 8 als reine Labelkorrektur; Aggregation, technischer Key, Worker- und Optimizervertrag bleiben unverändert. |
 
-PD-01 und PD-02 wurden nicht durch nachträgliche Soll-Erklärungen, sondern in
-den separaten Korrektur-Slices 6 und 7 mit Laufzeitvalidierung behoben. PD-03
-bleibt bis zu seinem UI-Slice offen.
+PD-01 bis PD-03 wurden nicht durch nachträgliche Soll-Erklärungen, sondern in
+den separaten Korrektur-Slices 6 bis 8 mit Laufzeit- beziehungsweise
+UI-Vertragsvalidierung behoben.
 
 ## Ergebnisregister und Interpretationsregeln
 

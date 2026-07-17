@@ -1,7 +1,7 @@
 # Korrektur-Arbeitsplan zu den Findings aus Slice 08
 
 **Stand:** 2026-07-17<br>
-**Status:** in Umsetzung – Slice 7 implementiert; Review ausstehend<br>
+**Status:** in Umsetzung – Slice 8 implementiert; Review ausstehend<br>
 **Ausgangsdokument:** `SLICE_ARCHITEKTUR_FACHKONZEPT_08_INTEGRATION_ABSCHLUSS.md`<br>
 **Betroffenes Hauptdokument:** `docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md`<br>
 **Planerstellungs-Branch:** `codex/architektur-fachkonzept-doku`<br>
@@ -505,9 +505,13 @@ deterministische 3,5-Prozent-Fall liefert nun `1.035 / 1.071,225` EUR statt
 nicht mutiert, Worker-Szenario-Klon und Chunking bleiben paritätisch. Input
 53/53, Profil 51/51, Care 21/21, Worker-Parität 369/369 und Gesamtsuite
 4.569/4.569 sind grün; das separate Browsergate bestand 14/14 Szenarien.
-Review und Nutzerfreigabe der Implementierung stehen aus.
+Review und Nutzerfreigabe der Implementierung wurden am 2026-07-17
+abgeschlossen.
 
 ### Slice 8 – PD-03 KPI-Bezeichnung präzisieren
+
+**Slice-Datei:**
+[`SLICE_ARCHITEKTUR_FACHKONZEPT_FINDINGS_08_DEPOT_ERSCHOEPFUNGS_KPI.md`](SLICE_ARCHITEKTUR_FACHKONZEPT_FINDINGS_08_DEPOT_ERSCHOEPFUNGS_KPI.md)
 
 **Ziel:** Anzeige und Hilfetext an die bestehende Berechnungsbasis anpassen,
 sofern der Nutzer nicht ausdrücklich eine Berechnungsänderung wählt.
@@ -532,6 +536,16 @@ sofern der Nutzer nicht ausdrücklich eine Berechnungsänderung wählt.
 - kein Text behauptet vollständige Vermögenslosigkeit;
 - Aggregation und Optimizervertrag ändern sich nicht;
 - PD-03 wird erst nach UI-/Dokumentationsabgleich geschlossen.
+
+**Umsetzungsstand 2026-07-17:** Dashboard und Alters-KPI heißen nun „Ruin
+oder Aktien/Gold ≤ 100 €“. Die Beschreibungen und das Handbuch nennen
+`isRuin`, die 100-Euro-Schwelle für Aktien plus Gold sowie den Ausschluss
+freier Liquidität und des Pflegebuckets aus dieser Teilgröße. Der technische
+Key, Prozentformatierung, Tone-Schwellen, Aggregation und Optimizervertrag
+sind unverändert. Der neue DOM-freie UI-Vertragstest ist mit 16/16 Assertions
+grün; Monte-Carlo 110/110, Auto-Optimize/Worker 7/7, Gesamtsuite
+4.585/4.585 und Browsergate 14/14 bestätigen die Kompatibilität. Der statische
+Evidenzvalidator ist grün; Review der Implementierung steht aus.
 
 ### Slice 9 – Forschungsvalidierungs-Backlog operationalisieren
 
@@ -702,7 +716,7 @@ Zusätzlich zu `AGENTS.md` wird gestoppt und nachgefragt, wenn:
 | 5 | freigegeben | MIT in Lizenztext, npm-/Lockfile-Root und Cargo; GAP-MKT-06 geschlossen; 14 Fokus- und 4.474 Gesamtassertions grün; Review durch Gemini abgeschlossen am 2026-07-17 |
 | 6 | freigegeben | Route A; echter Realwert über App-/Engine-State, Ansparpfad und Worker; 4.533/4.533 Assertions grün; Review durch Gemini abgeschlossen am 2026-07-17 |
 | 7 | freigegeben | einmalige In-memory-Normalisierung, unverändertes Profilformat, deterministische Care-/Cap- und Worker-Paritätsgates; 4.569/4.569 Assertions grün; Review durch Gemini abgeschlossen am 2026-07-17 |
-| 8 | geplant | präzise Depot-Erschöpfungs-KPI |
+| 8 | freigegeben | präzises Label „Ruin oder Aktien/Gold ≤ 100 €“; technischer Key, Aggregation und Optimizer unverändert; 4.585/4.585 Assertions und 14/14 Browser-Szenarien grün; Review durch Gemini abgeschlossen am 2026-07-17 |
 | 9 | geplant | operationalisierter Forschungsvalidierungs-Backlog |
 | 10 | geplant | Gesamtintegration und Abschlussvalidierung |
 
@@ -839,5 +853,5 @@ dokumentiert hier externe Entscheidungen und erteilt keine Eigenfreigabe.
 | U-K02 | Nutzer | Dokumenttopologie und Messvertrag | freigegeben | erledigt am 2026-07-16 |
 | U-K05 | Nutzer | autoritative Projektlizenz | MIT | für Slice 5 verbindlich |
 | U-K06 | Nutzer | PD-01 Route | Route A | Route entschieden; Delta-Baseline folgt vor Slice 6 |
-| U-K08 | Nutzer | PD-03 Route | Labelkorrektur | erledigt am 2026-07-16 |
+| U-K08 | Nutzer | PD-03 Route | Labelkorrektur | Route bestätigt am 2026-07-16; Slice 8 implementiert, Implementierungsreview ausstehend |
 | U-K07 | Nutzer/Reviewer | Pflegekosten-Einheitenvertrag | Prozentwerte in UI/Persistenz, einmalige In-memory-Normalisierung | Vertrag bestätigt; Slice 7 implementiert, Implementierungsreview ausstehend |

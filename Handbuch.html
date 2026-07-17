@@ -935,6 +935,10 @@
                             <li><strong>Monte-Carlo-Läufe:</strong> Jeder Lauf erzeugt eine eigene Rendite- und
                                 Inflationssequenz, wendet Sparraten und Entnahmen an und trackt Liquidität sowie
                                 Depotwerte.</li>
+                            <li><strong>Ruin oder Aktien/Gold ≤ 100 €:</strong> Diese Quote markiert Läufe mit
+                                <code>isRuin</code> oder einem Aktien-plus-Gold-Endbestand von höchstens 100 €.
+                                Freie Liquidität und ein verbleibender Pflegebucket zählen nicht zu dieser
+                                100-€-Schwelle.</li>
                             <li><strong>Guardrails:</strong> Bei negativen Pfaden werden automatische Sicherheitsnetze
                                 (z.B. Mindest-Cash, variable Ausgabenbremsen) ausgelöst und in den Ergebnissen als
                                 Ereignis markiert. Ein gesetzter Mindest-Flex kann gekürzte flexible Ausgaben anheben,

@@ -89,9 +89,9 @@ export function buildKpiDashboard(results, inputs = {}) {
             tone: 'default'
         },
         {
-            title: 'Depot-Erschöpfungs-Quote',
+            title: 'Ruin oder Aktien/Gold ≤ 100 €',
             value: formatPercentage(deQuote),
-            description: 'Anteil der Simulationen, in denen das Depot vollständig aufgebraucht wird.',
+            description: 'Anteil der Läufe mit Ruin (`isRuin`) oder einem Aktien-plus-Gold-Endbestand von höchstens 100 €. Freie Liquidität und Pflegebucket zählen nicht zur 100-€-Schwelle.',
             tone: depotTone
         },
         {
@@ -115,9 +115,9 @@ export function buildKpiDashboard(results, inputs = {}) {
                 tone: 'default'
             },
             {
-                title: 'Median-Alter bei Erschöpfung',
+                title: 'Median-Alter: Ruin oder Aktien/Gold ≤ 100 €',
                 value: formatNumberWithUnit(safeAge(results?.alterBeiErschoepfung?.p50), 'Jahre'),
-                description: 'Alter bei Eintritt der Depot-Erschöpfung (Median, nur erschöpfte Fälle).',
+                description: 'Medianes Alter beim ersten Ruin (`isRuin`) oder beim ersten Aktien-plus-Gold-Bestand von höchstens 100 € (nur entsprechend markierte Läufe).',
                 tone: 'default'
             },
             {

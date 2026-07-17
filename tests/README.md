@@ -289,6 +289,15 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 - **Perzentile:** P10 < P50 < P90 Ordnung
 - **Mindest-Flex:** Serial-MC-Lauf mit `minimumFlexAnnual > 0` inklusive Withdrawal-Effekt und Logstatus.
 
+#### `results-metrics.test.mjs`
+**Zweck:** Sichert den sichtbaren Vertrag der Depotrest-/Ruin-KPI ohne DOM.
+- **Präzises Label:** Ruin oder Aktien/Gold-Endbestand ≤ 100 Euro statt
+  vollständiger Vermögensaufzehrung
+- **Aussagegrenze:** `isRuin`, freie Liquidität und Pflegebucket werden im
+  Beschreibungstext ausdrücklich eingeordnet
+- **Kompatibilität:** Prozentformatierung, Altersanzeige und bestehende
+  Success-/Warning-/Danger-Schwellen bleiben unverändert
+
 #### `care-meta.test.mjs`
 **Zweck:** Validiert die Pflegefall-Logik.
 - **Eintrittswahrscheinlichkeit:** Altersabhängige Pflegewahrscheinlichkeit
