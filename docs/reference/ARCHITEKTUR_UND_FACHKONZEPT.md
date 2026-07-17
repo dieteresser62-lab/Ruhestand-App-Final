@@ -3761,7 +3761,10 @@ besitzt die normative Detail-Ownership für 55 FOR-Records, Taxonomie,
 Versionsstandard, Quellen-Mapping und die vollständigen MAP-Dossiers. Dieser
 Hauptblock besitzt die normative Ownership für die kompakte Einordnung, das
 Ergebnisbündel, FR-01 bis FR-12 und FQ-01 bis FQ-10. Beide Dokumente müssen bei
-einer Neubewertung gemeinsam gepflegt werden.
+einer Neubewertung gemeinsam gepflegt werden. Der interne
+[Forschungsvalidierungs-Backlog](../internal/FORSCHUNGSVALIDIERUNGS_BACKLOG.md)
+operationalisiert die offenen FR-/FQ-Nachweise, ohne ihren Status oder den
+Evidenzstatus der MAP-Dossiers anzuheben.
 
 ## E.2 Evidenz-, Übertragbarkeits- und Statusvertrag
 
@@ -4016,6 +4019,12 @@ bleiben bis zu einem dokumentierten Nachweis offen.
 
 ## E.7 Priorisierte Forschungsfragen
 
+Die zehn Fragen sind im
+[Forschungsvalidierungs-Backlog](../internal/FORSCHUNGSVALIDIERUNGS_BACKLOG.md)
+in getrennte Folgevorhaben mit Eingangsgates, Owner-Rollen, Mindestnachweisen,
+Abbruchkriterien und Ergebnisartefakten zerlegt. Alle Pakete stehen auf FV0
+und bleiben offen; ihre Planung ist kein Wirksamkeitsnachweis.
+
 | ID | Priorität | Frage | Mindestnachweis für eine belastbarere Aussage |
 | --- | --- | --- | --- |
 | FQ-01 | 1 | Wie ändern definierte Return-Indizes, Kosten und internationale Daten die Entnahmeergebnisse? | Datenmanifest, Kostenvertrag und vorab definierte Länder-/Teilperiodenläufe. |
@@ -4050,7 +4059,9 @@ Der Forschungsrahmen enthält damit eine kompakte Einordnung von MAP-01 bis
 MAP-17, die mehrdimensionale Ergebnisinterpretation, FR-01 bis FR-12 und
 FQ-01 bis FQ-10. Alle offenen V4-/V5-Prüfungen bleiben bestehen. Vollständige
 Quellen- und Dossierdetails stehen im
-[normativen Forschungs-Evidenzregister](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md).
+[normativen Forschungs-Evidenzregister](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md);
+Priorität, Startgates und gesperrte Wirksamkeitsaussagen im
+[internen Forschungsvalidierungs-Backlog](../internal/FORSCHUNGSVALIDIERUNGS_BACKLOG.md).
 
 ---
 

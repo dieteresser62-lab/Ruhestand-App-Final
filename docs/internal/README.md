@@ -6,6 +6,8 @@ Aktive interne Uebersichten:
 
 - `PROJEKTUEBERSICHT.md` - detaillierte technische und organisatorische Projektuebersicht.
 - `SLICE_EXECUTION_RULES.md` - verbindlicher Review-, Branch-, Risiko- und Abnahmeprozess fuer Slices.
+- `ARCHITEKTUR_FACHKONZEPT_FINDINGS_KORREKTURPLAN.md` - aktiver Korrekturplan zu den Findings aus dem Architektur- und Fachkonzept.
+- `FORSCHUNGSVALIDIERUNGS_BACKLOG.md` - priorisierte offene FR-/FQ-Folgevorhaben mit Nachweis- und Freigabegates.
 - Die oeffentliche Abschlussreferenz des Arbeitsplans liegt unter `../reference/TRANCHEN_MODULES_README.md`; die Nutzeranleitung unter `../guides/MULTI-TRANCHEN-ANLEITUNG.md`.
 
 Abgeschlossene Umsetzungen und fruehere Arbeitsplaene liegen im Archiv.

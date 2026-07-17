@@ -6,7 +6,7 @@
 **Status:** normativer Beleganhang zum Architektur- und Fachkonzept<br>
 **Hauptdokument:** [Architektur und Fachkonzept](ARCHITEKTUR_UND_FACHKONZEPT.md#forschungsrahmen)
 
-Dieses Register führt das vollständige kuratierte Korpus mit 55 FOR-Records und die ausführlichen Dossiers MAP-01 bis MAP-17. Es ist kein Archiv: Quellenrolle, Übertragbarkeit, Abweichung, Evidenzstatus, lokale Validierungsgrenze und offene V4-/V5-Prüfung sind hier normativ. Das Hauptdokument bleibt für Ergebnisgrenzen, FR-01 bis FR-12 und FQ-01 bis FQ-10 maßgeblich.
+Dieses Register führt das vollständige kuratierte Korpus mit 55 FOR-Records und die ausführlichen Dossiers MAP-01 bis MAP-17. Es ist kein Archiv: Quellenrolle, Übertragbarkeit, Abweichung, Evidenzstatus, lokale Validierungsgrenze und offene V4-/V5-Prüfung sind hier normativ. Das Hauptdokument bleibt für Ergebnisgrenzen, FR-01 bis FR-12 und FQ-01 bis FQ-10 maßgeblich. Der [interne Forschungsvalidierungs-Backlog](../internal/FORSCHUNGSVALIDIERUNGS_BACKLOG.md) definiert deren nächste Nachweise und Freigabegates; er schließt keine Frage und hebt keinen Evidenzstatus an.
 
 Die Aufnahme einer Quelle belegt weder eine identische Suite-Umsetzung noch deren Wirksamkeit. Literaturzahlen sind keine Suite-Ergebnisse; lokale Tests belegen höchstens V1 bis V3 und ersetzen keine externe Kalibrierung oder Wirksamkeitsprüfung.
 
