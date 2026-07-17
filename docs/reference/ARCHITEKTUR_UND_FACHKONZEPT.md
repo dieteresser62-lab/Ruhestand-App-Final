@@ -115,7 +115,7 @@ Die Ruhestand-Suite kombiniert folgende Funktionen:
 - Alle Planungsbeträge und automatisch akzeptierten Tranchenkurse sind EUR-basiert. Es gibt keine implizite Fremdwährungsumrechnung; Nicht-EUR-Quotes werden abgelehnt.
 - Das Steuermodell bildet einen begrenzten Verkaufskontext ab, nicht die gesamte deutsche Ertrags-, Einkommen- oder Investmentbesteuerung. Rechtliche Parameter werden nicht automatisch aktualisiert.
 - Der Simulator führt den kumulierten Inflationsfaktor über den vollständigen Jahrespfad einschließlich Ansparjahren fort. `jahresentnahme_real` ist die effektive nominale Entnahme geteilt durch den Faktor des aktuellen Modelljahres und bezieht sich auf die Kaufkraft des ersten Simulatorjahres.
-- Der UI-Wert für den zusätzlichen Pflegekostenanstieg wird zwischen Reader und Pflegelogik doppelt prozentual skaliert. Die angezeigten 3,5 % wirken im aktuellen Pfad als 0,035 %; dies ist ein offener Produktmangel, keine fachliche Sollannahme.
+- Der zusätzliche Pflegekostenanstieg bleibt in UI und gespeicherten Profilen ein Prozentwert. DOM- und Profil-Reader normalisieren ihn genau einmal in-memory; die Pflegelogik, Runner und Worker verwenden danach das Verhältnis direkt. Angezeigte 3,5 % wirken daher als jährlicher Faktor 1,035. Die Parameterkalibrierung bleibt davon getrennt eine Modellgrenze.
 - Indexvariante, geschätzte Frühhistorie und weitere Ergebnisgrenzen stehen in C.3.3 sowie im Annahmen- und Modellrisikoregister.
 
 ## Nachgezogene Entwicklungspakete seit dem Dokumentstand 2026-06-12
@@ -2111,12 +2111,16 @@ Wert `zusatzFloorZiel` wird dem Haushalts-Floor zugerechnet;
 dem bisherigen Pflege-Zielwert für Diagnose- und kumulative Pflegefelder fest.
 Der Flex-Level wirkt separat auf den Haushalts-Flex.
 
-**Offener Produktmangel PD-02 / Modellrisiko MR-10:** Das UI übergibt die zusätzliche
-Pflegekosten-Drift bereits als Dezimalwert, während `updateCareMeta()` sie
-nochmals durch 100 teilt. Der UI-Default 3,5% wirkt im aktuellen Laufzeitpfad
-deshalb als 0,035%. Bis zu einer Codeentscheidung dokumentiert diese Passage
-sowohl den beabsichtigten UI-Vertrag als auch die tatsächlich beobachtete
-Rechenwirkung; sie erklärt die Abweichung nicht zur Fachsemantik.
+**Behobener Produktmangel PD-02 / historisches Modellrisiko MR-10:** UI und
+persistierte Profile behalten Prozentwerte wie `3,5`. `readCareInputs()` und
+`buildSimulatorInputsFromProfileData()` verwenden denselben Normalisierer und
+geben `0,035` an den Laufzeitpfad weiter. Negative Werte werden dort auf null
+normalisiert; ungültige UI-Werte verwenden den UI-Default 3,5 %, ungültige
+oder fehlende Profilwerte aus Kompatibilitätsgründen weiterhin 0 %. Runner und
+Worker transportieren dieses Verhältnis unverändert; `updateCareMeta()`
+verwendet es ohne eine weitere Division durch 100. Das persistierte
+Profilformat wurde nicht geändert. Deterministische Pflegejahre sichern für
+3,5 % die Faktoren 1,035 und 1,035² sowie den bestehenden Cap-/Ramp-up-Pfad.
 
 ### C.4.5 Dual-Care für Paare
 
@@ -3244,7 +3248,7 @@ beliebige zusätzliche Asset-Klassen.
 | MR-07 | Pflege- und Mortalitätsparameter enthalten Kalibrierungs- und Nutzerannahmen. | Eintritt, Dauer, Kosten, Flexverlust und Lebensdauer können stark verschoben werden. | Szenarien und Sensitivitäten statt Einzelprognose; externe Evidenzprüfung erforderlich. Kalibrierungsrisiko. |
 | MR-08 | Erfolg, Depoterschöpfung und Endvermögen verwenden unterschiedliche Nenner und Vermögensbasen. | Einzelne KPI-Labels können eine breitere Aussage nahelegen als berechnet. | Kennzahlen gemeinsam und gemäß Ergebnisregister lesen; UI-Label zur Depoterschöpfung ist als PD-03 offen. |
 | MR-09 | Historisch wurde `jahresentnahme_real` im Simulatorpfad nicht mit einem fortgeschriebenen kumulierten Inflationsfaktor deflationiert. | Nominale Entnahmen erschienen als reale Entnahmen; davon abgeleitete reale KPIs waren fehlbezeichnet. | In Korrektur-Slice 6 behoben: App-State führt den Faktor einschließlich Ansparjahren genau einmal fort; Headless-, Backtest-, MC-, Auto-Optimize- und Worker-Paritätsgates sichern Route A. |
-| MR-10 | Pflegekosten-Drift wird zwischen UI-Reader und Pflegeberechnung doppelt durch 100 skaliert. | Ein UI-Wert von 3,5% wirkt als 0,035% p.a. | Keine neue Fachsemantik dokumentiert; Code-/UI-Contract muss separat korrigiert werden. Offener Produktmangel PD-02. |
+| MR-10 | Historisch wurde die Pflegekosten-Drift zwischen Input-Reader und Pflegeberechnung doppelt durch 100 skaliert. | Ein UI-Wert von 3,5 % wirkte als 0,035 % p.a. | In Korrektur-Slice 7 behoben: Prozentwerte werden an DOM-/Profil-Grenzen genau einmal normalisiert; Care-, Profil-, Persistenz- und Worker-Paritätsgates sichern Faktor 1,035. Die fachliche Kalibrierung bleibt MR-07/FR-10. |
 | MR-11 | Sampling-, Regime-, CAPE-, VPW- und Guardrail-Parameter sind Modellentscheidungen. | Gute Resultate können parameter- oder historienabhängig statt robust sein. | Mehrere Seeds, Methoden, Stresspfade und Sensitivitäten vergleichen. Modell- und Kalibrierungsrisiko. |
 | MR-12 | Nutzereingaben und reale Ausführung liegen außerhalb der Rechenautomatik. | Falsche Einstandswerte, Netto-/Bruttowerte, Steuerflags oder abweichende Brokerorders übertragen sich direkt auf Ergebnisse. | Eingaben, Vorschläge und Reconciliation getrennt prüfen. Operatives Risiko. |
 
@@ -3253,12 +3257,12 @@ beliebige zusätzliche Asset-Klassen.
 | ID | Beobachteter Ist-Zustand | Dokumentarische Behandlung | Erforderliche Produktentscheidung |
 |----|--------------------------|-----------------------------|----------------------------------|
 | PD-01 | Historisch führte der Simulator den kumulierten Inflationsfaktor für `jahresentnahme_real` nicht über die Jahre fort. | Route A ist umgesetzt: effektive Entnahme geteilt durch den aktuellen Faktor; Basis ist das erste Simulatorjahr. | Behoben in Korrektur-Slice 6; Faktor-, Anspar-, Backtest-, MC-, Auto-Optimize- und Worker-Verträge sind lokal validiert. |
-| PD-02 | Pflegekosten-Drift wird nach der UI-Normalisierung ein zweites Mal durch 100 geteilt. | Beabsichtigte UI-Einheit und tatsächliche Wirkung nebeneinander dokumentieren. | Prozentvertrag an genau einer Grenze normalisieren und Tests ergänzen. |
+| PD-02 | Historisch wurde die Pflegekosten-Drift nach der Input-Normalisierung ein zweites Mal durch 100 geteilt. | UI/Profil bleiben Prozentwerte; beide Reader normalisieren über denselben In-memory-Vertrag genau einmal auf ein nicht negatives Verhältnis. | Behoben in Korrektur-Slice 7; 0/3,5/100 %, Invalidwerte, mehrjährige Pflegekosten, Cap/Ramp-up und Worker-Parität sind lokal validiert. |
 | PD-03 | „Depot vollständig aufgebraucht“ zählt `isRuin` oder Aktien-plus-Gold ≤ 100 €, nicht zwingend freie Liquidität und Pflegebucket. | KPI als enge Depot-Teilgröße erklären. | UI-Label präzisieren oder Berechnungsbasis bewusst erweitern. |
 
-PD-01 wurde nicht durch eine nachträgliche Soll-Erklärung, sondern im
-separaten Korrektur-Slice 6 mit Laufzeitvalidierung behoben. PD-02 und PD-03
-bleiben bis zu ihren jeweiligen Code-/UI-Slices offen.
+PD-01 und PD-02 wurden nicht durch nachträgliche Soll-Erklärungen, sondern in
+den separaten Korrektur-Slices 6 und 7 mit Laufzeitvalidierung behoben. PD-03
+bleibt bis zu seinem UI-Slice offen.
 
 ## Ergebnisregister und Interpretationsregeln
 
@@ -3930,7 +3934,7 @@ Versicherungsprognose.
 | [MAP-13](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md#map-13) Sweep/Auto-Optimize – **experimentell** | Suchverfahren ordnen Kandidaten innerhalb eines Nutzerraums; Mehrfachtests und Backtest-Overfitting sind T4. Getrennte Seeds aus demselben Generator bilden keinen unabhängigen Markt-Holdout. | V1–V3 prüfen Sampling, Constraints und Champion-Shape. V4/V5 offen: Trial-Logging, nested Holdouts, Stabilitätsintervalle und unveränderte Baseline. |
 | [MAP-14](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md#map-14) Single-/Joint-Life-Horizont – **adaptiert** | Lebensdauertheorie und Periodensterbetafel sind T2/T3; Kohortenunterschiede sind T4. Quantil, Joint-Konstruktion und Puffer sind keine individuelle Lebensdauerprognose. | V1–V3 prüfen Monotonie und Pfadweitergabe. V4/V5 offen: Kohorten-/Verbesserungsszenarien, Partnerabhängigkeit und asymmetrische Horizonfehler. |
 | [MAP-15](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md#map-15) Rente/Witwenanteil – **adaptiert** | Amtliche Populations- und Rentenreihen liefern T3/T4-Kontext, keine Individualleistung. Eingabebetrag, Indexierung und Witwenquote ersetzen weder Bescheid noch Rechts-, Steuer- oder Abgabenprüfung. | V1–V3 prüfen Cashflow und Todespfad. V5/V6 offen: aktuelle Unterlagen, Brutto/Netto-Vertrag und externe Anspruchsprüfung. |
-| [MAP-16](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md#map-16) Pflegeprozess – **heuristisch** | Deutsche Bestände und Leistungen sind T3/T4; Bestände sind keine individuellen Eintritts- oder Übergangsraten. Dauer, Progression, Kosten und Mortalität sind nicht gemeinsam extern kalibriert; PD-02 verzerrt aktuell den UI-Driftpfad. | V1–V3 prüfen Zustände und Aggregation. V4/V5 offen: getrennte Quellenketten, Übergänge, Dauer, Versorgung, Kosten, Leistungen und Tod nach PD-02. |
+| [MAP-16](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md#map-16) Pflegeprozess – **heuristisch** | Deutsche Bestände und Leistungen sind T3/T4; Bestände sind keine individuellen Eintritts- oder Übergangsraten. Dauer, Progression, Kosten und Mortalität sind nicht gemeinsam extern kalibriert; der PD-02-Einheitenpfad ist korrigiert, aber nicht extern kalibriert. | V1–V3 prüfen Zustände, Einheiten und Aggregation. V4/V5 offen: getrennte Quellenketten, Übergänge, Dauer, Versorgung, Kosten, Leistungen und Tod auf dem korrigierten Einheitenvertrag. |
 | [MAP-17](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md#map-17) Pflegebucket – **experimentell** | Mental Accounting, Selbstversicherung und Pflegekontext sind T2 bis T4. Algorithmische Zweckbindung ist weder Versicherung noch vollständiges Liability Matching; Höhe und Trigger sind nicht extern validiert. | V1–V3 prüfen Carve-out, Trigger und KPIs. V4/V5 offen: gleiche Gesamtvermögen, Leistungen, Cash-Opportunitätskosten, Steuer und Alternativregeln. |
 
 ### E.4.4 Mechanismen gemeinsam bewerten
@@ -3983,9 +3987,10 @@ anschließend Konsumkürzung, Steuer, Pflegewirkung und Restvermögen gemeinsam
 lesen. Erst dann dürfen Policies verglichen werden. Ein Median ohne
 Tailverteilung oder ein Endvermögen ohne konsumierte Leistungen genügt nicht.
 Reale und nominale Größen sowie Prozent- und Verhältniswerte müssen dabei
-vertragstreu getrennt bleiben. PD-01 ist durch den kumulierten
-Simulator-State behoben; PD-02 begrenzt bis zu seiner Korrektur weiterhin die
-Pflegekosten-Driftaussagen.
+vertragstreu getrennt bleiben. PD-01 ist durch den kumulierten Simulator-State
+behoben; PD-02 durch die einmalige In-memory-Normalisierung an DOM- und
+Profilgrenze. Aussagen zur Eignung von Pflegeparametern bleiben dennoch durch
+MR-07 und FR-10 begrenzt.
 
 ## E.6 Forschungs- und Modellrisiken
 
@@ -4004,7 +4009,7 @@ bleiben bis zu einem dokumentierten Nachweis offen.
 | FR-07 | hoch | CAPE-Horizont-, Datenraum- und Forecast-Mismatch wird übersehen. | Internationale/zeitliche Holdouts und konstante Baseline verwenden. |
 | FR-08 | hoch | Unbekanntes Trial-Universum macht den Champion scheinbar robust oder optimal. | Alle Trials loggen, locked/nested Holdouts, Stabilitätsintervalle und Baseline. |
 | FR-09 | hoch | Perioden-/Kohorten- und Joint-Life-Fehler wirken wie individuelle Prognose. | Verbesserungs-/Kohortenszenarien, Quantilsensitivität und Partnerabhängigkeit. |
-| FR-10 | hoch | Unkalibrierte Pflegeübergänge, Kosten und Drift wirken individuell prognostisch. | Quellenketten je Parameter, PD-02-Korrektur, Kalibrierung und Sensitivität. |
+| FR-10 | hoch | Unkalibrierte Pflegeübergänge, Kosten und Drift wirken individuell prognostisch. | Quellenketten je Parameter, Kalibrierung und Sensitivität auf dem korrigierten PD-02-Einheitenvertrag. |
 | FR-11 | mittel | Bucket- oder Goldwirkung wird mit Allokationseffekt vermischt. | Ablation bei gleicher Allokation, Kosten, Rebalancing und Liquidität. |
 | FR-12 | hoch | Erfolgsquote verdeckt Konsumkürzung, Liquiditätsstress oder Nachlasslücke. | Ergebnisbündel aus E.5 nutzen und Shortfalltiefe/-dauer entwickeln. |
 
@@ -4015,7 +4020,7 @@ bleiben bis zu einem dokumentierten Nachweis offen.
 | FQ-01 | 1 | Wie ändern definierte Return-Indizes, Kosten und internationale Daten die Entnahmeergebnisse? | Datenmanifest, Kostenvertrag und vorab definierte Länder-/Teilperiodenläufe. |
 | FQ-02 | 1 | Welche Guardrail-/VPW-/CAPE-Verbesserungen halten auf unangetasteten Daten und Seeds? | Baseline, vollständiges Trial-Log und zeitlich/länderweise Holdouts. |
 | FQ-03 | 1 | Wie oft, tief und lange werden Floor, Flex und Runway verletzt? | Verteilungen für Shortfall, Kürzung und Liquiditätslücke. |
-| FQ-04 | 1 | Welche deutschen Quellen tragen Pflegeeintritt, Übergang, Dauer, Kosten, Leistungen und Mortalität? | Getrennte Parameterherkunft und Rekalibrierung nach PD-02. |
+| FQ-04 | 1 | Welche deutschen Quellen tragen Pflegeeintritt, Übergang, Dauer, Kosten, Leistungen und Mortalität? | Getrennte Parameterherkunft und Rekalibrierung auf dem korrigierten PD-02-Einheitenvertrag. |
 | FQ-05 | 2 | Welche Bootstrap-Blocklänge und Filter passen zu den Jahresdaten? | Abhängigkeitsdiagnostik, Sensitivitätsband und Samplervergleich. |
 | FQ-06 | 2 | Wie lässt sich Tail-Stress ohne inkonsistente oder doppelte Schocks formulieren? | Kalibrierte gemeinsame Szenarien, Challenge-Protokoll und Anti-Doppelpessimismus-Test. |
 | FQ-07 | 2 | Verbessert die CAPE-Policy Ergebnisse außerhalb der Entwicklungsdaten? | Internationale/zeitliche Out-of-sample-Studie mit konstanter Baseline. |

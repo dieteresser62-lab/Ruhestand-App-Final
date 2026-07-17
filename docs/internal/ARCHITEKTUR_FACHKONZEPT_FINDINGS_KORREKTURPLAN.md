@@ -1,7 +1,7 @@
 # Korrektur-Arbeitsplan zu den Findings aus Slice 08
 
 **Stand:** 2026-07-17<br>
-**Status:** in Umsetzung – Slice 6 implementiert; Review ausstehend<br>
+**Status:** in Umsetzung – Slice 7 implementiert; Review ausstehend<br>
 **Ausgangsdokument:** `SLICE_ARCHITEKTUR_FACHKONZEPT_08_INTEGRATION_ABSCHLUSS.md`<br>
 **Betroffenes Hauptdokument:** `docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md`<br>
 **Planerstellungs-Branch:** `codex/architektur-fachkonzept-doku`<br>
@@ -457,9 +457,12 @@ MC-/Auto-Optimize-Messung verändert ausschließlich die Realentnahmestichprobe;
 Endvermögen, Failure, Depoterschöpfung, alle drei Kandidatenmetriken und der
 Stichproben-Champion `targetEq=80` bleiben bitgenau stabil. Faktor-/Anspar-/MC-
 Contract 52/52, Backtest 46/46, Worker-Parität 354/354 und Gesamtsuite
-4.533/4.533 sind grün; Review und Nutzerfreigabe stehen aus.
+4.533/4.533 sind grün; Review und Nutzerfreigabe sind abgeschlossen.
 
 ### Slice 7 – PD-02 Pflegekosten-Drift korrigieren
+
+**Slice-Datei:**
+[`SLICE_ARCHITEKTUR_FACHKONZEPT_FINDINGS_07_PFLEGEKOSTEN_EINHEITENVERTRAG.md`](SLICE_ARCHITEKTUR_FACHKONZEPT_FINDINGS_07_PFLEGEKOSTEN_EINHEITENVERTRAG.md)
 
 **Ziel:** Prozent-/Verhältnisvertrag an genau einer Grenze normalisieren.
 
@@ -490,6 +493,19 @@ Contract 52/52, Backtest 46/46, Worker-Parität 354/354 und Gesamtsuite
 - Invalidwerte werden am festgelegten Contract abgelehnt oder nach
   dokumentierter Regel normalisiert;
 - erwartete Pflegeergebnisdeltas sind erklärt, unerwartete Deltas blockieren.
+
+**Umsetzungsstand 2026-07-17:** Der gemeinsame Input-Vertrag ist
+implementiert. DOM und gespeicherte Profile behalten Prozentwerte und
+normalisieren sie über denselben In-memory-Helper genau einmal; negative Werte
+werden auf null gesetzt, die bisherigen Missing-/Invalid-Fallbacks bleiben je
+Grenze erhalten. `updateCareMeta()` verwendet das Verhältnis direkt. Der
+deterministische 3,5-Prozent-Fall liefert nun `1.035 / 1.071,225` EUR statt
+`1.000,35 / 1.000,7001225` EUR für einen 1.000-EUR-Ausgangswert; 0 Prozent,
+100 Prozent und Cap/Ramp-up sind ebenfalls gesichert. Persistenzwerte werden
+nicht mutiert, Worker-Szenario-Klon und Chunking bleiben paritätisch. Input
+53/53, Profil 51/51, Care 21/21, Worker-Parität 369/369 und Gesamtsuite
+4.569/4.569 sind grün; das separate Browsergate bestand 14/14 Szenarien.
+Review und Nutzerfreigabe der Implementierung stehen aus.
 
 ### Slice 8 – PD-03 KPI-Bezeichnung präzisieren
 
@@ -669,7 +685,7 @@ Zusätzlich zu `AGENTS.md` wird gestoppt und nachgefragt, wenn:
 | U-K04 | Evidenzvalidator und Aktualitätsvertrag | Slice 4 | Nutzer + Reviewer | freigegeben am 2026-07-17 |
 | U-K05 | autoritative Lizenz | vor Slice 5 | Nutzer | MIT bestätigt am 2026-07-16 |
 | U-K06 | PD-01 Route A oder B und zulässiges Delta | vor Slice 6 | Nutzer | Route A bestätigt; Vorher-/Nachher-Baseline mit identischen Seeds und Kandidaten dokumentiert |
-| U-K07 | Pflegekosten-Einheitenvertrag | vor/mit Slice 7 | Nutzer + Reviewer | ausstehend |
+| U-K07 | Pflegekosten-Einheitenvertrag | vor/mit Slice 7 | Nutzer + Reviewer | freigegeben am 2026-07-17 |
 | U-K08 | PD-03 Labelroute oder neuer KPI-Plan | vor Slice 8 | Nutzer | Labelroute bestätigt am 2026-07-16 |
 | U-K09 | Forschungsvalidierungs-Backlog | Slice 9 | Nutzer + Reviewer | ausstehend |
 | U-K10 | Gesamtabschluss | Slice 10, alle Gates grün | Nutzer + Reviewer | ausstehend |
@@ -685,7 +701,7 @@ Zusätzlich zu `AGENTS.md` wird gestoppt und nachgefragt, wenn:
 | 4 | freigegeben | Offline-Validator und `npm run docs:evidence`; 69 MKT-, 55 FOR-, 17 MAP-Nachweise und 18 Aktualitätsscopes; 4.460/4.460 Assertions grün; Review durch Gemini abgeschlossen am 2026-07-17 |
 | 5 | freigegeben | MIT in Lizenztext, npm-/Lockfile-Root und Cargo; GAP-MKT-06 geschlossen; 14 Fokus- und 4.474 Gesamtassertions grün; Review durch Gemini abgeschlossen am 2026-07-17 |
 | 6 | freigegeben | Route A; echter Realwert über App-/Engine-State, Ansparpfad und Worker; 4.533/4.533 Assertions grün; Review durch Gemini abgeschlossen am 2026-07-17 |
-| 7 | geplant | korrigierter Pflegekosten-Einheitenvertrag |
+| 7 | freigegeben | einmalige In-memory-Normalisierung, unverändertes Profilformat, deterministische Care-/Cap- und Worker-Paritätsgates; 4.569/4.569 Assertions grün; Review durch Gemini abgeschlossen am 2026-07-17 |
 | 8 | geplant | präzise Depot-Erschöpfungs-KPI |
 | 9 | geplant | operationalisierter Forschungsvalidierungs-Backlog |
 | 10 | geplant | Gesamtintegration und Abschlussvalidierung |
@@ -824,3 +840,4 @@ dokumentiert hier externe Entscheidungen und erteilt keine Eigenfreigabe.
 | U-K05 | Nutzer | autoritative Projektlizenz | MIT | für Slice 5 verbindlich |
 | U-K06 | Nutzer | PD-01 Route | Route A | Route entschieden; Delta-Baseline folgt vor Slice 6 |
 | U-K08 | Nutzer | PD-03 Route | Labelkorrektur | erledigt am 2026-07-16 |
+| U-K07 | Nutzer/Reviewer | Pflegekosten-Einheitenvertrag | Prozentwerte in UI/Persistenz, einmalige In-memory-Normalisierung | Vertrag bestätigt; Slice 7 implementiert, Implementierungsreview ausstehend |

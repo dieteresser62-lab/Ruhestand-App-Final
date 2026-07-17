@@ -7,6 +7,36 @@ import {
 
 console.log('--- Simulator Multi-Profile Aggregation ---');
 
+{
+    console.log('\n📋 Test 0: Persisted care drift keeps percent storage and one runtime normalization');
+    const cases = [
+        { stored: '0', expected: 0, label: 'zero' },
+        { stored: '3.5', expected: 0.035, label: '3.5 percent' },
+        { stored: '100', expected: 1, label: '100 percent' },
+        { stored: '-1', expected: 0, label: 'negative' },
+        { stored: 'invalid', expected: 0, label: 'invalid' }
+    ];
+    for (const testCase of cases) {
+        const profileData = { sim_pflegeKostenDrift: testCase.stored };
+        const parsed = buildSimulatorInputsFromProfileData(profileData);
+        assertEqual(
+            parsed.pflegeKostenDrift,
+            testCase.expected,
+            `Stored care drift ${testCase.label} should satisfy the runtime ratio contract`
+        );
+        assertEqual(
+            profileData.sim_pflegeKostenDrift,
+            testCase.stored,
+            `Stored care drift ${testCase.label} should not be migrated or mutated`
+        );
+    }
+    assertEqual(
+        buildSimulatorInputsFromProfileData({}).pflegeKostenDrift,
+        0,
+        'Missing persisted care drift should keep the legacy 0 percent fallback'
+    );
+}
+
 const profileInputs = [
     {
         profileId: 'a',

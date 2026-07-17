@@ -18,6 +18,7 @@ import {
 } from '../profile/profile-state.js';
 import { LONGEVITY_DEFAULTS, normalizeLongevityMode } from './dynamic-flex-longevity-contract.js';
 import { classifyTranche } from '../../types/tranche-contract.js';
+import { normalizeCareCostDriftPercent } from './simulator-input-care.js';
 
 const DYNAMIC_FLEX_DEFAULTS = {
     HORIZON_METHOD: 'survival_quantile',
@@ -305,7 +306,10 @@ export function buildSimulatorInputsFromProfileData(profileData) {
         pflegeRampUp: readInt(profileData, simKey('pflegeRampUp'), 5),
         pflegeMinDauer: readInt(profileData, simKey('pflegeMinDauer'), 5),
         pflegeMaxDauer: readInt(profileData, simKey('pflegeMaxDauer'), 10),
-        pflegeKostenDrift: readNumber(profileData, simKey('pflegeKostenDrift'), 0) / 100,
+        pflegeKostenDrift: normalizeCareCostDriftPercent(
+            readNumber(profileData, simKey('pflegeKostenDrift'), 0),
+            0
+        ),
         pflegeRegionalZuschlag: readNumber(profileData, simKey('pflegeRegionalZuschlag'), 0) / 100,
         healthBucket,
         healthBucketEnabled: healthBucket.enabled,

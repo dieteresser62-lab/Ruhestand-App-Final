@@ -1,6 +1,6 @@
 import { EngineAPI } from '../engine/index.mjs';
 import { CONFIG } from '../engine/config.mjs';
-import { prepareHistoricalDataOnce } from '../app/simulator/simulator-engine-helpers.js';
+import { compileScenario, prepareHistoricalDataOnce } from '../app/simulator/simulator-engine-helpers.js';
 import { annualData } from '../app/simulator/simulator-data.js';
 import { createMonteCarloBuffers, MC_HEATMAP_BINS, pickWorstRun, runMonteCarloChunk, buildMonteCarloAggregates } from '../app/simulator/monte-carlo-runner.js';
 import { runSweepChunk } from '../app/simulator/sweep-runner.js';
@@ -1263,6 +1263,91 @@ try {
     console.log('✅ Stationary Bootstrap worker-like chunk parity passed');
 } catch (e) {
     console.error('❌ Stationary Bootstrap worker-like chunk parity failed', e);
+    throw e;
+}
+
+// Test 10: Care-cost drift ratio survives scenario serialization and chunking unchanged.
+try {
+    const careInputs = {
+        ...baseInputs,
+        startAlter: 80,
+        pflegefallLogikAktivieren: true,
+        pflegeModellTyp: 'chronisch',
+        pflegeRampUp: 3,
+        pflegeMinDauer: 2,
+        pflegeMaxDauer: 5,
+        pflegeKostenDrift: 0.035,
+        pflegeRegionalZuschlag: 0,
+        pflegeMaxFloor: 60000,
+        pflegeGradeConfigs: {
+            1: { zusatz: 1000, flexCut: 1.0, mortalityFactor: 1.0 },
+            2: { zusatz: 2000, flexCut: 0.8, mortalityFactor: 1.5 },
+            3: { zusatz: 3000, flexCut: 0.5, mortalityFactor: 2.0 },
+            4: { zusatz: 4000, flexCut: 0.2, mortalityFactor: 3.0 },
+            5: { zusatz: 5000, flexCut: 0.0, mortalityFactor: 4.0 }
+        }
+    };
+    const monteCarloParams = {
+        anzahl: 36,
+        maxDauer: 8,
+        blockSize: 3,
+        seed: 4242,
+        methode: 'block',
+        rngMode: 'per-run-seed'
+    };
+    const compiled = compileScenario(
+        careInputs,
+        widowOptions,
+        monteCarloParams.methode,
+        false,
+        careInputs.stressPreset
+    ).compiledScenario;
+    const workerClone = structuredClone(compiled);
+    assertClose(
+        workerClone.inputs.pflegeKostenDrift,
+        0.035,
+        Number.EPSILON,
+        'Worker scenario clone should retain care drift ratio without scaling'
+    );
+
+    const fullChunk = await runMonteCarloChunk({
+        inputs: workerClone.inputs,
+        monteCarloParams,
+        widowOptions: workerClone.widowOptions,
+        useCapeSampling: false,
+        runRange: { start: 0, count: monteCarloParams.anzahl },
+        engine: EngineAPI
+    });
+    const splitRanges = [
+        { start: 0, count: 11 },
+        { start: 11, count: 13 },
+        { start: 24, count: 12 }
+    ];
+    const merged = createMergedMonteCarloState(monteCarloParams.anzahl);
+    for (const range of splitRanges) {
+        const chunk = await runMonteCarloChunk({
+            inputs: workerClone.inputs,
+            monteCarloParams,
+            widowOptions: workerClone.widowOptions,
+            useCapeSampling: false,
+            runRange: range,
+            engine: EngineAPI
+        });
+        mergeMonteCarloChunk(merged, chunk, range.start);
+    }
+
+    assert(fullChunk.totals.pflegeTriggeredCount > 0, 'Care drift parity fixture should trigger care cases');
+    assertMonteCarloTotalsEqual(fullChunk.totals, merged.totals, 'Care-drift MC');
+    assertMonteCarloListShapesEqual(fullChunk.lists, merged.lists, 'Care-drift MC');
+    assertEqual(
+        JSON.stringify(merged.buffers.finalOutcomes),
+        JSON.stringify(fullChunk.buffers.finalOutcomes),
+        'Care-drift MC final outcomes should match across worker-like chunks'
+    );
+
+    console.log('✅ Care-cost drift scenario/runner parity passed');
+} catch (e) {
+    console.error('❌ Care-cost drift scenario/runner parity failed', e);
     throw e;
 }
 

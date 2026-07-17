@@ -646,8 +646,9 @@ export function updateCareMeta(care, inputs, age, yearData, rand) {
         const yearsSinceStart = care.currentYearInCare;
         const yearIndex = yearsSinceStart + 1;
         care.mortalityFactor = gradeConfig.mortalityFactor || 0;
-        const rawDriftPct = Number(inputs.pflegeKostenDrift);
-        const driftFactor = Number.isFinite(rawDriftPct) ? Math.max(0, rawDriftPct) / 100 : 0;
+        // Input readers normalize the persisted/UI percentage exactly once.
+        // Runner and worker contracts transport this ratio without rescaling.
+        const driftFactor = inputs.pflegeKostenDrift;
         const inflationsAnpassung = (1 + yearData.inflation / 100) * (1 + driftFactor);
         const regionalMultiplier = 1 + Math.max(0, inputs?.pflegeRegionalZuschlag || 0);
 

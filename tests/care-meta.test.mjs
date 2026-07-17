@@ -102,6 +102,51 @@ function getCareInputs() {
     console.log('✅ Cost Ramp-Up Verification Passed');
 }
 
+// --- TEST 2b: Care-cost drift ratio is applied directly and exactly once ---
+{
+    const makeActiveCare = (maxFloorAtTrigger = 100000) => {
+        const care = makeDefaultCareMeta(true, 'm');
+        Object.assign(care, {
+            active: true,
+            triggered: true,
+            grade: 1,
+            gradeLabel: 'Pflegegrad 1',
+            currentYearInCare: 0,
+            floorAtTrigger: 0,
+            flexAtTrigger: 0,
+            maxFloorAtTrigger
+        });
+        return care;
+    };
+    const runFirstYear = (driftRatio, options = {}) => {
+        const inputs = {
+            ...getCareInputs(),
+            pflegeRampUp: options.rampYears ?? 5,
+            pflegeKostenDrift: driftRatio
+        };
+        const care = makeActiveCare(options.maxFloorAtTrigger ?? 100000);
+        return updateCareMeta(care, inputs, 80, { inflation: 0 }, () => 0.99);
+    };
+
+    const inputs = { ...getCareInputs(), pflegeKostenDrift: 0.035 };
+    const care = makeActiveCare();
+    const year1 = updateCareMeta(care, inputs, 80, { inflation: 0 }, () => 0.99);
+    assertClose(year1.zusatzFloorZiel, 1035, 1e-9, '3.5 percent drift should use annual factor 1.035');
+    const year2 = updateCareMeta(care, inputs, 81, { inflation: 0 }, () => 0.99);
+    assertClose(year2.zusatzFloorZiel, 1071.225, 1e-9, 'Care drift should compound once per care year');
+
+    assertClose(runFirstYear(0).zusatzFloorZiel, 1000, 1e-9, 'Zero drift should remain neutral');
+    assertClose(runFirstYear(1).zusatzFloorZiel, 2000, 1e-9, 'Ratio 1 should represent 100 percent drift');
+    assertClose(
+        runFirstYear(0.035, { rampYears: 2, maxFloorAtTrigger: 500 }).zusatzFloorZiel,
+        517.5,
+        1e-9,
+        'Corrected drift should preserve deterministic cap and ramp-up interaction'
+    );
+
+    console.log('✅ Care-cost drift ratio contract passed');
+}
+
 // --- TEST 3: Household Flex Logic (Dual Care) ---
 {
     // Test the "75% Rule" implementation

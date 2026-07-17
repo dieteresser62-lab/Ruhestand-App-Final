@@ -10,6 +10,19 @@ import { readChecked, readInt, readNumber, readValue } from './simulator-input-d
 
 const DEFAULT_PFLEGE_DRIFT_PCT = 3.5; // Realistische Langfrist-Annahme (3-4 % ueber VPI)
 
+/**
+ * Normalizes a persisted/UI percentage to the simulator's ratio contract.
+ * Missing/invalid values use the boundary-specific fallback; negative values
+ * are rejected into the neutral 0 % value before the single division by 100.
+ */
+export function normalizeCareCostDriftPercent(rawPercent, fallbackPercent = 0) {
+    const numericRaw = Number(rawPercent);
+    const numericFallback = Number(fallbackPercent);
+    const fallback = Number.isFinite(numericFallback) ? numericFallback : 0;
+    const percent = Number.isFinite(numericRaw) ? numericRaw : fallback;
+    return Math.max(0, percent) / 100;
+}
+
 export function readCareInputs({ gender = 'w', doc = globalThis.document } = {}) {
     const pflegeGradeConfigs = {};
     SUPPORTED_PFLEGE_GRADES.forEach(grade => {
@@ -26,7 +39,6 @@ export function readCareInputs({ gender = 'w', doc = globalThis.document } = {})
     const rawPflegeMax = readInt('pflegeMaxDauer', NaN, doc);
     const normalizedCareDuration = normalizeCareDurationRange(rawPflegeMin, rawPflegeMax, gender);
     const driftPctRaw = readNumber('pflegeKostenDrift', NaN, doc);
-    const driftPct = Number.isFinite(driftPctRaw) ? driftPctRaw : DEFAULT_PFLEGE_DRIFT_PCT;
     const regionalRaw = readNumber('pflegeRegionalZuschlag', NaN, doc);
 
     return {
@@ -39,7 +51,7 @@ export function readCareInputs({ gender = 'w', doc = globalThis.document } = {})
         pflegeRampUp: readInt('pflegeRampUp', 5, doc) || 5,
         pflegeMinDauer: normalizedCareDuration.minYears,
         pflegeMaxDauer: normalizedCareDuration.maxYears,
-        pflegeKostenDrift: Math.max(0, driftPct) / 100,
+        pflegeKostenDrift: normalizeCareCostDriftPercent(driftPctRaw, DEFAULT_PFLEGE_DRIFT_PCT),
         pflegeRegionalZuschlag: Math.max(0, Number.isFinite(regionalRaw) ? regionalRaw : 0) / 100
     };
 }

@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 109 entdeckte Testdateien, davon 108 im Node-Gate ausgeführt, mit 4474 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (verifiziert mit `npm test` am 2026-07-17). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen.
+**Test-Statistik:** 110 entdeckte Testdateien, davon 109 im Node-Gate ausgeführt, mit 4569 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (verifiziert mit `npm test` am 2026-07-17). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand am selben Tag mit 14/14 Szenarien.
 
 Die Zahl beschreibt nur die Node-Standardsuite. `npm run test:browser`, `npm run test:coverage` und ein echter Tauri-Build sind getrennte Gates und in den Assertions nicht enthalten.
 
@@ -293,6 +293,8 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 **Zweck:** Validiert die Pflegefall-Logik.
 - **Eintrittswahrscheinlichkeit:** Altersabhängige Pflegewahrscheinlichkeit
 - **Kostenrampe:** Inflation und Progression der Pflegekosten
+- **Einheitenvertrag:** 0/3,5/100 %, direkte Verhältnisverwendung, zweijährige
+  Driftfortschreibung sowie Cap-/Ramp-up-Wirkung ohne doppelte Skalierung
 - **Dual-Household:** Flex-Budget-Anpassung bei Pflege beider Partner
 - Pflegegrade (PG 0-5) und ambulant vs. stationär
 
@@ -587,6 +589,8 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 **Zweck:** Kritische Parity-Prüfung.
 - MC/Sweep Chunk-Merges produzieren identische Aggregate wie Single-Pass
 - Worker-Chunking beeinflusst Ergebnisse nicht
+- Pflegekosten-Drift bleibt beim Szenario-Klon und über Care-Chunks als
+  normalisiertes Verhältnis unverändert
 
 #### `depot-tranches.test.mjs`
 **Zweck:** Testet Tranchen-Verwaltung.
