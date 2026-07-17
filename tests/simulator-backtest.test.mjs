@@ -120,6 +120,24 @@ try {
         const rows = window.globalBacktestData?.rows || [];
         assertEqual(rows.length, 3, 'Backtest should contain 3 yearly results for 2010-2012');
         assertEqual(rows[0].jahr, 2010, 'First backtest year should match start year');
+
+        let expectedCumulativeInflationFactor = 1;
+        for (const entry of rows) {
+            assertClose(
+                entry.row?.inflation_factor_cum,
+                expectedCumulativeInflationFactor,
+                1e-12,
+                `Backtest ${entry.jahr} should expose the cumulative factor for the current year`
+            );
+            assertClose(
+                entry.row?.jahresentnahme_real,
+                entry.row?.entnahme_effektiv / expectedCumulativeInflationFactor,
+                1e-9,
+                `Backtest ${entry.jahr} should deflate the effective withdrawal`
+            );
+            expectedCumulativeInflationFactor *= 1 + (entry.inflationVJ / 100);
+        }
+        assert(rows[1].row?.inflation_factor_cum !== 1, 'Backtest should advance inflation after the first year');
     }
 
     // --- TEST 3: Historische Daten geladen ---

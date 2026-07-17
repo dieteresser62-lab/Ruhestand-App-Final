@@ -1,7 +1,7 @@
 # Korrektur-Arbeitsplan zu den Findings aus Slice 08
 
 **Stand:** 2026-07-17<br>
-**Status:** in Umsetzung – Slice 5 implementiert; Review ausstehend<br>
+**Status:** in Umsetzung – Slice 6 implementiert; Review ausstehend<br>
 **Ausgangsdokument:** `SLICE_ARCHITEKTUR_FACHKONZEPT_08_INTEGRATION_ABSCHLUSS.md`<br>
 **Betroffenes Hauptdokument:** `docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md`<br>
 **Planerstellungs-Branch:** `codex/architektur-fachkonzept-doku`<br>
@@ -403,6 +403,9 @@ und die Gesamtsuite mit 4.474/4.474 Assertions sind grün.
 
 ### Slice 6 – PD-01 Real-/Nominalvertrag korrigieren
 
+**Slice-Datei:**
+[`SLICE_ARCHITEKTUR_FACHKONZEPT_FINDINGS_06_REAL_NOMINALVERTRAG.md`](SLICE_ARCHITEKTUR_FACHKONZEPT_FINDINGS_06_REAL_NOMINALVERTRAG.md)
+
 **Ziel:** Die freigegebene Route aus Abschnitt 4.3 vollständig und ohne
 Mischvertrag umsetzen.
 
@@ -443,6 +446,18 @@ Mischvertrag umsetzen.
 - Serial-, Worker- und Backtestpfade verwenden denselben Vertrag;
 - unerwartete Snapshot-/Backtest-Deltas lösen die Stop-Regel aus;
 - MR-09/PD-01 werden erst nach grüner Gesamtsuite geschlossen.
+
+**Umsetzungsstand 2026-07-17:** Route A ist implementiert. Der kanonische
+Simulator-App-State führt den kumulierten Inflationsfaktor über reguläre und
+Ansparjahre; die Engine erhält den aktuellen Faktor als State-Spiegel und
+`jahresentnahme_real` verwendet die effektive Auszahlung. Der synthetische
+10-Prozent-Fall liefert `1 / 1,1 / 1,21` und konstant 12.000 EUR real bei
+12.000 / 13.200 / 14.520 EUR nominal; FlowDelta bleibt null. Die identische
+MC-/Auto-Optimize-Messung verändert ausschließlich die Realentnahmestichprobe;
+Endvermögen, Failure, Depoterschöpfung, alle drei Kandidatenmetriken und der
+Stichproben-Champion `targetEq=80` bleiben bitgenau stabil. Faktor-/Anspar-/MC-
+Contract 52/52, Backtest 46/46, Worker-Parität 354/354 und Gesamtsuite
+4.533/4.533 sind grün; Review und Nutzerfreigabe stehen aus.
 
 ### Slice 7 – PD-02 Pflegekosten-Drift korrigieren
 
@@ -653,7 +668,7 @@ Zusätzlich zu `AGENTS.md` wird gestoppt und nachgefragt, wenn:
 | U-K03 | Markt-/Forschungsregister und Haupttextumfang | Slice 2 und 3 | Nutzer + Reviewer | freigegeben am 2026-07-17 |
 | U-K04 | Evidenzvalidator und Aktualitätsvertrag | Slice 4 | Nutzer + Reviewer | freigegeben am 2026-07-17 |
 | U-K05 | autoritative Lizenz | vor Slice 5 | Nutzer | MIT bestätigt am 2026-07-16 |
-| U-K06 | PD-01 Route A oder B und zulässiges Delta | vor Slice 6 | Nutzer | Route A bestätigt; Delta-Baseline vor Slice 6 ausstehend |
+| U-K06 | PD-01 Route A oder B und zulässiges Delta | vor Slice 6 | Nutzer | Route A bestätigt; Vorher-/Nachher-Baseline mit identischen Seeds und Kandidaten dokumentiert |
 | U-K07 | Pflegekosten-Einheitenvertrag | vor/mit Slice 7 | Nutzer + Reviewer | ausstehend |
 | U-K08 | PD-03 Labelroute oder neuer KPI-Plan | vor Slice 8 | Nutzer | Labelroute bestätigt am 2026-07-16 |
 | U-K09 | Forschungsvalidierungs-Backlog | Slice 9 | Nutzer + Reviewer | ausstehend |
@@ -669,7 +684,7 @@ Zusätzlich zu `AGENTS.md` wird gestoppt und nachgefragt, wenn:
 | 3 | freigegeben | 55 FOR-Records und 17 MAP-Dossiers im normativen Register; Forschungsblock 101 Wörter größer als Markt; gemeinsamer Anteil 24,43 %; Review durch Gemini abgeschlossen am 2026-07-17 |
 | 4 | freigegeben | Offline-Validator und `npm run docs:evidence`; 69 MKT-, 55 FOR-, 17 MAP-Nachweise und 18 Aktualitätsscopes; 4.460/4.460 Assertions grün; Review durch Gemini abgeschlossen am 2026-07-17 |
 | 5 | freigegeben | MIT in Lizenztext, npm-/Lockfile-Root und Cargo; GAP-MKT-06 geschlossen; 14 Fokus- und 4.474 Gesamtassertions grün; Review durch Gemini abgeschlossen am 2026-07-17 |
-| 6 | geplant | korrigierter Real-/Nominalvertrag |
+| 6 | freigegeben | Route A; echter Realwert über App-/Engine-State, Ansparpfad und Worker; 4.533/4.533 Assertions grün; Review durch Gemini abgeschlossen am 2026-07-17 |
 | 7 | geplant | korrigierter Pflegekosten-Einheitenvertrag |
 | 8 | geplant | präzise Depot-Erschöpfungs-KPI |
 | 9 | geplant | operationalisierter Forschungsvalidierungs-Backlog |

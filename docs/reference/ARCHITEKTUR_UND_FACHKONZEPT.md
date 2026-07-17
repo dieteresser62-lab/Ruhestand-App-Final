@@ -114,7 +114,7 @@ Die Ruhestand-Suite kombiniert folgende Funktionen:
 - Gebühren, Spreads, Slippage und laufende Produktkosten werden in Engine und Simulator nicht als eigene Cashflows abgezogen. Nur der bestätigte Realbestands-Reconcile erfasst tatsächlich eingegebene Ausführungsgebühren.
 - Alle Planungsbeträge und automatisch akzeptierten Tranchenkurse sind EUR-basiert. Es gibt keine implizite Fremdwährungsumrechnung; Nicht-EUR-Quotes werden abgelehnt.
 - Das Steuermodell bildet einen begrenzten Verkaufskontext ab, nicht die gesamte deutsche Ertrags-, Einkommen- oder Investmentbesteuerung. Rechtliche Parameter werden nicht automatisch aktualisiert.
-- Der als real bezeichnete Simulatorwert `jahresentnahme_real` wird im mehrjährigen Simulatorpfad derzeit nicht mit einem fortgeschriebenen kumulierten Inflationsfaktor deflationiert. Bis zur Codekorrektur ist er dort als nominaler Wert zu behandeln.
+- Der Simulator führt den kumulierten Inflationsfaktor über den vollständigen Jahrespfad einschließlich Ansparjahren fort. `jahresentnahme_real` ist die effektive nominale Entnahme geteilt durch den Faktor des aktuellen Modelljahres und bezieht sich auf die Kaufkraft des ersten Simulatorjahres.
 - Der UI-Wert für den zusätzlichen Pflegekostenanstieg wird zwischen Reader und Pflegelogik doppelt prozentual skaliert. Die angezeigten 3,5 % wirken im aktuellen Pfad als 0,035 %; dies ist ein offener Produktmangel, keine fachliche Sollannahme.
 - Indexvariante, geschätzte Frühhistorie und weitere Ergebnisgrenzen stehen in C.3.3 sowie im Annahmen- und Modellrisikoregister.
 
@@ -1410,7 +1410,7 @@ Die technische Modulzuordnung steht in Teil B. Zur schnellen Orientierung:
 | **Flex-Basis** | Verhandelbarer Jahresbedarf vor Anwendung der Flex-Rate. Bei Dynamic Flex kann VPW diese Basis ersetzen; ein Rentenüberschuss oberhalb des Floor reduziert sie. | Noch nicht der tatsächlich freigegebene Flex-Betrag. |
 | **Effektiver Flex** | Flex-Basis multipliziert mit der nach Policies wirksamen Flex-Rate. | Mindest-Flex, Budgets und Glättung können den Policy-Wert anheben oder begrenzen. |
 | **Nominal** | Geldbetrag in Preisen des betrachteten Modelljahres. | Die Engine erwartet den aktuellen Jahreswert; sie inflationsindexiert den Bedarf nicht nochmals intern. |
-| **Real** | Auf ein Basisjahr deflationierter Betrag. | Nur als real interpretieren, wenn ein kumulierter Inflationsfaktor tatsächlich fortgeschrieben und angewandt wurde; siehe MR-09 beziehungsweise PD-01. |
+| **Real** | Auf ein Basisjahr deflationierter Betrag. | Im Simulator ist das erste Simulatorjahr das Basisjahr; der aktuelle kumulierte Inflationsfaktor wird auch während einer Ansparphase fortgeschrieben. |
 | **Runway** | Frei verfügbare Liquidität geteilt durch den aktuellen jährlichen Netto-Bedarf aus Floor und effektivem Flex, ausgedrückt in Monaten. | Keine Überlebenswahrscheinlichkeit und keine garantierte Mindestreichweite des Gesamtvermögens. |
 | **Reserve** | Sammelbegriff, der nur zusammen mit seinem Typ verwendet werden soll: freie Liquidität, Runway-Ziel, Gold-Floor oder Pflegebucket. | Die vier Größen haben unterschiedliche Verfügbarkeit und Rechenwirkung. |
 | **Aktives Gesamtvermögen** | Aktien-, Gold- und freie Liquiditätsbestände, die der Entnahmeplanung zur Verfügung stehen; ein aktivierter Pflegebucket ist herausgerechnet. | Kein vollständiger Haushalts-Net-Worth und kein frei erweiterbares Multi-Asset-Portfolio. |
@@ -1438,6 +1438,15 @@ Jahr oder bereits zum Folgejahr gehört.
 | 7 | Auszahlung sicherstellen | Ein ausgelöster Pflegebucket wird vor erzwungenen Verkäufen eingesetzt; verbleibende Deckungslücken können Forced Sales auslösen. |
 | 8 | Zins, Steuer und Endbestände finalisieren | Freie Liquidität und ein verbleibender Pflegebucket erhalten den Cash-Ertrag. Danach wird das Jahres-Settlement unter Einbezug zusätzlicher Verkäufe aus allen Rohaggregaten neu berechnet und eine Steuerdifferenz im Cash-State reconciliert. |
 | 9 | Folgejahr vorbereiten | Floor, Flex, Mindest-Flex, Flex-Budgets und laufende Renten werden mit der Inflation beziehungsweise Rentenanpassung dieses Jahres für das **nächste** Modelljahr fortgeschrieben. |
+
+Der Simulator-App-State besitzt dafür den kanonischen
+`cumulativeInflationFactor`. Der Faktor zu Beginn eines Modelljahres gehört zu
+den nominalen Größen dieses Jahres und deflationiert die effektive Entnahme.
+Erst der Rückgabestate wird genau einmal mit `1 + inflation / 100` für das
+Folgejahr fortgeschrieben. Der Engine-`lastState` erhält denselben Faktor als
+Spiegel für Realvermögen und Real-Drawdown; Serial-, Monte-Carlo-, Sweep- und
+Workerpfad transportieren denselben App-State. Auch Ansparjahre schreiben den
+Faktor weiter, obwohl ihre Entnahme null ist.
 
 Ein innerhalb des Jahres gezogener Tod wirkt sofort auf den weiteren
 Haushaltslauf. Ein daraus entstehender Hinterbliebenenstatus wird jedoch aus
@@ -2014,9 +2023,10 @@ Weitere Ergebnisgrößen haben bewusst engere Basen:
   „Depot vollständig aufgebraucht“ ist deshalb weiter als die Berechnung.
 - `finalOutcomes` verwendet Aktien, Gold und freie Liquidität. Ein verbleibender
   Pflegebucket wird separat berichtet und ist nicht im Endvermögen enthalten.
-- Der als `jahresentnahme_real` bezeichnete Simulatorwert ist wegen MR-09 im
-  aktuellen Mehrjahrespfad faktisch nominal. Darauf aufbauende reale
-  Entnahme-KPIs sind bis zur Korrektur entsprechend eingeschränkt.
+- `jahresentnahme_real` verwendet die effektive nominale Auszahlung und den
+  kumulierten Faktor des aktuellen Modelljahres. Reale Entnahmestichproben und
+  Consumption-at-Risk beziehen sich damit auf die Kaufkraft des ersten
+  Simulatorjahres; sie bleiben dennoch modellinterne Ergebnisgrößen.
 
 Erfolgsquote, Depoterschöpfung, Endvermögen, Kürzungsjahre, Pflegebucket und
 Drawdown müssen daher gemeinsam gelesen werden. Keine einzelne Kennzahl ist
@@ -3233,22 +3243,22 @@ beliebige zusätzliche Asset-Klassen.
 | MR-06 | Asset-Universum und Bond-Modell sind eng begrenzt. | Diversifikation, Illiquidität, Duration und produktspezifische Risiken fehlen. | Aussagen nur für die unterstützten Bausteine verwenden. Bekannte Modellgrenze. |
 | MR-07 | Pflege- und Mortalitätsparameter enthalten Kalibrierungs- und Nutzerannahmen. | Eintritt, Dauer, Kosten, Flexverlust und Lebensdauer können stark verschoben werden. | Szenarien und Sensitivitäten statt Einzelprognose; externe Evidenzprüfung erforderlich. Kalibrierungsrisiko. |
 | MR-08 | Erfolg, Depoterschöpfung und Endvermögen verwenden unterschiedliche Nenner und Vermögensbasen. | Einzelne KPI-Labels können eine breitere Aussage nahelegen als berechnet. | Kennzahlen gemeinsam und gemäß Ergebnisregister lesen; UI-Label zur Depoterschöpfung ist als PD-03 offen. |
-| MR-09 | `jahresentnahme_real` wird im Simulatorpfad nicht mit einem fortgeschriebenen kumulierten Inflationsfaktor deflationiert. | Nominale Entnahmen erscheinen als reale Entnahmen; davon abgeleitete reale KPIs sind fehlbezeichnet. | Bis zur Codekorrektur als nominal behandeln. Offener Produktmangel PD-01. |
+| MR-09 | Historisch wurde `jahresentnahme_real` im Simulatorpfad nicht mit einem fortgeschriebenen kumulierten Inflationsfaktor deflationiert. | Nominale Entnahmen erschienen als reale Entnahmen; davon abgeleitete reale KPIs waren fehlbezeichnet. | In Korrektur-Slice 6 behoben: App-State führt den Faktor einschließlich Ansparjahren genau einmal fort; Headless-, Backtest-, MC-, Auto-Optimize- und Worker-Paritätsgates sichern Route A. |
 | MR-10 | Pflegekosten-Drift wird zwischen UI-Reader und Pflegeberechnung doppelt durch 100 skaliert. | Ein UI-Wert von 3,5% wirkt als 0,035% p.a. | Keine neue Fachsemantik dokumentiert; Code-/UI-Contract muss separat korrigiert werden. Offener Produktmangel PD-02. |
 | MR-11 | Sampling-, Regime-, CAPE-, VPW- und Guardrail-Parameter sind Modellentscheidungen. | Gute Resultate können parameter- oder historienabhängig statt robust sein. | Mehrere Seeds, Methoden, Stresspfade und Sensitivitäten vergleichen. Modell- und Kalibrierungsrisiko. |
 | MR-12 | Nutzereingaben und reale Ausführung liegen außerhalb der Rechenautomatik. | Falsche Einstandswerte, Netto-/Bruttowerte, Steuerflags oder abweichende Brokerorders übertragen sich direkt auf Ergebnisse. | Eingaben, Vorschläge und Reconciliation getrennt prüfen. Operatives Risiko. |
 
-## Offene Produktmängel aus dem Fachabgleich
+## Produktmängel aus dem Fachabgleich
 
 | ID | Beobachteter Ist-Zustand | Dokumentarische Behandlung | Erforderliche Produktentscheidung |
 |----|--------------------------|-----------------------------|----------------------------------|
-| PD-01 | Der Simulator führt den kumulierten Inflationsfaktor für `jahresentnahme_real` nicht über die Jahre fort. | Wert und abhängige KPIs bis dahin als nominal kennzeichnen und interpretieren. | Faktor korrekt fortschreiben oder KPI/UI eindeutig in nominal umbenennen. |
+| PD-01 | Historisch führte der Simulator den kumulierten Inflationsfaktor für `jahresentnahme_real` nicht über die Jahre fort. | Route A ist umgesetzt: effektive Entnahme geteilt durch den aktuellen Faktor; Basis ist das erste Simulatorjahr. | Behoben in Korrektur-Slice 6; Faktor-, Anspar-, Backtest-, MC-, Auto-Optimize- und Worker-Verträge sind lokal validiert. |
 | PD-02 | Pflegekosten-Drift wird nach der UI-Normalisierung ein zweites Mal durch 100 geteilt. | Beabsichtigte UI-Einheit und tatsächliche Wirkung nebeneinander dokumentieren. | Prozentvertrag an genau einer Grenze normalisieren und Tests ergänzen. |
 | PD-03 | „Depot vollständig aufgebraucht“ zählt `isRuin` oder Aktien-plus-Gold ≤ 100 €, nicht zwingend freie Liquidität und Pflegebucket. | KPI als enge Depot-Teilgröße erklären. | UI-Label präzisieren oder Berechnungsbasis bewusst erweitern. |
 
-Diese Punkte werden in diesem Dokumentationsprojekt nicht durch eine
-nachträgliche Soll-Erklärung geheilt. Ihre Korrektur erfordert einen separaten
-Code-/UI-Auftrag und neue Laufzeitvalidierung.
+PD-01 wurde nicht durch eine nachträgliche Soll-Erklärung, sondern im
+separaten Korrektur-Slice 6 mit Laufzeitvalidierung behoben. PD-02 und PD-03
+bleiben bis zu ihren jeweiligen Code-/UI-Slices offen.
 
 ## Ergebnisregister und Interpretationsregeln
 
@@ -3259,7 +3269,7 @@ Code-/UI-Auftrag und neue Laufzeitvalidierung.
 | **Endvermögen** | Aktien + Gold + freie Liquidität; fehlgeschlagene Läufe werden in Aggregaten mit 0 geführt | Verteilung des verbleibenden aktiven Vermögens | vollständiges Haushaltsvermögen einschließlich Pflegebucket und externer Assets |
 | **Depoterschöpfung** | Fehler/Ruin oder Aktien + Gold ≤ 100 € | enge Risiko-Teilmetrik für das simulierte Depot | dass keinerlei freie Liquidität oder Pflegebucket mehr existiert |
 | **Runway** | freie Liquidität / aktueller Netto-Monatsbedarf | operative Liquiditätsdeckung im aktuellen Modelljahr | Lebensdauer des Gesamtvermögens oder Erfolgswahrscheinlichkeit |
-| **Reale Entnahme** | nominale Entnahme / kumulierter Inflationsfaktor | Basisjahr-Kaufkraft nur bei intaktem Faktor | derzeit im Simulator wegen PD-01 nicht belastbar |
+| **Reale Entnahme** | effektive nominale Entnahme / kumulierter Inflationsfaktor des aktuellen Jahres | Kaufkraft des ersten Simulatorjahres unter den gewählten Modellannahmen | individuelle Konsumqualität, Nutzen oder Garantie realer Kaufkraft außerhalb des Modells |
 | **Pflegebucket-KPIs** | separater Start-, Nutzungs-, End- und Deckungs-State | Wirkung der Zweckbindung und Nutzung im Modell | Versicherungsleistung oder garantierte Pflegekostendeckung |
 | **Optimizer-Champion** | Zielfunktion und Constraints über gewählte Train-/Test-Seeds | bester gefundener Kandidat im untersuchten Suchraum | globales Optimum oder automatisch zu übernehmende Empfehlung |
 
@@ -3960,7 +3970,7 @@ Endvermögen kann aus zu niedriger Entnahme stammen.
 | Dimension | Heute zulässige Aussage | Offene Mess- oder Vertragsgrenze |
 | --- | --- | --- |
 | Floor-Verletzung | `failCount`, Erfolgsquote und `isRuin` beschreiben den implementierten Deckungsbruch. | Vollständige Verteilung von Höhe, Dauer und kumulierter realer Lücke fehlt. |
-| Konsumkürzung | Kürzungsjahre, maximale Flex-Kürzung, Jahre ohne Flex und Consumption-at-Risk zeigen modellierte Einschränkungen. | PD-01 begrenzt reale Entnahmewerte; individuelle Akzeptanz- oder Nutzengewichte fehlen. |
+| Konsumkürzung | Kürzungsjahre, maximale Flex-Kürzung, Jahre ohne Flex und der auf das erste Simulatorjahr deflationierte Consumption-at-Risk zeigen modellierte Einschränkungen. | Individuelle Akzeptanz- oder Nutzengewichte und eine vollständige reale Konsumlückenverteilung fehlen. |
 | Stressdauer | Stress-Kürzungsjahre und `recoveryYears` gelten für das gewählte Preset. | Keine allgemeine Regime-Verweildauer oder vollständige Erholungsverteilung. |
 | Nachlass/Restvermögen | P10/P50/P90 und Median erfolgreicher Läufe beschreiben modelliertes aktives Endvermögen. | Kein Nachlassziel und keine vollständigen externen Assets, Immobilien-, Versicherungs- oder Pflegebucketwerte. |
 | Steuerlast | Median kumulierter Modellsteuern und Verlusttopf-Effekt gelten für den implementierten Settlement-Vertrag. | Keine vollständige Einkommensteuer-, Sozialabgaben-, Rechts- oder Kostenlogik. |
@@ -3973,8 +3983,9 @@ anschließend Konsumkürzung, Steuer, Pflegewirkung und Restvermögen gemeinsam
 lesen. Erst dann dürfen Policies verglichen werden. Ein Median ohne
 Tailverteilung oder ein Endvermögen ohne konsumierte Leistungen genügt nicht.
 Reale und nominale Größen sowie Prozent- und Verhältniswerte müssen dabei
-vertragstreu getrennt bleiben; PD-01 und PD-02 begrenzen bis zu ihrer
-Korrektur ausdrücklich die betroffenen Aussagen.
+vertragstreu getrennt bleiben. PD-01 ist durch den kumulierten
+Simulator-State behoben; PD-02 begrenzt bis zu seiner Korrektur weiterhin die
+Pflegekosten-Driftaussagen.
 
 ## E.6 Forschungs- und Modellrisiken
 

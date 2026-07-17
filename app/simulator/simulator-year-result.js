@@ -2,6 +2,10 @@ import { sumDepot } from './simulator-portfolio.js';
 import { euros } from './simulator-engine-direct-utils.js';
 import { shortenReasonText } from './simulator-utils.js';
 import { sumBondBucketValuation } from '../../engine/transactions/three-bucket-logic.mjs';
+import {
+    advanceSimulatorCumulativeInflationFactor,
+    resolveSimulatorCumulativeInflationFactor
+} from './simulator-engine-helpers.js';
 
 export function buildSimulatorYearResult({
     portfolio,
@@ -87,6 +91,16 @@ export function buildSimulatorYearResult({
     if (kaufAktTotal > 0) aktionText += " / Rebal.(A+)";
 
     const inflFactorThisYear = 1 + (yearData.inflation / 100);
+    const cumulativeInflationFactor = resolveSimulatorCumulativeInflationFactor(currentState);
+    const nextCumulativeInflationFactor = advanceSimulatorCumulativeInflationFactor(
+        cumulativeInflationFactor,
+        yearData.inflation
+    );
+    const nextSpendingState = {
+        ...spendingNewState,
+        cumulativeInflationFactor: nextCumulativeInflationFactor,
+        lastEntnahmeReal: jahresEntnahmeEffektiv / cumulativeInflationFactor
+    };
     const {
         nextWidowPensionP1,
         nextWidowPensionP2,
@@ -144,12 +158,13 @@ export function buildSimulatorYearResult({
         },
         newState: {
             portfolio: nextPortfolio,
+            cumulativeInflationFactor: nextCumulativeInflationFactor,
             baseFloor: euros(baseFloor * inflFactorThisYear),
             baseFlex: euros(baseFlex * inflFactorThisYear),
             baseMinimumFlexAnnual: euros(baseMinimumFlexAnnual * inflFactorThisYear),
             baseFlexBudgetAnnual: euros(baseFlexBudgetAnnual * inflFactorThisYear),
             baseFlexBudgetRecharge: euros(baseFlexBudgetRecharge * inflFactorThisYear),
-            lastState: spendingNewState,
+            lastState: nextSpendingState,
             currentAnnualPension: nextAnnualPension,
             currentAnnualPension2: nextAnnualPension2,
             marketDataHist: newMarketDataHist,
@@ -267,8 +282,8 @@ export function buildSimulatorYearResult({
             floor_aus_depot: inflatedFloor,
             flex_brutto: inflatedFlex,
             flex_erfuellt_nominal: jahresEntnahmeEffektiv > inflatedFloor ? jahresEntnahmeEffektiv - inflatedFloor : 0,
-            inflation_factor_cum: spendingNewState.cumulativeInflationFactor || 1,
-            jahresentnahme_real: jahresEntnahmeEffektiv / (spendingNewState.cumulativeInflationFactor || 1),
+            inflation_factor_cum: cumulativeInflationFactor,
+            jahresentnahme_real: jahresEntnahmeEffektiv / cumulativeInflationFactor,
             pflege_aktiv: pflegeMeta?.active ?? false,
             pflege_zusatz_floor: pflegeMeta?.zusatzFloorZiel ?? 0,
             pflege_zusatz_floor_delta: pflegeMeta?.zusatzFloorDelta ?? 0,

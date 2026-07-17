@@ -122,6 +122,7 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 | Konservatives Langlebigkeitsmodell | `longevity-contract.test.mjs`, `longevity-horizon.test.mjs` | `longevity-engine-runner.test.mjs`, `longevity-ui-persistence.test.mjs`, `longevity-optimizer-docs.test.mjs`, `worker-parity.test.mjs` |
 | Stationary Bootstrap | `stationary-bootstrap-contract.test.mjs`, `stationary-bootstrap-sampler.test.mjs` | `mc-worker-contract.test.mjs`, `worker-parity.test.mjs` |
 | Tail-Risk-/Crash-Overlay | `tail-risk-contract.test.mjs`, `tail-risk-overlay.test.mjs` | `simulator-input-readers.test.mjs`, `simulator-monte-carlo.test.mjs`, `worker-parity.test.mjs` |
+| Simulator-Realentnahme | `simulator-real-withdrawal-contract.test.mjs` | Drei-Jahres-Faktor, Anspar-Transition, effektive Realentnahme, MC-Stichprobe und App-/Engine-State-Spiegelung |
 | Architektur-/Fachkonzept-Evidenz | `architecture-evidence.test.mjs` | `npm run docs:evidence`, offline im regulären `npm test`-Gate |
 | Projektlizenz-Metadaten | `project-license-metadata.test.mjs` | MIT-Konsistenz in Lizenztext, npm-/Lockfile-Root, Cargo, README und Markt-GAP |
 
@@ -477,6 +478,14 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 - **finalWealth:** Stimmt mit letztem Jahreseintrag überein
 - **Mindest-Flex:** Stresstest 2005-2014 mit hoeheren Entnahmen, angewandtem Logstatus und FlowDelta-Pruefung inklusive 3-Bucket-Modus.
 - **Profilverbund-Transparenz:** Backtest-Ergebnis behaelt die profilgenaue `minimumFlexProfiles`-Aufteilung.
+- **Realentnahme:** Historische Jahreszeilen führen den kumulierten Inflationsfaktor fort und deflationieren die effektive Entnahme.
+
+#### `simulator-real-withdrawal-contract.test.mjs`
+**Zweck:** Testet den Simulatorvertrag für echte Realentnahmen.
+- dreijähriger synthetischer 10-%-Inflationsfall mit Faktoren `1 / 1,1 / 1,21`
+- genau einmal fortgeschriebener App-State und Engine-`lastState`-Spiegel
+- Ansparjahre und erstes Entnahmejahr beziehen sich auf die Kaufkraft des ersten Simulatorjahres
+- deterministische MC-Log- und Realentnahmestichprobe verwenden denselben Faktorvertrag
 
 #### `simulator-heatmap.test.mjs`
 **Zweck:** Testet Heatmap-Rendering.
@@ -759,6 +768,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `simulator-input-readers.test.mjs` | ~160 | DOM-freie Simulator-Input-Reader |
 | `simulator-log-columns.test.mjs` | ~110 | Logspalten für Entnahme, VPW, Bonds und Steuer |
 | `simulator-monte-carlo.test.mjs` | ~460 | MC-Kern, Buffers, Merge |
+| `simulator-real-withdrawal-contract.test.mjs` | ~300 | Realentnahme, kumulierter Inflationsfaktor, Anspar-Transition und MC-Vertrag |
 | `simulator-multiprofile-aggregation.test.mjs` | ~190 | Simulator Multi-Profil, Tranchen-Merge |
 | `simulator-sweep.test.mjs` | ~470 | Parameter-Sweep |
 | `simulator-tax-settlement.test.mjs` | ~180 | Simulator Settlement-Recompute |

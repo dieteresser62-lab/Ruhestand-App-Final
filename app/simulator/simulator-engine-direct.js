@@ -32,8 +32,43 @@ import {
     applyHealthBucketInterest,
     buildHealthBucketDiagnostics
 } from './simulator-health-bucket.js';
+import { resolveSimulatorCumulativeInflationFactor } from './simulator-engine-helpers.js';
 
 const formatInteger = (value) => Number.isFinite(value) ? Math.round(value) : 0;
+
+function scaleFiniteRealValue(target, key, scale) {
+    if (!target || !Number.isFinite(target[key])) return;
+    target[key] *= scale;
+}
+
+function alignEngineInflationContract(fullResult, cumulativeInflationFactor) {
+    const spendingNewState = fullResult?.newState;
+    if (!spendingNewState) return;
+
+    const engineFactor = Number(spendingNewState.cumulativeInflationFactor);
+    const validEngineFactor = Number.isFinite(engineFactor) && engineFactor > 0
+        ? engineFactor
+        : 1;
+    const realValueScale = validEngineFactor / cumulativeInflationFactor;
+
+    scaleFiniteRealValue(spendingNewState, 'peakRealVermoegen', realValueScale);
+    scaleFiniteRealValue(spendingNewState, 'lastEntnahmeReal', realValueScale);
+    spendingNewState.cumulativeInflationFactor = cumulativeInflationFactor;
+
+    const spendingDetails = fullResult.ui?.spending?.details;
+    scaleFiniteRealValue(spendingDetails, 'peakRealVermoegen', realValueScale);
+    scaleFiniteRealValue(spendingDetails, 'currentRealVermoegen', realValueScale);
+    if (spendingDetails) {
+        spendingDetails.cumulativeInflationFactor = cumulativeInflationFactor;
+    }
+
+    const diagnosisKeyParams = fullResult.diagnosis?.keyParams;
+    scaleFiniteRealValue(diagnosisKeyParams, 'peakRealVermoegen', realValueScale);
+    scaleFiniteRealValue(diagnosisKeyParams, 'currentRealVermoegen', realValueScale);
+    if (diagnosisKeyParams) {
+        diagnosisKeyParams.cumulativeInflationFactor = cumulativeInflationFactor;
+    }
+}
 
 /**
  * FAIL-SAFE Liquidity Guard - Hilfsfunktionen
@@ -96,6 +131,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         widowPensionP1 = 0,
         widowPensionP2 = 0
     } = currentState;
+    const cumulativeInflationFactor = resolveSimulatorCumulativeInflationFactor(currentState);
 
     const sampledYear = Number(yearData?.jahr);
     const deterministicYear = Number.isInteger(sampledYear) && sampledYear >= 1 && sampledYear <= 9999
@@ -281,13 +317,18 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
 
     // **HAUPTUNTERSCHIED**: Ein einziger Engine-Aufruf statt 3-5 Adapter-Aufrufe
-    const fullResult = engine.simulateSingleYear(engineInput, lastState);
+    const engineLastState = lastState?.initialized
+        ? { ...lastState, cumulativeInflationFactor }
+        : lastState;
+    const fullResult = engine.simulateSingleYear(engineInput, engineLastState);
 
     // FAIL-SAFE: Error-Handling
     if (fullResult.error || !fullResult.ui) {
         console.error('EngineAPI error:', fullResult.error);
         return { isRuin: true, error: fullResult.error };
     }
+
+    alignEngineInflationContract(fullResult, cumulativeInflationFactor);
 
     // Extrahiere Ergebnisse direkt aus fullResult
     const spendingResult = fullResult.ui.spending;

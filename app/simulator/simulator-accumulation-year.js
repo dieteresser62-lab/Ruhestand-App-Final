@@ -6,6 +6,10 @@ import {
     applyHealthBucketInterest,
     buildHealthBucketDiagnostics
 } from './simulator-health-bucket.js';
+import {
+    advanceSimulatorCumulativeInflationFactor,
+    resolveSimulatorCumulativeInflationFactor
+} from './simulator-engine-helpers.js';
 
 export function isAccumulationYear(inputs, yearIndex) {
     return Boolean(inputs.accumulationPhase?.enabled && yearIndex < (inputs.transitionYear || 0));
@@ -40,6 +44,11 @@ export function simulateAccumulationYear({
     householdCtx,
     isBadYear
 }) {
+    const cumulativeInflationFactor = resolveSimulatorCumulativeInflationFactor(currentState);
+    const nextCumulativeInflationFactor = advanceSimulatorCumulativeInflationFactor(
+        cumulativeInflationFactor,
+        yearData.inflation
+    );
     let cashZinsen = euros(liquiditaet * rC);
     let liqNachZins = initialLiqStart;
 
@@ -64,7 +73,7 @@ export function simulateAccumulationYear({
     const healthBucketDiagnostics = buildHealthBucketDiagnostics({
         inputs,
         portfolio,
-        cumulativeInflationFactor: currentState.lastState?.cumulativeInflationFactor || 1
+        cumulativeInflationFactor
     });
 
     const zielLiquiditaet = calculateTargetLiquidityBalanceLike(
@@ -121,6 +130,7 @@ export function simulateAccumulationYear({
     return {
         newState: {
             portfolio,
+            cumulativeInflationFactor: nextCumulativeInflationFactor,
             baseFloor: euros(baseFloor * (1 + yearData.inflation / 100)),
             baseFlex: euros(baseFlex * (1 + yearData.inflation / 100)),
             baseMinimumFlexAnnual: euros(baseMinimumFlexAnnual * (1 + yearData.inflation / 100)),
@@ -190,7 +200,7 @@ export function simulateAccumulationYear({
             floor_aus_depot: 0,
             flex_brutto: 0,
             flex_erfuellt_nominal: 0,
-            inflation_factor_cum: 1,
+            inflation_factor_cum: cumulativeInflationFactor,
             jahresentnahme_real: 0,
             pflege_aktiv: false,
             pflege_zusatz_floor: 0,

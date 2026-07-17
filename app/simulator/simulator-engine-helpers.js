@@ -16,6 +16,42 @@ function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
+function isValidCumulativeInflationFactor(value) {
+    return Number.isFinite(value) && value > 0;
+}
+
+/**
+ * Resolves the simulator-owned cumulative inflation factor.
+ * The top-level simulator state is canonical; the nested Engine state remains
+ * a compatibility fallback for states created before the simulator contract.
+ */
+export function resolveSimulatorCumulativeInflationFactor(state) {
+    const appFactor = Number(state?.cumulativeInflationFactor);
+    if (isValidCumulativeInflationFactor(appFactor)) return appFactor;
+
+    const engineFactor = Number(state?.lastState?.cumulativeInflationFactor);
+    if (isValidCumulativeInflationFactor(engineFactor)) return engineFactor;
+
+    return 1;
+}
+
+/**
+ * Advances the factor for the next simulator year exactly once.
+ * Invalid source data keeps the current valid factor; validation of market
+ * inputs remains at the existing input/data boundaries.
+ */
+export function advanceSimulatorCumulativeInflationFactor(currentFactor, inflationPct) {
+    const current = isValidCumulativeInflationFactor(Number(currentFactor))
+        ? Number(currentFactor)
+        : 1;
+    const rate = Number(inflationPct);
+    if (!Number.isFinite(rate)) return current;
+
+    const annualFactor = 1 + (rate / 100);
+    const next = current * annualFactor;
+    return isValidCumulativeInflationFactor(next) ? next : current;
+}
+
 export function prepareHistoricalDataOnce() {
     if (historicalDataPrepared) return;
     prepareHistoricalData();
@@ -130,6 +166,7 @@ export function initMcRunState(inputs, startYearIndex) {
 
     return {
         portfolio: startPortfolio,
+        cumulativeInflationFactor: 1,
         baseFloor: inputs.startFloorBedarf,
         baseFlex: inputs.startFlexBedarf,
         baseMinimumFlexAnnual: inputs.minimumFlexAnnual || 0,
