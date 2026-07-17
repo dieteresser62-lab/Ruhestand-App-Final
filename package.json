@@ -4,6 +4,7 @@
   "description": "Die Ruhestand-App ist ein vollst\u00c3\u00a4ndig lokal ausf\u00c3\u00bchrbares Planungstool mit zwei Oberfl\u00c3\u00a4chen:",
   "main": "balance-binder.js",
   "scripts": {
+    "docs:evidence": "node scripts/check-architecture-evidence.mjs",
     "build:engine": "node build-engine.mjs",
     "build:engine:strict": "node -e \"process.env.ENGINE_BUILD_STRICT='1'; import('./build-engine.mjs')\"",
     "test": "node tests/run-tests.mjs",

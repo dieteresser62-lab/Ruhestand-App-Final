@@ -2,6 +2,7 @@
 
 **Stand:** 2026-07-17<br>
 **Quellen- und Erhebungsstand:** 2026-07-15<br>
+**Letzte Aktualitätsstichprobe dynamischer/amtlicher Anker:** 2026-07-17, Europe/Berlin<br>
 **Status:** normativer Beleganhang zum Architektur- und Fachkonzept<br>
 **Hauptdokument:** [Architektur und Fachkonzept](ARCHITEKTUR_UND_FACHKONZEPT.md#forschungsrahmen)
 
@@ -13,6 +14,7 @@ Die Aufnahme einer Quelle belegt weder eine identische Suite-Umsetzung noch dere
 
 - [Evidenztaxonomie](#evidenztaxonomie)
 - [Zitier- und Aktualitätsstandard](#zitierstandard)
+- [Aktualitäts- und Fälligkeitsvertrag](#aktualitaetsvertrag)
 - [Kuriertes Quellenkorpus](#quellenkorpus)
 - [Mechanismus-Quellen-Matrix](#mapping-grundlage)
 - [Status und Ergebnisübersicht](#einordnungsmassstab)
@@ -92,6 +94,39 @@ jeder zentralen Aussage mindestens `Quellen-ID + Quellenrolle +
   unabhängiger Qualitätsnachweis.
 - Direkte Zitate bleiben kurz; der Regelfall ist eine eigenständige Paraphrase
   mit enger Aussagegrenze.
+
+<a id="aktualitaetsvertrag"></a>
+
+## E.3.1 Aktualitäts- und Fälligkeitsvertrag
+
+Jede FOR-ID muss genau einem Record-Scope der folgenden Tabelle zugeordnet
+sein. `Letzte Prüfung` bezeichnet den dokumentierten Quellen-/Versionsabgleich;
+`Nächste Prüfung` ist der späteste erneute Prüftag. Ein Datum vor dem aktuellen
+Kalendertag in `Europe/Berlin` ist überfällig und blockiert das Offline-Gate.
+Der Validator selbst ruft keine DOI-, Verlags-, Community-, Daten- oder
+Behörden-URL auf.
+
+Peer-reviewte, abgeschlossene Veröffentlichungen werden jährlich auf
+Metadaten-, Versions- oder Retraktionsänderungen geprüft, aber nicht still
+gegen neuere Sekundärliteratur ausgetauscht. Dynamische Methoden-, Daten- und
+Behördenanker werden halbjährlich geprüft. Bei der Stichprobe vom 2026-07-17
+waren IRS Publication 590-B weiterhin als Ausgabe 2025, die Destatis-Tabelle
+61111-0002 weiterhin mit Stand 2026-06-12, die BMG-Pflegedaten weiterhin bis
+2025 und die laufende Shiller-Datenseite weiterhin unter dem dokumentierten
+Provenienzanker verfügbar. Bei diesen geprüften Ankern lag damit kein
+geänderter Daten- oder Berichtsstand vor, der einen historischen
+Recordaustausch rechtfertigte. Der vollständige Scope-Prüfstand bleibt
+2026-07-15; die Stichprobe ersetzt keine vorgezogene Vollprüfung.
+
+| Record-Scope | Reviewklasse | Letzte Prüfung | Nächste Prüfung | Prüfquelle | Ergebnis/Änderungsnotiz |
+| --- | --- | --- | --- | --- | --- |
+| FOR-ENT | gemischt; dynamische Anker halbjährlich | 2026-07-15 | 2027-01-15 | FOR-ENT-01 bis FOR-ENT-10; dynamisch insbesondere FOR-ENT-09/10 | Stichprobe 2026-07-17: IRS-Ausgabe 2025 bestätigt; statische Veröffentlichungen unverändert geführt |
+| FOR-LCF | peer-reviewt/Fachliteratur, jährlich | 2026-07-15 | 2027-07-15 | FOR-LCF-01 bis FOR-LCF-08 | kein geänderter Recordstand festgestellt; historische Versionen bleiben erhalten |
+| FOR-STO | gemischt; institutionelle Anker halbjährlich | 2026-07-15 | 2027-01-15 | FOR-STO-01 bis FOR-STO-10; dynamisch insbesondere FOR-STO-09/10 | vollständiger Prüfstand 2026-07-15; Methodenklassiker unverändert geführt |
+| FOR-VAL | gemischt; laufende Datenseite halbjährlich | 2026-07-15 | 2027-01-15 | FOR-VAL-01 bis FOR-VAL-10; dynamisch insbesondere FOR-VAL-10 | Stichprobe 2026-07-17: Shiller-Provenienzseite verfügbar; historische Forschungsrecords unverändert |
+| FOR-PFL | peer-reviewt, jährlich | 2026-07-15 | 2027-07-15 | FOR-PFL-01 bis FOR-PFL-03 | kein geänderter Recordstand festgestellt |
+| FOR-AST | peer-reviewt/Fachbuch, jährlich | 2026-07-15 | 2027-07-15 | FOR-AST-01 bis FOR-AST-07 | kein geänderter Recordstand festgestellt |
+| FOR-DE | amtliche Daten-/Berichtsanker, halbjährlich | 2026-07-15 | 2027-01-15 | FOR-DE-01 bis FOR-DE-07; Stichprobe insbesondere FOR-DE-04/07 | Stichprobe 2026-07-17: BMG-Daten bis 2025 und Destatis-Stand 2026-06-12 bestätigt; keine Recordversion ersetzt |
 
 <a id="quellenkorpus"></a>
 

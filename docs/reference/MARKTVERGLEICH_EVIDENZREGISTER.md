@@ -1,7 +1,8 @@
 # Marktvergleich – Evidenzregister
 
 **Normativer Erhebungsstand:** 2026-07-15<br>
-**Abrufdatum der externen Records:** 2026-07-15, Europe/Berlin<br>
+**Vollerhebung der externen Records:** 2026-07-15, Europe/Berlin<br>
+**Letzte volatile Aktualitätsprüfung:** 2026-07-17, Europe/Berlin<br>
 **Methodik und Ergebniszusammenfassung:**
 [`ARCHITEKTUR_UND_FACHKONZEPT.md`](ARCHITEKTUR_UND_FACHKONZEPT.md#marktvergleich)<br>
 **Status:** normativer Beleganhang; kein Archiv
@@ -38,9 +39,40 @@ segmentübergreifende Gesamtpunktzahl.
 Jeder Record führt Quellen-ID, Produktstufe beziehungsweise Zugriffsebene,
 Betreiber, Titel und Ziel, Evidenzklasse, Veröffentlichung oder Änderung,
 Sprache/Region, Kriterien und quellennahe Aussage sowie die Beleggrenze. Für
-alle externen Records gilt das oben genannte Abrufdatum. `Nicht ausgewiesen`
-bedeutet, dass auf der aufgerufenen Seite kein belastbares Veröffentlichungs-
-oder Änderungsdatum erkennbar war.
+die ursprüngliche Vollerhebung aller externen Records gilt das oben genannte
+Abrufdatum. Spätere gruppenbezogene Aktualitätsprüfungen stehen im folgenden
+Fälligkeitsregister. `Nicht ausgewiesen` bedeutet, dass auf der aufgerufenen
+Seite kein belastbares Veröffentlichungs- oder Änderungsdatum erkennbar war.
+
+## Aktualitäts- und Fälligkeitsvertrag
+
+Jede Quellen-ID muss genau einem Record-Scope der folgenden Tabelle
+zugeordnet sein. `Letzte Prüfung` bezeichnet den dokumentierten inhaltlichen
+oder strukturellen Abgleich; `Nächste Prüfung` ist der späteste erneute
+Prüftag. Ein Datum vor dem aktuellen Kalendertag in `Europe/Berlin` ist
+überfällig und blockiert das Offline-Gate. Der statische Validator prüft nur
+Dateien, Tabellen, IDs, Anker und Daten. Er ruft keine externe URL auf.
+
+Die volatile Prüfung vom 2026-07-17 verwendete ausschließlich die in den
+verlinkten Records genannten offiziellen Produkt-, Preis-, FAQ-, Rechner-
+oder Methodenseiten. Sie war keine erneute Vollerhebung aller Unterseiten.
+Unveränderte Aussagen behalten ihren Erhebungsstand 2026-07-15. Beim BVI
+wurde ausschließlich das inzwischen ausgewiesene Revisionsdatum angepasst;
+Methode und Einordnung blieben unverändert.
+
+| Record-Scope | Reviewklasse | Letzte Prüfung | Nächste Prüfung | Prüfquelle | Ergebnis/Änderungsnotiz |
+| --- | --- | --- | --- | --- | --- |
+| MKT-RS | Repository/bei Änderung, spätestens quartalsweise | 2026-07-17 | 2026-10-17 | [MKT-RS-01 bis MKT-RS-99](#mkt-rs-01) | lokale Fundstellen erreichbar; dokumentierter Lizenzwiderspruch bleibt bis Slice 5 offen |
+| MKT-PL | volatile Produktstufe/Preis, quartalsweise | 2026-07-17 | 2026-10-17 | [MKT-PL-01](#mkt-pl-01) | Premium weiterhin 129 USD pro Jahr; Kernumfang bestätigt |
+| MKT-BD | volatile Produktstufe/Preis, quartalsweise | 2026-07-17 | 2026-10-17 | [MKT-BD-01](#mkt-bd-01) | PlannerPlus weiterhin 144 USD pro Jahr; Kernumfang bestätigt |
+| MKT-BVI | volatile Rechner-/Methodenseite, quartalsweise | 2026-07-17 | 2026-10-17 | [MKT-BVI-01](#mkt-bvi-01) | Seitendatum auf 2026-07-02 fortgeschrieben; 100.000 Zufallskombinationen und Methodenbefund unverändert |
+| MKT-FF | volatile Rechnerseite, quartalsweise | 2026-07-17 | 2026-10-17 | [MKT-FF-01](#mkt-ff-01) | drei deterministische Rechnervarianten und Eingabevertrag bestätigt |
+| MKT-DR | volatile Portal-/FAQ-Seite, quartalsweise | 2026-07-17 | 2026-10-17 | [MKT-DR-01](#mkt-dr-01) | Portalzweck, Vorsorgeumfang und Exportwege bestätigt |
+| MKT-MG | volatile Beraterstufe/Preis, quartalsweise | 2026-07-17 | 2026-10-17 | [MKT-MG-01](#mkt-mg-01) | MoneyGuide weiterhin 2.000 USD jährlich beziehungsweise 175 USD monatlich pro Berater |
+| MKT-EM | volatile Produktseite, quartalsweise | 2026-07-17 | 2026-10-17 | [MKT-EM-01](#mkt-em-01) | Cashflow-, Portal-, Vergleichs- und What-if-Umfang bestätigt; kein öffentlicher Preis erhoben |
+| MKT-FI | volatile Methoden-/Hilfeseite, quartalsweise | 2026-07-17 | 2026-10-17 | [MKT-FI-01](#mkt-fi-01) | historischer Rechnerzweck und dokumentierter Strategiekatalog bestätigt |
+| MKT-FC | volatile Daten-/Methodenseite, quartalsweise | 2026-07-17 | 2026-10-17 | [MKT-FC-01](#mkt-fc-01) | Datenstand bis 2026-01-01 und Aktualisierung 2026-04-17 bestätigt |
+| MKT-PR | volatile Produktstufe/Preis, quartalsweise | 2026-07-17 | 2026-10-17 | [MKT-PR-02](#mkt-pr-02) | PRC2026 Gold weiterhin 99 USD; Download- und Lizenzstufe bestätigt |
 
 ## MKT-RS – Ruhestand-Suite, lokale Arbeitskopie
 
@@ -87,7 +119,7 @@ oder Änderungsdatum erkennbar war.
 
 | Quellen-ID | Klasse | Produktstufe, Betreiber, Titel und URL | Veröffentlichung/Änderung | Sprache/Region | Kriterien und Fundstelle | Grenze |
 | --- | --- | --- | --- | --- | --- | --- |
-| <a id="mkt-bvi-01"></a>MKT-BVI-01 | P1 | BVI Entnahme-Rechner, [direkter Rechner](https://www.bvi.de/service/rechner/entnahmerechner/), Eingaben und Methodenhinweis | revidiert 2026-06-15 | DE/Deutschland | K-01, K-02, K-06 bis K-08, K-13 bis K-15: 100.000 Zufallskombinationen historischer Jahresrenditen, Indizes/Zeiträume, Inflation, Kosten, Steuersatz und Ergebnisdownload | Wiederholung kann andere Ergebnisse liefern; keine Seedsteuerung |
+| <a id="mkt-bvi-01"></a>MKT-BVI-01 | P1 | BVI Entnahme-Rechner, [direkter Rechner](https://www.bvi.de/service/rechner/entnahmerechner/), Eingaben und Methodenhinweis | revidiert 2026-07-02 | DE/Deutschland | K-01, K-02, K-06 bis K-08, K-13 bis K-15: 100.000 Zufallskombinationen historischer Jahresrenditen, Indizes/Zeiträume, Inflation, Kosten, Steuersatz und Ergebnisdownload | Wiederholung kann andere Ergebnisse liefern; keine Seedsteuerung |
 | <a id="mkt-bvi-02"></a>MKT-BVI-02 | P1 | BVI, [Datenschutz](https://www.bvi.de/datenschutz/), Webzugriff, Logs, Cookies und Betroffenenrechte | zuletzt geändert 2021-02-08 | DE/Deutschland | K-11: Webdatenschutz und Drittanbieterhinweise | nicht rechnerspezifisch; eingegebene Finanzwerte werden nicht gesondert beschrieben |
 | <a id="mkt-bvi-99"></a>MKT-BVI-99 | I1 | Suchprotokoll: Rechner, Datenschutz, Impressum; Suchbegriffe Preis, Lizenz, offline, accessibility, WCAG, Szenario speichern | geprüft 2026-07-15 | DE/Deutschland | K-09, K-12, K-16 bis K-18: keine belastbaren produktbezogenen Aussagen gefunden | keine Negativaussage |
 
@@ -314,5 +346,6 @@ Datenschutz, Export, Offline-Nutzung und Barrierefreiheit. Betroffene Records
 erhalten ein neues Abrufdatum und eine Änderungsnotiz. Ein verlorener Link
 führt zunächst zu `nicht erneut verifiziert`, nicht automatisch zu `nicht
 vorhanden`. Status- oder Positionierungsänderungen benötigen einen tragenden
-Record. Der statische Vollständigkeits- und Fälligkeitsvertrag wird in Slice 4
-ergänzt.
+Record. Der statische Vollständigkeits- und Fälligkeitsvertrag wird durch
+`npm run docs:evidence` geprüft; die notwendige Live-Erhebung bleibt davon
+bewusst getrennt.

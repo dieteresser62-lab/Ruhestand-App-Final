@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 107 entdeckte Testdateien, davon 106 im Node-Gate ausgeführt, mit 4410 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (verifiziert mit `npm test` am 2026-07-14). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen.
+**Test-Statistik:** 108 entdeckte Testdateien, davon 107 im Node-Gate ausgeführt, mit 4460 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (verifiziert mit `npm test` am 2026-07-17). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen.
 
 Die Zahl beschreibt nur die Node-Standardsuite. `npm run test:browser`, `npm run test:coverage` und ein echter Tauri-Build sind getrennte Gates und in den Assertions nicht enthalten.
 
@@ -23,6 +23,19 @@ npm test
 ```
 
 `npm test` fuehrt die schnelle Node-Standardsuite ueber `node tests/run-tests.mjs` aus. Die Suite enthaelt DOM-freie Engine-, Balance-, Simulator-, Profil-, Tranchen-, Persistenz-, Worker- und Tauri-Contract-Tests. Browser-Smokes und echte Tauri-Builds sind separate Gates.
+
+Das statische Architektur-/Fachkonzept-Evidenzgate ist Teil dieser Suite und
+kann zusätzlich fokussiert ausgeführt werden:
+
+```bash
+npm run docs:evidence
+```
+
+Der Befehl prüft die normativen Markt- und Forschungsregister ausschließlich
+lokal auf Recordzahlen, Pflichtfelder, IDs, Anker, lokale Links,
+ISO-Datumsfelder und fällige Aktualitätsscopes. Er führt keine Live-HTTP-
+Prüfung durch; externe Erhebungen bleiben ein getrennt dokumentierter
+Pflegeschritt.
 
 Der Runner sortiert alle Dateien deterministisch und meldet fuer jede Datei Modus und Assertionzahl. Die Ausfuehrungspolicy steht explizit in `TEST_EXECUTION_POLICY`:
 
@@ -109,6 +122,7 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 | Konservatives Langlebigkeitsmodell | `longevity-contract.test.mjs`, `longevity-horizon.test.mjs` | `longevity-engine-runner.test.mjs`, `longevity-ui-persistence.test.mjs`, `longevity-optimizer-docs.test.mjs`, `worker-parity.test.mjs` |
 | Stationary Bootstrap | `stationary-bootstrap-contract.test.mjs`, `stationary-bootstrap-sampler.test.mjs` | `mc-worker-contract.test.mjs`, `worker-parity.test.mjs` |
 | Tail-Risk-/Crash-Overlay | `tail-risk-contract.test.mjs`, `tail-risk-overlay.test.mjs` | `simulator-input-readers.test.mjs`, `simulator-monte-carlo.test.mjs`, `worker-parity.test.mjs` |
+| Architektur-/Fachkonzept-Evidenz | `architecture-evidence.test.mjs` | `npm run docs:evidence`, offline im regulären `npm test`-Gate |
 
 Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-Integration und Worker-/Chunk-Paritaet. Sie belegen keine empirische Kalibrierung des Tail-Risk-Modells und keine Prognoseguete gegen unbekannte kuenftige Marktdaten.
 
@@ -678,6 +692,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 |-------|-------|-------|
 | `3bucket-config.test.mjs` | ~90 | 3-Bucket-Konfiguration und Engine-Input-Mapping |
 | `3bucket-refill.test.mjs` | ~160 | Bond-Refill und 3-Bucket-Nachsteuerung |
+| `architecture-evidence.test.mjs` | ~170 | Offline-Contract für Evidenzrecords, Pflichtfelder, IDs, Anker, lokale Links und Fälligkeiten |
 | `auto-optimizer.test.mjs` | ~500 | Mehrphasige Optimierung, LHS, Constraints |
 | `auto-optimize-worker-contract.test.mjs` | ~260 | Auto-Optimize Worker-Merge-Contract |
 | `balance-annual-cape.test.mjs` | ~140 | CAPE-Abruf, Fallback und Jahresupdate-Contract |

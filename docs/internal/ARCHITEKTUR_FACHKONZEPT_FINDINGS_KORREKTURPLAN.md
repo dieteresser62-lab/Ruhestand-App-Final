@@ -1,7 +1,7 @@
 # Korrektur-Arbeitsplan zu den Findings aus Slice 08
 
 **Stand:** 2026-07-17<br>
-**Status:** in Umsetzung – Slice 3 implementiert; Review ausstehend<br>
+**Status:** in Umsetzung – Slice 4 implementiert; Review ausstehend<br>
 **Ausgangsdokument:** `SLICE_ARCHITEKTUR_FACHKONZEPT_08_INTEGRATION_ABSCHLUSS.md`<br>
 **Betroffenes Hauptdokument:** `docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md`<br>
 **Planerstellungs-Branch:** `codex/architektur-fachkonzept-doku`<br>
@@ -301,16 +301,19 @@ eigenständig erklärt.
 - der Forschungsblock ist nach dem Messvertrag größer als der Marktblock;
 - offene V4-/V5-Prüfungen bleiben sichtbar.
 
-**Umsetzungsstand 2026-07-17:** Slice 3 ist dokumentarisch implementiert; das
-Review steht aus. Das neue normative Forschungs-Evidenzregister führt 55 von
+**Umsetzungsstand 2026-07-17:** Slice 3 ist dokumentarisch implementiert und
+freigegeben. Das neue normative Forschungs-Evidenzregister führt 55 von
 55 FOR-Recordzeilen inhaltsgleich mit eindeutigen Ankern und MAP-01 bis
 MAP-17 als inhaltsgleiche Sieben-Pflichtfeld-Dossiers. Der Forschungsblock im
 Hauptdokument umfasst 2.940 Wörter und ist 101 Wörter größer als der
 Marktblock mit 2.839 Wörtern. Gemeinsam belegen beide Blöcke 24,43 Prozent des
 Haupttextnenners. FR-01 bis FR-12 und FQ-01 bis FQ-10 bleiben im Hauptdokument
-normativ geführt; U-K03 bleibt bis zu Review und Nutzerfreigabe offen.
+normativ geführt; U-K03 wurde am 2026-07-17 freigegeben.
 
 ### Slice 4 – Evidenzaktualität und statischer Dokumentvalidator
+
+**Slice-Datei:**
+[`SLICE_ARCHITEKTUR_FACHKONZEPT_FINDINGS_04_EVIDENZVALIDATOR.md`](SLICE_ARCHITEKTUR_FACHKONZEPT_FINDINGS_04_EVIDENZVALIDATOR.md)
 
 **Ziel:** Strukturelle Vollständigkeit und Fälligkeit maschinell prüfen, ohne
 das Testgate von externem Netzwerk abhängig zu machen.
@@ -344,6 +347,18 @@ voraussichtlich:
   einen klaren Fehler;
 - externe Erhebung ist mit Datum und Quelle dokumentiert;
 - `npm test` benötigt kein Internet.
+
+**Umsetzungsstand 2026-07-17:** Slice 4 ist implementiert; Review und U-K04
+stehen aus. `scripts/check-architecture-evidence.mjs` prüft offline 69 MKT-,
+55 FOR-Records, MAP-01 bis MAP-17, Pflichtfelder, eindeutige IDs/Anker, lokale
+Links, ISO-Daten und 18 Aktualitätsscopes. `npm run docs:evidence` stellt das
+fokussierte Gate bereit; `architecture-evidence.test.mjs` bindet positive und
+negative Contractfälle in `npm test` ein. Die volatile Marktstichprobe wurde
+am 2026-07-17 über die offiziellen Produkt-/Preis-/Methodenanker erneuert; nur
+das BVI-Revisionsdatum änderte sich auf 2026-07-02. Die amtlich/dynamische
+Forschungsstichprobe bestätigte die geprüften Versionsstände ohne
+Recordaustausch. Fokuslauf 19/19 und Gesamtsuite 4.460/4.460 Assertions sind
+grün; das Gate meldet null offene Handles und benötigt kein Internet.
 
 ### Slice 5 – Lizenzmetadaten vereinheitlichen
 
@@ -621,8 +636,8 @@ Zusätzlich zu `AGENTS.md` wird gestoppt und nachgefragt, wenn:
 | --- | --- | --- | --- | --- |
 | U-K01 | dieser Korrekturplan | Review-Feedback eingearbeitet | Nutzer + Reviewer | freigegeben am 2026-07-16 |
 | U-K02 | Dokumenttopologie und Messvertrag | Slice 1 | Nutzer | freigegeben am 2026-07-16 |
-| U-K03 | Markt-/Forschungsregister und Haupttextumfang | Slice 2 und 3 | Nutzer + Reviewer | freigegeben durch Gemini / Nutzer ausstehend |
-| U-K04 | Evidenzvalidator und Aktualitätsvertrag | Slice 4 | Nutzer + Reviewer | ausstehend |
+| U-K03 | Markt-/Forschungsregister und Haupttextumfang | Slice 2 und 3 | Nutzer + Reviewer | freigegeben am 2026-07-17 |
+| U-K04 | Evidenzvalidator und Aktualitätsvertrag | Slice 4 | Nutzer + Reviewer | freigegeben durch Gemini / Nutzer ausstehend |
 | U-K05 | autoritative Lizenz | vor Slice 5 | Nutzer | MIT bestätigt am 2026-07-16 |
 | U-K06 | PD-01 Route A oder B und zulässiges Delta | vor Slice 6 | Nutzer | Route A bestätigt; Delta-Baseline vor Slice 6 ausstehend |
 | U-K07 | Pflegekosten-Einheitenvertrag | vor/mit Slice 7 | Nutzer + Reviewer | ausstehend |
@@ -638,7 +653,7 @@ Zusätzlich zu `AGENTS.md` wird gestoppt und nachgefragt, wenn:
 | 1 | freigegeben | Baseline, Messvertrag, Scope-Gates und Branch validiert; MIT und U-K02 bestätigt; Review durch Gemini abgeschlossen am 2026-07-16 |
 | 2 | freigegeben | 69 MKT-Records und Kriterienmatrix im normativen Register; Markt-Hauptblock auf 2.839 Wörter verdichtet; Review durch Gemini abgeschlossen am 2026-07-17 |
 | 3 | freigegeben | 55 FOR-Records und 17 MAP-Dossiers im normativen Register; Forschungsblock 101 Wörter größer als Markt; gemeinsamer Anteil 24,43 %; Review durch Gemini abgeschlossen am 2026-07-17 |
-| 4 | geplant | Evidenzaktualität und statischer Validator |
+| 4 | freigegeben | Offline-Validator und `npm run docs:evidence`; 69 MKT-, 55 FOR-, 17 MAP-Nachweise und 18 Aktualitätsscopes; 4.460/4.460 Assertions grün; Review durch Gemini abgeschlossen am 2026-07-17 |
 | 5 | geplant | konsistente Lizenzmetadaten |
 | 6 | geplant | korrigierter Real-/Nominalvertrag |
 | 7 | geplant | korrigierter Pflegekosten-Einheitenvertrag |
