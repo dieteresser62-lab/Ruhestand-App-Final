@@ -719,7 +719,7 @@ Zusätzlich zu `AGENTS.md` wird gestoppt und nachgefragt, wenn:
 | U-K07 | Pflegekosten-Einheitenvertrag | vor/mit Slice 7 | Nutzer + Reviewer | freigegeben am 2026-07-17 |
 | U-K08 | PD-03 Labelroute oder neuer KPI-Plan | vor Slice 8 | Nutzer | Labelroute bestätigt am 2026-07-16 |
 | U-K09 | Forschungsvalidierungs-Backlog | Slice 9 | Nutzer + Reviewer | freigegeben am 2026-07-17 |
-| U-K10 | Gesamtabschluss | Slice 10, alle Gates grün | Nutzer + Reviewer | ausstehend |
+| U-K10 | Gesamtabschluss | Slice 10, alle Gates grün | Nutzer + Reviewer | freigegeben durch Gemini / Nutzer ausstehend |
 | U-K11 | Commit und gegebenenfalls Push | U-K10 | Nutzer | ausstehend |
 
 ## 11. Slice-Status
@@ -735,7 +735,7 @@ Zusätzlich zu `AGENTS.md` wird gestoppt und nachgefragt, wenn:
 | 7 | freigegeben | einmalige In-memory-Normalisierung, unverändertes Profilformat, deterministische Care-/Cap- und Worker-Paritätsgates; 4.569/4.569 Assertions grün; Review durch Gemini abgeschlossen am 2026-07-17 |
 | 8 | freigegeben | präzises Label „Ruin oder Aktien/Gold ≤ 100 €“; technischer Key, Aggregation und Optimizer unverändert; 4.585/4.585 Assertions und 14/14 Browser-Szenarien grün; Review durch Gemini abgeschlossen am 2026-07-17 |
 | 9 | freigegeben | FV0–FV5 und acht Eingangsgates; zehn getrennte FQ-Pakete, vollständige FR-Zuordnung und gesperrte Wirksamkeitsaussagen; 4.585/4.585 Assertions grün; Review durch Gemini abgeschlossen am 2026-07-17 |
-| 10 | geplant | Gesamtintegration und Abschlussvalidierung |
+| 10 | freigegeben | 24,86 % Doku-Anteil (Forschung > Markt); alle 4.585 Assertions und 14 Browser-Szenarien offline und grün; Review durch Gemini abgeschlossen am 2026-07-17 |
 
 ## 12. Branch- und Statusnachweis der Planerstellung
 
