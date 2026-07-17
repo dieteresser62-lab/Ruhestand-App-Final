@@ -3526,9 +3526,11 @@ ausgewiesene Gesamtkosten wurden nicht ergänzt.
 | FIRECalc 3.0 | USA/öffentlich | Unterstützerfunktionen; Betrag offen | [MKT-FC-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-fc-01) |
 | Pralana Gold 2026 | USA/Excel-Download | 99 USD einmalig für Version 2026 | [MKT-PR-02](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-pr-02) |
 
-Lizenz- und Nutzungsgrenzen stehen stufenscharf bei den Records. Für die
-Suite bleibt die Inkonsistenz aus MIT-Text, ISC-npm-Metadatum und leerem
-Cargo-Feld als GAP-MKT-06 sichtbar.
+Lizenz- und Nutzungsgrenzen stehen stufenscharf bei den Records. Für die Suite
+nennen `LICENSE.md`, npm-Manifest, Root-Lockfile-Eintrag und Cargo-Manifest
+seit Slice 5 einheitlich MIT. GAP-MKT-06 ist mit automatisiertem
+Metadaten-Contract geschlossen; Abhängigkeiten behalten ihre eigenen
+Lizenzangaben.
 
 ## D.12 Quellenrecords der Erhebung
 
@@ -3652,7 +3654,7 @@ breite lokale Tabellenplanung. D.13 verbindet jeden Befund mit seinem Record.
 | GAP-MKT-03 | fixer Pflegeeintritt/Grad/Person nicht als deterministische Probe konfigurierbar | RH-03, [MKT-RS-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-01), [MKT-RS-99](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-99) | stochastische Pflegeanalyse nicht als exakter Pflegeplan darstellen |
 | GAP-MKT-04 | allgemeines Speichern, Kopieren und Side-by-side-Vergleichen vollständiger Pläne fehlt | K-09, [MKT-RS-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-01), [MKT-RS-99](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-99) | Sweep/Backtest nicht mit vollwertigem Szenariomanagement gleichsetzen |
 | GAP-MKT-05 | keine formale Usability-, Screenreader- oder WCAG-Prüfung | K-15/K-16, [MKT-RS-99](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-99) | Barrierefreiheit nur auf Ebene einzelner Hilfen beschreiben |
-| GAP-MKT-06 | Lizenzmetadaten sind widersprüchlich | K-18, [MKT-RS-04](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-04), [MKT-RS-05](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-05) | vor Veröffentlichung MIT/ISC/Cargo konsistent machen |
+| GAP-MKT-06 | geschlossen am 2026-07-17: Projektlizenz in Lizenztext, npm- und Cargo-Metadaten einheitlich MIT | K-18, [MKT-RS-04](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-04), [MKT-RS-05](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-05) | Regressionstest trennt Root-Projektmetadaten von eigenen Lizenzangaben der Abhängigkeiten |
 | GAP-MKT-07 | keine autoritative Rentenanspruchs- oder Kontenaggregation | [MKT-DR-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-dr-01), [MKT-EM-02](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-em-02) | manuelle Eingaben als Nutzerverantwortung kennzeichnen; Import wäre eine separate Produktentscheidung |
 | GAP-MKT-08 | keine externe Prognose-, Kalibrierungs- oder Entscheidungsvalidierung | D.1, [MKT-RS-01](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-01), [MKT-RS-02](MARKTVERGLEICH_EVIDENZREGISTER.md#mkt-rs-02) | Implementierung, Tests und Transparenz nicht als Wirksamkeitsbeleg formulieren |
 
@@ -3669,11 +3671,11 @@ UX-Verträgen.
 
 ### D.17.1 Offene Evidenzlücken
 
-Offen bleiben bei der Suite externe Validierung, formale UX/WCAG-Prüfung und
-konsistente Lizenzmetadaten; bei Web- und Beraterprodukten insbesondere
-geschlossene Bedienpfade, Accessibility, Offline-, Export-, Preis-, Lizenz-
-und Methodendetails. FI Calc und FIRECalc sind nicht allein wegen freien
-Zugangs Open Source; Pralanas Workbook wurde nicht gekauft oder ausgeführt.
+Offen bleiben bei der Suite externe Validierung und formale UX/WCAG-Prüfung;
+bei Web- und Beraterprodukten insbesondere geschlossene Bedienpfade,
+Accessibility, Offline-, Export-, Preis-, Lizenz- und Methodendetails. FI Calc
+und FIRECalc sind nicht allein wegen freien Zugangs Open Source; Pralanas
+Workbook wurde nicht gekauft oder ausgeführt.
 Die stufenscharfen Lücken und Konsequenzen stehen in den `99`-Records und der
 vollständigen Kriterienmatrix. Schweigen bleibt stets neutral.
 

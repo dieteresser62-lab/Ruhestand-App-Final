@@ -323,3 +323,4 @@ IP-/Transportmetadaten fallen bei externen Providern dennoch an.
 ## Lizenz
 
 Veröffentlicht unter der MIT-Lizenz. Die vollständigen Lizenzbedingungen stehen in `LICENSE.md`.
+Lizenztext, npm-Paketmetadaten und Tauri-/Cargo-Metadaten weisen das Projekt einheitlich als `MIT` aus.

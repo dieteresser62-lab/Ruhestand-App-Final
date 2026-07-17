@@ -18,7 +18,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "type": "module",
   "devDependencies": {
     "@tauri-apps/cli": "^2.5.0",

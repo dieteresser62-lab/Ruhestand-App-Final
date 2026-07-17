@@ -1,7 +1,7 @@
 # Korrektur-Arbeitsplan zu den Findings aus Slice 08
 
 **Stand:** 2026-07-17<br>
-**Status:** in Umsetzung – Slice 4 implementiert; Review ausstehend<br>
+**Status:** in Umsetzung – Slice 5 implementiert; Review ausstehend<br>
 **Ausgangsdokument:** `SLICE_ARCHITEKTUR_FACHKONZEPT_08_INTEGRATION_ABSCHLUSS.md`<br>
 **Betroffenes Hauptdokument:** `docs/reference/ARCHITEKTUR_UND_FACHKONZEPT.md`<br>
 **Planerstellungs-Branch:** `codex/architektur-fachkonzept-doku`<br>
@@ -348,8 +348,8 @@ voraussichtlich:
 - externe Erhebung ist mit Datum und Quelle dokumentiert;
 - `npm test` benötigt kein Internet.
 
-**Umsetzungsstand 2026-07-17:** Slice 4 ist implementiert; Review und U-K04
-stehen aus. `scripts/check-architecture-evidence.mjs` prüft offline 69 MKT-,
+**Umsetzungsstand 2026-07-17:** Slice 4 ist implementiert und freigegeben.
+`scripts/check-architecture-evidence.mjs` prüft offline 69 MKT-,
 55 FOR-Records, MAP-01 bis MAP-17, Pflichtfelder, eindeutige IDs/Anker, lokale
 Links, ISO-Daten und 18 Aktualitätsscopes. `npm run docs:evidence` stellt das
 fokussierte Gate bereit; `architecture-evidence.test.mjs` bindet positive und
@@ -361,6 +361,9 @@ Recordaustausch. Fokuslauf 19/19 und Gesamtsuite 4.460/4.460 Assertions sind
 grün; das Gate meldet null offene Handles und benötigt kein Internet.
 
 ### Slice 5 – Lizenzmetadaten vereinheitlichen
+
+**Slice-Datei:**
+[`SLICE_ARCHITEKTUR_FACHKONZEPT_FINDINGS_05_LIZENZMETADATEN.md`](SLICE_ARCHITEKTUR_FACHKONZEPT_FINDINGS_05_LIZENZMETADATEN.md)
 
 **Ziel:** Lizenztext und Paketmetadaten widerspruchsfrei machen.
 
@@ -386,6 +389,17 @@ grün; das Gate meldet null offene Handles und benötigt kein Internet.
 - `LICENSE.md`, npm und Cargo nennen dieselbe Lizenz;
 - keine Abhängigkeitslizenz wird fälschlich als Projektlizenz behandelt;
 - keine Paketversion oder Abhängigkeit ändert sich unbeabsichtigt.
+
+**Umsetzungsstand 2026-07-17:** Slice 5 ist implementiert; Review und
+Nutzerfreigabe stehen aus. `LICENSE.md`, `package.json`, der Root-Eintrag in
+`package-lock.json` und `src-tauri/Cargo.toml` nennen einheitlich MIT. Der
+Lockfile-Strukturvergleich weist ausschließlich die Änderung von
+`packages[""].license` nach; Abhängigkeitsmetadaten blieben unverändert.
+`project-license-metadata.test.mjs` sichert den Root-Vertrag sowie README,
+Hauptdokument, MKT-RS-04/MKT-RS-05, K-18 und den geschlossenen GAP-MKT-06 mit
+14/14 Assertions. `npm pkg get license`, offline Cargo-Metadaten, offline
+`cargo check --locked`, offline `cargo build --locked`, der Evidenzvalidator
+und die Gesamtsuite mit 4.474/4.474 Assertions sind grün.
 
 ### Slice 6 – PD-01 Real-/Nominalvertrag korrigieren
 
@@ -637,7 +651,7 @@ Zusätzlich zu `AGENTS.md` wird gestoppt und nachgefragt, wenn:
 | U-K01 | dieser Korrekturplan | Review-Feedback eingearbeitet | Nutzer + Reviewer | freigegeben am 2026-07-16 |
 | U-K02 | Dokumenttopologie und Messvertrag | Slice 1 | Nutzer | freigegeben am 2026-07-16 |
 | U-K03 | Markt-/Forschungsregister und Haupttextumfang | Slice 2 und 3 | Nutzer + Reviewer | freigegeben am 2026-07-17 |
-| U-K04 | Evidenzvalidator und Aktualitätsvertrag | Slice 4 | Nutzer + Reviewer | freigegeben durch Gemini / Nutzer ausstehend |
+| U-K04 | Evidenzvalidator und Aktualitätsvertrag | Slice 4 | Nutzer + Reviewer | freigegeben am 2026-07-17 |
 | U-K05 | autoritative Lizenz | vor Slice 5 | Nutzer | MIT bestätigt am 2026-07-16 |
 | U-K06 | PD-01 Route A oder B und zulässiges Delta | vor Slice 6 | Nutzer | Route A bestätigt; Delta-Baseline vor Slice 6 ausstehend |
 | U-K07 | Pflegekosten-Einheitenvertrag | vor/mit Slice 7 | Nutzer + Reviewer | ausstehend |
@@ -654,7 +668,7 @@ Zusätzlich zu `AGENTS.md` wird gestoppt und nachgefragt, wenn:
 | 2 | freigegeben | 69 MKT-Records und Kriterienmatrix im normativen Register; Markt-Hauptblock auf 2.839 Wörter verdichtet; Review durch Gemini abgeschlossen am 2026-07-17 |
 | 3 | freigegeben | 55 FOR-Records und 17 MAP-Dossiers im normativen Register; Forschungsblock 101 Wörter größer als Markt; gemeinsamer Anteil 24,43 %; Review durch Gemini abgeschlossen am 2026-07-17 |
 | 4 | freigegeben | Offline-Validator und `npm run docs:evidence`; 69 MKT-, 55 FOR-, 17 MAP-Nachweise und 18 Aktualitätsscopes; 4.460/4.460 Assertions grün; Review durch Gemini abgeschlossen am 2026-07-17 |
-| 5 | geplant | konsistente Lizenzmetadaten |
+| 5 | freigegeben | MIT in Lizenztext, npm-/Lockfile-Root und Cargo; GAP-MKT-06 geschlossen; 14 Fokus- und 4.474 Gesamtassertions grün; Review durch Gemini abgeschlossen am 2026-07-17 |
 | 6 | geplant | korrigierter Real-/Nominalvertrag |
 | 7 | geplant | korrigierter Pflegekosten-Einheitenvertrag |
 | 8 | geplant | präzise Depot-Erschöpfungs-KPI |

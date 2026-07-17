@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 108 entdeckte Testdateien, davon 107 im Node-Gate ausgeführt, mit 4460 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (verifiziert mit `npm test` am 2026-07-17). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen.
+**Test-Statistik:** 109 entdeckte Testdateien, davon 108 im Node-Gate ausgeführt, mit 4474 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (verifiziert mit `npm test` am 2026-07-17). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen.
 
 Die Zahl beschreibt nur die Node-Standardsuite. `npm run test:browser`, `npm run test:coverage` und ein echter Tauri-Build sind getrennte Gates und in den Assertions nicht enthalten.
 
@@ -123,6 +123,7 @@ Die folgenden Assertion-Funktionen werden vom Test-Runner global bereitgestellt:
 | Stationary Bootstrap | `stationary-bootstrap-contract.test.mjs`, `stationary-bootstrap-sampler.test.mjs` | `mc-worker-contract.test.mjs`, `worker-parity.test.mjs` |
 | Tail-Risk-/Crash-Overlay | `tail-risk-contract.test.mjs`, `tail-risk-overlay.test.mjs` | `simulator-input-readers.test.mjs`, `simulator-monte-carlo.test.mjs`, `worker-parity.test.mjs` |
 | Architektur-/Fachkonzept-Evidenz | `architecture-evidence.test.mjs` | `npm run docs:evidence`, offline im regulären `npm test`-Gate |
+| Projektlizenz-Metadaten | `project-license-metadata.test.mjs` | MIT-Konsistenz in Lizenztext, npm-/Lockfile-Root, Cargo, README und Markt-GAP |
 
 Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-Integration und Worker-/Chunk-Paritaet. Sie belegen keine empirische Kalibrierung des Tail-Risk-Modells und keine Prognoseguete gegen unbekannte kuenftige Marktdaten.
 
@@ -738,6 +739,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `monte-carlo-startyear.test.mjs` | ~100 | Startjahr-Auswahl |
 | `persistence.test.mjs` | ~900 | PersistenceFacade, IndexedDB/localStorage/Tauri-Adapter und Migrationen |
 | `portfolio.test.mjs` | ~100 | Portfolio-Operationen |
+| `project-license-metadata.test.mjs` | ~80 | MIT-Projektlizenz in Lizenztext, npm-/Cargo-Metadaten und normativer Dokumentation |
 | `profile-asset-values.test.mjs` | ~80 | Profil-Assetwerte und Aggregation |
 | `profile-navigation.test.mjs` | ~100 | Profilnavigation und UI-State |
 | `profile-state.test.mjs` | ~100 | Profilzustand und Storage-Contracts |

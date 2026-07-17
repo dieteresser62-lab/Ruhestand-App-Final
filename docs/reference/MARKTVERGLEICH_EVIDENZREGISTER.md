@@ -62,7 +62,7 @@ Methode und Einordnung blieben unverändert.
 
 | Record-Scope | Reviewklasse | Letzte Prüfung | Nächste Prüfung | Prüfquelle | Ergebnis/Änderungsnotiz |
 | --- | --- | --- | --- | --- | --- |
-| MKT-RS | Repository/bei Änderung, spätestens quartalsweise | 2026-07-17 | 2026-10-17 | [MKT-RS-01 bis MKT-RS-99](#mkt-rs-01) | lokale Fundstellen erreichbar; dokumentierter Lizenzwiderspruch bleibt bis Slice 5 offen |
+| MKT-RS | Repository/bei Änderung, spätestens quartalsweise | 2026-07-17 | 2026-10-17 | [MKT-RS-01 bis MKT-RS-99](#mkt-rs-01) | lokale Fundstellen erreichbar; MIT-Lizenztext und Projektmetadaten in Slice 5 konsistent nachgewiesen |
 | MKT-PL | volatile Produktstufe/Preis, quartalsweise | 2026-07-17 | 2026-10-17 | [MKT-PL-01](#mkt-pl-01) | Premium weiterhin 129 USD pro Jahr; Kernumfang bestätigt |
 | MKT-BD | volatile Produktstufe/Preis, quartalsweise | 2026-07-17 | 2026-10-17 | [MKT-BD-01](#mkt-bd-01) | PlannerPlus weiterhin 144 USD pro Jahr; Kernumfang bestätigt |
 | MKT-BVI | volatile Rechner-/Methodenseite, quartalsweise | 2026-07-17 | 2026-10-17 | [MKT-BVI-01](#mkt-bvi-01) | Seitendatum auf 2026-07-02 fortgeschrieben; 100.000 Zufallskombinationen und Methodenbefund unverändert |
@@ -81,8 +81,8 @@ Methode und Einordnung blieben unverändert.
 | <a id="mkt-rs-01"></a>MKT-RS-01 | P1 | Projekt, [README](../../README.md), Funktions-, Betriebs- und Workflowabschnitte | Repository-Stand 2026-07-15 | DE/Deutschland | K-01 bis K-05, K-07, K-09 bis K-15: lokale Kernrechnung, Profile, Steuer-, Pflege-, Simulations-, Optimierungs- und Exportpfade | Selbstdokumentation; kein externer Qualitäts- oder Wirksamkeitsnachweis |
 | <a id="mkt-rs-02"></a>MKT-RS-02 | P1 | Projekt, [TECHNICAL.md](TECHNICAL.md), Architektur-, Persistenz-, Worker- und Testverträge | Repository-Stand 2026-07-15 | DE/Deutschland | K-01, K-07 bis K-14: deterministische Contracts, lokale Adapter, Seeds, Worker und Diagnosepfade | Implementierungs- und Testnachweis, keine Entscheidungsvalidierung |
 | <a id="mkt-rs-03"></a>MKT-RS-03 | P1 | Projekt, [DATA_SOURCES.md](DATA_SOURCES.md), Quellen- und Fallbacktabellen | Repository-Stand 2026-07-15 | DE/international | K-06, K-11, K-12, K-14: Datenherkunft, Rekonstruktionen, optionale Netzpfade und Grenzen | Datenabdeckung und Rekonstruktionen bleiben modellabhängig |
-| <a id="mkt-rs-04"></a>MKT-RS-04 | P1 | Projekt, [LICENSE.md](../../LICENSE.md), „MIT License“ und „No Warranty“ | Copyright 2025 | EN/international | K-17, K-18: MIT-Rechte, Haftungs- und Beratungsgrenze | widerspricht der Lizenzangabe im npm-Manifest |
-| <a id="mkt-rs-05"></a>MKT-RS-05 | I1 | Projekt, [package.json](../../package.json) Feld license und [Cargo.toml](../../src-tauri/Cargo.toml) Feld license | Repository-Stand 2026-07-15 | EN/international | K-18: npm nennt ISC, Cargo lässt das Feld leer; Metadaten sind nicht synchron | Cross-Check, keine eigenständige Lizenzgewährung |
+| <a id="mkt-rs-04"></a>MKT-RS-04 | P1 | Projekt, [LICENSE.md](../../LICENSE.md), „MIT License“ und „No Warranty“ | Copyright 2025 | EN/international | K-17, K-18: MIT-Rechte, Haftungs- und Beratungsgrenze; stimmt mit den npm- und Cargo-Metadaten überein | Lizenztext ist die vollständige Lizenzgrundlage; Metadaten ersetzen ihn nicht |
+| <a id="mkt-rs-05"></a>MKT-RS-05 | I1 | Projekt, [package.json](../../package.json) Feld license, Root-Eintrag in [package-lock.json](../../package-lock.json) und [Cargo.toml](../../src-tauri/Cargo.toml) Feld license | Repository-Stand 2026-07-17 | EN/international | K-18: npm-Manifest, npm-Lockfile-Root und Cargo nennen einheitlich MIT | Cross-Check, keine eigenständige Lizenzgewährung und keine Aussage über Abhängigkeitslizenzen |
 | <a id="mkt-rs-99"></a>MKT-RS-99 | P3 | Direkter lokaler Check von Balance.html, Simulator.html, depot-tranchen-manager.html und app-Modulen auf Tastatur-, Fokus-, ARIA- und Szenariopfade | geprüft 2026-07-15 | DE/Deutschland | K-09, K-15, K-16 sowie RH-02 bis RH-04: einzelne A11y-Hilfen, feste Stress-Presets, stochastischer Pflegeeintritt und Witwenlogik | kein vollständiger Bedien-, Screenreader- oder WCAG-Test; keine frei konfigurierbare Ereignisfolge nachgewiesen |
 
 ## MKT-PL – ProjectionLab Premium
@@ -227,7 +227,7 @@ Slash-getrennte Nummern erben das vollständig genannte Präfix.
 | K-15 UX | teilweise · MKT-RS-01, MKT-RS-99 | geführte Workflows, Validierungen und Hilfen vorhanden; hohe Expertendichte und keine formale Usability-Studie |
 | K-16 Barrierefreiheit | teilweise · MKT-RS-99 | einzelne Tastaturbefehle, Fokus-, ARIA- und Live-Regionen; kein vollständiger WCAG-/Screenreader-Nachweis |
 | K-17 Preis | nicht anwendbar · MKT-RS-01, MKT-RS-04 | lokale Arbeitskopie, keine untersuchte kommerzielle Produktstufe |
-| K-18 Lizenz | teilweise · MKT-RS-04, MKT-RS-05 | MIT-Lizenztext vorhanden, aber npm- und Cargo-Metadaten widersprechen beziehungsweise fehlen |
+| K-18 Lizenz | vorhanden · MKT-RS-04, MKT-RS-05 | MIT-Lizenztext und Projektmetadaten sind konsistent; Abhängigkeiten behalten ihre eigenen Lizenzangaben |
 
 ### Consumer Planner
 
