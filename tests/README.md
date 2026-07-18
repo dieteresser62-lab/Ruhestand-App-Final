@@ -491,6 +491,14 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 - **Profilverbund-Transparenz:** Backtest-Ergebnis behaelt die profilgenaue `minimumFlexProfiles`-Aufteilung.
 - **Realentnahme:** Historische Jahreszeilen führen den kumulierten Inflationsfaktor fort und deflationieren die effektive Entnahme.
 
+#### `simulator-backtest-characterization.test.mjs`
+**Zweck:** Friert den Legacy-Iststand des historischen Backtests als `legacy_observed` ein, ohne ihn als fachliches Soll zu bewerten.
+- **Golden Cases:** kurzer und langer Completed-Pfad, 3-Bucket/Mindest-Flex, Ruin, Pflegebucket-Projektionsluecke sowie Dynamic-Flex/CAPE.
+- **Negative Cases:** Einjahreslauf, NaN-/rueckwaertige Periode, mittlere Datenluecke und nicht-finite Goldrendite.
+- **Messvertrag:** kanonische Input- und Row-Hashes, Non-Mutation, Metrikwoerterbuch, 2000/2001-Alignment, `legacy_schema_v0` und Detailtoggle-Paritaet.
+- **Delta-Gate:** Abweichungen sind standardmaessig `unexpected_delta`; freigegebene Contract-Aenderungen muessen explizit als `expected_after_approved_contract_change` klassifiziert werden.
+- **Fixture:** `fixtures/simulator-backtest-baseline-v1.json`; Aktualisierung nur nach freigegebenem Contract-Delta mit `UPDATE_BACKTEST_BASELINE=1 node tests/run-single.mjs tests/simulator-backtest-characterization.test.mjs`.
+
 #### `simulator-real-withdrawal-contract.test.mjs`
 **Zweck:** Testet den Simulatorvertrag für echte Realentnahmen.
 - dreijähriger synthetischer 10-%-Inflationsfall mit Faktoren `1 / 1,1 / 1,21`
@@ -774,6 +782,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `scenarios.test.mjs` | ~150 | Komplexe Lebenspfade |
 | `simulation.test.mjs` | ~200 | Simulations-Integration |
 | `simulator-3bucket-ui-e2e.test.mjs` | ~130 | 3-Bucket-UI-Integration im Simulator |
+| `simulator-backtest-characterization.test.mjs` | ~830 | Legacy-Golden-Cases, Negativfaelle, Messvertrag und Delta-Reporter fuer den historischen Backtest |
 | `simulator-backtest.test.mjs` | ~150 | Historischer Backtest |
 | `simulator-dynamic-flex-persistence.test.mjs` | ~110 | Persistenz von Dynamic-Flex-Inputs |
 | `simulator-headless.test.mjs` | ~125 | Headless 2000-2025 |
