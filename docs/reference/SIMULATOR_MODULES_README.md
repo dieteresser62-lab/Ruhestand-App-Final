@@ -189,18 +189,27 @@ DOM-freier Sweep-Runner für Worker-Jobs (Combos + RunRanges) mit deterministisc
 
 ---
 
-## 8. `simulator-backtest.js` (~360 Zeilen)
-Historische Backtests inkl. UI-Integration und Log-Export.
+## 8. Backtest-Module
+
+### `historical-backtest-runner.js`
+
+DOM-freier historischer Jahresrunner mit expliziten Dependencies. `runHistoricalBacktest()` akzeptiert normalisierte Inputs, `{ startYear, endYear }`, einen Historical-Data-Provider sowie die injizierten Funktionen `simulateYear`, `initializePortfolio`, `computeAdjustmentPct`, `resolveHorizon` und `totalPortfolio`. Der Runner liest weder Browserglobals noch Persistenz.
+
+Das vorlaeufige Ergebnis `BacktestRunResultV0` enthaelt den kanonisch eingefrorenen `BacktestRequestV0`, unverkuerzte `rows`, `requestedYears`, wirtschaftlich erfolgreiche `completedYears`, `portfolioStart`, `portfolioEnd`, `legacyOutcome` und die fuer den bestehenden UI-Summary benoetigten `legacyMetrics`. Caller-Inputs, Partner-/Tranchenobjekte und historische Records werden vor dem Lauf in eigene Kopien ueberfuehrt; `undefined`, `Date`, `RegExp`, Prototypen und zyklische Referenzen bleiben dabei erhalten.
+
+### `simulator-backtest.js` (~210 Zeilen)
+
+UI-Adapter, Rendering und Log-Export fuer historische Backtests.
 
 **Hauptfunktionen / Exporte:**
 - `initializeBacktestUI()` – verdrahtet UI-Buttons und persistiert Nutzereinstellungen.
-- `runBacktest()` – führt Jahres-Simulation mit echten Daten aus.
+- `runBacktest()` – liest und validiert DOM-Inputs, delegiert an `runHistoricalBacktest()` und projiziert weiterhin exakt `window.globalBacktestData` im `legacy_schema_v0`.
 - `renderBacktestLog()` / `exportBacktestLogData()` – Darstellung und CSV-Download.
 - Backtest-Logs zeigen Mindest-Flex-Betrag und Status; im Detailmodus zusaetzlich Blockgrund und effektiven Mindest-Flex-Wert nach der Policy.
 
-**Einbindung:** Wird in `initializeUI()` importiert und an die Backtest-Controls gekoppelt. Nutzt `simulator-main-helpers.js` für Formatierung/Export.
+**Einbindung:** Wird in `initializeUI()` importiert und an die Backtest-Controls gekoppelt. Nutzt `historical-backtest-runner.js` fuer die DOM-freie Jahresschleife und `simulator-main-helpers.js` fuer Formatierung/Export.
 
-**Dependencies:** `simulator-engine-wrapper.js`, `simulator-portfolio.js`, `simulator-main-helpers.js`, `simulator-utils.js`, `simulator-data.js`.
+**Dependencies:** `historical-backtest-runner.js`, `simulator-engine-wrapper.js`, `simulator-portfolio.js`, `simulator-main-helpers.js`, `simulator-utils.js`, `simulator-data.js`.
 
 ---
 
@@ -706,8 +715,9 @@ app/simulator/simulator-main.js
   │    ├─ app/simulator/simulator-sweep-utils.js
   │    └─ app/simulator/simulator-utils.js
   ├─ app/simulator/simulator-backtest.js
-  │    ├─ app/simulator/simulator-engine-wrapper.js
-  │    ├─ app/simulator/simulator-portfolio.js
+  │    ├─ app/simulator/historical-backtest-runner.js
+  │    ├─ app/simulator/simulator-engine-wrapper.js (injiziert)
+  │    ├─ app/simulator/simulator-portfolio.js (Initialisierung injiziert)
   │    └─ app/simulator/simulator-main-helpers.js
   ├─ app/simulator/simulator-ui-pflege.js
   ├─ app/simulator/simulator-ui-rente.js
@@ -744,8 +754,9 @@ app/simulator/simulator-main.js
 
 ### Backtest
 1. `simulator-main.js`: Backtest-Controls triggern `runBacktest()` aus `simulator-backtest.js`.
-2. `simulator-engine-wrapper.js`: Jahr-für-Jahr mit echten historischen Daten.
-3. `simulator-backtest.js`: `renderBacktestLog()` zeigt Jahresprotokoll.
+2. `simulator-backtest.js`: Liest/validiert DOM-Inputs und baut den Historical-Data-Provider.
+3. `historical-backtest-runner.js`: Fuehrt die DOM-freie Jahresschleife mit eigenen Laufkopien und injiziertem `simulateOneYear()` aus.
+4. `simulator-backtest.js`: Projiziert `legacy_schema_v0`; `renderBacktestLog()` zeigt das Jahresprotokoll.
 
 ---
 
@@ -776,7 +787,7 @@ Nach jeder Monte-Carlo-Simulation werden 30 Szenarien gespeichert:
 - **Pflege-UI:** `initializePflegeUIControls()` in `simulator-ui-pflege.js` setzt Preset-/Badge-Logik auf. Erwartet Felder `pflegeStufe*`, `pflegeMaxFloor`, `pflegeKostenStaffelPreset` und zeigt/hide Panels per Checkbox `pflegefallLogikAktivieren`.
 - **Renten-Persistenz:** `initRente2ConfigWithLocalStorage()` in `simulator-ui-rente.js` liest/migriert Rentenfelder, schaltet Partner-Section (`chkPartnerAktiv`, `sectionRente2`) und schreibt zurück in `localStorage`.
 - **Sweep-Voreinstellungen:** `initSweepDefaultsWithLocalStorageFallback()` in `simulator-sweep.js` lädt Defaults, liest `localStorage` und setzt Guardrails (Whitelist/Blocklist). Erwartet Zugriff auf Sweep-Formularfelder und das Toggle.
-- **Backtest-Setup:** `initializeBacktestUI()` in `simulator-backtest.js` verknüpft Zeitraum-/Startknöpfe, ruft `runBacktest()` und nutzt `renderBacktestLog()`/`exportBacktestLogData()` für Ausgabe. Erwartet vorhandene DOM-IDs des Backtest-Tabs.
+- **Backtest-Setup:** `initializeBacktestUI()` in `simulator-backtest.js` verknüpft Zeitraum-/Startknöpfe, ruft `runBacktest()` und nutzt `renderBacktestLog()`/`exportBacktestLogData()` für Ausgabe. Erwartet vorhandene DOM-IDs des Backtest-Tabs; die Jahresschleife selbst liegt in `historical-backtest-runner.js` und ist DOM-/Persistenz-frei.
 - **Monte-Carlo-Start:** `runMonteCarlo()` in `simulator-monte-carlo.js` liest `mcAnzahl`, `mcDauer`, `mcBlockSize`, `mcSeed`, `mcMethode`, `mcStartYearMode`, `mcStartYearFilter`, `mcStartYearHalfLife` sowie Progress-UI (`mc-progress-bar*`). Liefert nach Abschluss aggregierte Ergebnisse an `displayMonteCarloResults()`.
 - **Startjahr-Sampling:** `mc-run-context.js` bereitet die Sampling-Konfiguration vor; `mc-year-sampling.js` kapselt `FILTER` (harte Grenze), `RECENCY` (Half-Life), `UNIFORM` und CAPE-Kandidaten. Die Gewichtung wirkt auf Startjahr und laufende Jahresdaten; CAPE-Sampling hat Vorrang vor Gewichtung.
 - **Life-State:** `mc-life-events.js` initialisiert Care-Meta, Partnerstatus, Care-RNGs und HouseholdContext. Die Jahreslogik bleibt im Runner-Hot-Path, bis eine vollstaendige Extraktion den Benchmark stabil erfuellt.
@@ -807,4 +818,4 @@ Nach jeder Monte-Carlo-Simulation werden 30 Szenarien gespeichert:
 
 ---
 
-**Last Updated:** 2026-06-01
+**Last Updated:** 2026-07-18

@@ -13,6 +13,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const fixturePath = path.join(__dirname, 'fixtures', 'simulator-backtest-baseline-v1.json');
 const backtestSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'simulator-backtest.js');
+const backtestRunnerSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'historical-backtest-runner.js');
 const UPDATE_BASELINE = process.env.UPDATE_BACKTEST_BASELINE === '1';
 
 console.log('--- Simulator Backtest Characterization Tests ---');
@@ -755,7 +756,9 @@ try {
         notes: ['Legacy || 0 normalization silently turns a non-finite mandatory gold return into 0%.']
     });
 
-    const backtestSource = fs.readFileSync(backtestSourcePath, 'utf8');
+    const backtestSource = [backtestSourcePath, backtestRunnerSourcePath]
+        .map(sourcePath => fs.readFileSync(sourcePath, 'utf8'))
+        .join('\n');
     const actual = {
         schemaVersion: 'simulator-backtest-baseline-v1',
         oracleClass: 'legacy_observed',

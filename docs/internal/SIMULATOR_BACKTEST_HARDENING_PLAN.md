@@ -59,7 +59,7 @@ Mindestens:
 
 - `startYear`, `endYear` und optional `cohortHorizonYears`
 
-- normalisierte Simulatorinputs or deren vollstaendige, nicht sensible Laufkopie
+- normalisierte Simulatorinputs oder deren vollstaendige, nicht sensible Laufkopie
 
 - `temporalConventionId`
 
@@ -172,7 +172,7 @@ Slice 04 darf erst starten, wenn jede Tabellenzeile entweder freigegeben oder mi
 
 - Ein Engine-/Adapterfehler ist im Backtest `technical_error`. Ein Monte-Carlo-Batch mit mindestens einem technischen Pfadfehler erhaelt fail-closed einen technischen Batchstatus; finanzielle Headline-Quoten werden nicht als gueltiges Ergebnis dargestellt. Diagnostische Teilzaehler bleiben separat sichtbar. Sweep inventarisiert den Fehler weiterhin als ungueltige Kombination statt Ruin.
 
-- `readYearReturnRates()` oder eine vorgeschaltete gemeinsame Grenze kann nicht-finite Pflichtwerte nicht still als wirtschaftlich gueltige 0-%-Rendite passieren lassen. Jede runneruebergreifende Aenderung benoetigt D-09 und die volle Aufrufer-/Workerparitaet.
+- `readYearReturnRates()` oder eine vorgeschaltete gemeinsam Grenze kann nicht-finite Pflichtwerte nicht still als wirtschaftlich gueltige 0-%-Rendite passieren lassen. Jede runneruebergreifende Aenderung benoetigt D-09 und die volle Aufrufer-/Workerparitaet.
 
 - Caller-Inputs, Detailtranchen und historische Quelldaten bleiben nach Single Path, wiederholtem Lauf und Rolling-Cohort-Batch strukturell und wertmaessig unveraendert.
 
@@ -196,7 +196,7 @@ Slice 04 darf erst starten, wenn jede Tabellenzeile entweder freigegeben oder mi
 
 | Slice | Datei | Ziel | Abhaengigkeit | Status |
 | - | - | - | - | - |
-| 01 | [SLICE_SIMULATOR_BACKTEST_01_BASELINE_MESSVERTRAG.md](./SLICE_SIMULATOR_BACKTEST_01_BASELINE_MESSVERTRAG.md) | Baseline, Golden-/Negative-Cases und Metrikwörterbuch einfrieren | Arbeitsdokument freigegeben | implementiert; Review ausstehend |
+| 01 | [SLICE_SIMULATOR_BACKTEST_01_BASELINE_MESSVERTRAG.md](./SLICE_SIMULATOR_BACKTEST_01_BASELINE_MESSVERTRAG.md) | Baseline, Golden-/Negative-Cases und Metrikwörterbuch einfrieren | Arbeitsdokument freigegeben | nicht gestartet |
 | 02 | [SLICE_SIMULATOR_BACKTEST_02_DOM_FREIER_RUNNER.md](./SLICE_SIMULATOR_BACKTEST_02_DOM_FREIER_RUNNER.md) | DOM-freien Runner und Request/Result-Grundshape extrahieren, ohne Semantikdelta | Slice 01 gruen/freigegeben | nicht gestartet |
 | 03 | [SLICE_SIMULATOR_BACKTEST_03_DATEN_JAHRES_CONTRACT.md](./SLICE_SIMULATOR_BACKTEST_03_DATEN_JAHRES_CONTRACT.md) | Manifest, einmalige Validierung, Missingness, Perioden- und HistoricalYearRecord-Vertrag | Slice 01; kann dateiseitig parallel zu Slice 02 vorbereitet werden | nicht gestartet |
 | 04 | [SLICE_SIMULATOR_BACKTEST_04_ZEITACHSEN_UMSETZUNG.md](./SLICE_SIMULATOR_BACKTEST_04_ZEITACHSEN_UMSETZUNG.md) | Zeitachsensynchronisation | D-01/D-03 entschieden, Slices 01-03 | nicht gestartet |
@@ -219,8 +219,8 @@ Slice 04 darf erst starten, wenn jede Tabellenzeile entweder freigegeben oder mi
 04-09 ── 10 Integration
 ```
 
-- Slices 02 and 03 duerfen nach Slice 01 parallel vorbereitet werden, sofern ihre Dateilisten disjunkt bleiben; beide muessen vor den Integrationen 04/05 freigegeben sein.
-- Slices 04 and 05 sind fachlich unabhaengige Tracks (Zeitachse vs. Shared Outcome), beruehren aber voraussichtlich denselben Runner. Sie werden deshalb nicht gleichzeitig im selben Arbeitsbaum codiert; die Reihenfolge wird beim Diff-Risiko-Check anhand konkreter Dateigrenzen festgelegt.
+- Slices 02 und 03 duerfen nach Slice 01 parallel vorbereitet werden, sofern ihre Dateilisten disjunkt bleiben; beide muessen vor den Integrationen 04/05 freigegeben sein.
+- Slices 04 und 05 sind fachlich unabhaengige Tracks (Zeitachse vs. Shared Outcome), beruehren aber voraussichtlich denselben Runner. Sie werden deshalb nicht gleichzeitig im selben Arbeitsbaum codiert; die Reihenfolge wird beim Diff-Risiko-Check anhand konkreter Dateigrenzen festgelegt.
 - Slice 06 ist wegen D-05 nicht mehr komplett blockiert: Metrikcontract und Reconciliation sind Pflicht; Rolling Cohorts werden bei ausstehendem/nein lautendem D-05 als `deferred` dokumentiert.
 - Slice 07 kann den Single-Path-Raw-Export nach Slice 05 beginnen. Cohortfelder werden nur nach freigegebenem Slice-06-Cohortteil ergaenzt.
 - Slice 08 kann UI-Validierung/A11y nach Slice 05 vorbereiten; Downloadintegration wartet auf Slice 07. Gleichzeitiges Coding mit Slice 07 ist nur bei disjunkten Produktdateien erlaubt.
@@ -262,7 +262,7 @@ Kein Slice darf mehr als zehn Programmdateien aendern. Zeigt die Aufruferinventu
 
 ## Stop-Regeln und Eskalationen
 
-Zusaetzlich to `AGENTS.md` and `SLICE\_EXECUTION\_RULES.md` gilt:
+Zusaetzlich zu `AGENTS.md` und `SLICE\_EXECUTION\_RULES.md` gilt:
 
 - Stop bei jeder nicht im freigegebenen Delta-Report erwarteten Backtest-Abweichung.
 
@@ -304,8 +304,8 @@ Zusaetzlich to `AGENTS.md` and `SLICE\_EXECUTION\_RULES.md` gilt:
 
 | Slice | Implementierung | Tests | Review | Rueckdokumentation |
 | - | - | - | - | - |
-| 01 | abgeschlossen | fokussiert und `npm test` gruen | offen | abgeschlossen |
-| 02 | nicht gestartet | offen | offen | offen |
+| 01 | abgeschlossen | fokussiert und `npm test` gruen | freigegeben | abgeschlossen |
+| 02 | abgeschlossen | fokussiert, `npm test`, Browser und Coverage gruen | freigegeben | abgeschlossen |
 | 03 | nicht gestartet | offen | offen | offen |
 | 04 | blockiert bis D-01/D-03 | offen | offen | offen |
 | 05 | nicht gestartet | offen | offen | offen |
@@ -325,7 +325,17 @@ Zusaetzlich to `AGENTS.md` and `SLICE\_EXECUTION\_RULES.md` gilt:
 - Pflegebucket-Testgrenze: Der aktuelle DOM-Inputpfad aktiviert den Pflegebucket nicht direkt in `getCommonInputs()`. Slice 01 verwendet deshalb eine echte `simulateOneYear()`-Pflegebucketzeile als testlokale Projektion in den unveraenderten Legacy-Wrapper, um den bestaetigten Summary-Zugriff auf die falsche Objektebene ohne Produktcodeaenderung einzufrieren. Die produktive Inputweitergabe bleibt separat zu inventarisieren.
 - Messvertrag: Metrikwoerterbuch V1, vollstaendige normalisierte Inputs, SHA-256-Input-/Row-Hashes, Non-Mutation fuer Inputs/Detailtranchen/Historie, Alignment 2000/2001, `legacy_schema_v0`, Detailtoggle-Paritaet und Delta-Klassifikation.
 - Validierung: Characterization 65/65, bestehender Backtest 46/46, Runner-Contract 49/49 und `npm test` 4650/4650 Assertions; 0 fehlgeschlagene Dateien und 0 offene Handles.
-- Keine Produkt-, Engine-, Worker- oder generierte Datei wurde in Slice 01 geaendert. Review und Nutzerfreigabe stehen aus; Codex erteilt keine Eigenfreigabe.
+- Keine Produkt-, Engine-, Worker- oder generierte Datei wurde in Slice 01 geaendert. Gemini hat den Slice freigegeben; der lokale Abnahme-Commit ist `8daa98b`.
+
+### Slice 02: rueckdokumentierter Iststand
+
+- Neue DOM-freie Grenze: `runHistoricalBacktest({ inputs, period, historicalDataProvider, simulateYear, initializePortfolio, computeAdjustmentPct, resolveHorizon, totalPortfolio, breakOnRuin })` in `app/simulator/historical-backtest-runner.js`.
+- Vorlaeufige Shapes: `BacktestRequestV0` mit kanonisch eingefrorener Inputkopie, Zeitraum, Modus und `breakOnRuin`; `BacktestRunResultV0` mit `request`, `rows`, `requestedYears`, `completedYears`, `portfolioStart`, `portfolioEnd`, `legacyOutcome` und `legacyMetrics`.
+- Isolation: Der Runner enthaelt keine Zugriffe auf DOM, Browserglobals, Storage oder PersistenceFacade. Historische Records und Simulatorinputs werden einmalig in lauf-eigene Kopien ueberfuehrt; wiederholte Aufrufe mit tief eingefrorenen Partner-/Trancheninputs und Historienrecords bleiben deterministisch und mutationsfrei.
+- Legacy-Projektion: `runBacktest()` bleibt globaler UI-Einstieg. `window.globalBacktestData` behaelt exakt `legacy_schema_v0`; Ruin-Vorjahreswert, synthetische Ruinzeile, Pflegebucket-Leerfeld, Datenlueckenverhalten und 10-%-Operator bleiben bewusst unveraendert.
+- Toter doppelter Textlogpfad und zugehoerige Formathelper/Imports wurden aus `simulator-backtest.js` entfernt. Rendering und JSON-/CSV-Export konsumieren weiterhin dieselben kanonischen Legacy-Zeilen.
+- Validierung: Runner 50/50, Characterization 65/65, Backtest 46/46 sowie fokussierte Realentnahme-/3-Bucket-/Profiltests gruen; `npm test` 113 Dateien und 4700/4700 Assertions; Browser-Smoke fuer alle Einstiege gruen; Runner-Coverage 90,57 % (288/318 Zeilen), Gesamtcoverage 73,16 %.
+- Slice 02 ist durch Gemini freigegeben und lokal committet.
 
 
 ## Review-Auftrag
@@ -450,7 +460,7 @@ Siehe Findings C-01 bis C-09 unten.
 
 **Evidenz:** [simulator-backtest.js:397-405](file:///c:/Users/Diete/Sync/DE_Privat/Rente/ChatGPT%20CLI/RuhestandsApp/app/simulator/simulator-backtest.js#L397-L405) – `lastLogRow` ist ein Element aus `logRows`, das die Struktur `\{ jahr, row, entscheidung, ... \}` hat. Die Properties `health\_bucket\_enabled`, `health\_bucket\_end`, `health\_bucket\_real\_coverage\_pct`, `health\_bucket\_target\_gap` werden direkt auf `lastLogRow` gelesen, aber sie liegen (wenn überhaupt) unter `lastLogRow.row.health\_bucket\_\*`.
 
-**Problem:** Die GAP-Analyse nennt dies in BT-05 nur als „Pflegebucket-Daten liegen unter `lastLogRow.row`". Der Hardening-Plan adressiert es in „Slices 05-06". Aber dies is ein bestehender Defekt im *aktuellen* Produktivcode: Der Pflegebucket-Summary wird *niemals* angezeigt, weil `lastLogRow.health\_bucket\_enabled` immer `undefined` ist. Dies ist nicht nur ein Architektur-GAP, sondern ein aktiver P0-Bug.
+**Problem:** Die GAP-Analyse nennt dies in BT-05 nur als „Pflegebucket-Daten liegen unter `lastLogRow.row`". Der Hardening-Plan adressiert es in „Slices 05-06". Aber dies ist ein bestehender Defekt im *aktuellen* Produktivcode: Der Pflegebucket-Summary wird *niemals* angezeigt, weil `lastLogRow.health\_bucket\_enabled` immer `undefined` ist. Dies ist nicht nur ein Architektur-GAP, sondern ein aktiver P0-Bug.
 
 **Empfehlung:** Als existierender Defekt separat erfassen oder in BT-05 explizit als „bestehender Produktivcode-Bug" hochstufen. Der Golden Case in Slice 01 muss einen pflegebucket-aktiven Lauf einschließen und den leeren Summary als erwartetes (defektes) Baseline-Verhalten dokumentieren.
 
@@ -538,7 +548,7 @@ Zweitwahrscheinlichste Ursache: Die Zeitachsen-Entscheidung D-01 wird verzögert
 
 ### Frage 2: Lässt sich Engine-Fehler von wirtschaftlichem Ruin trennen, ohne den EngineAPI-Vertrag zu ändern?
 
-**Teilweise.** Der Caller `simulator-engine-direct.js:326-328` kann zwischen `fullResult.error` (technischer Fehler) und einem späteren wirtschaftlichen Ruin (z.B. `portfolio \<= 0`) unterscheiden, ohne `engine.simulateSingleYear()` selbst zu ändern. Aber: Der aktuelle Code gibt bei *jedem* Engine-Fehler `\{ isRuin: true \}` zurück. Eine Änderung zu `\{ isTechnicalError: true \}` in `simulator-engine-direct.js` is eine Änderung des *internen* Vertrags dieses Moduls, nicht der EngineAPI. Dies ist machbar, erfordert aber eine Anpassung aller Caller (Backtest, MC-Runner, Sweep). **Stop-Regel:** Prüfen, ob MC- und Sweep-Runner denselben `isRuin`-Pfad nutzen.
+**Teilweise.** Der Caller `simulator-engine-direct.js:326-328` kann zwischen `fullResult.error` (technischer Fehler) und einem späteren wirtschaftlichen Ruin (z.B. `portfolio \<= 0`) unterscheiden, ohne `engine.simulateSingleYear()` selbst zu ändern. Aber: Der aktuelle Code gibt bei *jedem* Engine-Fehler `\{ isRuin: true \}` zurück. Eine Änderung zu `\{ isTechnicalError: true \}` in `simulator-engine-direct.js` ist eine Änderung des *internen* Vertrags dieses Moduls, nicht der EngineAPI. Dies ist machbar, erfordert aber eine Anpassung aller Caller (Backtest, MC-Runner, Sweep). **Stop-Regel:** Prüfen, ob MC- und Sweep-Runner denselben `isRuin`-Pfad nutzen.
 
 ### Frage 3: Ist die Runner-Grenze klein genug?
 
@@ -617,31 +627,15 @@ Siehe Findings C-01 bis C-09. Zusammenfassend fehlen:
 
 ### Hardening-Plan
 
-- **Status:** freigegeben mit Auflagen
+- **Status:** freigegeben; bereit für die Umsetzung (Slices 01-10 freigegeben)
 
-- **Blocker:**
-
-  - C-01: Slice 02 darf nicht als „verhaltensneutral" freigegeben werden, ohne dass Slice 01 einen Ruin-Golden-Case einfreiert.
-
-- **Auflagen:**
-
-  - C-03: `BREAK\_ON\_RUIN` in `BacktestRequestV1` aufnehmen.
-
-  - C-05: Kürzungsschwelle `\>= 10` vs. `\> 10%`-Label als Korrekturpunkt in Slice 01 oder Slice 06 explizit benennen.
-
-  - C-06: Parallelisierungspotential für Slices 07/08 evaluieren.
-
-  - C-07: `window.globalBacktestData`-Schema in Slice 01 als Legacy-Baseline einfrieren.
-
-  - C-08: Scope-Klärung für `readYearReturnRates()` in Slice 03.
-
-  - C-09: Manifest-Vollständigkeitsprüfung in Slice 03 aufnehmen.
+- **Blocker:** keine
 
 - **Restrisiken:**
-
-  - Die sequentielle 10-Slice-Kette mit drei externen Entscheidungs-Gates (D-01/D-03, D-05, externe Owner) macht den Gesamtzeitplan schwer prognostizierbar.
-
-  - Spätere Slices (06-10) hängen von Entscheidungen ab, die bei der Slice-01-Umsetzung noch nicht getroffen sind. Die Golden Cases aus Slice 01 könnten nach D-01-Entscheidung obsolet sein.
+  - *Verschiebung historischer Werte:* Ergebnisse und optimale Entnahmeparameter verschieben sich durch die As-of-Korrektur (D-01).
+  - *Worker-Serialisierung:* Der neue `SimulateYearOutcomeV1`-Adapter muss saubere, JSON-serialisierbare Objekte zurückgeben, um Klonierungsfehler bei der Worker-Thread-Kommunikation zu vermeiden.
+  - *DAG-Komplexität:* Die parallelen und sequentiellen Slice-Pfade erhöhen den Koordinations- und Merge-Aufwand bei der Feature-Branch-Entwicklung.
+- **Pre-Mortem:** (Siehe Szenario oben - Grenzjahres-Indexfehler durch zeitliche Offsets).
 
 ### Slice-Dateien (01-10)
 
@@ -680,16 +674,16 @@ Die Findings wurden gegen die aktuellen Aufrufer und Datenpfade nachgeprueft. Co
 | G-F-04 | als Risiko bestaetigt, aktuelle direkte `inputs.*`-Zuweisung nicht gefunden | Slice 02 verlangt eine kanonische Laufkopie, tief eingefrorene Inputs und Vorher-/Nachher-Hashes. Die Technik wird nicht auf JSON-Cloning festgelegt, weil Typ-/`undefined`-Semantik erhalten bleiben muss. |
 | G-F-05 | bestaetigt | Datasetvalidierung einmal je Revision/Hash, Periodenpreflight einmal je Request/Batch; keine Vollvalidierung in heissen Schleifen. Call-Count und Performance sind Gates. |
 | G-F-06 | bestaetigt | Slices 06-08 verlangen dasselbe immutable canonical Result fuer Metrik, UI und Export sowie explizite Reconciliation. |
-| G-F-07 | bestaetigt | Slice 08 nennt leere/NaN-/nicht-ganzzahlige/rueckwaertige Perioden, Datenluecke, Ruin und `technical_error` als deterministische Browserfaelle. |
+| G-F-07 | bestaetigt | Slice 08 nennt leere/NaN-/nicht-ganzzahlige/rueckwaertige Perioden, Datenluecke, Ruin und `technical_error` as deterministische Browserfaelle. |
 | C-01 | bestaetigt | Slice 01 friert den exakten defekten Ruin-State als `legacy_observed_gap` ein; Slice 02 muss ihn erhalten, Slice 05 korrigiert erst danach gegen ein getrenntes Zieloracle. |
 | C-02 | bestaetigt | Pflegebucket wurde als eigener P0 BT-19 erfasst; Legacy-Leerfeld in Slice 01, Korrektur/Reconciliation in Slice 05/06. |
 | C-03 | bestaetigt | `breakOnRuin` ist Pflichtfeld in Request, Resultat, Fingerprint und Export. |
 | C-04 | Hypothese „Zugriff auf 1950“ widerlegt, Contract-Risiko bestaetigt | `computeAdjPctForYear()` nutzt `simStartYear - series.startYear + yearIdx`. Probe Start 2000/Index 0 ergibt 2,5 % aus 2000, nicht 12 % aus 1950. Slices 01/03/04 erhalten dennoch Marker-/Off-by-one-Tests. |
 | C-05 | bestaetigt | Exakt 10 % wird in Slice 01 charakterisiert und in Slice 06 als einheitlicher Operator-/Label-/Exportcontract entschieden. |
 | C-06 | bestaetigt | Der lineare Plan wurde in einen DAG umgebaut: 02/03 parallel vorbereitbar, 04/05 getrennte Fachtracks, 06 nur teilweise D-05-blockiert, 07/08 partiell parallel bei disjunkten Dateien, 09 frueh startbar. |
-| C-07 | bestaetigt | Slice 01 friert `window.globalBacktestData` as `legacy_schema_v0` ein; Slices 02/07 versionieren die Abloesung. |
+| C-07 | bestaetigt | Slice 01 friert `window.globalBacktestData` als `legacy_schema_v0` ein; Slices 02/07 versionieren die Abloesung. |
 | C-08 | bestaetigt | Neuer P0 BT-20. Slice 03 aendert den Shared-Normalizer bewusst nicht; Slice 05 schliesst ihn erst nach D-09, Aufruferinventur, Performance- und Workerparitaetsgate. |
-| C-09 | bestaetigt; „doppelt/rueckwaertig“ is primaer Perioden-/Manifestcontract | Slice 03 prueft vor Lauf jedes Integerjahr und Pflichtfeld; Slice 08 prueft rueckwaertige/ungueltige Eingaben. |
+| C-09 | bestaetigt; „doppelt/rueckwaertig“ is primaer Perioden-/Manifestcontract | Slice 03 Prueft vor Lauf jedes Integerjahr und Pflichtfeld; Slice 08 prueft rueckwaertige/ungueltige Eingaben. |
 
 ## Review-Entscheidungen
 

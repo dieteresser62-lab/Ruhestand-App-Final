@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 110 entdeckte Testdateien, davon 109 im Node-Gate ausgeführt, mit 4569 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (verifiziert mit `npm test` am 2026-07-17). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand am selben Tag mit 14/14 Szenarien.
+**Test-Statistik:** 113 entdeckte Testdateien, davon 112 im Node-Gate ausgeführt, mit 4700 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (verifiziert mit `npm test` am 2026-07-18). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand am selben Tag mit 14/14 Szenarien.
 
 Die Zahl beschreibt nur die Node-Standardsuite. `npm run test:browser`, `npm run test:coverage` und ein echter Tauri-Build sind getrennte Gates und in den Assertions nicht enthalten.
 
@@ -491,6 +491,13 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 - **Profilverbund-Transparenz:** Backtest-Ergebnis behaelt die profilgenaue `minimumFlexProfiles`-Aufteilung.
 - **Realentnahme:** Historische Jahreszeilen führen den kumulierten Inflationsfaktor fort und deflationieren die effektive Entnahme.
 
+#### `historical-backtest-runner.test.mjs`
+**Zweck:** Testet den DOM-freien historischen Runner direkt an seiner Dependency-Injection-Grenze.
+- **Request/Result:** Versionierte V0-Grundshapes, inklusive Zeitraum, `breakOnRuin`, Rows, Completion, Start-/Endportfolio und Legacy-Metriken.
+- **Isolation:** Lauf unter blockierten Browser-/Persistenzglobals; alle benoetigten Funktionen und historischen Records werden explizit injiziert.
+- **Non-Mutation:** Tief eingefrorene Partner-/Trancheninputs und Historienrecords, wiederholter identischer Aufruf sowie Erhalt von `undefined`, `Date`, `RegExp` und zyklischen Referenzen.
+- **Legacy-Paritaet:** Completed-, Datenluecken-, Leer- und Ruinpfad inklusive synthetischer Ruinzeile, Vorjahres-Endportfolio und 10-%-Kuerzungsoperator.
+
 #### `simulator-backtest-characterization.test.mjs`
 **Zweck:** Friert den Legacy-Iststand des historischen Backtests als `legacy_observed` ein, ohne ihn als fachliches Soll zu bewerten.
 - **Golden Cases:** kurzer und langer Completed-Pfad, 3-Bucket/Mindest-Flex, Ruin, Pflegebucket-Projektionsluecke sowie Dynamic-Flex/CAPE.
@@ -761,6 +768,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `engine-robustness.test.mjs` | ~240 | Edge Cases, Fehlereingaben |
 | `feature-flags.test.mjs` | ~60 | Feature-Flag-System |
 | `formatting.test.mjs` | ~120 | Formatierungsfunktionen |
+| `historical-backtest-runner.test.mjs` | ~330 | DOM-freier Backtest-Runner, Dependency Injection, V0-Resultat, Non-Mutation und Legacy-Pfade |
 | `historical-data-robustness.test.mjs` | ~60 | Fehlende Marktdaten |
 | `liquidity-guardrail.test.mjs` | ~100 | Liquiditäts-Guardrails |
 | `market-analyzer.test.mjs` | ~150 | Markt-Regime-Klassifizierung |
