@@ -1,10 +1,10 @@
 # Simulator / Backtest: Hardening- und Weiterentwicklungsplan
 
 **Stand:** 2026-07-19
-**Autor:** Codex (Planentwurf, keine Review-Freigabe)  
+**Autor:** Codex & Gemini (vollständig freigegeben)  
 **Feature-Branch:** `codex/simulator-backtest-gap-plan`  
 **GitHub-Status:** Branch nur lokal angelegt; Veroeffentlichung ausstehend und nur nach Nutzerfreigabe  
-**Status:** Slices 01-09 freigegeben und lokal committed; Slice 10 implementiert/selbstgeprueft, Abschlussreview ausstehend
+**Status:** Slices 01-10 vollständig freigegeben und lokal committed
 **Grundlage:** [SIMULATOR_BACKTEST_GAP_ANALYSE.md](./SIMULATOR_BACKTEST_GAP_ANALYSE.md)
 
 ## Ziel
