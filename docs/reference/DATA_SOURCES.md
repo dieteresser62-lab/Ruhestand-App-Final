@@ -91,6 +91,72 @@ commit-blocking.
 - Coverage: `1925-2025`
 - Estimated history segment: `1925-1949`
 - Baseline segment: `1950-2025`
+- Machine-readable manifest: `HISTORICAL_DATA_MANIFEST`, schema `HistoricalDataManifestV1`
+- Dataset ID/revision: `ruhestandsapp-historical-data-v1` / `2026-07-18.1`
+- Canonical content hash: `8246422d98657c2a76b750ce9fd1253e01aa7a9a4dfa0f0f01dcb96b5507ef29`
+- Hash algorithm: SHA-256 over canonical JSON (`sha256-canonical-json-v1`); year keys are numeric ascending, object fields lexical, and numbers are locale-independent JSON tokens.
+- Backtest lookback contract: four complete years before `startYear`; the contract-derived technical bounds are therefore `1929-2025`. The currently visible UI bounds remain legacy behavior until the time-axis/UI slices activate the new contract.
+
+The DOM-free contract lives in
+`app/simulator/historical-backtest-contract.js`. It validates the full dataset
+once per manifest revision/content hash, creates an immutable lookup of
+`HistoricalYearRecordV1`, and performs one period preflight per single-path
+request or cohort batch. It is deliberately not connected to the productive
+backtest, Monte Carlo, sweep, or worker paths in Slice 03, so existing results
+remain unchanged.
+
+### Manifest status terms
+
+- Resolution fields (`variant`, `currency`, `region`, `frequency`, `source`,
+  `license`, `transformation`) use `known`, `unresolved`, or
+  `not_applicable`. A `known` value must be non-empty. `unresolved` never
+  carries a guessed value.
+- Record quality uses `present`, `estimated`, `unresolved`, `fallback_zero`,
+  or `missing`.
+- `missing` and non-finite required values are contract errors.
+- `fallback_zero` is valid only inside a series segment explicitly listed in
+  `missingness.fallbackZeroSegments`. No current series declares such a
+  segment.
+- Zero values in `gold_eur_perf` remain numerically unchanged but receive
+  quality `unresolved`; the repository does not currently prove whether these
+  values mean a genuine zero return or unavailable history.
+
+### Series manifest
+
+| Series ID | Variant | Currency | Region | Frequency | Source | License | Transformation | Estimated segment | Missingness |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `msci_eur` | `unresolved` | EUR | global | annual | `unresolved` | `unresolved` | embedded levels; 1925-1949 rescaled to the 1950 bridge | 1925-1949 | required; reject missing/non-finite and non-positive levels |
+| `inflation_de` | `unresolved` | not applicable | DE | annual | `unresolved` | `unresolved` | identity from embedded annual percentage | 1925-1949 | required; reject missing/non-finite |
+| `zinssatz_de` | `unresolved` | not applicable | DE | annual | `unresolved` | `unresolved` | identity from embedded annual percentage | 1925-1949 | required; reject missing/non-finite |
+| `lohn_de` | `unresolved` | not applicable | DE | annual | `unresolved` | `unresolved` | identity from embedded annual percentage | 1925-1949 | required; reject missing/non-finite |
+| `gold_eur_perf` | `unresolved` | EUR | global | annual | `unresolved` | `unresolved` | identity from embedded annual percentage | 1925-1949 | required; reject missing/non-finite; zero quality unresolved |
+| `cape` | `unresolved` | not applicable | `unresolved` | annual | `unresolved` | `unresolved` | identity from embedded annual ratio | 1925-1949 | required; reject missing/non-finite and non-positive ratios |
+
+All source and license statuses above are intentionally unresolved. The
+manifest improves traceability but is not evidence that external provenance,
+index variant, or usage rights have been established.
+
+### `HistoricalYearRecordV1` and assignment inventory
+
+The proposed record separates ex-post `realized` observations from
+`decisionAsOf` policy inputs. Every observation carries `sourceYear`,
+`asOfYear`, unit, derivation, and quality. The record is marked
+`proposal_pending_d01`; the table is an inventory and Slice-04 proposal, not a
+completed economic time-axis decision.
+
+| Simulated field in year `t` | Legacy backtest | Active `annualData` / Monte Carlo | Alternative `prepareHistoricalData()` | V1 proposal (inactive) |
+| --- | --- | --- | --- | --- |
+| Equity return | index `t / (t-1) - 1` | index `t / (t-1) - 1` | index `t / (t-1) - 1` | realized `t`, input levels `t-1` and `t` |
+| Gold return | `t-1` | `t` | `t-1` | realized `t` |
+| Cash/bond proxy | `t-1` | `t` | `t-1` | realized `t` |
+| Inflation | `t-1` | `t` | `t-1` | realized `t` |
+| Wage/pension adjustment | `t` via `simStartYear - series.startYear + yearIdx` | `t` | `t-1` | realized `t` |
+| CAPE | `t-1` | `t` | not mapped | decision-as-of `t-1` |
+
+Marker tests preserve the existing pension-adjustment offset for 1950, 2000,
+and 2001. `simulator-year-portfolio.js:readYearReturnRates()` remains outside
+this slice; its shared non-finite-to-zero behavior is still the explicit
+BT-20/D-09 risk for Slice 05.
 
 ## Important notes
 

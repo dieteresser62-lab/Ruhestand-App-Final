@@ -111,6 +111,15 @@ BT-12, BT-15 und BT-16 benoetigen das versionierte Resultat. Der Export darf nic
 
 BT-13 und BT-18 koennen nicht allein durch Produktcode „geschlossen“ werden. Daten-/Methodik-Owner, Holdout-Custodian, Nutzungsrechte, vorab eingefrorene Protokolle und gegebenenfalls externe Fachreviews bleiben erforderlich. Slice 09 soll diese Grenze operationalisieren, nicht eine Wirksamkeitsfreigabe simulieren.
 
+## Rueckdokumentation Slice 03
+
+- **BT-01 teilweise technisch vorbereitet, nicht geschlossen:** `HistoricalYearRecordV1` und `HISTORICAL_ASSIGNMENT_INVENTORY_V1` weisen Legacy-Backtest, aktives Monte-Carlo-`annualData`, alternativen Builder und den noch inaktiven D-01-Vorschlag feldgenau aus. Der V1-Vorschlag nutzt realisierte Werte `t` und CAPE decision-as-of `t-1`, ist aber sichtbar `proposal_pending_d01`; die produktive Zuordnung bleibt unveraendert.
+- **BT-02 Preflight vorhanden, produktiver Defekt noch aktiv:** Der neue Provider prueft Lookback und jedes ganzzahlige Anfragejahr vor Single Path oder Cohort-Batch und liefert die erste Luecke strukturiert als `incomplete`. Der Legacy-Runner ist in Slice 03 absichtlich noch nicht angeschlossen und kann deshalb bis zur Integrationsfolge weiterhin `continue` ausfuehren.
+- **BT-06 Contract entschieden, UI noch legacy:** Ein vollstaendiger Einjahreslauf ist zulaessig; nicht-finite, nicht-ganzzahlige und rueckwaertige Perioden scheitern strukturiert. Technische Bounds `1929-2025` werden aus Dataset `1925-2025` plus vierjaehrigem Lookback abgeleitet. Sichtbare UI-Hardcodes werden erst in den Integrations-/UI-Slices ersetzt.
+- **BT-07 technisch manifestiert, methodisch offen:** Manifest-ID `ruhestandsapp-historical-data-v1`, Revision `2026-07-18.1`, kanonischer SHA-256 `8246422d98657c2a76b750ce9fd1253e01aa7a9a4dfa0f0f01dcb96b5507ef29`. Source, Lizenz und exakte Variante bleiben fuer alle sechs Reihen `unresolved`; die externe Klaerung bleibt Slice 09.
+- **BT-20 bewusst unveraendert:** Der V1-Contract lehnt nicht-finite Pflichtfelder ab, ist aber noch nicht im gemeinsamen YearData-Pfad aktiv. `simulator-year-portfolio.js:readYearReturnRates()` und seine MC-/Sweep-/Worker-Auswirkungen bleiben bis D-09/Slice 05 unangetastet.
+- **Qualitaet/Performance:** Records und Provider sind immutable. Vollvalidierung ist je Manifestrevision/Content-Hash gecacht; Single-Path- und Cohort-Batch-Preflight erzeugen je genau ein Instrumentationsereignis, waehrend wiederholte Year-/MC-/Sweep-/Cohort-Lookups reine Record-Reads bleiben.
+
 ## Zielbild
 
 ```text

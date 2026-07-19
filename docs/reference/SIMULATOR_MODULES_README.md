@@ -2,7 +2,7 @@
 
 Die Simulator-App ist inzwischen in mehrere spezialisierte ES6-Module zerlegt. Die zentralen Abläufe (Monte-Carlo, Sweep, Backtests, Pflege-UI) leben nicht mehr als Monolith in `simulator-main.js`, sondern wurden in klar abgegrenzte Dateien ausgelagert. Dieses Dokument beschreibt Zweck, Haupt-Exports, Einbindungspunkte und die gewünschte Aufteilung neuer Features.
 
-**Stand:** 2026-07-17 (einschliesslich Langlebigkeit, Stationary Bootstrap, Tail-Risk-Overlay und Realentnahmevertrag)
+**Stand:** 2026-07-18 (einschliesslich Langlebigkeit, Stationary Bootstrap, Tail-Risk-Overlay, Realentnahmevertrag und historischem Daten-/Jahrescontract)
 
 **Pfadkonvention:** Simulator-Module liegen unter `app/simulator/`, Profilmodule unter `app/profile/`, Shared-Utilities unter `app/shared/`, Tranchen-Status unter `app/tranches/`. Im Dokument werden Dateinamen aus Lesbarkeit meist ohne Präfix genannt.
 
@@ -190,6 +190,28 @@ DOM-freier Sweep-Runner für Worker-Jobs (Combos + RunRanges) mit deterministisc
 ---
 
 ## 8. Backtest-Module
+
+### `historical-backtest-contract.js`
+
+DOM-freier, noch nicht produktiv aktivierter Daten- und Jahrescontract. Er
+validiert `HISTORICAL_DATA_MANIFEST` und den kanonischen SHA-256-Fingerprint
+einmal je Revision/Hash, baut einen immutable Lookup von
+`HistoricalYearRecordV1` und stellt Einzelpfad-/Cohort-Batch-Preflights bereit.
+Jeder Record trennt ex-post `realized` von `decisionAsOf` und traegt
+`sourceYear`, `asOfYear`, Einheit, Ableitung und Qualitaetsstatus.
+
+**Hauptfunktionen / Exporte:**
+- `createHistoricalBacktestContractProvider()` – gecachter Datasetvalidator und immutable Provider mit abgeleiteten Bounds sowie `preparePeriod()`/`prepareBatch()`.
+- `buildHistoricalYearRecord()` / `validateHistoricalYearRecord()` – V1-Builder und strukturierte Recordvalidierung.
+- `validateHistoricalDataManifest()` / `computeHistoricalDatasetHash()` – Manifest- und kanonischer SHA-256-Vertrag.
+- `HISTORICAL_ASSIGNMENT_INVENTORY_V1` – maschinenlesbarer Vergleich von Legacy-Backtest, aktivem Monte-Carlo-`annualData`, alternativem Builder und inaktivem D-01-Vorschlag.
+
+**Einbindung:** Slice 03 stellt den Contract neben den bestehenden Pfad. Der
+produktive `historical-backtest-runner.js`, Monte Carlo, Sweep und Worker
+importieren ihn noch nicht; die wirksame Zeitachsensynchronisation folgt erst
+nach D-01-Freigabe.
+
+**Dependencies:** `simulator-data.js`; keine DOM-, Persistenz-, Engine- oder Worker-Abhaengigkeit.
 
 ### `historical-backtest-runner.js`
 

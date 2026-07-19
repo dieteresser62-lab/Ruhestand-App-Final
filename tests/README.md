@@ -498,6 +498,21 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 - **Non-Mutation:** Tief eingefrorene Partner-/Trancheninputs und Historienrecords, wiederholter identischer Aufruf sowie Erhalt von `undefined`, `Date`, `RegExp` und zyklischen Referenzen.
 - **Legacy-Paritaet:** Completed-, Datenluecken-, Leer- und Ruinpfad inklusive synthetischer Ruinzeile, Vorjahres-Endportfolio und 10-%-Kuerzungsoperator.
 
+#### `historical-backtest-contract.test.mjs`
+**Zweck:** Testet den inaktiven V1-Daten-/Jahrescontract ohne DOM oder produktive Runner-Umschaltung.
+- **YearRecord:** Realized-/Decision-as-of-Trennung, Source-/As-of-Jahre, Qualitaet und D-01-Proposalstatus.
+- **Preflight:** Einjahreslauf, Integer-/Bounds-Vertrag, erste Lookback-/Periodenluecke und Cohort-Batch.
+- **Fehler:** Strukturierte Missing-/Non-Finite-/Indexlevel-/Fallback-Zero-Fehler.
+- **Instrumentation:** Vollvalidierung einmal je Revision/Hash und Preflight einmal je Request/Batch; wiederholte Year-/MC-/Sweep-/Cohort-Lookups bleiben reine Cache-Reads.
+- **Marker:** Rentenanpassungs-Offset fuer 1950, 2000 und 2001 sowie maschinenlesbares Builderinventar.
+
+#### `historical-data-manifest.test.mjs`
+**Zweck:** Testet `HistoricalDataManifestV1` und den eingebetteten Datenfingerprint.
+- **Manifestfelder:** IDs, Variante, Waehrung, Region, Frequenz, Zeitraum, Source-/Lizenzstatus, Transformation, Schaetzsegmente, Missingness und Revision.
+- **Unresolved-Gate:** Keine leeren `known`-Werte und keine erfundenen Werte unter `unresolved`.
+- **Hash:** Browser-kompatibles SHA-256 gegen Node-`crypto` und den manifestierten Post-Normalisierungs-Datenbestand.
+- **Lookup:** Lueckenlose 1925-2025-Baseline, abgeleitete technische Bounds 1929-2025, Provenienz und Non-Mutation.
+
 #### `simulator-backtest-characterization.test.mjs`
 **Zweck:** Friert den Legacy-Iststand des historischen Backtests als `legacy_observed` ein, ohne ihn als fachliches Soll zu bewerten.
 - **Golden Cases:** kurzer und langer Completed-Pfad, 3-Bucket/Mindest-Flex, Ruin, Pflegebucket-Projektionsluecke sowie Dynamic-Flex/CAPE.
@@ -769,6 +784,8 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `feature-flags.test.mjs` | ~60 | Feature-Flag-System |
 | `formatting.test.mjs` | ~120 | Formatierungsfunktionen |
 | `historical-backtest-runner.test.mjs` | ~330 | DOM-freier Backtest-Runner, Dependency Injection, V0-Resultat, Non-Mutation und Legacy-Pfade |
+| `historical-backtest-contract.test.mjs` | ~320 | V1-YearRecord, Missingness, Perioden-/Batch-Preflight, Cache-Instrumentation und Builderinventar |
+| `historical-data-manifest.test.mjs` | ~210 | Manifestvollstaendigkeit, unresolved-Gates, kanonischer SHA-256 und immutable Lookup |
 | `historical-data-robustness.test.mjs` | ~60 | Fehlende Marktdaten |
 | `liquidity-guardrail.test.mjs` | ~100 | Liquiditäts-Guardrails |
 | `market-analyzer.test.mjs` | ~150 | Markt-Regime-Klassifizierung |
