@@ -101,9 +101,9 @@ The DOM-free contract lives in
 `app/simulator/historical-backtest-contract.js`. It validates the full dataset
 once per manifest revision/content hash, creates an immutable lookup of
 `HistoricalYearRecordV1`, and performs one period preflight per single-path
-request or cohort batch. It is deliberately not connected to the productive
-backtest, Monte Carlo, sweep, or worker paths in Slice 03, so existing results
-remain unchanged.
+request or cohort batch. The productive historical backtest and its rolling
+cohorts consume this provider. Monte Carlo, sweep, optimizer and worker data
+paths remain separate and must not be described as manifest-backed holdouts.
 
 ### Manifest status terms
 
@@ -136,15 +136,38 @@ All source and license statuses above are intentionally unresolved. The
 manifest improves traceability but is not evidence that external provenance,
 index variant, or usage rights have been established.
 
+### Research-gate status
+
+The
+[Simulator backtest research protocol](../internal/SIMULATOR_BACKTEST_FORSCHUNGSPROTOKOLL.md)
+is the operational owner of FV-G01 through FV-G08 for FQ-01 through FQ-03. It
+does not replace this runtime manifest and does not upgrade any field to
+`known`.
+
+| Open item | Current state | Required owner and next evidence | Blocking effect |
+| --- | --- | --- | --- |
+| exact `msci_eur` Price/Net/Gross-TR variant | `unresolved` | named data/capital-markets methodology owner; primary-source index identity, currency treatment, data vintage and license | blocks FQ-01 baseline and international comparison |
+| variants and primary sources for all six series | `unresolved` | exact series identifiers, definitions, retrieval/data dates and permitted source chain | blocks research-grade FV-G02 |
+| licenses/usage rights for all six series | `unresolved` | license text, use/redistribution scope and review date; legal review where needed | blocks replacement, integration or redistribution |
+| pre-1950 source and transformation chain | internal bridge/rescaling documented; external origin `unresolved` | raw-data hashes plus reproducible transformation and bridge evidence | 1925-1949 remain `estimated` and cannot be treated like baseline observations |
+| zero-valued `gold_eur_perf` observations | 42 records with unresolved quality: 1925-1932, 1934-1960 and 1962-1968 | evidence whether each segment is genuine zero return, missing data or an assumption, followed by a new manifest revision | blocks gold-effect and holdout claims; values must not be silently reinterpreted |
+| CAPE region | `unresolved` | exact market/region and transformation contract | blocks international CAPE/policy comparison |
+
+The embedded 1925-2025 history and every period or rolling cohort derived from
+it are exploratory/contaminated for confirmatory research because the data and
+results have already been visible during development. A raw
+`HistoricalBacktestExportV1` records one explicit run and its fingerprints; it
+is not an append-only trial registry and does not prove a locked holdout.
+
 ### `HistoricalYearRecordV1` and assignment inventory
 
-The proposed record separates ex-post `realized` observations from
+The active backtest record separates ex-post `realized` observations from
 `decisionAsOf` policy inputs. Every observation carries `sourceYear`,
 `asOfYear`, unit, derivation, and quality. The record is marked
-`proposal_pending_d01`; the table is an inventory and Slice-04 proposal, not a
-completed economic time-axis decision.
+`approved_d01` and uses temporal convention
+`realized_t_decision_t_minus_1_v1`.
 
-| Simulated field in year `t` | Legacy backtest | Active `annualData` / Monte Carlo | Alternative `prepareHistoricalData()` | V1 proposal (inactive) |
+| Simulated field in year `t` | Legacy backtest | Active `annualData` / Monte Carlo | Alternative `prepareHistoricalData()` | Active D-01 backtest contract |
 | --- | --- | --- | --- | --- |
 | Equity return | index `t / (t-1) - 1` | index `t / (t-1) - 1` | index `t / (t-1) - 1` | realized `t`, input levels `t-1` and `t` |
 | Gold return | `t-1` | `t` | `t-1` | realized `t` |
@@ -153,10 +176,10 @@ completed economic time-axis decision.
 | Wage/pension adjustment | `t` via `simStartYear - series.startYear + yearIdx` | `t` | `t-1` | realized `t` |
 | CAPE | `t-1` | `t` | not mapped | decision-as-of `t-1` |
 
-Marker tests preserve the existing pension-adjustment offset for 1950, 2000,
-and 2001. `simulator-year-portfolio.js:readYearReturnRates()` remains outside
-this slice; its shared non-finite-to-zero behavior is still the explicit
-BT-20/D-09 risk for Slice 05.
+Marker tests cover the pension-adjustment offset for 1950, 2000, and 2001. The
+low-level `simulator-year-portfolio.js:readYearReturnRates()` normalizer retains
+its fallback shape, while the productive Backtest/Monte-Carlo/Sweep adapter
+rejects non-finite required returns before portfolio mutation.
 
 ## Important notes
 

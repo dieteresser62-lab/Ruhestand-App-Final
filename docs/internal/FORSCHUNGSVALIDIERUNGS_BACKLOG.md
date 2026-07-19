@@ -1,14 +1,16 @@
 # Forschungsvalidierungs-Backlog
 
-**Stand:** 2026-07-17  
-**Status:** operationalisiert, vollständig offen  
+**Stand:** 2026-07-19<br>
+**Status:** operationalisiert; Slice-09-Gates dokumentiert, alle Pakete offen<br>
 **Owner des Backlogs:** Nutzer für Priorität und Freigaben; Codex für eine
 später ausdrücklich beauftragte Umsetzung; unabhängiger Methodikreview für
-V4-/V5-Aussagen  
+V4-/V5-Aussagen<br>
 **Normative Quellen:**
 [Architektur und Fachkonzept](../reference/ARCHITEKTUR_UND_FACHKONZEPT.md#e6-forschungs--und-modellrisiken)
 und
-[Forschungs-Evidenzregister](../reference/FORSCHUNGSABGLEICH_EVIDENZREGISTER.md)
+[Forschungs-Evidenzregister](../reference/FORSCHUNGSABGLEICH_EVIDENZREGISTER.md).<br>
+**Operationales Gate-Protokoll:**
+[Simulator-Backtest-Forschungsprotokoll](./SIMULATOR_BACKTEST_FORSCHUNGSPROTOKOLL.md)
 
 ## 1. Zweck und Statusgrenze
 
@@ -84,6 +86,38 @@ die genaue `msci_eur`-Variante offen. Ebenso ist der bestehende Train-/Test-
 Seed-Split des Auto-Optimizers kein externer Holdout, weil Datenkorpus und
 Generator identisch bleiben. Diese Lücken dürfen nicht durch neue Begriffe
 kaschiert werden.
+
+### 2.1 Operationaler Gate-Status aus Slice 09
+
+Das
+[Simulator-Backtest-Forschungsprotokoll](./SIMULATOR_BACKTEST_FORSCHUNGSPROTOKOLL.md)
+inventarisiert die aktuelle Blockierwirkung feld- und rollenbezogen. Es hebt
+keine Nachweisstufe an:
+
+| Gate | Status 2026-07-19 | Blockierende Mindestbedingung |
+| --- | --- | --- |
+| FV-G01 | teilweise dokumentiert, nicht studienspezifisch eingefroren | benannte FQ-Owner und vor Ergebniseinsicht freigegebenes Studienprotokoll |
+| FV-G02 | technisch manifestiert, fachlich blockiert | genaue Varianten, Quellen, Lizenzen und reproduzierbare externe Transformationskette |
+| FV-G03 | blockiert | versionierter Kosten-/Steuervertrag mit Sensitivitaetsbaendern und externem Rechtsreview fuer Rechtsaussagen |
+| FV-G04 | teilweise technisch nachgewiesen | studienspezifisches Parameter-/Einheitenwoerterbuch und Pfadparitaet |
+| FV-G05 | blockiert | ausdruecklicher Nutzerentscheid zu Speicher/Datenschutz und spaeteres append-only Trial-Register |
+| FV-G06 | blockiert | namentlicher Holdout-Custodian, vorab gesperrte neue Partition und Kontaminationsregister |
+| FV-G07 | teilweise technisch vorhanden | je FQ vorab definiertes vollstaendiges Ergebnisbuendel einschliesslich Fehlern und negativen Resultaten |
+| FV-G08 | blockiert | unabhaengiger Methodenreview und gegebenenfalls unabhaengige Replikation |
+
+Die eingebettete Historie 1925-2025, alle daraus gebildeten Backtestfenster und
+ueberlappenden Rolling Cohorts gelten als explorativ beziehungsweise
+kontaminiert. `HistoricalBacktestExportV1` ist ein reproduzierbares Manifest
+eines explizit exportierten Einzellaufs, aber weder ein vollstaendiges
+Trial-Register noch ein Holdout-Nachweis. Persistentes Trial-Tracking wurde
+durch Slice 09 nicht autorisiert.
+
+Solange kein Daten-/Kapitalmarktmethodik-Owner benannt ist, darf kein
+Produktcode-Folgevorhaben starten. Danach ist zunaechst nur das im Protokoll
+definierte reine Inventar-/Entscheidungsarbeitsdokument
+`FQ01_DATEN_KOSTEN_INVENTAR_PLAN.md` zulaessig. Datenersetzung,
+internationaler Datasetimport, Kosten-Cashflows und Policy-Wirksamkeitsvergleich
+bleiben jeweils eigene, reviewpflichtige Folgevorhaben.
 
 ## 3. Scope-Regel für alle Folgepakete
 

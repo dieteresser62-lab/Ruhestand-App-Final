@@ -135,9 +135,9 @@ Backtest, Monte Carlo und Sweep muessen denselben Adapterfehler gleich klassifiz
 | D-03 | Missingness | Pflichtreihe `missing` -\> Lauf `incomplete`; `fallback\_zero` nur explizit und sichtbar, nicht durch `|| 0`. | Review im Slice 03 |
 | D-04 | Ruin | In Slice 05 implementiert: Fachlicher Floor-Deckungsausfall bleibt `ruin`; Engine-/Contractfehler werden `technical\_error`; Ruinendwert ist der terminale Zustand nach Markt/Verkaeufen und vor der nicht deckbaren Auszahlung. | Nutzerauftrag zur Implementierung liegt vor; finales Review/Freigabe ausstehend |
 | D-05 | Rolling Cohorts | In Slice 06 umgesetzt: positive ganzzahlige, inklusive Horizontlaenge; alle Startjahre als Kandidaten; nur vollstaendige feste Fenster `eligible`; Anspar-/Policyinputs je Cohort unveraendert; getrenntes Outcome-/Ausschlussinventar; ueberlappende In-sample-Diagnose ohne Erfolgswahrscheinlichkeitsaussage. | Nutzerauftrag vom 2026-07-19 liegt vor; finales Slice-Review ausstehend |
-| D-06 | Trial-Persistenz | Slice 07 exportiert zunaechst ein vollstaendiges Laufmanifest; persistentes append-only Trial-Log bleibt opt-in und Slice-09-/Nutzerentscheidung. | Nutzerentscheidung |
-| D-07 | Historische Datenquellen | Ungeklaerte Felder als `unresolved`; keine Datenersetzung ohne Daten-/Methodik-Owner, Lizenz- und Transformationsnachweis. | Externer Owner in Slice 09 |
-| D-08 | Kostenmodell | Nicht innerhalb des Hardening still ergaenzen, da Engine-/Cashflow-Semantik betroffen sein kann. Eigenes Folgearbeitsdokument nach FQ-01-Gates. | Nutzer + Fachowner + neues Review |
+| D-06 | Trial-Persistenz | Slice 07 exportiert ein vollstaendiges Einzellaufmanifest. Slice 09 definiert das spaetere `ResearchTrialRecordV1`-Pflichtschema, autorisiert aber keine Persistenz. | ausdruecklicher neuer Nutzerentscheid plus Speicher-/Datenschutzvertrag und eigenes Arbeitsdokument |
+| D-07 | Historische Datenquellen | Alle unbelegten Varianten, Quellen und Lizenzen bleiben `unresolved`; die externe Ursprungskette vor 1950 und 42 Gold-Nulljahre bleiben blockierend inventarisiert. | Daten-/Kapitalmarktmethodik-Owner nicht benannt |
+| D-08 | Kostenmodell | Slice 09 inventarisiert Produktkosten, Transaktionskosten, Spread, Slippage, FX, Rebalancing und Steuerumfang als `modelled`, `not_modelled` oder `unresolved`; keine Cashflow-Semantik wurde geaendert. | Nutzer + Fachowner + FQ-01-Inventarplan + neues Review |
 | D-09 | Shared YearData/Fehler | In Slice 05 implementiert: O(1)-Guard fuer nicht-finite Aktien-, Gold- und Cash-/Bondreturns vor Portfoliomutation und Engineaufruf; Ziel ist `technical_error`. Aufruferinventur, Performancebaseline, Workerparitaet und unveraenderte Engine-Fachsemantik sind nachgewiesen. | Nutzerauftrag zur Implementierung liegt vor; finales Review/Freigabe ausstehend |
 
 ### Umgesetzte canonical Alignment-Tabelle fuer D-01
@@ -204,7 +204,7 @@ Die Zielwerte nach D-01 sind als neue `target_expected`-Oracles neben den unvera
 | 06 | [SLICE_SIMULATOR_BACKTEST_06_METRIKEN_ROLLING_COHORTS.md](./SLICE_SIMULATOR_BACKTEST_06_METRIKEN_ROLLING_COHORTS.md) | Reconciliierbares Ergebnisbuendel und Rolling-Cohort-In-sample-Diagnose | Slices 04-05; D-05 durch Nutzerauftrag entschieden | abgeschlossen, freigegeben und lokal committet |
 | 07 | [SLICE_SIMULATOR_BACKTEST_07_EXPORT_REPRODUZIERBARKEIT.md](./SLICE_SIMULATOR_BACKTEST_07_EXPORT_REPRODUZIERBARKEIT.md) | Versionierter Raw-Export und Laufmanifest, getrennt von Displayformatierung | Slices 02-03/05; Metrikteil aus 06, Cohortteil optional nach D-05 | abgeschlossen, freigegeben und lokal committet |
 | 08 | [SLICE_SIMULATOR_BACKTEST_08_UI_BROWSER_ACCESSIBILITY.md](./SLICE_SIMULATOR_BACKTEST_08_UI_BROWSER_ACCESSIBILITY.md) | UI-Validierung, Status/A11y und Browser-End-to-End-Gate | Slice 05; Exportteil nach 07, optionaler Cohortteil nach 06 | implementiert und selbstgeprueft; adversariales Review ausstehend |
-| 09 | [SLICE_SIMULATOR_BACKTEST_09_FORSCHUNGS_GATES.md](./SLICE_SIMULATOR_BACKTEST_09_FORSCHUNGS_GATES.md) | Daten-, Kosten-, Trial- und Holdout-Gates operationalisieren; Folgevorhaben abgrenzen | Start nach Slice 03; Laufmanifest-Verweise nach Slice 07; externe Owner | nicht gestartet |
+| 09 | [SLICE_SIMULATOR_BACKTEST_09_FORSCHUNGS_GATES.md](./SLICE_SIMULATOR_BACKTEST_09_FORSCHUNGS_GATES.md) | Daten-, Kosten-, Trial- und Holdout-Gates operationalisieren; Folgevorhaben abgrenzen | Start nach Slice 03; Laufmanifest-Verweise nach Slice 07; externe Owner | implementiert und selbstgeprueft; Forschungsarbeit extern blockiert, Review ausstehend |
 | 10 | [SLICE_SIMULATOR_BACKTEST_10_INTEGRATION_DOKUMENTATION.md](./SLICE_SIMULATOR_BACKTEST_10_INTEGRATION_DOKUMENTATION.md) | Gesamtintegration, Doku-Sync, Coverage- und Release-Readiness-Bericht | Slices 01-09 | nicht gestartet |
 
 ### Ausfuehrungs-DAG und Parallelisierung
@@ -311,8 +311,8 @@ Zusaetzlich zu `AGENTS.md` und `SLICE\_EXECUTION\_RULES.md` gilt:
 | 05 | abgeschlossen | fokussiert, `npm test`, Coverage und Performance gruen | freigegeben | abgeschlossen |
 | 06 | abgeschlossen | fokussiert und `npm test` gruen | offen | abgeschlossen |
 | 07 | abgeschlossen | fokussiert, `npm test` und Browser-Smoke gruen | offen | abgeschlossen |
-| 08 | nicht gestartet | offen | offen | offen |
-| 09 | teilweise extern blockiert | offen | offen | offen |
+| 08 | abgeschlossen | fokussiert, `npm test` und Browser gruen | offen | abgeschlossen |
+| 09 | abgeschlossen (nur Dokumentation) | Doku-Gates und `npm test` gruen | offen | abgeschlossen |
 | 10 | nicht gestartet | offen | offen | offen |
 
 ### Slice 01: rueckdokumentierter Iststand
@@ -405,6 +405,16 @@ Zusaetzlich zu `AGENTS.md` und `SLICE\_EXECUTION\_RULES.md` gilt:
 - Das Characterization-Zieloracle wurde ausschliesslich fuer die erwartete sichtbare Summary- und Inline-Statusprojektion fortgeschrieben. Kanonische Row-Hashes, Finanzwerte, Ruinfrequenz und FlowDelta-Invarianten blieben unveraendert.
 - Validierung: Syntaxchecks gruen; Backtest-UI 39/39, UI-Orchestrierung 37/37, Produktbacktest 56/56, Characterization 71/71 und 3-Bucket 15/15 Assertions gruen. `npm test` bestand 119 Testdateien mit 5722/5722 Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles. Das vollstaendige Chromium-Browser-Gate bestand alle 14 Einstiegspunkt-/Zusatzflows und wurde nach Doku-Sync erneut gruen ausgefuehrt.
 - Vier produktive Programmdateien wurden geaendert beziehungsweise neu angelegt. Engine-/Runner-/Zeitachsen-/Metriksemantik, MC/Sweep/Optimizer, Worker, Persistenz und generierte Artefakte blieben unveraendert. Implementierung und Selbstpruefung sind abgeschlossen; adversariales Review, Nutzerfreigabe und Commit stehen aus.
+
+### Slice 09: rueckdokumentierter Implementierungsstand
+
+- `SIMULATOR_BACKTEST_FORSCHUNGSPROTOKOLL.md` operationalisiert FQ-01 bis FQ-03 und FV-G01 bis FV-G08, ohne eine bestaetigende Studie oder Wirksamkeitsfreigabe zu behaupten. Alle Forschungsfragen bleiben FV0; fehlende Daten-/Methodik-, Statistik-, Metrik- und Review-Owner sowie der Holdout-Custodian bleiben namentlich unbesetzt und blockierend.
+- Dataset `ruhestandsapp-historical-data-v1`, Revision `2026-07-18.1` und SHA-256 `8246422d98657c2a76b750ce9fd1253e01aa7a9a4dfa0f0f01dcb96b5507ef29` bleiben der technische Iststand. Varianten, Quellen und Lizenzen aller sechs Reihen sind nicht fachlich geklaert. Die Vor-1950-Ursprungskette und 42 Gold-Nulljahre (1925-1932, 1934-1960, 1962-1968) bleiben `unresolved` und blockieren staerkere Daten-/Goldaussagen.
+- Der Kosten-/Steuervertrag unterscheidet `modelled`, `not_modelled` und `unresolved`: operative Rebalancing- und begrenzte Steuermodelle existieren; TER/Produktkosten, Transaktionsgebuehren, Spread, Slippage, FX- und Rebalancingkosten fehlen als Cashflows; studienspezifische Zeitvertraege und Sensitivitaetsbaender sind offen. Produktcode und Engine-Semantik blieben unveraendert.
+- Das dokumentarische `ResearchTrialRecordV1`-Schema umfasst Protokoll-/Code-/Datenhashes, Kandidatenraum, Seeds, Runmanifest, Ergebnisse einschliesslich Fehler/Abbruch, Nutzerinteraktionen, Append-only-Integritaet und Datenschutz. Slice 09 autorisiert keine Trial-Persistenz. `HistoricalBacktestExportV1` bleibt ein Manifest eines explizit exportierten Einzellaufs, nicht Trial-Log oder Holdout-Nachweis.
+- Die gesamte sichtbare Historie 1925-2025, alle abgeleiteten Backtestfenster, Rolling Cohorts und bisher betrachteten Policies gelten bestaetigungsbezogen als explorativ/kontaminiert. Es gibt keinen unangetasteten Holdout. Ein spaeterer Holdout benoetigt einen vorab benannten Custodian, gesperrte/hash-identifizierte neue Partitionen und einmalige Freigabe.
+- Aktuell zulaessige Produkttexte sind auf `historische In-sample-Diagnose`, `technisch getestet` und `unter diesen Annahmen beobachtet` begrenzt. Als naechstes ist nach Benennung des Daten-/Kapitalmarktmethodik-Owners nur ein reines `FQ01_DATEN_KOSTEN_INVENTAR_PLAN.md` zulaessig; Datenersetzung, internationale Daten, Kosten-Cashflows, Trial-Logging und Policyvergleich bleiben getrennte Folgearbeitsdokumente.
+- Geaendert wurden nur Markdown-Dateien. `npm run docs:evidence` sowie die fokussierten Architektur-/Lizenztests sind gruen; `npm test` bestand 119 Testdateien mit 5722/5722 Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles. Das adversariale Review steht aus; die externen Gate-Blockaden sind ein beabsichtigtes Ergebnis und keine Slice-09-Implementierungsluecke.
 
 
 ## Review-Auftrag
