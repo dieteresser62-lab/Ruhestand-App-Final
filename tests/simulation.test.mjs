@@ -559,6 +559,9 @@ try {
 
     const result = simulateOneYear(poorState, inputs, yearDataNormal, 0);
     assert(result.isRuin, 'Zero assets should be ruin');
+    assertEqual(result.ruinDetails.requiredFloorNominal, 24000, 'ruin diagnostics expose the required nominal floor');
+    assertEqual(result.ruinDetails.coveredFloorNominal, 0, 'ruin diagnostics expose covered floor capacity');
+    assertEqual(result.ruinDetails.shortfallNominal, 24000, 'ruin diagnostics expose the lossless floor shortfall');
     console.log('✅ Ruin detection passed');
 } catch (e) {
     console.error('Test 2 Failed', e);

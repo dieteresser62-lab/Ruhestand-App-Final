@@ -709,7 +709,7 @@ function buildInitialMarketHistory(startYear, context) {
     });
 }
 
-function preflightPeriod(periodInput, context) {
+function preflightPeriod(periodInput, context, validatedRecordYears = null) {
     const period = validatePeriodShape(periodInput, 'period');
     if (period.startYear < context.bounds.startYear || period.endYear > context.bounds.endYear) {
         return createIncomplete(period, 'period_out_of_bounds', { bounds: context.bounds });
@@ -728,7 +728,10 @@ function preflightPeriod(periodInput, context) {
         if (!record) {
             return createIncomplete(period, 'missing_historical_year_record', { year });
         }
-        validateHistoricalYearRecord(record, context.manifest);
+        if (!validatedRecordYears || !validatedRecordYears.has(year)) {
+            validateHistoricalYearRecord(record, context.manifest);
+            validatedRecordYears?.add(year);
+        }
         records.push(record);
     }
     return deepFreeze({
@@ -822,20 +825,23 @@ export function createHistoricalBacktestContractProvider({
                 mode: 'cohort_batch',
                 periods: periods.map(period => ({ ...period }))
             });
-            const prepared = [];
-            for (let index = 0; index < periods.length; index++) {
-                const result = preflightPeriod(periods[index], context);
-                if (result.status !== 'complete') {
-                    return deepFreeze({
-                        status: 'incomplete',
-                        batchIndex: index,
-                        period: result.period,
-                        reason: result.reason
-                    });
-                }
-                prepared.push(result);
-            }
-            return deepFreeze({ status: 'complete', periods: prepared });
+            const validatedRecordYears = new Set();
+            const prepared = periods.map(period => preflightPeriod(period, context, validatedRecordYears));
+            const incomplete = prepared
+                .map((result, batchIndex) => ({ result, batchIndex }))
+                .filter(entry => entry.result.status !== 'complete')
+                .map(entry => ({
+                    batchIndex: entry.batchIndex,
+                    period: entry.result.period,
+                    reason: entry.result.reason
+                }));
+            const firstIncomplete = incomplete[0] || null;
+            return deepFreeze({
+                status: incomplete.length === 0 ? 'complete' : 'incomplete',
+                periods: prepared,
+                incomplete,
+                ...(firstIncomplete || {})
+            });
         }
     });
     providerCache.set(cacheKey, provider);

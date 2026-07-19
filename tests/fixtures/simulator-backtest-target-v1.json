@@ -430,7 +430,7 @@
           }
         }
       ],
-      "summaryText": "Startvermögen 2.020.000,00 € Endvermögen 1.353.347,36 € Gesamte Entnahmen 172.800,00 € Max. Kürzungsdauer 6 Jahre Jahre mit Kürzung (>10%) 6 von 6 Gezahlte Steuern 0,00 €",
+      "summaryText": "Startvermögen 2.020.000,00 € Endvermögen 1.353.347,36 € Gesamte Entnahmen 172.800,00 € Max. Kürzungsdauer 6 Jahre Jahre mit Kürzung (≥ 10 %) 6 von 6 Gezahlte Steuern 0,00 €",
       "values": {
         "lastRowPortfolioTotalEnd": 1353347.36,
         "lastWrapperPortfolio": 1353347.36,
@@ -695,7 +695,7 @@
           }
         }
       ],
-      "summaryText": "Startvermögen 2.020.000,00 € Endvermögen 95.436.508,34 € Gesamte Entnahmen 4.122.159,99 € Max. Kürzungsdauer 59 Jahre Jahre mit Kürzung (>10%) 59 von 61 Gezahlte Steuern 791.315,78 €",
+      "summaryText": "Startvermögen 2.020.000,00 € Endvermögen 95.436.508,34 € Gesamte Entnahmen 4.122.159,99 € Max. Kürzungsdauer 59 Jahre Jahre mit Kürzung (≥ 10 %) 59 von 61 Gezahlte Steuern 791.315,78 €",
       "values": {
         "lastRowPortfolioTotalEnd": 95436508.34,
         "lastWrapperPortfolio": 95436508.34,
@@ -960,7 +960,7 @@
           }
         }
       ],
-      "summaryText": "Startvermögen 500.000,00 € Endvermögen 383.486,68 € Gesamte Entnahmen 327.600,00 € Max. Kürzungsdauer 10 Jahre Jahre mit Kürzung (>10%) 10 von 10 Gezahlte Steuern 20.261,85 €",
+      "summaryText": "Startvermögen 500.000,00 € Endvermögen 383.486,68 € Gesamte Entnahmen 327.600,00 € Max. Kürzungsdauer 10 Jahre Jahre mit Kürzung (≥ 10 %) 10 von 10 Gezahlte Steuern 20.261,85 €",
       "values": {
         "lastRowPortfolioTotalEnd": 383486.68,
         "lastWrapperPortfolio": 383486.68,
@@ -975,7 +975,7 @@
     },
     {
       "alerts": [],
-      "canonicalRowsHash": "f59c1e21951ca0b0ac908c649b668dead5f6cc0539abc767a632cd4cd298c8f1",
+      "canonicalRowsHash": "84ab2642058bd4da8439cc66cb35de33cc36d7f886c997c263cd1a2a0a2db752",
       "expectedRowCount": 2,
       "id": "capital_poor_ruin_2000_2005",
       "inputHash": "e576bf078df99d1bc8b779e50fc8c0ffe381bb5599f8c9b1809da292295d31fc",
@@ -1173,7 +1173,7 @@
           }
         }
       ],
-      "summaryText": "Startvermögen 120.000,00 € Endvermögen 14.695,21 € Gesamte Entnahmen 90.000,00 € Max. Kürzungsdauer 1 Jahre Jahre mit Kürzung (>10%) 1 von 1 Gezahlte Steuern 0,00 €",
+      "summaryText": "Startvermögen 120.000,00 € Endvermögen 14.695,21 € Gesamte Entnahmen 90.000,00 € Max. Kürzungsdauer 1 Jahre Jahre mit Kürzung (≥ 10 %) 1 von 1 Gezahlte Steuern 0,00 €",
       "values": {
         "lastRowPortfolioTotalEnd": 14695.21,
         "lastWrapperPortfolio": 14695.21,
@@ -1387,7 +1387,7 @@
           }
         }
       ],
-      "summaryText": "Startvermögen 2.020.000,00 € Endvermögen 2.042.036,36 € Gesamte Entnahmen 60.000,00 € Max. Kürzungsdauer 0 Jahre Jahre mit Kürzung (>10%) 0 von 2 Gezahlte Steuern 2.406,24 € Pflegebucket 8.000,00 € Pflegebucket-Zieldeckung 40% Pflegebucket-Ziellücke 12.000,00 €",
+      "summaryText": "Startvermögen 2.020.000,00 € Endvermögen 2.042.036,36 € Gesamte Entnahmen 60.000,00 € Max. Kürzungsdauer 0 Jahre Jahre mit Kürzung (≥ 10 %) 0 von 2 Gezahlte Steuern 2.406,24 € Pflegebucket 8.000,00 € Pflegebucket-Zieldeckung 40% Pflegebucket-Ziellücke 12.000,00 €",
       "values": {
         "lastRowPortfolioTotalEnd": 83759.36,
         "lastWrapperPortfolio": 2042036.36,
@@ -1652,7 +1652,7 @@
           }
         }
       ],
-      "summaryText": "Startvermögen 2.020.000,00 € Endvermögen 2.366.522,53 € Gesamte Entnahmen 453.000,00 € Max. Kürzungsdauer 4 Jahre Jahre mit Kürzung (>10%) 4 von 4 Gezahlte Steuern 36.336,00 €",
+      "summaryText": "Startvermögen 2.020.000,00 € Endvermögen 2.366.522,53 € Gesamte Entnahmen 453.000,00 € Max. Kürzungsdauer 4 Jahre Jahre mit Kürzung (≥ 10 %) 4 von 4 Gezahlte Steuern 36.336,00 €",
       "values": {
         "lastRowPortfolioTotalEnd": 2366522.53,
         "lastWrapperPortfolio": 2366522.53,
@@ -2448,7 +2448,7 @@
           }
         }
       ],
-      "summaryText": "Startvermögen 2.020.000,00 € Endvermögen 2.246.485,58 € Gesamte Entnahmen 30.000,00 € Max. Kürzungsdauer 0 Jahre Jahre mit Kürzung (>10%) 0 von 1 Gezahlte Steuern 1.327,48 €",
+      "summaryText": "Startvermögen 2.020.000,00 € Endvermögen 2.246.485,58 € Gesamte Entnahmen 30.000,00 € Max. Kürzungsdauer 0 Jahre Jahre mit Kürzung (≥ 10 %) 0 von 1 Gezahlte Steuern 1.327,48 €",
       "values": {
         "lastRowPortfolioTotalEnd": 2246485.58,
         "lastWrapperPortfolio": 2246485.58,
@@ -3011,7 +3011,7 @@
           }
         }
       ],
-      "summaryText": "Startvermögen 2.020.000,00 € Endvermögen 933.833,70 € Gesamte Entnahmen 86.400,00 € Max. Kürzungsdauer 3 Jahre Jahre mit Kürzung (>10%) 3 von 3 Gezahlte Steuern 621,49 €",
+      "summaryText": "Startvermögen 2.020.000,00 € Endvermögen 933.833,70 € Gesamte Entnahmen 86.400,00 € Max. Kürzungsdauer 3 Jahre Jahre mit Kürzung (≥ 10 %) 3 von 3 Gezahlte Steuern 621,49 €",
       "values": {
         "lastRowPortfolioTotalEnd": 933833.7,
         "lastWrapperPortfolio": 933833.7,
@@ -3224,7 +3224,7 @@
           }
         }
       ],
-      "summaryText": "Startvermögen 2.020.000,00 € Endvermögen 1.097.056,67 € Gesamte Entnahmen 57.600,00 € Max. Kürzungsdauer 2 Jahre Jahre mit Kürzung (>10%) 2 von 2 Gezahlte Steuern 0,00 €",
+      "summaryText": "Startvermögen 2.020.000,00 € Endvermögen 1.097.056,67 € Gesamte Entnahmen 57.600,00 € Max. Kürzungsdauer 2 Jahre Jahre mit Kürzung (≥ 10 %) 2 von 2 Gezahlte Steuern 0,00 €",
       "values": {
         "lastRowPortfolioTotalEnd": 1097056.67,
         "lastWrapperPortfolio": 1097056.67,
@@ -3240,14 +3240,19 @@
   ],
   "oracleClass": "target_expected",
   "reductionBoundaryOracle": {
-    "contradictorySummaryLabelPresent": true,
+    "canonicalSummaryLabelPresent": true,
+    "contradictorySummaryLabelPresent": false,
     "countedByLegacyOperator": true,
     "counterExpressionPresent": true,
-    "id": "reduction_exactly_10pct_legacy_boundary",
-    "note": "This freezes the operator/label contradiction without declaring either side fachlich correct.",
-    "oracleClass": "legacy_observed_gap",
+    "id": "reduction_exactly_10pct_canonical_boundary",
+    "note": "Slice 06 resolves the legacy operator/label contradiction in favor of the inclusive >= 10 percent contract.",
+    "oracleClass": "target_expected",
     "syntheticDecisionPct": 10,
-    "targetExpected": null
+    "targetExpected": {
+      "includesExactThreshold": true,
+      "label": "Jahre mit Kürzung (≥ 10 %)",
+      "operator": ">="
+    }
   },
   "schemaVersion": "simulator-backtest-target-v1"
 }

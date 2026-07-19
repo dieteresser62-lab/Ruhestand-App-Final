@@ -662,14 +662,19 @@ function buildLegacySchemaOracle(data) {
 
 function buildReductionBoundaryOracle(source) {
     return {
-        id: 'reduction_exactly_10pct_legacy_boundary',
-        oracleClass: 'legacy_observed_gap',
+        id: 'reduction_exactly_10pct_canonical_boundary',
+        oracleClass: 'target_expected',
         syntheticDecisionPct: 10,
         countedByLegacyOperator: 10 >= 10,
         counterExpressionPresent: /entscheidung\.kuerzungProzent\s*>=\s*10/.test(source),
         contradictorySummaryLabelPresent: /Jahre mit Kürzung \(>10%\)/.test(source),
-        targetExpected: null,
-        note: 'This freezes the operator/label contradiction without declaring either side fachlich correct.'
+        canonicalSummaryLabelPresent: /Jahre mit Kürzung \(≥ 10 %\)/.test(source),
+        targetExpected: {
+            operator: '>=',
+            includesExactThreshold: true,
+            label: 'Jahre mit Kürzung (≥ 10 %)'
+        },
+        note: 'Slice 06 resolves the legacy operator/label contradiction in favor of the inclusive >= 10 percent contract.'
     };
 }
 
@@ -894,7 +899,8 @@ try {
 
     assertEqual(actual.cases.length, 6, 'six runtime characterization cases should be present');
     assert(actual.reductionBoundaryOracle.countedByLegacyOperator, 'exact 10% must be counted by the legacy operator');
-    assert(actual.reductionBoundaryOracle.contradictorySummaryLabelPresent, 'legacy >10% label contradiction must remain visible');
+    assert(!actual.reductionBoundaryOracle.contradictorySummaryLabelPresent, 'legacy >10% label contradiction must be removed');
+    assert(actual.reductionBoundaryOracle.canonicalSummaryLabelPresent, 'summary label must expose the inclusive ten-percent contract');
     assertEqual(actual.negativeCases.length, 5, 'five legacy negative cases should be present');
     assert(
         [...actual.cases, ...actual.negativeCases].every(testCase => testCase.oracleClass === 'target_expected'),

@@ -299,6 +299,12 @@ assertEqual(completed.legacyMetrics.totalTaxes, 3, 'runner retains total taxes')
 assertEqual(completed.legacyMetrics.reductionYears, 1, 'exactly ten percent retains the legacy reduction counter');
 assertEqual(completed.legacyMetrics.maxReductionStreak, 1, 'runner retains the legacy reduction streak');
 assertEqual(completed.summary.reductionDenominator, 2, 'summary denominator uses completed years');
+assertEqual(completed.metrics.schemaVersion, 'HistoricalBacktestMetricsV1', 'runner exposes the canonical metric bundle');
+assertEqual(completed.metrics.reductionContract.metricId, 'flex_reduction_years_gte_10_pct', 'runner exposes the inclusive ten-percent metric contract');
+assertEqual(completed.metrics.values.flex_reduction_years_gte_10_pct, 1, 'canonical reduction metric includes exactly ten percent');
+assertEqual(completed.summary.metrics.flex_reduction_years_gte_10_pct, completed.metrics.values.flex_reduction_years_gte_10_pct, 'summary projects the same canonical metric id and raw value');
+assertEqual(completed.summary.totalTaxes, completed.metrics.values.tax_total_nominal_eur, 'legacy tax summary reconciles to canonical metrics');
+assert(Object.isFrozen(completed.metrics.values), 'canonical metric values are immutable');
 assertEqual(completed.summary.healthBucket.enabled, true, 'canonical summary exposes the enabled health bucket');
 assertClose(completed.summary.healthBucket.end, 4321.09, 1e-9, 'canonical summary reads health bucket end from the nested result row');
 assertClose(completed.summary.healthBucket.realCoveragePct, 76.5, 1e-9, 'canonical summary reads health bucket coverage');
@@ -358,6 +364,11 @@ const ruin = runHistoricalBacktest({
         kind: 'ruin',
         isRuin: true,
         reason: 'Test ruin',
+        ruinDetails: {
+            requiredFloorNominal: 12,
+            coveredFloorNominal: 7,
+            shortfallNominal: 5
+        },
         newState: {
             ...state,
             portfolio: {
@@ -378,6 +389,9 @@ assertEqual(ruin.outcome.ruinYear, 2000, 'ruin outcome identifies the first ruin
 assertEqual(ruin.portfolioEnd, 7, 'ruin end wealth uses the terminal ruin-year portfolio');
 assertEqual(ruin.rows[0].wertAktien + ruin.rows[0].wertGold + ruin.rows[0].liquiditaet, 7, 'ruin row reconciles to terminal end wealth');
 assertEqual(ruin.summary.endWealth, ruin.portfolioEnd, 'ruin summary reconciles to canonical terminal end wealth');
+assertEqual(ruin.rows[0].row.floor_shortfall_nominal, 5, 'ruin row retains the explicit floor shortfall raw value');
+assertEqual(ruin.metrics.values.floor_shortfall_total_nominal_eur, 5, 'ruin metric reconciles to the raw floor shortfall');
+assertEqual(ruin.metrics.values.floor_shortfall_total_real_eur, 5, 'first-year ruin shortfall is real at the start-year price basis');
 
 const lateRuin = runHistoricalBacktest({
     inputs: { ...callerInputs, self: undefined },
@@ -408,6 +422,7 @@ assertEqual(lateRuin.outcome.ruinYear, 2001, 'later ruin identifies its own year
 assertEqual(lateRuin.completedYears, 1, 'only the successful prior year is completed');
 assertEqual(lateRuin.lastCompletedYear, 2000, 'later ruin retains the last completed year');
 assertEqual(lateRuin.portfolioEnd, 9, 'later ruin uses its terminal portfolio, not the prior-year wealth');
+assertEqual(lateRuin.metrics.values.floor_shortfall_total_nominal_eur, null, 'ruin without explicit diagnostics does not invent a zero shortfall');
 
 const continueAfterRuin = runHistoricalBacktest({
     inputs: { ...callerInputs, self: undefined },

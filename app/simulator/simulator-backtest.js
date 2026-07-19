@@ -122,7 +122,7 @@ export function runBacktest() {
             <div class="summary-item"><strong>Endvermögen</strong><span>${formatCurrency(summary.endWealth)}</span></div>
             <div class="summary-item highlight"><strong>Gesamte Entnahmen</strong><span>${formatCurrency(totalEntnahme)}</span></div>
             <div class="summary-item"><strong>Max. Kürzungsdauer</strong><span>${maxKuerzungStreak} Jahre</span></div>
-            <div class="summary-item"><strong>Jahre mit Kürzung (>10%)</strong><span>${jahreMitKuerzung} von ${summary.reductionDenominator}</span></div>
+            <div class="summary-item"><strong>Jahre mit Kürzung (≥ 10 %)</strong><span>${jahreMitKuerzung} von ${summary.reductionDenominator}</span></div>
             <div class="summary-item tax"><strong>Gezahlte Steuern</strong><span>${formatCurrency(totalSteuern)}</span></div>
             ${healthBucketSummary}
         </div>`;

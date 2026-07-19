@@ -284,6 +284,17 @@ console.log('Test 7: dataset validation is cached and preflight is once per requ
     );
     assertEqual(batch.status, 'complete', 'Complete cohort batch should pass');
     assertEqual(preflights, 2, 'Whole cohort batch should add exactly one preflight event');
+
+    const mixedBatch = first.prepareBatch([
+        { startYear: 2000, endYear: 2000 },
+        { startYear: 1999, endYear: 1999 }
+    ]);
+    assertEqual(mixedBatch.status, 'incomplete', 'Mixed cohort batch reports incompleteness without dropping periods');
+    assertEqual(mixedBatch.periods.length, 2, 'Mixed cohort batch inventories every requested period');
+    assertEqual(mixedBatch.periods[0].status, 'complete', 'Valid cohort period remains prepared');
+    assertEqual(mixedBatch.periods[1].status, 'incomplete', 'Invalid cohort period remains explicitly incomplete');
+    assertEqual(mixedBatch.incomplete.length, 1, 'Mixed cohort batch exposes all incomplete entries');
+    assertEqual(mixedBatch.batchIndex, 1, 'Legacy first-incomplete alias remains available');
 }
 console.log('✓ validation/preflight instrumentation OK');
 

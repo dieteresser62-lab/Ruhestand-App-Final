@@ -1,6 +1,6 @@
 # Simulator / Backtest: Hardening- und Weiterentwicklungsplan
 
-**Stand:** 2026-07-18  
+**Stand:** 2026-07-19
 **Autor:** Codex (Planentwurf, keine Review-Freigabe)  
 **Feature-Branch:** `codex/simulator-backtest-gap-plan`  
 **GitHub-Status:** Branch nur lokal angelegt; Veroeffentlichung ausstehend und nur nach Nutzerfreigabe  
@@ -134,7 +134,7 @@ Backtest, Monte Carlo und Sweep muessen denselben Adapterfehler gleich klassifiz
 | D-02 | Einjahreslauf | Als gueltige Diagnose zulassen, sofern genau ein vollstaendiger YearRecord verfuegbar ist. | Review im Slice 03 |
 | D-03 | Missingness | Pflichtreihe `missing` -\> Lauf `incomplete`; `fallback\_zero` nur explizit und sichtbar, nicht durch `|| 0`. | Review im Slice 03 |
 | D-04 | Ruin | In Slice 05 implementiert: Fachlicher Floor-Deckungsausfall bleibt `ruin`; Engine-/Contractfehler werden `technical\_error`; Ruinendwert ist der terminale Zustand nach Markt/Verkaeufen und vor der nicht deckbaren Auszahlung. | Nutzerauftrag zur Implementierung liegt vor; finales Review/Freigabe ausstehend |
-| D-05 | Rolling Cohorts | Optionaler Diagnosemodus mit fester Horizontlaenge und allen zulässigen Startjahren; keine Erfolgswahrscheinlichkeit. | Nutzer + Reviewer vor Slice 06 |
+| D-05 | Rolling Cohorts | In Slice 06 umgesetzt: positive ganzzahlige, inklusive Horizontlaenge; alle Startjahre als Kandidaten; nur vollstaendige feste Fenster `eligible`; Anspar-/Policyinputs je Cohort unveraendert; getrenntes Outcome-/Ausschlussinventar; ueberlappende In-sample-Diagnose ohne Erfolgswahrscheinlichkeitsaussage. | Nutzerauftrag vom 2026-07-19 liegt vor; finales Slice-Review ausstehend |
 | D-06 | Trial-Persistenz | Slice 07 exportiert zunaechst ein vollstaendiges Laufmanifest; persistentes append-only Trial-Log bleibt opt-in und Slice-09-/Nutzerentscheidung. | Nutzerentscheidung |
 | D-07 | Historische Datenquellen | Ungeklaerte Felder als `unresolved`; keine Datenersetzung ohne Daten-/Methodik-Owner, Lizenz- und Transformationsnachweis. | Externer Owner in Slice 09 |
 | D-08 | Kostenmodell | Nicht innerhalb des Hardening still ergaenzen, da Engine-/Cashflow-Semantik betroffen sein kann. Eigenes Folgearbeitsdokument nach FQ-01-Gates. | Nutzer + Fachowner + neues Review |
@@ -200,8 +200,8 @@ Die Zielwerte nach D-01 sind als neue `target_expected`-Oracles neben den unvera
 | 02 | [SLICE_SIMULATOR_BACKTEST_02_DOM_FREIER_RUNNER.md](./SLICE_SIMULATOR_BACKTEST_02_DOM_FREIER_RUNNER.md) | DOM-freien Runner und Request/Result-Grundshape extrahieren, ohne Semantikdelta | Slice 01 gruen/freigegeben | abgeschlossen |
 | 03 | [SLICE_SIMULATOR_BACKTEST_03_DATEN_JAHRES_CONTRACT.md](./SLICE_SIMULATOR_BACKTEST_03_DATEN_JAHRES_CONTRACT.md) | Manifest, einmalige Validierung, Missingness, Perioden- und HistoricalYearRecord-Vertrag | Slices 01-02 gruen/freigegeben | abgeschlossen |
 | 04 | [SLICE_SIMULATOR_BACKTEST_04_ZEITACHSEN_UMSETZUNG.md](./SLICE_SIMULATOR_BACKTEST_04_ZEITACHSEN_UMSETZUNG.md) | Zeitachsensynchronisation | D-01/D-03 entschieden, Slices 01-03 | implementiert und getestet; erneutes Review ausstehend |
-| 05 | [SLICE_SIMULATOR_BACKTEST_05_OUTCOME_RUIN_FEHLER.md](./SLICE_SIMULATOR_BACKTEST_05_OUTCOME_RUIN_FEHLER.md) | Gemeinsame Adapterfehler, Ruin, incomplete und technische Fehler in Backtest/MC/Sweep trennen; Summary reconciliieren | Slices 02-03; D-04/D-09 | implementiert und selbstgeprueft; Review ausstehend |
-| 06 | [SLICE_SIMULATOR_BACKTEST_06_METRIKEN_ROLLING_COHORTS.md](./SLICE_SIMULATOR_BACKTEST_06_METRIKEN_ROLLING_COHORTS.md) | Reconciliierbares Ergebnisbuendel verpflichtend; Rolling Cohorts nur nach D-05 | Slices 04-05; D-05 blockiert nur den optionalen Cohort-Teil | nicht gestartet |
+| 05 | [SLICE_SIMULATOR_BACKTEST_05_OUTCOME_RUIN_FEHLER.md](./SLICE_SIMULATOR_BACKTEST_05_OUTCOME_RUIN_FEHLER.md) | Gemeinsame Adapterfehler, Ruin, incomplete und technische Fehler in Backtest/MC/Sweep trennen; Summary reconciliieren | Slices 02-03; D-04/D-09 | abgeschlossen, freigegeben und lokal committet |
+| 06 | [SLICE_SIMULATOR_BACKTEST_06_METRIKEN_ROLLING_COHORTS.md](./SLICE_SIMULATOR_BACKTEST_06_METRIKEN_ROLLING_COHORTS.md) | Reconciliierbares Ergebnisbuendel und Rolling-Cohort-In-sample-Diagnose | Slices 04-05; D-05 durch Nutzerauftrag entschieden | implementiert und getestet; Review ausstehend |
 | 07 | [SLICE_SIMULATOR_BACKTEST_07_EXPORT_REPRODUZIERBARKEIT.md](./SLICE_SIMULATOR_BACKTEST_07_EXPORT_REPRODUZIERBARKEIT.md) | Versionierter Raw-Export und Laufmanifest, getrennt von Displayformatierung | Slices 02-03/05; Metrikteil aus 06, Cohortteil optional nach D-05 | nicht gestartet |
 | 08 | [SLICE_SIMULATOR_BACKTEST_08_UI_BROWSER_ACCESSIBILITY.md](./SLICE_SIMULATOR_BACKTEST_08_UI_BROWSER_ACCESSIBILITY.md) | UI-Validierung, Status/A11y und Browser-End-to-End-Gate | Slice 05; Exportteil nach 07, optionaler Cohortteil nach 06 | nicht gestartet |
 | 09 | [SLICE_SIMULATOR_BACKTEST_09_FORSCHUNGS_GATES.md](./SLICE_SIMULATOR_BACKTEST_09_FORSCHUNGS_GATES.md) | Daten-, Kosten-, Trial- und Holdout-Gates operationalisieren; Folgevorhaben abgrenzen | Start nach Slice 03; Laufmanifest-Verweise nach Slice 07; externe Owner | nicht gestartet |
@@ -221,7 +221,7 @@ Die Zielwerte nach D-01 sind als neue `target_expected`-Oracles neben den unvera
 
 - Slices 02 und 03 duerfen nach Slice 01 parallel vorbereitet werden, sofern ihre Dateilisten disjunkt bleiben; beide muessen vor den Integrationen 04/05 freigegeben sein.
 - Slices 04 und 05 sind fachlich unabhaengige Tracks (Zeitachse vs. Shared Outcome), beruehren aber voraussichtlich denselben Runner. Sie werden deshalb nicht gleichzeitig im selben Arbeitsbaum codiert; die Reihenfolge wird beim Diff-Risiko-Check anhand konkreter Dateigrenzen festgelegt.
-- Slice 06 ist wegen D-05 nicht mehr komplett blockiert: Metrikcontract und Reconciliation sind Pflicht; Rolling Cohorts werden bei ausstehendem/nein lautendem D-05 als `deferred` dokumentiert.
+- Slice 06 wurde nach positivem D-05-Nutzerentscheid vollstaendig einschliesslich Rolling Cohorts umgesetzt; Cohorts bleiben ueberlappende In-sample-Diagnosen und keine Erfolgswahrscheinlichkeit.
 - Slice 07 kann den Single-Path-Raw-Export nach Slice 05 beginnen. Cohortfelder werden nur nach freigegebenem Slice-06-Cohortteil ergaenzt.
 - Slice 08 kann UI-Validierung/A11y nach Slice 05 vorbereiten; Downloadintegration wartet auf Slice 07. Gleichzeitiges Coding mit Slice 07 ist nur bei disjunkten Produktdateien erlaubt.
 - Slice 09 kann seine Owner-/Gate-Dokumentation nach Slice 03 beginnen und wird nach Slice 07 um das tatsaechliche Laufmanifest ergaenzt.
@@ -308,8 +308,8 @@ Zusaetzlich zu `AGENTS.md` und `SLICE\_EXECUTION\_RULES.md` gilt:
 | 02 | abgeschlossen | fokussiert, `npm test`, Browser und Coverage gruen | freigegeben | abgeschlossen |
 | 03 | abgeschlossen | fokussiert und `npm test` gruen | freigegeben | abgeschlossen |
 | 04 | abgeschlossen | fokussiert und `npm test` gruen | nach Blockerbehebung erneut offen | abgeschlossen |
-| 05 | nicht gestartet | offen | offen | offen |
-| 06 | Metrikteil nicht gestartet; Cohortteil blockiert bis D-05 | offen | offen | offen |
+| 05 | abgeschlossen | fokussiert, `npm test`, Coverage und Performance gruen | freigegeben | abgeschlossen |
+| 06 | abgeschlossen | fokussiert und `npm test` gruen | offen | abgeschlossen |
 | 07 | nicht gestartet | offen | offen | offen |
 | 08 | nicht gestartet | offen | offen | offen |
 | 09 | teilweise extern blockiert | offen | offen | offen |
@@ -371,6 +371,17 @@ Zusaetzlich zu `AGENTS.md` und `SLICE\_EXECUTION\_RULES.md` gilt:
 - Der O(1)-Guard prueft Aktien-, Gold- und Cash-/Bondreturn vor jeder Jahresmutation; bei Rejection erfolgen null Engineaufrufe. Eine Aenderung an `engine/`, der oeffentlichen `EngineAPI`, Spending, Floor oder Forced Sale war nicht erforderlich.
 - Validierung: fokussiert unter anderem Runner 101/101, Characterization 67/67, Produktbacktest 51/51, Monte Carlo 140/140, Sweep 107/107 und Worker-Paritaet 369/369; `npm test` sowie Coverage-Gate mit 115 Testdateien und 5226/5226 Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles. Gesamtcoverage 73,36 %.
 - Performance, Median aus je drei Laeufen: Monte Carlo 466,9 ms gegen 453 ms Baseline (+3,1 %), Sweep 365,8 ms gegen 410 ms Baseline (-10,8 %); beide innerhalb der maximalen +25 %. Exakt zehn Programmdateien einschliesslich Ziel-Fixture wurden geaendert. Implementierung/Selbstpruefung sind abgeschlossen; adversariales Review, Nutzerfreigabe, Commit und Push stehen aus.
+
+### Slice 06: rueckdokumentierter Implementierungsstand
+
+- `HistoricalBacktestMetricsV1` enthaelt 24 kanonische IDs mit Label, Einheit, nominal/real-Basis, Vorzeicheninterpretation, Aggregationsregel, Nenner, reiner Displayrundung, Missingness-, Outcome- und Rohquellenregel. `BacktestRunResultV1.metrics.values` und `summary.metrics` verwenden dieselben unveraenderten Werte.
+- Abgedeckt sind nominales/reales Start-/Endvermoegen, Entnahmen, Floor-Shortfall-Auftreten/-Hoehe/-Dauer, Flex-Kuerzung, Runway-Stress, nominaler Endwert-Max-Drawdown inklusive Pflegebucket, Steuern, Verlusttopfwirkung, Pflegebucket und Outcome-Indikatoren. Ruin liefert additive Rohdiagnostik fuer erforderlichen/gedeckten Floor und Fehlhoehe ohne Aenderung der Ruin- oder Engine-Semantik.
+- Der 10-%-Contract ist inklusiv: Operator `>= 10`, IDs `*_gte_10_pct`, kanonisches Label `≥ 10 %`. Target-Characterization und sichtbares Backtest-Summary wurden konsistent aktualisiert; Rundung findet nur als Displaymetadatum statt.
+- D-05 ist umgesetzt: `HistoricalBacktestCohortsV1` verwendet positive ganzzahlige inklusive Horizonte (`end=start+horizon-1`), inventarisiert alle Startjahre, schliesst spaete Fenster explizit als `insufficient_horizon` aus und zaehlt `completed`, `ruin`, `incomplete`, `technical_error` sowie `cancelled` gegen alle `eligible` Cohorts.
+- Jede Cohort erhaelt identische unveraenderte Anspar-/Policyinputs und startet `yearIndex=0`; automatische Parameterauswahl ist ausgeschlossen. Request und Descriptor markieren Ueberlappung, In-sample-Charakter, fehlende Unabhaengigkeit und keine Erfolgswahrscheinlichkeitsaussage.
+- `prepareBatch()` behaelt gemischte complete/incomplete-Perioden vollstaendig, validiert ueberlappende Recordjahre hoechstens einmal pro Batch und erlaubt den Single-Path-Runs den Verbrauch vorbereiteter Perioden ohne zweiten Provider-Preflight.
+- Golden-/Reconciliation-Ergebnisse: Metriken 298/298, Cohorts 59/59, Datencontract 169/169, Runner 111/111, Characterization 69/69; `npm test` mit 117 Testdateien und 5603/5603 Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles. Sechs produktive Programmdateien wurden geaendert; Engine-/Worker-/MC-/Sweep-/Optimizer-Semantik und generierte Artefakte blieben unveraendert.
+- Raw-Download/Manifest folgt in Slice 07 und muss das immutable Metrikbuendel ohne Neuberechnung projizieren; UI/A11y fuer Cohorts folgt in Slice 08. Implementierung/Selbstpruefung sind abgeschlossen, adversariales Review/Nutzerfreigabe und Commit stehen aus.
 
 
 ## Review-Auftrag

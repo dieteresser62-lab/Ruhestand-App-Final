@@ -1,5 +1,10 @@
 "use strict";
 
+import {
+    deriveHistoricalBacktestMetrics,
+    HISTORICAL_BACKTEST_METRICS_SCHEMA_VERSION
+} from './historical-backtest-metrics.js';
+
 export const BACKTEST_REQUEST_SCHEMA_VERSION = 'BacktestRequestV1';
 export const BACKTEST_RESULT_SCHEMA_VERSION = 'BacktestRunResultV1';
 
@@ -201,6 +206,27 @@ function buildSummary({
     };
 }
 
+function attachCanonicalMetrics(result) {
+    const metrics = deriveHistoricalBacktestMetrics(result);
+    const values = metrics.values;
+    return {
+        ...result,
+        metrics,
+        summary: {
+            ...result.summary,
+            startWealth: values.wealth_start_nominal_eur ?? result.summary.startWealth,
+            endWealth: values.wealth_end_nominal_eur ?? result.summary.endWealth,
+            totalWithdrawal: values.withdrawal_total_nominal_eur ?? result.summary.totalWithdrawal,
+            maxReductionStreak: values.flex_reduction_longest_streak_gte_10_pct
+                ?? result.summary.maxReductionStreak,
+            reductionYears: values.flex_reduction_years_gte_10_pct ?? result.summary.reductionYears,
+            totalTaxes: values.tax_total_nominal_eur ?? result.summary.totalTaxes,
+            metricSchemaVersion: HISTORICAL_BACKTEST_METRICS_SCHEMA_VERSION,
+            metrics: values
+        }
+    };
+}
+
 /**
  * Executes the historical year loop against one preflighted V1 record per year.
  * All environment-facing dependencies are supplied by the caller.
@@ -261,32 +287,34 @@ export function runHistoricalBacktest({
         reductionYears: 0,
         totalTaxes: 0
     };
-    const buildEarlyResult = ({ outcome, dataStatus, incompleteReason = null, diagnostics = null }) => ({
-        schemaVersion: BACKTEST_RESULT_SCHEMA_VERSION,
-        request,
-        outcome,
-        error: outcome.kind === BACKTEST_OUTCOME_KINDS.TECHNICAL_ERROR ? outcome.error : null,
-        rows: [],
-        requestedYears,
-        completedYears: 0,
-        lastCompletedYear: null,
-        breakOnRuin: request.breakOnRuin,
-        portfolioStart: null,
-        portfolioEnd: null,
-        dataStatus,
-        incompleteReason,
-        historicalYearRecords: [],
-        legacyOutcome: outcome.kind,
-        legacyMetrics: emptyMetrics,
-        summary: buildSummary({
+    const buildEarlyResult = ({ outcome, dataStatus, incompleteReason = null, diagnostics = null }) => (
+        attachCanonicalMetrics({
+            schemaVersion: BACKTEST_RESULT_SCHEMA_VERSION,
+            request,
+            outcome,
+            error: outcome.kind === BACKTEST_OUTCOME_KINDS.TECHNICAL_ERROR ? outcome.error : null,
             rows: [],
+            requestedYears,
+            completedYears: 0,
+            lastCompletedYear: null,
+            breakOnRuin: request.breakOnRuin,
             portfolioStart: null,
             portfolioEnd: null,
-            completedYears: 0,
-            ...emptyMetrics
-        }),
-        diagnostics
-    });
+            dataStatus,
+            incompleteReason,
+            historicalYearRecords: [],
+            legacyOutcome: outcome.kind,
+            legacyMetrics: emptyMetrics,
+            summary: buildSummary({
+                rows: [],
+                portfolioStart: null,
+                portfolioEnd: null,
+                completedYears: 0,
+                ...emptyMetrics
+            }),
+            diagnostics
+        })
+    );
 
     if (dependencyCause) {
         const error = normalizeTechnicalError(null, BACKTEST_TECHNICAL_ERROR_CODES.DEPENDENCY_INVALID);
@@ -386,7 +414,7 @@ export function runHistoricalBacktest({
             reductionYears,
             totalTaxes
         };
-        return {
+        return attachCanonicalMetrics({
             schemaVersion: BACKTEST_RESULT_SCHEMA_VERSION,
             request,
             outcome,
@@ -411,7 +439,7 @@ export function runHistoricalBacktest({
                 ...legacyMetrics
             }),
             diagnostics
-        };
+        });
     };
 
     for (let yearIndex = 0; yearIndex < historicalRecords.length; yearIndex++) {
@@ -468,6 +496,15 @@ export function runHistoricalBacktest({
             simulationState = result.newState;
             const terminal = readPortfolioParts(simulationState.portfolio);
             const terminalPortfolioTotal = computePortfolioTotal(simulationState.portfolio);
+            const requiredFloorNominal = Number.isFinite(result?.ruinDetails?.requiredFloorNominal)
+                ? result.ruinDetails.requiredFloorNominal
+                : null;
+            const coveredFloorNominal = Number.isFinite(result?.ruinDetails?.coveredFloorNominal)
+                ? result.ruinDetails.coveredFloorNominal
+                : null;
+            const floorShortfallNominal = Number.isFinite(result?.ruinDetails?.shortfallNominal)
+                ? result.ruinDetails.shortfallNominal
+                : null;
             rows.push({
                 jahr: year,
                 row: {
@@ -491,6 +528,11 @@ export function runHistoricalBacktest({
                     GuardNote: result.reason || 'Floor-Deckungsausfall',
                     health_bucket_enabled: terminal.healthBucketEnd > 0,
                     health_bucket_end: terminal.healthBucketEnd,
+                    floor_coverage_required_nominal: requiredFloorNominal,
+                    floor_coverage_covered_nominal: coveredFloorNominal,
+                    floor_shortfall_nominal: floorShortfallNominal,
+                    taxSavedByLossCarry: 0,
+                    lossCarryEnd: Number(simulationState?.lastState?.taxState?.lossCarry) || 0,
                     portfolio_total_end: terminalPortfolioTotal
                 },
                 entscheidung: { jahresEntnahme: 0 },

@@ -104,12 +104,30 @@ function restoreEngineBoundaryPortfolio(portfolio, snapshot) {
     else delete portfolio.simulationSourceProfileId;
 }
 
-function buildRuinOutcome({ currentState, portfolio, liquiditaet, marketDataCurrentYear, reason }) {
+function buildRuinOutcome({
+    currentState,
+    portfolio,
+    liquiditaet,
+    marketDataCurrentYear,
+    reason,
+    requiredFloorNominal,
+    coveredFloorNominal
+}) {
     const terminalPortfolio = { ...portfolio, liquiditaet: euros(liquiditaet) };
+    const normalizedRequiredFloor = euros(Math.max(0, Number(requiredFloorNominal) || 0));
+    const normalizedCoveredFloor = euros(Math.max(
+        0,
+        Math.min(normalizedRequiredFloor, Number(coveredFloorNominal) || 0)
+    ));
     return {
         kind: SIMULATOR_YEAR_OUTCOME_KINDS.RUIN,
         isRuin: true,
         reason,
+        ruinDetails: {
+            requiredFloorNominal: normalizedRequiredFloor,
+            coveredFloorNominal: normalizedCoveredFloor,
+            shortfallNominal: euros(Math.max(0, normalizedRequiredFloor - normalizedCoveredFloor))
+        },
         newState: {
             ...currentState,
             portfolio: terminalPortfolio,
@@ -640,7 +658,9 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             portfolio,
             liquiditaet,
             marketDataCurrentYear,
-            reason: `Gesamtvermögen (${formatInteger(totalWealthAvailable)}) < Floor (${formatInteger(netFloorYear)})`
+            reason: `Gesamtvermögen (${formatInteger(totalWealthAvailable)}) < Floor (${formatInteger(netFloorYear)})`,
+            requiredFloorNominal: netFloorYear,
+            coveredFloorNominal: totalWealthAvailable
         });
     }
 
@@ -678,7 +698,9 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             portfolio,
             liquiditaet: payoutFallback.liquiditaet,
             marketDataCurrentYear,
-            reason: payoutFallback.reason
+            reason: payoutFallback.reason,
+            requiredFloorNominal: netFloorYear,
+            coveredFloorNominal: jahresEntnahmeEffektiv + equityAfterBuys + goldAfterBuys
         });
     }
     liquiditaet = payoutFallback.liquiditaet;
