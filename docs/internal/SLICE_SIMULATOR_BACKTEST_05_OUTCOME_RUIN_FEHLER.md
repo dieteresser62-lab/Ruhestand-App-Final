@@ -3,7 +3,7 @@
 **Arbeitsplan:** [SIMULATOR_BACKTEST_HARDENING_PLAN.md](./SIMULATOR_BACKTEST_HARDENING_PLAN.md)  
 **Feature-Branch:** `codex/simulator-backtest-gap-plan`  
 **GitHub-Status:** nur lokal; Veroeffentlichung ausstehend und nur nach Nutzerfreigabe  
-**Status:** implementiert und selbstgeprueft; Review/Freigabe ausstehend  
+**Status:** freigegeben; Gemini-Review abgeschlossen, lokal committed als `2c4861d`
 **Abhaengigkeit:** Slices 02-03 freigegeben; D-04 und D-09 entschieden. Kann fachlich vor Slice 04 laufen, aber nicht gleichzeitig dieselben Runnerdateien editieren.  
 **GAPs:** BT-02, BT-03, BT-04, BT-05, BT-09, BT-19, BT-20
 
@@ -204,7 +204,7 @@ Rollback-Strategie:
 - Browser-End-to-End-Nachweise fuer sichtbare `technical_error`-/Ruinzustaende sind weiterhin Aufgabe von Slice 08; Slice 05 deckt die UI-Projektion mit DOM-freien und Characterization-Tests ab.
 - Export-/Persistenzvertraege fuer technische Inventare folgen erst in Slice 07. Bis dahin ist der neue Batchstatus laufzeitwirksam, aber noch kein versionierter Exportvertrag.
 - `cancelled` bleibt bewusst reserviert und ist noch kein produktiver Abbruchpfad.
-- Das finale adversariale Review durch Gemini/Claude beziehungsweise die Nutzerfreigabe steht aus; Codex markiert die eigene Implementierung nicht als freigegeben.
+- Das Gemini-Review ist abgeschlossen; der optionale Claude-Zweitreview wurde nicht durchgefuehrt. Die fachlichen Restrisiken bleiben trotz Freigabe dokumentiert.
 
 ## Rueckdokumentation
 
@@ -212,7 +212,7 @@ Outcome-Tabelle, Ruin-Endwertdefinition, Fehlercodes, Summary-Reconciliation, Cr
 
 ## Freigabestatus
 
-Freigegeben am 2026-07-19. Die Akzeptanzkriterien sind vollumfänglich erfüllt. Sämtliche 5155 Assertions der Testsuite laufen fehlerfrei durch. Ein lokaler Commit wird durchgeführt.
+Freigegeben am 2026-07-19 und lokal als `2c4861d` committed. Die Slice-Ausfuehrung dokumentierte 5226/5226 Assertions; die abweichende Zahl 5155 im damaligen Reviewtext stammt aus Slice 04 und wird durch den Ausfuehrungsnachweis oben korrigiert.
 
 ## Review-Feedback von Gemini
 
@@ -228,15 +228,16 @@ Freigegeben am 2026-07-19. Die Akzeptanzkriterien sind vollumfänglich erfüllt.
 
 ## Review-Feedback von Claude
 
-Noch offen.
+Nicht durchgefuehrt; fuer diesen Slice ist kein optionales Claude-Zweitreview eingetragen.
 
 ## Review-Antworten von Codex
 
-Noch offen.
+- Die beiden Gemini-Restrisiken zu Inflation und Lohn bleiben transparent: Der produktive historische Backtest validiert beide Reihen bereits im D-01-Datencontract; eine breitere Aenderung des MC-Jahresguards war nicht Bestandteil des freigegebenen Return-Contracts.
+- `breakOnRuin=false` bleibt durch fokussierte Runner-/Outcome-Tests abgedeckt. Komplexe kuenftige Steuerpfade nach Ruin bleiben ein Regressionsthema und werden nicht als ausgeschlossen dargestellt.
 
 ## Review-Entscheidungen
 
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
 | --- | --- | --- | --- | --- |
-| D-04 | Nutzer/Reviewer | Floor-Deckungsausfall ist `ruin`; Engine-/Adapter-/Contractfehler sind `technical_error`; Endwert stammt aus dem terminalen Portfoliozustand des Ruinjahrs | implementiert; Review ausstehend | Terminaler Zustand nach Markt/Verkaeufen und vor nicht deckbarer Auszahlung; keine EngineAPI-/Formelaenderung |
-| D-09 | Nutzer/Reviewer | O(1)-Pflichtreturn-Guard vor gemeinsamer Jahresgrenze; kein stilles 0-%-Fallback | implementiert; Review ausstehend | Drei Pflichtreturns, null Engineaufrufe bei Rejection, MC/Sweep-Mediane innerhalb der 25-%-Toleranz |
+| D-04 | Nutzer/Reviewer | Floor-Deckungsausfall ist `ruin`; Engine-/Adapter-/Contractfehler sind `technical_error`; Endwert stammt aus dem terminalen Portfoliozustand des Ruinjahrs | implementiert und durch Gemini freigegeben | Terminaler Zustand nach Markt/Verkaeufen und vor nicht deckbarer Auszahlung; keine EngineAPI-/Formelaenderung |
+| D-09 | Nutzer/Reviewer | O(1)-Pflichtreturn-Guard vor gemeinsamer Jahresgrenze; kein stilles 0-%-Fallback | implementiert und durch Gemini freigegeben | Drei Pflichtreturns, null Engineaufrufe bei Rejection, MC/Sweep-Mediane innerhalb der 25-%-Toleranz; Commit `2c4861d` |

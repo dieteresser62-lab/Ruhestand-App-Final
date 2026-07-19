@@ -3,7 +3,7 @@
 **Arbeitsplan:** [SIMULATOR_BACKTEST_HARDENING_PLAN.md](./SIMULATOR_BACKTEST_HARDENING_PLAN.md)  
 **Feature-Branch:** `codex/simulator-backtest-gap-plan`  
 **GitHub-Status:** nur lokal; Veroeffentlichung ausstehend und nur nach Nutzerfreigabe  
-**Status:** implementiert und selbstgeprueft; adversariales Review ausstehend  
+**Status:** freigegeben; Gemini-Review abgeschlossen, lokal committed als `ae32452`
 **Abhaengigkeit:** Slice 05 freigegeben; Export-/Downloadteil wartet auf Slice 07, optionaler Cohortteil auf Slice 06  
 **GAPs:** BT-06, BT-10, BT-11, BT-15, BT-16, BT-17
 
@@ -193,7 +193,7 @@ Erledigt in `SIMULATOR_BACKTEST_HARDENING_PLAN.md`, `README.md`, `docs/reference
 
 ## Freigabestatus
 
-Freigegeben am 2026-07-19. Die Akzeptanzkriterien für UI-Gestaltung, Feldvalidierung, Fokussteuerung und E2E-Tests sind vollumfänglich erfüllt. Sämtliche 5722 Assertions der Testsuite sowie die Playwright-Browsertests laufen fehlerfrei durch. Ein lokaler Commit wird durchgeführt.
+Freigegeben am 2026-07-19 und lokal als `ae32452` committed. Die Slice-Ausfuehrung dokumentierte 5722/5722 Assertions sowie ein gruenes Playwright-Gate.
 
 ## Review-Feedback von Gemini
 
@@ -208,14 +208,15 @@ Freigegeben am 2026-07-19. Die Akzeptanzkriterien für UI-Gestaltung, Feldvalidi
 
 ## Review-Feedback von Claude
 
-Noch offen.
+Nicht durchgefuehrt; fuer diesen Slice ist kein optionales Claude-Zweitreview eingetragen.
 
 ## Review-Antworten von Codex
 
-Noch offen.
+- Lange Fehlermeldungen und Nischenbrowser bleiben als manuelles Kompatibilitaetsrisiko bestehen. Technische Nutzertexte werden bereits sanitisiert; responsive Layout, Fokusvertrag und Chromium-Browsergate sind automatisiert abgedeckt.
+- `window.globalBacktestData` wird durch `backtest_ui_state_v1`, tief eingefrorene Resultate und Identity-/Fingerprinttests gegen nachtraegliche Manipulation geschuetzt. Eine globale Ablage bleibt dennoch eine Integrationsgrenze.
 
 ## Review-Entscheidungen
 
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
 | --- | --- | --- | --- | --- |
-| - | - | Noch kein Review | offen | - |
+| G-S08-01 | Gemini | Lange Fehlermeldungen/Nischenbrowser und geteilte globale Resultinstanz als Restrisiko | angenommen, kein Blocker | sanitizierte Texte, responsive CSS, Fokus-/Identity-/Browsergates; Restrisiko bleibt dokumentiert |

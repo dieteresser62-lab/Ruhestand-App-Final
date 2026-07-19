@@ -949,10 +949,10 @@
                         </ol>
                     </div>
                     <div class="detail-block" id="simulator-backtest">
-                        <h3>Backtesting (Realitätscheck)</h3>
-                        <p>Im Tab „Backtesting“ testen Sie Ihre Strategie gegen konkrete historische Marktphasen,
-                            z.B. ab dem Jahr 2000. Das ergänzt die Monte-Carlo-Prognose um einen direkten
-                            Realitätscheck.</p>
+                        <h3>Backtesting (historische In-sample-Diagnose)</h3>
+                        <p>Im Tab „Backtesting“ untersuchen Sie Ihre Strategie an bereits bekannten historischen
+                            Marktphasen, z.B. ab dem Jahr 2000. Das ergänzt Monte-Carlo-Ergebnisse um konkrete Pfade,
+                            ist aber weder eine Zukunftsvalidierung noch eine Erfolgswahrscheinlichkeit.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
                             <li><strong>Startjahr wählen:</strong> Setzen Sie ein historisches Startjahr und prüfen Sie
@@ -1560,9 +1560,10 @@
                         Spannbreiten statt nur Mittelwerte.</dd>
 
                     <dt>Was bringt das Backtesting zusätzlich zur Monte-Carlo-Simulation?</dt>
-                    <dd>Backtests prüfen konkrete historische Zeiträume (z.B. ab 2000) und zeigen, ob Ihre Strategie
-                        in realen Marktphasen funktioniert. Monte-Carlo liefert Wahrscheinlichkeiten; Backtesting
-                        gibt einen Realitätscheck.</dd>
+                    <dd>Backtests untersuchen konkrete, bereits bekannte historische Zeiträume (z.B. ab 2000) und
+                        zeigen den modellierten Verlauf Ihrer Strategie. Monte-Carlo liefert modellinterne
+                        Verteilungen; Backtesting bleibt eine historische In-sample-Diagnose und keine
+                        Zukunftsvalidierung oder Erfolgswahrscheinlichkeit.</dd>
 
                     <dt>Warum steigt die Entnahme bei Dynamic Flex plötzlich so stark?</dt>
                     <dd>Dynamic Flex (VPW) berechnet entnahmebasiert aus Vermögen, Restlaufzeit und Renditeannahmen
@@ -1657,8 +1658,9 @@ Ausgabe-Konto erhält Monatsbedarf aus Geldmarkt</pre>
                         Simulator-Ergebnissen.</dd>
 
                     <dt><a class="toc-link" data-tab-target="manual" href="#simulator-backtest">Backtesting</a></dt>
-                    <dd>Historischer Realitätscheck: Die Strategie wird ab einem gewählten Startjahr durch echte
-                        Marktphasen geführt (z.B. ab 2000). Ergänzt Monte-Carlo-Ergebnisse um konkrete Pfade.</dd>
+                    <dd>Historische In-sample-Diagnose: Die Strategie wird ab einem gewählten Startjahr durch die
+                        eingebetteten historischen Jahresrecords geführt (z.B. ab 2000). Ergänzt
+                        Monte-Carlo-Ergebnisse um konkrete Pfade, ohne Zukunftseignung zu behaupten.</dd>
 
                     <dt><a class="toc-link" data-tab-target="manual" href="#simulator-szenario-log">Szenario-Log</a></dt>
                     <dd>Auswahl von 30 repräsentativen Simulationen (Perzentile, Pflege-Extremfälle, Risiko- und

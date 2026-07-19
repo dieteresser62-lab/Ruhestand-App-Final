@@ -2,9 +2,9 @@
 
 **Technische Dokumentation der DIY-Software für Ruhestandsplanung**
 
-**Dokumentstand:** 2026-07-15 (redaktionell integrierter Abschlussstand nach Architektur-, Fach-, Markt- und Forschungsabgleich)
-**Inhaltlicher Codeabgleich:** Architekturabschnitt B sowie Fachkonzept-, Rechenkonventions- und Modellgrenzen gegen Commit `6ea3e7a` und die lokale Arbeitskopie vom 2026-07-15
-**Reproduzierbarer Inventarstand:** Commit `6ea3e7a` vom 2026-07-15; Ermittlungsweg siehe Release-Checkliste
+**Dokumentstand:** 2026-07-19 (integrierter Abschlussstand nach Simulator-Backtest-Hardening Slice 09 und Abschlussaudit Slice 10)
+**Inhaltlicher Codeabgleich:** Architekturabschnitt B, Backtest-Fachkonzept C.8 sowie Rechenkonventions- und Modellgrenzen gegen Commit `dfc22a9` und die lokale Arbeitskopie vom 2026-07-19
+**Reproduzierbarer Inventarstand:** Commit `dfc22a9` vom 2026-07-19; Ermittlungsweg siehe Release-Checkliste
 **Engine API:** v31.0, Build-ID `2025-12-22_16-35`; acht exponierte Methoden, davon fünf unterstützte operative Methoden und drei deprecated No-op-Kompatibilitäts-Stubs
 **Externer Quellenstand:** Marktvergleich mit Stichtag 2026-07-15; wissenschaftliches Korpus mit 55 Records, Abrufstand 2026-07-15 und abgeschlossenem Mechanismusabgleich MAP-01 bis MAP-17
 **Lizenz:** MIT
@@ -61,7 +61,7 @@ bestandener lokaler Test ist eine Wirksamkeitsfreigabe.
 
 ## Komponenten
 
-*Reproduzierbare Momentaufnahme von Commit `6ea3e7a` am 2026-07-15. Gezählt
+*Reproduzierbare Momentaufnahme von Commit `dfc22a9` am 2026-07-19. Gezählt
 wurden die jeweils angegebenen Dateiendungen mit den Befehlen aus der
 Release-Checkliste. Dateizahlen sind Orientierungshilfen, keine normativen
 Architekturgrenzen. Spezialisierte Referenzen (`TECHNICAL.md`, Modul-READMEs,
@@ -71,10 +71,10 @@ Exportkataloge.*
 | Komponente | Zweck | Momentaufnahme |
 |------------|-------|----------------|
 | **Balance-App** | Jahresplanung: Liquidität, Entnahme, Steuern, Transaktionen, Ausgaben-Check, Pflegebucket-Diagnose, Jahresabschluss-Snapshots | 36 JS-Module unter `app/balance/` |
-| **Simulator** | Monte-Carlo-Simulation, Parameter-Sweeps, Auto-Optimize, Dynamic Flex, Stationary Bootstrap, Tail-Risk-Overlay, Pflegebucket-Wirklogik | 95 JS-Module unter `app/simulator/` |
+| **Simulator** | Monte-Carlo-Simulation, historischer Backtest, Rolling-Cohort-Diagnose, Parameter-Sweeps, Auto-Optimize, Dynamic Flex, Stationary Bootstrap, Tail-Risk-Overlay, Pflegebucket-Wirklogik | 101 JS-Module unter `app/simulator/` |
 | **Engine** | Kern-Berechnungslogik, Guardrails, Steuern, kontinuierliche Regime-Signale und VPW-Rendite-Policy | 27 MJS-Module unter `engine/` |
 | **Workers** | Parallelisierung für MC/Sweep/Optimizer-Pfade | 3 JS-Module unter `workers/` |
-| **Tests** | Unit-, Integration-, Browser-Smoke- und Coverage-Gates | 107 entdeckte `*.test.mjs`-Dateien; davon 106 im Node-Standardgate, Browser-Smoke separat |
+| **Tests** | Unit-, Integration-, Browser-Smoke- und Coverage-Gates | 119 entdeckte `*.test.mjs`-Dateien; davon 118 im Node-Standardgate, Browser-Smoke separat |
 | **Profile, Tranchen, Shared, Types** | Profilverwaltung, Profilverbund, Tranchenstatus, gemeinsame Utilities und Datenverträge | 13 + 7 + 12 JS-Module sowie 3 JS-Module unter `types/` |
 
 *Hinweis: Dieses Dokument beschreibt Konzepte und Architekturentscheidungen. Für konkrete Implementierungsdetails gelten die genannten Module und Tests als Referenz; exakte Code-Zeilen werden bewusst vermieden, weil sie nach Refactorings schnell veralten.*
@@ -120,8 +120,8 @@ Die Ruhestand-Suite kombiniert folgende Funktionen:
 
 ## Nachgezogene Entwicklungspakete seit dem Dokumentstand 2026-06-12
 
-Die Bestandsaufnahme wurde im Architekturabgleich bis Commit `6ea3e7a` und zur
-lokalen Arbeitskopie vom 2026-07-15 fortgeschrieben. Archivierte
+Die Bestandsaufnahme wurde im Architekturabgleich bis Commit `dfc22a9` und zur
+lokalen Arbeitskopie vom 2026-07-19 fortgeschrieben. Archivierte
 Arbeitsdokumente dienen nur als Entscheidungsnachweis; die folgende Einordnung
 wurde gegen aktuelle Module, Tests und aktive Referenzen abgeglichen:
 
@@ -341,17 +341,17 @@ Ein Fallback ist nur zulässig, wenn Quelle und Semantik des Ersatzpfads
 feststehen. Das bloße Weiterschreiben mit einem alten, falschen oder
 nicht zuordenbaren Wert ist weder Fallback noch Fail-safe.
 
-**Aktuelle Bestandszahlen (Commit `6ea3e7a`, ermittelt am 2026-07-15):**
+**Aktuelle Bestandszahlen (Commit `dfc22a9`, ermittelt am 2026-07-19):**
 
 - `app/balance/`: 36 JS-Module
-- `app/simulator/`: 95 JS-Module
+- `app/simulator/`: 101 JS-Module
 - `app/profile/`: 13 JS-Module
 - `app/tranches/`: 7 JS-Module
 - `app/shared/`: 12 JS-Module
 - `types/`: 3 JS-Module
 - `engine/`: 27 MJS-Module
 - `workers/`: 3 JS-Module
-- `tests/`: 107 entdeckte `*.test.mjs`-Dateien, davon 106 im
+- `tests/`: 119 entdeckte `*.test.mjs`-Dateien, davon 118 im
   Node-Standardgate; `browser-smoke.test.mjs` ist ein separates Pflichtgate
 
 ## B.1.2 Desktop-Laufzeit, Release und Netzwerkgrenzen
@@ -536,7 +536,7 @@ Der Detailkatalog in `docs/reference/BALANCE_MODULES_README.md` ergänzt diese B
 | **Profilverbund-Anbindung** | `balance-main-profilverbund.js`, `app/profile/profilverbund-balance.js`, `profilverbund-action-attribution.js`, `profilverbund-balance-ui.js` | Profilauswahl, ein Haushalts-Engine-Lauf, finale Quellen-/Steuerattribution, Asset-Summaries und getrennte Haushalts-/Profilzustände |
 | **Tranchen-Anbindung** | `app/tranches/depot-tranchen-status.js`, `app/tranches/*manager*.js`, `depot-tranchen-manager.html` | Detailtranchen laden, aggregieren, in Inputs synchronisieren, Kursaktualisierung und Status-Badge bereitstellen |
 
-**Aktueller Bestand (Commit `6ea3e7a`, ermittelt am 2026-07-15):** 36 JS-Module unter `app/balance/`. Profilverbund-, Profil- und Tranchenmodule liegen bewusst außerhalb dieses Ordners und werden von Balance genutzt.
+**Aktueller Bestand (Commit `dfc22a9`, ermittelt am 2026-07-19):** 36 JS-Module unter `app/balance/`. Profilverbund-, Profil- und Tranchenmodule liegen bewusst außerhalb dieses Ordners und werden von Balance genutzt.
 
 ### B.2.1a Zentrale Modulverantwortung
 
@@ -931,18 +931,18 @@ Der Simulator ist deshalb nicht nur ein UI-Wrapper um `EngineAPI.simulateSingleY
 | **Jahressimulation** | `simulator-engine-wrapper.js`, `simulator-engine-direct.js`, `simulator-engine-input.js`, `simulator-engine-direct-utils.js`, `simulator-year-result.js`, `simulator-household-pension.js`, `simulator-accumulation-year.js` | Jahr-für-Jahr-Simulation, Engine-Input-Mapping, Rente/Witwenlogik, Ansparjahre, Ergebnis- und Logshape |
 | **Sondersituationen nach Engine-Call** | `simulator-forced-sale.js`, `simulator-tax-recompute.js`, `simulator-bond-refill.js` | Liquiditätsdeckung nach Auszahlung, Forced Sales, Gesamt-Settlement-Recompute, 3-Bucket-Bond-Verkauf und Wiederauffüllung |
 | **Monte Carlo** | `simulator-monte-carlo.js`, `monte-carlo-runner.js`, `monte-carlo-ui.js`, `mc-run-context.js`, `mc-year-sampling.js`, `stationary-bootstrap-contract.js`, `stationary-bootstrap-sampler.js`, `tail-risk-contract.js`, `tail-risk-overlay.js`, `mc-life-events.js`, `mc-stress-tracker.js`, `mc-log-builder.js`, `mc-run-metrics.js`, `monte-carlo-aggregates.js`, `monte-carlo-runner-utils.js`, `scenario-analyzer.js` | Run-Orchestrierung, deterministische Seeds, Startjahr-/CAPE-/Bootstrap-Sampling, Tail-Risk-Overlay, Life-State, Stressmetriken, Logs, KPIs, Szenarioauswahl |
-| **Backtest, Sweep und Optimierung** | `simulator-backtest.js`, `simulator-sweep.js`, `sweep-runner.js`, `simulator-sweep-utils.js`, `simulator-heatmap.js`, `simulator-optimizer.js`, `simulator-visualization.js`, `auto_optimize*.js` | Historische Pfade, Sensitivitätsraster, Worker-kompatible Sweep-Runs, Heatmaps, Sensitivität/Pareto, automatische Parameteroptimierung |
+| **Backtest, Sweep und Optimierung** | `simulator-backtest.js`, `historical-backtest-{contract,runner,metrics,cohorts,export,ui}.js`, `simulator-sweep.js`, `sweep-runner.js`, `simulator-sweep-utils.js`, `simulator-heatmap.js`, `simulator-optimizer.js`, `simulator-visualization.js`, `auto_optimize*.js` | Versionierter historischer Daten-/Outcome-/Metrik-/Cohort-/Export-/UI-Vertrag, Sensitivitätsraster, Worker-kompatible Sweep-Runs, Heatmaps, Sensitivität/Pareto, automatische Parameteroptimierung |
 | **Ergebnisdarstellung** | `simulator-results.js`, `results-metrics.js`, `results-renderers.js`, `results-formatting.js`, `simulator-formatting.js`, `simulator-main-helpers.js` | KPI-Karten, Szenario-/Backtest-Logs, CSV/JSON-Export, Spaltenkonfiguration, Formatierung |
 | **Daten und Shared Utilities** | `simulator-data.js`, `simulator-utils.js`, `cape-utils.js`, `app/shared/shared-formatting.js` | Historische Daten, Mortalität/Pflege/Stress-Presets, RNG/Statistik, CAPE-Kandidaten, gemeinsame Formatter |
 
-**Aktueller Bestand (Commit `6ea3e7a`, ermittelt am 2026-07-15):** 95 JS-Module unter `app/simulator/`. Profil-, Tranchen- und Shared-Module liegen teilweise außerhalb des Simulator-Ordners, sind aber Teil des fachlichen Datenflusses.
+**Aktueller Bestand (Commit `dfc22a9`, ermittelt am 2026-07-19):** 101 JS-Module unter `app/simulator/`. Profil-, Tranchen- und Shared-Module liegen teilweise außerhalb des Simulator-Ordners, sind aber Teil des fachlichen Datenflusses.
 
 ### B.3.2 Hauptflüsse
 
 Der Simulator hat vier zentrale Ausführungspfade:
 
 1. **Monte Carlo:** Viele Runs über zufällig oder gewichtet gezogene historische Jahre. Ergebnisse sind Verteilungen, Perzentile, Stressmetriken und ausgewählte Szenario-Logs.
-2. **Historischer Backtest:** Ein deterministischer Pfad über echte historische Jahre. Ergebnis ist ein nachvollziehbarer Jahreslog für die Frage, ob ein Plan durch konkrete Sequenzen wie 2000-2003 oder 2008 getragen hätte.
+2. **Historischer Backtest:** Ein deterministischer Pfad ueber die eingebetteten historischen Jahresrecords. Ergebnis ist eine historische In-sample-Diagnose fuer konkrete Sequenzen wie 2000-2003 oder 2008, keine Zukunftsvalidierung oder Erfolgswahrscheinlichkeit.
 3. **Parameter-Sweep:** Systematisches Raster über erlaubte Parameter. Ergebnis sind Sensitivitäten, Heatmaps und Vergleichstabellen.
 4. **Auto-Optimize:** Kandidatengenerierung, Bewertung und Verfeinerung zur Suche nach robusten Parameterkombinationen unter Zielmetriken und Constraints.
 
@@ -1323,7 +1323,7 @@ Balance und Simulator nutzen die gleiche Erkennung für Bond-Tranchen. Der Simul
 
 ## B.5 Test-Suite und Validierungsregeln
 
-**Übersicht:** Die Test-Suite umfasst in Commit `6ea3e7a` **107 entdeckte `*.test.mjs`-Dateien**. Davon führt das Node-Standardgate 106 aus; `browser-smoke.test.mjs` bleibt ein separates Pflichtgate. Die Zahlen wurden am 2026-07-15 per Dateiinventar geprüft; die in `tests/README.md` dokumentierte Runner-Baseline wurde am 2026-07-14 mit `npm test` verifiziert. Assertions und Coverage sind Ergebnisse eines konkreten Laufs und werden deshalb nicht als dauerhafte Architekturkennzahl festgeschrieben. Die Node-Tests laufen ohne Jest/Mocha über native ESM-Module und eigene globale Assertions (`assert`, `assertEqual`, `assertClose`).
+**Übersicht:** Die Test-Suite umfasst in Commit `dfc22a9` **119 entdeckte `*.test.mjs`-Dateien**. Davon führt das Node-Standardgate 118 aus; `browser-smoke.test.mjs` bleibt ein separates Pflichtgate. Die Zahlen wurden am 2026-07-19 per Dateiinventar geprüft; die in `tests/README.md` dokumentierte Runner-Baseline wurde am selben Tag mit `npm test` verifiziert. Assertions und Coverage sind Ergebnisse eines konkreten Laufs und werden deshalb nicht als dauerhafte Architekturkennzahl festgeschrieben. Die Node-Tests laufen ohne Jest/Mocha über native ESM-Module und eigene globale Assertions (`assert`, `assertEqual`, `assertClose`).
 
 ### B.5.1 Test-Inventar
 
@@ -1335,7 +1335,7 @@ Balance und Simulator nutzen die gleiche Erkennung für Bond-Tranchen. Der Simul
 | **Balance-Jahresprozess** | `balance-annual-period.test.mjs`, `balance-annual-workflow-contract.test.mjs`, `balance-binder-snapshots.test.mjs`, `balance-annual-inflation.test.mjs`, `balance-annual-marketdata.test.mjs`, `balance-annual-cape.test.mjs` | Perioden-ID, Doppel-Commit-Sperre, Phasen, Snapshot-Read-back, Recovery sowie Stichtags-/Provenienzverträge |
 | **Persistenz und Recovery** | `persistence.test.mjs`, `snapshot-archive.test.mjs`, `snapshot-key-policy.test.mjs`, `balance-storage-contract.test.mjs`, `profile-storage.test.mjs` | Adapterwahl, Cache/Flush, Migration, Live-Replace, Snapshot-Archiv, Import-/Profilgrenzen und Korruptionszustände |
 | **Balance-App** | `balance-smoke.test.mjs`, `balance-reader.test.mjs`, `balance-diagnosis-*.test.mjs`, `balance-expenses.test.mjs`, `balance-renderer-*.test.mjs` | Initialisierung, DOM-Input, Diagnose, Ausgaben-Check und Rendering |
-| **Simulator, Monte Carlo, Sweep, Optimierung** | `simulation.test.mjs`, `simulator-*.test.mjs`, `monte-carlo-*.test.mjs`, `auto-optimizer.test.mjs`, `auto-optimize-worker-contract.test.mjs`, `scenario-analyzer.test.mjs`, `scenarios.test.mjs`, `care-meta.test.mjs`, `health-bucket.test.mjs`, `portfolio.test.mjs` | Jahresloops, Backtest, MC-Sampling, Worker-Merge, Sweep, mehrphasige Auto-Optimize-Pipeline, Pflege, Pflegebucket, Szenarien, Portfolio |
+| **Simulator, Backtest, Monte Carlo, Sweep, Optimierung** | `historical-backtest-*.test.mjs`, `historical-data-manifest.test.mjs`, `simulator-backtest*.test.mjs`, `simulation.test.mjs`, `simulator-*.test.mjs`, `monte-carlo-*.test.mjs`, `auto-optimizer.test.mjs`, `auto-optimize-worker-contract.test.mjs`, `scenario-analyzer.test.mjs`, `scenarios.test.mjs`, `care-meta.test.mjs`, `health-bucket.test.mjs`, `portfolio.test.mjs` | Daten-/Zeit-/Outcome-/Metrik-/Cohort-/Export-/UI-Vertraege, Jahresloops, MC-Sampling, Worker-Merge, Sweep, mehrphasige Auto-Optimize-Pipeline, Pflege, Pflegebucket, Szenarien, Portfolio |
 | **Neue stochastische und VPW-Contracts** | `stationary-bootstrap-contract.test.mjs`, `stationary-bootstrap-sampler.test.mjs`, `tail-risk-contract.test.mjs`, `tail-risk-overlay.test.mjs`, `longevity-*.test.mjs`, `vpw-return-policy.test.mjs`, `regime-signals.test.mjs` | Parametergrenzen, deterministische Schedules/Sampler, Nicht-Mutation, Anti-Doppelpessimismus, Horizontpuffer, CAPE-Fallbacks und kontinuierliche Signale |
 | **Profile und Profilverbund** | `profile-storage.test.mjs`, `profile-state.test.mjs`, `profile-navigation.test.mjs`, `profile-asset-values.test.mjs`, `profilverbund-balance.test.mjs`, `profilverbund-profile-gold-overrides.test.mjs`, `simulator-multiprofile-aggregation.test.mjs` | Profilregistry, Navigation/State, genau ein Haushaltslauf, Quellen-/Steuerattribution, Reconciliation, profilbezogene Tranchen und Simulatoraggregation |
 | **Worker, Utilities und Formatierung** | `worker-parity.test.mjs`, `worker-pool.test.mjs`, `utils.test.mjs`, `formatting.test.mjs`, `feature-flags.test.mjs` | deterministische Worker-Parität, Pool-Lifecycle, RNG/Statistik, Formatter, Feature-Flags |
@@ -2466,99 +2466,110 @@ gewünschten Netto-/Bruttokonvention passen.
 
 ### C.8.1 Grundkonzept
 
-Neben der Monte-Carlo-Simulation bietet die Suite einen **deterministischen historischen Backtest**, der einen Ruhestandsplan über reale historische Zeiträume simuliert.
+Neben der Monte-Carlo-Simulation bietet die Suite einen **deterministischen
+historischen Backtest**, der einen Ruhestandsplan ueber die eingebetteten,
+versionierten historischen Jahresrecords simuliert. Der Lauf ist eine
+historische In-sample-Diagnose. Er belegt weder Zukunftseignung noch eine
+Erfolgswahrscheinlichkeit; Datenvarianten, Quellen, Lizenzen, Kostenmodell und
+unangetasteter Holdout bleiben getrennte Aussagegrenzen.
 
 **Kernunterschied zu Monte Carlo:**
 
 | Aspekt | Monte Carlo | Historischer Backtest |
 |--------|-------------|----------------------|
 | Datenquelle | Zufällige Stichproben aus Historie | Exakte historische Sequenz |
-| Zeitraum | Simulationsdauer gemäß Eingabe; Sampling aus 1925-2025, optional ohne geschätzte Jahre <1950 | 1951-2025 |
+| Zeitraum | Simulationsdauer gemäß Eingabe; Sampling aus 1925-2025, optional ohne geschätzte Jahre <1950 | Provider-Bounds 1929-2025 wegen vierjaehrigem Lookback |
 | Ergebnis | Verteilung (Perzentile) | Ein deterministischer Pfad |
-| Anwendung | Risikobewertung | Validierung ("Hätte mein Plan 2008 überlebt?") |
+| Anwendung | Modellinterne Risikoverteilung | Historische In-sample-Diagnose ("Wie waere der modellierte Plan durch 2008 gelaufen?") |
 
-Die Abgrenzung ist absichtlich: Die Monte-Carlo-Datenbasis enthält auch die geschätzte Erweiterung 1925-1949. Der Backtest startet dagegen erst 1951, weil er für Renditen, ATH-/Trendkontext und historische Reihen Vorjahreswerte ab 1950 benötigt und einen nachvollziehbaren deterministischen Pfad über die belastbarere Basishistorie zeigen soll.
+Die eingebettete Datenbasis deckt 1925-2025 ab. Der Backtest-Provider leitet aus
+dem vollstaendigen vierjaehrigen Marktkontext die technischen Grenzen
+1929-2025 ab und projiziert sie in die UI. Die Periode ist inklusiv; auch
+`startYear === endYear` ist bei vollstaendigem Record/Lookback gueltig. Die
+Jahre 1925-1949 bleiben als `estimated`, zahlreiche Gold-Nullwerte als
+`unresolved` gekennzeichnet. Diese Qualitaetsmarker werden angezeigt und im
+Raw-Export erhalten.
 
-### C.8.2 Implementierung (siehe `simulator-backtest.js`)
+### C.8.2 Daten-, Zeit- und Outcome-Vertrag
 
-**Hauptfunktion:**
-```javascript
-export function runBacktest() {
-    const inputs = getCommonInputs();
-    const startJahr = parseInt(document.getElementById('simStartJahr').value);
-    const endJahr = parseInt(document.getElementById('simEndJahr').value);
+`historical-backtest-contract.js` validiert das
+`HistoricalDataManifestV1` und den kanonischen Dataset-Hash einmal je
+Revision/Content-Hash. `preparePeriod()` beziehungsweise `prepareBatch()`
+pruefen vor einer Rechenschleife jedes angeforderte Pflichtjahr und den
+Lookback. Fehlende oder nicht-finite Daten beenden fail-closed als
+`incomplete`; ein stilles Ueberspringen oder ein 0-%-Fallback ist im
+produktiven Adapter nicht zulaessig.
 
-    // Validierung: 1951-2025
-    if (startJahr < 1951 || endJahr > 2025 || startJahr >= endJahr) {
-        alert('Fehler: Bitte gültigen Zeitraum eingeben.');
-        return;
-    }
+Die aktive Zeitkonvention `realized_t_decision_t_minus_1_v1` ordnet Aktien-,
+Gold-, Cash-/Bond-, Inflations- und Lohnwerte dem Simulationsjahr `t` zu. CAPE
+bleibt als Policywert decision-as-of `t-1`. Jeder `HistoricalYearRecordV1`
+enthaelt `sourceYear`, `asOfYear`, Einheit, Ableitung und Qualitaet. Monte
+Carlo, Sweep und Worker behalten eigene Recordpfade und duerfen nicht als
+manifestgestuetzte Holdouts beschrieben werden.
 
-    // Historische Serien ab 1950 aufbauen; der Simulationspfad startet ab 1951.
-    const backtestCtx = {
-        series: {
-            wageGrowth: histYears.map(y => HISTORICAL_DATA[y].lohn_de),
-            inflationPct: histYears.map(y => HISTORICAL_DATA[y].inflation_de)
-        }
-    };
+`historical-backtest-runner.js` fuehrt die Jahresschleife DOM- und
+persistenzfrei mit eigenen kanonischen Laufkopien aus. Sein tief eingefrorenes
+`BacktestRunResultV1` unterscheidet:
 
-    // Jahr-für-Jahr-Simulation
-    for (let jahr = startJahr; jahr <= endJahr; jahr++) {
-        const jahresrenditeAktien = (HISTORICAL_DATA[jahr].msci_eur - dataVJ.msci_eur) / dataVJ.msci_eur;
-        const result = simulateOneYear(simState, adjustedInputs, yearData, yearIndex);
+- `completed`: alle angeforderten Jahre wirtschaftlich erfolgreich simuliert,
+- `ruin`: modellierter Floor-Deckungsbruch; Jahreszeile, Endportfolio und
+  Summary verwenden denselben terminalen Zustand,
+- `incomplete`: Daten-/Perioden-Preflight nicht vollstaendig,
+- `technical_error`: Engine-, Adapter- oder Result-Contractfehler; kein Ruin.
 
-        if (result.isRuin) {
-            log += `${jahr}: RUIN`;
-            if (BREAK_ON_RUIN) break;
-        }
-        simState = result.newState;
-    }
-}
-```
+`BacktestRequestV1` und Resultat fuehren unter anderem `breakOnRuin`,
+`requestedYears`, `completedYears`, `lastCompletedYear`, Dataset-/Temporal-/
+Engineprovenienz, Portfolio-Snapshots und sichere Fehlerdaten. Technische
+Fehlerpfade erzeugen keine scheinbar gueltigen Finanzmetriken. Caller-Inputs,
+Profiltranchen und Realbestand bleiben unveraendert.
 
-### C.8.3 Backtest-Ausgabe
+### C.8.3 Metriken, Summary und Rolling Cohorts
 
-**Spalten im Detail-Modus:**
+`historical-backtest-metrics.js` definiert 24 kanonische Metriken mit ID,
+Label, Einheit, nominal/real-Basis, Vorzeichen, Aggregation, Nenner,
+Displayrundung, Missingness-, Outcome- und Rohquellenregel. Dazu gehoeren
+Start-/Endvermoegen, reale Werte, Entnahmen, Floor-Shortfall, Flex-Kuerzung,
+Runway-Stress, Endwert-Max-Drawdown, Steuern, Verlusttopfwirkung,
+Pflegebucket und Outcome-Indikatoren. Die 10-%-Kuerzungsgrenze ist inklusiv
+(`>= 10 %`) und in ID, Label, UI und Export identisch.
 
-| Spalte | Beschreibung |
-|--------|--------------|
-| `Jahr` | Simulationsjahr (z.B. 2008) |
-| `Entn.` | Jahresentnahme in € |
-| `Floor` | Floor-Bedarf (inflationsbereinigt) |
-| `Rente1/Rente2` | Renteneinkünfte pro Person |
-| `Flex%` | Aktuelle Flex-Rate |
-| `WQ%` | Entnahmequote vom Depot |
-| `Status` | Marktregime + Aktion |
-| `Quote%` | Entnahmequote Ende Jahr |
-| `Runway%` | Liquiditäts-Deckungsgrad |
-| `Pf.Akt%/Pf.Gld%` | Aktien-/Gold-Rendite |
-| `Handl.A/Handl.G` | Netto-Handelsaktivität Aktien/Gold |
-| `St.` | Gezahlte Steuern |
+Summary, Tabelle, Metrikbuendel und Export verwenden dasselbe immutable
+`BacktestRunResultV1`; Rundung findet erst in der Anzeige statt. Im
+Detailmodus zeigt die Tabelle unter anderem Entnahme-/Floor-/Rentenwerte,
+Portfolio, Runway, Renditen, Handel, Steuern sowie additive
+Payout-/VPW-Diagnosen. Caption, Header-Scopes, Fokusstatus und escaped Zellwerte
+sind Teil des Accessibility-Vertrags.
+
+Optional bildet `historical-backtest-cohorts.js` alle Kandidaten mit fester
+inklusiver Horizontlaenge (`end = start + horizon - 1`). Vollstaendige Fenster
+sind `eligible`; spaete Fenster werden sichtbar als `insufficient_horizon`
+ausgeschlossen. `completed`, `ruin`, `incomplete`, `technical_error` und
+`cancelled` werden gegen das gesamte geeignete Inventar getrennt gezaehlt.
+Alle Fenster ueberlappen und stammen aus demselben bekannten Datensatz; ihre
+Anteile sind keine unabhaengige Erfolgswahrscheinlichkeit.
 
 ### C.8.4 Renten-Indexierung im Backtest
 
-Der Backtest unterstützt dynamische Rentenanpassung basierend auf historischen Daten:
-
-```javascript
-export function computeAdjPctForYear(backtestCtx, yearIndex) {
-    const { mode, pct } = backtestCtx.inputs.rentAdj;
-
-    if (mode === 'wage') {
-        return backtestCtx.series.wageGrowth[yearIndex] || 0;
-    }
-    if (mode === 'cpi') {
-        return backtestCtx.series.inflationPct[yearIndex] || 0;
-    }
-    return pct || 0;  // Fixe Anpassung
-}
-```
+Bei dynamischer Rentenanpassung verwendet der Backtest den validierten Lohn-
+beziehungsweise Inflationswert des Simulationsjahrs `t`; feste Anpassung
+verwendet den normalisierten Nutzersatz. Marker- und Off-by-one-Tests fuer
+1950, 2000 und 2001 sichern die Zuordnung. Fehlende Werte werden nicht still
+durch 0 ersetzt.
 
 ### C.8.5 Export-Funktionen
 
 | Format | Inhalt |
 |--------|--------|
-| **JSON** | Vollständige Rohdaten inkl. Metadaten |
-| **CSV** | Tabellarisch für Excel/Google Sheets |
+| **Raw-JSON** | `HistoricalBacktestExportV1` mit vollstaendigem Request, diskriminiertem Outcome, Daten-/Temporal-/Engineprovenienz, Portfolio-Snapshots, Records, Rohzeilen, Metriken, Summary und optional identischem Cohort-Inventar |
+| **Technische CSV** | `HistoricalBacktestCsvV1` mit 25 festen Rohspalten, Semikolon, Punktdezimalen, LF, leeren Missingness-Zellen sowie Formel-/Quote-/Delimiter-/Zeilenumbruchschutz |
+
+Request- und Result-Fingerprints verwenden kanonisches JSON und SHA-256.
+`exportedAt`, generierte IDs, Exportmetadaten und interne Diagnostik gehoeren
+nicht zum Result-Fingerprint. Der Detailtoggle aendert weder Raw-Rows noch
+Fingerprint. Downloads entstehen nur nach explizitem Nutzerklick, enthalten
+die vollstaendigen lokalen Finanzannahmen und werden nicht automatisch
+persistiert oder uebertragen. Das Runmanifest ist kein vollstaendiges Trial-Log
+und kein Holdout-Nachweis.
 
 ---
 
@@ -4099,8 +4110,8 @@ Ermittlungsweg sowie die jeweils zuständige Spezialreferenz.*
 | Jahressimulation | `simulator-engine-direct.js`, `simulator-engine-wrapper.js`, `simulator-engine-input.js`, `simulator-household-pension.js`, `simulator-accumulation-year.js`, `simulator-health-bucket.js`, `simulator-year-result.js` | Engine-Aufruf je Jahr, Rente/Witwenlogik, Ansparphase, Pflegebucket, Ergebnis- und Logshape |
 | Nachsteuerung | `simulator-forced-sale.js`, `simulator-tax-recompute.js`, `simulator-bond-refill.js` | Forced Sales, Steuer-Recompute nach Zusatzverkäufen, 3-Bucket-Bond-Refill |
 | Monte Carlo | `simulator-monte-carlo.js`, `monte-carlo-runner.js`, `mc-*.js`, `monte-carlo-aggregates.js`, `scenario-analyzer.js` | Runs, Sampling, Life-State, Stressmetriken, Logs und Aggregation |
-| Backtest/Sweep/Optimize | `simulator-backtest.js`, `simulator-sweep.js`, `sweep-runner.js`, `simulator-heatmap.js`, `auto_optimize*.js`, `simulator-visualization.js` | Historische Pfade, Sensitivitätsraster, Heatmaps, Optimierung, Pareto/Sensitivity |
-| Ergebnisdarstellung | `simulator-results.js`, `results-metrics.js`, `results-renderers.js`, `results-formatting.js`, `simulator-main-helpers.js` | KPI-Karten, Szenario-/Backtest-Logs, CSV/JSON-Export, Tabellenformatierung |
+| Backtest/Sweep/Optimize | `simulator-backtest.js`, `historical-backtest-{contract,runner,metrics,cohorts,export,ui}.js`, `simulator-sweep.js`, `sweep-runner.js`, `simulator-heatmap.js`, `auto_optimize*.js`, `simulator-visualization.js` | Versionierte historische Daten-, Outcome-, Metrik-, Cohort-, Raw-Export- und UI-Vertraege; Sensitivitätsraster, Heatmaps, Optimierung, Pareto/Sensitivity |
+| Ergebnisdarstellung | `simulator-results.js`, `results-metrics.js`, `results-renderers.js`, `results-formatting.js`, `simulator-main-helpers.js` | KPI-Karten, Szenario-Logs, allgemeine Ergebnisformate und Tabellenformatierung; der historische Raw-Export liegt separat in `historical-backtest-export.js` |
 | Daten/Utilities | `simulator-data.js`, `simulator-utils.js`, `cape-utils.js` | Historische Daten, Pflege-/Mortalitätsdaten, Stress-Presets, RNG/Statistik, CAPE-Auswahl |
 
 ## Worker-Module (3)

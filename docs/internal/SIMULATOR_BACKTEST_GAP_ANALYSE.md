@@ -83,6 +83,35 @@ Die gruene Suite widerlegt die GAPs nicht. Mehrere Tests sichern die aktuelle Im
 | BT-19 | D | P0 | Der Pflegebucket-Summary-Pfad liest nachweislich aus der falschen Objektebene. | `logRows` speichert `{ jahr, row, ... }`; `simulator-backtest.js:397-405` liest jedoch `lastLogRow.health_bucket_*` statt `lastLogRow.row.health_bucket_*`. | Ein aktivierter Pflegebucket erscheint im Summary nie, obwohl die Jahreszeile Werte enthaelt. Das ist ein bestehender sichtbarer Produktdefekt. | Defektes Legacy-Verhalten in Slice 01 einfrieren, kanonische Summary-Reconciliation in Slice 05 korrigieren. |
 | BT-20 | D | P0 | Der gemeinsam genutzte Rendite-Normalizer wandelt nicht-finite Jahreswerte fuer Backtest, Monte Carlo und Sweep still in 0 % um. | `simulator-year-portfolio.js:11-16` liefert bei nicht-finiten Aktien-, Gold- oder Cash-/Bondwerten jeweils 0. Damit bleibt ein fehlerhafter `yearData`-Record nach der Runnergrenze wirtschaftlich gueltig. | Daten-/Contractfehler koennen runneruebergreifend als Nullrendite fortgerechnet werden. Eine zentrale Aenderung hat zugleich breite MC-/Sweep-/Worker-Seiteneffekte. | Backtest-Preflight in Slice 03; gemeinsamer YearData-/Fehlervertrag mit Aufruferinventur und Stop-Gate in Slice 05. |
 
+## GAP-Abschlussmatrix nach Slice 10
+
+Die Statuswerte unterscheiden technische Schliessung von externen Forschungs-
+und Owner-Gates. `geschlossen` bedeutet nicht, dass ein historischer Backtest
+eine Wirksamkeits-, Zukunfts- oder Eignungsfreigabe erhalten hat.
+
+| BT-ID | Abschlussstatus | Evidenz | Verbleibende Grenze |
+| --- | --- | --- | --- |
+| BT-01 | geschlossen | Slice 04: `HistoricalYearRecordV1`, aktive Konvention `realized_t_decision_t_minus_1_v1`, Marker-/Delta-Oracles und Commit `95a31cf` | MC/Sweep/Worker behalten bewusst eigene Recordpfade; Vergleich nur mit offengelegter Zuordnung |
+| BT-02 | geschlossen | Slices 03-05: lueckenloser Perioden-/Lookback-Preflight vor dem Loop, `incomplete` statt `continue` | neue Custom-Dataset-Importpfade brauchen denselben Preflight |
+| BT-03 | geschlossen | Slice 05: gemeinsame Jahres-Outcome-Union, identischer `technical_error`-Code in Backtest/MC/Sweep, Workerparitaet | technische Fehler bleiben von fachlichen Finanzquoten ausgeschlossen |
+| BT-04 | geschlossen | Slice 05: Ruinzeile, `portfolioEnd` und Summary verwenden denselben terminalen Zustand | `breakOnRuin=false` bleibt ein regressionssensitiver Folgepfad |
+| BT-05 | geschlossen | Slices 05-06: initialisiertes Startportfolio, kanonisches Summary und `HistoricalBacktestMetricsV1` | Displayrundung bleibt reine Projektion |
+| BT-06 | geschlossen | Slices 03/04/08: Integer-/Einjahresvertrag, manifestabgeleitete Bounds 1929-2025 und feldnahe UI-Validierung | Bounds aendern sich mit einer neuen Manifestrevision |
+| BT-07 | teilweise geschlossen | Slices 03/09: versioniertes Manifest, Content-Hash, Qualitaets-/Missingnessstatus und Owner-Gates | Varianten, Quellen, Lizenzen, Vor-1950-Kette und Gold-Nulljahre bleiben `unresolved` |
+| BT-08 | geschlossen | Slices 02/07: DOM-/Persistenz-freier Runner, eigene kanonische Laufkopien, tief eingefrorenes Resultat | globale UI-Ablage bleibt eine Integrationsgrenze |
+| BT-09 | geschlossen | Slices 05/07: `BacktestRequestV1`, `BacktestRunResultV1`, `breakOnRuin`, Completion, Outcome und Provenienz | `cancelled` ist reserviert, aber kein produktiver Pfad |
+| BT-10 | geschlossen | Slice 06: 24-Metrik-Woerterbuch, Rohquellen-/Nennervertrag und inklusive `>= 10 %`-Grenze | Metrikmenge darf nicht als externe Praezision missverstanden werden |
+| BT-11 | geschlossen | Slices 06/08: feste Rolling Cohorts, vollstaendiges Outcome-/Ausschlussinventar und UI/Export-Integration | ueberlappende Fenster bleiben abhaengige In-sample-Diagnosen |
+| BT-12 | geschlossen | Slice 07: `HistoricalBacktestExportV1`, `HistoricalBacktestCsvV1`, stabile Fingerprints sowie HTML-/Formelinjektionsschutz | Export ist keine automatische Replay-Funktion |
+| BT-13 | teilweise geschlossen | Slices 07/09: Einzellaufmanifest und dokumentiertes `ResearchTrialRecordV1`-Pflichtschema | kein autorisiertes append-only Trial-Register; fruehere Versuche sind nicht vollstaendig rekonstruierbar |
+| BT-14 | geschlossen | Slices 01-08: Legacy-/Target-Oracles, fokussierte Contracttests, Gesamt- und Coverage-Gates | Coverage ersetzt kein unabhängiges Fachoracle |
+| BT-15 | geschlossen | Slice 08: deterministisches Playwright-Gate fuer Success/Negativpfade, Outcome, UI/Raw-Reconciliation, Downloads und Non-Mutation | Chromium automatisiert; weitere Browser/Screenreader bleiben manuell |
+| BT-16 | geschlossen | Slice 08: Inlinefehler, Live-/Fokusstatus, Caption, Header-Scopes, Tastaturregion und sichere technische Meldungen | keine formale WCAG-/Screenreader-Zertifizierung |
+| BT-17 | geschlossen | Slice 10: synchronisierte Nutzer-, Architektur-, Modul-, Daten-, Workflow- und Testreferenzen; Backtest konsequent als historische In-sample-Diagnose | Doku-Sync muss bei spaeteren Contractaenderungen erneut laufen |
+| BT-18 | extern blockiert | Slice 09: benannte Daten-/Methodik-, Statistik-, Metrik-, Review- und Holdout-Custodian-Gates | keine autorisierten Datenersetzungen, Kosten-Cashflows, internationalen Vergleiche oder Holdout-Auswertungen |
+| BT-19 | geschlossen | Slices 05-06: Pflegebucket-Summary aus kanonischem Resultat und gleichnamige Metrik-/UI-/Browser-Reconciliation | neue Pflegebucket-Felder muessen dieselbe Row-/Summary-Quelle behalten |
+| BT-20 | geschlossen | Slice 05: O(1)-Pflichtreturn-Guard vor Mutation/Engineaufruf; Backtest/MC/Sweep-Codeparitaet und null Engineaufrufe bei Reject | Inflation/Lohn werden im Backtest-Datencontract validiert; breitere MC-Guards bleiben getrenntes Risiko |
+
 ## Befundgruppen und Abhaengigkeiten
 
 ### 1. Zuerst zu sichern: Mess- und Ausfuehrungsvertrag

@@ -3,7 +3,7 @@
 **Arbeitsplan:** [SIMULATOR_BACKTEST_HARDENING_PLAN.md](./SIMULATOR_BACKTEST_HARDENING_PLAN.md)<br>
 **Feature-Branch:** `codex/simulator-backtest-gap-plan`<br>
 **GitHub-Status:** nur lokal; Veroeffentlichung ausstehend und nur nach Nutzerfreigabe<br>
-**Status:** implementiert und selbstgeprueft; externe Forschungsarbeit bleibt blockiert, adversariales Review ausstehend<br>
+**Status:** freigegeben; Gemini-Review abgeschlossen, lokal committed als `dfc22a9`; externe Forschungsarbeit bleibt blockiert<br>
 **Abhaengigkeit:** kann nach Datenmanifest aus Slice 03 beginnen; Laufmanifest-/Trial-Verweise werden nach Slice 07 finalisiert<br>
 **GAPs:** BT-07, BT-13, BT-17, BT-18
 
@@ -232,7 +232,7 @@ Forschungsbacklog, Evidenzregister und in `DATA_SOURCES.md` eingetragen.
 
 ## Freigabestatus
 
-Freigegeben am 2026-07-19. Die Akzeptanzkriterien für Forschungsfragen-Abgrenzung, Datenlizenzierung, Holdout-Regeln und Evidenzregister sind vollständig in Dokumentation gegossen. Der Evidenz-Validator läuft erfolgreich durch. Ein lokaler Commit wird durchgeführt.
+Freigegeben am 2026-07-19 und lokal als `dfc22a9` committed. Die Akzeptanzkriterien fuer Forschungsfragen-Abgrenzung, Datenlizenzierung, Holdout-Regeln und Evidenzregister sind dokumentiert; der Evidenz-Validator war gruen.
 
 ## Review-Feedback von Gemini
 
@@ -247,11 +247,12 @@ Freigegeben am 2026-07-19. Die Akzeptanzkriterien für Forschungsfragen-Abgrenzu
 
 ## Review-Feedback von Claude
 
-Noch offen.
+Nicht durchgefuehrt; fuer diesen Slice ist kein optionales Claude-Zweitreview eingetragen.
 
 ## Review-Antworten von Codex
 
-Noch offen.
+- Das Gemini-Finding bestaetigt die beabsichtigte Grenze: Slice 09 schliesst Gate- und Ownerdokumentation, nicht die externen Daten-, Lizenz-, Kosten- oder Holdoutluecken.
+- Alle ungeklärten Felder bleiben `unresolved`; neue Daten, Kosten-Cashflows, Trial-Persistenz oder eine Wirksamkeitsaussage benoetigen eigene freigegebene Folgearbeitsdokumente.
 
 ## Review-Entscheidungen
 

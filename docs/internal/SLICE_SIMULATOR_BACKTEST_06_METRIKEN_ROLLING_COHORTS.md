@@ -3,7 +3,7 @@
 **Arbeitsplan:** [SIMULATOR_BACKTEST_HARDENING_PLAN.md](./SIMULATOR_BACKTEST_HARDENING_PLAN.md)  
 **Feature-Branch:** `codex/simulator-backtest-gap-plan`  
 **GitHub-Status:** nur lokal; Veroeffentlichung ausstehend und nur nach Nutzerfreigabe  
-**Status:** implementiert und selbstgeprueft; adversariales Review ausstehend  
+**Status:** freigegeben; Gemini-Review abgeschlossen, lokal committed als `04dcafc`
 **Abhaengigkeit:** Slices 04-05 freigegeben  
 **GAPs:** BT-10, BT-11, BT-13, BT-18, BT-19
 
@@ -206,7 +206,7 @@ Rollback-Strategie:
 - Zu viele KPIs koennen falsche Praezision erzeugen; Metriken brauchen klare Aussagegrenzen.
 - Der Cohort-Runner ist in Slice 06 bewusst noch kein UI-Einstieg; UI/A11y folgt in Slice 08 und der reproduzierbare Download in Slice 07.
 - Cohort-Ergebnisse enthalten vollstaendige Single-Path-Resultate und koennen bei sehr vielen/langen Fenstern speicherintensiv werden. Ein spaeterer kompakter Export darf Rohwerte nur projizieren, nicht neu berechnen.
-- Das adversariale Review durch Gemini/Claude beziehungsweise die finale Nutzerfreigabe steht aus; Codex markiert die eigene Implementierung nicht als freigegeben.
+- Das Gemini-Review ist abgeschlossen; der optionale Claude-Zweitreview wurde nicht durchgefuehrt. Speicherlast und Aussagegrenze bleiben dokumentierte Restrisiken.
 
 ## Rueckdokumentation
 
@@ -214,7 +214,7 @@ Metrikwörterbuch, D-05, Cohort-Inventarvertrag, Golden-Case- und Gesamttesterge
 
 ## Freigabestatus
 
-Freigegeben am 2026-07-19. Die Akzeptanzkriterien für Metriken und Rolling Cohorts sind vollumfänglich erfüllt. Sämtliche 5603 Assertions der Testsuite laufen fehlerfrei durch. Ein lokaler Commit wird durchgeführt.
+Freigegeben am 2026-07-19 und lokal als `04dcafc` committed. Die Slice-Ausfuehrung dokumentierte 5603/5603 Assertions.
 
 ## Review-Feedback von Gemini
 
@@ -229,16 +229,17 @@ Freigegeben am 2026-07-19. Die Akzeptanzkriterien für Metriken und Rolling Coho
 
 ## Review-Feedback von Claude
 
-Noch offen.
+Nicht durchgefuehrt; fuer diesen Slice ist kein optionales Claude-Zweitreview eingetragen.
 
 ## Review-Antworten von Codex
 
-Noch offen.
+- Die Speicherlast vollstaendiger Cohort-Resultate bleibt als offenes Skalierungsrisiko bestehen; eine kompakte Neuberechnung oder stilles Abschneiden wurde nicht eingefuehrt.
+- Das Gemini-Pre-Mortem zu `eligible=0` ist in Slice 08 durch `null`/`—`-Projektion und Node-/Browsertests ohne `NaN` oder Division durch null abgedeckt.
 
 ## Review-Entscheidungen
 
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
 | --- | --- | --- | --- | --- |
-| D-05 | Nutzer/Reviewer | Rolling-Cohort-Scope und Aussagegrenze | angenommen durch Nutzerauftrag vom 2026-07-19 auf Basis des freigegebenen Plans | implementiert; Review ausstehend |
+| D-05 | Nutzer/Reviewer | Rolling-Cohort-Scope und Aussagegrenze | angenommen, implementiert und durch Gemini freigegeben | lokal committed als `04dcafc`; In-sample-/Nullnenner-Vertrag in Slice 08 weiter integriert |
 | C-05 | Claude | Exakt 10 % muss mit Operator, ID und Label konsistent sein | angenommen | `>= 10`, `gte_10_pct`, Summarylabel `≥ 10 %` und Golden Case umgesetzt |
 | G-F-06 | Gemini | Summary/UI/Export duerfen Metriken nicht neu berechnen oder runden | angenommen | kanonische immutable IDs/Rohwerte in Result und Summary; Exportprojektion folgt Slice 07 |

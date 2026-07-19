@@ -4,7 +4,7 @@
 **Autor:** Codex (Planentwurf, keine Review-Freigabe)  
 **Feature-Branch:** `codex/simulator-backtest-gap-plan`  
 **GitHub-Status:** Branch nur lokal angelegt; Veroeffentlichung ausstehend und nur nach Nutzerfreigabe  
-**Status:** freigegeben; bereit für die Umsetzung (Slices 01-10 freigegeben)  
+**Status:** Slices 01-09 freigegeben und lokal committed; Slice 10 implementiert/selbstgeprueft, Abschlussreview ausstehend
 **Grundlage:** [SIMULATOR_BACKTEST_GAP_ANALYSE.md](./SIMULATOR_BACKTEST_GAP_ANALYSE.md)
 
 ## Ziel
@@ -130,19 +130,19 @@ Backtest, Monte Carlo und Sweep muessen denselben Adapterfehler gleich klassifiz
 
 | ID | Entscheidung | Planvorschlag | Freigabebedarf |
 | - | - | - | - |
-| D-01 | Jahres-/As-of-Konvention | In Slice 04 umgesetzt: realisierte Markt-/Makrowerte mit Label `t`; CAPE/Policy mit `sourceYear/asOfYear=t-1`. Jede Abweichung zu Monte Carlos aktivem `annualData` wird feldweise ausgewiesen. | Erneutes Gemini-Review und Nutzerfreigabe fuer Slice 04 ausstehend |
+| D-01 | Jahres-/As-of-Konvention | In Slice 04 umgesetzt: realisierte Markt-/Makrowerte mit Label `t`; CAPE/Policy mit `sourceYear/asOfYear=t-1`. Jede Abweichung zu Monte Carlos aktivem `annualData` wird feldweise ausgewiesen. | durch Gemini freigegeben; lokaler Commit `95a31cf` |
 | D-02 | Einjahreslauf | Als gueltige Diagnose zulassen, sofern genau ein vollstaendiger YearRecord verfuegbar ist. | Review im Slice 03 |
 | D-03 | Missingness | Pflichtreihe `missing` -\> Lauf `incomplete`; `fallback\_zero` nur explizit und sichtbar, nicht durch `|| 0`. | Review im Slice 03 |
-| D-04 | Ruin | In Slice 05 implementiert: Fachlicher Floor-Deckungsausfall bleibt `ruin`; Engine-/Contractfehler werden `technical\_error`; Ruinendwert ist der terminale Zustand nach Markt/Verkaeufen und vor der nicht deckbaren Auszahlung. | Nutzerauftrag zur Implementierung liegt vor; finales Review/Freigabe ausstehend |
-| D-05 | Rolling Cohorts | In Slice 06 umgesetzt: positive ganzzahlige, inklusive Horizontlaenge; alle Startjahre als Kandidaten; nur vollstaendige feste Fenster `eligible`; Anspar-/Policyinputs je Cohort unveraendert; getrenntes Outcome-/Ausschlussinventar; ueberlappende In-sample-Diagnose ohne Erfolgswahrscheinlichkeitsaussage. | Nutzerauftrag vom 2026-07-19 liegt vor; finales Slice-Review ausstehend |
+| D-04 | Ruin | In Slice 05 implementiert: Fachlicher Floor-Deckungsausfall bleibt `ruin`; Engine-/Contractfehler werden `technical\_error`; Ruinendwert ist der terminale Zustand nach Markt/Verkaeufen und vor der nicht deckbaren Auszahlung. | durch Gemini freigegeben; lokaler Commit `2c4861d` |
+| D-05 | Rolling Cohorts | In Slice 06 umgesetzt: positive ganzzahlige, inklusive Horizontlaenge; alle Startjahre als Kandidaten; nur vollstaendige feste Fenster `eligible`; Anspar-/Policyinputs je Cohort unveraendert; getrenntes Outcome-/Ausschlussinventar; ueberlappende In-sample-Diagnose ohne Erfolgswahrscheinlichkeitsaussage. | durch Gemini freigegeben; lokaler Commit `04dcafc` |
 | D-06 | Trial-Persistenz | Slice 07 exportiert ein vollstaendiges Einzellaufmanifest. Slice 09 definiert das spaetere `ResearchTrialRecordV1`-Pflichtschema, autorisiert aber keine Persistenz. | ausdruecklicher neuer Nutzerentscheid plus Speicher-/Datenschutzvertrag und eigenes Arbeitsdokument |
 | D-07 | Historische Datenquellen | Alle unbelegten Varianten, Quellen und Lizenzen bleiben `unresolved`; die externe Ursprungskette vor 1950 und 42 Gold-Nulljahre bleiben blockierend inventarisiert. | Daten-/Kapitalmarktmethodik-Owner nicht benannt |
 | D-08 | Kostenmodell | Slice 09 inventarisiert Produktkosten, Transaktionskosten, Spread, Slippage, FX, Rebalancing und Steuerumfang als `modelled`, `not_modelled` oder `unresolved`; keine Cashflow-Semantik wurde geaendert. | Nutzer + Fachowner + FQ-01-Inventarplan + neues Review |
-| D-09 | Shared YearData/Fehler | In Slice 05 implementiert: O(1)-Guard fuer nicht-finite Aktien-, Gold- und Cash-/Bondreturns vor Portfoliomutation und Engineaufruf; Ziel ist `technical_error`. Aufruferinventur, Performancebaseline, Workerparitaet und unveraenderte Engine-Fachsemantik sind nachgewiesen. | Nutzerauftrag zur Implementierung liegt vor; finales Review/Freigabe ausstehend |
+| D-09 | Shared YearData/Fehler | In Slice 05 implementiert: O(1)-Guard fuer nicht-finite Aktien-, Gold- und Cash-/Bondreturns vor Portfoliomutation und Engineaufruf; Ziel ist `technical_error`. Aufruferinventur, Performancebaseline, Workerparitaet und unveraenderte Engine-Fachsemantik sind nachgewiesen. | durch Gemini freigegeben; lokaler Commit `2c4861d` |
 
 ### Umgesetzte canonical Alignment-Tabelle fuer D-01
 
-Diese Tabelle beschreibt den in Slice 04 implementierten Zielcontract. Sie ist noch keine finale Slice-Freigabe:
+Diese Tabelle beschreibt den in Slice 04 implementierten und durch Gemini freigegebenen Zielcontract:
 
 | Feld im Simulationsjahr `t` | Planvorschlag | Legacy-Backtest | Aktives Monte-Carlo-`annualData` | Freigabenachweis |
 | --- | --- | --- | --- | --- |
@@ -199,13 +199,13 @@ Die Zielwerte nach D-01 sind als neue `target_expected`-Oracles neben den unvera
 | 01 | [SLICE_SIMULATOR_BACKTEST_01_BASELINE_MESSVERTRAG.md](./SLICE_SIMULATOR_BACKTEST_01_BASELINE_MESSVERTRAG.md) | Baseline, Golden-/Negative-Cases und Metrikwörterbuch einfrieren | Arbeitsdokument freigegeben | abgeschlossen |
 | 02 | [SLICE_SIMULATOR_BACKTEST_02_DOM_FREIER_RUNNER.md](./SLICE_SIMULATOR_BACKTEST_02_DOM_FREIER_RUNNER.md) | DOM-freien Runner und Request/Result-Grundshape extrahieren, ohne Semantikdelta | Slice 01 gruen/freigegeben | abgeschlossen |
 | 03 | [SLICE_SIMULATOR_BACKTEST_03_DATEN_JAHRES_CONTRACT.md](./SLICE_SIMULATOR_BACKTEST_03_DATEN_JAHRES_CONTRACT.md) | Manifest, einmalige Validierung, Missingness, Perioden- und HistoricalYearRecord-Vertrag | Slices 01-02 gruen/freigegeben | abgeschlossen |
-| 04 | [SLICE_SIMULATOR_BACKTEST_04_ZEITACHSEN_UMSETZUNG.md](./SLICE_SIMULATOR_BACKTEST_04_ZEITACHSEN_UMSETZUNG.md) | Zeitachsensynchronisation | D-01/D-03 entschieden, Slices 01-03 | implementiert und getestet; erneutes Review ausstehend |
+| 04 | [SLICE_SIMULATOR_BACKTEST_04_ZEITACHSEN_UMSETZUNG.md](./SLICE_SIMULATOR_BACKTEST_04_ZEITACHSEN_UMSETZUNG.md) | Zeitachsensynchronisation | D-01/D-03 entschieden, Slices 01-03 | abgeschlossen, freigegeben und lokal committet |
 | 05 | [SLICE_SIMULATOR_BACKTEST_05_OUTCOME_RUIN_FEHLER.md](./SLICE_SIMULATOR_BACKTEST_05_OUTCOME_RUIN_FEHLER.md) | Gemeinsame Adapterfehler, Ruin, incomplete und technische Fehler in Backtest/MC/Sweep trennen; Summary reconciliieren | Slices 02-03; D-04/D-09 | abgeschlossen, freigegeben und lokal committet |
 | 06 | [SLICE_SIMULATOR_BACKTEST_06_METRIKEN_ROLLING_COHORTS.md](./SLICE_SIMULATOR_BACKTEST_06_METRIKEN_ROLLING_COHORTS.md) | Reconciliierbares Ergebnisbuendel und Rolling-Cohort-In-sample-Diagnose | Slices 04-05; D-05 durch Nutzerauftrag entschieden | abgeschlossen, freigegeben und lokal committet |
 | 07 | [SLICE_SIMULATOR_BACKTEST_07_EXPORT_REPRODUZIERBARKEIT.md](./SLICE_SIMULATOR_BACKTEST_07_EXPORT_REPRODUZIERBARKEIT.md) | Versionierter Raw-Export und Laufmanifest, getrennt von Displayformatierung | Slices 02-03/05; Metrikteil aus 06, Cohortteil optional nach D-05 | abgeschlossen, freigegeben und lokal committet |
-| 08 | [SLICE_SIMULATOR_BACKTEST_08_UI_BROWSER_ACCESSIBILITY.md](./SLICE_SIMULATOR_BACKTEST_08_UI_BROWSER_ACCESSIBILITY.md) | UI-Validierung, Status/A11y und Browser-End-to-End-Gate | Slice 05; Exportteil nach 07, optionaler Cohortteil nach 06 | implementiert und selbstgeprueft; adversariales Review ausstehend |
-| 09 | [SLICE_SIMULATOR_BACKTEST_09_FORSCHUNGS_GATES.md](./SLICE_SIMULATOR_BACKTEST_09_FORSCHUNGS_GATES.md) | Daten-, Kosten-, Trial- und Holdout-Gates operationalisieren; Folgevorhaben abgrenzen | Start nach Slice 03; Laufmanifest-Verweise nach Slice 07; externe Owner | implementiert und selbstgeprueft; Forschungsarbeit extern blockiert, Review ausstehend |
-| 10 | [SLICE_SIMULATOR_BACKTEST_10_INTEGRATION_DOKUMENTATION.md](./SLICE_SIMULATOR_BACKTEST_10_INTEGRATION_DOKUMENTATION.md) | Gesamtintegration, Doku-Sync, Coverage- und Release-Readiness-Bericht | Slices 01-09 | nicht gestartet |
+| 08 | [SLICE_SIMULATOR_BACKTEST_08_UI_BROWSER_ACCESSIBILITY.md](./SLICE_SIMULATOR_BACKTEST_08_UI_BROWSER_ACCESSIBILITY.md) | UI-Validierung, Status/A11y und Browser-End-to-End-Gate | Slice 05; Exportteil nach 07, optionaler Cohortteil nach 06 | abgeschlossen, freigegeben und lokal committet |
+| 09 | [SLICE_SIMULATOR_BACKTEST_09_FORSCHUNGS_GATES.md](./SLICE_SIMULATOR_BACKTEST_09_FORSCHUNGS_GATES.md) | Daten-, Kosten-, Trial- und Holdout-Gates operationalisieren; Folgevorhaben abgrenzen | Start nach Slice 03; Laufmanifest-Verweise nach Slice 07; externe Owner | abgeschlossen, freigegeben und lokal committet; Forschungsarbeit extern blockiert |
+| 10 | [SLICE_SIMULATOR_BACKTEST_10_INTEGRATION_DOKUMENTATION.md](./SLICE_SIMULATOR_BACKTEST_10_INTEGRATION_DOKUMENTATION.md) | Gesamtintegration, Doku-Sync, Coverage- und Release-Readiness-Bericht | Slices 01-09 | implementiert und selbstgeprueft; Review ausstehend |
 
 ### Ausfuehrungs-DAG und Parallelisierung
 
@@ -307,13 +307,13 @@ Zusaetzlich zu `AGENTS.md` und `SLICE\_EXECUTION\_RULES.md` gilt:
 | 01 | abgeschlossen | fokussiert und `npm test` gruen | freigegeben | abgeschlossen |
 | 02 | abgeschlossen | fokussiert, `npm test`, Browser und Coverage gruen | freigegeben | abgeschlossen |
 | 03 | abgeschlossen | fokussiert und `npm test` gruen | freigegeben | abgeschlossen |
-| 04 | abgeschlossen | fokussiert und `npm test` gruen | nach Blockerbehebung erneut offen | abgeschlossen |
+| 04 | abgeschlossen | fokussiert und `npm test` gruen | freigegeben | abgeschlossen |
 | 05 | abgeschlossen | fokussiert, `npm test`, Coverage und Performance gruen | freigegeben | abgeschlossen |
-| 06 | abgeschlossen | fokussiert und `npm test` gruen | offen | abgeschlossen |
-| 07 | abgeschlossen | fokussiert, `npm test` und Browser-Smoke gruen | offen | abgeschlossen |
-| 08 | abgeschlossen | fokussiert, `npm test` und Browser gruen | offen | abgeschlossen |
-| 09 | abgeschlossen (nur Dokumentation) | Doku-Gates und `npm test` gruen | offen | abgeschlossen |
-| 10 | nicht gestartet | offen | offen | offen |
+| 06 | abgeschlossen | fokussiert und `npm test` gruen | freigegeben | abgeschlossen |
+| 07 | abgeschlossen | fokussiert, `npm test` und Browser-Smoke gruen | freigegeben | abgeschlossen |
+| 08 | abgeschlossen | fokussiert, `npm test` und Browser gruen | freigegeben | abgeschlossen |
+| 09 | abgeschlossen (nur Dokumentation) | Doku-Gates und `npm test` gruen | freigegeben | abgeschlossen |
+| 10 | abgeschlossen | fokussiert, Doku, `npm test`, Browser und Coverage gruen | offen | abgeschlossen |
 
 ### Slice 01: rueckdokumentierter Iststand
 
@@ -360,7 +360,7 @@ Zusaetzlich zu `AGENTS.md` und `SLICE\_EXECUTION\_RULES.md` gilt:
 - Die unveraenderte Legacy-Fixture `simulator-backtest-baseline-v1.json` bleibt getrennt von `simulator-backtest-target-v1.json`. Letztere enthaelt `BacktestTemporalDeltaReportV1` mit Ursachen pro geaenderter Metrik, historischen Endvermoegensdeltas, unveraendert 1/6 Ruinfaellen und der dokumentierten Nichtbetroffenheit der direkten Optimizer-/Risikoprofil-/MC-/Sweep-/Workerpfade.
 - Beispiel-Deltas: 2000-2005 Endvermoegen -5.209,18 EUR; 1960-2020 -156.153,94 EUR; Dynamic-Flex/CAPE 2010-2013 +39.114,73 EUR. Alle positiven Zielfaelle bleiben unter einem Euro absolutem FlowDelta; der lange Negativzinsfall reconciliiert auf 0.
 - Validierung: Contract 163/163, Runner 61/61, Characterization 67/67, Produktbacktest 51/51, Worker-Paritaet 369/369 und Gesamtsuite mit 115 Testdateien und 5.155/5.155 Assertions; 0 fehlgeschlagene Dateien und 0 offene Handles.
-- Restrisiken: weitere nicht-negative Geldnormalisierungen koennten Deflation still kappen; alternative Custom-Datasets benoetigen zusaetzliche Randjahres-/Lookback-Importtests. Implementierung und Selbstpruefung sind abgeschlossen, erneutes Gemini-Review/Nutzerfreigabe und Commit stehen aus.
+- Restrisiken: weitere nicht-negative Geldnormalisierungen koennten Deflation still kappen; alternative Custom-Datasets benoetigen zusaetzliche Randjahres-/Lookback-Importtests. Gemini hat den Slice freigegeben; lokaler Commit `95a31cf`.
 
 ### Slice 05: rueckdokumentierter Implementierungsstand
 
@@ -370,7 +370,7 @@ Zusaetzlich zu `AGENTS.md` und `SLICE\_EXECUTION\_RULES.md` gilt:
 - Monte Carlo zaehlt technische Pfade weder als Erfolg noch als Ruin, fuehrt ein separates technisches Inventar und setzt den Batch bei mindestens einem technischen Pfad fail-closed auf `technical_error`; Headlinemetriken sind dann ungueltig und werden nicht dargestellt. Main-/Worker-/Auto-Optimize-Merges sind additiv. Sweep behaelt seine Invalid-Combo-Semantik und denselben Adapterfehlercode.
 - Der O(1)-Guard prueft Aktien-, Gold- und Cash-/Bondreturn vor jeder Jahresmutation; bei Rejection erfolgen null Engineaufrufe. Eine Aenderung an `engine/`, der oeffentlichen `EngineAPI`, Spending, Floor oder Forced Sale war nicht erforderlich.
 - Validierung: fokussiert unter anderem Runner 101/101, Characterization 67/67, Produktbacktest 51/51, Monte Carlo 140/140, Sweep 107/107 und Worker-Paritaet 369/369; `npm test` sowie Coverage-Gate mit 115 Testdateien und 5226/5226 Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles. Gesamtcoverage 73,36 %.
-- Performance, Median aus je drei Laeufen: Monte Carlo 466,9 ms gegen 453 ms Baseline (+3,1 %), Sweep 365,8 ms gegen 410 ms Baseline (-10,8 %); beide innerhalb der maximalen +25 %. Exakt zehn Programmdateien einschliesslich Ziel-Fixture wurden geaendert. Implementierung/Selbstpruefung sind abgeschlossen; adversariales Review, Nutzerfreigabe, Commit und Push stehen aus.
+- Performance, Median aus je drei Laeufen: Monte Carlo 466,9 ms gegen 453 ms Baseline (+3,1 %), Sweep 365,8 ms gegen 410 ms Baseline (-10,8 %); beide innerhalb der maximalen +25 %. Exakt zehn Programmdateien einschliesslich Ziel-Fixture wurden geaendert. Gemini hat den Slice freigegeben; lokaler Commit `2c4861d`; Push steht weiterhin nur nach Nutzerfreigabe an.
 
 ### Slice 06: rueckdokumentierter Implementierungsstand
 
@@ -404,7 +404,7 @@ Zusaetzlich zu `AGENTS.md` und `SLICE\_EXECUTION\_RULES.md` gilt:
 - Das Playwright-Gate wartet auf den fachlichen Status statt auf 500 ms. Es prueft completed samt Cohorts, UI/Raw-Reconciliation fuer Periode, Outcome, Jahre, exakte 10-%-Metrik und Pflegebucket, JSON/CSV ohne HTML, Detailtoggle, Realbestands-Non-Mutation, leere/NaN-/nicht-ganzzahlige/rueckwaertige/out-of-bounds Fenster, synthetische mittlere Datenluecke, Ruin und `technical_error` ohne Alerts/Stackdetails.
 - Das Characterization-Zieloracle wurde ausschliesslich fuer die erwartete sichtbare Summary- und Inline-Statusprojektion fortgeschrieben. Kanonische Row-Hashes, Finanzwerte, Ruinfrequenz und FlowDelta-Invarianten blieben unveraendert.
 - Validierung: Syntaxchecks gruen; Backtest-UI 39/39, UI-Orchestrierung 37/37, Produktbacktest 56/56, Characterization 71/71 und 3-Bucket 15/15 Assertions gruen. `npm test` bestand 119 Testdateien mit 5722/5722 Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles. Das vollstaendige Chromium-Browser-Gate bestand alle 14 Einstiegspunkt-/Zusatzflows und wurde nach Doku-Sync erneut gruen ausgefuehrt.
-- Vier produktive Programmdateien wurden geaendert beziehungsweise neu angelegt. Engine-/Runner-/Zeitachsen-/Metriksemantik, MC/Sweep/Optimizer, Worker, Persistenz und generierte Artefakte blieben unveraendert. Implementierung und Selbstpruefung sind abgeschlossen; adversariales Review, Nutzerfreigabe und Commit stehen aus.
+- Vier produktive Programmdateien wurden geaendert beziehungsweise neu angelegt. Engine-/Runner-/Zeitachsen-/Metriksemantik, MC/Sweep/Optimizer, Worker, Persistenz und generierte Artefakte blieben unveraendert. Gemini hat den Slice freigegeben; lokaler Commit `ae32452`.
 
 ### Slice 09: rueckdokumentierter Implementierungsstand
 
@@ -414,7 +414,38 @@ Zusaetzlich zu `AGENTS.md` und `SLICE\_EXECUTION\_RULES.md` gilt:
 - Das dokumentarische `ResearchTrialRecordV1`-Schema umfasst Protokoll-/Code-/Datenhashes, Kandidatenraum, Seeds, Runmanifest, Ergebnisse einschliesslich Fehler/Abbruch, Nutzerinteraktionen, Append-only-Integritaet und Datenschutz. Slice 09 autorisiert keine Trial-Persistenz. `HistoricalBacktestExportV1` bleibt ein Manifest eines explizit exportierten Einzellaufs, nicht Trial-Log oder Holdout-Nachweis.
 - Die gesamte sichtbare Historie 1925-2025, alle abgeleiteten Backtestfenster, Rolling Cohorts und bisher betrachteten Policies gelten bestaetigungsbezogen als explorativ/kontaminiert. Es gibt keinen unangetasteten Holdout. Ein spaeterer Holdout benoetigt einen vorab benannten Custodian, gesperrte/hash-identifizierte neue Partitionen und einmalige Freigabe.
 - Aktuell zulaessige Produkttexte sind auf `historische In-sample-Diagnose`, `technisch getestet` und `unter diesen Annahmen beobachtet` begrenzt. Als naechstes ist nach Benennung des Daten-/Kapitalmarktmethodik-Owners nur ein reines `FQ01_DATEN_KOSTEN_INVENTAR_PLAN.md` zulaessig; Datenersetzung, internationale Daten, Kosten-Cashflows, Trial-Logging und Policyvergleich bleiben getrennte Folgearbeitsdokumente.
-- Geaendert wurden nur Markdown-Dateien. `npm run docs:evidence` sowie die fokussierten Architektur-/Lizenztests sind gruen; `npm test` bestand 119 Testdateien mit 5722/5722 Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles. Das adversariale Review steht aus; die externen Gate-Blockaden sind ein beabsichtigtes Ergebnis und keine Slice-09-Implementierungsluecke.
+- Geaendert wurden nur Markdown-Dateien. `npm run docs:evidence` sowie die fokussierten Architektur-/Lizenztests sind gruen; `npm test` bestand 119 Testdateien mit 5722/5722 Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles. Gemini hat den Slice freigegeben; lokaler Commit `dfc22a9`. Die externen Gate-Blockaden sind ein beabsichtigtes Ergebnis und keine Slice-09-Implementierungsluecke.
+
+### Slice 10: rueckdokumentierter Implementierungsstand
+
+- Nutzer-, Architektur-, Daten-, Workflow-, Modul- und Testreferenzen stimmen
+  beim Zeitraum-/As-of-Vertrag, diskriminierten Outcome, Metrik-/Cohortvertrag,
+  Raw-Export und der Aussagegrenze „historische In-sample-Diagnose“ ueberein.
+  Drei ueberholte „Realitaetscheck“-Texte in `Handbuch.html` wurden als reine
+  Dokumentationsabweichung ohne DOM-/Logikaenderung korrigiert.
+- Die GAP-Abschlussmatrix klassifiziert 17 BT-IDs als `geschlossen`, BT-07 und
+  BT-13 als `teilweise geschlossen` sowie BT-18 als `extern blockiert`. Alle
+  G-F-01-bis-G-F-07- und C-01-bis-C-09-Auflagen besitzen einen finalen
+  technischen Nachweis; methodische/externe Grenzen bleiben ausdruecklich
+  offen.
+- Fokussiert gruen: Contract 169/169, Manifest 274/274, Runner 121/121,
+  Metriken 298/298, Cohorts 59/59, Export 57/57, UI 39/39,
+  Produktbacktest 56/56, Characterization 71/71, Monte Carlo 140/140, Sweep
+  107/107 und Worker-Paritaet 369/369 Assertions.
+- `npm run docs:evidence`, `npm test` (119 entdeckte Dateien, 118 im Node-Gate,
+  5722/5722 Assertions, 0 Fehler, 0 offene Handles), `npm run test:browser`
+  (14/14 Flows) und `npm run test:coverage` sind gruen. Gesamtcoverage 73,85 %
+  (29132/39446 Zeilen in 201 Dateien), +0,49 Prozentpunkte gegenueber Slice 05.
+  Backtest-Kernmodule liegen zwischen 71,88 % (`simulator-backtest.js`) und
+  93,95 % (`historical-backtest-metrics.js`).
+- Aktuelle Performanceprobe gegen die Slice-05-Baselines: Monte Carlo Median
+  512,7 ms gegen 453 ms (+13,2 %), Sweep Median 449,5 ms gegen 410 ms (+9,6 %);
+  beide innerhalb des +25-%-Gates. Cache-/Preflight-Call-Counts, null
+  Engineaufrufe bei Return-Reject und Main-/Worker-Paritaet bleiben gruen.
+- Keine Rechen-, Engine-, Worker-, Persistenz- oder generierte Datei wurde
+  geaendert. `npm run build:engine` und Release-/EXE-Build waren nicht
+  erforderlich beziehungsweise nicht autorisiert. Implementierung und
+  Selbstpruefung sind abgeschlossen; Codex erteilt keine Eigenfreigabe.
 
 
 ## Review-Auftrag

@@ -3,7 +3,7 @@
 **Arbeitsplan:** [SIMULATOR_BACKTEST_HARDENING_PLAN.md](./SIMULATOR_BACKTEST_HARDENING_PLAN.md)  
 **Feature-Branch:** `codex/simulator-backtest-gap-plan`  
 **GitHub-Status:** nur lokal; Veroeffentlichung ausstehend und nur nach Nutzerfreigabe  
-**Status:** in Umsetzung; Gemini-Blocker werden behoben, erneutes Review ausstehend  
+**Status:** freigegeben; Gemini-Review abgeschlossen, lokal committed als `95a31cf`
 **Abhaengigkeit:** Slices 01-03 freigegeben; D-01/D-03 entschieden  
 **GAPs:** BT-01, BT-02, BT-06, BT-07
 
@@ -232,7 +232,7 @@ Freigegeben am 2026-07-19. Sämtliche Blocker wurden behoben, alle 5155 Assertio
 
 ## Review-Feedback von Claude
 
-Noch offen.
+Nicht durchgefuehrt; fuer diesen Slice ist kein optionales Claude-Zweitreview eingetragen.
 
 ## Review-Antworten von Codex
 
@@ -245,7 +245,7 @@ Noch offen.
 
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
 | --- | --- | --- | --- | --- |
-| D-01 | Nutzer/Reviewer | Zeitachsen-/As-of-Konvention | angenommen fuer die Blockerbehebung | Gemini bestaetigt im blockierten Review den Wert `t` als korrekten Contract; finale Slice-Freigabe bleibt ausstehend |
+| D-01 | Nutzer/Reviewer | Zeitachsen-/As-of-Konvention | angenommen und durch Gemini freigegeben | Wert `t` als aktiver Contract, Delta-Report und Zieloracles; lokal committed als `95a31cf` |
 | D-03 | Nutzer/Reviewer | Missingness-/Fallback-Regel | angenommen | in Slice 03 umgesetzt, durch Gemini freigegeben und mit Commit b04186c abgeschlossen |
 | S04-FLOW-01 | Gemini/Codex | Negativer Cashzins 2020 wird bilanziell angewendet, diagnostisch aber auf 0 begrenzt; FlowDelta -1.732,54 EUR | angenommen | signiertes angewandtes Cashdelta in Engine-Diagnose und Flow-Reconciliation; Negativzins- und Golden-Regressionen gruen |
 | G-S04-02 | Gemini | simulator-backtest.test.mjs erwartet noch Legacy-Inflation `t-1` | angenommen | Erwartung und Testbeschreibung auf D-01 `t` umgestellt; Test gruen |

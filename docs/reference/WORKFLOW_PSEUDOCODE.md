@@ -97,54 +97,60 @@ Funktion runMonteCarlo():
 
 ---
 
-## 3. Historischer Backtest (`simulator-backtest.js`)
+## 3. Historische In-sample-Diagnose
 
-Der Backtest läuft strikt sequentiell über historische Marktdaten (1950 - Heute).
+Der produktive Backtest trennt UI, Datenvertrag, DOM-freien Runner, Metriken,
+optionale Rolling Cohorts und Raw-Export. Die eingebettete Historie deckt
+1925-2025 ab; wegen des vierjaehrigen Lookbacks leitet der aktive Provider die
+technischen Laufgrenzen 1929-2025 ab. Ein Einjahreslauf ist zulaessig. Bereits
+gesehene Einzelpfade und ueberlappende Cohorts bleiben In-sample-Diagnosen und
+sind weder unabhaengige Versuche noch Erfolgswahrscheinlichkeiten.
 
 ```text
-Funktion runHistoricalBacktest():
-  1. Validierung
-     - Prüfe Start/Endjahr (1950-2025)
+Funktion runBacktest() in simulator-backtest.js:
+  1. UI und Request vorbereiten
+     - Lese normalisierte Simulatorinputs
+     - Projiziere Provider-Bounds in Start-/Endjahr
+     - Validiere leere, nicht-finite, nicht-ganzzahlige,
+       rueckwaertige und ausserhalb liegende Perioden
+     - Erfasse breakOnRuin sowie Dataset-, Temporal- und Engineprovenienz
 
-  2. Initialisierung State
-     - `simState` auf Startwerte setzen (Vermögen, Allokation)
-     - Historische Inflations- & Lohndaten laden
+  2. Daten vor der Schleife validieren
+     - historical-backtest-contract.preparePeriod(startYear, endYear)
+     - Pruefe Lookback und jedes Pflichtjahr lueckenlos
+     - Fehlende/ungueltige Daten -> outcome incomplete, null Engineaufrufe
+     - Realisierte Aktien-, Gold-, Cash-/Bond-, Inflations- und Lohnwerte
+       stammen aus Simulationsjahr t; CAPE ist decision-as-of t-1
 
-  3. Simulations-Schleife (Jahr = Start BIS Ende)
-     - Lade Marktdaten für 'Jahr' (Rendite, Zinssatz, Inflation)
+  3. DOM-freien Lauf ausfuehren
+     - Erzeuge eigene kanonische Kopien von Inputs, Tranchen und Records
+     - Initialisiere Portfolio und simState
+     - FUER jedes validierte Jahr t:
+         - Baue yearData ausschliesslich aus HistoricalYearRecordV1
+         - Berechne Rentenanpassung fuer t
+         - simulateOneYear(simState, inputs, yearData, yearIndex)
+         - success -> uebernehme neuen State und kanonische Rohzeile
+         - ruin -> uebernehme terminalen Ruinzustand; Abbruch gemaess breakOnRuin
+         - technical_error -> beende fail-closed mit sicherem Fehlercode
 
-     - Berechne Rentenanpassung (dynamisch oder fix)
+  4. Kanonisches Resultat ableiten
+     - Erzeuge tief eingefrorenes BacktestRunResultV1
+     - Reconciliiere Start-/Endportfolio, requested/completedYears,
+       Outcome, Jahreszeilen, Summary und HistoricalBacktestMetricsV1
+     - UI, Tabelle und Export teilen dieselbe Result-/Row-Instanz
 
-     - taxStatePrev merken (für möglichen Recompute)
+  5. Optional Rolling Cohorts
+     - Baue alle Kandidaten mit fester inklusiver Horizontlaenge
+     - prepareBatch() validiert ueberlappende Recordjahre einmal
+     - Inventarisiere completed, ruin, incomplete, technical_error,
+       cancelled und insufficient_horizon getrennt
 
-     - ENGINE-Aufruf (simulateOneYear)
-         - Berechne Entnahme, Steuern, Transaktionen
-         - Erfasse Payout-Zeitpunkte für das detaillierte Log
-         - Engine liefert Settlement inkl. taxRawAggregate
-         - Wende Markt-Rendite an
-         - Aktualisiere `simState` (neues Vermögen, taxState)
-     
-     - Notfallverkauf-Prüfung
-         - WENN (Liquiditätslücke nach Rendite):
-             - Forced Sale durchführen (calculateSaleAndTax)
-             - Roh-Aggregate von regulär + Notfallverkauf kombinieren
-             - Gesamt-Settlement-Recompute mit taxStatePrev
-             - action.steuer und taxState überschreiben
-
-     - Ruin-Check
-         - WENN (Vermögen <= 0):
-             - Logge "RUIN"
-             - Falls `BREAK_ON_RUIN` -> Abbruch
-
-     - Logging
-         - Füge Jahresergebnis zur Log-Tabelle hinzu (HTML)
-         - Nutze dieselben Entnahme-/Payout-/VPW-Felder wie das Monte-Carlo-Scenario-Log
-         - Sammle Statistiken (Steuern, Kürzungsjahre, taxSavedByLossCarry)
-
-  4. Abschluss
-     - Zeige Zusammenfassung (Endvermögen, Max Drawdown)
-     - Render Log-Tabelle
-     - Verwerfe Simulationskopien; Realbestand bleibt unveraendert
+  6. Rendering und expliziter Export
+     - Rendere fokussierbaren Status, Datenqualitaet, Summary und
+       semantische Tabelle ohne zweite wirtschaftliche Berechnung
+     - JSON -> HistoricalBacktestExportV1 mit Request/Result/Fingerprints
+     - CSV -> feste technische Rohspalten ohne HTML/Lokalisierung
+     - Export nur auf Nutzerklick; Realbestand/Persistenz bleiben unveraendert
 ```
 
 ---

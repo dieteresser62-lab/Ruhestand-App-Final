@@ -2,7 +2,7 @@
 
 Die Simulator-App ist inzwischen in mehrere spezialisierte ES6-Module zerlegt. Die zentralen Abläufe (Monte-Carlo, Sweep, Backtests, Pflege-UI) leben nicht mehr als Monolith in `simulator-main.js`, sondern wurden in klar abgegrenzte Dateien ausgelagert. Dieses Dokument beschreibt Zweck, Haupt-Exports, Einbindungspunkte und die gewünschte Aufteilung neuer Features.
 
-**Stand:** 2026-07-18 (einschliesslich Langlebigkeit, Stationary Bootstrap, Tail-Risk-Overlay, Realentnahmevertrag und historischem Daten-/Jahrescontract)
+**Stand:** 2026-07-19 (einschliesslich Langlebigkeit, Stationary Bootstrap, Tail-Risk-Overlay, Realentnahmevertrag sowie vollstaendigem historischen Backtest-Contract)
 
 **Pfadkonvention:** Simulator-Module liegen unter `app/simulator/`, Profilmodule unter `app/profile/`, Shared-Utilities unter `app/shared/`, Tranchen-Status unter `app/tranches/`. Im Dokument werden Dateinamen aus Lesbarkeit meist ohne Präfix genannt.
 
@@ -226,6 +226,26 @@ initiale Vierjahres-Markthistorie aus dem Contract und gibt bei einer Luecke
 tragen Dataset-, Manifest-, Temporal-, Engine-Build- und Config-Provenienz.
 
 `BacktestRunResultV1` ist tief eingefroren und enthaelt `BacktestRequestV1`, diskriminiertes Outcome, Warnungen/sichere Fehlerdaten, unverkuerzte `rows`, `requestedYears`, wirtschaftlich erfolgreiche `completedYears`, erste/letzte Laufjahre, kanonische Start-/Endportfolio-Snapshots, Historical-Year-Records, `HistoricalBacktestMetricsV1`, Summary sowie die Legacy-Aliase. Caller-Inputs, Partner-/Tranchenobjekte und historische Records werden vor dem Lauf in eigene Kopien ueberfuehrt; `undefined`, `Date`, `RegExp`, Prototypen und zyklische Referenzen bleiben dabei runnerintern erhalten.
+
+### `historical-backtest-metrics.js`
+
+DOM-freies Metrikwoerterbuch und reine Ableitung fuer das kanonische
+`BacktestRunResultV1`.
+
+**Hauptfunktionen / Exporte:**
+- `HISTORICAL_BACKTEST_METRIC_DESCRIPTORS` – versionierte Definitionen fuer 24 Metriken mit Einheit, nominal/real-Basis, Aggregation, Nenner, Rundung, Missingness, Outcome-Regel und Rohquelle.
+- `deriveHistoricalBacktestMetrics()` – leitet das unverkuerzte `HistoricalBacktestMetricsV1` aus Jahreszeilen und Outcome ab; Summary und Export konsumieren dieselben Werte ohne zweite Berechnung.
+- `FLEX_REDUCTION_THRESHOLD_PCT` / `FLEX_REDUCTION_OPERATOR` – gemeinsamer inklusiver `>= 10 %`-Vertrag fuer ID, Label, UI und Export.
+
+### `historical-backtest-cohorts.js`
+
+DOM-freier Diagnose-Runner fuer ueberlappende historische Fenster mit fester,
+inklusiver Horizontlaenge (`end = start + horizon - 1`).
+
+**Hauptfunktionen / Exporte:**
+- `runHistoricalBacktestCohorts()` – bildet alle Kandidaten, konsumiert genau einen Provider-Batch-Preflight und startet je geeignetem Fenster denselben Single-Path-Runner mit unveraenderten Inputs und `yearIndex=0`.
+- `HistoricalBacktestCohortsV1` – inventarisiert `completed`, `ruin`, `incomplete`, `technical_error`, `cancelled` und `insufficient_horizon`; Nullnenner bleiben `null`.
+- Jeder Request und Descriptor kennzeichnet die Fenster als ueberlappende historische In-sample-Diagnose, nicht als unabhaengige Stichprobe oder Erfolgswahrscheinlichkeit.
 
 ### `historical-backtest-export.js`
 

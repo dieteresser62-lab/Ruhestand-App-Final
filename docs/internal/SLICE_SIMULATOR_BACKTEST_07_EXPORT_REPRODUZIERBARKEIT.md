@@ -3,7 +3,7 @@
 **Arbeitsplan:** [SIMULATOR_BACKTEST_HARDENING_PLAN.md](./SIMULATOR_BACKTEST_HARDENING_PLAN.md)  
 **Feature-Branch:** `codex/simulator-backtest-gap-plan`  
 **GitHub-Status:** nur lokal; Veroeffentlichung ausstehend und nur nach Nutzerfreigabe  
-**Status:** implementiert und selbstgeprueft; adversariales Review ausstehend  
+**Status:** freigegeben; Gemini-Review abgeschlossen, lokal committed als `cce302b`
 **Abhaengigkeit:** Slices 02-05 und Metrikteil von Slice 06 freigegeben; Cohortexport nur nach freigegebenem D-05/Cohortteil  
 **GAPs:** BT-09, BT-12, BT-13, BT-17
 
@@ -215,7 +215,7 @@ Schemas, Fingerprintalgorithmus/-version, CSV-/Datenschutzgrenze, Testresultate 
 
 ## Freigabestatus
 
-Freigegeben am 2026-07-19. Die Akzeptanzkriterien für Versionierung, Serialisierung und CSV-Sicherheit sind vollumfänglich erfüllt. Sämtliche 5677 Assertions der Testsuite laufen fehlerfrei durch. Ein lokaler Commit wird durchgeführt.
+Freigegeben am 2026-07-19 und lokal als `cce302b` committed. Die Slice-Ausfuehrung dokumentierte 5677/5677 Assertions.
 
 ## Review-Feedback von Gemini
 
@@ -230,11 +230,12 @@ Freigegeben am 2026-07-19. Die Akzeptanzkriterien für Versionierung, Serialisie
 
 ## Review-Feedback von Claude
 
-Noch offen.
+Nicht durchgefuehrt; fuer diesen Slice ist kein optionales Claude-Zweitreview eingetragen.
 
 ## Review-Antworten von Codex
 
-Noch offen.
+- Das Gemini-Datenschutzrisiko ist angenommen. Der Export bleibt eine explizite Nutzeraktion; README, UI-Notice und Referenzen weisen auf die vollstaendigen lokalen Finanzannahmen hin. Es gibt keine automatische Persistenz oder Uebertragung.
+- Die CSV-Spaltenreihenfolge ist Teil von `HistoricalBacktestCsvV1` und durch Golden-/Header-Tests fixiert. Kuenftige Schemaaenderungen benoetigen Versionierung statt stiller positionsveraendernder Erweiterung.
 
 ## Review-Entscheidungen
 

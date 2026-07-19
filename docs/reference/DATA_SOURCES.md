@@ -95,7 +95,7 @@ commit-blocking.
 - Dataset ID/revision: `ruhestandsapp-historical-data-v1` / `2026-07-18.1`
 - Canonical content hash: `8246422d98657c2a76b750ce9fd1253e01aa7a9a4dfa0f0f01dcb96b5507ef29`
 - Hash algorithm: SHA-256 over canonical JSON (`sha256-canonical-json-v1`); year keys are numeric ascending, object fields lexical, and numbers are locale-independent JSON tokens.
-- Backtest lookback contract: four complete years before `startYear`; the contract-derived technical bounds are therefore `1929-2025`. The currently visible UI bounds remain legacy behavior until the time-axis/UI slices activate the new contract.
+- Backtest lookback contract: four complete years before `startYear`; the contract-derived technical bounds are therefore `1929-2025`. The Backtest UI reads these bounds from the active provider, sets both year inputs dynamically, and validates against the same contract.
 
 The DOM-free contract lives in
 `app/simulator/historical-backtest-contract.js`. It validates the full dataset
