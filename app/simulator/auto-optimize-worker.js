@@ -8,9 +8,12 @@
 "use strict";
 
 import {
+    attachMonteCarloBatchOutcome,
     buildMonteCarloAggregates,
     createMonteCarloBuffers,
+    createMonteCarloTechnicalInventory,
     MC_HEATMAP_BINS,
+    mergeMonteCarloTechnicalInventory,
     runMonteCarloChunk
 } from './monte-carlo-runner.js';
 import { compileScenario, getDataVersion } from './simulator-engine-helpers.js';
@@ -43,6 +46,20 @@ function appendArray(target, source) {
     for (let i = 0; i < source.length; i++) {
         target.push(source[i]);
     }
+}
+
+function finalizeAutoOptimizeBatch({ aggregatedResults, technicalInventory, failCount }) {
+    const contractedResults = attachMonteCarloBatchOutcome(aggregatedResults, technicalInventory);
+    if (contractedResults.batchStatus === 'technical_error') {
+        const firstError = technicalInventory?.errors?.[0];
+        throw new Error(firstError?.message || 'Auto-Optimize wurde wegen eines technischen Simulationsfehlers beendet.');
+    }
+    return {
+        aggregatedResults: contractedResults,
+        failCount,
+        batchStatus: contractedResults.batchStatus,
+        technicalInventory
+    };
 }
 
 let autoOptimizePool = null;
@@ -94,7 +111,11 @@ export async function runMonteCarloAutoOptimize({ inputs, widowOptions, monteCar
             lists: chunk.lists,
             allRealWithdrawalsSample: chunk.allRealWithdrawalsSample
         });
-        return { aggregatedResults, failCount: chunk.totals.failCount };
+        return finalizeAutoOptimizeBatch({
+            aggregatedResults,
+            technicalInventory: chunk.technicalInventory,
+            failCount: chunk.totals.failCount
+        });
     }
 
     const pool = getAutoOptimizePool(workerCount);
@@ -121,6 +142,7 @@ export async function runMonteCarloAutoOptimize({ inputs, widowOptions, monteCar
         healthBucketInterestAmounts: []
     };
     const allRealWithdrawalsSample = [];
+    const technicalInventory = createMonteCarloTechnicalInventory(anzahl);
     const totals = {
         failCount: 0,
         pflegeTriggeredCount: 0,
@@ -250,6 +272,7 @@ export async function runMonteCarloAutoOptimize({ inputs, widowOptions, monteCar
             appendArray(lists.healthBucketTargetGaps, result.lists.healthBucketTargetGaps);
             appendArray(lists.healthBucketInterestAmounts, result.lists.healthBucketInterestAmounts);
             appendArray(allRealWithdrawalsSample, result.allRealWithdrawalsSample);
+            mergeMonteCarloTechnicalInventory(technicalInventory, result.technicalInventory);
 
             if (elapsedMs > 0) {
                 const scaled = Math.round(count * (timeBudgetMs / elapsedMs));
@@ -285,7 +308,11 @@ export async function runMonteCarloAutoOptimize({ inputs, widowOptions, monteCar
             lists: chunk.lists,
             allRealWithdrawalsSample: chunk.allRealWithdrawalsSample
         });
-        return { aggregatedResults, failCount: chunk.totals.failCount };
+        return finalizeAutoOptimizeBatch({
+            aggregatedResults,
+            technicalInventory: chunk.technicalInventory,
+            failCount: chunk.totals.failCount
+        });
     } finally {
         if (autoOptimizePool?.telemetry && autoOptimizePool.telemetry.enabled) {
             autoOptimizePool.telemetry.printReport();
@@ -304,5 +331,9 @@ export async function runMonteCarloAutoOptimize({ inputs, widowOptions, monteCar
         allRealWithdrawalsSample
     });
 
-    return { aggregatedResults, failCount: totals.failCount };
+    return finalizeAutoOptimizeBatch({
+        aggregatedResults,
+        technicalInventory,
+        failCount: totals.failCount
+    });
 }

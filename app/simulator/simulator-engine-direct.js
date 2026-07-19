@@ -36,6 +36,88 @@ import { resolveSimulatorCumulativeInflationFactor } from './simulator-engine-he
 
 const formatInteger = (value) => Number.isFinite(value) ? Math.round(value) : 0;
 
+export const SIMULATOR_YEAR_OUTCOME_KINDS = Object.freeze({
+    SUCCESS: 'success',
+    RUIN: 'ruin',
+    TECHNICAL_ERROR: 'technical_error'
+});
+
+export const SIMULATOR_TECHNICAL_ERROR_CODES = Object.freeze({
+    ENGINE_API_UNAVAILABLE: 'SIM_ENGINE_API_UNAVAILABLE',
+    ENGINE_METHOD_UNAVAILABLE: 'SIM_ENGINE_METHOD_UNAVAILABLE',
+    ENGINE_EXECUTION_EXCEPTION: 'SIM_ENGINE_EXECUTION_EXCEPTION',
+    ENGINE_RESULT_ERROR: 'SIM_ENGINE_RESULT_ERROR',
+    ENGINE_RESULT_SHAPE_INVALID: 'SIM_ENGINE_RESULT_SHAPE_INVALID',
+    YEAR_DATA_RETURN_INVALID: 'SIM_YEAR_DATA_RETURN_INVALID'
+});
+
+function buildTechnicalErrorOutcome(code, message, cause = null, details = null) {
+    const error = { code, message };
+    if (details && typeof details === 'object') error.details = details;
+    if (cause !== null && cause !== undefined) error.cause = cause;
+    return {
+        kind: SIMULATOR_YEAR_OUTCOME_KINDS.TECHNICAL_ERROR,
+        isRuin: false,
+        error
+    };
+}
+
+function validateRequiredYearReturns(yearData) {
+    const requiredFields = ['rendite', 'gold_eur_perf', 'zinssatz'];
+    const invalidFields = requiredFields.filter(field => !Number.isFinite(yearData?.[field]));
+    return invalidFields.length === 0
+        ? null
+        : buildTechnicalErrorOutcome(
+            SIMULATOR_TECHNICAL_ERROR_CODES.YEAR_DATA_RETURN_INVALID,
+            `Ungültige Jahresrenditen (${SIMULATOR_TECHNICAL_ERROR_CODES.YEAR_DATA_RETURN_INVALID}). Der Lauf wurde ohne Ruinwertung beendet.`,
+            null,
+            { invalidFields }
+        );
+}
+
+function captureEngineBoundaryPortfolio(portfolio) {
+    const captureValues = tranches => Array.isArray(tranches)
+        ? tranches.map(tranche => tranche?.marketValue)
+        : [];
+    return {
+        equityValues: captureValues(portfolio?.depotTranchesAktien),
+        goldValues: captureValues(portfolio?.depotTranchesGold),
+        hasSimulationDate: Object.prototype.hasOwnProperty.call(portfolio || {}, 'simulationDate'),
+        simulationDate: portfolio?.simulationDate,
+        hasSourceProfileId: Object.prototype.hasOwnProperty.call(portfolio || {}, 'simulationSourceProfileId'),
+        simulationSourceProfileId: portfolio?.simulationSourceProfileId
+    };
+}
+
+function restoreEngineBoundaryPortfolio(portfolio, snapshot) {
+    const restoreValues = (tranches, values) => {
+        if (!Array.isArray(tranches)) return;
+        for (let i = 0; i < tranches.length && i < values.length; i++) {
+            tranches[i].marketValue = values[i];
+        }
+    };
+    restoreValues(portfolio?.depotTranchesAktien, snapshot.equityValues);
+    restoreValues(portfolio?.depotTranchesGold, snapshot.goldValues);
+    if (snapshot.hasSimulationDate) portfolio.simulationDate = snapshot.simulationDate;
+    else delete portfolio.simulationDate;
+    if (snapshot.hasSourceProfileId) portfolio.simulationSourceProfileId = snapshot.simulationSourceProfileId;
+    else delete portfolio.simulationSourceProfileId;
+}
+
+function buildRuinOutcome({ currentState, portfolio, liquiditaet, marketDataCurrentYear, reason }) {
+    const terminalPortfolio = { ...portfolio, liquiditaet: euros(liquiditaet) };
+    return {
+        kind: SIMULATOR_YEAR_OUTCOME_KINDS.RUIN,
+        isRuin: true,
+        reason,
+        newState: {
+            ...currentState,
+            portfolio: terminalPortfolio,
+            marketDataHist: marketDataCurrentYear || currentState.marketDataHist
+        }
+    };
+}
+
 function scaleFiniteRealValue(target, key, scale) {
     if (!target || !Number.isFinite(target[key])) return;
     target[key] *= scale;
@@ -98,24 +180,21 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const engine = engineAPI || (typeof window !== 'undefined' ? window.EngineAPI : null);
 
     if (!engine) {
-        console.error('[simulator-engine-direct] EngineAPI not available!', {
-            engineAPI,
-            windowEngineAPI: typeof window !== 'undefined' ? window.EngineAPI : 'no window',
-            windowKeys: typeof window !== 'undefined' ? Object.keys(window).filter(k => k.includes('Engine') || k.includes('Ruhe')) : []
-        });
-        throw new Error("Critical: No EngineAPI available in simulateOneYear. Pass it as argument or ensure global scope.");
+        return buildTechnicalErrorOutcome(
+            SIMULATOR_TECHNICAL_ERROR_CODES.ENGINE_API_UNAVAILABLE,
+            `Die Simulations-Engine ist nicht verfügbar (${SIMULATOR_TECHNICAL_ERROR_CODES.ENGINE_API_UNAVAILABLE}).`
+        );
     }
 
     if (typeof engine.simulateSingleYear !== 'function') {
-        console.error('[simulator-engine-direct] engine.simulateSingleYear is not a function!', {
-            engine,
-            engineType: typeof engine,
-            engineKeys: Object.keys(engine || {}),
-            hasSimulateSingleYear: 'simulateSingleYear' in (engine || {}),
-            simulateSingleYearType: typeof engine?.simulateSingleYear
-        });
-        throw new Error("Critical: engine.simulateSingleYear is not a function. Wrong engine object?");
+        return buildTechnicalErrorOutcome(
+            SIMULATOR_TECHNICAL_ERROR_CODES.ENGINE_METHOD_UNAVAILABLE,
+            `Die Simulations-Engine besitzt keinen gültigen Jahreseinstieg (${SIMULATOR_TECHNICAL_ERROR_CODES.ENGINE_METHOD_UNAVAILABLE}).`
+        );
     }
+
+    const invalidYearReturns = validateRequiredYearReturns(yearData);
+    if (invalidYearReturns) return invalidYearReturns;
 
     let {
         portfolio,
@@ -131,6 +210,7 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         widowPensionP1 = 0,
         widowPensionP2 = 0
     } = currentState;
+    const engineBoundaryPortfolio = captureEngineBoundaryPortfolio(portfolio);
     const cumulativeInflationFactor = resolveSimulatorCumulativeInflationFactor(currentState);
 
     const sampledYear = Number(yearData?.jahr);
@@ -224,7 +304,10 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     // ANSPARPHASE-LOGIK (unverändert, da keine Engine-Aufrufe)
     // ==========================================
     if (isAccumulationYear(inputs, yearIndex)) {
-        return simulateAccumulationYear({
+        return {
+            kind: SIMULATOR_YEAR_OUTCOME_KINDS.SUCCESS,
+            isRuin: false,
+            ...simulateAccumulationYear({
             currentState,
             inputs,
             yearData,
@@ -249,7 +332,8 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
             currentAnnualPension2,
             householdCtx,
             isBadYear
-        });
+            })
+        };
     }
 
     // ==========================================
@@ -320,12 +404,38 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     const engineLastState = lastState?.initialized
         ? { ...lastState, cumulativeInflationFactor }
         : lastState;
-    const fullResult = engine.simulateSingleYear(engineInput, engineLastState);
+    let fullResult;
+    try {
+        fullResult = engine.simulateSingleYear(engineInput, engineLastState);
+    } catch (cause) {
+        restoreEngineBoundaryPortfolio(portfolio, engineBoundaryPortfolio);
+        return buildTechnicalErrorOutcome(
+            SIMULATOR_TECHNICAL_ERROR_CODES.ENGINE_EXECUTION_EXCEPTION,
+            `Die Simulations-Engine konnte das Jahr nicht berechnen (${SIMULATOR_TECHNICAL_ERROR_CODES.ENGINE_EXECUTION_EXCEPTION}).`,
+            cause
+        );
+    }
 
     // FAIL-SAFE: Error-Handling
-    if (fullResult.error || !fullResult.ui) {
-        console.error('EngineAPI error:', fullResult.error);
-        return { isRuin: true, error: fullResult.error };
+    if (fullResult?.error) {
+        restoreEngineBoundaryPortfolio(portfolio, engineBoundaryPortfolio);
+        return buildTechnicalErrorOutcome(
+            SIMULATOR_TECHNICAL_ERROR_CODES.ENGINE_RESULT_ERROR,
+            `Die Simulations-Engine hat das Jahr abgewiesen (${SIMULATOR_TECHNICAL_ERROR_CODES.ENGINE_RESULT_ERROR}).`,
+            fullResult.error
+        );
+    }
+    if (!fullResult?.ui
+        || !fullResult.ui.spending
+        || !fullResult.ui.action
+        || !fullResult.ui.market
+        || !fullResult.newState) {
+        restoreEngineBoundaryPortfolio(portfolio, engineBoundaryPortfolio);
+        return buildTechnicalErrorOutcome(
+            SIMULATOR_TECHNICAL_ERROR_CODES.ENGINE_RESULT_SHAPE_INVALID,
+            `Die Simulations-Engine lieferte ein unvollständiges Ergebnis (${SIMULATOR_TECHNICAL_ERROR_CODES.ENGINE_RESULT_SHAPE_INVALID}).`,
+            fullResult
+        );
     }
 
     alignEngineInflationContract(fullResult, cumulativeInflationFactor);
@@ -525,10 +635,13 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
 
     const totalWealthAvailable = equityAfterBuys + goldAfterBuys + liquiditaet;
     if (totalWealthAvailable + 1e-6 < netFloorYear) {
-        return {
-            isRuin: true,
+        return buildRuinOutcome({
+            currentState,
+            portfolio,
+            liquiditaet,
+            marketDataCurrentYear,
             reason: `Gesamtvermögen (${formatInteger(totalWealthAvailable)}) < Floor (${formatInteger(netFloorYear)})`
-        };
+        });
     }
 
     // Hinweis: Ein Liquiditäts-Engpass erzeugt keinen Ruin, solange das Gesamtvermögen den Floor deckt.
@@ -560,10 +673,13 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         formatRuinNumber: formatInteger
     });
     if (payoutFallback.isRuin) {
-        return {
-            isRuin: true,
+        return buildRuinOutcome({
+            currentState,
+            portfolio,
+            liquiditaet: payoutFallback.liquiditaet,
+            marketDataCurrentYear,
             reason: payoutFallback.reason
-        };
+        });
     }
     liquiditaet = payoutFallback.liquiditaet;
     bondSaleAmount += payoutFallback.bondSaleAmountDelta;
@@ -660,7 +776,9 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         steuerGesamt: actionResult.steuer || 0
     }) : { vkAkt: 0, vkGld: 0, vkBnd: 0, stAkt: 0, stGld: 0, vkGes: 0, stGes: 0 };
 
-    return buildSimulatorYearResult({
+    return {
+        kind: SIMULATOR_YEAR_OUTCOME_KINDS.SUCCESS,
+        ...buildSimulatorYearResult({
         portfolio,
         liquiditaet,
         spendingResult,
@@ -732,8 +850,9 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
         healthBucketCoverage,
         healthBucketInterest,
         healthBucketDiagnostics,
-        balanceTrace
-    });
+            balanceTrace
+        })
+    };
 }
 
 // Exportiere alle Helper-Funktionen die auch von simulator-engine.js exportiert werden

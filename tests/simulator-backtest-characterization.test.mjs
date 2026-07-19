@@ -299,7 +299,8 @@ function projectRow(entry) {
     };
 }
 
-function observeOutcome({ rows, alerts, requestedYears }) {
+function observeOutcome({ data, rows, alerts, requestedYears }) {
+    if (typeof data?.outcome?.kind === 'string') return data.outcome.kind;
     if (alerts.length > 0) return 'validation_alert_legacy';
     if (rows.some(entry => entry?.row?.Regime === 'BANKRUPT')) return 'ruin_legacy';
     if (rows.length === 0) return 'empty_result_rendered_as_completed_legacy';
@@ -338,7 +339,7 @@ function projectScenario({ id, oracleClass = 'target_expected', inputs, data, al
         expectedRowCount,
         observedRowCount: rows.length,
         canonicalRowsHash: stableHash(rows),
-        outcomeObservation: observeOutcome({ rows, alerts, requestedYears }),
+        outcomeObservation: observeOutcome({ data, rows, alerts, requestedYears }),
         alerts,
         values: {
             startWealth: round(normalizedInputs.startVermoegen),
@@ -607,7 +608,7 @@ function buildTargetDeltaReport(legacy, target) {
             targetRows: entry.observedRowCount
         };
     });
-    const countRuin = entries => entries.filter(entry => entry.outcomeObservation === 'ruin_legacy').length;
+    const countRuin = entries => entries.filter(entry => ['ruin', 'ruin_legacy'].includes(entry.outcomeObservation)).length;
     return {
         schemaVersion: 'BacktestTemporalDeltaReportV1',
         legacyFixture: 'simulator-backtest-baseline-v1.json',
@@ -655,7 +656,7 @@ function buildLegacySchemaOracle(data) {
         rowWrapperFields: Object.keys(first).sort(),
         nestedRowFields: Object.keys(first.row || {}).sort(),
         detailToggleDependency: 'row payload stable; rendered/exported column projection depends on backtestLogDetailLevel',
-        fieldsMissingFromLegacyV0: ['schemaVersion', 'endJahr', 'outcome', 'error', 'warnings', 'breakOnRuin', 'datasetRevision', 'engineBuildId']
+        fieldsMissingFromLegacyV0: ['endJahr', 'error', 'warnings', 'datasetRevision', 'engineBuildId']
     };
 }
 
@@ -781,21 +782,21 @@ try {
         },
         expectedRowCount: 2,
         oracleClass: 'legacy_observed_gap',
-        notes: ['Synthetic zero ruin row and positive pre-ruin summary are a legacy_observed_gap, not a target.']
+        notes: ['Ruin row and summary use the same terminal portfolio state from the ruin year.']
     });
     const healthLogRow = buildHealthBucketLogRow();
     const healthBucketProjection = runScenario({
-        id: 'health_bucket_nested_row_summary_gap',
+        id: 'health_bucket_nested_row_summary_positive',
         values: { simStartJahr: 2010, simEndJahr: 2011 },
         expectedRowCount: 2,
         onAssign: data => {
             const last = data?.rows?.at(-1);
             if (last) last.row = healthLogRow;
         },
-        oracleClass: 'legacy_observed_gap',
+        oracleClass: 'target_expected',
         notes: [
             'A real engine health-bucket log row is projected into the legacy wrapper.',
-            'The summary remains empty because production reads lastLogRow.health_bucket_* instead of lastLogRow.row.health_bucket_*.'
+            'The summary reads the canonical nested row and exposes bucket end, coverage, and target gap.'
         ]
     });
     const dynamicFlexCape = runScenario({
@@ -903,11 +904,12 @@ try {
     assert(actual.cases.every(testCase => testCase.observedRowCount === testCase.expectedRowCount), 'positive runtime row counts should match the frozen contract');
     assert(actual.cases.every(testCase => testCase.values.maxAbsolutePortfolioFlowDelta < 1), 'positive baselines must keep FlowDelta below one euro');
     assert(actual.detailToggleOracle.payloadStable, 'normal and detailed rendering must retain the same canonical row payload');
-    assert(ruin.outcomeObservation === 'ruin_legacy', 'capital-poor case must reach the legacy ruin path');
-    assert(ruin.values.summaryEndWealth > ruin.values.lastWrapperPortfolio, 'ruin summary must freeze the positive pre-ruin wealth gap');
+    assert(ruin.outcomeObservation === 'ruin', 'capital-poor case must reach the canonical ruin outcome');
+    assertClose(ruin.values.summaryEndWealth, ruin.values.lastWrapperPortfolio, 0.01, 'ruin summary must reconcile to terminal ruin-row wealth');
+    assertClose(ruin.values.summaryEndWealth, ruin.values.lastRowPortfolioTotalEnd, 0.01, 'ruin summary must reconcile to the nested terminal total');
     assert(healthBucketProjection.rowSamples.at(-1).row.healthBucketEnabled === true, 'health case must contain nested bucket values');
-    assert(!healthBucketProjection.summaryText.includes('Pflegebucket'), 'legacy summary must freeze the missing nested health-bucket projection');
-    assert(nonFiniteReturn.outcomeObservation === 'completed_legacy', 'non-finite gold must freeze the current silent completed fallback');
+    assert(healthBucketProjection.summaryText.includes('Pflegebucket'), 'health summary must expose the canonical nested bucket projection');
+    assert(nonFiniteReturn.outcomeObservation === 'completed', 'provider snapshot keeps the caller-side non-finite mutation outside the prepared run');
 
     const legacyExpected = JSON.parse(fs.readFileSync(legacyFixturePath, 'utf8'));
     actual.deltaReport = buildTargetDeltaReport(legacyExpected, actual);

@@ -1,7 +1,24 @@
 "use strict";
 
-export const BACKTEST_REQUEST_SCHEMA_VERSION = 'BacktestRequestV0';
-export const BACKTEST_RESULT_SCHEMA_VERSION = 'BacktestRunResultV0';
+export const BACKTEST_REQUEST_SCHEMA_VERSION = 'BacktestRequestV1';
+export const BACKTEST_RESULT_SCHEMA_VERSION = 'BacktestRunResultV1';
+
+export const BACKTEST_OUTCOME_KINDS = Object.freeze({
+    COMPLETED: 'completed',
+    RUIN: 'ruin',
+    INCOMPLETE: 'incomplete',
+    TECHNICAL_ERROR: 'technical_error',
+    CANCELLED: 'cancelled'
+});
+
+export const BACKTEST_TECHNICAL_ERROR_CODES = Object.freeze({
+    DEPENDENCY_INVALID: 'BACKTEST_DEPENDENCY_INVALID',
+    PERIOD_CONTRACT_ERROR: 'BACKTEST_PERIOD_CONTRACT_ERROR',
+    INITIALIZATION_ERROR: 'BACKTEST_INITIALIZATION_ERROR',
+    SIMULATOR_EXCEPTION: 'SIMULATOR_ADAPTER_EXCEPTION',
+    SIMULATOR_RESULT_INVALID: 'SIMULATOR_RESULT_SHAPE_INVALID',
+    RUIN_STATE_INVALID: 'SIMULATOR_RUIN_STATE_INVALID'
+});
 
 function cloneRunValue(value, seen = new WeakMap()) {
     if (value === null || typeof value !== 'object') return value;
@@ -106,13 +123,82 @@ function buildVpwFallbackHint(vpwPayload) {
     return 'ok';
 }
 
-function buildLegacyOutcome(rows, requestedYears, ruinEncountered) {
-    if (ruinEncountered) return 'ruin_legacy';
-    if (rows.length === 0) return 'empty_result_rendered_as_completed_legacy';
-    if (Number.isInteger(requestedYears) && rows.length < requestedYears) {
-        return 'partial_result_rendered_as_completed_legacy';
+function sumTranches(tranches) {
+    return Array.isArray(tranches)
+        ? tranches.reduce((sum, tranche) => sum + (Number(tranche?.marketValue) || 0), 0)
+        : 0;
+}
+
+function readPortfolioParts(portfolio) {
+    return {
+        wertAktien: sumTranches(portfolio?.depotTranchesAktien),
+        wertGold: sumTranches(portfolio?.depotTranchesGold),
+        liquiditaet: Number(portfolio?.liquiditaet) || 0,
+        healthBucketEnd: Number(portfolio?.healthBucketGeldmarkt) || 0
+    };
+}
+
+function normalizeTechnicalError(error, fallbackCode) {
+    const code = typeof error?.code === 'string' && error.code.trim()
+        ? error.code.trim()
+        : fallbackCode;
+    const providedMessage = typeof error?.message === 'string' ? error.message.trim() : '';
+    const message = providedMessage.includes(code)
+        ? providedMessage
+        : `Der Backtest wurde wegen eines technischen Fehlers beendet (${code}).`;
+    return { code, message };
+}
+
+function buildIncompleteOutcome(reason) {
+    const missingYears = Number.isInteger(reason?.year) ? [reason.year] : [];
+    const missingFields = Array.isArray(reason?.missingFields)
+        ? reason.missingFields.map(String)
+        : (missingYears.length > 0 ? ['historicalYearRecord'] : []);
+    return {
+        kind: BACKTEST_OUTCOME_KINDS.INCOMPLETE,
+        lastCompletedYear: null,
+        missingYears,
+        missingFields,
+        exclusionReason: reason?.code || 'historical_data_incomplete'
+    };
+}
+
+function buildHealthBucketSummary(rows) {
+    for (let index = rows.length - 1; index >= 0; index--) {
+        const row = rows[index]?.row;
+        if (!row || row.health_bucket_enabled !== true) continue;
+        return {
+            enabled: true,
+            end: Number(row.health_bucket_end) || 0,
+            realCoveragePct: Number.isFinite(Number(row.health_bucket_real_coverage_pct))
+                ? Number(row.health_bucket_real_coverage_pct)
+                : null,
+            targetGap: Number(row.health_bucket_target_gap) || 0
+        };
     }
-    return 'completed_legacy';
+    return { enabled: false, end: 0, realCoveragePct: null, targetGap: 0 };
+}
+
+function buildSummary({
+    rows,
+    portfolioStart,
+    portfolioEnd,
+    completedYears,
+    totalWithdrawal,
+    maxReductionStreak,
+    reductionYears,
+    totalTaxes
+}) {
+    return {
+        startWealth: portfolioStart,
+        endWealth: portfolioEnd,
+        totalWithdrawal,
+        maxReductionStreak,
+        reductionYears,
+        reductionDenominator: completedYears,
+        totalTaxes,
+        healthBucket: buildHealthBucketSummary(rows)
+    };
 }
 
 /**
@@ -130,12 +216,6 @@ export function runHistoricalBacktest({
     totalPortfolio,
     breakOnRuin = false
 }) {
-    const simulate = requireFunction(simulateYear, 'simulateYear');
-    const initialize = requireFunction(initializePortfolio, 'initializePortfolio');
-    const computeAdjustment = requireFunction(computeAdjustmentPct, 'computeAdjustmentPct');
-    const resolveYearHorizon = requireFunction(resolveHorizon, 'resolveHorizon');
-    const computePortfolioTotal = requireFunction(totalPortfolio, 'totalPortfolio');
-
     const startYear = Number(period?.startYear);
     const endYear = Number(period?.endYear);
     const requestedYears = Number.isInteger(startYear) && Number.isInteger(endYear)
@@ -157,27 +237,82 @@ export function runHistoricalBacktest({
         },
         inputs: requestInputs
     });
-    const prepared = prepareHistoricalPeriod(historicalDataProvider, { startYear, endYear });
-    if (prepared.status === 'incomplete') {
-        return {
-            schemaVersion: BACKTEST_RESULT_SCHEMA_VERSION,
-            request,
+
+    let simulate;
+    let initialize;
+    let computeAdjustment;
+    let resolveYearHorizon;
+    let computePortfolioTotal;
+    let prepared;
+    let dependencyCause = null;
+    try {
+        simulate = requireFunction(simulateYear, 'simulateYear');
+        initialize = requireFunction(initializePortfolio, 'initializePortfolio');
+        computeAdjustment = requireFunction(computeAdjustmentPct, 'computeAdjustmentPct');
+        resolveYearHorizon = requireFunction(resolveHorizon, 'resolveHorizon');
+        computePortfolioTotal = requireFunction(totalPortfolio, 'totalPortfolio');
+    } catch (cause) {
+        dependencyCause = cause;
+    }
+
+    const emptyMetrics = {
+        totalWithdrawal: 0,
+        maxReductionStreak: 0,
+        reductionYears: 0,
+        totalTaxes: 0
+    };
+    const buildEarlyResult = ({ outcome, dataStatus, incompleteReason = null, diagnostics = null }) => ({
+        schemaVersion: BACKTEST_RESULT_SCHEMA_VERSION,
+        request,
+        outcome,
+        error: outcome.kind === BACKTEST_OUTCOME_KINDS.TECHNICAL_ERROR ? outcome.error : null,
+        rows: [],
+        requestedYears,
+        completedYears: 0,
+        lastCompletedYear: null,
+        breakOnRuin: request.breakOnRuin,
+        portfolioStart: null,
+        portfolioEnd: null,
+        dataStatus,
+        incompleteReason,
+        historicalYearRecords: [],
+        legacyOutcome: outcome.kind,
+        legacyMetrics: emptyMetrics,
+        summary: buildSummary({
             rows: [],
-            requestedYears,
-            completedYears: 0,
             portfolioStart: null,
             portfolioEnd: null,
+            completedYears: 0,
+            ...emptyMetrics
+        }),
+        diagnostics
+    });
+
+    if (dependencyCause) {
+        const error = normalizeTechnicalError(null, BACKTEST_TECHNICAL_ERROR_CODES.DEPENDENCY_INVALID);
+        return buildEarlyResult({
+            outcome: { kind: BACKTEST_OUTCOME_KINDS.TECHNICAL_ERROR, error, lastCompletedYear: null },
+            dataStatus: 'not_checked',
+            diagnostics: { cause: dependencyCause }
+        });
+    }
+
+    try {
+        prepared = prepareHistoricalPeriod(historicalDataProvider, { startYear, endYear });
+    } catch (cause) {
+        const error = normalizeTechnicalError(null, BACKTEST_TECHNICAL_ERROR_CODES.PERIOD_CONTRACT_ERROR);
+        return buildEarlyResult({
+            outcome: { kind: BACKTEST_OUTCOME_KINDS.TECHNICAL_ERROR, error, lastCompletedYear: null },
+            dataStatus: 'not_checked',
+            diagnostics: { cause }
+        });
+    }
+    if (prepared.status === 'incomplete') {
+        return buildEarlyResult({
+            outcome: buildIncompleteOutcome(prepared.reason),
             dataStatus: 'incomplete',
-            incompleteReason: prepared.reason,
-            legacyOutcome: 'incomplete',
-            historicalYearRecords: [],
-            legacyMetrics: {
-                totalWithdrawal: 0,
-                maxReductionStreak: 0,
-                reductionYears: 0,
-                totalTaxes: 0
-            }
-        };
+            incompleteReason: prepared.reason
+        });
     }
     const historicalRecords = prepared.records;
     const backtestContext = {
@@ -196,8 +331,19 @@ export function runHistoricalBacktest({
     };
     const initialMarketHistory = prepared.initialMarketHistory;
     const initialCapeRatio = historicalRecords[0].decisionAsOf.capeRatio.value;
+    let initialPortfolio;
+    try {
+        initialPortfolio = initialize(runInputs);
+    } catch (cause) {
+        const error = normalizeTechnicalError(null, BACKTEST_TECHNICAL_ERROR_CODES.INITIALIZATION_ERROR);
+        return buildEarlyResult({
+            outcome: { kind: BACKTEST_OUTCOME_KINDS.TECHNICAL_ERROR, error, lastCompletedYear: null },
+            dataStatus: 'complete',
+            diagnostics: { cause }
+        });
+    }
     let simulationState = {
-        portfolio: initialize(runInputs),
+        portfolio: initialPortfolio,
         baseFloor: runInputs.startFloorBedarf,
         baseFlex: runInputs.startFlexBedarf,
         baseMinimumFlexAnnual: runInputs.minimumFlexAnnual || 0,
@@ -225,7 +371,48 @@ export function runHistoricalBacktest({
     let totalTaxes = 0;
     let successfulYears = 0;
     let ruinEncountered = false;
+    let ruinYear = null;
+    let ruinReason = null;
+    let lastCompletedYear = null;
     const rows = [];
+
+    const finishResult = ({ outcome, diagnostics = null }) => {
+        const portfolioEnd = simulationState?.portfolio
+            ? computePortfolioTotal(simulationState.portfolio)
+            : null;
+        const legacyMetrics = {
+            totalWithdrawal,
+            maxReductionStreak: Math.max(maxReductionStreak, currentReductionStreak),
+            reductionYears,
+            totalTaxes
+        };
+        return {
+            schemaVersion: BACKTEST_RESULT_SCHEMA_VERSION,
+            request,
+            outcome,
+            error: outcome.kind === BACKTEST_OUTCOME_KINDS.TECHNICAL_ERROR ? outcome.error : null,
+            rows,
+            requestedYears,
+            completedYears: successfulYears,
+            lastCompletedYear,
+            breakOnRuin: request.breakOnRuin,
+            portfolioStart,
+            portfolioEnd,
+            dataStatus: 'complete',
+            incompleteReason: null,
+            historicalYearRecords: historicalRecords,
+            legacyOutcome: outcome.kind,
+            legacyMetrics,
+            summary: buildSummary({
+                rows,
+                portfolioStart,
+                portfolioEnd,
+                completedYears: successfulYears,
+                ...legacyMetrics
+            }),
+            diagnostics
+        };
+    };
 
     for (let yearIndex = 0; yearIndex < historicalRecords.length; yearIndex++) {
         const historicalRecord = historicalRecords[yearIndex];
@@ -244,10 +431,43 @@ export function runHistoricalBacktest({
                 ? { longevityHorizonDiagnostics: horizonResolution.diagnostics }
                 : {})
         };
-        const result = simulate(simulationState, adjustedInputs, yearData, yearIndex);
+        const stateBeforeYear = cloneRunValue(simulationState);
+        let result;
+        try {
+            result = simulate(simulationState, adjustedInputs, yearData, yearIndex);
+        } catch (cause) {
+            simulationState = stateBeforeYear;
+            const error = normalizeTechnicalError(null, BACKTEST_TECHNICAL_ERROR_CODES.SIMULATOR_EXCEPTION);
+            return finishResult({
+                outcome: { kind: BACKTEST_OUTCOME_KINDS.TECHNICAL_ERROR, error, lastCompletedYear },
+                diagnostics: { cause, failedYear: year }
+            });
+        }
 
-        if (result.isRuin) {
+        if (result?.kind === 'technical_error' || result?.error) {
+            simulationState = stateBeforeYear;
+            const error = normalizeTechnicalError(result?.error, BACKTEST_TECHNICAL_ERROR_CODES.SIMULATOR_RESULT_INVALID);
+            return finishResult({
+                outcome: { kind: BACKTEST_OUTCOME_KINDS.TECHNICAL_ERROR, error, lastCompletedYear },
+                diagnostics: { cause: result?.error?.cause || result?.error || null, failedYear: year }
+            });
+        }
+
+        if (result?.kind === 'ruin' || result?.isRuin === true) {
+            if (!result?.newState?.portfolio) {
+                simulationState = stateBeforeYear;
+                const error = normalizeTechnicalError(null, BACKTEST_TECHNICAL_ERROR_CODES.RUIN_STATE_INVALID);
+                return finishResult({
+                    outcome: { kind: BACKTEST_OUTCOME_KINDS.TECHNICAL_ERROR, error, lastCompletedYear },
+                    diagnostics: { cause: result, failedYear: year }
+                });
+            }
             ruinEncountered = true;
+            ruinYear ??= year;
+            ruinReason ??= result.reason || 'Floor-Deckungsausfall';
+            simulationState = result.newState;
+            const terminal = readPortfolioParts(simulationState.portfolio);
+            const terminalPortfolioTotal = computePortfolioTotal(simulationState.portfolio);
             rows.push({
                 jahr: year,
                 row: {
@@ -255,9 +475,9 @@ export function runHistoricalBacktest({
                     renteSum: 0,
                     aktionUndGrund: '!!! RUIN !!!',
                     Regime: 'BANKRUPT',
-                    liquiditaet: 0,
-                    wertAktien: 0,
-                    wertGold: 0,
+                    liquiditaet: terminal.liquiditaet,
+                    wertAktien: terminal.wertAktien,
+                    wertGold: terminal.wertGold,
                     FlexRatePct: 0,
                     flex_erfuellt_nominal: 0,
                     QuoteEndPct: 0,
@@ -268,12 +488,15 @@ export function runHistoricalBacktest({
                     NeedLiq: 0,
                     GuardGold: 0,
                     GuardEq: 0,
-                    GuardNote: result.reason || 'Pleite'
+                    GuardNote: result.reason || 'Floor-Deckungsausfall',
+                    health_bucket_enabled: terminal.healthBucketEnd > 0,
+                    health_bucket_end: terminal.healthBucketEnd,
+                    portfolio_total_end: terminalPortfolioTotal
                 },
                 entscheidung: { jahresEntnahme: 0 },
-                wertAktien: 0,
-                wertGold: 0,
-                liquiditaet: 0,
+                wertAktien: terminal.wertAktien,
+                wertGold: terminal.wertGold,
+                liquiditaet: terminal.liquiditaet,
                 netA: 0,
                 netG: 0,
                 vpw: null,
@@ -282,6 +505,16 @@ export function runHistoricalBacktest({
                 inflationVJ: historicalRecord.realized.inflation.value
             });
             if (breakOnRuin) break;
+            continue;
+        }
+
+        if (!result?.newState?.portfolio || !result?.logData) {
+            simulationState = stateBeforeYear;
+            const error = normalizeTechnicalError(null, BACKTEST_TECHNICAL_ERROR_CODES.SIMULATOR_RESULT_INVALID);
+            return finishResult({
+                outcome: { kind: BACKTEST_OUTCOME_KINDS.TECHNICAL_ERROR, error, lastCompletedYear },
+                diagnostics: { cause: result, failedYear: year }
+            });
         }
 
         simulationState = result.newState;
@@ -290,6 +523,7 @@ export function runHistoricalBacktest({
         const { entscheidung, wertAktien, wertGold, liquiditaet } = row;
         totalWithdrawal += entscheidung.jahresEntnahme;
         successfulYears++;
+        lastCompletedYear = year;
 
         const netA = Number.isFinite(row.netTradeEq)
             ? row.netTradeEq
@@ -323,25 +557,17 @@ export function runHistoricalBacktest({
     }
 
     maxReductionStreak = Math.max(maxReductionStreak, currentReductionStreak);
-    const portfolioEnd = computePortfolioTotal(simulationState.portfolio);
-
-    return {
-        schemaVersion: BACKTEST_RESULT_SCHEMA_VERSION,
-        request,
-        rows,
-        requestedYears,
-        completedYears: successfulYears,
-        portfolioStart,
-        portfolioEnd,
-        dataStatus: 'complete',
-        incompleteReason: null,
-        historicalYearRecords: historicalRecords,
-        legacyOutcome: buildLegacyOutcome(rows, requestedYears, ruinEncountered),
-        legacyMetrics: {
-            totalWithdrawal,
-            maxReductionStreak,
-            reductionYears,
-            totalTaxes
-        }
-    };
+    return finishResult({
+        outcome: ruinEncountered
+            ? {
+                kind: BACKTEST_OUTCOME_KINDS.RUIN,
+                ruinYear,
+                reason: ruinReason,
+                lastCompletedYear
+            }
+            : {
+                kind: BACKTEST_OUTCOME_KINDS.COMPLETED,
+                lastCompletedYear
+            }
+    });
 }

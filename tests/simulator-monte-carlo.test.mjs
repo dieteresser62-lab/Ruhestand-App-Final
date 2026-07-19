@@ -1,6 +1,20 @@
 import { EngineAPI } from '../engine/index.mjs';
 import { mergeHeatmap, appendArray } from '../app/simulator/simulator-monte-carlo.js';
-import { MC_HEATMAP_BINS, pickWorstRun, createMonteCarloBuffers, buildMonteCarloAggregates, runMonteCarloChunk } from '../app/simulator/monte-carlo-runner.js';
+import {
+    attachMonteCarloBatchOutcome,
+    MC_HEATMAP_BINS,
+    pickWorstRun,
+    createMonteCarloBuffers,
+    createMonteCarloTechnicalInventory,
+    buildMonteCarloAggregates,
+    mergeMonteCarloTechnicalInventory,
+    runMonteCarloChunk
+} from '../app/simulator/monte-carlo-runner.js';
+import {
+    simulateOneYear,
+    SIMULATOR_TECHNICAL_ERROR_CODES
+} from '../app/simulator/simulator-engine-direct.js';
+import { runSweepChunk } from '../app/simulator/sweep-runner.js';
 import { createMonteCarloRunContext } from '../app/simulator/mc-run-context.js';
 import {
     createMonteCarloStressTracker,
@@ -148,6 +162,10 @@ function buildBasicInputs() {
     assert(chunk.heatmap.length === 10, 'Heatmap should have 10 rows');
     assertEqual(chunk.bins.length, MC_HEATMAP_BINS.length, 'Bins should match MC_HEATMAP_BINS');
     assert(chunk.totals.totalSimulatedYears >= 0, 'Totals should be present');
+    assertEqual(chunk.batchStatus, 'completed', 'valid MC chunk has completed batch status');
+    assertEqual(chunk.technicalInventory.requested, 4, 'valid MC chunk inventories every requested path');
+    assertEqual(chunk.technicalInventory.financiallyEvaluable, 4, 'valid MC paths are financially evaluable');
+    assertEqual(chunk.technicalInventory.technicalError, 0, 'valid MC chunk has no technical path error');
 }
 
 // --- TEST 6a: Monte-Carlo run context creation ---
@@ -1055,6 +1073,97 @@ const emptyLists = {
             `Tail-risk log shape should be chunk-independent for run ${runIdx}`
         );
     }
+}
+
+// --- TEST 19: Shared technical outcome is fail-closed across Direct, MC, worker-like merge, and Sweep ---
+{
+    for (const invalidField of ['rendite', 'gold_eur_perf', 'zinssatz']) {
+        let engineCalls = 0;
+        const yearData = { jahr: 2000, rendite: 0.05, gold_eur_perf: 2, zinssatz: 1, inflation: 2 };
+        yearData[invalidField] = Number.NaN;
+        const guarded = simulateOneYear(
+            {},
+            {},
+            yearData,
+            0,
+            null,
+            0,
+            null,
+            1,
+            { simulateSingleYear: () => { engineCalls++; return {}; } }
+        );
+        assertEqual(guarded.kind, 'technical_error', `${invalidField} non-finite value should be technical_error`);
+        assertEqual(guarded.error.code, SIMULATOR_TECHNICAL_ERROR_CODES.YEAR_DATA_RETURN_INVALID, `${invalidField} should use stable return-guard code`);
+        assertEqual(guarded.isRuin, false, `${invalidField} technical error must not be ruin`);
+        assertEqual(engineCalls, 0, `${invalidField} guard must stop before the engine call`);
+    }
+
+    const rejectingEngine = {
+        simulateSingleYear: () => ({ error: new Error('internal C:\\private\\engine.js') })
+    };
+    const inputs = { ...buildBasicInputs(), startAlter: 20 };
+    const monteCarloParams = {
+        anzahl: 3,
+        maxDauer: 1,
+        blockSize: 1,
+        seed: 91,
+        methode: 'block',
+        rngMode: 'per-run-seed',
+        startYearMode: 'UNIFORM'
+    };
+    const runChunk = (start, count) => runMonteCarloChunk({
+        inputs,
+        monteCarloParams,
+        widowOptions: { mode: 'stop', percent: 0, marriageOffsetYears: 0, minMarriageYears: 0 },
+        useCapeSampling: false,
+        runRange: { start, count },
+        engine: rejectingEngine
+    });
+    const full = await runChunk(0, 3);
+    assertEqual(full.batchStatus, 'technical_error', 'one or more technical MC paths fail the batch closed');
+    assertEqual(full.financialMetricsValid, false, 'technical MC batch invalidates financial headlines');
+    assertEqual(full.technicalInventory.requested, 3, 'technical MC inventory retains requested denominator');
+    assertEqual(full.technicalInventory.financiallyEvaluable, 0, 'technical MC paths are excluded from financial evaluation');
+    assertEqual(full.technicalInventory.technicalError, 3, 'technical MC inventory counts every rejected path');
+    assertEqual(full.totals.failCount, 0, 'technical MC paths are not counted as economic ruin');
+    assertEqual(full.technicalInventory.errors[0].code, SIMULATOR_TECHNICAL_ERROR_CODES.ENGINE_RESULT_ERROR, 'MC preserves the direct adapter technical code');
+    assert(!full.technicalInventory.errors[0].message.includes('C:\\private'), 'MC user message hides internal paths');
+
+    const splitA = await runChunk(0, 1);
+    const splitB = await runChunk(1, 2);
+    const mergedInventory = createMonteCarloTechnicalInventory(3);
+    mergeMonteCarloTechnicalInventory(mergedInventory, splitA.technicalInventory);
+    mergeMonteCarloTechnicalInventory(mergedInventory, splitB.technicalInventory);
+    assertEqual(JSON.stringify(mergedInventory), JSON.stringify(full.technicalInventory), 'worker-like split merge preserves the complete technical inventory');
+    const contracted = attachMonteCarloBatchOutcome({}, mergedInventory);
+    assertEqual(contracted.batchStatus, 'technical_error', 'merged worker result remains fail-closed');
+    assertEqual(contracted.financialMetricsValid, false, 'merged worker result does not expose valid financial headlines');
+
+    const sweep = runSweepChunk({
+        baseInputs: inputs,
+        paramCombinations: [{
+            runwayMin: 18,
+            runwayTarget: 30,
+            targetEq: 60,
+            rebalBand: 5,
+            maxSkimPct: 10,
+            maxBearRefillPct: 5,
+            goldTargetPct: 0
+        }],
+        comboRange: { start: 0, count: 1 },
+        sweepConfig: {
+            anzahlRuns: 1,
+            maxDauer: 1,
+            blockSize: 1,
+            baseSeed: 91,
+            methode: 'block',
+            rngMode: 'per-run-seed'
+        },
+        engine: rejectingEngine
+    });
+    assertEqual(sweep.results[0].metrics.invalidCombination, true, 'Sweep keeps technical engine errors as invalid combinations');
+    assert(sweep.results[0].metrics.invalidReason.includes(SIMULATOR_TECHNICAL_ERROR_CODES.ENGINE_RESULT_ERROR), 'Sweep exposes the same stable technical code');
+    assert(!sweep.results[0].metrics.invalidReason.includes('C:\\private'), 'Sweep invalid reason hides internal paths');
 }
 
 console.log('--- Simulator Monte Carlo Tests Completed ---');

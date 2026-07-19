@@ -318,7 +318,7 @@
       ],
       "observedRowCount": 6,
       "oracleClass": "target_expected",
-      "outcomeObservation": "completed_legacy",
+      "outcomeObservation": "completed",
       "period": {
         "endYear": 2005,
         "requestedYears": 6,
@@ -430,7 +430,7 @@
           }
         }
       ],
-      "summaryText": "Startvermögen 2.000.000,00 € Endvermögen 1.353.347,36 € Gesamte Entnahmen 172.800,00 € Max. Kürzungsdauer 6 Jahre Jahre mit Kürzung (>10%) 6 von 6 Gezahlte Steuern 0,00 €",
+      "summaryText": "Startvermögen 2.020.000,00 € Endvermögen 1.353.347,36 € Gesamte Entnahmen 172.800,00 € Max. Kürzungsdauer 6 Jahre Jahre mit Kürzung (>10%) 6 von 6 Gezahlte Steuern 0,00 €",
       "values": {
         "lastRowPortfolioTotalEnd": 1353347.36,
         "lastWrapperPortfolio": 1353347.36,
@@ -583,7 +583,7 @@
       ],
       "observedRowCount": 61,
       "oracleClass": "target_expected",
-      "outcomeObservation": "completed_legacy",
+      "outcomeObservation": "completed",
       "period": {
         "endYear": 2020,
         "requestedYears": 61,
@@ -695,7 +695,7 @@
           }
         }
       ],
-      "summaryText": "Startvermögen 2.000.000,00 € Endvermögen 95.436.508,34 € Gesamte Entnahmen 4.122.159,99 € Max. Kürzungsdauer 59 Jahre Jahre mit Kürzung (>10%) 59 von 61 Gezahlte Steuern 791.315,78 €",
+      "summaryText": "Startvermögen 2.020.000,00 € Endvermögen 95.436.508,34 € Gesamte Entnahmen 4.122.159,99 € Max. Kürzungsdauer 59 Jahre Jahre mit Kürzung (>10%) 59 von 61 Gezahlte Steuern 791.315,78 €",
       "values": {
         "lastRowPortfolioTotalEnd": 95436508.34,
         "lastWrapperPortfolio": 95436508.34,
@@ -848,7 +848,7 @@
       ],
       "observedRowCount": 10,
       "oracleClass": "target_expected",
-      "outcomeObservation": "completed_legacy",
+      "outcomeObservation": "completed",
       "period": {
         "endYear": 2014,
         "requestedYears": 10,
@@ -975,7 +975,7 @@
     },
     {
       "alerts": [],
-      "canonicalRowsHash": "0eaf12f0e99633fe885889fe8d4b39d1461c8d2ba76d71c41f96026d0b6bc2bf",
+      "canonicalRowsHash": "f59c1e21951ca0b0ac908c649b668dead5f6cc0539abc767a632cd4cd298c8f1",
       "expectedRowCount": 2,
       "id": "capital_poor_ruin_2000_2005",
       "inputHash": "e576bf078df99d1bc8b779e50fc8c0ffe381bb5599f8c9b1809da292295d31fc",
@@ -1109,11 +1109,11 @@
         "zielLiquiditaet": 20000
       },
       "notes": [
-        "Synthetic zero ruin row and positive pre-ruin summary are a legacy_observed_gap, not a target."
+        "Ruin row and summary use the same terminal portfolio state from the ruin year."
       ],
       "observedRowCount": 2,
       "oracleClass": "target_expected",
-      "outcomeObservation": "ruin_legacy",
+      "outcomeObservation": "ruin",
       "period": {
         "endYear": 2005,
         "requestedYears": 6,
@@ -1153,11 +1153,11 @@
             "equityReturnRatio": 0,
             "goldReturnRatio": 0,
             "healthBucketCoveragePct": null,
-            "healthBucketEnabled": null,
-            "healthBucketEnd": null,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
             "healthBucketTargetGap": null,
             "portfolioFlowDelta": null,
-            "portfolioTotalEnd": null,
+            "portfolioTotalEnd": 14695.21,
             "reductionPct": null,
             "regime": "BANKRUPT",
             "tax": 0,
@@ -1166,21 +1166,21 @@
           "wrapper": {
             "adjPct": 0,
             "inflationVJ": 2.1,
-            "liquiditaet": 0,
+            "liquiditaet": 14695.21,
             "vpwFallbackHint": "no_vpw",
             "wertAktien": 0,
             "wertGold": 0
           }
         }
       ],
-      "summaryText": "Startvermögen 120.000,00 € Endvermögen 7.818,75 € Gesamte Entnahmen 90.000,00 € Max. Kürzungsdauer 1 Jahre Jahre mit Kürzung (>10%) 1 von 6 Gezahlte Steuern 0,00 €",
+      "summaryText": "Startvermögen 120.000,00 € Endvermögen 14.695,21 € Gesamte Entnahmen 90.000,00 € Max. Kürzungsdauer 1 Jahre Jahre mit Kürzung (>10%) 1 von 1 Gezahlte Steuern 0,00 €",
       "values": {
-        "lastRowPortfolioTotalEnd": null,
-        "lastWrapperPortfolio": 0,
+        "lastRowPortfolioTotalEnd": 14695.21,
+        "lastWrapperPortfolio": 14695.21,
         "maxAbsolutePortfolioFlowDelta": 0,
         "maxReductionStreak": 1,
         "startWealth": 120000,
-        "summaryEndWealth": 7818.75,
+        "summaryEndWealth": 14695.21,
         "totalTax": 0,
         "totalWithdrawal": 90000,
         "yearsWithReductionAtLeast10Pct": 1
@@ -1190,7 +1190,7 @@
       "alerts": [],
       "canonicalRowsHash": "557b472cfa6a66d56267e06a7f9930408184696f8cd9d22f879c1c7a64cfe398",
       "expectedRowCount": 2,
-      "id": "health_bucket_nested_row_summary_gap",
+      "id": "health_bucket_nested_row_summary_positive",
       "inputHash": "a799ab677936d36be93752fa374902ad2c0421c7f199f3a8f84b01086d4bfff5",
       "inputs": {
         "accumulationPhase": {
@@ -1323,11 +1323,11 @@
       },
       "notes": [
         "A real engine health-bucket log row is projected into the legacy wrapper.",
-        "The summary remains empty because production reads lastLogRow.health_bucket_* instead of lastLogRow.row.health_bucket_*."
+        "The summary reads the canonical nested row and exposes bucket end, coverage, and target gap."
       ],
       "observedRowCount": 2,
       "oracleClass": "target_expected",
-      "outcomeObservation": "completed_legacy",
+      "outcomeObservation": "completed",
       "period": {
         "endYear": 2011,
         "requestedYears": 2,
@@ -1387,7 +1387,7 @@
           }
         }
       ],
-      "summaryText": "Startvermögen 2.000.000,00 € Endvermögen 2.042.036,36 € Gesamte Entnahmen 60.000,00 € Max. Kürzungsdauer 0 Jahre Jahre mit Kürzung (>10%) 0 von 2 Gezahlte Steuern 2.406,24 €",
+      "summaryText": "Startvermögen 2.020.000,00 € Endvermögen 2.042.036,36 € Gesamte Entnahmen 60.000,00 € Max. Kürzungsdauer 0 Jahre Jahre mit Kürzung (>10%) 0 von 2 Gezahlte Steuern 2.406,24 € Pflegebucket 8.000,00 € Pflegebucket-Zieldeckung 40% Pflegebucket-Ziellücke 12.000,00 €",
       "values": {
         "lastRowPortfolioTotalEnd": 83759.36,
         "lastWrapperPortfolio": 2042036.36,
@@ -1540,7 +1540,7 @@
       ],
       "observedRowCount": 4,
       "oracleClass": "target_expected",
-      "outcomeObservation": "completed_legacy",
+      "outcomeObservation": "completed",
       "period": {
         "endYear": 2013,
         "requestedYears": 4,
@@ -1652,7 +1652,7 @@
           }
         }
       ],
-      "summaryText": "Startvermögen 2.000.000,00 € Endvermögen 2.366.522,53 € Gesamte Entnahmen 453.000,00 € Max. Kürzungsdauer 4 Jahre Jahre mit Kürzung (>10%) 4 von 4 Gezahlte Steuern 36.336,00 €",
+      "summaryText": "Startvermögen 2.020.000,00 € Endvermögen 2.366.522,53 € Gesamte Entnahmen 453.000,00 € Max. Kürzungsdauer 4 Jahre Jahre mit Kürzung (>10%) 4 von 4 Gezahlte Steuern 36.336,00 €",
       "values": {
         "lastRowPortfolioTotalEnd": 2366522.53,
         "lastWrapperPortfolio": 2366522.53,
@@ -1699,7 +1699,7 @@
         },
         "rowProjectionCause": "D-01 time-axis alignment and signed negative-cash-interest reconciliation",
         "rowProjectionChanged": true,
-        "targetOutcome": "completed_legacy"
+        "targetOutcome": "completed"
       },
       {
         "id": "completed_1960_2020",
@@ -1738,7 +1738,7 @@
         },
         "rowProjectionCause": "D-01 time-axis alignment and signed negative-cash-interest reconciliation",
         "rowProjectionChanged": true,
-        "targetOutcome": "completed_legacy"
+        "targetOutcome": "completed"
       },
       {
         "id": "three_bucket_minimum_flex_2005_2014",
@@ -1771,43 +1771,91 @@
         },
         "rowProjectionCause": "D-01 time-axis alignment and signed negative-cash-interest reconciliation",
         "rowProjectionChanged": true,
-        "targetOutcome": "completed_legacy"
+        "targetOutcome": "completed"
       },
       {
         "id": "capital_poor_ruin_2000_2005",
         "legacyOutcome": "ruin_legacy",
         "metricDeltas": {
-          "summaryEndWealth": {
+          "lastRowPortfolioTotalEnd": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
-            "legacyObserved": 7687.5,
-            "numericDelta": 131.25,
-            "targetExpected": 7818.75
-          }
-        },
-        "rowProjectionCause": "D-01 time-axis alignment and signed negative-cash-interest reconciliation",
-        "rowProjectionChanged": true,
-        "targetOutcome": "ruin_legacy"
-      },
-      {
-        "id": "health_bucket_nested_row_summary_gap",
-        "legacyOutcome": "completed_legacy",
-        "metricDeltas": {
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 14695.21
+          },
           "lastWrapperPortfolio": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
-            "legacyObserved": 2042004.35,
-            "numericDelta": 32.01,
-            "targetExpected": 2042036.36
+            "legacyObserved": 0,
+            "numericDelta": 14695.21,
+            "targetExpected": 14695.21
           },
           "summaryEndWealth": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
-            "legacyObserved": 2042004.35,
-            "numericDelta": 32.01,
-            "targetExpected": 2042036.36
+            "legacyObserved": 7687.5,
+            "numericDelta": 7007.71,
+            "targetExpected": 14695.21
           }
         },
         "rowProjectionCause": "D-01 time-axis alignment and signed negative-cash-interest reconciliation",
         "rowProjectionChanged": true,
-        "targetOutcome": "completed_legacy"
+        "targetOutcome": "ruin"
+      },
+      {
+        "id": "health_bucket_nested_row_summary_positive",
+        "legacyOutcome": null,
+        "metricDeltas": {
+          "lastRowPortfolioTotalEnd": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 83759.36
+          },
+          "lastWrapperPortfolio": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 2042036.36
+          },
+          "maxAbsolutePortfolioFlowDelta": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 0
+          },
+          "maxReductionStreak": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 0
+          },
+          "summaryEndWealth": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 2042036.36
+          },
+          "totalTax": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 1568.12
+          },
+          "totalWithdrawal": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 60000
+          },
+          "yearsWithReductionAtLeast10Pct": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 0
+          }
+        },
+        "rowProjectionCause": "D-01 time-axis alignment and signed negative-cash-interest reconciliation",
+        "rowProjectionChanged": true,
+        "targetOutcome": "completed"
       },
       {
         "id": "dynamic_flex_cape_2010_2013",
@@ -1846,7 +1894,7 @@
         },
         "rowProjectionCause": "D-01 time-axis alignment and signed negative-cash-interest reconciliation",
         "rowProjectionChanged": true,
-        "targetOutcome": "completed_legacy"
+        "targetOutcome": "completed"
       }
     ],
     "impactAnalysis": {
@@ -1896,19 +1944,19 @@
           "delta": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
             "legacyObserved": 7687.5,
-            "numericDelta": 131.25,
-            "targetExpected": 7818.75
+            "numericDelta": 7007.71,
+            "targetExpected": 14695.21
           },
           "id": "capital_poor_ruin_2000_2005"
         },
         {
           "delta": {
             "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
-            "legacyObserved": 2042004.35,
-            "numericDelta": 32.01,
+            "legacyObserved": null,
+            "numericDelta": null,
             "targetExpected": 2042036.36
           },
-          "id": "health_bucket_nested_row_summary_gap"
+          "id": "health_bucket_nested_row_summary_positive"
         },
         {
           "delta": {
@@ -1934,7 +1982,7 @@
         "id": "negative_single_year_2010",
         "legacyOutcome": "validation_alert_legacy",
         "legacyRows": 0,
-        "targetOutcome": "completed_legacy",
+        "targetOutcome": "completed",
         "targetRows": 1
       },
       {
@@ -1961,7 +2009,7 @@
         "id": "negative_missing_middle_year_2000_2002",
         "legacyOutcome": "partial_result_rendered_as_completed_legacy",
         "legacyRows": 1,
-        "targetOutcome": "completed_legacy",
+        "targetOutcome": "completed",
         "targetRows": 3
       },
       {
@@ -1970,7 +2018,7 @@
         "id": "negative_non_finite_gold_return_2001_2002",
         "legacyOutcome": "completed_legacy",
         "legacyRows": 2,
-        "targetOutcome": "completed_legacy",
+        "targetOutcome": "completed",
         "targetRows": 2
       }
     ],
@@ -1993,12 +2041,9 @@
   "legacyGlobalSchema": {
     "detailToggleDependency": "row payload stable; rendered/exported column projection depends on backtestLogDetailLevel",
     "fieldsMissingFromLegacyV0": [
-      "schemaVersion",
       "endJahr",
-      "outcome",
       "error",
       "warnings",
-      "breakOnRuin",
       "datasetRevision",
       "engineBuildId"
     ],
@@ -2151,17 +2196,27 @@
     ],
     "schemaId": "legacy_schema_v0",
     "topLevelFields": [
+      "breakOnRuin",
+      "completedYears",
       "decumulationMode",
       "goldAktiv",
       "minimumFlexProfiles",
+      "outcome",
+      "requestedYears",
       "rows",
+      "schemaVersion",
       "startJahr"
     ],
     "topLevelTypes": {
+      "breakOnRuin": "boolean",
+      "completedYears": "number",
       "decumulationMode": "string",
       "goldAktiv": "boolean",
       "minimumFlexProfiles": "array",
+      "outcome": "object",
+      "requestedYears": "number",
       "rows": "array",
+      "schemaVersion": "string",
       "startJahr": "number"
     }
   },
@@ -2359,7 +2414,7 @@
       ],
       "observedRowCount": 1,
       "oracleClass": "target_expected",
-      "outcomeObservation": "completed_legacy",
+      "outcomeObservation": "completed",
       "period": {
         "endYear": 2010,
         "requestedYears": 1,
@@ -2393,7 +2448,7 @@
           }
         }
       ],
-      "summaryText": "Startvermögen 2.000.000,00 € Endvermögen 2.246.485,58 € Gesamte Entnahmen 30.000,00 € Max. Kürzungsdauer 0 Jahre Jahre mit Kürzung (>10%) 0 von 1 Gezahlte Steuern 1.327,48 €",
+      "summaryText": "Startvermögen 2.020.000,00 € Endvermögen 2.246.485,58 € Gesamte Entnahmen 30.000,00 € Max. Kürzungsdauer 0 Jahre Jahre mit Kürzung (>10%) 0 von 1 Gezahlte Steuern 1.327,48 €",
       "values": {
         "lastRowPortfolioTotalEnd": 2246485.58,
         "lastWrapperPortfolio": 2246485.58,
@@ -2870,7 +2925,7 @@
       ],
       "observedRowCount": 3,
       "oracleClass": "target_expected",
-      "outcomeObservation": "completed_legacy",
+      "outcomeObservation": "completed",
       "period": {
         "endYear": 2002,
         "requestedYears": 3,
@@ -2956,7 +3011,7 @@
           }
         }
       ],
-      "summaryText": "Startvermögen 2.000.000,00 € Endvermögen 933.833,70 € Gesamte Entnahmen 86.400,00 € Max. Kürzungsdauer 3 Jahre Jahre mit Kürzung (>10%) 3 von 3 Gezahlte Steuern 621,49 €",
+      "summaryText": "Startvermögen 2.020.000,00 € Endvermögen 933.833,70 € Gesamte Entnahmen 86.400,00 € Max. Kürzungsdauer 3 Jahre Jahre mit Kürzung (>10%) 3 von 3 Gezahlte Steuern 621,49 €",
       "values": {
         "lastRowPortfolioTotalEnd": 933833.7,
         "lastWrapperPortfolio": 933833.7,
@@ -3109,7 +3164,7 @@
       ],
       "observedRowCount": 2,
       "oracleClass": "target_expected",
-      "outcomeObservation": "completed_legacy",
+      "outcomeObservation": "completed",
       "period": {
         "endYear": 2002,
         "requestedYears": 2,
@@ -3169,7 +3224,7 @@
           }
         }
       ],
-      "summaryText": "Startvermögen 2.000.000,00 € Endvermögen 1.097.056,67 € Gesamte Entnahmen 57.600,00 € Max. Kürzungsdauer 2 Jahre Jahre mit Kürzung (>10%) 2 von 2 Gezahlte Steuern 0,00 €",
+      "summaryText": "Startvermögen 2.020.000,00 € Endvermögen 1.097.056,67 € Gesamte Entnahmen 57.600,00 € Max. Kürzungsdauer 2 Jahre Jahre mit Kürzung (>10%) 2 von 2 Gezahlte Steuern 0,00 €",
       "values": {
         "lastRowPortfolioTotalEnd": 1097056.67,
         "lastWrapperPortfolio": 1097056.67,

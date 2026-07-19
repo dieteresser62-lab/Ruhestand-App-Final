@@ -1,4 +1,5 @@
 import {
+    BACKTEST_OUTCOME_KINDS,
     BACKTEST_REQUEST_SCHEMA_VERSION,
     BACKTEST_RESULT_SCHEMA_VERSION,
     runHistoricalBacktest
@@ -226,7 +227,11 @@ const dependencies = {
             floor_brutto: 12,
             renteSum: 0,
             aktionUndGrund: 'TEST',
-            steuern_gesamt: 1 + yearIndex
+            steuern_gesamt: 1 + yearIndex,
+            health_bucket_enabled: yearIndex === 1,
+            health_bucket_end: yearIndex === 1 ? 4321.09 : 0,
+            health_bucket_real_coverage_pct: yearIndex === 1 ? 76.5 : null,
+            health_bucket_target_gap: yearIndex === 1 ? 123.45 : 0
         };
         return {
             isRuin: false,
@@ -276,7 +281,11 @@ try {
 
 assertEqual(completed.schemaVersion, BACKTEST_RESULT_SCHEMA_VERSION, 'runner returns a versioned result shape');
 assertEqual(completed.request.schemaVersion, BACKTEST_REQUEST_SCHEMA_VERSION, 'runner embeds a versioned request shape');
+assertEqual(completed.schemaVersion, 'BacktestRunResultV1', 'runner activates the V1 result contract');
+assertEqual(completed.request.schemaVersion, 'BacktestRequestV1', 'runner activates the V1 request contract');
+assertEqual(completed.outcome.kind, BACKTEST_OUTCOME_KINDS.COMPLETED, 'completed run has a discriminated outcome');
 assertEqual(completed.request.breakOnRuin, true, 'request records the explicit ruin policy');
+assertEqual(completed.breakOnRuin, true, 'result records the explicit ruin policy');
 assertEqual(completed.request.temporalConventionId, HISTORICAL_TEMPORAL_CONVENTION_ID, 'request records the approved temporal convention');
 assertEqual(completed.request.dataset.datasetId, 'runner-fixture', 'request records dataset provenance');
 assertEqual(completed.requestedYears, 2, 'requestedYears includes the full inclusive period');
@@ -284,11 +293,15 @@ assertEqual(completed.completedYears, 2, 'completedYears counts successful simul
 assertEqual(completed.rows.length, 2, 'completed run returns one row per simulated year');
 assertEqual(completed.portfolioStart, 100, 'runner records the initial portfolio total');
 assertEqual(completed.portfolioEnd, 120, 'runner records the final portfolio total');
-assertEqual(completed.legacyOutcome, 'completed_legacy', 'completed path retains the legacy outcome label');
+assertEqual(completed.legacyOutcome, 'completed', 'legacy outcome alias follows the canonical V1 kind');
 assertEqual(completed.legacyMetrics.totalWithdrawal, 21, 'runner retains total withdrawals');
 assertEqual(completed.legacyMetrics.totalTaxes, 3, 'runner retains total taxes');
 assertEqual(completed.legacyMetrics.reductionYears, 1, 'exactly ten percent retains the legacy reduction counter');
 assertEqual(completed.legacyMetrics.maxReductionStreak, 1, 'runner retains the legacy reduction streak');
+assertEqual(completed.summary.reductionDenominator, 2, 'summary denominator uses completed years');
+assertEqual(completed.summary.healthBucket.enabled, true, 'canonical summary exposes the enabled health bucket');
+assertClose(completed.summary.healthBucket.end, 4321.09, 1e-9, 'canonical summary reads health bucket end from the nested result row');
+assertClose(completed.summary.healthBucket.realCoveragePct, 76.5, 1e-9, 'canonical summary reads health bucket coverage');
 assertEqual(completed.rows[0].netA, 2, 'explicit net equity trade takes precedence');
 assertEqual(completed.rows[1].netA, 2, 'legacy net equity fallback remains intact');
 assertEqual(completed.rows[1].netG, 3, 'legacy net gold fallback remains intact');
@@ -328,7 +341,10 @@ assertEqual(partial.rows.length, 0, 'missing-middle-year preflight prevents loop
 assertEqual(partial.completedYears, 0, 'incomplete data simulates no successful years');
 assertEqual(partial.dataStatus, 'incomplete', 'missing-middle-year path is explicitly incomplete');
 assertEqual(partial.incompleteReason.year, 2001, 'incomplete result identifies the exact missing year');
-assertEqual(partial.legacyOutcome, 'incomplete', 'incomplete data is no longer rendered as a completed legacy run');
+assertEqual(partial.outcome.kind, BACKTEST_OUTCOME_KINDS.INCOMPLETE, 'missing-middle-year path has incomplete outcome');
+assertEqual(partial.outcome.lastCompletedYear, null, 'preflight incomplete path has no completed year');
+assertEqual(partial.outcome.missingYears[0], 2001, 'incomplete outcome inventories the missing year');
+assert(partial.outcome.missingFields.includes('historicalYearRecord'), 'incomplete outcome inventories the missing required record');
 
 const ruin = runHistoricalBacktest({
     inputs: { ...callerInputs, self: undefined },
@@ -338,14 +354,86 @@ const ruin = runHistoricalBacktest({
     totalPortfolio: dependencies.totalPortfolio,
     computeAdjustmentPct: () => 0,
     resolveHorizon: () => ({ horizonYears: 30, diagnostics: { longevityMode: 'none' } }),
-    simulateYear: () => ({ isRuin: true, reason: 'Test ruin' }),
+    simulateYear: state => ({
+        kind: 'ruin',
+        isRuin: true,
+        reason: 'Test ruin',
+        newState: {
+            ...state,
+            portfolio: {
+                value: 7,
+                depotTranchesAktien: [{ marketValue: 5 }],
+                depotTranchesGold: [{ marketValue: 1 }],
+                liquiditaet: 1
+            }
+        }
+    }),
     breakOnRuin: true
 });
 assertEqual(ruin.rows.length, 1, 'ruin path returns the synthetic legacy row');
 assertEqual(ruin.rows[0].row.Regime, 'BANKRUPT', 'ruin row retains the legacy regime');
 assertEqual(ruin.completedYears, 0, 'ruin year is not counted as successfully completed');
-assertEqual(ruin.portfolioEnd, 100, 'ruin path retains the legacy pre-ruin portfolio end');
-assertEqual(ruin.legacyOutcome, 'ruin_legacy', 'ruin path retains the legacy outcome label');
+assertEqual(ruin.outcome.kind, BACKTEST_OUTCOME_KINDS.RUIN, 'floor failure has ruin outcome');
+assertEqual(ruin.outcome.ruinYear, 2000, 'ruin outcome identifies the first ruin year');
+assertEqual(ruin.portfolioEnd, 7, 'ruin end wealth uses the terminal ruin-year portfolio');
+assertEqual(ruin.rows[0].wertAktien + ruin.rows[0].wertGold + ruin.rows[0].liquiditaet, 7, 'ruin row reconciles to terminal end wealth');
+assertEqual(ruin.summary.endWealth, ruin.portfolioEnd, 'ruin summary reconciles to canonical terminal end wealth');
+
+const lateRuin = runHistoricalBacktest({
+    inputs: { ...callerInputs, self: undefined },
+    period: { startYear: 2000, endYear: 2001 },
+    historicalDataProvider: createContractProvider(),
+    ...dependencies,
+    simulateYear: (state, inputs, yearData, yearIndex) => {
+        if (yearIndex === 0) return dependencies.simulateYear(state, inputs, yearData, yearIndex);
+        return {
+            kind: 'ruin',
+            isRuin: true,
+            reason: 'Late ruin',
+            newState: {
+                ...state,
+                portfolio: {
+                    value: 9,
+                    depotTranchesAktien: [{ marketValue: 6 }],
+                    depotTranchesGold: [{ marketValue: 2 }],
+                    liquiditaet: 1
+                }
+            }
+        };
+    },
+    breakOnRuin: true
+});
+assertEqual(lateRuin.outcome.kind, BACKTEST_OUTCOME_KINDS.RUIN, 'later floor failure remains ruin');
+assertEqual(lateRuin.outcome.ruinYear, 2001, 'later ruin identifies its own year');
+assertEqual(lateRuin.completedYears, 1, 'only the successful prior year is completed');
+assertEqual(lateRuin.lastCompletedYear, 2000, 'later ruin retains the last completed year');
+assertEqual(lateRuin.portfolioEnd, 9, 'later ruin uses its terminal portfolio, not the prior-year wealth');
+
+const continueAfterRuin = runHistoricalBacktest({
+    inputs: { ...callerInputs, self: undefined },
+    period: { startYear: 2000, endYear: 2001 },
+    historicalDataProvider: createContractProvider(),
+    ...dependencies,
+    simulateYear: (state, inputs, yearData, yearIndex) => ({
+        kind: 'ruin',
+        isRuin: true,
+        reason: `Ruin ${yearIndex}`,
+        newState: {
+            ...state,
+            portfolio: {
+                value: 7 - yearIndex,
+                depotTranchesAktien: [{ marketValue: 5 - yearIndex }],
+                depotTranchesGold: [{ marketValue: 1 }],
+                liquiditaet: 1
+            }
+        }
+    }),
+    breakOnRuin: false
+});
+assertEqual(continueAfterRuin.rows.length, 2, 'breakOnRuin=false retains one terminal ruin row per requested year');
+assertEqual(continueAfterRuin.outcome.ruinYear, 2000, 'continued ruin run retains the first ruin year');
+assertEqual(continueAfterRuin.completedYears, 0, 'continued ruin rows are never counted as completed years');
+assertEqual(continueAfterRuin.breakOnRuin, false, 'result fingerprints the continued ruin policy');
 
 const singleYear = runHistoricalBacktest({
     inputs: { ...callerInputs, self: undefined },
@@ -355,38 +443,71 @@ const singleYear = runHistoricalBacktest({
 });
 assertEqual(singleYear.requestedYears, 1, 'one-year period has one requested year');
 assertEqual(singleYear.rows.length, 1, 'one-year period executes exactly one year');
-assertEqual(singleYear.legacyOutcome, 'completed_legacy', 'complete one-year period finishes successfully');
-expectThrow(
-    () => runHistoricalBacktest({
+assertEqual(singleYear.outcome.kind, BACKTEST_OUTCOME_KINDS.COMPLETED, 'complete one-year period finishes successfully');
+
+const technicalEngineError = runHistoricalBacktest({
+    inputs: {},
+    period: { startYear: 2000, endYear: 2001 },
+    historicalDataProvider: createContractProvider(),
+    ...dependencies,
+    simulateYear: () => ({
+        kind: 'technical_error',
+        isRuin: false,
+        error: {
+            code: 'SIM_ENGINE_RESULT_ERROR',
+            message: 'Die Simulations-Engine hat das Jahr abgewiesen (SIM_ENGINE_RESULT_ERROR).',
+            cause: new Error('internal C:\\private\\engine.js')
+        }
+    })
+});
+assertEqual(technicalEngineError.outcome.kind, BACKTEST_OUTCOME_KINDS.TECHNICAL_ERROR, 'engine rejection is technical_error, not ruin');
+assertEqual(technicalEngineError.outcome.error.code, 'SIM_ENGINE_RESULT_ERROR', 'engine rejection preserves the stable technical code');
+assertEqual(technicalEngineError.completedYears, 0, 'technical engine year is not financially completed');
+assertEqual(technicalEngineError.rows.length, 0, 'technical engine error does not create a ruin row');
+assert(!technicalEngineError.outcome.error.message.includes('C:\\private'), 'user-facing technical message does not expose a local path');
+assert(technicalEngineError.diagnostics.cause instanceof Error, 'technical cause remains internally diagnosable');
+
+const invalidProvider = runHistoricalBacktest({
         inputs: {},
         period: { startYear: 2000, endYear: 2001 },
         historicalDataProvider: {},
         ...dependencies
-    }),
-    /historicalDataProvider\.preparePeriod/,
-    'runner rejects an incomplete historical provider'
-);
-expectThrow(
-    () => runHistoricalBacktest({
+    });
+assertEqual(invalidProvider.outcome.kind, BACKTEST_OUTCOME_KINDS.TECHNICAL_ERROR, 'invalid provider becomes a structured technical result');
+assertEqual(invalidProvider.outcome.error.code, 'BACKTEST_PERIOD_CONTRACT_ERROR', 'invalid provider has stable period-contract code');
+
+const invalidDependency = runHistoricalBacktest({
         inputs: {},
         period: { startYear: 2000, endYear: 2001 },
         historicalDataProvider: createContractProvider(),
         ...dependencies,
         simulateYear: null
-    }),
-    /simulateYear/,
-    'runner rejects a missing simulation dependency'
-);
-expectThrow(
-    () => runHistoricalBacktest({
+    });
+assertEqual(invalidDependency.outcome.kind, BACKTEST_OUTCOME_KINDS.TECHNICAL_ERROR, 'missing adapter dependency becomes technical_error');
+assertEqual(invalidDependency.outcome.error.code, 'BACKTEST_DEPENDENCY_INVALID', 'missing dependency has stable code');
+
+const invalidPeriod = runHistoricalBacktest({
         inputs: {},
         period: { startYear: Number.NaN, endYear: 2001 },
         historicalDataProvider: createContractProvider(),
         ...dependencies
-    }),
-    /invalid historical period/,
-    'runner delegates invalid period rejection to the contract preflight'
-);
+    });
+assertEqual(invalidPeriod.outcome.kind, BACKTEST_OUTCOME_KINDS.TECHNICAL_ERROR, 'invalid period becomes technical_error');
+assertEqual(invalidPeriod.outcome.error.code, 'BACKTEST_PERIOD_CONTRACT_ERROR', 'invalid period has stable contract code');
+
+const initializedPortfolioRun = runHistoricalBacktest({
+    inputs: { ...callerInputs, self: undefined, startVermoegen: 999999 },
+    period: { startYear: 2000, endYear: 2000 },
+    historicalDataProvider: createContractProvider(),
+    ...dependencies,
+    initializePortfolio: () => ({ value: 123 }),
+    simulateYear: (state, inputs, yearData, yearIndex) => ({
+        ...dependencies.simulateYear(state, inputs, yearData, yearIndex),
+        newState: { ...state, portfolio: { value: 133 } }
+    })
+});
+assertEqual(initializedPortfolioRun.portfolioStart, 123, 'start wealth comes from the initialized portfolio, not the input aggregate');
+assertEqual(initializedPortfolioRun.summary.startWealth, 123, 'summary uses canonical initialized start wealth');
 
 console.log('✅ Historical backtest runner tests passed');
 console.log('--- Historical Backtest Runner Tests Completed ---');

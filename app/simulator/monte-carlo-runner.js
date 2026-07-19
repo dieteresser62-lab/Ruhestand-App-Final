@@ -49,6 +49,57 @@ import { resolveDynamicFlexRunnerHorizon } from './dynamic-flex-runner-horizon.j
 export { MC_HEATMAP_BINS, pickWorstRun, createMonteCarloBuffers, buildMonteCarloAggregates };
 export { buildStartYearCdf, pickStartYearIndex } from './mc-year-sampling.js';
 
+const MAX_TECHNICAL_ERROR_SAMPLES = 20;
+
+export function createMonteCarloTechnicalInventory(requested = 0) {
+    return {
+        requested: Math.max(0, Number(requested) || 0),
+        financiallyEvaluable: 0,
+        technicalError: 0,
+        errors: []
+    };
+}
+
+export function mergeMonteCarloTechnicalInventory(target, source) {
+    if (!target || !source) return target;
+    target.financiallyEvaluable += Math.max(0, Number(source.financiallyEvaluable) || 0);
+    target.technicalError += Math.max(0, Number(source.technicalError) || 0);
+    const sourceErrors = Array.isArray(source.errors) ? source.errors : [];
+    for (const error of sourceErrors) {
+        if (target.errors.length >= MAX_TECHNICAL_ERROR_SAMPLES) break;
+        target.errors.push(error);
+    }
+    return target;
+}
+
+export function attachMonteCarloBatchOutcome(aggregatedResults, technicalInventory) {
+    const inventory = technicalInventory || createMonteCarloTechnicalInventory(0);
+    const batchStatus = inventory.technicalError > 0 ? 'technical_error' : 'completed';
+    return {
+        ...aggregatedResults,
+        batchStatus,
+        financialMetricsValid: batchStatus === 'completed',
+        technicalInventory: inventory
+    };
+}
+
+function normalizeTechnicalPathError(result, runIdx, simulationsJahr) {
+    const fallbackCode = 'SIMULATOR_RESULT_SHAPE_INVALID';
+    const sourceError = result?.error;
+    const code = typeof sourceError?.code === 'string' && sourceError.code.trim()
+        ? sourceError.code.trim()
+        : fallbackCode;
+    const sourceMessage = typeof sourceError?.message === 'string' ? sourceError.message.trim() : '';
+    return {
+        runIndex: runIdx,
+        simulationYearIndex: simulationsJahr,
+        code,
+        message: sourceMessage.includes(code)
+            ? sourceMessage
+            : `Ein Simulationspfad wurde technisch abgebrochen (${code}).`
+    };
+}
+
 function resolveMonteCarloCape(yearData, inputs, marketDataHist) {
     const yearCape = Number(yearData?.capeRatio ?? yearData?.cape);
     if (Number.isFinite(yearCape) && yearCape > 0) return yearCape;
@@ -165,7 +216,7 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
     onProgress(95);
     await new Promise(resolve => setTimeout(resolve, 0));
 
-    const aggregatedResults = buildMonteCarloAggregates({
+    const aggregatedResults = attachMonteCarloBatchOutcome(buildMonteCarloAggregates({
         inputs,
         totalRuns: anzahl,
         buffers: chunk.buffers,
@@ -174,7 +225,7 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
         totals: chunk.totals,
         lists: chunk.lists,
         allRealWithdrawalsSample: chunk.allRealWithdrawalsSample
-    });
+    }), chunk.technicalInventory);
 
     onProgress(100);
 
@@ -183,7 +234,10 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
         failCount: chunk.totals.failCount,
         worstRun: chunk.worstRun,
         worstRunCare: chunk.worstRunCare,
-        pflegeTriggeredCount: chunk.totals.pflegeTriggeredCount
+        pflegeTriggeredCount: chunk.totals.pflegeTriggeredCount,
+        batchStatus: aggregatedResults.batchStatus,
+        financialMetricsValid: aggregatedResults.financialMetricsValid,
+        technicalInventory: chunk.technicalInventory
     };
 }
 
@@ -247,6 +301,7 @@ export async function runMonteCarloChunk({
     const DEPOT_DEPLETION_THRESHOLD = 100;
 
     const runMetrics = createMonteCarloRunMetrics(runCount);
+    const technicalInventory = createMonteCarloTechnicalInventory(runCount);
 
     const heatmap = Array(10).fill(0).map(() => new Uint32Array(MC_HEATMAP_BINS.length - 1));
     let lastProgressPct = -1;
@@ -264,6 +319,7 @@ export async function runMonteCarloChunk({
         let failed = false, totalTaxesThisRun = 0, totalTaxSavedByLossCarryThisRun = 0, kpiJahreMitKuerzungDieserLauf = 0, kpiMaxKuerzungDieserLauf = 0;
         let lebensdauer = 0, jahreOhneFlex = 0, triggeredAge = null;
         let careEverActive = false;
+        let technicalPathError = null;
 
         const runSeed = makeRunSeed(seed, 0, runIdx);
         const rand = legacyRand || rng(runSeed);
@@ -517,7 +573,12 @@ export async function runMonteCarloChunk({
                 p2ActiveThisYear
             } : null;
 
-            if (result.isRuin) {
+            if (result?.kind === 'technical_error' || result?.error) {
+                technicalPathError = normalizeTechnicalPathError(result, runIdx, simulationsJahr);
+                break;
+            }
+
+            if (result?.kind === 'ruin' || result?.isRuin === true) {
                 failed = true;
                 // Bei Ruin ist das Depot definitiv erschöpft - setze Alter
                 if (!depotErschoepfungAlterGesetzt) {
@@ -532,7 +593,9 @@ export async function runMonteCarloChunk({
                     tailRiskOverlay
                 }));
                 if (BREAK_ON_RUIN) break;
-            } else {
+            } else if ((result?.kind === undefined || result.kind === 'success')
+                && result?.newState?.portfolio
+                && result?.logData) {
                 simState = result.newState;
                 totalTaxesThisRun += result.totalTaxesThisYear;
                 totalTaxSavedByLossCarryThisRun += Number(result.logData?.taxSavedByLossCarry) || 0;
@@ -607,8 +670,21 @@ export async function runMonteCarloChunk({
                     lifeLogContext,
                     tailRiskOverlay
                 }));
+            } else {
+                technicalPathError = normalizeTechnicalPathError(result, runIdx, simulationsJahr);
+                break;
             }
         }
+
+        if (technicalPathError) {
+            technicalInventory.technicalError++;
+            if (technicalInventory.errors.length < MAX_TECHNICAL_ERROR_SAMPLES) {
+                technicalInventory.errors.push(technicalPathError);
+            }
+            continue;
+        }
+
+        technicalInventory.financiallyEvaluable++;
 
         if (runEndedBecauseAllDied) {
             // Ergänze einen letzten Log-Eintrag, damit klar ersichtlich ist, dass alle Personen verstorben sind.
@@ -696,6 +772,9 @@ export async function runMonteCarloChunk({
         allRealWithdrawalsSample: finalizedMetrics.allRealWithdrawalsSample,
         worstRun: finalizedMetrics.worstRun,
         worstRunCare: finalizedMetrics.worstRunCare,
-        runMeta: finalizedMetrics.runMeta
+        runMeta: finalizedMetrics.runMeta,
+        batchStatus: technicalInventory.technicalError > 0 ? 'technical_error' : 'completed',
+        financialMetricsValid: technicalInventory.technicalError === 0,
+        technicalInventory
     };
 }

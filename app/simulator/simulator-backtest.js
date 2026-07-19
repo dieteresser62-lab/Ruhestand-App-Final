@@ -60,24 +60,33 @@ export function runBacktest() {
             totalPortfolio: portfolioTotal,
             breakOnRuin: BREAK_ON_RUIN
         });
-        if (backtestResult.dataStatus === 'incomplete') {
+        if (backtestResult.outcome?.kind === 'incomplete') {
             const reason = backtestResult.incompleteReason?.code || 'unvollstaendige_historische_daten';
             alert(`Der Backtest wurde nicht gestartet, weil die historischen Daten unvollständig sind (${reason}).`);
             return;
         }
+        if (backtestResult.outcome?.kind === 'technical_error') {
+            alert(backtestResult.outcome.error?.message || 'Der Backtest wurde wegen eines technischen Fehlers beendet.');
+            return;
+        }
         const logRows = backtestResult.rows;
-        const endVermoegen = backtestResult.portfolioEnd;
+        const summary = backtestResult.summary;
         const {
             totalWithdrawal: totalEntnahme,
             maxReductionStreak: maxKuerzungStreak,
             reductionYears: jahreMitKuerzung,
             totalTaxes: totalSteuern
-        } = backtestResult.legacyMetrics;
+        } = summary;
 
         // Speichere Log-Daten für späteres Neu-Rendern
         window.globalBacktestData = {
             rows: logRows,
             startJahr,
+            schemaVersion: backtestResult.schemaVersion,
+            outcome: backtestResult.outcome,
+            requestedYears: backtestResult.requestedYears,
+            completedYears: backtestResult.completedYears,
+            breakOnRuin: backtestResult.breakOnRuin,
             decumulationMode: inputs?.decumulation?.mode || STRATEGY_OPTIONS.STANDARD,
             goldAktiv: inputs?.goldAktiv,
             minimumFlexProfiles: Array.isArray(inputs?.minimumFlexProfiles)
@@ -86,28 +95,40 @@ export function runBacktest() {
         };
 
         document.getElementById('simulationResults').style.display = 'block';
-        const lastLogRow = logRows[logRows.length - 1] || {};
-        const healthBucketSummary = lastLogRow.health_bucket_enabled
+        const lastCanonicalRow = logRows[logRows.length - 1]?.row || null;
+        const healthBucket = summary.healthBucket?.enabled
+            ? summary.healthBucket
+            : (lastCanonicalRow?.health_bucket_enabled === true
+                ? {
+                    enabled: true,
+                    end: Number(lastCanonicalRow.health_bucket_end) || 0,
+                    realCoveragePct: Number.isFinite(Number(lastCanonicalRow.health_bucket_real_coverage_pct))
+                        ? Number(lastCanonicalRow.health_bucket_real_coverage_pct)
+                        : null,
+                    targetGap: Number(lastCanonicalRow.health_bucket_target_gap) || 0
+                }
+                : summary.healthBucket);
+        const healthBucketSummary = healthBucket?.enabled
             ? `
-            <div class="summary-item"><strong>Pflegebucket</strong><span>${formatCurrency(lastLogRow.health_bucket_end || 0)}</span></div>
-            <div class="summary-item"><strong>Pflegebucket-Zieldeckung</strong><span>${Number.isFinite(Number(lastLogRow.health_bucket_real_coverage_pct))
-                ? formatPercentValue(Number(lastLogRow.health_bucket_real_coverage_pct), { fractionDigits: 0, invalid: '—' })
+            <div class="summary-item"><strong>Pflegebucket</strong><span>${formatCurrency(healthBucket.end || 0)}</span></div>
+            <div class="summary-item"><strong>Pflegebucket-Zieldeckung</strong><span>${Number.isFinite(Number(healthBucket.realCoveragePct))
+                ? formatPercentValue(Number(healthBucket.realCoveragePct), { fractionDigits: 0, invalid: '—' })
                 : '—'}</span></div>
-            <div class="summary-item"><strong>Pflegebucket-Ziellücke</strong><span>${formatCurrency(lastLogRow.health_bucket_target_gap || 0)}</span></div>`
+            <div class="summary-item"><strong>Pflegebucket-Ziellücke</strong><span>${formatCurrency(healthBucket.targetGap || 0)}</span></div>`
             : '';
         document.getElementById('simulationSummary').innerHTML = `
          <div class="summary-grid">
-            <div class="summary-item"><strong>Startvermögen</strong><span>${formatCurrency(inputs.startVermoegen)}</span></div>
-            <div class="summary-item"><strong>Endvermögen</strong><span>${formatCurrency(endVermoegen)}</span></div>
+            <div class="summary-item"><strong>Startvermögen</strong><span>${formatCurrency(summary.startWealth)}</span></div>
+            <div class="summary-item"><strong>Endvermögen</strong><span>${formatCurrency(summary.endWealth)}</span></div>
             <div class="summary-item highlight"><strong>Gesamte Entnahmen</strong><span>${formatCurrency(totalEntnahme)}</span></div>
             <div class="summary-item"><strong>Max. Kürzungsdauer</strong><span>${maxKuerzungStreak} Jahre</span></div>
-            <div class="summary-item"><strong>Jahre mit Kürzung (>10%)</strong><span>${jahreMitKuerzung} von ${endJahr - startJahr + 1}</span></div>
+            <div class="summary-item"><strong>Jahre mit Kürzung (>10%)</strong><span>${jahreMitKuerzung} von ${summary.reductionDenominator}</span></div>
             <div class="summary-item tax"><strong>Gezahlte Steuern</strong><span>${formatCurrency(totalSteuern)}</span></div>
             ${healthBucketSummary}
         </div>`;
         renderBacktestLog();
     } catch (error) {
-        alert("Ein Fehler ist im Backtest aufgetreten:\n\n" + formatSimulatorValidationError(error) + "\n" + (error.stack || ''));
+        alert("Ein Fehler ist im Backtest aufgetreten:\n\n" + formatSimulatorValidationError(error));
         console.error("Fehler in runBacktest():", error);
     } finally { document.getElementById('btButton').disabled = false; }
 }
