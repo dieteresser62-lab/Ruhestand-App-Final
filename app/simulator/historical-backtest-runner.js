@@ -4,6 +4,10 @@ import {
     deriveHistoricalBacktestMetrics,
     HISTORICAL_BACKTEST_METRICS_SCHEMA_VERSION
 } from './historical-backtest-metrics.js';
+import {
+    canonicalizeHistoricalContractValue,
+    sha256Hex
+} from './historical-backtest-contract.js';
 
 export const BACKTEST_REQUEST_SCHEMA_VERSION = 'BacktestRequestV1';
 export const BACKTEST_RESULT_SCHEMA_VERSION = 'BacktestRunResultV1';
@@ -209,7 +213,7 @@ function buildSummary({
 function attachCanonicalMetrics(result) {
     const metrics = deriveHistoricalBacktestMetrics(result);
     const values = metrics.values;
-    return {
+    return deepFreeze({
         ...result,
         metrics,
         summary: {
@@ -224,6 +228,38 @@ function attachCanonicalMetrics(result) {
             metricSchemaVersion: HISTORICAL_BACKTEST_METRICS_SCHEMA_VERSION,
             metrics: values
         }
+    });
+}
+
+function buildDatasetProvenance(historicalDataProvider) {
+    const manifest = historicalDataProvider?.manifest;
+    return {
+        datasetId: historicalDataProvider?.datasetId || null,
+        revision: historicalDataProvider?.revision || null,
+        contentHash: historicalDataProvider?.contentHash || null,
+        manifestSchemaVersion: manifest?.schemaVersion || null,
+        manifestHash: manifest && typeof manifest === 'object'
+            ? {
+                algorithm: 'sha256-canonical-json-v1',
+                value: sha256Hex(canonicalizeHistoricalContractValue(manifest))
+            }
+            : null
+    };
+}
+
+function buildEngineProvenance(engineProvenance) {
+    const configFingerprint = engineProvenance?.configFingerprint;
+    return {
+        apiVersion: typeof engineProvenance?.apiVersion === 'string' ? engineProvenance.apiVersion : null,
+        buildId: typeof engineProvenance?.buildId === 'string' ? engineProvenance.buildId : null,
+        configFingerprint: configFingerprint
+            && typeof configFingerprint.algorithm === 'string'
+            && typeof configFingerprint.value === 'string'
+            ? {
+                algorithm: configFingerprint.algorithm,
+                value: configFingerprint.value
+            }
+            : null
     };
 }
 
@@ -240,7 +276,8 @@ export function runHistoricalBacktest({
     computeAdjustmentPct,
     resolveHorizon,
     totalPortfolio,
-    breakOnRuin = false
+    breakOnRuin = false,
+    engineProvenance = null
 }) {
     const startYear = Number(period?.startYear);
     const endYear = Number(period?.endYear);
@@ -256,11 +293,8 @@ export function runHistoricalBacktest({
         executionMode: 'single_path',
         breakOnRuin: Boolean(breakOnRuin),
         temporalConventionId: historicalDataProvider?.temporalConventionId || null,
-        dataset: {
-            datasetId: historicalDataProvider?.datasetId || null,
-            revision: historicalDataProvider?.revision || null,
-            contentHash: historicalDataProvider?.contentHash || null
-        },
+        dataset: buildDatasetProvenance(historicalDataProvider),
+        engine: buildEngineProvenance(engineProvenance),
         inputs: requestInputs
     });
 
@@ -292,14 +326,18 @@ export function runHistoricalBacktest({
             schemaVersion: BACKTEST_RESULT_SCHEMA_VERSION,
             request,
             outcome,
+            warnings: [],
             error: outcome.kind === BACKTEST_OUTCOME_KINDS.TECHNICAL_ERROR ? outcome.error : null,
             rows: [],
             requestedYears,
             completedYears: 0,
+            firstYear: Number.isInteger(startYear) ? startYear : null,
             lastCompletedYear: null,
+            ruinYear: null,
             breakOnRuin: request.breakOnRuin,
             portfolioStart: null,
             portfolioEnd: null,
+            portfolioSnapshots: { start: null, end: null },
             dataStatus,
             incompleteReason,
             historicalYearRecords: [],
@@ -391,6 +429,7 @@ export function runHistoricalBacktest({
         }
     };
     const portfolioStart = computePortfolioTotal(simulationState.portfolio);
+    const portfolioStartSnapshot = deepFreeze(cloneRunValue(simulationState.portfolio));
 
     let totalWithdrawal = 0;
     let currentReductionStreak = 0;
@@ -418,14 +457,21 @@ export function runHistoricalBacktest({
             schemaVersion: BACKTEST_RESULT_SCHEMA_VERSION,
             request,
             outcome,
+            warnings: [],
             error: outcome.kind === BACKTEST_OUTCOME_KINDS.TECHNICAL_ERROR ? outcome.error : null,
             rows,
             requestedYears,
             completedYears: successfulYears,
+            firstYear: startYear,
             lastCompletedYear,
+            ruinYear: outcome.ruinYear ?? null,
             breakOnRuin: request.breakOnRuin,
             portfolioStart,
             portfolioEnd,
+            portfolioSnapshots: {
+                start: portfolioStartSnapshot,
+                end: simulationState?.portfolio ? cloneRunValue(simulationState.portfolio) : null
+            },
             dataStatus: 'complete',
             incompleteReason: null,
             historicalYearRecords: historicalRecords,

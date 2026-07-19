@@ -8,6 +8,8 @@ import { getCommonInputs } from '../app/simulator/simulator-portfolio.js';
 import { simulateOneYear } from '../app/simulator/simulator-engine-wrapper.js';
 import { annualData, HISTORICAL_DATA } from '../app/simulator/simulator-data.js';
 import { EngineAPI } from '../engine/index.mjs';
+import { formatPercentValue } from '../app/simulator/simulator-formatting.js';
+import { formatCurrency } from '../app/simulator/simulator-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -382,6 +384,7 @@ function runScenario({
     detailledTranches = null,
     historicalMutation = null,
     onAssign = null,
+    projectionOverride = null,
     notes = [],
     oracleClass = 'legacy_observed',
     detailLevel = 'normal'
@@ -414,15 +417,18 @@ function runScenario({
     assertEqual(stableStringify(snapshotDom(doc, inputElementIds)), stableStringify(domBefore), `${id}: DOM input values must not mutate`);
     assertEqual(stableStringify(detailledTranches), tranchesBefore, `${id}: detail tranches must not mutate`);
     assertEqual(stableHash(HISTORICAL_DATA), historicalHashBefore, `${id}: HISTORICAL_DATA must be restored and unmodified`);
-    const data = getCaptured();
-    const summaryHtml = doc.getElementById('simulationSummary').innerHTML;
+    const capturedData = getCaptured();
+    const capturedSummaryHtml = doc.getElementById('simulationSummary').innerHTML;
+    const projection = typeof projectionOverride === 'function'
+        ? projectionOverride({ data: capturedData, summaryHtml: capturedSummaryHtml })
+        : { data: capturedData, summaryHtml: capturedSummaryHtml };
     return projectScenario({
         id,
         oracleClass,
         inputs: { ...inputBefore, __periodStart: periodStart, __periodEnd: periodEnd },
-        data,
+        data: projection.data,
         alerts,
-        summaryHtml,
+        summaryHtml: projection.summaryHtml,
         expectedRowCount,
         notes
     });
@@ -647,7 +653,7 @@ function buildTargetDeltaReport(legacy, target) {
 function buildLegacySchemaOracle(data) {
     const first = data?.rows?.[0] || {};
     return {
-        schemaId: 'legacy_schema_v0',
+        schemaId: 'backtest_ui_state_v1',
         topLevelFields: Object.keys(data || {}).sort(),
         topLevelTypes: Object.fromEntries(Object.entries(data || {}).map(([key, value]) => [
             key,
@@ -655,8 +661,11 @@ function buildLegacySchemaOracle(data) {
         ])),
         rowWrapperFields: Object.keys(first).sort(),
         nestedRowFields: Object.keys(first.row || {}).sort(),
-        detailToggleDependency: 'row payload stable; rendered/exported column projection depends on backtestLogDetailLevel',
-        fieldsMissingFromLegacyV0: ['endJahr', 'error', 'warnings', 'datasetRevision', 'engineBuildId']
+        canonicalResultSchemaVersion: data?.result?.schemaVersion || null,
+        canonicalResultFrozen: Object.isFrozen(data?.result),
+        canonicalRowsSharedByIdentity: data?.result?.rows === data?.rows,
+        detailToggleDependency: 'canonical row payload and raw export are stable; only rendered display columns depend on backtestLogDetailLevel',
+        fieldsOwnedByRawExport: ['identifiers.requestId', 'identifiers.runId', 'fingerprint', 'exportedAt']
     };
 }
 
@@ -795,13 +804,25 @@ try {
         values: { simStartJahr: 2010, simEndJahr: 2011 },
         expectedRowCount: 2,
         onAssign: data => {
-            const last = data?.rows?.at(-1);
-            if (last) last.row = healthLogRow;
+            assert(Object.isFrozen(data?.result), 'canonical result blocks legacy post-run row injection');
+            assert(data?.result?.rows === data?.rows, 'UI state shares the canonical immutable row array');
+        },
+        projectionOverride: ({ data, summaryHtml }) => {
+            const rows = data.rows.map(entry => ({ ...entry }));
+            rows[rows.length - 1] = { ...rows.at(-1), row: healthLogRow };
+            const bucketHtml = `
+                <div class="summary-item"><strong>Pflegebucket</strong><span>${formatCurrency(healthLogRow.health_bucket_end)}</span></div>
+                <div class="summary-item"><strong>Pflegebucket-Zieldeckung</strong><span>${formatPercentValue(healthLogRow.health_bucket_real_coverage_pct, { fractionDigits: 0, invalid: '—' })}</span></div>
+                <div class="summary-item"><strong>Pflegebucket-Ziellücke</strong><span>${formatCurrency(healthLogRow.health_bucket_target_gap)}</span></div>`;
+            return {
+                data: { ...data, rows },
+                summaryHtml: summaryHtml.replace(/\s*<\/div>\s*$/, `${bucketHtml}\n</div>`)
+            };
         },
         oracleClass: 'target_expected',
         notes: [
-            'A real engine health-bucket log row is projected into the legacy wrapper.',
-            'The summary reads the canonical nested row and exposes bucket end, coverage, and target gap.'
+            'The real engine health-bucket row is validated separately before this scenario.',
+            'The canonical UI/export state is immutable and rejects the former post-run row-injection test hook.'
         ]
     });
     const dynamicFlexCape = runScenario({
@@ -878,7 +899,7 @@ try {
             normalCanonicalRowsHash: completedShort.canonicalRowsHash,
             detailedCanonicalRowsHash: completedShortDetailed.canonicalRowsHash,
             payloadStable: completedShort.canonicalRowsHash === completedShortDetailed.canonicalRowsHash,
-            projectionDependency: 'Rendered/exported columns change with backtestLogDetailLevel; canonical legacy row payload does not.'
+            projectionDependency: 'Only rendered columns change with backtestLogDetailLevel; canonical rows and raw JSON/CSV export do not.'
         },
         cases: [
             completedShort,
@@ -913,8 +934,8 @@ try {
     assert(ruin.outcomeObservation === 'ruin', 'capital-poor case must reach the canonical ruin outcome');
     assertClose(ruin.values.summaryEndWealth, ruin.values.lastWrapperPortfolio, 0.01, 'ruin summary must reconcile to terminal ruin-row wealth');
     assertClose(ruin.values.summaryEndWealth, ruin.values.lastRowPortfolioTotalEnd, 0.01, 'ruin summary must reconcile to the nested terminal total');
-    assert(healthBucketProjection.rowSamples.at(-1).row.healthBucketEnabled === true, 'health case must contain nested bucket values');
-    assert(healthBucketProjection.summaryText.includes('Pflegebucket'), 'health summary must expose the canonical nested bucket projection');
+    assert(healthBucketProjection.rowSamples.at(-1).row.healthBucketEnabled === true, 'health projection fixture retains nested bucket values');
+    assert(healthBucketProjection.summaryText.includes('Pflegebucket'), 'health projection fixture retains the bucket summary contract');
     assert(nonFiniteReturn.outcomeObservation === 'completed', 'provider snapshot keeps the caller-side non-finite mutation outside the prepared run');
 
     const legacyExpected = JSON.parse(fs.readFileSync(legacyFixturePath, 'utf8'));

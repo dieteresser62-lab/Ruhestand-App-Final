@@ -16,9 +16,7 @@ import { formatSimulatorValidationError, validateSimulatorInputs } from './simul
 import {
     buildBacktestColumnDefinitions,
     computeAdjPctForYear,
-    convertRowsToCsv,
     formatColumnValue,
-    prepareRowsForExport,
     triggerDownload
 } from './simulator-main-helpers.js';
 import { renderThreeBucketPortfolioChart } from './simulator-portfolio-chart.js';
@@ -26,6 +24,10 @@ import { STRATEGY_OPTIONS } from '../../types/strategy-options.js';
 import { resolveDynamicFlexRunnerHorizon } from './dynamic-flex-runner-horizon.js';
 import { createHistoricalBacktestContractProvider } from './historical-backtest-contract.js';
 import { runHistoricalBacktest } from './historical-backtest-runner.js';
+import {
+    captureHistoricalBacktestEngineProvenance,
+    createHistoricalBacktestDownload
+} from './historical-backtest-export.js';
 
 const HISTORICAL_BACKTEST_PROVIDER = createHistoricalBacktestContractProvider();
 
@@ -58,7 +60,24 @@ export function runBacktest() {
             computeAdjustmentPct: computeAdjPctForYear,
             resolveHorizon: resolveDynamicFlexRunnerHorizon,
             totalPortfolio: portfolioTotal,
-            breakOnRuin: BREAK_ON_RUIN
+            breakOnRuin: BREAK_ON_RUIN,
+            engineProvenance: captureHistoricalBacktestEngineProvenance(window?.EngineAPI)
+        });
+        // UI, Summary, Tabelle und Export teilen exakt diese immutable Runner-Instanz.
+        window.globalBacktestData = Object.freeze({
+            result: backtestResult,
+            rows: backtestResult.rows,
+            startJahr,
+            schemaVersion: backtestResult.schemaVersion,
+            outcome: backtestResult.outcome,
+            requestedYears: backtestResult.requestedYears,
+            completedYears: backtestResult.completedYears,
+            breakOnRuin: backtestResult.breakOnRuin,
+            decumulationMode: inputs?.decumulation?.mode || STRATEGY_OPTIONS.STANDARD,
+            goldAktiv: inputs?.goldAktiv,
+            minimumFlexProfiles: Array.isArray(inputs?.minimumFlexProfiles)
+                ? inputs.minimumFlexProfiles.map(entry => ({ ...entry }))
+                : []
         });
         if (backtestResult.outcome?.kind === 'incomplete') {
             const reason = backtestResult.incompleteReason?.code || 'unvollstaendige_historische_daten';
@@ -77,22 +96,6 @@ export function runBacktest() {
             reductionYears: jahreMitKuerzung,
             totalTaxes: totalSteuern
         } = summary;
-
-        // Speichere Log-Daten für späteres Neu-Rendern
-        window.globalBacktestData = {
-            rows: logRows,
-            startJahr,
-            schemaVersion: backtestResult.schemaVersion,
-            outcome: backtestResult.outcome,
-            requestedYears: backtestResult.requestedYears,
-            completedYears: backtestResult.completedYears,
-            breakOnRuin: backtestResult.breakOnRuin,
-            decumulationMode: inputs?.decumulation?.mode || STRATEGY_OPTIONS.STANDARD,
-            goldAktiv: inputs?.goldAktiv,
-            minimumFlexProfiles: Array.isArray(inputs?.minimumFlexProfiles)
-                ? inputs.minimumFlexProfiles.map(entry => ({ ...entry }))
-                : []
-        };
 
         document.getElementById('simulationResults').style.display = 'block';
         const lastCanonicalRow = logRows[logRows.length - 1]?.row || null;
@@ -128,8 +131,8 @@ export function runBacktest() {
         </div>`;
         renderBacktestLog();
     } catch (error) {
-        alert("Ein Fehler ist im Backtest aufgetreten:\n\n" + formatSimulatorValidationError(error));
         console.error("Fehler in runBacktest():", error);
+        alert("Ein Fehler ist im Backtest aufgetreten:\n\n" + formatSimulatorValidationError(error));
     } finally { document.getElementById('btButton').disabled = false; }
 }
 
@@ -184,29 +187,17 @@ export function renderBacktestLog() {
  */
 export function exportBacktestLogData(format = 'json') {
     const backtestData = window.globalBacktestData;
-    if (!backtestData || !Array.isArray(backtestData.rows) || backtestData.rows.length === 0) {
+    if (!backtestData?.result) {
         alert('Es sind keine Backtest-Daten zum Export verfügbar. Bitte zuerst einen Backtest ausführen.');
         return;
     }
 
-    const detailLevel = loadDetailLevel(BACKTEST_LOG_DETAIL_KEY, LEGACY_LOG_DETAIL_KEY);
-    const columns = buildBacktestColumnDefinitions(detailLevel, {
-        strategyMode: backtestData?.decumulationMode,
-        goldAktiv: backtestData?.goldAktiv
-    });
-    const timestamp = new Date().toISOString().replace(/[:]/g, '-');
-    const filenameBase = `backtest-log-${timestamp}`;
-
-    if (format === 'json') {
-        const payload = {
-            exportedAt: new Date().toISOString(),
-            options: { detailLevel, startJahr: backtestData.startJahr ?? null },
-            rows: prepareRowsForExport(backtestData.rows, columns)
-        };
-        triggerDownload(`${filenameBase}.json`, JSON.stringify(payload, null, 2), 'application/json');
-    } else if (format === 'csv') {
-        const csvContent = convertRowsToCsv(backtestData.rows, columns);
-        triggerDownload(`${filenameBase}.csv`, csvContent, 'text/csv;charset=utf-8');
+    try {
+        const download = createHistoricalBacktestDownload(backtestData.result, format);
+        triggerDownload(download.filename, download.content, download.mimeType);
+    } catch (error) {
+        console.error('Fehler beim Backtest-Export:', error);
+        alert('Der Backtest-Export konnte nicht erstellt werden. Bitte den Backtest erneut ausführen.');
     }
 }
 

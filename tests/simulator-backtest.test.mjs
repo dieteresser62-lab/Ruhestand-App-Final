@@ -2,6 +2,7 @@ import { runBacktest } from '../app/simulator/simulator-backtest.js';
 import { HISTORICAL_DATA } from '../app/simulator/simulator-data.js';
 import { EngineAPI } from '../engine/index.mjs';
 import { CONFIG } from '../engine/config.mjs';
+import { formatCurrency } from '../app/simulator/simulator-utils.js';
 
 console.log('--- Simulator Backtest Tests ---');
 
@@ -110,6 +111,16 @@ try {
         assertEqual(JSON.stringify(firstRows), JSON.stringify(secondRows), 'Backtest 2000-2025 should be deterministic');
         assertEqual(firstRows.length, 26, 'Backtest should contain 26 yearly results for 2000-2025');
         assertEqual(window.globalBacktestData?.rows?.at(-1)?.jahr, 2025, 'Last backtest year should be 2025');
+        assert(window.globalBacktestData?.result?.rows === window.globalBacktestData?.rows, 'UI and export state share the same canonical row array');
+        assert(Object.isFrozen(window.globalBacktestData?.result), 'UI retains an immutable canonical BacktestRunResultV1');
+        assertEqual(window.globalBacktestData?.result?.request?.engine?.buildId, EngineAPI.getVersion().build, 'UI captures the engine build used by the run');
+        assert(/^[a-f0-9]{64}$/.test(window.globalBacktestData?.result?.request?.engine?.configFingerprint?.value), 'UI captures a deterministic engine config fingerprint');
+        assert(
+            global.document.getElementById('simulationSummary').innerHTML.includes(
+                formatCurrency(window.globalBacktestData.result.metrics.values.wealth_end_nominal_eur)
+            ),
+            'display text formats the same canonical raw end-wealth metric'
+        );
     }
 
     // --- TEST 2: Startjahr-Filterung ---

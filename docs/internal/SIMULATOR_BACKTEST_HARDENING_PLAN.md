@@ -202,7 +202,7 @@ Die Zielwerte nach D-01 sind als neue `target_expected`-Oracles neben den unvera
 | 04 | [SLICE_SIMULATOR_BACKTEST_04_ZEITACHSEN_UMSETZUNG.md](./SLICE_SIMULATOR_BACKTEST_04_ZEITACHSEN_UMSETZUNG.md) | Zeitachsensynchronisation | D-01/D-03 entschieden, Slices 01-03 | implementiert und getestet; erneutes Review ausstehend |
 | 05 | [SLICE_SIMULATOR_BACKTEST_05_OUTCOME_RUIN_FEHLER.md](./SLICE_SIMULATOR_BACKTEST_05_OUTCOME_RUIN_FEHLER.md) | Gemeinsame Adapterfehler, Ruin, incomplete und technische Fehler in Backtest/MC/Sweep trennen; Summary reconciliieren | Slices 02-03; D-04/D-09 | abgeschlossen, freigegeben und lokal committet |
 | 06 | [SLICE_SIMULATOR_BACKTEST_06_METRIKEN_ROLLING_COHORTS.md](./SLICE_SIMULATOR_BACKTEST_06_METRIKEN_ROLLING_COHORTS.md) | Reconciliierbares Ergebnisbuendel und Rolling-Cohort-In-sample-Diagnose | Slices 04-05; D-05 durch Nutzerauftrag entschieden | implementiert und getestet; Review ausstehend |
-| 07 | [SLICE_SIMULATOR_BACKTEST_07_EXPORT_REPRODUZIERBARKEIT.md](./SLICE_SIMULATOR_BACKTEST_07_EXPORT_REPRODUZIERBARKEIT.md) | Versionierter Raw-Export und Laufmanifest, getrennt von Displayformatierung | Slices 02-03/05; Metrikteil aus 06, Cohortteil optional nach D-05 | nicht gestartet |
+| 07 | [SLICE_SIMULATOR_BACKTEST_07_EXPORT_REPRODUZIERBARKEIT.md](./SLICE_SIMULATOR_BACKTEST_07_EXPORT_REPRODUZIERBARKEIT.md) | Versionierter Raw-Export und Laufmanifest, getrennt von Displayformatierung | Slices 02-03/05; Metrikteil aus 06, Cohortteil optional nach D-05 | implementiert und getestet; Review ausstehend |
 | 08 | [SLICE_SIMULATOR_BACKTEST_08_UI_BROWSER_ACCESSIBILITY.md](./SLICE_SIMULATOR_BACKTEST_08_UI_BROWSER_ACCESSIBILITY.md) | UI-Validierung, Status/A11y und Browser-End-to-End-Gate | Slice 05; Exportteil nach 07, optionaler Cohortteil nach 06 | nicht gestartet |
 | 09 | [SLICE_SIMULATOR_BACKTEST_09_FORSCHUNGS_GATES.md](./SLICE_SIMULATOR_BACKTEST_09_FORSCHUNGS_GATES.md) | Daten-, Kosten-, Trial- und Holdout-Gates operationalisieren; Folgevorhaben abgrenzen | Start nach Slice 03; Laufmanifest-Verweise nach Slice 07; externe Owner | nicht gestartet |
 | 10 | [SLICE_SIMULATOR_BACKTEST_10_INTEGRATION_DOKUMENTATION.md](./SLICE_SIMULATOR_BACKTEST_10_INTEGRATION_DOKUMENTATION.md) | Gesamtintegration, Doku-Sync, Coverage- und Release-Readiness-Bericht | Slices 01-09 | nicht gestartet |
@@ -310,7 +310,7 @@ Zusaetzlich zu `AGENTS.md` und `SLICE\_EXECUTION\_RULES.md` gilt:
 | 04 | abgeschlossen | fokussiert und `npm test` gruen | nach Blockerbehebung erneut offen | abgeschlossen |
 | 05 | abgeschlossen | fokussiert, `npm test`, Coverage und Performance gruen | freigegeben | abgeschlossen |
 | 06 | abgeschlossen | fokussiert und `npm test` gruen | offen | abgeschlossen |
-| 07 | nicht gestartet | offen | offen | offen |
+| 07 | abgeschlossen | fokussiert, `npm test` und Browser-Smoke gruen | offen | abgeschlossen |
 | 08 | nicht gestartet | offen | offen | offen |
 | 09 | teilweise extern blockiert | offen | offen | offen |
 | 10 | nicht gestartet | offen | offen | offen |
@@ -382,6 +382,17 @@ Zusaetzlich zu `AGENTS.md` und `SLICE\_EXECUTION\_RULES.md` gilt:
 - `prepareBatch()` behaelt gemischte complete/incomplete-Perioden vollstaendig, validiert ueberlappende Recordjahre hoechstens einmal pro Batch und erlaubt den Single-Path-Runs den Verbrauch vorbereiteter Perioden ohne zweiten Provider-Preflight.
 - Golden-/Reconciliation-Ergebnisse: Metriken 298/298, Cohorts 59/59, Datencontract 169/169, Runner 111/111, Characterization 69/69; `npm test` mit 117 Testdateien und 5603/5603 Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles. Sechs produktive Programmdateien wurden geaendert; Engine-/Worker-/MC-/Sweep-/Optimizer-Semantik und generierte Artefakte blieben unveraendert.
 - Raw-Download/Manifest folgt in Slice 07 und muss das immutable Metrikbuendel ohne Neuberechnung projizieren; UI/A11y fuer Cohorts folgt in Slice 08. Implementierung/Selbstpruefung sind abgeschlossen, adversariales Review/Nutzerfreigabe und Commit stehen aus.
+
+### Slice 07: rueckdokumentierter Implementierungsstand
+
+- `historical-backtest-export.js` definiert `HistoricalBacktestExportV1` mit Schema-ID `de.ruhestandsapp.historical-backtest.raw`. Das Raw-JSON enthaelt Request-/Run-ID, vollstaendigen `BacktestRequestV1`, diskriminiertes Outcome, Warnungen/sichere Fehlerdaten, Completionfelder, Dataset-/Manifest-/Temporal-/Engineprovenienz, Start-/Endportfolio-Snapshots, Historical-Year-Records, unverkuerzte Jahreszeilen, `HistoricalBacktestMetricsV1`, Summary und optional das unveraendert uebergebene Cohort-Inventar.
+- Request- und Result-Fingerprints verwenden `sha256-canonical-json-v1`. Der Result-Fingerprint umfasst Schema, Request und kanonisches Ergebnis; `exportedAt`, IDs, Exportmetadaten und interne `diagnostics` sind ausgeschlossen. Engine-API-/Build-ID und ein Fingerprint der vollstaendigen Runtime-Config werden beim Start des Laufs erfasst; Dataset-Content- und Manifest-Hash stammen aus dem validierten Provider.
+- `HistoricalBacktestCsvV1` besitzt 25 feste technische Spalten mit Einheiten. Contract: Semikolon, Punkt als Dezimaltrenner, ECMAScript-Shortest-Roundtrip ohne Gruppierung, LF, leere Missingness-Zellen sowie Apostroph-/Quote-Schutz gegen Formelinjektion, Delimiter, Quotes und Zeilenumbrueche. Auch rowlose `incomplete`-/`technical_error`-Resultate behalten eine Statuszeile.
+- `BacktestRunResultV1` ist tief eingefroren und fuehrt kanonische Portfolio-Snapshots. `window.globalBacktestData.result` und `.rows` teilen exakt dieselbe immutable Instanz; Summary und Display formatieren nur diese Rohwerte. Der Detailtoggle wird vom Serializer nicht gelesen. `simulator-main-helpers.js` und seine HTML-Formatter blieben unveraendert.
+- Die bestehenden JSON-/CSV-Buttons rufen den Serializer ausschliesslich nach explizitem Klick auf. Es gibt keine neue Persistenz, Uebertragung, Trial-Registry oder Replay-Semantik. Das Exportmanifest weist darauf hin, dass die vollstaendigen lokalen Finanzannahmen enthalten sind.
+- Characterization-Delta: `legacy_schema_v0` wurde erwartungsgemaess durch `backtest_ui_state_v1` mit verschachteltem `BacktestRunResultV1`, Immutability- und Row-Identity-Nachweis ersetzt. Der fruehere Test-Hook fuer nachtraegliche Pflegebucket-Zeilenmutation wurde als reine Testprojektion umgesetzt; Golden-Werte, Ruinfrequenz, Portfolio-/Steuerzahlen und FlowDelta blieben unveraendert.
+- Validierung: Export 57/57, Runner 121/121, Produktbacktest 56/56, Characterization 71/71, Metriken 298/298, Cohorts 59/59, 3-Bucket 15/15 und Logspalten 96/96 Assertions. `npm test`: 118 Testdateien, 5677/5677 Assertions, 0 fehlgeschlagene Dateien, 0 offene Handles. `npm run test:browser` bestand alle Einstiegspunkte und zusaetzlichen Browser-Flows; `git diff --check` ist fehlerfrei.
+- Drei produktive Programmdateien wurden geaendert beziehungsweise neu angelegt. Engine-/Jahressemantik, MC/Sweep/Optimizer, Worker, PersistenceFacade, Displayformatter und generierte Artefakte blieben unveraendert. Implementierung/Selbstpruefung sind abgeschlossen; adversariales Review, Nutzerfreigabe und Commit stehen aus.
 
 
 ## Review-Auftrag

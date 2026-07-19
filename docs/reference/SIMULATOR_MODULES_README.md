@@ -217,29 +217,41 @@ Sweep und Worker importieren den Backtestcontract weiterhin nicht.
 
 ### `historical-backtest-runner.js`
 
-DOM-freier historischer Jahresrunner mit expliziten Dependencies. `runHistoricalBacktest()` akzeptiert normalisierte Inputs, `{ startYear, endYear }`, einen Historical-Data-Provider sowie die injizierten Funktionen `simulateYear`, `initializePortfolio`, `computeAdjustmentPct`, `resolveHorizon` und `totalPortfolio`. Der Runner liest weder Browserglobals noch Persistenz.
+DOM-freier historischer Jahresrunner mit expliziten Dependencies. `runHistoricalBacktest()` akzeptiert normalisierte Inputs, `{ startYear, endYear }`, einen Historical-Data-Provider, additive Engineprovenienz sowie die injizierten Funktionen `simulateYear`, `initializePortfolio`, `computeAdjustmentPct`, `resolveHorizon` und `totalPortfolio`. Der Runner liest weder Browserglobals noch Persistenz.
 
 Vor dem Lauf konsumiert der Runner genau einen vollstaendigen Provider-Preflight.
 Er baut jedes `yearData` ausschliesslich aus validierten Records, uebernimmt die
 initiale Vierjahres-Markthistorie aus dem Contract und gibt bei einer Luecke
 `incomplete` zurueck, bevor die Jahresschleife beginnt. Request und Ergebnis
-tragen Dataset- und Temporal-Provenienz.
+tragen Dataset-, Manifest-, Temporal-, Engine-Build- und Config-Provenienz.
 
-Das vorlaeufige Ergebnis `BacktestRunResultV0` enthaelt den kanonisch eingefrorenen `BacktestRequestV0`, unverkuerzte `rows`, `requestedYears`, wirtschaftlich erfolgreiche `completedYears`, `portfolioStart`, `portfolioEnd`, `legacyOutcome` und die fuer den bestehenden UI-Summary benoetigten `legacyMetrics`. Caller-Inputs, Partner-/Tranchenobjekte und historische Records werden vor dem Lauf in eigene Kopien ueberfuehrt; `undefined`, `Date`, `RegExp`, Prototypen und zyklische Referenzen bleiben dabei erhalten.
+`BacktestRunResultV1` ist tief eingefroren und enthaelt `BacktestRequestV1`, diskriminiertes Outcome, Warnungen/sichere Fehlerdaten, unverkuerzte `rows`, `requestedYears`, wirtschaftlich erfolgreiche `completedYears`, erste/letzte Laufjahre, kanonische Start-/Endportfolio-Snapshots, Historical-Year-Records, `HistoricalBacktestMetricsV1`, Summary sowie die Legacy-Aliase. Caller-Inputs, Partner-/Tranchenobjekte und historische Records werden vor dem Lauf in eigene Kopien ueberfuehrt; `undefined`, `Date`, `RegExp`, Prototypen und zyklische Referenzen bleiben dabei runnerintern erhalten.
+
+### `historical-backtest-export.js`
+
+DOM-freier, versionierter Exportadapter fuer genau eine kanonische `BacktestRunResultV1`-Instanz.
+
+**Hauptfunktionen / Exporte:**
+- `buildHistoricalBacktestRawExport()` / `serializeHistoricalBacktestJson()` – erzeugen `HistoricalBacktestExportV1` mit vollständigem Request-/Resultmanifest, echten JSON-Zahlen und optionalem Cohort-Inventar.
+- `serializeHistoricalBacktestCsv()` – projiziert feste technische Jahresfelder ohne Displayformatter; Semikolon, Punktdezimalen, LF, leere Missingness und Formel-Injektionsschutz sind Teil des Contracts.
+- `captureHistoricalBacktestEngineProvenance()` – erfasst Engine-API-/Build-ID und einen kanonischen SHA-256-Config-Fingerprint zum Laufzeitpunkt.
+- `createHistoricalBacktestDownload()` – liefert Dateiname, Inhalt, MIME-Typ und Fingerprint; schreibt oder uebertraegt selbst nichts.
+
+Der Result-Fingerprint umfasst Schema, Request und kanonisches Ergebnis. `exportedAt`, generierte IDs, Exportmetadaten und interne Diagnostik sind ausgeschlossen. Der Dateiname enthaelt Zeitraum, die ersten 12 Hashzeichen und den Exportzeitpunkt.
 
 ### `simulator-backtest.js` (~210 Zeilen)
 
-UI-Adapter, Rendering und Log-Export fuer historische Backtests.
+UI-Adapter, Rendering und expliziter Download fuer historische Backtests.
 
 **Hauptfunktionen / Exporte:**
 - `initializeBacktestUI()` – verdrahtet UI-Buttons und persistiert Nutzereinstellungen.
-- `runBacktest()` – liest und validiert DOM-Inputs, delegiert an `runHistoricalBacktest()` und projiziert weiterhin exakt `window.globalBacktestData` im `legacy_schema_v0`.
-- `renderBacktestLog()` / `exportBacktestLogData()` – Darstellung und CSV-Download.
+- `runBacktest()` – liest und validiert DOM-Inputs, delegiert an `runHistoricalBacktest()` und legt das immutable `BacktestRunResultV1` gemeinsam mit derselben Row-Referenz im `backtest_ui_state_v1` ab.
+- `renderBacktestLog()` / `exportBacktestLogData()` – lokalisierte Darstellung beziehungsweise JSON-/CSV-Download ueber den Raw-Serializer.
 - Backtest-Logs zeigen Mindest-Flex-Betrag und Status; im Detailmodus zusaetzlich Blockgrund und effektiven Mindest-Flex-Wert nach der Policy.
 
-**Einbindung:** Wird in `initializeUI()` importiert und an die Backtest-Controls gekoppelt. Nutzt `historical-backtest-runner.js` fuer die DOM-freie Jahresschleife und `simulator-main-helpers.js` fuer Formatierung/Export.
+**Einbindung:** Wird in `initializeUI()` importiert und an die Backtest-Controls gekoppelt. Nutzt `historical-backtest-runner.js` fuer die DOM-freie Jahresschleife, `historical-backtest-export.js` fuer Raw-Downloads und `simulator-main-helpers.js` nur fuer die Displayprojektion.
 
-**Dependencies:** `historical-backtest-runner.js`, `simulator-engine-wrapper.js`, `simulator-portfolio.js`, `simulator-main-helpers.js`, `simulator-utils.js`, `simulator-data.js`.
+**Dependencies:** `historical-backtest-runner.js`, `historical-backtest-export.js`, `simulator-engine-wrapper.js`, `simulator-portfolio.js`, `simulator-main-helpers.js`, `simulator-utils.js`, `simulator-data.js`.
 
 ---
 
@@ -786,7 +798,8 @@ app/simulator/simulator-main.js
 1. `simulator-main.js`: Backtest-Controls triggern `runBacktest()` aus `simulator-backtest.js`.
 2. `simulator-backtest.js`: Liest/validiert DOM-Inputs und baut den Historical-Data-Provider.
 3. `historical-backtest-runner.js`: Fuehrt die DOM-freie Jahresschleife mit eigenen Laufkopien und injiziertem `simulateOneYear()` aus.
-4. `simulator-backtest.js`: Projiziert `legacy_schema_v0`; `renderBacktestLog()` zeigt das Jahresprotokoll.
+4. `simulator-backtest.js`: Hält das immutable Resultat und dieselbe Row-Instanz fuer Summary, Tabelle und Export; `renderBacktestLog()` zeigt die lokalisierte Displayprojektion.
+5. `historical-backtest-export.js`: Erzeugt nach explizitem Klick das versionierte Raw-JSON oder die feste technische CSV-Projektion ohne Abhaengigkeit vom sichtbaren Detailmodus.
 
 ---
 
@@ -831,7 +844,7 @@ Nach jeder Monte-Carlo-Simulation werden 30 Szenarien gespeichert:
 
 - **UI-spezifische Logik (Formular, Presets, Tooltips):** In thematischen UI-Modulen (`simulator-ui-pflege.js`, `simulator-ui-rente.js`) oder generisch in `simulator-main-helpers.js`. `simulator-main.js` sollte nur die Verkabelung übernehmen.
 - **Simulation / Domain-Logik:** Pflege-/Renten-/Stressberechnungen gehören in `simulator-engine-helpers.js`, `simulator-engine-direct.js` oder `simulator-portfolio.js`. Monte-Carlo-spezifische Steuerparameter in `simulator-monte-carlo.js`. Sweep-spezifische Regeln in `simulator-sweep.js` bzw. `simulator-sweep-utils.js`.
-- **Rendering & Exporte:** Tabellen-/CSV-/Heatmap-Aufbereitung in `simulator-results.js`, `simulator-heatmap.js` oder `simulator-main-helpers.js` (falls UI-nah). Backtest-Ausgaben in `simulator-backtest.js`.
+- **Rendering & Exporte:** Tabellen-/CSV-/Heatmap-Aufbereitung in `simulator-results.js`, `simulator-heatmap.js` oder `simulator-main-helpers.js` (falls UI-nah). Backtest-Display in `simulator-backtest.js`; versionierte Backtest-Rohvertraege ausschliesslich in `historical-backtest-export.js`.
 - **Gemeinsame Utilitys:** Statistik/Formatierung bleiben in `simulator-utils.js`. Objekt-Transforms/Clones mit Bezug zu Sweeps oder Renten-Invarianz in `simulator-sweep-utils.js`.
 - **Neue Buttons/Flows:** Im UI-Bootstrap (`initializeUI()`) verdrahten und direkt den passenden Modul-Export aufrufen, statt Logik-Blöcke in `simulator-main.js` zu platzieren.
 

@@ -1322,8 +1322,8 @@
         "zielLiquiditaet": 20000
       },
       "notes": [
-        "A real engine health-bucket log row is projected into the legacy wrapper.",
-        "The summary reads the canonical nested row and exposes bucket end, coverage, and target gap."
+        "The real engine health-bucket row is validated separately before this scenario.",
+        "The canonical UI/export state is immutable and rejects the former post-run row-injection test hook."
       ],
       "observedRowCount": 2,
       "oracleClass": "target_expected",
@@ -2030,7 +2030,7 @@
     "detailedCanonicalRowsHash": "9f444cd7c6e2b78025ea89133c6c3af18a978aff9745a43ec9feb45250b8e6e0",
     "normalCanonicalRowsHash": "9f444cd7c6e2b78025ea89133c6c3af18a978aff9745a43ec9feb45250b8e6e0",
     "payloadStable": true,
-    "projectionDependency": "Rendered/exported columns change with backtestLogDetailLevel; canonical legacy row payload does not."
+    "projectionDependency": "Only rendered columns change with backtestLogDetailLevel; canonical rows and raw JSON/CSV export do not."
   },
   "exclusions": [
     "timestamps",
@@ -2039,13 +2039,15 @@
   ],
   "generatedBy": "tests/simulator-backtest-characterization.test.mjs",
   "legacyGlobalSchema": {
-    "detailToggleDependency": "row payload stable; rendered/exported column projection depends on backtestLogDetailLevel",
-    "fieldsMissingFromLegacyV0": [
-      "endJahr",
-      "error",
-      "warnings",
-      "datasetRevision",
-      "engineBuildId"
+    "canonicalResultFrozen": true,
+    "canonicalResultSchemaVersion": "BacktestRunResultV1",
+    "canonicalRowsSharedByIdentity": true,
+    "detailToggleDependency": "canonical row payload and raw export are stable; only rendered display columns depend on backtestLogDetailLevel",
+    "fieldsOwnedByRawExport": [
+      "identifiers.requestId",
+      "identifiers.runId",
+      "fingerprint",
+      "exportedAt"
     ],
     "nestedRowFields": [
       "Alarm",
@@ -2194,7 +2196,7 @@
       "wertAktien",
       "wertGold"
     ],
-    "schemaId": "legacy_schema_v0",
+    "schemaId": "backtest_ui_state_v1",
     "topLevelFields": [
       "breakOnRuin",
       "completedYears",
@@ -2203,6 +2205,7 @@
       "minimumFlexProfiles",
       "outcome",
       "requestedYears",
+      "result",
       "rows",
       "schemaVersion",
       "startJahr"
@@ -2215,6 +2218,7 @@
       "minimumFlexProfiles": "array",
       "outcome": "object",
       "requestedYears": "number",
+      "result": "object",
       "rows": "array",
       "schemaVersion": "string",
       "startJahr": "number"

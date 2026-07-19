@@ -143,6 +143,11 @@ function createContractProvider({ incompleteYear = null } = {}) {
         datasetId: 'runner-fixture',
         revision: 'runner-fixture-v1',
         contentHash: 'fixture-hash',
+        manifest: {
+            schemaVersion: 'HistoricalDataManifestV1',
+            datasetId: 'runner-fixture',
+            revision: 'runner-fixture-v1'
+        },
         temporalConventionId: HISTORICAL_TEMPORAL_CONVENTION_ID,
         preparePeriod(period) {
             if (!Number.isInteger(period?.startYear)
@@ -256,6 +261,11 @@ function executeCompletedRun() {
         period: { startYear: 2000, endYear: 2001 },
         historicalDataProvider: createContractProvider(),
         breakOnRuin: true,
+        engineProvenance: {
+            apiVersion: '31.0',
+            buildId: 'runner-build',
+            configFingerprint: { algorithm: 'sha256-canonical-json-v1', value: 'c'.repeat(64) }
+        },
         ...dependencies
     });
 }
@@ -288,11 +298,18 @@ assertEqual(completed.request.breakOnRuin, true, 'request records the explicit r
 assertEqual(completed.breakOnRuin, true, 'result records the explicit ruin policy');
 assertEqual(completed.request.temporalConventionId, HISTORICAL_TEMPORAL_CONVENTION_ID, 'request records the approved temporal convention');
 assertEqual(completed.request.dataset.datasetId, 'runner-fixture', 'request records dataset provenance');
+assertEqual(completed.request.dataset.manifestSchemaVersion, 'HistoricalDataManifestV1', 'request records the manifest schema');
+assert(/^[a-f0-9]{64}$/.test(completed.request.dataset.manifestHash.value), 'request fingerprints the full manifest');
+assertEqual(completed.request.engine.buildId, 'runner-build', 'request records the engine build id');
+assertEqual(completed.request.engine.configFingerprint.value, 'c'.repeat(64), 'request records the config fingerprint');
 assertEqual(completed.requestedYears, 2, 'requestedYears includes the full inclusive period');
 assertEqual(completed.completedYears, 2, 'completedYears counts successful simulated years');
+assertEqual(completed.firstYear, 2000, 'result records the first requested year');
 assertEqual(completed.rows.length, 2, 'completed run returns one row per simulated year');
 assertEqual(completed.portfolioStart, 100, 'runner records the initial portfolio total');
 assertEqual(completed.portfolioEnd, 120, 'runner records the final portfolio total');
+assertEqual(completed.portfolioSnapshots.start.value, 100, 'runner snapshots the initial portfolio');
+assertEqual(completed.portfolioSnapshots.end.value, 120, 'runner snapshots the terminal portfolio');
 assertEqual(completed.legacyOutcome, 'completed', 'legacy outcome alias follows the canonical V1 kind');
 assertEqual(completed.legacyMetrics.totalWithdrawal, 21, 'runner retains total withdrawals');
 assertEqual(completed.legacyMetrics.totalTaxes, 3, 'runner retains total taxes');
@@ -305,6 +322,9 @@ assertEqual(completed.metrics.values.flex_reduction_years_gte_10_pct, 1, 'canoni
 assertEqual(completed.summary.metrics.flex_reduction_years_gte_10_pct, completed.metrics.values.flex_reduction_years_gte_10_pct, 'summary projects the same canonical metric id and raw value');
 assertEqual(completed.summary.totalTaxes, completed.metrics.values.tax_total_nominal_eur, 'legacy tax summary reconciles to canonical metrics');
 assert(Object.isFrozen(completed.metrics.values), 'canonical metric values are immutable');
+assert(Object.isFrozen(completed), 'canonical run result is immutable');
+assert(Object.isFrozen(completed.rows), 'canonical run rows are immutable');
+assert(Object.isFrozen(completed.portfolioSnapshots.end), 'canonical terminal portfolio snapshot is immutable');
 assertEqual(completed.summary.healthBucket.enabled, true, 'canonical summary exposes the enabled health bucket');
 assertClose(completed.summary.healthBucket.end, 4321.09, 1e-9, 'canonical summary reads health bucket end from the nested result row');
 assertClose(completed.summary.healthBucket.realCoveragePct, 76.5, 1e-9, 'canonical summary reads health bucket coverage');
