@@ -194,11 +194,14 @@ function createElement(value = '0', checked = false) {
         disabled: false,
         innerHTML: '',
         textContent: '',
+        dataset: {},
         style: { display: 'none' },
         classList: { add: () => {}, remove: () => {} },
         addEventListener: () => {},
         appendChild: () => {},
-        setAttribute: () => {}
+        setAttribute: () => {},
+        removeAttribute: () => {},
+        focus: () => {}
     };
 }
 
@@ -301,8 +304,9 @@ function projectRow(entry) {
     };
 }
 
-function observeOutcome({ data, rows, alerts, requestedYears }) {
+function observeOutcome({ data, rows, alerts, requestedYears, uiStatus }) {
     if (typeof data?.outcome?.kind === 'string') return data.outcome.kind;
+    if (uiStatus?.code === 'BACKTEST_PERIOD_INVALID') return 'validation_inline';
     if (alerts.length > 0) return 'validation_alert_legacy';
     if (rows.some(entry => entry?.row?.Regime === 'BANKRUPT')) return 'ruin_legacy';
     if (rows.length === 0) return 'empty_result_rendered_as_completed_legacy';
@@ -310,7 +314,7 @@ function observeOutcome({ data, rows, alerts, requestedYears }) {
     return 'completed_legacy';
 }
 
-function projectScenario({ id, oracleClass = 'target_expected', inputs, data, alerts, summaryHtml, expectedRowCount, notes = [] }) {
+function projectScenario({ id, oracleClass = 'target_expected', inputs, data, alerts, summaryHtml, uiStatus, expectedRowCount, notes = [] }) {
     const rows = Array.isArray(data?.rows) ? data.rows : [];
     const requestedYears = Number.isInteger(Number(inputs?.__periodEnd)) && Number.isInteger(Number(inputs?.__periodStart))
         ? Number(inputs.__periodEnd) - Number(inputs.__periodStart) + 1
@@ -341,7 +345,8 @@ function projectScenario({ id, oracleClass = 'target_expected', inputs, data, al
         expectedRowCount,
         observedRowCount: rows.length,
         canonicalRowsHash: stableHash(rows),
-        outcomeObservation: observeOutcome({ data, rows, alerts, requestedYears }),
+        outcomeObservation: observeOutcome({ data, rows, alerts, requestedYears, uiStatus }),
+        uiStatus,
         alerts,
         values: {
             startWealth: round(normalizedInputs.startVermoegen),
@@ -419,6 +424,13 @@ function runScenario({
     assertEqual(stableHash(HISTORICAL_DATA), historicalHashBefore, `${id}: HISTORICAL_DATA must be restored and unmodified`);
     const capturedData = getCaptured();
     const capturedSummaryHtml = doc.getElementById('simulationSummary').innerHTML;
+    const statusElement = doc.getElementById('backtestStatus');
+    const statusText = summaryText(statusElement.innerHTML);
+    const uiStatus = {
+        kind: statusElement.dataset?.status || null,
+        code: statusText.match(/Code:\s*([A-Za-z0-9_.-]+)/)?.[1] || null,
+        text: statusText
+    };
     const projection = typeof projectionOverride === 'function'
         ? projectionOverride({ data: capturedData, summaryHtml: capturedSummaryHtml })
         : { data: capturedData, summaryHtml: capturedSummaryHtml };
@@ -429,6 +441,7 @@ function runScenario({
         data: projection.data,
         alerts,
         summaryHtml: projection.summaryHtml,
+        uiStatus,
         expectedRowCount,
         notes
     });

@@ -394,6 +394,166 @@ input:disabled {
     white-space: nowrap;
 }
 
+#simulationLog caption {
+    padding: 10px 8px;
+    color: #1f2937;
+    background: #f9fafb;
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-align: left;
+}
+
+.backtest-table-region:focus-visible {
+    outline: 3px solid #2563eb;
+    outline-offset: 3px;
+}
+
+.backtest-period-hint {
+    margin: 8px 0 0;
+    color: var(--text-light);
+    font-size: 0.84rem;
+    line-height: 1.45;
+}
+
+.field-error {
+    margin: 6px 0 0;
+    color: #9f1239;
+    font-size: 0.84rem;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+input[aria-invalid="true"] {
+    border-color: #be123c;
+    box-shadow: 0 0 0 2px rgba(190, 18, 60, 0.16);
+}
+
+.backtest-cohort-controls {
+    display: grid;
+    grid-template-columns: minmax(240px, 1fr) minmax(220px, 1fr);
+    gap: 18px;
+    align-items: start;
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+}
+
+.backtest-checkbox-label {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    margin-top: 10px;
+    white-space: normal;
+    overflow: visible;
+    line-height: 1.4;
+}
+
+.backtest-checkbox-label input {
+    flex: 0 0 auto;
+    width: auto;
+    margin-top: 2px;
+}
+
+.backtest-status,
+.backtest-notices,
+.backtest-cohort-summary {
+    margin-top: 16px;
+    padding: 14px 16px;
+    border: 1px solid #94a3b8;
+    border-left-width: 5px;
+    border-radius: 8px;
+    background: #f8fafc;
+    color: #172033;
+    line-height: 1.5;
+}
+
+.backtest-status span {
+    display: block;
+    margin-top: 4px;
+}
+
+.backtest-status-code {
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 0.82rem;
+}
+
+.backtest-status-running {
+    border-left-color: #2563eb;
+    background: #eff6ff;
+}
+
+.backtest-status-completed {
+    border-left-color: #15803d;
+    background: #f0fdf4;
+}
+
+.backtest-status-ruin,
+.backtest-status-incomplete {
+    border-left-color: #b45309;
+    background: #fffbeb;
+}
+
+.backtest-status-technical_error {
+    border-left-color: #be123c;
+    background: #fff1f2;
+}
+
+.backtest-status-validation_error {
+    border-left-color: #b45309;
+    background: #fffbeb;
+}
+
+.backtest-status:focus-visible {
+    outline: 3px solid #2563eb;
+    outline-offset: 3px;
+}
+
+.backtest-notices h4,
+.backtest-cohort-summary h4 {
+    margin: 0 0 8px;
+}
+
+.backtest-notices ul,
+.backtest-cohort-outcomes {
+    margin: 0;
+    padding-left: 22px;
+}
+
+.backtest-notices li + li,
+.backtest-cohort-outcomes li + li {
+    margin-top: 6px;
+}
+
+.backtest-cohort-inventory {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+    margin: 12px 0;
+}
+
+.backtest-cohort-inventory div {
+    padding: 8px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.75);
+}
+
+.backtest-cohort-inventory dt {
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.backtest-cohort-inventory dd {
+    margin: 2px 0 0;
+    font-size: 1.1rem;
+}
+
+@media (max-width: 680px) {
+    .backtest-cohort-controls {
+        grid-template-columns: 1fr;
+    }
+}
+
 button {
     background-color: var(--primary-color);
     color: white;

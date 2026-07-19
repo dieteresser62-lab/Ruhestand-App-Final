@@ -204,7 +204,8 @@ async function runSimulatorUiOrchestrationTests() {
         persistModule,
         sweepUiModule,
         optimizerModule,
-        monteCarloUiModule
+        monteCarloUiModule,
+        backtestUiModule
     ] = await Promise.all([
         import('../app/simulator/simulator-main.js'),
         import('../app/simulator/simulator-main-tabs.js'),
@@ -214,7 +215,8 @@ async function runSimulatorUiOrchestrationTests() {
         import('../app/simulator/simulator-main-input-persist.js'),
         import('../app/simulator/simulator-main-sweep-ui.js'),
         import('../app/simulator/simulator-optimizer.js'),
-        import('../app/simulator/monte-carlo-ui.js')
+        import('../app/simulator/monte-carlo-ui.js'),
+        import('../app/simulator/simulator-backtest.js')
     ]);
 
     void mainModule;
@@ -376,6 +378,32 @@ async function runSimulatorUiOrchestrationTests() {
 
         methodSelect.dispatchEvent({ type: 'change' });
         assertEqual(persistenceStorage.getItem('sim_mcMethode'), 'stationary', 'MC-Methode wird persistiert');
+    }
+
+    console.log('Test 8: Backtest controls receive bounds and exactly one module handler');
+    {
+        const startButton = registerElement(documentRef, 'btButton', { tagName: 'button' });
+        const startYear = registerElement(documentRef, 'simStartJahr', { value: '2000' });
+        const endYear = registerElement(documentRef, 'simEndJahr', { value: '2025' });
+        const datasetHint = registerElement(documentRef, 'backtestDatasetHint', { tagName: 'p' });
+        const cohortToggle = registerElement(documentRef, 'runBacktestCohorts', { type: 'checkbox' });
+        const cohortHorizon = registerElement(documentRef, 'backtestCohortHorizon', { value: '10' });
+        registerElement(documentRef, 'simStartJahrError', { tagName: 'p' });
+        registerElement(documentRef, 'simEndJahrError', { tagName: 'p' });
+        registerElement(documentRef, 'backtestCohortHorizonError', { tagName: 'p' });
+        registerElement(documentRef, 'toggle-backtest-detail', { type: 'checkbox' });
+        registerElement(documentRef, 'exportBacktestJson', { tagName: 'button' });
+        registerElement(documentRef, 'exportBacktestCsv', { tagName: 'button' });
+
+        backtestUiModule.initializeBacktestUI();
+        backtestUiModule.initializeBacktestUI();
+
+        assert(Number.isInteger(Number(startYear.min)) && Number(startYear.min) <= 2000, 'Backtest start input receives provider minimum');
+        assertEqual(endYear.max, '2025', 'Backtest end input receives provider maximum');
+        assert(datasetHint.textContent.includes('Datensatz') && datasetHint.textContent.includes('2025'), 'Backtest dataset hint is visible');
+        assertEqual(startButton.listeners.click.length, 1, 'Backtest start button has exactly one module click handler');
+        assertEqual(cohortToggle.listeners.change.length, 1, 'Cohort toggle has exactly one module change handler');
+        assertEqual(cohortHorizon.disabled, true, 'Cohort horizon remains disabled until explicitly selected');
     }
 
     console.log('Simulator UI orchestration tests passed');

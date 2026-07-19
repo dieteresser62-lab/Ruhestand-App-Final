@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 113 entdeckte Testdateien, davon 112 im Node-Gate ausgeführt, mit 4700 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (verifiziert mit `npm test` am 2026-07-18). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand am selben Tag mit 14/14 Szenarien.
+**Test-Statistik:** 119 entdeckte Testdateien, davon 118 im Node-Gate ausgefuehrt, mit 5722 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (verifiziert mit `npm test` am 2026-07-19). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand am selben Tag mit 14/14 Einstiegspunkt-/Zusatzflows.
 
 Die Zahl beschreibt nur die Node-Standardsuite. `npm run test:browser`, `npm run test:coverage` und ein echter Tauri-Build sind getrennte Gates und in den Assertions nicht enthalten.
 
@@ -64,7 +64,7 @@ Bekannte Coverage-Ausnahmen:
 npm run test:browser
 ```
 
-Das Browser-Gate nutzt Playwright mit einem vom Test verwalteten lokalen HTTP-Server. Jeder Fall erhaelt einen isolierten Browser-Context und eine eigene Storage-Baseline. Neben den zentralen Einstiegspunkten (`index.html`, `Balance.html`, `Simulator.html`, `depot-tranchen-manager.html`, `Handbuch.html`) prueft es in `Balance.html` Profilabwahl nach Reload, Engine-Mismatch, mutationsfreien Jahres-Preflight, sichtbare korrupte Ausgaben, sichtbaren Import-Reject sowie einen Doppelklick mit genau einem Jahrescommit und Recovery-Snapshot. Die Tranchenkette deckt mit synthetischen Profilen A/B Manager-Handoff, CRUD, Dialogfokus und Tastaturbedienung, EUR-Quote, Reload, 390-Pixel-Layout, schreibfreie Balance-/Simulatorlaeufe, bestaetigten Reconcile genau einmal, Quote-Teilerfolg/Offline und raw-preserving Corrupt-Recovery ab. Inflation, Yahoo-Proxy und CAPE werden deterministisch geroutet; andere externe Requests werden blockiert. Es ersetzt keine Node-Unit-Tests und laeuft bewusst getrennt von `npm test`.
+Das Browser-Gate nutzt Playwright mit einem vom Test verwalteten lokalen HTTP-Server. Jeder Fall erhaelt einen isolierten Browser-Context und eine eigene Storage-Baseline. Neben den zentralen Einstiegspunkten (`index.html`, `Balance.html`, `Simulator.html`, `depot-tranchen-manager.html`, `Handbuch.html`) prueft es in `Balance.html` Profilabwahl nach Reload, Engine-Mismatch, mutationsfreien Jahres-Preflight, sichtbare korrupte Ausgaben, sichtbaren Import-Reject sowie einen Doppelklick mit genau einem Jahrescommit und Recovery-Snapshot. Der Simulatorfall wartet auf den synchron gesetzten fachlichen Status statt auf feste Millisekunden: Er reconciliiert sichtbare Periode, Outcome, Jahrinventar, exakte 10-%-Metrik, Pflegebucket und Cohort-Inventar mit Raw-JSON, prueft JSON/CSV ohne HTML, stabilen Detailtoggle-Fingerprint, Tabellen-/Fokussemantik, leere/NaN-/nicht-ganzzahlige/rueckwaertige/out-of-bounds Eingaben, synthetische Datenluecke, Ruin, `technical_error`, null Alerts sowie Realbestands-Non-Mutation. Die Tranchenkette deckt mit synthetischen Profilen A/B Manager-Handoff, CRUD, Dialogfokus und Tastaturbedienung, EUR-Quote, Reload, 390-Pixel-Layout, schreibfreie Balance-/Simulatorlaeufe, bestaetigten Reconcile genau einmal, Quote-Teilerfolg/Offline und raw-preserving Corrupt-Recovery ab. Inflation, Yahoo-Proxy und CAPE werden deterministisch geroutet; andere externe Requests werden blockiert. Es ersetzt keine Node-Unit-Tests und laeuft bewusst getrennt von `npm test`.
 
 Wichtig fuer CI/Release: Weil `npm test` dieses Gate nicht ausfuehrt, muss `npm run test:browser` explizit als eigener Job oder Release-Schritt laufen, wenn Browser-Regressionen blockierend sein sollen.
 
@@ -492,6 +492,14 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 - **Realentnahme:** Historische Jahreszeilen führen den kumulierten Inflationsfaktor fort und deflationieren die effektive Entnahme.
 - **Negativzins:** Der 2019-2020-Fall behaelt negative Cashzinsen in Ergebnis und Balance-Trace und reconciliiert FlowDelta.
 
+#### `simulator-backtest-ui.test.mjs`
+**Zweck:** Testet den DOM-armen UI-/Accessibility-Vertrag des historischen Backtests.
+- **Zeitraum:** Provider-Bounds, sichtbarer Datensatzhinweis, Einjahreslauf sowie leere, NaN-, nicht-ganzzahlige, rueckwaertige und out-of-bounds Felder.
+- **Inline/Fokus:** Feldzuordnung, `aria-invalid`, sichtbarer Fehler und Fokus auf das erste ungueltige Feld.
+- **Statussicherheit:** Stabiler technischer Code ohne Stack oder lokalen Pfad; terminaler Fokus und maschinenlesbarer Status.
+- **Datenqualitaet/A11y:** Inventar der Observation-Qualitaetsmarker, Caption, `scope="col"`, verstaendliche Headerlabels und HTML-Escaping.
+- **Cohorts:** Tief eingefrorener UI-/Exportsnapshot, feste Horizontlaenge, Ausschlussgruende und `eligible=0` ohne `NaN`/`Infinity`.
+
 #### `historical-backtest-runner.test.mjs`
 **Zweck:** Testet den DOM-freien historischen Runner direkt an seiner Dependency-Injection-Grenze.
 - **Request/Result:** Versionierte V0-Grundshapes, inklusive Zeitraum, `breakOnRuin`, Dataset-/Temporal-Provenienz, Rows, Completion, Start-/Endportfolio und Legacy-Metriken.
@@ -771,7 +779,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `balance-storage-contract.test.mjs` | ~180 | Echte StorageManager-Migrationen und Snapshot-Contracts |
 | `balance-storage.test.mjs` | ~490 | localStorage-Persistenz |
 | `balance-ui-orchestration.test.mjs` | ~170 | Balance-UI-Bindings, Import-/Export-Control-Pfade und Profilverbund-Hooks |
-| `browser-smoke.test.mjs` | ~260 | Playwright-Smoke-Gate fuer HTML-Einstiege mit lokalem HTTP-Server |
+| `browser-smoke.test.mjs` | ~1000 | Playwright-Gate fuer HTML-Einstiege, Backtest-UI/Raw/A11y/Negativpfade sowie zentrale Balance-/Tranchenflows |
 | `care-meta.test.mjs` | ~200 | Pflegefall-Logik |
 | `health-bucket.test.mjs` | ~160 | Pflegebucket-Trigger, Deckung, Verzinsung und Diagnose |
 | `core-engine.test.mjs` | ~150 | EngineAPI-Basisvalidierung |
@@ -809,6 +817,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `simulation.test.mjs` | ~200 | Simulations-Integration |
 | `simulator-3bucket-ui-e2e.test.mjs` | ~130 | 3-Bucket-UI-Integration im Simulator |
 | `simulator-backtest-characterization.test.mjs` | ~830 | Legacy-Golden-Cases, Negativfaelle, Messvertrag und Delta-Reporter fuer den historischen Backtest |
+| `simulator-backtest-ui.test.mjs` | ~190 | Backtest-Periodenvalidierung, Statussicherheit, Datenqualitaet, Tabellen-A11y und Cohort-Nullnenner |
 | `simulator-backtest.test.mjs` | ~150 | Historischer Backtest |
 | `simulator-dynamic-flex-persistence.test.mjs` | ~110 | Persistenz von Dynamic-Flex-Inputs |
 | `simulator-headless.test.mjs` | ~125 | Headless 2000-2025 |
