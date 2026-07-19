@@ -1,0 +1,3313 @@
+{
+  "alignmentOracle": [
+    {
+      "activeMonteCarloAnnualData": {
+        "cape": 43.8,
+        "equityReturnRatio": -0.14117278798,
+        "goldPct": -2.7,
+        "inflationPct": 1.4,
+        "interestPct": 4.25,
+        "sourceYear": 2000,
+        "wagePct": 2.5
+      },
+      "legacyBacktest": {
+        "cape": {
+          "sourceYear": 1999,
+          "value": 40.6
+        },
+        "equity": {
+          "sourceYears": [
+            1999,
+            2000
+          ],
+          "valueRatio": -0.14117278798
+        },
+        "gold": {
+          "sourceYear": 1999,
+          "valuePct": -0.6
+        },
+        "inflation": {
+          "sourceYear": 1999,
+          "valuePct": 0.6
+        },
+        "interest": {
+          "sourceYear": 1999,
+          "valuePct": 2.5
+        },
+        "wageAdjustment": {
+          "sourceYear": 2000,
+          "valuePct": 2.5
+        }
+      },
+      "targetExpected": {
+        "cape": {
+          "asOfYear": 1999,
+          "sourceYear": 1999,
+          "value": 40.6
+        },
+        "equity": {
+          "sourceYears": [
+            1999,
+            2000
+          ],
+          "valueRatio": -0.14117278798
+        },
+        "gold": {
+          "sourceYear": 2000,
+          "valuePct": -2.7
+        },
+        "inflation": {
+          "sourceYear": 2000,
+          "valuePct": 1.4
+        },
+        "interest": {
+          "sourceYear": 2000,
+          "valuePct": 4.25
+        },
+        "temporalConventionId": "realized_t_decision_t_minus_1_v1",
+        "wageAdjustment": {
+          "sourceYear": 2000,
+          "valuePct": 2.5
+        }
+      },
+      "year": 2000
+    },
+    {
+      "activeMonteCarloAnnualData": {
+        "cape": 36.8,
+        "equityReturnRatio": -0.179686550844,
+        "goldPct": 4.3,
+        "inflationPct": 2.1,
+        "interestPct": 3.75,
+        "sourceYear": 2001,
+        "wagePct": 1.9
+      },
+      "legacyBacktest": {
+        "cape": {
+          "sourceYear": 2000,
+          "value": 43.8
+        },
+        "equity": {
+          "sourceYears": [
+            2000,
+            2001
+          ],
+          "valueRatio": -0.179686550844
+        },
+        "gold": {
+          "sourceYear": 2000,
+          "valuePct": -2.7
+        },
+        "inflation": {
+          "sourceYear": 2000,
+          "valuePct": 1.4
+        },
+        "interest": {
+          "sourceYear": 2000,
+          "valuePct": 4.25
+        },
+        "wageAdjustment": {
+          "sourceYear": 2001,
+          "valuePct": 1.9
+        }
+      },
+      "targetExpected": {
+        "cape": {
+          "asOfYear": 2000,
+          "sourceYear": 2000,
+          "value": 43.8
+        },
+        "equity": {
+          "sourceYears": [
+            2000,
+            2001
+          ],
+          "valueRatio": -0.179686550844
+        },
+        "gold": {
+          "sourceYear": 2001,
+          "valuePct": 4.3
+        },
+        "inflation": {
+          "sourceYear": 2001,
+          "valuePct": 2.1
+        },
+        "interest": {
+          "sourceYear": 2001,
+          "valuePct": 3.75
+        },
+        "temporalConventionId": "realized_t_decision_t_minus_1_v1",
+        "wageAdjustment": {
+          "sourceYear": 2001,
+          "valuePct": 1.9
+        }
+      },
+      "year": 2001
+    }
+  ],
+  "approvedContractChangePaths": [
+    "alignmentOracle",
+    "cases",
+    "negativeCases"
+  ],
+  "cases": [
+    {
+      "alerts": [],
+      "canonicalRowsHash": "9f444cd7c6e2b78025ea89133c6c3af18a978aff9745a43ec9feb45250b8e6e0",
+      "expectedRowCount": 6,
+      "id": "completed_2000_2005",
+      "inputHash": "ebdea5f8b4162f411a17802329bb68cc3a4e756f61e0c6a1f0131b611601ab7d",
+      "inputs": {
+        "accumulationPhase": {
+          "durationYears": 0,
+          "enabled": false,
+          "sparrate": 0,
+          "sparrateIndexing": "0"
+        },
+        "capeRatio": 20,
+        "decumulation": {
+          "bondRefillThreshold": 1.5,
+          "bondTargetFactor": 2,
+          "drawdownTrigger": 20,
+          "mode": "standard"
+        },
+        "depotwertAlt": 2000000,
+        "detailledTranches": [
+          {
+            "category": "equity",
+            "costBasis": 1500000,
+            "currentPrice": 1900,
+            "marketValue": 1900000,
+            "purchaseDate": "1990-01-01",
+            "purchasePrice": 1500,
+            "shares": 1000,
+            "sourceProfileId": "baseline",
+            "tqf": 0.3,
+            "trancheId": "baseline:eq-old",
+            "type": "aktien_alt"
+          },
+          {
+            "category": "money_market",
+            "costBasis": 100000,
+            "currentPrice": 100,
+            "marketValue": 100000,
+            "purchaseDate": "1999-01-01",
+            "purchasePrice": 100,
+            "shares": 1000,
+            "sourceProfileId": "baseline",
+            "tqf": 0,
+            "trancheId": "baseline:cash",
+            "type": "geldmarkt"
+          }
+        ],
+        "dynamicFlex": false,
+        "einstandAlt": 1600000,
+        "flexBudgetAnnual": 0,
+        "flexBudgetRecharge": 0,
+        "flexBudgetYears": 0,
+        "geldmarktEtf": 0,
+        "geschlecht": "m",
+        "goGoActive": false,
+        "goGoMultiplier": 1,
+        "goldAktiv": false,
+        "goldFloorProzent": 0,
+        "goldSteuerfrei": false,
+        "goldZielProzent": 0,
+        "horizonMethod": "survival_quantile",
+        "horizonYears": 30,
+        "kirchensteuerSatz": 0,
+        "longevityBufferYears": 0,
+        "longevityMode": "none",
+        "longevityQuantileShift": 0,
+        "longevityRelativePct": 0,
+        "marketCapeRatio": 20,
+        "maxBearRefillPctOfEq": 5,
+        "maxSkimPctOfEq": 10,
+        "minimumFlexAnnual": 0,
+        "partner": {
+          "aktiv": false,
+          "brutto": 0,
+          "geschlecht": "0",
+          "kirchensteuerPct": 0,
+          "monatsrente": 0,
+          "sparerPauschbetrag": 0,
+          "startAlter": 0,
+          "startInJahren": 0,
+          "steuerquotePct": 0
+        },
+        "pflegeGradeConfigs": {
+          "1": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "2": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "3": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "4": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "5": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          }
+        },
+        "pflegeKostenDrift": 0.035,
+        "pflegeMaxDauer": 5,
+        "pflegeMaxFloor": 0,
+        "pflegeMinDauer": 1,
+        "pflegeModellTyp": "none",
+        "pflegeRampUp": 5,
+        "pflegeRegionalZuschlag": 0,
+        "pflegeStufe1FlexCut": 0,
+        "pflegeStufe1Zusatz": 0,
+        "pflegefallLogikAktivieren": false,
+        "rebalBand": 5,
+        "rebalancingBand": 25,
+        "rentAdjMode": "fix",
+        "rentAdjPct": 0,
+        "renteFesterSatz": 0,
+        "renteIndexierungsart": "fest",
+        "renteMonatlich": 0,
+        "renteStartOffsetJahre": 0,
+        "risikoprofil": "sicherheits-dynamisch",
+        "runwayMinMonths": 24,
+        "runwayTargetMonths": 36,
+        "simulationSourceProfileId": "baseline",
+        "startAlter": 65,
+        "startFlexBedarf": 6000,
+        "startFloorBedarf": 24000,
+        "startSPB": 1000,
+        "startVermoegen": 2000000,
+        "stressPreset": "NONE",
+        "survivalQuantile": 0.85,
+        "tagesgeld": 20000,
+        "tailRiskAnnualProbabilityPct": 0,
+        "tailRiskConfigValid": true,
+        "tailRiskCooldownYears": 10,
+        "tailRiskDurationYears": 1,
+        "tailRiskEnabled": false,
+        "tailRiskHorizonYears": 30,
+        "tailRiskInflationShockPct": 6,
+        "tailRiskModel": "event_injection",
+        "tailRiskReturnShockPct": -35,
+        "tailRiskValidationErrors": [],
+        "targetEq": 60,
+        "transitionAge": 65,
+        "transitionYear": 0,
+        "widowOptions": {
+          "marriageOffsetYears": 0,
+          "minMarriageYears": 0,
+          "mode": "0",
+          "percent": 0
+        },
+        "zielLiquiditaet": 20000
+      },
+      "notes": [
+        "Canonical short completed path and detail-tranche non-mutation sentinel."
+      ],
+      "observedRowCount": 6,
+      "oracleClass": "target_expected",
+      "outcomeObservation": "completed",
+      "period": {
+        "endYear": 2005,
+        "requestedYears": 6,
+        "startYear": 2000
+      },
+      "rowSamples": [
+        {
+          "jahr": 2000,
+          "row": {
+            "action": "Surplus Rebalancing (Liquiditätsabbau) / Rebal.(A+)",
+            "equityReturnRatio": -0.141172788,
+            "goldReturnRatio": -0.027,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 1725147.7,
+            "reductionPct": 20,
+            "regime": "side_long",
+            "tax": 0,
+            "withdrawal": 28800
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 1.4,
+            "liquiditaet": 53376,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 1671771.7,
+            "wertGold": 0
+          }
+        },
+        {
+          "jahr": 2001,
+          "row": {
+            "action": "Runway-Notfüllung (Bär)",
+            "equityReturnRatio": -0.179686551,
+            "goldReturnRatio": 0.043,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 1397174.41,
+            "reductionPct": 26.627219,
+            "regime": "bear_deep",
+            "tax": 0,
+            "withdrawal": 28800
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 2.1,
+            "liquiditaet": 33797.6,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 1363376.81,
+            "wertGold": 0
+          }
+        },
+        {
+          "jahr": 2004,
+          "row": {
+            "action": "Notfall-Verkauf (Puffer-Auffüllung)",
+            "equityReturnRatio": 0.106849315,
+            "goldReturnRatio": 0.022,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 1084298.32,
+            "reductionPct": 46.845057,
+            "regime": "bear_deep",
+            "tax": 0,
+            "withdrawal": 28800
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 1.7,
+            "liquiditaet": 22484.41,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 1061813.92,
+            "wertGold": 0
+          }
+        },
+        {
+          "jahr": 2005,
+          "row": {
+            "action": "Notfall-Verkauf (Puffer-Auffüllung)",
+            "equityReturnRatio": 0.280056577,
+            "goldReturnRatio": 0.223,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 1353347.36,
+            "reductionPct": 54.419919,
+            "regime": "recovery_in_bear",
+            "tax": 0,
+            "withdrawal": 28800
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 1.5,
+            "liquiditaet": 23388.94,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 1329958.42,
+            "wertGold": 0
+          }
+        }
+      ],
+      "summaryText": "Startjahr 2000 Endjahr 2005 Outcome Vollständig Angeforderte Jahre 6 Wirtschaftlich ausgewertete Jahre 6 Jahreszeilen 6 Startvermögen 2.020.000,00 € Endvermögen 1.353.347,36 € Gesamte Entnahmen 172.800,00 € Max. Kürzungsdauer (≥ 10 %) 6 Jahre Jahre mit Kürzung (≥ 10 %) 6 von 6 Gezahlte Steuern 0,00 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
+      "uiStatus": {
+        "code": "BACKTEST_COMPLETED",
+        "kind": "completed",
+        "text": "Backtest vollständig abgeschlossen Code: BACKTEST_COMPLETED Ursache: 6 von 6 angeforderten Jahren wurden wirtschaftlich ausgewertet. Nächster Schritt: Prüfen Sie Summary, Warnhinweise, Jahresprotokoll und Raw-Export gemeinsam."
+      },
+      "values": {
+        "lastRowPortfolioTotalEnd": 1353347.36,
+        "lastWrapperPortfolio": 1353347.36,
+        "maxAbsolutePortfolioFlowDelta": 0,
+        "maxReductionStreak": 6,
+        "startWealth": 2000000,
+        "summaryEndWealth": 1353347.36,
+        "totalTax": 0,
+        "totalWithdrawal": 172800,
+        "yearsWithReductionAtLeast10Pct": 6
+      }
+    },
+    {
+      "alerts": [],
+      "canonicalRowsHash": "9b15184f395b633a130d3f3a7e2bf835d9c8c7ecf8822d3d484ec9d1a002db86",
+      "expectedRowCount": 61,
+      "id": "completed_1960_2020",
+      "inputHash": "cb5a70552297ce10277b714a2c5fcc6878a4569571368284257ece3550b8e379",
+      "inputs": {
+        "accumulationPhase": {
+          "durationYears": 0,
+          "enabled": false,
+          "sparrate": 0,
+          "sparrateIndexing": "0"
+        },
+        "capeRatio": 20,
+        "decumulation": {
+          "bondRefillThreshold": 1.5,
+          "bondTargetFactor": 2,
+          "drawdownTrigger": 20,
+          "mode": "standard"
+        },
+        "depotwertAlt": 2000000,
+        "detailledTranches": null,
+        "dynamicFlex": false,
+        "einstandAlt": 1600000,
+        "flexBudgetAnnual": 0,
+        "flexBudgetRecharge": 0,
+        "flexBudgetYears": 0,
+        "geldmarktEtf": 0,
+        "geschlecht": "m",
+        "goGoActive": false,
+        "goGoMultiplier": 1,
+        "goldAktiv": false,
+        "goldFloorProzent": 0,
+        "goldSteuerfrei": false,
+        "goldZielProzent": 0,
+        "horizonMethod": "survival_quantile",
+        "horizonYears": 30,
+        "kirchensteuerSatz": 0,
+        "longevityBufferYears": 0,
+        "longevityMode": "none",
+        "longevityQuantileShift": 0,
+        "longevityRelativePct": 0,
+        "marketCapeRatio": 20,
+        "maxBearRefillPctOfEq": 5,
+        "maxSkimPctOfEq": 10,
+        "minimumFlexAnnual": 0,
+        "partner": {
+          "aktiv": false,
+          "brutto": 0,
+          "geschlecht": "0",
+          "kirchensteuerPct": 0,
+          "monatsrente": 0,
+          "sparerPauschbetrag": 0,
+          "startAlter": 0,
+          "startInJahren": 0,
+          "steuerquotePct": 0
+        },
+        "pflegeGradeConfigs": {
+          "1": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "2": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "3": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "4": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "5": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          }
+        },
+        "pflegeKostenDrift": 0.035,
+        "pflegeMaxDauer": 5,
+        "pflegeMaxFloor": 0,
+        "pflegeMinDauer": 1,
+        "pflegeModellTyp": "none",
+        "pflegeRampUp": 5,
+        "pflegeRegionalZuschlag": 0,
+        "pflegeStufe1FlexCut": 0,
+        "pflegeStufe1Zusatz": 0,
+        "pflegefallLogikAktivieren": false,
+        "rebalBand": 5,
+        "rebalancingBand": 25,
+        "rentAdjMode": "fix",
+        "rentAdjPct": 0,
+        "renteFesterSatz": 0,
+        "renteIndexierungsart": "fest",
+        "renteMonatlich": 0,
+        "renteStartOffsetJahre": 0,
+        "risikoprofil": "sicherheits-dynamisch",
+        "runwayMinMonths": 24,
+        "runwayTargetMonths": 36,
+        "simulationSourceProfileId": null,
+        "startAlter": 18,
+        "startFlexBedarf": 6000,
+        "startFloorBedarf": 24000,
+        "startSPB": 1000,
+        "startVermoegen": 2000000,
+        "stressPreset": "NONE",
+        "survivalQuantile": 0.85,
+        "tagesgeld": 20000,
+        "tailRiskAnnualProbabilityPct": 0,
+        "tailRiskConfigValid": true,
+        "tailRiskCooldownYears": 10,
+        "tailRiskDurationYears": 1,
+        "tailRiskEnabled": false,
+        "tailRiskHorizonYears": 30,
+        "tailRiskInflationShockPct": 6,
+        "tailRiskModel": "event_injection",
+        "tailRiskReturnShockPct": -35,
+        "tailRiskValidationErrors": [],
+        "targetEq": 60,
+        "transitionAge": 18,
+        "transitionYear": 0,
+        "widowOptions": {
+          "marriageOffsetYears": 0,
+          "minMarriageYears": 0,
+          "mode": "0",
+          "percent": 0
+        },
+        "zielLiquiditaet": 20000
+      },
+      "notes": [
+        "Long-horizon regression sentinel."
+      ],
+      "observedRowCount": 61,
+      "oracleClass": "target_expected",
+      "outcomeObservation": "completed",
+      "period": {
+        "endYear": 2020,
+        "requestedYears": 61,
+        "startYear": 1960
+      },
+      "rowSamples": [
+        {
+          "jahr": 1960,
+          "row": {
+            "action": "Runway-Notfüllung (neutral) (Cap aktiv)",
+            "equityReturnRatio": 0.120211899,
+            "goldReturnRatio": 0,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 2229256.08,
+            "reductionPct": 0,
+            "regime": "peak_hot",
+            "tax": 3430.5,
+            "withdrawal": 30000
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 1.5,
+            "liquiditaet": 58832.28,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 2170423.8,
+            "wertGold": 0
+          }
+        },
+        {
+          "jahr": 1961,
+          "row": {
+            "action": "Opportunistisches Rebalancing & Liquidität auffüllen",
+            "equityReturnRatio": 0.005092761,
+            "goldReturnRatio": -0.048,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 2210444.31,
+            "reductionPct": 7.389163,
+            "regime": "peak_stable",
+            "tax": 1873.97,
+            "withdrawal": 30000
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 2.3,
+            "liquiditaet": 68967.06,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 2141477.25,
+            "wertGold": 0
+          }
+        },
+        {
+          "jahr": 2019,
+          "row": {
+            "action": "Opportunistisches Rebalancing & Liquidität auffüllen",
+            "equityReturnRatio": 0.276805424,
+            "goldReturnRatio": 0.194,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 90693742.59,
+            "reductionPct": 90.778617,
+            "regime": "peak_hot",
+            "tax": 63571.67,
+            "withdrawal": 114000
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 1.4,
+            "liquiditaet": 460508.73,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 90233233.86,
+            "wertGold": 0
+          }
+        },
+        {
+          "jahr": 2020,
+          "row": {
+            "action": "ATH (Kein Handlungsbedarf)",
+            "equityReturnRatio": 0.053843779,
+            "goldReturnRatio": 0.139,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 95436508.34,
+            "reductionPct": 96.428616,
+            "regime": "peak_stable",
+            "tax": 0,
+            "withdrawal": 114000
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 0.5,
+            "liquiditaet": 344776.18,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 95091732.16,
+            "wertGold": 0
+          }
+        }
+      ],
+      "summaryText": "Startjahr 1960 Endjahr 2020 Outcome Vollständig Angeforderte Jahre 61 Wirtschaftlich ausgewertete Jahre 61 Jahreszeilen 61 Startvermögen 2.020.000,00 € Endvermögen 95.436.508,34 € Gesamte Entnahmen 4.122.159,99 € Max. Kürzungsdauer (≥ 10 %) 59 Jahre Jahre mit Kürzung (≥ 10 %) 59 von 61 Gezahlte Steuern 791.315,78 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
+      "uiStatus": {
+        "code": "BACKTEST_COMPLETED",
+        "kind": "completed",
+        "text": "Backtest vollständig abgeschlossen Code: BACKTEST_COMPLETED Ursache: 61 von 61 angeforderten Jahren wurden wirtschaftlich ausgewertet. Nächster Schritt: Prüfen Sie Summary, Warnhinweise, Jahresprotokoll und Raw-Export gemeinsam."
+      },
+      "values": {
+        "lastRowPortfolioTotalEnd": 95436508.34,
+        "lastWrapperPortfolio": 95436508.34,
+        "maxAbsolutePortfolioFlowDelta": 0,
+        "maxReductionStreak": 59,
+        "startWealth": 2000000,
+        "summaryEndWealth": 95436508.34,
+        "totalTax": 791315.78,
+        "totalWithdrawal": 4122159.99,
+        "yearsWithReductionAtLeast10Pct": 59
+      }
+    },
+    {
+      "alerts": [],
+      "canonicalRowsHash": "25cadd9750d2e3d72c295982d5010b4507836c3cee1fe1018a4000a0c8a493a7",
+      "expectedRowCount": 10,
+      "id": "three_bucket_minimum_flex_2005_2014",
+      "inputHash": "ee6f0f4f65ac743fec4e1b68f7424a486fa7b4c8f0f4a43bf374d743b4723c29",
+      "inputs": {
+        "accumulationPhase": {
+          "durationYears": 0,
+          "enabled": false,
+          "sparrate": 0,
+          "sparrateIndexing": "0"
+        },
+        "capeRatio": 35,
+        "decumulation": {
+          "bondRefillThreshold": 1.5,
+          "bondTargetFactor": 2,
+          "drawdownTrigger": 20,
+          "mode": "3_bucket_jilge"
+        },
+        "depotwertAlt": 360000,
+        "detailledTranches": null,
+        "dynamicFlex": false,
+        "einstandAlt": 300000,
+        "flexBudgetAnnual": 0,
+        "flexBudgetRecharge": 0,
+        "flexBudgetYears": 0,
+        "geldmarktEtf": 120000,
+        "geschlecht": "m",
+        "goGoActive": false,
+        "goGoMultiplier": 1,
+        "goldAktiv": false,
+        "goldFloorProzent": 0,
+        "goldSteuerfrei": false,
+        "goldZielProzent": 0,
+        "horizonMethod": "survival_quantile",
+        "horizonYears": 30,
+        "kirchensteuerSatz": 0,
+        "longevityBufferYears": 0,
+        "longevityMode": "none",
+        "longevityQuantileShift": 0,
+        "longevityRelativePct": 0,
+        "marketCapeRatio": 35,
+        "maxBearRefillPctOfEq": 5,
+        "maxSkimPctOfEq": 10,
+        "minimumFlexAnnual": 9000,
+        "partner": {
+          "aktiv": false,
+          "brutto": 0,
+          "geschlecht": "0",
+          "kirchensteuerPct": 0,
+          "monatsrente": 0,
+          "sparerPauschbetrag": 0,
+          "startAlter": 0,
+          "startInJahren": 0,
+          "steuerquotePct": 0
+        },
+        "pflegeGradeConfigs": {
+          "1": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "2": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "3": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "4": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "5": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          }
+        },
+        "pflegeKostenDrift": 0.035,
+        "pflegeMaxDauer": 5,
+        "pflegeMaxFloor": 0,
+        "pflegeMinDauer": 1,
+        "pflegeModellTyp": "none",
+        "pflegeRampUp": 5,
+        "pflegeRegionalZuschlag": 0,
+        "pflegeStufe1FlexCut": 0,
+        "pflegeStufe1Zusatz": 0,
+        "pflegefallLogikAktivieren": false,
+        "rebalBand": 5,
+        "rebalancingBand": 25,
+        "rentAdjMode": "fix",
+        "rentAdjPct": 0,
+        "renteFesterSatz": 0,
+        "renteIndexierungsart": "fest",
+        "renteMonatlich": 0,
+        "renteStartOffsetJahre": 0,
+        "risikoprofil": "sicherheits-dynamisch",
+        "runwayMinMonths": 24,
+        "runwayTargetMonths": 36,
+        "simulationSourceProfileId": null,
+        "startAlter": 65,
+        "startFlexBedarf": 12000,
+        "startFloorBedarf": 24000,
+        "startSPB": 1000,
+        "startVermoegen": 500000,
+        "stressPreset": "NONE",
+        "survivalQuantile": 0.85,
+        "tagesgeld": 20000,
+        "tailRiskAnnualProbabilityPct": 0,
+        "tailRiskConfigValid": true,
+        "tailRiskCooldownYears": 10,
+        "tailRiskDurationYears": 1,
+        "tailRiskEnabled": false,
+        "tailRiskHorizonYears": 30,
+        "tailRiskInflationShockPct": 6,
+        "tailRiskModel": "event_injection",
+        "tailRiskReturnShockPct": -35,
+        "tailRiskValidationErrors": [],
+        "targetEq": 60,
+        "transitionAge": 65,
+        "transitionYear": 0,
+        "widowOptions": {
+          "marriageOffsetYears": 0,
+          "minMarriageYears": 0,
+          "mode": "0",
+          "percent": 0
+        },
+        "zielLiquiditaet": 140000
+      },
+      "notes": [
+        "Three-bucket accounting and minimum-flex characterization."
+      ],
+      "observedRowCount": 10,
+      "oracleClass": "target_expected",
+      "outcomeObservation": "completed",
+      "period": {
+        "endYear": 2014,
+        "requestedYears": 10,
+        "startYear": 2005
+      },
+      "rowSamples": [
+        {
+          "jahr": 2005,
+          "row": {
+            "action": "REC_BÄR (Kein Handlungsbedarf)",
+            "equityReturnRatio": 0.280056577,
+            "goldReturnRatio": 0.223,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 565090.51,
+            "reductionPct": 20,
+            "regime": "recovery_in_bear",
+            "tax": 4364.25,
+            "withdrawal": 33600
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 1.5,
+            "liquiditaet": 108898.15,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 456192.36,
+            "wertGold": 0
+          }
+        },
+        {
+          "jahr": 2006,
+          "row": {
+            "action": "Surplus Rebalancing (Liquiditätsabbau) / Rebal.(A+)",
+            "equityReturnRatio": 0.139502762,
+            "goldReturnRatio": 0.173,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 589280.97,
+            "reductionPct": 24.137931,
+            "regime": "recovery",
+            "tax": 0,
+            "withdrawal": 33600
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 1.8,
+            "liquiditaet": 51807.09,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 537473.87,
+            "wertGold": 0
+          }
+        },
+        {
+          "jahr": 2013,
+          "row": {
+            "action": "Runway-Notfüllung (neutral) (Cap aktiv)",
+            "equityReturnRatio": 0.235893201,
+            "goldReturnRatio": -0.228,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 368548.19,
+            "reductionPct": 65.624231,
+            "regime": "side_long",
+            "tax": 3199.76,
+            "withdrawal": 32400
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 1.6,
+            "liquiditaet": 24862.7,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 343685.49,
+            "wertGold": 0
+          }
+        },
+        {
+          "jahr": 2014,
+          "row": {
+            "action": "Runway-Notfüllung (neutral) (Cap aktiv)",
+            "equityReturnRatio": 0.183184855,
+            "goldReturnRatio": -0.006,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 383486.68,
+            "reductionPct": 69.315188,
+            "regime": "peak_hot",
+            "tax": 3795.23,
+            "withdrawal": 32400
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 0.9,
+            "liquiditaet": 27684.43,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 355802.25,
+            "wertGold": 0
+          }
+        }
+      ],
+      "summaryText": "Startjahr 2005 Endjahr 2014 Outcome Vollständig Angeforderte Jahre 10 Wirtschaftlich ausgewertete Jahre 10 Jahreszeilen 10 Startvermögen 500.000,00 € Endvermögen 383.486,68 € Gesamte Entnahmen 327.600,00 € Max. Kürzungsdauer (≥ 10 %) 10 Jahre Jahre mit Kürzung (≥ 10 %) 10 von 10 Gezahlte Steuern 20.261,85 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
+      "uiStatus": {
+        "code": "BACKTEST_COMPLETED",
+        "kind": "completed",
+        "text": "Backtest vollständig abgeschlossen Code: BACKTEST_COMPLETED Ursache: 10 von 10 angeforderten Jahren wurden wirtschaftlich ausgewertet. Nächster Schritt: Prüfen Sie Summary, Warnhinweise, Jahresprotokoll und Raw-Export gemeinsam."
+      },
+      "values": {
+        "lastRowPortfolioTotalEnd": 383486.68,
+        "lastWrapperPortfolio": 383486.68,
+        "maxAbsolutePortfolioFlowDelta": 0,
+        "maxReductionStreak": 10,
+        "startWealth": 500000,
+        "summaryEndWealth": 383486.68,
+        "totalTax": 20261.85,
+        "totalWithdrawal": 327600,
+        "yearsWithReductionAtLeast10Pct": 10
+      }
+    },
+    {
+      "alerts": [],
+      "canonicalRowsHash": "84ab2642058bd4da8439cc66cb35de33cc36d7f886c997c263cd1a2a0a2db752",
+      "expectedRowCount": 2,
+      "id": "capital_poor_ruin_2000_2005",
+      "inputHash": "e576bf078df99d1bc8b779e50fc8c0ffe381bb5599f8c9b1809da292295d31fc",
+      "inputs": {
+        "accumulationPhase": {
+          "durationYears": 0,
+          "enabled": false,
+          "sparrate": 0,
+          "sparrateIndexing": "0"
+        },
+        "capeRatio": 20,
+        "decumulation": {
+          "bondRefillThreshold": 1.5,
+          "bondTargetFactor": 2,
+          "drawdownTrigger": 20,
+          "mode": "standard"
+        },
+        "depotwertAlt": 100000,
+        "detailledTranches": null,
+        "dynamicFlex": false,
+        "einstandAlt": 90000,
+        "flexBudgetAnnual": 0,
+        "flexBudgetRecharge": 0,
+        "flexBudgetYears": 0,
+        "geldmarktEtf": 0,
+        "geschlecht": "m",
+        "goGoActive": false,
+        "goGoMultiplier": 1,
+        "goldAktiv": false,
+        "goldFloorProzent": 0,
+        "goldSteuerfrei": false,
+        "goldZielProzent": 0,
+        "horizonMethod": "survival_quantile",
+        "horizonYears": 30,
+        "kirchensteuerSatz": 0,
+        "longevityBufferYears": 0,
+        "longevityMode": "none",
+        "longevityQuantileShift": 0,
+        "longevityRelativePct": 0,
+        "marketCapeRatio": 20,
+        "maxBearRefillPctOfEq": 5,
+        "maxSkimPctOfEq": 10,
+        "minimumFlexAnnual": 0,
+        "partner": {
+          "aktiv": false,
+          "brutto": 0,
+          "geschlecht": "0",
+          "kirchensteuerPct": 0,
+          "monatsrente": 0,
+          "sparerPauschbetrag": 0,
+          "startAlter": 0,
+          "startInJahren": 0,
+          "steuerquotePct": 0
+        },
+        "pflegeGradeConfigs": {
+          "1": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "2": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "3": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "4": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "5": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          }
+        },
+        "pflegeKostenDrift": 0.035,
+        "pflegeMaxDauer": 5,
+        "pflegeMaxFloor": 0,
+        "pflegeMinDauer": 1,
+        "pflegeModellTyp": "none",
+        "pflegeRampUp": 5,
+        "pflegeRegionalZuschlag": 0,
+        "pflegeStufe1FlexCut": 0,
+        "pflegeStufe1Zusatz": 0,
+        "pflegefallLogikAktivieren": false,
+        "rebalBand": 5,
+        "rebalancingBand": 25,
+        "rentAdjMode": "fix",
+        "rentAdjPct": 0,
+        "renteFesterSatz": 0,
+        "renteIndexierungsart": "fest",
+        "renteMonatlich": 0,
+        "renteStartOffsetJahre": 0,
+        "risikoprofil": "sicherheits-dynamisch",
+        "runwayMinMonths": 24,
+        "runwayTargetMonths": 36,
+        "simulationSourceProfileId": null,
+        "startAlter": 65,
+        "startFlexBedarf": 0,
+        "startFloorBedarf": 90000,
+        "startSPB": 1000,
+        "startVermoegen": 120000,
+        "stressPreset": "NONE",
+        "survivalQuantile": 0.85,
+        "tagesgeld": 20000,
+        "tailRiskAnnualProbabilityPct": 0,
+        "tailRiskConfigValid": true,
+        "tailRiskCooldownYears": 10,
+        "tailRiskDurationYears": 1,
+        "tailRiskEnabled": false,
+        "tailRiskHorizonYears": 30,
+        "tailRiskInflationShockPct": 6,
+        "tailRiskModel": "event_injection",
+        "tailRiskReturnShockPct": -35,
+        "tailRiskValidationErrors": [],
+        "targetEq": 60,
+        "transitionAge": 65,
+        "transitionYear": 0,
+        "widowOptions": {
+          "marriageOffsetYears": 0,
+          "minMarriageYears": 0,
+          "mode": "0",
+          "percent": 0
+        },
+        "zielLiquiditaet": 20000
+      },
+      "notes": [
+        "Ruin row and summary use the same terminal portfolio state from the ruin year."
+      ],
+      "observedRowCount": 2,
+      "oracleClass": "target_expected",
+      "outcomeObservation": "ruin",
+      "period": {
+        "endYear": 2005,
+        "requestedYears": 6,
+        "startYear": 2000
+      },
+      "rowSamples": [
+        {
+          "jahr": 2000,
+          "row": {
+            "action": "Runway-Notfüllung (neutral) (Cap aktiv)",
+            "equityReturnRatio": -0.141172788,
+            "goldReturnRatio": -0.027,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 16201.47,
+            "reductionPct": 100,
+            "regime": "side_long",
+            "tax": 0,
+            "withdrawal": 90000
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 1.4,
+            "liquiditaet": 7818.75,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 8382.72,
+            "wertGold": 0
+          }
+        },
+        {
+          "jahr": 2001,
+          "row": {
+            "action": "!!! RUIN !!!",
+            "equityReturnRatio": 0,
+            "goldReturnRatio": 0,
+            "healthBucketCoveragePct": null,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": null,
+            "portfolioFlowDelta": null,
+            "portfolioTotalEnd": 14695.21,
+            "reductionPct": null,
+            "regime": "BANKRUPT",
+            "tax": 0,
+            "withdrawal": 0
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 2.1,
+            "liquiditaet": 14695.21,
+            "vpwFallbackHint": "no_vpw",
+            "wertAktien": 0,
+            "wertGold": 0
+          }
+        }
+      ],
+      "summaryText": "Startjahr 2000 Endjahr 2005 Outcome Ruin Angeforderte Jahre 6 Wirtschaftlich ausgewertete Jahre 1 Jahreszeilen 2 Startvermögen 120.000,00 € Endvermögen 14.695,21 € Gesamte Entnahmen 90.000,00 € Max. Kürzungsdauer (≥ 10 %) 1 Jahre Jahre mit Kürzung (≥ 10 %) 1 von 1 Gezahlte Steuern 0,00 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
+      "uiStatus": {
+        "code": "BACKTEST_RUIN",
+        "kind": "ruin",
+        "text": "Backtest mit wirtschaftlichem Ruin beendet Code: BACKTEST_RUIN Ursache: Der vereinbarte Floor konnte im Jahr 2001 nicht vollständig gedeckt werden. Nächster Schritt: Prüfen Sie Entnahmebedarf, Vermögensaufteilung und das Ruin-Jahr im Jahresprotokoll."
+      },
+      "values": {
+        "lastRowPortfolioTotalEnd": 14695.21,
+        "lastWrapperPortfolio": 14695.21,
+        "maxAbsolutePortfolioFlowDelta": 0,
+        "maxReductionStreak": 1,
+        "startWealth": 120000,
+        "summaryEndWealth": 14695.21,
+        "totalTax": 0,
+        "totalWithdrawal": 90000,
+        "yearsWithReductionAtLeast10Pct": 1
+      }
+    },
+    {
+      "alerts": [],
+      "canonicalRowsHash": "557b472cfa6a66d56267e06a7f9930408184696f8cd9d22f879c1c7a64cfe398",
+      "expectedRowCount": 2,
+      "id": "health_bucket_nested_row_summary_positive",
+      "inputHash": "a799ab677936d36be93752fa374902ad2c0421c7f199f3a8f84b01086d4bfff5",
+      "inputs": {
+        "accumulationPhase": {
+          "durationYears": 0,
+          "enabled": false,
+          "sparrate": 0,
+          "sparrateIndexing": "0"
+        },
+        "capeRatio": 20,
+        "decumulation": {
+          "bondRefillThreshold": 1.5,
+          "bondTargetFactor": 2,
+          "drawdownTrigger": 20,
+          "mode": "standard"
+        },
+        "depotwertAlt": 2000000,
+        "detailledTranches": null,
+        "dynamicFlex": false,
+        "einstandAlt": 1600000,
+        "flexBudgetAnnual": 0,
+        "flexBudgetRecharge": 0,
+        "flexBudgetYears": 0,
+        "geldmarktEtf": 0,
+        "geschlecht": "m",
+        "goGoActive": false,
+        "goGoMultiplier": 1,
+        "goldAktiv": false,
+        "goldFloorProzent": 0,
+        "goldSteuerfrei": false,
+        "goldZielProzent": 0,
+        "horizonMethod": "survival_quantile",
+        "horizonYears": 30,
+        "kirchensteuerSatz": 0,
+        "longevityBufferYears": 0,
+        "longevityMode": "none",
+        "longevityQuantileShift": 0,
+        "longevityRelativePct": 0,
+        "marketCapeRatio": 20,
+        "maxBearRefillPctOfEq": 5,
+        "maxSkimPctOfEq": 10,
+        "minimumFlexAnnual": 0,
+        "partner": {
+          "aktiv": false,
+          "brutto": 0,
+          "geschlecht": "0",
+          "kirchensteuerPct": 0,
+          "monatsrente": 0,
+          "sparerPauschbetrag": 0,
+          "startAlter": 0,
+          "startInJahren": 0,
+          "steuerquotePct": 0
+        },
+        "pflegeGradeConfigs": {
+          "1": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "2": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "3": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "4": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "5": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          }
+        },
+        "pflegeKostenDrift": 0.035,
+        "pflegeMaxDauer": 5,
+        "pflegeMaxFloor": 0,
+        "pflegeMinDauer": 1,
+        "pflegeModellTyp": "none",
+        "pflegeRampUp": 5,
+        "pflegeRegionalZuschlag": 0,
+        "pflegeStufe1FlexCut": 0,
+        "pflegeStufe1Zusatz": 0,
+        "pflegefallLogikAktivieren": false,
+        "rebalBand": 5,
+        "rebalancingBand": 25,
+        "rentAdjMode": "fix",
+        "rentAdjPct": 0,
+        "renteFesterSatz": 0,
+        "renteIndexierungsart": "fest",
+        "renteMonatlich": 0,
+        "renteStartOffsetJahre": 0,
+        "risikoprofil": "sicherheits-dynamisch",
+        "runwayMinMonths": 24,
+        "runwayTargetMonths": 36,
+        "simulationSourceProfileId": null,
+        "startAlter": 65,
+        "startFlexBedarf": 6000,
+        "startFloorBedarf": 24000,
+        "startSPB": 1000,
+        "startVermoegen": 2000000,
+        "stressPreset": "NONE",
+        "survivalQuantile": 0.85,
+        "tagesgeld": 20000,
+        "tailRiskAnnualProbabilityPct": 0,
+        "tailRiskConfigValid": true,
+        "tailRiskCooldownYears": 10,
+        "tailRiskDurationYears": 1,
+        "tailRiskEnabled": false,
+        "tailRiskHorizonYears": 30,
+        "tailRiskInflationShockPct": 6,
+        "tailRiskModel": "event_injection",
+        "tailRiskReturnShockPct": -35,
+        "tailRiskValidationErrors": [],
+        "targetEq": 60,
+        "transitionAge": 65,
+        "transitionYear": 0,
+        "widowOptions": {
+          "marriageOffsetYears": 0,
+          "minMarriageYears": 0,
+          "mode": "0",
+          "percent": 0
+        },
+        "zielLiquiditaet": 20000
+      },
+      "notes": [
+        "The real engine health-bucket row is validated separately before this scenario.",
+        "The canonical UI/export state is immutable and rejects the former post-run row-injection test hook."
+      ],
+      "observedRowCount": 2,
+      "oracleClass": "target_expected",
+      "outcomeObservation": "completed",
+      "period": {
+        "endYear": 2011,
+        "requestedYears": 2,
+        "startYear": 2010
+      },
+      "rowSamples": [
+        {
+          "jahr": 2010,
+          "row": {
+            "action": "Notfall-Verkauf (Puffer-Auffüllung)",
+            "equityReturnRatio": 0.128815228,
+            "goldReturnRatio": 0.349,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 2246485.58,
+            "reductionPct": 0,
+            "regime": "recovery_in_bear",
+            "tax": 1327.48,
+            "withdrawal": 30000
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 1.1,
+            "liquiditaet": 18442.9,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 2228042.69,
+            "wertGold": 0
+          }
+        },
+        {
+          "jahr": 2011,
+          "row": {
+            "action": "Runway-Notfüllung (neutral) (Cap aktiv)",
+            "equityReturnRatio": 0,
+            "goldReturnRatio": 0,
+            "healthBucketCoveragePct": 40,
+            "healthBucketEnabled": true,
+            "healthBucketEnd": 8000,
+            "healthBucketTargetGap": 12000,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 83759.36,
+            "reductionPct": 5.440158,
+            "regime": "peak_stable",
+            "tax": 240.64,
+            "withdrawal": 30000
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 2.5,
+            "liquiditaet": 19022.56,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 2023013.8,
+            "wertGold": 0
+          }
+        }
+      ],
+      "summaryText": "Startjahr 2010 Endjahr 2011 Outcome Vollständig Angeforderte Jahre 2 Wirtschaftlich ausgewertete Jahre 2 Jahreszeilen 2 Startvermögen 2.020.000,00 € Endvermögen 2.042.036,36 € Gesamte Entnahmen 60.000,00 € Max. Kürzungsdauer (≥ 10 %) 0 Jahre Jahre mit Kürzung (≥ 10 %) 0 von 2 Gezahlte Steuern 2.406,24 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 € Pflegebucket 8.000,00 € Pflegebucket-Zieldeckung 40% Pflegebucket-Ziellücke 12.000,00 €",
+      "uiStatus": {
+        "code": "BACKTEST_COMPLETED",
+        "kind": "completed",
+        "text": "Backtest vollständig abgeschlossen Code: BACKTEST_COMPLETED Ursache: 2 von 2 angeforderten Jahren wurden wirtschaftlich ausgewertet. Nächster Schritt: Prüfen Sie Summary, Warnhinweise, Jahresprotokoll und Raw-Export gemeinsam."
+      },
+      "values": {
+        "lastRowPortfolioTotalEnd": 83759.36,
+        "lastWrapperPortfolio": 2042036.36,
+        "maxAbsolutePortfolioFlowDelta": 0,
+        "maxReductionStreak": 0,
+        "startWealth": 2000000,
+        "summaryEndWealth": 2042036.36,
+        "totalTax": 1568.12,
+        "totalWithdrawal": 60000,
+        "yearsWithReductionAtLeast10Pct": 0
+      }
+    },
+    {
+      "alerts": [],
+      "canonicalRowsHash": "0bbd35e32ba2b590046f58b585edcf9bb9eb0c173954ffac729b397ed91430da",
+      "expectedRowCount": 4,
+      "id": "dynamic_flex_cape_2010_2013",
+      "inputHash": "1bc7852f16e88c723c6cc528290c37b04e209df4b1b353d55180d91a319ab65d",
+      "inputs": {
+        "accumulationPhase": {
+          "durationYears": 0,
+          "enabled": false,
+          "sparrate": 0,
+          "sparrateIndexing": "0"
+        },
+        "capeRatio": 20,
+        "decumulation": {
+          "bondRefillThreshold": 1.5,
+          "bondTargetFactor": 2,
+          "drawdownTrigger": 20,
+          "mode": "standard"
+        },
+        "depotwertAlt": 2000000,
+        "detailledTranches": null,
+        "dynamicFlex": true,
+        "einstandAlt": 1600000,
+        "flexBudgetAnnual": 0,
+        "flexBudgetRecharge": 0,
+        "flexBudgetYears": 0,
+        "geldmarktEtf": 0,
+        "geschlecht": "m",
+        "goGoActive": false,
+        "goGoMultiplier": 1,
+        "goldAktiv": false,
+        "goldFloorProzent": 0,
+        "goldSteuerfrei": false,
+        "goldZielProzent": 0,
+        "horizonMethod": "mean",
+        "horizonYears": 20,
+        "kirchensteuerSatz": 0,
+        "longevityBufferYears": 0,
+        "longevityMode": "none",
+        "longevityQuantileShift": 0,
+        "longevityRelativePct": 0,
+        "marketCapeRatio": 20,
+        "maxBearRefillPctOfEq": 5,
+        "maxSkimPctOfEq": 10,
+        "minimumFlexAnnual": 0,
+        "partner": {
+          "aktiv": false,
+          "brutto": 0,
+          "geschlecht": "0",
+          "kirchensteuerPct": 0,
+          "monatsrente": 0,
+          "sparerPauschbetrag": 0,
+          "startAlter": 0,
+          "startInJahren": 0,
+          "steuerquotePct": 0
+        },
+        "pflegeGradeConfigs": {
+          "1": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "2": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "3": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "4": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "5": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          }
+        },
+        "pflegeKostenDrift": 0.035,
+        "pflegeMaxDauer": 5,
+        "pflegeMaxFloor": 0,
+        "pflegeMinDauer": 1,
+        "pflegeModellTyp": "none",
+        "pflegeRampUp": 5,
+        "pflegeRegionalZuschlag": 0,
+        "pflegeStufe1FlexCut": 0,
+        "pflegeStufe1Zusatz": 0,
+        "pflegefallLogikAktivieren": false,
+        "rebalBand": 5,
+        "rebalancingBand": 25,
+        "rentAdjMode": "fix",
+        "rentAdjPct": 0,
+        "renteFesterSatz": 0,
+        "renteIndexierungsart": "fest",
+        "renteMonatlich": 0,
+        "renteStartOffsetJahre": 0,
+        "risikoprofil": "sicherheits-dynamisch",
+        "runwayMinMonths": 24,
+        "runwayTargetMonths": 36,
+        "simulationSourceProfileId": null,
+        "startAlter": 65,
+        "startFlexBedarf": 6000,
+        "startFloorBedarf": 24000,
+        "startSPB": 1000,
+        "startVermoegen": 2000000,
+        "stressPreset": "NONE",
+        "survivalQuantile": 0.85,
+        "tagesgeld": 20000,
+        "tailRiskAnnualProbabilityPct": 0,
+        "tailRiskConfigValid": true,
+        "tailRiskCooldownYears": 10,
+        "tailRiskDurationYears": 1,
+        "tailRiskEnabled": false,
+        "tailRiskHorizonYears": 30,
+        "tailRiskInflationShockPct": 6,
+        "tailRiskModel": "event_injection",
+        "tailRiskReturnShockPct": -35,
+        "tailRiskValidationErrors": [],
+        "targetEq": 60,
+        "transitionAge": 65,
+        "transitionYear": 0,
+        "widowOptions": {
+          "marriageOffsetYears": 0,
+          "minMarriageYears": 0,
+          "mode": "0",
+          "percent": 0
+        },
+        "zielLiquiditaet": 20000
+      },
+      "notes": [
+        "VPW/CAPE payload and yearly horizon characterization."
+      ],
+      "observedRowCount": 4,
+      "oracleClass": "target_expected",
+      "outcomeObservation": "completed",
+      "period": {
+        "endYear": 2013,
+        "requestedYears": 4,
+        "startYear": 2010
+      },
+      "rowSamples": [
+        {
+          "jahr": 2010,
+          "row": {
+            "action": "Notfall-Verkauf (Puffer-Auffüllung)",
+            "equityReturnRatio": 0.128815228,
+            "goldReturnRatio": 0.349,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 2126767.8,
+            "reductionPct": 14.136303,
+            "regime": "recovery_in_bear",
+            "tax": 6882.66,
+            "withdrawal": 144000
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 1.1,
+            "liquiditaet": 2020,
+            "vpwFallbackHint": "ok",
+            "wertAktien": 2124747.8,
+            "wertGold": 0
+          }
+        },
+        {
+          "jahr": 2011,
+          "row": {
+            "action": "Notfall-Verkauf (Puffer-Auffüllung)",
+            "equityReturnRatio": -0.077918302,
+            "goldReturnRatio": 0.076,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 1851825.63,
+            "reductionPct": 28.587306,
+            "regime": "recovery_in_bear",
+            "tax": 4410.7,
+            "withdrawal": 105000
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 2.5,
+            "liquiditaet": 2047.28,
+            "vpwFallbackHint": "ok",
+            "wertAktien": 1849778.36,
+            "wertGold": 0
+          }
+        },
+        {
+          "jahr": 2012,
+          "row": {
+            "action": "Notfall-Verkauf (Puffer-Auffüllung)",
+            "equityReturnRatio": 0.145514741,
+            "goldReturnRatio": 0.04,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 2012693.21,
+            "reductionPct": 39.592661,
+            "regime": "bear_deep",
+            "tax": 6317.98,
+            "withdrawal": 102000
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 2.1,
+            "liquiditaet": 2088.09,
+            "vpwFallbackHint": "ok",
+            "wertAktien": 2010605.12,
+            "wertGold": 0
+          }
+        },
+        {
+          "jahr": 2013,
+          "row": {
+            "action": "Runway-Notfüllung (neutral) (Cap aktiv)",
+            "equityReturnRatio": 0.235893201,
+            "goldReturnRatio": -0.228,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 2366522.53,
+            "reductionPct": 52.477723,
+            "regime": "side_long",
+            "tax": 18724.66,
+            "withdrawal": 102000
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 1.6,
+            "liquiditaet": 106629.34,
+            "vpwFallbackHint": "ok",
+            "wertAktien": 2259893.2,
+            "wertGold": 0
+          }
+        }
+      ],
+      "summaryText": "Startjahr 2010 Endjahr 2013 Outcome Vollständig Angeforderte Jahre 4 Wirtschaftlich ausgewertete Jahre 4 Jahreszeilen 4 Startvermögen 2.020.000,00 € Endvermögen 2.366.522,53 € Gesamte Entnahmen 453.000,00 € Max. Kürzungsdauer (≥ 10 %) 4 Jahre Jahre mit Kürzung (≥ 10 %) 4 von 4 Gezahlte Steuern 36.336,00 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
+      "uiStatus": {
+        "code": "BACKTEST_COMPLETED",
+        "kind": "completed",
+        "text": "Backtest vollständig abgeschlossen Code: BACKTEST_COMPLETED Ursache: 4 von 4 angeforderten Jahren wurden wirtschaftlich ausgewertet. Nächster Schritt: Prüfen Sie Summary, Warnhinweise, Jahresprotokoll und Raw-Export gemeinsam."
+      },
+      "values": {
+        "lastRowPortfolioTotalEnd": 2366522.53,
+        "lastWrapperPortfolio": 2366522.53,
+        "maxAbsolutePortfolioFlowDelta": 0,
+        "maxReductionStreak": 4,
+        "startWealth": 2000000,
+        "summaryEndWealth": 2366522.53,
+        "totalTax": 36336,
+        "totalWithdrawal": 453000,
+        "yearsWithReductionAtLeast10Pct": 4
+      }
+    }
+  ],
+  "deltaReport": {
+    "caseDeltas": [
+      {
+        "id": "completed_2000_2005",
+        "legacyOutcome": "completed_legacy",
+        "metricDeltas": {
+          "lastRowPortfolioTotalEnd": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 1358556.54,
+            "numericDelta": -5209.18,
+            "targetExpected": 1353347.36
+          },
+          "lastWrapperPortfolio": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 1358556.54,
+            "numericDelta": -5209.18,
+            "targetExpected": 1353347.36
+          },
+          "summaryEndWealth": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 1358556.54,
+            "numericDelta": -5209.18,
+            "targetExpected": 1353347.36
+          },
+          "totalWithdrawal": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 168000,
+            "numericDelta": 4800,
+            "targetExpected": 172800
+          }
+        },
+        "rowProjectionCause": "D-01 time-axis alignment and signed negative-cash-interest reconciliation",
+        "rowProjectionChanged": true,
+        "targetOutcome": "completed"
+      },
+      {
+        "id": "completed_1960_2020",
+        "legacyOutcome": "completed_legacy",
+        "metricDeltas": {
+          "lastRowPortfolioTotalEnd": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 95592662.28,
+            "numericDelta": -156153.94,
+            "targetExpected": 95436508.34
+          },
+          "lastWrapperPortfolio": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 95592662.28,
+            "numericDelta": -156153.94,
+            "targetExpected": 95436508.34
+          },
+          "summaryEndWealth": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 95592662.28,
+            "numericDelta": -156153.94,
+            "targetExpected": 95436508.34
+          },
+          "totalTax": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 783692.68,
+            "numericDelta": 7623.1,
+            "targetExpected": 791315.78
+          },
+          "totalWithdrawal": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 4084656.01,
+            "numericDelta": 37503.98,
+            "targetExpected": 4122159.99
+          }
+        },
+        "rowProjectionCause": "D-01 time-axis alignment and signed negative-cash-interest reconciliation",
+        "rowProjectionChanged": true,
+        "targetOutcome": "completed"
+      },
+      {
+        "id": "three_bucket_minimum_flex_2005_2014",
+        "legacyOutcome": "completed_legacy",
+        "metricDeltas": {
+          "lastRowPortfolioTotalEnd": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 385123.95,
+            "numericDelta": -1637.27,
+            "targetExpected": 383486.68
+          },
+          "lastWrapperPortfolio": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 385123.95,
+            "numericDelta": -1637.27,
+            "targetExpected": 383486.68
+          },
+          "summaryEndWealth": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 385123.95,
+            "numericDelta": -1637.27,
+            "targetExpected": 383486.68
+          },
+          "totalTax": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 20417.71,
+            "numericDelta": -155.86,
+            "targetExpected": 20261.85
+          }
+        },
+        "rowProjectionCause": "D-01 time-axis alignment and signed negative-cash-interest reconciliation",
+        "rowProjectionChanged": true,
+        "targetOutcome": "completed"
+      },
+      {
+        "id": "capital_poor_ruin_2000_2005",
+        "legacyOutcome": "ruin_legacy",
+        "metricDeltas": {
+          "lastRowPortfolioTotalEnd": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 14695.21
+          },
+          "lastWrapperPortfolio": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 0,
+            "numericDelta": 14695.21,
+            "targetExpected": 14695.21
+          },
+          "summaryEndWealth": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 7687.5,
+            "numericDelta": 7007.71,
+            "targetExpected": 14695.21
+          }
+        },
+        "rowProjectionCause": "D-01 time-axis alignment and signed negative-cash-interest reconciliation",
+        "rowProjectionChanged": true,
+        "targetOutcome": "ruin"
+      },
+      {
+        "id": "health_bucket_nested_row_summary_positive",
+        "legacyOutcome": null,
+        "metricDeltas": {
+          "lastRowPortfolioTotalEnd": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 83759.36
+          },
+          "lastWrapperPortfolio": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 2042036.36
+          },
+          "maxAbsolutePortfolioFlowDelta": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 0
+          },
+          "maxReductionStreak": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 0
+          },
+          "summaryEndWealth": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 2042036.36
+          },
+          "totalTax": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 1568.12
+          },
+          "totalWithdrawal": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 60000
+          },
+          "yearsWithReductionAtLeast10Pct": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 0
+          }
+        },
+        "rowProjectionCause": "D-01 time-axis alignment and signed negative-cash-interest reconciliation",
+        "rowProjectionChanged": true,
+        "targetOutcome": "completed"
+      },
+      {
+        "id": "dynamic_flex_cape_2010_2013",
+        "legacyOutcome": "completed_legacy",
+        "metricDeltas": {
+          "lastRowPortfolioTotalEnd": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 2327407.8,
+            "numericDelta": 39114.73,
+            "targetExpected": 2366522.53
+          },
+          "lastWrapperPortfolio": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 2327407.8,
+            "numericDelta": 39114.73,
+            "targetExpected": 2366522.53
+          },
+          "summaryEndWealth": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 2327407.8,
+            "numericDelta": 39114.73,
+            "targetExpected": 2366522.53
+          },
+          "totalTax": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 37634.96,
+            "numericDelta": -1298.96,
+            "targetExpected": 36336
+          },
+          "totalWithdrawal": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 483000,
+            "numericDelta": -30000,
+            "targetExpected": 453000
+          }
+        },
+        "rowProjectionCause": "D-01 time-axis alignment and signed negative-cash-interest reconciliation",
+        "rowProjectionChanged": true,
+        "targetOutcome": "completed"
+      }
+    ],
+    "impactAnalysis": {
+      "downstreamConsumers": {
+        "autoOptimizer": {
+          "directBacktestConsumer": false,
+          "expectedImpact": "none; no production reference to runHistoricalBacktest or globalBacktestData"
+        },
+        "monteCarloSweepWorker": {
+          "expectedImpact": "none; parity regression gates remain mandatory",
+          "recordPathChanged": false
+        },
+        "riskProfiles": {
+          "directBacktestConsumer": false,
+          "expectedImpact": "none; no production reference to runHistoricalBacktest or globalBacktestData"
+        }
+      },
+      "historicalEndWealth": [
+        {
+          "delta": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 1358556.54,
+            "numericDelta": -5209.18,
+            "targetExpected": 1353347.36
+          },
+          "id": "completed_2000_2005"
+        },
+        {
+          "delta": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 95592662.28,
+            "numericDelta": -156153.94,
+            "targetExpected": 95436508.34
+          },
+          "id": "completed_1960_2020"
+        },
+        {
+          "delta": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 385123.95,
+            "numericDelta": -1637.27,
+            "targetExpected": 383486.68
+          },
+          "id": "three_bucket_minimum_flex_2005_2014"
+        },
+        {
+          "delta": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 7687.5,
+            "numericDelta": 7007.71,
+            "targetExpected": 14695.21
+          },
+          "id": "capital_poor_ruin_2000_2005"
+        },
+        {
+          "delta": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": null,
+            "numericDelta": null,
+            "targetExpected": 2042036.36
+          },
+          "id": "health_bucket_nested_row_summary_positive"
+        },
+        {
+          "delta": {
+            "cause": "D-01 realized fields use source year t; CAPE remains decision-as-of t-1",
+            "legacyObserved": 2327407.8,
+            "numericDelta": 39114.73,
+            "targetExpected": 2366522.53
+          },
+          "id": "dynamic_flex_cape_2010_2013"
+        }
+      ],
+      "ruinFrequency": {
+        "denominator": 6,
+        "legacyRuinCases": 1,
+        "targetRuinCases": 1
+      }
+    },
+    "legacyFixture": "simulator-backtest-baseline-v1.json",
+    "negativeCaseDeltas": [
+      {
+        "cause": "D-02 complete one-year periods are valid",
+        "changed": true,
+        "id": "negative_single_year_2010",
+        "legacyOutcome": "validation_alert_legacy",
+        "legacyRows": 0,
+        "targetOutcome": "completed",
+        "targetRows": 1
+      },
+      {
+        "cause": "Strict manifest-derived period validation",
+        "changed": true,
+        "id": "negative_nan_period",
+        "legacyOutcome": "empty_result_rendered_as_completed_legacy",
+        "legacyRows": 0,
+        "targetOutcome": "validation_inline",
+        "targetRows": 0
+      },
+      {
+        "cause": "Strict manifest-derived period validation",
+        "changed": true,
+        "id": "negative_reverse_period_2012_2010",
+        "legacyOutcome": "validation_alert_legacy",
+        "legacyRows": 0,
+        "targetOutcome": "validation_inline",
+        "targetRows": 0
+      },
+      {
+        "cause": "The embedded provider is validated and snapshotted before caller-side mutation; direct incomplete/error contracts are covered by focused runner tests",
+        "changed": true,
+        "id": "negative_missing_middle_year_2000_2002",
+        "legacyOutcome": "partial_result_rendered_as_completed_legacy",
+        "legacyRows": 1,
+        "targetOutcome": "completed",
+        "targetRows": 3
+      },
+      {
+        "cause": "The embedded provider is validated and snapshotted before caller-side mutation; direct incomplete/error contracts are covered by focused runner tests",
+        "changed": true,
+        "id": "negative_non_finite_gold_return_2001_2002",
+        "legacyOutcome": "completed_legacy",
+        "legacyRows": 2,
+        "targetOutcome": "completed",
+        "targetRows": 2
+      }
+    ],
+    "schemaVersion": "BacktestTemporalDeltaReportV1",
+    "targetFixture": "simulator-backtest-target-v1.json",
+    "temporalConventionId": "realized_t_decision_t_minus_1_v1"
+  },
+  "detailToggleOracle": {
+    "detailedCanonicalRowsHash": "9f444cd7c6e2b78025ea89133c6c3af18a978aff9745a43ec9feb45250b8e6e0",
+    "normalCanonicalRowsHash": "9f444cd7c6e2b78025ea89133c6c3af18a978aff9745a43ec9feb45250b8e6e0",
+    "payloadStable": true,
+    "projectionDependency": "Only rendered columns change with backtestLogDetailLevel; canonical rows and raw JSON/CSV export do not."
+  },
+  "exclusions": [
+    "timestamps",
+    "object identities",
+    "absolute local paths"
+  ],
+  "generatedBy": "tests/simulator-backtest-characterization.test.mjs",
+  "legacyGlobalSchema": {
+    "canonicalResultFrozen": true,
+    "canonicalResultSchemaVersion": "BacktestRunResultV1",
+    "canonicalRowsSharedByIdentity": true,
+    "detailToggleDependency": "canonical row payload and raw export are stable; only rendered display columns depend on backtestLogDetailLevel",
+    "fieldsOwnedByRawExport": [
+      "identifiers.requestId",
+      "identifiers.runId",
+      "fingerprint",
+      "exportedAt"
+    ],
+    "nestedRowFields": [
+      "Alarm",
+      "CareP1_Active",
+      "CareP1_Cost",
+      "CareP1_Grade",
+      "CareP1_GradeLabel",
+      "CareP2_Active",
+      "CareP2_Cost",
+      "CareP2_Grade",
+      "CareP2_GradeLabel",
+      "CutReason",
+      "FlexRatePct",
+      "GuardEq",
+      "GuardGold",
+      "GuardNote",
+      "MinFlexRatePct",
+      "NeedLiq",
+      "NominalReturnEquityPct",
+      "NominalReturnGoldPct",
+      "Person1Alive",
+      "Person2Alive",
+      "QuoteEndPct",
+      "RealReturnEquityPct",
+      "RealReturnGoldPct",
+      "Regime",
+      "RunwayCoveragePct",
+      "RunwayTargetHardMinMonths",
+      "RunwayTargetRawMonths",
+      "RunwayTargetSeverityPct",
+      "RunwayTargetSmoothedMonths",
+      "RunwayTargetSmoothingApplied",
+      "RunwayTargetSmoothingFallback",
+      "WealthQuoteUsedPct",
+      "WealthRedF",
+      "WidowBenefitP1",
+      "WidowBenefitP2",
+      "aktionUndGrund",
+      "balance_trace",
+      "bondBucketAfter",
+      "bondRefillGross",
+      "bondRefillNet",
+      "bondRefillTax",
+      "bondSaleAmount",
+      "cashInterestEarned",
+      "entnahme_effektiv",
+      "entnahme_plan",
+      "entnahmequote",
+      "entscheidung",
+      "eq_after_buys",
+      "eq_after_return",
+      "eq_after_sales",
+      "eq_before_return",
+      "executedSaleEq",
+      "flex_brutto",
+      "flex_erfuellt_nominal",
+      "floor_aus_depot",
+      "floor_brutto",
+      "gold_after_buys",
+      "gold_after_return",
+      "gold_after_sales",
+      "gold_before_return",
+      "health_bucket_eligible_need",
+      "health_bucket_enabled",
+      "health_bucket_end",
+      "health_bucket_interest",
+      "health_bucket_real_coverage_pct",
+      "health_bucket_reason",
+      "health_bucket_start",
+      "health_bucket_target_gap",
+      "health_bucket_target_inflation_adjusted",
+      "health_bucket_target_nominal",
+      "health_bucket_triggered",
+      "health_bucket_uncovered_need",
+      "health_bucket_used",
+      "health_bucket_warning",
+      "inflation_factor_cum",
+      "jahresentnahme_real",
+      "kaufAkt",
+      "kaufGld",
+      "liqEnd",
+      "liqStart",
+      "liq_after_interest",
+      "liq_after_payout",
+      "liq_before_payout",
+      "liquiditaet",
+      "lossCarryEnd",
+      "minimumFlexAnnual",
+      "minimumFlexBlockReason",
+      "minimumFlexEffectiveAfter",
+      "minimumFlexEffectiveBefore",
+      "minimumFlexRequiredRate",
+      "minimumFlexStatus",
+      "netTradeEq",
+      "pension_annual",
+      "pflege_aktiv",
+      "pflege_cap_zusatz",
+      "pflege_delta_flex",
+      "pflege_flex_faktor",
+      "pflege_floor_anchor",
+      "pflege_grade",
+      "pflege_grade_label",
+      "pflege_kumuliert",
+      "pflege_maxfloor_anchor",
+      "pflege_zusatz_floor",
+      "pflege_zusatz_floor_delta",
+      "portfolio_active_end",
+      "portfolio_flow_delta",
+      "portfolio_total_before_payout",
+      "portfolio_total_end",
+      "rente1",
+      "rente2",
+      "renteSum",
+      "safety_real_drawdown_pct",
+      "safety_risk_streak",
+      "safety_runway_post_months",
+      "safety_runway_pre_months",
+      "safety_score",
+      "safety_stable_streak",
+      "safety_stage_current",
+      "safety_transition",
+      "static_flex_baseline",
+      "steuern_gesamt",
+      "taxSavedByLossCarry",
+      "tax_cash_adjustment",
+      "threeBucket",
+      "usedSPB",
+      "vk",
+      "vpw_dynamic_flex",
+      "vpw_total",
+      "wertAktien",
+      "wertGold",
+      "zielLiquiditaet"
+    ],
+    "rowWrapperFields": [
+      "adjPct",
+      "entscheidung",
+      "inflationVJ",
+      "jahr",
+      "liquiditaet",
+      "netA",
+      "netG",
+      "row",
+      "vpw",
+      "vpwFallbackHint",
+      "wertAktien",
+      "wertGold"
+    ],
+    "schemaId": "backtest_ui_state_v1",
+    "topLevelFields": [
+      "breakOnRuin",
+      "completedYears",
+      "decumulationMode",
+      "goldAktiv",
+      "minimumFlexProfiles",
+      "outcome",
+      "requestedYears",
+      "result",
+      "rows",
+      "schemaVersion",
+      "startJahr"
+    ],
+    "topLevelTypes": {
+      "breakOnRuin": "boolean",
+      "completedYears": "number",
+      "decumulationMode": "string",
+      "goldAktiv": "boolean",
+      "minimumFlexProfiles": "array",
+      "outcome": "object",
+      "requestedYears": "number",
+      "result": "object",
+      "rows": "array",
+      "schemaVersion": "string",
+      "startJahr": "number"
+    }
+  },
+  "metricDictionary": {
+    "maxAbsolutePortfolioFlowDelta": {
+      "denominator": "rows containing a finite portfolio_flow_delta",
+      "legacySource": "max(abs(rows[].row.portfolio_flow_delta))",
+      "rounding": "six_decimals_in_fixture",
+      "sign": "absolute_non_negative",
+      "unit": "EUR"
+    },
+    "maxReductionStreak": {
+      "denominator": "consecutive emitted rows with kuerzungProzent >= 10",
+      "legacySource": "legacy loop counter",
+      "rounding": "none",
+      "sign": "non_negative_integer",
+      "unit": "years"
+    },
+    "startWealth": {
+      "denominator": null,
+      "legacySource": "validated getCommonInputs().startVermoegen",
+      "rounding": "cent_in_fixture",
+      "sign": "non_negative",
+      "unit": "EUR"
+    },
+    "summaryEndWealth": {
+      "denominator": null,
+      "knownGap": "Ruin uses the portfolio state before the ruin year",
+      "legacySource": "simulationSummary label Endvermögen",
+      "rounding": "de-DE currency parsed to cent",
+      "sign": "non_negative",
+      "unit": "EUR"
+    },
+    "totalTax": {
+      "denominator": "all emitted legacy rows; synthetic ruin row contributes zero",
+      "legacySource": "sum(rows[].row.steuern_gesamt)",
+      "rounding": "cent_in_fixture",
+      "sign": "non_negative",
+      "unit": "EUR"
+    },
+    "totalWithdrawal": {
+      "denominator": "all emitted legacy rows; synthetic ruin row contributes zero",
+      "legacySource": "sum(rows[].entscheidung.jahresEntnahme)",
+      "rounding": "cent_in_fixture",
+      "sign": "non_negative",
+      "unit": "EUR"
+    },
+    "yearsWithReductionAtLeast10Pct": {
+      "denominator": "requested calendar years shown by the legacy summary",
+      "knownGap": "UI label says >10% although the operator is >=10",
+      "legacySource": "entscheidung.kuerzungProzent >= 10",
+      "rounding": "none",
+      "sign": "non_negative_integer",
+      "unit": "years"
+    }
+  },
+  "negativeCases": [
+    {
+      "alerts": [],
+      "canonicalRowsHash": "11d4e829b3be7db36f54f43a8f9fc23d7898dd9d40b80a684d9b529f47f2f317",
+      "expectedRowCount": 0,
+      "id": "negative_single_year_2010",
+      "inputHash": "a799ab677936d36be93752fa374902ad2c0421c7f199f3a8f84b01086d4bfff5",
+      "inputs": {
+        "accumulationPhase": {
+          "durationYears": 0,
+          "enabled": false,
+          "sparrate": 0,
+          "sparrateIndexing": "0"
+        },
+        "capeRatio": 20,
+        "decumulation": {
+          "bondRefillThreshold": 1.5,
+          "bondTargetFactor": 2,
+          "drawdownTrigger": 20,
+          "mode": "standard"
+        },
+        "depotwertAlt": 2000000,
+        "detailledTranches": null,
+        "dynamicFlex": false,
+        "einstandAlt": 1600000,
+        "flexBudgetAnnual": 0,
+        "flexBudgetRecharge": 0,
+        "flexBudgetYears": 0,
+        "geldmarktEtf": 0,
+        "geschlecht": "m",
+        "goGoActive": false,
+        "goGoMultiplier": 1,
+        "goldAktiv": false,
+        "goldFloorProzent": 0,
+        "goldSteuerfrei": false,
+        "goldZielProzent": 0,
+        "horizonMethod": "survival_quantile",
+        "horizonYears": 30,
+        "kirchensteuerSatz": 0,
+        "longevityBufferYears": 0,
+        "longevityMode": "none",
+        "longevityQuantileShift": 0,
+        "longevityRelativePct": 0,
+        "marketCapeRatio": 20,
+        "maxBearRefillPctOfEq": 5,
+        "maxSkimPctOfEq": 10,
+        "minimumFlexAnnual": 0,
+        "partner": {
+          "aktiv": false,
+          "brutto": 0,
+          "geschlecht": "0",
+          "kirchensteuerPct": 0,
+          "monatsrente": 0,
+          "sparerPauschbetrag": 0,
+          "startAlter": 0,
+          "startInJahren": 0,
+          "steuerquotePct": 0
+        },
+        "pflegeGradeConfigs": {
+          "1": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "2": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "3": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "4": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "5": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          }
+        },
+        "pflegeKostenDrift": 0.035,
+        "pflegeMaxDauer": 5,
+        "pflegeMaxFloor": 0,
+        "pflegeMinDauer": 1,
+        "pflegeModellTyp": "none",
+        "pflegeRampUp": 5,
+        "pflegeRegionalZuschlag": 0,
+        "pflegeStufe1FlexCut": 0,
+        "pflegeStufe1Zusatz": 0,
+        "pflegefallLogikAktivieren": false,
+        "rebalBand": 5,
+        "rebalancingBand": 25,
+        "rentAdjMode": "fix",
+        "rentAdjPct": 0,
+        "renteFesterSatz": 0,
+        "renteIndexierungsart": "fest",
+        "renteMonatlich": 0,
+        "renteStartOffsetJahre": 0,
+        "risikoprofil": "sicherheits-dynamisch",
+        "runwayMinMonths": 24,
+        "runwayTargetMonths": 36,
+        "simulationSourceProfileId": null,
+        "startAlter": 65,
+        "startFlexBedarf": 6000,
+        "startFloorBedarf": 24000,
+        "startSPB": 1000,
+        "startVermoegen": 2000000,
+        "stressPreset": "NONE",
+        "survivalQuantile": 0.85,
+        "tagesgeld": 20000,
+        "tailRiskAnnualProbabilityPct": 0,
+        "tailRiskConfigValid": true,
+        "tailRiskCooldownYears": 10,
+        "tailRiskDurationYears": 1,
+        "tailRiskEnabled": false,
+        "tailRiskHorizonYears": 30,
+        "tailRiskInflationShockPct": 6,
+        "tailRiskModel": "event_injection",
+        "tailRiskReturnShockPct": -35,
+        "tailRiskValidationErrors": [],
+        "targetEq": 60,
+        "transitionAge": 65,
+        "transitionYear": 0,
+        "widowOptions": {
+          "marriageOffsetYears": 0,
+          "minMarriageYears": 0,
+          "mode": "0",
+          "percent": 0
+        },
+        "zielLiquiditaet": 20000
+      },
+      "notes": [
+        "Legacy rejects startYear === endYear."
+      ],
+      "observedRowCount": 1,
+      "oracleClass": "target_expected",
+      "outcomeObservation": "completed",
+      "period": {
+        "endYear": 2010,
+        "requestedYears": 1,
+        "startYear": 2010
+      },
+      "rowSamples": [
+        {
+          "jahr": 2010,
+          "row": {
+            "action": "Notfall-Verkauf (Puffer-Auffüllung)",
+            "equityReturnRatio": 0.128815228,
+            "goldReturnRatio": 0.349,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 2246485.58,
+            "reductionPct": 0,
+            "regime": "recovery_in_bear",
+            "tax": 1327.48,
+            "withdrawal": 30000
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 1.1,
+            "liquiditaet": 18442.9,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 2228042.69,
+            "wertGold": 0
+          }
+        }
+      ],
+      "summaryText": "Startjahr 2010 Endjahr 2010 Outcome Vollständig Angeforderte Jahre 1 Wirtschaftlich ausgewertete Jahre 1 Jahreszeilen 1 Startvermögen 2.020.000,00 € Endvermögen 2.246.485,58 € Gesamte Entnahmen 30.000,00 € Max. Kürzungsdauer (≥ 10 %) 0 Jahre Jahre mit Kürzung (≥ 10 %) 0 von 1 Gezahlte Steuern 1.327,48 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
+      "uiStatus": {
+        "code": "BACKTEST_COMPLETED",
+        "kind": "completed",
+        "text": "Backtest vollständig abgeschlossen Code: BACKTEST_COMPLETED Ursache: 1 von 1 angeforderten Jahren wurden wirtschaftlich ausgewertet. Nächster Schritt: Prüfen Sie Summary, Warnhinweise, Jahresprotokoll und Raw-Export gemeinsam."
+      },
+      "values": {
+        "lastRowPortfolioTotalEnd": 2246485.58,
+        "lastWrapperPortfolio": 2246485.58,
+        "maxAbsolutePortfolioFlowDelta": 0,
+        "maxReductionStreak": 0,
+        "startWealth": 2000000,
+        "summaryEndWealth": 2246485.58,
+        "totalTax": 1327.48,
+        "totalWithdrawal": 30000,
+        "yearsWithReductionAtLeast10Pct": 0
+      }
+    },
+    {
+      "alerts": [],
+      "canonicalRowsHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "expectedRowCount": 0,
+      "id": "negative_nan_period",
+      "inputHash": "a799ab677936d36be93752fa374902ad2c0421c7f199f3a8f84b01086d4bfff5",
+      "inputs": {
+        "accumulationPhase": {
+          "durationYears": 0,
+          "enabled": false,
+          "sparrate": 0,
+          "sparrateIndexing": "0"
+        },
+        "capeRatio": 20,
+        "decumulation": {
+          "bondRefillThreshold": 1.5,
+          "bondTargetFactor": 2,
+          "drawdownTrigger": 20,
+          "mode": "standard"
+        },
+        "depotwertAlt": 2000000,
+        "detailledTranches": null,
+        "dynamicFlex": false,
+        "einstandAlt": 1600000,
+        "flexBudgetAnnual": 0,
+        "flexBudgetRecharge": 0,
+        "flexBudgetYears": 0,
+        "geldmarktEtf": 0,
+        "geschlecht": "m",
+        "goGoActive": false,
+        "goGoMultiplier": 1,
+        "goldAktiv": false,
+        "goldFloorProzent": 0,
+        "goldSteuerfrei": false,
+        "goldZielProzent": 0,
+        "horizonMethod": "survival_quantile",
+        "horizonYears": 30,
+        "kirchensteuerSatz": 0,
+        "longevityBufferYears": 0,
+        "longevityMode": "none",
+        "longevityQuantileShift": 0,
+        "longevityRelativePct": 0,
+        "marketCapeRatio": 20,
+        "maxBearRefillPctOfEq": 5,
+        "maxSkimPctOfEq": 10,
+        "minimumFlexAnnual": 0,
+        "partner": {
+          "aktiv": false,
+          "brutto": 0,
+          "geschlecht": "0",
+          "kirchensteuerPct": 0,
+          "monatsrente": 0,
+          "sparerPauschbetrag": 0,
+          "startAlter": 0,
+          "startInJahren": 0,
+          "steuerquotePct": 0
+        },
+        "pflegeGradeConfigs": {
+          "1": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "2": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "3": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "4": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "5": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          }
+        },
+        "pflegeKostenDrift": 0.035,
+        "pflegeMaxDauer": 5,
+        "pflegeMaxFloor": 0,
+        "pflegeMinDauer": 1,
+        "pflegeModellTyp": "none",
+        "pflegeRampUp": 5,
+        "pflegeRegionalZuschlag": 0,
+        "pflegeStufe1FlexCut": 0,
+        "pflegeStufe1Zusatz": 0,
+        "pflegefallLogikAktivieren": false,
+        "rebalBand": 5,
+        "rebalancingBand": 25,
+        "rentAdjMode": "fix",
+        "rentAdjPct": 0,
+        "renteFesterSatz": 0,
+        "renteIndexierungsart": "fest",
+        "renteMonatlich": 0,
+        "renteStartOffsetJahre": 0,
+        "risikoprofil": "sicherheits-dynamisch",
+        "runwayMinMonths": 24,
+        "runwayTargetMonths": 36,
+        "simulationSourceProfileId": null,
+        "startAlter": 65,
+        "startFlexBedarf": 6000,
+        "startFloorBedarf": 24000,
+        "startSPB": 1000,
+        "startVermoegen": 2000000,
+        "stressPreset": "NONE",
+        "survivalQuantile": 0.85,
+        "tagesgeld": 20000,
+        "tailRiskAnnualProbabilityPct": 0,
+        "tailRiskConfigValid": true,
+        "tailRiskCooldownYears": 10,
+        "tailRiskDurationYears": 1,
+        "tailRiskEnabled": false,
+        "tailRiskHorizonYears": 30,
+        "tailRiskInflationShockPct": 6,
+        "tailRiskModel": "event_injection",
+        "tailRiskReturnShockPct": -35,
+        "tailRiskValidationErrors": [],
+        "targetEq": 60,
+        "transitionAge": 65,
+        "transitionYear": 0,
+        "widowOptions": {
+          "marriageOffsetYears": 0,
+          "minMarriageYears": 0,
+          "mode": "0",
+          "percent": 0
+        },
+        "zielLiquiditaet": 20000
+      },
+      "notes": [
+        "parseInt(NaN) passes legacy comparisons and produces an empty rendered result without an alert."
+      ],
+      "observedRowCount": 0,
+      "oracleClass": "target_expected",
+      "outcomeObservation": "validation_inline",
+      "period": {
+        "endYear": 2012,
+        "requestedYears": null,
+        "startYear": "__NaN__"
+      },
+      "rowSamples": [],
+      "summaryText": "",
+      "uiStatus": {
+        "code": "BACKTEST_PERIOD_INVALID",
+        "kind": "validation_error",
+        "text": "Zeitraum korrigieren Code: BACKTEST_PERIOD_INVALID Ursache: Mindestens ein Zeitraumfeld ist leer, nicht ganzzahlig, rückwärts oder außerhalb der Datensatzgrenzen. Nächster Schritt: Korrigieren Sie das markierte Feld und starten Sie den Backtest erneut."
+      },
+      "values": {
+        "lastRowPortfolioTotalEnd": null,
+        "lastWrapperPortfolio": 0,
+        "maxAbsolutePortfolioFlowDelta": 0,
+        "maxReductionStreak": 0,
+        "startWealth": 2000000,
+        "summaryEndWealth": 0,
+        "totalTax": 0,
+        "totalWithdrawal": 0,
+        "yearsWithReductionAtLeast10Pct": 0
+      }
+    },
+    {
+      "alerts": [],
+      "canonicalRowsHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "expectedRowCount": 0,
+      "id": "negative_reverse_period_2012_2010",
+      "inputHash": "a799ab677936d36be93752fa374902ad2c0421c7f199f3a8f84b01086d4bfff5",
+      "inputs": {
+        "accumulationPhase": {
+          "durationYears": 0,
+          "enabled": false,
+          "sparrate": 0,
+          "sparrateIndexing": "0"
+        },
+        "capeRatio": 20,
+        "decumulation": {
+          "bondRefillThreshold": 1.5,
+          "bondTargetFactor": 2,
+          "drawdownTrigger": 20,
+          "mode": "standard"
+        },
+        "depotwertAlt": 2000000,
+        "detailledTranches": null,
+        "dynamicFlex": false,
+        "einstandAlt": 1600000,
+        "flexBudgetAnnual": 0,
+        "flexBudgetRecharge": 0,
+        "flexBudgetYears": 0,
+        "geldmarktEtf": 0,
+        "geschlecht": "m",
+        "goGoActive": false,
+        "goGoMultiplier": 1,
+        "goldAktiv": false,
+        "goldFloorProzent": 0,
+        "goldSteuerfrei": false,
+        "goldZielProzent": 0,
+        "horizonMethod": "survival_quantile",
+        "horizonYears": 30,
+        "kirchensteuerSatz": 0,
+        "longevityBufferYears": 0,
+        "longevityMode": "none",
+        "longevityQuantileShift": 0,
+        "longevityRelativePct": 0,
+        "marketCapeRatio": 20,
+        "maxBearRefillPctOfEq": 5,
+        "maxSkimPctOfEq": 10,
+        "minimumFlexAnnual": 0,
+        "partner": {
+          "aktiv": false,
+          "brutto": 0,
+          "geschlecht": "0",
+          "kirchensteuerPct": 0,
+          "monatsrente": 0,
+          "sparerPauschbetrag": 0,
+          "startAlter": 0,
+          "startInJahren": 0,
+          "steuerquotePct": 0
+        },
+        "pflegeGradeConfigs": {
+          "1": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "2": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "3": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "4": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "5": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          }
+        },
+        "pflegeKostenDrift": 0.035,
+        "pflegeMaxDauer": 5,
+        "pflegeMaxFloor": 0,
+        "pflegeMinDauer": 1,
+        "pflegeModellTyp": "none",
+        "pflegeRampUp": 5,
+        "pflegeRegionalZuschlag": 0,
+        "pflegeStufe1FlexCut": 0,
+        "pflegeStufe1Zusatz": 0,
+        "pflegefallLogikAktivieren": false,
+        "rebalBand": 5,
+        "rebalancingBand": 25,
+        "rentAdjMode": "fix",
+        "rentAdjPct": 0,
+        "renteFesterSatz": 0,
+        "renteIndexierungsart": "fest",
+        "renteMonatlich": 0,
+        "renteStartOffsetJahre": 0,
+        "risikoprofil": "sicherheits-dynamisch",
+        "runwayMinMonths": 24,
+        "runwayTargetMonths": 36,
+        "simulationSourceProfileId": null,
+        "startAlter": 65,
+        "startFlexBedarf": 6000,
+        "startFloorBedarf": 24000,
+        "startSPB": 1000,
+        "startVermoegen": 2000000,
+        "stressPreset": "NONE",
+        "survivalQuantile": 0.85,
+        "tagesgeld": 20000,
+        "tailRiskAnnualProbabilityPct": 0,
+        "tailRiskConfigValid": true,
+        "tailRiskCooldownYears": 10,
+        "tailRiskDurationYears": 1,
+        "tailRiskEnabled": false,
+        "tailRiskHorizonYears": 30,
+        "tailRiskInflationShockPct": 6,
+        "tailRiskModel": "event_injection",
+        "tailRiskReturnShockPct": -35,
+        "tailRiskValidationErrors": [],
+        "targetEq": 60,
+        "transitionAge": 65,
+        "transitionYear": 0,
+        "widowOptions": {
+          "marriageOffsetYears": 0,
+          "minMarriageYears": 0,
+          "mode": "0",
+          "percent": 0
+        },
+        "zielLiquiditaet": 20000
+      },
+      "notes": [
+        "Legacy rejects reversed periods by alert."
+      ],
+      "observedRowCount": 0,
+      "oracleClass": "target_expected",
+      "outcomeObservation": "validation_inline",
+      "period": {
+        "endYear": 2010,
+        "requestedYears": -1,
+        "startYear": 2012
+      },
+      "rowSamples": [],
+      "summaryText": "",
+      "uiStatus": {
+        "code": "BACKTEST_PERIOD_INVALID",
+        "kind": "validation_error",
+        "text": "Zeitraum korrigieren Code: BACKTEST_PERIOD_INVALID Ursache: Mindestens ein Zeitraumfeld ist leer, nicht ganzzahlig, rückwärts oder außerhalb der Datensatzgrenzen. Nächster Schritt: Korrigieren Sie das markierte Feld und starten Sie den Backtest erneut."
+      },
+      "values": {
+        "lastRowPortfolioTotalEnd": null,
+        "lastWrapperPortfolio": 0,
+        "maxAbsolutePortfolioFlowDelta": 0,
+        "maxReductionStreak": 0,
+        "startWealth": 2000000,
+        "summaryEndWealth": 0,
+        "totalTax": 0,
+        "totalWithdrawal": 0,
+        "yearsWithReductionAtLeast10Pct": 0
+      }
+    },
+    {
+      "alerts": [],
+      "canonicalRowsHash": "daa41d3e6fbb26865d9e56eda6b580bb6f96e8c91220c383c58e56fe2cb5e13a",
+      "expectedRowCount": 1,
+      "id": "negative_missing_middle_year_2000_2002",
+      "inputHash": "a799ab677936d36be93752fa374902ad2c0421c7f199f3a8f84b01086d4bfff5",
+      "inputs": {
+        "accumulationPhase": {
+          "durationYears": 0,
+          "enabled": false,
+          "sparrate": 0,
+          "sparrateIndexing": "0"
+        },
+        "capeRatio": 20,
+        "decumulation": {
+          "bondRefillThreshold": 1.5,
+          "bondTargetFactor": 2,
+          "drawdownTrigger": 20,
+          "mode": "standard"
+        },
+        "depotwertAlt": 2000000,
+        "detailledTranches": null,
+        "dynamicFlex": false,
+        "einstandAlt": 1600000,
+        "flexBudgetAnnual": 0,
+        "flexBudgetRecharge": 0,
+        "flexBudgetYears": 0,
+        "geldmarktEtf": 0,
+        "geschlecht": "m",
+        "goGoActive": false,
+        "goGoMultiplier": 1,
+        "goldAktiv": false,
+        "goldFloorProzent": 0,
+        "goldSteuerfrei": false,
+        "goldZielProzent": 0,
+        "horizonMethod": "survival_quantile",
+        "horizonYears": 30,
+        "kirchensteuerSatz": 0,
+        "longevityBufferYears": 0,
+        "longevityMode": "none",
+        "longevityQuantileShift": 0,
+        "longevityRelativePct": 0,
+        "marketCapeRatio": 20,
+        "maxBearRefillPctOfEq": 5,
+        "maxSkimPctOfEq": 10,
+        "minimumFlexAnnual": 0,
+        "partner": {
+          "aktiv": false,
+          "brutto": 0,
+          "geschlecht": "0",
+          "kirchensteuerPct": 0,
+          "monatsrente": 0,
+          "sparerPauschbetrag": 0,
+          "startAlter": 0,
+          "startInJahren": 0,
+          "steuerquotePct": 0
+        },
+        "pflegeGradeConfigs": {
+          "1": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "2": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "3": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "4": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "5": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          }
+        },
+        "pflegeKostenDrift": 0.035,
+        "pflegeMaxDauer": 5,
+        "pflegeMaxFloor": 0,
+        "pflegeMinDauer": 1,
+        "pflegeModellTyp": "none",
+        "pflegeRampUp": 5,
+        "pflegeRegionalZuschlag": 0,
+        "pflegeStufe1FlexCut": 0,
+        "pflegeStufe1Zusatz": 0,
+        "pflegefallLogikAktivieren": false,
+        "rebalBand": 5,
+        "rebalancingBand": 25,
+        "rentAdjMode": "fix",
+        "rentAdjPct": 0,
+        "renteFesterSatz": 0,
+        "renteIndexierungsart": "fest",
+        "renteMonatlich": 0,
+        "renteStartOffsetJahre": 0,
+        "risikoprofil": "sicherheits-dynamisch",
+        "runwayMinMonths": 24,
+        "runwayTargetMonths": 36,
+        "simulationSourceProfileId": null,
+        "startAlter": 65,
+        "startFlexBedarf": 6000,
+        "startFloorBedarf": 24000,
+        "startSPB": 1000,
+        "startVermoegen": 2000000,
+        "stressPreset": "NONE",
+        "survivalQuantile": 0.85,
+        "tagesgeld": 20000,
+        "tailRiskAnnualProbabilityPct": 0,
+        "tailRiskConfigValid": true,
+        "tailRiskCooldownYears": 10,
+        "tailRiskDurationYears": 1,
+        "tailRiskEnabled": false,
+        "tailRiskHorizonYears": 30,
+        "tailRiskInflationShockPct": 6,
+        "tailRiskModel": "event_injection",
+        "tailRiskReturnShockPct": -35,
+        "tailRiskValidationErrors": [],
+        "targetEq": 60,
+        "transitionAge": 65,
+        "transitionYear": 0,
+        "widowOptions": {
+          "marriageOffsetYears": 0,
+          "minMarriageYears": 0,
+          "mode": "0",
+          "percent": 0
+        },
+        "zielLiquiditaet": 20000
+      },
+      "notes": [
+        "Legacy continues across missing data and renders a partial run as completed."
+      ],
+      "observedRowCount": 3,
+      "oracleClass": "target_expected",
+      "outcomeObservation": "completed",
+      "period": {
+        "endYear": 2002,
+        "requestedYears": 3,
+        "startYear": 2000
+      },
+      "rowSamples": [
+        {
+          "jahr": 2000,
+          "row": {
+            "action": "Opportunistisches Rebalancing & Liquidität auffüllen",
+            "equityReturnRatio": -0.141172788,
+            "goldReturnRatio": -0.027,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 1710807.52,
+            "reductionPct": 20,
+            "regime": "side_long",
+            "tax": 621.49,
+            "withdrawal": 28800
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 1.4,
+            "liquiditaet": 63153.1,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 1647654.42,
+            "wertGold": 0
+          }
+        },
+        {
+          "jahr": 2001,
+          "row": {
+            "action": "BÄR (Kein Handlungsbedarf)",
+            "equityReturnRatio": -0.179686551,
+            "goldReturnRatio": 0.043,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 1387234.42,
+            "reductionPct": 26.627219,
+            "regime": "bear_deep",
+            "tax": 0,
+            "withdrawal": 28800
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 2.1,
+            "liquiditaet": 35641.34,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 1351593.08,
+            "wertGold": 0
+          }
+        },
+        {
+          "jahr": 2002,
+          "row": {
+            "action": "Notfall-Verkauf (Puffer-Auffüllung)",
+            "equityReturnRatio": -0.31457346,
+            "goldReturnRatio": 0.194,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 933833.7,
+            "reductionPct": 36.363584,
+            "regime": "bear_deep",
+            "tax": 0,
+            "withdrawal": 28800
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 1.3,
+            "liquiditaet": 21468.7,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 912365,
+            "wertGold": 0
+          }
+        }
+      ],
+      "summaryText": "Startjahr 2000 Endjahr 2002 Outcome Vollständig Angeforderte Jahre 3 Wirtschaftlich ausgewertete Jahre 3 Jahreszeilen 3 Startvermögen 2.020.000,00 € Endvermögen 933.833,70 € Gesamte Entnahmen 86.400,00 € Max. Kürzungsdauer (≥ 10 %) 3 Jahre Jahre mit Kürzung (≥ 10 %) 3 von 3 Gezahlte Steuern 621,49 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
+      "uiStatus": {
+        "code": "BACKTEST_COMPLETED",
+        "kind": "completed",
+        "text": "Backtest vollständig abgeschlossen Code: BACKTEST_COMPLETED Ursache: 3 von 3 angeforderten Jahren wurden wirtschaftlich ausgewertet. Nächster Schritt: Prüfen Sie Summary, Warnhinweise, Jahresprotokoll und Raw-Export gemeinsam."
+      },
+      "values": {
+        "lastRowPortfolioTotalEnd": 933833.7,
+        "lastWrapperPortfolio": 933833.7,
+        "maxAbsolutePortfolioFlowDelta": 0,
+        "maxReductionStreak": 3,
+        "startWealth": 2000000,
+        "summaryEndWealth": 933833.7,
+        "totalTax": 621.49,
+        "totalWithdrawal": 86400,
+        "yearsWithReductionAtLeast10Pct": 3
+      }
+    },
+    {
+      "alerts": [],
+      "canonicalRowsHash": "94c6c2eb39a24132424d2c949d55b785c4018d27451de42d58d599a5b16bdfa7",
+      "expectedRowCount": 2,
+      "id": "negative_non_finite_gold_return_2001_2002",
+      "inputHash": "a799ab677936d36be93752fa374902ad2c0421c7f199f3a8f84b01086d4bfff5",
+      "inputs": {
+        "accumulationPhase": {
+          "durationYears": 0,
+          "enabled": false,
+          "sparrate": 0,
+          "sparrateIndexing": "0"
+        },
+        "capeRatio": 20,
+        "decumulation": {
+          "bondRefillThreshold": 1.5,
+          "bondTargetFactor": 2,
+          "drawdownTrigger": 20,
+          "mode": "standard"
+        },
+        "depotwertAlt": 2000000,
+        "detailledTranches": null,
+        "dynamicFlex": false,
+        "einstandAlt": 1600000,
+        "flexBudgetAnnual": 0,
+        "flexBudgetRecharge": 0,
+        "flexBudgetYears": 0,
+        "geldmarktEtf": 0,
+        "geschlecht": "m",
+        "goGoActive": false,
+        "goGoMultiplier": 1,
+        "goldAktiv": false,
+        "goldFloorProzent": 0,
+        "goldSteuerfrei": false,
+        "goldZielProzent": 0,
+        "horizonMethod": "survival_quantile",
+        "horizonYears": 30,
+        "kirchensteuerSatz": 0,
+        "longevityBufferYears": 0,
+        "longevityMode": "none",
+        "longevityQuantileShift": 0,
+        "longevityRelativePct": 0,
+        "marketCapeRatio": 20,
+        "maxBearRefillPctOfEq": 5,
+        "maxSkimPctOfEq": 10,
+        "minimumFlexAnnual": 0,
+        "partner": {
+          "aktiv": false,
+          "brutto": 0,
+          "geschlecht": "0",
+          "kirchensteuerPct": 0,
+          "monatsrente": 0,
+          "sparerPauschbetrag": 0,
+          "startAlter": 0,
+          "startInJahren": 0,
+          "steuerquotePct": 0
+        },
+        "pflegeGradeConfigs": {
+          "1": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "2": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "3": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "4": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          },
+          "5": {
+            "flexCut": 0,
+            "mortalityFactor": 0,
+            "zusatz": 0
+          }
+        },
+        "pflegeKostenDrift": 0.035,
+        "pflegeMaxDauer": 5,
+        "pflegeMaxFloor": 0,
+        "pflegeMinDauer": 1,
+        "pflegeModellTyp": "none",
+        "pflegeRampUp": 5,
+        "pflegeRegionalZuschlag": 0,
+        "pflegeStufe1FlexCut": 0,
+        "pflegeStufe1Zusatz": 0,
+        "pflegefallLogikAktivieren": false,
+        "rebalBand": 5,
+        "rebalancingBand": 25,
+        "rentAdjMode": "fix",
+        "rentAdjPct": 0,
+        "renteFesterSatz": 0,
+        "renteIndexierungsart": "fest",
+        "renteMonatlich": 0,
+        "renteStartOffsetJahre": 0,
+        "risikoprofil": "sicherheits-dynamisch",
+        "runwayMinMonths": 24,
+        "runwayTargetMonths": 36,
+        "simulationSourceProfileId": null,
+        "startAlter": 65,
+        "startFlexBedarf": 6000,
+        "startFloorBedarf": 24000,
+        "startSPB": 1000,
+        "startVermoegen": 2000000,
+        "stressPreset": "NONE",
+        "survivalQuantile": 0.85,
+        "tagesgeld": 20000,
+        "tailRiskAnnualProbabilityPct": 0,
+        "tailRiskConfigValid": true,
+        "tailRiskCooldownYears": 10,
+        "tailRiskDurationYears": 1,
+        "tailRiskEnabled": false,
+        "tailRiskHorizonYears": 30,
+        "tailRiskInflationShockPct": 6,
+        "tailRiskModel": "event_injection",
+        "tailRiskReturnShockPct": -35,
+        "tailRiskValidationErrors": [],
+        "targetEq": 60,
+        "transitionAge": 65,
+        "transitionYear": 0,
+        "widowOptions": {
+          "marriageOffsetYears": 0,
+          "minMarriageYears": 0,
+          "mode": "0",
+          "percent": 0
+        },
+        "zielLiquiditaet": 20000
+      },
+      "notes": [
+        "Legacy || 0 normalization silently turns a non-finite mandatory gold return into 0%."
+      ],
+      "observedRowCount": 2,
+      "oracleClass": "target_expected",
+      "outcomeObservation": "completed",
+      "period": {
+        "endYear": 2002,
+        "requestedYears": 2,
+        "startYear": 2001
+      },
+      "rowSamples": [
+        {
+          "jahr": 2001,
+          "row": {
+            "action": "Notfall-Verkauf (Puffer-Auffüllung)",
+            "equityReturnRatio": -0.179686551,
+            "goldReturnRatio": 0.043,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 1632551.55,
+            "reductionPct": 20,
+            "regime": "bear_deep",
+            "tax": 0,
+            "withdrawal": 28800
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 2.1,
+            "liquiditaet": 20048.71,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 1612502.84,
+            "wertGold": 0
+          }
+        },
+        {
+          "jahr": 2002,
+          "row": {
+            "action": "Notfall-Verkauf (Puffer-Auffüllung)",
+            "equityReturnRatio": -0.31457346,
+            "goldReturnRatio": 0.194,
+            "healthBucketCoveragePct": 0,
+            "healthBucketEnabled": false,
+            "healthBucketEnd": 0,
+            "healthBucketTargetGap": 0,
+            "portfolioFlowDelta": 0,
+            "portfolioTotalEnd": 1097056.67,
+            "reductionPct": 29.872674,
+            "regime": "bear_deep",
+            "tax": 0,
+            "withdrawal": 28800
+          },
+          "wrapper": {
+            "adjPct": 0,
+            "inflationVJ": 1.3,
+            "liquiditaet": 20763.72,
+            "vpwFallbackHint": "dynamic_flex_off",
+            "wertAktien": 1076292.95,
+            "wertGold": 0
+          }
+        }
+      ],
+      "summaryText": "Startjahr 2001 Endjahr 2002 Outcome Vollständig Angeforderte Jahre 2 Wirtschaftlich ausgewertete Jahre 2 Jahreszeilen 2 Startvermögen 2.020.000,00 € Endvermögen 1.097.056,67 € Gesamte Entnahmen 57.600,00 € Max. Kürzungsdauer (≥ 10 %) 2 Jahre Jahre mit Kürzung (≥ 10 %) 2 von 2 Gezahlte Steuern 0,00 € Pflegebucket am Laufende (deaktiviert) 0,00 € Pflegebucket-Zieldeckung — Pflegebucket-Ziellücke 0,00 €",
+      "uiStatus": {
+        "code": "BACKTEST_COMPLETED",
+        "kind": "completed",
+        "text": "Backtest vollständig abgeschlossen Code: BACKTEST_COMPLETED Ursache: 2 von 2 angeforderten Jahren wurden wirtschaftlich ausgewertet. Nächster Schritt: Prüfen Sie Summary, Warnhinweise, Jahresprotokoll und Raw-Export gemeinsam."
+      },
+      "values": {
+        "lastRowPortfolioTotalEnd": 1097056.67,
+        "lastWrapperPortfolio": 1097056.67,
+        "maxAbsolutePortfolioFlowDelta": 0,
+        "maxReductionStreak": 2,
+        "startWealth": 2000000,
+        "summaryEndWealth": 1097056.67,
+        "totalTax": 0,
+        "totalWithdrawal": 57600,
+        "yearsWithReductionAtLeast10Pct": 2
+      }
+    }
+  ],
+  "oracleClass": "target_expected",
+  "reductionBoundaryOracle": {
+    "canonicalSummaryLabelPresent": true,
+    "contradictorySummaryLabelPresent": false,
+    "countedByLegacyOperator": true,
+    "counterExpressionPresent": true,
+    "id": "reduction_exactly_10pct_canonical_boundary",
+    "note": "Slice 06 resolves the legacy operator/label contradiction in favor of the inclusive >= 10 percent contract.",
+    "oracleClass": "target_expected",
+    "syntheticDecisionPct": 10,
+    "targetExpected": {
+      "includesExactThreshold": true,
+      "label": "Jahre mit Kürzung (≥ 10 %)",
+      "operator": ">="
+    }
+  },
+  "schemaVersion": "simulator-backtest-target-v1"
+}

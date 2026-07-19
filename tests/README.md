@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 110 entdeckte Testdateien, davon 109 im Node-Gate ausgeführt, mit 4569 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (verifiziert mit `npm test` am 2026-07-17). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand am selben Tag mit 14/14 Szenarien.
+**Test-Statistik:** 119 entdeckte Testdateien, davon 118 im Node-Gate ausgefuehrt, mit 5722 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (im Slice-10-Abschlussgate mit `npm test` am 2026-07-19 verifiziert). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand am selben Tag mit 14/14 Einstiegspunkt-/Zusatzflows.
 
 Die Zahl beschreibt nur die Node-Standardsuite. `npm run test:browser`, `npm run test:coverage` und ein echter Tauri-Build sind getrennte Gates und in den Assertions nicht enthalten.
 
@@ -50,9 +50,21 @@ Jede tatsaechlich ausgefuehrte Datei muss mindestens eine gezaehlte Assertion li
 npm run test:coverage
 ```
 
-Der Coverage-Runner loescht `.coverage/`, startet die Standardsuite mit `NODE_V8_COVERAGE` und schreibt `.coverage/summary.json`. Der Report wertet Projektdateien unter `app/`, `engine/`, `workers/` und `types/` aus. Die aktuelle Baseline aus Tranchenmanagement-Slice 09 liegt bei 72,25% Zeilen-Coverage (26529/36717 ausfuehrbare Zeilen in 195 Dateien); sie ist ein Transparenz- und Review-Gate, noch keine harte Mindestschwelle.
+Der Coverage-Runner loescht `.coverage/`, startet die Standardsuite mit `NODE_V8_COVERAGE` und schreibt `.coverage/summary.json`. Der Report wertet Projektdateien unter `app/`, `engine/`, `workers/` und `types/` aus. Das Slice-10-Abschlussgate liegt bei 73,85% Zeilen-Coverage (29132/39446 ausfuehrbare Zeilen in 201 Dateien). Gegenueber der zuletzt im Backtest-Hardening dokumentierten Slice-05-Gesamtcoverage von 73,36% ist das ein Plus von 0,49 Prozentpunkten. Coverage bleibt ein Transparenz- und Review-Gate, keine Wirksamkeits- oder Eignungsaussage.
 
-Das Coverage-Inventar fuehrt zentrale Tranchenmodule auch bei 0% sichtbar auf und markiert einen geladenen, aber nicht ausgefuehrten Page-Pfad als `runtime-loaded-uncovered`. `app/tranches/tranchen-manager-page.js` ist im aktuellen Node-Coverage-Lauf mit 60,35% (621/1029 Zeilen) erfasst; der separate Browser-Smoke bleibt fuer echte DOM- und Navigationspfade erforderlich.
+Backtest-Kernmodule im Slice-10-Abschlussgate:
+
+| Modul | Zeilen | Coverage |
+| --- | ---: | ---: |
+| `historical-backtest-contract.js` | 604/779 | 77,54% |
+| `historical-backtest-runner.js` | 545/610 | 89,34% |
+| `historical-backtest-metrics.js` | 202/215 | 93,95% |
+| `historical-backtest-cohorts.js` | 242/294 | 82,31% |
+| `historical-backtest-export.js` | 205/267 | 76,78% |
+| `historical-backtest-ui.js` | 265/327 | 81,04% |
+| `simulator-backtest.js` | 225/313 | 71,88% |
+
+Das Coverage-Inventar fuehrt zentrale Tranchenmodule auch bei 0% sichtbar auf und markiert einen geladenen, aber nicht ausgefuehrten Page-Pfad als `runtime-loaded-uncovered`. `app/tranches/tranchen-manager-page.js` ist im aktuellen Node-Coverage-Lauf mit 59,61% (611/1025 Zeilen) erfasst; der separate Browser-Smoke bleibt fuer echte DOM- und Navigationspfade erforderlich.
 
 Bekannte Coverage-Ausnahmen:
 - UI-nahe Renderer und Page-Module koennen trotz Browser-Smoke in der V8-Zeilenmetrik niedrig oder 0% erscheinen, wenn ihre Logik nur ueber echte Browserinteraktion relevant ist.
@@ -64,7 +76,7 @@ Bekannte Coverage-Ausnahmen:
 npm run test:browser
 ```
 
-Das Browser-Gate nutzt Playwright mit einem vom Test verwalteten lokalen HTTP-Server. Jeder Fall erhaelt einen isolierten Browser-Context und eine eigene Storage-Baseline. Neben den zentralen Einstiegspunkten (`index.html`, `Balance.html`, `Simulator.html`, `depot-tranchen-manager.html`, `Handbuch.html`) prueft es in `Balance.html` Profilabwahl nach Reload, Engine-Mismatch, mutationsfreien Jahres-Preflight, sichtbare korrupte Ausgaben, sichtbaren Import-Reject sowie einen Doppelklick mit genau einem Jahrescommit und Recovery-Snapshot. Die Tranchenkette deckt mit synthetischen Profilen A/B Manager-Handoff, CRUD, Dialogfokus und Tastaturbedienung, EUR-Quote, Reload, 390-Pixel-Layout, schreibfreie Balance-/Simulatorlaeufe, bestaetigten Reconcile genau einmal, Quote-Teilerfolg/Offline und raw-preserving Corrupt-Recovery ab. Inflation, Yahoo-Proxy und CAPE werden deterministisch geroutet; andere externe Requests werden blockiert. Es ersetzt keine Node-Unit-Tests und laeuft bewusst getrennt von `npm test`.
+Das Browser-Gate nutzt Playwright mit einem vom Test verwalteten lokalen HTTP-Server. Jeder Fall erhaelt einen isolierten Browser-Context und eine eigene Storage-Baseline. Neben den zentralen Einstiegspunkten (`index.html`, `Balance.html`, `Simulator.html`, `depot-tranchen-manager.html`, `Handbuch.html`) prueft es in `Balance.html` Profilabwahl nach Reload, Engine-Mismatch, mutationsfreien Jahres-Preflight, sichtbare korrupte Ausgaben, sichtbaren Import-Reject sowie einen Doppelklick mit genau einem Jahrescommit und Recovery-Snapshot. Der Simulatorfall wartet auf den synchron gesetzten fachlichen Status statt auf feste Millisekunden: Er reconciliiert sichtbare Periode, Outcome, Jahrinventar, exakte 10-%-Metrik, Pflegebucket und Cohort-Inventar mit Raw-JSON, prueft JSON/CSV ohne HTML, stabilen Detailtoggle-Fingerprint, Tabellen-/Fokussemantik, leere/NaN-/nicht-ganzzahlige/rueckwaertige/out-of-bounds Eingaben, synthetische Datenluecke, Ruin, `technical_error`, null Alerts sowie Realbestands-Non-Mutation. Die Tranchenkette deckt mit synthetischen Profilen A/B Manager-Handoff, CRUD, Dialogfokus und Tastaturbedienung, EUR-Quote, Reload, 390-Pixel-Layout, schreibfreie Balance-/Simulatorlaeufe, bestaetigten Reconcile genau einmal, Quote-Teilerfolg/Offline und raw-preserving Corrupt-Recovery ab. Inflation, Yahoo-Proxy und CAPE werden deterministisch geroutet; andere externe Requests werden blockiert. Es ersetzt keine Node-Unit-Tests und laeuft bewusst getrennt von `npm test`.
 
 Wichtig fuer CI/Release: Weil `npm test` dieses Gate nicht ausfuehrt, muss `npm run test:browser` explizit als eigener Job oder Release-Schritt laufen, wenn Browser-Regressionen blockierend sein sollen.
 
@@ -484,12 +496,69 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 **Zweck:** Testet die historische Backtest-Funktion.
 - **Determinismus:** Zwei Läufe mit gleichen Inputs sind identisch
 - **Startjahr-Filterung:** Korrekte Jahr-Auswahl (2010-2012)
-- **Historische Daten:** Inflation aus HISTORICAL_DATA
+- **Historische Daten:** D-01-konforme Inflation aus `HISTORICAL_DATA[t]`
 - **yearlyResults:** Länge entspricht (end-start+1)
 - **finalWealth:** Stimmt mit letztem Jahreseintrag überein
-- **Mindest-Flex:** Stresstest 2005-2014 mit hoeheren Entnahmen, angewandtem Logstatus und FlowDelta-Pruefung inklusive 3-Bucket-Modus.
+- **Mindest-Flex:** Stresstest 2005-2014 mit lokalem Same-Year-Invariant bei Status `applied`, Logstatus und FlowDelta-Pruefung inklusive 3-Bucket-Modus.
 - **Profilverbund-Transparenz:** Backtest-Ergebnis behaelt die profilgenaue `minimumFlexProfiles`-Aufteilung.
 - **Realentnahme:** Historische Jahreszeilen führen den kumulierten Inflationsfaktor fort und deflationieren die effektive Entnahme.
+- **Negativzins:** Der 2019-2020-Fall behaelt negative Cashzinsen in Ergebnis und Balance-Trace und reconciliiert FlowDelta.
+
+#### `simulator-backtest-ui.test.mjs`
+**Zweck:** Testet den DOM-armen UI-/Accessibility-Vertrag des historischen Backtests.
+- **Zeitraum:** Provider-Bounds, sichtbarer Datensatzhinweis, Einjahreslauf sowie leere, NaN-, nicht-ganzzahlige, rueckwaertige und out-of-bounds Felder.
+- **Inline/Fokus:** Feldzuordnung, `aria-invalid`, sichtbarer Fehler und Fokus auf das erste ungueltige Feld.
+- **Statussicherheit:** Stabiler technischer Code ohne Stack oder lokalen Pfad; terminaler Fokus und maschinenlesbarer Status.
+- **Datenqualitaet/A11y:** Inventar der Observation-Qualitaetsmarker, Caption, `scope="col"`, verstaendliche Headerlabels und HTML-Escaping.
+- **Cohorts:** Tief eingefrorener UI-/Exportsnapshot, feste Horizontlaenge, Ausschlussgruende und `eligible=0` ohne `NaN`/`Infinity`.
+
+#### `historical-backtest-runner.test.mjs`
+**Zweck:** Testet den DOM-freien historischen Runner direkt an seiner Dependency-Injection-Grenze.
+- **Request/Result:** `BacktestRequestV1` und `BacktestRunResultV1` inklusive Zeitraum, `breakOnRuin`, Dataset-/Temporal-/Engineprovenienz, diskriminiertem Outcome, Rows, Completion, Portfolio-Snapshots, Metriken und Summary.
+- **Isolation:** Lauf unter blockierten Browser-/Persistenzglobals; alle benoetigten Funktionen und historischen Records werden explizit injiziert.
+- **Non-Mutation:** Tief eingefrorene Partner-/Trancheninputs und Historienrecords, wiederholter identischer Aufruf sowie Erhalt von `undefined`, `Date`, `RegExp` und zyklischen Referenzen.
+- **Contractintegration:** Validierte Records, initiale Vierjahres-Markthistorie, D-01-`yearData`, fail-closed `incomplete` vor dem Loop sowie reconciliierte `completed`-/`ruin`-/`technical_error`-Pfade.
+
+#### `historical-backtest-contract.test.mjs`
+**Zweck:** Testet den im Produktbacktest aktiven V1-Daten-/Jahrescontract ohne DOM.
+- **YearRecord:** Realized-/Decision-as-of-Trennung, Source-/As-of-Jahre, Qualitaet und aktive D-01-Konvention `realized_t_decision_t_minus_1_v1`.
+- **Preflight:** Einjahreslauf, Integer-/Bounds-Vertrag, erste Lookback-/Periodenluecke und Cohort-Batch.
+- **Fehler:** Strukturierte Missing-/Non-Finite-/Indexlevel-/Fallback-Zero-Fehler.
+- **Instrumentation:** Vollvalidierung einmal je Revision/Hash und Preflight einmal je Request/Batch; wiederholte Year-/MC-/Sweep-/Cohort-Lookups bleiben reine Cache-Reads.
+- **Marker:** Rentenanpassungs-Offset fuer 1950, 2000 und 2001 sowie maschinenlesbares Builderinventar.
+
+#### `historical-data-manifest.test.mjs`
+**Zweck:** Testet `HistoricalDataManifestV1` und den eingebetteten Datenfingerprint.
+- **Manifestfelder:** IDs, Variante, Waehrung, Region, Frequenz, Zeitraum, Source-/Lizenzstatus, Transformation, Schaetzsegmente, Missingness und Revision.
+- **Unresolved-Gate:** Keine leeren `known`-Werte und keine erfundenen Werte unter `unresolved`.
+- **Hash:** Browser-kompatibles SHA-256 gegen Node-`crypto` und den manifestierten Post-Normalisierungs-Datenbestand.
+- **Lookup:** Lueckenlose 1925-2025-Baseline, abgeleitete technische Bounds 1929-2025, Provenienz und Non-Mutation.
+
+#### `historical-backtest-metrics.test.mjs`
+**Zweck:** Testet das vollstaendige `HistoricalBacktestMetricsV1`-Woerterbuch und die reine Ableitung aus kanonischen Rohzeilen.
+- **Definitionen:** Eindeutige IDs, Einheiten, nominal/real-Basis, Nenner, Rundung, Missingness, Outcome-Regel und Rohquellen fuer alle 24 Metriken.
+- **Reconciliation:** Start-/Endvermoegen, reale Werte, Entnahmen, Floor-Shortfall, inklusive `>= 10 %`-Flexgrenze, Runway, Drawdown, Steuern, Verlusttopf, Pflegebucket und Outcome-Indikatoren.
+- **Fehlerpfade:** `incomplete`/`technical_error` erhalten keine erfundenen Finanzmetriken; Ruin behaelt additive Floor-Deckungsdiagnostik.
+
+#### `historical-backtest-cohorts.test.mjs`
+**Zweck:** Testet `HistoricalBacktestCohortsV1` und feste ueberlappende In-sample-Fenster.
+- **Fenstervertrag:** Positive ganzzahlige inklusive Horizontlaenge, alle Kandidaten, `insufficient_horizon` fuer spaete Fenster und `yearIndex=0` je Cohort.
+- **Batch/Outcomes:** Ein Provider-Batch-Preflight, keine Doppelvalidierung ueberlappender Jahre sowie getrennte Inventare fuer alle Outcomes und Ausschluesse.
+- **Aussagegrenze:** Keine Erfolgswahrscheinlichkeit oder Unabhaengigkeitsbehauptung; Null-Eligible-Raten bleiben `null`.
+
+#### `historical-backtest-export.test.mjs`
+**Zweck:** Testet versioniertes Raw-JSON und die feste technische CSV-Projektion.
+- **Reproduktion:** Request-/Result-Fingerprint, Dataset-/Manifest-/Temporal-/Engineprovenienz, Portfolio-Snapshots, Records, Rows, Metriken und optionales Cohort-Inventar.
+- **Stabilitaet:** Exportzeitpunkt und Detailtoggle aendern den Result-Fingerprint nicht; JSON-Roundtrip behaelt Zahltypen.
+- **CSV/Sicherheit:** 25 feste Spalten, Punktdezimalen, LF, leere Missingness, keine HTML-/Displayformatter und Schutz gegen Formel-, Quote-, Delimiter- und Zeilenumbruchinjektion.
+
+#### `simulator-backtest-characterization.test.mjs`
+**Zweck:** Vergleicht die unveraenderte Slice-01-Baseline `legacy_observed` mit dem separaten D-01-Zieloracle `target_expected`.
+- **Golden Cases:** kurzer und langer Completed-Pfad, 3-Bucket/Mindest-Flex, Ruin, Pflegebucket-Projektionsluecke sowie Dynamic-Flex/CAPE.
+- **Negative Cases:** Einjahreslauf, NaN-/rueckwaertige Periode, mittlere Datenluecke und nicht-finite Goldrendite.
+- **Messvertrag:** kanonische Input- und Row-Hashes, Non-Mutation, Metrikwoerterbuch, 2000/2001-Alignment sowie kontrollierte Abloesung von `legacy_schema_v0` durch `backtest_ui_state_v1`; Detailtoggle-Paritaet bleibt erhalten.
+- **Delta-Gate:** `BacktestTemporalDeltaReportV1` benennt jede geaenderte Metrik samt Ursache und berichtet Endvermoegens-, Ruinfall- sowie Downstream-Consumer-Auswirkungen; nicht gespeicherte Zieldeltas schlagen fehl.
+- **Fixtures:** `fixtures/simulator-backtest-baseline-v1.json` bleibt read-only; `fixtures/simulator-backtest-target-v1.json` darf kontrolliert mit `UPDATE_BACKTEST_TARGET=1 node tests/run-single.mjs tests/simulator-backtest-characterization.test.mjs` erzeugt werden.
 
 #### `simulator-real-withdrawal-contract.test.mjs`
 **Zweck:** Testet den Simulatorvertrag für echte Realentnahmen.
@@ -740,7 +809,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `balance-storage-contract.test.mjs` | ~180 | Echte StorageManager-Migrationen und Snapshot-Contracts |
 | `balance-storage.test.mjs` | ~490 | localStorage-Persistenz |
 | `balance-ui-orchestration.test.mjs` | ~170 | Balance-UI-Bindings, Import-/Export-Control-Pfade und Profilverbund-Hooks |
-| `browser-smoke.test.mjs` | ~260 | Playwright-Smoke-Gate fuer HTML-Einstiege mit lokalem HTTP-Server |
+| `browser-smoke.test.mjs` | ~1000 | Playwright-Gate fuer HTML-Einstiege, Backtest-UI/Raw/A11y/Negativpfade sowie zentrale Balance-/Tranchenflows |
 | `care-meta.test.mjs` | ~200 | Pflegefall-Logik |
 | `health-bucket.test.mjs` | ~160 | Pflegebucket-Trigger, Deckung, Verzinsung und Diagnose |
 | `core-engine.test.mjs` | ~150 | EngineAPI-Basisvalidierung |
@@ -753,6 +822,12 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `engine-robustness.test.mjs` | ~240 | Edge Cases, Fehlereingaben |
 | `feature-flags.test.mjs` | ~60 | Feature-Flag-System |
 | `formatting.test.mjs` | ~120 | Formatierungsfunktionen |
+| `historical-backtest-runner.test.mjs` | ~550 | DOM-freier Backtest-Runner, Dependency Injection, V1-Outcome/Result, Reconciliation und Non-Mutation |
+| `historical-backtest-contract.test.mjs` | ~340 | V1-YearRecord, Missingness, Perioden-/Batch-Preflight, Cache-Instrumentation und Builderinventar |
+| `historical-backtest-metrics.test.mjs` | ~170 | Versioniertes Metrikwoerterbuch, Reconciliation, Missingness und Outcome-Regeln |
+| `historical-backtest-cohorts.test.mjs` | ~210 | Feste Rolling-Cohort-Fenster, Batch-Preflight, Outcome-/Ausschlussinventar und Aussagegrenze |
+| `historical-backtest-export.test.mjs` | ~310 | Raw-JSON/CSV, Fingerprints, Provenienz, Roundtrip, HTML-/Formelinjektionsschutz |
+| `historical-data-manifest.test.mjs` | ~165 | Manifestvollstaendigkeit, unresolved-Gates, kanonischer SHA-256 und immutable Lookup |
 | `historical-data-robustness.test.mjs` | ~60 | Fehlende Marktdaten |
 | `liquidity-guardrail.test.mjs` | ~100 | Liquiditäts-Guardrails |
 | `market-analyzer.test.mjs` | ~150 | Markt-Regime-Klassifizierung |
@@ -774,6 +849,8 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `scenarios.test.mjs` | ~150 | Komplexe Lebenspfade |
 | `simulation.test.mjs` | ~200 | Simulations-Integration |
 | `simulator-3bucket-ui-e2e.test.mjs` | ~130 | 3-Bucket-UI-Integration im Simulator |
+| `simulator-backtest-characterization.test.mjs` | ~990 | Legacy-/Target-Golden-Cases, Negativfaelle, Messvertrag und Delta-Reporter fuer den historischen Backtest |
+| `simulator-backtest-ui.test.mjs` | ~200 | Backtest-Periodenvalidierung, Statussicherheit, Datenqualitaet, Tabellen-A11y und Cohort-Nullnenner |
 | `simulator-backtest.test.mjs` | ~150 | Historischer Backtest |
 | `simulator-dynamic-flex-persistence.test.mjs` | ~110 | Persistenz von Dynamic-Flex-Inputs |
 | `simulator-headless.test.mjs` | ~125 | Headless 2000-2025 |

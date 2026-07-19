@@ -14,12 +14,147 @@ export const ESTIMATED_HISTORY_MIN_YEAR = 1925;
 export const ESTIMATED_HISTORY_MAX_YEAR = 1949;
 export const ESTIMATED_HISTORY_CUTOFF_YEAR = 1950;
 
+function deepFreezeDataMetadata(value, seen = new WeakSet()) {
+  if (value === null || typeof value !== 'object' || seen.has(value)) return value;
+  seen.add(value);
+  for (const child of Object.values(value)) deepFreezeDataMetadata(child, seen);
+  return Object.freeze(value);
+}
+
+const HISTORICAL_PERIOD = Object.freeze({ startYear: 1925, endYear: 2025 });
+const ESTIMATED_HISTORY_SEGMENTS = Object.freeze([
+  Object.freeze({
+    startYear: ESTIMATED_HISTORY_MIN_YEAR,
+    endYear: ESTIMATED_HISTORY_MAX_YEAR,
+    qualityStatus: 'estimated',
+    note: 'Embedded pre-1950 extension; exact external source chain remains unresolved.'
+  })
+]);
+
+function historicalSeriesManifest({
+  id,
+  label,
+  unit,
+  variant,
+  currency,
+  region,
+  transformation,
+  zeroValuePolicy = 'literal_value'
+}) {
+  return {
+    id,
+    label,
+    unit,
+    variant,
+    currency,
+    region,
+    frequency: { status: 'known', value: 'annual' },
+    period: HISTORICAL_PERIOD,
+    source: { status: 'unresolved', value: null },
+    license: { status: 'unresolved', value: null },
+    transformation,
+    estimatedSegments: ESTIMATED_HISTORY_SEGMENTS,
+    missingness: {
+      required: true,
+      rule: 'reject_missing_or_non_finite',
+      fallbackZeroSegments: [],
+      zeroValuePolicy
+    },
+    revision: '2026-07-18.1'
+  };
+}
+
+/**
+ * Reproduzierbarer Vertrag fuer den eingebetteten historischen Datenbestand.
+ * Ungeklaerte Herkunfts-, Varianten- und Lizenzangaben bleiben absichtlich
+ * `unresolved`; der Hash wird vom DOM-freien Contract gegen die kanonische
+ * Post-Normalisierungs-Projektion von HISTORICAL_DATA geprueft.
+ */
+export const HISTORICAL_DATA_MANIFEST = deepFreezeDataMetadata({
+  schemaVersion: 'HistoricalDataManifestV1',
+  datasetId: 'ruhestandsapp-historical-data-v1',
+  revision: '2026-07-18.1',
+  period: HISTORICAL_PERIOD,
+  lookback: {
+    backtestYears: 4,
+    reason: 'Equity return plus endeVJ, endeVJ_1, endeVJ_2 and endeVJ_3 initialization.'
+  },
+  contentHash: {
+    algorithm: 'sha256-canonical-json-v1',
+    value: '8246422d98657c2a76b750ce9fd1253e01aa7a9a4dfa0f0f01dcb96b5507ef29'
+  },
+  documentation: 'docs/reference/DATA_SOURCES.md',
+  series: {
+    msci_eur: historicalSeriesManifest({
+      id: 'msci_eur',
+      label: 'MSCI World EUR-like index level',
+      unit: 'index_level',
+      variant: { status: 'unresolved', value: null },
+      currency: { status: 'known', value: 'EUR' },
+      region: { status: 'known', value: 'global' },
+      transformation: {
+        status: 'known',
+        value: 'Embedded levels; 1925-1949 are rescaled at module initialization to connect to the 1950 level.'
+      }
+    }),
+    inflation_de: historicalSeriesManifest({
+      id: 'inflation_de',
+      label: 'German CPI inflation proxy',
+      unit: 'percent_per_year',
+      variant: { status: 'unresolved', value: null },
+      currency: { status: 'not_applicable', value: null },
+      region: { status: 'known', value: 'DE' },
+      transformation: { status: 'known', value: 'Identity projection from embedded annual percentage values.' }
+    }),
+    zinssatz_de: historicalSeriesManifest({
+      id: 'zinssatz_de',
+      label: 'German short-rate proxy',
+      unit: 'percent_per_year',
+      variant: { status: 'unresolved', value: null },
+      currency: { status: 'not_applicable', value: null },
+      region: { status: 'known', value: 'DE' },
+      transformation: { status: 'known', value: 'Identity projection from embedded annual percentage values.' }
+    }),
+    lohn_de: historicalSeriesManifest({
+      id: 'lohn_de',
+      label: 'German wage growth proxy',
+      unit: 'percent_per_year',
+      variant: { status: 'unresolved', value: null },
+      currency: { status: 'not_applicable', value: null },
+      region: { status: 'known', value: 'DE' },
+      transformation: { status: 'known', value: 'Identity projection from embedded annual percentage values.' }
+    }),
+    gold_eur_perf: historicalSeriesManifest({
+      id: 'gold_eur_perf',
+      label: 'Gold annual return proxy in EUR',
+      unit: 'percent_per_year',
+      variant: { status: 'unresolved', value: null },
+      currency: { status: 'known', value: 'EUR' },
+      region: { status: 'known', value: 'global' },
+      transformation: { status: 'known', value: 'Identity projection from embedded annual percentage values.' },
+      zeroValuePolicy: 'unresolved_if_zero'
+    }),
+    cape: historicalSeriesManifest({
+      id: 'cape',
+      label: 'CAPE valuation proxy',
+      unit: 'ratio',
+      variant: { status: 'unresolved', value: null },
+      currency: { status: 'not_applicable', value: null },
+      region: { status: 'unresolved', value: null },
+      transformation: { status: 'known', value: 'Identity projection from embedded annual ratio values.' }
+    })
+  }
+});
+
 /**
  * Maschinenlesbare Metadaten zu Datenherkunft und Qualität der Simulationsreihen.
  * Detaillierte Quellenangaben stehen in docs/reference/DATA_SOURCES.md.
  */
 export const DATASET_META = Object.freeze({
   historicalData: {
+    manifestId: HISTORICAL_DATA_MANIFEST.datasetId,
+    revision: HISTORICAL_DATA_MANIFEST.revision,
+    contentHash: HISTORICAL_DATA_MANIFEST.contentHash,
     coverageYears: [1925, 2025],
     estimatedYears: [ESTIMATED_HISTORY_MIN_YEAR, ESTIMATED_HISTORY_MAX_YEAR],
     estimatedHistoryCutoffYear: ESTIMATED_HISTORY_CUTOFF_YEAR,

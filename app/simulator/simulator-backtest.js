@@ -1,9 +1,9 @@
 "use strict";
 
-import { BREAK_ON_RUIN, HISTORICAL_DATA } from './simulator-data.js';
-import { initializePortfolio, getCommonInputs, sumDepot } from './simulator-portfolio.js';
+import { BREAK_ON_RUIN } from './simulator-data.js';
+import { initializePortfolio, getCommonInputs } from './simulator-portfolio.js';
 import { simulateOneYear } from './simulator-engine-wrapper.js';
-import { formatCurrency, formatCurrencyShortLog } from './simulator-utils.js';
+import { formatCurrency } from './simulator-utils.js';
 import { formatPercentValue } from './simulator-formatting.js';
 import {
     BACKTEST_LOG_DETAIL_KEY,
@@ -16,408 +16,251 @@ import { formatSimulatorValidationError, validateSimulatorInputs } from './simul
 import {
     buildBacktestColumnDefinitions,
     computeAdjPctForYear,
-    convertRowsToCsv,
     formatColumnValue,
-    prepareRowsForExport,
     triggerDownload
 } from './simulator-main-helpers.js';
 import { renderThreeBucketPortfolioChart } from './simulator-portfolio-chart.js';
 import { STRATEGY_OPTIONS } from '../../types/strategy-options.js';
 import { resolveDynamicFlexRunnerHorizon } from './dynamic-flex-runner-horizon.js';
+import { createHistoricalBacktestContractProvider } from './historical-backtest-contract.js';
+import { runHistoricalBacktest } from './historical-backtest-runner.js';
+import { runHistoricalBacktestCohorts } from './historical-backtest-cohorts.js';
+import {
+    captureHistoricalBacktestEngineProvenance,
+    createHistoricalBacktestDownload
+} from './historical-backtest-export.js';
+import {
+    buildAccessibleBacktestTableHtml,
+    configureHistoricalBacktestControls,
+    createBacktestUiStatus,
+    createImmutableCohortInventory,
+    describeHistoricalBacktestResult,
+    escapeBacktestHtml,
+    focusBacktestElement,
+    renderHistoricalBacktestCohorts,
+    renderHistoricalBacktestNotices,
+    renderHistoricalBacktestStatus,
+    renderHistoricalBacktestValidation,
+    validateHistoricalBacktestPeriod
+} from './historical-backtest-ui.js';
 
-const HIST_SERIES_START_YEAR = 1950;
+const HISTORICAL_BACKTEST_PROVIDER = createHistoricalBacktestContractProvider();
 
-/**
- * Pads a value to the left, ensuring consistent monospace alignment within the textual backtest log.
- * @param {string|number} value - Value to be padded.
- * @param {number} targetWidth - Desired width of the output string.
- * @returns {string} Left-padded string.
- */
-function padLeft(value, targetWidth) {
-    return String(value).padStart(targetWidth);
+const BACKTEST_RUNNING_STATUS = createBacktestUiStatus(
+    'running',
+    'BACKTEST_RUNNING',
+    'Backtest läuft',
+    'Der kanonische historische Lauf wird berechnet.',
+    'Warten Sie auf den fachlichen Endstatus.'
+);
+
+function canonicalAttribute(value) {
+    if (value === null || value === undefined) return '';
+    return escapeBacktestHtml(String(value));
 }
 
-/**
- * Formats a numeric value as a percentage with one decimal place, applying left padding.
- * @param {number} value - Percentage value (e.g., 2.5 represents 2.5%).
- * @param {number} targetWidth - Desired width of the output string.
- * @returns {string} Formatted percentage string.
- */
-function formatPercentOneDecimal(value, targetWidth) {
-    const formatted = formatPercentValue(value || 0, { fractionDigits: 1, invalid: '0.0%' });
-    return padLeft(formatted, targetWidth);
+function summaryItem({ label, displayValue, rawValue, metricId = null, resultField = null, className = '' }) {
+    const attributes = [
+        metricId ? `data-metric-id="${escapeBacktestHtml(metricId)}"` : '',
+        resultField ? `data-result-field="${escapeBacktestHtml(resultField)}"` : '',
+        `data-canonical-value="${canonicalAttribute(rawValue)}"`
+    ].filter(Boolean).join(' ');
+    return `<div class="summary-item ${escapeBacktestHtml(className)}" ${attributes}><strong>${escapeBacktestHtml(label)}</strong><span>${escapeBacktestHtml(displayValue)}</span></div>`;
 }
 
-/**
- * Formats a numeric value as a percentage with zero decimals, applying left padding.
- * @param {number} value - Percentage value.
- * @param {number} targetWidth - Desired width of the output string.
- * @returns {string} Formatted integer percentage string.
- */
-function formatPercentInteger(value, targetWidth) {
-    const formatted = formatPercentValue(Math.round(value || 0), { fractionDigits: 0, invalid: '0%' });
-    return padLeft(formatted, targetWidth);
+function currencyOrDash(value) {
+    return typeof value === 'number' && Number.isFinite(value) ? formatCurrency(value) : '—';
 }
 
-function resolveBacktestCape(yearData, inputs, marketDataHist) {
-    const yearCape = Number(yearData?.cape);
-    if (Number.isFinite(yearCape) && yearCape > 0) return yearCape;
-    const inputCape = Number(inputs?.capeRatio);
-    if (Number.isFinite(inputCape) && inputCape > 0) return inputCape;
-    const inputLegacyCape = Number(inputs?.marketCapeRatio);
-    if (Number.isFinite(inputLegacyCape) && inputLegacyCape > 0) return inputLegacyCape;
-    const histCape = Number(marketDataHist?.capeRatio);
-    if (Number.isFinite(histCape) && histCape > 0) return histCape;
-    return 0;
+function renderBacktestSummary(result) {
+    const summaryElement = document.getElementById('simulationSummary');
+    if (!summaryElement) return;
+    const metrics = result?.metrics?.values || {};
+    const healthBucket = result?.summary?.healthBucket || {};
+    const outcome = result?.outcome?.kind || 'technical_error';
+    const outcomeLabel = {
+        completed: 'Vollständig',
+        ruin: 'Ruin',
+        incomplete: 'Unvollständig',
+        technical_error: 'Technischer Fehler'
+    }[outcome] || outcome;
+    const healthCoverage = typeof healthBucket.realCoveragePct === 'number' && Number.isFinite(healthBucket.realCoveragePct)
+        ? formatPercentValue(healthBucket.realCoveragePct, { fractionDigits: 0, invalid: '—' })
+        : '—';
+
+    summaryElement.innerHTML = `<div class="summary-grid">
+        ${summaryItem({ label: 'Startjahr', displayValue: result.request?.startYear ?? '—', rawValue: result.request?.startYear, resultField: 'period_start' })}
+        ${summaryItem({ label: 'Endjahr', displayValue: result.request?.endYear ?? '—', rawValue: result.request?.endYear, resultField: 'period_end' })}
+        ${summaryItem({ label: 'Outcome', displayValue: outcomeLabel, rawValue: outcome, resultField: 'outcome' })}
+        ${summaryItem({ label: 'Angeforderte Jahre', displayValue: result.requestedYears ?? '—', rawValue: result.requestedYears, resultField: 'requested_years' })}
+        ${summaryItem({ label: 'Wirtschaftlich ausgewertete Jahre', displayValue: result.completedYears ?? '—', rawValue: result.completedYears, resultField: 'completed_years' })}
+        ${summaryItem({ label: 'Jahreszeilen', displayValue: result.rows?.length ?? 0, rawValue: result.rows?.length ?? 0, resultField: 'row_count' })}
+        ${summaryItem({ label: 'Startvermögen', displayValue: currencyOrDash(metrics.wealth_start_nominal_eur), rawValue: metrics.wealth_start_nominal_eur, metricId: 'wealth_start_nominal_eur' })}
+        ${summaryItem({ label: 'Endvermögen', displayValue: currencyOrDash(metrics.wealth_end_nominal_eur), rawValue: metrics.wealth_end_nominal_eur, metricId: 'wealth_end_nominal_eur' })}
+        ${summaryItem({ label: 'Gesamte Entnahmen', displayValue: currencyOrDash(metrics.withdrawal_total_nominal_eur), rawValue: metrics.withdrawal_total_nominal_eur, metricId: 'withdrawal_total_nominal_eur', className: 'highlight' })}
+        ${summaryItem({ label: 'Max. Kürzungsdauer (≥ 10 %)', displayValue: `${metrics.flex_reduction_longest_streak_gte_10_pct ?? '—'} Jahre`, rawValue: metrics.flex_reduction_longest_streak_gte_10_pct, metricId: 'flex_reduction_longest_streak_gte_10_pct' })}
+        ${summaryItem({ label: 'Jahre mit Kürzung (≥ 10 %)', displayValue: `${metrics.flex_reduction_years_gte_10_pct ?? '—'} von ${result.completedYears ?? '—'}`, rawValue: metrics.flex_reduction_years_gte_10_pct, metricId: 'flex_reduction_years_gte_10_pct' })}
+        ${summaryItem({ label: 'Gezahlte Steuern', displayValue: currencyOrDash(metrics.tax_total_nominal_eur), rawValue: metrics.tax_total_nominal_eur, metricId: 'tax_total_nominal_eur', className: 'tax' })}
+        ${summaryItem({ label: healthBucket.enabled ? 'Pflegebucket am Laufende' : 'Pflegebucket am Laufende (deaktiviert)', displayValue: currencyOrDash(metrics.health_bucket_end_nominal_eur), rawValue: metrics.health_bucket_end_nominal_eur, metricId: 'health_bucket_end_nominal_eur' })}
+        ${summaryItem({ label: 'Pflegebucket-Zieldeckung', displayValue: healthCoverage, rawValue: healthBucket.realCoveragePct, resultField: 'health_bucket_coverage_pct' })}
+        ${summaryItem({ label: 'Pflegebucket-Ziellücke', displayValue: currencyOrDash(healthBucket.targetGap), rawValue: healthBucket.targetGap, resultField: 'health_bucket_target_gap' })}
+    </div>`;
 }
 
-function buildVpwFallbackHint(vpwPayload) {
-    if (!vpwPayload || typeof vpwPayload !== 'object') return 'no_vpw';
-    const status = String(vpwPayload.status || '');
-    if (status === 'disabled') return 'dynamic_flex_off';
-    if (status === 'contract_ready') return 'contract_not_active';
-    if (status === 'safety_static_flex') return 'safety_static_flex';
-    if (status !== 'active') return 'unknown_status';
-    if (!Number.isFinite(vpwPayload.capeRatioUsed) || vpwPayload.capeRatioUsed <= 0) return 'fallback_no_cape';
-    if (!Number.isFinite(vpwPayload.expectedReturnCape)) return 'fallback_no_cape_return';
-    if (!Number.isFinite(vpwPayload.expectedRealReturn)) return 'fallback_no_real_return';
-    return 'ok';
+function setBacktestResultsVisible(visible) {
+    const results = document.getElementById('simulationResults');
+    if (results) results.style.display = visible ? 'block' : 'none';
+}
+
+function setBacktestExportEnabled(enabled) {
+    for (const id of ['exportBacktestJson', 'exportBacktestCsv']) {
+        const button = document.getElementById(id);
+        if (button) button.disabled = !enabled;
+    }
+}
+
+function clearBacktestResultProjection() {
+    const summary = document.getElementById('simulationSummary');
+    const log = document.getElementById('simulationLog');
+    const chart = document.getElementById('portfolioCompositionChart');
+    if (summary) summary.innerHTML = '';
+    if (log) log.textContent = 'Keine Daten';
+    if (chart) chart.style.display = 'none';
+    renderHistoricalBacktestCohorts(document, null, null);
+    setBacktestResultsVisible(false);
+    setBacktestExportEnabled(false);
+}
+
+function clearBacktestNotices() {
+    const section = document.getElementById('backtestNotices');
+    const list = document.getElementById('backtestNoticeList');
+    if (section) section.hidden = true;
+    if (list) list.innerHTML = '';
 }
 
 /**
  * Führt einen historischen Backtest durch.
- * Lesen und Schreiben erfolgen weiterhin über das DOM, damit bestehende UI-Flows unverändert bleiben.
+ * Lesen und Schreiben erfolgen über den UI-Adapter; fachliche Abhängigkeiten sind für Browser-Gates injizierbar.
  */
-export function runBacktest() {
+export function runBacktest(options = {}) {
+    const button = document.getElementById('btButton');
     try {
-        // Reuse MC extra KPIs when available for context in the log UI.
-        const extraKPI = document.getElementById('monteCarloResults').style.display === 'block' ? (window.lastMcRunExtraKPI || {}) : {};
-        document.getElementById('btButton').disabled = true;
+        if (button) button.disabled = true;
+        clearBacktestNotices();
+        const dependencies = options && typeof options === 'object' ? options : {};
+        const historicalDataProvider = dependencies.historicalDataProvider || HISTORICAL_BACKTEST_PROVIDER;
+        const cohortCheckbox = document.getElementById('runBacktestCohorts');
+        const cohortHorizonInput = document.getElementById('backtestCohortHorizon');
+        const validation = validateHistoricalBacktestPeriod({
+            startRaw: document.getElementById('simStartJahr')?.value,
+            endRaw: document.getElementById('simEndJahr')?.value,
+            bounds: historicalDataProvider.bounds,
+            cohortsEnabled: Boolean(cohortCheckbox?.checked),
+            cohortHorizonRaw: cohortHorizonInput?.value
+        });
+        renderHistoricalBacktestValidation(document, validation);
+        if (!validation.valid) {
+            window.globalBacktestData = null;
+            clearBacktestResultProjection();
+            renderHistoricalBacktestStatus(document, createBacktestUiStatus(
+                'validation_error',
+                'BACKTEST_PERIOD_INVALID',
+                'Zeitraum korrigieren',
+                'Mindestens ein Zeitraumfeld ist leer, nicht ganzzahlig, rückwärts oder außerhalb der Datensatzgrenzen.',
+                'Korrigieren Sie das markierte Feld und starten Sie den Backtest erneut.'
+            ));
+            return null;
+        }
+
+        renderHistoricalBacktestStatus(document, BACKTEST_RUNNING_STATUS);
         const inputs = validateSimulatorInputs(getCommonInputs());
-        const startJahr = parseInt(document.getElementById('simStartJahr').value);
-        const endJahr = parseInt(document.getElementById('simEndJahr').value);
-        if (startJahr < 1951 || endJahr > 2025 || startJahr >= endJahr) {
-            alert(`Fehler: Bitte einen gültigen Zeitraum eingeben.\n- Der Zeitraum muss zwischen 1951 und 2025 liegen.`);
-            document.getElementById('btButton').disabled = false; return;
-        }
+        const engineApi = dependencies.engineApi || window?.EngineAPI;
+        const runSinglePath = dependencies.runSinglePath || runHistoricalBacktest;
+        const backtestResult = runSinglePath({
+            inputs,
+            period: { startYear: validation.startYear, endYear: validation.endYear },
+            historicalDataProvider,
+            simulateYear: dependencies.simulateYear || simulateOneYear,
+            initializePortfolio: dependencies.initializePortfolio || initializePortfolio,
+            computeAdjustmentPct: dependencies.computeAdjustmentPct || computeAdjPctForYear,
+            resolveHorizon: dependencies.resolveHorizon || resolveDynamicFlexRunnerHorizon,
+            totalPortfolio: dependencies.totalPortfolio || portfolioTotal,
+            breakOnRuin: dependencies.breakOnRuin ?? BREAK_ON_RUIN,
+            engineProvenance: captureHistoricalBacktestEngineProvenance(engineApi)
+        });
 
-        // Historische Reihen als Arrays aufbauen (ab 1950)
-        const histYears = Object.keys(HISTORICAL_DATA).map(Number).sort((a, b) => a - b).filter(y => y >= 1950);
-        const wageGrowthArray = histYears.map(y => HISTORICAL_DATA[y].lohn_de || 0);
-        const inflationPctArray = histYears.map(y => HISTORICAL_DATA[y].inflation_de || 0);
-
-        // Backtest-Kontext für Rentenanpassung
-        const backtestCtx = {
-            inputs: {
-                rentAdj: {
-                    mode: inputs.rentAdjMode || 'fix',
-                    pct: inputs.rentAdjPct || 0
-                }
-            },
-            series: {
-                wageGrowth: wageGrowthArray,
-                inflationPct: inflationPctArray,
-                startYear: HIST_SERIES_START_YEAR
-            },
-            simStartYear: startJahr
-        };
-
-        // Helper to safely get historical data
-        const getHistVal = (y, prop) => (HISTORICAL_DATA[y] ? HISTORICAL_DATA[y][prop] : 0);
-
-        let simState = {
-            portfolio: initializePortfolio(inputs),
-            baseFloor: inputs.startFloorBedarf,
-            baseFlex: inputs.startFlexBedarf,
-            baseMinimumFlexAnnual: inputs.minimumFlexAnnual || 0,
-            baseFlexBudgetAnnual: inputs.flexBudgetAnnual || 0,
-            baseFlexBudgetRecharge: inputs.flexBudgetRecharge || 0,
-            lastState: null,
-            currentAnnualPension: (inputs.renteMonatlich || 0) * 12,
-            currentAnnualPension2: (inputs.partner?.brutto || 0),
-            marketDataHist: {
-                endeVJ: getHistVal(startJahr - 1, 'msci_eur'),
-                endeVJ_1: getHistVal(startJahr - 2, 'msci_eur'),
-                endeVJ_2: getHistVal(startJahr - 3, 'msci_eur'),
-                endeVJ_3: getHistVal(startJahr - 4, 'msci_eur'),
-                ath: 0,
-                jahreSeitAth: 0,
-                capeRatio: inputs.marketCapeRatio || 0
-            }
-        };
-
-        const prevYearsVals = Object.keys(HISTORICAL_DATA)
-            .filter(y => y < startJahr)
-            .map(y => HISTORICAL_DATA[y].msci_eur);
-        simState.marketDataHist.ath = prevYearsVals.length > 0 ? Math.max(...prevYearsVals) : (simState.marketDataHist.endeVJ || 0);
-
-        let totalEntnahme = 0, kuerzungJahreAmStueck = 0, maxKuerzungStreak = 0, jahreMitKuerzung = 0, totalSteuern = 0;
-        const logRows = []; // Speichere Log-Daten für späteres Neu-Rendern
-
-        // Lese Detail-Level für Backtests aus localStorage (entkoppelt vom Worst-Log)
-        const logDetailLevel = loadDetailLevel(BACKTEST_LOG_DETAIL_KEY, LEGACY_LOG_DETAIL_KEY);
-
-        // Header basierend auf Detail-Level
-        let headerCols = [
-            "Jahr".padEnd(4), "Entn.".padStart(7), "Floor".padStart(7)
-        ];
-        if (logDetailLevel === 'detailed') {
-            headerCols.push("Rente1".padStart(7), "Rente2".padStart(7));
-        }
-        headerCols.push("RenteSum".padStart(8));
-        if (logDetailLevel === 'detailed') {
-            headerCols.push("FloorDep".padStart(8));
-        }
-        headerCols.push(
-            "Flex%".padStart(5),
-            "MinF%".padStart(5),
-            "WRed%".padStart(5),
-            "WQ%".padStart(4),
-            "Flex€".padStart(7),
-            "MinFlex€".padStart(8),
-            "MinFSt".padEnd(10)
-        );
-        if (logDetailLevel === 'detailed') {
-            headerCols.push(
-                "VPW%".padStart(5),
-                "Hor".padStart(4),
-                "VPWSt".padEnd(7),
-                "Safe".padStart(4),
-                "VPWHint".padEnd(18),
-                "Entn_real".padStart(9),
-                "Adj%".padStart(5)
-            );
-        }
-        headerCols.push(
-            "Status".padEnd(16), "Cut".padEnd(12), "Alarm".padEnd(6), "Quote%".padStart(6), "Runway%".padStart(7),
-            "Pf.Akt%".padStart(8), "Pf.Gld%".padStart(8), "Infl.".padStart(5),
-            "Handl.A".padStart(8), "Handl.G".padStart(8), "St.".padStart(6),
-            "Aktien".padStart(8), "Gold".padStart(7), "Liq.".padStart(7)
-        );
-        if (logDetailLevel === 'detailed') {
-            headerCols.push(
-                "Liq@rC-".padStart(9), "Zins€".padStart(7), "Liq@rC+".padStart(9),
-                "ZielLiq".padStart(8), "NeedLiq".padStart(8), "GuardG".padStart(7), "GuardA".padStart(7), "GuardNote".padStart(16),
-                "Akt_vorR".padStart(9), "Akt_nachR".padStart(9), "Akt_nachV".padStart(9), "Akt_nachK".padStart(9),
-                "Gld_vorR".padStart(9), "Gld_nachR".padStart(9), "Gld_nachV".padStart(9), "Gld_nachK".padStart(9)
-            );
-        }
-        let header = headerCols.join("  ");
-        let log = header + "\n" + "=".repeat(header.length) + "\n";
-
-        for (let jahr = startJahr; jahr <= endJahr; jahr++) {
-            const dataVJ = HISTORICAL_DATA[jahr - 1];
-            if (!dataVJ || !HISTORICAL_DATA[jahr]) { log += `${jahr}: Fehlende Daten.\n`; continue; }
-
-            const jahresrenditeAktien = (HISTORICAL_DATA[jahr].msci_eur - dataVJ.msci_eur) / dataVJ.msci_eur;
-            const jahresrenditeGold = (dataVJ.gold_eur_perf || 0) / 100;
-            const yearData = { ...dataVJ, rendite: jahresrenditeAktien, gold_eur_perf: dataVJ.gold_eur_perf, zinssatz: dataVJ.zinssatz_de, inflation: dataVJ.inflation_de, jahr };
-            const resolvedCapeRatio = resolveBacktestCape(yearData, inputs, simState.marketDataHist);
-
-            const yearIndex = jahr - startJahr;
-
-            // Berechne dynamische Rentenanpassung mit neuer Helper-Funktion
-            const adjPct = computeAdjPctForYear(backtestCtx, yearIndex);
-
-            // Übergebe die berechnete Anpassungsrate an simulateOneYear
-            const horizonResolution = resolveDynamicFlexRunnerHorizon(inputs, { yearIndex });
-            const adjustedInputs = {
-                ...inputs,
-                rentAdjPct: adjPct,
-                capeRatio: resolvedCapeRatio,
-                marketCapeRatio: resolvedCapeRatio,
-                horizonYears: horizonResolution.horizonYears,
-                ...(horizonResolution.diagnostics?.longevityMode !== 'none'
-                    ? { longevityHorizonDiagnostics: horizonResolution.diagnostics }
-                    : {})
-            };
-            yearData.capeRatio = resolvedCapeRatio;
-            const result = simulateOneYear(simState, adjustedInputs, yearData, yearIndex);
-
-            if (result.isRuin) {
-                log += `${String(jahr).padEnd(5)}... RUIN ...\n`; 
-                
-                // Expliziter Ruin-Eintrag für die Tabelle erzwingen
-                logRows.push({
-                    jahr,
-                    row: {
-                        floor_brutto: simState.baseFloor,
-                        renteSum: 0,
-                        aktionUndGrund: "!!! RUIN !!!",
-                        Regime: "BANKRUPT",
-                        liquiditaet: 0,
-                        wertAktien: 0,
-                        wertGold: 0,
-                        FlexRatePct: 0,
-                        flex_erfuellt_nominal: 0,
-                        QuoteEndPct: 0,
-                        RunwayCoveragePct: 0,
-                        NominalReturnEquityPct: 0,
-                        NominalReturnGoldPct: 0,
-                        steuern_gesamt: 0,
-                        NeedLiq: 0,
-                        GuardGold: 0,
-                        GuardEq: 0,
-                        GuardNote: result.reason || 'Pleite'
-                    },
-                    entscheidung: { jahresEntnahme: 0 },
-                    wertAktien: 0,
-                    wertGold: 0,
-                    liquiditaet: 0,
-                    netA: 0,
-                    netG: 0,
-                    vpw: null,
-                    vpwFallbackHint: 'no_vpw',
-                    adjPct: adjPct,
-                    inflationVJ: dataVJ.inflation_de
-                });
-
-                if (BREAK_ON_RUIN) break;
-            }
-
-            simState = result.newState;
-            totalSteuern += result.totalTaxesThisYear;
-            const row = result.logData;
-            const { entscheidung, wertAktien, wertGold, liquiditaet } = row;
-            totalEntnahme += entscheidung.jahresEntnahme;
-
-            const netA = Number.isFinite(row.netTradeEq)
-                ? row.netTradeEq
-                : (row.vk?.vkAkt || 0) - (row.kaufAkt || 0);
-            const netG = Number.isFinite(row.netTradeGold)
-                ? row.netTradeGold
-                : (row.vk?.vkGld || 0) - (row.kaufGld || 0);
-
-            // Speichere Log-Daten für späteres Neu-Rendern
-            const vpwPayload = result.ui?.vpw || null;
-            logRows.push({
-                jahr, row, entscheidung, wertAktien, wertGold, liquiditaet,
-                netA, netG,
-                vpw: vpwPayload,
-                vpwFallbackHint: buildVpwFallbackHint(vpwPayload),
-                adjPct, inflationVJ: dataVJ.inflation_de
+        let cohortInventory = null;
+        if (validation.cohortsEnabled && ['completed', 'ruin'].includes(backtestResult.outcome?.kind)) {
+            const runCohorts = dependencies.runCohorts || runHistoricalBacktestCohorts;
+            const cohortResult = runCohorts({
+                inputs,
+                range: { startYear: validation.startYear, endYear: validation.endYear },
+                cohortHorizonYears: validation.cohortHorizonYears,
+                historicalDataProvider,
+                simulateYear: dependencies.simulateYear || simulateOneYear,
+                initializePortfolio: dependencies.initializePortfolio || initializePortfolio,
+                computeAdjustmentPct: dependencies.computeAdjustmentPct || computeAdjPctForYear,
+                resolveHorizon: dependencies.resolveHorizon || resolveDynamicFlexRunnerHorizon,
+                totalPortfolio: dependencies.totalPortfolio || portfolioTotal,
+                breakOnRuin: dependencies.breakOnRuin ?? BREAK_ON_RUIN,
+                runSinglePath
             });
-
-            // Log-Zeile basierend auf Detail-Level
-            let logCols = [
-                padLeft(jahr, 4),
-                formatCurrencyShortLog(entscheidung.jahresEntnahme).padStart(7),
-                formatCurrencyShortLog(row.floor_brutto).padStart(7)
-            ];
-            if (logDetailLevel === 'detailed') {
-                logCols.push(
-                    formatCurrencyShortLog(row.rente1 || 0).padStart(7),
-                    formatCurrencyShortLog(row.rente2 || 0).padStart(7)
-                );
-            }
-            logCols.push(formatCurrencyShortLog(row.renteSum || 0).padStart(8));
-            if (logDetailLevel === 'detailed') {
-                logCols.push(formatCurrencyShortLog(row.floor_aus_depot).padStart(8));
-            }
-            logCols.push(
-                formatPercentInteger(row.FlexRatePct, 5),
-                formatPercentInteger(row.MinFlexRatePct || 0, 5),
-                formatPercentInteger(row.WealthRedF || 0, 5),
-                formatPercentInteger(row.WealthQuoteUsedPct || 0, 4),
-                formatCurrencyShortLog(row.flex_erfuellt_nominal).padStart(7),
-                formatCurrencyShortLog(row.minimumFlexAnnual || 0).padStart(8),
-                String(row.minimumFlexStatus || '').substring(0, 10).padEnd(10)
-            );
-            if (logDetailLevel === 'detailed') {
-                const vpw = result.ui?.vpw || null;
-                const vpwStatus = vpw?.status === 'active'
-                    ? 'aktiv'
-                    : (vpw?.status === 'disabled' ? 'aus' : (vpw?.status === 'contract_ready' ? 'bereit' : (vpw?.status === 'safety_static_flex' ? 's2-stat' : '')));
-                logCols.push(
-                    formatPercentOneDecimal((vpw?.vpwRate || 0) * 100, 5),
-                    padLeft((Number.isFinite(vpw?.horizonYears) ? Math.round(vpw.horizonYears) : ''), 4),
-                    String(vpwStatus || '').substring(0, 7).padEnd(7),
-                    padLeft((Number.isFinite(vpw?.safetyStage) ? Math.round(vpw.safetyStage) : ''), 4),
-                    String(buildVpwFallbackHint(vpw)).substring(0, 18).padEnd(18),
-                    formatCurrencyShortLog(row.jahresentnahme_real).padStart(9),
-                    formatPercentOneDecimal(adjPct, 5)
-                );
-            }
-            logCols.push(
-                row.aktionUndGrund.substring(0, 15).padEnd(16),
-                (row.CutReason || '').substring(0, 12).padEnd(12),
-                (row.Alarm ? 'A' : '').padEnd(6),
-                formatPercentOneDecimal(row.QuoteEndPct, 6),
-                formatPercentInteger(row.RunwayCoveragePct, 7),
-                formatPercentOneDecimal((row.NominalReturnEquityPct || 0) * 100, 8),
-                formatPercentOneDecimal((row.NominalReturnGoldPct || 0) * 100, 8),
-                formatPercentOneDecimal(dataVJ.inflation_de, 5),
-                formatCurrencyShortLog(netA).padStart(8),
-                formatCurrencyShortLog(netG).padStart(8),
-                formatCurrencyShortLog(row.steuern_gesamt || 0).padStart(6),
-                formatCurrencyShortLog(wertAktien).padStart(8),
-                formatCurrencyShortLog(wertGold).padStart(7),
-                formatCurrencyShortLog(liquiditaet).padStart(7)
-            );
-            if (logDetailLevel === 'detailed') {
-                logCols.push(
-                    formatCurrencyShortLog(row.liqStart || 0).padStart(9),
-                    formatCurrencyShortLog(row.cashInterestEarned || 0).padStart(7),
-                    formatCurrencyShortLog(row.liqEnd || 0).padStart(9),
-                    formatCurrencyShortLog(row.zielLiquiditaet || 0).padStart(8),
-                    formatCurrencyShortLog(row.NeedLiq || 0).padStart(8),
-                    formatCurrencyShortLog(row.GuardGold || 0).padStart(7),
-                    formatCurrencyShortLog(row.GuardEq || 0).padStart(7),
-                    String(row.GuardNote || '').substring(0, 16).padStart(16),
-                    formatCurrencyShortLog(row.eq_before_return || 0).padStart(9),
-                    formatCurrencyShortLog(row.eq_after_return || 0).padStart(9),
-                    formatCurrencyShortLog(row.eq_after_sales || 0).padStart(9),
-                    formatCurrencyShortLog(row.eq_after_buys || 0).padStart(9),
-                    formatCurrencyShortLog(row.gold_before_return || 0).padStart(9),
-                    formatCurrencyShortLog(row.gold_after_return || 0).padStart(9),
-                    formatCurrencyShortLog(row.gold_after_sales || 0).padStart(9),
-                    formatCurrencyShortLog(row.gold_after_buys || 0).padStart(9)
-                );
-            }
-            log += logCols.join("  ") + "\n";
-
-            if (entscheidung.kuerzungProzent >= 10) { jahreMitKuerzung++; kuerzungJahreAmStueck++; }
-            else { maxKuerzungStreak = Math.max(maxKuerzungStreak, kuerzungJahreAmStueck); kuerzungJahreAmStueck = 0; }
+            cohortInventory = createImmutableCohortInventory(cohortResult.inventory);
         }
-        maxKuerzungStreak = Math.max(maxKuerzungStreak, kuerzungJahreAmStueck);
-        const endVermoegen = portfolioTotal(simState.portfolio);
 
-        // Speichere Log-Daten für späteres Neu-Rendern
-        window.globalBacktestData = {
-            rows: logRows,
-            startJahr,
+        // UI, Summary, Tabelle und Export teilen exakt diese immutable Runner-Instanz.
+        window.globalBacktestData = Object.freeze({
+            result: backtestResult,
+            rows: backtestResult.rows,
+            startJahr: validation.startYear,
+            schemaVersion: backtestResult.schemaVersion,
+            outcome: backtestResult.outcome,
+            requestedYears: backtestResult.requestedYears,
+            completedYears: backtestResult.completedYears,
+            breakOnRuin: backtestResult.breakOnRuin,
+            ...(cohortInventory ? {
+                cohortInventory,
+                cohortHorizonYears: validation.cohortHorizonYears
+            } : {}),
             decumulationMode: inputs?.decumulation?.mode || STRATEGY_OPTIONS.STANDARD,
             goldAktiv: inputs?.goldAktiv,
             minimumFlexProfiles: Array.isArray(inputs?.minimumFlexProfiles)
                 ? inputs.minimumFlexProfiles.map(entry => ({ ...entry }))
                 : []
-        };
+        });
+        renderHistoricalBacktestStatus(document, describeHistoricalBacktestResult(backtestResult), { focus: true });
+        renderHistoricalBacktestNotices(document, backtestResult, cohortInventory);
 
-        document.getElementById('simulationResults').style.display = 'block';
-        const lastLogRow = logRows[logRows.length - 1] || {};
-        const healthBucketSummary = lastLogRow.health_bucket_enabled
-            ? `
-            <div class="summary-item"><strong>Pflegebucket</strong><span>${formatCurrency(lastLogRow.health_bucket_end || 0)}</span></div>
-            <div class="summary-item"><strong>Pflegebucket-Zieldeckung</strong><span>${Number.isFinite(Number(lastLogRow.health_bucket_real_coverage_pct))
-                ? formatPercentValue(Number(lastLogRow.health_bucket_real_coverage_pct), { fractionDigits: 0, invalid: '—' })
-                : '—'}</span></div>
-            <div class="summary-item"><strong>Pflegebucket-Ziellücke</strong><span>${formatCurrency(lastLogRow.health_bucket_target_gap || 0)}</span></div>`
-            : '';
-        document.getElementById('simulationSummary').innerHTML = `
-         <div class="summary-grid">
-            <div class="summary-item"><strong>Startvermögen</strong><span>${formatCurrency(inputs.startVermoegen)}</span></div>
-            <div class="summary-item"><strong>Endvermögen</strong><span>${formatCurrency(endVermoegen)}</span></div>
-            <div class="summary-item highlight"><strong>Gesamte Entnahmen</strong><span>${formatCurrency(totalEntnahme)}</span></div>
-            <div class="summary-item"><strong>Max. Kürzungsdauer</strong><span>${maxKuerzungStreak} Jahre</span></div>
-            <div class="summary-item"><strong>Jahre mit Kürzung (>10%)</strong><span>${jahreMitKuerzung} von ${endJahr - startJahr + 1}</span></div>
-            <div class="summary-item tax"><strong>Gezahlte Steuern</strong><span>${formatCurrency(totalSteuern)}</span></div>
-            ${healthBucketSummary}
-        </div>`;
-        renderBacktestLog();
+        if (['completed', 'ruin'].includes(backtestResult.outcome?.kind)) {
+            setBacktestResultsVisible(true);
+            setBacktestExportEnabled(true);
+            renderBacktestSummary(backtestResult);
+            renderHistoricalBacktestCohorts(document, cohortInventory, validation.cohortHorizonYears);
+            renderBacktestLog();
+        } else {
+            clearBacktestResultProjection();
+        }
+        return backtestResult;
     } catch (error) {
-        alert("Ein Fehler ist im Backtest aufgetreten:\n\n" + formatSimulatorValidationError(error) + "\n" + (error.stack || ''));
-        console.error("Fehler in runBacktest():", error);
-    } finally { document.getElementById('btButton').disabled = false; }
+        window.globalBacktestData = null;
+        clearBacktestResultProjection();
+        const isInputValidation = error?.name === 'SimulatorValidationError';
+        renderHistoricalBacktestStatus(document, createBacktestUiStatus(
+            isInputValidation ? 'validation_error' : 'technical_error',
+            isInputValidation ? 'BACKTEST_INPUT_INVALID' : 'BACKTEST_UI_EXCEPTION',
+            isInputValidation ? 'Simulator-Eingabe korrigieren' : 'Backtest technisch abgebrochen',
+            isInputValidation
+                ? formatSimulatorValidationError(error)
+                : 'Die Eingaben oder der Lauf konnten technisch nicht sicher verarbeitet werden.',
+            isInputValidation
+                ? 'Korrigieren Sie die betroffene Simulator-Eingabe und starten Sie erneut.'
+                : 'Prüfen Sie die Eingaben und starten Sie erneut. Bleibt der Code bestehen, melden Sie ihn zur Diagnose.'
+        ), { focus: !isInputValidation });
+        if (isInputValidation) focusBacktestElement(document, error?.errors?.[0]?.fieldId);
+        return null;
+    } finally {
+        if (button) button.disabled = false;
+    }
 }
 
 /**
@@ -436,27 +279,11 @@ export function renderBacktestLog() {
         goldAktiv: window.globalBacktestData?.goldAktiv
     });
 
-    // Generate HTML table
-    let html = '<table><thead><tr>';
-    for (const col of columns) {
-        html += `<th>${col.header || ''}</th>`;
-    }
-    html += '</tr></thead><tbody>';
-
-    for (let i = 0; i < logRows.length; i++) {
-        const row = logRows[i];
-        const rowClass = i % 2 === 0 ? 'even' : 'odd';
-        html += `<tr class="${rowClass}">`;
-
-        for (const col of columns) {
-            const value = formatColumnValue(col, row);
-            html += `<td>${value}</td>`;
-        }
-        html += '</tr>';
-    }
-    html += '</tbody></table>';
-
-    document.getElementById('simulationLog').innerHTML = html;
+    document.getElementById('simulationLog').innerHTML = buildAccessibleBacktestTableHtml(
+        logRows,
+        columns,
+        formatColumnValue
+    );
     const chartContainer = document.getElementById('portfolioCompositionChart');
     if (chartContainer) {
         chartContainer.style.display = 'block';
@@ -471,29 +298,51 @@ export function renderBacktestLog() {
  */
 export function exportBacktestLogData(format = 'json') {
     const backtestData = window.globalBacktestData;
-    if (!backtestData || !Array.isArray(backtestData.rows) || backtestData.rows.length === 0) {
-        alert('Es sind keine Backtest-Daten zum Export verfügbar. Bitte zuerst einen Backtest ausführen.');
+    if (!backtestData?.result) {
+        renderHistoricalBacktestStatus(document, createBacktestUiStatus(
+            'technical_error',
+            'BACKTEST_EXPORT_RESULT_MISSING',
+            'Kein Backtest für den Export vorhanden',
+            'Es liegt kein kanonisches Backtest-Resultat vor.',
+            'Führen Sie zuerst einen vollständigen Backtest aus.'
+        ), { focus: true });
         return;
     }
 
-    const detailLevel = loadDetailLevel(BACKTEST_LOG_DETAIL_KEY, LEGACY_LOG_DETAIL_KEY);
-    const columns = buildBacktestColumnDefinitions(detailLevel, {
-        strategyMode: backtestData?.decumulationMode,
-        goldAktiv: backtestData?.goldAktiv
-    });
-    const timestamp = new Date().toISOString().replace(/[:]/g, '-');
-    const filenameBase = `backtest-log-${timestamp}`;
+    try {
+        const download = createHistoricalBacktestDownload(backtestData.result, format, {
+            cohortInventory: backtestData.cohortInventory
+        });
+        triggerDownload(download.filename, download.content, download.mimeType);
+    } catch (error) {
+        void error;
+        renderHistoricalBacktestStatus(document, createBacktestUiStatus(
+            'technical_error',
+            'BACKTEST_EXPORT_FAILED',
+            'Backtest-Export fehlgeschlagen',
+            'Der kanonische Raw-Export konnte technisch nicht erstellt werden.',
+            'Führen Sie den Backtest erneut aus und wiederholen Sie den Download.'
+        ), { focus: true });
+    }
+}
 
-    if (format === 'json') {
-        const payload = {
-            exportedAt: new Date().toISOString(),
-            options: { detailLevel, startJahr: backtestData.startJahr ?? null },
-            rows: prepareRowsForExport(backtestData.rows, columns)
-        };
-        triggerDownload(`${filenameBase}.json`, JSON.stringify(payload, null, 2), 'application/json');
-    } else if (format === 'csv') {
-        const csvContent = convertRowsToCsv(backtestData.rows, columns);
-        triggerDownload(`${filenameBase}.csv`, csvContent, 'text/csv;charset=utf-8');
+function bindBacktestEventOnce(element, eventName, key, handler) {
+    if (!element) return;
+    if (!element.dataset) element.dataset = {};
+    const marker = `backtestBound${key}`;
+    if (element.dataset[marker] === 'true') return;
+    element.addEventListener(eventName, handler);
+    element.dataset[marker] = 'true';
+}
+
+function clearBacktestFieldError(fieldId, errorId) {
+    const field = document.getElementById(fieldId);
+    const error = document.getElementById(errorId);
+    if (typeof field?.removeAttribute === 'function') field.removeAttribute('aria-invalid');
+    else if (field) delete field['aria-invalid'];
+    if (error) {
+        error.textContent = '';
+        error.hidden = true;
     }
 }
 
@@ -502,27 +351,49 @@ export function exportBacktestLogData(format = 'json') {
  * Diese Logik wurde extrahiert, um Simulator-Main zu entlasten und Wiederverwendung zu vereinfachen.
  */
 export function initializeBacktestUI() {
+    configureHistoricalBacktestControls(document, HISTORICAL_BACKTEST_PROVIDER);
+    setBacktestExportEnabled(Boolean(window.globalBacktestData?.result));
+
+    const startButton = document.getElementById('btButton');
+    bindBacktestEventOnce(startButton, 'click', 'Start', () => runBacktest());
+
+    const cohortCheckbox = document.getElementById('runBacktestCohorts');
+    const cohortHorizonInput = document.getElementById('backtestCohortHorizon');
+    const syncCohortControl = () => {
+        if (cohortHorizonInput) cohortHorizonInput.disabled = !cohortCheckbox?.checked;
+        if (!cohortCheckbox?.checked) clearBacktestFieldError('backtestCohortHorizon', 'backtestCohortHorizonError');
+    };
+    bindBacktestEventOnce(cohortCheckbox, 'change', 'CohortToggle', syncCohortControl);
+    syncCohortControl();
+
+    for (const [fieldId, errorId] of [
+        ['simStartJahr', 'simStartJahrError'],
+        ['simEndJahr', 'simEndJahrError'],
+        ['backtestCohortHorizon', 'backtestCohortHorizonError']
+    ]) {
+        const field = document.getElementById(fieldId);
+        bindBacktestEventOnce(field, 'input', `Clear${fieldId}`, () => clearBacktestFieldError(fieldId, errorId));
+    }
+
     const backtestDetailCheckbox = document.getElementById('toggle-backtest-detail');
     if (backtestDetailCheckbox) {
         backtestDetailCheckbox.checked = loadDetailLevel(BACKTEST_LOG_DETAIL_KEY, LEGACY_LOG_DETAIL_KEY) === 'detailed';
-        backtestDetailCheckbox.addEventListener('change', (e) => {
-            const detailLevel = e.currentTarget.checked ? 'detailed' : 'normal';
+        bindBacktestEventOnce(backtestDetailCheckbox, 'change', 'Detail', (event) => {
+            const detailLevel = (event.currentTarget || backtestDetailCheckbox).checked ? 'detailed' : 'normal';
             // Backtest detail level is isolated to keep the worst-case log unchanged.
             persistDetailLevel(BACKTEST_LOG_DETAIL_KEY, detailLevel);
 
             // Re-render Backtest-Log mit neuem Detail-Level
             if (typeof window.renderBacktestLog === 'function') {
                 window.renderBacktestLog();
+            } else {
+                renderBacktestLog();
             }
         });
     }
 
     const exportBacktestJsonBtn = document.getElementById('exportBacktestJson');
-    if (exportBacktestJsonBtn) {
-        exportBacktestJsonBtn.addEventListener('click', () => exportBacktestLogData('json'));
-    }
+    bindBacktestEventOnce(exportBacktestJsonBtn, 'click', 'ExportJson', () => exportBacktestLogData('json'));
     const exportBacktestCsvBtn = document.getElementById('exportBacktestCsv');
-    if (exportBacktestCsvBtn) {
-        exportBacktestCsvBtn.addEventListener('click', () => exportBacktestLogData('csv'));
-    }
+    bindBacktestEventOnce(exportBacktestCsvBtn, 'click', 'ExportCsv', () => exportBacktestLogData('csv'));
 }

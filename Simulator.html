@@ -920,26 +920,52 @@
                         <legend><span class="section-icon">📅</span>Backtesting-Parameter</legend>
                         <div class="form-grid" style="grid-template-columns: 1fr 1fr;">
                             <div class="form-group"><label for="simStartJahr">Startjahr</label><input type="number"
-                                    id="simStartJahr" value="2000"></div>
+                                    id="simStartJahr" value="2000" step="1" required
+                                    aria-describedby="backtestDatasetHint simStartJahrError">
+                                <p class="field-error" id="simStartJahrError" hidden></p>
+                            </div>
                             <div class="form-group"><label for="simEndJahr">Endjahr</label><input type="number"
-                                    id="simEndJahr" value="2025"></div>
+                                    id="simEndJahr" value="2025" step="1" required
+                                    aria-describedby="backtestDatasetHint simEndJahrError">
+                                <p class="field-error" id="simEndJahrError" hidden></p>
+                            </div>
                         </div>
-                    </fieldset><button id="btButton" onclick="runBacktest()">Historische Simulation starten</button>
+                        <p class="backtest-period-hint" id="backtestDatasetHint">Historischer Datensatz wird geladen.</p>
+                        <div class="backtest-cohort-controls">
+                            <label class="backtest-checkbox-label" for="runBacktestCohorts"><input type="checkbox"
+                                    id="runBacktestCohorts">Rolling-Cohort-In-sample-Diagnose zusätzlich ausführen</label>
+                            <div class="form-group">
+                                <label for="backtestCohortHorizon">Feste Cohort-Horizontlänge (Jahre)</label>
+                                <input type="number" id="backtestCohortHorizon" value="10" min="1" step="1" disabled
+                                    aria-describedby="backtestCohortHint backtestCohortHorizonError">
+                                <p id="backtestCohortHint" class="backtest-period-hint">Überlappende historische Fenster; keine Erfolgswahrscheinlichkeit.</p>
+                                <p class="field-error" id="backtestCohortHorizonError" hidden></p>
+                            </div>
+                        </div>
+                    </fieldset><button id="btButton" type="button">Historische Simulation starten</button>
+                    <div id="backtestStatus" class="backtest-status backtest-status-idle" role="status" aria-live="polite"
+                        aria-atomic="true" tabindex="-1" data-status="idle"><strong>Backtest bereit</strong><span>Wählen Sie einen Zeitraum und starten Sie die historische Simulation.</span></div>
+                    <section id="backtestNotices" class="backtest-notices" aria-labelledby="backtestNoticesHeading" hidden>
+                        <h4 id="backtestNoticesHeading">Einordnung und Warnhinweise</h4>
+                        <ul id="backtestNoticeList"></ul>
+                    </section>
                     <div id="simulationResults" style="display:none; margin-top: 25px;">
-                        <h3>Ergebnis des Backtests</h3>
+                        <h3 id="backtestResultHeading" tabindex="-1">Ergebnis des Backtests</h3>
                         <div id="simulationSummary"></div>
+                        <section id="backtestCohortSummary" class="backtest-cohort-summary" aria-live="polite" hidden></section>
                         <div id="portfolioCompositionChart" style="display:none; margin-top: 18px;"></div>
-                        <h4 style="text-align:center; margin-top:20px;">Jahresprotokoll</h4>
+                        <h4 id="backtestLogHeading" style="text-align:center; margin-top:20px;">Jahresprotokoll</h4>
                         <div style="text-align: center; margin-bottom: 10px; font-size: 0.9rem;"><label
                                 style="user-select:none; cursor:pointer;"
                                 title="Umschalten zwischen normalem (kompakt) und detailliertem (alle Spalten) Log."><input
                                     type="checkbox" id="toggle-backtest-detail"
                                     style="width:auto; vertical-align: middle; margin-right: 4px;">Detailliertes Log
                                 anzeigen </label></div>
-                        <div id="simulationLog">Keine Daten</div>
+                        <div id="simulationLog" class="backtest-table-region" role="region"
+                            aria-labelledby="backtestLogHeading" tabindex="0">Keine Daten</div>
                         <div class="log-export-buttons"><button type="button"
-                                id="exportBacktestJson">JSON</button><button type="button"
-                                id="exportBacktestCsv">CSV</button></div>
+                                id="exportBacktestJson">Raw-JSON herunterladen</button><button type="button"
+                                id="exportBacktestCsv">Raw-CSV herunterladen</button></div>
                     </div>
                     <div id="engine-mismatch-footer"></div>
                     <section class="dev-only" id="parity-smoketest-card">

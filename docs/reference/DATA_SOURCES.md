@@ -91,6 +91,95 @@ commit-blocking.
 - Coverage: `1925-2025`
 - Estimated history segment: `1925-1949`
 - Baseline segment: `1950-2025`
+- Machine-readable manifest: `HISTORICAL_DATA_MANIFEST`, schema `HistoricalDataManifestV1`
+- Dataset ID/revision: `ruhestandsapp-historical-data-v1` / `2026-07-18.1`
+- Canonical content hash: `8246422d98657c2a76b750ce9fd1253e01aa7a9a4dfa0f0f01dcb96b5507ef29`
+- Hash algorithm: SHA-256 over canonical JSON (`sha256-canonical-json-v1`); year keys are numeric ascending, object fields lexical, and numbers are locale-independent JSON tokens.
+- Backtest lookback contract: four complete years before `startYear`; the contract-derived technical bounds are therefore `1929-2025`. The Backtest UI reads these bounds from the active provider, sets both year inputs dynamically, and validates against the same contract.
+
+The DOM-free contract lives in
+`app/simulator/historical-backtest-contract.js`. It validates the full dataset
+once per manifest revision/content hash, creates an immutable lookup of
+`HistoricalYearRecordV1`, and performs one period preflight per single-path
+request or cohort batch. The productive historical backtest and its rolling
+cohorts consume this provider. Monte Carlo, sweep, optimizer and worker data
+paths remain separate and must not be described as manifest-backed holdouts.
+
+### Manifest status terms
+
+- Resolution fields (`variant`, `currency`, `region`, `frequency`, `source`,
+  `license`, `transformation`) use `known`, `unresolved`, or
+  `not_applicable`. A `known` value must be non-empty. `unresolved` never
+  carries a guessed value.
+- Record quality uses `present`, `estimated`, `unresolved`, `fallback_zero`,
+  or `missing`.
+- `missing` and non-finite required values are contract errors.
+- `fallback_zero` is valid only inside a series segment explicitly listed in
+  `missingness.fallbackZeroSegments`. No current series declares such a
+  segment.
+- Zero values in `gold_eur_perf` remain numerically unchanged but receive
+  quality `unresolved`; the repository does not currently prove whether these
+  values mean a genuine zero return or unavailable history.
+
+### Series manifest
+
+| Series ID | Variant | Currency | Region | Frequency | Source | License | Transformation | Estimated segment | Missingness |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `msci_eur` | `unresolved` | EUR | global | annual | `unresolved` | `unresolved` | embedded levels; 1925-1949 rescaled to the 1950 bridge | 1925-1949 | required; reject missing/non-finite and non-positive levels |
+| `inflation_de` | `unresolved` | not applicable | DE | annual | `unresolved` | `unresolved` | identity from embedded annual percentage | 1925-1949 | required; reject missing/non-finite |
+| `zinssatz_de` | `unresolved` | not applicable | DE | annual | `unresolved` | `unresolved` | identity from embedded annual percentage | 1925-1949 | required; reject missing/non-finite |
+| `lohn_de` | `unresolved` | not applicable | DE | annual | `unresolved` | `unresolved` | identity from embedded annual percentage | 1925-1949 | required; reject missing/non-finite |
+| `gold_eur_perf` | `unresolved` | EUR | global | annual | `unresolved` | `unresolved` | identity from embedded annual percentage | 1925-1949 | required; reject missing/non-finite; zero quality unresolved |
+| `cape` | `unresolved` | not applicable | `unresolved` | annual | `unresolved` | `unresolved` | identity from embedded annual ratio | 1925-1949 | required; reject missing/non-finite and non-positive ratios |
+
+All source and license statuses above are intentionally unresolved. The
+manifest improves traceability but is not evidence that external provenance,
+index variant, or usage rights have been established.
+
+### Research-gate status
+
+The
+[Simulator backtest research protocol](../internal/SIMULATOR_BACKTEST_FORSCHUNGSPROTOKOLL.md)
+is the operational owner of FV-G01 through FV-G08 for FQ-01 through FQ-03. It
+does not replace this runtime manifest and does not upgrade any field to
+`known`.
+
+| Open item | Current state | Required owner and next evidence | Blocking effect |
+| --- | --- | --- | --- |
+| exact `msci_eur` Price/Net/Gross-TR variant | `unresolved` | named data/capital-markets methodology owner; primary-source index identity, currency treatment, data vintage and license | blocks FQ-01 baseline and international comparison |
+| variants and primary sources for all six series | `unresolved` | exact series identifiers, definitions, retrieval/data dates and permitted source chain | blocks research-grade FV-G02 |
+| licenses/usage rights for all six series | `unresolved` | license text, use/redistribution scope and review date; legal review where needed | blocks replacement, integration or redistribution |
+| pre-1950 source and transformation chain | internal bridge/rescaling documented; external origin `unresolved` | raw-data hashes plus reproducible transformation and bridge evidence | 1925-1949 remain `estimated` and cannot be treated like baseline observations |
+| zero-valued `gold_eur_perf` observations | 42 records with unresolved quality: 1925-1932, 1934-1960 and 1962-1968 | evidence whether each segment is genuine zero return, missing data or an assumption, followed by a new manifest revision | blocks gold-effect and holdout claims; values must not be silently reinterpreted |
+| CAPE region | `unresolved` | exact market/region and transformation contract | blocks international CAPE/policy comparison |
+
+The embedded 1925-2025 history and every period or rolling cohort derived from
+it are exploratory/contaminated for confirmatory research because the data and
+results have already been visible during development. A raw
+`HistoricalBacktestExportV1` records one explicit run and its fingerprints; it
+is not an append-only trial registry and does not prove a locked holdout.
+
+### `HistoricalYearRecordV1` and assignment inventory
+
+The active backtest record separates ex-post `realized` observations from
+`decisionAsOf` policy inputs. Every observation carries `sourceYear`,
+`asOfYear`, unit, derivation, and quality. The record is marked
+`approved_d01` and uses temporal convention
+`realized_t_decision_t_minus_1_v1`.
+
+| Simulated field in year `t` | Legacy backtest | Active `annualData` / Monte Carlo | Alternative `prepareHistoricalData()` | Active D-01 backtest contract |
+| --- | --- | --- | --- | --- |
+| Equity return | index `t / (t-1) - 1` | index `t / (t-1) - 1` | index `t / (t-1) - 1` | realized `t`, input levels `t-1` and `t` |
+| Gold return | `t-1` | `t` | `t-1` | realized `t` |
+| Cash/bond proxy | `t-1` | `t` | `t-1` | realized `t` |
+| Inflation | `t-1` | `t` | `t-1` | realized `t` |
+| Wage/pension adjustment | `t` via `simStartYear - series.startYear + yearIdx` | `t` | `t-1` | realized `t` |
+| CAPE | `t-1` | `t` | not mapped | decision-as-of `t-1` |
+
+Marker tests cover the pension-adjustment offset for 1950, 2000, and 2001. The
+low-level `simulator-year-portfolio.js:readYearReturnRates()` normalizer retains
+its fallback shape, while the productive Backtest/Monte-Carlo/Sweep adapter
+rejects non-finite required returns before portfolio mutation.
 
 ## Important notes
 

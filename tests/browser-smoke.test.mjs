@@ -296,6 +296,12 @@ async function readIndexedDb(page, storeName, key) {
     }), { storeName, key });
 }
 
+async function readDownloadText(download) {
+    const downloadPath = await download.path();
+    assert(downloadPath, 'Browser download must expose a readable temporary path');
+    return fs.readFileSync(downloadPath, 'utf8');
+}
+
 async function runIndexSmoke(browser, baseUrl) {
     const smoke = await openSmokePage(browser, baseUrl, 'index.html');
     const { page } = smoke;
@@ -501,12 +507,199 @@ async function runSimulatorSmoke(browser, baseUrl) {
     const smoke = await openSmokePage(browser, baseUrl, 'Simulator.html');
     const { page } = smoke;
     await page.locator('h1').filter({ hasText: 'Ruhestand-Simulator' }).waitFor({ state: 'visible' });
+    await page.evaluate(() => {
+        const values = {
+            simStartVermoegen: '2020000',
+            depotwertGesamt: '2000000',
+            depotwertAlt: '2000000',
+            einstandAlt: '1600000',
+            tagesgeld: '20000',
+            geldmarktEtf: '0'
+        };
+        for (const [id, value] of Object.entries(values)) {
+            const element = document.getElementById(id);
+            if (element) element.value = value;
+        }
+    });
     await page.locator('#startFloorBedarf').fill('24000');
     await page.locator('#startFlexBedarf').fill('12000');
     await page.locator('.tab-btn[data-tab="backtesting"]').click();
     await page.locator('#btButton').waitFor({ state: 'visible' });
+
+    const bounds = await page.evaluate(() => ({
+        startMin: Number(document.getElementById('simStartJahr').min),
+        startMax: Number(document.getElementById('simStartJahr').max),
+        endMin: Number(document.getElementById('simEndJahr').min),
+        endMax: Number(document.getElementById('simEndJahr').max),
+        hint: document.getElementById('backtestDatasetHint').textContent
+    }));
+    assert(Number.isInteger(bounds.startMin) && bounds.startMin < bounds.startMax, 'Backtest start input needs dynamic integer bounds');
+    assert(bounds.startMin === bounds.endMin && bounds.startMax === bounds.endMax, 'Start/end inputs must share provider bounds');
+    assert(bounds.hint.includes(String(bounds.startMin)) && bounds.hint.includes(String(bounds.endMax)), 'Visible dataset hint must name both bounds');
+
+    const realInventoryBefore = await readIndexedDb(page, 'kv', 'depot_tranchen');
+    await page.locator('#runBacktestCohorts').check();
+    await page.locator('#backtestCohortHorizon').fill('10');
     await page.locator('#btButton').click();
-    await page.waitForTimeout(500);
+    const initialTerminalStatus = await page.locator('#backtestStatus').getAttribute('data-status');
+    const initialTerminalText = await page.locator('#backtestStatus').textContent();
+    assert(initialTerminalStatus === 'completed', `Default browser backtest must complete: ${JSON.stringify({ initialTerminalStatus, initialTerminalText })}`);
+    await page.locator('#simulationResults').waitFor({ state: 'visible' });
+    await page.locator('#backtestCohortSummary').waitFor({ state: 'visible' });
+
+    assert(await page.evaluate(() => document.activeElement?.id) === 'backtestStatus', 'Completed run must focus the terminal result status');
+    assert(await page.locator('#simulationLog caption').count() === 1, 'Backtest table needs exactly one caption');
+    assert(await page.locator('#simulationLog thead th[scope="col"]').count() === await page.locator('#simulationLog thead th').count(),
+        'Every backtest column header needs scope=col');
+    assert(await page.locator('#simulationLog').getAttribute('tabindex') === '0', 'Scrollable backtest table region must be keyboard-focusable');
+    const notices = await page.locator('#backtestNotices').textContent();
+    assert(notices.includes('Outcome:') && notices.includes('Datenqualität:') && notices.includes('In-sample-Hinweis:'),
+        'Outcome, data quality and in-sample warning must all be visible');
+    const cohortText = await page.locator('#backtestCohortSummary').textContent();
+    assert(cohortText.includes('Feste Horizontlänge: 10 Jahre'), 'Cohort summary must name its fixed horizon');
+    assert(cohortText.includes('Geeignet') && cohortText.includes('Ausgeschlossen') && cohortText.includes('Ruin'),
+        'Cohort summary must separate inventory, exclusions and outcomes');
+    assert(cohortText.includes('keine Erfolgswahrscheinlichkeit'), 'Cohort summary must state its inference boundary');
+
+    const normalHeaderCount = await page.locator('#simulationLog thead th').count();
+    const [jsonDownload] = await Promise.all([
+        page.waitForEvent('download'),
+        page.locator('#exportBacktestJson').click()
+    ]);
+    const rawJsonText = await readDownloadText(jsonDownload);
+    assert(!/<(?:table|tr|td|th)\b/i.test(rawJsonText), 'Raw JSON download must not contain rendered table HTML');
+    const rawDocument = JSON.parse(rawJsonText);
+
+    const [csvDownload] = await Promise.all([
+        page.waitForEvent('download'),
+        page.locator('#exportBacktestCsv').click()
+    ]);
+    const rawCsvText = await readDownloadText(csvDownload);
+    assert(rawCsvText.startsWith('simulation_year_calendar_year;outcome_code;'), 'Raw CSV must use the versioned technical header contract');
+    assert(!/<(?:table|tr|td|th)\b/i.test(rawCsvText), 'Raw CSV download must not contain rendered table HTML');
+
+    const visibleCanonical = await page.evaluate(() => {
+        const field = name => document.querySelector(`#simulationSummary [data-result-field="${name}"]`)?.dataset.canonicalValue;
+        const metric = id => document.querySelector(`#simulationSummary [data-metric-id="${id}"]`)?.dataset.canonicalValue;
+        return {
+            startYear: field('period_start'),
+            endYear: field('period_end'),
+            outcome: field('outcome'),
+            requestedYears: field('requested_years'),
+            completedYears: field('completed_years'),
+            rowCount: field('row_count'),
+            exactTenPctMetric: metric('flex_reduction_years_gte_10_pct'),
+            healthBucketEnd: metric('health_bucket_end_nominal_eur'),
+            cohortEligible: document.querySelector('[data-cohort-field="eligible"]')?.textContent?.trim()
+        };
+    });
+    assert(visibleCanonical.startYear === String(rawDocument.request.startYear), 'Visible start year reconciles with Raw JSON');
+    assert(visibleCanonical.endYear === String(rawDocument.request.endYear), 'Visible end year reconciles with Raw JSON');
+    assert(visibleCanonical.outcome === rawDocument.result.outcome.kind, 'Visible outcome reconciles with Raw JSON');
+    assert(visibleCanonical.requestedYears === String(rawDocument.result.requestedYears), 'Visible requested-year inventory reconciles with Raw JSON');
+    assert(visibleCanonical.completedYears === String(rawDocument.result.completedYears), 'Visible completed-year inventory reconciles with Raw JSON');
+    assert(visibleCanonical.rowCount === String(rawDocument.result.rows.length), 'Visible row inventory reconciles with Raw JSON');
+    assert(visibleCanonical.exactTenPctMetric === String(rawDocument.result.metrics.values.flex_reduction_years_gte_10_pct),
+        'Visible exact-10-percent reduction metric reconciles with Raw JSON');
+    assert(visibleCanonical.healthBucketEnd === String(rawDocument.result.metrics.values.health_bucket_end_nominal_eur),
+        'Visible health-bucket end reconciles with Raw JSON');
+    assert(visibleCanonical.cohortEligible === String(rawDocument.result.cohortInventory.eligible),
+        'Visible cohort inventory reconciles with the Raw JSON snapshot');
+
+    await page.locator('#toggle-backtest-detail').check();
+    const detailedHeaderCount = await page.locator('#simulationLog thead th').count();
+    assert(detailedHeaderCount > normalHeaderCount, 'Detail toggle must add display-only diagnostic columns');
+    const [detailedJsonDownload] = await Promise.all([
+        page.waitForEvent('download'),
+        page.locator('#exportBacktestJson').click()
+    ]);
+    const detailedRawDocument = JSON.parse(await readDownloadText(detailedJsonDownload));
+    assert(detailedRawDocument.fingerprint.value === rawDocument.fingerprint.value,
+        'Detail toggle must not change the canonical Raw JSON fingerprint');
+    assert(JSON.stringify(detailedRawDocument.result.rows) === JSON.stringify(rawDocument.result.rows),
+        'Detail toggle must not change Raw JSON rows');
+    const realInventoryAfter = await readIndexedDb(page, 'kv', 'depot_tranchen');
+    assert(JSON.stringify(realInventoryAfter) === JSON.stringify(realInventoryBefore), 'Backtest and cohort runs must not mutate real tranche inventory');
+
+    const runPeriodValidationCase = async ({ start, end, expectedField, label, startType = 'number' }) => {
+        await page.locator('#simStartJahr').evaluate((input, type) => { input.type = type; }, startType);
+        await page.locator('#simStartJahr').fill(String(start));
+        await page.locator('#simEndJahr').fill(String(end));
+        await page.locator('#btButton').click();
+        assert(await page.locator('#backtestStatus').textContent().then(text => text.includes('BACKTEST_PERIOD_INVALID')), `${label}: stable validation code must be visible`);
+        assert(await page.evaluate(() => document.activeElement?.id) === expectedField, `${label}: first invalid field must receive focus`);
+        assert(await page.locator(`#${expectedField}`).getAttribute('aria-invalid') === 'true', `${label}: invalid field must expose aria-invalid`);
+    };
+
+    await page.locator('#runBacktestCohorts').uncheck();
+    await runPeriodValidationCase({ start: '', end: 2000, expectedField: 'simStartJahr', label: 'empty start' });
+    await runPeriodValidationCase({ start: 'NaN', end: 2000, expectedField: 'simStartJahr', label: 'NaN start', startType: 'text' });
+    await runPeriodValidationCase({ start: '2000.5', end: 2001, expectedField: 'simStartJahr', label: 'fractional start' });
+    await runPeriodValidationCase({ start: 2002, end: 2001, expectedField: 'simEndJahr', label: 'reversed period' });
+    await runPeriodValidationCase({ start: bounds.startMin - 1, end: 2000, expectedField: 'simStartJahr', label: 'out-of-bounds start' });
+
+    await page.locator('#simStartJahr').fill('2000');
+    await page.locator('#simEndJahr').fill('2002');
+    await page.evaluate(() => {
+        const defaultBounds = {
+            startYear: Number(document.getElementById('simStartJahr').min),
+            endYear: Number(document.getElementById('simStartJahr').max),
+            lookbackYears: 1
+        };
+        return window.runBacktest({
+            historicalDataProvider: {
+                schemaVersion: 'SyntheticHistoricalProviderV1',
+                datasetId: 'synthetic-missing-middle-year',
+                revision: 'browser-gate',
+                contentHash: '0'.repeat(64),
+                temporalConventionId: 'synthetic-browser-gate',
+                bounds: defaultBounds,
+                preparePeriod(period) {
+                    return {
+                        status: 'incomplete',
+                        period,
+                        reason: { code: 'historical_year_missing', year: period.startYear + 1 }
+                    };
+                }
+            }
+        });
+    });
+    assert(await page.locator('#backtestStatus').getAttribute('data-status') === 'incomplete', 'Synthetic middle-year gap must render incomplete');
+    assert((await page.locator('#backtestStatus').textContent()).includes('historical_year_missing'), 'Incomplete state must expose its stable reason code');
+    assert(!(await page.locator('#simulationResults').isVisible()), 'Incomplete result must not masquerade as a complete summary');
+
+    await page.evaluate(() => window.runBacktest({
+        simulateYear() {
+            return {
+                kind: 'technical_error',
+                error: {
+                    code: 'SYNTHETIC_TECHNICAL_ERROR',
+                    message: 'SYNTHETIC_TECHNICAL_ERROR at C:\\Users\\private\\runner.js',
+                    stack: 'synthetic stack'
+                }
+            };
+        }
+    }));
+    const technicalStatus = await page.locator('#backtestStatus').textContent();
+    assert(await page.locator('#backtestStatus').getAttribute('data-status') === 'technical_error', 'Synthetic engine failure must render technical_error');
+    assert(technicalStatus.includes('SYNTHETIC_TECHNICAL_ERROR'), 'Technical state must expose its stable code');
+    assert(!technicalStatus.includes('C:\\Users') && !technicalStatus.includes('synthetic stack'), 'Technical state must suppress local paths and stack details');
+
+    await page.evaluate(() => window.runBacktest({
+        simulateYear(state) {
+            return {
+                kind: 'ruin',
+                isRuin: true,
+                newState: state,
+                reason: 'synthetic_floor_shortfall',
+                ruinDetails: { requiredFloorNominal: 1, coveredFloorNominal: 0, shortfallNominal: 1 }
+            };
+        }
+    }));
+    assert(await page.locator('#backtestStatus').getAttribute('data-status') === 'ruin', 'Synthetic floor shortfall must render ruin separately');
+    assert((await page.locator('#backtestStatus').textContent()).includes('BACKTEST_RUIN'), 'Ruin state must expose its stable financial code');
+    assert(await page.locator('#simulationResults').isVisible(), 'Ruin remains a financial result with summary and rows');
+    assert((await page.evaluate(() => window.__browserSmokeAlerts || [])).length === 0, 'Backtest validation and terminal states must not rely on alert dialogs');
     smoke.assertNoErrors();
     await smoke.close();
 }

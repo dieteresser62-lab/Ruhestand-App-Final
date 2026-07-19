@@ -1,12 +1,12 @@
 # Forschungsabgleich – Evidenzregister
 
-**Stand:** 2026-07-17<br>
+**Stand:** 2026-07-19<br>
 **Quellen- und Erhebungsstand:** 2026-07-15<br>
 **Letzte Aktualitätsstichprobe dynamischer/amtlicher Anker:** 2026-07-17, Europe/Berlin<br>
 **Status:** normativer Beleganhang zum Architektur- und Fachkonzept<br>
 **Hauptdokument:** [Architektur und Fachkonzept](ARCHITEKTUR_UND_FACHKONZEPT.md#forschungsrahmen)
 
-Dieses Register führt das vollständige kuratierte Korpus mit 55 FOR-Records und die ausführlichen Dossiers MAP-01 bis MAP-17. Es ist kein Archiv: Quellenrolle, Übertragbarkeit, Abweichung, Evidenzstatus, lokale Validierungsgrenze und offene V4-/V5-Prüfung sind hier normativ. Das Hauptdokument bleibt für Ergebnisgrenzen, FR-01 bis FR-12 und FQ-01 bis FQ-10 maßgeblich. Der [interne Forschungsvalidierungs-Backlog](../internal/FORSCHUNGSVALIDIERUNGS_BACKLOG.md) definiert deren nächste Nachweise und Freigabegates; er schließt keine Frage und hebt keinen Evidenzstatus an.
+Dieses Register führt das vollständige kuratierte Korpus mit 55 FOR-Records und die ausführlichen Dossiers MAP-01 bis MAP-17. Es ist kein Archiv: Quellenrolle, Übertragbarkeit, Abweichung, Evidenzstatus, lokale Validierungsgrenze und offene V4-/V5-Prüfung sind hier normativ. Das Hauptdokument bleibt für Ergebnisgrenzen, FR-01 bis FR-12 und FQ-01 bis FQ-10 maßgeblich. Der [interne Forschungsvalidierungs-Backlog](../internal/FORSCHUNGSVALIDIERUNGS_BACKLOG.md) definiert deren nächste Nachweise und Freigabegates. Das [Simulator-Backtest-Forschungsprotokoll](../internal/SIMULATOR_BACKTEST_FORSCHUNGSPROTOKOLL.md) inventarisiert fuer MAP-12/13 Daten-, Kosten-, Trial-, Holdout- und Owner-Blockaden; beide Dokumente schließen keine Frage und heben keinen Evidenzstatus an.
 
 Die Aufnahme einer Quelle belegt weder eine identische Suite-Umsetzung noch deren Wirksamkeit. Literaturzahlen sind keine Suite-Ergebnisse; lokale Tests belegen höchstens V1 bis V3 und ersetzen keine externe Kalibrierung oder Wirksamkeitsprüfung.
 
@@ -486,6 +486,7 @@ Nachlass erreicht oder reale Kaufkraft ohne Unterbrechung gehalten wurde.
 | Abweichung | Policy, Parameter, Datenquelle und Auswertungsgrößen wurden unter Kenntnis derselben Historie entwickelt. Eine chronologische Ausführung verhindert nicht den Forscher-Look-ahead bei Regelwahl. Die enge Datenbasis deckt Länderausfälle, Produktkosten und nicht überlebende Märkte nur unvollständig ab. |
 | Evidenzstatus | **etabliert als Diagnoseverfahren**; nicht als unabhängige Wirksamkeitsvalidierung. |
 | Lokale Validierung | `simulator-backtest.test.mjs`, `simulation.test.mjs` und relevante Engine-Regressionstests prüfen Fenster-, Renten-, Mindest-Flex- und Ergebnisverträge (V1–V3). |
+| Operationaler Gate-Status | Slice 09 begrenzt aktuelle Aussagen auf historische In-sample-Diagnose, technisch getestet oder unter den offengelegten Annahmen beobachtet. Die gesamte eingebettete Historie 1925-2025 und daraus gebildete Rolling Cohorts gelten als explorativ/kontaminiert. `HistoricalBacktestExportV1` manifestiert einen explizit exportierten Lauf, ist aber kein vollständiges Trial-Log und kein Holdout-Nachweis. FV-G02, FV-G03, FV-G05, FV-G06 und FV-G08 bleiben blockiert; siehe [Forschungsprotokoll](../internal/SIMULATOR_BACKTEST_FORSCHUNGSPROTOKOLL.md). |
 | Restrisiko und offene Prüfung | Wiederholtes Ausprobieren erzeugt ein nicht protokolliertes Trial-Universum. Für stärkere Evidenz wären eingefrorene Regeln, vollständiges Trial-Inventar, unangetastete Holdout-Perioden und breitere Länder-/Indexdaten erforderlich. |
 
 <a id="map-13"></a>
@@ -500,6 +501,7 @@ Nachlass erreicht oder reale Kaufkraft ohne Unterbrechung gehalten wurde.
 | Abweichung | Disjunkte Seeds sind keine unabhängige Markt-/Modell-Stichprobe, weil Train und Test aus derselben Datenbasis und demselben Generator stammen. Top-K-Auswahl, lokale Verfeinerung und wiederholte Läufe vergrößern das effektive Trial-Universum; es gibt keine verschachtelte Validierung oder Multiple-Testing-Korrektur. |
 | Evidenzstatus | **experimentell**; Such- und Sensitivitätswerkzeug, keine automatische Empfehlung oder globale Optimierung. |
 | Lokale Validierung | `simulator-sweep.test.mjs`, `auto-optimizer.test.mjs`, `auto-optimize-worker-contract.test.mjs`, `simulator-heatmap.test.mjs` und `worker-parity.test.mjs` prüfen Sampling, Constraints, Cache, Champion-Shape und Ausführungsgleichheit (V1–V3). |
+| Operationaler Gate-Status | Disjunkte Train-/Test-Seeds desselben Generators bleiben modellinterne Validierung und kein externer Holdout. Frühere betrachtete Kandidaten und manuelle Nachjustierungen sind nicht vollständig rekonstruierbar. Persistentes append-only Trial-Tracking ist nicht autorisiert; ein Validierungs-/Statistik-Owner, Holdout-Custodian und eigener Speicher-/Datenschutzvertrag fehlen. |
 | Restrisiko und offene Prüfung | Objective- und Zielfunktions-Overfit, Champion-Instabilität und vom Nutzer wiederholt betrachtete Test-Sets bleiben. Erforderlich sind Trial-Logging, verschachtelte oder zeitlich/länderweise Holdouts, Stabilitätsintervalle und ein unveränderter Baselinevergleich. |
 
 <a id="langelbigkeit-rente-pflege"></a>

@@ -6,7 +6,17 @@ import { displayMonteCarloResults } from './simulator-results.js';
 import { normalizeWidowOptions } from './simulator-sweep-utils.js';
 import { readMonteCarloParameters, createMonteCarloUI } from './monte-carlo-ui.js';
 import { ScenarioAnalyzer } from './scenario-analyzer.js';
-import { buildMonteCarloAggregates, createMonteCarloBuffers, MC_HEATMAP_BINS, pickWorstRun, runMonteCarloChunk, runMonteCarloSimulation } from './monte-carlo-runner.js';
+import {
+    attachMonteCarloBatchOutcome,
+    buildMonteCarloAggregates,
+    createMonteCarloBuffers,
+    createMonteCarloTechnicalInventory,
+    MC_HEATMAP_BINS,
+    mergeMonteCarloTechnicalInventory,
+    pickWorstRun,
+    runMonteCarloChunk,
+    runMonteCarloSimulation
+} from './monte-carlo-runner.js';
 import { WorkerJobRunner } from './worker-job-runner.js';
 import { featureFlags } from '../shared/feature-flags.js';
 import { WorkerPool } from '../../workers/worker-pool.js';
@@ -135,6 +145,7 @@ async function runMonteCarloWithWorkers({
         healthBucketInterestAmounts: []
     };
     const allRealWithdrawalsSample = [];
+    const technicalInventory = createMonteCarloTechnicalInventory(anzahl);
     const totals = {
         failCount: 0,
         pflegeTriggeredCount: 0,
@@ -252,6 +263,7 @@ async function runMonteCarloWithWorkers({
             appendArray(lists.healthBucketTargetGaps, result.lists.healthBucketTargetGaps);
             appendArray(lists.healthBucketInterestAmounts, result.lists.healthBucketInterestAmounts);
             appendArray(allRealWithdrawalsSample, result.allRealWithdrawalsSample);
+            mergeMonteCarloTechnicalInventory(technicalInventory, result.technicalInventory);
 
             worstRun = pickWorstRun(worstRun, result.worstRun);
             worstRunCare = pickWorstRun(worstRunCare, result.worstRunCare);
@@ -289,7 +301,7 @@ async function runMonteCarloWithWorkers({
     onProgress(95);
     await new Promise(resolve => setTimeout(resolve, 0));
 
-    const aggregatedResults = buildMonteCarloAggregates({
+    const aggregatedResults = attachMonteCarloBatchOutcome(buildMonteCarloAggregates({
         inputs,
         totalRuns: anzahl,
         buffers,
@@ -298,7 +310,7 @@ async function runMonteCarloWithWorkers({
         totals,
         lists,
         allRealWithdrawalsSample
-    });
+    }), technicalInventory);
 
     onProgress(100);
 
@@ -307,7 +319,10 @@ async function runMonteCarloWithWorkers({
         failCount: totals.failCount,
         worstRun,
         worstRunCare,
-        pflegeTriggeredCount: totals.pflegeTriggeredCount
+        pflegeTriggeredCount: totals.pflegeTriggeredCount,
+        batchStatus: aggregatedResults.batchStatus,
+        financialMetricsValid: aggregatedResults.financialMetricsValid,
+        technicalInventory
     };
 }
 
@@ -474,7 +489,21 @@ export async function runMonteCarlo() {
             });
         }
 
-        const { aggregatedResults, failCount, worstRun, worstRunCare, pflegeTriggeredCount } = results;
+        const {
+            aggregatedResults,
+            failCount,
+            worstRun,
+            worstRunCare,
+            pflegeTriggeredCount,
+            batchStatus,
+            technicalInventory
+        } = results;
+
+        if (batchStatus === 'technical_error') {
+            const firstError = technicalInventory?.errors?.[0];
+            ui.showError(firstError?.message || 'Die Monte-Carlo-Simulation wurde wegen eines technischen Fehlers beendet.');
+            return;
+        }
 
         if (usedWorkers && scenarioAnalyzer) {
             // Re-run selected indices in serial to capture full log rows.

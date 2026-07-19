@@ -7,7 +7,10 @@ Aktive interne Uebersichten:
 - `PROJEKTUEBERSICHT.md` - detaillierte technische und organisatorische Projektuebersicht.
 - `SLICE_EXECUTION_RULES.md` - verbindlicher Review-, Branch-, Risiko- und Abnahmeprozess fuer Slices.
 - `FORSCHUNGSVALIDIERUNGS_BACKLOG.md` - priorisierte offene FR-/FQ-Folgevorhaben mit Nachweis- und Freigabegates.
-- Die oeffentliche Abschlussreferenz des Arbeitsplans liegt unter `../reference/TRANCHEN_MODULES_README.md`; die Nutzeranleitung unter `../guides/MULTI-TRANCHEN-ANLEITUNG.md`.
+- `SIMULATOR_BACKTEST_GAP_ANALYSE.md` - reviewte Ist-/Soll-Bestandsaufnahme mit BT-01 bis BT-20 und Abschlussmatrix nach Slices 01-10.
+- `SIMULATOR_BACKTEST_HARDENING_PLAN.md` - freigegebener Arbeitsplan mit zehn 1-basierten Slices und Ausfuehrungs-DAG fuer Runner-, Daten-, Shared-Outcome-, Metrik-, Export-, UI-, Forschungs- und Integrationsgates; Slice 10 ist implementiert und wartet auf Review.
+- `SIMULATOR_BACKTEST_FORSCHUNGSPROTOKOLL.md` - operationalisierte FQ-/FV-Gates, Ownerrollen, Daten-/Kosten-/Trial-/Holdout-Grenzen und zulaessige Aussageformen ohne Forschungsfreigabe.
+- Die oeffentliche Abschlussreferenz des abgeschlossenen Tranchen-Arbeitsplans liegt unter `../reference/TRANCHEN_MODULES_README.md`; die Nutzeranleitung unter `../guides/MULTI-TRANCHEN-ANLEITUNG.md`.
 
 Abgeschlossene Umsetzungen und fruehere Arbeitsplaene liegen im Archiv.
 
