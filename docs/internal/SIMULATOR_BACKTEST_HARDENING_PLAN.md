@@ -130,7 +130,7 @@ Backtest, Monte Carlo und Sweep muessen denselben Adapterfehler gleich klassifiz
 
 | ID | Entscheidung | Planvorschlag | Freigabebedarf |
 | - | - | - | - |
-| D-01 | Jahres-/As-of-Konvention | Planvorschlag gemaess Alignment-Tabelle unten: realisierte Markt-/Makrowerte mit Label `t`; CAPE/Policy nur mit belegtem As-of vor der Entscheidung. Jede Abweichung zu Monte Carlos aktivem `annualData` wird feldweise ausgewiesen. | Gemini + Claude + Nutzer vor Slice 04 |
+| D-01 | Jahres-/As-of-Konvention | In Slice 04 umgesetzt: realisierte Markt-/Makrowerte mit Label `t`; CAPE/Policy mit `sourceYear/asOfYear=t-1`. Jede Abweichung zu Monte Carlos aktivem `annualData` wird feldweise ausgewiesen. | Erneutes Gemini-Review und Nutzerfreigabe fuer Slice 04 ausstehend |
 | D-02 | Einjahreslauf | Als gueltige Diagnose zulassen, sofern genau ein vollstaendiger YearRecord verfuegbar ist. | Review im Slice 03 |
 | D-03 | Missingness | Pflichtreihe `missing` -\> Lauf `incomplete`; `fallback\_zero` nur explizit und sichtbar, nicht durch `|| 0`. | Review im Slice 03 |
 | D-04 | Ruin | Fachlicher Floor-Deckungsausfall bleibt `ruin`; Engine-/Contractfehler werden `technical\_error`. | Review im Slice 05; Stop bei EngineAPI-Aenderung |
@@ -140,9 +140,9 @@ Backtest, Monte Carlo und Sweep muessen denselben Adapterfehler gleich klassifiz
 | D-08 | Kostenmodell | Nicht innerhalb des Hardening still ergaenzen, da Engine-/Cashflow-Semantik betroffen sein kann. Eigenes Folgearbeitsdokument nach FQ-01-Gates. | Nutzer + Fachowner + neues Review |
 | D-09 | Shared YearData/Fehler | Nicht-finite Pflichtreturns duerfen im gemeinsamen Simulatorpfad nicht als 0 % fortgerechnet werden; Ziel ist `technical_error`. Umsetzung erst nach Aufruferinventur, Performancebaseline und Nachweis, dass keine Engine-Fachsemantik geaendert wird. | Gemini + Claude + Nutzer vor Slice 05 |
 
-### Vorgeschlagene canonical Alignment-Tabelle fuer D-01
+### Umgesetzte canonical Alignment-Tabelle fuer D-01
 
-Diese Tabelle is ein zu reviewender Planvorschlag, noch keine fachliche Freigabe:
+Diese Tabelle beschreibt den in Slice 04 implementierten Zielcontract. Sie ist noch keine finale Slice-Freigabe:
 
 | Feld im Simulationsjahr `t` | Planvorschlag | Legacy-Backtest | Aktives Monte-Carlo-`annualData` | Freigabenachweis |
 | --- | --- | --- | --- | --- |
@@ -153,7 +153,7 @@ Diese Tabelle is ein zu reviewender Planvorschlag, noch keine fachliche Freigabe
 | Lohn-/Rentenanpassung | `lohn_de[t]` beziehungsweise `inflation_de[t]`; `computeAdjPctForYear()` mappt nachweislich `simStartYear - series.startYear + yearIdx` | Wert `t` | Wert `t` | Off-by-one-Test 1950/2000/2001 |
 | CAPE/Policy | letzter vor Policyentscheidung belegbar verfuegbarer Wert, voraussichtlich Datenlabel `t-1`; exaktes As-of muss das Manifest tragen | durch `dataVJ` effektiv `t-1` | gesampelter Record `t` | Look-ahead-Negativtest und Nutzerentscheid |
 
-Slice 04 darf erst starten, wenn jede Tabellenzeile entweder freigegeben oder mit begruendetem Blocker versehen ist. Die Zielwerte nach D-01 werden als neue `target_expected`-Oracles neben den unveraenderten `legacy_observed`-Fixtures aus Slice 01 gespeichert; die Legacy-Fixtures werden nicht umgedeutet.
+Die Zielwerte nach D-01 sind als neue `target_expected`-Oracles neben den unveraenderten `legacy_observed`-Fixtures aus Slice 01 gespeichert; die Legacy-Fixtures werden nicht umgedeutet. Das blockierte Gemini-Review bestaetigte die `t`-Zuordnung fuer Inflation, verlangte aber vor Freigabe die signierte Negativzins-Reconciliation und die Anpassung des Legacy-Regressionstests. Beides ist umgesetzt; das erneute Review steht aus.
 
 
 ## Gesamt-Akzeptanzkriterien
@@ -199,7 +199,7 @@ Slice 04 darf erst starten, wenn jede Tabellenzeile entweder freigegeben oder mi
 | 01 | [SLICE_SIMULATOR_BACKTEST_01_BASELINE_MESSVERTRAG.md](./SLICE_SIMULATOR_BACKTEST_01_BASELINE_MESSVERTRAG.md) | Baseline, Golden-/Negative-Cases und Metrikwörterbuch einfrieren | Arbeitsdokument freigegeben | abgeschlossen |
 | 02 | [SLICE_SIMULATOR_BACKTEST_02_DOM_FREIER_RUNNER.md](./SLICE_SIMULATOR_BACKTEST_02_DOM_FREIER_RUNNER.md) | DOM-freien Runner und Request/Result-Grundshape extrahieren, ohne Semantikdelta | Slice 01 gruen/freigegeben | abgeschlossen |
 | 03 | [SLICE_SIMULATOR_BACKTEST_03_DATEN_JAHRES_CONTRACT.md](./SLICE_SIMULATOR_BACKTEST_03_DATEN_JAHRES_CONTRACT.md) | Manifest, einmalige Validierung, Missingness, Perioden- und HistoricalYearRecord-Vertrag | Slices 01-02 gruen/freigegeben | abgeschlossen |
-| 04 | [SLICE_SIMULATOR_BACKTEST_04_ZEITACHSEN_UMSETZUNG.md](./SLICE_SIMULATOR_BACKTEST_04_ZEITACHSEN_UMSETZUNG.md) | Zeitachsensynchronisation | D-01/D-03 entschieden, Slices 01-03 | nicht gestartet |
+| 04 | [SLICE_SIMULATOR_BACKTEST_04_ZEITACHSEN_UMSETZUNG.md](./SLICE_SIMULATOR_BACKTEST_04_ZEITACHSEN_UMSETZUNG.md) | Zeitachsensynchronisation | D-01/D-03 entschieden, Slices 01-03 | implementiert und getestet; erneutes Review ausstehend |
 | 05 | [SLICE_SIMULATOR_BACKTEST_05_OUTCOME_RUIN_FEHLER.md](./SLICE_SIMULATOR_BACKTEST_05_OUTCOME_RUIN_FEHLER.md) | Gemeinsame Adapterfehler, Ruin, incomplete und technische Fehler in Backtest/MC/Sweep trennen; Summary reconciliieren | Slices 02-03; D-04/D-09 | nicht gestartet |
 | 06 | [SLICE_SIMULATOR_BACKTEST_06_METRIKEN_ROLLING_COHORTS.md](./SLICE_SIMULATOR_BACKTEST_06_METRIKEN_ROLLING_COHORTS.md) | Reconciliierbares Ergebnisbuendel verpflichtend; Rolling Cohorts nur nach D-05 | Slices 04-05; D-05 blockiert nur den optionalen Cohort-Teil | nicht gestartet |
 | 07 | [SLICE_SIMULATOR_BACKTEST_07_EXPORT_REPRODUZIERBARKEIT.md](./SLICE_SIMULATOR_BACKTEST_07_EXPORT_REPRODUZIERBARKEIT.md) | Versionierter Raw-Export und Laufmanifest, getrennt von Displayformatierung | Slices 02-03/05; Metrikteil aus 06, Cohortteil optional nach D-05 | nicht gestartet |
@@ -307,7 +307,7 @@ Zusaetzlich zu `AGENTS.md` und `SLICE\_EXECUTION\_RULES.md` gilt:
 | 01 | abgeschlossen | fokussiert und `npm test` gruen | freigegeben | abgeschlossen |
 | 02 | abgeschlossen | fokussiert, `npm test`, Browser und Coverage gruen | freigegeben | abgeschlossen |
 | 03 | abgeschlossen | fokussiert und `npm test` gruen | freigegeben | abgeschlossen |
-| 04 | blockiert bis D-01/D-03 | offen | offen | offen |
+| 04 | abgeschlossen | fokussiert und `npm test` gruen | nach Blockerbehebung erneut offen | abgeschlossen |
 | 05 | nicht gestartet | offen | offen | offen |
 | 06 | Metrikteil nicht gestartet; Cohortteil blockiert bis D-05 | offen | offen | offen |
 | 07 | nicht gestartet | offen | offen | offen |
@@ -350,6 +350,17 @@ Zusaetzlich zu `AGENTS.md` und `SLICE\_EXECUTION\_RULES.md` gilt:
 - Produktiver Backtest, Monte Carlo, Sweep, Worker und `readYearReturnRates()` importieren den neuen Contract noch nicht. D-01 und die wirksame Umschaltung bleiben Slice 04; BT-20/D-09 bleibt Slice 05.
 - Validierung: neue Contracttests 146/146, Manifesttests 274/274, Datenrobustheit 3/3, Input-Reader 53/53, Characterization 65/65 ohne Fixture-Delta, Backtest 46/46 sowie `npm test` mit 115 Dateien und 5120/5120 Assertions; 0 fehlgeschlagene Dateien und 0 offene Handles.
 - Slice 03 ist durch Gemini freigegeben und lokal committet.
+
+### Slice 04: rueckdokumentierter Implementierungsstand
+
+- Der produktive Backtest nutzt jetzt den gecachten `HistoricalBacktestContractProvider`. Die Temporal-Konvention `realized_t_decision_t_minus_1_v1` ordnet Aktienendpunkte, Gold, Cash-/Bondzins, Inflation und Lohn dem Simulationsjahr `t` zu; CAPE bleibt decision-as-of `t-1`.
+- Der Periodenpreflight validiert das vollstaendige Anfrage- und Lookback-Fenster, liefert die initiale Vierjahres-Markthistorie und beendet unvollstaendige Requests vor der Jahresschleife als `incomplete`. Bounds stammen aus dem Manifest; vollstaendige Einjahreslaeufe sind erlaubt.
+- Der Runner baut `yearData` nur noch aus validierten Records. Request und Ergebnis fuehren Dataset-/Temporal-Provenienz; der Legacy-UI-/Exportschema-Vertrag bleibt fuer diesen Slice bestehen.
+- Gemini blockierte den ersten Stand wegen eines nicht reconcilierten negativen Cashzinses 2020 und einer Legacy-Inflationserwartung in `simulator-backtest.test.mjs`. Cashzins, Balance-Trace und Flow-Reconciliation sind nun signiert; der Test erwartet D-01-konform Inflation `t`.
+- Die unveraenderte Legacy-Fixture `simulator-backtest-baseline-v1.json` bleibt getrennt von `simulator-backtest-target-v1.json`. Letztere enthaelt `BacktestTemporalDeltaReportV1` mit Ursachen pro geaenderter Metrik, historischen Endvermoegensdeltas, unveraendert 1/6 Ruinfaellen und der dokumentierten Nichtbetroffenheit der direkten Optimizer-/Risikoprofil-/MC-/Sweep-/Workerpfade.
+- Beispiel-Deltas: 2000-2005 Endvermoegen -5.209,18 EUR; 1960-2020 -156.153,94 EUR; Dynamic-Flex/CAPE 2010-2013 +39.114,73 EUR. Alle positiven Zielfaelle bleiben unter einem Euro absolutem FlowDelta; der lange Negativzinsfall reconciliiert auf 0.
+- Validierung: Contract 163/163, Runner 61/61, Characterization 67/67, Produktbacktest 51/51, Worker-Paritaet 369/369 und Gesamtsuite mit 115 Testdateien und 5.155/5.155 Assertions; 0 fehlgeschlagene Dateien und 0 offene Handles.
+- Restrisiken: weitere nicht-negative Geldnormalisierungen koennten Deflation still kappen; alternative Custom-Datasets benoetigen zusaetzliche Randjahres-/Lookback-Importtests. Implementierung und Selbstpruefung sind abgeschlossen, erneutes Gemini-Review/Nutzerfreigabe und Commit stehen aus.
 
 
 ## Review-Auftrag

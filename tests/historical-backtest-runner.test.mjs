@@ -1,9 +1,9 @@
 import {
     BACKTEST_REQUEST_SCHEMA_VERSION,
     BACKTEST_RESULT_SCHEMA_VERSION,
-    createHistoricalDataProvider,
     runHistoricalBacktest
 } from '../app/simulator/historical-backtest-runner.js';
+import { HISTORICAL_TEMPORAL_CONVENTION_ID } from '../app/simulator/historical-backtest-contract.js';
 
 console.log('--- Historical Backtest Runner Tests ---');
 
@@ -64,6 +64,9 @@ callerInputs.self = callerInputs;
 freezeDeep(callerInputs);
 
 const historicalRecords = {
+    1996: { msci_eur: 70, gold_eur_perf: 1, zinssatz_de: 1, inflation_de: 0.4, lohn_de: 1.1, cape: 15 },
+    1997: { msci_eur: 80, gold_eur_perf: 2, zinssatz_de: 1.2, inflation_de: 0.6, lohn_de: 1.2, cape: 16 },
+    1998: { msci_eur: 90, gold_eur_perf: 3, zinssatz_de: 1.5, inflation_de: 0.8, lohn_de: 1.3, cape: 17 },
     1999: {
         msci_eur: 100,
         gold_eur_perf: 4,
@@ -94,6 +97,88 @@ const historicalRecords = {
 };
 freezeDeep(historicalRecords);
 
+function observation(seriesId, value, sourceYear, extra = {}) {
+    return {
+        seriesId,
+        value,
+        sourceYear,
+        asOfYear: sourceYear,
+        qualityStatus: 'present',
+        ...extra
+    };
+}
+
+function makeHistoricalYearRecord(year) {
+    const previous = historicalRecords[year - 1];
+    const current = historicalRecords[year];
+    return freezeDeep({
+        schemaVersion: 'HistoricalYearRecordV1',
+        year,
+        simulationYear: year,
+        temporalConventionId: HISTORICAL_TEMPORAL_CONVENTION_ID,
+        alignmentStatus: 'approved_d01',
+        realized: {
+            equityReturn: observation('msci_eur', (current.msci_eur / previous.msci_eur) - 1, year, {
+                inputs: {
+                    previousSourceYear: year - 1,
+                    previousIndexLevel: previous.msci_eur,
+                    currentSourceYear: year,
+                    currentIndexLevel: current.msci_eur
+                }
+            }),
+            goldReturn: observation('gold_eur_perf', current.gold_eur_perf, year),
+            cashBondReturn: observation('zinssatz_de', current.zinssatz_de, year),
+            inflation: observation('inflation_de', current.inflation_de, year),
+            wagePensionAdjustment: observation('lohn_de', current.lohn_de, year)
+        },
+        decisionAsOf: {
+            capeRatio: observation('cape', previous.cape, year - 1)
+        }
+    });
+}
+
+function createContractProvider({ incompleteYear = null } = {}) {
+    return freezeDeep({
+        datasetId: 'runner-fixture',
+        revision: 'runner-fixture-v1',
+        contentHash: 'fixture-hash',
+        temporalConventionId: HISTORICAL_TEMPORAL_CONVENTION_ID,
+        preparePeriod(period) {
+            if (!Number.isInteger(period?.startYear)
+                || !Number.isInteger(period?.endYear)
+                || period.startYear > period.endYear) {
+                throw new TypeError('invalid historical period');
+            }
+            if (incompleteYear !== null) {
+                return freezeDeep({
+                    status: 'incomplete',
+                    period: { ...period },
+                    reason: { code: 'missing_historical_year', year: incompleteYear, phase: 'requested_period' }
+                });
+            }
+            const records = [];
+            for (let year = period.startYear; year <= period.endYear; year++) records.push(makeHistoricalYearRecord(year));
+            return freezeDeep({
+                status: 'complete',
+                period: { ...period },
+                requestedYears: records.length,
+                temporalConventionId: HISTORICAL_TEMPORAL_CONVENTION_ID,
+                initialMarketHistory: {
+                    levels: {
+                        endeVJ: observation('msci_eur', historicalRecords[period.startYear - 1].msci_eur, period.startYear - 1),
+                        endeVJ_1: observation('msci_eur', historicalRecords[period.startYear - 2].msci_eur, period.startYear - 2),
+                        endeVJ_2: observation('msci_eur', historicalRecords[period.startYear - 3].msci_eur, period.startYear - 3),
+                        endeVJ_3: observation('msci_eur', historicalRecords[period.startYear - 4].msci_eur, period.startYear - 4)
+                    },
+                    allTimeHigh: observation('msci_eur', historicalRecords[period.startYear - 1].msci_eur, period.startYear - 1),
+                    yearsSinceAllTimeHigh: 0
+                },
+                records
+            });
+        }
+    });
+}
+
 const callerInputsBefore = snapshot(callerInputs);
 const historicalBefore = snapshot(historicalRecords);
 const observedYears = [];
@@ -118,11 +203,15 @@ const dependencies = {
             horizonYears: inputs.horizonYears,
             capeRatio: inputs.capeRatio,
             equityReturn: yearData.rendite,
-            source: yearData.nested.source
+            goldReturn: yearData.gold_eur_perf,
+            cashBondReturn: yearData.zinssatz,
+            inflation: yearData.inflation,
+            wageAdjustment: yearData.lohn,
+            temporal: yearData.temporal
         });
         inputs.partner.metadata.label = `run-${yearIndex}`;
         inputs.detailTranches[0].nested.acquisitionYear++;
-        yearData.nested.source = `run-${yearIndex}`;
+        yearData.rendite = 999;
         const value = state.portfolio.value + 10;
         const reductionPct = yearIndex === 0 ? 5 : 10;
         const logData = {
@@ -160,7 +249,7 @@ function executeCompletedRun() {
     return runHistoricalBacktest({
         inputs: callerInputs,
         period: { startYear: 2000, endYear: 2001 },
-        historicalDataProvider: createHistoricalDataProvider(historicalRecords),
+        historicalDataProvider: createContractProvider(),
         breakOnRuin: true,
         ...dependencies
     });
@@ -188,6 +277,8 @@ try {
 assertEqual(completed.schemaVersion, BACKTEST_RESULT_SCHEMA_VERSION, 'runner returns a versioned result shape');
 assertEqual(completed.request.schemaVersion, BACKTEST_REQUEST_SCHEMA_VERSION, 'runner embeds a versioned request shape');
 assertEqual(completed.request.breakOnRuin, true, 'request records the explicit ruin policy');
+assertEqual(completed.request.temporalConventionId, HISTORICAL_TEMPORAL_CONVENTION_ID, 'request records the approved temporal convention');
+assertEqual(completed.request.dataset.datasetId, 'runner-fixture', 'request records dataset provenance');
 assertEqual(completed.requestedYears, 2, 'requestedYears includes the full inclusive period');
 assertEqual(completed.completedYears, 2, 'completedYears counts successful simulated years');
 assertEqual(completed.rows.length, 2, 'completed run returns one row per simulated year');
@@ -203,6 +294,13 @@ assertEqual(completed.rows[1].netA, 2, 'legacy net equity fallback remains intac
 assertEqual(completed.rows[1].netG, 3, 'legacy net gold fallback remains intact');
 assertEqual(completed.rows[0].vpwFallbackHint, 'ok', 'active VPW payload retains the legacy hint');
 assertClose(observedYears[0].equityReturn, 0.1, 1e-12, 'runner builds the legacy equity return from adjacent records');
+assertEqual(observedYears[0].goldReturn, 5, 'runner uses realized gold from simulation year t');
+assertEqual(observedYears[0].cashBondReturn, 2.5, 'runner uses realized cash/bond return from simulation year t');
+assertEqual(observedYears[0].inflation, 1.2, 'runner uses realized inflation from simulation year t');
+assertEqual(observedYears[0].wageAdjustment, 1.7, 'runner uses wage adjustment from simulation year t');
+assertEqual(observedYears[0].capeRatio, 18, 'runner uses CAPE known at t-1');
+assertEqual(observedYears[0].temporal.realizedSourceYears.goldReturn, 2000, 'runner passes explicit realized source years');
+assertEqual(observedYears[0].temporal.decisionAsOf.capeRatio, 1999, 'runner passes explicit CAPE as-of year');
 assertEqual(observedYears[1].rentAdjPct, 3, 'runner delegates yearly pension adjustment');
 assertEqual(observedYears[1].horizonYears, 29, 'runner delegates yearly horizon resolution');
 assertEqual(snapshot(callerInputs), callerInputsBefore, 'deeply frozen caller inputs remain unchanged');
@@ -223,21 +321,19 @@ assertEqual(snapshot(historicalRecords), historicalBefore, 'repeated execution s
 const partial = runHistoricalBacktest({
     inputs: { ...callerInputs, self: undefined },
     period: { startYear: 2000, endYear: 2002 },
-    historicalDataProvider: createHistoricalDataProvider({
-        1999: historicalRecords[1999],
-        2000: historicalRecords[2000],
-        2002: historicalRecords[2001]
-    }),
+    historicalDataProvider: createContractProvider({ incompleteYear: 2001 }),
     ...dependencies
 });
-assertEqual(partial.rows.length, 1, 'legacy missing-middle-year path skips unavailable pairs');
-assertEqual(partial.completedYears, 1, 'partial path counts only successful years');
-assertEqual(partial.legacyOutcome, 'partial_result_rendered_as_completed_legacy', 'partial path is marked with the observed legacy outcome');
+assertEqual(partial.rows.length, 0, 'missing-middle-year preflight prevents loop entry');
+assertEqual(partial.completedYears, 0, 'incomplete data simulates no successful years');
+assertEqual(partial.dataStatus, 'incomplete', 'missing-middle-year path is explicitly incomplete');
+assertEqual(partial.incompleteReason.year, 2001, 'incomplete result identifies the exact missing year');
+assertEqual(partial.legacyOutcome, 'incomplete', 'incomplete data is no longer rendered as a completed legacy run');
 
 const ruin = runHistoricalBacktest({
     inputs: { ...callerInputs, self: undefined },
     period: { startYear: 2000, endYear: 2001 },
-    historicalDataProvider: createHistoricalDataProvider(historicalRecords),
+    historicalDataProvider: createContractProvider(),
     initializePortfolio: dependencies.initializePortfolio,
     totalPortfolio: dependencies.totalPortfolio,
     computeAdjustmentPct: () => 0,
@@ -251,21 +347,15 @@ assertEqual(ruin.completedYears, 0, 'ruin year is not counted as successfully co
 assertEqual(ruin.portfolioEnd, 100, 'ruin path retains the legacy pre-ruin portfolio end');
 assertEqual(ruin.legacyOutcome, 'ruin_legacy', 'ruin path retains the legacy outcome label');
 
-const empty = runHistoricalBacktest({
+const singleYear = runHistoricalBacktest({
     inputs: { ...callerInputs, self: undefined },
-    period: { startYear: Number.NaN, endYear: 2001 },
-    historicalDataProvider: createHistoricalDataProvider(historicalRecords),
+    period: { startYear: 2000, endYear: 2000 },
+    historicalDataProvider: createContractProvider(),
     ...dependencies
 });
-assertEqual(empty.requestedYears, null, 'non-integer legacy period has no requested-year count');
-assertEqual(empty.rows.length, 0, 'NaN legacy period executes no year');
-assertEqual(empty.legacyOutcome, 'empty_result_rendered_as_completed_legacy', 'empty path retains the observed legacy outcome');
-
-expectThrow(
-    () => createHistoricalDataProvider(null),
-    /records object/,
-    'historical provider rejects a missing records object'
-);
+assertEqual(singleYear.requestedYears, 1, 'one-year period has one requested year');
+assertEqual(singleYear.rows.length, 1, 'one-year period executes exactly one year');
+assertEqual(singleYear.legacyOutcome, 'completed_legacy', 'complete one-year period finishes successfully');
 expectThrow(
     () => runHistoricalBacktest({
         inputs: {},
@@ -273,19 +363,29 @@ expectThrow(
         historicalDataProvider: {},
         ...dependencies
     }),
-    /historicalDataProvider\.getYears/,
+    /historicalDataProvider\.preparePeriod/,
     'runner rejects an incomplete historical provider'
 );
 expectThrow(
     () => runHistoricalBacktest({
         inputs: {},
         period: { startYear: 2000, endYear: 2001 },
-        historicalDataProvider: createHistoricalDataProvider(historicalRecords),
+        historicalDataProvider: createContractProvider(),
         ...dependencies,
         simulateYear: null
     }),
     /simulateYear/,
     'runner rejects a missing simulation dependency'
+);
+expectThrow(
+    () => runHistoricalBacktest({
+        inputs: {},
+        period: { startYear: Number.NaN, endYear: 2001 },
+        historicalDataProvider: createContractProvider(),
+        ...dependencies
+    }),
+    /invalid historical period/,
+    'runner delegates invalid period rejection to the contract preflight'
 );
 
 console.log('✅ Historical backtest runner tests passed');

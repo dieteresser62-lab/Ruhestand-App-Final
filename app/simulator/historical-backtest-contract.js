@@ -4,6 +4,7 @@ import { HISTORICAL_DATA, HISTORICAL_DATA_MANIFEST } from './simulator-data.js';
 
 export const HISTORICAL_YEAR_RECORD_SCHEMA_VERSION = 'HistoricalYearRecordV1';
 export const HISTORICAL_DATA_MANIFEST_SCHEMA_VERSION = 'HistoricalDataManifestV1';
+export const HISTORICAL_TEMPORAL_CONVENTION_ID = 'realized_t_decision_t_minus_1_v1';
 
 const REQUIRED_SERIES_IDS = Object.freeze([
     'msci_eur',
@@ -393,7 +394,9 @@ export function buildHistoricalYearRecord({ year, current, previous, manifest = 
     const record = {
         schemaVersion: HISTORICAL_YEAR_RECORD_SCHEMA_VERSION,
         year,
-        alignmentStatus: 'proposal_pending_d01',
+        simulationYear: year,
+        temporalConventionId: HISTORICAL_TEMPORAL_CONVENTION_ID,
+        alignmentStatus: 'approved_d01',
         dataset: {
             datasetId: manifest.datasetId,
             revision: manifest.revision,
@@ -487,6 +490,20 @@ export function validateHistoricalYearRecord(record, manifest = HISTORICAL_DATA_
     if (!Number.isInteger(record.year)) {
         contractError('HISTORICAL_YEAR_RECORD_INVALID', 'HistoricalYearRecord.year must be an integer', { year: record.year });
     }
+    if (record.simulationYear !== record.year) {
+        contractError('HISTORICAL_TEMPORAL_ALIGNMENT_INVALID', 'HistoricalYearRecord.simulationYear must match year', {
+            year: record.year,
+            simulationYear: record.simulationYear
+        });
+    }
+    if (record.temporalConventionId !== HISTORICAL_TEMPORAL_CONVENTION_ID
+        || record.alignmentStatus !== 'approved_d01') {
+        contractError('HISTORICAL_TEMPORAL_ALIGNMENT_INVALID', 'HistoricalYearRecord does not use the approved D-01 convention', {
+            year: record.year,
+            temporalConventionId: record.temporalConventionId,
+            alignmentStatus: record.alignmentStatus
+        });
+    }
     for (const definition of REQUIRED_OBSERVATIONS) {
         const observation = record[definition.section]?.[definition.field];
         const path = `${definition.section}.${definition.field}`;
@@ -543,6 +560,30 @@ export function validateHistoricalYearRecord(record, manifest = HISTORICAL_DATA_
             }
         }
     }
+    for (const field of ['equityReturn', 'goldReturn', 'cashBondReturn', 'inflation', 'wagePensionAdjustment']) {
+        const observation = record.realized[field];
+        if (observation.sourceYear !== record.simulationYear || observation.asOfYear !== record.simulationYear) {
+            contractError('HISTORICAL_TEMPORAL_ALIGNMENT_INVALID', `realized.${field} must be assigned to simulation year t`, {
+                year: record.year,
+                path: `realized.${field}`,
+                sourceYear: observation.sourceYear,
+                asOfYear: observation.asOfYear,
+                expectedYear: record.simulationYear
+            });
+        }
+    }
+    const capeObservation = record.decisionAsOf.capeRatio;
+    const latestDecisionYear = record.simulationYear - 1;
+    if (capeObservation.sourceYear !== latestDecisionYear
+        || capeObservation.asOfYear !== latestDecisionYear
+        || capeObservation.asOfYear >= record.simulationYear) {
+        contractError('HISTORICAL_TEMPORAL_LOOKAHEAD', 'decisionAsOf.capeRatio must be known before simulation year t', {
+            year: record.year,
+            sourceYear: capeObservation.sourceYear,
+            asOfYear: capeObservation.asOfYear,
+            latestDecisionYear
+        });
+    }
     const equityInputs = record.realized.equityReturn.inputs;
     if (!equityInputs
         || !Number.isFinite(equityInputs.previousIndexLevel)
@@ -551,6 +592,14 @@ export function validateHistoricalYearRecord(record, manifest = HISTORICAL_DATA_
         || equityInputs.currentIndexLevel <= 0) {
         contractError('HISTORICAL_INDEX_LEVEL_INVALID', 'HistoricalYearRecord equity index levels must be finite and greater than zero', {
             year: record.year
+        });
+    }
+    if (equityInputs.previousSourceYear !== record.simulationYear - 1
+        || equityInputs.currentSourceYear !== record.simulationYear) {
+        contractError('HISTORICAL_TEMPORAL_ALIGNMENT_INVALID', 'Historical equity return endpoints must be t-1 and t', {
+            year: record.year,
+            previousSourceYear: equityInputs.previousSourceYear,
+            currentSourceYear: equityInputs.currentSourceYear
         });
     }
     if (record.decisionAsOf.capeRatio.value <= 0) {
@@ -615,6 +664,51 @@ function createIncomplete(period, code, details = {}) {
     });
 }
 
+function buildInitialMarketHistory(startYear, context) {
+    const levelDefinitions = [
+        ['endeVJ', startYear - 1],
+        ['endeVJ_1', startYear - 2],
+        ['endeVJ_2', startYear - 3],
+        ['endeVJ_3', startYear - 4]
+    ];
+    const equitySeries = context.manifest.series.msci_eur;
+    const levels = Object.fromEntries(levelDefinitions.map(([field, sourceYear]) => {
+        const value = context.rawLookup.get(sourceYear)?.msci_eur;
+        return [field, createObservation({
+            seriesId: 'msci_eur',
+            value,
+            unit: equitySeries.unit,
+            sourceYear,
+            asOfYear: sourceYear,
+            qualityStatus: resolveQualityStatus(equitySeries, sourceYear, value),
+            derivation: `initial_market_history_${field}`
+        })];
+    }));
+    const priorLevels = context.datasetYears
+        .filter(year => year < startYear)
+        .map(year => ({ year, value: context.rawLookup.get(year).msci_eur }));
+    const allTimeHigh = priorLevels.reduce((selected, candidate) => (
+        candidate.value >= selected.value ? candidate : selected
+    ), priorLevels[0]);
+    return deepFreeze({
+        schemaVersion: 'HistoricalInitialMarketHistoryV1',
+        temporalConventionId: HISTORICAL_TEMPORAL_CONVENTION_ID,
+        asOfYear: startYear - 1,
+        levels,
+        allTimeHigh: createObservation({
+            seriesId: 'msci_eur',
+            value: allTimeHigh.value,
+            unit: equitySeries.unit,
+            sourceYear: allTimeHigh.year,
+            asOfYear: startYear - 1,
+            qualityStatus: resolveQualityStatus(equitySeries, allTimeHigh.year, allTimeHigh.value),
+            derivation: 'maximum_index_level_through_t_minus_1'
+        }),
+        yearsSinceAllTimeHigh: 0,
+        yearsSinceAllTimeHighPolicy: 'legacy_zero_preserved_until_regime_contract_slice'
+    });
+}
+
 function preflightPeriod(periodInput, context) {
     const period = validatePeriodShape(periodInput, 'period');
     if (period.startYear < context.bounds.startYear || period.endYear > context.bounds.endYear) {
@@ -642,6 +736,8 @@ function preflightPeriod(periodInput, context) {
         period,
         requestedYears: period.endYear - period.startYear + 1,
         lookbackYears: context.lookbackYears,
+        temporalConventionId: HISTORICAL_TEMPORAL_CONVENTION_ID,
+        initialMarketHistory: buildInitialMarketHistory(period.startYear, context),
         records
     });
 }
@@ -696,6 +792,8 @@ export function createHistoricalBacktestContractProvider({
         bounds,
         lookbackYears,
         rawYears: new Set(dataset.years),
+        rawLookup: dataset.rawLookup,
+        datasetYears: dataset.years,
         recordLookup: validated.lookup
     };
 
@@ -704,6 +802,7 @@ export function createHistoricalBacktestContractProvider({
         datasetId: manifestSnapshot.datasetId,
         revision: manifestSnapshot.revision,
         contentHash: computedHash,
+        temporalConventionId: HISTORICAL_TEMPORAL_CONVENTION_ID,
         manifest: manifestSnapshot,
         bounds,
         getYears: () => validated.recordYears,
@@ -768,7 +867,7 @@ export const HISTORICAL_ASSIGNMENT_INVENTORY_V1 = deepFreeze({
         wagePensionAdjustment: 't_minus_1',
         capeRatio: 'not_mapped'
     },
-    historicalYearRecordV1Proposal: {
+    canonicalHistoricalYearRecordV1: {
         equityReturn: 'index_level_t / index_level_t_minus_1 - 1',
         goldReturn: 't',
         cashBondReturn: 't',

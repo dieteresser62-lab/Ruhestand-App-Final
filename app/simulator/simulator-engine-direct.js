@@ -604,12 +604,12 @@ export function simulateOneYear(currentState, inputs, yearData, yearIndex, pfleg
     // Cash-Verzinsung
     // Cash-Verzinsung
     const liqBasisForInterest = euros(liquiditaet);
-    cashZinsen = euros(liqBasisForInterest * rC);
     liquiditaet = euros(liqBasisForInterest * (1 + rC));
+    cashZinsen = liquiditaet - liqBasisForInterest;
     liqNachZins = euros(liquiditaet);
     if (!isFinite(liquiditaet)) liquiditaet = 0;
     snapshotBalance('after_cash_interest', {
-        cashInterestEarned: euros(cashZinsen),
+        cashInterestEarned: cashZinsen,
         liqBasisForInterest
     });
     const healthBucketInterest = applyHealthBucketInterest({ inputs, portfolio, rC });

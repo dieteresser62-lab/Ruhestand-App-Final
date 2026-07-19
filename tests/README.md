@@ -484,23 +484,24 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 **Zweck:** Testet die historische Backtest-Funktion.
 - **Determinismus:** Zwei Läufe mit gleichen Inputs sind identisch
 - **Startjahr-Filterung:** Korrekte Jahr-Auswahl (2010-2012)
-- **Historische Daten:** Inflation aus HISTORICAL_DATA
+- **Historische Daten:** D-01-konforme Inflation aus `HISTORICAL_DATA[t]`
 - **yearlyResults:** Länge entspricht (end-start+1)
 - **finalWealth:** Stimmt mit letztem Jahreseintrag überein
-- **Mindest-Flex:** Stresstest 2005-2014 mit hoeheren Entnahmen, angewandtem Logstatus und FlowDelta-Pruefung inklusive 3-Bucket-Modus.
+- **Mindest-Flex:** Stresstest 2005-2014 mit lokalem Same-Year-Invariant bei Status `applied`, Logstatus und FlowDelta-Pruefung inklusive 3-Bucket-Modus.
 - **Profilverbund-Transparenz:** Backtest-Ergebnis behaelt die profilgenaue `minimumFlexProfiles`-Aufteilung.
 - **Realentnahme:** Historische Jahreszeilen führen den kumulierten Inflationsfaktor fort und deflationieren die effektive Entnahme.
+- **Negativzins:** Der 2019-2020-Fall behaelt negative Cashzinsen in Ergebnis und Balance-Trace und reconciliiert FlowDelta.
 
 #### `historical-backtest-runner.test.mjs`
 **Zweck:** Testet den DOM-freien historischen Runner direkt an seiner Dependency-Injection-Grenze.
-- **Request/Result:** Versionierte V0-Grundshapes, inklusive Zeitraum, `breakOnRuin`, Rows, Completion, Start-/Endportfolio und Legacy-Metriken.
+- **Request/Result:** Versionierte V0-Grundshapes, inklusive Zeitraum, `breakOnRuin`, Dataset-/Temporal-Provenienz, Rows, Completion, Start-/Endportfolio und Legacy-Metriken.
 - **Isolation:** Lauf unter blockierten Browser-/Persistenzglobals; alle benoetigten Funktionen und historischen Records werden explizit injiziert.
 - **Non-Mutation:** Tief eingefrorene Partner-/Trancheninputs und Historienrecords, wiederholter identischer Aufruf sowie Erhalt von `undefined`, `Date`, `RegExp` und zyklischen Referenzen.
-- **Legacy-Paritaet:** Completed-, Datenluecken-, Leer- und Ruinpfad inklusive synthetischer Ruinzeile, Vorjahres-Endportfolio und 10-%-Kuerzungsoperator.
+- **Contractintegration:** Validierte Records, initiale Vierjahres-Markthistorie, D-01-`yearData`, fail-closed `incomplete` vor dem Loop sowie weiterhin bestehende Ruin-/Legacy-Projektionsvertraege.
 
 #### `historical-backtest-contract.test.mjs`
-**Zweck:** Testet den inaktiven V1-Daten-/Jahrescontract ohne DOM oder produktive Runner-Umschaltung.
-- **YearRecord:** Realized-/Decision-as-of-Trennung, Source-/As-of-Jahre, Qualitaet und D-01-Proposalstatus.
+**Zweck:** Testet den im Produktbacktest aktiven V1-Daten-/Jahrescontract ohne DOM.
+- **YearRecord:** Realized-/Decision-as-of-Trennung, Source-/As-of-Jahre, Qualitaet und aktive D-01-Konvention `realized_t_decision_t_minus_1_v1`.
 - **Preflight:** Einjahreslauf, Integer-/Bounds-Vertrag, erste Lookback-/Periodenluecke und Cohort-Batch.
 - **Fehler:** Strukturierte Missing-/Non-Finite-/Indexlevel-/Fallback-Zero-Fehler.
 - **Instrumentation:** Vollvalidierung einmal je Revision/Hash und Preflight einmal je Request/Batch; wiederholte Year-/MC-/Sweep-/Cohort-Lookups bleiben reine Cache-Reads.
@@ -514,12 +515,12 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 - **Lookup:** Lueckenlose 1925-2025-Baseline, abgeleitete technische Bounds 1929-2025, Provenienz und Non-Mutation.
 
 #### `simulator-backtest-characterization.test.mjs`
-**Zweck:** Friert den Legacy-Iststand des historischen Backtests als `legacy_observed` ein, ohne ihn als fachliches Soll zu bewerten.
+**Zweck:** Vergleicht die unveraenderte Slice-01-Baseline `legacy_observed` mit dem separaten D-01-Zieloracle `target_expected`.
 - **Golden Cases:** kurzer und langer Completed-Pfad, 3-Bucket/Mindest-Flex, Ruin, Pflegebucket-Projektionsluecke sowie Dynamic-Flex/CAPE.
 - **Negative Cases:** Einjahreslauf, NaN-/rueckwaertige Periode, mittlere Datenluecke und nicht-finite Goldrendite.
 - **Messvertrag:** kanonische Input- und Row-Hashes, Non-Mutation, Metrikwoerterbuch, 2000/2001-Alignment, `legacy_schema_v0` und Detailtoggle-Paritaet.
-- **Delta-Gate:** Abweichungen sind standardmaessig `unexpected_delta`; freigegebene Contract-Aenderungen muessen explizit als `expected_after_approved_contract_change` klassifiziert werden.
-- **Fixture:** `fixtures/simulator-backtest-baseline-v1.json`; Aktualisierung nur nach freigegebenem Contract-Delta mit `UPDATE_BACKTEST_BASELINE=1 node tests/run-single.mjs tests/simulator-backtest-characterization.test.mjs`.
+- **Delta-Gate:** `BacktestTemporalDeltaReportV1` benennt jede geaenderte Metrik samt Ursache und berichtet Endvermoegens-, Ruinfall- sowie Downstream-Consumer-Auswirkungen; nicht gespeicherte Zieldeltas schlagen fehl.
+- **Fixtures:** `fixtures/simulator-backtest-baseline-v1.json` bleibt read-only; `fixtures/simulator-backtest-target-v1.json` darf kontrolliert mit `UPDATE_BACKTEST_TARGET=1 node tests/run-single.mjs tests/simulator-backtest-characterization.test.mjs` erzeugt werden.
 
 #### `simulator-real-withdrawal-contract.test.mjs`
 **Zweck:** Testet den Simulatorvertrag für echte Realentnahmen.

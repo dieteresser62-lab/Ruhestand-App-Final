@@ -120,6 +120,17 @@ BT-13 und BT-18 koennen nicht allein durch Produktcode „geschlossen“ werden.
 - **BT-20 bewusst unveraendert:** Der V1-Contract lehnt nicht-finite Pflichtfelder ab, ist aber noch nicht im gemeinsamen YearData-Pfad aktiv. `simulator-year-portfolio.js:readYearReturnRates()` und seine MC-/Sweep-/Worker-Auswirkungen bleiben bis D-09/Slice 05 unangetastet.
 - **Qualitaet/Performance:** Records und Provider sind immutable. Vollvalidierung ist je Manifestrevision/Content-Hash gecacht; Single-Path- und Cohort-Batch-Preflight erzeugen je genau ein Instrumentationsereignis, waehrend wiederholte Year-/MC-/Sweep-/Cohort-Lookups reine Record-Reads bleiben.
 
+## Rueckdokumentation Slice 04
+
+- **BT-01 im Backtest technisch umgesetzt, Review ausstehend:** Der produktive Backtest verwendet `HistoricalYearRecordV1` mit `realized_t_decision_t_minus_1_v1`: Aktienendpunkte, Gold, Cash-/Bondzins, Inflation und Lohn liegen auf `t`; CAPE liegt decision-as-of auf `t-1`. Das aktive Monte-Carlo-`annualData` bleibt unveraendert und ist im maschinenlesbaren Alignmentvergleich separat ausgewiesen.
+- **BT-02 fuer den Produktbacktest geschlossen:** Contractpreflight und initiales Lookback laufen vollstaendig vor der Jahresschleife. Fehlende Pflicht-/Lookbackwerte liefern `incomplete`; ein Silent Skip ist im produktiven Runner nicht mehr moeglich.
+- **BT-06 fuer die Runnergrenze geschlossen:** Der UI-Adapter validiert finite Ganzzahlen gegen manifestabgeleitete Bounds und akzeptiert vollstaendige Einjahreslaeufe. Die sichtbare UI-/A11y-Projektion bleibt Slice 08.
+- **BT-07 bleibt methodisch offen:** Request und Ergebnis tragen Dataset-ID, Revision, Hash und Temporal-Konvention. Quellen-, Lizenz- und Variantenstatus bleiben weiterhin `unresolved`; Slice 04 aendert keine Rohdaten.
+- **Negativzins-Folgebefund behoben:** Die D-01-Aktivierung machte 2020 einen bestehenden Diagnosefehler sichtbar: negative Cashzinsen wurden bilanziell angewendet, aber durch `euros()` diagnostisch auf 0 gesetzt. Der tatsaechlich angewandte Cashzins bleibt nun signiert und reconciliiert im FlowDelta; Regressionen decken Ergebnis und Balance-Trace ab.
+- **Oracles:** `simulator-backtest-baseline-v1.json` bleibt unveraendert `legacy_observed`; `simulator-backtest-target-v1.json` ist `target_expected` und enthaelt `BacktestTemporalDeltaReportV1`. Die sechs Zielfaelle haben weiterhin 1/6 Ruinfaelle und FlowDelta jeweils unter 1 EUR.
+- **Aussagegrenze:** Auto-Optimizer und Risikoprofile referenzieren den Backtestresultatpfad nicht direkt; Monte Carlo, Sweep und Worker wurden nicht auf den Backtestrecord umgestellt. Deren fachliche Zeitachsen-/YearData-Fragen bleiben bei D-09/Slice 05 beziehungsweise spaeteren Fachentscheiden.
+- **Restrisiken:** Deflation kann an noch nicht inventarisierten `euros()`-Verwendungen still gekappt werden. Alternative Custom-Datasets koennen neue Lookback-Randjahresfaelle erzeugen und benoetigen Import-/Preflight-Regressionen.
+
 ## Zielbild
 
 ```text

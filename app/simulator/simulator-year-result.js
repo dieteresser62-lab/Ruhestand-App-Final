@@ -115,11 +115,12 @@ export function buildSimulatorYearResult({
     const portfolioActiveEnd = euros(wertAktien + wertGold + liquiditaet);
     const portfolioTotalEnd = euros(portfolioActiveEnd + healthBucketEnd);
     const taxCashAdjustment = euros(actionResult?.taxSettlement?.taxCashAdjustment);
+    const signedCashInterest = Number.isFinite(Number(cashZinsen)) ? Number(cashZinsen) : 0;
     const portfolioFlowDelta = portfolioActiveEnd - (
         euros(portfolioTotalBeforePayout)
         - euros(jahresEntnahmeEffektiv)
         - euros(bondRefillTax)
-        + euros(cashZinsen)
+        + signedCashInterest
         + taxCashAdjustment
     );
     const normalizedBalanceTrace = Array.isArray(balanceTrace)

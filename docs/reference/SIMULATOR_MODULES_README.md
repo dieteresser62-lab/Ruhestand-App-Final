@@ -193,29 +193,37 @@ DOM-freier Sweep-Runner für Worker-Jobs (Combos + RunRanges) mit deterministisc
 
 ### `historical-backtest-contract.js`
 
-DOM-freier, noch nicht produktiv aktivierter Daten- und Jahrescontract. Er
+DOM-freier, im historischen Produktbacktest aktivierter Daten- und Jahrescontract. Er
 validiert `HISTORICAL_DATA_MANIFEST` und den kanonischen SHA-256-Fingerprint
 einmal je Revision/Hash, baut einen immutable Lookup von
 `HistoricalYearRecordV1` und stellt Einzelpfad-/Cohort-Batch-Preflights bereit.
 Jeder Record trennt ex-post `realized` von `decisionAsOf` und traegt
-`sourceYear`, `asOfYear`, Einheit, Ableitung und Qualitaetsstatus.
+`sourceYear`, `asOfYear`, Einheit, Ableitung und Qualitaetsstatus. Die aktive
+Konvention `realized_t_decision_t_minus_1_v1` verwendet realisierte Werte aus
+`t` und CAPE decision-as-of aus `t-1`.
 
 **Hauptfunktionen / Exporte:**
 - `createHistoricalBacktestContractProvider()` – gecachter Datasetvalidator und immutable Provider mit abgeleiteten Bounds sowie `preparePeriod()`/`prepareBatch()`.
 - `buildHistoricalYearRecord()` / `validateHistoricalYearRecord()` – V1-Builder und strukturierte Recordvalidierung.
 - `validateHistoricalDataManifest()` / `computeHistoricalDatasetHash()` – Manifest- und kanonischer SHA-256-Vertrag.
-- `HISTORICAL_ASSIGNMENT_INVENTORY_V1` – maschinenlesbarer Vergleich von Legacy-Backtest, aktivem Monte-Carlo-`annualData`, alternativem Builder und inaktivem D-01-Vorschlag.
+- `HISTORICAL_TEMPORAL_CONVENTION_ID` – stabile ID der aktiven Backtest-Zeitachse.
+- `HISTORICAL_ASSIGNMENT_INVENTORY_V1` – maschinenlesbarer Vergleich von Legacy-Backtest, aktivem Monte-Carlo-`annualData`, alternativem Builder und kanonischem D-01-Zielcontract.
 
-**Einbindung:** Slice 03 stellt den Contract neben den bestehenden Pfad. Der
-produktive `historical-backtest-runner.js`, Monte Carlo, Sweep und Worker
-importieren ihn noch nicht; die wirksame Zeitachsensynchronisation folgt erst
-nach D-01-Freigabe.
+**Einbindung:** `simulator-backtest.js` erzeugt einen gecachten Provider und
+uebergibt ihn an den produktiven `historical-backtest-runner.js`. Monte Carlo,
+Sweep und Worker importieren den Backtestcontract weiterhin nicht.
 
 **Dependencies:** `simulator-data.js`; keine DOM-, Persistenz-, Engine- oder Worker-Abhaengigkeit.
 
 ### `historical-backtest-runner.js`
 
 DOM-freier historischer Jahresrunner mit expliziten Dependencies. `runHistoricalBacktest()` akzeptiert normalisierte Inputs, `{ startYear, endYear }`, einen Historical-Data-Provider sowie die injizierten Funktionen `simulateYear`, `initializePortfolio`, `computeAdjustmentPct`, `resolveHorizon` und `totalPortfolio`. Der Runner liest weder Browserglobals noch Persistenz.
+
+Vor dem Lauf konsumiert der Runner genau einen vollstaendigen Provider-Preflight.
+Er baut jedes `yearData` ausschliesslich aus validierten Records, uebernimmt die
+initiale Vierjahres-Markthistorie aus dem Contract und gibt bei einer Luecke
+`incomplete` zurueck, bevor die Jahresschleife beginnt. Request und Ergebnis
+tragen Dataset- und Temporal-Provenienz.
 
 Das vorlaeufige Ergebnis `BacktestRunResultV0` enthaelt den kanonisch eingefrorenen `BacktestRequestV0`, unverkuerzte `rows`, `requestedYears`, wirtschaftlich erfolgreiche `completedYears`, `portfolioStart`, `portfolioEnd`, `legacyOutcome` und die fuer den bestehenden UI-Summary benoetigten `legacyMetrics`. Caller-Inputs, Partner-/Tranchenobjekte und historische Records werden vor dem Lauf in eigene Kopien ueberfuehrt; `undefined`, `Date`, `RegExp`, Prototypen und zyklische Referenzen bleiben dabei erhalten.
 

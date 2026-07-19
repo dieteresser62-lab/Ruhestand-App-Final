@@ -144,8 +144,8 @@ try {
     {
         const rows = window.globalBacktestData?.rows || [];
         const first = rows[0];
-        const expectedInflation = HISTORICAL_DATA[first.jahr - 1]?.inflation_de || 0;
-        assertClose(first.inflationVJ, expectedInflation, 0.0001, 'Inflation should match HISTORICAL_DATA');
+        const expectedInflation = HISTORICAL_DATA[first.jahr]?.inflation_de;
+        assertClose(first.inflationVJ, expectedInflation, 0.0001, 'Inflation should match D-01 simulation year t');
     }
 
     // --- TEST 4: yearlyResults length ---
@@ -263,7 +263,6 @@ try {
         global.document.getElementById('monteCarloResults').style.display = 'none';
         runBacktest();
         const withMinimumFlexRows = window.globalBacktestData?.rows || [];
-        const withMinimumFlexTotal = withMinimumFlexRows.reduce((sum, r) => sum + (r.entscheidung?.jahresEntnahme || 0), 0);
 
         global.document = createMockDocument({
             ...baseInputs,
@@ -284,10 +283,17 @@ try {
         global.document.getElementById('monteCarloResults').style.display = 'none';
         runBacktest();
         const withoutMinimumFlexRows = window.globalBacktestData?.rows || [];
-        const withoutMinimumFlexTotal = withoutMinimumFlexRows.reduce((sum, r) => sum + (r.entscheidung?.jahresEntnahme || 0), 0);
-
-        assert(withMinimumFlexTotal > withoutMinimumFlexTotal, 'Mindest-Flex should increase 2005-2014 withdrawals');
-        assert(withMinimumFlexRows.some(r => r.row?.minimumFlexStatus === 'applied'), 'Backtest log should expose applied minimum-flex status');
+        const withoutMinimumByYear = new Map(withoutMinimumFlexRows.map(row => [row.jahr, row]));
+        const appliedMinimumRows = withMinimumFlexRows.filter(row => row.row?.minimumFlexStatus === 'applied');
+        assert(appliedMinimumRows.length > 0, 'Backtest log should expose applied minimum-flex status');
+        assert(
+            appliedMinimumRows.every(row => row.entscheidung?.jahresEntnahme >= (withoutMinimumByYear.get(row.jahr)?.entscheidung?.jahresEntnahme || 0)),
+            'Applied minimum flex should not reduce the same-year withdrawal'
+        );
+        assert(
+            appliedMinimumRows.some(row => row.entscheidung?.jahresEntnahme > (withoutMinimumByYear.get(row.jahr)?.entscheidung?.jahresEntnahme || 0)),
+            'Minimum flex should increase at least one same-year withdrawal when applied'
+        );
         assert(withMinimumFlexRows.every(r => Math.abs(Number(r.row?.portfolio_flow_delta) || 0) < 1), 'FlowDelta should remain near zero with minimum flex');
     }
 
@@ -327,6 +333,29 @@ try {
         assertEqual(window.globalBacktestData?.minimumFlexProfiles?.[1]?.minimumFlexAnnual, 9000, 'Backtest should expose profile B minimum flex');
         assert(rows.some(r => r.row?.minimumFlexStatus === 'applied'), '3-Bucket log should expose applied minimum-flex status');
         assert(rows.every(r => Math.abs(Number(r.row?.portfolio_flow_delta) || 0) < 1), '3-Bucket FlowDelta should remain near zero with minimum flex');
+    }
+
+    // --- TEST 10: Negative Cashzinsen bleiben signiert und reconciliert ---
+    {
+        global.document = createMockDocument({
+            ...baseInputs,
+            simStartJahr: 2019,
+            simEndJahr: 2020,
+            simStartVermoegen: 2000000,
+            depotwertAlt: 1500000,
+            einstandAlt: 1200000,
+            tagesgeld: 500000
+        });
+        global.document.getElementById('dynamicFlex').checked = false;
+        global.document.getElementById('monteCarloResults').style.display = 'none';
+        runBacktest();
+
+        const row2020 = window.globalBacktestData?.rows?.find(entry => entry.jahr === 2020);
+        assert(row2020, 'Negative-interest fixture should contain 2020');
+        assert(row2020.row?.cashInterestEarned < 0, '2020 cash interest should retain its negative sign');
+        assertClose(row2020.row?.portfolio_flow_delta, 0, 1e-6, 'Negative cash interest should reconcile without FlowDelta');
+        const interestTrace = row2020.row?.balance_trace?.find(entry => entry.phase === 'after_cash_interest');
+        assert(interestTrace?.cashInterestEarned < 0, 'Balance trace should retain signed negative cash interest');
     }
 
     console.log('✅ Simulator backtest tests passed');

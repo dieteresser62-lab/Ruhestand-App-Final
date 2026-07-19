@@ -1,11 +1,12 @@
 import {
     HISTORICAL_ASSIGNMENT_INVENTORY_V1,
+    HISTORICAL_TEMPORAL_CONVENTION_ID,
     HistoricalDataContractError,
     computeHistoricalDatasetHash,
     createHistoricalBacktestContractProvider,
     validateHistoricalYearRecord
 } from '../app/simulator/historical-backtest-contract.js';
-import { HISTORICAL_DATA, HISTORICAL_DATA_MANIFEST } from '../app/simulator/simulator-data.js';
+import { HISTORICAL_DATA, HISTORICAL_DATA_MANIFEST, annualData } from '../app/simulator/simulator-data.js';
 import { computeAdjPctForYear } from '../app/simulator/simulator-main-helpers.js';
 
 console.log('--- Historical Backtest Contract Tests ---');
@@ -88,10 +89,12 @@ console.log('Test 2: HistoricalYearRecordV1 separates realized and decision-as-o
 {
     const record = provider.getRecord(2000);
     assertEqual(record.schemaVersion, 'HistoricalYearRecordV1', 'Record schema should be versioned');
+    assertEqual(record.simulationYear, 2000, 'Record should expose the explicit simulation year');
+    assertEqual(record.temporalConventionId, HISTORICAL_TEMPORAL_CONVENTION_ID, 'Record should expose the approved temporal convention');
     assertClose(record.realized.equityReturn.value, (140 / 130) - 1, 1e-12, 'Equity return should use t and t-1 levels');
     assertEqual(record.realized.equityReturn.sourceYear, 2000, 'Equity source year should be t');
     assertEqual(record.realized.equityReturn.inputs.previousSourceYear, 1999, 'Equity derivation should expose t-1');
-    assertEqual(record.realized.goldReturn.value, 20, 'Gold realization should use the proposed t value');
+    assertEqual(record.realized.goldReturn.value, 20, 'Gold realization should use the approved t value');
     assertEqual(record.realized.goldReturn.sourceYear, 2000, 'Gold source year should be t');
     assertEqual(record.realized.cashBondReturn.sourceYear, 2000, 'Cash/bond source year should be t');
     assertEqual(record.realized.inflation.sourceYear, 2000, 'Inflation source year should be t');
@@ -99,7 +102,19 @@ console.log('Test 2: HistoricalYearRecordV1 separates realized and decision-as-o
     assertEqual(record.decisionAsOf.capeRatio.value, 19, 'CAPE should use the last pre-decision value');
     assertEqual(record.decisionAsOf.capeRatio.sourceYear, 1999, 'CAPE source year should be t-1');
     assertEqual(record.decisionAsOf.capeRatio.asOfYear, 1999, 'CAPE as-of year should be t-1');
-    assertEqual(record.alignmentStatus, 'proposal_pending_d01', 'D-01 proposal must remain visibly unapproved');
+    assertEqual(record.alignmentStatus, 'approved_d01', 'D-01 alignment should be visibly approved');
+
+    const lookAheadRecord = clone(record);
+    lookAheadRecord.decisionAsOf.capeRatio.sourceYear = 2000;
+    lookAheadRecord.decisionAsOf.capeRatio.asOfYear = 2000;
+    const lookAheadError = captureError(() => validateHistoricalYearRecord(lookAheadRecord, fixtureManifest));
+    assertEqual(lookAheadError?.code, 'HISTORICAL_TEMPORAL_LOOKAHEAD', 'CAPE from t must fail as look-ahead');
+
+    const misalignedRealized = clone(record);
+    misalignedRealized.realized.goldReturn.sourceYear = 1999;
+    misalignedRealized.realized.goldReturn.asOfYear = 1999;
+    const alignmentError = captureError(() => validateHistoricalYearRecord(misalignedRealized, fixtureManifest));
+    assertEqual(alignmentError?.code, 'HISTORICAL_TEMPORAL_ALIGNMENT_INVALID', 'Realized values from t-1 must fail the approved alignment');
 }
 console.log('✓ realized/as-of split OK');
 
@@ -108,6 +123,12 @@ console.log('Test 3: one-year periods are valid and invalid year shapes fail str
     const oneYear = provider.preparePeriod({ startYear: 2000, endYear: 2000 });
     assertEqual(oneYear.status, 'complete', 'A complete one-year period should be accepted');
     assertEqual(oneYear.requestedYears, 1, 'One-year period should contain exactly one record');
+    assertEqual(oneYear.temporalConventionId, HISTORICAL_TEMPORAL_CONVENTION_ID, 'Prepared period should retain the temporal convention');
+    assertEqual(oneYear.initialMarketHistory.asOfYear, 1999, 'Initial market history should be known through t-1');
+    assertEqual(oneYear.initialMarketHistory.levels.endeVJ.sourceYear, 1999, 'Initial endeVJ should come from t-1');
+    assertEqual(oneYear.initialMarketHistory.levels.endeVJ_3.sourceYear, 1996, 'Initial four-year lookback should end at t-4');
+    assertEqual(oneYear.initialMarketHistory.allTimeHigh.value, 130, 'Initial ATH should be derived through t-1');
+    assert(Object.isFrozen(oneYear.initialMarketHistory), 'Initial market history should be immutable');
 
     const fractional = captureError(() => provider.preparePeriod({ startYear: 2000.5, endYear: 2001 }));
     assert(fractional instanceof HistoricalDataContractError, 'Fractional period should throw a contract error');
@@ -285,12 +306,26 @@ console.log('Test 8: pension adjustment marker mapping preserves 1950/2000/2001 
 }
 console.log('✓ pension marker mapping OK');
 
-console.log('Test 9: assignment inventory keeps active builders and the D-01 proposal distinct');
+console.log('Test 9: assignment inventory keeps active builders and the approved D-01 contract distinct');
 assertEqual(HISTORICAL_ASSIGNMENT_INVENTORY_V1.legacyBacktest.goldReturn, 't_minus_1', 'Legacy gold mapping should remain inventoried');
 assertEqual(HISTORICAL_ASSIGNMENT_INVENTORY_V1.activeMonteCarloAnnualData.goldReturn, 't', 'Active MC gold mapping should remain inventoried');
 assertEqual(HISTORICAL_ASSIGNMENT_INVENTORY_V1.alternativePrepareHistoricalData.capeRatio, 'not_mapped', 'Alternative builder should expose missing CAPE mapping');
-assertEqual(HISTORICAL_ASSIGNMENT_INVENTORY_V1.historicalYearRecordV1Proposal.capeRatio, 't_minus_1_decision_as_of', 'V1 CAPE proposal should be explicit');
+assertEqual(HISTORICAL_ASSIGNMENT_INVENTORY_V1.canonicalHistoricalYearRecordV1.capeRatio, 't_minus_1_decision_as_of', 'V1 CAPE decision-as-of should be explicit');
 assert(Object.isFrozen(HISTORICAL_ASSIGNMENT_INVENTORY_V1), 'Assignment inventory should be immutable');
+
+console.log('Test 10: approved realized fields align with active Monte Carlo annualData while CAPE remains pre-decision');
+{
+    const record = createHistoricalBacktestContractProvider().getRecord(2000);
+    const mc = annualData.find(entry => entry.jahr === 2000);
+    assertClose(record.realized.equityReturn.value, mc.rendite, 1e-12, 'Equity return should align with MC year t');
+    assertEqual(record.realized.goldReturn.value, mc.gold_eur_perf, 'Gold return should align with MC year t');
+    assertEqual(record.realized.cashBondReturn.value, mc.zinssatz, 'Cash/bond return should align with MC year t');
+    assertEqual(record.realized.inflation.value, mc.inflation, 'Inflation should align with MC year t');
+    assertEqual(record.realized.wagePensionAdjustment.value, mc.lohn, 'Wage adjustment should align with MC year t');
+    assertEqual(record.decisionAsOf.capeRatio.value, HISTORICAL_DATA[1999].cape, 'CAPE should remain the known t-1 policy value');
+    assert(record.decisionAsOf.capeRatio.value !== mc.capeRatio, 'CAPE must intentionally differ from MC sampled t to prevent look-ahead');
+}
+console.log('✓ approved D-01 versus active MC alignment OK');
 console.log('✓ assignment inventory OK');
 
 console.log('✅ Historical backtest contract tests passed');

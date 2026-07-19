@@ -11,10 +11,11 @@ import { EngineAPI } from '../engine/index.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const fixturePath = path.join(__dirname, 'fixtures', 'simulator-backtest-baseline-v1.json');
+const legacyFixturePath = path.join(__dirname, 'fixtures', 'simulator-backtest-baseline-v1.json');
+const targetFixturePath = path.join(__dirname, 'fixtures', 'simulator-backtest-target-v1.json');
 const backtestSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'simulator-backtest.js');
 const backtestRunnerSourcePath = path.join(__dirname, '..', 'app', 'simulator', 'historical-backtest-runner.js');
-const UPDATE_BASELINE = process.env.UPDATE_BACKTEST_BASELINE === '1';
+const UPDATE_TARGET = process.env.UPDATE_BACKTEST_TARGET === '1';
 
 console.log('--- Simulator Backtest Characterization Tests ---');
 
@@ -306,7 +307,7 @@ function observeOutcome({ rows, alerts, requestedYears }) {
     return 'completed_legacy';
 }
 
-function projectScenario({ id, oracleClass = 'legacy_observed', inputs, data, alerts, summaryHtml, expectedRowCount, notes = [] }) {
+function projectScenario({ id, oracleClass = 'target_expected', inputs, data, alerts, summaryHtml, expectedRowCount, notes = [] }) {
     const rows = Array.isArray(data?.rows) ? data.rows : [];
     const requestedYears = Number.isInteger(Number(inputs?.__periodEnd)) && Number.isInteger(Number(inputs?.__periodStart))
         ? Number(inputs.__periodEnd) - Number(inputs.__periodStart) + 1
@@ -530,9 +531,116 @@ function buildAlignmentOracle() {
                 interestPct: mc?.zinssatz ?? null,
                 wagePct: mc?.lohn ?? null,
                 cape: mc?.capeRatio ?? null
+            },
+            targetExpected: {
+                temporalConventionId: 'realized_t_decision_t_minus_1_v1',
+                equity: {
+                    sourceYears: [year - 1, year],
+                    valueRatio: round((current.msci_eur - previous.msci_eur) / previous.msci_eur, 12)
+                },
+                gold: { sourceYear: year, valuePct: current.gold_eur_perf },
+                inflation: { sourceYear: year, valuePct: current.inflation_de },
+                interest: { sourceYear: year, valuePct: current.zinssatz_de },
+                wageAdjustment: { sourceYear: year, valuePct: current.lohn_de },
+                cape: { sourceYear: year - 1, asOfYear: year - 1, value: previous.cape }
             }
         };
     });
+}
+
+function buildTargetDeltaReport(legacy, target) {
+    const metricKeys = [
+        'summaryEndWealth',
+        'lastWrapperPortfolio',
+        'lastRowPortfolioTotalEnd',
+        'totalWithdrawal',
+        'totalTax',
+        'yearsWithReductionAtLeast10Pct',
+        'maxReductionStreak',
+        'maxAbsolutePortfolioFlowDelta'
+    ];
+    const legacyCases = new Map((legacy.cases || []).map(entry => [entry.id, entry]));
+    const caseDeltas = (target.cases || []).map(entry => {
+        const before = legacyCases.get(entry.id);
+        const metricDeltas = Object.fromEntries(metricKeys.flatMap(key => {
+            const legacyValue = before?.values?.[key] ?? null;
+            const targetValue = entry?.values?.[key] ?? null;
+            if (stableStringify(legacyValue) === stableStringify(targetValue)) return [];
+            return [[key, {
+                legacyObserved: legacyValue,
+                targetExpected: targetValue,
+                numericDelta: Number.isFinite(legacyValue) && Number.isFinite(targetValue)
+                    ? round(targetValue - legacyValue, 6)
+                    : null,
+                cause: 'D-01 realized fields use source year t; CAPE remains decision-as-of t-1'
+            }]];
+        }));
+        return {
+            id: entry.id,
+            legacyOutcome: before?.outcomeObservation ?? null,
+            targetOutcome: entry.outcomeObservation,
+            rowProjectionChanged: before?.canonicalRowsHash !== entry.canonicalRowsHash,
+            rowProjectionCause: before?.canonicalRowsHash !== entry.canonicalRowsHash
+                ? 'D-01 time-axis alignment and signed negative-cash-interest reconciliation'
+                : null,
+            metricDeltas
+        };
+    });
+    const legacyNegative = new Map((legacy.negativeCases || []).map(entry => [entry.id, entry]));
+    const negativeCaseDeltas = (target.negativeCases || []).map(entry => {
+        const before = legacyNegative.get(entry.id);
+        const changed = before?.canonicalRowsHash !== entry.canonicalRowsHash
+            || before?.outcomeObservation !== entry.outcomeObservation
+            || before?.observedRowCount !== entry.observedRowCount;
+        const cause = entry.id === 'negative_single_year_2010'
+            ? 'D-02 complete one-year periods are valid'
+            : entry.id.includes('missing_middle_year') || entry.id.includes('non_finite')
+                ? 'The embedded provider is validated and snapshotted before caller-side mutation; direct incomplete/error contracts are covered by focused runner tests'
+                : 'Strict manifest-derived period validation';
+        return {
+            id: entry.id,
+            changed,
+            cause: changed ? cause : null,
+            legacyOutcome: before?.outcomeObservation ?? null,
+            targetOutcome: entry.outcomeObservation,
+            legacyRows: before?.observedRowCount ?? null,
+            targetRows: entry.observedRowCount
+        };
+    });
+    const countRuin = entries => entries.filter(entry => entry.outcomeObservation === 'ruin_legacy').length;
+    return {
+        schemaVersion: 'BacktestTemporalDeltaReportV1',
+        legacyFixture: 'simulator-backtest-baseline-v1.json',
+        targetFixture: 'simulator-backtest-target-v1.json',
+        temporalConventionId: 'realized_t_decision_t_minus_1_v1',
+        caseDeltas,
+        negativeCaseDeltas,
+        impactAnalysis: {
+            historicalEndWealth: caseDeltas.map(entry => ({
+                id: entry.id,
+                delta: entry.metricDeltas.summaryEndWealth || null
+            })),
+            ruinFrequency: {
+                denominator: target.cases.length,
+                legacyRuinCases: countRuin(legacy.cases || []),
+                targetRuinCases: countRuin(target.cases || [])
+            },
+            downstreamConsumers: {
+                autoOptimizer: {
+                    directBacktestConsumer: false,
+                    expectedImpact: 'none; no production reference to runHistoricalBacktest or globalBacktestData'
+                },
+                riskProfiles: {
+                    directBacktestConsumer: false,
+                    expectedImpact: 'none; no production reference to runHistoricalBacktest or globalBacktestData'
+                },
+                monteCarloSweepWorker: {
+                    recordPathChanged: false,
+                    expectedImpact: 'none; parity regression gates remain mandatory'
+                }
+            }
+        }
+    };
 }
 
 function buildLegacySchemaOracle(data) {
@@ -577,15 +685,6 @@ function collectDiffs(expected, actual, pathPrefix = '') {
         actual[key],
         pathPrefix ? `${pathPrefix}.${key}` : key
     ));
-}
-
-function classifyDeltas(diffs, approvedPaths = []) {
-    return diffs.map(diff => ({
-        ...diff,
-        classification: approvedPaths.some(prefix => diff.path === prefix || diff.path.startsWith(`${prefix}.`))
-            ? 'expected_after_approved_contract_change'
-            : 'unexpected_delta'
-    }));
 }
 
 const previousGlobals = {
@@ -760,11 +859,11 @@ try {
         .map(sourcePath => fs.readFileSync(sourcePath, 'utf8'))
         .join('\n');
     const actual = {
-        schemaVersion: 'simulator-backtest-baseline-v1',
-        oracleClass: 'legacy_observed',
+        schemaVersion: 'simulator-backtest-target-v1',
+        oracleClass: 'target_expected',
         generatedBy: 'tests/simulator-backtest-characterization.test.mjs',
         exclusions: ['timestamps', 'object identities', 'absolute local paths'],
-        approvedContractChangePaths: [],
+        approvedContractChangePaths: ['alignmentOracle', 'cases', 'negativeCases'],
         metricDictionary: METRIC_DICTIONARY_V1,
         alignmentOracle: buildAlignmentOracle(),
         reductionBoundaryOracle: buildReductionBoundaryOracle(backtestSource),
@@ -782,20 +881,24 @@ try {
             ruin,
             healthBucketProjection,
             dynamicFlexCape
-        ],
+        ].map(entry => ({ ...entry, oracleClass: 'target_expected' })),
         negativeCases: [
             invalidSingleYear,
             invalidNanPeriod,
             invalidReversePeriod,
             missingMiddleYear,
             nonFiniteReturn
-        ]
+        ].map(entry => ({ ...entry, oracleClass: 'target_expected' }))
     };
 
     assertEqual(actual.cases.length, 6, 'six runtime characterization cases should be present');
     assert(actual.reductionBoundaryOracle.countedByLegacyOperator, 'exact 10% must be counted by the legacy operator');
     assert(actual.reductionBoundaryOracle.contradictorySummaryLabelPresent, 'legacy >10% label contradiction must remain visible');
     assertEqual(actual.negativeCases.length, 5, 'five legacy negative cases should be present');
+    assert(
+        [...actual.cases, ...actual.negativeCases].every(testCase => testCase.oracleClass === 'target_expected'),
+        'every case in the target fixture must be labeled target_expected'
+    );
     assert(actual.cases.every(testCase => testCase.inputHash.length === 64), 'every runtime case should contain a canonical SHA-256 input hash');
     assert(actual.cases.every(testCase => testCase.observedRowCount === testCase.expectedRowCount), 'positive runtime row counts should match the frozen contract');
     assert(actual.cases.every(testCase => testCase.values.maxAbsolutePortfolioFlowDelta < 1), 'positive baselines must keep FlowDelta below one euro');
@@ -806,23 +909,30 @@ try {
     assert(!healthBucketProjection.summaryText.includes('Pflegebucket'), 'legacy summary must freeze the missing nested health-bucket projection');
     assert(nonFiniteReturn.outcomeObservation === 'completed_legacy', 'non-finite gold must freeze the current silent completed fallback');
 
-    if (UPDATE_BASELINE) {
-        fs.mkdirSync(path.dirname(fixturePath), { recursive: true });
-        fs.writeFileSync(fixturePath, `${stableStringify(actual, 2)}\n`, 'utf8');
-        console.log(`Updated ${path.relative(path.join(__dirname, '..'), fixturePath)}`);
+    const legacyExpected = JSON.parse(fs.readFileSync(legacyFixturePath, 'utf8'));
+    actual.deltaReport = buildTargetDeltaReport(legacyExpected, actual);
+    assert(
+        actual.deltaReport.caseDeltas.every(entry => Object.values(entry.metricDeltas).every(delta => Boolean(delta.cause))),
+        'every changed target metric should have a machine-readable cause'
+    );
+    assertEqual(
+        actual.deltaReport.impactAnalysis.ruinFrequency.targetRuinCases,
+        actual.deltaReport.impactAnalysis.ruinFrequency.legacyRuinCases,
+        'D-01 target should not silently change characterized ruin frequency'
+    );
+
+    if (UPDATE_TARGET) {
+        fs.mkdirSync(path.dirname(targetFixturePath), { recursive: true });
+        fs.writeFileSync(targetFixturePath, `${stableStringify(actual, 2)}\n`, 'utf8');
+        console.log(`Updated ${path.relative(path.join(__dirname, '..'), targetFixturePath)}`);
     } else {
-        const expected = JSON.parse(fs.readFileSync(fixturePath, 'utf8'));
-        const classified = classifyDeltas(
-            collectDiffs(expected, actual),
-            expected.approvedContractChangePaths || []
-        );
-        const unexpected = classified.filter(delta => delta.classification === 'unexpected_delta');
+        const expected = JSON.parse(fs.readFileSync(targetFixturePath, 'utf8'));
+        const unexpected = collectDiffs(expected, actual);
         if (unexpected.length > 0) {
-            console.error('Unexpected backtest baseline deltas:');
+            console.error('Unexpected backtest target deltas:');
             console.error(stableStringify(unexpected.slice(0, 20), 2));
         }
-        assertEqual(unexpected.length, 0, 'baseline delta reporter should find no unexpected deltas');
-        assert(classified.every(delta => delta.classification !== 'expected_after_approved_contract_change'), 'no approved contract delta is active in Slice 01');
+        assertEqual(unexpected.length, 0, 'target delta reporter should find no unexpected deltas');
     }
 
     console.log('✅ Simulator backtest characterization tests passed');

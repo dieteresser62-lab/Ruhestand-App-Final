@@ -1,6 +1,6 @@
 "use strict";
 
-import { BREAK_ON_RUIN, HISTORICAL_DATA } from './simulator-data.js';
+import { BREAK_ON_RUIN } from './simulator-data.js';
 import { initializePortfolio, getCommonInputs } from './simulator-portfolio.js';
 import { simulateOneYear } from './simulator-engine-wrapper.js';
 import { formatCurrency } from './simulator-utils.js';
@@ -24,7 +24,10 @@ import {
 import { renderThreeBucketPortfolioChart } from './simulator-portfolio-chart.js';
 import { STRATEGY_OPTIONS } from '../../types/strategy-options.js';
 import { resolveDynamicFlexRunnerHorizon } from './dynamic-flex-runner-horizon.js';
-import { createHistoricalDataProvider, runHistoricalBacktest } from './historical-backtest-runner.js';
+import { createHistoricalBacktestContractProvider } from './historical-backtest-contract.js';
+import { runHistoricalBacktest } from './historical-backtest-runner.js';
+
+const HISTORICAL_BACKTEST_PROVIDER = createHistoricalBacktestContractProvider();
 
 /**
  * Führt einen historischen Backtest durch.
@@ -34,17 +37,22 @@ export function runBacktest() {
     try {
         document.getElementById('btButton').disabled = true;
         const inputs = validateSimulatorInputs(getCommonInputs());
-        const startJahr = parseInt(document.getElementById('simStartJahr').value);
-        const endJahr = parseInt(document.getElementById('simEndJahr').value);
-        if (startJahr < 1951 || endJahr > 2025 || startJahr >= endJahr) {
-            alert(`Fehler: Bitte einen gültigen Zeitraum eingeben.\n- Der Zeitraum muss zwischen 1951 und 2025 liegen.`);
+        const startJahr = Number(document.getElementById('simStartJahr').value);
+        const endJahr = Number(document.getElementById('simEndJahr').value);
+        const { startYear: earliestStartYear, endYear: latestEndYear } = HISTORICAL_BACKTEST_PROVIDER.bounds;
+        if (!Number.isInteger(startJahr)
+            || !Number.isInteger(endJahr)
+            || startJahr < earliestStartYear
+            || endJahr > latestEndYear
+            || startJahr > endJahr) {
+            alert(`Fehler: Bitte einen gültigen Zeitraum eingeben.\n- Der Zeitraum muss zwischen ${earliestStartYear} und ${latestEndYear} liegen.`);
             document.getElementById('btButton').disabled = false; return;
         }
 
         const backtestResult = runHistoricalBacktest({
             inputs,
             period: { startYear: startJahr, endYear: endJahr },
-            historicalDataProvider: createHistoricalDataProvider(HISTORICAL_DATA),
+            historicalDataProvider: HISTORICAL_BACKTEST_PROVIDER,
             simulateYear: simulateOneYear,
             initializePortfolio,
             computeAdjustmentPct: computeAdjPctForYear,
@@ -52,6 +60,11 @@ export function runBacktest() {
             totalPortfolio: portfolioTotal,
             breakOnRuin: BREAK_ON_RUIN
         });
+        if (backtestResult.dataStatus === 'incomplete') {
+            const reason = backtestResult.incompleteReason?.code || 'unvollstaendige_historische_daten';
+            alert(`Der Backtest wurde nicht gestartet, weil die historischen Daten unvollständig sind (${reason}).`);
+            return;
+        }
         const logRows = backtestResult.rows;
         const endVermoegen = backtestResult.portfolioEnd;
         const {

@@ -46,35 +46,51 @@ function requireFunction(value, name) {
     return value;
 }
 
-function snapshotHistoricalData(provider) {
+function prepareHistoricalPeriod(provider, period) {
     if (!provider || typeof provider !== 'object') {
         throw new TypeError('runHistoricalBacktest requires a historicalDataProvider');
     }
-    const getYears = requireFunction(provider.getYears, 'historicalDataProvider.getYears');
-    const getYear = requireFunction(provider.getYear, 'historicalDataProvider.getYear');
-    const years = getYears()
-        .map(Number)
-        .filter(Number.isFinite)
-        .sort((a, b) => a - b);
-    const records = new Map();
-    for (const year of years) {
-        if (records.has(year)) continue;
-        const record = getYear(year);
-        if (record !== undefined) records.set(year, cloneRunValue(record));
+    const preparePeriod = requireFunction(provider.preparePeriod, 'historicalDataProvider.preparePeriod');
+    const prepared = preparePeriod(period);
+    if (!prepared || !['complete', 'incomplete'].includes(prepared.status)) {
+        throw new TypeError('historicalDataProvider.preparePeriod returned an unsupported result');
     }
-    return { years: [...records.keys()], records };
+    return prepared;
 }
 
-function resolveBacktestCape(yearData, inputs, marketDataHist) {
-    const yearCape = Number(yearData?.cape);
-    if (Number.isFinite(yearCape) && yearCape > 0) return yearCape;
-    const inputCape = Number(inputs?.capeRatio);
-    if (Number.isFinite(inputCape) && inputCape > 0) return inputCape;
-    const inputLegacyCape = Number(inputs?.marketCapeRatio);
-    if (Number.isFinite(inputLegacyCape) && inputLegacyCape > 0) return inputLegacyCape;
-    const histCape = Number(marketDataHist?.capeRatio);
-    if (Number.isFinite(histCape) && histCape > 0) return histCape;
-    return 0;
+function readInitialMarketValue(initialMarketHistory, field) {
+    const value = Number(initialMarketHistory?.levels?.[field]?.value);
+    if (!Number.isFinite(value) || value <= 0) {
+        throw new TypeError(`historicalDataProvider returned invalid initialMarketHistory.${field}`);
+    }
+    return value;
+}
+
+function buildYearData(record) {
+    return {
+        jahr: record.simulationYear,
+        rendite: record.realized.equityReturn.value,
+        gold_eur_perf: record.realized.goldReturn.value,
+        zinssatz: record.realized.cashBondReturn.value,
+        inflation: record.realized.inflation.value,
+        lohn: record.realized.wagePensionAdjustment.value,
+        cape: record.decisionAsOf.capeRatio.value,
+        capeRatio: record.decisionAsOf.capeRatio.value,
+        temporal: deepFreeze({
+            temporalConventionId: record.temporalConventionId,
+            simulationYear: record.simulationYear,
+            realizedSourceYears: {
+                equityReturn: record.realized.equityReturn.sourceYear,
+                goldReturn: record.realized.goldReturn.sourceYear,
+                cashBondReturn: record.realized.cashBondReturn.sourceYear,
+                inflation: record.realized.inflation.sourceYear,
+                wagePensionAdjustment: record.realized.wagePensionAdjustment.sourceYear
+            },
+            decisionAsOf: {
+                capeRatio: record.decisionAsOf.capeRatio.asOfYear
+            }
+        })
+    };
 }
 
 function buildVpwFallbackHint(vpwPayload) {
@@ -99,18 +115,8 @@ function buildLegacyOutcome(rows, requestedYears, ruinEncountered) {
     return 'completed_legacy';
 }
 
-export function createHistoricalDataProvider(records) {
-    if (!records || typeof records !== 'object') {
-        throw new TypeError('createHistoricalDataProvider requires a records object');
-    }
-    return {
-        getYears: () => Object.keys(records).map(Number),
-        getYear: year => records[year]
-    };
-}
-
 /**
- * Executes the legacy historical year loop against isolated run-owned copies.
+ * Executes the historical year loop against one preflighted V1 record per year.
  * All environment-facing dependencies are supplied by the caller.
  */
 export function runHistoricalBacktest({
@@ -122,8 +128,7 @@ export function runHistoricalBacktest({
     computeAdjustmentPct,
     resolveHorizon,
     totalPortfolio,
-    breakOnRuin = false,
-    historicalSeriesStartYear = 1950
+    breakOnRuin = false
 }) {
     const simulate = requireFunction(simulateYear, 'simulateYear');
     const initialize = requireFunction(initializePortfolio, 'initializePortfolio');
@@ -144,12 +149,37 @@ export function runHistoricalBacktest({
         endYear,
         executionMode: 'single_path',
         breakOnRuin: Boolean(breakOnRuin),
+        temporalConventionId: historicalDataProvider?.temporalConventionId || null,
+        dataset: {
+            datasetId: historicalDataProvider?.datasetId || null,
+            revision: historicalDataProvider?.revision || null,
+            contentHash: historicalDataProvider?.contentHash || null
+        },
         inputs: requestInputs
     });
-    const historical = snapshotHistoricalData(historicalDataProvider);
-    const getHistoricalRecord = year => historical.records.get(Number(year));
-
-    const historicalSeriesYears = historical.years.filter(year => year >= historicalSeriesStartYear);
+    const prepared = prepareHistoricalPeriod(historicalDataProvider, { startYear, endYear });
+    if (prepared.status === 'incomplete') {
+        return {
+            schemaVersion: BACKTEST_RESULT_SCHEMA_VERSION,
+            request,
+            rows: [],
+            requestedYears,
+            completedYears: 0,
+            portfolioStart: null,
+            portfolioEnd: null,
+            dataStatus: 'incomplete',
+            incompleteReason: prepared.reason,
+            legacyOutcome: 'incomplete',
+            historicalYearRecords: [],
+            legacyMetrics: {
+                totalWithdrawal: 0,
+                maxReductionStreak: 0,
+                reductionYears: 0,
+                totalTaxes: 0
+            }
+        };
+    }
+    const historicalRecords = prepared.records;
     const backtestContext = {
         inputs: {
             rentAdj: {
@@ -158,17 +188,14 @@ export function runHistoricalBacktest({
             }
         },
         series: {
-            wageGrowth: historicalSeriesYears.map(year => getHistoricalRecord(year).lohn_de || 0),
-            inflationPct: historicalSeriesYears.map(year => getHistoricalRecord(year).inflation_de || 0),
-            startYear: historicalSeriesStartYear
+            wageGrowth: historicalRecords.map(record => record.realized.wagePensionAdjustment.value),
+            inflationPct: historicalRecords.map(record => record.realized.inflation.value),
+            startYear
         },
         simStartYear: startYear
     };
-
-    const getHistoricalValue = (year, property) => {
-        const record = getHistoricalRecord(year);
-        return record ? record[property] : 0;
-    };
+    const initialMarketHistory = prepared.initialMarketHistory;
+    const initialCapeRatio = historicalRecords[0].decisionAsOf.capeRatio.value;
     let simulationState = {
         portfolio: initialize(runInputs),
         baseFloor: runInputs.startFloorBedarf,
@@ -180,22 +207,16 @@ export function runHistoricalBacktest({
         currentAnnualPension: (runInputs.renteMonatlich || 0) * 12,
         currentAnnualPension2: runInputs.partner?.brutto || 0,
         marketDataHist: {
-            endeVJ: getHistoricalValue(startYear - 1, 'msci_eur'),
-            endeVJ_1: getHistoricalValue(startYear - 2, 'msci_eur'),
-            endeVJ_2: getHistoricalValue(startYear - 3, 'msci_eur'),
-            endeVJ_3: getHistoricalValue(startYear - 4, 'msci_eur'),
-            ath: 0,
-            jahreSeitAth: 0,
-            capeRatio: runInputs.marketCapeRatio || 0
+            endeVJ: readInitialMarketValue(initialMarketHistory, 'endeVJ'),
+            endeVJ_1: readInitialMarketValue(initialMarketHistory, 'endeVJ_1'),
+            endeVJ_2: readInitialMarketValue(initialMarketHistory, 'endeVJ_2'),
+            endeVJ_3: readInitialMarketValue(initialMarketHistory, 'endeVJ_3'),
+            ath: initialMarketHistory.allTimeHigh.value,
+            jahreSeitAth: initialMarketHistory.yearsSinceAllTimeHigh,
+            capeRatio: initialCapeRatio
         }
     };
     const portfolioStart = computePortfolioTotal(simulationState.portfolio);
-    const previousYearValues = historical.years
-        .filter(year => year < startYear)
-        .map(year => getHistoricalRecord(year).msci_eur);
-    simulationState.marketDataHist.ath = previousYearValues.length > 0
-        ? Math.max(...previousYearValues)
-        : (simulationState.marketDataHist.endeVJ || 0);
 
     let totalWithdrawal = 0;
     let currentReductionStreak = 0;
@@ -206,22 +227,11 @@ export function runHistoricalBacktest({
     let ruinEncountered = false;
     const rows = [];
 
-    for (let year = startYear; year <= endYear; year++) {
-        const previousYearData = getHistoricalRecord(year - 1);
-        const currentYearData = getHistoricalRecord(year);
-        if (!previousYearData || !currentYearData) continue;
-
-        const equityReturn = (currentYearData.msci_eur - previousYearData.msci_eur) / previousYearData.msci_eur;
-        const yearData = {
-            ...cloneRunValue(previousYearData),
-            rendite: equityReturn,
-            gold_eur_perf: previousYearData.gold_eur_perf,
-            zinssatz: previousYearData.zinssatz_de,
-            inflation: previousYearData.inflation_de,
-            jahr: year
-        };
-        const resolvedCapeRatio = resolveBacktestCape(yearData, runInputs, simulationState.marketDataHist);
-        const yearIndex = year - startYear;
+    for (let yearIndex = 0; yearIndex < historicalRecords.length; yearIndex++) {
+        const historicalRecord = historicalRecords[yearIndex];
+        const year = historicalRecord.simulationYear;
+        const yearData = buildYearData(historicalRecord);
+        const resolvedCapeRatio = historicalRecord.decisionAsOf.capeRatio.value;
         const adjustmentPct = computeAdjustment(backtestContext, yearIndex);
         const horizonResolution = resolveYearHorizon(runInputs, { yearIndex });
         const adjustedInputs = {
@@ -234,7 +244,6 @@ export function runHistoricalBacktest({
                 ? { longevityHorizonDiagnostics: horizonResolution.diagnostics }
                 : {})
         };
-        yearData.capeRatio = resolvedCapeRatio;
         const result = simulate(simulationState, adjustedInputs, yearData, yearIndex);
 
         if (result.isRuin) {
@@ -270,7 +279,7 @@ export function runHistoricalBacktest({
                 vpw: null,
                 vpwFallbackHint: 'no_vpw',
                 adjPct: adjustmentPct,
-                inflationVJ: previousYearData.inflation_de
+                inflationVJ: historicalRecord.realized.inflation.value
             });
             if (breakOnRuin) break;
         }
@@ -301,7 +310,7 @@ export function runHistoricalBacktest({
             vpw: vpwPayload,
             vpwFallbackHint: buildVpwFallbackHint(vpwPayload),
             adjPct: adjustmentPct,
-            inflationVJ: previousYearData.inflation_de
+            inflationVJ: historicalRecord.realized.inflation.value
         });
 
         if (entscheidung.kuerzungProzent >= 10) {
@@ -324,6 +333,9 @@ export function runHistoricalBacktest({
         completedYears: successfulYears,
         portfolioStart,
         portfolioEnd,
+        dataStatus: 'complete',
+        incompleteReason: null,
+        historicalYearRecords: historicalRecords,
         legacyOutcome: buildLegacyOutcome(rows, requestedYears, ruinEncountered),
         legacyMetrics: {
             totalWithdrawal,
