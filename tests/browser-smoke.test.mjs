@@ -2,6 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runMonteCarloBrowserRegression } from './simulator-monte-carlo-browser.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1037,6 +1038,7 @@ async function main() {
             ['Balance annual preflight', runBalanceAnnualPreflight],
             ['Balance corrupt expenses', runBalanceCorruptExpenses],
             ['Simulator.html', runSimulatorSmoke],
+            ['Simulator Monte-Carlo E2E', runMonteCarloBrowserRegression],
             ['depot-tranchen-manager.html', runTranchesSmoke],
             ['tranche quote partial/offline', runTranchesQuoteFailureSmoke],
             ['tranche corrupt recovery', runTranchesRecoverySmoke],

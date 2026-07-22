@@ -3,6 +3,7 @@ import { EngineAPI } from '../engine/index.mjs';
 import {
     MONTE_CARLO_RUN_REQUEST_VERSION,
     MONTE_CARLO_RUN_RESULT_VERSION,
+    MONTE_CARLO_LEGACY_READ_ALIASES,
     createMonteCarloRunRequestV1,
     createMonteCarloRunResultV1,
     extractMonteCarloReplayArgsV1,
@@ -363,8 +364,10 @@ const schemaGolden = JSON.parse(fs.readFileSync(
         verifyFingerprint: false,
         onTelemetry: event => telemetry.push(event)
     });
-    assert(read.compatibility.deprecatedAliases.includes('result.kpis.extraKPI.consumptionAtRiskP10Real'), 'reader inventories a deprecated alias');
-    assert(telemetry.some(event => event.event === 'monte_carlo_deprecated_alias_read'), 'deprecated alias read emits telemetry');
+    assertEqual(MONTE_CARLO_LEGACY_READ_ALIASES.length, 0, 'Slice 11 removes every time-boxed V1 read alias');
+    assertEqual(read.compatibility.deprecatedAliases.length, 0, 'reader no longer inventories a removed KPI alias');
+    assert(!telemetry.some(event => event.event === 'monte_carlo_deprecated_alias_read'), 'removed aliases no longer emit read telemetry');
+    assertEqual(document.compatibility.deprecatedReadAliases.length, 0, 'new exports publish an empty deprecated-alias registry');
 }
 
 {

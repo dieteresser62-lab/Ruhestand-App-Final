@@ -1,4 +1,10 @@
-import { buildCareMetrics, buildKpiDashboard, buildStressMetrics, buildSummaryData } from '../app/simulator/results-metrics.js';
+import {
+    buildCareMetrics,
+    buildKpiDashboard,
+    buildStressMetrics,
+    buildSummaryData,
+    prepareMonteCarloViewModel
+} from '../app/simulator/results-metrics.js';
 import { buildMonteCarloOutcomeInventoryV1 } from '../app/simulator/monte-carlo-chunk-result.js';
 
 console.log('--- Results Metrics UI Contract Tests ---');
@@ -134,6 +140,24 @@ assert(withdrawalKpi.value.includes('10.000'), 'Run-based real withdrawal P10 sh
 assert(withdrawalKpi.description.includes('Stichprobe: 8 Läufe'), 'Withdrawal P10 tooltip should expose evaluable run count');
 assert(withdrawalKpi.description.includes('Technik 1'), 'Withdrawal P10 tooltip should expose technical missingness');
 assert(withdrawalKpi.description.includes('Kein Quantil-Konfidenzintervall'), 'Withdrawal P10 tooltip should not imply an unimplemented interval');
+
+const canonicalWithdrawalView = prepareMonteCarloViewModel({
+    results: {
+        realWithdrawalP10: { realEur: 12000 },
+        extraKPI: { consumptionAtRiskP10Real: 99999 }
+    },
+    totalRuns: 1,
+    failCount: 0,
+    inputs: {}
+});
+assertEqual(canonicalWithdrawalView.carThreshold, 12000, 'scenario threshold uses the canonical real-withdrawal KPI');
+const removedAliasView = prepareMonteCarloViewModel({
+    results: { extraKPI: { consumptionAtRiskP10Real: 99999 } },
+    totalRuns: 1,
+    failCount: 0,
+    inputs: {}
+});
+assertEqual(removedAliasView.carThreshold, undefined, 'UI no longer reads the removed consumption-at-risk alias');
 
 const stressMetrics = buildStressMetrics({
     presetKey: 'GREAT_DEPRESSION_29_33',

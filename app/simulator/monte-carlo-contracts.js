@@ -20,26 +20,10 @@ export const MONTE_CARLO_SNAPSHOT_POLICY = Object.freeze({
     policy: 'immutable-baseline-with-versioned-post-slice-references'
 });
 
-export const MONTE_CARLO_LEGACY_READ_ALIASES = Object.freeze([
-    Object.freeze({
-        path: 'result.kpis.kpiKuerzungsjahre',
-        replacement: 'result.kpis.cutYearSharePct',
-        deprecated: true,
-        removalTarget: 'Slice 11'
-    }),
-    Object.freeze({
-        path: 'result.kpis.extraKPI.consumptionAtRiskP10Real',
-        replacement: 'result.kpis.realWithdrawalP10RealEur',
-        deprecated: true,
-        removalTarget: 'Slice 11'
-    }),
-    Object.freeze({
-        path: 'result.kpis.stressKPI.consumptionAtRiskP10Real',
-        replacement: 'result.kpis.stress.realWithdrawalP10RealEur',
-        deprecated: true,
-        removalTarget: 'Slice 11'
-    })
-]);
+// The time-boxed V1 read-compatibility window ended with Slice 11. Keeping the
+// frozen registry as an empty public contract lets readers expose the same
+// compatibility shape without recognizing removed KPI aliases.
+export const MONTE_CARLO_LEGACY_READ_ALIASES = Object.freeze([]);
 
 const OMIT = Symbol('omit');
 const SAMPLING_METHODS = new Set(['block', 'stationary', 'regime_markov', 'regime_iid']);

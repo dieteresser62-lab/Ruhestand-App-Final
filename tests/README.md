@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 119 entdeckte Testdateien, davon 118 im Node-Gate ausgefuehrt, mit 5722 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (im Slice-10-Abschlussgate mit `npm test` am 2026-07-19 verifiziert). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand am selben Tag mit 14/14 Einstiegspunkt-/Zusatzflows.
+**Test-Statistik:** 128 entdeckte Testdateien, davon 127 im Node-Gate ausgefuehrt, mit 6.862 von 6.863 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (im Slice-11-Gate mit `npm test` am 2026-07-22 verifiziert). Die einzige rote Assertion ist das vorbestehende Architektur-Evidenzgate mit sechs Links auf zwei fehlende Forschungsdokumente. `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand mit 15/15 Einstiegspunkt-/Zusatzflows, darunter vier isolierte Monte-Carlo-Browserfaelle.
 
 Die Zahl beschreibt nur die Node-Standardsuite. `npm run test:browser`, `npm run test:coverage` und ein echter Tauri-Build sind getrennte Gates und in den Assertions nicht enthalten.
 
@@ -50,7 +50,7 @@ Jede tatsaechlich ausgefuehrte Datei muss mindestens eine gezaehlte Assertion li
 npm run test:coverage
 ```
 
-Der Coverage-Runner loescht `.coverage/`, startet die Standardsuite mit `NODE_V8_COVERAGE` und schreibt `.coverage/summary.json`. Der Report wertet Projektdateien unter `app/`, `engine/`, `workers/` und `types/` aus. Das Slice-10-Abschlussgate liegt bei 73,85% Zeilen-Coverage (29132/39446 ausfuehrbare Zeilen in 201 Dateien). Gegenueber der zuletzt im Backtest-Hardening dokumentierten Slice-05-Gesamtcoverage von 73,36% ist das ein Plus von 0,49 Prozentpunkten. Coverage bleibt ein Transparenz- und Review-Gate, keine Wirksamkeits- oder Eignungsaussage.
+Der Coverage-Runner loescht `.coverage/`, startet die Standardsuite mit `NODE_V8_COVERAGE` und schreibt bei gruener Standardsuite `.coverage/summary.json`. Der Report wertet Projektdateien unter `app/`, `engine/`, `workers/` und `types/` aus. Wegen des bekannten fremden Architektur-Linkfehlers endet `npm run test:coverage` derzeit nach dem Testlauf rot; `node tests/coverage-report.mjs` kann die trotzdem erzeugten V8-Daten auswerten. Die Slice-11-Messung liegt bei 76,12% approximativer Zeilencoverage (32.481/42.668 ausfuehrbare Zeilen in 206 Dateien), 0,07 Prozentpunkte ueber Slice 10. Playwright-Ausfuehrung fliesst nicht in diese Node-V8-Zahl ein. Coverage bleibt ein Transparenz- und Review-Gate, keine Wirksamkeits- oder Eignungsaussage.
 
 Backtest-Kernmodule im Slice-10-Abschlussgate:
 
@@ -809,7 +809,8 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `balance-storage-contract.test.mjs` | ~180 | Echte StorageManager-Migrationen und Snapshot-Contracts |
 | `balance-storage.test.mjs` | ~490 | localStorage-Persistenz |
 | `balance-ui-orchestration.test.mjs` | ~170 | Balance-UI-Bindings, Import-/Export-Control-Pfade und Profilverbund-Hooks |
-| `browser-smoke.test.mjs` | ~1000 | Playwright-Gate fuer HTML-Einstiege, Backtest-UI/Raw/A11y/Negativpfade sowie zentrale Balance-/Tranchenflows |
+| `browser-smoke.test.mjs` | ~1070 | Playwright-Gate fuer HTML-Einstiege, MC-/Backtest-UI, A11y/Negativpfade sowie zentrale Balance-/Tranchenflows |
+| `simulator-monte-carlo-browser.mjs` | ~360 | Vier isolierte MC-Browserfaelle fuer Worker, Fallback, Technikfehler, Cancel/Restart, Download und A11y |
 | `care-meta.test.mjs` | ~200 | Pflegefall-Logik |
 | `health-bucket.test.mjs` | ~160 | Pflegebucket-Trigger, Deckung, Verzinsung und Diagnose |
 | `core-engine.test.mjs` | ~150 | EngineAPI-Basisvalidierung |

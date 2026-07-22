@@ -316,7 +316,6 @@ export function prepareMonteCarloViewModel({ results, totalRuns, failCount, inpu
             extraKPI: results?.extraKPI
         },
         carThreshold: results?.realWithdrawalP10?.realEur
-            ?? results?.extraKPI?.consumptionAtRiskP10Real
     };
 }
 

@@ -207,7 +207,7 @@ Semantikaenderungen sind unzulaessig.
 | [08](./SLICE_SIMULATOR_MONTE_CARLO_08_RUNRESULT_EXPORT_PROVENIENZ.md) | versionierter Run-/Exportvertrag | MC-11 | 04-07 | abgeschlossen und freigegeben |
 | [09](./SLICE_SIMULATOR_MONTE_CARLO_09_WORKER_LIFECYCLE_ISOLATION.md) | Abbruch, Stale Jobs, Cache/Version | MC-12, MC-13 | 02, D-12 | abgeschlossen und freigegeben |
 | [10](./SLICE_SIMULATOR_MONTE_CARLO_10_RESOURCE_UI_ACCESSIBILITY.md) | Bounds, Kostenhinweis, UI/A11y | MC-14, Teile MC-15 | 05, 08, 09, D-08 | abgeschlossen und freigegeben |
-| [11](./SLICE_SIMULATOR_MONTE_CARLO_11_BROWSER_E2E_REGRESSION.md) | Browser-E2E und Pfadparitaet | MC-15 | 03-10 | geplant |
+| [11](./SLICE_SIMULATOR_MONTE_CARLO_11_BROWSER_E2E_REGRESSION.md) | Browser-E2E und Pfadparitaet | MC-15 | 03-10 | abgeschlossen und freigegeben |
 | [12](./SLICE_SIMULATOR_MONTE_CARLO_12_INTEGRATION_DOKUMENTATION.md) | Integration, Doku- und Volltestgate | MC-16; Abschluss aller | 01-11 | geplant |
 
 ### Rueckdokumentation Slice 09
@@ -258,6 +258,38 @@ Semantikaenderungen sind unzulaessig.
   `npm run test:coverage` liefert 6858/6859 gruene Assertions und 0 offene
   Handles; einzig das bereits vor Slice 10 dokumentierte Architektur-Linkgate
   bleibt rot. `npm run test:browser` liefert 14/14 gruene Szenarien.
+
+### Rueckdokumentation Slice 11
+
+- Implementierungsstatus: abgeschlossen; Gemini-/Nutzerreview des Slice steht
+  aus. Codex erteilt keine eigene Freigabe und erstellt keinen Commit.
+- Das bestehende Chromium-Gate enthaelt jetzt vier isolierte MC-Nutzerflows:
+  echten Worker-Erfolg, kontrollierten seriellen Fallback, fail-closed
+  Technikfehler sowie Cancel/Restart mit bewusst spaeter Altantwort. Tastatur,
+  zentrale ARIA-Zustaende, Fokus, sichtbare Outcome-/KPI-/Unsicherheitslabels
+  und der explizite JSON-Download werden beobachtbar geprueft.
+- Der Download wird als `MonteCarloExportV1` samt Fingerprint, Worker-/
+  Chunkmetadaten und Samplingdiagnostik validiert. Neue V1-Exporte enthalten
+  keinen der befristeten KPI-Aliase; das Aliasregister ist leer, der Reader
+  telemetriert entfernte Keys nicht mehr, und der Ergebnis-UI-Fallback auf
+  `consumptionAtRiskP10Real` ist entfernt.
+- Die bestehende DOM-freie Messmatrix belegt weiterhin exakte direkte/
+  Workerparitaet fuer 1/2/4 Worker und mehrere Chunklayouts innerhalb derselben
+  Runtime. Zusammen mit Lifecycle, MC-Kern, Export und UI sind 1.409/1.409
+  fokussierte Assertions gruen.
+- `npm run test:browser` liefert 15/15 gruene Flows in 29,2 Sekunden. Der
+  Neustartfall erzeugt genau einen lazy Ersatz-Worker und ignoriert genau eine
+  spaete Antwort der terminierten Altgeneration.
+- `npm test` und der Coverage-Lauf liefern 6.862/6.863 gruene Assertions bei 0
+  offenen Handles. Einzige Abweichung bleibt das vorbestehende fremde
+  Architektur-Linkgate mit sechs toten Links auf zwei fehlende
+  Forschungsdokumente.
+- Die approximative Node-Zeilencoverage steigt von 76,05 auf 76,12 Prozent.
+  Playwright-Pfade fliessen nicht in diese Zahl ein; deshalb bleiben
+  `simulator-monte-carlo.js` bei 3,39 Prozent und `results-renderers.js` bei 0
+  Prozent Node-Coverage. Das beschlossene 50-Prozent-Abschlussgate und die
+  Integrationsbereinigung interner Pflege-Metadaten-Aliase verbleiben in
+  Slice 12.
 
 Zulaessige Parallelisierung nach Slice 02:
 
@@ -610,8 +642,8 @@ alte Erfolgsquotenterminologie verwendet.
 - Planreview Claude: Erstreview blockiert; Revision 1 wartet auf Re-Review.
 - Nutzerfreigabe: erteilt am 2026-07-22.
 - Status `implementierungsreif`: erteilt (für Gemini-Freigabepfad & Nutzer).
-- Implementierungsstand: Slices 01-07 abgeschlossen und als Release-Commits
-  vorhanden; Slice 08 auf Nutzerauftrag vom 2026-07-22 implementiert und im
+- Implementierungsstand: Slices 01-10 abgeschlossen und als Release-Commits
+  vorhanden; Slice 11 auf Nutzerauftrag vom 2026-07-22 implementiert und im
   Review.
 
 ## 14. Rueckdokumentation Slice 01
