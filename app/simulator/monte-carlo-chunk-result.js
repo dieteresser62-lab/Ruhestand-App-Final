@@ -5,6 +5,10 @@ import {
     createMonteCarloBuffers,
     pickWorstRun
 } from './monte-carlo-runner-utils.js';
+import {
+    assertMonteCarloSamplingDiagnosticsV1,
+    mergeMonteCarloSamplingDiagnosticsV1
+} from './mc-year-sampling.js';
 
 export const MONTE_CARLO_CHUNK_RESULT_VERSION = 'MonteCarloChunkResultV1';
 export const MONTE_CARLO_OUTCOME_INVENTORY_VERSION = 'MonteCarloOutcomeInventoryV1';
@@ -532,6 +536,11 @@ function assertDiagnostics(result, count) {
     if (result.runMeta.length !== result.technicalInventory.financiallyEvaluable) {
         throw contractError('runMeta length must equal financially evaluable runs.');
     }
+    try {
+        assertMonteCarloSamplingDiagnosticsV1(result.samplingDiagnostics, { expectedRuns: count });
+    } catch (error) {
+        throw contractError(`samplingDiagnostics are invalid: ${error?.message || String(error)}`);
+    }
 }
 
 export function assertMonteCarloChunkResultV1(result, {
@@ -776,6 +785,7 @@ export function createMonteCarloChunkAccumulatorV1(totalRuns, {
         mergedRuns: new Uint8Array(totalRuns),
         retainRunMeta: retainRunMeta === true,
         runMetaByIndex: retainRunMeta === true ? new Array(totalRuns) : null,
+        samplingDiagnostics: null,
         contributions: new Map()
     };
 }
@@ -833,6 +843,7 @@ export function mergeMonteCarloChunkResultV1(accumulator, result, {
             ...result.technicalInventory,
             errors: [...result.technicalInventory.errors]
         },
+        samplingDiagnostics: JSON.parse(JSON.stringify(result.samplingDiagnostics)),
         worstRun: result.worstRun,
         worstRunCare: result.worstRunCare
     });
@@ -924,6 +935,7 @@ export function finalizeMonteCarloChunkAccumulatorV1(accumulator) {
         : [];
     let worstRun = null;
     let worstRunCare = null;
+    let samplingDiagnostics = null;
 
     for (const chunk of chunks) {
         for (const field of MONTE_CARLO_COUNTER_FIELDS) totals[field] += chunk.totals[field];
@@ -933,6 +945,15 @@ export function finalizeMonteCarloChunkAccumulatorV1(accumulator) {
             }
         }
         allRealWithdrawalsSample.push(...chunk.allRealWithdrawalsSample);
+        if (!samplingDiagnostics) {
+            samplingDiagnostics = JSON.parse(JSON.stringify(chunk.samplingDiagnostics));
+        } else {
+            try {
+                mergeMonteCarloSamplingDiagnosticsV1(samplingDiagnostics, chunk.samplingDiagnostics);
+            } catch (error) {
+                throw contractError(`sampling diagnostics cannot be merged: ${error?.message || String(error)}`);
+            }
+        }
         worstRun = pickWorstRun(worstRun, chunk.worstRun);
         worstRunCare = pickWorstRun(worstRunCare, chunk.worstRunCare);
     }
@@ -955,6 +976,7 @@ export function finalizeMonteCarloChunkAccumulatorV1(accumulator) {
         lists: buildListsFromPathSummaries(accumulator),
         allRealWithdrawalsSample,
         technicalInventory: buildTechnicalInventory(accumulator.totalRuns, chunks),
+        samplingDiagnostics,
         worstRun,
         worstRunCare,
         runMeta

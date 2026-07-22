@@ -1,0 +1,187 @@
+{
+  "schemaVersion": "monte-carlo-post-slice-snapshot-v1",
+  "snapshotId": "post-slice-06-v1",
+  "sourceReference": "post-slice-05-v1",
+  "sliceId": "06",
+  "reviewStatus": "pending",
+  "capturedAtUtc": "2026-07-22T00:00:00.000Z",
+  "goldenCaseId": "GC-SAMPLING-01",
+  "metadata": {
+    "seed": 20260722,
+    "dataVersion": {
+      "annualDataHash": "614993a3",
+      "regimeHash": "50aa7f99"
+    },
+    "runtime": {
+      "kind": "node",
+      "version": "v25.2.1",
+      "platform": "win32",
+      "architecture": "x64"
+    },
+    "numericTolerance": {
+      "sameRuntime": { "defaultAbsolute": 0 },
+      "crossRuntime": { "defaultAbsolute": 0, "fields": [] }
+    }
+  },
+  "result": {
+    "bufferBytes": 600,
+    "bufferBytesPerRun": 75,
+    "buffers": {
+      "finalOutcomes": [
+        522868.21511808527,
+        882715.6737439169,
+        625060.3586994709,
+        442492.33397705486,
+        3442741.9371716403,
+        2397281.3402026976,
+        480176.0373738997,
+        152907.13861506514
+      ],
+      "kpiLebensdauer": [9, 12, 12, 12, 12, 12, 12, 8]
+    },
+    "totals": {
+      "outcomeRuinCount": 0,
+      "outcomeAllDeadCount": 2,
+      "outcomeHorizonExhaustedCount": 6,
+      "tailRiskEventCount": 0,
+      "tailRiskEvaluatedYears": 89,
+      "tailRiskAppliedYears": 0
+    },
+    "samplingDiagnostics": {
+      "schemaVersion": "MonteCarloSamplingDiagnosticsV1",
+      "contract": {
+        "schemaVersion": "MonteCarloSamplingContractV1",
+        "method": "block",
+        "startSource": "uniform",
+        "requestedStartYearMode": "UNIFORM",
+        "capeSamplingRequested": false,
+        "capeSamplingEffective": false,
+        "excludeEstimatedHistory": false,
+        "ignoredOptions": [],
+        "warnings": [],
+        "initialCandidateCount": 94,
+        "firstRecordPolicy": "selected_start_record",
+        "fixedBlockPolicy": "full_sequential_block_from_selected_start",
+        "stationaryRestartPolicy": "not_applicable",
+        "regimePolicy": "not_applicable",
+        "precedence": [
+          "estimated_history_exclusion",
+          "cape_or_start_weighting",
+          "sampling_method",
+          "conditional_stress_override",
+          "tail_risk_overlay"
+        ]
+      },
+      "dataVersion": {
+        "annualDataHash": "614993a3",
+        "regimeHash": "50aa7f99"
+      },
+      "requestedRuns": 8,
+      "sampledYears": 89,
+      "initialStartYearCounts": {
+        "1930": 1,
+        "1938": 1,
+        "1954": 1,
+        "1980": 1,
+        "1982": 1,
+        "1987": 1,
+        "2006": 1,
+        "2018": 1
+      },
+      "historicalYearCounts": {
+        "1929": 1,
+        "1930": 2,
+        "1931": 2,
+        "1932": 2,
+        "1933": 1,
+        "1938": 1,
+        "1939": 1,
+        "1940": 1,
+        "1941": 1,
+        "1943": 1,
+        "1944": 1,
+        "1945": 1,
+        "1946": 2,
+        "1947": 1,
+        "1948": 2,
+        "1949": 3,
+        "1950": 2,
+        "1951": 2,
+        "1952": 1,
+        "1953": 1,
+        "1954": 2,
+        "1955": 3,
+        "1956": 4,
+        "1957": 2,
+        "1958": 1,
+        "1971": 1,
+        "1972": 1,
+        "1973": 2,
+        "1974": 2,
+        "1975": 1,
+        "1976": 1,
+        "1980": 2,
+        "1981": 2,
+        "1982": 3,
+        "1983": 3,
+        "1984": 1,
+        "1985": 1,
+        "1987": 1,
+        "1988": 1,
+        "1989": 1,
+        "1990": 1,
+        "1999": 1,
+        "2000": 1,
+        "2001": 1,
+        "2002": 1,
+        "2006": 2,
+        "2007": 2,
+        "2008": 3,
+        "2009": 3,
+        "2010": 1,
+        "2011": 2,
+        "2012": 1,
+        "2013": 1,
+        "2014": 1,
+        "2018": 1,
+        "2019": 1,
+        "2020": 1,
+        "2021": 1
+      },
+      "sourceCounts": {
+        "initial_start": 8,
+        "fixed_block_continuation": 66,
+        "fixed_block_restart": 15
+      },
+      "regimeCounts": {
+        "BEAR": 10,
+        "SIDEWAYS": 30,
+        "BULL": 38,
+        "STAGFLATION": 11
+      },
+      "stationaryRestartCounts": {
+        "initial": 0,
+        "random": 0,
+        "data_end": 0
+      },
+      "tailRisk": {
+        "runsActiveCount": 0,
+        "runsAppliedCount": 0,
+        "eventCount": 0,
+        "evaluatedYears": 89,
+        "activeYears": 0,
+        "appliedYears": 0,
+        "skippedHistoricalCrisisYears": 0
+      }
+    },
+    "aggregates": {
+      "finalOutcomes": {
+        "p10": 355616.77536845795,
+        "p50": 573964.2869087781,
+        "p90": 2710919.51929338,
+        "p50_successful": 573964.2869087781
+      },
+      "depotErschoepfungsQuote": 0
+    }
+  }
+}

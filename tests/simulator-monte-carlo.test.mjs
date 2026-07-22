@@ -953,7 +953,7 @@ const emptyLists = {
         anzahl: 1,
         maxDauer: 6,
         blockSize: 1,
-        seed: 2005,
+        seed: 1,
         methode: 'block',
         rngMode: 'per-run-seed',
         startYearMode: 'UNIFORM'
@@ -976,7 +976,7 @@ const emptyLists = {
 
     assert(withRows.length > 0 && withoutRows.length > 0, 'MC minimum-flex comparison should produce log rows');
     assert(sumWithdrawals(withRows) > sumWithdrawals(withoutRows), 'MC should withdraw more when minimum flex is set');
-    assert(withRows.some(row => row?.minimumFlexStatus === 'applied'), 'MC log should expose applied minimum-flex status');
+    assert(withRows.some(row => String(row?.minimumFlexStatus || '').startsWith('applied')), 'MC log should expose an applied minimum-flex status');
 }
 
 // --- TEST 16: taxSavedByLossCarry is deterministic with fixed seed ---

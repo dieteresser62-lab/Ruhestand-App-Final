@@ -359,16 +359,35 @@ async function runSimulatorUiOrchestrationTests() {
         assertEqual(documentRef.getElementById('goldAktiv').checked, true, 'Gold wird bei Zielquote > 0 aktiviert');
     }
 
-    console.log('Test 7: Monte-Carlo method controls expose Stationary Bootstrap block length semantics');
+    console.log('Test 7: Monte-Carlo controls expose method semantics and CAPE precedence');
     {
         const methodSelect = registerElement(documentRef, 'mcMethode', { tagName: 'select', value: 'regime_markov' });
         const blockSizeInput = registerElement(documentRef, 'mcBlockSize', { value: '5' });
         const blockSizeLabel = registerElement(documentRef, 'mcBlockSizeLabel', { tagName: 'label' });
+        const startYearMode = registerElement(documentRef, 'mcStartYearMode', { tagName: 'select', value: 'FILTER' });
+        const filterRow = registerElement(documentRef, 'mcStartYearFilterRow', { tagName: 'div' });
+        const halfLifeRow = registerElement(documentRef, 'mcStartYearHalfLifeRow', { tagName: 'div' });
+        const filterValue = registerElement(documentRef, 'mcStartYearFilterValue', { tagName: 'span' });
+        const halfLifeValue = registerElement(documentRef, 'mcStartYearHalfLifeValue', { tagName: 'span' });
+        registerElement(documentRef, 'mcStartYearFilter', { value: '1970' });
+        registerElement(documentRef, 'mcStartYearHalfLife', { value: '20' });
+        const capeToggle = registerElement(documentRef, 'useCapeSampling', { type: 'checkbox', checked: true });
+        const capeWarning = registerElement(documentRef, 'mcStartYearCapeWarning', { tagName: 'div' });
 
         persistModule.initInputPersistence();
         monteCarloUiModule.initMonteCarloMethodControls();
+        monteCarloUiModule.initMonteCarloStartYearControls();
         assertEqual(blockSizeInput.disabled, true, 'Regime-Methoden deaktivieren Blocklaengenfeld');
         assertEqual(blockSizeLabel.textContent, 'Blockgröße (Jahre)', 'Regime-Methoden behalten neutrales Blockgroessenlabel');
+        assertEqual(filterRow.style.display, 'block', 'FILTER zeigt das Startjahrfeld');
+        assertEqual(halfLifeRow.style.display, 'none', 'FILTER blendet die Recency-Halbwertszeit aus');
+        assertEqual(filterValue.textContent, '1970', 'FILTER-Ausgabewert wird synchronisiert');
+        assertEqual(halfLifeValue.textContent, '20', 'Recency-Ausgabewert wird synchronisiert');
+        assertEqual(capeWarning.style.display, 'block', 'CAPE plus Gewichtung zeigt den sichtbaren Vorranghinweis');
+
+        capeToggle.checked = false;
+        capeToggle.dispatchEvent({ type: 'change' });
+        assertEqual(capeWarning.style.display, 'none', 'Der Vorranghinweis verschwindet ohne CAPE-Sampling');
 
         methodSelect.value = 'stationary';
         methodSelect.dispatchEvent({ type: 'change' });

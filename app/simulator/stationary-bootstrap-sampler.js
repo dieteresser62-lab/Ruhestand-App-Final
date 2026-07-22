@@ -80,6 +80,7 @@ export function createStationaryBootstrapSampler({
     mode = 'UNIFORM',
     cdf = null,
     startIndices = null,
+    initialStartIndex = null,
     rng = null
 } = {}) {
     const safeAnnualData = validateAnnualData(annualData);
@@ -112,6 +113,11 @@ export function createStationaryBootstrapSampler({
         startIndices: normalizedStartIndices,
         startCdf: normalizeSamplerCdf({ cdf, startIndices: normalizedStartIndices }),
         startSamplerObject,
+        initialStartIndex: Number.isInteger(initialStartIndex)
+            && initialStartIndex >= 0
+            && initialStartIndex < safeAnnualData.length
+            ? initialStartIndex
+            : null,
         currentIndex: null,
         yearsInCurrentBlock: 0,
         restartCount: 0,
@@ -125,10 +131,9 @@ export function nextYearSample(state) {
         throw new TypeError('Stationary Bootstrap state requires a non-empty annualData array.');
     }
 
-    const restartDraw = drawRandom(state.rng);
-    state.lastRestartDraw = restartDraw;
-
     const isInitial = state.currentIndex === null || state.currentIndex === undefined;
+    const restartDraw = isInitial ? null : drawRandom(state.rng);
+    state.lastRestartDraw = restartDraw;
     const isAtDataEnd = !isInitial && state.currentIndex >= state.annualData.length - 1;
     const isRandomRestart = !isInitial && !isAtDataEnd && restartDraw < state.restartProbability;
 
@@ -142,7 +147,10 @@ export function nextYearSample(state) {
     }
 
     if (restartReason) {
-        state.currentIndex = pickBlockStartIndex(state);
+        state.currentIndex = restartReason === STATIONARY_BOOTSTRAP_RESTART_REASONS.INITIAL
+            && state.initialStartIndex !== null
+            ? state.initialStartIndex
+            : pickBlockStartIndex(state);
         state.yearsInCurrentBlock = 1;
         state.restartCount += 1;
         state.lastRestartReason = restartReason;

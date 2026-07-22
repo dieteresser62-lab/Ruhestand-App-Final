@@ -79,6 +79,28 @@
       "expectedDirection": "buffer storage increases by 7 bytes per run; valid in-range paths are unchanged while out-of-range mortality fails closed consistently",
       "goldenCaseIds": ["GC-OUTCOME-01"],
       "reviewStatus": "pending"
+    },
+    {
+      "sliceId": "06",
+      "sourceReference": "post-slice-05-v1",
+      "targetReference": "post-slice-06-v1",
+      "fieldPath": "sampling path / buffers / aggregates / runMeta.logDataRows[*].histJahr",
+      "formulaBefore": "the selected CAPE/filter/recency start record initialized historical lookback only; fixed block, stationary and regime methods immediately performed a separate first-year draw and fixed-block eligibility excluded the final complete start index",
+      "formulaAfter": "the selected start record is the first method-specific simulated record; fixed block continues a complete sequential first block, stationary applies restart probability only afterwards, Markov transitions after the start regime and IID becomes independent after the start record",
+      "expectedDirection": "identical seeds intentionally produce different sampled paths and therefore potentially different financial outcomes; the direction is not monotonic and is accepted only against GC-SAMPLING-01 and the Post-Slice-06 snapshot",
+      "goldenCaseIds": ["GC-SAMPLING-01"],
+      "reviewStatus": "pending"
+    },
+    {
+      "sliceId": "06",
+      "sourceReference": "post-slice-05-v1",
+      "targetReference": "post-slice-06-v1",
+      "fieldPath": "samplingDiagnostics",
+      "formulaBefore": "sampling method, effective start source, drawn-year inventory, regime counts, tail-risk counters and data version were not available as one chunk-mergeable contract",
+      "formulaAfter": "MonteCarloSamplingDiagnosticsV1 carries the effective MonteCarloSamplingContractV1, O(historical-year-domain) start/year/source/regime counters, stationary restart counts, reconciled tail-risk counters and annual/regime data hashes",
+      "expectedDirection": "new diagnostic fields only; worker payload grows with the bounded historical-year domain, not with runs times years",
+      "goldenCaseIds": ["GC-SAMPLING-01"],
+      "reviewStatus": "pending"
     }
   ],
   "requiredEntryFields": [

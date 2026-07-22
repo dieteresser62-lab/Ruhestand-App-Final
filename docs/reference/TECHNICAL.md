@@ -277,13 +277,13 @@ Diese Grenze ist fachlich gewollt: Balance kennt derzeit keinen belastbaren aktu
 * `app/simulator/simulator-main.js` – zentrale Steuerung, Parameter-Sweep-Logik, Self-Tests.
 * `app/simulator/simulator-monte-carlo.js` – UI-Koordinator für Monte-Carlo (liest Inputs, setzt Progress, orchestriert Runner/Analyzer) inkl. Worker-Orchestrierung.
 * `app/simulator/mc-run-context.js` – DOM-freie Chunk-Kontext-Erzeugung fuer Monte-Carlo (RunRange, RNG-Modus, Buffers, Progress-Intervall, LogIndexSet und Sampling-Konfiguration).
-* `app/simulator/mc-year-sampling.js` – DOM-freie Startjahr-/CAPE-Sampling-Logik fuer Monte-Carlo inklusive FILTER-/RECENCY-CDF, Uniform-Fallback und Estimated-History-Filter.
+* `app/simulator/mc-year-sampling.js` – DOM-freier `MonteCarloSamplingContractV1` fuer Startjahr-/CAPE-Praezedenz, methodenspezifische Jahr-1-Regeln, FILTER-/RECENCY-CDF, Estimated-History-Filter sowie kompakte, merge-invariante `MonteCarloSamplingDiagnosticsV1`.
 * `app/simulator/mc-life-events.js` – DOM-freie Life-State-Initialisierung fuer Monte-Carlo (Care-Meta, Partnerstatus, Care-RNGs, Alive-Initialwerte, HouseholdContext) sowie gemeinsamer fail-closed Mortalitaets- und Horizon-/Altersgrenzvertrag; per-year Life-Events bleiben aus Performance-Gruenden im Runner-Hot-Path.
 * `app/simulator/mc-stress-tracker.js` – DOM-freie Stress-Metrik-Kapselung fuer Monte-Carlo (Stress-Drawdown, Quote-Above-4.5, Cut-Years, Real-CaR, Recovery-Years) bei stabilen Worker-Buffer-Namen.
 * `app/simulator/mc-log-builder.js` – DOM-freie Monte-Carlo-Logzeilen-Builder fuer Ruin-, Jahres- und Todesfall-Logs mit zentralen Alive-/Care-Feldern.
 * `app/simulator/mc-run-metrics.js` – DOM-freie Run-Ende-Metrikfortschreibung fuer Monte-Carlo (Ergebnisbuffer, Pflege-Listen, Pflegebucket-Listen, Safety-Run-Zaehler, Worst-Runs, `runMeta`).
 * `app/simulator/monte-carlo-runner.js` – DOM-freie Simulation (Jahresschleife, Pflege-KPIs) auf Basis von `simulator-engine-wrapper.js`. Unterstützt eine **Ansparphase** mit dynamischem Übergang in die Rentenphase (via `effectiveTransitionYear`) und klassifiziert jeden Run chronologisch genau einmal als `ruin`, `all_dead`, `horizon_exhausted` oder `technical_error`.
-* `app/simulator/monte-carlo-chunk-result.js` – `MonteCarloChunkResultV1`, global indexierte Path-Summaries und `MonteCarloOutcomeInventoryV1`. Der Contract prueft Outcome-Summe, Ruinzaehler, technische Missingness und Worker-/Chunkparitaet; Dauer und Erschoepfungsalter nutzen `Uint32` sowie eine separate Missingness statt des frueheren 255-Sentinels.
+* `app/simulator/monte-carlo-chunk-result.js` – `MonteCarloChunkResultV1`, global indexierte Path-Summaries, `MonteCarloOutcomeInventoryV1` und validierte Samplingdiagnostik. Der Contract prueft Outcome-Summe, Ruinzaehler, technische Missingness und Worker-/Chunkparitaet; Dauer und Erschoepfungsalter nutzen `Uint32` sowie eine separate Missingness statt des frueheren 255-Sentinels.
 * `app/simulator/dynamic-flex-longevity-contract.js`, `dynamic-flex-longevity-horizon.js` und `dynamic-flex-runner-horizon.js` – DOM-freier Contract, Horizon-Adjustment und Runner-Resolver fuer konservativere Dynamic-Flex-Langlebigkeitsannahmen.
 * `app/simulator/monte-carlo-ui.js` – UI-Fassade für Progressbar/Parameter-Lesen; erlaubt Callbacks ohne DOM-Leaks.
 * `app/simulator/scenario-analyzer.js` – waehlt waehrend der Simulation bis zu 31 Szenarien (Worst, Perzentile, getrennte P1-/P2-Pflegefaelle, Zufall) aus.
@@ -369,8 +369,10 @@ Dynamic-Flex ist entlang der Simulator-Pipeline konsistent aktiviert:
 * Monte Carlo, der Life-Event-Helfer und Sweep verwenden ausserhalb der Mortalitaetstabelle gemeinsam Todeswahrscheinlichkeit 1. Horizon-/Alterssummen werden vor dem Lauf gegen den `Uint32`-Zaehlerbereich validiert und nie still begrenzt.
 * Default ist uniformes Sampling über alle historischen Startjahre.
 * Optional: `FILTER` (harte Startjahr-Grenze) oder `RECENCY` (Half-Life-Gewichtung).
-* Die Gewichtung beeinflusst Startjahr und laufende Jahresdaten (Regime/Block/IID).
-* CAPE-Sampling hat Vorrang; wenn aktiv, wird die Startjahr-Gewichtung ignoriert.
+* Die feste Praezedenz lautet: Estimated-History-Ausschluss, CAPE oder Startjahrgewichtung, Samplingmethode, bedingter Stress-Override, Tail-Risk-Overlay.
+* CAPE-Sampling hat Vorrang; bei wirksamer CAPE-Kandidatenmenge werden FILTER/RECENCY im Start- und Folgejahrsampling ignoriert und als `ignoredOptions` diagnostiziert. Fehlt ein nutzbarer CAPE-Wert oder Kandidat, bleibt die angeforderte Gewichtung aktiv und der Vertrag meldet den Fallback als Warnung.
+* Das gezogene Startjahr ist das erste tatsaechlich simulierte Marktjahr: Fixed-Block setzt dort den vollstaendigen ersten Block fort, Stationary Bootstrap prueft seine Wiederanlaufwahrscheinlichkeit erst ab dem Folgejahr, Markov startet mit dem Regime dieses Records und IID zieht erst ab Jahr 2 unabhaengig.
+* `MonteCarloSamplingDiagnosticsV1` zaehlt Startjahre, historische Jahre, Quellen, Regime, Stationary-Neustarts und Tail-Risk-Wirkung. Datenfingerprints und der eingebettete Samplingvertrag muessen beim Chunk-Merge identisch sein; Zaehler werden unabhaengig von Chunk- und Workerreihenfolge summiert.
 
 **Tail-Risk-Overlay**
 * Das optionale Fat-Tail-/Crash-Overlay ist im Simulator ein explizites Opt-in und bleibt im Default deaktiviert. Version 1 nutzt Ereignis-Injektion pro Run mit validierten Grenzen: Wahrscheinlichkeit 0-5% p.a., Aktien-Schock -60% bis 0%, Inflationsschock 0-15%, Dauer 1-5 Jahre und Cooldown 0-20 Jahre.

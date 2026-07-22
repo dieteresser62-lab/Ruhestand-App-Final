@@ -260,6 +260,13 @@ ausdrueckliche Review-Freigabe.
 
 **Slice:** 06.
 
+**Implementierungsstand 2026-07-22:** `MonteCarloSamplingContractV1` verankert
+den gezogenen Startrecord methodenspezifisch als erstes tatsaechliches
+Marktjahr. CAPE-/Gewichtungs-Praezedenz, Fallbacks, Datenfingerprints und
+kompakte Ziehungszaehler sind im Chunk- und Workerresultat diagnostizierbar.
+Fixed-/Stationary-/Markov-/IID-Golden-Cases sowie Chunk-/Workerparitaet sind
+gruen; externe Slice-Freigabe steht aus.
+
 ### MC-07 - Dauer-, Sterbetafel- und Typed-Array-Grenzen sind ungesichert (P0)
 
 **Evidenz:** `mcDauer` wird nur auf `>= 1` validiert. `kpiLebensdauer` und

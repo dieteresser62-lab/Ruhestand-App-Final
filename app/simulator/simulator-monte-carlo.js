@@ -219,7 +219,8 @@ async function runMonteCarloWithWorkers({
         pflegeTriggeredCount: finalized.totals.pflegeTriggeredCount,
         batchStatus: aggregatedResults.batchStatus,
         financialMetricsValid: aggregatedResults.financialMetricsValid,
-        technicalInventory: finalized.technicalInventory
+        technicalInventory: finalized.technicalInventory,
+        samplingDiagnostics: finalized.samplingDiagnostics
     };
 }
 

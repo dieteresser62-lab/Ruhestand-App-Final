@@ -8,9 +8,9 @@
 "use strict";
 
 import { rng, makeRunSeed, quantile } from './simulator-utils.js';
-import { BREAK_ON_RUIN, ESTIMATED_HISTORY_CUTOFF_YEAR, annualData } from './simulator-data.js';
+import { BREAK_ON_RUIN, annualData } from './simulator-data.js';
 import { applyStressOverride, computeRentAdjRate } from './simulator-portfolio.js';
-import { simulateOneYear, initMcRunState, sampleNextYearData, computeRunStatsFromSeries, updateCareMeta, calcCareCost, computeCareMortalityMultiplier, computeHouseholdFlexFactor, resolveSimulatorCumulativeInflationFactor } from './simulator-engine-wrapper.js';
+import { simulateOneYear, initMcRunState, sampleNextYearData, computeRunStatsFromSeries, updateCareMeta, calcCareCost, computeCareMortalityMultiplier, computeHouseholdFlexFactor, getDataVersion, resolveSimulatorCumulativeInflationFactor } from './simulator-engine-wrapper.js';
 import { portfolioTotal } from './simulator-results.js';
 import { sumDepot } from './simulator-portfolio.js';
 import { cloneStressContext, computeMarriageYearsCompleted } from './simulator-sweep-utils.js';
@@ -23,7 +23,6 @@ import {
     createMonteCarloLifeState,
     resolveSimulatorMortalityProbability
 } from './mc-life-events.js';
-import { getStartYearCandidates } from '../shared/cape-utils.js';
 import { STATIONARY_BOOTSTRAP_METHOD, isStationaryBootstrapMethod } from './stationary-bootstrap-contract.js';
 import { createStationaryBootstrapSampler, nextYearSample } from './stationary-bootstrap-sampler.js';
 import { applyTailRiskOverlay, createTailRiskSchedule } from './tail-risk-overlay.js';
@@ -47,7 +46,12 @@ import {
 import {
     buildStartYearCdf,
     buildYearSamplingConfig,
+    createMonteCarloSamplingDiagnosticsV1,
+    finalizeMonteCarloSamplingDiagnosticsV1,
     pickMonteCarloStartYearIndex,
+    recordMonteCarloSampledYearV1,
+    recordMonteCarloSamplingStartV1,
+    resolveMonteCarloSamplingContractV1,
     resolveMinStartYearIndex
 } from './mc-year-sampling.js';
 import { resolveDynamicFlexRunnerHorizon } from './dynamic-flex-runner-horizon.js';
@@ -145,65 +149,21 @@ function resolveMonteCarloCape(yearData, inputs, marketDataHist) {
     return 0;
 }
 
-function buildStationaryBootstrapStartOptions({
-    inputs,
-    useCapeSampling,
-    excludeEstimatedHistory,
-    yearSamplingConfig
-}) {
-    const fallbackIndices = Array.isArray(yearSamplingConfig?.allowedIndices) && yearSamplingConfig.allowedIndices.length > 0
-        ? yearSamplingConfig.allowedIndices
-        : annualData.map((_, index) => index);
-
-    const inputCapeForSampling = Number(inputs?.capeRatio) > 0
-        ? Number(inputs.capeRatio)
-        : Number(inputs?.marketCapeRatio);
-    if (useCapeSampling === true && inputCapeForSampling > 0) {
-        const capeIndices = getStartYearCandidates(inputCapeForSampling, annualData)
-            .filter(year => !excludeEstimatedHistory || year >= ESTIMATED_HISTORY_CUTOFF_YEAR)
-            .map(year => annualData.findIndex(entry => entry?.jahr === year))
-            .filter(index => index >= 0);
-        if (capeIndices.length > 0) {
-            return {
-                startIndices: capeIndices,
-                cdf: null
-            };
-        }
-    }
-
-    if (yearSamplingConfig?.allSampler) {
-        return {
-            startIndices: yearSamplingConfig.allSampler.indices,
-            cdf: yearSamplingConfig.allSampler
-        };
-    }
-
-    return {
-        startIndices: fallbackIndices,
-        cdf: null
-    };
-}
-
 function createStationaryBootstrapForRun({
-    inputs,
     blockSize,
     rand,
-    useCapeSampling,
-    excludeEstimatedHistory,
-    yearSamplingConfig
+    startYearIndex,
+    samplingResolution
 }) {
-    const { startIndices, cdf } = buildStationaryBootstrapStartOptions({
-        inputs,
-        useCapeSampling,
-        excludeEstimatedHistory,
-        yearSamplingConfig
-    });
+    const startSampler = samplingResolution?.blockStartSampler;
+    const startIndices = startSampler?.indices;
     return createStationaryBootstrapSampler({
         annualData,
         blockSize,
         mode: STATIONARY_BOOTSTRAP_METHOD,
-        cdf,
+        cdf: Array.isArray(startSampler?.cdf) ? startSampler : null,
         startIndices,
+        initialStartIndex: startYearIndex,
         rng: rand
     });
 }
@@ -270,7 +230,8 @@ export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowO
         pflegeTriggeredCount: chunk.totals.pflegeTriggeredCount,
         batchStatus: aggregatedResults.batchStatus,
         financialMetricsValid: aggregatedResults.financialMetricsValid,
-        technicalInventory: chunk.technicalInventory
+        technicalInventory: chunk.technicalInventory,
+        samplingDiagnostics: chunk.samplingDiagnostics
     };
 }
 
@@ -302,6 +263,9 @@ export async function runMonteCarloChunk({
         blockSize,
         seed,
         methode,
+        startYearMode,
+        startYearFilter,
+        startYearHalfLife,
         excludeEstimatedHistory,
         runStart,
         runCount,
@@ -314,6 +278,22 @@ export async function runMonteCarloChunk({
         startYearCdf,
         minStartYearIndex
     } = context;
+    const samplingResolution = resolveMonteCarloSamplingContractV1({
+        method: methode,
+        inputs,
+        annualData,
+        useCapeSampling,
+        startYearMode,
+        startYearFilter,
+        startYearHalfLife,
+        blockSize,
+        excludeEstimatedHistory,
+        yearSamplingConfig
+    });
+    const samplingDiagnostics = createMonteCarloSamplingDiagnosticsV1({
+        contract: samplingResolution.contract,
+        dataVersion: getDataVersion()
+    });
     const {
         finalOutcomes,
         taxOutcomes,
@@ -382,21 +362,29 @@ export async function runMonteCarloChunk({
             excludeEstimatedHistory,
             yearSamplingConfig,
             startYearCdf,
-            minStartYearIndex
+            minStartYearIndex,
+            samplingContract: samplingResolution
         });
+        recordMonteCarloSamplingStartV1(samplingDiagnostics, annualData[startYearIndex]);
 
         let simState = initMcRunState(inputs, startYearIndex);
-        if (yearSamplingConfig) {
-            simState.samplerState.yearSampling = yearSamplingConfig;
+        if (samplingResolution.effectiveYearSamplingConfig) {
+            simState.samplerState.yearSampling = samplingResolution.effectiveYearSamplingConfig;
+        }
+        if (methode === 'block') {
+            simState.samplerState.blockStartIndex = startYearIndex;
+            simState.samplerState.yearInBlock = 0;
+            simState.samplerState.contractInitialRecordPending = true;
+        } else if (methode === 'regime_markov' || methode === 'regime_iid') {
+            simState.samplerState.currentRegime = annualData[startYearIndex]?.regime;
+            simState.samplerState.contractInitialRecordPending = true;
         }
         if (isStationaryBootstrapMethod(methode)) {
             simState.samplerState.stationaryBootstrap = createStationaryBootstrapForRun({
-                inputs,
                 blockSize,
                 rand,
-                useCapeSampling,
-                excludeEstimatedHistory,
-                yearSamplingConfig
+                startYearIndex,
+                samplingResolution
             });
         }
 
@@ -448,9 +436,43 @@ export async function runMonteCarloChunk({
         for (let simulationsJahr = 0; simulationsJahr < maxDauer; simulationsJahr++) {
             lebensdauer = simulationsJahr + 1;
 
-            let yearData = isStationaryBootstrapMethod(methode) && !shouldUseStressBootstrap(stressCtx)
-                ? nextYearSample(simState.samplerState.stationaryBootstrap).yearData
-                : sampleNextYearData(simState, methode, blockSize, rand, stressCtx);
+            const conditionalStressActive = shouldUseStressBootstrap(stressCtx);
+            let stationarySample = null;
+            let samplingSource = 'unknown';
+            let yearData;
+            if (isStationaryBootstrapMethod(methode) && !conditionalStressActive) {
+                stationarySample = nextYearSample(simState.samplerState.stationaryBootstrap);
+                yearData = stationarySample.yearData;
+                samplingSource = stationarySample.restartReason === 'initial'
+                    ? 'initial_start'
+                    : (stationarySample.isRestart ? 'stationary_restart' : 'stationary_continuation');
+            } else if ((methode === 'regime_markov' || methode === 'regime_iid')
+                && simState.samplerState.contractInitialRecordPending
+                && !conditionalStressActive) {
+                yearData = { ...annualData[startYearIndex] };
+                simState.samplerState.contractInitialRecordPending = false;
+                samplingSource = 'initial_start';
+            } else {
+                yearData = sampleNextYearData(simState, methode, blockSize, rand, stressCtx);
+                if (conditionalStressActive) {
+                    samplingSource = 'conditional_stress';
+                } else if (methode === 'block') {
+                    const isBlockStart = simState.samplerState.yearInBlock === 1;
+                    if (isBlockStart && simState.samplerState.contractInitialRecordPending) {
+                        samplingSource = 'initial_start';
+                        simState.samplerState.contractInitialRecordPending = false;
+                    } else {
+                        samplingSource = isBlockStart ? 'fixed_block_restart' : 'fixed_block_continuation';
+                    }
+                } else {
+                    samplingSource = methode;
+                }
+            }
+            recordMonteCarloSampledYearV1(samplingDiagnostics, {
+                yearData,
+                source: samplingSource,
+                stationaryRestartReason: stationarySample?.restartReason || null
+            });
             yearData = applyStressOverride(yearData, stressCtx, rand);
             const tailRiskOverlay = applyTailRiskOverlay(yearData, tailRiskSchedule[simulationsJahr] ?? null, {
                 runIdx,
@@ -917,6 +939,7 @@ export async function runMonteCarloChunk({
     finalizedMetrics.totals.outcomeRuinCount = outcomeCounts.ruin;
     finalizedMetrics.totals.outcomeAllDeadCount = outcomeCounts.all_dead;
     finalizedMetrics.totals.outcomeHorizonExhaustedCount = outcomeCounts.horizon_exhausted;
+    finalizeMonteCarloSamplingDiagnosticsV1(samplingDiagnostics, finalizedMetrics.totals);
 
     return createMonteCarloChunkResultV1({
         runRange: { start: runStart, count: runCount },
@@ -933,6 +956,7 @@ export async function runMonteCarloChunk({
         runMeta: finalizedMetrics.runMeta,
         batchStatus: technicalInventory.technicalError > 0 ? 'technical_error' : 'completed',
         financialMetricsValid: technicalInventory.technicalError === 0,
-        technicalInventory
+        technicalInventory,
+        samplingDiagnostics
     });
 }

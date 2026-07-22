@@ -47,7 +47,7 @@ function createSequenceRng(sequence) {
         annualData: sampleData,
         expectedBlockLength: 5,
         startIndices: [1],
-        rng: createSequenceRng([0.9, 0.0, 0.9, 0.9])
+        rng: createSequenceRng([0.0, 0.9, 0.9])
     });
 
     const first = nextYearSample(sampler);
@@ -66,7 +66,7 @@ function createSequenceRng(sequence) {
         annualData: sampleData,
         expectedBlockLength: 1,
         startIndices: [0, 2, 4],
-        rng: createSequenceRng([0.2, 0.0, 0.4, 0.5, 0.6, 0.99])
+        rng: createSequenceRng([0.2, 0.0, 0.4, 0.5, 0.99])
     });
 
     const first = nextYearSample(sampler);
@@ -85,7 +85,7 @@ function createSequenceRng(sequence) {
         annualData: sampleData,
         expectedBlockLength: 30,
         startIndices: [3],
-        rng: createSequenceRng([0.7, 0.0, 0.8, 0.8, 0.8])
+        rng: createSequenceRng([0.7, 0.8, 0.8, 0.8])
     });
 
     const first = nextYearSample(sampler);
@@ -107,11 +107,30 @@ function createSequenceRng(sequence) {
             indices: [1, 4],
             cdf: [0.25, 1]
         },
-        rng: createSequenceRng([0.9, 0.2])
+        rng: createSequenceRng([0.2])
     });
 
     const first = nextYearSample(sampler);
     assertEqual(first.index, 1, 'sampler object CDF selects weighted start index');
+}
+
+{
+    let draws = 0;
+    const sampler = createStationaryBootstrapSampler({
+        annualData: sampleData,
+        expectedBlockLength: 5,
+        startIndices: [0, 4],
+        initialStartIndex: 2,
+        rng: () => {
+            draws += 1;
+            return 0;
+        }
+    });
+
+    const first = nextYearSample(sampler);
+    assertEqual(first.index, 2, 'reviewed initial start index anchors the first stationary block');
+    assertEqual(first.restartDraw, null, 'initial stationary record does not apply restart probability');
+    assertEqual(draws, 0, 'initial stationary record consumes no restart or block-start draw');
 }
 
 console.log('--- Stationary Bootstrap Sampler Tests Completed ---');

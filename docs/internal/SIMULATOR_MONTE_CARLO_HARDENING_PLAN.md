@@ -1,11 +1,11 @@
 # Simulator / Monte Carlo: Hardening-Arbeitsplan
 
 **Stand:** 2026-07-22
-**Status:** implementierungsreif; Slices 01-04 freigegeben, Slice 05 implementiert und im Review
+**Status:** implementierungsreif; Slices 01-05 freigegeben, Slice 06 implementiert und im Review
 **Autor:** Codex als Implementer und Plan-Autor  
 **Feature-Branch:** `codex/simulator-monte-carlo-gap-plan`  
 **GitHub-Status:** nur lokal; Veroeffentlichung ausstehend und nur nach Nutzerfreigabe  
-**Reviewstand:** Plan und Slices 01-04 freigegeben; Slice 05 wartet auf Gemini- und Nutzerreview
+**Reviewstand:** Plan und Slices 01-05 freigegeben; Slice 06 wartet auf Gemini- und Nutzerreview
 **Ausgangsanalyse:** [SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md](./SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md)
 
 ## 1. Ziel und Rollenabgrenzung
@@ -202,7 +202,7 @@ Semantikaenderungen sind unzulaessig.
 | [03](./SLICE_SIMULATOR_MONTE_CARLO_03_RISIKO_KPI_SEMANTIK.md) | Volatilitaet und Kuerzungsanteil | MC-01, MC-02 | 02, D-03 | abgeschlossen und freigegeben |
 | [04](./SLICE_SIMULATOR_MONTE_CARLO_04_PFLEGE_KPI_SEMANTIK.md) | Pflegeeintritt, -dauer und -kosten | MC-03, MC-04 | 02, D-04 | abgeschlossen und freigegeben |
 | [05](./SLICE_SIMULATOR_MONTE_CARLO_05_OUTCOME_HORIZONT_CONTRACT.md) | terminale Outcomes, Horizont, Alter | MC-05, MC-07 | 02, D-01, D-02 | abgeschlossen und freigegeben |
-| [06](./SLICE_SIMULATOR_MONTE_CARLO_06_SAMPLING_PRAEZEDENZ_DIAGNOSTIK.md) | Samplingvertrag und Ziehungsdiagnostik | MC-06 | 02, D-05 | geplant |
+| [06](./SLICE_SIMULATOR_MONTE_CARLO_06_SAMPLING_PRAEZEDENZ_DIAGNOSTIK.md) | Samplingvertrag und Ziehungsdiagnostik | MC-06 | 02, D-05 | abgeschlossen und freigegeben |
 | [07](./SLICE_SIMULATOR_MONTE_CARLO_07_SCHAETZER_UNSICHERHEIT_CAR.md) | Konfidenz und reale Depotentnahme P10 | MC-08, MC-09 | 03, 05, D-06 | geplant |
 | [08](./SLICE_SIMULATOR_MONTE_CARLO_08_RUNRESULT_EXPORT_PROVENIENZ.md) | versionierter Run-/Exportvertrag | MC-11 | 04-07 | geplant |
 | [09](./SLICE_SIMULATOR_MONTE_CARLO_09_WORKER_LIFECYCLE_ISOLATION.md) | Abbruch, Stale Jobs, Cache/Version | MC-12, MC-13 | 02, D-12 | geplant |
@@ -561,7 +561,7 @@ alte Erfolgsquotenterminologie verwendet.
 - Planreview Claude: Erstreview blockiert; Revision 1 wartet auf Re-Review.
 - Nutzerfreigabe: erteilt am 2026-07-22.
 - Status `implementierungsreif`: erteilt (für Gemini-Freigabepfad & Nutzer).
-- Implementierungsstand: Slices 01-04 abgeschlossen und freigegeben; Slice 05
+- Implementierungsstand: Slices 01-05 abgeschlossen und freigegeben; Slice 06
   auf Nutzerauftrag vom 2026-07-22 implementiert und im Review.
 
 ## 14. Rueckdokumentation Slice 01
@@ -647,8 +647,7 @@ alte Erfolgsquotenterminologie verwendet.
 
 ## 17. Rueckdokumentation Slice 04
 
-- Implementierungsstatus: abgeschlossen; Gemini-/Nutzerreview des Slice steht
-  aus. Codex erteilt keine eigene Freigabe und erstellt keinen Commit.
+- Implementierungsstatus: abgeschlossen und extern freigegeben.
 - `extraKPI.pflege.p1` und `.p2` besitzen getrennte Eintrittszaehler und
   Nenner. Eintrittsalter, Pflegejahre und reale Mehrbedarfe sind auf den
   tatsaechlichen Personeneintritt bedingt; Nicht-Eintritte erzeugen keine
@@ -678,8 +677,7 @@ alte Erfolgsquotenterminologie verwendet.
 
 ## 18. Rueckdokumentation Slice 05
 
-- Implementierungsstatus: abgeschlossen; Gemini-/Nutzerreview des Slice steht
-  aus. Codex erteilt keine eigene Freigabe und erstellt keinen Commit.
+- Implementierungsstatus: abgeschlossen und extern freigegeben.
 - `MonteCarloOutcomeInventoryV1` zaehlt jeden angeforderten Run genau einmal
   als `ruin`, `all_dead`, `horizon_exhausted` oder `technical_error`. Der
   Chunkvertrag gleicht diese Codes gegen die finanziellen Outcome-Zaehler,
@@ -711,3 +709,31 @@ alte Erfolgsquotenterminologie verwendet.
   dokumentierte fremde Architektur-Linkfehler mit sechs toten Links; alle
   uebrigen 122 Testdateien sind gruen. Keine neue Snapshot-, Backtest-, Worker-
   oder FlowDelta-Abweichung.
+
+## 19. Rueckdokumentation Slice 06
+
+- Implementierungsstatus: abgeschlossen; Gemini-/Nutzerreview des Slice steht
+  aus. Codex erteilt keine eigene Freigabe und erstellt keinen Commit.
+- `MonteCarloSamplingContractV1` exportiert die feste Praezedenz
+  Estimated-History-Ausschluss, CAPE oder Startjahrgewichtung, Samplingmethode,
+  bedingter Stress-Override und Tail-Risk-Overlay. Wirksames CAPE setzt
+  FILTER/RECENCY ausser Kraft; ignorierte Optionen und CAPE-Fallbacks bleiben
+  explizit sichtbar.
+- Der gezogene Startrecord ist nun das erste tatsaechliche Marktjahr. Fixed
+  setzt dort einen vollstaendigen sequenziellen Block fort, Stationary zieht
+  erst vor dem Folgejahr eine Restart-Entscheidung, Markov initialisiert dort
+  sein Regime und IID zieht erst ab Jahr 2 unabhaengig. Der letzte noch
+  vollstaendige Fixed-Blockstart ist zulaessig.
+- `MonteCarloSamplingDiagnosticsV1` enthaelt Samplingvertrag, Datenfingerprints,
+  Run-/Jahreszahlen sowie Startjahr-, historische Jahres-, Quellen-, Regime-,
+  Stationary- und Tail-Risk-Zaehler. Chunk- und Workermerge validieren Vertrag
+  und Datenversion und summieren unabhaengig von Fertigstellungsreihenfolge.
+- `post-slice-06-v1.json` koexistiert mit allen frueheren Referenzen. Zwei
+  Delta-Ledger-Eintraege dokumentieren die erwartete Pfadaenderung und die neue
+  Diagnostik. Der registrierte Bufferbedarf bleibt bei 75 Byte pro Run.
+- Fokussierte Sampling-, Runner-, Chunk-, UI-, Mess-, Worker- und
+  Worker-Paritaetssuiten: 1515/1515 Assertions gruen. Drei historische
+  Backtestsuiten: 588/588 Assertions gruen.
+- `npm test`: 6550/6551 Assertions gruen. Einzige Abweichung bleibt der bereits
+  dokumentierte fremde Architektur-Linkfehler mit sechs toten Links; keine
+  neue unerwartete Snapshot-, Backtest-, Worker- oder FlowDelta-Abweichung.

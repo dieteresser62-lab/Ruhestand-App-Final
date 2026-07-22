@@ -89,9 +89,10 @@ DOM-freie Startjahr- und CAPE-Sampling-Logik fuer Monte-Carlo.
 **Hauptfunktionen / Exporte:**
 - `buildStartYearCdf()` / `pickStartYearIndex()` – CDF-Aufbau und deterministische Startjahrwahl fuer FILTER/RECENCY/UNIFORM.
 - `buildYearSamplingConfig()` – gewichtete Sampling-Konfiguration fuer Startjahr und laufende Jahresdaten.
-- `pickMonteCarloStartYearIndex()` – per-Run-Auswahl inklusive CAPE-Kandidaten und Fallback.
+- `resolveMonteCarloSamplingContractV1()` / `pickMonteCarloStartYearIndex()` – versionierte Praezedenzaufloesung und per-Run-Auswahl inklusive CAPE-Kandidaten, methodenspezifischer Jahr-1-Regel und sichtbarem Fallback.
+- `createMonteCarloSamplingDiagnosticsV1()` / `recordMonteCarloSampledYearV1()` / `mergeMonteCarloSamplingDiagnosticsV1()` – kompakte Startjahr-, Jahres-, Quellen-, Regime-, Stationary- und Tail-Risk-Zaehler mit Datenfingerprints.
 
-**Einbindung:** Wird von `mc-run-context.js` fuer die Sampling-Konfiguration und von `monte-carlo-runner.js` fuer die Startjahrwahl je Run genutzt.
+**Einbindung:** Wird von `mc-run-context.js` fuer die Basiskonfiguration, vom Runner fuer die einmalige Vertragsaufloesung und Startjahrwahl sowie vom Chunkresultat fuer Validierung und reihenfolgeunabhaengiges Merge genutzt.
 
 ## 3c. `mc-life-events.js`
 DOM-freie Life-State-Initialisierung fuer Monte-Carlo.
@@ -824,8 +825,8 @@ app/simulator/simulator-main.js
 ### Monte-Carlo-Simulation
 1. `simulator-main.js`: UI-Bootstrap ruft `runMonteCarlo` aus `simulator-monte-carlo.js` auf.
 2. `simulator-monte-carlo.js`: Erstellt die UI-Fassade, normalisiert Eingaben/Witwen-Optionen und delegiert an den Runner.
-3. `mc-run-context.js`: Bereitet Chunk-Kontext, RNG, Buffers, Sampling-Konfiguration und Progress-Intervall vor.
-4. `mc-year-sampling.js`: Liefert Startjahr-/CAPE-Sampling und CDF-/Sampler-Helfer.
+3. `mc-run-context.js`: Bereitet Chunk-Kontext, RNG, Buffers, Sampling-Basiskonfiguration und Progress-Intervall vor.
+4. `mc-year-sampling.js`: Loest `MonteCarloSamplingContractV1` einmal je Chunk auf und liefert Startjahr-/CAPE-Sampling sowie die merge-invariante Ziehungsdiagnostik.
 5. `mc-life-events.js`: Initialisiert den Run-Life-State fuer Care-Meta, Partnerstatus, Care-RNGs und HouseholdContext.
 6. `tail-risk-overlay.js`: Wendet bei explizitem Opt-in ein deterministisches Tail-Risk-Ereignisfenster auf die gezogenen Jahresdaten an, ohne historische Daten zu mutieren.
 6. `mc-stress-tracker.js`: Kapselt Stress-Metrik-Initialisierung, Jahresfortschreibung und Buffer-Schreibung.
@@ -879,7 +880,8 @@ Nach jeder Monte-Carlo-Simulation werden bis zu 31 Szenarien gespeichert:
 - **Sweep-Voreinstellungen:** `initSweepDefaultsWithLocalStorageFallback()` in `simulator-sweep.js` lädt Defaults, liest `localStorage` und setzt Guardrails (Whitelist/Blocklist). Erwartet Zugriff auf Sweep-Formularfelder und das Toggle.
 - **Backtest-Setup:** `initializeBacktestUI()` in `simulator-backtest.js` verknuepft Zeitraum-, Start-, Cohort-, Detail- und Raw-Downloadcontrols per idempotenter Modulbindung. `historical-backtest-ui.js` erwartet die Status-, Hint-, Fehler-, Notice-, Cohort- und Tabellen-DOM-IDs des Backtest-Tabs; die Jahresschleife selbst liegt in `historical-backtest-runner.js` und ist DOM-/Persistenz-frei.
 - **Monte-Carlo-Start:** `runMonteCarlo()` in `simulator-monte-carlo.js` liest `mcAnzahl`, `mcDauer`, `mcBlockSize`, `mcSeed`, `mcMethode`, `mcStartYearMode`, `mcStartYearFilter`, `mcStartYearHalfLife` sowie Progress-UI (`mc-progress-bar*`). Liefert nach Abschluss aggregierte Ergebnisse an `displayMonteCarloResults()`.
-- **Startjahr-Sampling:** `mc-run-context.js` bereitet die Sampling-Konfiguration vor; `mc-year-sampling.js` kapselt `FILTER` (harte Grenze), `RECENCY` (Half-Life), `UNIFORM` und CAPE-Kandidaten. Die Gewichtung wirkt auf Startjahr und laufende Jahresdaten; CAPE-Sampling hat Vorrang vor Gewichtung.
+- **Startjahr-Sampling:** `mc-run-context.js` bereitet die Basiskonfiguration vor; `mc-year-sampling.js` kapselt `FILTER` (harte Grenze), `RECENCY` (Half-Life), `UNIFORM`, CAPE-Kandidaten und `MonteCarloSamplingContractV1`. CAPE hat vor Gewichtung Vorrang. Das gewaehlte Startjahr ist fuer Fixed-/Stationary-Block sowie Markov/IID das erste tatsaechliche Marktjahr; ignorierte Optionen und Fallbacks bleiben im Vertrag sichtbar.
+- **Samplingdiagnostik:** Direktlauf und Worker transportieren `MonteCarloSamplingDiagnosticsV1` mit Samplingvertrag, Datenfingerprints, Startjahr-/Jahres-, Quellen-, Regime-, Stationary- und Tail-Risk-Zaehlern. `monte-carlo-chunk-result.js` validiert und merged diese Zaehler unabhaengig von Chunkreihenfolge.
 - **Life-State:** `mc-life-events.js` initialisiert Care-Meta, Partnerstatus, Care-RNGs und HouseholdContext. Die Jahreslogik bleibt im Runner-Hot-Path, bis eine vollstaendige Extraktion den Benchmark stabil erfuellt.
 - **Stress-Metriken:** `mc-stress-tracker.js` kapselt Portfolio-Drawdown, Quote-Above-4.5, Cut-Years, Real-CaR und Recovery-Years fuer Stress-Presets. Die bestehenden Worker-Buffer und Aggregatnamen bleiben stabil.
 - **Logzeilen:** `mc-log-builder.js` vereinheitlicht Ruin-, Jahres- und Todesfall-Logs. Builder laufen nur fuer tatsaechlich geloggte Runs. Backtest-Logs und Monte-Carlo-Scenario-Logs verwenden dieselbe Semantik fuer Entnahme-/Payout-/VPW-Felder.

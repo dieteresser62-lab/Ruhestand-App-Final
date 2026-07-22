@@ -17,6 +17,12 @@ import {
     MC_HEATMAP_BINS,
     createMonteCarloBuffers
 } from '../app/simulator/monte-carlo-runner-utils.js';
+import {
+    createMonteCarloSamplingDiagnosticsV1,
+    finalizeMonteCarloSamplingDiagnosticsV1,
+    recordMonteCarloSampledYearV1,
+    recordMonteCarloSamplingStartV1
+} from '../app/simulator/mc-year-sampling.js';
 
 console.log('--- Monte Carlo Chunk Result Contract Tests ---');
 
@@ -127,6 +133,46 @@ function emptyLists() {
     return Object.fromEntries(MONTE_CARLO_LIST_FIELDS.map(field => [field, []]));
 }
 
+function makeSamplingDiagnostics(start, selectedRows, totals) {
+    const diagnostics = createMonteCarloSamplingDiagnosticsV1({
+        contract: {
+            schemaVersion: 'MonteCarloSamplingContractV1',
+            method: 'block',
+            startSource: 'uniform',
+            requestedStartYearMode: 'UNIFORM',
+            capeSamplingRequested: false,
+            capeSamplingEffective: false,
+            excludeEstimatedHistory: false,
+            ignoredOptions: [],
+            warnings: [],
+            initialCandidateCount: 10,
+            firstRecordPolicy: 'selected_start_record',
+            fixedBlockPolicy: 'full_sequential_block_from_selected_start',
+            stationaryRestartPolicy: 'not_applicable',
+            regimePolicy: 'not_applicable',
+            precedence: [
+                'estimated_history_exclusion',
+                'cape_or_start_weighting',
+                'sampling_method',
+                'conditional_stress_override',
+                'tail_risk_overlay'
+            ]
+        },
+        dataVersion: { annualDataHash: 'test', regimeHash: 'test' }
+    });
+    selectedRows.forEach((row, localIndex) => {
+        const startYear = 2000 + start + localIndex;
+        recordMonteCarloSamplingStartV1(diagnostics, { jahr: startYear });
+        for (let yearOffset = 0; yearOffset < row.simulatedYears; yearOffset++) {
+            recordMonteCarloSampledYearV1(diagnostics, {
+                yearData: { jahr: startYear + yearOffset, regime: 'SIDEWAYS' },
+                source: yearOffset === 0 ? 'initial_start' : 'fixed_block_continuation'
+            });
+        }
+    });
+    return finalizeMonteCarloSamplingDiagnosticsV1(diagnostics, totals);
+}
+
 function makeChunk(start, selectedRows) {
     const count = selectedRows.length;
     const buffers = createMonteCarloBuffers(count);
@@ -234,6 +280,7 @@ function makeChunk(start, selectedRows) {
         runMeta,
         batchStatus: 'completed',
         financialMetricsValid: true,
+        samplingDiagnostics: makeSamplingDiagnostics(start, selectedRows, totals),
         technicalInventory: {
             requested: count,
             financiallyEvaluable: count,
@@ -253,6 +300,7 @@ function project(batch) {
         heatmap: batch.heatmap.map(row => Array.from(row)),
         allRealWithdrawalsSample: batch.allRealWithdrawalsSample,
         runMeta: batch.runMeta,
+        samplingDiagnostics: batch.samplingDiagnostics,
         worstRun: batch.worstRun,
         worstRunCare: batch.worstRunCare
     };
@@ -358,6 +406,7 @@ function expectContractError(callback, message) {
         worstRun: null,
         worstRunCare: null,
         runMeta: [],
+        samplingDiagnostics: makeSamplingDiagnostics(3, [{ simulatedYears: 0 }], emptyTotals()),
         technicalInventory: {
             requested: 1,
             financiallyEvaluable: 0,

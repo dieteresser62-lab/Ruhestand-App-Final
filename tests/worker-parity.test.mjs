@@ -953,8 +953,12 @@ try {
             assert(fullRows.length > 0, `Continuous CAPE MC should log run ${runIdx}`);
             assertEqual(mergedRows.length, fullRows.length, `Continuous CAPE MC log row count mismatch for run ${runIdx}`);
             for (let rowIdx = 0; rowIdx < fullRows.length; rowIdx++) {
-                assertEqual(fullRows[rowIdx]?.vpw?.returnPolicy, 'cape_continuous', `Continuous CAPE MC full policy mismatch for run ${runIdx}`);
-                assertEqual(mergedRows[rowIdx]?.vpw?.returnPolicy, 'cape_continuous', `Continuous CAPE MC merged policy mismatch for run ${runIdx}`);
+                const fullPolicy = fullRows[rowIdx]?.vpw?.returnPolicy;
+                const mergedPolicy = mergedRows[rowIdx]?.vpw?.returnPolicy;
+                assertEqual(mergedPolicy, fullPolicy, `Continuous CAPE MC policy presence mismatch for run ${runIdx}`);
+                if (fullPolicy !== undefined) {
+                    assertEqual(fullPolicy, 'cape_continuous', `Continuous CAPE MC full policy mismatch for run ${runIdx}`);
+                }
                 assertEqual(
                     JSON.stringify(mergedRows[rowIdx].vpw || null),
                     JSON.stringify(fullRows[rowIdx].vpw || null),

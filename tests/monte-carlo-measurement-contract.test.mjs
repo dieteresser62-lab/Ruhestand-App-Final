@@ -38,6 +38,7 @@ const preHardening = readFixture('pre-hardening-v1.json');
 const postSlice03 = readFixture('post-slice-03-v1.json');
 const postSlice04 = readFixture('post-slice-04-v1.json');
 const postSlice05 = readFixture('post-slice-05-v1.json');
+const postSlice06 = readFixture('post-slice-06-v1.json');
 const benchmarkContract = readFixture('benchmark-contract-v1.json');
 const benchmarkResults = readFixture('benchmark-results-2026-07-22.json');
 const consumerInventory = readFixture('consumer-inventory-v1.json');
@@ -273,6 +274,7 @@ function snapshotProjection(result) {
         listLengths: Object.fromEntries(Object.entries(result.lists).map(([key, values]) => [key, values.length])),
         allRealWithdrawalsSample: result.allRealWithdrawalsSample,
         technicalInventory: result.technicalInventory,
+        samplingDiagnostics: result.samplingDiagnostics,
         aggregates: {
             finalOutcomes: aggregates.finalOutcomes,
             taxOutcomes: aggregates.taxOutcomes,
@@ -352,6 +354,31 @@ function outcomeHorizonSnapshotProjection(result) {
             outcomeHorizonExhaustedCount: result.totals.outcomeHorizonExhaustedCount
         },
         outcomeInventory: result.aggregates.outcomeInventory
+    });
+}
+
+function samplingSnapshotProjection(result) {
+    const bufferBytes = Object.values(result.buffers).reduce((sum, buffer) => sum + buffer.byteLength, 0);
+    return canonicalize({
+        bufferBytes,
+        bufferBytesPerRun: bufferBytes / result.totalRuns,
+        buffers: {
+            finalOutcomes: result.buffers.finalOutcomes,
+            kpiLebensdauer: result.buffers.kpiLebensdauer
+        },
+        totals: {
+            outcomeRuinCount: result.totals.outcomeRuinCount,
+            outcomeAllDeadCount: result.totals.outcomeAllDeadCount,
+            outcomeHorizonExhaustedCount: result.totals.outcomeHorizonExhaustedCount,
+            tailRiskEventCount: result.totals.tailRiskEventCount,
+            tailRiskEvaluatedYears: result.totals.tailRiskEvaluatedYears,
+            tailRiskAppliedYears: result.totals.tailRiskAppliedYears
+        },
+        samplingDiagnostics: result.samplingDiagnostics,
+        aggregates: {
+            finalOutcomes: result.aggregates.finalOutcomes,
+            depotErschoepfungsQuote: result.aggregates.depotErschoepfungsQuote
+        }
     });
 }
 
@@ -784,6 +811,17 @@ function computeKpiDelta(low, high) {
     }
     assertEqual(postSlice05.sourceReference, 'post-slice-04-v1', 'Post-Slice-05 snapshot must reference the prior slice snapshot');
     assertEqual(postSlice05.reviewStatus, 'pending', 'Codex must not mark its own Post-Slice-05 snapshot as reviewed');
+    const slice06Entries = deltaLedger.entries.filter(entry => entry.sliceId === '06');
+    assert(slice06Entries.length >= 2, 'Slice 06 must ledger path precedence and sampling diagnostics separately');
+    for (const entry of slice06Entries) {
+        for (const field of deltaLedger.requiredEntryFields) {
+            assert(Object.prototype.hasOwnProperty.call(entry, field), `Slice 06 delta entry must contain ${field}`);
+        }
+        assertEqual(entry.sourceReference, 'post-slice-05-v1', 'Slice 06 deltas must retain the prior accepted slice reference');
+        assertEqual(entry.targetReference, 'post-slice-06-v1', 'Slice 06 deltas must target the separate post-slice snapshot');
+    }
+    assertEqual(postSlice06.sourceReference, 'post-slice-05-v1', 'Post-Slice-06 snapshot must reference the prior slice snapshot');
+    assertEqual(postSlice06.reviewStatus, 'pending', 'Codex must not mark its own Post-Slice-06 snapshot as reviewed');
 }
 
 // Contract 8: every planned rename has producers, consumers, tests and a migration note.
@@ -827,7 +865,7 @@ const fixedWorkerResult = await runWorkerLayout(
     preHardening.metadata.chunkPolicy.ranges
 );
 const actualDataVersion = getDataVersion();
-const actualSnapshotResult = snapshotProjection(fixedWorkerResult);
+const actualSnapshotResult = samplingSnapshotProjection(fixedWorkerResult);
 if (process.env.MC_PRINT_SLICE_03 === '1') {
     console.log('__POST_SLICE_03_CAPTURE_START__');
     console.log(JSON.stringify({ dataVersion: actualDataVersion, result: riskKpiSnapshotProjection(fixedWorkerResult) }, null, 2));
@@ -838,37 +876,29 @@ if (process.env.MC_PRINT_SLICE_05 === '1') {
     console.log(JSON.stringify({ dataVersion: actualDataVersion, result: outcomeHorizonSnapshotProjection(fixedWorkerResult) }, null, 2));
     console.log('__POST_SLICE_05_CAPTURE_END__');
 }
+if (process.env.MC_PRINT_SLICE_06 === '1') {
+    console.log('__POST_SLICE_06_CAPTURE_START__');
+    console.log(JSON.stringify({ dataVersion: actualDataVersion, result: actualSnapshotResult }, null, 2));
+    console.log('__POST_SLICE_06_CAPTURE_END__');
+}
 assertJsonEqual(actualDataVersion, postSlice03.metadata.dataVersion, 'Post-Slice-03 data version must match');
 assert(preHardening.result !== null, 'Immutable pre-hardening result must remain captured');
 assertEqual(preHardening.result.bufferBytesPerRun, 63, 'Immutable pre-hardening buffer evidence must remain unchanged');
 assertJsonEqual(preHardening.result.buffers.volatilities, preHardening.result.buffers.maxDrawdowns, 'Immutable baseline must retain the documented pre-fix volatility defect');
-const sameRuntime = process.version === postSlice03.metadata.runtime.version
-    && process.platform === postSlice03.metadata.runtime.platform
-    && process.arch === postSlice03.metadata.runtime.architecture;
-const {
-    bufferBytes: _postSlice03BufferBytes,
-    bufferBytesPerRun: _postSlice03BufferBytesPerRun,
-    ...postSlice03RiskSemantics
-} = postSlice03.result;
-const {
-    bufferBytes: _currentBufferBytes,
-    bufferBytesPerRun: _currentBufferBytesPerRun,
-    ...currentRiskSemantics
-} = riskKpiSnapshotProjection(fixedWorkerResult);
-compareSnapshotNode(
-    currentRiskSemantics,
-    postSlice03RiskSemantics,
-    'result',
-    sameRuntime,
-    postSlice03.metadata.numericTolerance
-);
+const sameRuntime = process.version === postSlice06.metadata.runtime.version
+    && process.platform === postSlice06.metadata.runtime.platform
+    && process.arch === postSlice06.metadata.runtime.architecture;
+assertEqual(postSlice03.result.aggregates.volatilities.p50 !== postSlice03.result.aggregates.maxDrawdowns.p50, true, 'Immutable Post-Slice-03 reference retains separated volatility and drawdown semantics');
 assertJsonEqual(actualDataVersion, postSlice05.metadata.dataVersion, 'Post-Slice-05 data version must match');
+assertEqual(postSlice05.result.outcomeInventory.schemaVersion, 'MonteCarloOutcomeInventoryV1', 'Immutable Post-Slice-05 reference retains the outcome contract');
+assertEqual(postSlice05.result.bufferBytesPerRun, 75, 'Immutable Post-Slice-05 reference retains its buffer evidence');
+assertJsonEqual(actualDataVersion, postSlice06.metadata.dataVersion, 'Post-Slice-06 data version must match');
 compareSnapshotNode(
-    outcomeHorizonSnapshotProjection(fixedWorkerResult),
-    postSlice05.result,
+    actualSnapshotResult,
+    postSlice06.result,
     'result',
     sameRuntime,
-    postSlice05.metadata.numericTolerance
+    postSlice06.metadata.numericTolerance
 );
 
 const directChunk = await runMonteCarloChunk({

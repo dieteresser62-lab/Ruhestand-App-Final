@@ -5,9 +5,10 @@ import { HISTORICAL_DATA } from '../simulator/simulator-data.js';
  * @param {number} targetCape - The user's input CAPE.
  * @param {Array} data - The annualData array (or access HISTORICAL_DATA directly).
  * @param {number} tolerance - Percentage tolerance (default 0.2 for +/- 20%).
+ * @param {{fallbackToAll?: boolean}} options - Controls the legacy all-years fallback.
  * @returns {Array<number>} List of years (e.g. [1995, 1996, ...]).
  */
-export function getStartYearCandidates(targetCape, data, tolerance = 0.2) {
+export function getStartYearCandidates(targetCape, data, tolerance = 0.2, { fallbackToAll = true } = {}) {
     // Access HISTORICAL_DATA directly as it contains the 'cape' property
     // We need to import HISTORICAL_DATA if it's not available in scope, 
     // but since we are in simulator-main.js and it imports it, we can use it.
@@ -46,7 +47,9 @@ export function getStartYearCandidates(targetCape, data, tolerance = 0.2) {
                 }
             }
         }
-        return wideCandidates.length > 0 ? wideCandidates : validYears;
+        return wideCandidates.length > 0
+            ? wideCandidates
+            : (fallbackToAll ? validYears : []);
     }
 
     return candidates;
