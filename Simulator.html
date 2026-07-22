@@ -740,19 +740,21 @@
                         <legend><span class="section-icon">🎲</span>Simulationsparameter</legend>
                         <div class="form-grid-four-col">
                             <div class="form-group"><label for="mcAnzahl">Anzahl Simulationen</label><input
-                                    type="number" id="mcAnzahl" value="1000"
+                                    type="number" id="mcAnzahl" value="10000" min="1" max="1000000" step="1"
+                                    aria-describedby="mcResourceEstimate"
                                     title="Wie viele verschiedene Zukunftsszenarien simuliert werden - mehr Simulationen = genauere Ergebnisse">
                             </div>
                             <div class="form-group"><label for="mcDauer">Maximale Dauer (Jahre)</label><input
-                                    type="number" id="mcDauer" value="35"
+                                    type="number" id="mcDauer" value="35" min="1" max="110" step="1"
+                                    aria-describedby="mcResourceEstimate"
                                     title="Über wie viele Jahre in die Zukunft simuliert wird - sollte mindestens Ihre Lebenserwartung abdecken">
                             </div>
                             <div class="form-group"><label id="mcBlockSizeLabel" for="mcBlockSize">Blockgröße
-                                    (Jahre)</label><input type="number" id="mcBlockSize" value="5"
+                                    (Jahre)</label><input type="number" id="mcBlockSize" value="5" min="1" max="30" step="1"
                                     title="Länge der historischen Blöcke für Block-Bootstrap oder erwartete Blocklänge für Stationary Bootstrap">
                             </div>
                             <div class="form-group"><label for="mcSeed">Seed</label><input type="number"
-                                    id="mcSeed" value="12345"
+                                    id="mcSeed" value="12345" min="0" max="4294967295" step="1"
                                     title="Zufallszahlengenerator-Seed für reproduzierbare Simulationen"></div>
                         </div>
                         <div class="form-group" style="margin-top: 20px;"><label
@@ -769,11 +771,25 @@
                             </select></div>
                         <div class="form-grid-four-col" style="margin-top: 10px;">
                             <div class="form-group"><label for="mcWorkerCount">Worker-Anzahl</label><input
-                                    type="number" id="mcWorkerCount" value="8" min="0"
+                                    type="number" id="mcWorkerCount" value="8" min="0" max="32" step="1"
                                     title="Default: 8. 0 = auto (hardwareConcurrency), sonst fixe Worker-Anzahl"></div>
                             <div class="form-group"><label for="mcWorkerBudget">Job-Timebudget (ms)</label><input
-                                    type="number" id="mcWorkerBudget" value="500" min="50"
+                                    type="number" id="mcWorkerBudget" value="500" min="50" max="5000" step="1"
                                     title="Default: 500 ms. Ziel-CPU-Zeit pro Worker-Job (auto Chunking)"></div>
+                        </div>
+                        <div class="mc-resource-panel" aria-labelledby="mcResourceHeading">
+                            <strong id="mcResourceHeading">Geschätzte Rechenlast</strong>
+                            <p id="mcResourceEstimate" role="status" aria-live="polite">
+                                Kostenschätzung wird aus Runzahl und Dauer berechnet.
+                            </p>
+                            <div id="mcLargeRunConfirmationRow" class="mc-large-run-confirmation" hidden
+                                style="display:none;">
+                                <label for="mcLargeRunConfirm">
+                                    <input type="checkbox" id="mcLargeRunConfirm">
+                                    Großlast mit mehr als 100.000 Simulationen ausdrücklich bestätigen
+                                </label>
+                                <small>Bis 1.000.000 Runs ist der Lauf zulässig; Speicher- und Laufzeitbedarf steigen deutlich.</small>
+                            </div>
                         </div>
                         <div class="form-group" style="justify-content: center; margin-top: 10px;"><label
                                 style="flex-direction: row; align-items: center;"
@@ -794,7 +810,7 @@
                             <div class="form-group" id="mcStartYearFilterRow" style="display:none;">
                                 <label for="mcStartYearFilter">Startjahr-Filter</label>
                                 <div style="display:flex; align-items:center; gap:8px;">
-                                    <input type="range" id="mcStartYearFilter" min="1950" max="2010" value="1970">
+                                    <input type="range" id="mcStartYearFilter" min="1925" max="2025" value="1970">
                                     <output id="mcStartYearFilterValue">1970</output>
                                 </div>
                             </div>
@@ -868,18 +884,23 @@
                     </div>
                     <div id="mc-compare-results"
                         style="display:none; margin-top: 10px; font-size: 0.95rem; color: var(--text-secondary);"></div>
-                    <button id="mcButton" onclick="runMonteCarlo()">Monte-Carlo-Simulation starten</button>
+                    <button type="button" id="mcButton" aria-controls="monteCarloResults mcRunStatus"
+                        onclick="runMonteCarlo()">Monte-Carlo-Simulation starten</button>
                     <button type="button" id="mcCancelButton" hidden disabled
-                        style="display:none; margin-top: 8px;">Monte-Carlo-Lauf abbrechen</button>
-                    <div id="mc-progress-bar-container">
-                        <div id="mc-progress-bar"></div>
+                        aria-controls="mcRunStatus" style="display:none; margin-top: 8px;">Monte-Carlo-Lauf abbrechen</button>
+                    <span id="mcProgressLabel" class="visually-hidden">Fortschritt des Monte-Carlo-Laufs</span>
+                    <div id="mc-progress-bar-container" role="progressbar" aria-labelledby="mcProgressLabel"
+                        aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="-1">
+                        <div id="mc-progress-bar" aria-hidden="true"></div>
                     </div>
+                    <div id="mcRunStatus" class="mc-run-status" role="status" aria-live="polite"></div>
                     <div id="mc-error-container"
+                        role="alert" aria-live="assertive" tabindex="-1"
                         style="display:none; margin-top: 15px; padding: 15px; background-color: #ffebee; border: 1px solid #ffcdd2; border-radius: 6px; color: #c62828;">
                         <h4 style="margin-top: 0; margin-bottom: 10px;">Fehler in der Simulation</h4>
                         <pre id="mc-error-message"
                             style="white-space: pre-wrap; font-family: monospace; font-size: 0.9em; margin: 0;"></pre>
-                        <button onclick="document.getElementById('mc-error-container').style.display='none'"
+                        <button type="button" onclick="document.getElementById('mc-error-container').style.display='none'"
                             style="margin-top: 10px; padding: 5px 10px; cursor: pointer;">Schließen</button>
                     </div>
                     <div class="log-export-buttons" id="mcRunExportActions" hidden style="display:none;">
@@ -887,7 +908,8 @@
                         <span id="mcRunExportStatus" role="status" aria-live="polite"></span>
                     </div>
                     <div id="print-footer" class="print-footer"></div>
-                    <div id="monteCarloResults" style="display:none; margin-top: 25px;">
+                    <div id="monteCarloResults" tabindex="-1" aria-label="Ergebnisse der Monte-Carlo-Analyse"
+                        style="display:none; margin-top: 25px;">
                         <h3>Ergebnisse der Monte-Carlo-Analyse</h3>
                         <div id="monteCarloSummary"></div>
                         <div id="unifiedKpiDashboard" style="display:none;"></div>

@@ -288,6 +288,7 @@ async function runSimulatorUiOrchestrationTests() {
         assertEqual(confirmCalls, 0, 'Partner-Toggle fragt nicht unnoetig nach Bestaetigung');
 
         const floorInput = registerElement(documentRef, 'startFloorBedarf', { value: '24000' });
+        const mcRunsInput = registerElement(documentRef, 'mcAnzahl', { value: '1000' });
         [
             ['displayPortfolioBreakdown', 'div'],
             ['simStartVermoegen', 'input'],
@@ -306,6 +307,10 @@ async function runSimulatorUiOrchestrationTests() {
             ['initialBondBucket', 'input']
         ].forEach(([id, tagName]) => registerElement(documentRef, id, { tagName }));
         persistModule.initInputPersistence();
+        assertEqual(mcRunsInput.value, '10000', 'new/empty persistence uses the central 10,000-run default');
+        persistenceStorage.setItem('sim_mcAnzahl', '7777');
+        persistModule.initInputPersistence();
+        assertEqual(mcRunsInput.value, '7777', 'an explicit persisted valid run count is not overwritten');
         floorInput.value = '30000';
         floorInput.dispatchEvent({ type: 'input' });
 

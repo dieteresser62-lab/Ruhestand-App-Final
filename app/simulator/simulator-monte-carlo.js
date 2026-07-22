@@ -34,6 +34,7 @@ import {
     captureMonteCarloEngineProvenance,
     createMonteCarloExportDownload
 } from './monte-carlo-export.js';
+import { resolveMonteCarloWorkerCountV1 } from './monte-carlo-parameters.js';
 
 const formatMs = (value, digits = 0) => `${Number(value).toFixed(digits)} ms`;
 const formatSpeedup = (value, digits = 2) => `${Number(value).toFixed(digits)}x`;
@@ -149,9 +150,10 @@ async function runMonteCarloWithWorkers({
         excludeEstimatedHistory = false
     } = monteCarloParams;
     const desiredWorkers = workerConfig?.workerCount ?? 0;
-    const workerCount = Math.max(1, Number.isFinite(desiredWorkers) && desiredWorkers > 0
-        ? desiredWorkers
-        : Math.max(1, (navigator?.hardwareConcurrency || 2) - 1));
+    const workerCount = resolveMonteCarloWorkerCountV1({
+        workerCount: desiredWorkers,
+        timeBudgetMs: workerConfig?.timeBudgetMs
+    });
     const pool = getMonteCarloPool(workerCount);
     pool.ensureCapacity();
     pool.onError = error => console.error('[MC WorkerPool] Error:', error);
@@ -368,7 +370,7 @@ async function executeMonteCarloRun(runState) {
             startYearFilter,
             startYearHalfLife,
             excludeEstimatedHistory
-        } = readMonteCarloParameters();
+        } = readMonteCarloParameters(inputs);
         const monteCarloParams = {
             anzahl,
             maxDauer,
@@ -382,6 +384,8 @@ async function executeMonteCarloRun(runState) {
             excludeEstimatedHistory
         };
 
+        const workerConfig = ui.readWorkerConfig();
+        ui.requireLargeRunConfirmation(monteCarloParams);
         ui.showProgress();
         updateProgress(0);
         ui.hideCompareResults();
@@ -390,7 +394,6 @@ async function executeMonteCarloRun(runState) {
         const useWorkers = rngMode !== 'legacy-stream';
         const useCapeSampling = ui.readUseCapeSampling();
         const compareMode = ui.readCompareMode();
-        const workerConfig = ui.readWorkerConfig();
         let results = null;
         let usedWorkers = false;
 
@@ -554,6 +557,7 @@ async function executeMonteCarloRun(runState) {
         const scenarioLogs = scenarioAnalyzer.buildScenarioLogs();
         throwIfRunCancelled(signal, generationId);
         displayMonteCarloResults(aggregatedResults, anzahl, failCount, worstRun, {}, {}, pflegeTriggeredCount, inputs, worstRunCare, scenarioLogs);
+        ui.showCompleted?.();
     } catch (e) {
         if (isWorkerRunCancelledError(e) || signal.aborted) {
             runState.status = 'cancelled';

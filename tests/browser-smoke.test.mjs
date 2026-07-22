@@ -511,6 +511,35 @@ async function runSimulatorSmoke(browser, baseUrl) {
     assert(await mcCancelButton.count() === 1, 'Simulator must expose exactly one Monte-Carlo cancel control');
     assert(await mcCancelButton.isHidden(), 'Monte-Carlo cancel control must stay hidden before a run starts');
     assert(await mcCancelButton.isDisabled(), 'Monte-Carlo cancel control must stay disabled before a run starts');
+    const mcRuns = page.locator('#mcAnzahl');
+    const mcDuration = page.locator('#mcDauer');
+    const mcEstimate = page.locator('#mcResourceEstimate');
+    const mcConfirmationRow = page.locator('#mcLargeRunConfirmationRow');
+    const mcConfirmation = page.locator('#mcLargeRunConfirm');
+    await page.locator('.tab-btn[data-tab="montecarlo"]').click();
+    await page.locator('#tab-montecarlo').waitFor({ state: 'visible' });
+    assert(await mcRuns.inputValue() === '10000', 'new Simulator profile uses the 10,000-run Monte-Carlo default');
+    await mcEstimate.filter({ hasText: 'Run-Jahre' }).waitFor({ state: 'visible' });
+    assert((await mcEstimate.textContent()).includes('Speicherklasse'), 'Monte-Carlo resource estimate names its memory class');
+    assert(await page.locator('#mc-progress-bar-container').getAttribute('role') === 'progressbar', 'Monte-Carlo progress is semantic in a real browser');
+    assert(await page.locator('#mc-error-container').getAttribute('role') === 'alert', 'Monte-Carlo errors are not color-only in a real browser');
+
+    await mcRuns.fill('100001');
+    await mcRuns.dispatchEvent('input');
+    await mcConfirmationRow.waitFor({ state: 'visible' });
+    await mcConfirmation.check();
+    await mcDuration.fill('36');
+    await mcDuration.dispatchEvent('input');
+    assert(!(await mcConfirmation.isChecked()), 'duration changes invalidate a prior large-run confirmation');
+    await mcRuns.fill('100000');
+    await mcRuns.dispatchEvent('input');
+    await mcConfirmationRow.waitFor({ state: 'hidden' });
+    await mcRuns.fill('10000');
+    await mcRuns.dispatchEvent('input');
+    await mcDuration.fill('35');
+    await mcDuration.dispatchEvent('input');
+    await page.locator('.tab-btn[data-tab="rahmendaten"]').click();
+    await page.locator('#tab-rahmendaten').waitFor({ state: 'visible' });
     await page.evaluate(() => {
         const values = {
             simStartVermoegen: '2020000',

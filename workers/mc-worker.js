@@ -4,6 +4,7 @@ import { EngineAPI } from '../engine/index.mjs';
 import { runMonteCarloChunk } from '../app/simulator/monte-carlo-runner.js';
 import { runSweepChunk } from '../app/simulator/sweep-runner.js';
 import { prepareHistoricalDataOnce } from '../app/simulator/simulator-engine-helpers.js';
+import { normalizeMonteCarloParametersV1 } from '../app/simulator/monte-carlo-parameters.js';
 
 const scenarioCache = new Map();
 const MAX_SCENARIO_CACHE_ENTRIES = 8;
@@ -135,15 +136,18 @@ self.onmessage = async event => {
                 }
             }
             const { compiledScenario } = cachedScenario;
+            const normalizedParameters = normalizeMonteCarloParametersV1({
+                ...monteCarloParams,
+                methode: monteCarloParams?.methode ?? compiledScenario.methode
+            }, {
+                inputs: compiledScenario.inputs
+            });
 
             const startedAt = performance.now();
             const result = await runMonteCarloChunk({
                 inputs: compiledScenario.inputs,
                 widowOptions: compiledScenario.widowOptions,
-                monteCarloParams: {
-                    ...monteCarloParams,
-                    methode: monteCarloParams?.methode ?? compiledScenario.methode
-                },
+                monteCarloParams: normalizedParameters,
                 useCapeSampling: useCapeSampling ?? compiledScenario.useCapeSampling,
                 runRange,
                 logIndices,

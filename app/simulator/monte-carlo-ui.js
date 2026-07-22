@@ -1,6 +1,53 @@
 "use strict";
 
 import { STATIONARY_BOOTSTRAP_METHOD } from './stationary-bootstrap-contract.js';
+import {
+    MONTE_CARLO_PARAMETER_LIMITS,
+    estimateMonteCarloResourcesV1,
+    normalizeMonteCarloParametersV1,
+    normalizeMonteCarloResourceConfigV1
+} from './monte-carlo-parameters.js';
+
+function focusElement(element) {
+    if (typeof element?.focus !== 'function') return false;
+    try {
+        element.focus({ preventScroll: false });
+    } catch {
+        element.focus();
+    }
+    return true;
+}
+
+function formatInteger(value) {
+    return new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 }).format(value);
+}
+
+export function formatMonteCarloResourceEstimate(estimate) {
+    const memoryMiB = estimate.estimatedWorkerResultMiB < 10
+        ? estimate.estimatedWorkerResultMiB.toFixed(1)
+        : estimate.estimatedWorkerResultMiB.toFixed(0);
+    const loadLabel = estimate.loadLevel === 'grosslast'
+        ? 'Großlast'
+        : estimate.loadLevel === 'erhoeht'
+            ? 'erhöhte Last'
+            : 'normale Last';
+    return `${formatInteger(estimate.runYears)} Run-Jahre · Speicherklasse ${estimate.memoryClass} (ca. ${memoryMiB} MiB Ergebnisdaten) · ${loadLabel}.`;
+}
+
+export function updateMonteCarloResourceEstimate(parameters, { documentRef = globalThis.document } = {}) {
+    const estimate = estimateMonteCarloResourcesV1(parameters);
+    const estimateElement = documentRef?.getElementById?.('mcResourceEstimate');
+    const confirmationRow = documentRef?.getElementById?.('mcLargeRunConfirmationRow');
+    if (estimateElement) {
+        estimateElement.textContent = formatMonteCarloResourceEstimate(estimate);
+        estimateElement.dataset.loadLevel = estimate.loadLevel;
+    }
+    if (confirmationRow) {
+        confirmationRow.hidden = !estimate.requiresLargeRunConfirmation;
+        confirmationRow.style.display = estimate.requiresLargeRunConfirmation ? 'block' : 'none';
+    }
+    return estimate;
+}
 
 export function triggerMonteCarloDownload(download, {
     documentRef = globalThis.document,
@@ -45,7 +92,17 @@ export function createMonteCarloUI() {
     const exportActions = document.getElementById('mcRunExportActions');
     const exportButton = document.getElementById('exportMonteCarloRunJson');
     const exportStatus = document.getElementById('mcRunExportStatus');
+    const runStatus = document.getElementById('mcRunStatus');
+    const resultRegion = document.getElementById('monteCarloResults');
+    const errorContainer = document.getElementById('mc-error-container');
+    const largeRunConfirmation = document.getElementById('mcLargeRunConfirm');
     let cancelHandler = null;
+    let terminalFocusTarget = null;
+    let lastAnnouncedProgress = -1;
+
+    const setRunStatus = text => {
+        if (runStatus) runStatus.textContent = text;
+    };
 
     return {
         /**
@@ -73,8 +130,10 @@ export function createMonteCarloUI() {
             return true;
         },
         beginRun() {
+            terminalFocusTarget = null;
             mcButton.disabled = true;
             mcButton.setAttribute?.('aria-busy', 'true');
+            setRunStatus('Monte-Carlo-Lauf gestartet.');
             if (cancelButton) {
                 cancelButton.hidden = false;
                 cancelButton.style.display = 'inline-block';
@@ -84,6 +143,7 @@ export function createMonteCarloUI() {
         },
         beginCancelling() {
             mcButton.disabled = true;
+            setRunStatus('Monte-Carlo-Lauf wird abgebrochen.');
             if (cancelButton) {
                 cancelButton.disabled = true;
                 cancelButton.textContent = 'Abbruch läuft …';
@@ -98,27 +158,58 @@ export function createMonteCarloUI() {
                 cancelButton.style.display = 'none';
                 cancelButton.textContent = 'Monte-Carlo-Lauf abbrechen';
             }
+            focusElement(terminalFocusTarget);
+            terminalFocusTarget = null;
         },
         showCancelled() {
             this.showCompareResults('Monte-Carlo-Lauf wurde abgebrochen.');
+            setRunStatus('Monte-Carlo-Lauf wurde abgebrochen.');
+            terminalFocusTarget = mcButton;
             if (exportStatus) exportStatus.textContent = 'Monte-Carlo-Lauf wurde abgebrochen.';
+        },
+        showCompleted() {
+            setRunStatus('Monte-Carlo-Lauf abgeschlossen. Ergebnisse sind verfügbar.');
+            terminalFocusTarget = resultRegion || mcButton;
         },
         /**
          * Blendet die Fortschrittsanzeige ein und setzt sie zurück.
          */
-        showProgress() { progressBarContainer.style.display = 'block'; this.updateProgress(0); },
+        showProgress() {
+            progressBarContainer.style.display = 'block';
+            progressBarContainer.setAttribute?.('aria-busy', 'true');
+            lastAnnouncedProgress = -1;
+            this.updateProgress(0);
+            focusElement(progressBarContainer);
+        },
         /**
          * Aktualisiert die Fortschrittsanzeige in Prozent (0-100).
          * @param {number} percent - Fortschritt in Prozent.
          */
-        updateProgress(percent) { progressBar.style.width = `${Math.max(0, Math.min(percent, 100))}%`; },
+        updateProgress(percent) {
+            const numericPercent = Number(percent);
+            const boundedPercent = Number.isFinite(numericPercent)
+                ? Math.max(0, Math.min(numericPercent, 100))
+                : 0;
+            const roundedPercent = Math.round(boundedPercent);
+            progressBar.style.width = `${boundedPercent}%`;
+            progressBarContainer.setAttribute?.('aria-valuenow', String(roundedPercent));
+            if (lastAnnouncedProgress < 0 || roundedPercent === 100
+                || Math.abs(roundedPercent - lastAnnouncedProgress) >= 5) {
+                setRunStatus(`Monte-Carlo-Fortschritt: ${roundedPercent} Prozent.`);
+                lastAnnouncedProgress = roundedPercent;
+            }
+        },
         /**
          * Blendet die Fortschrittsanzeige nach kurzer Verzögerung aus.
          */
         async finishProgress({ completed = true } = {}) {
-            if (completed) this.updateProgress(100);
+            if (completed) {
+                progressBar.style.width = '100%';
+                progressBarContainer.setAttribute?.('aria-valuenow', '100');
+            }
             await new Promise(resolve => setTimeout(resolve, 250));
             progressBarContainer.style.display = 'none';
+            progressBarContainer.removeAttribute?.('aria-busy');
         },
         /**
          * Liest den Status der CAPE-Sampling-Option defensiv aus.
@@ -132,12 +223,23 @@ export function createMonteCarloUI() {
         readWorkerConfig() {
             const workerCountRaw = document.getElementById('mcWorkerCount')?.value ?? '8';
             const budgetRaw = document.getElementById('mcWorkerBudget')?.value ?? '500';
-            const workerCount = parseInt(String(workerCountRaw).trim(), 10);
-            const timeBudgetMs = parseInt(String(budgetRaw).trim(), 10);
-            return {
-                workerCount: Number.isFinite(workerCount) && workerCount > 0 ? workerCount : 0,
-                timeBudgetMs: Number.isFinite(timeBudgetMs) && timeBudgetMs > 0 ? timeBudgetMs : 500
-            };
+            return normalizeMonteCarloResourceConfigV1({
+                workerCount: workerCountRaw,
+                timeBudgetMs: budgetRaw
+            });
+        },
+        showResourceEstimate(parameters) {
+            return updateMonteCarloResourceEstimate(parameters);
+        },
+        requireLargeRunConfirmation(parameters) {
+            const estimate = this.showResourceEstimate(parameters);
+            if (!estimate.requiresLargeRunConfirmation) return estimate;
+            if (largeRunConfirmation?.checked !== true) {
+                focusElement(largeRunConfirmation);
+                throw new Error(`Mehr als ${formatInteger(MONTE_CARLO_PARAMETER_LIMITS.runs.interactiveRecommendedMaximum)} Simulationen sind eine Großlast. Bitte bestätigen Sie die angezeigte Belastung vor dem Start.`);
+            }
+            largeRunConfirmation.checked = false;
+            return estimate;
         },
         /**
          * Liest den Vergleichsmodus fuer Seriell vs Worker aus.
@@ -167,12 +269,14 @@ export function createMonteCarloUI() {
          * @param {Error|string} error - Das Fehlerobjekt oder die Fehlermeldung.
          */
         showError(error) {
-            const container = document.getElementById('mc-error-container');
             const messageEl = document.getElementById('mc-error-message');
-            if (container && messageEl) {
+            if (errorContainer && messageEl) {
                 const msg = error instanceof Error ? `${error.message}\n${error.stack || ''}` : String(error);
                 messageEl.textContent = msg;
-                container.style.display = 'block';
+                errorContainer.style.display = 'block';
+                setRunStatus(`Fehler: ${error instanceof Error ? error.message : String(error)}`);
+                terminalFocusTarget = errorContainer;
+                focusElement(errorContainer);
             } else {
                 console.error("Error Container missing!", error);
                 alert("Fehler (Fallback): " + error);
@@ -182,8 +286,7 @@ export function createMonteCarloUI() {
          * Versteckt die Fehlermeldung.
          */
         hideError() {
-            const container = document.getElementById('mc-error-container');
-            if (container) container.style.display = 'none';
+            if (errorContainer) errorContainer.style.display = 'none';
         },
         clearRunExport() {
             if (exportButton) {
@@ -243,7 +346,7 @@ export function requireElement(elementId, description) {
 export function readIntegerInput(elementId, description, { min = -Infinity, max = Infinity, defaultValue } = {}) {
     const element = requireElement(elementId, description);
     const rawValue = (element.value ?? '').trim();
-    const parsed = parseInt(rawValue, 10);
+    const parsed = /^-?(?:0|[1-9]\d*)$/.test(rawValue) ? Number(rawValue) : Number.NaN;
 
     if (Number.isNaN(parsed)) {
         if (typeof defaultValue === 'number') {
@@ -251,8 +354,8 @@ export function readIntegerInput(elementId, description, { min = -Infinity, max 
         }
         throw new Error(`Ungültiger Wert für ${description}: Bitte eine Zahl eingeben.`);
     }
-    if (!Number.isFinite(parsed)) {
-        throw new Error(`Ungültiger Wert für ${description}: Zahl ist nicht endlich.`);
+    if (!Number.isSafeInteger(parsed)) {
+        throw new Error(`Ungültiger Wert für ${description}: Zahl ist keine sichere ganze Zahl.`);
     }
     if (parsed < min || parsed > max) {
         const minInfo = Number.isFinite(min) ? ` (min: ${min})` : '';
@@ -276,43 +379,63 @@ function readOptionalIntegerInput(elementId, description, { min = -Infinity, max
  * und liefert dem Nutzer klare Fehlermeldungen.
  * @returns {{ anzahl: number, maxDauer: number, blockSize: number, seed: number, methode: string, rngMode: string, startYearMode: string, startYearFilter: number, startYearHalfLife: number, excludeEstimatedHistory: boolean }}
  */
-export function readMonteCarloParameters() {
+export function readMonteCarloParameters(inputs = null) {
     const methodeSelect = requireElement('mcMethode', 'Monte-Carlo Methode');
-    const allowedMethods = Array.from(methodeSelect.options || []).map(option => option.value);
-    const methode = methodeSelect.value || allowedMethods[0] || '';
-    if (allowedMethods.length > 0 && !allowedMethods.includes(methode)) {
-        throw new Error(`Ungültige Monte-Carlo-Methode: ${methode}`);
-    }
-
-    const anzahl = readIntegerInput('mcAnzahl', 'Anzahl der Simulationen', { min: 1 });
-    const maxDauer = readIntegerInput('mcDauer', 'Simulationsdauer in Jahren', { min: 1 });
-    const blockSizeDescription = methode === STATIONARY_BOOTSTRAP_METHOD ? 'Erwartete Blocklänge' : 'Blockgröße';
-    const blockSizeOptions = methode === STATIONARY_BOOTSTRAP_METHOD
-        ? { min: 1, max: 30 }
-        : { min: 1 };
-    const blockSize = readIntegerInput('mcBlockSize', blockSizeDescription, blockSizeOptions);
-    const seed = readIntegerInput('mcSeed', 'Zufalls-Seed', { defaultValue: 0 });
+    const anzahlElement = requireElement('mcAnzahl', 'Anzahl der Simulationen');
+    const durationElement = requireElement('mcDauer', 'Simulationsdauer in Jahren');
+    const blockSizeElement = requireElement('mcBlockSize', 'Blocklaenge');
+    const seedElement = requireElement('mcSeed', 'Zufalls-Seed');
     const rngModeElement = document.getElementById('rngMode');
-    const rngMode = rngModeElement ? rngModeElement.value : 'per-run-seed';
-
     const startYearModeElement = document.getElementById('mcStartYearMode');
-    const startYearModeRaw = startYearModeElement ? startYearModeElement.value : 'UNIFORM';
-    const allowedStartYearModes = ['UNIFORM', 'FILTER', 'RECENCY'];
-    const startYearMode = allowedStartYearModes.includes(startYearModeRaw) ? startYearModeRaw : 'UNIFORM';
-    const startYearFilter = readOptionalIntegerInput('mcStartYearFilter', 'Startjahr-Filter', {
-        min: 1950,
-        max: 2010,
-        defaultValue: 1970
-    });
-    const startYearHalfLife = readOptionalIntegerInput('mcStartYearHalfLife', 'Half-Life (Jahre)', {
-        min: 5,
-        max: 50,
-        defaultValue: 20
-    });
     const excludeEstimatedHistoryElement = document.getElementById('mcExcludeEstimatedHistory');
-    const excludeEstimatedHistory = excludeEstimatedHistoryElement?.checked === true;
 
-    return { anzahl, maxDauer, blockSize, seed, methode, rngMode, startYearMode, startYearFilter, startYearHalfLife, excludeEstimatedHistory };
+    return normalizeMonteCarloParametersV1({
+        anzahl: anzahlElement.value,
+        maxDauer: durationElement.value,
+        blockSize: blockSizeElement.value,
+        seed: seedElement.value,
+        methode: methodeSelect.value,
+        rngMode: rngModeElement?.value,
+        startYearMode: startYearModeElement?.value,
+        startYearFilter: document.getElementById('mcStartYearFilter')?.value,
+        startYearHalfLife: document.getElementById('mcStartYearHalfLife')?.value,
+        excludeEstimatedHistory: excludeEstimatedHistoryElement?.checked === true
+    }, { inputs });
+}
+
+export function initMonteCarloResourceControls() {
+    const runsElement = document.getElementById('mcAnzahl');
+    const durationElement = document.getElementById('mcDauer');
+    const estimateElement = document.getElementById('mcResourceEstimate');
+    const confirmation = document.getElementById('mcLargeRunConfirm');
+    if (!runsElement || !durationElement || !estimateElement) return;
+
+    let previousSignature = `${String(runsElement.value ?? '')}:${String(durationElement.value ?? '')}`;
+    const update = () => {
+        const nextSignature = `${String(runsElement.value ?? '')}:${String(durationElement.value ?? '')}`;
+        if (confirmation && nextSignature !== previousSignature) confirmation.checked = false;
+        previousSignature = nextSignature;
+        try {
+            updateMonteCarloResourceEstimate({
+                anzahl: runsElement.value,
+                maxDauer: durationElement.value
+            });
+        } catch {
+            estimateElement.textContent = 'Kostenschätzung verfügbar, sobald Runzahl und Dauer gültig sind.';
+            estimateElement.dataset.loadLevel = 'invalid';
+            const confirmationRow = document.getElementById('mcLargeRunConfirmationRow');
+            if (confirmationRow) {
+                confirmationRow.hidden = true;
+                confirmationRow.style.display = 'none';
+            }
+        }
+    };
+
+    runsElement.addEventListener('input', update);
+    runsElement.addEventListener('change', update);
+    durationElement.addEventListener('input', update);
+    durationElement.addEventListener('change', update);
+    update();
 }
 
 export function initMonteCarloMethodControls() {
@@ -341,6 +464,7 @@ export function initMonteCarloMethodControls() {
 
     methodElement.addEventListener('change', updateControls);
     updateControls();
+    initMonteCarloResourceControls();
 }
 
 export function initMonteCarloStartYearControls() {

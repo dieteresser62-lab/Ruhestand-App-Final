@@ -645,11 +645,68 @@ button:disabled {
     display: none;
 }
 
+#mc-progress-bar-container:focus {
+    outline: 3px solid color-mix(in srgb, var(--secondary-color) 55%, white);
+    outline-offset: 3px;
+}
+
 #mc-progress-bar {
     width: 0%;
     height: 100%;
     background-color: var(--success-color);
     transition: width 0.1s linear;
+}
+
+.visually-hidden {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+.mc-resource-panel {
+    margin-top: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--background-color, #fff) 92%, var(--secondary-color));
+}
+
+.mc-resource-panel p,
+.mc-large-run-confirmation small {
+    display: block;
+    margin: 5px 0 0;
+    color: var(--text-secondary);
+}
+
+.mc-resource-panel [data-load-level="grosslast"],
+.mc-large-run-confirmation {
+    color: var(--danger-color);
+    font-weight: 600;
+}
+
+.mc-large-run-confirmation label {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.mc-large-run-confirmation input {
+    width: auto;
+    margin-top: 3px;
+}
+
+.mc-run-status {
+    min-height: 1.4em;
+    margin-top: 8px;
+    color: var(--text-secondary);
+    text-align: center;
 }
 
 #engine-mismatch-footer {

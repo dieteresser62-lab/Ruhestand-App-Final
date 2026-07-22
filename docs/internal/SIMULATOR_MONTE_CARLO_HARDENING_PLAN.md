@@ -1,11 +1,11 @@
 # Simulator / Monte Carlo: Hardening-Arbeitsplan
 
 **Stand:** 2026-07-22
-**Status:** implementierungsreif; Slices 01-08 als Release-Commits abgeschlossen, Slice 09 implementiert und im Review
+**Status:** implementierungsreif; Slices 01-09 als Release-Commits abgeschlossen, Slice 10 implementiert und im Review
 **Autor:** Codex als Implementer und Plan-Autor  
 **Feature-Branch:** `codex/simulator-monte-carlo-gap-plan`  
 **GitHub-Status:** nur lokal; Veroeffentlichung ausstehend und nur nach Nutzerfreigabe  
-**Reviewstand:** Plan und Slices 01-08 freigegeben; Slice 09 wartet auf Gemini- und Nutzerreview
+**Reviewstand:** Plan und Slices 01-09 freigegeben; Slice 10 wartet auf Gemini- und Nutzerreview
 **Ausgangsanalyse:** [SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md](./SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md)
 
 ## 1. Ziel und Rollenabgrenzung
@@ -206,7 +206,7 @@ Semantikaenderungen sind unzulaessig.
 | [07](./SLICE_SIMULATOR_MONTE_CARLO_07_SCHAETZER_UNSICHERHEIT_CAR.md) | Konfidenz und reale Depotentnahme P10 | MC-08, MC-09 | 03, 05, D-06 | abgeschlossen und freigegeben |
 | [08](./SLICE_SIMULATOR_MONTE_CARLO_08_RUNRESULT_EXPORT_PROVENIENZ.md) | versionierter Run-/Exportvertrag | MC-11 | 04-07 | abgeschlossen und freigegeben |
 | [09](./SLICE_SIMULATOR_MONTE_CARLO_09_WORKER_LIFECYCLE_ISOLATION.md) | Abbruch, Stale Jobs, Cache/Version | MC-12, MC-13 | 02, D-12 | abgeschlossen und freigegeben |
-| [10](./SLICE_SIMULATOR_MONTE_CARLO_10_RESOURCE_UI_ACCESSIBILITY.md) | Bounds, Kostenhinweis, UI/A11y | MC-14, Teile MC-15 | 05, 08, 09, D-08 | geplant |
+| [10](./SLICE_SIMULATOR_MONTE_CARLO_10_RESOURCE_UI_ACCESSIBILITY.md) | Bounds, Kostenhinweis, UI/A11y | MC-14, Teile MC-15 | 05, 08, 09, D-08 | abgeschlossen und freigegeben |
 | [11](./SLICE_SIMULATOR_MONTE_CARLO_11_BROWSER_E2E_REGRESSION.md) | Browser-E2E und Pfadparitaet | MC-15 | 03-10 | geplant |
 | [12](./SLICE_SIMULATOR_MONTE_CARLO_12_INTEGRATION_DOKUMENTATION.md) | Integration, Doku- und Volltestgate | MC-16; Abschluss aller | 01-11 | geplant |
 
@@ -235,6 +235,29 @@ Semantikaenderungen sind unzulaessig.
   0 offene Handles; einzig das bereits vor Slice 09 dokumentierte
   Architektur-Linkgate bleibt rot. Aus den trotzdem erzeugten V8-Daten erreicht
   `worker-job-runner.js` 67,74 Prozent approximative Zeilen-Coverage.
+
+### Rueckdokumentation Slice 10
+
+- Implementierungsstatus: abgeschlossen; Gemini-/Nutzerreview des Slice steht
+  aus. Codex erteilt keine eigene Freigabe und erstellt keinen Commit.
+- `MonteCarloParametersV1` ist der gemeinsame strikte Eingangsvertrag fuer UI,
+  direkten Runner, Worker und Auto-Optimize. Ganze Zahlen, Enums, Booleans,
+  Mortalitaetshorizont, Blocklaenge, Seed, Worker und Jobbudget werden ohne
+  Teilparsing oder stilles Klemmen validiert.
+- Der sichtbare und zentrale Default ist 10.000 Runs. 100.000 Runs bleiben
+  bestaetigungsfrei; 100.001 bis 1.000.000 Runs zeigen Run-Jahre und eine auf
+  gemessenen 419 Result-Bytes pro Run basierende Speicherklasse und benoetigen
+  vor jedem Start eine neue Bestaetigung. Auto-Worker sind auf 32 begrenzt.
+- Start, Cancel und `cancelling` bleiben single-flight. Fortschrittsbalken,
+  Live-Status, Fehler, Abschlussfokus und Exportstatus besitzen explizite
+  Rollen/ARIA-Werte; Parameteraenderungen aktualisieren nur die Schaetzung und
+  starten keinen Lauf.
+- Die Slice-spezifischen Parameter-, DOM-, Persistenz-, Worker-,
+  Auto-Optimize-, Runner-, Paritaets-, Lifecycle-, Export- und Browser-Gates
+  sind gruen. Der abschliessende Vollsuitenlauf innerhalb von
+  `npm run test:coverage` liefert 6858/6859 gruene Assertions und 0 offene
+  Handles; einzig das bereits vor Slice 10 dokumentierte Architektur-Linkgate
+  bleibt rot. `npm run test:browser` liefert 14/14 gruene Szenarien.
 
 Zulaessige Parallelisierung nach Slice 02:
 

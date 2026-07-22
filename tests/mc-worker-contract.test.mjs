@@ -469,4 +469,41 @@ console.log('Test 7: invalid dataVersion fails closed');
     }
 }
 
+// Test 8: the worker entrypoint applies MonteCarloParametersV1 before execution.
+console.log('Test 8: invalid Monte-Carlo parameters fail closed in worker');
+{
+    const worker = createWorkerHarness();
+    try {
+        const inputs = createInputs();
+        const { scenarioKey, compiledScenario } = compileScenario(
+            inputs,
+            widowOptions,
+            monteCarloParams.methode,
+            false,
+            inputs.stressPreset
+        );
+        await postAndWait(worker, {
+            type: 'init',
+            jobId: 'init-invalid-parameters',
+            scenarioKey,
+            compiledScenario,
+            dataVersion: getDataVersion()
+        });
+        const response = await postAndWait(worker, {
+            type: 'job',
+            jobId: 'job-invalid-parameters',
+            scenarioKey,
+            runRange: { start: 0, count: 6 },
+            monteCarloParams: { ...monteCarloParams, anzahl: '6runs' },
+            useCapeSampling: false,
+            logIndices: []
+        });
+        assertEqual(response.message.type, 'error', 'worker rejects a suffixed run count');
+        assert(response.message.message.includes('ganze Zahl'), 'worker exposes the shared integer-contract error');
+        console.log('✓ invalid Monte-Carlo parameters fail closed in worker OK');
+    } finally {
+        await terminateWorker(worker);
+    }
+}
+
 console.log('--- MC Worker Entrypoint Contract Tests Completed ---');

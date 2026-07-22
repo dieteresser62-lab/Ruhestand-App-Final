@@ -3,6 +3,7 @@
 import { SUPPORTED_PFLEGE_GRADES } from './simulator-data.js';
 import { updateStartPortfolioDisplay } from './simulator-portfolio.js';
 import { persistenceStorage } from '../shared/persistence-facade.js';
+import { MONTE_CARLO_PARAMETER_LIMITS } from './monte-carlo-parameters.js';
 
 const CARE_GRADE_FIELD_IDS = SUPPORTED_PFLEGE_GRADES.flatMap(grade => [
     `pflegeStufe${grade}Zusatz`,
@@ -32,6 +33,9 @@ export function initInputPersistence() {
             // Persistence Logic
             const storageKey = 'sim_' + id;
             const storedVal = persistenceStorage.getItem(storageKey);
+            if (id === 'mcAnzahl' && (storedVal === null || storedVal === '')) {
+                element.value = String(MONTE_CARLO_PARAMETER_LIMITS.runs.default);
+            }
             // noPersist allows specific fields to opt out of persisted storage.
             if (!element.dataset.noPersist && storedVal !== null && storedVal !== "") {
                 if (element.type === 'checkbox') {

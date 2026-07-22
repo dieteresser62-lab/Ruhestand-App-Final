@@ -18,6 +18,7 @@ import { ScenarioAnalyzer } from './scenario-analyzer.js';
 import { MC_HEATMAP_BINS, pickWorstRun, createMonteCarloBuffers } from './monte-carlo-runner-utils.js';
 import { buildMonteCarloAggregates } from './monte-carlo-aggregates.js';
 import { createMonteCarloRunContext } from './mc-run-context.js';
+import { normalizeMonteCarloParametersV1 } from './monte-carlo-parameters.js';
 import {
     assertSimulatorHorizonAgeContract,
     createMonteCarloLifeState,
@@ -251,12 +252,16 @@ function appendPostRuinZeroWithdrawals({
  * @returns {Promise<{ aggregatedResults: object, failCount: number, worstRun: object, worstRunCare: object, pflegeTriggeredCount: number }>}
  */
 export async function runMonteCarloSimulation({ inputs, monteCarloParams, widowOptions, useCapeSampling, onProgress = () => { }, scenarioAnalyzer = null, engine = null }) {
-    const { anzahl } = monteCarloParams;
+    const normalizedParameters = normalizeMonteCarloParametersV1(monteCarloParams, {
+        inputs,
+        historicalRecordCount: annualData.length || null
+    });
+    const { anzahl } = normalizedParameters;
     const analyzer = scenarioAnalyzer || new ScenarioAnalyzer(anzahl);
 
     const chunk = await runMonteCarloChunk({
         inputs,
-        monteCarloParams,
+        monteCarloParams: normalizedParameters,
         widowOptions,
         useCapeSampling,
         onProgress,
@@ -312,11 +317,15 @@ export async function runMonteCarloChunk({
 }) {
     onProgress(0);
 
-    assertSimulatorHorizonAgeContract(inputs, monteCarloParams?.maxDauer);
+    const normalizedParameters = normalizeMonteCarloParametersV1(monteCarloParams, {
+        inputs,
+        historicalRecordCount: annualData.length || null
+    });
+    assertSimulatorHorizonAgeContract(inputs, normalizedParameters.maxDauer);
 
     const context = createMonteCarloRunContext({
         inputs,
-        monteCarloParams,
+        monteCarloParams: normalizedParameters,
         runRange,
         logIndices,
         buildYearSamplingConfig,

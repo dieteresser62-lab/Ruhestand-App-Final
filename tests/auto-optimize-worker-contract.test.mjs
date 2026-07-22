@@ -256,6 +256,19 @@ try {
         'Auto-Optimize worker cut-year sample size should match serial'
     );
 
+    let invalidParametersRejected = false;
+    try {
+        await runMonteCarloAutoOptimize({
+            inputs,
+            widowOptions,
+            monteCarloParams: { ...monteCarloParams, anzahl: '23runs' },
+            useCapeSampling: false
+        });
+    } catch (error) {
+        invalidParametersRejected = error?.code === 'MC_PARAMETER_INTEGER_INVALID';
+    }
+    assert(invalidParametersRejected, 'Auto-Optimize rejects the same suffixed run-count fixture before scheduling');
+
     console.log('✅ Auto-Optimize worker MC merge contract passed');
 } finally {
     if (previousWorker === undefined) {

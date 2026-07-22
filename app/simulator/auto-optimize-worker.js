@@ -20,16 +20,19 @@ import {
 } from './monte-carlo-chunk-result.js';
 import { compileScenario, getDataVersion } from './simulator-engine-helpers.js';
 import { WorkerPool } from '../../workers/worker-pool.js';
+import {
+    normalizeMonteCarloParametersV1,
+    normalizeMonteCarloResourceConfigV1,
+    resolveMonteCarloWorkerCountV1
+} from './monte-carlo-parameters.js';
 
 function readWorkerConfig() {
     const workerCountRaw = document.getElementById('mcWorkerCount')?.value ?? '8';
     const budgetRaw = document.getElementById('mcWorkerBudget')?.value ?? '500';
-    const workerCount = parseInt(String(workerCountRaw).trim(), 10);
-    const timeBudgetMs = parseInt(String(budgetRaw).trim(), 10);
-    return {
-        workerCount: Number.isFinite(workerCount) && workerCount > 0 ? workerCount : 0,
-        timeBudgetMs: Number.isFinite(timeBudgetMs) && timeBudgetMs > 0 ? timeBudgetMs : 500
-    };
+    return normalizeMonteCarloResourceConfigV1({
+        workerCount: workerCountRaw,
+        timeBudgetMs: budgetRaw
+    });
 }
 
 function finalizeAutoOptimizeBatch({ aggregatedResults, technicalInventory, failCount }) {
@@ -91,12 +94,14 @@ function getAutoOptimizePool(workerCount) {
 }
 
 export async function runMonteCarloAutoOptimize({ inputs, widowOptions, monteCarloParams, useCapeSampling }) {
+    monteCarloParams = normalizeMonteCarloParametersV1(monteCarloParams, { inputs });
     const { anzahl } = monteCarloParams;
     const workerConfig = readWorkerConfig();
     const desiredWorkers = workerConfig.workerCount ?? 0;
-    const workerCount = Math.max(1, Number.isFinite(desiredWorkers) && desiredWorkers > 0
-        ? desiredWorkers
-        : Math.max(1, (navigator?.hardwareConcurrency || 2) - 1));
+    const workerCount = resolveMonteCarloWorkerCountV1({
+        workerCount: desiredWorkers,
+        timeBudgetMs: workerConfig.timeBudgetMs
+    });
     const timeBudgetMs = workerConfig.timeBudgetMs ?? 200;
 
     // Fallback: ohne Worker läuft alles seriell im Main Thread.
