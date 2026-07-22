@@ -6,6 +6,7 @@ import {
     resolveSimulatorCumulativeInflationFactor
 } from '../app/simulator/simulator-engine-helpers.js';
 import { runMonteCarloChunk } from '../app/simulator/monte-carlo-runner.js';
+import { quantile } from '../app/simulator/simulator-utils.js';
 
 console.log('--- Simulator Real Withdrawal Contract Tests ---');
 
@@ -293,13 +294,15 @@ for (let rowIndex = 0; rowIndex < mcRows.length; rowIndex++) {
         1e-9,
         `MC year ${rowIndex + 1} should expose a real effective withdrawal`
     );
-    assertClose(
-        mcChunk.allRealWithdrawalsSample[rowIndex],
-        row.jahresentnahme_real,
-        1e-9,
-        `MC real-withdrawal sample ${rowIndex + 1} should match the logged contract`
-    );
     expectedMcFactor *= 1 + (row.inflation / 100);
 }
+assertEqual(mcChunk.allRealWithdrawalsSample.length, 0, 'Deprecated run-index withdrawal sampling should no longer be transferred');
+assertEqual(mcChunk.pathSummaries.realWithdrawalObservationCount[0], 3, 'Per-run withdrawal summary should count all decumulation observations');
+assertClose(
+    mcChunk.pathSummaries.realWithdrawalP10RealEur[0],
+    quantile(mcRows.map(row => row.jahresentnahme_real), 0.1),
+    1e-9,
+    'Per-run withdrawal P10 should use the logged real-withdrawal contract without year sampling'
+);
 
 console.log('--- Simulator Real Withdrawal Contract Tests Completed ---');

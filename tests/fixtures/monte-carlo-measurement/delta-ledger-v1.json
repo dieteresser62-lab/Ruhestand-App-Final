@@ -101,6 +101,28 @@
       "expectedDirection": "new diagnostic fields only; worker payload grows with the bounded historical-year domain, not with runs times years",
       "goldenCaseIds": ["GC-SAMPLING-01"],
       "reviewStatus": "pending"
+    },
+    {
+      "sliceId": "07",
+      "sourceReference": "post-slice-06-v1",
+      "targetReference": "post-slice-07-v1",
+      "fieldPath": "aggregates.outcomeInventory.floorCoverageEstimate",
+      "formulaBefore": "floor coverage exposed a point estimate over requested runs without estimator uncertainty",
+      "formulaAfter": "technical-error-free floor coverage exposes numerator, requested-runs denominator, point estimate and Wilson 95 percent interval; technical_error suppresses estimate and interval fail-closed",
+      "expectedDirection": "the point estimate is unchanged for clean batches; new interval and small-sample warning fields are added",
+      "goldenCaseIds": ["GC-OUTCOME-01"],
+      "reviewStatus": "pending"
+    },
+    {
+      "sliceId": "07",
+      "sourceReference": "post-slice-06-v1",
+      "targetReference": "post-slice-07-v1",
+      "fieldPath": "pathSummaries.realWithdrawalP10RealEur/aggregates.realWithdrawalP10/stressKPI.realWithdrawalP10",
+      "formulaBefore": "main CaR pooled annual withdrawals from runIdx modulo 100 paths and stress CaR omitted post-ruin zero years",
+      "formulaAfter": "each evaluable run contributes one P10 scalar over its decumulation window, with zero fill after ruin while someone lives; across-run P10/P50 use equal run weights and explicit missingness; stress uses the same zero fill inside its fixed window",
+      "expectedDirection": "values are not directly comparable; early-ruin paths can lower the estimator and length bias is removed",
+      "goldenCaseIds": ["GC-CAR-01"],
+      "reviewStatus": "pending"
     }
   ],
   "requiredEntryFields": [

@@ -13,7 +13,13 @@ export function createMonteCarloStressTracker(stressCtxMaster, initialPortfolioV
     };
 }
 
-export function recordMonteCarloStressYear(tracker, simulationsJahr, portfolioValue, logData) {
+export function recordMonteCarloStressYear(
+    tracker,
+    simulationsJahr,
+    portfolioValue,
+    logData,
+    { realWithdrawalObserved = true } = {}
+) {
     if (tracker.stressYears <= 0) return;
 
     if (simulationsJahr < tracker.stressYears) {
@@ -25,12 +31,20 @@ export function recordMonteCarloStressYear(tracker, simulationsJahr, portfolioVa
         if (logData.entscheidung.kuerzungProzent > 10) {
             tracker.cutYears++;
         }
-        tracker.realWithdrawals.push(logData.jahresentnahme_real);
+        if (realWithdrawalObserved && Number.isFinite(Number(logData.jahresentnahme_real))) {
+            tracker.realWithdrawals.push(Number(logData.jahresentnahme_real));
+        }
         return;
     }
 
     if (tracker.postStressRecoveryYears === null && logData.entnahmequote * 100 < 3.5) {
         tracker.postStressRecoveryYears = simulationsJahr - (tracker.stressYears - 1);
+    }
+}
+
+export function recordMonteCarloStressZeroWithdrawal(tracker, simulationsJahr) {
+    if (tracker?.stressYears > 0 && simulationsJahr < tracker.stressYears) {
+        tracker.realWithdrawals.push(0);
     }
 }
 

@@ -1,7 +1,7 @@
 # Slice 06: Sampling-Praezedenz und Diagnostik
 
 **Stand:** 2026-07-22
-**Status:** Implementierung abgeschlossen; Gemini-/Nutzerreview ausstehend
+**Status:** Abgeschlossen; als Release-Commit `922bbbe` vorhanden
 **Feature-Branch:** `codex/simulator-monte-carlo-gap-plan`  
 **GitHub-Status:** nur lokal; Veroeffentlichung ausstehend  
 **Arbeitsplan:** [SIMULATOR_MONTE_CARLO_HARDENING_PLAN.md](./SIMULATOR_MONTE_CARLO_HARDENING_PLAN.md)  

@@ -39,6 +39,7 @@ const postSlice03 = readFixture('post-slice-03-v1.json');
 const postSlice04 = readFixture('post-slice-04-v1.json');
 const postSlice05 = readFixture('post-slice-05-v1.json');
 const postSlice06 = readFixture('post-slice-06-v1.json');
+const postSlice07 = readFixture('post-slice-07-v1.json');
 const benchmarkContract = readFixture('benchmark-contract-v1.json');
 const benchmarkResults = readFixture('benchmark-results-2026-07-22.json');
 const consumerInventory = readFixture('consumer-inventory-v1.json');
@@ -378,6 +379,35 @@ function samplingSnapshotProjection(result) {
         aggregates: {
             finalOutcomes: result.aggregates.finalOutcomes,
             depotErschoepfungsQuote: result.aggregates.depotErschoepfungsQuote
+        }
+    });
+}
+
+function carUncertaintySnapshotProjection(result) {
+    const bufferBytes = Object.values(result.buffers).reduce((sum, buffer) => sum + buffer.byteLength, 0);
+    return canonicalize({
+        bufferBytes,
+        bufferBytesPerRun: bufferBytes / result.totalRuns,
+        buffers: {
+            realWithdrawalP10RealEur: result.buffers.realWithdrawalP10RealEur,
+            realWithdrawalObservationCount: result.buffers.realWithdrawalObservationCount,
+            realWithdrawalP10Missingness: result.buffers.realWithdrawalP10Missingness,
+            stressRealWithdrawalP10RealEur: result.buffers.stress_CaR_P10_Real,
+            stressRealWithdrawalObservationCount: result.buffers.stress_realWithdrawalObservationCount,
+            stressRealWithdrawalP10Missingness: result.buffers.stress_realWithdrawalP10Missingness
+        },
+        allRealWithdrawalsSample: result.allRealWithdrawalsSample,
+        pathSummaries: {
+            realWithdrawalP10RealEur: result.pathSummaries.realWithdrawalP10RealEur,
+            realWithdrawalObservationCount: result.pathSummaries.realWithdrawalObservationCount
+        },
+        pathMissingness: {
+            realWithdrawalP10RealEur: result.pathMissingness.realWithdrawalP10RealEur
+        },
+        aggregates: {
+            realWithdrawalP10: result.aggregates.realWithdrawalP10,
+            stressRealWithdrawalP10: result.aggregates.stressKPI.realWithdrawalP10,
+            floorCoverageEstimate: result.aggregates.outcomeInventory.floorCoverageEstimate
         }
     });
 }
@@ -822,6 +852,17 @@ function computeKpiDelta(low, high) {
     }
     assertEqual(postSlice06.sourceReference, 'post-slice-05-v1', 'Post-Slice-06 snapshot must reference the prior slice snapshot');
     assertEqual(postSlice06.reviewStatus, 'pending', 'Codex must not mark its own Post-Slice-06 snapshot as reviewed');
+    const slice07Entries = deltaLedger.entries.filter(entry => entry.sliceId === '07');
+    assertEqual(slice07Entries.length, 2, 'Slice 07 must ledger estimator uncertainty and run-based withdrawal semantics separately');
+    for (const entry of slice07Entries) {
+        for (const field of deltaLedger.requiredEntryFields) {
+            assert(Object.prototype.hasOwnProperty.call(entry, field), `Slice 07 delta entry must contain ${field}`);
+        }
+        assertEqual(entry.sourceReference, 'post-slice-06-v1', 'Slice 07 deltas must retain the prior accepted slice reference');
+        assertEqual(entry.targetReference, 'post-slice-07-v1', 'Slice 07 deltas must target the separate post-slice snapshot');
+    }
+    assertEqual(postSlice07.sourceReference, 'post-slice-06-v1', 'Post-Slice-07 snapshot must reference the prior slice snapshot');
+    assertEqual(postSlice07.reviewStatus, 'pending', 'Codex must not mark its own Post-Slice-07 snapshot as reviewed');
 }
 
 // Contract 8: every planned rename has producers, consumers, tests and a migration note.
@@ -866,6 +907,7 @@ const fixedWorkerResult = await runWorkerLayout(
 );
 const actualDataVersion = getDataVersion();
 const actualSnapshotResult = samplingSnapshotProjection(fixedWorkerResult);
+const actualSlice07Result = carUncertaintySnapshotProjection(fixedWorkerResult);
 if (process.env.MC_PRINT_SLICE_03 === '1') {
     console.log('__POST_SLICE_03_CAPTURE_START__');
     console.log(JSON.stringify({ dataVersion: actualDataVersion, result: riskKpiSnapshotProjection(fixedWorkerResult) }, null, 2));
@@ -881,24 +923,31 @@ if (process.env.MC_PRINT_SLICE_06 === '1') {
     console.log(JSON.stringify({ dataVersion: actualDataVersion, result: actualSnapshotResult }, null, 2));
     console.log('__POST_SLICE_06_CAPTURE_END__');
 }
+if (process.env.MC_PRINT_SLICE_07 === '1') {
+    console.log('__POST_SLICE_07_CAPTURE_START__');
+    console.log(JSON.stringify({ dataVersion: actualDataVersion, result: actualSlice07Result }, null, 2));
+    console.log('__POST_SLICE_07_CAPTURE_END__');
+}
 assertJsonEqual(actualDataVersion, postSlice03.metadata.dataVersion, 'Post-Slice-03 data version must match');
 assert(preHardening.result !== null, 'Immutable pre-hardening result must remain captured');
 assertEqual(preHardening.result.bufferBytesPerRun, 63, 'Immutable pre-hardening buffer evidence must remain unchanged');
 assertJsonEqual(preHardening.result.buffers.volatilities, preHardening.result.buffers.maxDrawdowns, 'Immutable baseline must retain the documented pre-fix volatility defect');
-const sameRuntime = process.version === postSlice06.metadata.runtime.version
-    && process.platform === postSlice06.metadata.runtime.platform
-    && process.arch === postSlice06.metadata.runtime.architecture;
+const sameRuntime = process.version === postSlice07.metadata.runtime.version
+    && process.platform === postSlice07.metadata.runtime.platform
+    && process.arch === postSlice07.metadata.runtime.architecture;
 assertEqual(postSlice03.result.aggregates.volatilities.p50 !== postSlice03.result.aggregates.maxDrawdowns.p50, true, 'Immutable Post-Slice-03 reference retains separated volatility and drawdown semantics');
 assertJsonEqual(actualDataVersion, postSlice05.metadata.dataVersion, 'Post-Slice-05 data version must match');
 assertEqual(postSlice05.result.outcomeInventory.schemaVersion, 'MonteCarloOutcomeInventoryV1', 'Immutable Post-Slice-05 reference retains the outcome contract');
 assertEqual(postSlice05.result.bufferBytesPerRun, 75, 'Immutable Post-Slice-05 reference retains its buffer evidence');
 assertJsonEqual(actualDataVersion, postSlice06.metadata.dataVersion, 'Post-Slice-06 data version must match');
+assertEqual(postSlice06.result.bufferBytesPerRun, 75, 'Immutable Post-Slice-06 reference retains its buffer evidence');
+assertJsonEqual(actualDataVersion, postSlice07.metadata.dataVersion, 'Post-Slice-07 data version must match');
 compareSnapshotNode(
-    actualSnapshotResult,
-    postSlice06.result,
+    actualSlice07Result,
+    postSlice07.result,
     'result',
     sameRuntime,
-    postSlice06.metadata.numericTolerance
+    postSlice07.metadata.numericTolerance
 );
 
 const directChunk = await runMonteCarloChunk({

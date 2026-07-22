@@ -203,6 +203,41 @@
         "rounding": { "mode": "none", "displayDigits": 0 },
         "uiLabel": { "samplingDiagnostics": "Sampling-Diagnostik" }
       }
+    },
+    {
+      "id": "GC-CAR-01",
+      "contract": "run-based-real-withdrawal-p10",
+      "input": {
+        "requestedRuns": 5,
+        "perRun": [
+          { "runIndex": 0, "realWithdrawalP10RealEur": 0, "observationCount": 5, "missingness": "observed" },
+          { "runIndex": 1, "realWithdrawalP10RealEur": 10000, "observationCount": 5, "missingness": "observed" },
+          { "runIndex": 2, "realWithdrawalP10RealEur": 20000, "observationCount": 5, "missingness": "observed" },
+          { "runIndex": 3, "realWithdrawalP10RealEur": null, "observationCount": 0, "missingness": "died_before_first_obligation" },
+          { "runIndex": 4, "realWithdrawalP10RealEur": null, "observationCount": 0, "missingness": "technical_error" }
+        ]
+      },
+      "expected": {
+        "intermediate": {
+          "observedPerRunP10RealEur": [0, 10000, 20000],
+          "sampleSize": 3,
+          "excludedRuns": 2
+        },
+        "value": {
+          "realEur": 2000,
+          "p50RealEur": 10000,
+          "missingness": {
+            "no_observations": 0,
+            "died_before_first_obligation": 1,
+            "technical_error": 1,
+            "not_applicable": 0
+          }
+        },
+        "unit": { "realEur": "real EUR at simulation-start prices" },
+        "denominator": { "realEur": "one per-run P10 scalar for every evaluable run" },
+        "rounding": { "mode": "half-away-from-zero", "displayDigits": 0 },
+        "uiLabel": { "realEur": "Reale Depotentnahme P10" }
+      }
     }
   ]
 }

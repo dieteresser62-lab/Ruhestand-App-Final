@@ -1,0 +1,106 @@
+{
+  "schemaVersion": "monte-carlo-post-slice-snapshot-v1",
+  "snapshotId": "post-slice-07-v1",
+  "sourceReference": "post-slice-06-v1",
+  "sliceId": "07",
+  "reviewStatus": "pending",
+  "capturedAtUtc": "2026-07-22T00:00:00.000Z",
+  "goldenCaseId": "GC-CAR-01",
+  "metadata": {
+    "seed": 20260722,
+    "dataVersion": {
+      "annualDataHash": "614993a3",
+      "regimeHash": "50aa7f99"
+    },
+    "runtime": {
+      "kind": "node",
+      "version": "v25.2.1",
+      "platform": "win32",
+      "architecture": "x64"
+    },
+    "numericTolerance": {
+      "sameRuntime": { "defaultAbsolute": 0 },
+      "crossRuntime": { "defaultAbsolute": 0, "fields": [] }
+    }
+  },
+  "result": {
+    "bufferBytes": 744,
+    "bufferBytesPerRun": 93,
+    "buffers": {
+      "realWithdrawalP10RealEur": [30340.708360201734, 32762.03501743999, 29755.141710791806, 30106.100266858655, 33027.35846061342, 33718.09443483799, 29176.25689049641, 31159.35300922975],
+      "realWithdrawalObservationCount": [8, 12, 12, 12, 12, 12, 12, 7],
+      "realWithdrawalP10Missingness": [1, 1, 1, 1, 1, 1, 1, 1],
+      "stressRealWithdrawalP10RealEur": [0, 0, 0, 0, 0, 0, 0, 0],
+      "stressRealWithdrawalObservationCount": [0, 0, 0, 0, 0, 0, 0, 0],
+      "stressRealWithdrawalP10Missingness": [2, 2, 2, 2, 2, 2, 2, 2]
+    },
+    "allRealWithdrawalsSample": [],
+    "pathSummaries": {
+      "realWithdrawalP10RealEur": [30340.708360201734, 32762.03501743999, 29755.141710791806, 30106.100266858655, 33027.35846061342, 33718.09443483799, 29176.25689049641, 31159.35300922975],
+      "realWithdrawalObservationCount": [8, 12, 12, 12, 12, 12, 12, 7]
+    },
+    "pathMissingness": {
+      "realWithdrawalP10RealEur": [1, 1, 1, 1, 1, 1, 1, 1]
+    },
+    "aggregates": {
+      "realWithdrawalP10": {
+        "realEur": 29581.476264703186,
+        "p50RealEur": 30750.03068471574,
+        "sampleSize": 8,
+        "excludedRuns": 0,
+        "missingness": {
+          "no_observations": 0,
+          "died_before_first_obligation": 0,
+          "technical_error": 0,
+          "not_applicable": 0
+        },
+        "unit": "real_eur_at_simulation_start_prices",
+        "perRunStatistic": "p10",
+        "uncertainty": {
+          "confidenceInterval": null,
+          "reason": "quantile_confidence_interval_not_estimated"
+        }
+      },
+      "stressRealWithdrawalP10": {
+        "realEur": null,
+        "p50RealEur": null,
+        "sampleSize": 0,
+        "excludedRuns": 8,
+        "missingness": {
+          "no_observations": 0,
+          "died_before_first_obligation": 0,
+          "technical_error": 0,
+          "not_applicable": 8
+        },
+        "unit": "real_eur_at_simulation_start_prices",
+        "perRunStatistic": "p10",
+        "uncertainty": {
+          "confidenceInterval": null,
+          "reason": "quantile_confidence_interval_not_estimated"
+        }
+      },
+      "floorCoverageEstimate": {
+        "estimator": "binomial_proportion",
+        "numerator": 8,
+        "denominator": 8,
+        "sampleSize": 8,
+        "estimateRatio": 1,
+        "estimatePct": 100,
+        "confidenceInterval95": {
+          "method": "wilson_score",
+          "confidenceLevel": 0.95,
+          "lowerRatio": 0.6755924351161198,
+          "upperRatio": 1,
+          "lowerPct": 67.55924351161198,
+          "upperPct": 100
+        },
+        "uncertaintyWarning": {
+          "code": "small_sample",
+          "thresholdRuns": 1000,
+          "message": "Nur 8 Laeufe: Das Intervall ist breit und der Punktschaetzer nicht hochpraezise."
+        },
+        "interpretation": "Das Intervall quantifiziert Simulationsfehler des binaeren Schaetzers, nicht Modellrisiko."
+      }
+    }
+  }
+}

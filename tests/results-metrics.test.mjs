@@ -1,4 +1,5 @@
-import { buildCareMetrics, buildKpiDashboard, buildSummaryData } from '../app/simulator/results-metrics.js';
+import { buildCareMetrics, buildKpiDashboard, buildStressMetrics, buildSummaryData } from '../app/simulator/results-metrics.js';
+import { buildMonteCarloOutcomeInventoryV1 } from '../app/simulator/monte-carlo-chunk-result.js';
 
 console.log('--- Results Metrics UI Contract Tests ---');
 
@@ -20,6 +21,24 @@ const outcomeSummary = buildSummaryData({
 assertEqual(outcomeSummary[0].title, 'Floor-Deckung im gewählten Horizont', 'Summary should use the reviewed floor-coverage label');
 assertEqual(outcomeSummary[0].value, '—', 'Technical path should suppress floor coverage in the UI');
 assert(outcomeSummary[1].value.includes('Ruin 1') && outcomeSummary[1].value.includes('Technik 1'), 'Summary should keep the terminal outcome inventory visible');
+
+const uncertainSummary = buildSummaryData({
+    results: {
+        outcomeInventory: buildMonteCarloOutcomeInventoryV1({
+            requestedRuns: 4,
+            ruin: 1,
+            all_dead: 1,
+            horizon_exhausted: 2,
+            technical_error: 0
+        })
+    },
+    totalRuns: 4,
+    failCount: 1
+});
+assert(uncertainSummary[0].value.includes('95%-KI'), 'Floor-coverage card should show the Wilson interval');
+assert(uncertainSummary[0].description.includes('Simulationsfehler, nicht Modellrisiko'), 'Floor-coverage tooltip should state the interval interpretation limit');
+assert(uncertainSummary[0].description.includes('Unsicherheitswarnung'), 'Small batches should show a visible uncertainty warning');
+assertEqual(uncertainSummary[0].tone, 'warning', 'Small-sample floor coverage should not be styled as precise success');
 
 const dashboard = buildKpiDashboard({
     depotErschoepfungsQuote: 12.34,
@@ -97,6 +116,38 @@ const volatilityKpi = buildKpiDashboard({
 }).detailSections.flatMap(section => section.kpis).find(kpi => kpi.title.includes('Portfoliovolatilität'));
 assert(volatilityKpi?.description.includes('(N-1)'), 'Volatility tooltip should document sample standard deviation');
 assert(volatilityKpi?.description.includes('keine zusätzliche Annualisierung'), 'Volatility tooltip should document annual frequency semantics');
+
+const withdrawalDashboard = buildKpiDashboard({
+    depotErschoepfungsQuote: 0,
+    realWithdrawalP10: {
+        realEur: 12000,
+        p50RealEur: 18000,
+        sampleSize: 8,
+        excludedRuns: 2,
+        missingness: { died_before_first_obligation: 1, technical_error: 1 }
+    }
+});
+const withdrawalKpi = withdrawalDashboard.detailSections
+    .flatMap(section => section.kpis)
+    .find(kpi => kpi.title === 'Reale Depotentnahme P10');
+assert(withdrawalKpi.value.includes('10.000'), 'Run-based real withdrawal P10 should render with the established rounded-euro formatter');
+assert(withdrawalKpi.description.includes('Stichprobe: 8 Läufe'), 'Withdrawal P10 tooltip should expose evaluable run count');
+assert(withdrawalKpi.description.includes('Technik 1'), 'Withdrawal P10 tooltip should expose technical missingness');
+assert(withdrawalKpi.description.includes('Kein Quantil-Konfidenzintervall'), 'Withdrawal P10 tooltip should not imply an unimplemented interval');
+
+const stressMetrics = buildStressMetrics({
+    presetKey: 'GREAT_DEPRESSION_29_33',
+    years: 5,
+    maxDD: { p50: 10, p90: 20 },
+    timeShareAbove45: { p50: 40 },
+    cutYears: { p50: 2 },
+    realWithdrawalP10: { realEur: 7000, p50RealEur: 9000, sampleSize: 7 },
+    recoveryYears: { p50: 3 }
+});
+const stressWithdrawal = stressMetrics.kpis.find(kpi => kpi.title === 'Reale Depotentnahme P10 (Stress)');
+assert(stressWithdrawal.value.includes('7.000'), 'Stress withdrawal P10 should use the canonical across-run P10 field and established rounded-euro formatter');
+assert(stressWithdrawal.description.includes('Stichprobe: 7 Läufe'), 'Stress withdrawal tooltip should expose sample size');
+assert(stressWithdrawal.description.includes('9.000'), 'Stress withdrawal tooltip should expose the median run P10 separately');
 
 const careMetrics = buildCareMetrics({
     extraKPI: {

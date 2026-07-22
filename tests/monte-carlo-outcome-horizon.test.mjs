@@ -10,6 +10,7 @@ import {
     resolveSimulatorMortalityProbability
 } from '../app/simulator/mc-life-events.js';
 import {
+    MONTE_CARLO_MISSINGNESS_CODE,
     MONTE_CARLO_OUTCOME_CODE,
     buildMonteCarloOutcomeInventoryV1,
     resolveMonteCarloTerminalOutcomeV1
@@ -66,7 +67,7 @@ function buildInputs(overrides = {}) {
 
 const widowOptions = { mode: 'stop', percent: 0, marriageOffsetYears: 0, minMarriageYears: 0 };
 
-async function runSingle(inputs, { engine = EngineAPI, seed = 42 } = {}) {
+async function runSingle(inputs, { engine = EngineAPI, seed = 42, monteCarloOverrides = {} } = {}) {
     return runMonteCarloChunk({
         inputs,
         monteCarloParams: {
@@ -76,7 +77,8 @@ async function runSingle(inputs, { engine = EngineAPI, seed = 42 } = {}) {
             seed,
             methode: 'block',
             rngMode: 'per-run-seed',
-            startYearMode: 'UNIFORM'
+            startYearMode: 'UNIFORM',
+            ...monteCarloOverrides
         },
         widowOptions,
         useCapeSampling: false,
@@ -129,6 +131,10 @@ async function runSingle(inputs, { engine = EngineAPI, seed = 42 } = {}) {
         errors: []
     });
     assertEqual(clean.outcomeInventory.floorCoveragePct, 75, 'Clean batch should use all_dead plus horizon_exhausted over requested runs');
+    assertEqual(clean.outcomeInventory.floorCoverageEstimate.sampleSize, 4, 'Floor estimate should expose requested runs as its sample size');
+    assertEqual(clean.outcomeInventory.floorCoverageEstimate.confidenceInterval95.method, 'wilson_score', 'Floor estimate should use the reviewed Wilson interval');
+    assert(clean.outcomeInventory.floorCoverageEstimate.confidenceInterval95.lowerPct < 75, 'Wilson lower bound should remain below the point estimate');
+    assertEqual(clean.outcomeInventory.floorCoverageEstimate.uncertaintyWarning.code, 'small_sample', 'Small batches should carry an explicit uncertainty warning');
 
     const technicalTransport = {
         requested: 4,
@@ -178,6 +184,8 @@ async function runSingle(inputs, { engine = EngineAPI, seed = 42 } = {}) {
 
     const deathChunk = await runSingle(buildInputs({ startAlter: 110 }));
     assertEqual(deathChunk.pathSummaries.outcomeCode[0], MONTE_CARLO_OUTCOME_CODE.ALL_DEAD, 'Certain death in the last plan year should be all_dead before the financial obligation');
+    assertEqual(deathChunk.pathSummaries.realWithdrawalObservationCount[0], 0, 'Death before the first obligation should have no withdrawal observation');
+    assertEqual(deathChunk.pathMissingness.realWithdrawalP10RealEur[0], MONTE_CARLO_MISSINGNESS_CODE.DIED_BEFORE_FIRST_OBLIGATION, 'Death before the first obligation should retain its dedicated missingness reason');
 
     const ruinChunk = await runSingle(buildInputs({
         startVermoegen: 1,
@@ -189,6 +197,35 @@ async function runSingle(inputs, { engine = EngineAPI, seed = 42 } = {}) {
         startFlexBedarf: 0
     }));
     assertEqual(ruinChunk.pathSummaries.outcomeCode[0], MONTE_CARLO_OUTCOME_CODE.RUIN, 'Uncovered floor in a started year should end as ruin');
+
+    const paddedRuinChunk = await runSingle(buildInputs({
+        startVermoegen: 1,
+        depotwertAlt: 1,
+        einstandAlt: 1,
+        tagesgeld: 0,
+        zielLiquiditaet: 0,
+        startFloorBedarf: 1000000,
+        startFlexBedarf: 0
+    }), {
+        monteCarloOverrides: { maxDauer: 5 }
+    });
+    assertEqual(paddedRuinChunk.pathSummaries.realWithdrawalObservationCount[0], 5, 'Immediate ruin should include the attempted obligation and living post-ruin years');
+    assertEqual(paddedRuinChunk.pathSummaries.realWithdrawalP10RealEur[0], 0, 'Immediate ruin should produce an observed per-run withdrawal P10 of zero');
+
+    const stressRuinChunk = await runSingle(buildInputs({
+        startVermoegen: 1,
+        depotwertAlt: 1,
+        einstandAlt: 1,
+        tagesgeld: 0,
+        zielLiquiditaet: 0,
+        startFloorBedarf: 1000000,
+        startFlexBedarf: 0,
+        stressPreset: 'GREAT_DEPRESSION_29_33'
+    }), {
+        monteCarloOverrides: { maxDauer: 5 }
+    });
+    assertEqual(stressRuinChunk.buffers.stress_realWithdrawalObservationCount[0], 5, 'Stress CaR should use the same post-ruin zero fill inside its fixed window');
+    assertEqual(stressRuinChunk.buffers.stress_CaR_P10_Real[0], 0, 'Stress CaR should observe zero for immediate ruin');
 
     const technicalChunk = await runSingle(buildInputs(), {
         engine: { simulateSingleYear: () => ({ error: new Error('synthetic') }) }

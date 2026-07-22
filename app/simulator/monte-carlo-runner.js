@@ -29,6 +29,7 @@ import { applyTailRiskOverlay, createTailRiskSchedule } from './tail-risk-overla
 import {
     createMonteCarloStressTracker,
     recordMonteCarloStressYear,
+    recordMonteCarloStressZeroWithdrawal,
     writeMonteCarloStressMetrics
 } from './mc-stress-tracker.js';
 import {
@@ -56,6 +57,7 @@ import {
 } from './mc-year-sampling.js';
 import { resolveDynamicFlexRunnerHorizon } from './dynamic-flex-runner-horizon.js';
 import {
+    MONTE_CARLO_MISSINGNESS_CODE,
     MONTE_CARLO_OUTCOME_CODE,
     buildMonteCarloOutcomeInventoryV1,
     createMonteCarloChunkResultV1,
@@ -170,6 +172,69 @@ function createStationaryBootstrapForRun({
 
 function shouldUseStressBootstrap(stressCtx) {
     return stressCtx?.type === 'conditional_bootstrap' && stressCtx.remainingYears > 0;
+}
+
+function appendPostRuinZeroWithdrawals({
+    inputs,
+    startSimulationYear,
+    maxDauer,
+    p1Alive: initialP1Alive,
+    p2Alive: initialP2Alive,
+    careMetaP1,
+    careMetaP2,
+    rngCareP1,
+    rngCareP2,
+    rand,
+    effectiveTransitionYear: initialTransitionYear,
+    realWithdrawals,
+    stressTracker
+}) {
+    let p1Alive = initialP1Alive;
+    let p2Alive = initialP2Alive;
+    let effectiveTransitionYear = initialTransitionYear;
+    const postRuinCareP1 = careMetaP1 ? { ...careMetaP1 } : null;
+    const postRuinCareP2 = careMetaP2 ? { ...careMetaP2 } : null;
+    const neutralYearData = { inflation: 0 };
+
+    for (let simulationsJahr = startSimulationYear; simulationsJahr < maxDauer; simulationsJahr++) {
+        const ageP1 = inputs.startAlter + simulationsJahr;
+        const ageP2 = inputs.partner?.aktiv
+            ? inputs.partner.startAlter + simulationsJahr
+            : ageP1;
+
+        if (p1Alive && postRuinCareP1) {
+            updateCareMeta(postRuinCareP1, inputs, ageP1, neutralYearData, rngCareP1);
+        }
+        if (p2Alive && postRuinCareP2) {
+            updateCareMeta(postRuinCareP2, inputs, ageP2, neutralYearData, rngCareP2);
+        }
+        if (inputs.accumulationPhase?.enabled && simulationsJahr < effectiveTransitionYear
+            && ((p1Alive && postRuinCareP1?.active) || (p2Alive && postRuinCareP2?.active))) {
+            effectiveTransitionYear = simulationsJahr;
+        }
+        const isAccumulation = inputs.accumulationPhase?.enabled
+            && simulationsJahr < effectiveTransitionYear;
+
+        if (!isAccumulation && p1Alive) {
+            let qx1 = resolveSimulatorMortalityProbability(inputs.geschlecht, ageP1);
+            const careFactorP1 = computeCareMortalityMultiplier(postRuinCareP1, inputs);
+            if (careFactorP1 > 1) qx1 = Math.min(1, qx1 * careFactorP1);
+            if (rand() < qx1) p1Alive = false;
+        }
+        if (!isAccumulation && p2Alive && postRuinCareP2) {
+            const p2Gender = inputs.partner?.geschlecht || (inputs.geschlecht === 'm' ? 'w' : 'm');
+            let qx2 = resolveSimulatorMortalityProbability(p2Gender, ageP2);
+            const careFactorP2 = computeCareMortalityMultiplier(postRuinCareP2, inputs);
+            if (careFactorP2 > 1) qx2 = Math.min(1, qx2 * careFactorP2);
+            if (rand() < qx2) p2Alive = false;
+        }
+
+        if (!p1Alive && !p2Alive) break;
+        if (!isAccumulation) {
+            realWithdrawals.push(0);
+            recordMonteCarloStressZeroWithdrawal(stressTracker, simulationsJahr);
+        }
+    }
 }
 
 /**
@@ -294,6 +359,10 @@ export async function runMonteCarloChunk({
         contract: samplingResolution.contract,
         dataVersion: getDataVersion()
     });
+    const { pathSummaries, pathMissingness } = createMonteCarloPathSummaryV1(runCount, {
+        buffers,
+        attachTransferBuffers: true
+    });
     const {
         finalOutcomes,
         taxOutcomes,
@@ -310,6 +379,8 @@ export async function runMonteCarloChunk({
         stress_timeQuoteAbove45,
         stress_cutYears,
         stress_CaR_P10_Real,
+        stress_realWithdrawalObservationCount,
+        stress_realWithdrawalP10Missingness,
         stress_recoveryYears
     } = buffers;
 
@@ -323,11 +394,6 @@ export async function runMonteCarloChunk({
         all_dead: 0,
         horizon_exhausted: 0
     };
-    const { pathSummaries, pathMissingness } = createMonteCarloPathSummaryV1(runCount, {
-        buffers,
-        attachTransferBuffers: true
-    });
-
     const heatmap = Array(10).fill(0).map(() => new Uint32Array(MC_HEATMAP_BINS.length - 1));
     let lastProgressPct = -1;
 
@@ -672,6 +738,10 @@ export async function runMonteCarloChunk({
 
             if (result?.kind === 'ruin' || result?.isRuin === true) {
                 failed = true;
+                if (!isAccumulation) {
+                    realWithdrawalsThisRun.push(0);
+                    recordMonteCarloStressZeroWithdrawal(stressTracker, simulationsJahr);
+                }
                 // Bei Ruin ist das Depot definitiv erschöpft - setze Alter
                 if (!depotErschoepfungAlterGesetzt) {
                     alterBeiErschoepfung[i] = ageP1;
@@ -743,8 +813,7 @@ export async function runMonteCarloChunk({
                         runSafetyStage2Ever = true;
                     }
                 }
-                if (runIdx % 100 === 0) runMetrics.allRealWithdrawalsSample.push(result.logData.jahresentnahme_real);
-                if (Number.isFinite(Number(result.logData.jahresentnahme_real))) {
+                if (!isAccumulation && Number.isFinite(Number(result.logData.jahresentnahme_real))) {
                     realWithdrawalsThisRun.push(Number(result.logData.jahresentnahme_real));
                 }
 
@@ -763,7 +832,8 @@ export async function runMonteCarloChunk({
                         stressTracker,
                         simulationsJahr,
                         portfolioTotal(simState.portfolio),
-                        result.logData
+                        result.logData,
+                        { realWithdrawalObserved: !isAccumulation }
                     );
                 }
 
@@ -780,7 +850,26 @@ export async function runMonteCarloChunk({
             }
         }
 
+        if (failed && BREAK_ON_RUIN && !technicalPathError) {
+            appendPostRuinZeroWithdrawals({
+                inputs,
+                startSimulationYear: lebensdauer,
+                maxDauer,
+                p1Alive,
+                p2Alive,
+                careMetaP1,
+                careMetaP2,
+                rngCareP1,
+                rngCareP2,
+                rand,
+                effectiveTransitionYear,
+                realWithdrawals: realWithdrawalsThisRun,
+                stressTracker
+            });
+        }
+
         if (technicalPathError) {
+            stress_realWithdrawalP10Missingness[i] = MONTE_CARLO_MISSINGNESS_CODE.TECHNICAL_ERROR;
             technicalInventory.technicalError++;
             if (technicalInventory.errors.length < MAX_TECHNICAL_ERROR_SAMPLES) {
                 technicalInventory.errors.push(technicalPathError);
@@ -814,6 +903,7 @@ export async function runMonteCarloChunk({
                     message: `Ein Simulationspfad verletzte den terminalen Outcome-Vertrag (${errorCode}).`
                 });
             }
+            stress_realWithdrawalP10Missingness[i] = MONTE_CARLO_MISSINGNESS_CODE.TECHNICAL_ERROR;
             recordMonteCarloPathSummaryV1({
                 pathSummaries,
                 pathMissingness,
@@ -863,6 +953,15 @@ export async function runMonteCarloChunk({
             stress_CaR_P10_Real,
             stress_recoveryYears
         );
+        const stressWithdrawalCount = stressTracker.realWithdrawals?.length || 0;
+        stress_realWithdrawalObservationCount[i] = stressWithdrawalCount;
+        stress_realWithdrawalP10Missingness[i] = stressTracker.stressYears <= 0
+            ? MONTE_CARLO_MISSINGNESS_CODE.NOT_APPLICABLE
+            : stressWithdrawalCount > 0
+                ? MONTE_CARLO_MISSINGNESS_CODE.OBSERVED
+                : terminalResolution.outcomeCode === MONTE_CARLO_OUTCOME_CODE.ALL_DEAD
+                    ? MONTE_CARLO_MISSINGNESS_CODE.DIED_BEFORE_FIRST_OBLIGATION
+                    : MONTE_CARLO_MISSINGNESS_CODE.NO_OBSERVATIONS;
 
         const depotOnlyEnd = depotNurHistorie[depotNurHistorie.length - 1] || 0;
         const ruinOrDepleted = failed || depotOnlyEnd <= DEPOT_DEPLETION_THRESHOLD;

@@ -59,6 +59,7 @@ DOM-freie Simulation, die alle Runs, KPI-Arrays, Pflegemetriken und Pflegebucket
   Teilmetrik.
 - Aggregiert zusätzlich `taxSavedByLossCarry` (gesamt und pro Run), damit Steuerersparnis aus Verlustvorträgen auswertbar bleibt.
 - Wendet optional das Tail-Risk-Overlay nicht-mutierend auf gezogene Jahresdaten an; die Schedule ist an den absoluten `runIdx` und den per-run Seed gekoppelt.
+- Ermittelt ab der ersten Dekumulationsverpflichtung genau einen realen Depotentnahme-P10-Skalar je Run. Bei Ruin werden weitere Verpflichtungsjahre bis Tod oder Horizont ohne zusaetzliche Marktziehungen mit 0 Euro erfasst.
 
 **Einbindung:** Wird ausschließlich aus `simulator-monte-carlo.js` aufgerufen. Erwartet fertige Eingaben und Callbacks (Progress, Szenario-Analyzer) und nutzt `simulator-engine-wrapper.js` (delegiert an Direct Engine) für die Jahr-für-Jahr-Logik.
 
@@ -108,10 +109,11 @@ DOM-freie Stress-Metrik-Kapselung fuer Monte-Carlo.
 
 **Hauptfunktionen / Exporte:**
 - `createMonteCarloStressTracker()` – initialisiert Stress-Jahre, Portfolio-Serie, Cut-Year-Zaehler, Real-Withdrawal-Liste und Recovery-Status.
-- `recordMonteCarloStressYear()` – schreibt pro Simulationsjahr nur bei aktivem Stress die Stress-Metriken fort.
+- `recordMonteCarloStressYear()` – schreibt pro Simulationsjahr nur bei aktivem Stress die Stress-Metriken fort; Ansparjahre gehen nicht in die reale Depotentnahme ein.
+- `recordMonteCarloStressZeroWithdrawal()` – ergaenzt nach Ruin Nullentnahmen nur innerhalb des festen Stressfensters.
 - `writeMonteCarloStressMetrics()` – schreibt die bestehenden Stress-Buffer (`stress_maxDrawdowns`, `stress_timeQuoteAbove45`, `stress_cutYears`, `stress_CaR_P10_Real`, `stress_recoveryYears`).
 
-**Einbindung:** Wird von `monte-carlo-runner.js` pro Run initialisiert und nach erfolgreichem Jahreslauf bzw. beim finalen Buffer-Schreiben genutzt. Worker-Payloads bleiben unveraendert.
+**Einbindung:** Wird von `monte-carlo-runner.js` pro Run initialisiert und nach erfolgreichem Jahreslauf, bei der Nullauffuellung nach Ruin sowie beim finalen Buffer-Schreiben genutzt. Der V1-Path-Summary transportiert P10, Beobachtungszahl und Missingness indexiert je Run.
 
 ## 3e. `mc-log-builder.js`
 DOM-freie Logzeilen-Builder fuer Monte-Carlo.
@@ -133,6 +135,16 @@ DOM-freie Run-Ende-Metrikfortschreibung fuer Monte-Carlo.
 - `finalizeMonteCarloRunMetrics()` – baut `totals`, `lists`, Worst-Runs, `allRealWithdrawalsSample` und `runMeta` inklusive P1-/P2-, Pflegebucket- und Tail-Risk-Zaehlern fuer die Chunk-Rueckgabe.
 
 **Einbindung:** Wird von `monte-carlo-runner.js` im Jahresloop und am Run-Ende genutzt. Der V1-Path-Summary-Contract traegt reale und explizit mit `NominalEur` benannte nominale Pflegefelder; eine kausale Depotkosten-Zurechnung wird nicht behauptet.
+
+## 3h. `monte-carlo-statistics.js`
+Reine Statistikhelfer fuer Monte-Carlo-Anteils- und Quantilschaetzer.
+
+**Hauptfunktionen / Exporte:**
+- `calculateWilson95Interval()` – berechnet das Wilson-95-Prozent-Intervall fuer einen binaeren Anteil einschliesslich der Randfaelle `0/n` und `n/n`.
+- `buildBinaryProportionEstimate()` – liefert Punktschaetzer, Zaehler, Nenner, Runzahl, Intervall und eine sichtbare Klein-Stichproben-Warnung unter 1.000 Runs; technische Batchfehler unterdruecken Schaetzer und Intervall fail-closed.
+- `summarizePerRunRealWithdrawalP10()` – aggregiert genau einen realen Depotentnahme-P10-Skalar je auswertbarem Run und liefert P10, P50, Stichprobengroesse sowie Missingness-Inventar. Ein Konfidenzintervall fuer das Quantil wird nicht behauptet.
+
+**Einbindung:** `monte-carlo-chunk-result.js` baut den Floor-Schaetzer, `monte-carlo-aggregates.js` aggregiert die global indexierten Per-Run-Skalare und `results-metrics.js` projiziert Interpretation, Stichprobengroesse und Warnungen.
 
 ---
 
@@ -662,6 +674,12 @@ Konstanten und Hilfsfunktionen für den Monte-Carlo-Runner.
   beobachtet, nicht beobachtbar und technischer Fehler
 - `Uint8Array`: kpiLebensdauer, depotErschoepft, alterBeiErschoepfung
 
+`MonteCarloPathSummaryV1` ergaenzt `Float64Array`-Werte fuer den realen
+Depotentnahme-P10 je Run, `Uint32Array`-Beobachtungszahlen und getrennte
+`Uint8Array`-Missingness fuer Haupt- und Stresspfad. Der registrierte
+Transferbedarf steigt dadurch von 75 auf 93 Byte pro Run; volle Jahresreihen
+und die fruehere `runIdx % 100`-Stichprobe werden nicht uebertragen.
+
 **Dependencies:** keine
 
 ---
@@ -687,10 +705,10 @@ Aggregation aller Monte-Carlo-Ergebnisse nach Abschluss der Simulation.
 - `volatilities`: P50 der Stichproben-Standardabweichung (N-1) jaehrlicher
   Portfolio-Renditen ohne zusaetzlichen Annualisierungsfaktor;
   `maxDrawdowns`: davon getrennte P50-/P90-Drawdowns
-- `extraKPI`: timeShareQuoteAbove45, consumptionAtRiskP10Real, Pflege-KPIs
+- `realWithdrawalP10`: kanonischer runbasierter P10/P50-Vertrag mit `sampleSize`, ausgeschlossenen Runs und Missingness-Inventar. `extraKPI.consumptionAtRiskP10Real` bleibt nur als befristeter skalarer Read-Alias fuer bestehende Consumer erhalten.
 - `extraKPI.lossCarryTaxSavings`: `total`, `perRunMean`
 - `extraKPI.healthBucket`: Nutzungs-/Erschoepfungsquote, Nutzungssummen, Restbucket, Zieldeckung, Zielluecke und Bucket-Zinsen
-- `stressKPI`: maxDD, timeShareAbove45, cutYears, CaR, recoveryYears
+- `stressKPI`: maxDD, timeShareAbove45, cutYears, `realWithdrawalP10`, recoveryYears; der alte CaR-Skalar bleibt als befristeter Read-Alias markiert
 - `extraKPI.pflege.p1` / `.p2`: getrennte Eintrittsquoten mit Zaehler/Nenner sowie bedingte P50-Werte fuer Eintrittsalter, Pflegejahre und realen Mehrbedarf; leere Stichproben sind `null` mit `sampleSize=0` und Missingness-Grund
 - `extraKPI.pflege.household`: Pflegequote, simultane Pflegejahre, realer gesamter und maximaler jaehrlicher P1-plus-P2-Mehrbedarf, reale Endvermoegens-Gruppenmediane und bedingte Shortfall-Raten
 - `extraKPI.pflege.comparison`: `endWealthNoCareMinusCareRealEur` als ungepaarte, nicht-kausale Gruppenmedian-Differenz; UI-Geldwerte sind real zur Startpreisbasis, nominale Path-Felder tragen `NominalEur`
@@ -833,8 +851,9 @@ app/simulator/simulator-main.js
 7. `mc-log-builder.js`: Baut Ruin-, Jahres- und Todesfall-Logzeilen mit zentralen Alive-/Care-Feldern.
 8. `mc-run-metrics.js`: Summiert im Jahresloop reale/nominale Pflege-Mehrbedarfe und schreibt am Run-Ende getrennte P1-/P2-/Haushalts-KPIs, Worst-Runs und `runMeta` fort.
 9. `monte-carlo-runner.js`: Führt die reinen Simulationen durch (inkl. Pflege-KPIs) und nutzt `simulator-engine-wrapper.js` für die Jahresschleifen.
-10. `scenario-analyzer.js`: Zeichnet Worst/Perzentil-/Pflege-/Zufalls-Szenarien waehrend der Runs auf; fruehe Pflege wird fuer P1 und P2 separat ermittelt.
-5. `simulator-results.js`: `displayMonteCarloResults()` zeigt Aggregationen und Szenario-Logs an.
+10. `monte-carlo-statistics.js` und `monte-carlo-aggregates.js`: Berechnen Wilson-Unsicherheit und reduzieren die global indexierten Depotentnahme-P10-Skalare in Runindex-Reihenfolge.
+11. `scenario-analyzer.js`: Zeichnet Worst/Perzentil-/Pflege-/Zufalls-Szenarien waehrend der Runs auf; fruehe Pflege wird fuer P1 und P2 separat ermittelt.
+12. `simulator-results.js`: `displayMonteCarloResults()` zeigt Aggregationen und Szenario-Logs an.
 
 ### Parameter-Sweep
 1. `simulator-main.js`: Sweep-Button bindet `runParameterSweep()` aus `simulator-sweep.js`.
@@ -883,7 +902,8 @@ Nach jeder Monte-Carlo-Simulation werden bis zu 31 Szenarien gespeichert:
 - **Startjahr-Sampling:** `mc-run-context.js` bereitet die Basiskonfiguration vor; `mc-year-sampling.js` kapselt `FILTER` (harte Grenze), `RECENCY` (Half-Life), `UNIFORM`, CAPE-Kandidaten und `MonteCarloSamplingContractV1`. CAPE hat vor Gewichtung Vorrang. Das gewaehlte Startjahr ist fuer Fixed-/Stationary-Block sowie Markov/IID das erste tatsaechliche Marktjahr; ignorierte Optionen und Fallbacks bleiben im Vertrag sichtbar.
 - **Samplingdiagnostik:** Direktlauf und Worker transportieren `MonteCarloSamplingDiagnosticsV1` mit Samplingvertrag, Datenfingerprints, Startjahr-/Jahres-, Quellen-, Regime-, Stationary- und Tail-Risk-Zaehlern. `monte-carlo-chunk-result.js` validiert und merged diese Zaehler unabhaengig von Chunkreihenfolge.
 - **Life-State:** `mc-life-events.js` initialisiert Care-Meta, Partnerstatus, Care-RNGs und HouseholdContext. Die Jahreslogik bleibt im Runner-Hot-Path, bis eine vollstaendige Extraktion den Benchmark stabil erfuellt.
-- **Stress-Metriken:** `mc-stress-tracker.js` kapselt Portfolio-Drawdown, Quote-Above-4.5, Cut-Years, Real-CaR und Recovery-Years fuer Stress-Presets. Die bestehenden Worker-Buffer und Aggregatnamen bleiben stabil.
+- **Schaetzer und reale Depotentnahme:** `monte-carlo-statistics.js` liefert Wilson-95-Prozent-Intervalle fuer die binaere Floor-Deckung sowie die laufgewichtete Aggregation eines realen Depotentnahme-P10-Skalars je auswertbarem Run. Direkter und Workerpfad transportieren P10, Beobachtungszahl und Missingness indexiert; eine volle Jahresreihe wird nicht gemerged.
+- **Stress-Metriken:** `mc-stress-tracker.js` kapselt Portfolio-Drawdown, Quote-Above-4.5, Cut-Years, runbasierte reale Depotentnahme P10 und Recovery-Years fuer Stress-Presets. Nullauffuellung nach Ruin endet am Stressfenster beziehungsweise am Tod des Haushalts.
 - **Logzeilen:** `mc-log-builder.js` vereinheitlicht Ruin-, Jahres- und Todesfall-Logs. Builder laufen nur fuer tatsaechlich geloggte Runs. Backtest-Logs und Monte-Carlo-Scenario-Logs verwenden dieselbe Semantik fuer Entnahme-/Payout-/VPW-Felder.
 - **Run-Metriken:** `mc-run-metrics.js` kapselt Ergebnisbuffer, getrennte Pflege-Listen und -Zaehler, den realen/nominalen Pflege-Mehrbedarf, Safety-Run-Zaehler, Worst-Run-Auswahl und `runMeta`.
 

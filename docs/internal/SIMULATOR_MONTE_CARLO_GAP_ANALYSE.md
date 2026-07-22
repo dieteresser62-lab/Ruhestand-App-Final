@@ -1,7 +1,7 @@
 # Simulator / Monte Carlo: GAP-Analyse
 
 **Stand:** 2026-07-22
-**Status:** Plan und Slices 01-03 freigegeben; Slice 04 implementiert, externes Review ausstehend
+**Status:** Plan und Slices 01-06 freigegeben; Slice 07 implementiert, externes Review ausstehend
 **Autor:** Codex als Implementer und Plan-Autor  
 **Planungsbranch:** `codex/simulator-monte-carlo-gap-plan` (nur lokal; nicht auf GitHub veroeffentlicht)  
 **Folgeplan:** [SIMULATOR_MONTE_CARLO_HARDENING_PLAN.md](./SIMULATOR_MONTE_CARLO_HARDENING_PLAN.md)
@@ -309,6 +309,14 @@ vorab freigegebenem Verfahren ausgewiesen oder bewusst als offen markiert.
 
 **Slice:** 07.
 
+**Umsetzungsstand 2026-07-22:** Implementiert. Die binaere Floor-Deckung
+exportiert Zaehler, `requestedRuns` als Nenner und ein Wilson-95-Prozent-
+Intervall; bereits ein technischer Run unterdrueckt Schaetzer und Intervall
+fail-closed. Unter 1.000 Runs erscheint eine sichtbare Warnung. Die UI grenzt
+Simulationsfehler explizit von Modellrisiko ab. Quantile weisen
+Stichprobengroesse und Missingness aus, erhalten aber kein unbelegtes
+Konfidenzintervall. Externes Review ausstehend.
+
 ### MC-09 - Consumption-at-Risk basiert auf einer opaken, laengenverzerrten Stichprobe (P1)
 
 **Evidenz:** Reale Entnahmen werden nur fuer Runs mit `runIdx % 100 === 0`
@@ -330,6 +338,15 @@ Per-Run-P10 samt Beobachtungszahl, nicht die volle Jahresreihe. Ueber alle
 evaluierbaren Runs werden P10/P50 und Stichprobengroesse ausgewiesen.
 
 **Slice:** 07.
+
+**Umsetzungsstand 2026-07-22:** Implementiert. Haupt- und Stresspfad
+transportieren je Run genau einen realen Depotentnahme-P10-Skalar,
+Beobachtungszahl und Missingness. Das Bewertungsfenster beginnt mit der ersten
+Dekumulationsverpflichtung; nach Ruin werden Verpflichtungsjahre bis Tod oder
+Horizont mit 0 aufgefuellt. Die Aggregation ist damit lauf- statt
+jahresgewichtet und weist P10, P50, `sampleSize` und Missingness aus. Die alte
+`runIdx % 100`-Jahresstichprobe bleibt im Legacy-Shape leer. Externes Review
+ausstehend.
 
 ### MC-10 - Chunk-Merge-Contract ist in mehreren Consumern dupliziert (P1)
 

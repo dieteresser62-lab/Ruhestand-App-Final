@@ -356,7 +356,7 @@ function expectContractError(callback, message) {
     assertEqual(finalized[0].lists.entryAgesP2.join(','), '79', 'P2 conditional ages must not contain a zero sentinel');
     assertEqual(finalized[0].lists.p1CareAdditionalNeedRealEur.join(','), '22000,9000', 'P1 real care need should follow P1-only observations');
     assertEqual(finalized[0].worstRun.runIdx, 1, 'Worst-run tie breaking should retain the smallest global index');
-    assertEqual(finalized[0].pathMissingness.realWithdrawalP10RealEur[2], MONTE_CARLO_MISSINGNESS_CODE.NO_OBSERVATIONS, 'Missing CaR observation should use an explicit code');
+    assertEqual(finalized[0].pathMissingness.realWithdrawalP10RealEur[2], MONTE_CARLO_MISSINGNESS_CODE.DIED_BEFORE_FIRST_OBLIGATION, 'Death before the first obligation should use its dedicated CaR missingness code');
     assertEqual(finalized[0].pathSummaries.cutYearShareRatio[0], Math.fround(0.1), 'Cut share should store numerator divided by denominator');
     assertEqual(finalized[0].pathMissingness.cutYearShareRatio[0], MONTE_CARLO_MISSINGNESS_CODE.OBSERVED, 'Positive cut denominator should be observed');
     assertEqual(finalized[0].buffers.finalOutcomes.length, rows.length, 'Accumulator memory should remain O(runs)');

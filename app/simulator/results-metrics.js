@@ -37,15 +37,25 @@ export function buildSummaryData({ results, totalRuns, failCount }) {
     const allDeadRuns = hasOutcomeInventory ? outcomeInventory.all_dead : 0;
     const horizonRuns = hasOutcomeInventory ? outcomeInventory.horizon_exhausted : Math.max(0, safeTotalRuns - safeFailCount);
     const technicalRuns = hasOutcomeInventory ? outcomeInventory.technical_error : 0;
+    const floorEstimate = hasOutcomeInventory ? outcomeInventory.floorCoverageEstimate : null;
+    const floorInterval = floorEstimate?.confidenceInterval95;
+    const floorValue = floorCoveragePct === null
+        ? formatPercentage(null)
+        : floorInterval
+            ? `${formatPercentage(floorCoveragePct)} (95%-KI ${formatPercentage(floorInterval.lowerPct)}–${formatPercentage(floorInterval.upperPct)})`
+            : formatPercentage(floorCoveragePct);
+    const floorWarning = floorEstimate?.uncertaintyWarning?.code === 'small_sample'
+        ? ` Unsicherheitswarnung: nur ${requestedRuns} Läufe; Schwelle ${floorEstimate.uncertaintyWarning.thresholdRuns}.`
+        : '';
 
     return [
         {
             title: 'Floor-Deckung im gewählten Horizont',
-            value: formatPercentage(floorCoveragePct),
+            value: floorValue,
             description: technicalRuns > 0
                 ? `Wegen ${technicalRuns} technischem/technischen Fehler(n) fail-closed nicht ausgewiesen; das Outcome-Inventar bleibt sichtbar.`
-                : `Anteil all_dead plus horizon_exhausted an ${requestedRuns} angeforderten Läufen. Horizontende ist ein zensierter, kein vollständiger Lebenszeitpfad.`,
-            tone: floorCoveragePct === null ? 'warning' : 'success'
+                : `Anteil all_dead plus horizon_exhausted an ${requestedRuns} angeforderten Läufen. Das Wilson-95%-Intervall quantifiziert Simulationsfehler, nicht Modellrisiko. Horizontende ist ein zensierter, kein vollständiger Lebenszeitpfad.${floorWarning}`,
+            tone: floorCoveragePct === null || floorWarning ? 'warning' : 'success'
         },
         {
             title: 'Terminale Outcomes',
@@ -170,6 +180,7 @@ export function buildStressMetrics(stressKPI) {
     }
 
     const presetLabel = STRESS_PRESETS[stressKPI.presetKey]?.label || 'Stress-Szenario';
+    const realWithdrawalP10 = stressKPI.realWithdrawalP10;
     return {
         presetLabel,
         years: stressKPI.years,
@@ -199,9 +210,11 @@ export function buildStressMetrics(stressKPI) {
                 tone: 'warning'
             },
             {
-                title: 'Consumption-at-Risk P10 (Stress)',
-                value: formatCurrencyRounded(stressKPI.consumptionAtRiskP10Real?.p50), // CaR wird auch gerundet
-                description: 'Inflationsbereinigte Jahresentnahme im P10 über die Stressjahre (Median).',
+                title: 'Reale Depotentnahme P10 (Stress)',
+                value: Number.isFinite(realWithdrawalP10?.realEur)
+                    ? formatCurrencyRounded(realWithdrawalP10.realEur)
+                    : '—',
+                description: `P10 über die runbasierten P10-Depotentnahmen im festen Stressfenster; nach Ruin werden verbleibende Lebensjahre im Fenster mit 0 Euro aufgefüllt. Stichprobe: ${Number(realWithdrawalP10?.sampleSize) || 0} Läufe. Median der Run-P10: ${Number.isFinite(realWithdrawalP10?.p50RealEur) ? formatCurrencyRounded(realWithdrawalP10.p50RealEur) : '—'}. Kein Quantil-Konfidenzintervall geschätzt.`,
                 tone: 'danger'
             },
             {
@@ -302,7 +315,8 @@ export function prepareMonteCarloViewModel({ results, totalRuns, failCount, inpu
             totalRuns,
             extraKPI: results?.extraKPI
         },
-        carThreshold: results?.extraKPI?.consumptionAtRiskP10Real
+        carThreshold: results?.realWithdrawalP10?.realEur
+            ?? results?.extraKPI?.consumptionAtRiskP10Real
     };
 }
 
@@ -347,6 +361,18 @@ function buildRiskKpis(results) {
             tone: 'default'
         });
     }
+    if (results?.realWithdrawalP10) {
+        const withdrawal = results.realWithdrawalP10;
+        const missing = withdrawal.missingness || {};
+        kpis.push({
+            title: 'Reale Depotentnahme P10',
+            value: Number.isFinite(withdrawal.realEur)
+                ? formatCurrencyRounded(withdrawal.realEur)
+                : '—',
+            description: `P10 über die runbasierten P10-Werte realer Depotentnahmen; das Fenster beginnt mit der ersten Dekumulationsverpflichtung und wird nach Ruin bis Tod oder Horizont mit 0 Euro aufgefüllt. Stichprobe: ${Number(withdrawal.sampleSize) || 0} Läufe; ausgeschlossen: ${Number(withdrawal.excludedRuns) || 0} (Tod vor erster Verpflichtung ${Number(missing.died_before_first_obligation) || 0}, Technik ${Number(missing.technical_error) || 0}). Median der Run-P10: ${Number.isFinite(withdrawal.p50RealEur) ? formatCurrencyRounded(withdrawal.p50RealEur) : '—'}. Kein Quantil-Konfidenzintervall geschätzt.`,
+            tone: 'danger'
+        });
+    }
     if (results?.extraKPI) {
         const timeShare = isFinite(results.extraKPI.timeShareQuoteAbove45)
             ? (results.extraKPI.timeShareQuoteAbove45 * 100)
@@ -357,14 +383,6 @@ function buildRiskKpis(results) {
             description: 'Anteil aller simulierten Jahre mit Entnahmerate über 4.5%.',
             tone: 'warning'
         });
-        if (isFinite(results.extraKPI.consumptionAtRiskP10Real)) {
-            kpis.push({
-                title: 'Reale Entnahme (P10)',
-                value: formatCurrencyRounded(results.extraKPI.consumptionAtRiskP10Real),
-                description: 'Worst-Case (10%-Quantil) der inflationsbereinigten Jahresentnahmen.',
-                tone: 'danger'
-            });
-        }
         const lossCarrySavings = Number(results.extraKPI?.lossCarryTaxSavings?.perRunMean);
         if (Number.isFinite(lossCarrySavings)) {
             kpis.push({

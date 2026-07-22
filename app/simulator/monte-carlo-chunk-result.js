@@ -9,6 +9,7 @@ import {
     assertMonteCarloSamplingDiagnosticsV1,
     mergeMonteCarloSamplingDiagnosticsV1
 } from './mc-year-sampling.js';
+import { buildBinaryProportionEstimate } from './monte-carlo-statistics.js';
 
 export const MONTE_CARLO_CHUNK_RESULT_VERSION = 'MonteCarloChunkResultV1';
 export const MONTE_CARLO_OUTCOME_INVENTORY_VERSION = 'MonteCarloOutcomeInventoryV1';
@@ -79,15 +80,20 @@ export function buildMonteCarloOutcomeInventoryV1({
     }
     const floorCoveredCount = all_dead + horizon_exhausted;
     const hasTechnicalError = technical_error > 0;
+    const floorCoverageEstimate = buildBinaryProportionEstimate({
+        successes: floorCoveredCount,
+        trials: requestedRuns,
+        technicalErrorCount: technical_error
+    });
     return {
         schemaVersion: MONTE_CARLO_OUTCOME_INVENTORY_VERSION,
         requestedRuns,
         ...counts,
         inventorySum,
         floorCoveredCount,
-        floorCoveragePct: !hasTechnicalError && requestedRuns > 0
-            ? (floorCoveredCount / requestedRuns) * 100
-            : null,
+        floorCoverageRatio: floorCoverageEstimate.estimateRatio,
+        floorCoveragePct: floorCoverageEstimate.estimatePct,
+        floorCoverageEstimate,
         floorCoverageMissingnessReason: hasTechnicalError
             ? 'technical_error_in_batch'
             : requestedRuns === 0
@@ -101,7 +107,8 @@ export const MONTE_CARLO_MISSINGNESS_CODE = Object.freeze({
     OBSERVED: 1,
     NOT_APPLICABLE: 2,
     TECHNICAL_ERROR: 3,
-    NO_OBSERVATIONS: 4
+    NO_OBSERVATIONS: 4,
+    DIED_BEFORE_FIRST_OBLIGATION: 5
 });
 
 export const MONTE_CARLO_BUFFER_FIELDS = Object.freeze({
@@ -122,7 +129,12 @@ export const MONTE_CARLO_BUFFER_FIELDS = Object.freeze({
     stress_timeQuoteAbove45: Float32Array,
     stress_cutYears: Float32Array,
     stress_CaR_P10_Real: Float64Array,
-    stress_recoveryYears: Float32Array
+    stress_realWithdrawalObservationCount: Uint32Array,
+    stress_realWithdrawalP10Missingness: Uint8Array,
+    stress_recoveryYears: Float32Array,
+    realWithdrawalP10RealEur: Float64Array,
+    realWithdrawalObservationCount: Uint32Array,
+    realWithdrawalP10Missingness: Uint8Array
 });
 
 export const MONTE_CARLO_COUNTER_FIELDS = Object.freeze([
@@ -217,6 +229,7 @@ export const MONTE_CARLO_PATH_MISSINGNESS_FIELDS = Object.freeze({
     path: Uint8Array,
     cutYearShareRatio: Uint8Array,
     realWithdrawalP10RealEur: Uint8Array,
+    stressRealWithdrawalP10RealEur: Uint8Array,
     p1CareEntryAge: Uint8Array,
     p2CareEntryAge: Uint8Array,
     p1CareAdditionalNeedRealEur: Uint8Array,
@@ -264,6 +277,27 @@ function attachPathTransferBuffers(buffers, pathSummaries, pathMissingness) {
     }
 }
 
+function ensureWithdrawalBuffers(buffers, runCount) {
+    const required = {
+        realWithdrawalP10RealEur: Float64Array,
+        realWithdrawalObservationCount: Uint32Array,
+        realWithdrawalP10Missingness: Uint8Array,
+        stress_realWithdrawalObservationCount: Uint32Array,
+        stress_realWithdrawalP10Missingness: Uint8Array
+    };
+    for (const [field, Constructor] of Object.entries(required)) {
+        if (buffers[field] === undefined) {
+            buffers[field] = new Constructor(runCount);
+            if (field === 'stress_realWithdrawalP10Missingness') {
+                buffers[field].fill(MONTE_CARLO_MISSINGNESS_CODE.NOT_APPLICABLE);
+            }
+        }
+        if (!(buffers[field] instanceof Constructor) || buffers[field].length !== runCount) {
+            throw contractError(`buffers.${field} must be ${Constructor.name} with length ${runCount}.`);
+        }
+    }
+}
+
 export function createMonteCarloPathSummaryV1(runCount, {
     buffers = null,
     attachTransferBuffers = false
@@ -271,14 +305,19 @@ export function createMonteCarloPathSummaryV1(runCount, {
     assertNonNegativeInteger(runCount, 'runCount');
     const pathSummaries = createTypedFields(MONTE_CARLO_PATH_SUMMARY_FIELDS, runCount);
     if (buffers) {
+        ensureWithdrawalBuffers(buffers, runCount);
         pathSummaries.finalValueNominalEur = buffers.finalOutcomes;
         pathSummaries.volatilityPct = buffers.volatilities;
         pathSummaries.maxDrawdownPct = buffers.maxDrawdowns;
         pathSummaries.cutYearShareRatio = buffers.cutYearShareRatio;
+        pathSummaries.realWithdrawalP10RealEur = buffers.realWithdrawalP10RealEur;
+        pathSummaries.realWithdrawalObservationCount = buffers.realWithdrawalObservationCount;
     }
     const pathMissingness = createTypedFields(MONTE_CARLO_PATH_MISSINGNESS_FIELDS, runCount);
     if (buffers) {
         pathMissingness.cutYearShareRatio = buffers.cutYearShareMissingness;
+        pathMissingness.realWithdrawalP10RealEur = buffers.realWithdrawalP10Missingness;
+        pathMissingness.stressRealWithdrawalP10RealEur = buffers.stress_realWithdrawalP10Missingness;
     }
     if (buffers && attachTransferBuffers) {
         attachPathTransferBuffers(buffers, pathSummaries, pathMissingness);
@@ -375,7 +414,9 @@ export function recordMonteCarloPathSummaryV1({
         pathMissingness.realWithdrawalP10RealEur,
         localIndex,
         pathSummaries.realWithdrawalObservationCount[localIndex] > 0 ? realWithdrawalP10RealEur : null,
-        MONTE_CARLO_MISSINGNESS_CODE.NO_OBSERVATIONS
+        outcomeCode === MONTE_CARLO_OUTCOME_CODE.ALL_DEAD
+            ? MONTE_CARLO_MISSINGNESS_CODE.DIED_BEFORE_FIRST_OBLIGATION
+            : MONTE_CARLO_MISSINGNESS_CODE.NO_OBSERVATIONS
     );
     const normalizedP1CareEntryAge = Number(p1CareEntryAge) > 0 ? p1CareEntryAge : null;
     const normalizedP2CareEntryAge = Number(p2CareEntryAge) > 0 ? p2CareEntryAge : null;
@@ -635,6 +676,10 @@ export function assertMonteCarloChunkResultV1(result, {
                     throw contractError(`technical path ${globalIndex} must fail all summary fields closed.`);
                 }
             }
+            if (result.buffers.stress_realWithdrawalP10Missingness[localIndex]
+                !== MONTE_CARLO_MISSINGNESS_CODE.TECHNICAL_ERROR) {
+                throw contractError(`technical path ${globalIndex} must fail the stress withdrawal summary closed.`);
+            }
         } else if (pathState !== MONTE_CARLO_MISSINGNESS_CODE.OBSERVED) {
             throw contractError(`financial path ${globalIndex} must be observed.`);
         } else {
@@ -666,6 +711,34 @@ export function assertMonteCarloChunkResultV1(result, {
             }
             if (result.buffers.cutYearShareMissingness[localIndex] !== cutMissingness) {
                 throw contractError(`financial path ${globalIndex} has divergent cut-year buffer and missingness values.`);
+            }
+
+            const withdrawalCount = result.pathSummaries.realWithdrawalObservationCount[localIndex];
+            const withdrawalMissingness = result.pathMissingness.realWithdrawalP10RealEur[localIndex];
+            if (withdrawalCount === 0) {
+                const allowedMissingness = outcomeCode === MONTE_CARLO_OUTCOME_CODE.ALL_DEAD
+                    ? MONTE_CARLO_MISSINGNESS_CODE.DIED_BEFORE_FIRST_OBLIGATION
+                    : MONTE_CARLO_MISSINGNESS_CODE.NO_OBSERVATIONS;
+                if (withdrawalMissingness !== allowedMissingness
+                    || result.pathSummaries.realWithdrawalP10RealEur[localIndex] !== 0) {
+                    throw contractError(`financial path ${globalIndex} has inconsistent withdrawal missingness.`);
+                }
+            } else if (withdrawalMissingness !== MONTE_CARLO_MISSINGNESS_CODE.OBSERVED
+                || result.pathSummaries.realWithdrawalP10RealEur[localIndex] < 0) {
+                throw contractError(`financial path ${globalIndex} has an invalid observed withdrawal summary.`);
+            }
+
+            const stressCount = result.buffers.stress_realWithdrawalObservationCount[localIndex];
+            const stressMissingness = result.buffers.stress_realWithdrawalP10Missingness[localIndex];
+            if (stressCount > 0) {
+                if (stressMissingness !== MONTE_CARLO_MISSINGNESS_CODE.OBSERVED
+                    || result.buffers.stress_CaR_P10_Real[localIndex] < 0) {
+                    throw contractError(`financial path ${globalIndex} has an invalid stress withdrawal summary.`);
+                }
+            } else if (![MONTE_CARLO_MISSINGNESS_CODE.NO_OBSERVATIONS,
+                MONTE_CARLO_MISSINGNESS_CODE.DIED_BEFORE_FIRST_OBLIGATION,
+                MONTE_CARLO_MISSINGNESS_CODE.NOT_APPLICABLE].includes(stressMissingness)) {
+                throw contractError(`financial path ${globalIndex} has inconsistent stress withdrawal missingness.`);
             }
 
             const p1Observed = result.pathMissingness.p1CareEntryAge[localIndex]

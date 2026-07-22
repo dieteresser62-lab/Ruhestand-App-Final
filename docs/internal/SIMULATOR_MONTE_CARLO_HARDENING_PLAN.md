@@ -1,11 +1,11 @@
 # Simulator / Monte Carlo: Hardening-Arbeitsplan
 
 **Stand:** 2026-07-22
-**Status:** implementierungsreif; Slices 01-05 freigegeben, Slice 06 implementiert und im Review
+**Status:** implementierungsreif; Slices 01-06 als Release-Commits abgeschlossen, Slice 07 implementiert und im Review
 **Autor:** Codex als Implementer und Plan-Autor  
 **Feature-Branch:** `codex/simulator-monte-carlo-gap-plan`  
 **GitHub-Status:** nur lokal; Veroeffentlichung ausstehend und nur nach Nutzerfreigabe  
-**Reviewstand:** Plan und Slices 01-05 freigegeben; Slice 06 wartet auf Gemini- und Nutzerreview
+**Reviewstand:** Plan und Slices 01-06 freigegeben; Slice 07 wartet auf Gemini- und Nutzerreview
 **Ausgangsanalyse:** [SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md](./SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md)
 
 ## 1. Ziel und Rollenabgrenzung
@@ -181,7 +181,7 @@ repariert.
 | D-03 | Pro Run: Zaehler = erfolgreich abgeschlossene Dekumulationsjahre mit Kuerzung `>= 10 %`; Nenner = erfolgreich abgeschlossene Dekumulationsjahre mit endlicher Kuerzungsentscheidung. Nenner 0 ergibt `null`, nie 0 oder NaN. | G-02 | in Slice 03 implementiert und freigegeben |
 | D-04 | P1/P2 getrennt; leere bedingte Verteilungen sind `null` plus `sampleSize=0`; Pflegebetrag im UI real zur Startpreisbasis, nominal nur explizit benannt im Export. | G-06, C-10 | entschieden; in Slice 01 fixiert |
 | D-05 | Fixed-/Stationary-Block starten ihren ersten zusammenhaengenden Block am CAPE-Startrecord. Regime-Markov initialisiert dort sein Startregime; IID darf ab Jahr 2 unabhaengig ziehen. Jede Methode exportiert die tatsaechliche Praezedenz. | G-04 | entschieden; in Slice 01 fixiert |
-| D-06 | UI-KPI wird ehrlich in "Reale Depotentnahme P10" umbenannt. Das Bewertungsfenster beginnt mit der ersten geplanten Dekumulationsverpflichtung und endet bei Tod aller Personen oder Horizont; ein Ruinversuch zaehlt als Beginn. Nach Ruin und solange jemand lebt wird mit realer Depotentnahme 0 aufgefuellt. Technische Fehler und Haushalte, die vor jeder Dekumulationsverpflichtung sterben, sind `null` mit Grund. Ueber Runs werden P10/P50 und `sampleSize` ausgewiesen. | G-01, C-05, C-07 | entschieden; in Slice 01 fixiert |
+| D-06 | UI-KPI wird ehrlich in "Reale Depotentnahme P10" umbenannt. Das Bewertungsfenster beginnt mit der ersten geplanten Dekumulationsverpflichtung und endet bei Tod aller Personen oder Horizont; ein Ruinversuch zaehlt als Beginn. Nach Ruin und solange jemand lebt wird mit realer Depotentnahme 0 aufgefuellt. Technische Fehler und Haushalte, die vor jeder Dekumulationsverpflichtung sterben, sind `null` mit Grund. Ueber Runs werden P10/P50 und `sampleSize` ausgewiesen. | G-01, C-05, C-07 | in Slice 07 implementiert; externes Review ausstehend |
 | D-07 | V1-Felder sind kanonisch. Befristete Read-Aliase tragen Deprecation-Telemetrie und werden spaetestens in Slice 11 entfernt; Slice 12 weist ihre Abwesenheit nach. | Gemini Vertragstreue | entschieden; in Slice 01 fixiert |
 | D-08 | Runvertrag: neuer Default 10.000; bis 100.000 ohne Grosslastbestaetigung; ueber 100.000 Warnung mit Run-Jahren/Speicherschaetzung und expliziter Bestaetigung; harte Grenze 1.000.000. Standardbenchmark `100.000 x 35 Jahre`, Stresstest `1.000.000 x 35 Jahre`, jeweils 8 Worker/500 ms. Dauer, Blocklaenge, Worker und Budget erhalten weiterhin daten-/hardwarebasierte Grenzen in Slice 01. Keine stille Klemmung. | Nutzerbeleg U-01/U-02/U-03, MC-14 | entschieden; Messvertrag in Slice 01 fixiert |
 | D-09 | Paired Compare bleibt separates Folgefeature nach stabilem V1-Export. | MC-17 | entschieden; in Slice 01 fixiert |
@@ -203,7 +203,7 @@ Semantikaenderungen sind unzulaessig.
 | [04](./SLICE_SIMULATOR_MONTE_CARLO_04_PFLEGE_KPI_SEMANTIK.md) | Pflegeeintritt, -dauer und -kosten | MC-03, MC-04 | 02, D-04 | abgeschlossen und freigegeben |
 | [05](./SLICE_SIMULATOR_MONTE_CARLO_05_OUTCOME_HORIZONT_CONTRACT.md) | terminale Outcomes, Horizont, Alter | MC-05, MC-07 | 02, D-01, D-02 | abgeschlossen und freigegeben |
 | [06](./SLICE_SIMULATOR_MONTE_CARLO_06_SAMPLING_PRAEZEDENZ_DIAGNOSTIK.md) | Samplingvertrag und Ziehungsdiagnostik | MC-06 | 02, D-05 | abgeschlossen und freigegeben |
-| [07](./SLICE_SIMULATOR_MONTE_CARLO_07_SCHAETZER_UNSICHERHEIT_CAR.md) | Konfidenz und reale Depotentnahme P10 | MC-08, MC-09 | 03, 05, D-06 | geplant |
+| [07](./SLICE_SIMULATOR_MONTE_CARLO_07_SCHAETZER_UNSICHERHEIT_CAR.md) | Konfidenz und reale Depotentnahme P10 | MC-08, MC-09 | 03, 05, D-06 | abgeschlossen und freigegeben |
 | [08](./SLICE_SIMULATOR_MONTE_CARLO_08_RUNRESULT_EXPORT_PROVENIENZ.md) | versionierter Run-/Exportvertrag | MC-11 | 04-07 | geplant |
 | [09](./SLICE_SIMULATOR_MONTE_CARLO_09_WORKER_LIFECYCLE_ISOLATION.md) | Abbruch, Stale Jobs, Cache/Version | MC-12, MC-13 | 02, D-12 | geplant |
 | [10](./SLICE_SIMULATOR_MONTE_CARLO_10_RESOURCE_UI_ACCESSIBILITY.md) | Bounds, Kostenhinweis, UI/A11y | MC-14, Teile MC-15 | 05, 08, 09, D-08 | geplant |
@@ -561,8 +561,9 @@ alte Erfolgsquotenterminologie verwendet.
 - Planreview Claude: Erstreview blockiert; Revision 1 wartet auf Re-Review.
 - Nutzerfreigabe: erteilt am 2026-07-22.
 - Status `implementierungsreif`: erteilt (für Gemini-Freigabepfad & Nutzer).
-- Implementierungsstand: Slices 01-05 abgeschlossen und freigegeben; Slice 06
-  auf Nutzerauftrag vom 2026-07-22 implementiert und im Review.
+- Implementierungsstand: Slices 01-06 abgeschlossen und als Release-Commits
+  vorhanden; Slice 07 auf Nutzerauftrag vom 2026-07-22 implementiert und im
+  Review.
 
 ## 14. Rueckdokumentation Slice 01
 
@@ -712,8 +713,8 @@ alte Erfolgsquotenterminologie verwendet.
 
 ## 19. Rueckdokumentation Slice 06
 
-- Implementierungsstatus: abgeschlossen; Gemini-/Nutzerreview des Slice steht
-  aus. Codex erteilt keine eigene Freigabe und erstellt keinen Commit.
+- Implementierungsstatus: abgeschlossen und als Nutzer-Release-Commit
+  `922bbbe` vorhanden.
 - `MonteCarloSamplingContractV1` exportiert die feste Praezedenz
   Estimated-History-Ausschluss, CAPE oder Startjahrgewichtung, Samplingmethode,
   bedingter Stress-Override und Tail-Risk-Overlay. Wirksames CAPE setzt
@@ -737,3 +738,37 @@ alte Erfolgsquotenterminologie verwendet.
 - `npm test`: 6550/6551 Assertions gruen. Einzige Abweichung bleibt der bereits
   dokumentierte fremde Architektur-Linkfehler mit sechs toten Links; keine
   neue unerwartete Snapshot-, Backtest-, Worker- oder FlowDelta-Abweichung.
+
+## 20. Rueckdokumentation Slice 07
+
+- Implementierungsstatus: abgeschlossen; Gemini-/Nutzerreview des Slice steht
+  aus. Codex erteilt keine eigene Freigabe und erstellt keinen Commit.
+- Die Floor-Deckung verwendet bei fehlerfreiem Batch
+  `successes = all_dead + horizon_exhausted` und `trials = requestedRuns`.
+  Fuer `p = successes / trials`, `z = 1,959963984540054` berechnet das
+  Wilson-Intervall
+  `(p + z^2/(2n) +/- z*sqrt(p*(1-p)/n + z^2/(4n^2))) / (1 + z^2/n)`.
+  Ein technischer Run setzt Punktschaetzer und Intervall fuer den Batch auf
+  `null`; unter 1.000 Runs wird sichtbar vor hoher Stichprobenunsicherheit
+  gewarnt. Das Intervall beschreibt Simulationsfehler, nicht Modellrisiko.
+- `realWithdrawalP10` aggregiert gleichgewichtet genau einen realen
+  Depotentnahme-P10-Skalar pro evaluierbarem Run. Das Runfenster reicht von der
+  ersten Dekumulationsverpflichtung bis Tod aller Personen oder Horizont. Ein
+  unmittelbarer Ruinversuch und spaetere Verpflichtungen bei noch lebendem
+  Haushalt werden mit 0 erfasst. Tod vor der ersten Verpflichtung und
+  technische Fehler haben getrennte Missingness-Codes.
+- Haupt- und Stresspfad transportieren P10, Beobachtungszahl und Missingness in
+  global indexierten Typed Arrays. Der Bufferbedarf steigt von 75 auf 93 Byte
+  je Run; die volle Jahresreihe und die `runIdx % 100`-Stichprobe entfallen.
+  Das Aggregat weist P10, P50, `sampleSize` und Missingness aus, aber bewusst
+  kein Quantil-Konfidenzintervall.
+- `post-slice-07-v1.json`, Golden Case `GC-CAR-01` und zwei
+  Delta-Ledger-Eintraege dokumentieren das beabsichtigte Wilson-/CaR-Delta.
+- Fokussierte Statistik-, Outcome-/Horizont-, Chunk-, Results-, Runner-,
+  Worker-, Auto-Optimize-, Real-Withdrawal-, Pflege- und Messvertragssuiten:
+  1438/1438 Assertions gruen.
+- `npm test`: 6630/6631 Assertions gruen. Einzige Abweichung bleibt der bereits
+  vor Slice 07 dokumentierte fremde Architektur-Linkfehler mit sechs toten
+  Links auf zwei fehlende Forschungsdokumente; alle uebrigen 124 Testdateien
+  sind gruen. Keine neue Snapshot-, Backtest-, Worker- oder
+  FlowDelta-Abweichung.

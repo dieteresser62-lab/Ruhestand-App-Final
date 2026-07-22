@@ -4,6 +4,7 @@ import { quantile, sum, mean } from './simulator-utils.js';
 import { STRESS_PRESETS } from './simulator-data.js';
 import { MC_HEATMAP_BINS } from './monte-carlo-runner-utils.js';
 import { MONTE_CARLO_MISSINGNESS_CODE } from './monte-carlo-chunk-result.js';
+import { summarizePerRunRealWithdrawalP10 } from './monte-carlo-statistics.js';
 
 const NO_OBSERVATIONS = 'no_observations';
 
@@ -38,8 +39,7 @@ export function buildMonteCarloAggregates({
     heatmap,
     bins,
     totals,
-    lists,
-    allRealWithdrawalsSample
+    lists
 }) {
     const {
         finalOutcomes,
@@ -59,6 +59,8 @@ export function buildMonteCarloAggregates({
         stress_timeQuoteAbove45,
         stress_cutYears,
         stress_CaR_P10_Real,
+        stress_realWithdrawalObservationCount,
+        stress_realWithdrawalP10Missingness,
         stress_recoveryYears
     } = buffers;
     const {
@@ -189,6 +191,20 @@ export function buildMonteCarloAggregates({
     };
 
     const stressPresetKey = inputs.stressPreset || 'NONE';
+    const realWithdrawalP10 = summarizePerRunRealWithdrawalP10({
+        values: buffers.realWithdrawalP10RealEur,
+        observationCounts: buffers.realWithdrawalObservationCount,
+        missingness: buffers.realWithdrawalP10Missingness,
+        totalRuns,
+        missingnessCodes: MONTE_CARLO_MISSINGNESS_CODE
+    });
+    const stressRealWithdrawalP10 = summarizePerRunRealWithdrawalP10({
+        values: stress_CaR_P10_Real,
+        observationCounts: stress_realWithdrawalObservationCount,
+        missingness: stress_realWithdrawalP10Missingness,
+        totalRuns,
+        missingnessCodes: MONTE_CARLO_MISSINGNESS_CODE
+    });
     return {
         outcomeCounts: {
             ruin: outcomeRuinCount,
@@ -222,11 +238,12 @@ export function buildMonteCarloAggregates({
         anteilJahreOhneFlex: { p50: quantile(anteilJahreOhneFlex, 0.5) },
         volatilities: { p50: quantile(volatilities, 0.5) },
         maxDrawdowns: { p50: quantile(maxDrawdowns, 0.5), p90: quantile(maxDrawdowns, 0.9) },
+        realWithdrawalP10,
         heatmap: heatmap.map(yearData => Array.from(yearData)),
         bins: bins || MC_HEATMAP_BINS,
         extraKPI: {
             timeShareQuoteAbove45: totalSimulatedYears > 0 ? totalYearsQuoteAbove45 / totalSimulatedYears : 0,
-            consumptionAtRiskP10Real: quantile(allRealWithdrawalsSample, 0.1),
+            consumptionAtRiskP10Real: realWithdrawalP10.realEur,
             dynamicFlexSafety: {
                 yearShareStage1plus: totalSimulatedYears > 0 ? totalYearsSafetyStage1plus / totalSimulatedYears : 0,
                 yearShareStage2: totalSimulatedYears > 0 ? totalYearsSafetyStage2 / totalSimulatedYears : 0,
@@ -281,8 +298,12 @@ export function buildMonteCarloAggregates({
             cutYears: {
                 p50: quantile(stress_cutYears, 0.50)
             },
+            realWithdrawalP10: stressRealWithdrawalP10,
             consumptionAtRiskP10Real: {
-                p50: quantile(stress_CaR_P10_Real, 0.50)
+                p50: stressRealWithdrawalP10.p50RealEur,
+                deprecated: true,
+                replacement: 'stressKPI.realWithdrawalP10',
+                removalTarget: 'Slice 11'
             },
             recoveryYears: {
                 p50: quantile(stress_recoveryYears, 0.50)
