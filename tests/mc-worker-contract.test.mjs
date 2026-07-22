@@ -3,6 +3,10 @@ import { EngineAPI } from '../engine/index.mjs';
 import { compileScenario, getDataVersion } from '../app/simulator/simulator-engine-helpers.js';
 import { annualData } from '../app/simulator/simulator-data.js';
 import { runMonteCarloChunk } from '../app/simulator/monte-carlo-runner.js';
+import {
+    MONTE_CARLO_CHUNK_RESULT_VERSION,
+    assertMonteCarloChunkResultV1
+} from '../app/simulator/monte-carlo-chunk-result.js';
 
 console.log('--- MC Worker Entrypoint Contract Tests ---');
 
@@ -267,6 +271,10 @@ console.log('Test 4: valid Monte-Carlo job');
         assert(result.buffers?.finalOutcomes instanceof Float64Array, 'result should include finalOutcomes buffer');
         assertEqual(result.buffers.finalOutcomes.length, monteCarloParams.anzahl, 'finalOutcomes should match run count');
         assert(result.buffers.finalOutcomes.buffer.byteLength > 0, 'finalOutcomes should have a transferable buffer');
+        assertEqual(result.schemaVersion, MONTE_CARLO_CHUNK_RESULT_VERSION, 'worker should return the central chunk schema');
+        assertMonteCarloChunkResultV1(result, { expectedStart: 0, expectedCount: monteCarloParams.anzahl });
+        assert(result.pathSummaries?.globalRunIndex instanceof Uint32Array, 'worker should transfer indexed path summaries');
+        assert(result.pathMissingness?.path instanceof Uint8Array, 'worker should transfer path missingness');
         assert(Array.isArray(result.heatmap), 'result should include heatmap rows');
         assert(result.heatmap[0] instanceof Uint32Array, 'heatmap rows should be typed arrays');
         assert(result.totals && Number.isFinite(result.totals.failCount), 'result should include totals.failCount');

@@ -7,7 +7,7 @@
  */
 "use strict";
 
-import { rng, makeRunSeed } from './simulator-utils.js';
+import { rng, makeRunSeed, quantile } from './simulator-utils.js';
 import { BREAK_ON_RUIN, ESTIMATED_HISTORY_CUTOFF_YEAR, MORTALITY_TABLE, annualData } from './simulator-data.js';
 import { applyStressOverride, computeRentAdjRate } from './simulator-portfolio.js';
 import { simulateOneYear, initMcRunState, sampleNextYearData, computeRunStatsFromSeries, updateCareMeta, calcCareCost, computeCareMortalityMultiplier, computeHouseholdFlexFactor } from './simulator-engine-wrapper.js';
@@ -45,6 +45,12 @@ import {
     resolveMinStartYearIndex
 } from './mc-year-sampling.js';
 import { resolveDynamicFlexRunnerHorizon } from './dynamic-flex-runner-horizon.js';
+import {
+    MONTE_CARLO_OUTCOME_CODE,
+    createMonteCarloChunkResultV1,
+    createMonteCarloPathSummaryV1,
+    recordMonteCarloPathSummaryV1
+} from './monte-carlo-chunk-result.js';
 
 export { MC_HEATMAP_BINS, pickWorstRun, createMonteCarloBuffers, buildMonteCarloAggregates };
 export { buildStartYearCdf, pickStartYearIndex } from './mc-year-sampling.js';
@@ -302,6 +308,10 @@ export async function runMonteCarloChunk({
 
     const runMetrics = createMonteCarloRunMetrics(runCount);
     const technicalInventory = createMonteCarloTechnicalInventory(runCount);
+    const { pathSummaries, pathMissingness } = createMonteCarloPathSummaryV1(runCount, {
+        buffers,
+        attachTransferBuffers: true
+    });
 
     const heatmap = Array(10).fill(0).map(() => new Uint32Array(MC_HEATMAP_BINS.length - 1));
     let lastProgressPct = -1;
@@ -317,9 +327,11 @@ export async function runMonteCarloChunk({
         }
         const runIdx = runStart + i;
         let failed = false, totalTaxesThisRun = 0, totalTaxSavedByLossCarryThisRun = 0, kpiJahreMitKuerzungDieserLauf = 0, kpiMaxKuerzungDieserLauf = 0;
+        let cutDecisionYearsThisRun = 0;
         let lebensdauer = 0, jahreOhneFlex = 0, triggeredAge = null;
         let careEverActive = false;
         let technicalPathError = null;
+        const realWithdrawalsThisRun = [];
 
         const runSeed = makeRunSeed(seed, 0, runIdx);
         const rand = legacyRand || rng(runSeed);
@@ -614,6 +626,7 @@ export async function runMonteCarloChunk({
                     healthBucketTargetGapThisRun = Number(result.logData.health_bucket_target_gap);
                 }
                 if (result.logData.entscheidung.kuerzungProzent >= 10) kpiJahreMitKuerzungDieserLauf++;
+                if (Number.isFinite(Number(result.logData.entscheidung.kuerzungProzent))) cutDecisionYearsThisRun++;
                 kpiMaxKuerzungDieserLauf = Math.max(kpiMaxKuerzungDieserLauf, result.logData.entscheidung.kuerzungProzent);
 
                 const depotOnlyNow = sumDepot(simState.portfolio);
@@ -643,6 +656,9 @@ export async function runMonteCarloChunk({
                     }
                 }
                 if (runIdx % 100 === 0) runMetrics.allRealWithdrawalsSample.push(result.logData.jahresentnahme_real);
+                if (Number.isFinite(Number(result.logData.jahresentnahme_real))) {
+                    realWithdrawalsThisRun.push(Number(result.logData.jahresentnahme_real));
+                }
 
                 if (!isAccumulation && retirementYearCounter < 10) {
                     const quote = result.logData.entnahmequote * 100;
@@ -681,6 +697,14 @@ export async function runMonteCarloChunk({
             if (technicalInventory.errors.length < MAX_TECHNICAL_ERROR_SAMPLES) {
                 technicalInventory.errors.push(technicalPathError);
             }
+            recordMonteCarloPathSummaryV1({
+                pathSummaries,
+                pathMissingness,
+                localIndex: i,
+                globalRunIndex: runIdx,
+                outcomeCode: MONTE_CARLO_OUTCOME_CODE.TECHNICAL_ERROR,
+                technicalError: true
+            });
             continue;
         }
 
@@ -758,13 +782,53 @@ export async function runMonteCarloChunk({
             tailRiskEntriesThisRun,
             currentRunLog
         });
+        recordMonteCarloPathSummaryV1({
+            pathSummaries,
+            pathMissingness,
+            localIndex: i,
+            globalRunIndex: runIdx,
+            outcomeCode: failed
+                ? MONTE_CARLO_OUTCOME_CODE.RUIN
+                : runEndedBecauseAllDied
+                    ? MONTE_CARLO_OUTCOME_CODE.ALL_DEAD
+                    : MONTE_CARLO_OUTCOME_CODE.HORIZON_EXHAUSTED,
+            finalValueNominalEur: finalOutcomes[i],
+            volatilityPct: volatilities[i],
+            maxDrawdownPct: maxDrawdowns[i],
+            cutYearsNumerator: kpiJahreMitKuerzungDieserLauf,
+            cutYearsDenominator: cutDecisionYearsThisRun,
+            realWithdrawalP10RealEur: realWithdrawalsThisRun.length > 0
+                ? quantile(realWithdrawalsThisRun, 0.10)
+                : null,
+            realWithdrawalObservationCount: realWithdrawalsThisRun.length,
+            p1CareEntryAge: triggeredAge,
+            p2CareEntryAge: triggeredAgeP2,
+            p1CareYears,
+            p2CareYears,
+            bothCareYears,
+            careEverActive,
+            hasPartner,
+            careDepotCostEur: careEverActive ? Math.max(0, depotOnlyStart - depotOnlyEnd) : null,
+            maxAnnualCareSpendEur: careEverActive
+                ? Math.max(careMetaP1?.zusatzFloorZiel || 0, careMetaP2?.zusatzFloorZiel || 0)
+                : 0,
+            healthBucketEnabled: healthBucketEnabledThisRun,
+            healthBucketUsedEur: healthBucketUsedThisRun,
+            healthBucketEndEur: healthBucketEndThisRun,
+            healthBucketCoveragePct: healthBucketCoveragePctThisRun,
+            healthBucketTargetGapEur: healthBucketTargetGapThisRun,
+            healthBucketInterestEur: healthBucketInterestThisRun,
+            taxSavedByLossCarryEur: totalTaxSavedByLossCarryThisRun
+        });
     }
 
     const finalizedMetrics = finalizeMonteCarloRunMetrics(runMetrics);
 
-    return {
+    return createMonteCarloChunkResultV1({
         runRange: { start: runStart, count: runCount },
         buffers,
+        pathSummaries,
+        pathMissingness,
         heatmap,
         bins: MC_HEATMAP_BINS,
         totals: finalizedMetrics.totals,
@@ -776,5 +840,5 @@ export async function runMonteCarloChunk({
         batchStatus: technicalInventory.technicalError > 0 ? 'technical_error' : 'completed',
         financialMetricsValid: technicalInventory.technicalError === 0,
         technicalInventory
-    };
+    });
 }

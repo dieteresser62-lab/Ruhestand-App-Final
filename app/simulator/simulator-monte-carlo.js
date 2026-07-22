@@ -9,14 +9,14 @@ import { ScenarioAnalyzer } from './scenario-analyzer.js';
 import {
     attachMonteCarloBatchOutcome,
     buildMonteCarloAggregates,
-    createMonteCarloBuffers,
-    createMonteCarloTechnicalInventory,
-    MC_HEATMAP_BINS,
-    mergeMonteCarloTechnicalInventory,
-    pickWorstRun,
     runMonteCarloChunk,
     runMonteCarloSimulation
 } from './monte-carlo-runner.js';
+import {
+    createMonteCarloChunkAccumulatorV1,
+    finalizeMonteCarloChunkAccumulatorV1,
+    mergeMonteCarloChunkResultV1
+} from './monte-carlo-chunk-result.js';
 import { WorkerJobRunner } from './worker-job-runner.js';
 import { featureFlags } from '../shared/feature-flags.js';
 import { WorkerPool } from '../../workers/worker-pool.js';
@@ -126,54 +126,7 @@ async function runMonteCarloWithWorkers({
     // Random sample indices are logged by workers to build scenario highlights.
     const logIndices = scenarioAnalyzer?.getRandomSampleIndices?.() || null;
 
-    const buffers = createMonteCarloBuffers(anzahl);
-    const heatmap = Array(10).fill(0).map(() => new Uint32Array(MC_HEATMAP_BINS.length - 1));
-    const lists = {
-        entryAges: [],
-        entryAgesP2: [],
-        careDepotCosts: [],
-        endWealthWithCareList: [],
-        endWealthNoCareList: [],
-        p1CareYearsTriggered: [],
-        p2CareYearsTriggered: [],
-        bothCareYearsOverlapTriggered: [],
-        maxAnnualCareSpendTriggered: [],
-        healthBucketUsedAmounts: [],
-        healthBucketEndAmounts: [],
-        healthBucketCoveragePct: [],
-        healthBucketTargetGaps: [],
-        healthBucketInterestAmounts: []
-    };
-    const allRealWithdrawalsSample = [];
-    const technicalInventory = createMonteCarloTechnicalInventory(anzahl);
-    const totals = {
-        failCount: 0,
-        pflegeTriggeredCount: 0,
-        totalSimulatedYears: 0,
-        totalYearsQuoteAbove45: 0,
-        totalYearsSafetyStage1plus: 0,
-        totalYearsSafetyStage2: 0,
-        shortfallWithCareCount: 0,
-        shortfallNoCareProxyCount: 0,
-        p2TriggeredCount: 0,
-        runsSafetyStage1Triggered: 0,
-        runsSafetyStage2Triggered: 0,
-        totalTaxSavedByLossCarry: 0,
-        healthBucketEnabledCount: 0,
-        healthBucketUsedCount: 0,
-        healthBucketDepletedCount: 0,
-        totalHealthBucketUsed: 0,
-        tailRiskRunsActiveCount: 0,
-        tailRiskRunsAppliedCount: 0,
-        tailRiskEventCount: 0,
-        tailRiskEvaluatedYears: 0,
-        tailRiskActiveYears: 0,
-        tailRiskAppliedYears: 0,
-        tailRiskSkippedHistoricalCrisisYears: 0
-    };
-
-    let worstRun = null;
-    let worstRunCare = null;
+    const chunkAccumulator = createMonteCarloChunkAccumulatorV1(anzahl);
     const timeBudgetMs = workerConfig?.timeBudgetMs ?? 200;
     const runner = new WorkerJobRunner({
         pool,
@@ -204,77 +157,10 @@ async function runMonteCarloWithWorkers({
             logIndices
         }),
         mergeResult: (result, start, count) => {
-            // Merge fixed-size buffers at their run indices.
-            const chunkBuffers = result.buffers;
-            buffers.finalOutcomes.set(chunkBuffers.finalOutcomes, start);
-            buffers.taxOutcomes.set(chunkBuffers.taxOutcomes, start);
-            buffers.kpiLebensdauer.set(chunkBuffers.kpiLebensdauer, start);
-            buffers.kpiKuerzungsjahre.set(chunkBuffers.kpiKuerzungsjahre, start);
-            buffers.kpiMaxKuerzung.set(chunkBuffers.kpiMaxKuerzung, start);
-            buffers.volatilities.set(chunkBuffers.volatilities, start);
-            buffers.maxDrawdowns.set(chunkBuffers.maxDrawdowns, start);
-            buffers.depotErschoepft.set(chunkBuffers.depotErschoepft, start);
-            buffers.alterBeiErschoepfung.set(chunkBuffers.alterBeiErschoepfung, start);
-            buffers.anteilJahreOhneFlex.set(chunkBuffers.anteilJahreOhneFlex, start);
-            buffers.stress_maxDrawdowns.set(chunkBuffers.stress_maxDrawdowns, start);
-            buffers.stress_timeQuoteAbove45.set(chunkBuffers.stress_timeQuoteAbove45, start);
-            buffers.stress_cutYears.set(chunkBuffers.stress_cutYears, start);
-            buffers.stress_CaR_P10_Real.set(chunkBuffers.stress_CaR_P10_Real, start);
-            buffers.stress_recoveryYears.set(chunkBuffers.stress_recoveryYears, start);
-
-            mergeHeatmap(heatmap, result.heatmap);
-
-            totals.failCount += result.totals.failCount;
-            totals.pflegeTriggeredCount += result.totals.pflegeTriggeredCount;
-            totals.totalSimulatedYears += result.totals.totalSimulatedYears;
-            totals.totalYearsQuoteAbove45 += result.totals.totalYearsQuoteAbove45;
-            totals.totalYearsSafetyStage1plus += result.totals.totalYearsSafetyStage1plus || 0;
-            totals.totalYearsSafetyStage2 += result.totals.totalYearsSafetyStage2 || 0;
-            totals.shortfallWithCareCount += result.totals.shortfallWithCareCount;
-            totals.shortfallNoCareProxyCount += result.totals.shortfallNoCareProxyCount;
-            totals.p2TriggeredCount += result.totals.p2TriggeredCount;
-            totals.runsSafetyStage1Triggered += result.totals.runsSafetyStage1Triggered || 0;
-            totals.runsSafetyStage2Triggered += result.totals.runsSafetyStage2Triggered || 0;
-            totals.totalTaxSavedByLossCarry += result.totals.totalTaxSavedByLossCarry || 0;
-            totals.healthBucketEnabledCount += result.totals.healthBucketEnabledCount || 0;
-            totals.healthBucketUsedCount += result.totals.healthBucketUsedCount || 0;
-            totals.healthBucketDepletedCount += result.totals.healthBucketDepletedCount || 0;
-            totals.totalHealthBucketUsed += result.totals.totalHealthBucketUsed || 0;
-            totals.tailRiskRunsActiveCount += result.totals.tailRiskRunsActiveCount || 0;
-            totals.tailRiskRunsAppliedCount += result.totals.tailRiskRunsAppliedCount || 0;
-            totals.tailRiskEventCount += result.totals.tailRiskEventCount || 0;
-            totals.tailRiskEvaluatedYears += result.totals.tailRiskEvaluatedYears || 0;
-            totals.tailRiskActiveYears += result.totals.tailRiskActiveYears || 0;
-            totals.tailRiskAppliedYears += result.totals.tailRiskAppliedYears || 0;
-            totals.tailRiskSkippedHistoricalCrisisYears += result.totals.tailRiskSkippedHistoricalCrisisYears || 0;
-
-            appendArray(lists.entryAges, result.lists.entryAges);
-            appendArray(lists.entryAgesP2, result.lists.entryAgesP2);
-            appendArray(lists.careDepotCosts, result.lists.careDepotCosts);
-            appendArray(lists.endWealthWithCareList, result.lists.endWealthWithCareList);
-            appendArray(lists.endWealthNoCareList, result.lists.endWealthNoCareList);
-            appendArray(lists.p1CareYearsTriggered, result.lists.p1CareYearsTriggered);
-            appendArray(lists.p2CareYearsTriggered, result.lists.p2CareYearsTriggered);
-            appendArray(lists.bothCareYearsOverlapTriggered, result.lists.bothCareYearsOverlapTriggered);
-            appendArray(lists.maxAnnualCareSpendTriggered, result.lists.maxAnnualCareSpendTriggered);
-            appendArray(lists.healthBucketUsedAmounts, result.lists.healthBucketUsedAmounts);
-            appendArray(lists.healthBucketEndAmounts, result.lists.healthBucketEndAmounts);
-            appendArray(lists.healthBucketCoveragePct, result.lists.healthBucketCoveragePct);
-            appendArray(lists.healthBucketTargetGaps, result.lists.healthBucketTargetGaps);
-            appendArray(lists.healthBucketInterestAmounts, result.lists.healthBucketInterestAmounts);
-            appendArray(allRealWithdrawalsSample, result.allRealWithdrawalsSample);
-            mergeMonteCarloTechnicalInventory(technicalInventory, result.technicalInventory);
-
-            worstRun = pickWorstRun(worstRun, result.worstRun);
-            worstRunCare = pickWorstRun(worstRunCare, result.worstRunCare);
-
-            if (scenarioAnalyzer && result.runMeta) {
-                for (const meta of result.runMeta) {
-                    // Track characteristic and random samples for later log rendering.
-                    meta.isRandomSample = scenarioAnalyzer.shouldCaptureRandomSample(meta.index);
-                    scenarioAnalyzer.addRun(meta);
-                }
-            }
+            mergeMonteCarloChunkResultV1(chunkAccumulator, result, {
+                expectedStart: start,
+                expectedCount: count
+            });
         }
     });
 
@@ -291,6 +177,17 @@ async function runMonteCarloWithWorkers({
         // keep pool alive for reuse across runs
     }
 
+    const finalized = finalizeMonteCarloChunkAccumulatorV1(chunkAccumulator);
+    if (scenarioAnalyzer) {
+        for (const meta of finalized.runMeta) {
+            // Track samples in global run order, independent of worker completion order.
+            meta.isRandomSample = scenarioAnalyzer.shouldCaptureRandomSample(meta.index);
+            scenarioAnalyzer.addRun(meta);
+        }
+    }
+
+    let worstRun = finalized.worstRun;
+    let worstRunCare = finalized.worstRunCare;
     if (!worstRun) {
         worstRun = { finalVermoegen: Infinity, logDataRows: [], failed: false, comboIdx: 0, runIdx: 0 };
     }
@@ -304,25 +201,25 @@ async function runMonteCarloWithWorkers({
     const aggregatedResults = attachMonteCarloBatchOutcome(buildMonteCarloAggregates({
         inputs,
         totalRuns: anzahl,
-        buffers,
-        heatmap,
-        bins: MC_HEATMAP_BINS,
-        totals,
-        lists,
-        allRealWithdrawalsSample
-    }), technicalInventory);
+        buffers: finalized.buffers,
+        heatmap: finalized.heatmap,
+        bins: finalized.bins,
+        totals: finalized.totals,
+        lists: finalized.lists,
+        allRealWithdrawalsSample: finalized.allRealWithdrawalsSample
+    }), finalized.technicalInventory);
 
     onProgress(100);
 
     return {
         aggregatedResults,
-        failCount: totals.failCount,
+        failCount: finalized.totals.failCount,
         worstRun,
         worstRunCare,
-        pflegeTriggeredCount: totals.pflegeTriggeredCount,
+        pflegeTriggeredCount: finalized.totals.pflegeTriggeredCount,
         batchStatus: aggregatedResults.batchStatus,
         financialMetricsValid: aggregatedResults.financialMetricsValid,
-        technicalInventory
+        technicalInventory: finalized.technicalInventory
     };
 }
 

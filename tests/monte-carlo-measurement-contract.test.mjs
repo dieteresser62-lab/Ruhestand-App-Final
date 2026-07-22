@@ -7,12 +7,13 @@ import { EngineAPI } from '../engine/index.mjs';
 import {
     attachMonteCarloBatchOutcome,
     buildMonteCarloAggregates,
-    createMonteCarloBuffers,
-    createMonteCarloTechnicalInventory,
-    mergeMonteCarloTechnicalInventory,
-    pickWorstRun,
     runMonteCarloChunk
 } from '../app/simulator/monte-carlo-runner.js';
+import {
+    createMonteCarloChunkAccumulatorV1,
+    finalizeMonteCarloChunkAccumulatorV1,
+    mergeMonteCarloChunkResultV1
+} from '../app/simulator/monte-carlo-chunk-result.js';
 import {
     compileScenario,
     getDataVersion
@@ -25,8 +26,6 @@ console.log('--- Monte Carlo Measurement Contract Tests ---');
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixtureDir = path.join(__dirname, 'fixtures', 'monte-carlo-measurement');
 const workerUrl = new URL('../workers/mc-worker.js', import.meta.url);
-const BUFFER_FIELDS = Object.keys(createMonteCarloBuffers(0));
-
 function readFixture(name) {
     return JSON.parse(fs.readFileSync(path.join(fixtureDir, name), 'utf8'));
 }
@@ -164,20 +163,12 @@ function createAccumulator(totalRuns, templateResult = null, { retainRunMeta = t
     const bins = templateResult?.bins || [0, 3, 3.5, 4, 4.5, 5, 5.5, 6, 7, 8, 10, Infinity];
     const heatmapRows = templateResult?.heatmap?.length || 10;
     return {
-        totalRuns,
-        buffers: createMonteCarloBuffers(totalRuns),
-        heatmap: Array.from({ length: heatmapRows }, () => new Uint32Array(bins.length - 1)),
-        bins,
-        totals: {},
-        lists: {},
-        allRealWithdrawalsSample: [],
-        technicalInventory: createMonteCarloTechnicalInventory(totalRuns),
-        worstRun: null,
-        worstRunCare: null,
-        runMeta: [],
-        retainRunMeta,
-        payloadBytes: 0,
-        completedRuns: 0
+        ...createMonteCarloChunkAccumulatorV1(totalRuns, {
+            bins,
+            heatmapRows,
+            retainRunMeta
+        }),
+        payloadBytes: 0
     };
 }
 
@@ -194,51 +185,26 @@ function estimatePayloadBytes(result) {
 }
 
 function mergeChunkIntoAccumulator(accumulator, result, start, count, payloadBytes = 0) {
-    for (const field of BUFFER_FIELDS) {
-        accumulator.buffers[field].set(result.buffers[field], start);
-    }
-    for (let row = 0; row < accumulator.heatmap.length; row++) {
-        const sourceRow = result.heatmap?.[row];
-        if (!sourceRow) continue;
-        for (let column = 0; column < accumulator.heatmap[row].length; column++) {
-            accumulator.heatmap[row][column] += sourceRow[column] || 0;
-        }
-    }
-    for (const [key, value] of Object.entries(result.totals || {})) {
-        accumulator.totals[key] = (accumulator.totals[key] || 0) + (Number(value) || 0);
-    }
-    for (const [key, values] of Object.entries(result.lists || {})) {
-        accumulator.lists[key] ||= [];
-        if (Array.isArray(values)) accumulator.lists[key].push(...values);
-    }
-    if (Array.isArray(result.allRealWithdrawalsSample)) {
-        accumulator.allRealWithdrawalsSample.push(...result.allRealWithdrawalsSample);
-    }
-    mergeMonteCarloTechnicalInventory(accumulator.technicalInventory, result.technicalInventory);
-    accumulator.worstRun = pickWorstRun(accumulator.worstRun, result.worstRun);
-    accumulator.worstRunCare = pickWorstRun(accumulator.worstRunCare, result.worstRunCare);
-    if (accumulator.retainRunMeta && Array.isArray(result.runMeta)) {
-        accumulator.runMeta.push(...result.runMeta);
-    }
+    mergeMonteCarloChunkResultV1(accumulator, result, {
+        expectedStart: start,
+        expectedCount: count
+    });
     accumulator.payloadBytes += payloadBytes;
-    accumulator.completedRuns += count;
 }
 
 function finalizeAccumulator(accumulator, inputs) {
-    if (accumulator.retainRunMeta) {
-        accumulator.runMeta.sort((left, right) => left.index - right.index);
-    }
+    const finalized = finalizeMonteCarloChunkAccumulatorV1(accumulator);
     const aggregates = attachMonteCarloBatchOutcome(buildMonteCarloAggregates({
         inputs,
-        totalRuns: accumulator.totalRuns,
-        buffers: accumulator.buffers,
-        heatmap: accumulator.heatmap,
-        bins: accumulator.bins,
-        totals: accumulator.totals,
-        lists: accumulator.lists,
-        allRealWithdrawalsSample: accumulator.allRealWithdrawalsSample
-    }), accumulator.technicalInventory);
-    return { ...accumulator, aggregates };
+        totalRuns: finalized.totalRuns,
+        buffers: finalized.buffers,
+        heatmap: finalized.heatmap,
+        bins: finalized.bins,
+        totals: finalized.totals,
+        lists: finalized.lists,
+        allRealWithdrawalsSample: finalized.allRealWithdrawalsSample
+    }), finalized.technicalInventory);
+    return { ...finalized, payloadBytes: accumulator.payloadBytes, aggregates };
 }
 
 async function runWorkerLayout(runnerCase, workerCount, ranges) {
@@ -258,11 +224,13 @@ async function runWorkerLayout(runnerCase, workerCount, ranges) {
             logIndices: runnerCase.logIndices
         }));
         const messages = await Promise.all(jobs);
-        const ordered = messages
+        // Merge deliberately opposite to global run order. The V1 contract must
+        // make worker completion/merge order irrelevant.
+        const completionOrder = messages
             .map((message, index) => ({ message, range: ranges[index] }))
-            .sort((left, right) => left.range.start - right.range.start);
-        const accumulator = createAccumulator(runnerCase.monteCarloParams.anzahl, ordered[0]?.message);
-        for (const { message, range } of ordered) {
+            .reverse();
+        const accumulator = createAccumulator(runnerCase.monteCarloParams.anzahl, completionOrder[0]?.message);
+        for (const { message, range } of completionOrder) {
             mergeChunkIntoAccumulator(
                 accumulator,
                 message,

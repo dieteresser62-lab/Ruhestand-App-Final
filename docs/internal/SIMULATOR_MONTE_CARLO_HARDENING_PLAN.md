@@ -1,11 +1,11 @@
 # Simulator / Monte Carlo: Hardening-Arbeitsplan
 
 **Stand:** 2026-07-22
-**Status:** implementierungsreif; Slice 01 umgesetzt, Slice-Review ausstehend
+**Status:** implementierungsreif; Slice 01 freigegeben, Slice 02 implementiert und im Review
 **Autor:** Codex als Implementer und Plan-Autor  
 **Feature-Branch:** `codex/simulator-monte-carlo-gap-plan`  
 **GitHub-Status:** nur lokal; Veroeffentlichung ausstehend und nur nach Nutzerfreigabe  
-**Reviewstand:** Gemini-Re-Review und Nutzerfreigabe erteilt; Slice 01 wartet auf Review
+**Reviewstand:** Plan und Slice 01 freigegeben; Slice 02 wartet auf Gemini- und Nutzerreview
 **Ausgangsanalyse:** [SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md](./SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md)
 
 ## 1. Ziel und Rollenabgrenzung
@@ -198,7 +198,7 @@ Semantikaenderungen sind unzulaessig.
 | Slice | Inhalt | GAPs | Abhaengigkeit | Status |
 |---|---|---|---|---|
 | [01](./SLICE_SIMULATOR_MONTE_CARLO_01_BASELINE_MESSVERTRAG.md) | Baseline, Entscheidungen und Messvertrag | querschnittlich; Golden Cases fuer MC-01 bis MC-19 | Reviewfreigabe des Plans | abgeschlossen und freigegeben |
-| [02](./SLICE_SIMULATOR_MONTE_CARLO_02_CHUNK_RESULT_CONTRACT.md) | zentraler Chunk-/Path-Summary-Vertrag | MC-10, MC-19 | 01, D-10, D-11 | geplant |
+| [02](./SLICE_SIMULATOR_MONTE_CARLO_02_CHUNK_RESULT_CONTRACT.md) | zentraler Chunk-/Path-Summary-Vertrag | MC-10, MC-19 | 01, D-10, D-11 | abgeschlossen und freigegeben |
 | [03](./SLICE_SIMULATOR_MONTE_CARLO_03_RISIKO_KPI_SEMANTIK.md) | Volatilitaet und Kuerzungsanteil | MC-01, MC-02 | 02, D-03 | geplant |
 | [04](./SLICE_SIMULATOR_MONTE_CARLO_04_PFLEGE_KPI_SEMANTIK.md) | Pflegeeintritt, -dauer und -kosten | MC-03, MC-04 | 02, D-04 | geplant |
 | [05](./SLICE_SIMULATOR_MONTE_CARLO_05_OUTCOME_HORIZONT_CONTRACT.md) | terminale Outcomes, Horizont, Alter | MC-05, MC-07 | 02, D-01, D-02 | geplant |
@@ -593,3 +593,29 @@ alte Erfolgsquotenterminologie verwendet.
   Architektur-Linkfehler mit sechs toten Links auf zwei fehlende
   Forschungsdokumente; diese Dateien blieben ausserhalb des Slice-Scope
   unangetastet.
+
+## 15. Rueckdokumentation Slice 02
+
+- Implementierungsstatus: abgeschlossen; Gemini-/Nutzerreview des Slice steht
+  aus. Codex erteilt keine eigene Freigabe.
+- `MonteCarloChunkResultV1` registriert Legacy-Buffer, Integercounter,
+  Floataggregate, bedingte Listen, Diagnostik und eine global indexierte
+  `MonteCarloPathSummaryV1` samt Missingness-Codes.
+- `runMonteCarloChunk()` ist der gemeinsame Producer fuer Direktlauf und
+  Workerantwort. UI-Orchestrierung, Auto-Optimize und dessen serieller Fallback
+  finalisieren ueber denselben DOM-freien Akkumulator; manuelle produktive
+  Mergefeldlisten wurden entfernt.
+- Floataggregate werden aus per-Run-Beitraegen in globaler Runreihenfolge
+  reduziert. Diagnostik, Listen, `runMeta` und Worst-Run-Tie-Breaks sind von
+  Completion-Reihenfolge und Chunkgrenzen unabhaengig.
+- Der Zusatzvertrag belegt 108 Typed-Array-Byte pro Run und uebertraegt keine
+  Jahrespfade. Auto-Optimize verwirft `runMeta`; vollstaendige Chunkobjekte
+  werden nach dem Merge nicht festgehalten.
+- Der neue Contracttest ist mit 25/25 Assertions gruen. Die auf den zentralen
+  Vertrag migrierte Slice-01-Messmatrix bleibt mit 785/785 Assertions fuer
+  Direktlauf sowie echte 1-/2-/4-Worker- und drei Chunklayouts exakt gruen.
+- Betroffene Bestandssuiten sind gruen: MC-Runner 140/140, Worker-Contract
+  34/34, Worker-Paritaet 369/369 und Auto-Optimize 7/7.
+- `npm test` erreicht 6516/6517 Assertions. Einzige Abweichung bleibt der
+  dokumentierte fremde Architektur-Linkfehler; keine neue Snapshot-,
+  Backtest- oder FlowDelta-Abweichung.
