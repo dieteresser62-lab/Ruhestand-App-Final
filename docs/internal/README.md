@@ -6,9 +6,8 @@ Aktive interne Uebersichten:
 
 - `PROJEKTUEBERSICHT.md` - detaillierte technische und organisatorische Projektuebersicht.
 - `SLICE_EXECUTION_RULES.md` - verbindlicher Review-, Branch-, Risiko- und Abnahmeprozess fuer Slices.
-- `SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md` - technische Ist-/Soll-Analyse des Simulator-/Monte-Carlo-Bereichs mit den Findings MC-01 bis MC-19 und der Slice-12-Abschlussmatrix.
-- `SIMULATOR_MONTE_CARLO_HARDENING_PLAN.md` - implementierter Arbeitsplan mit zwoelf 1-basierten Slices fuer Messvertraege, KPIs, Sampling, Outcomes, Exporte, Worker-Lifecycle, UI, E2E und Integrationsnachweis; externe Abschlussfreigabe steht aus.
 - Der weiterhin offene Forschungsvalidierungs-Backlog liegt unter `archive/FORSCHUNGSVALIDIERUNGS_BACKLOG.md`; sein Archivstatus ist keine fachliche Freigabe.
+- Monte-Carlo-GAP-Analyse und Hardening-Arbeitsplan liegen im Archiv unter `archive/2026-simulator-monte-carlo-hardening/`.
 - Backtest-GAP-Analyse, Hardening-Plan und Forschungsprotokoll liegen unter `archive/2026-simulator-backtest-hardening/`.
 - Die oeffentliche Abschlussreferenz des abgeschlossenen Tranchen-Arbeitsplans liegt unter `../reference/TRANCHEN_MODULES_README.md`; die Nutzeranleitung unter `../guides/MULTI-TRANCHEN-ANLEITUNG.md`.
 
@@ -16,6 +15,7 @@ Abgeschlossene Umsetzungen und fruehere Arbeitsplaene liegen im Archiv.
 
 ## Archive
 
+- `archive/2026-simulator-monte-carlo-hardening/`
 - `archive/2026-architektur-fachkonzept-findings/`
 - `archive/2026-architektur-fachkonzept-ueberarbeitung/`
 - `archive/2026-tranchenmanagement-hardening/`
