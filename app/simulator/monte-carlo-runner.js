@@ -8,7 +8,7 @@
 "use strict";
 
 import { rng, makeRunSeed, quantile } from './simulator-utils.js';
-import { BREAK_ON_RUIN, ESTIMATED_HISTORY_CUTOFF_YEAR, MORTALITY_TABLE, annualData } from './simulator-data.js';
+import { BREAK_ON_RUIN, ESTIMATED_HISTORY_CUTOFF_YEAR, annualData } from './simulator-data.js';
 import { applyStressOverride, computeRentAdjRate } from './simulator-portfolio.js';
 import { simulateOneYear, initMcRunState, sampleNextYearData, computeRunStatsFromSeries, updateCareMeta, calcCareCost, computeCareMortalityMultiplier, computeHouseholdFlexFactor, resolveSimulatorCumulativeInflationFactor } from './simulator-engine-wrapper.js';
 import { portfolioTotal } from './simulator-results.js';
@@ -18,7 +18,11 @@ import { ScenarioAnalyzer } from './scenario-analyzer.js';
 import { MC_HEATMAP_BINS, pickWorstRun, createMonteCarloBuffers } from './monte-carlo-runner-utils.js';
 import { buildMonteCarloAggregates } from './monte-carlo-aggregates.js';
 import { createMonteCarloRunContext } from './mc-run-context.js';
-import { createMonteCarloLifeState } from './mc-life-events.js';
+import {
+    assertSimulatorHorizonAgeContract,
+    createMonteCarloLifeState,
+    resolveSimulatorMortalityProbability
+} from './mc-life-events.js';
 import { getStartYearCandidates } from '../shared/cape-utils.js';
 import { STATIONARY_BOOTSTRAP_METHOD, isStationaryBootstrapMethod } from './stationary-bootstrap-contract.js';
 import { createStationaryBootstrapSampler, nextYearSample } from './stationary-bootstrap-sampler.js';
@@ -49,9 +53,11 @@ import {
 import { resolveDynamicFlexRunnerHorizon } from './dynamic-flex-runner-horizon.js';
 import {
     MONTE_CARLO_OUTCOME_CODE,
+    buildMonteCarloOutcomeInventoryV1,
     createMonteCarloChunkResultV1,
     createMonteCarloPathSummaryV1,
-    recordMonteCarloPathSummaryV1
+    recordMonteCarloPathSummaryV1,
+    resolveMonteCarloTerminalOutcomeV1
 } from './monte-carlo-chunk-result.js';
 
 export { MC_HEATMAP_BINS, pickWorstRun, createMonteCarloBuffers, buildMonteCarloAggregates };
@@ -83,11 +89,30 @@ export function mergeMonteCarloTechnicalInventory(target, source) {
 export function attachMonteCarloBatchOutcome(aggregatedResults, technicalInventory) {
     const inventory = technicalInventory || createMonteCarloTechnicalInventory(0);
     const batchStatus = inventory.technicalError > 0 ? 'technical_error' : 'completed';
+    const outcomeCounts = aggregatedResults?.outcomeCounts || {};
+    const outcomeInventory = buildMonteCarloOutcomeInventoryV1({
+        requestedRuns: inventory.requested,
+        ruin: Math.max(0, Number(outcomeCounts.ruin) || 0),
+        all_dead: Math.max(0, Number(outcomeCounts.all_dead) || 0),
+        horizon_exhausted: Math.max(0, Number(outcomeCounts.horizon_exhausted) || 0),
+        technical_error: inventory.technicalError
+    });
+    if (batchStatus === 'technical_error' && inventory.errors?.[0]) {
+        const firstError = inventory.errors[0];
+        if (!String(firstError.message || '').includes('Terminale Outcomes:')) {
+            firstError.message = `${firstError.message || 'Die Monte-Carlo-Simulation wurde technisch abgebrochen.'} `
+                + `Floor-Deckung im gewaehlten Horizont: nicht ausgewiesen. Terminale Outcomes: `
+                + `Ruin ${outcomeInventory.ruin}, Tod ${outcomeInventory.all_dead}, `
+                + `Horizont ${outcomeInventory.horizon_exhausted}, Technik ${outcomeInventory.technical_error}.`;
+        }
+    }
+    const { outcomeCounts: _outcomeCounts, ...financialResults } = aggregatedResults || {};
     return {
-        ...aggregatedResults,
+        ...financialResults,
         batchStatus,
         financialMetricsValid: batchStatus === 'completed',
-        technicalInventory: inventory
+        technicalInventory: inventory,
+        outcomeInventory
     };
 }
 
@@ -261,6 +286,8 @@ export async function runMonteCarloChunk({
 }) {
     onProgress(0);
 
+    assertSimulatorHorizonAgeContract(inputs, monteCarloParams?.maxDauer);
+
     const context = createMonteCarloRunContext({
         inputs,
         monteCarloParams,
@@ -297,6 +324,7 @@ export async function runMonteCarloChunk({
         maxDrawdowns,
         depotErschoepft,
         alterBeiErschoepfung,
+        alterBeiErschoepfungMissingness,
         anteilJahreOhneFlex,
         stress_maxDrawdowns,
         stress_timeQuoteAbove45,
@@ -310,6 +338,11 @@ export async function runMonteCarloChunk({
 
     const runMetrics = createMonteCarloRunMetrics(runCount);
     const technicalInventory = createMonteCarloTechnicalInventory(runCount);
+    const outcomeCounts = {
+        ruin: 0,
+        all_dead: 0,
+        horizon_exhausted: 0
+    };
     const { pathSummaries, pathMissingness } = createMonteCarloPathSummaryV1(runCount, {
         buffers,
         attachTransferBuffers: true
@@ -471,7 +504,7 @@ export async function runMonteCarloChunk({
             const isAccumulation = inputs.accumulationPhase?.enabled && simulationsJahr < effectiveTransitionYear;
 
             if (!isAccumulation && p1Alive) {
-                let qx1 = MORTALITY_TABLE[inputs.geschlecht][ageP1] || 0.0005;
+                let qx1 = resolveSimulatorMortalityProbability(inputs.geschlecht, ageP1);
                 const careFactorP1 = computeCareMortalityMultiplier(careMetaP1, inputs);
                 if (careFactorP1 > 1) {
                     qx1 = Math.min(1.0, qx1 * careFactorP1);
@@ -483,7 +516,7 @@ export async function runMonteCarloChunk({
 
             if (!isAccumulation && p2Alive && careMetaP2) {
                 const p2Gender = inputs.partner?.geschlecht || (inputs.geschlecht === 'm' ? 'w' : 'm');
-                let qx2 = MORTALITY_TABLE[p2Gender][ageP2] || 0.0005;
+                let qx2 = resolveSimulatorMortalityProbability(p2Gender, ageP2);
                 const careFactorP2 = computeCareMortalityMultiplier(careMetaP2, inputs);
                 if (careFactorP2 > 1) {
                     qx2 = Math.min(1.0, qx2 * careFactorP2);
@@ -598,6 +631,18 @@ export async function runMonteCarloChunk({
                 p2ActiveThisYear
             } : null;
 
+            const adapterFlagsConflict = (result?.kind === 'success' && result?.isRuin === true)
+                || (result?.kind === 'ruin' && result?.isRuin === false);
+            if (adapterFlagsConflict) {
+                technicalPathError = normalizeTechnicalPathError({
+                    error: {
+                        code: 'MC_TERMINAL_FLAGS_CONFLICT',
+                        message: 'Der Jahresadapter lieferte widerspruechliche Terminalflags.'
+                    }
+                }, runIdx, simulationsJahr);
+                break;
+            }
+
             if (result?.kind === 'technical_error' || result?.error) {
                 technicalPathError = normalizeTechnicalPathError(result, runIdx, simulationsJahr);
                 break;
@@ -608,6 +653,7 @@ export async function runMonteCarloChunk({
                 // Bei Ruin ist das Depot definitiv erschöpft - setze Alter
                 if (!depotErschoepfungAlterGesetzt) {
                     alterBeiErschoepfung[i] = ageP1;
+                    alterBeiErschoepfungMissingness[i] = 1;
                     depotErschoepfungAlterGesetzt = true;
                 }
                 if (currentRunLog) currentRunLog.push(buildMonteCarloRuinLogRow({
@@ -653,6 +699,7 @@ export async function runMonteCarloChunk({
 
                 if (!depotErschoepfungAlterGesetzt && depotOnlyNow <= DEPOT_DEPLETION_THRESHOLD) {
                     alterBeiErschoepfung[i] = ageP1;
+                    alterBeiErschoepfungMissingness[i] = 1;
                     depotErschoepfungAlterGesetzt = true;
                 }
 
@@ -727,7 +774,39 @@ export async function runMonteCarloChunk({
             continue;
         }
 
+        const terminalResolution = resolveMonteCarloTerminalOutcomeV1({
+            ruinInStartedFinancialYear: failed,
+            allDeadTiming: runEndedBecauseAllDied
+                ? failed ? 'after_ruin' : 'before_next_financial_obligation'
+                : null,
+            horizonExhausted: !failed && !runEndedBecauseAllDied && lebensdauer === maxDauer
+        });
+        if (terminalResolution.outcomeCode === MONTE_CARLO_OUTCOME_CODE.TECHNICAL_ERROR) {
+            const errorCode = terminalResolution.errorCode || 'MC_TERMINAL_OUTCOME_INVALID';
+            technicalInventory.technicalError++;
+            if (technicalInventory.errors.length < MAX_TECHNICAL_ERROR_SAMPLES) {
+                technicalInventory.errors.push({
+                    runIndex: runIdx,
+                    simulationYearIndex: Math.max(0, lebensdauer - 1),
+                    code: errorCode,
+                    message: `Ein Simulationspfad verletzte den terminalen Outcome-Vertrag (${errorCode}).`
+                });
+            }
+            recordMonteCarloPathSummaryV1({
+                pathSummaries,
+                pathMissingness,
+                localIndex: i,
+                globalRunIndex: runIdx,
+                outcomeCode: MONTE_CARLO_OUTCOME_CODE.TECHNICAL_ERROR,
+                technicalError: true
+            });
+            continue;
+        }
+
         technicalInventory.financiallyEvaluable++;
+        if (terminalResolution.outcomeCode === MONTE_CARLO_OUTCOME_CODE.RUIN) outcomeCounts.ruin++;
+        if (terminalResolution.outcomeCode === MONTE_CARLO_OUTCOME_CODE.ALL_DEAD) outcomeCounts.all_dead++;
+        if (terminalResolution.outcomeCode === MONTE_CARLO_OUTCOME_CODE.HORIZON_EXHAUSTED) outcomeCounts.horizon_exhausted++;
 
         if (runEndedBecauseAllDied) {
             // Ergänze einen letzten Log-Eintrag, damit klar ersichtlich ist, dass alle Personen verstorben sind.
@@ -805,11 +884,7 @@ export async function runMonteCarloChunk({
             pathMissingness,
             localIndex: i,
             globalRunIndex: runIdx,
-            outcomeCode: failed
-                ? MONTE_CARLO_OUTCOME_CODE.RUIN
-                : runEndedBecauseAllDied
-                    ? MONTE_CARLO_OUTCOME_CODE.ALL_DEAD
-                    : MONTE_CARLO_OUTCOME_CODE.HORIZON_EXHAUSTED,
+            outcomeCode: terminalResolution.outcomeCode,
             finalValueNominalEur: finalOutcomes[i],
             finalValueRealEur,
             volatilityPct: volatilities[i],
@@ -839,6 +914,9 @@ export async function runMonteCarloChunk({
     }
 
     const finalizedMetrics = finalizeMonteCarloRunMetrics(runMetrics);
+    finalizedMetrics.totals.outcomeRuinCount = outcomeCounts.ruin;
+    finalizedMetrics.totals.outcomeAllDeadCount = outcomeCounts.all_dead;
+    finalizedMetrics.totals.outcomeHorizonExhaustedCount = outcomeCounts.horizon_exhausted;
 
     return createMonteCarloChunkResultV1({
         runRange: { start: runStart, count: runCount },

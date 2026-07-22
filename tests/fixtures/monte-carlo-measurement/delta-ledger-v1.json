@@ -57,6 +57,28 @@
       "expectedDirection": "sign reverses relative to the old implementation",
       "goldenCaseIds": ["GC-CARE-01"],
       "reviewStatus": "pending"
+    },
+    {
+      "sliceId": "05",
+      "sourceReference": "post-slice-04-v1",
+      "targetReference": "post-slice-05-v1",
+      "fieldPath": "pathSummaries.outcomeCode/totals.outcome*Count/aggregates.outcomeInventory",
+      "formulaBefore": "technical errors were separated, but financial terminal reasons were not exposed as an exhaustive inventory and the UI derived a generic success rate from failCount",
+      "formulaAfter": "each requested run is exactly ruin, all_dead, horizon_exhausted or technical_error; floor coverage is (all_dead + horizon_exhausted) / requestedRuns only for technical-error-free batches and otherwise null",
+      "expectedDirection": "headline becomes nullable on technical error and censored horizon paths become explicitly visible",
+      "goldenCaseIds": ["GC-OUTCOME-01"],
+      "reviewStatus": "pending"
+    },
+    {
+      "sliceId": "05",
+      "sourceReference": "post-slice-04-v1",
+      "targetReference": "post-slice-05-v1",
+      "fieldPath": "buffers.kpiLebensdauer/buffers.alterBeiErschoepfung/buffers.alterBeiErschoepfungMissingness/mortality fallback",
+      "formulaBefore": "duration and depletion age used Uint8 with sentinel 255; Monte Carlo used 0.0005 outside the mortality table while Sweep used 1",
+      "formulaAfter": "duration and age use Uint32 plus explicit missingness; all simulator paths use probability 1 outside the mortality table and reject age-plus-horizon overflow",
+      "expectedDirection": "buffer storage increases by 7 bytes per run; valid in-range paths are unchanged while out-of-range mortality fails closed consistently",
+      "goldenCaseIds": ["GC-OUTCOME-01"],
+      "reviewStatus": "pending"
     }
   ],
   "requiredEntryFields": [

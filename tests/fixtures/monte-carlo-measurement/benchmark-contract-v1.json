@@ -12,7 +12,7 @@
     "durationYears": {
       "minimum": 1,
       "mortalityTableMaximumAge": 110,
-      "storageMaximum": 255,
+      "storageMaximum": 4294967295,
       "effectiveMaximumFormula": "min(storageMaximum, mortalityTableMaximumAge - youngestHouseholdStartAge + 1)",
       "fallbackMortalityBeyondTableAllowed": false,
       "silentClampingAllowed": false

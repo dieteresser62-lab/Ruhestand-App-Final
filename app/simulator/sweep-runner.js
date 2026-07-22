@@ -2,7 +2,8 @@
 
 import { rng, makeRunSeed, RUNIDX_COMBO_SETUP } from './simulator-utils.js';
 import { buildStressContext, computeRentAdjRate, applyStressOverride } from './simulator-portfolio.js';
-import { MORTALITY_TABLE, annualData, BREAK_ON_RUIN } from './simulator-data.js';
+import { annualData, BREAK_ON_RUIN } from './simulator-data.js';
+import { resolveSimulatorMortalityProbability } from './mc-life-events.js';
 import {
     simulateOneYear,
     initMcRunState,
@@ -246,7 +247,7 @@ export function runSweepChunk({
 
                 // Mortality only applies in withdrawal phase.
                 if (!isAccumulation) {
-                    let qx = MORTALITY_TABLE[inputs.geschlecht][currentAge] || 1;
+                    let qx = resolveSimulatorMortalityProbability(inputs.geschlecht, currentAge);
                     const careFactor = computeCareMortalityMultiplier(careMeta, inputs);
                     if (careFactor > 1) {
                         qx = Math.min(1.0, qx * careFactor);

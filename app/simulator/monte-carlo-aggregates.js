@@ -53,6 +53,7 @@ export function buildMonteCarloAggregates({
         maxDrawdowns,
         depotErschoepft,
         alterBeiErschoepfung,
+        alterBeiErschoepfungMissingness,
         anteilJahreOhneFlex,
         stress_maxDrawdowns,
         stress_timeQuoteAbove45,
@@ -61,6 +62,9 @@ export function buildMonteCarloAggregates({
         stress_recoveryYears
     } = buffers;
     const {
+        outcomeRuinCount = 0,
+        outcomeAllDeadCount = 0,
+        outcomeHorizonExhaustedCount = 0,
         pflegeTriggeredCount = 0,
         p1TriggeredCount = 0,
         p2TriggeredCount = 0,
@@ -186,6 +190,11 @@ export function buildMonteCarloAggregates({
 
     const stressPresetKey = inputs.stressPreset || 'NONE';
     return {
+        outcomeCounts: {
+            ruin: outcomeRuinCount,
+            all_dead: outcomeAllDeadCount,
+            horizon_exhausted: outcomeHorizonExhaustedCount
+        },
         finalOutcomes: {
             p10: quantile(finalOutcomes, 0.1), p50: quantile(finalOutcomes, 0.5),
             p90: quantile(finalOutcomes, 0.9), p50_successful: quantile(successfulOutcomes, 0.5)
@@ -202,7 +211,14 @@ export function buildMonteCarloAggregates({
         },
         kpiMaxKuerzung: { p50: quantile(kpiMaxKuerzung, 0.5) },
         depotErschoepfungsQuote: (sum(depotErschoepft) / totalRuns) * 100,
-        alterBeiErschoepfung: { p50: quantile(Array.from(alterBeiErschoepfung).filter(a => a < 255), 0.5) || 0 },
+        alterBeiErschoepfung: {
+            p50: quantile(
+                Array.from(alterBeiErschoepfung).filter((_age, index) => (
+                    alterBeiErschoepfungMissingness[index] === MONTE_CARLO_MISSINGNESS_CODE.OBSERVED
+                )),
+                0.5
+            ) || 0
+        },
         anteilJahreOhneFlex: { p50: quantile(anteilJahreOhneFlex, 0.5) },
         volatilities: { p50: quantile(volatilities, 0.5) },
         maxDrawdowns: { p50: quantile(maxDrawdowns, 0.5), p90: quantile(maxDrawdowns, 0.9) },

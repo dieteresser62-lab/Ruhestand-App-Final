@@ -229,6 +229,14 @@ bezeichnet; ein Lifetime-Versprechen wird nicht abgeleitet.
 
 **Slice:** 05.
 
+**Umsetzungsstand 2026-07-22:** Implementiert. `MonteCarloOutcomeInventoryV1`
+zaehlt alle vier terminalen Zustaende exhaustiv und worker-/chunkstabil. Die
+Headline „Floor-Deckung im gewaehlten Horizont“ verwendet bei fehlerfreiem
+Batch `all_dead + horizon_exhausted` ueber `requestedRuns` und wird bei einem
+technischen Fehler fail-closed `null`. Horizontpfade bleiben sichtbar zensiert;
+widerspruechliche Terminalflags werden technische Contractfehler. Die externe
+Freigabe steht aus.
+
 ### MC-06 - CAPE-Prioritaet und tatsaechlicher Samplingpfad laufen auseinander (P0)
 
 **Evidenz:** Die UI sagt, CAPE-Sampling habe Vorrang und die Startjahrgewichtung
@@ -269,6 +277,14 @@ kein stiller Fallback ausserhalb der Sterbetafel. Falls laengere Horizonte
 zulaessig bleiben, werden Buffer und Sentinel versioniert erweitert.
 
 **Slices:** 05 und 10.
+
+**Umsetzungsstand Slice 05, 2026-07-22:** Die Laufdauer- und Altersbuffer sind
+auf `Uint32` erweitert; das Erschoepfungsalter nutzt eine separate Missingness
+statt des 255-Sentinels. Startalter plus Horizont wird gegen den Zaehlerbereich
+validiert. Monte Carlo, Life-Event-Helfer und Sweep verwenden ausserhalb der
+Sterbetafel identisch Todeswahrscheinlichkeit 1. Ressourcen-/UI-Hoechstwerte
+und Kostenhinweise bleiben wie geplant Aufgabe von Slice 10. Die externe
+Freigabe steht aus.
 
 ### MC-08 - Keine numerische Unsicherheit der Monte-Carlo-Schaetzer (P1)
 

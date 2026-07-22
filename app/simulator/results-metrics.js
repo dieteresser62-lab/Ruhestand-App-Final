@@ -25,22 +25,32 @@ import { STRESS_PRESETS } from './simulator-data.js';
 export function buildSummaryData({ results, totalRuns, failCount }) {
     const safeTotalRuns = Math.max(0, Number(totalRuns) || 0);
     const safeFailCount = Math.max(0, Number(failCount) || 0);
-    // Success rate is derived, not directly stored, so guard division by zero.
-    const successRate = safeTotalRuns > 0
-        ? ((safeTotalRuns - safeFailCount) / safeTotalRuns) * 100
-        : 0;
+    const outcomeInventory = results?.outcomeInventory;
+    const hasOutcomeInventory = outcomeInventory?.schemaVersion === 'MonteCarloOutcomeInventoryV1';
+    const floorCoveragePct = hasOutcomeInventory
+        ? outcomeInventory.floorCoveragePct
+        : safeTotalRuns > 0
+            ? ((safeTotalRuns - safeFailCount) / safeTotalRuns) * 100
+            : null;
+    const requestedRuns = hasOutcomeInventory ? outcomeInventory.requestedRuns : safeTotalRuns;
+    const ruinRuns = hasOutcomeInventory ? outcomeInventory.ruin : safeFailCount;
+    const allDeadRuns = hasOutcomeInventory ? outcomeInventory.all_dead : 0;
+    const horizonRuns = hasOutcomeInventory ? outcomeInventory.horizon_exhausted : Math.max(0, safeTotalRuns - safeFailCount);
+    const technicalRuns = hasOutcomeInventory ? outcomeInventory.technical_error : 0;
 
     return [
         {
-            title: 'Erfolgsquote',
-            value: formatPercentage(successRate),
-            description: 'Anteil erfolgreicher Läufe bezogen auf die Gesamtzahl.',
-            tone: 'success'
+            title: 'Floor-Deckung im gewählten Horizont',
+            value: formatPercentage(floorCoveragePct),
+            description: technicalRuns > 0
+                ? `Wegen ${technicalRuns} technischem/technischen Fehler(n) fail-closed nicht ausgewiesen; das Outcome-Inventar bleibt sichtbar.`
+                : `Anteil all_dead plus horizon_exhausted an ${requestedRuns} angeforderten Läufen. Horizontende ist ein zensierter, kein vollständiger Lebenszeitpfad.`,
+            tone: floorCoveragePct === null ? 'warning' : 'success'
         },
         {
-            title: 'Shortfalls',
-            value: `${safeFailCount} von ${safeTotalRuns}`,
-            description: 'Anzahl der Simulationen, die den Floor nicht halten konnten.',
+            title: 'Terminale Outcomes',
+            value: `Ruin ${ruinRuns} · Tod ${allDeadRuns} · Horizont ${horizonRuns} · Technik ${technicalRuns}`,
+            description: `Disjunkte Endzustände für ${requestedRuns} angeforderte Läufe; ihre Summe entspricht der Runzahl.`,
             tone: 'default'
         },
         {

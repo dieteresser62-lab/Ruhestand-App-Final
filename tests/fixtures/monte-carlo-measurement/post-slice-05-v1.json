@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "monte-carlo-post-slice-snapshot-v1",
+  "snapshotId": "post-slice-05-v1",
+  "sourceReference": "post-slice-04-v1",
+  "sliceId": "05",
+  "reviewStatus": "pending",
+  "capturedAtUtc": "2026-07-22T00:00:00.000Z",
+  "goldenCaseId": "GC-OUTCOME-01",
+  "metadata": {
+    "seed": 20260722,
+    "dataVersion": {
+      "annualDataHash": "614993a3",
+      "regimeHash": "50aa7f99"
+    },
+    "runtime": {
+      "kind": "node",
+      "version": "v25.2.1",
+      "platform": "win32",
+      "architecture": "x64"
+    },
+    "numericTolerance": {
+      "sameRuntime": { "defaultAbsolute": 0 },
+      "crossRuntime": { "defaultAbsolute": 0, "fields": [] }
+    }
+  },
+  "result": {
+    "bufferBytes": 600,
+    "bufferBytesPerRun": 75,
+    "bufferTypes": {
+      "kpiLebensdauer": "Uint32Array",
+      "alterBeiErschoepfung": "Uint32Array",
+      "alterBeiErschoepfungMissingness": "Uint8Array",
+      "outcomeCode": "Uint8Array"
+    },
+    "buffers": {
+      "kpiLebensdauer": [12, 12, 12, 12, 12, 12, 12, 4],
+      "alterBeiErschoepfung": [0, 0, 0, 0, 0, 0, 0, 0],
+      "alterBeiErschoepfungMissingness": [0, 0, 0, 0, 0, 0, 0, 0],
+      "outcomeCode": [3, 3, 3, 3, 3, 2, 3, 2]
+    },
+    "totals": {
+      "outcomeRuinCount": 0,
+      "outcomeAllDeadCount": 2,
+      "outcomeHorizonExhaustedCount": 6
+    },
+    "outcomeInventory": {
+      "schemaVersion": "MonteCarloOutcomeInventoryV1",
+      "requestedRuns": 8,
+      "ruin": 0,
+      "all_dead": 2,
+      "horizon_exhausted": 6,
+      "technical_error": 0,
+      "inventorySum": 8,
+      "floorCoveredCount": 8,
+      "floorCoveragePct": 100,
+      "floorCoverageMissingnessReason": null
+    }
+  }
+}

@@ -185,6 +185,9 @@ function makeChunk(start, selectedRows) {
         });
 
         totals.failCount += row.outcomeCode === MONTE_CARLO_OUTCOME_CODE.RUIN ? 1 : 0;
+        totals.outcomeRuinCount += row.outcomeCode === MONTE_CARLO_OUTCOME_CODE.RUIN ? 1 : 0;
+        totals.outcomeAllDeadCount += row.outcomeCode === MONTE_CARLO_OUTCOME_CODE.ALL_DEAD ? 1 : 0;
+        totals.outcomeHorizonExhaustedCount += row.outcomeCode === MONTE_CARLO_OUTCOME_CODE.HORIZON_EXHAUSTED ? 1 : 0;
         totals.pflegeTriggeredCount += row.care ? 1 : 0;
         totals.p1TriggeredCount += Number.isFinite(row.p1EntryAge) ? 1 : 0;
         totals.p2TriggeredCount += Number.isFinite(row.p2EntryAge) ? 1 : 0;

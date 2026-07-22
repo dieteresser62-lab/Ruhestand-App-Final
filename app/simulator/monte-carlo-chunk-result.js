@@ -7,6 +7,7 @@ import {
 } from './monte-carlo-runner-utils.js';
 
 export const MONTE_CARLO_CHUNK_RESULT_VERSION = 'MonteCarloChunkResultV1';
+export const MONTE_CARLO_OUTCOME_INVENTORY_VERSION = 'MonteCarloOutcomeInventoryV1';
 
 export const MONTE_CARLO_OUTCOME_CODE = Object.freeze({
     UNSET: 0,
@@ -15,6 +16,81 @@ export const MONTE_CARLO_OUTCOME_CODE = Object.freeze({
     HORIZON_EXHAUSTED: 3,
     TECHNICAL_ERROR: 4
 });
+
+const MONTE_CARLO_OUTCOME_NAME_BY_CODE = Object.freeze({
+    [MONTE_CARLO_OUTCOME_CODE.RUIN]: 'ruin',
+    [MONTE_CARLO_OUTCOME_CODE.ALL_DEAD]: 'all_dead',
+    [MONTE_CARLO_OUTCOME_CODE.HORIZON_EXHAUSTED]: 'horizon_exhausted',
+    [MONTE_CARLO_OUTCOME_CODE.TECHNICAL_ERROR]: 'technical_error'
+});
+
+export function resolveMonteCarloTerminalOutcomeV1({
+    technicalError = false,
+    ruinInStartedFinancialYear = false,
+    allDeadTiming = null,
+    horizonExhausted = false
+} = {}) {
+    const allowedDeathTimings = new Set([null, 'before_next_financial_obligation', 'after_ruin']);
+    const flagsAreBoolean = [technicalError, ruinInStartedFinancialYear, horizonExhausted]
+        .every(value => typeof value === 'boolean');
+    if (!flagsAreBoolean || !allowedDeathTimings.has(allDeadTiming)) {
+        return { outcomeCode: MONTE_CARLO_OUTCOME_CODE.TECHNICAL_ERROR, errorCode: 'MC_TERMINAL_FLAGS_INVALID' };
+    }
+    if (technicalError) {
+        return { outcomeCode: MONTE_CARLO_OUTCOME_CODE.TECHNICAL_ERROR, errorCode: null };
+    }
+    if (ruinInStartedFinancialYear) {
+        if (allDeadTiming === 'before_next_financial_obligation' || horizonExhausted) {
+            return { outcomeCode: MONTE_CARLO_OUTCOME_CODE.TECHNICAL_ERROR, errorCode: 'MC_TERMINAL_FLAGS_CONFLICT' };
+        }
+        return { outcomeCode: MONTE_CARLO_OUTCOME_CODE.RUIN, errorCode: null };
+    }
+    if (allDeadTiming !== null) {
+        if (allDeadTiming === 'after_ruin' || horizonExhausted) {
+            return { outcomeCode: MONTE_CARLO_OUTCOME_CODE.TECHNICAL_ERROR, errorCode: 'MC_TERMINAL_FLAGS_CONFLICT' };
+        }
+        return { outcomeCode: MONTE_CARLO_OUTCOME_CODE.ALL_DEAD, errorCode: null };
+    }
+    if (horizonExhausted) {
+        return { outcomeCode: MONTE_CARLO_OUTCOME_CODE.HORIZON_EXHAUSTED, errorCode: null };
+    }
+    return { outcomeCode: MONTE_CARLO_OUTCOME_CODE.TECHNICAL_ERROR, errorCode: 'MC_TERMINAL_OUTCOME_INCOMPLETE' };
+}
+
+export function buildMonteCarloOutcomeInventoryV1({
+    requestedRuns,
+    ruin = 0,
+    all_dead = 0,
+    horizon_exhausted = 0,
+    technical_error = 0
+} = {}) {
+    const counts = { ruin, all_dead, horizon_exhausted, technical_error };
+    assertNonNegativeInteger(requestedRuns, 'outcomeInventory.requestedRuns');
+    for (const [name, value] of Object.entries(counts)) {
+        assertNonNegativeInteger(value, `outcomeInventory.${name}`);
+    }
+    const inventorySum = Object.values(counts).reduce((total, value) => total + value, 0);
+    if (inventorySum !== requestedRuns) {
+        throw contractError(`Outcome inventory sum ${inventorySum} does not match requestedRuns ${requestedRuns}.`);
+    }
+    const floorCoveredCount = all_dead + horizon_exhausted;
+    const hasTechnicalError = technical_error > 0;
+    return {
+        schemaVersion: MONTE_CARLO_OUTCOME_INVENTORY_VERSION,
+        requestedRuns,
+        ...counts,
+        inventorySum,
+        floorCoveredCount,
+        floorCoveragePct: !hasTechnicalError && requestedRuns > 0
+            ? (floorCoveredCount / requestedRuns) * 100
+            : null,
+        floorCoverageMissingnessReason: hasTechnicalError
+            ? 'technical_error_in_batch'
+            : requestedRuns === 0
+                ? 'no_requested_runs'
+                : null
+    };
+}
 
 export const MONTE_CARLO_MISSINGNESS_CODE = Object.freeze({
     UNSET: 0,
@@ -27,7 +103,7 @@ export const MONTE_CARLO_MISSINGNESS_CODE = Object.freeze({
 export const MONTE_CARLO_BUFFER_FIELDS = Object.freeze({
     finalOutcomes: Float64Array,
     taxOutcomes: Float64Array,
-    kpiLebensdauer: Uint8Array,
+    kpiLebensdauer: Uint32Array,
     kpiKuerzungsjahre: Float32Array,
     cutYearShareRatio: Float32Array,
     cutYearShareMissingness: Uint8Array,
@@ -35,7 +111,8 @@ export const MONTE_CARLO_BUFFER_FIELDS = Object.freeze({
     volatilities: Float32Array,
     maxDrawdowns: Float32Array,
     depotErschoepft: Uint8Array,
-    alterBeiErschoepfung: Uint8Array,
+    alterBeiErschoepfung: Uint32Array,
+    alterBeiErschoepfungMissingness: Uint8Array,
     anteilJahreOhneFlex: Float32Array,
     stress_maxDrawdowns: Float32Array,
     stress_timeQuoteAbove45: Float32Array,
@@ -46,6 +123,9 @@ export const MONTE_CARLO_BUFFER_FIELDS = Object.freeze({
 
 export const MONTE_CARLO_COUNTER_FIELDS = Object.freeze([
     'failCount',
+    'outcomeRuinCount',
+    'outcomeAllDeadCount',
+    'outcomeHorizonExhaustedCount',
     'pflegeTriggeredCount',
     'p1TriggeredCount',
     'p2TriggeredCount',
@@ -508,6 +588,12 @@ export function assertMonteCarloChunkResultV1(result, {
     assertDiagnostics(result, count);
 
     let technicalPaths = 0;
+    const outcomeCounts = {
+        ruin: 0,
+        all_dead: 0,
+        horizon_exhausted: 0,
+        technical_error: 0
+    };
     let observedHouseholdCarePaths = 0;
     let observedP1CarePaths = 0;
     let observedP2CarePaths = 0;
@@ -524,6 +610,7 @@ export function assertMonteCarloChunkResultV1(result, {
         if (!validOutcomeCodes.has(outcomeCode)) {
             throw contractError(`pathSummaries.outcomeCode[${localIndex}] is not registered.`);
         }
+        outcomeCounts[MONTE_CARLO_OUTCOME_NAME_BY_CODE[outcomeCode]]++;
         for (const [field, values] of Object.entries(result.pathMissingness)) {
             if (!validMissingnessCodes.has(values[localIndex])) {
                 throw contractError(`pathMissingness.${field}[${localIndex}] is not registered.`);
@@ -622,6 +709,18 @@ export function assertMonteCarloChunkResultV1(result, {
     if (technicalPaths !== result.technicalInventory.technicalError) {
         throw contractError('Path outcome codes and technical inventory disagree.');
     }
+    if (outcomeCounts.ruin !== result.totals.outcomeRuinCount
+        || outcomeCounts.all_dead !== result.totals.outcomeAllDeadCount
+        || outcomeCounts.horizon_exhausted !== result.totals.outcomeHorizonExhaustedCount) {
+        throw contractError('Path outcome codes and financial outcome counters disagree.');
+    }
+    if (result.totals.failCount !== result.totals.outcomeRuinCount) {
+        throw contractError('failCount and outcomeRuinCount must describe the same financial paths.');
+    }
+    buildMonteCarloOutcomeInventoryV1({
+        requestedRuns: count,
+        ...outcomeCounts
+    });
     if (observedHouseholdCarePaths !== result.totals.pflegeTriggeredCount
         || observedP1CarePaths !== result.totals.p1TriggeredCount
         || observedP2CarePaths !== result.totals.p2TriggeredCount) {

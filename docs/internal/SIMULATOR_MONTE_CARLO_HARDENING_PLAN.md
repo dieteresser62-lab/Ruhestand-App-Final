@@ -1,11 +1,11 @@
 # Simulator / Monte Carlo: Hardening-Arbeitsplan
 
 **Stand:** 2026-07-22
-**Status:** implementierungsreif; Slices 01-03 freigegeben, Slice 04 implementiert und im Review
+**Status:** implementierungsreif; Slices 01-04 freigegeben, Slice 05 implementiert und im Review
 **Autor:** Codex als Implementer und Plan-Autor  
 **Feature-Branch:** `codex/simulator-monte-carlo-gap-plan`  
 **GitHub-Status:** nur lokal; Veroeffentlichung ausstehend und nur nach Nutzerfreigabe  
-**Reviewstand:** Plan und Slices 01-03 freigegeben; Slice 04 wartet auf Gemini- und Nutzerreview
+**Reviewstand:** Plan und Slices 01-04 freigegeben; Slice 05 wartet auf Gemini- und Nutzerreview
 **Ausgangsanalyse:** [SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md](./SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md)
 
 ## 1. Ziel und Rollenabgrenzung
@@ -201,7 +201,7 @@ Semantikaenderungen sind unzulaessig.
 | [02](./SLICE_SIMULATOR_MONTE_CARLO_02_CHUNK_RESULT_CONTRACT.md) | zentraler Chunk-/Path-Summary-Vertrag | MC-10, MC-19 | 01, D-10, D-11 | abgeschlossen und freigegeben |
 | [03](./SLICE_SIMULATOR_MONTE_CARLO_03_RISIKO_KPI_SEMANTIK.md) | Volatilitaet und Kuerzungsanteil | MC-01, MC-02 | 02, D-03 | abgeschlossen und freigegeben |
 | [04](./SLICE_SIMULATOR_MONTE_CARLO_04_PFLEGE_KPI_SEMANTIK.md) | Pflegeeintritt, -dauer und -kosten | MC-03, MC-04 | 02, D-04 | abgeschlossen und freigegeben |
-| [05](./SLICE_SIMULATOR_MONTE_CARLO_05_OUTCOME_HORIZONT_CONTRACT.md) | terminale Outcomes, Horizont, Alter | MC-05, MC-07 | 02, D-01, D-02 | geplant |
+| [05](./SLICE_SIMULATOR_MONTE_CARLO_05_OUTCOME_HORIZONT_CONTRACT.md) | terminale Outcomes, Horizont, Alter | MC-05, MC-07 | 02, D-01, D-02 | abgeschlossen und freigegeben |
 | [06](./SLICE_SIMULATOR_MONTE_CARLO_06_SAMPLING_PRAEZEDENZ_DIAGNOSTIK.md) | Samplingvertrag und Ziehungsdiagnostik | MC-06 | 02, D-05 | geplant |
 | [07](./SLICE_SIMULATOR_MONTE_CARLO_07_SCHAETZER_UNSICHERHEIT_CAR.md) | Konfidenz und reale Depotentnahme P10 | MC-08, MC-09 | 03, 05, D-06 | geplant |
 | [08](./SLICE_SIMULATOR_MONTE_CARLO_08_RUNRESULT_EXPORT_PROVENIENZ.md) | versionierter Run-/Exportvertrag | MC-11 | 04-07 | geplant |
@@ -561,7 +561,7 @@ alte Erfolgsquotenterminologie verwendet.
 - Planreview Claude: Erstreview blockiert; Revision 1 wartet auf Re-Review.
 - Nutzerfreigabe: erteilt am 2026-07-22.
 - Status `implementierungsreif`: erteilt (für Gemini-Freigabepfad & Nutzer).
-- Implementierungsstand: Slices 01-03 abgeschlossen und freigegeben; Slice 04
+- Implementierungsstand: Slices 01-04 abgeschlossen und freigegeben; Slice 05
   auf Nutzerauftrag vom 2026-07-22 implementiert und im Review.
 
 ## 14. Rueckdokumentation Slice 01
@@ -674,4 +674,40 @@ alte Erfolgsquotenterminologie verwendet.
 - `npm test`: 6371/6372 Assertions gruen. Einzige Abweichung bleibt der bereits
   dokumentierte fremde Architektur-Linkfehler mit sechs toten Links; alle
   uebrigen 121 Testdateien sind gruen. Keine neue Snapshot-, Backtest-, Worker-
+  oder FlowDelta-Abweichung.
+
+## 18. Rueckdokumentation Slice 05
+
+- Implementierungsstatus: abgeschlossen; Gemini-/Nutzerreview des Slice steht
+  aus. Codex erteilt keine eigene Freigabe und erstellt keinen Commit.
+- `MonteCarloOutcomeInventoryV1` zaehlt jeden angeforderten Run genau einmal
+  als `ruin`, `all_dead`, `horizon_exhausted` oder `technical_error`. Der
+  Chunkvertrag gleicht diese Codes gegen die finanziellen Outcome-Zaehler,
+  `failCount` und die technische Missingness ab.
+- Die terminale Zustandsmaschine bildet die beschlossene Jahreschronologie ab:
+  technischer Fehler invalidiert, Ruin im begonnenen Finanzjahr bleibt vor
+  spaeterem Tod Ruin, Tod vor der naechsten Verpflichtung ist `all_dead`, und
+  nur lebende Restpfade werden am letzten Planjahr `horizon_exhausted`.
+  Widerspruechliche Adapterflags liefern den stabilen Contractfehler
+  `MC_TERMINAL_FLAGS_CONFLICT`.
+- Die Headline heisst nun „Floor-Deckung im gewaehlten Horizont“. Ihr Zaehler
+  ist `all_dead + horizon_exhausted`, ihr Nenner `requestedRuns`. Sobald ein
+  technischer Fehler vorliegt, ist die Quote `null`; das Outcome-Inventar
+  bleibt in Ergebnisdaten und sichtbarer Fehlerdiagnose erhalten.
+- `kpiLebensdauer` und `alterBeiErschoepfung` verwenden `Uint32`. Das
+  Erschoepfungsalter besitzt eine separate Missingness statt des 255-Sentinels.
+  Horizon plus Startalter wird vor dem Lauf gegen den Zaehlerbereich validiert
+  und nie still geklemmt.
+- Monte Carlo, der Life-Event-Helfer und Sweep verwenden ausserhalb der
+  Mortalitaetstabelle identisch die fail-closed Todeswahrscheinlichkeit 1;
+  Alter 110 und Tod im letzten Planjahr sind als Golden Cases belegt.
+- `post-slice-05-v1.json` koexistiert mit allen frueheren Referenzen. Zwei
+  Delta-Ledger-Eintraege dokumentieren Outcome-/Headline-Semantik und
+  Buffer-/Mortalitaetsgrenzen. Der registrierte Bufferbedarf steigt planmaessig
+  von 68 auf 75 Byte pro Run.
+- Fokussierte Outcome-, Runner-, Chunk-, Results-, Mess-, Care-, Sweep-, echte
+  Worker- und Worker-Paritaetssuiten: 1479/1479 Assertions gruen.
+- `npm test`: 6494/6495 Assertions gruen. Einzige Abweichung bleibt der bereits
+  dokumentierte fremde Architektur-Linkfehler mit sechs toten Links; alle
+  uebrigen 122 Testdateien sind gruen. Keine neue Snapshot-, Backtest-, Worker-
   oder FlowDelta-Abweichung.

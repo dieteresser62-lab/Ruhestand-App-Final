@@ -20,7 +20,7 @@ export function createMonteCarloBuffers(runCount) {
     return {
         finalOutcomes: new Float64Array(runCount),
         taxOutcomes: new Float64Array(runCount),
-        kpiLebensdauer: new Uint8Array(runCount),
+        kpiLebensdauer: new Uint32Array(runCount),
         // Legacy count kept until the temporary V1 read alias is removed.
         kpiKuerzungsjahre: new Float32Array(runCount),
         cutYearShareRatio: new Float32Array(runCount),
@@ -29,7 +29,8 @@ export function createMonteCarloBuffers(runCount) {
         volatilities: new Float32Array(runCount),
         maxDrawdowns: new Float32Array(runCount),
         depotErschoepft: new Uint8Array(runCount),
-        alterBeiErschoepfung: new Uint8Array(runCount).fill(255),
+        alterBeiErschoepfung: new Uint32Array(runCount),
+        alterBeiErschoepfungMissingness: new Uint8Array(runCount),
         anteilJahreOhneFlex: new Float32Array(runCount),
         stress_maxDrawdowns: new Float32Array(runCount),
         stress_timeQuoteAbove45: new Float32Array(runCount),

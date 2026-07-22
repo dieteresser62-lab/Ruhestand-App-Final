@@ -8,6 +8,39 @@ import {
 import { MORTALITY_TABLE } from './simulator-data.js';
 import { computeMarriageYearsCompleted } from './simulator-sweep-utils.js';
 
+export const MAX_SIMULATOR_COUNTER_VALUE = 0xFFFFFFFF;
+
+export function resolveSimulatorMortalityProbability(gender, age) {
+    const normalizedAge = Number(age);
+    const table = MORTALITY_TABLE[gender];
+    if (!table || !Number.isSafeInteger(normalizedAge) || normalizedAge < 0) return 1;
+    const probability = Number(table[normalizedAge]);
+    if (!Number.isFinite(probability)) return 1;
+    return Math.min(1, Math.max(0, probability));
+}
+
+export function assertSimulatorHorizonAgeContract(inputs, maxDauer) {
+    const duration = Number(maxDauer);
+    if (!Number.isSafeInteger(duration) || duration < 1 || duration > MAX_SIMULATOR_COUNTER_VALUE) {
+        throw new RangeError(`Simulationsdauer muss eine ganze Zahl zwischen 1 und ${MAX_SIMULATOR_COUNTER_VALUE} sein.`);
+    }
+
+    const persons = [
+        ['P1', inputs?.startAlter],
+        ...(inputs?.partner?.aktiv === true ? [['P2', inputs.partner.startAlter]] : [])
+    ];
+    for (const [label, rawAge] of persons) {
+        const startAge = Number(rawAge);
+        if (!Number.isSafeInteger(startAge) || startAge < 0 || startAge > MAX_SIMULATOR_COUNTER_VALUE) {
+            throw new RangeError(`${label}-Startalter muss eine nichtnegative ganze Zahl sein.`);
+        }
+        if (startAge + duration - 1 > MAX_SIMULATOR_COUNTER_VALUE) {
+            throw new RangeError(`${label}-Alter am Horizont ueberschreitet den Simulator-Zaehlerbereich.`);
+        }
+    }
+    return { duration, maxAge: MAX_SIMULATOR_COUNTER_VALUE };
+}
+
 export function createMonteCarloLifeState(inputs, rand) {
     const careMetaP1 = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren, inputs.geschlecht);
     const partnerGenderFallback = inputs.geschlecht === 'm' ? 'w' : 'm';
@@ -73,7 +106,7 @@ export function updateMonteCarloLifeEventsForYear(
 
     if (lifeState.singleNoCareFastPath) {
         if (!isAccumulation && lifeState.p1Alive) {
-            const qx1 = MORTALITY_TABLE[inputs.geschlecht][ageP1] || 0.0005;
+            const qx1 = resolveSimulatorMortalityProbability(inputs.geschlecht, ageP1);
             if (rand() < qx1) {
                 lifeState.p1Alive = false;
             }
@@ -154,7 +187,7 @@ export function updateMonteCarloLifeEventsForYear(
     if (lifeState.p1ActiveThisYear && lifeState.p2ActiveThisYear) lifeState.bothCareYears++;
 
     if (!isAccumulation && lifeState.p1Alive) {
-        let qx1 = MORTALITY_TABLE[inputs.geschlecht][ageP1] || 0.0005;
+        let qx1 = resolveSimulatorMortalityProbability(inputs.geschlecht, ageP1);
         const careFactorP1 = computeCareMortalityMultiplier(careMetaP1, inputs);
         if (careFactorP1 > 1) {
             qx1 = Math.min(1.0, qx1 * careFactorP1);
@@ -166,7 +199,7 @@ export function updateMonteCarloLifeEventsForYear(
 
     if (!isAccumulation && lifeState.p2Alive && careMetaP2) {
         const p2Gender = inputs.partner?.geschlecht || (inputs.geschlecht === 'm' ? 'w' : 'm');
-        let qx2 = MORTALITY_TABLE[p2Gender][ageP2] || 0.0005;
+        let qx2 = resolveSimulatorMortalityProbability(p2Gender, ageP2);
         const careFactorP2 = computeCareMortalityMultiplier(careMetaP2, inputs);
         if (careFactorP2 > 1) {
             qx2 = Math.min(1.0, qx2 * careFactorP2);

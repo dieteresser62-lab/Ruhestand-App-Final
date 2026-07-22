@@ -37,6 +37,7 @@ const deltaLedger = readFixture('delta-ledger-v1.json');
 const preHardening = readFixture('pre-hardening-v1.json');
 const postSlice03 = readFixture('post-slice-03-v1.json');
 const postSlice04 = readFixture('post-slice-04-v1.json');
+const postSlice05 = readFixture('post-slice-05-v1.json');
 const benchmarkContract = readFixture('benchmark-contract-v1.json');
 const benchmarkResults = readFixture('benchmark-results-2026-07-22.json');
 const consumerInventory = readFixture('consumer-inventory-v1.json');
@@ -325,6 +326,32 @@ function riskKpiSnapshotProjection(result) {
             volatilities: result.aggregates.volatilities,
             maxDrawdowns: result.aggregates.maxDrawdowns
         }
+    });
+}
+
+function outcomeHorizonSnapshotProjection(result) {
+    const bufferBytes = Object.values(result.buffers).reduce((sum, buffer) => sum + buffer.byteLength, 0);
+    return canonicalize({
+        bufferBytes,
+        bufferBytesPerRun: bufferBytes / result.totalRuns,
+        bufferTypes: {
+            kpiLebensdauer: result.buffers.kpiLebensdauer.constructor.name,
+            alterBeiErschoepfung: result.buffers.alterBeiErschoepfung.constructor.name,
+            alterBeiErschoepfungMissingness: result.buffers.alterBeiErschoepfungMissingness.constructor.name,
+            outcomeCode: result.pathSummaries.outcomeCode.constructor.name
+        },
+        buffers: {
+            kpiLebensdauer: result.buffers.kpiLebensdauer,
+            alterBeiErschoepfung: result.buffers.alterBeiErschoepfung,
+            alterBeiErschoepfungMissingness: result.buffers.alterBeiErschoepfungMissingness,
+            outcomeCode: result.pathSummaries.outcomeCode
+        },
+        totals: {
+            outcomeRuinCount: result.totals.outcomeRuinCount,
+            outcomeAllDeadCount: result.totals.outcomeAllDeadCount,
+            outcomeHorizonExhaustedCount: result.totals.outcomeHorizonExhaustedCount
+        },
+        outcomeInventory: result.aggregates.outcomeInventory
     });
 }
 
@@ -746,6 +773,17 @@ function computeKpiDelta(low, high) {
     assertEqual(postSlice04.sourceReference, 'post-slice-03-v1', 'Post-Slice-04 snapshot must reference the prior slice snapshot');
     assertEqual(postSlice04.reviewStatus, 'pending', 'Codex must not mark its own Post-Slice-04 snapshot as reviewed');
     assertJsonEqual(careKpiSnapshotProjection(), postSlice04.result, 'Post-Slice-04 care snapshot must match the deterministic golden aggregate');
+    const slice05Entries = deltaLedger.entries.filter(entry => entry.sliceId === '05');
+    assert(slice05Entries.length >= 2, 'Slice 05 must ledger outcome semantics and buffer/mortality bounds separately');
+    for (const entry of slice05Entries) {
+        for (const field of deltaLedger.requiredEntryFields) {
+            assert(Object.prototype.hasOwnProperty.call(entry, field), `Slice 05 delta entry must contain ${field}`);
+        }
+        assertEqual(entry.sourceReference, 'post-slice-04-v1', 'Slice 05 deltas must retain the prior accepted slice reference');
+        assertEqual(entry.targetReference, 'post-slice-05-v1', 'Slice 05 deltas must target the separate post-slice snapshot');
+    }
+    assertEqual(postSlice05.sourceReference, 'post-slice-04-v1', 'Post-Slice-05 snapshot must reference the prior slice snapshot');
+    assertEqual(postSlice05.reviewStatus, 'pending', 'Codex must not mark its own Post-Slice-05 snapshot as reviewed');
 }
 
 // Contract 8: every planned rename has producers, consumers, tests and a migration note.
@@ -769,6 +807,7 @@ function computeKpiDelta(low, high) {
     assertEqual(resources.runs.hardMaximum, 1000000, 'Hard run maximum must be 1000000');
     assertEqual(resources.runs.silentClampingAllowed, false, 'Run values must not be silently clamped');
     assertEqual(resources.durationYears.mortalityTableMaximumAge, 110, 'Duration bound must reference the mortality-table maximum');
+    assertEqual(resources.durationYears.storageMaximum, 4294967295, 'Duration storage bound must match the Uint32 contract');
     assertEqual(Math.min(resources.durationYears.storageMaximum, resources.durationYears.mortalityTableMaximumAge - 65 + 1), 46, 'Duration formula must be reproducible for age 65');
     assertEqual(resources.blockLengthYears.configuredMaximum, 30, 'Block length maximum must be fixed');
     assertEqual(resources.workerCount.benchmarkValue, 8, 'Benchmark worker count must be fixed at 8');
@@ -794,6 +833,11 @@ if (process.env.MC_PRINT_SLICE_03 === '1') {
     console.log(JSON.stringify({ dataVersion: actualDataVersion, result: riskKpiSnapshotProjection(fixedWorkerResult) }, null, 2));
     console.log('__POST_SLICE_03_CAPTURE_END__');
 }
+if (process.env.MC_PRINT_SLICE_05 === '1') {
+    console.log('__POST_SLICE_05_CAPTURE_START__');
+    console.log(JSON.stringify({ dataVersion: actualDataVersion, result: outcomeHorizonSnapshotProjection(fixedWorkerResult) }, null, 2));
+    console.log('__POST_SLICE_05_CAPTURE_END__');
+}
 assertJsonEqual(actualDataVersion, postSlice03.metadata.dataVersion, 'Post-Slice-03 data version must match');
 assert(preHardening.result !== null, 'Immutable pre-hardening result must remain captured');
 assertEqual(preHardening.result.bufferBytesPerRun, 63, 'Immutable pre-hardening buffer evidence must remain unchanged');
@@ -801,12 +845,30 @@ assertJsonEqual(preHardening.result.buffers.volatilities, preHardening.result.bu
 const sameRuntime = process.version === postSlice03.metadata.runtime.version
     && process.platform === postSlice03.metadata.runtime.platform
     && process.arch === postSlice03.metadata.runtime.architecture;
+const {
+    bufferBytes: _postSlice03BufferBytes,
+    bufferBytesPerRun: _postSlice03BufferBytesPerRun,
+    ...postSlice03RiskSemantics
+} = postSlice03.result;
+const {
+    bufferBytes: _currentBufferBytes,
+    bufferBytesPerRun: _currentBufferBytesPerRun,
+    ...currentRiskSemantics
+} = riskKpiSnapshotProjection(fixedWorkerResult);
 compareSnapshotNode(
-    riskKpiSnapshotProjection(fixedWorkerResult),
-    postSlice03.result,
+    currentRiskSemantics,
+    postSlice03RiskSemantics,
     'result',
     sameRuntime,
     postSlice03.metadata.numericTolerance
+);
+assertJsonEqual(actualDataVersion, postSlice05.metadata.dataVersion, 'Post-Slice-05 data version must match');
+compareSnapshotNode(
+    outcomeHorizonSnapshotProjection(fixedWorkerResult),
+    postSlice05.result,
+    'result',
+    sameRuntime,
+    postSlice05.metadata.numericTolerance
 );
 
 const directChunk = await runMonteCarloChunk({

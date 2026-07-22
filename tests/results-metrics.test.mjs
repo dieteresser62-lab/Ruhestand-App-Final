@@ -1,6 +1,25 @@
-import { buildCareMetrics, buildKpiDashboard } from '../app/simulator/results-metrics.js';
+import { buildCareMetrics, buildKpiDashboard, buildSummaryData } from '../app/simulator/results-metrics.js';
 
 console.log('--- Results Metrics UI Contract Tests ---');
+
+const outcomeSummary = buildSummaryData({
+    results: {
+        outcomeInventory: {
+            schemaVersion: 'MonteCarloOutcomeInventoryV1',
+            requestedRuns: 4,
+            ruin: 1,
+            all_dead: 1,
+            horizon_exhausted: 1,
+            technical_error: 1,
+            floorCoveragePct: null
+        }
+    },
+    totalRuns: 4,
+    failCount: 1
+});
+assertEqual(outcomeSummary[0].title, 'Floor-Deckung im gewählten Horizont', 'Summary should use the reviewed floor-coverage label');
+assertEqual(outcomeSummary[0].value, '—', 'Technical path should suppress floor coverage in the UI');
+assert(outcomeSummary[1].value.includes('Ruin 1') && outcomeSummary[1].value.includes('Technik 1'), 'Summary should keep the terminal outcome inventory visible');
 
 const dashboard = buildKpiDashboard({
     depotErschoepfungsQuote: 12.34,

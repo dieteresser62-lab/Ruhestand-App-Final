@@ -1039,13 +1039,13 @@ Die Ansparphase ist ein eigener Vor-Ruhestandsmodus: vor der Transition werden S
 
 Ergebnisse sind bewusst mehrschichtig:
 
-- KPI-Karten zeigen robuste Zusammenfassungen wie Erfolgsquote, Perzentile, Kürzungsjahre, Depoterschöpfung, Steuerersparnis aus Verlusttopf und Pflegekennzahlen.
+- KPI-Karten zeigen robuste Zusammenfassungen wie Floor-Deckung im gewählten Horizont, terminale Outcomes, Perzentile, Kürzungsjahre, Depoterschöpfung, Steuerersparnis aus Verlusttopf und Pflegekennzahlen.
 - Szenario-Logs zeigen ausgewählte Runs: Worst, Perzentile, Pflegefälle, lange Lebensdauer, hohe Kürzung und Zufallssamples.
 - Backtest-Logs zeigen den deterministischen historischen Jahrespfad.
 - Sweep- und Optimizer-Ausgaben zeigen Parameterwirkung, Heatmaps, Sensitivität, Pareto-Frontier und Champion-Parameter.
 - Detailmodus ergänzt technische Spalten zu Entnahme/Payout/VPW/Liquidität/Bonds, ohne die Normalansicht zu verändern.
 
-Diese Trennung ist fachlich wichtig: Der Simulator soll nicht nur eine Erfolgsquote liefern, sondern erklären, welche Pfade scheitern, wodurch Kürzungen entstehen und welche Parameter die Robustheit wirklich treiben.
+Diese Trennung ist fachlich wichtig: Der Simulator soll nicht nur eine Floor-Deckungsquote liefern, sondern über das disjunkte Outcome-Inventar erklären, welche Pfade scheitern oder durch Tod beziehungsweise Horizontende abgeschlossen werden, wodurch Kürzungen entstehen und welche Parameter die Robustheit wirklich treiben.
 
 ---
 
@@ -1994,20 +1994,24 @@ export function makeRunSeed(baseSeed, comboIdx, runIdx) {
 }
 ```
 
-### C.3.5 Erfolg, Ruin und Ergebnisgrenzen
+### C.3.5 Floor-Deckung, terminale Outcomes und Ergebnisgrenzen
 
-Die Monte-Carlo-Erfolgsquote ist rein modellintern:
+Die Monte-Carlo-Headline ist rein modellintern:
 
 ```text
-Erfolgsquote = (Anzahl Läufe − failCount) / Anzahl Läufe
+Floor-Deckung im gewählten Horizont =
+  (all_dead + horizon_exhausted) / requestedRuns
 ```
 
-`failCount` steigt bei `isRuin`; ein Engine-Validierungsfehler wird im direkten
-Simulatorpfad ebenfalls als fehlgeschlagener Lauf behandelt. Endet der Lauf,
-weil alle modellierten Personen verstorben sind, ist er ohne vorherigen Ruin
-erfolgreich. Die Quote misst daher die Floor-Deckung unter den gewählten
-Parametern und gezogenen Pfaden, nicht die Wahrscheinlichkeit einer Garantie
-in der realen Welt.
+Die Formel gilt nur fuer einen Batch ohne `technical_error`; andernfalls ist
+die Quote `null`. Jeder angeforderte Run steht genau einmal im disjunkten
+`MonteCarloOutcomeInventoryV1` als `ruin`, `all_dead`, `horizon_exhausted` oder
+`technical_error`. Ein Ruin im begonnenen Finanzjahr bleibt Ruin, Tod vor der
+naechsten finanziellen Verpflichtung ist `all_dead`, und ein am Horizont noch
+lebender Run ist als `horizon_exhausted` zensiert. Die Quote misst daher nur
+die Floor-Deckung unter den gewählten Parametern und innerhalb des gewaehlten
+Horizonts, nicht die Wahrscheinlichkeit einer Garantie oder eines vollstaendig
+beobachteten Lebenszeitpfads in der realen Welt.
 
 Die gleich benannte Optimierungsmetrik besitzt zwei Darstellungsgrenzen:
 Sweep-Ergebnisse führen `successProbFloor` als Prozentwert von 0 bis 100,
@@ -2029,7 +2033,7 @@ Weitere Ergebnisgrößen haben bewusst engere Basen:
   Consumption-at-Risk beziehen sich damit auf die Kaufkraft des ersten
   Simulatorjahres; sie bleiben dennoch modellinterne Ergebnisgrößen.
 
-Erfolgsquote, Depoterschöpfung, Endvermögen, Kürzungsjahre, Pflegebucket und
+Floor-Deckung, Outcome-Inventar, Depoterschöpfung, Endvermögen, Kürzungsjahre, Pflegebucket und
 Drawdown müssen daher gemeinsam gelesen werden. Keine einzelne Kennzahl ist
 ein vollständiges Qualitätsurteil über einen Ruhestandsplan.
 
@@ -3280,7 +3284,8 @@ UI-Vertragsvalidierung behoben.
 
 | Ergebnisgröße | Berechnungsbasis | Zulässige Aussage | Nicht daraus ableiten |
 |---------------|-------------------|-------------------|----------------------|
-| **Erfolgsquote** | Anteil der Läufe ohne `isRuin`/Validierungsfehler bis Laufende | Robustheit der Floor-Deckung unter genau diesem Szenario | Garantie, vollständige Flex-Erfüllung oder empirische Eintrittswahrscheinlichkeit |
+| **Floor-Deckung im gewählten Horizont** | `all_dead + horizon_exhausted` über alle angeforderten Runs; bei `technical_error` fail-closed `null` | modellinterne Deckung des Floors innerhalb des gewählten Horizonts | Garantie, vollständiger Lebenszeitpfad, vollständige Flex-Erfüllung oder empirische Eintrittswahrscheinlichkeit |
+| **Terminale Outcomes** | disjunkte Zählung von `ruin`, `all_dead`, `horizon_exhausted`, `technical_error` | warum und mit welchem Zensierungsstatus Runs endeten | dass `horizon_exhausted` ein vollständig beobachteter Lebenszeitpfad sei |
 | **Ruin** | aktive Vermögensdeckung beziehungsweise Auszahlungs-Fallback für Netto-Floor | modellierter Floor-Deckungsbruch | rechtliche Insolvenz oder vollständige Vermögenslosigkeit |
 | **Endvermögen** | Aktien + Gold + freie Liquidität; fehlgeschlagene Läufe werden in Aggregaten mit 0 geführt | Verteilung des verbleibenden aktiven Vermögens | vollständiges Haushaltsvermögen einschließlich Pflegebucket und externer Assets |
 | **Depoterschöpfung** | Fehler/Ruin oder Aktien + Gold ≤ 100 € | enge Risiko-Teilmetrik für das simulierte Depot | dass keinerlei freie Liquidität oder Pflegebucket mehr existiert |
@@ -3293,7 +3298,7 @@ Für belastbare Nutzung gelten vier Regeln:
 
 1. Nominale und reale Werte sowie Prozent- und Verhältnis-Einheiten nicht
    mischen.
-2. Nie nur Erfolgsquote oder Median betrachten; Tail, Kürzungen, Drawdown,
+2. Nie nur Floor-Deckung oder Median betrachten; Outcome-Inventar, Tail, Kürzungen, Drawdown,
    Endvermögen, Depoterschöpfung und Pflegewirkung mitlesen.
 3. Ergebnisse über mehrere Seeds, Sampling-Methoden, Startjahrgrenzen und
    Stressannahmen vergleichen.
@@ -3978,17 +3983,20 @@ solche Ketten nicht. Die behauptete Wirkung muss bis zu allen betroffenen
 Ergebnissen und Runnerpfaden verfolgt werden, bevor eine Mechanismuszeile oder
 ein Risikostatus geändert wird.
 
-## E.5 Ergebnisinterpretation jenseits der Erfolgsquote
+## E.5 Ergebnisinterpretation jenseits der Floor-Deckungsquote
 
-Die Erfolgsquote zeigt nur, ob der implementierte binäre Floor-Deckungsbruch
-im Lauf ausblieb. Zwei Policies sind nur unter identischen Daten, Seeds,
-Horizonten, Haushaltsinputs, Kosten- und Steuerannahmen vergleichbar. Ein
-höherer Erfolgsanteil bei häufigeren Flex-Kürzungen ist ein Trade-off; höheres
+Die Floor-Deckungsquote zeigt nur, bei welchem Anteil der angeforderten Läufe
+im gewählten Horizont kein implementierter Floor-Deckungsbruch eintrat. Das
+terminale Outcome-Inventar trennt Ruin, Tod, Horizontende und technischen
+Fehler disjunkt; bei technischen Fehlern wird die Quote nicht ausgewiesen.
+Zwei Policies sind nur unter identischen Daten, Seeds, Horizonten,
+Haushaltsinputs, Kosten- und Steuerannahmen vergleichbar. Eine höhere
+Floor-Deckung bei häufigeren Flex-Kürzungen ist ein Trade-off; höheres
 Endvermögen kann aus zu niedriger Entnahme stammen.
 
 | Dimension | Heute zulässige Aussage | Offene Mess- oder Vertragsgrenze |
 | --- | --- | --- |
-| Floor-Verletzung | `failCount`, Erfolgsquote und `isRuin` beschreiben den implementierten Deckungsbruch. | Vollständige Verteilung von Höhe, Dauer und kumulierter realer Lücke fehlt. |
+| Floor-Verletzung | `failCount`, `isRuin`, die Floor-Deckungsquote im gewählten Horizont und das disjunkte Outcome-Inventar beschreiben den implementierten Deckungsbruch und den terminalen Laufstatus. | Vollständige Verteilung von Höhe, Dauer und kumulierter realer Lücke fehlt. |
 | Konsumkürzung | Kürzungsjahre, maximale Flex-Kürzung, Jahre ohne Flex und der auf das erste Simulatorjahr deflationierte Consumption-at-Risk zeigen modellierte Einschränkungen. | Individuelle Akzeptanz- oder Nutzengewichte und eine vollständige reale Konsumlückenverteilung fehlen. |
 | Stressdauer | Stress-Kürzungsjahre und `recoveryYears` gelten für das gewählte Preset. | Keine allgemeine Regime-Verweildauer oder vollständige Erholungsverteilung. |
 | Nachlass/Restvermögen | P10/P50/P90 und Median erfolgreicher Läufe beschreiben modelliertes aktives Endvermögen. | Kein Nachlassziel und keine vollständigen externen Assets, Immobilien-, Versicherungs- oder Pflegebucketwerte. |
