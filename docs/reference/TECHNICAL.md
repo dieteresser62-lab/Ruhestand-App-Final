@@ -275,7 +275,7 @@ Diese Grenze ist fachlich gewollt: Balance kennt derzeit keinen belastbaren aktu
 ### Wichtige Module
 
 * `app/simulator/simulator-main.js` – zentrale Steuerung, Parameter-Sweep-Logik, Self-Tests.
-* `app/simulator/simulator-monte-carlo.js` – UI-Koordinator für Monte-Carlo (liest Inputs, setzt Progress, orchestriert Runner/Analyzer) inkl. Worker-Orchestrierung und Erzeugung des versionierten Run-/Result-/Provenienzexports.
+* `app/simulator/simulator-monte-carlo.js` – UI-Koordinator für Monte-Carlo (liest Inputs, setzt Progress, orchestriert Runner/Analyzer) inkl. generationengebundenem Single-Flight-Start/-Abbruch, Worker-Orchestrierung und Erzeugung des versionierten Run-/Result-/Provenienzexports.
 * `app/simulator/mc-run-context.js` – DOM-freie Chunk-Kontext-Erzeugung fuer Monte-Carlo (RunRange, RNG-Modus, Buffers, Progress-Intervall, LogIndexSet und Sampling-Konfiguration).
 * `app/simulator/mc-year-sampling.js` – DOM-freier `MonteCarloSamplingContractV1` fuer Startjahr-/CAPE-Praezedenz, methodenspezifische Jahr-1-Regeln, FILTER-/RECENCY-CDF, Estimated-History-Filter sowie kompakte, merge-invariante `MonteCarloSamplingDiagnosticsV1`.
 * `app/simulator/mc-life-events.js` – DOM-freie Life-State-Initialisierung fuer Monte-Carlo (Care-Meta, Partnerstatus, Care-RNGs, Alive-Initialwerte, HouseholdContext) sowie gemeinsamer fail-closed Mortalitaets- und Horizon-/Altersgrenzvertrag; per-year Life-Events bleiben aus Performance-Gruenden im Runner-Hot-Path.
@@ -288,7 +288,7 @@ Diese Grenze ist fachlich gewollt: Balance kennt derzeit keinen belastbaren aktu
 * `app/simulator/monte-carlo-contracts.js` – DOM-freie, fail-closed Validatoren und Builder fuer `MonteCarloRunRequestV1` und `MonteCarloRunResultV1`, Replay-Projektion, Einheiten-/Missingnessvertrag, Snapshotpolicy und deprecated Alias-Telemetrie.
 * `app/simulator/monte-carlo-export.js` – DOM-freier `MonteCarloExportV1`-Serializer/Reader mit kanonischem SHA-256-Fingerprint, Request-/Run-ID, App-/Engineprovenienz, Forward-Policy und sicherem Downloadnamen.
 * `app/simulator/dynamic-flex-longevity-contract.js`, `dynamic-flex-longevity-horizon.js` und `dynamic-flex-runner-horizon.js` – DOM-freier Contract, Horizon-Adjustment und Runner-Resolver fuer konservativere Dynamic-Flex-Langlebigkeitsannahmen.
-* `app/simulator/monte-carlo-ui.js` – UI-Fassade für Progressbar, Parameter-Lesen und den ausschliesslich nutzergetriggerten V1-JSON-Download; erlaubt Callbacks ohne DOM-Leaks.
+* `app/simulator/monte-carlo-ui.js` – UI-Fassade für Progressbar, Start-/Cancelzustand, Parameter-Lesen und den ausschliesslich nutzergetriggerten V1-JSON-Download; erlaubt Callbacks ohne DOM-Leaks.
 * `app/simulator/scenario-analyzer.js` – waehlt waehrend der Simulation bis zu 31 Szenarien (Worst, Perzentile, getrennte P1-/P2-Pflegefaelle, Zufall) aus.
 
 * `app/simulator/simulator-engine-wrapper.js` – Facade für Engine-Aufrufe (verwendet `simulator-engine-direct.js`).
@@ -391,9 +391,10 @@ Dynamic-Flex ist entlang der Simulator-Pipeline konsistent aktiviert:
 
 Die Parallelisierung basiert auf Web-Workern und einer gemeinsamen Pool-Schicht:
 
-* `workers/worker-pool.js` verwaltet einen Pool fester Worker-Instanzen, verteilt Jobs und ersetzt defekte Worker.
-* `workers/mc-worker.js` hostet die DOM-freien Runner fuer Monte Carlo und Sweep (`monte-carlo-runner.js`, `sweep-runner.js`) und verarbeitet Job-Typen (`init`, `job`, `sweep-init`, `sweep`).
-* `simulator-monte-carlo.js` orchestriert die Worker-Jobs, führt Chunking (Zeitbudget) durch, aggregiert Ergebnisse und fällt bei Stalls auf seriell zurück.
+* `workers/worker-pool.js` verwaltet einen Pool fester Worker-Instanzen, verteilt generationengebundene Jobs und ersetzt defekte Worker. `cancelGeneration()` verwirft Queue und aktive Jobs, terminiert die zugehoerigen Worker und laesst die Slots bis zum naechsten expliziten Start leer; `dispose()` ist idempotent und weist offene Jobs kontrolliert ab.
+* `workers/mc-worker.js` hostet die DOM-freien Runner fuer Monte Carlo und Sweep (`monte-carlo-runner.js`, `sweep-runner.js`) und verarbeitet Job-Typen (`init`, `job`, `sweep-init`, `sweep`). Monte-Carlo-Antworten spiegeln `generationId`; der Szenariocache ist auf acht Eintraege begrenzt und wird bei einer geaenderten oder unpassenden `dataVersion` geleert beziehungsweise fail-closed abgewiesen.
+* `app/simulator/worker-job-runner.js` ist die gemeinsame adaptive Job-/Stall-Orchestrierung. Sein Watchdog bleibt die einzige Job-Level-Timeoutquelle; Abort und Fehler brechen genau die betroffene Generation ab, bevor der Aufrufer ueber Fallback oder Fehler entscheidet.
+* `simulator-monte-carlo.js` orchestriert die Worker-Jobs, führt Chunking (Zeitbudget) durch und aggregiert Ergebnisse. Worker-Stall/-Fehler darf genau einmal seriell fallbacken; ein Nutzerabbruch wird getrennt erkannt und startet keinen seriellen Lauf. Fortschritt und Resultat werden nur fuer die aktive Generation publiziert.
 * `simulator-sweep.js` verteilt Parameter-Kombinationen auf Worker-Chunks und aggregiert Sweep-Metriken (Fallback seriell).
 * `auto_optimize.js` bewertet Kandidaten in Promise-Batches; `auto-optimize-worker.js` nutzt denselben `workers/mc-worker.js`-Jobtyp `job` wie Monte Carlo, merged MC-Buffers/Heatmap/Totals/Listen selbst und faellt bei Worker-Fehlern auf seriell zurueck.
 

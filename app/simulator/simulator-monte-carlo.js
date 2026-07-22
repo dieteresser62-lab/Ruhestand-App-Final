@@ -17,7 +17,11 @@ import {
     finalizeMonteCarloChunkAccumulatorV1,
     mergeMonteCarloChunkResultV1
 } from './monte-carlo-chunk-result.js';
-import { WorkerJobRunner } from './worker-job-runner.js';
+import {
+    WorkerJobRunner,
+    WorkerRunCancelledError,
+    isWorkerRunCancelledError
+} from './worker-job-runner.js';
 import { featureFlags } from '../shared/feature-flags.js';
 import { WorkerPool } from '../../workers/worker-pool.js';
 import { formatSimulatorValidationError, validateSimulatorInputs } from './simulator-input-validation.js';
@@ -51,11 +55,14 @@ async function runMonteCarloLogsForIndices({
     widowOptions,
     monteCarloParams,
     useCapeSampling,
-    runIndices
+    runIndices,
+    generationId,
+    signal = null
 }) {
     const logsByIndex = new Map();
     if (!Array.isArray(runIndices) || runIndices.length === 0) return logsByIndex;
     for (const runIdx of runIndices) {
+        throwIfRunCancelled(signal, generationId);
         // Re-run a single index with logging enabled to get full log rows.
         const chunk = await runMonteCarloChunk({
             inputs,
@@ -84,9 +91,24 @@ export { mergeHeatmap, appendArray };
 
 let globalMonteCarloPool = null;
 let globalMonteCarloPoolSize = 0;
+let activeMonteCarloRun = null;
+let nextMonteCarloGeneration = 1;
+
+function createMonteCarloGenerationId() {
+    return `monte-carlo-${nextMonteCarloGeneration++}`;
+}
+
+function throwIfRunCancelled(signal, generationId) {
+    if (signal?.aborted) {
+        throw new WorkerRunCancelledError(generationId, signal.reason);
+    }
+}
 
 function getMonteCarloPool(workerCount) {
-    if (!globalMonteCarloPool || globalMonteCarloPoolSize !== workerCount) {
+    if (!globalMonteCarloPool
+        || globalMonteCarloPoolSize !== workerCount
+        || globalMonteCarloPool.disposed
+        || globalMonteCarloPool.poolDisabled) {
         if (globalMonteCarloPool) {
             globalMonteCarloPool.dispose();
         }
@@ -109,8 +131,11 @@ async function runMonteCarloWithWorkers({
     useCapeSampling,
     scenarioAnalyzer,
     onProgress,
-    workerConfig = null
+    workerConfig = null,
+    generationId,
+    signal = null
 }) {
+    throwIfRunCancelled(signal, generationId);
     const {
         anzahl,
         maxDauer,
@@ -128,6 +153,7 @@ async function runMonteCarloWithWorkers({
         ? desiredWorkers
         : Math.max(1, (navigator?.hardwareConcurrency || 2) - 1));
     const pool = getMonteCarloPool(workerCount);
+    pool.ensureCapacity();
     pool.onError = error => console.error('[MC WorkerPool] Error:', error);
 
     const { scenarioKey, compiledScenario } = compileScenario(inputs, widowOptions, methode, useCapeSampling, inputs.stressPreset);
@@ -169,29 +195,42 @@ async function runMonteCarloWithWorkers({
                 excludeEstimatedHistory
             },
             useCapeSampling,
-            logIndices
+            logIndices,
+            dataVersion
         }),
         mergeResult: (result, start, count) => {
             mergeMonteCarloChunkResultV1(chunkAccumulator, result, {
                 expectedStart: start,
                 expectedCount: count
             });
-        }
+        },
+        generationId,
+        signal
     });
 
+    const abortGeneration = () => {
+        void pool.cancelGeneration(
+            generationId,
+            new WorkerRunCancelledError(generationId, signal?.reason)
+        ).catch(error => console.error('[MC] Worker generation cancellation failed.', error));
+    };
+    signal?.addEventListener?.('abort', abortGeneration, { once: true });
     try {
         await pool.broadcast({
             type: 'init',
             scenarioKey,
             compiledScenario,
             dataVersion
-        });
+        }, [], { generationId });
 
+        throwIfRunCancelled(signal, generationId);
         await runner.run();
     } finally {
+        signal?.removeEventListener?.('abort', abortGeneration);
         // keep pool alive for reuse across runs
     }
 
+    throwIfRunCancelled(signal, generationId);
     const finalized = finalizeMonteCarloChunkAccumulatorV1(chunkAccumulator);
     if (scenarioAnalyzer) {
         for (const meta of finalized.runMeta) {
@@ -212,6 +251,7 @@ async function runMonteCarloWithWorkers({
 
     onProgress(95);
     await new Promise(resolve => setTimeout(resolve, 0));
+    throwIfRunCancelled(signal, generationId);
 
     const aggregatedResults = attachMonteCarloBatchOutcome(buildMonteCarloAggregates({
         inputs,
@@ -263,13 +303,57 @@ async function runMonteCarloWithWorkers({
  * @returns {Promise<void>} Promise, das nach Abschluss der Simulation aufgelöst wird
  * @throws {Error} Bei Validierungs- oder Berechnungsfehlern
  */
-export async function runMonteCarlo() {
+export function runMonteCarlo() {
+    if (activeMonteCarloRun) return activeMonteCarloRun.promise;
+
+    const runState = {
+        generationId: createMonteCarloGenerationId(),
+        controller: new AbortController(),
+        status: 'running',
+        ui: null,
+        promise: null,
+        cancelPromise: null
+    };
+    activeMonteCarloRun = runState;
+    runState.promise = executeMonteCarloRun(runState).finally(() => {
+        if (activeMonteCarloRun === runState) activeMonteCarloRun = null;
+    });
+    return runState.promise;
+}
+
+export function cancelMonteCarlo() {
+    const runState = activeMonteCarloRun;
+    if (!runState) return Promise.resolve(false);
+    if (runState.cancelPromise) return runState.cancelPromise;
+
+    runState.status = 'cancelling';
+    runState.ui?.beginCancelling?.();
+    runState.controller.abort(new WorkerRunCancelledError(runState.generationId));
+    runState.cancelPromise = runState.promise.then(
+        () => true,
+        () => true
+    );
+    return runState.cancelPromise;
+}
+
+async function executeMonteCarloRun(runState) {
+    const { generationId, controller } = runState;
+    const { signal } = controller;
     const ui = createMonteCarloUI();
+    runState.ui = ui;
+    ui.bindCancel?.(() => cancelMonteCarlo());
+    ui.beginRun?.();
     ui.disableStart();
     ui.hideError(); // Reset error state
     ui.clearRunExport();
+    const updateProgress = percent => {
+        if (!signal.aborted && activeMonteCarloRun === runState) {
+            ui.updateProgress(percent);
+        }
+    };
 
     try {
+        throwIfRunCancelled(signal, generationId);
         prepareHistoricalDataOnce();
         const inputs = validateSimulatorInputs(getCommonInputs());
         const widowOptions = normalizeWidowOptions(inputs.widowOptions);
@@ -299,7 +383,7 @@ export async function runMonteCarlo() {
         };
 
         ui.showProgress();
-        ui.updateProgress(0);
+        updateProgress(0);
         ui.hideCompareResults();
 
         const scenarioAnalyzer = new ScenarioAnalyzer(anzahl);
@@ -317,9 +401,10 @@ export async function runMonteCarlo() {
                 widowOptions,
                 monteCarloParams,
                 useCapeSampling,
-                onProgress: pct => ui.updateProgress(pct * 0.5),
+                onProgress: pct => updateProgress(pct * 0.5),
                 scenarioAnalyzer: null
             });
+            throwIfRunCancelled(signal, generationId);
             const serialElapsed = performance.now() - serialStart;
 
             if (!useWorkers) {
@@ -333,15 +418,18 @@ export async function runMonteCarlo() {
                         widowOptions,
                         monteCarloParams,
                         useCapeSampling,
-                        onProgress: pct => ui.updateProgress(50 + pct * 0.5),
+                        onProgress: pct => updateProgress(50 + pct * 0.5),
                         scenarioAnalyzer,
-                        workerConfig
+                        workerConfig,
+                        generationId,
+                        signal
                     });
                     usedWorkers = true;
                     const workerElapsed = performance.now() - workerStart;
                     const speedup = serialElapsed > 0 ? (serialElapsed / workerElapsed) : 0;
                     ui.showCompareResults(`Seriell: ${formatMs(serialElapsed)} · Worker: ${formatMs(workerElapsed)} · Speedup: ${formatSpeedup(speedup, 2)}`);
                 } catch (error) {
+                    if (isWorkerRunCancelledError(error) || signal.aborted) throw error;
                     console.error('[MC] Worker execution failed, falling back to serial.', error);
                     results = serialResults;
                     ui.showCompareResults(`Seriell: ${formatMs(serialElapsed)} · Worker fehlgeschlagen (Fallback auf seriell).`);
@@ -354,28 +442,33 @@ export async function runMonteCarlo() {
                     widowOptions,
                     monteCarloParams,
                     useCapeSampling,
-                    onProgress: pct => ui.updateProgress(pct),
+                    onProgress: pct => updateProgress(pct),
                     scenarioAnalyzer,
-                    workerConfig
+                    workerConfig,
+                    generationId,
+                    signal
                 });
                 usedWorkers = true;
             } catch (error) {
+                if (isWorkerRunCancelledError(error) || signal.aborted) throw error;
                 console.error('[MC] Worker execution failed, falling back to serial.', error);
                 results = null;
             }
         }
 
         if (!results) {
+            throwIfRunCancelled(signal, generationId);
             results = await runMonteCarloSimulation({
                 inputs,
                 widowOptions,
                 monteCarloParams,
                 useCapeSampling,
-                onProgress: pct => ui.updateProgress(pct),
+                onProgress: pct => updateProgress(pct),
                 scenarioAnalyzer
                 // engine parameter removed - wrapper selects correct engine based on feature flag mode
             });
         }
+        throwIfRunCancelled(signal, generationId);
 
         const {
             aggregatedResults,
@@ -443,9 +536,12 @@ export async function runMonteCarlo() {
                 inputs,
                 widowOptions,
                 monteCarloParams,
-                useCapeSampling,
-                runIndices: targetIndices
-            });
+            useCapeSampling,
+            runIndices: targetIndices,
+            generationId,
+            signal
+        });
+            throwIfRunCancelled(signal, generationId);
             scenarioAnalyzer.updateRunLogs(logsByIndex);
             if (logsByIndex.has(worstRun?.runIdx)) {
                 worstRun.logDataRows = logsByIndex.get(worstRun.runIdx);
@@ -456,12 +552,20 @@ export async function runMonteCarlo() {
         }
 
         const scenarioLogs = scenarioAnalyzer.buildScenarioLogs();
+        throwIfRunCancelled(signal, generationId);
         displayMonteCarloResults(aggregatedResults, anzahl, failCount, worstRun, {}, {}, pflegeTriggeredCount, inputs, worstRunCare, scenarioLogs);
     } catch (e) {
+        if (isWorkerRunCancelledError(e) || signal.aborted) {
+            runState.status = 'cancelled';
+            ui.showCancelled?.();
+            return;
+        }
         console.error("Monte-Carlo Simulation Failed:", e);
         ui.showError(formatSimulatorValidationError(e));
     } finally {
-        await ui.finishProgress();
+        await ui.finishProgress({ completed: runState.status !== 'cancelled' });
+        ui.unbindCancel?.();
+        ui.finishRun?.();
         ui.enableStart();
     }
 }

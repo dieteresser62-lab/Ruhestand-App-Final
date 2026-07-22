@@ -2,6 +2,27 @@
 
 import { WorkerTelemetry } from './worker-telemetry.js';
 
+const MAX_REMEMBERED_CANCELLED_GENERATIONS = 32;
+
+export class WorkerGenerationCancelledError extends Error {
+    constructor(generationId, reason = null) {
+        const reasonMessage = reason instanceof Error ? reason.message : String(reason || '').trim();
+        super(reasonMessage || `Worker generation ${String(generationId)} was cancelled.`);
+        this.name = 'AbortError';
+        this.code = 'WORKER_GENERATION_CANCELLED';
+        this.generationId = generationId;
+        if (reason instanceof Error && reason !== this) this.cause = reason;
+    }
+}
+
+export class WorkerPoolDisposedError extends Error {
+    constructor() {
+        super('WorkerPool has been disposed.');
+        this.name = 'WorkerPoolDisposedError';
+        this.code = 'WORKER_POOL_DISPOSED';
+    }
+}
+
 export class WorkerPool {
     constructor({ workerUrl, size = 1, type = 'module', onProgress = null, onError = null, telemetryName = 'default' } = {}) {
         if (!workerUrl) {
@@ -22,23 +43,37 @@ export class WorkerPool {
         this.workerIds = new Map();
         this.nextWorkerId = 1;
         this.workerReady = new WeakMap();
+        this.retiredWorkers = new WeakSet();
         this.poolDisabled = false;
         this.poolFailureReason = null;
+        this.disposed = false;
         this.consecutiveBootstrapFailures = 0;
         this.maxBootstrapFailures = Math.max(3, this.size * 2);
+        this.cancelledGenerations = new Set();
+        this.generationCancelPromises = new Map();
 
         this._initWorkers();
     }
 
     _initWorkers() {
-        for (let i = 0; i < this.size; i++) {
+        while (this.workers.length < this.size) {
             const worker = this._createWorker();
             this.workers.push(worker);
             this.idle.push(worker);
         }
-        if (this.telemetry && this.telemetry.enabled) {
-            this.telemetry.workerCount = this.size;
-        }
+        this._syncTelemetryWorkerCount();
+    }
+
+    _syncTelemetryWorkerCount() {
+        if (this.telemetry) this.telemetry.workerCount = this.workers.length;
+    }
+
+    ensureCapacity() {
+        if (this.disposed) throw new WorkerPoolDisposedError();
+        if (this.poolDisabled) throw this._getPoolDisabledError();
+        this._initWorkers();
+        this._drainQueue();
+        return this.workers.length;
     }
 
     _createWorker() {
@@ -49,6 +84,10 @@ export class WorkerPool {
         this.workerIds.set(worker, workerId);
         this.workerReady.set(worker, false);
         return worker;
+    }
+
+    _isLiveWorker(worker) {
+        return !this.retiredWorkers.has(worker) && this.workers.includes(worker);
     }
 
     _formatErrorMessage(error) {
@@ -86,30 +125,14 @@ export class WorkerPool {
         if (this.poolDisabled) return;
         this.poolDisabled = true;
         this.poolFailureReason = reason instanceof Error ? reason : new Error(String(reason));
-        const allJobIds = Array.from(this.jobs.keys());
-        for (const jobId of allJobIds) {
-            const job = this.jobs.get(jobId);
-            if (!job) continue;
-            this.jobs.delete(jobId);
-            if (this.telemetry) {
-                this.telemetry.recordJobFailed(jobId, 'pool-disabled', this.poolFailureReason);
-            }
-            job.reject(this.poolFailureReason);
-        }
-        while (this.queue.length > 0) {
-            const queued = this.queue.shift();
-            if (!queued) continue;
-            if (this.telemetry) {
-                this.telemetry.recordJobFailed(queued.jobId, 'pool-disabled', this.poolFailureReason);
-            }
-            queued.reject(this.poolFailureReason);
-        }
-        for (const worker of this.workers) {
-            worker.terminate();
+        this._rejectAllJobs(this.poolFailureReason, 'pool-disabled');
+        for (const worker of [...this.workers]) {
+            this._retireWorker(worker, this.poolFailureReason);
         }
         this.workers = [];
         this.idle = [];
         this.workerIds.clear();
+        this._syncTelemetryWorkerCount();
     }
 
     _getPoolDisabledError() {
@@ -123,23 +146,73 @@ export class WorkerPool {
         return this.workerIds.get(worker) || 'unknown';
     }
 
+    _recordJobFailure(jobId, workerId, error) {
+        this.telemetry?.recordJobFailed(jobId, workerId, error);
+    }
+
+    _rejectAllJobs(error, workerId = 'pool') {
+        for (const [jobId, job] of [...this.jobs.entries()]) {
+            this.jobs.delete(jobId);
+            this._recordJobFailure(jobId, workerId, error);
+            job.reject(error);
+        }
+        while (this.queue.length > 0) {
+            const job = this.queue.shift();
+            if (!job) continue;
+            this._recordJobFailure(job.jobId, workerId, error);
+            job.reject(error);
+        }
+    }
+
+    _rejectJobsForWorker(worker, error) {
+        const workerId = this._getWorkerId(worker);
+        for (const [jobId, job] of [...this.jobs.entries()]) {
+            if (job.worker !== worker) continue;
+            this.jobs.delete(jobId);
+            this._recordJobFailure(jobId, workerId, error);
+            job.reject(error);
+        }
+    }
+
+    _retireWorker(worker, error = null) {
+        if (!worker || this.retiredWorkers.has(worker)) return false;
+        this.retiredWorkers.add(worker);
+        if (error) this._rejectJobsForWorker(worker, error);
+        const index = this.workers.indexOf(worker);
+        if (index !== -1) this.workers.splice(index, 1);
+        this.idle = this.idle.filter(item => item !== worker);
+        this.workerIds.delete(worker);
+        worker.onmessage = null;
+        worker.onerror = null;
+        worker.terminate();
+        this._syncTelemetryWorkerCount();
+        return index !== -1;
+    }
+
+    _messageMatchesGeneration(job, message) {
+        if (job.generationId == null) return true;
+        return message?.generationId === job.generationId;
+    }
+
     _handleMessage(worker, message) {
-        if (!message || typeof message !== 'object') return;
+        if (!this._isLiveWorker(worker) || !message || typeof message !== 'object') return;
+        const jobId = message.jobId;
+        if (!jobId) return;
+
+        const job = this.jobs.get(jobId);
+        if (!job || job.worker !== worker) return;
+        if (!this._messageMatchesGeneration(job, message)) {
+            this._handleError(worker, new Error(
+                `Worker generation mismatch for job ${String(jobId)}: expected ${String(job.generationId)}, received ${String(message.generationId)}.`
+            ));
+            return;
+        }
+
         this.workerReady.set(worker, true);
         this.consecutiveBootstrapFailures = 0;
 
         if (message.type === 'progress') {
-            if (this.onProgress) this.onProgress(message);
-            return;
-        }
-
-        const jobId = message.jobId;
-        if (!jobId) {
-            return;
-        }
-
-        const job = this.jobs.get(jobId);
-        if (!job) {
+            this.onProgress?.(message);
             return;
         }
 
@@ -162,20 +235,17 @@ export class WorkerPool {
         if (message.type === 'error') {
             const err = new Error(message.message || 'Worker error');
             err.stack = message.stack || err.stack;
-            if (this.telemetry) {
-                this.telemetry.recordJobFailed(jobId, this._getWorkerId(worker), err);
-            }
+            this._recordJobFailure(jobId, this._getWorkerId(worker), err);
             job.reject(err);
             return;
         }
 
-        if (this.telemetry) {
-            this.telemetry.recordJobComplete(jobId, this._getWorkerId(worker), message.elapsedMs);
-        }
+        this.telemetry?.recordJobComplete(jobId, this._getWorkerId(worker), message.elapsedMs);
         job.resolve(message);
     }
 
     _handleError(worker, error) {
+        if (!this._isLiveWorker(worker)) return;
         const normalizedError = this._toError(error, worker);
         const isBootstrapFailure = this.workerReady.get(worker) !== true;
         if (isBootstrapFailure) {
@@ -183,25 +253,8 @@ export class WorkerPool {
         } else {
             this.consecutiveBootstrapFailures = 0;
         }
-        const workerId = this._getWorkerId(worker);
-        if (this.onError) this.onError(normalizedError);
-
-        for (const [jobId, job] of this.jobs.entries()) {
-            if (job.worker === worker) {
-                this.jobs.delete(jobId);
-                if (this.telemetry) {
-                    this.telemetry.recordJobFailed(jobId, workerId, normalizedError);
-                }
-                job.reject(normalizedError);
-            }
-        }
-        const index = this.workers.indexOf(worker);
-        if (index !== -1) {
-            worker.terminate();
-            this.idle = this.idle.filter(item => item !== worker);
-            this.workers.splice(index, 1);
-            this.workerIds.delete(worker);
-        }
+        this.onError?.(normalizedError);
+        this._retireWorker(worker, normalizedError);
 
         if (isBootstrapFailure && this.consecutiveBootstrapFailures >= this.maxBootstrapFailures) {
             const message = [
@@ -213,36 +266,39 @@ export class WorkerPool {
             this._disablePool(new Error(message));
             return;
         }
-        if (this.poolDisabled) {
-            return;
-        }
-        // Replace the worker to avoid reusing a potentially corrupted state.
+        if (this.poolDisabled || this.disposed) return;
+
+        // Runtime/bootstrap errors retain the historical immediate replacement policy.
+        // User cancellation uses cancelGeneration() and deliberately skips this path.
         const replacement = this._createWorker();
         this.workers.push(replacement);
         this.idle.push(replacement);
+        this._syncTelemetryWorkerCount();
         this._drainQueue();
     }
 
     _drainQueue() {
-        if (this.poolDisabled) {
-            const disabledError = this._getPoolDisabledError();
+        if (this.disposed || this.poolDisabled) {
+            const error = this.disposed ? new WorkerPoolDisposedError() : this._getPoolDisabledError();
             while (this.queue.length > 0) {
                 const job = this.queue.shift();
                 if (!job) continue;
-                if (this.telemetry) {
-                    this.telemetry.recordJobFailed(job.jobId, 'pool-disabled', disabledError);
-                }
-                job.reject(disabledError);
+                this._recordJobFailure(job.jobId, this.disposed ? 'pool-disposed' : 'pool-disabled', error);
+                job.reject(error);
             }
             return;
         }
         while (this.idle.length > 0 && this.queue.length > 0) {
             const worker = this.idle.pop();
             const job = this.queue.shift();
-            this.jobs.set(job.jobId, { ...job, worker });
-            if (this.telemetry) {
-                this.telemetry.recordJobStart(job.jobId, this._getWorkerId(worker), job.payload);
+            if (this.cancelledGenerations.has(job.generationId)) {
+                const error = new WorkerGenerationCancelledError(job.generationId);
+                this._recordJobFailure(job.jobId, 'cancelled', error);
+                job.reject(error);
+                continue;
             }
+            this.jobs.set(job.jobId, { ...job, worker });
+            this.telemetry?.recordJobStart(job.jobId, this._getWorkerId(worker), job.payload);
             try {
                 worker.postMessage(job.payload, job.transferables);
             } catch (postMessageError) {
@@ -251,69 +307,144 @@ export class WorkerPool {
         }
     }
 
-    runJob(payload, transferables = []) {
-        if (this.poolDisabled) {
-            return Promise.reject(this._getPoolDisabledError());
+    _resolveGeneration(payload, options) {
+        const generationId = options?.generationId ?? payload?.generationId ?? null;
+        return generationId == null ? null : generationId;
+    }
+
+    _assertCanSchedule(generationId) {
+        if (this.disposed) throw new WorkerPoolDisposedError();
+        if (this.poolDisabled) throw this._getPoolDisabledError();
+        if (generationId != null && this.cancelledGenerations.has(generationId)) {
+            throw new WorkerGenerationCancelledError(generationId);
+        }
+    }
+
+    runJob(payload, transferables = [], options = {}) {
+        const generationId = this._resolveGeneration(payload, options);
+        try {
+            this._assertCanSchedule(generationId);
+            this.ensureCapacity();
+        } catch (error) {
+            return Promise.reject(error);
         }
         const jobId = this.nextJobId++;
-        const message = { ...payload, jobId };
-        if (this.telemetry) {
-            this.telemetry.recordJobStart(jobId, 'pending', message);
-        }
+        const message = generationId == null
+            ? { ...payload, jobId }
+            : { ...payload, jobId, generationId };
+        this.telemetry?.recordJobStart(jobId, 'pending', message);
         return new Promise((resolve, reject) => {
-            this.queue.push({ jobId, payload: message, transferables, resolve, reject });
+            this.queue.push({ jobId, payload: message, transferables, resolve, reject, generationId });
             this._drainQueue();
         });
     }
 
-    async broadcast(payload, transferables = []) {
-        if (this.poolDisabled) {
-            throw this._getPoolDisabledError();
-        }
+    async broadcast(payload, transferables = [], options = {}) {
+        const generationId = this._resolveGeneration(payload, options);
+        this._assertCanSchedule(generationId);
+        this.ensureCapacity();
         const responses = [];
-        for (const worker of this.workers) {
-            responses.push(this._sendDirect(worker, payload, transferables));
+        for (const worker of [...this.workers]) {
+            responses.push(this._sendDirect(worker, payload, transferables, { generationId }));
         }
         return Promise.all(responses);
     }
 
-    _sendDirect(worker, payload, transferables = []) {
-        if (this.poolDisabled) {
-            return Promise.reject(this._getPoolDisabledError());
+    _sendDirect(worker, payload, transferables = [], options = {}) {
+        const generationId = this._resolveGeneration(payload, options);
+        try {
+            this._assertCanSchedule(generationId);
+            if (!this._isLiveWorker(worker)) throw new Error('Cannot send to a retired worker.');
+        } catch (error) {
+            return Promise.reject(error);
         }
         const jobId = this.nextJobId++;
-        const message = { ...payload, jobId };
+        const message = generationId == null
+            ? { ...payload, jobId }
+            : { ...payload, jobId, generationId };
         return new Promise((resolve, reject) => {
-            this.jobs.set(jobId, { resolve, reject, worker });
+            this.jobs.set(jobId, { resolve, reject, worker, generationId });
             const idleIndex = this.idle.indexOf(worker);
-            if (idleIndex !== -1) {
-                this.idle.splice(idleIndex, 1);
-            }
-            if (this.telemetry) {
-                this.telemetry.recordJobStart(jobId, this._getWorkerId(worker), message);
-            }
+            if (idleIndex !== -1) this.idle.splice(idleIndex, 1);
+            this.telemetry?.recordJobStart(jobId, this._getWorkerId(worker), message);
             try {
                 worker.postMessage(message, transferables);
             } catch (postMessageError) {
                 this.jobs.delete(jobId);
-                reject(this._toError(postMessageError, worker));
+                const normalizedError = this._toError(postMessageError, worker);
+                reject(normalizedError);
+                this._handleError(worker, normalizedError);
             }
         });
     }
 
-    dispose() {
-        if (this.telemetry) {
-            this.telemetry.printReport();
+    cancelGeneration(generationId, reason = null) {
+        if (generationId == null || String(generationId).trim() === '') {
+            return Promise.reject(new Error('cancelGeneration requires a non-empty generationId.'));
         }
-        for (const worker of this.workers) {
-            worker.terminate();
+        const existing = this.generationCancelPromises.get(generationId);
+        if (existing) return existing;
+
+        const error = reason instanceof Error
+            ? reason
+            : new WorkerGenerationCancelledError(generationId, reason);
+        this.cancelledGenerations.add(generationId);
+
+        let queuedJobs = 0;
+        this.queue = this.queue.filter(job => {
+            if (job.generationId !== generationId) return true;
+            queuedJobs += 1;
+            this._recordJobFailure(job.jobId, 'cancelled', error);
+            job.reject(error);
+            return false;
+        });
+
+        const workersToTerminate = new Set();
+        let activeJobs = 0;
+        for (const [jobId, job] of [...this.jobs.entries()]) {
+            if (job.generationId !== generationId) continue;
+            activeJobs += 1;
+            this.jobs.delete(jobId);
+            workersToTerminate.add(job.worker);
+            this._recordJobFailure(jobId, this._getWorkerId(job.worker), error);
+            job.reject(error);
+        }
+        for (const worker of workersToTerminate) {
+            this._retireWorker(worker, error);
+        }
+        this._drainQueue();
+
+        const result = Promise.resolve({
+            generationId,
+            activeJobs,
+            queuedJobs,
+            terminatedWorkers: workersToTerminate.size
+        });
+        this.generationCancelPromises.set(generationId, result);
+        while (this.generationCancelPromises.size > MAX_REMEMBERED_CANCELLED_GENERATIONS) {
+            const oldest = this.generationCancelPromises.keys().next().value;
+            this.generationCancelPromises.delete(oldest);
+            this.cancelledGenerations.delete(oldest);
+        }
+        return result;
+    }
+
+    dispose() {
+        if (this.disposed) return false;
+        this.disposed = true;
+        this.poolDisabled = true;
+        const error = new WorkerPoolDisposedError();
+        this._rejectAllJobs(error, 'pool-disposed');
+        for (const worker of [...this.workers]) {
+            this._retireWorker(worker, error);
         }
         this.workers = [];
         this.idle = [];
         this.queue = [];
         this.jobs.clear();
         this.workerIds.clear();
-        this.poolDisabled = true;
-        this.poolFailureReason = null;
+        this._syncTelemetryWorkerCount();
+        this.telemetry?.printReport();
+        return true;
     }
 }

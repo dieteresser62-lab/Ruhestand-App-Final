@@ -507,6 +507,10 @@ async function runSimulatorSmoke(browser, baseUrl) {
     const smoke = await openSmokePage(browser, baseUrl, 'Simulator.html');
     const { page } = smoke;
     await page.locator('h1').filter({ hasText: 'Ruhestand-Simulator' }).waitFor({ state: 'visible' });
+    const mcCancelButton = page.locator('#mcCancelButton');
+    assert(await mcCancelButton.count() === 1, 'Simulator must expose exactly one Monte-Carlo cancel control');
+    assert(await mcCancelButton.isHidden(), 'Monte-Carlo cancel control must stay hidden before a run starts');
+    assert(await mcCancelButton.isDisabled(), 'Monte-Carlo cancel control must stay disabled before a run starts');
     await page.evaluate(() => {
         const values = {
             simStartVermoegen: '2020000',

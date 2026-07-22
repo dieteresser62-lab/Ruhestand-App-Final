@@ -1,11 +1,11 @@
 # Simulator / Monte Carlo: Hardening-Arbeitsplan
 
 **Stand:** 2026-07-22
-**Status:** implementierungsreif; Slices 01-07 als Release-Commits abgeschlossen, Slice 08 implementiert und im Review
+**Status:** implementierungsreif; Slices 01-08 als Release-Commits abgeschlossen, Slice 09 implementiert und im Review
 **Autor:** Codex als Implementer und Plan-Autor  
 **Feature-Branch:** `codex/simulator-monte-carlo-gap-plan`  
 **GitHub-Status:** nur lokal; Veroeffentlichung ausstehend und nur nach Nutzerfreigabe  
-**Reviewstand:** Plan und Slices 01-07 freigegeben; Slice 08 wartet auf Gemini- und Nutzerreview
+**Reviewstand:** Plan und Slices 01-08 freigegeben; Slice 09 wartet auf Gemini- und Nutzerreview
 **Ausgangsanalyse:** [SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md](./SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md)
 
 ## 1. Ziel und Rollenabgrenzung
@@ -205,10 +205,36 @@ Semantikaenderungen sind unzulaessig.
 | [06](./SLICE_SIMULATOR_MONTE_CARLO_06_SAMPLING_PRAEZEDENZ_DIAGNOSTIK.md) | Samplingvertrag und Ziehungsdiagnostik | MC-06 | 02, D-05 | abgeschlossen und freigegeben |
 | [07](./SLICE_SIMULATOR_MONTE_CARLO_07_SCHAETZER_UNSICHERHEIT_CAR.md) | Konfidenz und reale Depotentnahme P10 | MC-08, MC-09 | 03, 05, D-06 | abgeschlossen und freigegeben |
 | [08](./SLICE_SIMULATOR_MONTE_CARLO_08_RUNRESULT_EXPORT_PROVENIENZ.md) | versionierter Run-/Exportvertrag | MC-11 | 04-07 | abgeschlossen und freigegeben |
-| [09](./SLICE_SIMULATOR_MONTE_CARLO_09_WORKER_LIFECYCLE_ISOLATION.md) | Abbruch, Stale Jobs, Cache/Version | MC-12, MC-13 | 02, D-12 | geplant |
+| [09](./SLICE_SIMULATOR_MONTE_CARLO_09_WORKER_LIFECYCLE_ISOLATION.md) | Abbruch, Stale Jobs, Cache/Version | MC-12, MC-13 | 02, D-12 | abgeschlossen und freigegeben |
 | [10](./SLICE_SIMULATOR_MONTE_CARLO_10_RESOURCE_UI_ACCESSIBILITY.md) | Bounds, Kostenhinweis, UI/A11y | MC-14, Teile MC-15 | 05, 08, 09, D-08 | geplant |
 | [11](./SLICE_SIMULATOR_MONTE_CARLO_11_BROWSER_E2E_REGRESSION.md) | Browser-E2E und Pfadparitaet | MC-15 | 03-10 | geplant |
 | [12](./SLICE_SIMULATOR_MONTE_CARLO_12_INTEGRATION_DOKUMENTATION.md) | Integration, Doku- und Volltestgate | MC-16; Abschluss aller | 01-11 | geplant |
+
+### Rueckdokumentation Slice 09
+
+- `runMonteCarlo()` verwaltet genau eine aktive Generation mit den Zustaenden
+  `running` und `cancelling`; doppelte Starts liefern dasselbe Promise, doppelte
+  Cancelaktionen dieselbe Canceloperation. Parameteraenderungen starten keinen
+  Lauf.
+- User-Cancel markiert die Generation als abgebrochen, weist Queue und aktive
+  Jobs kontrolliert ab und terminiert die daran arbeitenden Worker. Er startet
+  keinen seriellen Fallback. Gesunde Slots bleiben erhalten; terminierte Slots
+  werden erst beim naechsten expliziten Start lazy ersetzt.
+- `WorkerJobRunner` bleibt die einzige adaptive Stall-/Timeoutquelle. Ein
+  Worker-Stall oder -Fehler beendet zuerst die Generation; der MC-Aufrufer
+  entscheidet danach genau einmal ueber seriellen Fallback oder sichtbaren
+  Fehler. Spaete Resultate und Progressmeldungen alter Generationen werden
+  ignoriert.
+- Der Worker-Szenariocache ist auf acht Eintraege begrenzt. `dataVersion`
+  benoetigt `annualDataHash` und `regimeHash`; Versionswechsel leeren den Cache,
+  und ein Job mit unpassender Version wird fail-closed abgewiesen.
+- Neue direkte Lifecycle-Tests decken Cancel vor Start, CPU-blockierte Worker,
+  Cancel waehrend Batch, spaete Antworten, Lazy Replacement, Rejection, Stall
+  und mehrfaches Dispose ab. Die fokussierten Suiten sowie der komplette
+  Browser-Smoke sind gruen. `npm test` liefert 6793/6794 gruene Assertions und
+  0 offene Handles; einzig das bereits vor Slice 09 dokumentierte
+  Architektur-Linkgate bleibt rot. Aus den trotzdem erzeugten V8-Daten erreicht
+  `worker-job-runner.js` 67,74 Prozent approximative Zeilen-Coverage.
 
 Zulaessige Parallelisierung nach Slice 02:
 

@@ -257,9 +257,11 @@ console.log('Test 4: valid Monte-Carlo job');
         const response = await postAndWait(worker, {
             type: 'job',
             jobId: 'job-1',
+            generationId: 'generation-valid-job',
             scenarioKey,
             runRange: { start: 0, count: monteCarloParams.anzahl },
             monteCarloParams,
+            dataVersion: getDataVersion(),
             useCapeSampling: false,
             logIndices: [0]
         });
@@ -267,6 +269,7 @@ console.log('Test 4: valid Monte-Carlo job');
         const result = response.message;
         assertEqual(result.type, 'result', 'valid job should return result');
         assertEqual(result.jobId, 'job-1', 'valid job should echo jobId');
+        assertEqual(result.generationId, 'generation-valid-job', 'valid job should echo generationId');
         assert(Number.isFinite(result.elapsedMs), 'result should include elapsedMs');
         assert(result.buffers?.finalOutcomes instanceof Float64Array, 'result should include finalOutcomes buffer');
         assertEqual(result.buffers.finalOutcomes.length, monteCarloParams.anzahl, 'finalOutcomes should match run count');
@@ -281,8 +284,10 @@ console.log('Test 4: valid Monte-Carlo job');
         assert(Array.isArray(result.lists?.entryAges), 'result should include list payloads');
         assert(response.progress.length > 0, 'valid job should emit progress messages');
         assert(
-            response.progress.every(item => item.jobId === 'job-1' && item.phase === 'run'),
-            'progress messages should carry jobId and phase'
+            response.progress.every(item => item.jobId === 'job-1'
+                && item.generationId === 'generation-valid-job'
+                && item.phase === 'run'),
+            'progress messages should carry jobId, generationId and phase'
         );
         console.log('✓ valid Monte-Carlo job OK');
     } finally {
@@ -368,6 +373,97 @@ console.log('Test 5: stationary bootstrap Monte-Carlo job');
             'stationary worker should keep data-end restarts inside the filtered last year'
         );
         console.log('✓ stationary bootstrap Monte-Carlo job OK');
+    } finally {
+        await terminateWorker(worker);
+    }
+}
+
+// Test 6: cache is bounded and a changed data version invalidates older scenarios.
+console.log('Test 6: bounded scenario cache and dataVersion invalidation');
+{
+    const worker = createWorkerHarness();
+    try {
+        const inputs = createInputs();
+        const { compiledScenario } = compileScenario(
+            inputs,
+            widowOptions,
+            monteCarloParams.methode,
+            false,
+            inputs.stressPreset
+        );
+        const version = getDataVersion();
+
+        let latestInit = null;
+        for (let index = 0; index < 9; index++) {
+            latestInit = await postAndWait(worker, {
+                type: 'init',
+                jobId: `init-cache-${index}`,
+                scenarioKey: `scenario-${index}`,
+                compiledScenario,
+                dataVersion: version
+            });
+        }
+        assertEqual(latestInit.message.scenarioCacheSize, 8, 'worker scenario cache should be bounded to eight entries');
+
+        const evicted = await postAndWait(worker, {
+            type: 'job',
+            jobId: 'evicted-scenario-job',
+            scenarioKey: 'scenario-0',
+            runRange: { start: 0, count: 1 },
+            monteCarloParams: { ...monteCarloParams, anzahl: 1 },
+            dataVersion: version,
+            useCapeSampling: false,
+            logIndices: []
+        });
+        assertEqual(evicted.message.type, 'error', 'oldest scenario should be evicted at the cache limit');
+        assert(evicted.message.message.includes('Unknown scenarioKey'), 'evicted scenario should fail closed');
+
+        const nextVersion = {
+            ...version,
+            annualDataHash: `${version.annualDataHash}-changed`
+        };
+        const changed = await postAndWait(worker, {
+            type: 'init',
+            jobId: 'init-data-version-change',
+            scenarioKey: 'scenario-new-version',
+            compiledScenario,
+            dataVersion: nextVersion
+        });
+        assertEqual(changed.message.scenarioCacheSize, 1, 'dataVersion change should clear the previous scenario cache');
+
+        const stale = await postAndWait(worker, {
+            type: 'job',
+            jobId: 'stale-data-version-job',
+            scenarioKey: 'scenario-new-version',
+            runRange: { start: 0, count: 1 },
+            monteCarloParams: { ...monteCarloParams, anzahl: 1 },
+            dataVersion: version,
+            useCapeSampling: false,
+            logIndices: []
+        });
+        assertEqual(stale.message.type, 'error', 'stale job dataVersion should be rejected');
+        assert(stale.message.message.includes('dataVersion mismatch'), 'stale dataVersion error should be explicit');
+        console.log('✓ bounded scenario cache and dataVersion invalidation OK');
+    } finally {
+        await terminateWorker(worker);
+    }
+}
+
+// Test 7: malformed data versions fail as controlled init errors.
+console.log('Test 7: invalid dataVersion fails closed');
+{
+    const worker = createWorkerHarness();
+    try {
+        const response = await postAndWait(worker, {
+            type: 'init',
+            jobId: 'init-invalid-version',
+            scenarioKey: 'invalid-version',
+            compiledScenario: { inputs: createInputs(), widowOptions },
+            dataVersion: { annualDataHash: 'only-one-hash' }
+        });
+        assertEqual(response.message.type, 'error', 'invalid dataVersion should return a controlled error');
+        assert(response.message.message.includes('annualDataHash and regimeHash'), 'invalid dataVersion error should name required hashes');
+        console.log('✓ invalid dataVersion fails closed OK');
     } finally {
         await terminateWorker(worker);
     }

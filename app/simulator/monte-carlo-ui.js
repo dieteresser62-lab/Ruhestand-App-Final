@@ -39,11 +39,13 @@ export function triggerMonteCarloDownload(download, {
  */
 export function createMonteCarloUI() {
     const mcButton = requireElement('mcButton', 'Monte-Carlo Start-Button');
+    const cancelButton = document.getElementById('mcCancelButton');
     const progressBarContainer = requireElement('mc-progress-bar-container', 'Monte-Carlo Fortschrittsanzeige');
     const progressBar = requireElement('mc-progress-bar', 'Monte-Carlo Fortschrittsbalken');
     const exportActions = document.getElementById('mcRunExportActions');
     const exportButton = document.getElementById('exportMonteCarloRunJson');
     const exportStatus = document.getElementById('mcRunExportStatus');
+    let cancelHandler = null;
 
     return {
         /**
@@ -54,6 +56,53 @@ export function createMonteCarloUI() {
          * Aktiviert den Start-Button wieder.
          */
         enableStart() { mcButton.disabled = false; },
+        bindCancel(handler) {
+            if (!cancelButton || typeof handler !== 'function') return false;
+            this.unbindCancel();
+            cancelHandler = event => {
+                event?.preventDefault?.();
+                void handler();
+            };
+            cancelButton.addEventListener('click', cancelHandler);
+            return true;
+        },
+        unbindCancel() {
+            if (!cancelButton || !cancelHandler) return false;
+            cancelButton.removeEventListener?.('click', cancelHandler);
+            cancelHandler = null;
+            return true;
+        },
+        beginRun() {
+            mcButton.disabled = true;
+            mcButton.setAttribute?.('aria-busy', 'true');
+            if (cancelButton) {
+                cancelButton.hidden = false;
+                cancelButton.style.display = 'inline-block';
+                cancelButton.disabled = false;
+                cancelButton.textContent = 'Monte-Carlo-Lauf abbrechen';
+            }
+        },
+        beginCancelling() {
+            mcButton.disabled = true;
+            if (cancelButton) {
+                cancelButton.disabled = true;
+                cancelButton.textContent = 'Abbruch läuft …';
+            }
+        },
+        finishRun() {
+            mcButton.disabled = false;
+            mcButton.removeAttribute?.('aria-busy');
+            if (cancelButton) {
+                cancelButton.disabled = true;
+                cancelButton.hidden = true;
+                cancelButton.style.display = 'none';
+                cancelButton.textContent = 'Monte-Carlo-Lauf abbrechen';
+            }
+        },
+        showCancelled() {
+            this.showCompareResults('Monte-Carlo-Lauf wurde abgebrochen.');
+            if (exportStatus) exportStatus.textContent = 'Monte-Carlo-Lauf wurde abgebrochen.';
+        },
         /**
          * Blendet die Fortschrittsanzeige ein und setzt sie zurück.
          */
@@ -66,8 +115,8 @@ export function createMonteCarloUI() {
         /**
          * Blendet die Fortschrittsanzeige nach kurzer Verzögerung aus.
          */
-        async finishProgress() {
-            this.updateProgress(100);
+        async finishProgress({ completed = true } = {}) {
+            if (completed) this.updateProgress(100);
             await new Promise(resolve => setTimeout(resolve, 250));
             progressBarContainer.style.display = 'none';
         },

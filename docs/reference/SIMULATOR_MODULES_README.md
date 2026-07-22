@@ -38,10 +38,11 @@ UI-Orchestrierung und Klammer um die ausgelagerten Feature-Module. Registriert E
 Koordiniert die Monte-Carlo-Simulation und verbindet DOM-Interaktion mit der reinen Simulationslogik.
 
 **Hauptfunktionen / Exporte:**
-- `runMonteCarlo()` – liest UI-Parameter, orchestriert `monte-carlo-runner.js` und Web-Worker-Jobs, aktualisiert Progress/UI und publiziert nach dem Lauf den versionierten V1-JSON-Download (Default: 8 Worker, 500 ms Job-Budget).
+- `runMonteCarlo()` – startet genau einen generationengebundenen Lauf, liest UI-Parameter, orchestriert `monte-carlo-runner.js` und Web-Worker-Jobs, aktualisiert Progress/UI und publiziert nach dem Lauf den versionierten V1-JSON-Download (Default: 8 Worker, 500 ms Job-Budget). Doppelte Starts liefern dasselbe laufende Promise.
+- `cancelMonteCarlo()` – ist single-flight, schaltet die UI auf `cancelling`, terminiert die fuer die aktive Generation arbeitenden Worker und verhindert einen seriellen Fallback.
 - Validiert vor dem Start, dass `Mindest-Flex p.a.` den `Flex-Bedarf p.a.` nicht uebersteigt und optionale Tail-Risk-Parameter innerhalb des freigegebenen Contracts liegen.
 
-**Einbindung:** Wird von `simulator-main.js` importiert und im UI-Bootstrap an den Start-Button (`#mcButton`) gekoppelt. Alle Monte-Carlo-spezifischen Anpassungen sollten hier erfolgen, damit `simulator-main.js` schlank bleibt.
+**Einbindung:** Wird von `simulator-main.js` importiert und im UI-Bootstrap an den Start-Button (`#mcButton`) gekoppelt. Die Laufzeitbindung des Cancel-Buttons (`#mcCancelButton`) erfolgt ueber die UI-Fassade. Alle Monte-Carlo-spezifischen Anpassungen sollten hier erfolgen, damit `simulator-main.js` schlank bleibt.
 
 **Dependencies:** `monte-carlo-runner.js`, `monte-carlo-ui.js`, `monte-carlo-contracts.js`, `monte-carlo-export.js`, `scenario-analyzer.js`, `simulator-portfolio.js`, `simulator-results.js`, `simulator-sweep-utils.js`, `simulator-utils.js`, `simulator-data.js`, `cape-utils.js`.
 
@@ -160,10 +161,10 @@ DOM-freier, versionierter Raw-Vertrag fuer einen vollstaendigen Monte-Carlo-Lauf
 ---
 
 ## 4. `monte-carlo-ui.js`
-Kapselt DOM-Zugriffe für Monte-Carlo (Progressbar, Checkboxen, Parameter-Inputs und expliziter V1-JSON-Download) und liefert eine UI-Fassade zurück.
+Kapselt DOM-Zugriffe für Monte-Carlo (Progressbar, Start-/Cancelzustand, Checkboxen, Parameter-Inputs und expliziter V1-JSON-Download) und liefert eine UI-Fassade zurück.
 
 **Hauptfunktionen / Exporte:**
-- `createMonteCarloUI()` – erzeugt ein UI-Objekt mit Methoden `disableStart()`, `showProgress()`, `updateProgress()`, `finishProgress()`, `readUseCapeSampling()`.
+- `createMonteCarloUI()` – erzeugt ein UI-Objekt mit Methoden fuer `running`/`cancelling`/`idle`, eine idempotent loesbare Cancelbindung, Progress und `readUseCapeSampling()`.
 - `readMonteCarloParameters()` – defensives Auslesen der Eingabefelder (Anzahl, Dauer, Blocksize, Seed, Methode).
 - `triggerMonteCarloDownload()` – erzeugt Blob/Objekt-URL nur nach Buttonaktion, setzt den sicheren Dateinamen und raeumt die URL wieder auf.
 
@@ -854,7 +855,7 @@ app/simulator/simulator-main.js
 
 ### Monte-Carlo-Simulation
 1. `simulator-main.js`: UI-Bootstrap ruft `runMonteCarlo` aus `simulator-monte-carlo.js` auf.
-2. `simulator-monte-carlo.js`: Erstellt die UI-Fassade, normalisiert Eingaben/Witwen-Optionen und delegiert an den Runner.
+2. `simulator-monte-carlo.js`: Erstellt Generation, AbortController und UI-Fassade, normalisiert Eingaben/Witwen-Optionen und delegiert an den Runner. Start und Cancel sind single-flight; User-Cancel darf keinen seriellen Fallback starten.
 3. `mc-run-context.js`: Bereitet Chunk-Kontext, RNG, Buffers, Sampling-Basiskonfiguration und Progress-Intervall vor.
 4. `mc-year-sampling.js`: Loest `MonteCarloSamplingContractV1` einmal je Chunk auf und liefert Startjahr-/CAPE-Sampling sowie die merge-invariante Ziehungsdiagnostik.
 5. `mc-life-events.js`: Initialisiert den Run-Life-State fuer Care-Meta, Partnerstatus, Care-RNGs und HouseholdContext.
@@ -866,7 +867,7 @@ app/simulator/simulator-main.js
 10. `monte-carlo-statistics.js` und `monte-carlo-aggregates.js`: Berechnen Wilson-Unsicherheit und reduzieren die global indexierten Depotentnahme-P10-Skalare in Runindex-Reihenfolge.
 11. `scenario-analyzer.js`: Zeichnet Worst/Perzentil-/Pflege-/Zufalls-Szenarien waehrend der Runs auf; fruehe Pflege wird fuer P1 und P2 separat ermittelt.
 12. `monte-carlo-contracts.js` und `monte-carlo-export.js`: Bauen den tief eingefrorenen Request-/Result-/Provenienzvertrag aus genau diesem Lauf; der Reader prueft Versionen, Pflichtfelder und Fingerprints fail-closed.
-13. `monte-carlo-ui.js`: Schaltet den V1-JSON-Download fuer die explizite Nutzeraktion frei.
+13. `monte-carlo-ui.js`: Haelt Start waehrend `running`/`cancelling` gesperrt, bindet den sichtbaren Cancel-Button und schaltet nach erfolgreichem Abschluss den V1-JSON-Download fuer die explizite Nutzeraktion frei.
 14. `simulator-results.js`: `displayMonteCarloResults()` zeigt Aggregationen und Szenario-Logs an.
 
 ### Parameter-Sweep
@@ -912,7 +913,7 @@ Nach jeder Monte-Carlo-Simulation werden bis zu 31 Szenarien gespeichert:
 - **Renten-Persistenz:** `initRente2ConfigWithLocalStorage()` in `simulator-ui-rente.js` liest/migriert Rentenfelder, schaltet Partner-Section (`chkPartnerAktiv`, `sectionRente2`) und schreibt zurück in `localStorage`.
 - **Sweep-Voreinstellungen:** `initSweepDefaultsWithLocalStorageFallback()` in `simulator-sweep.js` lädt Defaults, liest `localStorage` und setzt Guardrails (Whitelist/Blocklist). Erwartet Zugriff auf Sweep-Formularfelder und das Toggle.
 - **Backtest-Setup:** `initializeBacktestUI()` in `simulator-backtest.js` verknuepft Zeitraum-, Start-, Cohort-, Detail- und Raw-Downloadcontrols per idempotenter Modulbindung. `historical-backtest-ui.js` erwartet die Status-, Hint-, Fehler-, Notice-, Cohort- und Tabellen-DOM-IDs des Backtest-Tabs; die Jahresschleife selbst liegt in `historical-backtest-runner.js` und ist DOM-/Persistenz-frei.
-- **Monte-Carlo-Start:** `runMonteCarlo()` in `simulator-monte-carlo.js` liest `mcAnzahl`, `mcDauer`, `mcBlockSize`, `mcSeed`, `mcMethode`, `mcStartYearMode`, `mcStartYearFilter`, `mcStartYearHalfLife` sowie Progress-UI (`mc-progress-bar*`). Liefert nach Abschluss aggregierte Ergebnisse an `displayMonteCarloResults()`.
+- **Monte-Carlo-Start/Lifecycle:** `runMonteCarlo()` in `simulator-monte-carlo.js` liest `mcAnzahl`, `mcDauer`, `mcBlockSize`, `mcSeed`, `mcMethode`, `mcStartYearMode`, `mcStartYearFilter`, `mcStartYearHalfLife` sowie Progress-UI (`mc-progress-bar*`). Jeder Lauf erhaelt eine eindeutige Generation; `cancelMonteCarlo()` terminiert aktive Slots, verwirft spaete Antworten und laesst Replacement bis zum naechsten Start aus. Nur ein nicht abgebrochener aktueller Lauf liefert aggregierte Ergebnisse an `displayMonteCarloResults()`.
 - **Startjahr-Sampling:** `mc-run-context.js` bereitet die Basiskonfiguration vor; `mc-year-sampling.js` kapselt `FILTER` (harte Grenze), `RECENCY` (Half-Life), `UNIFORM`, CAPE-Kandidaten und `MonteCarloSamplingContractV1`. CAPE hat vor Gewichtung Vorrang. Das gewaehlte Startjahr ist fuer Fixed-/Stationary-Block sowie Markov/IID das erste tatsaechliche Marktjahr; ignorierte Optionen und Fallbacks bleiben im Vertrag sichtbar.
 - **Samplingdiagnostik:** Direktlauf und Worker transportieren `MonteCarloSamplingDiagnosticsV1` mit Samplingvertrag, Datenfingerprints, Startjahr-/Jahres-, Quellen-, Regime-, Stationary- und Tail-Risk-Zaehlern. `monte-carlo-chunk-result.js` validiert und merged diese Zaehler unabhaengig von Chunkreihenfolge.
 - **Life-State:** `mc-life-events.js` initialisiert Care-Meta, Partnerstatus, Care-RNGs und HouseholdContext. Die Jahreslogik bleibt im Runner-Hot-Path, bis eine vollstaendige Extraktion den Benchmark stabil erfuellt.

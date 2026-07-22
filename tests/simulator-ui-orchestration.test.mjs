@@ -45,6 +45,10 @@ class MockElement {
         this.listeners[type].push(handler);
     }
 
+    removeEventListener(type, handler) {
+        this.listeners[type] = (this.listeners[type] || []).filter(existing => existing !== handler);
+    }
+
     appendChild(child) {
         child.parentNode = this;
         this.children.push(child);
@@ -399,7 +403,40 @@ async function runSimulatorUiOrchestrationTests() {
         assertEqual(persistenceStorage.getItem('sim_mcMethode'), 'stationary', 'MC-Methode wird persistiert');
     }
 
-    console.log('Test 8: Backtest controls receive bounds and exactly one module handler');
+    console.log('Test 8: Monte-Carlo cancel UI exposes running and cancelling states');
+    {
+        const startButton = registerElement(documentRef, 'mcButton', { tagName: 'button' });
+        const cancelButton = registerElement(documentRef, 'mcCancelButton', { tagName: 'button' });
+        cancelButton.hidden = true;
+        const progressContainer = registerElement(documentRef, 'mc-progress-bar-container', { tagName: 'div' });
+        registerElement(documentRef, 'mc-progress-bar', { tagName: 'div' });
+        const compareResults = registerElement(documentRef, 'mc-compare-results', { tagName: 'div' });
+        let cancelCalls = 0;
+        const ui = monteCarloUiModule.createMonteCarloUI();
+        ui.bindCancel(() => { cancelCalls += 1; });
+
+        ui.beginRun();
+        assertEqual(startButton.disabled, true, 'MC start remains disabled while a run is active');
+        assertEqual(cancelButton.disabled, false, 'MC cancel is enabled for the active run');
+        assertEqual(cancelButton.hidden, false, 'MC cancel is visible for the active run');
+        cancelButton.click();
+        assertEqual(cancelCalls, 1, 'MC cancel dispatches exactly one bound action per click');
+
+        ui.beginCancelling();
+        assertEqual(startButton.disabled, true, 'MC start remains disabled while cancellation completes');
+        assertEqual(cancelButton.disabled, true, 'duplicate MC cancel is disabled while cancellation completes');
+        assert(cancelButton.textContent.includes('Abbruch'), 'cancelling state is visible on the cancel button');
+        ui.showCancelled();
+        assertEqual(compareResults.style.display, 'block', 'cancelled status is visibly rendered');
+
+        ui.unbindCancel();
+        ui.finishRun();
+        assertEqual(startButton.disabled, false, 'MC start is restored after lifecycle completion');
+        assertEqual(cancelButton.hidden, true, 'MC cancel is hidden after lifecycle completion');
+        assertEqual(progressContainer.style.display, '', 'lifecycle state does not mutate progress visibility directly');
+    }
+
+    console.log('Test 9: Backtest controls receive bounds and exactly one module handler');
     {
         const startButton = registerElement(documentRef, 'btButton', { tagName: 'button' });
         const startYear = registerElement(documentRef, 'simStartJahr', { value: '2000' });
