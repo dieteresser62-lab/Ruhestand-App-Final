@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "monte-carlo-delta-ledger-v1",
+  "baselineReference": "pre-hardening-v1",
+  "baselineOverwriteAllowed": false,
+  "entries": [],
+  "requiredEntryFields": [
+    "sliceId",
+    "sourceReference",
+    "targetReference",
+    "fieldPath",
+    "formulaBefore",
+    "formulaAfter",
+    "expectedDirection",
+    "goldenCaseIds",
+    "reviewStatus"
+  ],
+  "policy": {
+    "unexplainedDelta": "block",
+    "bulkSnapshotAcceptance": false,
+    "toleranceChangeRequiresPreExecutionReview": true
+  }
+}

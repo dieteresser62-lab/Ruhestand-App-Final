@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "monte-carlo-consumer-inventory-v1",
+  "fields": [
+    {
+      "currentField": "buffers.volatilities",
+      "targetField": "pathSummaries.volatilityPct",
+      "producer": ["app/simulator/monte-carlo-runner.js", "app/simulator/monte-carlo-runner-utils.js"],
+      "consumers": ["app/simulator/monte-carlo-aggregates.js", "app/simulator/simulator-monte-carlo.js", "app/simulator/auto-optimize-worker.js", "app/simulator/results-metrics.js", "workers/mc-worker.js"],
+      "tests": ["tests/simulator-monte-carlo.test.mjs", "tests/worker-parity.test.mjs", "tests/auto-optimize-worker-contract.test.mjs"],
+      "migration": "Slice 03 separates volatility from max drawdown; the current buffer name must never receive maxDDpct."
+    },
+    {
+      "currentField": "buffers.kpiKuerzungsjahre",
+      "targetField": "pathSummaries.cutYearShareRatio",
+      "producer": ["app/simulator/monte-carlo-runner.js", "app/simulator/mc-run-metrics.js"],
+      "consumers": ["app/simulator/monte-carlo-aggregates.js", "app/simulator/simulator-monte-carlo.js", "app/simulator/auto-optimize-worker.js", "app/simulator/results-metrics.js", "workers/mc-worker.js"],
+      "tests": ["tests/simulator-monte-carlo.test.mjs", "tests/worker-parity.test.mjs"],
+      "migration": "Slice 03 stores numerator and denominator or their reviewed run scalar; UI uses >= 10 percent and an actual share."
+    },
+    {
+      "currentField": "extraKPI.pflege.entryRatePct",
+      "targetField": "care.p1.entryRatePct",
+      "producer": ["app/simulator/monte-carlo-aggregates.js", "app/simulator/mc-run-metrics.js"],
+      "consumers": ["app/simulator/results-metrics.js", "app/simulator/simulator-results.js"],
+      "tests": ["tests/simulator-monte-carlo.test.mjs", "tests/results-metrics.test.mjs", "tests/worker-parity.test.mjs"],
+      "migration": "Slice 04 separates P1 and P2 counters, sample sizes and nullable conditional distributions."
+    },
+    {
+      "currentField": "extraKPI.pflege.p2EntryRatePct",
+      "targetField": "care.p2.entryRatePct",
+      "producer": ["app/simulator/monte-carlo-aggregates.js", "app/simulator/mc-run-metrics.js"],
+      "consumers": ["app/simulator/results-metrics.js", "app/simulator/simulator-results.js"],
+      "tests": ["tests/simulator-monte-carlo.test.mjs", "tests/results-metrics.test.mjs", "tests/worker-parity.test.mjs"],
+      "migration": "Slice 04 must use the P2 event counter and P2 conditional sample."
+    },
+    {
+      "currentField": "failCount/depotErschoepfungsQuote",
+      "targetField": "outcomeInventory.ruin and floorCoveragePct",
+      "producer": ["app/simulator/monte-carlo-runner.js", "app/simulator/mc-run-metrics.js", "app/simulator/monte-carlo-aggregates.js"],
+      "consumers": ["app/simulator/results-metrics.js", "app/simulator/simulator-results.js", "app/simulator/auto-optimize-evaluate.js", "app/simulator/auto-optimize-worker.js", "app/simulator/sweep-runner.js"],
+      "tests": ["tests/simulator-monte-carlo.test.mjs", "tests/worker-parity.test.mjs", "tests/simulator-sweep.test.mjs", "tests/results-metrics.test.mjs"],
+      "migration": "Slice 05 introduces four exclusive outcomes; technical_error suppresses the floor-coverage headline."
+    },
+    {
+      "currentField": "successProbFloor",
+      "targetField": "floorCoverageRatio",
+      "producer": ["app/simulator/auto-optimize-evaluate.js", "app/simulator/simulator-results.js", "app/simulator/sweep-runner.js"],
+      "consumers": ["app/simulator/auto-optimize-metrics.js", "app/simulator/auto-optimize-renderer.js", "app/simulator/auto-optimize-utils.js", "app/simulator/simulator-heatmap.js", "app/simulator/simulator-optimizer.js", "app/simulator/simulator-visualization.js"],
+      "tests": ["tests/auto-optimizer.test.mjs", "tests/simulator-sweep.test.mjs", "tests/simulator-heatmap.test.mjs", "tests/worker-parity.test.mjs"],
+      "migration": "Slices 05, 08 and 11 keep one ratio unit and remove temporary read aliases by Slice 11."
+    },
+    {
+      "currentField": "extraKPI.consumptionAtRiskP10Real",
+      "targetField": "realWithdrawalP10.realEur",
+      "producer": ["app/simulator/monte-carlo-aggregates.js", "app/simulator/monte-carlo-runner.js"],
+      "consumers": ["app/simulator/results-metrics.js", "app/simulator/simulator-results.js"],
+      "tests": ["tests/simulator-monte-carlo.test.mjs", "tests/results-metrics.test.mjs"],
+      "migration": "Slice 07 replaces pooled sampled years with one reviewed scalar per evaluable run and exposes sampleSize/missingness."
+    },
+    {
+      "currentField": "stressKPI.consumptionAtRiskP10Real",
+      "targetField": "stressKPI.realWithdrawalP10",
+      "producer": ["app/simulator/mc-stress-tracker.js", "app/simulator/monte-carlo-aggregates.js"],
+      "consumers": ["app/simulator/results-metrics.js"],
+      "tests": ["tests/simulator-monte-carlo.test.mjs", "tests/results-metrics.test.mjs"],
+      "migration": "Slice 07 aligns the stress label and units with the reviewed real-withdrawal definition."
+    }
+  ]
+}

@@ -1,0 +1,208 @@
+{
+  "schemaVersion": "monte-carlo-measurement-golden-v1",
+  "status": "approved-target-contract",
+  "decisions": [
+    { "id": "D-01", "status": "decided", "summary": "Floor-Deckung uses all_dead plus horizon_exhausted over requestedRuns and is null for a batch containing technical_error." },
+    { "id": "D-02", "status": "decided", "summary": "Every run ends in exactly one of ruin, all_dead, horizon_exhausted or technical_error, following financial-year chronology." },
+    { "id": "D-03", "status": "decided", "summary": "Cut-year share counts completed decumulation years with a finite cut decision and a cut of at least 10 percent." },
+    { "id": "D-04", "status": "decided", "summary": "P1 and P2 care distributions are separate; empty conditional distributions are null with sampleSize zero; UI money is real start-price euros." },
+    { "id": "D-05", "status": "decided", "summary": "CAPE anchors the first fixed or stationary block and initializes the first Markov regime; IID may draw independently from year two." },
+    { "id": "D-06", "status": "decided", "summary": "Consumption-at-Risk is renamed Reale Depotentnahme P10 and uses a run-level real-withdrawal scalar with explicit missingness." },
+    { "id": "D-07", "status": "decided", "summary": "V1 fields are canonical; temporary read aliases require deprecation telemetry and expire by Slice 11." },
+    { "id": "D-08", "status": "decided", "summary": "Runs default to 10000, require confirmation above 100000 and stop at 1000000; remaining resource bounds are fixed in benchmark-contract-v1.json." },
+    { "id": "D-09", "status": "decided", "summary": "Paired compare remains a separate follow-up feature after stable V1 export." },
+    { "id": "D-10", "status": "decided", "summary": "Per-run summaries use global run indices and same-runtime reductions are exact across worker and chunk layouts." },
+    { "id": "D-11", "status": "decided", "summary": "The pre-hardening snapshot is immutable; later semantic slices create new references and delta ledgers." },
+    { "id": "D-12", "status": "decided", "summary": "WorkerJobRunner remains; user cancel terminates active workers without serial fallback and replacement is lazy on the next explicit start." }
+  ],
+  "cases": [
+    {
+      "id": "GC-RISK-01",
+      "contract": "volatility-and-drawdown",
+      "input": {
+        "portfolioValuesNominalEur": [100, 110, 99]
+      },
+      "expected": {
+        "intermediate": {
+          "periodReturnsRatio": [0.1, -0.1],
+          "meanReturnRatio": 0,
+          "squaredDeviationSum": 0.02,
+          "sampleVariance": 0.02,
+          "peakPathNominalEur": [100, 110, 110],
+          "drawdownPathRatio": [0, 0, -0.1]
+        },
+        "value": {
+          "volatilityPct": 14.142135623730951,
+          "maxDrawdownPct": 10
+        },
+        "unit": {
+          "volatilityPct": "percent",
+          "maxDrawdownPct": "percent"
+        },
+        "denominator": {
+          "volatilityPct": "sample standard deviation with N-1 over two finite period returns",
+          "maxDrawdownPct": "largest peak-to-trough loss relative to the running positive peak"
+        },
+        "rounding": {
+          "mode": "half-away-from-zero",
+          "displayDigits": 1,
+          "display": { "volatilityPct": "14.1 %", "maxDrawdownPct": "10.0 %" }
+        },
+        "uiLabel": {
+          "volatilityPct": "Median Portfoliovolatilitaet",
+          "maxDrawdownPct": "Max. Drawdown (Median)"
+        }
+      }
+    },
+    {
+      "id": "GC-CUT-01",
+      "contract": "cut-year-share",
+      "input": {
+        "decumulationYears": [
+          { "year": 1, "completed": true, "cutPct": 0 },
+          { "year": 2, "completed": true, "cutPct": 10 },
+          { "year": 3, "completed": true, "cutPct": 9.99 },
+          { "year": 4, "completed": true, "cutPct": 25 },
+          { "year": 5, "completed": false, "cutPct": null, "missingnessReason": "technical_error" }
+        ]
+      },
+      "expected": {
+        "intermediate": {
+          "eligibleYears": [1, 2, 3, 4],
+          "cutYearsGte10Pct": [2, 4],
+          "numerator": 2,
+          "denominator": 4
+        },
+        "value": { "cutYearShareRatio": 0.5, "cutYearSharePct": 50 },
+        "unit": { "cutYearSharePct": "percent" },
+        "denominator": { "cutYearSharePct": "successfully completed decumulation years with a finite cut decision" },
+        "rounding": {
+          "mode": "half-away-from-zero",
+          "displayDigits": 1,
+          "display": { "cutYearSharePct": "50.0 %" }
+        },
+        "uiLabel": { "cutYearSharePct": "Anteil Kuerzungsjahre (>= 10 %)" }
+      }
+    },
+    {
+      "id": "GC-CARE-01",
+      "contract": "separate-p1-p2-care",
+      "input": {
+        "requestedRuns": 4,
+        "runs": [
+          { "runIndex": 0, "p1": { "entryAge": 72, "careYears": 3, "realCostEur": 12000 }, "p2": null },
+          { "runIndex": 1, "p1": { "entryAge": 78, "careYears": 2, "realCostEur": 8000 }, "p2": { "entryAge": 80, "careYears": 1, "realCostEur": 6000 } },
+          { "runIndex": 2, "p1": null, "p2": null },
+          { "runIndex": 3, "p1": null, "p2": null }
+        ],
+        "emptyConditionalRuns": [
+          { "runIndex": 0, "p1": null, "p2": null },
+          { "runIndex": 1, "p1": null, "p2": null }
+        ]
+      },
+      "expected": {
+        "intermediate": {
+          "p1EntryAges": [72, 78],
+          "p2EntryAges": [80],
+          "p1CareYears": [3, 2],
+          "p2CareYears": [1],
+          "p1RealCostsEur": [12000, 8000],
+          "p2RealCostsEur": [6000]
+        },
+        "value": {
+          "p1": { "entryRatePct": 50, "entryAgeP50": 75, "careYearsP50": 2.5, "realCostEurP50": 10000, "sampleSize": 2 },
+          "p2": { "entryRatePct": 25, "entryAgeP50": 80, "careYearsP50": 1, "realCostEurP50": 6000, "sampleSize": 1 },
+          "emptyP1": { "entryAgeP50": null, "careYearsP50": null, "realCostEurP50": null, "sampleSize": 0 },
+          "emptyP2": { "entryAgeP50": null, "careYearsP50": null, "realCostEurP50": null, "sampleSize": 0 }
+        },
+        "unit": {
+          "entryRatePct": "percent of requested runs",
+          "entryAgeP50": "years of age",
+          "careYearsP50": "years",
+          "realCostEurP50": "real EUR at simulation-start prices"
+        },
+        "denominator": {
+          "entryRatePct": "requestedRuns",
+          "conditionalMedians": "runs with an observed value for the named person"
+        },
+        "rounding": {
+          "mode": "half-away-from-zero",
+          "displayDigits": { "percent": 1, "age": 1, "years": 1, "eur": 0 }
+        },
+        "uiLabel": {
+          "p1EntryRatePct": "Pflegefall-Eintrittsquote P1",
+          "p2EntryRatePct": "Pflegefall-Eintrittsquote P2",
+          "p1CareYearsP50": "Median Pflegejahre P1",
+          "p2CareYearsP50": "Median Pflegejahre P2",
+          "realCostEurP50": "Reale Pflegekosten (Median)"
+        }
+      }
+    },
+    {
+      "id": "GC-OUTCOME-01",
+      "contract": "terminal-outcome-inventory",
+      "input": {
+        "requestedRuns": 4,
+        "runs": [
+          { "runIndex": 0, "events": ["financial_year_started", "ruin_detected", "all_dead_after_ruin"] },
+          { "runIndex": 1, "events": ["all_dead_before_next_financial_obligation"] },
+          { "runIndex": 2, "events": ["last_plan_year_completed_while_alive"] },
+          { "runIndex": 3, "events": ["technical_error"] }
+        ]
+      },
+      "expected": {
+        "intermediate": {
+          "outcomeByRunIndex": ["ruin", "all_dead", "horizon_exhausted", "technical_error"],
+          "inventorySum": 4,
+          "floorCoveredCountBeforeFailClosed": 2
+        },
+        "value": {
+          "inventory": { "ruin": 1, "all_dead": 1, "horizon_exhausted": 1, "technical_error": 1 },
+          "floorCoveragePct": null,
+          "floorCoverageMissingnessReason": "technical_error_in_batch"
+        },
+        "unit": { "inventory": "runs", "floorCoveragePct": "percent" },
+        "denominator": { "inventory": "requestedRuns", "floorCoveragePct": "requestedRuns only when technical_error is zero" },
+        "rounding": { "mode": "half-away-from-zero", "displayDigits": 1, "display": { "floorCoveragePct": "-" } },
+        "uiLabel": {
+          "floorCoveragePct": "Floor-Deckung im gewaehlten Horizont",
+          "inventory": "Terminale Outcomes"
+        }
+      }
+    },
+    {
+      "id": "GC-SAMPLING-01",
+      "contract": "sampling-precedence",
+      "input": {
+        "capeStartRecord": { "index": 40, "year": 1969, "regime": "bear" },
+        "nextSequentialRecords": [
+          { "index": 41, "year": 1970, "regime": "bear" },
+          { "index": 42, "year": 1971, "regime": "neutral" }
+        ],
+        "independentDrawRecord": { "index": 75, "year": 2004, "regime": "bull" },
+        "methods": ["block", "stationary", "regime_markov", "regime_iid"],
+        "blockSize": 3,
+        "capeEnabled": true,
+        "filterStartYear": 1980,
+        "recencyEnabled": true,
+        "tailRiskEnabled": true
+      },
+      "expected": {
+        "intermediate": {
+          "block": { "firstSource": "cape", "recordIndices": [40, 41, 42], "filterAppliedToCapeAnchor": false },
+          "stationary": { "firstSource": "cape", "initialRecordIndex": 40, "continuationCandidateIndex": 41 },
+          "regime_markov": { "firstSource": "cape", "initialRegime": "bear" },
+          "regime_iid": { "firstSource": "cape", "yearTwoMayUseIndependentRecordIndex": 75 },
+          "tailRiskStage": "after_historical_record_selection"
+        },
+        "value": {
+          "precedence": ["cape_start", "method_continuation_or_regime", "filter_or_recency_for_later_draws", "tail_risk_overlay"]
+        },
+        "unit": { "recordIndices": "zero-based annual-data index", "precedence": "ordered stages" },
+        "denominator": { "samplingDiagnostics": "one diagnostic record per simulated year" },
+        "rounding": { "mode": "none", "displayDigits": 0 },
+        "uiLabel": { "samplingDiagnostics": "Sampling-Diagnostik" }
+      }
+    }
+  ]
+}

@@ -1,0 +1,197 @@
+{
+  "schemaVersion": "monte-carlo-benchmark-results-v1",
+  "contractVersion": "monte-carlo-benchmark-contract-v1",
+  "measuredAtUtc": "2026-07-22T08:41:14.426Z",
+  "environment": {
+    "runtime": "v25.2.1",
+    "platform": "win32",
+    "architecture": "x64",
+    "logicalCpuCount": 16,
+    "hostClass": "local-development-machine"
+  },
+  "status": "completed",
+  "measurements": [
+    {
+      "profileName": "standard",
+      "profile": {
+        "runs": 100000,
+        "durationYears": 35,
+        "workerCount": 8,
+        "jobTimeBudgetMs": 500,
+        "scenarioId": "base",
+        "seed": 12345
+      },
+      "measurement": {
+        "durationMs": 27933.9405,
+        "peakRssBytes": 939991040,
+        "peakHeapUsedBytes": 55541016,
+        "cancellationReactionMs": 4.647499999999127,
+        "bufferBytes": 6300000,
+        "bufferBytesPerRun": 63,
+        "estimatedWorkerPayloadBytes": 41944116,
+        "estimatedWorkerPayloadBytesPerRun": 419.44116,
+        "chunkCount": 420,
+        "chunkSizeMinimum": 42,
+        "chunkSizeMaximum": 400,
+        "chunkSizeMean": 238.0952380952381,
+        "completedRuns": 100000,
+        "technicalErrorRuns": 0
+      },
+      "kpis": {
+        "floorCoveragePct": 94.068,
+        "ruinRatePct": 6.677,
+        "endWealthP10NominalEur": 194773.01330241346,
+        "endWealthP50NominalEur": 1209442.7250334807,
+        "maxDrawdownP90Pct": 81.63123397827148
+      }
+    },
+    {
+      "profileName": "stress",
+      "profile": {
+        "runs": 1000000,
+        "durationYears": 35,
+        "workerCount": 8,
+        "jobTimeBudgetMs": 500,
+        "scenarioId": "base",
+        "seed": 12345
+      },
+      "measurement": {
+        "durationMs": 233089.3236,
+        "peakRssBytes": 1888497664,
+        "peakHeapUsedBytes": 310856720,
+        "cancellationReactionMs": 12.052700000000186,
+        "bufferBytes": 63000000,
+        "bufferBytesPerRun": 63,
+        "estimatedWorkerPayloadBytes": 419309381,
+        "estimatedWorkerPayloadBytesPerRun": 419.309381,
+        "chunkCount": 3681,
+        "chunkSizeMinimum": 158,
+        "chunkSizeMaximum": 400,
+        "chunkSizeMean": 271.66530834012497,
+        "completedRuns": 1000000,
+        "technicalErrorRuns": 0
+      },
+      "kpis": {
+        "floorCoveragePct": 94.01509999999999,
+        "ruinRatePct": 6.7317,
+        "endWealthP10NominalEur": 193635.85056255432,
+        "endWealthP50NominalEur": 1212153.996039176,
+        "maxDrawdownP90Pct": 81.65062789916992
+      }
+    },
+    {
+      "profileName": "weakReference",
+      "profile": {
+        "runs": 100000,
+        "durationYears": 35,
+        "workerCount": 2,
+        "jobTimeBudgetMs": 500,
+        "scenarioId": "base",
+        "seed": 12345
+      },
+      "measurement": {
+        "durationMs": 87056.7917,
+        "peakRssBytes": 471277568,
+        "peakHeapUsedBytes": 40821616,
+        "cancellationReactionMs": 3.11699999999837,
+        "bufferBytes": 6300000,
+        "bufferBytesPerRun": 63,
+        "estimatedWorkerPayloadBytes": 41782142,
+        "estimatedWorkerPayloadBytesPerRun": 417.82142,
+        "chunkCount": 343,
+        "chunkSizeMinimum": 241,
+        "chunkSizeMaximum": 400,
+        "chunkSizeMean": 291.5451895043732,
+        "completedRuns": 100000,
+        "technicalErrorRuns": 0
+      },
+      "kpis": {
+        "floorCoveragePct": 94.068,
+        "ruinRatePct": 6.677,
+        "endWealthP10NominalEur": 194773.01330241346,
+        "endWealthP50NominalEur": 1209442.7250334807,
+        "maxDrawdownP90Pct": 81.63123397827148
+      }
+    }
+  ],
+  "convergence": [
+    {
+      "id": "CONV-BASE-12345",
+      "lowRuns": 100000,
+      "highRuns": 1000000,
+      "lowKpis": {
+        "floorCoveragePct": 94.068,
+        "ruinRatePct": 6.677,
+        "endWealthP10NominalEur": 194773.01330241346,
+        "endWealthP50NominalEur": 1209442.7250334807,
+        "maxDrawdownP90Pct": 81.63123397827148
+      },
+      "highKpis": {
+        "floorCoveragePct": 94.01509999999999,
+        "ruinRatePct": 6.7317,
+        "endWealthP10NominalEur": 193635.85056255432,
+        "endWealthP50NominalEur": 1212153.996039176,
+        "maxDrawdownP90Pct": 81.65062789916992
+      },
+      "deltaHighMinusLow": {
+        "floorCoveragePct": -0.05290000000000816,
+        "ruinRatePct": 0.054700000000000415,
+        "endWealthP10NominalEur": -1137.1627398591372,
+        "endWealthP50NominalEur": 2711.27100569522,
+        "maxDrawdownP90Pct": 0.0193939208984375
+      }
+    },
+    {
+      "id": "CONV-HIGH-WITHDRAWAL-24680",
+      "lowRuns": 100000,
+      "highRuns": 1000000,
+      "lowKpis": {
+        "floorCoveragePct": 49.368,
+        "ruinRatePct": 55.245999999999995,
+        "endWealthP10NominalEur": 0,
+        "endWealthP50NominalEur": 0,
+        "maxDrawdownP90Pct": 100
+      },
+      "highKpis": {
+        "floorCoveragePct": 49.4156,
+        "ruinRatePct": 55.2392,
+        "endWealthP10NominalEur": 0,
+        "endWealthP50NominalEur": 0,
+        "maxDrawdownP90Pct": 100
+      },
+      "deltaHighMinusLow": {
+        "floorCoveragePct": 0.047599999999995646,
+        "ruinRatePct": -0.006799999999998363,
+        "endWealthP10NominalEur": 0,
+        "endWealthP50NominalEur": 0,
+        "maxDrawdownP90Pct": 0
+      }
+    },
+    {
+      "id": "CONV-CARE-PARTNER-424242",
+      "lowRuns": 100000,
+      "highRuns": 1000000,
+      "lowKpis": {
+        "floorCoveragePct": 88.456,
+        "ruinRatePct": 12.647,
+        "endWealthP10NominalEur": 0,
+        "endWealthP50NominalEur": 1722543.8534612628,
+        "maxDrawdownP90Pct": 96.4998878479004
+      },
+      "highKpis": {
+        "floorCoveragePct": 88.5052,
+        "ruinRatePct": 12.585799999999999,
+        "endWealthP10NominalEur": 0,
+        "endWealthP50NominalEur": 1724299.2831940986,
+        "maxDrawdownP90Pct": 96.46842803955079
+      },
+      "deltaHighMinusLow": {
+        "floorCoveragePct": 0.04919999999999902,
+        "ruinRatePct": -0.06120000000000125,
+        "endWealthP10NominalEur": 0,
+        "endWealthP50NominalEur": 1755.4297328358516,
+        "maxDrawdownP90Pct": -0.031459808349609375
+      }
+    }
+  ]
+}

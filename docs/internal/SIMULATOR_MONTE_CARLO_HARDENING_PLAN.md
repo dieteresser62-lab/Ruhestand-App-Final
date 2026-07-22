@@ -1,11 +1,11 @@
 # Simulator / Monte Carlo: Hardening-Arbeitsplan
 
-**Stand:** 2026-07-19  
-**Status:** Revision 1 nach Gemini-/Claude-Review; blockiert bis erneute Freigabe  
+**Stand:** 2026-07-22
+**Status:** implementierungsreif; Slice 01 umgesetzt, Slice-Review ausstehend
 **Autor:** Codex als Implementer und Plan-Autor  
 **Feature-Branch:** `codex/simulator-monte-carlo-gap-plan`  
 **GitHub-Status:** nur lokal; Veroeffentlichung ausstehend und nur nach Nutzerfreigabe  
-**Reviewstand:** Gemini G-01 bis G-06 und Claude C-01 bis C-10 eingearbeitet; Re-Review ausstehend  
+**Reviewstand:** Gemini-Re-Review und Nutzerfreigabe erteilt; Slice 01 wartet auf Review
 **Ausgangsanalyse:** [SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md](./SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md)
 
 ## 1. Ziel und Rollenabgrenzung
@@ -64,9 +64,10 @@ Gemini-Freigabe und Nutzerfreigabe darf Slice 01 beginnen.
   festgelegt. Der Ist-Wert 1.000 bleibt bis zur freigegebenen Umsetzung in
   Slice 10 bestehen; danach muessen HTML, Eingabevertrag, Persistenzfallback,
   Tests und Dokumentation denselben Default 10.000 verwenden.
-- Die heute fest angelegten Typed Arrays beanspruchen mindestens 69 Byte pro
-  Run, also rund 65,8 MiB bei einer Million Runs; JS-Listen, `runMeta`,
-  Workerzustand und die geplanten V1-Summaries kommen hinzu.
+- Die in Slice 01 aus `createMonteCarloBuffers()` ausgemessenen Typed Arrays
+  beanspruchen **63 Byte pro Run**, also rund 60,1 MiB bei einer Million Runs.
+  Der gemessene gesamte Worker-Result-Payload liegt durch JS-Listen, `runMeta`
+  und weitere Ergebnisobjekte bei rund **419 Byte pro Run**.
 - Der Beleg widerlegt eine harte Grenze unter 100.000 Runs. Die Revision setzt
   100.000 als empfohlenen interaktiven Hoechstwert und 1.000.000 als weiterhin
   zulaessigen, bestaetigungspflichtigen Stresstest. Er ersetzt noch keinen
@@ -175,18 +176,18 @@ repariert.
 
 | ID | Festlegung von Codex nach Review | Betroffene Findings | Status |
 |---|---|---|---|
-| D-01 | Heutige Erfolgsquote wird "Floor-Deckung im gewaehlten Horizont"; bei fehlerfreiem Batch ist der Nenner `requestedRuns` und der Zaehler `all_dead + horizon_exhausted`. Sobald mindestens ein `technical_error` vorliegt, werden Quote und Intervall fuer den Gesamtbatch fail-closed als `null` unterdrueckt; das Outcome-Inventar bleibt sichtbar. | G-03 | zur Re-Review |
-| D-02 | Vier Outcomes und Jahreschronologie/Prioritaet aus Abschnitt 3.4; Ruin eines begonnenen Finanzjahrs geht spaeterem Todesflag vor. | G-03, C-05 | zur Re-Review |
-| D-03 | Pro Run: Zaehler = erfolgreich abgeschlossene Dekumulationsjahre mit Kuerzung `>= 10 %`; Nenner = erfolgreich abgeschlossene Dekumulationsjahre mit endlicher Kuerzungsentscheidung. Nenner 0 ergibt `null`, nie 0 oder NaN. | G-02 | zur Re-Review |
-| D-04 | P1/P2 getrennt; leere bedingte Verteilungen sind `null` plus `sampleSize=0`; Pflegebetrag im UI real zur Startpreisbasis, nominal nur explizit benannt im Export. | G-06, C-10 | zur Re-Review |
-| D-05 | Fixed-/Stationary-Block starten ihren ersten zusammenhaengenden Block am CAPE-Startrecord. Regime-Markov initialisiert dort sein Startregime; IID darf ab Jahr 2 unabhaengig ziehen. Jede Methode exportiert die tatsaechliche Praezedenz. | G-04 | zur Re-Review |
-| D-06 | UI-KPI wird ehrlich in "Reale Depotentnahme P10" umbenannt. Das Bewertungsfenster beginnt mit der ersten geplanten Dekumulationsverpflichtung und endet bei Tod aller Personen oder Horizont; ein Ruinversuch zaehlt als Beginn. Nach Ruin und solange jemand lebt wird mit realer Depotentnahme 0 aufgefuellt. Technische Fehler und Haushalte, die vor jeder Dekumulationsverpflichtung sterben, sind `null` mit Grund. Ueber Runs werden P10/P50 und `sampleSize` ausgewiesen. | G-01, C-05, C-07 | zur Re-Review |
-| D-07 | V1-Felder sind kanonisch. Befristete Read-Aliase tragen Deprecation-Telemetrie und werden spaetestens in Slice 11 entfernt; Slice 12 weist ihre Abwesenheit nach. | Gemini Vertragstreue | zur Re-Review |
-| D-08 | Runvertrag: neuer Default 10.000; bis 100.000 ohne Grosslastbestaetigung; ueber 100.000 Warnung mit Run-Jahren/Speicherschaetzung und expliziter Bestaetigung; harte Grenze 1.000.000. Standardbenchmark `100.000 x 35 Jahre`, Stresstest `1.000.000 x 35 Jahre`, jeweils 8 Worker/500 ms. Dauer, Blocklaenge, Worker und Budget erhalten weiterhin daten-/hardwarebasierte Grenzen in Slice 01. Keine stille Klemmung. | Nutzerbeleg U-01/U-02/U-03, MC-14 | Runwerte entschieden zur Re-Review; uebrige Parametergrenzen in Slice 01 offen |
-| D-09 | Paired Compare bleibt separates Folgefeature nach stabilem V1-Export. | MC-17 | zur Re-Review |
-| D-10 | Per-Run-Summaries werden global indexiert; Finalisierung reduziert in Runindex-Reihenfolge. Innerhalb derselben JS-Runtime muessen Worker-/Chunkvarianten auch endliche Float-Per-Run-Werte und daraus abgeleitete Aggregate exakt liefern. Nur Snapshots ueber dokumentiert unterschiedliche Runtimeversionen duerfen feldspezifische, vorab quantifizierte Toleranzen verwenden. | C-01, C-07, C-09 | zur Re-Review |
-| D-11 | Snapshotpolicy aus Abschnitt 3.6; Pre-Hardening-Referenz wird niemals ueberschrieben. | C-04 | zur Re-Review |
-| D-12 | `WorkerJobRunner` wird erweitert, nicht ersetzt. User-Cancel terminiert aktive Worker, erzeugt keinen Serial-Fallback und baut den Singleton-Pool erst beim naechsten expliziten Start lazy neu auf. Parameterwechsel starten keinen Lauf automatisch; Start/Cancel sind single-flight. | G-05, C-08 | zur Re-Review |
+| D-01 | Heutige Erfolgsquote wird "Floor-Deckung im gewaehlten Horizont"; bei fehlerfreiem Batch ist der Nenner `requestedRuns` und der Zaehler `all_dead + horizon_exhausted`. Sobald mindestens ein `technical_error` vorliegt, werden Quote und Intervall fuer den Gesamtbatch fail-closed als `null` unterdrueckt; das Outcome-Inventar bleibt sichtbar. | G-03 | entschieden; in Slice 01 fixiert |
+| D-02 | Vier Outcomes und Jahreschronologie/Prioritaet aus Abschnitt 3.4; Ruin eines begonnenen Finanzjahrs geht spaeterem Todesflag vor. | G-03, C-05 | entschieden; in Slice 01 fixiert |
+| D-03 | Pro Run: Zaehler = erfolgreich abgeschlossene Dekumulationsjahre mit Kuerzung `>= 10 %`; Nenner = erfolgreich abgeschlossene Dekumulationsjahre mit endlicher Kuerzungsentscheidung. Nenner 0 ergibt `null`, nie 0 oder NaN. | G-02 | entschieden; in Slice 01 fixiert |
+| D-04 | P1/P2 getrennt; leere bedingte Verteilungen sind `null` plus `sampleSize=0`; Pflegebetrag im UI real zur Startpreisbasis, nominal nur explizit benannt im Export. | G-06, C-10 | entschieden; in Slice 01 fixiert |
+| D-05 | Fixed-/Stationary-Block starten ihren ersten zusammenhaengenden Block am CAPE-Startrecord. Regime-Markov initialisiert dort sein Startregime; IID darf ab Jahr 2 unabhaengig ziehen. Jede Methode exportiert die tatsaechliche Praezedenz. | G-04 | entschieden; in Slice 01 fixiert |
+| D-06 | UI-KPI wird ehrlich in "Reale Depotentnahme P10" umbenannt. Das Bewertungsfenster beginnt mit der ersten geplanten Dekumulationsverpflichtung und endet bei Tod aller Personen oder Horizont; ein Ruinversuch zaehlt als Beginn. Nach Ruin und solange jemand lebt wird mit realer Depotentnahme 0 aufgefuellt. Technische Fehler und Haushalte, die vor jeder Dekumulationsverpflichtung sterben, sind `null` mit Grund. Ueber Runs werden P10/P50 und `sampleSize` ausgewiesen. | G-01, C-05, C-07 | entschieden; in Slice 01 fixiert |
+| D-07 | V1-Felder sind kanonisch. Befristete Read-Aliase tragen Deprecation-Telemetrie und werden spaetestens in Slice 11 entfernt; Slice 12 weist ihre Abwesenheit nach. | Gemini Vertragstreue | entschieden; in Slice 01 fixiert |
+| D-08 | Runvertrag: neuer Default 10.000; bis 100.000 ohne Grosslastbestaetigung; ueber 100.000 Warnung mit Run-Jahren/Speicherschaetzung und expliziter Bestaetigung; harte Grenze 1.000.000. Standardbenchmark `100.000 x 35 Jahre`, Stresstest `1.000.000 x 35 Jahre`, jeweils 8 Worker/500 ms. Dauer, Blocklaenge, Worker und Budget erhalten weiterhin daten-/hardwarebasierte Grenzen in Slice 01. Keine stille Klemmung. | Nutzerbeleg U-01/U-02/U-03, MC-14 | entschieden; Messvertrag in Slice 01 fixiert |
+| D-09 | Paired Compare bleibt separates Folgefeature nach stabilem V1-Export. | MC-17 | entschieden; in Slice 01 fixiert |
+| D-10 | Per-Run-Summaries werden global indexiert; Finalisierung reduziert in Runindex-Reihenfolge. Innerhalb derselben JS-Runtime muessen Worker-/Chunkvarianten auch endliche Float-Per-Run-Werte und daraus abgeleitete Aggregate exakt liefern. Nur Snapshots ueber dokumentiert unterschiedliche Runtimeversionen duerfen feldspezifische, vorab quantifizierte Toleranzen verwenden. | C-01, C-07, C-09 | entschieden; in Slice 01 fixiert |
+| D-11 | Snapshotpolicy aus Abschnitt 3.6; Pre-Hardening-Referenz wird niemals ueberschrieben. | C-04 | entschieden; in Slice 01 fixiert |
+| D-12 | `WorkerJobRunner` wird erweitert, nicht ersetzt. User-Cancel terminiert aktive Worker, erzeugt keinen Serial-Fallback und baut den Singleton-Pool erst beim naechsten expliziten Start lazy neu auf. Parameterwechsel starten keinen Lauf automatisch; Start/Cancel sind single-flight. | G-05, C-08 | entschieden; in Slice 01 fixiert |
 
 Eine Review darf Alternativen beschliessen. Die Entscheidung muss dann in
 dieser Tabelle und in den betroffenen Slices dokumentiert werden; stillschweigende
@@ -196,7 +197,7 @@ Semantikaenderungen sind unzulaessig.
 
 | Slice | Inhalt | GAPs | Abhaengigkeit | Status |
 |---|---|---|---|---|
-| [01](./SLICE_SIMULATOR_MONTE_CARLO_01_BASELINE_MESSVERTRAG.md) | Baseline, Entscheidungen und Messvertrag | querschnittlich; Golden Cases fuer MC-01 bis MC-19 | Reviewfreigabe des Plans | geplant |
+| [01](./SLICE_SIMULATOR_MONTE_CARLO_01_BASELINE_MESSVERTRAG.md) | Baseline, Entscheidungen und Messvertrag | querschnittlich; Golden Cases fuer MC-01 bis MC-19 | Reviewfreigabe des Plans | abgeschlossen und freigegeben |
 | [02](./SLICE_SIMULATOR_MONTE_CARLO_02_CHUNK_RESULT_CONTRACT.md) | zentraler Chunk-/Path-Summary-Vertrag | MC-10, MC-19 | 01, D-10, D-11 | geplant |
 | [03](./SLICE_SIMULATOR_MONTE_CARLO_03_RISIKO_KPI_SEMANTIK.md) | Volatilitaet und Kuerzungsanteil | MC-01, MC-02 | 02, D-03 | geplant |
 | [04](./SLICE_SIMULATOR_MONTE_CARLO_04_PFLEGE_KPI_SEMANTIK.md) | Pflegeeintritt, -dauer und -kosten | MC-03, MC-04 | 02, D-04 | geplant |
@@ -561,3 +562,34 @@ alte Erfolgsquotenterminologie verwendet.
 - Nutzerfreigabe: erteilt am 2026-07-22.
 - Status `implementierungsreif`: erteilt (für Gemini-Freigabepfad & Nutzer).
 - Implementierungsbeginn: freigegeben für Slice 01 auf Branch `codex/simulator-monte-carlo-gap-plan`.
+
+## 14. Rueckdokumentation Slice 01
+
+- Implementierungsstatus: abgeschlossen; Gemini-/Nutzerreview des Slice steht
+  aus. Codex erteilt keine eigene Freigabe.
+- D-01 bis D-12 sind in `golden-cases-v1.json` als entschiedene Zielvertraege
+  fixiert. Golden Cases decken Risiko, Kuerzungsanteil, getrennte P1-/P2-Pflege,
+  vier terminale Outcomes und Sampling-Praezedenz ab.
+- `pre-hardening-v1.json` ist die unveraenderliche Ist-Referenz mit Seed,
+  Datenversion, Runtime, fester 4-Worker-/4-Chunk-Konfiguration und vorab
+  festgelegten Runtime-Toleranzen. Die Policy verbietet ihr Ueberschreiben.
+- Der neue Contracttest vergleicht direkten Runner und echte Worker-Threads
+  sowie 1-/2-/4-Worker-Aufteilungen bei drei Chunklayouts exakt und prueft alle
+  endlichen Per-Run-Floats und abgeleiteten Aggregate.
+- Reproduzierbare Messprofile, Consumer-Inventar und Delta-Ledger liegen unter
+  `tests/fixtures/monte-carlo-measurement/`.
+- Lastmessung auf Node v25.2.1, Windows x64, 16 logischen CPUs:
+  - Standard `100.000 x 35`, 8 Worker: 27,934 s, Peak-RSS 896,4 MiB;
+  - Stress `1.000.000 x 35`, 8 Worker: 233,089 s, Peak-RSS 1,759 GiB;
+  - schwache Referenz `100.000 x 35`, 2 Worker: 87,057 s, Peak-RSS 449,4 MiB;
+  - Abbruchreaktion in allen drei Profilen unter 13 ms, keine technischen
+    Fehler, Typed Arrays 63 Byte/Run, gesamter Payload rund 419 Byte/Run.
+- Die drei Konvergenzfaelle zeigen kleine, aber messbare Deltas. Die groesste
+  absolute Wahrscheinlichkeitsabweichung betraegt 0,0612 Prozentpunkte; damit
+  bleibt der Nutzerbefund lokal plausibel, wird aber nicht verallgemeinert.
+- Slice-Test: 785/785 Assertions gruen. Sieben betroffene Bestandssuiten:
+  681/681 Assertions gruen. `npm test` erreicht 6488/6489 Assertions und
+  reproduziert als einzige Abweichung den bereits dokumentierten fremden
+  Architektur-Linkfehler mit sechs toten Links auf zwei fehlende
+  Forschungsdokumente; diese Dateien blieben ausserhalb des Slice-Scope
+  unangetastet.

@@ -1,0 +1,114 @@
+{
+  "schemaVersion": "monte-carlo-benchmark-contract-v1",
+  "resourceContract": {
+    "runs": {
+      "minimum": 1,
+      "default": 10000,
+      "interactiveRecommendedMaximum": 100000,
+      "confirmationRequiredAbove": 100000,
+      "hardMaximum": 1000000,
+      "silentClampingAllowed": false
+    },
+    "durationYears": {
+      "minimum": 1,
+      "mortalityTableMaximumAge": 110,
+      "storageMaximum": 255,
+      "effectiveMaximumFormula": "min(storageMaximum, mortalityTableMaximumAge - youngestHouseholdStartAge + 1)",
+      "fallbackMortalityBeyondTableAllowed": false,
+      "silentClampingAllowed": false
+    },
+    "blockLengthYears": {
+      "minimum": 1,
+      "configuredMaximum": 30,
+      "fixedBlockMaximumFormula": "min(configuredMaximum, eligibleHistoricalRecordCount)",
+      "stationaryExpectedLengthMaximum": 30,
+      "notApplicableMethods": ["regime_markov", "regime_iid"],
+      "silentClampingAllowed": false
+    },
+    "workerCount": {
+      "autoSentinel": 0,
+      "minimumExplicit": 1,
+      "configuredMaximum": 32,
+      "effectiveAutoFormula": "max(1, min(32, hardwareConcurrency - 1))",
+      "benchmarkValue": 8
+    },
+    "jobTimeBudgetMs": {
+      "minimum": 50,
+      "default": 500,
+      "maximum": 5000,
+      "benchmarkValue": 500
+    },
+    "seed": {
+      "minimum": 0,
+      "maximum": 4294967295,
+      "integerRequired": true
+    }
+  },
+  "measurementMethod": {
+    "clock": "performance.now",
+    "memory": "process.memoryUsage sampled every 100 ms; peak RSS and peak heapUsed",
+    "payloadBytes": "typed-array byteLength plus UTF-8 JSON bytes for non-typed result payload",
+    "bytesPerRun": "total worker result payload bytes divided by completed runs",
+    "cancelReaction": "terminate all active worker threads after a 50 ms warm-up and measure until all terminate promises settle",
+    "chunkPolicy": {
+      "id": "adaptive-time-budget-v1",
+      "minimumChunk": 10,
+      "maximumChunk": 400,
+      "smoothingOldWeight": 0.7,
+      "smoothingTargetWeight": 0.3
+    }
+  },
+  "profiles": {
+    "standard": {
+      "runs": 100000,
+      "durationYears": 35,
+      "workerCount": 8,
+      "jobTimeBudgetMs": 500,
+      "scenarioId": "base",
+      "seed": 12345
+    },
+    "stress": {
+      "runs": 1000000,
+      "durationYears": 35,
+      "workerCount": 8,
+      "jobTimeBudgetMs": 500,
+      "scenarioId": "base",
+      "seed": 12345
+    },
+    "weakReference": {
+      "runs": 100000,
+      "durationYears": 35,
+      "workerCount": 2,
+      "jobTimeBudgetMs": 500,
+      "scenarioId": "base",
+      "seed": 12345
+    }
+  },
+  "convergenceCases": [
+    {
+      "id": "CONV-BASE-12345",
+      "scenarioId": "base",
+      "seed": 12345,
+      "runCounts": [100000, 1000000]
+    },
+    {
+      "id": "CONV-HIGH-WITHDRAWAL-24680",
+      "scenarioId": "highWithdrawal",
+      "seed": 24680,
+      "runCounts": [100000, 1000000]
+    },
+    {
+      "id": "CONV-CARE-PARTNER-424242",
+      "scenarioId": "carePartner",
+      "seed": 424242,
+      "runCounts": [100000, 1000000]
+    }
+  ],
+  "reportedKpis": [
+    "floorCoveragePct",
+    "ruinRatePct",
+    "endWealthP10NominalEur",
+    "endWealthP50NominalEur",
+    "maxDrawdownP90Pct"
+  ]
+}

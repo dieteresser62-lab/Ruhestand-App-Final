@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "monte-carlo-snapshot-policy-v1",
+  "referenceClasses": [
+    {
+      "id": "pre-hardening-v1",
+      "file": "pre-hardening-v1.json",
+      "immutable": true,
+      "overwriteAllowed": false,
+      "purpose": "Characterize the implementation before semantic hardening."
+    },
+    {
+      "idPattern": "post-slice-{sliceNumber}-v{revision}",
+      "filePattern": "post-slice-{sliceNumber}-v{revision}.json",
+      "immutableAfterReview": true,
+      "overwriteAllowed": false,
+      "requiresDeltaLedger": true,
+      "purpose": "Record an explicitly reviewed semantic transition without changing earlier references."
+    },
+    {
+      "id": "monte-carlo-v1-final",
+      "file": "monte-carlo-v1-final.json",
+      "candidateOnlyUntilExternalApproval": true,
+      "overwriteAllowed": false,
+      "purpose": "Integration candidate created in Slice 12."
+    }
+  ],
+  "comparisonRules": {
+    "sameRuntime": "exact",
+    "crossRuntime": "field-specific tolerances declared in the snapshot before execution",
+    "discreteFields": "exact-always",
+    "widenToleranceAfterFailure": false,
+    "unexplainedDelta": "block"
+  }
+}
