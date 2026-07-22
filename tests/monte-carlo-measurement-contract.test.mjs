@@ -7,6 +7,7 @@ import { EngineAPI } from '../engine/index.mjs';
 import {
     attachMonteCarloBatchOutcome,
     buildMonteCarloAggregates,
+    createMonteCarloBuffers,
     runMonteCarloChunk
 } from '../app/simulator/monte-carlo-runner.js';
 import {
@@ -35,6 +36,7 @@ const snapshotPolicy = readFixture('snapshot-policy-v1.json');
 const deltaLedger = readFixture('delta-ledger-v1.json');
 const preHardening = readFixture('pre-hardening-v1.json');
 const postSlice03 = readFixture('post-slice-03-v1.json');
+const postSlice04 = readFixture('post-slice-04-v1.json');
 const benchmarkContract = readFixture('benchmark-contract-v1.json');
 const benchmarkResults = readFixture('benchmark-results-2026-07-22.json');
 const consumerInventory = readFixture('consumer-inventory-v1.json');
@@ -324,6 +326,54 @@ function riskKpiSnapshotProjection(result) {
             maxDrawdowns: result.aggregates.maxDrawdowns
         }
     });
+}
+
+function careKpiSnapshotProjection() {
+    const golden = getGolden('GC-CARE-01');
+    const runsWithCare = golden.input.runs.filter(run => run.p1 || run.p2);
+    const p1Rows = golden.input.runs.map(run => run.p1).filter(Boolean);
+    const p2Rows = golden.input.runs.map(run => run.p2).filter(Boolean);
+    const totalRuns = golden.input.requestedRuns;
+    const buffers = createMonteCarloBuffers(totalRuns);
+    const lists = {
+        entryAges: p1Rows.map(row => row.entryAge),
+        entryAgesP2: p2Rows.map(row => row.entryAge),
+        p1CareAdditionalNeedRealEur: p1Rows.map(row => row.realCostEur),
+        p2CareAdditionalNeedRealEur: p2Rows.map(row => row.realCostEur),
+        totalCareAdditionalNeedRealEur: runsWithCare.map(run => (
+            (run.p1?.realCostEur || 0) + (run.p2?.realCostEur || 0)
+        )),
+        endWealthWithCareRealEur: [700000, 600000],
+        endWealthNoCareRealEur: [900000, 1000000],
+        p1CareYearsTriggered: p1Rows.map(row => row.careYears),
+        p2CareYearsTriggered: p2Rows.map(row => row.careYears),
+        bothCareYearsOverlapTriggered: [0, 1],
+        maxAnnualCareAdditionalNeedRealEur: [12000, 14000],
+        healthBucketUsedAmounts: [],
+        healthBucketEndAmounts: [],
+        healthBucketCoveragePct: [],
+        healthBucketTargetGaps: [],
+        healthBucketInterestAmounts: []
+    };
+    const aggregate = buildMonteCarloAggregates({
+        inputs: { stressPreset: 'NONE', partner: { aktiv: true } },
+        totalRuns,
+        buffers,
+        heatmap: [new Uint32Array([0])],
+        bins: [0, Infinity],
+        totals: {
+            pflegeTriggeredCount: runsWithCare.length,
+            p1TriggeredCount: p1Rows.length,
+            p2TriggeredCount: p2Rows.length,
+            totalSimulatedYears: 0,
+            totalYearsQuoteAbove45: 0,
+            shortfallWithCareCount: 0,
+            shortfallNoCareProxyCount: 0
+        },
+        lists,
+        allRealWithdrawalsSample: []
+    });
+    return canonicalize(aggregate.extraKPI.pflege);
 }
 
 function resolveTolerance(pathName, sameRuntime, toleranceContract) {
@@ -684,6 +734,18 @@ function computeKpiDelta(low, high) {
     }
     assertEqual(postSlice03.sourceReference, 'pre-hardening-v1', 'Post-Slice-03 snapshot must reference the immutable baseline');
     assertEqual(postSlice03.reviewStatus, 'pending', 'Codex must not mark its own post-slice snapshot as reviewed');
+    const slice04Entries = deltaLedger.entries.filter(entry => entry.sliceId === '04');
+    assertEqual(slice04Entries.length, 3, 'Slice 04 must ledger person semantics, care-need units and comparison sign separately');
+    for (const entry of slice04Entries) {
+        for (const field of deltaLedger.requiredEntryFields) {
+            assert(entry[field] !== undefined, `Slice 04 delta entry must contain ${field}`);
+        }
+        assertEqual(entry.sourceReference, 'post-slice-03-v1', 'Slice 04 deltas must retain the prior accepted slice reference');
+        assertEqual(entry.targetReference, 'post-slice-04-v1', 'Slice 04 deltas must target the separate post-slice snapshot');
+    }
+    assertEqual(postSlice04.sourceReference, 'post-slice-03-v1', 'Post-Slice-04 snapshot must reference the prior slice snapshot');
+    assertEqual(postSlice04.reviewStatus, 'pending', 'Codex must not mark its own Post-Slice-04 snapshot as reviewed');
+    assertJsonEqual(careKpiSnapshotProjection(), postSlice04.result, 'Post-Slice-04 care snapshot must match the deterministic golden aggregate');
 }
 
 // Contract 8: every planned rename has producers, consumers, tests and a migration note.

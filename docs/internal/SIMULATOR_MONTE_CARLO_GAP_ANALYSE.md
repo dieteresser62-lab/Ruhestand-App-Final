@@ -1,7 +1,7 @@
 # Simulator / Monte Carlo: GAP-Analyse
 
 **Stand:** 2026-07-22
-**Status:** Plan freigegeben; Slices 01-02 freigegeben, Slice 03 implementiert und im Review
+**Status:** Plan und Slices 01-03 freigegeben; Slice 04 implementiert, externes Review ausstehend
 **Autor:** Codex als Implementer und Plan-Autor  
 **Planungsbranch:** `codex/simulator-monte-carlo-gap-plan` (nur lokal; nicht auf GitHub veroeffentlicht)  
 **Folgeplan:** [SIMULATOR_MONTE_CARLO_HARDENING_PLAN.md](./SIMULATOR_MONTE_CARLO_HARDENING_PLAN.md)
@@ -131,7 +131,7 @@ Golden Cases muessen beide Groessen auseinanderhalten.
 
 **Umsetzungsstand 2026-07-22:** Implementiert. Der Runner schreibt `volPct`
 und `maxDDpct` in getrennte V1-Felder. Golden Case, Post-Slice-Snapshot und
-direkte/Worker-/Auto-Optimize-Paritaet sind gruen; externe Freigabe steht aus.
+direkte/Worker-/Auto-Optimize-Paritaet sind gruen; Slice 03 ist extern freigegeben.
 
 ### MC-02 - Jahresanzahl wird als Anteil der Kuerzungsjahre ausgegeben (P0)
 
@@ -156,7 +156,7 @@ Exakt 10 Prozent und Ruin vor dem ersten abgeschlossenen Jahr sind Golden Cases.
 `cutYearShareRatio` nutzt nur abgeschlossene Dekumulationsjahre, schliesst
 exakt 10 Prozent ein und traegt bei Nenner 0 `NO_OBSERVATIONS`; Aggregat und UI
 verwenden `cutYearSharePct` mit Stichprobengroesse. Der absolute Legacy-Zaehler
-bleibt befristet und explizit deprecated; externe Freigabe steht aus.
+bleibt befristet und explizit deprecated; Slice 03 ist extern freigegeben.
 
 ### MC-03 - Pflege-P1-KPIs verwenden teilweise den Haushaltszaehler (P0)
 
@@ -175,6 +175,11 @@ werden je KPI ausgewiesen. Leere Verteilungen liefern `null`, `sampleSize=0`
 und im UI einen Gedankenstrich statt 0 oder NaN.
 
 **Slice:** 04.
+
+**Umsetzungsstand 2026-07-22:** Implementiert. P1 und P2 besitzen getrennte
+Eintrittszaehler, bedingte Listen ohne Null-Sentinels sowie nullable P50-Werte
+mit Stichprobengroesse und Missingness. Haushaltseintritt bleibt separat; die
+externe Freigabe steht aus.
 
 ### MC-04 - Pflegekosten- und Delta-Karten ueberzeichnen ihre Semantik (P0)
 
@@ -195,6 +200,13 @@ Export eine explizite Einheit. Nicht-kausale Gruppenvergleiche als solche
 markieren. Vorzeichen und Beschreibung muessen reconciliierbar sein.
 
 **Slice:** 04.
+
+**Umsetzungsstand 2026-07-22:** Implementiert. Der Runner misst den tatsaechlich
+an die Simulation uebergebenen Zusatzbedarf als Jahressumme P1 plus P2. UI-
+Betraege sind real zur Preisbasis des Simulationsstarts; nominale V1-Path-
+Felder tragen `NominalEur`. Die falsche Depotkosten-Zurechnung wurde entfernt,
+und `ohne Pflege minus mit Pflege` ist als ungepaarter, nicht-kausaler
+Gruppenmedianvergleich markiert. Die externe Freigabe steht aus.
 
 ### MC-05 - Horizontende ist kein eigener Outcome (P0)
 

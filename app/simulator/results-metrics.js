@@ -223,31 +223,35 @@ export function buildCareMetrics(results, inputs) {
     const cards = [];
 
     if (hasCareMetrics) {
+        const p1 = care.p1 || {};
         cards.push(
-            buildCareEntryCard('Pflegefall-Eintrittsquote P1', care.entryRatePct, 'Anteil der Simulationen, in denen Person 1 Pflegefall eintritt.'),
-            buildCareEntryCard('Median Eintrittsalter P1', safeAge(care.entryAgeMedian), 'Typisches Alter bei Eintritt des Pflegefalls Person 1.', 'Jahre'),
-            buildCareEntryCard('Median Pflegejahre P1', safeAge(care.p1CareYears), 'Typische Anzahl Jahre in Pflege (Person 1).', 'Jahre')
+            buildCareEntryCard('Pflegefall-Eintrittsquote P1', p1.entryRatePct, `P1-Eintritte: ${p1.entryRateNumerator || 0} von ${p1.entryRateDenominator || 0} angeforderten Läufen.`, '%'),
+            buildCareEntryCard('Median Eintrittsalter P1', p1.entryAgeP50, `Bedingt auf beobachtete P1-Eintritte; Stichprobe: ${p1.sampleSize || 0} Läufe.`, 'Jahre'),
+            buildCareEntryCard('Median Pflegejahre P1', p1.careYearsP50, `Nur P1-Pflegejahre in Läufen mit P1-Eintritt; Stichprobe: ${p1.sampleSize || 0}.`, 'Jahre'),
+            buildCareEntryCard('Realer Pflege-Mehrbedarf P1 (Median)', p1.realCostEurP50, `Modellierter P1-Zusatzbedarf zu Preisen des Simulationsstarts; keine kausale Depot-Cashflow-Zurechnung. Stichprobe: ${p1.sampleSize || 0}.`, null, true, true)
         );
     }
 
     if (hasCareMetrics && inputs.partner?.aktiv) {
+        const p2 = care.p2 || {};
         cards.push(
-            buildCareEntryCard('Pflegefall-Eintrittsquote P2', care.p2EntryRatePct, 'Anteil der Simulationen, in denen Person 2 Pflegefall eintritt.'),
-            buildCareEntryCard('Median Eintrittsalter P2', safeAge(care.p2EntryAgeMedian), 'Typisches Alter bei Eintritt des Pflegefalls Person 2.', 'Jahre'),
-            buildCareEntryCard('Median Pflegejahre P2', safeAge(care.p2CareYears), 'Typische Anzahl Jahre in Pflege (Person 2).', 'Jahre'),
-            buildCareEntryCard('Median Jahre beide in Pflege', safeAge(care.bothCareYears), 'Typische Anzahl Jahre, in denen beide Personen gleichzeitig in Pflege sind.', 'Jahre'),
-            buildCareEntryCard('Max. jährl. Pflege-Ausgaben', care.maxAnnualCareSpend, 'Median der maximalen jährlichen Pflege-Gesamtkosten (P1+P2).', null, true, true)
+            buildCareEntryCard('Pflegefall-Eintrittsquote P2', p2.entryRatePct, `P2-Eintritte: ${p2.entryRateNumerator || 0} von ${p2.entryRateDenominator || 0} angeforderten Läufen.`, '%'),
+            buildCareEntryCard('Median Eintrittsalter P2', p2.entryAgeP50, `Bedingt auf beobachtete P2-Eintritte; Stichprobe: ${p2.sampleSize || 0} Läufe.`, 'Jahre'),
+            buildCareEntryCard('Median Pflegejahre P2', p2.careYearsP50, `Nur P2-Pflegejahre in Läufen mit P2-Eintritt; Stichprobe: ${p2.sampleSize || 0}.`, 'Jahre'),
+            buildCareEntryCard('Realer Pflege-Mehrbedarf P2 (Median)', p2.realCostEurP50, `Modellierter P2-Zusatzbedarf zu Preisen des Simulationsstarts; keine kausale Depot-Cashflow-Zurechnung. Stichprobe: ${p2.sampleSize || 0}.`, null, true, true),
+            buildCareEntryCard('Median Jahre beide in Pflege', care.household?.careYearsOverlapP50, `Gleichzeitige P1-/P2-Pflegejahre, einschließlich beobachteter 0; Stichprobe: ${care.household?.sampleSize || 0}.`, 'Jahre')
         );
     }
 
     if (hasCareMetrics) {
         cards.push(
-            buildCareEntryCard('Bedingte Shortfall-Rate', care.shortfallRate_condCare, 'Anteil der Fehlschläge, wenn ein Pflegefall eingetreten ist.', '%'),
-            buildCareEntryCard('Shortfall-Rate (o. Pflege)', care.shortfallRate_noCareProxy, 'Geschätzte Fehlschlag-Rate ohne Pflegefall-Eintritt.', '%'),
-            buildCareEntryCard('Median Endvermögen (m. Pflege)', care.endwealthWithCare_median, 'Typisches Endvermögen unter Berücksichtigung des Pflegerisikos.', null, true, true),
-            buildCareEntryCard('Median Endvermögen (o. Pflege)', care.endwealthNoCare_median, 'Geschätztes typisches Endvermögen ohne die Last des Pflegefalls.', null, true, true),
-            buildCareEntryCard('Median Gesamtkosten (Depot)', care.depotCosts_median, 'Typische Summe der aus dem Depot finanzierten Pflege-Mehrkosten (betroffene Läufe).', null, true, true),
-            buildCareEntryCard('Median-Vermögensdifferenz', care.shortfallDelta_vs_noCare, 'Unterschied im medianen Endvermögen (ohne Pflege minus mit Pflege).', null, true, true)
+            buildCareEntryCard('Max. jährlicher Pflege-Mehrbedarf (real)', care.household?.maxAnnualAdditionalNeedRealEurP50, 'Median des je Lauf höchsten tatsächlich modellierten jährlichen Haushalts-Zusatzbedarfs (P1 + P2), zu Preisen des Simulationsstarts.', null, true, true),
+            buildCareEntryCard('Gesamter Pflege-Mehrbedarf (real)', care.household?.totalAdditionalNeedRealEurP50, 'Median der über Pflegejahre summierten modellierten Haushalts-Zusatzbedarfe, zu Preisen des Simulationsstarts; nicht als depotfinanzierter Betrag interpretieren.', null, true, true),
+            buildCareEntryCard('Bedingte Shortfall-Rate', care.household?.shortfallRateWithCarePct, `Anteil der Shortfalls unter Läufen mit Pflegeeintritt; Stichprobe: ${care.household?.sampleSize || 0}.`, '%'),
+            buildCareEntryCard('Shortfall-Rate (o. Pflege)', care.household?.shortfallRateWithoutCarePct, `Anteil der Shortfalls unter Läufen ohne Pflegeeintritt; Stichprobe: ${care.household?.noCareSampleSize || 0}.`, '%'),
+            buildCareEntryCard('Reales Endvermögen (m. Pflege, Median)', care.household?.endWealthWithCareRealEurP50, 'Gruppenmedian der Läufe mit Pflegeeintritt, zu Preisen des Simulationsstarts.', null, true, true),
+            buildCareEntryCard('Reales Endvermögen (o. Pflege, Median)', care.household?.endWealthNoCareRealEurP50, 'Gruppenmedian der Läufe ohne Pflegeeintritt, zu Preisen des Simulationsstarts.', null, true, true),
+            buildCareEntryCard('Gruppenmedian-Differenz ohne minus mit Pflege', care.comparison?.endWealthNoCareMinusCareRealEur, 'Nicht gepaarter, nicht-kausaler Vergleich: Median ohne Pflege minus Median mit Pflege, zu Preisen des Simulationsstarts.', null, true, true)
         );
     }
 

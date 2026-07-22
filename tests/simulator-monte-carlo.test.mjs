@@ -250,13 +250,14 @@ function buildBasicInputs() {
     const heatmap = [new Uint32Array([1, 2])];
     const totals = {
         pflegeTriggeredCount: 0,
+        p1TriggeredCount: 0,
+        p2TriggeredCount: 0,
         totalSimulatedYears: 10,
         totalYearsQuoteAbove45: 2,
         totalYearsSafetyStage1plus: 3,
         totalYearsSafetyStage2: 1,
         shortfallWithCareCount: 0,
         shortfallNoCareProxyCount: 0,
-        p2TriggeredCount: 0,
         runsSafetyStage1Triggered: 1,
         runsSafetyStage2Triggered: 1,
         healthBucketEnabledCount: 2,
@@ -267,13 +268,15 @@ function buildBasicInputs() {
     const lists = {
         entryAges: [],
         entryAgesP2: [],
-        careDepotCosts: [],
-        endWealthWithCareList: [],
-        endWealthNoCareList: [],
+        p1CareAdditionalNeedRealEur: [],
+        p2CareAdditionalNeedRealEur: [],
+        totalCareAdditionalNeedRealEur: [],
+        endWealthWithCareRealEur: [],
+        endWealthNoCareRealEur: [],
         p1CareYearsTriggered: [],
         p2CareYearsTriggered: [],
         bothCareYearsOverlapTriggered: [],
-        maxAnnualCareSpendTriggered: [],
+        maxAnnualCareAdditionalNeedRealEur: [],
         healthBucketUsedAmounts: [5000],
         healthBucketEndAmounts: [0, 20000],
         healthBucketCoveragePct: [0, 80],
@@ -320,17 +323,20 @@ function buildBasicInputs() {
         bins: [0, Infinity],
         totals: {
             pflegeTriggeredCount: 0,
+            p1TriggeredCount: 0,
+            p2TriggeredCount: 0,
             totalSimulatedYears: 0,
             totalYearsQuoteAbove45: 0,
             shortfallWithCareCount: 0,
-            shortfallNoCareProxyCount: 0,
-            p2TriggeredCount: 0
+            shortfallNoCareProxyCount: 0
         },
         lists: {
-            entryAges: [], entryAgesP2: [], careDepotCosts: [],
-            endWealthWithCareList: [], endWealthNoCareList: [],
+            entryAges: [], entryAgesP2: [],
+            p1CareAdditionalNeedRealEur: [], p2CareAdditionalNeedRealEur: [],
+            totalCareAdditionalNeedRealEur: [],
+            endWealthWithCareRealEur: [], endWealthNoCareRealEur: [],
             p1CareYearsTriggered: [], p2CareYearsTriggered: [],
-            bothCareYearsOverlapTriggered: [], maxAnnualCareSpendTriggered: []
+            bothCareYearsOverlapTriggered: [], maxAnnualCareAdditionalNeedRealEur: []
         },
         allRealWithdrawalsSample: []
     });
@@ -449,8 +455,7 @@ function buildBasicInputs() {
         kpiMaxKuerzungDieserLauf: 12,
         totalTaxesThisRun: 99,
         totalTaxSavedByLossCarryThisRun: 11,
-        depotOnlyStart: 1000,
-        depotOnlyEnd: 800,
+        finalValueRealEur: 1000,
         ruinOrDepleted: false,
         careEverActive: true,
         triggeredAge: 70,
@@ -459,8 +464,10 @@ function buildBasicInputs() {
         p2CareYears: 1,
         bothCareYears: 1,
         hasPartner: true,
-        careMetaP1: { zusatzFloorZiel: 1000 },
-        careMetaP2: { zusatzFloorZiel: 500 },
+        p1CareAdditionalNeedRealEur: 2000,
+        p2CareAdditionalNeedRealEur: 500,
+        totalCareAdditionalNeedRealEur: 2500,
+        maxAnnualCareAdditionalNeedRealEur: 1500,
         runSafetyStage1Ever: true,
         runSafetyStage2Ever: false,
         healthBucketEnabledThisRun: true,
@@ -476,9 +483,12 @@ function buildBasicInputs() {
     assertEqual(buffers.kpiLebensdauer[0], 3, 'Run metrics should write lifespan buffer');
     assertEqual(buffers.kpiKuerzungsjahre[0], 2, 'Run metrics should write cut-years buffer');
     assertEqual(finalized.totals.pflegeTriggeredCount, 1, 'Run metrics should count care-triggered runs');
+    assertEqual(finalized.totals.p1TriggeredCount, 1, 'Run metrics should count P1-triggered runs separately');
+    assertEqual(finalized.totals.p2TriggeredCount, 1, 'Run metrics should count P2-triggered runs separately');
     assertEqual(finalized.totals.runsSafetyStage1Triggered, 1, 'Run metrics should count safety stage 1 runs');
     assertEqual(finalized.lists.entryAges[0], 70, 'Run metrics should store P1 care entry age');
     assertEqual(finalized.lists.entryAgesP2[0], 72, 'Run metrics should store P2 care entry age');
+    assertEqual(finalized.lists.totalCareAdditionalNeedRealEur[0], 2500, 'Run metrics should store real modelled household care need');
     assertEqual(finalized.totals.healthBucketUsedCount, 1, 'Run metrics should count health bucket usage');
     assertEqual(finalized.lists.healthBucketUsedAmounts[0], 12000, 'Run metrics should store health bucket usage');
     assertEqual(finalized.runMeta[0].healthBucketEnd, 8000, 'Run metrics should write health bucket meta');
@@ -564,13 +574,14 @@ function buildBasicInputs() {
 
     const combinedTotals = {
         pflegeTriggeredCount: chunkA.totals.pflegeTriggeredCount + chunkB.totals.pflegeTriggeredCount,
+        p1TriggeredCount: chunkA.totals.p1TriggeredCount + chunkB.totals.p1TriggeredCount,
+        p2TriggeredCount: chunkA.totals.p2TriggeredCount + chunkB.totals.p2TriggeredCount,
         totalSimulatedYears: chunkA.totals.totalSimulatedYears + chunkB.totals.totalSimulatedYears,
         totalYearsQuoteAbove45: chunkA.totals.totalYearsQuoteAbove45 + chunkB.totals.totalYearsQuoteAbove45,
         totalYearsSafetyStage1plus: (chunkA.totals.totalYearsSafetyStage1plus || 0) + (chunkB.totals.totalYearsSafetyStage1plus || 0),
         totalYearsSafetyStage2: (chunkA.totals.totalYearsSafetyStage2 || 0) + (chunkB.totals.totalYearsSafetyStage2 || 0),
         shortfallWithCareCount: chunkA.totals.shortfallWithCareCount + chunkB.totals.shortfallWithCareCount,
         shortfallNoCareProxyCount: chunkA.totals.shortfallNoCareProxyCount + chunkB.totals.shortfallNoCareProxyCount,
-        p2TriggeredCount: chunkA.totals.p2TriggeredCount + chunkB.totals.p2TriggeredCount,
         runsSafetyStage1Triggered: (chunkA.totals.runsSafetyStage1Triggered || 0) + (chunkB.totals.runsSafetyStage1Triggered || 0),
         runsSafetyStage2Triggered: (chunkA.totals.runsSafetyStage2Triggered || 0) + (chunkB.totals.runsSafetyStage2Triggered || 0),
         totalTaxSavedByLossCarry: (chunkA.totals.totalTaxSavedByLossCarry || 0) + (chunkB.totals.totalTaxSavedByLossCarry || 0)
@@ -579,32 +590,38 @@ function buildBasicInputs() {
     const combinedLists = {
         entryAges: [],
         entryAgesP2: [],
-        careDepotCosts: [],
-        endWealthWithCareList: [],
-        endWealthNoCareList: [],
+        p1CareAdditionalNeedRealEur: [],
+        p2CareAdditionalNeedRealEur: [],
+        totalCareAdditionalNeedRealEur: [],
+        endWealthWithCareRealEur: [],
+        endWealthNoCareRealEur: [],
         p1CareYearsTriggered: [],
         p2CareYearsTriggered: [],
         bothCareYearsOverlapTriggered: [],
-        maxAnnualCareSpendTriggered: []
+        maxAnnualCareAdditionalNeedRealEur: []
     };
     appendArray(combinedLists.entryAges, chunkA.lists.entryAges);
     appendArray(combinedLists.entryAges, chunkB.lists.entryAges);
     appendArray(combinedLists.entryAgesP2, chunkA.lists.entryAgesP2);
     appendArray(combinedLists.entryAgesP2, chunkB.lists.entryAgesP2);
-    appendArray(combinedLists.careDepotCosts, chunkA.lists.careDepotCosts);
-    appendArray(combinedLists.careDepotCosts, chunkB.lists.careDepotCosts);
-    appendArray(combinedLists.endWealthWithCareList, chunkA.lists.endWealthWithCareList);
-    appendArray(combinedLists.endWealthWithCareList, chunkB.lists.endWealthWithCareList);
-    appendArray(combinedLists.endWealthNoCareList, chunkA.lists.endWealthNoCareList);
-    appendArray(combinedLists.endWealthNoCareList, chunkB.lists.endWealthNoCareList);
+    appendArray(combinedLists.p1CareAdditionalNeedRealEur, chunkA.lists.p1CareAdditionalNeedRealEur);
+    appendArray(combinedLists.p1CareAdditionalNeedRealEur, chunkB.lists.p1CareAdditionalNeedRealEur);
+    appendArray(combinedLists.p2CareAdditionalNeedRealEur, chunkA.lists.p2CareAdditionalNeedRealEur);
+    appendArray(combinedLists.p2CareAdditionalNeedRealEur, chunkB.lists.p2CareAdditionalNeedRealEur);
+    appendArray(combinedLists.totalCareAdditionalNeedRealEur, chunkA.lists.totalCareAdditionalNeedRealEur);
+    appendArray(combinedLists.totalCareAdditionalNeedRealEur, chunkB.lists.totalCareAdditionalNeedRealEur);
+    appendArray(combinedLists.endWealthWithCareRealEur, chunkA.lists.endWealthWithCareRealEur);
+    appendArray(combinedLists.endWealthWithCareRealEur, chunkB.lists.endWealthWithCareRealEur);
+    appendArray(combinedLists.endWealthNoCareRealEur, chunkA.lists.endWealthNoCareRealEur);
+    appendArray(combinedLists.endWealthNoCareRealEur, chunkB.lists.endWealthNoCareRealEur);
     appendArray(combinedLists.p1CareYearsTriggered, chunkA.lists.p1CareYearsTriggered);
     appendArray(combinedLists.p1CareYearsTriggered, chunkB.lists.p1CareYearsTriggered);
     appendArray(combinedLists.p2CareYearsTriggered, chunkA.lists.p2CareYearsTriggered);
     appendArray(combinedLists.p2CareYearsTriggered, chunkB.lists.p2CareYearsTriggered);
     appendArray(combinedLists.bothCareYearsOverlapTriggered, chunkA.lists.bothCareYearsOverlapTriggered);
     appendArray(combinedLists.bothCareYearsOverlapTriggered, chunkB.lists.bothCareYearsOverlapTriggered);
-    appendArray(combinedLists.maxAnnualCareSpendTriggered, chunkA.lists.maxAnnualCareSpendTriggered);
-    appendArray(combinedLists.maxAnnualCareSpendTriggered, chunkB.lists.maxAnnualCareSpendTriggered);
+    appendArray(combinedLists.maxAnnualCareAdditionalNeedRealEur, chunkA.lists.maxAnnualCareAdditionalNeedRealEur);
+    appendArray(combinedLists.maxAnnualCareAdditionalNeedRealEur, chunkB.lists.maxAnnualCareAdditionalNeedRealEur);
 
     const combinedWithdrawals = [];
     appendArray(combinedWithdrawals, chunkA.allRealWithdrawalsSample);
@@ -639,13 +656,14 @@ function buildBasicInputs() {
 
 const emptyTotals = {
     pflegeTriggeredCount: 0,
+    p1TriggeredCount: 0,
+    p2TriggeredCount: 0,
     totalSimulatedYears: 0,
     totalYearsQuoteAbove45: 0,
     totalYearsSafetyStage1plus: 0,
     totalYearsSafetyStage2: 0,
     shortfallWithCareCount: 0,
     shortfallNoCareProxyCount: 0,
-    p2TriggeredCount: 0,
     runsSafetyStage1Triggered: 0,
     runsSafetyStage2Triggered: 0,
     totalTaxSavedByLossCarry: 0
@@ -653,13 +671,15 @@ const emptyTotals = {
 const emptyLists = {
     entryAges: [],
     entryAgesP2: [],
-    careDepotCosts: [],
-    endWealthWithCareList: [],
-    endWealthNoCareList: [],
+    p1CareAdditionalNeedRealEur: [],
+    p2CareAdditionalNeedRealEur: [],
+    totalCareAdditionalNeedRealEur: [],
+    endWealthWithCareRealEur: [],
+    endWealthNoCareRealEur: [],
     p1CareYearsTriggered: [],
     p2CareYearsTriggered: [],
     bothCareYearsOverlapTriggered: [],
-    maxAnnualCareSpendTriggered: []
+    maxAnnualCareAdditionalNeedRealEur: []
 };
 
 // --- TEST 9: Determinism (same seed -> same results) ---

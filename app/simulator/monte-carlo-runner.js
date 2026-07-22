@@ -10,7 +10,7 @@
 import { rng, makeRunSeed, quantile } from './simulator-utils.js';
 import { BREAK_ON_RUIN, ESTIMATED_HISTORY_CUTOFF_YEAR, MORTALITY_TABLE, annualData } from './simulator-data.js';
 import { applyStressOverride, computeRentAdjRate } from './simulator-portfolio.js';
-import { simulateOneYear, initMcRunState, sampleNextYearData, computeRunStatsFromSeries, updateCareMeta, calcCareCost, computeCareMortalityMultiplier, computeHouseholdFlexFactor } from './simulator-engine-wrapper.js';
+import { simulateOneYear, initMcRunState, sampleNextYearData, computeRunStatsFromSeries, updateCareMeta, calcCareCost, computeCareMortalityMultiplier, computeHouseholdFlexFactor, resolveSimulatorCumulativeInflationFactor } from './simulator-engine-wrapper.js';
 import { portfolioTotal } from './simulator-results.js';
 import { sumDepot } from './simulator-portfolio.js';
 import { cloneStressContext, computeMarriageYearsCompleted } from './simulator-sweep-utils.js';
@@ -34,8 +34,10 @@ import {
     buildMonteCarloYearLogRow
 } from './mc-log-builder.js';
 import {
+    createMonteCarloCareNeedTracker,
     createMonteCarloRunMetrics,
     finalizeMonteCarloRunMetrics,
+    recordMonteCarloCareNeedYear,
     recordMonteCarloRunOutcome
 } from './mc-run-metrics.js';
 import {
@@ -331,6 +333,7 @@ export async function runMonteCarloChunk({
         let cutDecisionYearsThisRun = 0;
         let lebensdauer = 0, jahreOhneFlex = 0, triggeredAge = null;
         let careEverActive = false;
+        const careNeedTracker = createMonteCarloCareNeedTracker();
         let technicalPathError = null;
         const realWithdrawalsThisRun = [];
 
@@ -527,6 +530,15 @@ export async function runMonteCarloChunk({
             };
 
             if (runEndedBecauseAllDied) break;
+
+            // Measure the exact modelled care addition passed to the engine.
+            // It is a need, not an attributable depot cash flow. Real values use
+            // the same start-price factor as the current simulator year.
+            recordMonteCarloCareNeedYear(careNeedTracker, {
+                p1CareAdditionalNeedNominalEur: careCostP1.zusatzFloor,
+                p2CareAdditionalNeedNominalEur: careCostP2?.zusatzFloor,
+                priceFactor: resolveSimulatorCumulativeInflationFactor(simState)
+            });
 
             // Do NOT modify simState.baseFlex permanently.
             // We pass the effectiveFlexFactor to simulateOneYear to apply it only for the current year's spending decision.
@@ -751,9 +763,10 @@ export async function runMonteCarloChunk({
             stress_recoveryYears
         );
 
-        const depotOnlyStart = depotNurHistorie[0] || 1;
         const depotOnlyEnd = depotNurHistorie[depotNurHistorie.length - 1] || 0;
         const ruinOrDepleted = failed || depotOnlyEnd <= DEPOT_DEPLETION_THRESHOLD;
+        const finalValueNominalEur = failed ? 0 : portfolioTotal(simState.portfolio);
+        const finalValueRealEur = finalValueNominalEur / resolveSimulatorCumulativeInflationFactor(simState);
         recordMonteCarloRunOutcome(runMetrics, {
             i,
             runIdx,
@@ -766,8 +779,7 @@ export async function runMonteCarloChunk({
             kpiMaxKuerzungDieserLauf,
             totalTaxesThisRun,
             totalTaxSavedByLossCarryThisRun,
-            depotOnlyStart,
-            depotOnlyEnd,
+            finalValueRealEur,
             ruinOrDepleted,
             careEverActive,
             triggeredAge,
@@ -776,8 +788,7 @@ export async function runMonteCarloChunk({
             p2CareYears,
             bothCareYears,
             hasPartner,
-            careMetaP1,
-            careMetaP2,
+            ...careNeedTracker,
             runSafetyStage1Ever,
             runSafetyStage2Ever,
             healthBucketEnabledThisRun,
@@ -800,6 +811,7 @@ export async function runMonteCarloChunk({
                     ? MONTE_CARLO_OUTCOME_CODE.ALL_DEAD
                     : MONTE_CARLO_OUTCOME_CODE.HORIZON_EXHAUSTED,
             finalValueNominalEur: finalOutcomes[i],
+            finalValueRealEur,
             volatilityPct: volatilities[i],
             maxDrawdownPct: maxDrawdowns[i],
             cutYearsNumerator: cutYearsNumeratorThisRun,
@@ -815,10 +827,7 @@ export async function runMonteCarloChunk({
             bothCareYears,
             careEverActive,
             hasPartner,
-            careDepotCostEur: careEverActive ? Math.max(0, depotOnlyStart - depotOnlyEnd) : null,
-            maxAnnualCareSpendEur: careEverActive
-                ? Math.max(careMetaP1?.zusatzFloorZiel || 0, careMetaP2?.zusatzFloorZiel || 0)
-                : 0,
+            ...careNeedTracker,
             healthBucketEnabled: healthBucketEnabledThisRun,
             healthBucketUsedEur: healthBucketUsedThisRun,
             healthBucketEndEur: healthBucketEndThisRun,

@@ -1,5 +1,27 @@
 "use strict";
 
+function finiteCareEntryAge(meta, person) {
+    const primary = Number(meta?.[`${person}CareEntryAge`]);
+    if (Number.isFinite(primary) && primary > 0) return primary;
+    if (person === 'p1') {
+        const legacyP1 = Number(meta?.triggeredAge);
+        if (Number.isFinite(legacyP1) && legacyP1 > 0) return legacyP1;
+    }
+    if (person === 'p2') {
+        const legacyP2 = Number(meta?.triggeredAgeP2);
+        if (Number.isFinite(legacyP2) && legacyP2 > 0) return legacyP2;
+    }
+    return null;
+}
+
+function earliestCareScenario(scenarios, person) {
+    const observed = scenarios.filter(scenario => finiteCareEntryAge(scenario, person) !== null);
+    if (observed.length === 0) return null;
+    return observed.reduce((left, right) => (
+        finiteCareEntryAge(left, person) <= finiteCareEntryAge(right, person) ? left : right
+    ));
+}
+
 /**
  * Verantwortlich für Tracking, Auswahl und Aufbereitung charakteristischer Szenarien.
  * Die Simulation kann Meta-Daten pro Run registrieren, ohne selbst UI-Logik zu kennen.
@@ -78,13 +100,16 @@ export class ScenarioAnalyzer {
         if (careScenarios.length > 0) {
             const worstWithCare = careScenarios.reduce((a, b) => a.endVermoegen < b.endVermoegen ? a : b);
             const longestCare = careScenarios.reduce((a, b) => a.totalCareYears > b.totalCareYears ? a : b);
-            const highestCareCost = careScenarios.reduce((a, b) => a.totalCareCosts > b.totalCareCosts ? a : b);
-            const earliestCare = careScenarios.filter(s => s.triggeredAge !== null)
-                .reduce((a, b) => (a.triggeredAge < b.triggeredAge ? a : b), careScenarios[0]);
+            const highestCareNeed = careScenarios.reduce((a, b) => (
+                a.totalCareAdditionalNeedRealEur > b.totalCareAdditionalNeedRealEur ? a : b
+            ));
+            const earliestCareP1 = earliestCareScenario(careScenarios, 'p1');
+            const earliestCareP2 = earliestCareScenario(careScenarios, 'p2');
             indices.add(worstWithCare.index);
             indices.add(longestCare.index);
-            indices.add(highestCareCost.index);
-            if (earliestCare) indices.add(earliestCare.index);
+            indices.add(highestCareNeed.index);
+            if (earliestCareP1) indices.add(earliestCareP1.index);
+            if (earliestCareP2) indices.add(earliestCareP2.index);
         }
 
         // Extremfälle als "Stress-Szenarien".
@@ -150,12 +175,19 @@ export class ScenarioAnalyzer {
             const longestCare = careScenarios.reduce((a, b) => a.totalCareYears > b.totalCareYears ? a : b);
             careSpecific.push({ key: 'longestCare', label: 'Längste Pflegedauer', scenario: longestCare });
 
-            const highestCareCost = careScenarios.reduce((a, b) => a.totalCareCosts > b.totalCareCosts ? a : b);
-            careSpecific.push({ key: 'highestCareCost', label: 'Höchste Pflegekosten', scenario: highestCareCost });
+            const highestCareNeed = careScenarios.reduce((a, b) => (
+                a.totalCareAdditionalNeedRealEur > b.totalCareAdditionalNeedRealEur ? a : b
+            ));
+            careSpecific.push({ key: 'highestCareNeed', label: 'Höchster realer Pflege-Mehrbedarf', scenario: highestCareNeed });
 
-            const earliestCare = careScenarios.filter(s => s.triggeredAge !== null)
-                .reduce((a, b) => (a.triggeredAge < b.triggeredAge ? a : b), careScenarios[0]);
-            careSpecific.push({ key: 'earliestCare', label: 'Frühester Pflegeeintritt', scenario: earliestCare });
+            const earliestCareP1 = earliestCareScenario(careScenarios, 'p1');
+            const earliestCareP2 = earliestCareScenario(careScenarios, 'p2');
+            if (earliestCareP1) {
+                careSpecific.push({ key: 'earliestCareP1', label: 'Frühester Pflegeeintritt P1', scenario: earliestCareP1 });
+            }
+            if (earliestCareP2) {
+                careSpecific.push({ key: 'earliestCareP2', label: 'Frühester Pflegeeintritt P2', scenario: earliestCareP2 });
+            }
         }
 
         const longestLife = this.meta.reduce((a, b) => a.lebensdauer > b.lebensdauer ? a : b);
@@ -184,6 +216,9 @@ export class ScenarioAnalyzer {
                 lebensdauer: s.scenario.lebensdauer,
                 careEverActive: s.scenario.careEverActive,
                 totalCareYears: s.scenario.totalCareYears,
+                totalCareAdditionalNeedRealEur: s.scenario.totalCareAdditionalNeedRealEur,
+                p1CareEntryAge: finiteCareEntryAge(s.scenario, 'p1'),
+                p2CareEntryAge: finiteCareEntryAge(s.scenario, 'p2'),
                 logDataRows: s.scenario.logDataRows
             })),
             random: randomScenarios.map(s => ({
@@ -194,6 +229,9 @@ export class ScenarioAnalyzer {
                 lebensdauer: s.scenario.lebensdauer,
                 careEverActive: s.scenario.careEverActive,
                 totalCareYears: s.scenario.totalCareYears,
+                totalCareAdditionalNeedRealEur: s.scenario.totalCareAdditionalNeedRealEur,
+                p1CareEntryAge: finiteCareEntryAge(s.scenario, 'p1'),
+                p2CareEntryAge: finiteCareEntryAge(s.scenario, 'p2'),
                 logDataRows: s.scenario.logDataRows
             }))
         };
@@ -207,9 +245,12 @@ export function extractKeyMetrics(meta = {}) {
         lebensdauer: Number.isFinite(meta.lebensdauer) ? meta.lebensdauer : 0,
         careEverActive: !!meta.careEverActive,
         totalCareYears: Number.isFinite(meta.totalCareYears) ? meta.totalCareYears : 0,
-        totalCareCosts: Number.isFinite(meta.totalCareCosts) ? meta.totalCareCosts : 0,
+        totalCareAdditionalNeedRealEur: Number.isFinite(meta.totalCareAdditionalNeedRealEur)
+            ? meta.totalCareAdditionalNeedRealEur
+            : 0,
         maxKuerzung: Number.isFinite(meta.maxKuerzung) ? meta.maxKuerzung : 0,
-        triggeredAge: Number.isFinite(meta.triggeredAge) ? meta.triggeredAge : null,
+        p1CareEntryAge: finiteCareEntryAge(meta, 'p1'),
+        p2CareEntryAge: finiteCareEntryAge(meta, 'p2'),
         isWidow: !!(meta.isWidow || meta.widowTriggered),
         isCrash: !!(meta.isCrash || meta.crashTriggered)
     };
@@ -219,9 +260,12 @@ export function analyzeScenario(meta = {}) {
     const metrics = extractKeyMetrics(meta);
     const tags = [];
     if (metrics.careEverActive) tags.push('care');
-    if (metrics.totalCareCosts > 0) tags.push('care_costs');
+    if (metrics.totalCareAdditionalNeedRealEur > 0) tags.push('care_need');
     if (metrics.failed) tags.push('failed');
-    if (metrics.triggeredAge !== null && metrics.triggeredAge <= 70) tags.push('early_care');
+    if ((metrics.p1CareEntryAge !== null && metrics.p1CareEntryAge <= 70)
+        || (metrics.p2CareEntryAge !== null && metrics.p2CareEntryAge <= 70)) {
+        tags.push('early_care');
+    }
     if (metrics.maxKuerzung >= 50) tags.push('severe_cut');
     if (metrics.isWidow || meta.logDataRows?.some(row => row?.widow === true || row?.witwe === true)) tags.push('widow');
     if (metrics.isCrash || meta.logDataRows?.some(row => row?.crash === true || String(row?.action || '').includes('Notfall'))) tags.push('crash');

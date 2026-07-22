@@ -24,6 +24,7 @@ const rows = [
     {
         outcomeCode: MONTE_CARLO_OUTCOME_CODE.HORIZON_EXHAUSTED,
         finalValue: 1000,
+        finalValueReal: 800,
         volatility: 4.5,
         drawdown: 12,
         cutNumerator: 1,
@@ -38,6 +39,7 @@ const rows = [
     {
         outcomeCode: MONTE_CARLO_OUTCOME_CODE.RUIN,
         finalValue: 0,
+        finalValueReal: 0,
         volatility: 8,
         drawdown: 100,
         cutNumerator: 2,
@@ -52,8 +54,14 @@ const rows = [
         p1CareYears: 2,
         p2CareYears: 1,
         bothCareYears: 1,
-        careCost: 40000,
-        maxAnnualCareSpend: 18000,
+        p1CareNeedReal: 22000,
+        p2CareNeedReal: 18000,
+        totalCareNeedReal: 40000,
+        maxAnnualCareNeedReal: 18000,
+        p1CareNeedNominal: 23000,
+        p2CareNeedNominal: 19000,
+        totalCareNeedNominal: 42000,
+        maxAnnualCareNeedNominal: 19000,
         hasPartner: true,
         healthEnabled: true,
         healthUsed: 12000,
@@ -65,6 +73,7 @@ const rows = [
     {
         outcomeCode: MONTE_CARLO_OUTCOME_CODE.ALL_DEAD,
         finalValue: 500,
+        finalValueReal: 400,
         volatility: 2,
         drawdown: 5,
         cutNumerator: 0,
@@ -79,14 +88,21 @@ const rows = [
         p1CareYears: 1,
         p2CareYears: 0,
         bothCareYears: 0,
-        careCost: 9000,
-        maxAnnualCareSpend: 9000,
+        p1CareNeedReal: 9000,
+        p2CareNeedReal: null,
+        totalCareNeedReal: 9000,
+        maxAnnualCareNeedReal: 9000,
+        p1CareNeedNominal: 9500,
+        p2CareNeedNominal: null,
+        totalCareNeedNominal: 9500,
+        maxAnnualCareNeedNominal: 9500,
         hasPartner: false,
         healthUsed: 0
     },
     {
         outcomeCode: MONTE_CARLO_OUTCOME_CODE.HORIZON_EXHAUSTED,
         finalValue: 2500,
+        finalValueReal: 2000,
         volatility: 3.25,
         drawdown: 9,
         cutNumerator: 0,
@@ -137,6 +153,7 @@ function makeChunk(start, selectedRows) {
             globalRunIndex,
             outcomeCode: row.outcomeCode,
             finalValueNominalEur: row.finalValue,
+            finalValueRealEur: row.finalValueReal,
             volatilityPct: row.volatility,
             maxDrawdownPct: row.drawdown,
             cutYearsNumerator: row.cutNumerator,
@@ -150,8 +167,14 @@ function makeChunk(start, selectedRows) {
             bothCareYears: row.bothCareYears,
             careEverActive: row.care,
             hasPartner: row.hasPartner,
-            careDepotCostEur: row.careCost,
-            maxAnnualCareSpendEur: row.maxAnnualCareSpend,
+            p1CareAdditionalNeedRealEur: row.p1CareNeedReal,
+            p2CareAdditionalNeedRealEur: row.p2CareNeedReal,
+            totalCareAdditionalNeedRealEur: row.totalCareNeedReal,
+            maxAnnualCareAdditionalNeedRealEur: row.maxAnnualCareNeedReal,
+            p1CareAdditionalNeedNominalEur: row.p1CareNeedNominal,
+            p2CareAdditionalNeedNominalEur: row.p2CareNeedNominal,
+            totalCareAdditionalNeedNominalEur: row.totalCareNeedNominal,
+            maxAnnualCareAdditionalNeedNominalEur: row.maxAnnualCareNeedNominal,
             healthBucketEnabled: row.healthEnabled,
             healthBucketUsedEur: row.healthUsed,
             healthBucketEndEur: row.healthEnd,
@@ -163,11 +186,12 @@ function makeChunk(start, selectedRows) {
 
         totals.failCount += row.outcomeCode === MONTE_CARLO_OUTCOME_CODE.RUIN ? 1 : 0;
         totals.pflegeTriggeredCount += row.care ? 1 : 0;
+        totals.p1TriggeredCount += Number.isFinite(row.p1EntryAge) ? 1 : 0;
+        totals.p2TriggeredCount += Number.isFinite(row.p2EntryAge) ? 1 : 0;
         totals.totalSimulatedYears += row.simulatedYears;
         totals.totalYearsQuoteAbove45 += row.cutNumerator;
         totals.shortfallWithCareCount += row.care && row.outcomeCode === MONTE_CARLO_OUTCOME_CODE.RUIN ? 1 : 0;
         totals.shortfallNoCareProxyCount += !row.care && row.outcomeCode === MONTE_CARLO_OUTCOME_CODE.RUIN ? 1 : 0;
-        totals.p2TriggeredCount += (row.p2CareYears || 0) > 0 ? 1 : 0;
         totals.healthBucketEnabledCount += row.healthEnabled ? 1 : 0;
         totals.healthBucketUsedCount += row.healthUsed > 0 ? 1 : 0;
         totals.healthBucketDepletedCount += row.healthEnabled && row.healthEnd <= 0 ? 1 : 0;
@@ -277,7 +301,9 @@ function expectContractError(callback, message) {
     assertEqual(JSON.stringify(project(finalized[1])), JSON.stringify(project(finalized[0])), 'Completion permutation must not affect results');
     assertEqual(JSON.stringify(project(finalized[2])), JSON.stringify(project(finalized[0])), 'Chunk partition must not affect results');
     assertEqual(finalized[0].totals.totalTaxSavedByLossCarry, 1e16 + 1 + 1 + 2, 'Float aggregate should reduce per-run values globally');
-    assertEqual(finalized[0].lists.entryAges.join(','), '81,88', 'Conditional lists should follow global run order');
+        assertEqual(finalized[0].lists.entryAges.join(','), '81,88', 'Conditional lists should follow global run order');
+    assertEqual(finalized[0].lists.entryAgesP2.join(','), '79', 'P2 conditional ages must not contain a zero sentinel');
+    assertEqual(finalized[0].lists.p1CareAdditionalNeedRealEur.join(','), '22000,9000', 'P1 real care need should follow P1-only observations');
     assertEqual(finalized[0].worstRun.runIdx, 1, 'Worst-run tie breaking should retain the smallest global index');
     assertEqual(finalized[0].pathMissingness.realWithdrawalP10RealEur[2], MONTE_CARLO_MISSINGNESS_CODE.NO_OBSERVATIONS, 'Missing CaR observation should use an explicit code');
     assertEqual(finalized[0].pathSummaries.cutYearShareRatio[0], Math.fround(0.1), 'Cut share should store numerator divided by denominator');

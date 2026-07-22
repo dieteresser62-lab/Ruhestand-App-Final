@@ -5,6 +5,32 @@ import { STRESS_PRESETS } from './simulator-data.js';
 import { MC_HEATMAP_BINS } from './monte-carlo-runner-utils.js';
 import { MONTE_CARLO_MISSINGNESS_CODE } from './monte-carlo-chunk-result.js';
 
+const NO_OBSERVATIONS = 'no_observations';
+
+function conditionalMedian(values) {
+    return values.length > 0 ? quantile(values, 0.5) : null;
+}
+
+function buildPersonCareAggregate({
+    triggeredCount,
+    totalRuns,
+    entryAges,
+    careYears,
+    realCostsEur
+}) {
+    const sampleSize = entryAges.length;
+    return {
+        entryRatePct: totalRuns > 0 ? (triggeredCount / totalRuns) * 100 : null,
+        entryRateNumerator: triggeredCount,
+        entryRateDenominator: totalRuns,
+        entryAgeP50: conditionalMedian(entryAges),
+        careYearsP50: conditionalMedian(careYears),
+        realCostEurP50: conditionalMedian(realCostsEur),
+        sampleSize,
+        missingness: sampleSize > 0 ? null : NO_OBSERVATIONS
+    };
+}
+
 export function buildMonteCarloAggregates({
     inputs,
     totalRuns,
@@ -35,14 +61,15 @@ export function buildMonteCarloAggregates({
         stress_recoveryYears
     } = buffers;
     const {
-        pflegeTriggeredCount,
+        pflegeTriggeredCount = 0,
+        p1TriggeredCount = 0,
+        p2TriggeredCount = 0,
         totalSimulatedYears,
         totalYearsQuoteAbove45,
         totalYearsSafetyStage1plus = 0,
         totalYearsSafetyStage2 = 0,
         shortfallWithCareCount,
         shortfallNoCareProxyCount,
-        p2TriggeredCount,
         runsSafetyStage1Triggered = 0,
         runsSafetyStage2Triggered = 0,
         totalTaxSavedByLossCarry = 0,
@@ -59,15 +86,17 @@ export function buildMonteCarloAggregates({
         tailRiskSkippedHistoricalCrisisYears = 0
     } = totals;
     const {
-        entryAges,
-        entryAgesP2,
-        careDepotCosts,
-        endWealthWithCareList,
-        endWealthNoCareList,
-        p1CareYearsTriggered,
-        p2CareYearsTriggered,
-        bothCareYearsOverlapTriggered,
-        maxAnnualCareSpendTriggered,
+        entryAges = [],
+        entryAgesP2 = [],
+        p1CareAdditionalNeedRealEur = [],
+        p2CareAdditionalNeedRealEur = [],
+        totalCareAdditionalNeedRealEur = [],
+        endWealthWithCareRealEur = [],
+        endWealthNoCareRealEur = [],
+        p1CareYearsTriggered = [],
+        p2CareYearsTriggered = [],
+        bothCareYearsOverlapTriggered = [],
+        maxAnnualCareAdditionalNeedRealEur = [],
         healthBucketUsedAmounts = [],
         healthBucketEndAmounts = [],
         healthBucketCoveragePct = [],
@@ -96,26 +125,63 @@ export function buildMonteCarloAggregates({
         denominator: 'completed_decumulation_years_with_finite_cut_decision'
     };
 
-    const medianWithCare = endWealthWithCareList.length ? quantile(endWealthWithCareList, 0.5) : 0;
-    const medianNoCare = endWealthNoCareList.length ? quantile(endWealthNoCareList, 0.5) : 0;
+    const medianWithCare = conditionalMedian(endWealthWithCareRealEur);
+    const medianNoCare = conditionalMedian(endWealthNoCareRealEur);
+    const p1Care = buildPersonCareAggregate({
+        triggeredCount: p1TriggeredCount,
+        totalRuns,
+        entryAges,
+        careYears: p1CareYearsTriggered,
+        realCostsEur: p1CareAdditionalNeedRealEur
+    });
+    const p2Care = buildPersonCareAggregate({
+        triggeredCount: p2TriggeredCount,
+        totalRuns,
+        entryAges: entryAgesP2,
+        careYears: p2CareYearsTriggered,
+        realCostsEur: p2CareAdditionalNeedRealEur
+    });
+    const noCareRuns = Math.max(0, totalRuns - pflegeTriggeredCount);
     const pflegeResults = {
-        entryRatePct: (pflegeTriggeredCount / totalRuns) * 100,
-        entryAgeMedian: entryAges.length ? quantile(entryAges, 0.5) : 0,
-        shortfallRate_condCare: pflegeTriggeredCount > 0 ? (shortfallWithCareCount / pflegeTriggeredCount) * 100 : 0,
-        shortfallRate_noCareProxy: (totalRuns - pflegeTriggeredCount) > 0 ? (shortfallNoCareProxyCount / (totalRuns - pflegeTriggeredCount)) * 100 : 0,
-        endwealthWithCare_median: medianWithCare,
-        endwealthNoCare_median: medianNoCare,
-        depotCosts_median: careDepotCosts.length ? quantile(careDepotCosts, 0.5) : 0,
-        // Dual Care KPIs (only for triggered cases)
-        p1CareYears: p1CareYearsTriggered.length ? quantile(p1CareYearsTriggered, 0.5) : 0,
-        p2CareYears: p2CareYearsTriggered.length ? quantile(p2CareYearsTriggered, 0.5) : 0,
-        bothCareYears: bothCareYearsOverlapTriggered.length ? quantile(bothCareYearsOverlapTriggered, 0.5) : 0,
-        p2EntryRatePct: (p2TriggeredCount / totalRuns) * 100,
-        p2EntryAgeMedian: entryAgesP2.length ? quantile(entryAgesP2, 0.5) : 0,
-        maxAnnualCareSpend: maxAnnualCareSpendTriggered.length ? quantile(maxAnnualCareSpendTriggered, 0.5) : 0,
-        shortfallDelta_vs_noCare: (endWealthNoCareList.length && endWealthWithCareList.length)
-            ? (medianWithCare - medianNoCare)
-            : 0
+        p1: p1Care,
+        p2: p2Care,
+        household: {
+            entryRatePct: totalRuns > 0 ? (pflegeTriggeredCount / totalRuns) * 100 : null,
+            entryRateNumerator: pflegeTriggeredCount,
+            entryRateDenominator: totalRuns,
+            careYearsOverlapP50: conditionalMedian(bothCareYearsOverlapTriggered),
+            totalAdditionalNeedRealEurP50: conditionalMedian(totalCareAdditionalNeedRealEur),
+            maxAnnualAdditionalNeedRealEurP50: conditionalMedian(maxAnnualCareAdditionalNeedRealEur),
+            endWealthWithCareRealEurP50: medianWithCare,
+            endWealthNoCareRealEurP50: medianNoCare,
+            shortfallRateWithCarePct: pflegeTriggeredCount > 0
+                ? (shortfallWithCareCount / pflegeTriggeredCount) * 100
+                : null,
+            shortfallRateWithoutCarePct: noCareRuns > 0
+                ? (shortfallNoCareProxyCount / noCareRuns) * 100
+                : null,
+            sampleSize: pflegeTriggeredCount,
+            noCareSampleSize: noCareRuns,
+            missingness: pflegeTriggeredCount > 0 ? null : NO_OBSERVATIONS
+        },
+        comparison: {
+            endWealthNoCareMinusCareRealEur: medianNoCare !== null && medianWithCare !== null
+                ? medianNoCare - medianWithCare
+                : null,
+            method: 'unpaired_group_median_difference',
+            withCareSampleSize: endWealthWithCareRealEur.length,
+            noCareSampleSize: endWealthNoCareRealEur.length,
+            missingness: medianNoCare !== null && medianWithCare !== null ? null : NO_OBSERVATIONS
+        },
+        unitContract: {
+            uiMonetaryValues: 'real_eur_at_simulation_start_prices',
+            nominalPathFields: [
+                'p1CareAdditionalNeedNominalEur',
+                'p2CareAdditionalNeedNominalEur',
+                'totalCareAdditionalNeedNominalEur',
+                'maxAnnualCareAdditionalNeedNominalEur'
+            ]
+        }
     };
 
     const stressPresetKey = inputs.stressPreset || 'NONE';

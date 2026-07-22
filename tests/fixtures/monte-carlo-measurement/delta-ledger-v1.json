@@ -24,6 +24,39 @@
       "expectedDirection": "unit and denominator change; old and new values are not directly comparable",
       "goldenCaseIds": ["GC-CUT-01"],
       "reviewStatus": "pending"
+    },
+    {
+      "sliceId": "04",
+      "sourceReference": "post-slice-03-v1",
+      "targetReference": "post-slice-04-v1",
+      "fieldPath": "totals.p1TriggeredCount/totals.p2TriggeredCount/aggregates.extraKPI.pflege.p1/aggregates.extraKPI.pflege.p2",
+      "formulaBefore": "household care triggers were assigned to P1 and absent person entries were stored as age zero",
+      "formulaAfter": "P1 and P2 use separate observed-entry counters over requested runs; conditional person distributions exclude non-entry sentinels and expose sampleSize plus missingness",
+      "expectedDirection": "person rates and conditional medians may move independently; empty distributions change from zero to null",
+      "goldenCaseIds": ["GC-CARE-01"],
+      "reviewStatus": "pending"
+    },
+    {
+      "sliceId": "04",
+      "sourceReference": "post-slice-03-v1",
+      "targetReference": "post-slice-04-v1",
+      "fieldPath": "pathSummaries.*CareAdditionalNeedRealEur/pathSummaries.*CareAdditionalNeedNominalEur/aggregates.extraKPI.pflege",
+      "formulaBefore": "DepotStart minus DepotEnd was labelled as depot-financed care cost and annual household spend used max(P1 target, P2 target)",
+      "formulaAfter": "modelled annual care additions passed to the simulation are summed as P1 plus P2, accumulated per person and household, and reported in real EUR at simulation-start prices; nominal path fields use the NominalEur suffix",
+      "expectedDirection": "values are not comparable because attribution, household addition and price basis change",
+      "goldenCaseIds": ["GC-CARE-01"],
+      "reviewStatus": "pending"
+    },
+    {
+      "sliceId": "04",
+      "sourceReference": "post-slice-03-v1",
+      "targetReference": "post-slice-04-v1",
+      "fieldPath": "aggregates.extraKPI.pflege.comparison.endWealthNoCareMinusCareRealEur",
+      "formulaBefore": "median with care minus median without care despite the opposite UI description",
+      "formulaAfter": "real-EUR median without care minus real-EUR median with care, explicitly marked as an unpaired non-causal group comparison",
+      "expectedDirection": "sign reverses relative to the old implementation",
+      "goldenCaseIds": ["GC-CARE-01"],
+      "reviewStatus": "pending"
     }
   ],
   "requiredEntryFields": [

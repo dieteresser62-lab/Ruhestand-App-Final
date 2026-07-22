@@ -2,7 +2,7 @@
 
 Die Simulator-App ist inzwischen in mehrere spezialisierte ES6-Module zerlegt. Die zentralen Abläufe (Monte-Carlo, Sweep, Backtests, Pflege-UI) leben nicht mehr als Monolith in `simulator-main.js`, sondern wurden in klar abgegrenzte Dateien ausgelagert. Dieses Dokument beschreibt Zweck, Haupt-Exports, Einbindungspunkte und die gewünschte Aufteilung neuer Features.
 
-**Stand:** 2026-07-19 (einschliesslich Langlebigkeit, Stationary Bootstrap, Tail-Risk-Overlay, Realentnahmevertrag sowie vollstaendigem historischen Backtest-Contract)
+**Stand:** 2026-07-22 (einschliesslich Langlebigkeit, Stationary Bootstrap, Tail-Risk-Overlay, Realentnahmevertrag, getrennter Pflege-KPI-Semantik sowie vollstaendigem historischen Backtest-Contract)
 
 **Pfadkonvention:** Simulator-Module liegen unter `app/simulator/`, Profilmodule unter `app/profile/`, Shared-Utilities unter `app/shared/`, Tranchen-Status unter `app/tranches/`. Im Dokument werden Dateinamen aus Lesbarkeit meist ohne Präfix genannt.
 
@@ -126,11 +126,12 @@ DOM-freie Logzeilen-Builder fuer Monte-Carlo.
 DOM-freie Run-Ende-Metrikfortschreibung fuer Monte-Carlo.
 
 **Hauptfunktionen / Exporte:**
-- `createMonteCarloRunMetrics()` – initialisiert Pflege-Listen, Care-Year-Arrays, Worst-Run-Container, `runMeta` und globale Zaehler.
-- `recordMonteCarloRunOutcome()` – schreibt pro Run Ergebnisbuffer, Pflege-Listen, Pflegebucket-Nutzung/Erschoepfung, Safety-Run-Zaehler, Worst-Run-Auswahl und `runMeta` fort.
-- `finalizeMonteCarloRunMetrics()` – baut die bestehenden `totals`, `lists`, Worst-Runs, `allRealWithdrawalsSample` und `runMeta` inklusive Pflegebucket- und Tail-Risk-Zaehlern fuer die Chunk-Rueckgabe.
+- `createMonteCarloCareNeedTracker()` / `recordMonteCarloCareNeedYear()` – summieren den modellierten P1-/P2-Zusatzbedarf pro Run nominal und real zur Preisbasis des Simulationsstarts; gleichzeitiger Bedarf ist die Jahressumme P1 plus P2.
+- `createMonteCarloRunMetrics()` – initialisiert getrennte P1-/P2-/Haushaltslisten, Worst-Run-Container, `runMeta` und globale Zaehler.
+- `recordMonteCarloRunOutcome()` – schreibt pro Run getrennte Pflegeeintritte und -jahre ohne Null-Sentinels, reale Pflege-Mehrbedarfe, Pflegebucket-Nutzung/Erschoepfung, Safety-Run-Zaehler, Worst-Run-Auswahl und `runMeta` fort.
+- `finalizeMonteCarloRunMetrics()` – baut `totals`, `lists`, Worst-Runs, `allRealWithdrawalsSample` und `runMeta` inklusive P1-/P2-, Pflegebucket- und Tail-Risk-Zaehlern fuer die Chunk-Rueckgabe.
 
-**Einbindung:** Wird von `monte-carlo-runner.js` am Run-Ende genutzt. Buffer-Namen, Worker-Payloads, Aggregat-Shape und `runMeta` bleiben kompatibel; Pflegebucket-Metriken sind additive Felder.
+**Einbindung:** Wird von `monte-carlo-runner.js` im Jahresloop und am Run-Ende genutzt. Der V1-Path-Summary-Contract traegt reale und explizit mit `NominalEur` benannte nominale Pflegefelder; eine kausale Depotkosten-Zurechnung wird nicht behauptet.
 
 ---
 
@@ -145,11 +146,11 @@ Kapselt DOM-Zugriffe für Monte-Carlo (Progressbar, Checkboxen, Parameter-Inputs
 
 ---
 
-## 5. `scenario-analyzer.js` (~140 Zeilen)
+## 5. `scenario-analyzer.js`
 Sammelt und sortiert Szenarien (Worst, Perzentile, Pflege, Zufalls-Samples) während der Simulation.
 
 **Hauptfunktionen / Exporte:**
-- `ScenarioAnalyzer` – Klasse mit `trackScenario()`/`buildScenarioLogs()`, die Metadaten und Logzeilen für 30 Szenarien zurückliefert.
+- `ScenarioAnalyzer` – Klasse mit `trackScenario()`/`buildScenarioLogs()`, die Metadaten und Logzeilen fuer charakteristische und zufaellige Szenarien zurueckliefert. Pflegefaelle werden nach fruehestem P1-/P2-Eintritt und hoechstem realen Mehrbedarf getrennt ausgewaehlt.
 
 **Einbindung:** Von `simulator-monte-carlo.js` instanziiert und als Callback an den Runner übergeben.
 
@@ -368,12 +369,12 @@ Aggregation der Monte-Carlo-Ausgabe, Orchestrierung von KPI-Berechnung und Rende
 - leitet an `results-metrics.js` (Berechnungen) und `results-renderers.js` (DOM)
 
 **Features:**
-- Dropdown für 30 Szenario-Logs (charakteristische + zufällige)
+- Dropdown fuer bis zu 31 Szenario-Logs (bis zu 16 charakteristische + 15 zufaellige)
 - Checkboxen für Pflege-Details und detailliertes Log
 - Detailspalten fuer Entnahme-/Payout-/VPW-Transparenz (`EntPlan`, `EntEff`, `VPW€`, `VPWFlex`, `StatFlex`, `Liq>P`, `Liq<P`, `Liq>Z`, `Port>P`, `PortEnd`)
 - Mindest-Flex-Spalten: `MinFlex€`, `MinFSt` sowie im Detailmodus `MinFBlock` und `MinFEff`
 - JSON/CSV-Export für ausgewählte Szenarien
-- Pflege-KPI-Dashboard mit Dual-Care-Metriken
+- Pflege-KPI-Dashboard mit getrennten P1-/P2-Verteilungen, Stichprobengroessen, nullable bedingten Kennzahlen und realen Haushalts-Mehrbedarfen
 - enthält zusätzlich Metriken für `taxSavedByLossCarry` aus Sweep/MC-Ergebnissen
 - enthält zusätzlich Pflegebucket-KPIs aus MC-Ergebnissen: Nutzungsquote, Erschoepfungsquote, Median-/P90-Nutzung, Median-Restbucket, Zieldeckung und Zielluecke
 - enthält bei aktivem Tail-Risk-Overlay zusaetzliche KPI-Karten fuer aktive/applizierte Runs, aktive/applizierte Jahresanteile und historische Krisen-Skips; Scenario-Log-JSON/CSV exportiert die Tail-Event-Felder unverkuerzt aus den Row-Daten.
@@ -689,7 +690,9 @@ Aggregation aller Monte-Carlo-Ergebnisse nach Abschluss der Simulation.
 - `extraKPI.lossCarryTaxSavings`: `total`, `perRunMean`
 - `extraKPI.healthBucket`: Nutzungs-/Erschoepfungsquote, Nutzungssummen, Restbucket, Zieldeckung, Zielluecke und Bucket-Zinsen
 - `stressKPI`: maxDD, timeShareAbove45, cutYears, CaR, recoveryYears
-- `pflegeResults`: entryRate, entryAge, shortfallRate, endWealth, depotCosts, Dual-Care-KPIs
+- `extraKPI.pflege.p1` / `.p2`: getrennte Eintrittsquoten mit Zaehler/Nenner sowie bedingte P50-Werte fuer Eintrittsalter, Pflegejahre und realen Mehrbedarf; leere Stichproben sind `null` mit `sampleSize=0` und Missingness-Grund
+- `extraKPI.pflege.household`: Pflegequote, simultane Pflegejahre, realer gesamter und maximaler jaehrlicher P1-plus-P2-Mehrbedarf, reale Endvermoegens-Gruppenmediane und bedingte Shortfall-Raten
+- `extraKPI.pflege.comparison`: `endWealthNoCareMinusCareRealEur` als ungepaarte, nicht-kausale Gruppenmedian-Differenz; UI-Geldwerte sind real zur Startpreisbasis, nominale Path-Felder tragen `NominalEur`
 
 **Dependencies:** `simulator-utils.js`, `simulator-data.js`, `monte-carlo-runner-utils.js`
 
@@ -827,9 +830,9 @@ app/simulator/simulator-main.js
 6. `tail-risk-overlay.js`: Wendet bei explizitem Opt-in ein deterministisches Tail-Risk-Ereignisfenster auf die gezogenen Jahresdaten an, ohne historische Daten zu mutieren.
 6. `mc-stress-tracker.js`: Kapselt Stress-Metrik-Initialisierung, Jahresfortschreibung und Buffer-Schreibung.
 7. `mc-log-builder.js`: Baut Ruin-, Jahres- und Todesfall-Logzeilen mit zentralen Alive-/Care-Feldern.
-8. `mc-run-metrics.js`: Schreibt Run-Ende-KPIs, Pflege-Listen, Worst-Runs und `runMeta` fort.
+8. `mc-run-metrics.js`: Summiert im Jahresloop reale/nominale Pflege-Mehrbedarfe und schreibt am Run-Ende getrennte P1-/P2-/Haushalts-KPIs, Worst-Runs und `runMeta` fort.
 9. `monte-carlo-runner.js`: Führt die reinen Simulationen durch (inkl. Pflege-KPIs) und nutzt `simulator-engine-wrapper.js` für die Jahresschleifen.
-4. `scenario-analyzer.js`: Zeichnet Worst/Perzentil-/Pflege-/Zufalls-Szenarien während der Runs auf.
+10. `scenario-analyzer.js`: Zeichnet Worst/Perzentil-/Pflege-/Zufalls-Szenarien waehrend der Runs auf; fruehe Pflege wird fuer P1 und P2 separat ermittelt.
 5. `simulator-results.js`: `displayMonteCarloResults()` zeigt Aggregationen und Szenario-Logs an.
 
 ### Parameter-Sweep
@@ -849,11 +852,11 @@ app/simulator/simulator-main.js
 
 ## Szenario-Log-System
 
-Nach jeder Monte-Carlo-Simulation werden 30 Szenarien gespeichert:
+Nach jeder Monte-Carlo-Simulation werden bis zu 31 Szenarien gespeichert:
 
-### 15 Charakteristische Szenarien
+### Bis zu 16 Charakteristische Szenarien
 - **Vermögensbasiert:** Worst, P5, P10, P25, Median, P75, P90, P95, Best
-- **Pflege-spezifisch:** Worst MIT Pflege, längste Pflegedauer, höchste Kosten, frühester Eintritt
+- **Pflege-spezifisch:** Worst mit Pflege, laengste Pflegedauer, hoechster realer Pflege-Mehrbedarf sowie fruehester Eintritt P1 und P2 (soweit beobachtet)
 - **Risiko:** Längste Lebensdauer, maximale Kürzung
 
 ### 15 Zufällige Szenarien
@@ -880,7 +883,7 @@ Nach jeder Monte-Carlo-Simulation werden 30 Szenarien gespeichert:
 - **Life-State:** `mc-life-events.js` initialisiert Care-Meta, Partnerstatus, Care-RNGs und HouseholdContext. Die Jahreslogik bleibt im Runner-Hot-Path, bis eine vollstaendige Extraktion den Benchmark stabil erfuellt.
 - **Stress-Metriken:** `mc-stress-tracker.js` kapselt Portfolio-Drawdown, Quote-Above-4.5, Cut-Years, Real-CaR und Recovery-Years fuer Stress-Presets. Die bestehenden Worker-Buffer und Aggregatnamen bleiben stabil.
 - **Logzeilen:** `mc-log-builder.js` vereinheitlicht Ruin-, Jahres- und Todesfall-Logs. Builder laufen nur fuer tatsaechlich geloggte Runs. Backtest-Logs und Monte-Carlo-Scenario-Logs verwenden dieselbe Semantik fuer Entnahme-/Payout-/VPW-Felder.
-- **Run-Metriken:** `mc-run-metrics.js` kapselt Ergebnisbuffer, Pflege-Listen, Safety-Run-Zaehler, Worst-Run-Auswahl und `runMeta` am Run-Ende.
+- **Run-Metriken:** `mc-run-metrics.js` kapselt Ergebnisbuffer, getrennte Pflege-Listen und -Zaehler, den realen/nominalen Pflege-Mehrbedarf, Safety-Run-Zaehler, Worst-Run-Auswahl und `runMeta`.
 
 ---
 

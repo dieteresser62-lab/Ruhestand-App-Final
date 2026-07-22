@@ -134,7 +134,7 @@
           "p2EntryRatePct": "Pflegefall-Eintrittsquote P2",
           "p1CareYearsP50": "Median Pflegejahre P1",
           "p2CareYearsP50": "Median Pflegejahre P2",
-          "realCostEurP50": "Reale Pflegekosten (Median)"
+          "realCostEurP50": "Realer Pflege-Mehrbedarf je Person (Median)"
         }
       }
     },

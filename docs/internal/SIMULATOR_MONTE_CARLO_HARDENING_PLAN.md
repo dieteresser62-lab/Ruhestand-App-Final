@@ -1,11 +1,11 @@
 # Simulator / Monte Carlo: Hardening-Arbeitsplan
 
 **Stand:** 2026-07-22
-**Status:** implementierungsreif; Slices 01-02 freigegeben, Slice 03 implementiert und im Review
+**Status:** implementierungsreif; Slices 01-03 freigegeben, Slice 04 implementiert und im Review
 **Autor:** Codex als Implementer und Plan-Autor  
 **Feature-Branch:** `codex/simulator-monte-carlo-gap-plan`  
 **GitHub-Status:** nur lokal; Veroeffentlichung ausstehend und nur nach Nutzerfreigabe  
-**Reviewstand:** Plan und Slices 01-02 freigegeben; Slice 03 wartet auf Gemini- und Nutzerreview
+**Reviewstand:** Plan und Slices 01-03 freigegeben; Slice 04 wartet auf Gemini- und Nutzerreview
 **Ausgangsanalyse:** [SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md](./SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md)
 
 ## 1. Ziel und Rollenabgrenzung
@@ -178,7 +178,7 @@ repariert.
 |---|---|---|---|
 | D-01 | Heutige Erfolgsquote wird "Floor-Deckung im gewaehlten Horizont"; bei fehlerfreiem Batch ist der Nenner `requestedRuns` und der Zaehler `all_dead + horizon_exhausted`. Sobald mindestens ein `technical_error` vorliegt, werden Quote und Intervall fuer den Gesamtbatch fail-closed als `null` unterdrueckt; das Outcome-Inventar bleibt sichtbar. | G-03 | entschieden; in Slice 01 fixiert |
 | D-02 | Vier Outcomes und Jahreschronologie/Prioritaet aus Abschnitt 3.4; Ruin eines begonnenen Finanzjahrs geht spaeterem Todesflag vor. | G-03, C-05 | entschieden; in Slice 01 fixiert |
-| D-03 | Pro Run: Zaehler = erfolgreich abgeschlossene Dekumulationsjahre mit Kuerzung `>= 10 %`; Nenner = erfolgreich abgeschlossene Dekumulationsjahre mit endlicher Kuerzungsentscheidung. Nenner 0 ergibt `null`, nie 0 oder NaN. | G-02 | in Slice 03 implementiert; Review ausstehend |
+| D-03 | Pro Run: Zaehler = erfolgreich abgeschlossene Dekumulationsjahre mit Kuerzung `>= 10 %`; Nenner = erfolgreich abgeschlossene Dekumulationsjahre mit endlicher Kuerzungsentscheidung. Nenner 0 ergibt `null`, nie 0 oder NaN. | G-02 | in Slice 03 implementiert und freigegeben |
 | D-04 | P1/P2 getrennt; leere bedingte Verteilungen sind `null` plus `sampleSize=0`; Pflegebetrag im UI real zur Startpreisbasis, nominal nur explizit benannt im Export. | G-06, C-10 | entschieden; in Slice 01 fixiert |
 | D-05 | Fixed-/Stationary-Block starten ihren ersten zusammenhaengenden Block am CAPE-Startrecord. Regime-Markov initialisiert dort sein Startregime; IID darf ab Jahr 2 unabhaengig ziehen. Jede Methode exportiert die tatsaechliche Praezedenz. | G-04 | entschieden; in Slice 01 fixiert |
 | D-06 | UI-KPI wird ehrlich in "Reale Depotentnahme P10" umbenannt. Das Bewertungsfenster beginnt mit der ersten geplanten Dekumulationsverpflichtung und endet bei Tod aller Personen oder Horizont; ein Ruinversuch zaehlt als Beginn. Nach Ruin und solange jemand lebt wird mit realer Depotentnahme 0 aufgefuellt. Technische Fehler und Haushalte, die vor jeder Dekumulationsverpflichtung sterben, sind `null` mit Grund. Ueber Runs werden P10/P50 und `sampleSize` ausgewiesen. | G-01, C-05, C-07 | entschieden; in Slice 01 fixiert |
@@ -200,7 +200,7 @@ Semantikaenderungen sind unzulaessig.
 | [01](./SLICE_SIMULATOR_MONTE_CARLO_01_BASELINE_MESSVERTRAG.md) | Baseline, Entscheidungen und Messvertrag | querschnittlich; Golden Cases fuer MC-01 bis MC-19 | Reviewfreigabe des Plans | abgeschlossen und freigegeben |
 | [02](./SLICE_SIMULATOR_MONTE_CARLO_02_CHUNK_RESULT_CONTRACT.md) | zentraler Chunk-/Path-Summary-Vertrag | MC-10, MC-19 | 01, D-10, D-11 | abgeschlossen und freigegeben |
 | [03](./SLICE_SIMULATOR_MONTE_CARLO_03_RISIKO_KPI_SEMANTIK.md) | Volatilitaet und Kuerzungsanteil | MC-01, MC-02 | 02, D-03 | abgeschlossen und freigegeben |
-| [04](./SLICE_SIMULATOR_MONTE_CARLO_04_PFLEGE_KPI_SEMANTIK.md) | Pflegeeintritt, -dauer und -kosten | MC-03, MC-04 | 02, D-04 | geplant |
+| [04](./SLICE_SIMULATOR_MONTE_CARLO_04_PFLEGE_KPI_SEMANTIK.md) | Pflegeeintritt, -dauer und -kosten | MC-03, MC-04 | 02, D-04 | abgeschlossen und freigegeben |
 | [05](./SLICE_SIMULATOR_MONTE_CARLO_05_OUTCOME_HORIZONT_CONTRACT.md) | terminale Outcomes, Horizont, Alter | MC-05, MC-07 | 02, D-01, D-02 | geplant |
 | [06](./SLICE_SIMULATOR_MONTE_CARLO_06_SAMPLING_PRAEZEDENZ_DIAGNOSTIK.md) | Samplingvertrag und Ziehungsdiagnostik | MC-06 | 02, D-05 | geplant |
 | [07](./SLICE_SIMULATOR_MONTE_CARLO_07_SCHAETZER_UNSICHERHEIT_CAR.md) | Konfidenz und reale Depotentnahme P10 | MC-08, MC-09 | 03, 05, D-06 | geplant |
@@ -561,7 +561,7 @@ alte Erfolgsquotenterminologie verwendet.
 - Planreview Claude: Erstreview blockiert; Revision 1 wartet auf Re-Review.
 - Nutzerfreigabe: erteilt am 2026-07-22.
 - Status `implementierungsreif`: erteilt (für Gemini-Freigabepfad & Nutzer).
-- Implementierungsstand: Slices 01-02 abgeschlossen und freigegeben; Slice 03
+- Implementierungsstand: Slices 01-03 abgeschlossen und freigegeben; Slice 04
   auf Nutzerauftrag vom 2026-07-22 implementiert und im Review.
 
 ## 14. Rueckdokumentation Slice 01
@@ -621,8 +621,7 @@ alte Erfolgsquotenterminologie verwendet.
 
 ## 16. Rueckdokumentation Slice 03
 
-- Implementierungsstatus: abgeschlossen; Gemini-/Nutzerreview des Slice steht
-  aus. Codex erteilt keine eigene Freigabe und erstellt keinen Commit.
+- Implementierungsstatus: abgeschlossen und extern freigegeben.
 - `buffers.volatilities` und `pathSummaries.volatilityPct` enthalten jetzt
   `volPct`; `maxDDpct` bleibt ausschliesslich in den Drawdown-Feldern. Die
   Formel ist die Stichproben-Standardabweichung N-1 der jaehrlichen
@@ -645,3 +644,34 @@ alte Erfolgsquotenterminologie verwendet.
   dokumentierte fremde Architektur-Linkfehler mit sechs toten Links; alle
   uebrigen 120 Testdateien sind gruen. Keine neue Snapshot-, Backtest- oder
   FlowDelta-Abweichung.
+
+## 17. Rueckdokumentation Slice 04
+
+- Implementierungsstatus: abgeschlossen; Gemini-/Nutzerreview des Slice steht
+  aus. Codex erteilt keine eigene Freigabe und erstellt keinen Commit.
+- `extraKPI.pflege.p1` und `.p2` besitzen getrennte Eintrittszaehler und
+  Nenner. Eintrittsalter, Pflegejahre und reale Mehrbedarfe sind auf den
+  tatsaechlichen Personeneintritt bedingt; Nicht-Eintritte erzeugen keine
+  Null-Sentinels. Leere Verteilungen sind `null` mit `sampleSize=0` und
+  `no_observations`.
+- `extraKPI.pflege.household` aggregiert den modellierten P1-plus-P2-
+  Zusatzbedarf real zur Preisbasis des Simulationsstarts. Nominale V1-Path-
+  Felder tragen `NominalEur`; die nicht herleitbare Depotkosten-Zurechnung wurde
+  entfernt.
+- `extraKPI.pflege.comparison.endWealthNoCareMinusCareRealEur` hat das zum
+  Namen passende Vorzeichen und ist als ungepaarter, nicht-kausaler
+  Gruppenmedianvergleich dokumentiert.
+- Szenarioanalyse und UI trennen P1/P2, bewahren beobachtete 0 und zeigen leere
+  bedingte Werte als Gedankenstrich. Die Trennung des fruehesten Eintritts
+  erweitert das Angebot auf bis zu 31 Szenarien.
+- `post-slice-04-v1.json` koexistiert mit den bisherigen Referenzen. Drei
+  Delta-Ledger-Eintraege dokumentieren Personen-, Pflegebedarfs-/Einheiten- und
+  Vorzeichensemantik. Der zusaetzliche Path-Summary-/Missingness-Speicher steigt
+  von 108 auf 171 Byte pro Run.
+- Fokussierte Suiten: 1254/1254 Assertions gruen, darunter fuenf
+  Pflege-Golden-Cases, Chunk-/Messvertrag, MC-Runner, UI-Metriken,
+  Szenarioanalyse, echte Worker-Vertraege und Worker-Paritaet.
+- `npm test`: 6371/6372 Assertions gruen. Einzige Abweichung bleibt der bereits
+  dokumentierte fremde Architektur-Linkfehler mit sechs toten Links; alle
+  uebrigen 121 Testdateien sind gruen. Keine neue Snapshot-, Backtest-, Worker-
+  oder FlowDelta-Abweichung.

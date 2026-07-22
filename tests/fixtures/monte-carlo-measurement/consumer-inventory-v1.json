@@ -19,7 +19,7 @@
     },
     {
       "currentField": "extraKPI.pflege.entryRatePct",
-      "targetField": "care.p1.entryRatePct",
+      "targetField": "extraKPI.pflege.p1.entryRatePct",
       "producer": ["app/simulator/monte-carlo-aggregates.js", "app/simulator/mc-run-metrics.js"],
       "consumers": ["app/simulator/results-metrics.js", "app/simulator/simulator-results.js"],
       "tests": ["tests/simulator-monte-carlo.test.mjs", "tests/results-metrics.test.mjs", "tests/worker-parity.test.mjs"],
@@ -27,11 +27,19 @@
     },
     {
       "currentField": "extraKPI.pflege.p2EntryRatePct",
-      "targetField": "care.p2.entryRatePct",
+      "targetField": "extraKPI.pflege.p2.entryRatePct",
       "producer": ["app/simulator/monte-carlo-aggregates.js", "app/simulator/mc-run-metrics.js"],
       "consumers": ["app/simulator/results-metrics.js", "app/simulator/simulator-results.js"],
       "tests": ["tests/simulator-monte-carlo.test.mjs", "tests/results-metrics.test.mjs", "tests/worker-parity.test.mjs"],
       "migration": "Slice 04 must use the P2 event counter and P2 conditional sample."
+    },
+    {
+      "currentField": "extraKPI.pflege.depotCosts_median/maxAnnualCareSpend",
+      "targetField": "extraKPI.pflege.household.totalAdditionalNeedRealEurP50",
+      "producer": ["app/simulator/monte-carlo-runner.js", "app/simulator/mc-run-metrics.js", "app/simulator/monte-carlo-aggregates.js"],
+      "consumers": ["app/simulator/results-metrics.js", "app/simulator/simulator-results.js", "app/simulator/scenario-analyzer.js"],
+      "tests": ["tests/monte-carlo-care-kpi.test.mjs", "tests/simulator-monte-carlo.test.mjs", "tests/results-metrics.test.mjs", "tests/worker-parity.test.mjs"],
+      "migration": "Slice 04 removes false depot attribution, sums P1 plus P2 modelled need and separates real UI values from NominalEur path fields."
     },
     {
       "currentField": "failCount/depotErschoepfungsQuote",

@@ -47,13 +47,14 @@ export const MONTE_CARLO_BUFFER_FIELDS = Object.freeze({
 export const MONTE_CARLO_COUNTER_FIELDS = Object.freeze([
     'failCount',
     'pflegeTriggeredCount',
+    'p1TriggeredCount',
+    'p2TriggeredCount',
     'totalSimulatedYears',
     'totalYearsQuoteAbove45',
     'totalYearsSafetyStage1plus',
     'totalYearsSafetyStage2',
     'shortfallWithCareCount',
     'shortfallNoCareProxyCount',
-    'p2TriggeredCount',
     'runsSafetyStage1Triggered',
     'runsSafetyStage2Triggered',
     'healthBucketEnabledCount',
@@ -76,13 +77,15 @@ export const MONTE_CARLO_FLOAT_AGGREGATE_FIELDS = Object.freeze([
 export const MONTE_CARLO_LIST_FIELDS = Object.freeze([
     'entryAges',
     'entryAgesP2',
-    'careDepotCosts',
-    'endWealthWithCareList',
-    'endWealthNoCareList',
+    'p1CareAdditionalNeedRealEur',
+    'p2CareAdditionalNeedRealEur',
+    'totalCareAdditionalNeedRealEur',
+    'endWealthWithCareRealEur',
+    'endWealthNoCareRealEur',
     'p1CareYearsTriggered',
     'p2CareYearsTriggered',
     'bothCareYearsOverlapTriggered',
-    'maxAnnualCareSpendTriggered',
+    'maxAnnualCareAdditionalNeedRealEur',
     'healthBucketUsedAmounts',
     'healthBucketEndAmounts',
     'healthBucketCoveragePct',
@@ -94,6 +97,7 @@ export const MONTE_CARLO_PATH_SUMMARY_FIELDS = Object.freeze({
     globalRunIndex: Uint32Array,
     outcomeCode: Uint8Array,
     finalValueNominalEur: Float64Array,
+    finalValueRealEur: Float64Array,
     volatilityPct: Float32Array,
     maxDrawdownPct: Float32Array,
     cutYearsNumerator: Uint32Array,
@@ -108,8 +112,14 @@ export const MONTE_CARLO_PATH_SUMMARY_FIELDS = Object.freeze({
     bothCareYears: Uint16Array,
     careEverActive: Uint8Array,
     hasPartner: Uint8Array,
-    careDepotCostEur: Float64Array,
-    maxAnnualCareSpendEur: Float64Array,
+    p1CareAdditionalNeedRealEur: Float64Array,
+    p2CareAdditionalNeedRealEur: Float64Array,
+    totalCareAdditionalNeedRealEur: Float64Array,
+    maxAnnualCareAdditionalNeedRealEur: Float64Array,
+    p1CareAdditionalNeedNominalEur: Float64Array,
+    p2CareAdditionalNeedNominalEur: Float64Array,
+    totalCareAdditionalNeedNominalEur: Float64Array,
+    maxAnnualCareAdditionalNeedNominalEur: Float64Array,
     healthBucketEnabled: Uint8Array,
     healthBucketUsedEur: Float64Array,
     healthBucketEndEur: Float64Array,
@@ -125,7 +135,14 @@ export const MONTE_CARLO_PATH_MISSINGNESS_FIELDS = Object.freeze({
     realWithdrawalP10RealEur: Uint8Array,
     p1CareEntryAge: Uint8Array,
     p2CareEntryAge: Uint8Array,
-    careDepotCostEur: Uint8Array,
+    p1CareAdditionalNeedRealEur: Uint8Array,
+    p2CareAdditionalNeedRealEur: Uint8Array,
+    totalCareAdditionalNeedRealEur: Uint8Array,
+    maxAnnualCareAdditionalNeedRealEur: Uint8Array,
+    p1CareAdditionalNeedNominalEur: Uint8Array,
+    p2CareAdditionalNeedNominalEur: Uint8Array,
+    totalCareAdditionalNeedNominalEur: Uint8Array,
+    maxAnnualCareAdditionalNeedNominalEur: Uint8Array,
     healthBucketCoveragePct: Uint8Array
 });
 
@@ -203,6 +220,7 @@ export function recordMonteCarloPathSummaryV1({
     outcomeCode,
     technicalError = false,
     finalValueNominalEur = 0,
+    finalValueRealEur = 0,
     volatilityPct = 0,
     maxDrawdownPct = 0,
     cutYearsNumerator = 0,
@@ -216,8 +234,14 @@ export function recordMonteCarloPathSummaryV1({
     bothCareYears = 0,
     careEverActive = false,
     hasPartner = false,
-    careDepotCostEur = null,
-    maxAnnualCareSpendEur = 0,
+    p1CareAdditionalNeedRealEur = null,
+    p2CareAdditionalNeedRealEur = null,
+    totalCareAdditionalNeedRealEur = null,
+    maxAnnualCareAdditionalNeedRealEur = null,
+    p1CareAdditionalNeedNominalEur = null,
+    p2CareAdditionalNeedNominalEur = null,
+    totalCareAdditionalNeedNominalEur = null,
+    maxAnnualCareAdditionalNeedNominalEur = null,
     healthBucketEnabled = false,
     healthBucketUsedEur = 0,
     healthBucketEndEur = 0,
@@ -244,6 +268,7 @@ export function recordMonteCarloPathSummaryV1({
 
     pathMissingness.path[localIndex] = MONTE_CARLO_MISSINGNESS_CODE.OBSERVED;
     pathSummaries.finalValueNominalEur[localIndex] = Number(finalValueNominalEur) || 0;
+    pathSummaries.finalValueRealEur[localIndex] = Number(finalValueRealEur) || 0;
     pathSummaries.volatilityPct[localIndex] = Number(volatilityPct) || 0;
     pathSummaries.maxDrawdownPct[localIndex] = Number(maxDrawdownPct) || 0;
     assertNonNegativeInteger(cutYearsNumerator, 'cutYearsNumerator');
@@ -268,18 +293,20 @@ export function recordMonteCarloPathSummaryV1({
         pathSummaries.realWithdrawalObservationCount[localIndex] > 0 ? realWithdrawalP10RealEur : null,
         MONTE_CARLO_MISSINGNESS_CODE.NO_OBSERVATIONS
     );
+    const normalizedP1CareEntryAge = Number(p1CareEntryAge) > 0 ? p1CareEntryAge : null;
+    const normalizedP2CareEntryAge = Number(p2CareEntryAge) > 0 ? p2CareEntryAge : null;
     setOptionalValue(
         pathSummaries.p1CareEntryAge,
         pathMissingness.p1CareEntryAge,
         localIndex,
-        p1CareEntryAge,
+        normalizedP1CareEntryAge,
         MONTE_CARLO_MISSINGNESS_CODE.NOT_APPLICABLE
     );
     setOptionalValue(
         pathSummaries.p2CareEntryAge,
         pathMissingness.p2CareEntryAge,
         localIndex,
-        p2CareEntryAge,
+        normalizedP2CareEntryAge,
         MONTE_CARLO_MISSINGNESS_CODE.NOT_APPLICABLE
     );
     pathSummaries.p1CareYears[localIndex] = Math.max(0, Number(p1CareYears) || 0);
@@ -287,14 +314,25 @@ export function recordMonteCarloPathSummaryV1({
     pathSummaries.bothCareYears[localIndex] = Math.max(0, Number(bothCareYears) || 0);
     pathSummaries.careEverActive[localIndex] = careEverActive ? 1 : 0;
     pathSummaries.hasPartner[localIndex] = hasPartner ? 1 : 0;
-    setOptionalValue(
-        pathSummaries.careDepotCostEur,
-        pathMissingness.careDepotCostEur,
-        localIndex,
-        careEverActive ? careDepotCostEur : null,
-        MONTE_CARLO_MISSINGNESS_CODE.NOT_APPLICABLE
-    );
-    pathSummaries.maxAnnualCareSpendEur[localIndex] = Number(maxAnnualCareSpendEur) || 0;
+    const careValues = {
+        p1CareAdditionalNeedRealEur: [normalizedP1CareEntryAge !== null, p1CareAdditionalNeedRealEur],
+        p2CareAdditionalNeedRealEur: [normalizedP2CareEntryAge !== null, p2CareAdditionalNeedRealEur],
+        totalCareAdditionalNeedRealEur: [careEverActive, totalCareAdditionalNeedRealEur],
+        maxAnnualCareAdditionalNeedRealEur: [careEverActive, maxAnnualCareAdditionalNeedRealEur],
+        p1CareAdditionalNeedNominalEur: [normalizedP1CareEntryAge !== null, p1CareAdditionalNeedNominalEur],
+        p2CareAdditionalNeedNominalEur: [normalizedP2CareEntryAge !== null, p2CareAdditionalNeedNominalEur],
+        totalCareAdditionalNeedNominalEur: [careEverActive, totalCareAdditionalNeedNominalEur],
+        maxAnnualCareAdditionalNeedNominalEur: [careEverActive, maxAnnualCareAdditionalNeedNominalEur]
+    };
+    for (const [field, [applicable, value]] of Object.entries(careValues)) {
+        setOptionalValue(
+            pathSummaries[field],
+            pathMissingness[field],
+            localIndex,
+            applicable ? value : null,
+            MONTE_CARLO_MISSINGNESS_CODE.NOT_APPLICABLE
+        );
+    }
     pathSummaries.healthBucketEnabled[localIndex] = healthBucketEnabled ? 1 : 0;
     pathSummaries.healthBucketUsedEur[localIndex] = Number(healthBucketUsedEur) || 0;
     pathSummaries.healthBucketEndEur[localIndex] = Number(healthBucketEndEur) || 0;
@@ -470,6 +508,9 @@ export function assertMonteCarloChunkResultV1(result, {
     assertDiagnostics(result, count);
 
     let technicalPaths = 0;
+    let observedHouseholdCarePaths = 0;
+    let observedP1CarePaths = 0;
+    let observedP2CarePaths = 0;
     const seenMetaIndices = new Set();
     const validOutcomeCodes = new Set(Object.values(MONTE_CARLO_OUTCOME_CODE).filter(code => code !== MONTE_CARLO_OUTCOME_CODE.UNSET));
     const validMissingnessCodes = new Set(Object.values(MONTE_CARLO_MISSINGNESS_CODE).filter(code => code !== MONTE_CARLO_MISSINGNESS_CODE.UNSET));
@@ -530,10 +571,61 @@ export function assertMonteCarloChunkResultV1(result, {
             if (result.buffers.cutYearShareMissingness[localIndex] !== cutMissingness) {
                 throw contractError(`financial path ${globalIndex} has divergent cut-year buffer and missingness values.`);
             }
+
+            const p1Observed = result.pathMissingness.p1CareEntryAge[localIndex]
+                === MONTE_CARLO_MISSINGNESS_CODE.OBSERVED;
+            const p2Observed = result.pathMissingness.p2CareEntryAge[localIndex]
+                === MONTE_CARLO_MISSINGNESS_CODE.OBSERVED;
+            const householdObserved = result.pathSummaries.careEverActive[localIndex] === 1;
+            if (p1Observed) observedP1CarePaths++;
+            if (p2Observed) observedP2CarePaths++;
+            if (householdObserved) observedHouseholdCarePaths++;
+            if (householdObserved !== (p1Observed || p2Observed)) {
+                throw contractError(`financial path ${globalIndex} has inconsistent household/person care flags.`);
+            }
+            if (p2Observed && result.pathSummaries.hasPartner[localIndex] !== 1) {
+                throw contractError(`financial path ${globalIndex} observes P2 care without a partner.`);
+            }
+            if (!p1Observed && result.pathSummaries.p1CareYears[localIndex] !== 0) {
+                throw contractError(`financial path ${globalIndex} has P1 care years without a P1 entry.`);
+            }
+            if (!p2Observed && result.pathSummaries.p2CareYears[localIndex] !== 0) {
+                throw contractError(`financial path ${globalIndex} has P2 care years without a P2 entry.`);
+            }
+            if (result.pathSummaries.bothCareYears[localIndex]
+                > Math.min(result.pathSummaries.p1CareYears[localIndex], result.pathSummaries.p2CareYears[localIndex])) {
+                throw contractError(`financial path ${globalIndex} has impossible simultaneous care years.`);
+            }
+            const careMissingnessExpectations = {
+                p1CareAdditionalNeedRealEur: p1Observed,
+                p2CareAdditionalNeedRealEur: p2Observed,
+                totalCareAdditionalNeedRealEur: householdObserved,
+                maxAnnualCareAdditionalNeedRealEur: householdObserved,
+                p1CareAdditionalNeedNominalEur: p1Observed,
+                p2CareAdditionalNeedNominalEur: p2Observed,
+                totalCareAdditionalNeedNominalEur: householdObserved,
+                maxAnnualCareAdditionalNeedNominalEur: householdObserved
+            };
+            for (const [field, observed] of Object.entries(careMissingnessExpectations)) {
+                const expectedCode = observed
+                    ? MONTE_CARLO_MISSINGNESS_CODE.OBSERVED
+                    : MONTE_CARLO_MISSINGNESS_CODE.NOT_APPLICABLE;
+                if (result.pathMissingness[field][localIndex] !== expectedCode) {
+                    throw contractError(`financial path ${globalIndex} has inconsistent ${field} missingness.`);
+                }
+                if (result.pathSummaries[field][localIndex] < 0) {
+                    throw contractError(`financial path ${globalIndex} has negative ${field}.`);
+                }
+            }
         }
     }
     if (technicalPaths !== result.technicalInventory.technicalError) {
         throw contractError('Path outcome codes and technical inventory disagree.');
+    }
+    if (observedHouseholdCarePaths !== result.totals.pflegeTriggeredCount
+        || observedP1CarePaths !== result.totals.p1TriggeredCount
+        || observedP2CarePaths !== result.totals.p2TriggeredCount) {
+        throw contractError('Path care observations and care counters disagree.');
     }
     for (const meta of result.runMeta) {
         const index = meta?.index;
@@ -654,23 +746,25 @@ function buildListsFromPathSummaries(accumulator) {
     const missing = accumulator.pathMissingness;
     for (let index = 0; index < accumulator.totalRuns; index++) {
         if (missing.path[index] !== MONTE_CARLO_MISSINGNESS_CODE.OBSERVED) continue;
-        if (summary.careEverActive[index] === 1) {
-            lists.entryAges.push(missing.p1CareEntryAge[index] === MONTE_CARLO_MISSINGNESS_CODE.OBSERVED
-                ? summary.p1CareEntryAge[index]
-                : 0);
-            if (summary.hasPartner[index] === 1) {
-                lists.entryAgesP2.push(missing.p2CareEntryAge[index] === MONTE_CARLO_MISSINGNESS_CODE.OBSERVED
-                    ? summary.p2CareEntryAge[index]
-                    : 0);
-                lists.p2CareYearsTriggered.push(summary.p2CareYears[index]);
-            }
-            lists.careDepotCosts.push(summary.careDepotCostEur[index]);
-            lists.endWealthWithCareList.push(summary.finalValueNominalEur[index]);
+        const p1Triggered = missing.p1CareEntryAge[index] === MONTE_CARLO_MISSINGNESS_CODE.OBSERVED;
+        const p2Triggered = missing.p2CareEntryAge[index] === MONTE_CARLO_MISSINGNESS_CODE.OBSERVED;
+        if (p1Triggered) {
+            lists.entryAges.push(summary.p1CareEntryAge[index]);
             lists.p1CareYearsTriggered.push(summary.p1CareYears[index]);
+            lists.p1CareAdditionalNeedRealEur.push(summary.p1CareAdditionalNeedRealEur[index]);
+        }
+        if (p2Triggered) {
+            lists.entryAgesP2.push(summary.p2CareEntryAge[index]);
+            lists.p2CareYearsTriggered.push(summary.p2CareYears[index]);
+            lists.p2CareAdditionalNeedRealEur.push(summary.p2CareAdditionalNeedRealEur[index]);
+        }
+        if (summary.careEverActive[index] === 1) {
+            lists.totalCareAdditionalNeedRealEur.push(summary.totalCareAdditionalNeedRealEur[index]);
+            lists.endWealthWithCareRealEur.push(summary.finalValueRealEur[index]);
             lists.bothCareYearsOverlapTriggered.push(summary.bothCareYears[index]);
-            lists.maxAnnualCareSpendTriggered.push(summary.maxAnnualCareSpendEur[index]);
+            lists.maxAnnualCareAdditionalNeedRealEur.push(summary.maxAnnualCareAdditionalNeedRealEur[index]);
         } else {
-            lists.endWealthNoCareList.push(summary.finalValueNominalEur[index]);
+            lists.endWealthNoCareRealEur.push(summary.finalValueRealEur[index]);
         }
 
         if (summary.healthBucketEnabled[index] === 1) {

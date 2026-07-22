@@ -1,0 +1,62 @@
+{
+  "schemaVersion": "monte-carlo-post-slice-snapshot-v1",
+  "snapshotId": "post-slice-04-v1",
+  "sourceReference": "post-slice-03-v1",
+  "sliceId": "04",
+  "reviewStatus": "pending",
+  "capturedAtUtc": "2026-07-22T00:00:00.000Z",
+  "goldenCaseId": "GC-CARE-01",
+  "result": {
+    "p1": {
+      "entryRatePct": 50,
+      "entryRateNumerator": 2,
+      "entryRateDenominator": 4,
+      "entryAgeP50": 75,
+      "careYearsP50": 2.5,
+      "realCostEurP50": 10000,
+      "sampleSize": 2,
+      "missingness": null
+    },
+    "p2": {
+      "entryRatePct": 25,
+      "entryRateNumerator": 1,
+      "entryRateDenominator": 4,
+      "entryAgeP50": 80,
+      "careYearsP50": 1,
+      "realCostEurP50": 6000,
+      "sampleSize": 1,
+      "missingness": null
+    },
+    "household": {
+      "entryRatePct": 50,
+      "entryRateNumerator": 2,
+      "entryRateDenominator": 4,
+      "careYearsOverlapP50": 0.5,
+      "totalAdditionalNeedRealEurP50": 13000,
+      "maxAnnualAdditionalNeedRealEurP50": 13000,
+      "endWealthWithCareRealEurP50": 650000,
+      "endWealthNoCareRealEurP50": 950000,
+      "shortfallRateWithCarePct": 0,
+      "shortfallRateWithoutCarePct": 0,
+      "sampleSize": 2,
+      "noCareSampleSize": 2,
+      "missingness": null
+    },
+    "comparison": {
+      "endWealthNoCareMinusCareRealEur": 300000,
+      "method": "unpaired_group_median_difference",
+      "withCareSampleSize": 2,
+      "noCareSampleSize": 2,
+      "missingness": null
+    },
+    "unitContract": {
+      "uiMonetaryValues": "real_eur_at_simulation_start_prices",
+      "nominalPathFields": [
+        "p1CareAdditionalNeedNominalEur",
+        "p2CareAdditionalNeedNominalEur",
+        "totalCareAdditionalNeedNominalEur",
+        "maxAnnualCareAdditionalNeedNominalEur"
+      ]
+    }
+  }
+}

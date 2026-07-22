@@ -1,4 +1,4 @@
-import { buildKpiDashboard } from '../app/simulator/results-metrics.js';
+import { buildCareMetrics, buildKpiDashboard } from '../app/simulator/results-metrics.js';
 
 console.log('--- Results Metrics UI Contract Tests ---');
 
@@ -78,5 +78,59 @@ const volatilityKpi = buildKpiDashboard({
 }).detailSections.flatMap(section => section.kpis).find(kpi => kpi.title.includes('Portfoliovolatilität'));
 assert(volatilityKpi?.description.includes('(N-1)'), 'Volatility tooltip should document sample standard deviation');
 assert(volatilityKpi?.description.includes('keine zusätzliche Annualisierung'), 'Volatility tooltip should document annual frequency semantics');
+
+const careMetrics = buildCareMetrics({
+    extraKPI: {
+        pflege: {
+            p1: {
+                entryRatePct: 25,
+                entryRateNumerator: 1,
+                entryRateDenominator: 4,
+                entryAgeP50: 72,
+                careYearsP50: 3,
+                realCostEurP50: 12000,
+                sampleSize: 1
+            },
+            p2: {
+                entryRatePct: 0,
+                entryRateNumerator: 0,
+                entryRateDenominator: 4,
+                entryAgeP50: null,
+                careYearsP50: null,
+                realCostEurP50: null,
+                sampleSize: 0,
+                missingness: 'no_observations'
+            },
+            household: {
+                careYearsOverlapP50: 0,
+                maxAnnualAdditionalNeedRealEurP50: 12000,
+                totalAdditionalNeedRealEurP50: 30000,
+                shortfallRateWithCarePct: 0,
+                shortfallRateWithoutCarePct: 10,
+                endWealthWithCareRealEurP50: 700000,
+                endWealthNoCareRealEurP50: 800000,
+                sampleSize: 1,
+                noCareSampleSize: 3
+            },
+            comparison: {
+                endWealthNoCareMinusCareRealEur: 100000,
+                method: 'unpaired_group_median_difference'
+            }
+        }
+    }
+}, {
+    pflegefallLogikAktivieren: true,
+    partner: { aktiv: true }
+});
+const careCard = title => careMetrics.cards.find(card => card.title === title);
+assert(careCard('Pflegefall-Eintrittsquote P1')?.value === '25,0 %', 'P1 entry rate should render as a percentage');
+assert(careCard('Median Eintrittsalter P2')?.value === '—', 'Empty P2 entry-age distribution should render as an em dash');
+assert(careCard('Median Pflegejahre P2')?.value === '—', 'Empty P2 care-years distribution should render as an em dash');
+assert(careCard('Realer Pflege-Mehrbedarf P2 (Median)')?.value === '—', 'Empty P2 real-cost distribution should render as an em dash');
+assert(careCard('Median Jahre beide in Pflege')?.value === '0,0 Jahre', 'Observed zero simultaneous-care years should remain distinguishable from missingness');
+assert(careCard('Max. jährlicher Pflege-Mehrbedarf (real)')?.description.includes('P1 + P2'), 'Annual household care need should document the summed persons');
+assert(!careMetrics.cards.some(card => card.title.includes('Depot')), 'Care KPI cards must not claim a depot-financed care amount');
+assert(careCard('Gruppenmedian-Differenz ohne minus mit Pflege')?.value.includes('100.000'), 'Care comparison should use no-care minus care sign convention');
+assert(careCard('Gruppenmedian-Differenz ohne minus mit Pflege')?.description.includes('nicht-kausaler'), 'Care comparison should disclose the unpaired non-causal method');
 
 console.log('--- Results Metrics UI Contract Tests Completed ---');

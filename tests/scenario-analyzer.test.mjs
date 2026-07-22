@@ -1,6 +1,6 @@
 console.log('--- Scenario Analyzer Tests ---');
 
-import { analyzeScenario, compareScenarios, extractKeyMetrics } from '../app/simulator/scenario-analyzer.js';
+import { ScenarioAnalyzer, analyzeScenario, compareScenarios, extractKeyMetrics } from '../app/simulator/scenario-analyzer.js';
 
 // --- TEST 1: extractKeyMetrics defaults and coercion ---
 {
@@ -11,7 +11,7 @@ import { analyzeScenario, compareScenarios, extractKeyMetrics } from '../app/sim
         lebensdauer: undefined,
         careEverActive: 'yes',
         totalCareYears: NaN,
-        totalCareCosts: 1000,
+        totalCareAdditionalNeedRealEur: 1000,
         maxKuerzung: 49,
         triggeredAge: 'x',
         widowTriggered: true,
@@ -23,9 +23,9 @@ import { analyzeScenario, compareScenarios, extractKeyMetrics } from '../app/sim
     assertEqual(metrics.lebensdauer, 0, 'extractKeyMetrics should default non-finite lebensdauer to 0');
     assertEqual(metrics.careEverActive, true, 'extractKeyMetrics should coerce careEverActive to boolean');
     assertEqual(metrics.totalCareYears, 0, 'extractKeyMetrics should default non-finite totalCareYears to 0');
-    assertEqual(metrics.totalCareCosts, 1000, 'extractKeyMetrics should preserve numeric totalCareCosts');
+    assertEqual(metrics.totalCareAdditionalNeedRealEur, 1000, 'extractKeyMetrics should preserve real care need');
     assertEqual(metrics.maxKuerzung, 49, 'extractKeyMetrics should preserve numeric maxKuerzung');
-    assertEqual(metrics.triggeredAge, null, 'extractKeyMetrics should set triggeredAge to null when non-finite');
+    assertEqual(metrics.p1CareEntryAge, null, 'extractKeyMetrics should set P1 entry age to null when non-finite');
     assertEqual(metrics.isWidow, true, 'extractKeyMetrics should detect widowTriggered');
     assertEqual(metrics.isCrash, false, 'extractKeyMetrics should detect crashTriggered');
 }
@@ -34,7 +34,7 @@ import { analyzeScenario, compareScenarios, extractKeyMetrics } from '../app/sim
 {
     const result = analyzeScenario({
         careEverActive: true,
-        totalCareCosts: 5000,
+        totalCareAdditionalNeedRealEur: 5000,
         failed: true,
         triggeredAge: 68,
         maxKuerzung: 55,
@@ -43,12 +43,66 @@ import { analyzeScenario, compareScenarios, extractKeyMetrics } from '../app/sim
     });
 
     assert(result.tags.includes('care'), 'analyzeScenario should tag care when careEverActive');
-    assert(result.tags.includes('care_costs'), 'analyzeScenario should tag care_costs when costs > 0');
+    assert(result.tags.includes('care_need'), 'analyzeScenario should tag care_need when modelled need is positive');
     assert(result.tags.includes('failed'), 'analyzeScenario should tag failed when failed');
     assert(result.tags.includes('early_care'), 'analyzeScenario should tag early_care when triggeredAge <= 70');
     assert(result.tags.includes('severe_cut'), 'analyzeScenario should tag severe_cut when maxKuerzung >= 50');
     assert(result.tags.includes('widow'), 'analyzeScenario should tag widow when isWidow is true');
     assert(result.tags.includes('crash'), 'analyzeScenario should tag crash when isCrash is true');
+}
+
+// --- TEST 2b: P2-only early care and characteristic selection stay person-specific ---
+{
+    const result = analyzeScenario({
+        careEverActive: true,
+        p1CareEntryAge: null,
+        p2CareEntryAge: 69
+    });
+    assert(result.tags.includes('early_care'), 'P2-only early care should receive the early-care tag');
+
+    const analyzer = new ScenarioAnalyzer(3);
+    analyzer.addRun({
+        index: 0,
+        endVermoegen: 100,
+        failed: false,
+        lebensdauer: 10,
+        careEverActive: true,
+        totalCareYears: 1,
+        totalCareAdditionalNeedRealEur: 1000,
+        p1CareEntryAge: 74,
+        p2CareEntryAge: null,
+        maxKuerzung: 0,
+        logDataRows: []
+    });
+    analyzer.addRun({
+        index: 1,
+        endVermoegen: 200,
+        failed: false,
+        lebensdauer: 10,
+        careEverActive: true,
+        totalCareYears: 1,
+        totalCareAdditionalNeedRealEur: 2000,
+        p1CareEntryAge: null,
+        p2CareEntryAge: 68,
+        maxKuerzung: 0,
+        logDataRows: []
+    });
+    analyzer.addRun({
+        index: 2,
+        endVermoegen: 300,
+        failed: false,
+        lebensdauer: 10,
+        careEverActive: false,
+        totalCareYears: 0,
+        totalCareAdditionalNeedRealEur: 0,
+        p1CareEntryAge: null,
+        p2CareEntryAge: null,
+        maxKuerzung: 0,
+        logDataRows: []
+    });
+    const scenarios = analyzer.buildScenarioLogs().characteristic;
+    assertEqual(scenarios.find(entry => entry.key === 'earliestCareP1')?.p1CareEntryAge, 74, 'Scenario analysis should select earliest P1 care independently');
+    assertEqual(scenarios.find(entry => entry.key === 'earliestCareP2')?.p2CareEntryAge, 68, 'Scenario analysis should select earliest P2 care independently');
 }
 
 // --- TEST 3: analyzeScenario tags from logDataRows ---
