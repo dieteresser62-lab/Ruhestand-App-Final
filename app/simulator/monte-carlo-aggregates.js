@@ -3,6 +3,7 @@
 import { quantile, sum, mean } from './simulator-utils.js';
 import { STRESS_PRESETS } from './simulator-data.js';
 import { MC_HEATMAP_BINS } from './monte-carlo-runner-utils.js';
+import { MONTE_CARLO_MISSINGNESS_CODE } from './monte-carlo-chunk-result.js';
 
 export function buildMonteCarloAggregates({
     inputs,
@@ -19,6 +20,8 @@ export function buildMonteCarloAggregates({
         taxOutcomes,
         kpiLebensdauer,
         kpiKuerzungsjahre,
+        cutYearShareRatio,
+        cutYearShareMissingness,
         kpiMaxKuerzung,
         volatilities,
         maxDrawdowns,
@@ -77,6 +80,22 @@ export function buildMonteCarloAggregates({
         if (finalOutcomes[i] > 0) successfulOutcomes.push(finalOutcomes[i]);
     }
 
+    const observedCutYearSharesPct = Array.from(cutYearShareRatio)
+        .filter((_value, index) => (
+            cutYearShareMissingness[index] === MONTE_CARLO_MISSINGNESS_CODE.OBSERVED
+        ))
+        .map(value => value * 100);
+    const cutYearSharePct = {
+        p50: observedCutYearSharesPct.length > 0
+            ? quantile(observedCutYearSharesPct, 0.5)
+            : null,
+        sampleSize: observedCutYearSharesPct.length,
+        excludedRuns: Math.max(0, totalRuns - observedCutYearSharesPct.length),
+        thresholdPct: 10,
+        numerator: 'completed_decumulation_years_with_cut_gte_10_pct',
+        denominator: 'completed_decumulation_years_with_finite_cut_decision'
+    };
+
     const medianWithCare = endWealthWithCareList.length ? quantile(endWealthWithCareList, 0.5) : 0;
     const medianNoCare = endWealthNoCareList.length ? quantile(endWealthNoCareList, 0.5) : 0;
     const pflegeResults = {
@@ -107,7 +126,14 @@ export function buildMonteCarloAggregates({
         },
         taxOutcomes: { p50: quantile(taxOutcomes, 0.5) },
         kpiLebensdauer: { mean: mean(kpiLebensdauer) },
-        kpiKuerzungsjahre: { p50: quantile(kpiKuerzungsjahre, 0.5) },
+        cutYearSharePct,
+        kpiKuerzungsjahre: {
+            p50: quantile(kpiKuerzungsjahre, 0.5),
+            unit: 'years',
+            deprecated: true,
+            replacement: 'cutYearSharePct',
+            removalTarget: 'Slice 11'
+        },
         kpiMaxKuerzung: { p50: quantile(kpiMaxKuerzung, 0.5) },
         depotErschoepfungsQuote: (sum(depotErschoepft) / totalRuns) * 100,
         alterBeiErschoepfung: { p50: quantile(Array.from(alterBeiErschoepfung).filter(a => a < 255), 0.5) || 0 },

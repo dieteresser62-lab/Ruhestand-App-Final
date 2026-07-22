@@ -327,6 +327,7 @@ export async function runMonteCarloChunk({
         }
         const runIdx = runStart + i;
         let failed = false, totalTaxesThisRun = 0, totalTaxSavedByLossCarryThisRun = 0, kpiJahreMitKuerzungDieserLauf = 0, kpiMaxKuerzungDieserLauf = 0;
+        let cutYearsNumeratorThisRun = 0;
         let cutDecisionYearsThisRun = 0;
         let lebensdauer = 0, jahreOhneFlex = 0, triggeredAge = null;
         let careEverActive = false;
@@ -625,9 +626,15 @@ export async function runMonteCarloChunk({
                 if (Number.isFinite(Number(result.logData?.health_bucket_target_gap))) {
                     healthBucketTargetGapThisRun = Number(result.logData.health_bucket_target_gap);
                 }
-                if (result.logData.entscheidung.kuerzungProzent >= 10) kpiJahreMitKuerzungDieserLauf++;
-                if (Number.isFinite(Number(result.logData.entscheidung.kuerzungProzent))) cutDecisionYearsThisRun++;
-                kpiMaxKuerzungDieserLauf = Math.max(kpiMaxKuerzungDieserLauf, result.logData.entscheidung.kuerzungProzent);
+                const cutPct = Number(result.logData.entscheidung.kuerzungProzent);
+                if (Number.isFinite(cutPct)) {
+                    if (cutPct >= 10) kpiJahreMitKuerzungDieserLauf++;
+                    if (!isAccumulation) {
+                        cutDecisionYearsThisRun++;
+                        if (cutPct >= 10) cutYearsNumeratorThisRun++;
+                    }
+                    kpiMaxKuerzungDieserLauf = Math.max(kpiMaxKuerzungDieserLauf, cutPct);
+                }
 
                 const depotOnlyNow = sumDepot(simState.portfolio);
                 depotNurHistorie.push(depotOnlyNow);
@@ -730,8 +737,8 @@ export async function runMonteCarloChunk({
             }));
         }
 
-        const { maxDDpct } = computeRunStatsFromSeries(depotWertHistorie);
-        volatilities[i] = maxDDpct;
+        const { volPct, maxDDpct } = computeRunStatsFromSeries(depotWertHistorie);
+        volatilities[i] = volPct;
         maxDrawdowns[i] = maxDDpct;
 
         writeMonteCarloStressMetrics(
@@ -795,7 +802,7 @@ export async function runMonteCarloChunk({
             finalValueNominalEur: finalOutcomes[i],
             volatilityPct: volatilities[i],
             maxDrawdownPct: maxDrawdowns[i],
-            cutYearsNumerator: kpiJahreMitKuerzungDieserLauf,
+            cutYearsNumerator: cutYearsNumeratorThisRun,
             cutYearsDenominator: cutDecisionYearsThisRun,
             realWithdrawalP10RealEur: realWithdrawalsThisRun.length > 0
                 ? quantile(realWithdrawalsThisRun, 0.10)

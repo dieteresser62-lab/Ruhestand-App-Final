@@ -29,6 +29,8 @@ export const MONTE_CARLO_BUFFER_FIELDS = Object.freeze({
     taxOutcomes: Float64Array,
     kpiLebensdauer: Uint8Array,
     kpiKuerzungsjahre: Float32Array,
+    cutYearShareRatio: Float32Array,
+    cutYearShareMissingness: Uint8Array,
     kpiMaxKuerzung: Float32Array,
     volatilities: Float32Array,
     maxDrawdowns: Float32Array,
@@ -96,6 +98,7 @@ export const MONTE_CARLO_PATH_SUMMARY_FIELDS = Object.freeze({
     maxDrawdownPct: Float32Array,
     cutYearsNumerator: Uint32Array,
     cutYearsDenominator: Uint32Array,
+    cutYearShareRatio: Float32Array,
     realWithdrawalP10RealEur: Float64Array,
     realWithdrawalObservationCount: Uint32Array,
     p1CareEntryAge: Uint16Array,
@@ -118,6 +121,7 @@ export const MONTE_CARLO_PATH_SUMMARY_FIELDS = Object.freeze({
 
 export const MONTE_CARLO_PATH_MISSINGNESS_FIELDS = Object.freeze({
     path: Uint8Array,
+    cutYearShareRatio: Uint8Array,
     realWithdrawalP10RealEur: Uint8Array,
     p1CareEntryAge: Uint8Array,
     p2CareEntryAge: Uint8Array,
@@ -169,8 +173,12 @@ export function createMonteCarloPathSummaryV1(runCount, {
         pathSummaries.finalValueNominalEur = buffers.finalOutcomes;
         pathSummaries.volatilityPct = buffers.volatilities;
         pathSummaries.maxDrawdownPct = buffers.maxDrawdowns;
+        pathSummaries.cutYearShareRatio = buffers.cutYearShareRatio;
     }
     const pathMissingness = createTypedFields(MONTE_CARLO_PATH_MISSINGNESS_FIELDS, runCount);
+    if (buffers) {
+        pathMissingness.cutYearShareRatio = buffers.cutYearShareMissingness;
+    }
     if (buffers && attachTransferBuffers) {
         attachPathTransferBuffers(buffers, pathSummaries, pathMissingness);
     }
@@ -238,8 +246,20 @@ export function recordMonteCarloPathSummaryV1({
     pathSummaries.finalValueNominalEur[localIndex] = Number(finalValueNominalEur) || 0;
     pathSummaries.volatilityPct[localIndex] = Number(volatilityPct) || 0;
     pathSummaries.maxDrawdownPct[localIndex] = Number(maxDrawdownPct) || 0;
-    pathSummaries.cutYearsNumerator[localIndex] = Math.max(0, Number(cutYearsNumerator) || 0);
-    pathSummaries.cutYearsDenominator[localIndex] = Math.max(0, Number(cutYearsDenominator) || 0);
+    assertNonNegativeInteger(cutYearsNumerator, 'cutYearsNumerator');
+    assertNonNegativeInteger(cutYearsDenominator, 'cutYearsDenominator');
+    if (cutYearsNumerator > cutYearsDenominator) {
+        throw contractError('cutYearsNumerator must not exceed cutYearsDenominator.');
+    }
+    pathSummaries.cutYearsNumerator[localIndex] = cutYearsNumerator;
+    pathSummaries.cutYearsDenominator[localIndex] = cutYearsDenominator;
+    setOptionalValue(
+        pathSummaries.cutYearShareRatio,
+        pathMissingness.cutYearShareRatio,
+        localIndex,
+        cutYearsDenominator > 0 ? cutYearsNumerator / cutYearsDenominator : null,
+        MONTE_CARLO_MISSINGNESS_CODE.NO_OBSERVATIONS
+    );
     pathSummaries.realWithdrawalObservationCount[localIndex] = Math.max(0, Number(realWithdrawalObservationCount) || 0);
     setOptionalValue(
         pathSummaries.realWithdrawalP10RealEur,
@@ -485,6 +505,30 @@ export function assertMonteCarloChunkResultV1(result, {
                 if (field !== 'path' && values[localIndex] === MONTE_CARLO_MISSINGNESS_CODE.TECHNICAL_ERROR) {
                     throw contractError(`financial path ${globalIndex} cannot contain technical missingness.`);
                 }
+            }
+            const cutNumerator = result.pathSummaries.cutYearsNumerator[localIndex];
+            const cutDenominator = result.pathSummaries.cutYearsDenominator[localIndex];
+            const cutRatio = result.pathSummaries.cutYearShareRatio[localIndex];
+            const cutMissingness = result.pathMissingness.cutYearShareRatio[localIndex];
+            if (cutNumerator > cutDenominator) {
+                throw contractError(`financial path ${globalIndex} has a cut numerator above its denominator.`);
+            }
+            if (cutDenominator === 0) {
+                if (cutNumerator !== 0
+                    || cutMissingness !== MONTE_CARLO_MISSINGNESS_CODE.NO_OBSERVATIONS
+                    || cutRatio !== 0) {
+                    throw contractError(`financial path ${globalIndex} must encode an empty cut denominator as nullable missingness.`);
+                }
+            } else if (cutMissingness !== MONTE_CARLO_MISSINGNESS_CODE.OBSERVED
+                || cutRatio !== Math.fround(cutNumerator / cutDenominator)) {
+                throw contractError(`financial path ${globalIndex} has an inconsistent cut-year share.`);
+            }
+            const bufferedCutRatio = result.buffers.cutYearShareRatio[localIndex];
+            if (!Object.is(bufferedCutRatio, cutRatio)) {
+                throw contractError(`financial path ${globalIndex} has divergent cut-year buffer and summary values.`);
+            }
+            if (result.buffers.cutYearShareMissingness[localIndex] !== cutMissingness) {
+                throw contractError(`financial path ${globalIndex} has divergent cut-year buffer and missingness values.`);
             }
         }
     }

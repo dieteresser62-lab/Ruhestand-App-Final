@@ -239,6 +239,22 @@ try {
         1e-6,
         'Auto-Optimize worker timeShare should match serial'
     );
+    assertClose(
+        workerResult.aggregatedResults.volatilities.p50,
+        serialAggregates.volatilities.p50,
+        0,
+        'Auto-Optimize worker volatility should match serial exactly'
+    );
+    assertClose(
+        workerResult.aggregatedResults.cutYearSharePct.p50,
+        serialAggregates.cutYearSharePct.p50,
+        0,
+        'Auto-Optimize worker cut-year share should match serial exactly'
+    );
+    assert(
+        workerResult.aggregatedResults.cutYearSharePct.sampleSize === serialAggregates.cutYearSharePct.sampleSize,
+        'Auto-Optimize worker cut-year sample size should match serial'
+    );
 
     console.log('✅ Auto-Optimize worker MC merge contract passed');
 } finally {

@@ -1,7 +1,7 @@
 # Simulator / Monte Carlo: GAP-Analyse
 
-**Stand:** 2026-07-19  
-**Status:** Revision 1 nach blockiertem Gemini-/Claude-Review; Re-Review ausstehend  
+**Stand:** 2026-07-22
+**Status:** Plan freigegeben; Slices 01-02 freigegeben, Slice 03 implementiert und im Review
 **Autor:** Codex als Implementer und Plan-Autor  
 **Planungsbranch:** `codex/simulator-monte-carlo-gap-plan` (nur lokal; nicht auf GitHub veroeffentlicht)  
 **Folgeplan:** [SIMULATOR_MONTE_CARLO_HARDENING_PLAN.md](./SIMULATOR_MONTE_CARLO_HARDENING_PLAN.md)
@@ -129,6 +129,10 @@ Golden Cases muessen beide Groessen auseinanderhalten.
 
 **Slice:** 03.
 
+**Umsetzungsstand 2026-07-22:** Implementiert. Der Runner schreibt `volPct`
+und `maxDDpct` in getrennte V1-Felder. Golden Case, Post-Slice-Snapshot und
+direkte/Worker-/Auto-Optimize-Paritaet sind gruen; externe Freigabe steht aus.
+
 ### MC-02 - Jahresanzahl wird als Anteil der Kuerzungsjahre ausgegeben (P0)
 
 **Evidenz:** Der Runner zaehlt Jahre mit `kuerzungProzent >= 10` in
@@ -147,6 +151,12 @@ abgeschlossene Dekumulationsjahre mit endlicher Kuerzungsentscheidung. Nenner
 Exakt 10 Prozent und Ruin vor dem ersten abgeschlossenen Jahr sind Golden Cases.
 
 **Slice:** 03.
+
+**Umsetzungsstand 2026-07-22:** Implementiert. Der kanonische
+`cutYearShareRatio` nutzt nur abgeschlossene Dekumulationsjahre, schliesst
+exakt 10 Prozent ein und traegt bei Nenner 0 `NO_OBSERVATIONS`; Aggregat und UI
+verwenden `cutYearSharePct` mit Stichprobengroesse. Der absolute Legacy-Zaehler
+bleibt befristet und explizit deprecated; externe Freigabe steht aus.
 
 ### MC-03 - Pflege-P1-KPIs verwenden teilweise den Haushaltszaehler (P0)
 

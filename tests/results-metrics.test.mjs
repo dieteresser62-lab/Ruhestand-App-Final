@@ -56,4 +56,27 @@ assert(
     'Depletion tone should remain dangerous above twenty percent'
 );
 
+const cutDashboard = buildKpiDashboard({
+    depotErschoepfungsQuote: 0,
+    cutYearSharePct: { p50: 50, sampleSize: 4, excludedRuns: 1 }
+});
+const cutKpi = cutDashboard.primary.find(kpi => kpi.title.includes('Kürzungsjahre'));
+assert(cutKpi?.title === 'Anteil Kürzungsjahre (≥ 10 %)', 'Cut-share title should use the inclusive ten-percent threshold');
+assert(cutKpi?.value === '50,0 %', 'Observed cut share should render as percent');
+assert(cutKpi?.description.includes('abgeschlossener Dekumulationsjahre'), 'Cut-share tooltip should name the denominator population');
+assert(cutKpi?.description.includes('Stichprobe: 4 Läufe'), 'Cut-share tooltip should expose sample size');
+
+const emptyCutKpi = buildKpiDashboard({
+    depotErschoepfungsQuote: 0,
+    cutYearSharePct: { p50: null, sampleSize: 0, excludedRuns: 2 }
+}).primary.find(kpi => kpi.title.includes('Kürzungsjahre'));
+assert(emptyCutKpi?.value === '—', 'Missing cut-share distribution should render as an em dash, not zero or NaN');
+
+const volatilityKpi = buildKpiDashboard({
+    depotErschoepfungsQuote: 0,
+    volatilities: { p50: 14.142 }
+}).detailSections.flatMap(section => section.kpis).find(kpi => kpi.title.includes('Portfoliovolatilität'));
+assert(volatilityKpi?.description.includes('(N-1)'), 'Volatility tooltip should document sample standard deviation');
+assert(volatilityKpi?.description.includes('keine zusätzliche Annualisierung'), 'Volatility tooltip should document annual frequency semantics');
+
 console.log('--- Results Metrics UI Contract Tests Completed ---');

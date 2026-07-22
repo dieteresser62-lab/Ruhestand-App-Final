@@ -34,6 +34,7 @@ const goldenFixture = readFixture('golden-cases-v1.json');
 const snapshotPolicy = readFixture('snapshot-policy-v1.json');
 const deltaLedger = readFixture('delta-ledger-v1.json');
 const preHardening = readFixture('pre-hardening-v1.json');
+const postSlice03 = readFixture('post-slice-03-v1.json');
 const benchmarkContract = readFixture('benchmark-contract-v1.json');
 const benchmarkResults = readFixture('benchmark-results-2026-07-22.json');
 const consumerInventory = readFixture('consumer-inventory-v1.json');
@@ -274,6 +275,7 @@ function snapshotProjection(result) {
             taxOutcomes: aggregates.taxOutcomes,
             kpiLebensdauer: aggregates.kpiLebensdauer,
             kpiKuerzungsjahre: aggregates.kpiKuerzungsjahre,
+            cutYearSharePct: aggregates.cutYearSharePct,
             kpiMaxKuerzung: aggregates.kpiMaxKuerzung,
             depotErschoepfungsQuote: aggregates.depotErschoepfungsQuote,
             alterBeiErschoepfung: aggregates.alterBeiErschoepfung,
@@ -290,6 +292,37 @@ function snapshotProjection(result) {
         },
         worstRun: compactWorstRun(result.worstRun),
         worstRunCare: compactWorstRun(result.worstRunCare)
+    });
+}
+
+function riskKpiSnapshotProjection(result) {
+    const bufferBytes = Object.values(result.buffers).reduce((sum, buffer) => sum + buffer.byteLength, 0);
+    return canonicalize({
+        bufferBytes,
+        bufferBytesPerRun: bufferBytes / result.totalRuns,
+        buffers: {
+            legacyCutYearCounts: result.buffers.kpiKuerzungsjahre,
+            cutYearShareRatio: result.buffers.cutYearShareRatio,
+            cutYearShareMissingness: result.buffers.cutYearShareMissingness,
+            volatilityPct: result.buffers.volatilities,
+            maxDrawdownPct: result.buffers.maxDrawdowns
+        },
+        pathSummaries: {
+            cutYearsNumerator: result.pathSummaries.cutYearsNumerator,
+            cutYearsDenominator: result.pathSummaries.cutYearsDenominator,
+            cutYearShareRatio: result.pathSummaries.cutYearShareRatio,
+            volatilityPct: result.pathSummaries.volatilityPct,
+            maxDrawdownPct: result.pathSummaries.maxDrawdownPct
+        },
+        pathMissingness: {
+            cutYearShareRatio: result.pathMissingness.cutYearShareRatio
+        },
+        aggregates: {
+            legacyCutYearCounts: result.aggregates.kpiKuerzungsjahre,
+            cutYearSharePct: result.aggregates.cutYearSharePct,
+            volatilities: result.aggregates.volatilities,
+            maxDrawdowns: result.aggregates.maxDrawdowns
+        }
     });
 }
 
@@ -640,6 +673,17 @@ function computeKpiDelta(low, high) {
     assertEqual(deltaLedger.baselineOverwriteAllowed, false, 'Delta ledger must not permit baseline overwrite');
     assert(deltaLedger.requiredEntryFields.includes('goldenCaseIds'), 'Delta entries must link to golden cases');
     assertEqual(deltaLedger.policy.unexplainedDelta, 'block', 'Unexplained deltas must block');
+    const slice03Entries = deltaLedger.entries.filter(entry => entry.sliceId === '03');
+    assertEqual(slice03Entries.length, 2, 'Slice 03 must ledger volatility and cut-share changes separately');
+    for (const entry of slice03Entries) {
+        for (const field of deltaLedger.requiredEntryFields) {
+            assert(entry[field] !== undefined, `Slice 03 delta entry must contain ${field}`);
+        }
+        assertEqual(entry.sourceReference, 'pre-hardening-v1', 'Slice 03 deltas must retain the immutable source reference');
+        assertEqual(entry.targetReference, 'post-slice-03-v1', 'Slice 03 deltas must target the separate post-slice snapshot');
+    }
+    assertEqual(postSlice03.sourceReference, 'pre-hardening-v1', 'Post-Slice-03 snapshot must reference the immutable baseline');
+    assertEqual(postSlice03.reviewStatus, 'pending', 'Codex must not mark its own post-slice snapshot as reviewed');
 }
 
 // Contract 8: every planned rename has producers, consumers, tests and a migration note.
@@ -683,25 +727,25 @@ const fixedWorkerResult = await runWorkerLayout(
 );
 const actualDataVersion = getDataVersion();
 const actualSnapshotResult = snapshotProjection(fixedWorkerResult);
-if (process.env.MC_PRINT_BASELINE === '1') {
-    console.log('__PRE_HARDENING_CAPTURE_START__');
-    console.log(JSON.stringify({ dataVersion: actualDataVersion, result: actualSnapshotResult }, null, 2));
-    console.log('__PRE_HARDENING_CAPTURE_END__');
-    assert(true, 'Baseline capture is printable without mutating the immutable fixture');
-} else {
-    assertJsonEqual(actualDataVersion, preHardening.metadata.dataVersion, 'Snapshot data version must match');
-    assert(preHardening.result !== null, 'Immutable pre-hardening result must be captured');
-    const sameRuntime = process.version === preHardening.metadata.runtime.version
-        && process.platform === preHardening.metadata.runtime.platform
-        && process.arch === preHardening.metadata.runtime.architecture;
-    compareSnapshotNode(
-        actualSnapshotResult,
-        preHardening.result,
-        'result',
-        sameRuntime,
-        preHardening.metadata.numericTolerance
-    );
+if (process.env.MC_PRINT_SLICE_03 === '1') {
+    console.log('__POST_SLICE_03_CAPTURE_START__');
+    console.log(JSON.stringify({ dataVersion: actualDataVersion, result: riskKpiSnapshotProjection(fixedWorkerResult) }, null, 2));
+    console.log('__POST_SLICE_03_CAPTURE_END__');
 }
+assertJsonEqual(actualDataVersion, postSlice03.metadata.dataVersion, 'Post-Slice-03 data version must match');
+assert(preHardening.result !== null, 'Immutable pre-hardening result must remain captured');
+assertEqual(preHardening.result.bufferBytesPerRun, 63, 'Immutable pre-hardening buffer evidence must remain unchanged');
+assertJsonEqual(preHardening.result.buffers.volatilities, preHardening.result.buffers.maxDrawdowns, 'Immutable baseline must retain the documented pre-fix volatility defect');
+const sameRuntime = process.version === postSlice03.metadata.runtime.version
+    && process.platform === postSlice03.metadata.runtime.platform
+    && process.arch === postSlice03.metadata.runtime.architecture;
+compareSnapshotNode(
+    riskKpiSnapshotProjection(fixedWorkerResult),
+    postSlice03.result,
+    'result',
+    sameRuntime,
+    postSlice03.metadata.numericTolerance
+);
 
 const directChunk = await runMonteCarloChunk({
     ...preHardening.runnerCase,

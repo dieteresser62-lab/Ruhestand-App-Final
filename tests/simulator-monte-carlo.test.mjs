@@ -31,6 +31,7 @@ import {
     finalizeMonteCarloRunMetrics,
     recordMonteCarloRunOutcome
 } from '../app/simulator/mc-run-metrics.js';
+import { MONTE_CARLO_MISSINGNESS_CODE } from '../app/simulator/monte-carlo-chunk-result.js';
 
 console.log('--- Simulator Monte Carlo Tests ---');
 
@@ -232,6 +233,8 @@ function buildBasicInputs() {
     buffers.taxOutcomes.set([10, 20, 30]);
     buffers.kpiLebensdauer.set([80, 82, 84]);
     buffers.kpiKuerzungsjahre.set([1, 2, 3]);
+    buffers.cutYearShareRatio.set([0, 0.5, 1]);
+    buffers.cutYearShareMissingness.fill(MONTE_CARLO_MISSINGNESS_CODE.OBSERVED);
     buffers.kpiMaxKuerzung.set([5, 6, 7]);
     buffers.volatilities.set([10, 20, 30]);
     buffers.maxDrawdowns.set([0.1, 0.2, 0.3]);
@@ -293,6 +296,9 @@ function buildBasicInputs() {
     // Verifikation: zentrale Kennzahlen korrekt abgeleitet.
     assertClose(aggregates.finalOutcomes.p50, 200, 0.0001, 'Median end wealth should be 200');
     assertClose(aggregates.taxOutcomes.p50, 20, 0.0001, 'Median tax should be 20');
+    assertClose(aggregates.cutYearSharePct.p50, 50, 0.0001, 'Median cut-year share should be exported as percent');
+    assertEqual(aggregates.cutYearSharePct.sampleSize, 3, 'Cut-year share should expose its observed run count');
+    assertEqual(aggregates.kpiKuerzungsjahre.deprecated, true, 'Legacy cut-year count should be explicitly deprecated');
     assertClose(aggregates.depotErschoepfungsQuote, (1 / 3) * 100, 0.0001, 'Depletion rate should match');
     assertClose(aggregates.extraKPI.timeShareQuoteAbove45, 0.2, 0.0001, 'Time share above 4.5 should match');
     assertClose(aggregates.extraKPI.dynamicFlexSafety.yearShareStage1plus, 0.3, 0.0001, 'Safety stage1+ year share should match');
@@ -301,6 +307,36 @@ function buildBasicInputs() {
     assertClose(aggregates.extraKPI.healthBucket.depletedRatePct, 50, 0.0001, 'Health bucket depletion rate should match');
     assertClose(aggregates.extraKPI.healthBucket.totalUsed, 5000, 0.0001, 'Health bucket total used should match');
     assertClose(aggregates.extraKPI.healthBucket.coverageMedianPct, 40, 0.0001, 'Health bucket coverage median should match');
+}
+
+// --- TEST 7e: Empty cut-decision distributions remain nullable ---
+{
+    const buffers = createMonteCarloBuffers(2);
+    const aggregates = buildMonteCarloAggregates({
+        inputs: { stressPreset: 'NONE' },
+        totalRuns: 2,
+        buffers,
+        heatmap: [new Uint32Array([0])],
+        bins: [0, Infinity],
+        totals: {
+            pflegeTriggeredCount: 0,
+            totalSimulatedYears: 0,
+            totalYearsQuoteAbove45: 0,
+            shortfallWithCareCount: 0,
+            shortfallNoCareProxyCount: 0,
+            p2TriggeredCount: 0
+        },
+        lists: {
+            entryAges: [], entryAgesP2: [], careDepotCosts: [],
+            endWealthWithCareList: [], endWealthNoCareList: [],
+            p1CareYearsTriggered: [], p2CareYearsTriggered: [],
+            bothCareYearsOverlapTriggered: [], maxAnnualCareSpendTriggered: []
+        },
+        allRealWithdrawalsSample: []
+    });
+    assertEqual(aggregates.cutYearSharePct.p50, null, 'No finite cut decisions should aggregate to null');
+    assertEqual(aggregates.cutYearSharePct.sampleSize, 0, 'No finite cut decisions should expose sampleSize zero');
+    assertEqual(aggregates.cutYearSharePct.excludedRuns, 2, 'No finite cut decisions should expose all runs as excluded');
 }
 
 // --- TEST 7b: Monte-Carlo stress tracker ---
@@ -1075,7 +1111,49 @@ const emptyLists = {
     }
 }
 
-// --- TEST 19: Shared technical outcome is fail-closed across Direct, MC, worker-like merge, and Sweep ---
+// --- TEST 19: Risk KPIs use annual volatility and completed decumulation years ---
+{
+    const inputs = {
+        ...buildBasicInputs(),
+        startAlter: 20,
+        accumulationPhase: { enabled: true },
+        transitionYear: 2
+    };
+    const monteCarloParams = {
+        anzahl: 1,
+        maxDauer: 4,
+        blockSize: 1,
+        seed: 20260722,
+        methode: 'block',
+        rngMode: 'per-run-seed',
+        startYearMode: 'UNIFORM'
+    };
+    const chunk = await runMonteCarloChunk({
+        inputs,
+        monteCarloParams,
+        widowOptions: { mode: 'stop', percent: 0, marriageOffsetYears: 0, minMarriageYears: 0 },
+        useCapeSampling: false,
+        runRange: { start: 0, count: 1 },
+        logIndices: [0],
+        engine: EngineAPI
+    });
+    const completedRows = chunk.runMeta[0].logDataRows.filter(row => (
+        Number.isFinite(Number(row?.entscheidung?.kuerzungProzent))
+    ));
+    const eligibleRows = completedRows.filter(row => row.jahr > inputs.transitionYear);
+    const cutRows = eligibleRows.filter(row => Number(row.entscheidung.kuerzungProzent) >= 10);
+    const legacyCutRows = completedRows.filter(row => Number(row.entscheidung.kuerzungProzent) >= 10);
+
+    assertEqual(chunk.buffers.kpiKuerzungsjahre[0], legacyCutRows.length, 'Deprecated cut-year count should retain its legacy all-phase semantics');
+    assertEqual(chunk.pathSummaries.cutYearsDenominator[0], eligibleRows.length, 'Accumulation years should be excluded from the cut-share denominator');
+    assertEqual(chunk.pathSummaries.cutYearsNumerator[0], cutRows.length, 'Cut-share numerator should use the inclusive ten-percent threshold');
+    assertClose(chunk.pathSummaries.cutYearShareRatio[0], cutRows.length / eligibleRows.length, 1e-7, 'Runner should store the reviewed cut-year ratio');
+    assertEqual(chunk.pathSummaries.volatilityPct[0], chunk.buffers.volatilities[0], 'Runner volatility should flow into the canonical path field');
+    assertEqual(chunk.pathSummaries.maxDrawdownPct[0], chunk.buffers.maxDrawdowns[0], 'Runner drawdown should flow into its separate path field');
+    assert(chunk.buffers.volatilities[0] !== chunk.buffers.maxDrawdowns[0], 'Runner must not copy max drawdown into volatility');
+}
+
+// --- TEST 20: Shared technical outcome is fail-closed across Direct, MC, worker-like merge, and Sweep ---
 {
     for (const invalidField of ['rendite', 'gold_eur_perf', 'zinssatz']) {
         let engineCalls = 0;

@@ -95,9 +95,9 @@ export function buildKpiDashboard(results, inputs = {}) {
             tone: depotTone
         },
         {
-            title: 'Anteil Kürzungsjahre (>10%)',
-            value: formatPercentage(results?.kpiKuerzungsjahre?.p50),
-            description: 'Medianer Anteil der Jahre mit Flex-Kürzung über 10%.',
+            title: 'Anteil Kürzungsjahre (≥ 10 %)',
+            value: formatPercentage(results?.cutYearSharePct?.p50),
+            description: `Medianer Anteil erfolgreich abgeschlossener Dekumulationsjahre mit Flex-Kürzung von mindestens 10 %; Nenner sind abgeschlossene Dekumulationsjahre mit endlicher Kürzungsentscheidung. Stichprobe: ${Number(results?.cutYearSharePct?.sampleSize) || 0} Läufe.`,
             tone: 'default'
         },
         ...buildDrawdownKpis(results?.maxDrawdowns)
@@ -329,7 +329,7 @@ function buildRiskKpis(results) {
         kpis.push({
             title: 'Median Portfoliovolatilität',
             value: formatPercentage(results.volatilities.p50),
-            description: 'Annualisierte Standardabweichung der Portfolio-Renditen (Median).',
+            description: 'Stichproben-Standardabweichung (N-1) der jährlichen Portfolio-Renditen; die Jahresfrequenz benötigt keine zusätzliche Annualisierung (Median über Läufe).',
             tone: 'default'
         });
     }

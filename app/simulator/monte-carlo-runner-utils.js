@@ -21,7 +21,10 @@ export function createMonteCarloBuffers(runCount) {
         finalOutcomes: new Float64Array(runCount),
         taxOutcomes: new Float64Array(runCount),
         kpiLebensdauer: new Uint8Array(runCount),
+        // Legacy count kept until the temporary V1 read alias is removed.
         kpiKuerzungsjahre: new Float32Array(runCount),
+        cutYearShareRatio: new Float32Array(runCount),
+        cutYearShareMissingness: new Uint8Array(runCount),
         kpiMaxKuerzung: new Float32Array(runCount),
         volatilities: new Float32Array(runCount),
         maxDrawdowns: new Float32Array(runCount),

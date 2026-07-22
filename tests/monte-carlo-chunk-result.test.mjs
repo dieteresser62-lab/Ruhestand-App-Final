@@ -280,8 +280,29 @@ function expectContractError(callback, message) {
     assertEqual(finalized[0].lists.entryAges.join(','), '81,88', 'Conditional lists should follow global run order');
     assertEqual(finalized[0].worstRun.runIdx, 1, 'Worst-run tie breaking should retain the smallest global index');
     assertEqual(finalized[0].pathMissingness.realWithdrawalP10RealEur[2], MONTE_CARLO_MISSINGNESS_CODE.NO_OBSERVATIONS, 'Missing CaR observation should use an explicit code');
+    assertEqual(finalized[0].pathSummaries.cutYearShareRatio[0], Math.fround(0.1), 'Cut share should store numerator divided by denominator');
+    assertEqual(finalized[0].pathMissingness.cutYearShareRatio[0], MONTE_CARLO_MISSINGNESS_CODE.OBSERVED, 'Positive cut denominator should be observed');
     assertEqual(finalized[0].buffers.finalOutcomes.length, rows.length, 'Accumulator memory should remain O(runs)');
     assert(!Object.keys(finalized[0].pathSummaries).some(field => /annualPath|yearPath/i.test(field)), 'Contract must not transfer annual path arrays');
+}
+
+{
+    const noDecisionChunk = makeChunk(0, [{
+        outcomeCode: MONTE_CARLO_OUTCOME_CODE.ALL_DEAD,
+        finalValue: 1000,
+        volatility: 0,
+        drawdown: 0,
+        cutNumerator: 0,
+        cutDenominator: 0,
+        withdrawalP10: null,
+        withdrawalCount: 0,
+        taxSaved: 0,
+        simulatedYears: 0,
+        care: false,
+        healthUsed: 0
+    }]);
+    assertEqual(noDecisionChunk.pathSummaries.cutYearShareRatio[0], 0, 'Zero cut denominator should retain a finite placeholder value');
+    assertEqual(noDecisionChunk.pathMissingness.cutYearShareRatio[0], MONTE_CARLO_MISSINGNESS_CODE.NO_OBSERVATIONS, 'Zero cut denominator should use no-observations missingness');
 }
 
 {
@@ -331,6 +352,12 @@ function expectContractError(callback, message) {
     expectContractError(
         () => assertMonteCarloChunkResultV1({ ...valid, pathSummaries: { ...valid.pathSummaries, outcomeCode: new Uint8Array(1) } }),
         'Wrong summary lengths must be rejected'
+    );
+    const infiniteNullable = makeChunk(0, rows.slice(0, 1));
+    infiniteNullable.buffers.cutYearShareRatio[0] = Number.POSITIVE_INFINITY;
+    expectContractError(
+        () => assertMonteCarloChunkResultV1(infiniteNullable),
+        'Nullable cut share must reject infinity'
     );
     expectContractError(
         () => mergeMonteCarloChunkResultV1(createMonteCarloChunkAccumulatorV1(2), valid, { expectedStart: 1 }),

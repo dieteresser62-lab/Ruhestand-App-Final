@@ -651,7 +651,13 @@ Konstanten und Hilfsfunktionen für den Monte-Carlo-Runner.
 
 **Buffer-Typen:**
 - `Float64Array`: finalOutcomes, taxOutcomes, stress_CaR_P10_Real
-- `Float32Array`: kpiKuerzungsjahre, kpiMaxKuerzung, volatilities, maxDrawdowns, etc.
+- `Float32Array`: `cutYearShareRatio`, kpiKuerzungsjahre,
+  kpiMaxKuerzung, volatilities, maxDrawdowns, etc. Der kanonische
+  `cutYearShareRatio` verwendet bei fehlendem Nenner einen endlichen
+  0-Platzhalter; `cutYearShareMissingness` unterscheidet ihn zwingend von einem
+  beobachteten Nullanteil. JSON serialisiert Missingness als `null`.
+- `Uint8Array`: zusaetzlich `cutYearShareMissingness` mit den V1-Codes fuer
+  beobachtet, nicht beobachtbar und technischer Fehler
 - `Uint8Array`: kpiLebensdauer, depotErschoepft, alterBeiErschoepfung
 
 **Dependencies:** keine
@@ -668,11 +674,17 @@ Aggregation aller Monte-Carlo-Ergebnisse nach Abschluss der Simulation.
 - `finalOutcomes`: P10, P50, P90, P50 (nur erfolgreiche)
 - `taxOutcomes`: P50
 - `kpiLebensdauer`: Mean
-- `kpiKuerzungsjahre`, `kpiMaxKuerzung`: P50
+- `cutYearSharePct`: P50, `sampleSize`, ausgeschlossene Runs, inklusive
+  10-Prozent-Schwelle und expliziter Zaehler-/Nennervertrag. Der alte
+  `kpiKuerzungsjahre`-P50 bleibt nur als deprecated absoluter Jahreszaehler bis
+  maximal Slice 11 erhalten.
+- `kpiMaxKuerzung`: P50
 - `depotErschoepfungsQuote`: Anteil der Läufe mit `isRuin` oder
   Aktien-plus-Gold-Endbestand ≤ 100 Euro;
   `alterBeiErschoepfung`: P50 des ersten entsprechenden Ereignisalters
-- `volatilities`, `maxDrawdowns`: P50, P90
+- `volatilities`: P50 der Stichproben-Standardabweichung (N-1) jaehrlicher
+  Portfolio-Renditen ohne zusaetzlichen Annualisierungsfaktor;
+  `maxDrawdowns`: davon getrennte P50-/P90-Drawdowns
 - `extraKPI`: timeShareQuoteAbove45, consumptionAtRiskP10Real, Pflege-KPIs
 - `extraKPI.lossCarryTaxSavings`: `total`, `perRunMean`
 - `extraKPI.healthBucket`: Nutzungs-/Erschoepfungsquote, Nutzungssummen, Restbucket, Zieldeckung, Zielluecke und Bucket-Zinsen

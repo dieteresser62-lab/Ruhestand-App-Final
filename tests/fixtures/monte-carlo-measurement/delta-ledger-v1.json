@@ -2,7 +2,30 @@
   "schemaVersion": "monte-carlo-delta-ledger-v1",
   "baselineReference": "pre-hardening-v1",
   "baselineOverwriteAllowed": false,
-  "entries": [],
+  "entries": [
+    {
+      "sliceId": "03",
+      "sourceReference": "pre-hardening-v1",
+      "targetReference": "post-slice-03-v1",
+      "fieldPath": "buffers.volatilities/pathSummaries.volatilityPct/aggregates.volatilities",
+      "formulaBefore": "maxDDpct was copied into both volatility and maximum drawdown",
+      "formulaAfter": "sample standard deviation (N-1) of annual portfolio returns, expressed in percent; no additional annualization factor",
+      "expectedDirection": "not monotonic; volatility and drawdown become independent risk measures",
+      "goldenCaseIds": ["GC-RISK-01"],
+      "reviewStatus": "pending"
+    },
+    {
+      "sliceId": "03",
+      "sourceReference": "pre-hardening-v1",
+      "targetReference": "post-slice-03-v1",
+      "fieldPath": "pathSummaries.cutYearShareRatio/aggregates.cutYearSharePct",
+      "formulaBefore": "absolute count of successful years with cutPct >= 10, including accumulation years",
+      "formulaAfter": "completed decumulation years with finite cutPct >= 10 divided by completed decumulation years with a finite cut decision; denominator zero is nullable",
+      "expectedDirection": "unit and denominator change; old and new values are not directly comparable",
+      "goldenCaseIds": ["GC-CUT-01"],
+      "reviewStatus": "pending"
+    }
+  ],
   "requiredEntryFields": [
     "sliceId",
     "sourceReference",
