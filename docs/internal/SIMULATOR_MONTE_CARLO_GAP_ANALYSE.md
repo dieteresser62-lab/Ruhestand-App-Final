@@ -1,7 +1,7 @@
 # Simulator / Monte Carlo: GAP-Analyse
 
 **Stand:** 2026-07-22
-**Status:** Plan und Slices 01-06 freigegeben; Slice 07 implementiert, externes Review ausstehend
+**Status:** Plan und Slices 01-07 freigegeben; Slice 08 implementiert, externes Review ausstehend
 **Autor:** Codex als Implementer und Plan-Autor  
 **Planungsbranch:** `codex/simulator-monte-carlo-gap-plan` (nur lokal; nicht auf GitHub veroeffentlicht)  
 **Folgeplan:** [SIMULATOR_MONTE_CARLO_HARDENING_PLAN.md](./SIMULATOR_MONTE_CARLO_HARDENING_PLAN.md)
@@ -378,6 +378,13 @@ reproduzierbar oder mit einem zweiten Lauf reconciliierbar.
 **Ziel:** `MonteCarloRunRequestV1`, `MonteCarloRunResultV1` und
 `MonteCarloExportV1` mit Schema-, Engine-, Daten- und Konfigurationsprovenienz;
 Raw-Export strikt getrennt von Displayformatierung.
+
+**Umsetzungsstand 2026-07-22:** In Slice 08 implementiert. Die drei
+V1-Vertraege enthalten normalisierte Eingaben, Resultat-/Diagnostikinventar,
+Snapshot-, App-, Engine-, Daten- und Konfigurationsprovenienz sowie einen beim
+Lesen verifizierten kanonischen SHA-256-Fingerprint. Versions-, Pflichtfeld-,
+Datenschutz-, Forward-Compatibility- und deterministische Replay-Tests sind
+gruen; externes Review steht aus.
 
 **Slice:** 08.
 

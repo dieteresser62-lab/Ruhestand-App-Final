@@ -2,6 +2,35 @@
 
 import { STATIONARY_BOOTSTRAP_METHOD } from './stationary-bootstrap-contract.js';
 
+export function triggerMonteCarloDownload(download, {
+    documentRef = globalThis.document,
+    urlApi = globalThis.URL,
+    BlobCtor = globalThis.Blob
+} = {}) {
+    if (!download || typeof download.content !== 'string'
+        || typeof download.filename !== 'string' || !download.filename.endsWith('.json')) {
+        throw new TypeError('Monte-Carlo-Download ist unvollstaendig.');
+    }
+    if (!documentRef?.createElement || typeof urlApi?.createObjectURL !== 'function'
+        || typeof BlobCtor !== 'function') {
+        throw new Error('Der Browserdownload ist in dieser Umgebung nicht verfuegbar.');
+    }
+    const blob = new BlobCtor([download.content], { type: download.mimeType || 'application/json' });
+    const url = urlApi.createObjectURL(blob);
+    const anchor = documentRef.createElement('a');
+    anchor.href = url;
+    anchor.download = download.filename;
+    try {
+        documentRef.body?.appendChild?.(anchor);
+        anchor.click();
+    } finally {
+        if (typeof anchor.remove === 'function') anchor.remove();
+        else documentRef.body?.removeChild?.(anchor);
+        urlApi.revokeObjectURL?.(url);
+    }
+    return download.filename;
+}
+
 /**
  * Stellt alle DOM-Interaktionen für die Monte-Carlo-Simulation bereit.
  * Kapselt UI-spezifische Logik (Validierung, Progress-Anzeige, Button-Zustände)
@@ -12,6 +41,9 @@ export function createMonteCarloUI() {
     const mcButton = requireElement('mcButton', 'Monte-Carlo Start-Button');
     const progressBarContainer = requireElement('mc-progress-bar-container', 'Monte-Carlo Fortschrittsanzeige');
     const progressBar = requireElement('mc-progress-bar', 'Monte-Carlo Fortschrittsbalken');
+    const exportActions = document.getElementById('mcRunExportActions');
+    const exportButton = document.getElementById('exportMonteCarloRunJson');
+    const exportStatus = document.getElementById('mcRunExportStatus');
 
     return {
         /**
@@ -103,6 +135,35 @@ export function createMonteCarloUI() {
         hideError() {
             const container = document.getElementById('mc-error-container');
             if (container) container.style.display = 'none';
+        },
+        clearRunExport() {
+            if (exportButton) {
+                exportButton.disabled = true;
+                exportButton.onclick = null;
+            }
+            if (exportActions) {
+                exportActions.hidden = true;
+                exportActions.style.display = 'none';
+            }
+            if (exportStatus) exportStatus.textContent = '';
+        },
+        publishRunExport(download) {
+            if (!exportButton || !exportActions) return false;
+            exportButton.disabled = false;
+            exportButton.onclick = () => {
+                try {
+                    const filename = triggerMonteCarloDownload(download);
+                    if (exportStatus) exportStatus.textContent = `Export gespeichert: ${filename}`;
+                } catch (error) {
+                    this.showError(error);
+                }
+            };
+            exportActions.hidden = false;
+            exportActions.style.display = 'flex';
+            if (exportStatus) {
+                exportStatus.textContent = 'Versionierter Run-/Result-/Provenienzexport ist bereit.';
+            }
+            return true;
         }
     };
 }

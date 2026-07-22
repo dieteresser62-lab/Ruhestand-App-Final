@@ -21,6 +21,15 @@ import { WorkerJobRunner } from './worker-job-runner.js';
 import { featureFlags } from '../shared/feature-flags.js';
 import { WorkerPool } from '../../workers/worker-pool.js';
 import { formatSimulatorValidationError, validateSimulatorInputs } from './simulator-input-validation.js';
+import { EngineAPI } from '../../engine/index.mjs';
+import {
+    createMonteCarloRunRequestV1,
+    createMonteCarloRunResultV1
+} from './monte-carlo-contracts.js';
+import {
+    captureMonteCarloEngineProvenance,
+    createMonteCarloExportDownload
+} from './monte-carlo-export.js';
 
 const formatMs = (value, digits = 0) => `${Number(value).toFixed(digits)} ms`;
 const formatSpeedup = (value, digits = 2) => `${Number(value).toFixed(digits)}x`;
@@ -128,14 +137,20 @@ async function runMonteCarloWithWorkers({
 
     const chunkAccumulator = createMonteCarloChunkAccumulatorV1(anzahl);
     const timeBudgetMs = workerConfig?.timeBudgetMs ?? 200;
+    const chunkConfiguration = {
+        strategy: 'adaptive-time-budget-v1',
+        minChunkRuns: 10,
+        baseTimeoutMs: 5000,
+        stallTimeoutMs: 20000
+    };
     const runner = new WorkerJobRunner({
         pool,
         totalItems: anzahl,
         workerCount,
         timeBudgetMs,
-        minChunk: 10,
-        baseTimeoutMs: 5000,
-        stallTimeoutMs: 20000,
+        minChunk: chunkConfiguration.minChunkRuns,
+        baseTimeoutMs: chunkConfiguration.baseTimeoutMs,
+        stallTimeoutMs: chunkConfiguration.stallTimeoutMs,
         onProgress: pct => onProgress(pct * 0.9),
         buildPayload: (start, count) => ({
             type: 'job',
@@ -220,7 +235,13 @@ async function runMonteCarloWithWorkers({
         batchStatus: aggregatedResults.batchStatus,
         financialMetricsValid: aggregatedResults.financialMetricsValid,
         technicalInventory: finalized.technicalInventory,
-        samplingDiagnostics: finalized.samplingDiagnostics
+        samplingDiagnostics: finalized.samplingDiagnostics,
+        executionDiagnostics: {
+            mode: 'worker',
+            workerCount,
+            timeBudgetMs,
+            chunkConfiguration
+        }
     };
 }
 
@@ -246,6 +267,7 @@ export async function runMonteCarlo() {
     const ui = createMonteCarloUI();
     ui.disableStart();
     ui.hideError(); // Reset error state
+    ui.clearRunExport();
 
     try {
         prepareHistoricalDataOnce();
@@ -263,6 +285,18 @@ export async function runMonteCarlo() {
             startYearHalfLife,
             excludeEstimatedHistory
         } = readMonteCarloParameters();
+        const monteCarloParams = {
+            anzahl,
+            maxDauer,
+            blockSize,
+            seed,
+            methode,
+            rngMode,
+            startYearMode,
+            startYearFilter,
+            startYearHalfLife,
+            excludeEstimatedHistory
+        };
 
         ui.showProgress();
         ui.updateProgress(0);
@@ -281,18 +315,7 @@ export async function runMonteCarlo() {
             const serialResults = await runMonteCarloSimulation({
                 inputs,
                 widowOptions,
-                monteCarloParams: {
-                    anzahl,
-                    maxDauer,
-                    blockSize,
-                    seed,
-                    methode,
-                    rngMode,
-                    startYearMode,
-                    startYearFilter,
-                    startYearHalfLife,
-                    excludeEstimatedHistory
-                },
+                monteCarloParams,
                 useCapeSampling,
                 onProgress: pct => ui.updateProgress(pct * 0.5),
                 scenarioAnalyzer: null
@@ -308,18 +331,7 @@ export async function runMonteCarlo() {
                     results = await runMonteCarloWithWorkers({
                         inputs,
                         widowOptions,
-                        monteCarloParams: {
-                            anzahl,
-                            maxDauer,
-                            blockSize,
-                            seed,
-                            methode,
-                            rngMode,
-                            startYearMode,
-                            startYearFilter,
-                            startYearHalfLife,
-                            excludeEstimatedHistory
-                        },
+                        monteCarloParams,
                         useCapeSampling,
                         onProgress: pct => ui.updateProgress(50 + pct * 0.5),
                         scenarioAnalyzer,
@@ -340,18 +352,7 @@ export async function runMonteCarlo() {
                 results = await runMonteCarloWithWorkers({
                     inputs,
                     widowOptions,
-                    monteCarloParams: {
-                        anzahl,
-                        maxDauer,
-                        blockSize,
-                        seed,
-                        methode,
-                        rngMode,
-                        startYearMode,
-                        startYearFilter,
-                        startYearHalfLife,
-                        excludeEstimatedHistory
-                    },
+                    monteCarloParams,
                     useCapeSampling,
                     onProgress: pct => ui.updateProgress(pct),
                     scenarioAnalyzer,
@@ -368,18 +369,7 @@ export async function runMonteCarlo() {
             results = await runMonteCarloSimulation({
                 inputs,
                 widowOptions,
-                monteCarloParams: {
-                    anzahl,
-                    maxDauer,
-                    blockSize,
-                    seed,
-                    methode,
-                    rngMode,
-                    startYearMode,
-                    startYearFilter,
-                    startYearHalfLife,
-                    excludeEstimatedHistory
-                },
+                monteCarloParams,
                 useCapeSampling,
                 onProgress: pct => ui.updateProgress(pct),
                 scenarioAnalyzer
@@ -397,6 +387,49 @@ export async function runMonteCarlo() {
             technicalInventory
         } = results;
 
+        const effectiveExecutionDiagnostics = results.executionDiagnostics || {
+            mode: 'serial',
+            workerCount: 0,
+            timeBudgetMs: null,
+            chunkConfiguration: {
+                strategy: 'single-chunk-v1',
+                minChunkRuns: null,
+                baseTimeoutMs: null,
+                stallTimeoutMs: null
+            }
+        };
+        const { scenarioKey } = compileScenario(
+            inputs,
+            widowOptions,
+            methode,
+            useCapeSampling,
+            inputs.stressPreset
+        );
+        const runRequest = createMonteCarloRunRequestV1({
+            inputs,
+            widowOptions,
+            monteCarloParams,
+            useCapeSampling,
+            samplingDiagnostics: results.samplingDiagnostics,
+            dataVersion: results.samplingDiagnostics?.dataVersion || getDataVersion(),
+            execution: {
+                ...effectiveExecutionDiagnostics,
+                compareModeRequested: compareMode
+            },
+            scenarioKey
+        });
+        const runResult = createMonteCarloRunResultV1({
+            aggregatedResults,
+            samplingDiagnostics: results.samplingDiagnostics,
+            executionDiagnostics: runRequest.execution,
+            requestedRuns: anzahl
+        });
+        ui.publishRunExport(createMonteCarloExportDownload({
+            request: runRequest,
+            result: runResult,
+            engine: captureMonteCarloEngineProvenance(EngineAPI)
+        }));
+
         if (batchStatus === 'technical_error') {
             const firstError = technicalInventory?.errors?.[0];
             ui.showError(firstError?.message || 'Die Monte-Carlo-Simulation wurde wegen eines technischen Fehlers beendet.');
@@ -409,18 +442,7 @@ export async function runMonteCarlo() {
             const logsByIndex = await runMonteCarloLogsForIndices({
                 inputs,
                 widowOptions,
-                monteCarloParams: {
-                    anzahl,
-                    maxDauer,
-                    blockSize,
-                    seed,
-                    methode,
-                    rngMode,
-                    startYearMode,
-                    startYearFilter,
-                    startYearHalfLife,
-                    excludeEstimatedHistory
-                },
+                monteCarloParams,
                 useCapeSampling,
                 runIndices: targetIndices
             });

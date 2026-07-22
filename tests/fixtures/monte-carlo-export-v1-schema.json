@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "monte-carlo-export-contract-golden-v1",
+  "schemaId": "de.ruhestandsapp.monte-carlo.run",
+  "contracts": {
+    "request": "MonteCarloRunRequestV1",
+    "result": "MonteCarloRunResultV1",
+    "export": "MonteCarloExportV1",
+    "scenario": "MonteCarloScenarioV1",
+    "snapshotPolicy": "MonteCarloSnapshotPolicyV1"
+  },
+  "requiredRequestFields": [
+    "parameters",
+    "sampling",
+    "stress",
+    "scenario",
+    "data",
+    "execution",
+    "snapshotPolicy"
+  ],
+  "requiredResultFields": [
+    "sampleSize",
+    "technicalErrorCount",
+    "outcomeInventory",
+    "kpis",
+    "uncertainty",
+    "missingness",
+    "diagnostics",
+    "warnings",
+    "unitContract"
+  ],
+  "moneyFieldSuffixes": {
+    "nominal": "NominalEur",
+    "real": "RealEur"
+  },
+  "fingerprintAlgorithm": "sha256-canonical-json-v1",
+  "forwardPolicy": "ignore-unknown-fields-after-v1-required-field-validation",
+  "unknownSchemaVersions": "reject",
+  "newExportsWriteDeprecatedAliases": false
+}
