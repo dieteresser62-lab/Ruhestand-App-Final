@@ -6,6 +6,8 @@ Aktive interne Uebersichten:
 
 - `PROJEKTUEBERSICHT.md` - detaillierte technische und organisatorische Projektuebersicht.
 - `SLICE_EXECUTION_RULES.md` - verbindlicher Review-, Branch-, Risiko- und Abnahmeprozess fuer Slices.
+- `SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md` - technische Ist-/Soll-Analyse des Simulator-/Monte-Carlo-Bereichs mit den Findings MC-01 bis MC-19; Revision nach blockiertem Gemini-/Claude-Review.
+- `SIMULATOR_MONTE_CARLO_HARDENING_PLAN.md` - aus der GAP-Analyse abgeleiteter, noch nicht freigegebener Arbeitsplan mit zwoelf 1-basierten Slices fuer Messvertraege, KPIs, Sampling, Outcomes, Exporte, Worker-Lifecycle, UI und E2E-Nachweise.
 - `FORSCHUNGSVALIDIERUNGS_BACKLOG.md` - priorisierte offene FR-/FQ-Folgevorhaben mit Nachweis- und Freigabegates.
 - `SIMULATOR_BACKTEST_GAP_ANALYSE.md` - reviewte Ist-/Soll-Bestandsaufnahme mit BT-01 bis BT-20 und Abschlussmatrix nach Slices 01-10.
 - `SIMULATOR_BACKTEST_HARDENING_PLAN.md` - freigegebener Arbeitsplan mit zehn 1-basierten Slices und Ausfuehrungs-DAG fuer Runner-, Daten-, Shared-Outcome-, Metrik-, Export-, UI-, Forschungs- und Integrationsgates; Slice 10 ist implementiert und wartet auf Review.

@@ -1,0 +1,563 @@
+# Simulator / Monte Carlo: Hardening-Arbeitsplan
+
+**Stand:** 2026-07-19  
+**Status:** Revision 1 nach Gemini-/Claude-Review; blockiert bis erneute Freigabe  
+**Autor:** Codex als Implementer und Plan-Autor  
+**Feature-Branch:** `codex/simulator-monte-carlo-gap-plan`  
+**GitHub-Status:** nur lokal; Veroeffentlichung ausstehend und nur nach Nutzerfreigabe  
+**Reviewstand:** Gemini G-01 bis G-06 und Claude C-01 bis C-10 eingearbeitet; Re-Review ausstehend  
+**Ausgangsanalyse:** [SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md](./SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md)
+
+## 1. Ziel und Rollenabgrenzung
+
+Dieser Arbeitsplan ueberfuehrt die GAPs MC-01 bis MC-19 in pruefbare,
+1-basierte Umsetzungsslices. Ziel ist ein versionierter und erklaerbarer
+Monte-Carlo-Vertrag fuer Parameter, Sampling, Endzustaende, KPIs, Workerpfade
+und Exporte. Der Plan aendert noch keinen Anwendungscode.
+
+Codex darf den Plan erstellen und spaeter nach Freigabe implementieren, aber
+weder Plan noch eigene Implementierung freigeben. Gemini und Claude sollen
+Findings adversarial dokumentieren. Erst nach geklaerten Blockern, expliziter
+Gemini-Freigabe und Nutzerfreigabe darf Slice 01 beginnen.
+
+## 2. Ausgangslage und Baseline
+
+### 2.1 Git- und Arbeitsbaumstatus bei Planerstellung
+
+- Aktiver Branch: `codex/simulator-monte-carlo-gap-plan`.
+- Der Branch wurde fuer dieses Arbeitsdokument lokal angelegt.
+- Bereits vor der Planung vorhandene, nicht zu diesem Thema gehoerende
+  Aenderungen bleiben unangetastet:
+  - geloeschter Pfad `docs/internal/FORSCHUNGSVALIDIERUNGS_BACKLOG.md`,
+  - neuer Archivpfad `docs/internal/archive/FORSCHUNGSVALIDIERUNGS_BACKLOG.md`,
+  - unversionierte Playwright-Dateien unter `node_modules/`.
+- Vor jedem Slice sind Branch und Status erneut zu ermitteln und wortgetreu in
+  dessen Diff-Risiko-Block zu uebernehmen.
+
+### 2.2 Testbaseline vom 2026-07-19
+
+- Zehn fokussierte Monte-Carlo-, Worker-, Ergebnis- und UI-Suiten: gruen.
+- Browser-Smoke-Test: gruen; er enthaelt derzeit keinen vollstaendigen
+  Monte-Carlo-Nutzerlauf.
+- Vollstaendiger Coverage-Lauf: `5703/5704`; einzige Abweichung ist ein
+  Architektur-Linktest wegen der bereits vorgefundenen Verschiebung des
+  Forschungsbacklogs. Vor Coding muss diese Baseline entweder durch den
+  Besitzer bereinigt oder als explizit freigegebene Fremdabweichung behandelt
+  werden. Neue fachlich rote Tests duerfen nicht daneben bestehen bleiben.
+- Aus den erzeugten V8-Daten: 73,85 Prozent Statements (`29132/39446`). Besonders
+  gering abgedeckt sind Orchestrierung, Ergebnisrenderer, Szenarioanalyse und
+  Worker-Lifecycle.
+
+### 2.3 Nutzerbeleg fuer Grosslast
+
+- Der Nutzer hat am 2026-07-19 einen Lauf mit **1.000.000 Runs** und ansonsten
+  normalen Einstellungen ohne wahrgenommenen Engpass abgeschlossen.
+- Der Nutzer verwendet praktisch hoechstens **100.000 Runs**, weil zwischen
+  100.000 und 1.000.000 Runs keine fuer ihn messbaren KPI-Unterschiede
+  festgestellt wurden. Diese Aussage ist ein lokaler Konvergenzbeleg, kein
+  allgemeiner statistischer Nachweis fuer alle Szenarien und Seeds.
+- Die im Quell-HTML hinterlegten UI-Vorgaben sind derzeit 1.000 Runs, 35 Jahre,
+  8 Worker und 500 ms Jobbudget. Der Nutzerbeleg wird daher als
+  "1.000.000 Runs bei ansonsten standardnaher Konfiguration" dokumentiert,
+  nicht als Behauptung, 1.000.000 sei bereits der HTML-Default.
+- Der Nutzer hat anschliessend **10.000 Runs als neuen Produktstandard**
+  festgelegt. Der Ist-Wert 1.000 bleibt bis zur freigegebenen Umsetzung in
+  Slice 10 bestehen; danach muessen HTML, Eingabevertrag, Persistenzfallback,
+  Tests und Dokumentation denselben Default 10.000 verwenden.
+- Die heute fest angelegten Typed Arrays beanspruchen mindestens 69 Byte pro
+  Run, also rund 65,8 MiB bei einer Million Runs; JS-Listen, `runMeta`,
+  Workerzustand und die geplanten V1-Summaries kommen hinzu.
+- Der Beleg widerlegt eine harte Grenze unter 100.000 Runs. Die Revision setzt
+  100.000 als empfohlenen interaktiven Hoechstwert und 1.000.000 als weiterhin
+  zulaessigen, bestaetigungspflichtigen Stresstest. Er ersetzt noch keinen
+  reproduzierbaren Benchmark auf schwacher Referenzhardware.
+
+## 3. Verbindliche Zielvertraege
+
+Die Namen sind Arbeitsnamen. Reviewer duerfen Zuschnitt und Versionierung
+aendern, muessen aber die Verantwortlichkeiten erhalten.
+
+### 3.1 `MonteCarloParametersV1`
+
+- strikte, gemeinsame Normalisierung fuer UI, direkten Runner, Worker und
+  Auto-Optimize,
+- endliche Ganzzahlen, erlaubte Enums und sichere Obergrenzen,
+- kein stilles Begrenzen fachlicher Werte,
+- validierte Abhaengigkeiten zwischen Dauer, Altersbereich, Samplingmethode,
+  Blocklaenge, Runzahl und Workerzahl.
+
+### 3.2 `MonteCarloSamplingContractV1`
+
+- eindeutige Praezedenz von CAPE, Filter, Recency, Regime und Tail-Risk,
+- dokumentierte Behandlung des gewaehlten Startdatensatzes und des gesamten
+  ersten Blocks statt eines isolierten CAPE-Jahres,
+- deterministische Seed-Ableitung pro Run unabhaengig von Chunking und
+  Workerzahl,
+- Diagnostik fuer tatsaechlich gezogene Jahre, Regime und Startquellen.
+
+### 3.3 `MonteCarloChunkResultV1`
+
+- eine kanonische Erzeugungs-, Merge- und Finalisierungslogik,
+- ein `MonteCarloPathSummaryV1` in Struct-of-Arrays-Form, dessen Eintraege ueber
+  `globalRunIndex = start + localIndex` fest zugeordnet werden,
+- pro Run mindestens Outcome-Code, Endwert, Volatilitaet, Drawdown,
+  Kuerzungszaehler/-nenner, CaR-Skalar samt Beobachtungszahl und die fuer
+  Pflegeaggregate erforderlichen nullable Werte,
+- keine Uebertragung vollstaendiger Jahrespfade; der Runner berechnet
+  runbezogene Skalare im Worker und uebertraegt nur O(Runs)-Summaries,
+- explizite Buffer-, Counter-, Missingness- und Diagnostikfelder,
+- Form-/Laengenpruefung beim Merge,
+- identischer Vertrag fuer direkten Lauf, Worker und Auto-Optimize,
+- Finalisierung in globaler Runreihenfolge. Gleitkommaaggregate werden aus den
+  indexierten Per-Run-Werten gebildet, nicht in Worker-Fertigstellungsreihenfolge.
+
+### 3.4 `MonteCarloOutcomeInventoryV1`
+
+Jeder Run endet genau einmal in einem dieser Zustaende:
+
+- `ruin`,
+- `all_dead`,
+- `horizon_exhausted`,
+- `technical_error`.
+
+Die Summe entspricht der angeforderten Runzahl. `technical_error` wird niemals
+als fachlicher Erfolg verrechnet. Bestehende Erfolgsanzeigen werden bis zur
+Review-Entscheidung als "Floor-Deckung im gewaehlten Horizont" behandelt.
+
+Terminale Prioritaet folgt der Jahreschronologie:
+
+1. Ein technischer Fehler macht den Run nicht fachlich auswertbar.
+2. Ein bereits im begonnenen Finanzjahr festgestellter Ruin bleibt `ruin`, auch
+   wenn danach fuer dasselbe Jahr ein Todesstatus gemeldet wird.
+3. `all_dead` gilt nur, wenn alle Personen vor der naechsten finanziellen
+   Jahresverpflichtung verstorben sind und zuvor kein Ruin eingetreten ist.
+4. Nur weiterhin lebende, weder ruinierte noch technisch fehlerhafte Runs am
+   letzten Planjahr werden `horizon_exhausted`.
+
+Widerspruechliche Terminalflags ausserhalb dieser Chronologie sind ein
+Contractfehler und werden `technical_error`, nicht per stiller Prioritaet
+repariert.
+
+### 3.5 `MonteCarloRunRequestV1`, `MonteCarloRunResultV1` und
+`MonteCarloExportV1`
+
+- Request: normalisierte Eingaben, Seed, Methoden, Szenario- und Datenversion,
+- Result: Outcome-Inventar, KPIs, Unsicherheitsangaben, Diagnostik und Warnungen,
+- Export: Schema-/App-/Engine-Version, UTC-Zeit, Datenfingerprints,
+  reproduzierbarer Request und vollstaendiges Resultat,
+- keine personenbezogenen Finanzdaten oder lokale Pfade ausserhalb der bereits
+  vom Nutzer eingegebenen Szenariodaten.
+
+### 3.6 `MonteCarloSnapshotPolicyV1`
+
+- Slice 01 erzeugt einen unveraenderlichen `pre-hardening-v1`-Snapshot mit
+  fester Workerzahl, fester Chunkstrategie, Seed, Datenversion, Runtimeversion
+  und numerischer Toleranz als Metadaten.
+- Semantikaendernde Slices 03 bis 07 ueberschreiben diesen Snapshot nie. Jeder
+  Slice erzeugt einen eigenen versionierten Post-Slice-Referenzstand und ein
+  Delta-Ledger mit erwarteten Formelaenderungen.
+- Slice 12 erzeugt erst nach Integration den Kandidaten `monte-carlo-v1-final`.
+  Alte und neue Referenzen koexistieren bis zur externen Abschlussfreigabe.
+- Unerklaerte Deltas blockieren; erklaerte Deltas werden nicht pauschal als
+  Snapshot-Update akzeptiert, sondern gegen Golden Cases nachgerechnet.
+
+### 3.7 Missingness- und Einheitenvertrag
+
+- Nicht beobachtbare Kennzahlen werden intern als nullable Wert plus
+  Missingness-Grund gefuehrt, im JSON als `null` exportiert und im UI als
+  Gedankenstrich dargestellt. `0` bedeutet immer einen beobachteten Nullwert.
+- Bedingte Verteilungen weisen `sampleSize` und ausgeschlossene Runs aus.
+- Pflegegeldbetraege werden im UI kanonisch in realen Euro der
+  Simulationsstart-Preisbasis gezeigt. Nominale Rohwerte duerfen zusaetzlich
+  versioniert exportiert werden, muessen aber im Feldnamen `NominalEur` tragen.
+
+## 4. Vertragsentscheidungen der Revision 1 zur erneuten Review
+
+| ID | Festlegung von Codex nach Review | Betroffene Findings | Status |
+|---|---|---|---|
+| D-01 | Heutige Erfolgsquote wird "Floor-Deckung im gewaehlten Horizont"; bei fehlerfreiem Batch ist der Nenner `requestedRuns` und der Zaehler `all_dead + horizon_exhausted`. Sobald mindestens ein `technical_error` vorliegt, werden Quote und Intervall fuer den Gesamtbatch fail-closed als `null` unterdrueckt; das Outcome-Inventar bleibt sichtbar. | G-03 | zur Re-Review |
+| D-02 | Vier Outcomes und Jahreschronologie/Prioritaet aus Abschnitt 3.4; Ruin eines begonnenen Finanzjahrs geht spaeterem Todesflag vor. | G-03, C-05 | zur Re-Review |
+| D-03 | Pro Run: Zaehler = erfolgreich abgeschlossene Dekumulationsjahre mit Kuerzung `>= 10 %`; Nenner = erfolgreich abgeschlossene Dekumulationsjahre mit endlicher Kuerzungsentscheidung. Nenner 0 ergibt `null`, nie 0 oder NaN. | G-02 | zur Re-Review |
+| D-04 | P1/P2 getrennt; leere bedingte Verteilungen sind `null` plus `sampleSize=0`; Pflegebetrag im UI real zur Startpreisbasis, nominal nur explizit benannt im Export. | G-06, C-10 | zur Re-Review |
+| D-05 | Fixed-/Stationary-Block starten ihren ersten zusammenhaengenden Block am CAPE-Startrecord. Regime-Markov initialisiert dort sein Startregime; IID darf ab Jahr 2 unabhaengig ziehen. Jede Methode exportiert die tatsaechliche Praezedenz. | G-04 | zur Re-Review |
+| D-06 | UI-KPI wird ehrlich in "Reale Depotentnahme P10" umbenannt. Das Bewertungsfenster beginnt mit der ersten geplanten Dekumulationsverpflichtung und endet bei Tod aller Personen oder Horizont; ein Ruinversuch zaehlt als Beginn. Nach Ruin und solange jemand lebt wird mit realer Depotentnahme 0 aufgefuellt. Technische Fehler und Haushalte, die vor jeder Dekumulationsverpflichtung sterben, sind `null` mit Grund. Ueber Runs werden P10/P50 und `sampleSize` ausgewiesen. | G-01, C-05, C-07 | zur Re-Review |
+| D-07 | V1-Felder sind kanonisch. Befristete Read-Aliase tragen Deprecation-Telemetrie und werden spaetestens in Slice 11 entfernt; Slice 12 weist ihre Abwesenheit nach. | Gemini Vertragstreue | zur Re-Review |
+| D-08 | Runvertrag: neuer Default 10.000; bis 100.000 ohne Grosslastbestaetigung; ueber 100.000 Warnung mit Run-Jahren/Speicherschaetzung und expliziter Bestaetigung; harte Grenze 1.000.000. Standardbenchmark `100.000 x 35 Jahre`, Stresstest `1.000.000 x 35 Jahre`, jeweils 8 Worker/500 ms. Dauer, Blocklaenge, Worker und Budget erhalten weiterhin daten-/hardwarebasierte Grenzen in Slice 01. Keine stille Klemmung. | Nutzerbeleg U-01/U-02/U-03, MC-14 | Runwerte entschieden zur Re-Review; uebrige Parametergrenzen in Slice 01 offen |
+| D-09 | Paired Compare bleibt separates Folgefeature nach stabilem V1-Export. | MC-17 | zur Re-Review |
+| D-10 | Per-Run-Summaries werden global indexiert; Finalisierung reduziert in Runindex-Reihenfolge. Innerhalb derselben JS-Runtime muessen Worker-/Chunkvarianten auch endliche Float-Per-Run-Werte und daraus abgeleitete Aggregate exakt liefern. Nur Snapshots ueber dokumentiert unterschiedliche Runtimeversionen duerfen feldspezifische, vorab quantifizierte Toleranzen verwenden. | C-01, C-07, C-09 | zur Re-Review |
+| D-11 | Snapshotpolicy aus Abschnitt 3.6; Pre-Hardening-Referenz wird niemals ueberschrieben. | C-04 | zur Re-Review |
+| D-12 | `WorkerJobRunner` wird erweitert, nicht ersetzt. User-Cancel terminiert aktive Worker, erzeugt keinen Serial-Fallback und baut den Singleton-Pool erst beim naechsten expliziten Start lazy neu auf. Parameterwechsel starten keinen Lauf automatisch; Start/Cancel sind single-flight. | G-05, C-08 | zur Re-Review |
+
+Eine Review darf Alternativen beschliessen. Die Entscheidung muss dann in
+dieser Tabelle und in den betroffenen Slices dokumentiert werden; stillschweigende
+Semantikaenderungen sind unzulaessig.
+
+## 5. Umsetzungsslices und Abhaengigkeiten
+
+| Slice | Inhalt | GAPs | Abhaengigkeit | Status |
+|---|---|---|---|---|
+| [01](./SLICE_SIMULATOR_MONTE_CARLO_01_BASELINE_MESSVERTRAG.md) | Baseline, Entscheidungen und Messvertrag | querschnittlich; Golden Cases fuer MC-01 bis MC-19 | Reviewfreigabe des Plans | geplant |
+| [02](./SLICE_SIMULATOR_MONTE_CARLO_02_CHUNK_RESULT_CONTRACT.md) | zentraler Chunk-/Path-Summary-Vertrag | MC-10, MC-19 | 01, D-10, D-11 | geplant |
+| [03](./SLICE_SIMULATOR_MONTE_CARLO_03_RISIKO_KPI_SEMANTIK.md) | Volatilitaet und Kuerzungsanteil | MC-01, MC-02 | 02, D-03 | geplant |
+| [04](./SLICE_SIMULATOR_MONTE_CARLO_04_PFLEGE_KPI_SEMANTIK.md) | Pflegeeintritt, -dauer und -kosten | MC-03, MC-04 | 02, D-04 | geplant |
+| [05](./SLICE_SIMULATOR_MONTE_CARLO_05_OUTCOME_HORIZONT_CONTRACT.md) | terminale Outcomes, Horizont, Alter | MC-05, MC-07 | 02, D-01, D-02 | geplant |
+| [06](./SLICE_SIMULATOR_MONTE_CARLO_06_SAMPLING_PRAEZEDENZ_DIAGNOSTIK.md) | Samplingvertrag und Ziehungsdiagnostik | MC-06 | 02, D-05 | geplant |
+| [07](./SLICE_SIMULATOR_MONTE_CARLO_07_SCHAETZER_UNSICHERHEIT_CAR.md) | Konfidenz und reale Depotentnahme P10 | MC-08, MC-09 | 03, 05, D-06 | geplant |
+| [08](./SLICE_SIMULATOR_MONTE_CARLO_08_RUNRESULT_EXPORT_PROVENIENZ.md) | versionierter Run-/Exportvertrag | MC-11 | 04-07 | geplant |
+| [09](./SLICE_SIMULATOR_MONTE_CARLO_09_WORKER_LIFECYCLE_ISOLATION.md) | Abbruch, Stale Jobs, Cache/Version | MC-12, MC-13 | 02, D-12 | geplant |
+| [10](./SLICE_SIMULATOR_MONTE_CARLO_10_RESOURCE_UI_ACCESSIBILITY.md) | Bounds, Kostenhinweis, UI/A11y | MC-14, Teile MC-15 | 05, 08, 09, D-08 | geplant |
+| [11](./SLICE_SIMULATOR_MONTE_CARLO_11_BROWSER_E2E_REGRESSION.md) | Browser-E2E und Pfadparitaet | MC-15 | 03-10 | geplant |
+| [12](./SLICE_SIMULATOR_MONTE_CARLO_12_INTEGRATION_DOKUMENTATION.md) | Integration, Doku- und Volltestgate | MC-16; Abschluss aller | 01-11 | geplant |
+
+Zulaessige Parallelisierung nach Slice 02:
+
+- 03, 04, 05 und 06 duerfen getrennt bearbeitet werden, sofern jeder Slice
+  einzeln gruen beendet, reviewt und lokal committet wurde.
+- 09 darf parallel zu den fachlichen KPI-Slices bearbeitet werden.
+- 07, 08, 10, 11 und 12 folgen den Tabellenabhaengigkeiten.
+- Es gibt keinen dauerhaften Red-State zwischen Slices.
+
+## 6. Slice-Grenzen
+
+### 6.1 Produktive Dateien
+
+Jeder Slice bleibt unter der Stop-Grenze von maximal zehn produktiven Programm-
+oder Konfigurationsdateien. Dokumentation und Tests werden mitgezaehlt und
+dokumentiert, fallen aber nicht unter diese produktive Dateigrenze. Sobald ein
+Slice die geplante produktive Dateiliste ueberschreiten wuerde, stoppt Codex vor
+dem Edit und legt eine Aufteilung zur Review vor.
+
+### 6.2 Nicht-Scope fuer den gesamten Plan
+
+- keine Aenderung der Engine-Semantik oder der oeffentlichen `EngineAPI`,
+- keine manuelle Aenderung von `engine.js`, `dist/` oder `RuheStandSuite.exe`,
+- keine empirische Freigabe von Kapitalmarkt-, Pflege- oder Mortalitaetsmodellen,
+- keine Policy-Empfehlung fuer reale Haushalte,
+- keine tranchenspezifische Monte-Carlo-Ruinanalyse: Tranchen werden bei der
+  Szenariokompilation in das Gesamtdepot konsolidiert; dieser Plan prueft den
+  danach entstehenden Gesamtdepotpfad,
+- kein neues Paired-Compare-Feature,
+- keine Behebung fremder Arbeitsbaum-Aenderungen ohne gesonderten Auftrag.
+
+Wenn sich waehrend der Umsetzung zeigt, dass die Engine-Semantik geaendert
+werden muss, greift die Stop-Regel. Der Plan ist dann vor Coding zu erweitern
+und erneut reviewen zu lassen.
+
+## 7. Uebergreifende Akzeptanzkriterien
+
+Der Themenbereich gilt erst nach Slice 12 als technisch abgeschlossen, wenn:
+
+1. jeder angeforderte Run genau einem terminalen Outcome zugeordnet ist;
+2. Volatilitaet, Drawdown, Kuerzungsanteil und Pflege-KPIs per Golden Case
+   fachlich nachgerechnet und UI-seitig identisch benannt sind;
+3. CAPE-/Filter-/Recency-/Regime-/Tail-Risk-Praezedenz dokumentiert, getestet
+   und aus einem Run diagnostizierbar ist;
+4. gleiche Request-/Seed-Daten in direktem, Worker- und Auto-Optimize-Pfad bei
+   mindestens zwei Workerzahlen und drei Chunkaufteilungen innerhalb derselben
+   Runtime einschliesslich endlicher Floatwerte exakt uebereinstimmen;
+5. binaere Floor-Deckung ihre Stichprobengroesse und Wilson-Unsicherheit
+   ausweist; Quantile zeigen Stichprobengroesse/Missingness ohne ein nicht
+   belegtes Konfidenzversprechen;
+6. Lauf und Export ueber versionierte, validierte V1-Vertraege reproduzierbar
+   beschrieben sind;
+7. Abbruch, Worker-Stall, Fehler und veraltete Antworten keine spaeten UI- oder
+   Cache-Seiteneffekte erzeugen;
+8. ungueltige oder unvertretbar teure Parameter vor Start verstaendlich
+   abgewiesen werden, ohne fachliche Werte still zu begrenzen;
+9. ein echter Browser-Monte-Carlo-Lauf Erfolgs-, Fehler-, Fallback-, Abbruch-
+   und Exportpfad abdeckt;
+10. `npm test`, fokussierte MC-Suiten und `npm run test:browser` gruen sind,
+    die Gesamtcoverage nicht sinkt und `worker-job-runner.js` sowie
+    `results-renderers.js` jeweils mindestens 50 Prozent Statement-Coverage
+    erreichen;
+11. README, Handbuch, Fachkonzept, technische Referenz und Modulreferenz denselben
+    Vertrag beschreiben;
+12. Gemini und Nutzer jeden Slice nach dokumentiertem adversarialem Review
+    freigegeben haben.
+
+## 8. Test- und Nachweisstrategie
+
+### 8.1 Pro Slice
+
+- zuerst fachliche Golden Cases beziehungsweise Contracttests,
+- fokussierter Lauf mit `node tests/run-single.mjs <testdatei>`,
+- alle direkt betroffenen bestehenden Suiten,
+- direkte/Worker-Paritaet, sobald Result- oder Samplingfelder betroffen sind,
+- bei semantischen Slices ein versionierter Post-Slice-Snapshot samt
+  Delta-Ledger gemaess `MonteCarloSnapshotPolicyV1`,
+- keine erwarteten roten Tests ueber das Ende eines Slice hinaus.
+
+### 8.2 Integrationsgate
+
+- `npm test`,
+- `npm run test:browser`,
+- `npm run test:coverage` und dokumentierter Vergleich zur Baseline,
+- Coverage-Mindestgate von 50 Prozent Statements fuer
+  `worker-job-runner.js` und `results-renderers.js`,
+- bei unerwarteten Snapshot-/Backtest-/FlowDelta-Abweichungen sofortiger Stop,
+- `npm run build:engine` nur wenn eine separat freigegebene Engine-Aenderung
+  notwendig wird; diese ist im vorliegenden Plan nicht vorgesehen.
+
+## 9. Daten-, Datenschutz- und Reproduzierbarkeitsgrenzen
+
+- Exporte enthalten nur die fuer Reproduktion erforderlichen Szenariodaten.
+- Keine lokalen Pfade, Secrets, Tokens, Logs oder fremde Finanzexporte.
+- Hashes/Fingerprints muessen stabil definiert und kollisionsbedingte Risiken
+  dokumentiert werden; ein Hash ist kein kryptografischer Herkunftsnachweis.
+- Forschungsfragen zu Datenprovenienz, Holdouts und Modellkalibrierung bleiben
+  getrennte Freigabegates. Technisches Hardening darf nicht als empirische
+  Validierung dargestellt werden.
+
+## 10. Stop-, Rollback-, Commit- und Push-Regeln
+
+- Es gelten `AGENTS.md` und `SLICE_EXECUTION_RULES.md` vollstaendig.
+- Vor jedem Slice: Branch, Status, exakte Dateiliste, Aenderungstiefe,
+  gefaehrdete Tests, Nicht-anfassen-Liste und konkrete Rollback-Dateien.
+- Stop bei mehr als zehn produktiven Dateien, unklarem Contract, erforderlicher
+  Engine-Semantikaenderung, nicht ersetzbarer Testbarkeit, unerwarteten
+  Snapshots/Backtests/FlowDelta oder UI-/Engine-Parameternamenskonflikt.
+- Rollback betrifft ausschliesslich die Dateien des aktiven Slice; keine harten
+  Resets oder destruktiven Befehle ohne ausdrueckliche Freigabe.
+- Codex erstellt keine Commits. Nach positivem Gemini- und Nutzerreview prueft
+  Gemini den Status gegen den Slice-Scope und erstellt den lokalen Commit.
+- Push beziehungsweise Remote-Branch nur nach ausdruecklicher Nutzerfreigabe.
+
+## 11. Plan-Pre-Mortem
+
+Angenommen, die Umsetzung verursacht in drei Monaten einen Produktivfehler:
+Die wahrscheinlichste Ursache ist eine nur teilweise migrierte Per-Run-
+Semantik: Endwert- und Outcome-Summaries sind korrekt indexiert, CaR oder
+Pflege-Missingness bleibt aber in einem Consumer stichproben- oder
+completion-order-abhaengig. Parallel koennte ein Cancel-/Restart-Pfad den
+Singleton-Pool wiederholt terminieren und neu erzeugen. Dagegen stehen der
+zentrale Path-Summary-Vertrag, globale Runindexfinalisierung, Consumer-
+Inventar, single-flight Worker-Lifecycle, Snapshot-Delta-Ledger und E2E-
+Paritaet. Das groesste Restrisiko bleibt eine fachlich plausible, aber
+empirisch unzureichend validierte Modellannahme; sie wird durch diesen
+technischen Plan nicht geloest.
+
+## 12. Auftrag an Gemini und Claude
+
+Bitte insbesondere pruefen:
+
+- ob die Befunde MC-01 bis MC-19 reproduzierbar und vollstaendig sind,
+- ob D-01 bis D-12 fachlich eindeutig entschieden werden koennen,
+- ob die V1-Vertraege vorhandene Consumers und Migrationspfade abdecken,
+- ob Slice-Grenzen und DAG Seiteneffekte oder einen verdeckten Red-State
+  erzeugen,
+- ob Stop-Regeln und Akzeptanzkriterien ausreichend hart sind,
+- welches realistische Versagensszenario trotz dieses Plans uebrig bleibt.
+
+Das Review muss die Pflichtstruktur aus `SLICE_EXECUTION_RULES.md` enthalten.
+
+## Review-Feedback von Gemini
+
+### 1. Systematische Prüfdimensionen
+
+* **Korrektheit:** Die vorgeschlagene Kürzungsjahre-Definition und die Ausgliederung von `all_dead` korrigieren wesentliche Anzeigefehler. Die Slices decken die identifizierten GAPs strukturell ab. Allerdings fehlen mathematische Spezifikationen für Randfälle.
+* **Vertragstreue:** Der Entwurf führt mit `MonteCarloChunkResultV1` und `MonteCarloOutcomeInventoryV1` notwendige Verträge ein. Übergangsphasen (Read-Aliase für Abwärtskompatibilität) müssen zeitlich streng begrenzt und in Phase 11/12 vollständig entfernt werden.
+* **Fehlerbehandlung:** Der Worker-Lifecycle (Slice 09) und die Ressourcenparameter (Slice 10) verbessern die Stabilität. Unklar bleibt die konkrete technische Handhabung eines synchron blockierten Workers bei einem Abort.
+* **Seiteneffekte:** `auto-optimize-worker.js` und `results-renderers.js` sind stark betroffen. Der Plan isoliert diese Seiteneffekte gut durch den gemeinsamen Chunk-Contract (Slice 02).
+* **Was könnte brechen?** Die mathematischen Definitionen von Risikokennzahlen (CaR) bei vorzeitigem Ruin weisen logische Schwachstellen auf.
+
+### 2. Nummerierte Findings
+
+* **Finding G-01: Das Ruin-Paradoxon bei der Consumption-at-Risk (CaR) (MC-09 / Slice 07):** Wenn ein Run nach dem Ruin abgebrochen wird und die CaR-Berechnung nur über tatsächlich simulierte Jahre läuft, haben Pfade mit schnellem Ruin bei hohem Konsum ein fälschlicherweise hohes P10 (keine Jahre mit Null-Konsum erfasst). Überlebende Pfade mit kontrollierter Kürzung wirken dadurch riskanter als ruinierte Pfade.
+  * *Vorschlag:* Jahre nach dem Ruin bis zum geplanten Horizont (oder Tod) müssen mit Entnahme = 0 (bzw. dem garantierten Minimum/Floor) in die CaR-Zeitreihe eingehen.
+* **Finding G-02: Division durch Null bei Kürzungsquote (MC-02 / Slice 03):** Bei einem sofortigen Ruin im ersten Jahr ist die Anzahl der "wirtschaftlich simulierten Entnahmejahre" 0 oder 1. Dies führt zu statistischen Ausreißern oder `NaN`.
+  * *Vorschlag:* Mindestdauer für die Nenner-Berechnung festlegen oder Pfade mit Dauer <= 1 Jahr separat im Nenner abfangen.
+* **Finding G-03: Zustandspriorisierung bei gleichzeitigem Ruin und Tod (MC-05 / Slice 05):** Stirbt der Haushalt in demselben Jahr, in dem das Depot auf 0 fällt, gibt es einen Konflikt zwischen `ruin` und `all_dead`.
+  * *Vorschlag:* `ruin` hat Vorrang vor `all_dead`, da der finanzielle Ruin die Ursache oder das primäre Ereignis des Jahres darstellt.
+* **Finding G-04: Block-Sampling-Sprünge bei CAPE-Startjahr (MC-06 / Slice 06):** Der Übergang von einem CAPE-gezogenen Jahr 1 zu einem Block-Sampling ab Jahr 2 bricht die Autokorrelation.
+  * *Vorschlag:* Der Plan muss explizit festlegen, ob der Block in Jahr 1 mit dem CAPE-Startjahr beginnt (also Jahr 1-5 zusammenhängen) oder ob Jahr 1 ein isolierter Übergang ist.
+* **Finding G-05: CPU-Schleifenblockade bei Worker-Abort (MC-12 / Slice 09):** Da Monte-Carlo-Läufe in engen CPU-Schleifen laufen, reagieren Worker nicht auf `postMessage(abort)`. Ein Abbruch erfordert `worker.terminate()`.
+  * *Vorschlag:* Slice 09 muss die Kosten für das Neuerstellen der Worker-Threads bei häufigem Abort explizit berücksichtigen und minimieren (z. B. durch Debouncing von Parameteränderungen im UI).
+* **Finding G-06: Leere Verteilungen bei ausbleibenden Pflegefällen (MC-03 / Slice 04):** Bei einer Pflege-Wahrscheinlichkeit von 0 ist das Array der Eintrittsalter leer.
+  * *Vorschlag:* Der Aggregator und das UI müssen leere Verteilungen explizit abfangen und im UI als "-" statt `NaN` rendern.
+
+### 3. Pre-Mortem (3 Monate in die Zukunft)
+
+Die wahrscheinlichste Fehlerursache im Produktivbetrieb ist ein Speicher- und Performance-Leak im Browser, da bei schnellen Schieberegler-Bewegungen im UI massenhaft Worker abgebrochen (`terminate`) und neu instanziiert werden. Dies führt auf schwächeren Endgeräten zu Browser-Abstürzen, während gleichzeitig die CaR-KPIs für Läufe mit frühem Ruin absurde Werte anzeigen, da die Zeitreihe nach dem Ruin nicht standardisiert aufgefüllt wurde.
+
+### 4. Review-Ergebnis
+- **Status:** blockiert
+- **Blocker:**
+  1. Definition der CaR-Zeitreihe bei vorzeitigem Ruin (Finding G-01).
+  2. Festlegung der Zustandspriorisierung bei gleichzeitigem Ruin und Tod (Finding G-03).
+  3. Abbrechen blockierter Worker via `terminate()` und dessen Performance-Implikationen (Finding G-05).
+- **Restrisiken:**
+  1. Statistische Volatilitätsartefakte am Übergang von CAPE-Startjahr zu Block-Sampling (Finding G-04).
+  2. UI-Robustheit bei Divisionen durch Null (Finding G-02, G-06).
+
+## Review-Feedback von Claude
+
+**Quelle:** Vom Nutzer am 2026-07-19 als externe Reviewdatei uebergeben und von
+Codex in die Pflichtstruktur dieser Datei uebertragen. Der folgende Inhalt ist
+eine strukturtreue Verdichtung; die Finding-IDs und Schweregrade bleiben
+unveraendert.
+
+### 1. Systematische Pruefdimensionen
+
+- **Korrektheit:** MC-01, MC-10, MC-12/13 und MC-15 wurden im Code bestaetigt.
+  Randfaelle und Snapshotfortschreibung waren noch nicht ausreichend bestimmt.
+- **Vertragstreue:** Die V1-Vertraege passen grundsaetzlich zur Architektur;
+  Pfadgranularitaet, Abwaertskompatibilitaet und Worker-/Chunkdeterminismus
+  mussten konkretisiert werden.
+- **Fehlerbehandlung:** Ruin, Nullnenner, Worker-Stall, technische Fehler und
+  Typed-Array-Grenzen sind relevant. Gemini G-01, G-03 und G-05 waren im
+  Erstentwurf formal offen.
+- **Seiteneffekte:** Auto-Optimize, Sweep, Worker-Pool, Snapshots und Renderer
+  sind als zweite Consumer beziehungsweise Regressionspfade betroffen.
+- **Was koennte brechen:** Workeranzahl und adaptive Chunkgrenzen koennten
+  Aggregatreihenfolgen veraendern; CaR benoetigt eine explizite
+  Per-Run-Datenentscheidung; semantische Slices koennten eine alte Baseline
+  unkontrolliert ueberschreiben.
+
+### 2. Nummerierte Findings
+
+- **C-01 (Blocker): Aggregationsdeterminismus bei variabler
+  Worker-Konfiguration.** Per-Run-Seeds sind stabil, aber adaptive Chunks und
+  Fertigstellungsreihenfolge koennen Gleitkommaaggregation oder Listenordnung
+  beeinflussen. Snapshotmetadaten und ein worker-/chunkunabhaengiger
+  Mergevertrag fehlen.
+- **C-02 (Verbesserung): Tranchen-MC-Interaktion nicht abgegrenzt.** Tranchen
+  werden vor MC in der Szenariokompilation konsolidiert; tranchenspezifische
+  Ruinanalyse muss explizit Nicht-Scope sein.
+- **C-03 (Hinweis): Kein Coverage-Mindestziel.** Fuer die bisher mit 0 Prozent
+  erfassten Module `worker-job-runner.js` und `results-renderers.js` soll ein
+  Mindestgate gelten.
+- **C-04 (Blocker): Zirkulaere Snapshotabhaengigkeit.** Eine
+  Pre-Hardening-Baseline wird durch die Semantikaenderungen in 03 bis 05
+  absichtlich ungueltig; eine Update-/Koexistenzpolicy fehlte.
+- **C-05 (Blocker): Gemini G-01/G-03/G-05 formal ungeloest.** CaR nach Ruin und
+  Ruin-/Tod-Prioritaet muessen entschieden werden. G-05 kann nach Nachweis von
+  fehlendem `SharedArrayBuffer`, vorhandenem Worker-Replacement und
+  UI-Churn-Schutz als Verbesserung behandelt werden.
+- **C-06 (kein Handlungsbedarf):** Die Abhaengigkeit Slice 05 zu 07 ist bereits
+  korrekt modelliert.
+- **C-07 (Blocker): Pfadgranularitaet im Chunkvertrag unklar.** Der Plan muss
+  entscheiden, welche Per-Run-Daten der Worker fuer CaR und Unsicherheit
+  liefert und wie Speicherdruck vermieden wird.
+- **C-08 (Verbesserung): Timeoutkonzepte nicht abgeglichen.** Es muss klar sein,
+  ob `WorkerJobRunner` erweitert oder ersetzt wird und wie Stall-Watchdog und
+  Workerterminierung zusammenarbeiten.
+- **C-09 (Verbesserung): Worker-/Chunkkonfiguration fehlt im Snapshot.** Die
+  Golden-Case-Konfiguration muss Snapshotmetadatum sein.
+- **C-10 (Verbesserung): Pflegekosteneinheit fehlt.** Nominal- und Realwerte
+  muessen ueber D-04 und Feldnamen getrennt werden.
+
+### 3. Pre-Mortem
+
+Wahrscheinlichstes Versagensszenario ist eine nur teilweise geloeste
+Pfadgranularitaet: Endwertquantile werden korrekt aus Per-Run-Buffern gebildet,
+CaR verbleibt aber versehentlich auf einer Stichprobe und behaelt den Length
+Bias. Zweites Szenario ist ein veraltetes `Handbuch.html`, das weiterhin die
+alte Erfolgsquotenterminologie verwendet.
+
+### 4. Review-Ergebnis
+
+- **Status:** blockiert.
+- **Blocker:** C-01, C-04, C-05, C-07.
+- **Verbesserungen vor Implementierung:** C-02, C-08, C-09, C-10.
+- **Hinweise:** C-03; C-06 bestaetigt die vorhandene Abhaengigkeit.
+- **Restrisiken:** unterschaetzte Quantilunsicherheit bei abhaengigen Pfaden,
+  Float-Nichtdeterminismus, Speicherdruck durch Pfaddaten, Auto-Optimize als
+  zweiter Consumer und Worker-Churn bei schnellem Neustart.
+
+### Re-Review von Gemini (Revision 1)
+
+#### 1. Bewertung der Überarbeitungen
+* **G-01 (CaR / Ruin-Paradoxon):** Mit D-06 vollständig gelöst. Das Auffüllen mit `0` für lebende Jahre nach Ruin verhindert die systematische Überschätzung von Entnahmekapazitäten. Die Umbenennung in "Reale Depotentnahme P10" schafft fachliche Klarheit.
+* **G-02 (Division durch 0 bei Kürzungsquote):** Mit D-03 gelöst. Nenner `0` wird explizit als `null` mit Grund gehandhabt.
+* **G-03 (Zustandspriorisierung Ruin/Tod):** Mit D-02 gelöst. Jahreschronologische Priorisierung (Ruin im begonnenen Finanzjahr vor späterem Tod) ist eindeutig definiert.
+* **G-04 (Block-Sampling / CAPE):** Mit D-05 gelöst. Verankerung des 1. Blocks am CAPE-Startrecord verhindert Autokorrelationsbrüche.
+* **G-05 (Worker-Abort):** Mit D-12 gelöst. `worker.terminate()` bei Abort in Kombination mit Single-Flight-Handling minimiert Performance- und Schleifenrisiken.
+* **G-06 (Leere Pflegeverteilungen):** Mit D-04 gelöst. Sauberes Nullable-Handling mit `sampleSize=0`.
+
+#### 2. Re-Review-Ergebnis
+- **Status:** freigegeben
+- **Blocker:** keine
+- **Restrisiken:**
+  1. Leichter Speicherdruck bei 1 Mio. Runs durch per-Run Skalar-Summaries (mit D-08 und Hardware-Limits abgefangen).
+  2. Floating-Point-Abweichungen zwischen unterschiedlichen JS-Runtimes (mit D-10 abgedeckt).
+- **Pre-Mortem (3 Monate in die Zukunft):** Wahrscheinlichste Ursache für verbleibende Probleme wäre eine schleichende Regression im UI-Renderer bei der Formatierung von Nullable-Keys aus älteren Profilen. Dies wird durch Slice 10 & 11 (Browser-E2E & A11y) minimiert.
+
+## Review-Antworten von Codex
+
+### Antworten auf Gemini
+
+- **G-01 angenommen:** D-06 standardisiert die reale Depotentnahmeserie bis Tod
+  oder Horizont und fuellt lebende Jahre nach Ruin mit 0. Der KPI wird von
+  "Consumption" in "Reale Depotentnahme P10" umbenannt. Technische/missing
+  Pfade bleiben nullable.
+- **G-02 angenommen:** D-03 definiert Zaehler und Nenner. Nenner 0 wird `null`
+  mit Grund; beobachtete 0 bleibt ein gueltiger Wert.
+- **G-03 angenommen mit Chronologiepraezisierung:** Ruin eines begonnenen
+  Finanzjahrs bleibt Ruin; Tod vor der naechsten Finanzpflicht ist `all_dead`.
+  Widerspruechliche Adapterflags werden `technical_error`.
+- **G-04 angenommen:** Fixed-/Stationary-Block starten ihren ersten
+  zusammenhaengenden Block am CAPE-Record; Regimeverfahren erhalten eine
+  explizite Initialisierungsregel.
+- **G-05 angenommen:** CPU-blockierte Worker werden bei User-Cancel terminiert.
+  Kein serieller Fallback, kein `SharedArrayBuffer`, lazy Pool-Replacement und
+  single-flight UI verhindern Terminate-/Recreate-Schleifen.
+- **G-06 angenommen:** Leere Pflegeverteilungen werden `null` mit
+  `sampleSize=0`; UI zeigt einen Gedankenstrich.
+
+### Antworten auf Claude
+
+- **C-01 angenommen:** Neuer GAP MC-19, global indexierte Path-Summaries,
+  Finalisierung in Runindex-Reihenfolge und eine Worker-/Chunk-Paritaetsmatrix.
+- **C-02 angenommen:** Tranchenspezifische MC-Ruinanalyse ist nun explizit
+  Nicht-Scope; MC arbeitet auf dem kompilierten Gesamtdepot.
+- **C-03 angenommen:** Slice 12 fordert mindestens 50 Prozent
+  Statement-Coverage fuer beide bisher ungetesteten kritischen Module und
+  Nichtregression der Gesamtcoverage.
+- **C-04 angenommen:** `MonteCarloSnapshotPolicyV1` trennt unveraenderliche
+  Pre-Baseline, Post-Slice-Referenzen/Delta-Ledger und finalen V1-Kandidaten.
+- **C-05 angenommen:** Die drei Gemini-Punkte sind ueber D-02, D-06 und D-12
+  formal konkretisiert; die Herabstufung von G-05 bleibt der Re-Review
+  vorbehalten.
+- **C-06 bestaetigt:** Keine Planaenderung erforderlich.
+- **C-07 angenommen mit Architekturpraezisierung:** Das vorhandene Design
+  uebertraegt bereits Per-Run-Endwertbuffer. V1 ergaenzt indexierte Per-Run-
+  Skalare fuer CaR/Missingness; volle Jahrespfade sind nicht erforderlich.
+  Ein Bootstrap-CI fuer Quantile ist ausdruecklich Nicht-Scope.
+- **C-08 angenommen:** `WorkerJobRunner` wird erweitert und bleibt einzige
+  Job-Level-Stallquelle; der Pool stellt Termination/Replacement bereit.
+- **C-09 angenommen:** Workerzahl, Chunkpolicy, Runtime und Datenversion werden
+  Snapshotmetadaten.
+- **C-10 angenommen:** Pflegekarten zeigen reale Euro zur Startpreisbasis;
+  nominale Exportwerte werden explizit benannt.
+
+## Review-Entscheidungen
+
+| ID | Quelle | Finding | Entscheidung | Umsetzung |
+|---|---|---|---|---|
+| G-01 | Gemini | Ruin-Paradoxon bei CaR | angenommen | D-06/Slice 07 revidiert; Re-Review freigegeben |
+| G-02 | Gemini | Division durch Null bei Kuerzungsquote | angenommen | D-03/Slice 03 revidiert; Re-Review freigegeben |
+| G-03 | Gemini | Zustandspriorisierung Ruin/Tod | angenommen | D-02/Slice 05 revidiert; Re-Review freigegeben |
+| G-04 | Gemini | Block-Sampling-Spruenge | angenommen | D-05/Slice 06 revidiert; Re-Review freigegeben |
+| G-05 | Gemini | CPU-Schleifenblockade bei Abort | angenommen | D-12/Slices 09-11 revidiert; Re-Review freigegeben |
+| G-06 | Gemini | Leere Verteilungen bei Pflege-Quote 0 | angenommen | D-04/Slice 04 revidiert; Re-Review freigegeben |
+| C-01 | Claude | Worker-/Chunkdeterminismus | angenommen | MC-19, D-10, Slices 01/02/11/12 |
+| C-02 | Claude | Tranchen-Scope fehlt | angenommen | Nicht-Scope ergaenzt |
+| C-03 | Claude | Coverage-Mindestziel fehlt | angenommen | 50-Prozent-Gate in Slice 12 |
+| C-04 | Claude | Snapshotpolicy fehlt | angenommen | SnapshotPolicyV1 und Delta-Ledger |
+| C-05 | Claude | Gemini-Blocker offen | angenommen | D-02, D-06, D-12 konkretisiert |
+| C-06 | Claude | Abhaengigkeit 05 zu 07 korrekt | bestaetigt | keine Aenderung |
+| C-07 | Claude | Pfadgranularitaet unklar | angenommen mit Praezisierung | indexierte Per-Run-Skalare, keine Jahrespfade |
+| C-08 | Claude | Timeoutkonzepte unklar | angenommen | JobRunner erweitert; eine Stallquelle |
+| C-09 | Claude | Snapshotmetadaten fehlen | angenommen | Worker-/Chunk-/Runtime-Metadaten |
+| C-10 | Claude | Pflegekosteneinheit fehlt | angenommen | UI real; Export explizit nominal/real |
+| U-01 | Nutzer | 1 Mio. Runs standardnah ohne Engpass ausgefuehrt | angenommen | D-08: 1 Mio. als startbarer Stresstest und harte Rungrenze |
+| U-02 | Nutzer | Ab 100k bis 1 Mio. keine messbaren KPI-Unterschiede; praktisch max. 100k | angenommen | 100k empfohlen, Warnung darueber, harte Grenze 1 Mio. |
+| U-03 | Nutzer | MC-Standard auf 10.000 Runs setzen | angenommen | D-08/Slice 10; Codeaenderung erst nach Re-Review |
+
+## 13. Freigabestatus
+
+- Planreview Gemini: freigegeben (Re-Review Revision 1 bestanden).
+- Planreview Claude: Erstreview blockiert; Revision 1 wartet auf Re-Review.
+- Nutzerfreigabe: erteilt am 2026-07-22.
+- Status `implementierungsreif`: erteilt (für Gemini-Freigabepfad & Nutzer).
+- Implementierungsbeginn: freigegeben für Slice 01 auf Branch `codex/simulator-monte-carlo-gap-plan`.
