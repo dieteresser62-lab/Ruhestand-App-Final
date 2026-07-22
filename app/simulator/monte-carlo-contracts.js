@@ -16,7 +16,7 @@ export const MONTE_CARLO_SNAPSHOT_POLICY = Object.freeze({
     immutableBaseline: 'pre-hardening-v1',
     currentReference: 'post-slice-07-v1',
     deltaLedger: 'delta-ledger-v1',
-    finalCandidate: null,
+    finalCandidate: 'monte-carlo-v1-final',
     policy: 'immutable-baseline-with-versioned-post-slice-references'
 });
 

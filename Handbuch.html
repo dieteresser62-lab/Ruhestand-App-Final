@@ -519,8 +519,9 @@
                         <div class="step-content">
                             <h3>Simulieren und Analysieren</h3>
                             <p>Klicken Sie auf "Simulation starten". Das System berechnet tausende mögliche
-                                Marktszenarien. Achten Sie auf die <strong>Erfolgswahrscheinlichkeit</strong> – diese
-                                sollte idealerweise über 95% liegen. Prüfen Sie zusätzlich den Backtesting-Tab.</p>
+                                Marktszenarien. Lesen Sie die modellinterne <strong>Floor-Deckung im gewählten
+                                    Horizont</strong> gemeinsam mit Outcomes, Intervall, Kürzungen, realer
+                                Depotentnahme, Drawdown und Pflege-KPIs. Prüfen Sie zusätzlich den Backtesting-Tab.</p>
                         </div>
                     </li>
                 </ol>
@@ -628,12 +629,12 @@
                             realistisch zur Gesamtplanung passt.</li>
                         <li><strong>Asset-Allokation wählen:</strong> Starten Sie mit einer Aktienquote passend zu
                             Ihrem Risikoappetit (z.B. 70-90 % bei langem Horizont). Nutzen Sie die Sensitivität der
-                            Erfolgswahrscheinlichkeit, um die Quote anzupassen.</li>
+                            Floor-Deckung und der Risikokennzahlen, um die Quote anzupassen.</li>
                         <li><strong>Parameter-Sweep ausführen:</strong> Variieren Sie Sparrate, Rentenalter und
                             Aktienquote automatisch, um zu sehen, wie viel Puffer Sie für Marktstress haben.</li>
                         <li><strong>Zielkorridor definieren:</strong> Speichern Sie zwei bis drei Szenarien
-                            (Basis, optimistisch, konservativ) und vergleichen Sie Erfolgswahrscheinlichkeiten sowie
-                            Endvermögen.</li>
+                            (Basis, optimistisch, konservativ) und vergleichen Sie Floor-Deckung, terminale Outcomes,
+                            Kürzungen sowie Endvermögen.</li>
                         <li><strong>Jährliches Update:</strong> Wiederholen Sie die Simulation nach Gehaltsänderungen
                             oder größeren Ausgaben. Dokumentieren Sie die Version (z.B. YYYY-MM) für Ihre
                             Planungsunterlagen.</li>
@@ -643,14 +644,14 @@
                     <h3>Nutzen für Ansparer</h3>
                     <ul style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
                         <li><strong>Klarheit über Sparlücke:</strong> Zeigt, ob Sparrate oder Rentenalter angepasst
-                            werden sollten, um eine hohe Erfolgswahrscheinlichkeit zu erreichen.</li>
+                            werden sollten, um den gewählten Zielkorridor robuster zu erreichen.</li>
                         <li><strong>Stress-Resilienz:</strong> Monte-Carlo-Simulationen machen sichtbar, wie robust
                             der Plan gegenüber Crashs oder hoher Inflation bleibt.</li>
                         <li><strong>Messbare Fortschritte:</strong> Durch jährliche Szenarienvergleiche erkennen Sie,
                             ob Sie im Soll liegen oder nachjustieren müssen.</li>
-                        <li><strong>Frühe Warnsignale:</strong> Sinkt die Erfolgswahrscheinlichkeit unter Ihren
-                            Zielkorridor, können Sie Sparraten erhöhen oder Konsumziele anpassen, solange noch viel
-                            Zeit bleibt.</li>
+                        <li><strong>Frühe Warnsignale:</strong> Verschlechtern sich Floor-Deckung, terminale Outcomes
+                            oder Kürzungs-/Entnahmekennzahlen gegenüber Ihrem Zielkorridor, können Sie Sparraten oder
+                            Konsumziele anpassen, solange noch viel Zeit bleibt.</li>
                     </ul>
                     <div class="tip-box">
                         <span class="tip-icon">💡</span>
@@ -929,12 +930,18 @@
                     </div>
                     <div class="detail-block" id="simulator-start">
                         <h3>Simulation starten</h3>
-                        <p>Klicken Sie auf <strong>"Simulation starten"</strong>. Die Engine berechnet mehrere hundert
-                            bis tausend Marktszenarien, um realistische Schwankungen abzubilden.</p>
+                        <p>Klicken Sie auf <strong>"Simulation starten"</strong>. Der Standard sind 10.000
+                            modellierte Pfade. Bis 100.000 Läufe gilt der interaktive Normalbereich; bei 100.001 bis
+                            1.000.000 Läufen zeigt die Oberfläche Run-Jahre und Speicherklasse und verlangt vor jedem
+                            Start eine ausdrückliche Bestätigung.</p>
                         <ol style="margin-left: 20px; color: var(--text-light); margin-top: 10px;">
                             <li><strong>Monte-Carlo-Läufe:</strong> Jeder Lauf erzeugt eine eigene Rendite- und
                                 Inflationssequenz, wendet Sparraten und Entnahmen an und trackt Liquidität sowie
                                 Depotwerte.</li>
+                            <li><strong>Sampling:</strong> Das gewählte Startjahr ist das erste tatsächlich simulierte
+                                Marktjahr. Fixed- und Stationary-Block setzen dort zusammenhängend fort, Markov startet
+                                im Regime dieses Jahres und IID zieht erst ab Jahr 2 unabhängig. CAPE hat Vorrang vor
+                                Filter/Recency; Konflikte und Fallbacks erscheinen in der Sampling-Diagnostik.</li>
                             <li><strong>Ruin oder Aktien/Gold ≤ 100 €:</strong> Diese Quote markiert Läufe mit
                                 <code>isRuin</code> oder einem Aktien-plus-Gold-Endbestand von höchstens 100 €.
                                 Freie Liquidität und ein verbleibender Pflegebucket zählen nicht zu dieser
@@ -946,6 +953,9 @@
                             <li><strong>Fehlerabfang:</strong> Eingaben werden validiert (keine negativen Sparraten,
                                 Ausgaben &lt;= erreichbare Einnahmen). Fehlende Pflichtfelder werden direkt im UI
                                 hervorgehoben.</li>
+                            <li><strong>Abbruch:</strong> „Monte-Carlo-Lauf abbrechen“ beendet die aktive
+                                Worker-Generation. Ein Nutzerabbruch startet keinen seriellen Ersatzlauf; ein neuer
+                                Worker-Pool entsteht erst beim nächsten ausdrücklichen Start.</li>
                         </ol>
                     </div>
                     <div class="detail-block" id="simulator-backtest">
@@ -977,11 +987,25 @@
                     </div>
                     <div class="detail-block" id="simulator-ergebnisse">
                         <h3>Ergebnisse deuten</h3>
-                        <p>Achten Sie auf die <strong>Erfolgswahrscheinlichkeit</strong> (Ziel: 90-95%+). Nutzen Sie die
-                            Heatmap des <em>Parameter Sweep</em>, um zu sehen, wie Sparrate oder späterer Ruhestand das
-                            Ergebnis verändern.</p>
+                        <p>Die Headline <strong>„Floor-Deckung im gewählten Horizont“</strong> ist eine
+                            modellinterne Quote, keine Garantie oder empirische Erfolgswahrscheinlichkeit. Sie zählt
+                            bei einem technisch fehlerfreien Batch <code>all_dead + horizon_exhausted</code> über alle
+                            angeforderten Läufe. Sobald ein <code>technical_error</code> vorkommt, werden Quote und
+                            Wilson-Intervall nicht ausgewiesen; das terminale Outcome-Inventar bleibt sichtbar.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
+                            <li><strong>Unsicherheit:</strong> Das Wilson-95-%-Intervall beschreibt nur den
+                                Stichprobenfehler des binären Monte-Carlo-Schätzers, nicht Modell-, Daten- oder
+                                Kalibrierungsrisiko. Unter 1.000 Läufen erscheint eine zusätzliche Warnung.</li>
+                            <li><strong>Terminale Outcomes:</strong> Jeder Lauf endet genau einmal als
+                                <code>ruin</code>, <code>all_dead</code>, zensiertes
+                                <code>horizon_exhausted</code> oder <code>technical_error</code>. Technische Fehler
+                                sind keine fachlich fehlgeschlagenen Finanzläufe.</li>
+                            <li><strong>Reale Depotentnahme P10:</strong> Jeder auswertbare Lauf liefert genau einen
+                                P10-Wert in realen Euro zur Preisbasis des Simulationsstarts. Nach Ruin werden weitere
+                                Dekumulationsverpflichtungen bis Tod oder Horizont mit 0 Euro aufgefüllt. Die Kennzahl
+                                ist kein Maß für den gesamten Haushaltskonsum und besitzt kein behauptetes
+                                Quantil-Konfidenzintervall.</li>
                             <li><strong>Liquiditäts-Puffer:</strong> Zeigt, wie viele Monate der Grundbedarf auch in
                                 Drawdowns gedeckt bleibt. Werte &gt;= 24 Monate gelten als komfortabel.</li>
                             <li><strong>Stress-Events:</strong> Die Ergebnis-Timeline markiert Kapitalmarktschocks und
@@ -991,13 +1015,15 @@
                                 um zu unterscheiden, ob Verbesserungen nur die Mittelwerte betreffen oder wirklich die
                                 Risikoschwänze stabilisieren.</li>
                             <li><strong>Pflege-KPIs:</strong> KPI-Karten je Person zeigen Eintrittsalter, Dauer,
-                                Kosten, simultane Pflegejahre sowie Shortfall-Deltas.</li>
+                                realen modellierten Mehrbedarf zur Preisbasis des Simulationsstarts, simultane
+                                Pflegejahre sowie nicht-kausale Gruppenmedian-Deltas. Ein Gedankenstrich bedeutet
+                                fehlende Beobachtung, nicht den beobachteten Wert 0.</li>
                         </ul>
                     </div>
                     <div class="detail-block" id="simulator-szenario-log">
                         <h3>Szenario-Log &amp; Export</h3>
-                        <p>Das Szenario-Log enthält 30 repräsentative Läufe: 15 charakteristische Pfade (Perzentile,
-                            Pflege-Extremfälle, Risiko-Szenarien) plus 15 Zufallsbeispiele. Damit sehen Sie
+                        <p>Das Szenario-Log enthält bis zu 31 repräsentative Läufe: bis zu 16 charakteristische Pfade
+                            (Perzentile, Pflege-Extremfälle, Risiko-Szenarien) plus 15 Zufallsbeispiele. Damit sehen Sie
                             „typische“ und „kritische“ Entwicklungen nebeneinander.</p>
                         <ul
                             style="list-style-type: disc; margin-left: 20px; color: var(--text-light); margin-top: 10px;">
@@ -1015,7 +1041,13 @@
                             <li><strong>Konservativer Horizont:</strong> Bei aktiven Langlebigkeitsannahmen bleibt
                                 sichtbar, ob der VPW-Horizont aus dem Basisquantil, einem relativen Puffer oder einem
                                 festen Vergleichspuffer stammt.</li>
-                            <li><strong>Export:</strong> Einzelne Szenarien lassen sich als JSON oder CSV sichern.</li>
+                            <li><strong>Vollständiges MC-Ergebnis:</strong> Nach einem fachlich oder technisch
+                                abgeschlossenen Batch speichert „Vollständiges MC-Ergebnis (JSON)“ den versionierten
+                                Request-/Result-/Provenienzvertrag mit Seed, Sampling, Outcomes, KPIs, Missingness,
+                                Worker-/Chunk-, App-, Engine-, Snapshot- und Datenstand. Der Export entsteht erst nach
+                                dem Klick und enthält die Finanzannahmen des aktuellen Szenarios.</li>
+                            <li><strong>Szenario-Export:</strong> JSON/CSV eines ausgewählten Szenario-Logs bleibt ein
+                                eigener, kleinerer Export und ersetzt den vollständigen Laufvertrag nicht.</li>
                         </ul>
                     </div>
                     <div class="detail-block" id="simulator-sweep">
@@ -1031,7 +1063,7 @@
                             <li><strong>Szenario-Speicher:</strong> Speichern Sie interessante Konfigurationen als
                                 benannte Szenarien, um sie später in der Balance-App gegenzuprüfen.</li>
                             <li><strong>Optimierer:</strong> Aktivieren Sie den eingebauten Optimierer, um Sparrate oder
-                                Aktienquote automatisch auf ein Ziel (z.B. 92% Erfolgswahrscheinlichkeit) einzustellen.
+                                Aktienquote automatisch auf eine modellinterne Floor-Deckungs-Schwelle einzustellen.
                             </li>
                             <li><strong>Auto-Optimize-Details:</strong> Der Optimierer arbeitet in drei Stufen
                                 (Grob/Raffiniert/Verifikation) und gibt eine Champion-Konfiguration als Vorlage aus.</li>
@@ -1059,11 +1091,11 @@
                                 Inflationsband und senken Sie die Aktienquote leicht; prüfen Sie, ob die Liquidität in
                                 den ersten fünf Ruhestandsjahren stabil bleibt.</li>
                             <li><strong>„Reicht meine Sparrate?“</strong> Nutzen Sie den Sweep mit 50-€-Schritten. Ein
-                                Plateau bei 90%+ Erfolgswahrscheinlichkeit zeigt, dass weitere Erhöhungen wenig
-                                zusätzlichen Nutzen bringen.</li>
+                                Plateau bei Floor-Deckung und Risikokennzahlen zeigt, dass weitere Erhöhungen im
+                                untersuchten Modellraum wenig zusätzlichen Nutzen bringen.</li>
                             <li><strong>„Wie robust ist mein Entnahmeplan?“</strong> Simulieren Sie reduzierte flexible
-                                Ausgaben und vergleichen Sie die Erfolgswahrscheinlichkeit. Eine geringe Differenz
-                                deutet auf stabile Guardrails hin.</li>
+                                Ausgaben und vergleichen Sie Floor-Deckung, Outcomes, Kürzungsanteil und reale
+                                Depotentnahme. Eine geringe Differenz allein ist noch kein externer Robustheitsnachweis.</li>
                         </ul>
                     </div>
                 </div>
@@ -1487,8 +1519,8 @@
                         aktualisieren und Ergebnisse protokollieren.</li>
                     <li><strong>Datenquellen einfrieren:</strong> Für Vergleiche dasselbe Inflations- und Kursdatum
                         verwenden; danach Export mit Zeitstempel ablegen.</li>
-                    <li><strong>Delta-Review:</strong> Änderungen bei Vermögen, Bedarf und Erfolgswahrscheinlichkeit
-                        gegenüber Vorjahr notieren; große Abweichungen kommentieren.</li>
+                    <li><strong>Delta-Review:</strong> Änderungen bei Vermögen, Bedarf, Floor-Deckung, Outcomes und
+                        Kürzungs-/Entnahmekennzahlen gegenüber dem Vorjahr notieren; große Abweichungen kommentieren.</li>
                     <li><strong>Handlungsschritte prüfen:</strong> Rebalancing und Runway-Anpassungen sofort
                         terminieren, damit der Plan nicht liegen bleibt.</li>
                     <li><strong>Risiko-Parameter bestätigen:</strong> Ziel-Aktienquote, CAPE-Grenzen und Runway-Minimum
@@ -1622,13 +1654,11 @@
                 <h2>Glossar</h2>
                 <dl class="term-list">
                     <dt><a class="toc-link" data-tab-target="manual"
-                            href="#simulator-ergebnisse">Erfolgswahrscheinlichkeit</a></dt>
-                    <dd>Prozent der <strong>simulierten Lebensläufe</strong>, in denen Ihr Portfolio bis zum Ende der
-                        geplanten
-                        Laufzeit finanzierbar bleibt. Beispiel: <em>93% bei 1.000 Läufen</em> bedeutet, dass 930 Pfade
-                        nicht
-                        vorzeitig scheitern. In der Simulator-Ausgabe sehen Sie den Wert oberhalb der
-                        Ergebnis-Grafik.</dd>
+                            href="#simulator-ergebnisse">Floor-Deckung im gewählten Horizont</a></dt>
+                    <dd>Modellinterner Anteil von <code>all_dead + horizon_exhausted</code> an allen angeforderten
+                        Läufen eines technisch fehlerfreien Batches. <code>horizon_exhausted</code> bleibt zensiert;
+                        die Kennzahl ist weder Garantie noch empirische Erfolgswahrscheinlichkeit. Bei einem
+                        <code>technical_error</code> werden Quote und Wilson-Intervall nicht ausgewiesen.</dd>
 
                     <dt><a class="toc-link" data-tab-target="manual" href="#balance-diagnose">Runway</a></dt>
                     <dd>Monatspuffer aus Cash/Geldmarkt, der Entnahmen in schwachen Märkten abfedert. Beispiel:
@@ -1652,10 +1682,8 @@ Ausgabe-Konto erhält Monatsbedarf aus Geldmarkt</pre>
                     <dt><a class="toc-link" data-tab-target="manual" href="#simulator-ergebnisse">Parameter Sweep</a>
                     </dt>
                     <dd>Heatmap, die zeigt, wie Kombinationen aus Sparrate und Rentenbeginn die
-                        Erfolgswahrscheinlichkeit beeinflussen. Beispiel: Dunkelgrüne Felder markieren hohe
-                        Erfolgswerte bei <em>+200 € Sparrate</em> und <em>Rente ab 66</em>. Öffnen Sie den Sweep unter
-                        den
-                        Simulator-Ergebnissen.</dd>
+                        modellinterne Floor-Deckung und weitere Zielmetriken beeinflussen. Die Felder sind eine
+                        Sensitivitätsansicht im gewählten Modellraum, keine empirischen Wahrscheinlichkeiten.</dd>
 
                     <dt><a class="toc-link" data-tab-target="manual" href="#simulator-backtest">Backtesting</a></dt>
                     <dd>Historische In-sample-Diagnose: Die Strategie wird ab einem gewählten Startjahr durch die
@@ -1663,8 +1691,8 @@ Ausgabe-Konto erhält Monatsbedarf aus Geldmarkt</pre>
                         Monte-Carlo-Ergebnisse um konkrete Pfade, ohne Zukunftseignung zu behaupten.</dd>
 
                     <dt><a class="toc-link" data-tab-target="manual" href="#simulator-szenario-log">Szenario-Log</a></dt>
-                    <dd>Auswahl von 30 repräsentativen Simulationen (Perzentile, Pflege-Extremfälle, Risiko- und
-                        Zufallsszenarien) inkl. Exportfunktion.</dd>
+                    <dd>Auswahl von bis zu 31 repräsentativen Simulationen (Perzentile, Pflege-Extremfälle, Risiko-
+                        und Zufallsszenarien) mit getrenntem JSON/CSV-Szenarioexport.</dd>
 
                     <dt><a class="toc-link" data-tab-target="manual" href="#balance-jahresupdate">Floor/Flex-Bedarf</a>
                     </dt>

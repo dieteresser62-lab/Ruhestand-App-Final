@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 128 entdeckte Testdateien, davon 127 im Node-Gate ausgefuehrt, mit 6.862 von 6.863 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (im Slice-11-Gate mit `npm test` am 2026-07-22 verifiziert). Die einzige rote Assertion ist das vorbestehende Architektur-Evidenzgate mit sechs Links auf zwei fehlende Forschungsdokumente. `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand mit 15/15 Einstiegspunkt-/Zusatzflows, darunter vier isolierte Monte-Carlo-Browserfaelle.
+**Test-Statistik:** 129 entdeckte Testdateien, davon 128 im Node-Gate ausgefuehrt, mit 7.300 von 7.300 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (im Slice-12-Abschlussgate mit `npm test` am 2026-07-22 verifiziert). Das zuvor rote Architektur-Evidenzgate ist nach Korrektur der lokalen Forschungsdokument-Links ebenfalls gruen. `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand mit 15/15 Einstiegspunkt-/Zusatzflows, darunter vier isolierte Monte-Carlo-Browserfaelle.
 
 Die Zahl beschreibt nur die Node-Standardsuite. `npm run test:browser`, `npm run test:coverage` und ein echter Tauri-Build sind getrennte Gates und in den Assertions nicht enthalten.
 
@@ -50,7 +50,14 @@ Jede tatsaechlich ausgefuehrte Datei muss mindestens eine gezaehlte Assertion li
 npm run test:coverage
 ```
 
-Der Coverage-Runner loescht `.coverage/`, startet die Standardsuite mit `NODE_V8_COVERAGE` und schreibt bei gruener Standardsuite `.coverage/summary.json`. Der Report wertet Projektdateien unter `app/`, `engine/`, `workers/` und `types/` aus. Wegen des bekannten fremden Architektur-Linkfehlers endet `npm run test:coverage` derzeit nach dem Testlauf rot; `node tests/coverage-report.mjs` kann die trotzdem erzeugten V8-Daten auswerten. Die Slice-11-Messung liegt bei 76,12% approximativer Zeilencoverage (32.481/42.668 ausfuehrbare Zeilen in 206 Dateien), 0,07 Prozentpunkte ueber Slice 10. Playwright-Ausfuehrung fliesst nicht in diese Node-V8-Zahl ein. Coverage bleibt ein Transparenz- und Review-Gate, keine Wirksamkeits- oder Eignungsaussage.
+Der Coverage-Runner loescht `.coverage/`, startet die Standardsuite mit `NODE_V8_COVERAGE` und schreibt bei gruener Standardsuite `.coverage/summary.json`. Der Report wertet Projektdateien unter `app/`, `engine/`, `workers/` und `types/` aus. Die Slice-12-Messung liegt bei 76,46% approximativer Coverage aus ausfuehrbaren V8-Zeilenbereichen (32.625/42.668 Zeilen in 206 Dateien), 0,34 Prozentpunkte ueber Slice 11. `npm run test:coverage` erzwingt zusaetzlich ein 50-Prozent-Dateigate fuer `worker-job-runner.js` und `results-renderers.js`; ein fehlender Inventareintrag oder eine Unterschreitung beendet den Lauf rot. Playwright-Ausfuehrung fliesst nicht in diese Node-V8-Zahl ein. Coverage bleibt ein Transparenz- und Review-Gate, keine Wirksamkeits- oder Eignungsaussage und insbesondere keine echte JavaScript-Statement-Metrik.
+
+Monte-Carlo-Abschlussgate in Slice 12:
+
+| Modul | Zeilen | Coverage |
+| --- | ---: | ---: |
+| `worker-job-runner.js` | 147/217 | 67,74% |
+| `results-renderers.js` | 117/117 | 100,00% |
 
 Backtest-Kernmodule im Slice-10-Abschlussgate:
 
@@ -817,7 +824,8 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `core-negative-contracts.test.mjs` | ~130 | Negative Kern-Contracts fuer Stop-Regel-nahe Fehlerpfade |
 | `core-tax-settlement.test.mjs` | ~70 | Core Settlement-Integration |
 | `coverage-inventory.test.mjs` | ~120 | Coverage-Inventar, Modulklassifikation und ungeladene/runtime-geladene Dateien |
-| `coverage-report.test.mjs` | ~190 | V8-Coverage-Report, Pfadnormalisierung und Leerreport-Fehlerverhalten |
+| `coverage-report.test.mjs` | ~220 | V8-Coverage-Report, Pfadnormalisierung, Leerreport und obligatorische Dateigates |
+| `results-renderers.test.mjs` | ~620 | DOM-freie Ergebnisrenderer fuer Outcome, KPIs, Unsicherheit, Pflege, Sampling, Missingness und Fehlerpfade |
 | `depot-tranches.test.mjs` | ~130 | FIFO-Verkäufe, Steuer |
 | `dynamic-flex-horizon.test.mjs` | ~40 | Sterbetafel-Horizonte, Single/Joint, Mean/Quantil |
 | `engine-robustness.test.mjs` | ~240 | Edge Cases, Fehlereingaben |

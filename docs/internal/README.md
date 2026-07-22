@@ -6,12 +6,10 @@ Aktive interne Uebersichten:
 
 - `PROJEKTUEBERSICHT.md` - detaillierte technische und organisatorische Projektuebersicht.
 - `SLICE_EXECUTION_RULES.md` - verbindlicher Review-, Branch-, Risiko- und Abnahmeprozess fuer Slices.
-- `SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md` - technische Ist-/Soll-Analyse des Simulator-/Monte-Carlo-Bereichs mit den Findings MC-01 bis MC-19; Revision nach blockiertem Gemini-/Claude-Review.
-- `SIMULATOR_MONTE_CARLO_HARDENING_PLAN.md` - aus der GAP-Analyse abgeleiteter, noch nicht freigegebener Arbeitsplan mit zwoelf 1-basierten Slices fuer Messvertraege, KPIs, Sampling, Outcomes, Exporte, Worker-Lifecycle, UI und E2E-Nachweise.
-- `FORSCHUNGSVALIDIERUNGS_BACKLOG.md` - priorisierte offene FR-/FQ-Folgevorhaben mit Nachweis- und Freigabegates.
-- `SIMULATOR_BACKTEST_GAP_ANALYSE.md` - reviewte Ist-/Soll-Bestandsaufnahme mit BT-01 bis BT-20 und Abschlussmatrix nach Slices 01-10.
-- `SIMULATOR_BACKTEST_HARDENING_PLAN.md` - freigegebener Arbeitsplan mit zehn 1-basierten Slices und Ausfuehrungs-DAG fuer Runner-, Daten-, Shared-Outcome-, Metrik-, Export-, UI-, Forschungs- und Integrationsgates; Slice 10 ist implementiert und wartet auf Review.
-- `SIMULATOR_BACKTEST_FORSCHUNGSPROTOKOLL.md` - operationalisierte FQ-/FV-Gates, Ownerrollen, Daten-/Kosten-/Trial-/Holdout-Grenzen und zulaessige Aussageformen ohne Forschungsfreigabe.
+- `SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md` - technische Ist-/Soll-Analyse des Simulator-/Monte-Carlo-Bereichs mit den Findings MC-01 bis MC-19 und der Slice-12-Abschlussmatrix.
+- `SIMULATOR_MONTE_CARLO_HARDENING_PLAN.md` - implementierter Arbeitsplan mit zwoelf 1-basierten Slices fuer Messvertraege, KPIs, Sampling, Outcomes, Exporte, Worker-Lifecycle, UI, E2E und Integrationsnachweis; externe Abschlussfreigabe steht aus.
+- Der weiterhin offene Forschungsvalidierungs-Backlog liegt unter `archive/FORSCHUNGSVALIDIERUNGS_BACKLOG.md`; sein Archivstatus ist keine fachliche Freigabe.
+- Backtest-GAP-Analyse, Hardening-Plan und Forschungsprotokoll liegen unter `archive/2026-simulator-backtest-hardening/`.
 - Die oeffentliche Abschlussreferenz des abgeschlossenen Tranchen-Arbeitsplans liegt unter `../reference/TRANCHEN_MODULES_README.md`; die Nutzeranleitung unter `../guides/MULTI-TRANCHEN-ANLEITUNG.md`.
 
 Abgeschlossene Umsetzungen und fruehere Arbeitsplaene liegen im Archiv.

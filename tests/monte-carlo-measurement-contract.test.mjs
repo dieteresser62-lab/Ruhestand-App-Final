@@ -16,6 +16,17 @@ import {
     mergeMonteCarloChunkResultV1
 } from '../app/simulator/monte-carlo-chunk-result.js';
 import {
+    MONTE_CARLO_LEGACY_READ_ALIASES,
+    MONTE_CARLO_RUN_REQUEST_VERSION,
+    MONTE_CARLO_RUN_RESULT_VERSION,
+    MONTE_CARLO_SCENARIO_VERSION,
+    MONTE_CARLO_SNAPSHOT_POLICY
+} from '../app/simulator/monte-carlo-contracts.js';
+import {
+    MONTE_CARLO_PARAMETER_LIMITS,
+    MONTE_CARLO_PARAMETERS_VERSION
+} from '../app/simulator/monte-carlo-parameters.js';
+import {
     compileScenario,
     getDataVersion
 } from '../app/simulator/simulator-engine-helpers.js';
@@ -40,6 +51,7 @@ const postSlice04 = readFixture('post-slice-04-v1.json');
 const postSlice05 = readFixture('post-slice-05-v1.json');
 const postSlice06 = readFixture('post-slice-06-v1.json');
 const postSlice07 = readFixture('post-slice-07-v1.json');
+const finalCandidate = readFixture('monte-carlo-v1-final.json');
 const benchmarkContract = readFixture('benchmark-contract-v1.json');
 const benchmarkResults = readFixture('benchmark-results-2026-07-22.json');
 const consumerInventory = readFixture('consumer-inventory-v1.json');
@@ -460,6 +472,70 @@ function careKpiSnapshotProjection() {
     return canonicalize(aggregate.extraKPI.pflege);
 }
 
+function finalCandidateSnapshotProjection(result) {
+    const bufferBytes = Object.values(result.buffers).reduce((sum, buffer) => sum + buffer.byteLength, 0);
+    const samplingDiagnostics = result.samplingDiagnostics;
+    return canonicalize({
+        contracts: {
+            parameters: MONTE_CARLO_PARAMETERS_VERSION,
+            runRequest: MONTE_CARLO_RUN_REQUEST_VERSION,
+            runResult: MONTE_CARLO_RUN_RESULT_VERSION,
+            scenario: MONTE_CARLO_SCENARIO_VERSION,
+            snapshotPolicy: MONTE_CARLO_SNAPSHOT_POLICY
+        },
+        resourceContract: {
+            runs: MONTE_CARLO_PARAMETER_LIMITS.runs,
+            durationYears: MONTE_CARLO_PARAMETER_LIMITS.durationYears,
+            blockLengthYears: MONTE_CARLO_PARAMETER_LIMITS.blockLengthYears,
+            workerCount: MONTE_CARLO_PARAMETER_LIMITS.workerCount,
+            jobTimeBudgetMs: MONTE_CARLO_PARAMETER_LIMITS.jobTimeBudgetMs,
+            measuredWorkerResultBytesPerRun: MONTE_CARLO_PARAMETER_LIMITS.measuredWorkerResultBytesPerRun
+        },
+        compatibility: {
+            deprecatedReadAliases: MONTE_CARLO_LEGACY_READ_ALIASES
+        },
+        execution: {
+            workerConfiguration: preHardening.metadata.workerConfiguration,
+            chunkPolicy: preHardening.metadata.chunkPolicy
+        },
+        result: {
+            bufferBytesPerRun: bufferBytes / result.totalRuns,
+            pathSummaries: {
+                outcomeCode: result.pathSummaries.outcomeCode,
+                volatilityPct: result.pathSummaries.volatilityPct,
+                maxDrawdownPct: result.pathSummaries.maxDrawdownPct,
+                cutYearShareRatio: result.pathSummaries.cutYearShareRatio,
+                realWithdrawalP10RealEur: result.pathSummaries.realWithdrawalP10RealEur
+            },
+            pathMissingness: {
+                cutYearShareRatio: result.pathMissingness.cutYearShareRatio,
+                realWithdrawalP10RealEur: result.pathMissingness.realWithdrawalP10RealEur
+            },
+            outcomeInventory: result.aggregates.outcomeInventory,
+            riskKpis: {
+                volatilityPct: result.aggregates.volatilities,
+                maximumDrawdownPct: result.aggregates.maxDrawdowns,
+                cutYearSharePct: result.aggregates.cutYearSharePct
+            },
+            realWithdrawalP10: result.aggregates.realWithdrawalP10,
+            careKpis: careKpiSnapshotProjection(),
+            samplingDiagnostics: {
+                schemaVersion: samplingDiagnostics.schemaVersion,
+                contract: samplingDiagnostics.contract,
+                dataVersion: samplingDiagnostics.dataVersion,
+                requestedRuns: samplingDiagnostics.requestedRuns,
+                sampledYears: samplingDiagnostics.sampledYears,
+                initialStartYearCounts: samplingDiagnostics.initialStartYearCounts,
+                sourceCounts: samplingDiagnostics.sourceCounts,
+                regimeCounts: samplingDiagnostics.regimeCounts,
+                stationaryRestartCounts: samplingDiagnostics.stationaryRestartCounts,
+                tailRisk: samplingDiagnostics.tailRisk
+            },
+            technicalInventory: result.technicalInventory
+        }
+    });
+}
+
 function resolveTolerance(pathName, sameRuntime, toleranceContract) {
     if (sameRuntime) return toleranceContract.sameRuntime.defaultAbsolute;
     let tolerance = toleranceContract.crossRuntime.defaultAbsolute;
@@ -863,6 +939,18 @@ function computeKpiDelta(low, high) {
     }
     assertEqual(postSlice07.sourceReference, 'post-slice-06-v1', 'Post-Slice-07 snapshot must reference the prior slice snapshot');
     assertEqual(postSlice07.reviewStatus, 'pending', 'Codex must not mark its own Post-Slice-07 snapshot as reviewed');
+    const slice12Entries = deltaLedger.entries.filter(entry => entry.sliceId === '12');
+    assertEqual(slice12Entries.length, 1, 'Slice 12 must ledger the integrated final candidate separately');
+    for (const field of deltaLedger.requiredEntryFields) {
+        assert(Object.prototype.hasOwnProperty.call(slice12Entries[0], field), `Slice 12 delta entry must contain ${field}`);
+    }
+    assertEqual(slice12Entries[0].sourceReference, 'post-slice-07-v1', 'Final integration ledger must retain the latest semantic source reference');
+    assertEqual(slice12Entries[0].targetReference, 'monte-carlo-v1-final', 'Final integration ledger must target the separate candidate');
+    assertEqual(finalCandidate.snapshotId, 'monte-carlo-v1-final', 'Final candidate must use the policy identifier');
+    assertEqual(finalCandidate.reviewStatus, 'candidate_pending_external_review', 'Codex must not approve the final candidate');
+    assertEqual(finalCandidate.sourceReferences[0], 'pre-hardening-v1', 'Final candidate must retain the immutable baseline lineage');
+    assert(finalCandidate.sourceReferences.includes('post-slice-07-v1'), 'Final candidate must retain the latest semantic reference lineage');
+    assertEqual(finalCandidate.goldenCaseIds.length, goldenFixture.cases.length, 'Final candidate must cover every approved golden-case family');
 }
 
 // Contract 8: every planned rename has producers, consumers, tests and a migration note.
@@ -899,6 +987,28 @@ function computeKpiDelta(low, high) {
     assert(new Set(benchmarkContract.convergenceCases.map(entry => entry.scenarioId)).size >= 3, 'Convergence cases must use several fixed scenarios');
 }
 
+// Contract 9a: time-boxed V1 KPI aliases are absent from productive readers.
+{
+    assertEqual(MONTE_CARLO_LEGACY_READ_ALIASES.length, 0, 'Public V1 legacy read-alias registry must remain empty after Slice 11');
+    const removedAliases = ['kpiKuerzungsjahre', 'consumptionAtRiskP10Real'];
+    const productiveReaders = [
+        'app/simulator/results-metrics.js',
+        'app/simulator/simulator-results.js',
+        'app/simulator/simulator-monte-carlo.js',
+        'app/simulator/monte-carlo-contracts.js',
+        'app/simulator/monte-carlo-export.js',
+        'app/simulator/auto-optimize-evaluate.js',
+        'app/simulator/auto-optimize-metrics.js',
+        'app/simulator/auto-optimize-renderer.js'
+    ];
+    for (const relativePath of productiveReaders) {
+        const source = fs.readFileSync(path.join(__dirname, '..', relativePath), 'utf8');
+        for (const alias of removedAliases) {
+            assert(!source.includes(`.${alias}`) && !source.includes(`[\"${alias}\"]`) && !source.includes(`['${alias}']`), `${relativePath} must not consume removed alias ${alias}`);
+        }
+    }
+}
+
 // Contract 10: the fixed worker snapshot uses the same runner fixture as direct execution.
 const fixedWorkerResult = await runWorkerLayout(
     preHardening.runnerCase,
@@ -928,6 +1038,11 @@ if (process.env.MC_PRINT_SLICE_07 === '1') {
     console.log(JSON.stringify({ dataVersion: actualDataVersion, result: actualSlice07Result }, null, 2));
     console.log('__POST_SLICE_07_CAPTURE_END__');
 }
+if (process.env.MC_PRINT_FINAL === '1') {
+    console.log('__MONTE_CARLO_V1_FINAL_CAPTURE_START__');
+    console.log(JSON.stringify({ dataVersion: actualDataVersion, result: finalCandidateSnapshotProjection(fixedWorkerResult) }, null, 2));
+    console.log('__MONTE_CARLO_V1_FINAL_CAPTURE_END__');
+}
 assertJsonEqual(actualDataVersion, postSlice03.metadata.dataVersion, 'Post-Slice-03 data version must match');
 assert(preHardening.result !== null, 'Immutable pre-hardening result must remain captured');
 assertEqual(preHardening.result.bufferBytesPerRun, 63, 'Immutable pre-hardening buffer evidence must remain unchanged');
@@ -948,6 +1063,18 @@ compareSnapshotNode(
     'result',
     sameRuntime,
     postSlice07.metadata.numericTolerance
+);
+assertJsonEqual(actualDataVersion, finalCandidate.metadata.dataVersion, 'Final candidate data version must match');
+assertEqual(MONTE_CARLO_SNAPSHOT_POLICY.finalCandidate, finalCandidate.snapshotId, 'Public snapshot policy must name the integrated final candidate');
+const sameRuntimeFinal = process.version === finalCandidate.metadata.runtime.version
+    && process.platform === finalCandidate.metadata.runtime.platform
+    && process.arch === finalCandidate.metadata.runtime.architecture;
+compareSnapshotNode(
+    finalCandidateSnapshotProjection(fixedWorkerResult),
+    finalCandidate.result,
+    'finalCandidate.result',
+    sameRuntimeFinal,
+    finalCandidate.metadata.numericTolerance
 );
 
 const directChunk = await runMonteCarloChunk({

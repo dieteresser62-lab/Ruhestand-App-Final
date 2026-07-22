@@ -12,6 +12,11 @@ const defaultSummaryPath = path.join(defaultRepoRoot, '.coverage', 'summary.json
 const includeRoots = ['app', 'engine', 'workers', 'types'];
 const includeExt = new Set(['.js', '.mjs', '.cjs']);
 
+export const REQUIRED_COVERAGE_FILE_GATES = Object.freeze([
+    Object.freeze({ file: 'app/simulator/worker-job-runner.js', minimumPct: 50 }),
+    Object.freeze({ file: 'app/simulator/results-renderers.js', minimumPct: 50 })
+]);
+
 function isInside(base, target) {
     const rel = path.relative(base, target);
     return rel && !rel.startsWith('..') && !path.isAbsolute(rel);
@@ -336,6 +341,38 @@ export function buildCoverageSummary({ repoRoot, coverageDir, summaryPath } = ge
     return { files, summary, summaryPath, repoRoot };
 }
 
+export function validateCoverageFileGates(
+    summary,
+    gates = REQUIRED_COVERAGE_FILE_GATES
+) {
+    const files = Array.isArray(summary?.files) ? summary.files : [];
+    const byFile = new Map(files.map(entry => [entry.file, entry]));
+    const failures = [];
+
+    for (const gate of gates) {
+        const entry = byFile.get(gate.file);
+        if (!entry) {
+            failures.push(`${gate.file}: missing from coverage summary`);
+            continue;
+        }
+        if (!Number.isFinite(entry.coveragePct)) {
+            failures.push(`${gate.file}: coverage is not measurable`);
+            continue;
+        }
+        if (entry.coveragePct < gate.minimumPct) {
+            failures.push(
+                `${gate.file}: ${entry.coveragePct.toFixed(2)}% is below ${gate.minimumPct.toFixed(2)}%`
+            );
+        }
+    }
+
+    return {
+        ok: failures.length === 0,
+        metric: 'approximate executable-line coverage from V8 ranges',
+        failures
+    };
+}
+
 function writeSummary({ files, summary, summaryPath, repoRoot }) {
     fs.mkdirSync(path.dirname(summaryPath), { recursive: true });
     fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
@@ -354,7 +391,17 @@ function writeSummary({ files, summary, summaryPath, repoRoot }) {
 }
 
 export function main() {
-    writeSummary(buildCoverageSummary());
+    const report = buildCoverageSummary();
+    writeSummary(report);
+    if (process.env.COVERAGE_ENFORCE_GATES === '1') {
+        const gateResult = validateCoverageFileGates(report.summary);
+        if (!gateResult.ok) {
+            throw new Error(`Required file coverage gate failed (${gateResult.metric}): ${gateResult.failures.join('; ')}`);
+        }
+        console.log(
+            `Required file coverage gates passed: ${REQUIRED_COVERAGE_FILE_GATES.map(gate => `${gate.file} >= ${gate.minimumPct}%`).join('; ')}`
+        );
+    }
 }
 
 const isMain = process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;

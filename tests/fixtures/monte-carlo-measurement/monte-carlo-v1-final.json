@@ -1,0 +1,349 @@
+{
+  "schemaVersion": "monte-carlo-final-candidate-v1",
+  "snapshotId": "monte-carlo-v1-final",
+  "sliceId": "12",
+  "reviewStatus": "candidate_pending_external_review",
+  "capturedAtUtc": "2026-07-22T00:00:00.000Z",
+  "sourceReferences": [
+    "pre-hardening-v1",
+    "post-slice-03-v1",
+    "post-slice-04-v1",
+    "post-slice-05-v1",
+    "post-slice-06-v1",
+    "post-slice-07-v1"
+  ],
+  "goldenCaseIds": [
+    "GC-RISK-01",
+    "GC-CUT-01",
+    "GC-CARE-01",
+    "GC-OUTCOME-01",
+    "GC-SAMPLING-01",
+    "GC-CAR-01"
+  ],
+  "metadata": {
+    "seed": 20260722,
+    "dataVersion": {
+      "annualDataHash": "614993a3",
+      "regimeHash": "50aa7f99"
+    },
+    "runtime": {
+      "kind": "node",
+      "version": "v25.2.1",
+      "platform": "win32",
+      "architecture": "x64"
+    },
+    "numericTolerance": {
+      "sameRuntime": { "defaultAbsolute": 0 },
+      "crossRuntime": { "defaultAbsolute": 0, "fields": [] }
+    }
+  },
+  "result": {
+    "contracts": {
+      "parameters": "MonteCarloParametersV1",
+      "runRequest": "MonteCarloRunRequestV1",
+      "runResult": "MonteCarloRunResultV1",
+      "scenario": "MonteCarloScenarioV1",
+      "snapshotPolicy": {
+        "schemaVersion": "MonteCarloSnapshotPolicyV1",
+        "immutableBaseline": "pre-hardening-v1",
+        "currentReference": "post-slice-07-v1",
+        "deltaLedger": "delta-ledger-v1",
+        "finalCandidate": "monte-carlo-v1-final",
+        "policy": "immutable-baseline-with-versioned-post-slice-references"
+      }
+    },
+    "resourceContract": {
+      "runs": {
+        "minimum": 1,
+        "default": 10000,
+        "interactiveRecommendedMaximum": 100000,
+        "hardMaximum": 1000000
+      },
+      "durationYears": {
+        "minimum": 1,
+        "default": 35,
+        "mortalityTableMaximumAge": 110,
+        "storageMaximum": 4294967295
+      },
+      "blockLengthYears": {
+        "minimum": 1,
+        "default": 5,
+        "maximum": 30
+      },
+      "workerCount": {
+        "autoSentinel": 0,
+        "minimumExplicit": 1,
+        "default": 8,
+        "maximum": 32
+      },
+      "jobTimeBudgetMs": {
+        "minimum": 50,
+        "default": 500,
+        "maximum": 5000
+      },
+      "measuredWorkerResultBytesPerRun": 419
+    },
+    "compatibility": {
+      "deprecatedReadAliases": []
+    },
+    "execution": {
+      "workerConfiguration": {
+        "workerCount": 4,
+        "jobTimeBudgetMs": 500
+      },
+      "chunkPolicy": {
+        "id": "fixed-contiguous-pre-hardening-v1",
+        "ranges": [
+          { "start": 0, "count": 2 },
+          { "start": 2, "count": 2 },
+          { "start": 4, "count": 2 },
+          { "start": 6, "count": 2 }
+        ]
+      }
+    },
+    "result": {
+      "bufferBytesPerRun": 93,
+      "pathSummaries": {
+        "outcomeCode": [2, 3, 3, 3, 3, 3, 3, 2],
+        "volatilityPct": [
+          29.05327033996582,
+          16.171361923217773,
+          17.69449234008789,
+          18.103626251220703,
+          17.069656372070312,
+          19.137372970581055,
+          23.32069206237793,
+          27.17749786376953
+        ],
+        "maxDrawdownPct": [
+          67.67330932617188,
+          40.54719924926758,
+          42.43539047241211,
+          54.51436233520508,
+          9.192154884338379,
+          20.584917068481445,
+          64.06470489501953,
+          81.19022369384766
+        ],
+        "cutYearShareRatio": [
+          1,
+          1,
+          1,
+          0.8333333134651184,
+          0.9166666865348816,
+          1,
+          0.9166666865348816,
+          1
+        ],
+        "realWithdrawalP10RealEur": [
+          30340.708360201734,
+          32762.03501743999,
+          29755.141710791806,
+          30106.100266858655,
+          33027.35846061342,
+          33718.09443483799,
+          29176.25689049641,
+          31159.35300922975
+        ]
+      },
+      "pathMissingness": {
+        "cutYearShareRatio": [1, 1, 1, 1, 1, 1, 1, 1],
+        "realWithdrawalP10RealEur": [1, 1, 1, 1, 1, 1, 1, 1]
+      },
+      "outcomeInventory": {
+        "schemaVersion": "MonteCarloOutcomeInventoryV1",
+        "requestedRuns": 8,
+        "ruin": 0,
+        "all_dead": 2,
+        "horizon_exhausted": 6,
+        "technical_error": 0,
+        "inventorySum": 8,
+        "floorCoveredCount": 8,
+        "floorCoverageRatio": 1,
+        "floorCoveragePct": 100,
+        "floorCoverageEstimate": {
+          "estimator": "binomial_proportion",
+          "numerator": 8,
+          "denominator": 8,
+          "sampleSize": 8,
+          "estimateRatio": 1,
+          "estimatePct": 100,
+          "confidenceInterval95": {
+            "method": "wilson_score",
+            "confidenceLevel": 0.95,
+            "lowerRatio": 0.6755924351161198,
+            "upperRatio": 1,
+            "lowerPct": 67.55924351161198,
+            "upperPct": 100
+          },
+          "uncertaintyWarning": {
+            "code": "small_sample",
+            "thresholdRuns": 1000,
+            "message": "Nur 8 Laeufe: Das Intervall ist breit und der Punktschaetzer nicht hochpraezise."
+          },
+          "interpretation": "Das Intervall quantifiziert Simulationsfehler des binaeren Schaetzers, nicht Modellrisiko."
+        },
+        "floorCoverageMissingnessReason": null
+      },
+      "riskKpis": {
+        "volatilityPct": { "p50": 18.62049961090088 },
+        "maximumDrawdownPct": {
+          "p50": 48.474876403808594,
+          "p90": 71.7283836364746
+        },
+        "cutYearSharePct": {
+          "p50": 100,
+          "sampleSize": 8,
+          "excludedRuns": 0,
+          "thresholdPct": 10,
+          "numerator": "completed_decumulation_years_with_cut_gte_10_pct",
+          "denominator": "completed_decumulation_years_with_finite_cut_decision"
+        }
+      },
+      "realWithdrawalP10": {
+        "realEur": 29581.476264703186,
+        "p50RealEur": 30750.03068471574,
+        "sampleSize": 8,
+        "excludedRuns": 0,
+        "missingness": {
+          "no_observations": 0,
+          "died_before_first_obligation": 0,
+          "technical_error": 0,
+          "not_applicable": 0
+        },
+        "unit": "real_eur_at_simulation_start_prices",
+        "perRunStatistic": "p10",
+        "uncertainty": {
+          "confidenceInterval": null,
+          "reason": "quantile_confidence_interval_not_estimated"
+        }
+      },
+      "careKpis": {
+        "p1": {
+          "entryRatePct": 50,
+          "entryRateNumerator": 2,
+          "entryRateDenominator": 4,
+          "entryAgeP50": 75,
+          "careYearsP50": 2.5,
+          "realCostEurP50": 10000,
+          "sampleSize": 2,
+          "missingness": null
+        },
+        "p2": {
+          "entryRatePct": 25,
+          "entryRateNumerator": 1,
+          "entryRateDenominator": 4,
+          "entryAgeP50": 80,
+          "careYearsP50": 1,
+          "realCostEurP50": 6000,
+          "sampleSize": 1,
+          "missingness": null
+        },
+        "household": {
+          "entryRatePct": 50,
+          "entryRateNumerator": 2,
+          "entryRateDenominator": 4,
+          "careYearsOverlapP50": 0.5,
+          "totalAdditionalNeedRealEurP50": 13000,
+          "maxAnnualAdditionalNeedRealEurP50": 13000,
+          "endWealthWithCareRealEurP50": 650000,
+          "endWealthNoCareRealEurP50": 950000,
+          "shortfallRateWithCarePct": 0,
+          "shortfallRateWithoutCarePct": 0,
+          "sampleSize": 2,
+          "noCareSampleSize": 2,
+          "missingness": null
+        },
+        "comparison": {
+          "endWealthNoCareMinusCareRealEur": 300000,
+          "method": "unpaired_group_median_difference",
+          "withCareSampleSize": 2,
+          "noCareSampleSize": 2,
+          "missingness": null
+        },
+        "unitContract": {
+          "uiMonetaryValues": "real_eur_at_simulation_start_prices",
+          "nominalPathFields": [
+            "p1CareAdditionalNeedNominalEur",
+            "p2CareAdditionalNeedNominalEur",
+            "totalCareAdditionalNeedNominalEur",
+            "maxAnnualCareAdditionalNeedNominalEur"
+          ]
+        }
+      },
+      "samplingDiagnostics": {
+        "schemaVersion": "MonteCarloSamplingDiagnosticsV1",
+        "contract": {
+          "schemaVersion": "MonteCarloSamplingContractV1",
+          "method": "block",
+          "startSource": "uniform",
+          "requestedStartYearMode": "UNIFORM",
+          "capeSamplingRequested": false,
+          "capeSamplingEffective": false,
+          "excludeEstimatedHistory": false,
+          "ignoredOptions": [],
+          "warnings": [],
+          "initialCandidateCount": 94,
+          "firstRecordPolicy": "selected_start_record",
+          "fixedBlockPolicy": "full_sequential_block_from_selected_start",
+          "stationaryRestartPolicy": "not_applicable",
+          "regimePolicy": "not_applicable",
+          "precedence": [
+            "estimated_history_exclusion",
+            "cape_or_start_weighting",
+            "sampling_method",
+            "conditional_stress_override",
+            "tail_risk_overlay"
+          ]
+        },
+        "dataVersion": {
+          "annualDataHash": "614993a3",
+          "regimeHash": "50aa7f99"
+        },
+        "requestedRuns": 8,
+        "sampledYears": 89,
+        "initialStartYearCounts": {
+          "1930": 1,
+          "1938": 1,
+          "1954": 1,
+          "1980": 1,
+          "1982": 1,
+          "1987": 1,
+          "2006": 1,
+          "2018": 1
+        },
+        "sourceCounts": {
+          "initial_start": 8,
+          "fixed_block_continuation": 66,
+          "fixed_block_restart": 15
+        },
+        "regimeCounts": {
+          "BEAR": 10,
+          "SIDEWAYS": 30,
+          "BULL": 38,
+          "STAGFLATION": 11
+        },
+        "stationaryRestartCounts": {
+          "initial": 0,
+          "random": 0,
+          "data_end": 0
+        },
+        "tailRisk": {
+          "runsActiveCount": 0,
+          "runsAppliedCount": 0,
+          "eventCount": 0,
+          "evaluatedYears": 89,
+          "activeYears": 0,
+          "appliedYears": 0,
+          "skippedHistoricalCrisisYears": 0
+        }
+      },
+      "technicalInventory": {
+        "requested": 8,
+        "financiallyEvaluable": 8,
+        "technicalError": 0,
+        "errors": []
+      }
+    }
+  }
+}

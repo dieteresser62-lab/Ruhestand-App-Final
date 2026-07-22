@@ -35,7 +35,10 @@ const reportResult = spawnSync(
     {
         cwd: repoRoot,
         stdio: 'inherit',
-        env: process.env
+        env: {
+            ...process.env,
+            COVERAGE_ENFORCE_GATES: '1'
+        }
     }
 );
 

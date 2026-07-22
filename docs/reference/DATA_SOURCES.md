@@ -139,7 +139,7 @@ index variant, or usage rights have been established.
 ### Research-gate status
 
 The
-[Simulator backtest research protocol](../internal/SIMULATOR_BACKTEST_FORSCHUNGSPROTOKOLL.md)
+[Simulator backtest research protocol](../internal/archive/2026-simulator-backtest-hardening/SIMULATOR_BACKTEST_FORSCHUNGSPROTOKOLL.md)
 is the operational owner of FV-G01 through FV-G08 for FQ-01 through FQ-03. It
 does not replace this runtime manifest and does not upgrade any field to
 `known`.

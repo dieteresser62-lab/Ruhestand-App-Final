@@ -123,6 +123,17 @@
       "expectedDirection": "values are not directly comparable; early-ruin paths can lower the estimator and length bias is removed",
       "goldenCaseIds": ["GC-CAR-01"],
       "reviewStatus": "pending"
+    },
+    {
+      "sliceId": "12",
+      "sourceReference": "post-slice-07-v1",
+      "targetReference": "monte-carlo-v1-final",
+      "fieldPath": "contracts/resourceContract/compatibility/execution/result",
+      "formulaBefore": "semantic Post-Slice references 03 through 07 existed separately; later export, lifecycle, resource, browser and alias-removal contracts had no integrated final candidate",
+      "formulaAfter": "the final candidate retains every immutable semantic reference and records V1 contract versions, resource bounds, fixed worker/chunk provenance, absence of expired read aliases, terminal outcomes, risk, care, run-based real withdrawal, sampling diagnostics and technical inventory without changing financial formulas",
+      "expectedDirection": "no financial KPI direction; exact same-runtime integration equality is required and every unexplained delta blocks",
+      "goldenCaseIds": ["GC-RISK-01", "GC-CUT-01", "GC-CARE-01", "GC-OUTCOME-01", "GC-SAMPLING-01", "GC-CAR-01"],
+      "reviewStatus": "candidate_pending_external_review"
     }
   ],
   "requiredEntryFields": [

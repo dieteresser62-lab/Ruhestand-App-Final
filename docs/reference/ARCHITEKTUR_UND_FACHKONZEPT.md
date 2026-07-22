@@ -2,9 +2,9 @@
 
 **Technische Dokumentation der DIY-Software für Ruhestandsplanung**
 
-**Dokumentstand:** 2026-07-19 (integrierter Abschlussstand nach Simulator-Backtest-Hardening Slice 09 und Abschlussaudit Slice 10)
-**Inhaltlicher Codeabgleich:** Architekturabschnitt B, Backtest-Fachkonzept C.8 sowie Rechenkonventions- und Modellgrenzen gegen Commit `dfc22a9` und die lokale Arbeitskopie vom 2026-07-19
-**Reproduzierbarer Inventarstand:** Commit `dfc22a9` vom 2026-07-19; Ermittlungsweg siehe Release-Checkliste
+**Dokumentstand:** 2026-07-22 (integrierter Abschlusskandidat nach Simulator-Monte-Carlo-Hardening Slice 12)
+**Inhaltlicher Codeabgleich:** Architekturabschnitt B, Monte-Carlo-Fachkonzept C.3, Backtest-Fachkonzept C.8 sowie Rechenkonventions- und Modellgrenzen gegen Commit `4cd9eeb` und die lokale Slice-12-Arbeitskopie vom 2026-07-22
+**Reproduzierbarer Inventarstand:** Commit `4cd9eeb` plus getrenntem, extern noch nicht freigegebenem Kandidaten `monte-carlo-v1-final`; Ermittlungsweg siehe Release-Checkliste
 **Engine API:** v31.0, Build-ID `2025-12-22_16-35`; acht exponierte Methoden, davon fünf unterstützte operative Methoden und drei deprecated No-op-Kompatibilitäts-Stubs
 **Externer Quellenstand:** Marktvergleich mit Stichtag 2026-07-15; wissenschaftliches Korpus mit 55 Records, Abrufstand 2026-07-15 und abgeschlossenem Mechanismusabgleich MAP-01 bis MAP-17
 **Lizenz:** MIT
@@ -993,17 +993,16 @@ Wichtige Verträge:
 
 Monte Carlo ist in eine UI-Schicht (`simulator-monte-carlo.js`, `monte-carlo-ui.js`) und eine DOM-freie Rechenschicht (`monte-carlo-runner.js` plus `mc-*` Module) getrennt. Pro Run werden Seed, Startjahr, Stresskontext, Pflege-/Partnerstatus und Logauswahl deterministisch initialisiert. Dadurch darf Chunking oder Worker-Aufteilung die Ergebnisse nicht verändern.
 
-Die Sampling-Logik umfasst:
+Die Sampling-Logik trennt Startgewichtung und Fortsetzungsmethode:
 
-| Modus | Bedeutung |
-|-------|-----------|
-| `UNIFORM` | Startjahre und Folgejahre historisch gleichgewichtet |
-| `CAPE` | Auswahl über CAPE-nahe historische Startjahre mit Fallback-Toleranzen |
-| `FILTER` | harte Begrenzung, z. B. Ausschluss früher Nachkriegsjahre |
-| `RECENCY` | exponentielle Gewichtung jüngerer Historie über Half-Life |
-| `block_bootstrap` | Blöcke zusammenhängender Jahre zur Erhaltung von Autokorrelation |
-| `stationary` | variable Blocklaengen; Neustartwahrscheinlichkeit `1 / erwartete Blocklaenge`, deterministisch pro Run |
-| `regime` | Markov-artige Regime-Transitions auf Basis historischer Regime |
+| Dimension | Werte | Bedeutung |
+|-------|-----------|---|
+| Startgewichtung | `UNIFORM`, `FILTER`, `RECENCY`, optional CAPE | CAPE hat bei wirksamer Kandidatenmenge Vorrang; ignorierte Gewichtungen und Fallbacks bleiben diagnostizierbar |
+| Fortsetzung | `block`, `stationary`, `regime_markov`, `regime_iid` | der ausgewaehlte Startrecord ist stets das erste Marktjahr; Fixed/Stationary setzen dort fort, Markov initialisiert dort und IID zieht erst ab Jahr 2 unabhaengig |
+
+Fixed- und Stationary-Bloecke verwenden am Datenende einen neuen gueltigen
+Start statt eines Wrap-arounds. Der effektive Vertrag und die tatsaechlichen
+Ziehungszaehler stehen in `MonteCarloSamplingDiagnosticsV1`.
 
 Workers werden für Monte Carlo, Sweep und Auto-Optimize eingesetzt. `workers/worker-pool.js` steuert Queue, Chunking und Fallbacks; `workers/mc-worker.js` führt Worker-Jobs aus; Telemetrie ist optional und dev-only. Detaillierte Logs werden bewusst nicht für jeden Run im Worker transportiert, sondern nur für ausgewählte Szenarien aufgebaut.
 
@@ -1815,102 +1814,34 @@ function settleTaxYear({ taxStatePrev, rawAggregate, sparerPauschbetrag, kirchen
 
 ### C.3.1 Sampling-Strategien
 
-**Strategie 1: Zufälliges Jahr (UNIFORM)**
-```javascript
-startYearIndex = Math.floor(rand() * annualData.length);
-```
+Der aktive `MonteCarloSamplingContractV1` trennt die Auswahl des ersten
+historischen Records von der Fortsetzungsregel. Die feste Praezedenz lautet:
 
-**Strategie 2: CAPE-Sampling**
-```javascript
-if (useCapeSampling && inputs.marketCapeRatio > 0) {
-    const candidates = getStartYearCandidates(inputs.marketCapeRatio, annualData);
-    if (candidates.length > 0) {
-        const chosenYear = candidates[Math.floor(rand() * candidates.length)];
-        startYearIndex = annualData.findIndex(d => d.jahr === chosenYear);
-    }
-}
-```
+1. geschaetzte Historie optional ausschliessen,
+2. CAPE oder Startjahrgewichtung (`UNIFORM`, `FILTER`, `RECENCY`) aufloesen,
+3. Samplingmethode anwenden,
+4. bedingten Stress-Override anwenden,
+5. Tail-Risk als nachgelagertes Overlay anwenden.
 
-**Strategie 3: Block-Bootstrap**
-```javascript
-function sampleNextYearData(state, method, blockSize, rand, stressCtx) {
-    if (method === 'block_bootstrap') {
-        if (state.blockRemaining > 0) {
-            state.blockRemaining--;
-            return annualData[(state.currentIndex + 1) % annualData.length];
-        } else {
-            state.currentIndex = Math.floor(rand() * annualData.length);
-            state.blockRemaining = blockSize - 1;
-            return annualData[state.currentIndex];
-        }
-    }
-}
-```
+CAPE hat bei einer wirksamen Kandidatenmenge Vorrang vor `FILTER` und
+`RECENCY`; ignorierte Optionen werden in `ignoredOptions` ausgewiesen. Fehlt
+ein nutzbarer CAPE-Wert oder Kandidat, bleibt die angeforderte Gewichtung aktiv
+und der Vertrag meldet den Fallback. Ueber `mcExcludeEstimatedHistory` kann die
+geschaetzte Erweiterung 1925-1949 ausgeschlossen werden.
 
-**Strategie 3a: Stationary Bootstrap**
+| Methode | Vertrag fuer den ausgewaehlten Startrecord | Fortsetzung |
+|---|---|---|
+| `block` | erstes tatsaechlich simuliertes Marktjahr und Beginn eines vollstaendigen Fixed-Blocks | sequenziell bis Blockende; nur vollstaendige Startbloecke sind zulaessig, kein Wrap-around |
+| `stationary` | erstes tatsaechlich simuliertes Marktjahr | Restart-Entscheidung erst vor dem Folgejahr mit `p = 1 / expectedBlockLength`; am Datenende neuer Start statt Wrap-around |
+| `regime_markov` | erstes Marktjahr und Initialregime | Markov-Uebergang erst fuer das Folgejahr |
+| `regime_iid` | erstes Marktjahr | ab Jahr 2 unabhaengige Regime-/Jahresziehung |
 
-Der Simulator bietet zusaetzlich `stationary` als Stationary Bootstrap nach Politis/Romano an. Das bestehende UI-Feld `mcBlockSize` wird dabei als erwartete Blocklaenge interpretiert. Pro Simulationsjahr wird deterministisch entschieden, ob ein neuer historischer Blockstart gezogen wird (`p = 1 / expectedBlockLength`) oder ob der aktuelle historische Block sequenziell fortgesetzt wird. Am Datenende wird ein neuer Blockstart erzwungen; ein Wrap-around vom letzten zum ersten historischen Jahr findet nicht statt.
-
-Startjahrfilter, Recency-Gewichtung und CAPE-Sampling greifen nur bei neuen Blockstarts. Innerhalb eines laufenden Blocks wird das naechste historische Jahr ohne erneute Gewichtung genutzt, damit lokale Autokorrelation erhalten bleibt. Der Sampler-State wird pro Monte-Carlo-Run initialisiert und ist dadurch mit Worker-Chunks paritaetisch.
-
-**Strategie 4: Regime-basiert**
-```javascript
-REGIME_TRANSITIONS = {
-    BULL: { BULL: 0.65, BEAR: 0.10, SIDEWAYS: 0.20, STAGFLATION: 0.05 },
-    BEAR: { BULL: 0.20, BEAR: 0.40, SIDEWAYS: 0.30, STAGFLATION: 0.10 },
-    // ...
-};
-```
-
-### C.3.1a Startjahr-Sampling-Modi
-
-**Strategie 5: FILTER Mode** (monte-carlo-runner.js)
-```javascript
-// Beschränkt Sampling auf bestimmte Jahre (z.B. ab 1970)
-if (samplingMode === 'FILTER') {
-    const validIndices = annualData
-        .map((d, i) => i)
-        .filter(i => annualData[i].jahr >= filterStartYear);
-    startYearIndex = validIndices[Math.floor(rand() * validIndices.length)];
-}
-```
-*Anwendung:* Ausschluss des "Wirtschaftswunder"-Bias (1950-1960) für konservativere Simulationen.
-
-**Strategie 6: RECENCY Mode mit Halbwertszeit** (monte-carlo-runner.js)
-```javascript
-// Exponentiell gewichtetes Sampling - jüngere Jahre bevorzugt
-function buildCdfFromIndices(indices, halfLife) {
-    const weights = indices.map((_, i) => Math.exp(-i * Math.LN2 / halfLife));
-    const total = weights.reduce((a, b) => a + b, 0);
-    let cumulative = 0;
-    return weights.map(w => (cumulative += w / total));
-}
-
-function pickFromSampler(cdf, rand) {
-    const r = rand();
-    // Binäre Suche O(log n)
-    let lo = 0, hi = cdf.length - 1;
-    while (lo < hi) {
-        const mid = (lo + hi) >>> 1;
-        if (cdf[mid] < r) lo = mid + 1;
-        else hi = mid;
-    }
-    return lo;
-}
-```
-*Anwendung:* Höhere Gewichtung für jüngere Marktdaten (z.B. Halbwertszeit = 20 Jahre).
-
-**Vergleich der Sampling-Modi:**
-
-| Modus | Gewichtung | Anwendungsfall |
-|-------|------------|----------------|
-| UNIFORM | Gleichverteilt | Standard, historisch neutral |
-| CAPE | CAPE-Band-Match | Aktuelle Bewertung berücksichtigen |
-| FILTER | Ausschluss Jahre | Konservativ ohne "Golden Age" |
-| RECENCY | Exponentiell | Jüngere Marktstruktur bevorzugen |
-| BLOCK_BOOTSTRAP | Sequenzielle Blöcke | Autokorrelation und Krisencluster erhalten |
-
-Die Startjahr- und Folgejahrlogik liegt in `mc-year-sampling.js`, `mc-run-context.js` und `monte-carlo-runner.js`. Über `mcExcludeEstimatedHistory` kann die geschätzte Erweiterung 1925-1949 aus dem Monte-Carlo-Sampling ausgeschlossen werden; dann beginnt die gezogene Historie faktisch ab 1950.
+`MonteCarloSamplingDiagnosticsV1` transportiert den effektiven Vertrag,
+Datenfingerprints, Startjahr-, historische Jahres-, Quellen-, Regime-,
+Stationary- und Tail-Risk-Zaehler. Chunk-Merge und Workerpfad verlangen
+identische Vertraege und Datenversionen und summieren die Zaehler unabhaengig
+von der Fertigstellungsreihenfolge. Die Startjahr- und Folgejahrlogik liegt in
+`mc-year-sampling.js`, `mc-run-context.js` und `monte-carlo-runner.js`.
 
 ### C.3.2 Stress-Presets
 
@@ -2028,10 +1959,12 @@ Weitere Ergebnisgrößen haben bewusst engere Basen:
   grenzen die nicht erfassten Bestände ab.
 - `finalOutcomes` verwendet Aktien, Gold und freie Liquidität. Ein verbleibender
   Pflegebucket wird separat berichtet und ist nicht im Endvermögen enthalten.
-- `jahresentnahme_real` verwendet die effektive nominale Auszahlung und den
-  kumulierten Faktor des aktuellen Modelljahres. Reale Entnahmestichproben und
-  Consumption-at-Risk beziehen sich damit auf die Kaufkraft des ersten
-  Simulatorjahres; sie bleiben dennoch modellinterne Ergebnisgrößen.
+- `realWithdrawalP10` ist die „Reale Depotentnahme P10“ in Kaufkraft des ersten
+  Simulatorjahres. Jeder auswertbare Run liefert einen P10-Skalar ueber sein
+  Dekumulationsfenster; nach Ruin werden weitere Verpflichtungsjahre bis Tod
+  oder Horizont mit 0 aufgefuellt. P10/P50 ueber Runs nennen Stichprobengroesse
+  und Missingness, beanspruchen aber kein Quantil-Konfidenzintervall und messen
+  nicht den gesamten Haushaltskonsum.
 
 Floor-Deckung, Outcome-Inventar, Depoterschöpfung, Endvermögen, Kürzungsjahre, Pflegebucket und
 Drawdown müssen daher gemeinsam gelesen werden. Keine einzelne Kennzahl ist
@@ -3778,7 +3711,7 @@ Versionsstandard, Quellen-Mapping und die vollständigen MAP-Dossiers. Dieser
 Hauptblock besitzt die normative Ownership für die kompakte Einordnung, das
 Ergebnisbündel, FR-01 bis FR-12 und FQ-01 bis FQ-10. Beide Dokumente müssen bei
 einer Neubewertung gemeinsam gepflegt werden. Der interne
-[Forschungsvalidierungs-Backlog](../internal/FORSCHUNGSVALIDIERUNGS_BACKLOG.md)
+[Forschungsvalidierungs-Backlog](../internal/archive/FORSCHUNGSVALIDIERUNGS_BACKLOG.md)
 operationalisiert die offenen FR-/FQ-Nachweise, ohne ihren Status oder den
 Evidenzstatus der MAP-Dossiers anzuheben.
 
@@ -3997,7 +3930,7 @@ Endvermögen kann aus zu niedriger Entnahme stammen.
 | Dimension | Heute zulässige Aussage | Offene Mess- oder Vertragsgrenze |
 | --- | --- | --- |
 | Floor-Verletzung | `failCount`, `isRuin`, die Floor-Deckungsquote im gewählten Horizont und das disjunkte Outcome-Inventar beschreiben den implementierten Deckungsbruch und den terminalen Laufstatus. | Vollständige Verteilung von Höhe, Dauer und kumulierter realer Lücke fehlt. |
-| Konsumkürzung | Kürzungsjahre, maximale Flex-Kürzung, Jahre ohne Flex und der auf das erste Simulatorjahr deflationierte Consumption-at-Risk zeigen modellierte Einschränkungen. | Individuelle Akzeptanz- oder Nutzengewichte und eine vollständige reale Konsumlückenverteilung fehlen. |
+| Konsumkürzung | Anteil abgeschlossener Dekumulationsjahre mit Kürzung `>= 10 %`, maximale Flex-Kürzung, Jahre ohne Flex und die laufbasierte „Reale Depotentnahme P10“ zur Preisbasis des Simulationsstarts zeigen modellierte Einschränkungen. | Individuelle Akzeptanz- oder Nutzengewichte, ein Quantil-Konfidenzintervall und eine vollständige reale Haushaltskonsum-Lückenverteilung fehlen. |
 | Stressdauer | Stress-Kürzungsjahre und `recoveryYears` gelten für das gewählte Preset. | Keine allgemeine Regime-Verweildauer oder vollständige Erholungsverteilung. |
 | Nachlass/Restvermögen | P10/P50/P90 und Median erfolgreicher Läufe beschreiben modelliertes aktives Endvermögen. | Kein Nachlassziel und keine vollständigen externen Assets, Immobilien-, Versicherungs- oder Pflegebucketwerte. |
 | Steuerlast | Median kumulierter Modellsteuern und Verlusttopf-Effekt gelten für den implementierten Settlement-Vertrag. | Keine vollständige Einkommensteuer-, Sozialabgaben-, Rechts- oder Kostenlogik. |
@@ -4039,7 +3972,7 @@ bleiben bis zu einem dokumentierten Nachweis offen.
 ## E.7 Priorisierte Forschungsfragen
 
 Die zehn Fragen sind im
-[Forschungsvalidierungs-Backlog](../internal/FORSCHUNGSVALIDIERUNGS_BACKLOG.md)
+[Forschungsvalidierungs-Backlog](../internal/archive/FORSCHUNGSVALIDIERUNGS_BACKLOG.md)
 in getrennte Folgevorhaben mit Eingangsgates, Owner-Rollen, Mindestnachweisen,
 Abbruchkriterien und Ergebnisartefakten zerlegt. Alle Pakete stehen auf FV0
 und bleiben offen; ihre Planung ist kein Wirksamkeitsnachweis.
@@ -4080,7 +4013,7 @@ FQ-01 bis FQ-10. Alle offenen V4-/V5-Prüfungen bleiben bestehen. Vollständige
 Quellen- und Dossierdetails stehen im
 [normativen Forschungs-Evidenzregister](FORSCHUNGSABGLEICH_EVIDENZREGISTER.md);
 Priorität, Startgates und gesperrte Wirksamkeitsaussagen im
-[internen Forschungsvalidierungs-Backlog](../internal/FORSCHUNGSVALIDIERUNGS_BACKLOG.md).
+[internen Forschungsvalidierungs-Backlog](../internal/archive/FORSCHUNGSVALIDIERUNGS_BACKLOG.md).
 
 ---
 

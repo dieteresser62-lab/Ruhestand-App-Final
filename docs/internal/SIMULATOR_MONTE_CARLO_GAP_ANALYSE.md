@@ -1,7 +1,7 @@
 # Simulator / Monte Carlo: GAP-Analyse
 
 **Stand:** 2026-07-22
-**Status:** Plan und Slices 01-07 freigegeben; Slice 08 implementiert, externes Review ausstehend
+**Status:** MC-01 bis MC-16 und MC-19 technisch umgesetzt; MC-17/MC-18 bleiben getrennte offene Gates; Slice-12-Abschlussreview ausstehend
 **Autor:** Codex als Implementer und Plan-Autor  
 **Planungsbranch:** `codex/simulator-monte-carlo-gap-plan` (nur lokal; nicht auf GitHub veroeffentlicht)  
 **Folgeplan:** [SIMULATOR_MONTE_CARLO_HARDENING_PLAN.md](./SIMULATOR_MONTE_CARLO_HARDENING_PLAN.md)
@@ -552,6 +552,34 @@ Toleranzen.
 | MC-17 | P2 | separates Folgefeature | Nutzerentscheid |
 | MC-18 | P2/extern | Forschungsbacklog | Fachowner/Holdout/Review |
 | MC-19 | P1 | 01 und 02 Determinismusvertrag | 11, 12 |
+
+### 6.1 Abschlussmatrix Slice 12
+
+`technisch umgesetzt` bedeutet hier nur, dass der vereinbarte Softwarevertrag
+implementiert und automatisiert belegt ist. Es ist keine Eigenfreigabe durch
+Codex und keine empirische Modell- oder Produkteignungsfreigabe.
+
+| GAP | Ergebnis | Nachweis | Verbleibendes Restrisiko |
+| --- | --- | --- | --- |
+| MC-01 | technisch umgesetzt: Volatilitaet und Max Drawdown sind getrennte Per-Run-/Aggregatfelder | `GC-RISK-01`, `post-slice-03-v1`, Messvertrag und `monte-carlo-v1-final` | Stichprobenvolatilitaet bleibt eine modellinterne historische Pfadmetrik |
+| MC-02 | technisch umgesetzt: Kuerzungsanteil nutzt abgeschlossene Dekumulationsjahre, Schwelle `>= 10 %`, nullable Nenner 0 | `GC-CUT-01`, `post-slice-03-v1`, Chunk-/UI-/Exporttests | Anteil bewertet nicht Schwere, Dauer oder individuellen Nutzen der Kuerzung |
+| MC-03 | technisch umgesetzt: P1/P2 besitzen getrennte Eintrittszaehler und bedingte Verteilungen | `GC-CARE-01`, `post-slice-04-v1`, Pflege- und Renderertests | Pflegewahrscheinlichkeiten sind nicht extern individuell kalibriert |
+| MC-04 | technisch umgesetzt: reale P1-plus-P2-Mehrbedarfe und nicht-kausaler Gruppenvergleich sind korrekt benannt | `GC-CARE-01`, `post-slice-04-v1`, Pflege-/Einheitentests | Gruppenmedian-Differenz bleibt ungepaart und nicht kausal |
+| MC-05 | technisch umgesetzt: disjunkte Outcomes und fail-closed Floor-Deckung bei `technical_error` | `GC-OUTCOME-01`, `post-slice-05-v1`, Browser-Fehlerfall | `horizon_exhausted` bleibt zensiert und darf nicht als voller Lebenszeitpfad gelesen werden |
+| MC-06 | technisch umgesetzt: CAPE-/Gewichtungs-Praezedenz, Startrecord und methodenspezifische Fortsetzung sind versioniert | `GC-SAMPLING-01`, `post-slice-06-v1`, Samplingdiagnostik-/Workerparitaet | Methoden- und Blockwahl bleiben Modellannahmen ohne externe Kalibrierungsfreigabe |
+| MC-07 | technisch umgesetzt: Mortalitaetshorizont, `Uint32`-Speicher und gemeinsame Out-of-table-Regel sind validiert | `post-slice-05-v1`, Outcome-/Parameter-/Sweep-Golden-Cases | Mortalitaetstabelle und maximale Altersgrenze bleiben fachliche Annahmen |
+| MC-08 | technisch umgesetzt: Floor-Schaetzer fuehrt Wilson-95-%-Intervall und Small-Sample-Warnung | `post-slice-07-v1`, Statistiktests und Browserlabel | Intervall misst Simulationsfehler, nicht Modell-, Daten- oder Parameterunsicherheit |
+| MC-09 | technisch umgesetzt: laufbasierte reale Depotentnahme P10 mit Nullauffuellung nach Ruin | `GC-CAR-01`, `post-slice-07-v1`, direkte/Worker-/Browsernachweise | Kein Quantil-Konfidenzintervall; Kennzahl ist nicht gesamter Haushaltskonsum |
+| MC-10 | technisch umgesetzt: zentraler `MonteCarloChunkResultV1` und global indexierte Path-Summaries | Chunk-Contracttests, 1-/2-/4-Worker-Matrix, finaler Snapshot | Neue Felder koennen bei spaeterer Erweiterung erneut unvollstaendig registriert werden |
+| MC-11 | technisch umgesetzt: reproduzierbarer Request-/Result-/Exportvertrag mit Fingerprint und Datenschutzgrenzen | Export-/Replay-/Privacytests und echter Browserdownload | Export enthaelt vertrauliche Szenarioannahmen; externe Langzeitkompatibilitaet bleibt Nutzerverantwortung |
+| MC-12 | technisch umgesetzt: Generation, Abort, Termination, Stale-Result-Schutz und genau eine Fallbackentscheidung | Worker-Lifecycle-Tests und Browser-Cancel/Restart | Echte hardwarebedingte CPU-/Browser-Stalls sind nur kontrolliert simuliert |
+| MC-13 | technisch umgesetzt: begrenzter Szenariocache und fail-closed Datenversions-Handshake | Worker-Entrypoint-/Lifecycle-/Paritaetstests | Zukuenftige neue Cachetypen muessen denselben Versionsvertrag explizit uebernehmen |
+| MC-14 | technisch umgesetzt: gemeinsamer strikter Ressourcenvertrag, Default 10.000, Bestaetigung ueber 100.000, Maximum 1.000.000 | Parameter-/UI-/Browsertests und Benchmarkvertrag | Performance auf schwacher, unbekannter Nutzerhardware ist kein allgemeiner Benchmarknachweis |
+| MC-15 | technisch umgesetzt: echter Chromium-MC-Workflow und Node-Coveragegates fuer JobRunner/Renderer | 15 Browserflows; `worker-job-runner.js` 67,74 % und `results-renderers.js` 100 % im fokussierten V8-Lauf | Firefox/WebKit, Pixelvergleich und Browsercoverage-Instrumentierung bleiben offen |
+| MC-16 | technisch umgesetzt: README, Handbuch, Fachkonzept, Technik- und Modulreferenz verwenden denselben V1-Vertrag | Architektur-Linkgate, Dokumentationsdiff und Slice-12-Volltests | Manuelle Folgeaenderungen koennen Doku erneut entkoppeln; Doku-Sync bleibt Prozesspflicht |
+| MC-17 | offen als getrenntes P2-Folgefeature: kein gepaarter Produktvergleich | stabiler `MonteCarloExportV1` ist als Voraussetzung vorhanden; D-09 dokumentiert Nicht-Scope | Manuelle Vergleiche koennen weiterhin Input-/Seed-/Datenunterschiede vermischen |
+| MC-18 | offen als externes Forschungs-/Modellvalidierungsgate | Forschungsregister, archivierter Validierungsbacklog und Backtest-Forschungsprotokoll | Kapitalmarkt-, Pflege-, Mortalitaets- und Policykalibrierung sind nicht empirisch freigegeben |
+| MC-19 | technisch umgesetzt: gleiche Runtime liefert worker-/chunkunabhaengig exakte diskrete und endliche Floatwerte | 1-/2-/4-Worker-/Chunkmatrix, immutable Snapshotlinie und `monte-carlo-v1-final` | Runtimeuebergreifende Unterschiede duerfen nur mit vorab festgelegten Feldtoleranzen verglichen werden |
 
 ## 7. Bereits vorhandene Staerken, die erhalten bleiben muessen
 

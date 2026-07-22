@@ -5,7 +5,9 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
     buildCoverageSummary,
-    coverageUrlToPath
+    coverageUrlToPath,
+    REQUIRED_COVERAGE_FILE_GATES,
+    validateCoverageFileGates
 } from './coverage-report.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -117,6 +119,30 @@ console.log('--- Coverage Report Contract Tests ---');
     } finally {
         cleanup(workspace.root);
     }
+}
+
+{
+    assertEqual(REQUIRED_COVERAGE_FILE_GATES.length, 2, 'Slice 12 should define two mandatory file coverage gates');
+    const passingSummary = {
+        files: REQUIRED_COVERAGE_FILE_GATES.map(gate => ({
+            file: gate.file,
+            coveragePct: gate.minimumPct
+        }))
+    };
+    const passingGate = validateCoverageFileGates(passingSummary);
+    assert(passingGate.ok, 'Coverage file gates should accept values exactly at their minimum');
+    assertEqual(passingGate.metric, 'approximate executable-line coverage from V8 ranges', 'Coverage gate should name the measured V8 metric without overstating statement coverage');
+
+    const belowMinimum = validateCoverageFileGates({
+        files: [
+            { file: REQUIRED_COVERAGE_FILE_GATES[0].file, coveragePct: 49.99 },
+            { file: REQUIRED_COVERAGE_FILE_GATES[1].file, coveragePct: 100 }
+        ]
+    });
+    assert(!belowMinimum.ok && belowMinimum.failures[0].includes('below 50.00%'), 'Coverage file gates should fail below the configured minimum');
+
+    const missingFile = validateCoverageFileGates({ files: [] });
+    assert(!missingFile.ok && missingFile.failures.every(message => message.includes('missing')), 'Coverage file gates should fail closed when a required file is absent');
 }
 
 {

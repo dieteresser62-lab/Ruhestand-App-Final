@@ -154,7 +154,9 @@ DOM-freier, versionierter Raw-Vertrag fuer einen vollstaendigen Monte-Carlo-Lauf
 - `createMonteCarloRunRequestV1()` / `validateMonteCarloRunRequestV1()` – normalisieren und validieren Seed, Methoden, Szenario, Datenfingerprint, Worker-/Chunkkonfiguration und Snapshotpolicy; lokale Pfade, Secret-Felder und nicht endliche Zahlen werden abgewiesen.
 - `createMonteCarloRunResultV1()` / `validateMonteCarloRunResultV1()` – projizieren Outcome-Inventar, kanonische KPIs mit expliziten `NominalEur`-/`RealEur`-Namen, Unsicherheit, Missingness, Warnungen und Diagnostik ohne Displayformatierung.
 - `extractMonteCarloReplayArgsV1()` – rekonstruiert die DOM-freien Runnerargumente fuer einen deterministischen Re-Run.
-- `buildMonteCarloExportV1()` / `readMonteCarloExportV1()` / `createMonteCarloExportDownload()` – erzeugen und lesen `MonteCarloExportV1` mit SHA-256-Runfingerprint, App-/Engineprovenienz, Forward-Policy, deprecated Alias-Telemetrie und eindeutigem sicheren Dateinamen.
+- `buildMonteCarloExportV1()` / `readMonteCarloExportV1()` / `createMonteCarloExportDownload()` – erzeugen und lesen `MonteCarloExportV1` mit SHA-256-Runfingerprint, App-/Engineprovenienz, Forward-Policy und eindeutigem sicheren Dateinamen. Das befristete Legacy-Read-Aliasregister ist seit Slice 11 leer; nur kanonische KPI-Felder werden erkannt.
+
+**Snapshotlinie:** `MonteCarloSnapshotPolicyV1` trennt die unveraenderliche Referenz `pre-hardening-v1`, versionierte semantische Post-Slice-Referenzen und den extern noch nicht freigegebenen Integrationskandidaten `monte-carlo-v1-final`. Unerklaerte Deltas blockieren die Fortschreibung.
 
 **Einbindung:** `simulator-monte-carlo.js` erzeugt Request und Resultat direkt aus den tatsaechlich verwendeten Laufdaten. `monte-carlo-ui.js` stellt den Download erst danach bereit; es gibt keine automatische Persistenz oder Uebertragung.
 

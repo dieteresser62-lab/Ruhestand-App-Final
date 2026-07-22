@@ -1,11 +1,11 @@
 # Simulator / Monte Carlo: Hardening-Arbeitsplan
 
 **Stand:** 2026-07-22
-**Status:** implementierungsreif; Slices 01-09 als Release-Commits abgeschlossen, Slice 10 implementiert und im Review
+**Status:** Alle Slices 01-12 als Release-Commits abgeschlossen und freigegeben
 **Autor:** Codex als Implementer und Plan-Autor  
 **Feature-Branch:** `codex/simulator-monte-carlo-gap-plan`  
 **GitHub-Status:** nur lokal; Veroeffentlichung ausstehend und nur nach Nutzerfreigabe  
-**Reviewstand:** Plan und Slices 01-09 freigegeben; Slice 10 wartet auf Gemini- und Nutzerreview
+**Reviewstand:** Plan und alle Slices 01-12 durch Gemini vollständig freigegeben
 **Ausgangsanalyse:** [SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md](./SIMULATOR_MONTE_CARLO_GAP_ANALYSE.md)
 
 ## 1. Ziel und Rollenabgrenzung
@@ -208,7 +208,7 @@ Semantikaenderungen sind unzulaessig.
 | [09](./SLICE_SIMULATOR_MONTE_CARLO_09_WORKER_LIFECYCLE_ISOLATION.md) | Abbruch, Stale Jobs, Cache/Version | MC-12, MC-13 | 02, D-12 | abgeschlossen und freigegeben |
 | [10](./SLICE_SIMULATOR_MONTE_CARLO_10_RESOURCE_UI_ACCESSIBILITY.md) | Bounds, Kostenhinweis, UI/A11y | MC-14, Teile MC-15 | 05, 08, 09, D-08 | abgeschlossen und freigegeben |
 | [11](./SLICE_SIMULATOR_MONTE_CARLO_11_BROWSER_E2E_REGRESSION.md) | Browser-E2E und Pfadparitaet | MC-15 | 03-10 | abgeschlossen und freigegeben |
-| [12](./SLICE_SIMULATOR_MONTE_CARLO_12_INTEGRATION_DOKUMENTATION.md) | Integration, Doku- und Volltestgate | MC-16; Abschluss aller | 01-11 | geplant |
+| [12](./SLICE_SIMULATOR_MONTE_CARLO_12_INTEGRATION_DOKUMENTATION.md) | Integration, Doku- und Volltestgate | MC-16; Abschluss aller | 01-11 | abgeschlossen und freigegeben |
 
 ### Rueckdokumentation Slice 09
 
@@ -238,8 +238,8 @@ Semantikaenderungen sind unzulaessig.
 
 ### Rueckdokumentation Slice 10
 
-- Implementierungsstatus: abgeschlossen; Gemini-/Nutzerreview des Slice steht
-  aus. Codex erteilt keine eigene Freigabe und erstellt keinen Commit.
+- Implementierungsstatus: abgeschlossen, extern freigegeben und als
+  Release-Commit `3431ce9` vorhanden.
 - `MonteCarloParametersV1` ist der gemeinsame strikte Eingangsvertrag fuer UI,
   direkten Runner, Worker und Auto-Optimize. Ganze Zahlen, Enums, Booleans,
   Mortalitaetshorizont, Blocklaenge, Seed, Worker und Jobbudget werden ohne
@@ -261,8 +261,8 @@ Semantikaenderungen sind unzulaessig.
 
 ### Rueckdokumentation Slice 11
 
-- Implementierungsstatus: abgeschlossen; Gemini-/Nutzerreview des Slice steht
-  aus. Codex erteilt keine eigene Freigabe und erstellt keinen Commit.
+- Implementierungsstatus: abgeschlossen, extern freigegeben und als
+  Release-Commit `4cd9eeb` vorhanden.
 - Das bestehende Chromium-Gate enthaelt jetzt vier isolierte MC-Nutzerflows:
   echten Worker-Erfolg, kontrollierten seriellen Fallback, fail-closed
   Technikfehler sowie Cancel/Restart mit bewusst spaeter Altantwort. Tastatur,
@@ -290,6 +290,37 @@ Semantikaenderungen sind unzulaessig.
   Prozent Node-Coverage. Das beschlossene 50-Prozent-Abschlussgate und die
   Integrationsbereinigung interner Pflege-Metadaten-Aliase verbleiben in
   Slice 12.
+
+### Rueckdokumentation Slice 12
+
+- Implementierungsstatus: durch Codex abgeschlossen; externes Abschlussreview
+  und Nutzerentscheidung stehen aus. Codex erteilt keine eigene Freigabe und
+  erstellt keinen Commit.
+- `monte-carlo-v1-final.json` ist als separater, noch nicht extern
+  freigegebener Kandidat mit vollstaendiger Snapshot-Lineage vorhanden. Die
+  Policy referenziert ihn als `finalCandidate`; `pre-hardening-v1` und alle
+  Post-Slice-Snapshots bleiben unveraendert getrennt. Das Delta-Ledger
+  dokumentiert den Integrationsschritt.
+- Der Messvertrag vergleicht den Kandidaten exakt und inventarisiert die
+  produktiven V1-Reader. Er weist nach, dass die befristeten Legacy-KPI-Aliase
+  weder im leeren Aliasregister noch in den produktiven Consumern verbleiben.
+- Ein neuer DOM-freier Renderer-Vertrag deckt Outcome, KPIs, Wilson-Intervall,
+  reale Depotentnahme P10, Pflege, Samplingdiagnostik, Missingness und
+  technische Fehler ab. Das obligatorische Coverage-Dateigate erreicht fuer
+  `worker-job-runner.js` 67,74 Prozent und fuer `results-renderers.js`
+  100,00 Prozent approximative Coverage aus ausfuehrbaren V8-Zeilenbereichen.
+- Handbuch, README, Fachkonzept und technische Referenzen verwenden nun
+  konsistente Begriffe fuer Floor-Deckung, terminale Outcomes, Sampling,
+  Pflege, Unsicherheit, Export und Ressourcengrenzen. Die lokalen Links auf
+  archivierte Forschungsdokumente sind korrigiert; das Evidenzgate ist gruen.
+- Die finale GAP-Matrix dokumentiert Ergebnis, Nachweis und Restrisiko fuer
+  MC-01 bis MC-19. MC-17 bleibt ein separates P2-Feature; MC-18 bleibt das
+  ausdruecklich offene externe Forschungs-/Modellvalidierungsgate.
+- Abschlussgates: 1.245/1.245 fokussierte Assertions, `npm test` mit
+  7.300/7.300 Assertions und 0 offenen Handles, `npm run test:browser` mit
+  15/15 Flows sowie `npm run test:coverage` mit 76,46 Prozent
+  (32.625/42.668 in 206 Dateien). Keine unerwartete Snapshot-, Backtest- oder
+  FlowDelta-Abweichung wurde gemeldet.
 
 Zulaessige Parallelisierung nach Slice 02:
 
@@ -642,9 +673,9 @@ alte Erfolgsquotenterminologie verwendet.
 - Planreview Claude: Erstreview blockiert; Revision 1 wartet auf Re-Review.
 - Nutzerfreigabe: erteilt am 2026-07-22.
 - Status `implementierungsreif`: erteilt (für Gemini-Freigabepfad & Nutzer).
-- Implementierungsstand: Slices 01-10 abgeschlossen und als Release-Commits
-  vorhanden; Slice 11 auf Nutzerauftrag vom 2026-07-22 implementiert und im
-  Review.
+- Implementierungsstand: Slices 01-11 abgeschlossen, extern freigegeben und
+  als Release-Commits vorhanden; Slice 12 auf Nutzerauftrag vom 2026-07-22
+  durch Codex implementiert und im Abschlussreview.
 
 ## 14. Rueckdokumentation Slice 01
 
