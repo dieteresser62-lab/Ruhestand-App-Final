@@ -7,11 +7,32 @@
  */
 "use strict";
 
-import { parseDisplayNumber } from './simulator-portfolio-format.js';
 import { normalizeProfileHealthBucket } from '../profile/profile-state.js';
 import { classifyTranche } from '../../types/tranche-contract.js';
 
 const FIFO_FALLBACK_DATE_MS = Date.parse('1900-01-01');
+
+export class SimulatorPortfolioInputError extends Error {
+    constructor({ fieldId, index, value }) {
+        super(`Tranche ${index + 1}: ${fieldId} muss eine endliche kanonische Zahl sein.`);
+        this.name = 'SimulatorPortfolioInputError';
+        this.code = 'SIMULATOR_PORTFOLIO_NUMBER_INVALID';
+        this.fieldId = fieldId;
+        this.index = index;
+        this.value = value;
+    }
+}
+
+function readCanonicalTrancheNumber(tranche, fieldId, index, fallback = 0) {
+    if (!Object.prototype.hasOwnProperty.call(tranche, fieldId) || tranche[fieldId] == null) {
+        return fallback;
+    }
+    const value = tranche[fieldId];
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+        throw new SimulatorPortfolioInputError({ fieldId, index, value });
+    }
+    return value;
+}
 
 function toSortableDateMs(value) {
     if (!value) return FIFO_FALLBACK_DATE_MS;
@@ -206,11 +227,13 @@ export function initializePortfolioDetailed(inputs) {
             }
 
             // Derive missing price/value fields from shares where possible.
-            const shares = parseDisplayNumber(tranche.shares);
-            const purchasePriceRaw = parseDisplayNumber(tranche.purchasePrice);
-            const currentPriceRaw = parseDisplayNumber(tranche.currentPrice || tranche.purchasePrice);
-            const marketValueRaw = parseDisplayNumber(tranche.marketValue);
-            const costBasisRaw = parseDisplayNumber(tranche.costBasis);
+            const shares = readCanonicalTrancheNumber(tranche, 'shares', index);
+            const purchasePriceRaw = readCanonicalTrancheNumber(tranche, 'purchasePrice', index);
+            const currentPriceRaw = Object.prototype.hasOwnProperty.call(tranche, 'currentPrice')
+                ? readCanonicalTrancheNumber(tranche, 'currentPrice', index)
+                : purchasePriceRaw;
+            const marketValueRaw = readCanonicalTrancheNumber(tranche, 'marketValue', index);
+            const costBasisRaw = readCanonicalTrancheNumber(tranche, 'costBasis', index);
             const purchasePrice = purchasePriceRaw > 0 ? purchasePriceRaw : 0;
             const currentPrice = currentPriceRaw > 0 ? currentPriceRaw
                 : (shares > 0 && marketValueRaw > 0 ? marketValueRaw / shares : 0);

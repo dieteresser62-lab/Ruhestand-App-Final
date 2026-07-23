@@ -89,7 +89,13 @@ try {
         goldAllokationProzent: 0,
         goldFloorProzent: 0,
         rebalancingBand: 20,
-        goldSteuerfrei: 'false'
+        goldSteuerfrei: 'false',
+        runwayMinMonths: 24,
+        runwayTargetMonths: 36,
+        targetEq: 60,
+        rebalBand: 5,
+        maxSkimPctOfEq: 10,
+        maxBearRefillPctOfEq: 5
     };
 
     // --- TEST 1: Determinism (2000-2025) ---
@@ -121,6 +127,38 @@ try {
             ),
             'display text formats the same canonical raw end-wealth metric'
         );
+    }
+
+    // --- TEST 1b: Fractional lot uses the canonical Number contract ---
+    {
+        global.window.__profilverbundTranchenOverride = [{
+            trancheId: 'fractional-backtest',
+            sourceProfileId: 'profile-a',
+            name: 'Fractional ETF',
+            shares: 1.234,
+            purchasePrice: 100.5,
+            currentPrice: 100.5,
+            purchaseDate: '2026-01-01',
+            tqf: 0.3,
+            type: 'aktien_neu',
+            category: 'equity'
+        }];
+        global.window.__profilverbundPreferAggregates = false;
+        global.document = createMockDocument({
+            ...baseInputs,
+            simStartJahr: 2020,
+            simEndJahr: 2020
+        });
+        global.document.getElementById('monteCarloResults').style.display = 'none';
+        runBacktest();
+        assertClose(
+            window.globalBacktestData?.result?.portfolioStart,
+            20124.017,
+            1e-9,
+            'Backtest initializes O-05 with 1.234 shares at 100.50 EUR plus cash'
+        );
+        delete global.window.__profilverbundTranchenOverride;
+        delete global.window.__profilverbundPreferAggregates;
     }
 
     // --- TEST 2: Startjahr-Filterung ---

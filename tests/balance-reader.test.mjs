@@ -774,6 +774,7 @@ console.log('Test 13: Produktionsreader für Tranchenstatus und Aggregation');
         kirchensteuerSatz: new MockElement('select', '0.09'),
         runwayMinMonths: new MockElement('input', '24'),
         runwayTargetMonths: new MockElement('input', '36'),
+        minCashBufferMonths: new MockElement('input', '0'),
         targetEq: new MockElement('input', '60')
     };
     global.document = createDocumentMock(inputs);
@@ -791,6 +792,7 @@ console.log('Test 13: Produktionsreader für Tranchenstatus und Aggregation');
     assertEqual(aggregated.goldWert, 200, 'Production reader should keep gold out of equity');
     assertEqual(aggregated.detailledTranches.length, 3, 'Production reader should pass normalized lots to the engine input');
     assertClose(aggregated.kirchensteuerSatz, 0.09, 1e-9, 'Production reader should preserve the Balance UI decimal church-tax unit');
+    assertEqual(aggregated.minCashBufferMonths, 0, 'Production reader should preserve an explicit zero cash buffer');
 
     global.window.__profilverbundTranchenOverride = [];
     const explicitEmpty = ProductionUIReader.readAllInputs();

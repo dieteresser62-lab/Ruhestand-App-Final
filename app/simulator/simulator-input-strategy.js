@@ -111,12 +111,12 @@ export function readDecumulationInputs(doc = globalThis.document) {
 
 export function readStrategyInputs(doc = globalThis.document) {
     return {
-        runwayMinMonths: readInt('runwayMinMonths', 24, doc) || 24,
-        runwayTargetMonths: readInt('runwayTargetMonths', 36, doc) || 36,
-        targetEq: readInt('targetEq', 60, doc) || 60,
-        rebalBand: readInt('rebalBand', 5, doc) || 5,
-        maxSkimPctOfEq: readInt('maxSkimPctOfEq', 10, doc) || 10,
-        maxBearRefillPctOfEq: readInt('maxBearRefillPctOfEq', 5, doc) || 5
+        runwayMinMonths: readInt('runwayMinMonths', 24, doc),
+        runwayTargetMonths: readInt('runwayTargetMonths', 36, doc),
+        targetEq: readNumber('targetEq', 60, doc),
+        rebalBand: readNumber('rebalBand', 5, doc),
+        maxSkimPctOfEq: readNumber('maxSkimPctOfEq', 10, doc),
+        maxBearRefillPctOfEq: readNumber('maxBearRefillPctOfEq', 5, doc)
     };
 }
 

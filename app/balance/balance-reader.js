@@ -143,6 +143,21 @@ export const UIReader = {
             ? parseBalanceCurrencyInput(id, dom.inputs[id].value)
             : 0;
         const val = (id) => dom.inputs[id] ? dom.inputs[id].value : '';
+        const finiteNumber = (id, fallback = 0, { integer = false } = {}) => {
+            const rawValue = val(id);
+            if (rawValue === null || rawValue === undefined || String(rawValue).trim() === '') {
+                return fallback;
+            }
+            const raw = String(rawValue).trim();
+            if (raw.includes('.') && raw.includes(',')) return fallback;
+            const normalized = raw.includes(',') ? raw.replace(',', '.') : raw;
+            if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(normalized)) {
+                return fallback;
+            }
+            const parsed = Number(normalized);
+            if (!Number.isFinite(parsed) || (integer && !Number.isInteger(parsed))) return fallback;
+            return parsed;
+        };
         const checked = (id) => dom.inputs[id] ? dom.inputs[id].checked : false;
         const readPersistedCapeRatio = () => {
             try {
@@ -300,13 +315,13 @@ export const UIReader = {
             goldCost: useAggregates ? aggregated.goldCost : num('goldCost'),
             kirchensteuerSatz: parseFloat(val('kirchensteuerSatz')) || 0,
             sparerPauschbetrag: num('sparerPauschbetrag'),
-            runwayMinMonths: parseInt(document.getElementById('runwayMinMonths').value) || 24,
-            runwayTargetMonths: parseInt(document.getElementById('runwayTargetMonths').value) || 36,
-            minCashBufferMonths: parseInt(document.getElementById('minCashBufferMonths')?.value) || 2, // Default: 2 Monate Puffer
-            targetEq: parseFloat(document.getElementById('targetEq').value) || 60,
-            rebalBand: parseFloat(val('rebalBand')) || 0,
-            maxSkimPctOfEq: parseFloat(val('maxSkimPctOfEq')) || 0,
-            maxBearRefillPctOfEq: parseFloat(val('maxBearRefillPctOfEq')) || 0,
+            runwayMinMonths: finiteNumber('runwayMinMonths', 24, { integer: true }),
+            runwayTargetMonths: finiteNumber('runwayTargetMonths', 36, { integer: true }),
+            minCashBufferMonths: finiteNumber('minCashBufferMonths', 2, { integer: true }),
+            targetEq: finiteNumber('targetEq', 60),
+            rebalBand: finiteNumber('rebalBand', 0),
+            maxSkimPctOfEq: finiteNumber('maxSkimPctOfEq', 0),
+            maxBearRefillPctOfEq: finiteNumber('maxBearRefillPctOfEq', 0),
             marketCapeRatio: capeRatio,
             capeRatio: capeRatio,
             dynamicFlex,
