@@ -20,6 +20,10 @@ import MarketAnalyzer from './analyzers/MarketAnalyzer.mjs';
 import SpendingPlanner from './planners/SpendingPlanner.mjs';
 import TransactionEngine from './transactions/TransactionEngine.mjs';
 import { settleTaxYear } from './tax-settlement.mjs';
+import {
+    finalizeThreeBucketAction,
+    sumBondBucketValuation
+} from './transactions/three-bucket-logic.mjs';
 import { deriveVpwExpectedRealReturn } from './planners/vpw-return-policy.mjs';
 import { STRATEGY_OPTIONS } from '../types/strategy-options.js';
 
@@ -138,6 +142,47 @@ function _normalizeEngineInput(rawInput) {
 
 function _clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
+}
+
+function _allocateFinalTaxToActionSources(sources, finalTax) {
+    const sourceList = Array.isArray(sources) ? sources : [];
+    const assetRows = sourceList
+        .map((source, index) => ({ source, index }))
+        .filter(({ source }) => source?.kind && source.kind !== 'liquiditaet');
+    if (!assetRows.length) return sourceList.map(source => ({ ...source }));
+
+    const positiveTaxable = assetRows.map(({ source }) => (
+        Math.max(0, Number(source?.taxableAfterTqfSigned) || 0)
+    ));
+    const taxableTotal = positiveTaxable.reduce((total, value) => total + value, 0);
+    const weights = taxableTotal > 0
+        ? positiveTaxable
+        : assetRows.map(({ source }) => Math.max(0, Number(source?.brutto) || 0));
+    const weightTotal = weights.reduce((total, value) => total + value, 0);
+    let taxRemaining = Math.max(0, Number(finalTax) || 0);
+    const allocatedByIndex = new Map();
+    assetRows.forEach(({ index }, assetIndex) => {
+        const isLast = assetIndex === assetRows.length - 1;
+        const allocatedTax = isLast
+            ? taxRemaining
+            : Math.min(
+                taxRemaining,
+                Math.max(0, Number(finalTax) || 0) * (weightTotal > 0 ? weights[assetIndex] / weightTotal : 0)
+            );
+        allocatedByIndex.set(index, allocatedTax);
+        taxRemaining -= allocatedTax;
+    });
+
+    return sourceList.map((source, index) => {
+        if (!allocatedByIndex.has(index)) return { ...source };
+        const allocatedTax = allocatedByIndex.get(index);
+        return {
+            ...source,
+            steuerPlan: Number(source?.steuer) || 0,
+            steuer: allocatedTax,
+            netto: Math.max(0, Number(source?.brutto) || 0) - allocatedTax
+        };
+    });
 }
 
 const _berechneEntnahmeRate = (realeRendite, horizontJahre) => {
@@ -420,7 +465,15 @@ function _internal_calculateModel(input, lastState) {
 
     // 3. Marktanalyse durchführen
     // Bestimmt Marktszenario (Bär, Bulle, Seitwärts, etc.) basierend auf historischen Daten
-    const market = MarketAnalyzer.analyzeMarket(normalizedInput);
+    const marketAnalysis = MarketAnalyzer.analyzeMarket(normalizedInput);
+    const realReturnEq = (
+        (Number(marketAnalysis.perf1Y) || 0)
+        - (Number(normalizedInput.inflation) || 0)
+    ) / 100;
+    const market = {
+        ...marketAnalysis,
+        realReturnEq
+    };
 
     // 4. Gold-Floor berechnen (Mindestbestand)
     // Definiert minimalen Gold-Bestand als Prozentsatz des Gesamtvermögens
@@ -585,7 +638,7 @@ function _internal_calculateModel(input, lastState) {
     // - Depot-Verkauf zur Liquiditäts-Auffüllung
     // - Rebalancing (Aktien/Gold)
     // - Notfall-Verkäufe bei kritischem Runway
-    const action = TransactionEngine.determineAction({
+    let action = TransactionEngine.determineAction({
         aktuelleLiquiditaet,
         depotwertGesamt,
         zielLiquiditaet,
@@ -595,6 +648,29 @@ function _internal_calculateModel(input, lastState) {
         profil,
         input: normalizedInput
     });
+    let threeBucketDiagnosis = null;
+    if (
+        normalizedInput.finalizeThreeBucketAction === true
+        && normalizedInput.decumulation?.mode === STRATEGY_OPTIONS.THREE_BUCKET_JILGE
+    ) {
+        const detailedTranches = Array.isArray(normalizedInput.detailledTranches)
+            ? normalizedInput.detailledTranches
+            : [];
+        const finalized = finalizeThreeBucketAction({
+            detailedTranches,
+            engineInput: normalizedInput,
+            market,
+            pendingAction: action,
+            realReturnEq: market.realReturnEq,
+            annualWithdrawalTarget: Math.max(
+                0,
+                (Number(spendingResult?.monatlicheEntnahme) || 0) * 12
+            ),
+            currentBondValuation: sumBondBucketValuation(detailedTranches)
+        });
+        action = finalized.updatedAction;
+        threeBucketDiagnosis = finalized.threeBucketState;
+    }
 
     // Diagnose-Einträge von Transaktion hinzufügen
     // Transaktionen können eigene Diagnose-Einträge erzeugen (z.B. Caps, Guardrails)
@@ -609,12 +685,6 @@ function _internal_calculateModel(input, lastState) {
         sumRealizedGainSigned: Number(action?.taxRawAggregate?.sumRealizedGainSigned) || 0,
         sumTaxableAfterTqfSigned: Number(action?.taxRawAggregate?.sumTaxableAfterTqfSigned) || 0
     };
-    const taxSettlement = settleTaxYear({
-        taxStatePrev,
-        rawAggregate: actionRawAggregate,
-        sparerPauschbetrag: normalizedInput.sparerPauschbetrag,
-        kirchensteuerSatz: normalizedInput.kirchensteuerSatz
-    });
     const hasAssetSale = Array.isArray(action?.quellen) && action.quellen.some(
         source => source?.kind && source.kind !== 'liquiditaet'
     );
@@ -626,6 +696,26 @@ function _internal_calculateModel(input, lastState) {
             0
         )
         : 0;
+    const taxSettlementDeferred = normalizedInput.deferTaxSettlement === true;
+    const taxSettlement = taxSettlementDeferred
+        ? {
+            taxDue: steuerPlanGesamt,
+            taxStateNext: { ...taxStatePrev },
+            details: {
+                deferred: true,
+                reason: 'profile_attribution_required',
+                sumRealizedGainSigned: actionRawAggregate.sumRealizedGainSigned,
+                sumTaxableAfterTqfSigned: actionRawAggregate.sumTaxableAfterTqfSigned,
+                lossCarryStart: taxStatePrev.lossCarry,
+                taxPlanDue: steuerPlanGesamt
+            }
+        }
+        : settleTaxYear({
+            taxStatePrev,
+            rawAggregate: actionRawAggregate,
+            sparerPauschbetrag: normalizedInput.sparerPauschbetrag,
+            kirchensteuerSatz: normalizedInput.kirchensteuerSatz
+        });
     const taxCashAdjustment = hasAssetSale
         ? steuerPlanGesamt - taxSettlement.taxDue
         : 0;
@@ -635,12 +725,15 @@ function _internal_calculateModel(input, lastState) {
             `Steuerreserve-Contract verletzt: finale Steuer uebersteigt Planreserve um ${Math.abs(taxCashAdjustment).toFixed(2)} EUR.`
         );
     }
+    action.quellen = _allocateFinalTaxToActionSources(action?.quellen, taxSettlement.taxDue);
 
-    const verwendungen = {
-        liquiditaet: Number(action?.verwendungen?.liquiditaet) || 0,
-        gold: Number(action?.verwendungen?.gold) || 0,
-        aktien: Number(action?.verwendungen?.aktien) || 0
-    };
+    const verwendungen = Object.fromEntries(
+        Object.entries(action?.verwendungen || {})
+            .map(([key, value]) => [key, Number(value) || 0])
+    );
+    verwendungen.liquiditaet = Number(verwendungen.liquiditaet) || 0;
+    verwendungen.gold = Number(verwendungen.gold) || 0;
+    verwendungen.aktien = Number(verwendungen.aktien) || 0;
     if (hasAssetSale) {
         verwendungen.liquiditaet += taxCashAdjustment;
         action.nettoErlös = nettoErloesPlan + taxCashAdjustment;
@@ -655,11 +748,26 @@ function _internal_calculateModel(input, lastState) {
     action.verwendungen = verwendungen;
     action.taxRawAggregate = actionRawAggregate;
     action.taxSettlement = taxSettlement.details;
+    action.taxSettlementDeferred = taxSettlementDeferred;
     // NOTE: action is passed by reference to the UI payload below.
     // We intentionally override steuer with the final annual settlement tax.
     action.steuer = taxSettlement.taxDue;
+    if (normalizedInput.finalizeThreeBucketAction === true && action?.type === 'TRANSACTION') {
+        const sourceNet = (action.quellen || [])
+            .reduce((total, source) => total + (Number(source?.netto) || 0), 0);
+        const useTotal = Object.values(verwendungen)
+            .reduce((total, value) => total + (Number(value) || 0), 0);
+        if (Math.abs(sourceNet - useTotal) > 0.01 || Math.abs(sourceNet - action.nettoErlös) > 0.01) {
+            throw new Error(
+                `Final-Action-Reconciliation verletzt: Quellen-Netto ${sourceNet.toFixed(2)} EUR, Verwendungen ${useTotal.toFixed(2)} EUR, Action-Netto ${(Number(action.nettoErlös) || 0).toFixed(2)} EUR.`
+            );
+        }
+    }
     diagnosis.keyParams = diagnosis.keyParams || {};
     diagnosis.keyParams.taxSettlement = taxSettlement.details;
+    if (threeBucketDiagnosis) {
+        diagnosis.keyParams.threeBucket = threeBucketDiagnosis;
+    }
 
     // 10. Liquidität nach Transaktion berechnen
     // Berücksichtigt Depot-Verkäufe zur Liquiditäts-Auffüllung
@@ -820,6 +928,7 @@ function _internal_calculateModel(input, lastState) {
         market,
         spending: spendingResult,
         action,
+        threeBucket: threeBucketDiagnosis,
         liquiditaet: {
             deckungVorher,
             deckungNachher

@@ -693,6 +693,7 @@ export function attributeHouseholdAction({ householdAction, profiles, mode = 'ta
                 verwendungen: profileUses,
                 taxRawAggregate: { ...settlement.rawAggregate },
                 taxSettlement: { ...settlement.details },
+                taxSettlementDeferred: false,
                 bruttoVerkaufGesamt: sum(sources.filter(source => !isLiquiditySource(source)).map(source => source.brutto)),
                 steuerPlanGesamt: settlement.taxDue,
                 nettoErlösPlan: profileNet,
@@ -755,6 +756,7 @@ export function attributeHouseholdAction({ householdAction, profiles, mode = 'ta
         taxCashAdjustment: 0,
         taxRawAggregate: rawAggregate,
         taxSettlement: finalTaxSettlement,
+        taxSettlementDeferred: false,
         taxSettlements: settlements.map(settlement => ({
             profileId: settlement.profileId,
             taxDue: settlement.taxDue,

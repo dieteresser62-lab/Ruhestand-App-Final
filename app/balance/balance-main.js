@@ -243,7 +243,10 @@ export function update(options = {}) {
         // Input: Benutzereingaben + letzter State
         // Output: {input, newState, diagnosis, ui} oder {error}
         const modelResult = profilverbundRuns?.householdResult
-            || engineApi.simulateSingleYear(inputData, lastState);
+            || engineApi.simulateSingleYear({
+                ...inputData,
+                finalizeThreeBucketAction: true
+            }, lastState);
 
         // 4. Handle Engine Response
         // Bei Fehler: Exception werfen für einheitliches Error-Handling

@@ -51,10 +51,32 @@ export function calculateSaleAndTax(requestedRefill, input, context, market, isE
         const remainingBudgets = (context && context.saleBudgets)
             ? { ...context.saleBudgets }
             : null;
-        let remainingEquityBudget = Number(context?.maxEquityBudgetTotal);
-        if (!Number.isFinite(remainingEquityBudget) || remainingEquityBudget <= 0) {
-            remainingEquityBudget = null;
-        }
+        const hasExplicitEquityBudget = Boolean(
+            context
+            && Object.prototype.hasOwnProperty.call(context, 'maxEquityBudgetTotal')
+        );
+        const equityBudgetRaw = Number(context?.maxEquityBudgetTotal);
+        let remainingEquityBudget = hasExplicitEquityBudget
+            ? (Number.isFinite(equityBudgetRaw) ? Math.max(0, equityBudgetRaw) : 0)
+            : null;
+        const hasGoldFloorContract = Boolean(
+            context
+            && Object.prototype.hasOwnProperty.call(context, 'minGold')
+        );
+        const totalGoldValue = tranchesToUse.reduce(
+            (total, tranche) => (
+                tranche?.kind === 'gold'
+                    ? total + Math.max(0, Number(tranche.marketValue) || 0)
+                    : total
+            ),
+            0
+        );
+        const effectiveMinGold = (isEmergencySale || context?.ignoreGoldFloor)
+            ? 0
+            : Math.max(0, Number(context?.minGold) || 0);
+        let remainingGoldHeadroom = hasGoldFloorContract
+            ? Math.max(0, totalGoldValue - effectiveMinGold)
+            : null;
 
         for (const tranche of tranchesToUse) {
             // Abbruchbedingung: Wenn Netto-Bedarf gedeckt ist (Normalfall)
@@ -70,12 +92,8 @@ export function calculateSaleAndTax(requestedRefill, input, context, market, isE
             // Gold-Floor berücksichtigen - ABER: Bei Notfallverkäufen (isEmergencySale)
             // oder wenn context.ignoreGoldFloor gesetzt ist, darf der Floor ignoriert werden,
             // um Liquiditätsengpässe zu vermeiden.
-            if (tranche.kind === 'gold' && context.minGold !== undefined) {
-                const goldVal = Number(input.goldWert) || 0;
-                const minG = Number(context.minGold) || 0;
-                // Bei Notfallverkäufen: Gold-Floor auf 0 setzen, um volle Liquiditätsbeschaffung zu ermöglichen
-                const effectiveMinGold = (isEmergencySale || context.ignoreGoldFloor) ? 0 : minG;
-                maxBruttoVerkaufbar = Math.max(0, goldVal - effectiveMinGold);
+            if (tranche.kind === 'gold' && remainingGoldHeadroom !== null) {
+                maxBruttoVerkaufbar = Math.min(maxBruttoVerkaufbar, remainingGoldHeadroom);
             }
 
             // Sale-Budget berücksichtigen
@@ -149,7 +167,9 @@ export function calculateSaleAndTax(requestedRefill, input, context, market, isE
             if (remainingEquityBudget !== null && String(tranche.kind || '').startsWith('aktien')) {
                 remainingEquityBudget = Math.max(0, remainingEquityBudget - zuVerkaufenBrutto);
             }
-
+            if (remainingGoldHeadroom !== null && tranche.kind === 'gold') {
+                remainingGoldHeadroom = Math.max(0, remainingGoldHeadroom - zuVerkaufenBrutto);
+            }
             // Tatsächliche Steuer berechnen
             const bruttogewinn = zuVerkaufenBrutto * gewinnQuote;
             const bruttogewinnSigned = zuVerkaufenBrutto * gewinnQuoteSigned;

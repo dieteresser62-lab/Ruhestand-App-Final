@@ -239,7 +239,7 @@ export function buildOpportunisticRefill({
         }
 
         // ATH-skaliertes Cap: Bei -20% ATH-Abstand kein Rebalancing mehr
-        const baseMaxSkimCapEuro = ((input.maxSkimPctOfEq || 5) / 100) * aktienwert;
+        const baseMaxSkimCapEuro = ((input.maxSkimPctOfEq ?? 5) / 100) * aktienwert;
         const athScaledSkimCap = baseMaxSkimCapEuro * athRebalancingFaktor;
 
         // Bei kritischer Liquidität ODER absolutem Minimum ODER externem Override: Cap lockern
@@ -267,7 +267,11 @@ export function buildOpportunisticRefill({
         let dryRunSale = calculateSaleAndTax(
             effectiveTotalerBedarf,
             input,
-            { minGold: saleContext.minGold, saleBudgets: saleContext.saleBudgets },
+            {
+                minGold: saleContext.minGold,
+                saleBudgets: saleContext.saleBudgets,
+                maxEquityBudgetTotal: saleContext.maxEquityBudgetTotal
+            },
             market,
             false // isEmergencySale
         );

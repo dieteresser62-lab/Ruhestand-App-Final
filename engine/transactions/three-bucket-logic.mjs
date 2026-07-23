@@ -54,6 +54,105 @@ export function sumBondBucketValuation(tranches) {
     }, 0);
 }
 
+function isLiquiditySource(source) {
+    return String(source?.kind || '').toLowerCase() === 'liquiditaet';
+}
+
+function nonLiquidSaleSources(action) {
+    return (Array.isArray(action?.quellen) ? action.quellen : [])
+        .filter(source => source?.kind && !isLiquiditySource(source) && (Number(source.brutto) || 0) > 0);
+}
+
+function reservePlannedLotInventory(detailedTranches, pendingAction) {
+    const tranches = Array.isArray(detailedTranches) ? detailedTranches : [];
+    if (!tranches.length) return [];
+
+    const reservations = new Map();
+    nonLiquidSaleSources(pendingAction).forEach(source => {
+        const trancheId = source?.trancheId;
+        if (!trancheId) {
+            throw new Error('3-Bucket-Finalisierung: Verkaufsquelle ohne eindeutige trancheId kann nicht reserviert werden.');
+        }
+        reservations.set(
+            trancheId,
+            (reservations.get(trancheId) || 0) + Math.max(0, Number(source.brutto) || 0)
+        );
+    });
+
+    return tranches
+        .map(tranche => {
+            const marketValue = Math.max(0, Number(tranche?.marketValue) || 0);
+            const reservedGross = reservations.get(tranche?.trancheId) || 0;
+            if (reservedGross > marketValue + 0.01) {
+                throw new Error(
+                    `3-Bucket-Finalisierung: Lot ${String(tranche?.trancheId || 'unbekannt')} ist um ${(reservedGross - marketValue).toFixed(2)} EUR ueberbucht.`
+                );
+            }
+            const remainingMarketValue = Math.max(0, marketValue - reservedGross);
+            const remainingRatio = marketValue > 0 ? remainingMarketValue / marketValue : 0;
+            return {
+                ...tranche,
+                marketValue: remainingMarketValue,
+                costBasis: Math.max(0, Number(tranche?.costBasis) || 0) * remainingRatio
+            };
+        })
+        .filter(tranche => tranche.marketValue > 0.01);
+}
+
+function mergeLotSaleSources(sources) {
+    const merged = [];
+    const indexByLot = new Map();
+    (sources || []).forEach((source, sourceIndex) => {
+        const trancheId = source?.trancheId;
+        const key = trancheId
+            ? `${String(source?.sourceProfileId || '')}:${String(trancheId)}`
+            : `unscoped:${sourceIndex}`;
+        const existingIndex = indexByLot.get(key);
+        if (existingIndex === undefined) {
+            indexByLot.set(key, merged.length);
+            merged.push({ ...source });
+            return;
+        }
+        const existing = merged[existingIndex];
+        merged[existingIndex] = {
+            ...existing,
+            brutto: (Number(existing.brutto) || 0) + (Number(source.brutto) || 0),
+            steuer: (Number(existing.steuer) || 0) + (Number(source.steuer) || 0),
+            netto: (Number(existing.netto) || 0) + (Number(source.netto) || 0),
+            spbUsed: (Number(existing.spbUsed) || 0) + (Number(source.spbUsed) || 0),
+            realizedGainSigned: (Number(existing.realizedGainSigned) || 0) + (Number(source.realizedGainSigned) || 0),
+            taxableAfterTqfSigned: (Number(existing.taxableAfterTqfSigned) || 0) + (Number(source.taxableAfterTqfSigned) || 0)
+        };
+    });
+    return merged;
+}
+
+function assertFinalLotCapacities(action, detailedTranches) {
+    const tranches = Array.isArray(detailedTranches) ? detailedTranches : [];
+    if (!tranches.length) return;
+    const capacityByLot = new Map(tranches.map(tranche => [
+        `${String(tranche?.sourceProfileId || '')}:${String(tranche?.trancheId || '')}`,
+        Math.max(0, Number(tranche?.marketValue) || 0)
+    ]));
+    const soldByLot = new Map();
+    nonLiquidSaleSources(action).forEach(source => {
+        if (!source?.trancheId) {
+            throw new Error('3-Bucket-Finalisierung: Finale Verkaufsquelle besitzt keine eindeutige trancheId.');
+        }
+        const key = `${String(source?.sourceProfileId || '')}:${String(source.trancheId)}`;
+        if (!capacityByLot.has(key)) {
+            throw new Error(`3-Bucket-Finalisierung: Finale Verkaufsquelle ${String(source.trancheId)} besitzt kein Ursprungs-Lot.`);
+        }
+        soldByLot.set(key, (soldByLot.get(key) || 0) + Math.max(0, Number(source.brutto) || 0));
+    });
+    soldByLot.forEach((sold, key) => {
+        const capacity = capacityByLot.get(key) || 0;
+        if (sold > capacity + 0.01) {
+            throw new Error(`3-Bucket-Finalisierung: Lot ${key} ist um ${(sold - capacity).toFixed(2)} EUR ueberbucht.`);
+        }
+    });
+}
+
 /**
  * Central function to apply the 3-Bucket Decumulation.
  * Analyzes the standard Action recommendation. If it's a "bad year" (equity dropped below trigger),
@@ -212,14 +311,15 @@ export function appendBondReplenishment(
             : 0;
 
         if (bondDeficit > refillThreshold) {
-            const equityOnly = (detailedTranches || []).reduce((sum, t) => sum + (!(isBondCategory(t.type) || isBondCategory(t.category)) ? (Number(t.marketValue) || 0) : 0), 0);
+            const remainingTranches = reservePlannedLotInventory(detailedTranches, pendingAction);
+            const equityOnly = remainingTranches.reduce((sum, t) => sum + (!(isBondCategory(t.type) || isBondCategory(t.category)) ? (Number(t.marketValue) || 0) : 0), 0);
             const netFloorYear = Math.max(0, engineInput.floorBedarf - (engineInput.renteAktiv ? (engineInput.renteMonatlich * 12) : 0));
             const equityGuardMin = Math.max(jahresEntnahmeTarget, netFloorYear);
             const maxRefillNet = Math.max(0, equityOnly - equityGuardMin);
 
             if (maxRefillNet > 0) {
                 const requestedNet = Math.min(bondDeficit, maxRefillNet);
-                const refillTranches = (detailedTranches || []).filter(t => !(isBondCategory(t.type) || isBondCategory(t.category)) && String(t.category || '') === 'equity');
+                const refillTranches = remainingTranches.filter(t => !(isBondCategory(t.type) || isBondCategory(t.category)) && String(t.category || '') === 'equity');
 
                 if (requestedNet > 0 && refillTranches.length > 0) {
                     const refillSale = calculateSaleAndTax(requestedNet, {
@@ -277,7 +377,10 @@ export function appendBondReplenishment(
                             updatedAction.verwendungen.bonds = (updatedAction.verwendungen.bonds || 0) + refillNet;
 
                             if (Array.isArray(refillSale.breakdown)) {
-                                updatedAction.quellen = [...(updatedAction.quellen || []), ...refillSale.breakdown];
+                                updatedAction.quellen = mergeLotSaleSources([
+                                    ...(updatedAction.quellen || []),
+                                    ...refillSale.breakdown
+                                ]);
                             }
                             updatedAction.taxRawAggregate = {
                                 sumRealizedGainSigned: (Number(updatedAction.taxRawAggregate?.sumRealizedGainSigned) || 0) + (Number(refillSale.taxRawAggregate?.sumRealizedGainSigned) || 0),
@@ -291,4 +394,64 @@ export function appendBondReplenishment(
     }
 
     return { updatedAction, bondReplenishmentAmount, addedActionDelta };
+}
+
+/**
+ * Finalizes the complete 3-bucket source ledger before annual tax settlement.
+ * The real equity return uses ratio units (-0.30 means -30 percent).
+ */
+export function finalizeThreeBucketAction({
+    detailedTranches,
+    engineInput,
+    market,
+    pendingAction,
+    realReturnEq,
+    annualWithdrawalTarget,
+    currentBondValuation
+}) {
+    if (!Number.isFinite(realReturnEq)) {
+        throw new Error('3-Bucket-Finalisierung: Reale Aktienrendite muss als endlicher Ratio-Wert vorliegen.');
+    }
+    const threeBucketResult = applyThreeBucketLogic(
+        detailedTranches,
+        engineInput,
+        market,
+        pendingAction,
+        realReturnEq,
+        currentBondValuation
+    );
+    const replenishResult = appendBondReplenishment(
+        detailedTranches,
+        engineInput,
+        threeBucketResult.updatedAction,
+        realReturnEq,
+        Math.max(0, Number(annualWithdrawalTarget) || 0),
+        currentBondValuation,
+        market
+    );
+    const updatedAction = {
+        ...replenishResult.updatedAction,
+        quellen: mergeLotSaleSources(replenishResult.updatedAction?.quellen || [])
+    };
+    assertFinalLotCapacities(updatedAction, detailedTranches);
+
+    const bondSaleGross = nonLiquidSaleSources(updatedAction).reduce((total, source) => (
+        isBondCategory(source?.kind) || isBondCategory(source?.category)
+            ? total + (Number(source.brutto) || 0)
+            : total
+    ), 0);
+    const bondRefillNet = Math.max(0, Number(replenishResult.bondReplenishmentAmount) || 0);
+    const bondRefillGross = (replenishResult.addedActionDelta?.quellen || [])
+        .reduce((total, source) => total + (Number(source?.brutto) || 0), 0);
+    const bondRefillTax = Math.max(0, Number(replenishResult.addedActionDelta?.steuer) || 0);
+    const threeBucketState = {
+        ...threeBucketResult.threeBucketState,
+        bondSaleAmount: bondSaleGross,
+        bondRefillNet,
+        bondRefillGross,
+        bondRefillTax,
+        bondBucketAfter: Math.max(0, currentBondValuation - bondSaleGross + bondRefillNet)
+    };
+
+    return { updatedAction, threeBucketState };
 }

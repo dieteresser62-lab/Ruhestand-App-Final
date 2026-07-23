@@ -63,7 +63,7 @@ engine/
 | `planners/spending-policy-helpers.mjs` | `{ quantizeMonthly, smoothstep, calcFlexShare, calculateFinalWithdrawal }` | Reine Helper fuer Spending-Policies |
 | `planners/wealth-reduction.mjs` | `{ calculateWealthAdjustedReductionFactor }` | Vermoegensbasierte Daempfung der Flex-Reduktion |
 | `transactions/TransactionEngine.mjs` | `TransactionEngine` | Liquiditätsziele, Rebalancing |
-| `transactions/three-bucket-logic.mjs` | `{ getThreeBucketInputs, applyThreeBucketLogic, appendBondReplenishment }` | 3-Bucket-Jilge-Logik fuer Bond-Verkauf, Bond-Refill und Bond-Klassifikation |
+| `transactions/three-bucket-logic.mjs` | `{ getThreeBucketInputs, applyThreeBucketLogic, appendBondReplenishment, finalizeThreeBucketAction }` | 3-Bucket-Jilge-Logik fuer Bond-Verkauf, reservierten Bond-Refill, finale Lot-Pruefung und Bond-Klassifikation |
 | `core.mjs` | `{ EngineAPI, _internal_calculateModel }` | Öffentliche API + interner Pipeline-Entry |
 
 
@@ -93,13 +93,17 @@ EngineAPI-Contractentscheidung samt zugehöriger Validierung. Der separat aus
 
 `transactions/sale-engine.mjs` baut fuer detaillierte Tranchen eine `breakdown[]`-Liste. Die Eingangsgrenze erwartet die kanonische, disjunkte Kategorie-/Typ-Matrix aus `types/tranche-contract.js`; doppelte Lot-IDs und widerspruechliche Klassifikationen werden vor der Berechnung abgelehnt. Neben Verkaufsbetrag, Steuer- und Rohgewinnfeldern bleiben `trancheId` und, falls vorhanden, `sourceProfileId` erhalten. Mehrprofilige Simulator-Inputs koennen dadurch gleichartige Positionen aus unterschiedlichen Profilen eindeutig auf die urspruengliche Profil-Tranche zurueckfuehren.
 
+Ein fehlendes Equity-Gesamtbudget bedeutet unbegrenzt; ein explizites `maxEquityBudgetTotal=0` ist dagegen eine harte Nullgrenze. Derselbe Vertrag gilt fuer `maxSkimPctOfEq=0` in Opportunistic- und Surplus-Pfaden. Der Dry-Run reicht das Gesamtbudget unveraendert an die finale Verkaufsrechnung weiter. Mehrere Goldlots teilen einen einmalig aus dem aggregierten Goldbestand abgeleiteten Floor-Headroom, sodass weder Equity-, Gold- noch Lotbestand mehrfach verplant werden.
+
 Die Engine plant nur. Sie schreibt weder Empfehlungen noch simulierte Lotmutationen in `depot_tranchen`. Eine reale Bestandsfortschreibung erfolgt ausschliesslich nach Broker-Ausfuehrung ueber den bestaetigten Reconcile-Pfad des Profil-Assets-Managers. Siehe `../docs/reference/TRANCHEN_MODULES_README.md`.
 
-Im Core-Einzelverkauf bleiben `breakdown[].steuer` und `breakdown[].netto` die Planattribution des konservativen Gross-ups. Die Top-Level-Felder trennen diese Planung von der finalen Cash-Wahrheit: `bruttoVerkaufGesamt`, `steuerPlanGesamt` und `nettoErlösPlan` beschreiben den Verkauf vor Jahres-Settlement; `steuer` kommt aus `tax-settlement.mjs`, und `taxCashAdjustment = steuerPlanGesamt - steuer` wird genau einmal `verwendungen.liquiditaet` zugeschlagen. Dadurch gelten mit 0,01 EUR Toleranz `bruttoVerkaufGesamt - steuer = nettoErlös` und `sum(verwendungen) = nettoErlös`. Nicht-Verkaufsaktionen exponieren die neuen Verkaufs-/Steuerfelder neutral mit `0`.
+Die Top-Level-Felder trennen konservative Planung von finaler Cash-Wahrheit: `bruttoVerkaufGesamt`, `steuerPlanGesamt` und `nettoErlösPlan` beschreiben den Verkauf vor Jahres-Settlement; `steuer` kommt aus `tax-settlement.mjs`, und `taxCashAdjustment = steuerPlanGesamt - steuer` wird genau einmal `verwendungen.liquiditaet` zugeschlagen. Die finale Steuer wird nach positiver Steuerbasis beziehungsweise Bruttoquelle auf `quellen[]` attribuiert; `steuerPlan` bewahrt dort bei Abweichung die Plansteuer. Dadurch gelten mit 0,01 EUR Toleranz `bruttoVerkaufGesamt - steuer = nettoErlös`, `sum(quellen.netto) = nettoErlös` und `sum(verwendungen) = nettoErlös`. Nicht-Verkaufsaktionen exponieren die Verkaufs-/Steuerfelder neutral mit `0`.
 
 ### 3-Bucket-Jilge-Contract
 
-`transactions/three-bucket-logic.mjs` normalisiert die Strategieparameter fuer `3_bucket_jilge`, erkennt Bond-/Anleihen-Tranchen ueber Typ oder Kategorie (`bond`, `bonds`, `anleihe`) und stellt gemeinsame Funktionen fuer Bond-Verkauf in schlechten Jahren sowie Bond-Wiederauffuellung in guten Jahren bereit. Die Funktionen liefern dieselben Verkaufs- und Steuer-Rohaggregate wie regulaere Verkäufe, damit `tax-settlement.mjs` die finale Jahressteuer konsistent berechnen kann.
+`transactions/three-bucket-logic.mjs` normalisiert die Strategieparameter fuer `3_bucket_jilge`, erkennt Bond-/Anleihen-Tranchen ueber Typ oder Kategorie (`bond`, `bonds`, `anleihe`) und stellt gemeinsame Funktionen fuer Bond-Verkauf in schlechten Jahren sowie Bond-Wiederauffuellung in guten Jahren bereit. `realReturnEq` ist ein endlicher Ratio-Wert (`-0.30` entspricht -30 Prozent). Der Bond-Refill verwendet den von der Spending-Engine tatsaechlich entschiedenen Jahresbedarf, reserviert vorher alle bereits geplanten Lotverkaeufe und skaliert deren verbleibende Cost Basis proportional.
+
+Balance aktiviert den internen Final-Action-Modus auf einem nicht persistierten Input-Clone. `finalizeThreeBucketAction()` schliesst Quellen, Rohsteueraggregate und Verwendungen vor dem einzigen Jahres-Settlement ab, fasst Mehrfachzeilen desselben Profil-Lots zusammen und blockiert fehlende Provenienz oder Ueberbuchung. Single Profile settled im Core; der Profilverbund defert das Haushaltssettlement, attribuiert die finalen Quellen und settled danach genau einmal je Steuer-Owner. Nach dem Settlement veraendert kein Balance-Postprozessor mehr Quellen oder Mengen.
 
 ### Dynamic-Flex Vertragsfelder (`simulateSingleYear`)
 

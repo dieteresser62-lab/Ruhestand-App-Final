@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 129 entdeckte Testdateien, davon 128 im Node-Gate ausgefuehrt, mit 7.300 von 7.300 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (im Slice-12-Abschlussgate mit `npm test` am 2026-07-22 verifiziert). Das zuvor rote Architektur-Evidenzgate ist nach Korrektur der lokalen Forschungsdokument-Links ebenfalls gruen. `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand mit 15/15 Einstiegspunkt-/Zusatzflows, darunter vier isolierte Monte-Carlo-Browserfaelle.
+**Test-Statistik:** 132 entdeckte Testdateien, davon 131 im Node-Gate ausgefuehrt, mit 7.484 von 7.484 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (im Suite-Datenintegritaet-Slice-02-Abschlussgate mit `npm test` am 2026-07-23 verifiziert). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand mit 16/16 Einstiegspunkt-/Zusatzflows, darunter vier isolierte Monte-Carlo-Browserfaelle.
 
 Die Zahl beschreibt nur die Node-Standardsuite. `npm run test:browser`, `npm run test:coverage` und ein echter Tauri-Build sind getrennte Gates und in den Assertions nicht enthalten.
 
@@ -282,6 +282,12 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 - **Komponenten-Rundung:** Gilt auch für Gold-Verkäufe
 
 ### 4. Monte-Carlo-Simulation
+
+#### `monte-carlo-measurement-contract.test.mjs`
+**Zweck:** Validiert Golden Cases, unveraenderliche Snapshot-Linie, Delta-Ledger, Same-Runtime-Exaktheit sowie Direct-/Worker-/Chunk-Paritaet.
+- **Aktuelle Referenz:** `post-suite-data-02-v1` baut auf `post-suite-data-05-v1` auf; keine fruehere Fixture wird ueberschrieben.
+- **Slice-02-Delta:** Die harte Nullsemantik fuer `maxSkimPctOfEq` und das Equity-Gesamtbudget veraendert im festen Acht-Run-Fall nur Volatilitaet und maximalen Drawdown von Run 6 sowie die davon abgeleitete Median-Volatilitaet.
+- **Invarianten:** Direct-Runner-CaR, alle anderen Pfad-/Aggregatwerte, Outcome-Inventar, Missingness und Datenprovenienz bleiben exakt.
 
 #### `monte-carlo-sampling.test.mjs`
 **Zweck:** Validiert den statistischen Kern der Simulation.
@@ -841,6 +847,8 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `liquidity-guardrail.test.mjs` | ~100 | Liquiditäts-Guardrails |
 | `market-analyzer.test.mjs` | ~150 | Markt-Regime-Klassifizierung |
 | `mc-worker-contract.test.mjs` | ~170 | MC-Worker-Entrypoint, Lifecycle und Fehlervertraege |
+| `monte-carlo-export-contract.test.mjs` | ~520 | Request-/Result-/Export-Provenienz, Fingerprint, Replay und Downloadvertrag |
+| `monte-carlo-measurement-contract.test.mjs` | ~1100 | Golden Cases, Snapshot-Linie, Delta-Ledger, Ressourcen-/Worker-Paritaet |
 | `monte-carlo-sampling.test.mjs` | ~200 | Bootstrap, Regime-Transitions |
 | `monte-carlo-startyear.test.mjs` | ~100 | Startjahr-Auswahl |
 | `persistence.test.mjs` | ~900 | PersistenceFacade, IndexedDB/localStorage/Tauri-Adapter und Migrationen |
@@ -876,6 +884,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `snapshot-key-policy.test.mjs` | ~130 | Snapshot-Key-Policy, Restore-Grenzen und technische Key-Ausnahmen |
 | `spending-planner.test.mjs` | ~200 | Entnahme-Logik |
 | `spending-quantization.test.mjs` | ~80 | Entnahme-Rundung |
+| `suite-data-three-bucket-final-action.test.mjs` | ~400 | Slice-02-Final-Action, Nullbudgets, Lot-/Gold-Kapazitaet, Steuer- und Profil-Reconciliation |
 | `tauri-csp.test.mjs` | ~130 | Tauri-CSP, Live-Daten-Endpunkte und Icons |
 | `transaction-engine-ath.test.mjs` | ~160 | ATH-Verhalten |
 | `transaction-engine-rebal.test.mjs` | ~105 | Gold-Rebalancing |

@@ -4,7 +4,7 @@
  *          It runs one household simulation and attributes the finalized action to profile-owned sources.
  * Usage: Used by balance-main.js to handle multi-profile scenarios.
  * Dependencies: profile-storage.js, profilverbund-balance.js, profilverbund-action-attribution.js,
- *               profilverbund-balance-ui.js, three-bucket-logic.mjs
+ *               profilverbund-balance-ui.js
  */
 "use strict";
 
@@ -20,7 +20,6 @@ import {
     buildProfilverbundProfileSummaries
 } from '../profile/profilverbund-balance.js';
 import { renderProfilverbundProfileSelector, toggleProfilverbundMode } from '../profile/profilverbund-balance-ui.js';
-import { applyThreeBucketLogic, appendBondReplenishment, sumBondBucketValuation } from '../../engine/transactions/three-bucket-logic.mjs';
 import {
     attributeHouseholdAction,
     reconcileHouseholdLiquidityKpis
@@ -96,7 +95,9 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
         });
         const householdInput = {
             ...sharedInput,
-            detailledTranches: buildProfilverbundAssetSummary(profiles).mergedTranches
+            detailledTranches: buildProfilverbundAssetSummary(profiles).mergedTranches,
+            finalizeThreeBucketAction: true,
+            deferTaxSettlement: true
         };
         const householdResult = window.EngineAPI.simulateSingleYear(householdInput, householdLastState);
         if (householdResult?.error) {
@@ -118,46 +119,8 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
         }
         const allocationByProfile = new Map(distribution.items.map(item => [item.profileId, item.withdrawalAmount]));
 
-        let finalizedHouseholdAction = householdResult.ui?.action || {};
-        let threeBucketDiagnosis = null;
-        if (householdInput.decumulation?.mode === '3_bucket_jilge' && householdResult.ui?.action) {
-            const market = {
-                realReturnEq: Number(householdResult.newState?.marketData?.returns?.realEq) || 0,
-                sKey: householdResult.ui?.market?.sKey || 'neutral'
-            };
-            const bondBucketBefore = sumBondBucketValuation(householdInput.detailledTranches || []);
-            const threeBucketResult = applyThreeBucketLogic(
-                householdInput.detailledTranches || [],
-                householdInput,
-                market,
-                finalizedHouseholdAction,
-                market.realReturnEq,
-                bondBucketBefore
-            );
-            const annualWithdrawalTarget = Math.max(
-                0,
-                (Number(householdResult.ui?.spending?.monatlicheEntnahme) || 0) * 12
-            );
-            const replenishResult = appendBondReplenishment(
-                householdInput.detailledTranches || [],
-                householdInput,
-                threeBucketResult.updatedAction,
-                market.realReturnEq,
-                annualWithdrawalTarget,
-                bondBucketBefore,
-                market
-            );
-            finalizedHouseholdAction = replenishResult.updatedAction;
-            threeBucketDiagnosis = {
-                ...threeBucketResult.threeBucketState,
-                bondRefillNet: Number(replenishResult.bondReplenishmentAmount) || 0,
-                bondRefillGross: Number(replenishResult.addedActionDelta?.quellen?.reduce(
-                    (total, source) => total + (Number(source?.brutto) || 0),
-                    0
-                )) || 0,
-                bondRefillTax: Number(replenishResult.addedActionDelta?.steuer) || 0
-            };
-        }
+        const finalizedHouseholdAction = householdResult.ui?.action || {};
+        const threeBucketDiagnosis = householdResult.ui?.threeBucket || null;
 
         const attribution = attributeHouseholdAction({
             householdAction: finalizedHouseholdAction,

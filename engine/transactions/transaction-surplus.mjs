@@ -75,7 +75,7 @@ export function trySurplusRebalance({
 
         // Wenn keine Gaps existieren, aber Überschuss hoch ist, erlauben wir
         // einen begrenzten Cash-Abbau in Aktien (marktabhängig).
-        const equityOverflowCap = ((input.maxSkimPctOfEq || 5) / 100) * currentStockVal;
+        const equityOverflowCap = ((input.maxSkimPctOfEq ?? 5) / 100) * currentStockVal;
         if (totalGap <= 0) {
             investAmountRaw = Math.min(surplus, equityOverflowCap);
         }

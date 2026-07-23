@@ -24,6 +24,7 @@ import {
 } from '../app/balance/balance-update-pipeline.js';
 import { PersistenceFacade } from '../app/shared/persistence-facade.js';
 import { loadProfilverbundProfiles } from '../app/profile/profilverbund-balance.js';
+import { EngineAPI } from '../engine/index.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 
@@ -932,34 +933,13 @@ async function runBalanceUiOrchestrationTests() {
 
         let engineCalls = 0;
         window.EngineAPI = {
-            simulateSingleYear() {
+            simulateSingleYear(input, lastState) {
                 engineCalls += 1;
-                return {
-                    newState: { marketData: { returns: { realEq: -0.2 } } },
-                    diagnosis: { general: {} },
-                    ui: {
-                        spending: { monatlicheEntnahme: 1000 },
-                        market: { sKey: 'bear_deep' },
-                        zielLiquiditaet: 20000,
-                        action: {
-                            type: 'TRANSACTION',
-                            title: 'Aktienverkauf',
-                            nettoErlös: 10000,
-                            steuer: 0,
-                            quellen: [{
-                                kind: 'aktien_neu',
-                                sourceProfileId: 'equity-owner',
-                                brutto: 10000,
-                                netto: 10000,
-                                steuer: 0,
-                                realizedGainSigned: 0,
-                                taxableAfterTqfSigned: 0
-                            }],
-                            verwendungen: { liquiditaet: 10000, gold: 0, aktien: 0 },
-                            taxRawAggregate: { sumRealizedGainSigned: 0, sumTaxableAfterTqfSigned: 0 }
-                        }
-                    }
-                };
+                assertEqual(input.finalizeThreeBucketAction, true,
+                    'Household Engine input requests pre-settlement 3-bucket finalization');
+                assertEqual(input.deferTaxSettlement, true,
+                    'Household Engine input defers tax until profile attribution');
+                return EngineAPI.simulateSingleYear(input, lastState);
             }
         };
         const handlers = createProfilverbundHandlers({
@@ -985,8 +965,23 @@ async function runBalanceUiOrchestrationTests() {
         const runs = handlers.runProfilverbundProfileSimulations({
             floorBedarf: 12000,
             flexBedarf: 0,
+            aktuellesAlter: 65,
+            inflation: 2,
             tagesgeld: 0,
             geldmarktEtf: 0,
+            goldAktiv: false,
+            goldWert: 0,
+            goldFloorProzent: 0,
+            goldZielProzent: 0,
+            runwayTargetMonths: 36,
+            runwayMinMonths: 24,
+            risikoprofil: 'sicherheits-dynamisch',
+            endeVJ: 70,
+            endeVJ_1: 100,
+            endeVJ_2: 100,
+            endeVJ_3: 100,
+            ath: 100,
+            jahreSeitAth: 1,
             decumulation: { mode: '3_bucket_jilge', drawdownTrigger: -0.15, bondTargetFactor: 5 },
             sparerPauschbetrag: 1000,
             kirchensteuerSatz: 0

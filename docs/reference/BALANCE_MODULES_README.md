@@ -12,7 +12,7 @@ Die folgende Inventur wurde vor dem Balance-App-Hardening direkt gegen `app/bala
 
 | Datei | Primaere Verantwortung |
 |---|---|
-| `balance-action-postprocessor.js` | Single-Profil-3-Bucket-Nachbearbeitung und Weitergabe der finalen Profilverbund-Aktion |
+| `balance-action-postprocessor.js` | Exponiert die bereits in der Engine finalisierte Single-/Profilverbund-Aktion ohne steuerrelevante Nachbearbeitung |
 | `balance-annual-inflation.js` | Inflationsabruf und Bedarfs-/Faktorfortschreibung |
 | `balance-annual-marketdata.js` | ETF-, ATH-, CAPE- und Nachruecken-Workflow |
 | `balance-annual-modal.js` | Ergebnisdialog des Jahresupdates |
@@ -221,9 +221,9 @@ Einstiegspunkt und Orchestrator.
 
 **Helper-Module (ausgelagert):**
 - `balance-main-profile-sync.js` – Profilwerte in Balance-Inputs spiegeln
-- `balance-main-profilverbund.js` – einmalige Haushalts-Simulation, Profilattribution & UI-Handling
+- `balance-main-profilverbund.js` – einmalige Haushalts-Simulation mit Engine-Final-Action, Profilattribution & UI-Handling
 - `balance-update-pipeline.js` – Engine-Handshake/-Gate, Update-Ergebnisvertrag, Mindest-Flex-Validierung, Engine-Last-State, Renderer-/Diagnose-Payload, Persistenzentscheidung und Ausgabenbudget.
-- `balance-action-postprocessor.js` – Single-Profil-3-Bucket-Postprocessing; im Profilverbund unveraenderte Weitergabe der bereits finalisierten Haushaltsaktion.
+- `balance-action-postprocessor.js` – uebernimmt Diagnose und bereits finalisierte 3-Bucket-Aktion aus dem Engine-Ergebnis; Single Profile und Profilverbund veraendern danach keine Quelle oder Menge mehr.
 
 **Pflegebucket:** Der Update-Zyklus reicht die im Reader erzeugte Pflegebucket-Diagnose an Summary, Key-Parameter und Diagnose-Copytext weiter. Die Engine-Eingaben und die Handlungsempfehlung werden dadurch nicht operativ verändert.
 
@@ -370,8 +370,10 @@ Kernlogik für den Profilverbund (Multi-Profil-Modus).
 
 **Haushalts-/Finanzierungscontract:**
 - `balance-main.js` fuehrt im Multi-Profil-Fall genau einen Haushalts-Engine-Lauf fuer Floor, Flex, Dynamic Flex, Einkommen und Transaktionsplanung aus.
-- Der Engine-Lauf erhaelt einen vollstaendigen Haushaltstranchenpool mit eindeutiger `sourceProfileId`; dessen Laufzeit-`trancheId` ist als `<profileId>:<trancheId>` profilbezogen, ohne die gespeicherte Profiltranche zu veraendern. Die 3-Bucket-Logik und Bond-Wiederauffuellung finalisieren diese Haushaltsaktion genau einmal.
+- Single Profile und Profilverbund setzen `finalizeThreeBucketAction` nur auf einem nicht persistierten Engine-Input-Clone. Der Engine-Lauf verwendet die reale Aktienrendite als Ratio und den tatsaechlich entschiedenen Jahres-Nettoentnahmebedarf.
+- Der Engine-Lauf erhaelt einen vollstaendigen Haushaltstranchenpool mit eindeutiger `sourceProfileId`; dessen Laufzeit-`trancheId` ist als `<profileId>:<trancheId>` profilbezogen, ohne die gespeicherte Profiltranche zu veraendern. Die 3-Bucket-Logik reserviert bereits geplante Lotverkaeufe und finalisiert Bond-Verkauf beziehungsweise -Wiederauffuellung genau einmal vor dem Steuerabschluss.
 - Danach finden keine Profil-Engine-Laeufe statt. Die Profile erhalten ausschliesslich Quellen- und Verwendungsattributionen der finalen Haushaltsaktion; die Verteilungsmodi steuern diese Attribution, aber keine zweite Spending- oder Assetentscheidung.
+- Das Haushaltssettlement ist fuer diesen Lauf explizit deferiert. Erst nach der Quellenattribution ruft `profilverbund-action-attribution.js` `settleTaxYear()` genau einmal je Steuer-Owner auf und setzt `taxSettlementDeferred` im finalen Ergebnis auf `false`.
 - Quellen, Verwendungen und die Summe der finalen Profilsteuern muessen innerhalb 0,01 EUR reconciliert sein. Fehlende Herkunft oder nicht finanzierbare Restbetraege blockieren fail-closed.
 - Haushalts-Guardrail-State und Profil-Steuer-State werden getrennt persistiert. Je Profil wird nur der aus den final attribuierten Verkaeufen berechnete `taxState` ersetzt; sonstige Profil-Last-State-Felder bleiben erhalten.
 

@@ -458,7 +458,7 @@ Die Slice-Dateien werden gemaess `SLICE_EXECUTION_RULES.md` jeweils vor Beginn d
 | Nr. | Vorgesehene Slice-Datei | Titel | Prioritaet | Abhaengigkeit | Programmdateien max. | Status |
 | ---: | --- | --- | --- | --- | ---: | --- |
 | 1 | [SLICE_SUITE_DATA_01_BALANCE_PREVIEW_COMMIT.md](./SLICE_SUITE_DATA_01_BALANCE_PREVIEW_COMMIT.md) | Balance Preview-/Commit-Trennung | P0 | D-02 | 5 | freigegeben |
-| 2 | `SLICE_SUITE_DATA_02_THREE_BUCKET_FINAL_ACTION.md` | Transaktionsbudgets, 3-Bucket Final Action und Steuer | P0 | 1, 3, 5, D-03 | 10 | geplant |
+| 2 | [SLICE_SUITE_DATA_02_THREE_BUCKET_FINAL_ACTION.md](./SLICE_SUITE_DATA_02_THREE_BUCKET_FINAL_ACTION.md) | Transaktionsbudgets, 3-Bucket Final Action und Steuer | P0 | 1, 3, 5, D-03 | 10 | freigegeben |
 | 3 | [SLICE_SUITE_DATA_03_CANONICAL_NUMBERS.md](./SLICE_SUITE_DATA_03_CANONICAL_NUMBERS.md) | Kanonische Zahlen, Fractional Lots und Nullgrenzen | P0 | keine | 6 | freigegeben |
 | 4 | `SLICE_SUITE_DATA_04_PROFILE_ASSET_GOLD.md` | Verlustfreie Profilassets und Goldziele | P0/P1 | 3, D-04, D-05 | 6 | geplant |
 | 5 | [SLICE_SUITE_DATA_05_ENGINE_INVARIANTS.md](./SLICE_SUITE_DATA_05_ENGINE_INVARIANTS.md) | Engine-Spending, Floors, Flex und Rente | P1 | 3 | 7 | freigegeben |
@@ -1661,6 +1661,9 @@ Drittes Restrisiko ist Recovery, das bei transientem IO-Fehler faelschlich Korru
 | 2026-07-23 | Slice 3 durch Codex implementiert | Fractional-Lot- und Nullgrenzencontract ueber Backtest, MC, Sweep und Optimizer nachgewiesen; 131 Testdateien mit 7.399 Assertions und 16 Browser-Smokes gruen; Review ausstehend |
 | 2026-07-23 | Slice 5 durch Codex gestartet | direkter Abhaengigkeitsslice 3 ist freigegeben; Branch und Worktree sauber; Scope auf fuenf Engine-Dateien begrenzt |
 | 2026-07-23 | Slice 5 durch Codex implementiert | Flex-Nullzustand, Renten-Nettoinvariante, harter Floor, Erstjahresquote und aktive Rentenvalidierung korrigiert; erwartete Backtest- und MC-Deltas kontrolliert versioniert; 131 Testdateien mit 7.443 Assertions gruen; Review ausstehend |
+| 2026-07-23 | Slice 2 durch Codex gestartet | direkte Abhaengigkeiten 1, 3 und 5 sowie D-03 freigegeben; Branch und Worktree sauber; initialer Scope auf neun Programmdateien begrenzt |
+| 2026-07-23 | Slice 2 Snapshot-Stop und Nutzerentscheidung | drei isolierte MC-Risikodeltas auf die beabsichtigte harte `maxSkimPctOfEq=0`-Semantik zurueckgefuehrt; Nutzer hob die Stop-Regel fuer genau dieses Delta auf; Scope vor dem Edit auf zehn Programmdateien erweitert |
+| 2026-07-23 | Slice 2 durch Codex implementiert | 3-Bucket-Final-Action vor Settlement, reservierte Lot-/Gold-/Equity-Budgets und profilgenaues Steuer-Settlement umgesetzt; `post-suite-data-02-v1` versioniert; 132 Testdateien mit 7.484 Assertions und 16 Browser-Smokes gruen; Review ausstehend |
 
 ## Review-Feedback von Gemini
 

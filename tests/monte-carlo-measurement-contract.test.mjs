@@ -52,6 +52,7 @@ const postSlice05 = readFixture('post-slice-05-v1.json');
 const postSlice06 = readFixture('post-slice-06-v1.json');
 const postSlice07 = readFixture('post-slice-07-v1.json');
 const postSuiteData05 = readFixture('post-suite-data-05-v1.json');
+const postSuiteData02 = readFixture('post-suite-data-02-v1.json');
 const finalCandidate = readFixture('monte-carlo-v1-final.json');
 const benchmarkContract = readFixture('benchmark-contract-v1.json');
 const benchmarkResults = readFixture('benchmark-results-2026-07-22.json');
@@ -949,6 +950,16 @@ function computeKpiDelta(low, high) {
     assertEqual(suiteData05Entries[0].targetReference, 'post-suite-data-05-v1', 'Suite-Data Slice 05 must target a separate versioned snapshot');
     assertEqual(postSuiteData05.sourceReference, 'post-slice-07-v1', 'Suite-Data Slice 05 snapshot must reference the prior MC semantic snapshot');
     assertEqual(postSuiteData05.reviewStatus, 'pending', 'Codex must not mark its own Suite-Data Slice 05 snapshot as reviewed');
+    const suiteData02Entries = deltaLedger.entries.filter(entry => entry.sliceId === 'SUITE-DATA-02');
+    assertEqual(suiteData02Entries.length, 1, 'Suite-Data Slice 02 must ledger its transaction-budget snapshot delta separately');
+    for (const field of deltaLedger.requiredEntryFields) {
+        assert(Object.prototype.hasOwnProperty.call(suiteData02Entries[0], field), `Suite-Data Slice 02 delta entry must contain ${field}`);
+    }
+    assertEqual(suiteData02Entries[0].sourceReference, 'post-suite-data-05-v1', 'Suite-Data Slice 02 must retain the prior Suite-Data reference');
+    assertEqual(suiteData02Entries[0].targetReference, 'post-suite-data-02-v1', 'Suite-Data Slice 02 must target a separate versioned snapshot');
+    assertEqual(postSuiteData02.sourceReference, 'post-suite-data-05-v1', 'Suite-Data Slice 02 snapshot must reference the prior Suite-Data snapshot');
+    assertEqual(postSuiteData02.reviewStatus, 'pending', 'Codex must not mark its own Suite-Data Slice 02 snapshot as reviewed');
+    assertJsonEqual(postSuiteData02.carResult, postSuiteData05.carResult, 'Suite-Data Slice 02 must retain the direct-runner CaR reference exactly');
     const slice12Entries = deltaLedger.entries.filter(entry => entry.sliceId === '12');
     assertEqual(slice12Entries.length, 1, 'Slice 12 must ledger the integrated final candidate separately');
     for (const field of deltaLedger.requiredEntryFields) {
@@ -1057,9 +1068,9 @@ assertJsonEqual(actualDataVersion, postSlice03.metadata.dataVersion, 'Post-Slice
 assert(preHardening.result !== null, 'Immutable pre-hardening result must remain captured');
 assertEqual(preHardening.result.bufferBytesPerRun, 63, 'Immutable pre-hardening buffer evidence must remain unchanged');
 assertJsonEqual(preHardening.result.buffers.volatilities, preHardening.result.buffers.maxDrawdowns, 'Immutable baseline must retain the documented pre-fix volatility defect');
-const sameRuntime = process.version === postSuiteData05.metadata.runtime.version
-    && process.platform === postSuiteData05.metadata.runtime.platform
-    && process.arch === postSuiteData05.metadata.runtime.architecture;
+const sameRuntime = process.version === postSuiteData02.metadata.runtime.version
+    && process.platform === postSuiteData02.metadata.runtime.platform
+    && process.arch === postSuiteData02.metadata.runtime.architecture;
 assertEqual(postSlice03.result.aggregates.volatilities.p50 !== postSlice03.result.aggregates.maxDrawdowns.p50, true, 'Immutable Post-Slice-03 reference retains separated volatility and drawdown semantics');
 assertJsonEqual(actualDataVersion, postSlice05.metadata.dataVersion, 'Post-Slice-05 data version must match');
 assertEqual(postSlice05.result.outcomeInventory.schemaVersion, 'MonteCarloOutcomeInventoryV1', 'Immutable Post-Slice-05 reference retains the outcome contract');
@@ -1069,21 +1080,21 @@ assertEqual(postSlice06.result.bufferBytesPerRun, 75, 'Immutable Post-Slice-06 r
 assertJsonEqual(actualDataVersion, postSlice07.metadata.dataVersion, 'Post-Slice-07 data version must match');
 compareSnapshotNode(
     actualSlice07Result,
-    postSuiteData05.carResult,
+    postSuiteData02.carResult,
     'result',
     sameRuntime,
-    postSuiteData05.metadata.numericTolerance
+    postSuiteData02.metadata.numericTolerance
 );
 assertJsonEqual(actualDataVersion, finalCandidate.metadata.dataVersion, 'Final candidate data version must match');
 assertEqual(MONTE_CARLO_SNAPSHOT_POLICY.finalCandidate, finalCandidate.snapshotId, 'Public snapshot policy must name the integrated final candidate');
-assertEqual(MONTE_CARLO_SNAPSHOT_POLICY.currentReference, postSuiteData05.snapshotId, 'Public snapshot policy must name the current Suite-Data reference');
+assertEqual(MONTE_CARLO_SNAPSHOT_POLICY.currentReference, postSuiteData02.snapshotId, 'Public snapshot policy must name the current Suite-Data reference');
 const actualFinalProjection = finalCandidateSnapshotProjection(fixedWorkerResult);
 compareSnapshotNode(
     actualFinalProjection,
-    postSuiteData05.result,
-    'postSuiteData05.result',
+    postSuiteData02.result,
+    'postSuiteData02.result',
     sameRuntime,
-    postSuiteData05.metadata.numericTolerance
+    postSuiteData02.metadata.numericTolerance
 );
 
 const directChunk = await runMonteCarloChunk({
