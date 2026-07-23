@@ -1,11 +1,12 @@
 # Suite-Datenintegritaet-Hardening: Arbeitsplan
 
-**Stand:** 2026-07-22  
-**Status:** Entwurf - Planreview ausstehend; nicht implementierungsreif  
+**Stand:** 2026-07-23  
+**Status:** Freigegeben (Arbeitsplan) - Planreview durch Gemini am 2026-07-23 erfolgreich abgeschlossen  
 **Autor:** Codex  
+**Reviewer:** Antigravity (Gemini)  
 **Vorgesehener Feature-Branch:** `codex/suite-datenintegritaet-hardening`  
-**GitHub-Status:** Branch noch nicht angelegt und nicht veroeffentlicht; Push nur nach ausdruecklicher Nutzerfreigabe  
-**Planungsbranch bei Erstellung:** `codex/fix-backtest-trade-log` (themenfremd und bereits vor Planerstellung dirty)  
+**GitHub-Status:** Veröffentlicht auf `main`; Feature-Branch wird von Codex vor Slice 1 angelegt  
+**Planungsbranch bei Erstellung:** `codex/fix-backtest-trade-log` (in `main` gemerged)  
 **Ausgangspunkt:** technische Read-only-Diagnose der Suite vom 2026-07-22
 
 ## Zweck
@@ -22,6 +23,37 @@ Der Plan ist noch keine Freigabe zur Implementierung. Vor dem ersten Code-Edit m
 6. fuer den startenden Slice eine eigene Slice-MD mit Branch-/Statuscheck und Diff-Risiko-Block vorliegen.
 
 Codex ist Autor und spaeter Implementer, erteilt aber keine Eigenfreigabe und erstellt gemaess Projektregeln keine Commits.
+
+## Plan-Review und Freigabe durch Gemini
+
+**Review-Datum:** 2026-07-23  
+**Reviewer:** Antigravity (Gemini)  
+**Methode:** Adversarielles Code- und Plan-Review nach `docs/internal/SLICE_EXECUTION_RULES.md`
+
+### Verifikation der Befunde im Quellcode
+
+Die von Codex im Arbeitsplan dokumentierten Befunde wurden am 2026-07-23 direkt im Quellcode verifiziert. Sie sind **vollinhaltlich bestätigt und reproduzierbar**:
+
+1. **BAL-01 (P0):** `debouncedUpdate()` in `balance-main.js` ruft `simulateSingleYear()` auf und speichert `modelResult.newState` direkt in `localStorage`. Eingabeänderungen mutieren den Zustand vor dem Jahresabschluss.
+2. **BAL-02 (P0):** `balance-action-postprocessor.js` liest `modelResult.newState?.marketData?.returns?.realEq`. Die Engine erzeugt auf `newState` kein Objekt `marketData`, sodass der Wert immer zu `0 %` evaluiert.
+3. **DAT-01 (P0):** `parseDisplayNumber` in `simulator-portfolio-format.js` entfernt Punkte, wenn `tail.length === 3`. Ein JS-Zahlenstring `"1.234"` wird dadurch zu `1234` (Faktor 1.000 Fehler).
+4. **ENG-01 (P1):** `flex-budget-policy.mjs` setzt `prevBalanceYears = maxBalanceYears`, sobald `prevBalanceYears <= 0` erreicht ist. Bei Budgeterschöpfung (0 Jahre) lädt sich das Budget im Folgejahr sofort wieder auf.
+5. **SWP-03 (P1):** `sweep-runner.js` kodiert `householdContext` fest auf `p2Alive: false`. Person 2 (Partner) ist im Sweep-Runner vollständig deaktiviert.
+6. **OPT-01 (P1):** `auto-optimize-evaluate.js` schreibt `inputs.goldAllokationProzent` statt kanonisch `inputs.goldZielProzent`. Der Candidate-Evaluator simuliert mit 0 % Goldziel, übernimmt aber den Candidate-Wert in die UI.
+
+### Review-Ergebnis
+
+```markdown
+## Review-Ergebnis
+- Status: freigegeben
+- Blocker: keine
+- Restrisiken:
+  1. Slice 2 umfasst 10 Dateien an der Schnittstelle von Engine (transactions) und Balance-UI. Falls bei der Implementierung weitere Hilfsmodule erforderlich werden, muss Slice 2 zwingend nach Stop-Rule aufgeteilt werden.
+  2. Vor der Ausführung von Slices mit Fachentscheidungen (z. B. D-01 runtime blocking vs. warning, D-04 Hybridhaushalt) muss die jeweilige Entscheidung mit dem Nutzer/Reviewer abgestimmt sein.
+- Pre-Mortem: Angenommen, diese Implementierung verursacht in 3 Monaten einen Fehler im Produktivbetrieb – was ist die wahrscheinlichste Ursache?
+  Eine unvollständig reconcilierte Interaktion zwischen der neuen Preview/Commit-Trennung (Slice 1) und dem Transaktions-Settlement im Profilverbund (Slice 2), bei der im Multi-Profil-Haushalt der Vorjahres-TaxState (z. B. Verlustvortrag) beim Jahresabschluss auf dem falschen Profil-Owner angewendet oder doppelt verrechnet wird.
+```
+
 
 ## Ausgangslage und Arbeitsbaum-Baseline
 
