@@ -76,6 +76,9 @@ export function createSnapshotHandlers({
     flushLiveState = async ({ sync = false } = {}) => {
         if (sync && typeof debouncedUpdate === 'function') debouncedUpdate();
         await PersistenceFacade.flush();
+    },
+    commitLiveState = async () => {
+        throw new Error('Der periodengebundene Balance-Commit ist nicht konfiguriert.');
     }
 }) {
     let annualCloseInFlight = false;
@@ -179,7 +182,7 @@ export function createSnapshotHandlers({
                 if (nextYear !== planning.plan.expenses.nextYear) {
                     throw new Error(`Post-Write-Validierung: Ausgabenjahr ${planning.plan.expenses.nextYear} wurde erwartet.`);
                 }
-                await flushLiveState({ sync: true });
+                await commitLiveState({ periodId: planning.plan.periodId });
 
                 const completed = completeAnnualPeriodCommit({ periodId: planning.plan.periodId, metadata });
                 if (!completed.metadata) throw new Error(formatPeriodErrors(completed));

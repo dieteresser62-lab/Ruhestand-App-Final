@@ -457,7 +457,7 @@ Die Slice-Dateien werden gemaess `SLICE_EXECUTION_RULES.md` jeweils vor Beginn d
 
 | Nr. | Vorgesehene Slice-Datei | Titel | Prioritaet | Abhaengigkeit | Programmdateien max. | Status |
 | ---: | --- | --- | --- | --- | ---: | --- |
-| 1 | `SLICE_SUITE_DATA_01_BALANCE_PREVIEW_COMMIT.md` | Balance Preview-/Commit-Trennung | P0 | D-02 | 5 | geplant |
+| 1 | [SLICE_SUITE_DATA_01_BALANCE_PREVIEW_COMMIT.md](./SLICE_SUITE_DATA_01_BALANCE_PREVIEW_COMMIT.md) | Balance Preview-/Commit-Trennung | P0 | D-02 | 5 | freigegeben |
 | 2 | `SLICE_SUITE_DATA_02_THREE_BUCKET_FINAL_ACTION.md` | Transaktionsbudgets, 3-Bucket Final Action und Steuer | P0 | 1, 3, 5, D-03 | 10 | geplant |
 | 3 | `SLICE_SUITE_DATA_03_CANONICAL_NUMBERS.md` | Kanonische Zahlen, Fractional Lots und Nullgrenzen | P0 | keine | 6 | geplant |
 | 4 | `SLICE_SUITE_DATA_04_PROFILE_ASSET_GOLD.md` | Verlustfreie Profilassets und Goldziele | P0/P1 | 3, D-04, D-05 | 6 | geplant |
@@ -1642,12 +1642,12 @@ Drittes Restrisiko ist Recovery, das bei transientem IO-Fehler faelschlich Korru
 - [ ] alle Review-Blocker beantwortet
 - [ ] Nutzer hat den korrigierten Plan freigegeben
 - [ ] Status auf `implementierungsreif` gesetzt
-- [ ] sauberer Feature-Branch angelegt/aktiv und GitHub-Status dokumentiert
+- [x] sauberer Feature-Branch angelegt/aktiv und GitHub-Status dokumentiert
 - [ ] Gemini hat vor dem Plan-Commit Status, vollstaendige Dateiliste und Scope-Abgleich dokumentiert
 - [ ] finaler Hauptplan und `docs/internal/README.md` sind lokal auf dem Feature-Branch committed
 - [ ] Remote-Planstand ist nach Nutzerfreigabe veroeffentlicht oder als ausstehend dokumentiert
-- [ ] Slice-MD des ersten freigegebenen Slice erstellt
-- [ ] erste Slice-MD ist relativ in der Slice-Uebersicht verlinkt und ihr Status im Hauptplan aktualisiert
+- [x] Slice-MD des ersten freigegebenen Slice erstellt
+- [x] erste Slice-MD ist relativ in der Slice-Uebersicht verlinkt und ihr Status im Hauptplan aktualisiert
 
 ## Umsetzungsprotokoll
 
@@ -1655,6 +1655,8 @@ Drittes Restrisiko ist Recovery, das bei transientem IO-Fehler faelschlich Korru
 | --- | --- | --- |
 | 2026-07-22 | technische Read-only-Diagnose | mehrere P0-/P1-Datenintegritaetsfehler reproduziert; Tests und Browsergate trotzdem gruen |
 | 2026-07-22 | Hauptplan durch Codex entworfen | Planreview ausstehend; keine Codeaenderung; Umsetzungsbranch noch nicht angelegt |
+| 2026-07-23 | Slice 1 durch Codex gestartet | lokaler Feature-Branch angelegt; Slice-MD erstellt und verlinkt; Implementierung in Arbeit |
+| 2026-07-23 | Slice 1 durch Codex implementiert | Preview/Input/Periodencommit getrennt; 130 Testdateien mit 7.353 Assertions und 16 Browser-Smokes gruen; Multi-Profil-Browsercommit bleibt Review-/Integrationsrisiko |
 
 ## Review-Feedback von Gemini
 

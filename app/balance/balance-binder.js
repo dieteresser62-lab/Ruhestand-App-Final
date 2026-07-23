@@ -22,6 +22,7 @@ import { createImportExportHandlers } from './balance-binder-imports.js';
 import { createDiagnosisHandlers } from './balance-binder-diagnosis.js';
 import { createSnapshotHandlers } from './balance-binder-snapshots.js';
 import { PersistenceFacade } from '../shared/persistence-facade.js';
+import { BALANCE_UPDATE_MODE } from './balance-update-pipeline.js';
 
 // Module-level references
 let dom = null;
@@ -57,13 +58,26 @@ export function initUIBinder(domRefs, state, updateFn, debouncedUpdateFn) {
         debouncedUpdate,
         applyAnnualInflation: annual.applyAnnualInflation,
         runAnnualUpdate: annual.handleJahresUpdate,
-        validateLiveState: () => update({ persist: false }),
+        validateLiveState: () => update({ mode: BALANCE_UPDATE_MODE.PREVIEW }),
         flushLiveState: async ({ sync = true } = {}) => {
-            const result = sync ? update() : { ok: true };
+            const result = sync
+                ? update({ mode: BALANCE_UPDATE_MODE.PERSIST_INPUTS })
+                : { ok: true };
             if (!result?.ok) {
                 throw result?.error || new Error('Balance-Zustand konnte nicht validiert und gespeichert werden.');
             }
             await PersistenceFacade.flush();
+        },
+        commitLiveState: async ({ periodId }) => {
+            const result = update({
+                mode: BALANCE_UPDATE_MODE.COMMIT_PERIOD,
+                periodId
+            });
+            if (!result?.ok) {
+                throw result?.error || new Error('Balance-Perioden-State konnte nicht committed werden.');
+            }
+            await PersistenceFacade.flush();
+            return result;
         }
     });
     handlers = { annual, imports, diagnosis, snapshots };

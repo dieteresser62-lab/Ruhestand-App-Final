@@ -30,17 +30,22 @@ import { getPersistenceStatus, init as initPersistence } from '../shared/persist
 import { PROFILE_VALUE_KEYS } from '../profile/profile-state.js';
 import { postprocessBalanceAction } from './balance-action-postprocessor.js';
 import {
+    BALANCE_UPDATE_MODE,
     BALANCE_UPDATE_STATUS,
     assertActiveEngineHandshake,
+    assertBalanceCandidateFresh,
+    assertBalancePeriodCommit,
     buildBalanceRendererPayload,
     calculateExpensesBudget,
     createBlockedUpdateResult,
+    createBalanceFingerprint,
     createEngineHandshake,
     createUpdateFailureResult,
     createUpdateSuccessResult,
     enrichBalanceDiagnosisPayload,
     persistBalanceUpdate,
     prepareEngineLastState,
+    resolveBalanceUpdateRequest,
     validateBalanceInputs
 } from './balance-update-pipeline.js';
 
@@ -159,7 +164,7 @@ const profileSyncHandlers = createProfileSyncHandlers({
  * 2. Lädt persistenten Zustand (Guardrail-History)
  * 3. Ruft die externe Engine auf (engine.js)
  * 4. Rendert alle Ergebnisse in der UI
- * 5. Speichert den neuen Zustand
+ * 5. Persistiert je nach explizitem Modus keine Daten, nur Eingaben oder den Perioden-State
  *
  * Wird aufgerufen bei:
  * - Initialisierung der App
@@ -167,9 +172,11 @@ const profileSyncHandlers = createProfileSyncHandlers({
  * - Import von Daten
  * - Jahresabschluss
  */
-export function update({ persist = true } = {}) {
-    let phase = 'engine_gate';
+export function update(options = {}) {
+    let phase = 'update_contract';
     try {
+        const request = resolveBalanceUpdateRequest(options);
+        phase = 'engine_gate';
         const engineApi = assertActiveEngineHandshake(appState.engineHandshake, window.EngineAPI);
         UIRenderer.clearError();
 
@@ -195,6 +202,19 @@ export function update({ persist = true } = {}) {
 
         // Profilverbund runs are computed only for multi-profile households.
         const isMultiProfileHousehold = profilverbundProfiles.length > 1;
+        if (request.mode === BALANCE_UPDATE_MODE.COMMIT_PERIOD) {
+            assertBalancePeriodCommit(persistentState, request.periodId);
+        }
+        const createBaseStateFingerprint = (state, profiles) => createBalanceFingerprint({
+            persistentState: state,
+            profilverbundStates: isMultiProfileHousehold
+                ? profiles.map(entry => ({
+                    profileId: entry.profileId,
+                    balanceState: entry.balanceState || null
+                }))
+                : null
+        });
+        const baseStateFingerprint = createBaseStateFingerprint(persistentState, profilverbundProfiles);
         const householdStateSource = profilverbundProfiles
             .find(entry => entry?.balanceState?.profilverbundHouseholdLastState)
             ?.balanceState || persistentState;
@@ -267,18 +287,48 @@ export function update({ persist = true } = {}) {
         });
         updateExpensesBudget({ monthlyBudget, annualBudget });
 
-        const result = createUpdateSuccessResult({ inputData, modelResult });
+        const fingerprints = {
+            inputFingerprint: createBalanceFingerprint(inputData),
+            baseStateFingerprint,
+            candidateStateFingerprint: createBalanceFingerprint({
+                householdState: modelResult.newState,
+                profileStates: profilverbundRuns
+                    ? profilverbundRuns.map(run => ({
+                        profileId: run.profileId,
+                        newState: run.newState
+                    }))
+                    : null
+            })
+        };
+        const result = createUpdateSuccessResult({
+            inputData,
+            modelResult,
+            updateMode: request.mode,
+            fingerprints
+        });
 
         // Persistenz ist ausschliesslich nach erfolgreicher Validierung und Engine-Ausfuehrung erlaubt.
-        if (persist && result.status === BALANCE_UPDATE_STATUS.SUCCESS) {
+        if (request.mode !== BALANCE_UPDATE_MODE.PREVIEW && result.status === BALANCE_UPDATE_STATUS.SUCCESS) {
             phase = 'persistence';
-            persistBalanceUpdate({
+            if (request.mode === BALANCE_UPDATE_MODE.COMMIT_PERIOD) {
+                const currentPersistentState = StorageManager.loadState();
+                const currentProfiles = loadProfilverbundProfiles();
+                const currentBaseStateFingerprint = createBaseStateFingerprint(
+                    currentPersistentState,
+                    currentProfiles
+                );
+                assertBalanceCandidateFresh(baseStateFingerprint, currentBaseStateFingerprint);
+            }
+            result.persistence = persistBalanceUpdate({
+                mode: request.mode,
+                periodId: request.periodId,
                 profilverbundRuns,
                 profilverbundHandlers,
                 storageManager: StorageManager,
                 persistentState,
                 inputData,
-                modelResult
+                modelResult,
+                fingerprints
             });
 
             profilverbundHandlers.refreshProfilverbundBalance();
@@ -302,7 +352,10 @@ export function update({ persist = true } = {}) {
  */
 function debouncedUpdate() {
     clearTimeout(appState.debounceTimer);
-    appState.debounceTimer = setTimeout(update, 250);
+    appState.debounceTimer = setTimeout(
+        () => update({ mode: BALANCE_UPDATE_MODE.PERSIST_INPUTS }),
+        250
+    );
 }
 
 /**
@@ -432,7 +485,7 @@ export async function init() {
 
     // 9. Initial update
     // Führt ersten Berechnungs- und Render-Zyklus durch
-    const initialUpdateResult = update();
+    const initialUpdateResult = update({ mode: BALANCE_UPDATE_MODE.PREVIEW });
 
     // 10. Initialize Depot-Tranchen Status Badge
     // Zeigt Status der geladenen detaillierten Tranchen an

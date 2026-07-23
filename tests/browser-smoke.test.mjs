@@ -415,6 +415,55 @@ async function runBalanceAnnualPreflight(browser, baseUrl) {
     await smoke.close();
 }
 
+async function runBalancePreviewLifecycle(browser, baseUrl) {
+    const seededStorage = createBalanceStorage(2025);
+    const seededState = JSON.parse(seededStorage[BALANCE_STATE_KEY]);
+    seededState.lastState = {
+        ...seededState.lastState,
+        taxState: { lossCarry: 20000 },
+        flexBudget: { balanceYears: 3 },
+        vpw: { streak: 4 },
+        lastWithdrawal: 36000
+    };
+    seededStorage[BALANCE_STATE_KEY] = JSON.stringify(seededState);
+
+    const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', { storage: seededStorage });
+    await smoke.page.locator('#profilverbund-profile-list input').waitFor({ state: 'visible' });
+    await smoke.page.locator('#floorBedarf').waitFor({ state: 'attached' });
+    await smoke.page.waitForTimeout(750);
+
+    const afterInitialRender = JSON.parse(
+        (await readIndexedDb(smoke.page, 'kv', BALANCE_STATE_KEY)).value
+    );
+    assert(
+        JSON.stringify(afterInitialRender.lastState) === JSON.stringify(seededState.lastState),
+        'Initialrender darf den fachlichen Balance-State nicht fortschreiben'
+    );
+
+    await smoke.page.locator('#floorBedarf').evaluate(element => {
+        element.value = '13000';
+        for (let count = 0; count < 5; count++) {
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    });
+    await smoke.page.waitForTimeout(750);
+
+    const afterRepeatedInputs = JSON.parse(
+        (await readIndexedDb(smoke.page, 'kv', BALANCE_STATE_KEY)).value
+    );
+    assert(afterRepeatedInputs.inputs.floorBedarf === 13000, 'Input-only Persistenz muss reload-fest bleiben');
+    assert(
+        JSON.stringify(afterRepeatedInputs.lastState) === JSON.stringify(seededState.lastState),
+        'Fuenf identische Eingaben duerfen Verlustvortrag, Flex, VPW und letzte Entnahme nicht fortschreiben'
+    );
+    assert(
+        afterRepeatedInputs.balanceStateLifecycle === undefined,
+        'Input-only Persistenz darf keinen Periodencommit vortaeuschen'
+    );
+    smoke.assertNoErrors();
+    await smoke.close();
+}
+
 async function runBalanceAnnualCommit(browser, baseUrl) {
     const smoke = await openSmokePage(browser, baseUrl, 'Balance.html', {
         storage: createBalanceStorage(2025), annualFixtures: true
@@ -446,6 +495,10 @@ async function runBalanceAnnualCommit(browser, baseUrl) {
     const row = await readIndexedDb(smoke.page, 'kv', BALANCE_STATE_KEY);
     const state = JSON.parse(row.value);
     assert(state.annualPeriodMetadata.lastCommittedPeriod === 'calendar-year:2025', 'Commit muss stabile Perioden-ID speichern');
+    assert(
+        state.balanceStateLifecycle?.lastCommittedPeriod === 'calendar-year:2025',
+        'Fachlicher State-Commit muss dieselbe stabile Perioden-ID speichern'
+    );
     assert(await readIndexedDb(smoke.page, 'snapshots', null) === 1, 'Doppelklick darf nur einen Recovery-Snapshot erzeugen');
     smoke.assertNoErrors();
     await smoke.close();
@@ -1036,6 +1089,7 @@ async function main() {
             ['Balance shared tranche ids', runBalanceSharedTrancheIds],
             ['Balance engine gate', runBalanceEngineGate],
             ['Balance annual preflight', runBalanceAnnualPreflight],
+            ['Balance preview lifecycle', runBalancePreviewLifecycle],
             ['Balance corrupt expenses', runBalanceCorruptExpenses],
             ['Simulator.html', runSimulatorSmoke],
             ['Simulator Monte-Carlo E2E', runMonteCarloBrowserRegression],

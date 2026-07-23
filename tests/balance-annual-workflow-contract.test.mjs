@@ -148,7 +148,8 @@ try {
             },
             applyAnnualInflation: () => { calls.push('inflation-write'); },
             rollExpensesYearFn: () => { calls.push('expenses-write'); return NEXT_YEAR; },
-            flushLiveState: async ({ sync = false } = {}) => { calls.push(`flush:${sync}`); }
+            flushLiveState: async ({ sync = false } = {}) => { calls.push(`flush:${sync}`); },
+            commitLiveState: async ({ periodId }) => { calls.push(`commit:${periodId}`); }
         });
 
         const result = await handlers.handleJahresabschluss();
@@ -160,6 +161,10 @@ try {
         assert(calls.indexOf('snapshot') < calls.indexOf('annual-update'), 'Snapshot liegt vor erster fachlicher Jahresmutation');
         assert(calls.indexOf('annual-update') < calls.indexOf('inflation-write'), 'Jahresupdate liegt vor Inflationsfortschreibung');
         assert(calls.indexOf('inflation-write') < calls.indexOf('expenses-write'), 'Inflation liegt vor Ausgaben-Rollover');
+        assert(
+            calls.indexOf('expenses-write') < calls.indexOf(`commit:calendar-year:${TARGET_YEAR}`),
+            'Fachlicher Candidate wird erst nach den Jahreswrites periodengebunden committed'
+        );
         assertEqual(calls[calls.length - 1], 'render', 'Snapshot-Liste wird erst nach erfolgreichem Commit gerendert');
 
         const duplicate = await handlers.handleJahresabschluss();
@@ -185,7 +190,8 @@ try {
             runAnnualUpdate: async () => { calls.push('annual-update'); return { ok: true }; },
             applyAnnualInflation: () => { calls.push('inflation-write'); },
             rollExpensesYearFn: () => { calls.push('expenses-write'); return NEXT_YEAR; },
-            flushLiveState: async () => {}
+            flushLiveState: async () => {},
+            commitLiveState: async () => {}
         });
         await handlers.handleJahresabschluss();
         assert(!calls.includes('snapshot'), 'Fehlgeschlagene Vorpruefung verhindert Snapshot');
@@ -212,7 +218,8 @@ try {
             runAnnualUpdate: async () => { calls.push('annual-update'); return { ok: true }; },
             applyAnnualInflation: () => { calls.push('inflation-write'); },
             rollExpensesYearFn: () => { calls.push('expenses-write'); return NEXT_YEAR; },
-            flushLiveState: async () => {}
+            flushLiveState: async () => {},
+            commitLiveState: async () => {}
         });
         const result = await handlers.handleJahresabschluss();
         assertEqual(result.status, 'invalid', 'Snapshot-Fehler vor Commit liefert fail-closed Status ohne Recovery-Behauptung');
@@ -245,7 +252,8 @@ try {
             },
             applyAnnualInflation: () => { calls.push('inflation-write'); },
             rollExpensesYearFn: () => { calls.push('expenses-write'); return NEXT_YEAR; },
-            flushLiveState: async () => {}
+            flushLiveState: async () => {},
+            commitLiveState: async () => {}
         });
         const result = await handlers.handleJahresabschluss();
         const metadata = StorageManager.loadState()[ANNUAL_PERIOD_METADATA_KEY];
@@ -286,7 +294,8 @@ try {
             },
             applyAnnualInflation: () => {},
             rollExpensesYearFn: () => NEXT_YEAR,
-            flushLiveState: async () => {}
+            flushLiveState: async () => {},
+            commitLiveState: async () => {}
         });
         const first = handlers.handleJahresabschluss();
         await Promise.resolve();

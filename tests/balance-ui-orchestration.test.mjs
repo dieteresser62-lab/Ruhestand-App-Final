@@ -383,7 +383,8 @@ async function runBalanceUiOrchestrationTests() {
                 renteAktiv: false,
                 renteMonatlich: 0
             },
-            lastState: { guardrailMarker: 'included-keep', taxState: { lossCarry: 111 } }
+            lastState: { guardrailMarker: 'included-keep', taxState: { lossCarry: 111 } },
+            profilverbundHouseholdLastState: { householdGuardrail: 'household-keep' }
         };
         const partnerState = {
             inputs: {
@@ -502,7 +503,32 @@ async function runBalanceUiOrchestrationTests() {
         assert(engineCalls[0].detailledTranches.some(tranche => tranche.sourceProfileId === 'partner'),
             'Zweites ausgewaehltes Profil besitzt eindeutige Quellenprovenienz');
 
-        handlers.persistProfilverbundProfileStates(runs);
+        runs[0].persistedInput = { ...runs[0].persistedInput, floorBedarf: 1300 };
+        handlers.persistProfilverbundInputs(runs);
+        const registryAfterInputPersistence = JSON.parse(localStorageRef.getItem('rs_profiles_v1'));
+        const includedAfterInputPersistence = JSON.parse(
+            registryAfterInputPersistence.profiles.included.data[CONFIG.STORAGE.LS_KEY]
+        );
+        const partnerAfterInputPersistence = JSON.parse(
+            registryAfterInputPersistence.profiles.partner.data[CONFIG.STORAGE.LS_KEY]
+        );
+        assertEqual(includedAfterInputPersistence.inputs.floorBedarf, 1300,
+            'Input-only Persistenz speichert geaenderte Profileingaben');
+        assertEqual(includedAfterInputPersistence.lastState.guardrailMarker, 'included-keep',
+            'Input-only Persistenz erhaelt den ersten Profil-Guardrail-State');
+        assertClose(includedAfterInputPersistence.lastState.taxState.lossCarry, 111, 0.001,
+            'Input-only Persistenz erhaelt den ersten Verlustvortrag');
+        assertClose(partnerAfterInputPersistence.lastState.taxState.lossCarry, 222, 0.001,
+            'Input-only Persistenz erhaelt den zweiten Verlustvortrag');
+        assertEqual(
+            includedAfterInputPersistence.profilverbundHouseholdLastState.householdGuardrail,
+            'household-keep',
+            'Input-only Persistenz erhaelt den Household-Guardrail-State'
+        );
+
+        handlers.persistProfilverbundProfileStates(runs, {
+            lifecycle: { schemaVersion: 1, lastCommittedPeriod: 'calendar-year:2025' }
+        });
         const registryAfterPersistence = JSON.parse(localStorageRef.getItem('rs_profiles_v1'));
         const includedPersisted = JSON.parse(registryAfterPersistence.profiles.included.data[CONFIG.STORAGE.LS_KEY]);
         const partnerPersisted = JSON.parse(registryAfterPersistence.profiles.partner.data[CONFIG.STORAGE.LS_KEY]);
@@ -516,6 +542,8 @@ async function runBalanceUiOrchestrationTests() {
             'Gemeinsamer Haushalts-Guardrail-State bleibt separat erhalten');
         assertClose(includedPersisted.profilverbundHouseholdLastState.taxState.lossCarry, 0, 0.001,
             'Nicht autoritativer Haushalts-Steuerzustand wird vor der Persistenz neutralisiert');
+        assertEqual(includedPersisted.balanceStateLifecycle.lastCommittedPeriod, 'calendar-year:2025',
+            'Profilverbund-Commit speichert die gemeinsame Perioden-ID');
     }
 
     console.log('Test 3: Balance import schema, legacy migration and fail-safe orchestration');

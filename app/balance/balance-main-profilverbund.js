@@ -227,7 +227,28 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
         return runs.finalAction;
     };
 
-    const persistProfilverbundProfileStates = (runs) => {
+    const writeProfileBalanceState = (profileId, nextState) => {
+        updateProfileData(profileId, {
+            [CONFIG.STORAGE.LS_KEY]: JSON.stringify(nextState)
+        });
+        if (profileId === getCurrentProfileId()) {
+            persistenceStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify(nextState));
+        }
+    };
+
+    const persistProfilverbundInputs = (runs) => {
+        runs.forEach(run => {
+            const existing = (run.balanceState && typeof run.balanceState === 'object') ? run.balanceState : {};
+            const nextState = {
+                ...existing,
+                inputs: run.persistedInput || run.input,
+                profilverbundHouseholdInputs: runs.householdInput || existing.profilverbundHouseholdInputs
+            };
+            writeProfileBalanceState(run.profileId, nextState);
+        });
+    };
+
+    const persistProfilverbundProfileStates = (runs, { lifecycle = null } = {}) => {
         const householdNewState = runs.householdResult?.newState
             ? { ...runs.householdResult.newState, taxState: { lossCarry: 0 } }
             : null;
@@ -238,14 +259,10 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
                 inputs: run.persistedInput || run.input,
                 lastState: run.newState,
                 profilverbundHouseholdInputs: runs.householdInput || existing.profilverbundHouseholdInputs,
-                profilverbundHouseholdLastState: householdNewState || existing.profilverbundHouseholdLastState
+                profilverbundHouseholdLastState: householdNewState || existing.profilverbundHouseholdLastState,
+                ...(lifecycle ? { balanceStateLifecycle: lifecycle } : {})
             };
-            updateProfileData(run.profileId, {
-                [CONFIG.STORAGE.LS_KEY]: JSON.stringify(nextState)
-            });
-            if (run.profileId === getCurrentProfileId()) {
-                persistenceStorage.setItem(CONFIG.STORAGE.LS_KEY, JSON.stringify(nextState));
-            }
+            writeProfileBalanceState(run.profileId, nextState);
         });
     };
 
@@ -327,6 +344,7 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
         refreshProfilverbundBalance,
         runProfilverbundProfileSimulations,
         mergeProfilverbundActions,
+        persistProfilverbundInputs,
         persistProfilverbundProfileStates,
         initProfilverbundBalance,
         updateProfilverbundGlobals
