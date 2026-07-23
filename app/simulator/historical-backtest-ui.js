@@ -53,9 +53,9 @@ const COLUMN_LABELS = Object.freeze({
     'Pf.Akt%': 'Aktienrendite in Prozent',
     'Pf.Gld%': 'Goldrendite in Prozent',
     'Infl.': 'Inflation in Prozent',
-    'Handl.A': 'Nettohandel Aktien',
-    'Handl.G': 'Nettohandel Gold',
-    'Handl.Bd': 'Nettohandel Bonds',
+    'Handl.A': 'Nettohandel Aktien: positiv = Verkauf, negativ = Kauf',
+    'Handl.G': 'Nettohandel Gold: positiv = Verkauf, negativ = Kauf',
+    'Handl.Bd': 'Nettohandel Bonds: positiv = Verkauf, negativ = Kauf',
     'St.': 'Gezahlte Steuern',
     'ETF': 'ETF-Bestand am Jahresende',
     'Aktien': 'Aktienbestand am Jahresende',
@@ -76,6 +76,11 @@ const COLUMN_LABELS = Object.freeze({
     'HBTrig': 'Pflegebucket-Trigger',
     'HBWarn': 'Pflegebucket-Warnung'
 });
+
+const SAFE_BACKTEST_CELL_CLASSES = new Set([
+    'backtest-trade-sale',
+    'backtest-trade-buy'
+]);
 
 function finiteInteger(value) {
     const number = Number(value);
@@ -405,6 +410,13 @@ function accessibleColumnLabel(column) {
     return key ? `${header} (${key})` : header;
 }
 
+function safeBacktestCellClass(column, row) {
+    const requestedClass = typeof column?.cellClass === 'function'
+        ? column.cellClass(row)
+        : column?.cellClass;
+    return SAFE_BACKTEST_CELL_CLASSES.has(requestedClass) ? requestedClass : '';
+}
+
 export function buildAccessibleBacktestTableHtml(rows, columns, formatValue) {
     const safeRows = Array.isArray(rows) ? rows : [];
     const safeColumns = Array.isArray(columns) ? columns : [];
@@ -420,7 +432,9 @@ export function buildAccessibleBacktestTableHtml(rows, columns, formatValue) {
         html += `<tr class="${index % 2 === 0 ? 'even' : 'odd'}">`;
         for (const column of safeColumns) {
             const value = typeof formatValue === 'function' ? formatValue(column, row) : '';
-            html += `<td>${escapeBacktestHtml(value)}</td>`;
+            const cellClass = safeBacktestCellClass(column, row);
+            const classAttribute = cellClass ? ` class="${cellClass}"` : '';
+            html += `<td${classAttribute}>${escapeBacktestHtml(value)}</td>`;
         }
         html += '</tr>';
     }

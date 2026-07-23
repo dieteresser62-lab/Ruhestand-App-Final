@@ -394,6 +394,16 @@ input:disabled {
     white-space: nowrap;
 }
 
+#simulationLog td.backtest-trade-sale {
+    color: darkred;
+    font-weight: bold;
+}
+
+#simulationLog td.backtest-trade-buy {
+    color: darkblue;
+    font-weight: bold;
+}
+
 #simulationLog caption {
     padding: 10px 8px;
     color: #1f2937;

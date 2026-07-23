@@ -9,6 +9,11 @@ import {
     summarizeHistoricalBacktestDataQuality,
     validateHistoricalBacktestPeriod
 } from '../app/simulator/historical-backtest-ui.js';
+import {
+    buildBacktestColumnDefinitions,
+    formatColumnValue
+} from '../app/simulator/simulator-main-helpers.js';
+import { STRATEGY_OPTIONS } from '../types/strategy-options.js';
 
 console.log('--- Simulator Backtest UI Contract Tests ---');
 
@@ -173,7 +178,36 @@ console.log('Test 6: accessible table has caption, scoped headers and escaped ce
     assert(html.includes('&lt;unsafe&gt;') && !html.includes('<unsafe>'), 'Cell data is HTML-escaped');
 }
 
-console.log('Test 7: zero-eligible cohort inventory renders without division artifacts and is immutable');
+console.log('Test 7: trade cells keep plain text, sign semantics and whitelisted colors');
+{
+    const columns = buildBacktestColumnDefinitions('normal', {
+        strategyMode: STRATEGY_OPTIONS.THREE_BUCKET_JILGE,
+        goldAktiv: true
+    }).filter(column => ['Handl.A', 'Handl.G', 'Handl.Bd'].includes(column.header));
+    const html = buildAccessibleBacktestTableHtml([{
+        netA: -120000,
+        netG: 50000,
+        row: {
+            bondSaleAmount: 2000,
+            bondRefillNet: 5000
+        }
+    }], columns, formatColumnValue);
+
+    assert(html.includes('aria-label="Nettohandel Aktien: positiv = Verkauf, negativ = Kauf"'), 'Trade header explains the sign convention');
+    assert(html.includes('<td class="backtest-trade-buy">-120k €</td>'), 'Equity purchase renders as escaped plain text with the buy class');
+    assert(html.includes('<td class="backtest-trade-sale">50k €</td>'), 'Gold sale renders as escaped plain text with the sale class');
+    assert(html.includes('<td class="backtest-trade-buy">-3k €</td>'), 'Bond purchase renders with the same sign convention');
+    assert(!html.includes('<span') && !html.includes('&lt;span'), 'Trade cells contain no formatter HTML');
+
+    const rejectedClassHtml = buildAccessibleBacktestTableHtml(
+        [{ value: 'safe' }],
+        [{ header: 'Test', key: 'value', cellClass: () => 'unsafe-class' }],
+        (column, row) => row[column.key]
+    );
+    assert(!rejectedClassHtml.includes('unsafe-class'), 'Renderer rejects non-whitelisted cell classes');
+}
+
+console.log('Test 8: zero-eligible cohort inventory renders without division artifacts and is immutable');
 {
     const inventory = createImmutableCohortInventory({
         candidate: 3,

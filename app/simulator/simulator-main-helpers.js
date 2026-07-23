@@ -8,6 +8,18 @@ import { STRATEGY_OPTIONS } from '../../types/strategy-options.js';
 
 const CSV_DELIMITER = ';';
 
+const BACKTEST_TRADE_CELL_CLASSES = Object.freeze({
+    sale: 'backtest-trade-sale',
+    buy: 'backtest-trade-buy'
+});
+
+function tradeCellClass(value) {
+    const amount = Number(value);
+    if (amount > 0) return BACKTEST_TRADE_CELL_CLASSES.sale;
+    if (amount < 0) return BACKTEST_TRADE_CELL_CLASSES.buy;
+    return '';
+}
+
 
 /**
  * Computes the pension adjustment percentage for a specific simulation year.
@@ -228,6 +240,10 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal', options =
         const entry = trace.find(item => item?.phase === phase);
         return Number(entry?.total);
     };
+    const bondNetTrade = row => (
+        (Number(row?.row?.threeBucket?.bondSaleAmount ?? row?.row?.bondSaleAmount) || 0)
+        - (Number(row?.row?.threeBucket?.bondRefillNet ?? row?.row?.bondRefillNet) || 0)
+    );
 
     const columns = [
         { header: 'Jahr', width: 4, key: 'jahr', valueFormatter: v => v ?? '', align: 'right' },
@@ -411,28 +427,22 @@ export function buildBacktestColumnDefinitions(detailLevel = 'normal', options =
         { header: 'Pf.Gld%', width: 8, extractor: row => formatPercentRatio(row.row?.NominalReturnGoldPct || 0, { fractionDigits: 1, invalid: '0.0%' }), valueFormatter: v => v, align: 'right' },
         { header: 'Infl.', width: 5, key: 'inflationVJ', valueFormatter: v => formatPercent(v), align: 'right' },
         {
-            header: 'Handl.A', width: 8, key: 'netA', valueFormatter: v => {
-                const formatted = formatCurrencyShortLog(v);
-                if (v > 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
-                if (v < 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
-                return formatted;
-            }, align: 'right'
+            header: 'Handl.A', width: 8, key: 'netA',
+            valueFormatter: v => formatCurrencyShortLog(v),
+            cellClass: row => tradeCellClass(row?.netA),
+            align: 'right'
         },
         {
-            header: 'Handl.G', width: 8, key: 'netG', valueFormatter: v => {
-                const formatted = formatCurrencyShortLog(v);
-                if (v > 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
-                if (v < 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
-                return formatted;
-            }, align: 'right'
+            header: 'Handl.G', width: 8, key: 'netG',
+            valueFormatter: v => formatCurrencyShortLog(v),
+            cellClass: row => tradeCellClass(row?.netG),
+            align: 'right'
         },
         ...(isThreeBucket ? [{
-            header: 'Handl.Bd', width: 8, extractor: row => (Number(row?.row?.threeBucket?.bondSaleAmount ?? row?.row?.bondSaleAmount) || 0) - (Number(row?.row?.threeBucket?.bondRefillNet ?? row?.row?.bondRefillNet) || 0), valueFormatter: v => {
-                const formatted = formatCurrencyShortLog(v);
-                if (v > 0) return `<span style="color: darkred; font-weight: bold">${formatted}</span>`;
-                if (v < 0) return `<span style="color: darkblue; font-weight: bold">${formatted}</span>`;
-                return formatted;
-            }, align: 'right'
+            header: 'Handl.Bd', width: 8, extractor: bondNetTrade,
+            valueFormatter: v => formatCurrencyShortLog(v),
+            cellClass: row => tradeCellClass(bondNetTrade(row)),
+            align: 'right'
         }] : []),
         { header: 'St.', width: 6, key: 'row.steuern_gesamt', valueFormatter: v => formatCurrencyShortLog(v), align: 'right' },
         {
