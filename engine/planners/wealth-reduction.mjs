@@ -13,8 +13,9 @@ export function calculateWealthAdjustedReductionFactor(params) {
     const inflatedBedarf = params?.inflatedBedarf || {};
     const floor = Math.max(0, Number(inflatedBedarf.floor) || 0);
     const flex = Math.max(0, Number(inflatedBedarf.flex) || 0);
-    const renteJahr = Math.max(0, Number(params?.renteJahr) || 0);
-    const maxEntnahme = Math.max(0, floor + flex - renteJahr);
+    // inflatedBedarf is the canonical net need after pension reconciliation.
+    // Subtracting renteJahr here again would count the same pension twice.
+    const maxEntnahme = floor + flex;
     const depotwertGesamt = Math.max(0, Number(params?.depotwertGesamt) || 0);
     const lastState = params?.lastState || {};
     const lastEntnahmeReal = Number.isFinite(lastState.lastEntnahmeReal)

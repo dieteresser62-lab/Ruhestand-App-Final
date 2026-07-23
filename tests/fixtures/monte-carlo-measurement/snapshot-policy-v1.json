@@ -17,6 +17,14 @@
       "purpose": "Record an explicitly reviewed semantic transition without changing earlier references."
     },
     {
+      "idPattern": "post-suite-data-{sliceNumber}-v{revision}",
+      "filePattern": "post-suite-data-{sliceNumber}-v{revision}.json",
+      "immutableAfterReview": true,
+      "overwriteAllowed": false,
+      "requiresDeltaLedger": true,
+      "purpose": "Record Suite-Datenintegritaet semantic transitions without overwriting the completed Monte Carlo hardening references."
+    },
+    {
       "id": "monte-carlo-v1-final",
       "file": "monte-carlo-v1-final.json",
       "candidateOnlyUntilExternalApproval": true,

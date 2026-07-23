@@ -177,7 +177,7 @@ const schemaGolden = JSON.parse(fs.readFileSync(
     assert(/^[a-f0-9]{64}$/.test(request.scenario.fingerprint.value), 'scenario fingerprint is a SHA-256 hex value');
     assert(/^[a-f0-9]{64}$/.test(request.data.fingerprint.value), 'data fingerprint is a SHA-256 hex value');
     assertEqual(request.execution.chunkConfiguration.strategy, 'single-chunk-v1', 'request records the exact serial chunk policy');
-    assertEqual(request.snapshotPolicy.currentReference, 'post-slice-07-v1', 'request identifies the versioned snapshot reference');
+    assertEqual(request.snapshotPolicy.currentReference, 'post-suite-data-05-v1', 'request identifies the current Suite-Datenintegritaet snapshot reference');
     assert(Object.isFrozen(request) && Object.isFrozen(request.scenario.normalizedInputs), 'request is deeply immutable');
     validateMonteCarloRunRequestV1(request);
 }

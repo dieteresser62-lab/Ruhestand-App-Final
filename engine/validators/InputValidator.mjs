@@ -77,6 +77,14 @@ const InputValidator = {
         }
     });
 
+    if (input.renteAktiv === true) {
+        check(
+            !Number.isFinite(input.renteMonatlich) || input.renteMonatlich < 0,
+            'renteMonatlich',
+            'Aktive Rente muss eine gültige nicht-negative Zahl sein.'
+        );
+    }
+
     // This optional override belongs to the engine contract, not to locale-aware UI parsing.
     if (input.aktuelleLiquiditaet != null) {
         check(

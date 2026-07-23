@@ -27,18 +27,33 @@ export function calcFlexShare(inflatedBedarf) {
 }
 
 export function calculateFinalWithdrawal(inflatedBedarf, flexRate, antiPseudoAccuracyEnabled = true) {
-    const rawEntnahme = inflatedBedarf.floor +
+    const floorAnnual = Math.max(0, Number(inflatedBedarf.floor) || 0);
+    const rawEntnahme = floorAnnual +
         (inflatedBedarf.flex * (Math.max(0, Math.min(100, flexRate)) / 100));
-    let monthlyEntnahme = rawEntnahme / 12;
+    const rawMonthly = rawEntnahme / 12;
+    let quantizedMonthly = rawMonthly;
 
     if (antiPseudoAccuracyEnabled) {
-        monthlyEntnahme = quantizeMonthly(monthlyEntnahme, 'floor');
+        quantizedMonthly = quantizeMonthly(rawMonthly, 'floor');
     }
 
-    const endgueltigeEntnahme = monthlyEntnahme * 12;
+    const quantizedAnnual = quantizedMonthly * 12;
+    const floorProtectionApplied = quantizedAnnual < floorAnnual;
+    const endgueltigeEntnahme = Math.max(floorAnnual, quantizedAnnual);
     const effectiveFlexRate = (inflatedBedarf.flex > 0)
         ? ((Math.max(0, endgueltigeEntnahme - inflatedBedarf.floor) / inflatedBedarf.flex) * 100)
         : 0;
+    const quantization = {
+        enabled: antiPseudoAccuracyEnabled,
+        mode: 'floor',
+        rawAnnual: rawEntnahme,
+        rawMonthly,
+        quantizedMonthly,
+        quantizedAnnual,
+        floorAnnual,
+        floorProtectionApplied,
+        finalAnnual: endgueltigeEntnahme
+    };
 
-    return { endgueltigeEntnahme, flexRate: effectiveFlexRate };
+    return { endgueltigeEntnahme, flexRate: effectiveFlexRate, quantization };
 }

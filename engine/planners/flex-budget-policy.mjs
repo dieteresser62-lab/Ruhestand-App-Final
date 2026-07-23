@@ -19,7 +19,7 @@ export function applyFlexBudgetCap(flexRate, inflatedBedarf, input, state, marke
     let prevBalanceYears = Number.isFinite(state.flexBudgetBalanceYears)
         ? state.flexBudgetBalanceYears
         : (Number.isFinite(state.flexBudgetBalance) ? state.flexBudgetBalance : maxBalanceYears);
-    if (!Number.isFinite(prevBalanceYears) || prevBalanceYears <= 0) {
+    if (!Number.isFinite(prevBalanceYears)) {
         prevBalanceYears = maxBalanceYears;
     }
     prevBalanceYears = Math.min(maxBalanceYears, Math.max(0, prevBalanceYears));

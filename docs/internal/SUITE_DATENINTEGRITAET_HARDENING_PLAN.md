@@ -461,7 +461,7 @@ Die Slice-Dateien werden gemaess `SLICE_EXECUTION_RULES.md` jeweils vor Beginn d
 | 2 | `SLICE_SUITE_DATA_02_THREE_BUCKET_FINAL_ACTION.md` | Transaktionsbudgets, 3-Bucket Final Action und Steuer | P0 | 1, 3, 5, D-03 | 10 | geplant |
 | 3 | [SLICE_SUITE_DATA_03_CANONICAL_NUMBERS.md](./SLICE_SUITE_DATA_03_CANONICAL_NUMBERS.md) | Kanonische Zahlen, Fractional Lots und Nullgrenzen | P0 | keine | 6 | freigegeben |
 | 4 | `SLICE_SUITE_DATA_04_PROFILE_ASSET_GOLD.md` | Verlustfreie Profilassets und Goldziele | P0/P1 | 3, D-04, D-05 | 6 | geplant |
-| 5 | `SLICE_SUITE_DATA_05_ENGINE_INVARIANTS.md` | Engine-Spending, Floors, Flex und Rente | P1 | 3 | 7 | geplant |
+| 5 | [SLICE_SUITE_DATA_05_ENGINE_INVARIANTS.md](./SLICE_SUITE_DATA_05_ENGINE_INVARIANTS.md) | Engine-Spending, Floors, Flex und Rente | P1 | 3 | 7 | freigegeben |
 | 6 | `SLICE_SUITE_DATA_06_RESULT_SIGN_SEMANTICS.md` | Nullwerte, negative Renditen und wahrheitsgetreue Darstellung | P1 | 3, 5, D-06, D-19 | 7 | geplant |
 | 7 | `SLICE_SUITE_DATA_07_SWEEP_REQUEST_SAMPLING.md` | Kanonischer Sweep-Request und Sampling | P1 | 3, 5 | 6 | geplant |
 | 8 | `SLICE_SUITE_DATA_08_SWEEP_HOUSEHOLD_RISK.md` | Partner, Pflege, Langlebigkeit und Tail Risk | P1 | 7 | 7 | geplant |
@@ -1659,6 +1659,8 @@ Drittes Restrisiko ist Recovery, das bei transientem IO-Fehler faelschlich Korru
 | 2026-07-23 | Slice 1 durch Codex implementiert | Preview/Input/Periodencommit getrennt; 130 Testdateien mit 7.353 Assertions und 16 Browser-Smokes gruen; Multi-Profil-Browsercommit bleibt Review-/Integrationsrisiko |
 | 2026-07-23 | Slice 3 durch Codex gestartet | Bounds-Stop-Fall durch Nutzer entschieden; kanonische Numbers bleiben unveraendert, UI folgt vorhandenen Engine-Grenzen |
 | 2026-07-23 | Slice 3 durch Codex implementiert | Fractional-Lot- und Nullgrenzencontract ueber Backtest, MC, Sweep und Optimizer nachgewiesen; 131 Testdateien mit 7.399 Assertions und 16 Browser-Smokes gruen; Review ausstehend |
+| 2026-07-23 | Slice 5 durch Codex gestartet | direkter Abhaengigkeitsslice 3 ist freigegeben; Branch und Worktree sauber; Scope auf fuenf Engine-Dateien begrenzt |
+| 2026-07-23 | Slice 5 durch Codex implementiert | Flex-Nullzustand, Renten-Nettoinvariante, harter Floor, Erstjahresquote und aktive Rentenvalidierung korrigiert; erwartete Backtest- und MC-Deltas kontrolliert versioniert; 131 Testdateien mit 7.443 Assertions gruen; Review ausstehend |
 
 ## Review-Feedback von Gemini
 

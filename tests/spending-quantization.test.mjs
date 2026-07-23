@@ -81,4 +81,29 @@ const INPUT = { inflation: 2 };
     console.log('✅ Integration Logic Passed');
 }
 
+// --- TEST 3: Quantization cannot undercut the hard annual floor ---
+{
+    CONFIG.ANTI_PSEUDO_ACCURACY.ENABLED = true;
+    const floorOnly = { floor: 25000, flex: 0 };
+    const direct = SpendingPlanner._calculateFinalWithdrawal(floorOnly, 100);
+    const result = SpendingPlanner.determineSpending({
+        lastState: LAST_STATE,
+        market: MARKET,
+        inflatedBedarf: floorOnly,
+        runwayMonate: 40,
+        profil: PROFILE,
+        depotwertGesamt: 600000,
+        gesamtwert: 600000,
+        renteJahr: 0,
+        input: INPUT
+    });
+
+    assertEqual(direct.endgueltigeEntnahme, 25000, 'Monthly quantization must not reduce a 25,000 annual floor to 24,000');
+    assertEqual(result.spendingResult.details.endgueltigeEntnahme, 25000, 'Planner integration must preserve the exact hard floor');
+    assert(direct.quantization.floorProtectionApplied === true, 'Helper should diagnose floor protection after quantization');
+    assertEqual(direct.quantization.quantizedAnnual, 24000, 'Diagnostics should retain the pre-protection quantized annual amount');
+    assertEqual(direct.quantization.finalAnnual, 25000, 'Diagnostics should expose the protected final annual amount');
+    console.log('✅ Hard floor survives monthly quantization');
+}
+
 console.log('--- Spending Quantization Tests Completed ---');

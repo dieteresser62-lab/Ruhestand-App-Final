@@ -144,8 +144,11 @@ export const SpendingPlanner = {
             const realerDepotDrawdown = (peakRealVermoegen > 0)
                 ? (peakRealVermoegen - realVermögen) / peakRealVermoegen
                 : 0;
+            const previousFlexRate = Number.isFinite(lastState.flexRate)
+                ? Math.max(0, Math.min(100, lastState.flexRate))
+                : 100;
             const vorlaeufigeEntnahme = p.inflatedBedarf.floor +
-                (p.inflatedBedarf.flex * (lastState.flexRate / 100));
+                (p.inflatedBedarf.flex * (previousFlexRate / 100));
             const entnahmequoteDepot = p.depotwertGesamt > 0
                 ? vorlaeufigeEntnahme / p.depotwertGesamt
                 : 0;
@@ -168,6 +171,11 @@ export const SpendingPlanner = {
             'active'
         );
 
+        const initialWithdrawal = p.inflatedBedarf.floor + p.inflatedBedarf.flex;
+        const initialWithdrawalRate = p.depotwertGesamt > 0
+            ? initialWithdrawal / p.depotwertGesamt
+            : 0;
+
         return {
             flexRate: 100,
             lastMarketSKey: p.market.sKey,
@@ -181,7 +189,7 @@ export const SpendingPlanner = {
                 peakRealVermoegen: p.gesamtwert,
                 currentRealVermoegen: p.gesamtwert,
                 cumulativeInflationFactor: 1,
-                entnahmequoteDepot: 0,
+                entnahmequoteDepot: initialWithdrawalRate,
                 realerDepotDrawdown: 0
             }
         };

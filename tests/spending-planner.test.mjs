@@ -481,6 +481,48 @@ function clone(value) {
     console.log('✅ Flex-budget policy: recharge works');
 }
 
+// --- TEST 3fa: Flex-budget golden sequence preserves exhausted zero ---
+{
+    const input = {
+        floorBedarf: 24000,
+        flexBedarf: 24000,
+        flexBudgetAnnual: 6000,
+        flexBudgetYears: 2,
+        flexBudgetRecharge: 3000
+    };
+    const need = { floor: 24000, flex: 24000 };
+    const bear = { sKey: 'bear_deep' };
+    const calm = { sKey: 'hot_neutral' };
+    const state = { keyParams: { wealthReductionFactor: 1 } };
+
+    const year1 = applyFlexBudgetCap(100, need, input, state, bear, () => {});
+    assertClose(year1.balanceYears, 1, 0.0001, 'Missing budget state should initialize at max and consume one bear year');
+
+    state.flexBudgetBalanceYears = year1.balanceYears;
+    const year2 = applyFlexBudgetCap(100, need, input, state, bear, () => {});
+    assertClose(year2.balanceYears, 0, 0.0001, 'Second bear year should exhaust the budget');
+
+    state.flexBudgetBalanceYears = year2.balanceYears;
+    const exhaustedBear = applyFlexBudgetCap(100, need, input, state, bear, () => {});
+    assertClose(exhaustedBear.balanceYears, 0, 0.0001, 'Exhausted explicit zero must stay zero in an active regime');
+    assert(exhaustedBear.applied === false, 'Exhausted budget must not apply another annual cap');
+
+    state.flexBudgetBalanceYears = exhaustedBear.balanceYears;
+    const recharge = applyFlexBudgetCap(100, need, input, state, calm, () => {});
+    assertClose(recharge.balanceYears, 0.5, 0.0001, 'Inactive regime should recharge only recharge / annualCap');
+
+    const legacyZero = applyFlexBudgetCap(
+        100,
+        need,
+        input,
+        { flexBudgetBalance: 0, keyParams: { wealthReductionFactor: 1 } },
+        bear,
+        () => {}
+    );
+    assertClose(legacyZero.balanceYears, 0, 0.0001, 'Legacy explicit zero must also remain exhausted');
+    console.log('✅ Flex-budget policy: missing, exhausted and recharge sequence works');
+}
+
 // --- TEST 3g: Flex-budget policy min-rate ---
 {
     const state = { flexBudgetBalanceYears: 2, keyParams: { wealthReductionFactor: 1 } };
@@ -641,16 +683,32 @@ function clone(value) {
     console.log('✅ Wealth-adjusted reduction: 5% => 1');
 }
 
-// --- TEST 8: Wealth-adjusted reduction respects pensions (net withdrawal) ---
+// --- TEST 8: Wealth-adjusted reduction consumes already-net pension need exactly once ---
 {
-    const params = {
-        inflatedBedarf: { floor: 40000, flex: 20000 },
-        renteJahr: 60000, // pensions cover full need
+    const withoutPension = {
+        inflatedBedarf: { floor: 12000, flex: 12000 },
+        renteJahr: 0,
         depotwertGesamt: 1000000
     };
-    const result = calculateWealthAdjustedReductionFactor(params);
-    assertClose(result.factor, 0, 0.001, 'No reduction when pensions cover full need');
-    console.log('✅ Wealth-adjusted reduction: pensions cover need => 0');
+    const withPensionAlreadyNetted = {
+        inflatedBedarf: { floor: 12000, flex: 12000 },
+        renteJahr: 12000,
+        depotwertGesamt: 1000000
+    };
+    const expectedRate = 24000 / 1000000;
+    const cfg = CONFIG.SPENDING_MODEL.WEALTH_ADJUSTED_REDUCTION;
+    const expectedFactor = smoothstep(
+        (expectedRate - cfg.SAFE_WITHDRAWAL_RATE) /
+        (cfg.FULL_WITHDRAWAL_RATE - cfg.SAFE_WITHDRAWAL_RATE)
+    );
+    const withoutResult = calculateWealthAdjustedReductionFactor(withoutPension);
+    const withResult = calculateWealthAdjustedReductionFactor(withPensionAlreadyNetted);
+
+    assertClose(withoutResult.entnahmequoteUsed, expectedRate, 0.0001, 'No-pension case should use hand-calculated 2.4% net withdrawal');
+    assertClose(withResult.entnahmequoteUsed, expectedRate, 0.0001, 'Already-net pension case must not subtract pension a second time');
+    assertClose(withoutResult.factor, expectedFactor, 0.0001, 'No-pension case should match hand-calculated wealth factor');
+    assertClose(withResult.factor, expectedFactor, 0.0001, 'Economically identical pension case should match the same wealth factor');
+    console.log('✅ Wealth-adjusted reduction: pension is consumed exactly once');
 }
 
 // --- TEST 9: S-curve check against linear ---
@@ -689,6 +747,47 @@ function clone(value) {
         'Planner delegate should return wealth policy factor'
     );
     console.log('✅ Wealth-adjusted reduction: real previous withdrawal basis works');
+}
+
+// --- TEST 9c: First-year withdrawal rate and alarm use the same current contract as later years ---
+{
+    const base = {
+        market: { sKey: 'bear_deep', abstandVomAthProzent: 30, szenarioText: 'Test' },
+        inflatedBedarf: { floor: 24000, flex: 0 },
+        runwayMonate: 6,
+        profil: mockProfile,
+        depotwertGesamt: 100000,
+        gesamtwert: 100000,
+        renteJahr: 0,
+        input: {
+            inflation: 0,
+            runwayTargetMonths: 36,
+            runwayMinMonths: 24,
+            floorBedarf: 24000,
+            flexBedarf: 0
+        }
+    };
+    const firstYear = SpendingPlanner.determineSpending({ ...base, lastState: null });
+    const laterYear = SpendingPlanner.determineSpending({
+        ...base,
+        lastState: {
+            initialized: true,
+            flexRate: 100,
+            alarmActive: false,
+            peakRealVermoegen: 100000,
+            cumulativeInflationFactor: 1
+        }
+    });
+    const firstAlarm = firstYear.diagnosis.decisionTree.find(entry => entry.step === 'Alarm-Aktivierung!');
+    const laterAlarm = laterYear.diagnosis.decisionTree.find(entry => entry.step === 'Alarm-Aktivierung!');
+
+    assertClose(firstYear.spendingResult.details.entnahmequoteDepot, 0.24, 0.0001, 'First year should calculate 24% from 24,000 / 100,000');
+    assertClose(laterYear.spendingResult.details.entnahmequoteDepot, 0.24, 0.0001, 'Later year should calculate the same 24% current rate');
+    assert(firstYear.diagnosis.general.alarmActive === true, 'Critical first-year rate should activate the alarm');
+    assert(laterYear.diagnosis.general.alarmActive === true, 'Equivalent later-year rate should activate the alarm');
+    assert(firstAlarm?.severity === 'alarm', 'First-year warning should use alarm severity');
+    assert(laterAlarm?.severity === 'alarm', 'Later-year warning should use the same alarm severity');
+    console.log('✅ First-year withdrawal rate and alarm parity works');
 }
 
 // --- TEST 10: Alarm + Flex-Budget + Final-Limits interaction ---

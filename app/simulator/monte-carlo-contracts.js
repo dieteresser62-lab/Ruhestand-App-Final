@@ -14,7 +14,7 @@ export const MONTE_CARLO_FINGERPRINT_ALGORITHM = 'sha256-canonical-json-v1';
 export const MONTE_CARLO_SNAPSHOT_POLICY = Object.freeze({
     schemaVersion: MONTE_CARLO_SNAPSHOT_POLICY_VERSION,
     immutableBaseline: 'pre-hardening-v1',
-    currentReference: 'post-slice-07-v1',
+    currentReference: 'post-suite-data-05-v1',
     deltaLedger: 'delta-ledger-v1',
     finalCandidate: 'monte-carlo-v1-final',
     policy: 'immutable-baseline-with-versioned-post-slice-references'

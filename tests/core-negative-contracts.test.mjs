@@ -180,7 +180,24 @@ function createDocumentMock(values = {}) {
     }
 }
 
-// --- TEST 6: tax settlement sanitizes invalid tax state and raw aggregates without mutation ---
+// --- TEST 6: Active pension requires a finite non-negative monthly amount ---
+{
+    for (const value of [undefined, Number.NaN, Number.POSITIVE_INFINITY, -1]) {
+        const result = withMutedValidationLog(() => EngineAPI.simulateSingleYear(
+            { ...baseEngineInput, renteAktiv: true, renteMonatlich: value },
+            null
+        ));
+        assertValidationField(result.error, 'renteMonatlich', `Invalid active pension ${String(value)}`);
+    }
+
+    const zeroPension = EngineAPI.simulateSingleYear(
+        { ...baseEngineInput, renteAktiv: true, renteMonatlich: 0 },
+        null
+    );
+    assert(!zeroPension.error, 'Active pension with explicit zero should remain valid');
+}
+
+// --- TEST 7: tax settlement sanitizes invalid tax state and raw aggregates without mutation ---
 {
     const prev = { lossCarry: Number.POSITIVE_INFINITY };
     const prevBefore = JSON.stringify(prev);
@@ -201,7 +218,7 @@ function createDocumentMock(values = {}) {
     assertEqual(result.details.sumRealizedGainSigned, 0, 'Invalid realized aggregate should sanitize to zero');
 }
 
-// --- TEST 7: forced-sale recompute uses loss carry and TQF-adjusted signed aggregate ---
+// --- TEST 8: forced-sale recompute uses loss carry and TQF-adjusted signed aggregate ---
 {
     const aggregate = buildTaxRawAggregate({
         sumRealizedGainSigned: 10000,
@@ -234,7 +251,7 @@ function createDocumentMock(values = {}) {
     assertEqual(actionResult.taxRawAggregate.sumTaxableAfterTqfSigned, 7000, 'Forced-sale path should preserve TQF-adjusted aggregate');
 }
 
-// --- TEST 8: non-positive forced shortfall is a neutral no-sale path ---
+// --- TEST 9: non-positive forced shortfall is a neutral no-sale path ---
 {
     const portfolio = {
         depotTranchesAktien: [{ marketValue: 1000, costBasis: 800, type: 'aktien_alt', purchaseDate: '2020-01-01' }],

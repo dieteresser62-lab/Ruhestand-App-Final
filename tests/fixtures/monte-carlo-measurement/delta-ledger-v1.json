@@ -125,6 +125,17 @@
       "reviewStatus": "pending"
     },
     {
+      "sliceId": "SUITE-DATA-05",
+      "sourceReference": "post-slice-07-v1",
+      "targetReference": "post-suite-data-05-v1",
+      "fieldPath": "buffers.realWithdrawalP10RealEur/pathSummaries.realWithdrawalP10RealEur/integrated.pathSummaries.{volatilityPct,maxDrawdownPct,cutYearShareRatio}/integrated.riskKpis",
+      "formulaBefore": "the first engine year persisted withdrawal rate zero and the wealth fallback subtracted pension income a second time from an already netted need",
+      "formulaAfter": "first and later engine years derive withdrawal rate from the current net need; the wealth fallback consumes the already pension-netted need exactly once; hard floor quantization and exhausted flex-budget zero remain invariant",
+      "expectedDirection": "path-level real withdrawal P10, volatility, drawdown and cut-year share may move in either direction; aggregate real-withdrawal P10, observation counts, missingness, outcome inventory and floor coverage remain unchanged for GC-CAR-01",
+      "goldenCaseIds": ["GC-CAR-01"],
+      "reviewStatus": "pending"
+    },
+    {
       "sliceId": "12",
       "sourceReference": "post-slice-07-v1",
       "targetReference": "monte-carlo-v1-final",

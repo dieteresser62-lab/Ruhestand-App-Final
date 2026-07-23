@@ -153,7 +153,7 @@
   "cases": [
     {
       "alerts": [],
-      "canonicalRowsHash": "9f444cd7c6e2b78025ea89133c6c3af18a978aff9745a43ec9feb45250b8e6e0",
+      "canonicalRowsHash": "ca5828ee5050aa1b8a80b4226757191f694bc2972ead3712178db97723c9d275",
       "expectedRowCount": 6,
       "id": "completed_2000_2005",
       "inputHash": "ebdea5f8b4162f411a17802329bb68cc3a4e756f61e0c6a1f0131b611601ab7d",
@@ -450,7 +450,7 @@
     },
     {
       "alerts": [],
-      "canonicalRowsHash": "9b15184f395b633a130d3f3a7e2bf835d9c8c7ecf8822d3d484ec9d1a002db86",
+      "canonicalRowsHash": "bf041bdf1c54d450bef5b3d35d1c9cc7bccfadae328dd653bdb09d4e436eaa61",
       "expectedRowCount": 61,
       "id": "completed_1960_2020",
       "inputHash": "cb5a70552297ce10277b714a2c5fcc6878a4569571368284257ece3550b8e379",
@@ -720,7 +720,7 @@
     },
     {
       "alerts": [],
-      "canonicalRowsHash": "25cadd9750d2e3d72c295982d5010b4507836c3cee1fe1018a4000a0c8a493a7",
+      "canonicalRowsHash": "1d3c42f3c097e003e99f725df7c78441452eba668d9c3aa7c54fe045aa0db035",
       "expectedRowCount": 10,
       "id": "three_bucket_minimum_flex_2005_2014",
       "inputHash": "ee6f0f4f65ac743fec4e1b68f7424a486fa7b4c8f0f4a43bf374d743b4723c29",
@@ -990,7 +990,7 @@
     },
     {
       "alerts": [],
-      "canonicalRowsHash": "84ab2642058bd4da8439cc66cb35de33cc36d7f886c997c263cd1a2a0a2db752",
+      "canonicalRowsHash": "bc9d63550ef6b197c53eb289dae2255519c7a77dca23db049beb8b1389399265",
       "expectedRowCount": 2,
       "id": "capital_poor_ruin_2000_2005",
       "inputHash": "e576bf078df99d1bc8b779e50fc8c0ffe381bb5599f8c9b1809da292295d31fc",
@@ -1208,7 +1208,7 @@
     },
     {
       "alerts": [],
-      "canonicalRowsHash": "557b472cfa6a66d56267e06a7f9930408184696f8cd9d22f879c1c7a64cfe398",
+      "canonicalRowsHash": "1ee32f18bc106e5a86da8c2a04a6af103d28166c27ca89426aa3265da6c0b71c",
       "expectedRowCount": 2,
       "id": "health_bucket_nested_row_summary_positive",
       "inputHash": "a799ab677936d36be93752fa374902ad2c0421c7f199f3a8f84b01086d4bfff5",
@@ -1427,7 +1427,7 @@
     },
     {
       "alerts": [],
-      "canonicalRowsHash": "0bbd35e32ba2b590046f58b585edcf9bb9eb0c173954ffac729b397ed91430da",
+      "canonicalRowsHash": "0048585e7909c89c4f45da8db53b7029d175bcfb718a1a69e1232342613dfd1d",
       "expectedRowCount": 4,
       "id": "dynamic_flex_cape_2010_2013",
       "inputHash": "1bc7852f16e88c723c6cc528290c37b04e209df4b1b353d55180d91a319ab65d",
@@ -2057,8 +2057,8 @@
     "temporalConventionId": "realized_t_decision_t_minus_1_v1"
   },
   "detailToggleOracle": {
-    "detailedCanonicalRowsHash": "9f444cd7c6e2b78025ea89133c6c3af18a978aff9745a43ec9feb45250b8e6e0",
-    "normalCanonicalRowsHash": "9f444cd7c6e2b78025ea89133c6c3af18a978aff9745a43ec9feb45250b8e6e0",
+    "detailedCanonicalRowsHash": "ca5828ee5050aa1b8a80b4226757191f694bc2972ead3712178db97723c9d275",
+    "normalCanonicalRowsHash": "ca5828ee5050aa1b8a80b4226757191f694bc2972ead3712178db97723c9d275",
     "payloadStable": true,
     "projectionDependency": "Only rendered columns change with backtestLogDetailLevel; canonical rows and raw JSON/CSV export do not."
   },
@@ -2310,7 +2310,7 @@
   "negativeCases": [
     {
       "alerts": [],
-      "canonicalRowsHash": "11d4e829b3be7db36f54f43a8f9fc23d7898dd9d40b80a684d9b529f47f2f317",
+      "canonicalRowsHash": "b0ba109fde0ea3c49676ae3ce0ace5841181521e07ca5e7c90bfc32fb2b6d8ff",
       "expectedRowCount": 0,
       "id": "negative_single_year_2010",
       "inputHash": "a799ab677936d36be93752fa374902ad2c0421c7f199f3a8f84b01086d4bfff5",
@@ -2832,7 +2832,7 @@
     },
     {
       "alerts": [],
-      "canonicalRowsHash": "daa41d3e6fbb26865d9e56eda6b580bb6f96e8c91220c383c58e56fe2cb5e13a",
+      "canonicalRowsHash": "b49dcf23ff8126a3951a2766efdcf207570a03f29d35260ada00bdf3f5ecc5e2",
       "expectedRowCount": 1,
       "id": "negative_missing_middle_year_2000_2002",
       "inputHash": "a799ab677936d36be93752fa374902ad2c0421c7f199f3a8f84b01086d4bfff5",
@@ -3076,7 +3076,7 @@
     },
     {
       "alerts": [],
-      "canonicalRowsHash": "94c6c2eb39a24132424d2c949d55b785c4018d27451de42d58d599a5b16bdfa7",
+      "canonicalRowsHash": "5babb878fecded49ab08d6b295f7951a5ad069df815f905f2c7e232f15745cb8",
       "expectedRowCount": 2,
       "id": "negative_non_finite_gold_return_2001_2002",
       "inputHash": "a799ab677936d36be93752fa374902ad2c0421c7f199f3a8f84b01086d4bfff5",
