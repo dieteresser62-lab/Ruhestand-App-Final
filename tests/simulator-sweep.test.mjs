@@ -11,6 +11,10 @@
 
 import { EngineAPI } from '../engine/index.mjs';
 import { prepareHistoricalDataOnce } from '../app/simulator/simulator-engine-helpers.js';
+import {
+    ESTIMATED_HISTORY_CUTOFF_YEAR,
+    annualData
+} from '../app/simulator/simulator-data.js';
 import { parseRangeInput, cartesianProductLimited } from '../app/simulator/simulator-utils.js';
 import {
     deepClone,
@@ -21,7 +25,17 @@ import {
     areP2InvariantsEqual,
     normalizeWidowOptions
 } from '../app/simulator/simulator-sweep-utils.js';
-import { buildSweepInputs, runSweepChunk } from '../app/simulator/sweep-runner.js';
+import {
+    SWEEP_RESULT_PROVENANCE_VERSION,
+    SWEEP_SAMPLING_FINGERPRINT_VERSION,
+    buildSweepInputs,
+    runSweepChunk
+} from '../app/simulator/sweep-runner.js';
+import {
+    SWEEP_REQUEST_VERSION,
+    normalizeSweepRequestV1
+} from '../app/simulator/monte-carlo-parameters.js';
+import { runMonteCarloChunk } from '../app/simulator/monte-carlo-runner.js';
 
 if (typeof global.window === 'undefined') {
     global.window = {};
@@ -29,6 +43,87 @@ if (typeof global.window === 'undefined') {
 global.window.EngineAPI = EngineAPI;
 
 console.log('--- Simulator Sweep Tests ---');
+
+function buildSamplingTestInputs(overrides = {}) {
+    return {
+        startAlter: 30,
+        geschlecht: 'm',
+        startVermoegen: 500000,
+        depotwertAlt: 450000,
+        einstandAlt: 350000,
+        tagesgeld: 50000,
+        geldmarktEtf: 0,
+        zielLiquiditaet: 30000,
+        startFloorBedarf: 24000,
+        startFlexBedarf: 12000,
+        flexBudgetAnnual: 0,
+        flexBudgetRecharge: 0,
+        targetEq: 60,
+        rebalBand: 5,
+        maxSkimPctOfEq: 10,
+        maxBearRefillPctOfEq: 5,
+        runwayMinMonths: 24,
+        runwayTargetMonths: 36,
+        goldAktiv: false,
+        goldZielProzent: 0,
+        goldFloorProzent: 0,
+        goldSteuerfrei: true,
+        dynamicFlex: false,
+        horizonMethod: 'survival_quantile',
+        horizonYears: 20,
+        survivalQuantile: 0.85,
+        goGoActive: false,
+        goGoMultiplier: 1,
+        startSPB: 1000,
+        kirchensteuerSatz: 0,
+        rentAdjMode: 'fix',
+        rentAdjPct: 0,
+        renteMonatlich: 0,
+        renteStartOffsetJahre: 0,
+        capeRatio: 20,
+        marketCapeRatio: 20,
+        stressPreset: 'NONE',
+        pflegefallLogikAktivieren: false,
+        partner: { aktiv: false },
+        accumulationPhase: { enabled: false },
+        transitionYear: 0,
+        tailRiskEnabled: false,
+        ...overrides
+    };
+}
+
+const samplingTestCombination = Object.freeze({
+    runwayMin: 24,
+    runwayTarget: 36,
+    targetEq: 60,
+    rebalBand: 5,
+    maxSkimPct: 10,
+    maxBearRefillPct: 5,
+    goldTargetPct: 0
+});
+
+function buildSweepRequest(method, overrides = {}, useCapeSampling = false) {
+    return normalizeSweepRequestV1({
+        schemaVersion: SWEEP_REQUEST_VERSION,
+        monteCarloParameters: {
+            anzahl: 1,
+            maxDauer: 4,
+            blockSize: 3,
+            seed: 60616,
+            methode: method,
+            rngMode: 'per-run-seed',
+            startYearMode: 'UNIFORM',
+            startYearFilter: 1970,
+            startYearHalfLife: 20,
+            excludeEstimatedHistory: false,
+            ...overrides
+        },
+        useCapeSampling
+    }, {
+        inputs: buildSamplingTestInputs(),
+        historicalRecordCount: annualData.length
+    });
+}
 
 // Test 1: parseRangeInput - Einzelwert
 console.log('Test 1: parseRangeInput - Einzelwert');
@@ -821,6 +916,197 @@ console.log('Test 28: runSweepChunk - Mindest-Flex wird in Sweep-Laeufen akzepti
     assert(typeof results[0].metrics.successProbFloor === 'number', 'Mindest-Flex-Sweep sollte Metriken berechnen');
     assert(Number.isFinite(results[0].metrics.meanEndWealth), 'Mindest-Flex-Sweep sollte end wealth aggregieren');
     console.log('✓ runSweepChunk Mindest-Flex akzeptiert OK');
+}
+
+// Test 29: O-11 - expliziter Stationary-/Markov-Dispatch mit Indexfingerprint
+console.log('Test 29: O-11 - expliziter Stationary-/Markov-Dispatch mit Indexfingerprint');
+{
+    prepareHistoricalDataOnce();
+    const lastHistoricalIndex = annualData.length - 1;
+    const lastHistoricalYear = annualData[lastHistoricalIndex].jahr;
+    const baseInputs = buildSamplingTestInputs();
+    const requestOverrides = {
+        maxDauer: 4,
+        blockSize: 2,
+        startYearMode: 'FILTER',
+        startYearFilter: lastHistoricalYear
+    };
+    const stationary = runSweepChunk({
+        baseInputs,
+        paramCombinations: [samplingTestCombination],
+        comboRange: { start: 0, count: 1 },
+        sweepRequest: buildSweepRequest('stationary', requestOverrides)
+    }).results[0];
+    const markov = runSweepChunk({
+        baseInputs,
+        paramCombinations: [samplingTestCombination],
+        comboRange: { start: 0, count: 1 },
+        sweepRequest: buildSweepRequest('regime_markov', requestOverrides)
+    }).results[0];
+
+    const stationaryFingerprint = stationary.provenance.samplingFingerprint;
+    const markovFingerprint = markov.provenance.samplingFingerprint;
+    assertEqual(stationary.provenance.schemaVersion, SWEEP_RESULT_PROVENANCE_VERSION, 'Sweep result provenance is versioned');
+    assertEqual(stationaryFingerprint.schemaVersion, SWEEP_SAMPLING_FINGERPRINT_VERSION, 'Sweep sampling fingerprint is versioned');
+    assertEqual(stationaryFingerprint.tracedRuns[0].historicalYearIndices.length, 4, 'stationary reference path contains the complete four-year index sequence');
+    assertEqual(markovFingerprint.tracedRuns[0].historicalYearIndices.length, 4, 'Markov reference path contains the complete four-year index sequence');
+    assert(
+        stationaryFingerprint.tracedRuns[0].historicalYearIndices.every(index => index === lastHistoricalIndex),
+        'stationary exact reference path remains anchored to the only eligible historical index'
+    );
+    assert(
+        markovFingerprint.tracedRuns[0].historicalYearIndices.every(index => index === lastHistoricalIndex),
+        'regime Markov exact reference path remains inside the only eligible historical index'
+    );
+    assertEqual(stationary.provenance.appliedSamplingMethod, 'stationary', 'stationary provenance names the applied sampler');
+    assertEqual(markov.provenance.appliedSamplingMethod, 'regime_markov', 'Markov provenance names the applied sampler');
+    assert(
+        stationary.provenance.samplingDiagnostics.stationaryRestartCounts.initial > 0,
+        'stationary dispatch records its initial stationary block'
+    );
+    assertEqual(
+        markov.provenance.samplingDiagnostics.stationaryRestartCounts.initial,
+        0,
+        'Markov dispatch does not pass through the stationary sampler'
+    );
+    console.log('✓ O-11 expliziter Stationary-/Markov-Dispatch OK');
+}
+
+// Test 30: Seed 0 bleibt reproduzierbar und unterscheidet sich von 12345
+console.log('Test 30: Sweep Seed 0 Reproduzierbarkeit');
+{
+    const baseInputs = buildSamplingTestInputs();
+    const run = seed => runSweepChunk({
+        baseInputs,
+        paramCombinations: [samplingTestCombination],
+        comboRange: { start: 0, count: 1 },
+        sweepRequest: buildSweepRequest('stationary', {
+            anzahl: 3,
+            maxDauer: 8,
+            seed
+        })
+    });
+    const zeroA = run(0);
+    const zeroB = run(0);
+    const other = run(12345);
+    const zeroFingerprint = zeroA.results[0].provenance.samplingFingerprint.hash;
+    assertEqual(zeroA.sweepRequest.monteCarloParameters.seed, 0, 'runner preserves seed zero in the normalized request');
+    assertEqual(
+        zeroFingerprint,
+        zeroB.results[0].provenance.samplingFingerprint.hash,
+        'seed zero produces a stable sampling fingerprint'
+    );
+    assert(
+        zeroFingerprint !== other.results[0].provenance.samplingFingerprint.hash,
+        'seed zero produces a different sampling fingerprint than seed 12345'
+    );
+    console.log('✓ Sweep Seed 0 Reproduzierbarkeit OK');
+}
+
+// Test 31: Filter und Estimated-History-Ausschluss gelten fuer jeden Zug
+console.log('Test 31: Sweep Startjahrfilter und Estimated-History-Ausschluss');
+{
+    const filterYear = Math.max(1970, ESTIMATED_HISTORY_CUTOFF_YEAR);
+    const result = runSweepChunk({
+        baseInputs: buildSamplingTestInputs(),
+        paramCombinations: [samplingTestCombination],
+        comboRange: { start: 0, count: 1 },
+        sweepRequest: buildSweepRequest('regime_markov', {
+            anzahl: 3,
+            maxDauer: 8,
+            startYearMode: 'FILTER',
+            startYearFilter: filterYear,
+            excludeEstimatedHistory: true
+        })
+    }).results[0];
+    const tracedIndices = result.provenance.samplingFingerprint.tracedRuns
+        .flatMap(run => run.historicalYearIndices);
+    assert(tracedIndices.length > 0, 'filtered Sweep exposes inspected historical indices');
+    assert(
+        tracedIndices.every(index => Number(annualData[index]?.jahr) >= filterYear),
+        'every inspected Sweep draw satisfies the configured start-year filter'
+    );
+    assertEqual(
+        result.provenance.samplingDiagnostics.contract.excludeEstimatedHistory,
+        true,
+        'sampling diagnostics retain estimated-history exclusion'
+    );
+    console.log('✓ Sweep Startjahrfilter und Estimated-History-Ausschluss OK');
+}
+
+// Test 32: Single-Combination-Sweep nutzt den kanonischen MC-Samplingstart
+console.log('Test 32: Single-Combination-Sweep/MC Samplingparitaet');
+{
+    const baseInputs = buildSamplingTestInputs();
+    const request = buildSweepRequest('stationary', {
+        anzahl: 1,
+        maxDauer: 1,
+        seed: 4242,
+        startYearMode: 'RECENCY'
+    }, true);
+    const sweep = runSweepChunk({
+        baseInputs,
+        paramCombinations: [samplingTestCombination],
+        comboRange: { start: 0, count: 1 },
+        sweepRequest: request
+    });
+    const mcInputs = buildSweepInputs(baseInputs, samplingTestCombination);
+    const monteCarlo = await runMonteCarloChunk({
+        inputs: mcInputs,
+        monteCarloParams: request.monteCarloParameters,
+        widowOptions: {
+            mode: 'stop',
+            percent: 0,
+            marriageOffsetYears: 0,
+            minMarriageYears: 0
+        },
+        useCapeSampling: request.useCapeSampling,
+        runRange: { start: 0, count: 1 },
+        logIndices: [0],
+        engine: EngineAPI
+    });
+    const sweepIndex = sweep.results[0].provenance
+        .samplingFingerprint.tracedRuns[0].historicalYearIndices[0];
+    const monteCarloYear = monteCarlo.runMeta[0].logDataRows[0].histJahr;
+    const monteCarloIndex = annualData.findIndex(
+        entry => Number(entry.jahr) === Number(monteCarloYear)
+    );
+    assertEqual(sweepIndex, monteCarloIndex, 'single-combination Sweep and MC select the same canonical initial record');
+    assertEqual(
+        sweep.results[0].provenance.samplingDiagnostics.contract.startSource,
+        monteCarlo.samplingDiagnostics.contract.startSource,
+        'single-combination Sweep and MC expose the same applied start-source policy'
+    );
+    assertEqual(
+        sweep.results[0].provenance.requestedSamplingMethod,
+        sweep.results[0].provenance.appliedSamplingMethod,
+        'result provenance distinguishes and reconciles requested/applied method'
+    );
+    console.log('✓ Single-Combination-Sweep/MC Samplingparitaet OK');
+}
+
+// Test 33: Unbekannte Sweep-Methode wird fail-closed abgewiesen
+console.log('Test 33: Unbekannte Sweep-Methode');
+{
+    let thrown = null;
+    try {
+        runSweepChunk({
+            baseInputs: buildSamplingTestInputs(),
+            paramCombinations: [samplingTestCombination],
+            comboRange: { start: 0, count: 1 },
+            sweepRequest: {
+                schemaVersion: SWEEP_REQUEST_VERSION,
+                monteCarloParameters: {
+                    ...buildSweepRequest('block').monteCarloParameters,
+                    methode: 'unknown_sampler'
+                }
+            }
+        });
+    } catch (error) {
+        thrown = error;
+    }
+    assertEqual(thrown?.code, 'MC_PARAMETER_ENUM_INVALID', 'unknown Sweep method is rejected by the canonical parameter contract');
+    console.log('✓ Unbekannte Sweep-Methode OK');
 }
 
 console.log('--- Simulator Sweep Tests Abgeschlossen ---');

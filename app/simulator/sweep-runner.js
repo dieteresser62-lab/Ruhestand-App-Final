@@ -12,9 +12,22 @@ import {
     computeRunStatsFromSeries,
     updateCareMeta,
     calcCareCost,
-    computeCareMortalityMultiplier
+    computeCareMortalityMultiplier,
+    getDataVersion
 } from './simulator-engine-wrapper.js';
 import { aggregateSweepMetrics, portfolioTotal } from './simulator-results.js';
+import { normalizeSweepRequestV1 } from './monte-carlo-parameters.js';
+import {
+    buildYearSamplingConfig,
+    createMonteCarloSamplingDiagnosticsV1,
+    finalizeMonteCarloSamplingDiagnosticsV1,
+    initializeMonteCarloSamplingStateV1,
+    pickMonteCarloStartYearIndex,
+    recordMonteCarloSampledYearV1,
+    recordMonteCarloSamplingStartV1,
+    resolveMonteCarloSamplingContractV1,
+    sampleMonteCarloYearV1
+} from './mc-year-sampling.js';
 import {
     deepClone,
     SWEEP_ALLOWED_KEYS,
@@ -44,6 +57,81 @@ const SWEEP_LIMITS = {
     dynamicGoGoMultiplierMin: 1.0,
     dynamicGoGoMultiplierMax: 1.5
 };
+export const SWEEP_RESULT_PROVENANCE_VERSION = 'SweepResultProvenanceV1';
+export const SWEEP_SAMPLING_FINGERPRINT_VERSION = 'SweepSamplingFingerprintV1';
+
+const MAX_FINGERPRINT_TRACE_RUNS = 3;
+const MAX_FINGERPRINT_TRACE_YEARS = 64;
+const ANNUAL_DATA_INDEX_BY_YEAR = new Map(
+    annualData.map((entry, index) => [Number(entry?.jahr), index])
+);
+
+function updateFingerprintHash(hash, value) {
+    const normalized = Number.isSafeInteger(value) ? value >>> 0 : 0xFFFFFFFE;
+    return Math.imul((hash ^ normalized) >>> 0, 0x01000193) >>> 0;
+}
+
+function createSweepSamplingFingerprint(request) {
+    return {
+        hash: 0x811C9DC5,
+        publicValue: {
+            schemaVersion: SWEEP_SAMPLING_FINGERPRINT_VERSION,
+            hashAlgorithm: 'fnv1a32_run_and_historical_index_sequence',
+            hash: null,
+            requestedSamplingMethod: request.requestedSamplingMethod,
+            appliedSamplingMethod: request.appliedSamplingMethod,
+            tracedRuns: [],
+            truncated: false
+        }
+    };
+}
+
+function beginSweepFingerprintRun(fingerprint, runIndex) {
+    fingerprint.hash = updateFingerprintHash(fingerprint.hash, 0xFFFFFFFF);
+    fingerprint.hash = updateFingerprintHash(fingerprint.hash, runIndex);
+    if (fingerprint.publicValue.tracedRuns.length >= MAX_FINGERPRINT_TRACE_RUNS) {
+        fingerprint.publicValue.truncated = true;
+        return null;
+    }
+    const trace = { runIndex, historicalYearIndices: [] };
+    fingerprint.publicValue.tracedRuns.push(trace);
+    return trace;
+}
+
+function recordSweepFingerprintYear(fingerprint, trace, yearData) {
+    const historicalIndex = ANNUAL_DATA_INDEX_BY_YEAR.get(Number(yearData?.jahr));
+    const normalizedIndex = Number.isInteger(historicalIndex) ? historicalIndex : -1;
+    fingerprint.hash = updateFingerprintHash(fingerprint.hash, normalizedIndex);
+    if (!trace) return;
+    if (trace.historicalYearIndices.length >= MAX_FINGERPRINT_TRACE_YEARS) {
+        fingerprint.publicValue.truncated = true;
+        return;
+    }
+    trace.historicalYearIndices.push(normalizedIndex);
+}
+
+function finalizeSweepSamplingFingerprint(fingerprint) {
+    fingerprint.publicValue.hash = fingerprint.hash.toString(16).padStart(8, '0');
+    return fingerprint.publicValue;
+}
+
+function buildSweepResultProvenance(request, samplingDiagnostics, samplingFingerprint) {
+    return {
+        schemaVersion: SWEEP_RESULT_PROVENANCE_VERSION,
+        requestVersion: request.schemaVersion,
+        requestedSamplingMethod: request.requestedSamplingMethod,
+        appliedSamplingMethod: request.appliedSamplingMethod,
+        useCapeSampling: request.useCapeSampling,
+        normalizedParameters: { ...request.monteCarloParameters },
+        samplingDiagnostics,
+        samplingFingerprint
+    };
+}
+
+function isConditionalStressActive(stressContext) {
+    return stressContext?.type === 'conditional_bootstrap'
+        && stressContext.remainingYears > 0;
+}
 
 function makeInvalidSweepMetrics(reason) {
     return {
@@ -169,11 +257,28 @@ export function runSweepChunk({
     baseInputs,
     paramCombinations,
     comboRange,
-    sweepConfig,
+    sweepRequest = null,
+    sweepConfig = null,
     refP2Invariants = null,
     engine = null
 }) {
-    const { anzahlRuns, maxDauer, blockSize, baseSeed, methode, rngMode = 'per-run-seed' } = sweepConfig;
+    const normalizedRequest = normalizeSweepRequestV1(sweepRequest ?? sweepConfig ?? {}, {
+        inputs: baseInputs,
+        historicalRecordCount: annualData.length || null
+    });
+    const {
+        anzahl: anzahlRuns,
+        maxDauer,
+        blockSize,
+        seed: baseSeed,
+        methode,
+        rngMode,
+        startYearMode,
+        startYearFilter,
+        startYearHalfLife,
+        excludeEstimatedHistory
+    } = normalizedRequest.monteCarloParameters;
+    const { useCapeSampling } = normalizedRequest;
     const start = comboRange?.start ?? 0;
     const count = comboRange?.count ?? paramCombinations.length;
 
@@ -190,11 +295,35 @@ export function runSweepChunk({
             results.push({
                 comboIdx,
                 params,
-                metrics: makeInvalidSweepMetrics(validation.reason)
+                metrics: makeInvalidSweepMetrics(validation.reason),
+                provenance: buildSweepResultProvenance(normalizedRequest, null, null)
             });
             continue;
         }
         const inputs = buildSweepInputs(baseInputs, params);
+        const yearSamplingConfig = buildYearSamplingConfig(startYearMode, annualData, {
+            startYearFilter,
+            startYearHalfLife,
+            blockSize,
+            excludeEstimatedHistory
+        });
+        const samplingResolution = resolveMonteCarloSamplingContractV1({
+            method: methode,
+            inputs,
+            annualData,
+            useCapeSampling,
+            startYearMode,
+            startYearFilter,
+            startYearHalfLife,
+            blockSize,
+            excludeEstimatedHistory,
+            yearSamplingConfig
+        });
+        const samplingDiagnostics = createMonteCarloSamplingDiagnosticsV1({
+            contract: samplingResolution.contract,
+            dataVersion: getDataVersion()
+        });
+        const samplingFingerprint = createSweepSamplingFingerprint(normalizedRequest);
 
         const p2Invariants = extractP2Invariants(inputs);
         if (!resolvedRef) {
@@ -218,8 +347,27 @@ export function runSweepChunk({
             const rand = legacyRand || rng(makeRunSeed(baseSeed, comboIdx, i));
             let failed = false;
             let totalTaxSavedByLossCarryThisRun = 0;
-            const startYearIndex = Math.floor(rand() * annualData.length);
+            const startYearIndex = pickMonteCarloStartYearIndex({
+                rand,
+                inputs,
+                annualData,
+                useCapeSampling,
+                excludeEstimatedHistory,
+                yearSamplingConfig,
+                samplingContract: samplingResolution
+            });
+            recordMonteCarloSamplingStartV1(samplingDiagnostics, annualData[startYearIndex]);
             let simState = initMcRunState(inputs, startYearIndex);
+            initializeMonteCarloSamplingStateV1({
+                state: simState,
+                method: methode,
+                blockSize,
+                rand,
+                startYearIndex,
+                samplingResolution,
+                annualData
+            });
+            const fingerprintTrace = beginSweepFingerprintRun(samplingFingerprint, i);
 
             const depotWertHistorie = [portfolioTotal(simState.portfolio)];
             let careMeta = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren, inputs.geschlecht);
@@ -231,7 +379,24 @@ export function runSweepChunk({
             for (let simulationsJahr = 0; simulationsJahr < maxDauer; simulationsJahr++) {
                 const currentAge = inputs.startAlter + simulationsJahr;
 
-                let yearData = sampleNextYearData(simState, methode, blockSize, rand, stressCtx);
+                const samplingStep = sampleMonteCarloYearV1({
+                    state: simState,
+                    method: methode,
+                    blockSize,
+                    rand,
+                    stressContext: stressCtx,
+                    conditionalStressActive: isConditionalStressActive(stressCtx),
+                    samplingResolution,
+                    annualData,
+                    sampleNextYearData
+                });
+                let yearData = samplingStep.yearData;
+                recordMonteCarloSampledYearV1(samplingDiagnostics, {
+                    yearData,
+                    source: samplingStep.source,
+                    stationaryRestartReason: samplingStep.stationaryRestartReason
+                });
+                recordSweepFingerprintYear(samplingFingerprint, fingerprintTrace, yearData);
                 yearData = applyStressOverride(yearData, stressCtx, rand);
 
                 careMeta = updateCareMeta(careMeta, inputs, currentAge, yearData, rand);
@@ -308,11 +473,18 @@ export function runSweepChunk({
             }
         }
 
+        finalizeMonteCarloSamplingDiagnosticsV1(samplingDiagnostics);
+        const resultProvenance = buildSweepResultProvenance(
+            normalizedRequest,
+            samplingDiagnostics,
+            finalizeSweepSamplingFingerprint(samplingFingerprint)
+        );
         if (invalidComboReason) {
             results.push({
                 comboIdx,
                 params,
-                metrics: makeInvalidSweepMetrics(`Engine Validation: ${invalidComboReason}`)
+                metrics: makeInvalidSweepMetrics(`Engine Validation: ${invalidComboReason}`),
+                provenance: resultProvenance
             });
             continue;
         }
@@ -320,8 +492,8 @@ export function runSweepChunk({
         // Aggregate P50/P10/etc per combo to feed the heatmap.
         const metrics = aggregateSweepMetrics(runOutcomes);
         metrics.warningR2Varies = p2VarianceWarning;
-        results.push({ comboIdx, params, metrics });
+        results.push({ comboIdx, params, metrics, provenance: resultProvenance });
     }
 
-    return { results, p2VarianceCount };
+    return { results, p2VarianceCount, sweepRequest: normalizedRequest };
 }

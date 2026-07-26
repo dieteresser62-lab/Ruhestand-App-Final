@@ -6,6 +6,7 @@ const HISTORICAL_YEAR_MINIMUM = annualData[0]?.jahr ?? 1925;
 const HISTORICAL_YEAR_MAXIMUM = annualData[annualData.length - 1]?.jahr ?? 2025;
 
 export const MONTE_CARLO_PARAMETERS_VERSION = 'MonteCarloParametersV1';
+export const SWEEP_REQUEST_VERSION = 'SweepRequestV1';
 
 export const MONTE_CARLO_PARAMETER_LIMITS = Object.freeze({
     runs: Object.freeze({
@@ -44,6 +45,12 @@ export const MONTE_CARLO_START_YEAR_MODES = Object.freeze(['UNIFORM', 'FILTER', 
 
 function parameterError(code, message) {
     const error = new TypeError(`${MONTE_CARLO_PARAMETERS_VERSION}: ${message}`);
+    error.code = code;
+    return error;
+}
+
+function sweepRequestError(code, message) {
+    const error = new TypeError(`${SWEEP_REQUEST_VERSION}: ${message}`);
     error.code = code;
     return error;
 }
@@ -184,6 +191,63 @@ export function normalizeMonteCarloParametersV1(rawParameters = {}, {
     };
 
     return Object.freeze(normalized);
+}
+
+/**
+ * Builds the DOM-free, versioned request consumed by serial and worker sweeps.
+ *
+ * Legacy direct callers may still provide the former flat sweepConfig fields;
+ * production callers emit the versioned nested form. Both routes are validated
+ * by normalizeMonteCarloParametersV1 so no second bounds contract can drift.
+ */
+export function normalizeSweepRequestV1(rawRequest = {}, {
+    inputs = null,
+    historicalRecordCount = null
+} = {}) {
+    if (!rawRequest || typeof rawRequest !== 'object' || Array.isArray(rawRequest)) {
+        throw sweepRequestError('SWEEP_REQUEST_OBJECT_REQUIRED', 'Request muss als Objekt uebergeben werden.');
+    }
+    if (rawRequest.schemaVersion !== undefined
+        && rawRequest.schemaVersion !== null
+        && rawRequest.schemaVersion !== SWEEP_REQUEST_VERSION) {
+        throw sweepRequestError(
+            'SWEEP_REQUEST_VERSION_INVALID',
+            `Nicht unterstuetzte Requestversion: ${String(rawRequest.schemaVersion)}.`
+        );
+    }
+
+    const nestedParameters = rawRequest.monteCarloParameters;
+    const rawParameters = nestedParameters === undefined
+        ? {
+            anzahl: rawRequest.anzahl ?? rawRequest.anzahlRuns,
+            maxDauer: rawRequest.maxDauer,
+            blockSize: rawRequest.blockSize,
+            seed: rawRequest.seed ?? rawRequest.baseSeed,
+            methode: rawRequest.methode,
+            rngMode: rawRequest.rngMode,
+            startYearMode: rawRequest.startYearMode,
+            startYearFilter: rawRequest.startYearFilter,
+            startYearHalfLife: rawRequest.startYearHalfLife,
+            excludeEstimatedHistory: rawRequest.excludeEstimatedHistory
+        }
+        : nestedParameters;
+    const monteCarloParameters = normalizeMonteCarloParametersV1(rawParameters, {
+        inputs,
+        historicalRecordCount
+    });
+    const requestedSamplingMethod = rawParameters?.methode === undefined
+        || rawParameters?.methode === null
+        || rawParameters?.methode === ''
+        ? monteCarloParameters.methode
+        : rawParameters.methode;
+
+    return Object.freeze({
+        schemaVersion: SWEEP_REQUEST_VERSION,
+        requestedSamplingMethod,
+        appliedSamplingMethod: monteCarloParameters.methode,
+        useCapeSampling: readBoolean(rawRequest.useCapeSampling, 'CAPE-Sampling', false),
+        monteCarloParameters
+    });
 }
 
 export function normalizeMonteCarloResourceConfigV1(rawConfig = {}) {

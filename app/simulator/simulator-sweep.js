@@ -24,6 +24,13 @@ import { WorkerJobRunner } from './worker-job-runner.js';
 import { buildSweepInputs, runSweepChunk } from './sweep-runner.js';
 import { persistenceStorage } from '../shared/persistence-facade.js';
 import { formatSimulatorValidationError, validateSimulatorInputs } from './simulator-input-validation.js';
+import { readMonteCarloParameters } from './monte-carlo-ui.js';
+import {
+    SWEEP_REQUEST_VERSION,
+    normalizeSweepRequestV1
+} from './monte-carlo-parameters.js';
+
+export const SWEEP_EXECUTION_VERSION = 'SweepExecutionV1';
 
 /**
  * Initialisiert Sweep-Inputfelder und synchronisiert sie mit der Persistenz-Facade.
@@ -111,7 +118,7 @@ function readSweepWorkerConfig() {
 async function runSweepWithWorkers({
     baseInputs,
     paramCombinations,
-    sweepConfig,
+    sweepRequest,
     refP2Invariants,
     onProgress
 }) {
@@ -146,14 +153,18 @@ async function runSweepWithWorkers({
         onProgress,
         buildPayload: (start, count) => ({
             type: 'sweep',
-            sweepConfig,
+            sweepRequest,
             comboRange: { start, count },
             refP2Invariants
         }),
         mergeResult: result => {
             // Merge sparse results into the full array by combo index.
             for (const item of result.results) {
-                sweepResults[item.comboIdx] = { params: item.params, metrics: item.metrics };
+                sweepResults[item.comboIdx] = {
+                    params: item.params,
+                    metrics: item.metrics,
+                    provenance: item.provenance
+                };
             }
         }
     });
@@ -175,7 +186,7 @@ async function runSweepWithWorkers({
 async function runSweepSerial({
     baseInputs,
     paramCombinations,
-    sweepConfig,
+    sweepRequest,
     refP2Invariants,
     onProgress
 }) {
@@ -191,11 +202,15 @@ async function runSweepSerial({
             baseInputs,
             paramCombinations,
             comboRange: { start, count },
-            sweepConfig,
+            sweepRequest,
             refP2Invariants
         });
         for (const item of serial.results) {
-            sweepResults[item.comboIdx] = { params: item.params, metrics: item.metrics };
+            sweepResults[item.comboIdx] = {
+                params: item.params,
+                metrics: item.metrics,
+                provenance: item.provenance
+            };
         }
         completedCombos += count;
         if (typeof onProgress === 'function') {
@@ -302,15 +317,11 @@ export async function runParameterSweep() {
         // Basis-Inputs nur EINMAL lesen und einfrieren (Deep Clone)
         // Clone once so each combo can be safely overridden without side effects.
         const baseInputs = deepClone(validateSimulatorInputs(getCommonInputs()));
-        const anzahlRuns = parseInt(document.getElementById('mcAnzahl').value) || 100;
-        const maxDauer = parseInt(document.getElementById('mcDauer').value) || 35;
-        const blockSize = parseInt(document.getElementById('mcBlockSize').value) || 5;
-        const baseSeed = parseInt(document.getElementById('mcSeed').value) || 12345;
-        const methode = document.getElementById('mcMethode').value;
-        const rngModeEl = document.getElementById('rngMode');
-        const rngMode = rngModeEl ? rngModeEl.value : 'per-run-seed';
-
-        const sweepConfig = { anzahlRuns, maxDauer, blockSize, baseSeed, methode, rngMode };
+        const sweepRequest = normalizeSweepRequestV1({
+            schemaVersion: SWEEP_REQUEST_VERSION,
+            monteCarloParameters: readMonteCarloParameters(baseInputs),
+            useCapeSampling: document.getElementById('useCapeSampling')?.checked === true
+        }, { inputs: baseInputs });
         const sweepResults = new Array(paramCombinations.length);
 
         // Reference P2 invariants guard against accidental partner changes.
@@ -321,7 +332,7 @@ export async function runParameterSweep() {
             const workerResults = await runSweepWithWorkers({
                 baseInputs,
                 paramCombinations,
-                sweepConfig,
+                sweepRequest,
                 refP2Invariants,
                 onProgress: pct => {
                     progressBar.style.width = `${pct}%`;
@@ -336,7 +347,7 @@ export async function runParameterSweep() {
             const serialResults = await runSweepSerial({
                 baseInputs,
                 paramCombinations,
-                sweepConfig,
+                sweepRequest,
                 refP2Invariants,
                 onProgress: pct => {
                     progressBar.style.width = `${pct}%`;
@@ -349,6 +360,11 @@ export async function runParameterSweep() {
         }
 
         window.sweepResults = sweepResults;
+        window.sweepExecution = {
+            schemaVersion: SWEEP_EXECUTION_VERSION,
+            request: sweepRequest,
+            results: sweepResults
+        };
         window.sweepParamRanges = paramRanges;
 
         displaySweepResults();

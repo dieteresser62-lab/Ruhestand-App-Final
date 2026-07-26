@@ -1,9 +1,11 @@
 import fs from 'node:fs';
 import {
     MONTE_CARLO_PARAMETER_LIMITS,
+    SWEEP_REQUEST_VERSION,
     estimateMonteCarloResourcesV1,
     normalizeMonteCarloParametersV1,
     normalizeMonteCarloResourceConfigV1,
+    normalizeSweepRequestV1,
     resolveMonteCarloDurationMaximumV1,
     resolveMonteCarloWorkerCountV1
 } from '../app/simulator/monte-carlo-parameters.js';
@@ -62,6 +64,80 @@ const validParameters = Object.freeze({
     }, { inputs: { startAlter: 76, partner: { aktiv: false } } });
     assertEqual(boundary.anzahl, 1000000, 'one million runs remains startable at the hard boundary');
     assertEqual(boundary.seed, 4294967295, 'uint32 seed maximum is accepted');
+}
+
+{
+    const sweepRequest = normalizeSweepRequestV1({
+        schemaVersion: SWEEP_REQUEST_VERSION,
+        monteCarloParameters: {
+            ...validParameters,
+            anzahl: 12,
+            maxDauer: 10,
+            seed: 0,
+            methode: 'stationary',
+            startYearMode: 'FILTER',
+            startYearFilter: 1980,
+            excludeEstimatedHistory: true
+        },
+        useCapeSampling: true
+    }, {
+        inputs: { startAlter: 65, partner: { aktiv: false } }
+    });
+    assertEqual(sweepRequest.schemaVersion, SWEEP_REQUEST_VERSION, 'Sweep request is explicitly versioned');
+    assertEqual(sweepRequest.monteCarloParameters.seed, 0, 'Sweep request preserves explicit seed zero');
+    assertEqual(sweepRequest.monteCarloParameters.startYearMode, 'FILTER', 'Sweep request transports start-year mode');
+    assertEqual(sweepRequest.monteCarloParameters.startYearFilter, 1980, 'Sweep request transports start-year filter');
+    assertEqual(sweepRequest.monteCarloParameters.excludeEstimatedHistory, true, 'Sweep request transports estimated-history exclusion');
+    assertEqual(sweepRequest.requestedSamplingMethod, 'stationary', 'Sweep request records requested method');
+    assertEqual(sweepRequest.appliedSamplingMethod, 'stationary', 'Sweep request records applied method');
+    assertEqual(sweepRequest.useCapeSampling, true, 'Sweep request transports CAPE sampling');
+    assert(Object.isFrozen(sweepRequest), 'normalized Sweep request is immutable');
+
+    const legacyRequest = normalizeSweepRequestV1({
+        anzahlRuns: 7,
+        maxDauer: 8,
+        blockSize: 3,
+        baseSeed: 0,
+        methode: 'block',
+        rngMode: 'per-run-seed'
+    }, {
+        inputs: { startAlter: 65, partner: { aktiv: false } }
+    });
+    assertEqual(legacyRequest.monteCarloParameters.anzahl, 7, 'legacy Sweep run count maps into canonical MC parameters');
+    assertEqual(legacyRequest.monteCarloParameters.seed, 0, 'legacy Sweep seed zero maps without a falsy default');
+}
+
+{
+    const invalidSweepFixtures = [
+        ['run count', { anzahl: 0 }, 'MC_PARAMETER_BELOW_MINIMUM'],
+        ['duration', { maxDauer: 0 }, 'MC_PARAMETER_BELOW_MINIMUM'],
+        ['block length', { blockSize: 31 }, 'MC_PARAMETER_ABOVE_MAXIMUM'],
+        ['method', { methode: 'unknown' }, 'MC_PARAMETER_ENUM_INVALID'],
+        ['seed', { seed: -1 }, 'MC_PARAMETER_BELOW_MINIMUM']
+    ];
+    for (const [name, override, expectedCode] of invalidSweepFixtures) {
+        let thrown = null;
+        try {
+            normalizeSweepRequestV1({
+                schemaVersion: SWEEP_REQUEST_VERSION,
+                monteCarloParameters: { ...validParameters, ...override }
+            });
+        } catch (error) {
+            thrown = error;
+        }
+        assertEqual(thrown?.code, expectedCode, `Sweep request rejects invalid ${name} through the MC contract`);
+    }
+
+    let versionError = null;
+    try {
+        normalizeSweepRequestV1({
+            schemaVersion: 'SweepRequestV0',
+            monteCarloParameters: validParameters
+        });
+    } catch (error) {
+        versionError = error;
+    }
+    assertEqual(versionError?.code, 'SWEEP_REQUEST_VERSION_INVALID', 'Sweep request rejects unknown contract versions');
 }
 
 {

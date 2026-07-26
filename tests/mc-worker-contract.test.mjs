@@ -1,8 +1,14 @@
 import { Worker } from 'node:worker_threads';
 import { EngineAPI } from '../engine/index.mjs';
-import { compileScenario, getDataVersion } from '../app/simulator/simulator-engine-helpers.js';
+import {
+    compileScenario,
+    getDataVersion,
+    prepareHistoricalDataOnce
+} from '../app/simulator/simulator-engine-helpers.js';
 import { annualData } from '../app/simulator/simulator-data.js';
 import { runMonteCarloChunk } from '../app/simulator/monte-carlo-runner.js';
+import { runSweepChunk } from '../app/simulator/sweep-runner.js';
+import { SWEEP_REQUEST_VERSION } from '../app/simulator/monte-carlo-parameters.js';
 import {
     MONTE_CARLO_CHUNK_RESULT_VERSION,
     assertMonteCarloChunkResultV1
@@ -501,6 +507,104 @@ console.log('Test 8: invalid Monte-Carlo parameters fail closed in worker');
         assertEqual(response.message.type, 'error', 'worker rejects a suffixed run count');
         assert(response.message.message.includes('ganze Zahl'), 'worker exposes the shared integer-contract error');
         console.log('✓ invalid Monte-Carlo parameters fail closed in worker OK');
+    } finally {
+        await terminateWorker(worker);
+    }
+}
+
+// Test 9: the real worker consumes the same versioned SweepRequest as serial.
+console.log('Test 9: versioned Sweep request worker parity');
+{
+    const worker = createWorkerHarness();
+    try {
+        prepareHistoricalDataOnce();
+        const baseInputs = createInputs();
+        const paramCombinations = [{
+            runwayMin: 24,
+            runwayTarget: 36,
+            targetEq: 60,
+            rebalBand: 5,
+            maxSkimPct: 10,
+            maxBearRefillPct: 5,
+            goldTargetPct: 0
+        }];
+        const sweepRequest = {
+            schemaVersion: SWEEP_REQUEST_VERSION,
+            monteCarloParameters: {
+                anzahl: 2,
+                maxDauer: 2,
+                blockSize: 1,
+                seed: 0,
+                methode: 'stationary',
+                rngMode: 'per-run-seed',
+                startYearMode: 'FILTER',
+                startYearFilter: 1970,
+                startYearHalfLife: 20,
+                excludeEstimatedHistory: true
+            },
+            useCapeSampling: false
+        };
+        const initialized = await postAndWait(worker, {
+            type: 'sweep-init',
+            jobId: 'sweep-init-v1',
+            baseInputs,
+            paramCombinations
+        });
+        assertEqual(initialized.message.type, 'ready', 'worker accepts Sweep cache initialization');
+
+        const valid = await postAndWait(worker, {
+            type: 'sweep',
+            jobId: 'sweep-v1',
+            sweepRequest,
+            comboRange: { start: 0, count: 1 }
+        });
+        assertEqual(valid.message.type, 'result', 'worker accepts versioned SweepRequestV1');
+        assertEqual(valid.message.sweepRequest.schemaVersion, SWEEP_REQUEST_VERSION, 'worker returns normalized Sweep request version');
+        assertEqual(valid.message.sweepRequest.monteCarloParameters.seed, 0, 'worker preserves explicit Sweep seed zero');
+        assertEqual(valid.message.results[0].provenance.appliedSamplingMethod, 'stationary', 'worker result exposes applied sampling method');
+        assertEqual(valid.message.results[0].provenance.samplingDiagnostics.contract.excludeEstimatedHistory, true, 'worker result exposes applied history exclusion');
+        const serial = runSweepChunk({
+            baseInputs,
+            paramCombinations,
+            comboRange: { start: 0, count: 1 },
+            sweepRequest,
+            engine: EngineAPI
+        });
+        assertEqual(
+            JSON.stringify(valid.message.results[0].provenance),
+            JSON.stringify(serial.results[0].provenance),
+            'worker and serial Sweep return identical request and sampling provenance'
+        );
+
+        const invalidSweepRequest = {
+            ...sweepRequest,
+            monteCarloParameters: {
+                ...sweepRequest.monteCarloParameters,
+                methode: 'unknown_sampler'
+            }
+        };
+        let serialError = null;
+        try {
+            runSweepChunk({
+                baseInputs,
+                paramCombinations,
+                comboRange: { start: 0, count: 1 },
+                sweepRequest: invalidSweepRequest,
+                engine: EngineAPI
+            });
+        } catch (error) {
+            serialError = error;
+        }
+        const invalid = await postAndWait(worker, {
+            type: 'sweep',
+            jobId: 'sweep-invalid-v1',
+            sweepRequest: invalidSweepRequest,
+            comboRange: { start: 0, count: 1 }
+        });
+        assertEqual(invalid.message.type, 'error', 'worker rejects unsupported Sweep method');
+        assertEqual(invalid.message.code, serialError?.code, 'worker and serial Sweep expose the same structured error code');
+        assertEqual(invalid.message.message, serialError?.message, 'worker and serial Sweep expose the same error message');
+        console.log('✓ versioned Sweep request worker parity OK');
     } finally {
         await terminateWorker(worker);
     }

@@ -172,7 +172,14 @@ self.onmessage = async event => {
     }
 
     if (type === 'sweep') {
-        const { jobId, generationId, sweepConfig, comboRange, refP2Invariants } = message;
+        const {
+            jobId,
+            generationId,
+            sweepRequest,
+            sweepConfig,
+            comboRange,
+            refP2Invariants
+        } = message;
         try {
             prepareHistoricalDataOnce();
             const startedAt = performance.now();
@@ -183,7 +190,7 @@ self.onmessage = async event => {
                 baseInputs: sweepCache.baseInputs,
                 paramCombinations: sweepCache.paramCombinations,
                 comboRange,
-                sweepConfig,
+                sweepRequest: sweepRequest ?? sweepConfig,
                 refP2Invariants,
                 engine: EngineAPI
             });
@@ -193,6 +200,7 @@ self.onmessage = async event => {
             send('error', {
                 jobId,
                 generationId,
+                code: error?.code || 'SWEEP_WORKER_ERROR',
                 message: error?.message || 'Worker sweep job failed',
                 stack: error?.stack || ''
             });

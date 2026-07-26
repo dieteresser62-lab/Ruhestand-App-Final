@@ -211,6 +211,30 @@ for (const method of ['block', 'stationary', 'regime_markov', 'regime_iid']) {
 }
 
 {
+    const lastHistoricalYear = annualData.at(-1).jahr;
+    const chunk = await runCase('regime_markov', {
+        params: {
+            maxDauer: 5,
+            startYearMode: 'FILTER',
+            startYearFilter: lastHistoricalYear,
+            excludeEstimatedHistory: true
+        },
+        useCapeSampling: false
+    });
+    const rows = chunk.runMeta?.[0]?.logDataRows || [];
+    assertEqual(rows.length, 5, 'filtered Markov reference path remains inspectable for the full horizon');
+    assert(
+        rows.every(row => Number(row.histJahr) === Number(lastHistoricalYear)),
+        'every Markov draw remains inside the only eligible filtered historical record'
+    );
+    assert(
+        Object.keys(chunk.samplingDiagnostics.historicalYearCounts)
+            .every(year => Number(year) === Number(lastHistoricalYear)),
+        'Markov diagnostics expose no draw outside the effective filtered universe'
+    );
+}
+
+{
     const chunk = await runCase('block', {
         inputs: {
             tailRiskEnabled: true,

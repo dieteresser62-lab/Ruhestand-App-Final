@@ -463,7 +463,7 @@ Die Slice-Dateien werden gemaess `SLICE_EXECUTION_RULES.md` jeweils vor Beginn d
 | 4 | [SLICE_SUITE_DATA_04_PROFILE_ASSET_GOLD.md](./SLICE_SUITE_DATA_04_PROFILE_ASSET_GOLD.md) | Verlustfreie Profilassets und Goldziele | P0/P1 | 3, D-04, D-05 | 6 | freigegeben |
 | 5 | [SLICE_SUITE_DATA_05_ENGINE_INVARIANTS.md](./SLICE_SUITE_DATA_05_ENGINE_INVARIANTS.md) | Engine-Spending, Floors, Flex und Rente | P1 | 3 | 7 | freigegeben |
 | 6 | [SLICE_SUITE_DATA_06_RESULT_SIGN_SEMANTICS.md](./SLICE_SUITE_DATA_06_RESULT_SIGN_SEMANTICS.md) | Nullwerte, negative Renditen und wahrheitsgetreue Darstellung | P1 | 3, 5, D-06, D-19 | 7 | freigegeben |
-| 7 | `SLICE_SUITE_DATA_07_SWEEP_REQUEST_SAMPLING.md` | Kanonischer Sweep-Request und Sampling | P1 | 3, 5 | 6 | geplant |
+| 7 | [SLICE_SUITE_DATA_07_SWEEP_REQUEST_SAMPLING.md](./SLICE_SUITE_DATA_07_SWEEP_REQUEST_SAMPLING.md) | Kanonischer Sweep-Request und Sampling | P1 | 3, 5 | 6 | freigegeben |
 | 8 | `SLICE_SUITE_DATA_08_SWEEP_HOUSEHOLD_RISK.md` | Partner, Pflege, Langlebigkeit und Tail Risk | P1 | 7 | 7 | geplant |
 | 9 | `SLICE_SUITE_DATA_09_SWEEP_METRICS_COMPARABILITY.md` | Drawdown, Outcomes und faire Vergleiche | P1 | 6-8, D-06, D-07 | 9 | geplant |
 | 10 | `SLICE_SUITE_DATA_10_AUTO_OPTIMIZE_FIDELITY.md` | Optimizer-Parameter und Apply-Paritaet | P1 | 6-9, D-08 | 8 | geplant |
@@ -1677,6 +1677,8 @@ Drittes Restrisiko ist Recovery, das bei transientem IO-Fehler faelschlich Korru
 | 2026-07-26 | Slice 6 Backtest-Hash-Stop | drei isolierte `canonicalRowsHash`-Deltas vollstaendig auf die beabsichtigte Erhaltung von `FlexRatePct=0` zurueckgefuehrt; alle separat ausgewiesenen Fachmetriken und FlowDeltas unveraendert; Nutzerfreigabe zur Target-Aktualisierung ausstehend |
 | 2026-07-26 | Nutzerfreigabe fuer Slice-6-Backtest-Deltas | Aktualisierung genau der drei fachlich erklaerten Target-Hashes freigegeben; Validierung wird fortgesetzt |
 | 2026-07-26 | Slice 6 durch Codex implementiert | Null-/Missingness-Semantik, signierte Cashrenditen, terminale Chartpunkte, versionierter Heatmap-Nenner und statusbasierte erfolgreiche Null-Outcomes umgesetzt; drei freigegebene Backtest-Hashes aktualisiert; 132 Testdateien mit 7.534 Assertions, 16 Browser-Smokes und alle Coverage-Gates gruen; Review ausstehend |
+| 2026-07-26 | Slice 7 durch Codex gestartet | direkte Abhaengigkeiten 3 und 5 freigegeben; Branch und Worktree sauber; Scope auf sechs Programmdateien begrenzt |
+| 2026-07-26 | Slice 7 durch Codex implementiert | `SweepRequestV1`, gemeinsamer expliziter MC-/Sweep-Samplingdispatch, Filterinvariante und versionierte Samplingprovenienz umgesetzt; 132 Testdateien mit 7.584 Assertions und 16 Browser-Smokes gruen; Review ausstehend |
 
 ## Review-Feedback von Gemini
 

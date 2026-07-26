@@ -24,8 +24,6 @@ import {
     createMonteCarloLifeState,
     resolveSimulatorMortalityProbability
 } from './mc-life-events.js';
-import { STATIONARY_BOOTSTRAP_METHOD, isStationaryBootstrapMethod } from './stationary-bootstrap-contract.js';
-import { createStationaryBootstrapSampler, nextYearSample } from './stationary-bootstrap-sampler.js';
 import { applyTailRiskOverlay, createTailRiskSchedule } from './tail-risk-overlay.js';
 import {
     createMonteCarloStressTracker,
@@ -50,11 +48,13 @@ import {
     buildYearSamplingConfig,
     createMonteCarloSamplingDiagnosticsV1,
     finalizeMonteCarloSamplingDiagnosticsV1,
+    initializeMonteCarloSamplingStateV1,
     pickMonteCarloStartYearIndex,
     recordMonteCarloSampledYearV1,
     recordMonteCarloSamplingStartV1,
     resolveMonteCarloSamplingContractV1,
-    resolveMinStartYearIndex
+    resolveMinStartYearIndex,
+    sampleMonteCarloYearV1
 } from './mc-year-sampling.js';
 import { resolveDynamicFlexRunnerHorizon } from './dynamic-flex-runner-horizon.js';
 import {
@@ -150,25 +150,6 @@ function resolveMonteCarloCape(yearData, inputs, marketDataHist) {
     const histCape = Number(marketDataHist?.capeRatio);
     if (Number.isFinite(histCape) && histCape > 0) return histCape;
     return 0;
-}
-
-function createStationaryBootstrapForRun({
-    blockSize,
-    rand,
-    startYearIndex,
-    samplingResolution
-}) {
-    const startSampler = samplingResolution?.blockStartSampler;
-    const startIndices = startSampler?.indices;
-    return createStationaryBootstrapSampler({
-        annualData,
-        blockSize,
-        mode: STATIONARY_BOOTSTRAP_METHOD,
-        cdf: Array.isArray(startSampler?.cdf) ? startSampler : null,
-        startIndices,
-        initialStartIndex: startYearIndex,
-        rng: rand
-    });
 }
 
 function shouldUseStressBootstrap(stressCtx) {
@@ -443,25 +424,15 @@ export async function runMonteCarloChunk({
         recordMonteCarloSamplingStartV1(samplingDiagnostics, annualData[startYearIndex]);
 
         let simState = initMcRunState(inputs, startYearIndex);
-        if (samplingResolution.effectiveYearSamplingConfig) {
-            simState.samplerState.yearSampling = samplingResolution.effectiveYearSamplingConfig;
-        }
-        if (methode === 'block') {
-            simState.samplerState.blockStartIndex = startYearIndex;
-            simState.samplerState.yearInBlock = 0;
-            simState.samplerState.contractInitialRecordPending = true;
-        } else if (methode === 'regime_markov' || methode === 'regime_iid') {
-            simState.samplerState.currentRegime = annualData[startYearIndex]?.regime;
-            simState.samplerState.contractInitialRecordPending = true;
-        }
-        if (isStationaryBootstrapMethod(methode)) {
-            simState.samplerState.stationaryBootstrap = createStationaryBootstrapForRun({
-                blockSize,
-                rand,
-                startYearIndex,
-                samplingResolution
-            });
-        }
+        initializeMonteCarloSamplingStateV1({
+            state: simState,
+            method: methode,
+            blockSize,
+            rand,
+            startYearIndex,
+            samplingResolution,
+            annualData
+        });
 
         const depotWertHistorie = [portfolioTotal(simState.portfolio)];
         const shouldLogRun = !logIndexSet || logIndexSet.has(runIdx);
@@ -512,41 +483,22 @@ export async function runMonteCarloChunk({
             lebensdauer = simulationsJahr + 1;
 
             const conditionalStressActive = shouldUseStressBootstrap(stressCtx);
-            let stationarySample = null;
-            let samplingSource = 'unknown';
-            let yearData;
-            if (isStationaryBootstrapMethod(methode) && !conditionalStressActive) {
-                stationarySample = nextYearSample(simState.samplerState.stationaryBootstrap);
-                yearData = stationarySample.yearData;
-                samplingSource = stationarySample.restartReason === 'initial'
-                    ? 'initial_start'
-                    : (stationarySample.isRestart ? 'stationary_restart' : 'stationary_continuation');
-            } else if ((methode === 'regime_markov' || methode === 'regime_iid')
-                && simState.samplerState.contractInitialRecordPending
-                && !conditionalStressActive) {
-                yearData = { ...annualData[startYearIndex] };
-                simState.samplerState.contractInitialRecordPending = false;
-                samplingSource = 'initial_start';
-            } else {
-                yearData = sampleNextYearData(simState, methode, blockSize, rand, stressCtx);
-                if (conditionalStressActive) {
-                    samplingSource = 'conditional_stress';
-                } else if (methode === 'block') {
-                    const isBlockStart = simState.samplerState.yearInBlock === 1;
-                    if (isBlockStart && simState.samplerState.contractInitialRecordPending) {
-                        samplingSource = 'initial_start';
-                        simState.samplerState.contractInitialRecordPending = false;
-                    } else {
-                        samplingSource = isBlockStart ? 'fixed_block_restart' : 'fixed_block_continuation';
-                    }
-                } else {
-                    samplingSource = methode;
-                }
-            }
+            const samplingStep = sampleMonteCarloYearV1({
+                state: simState,
+                method: methode,
+                blockSize,
+                rand,
+                stressContext: stressCtx,
+                conditionalStressActive,
+                samplingResolution,
+                annualData,
+                sampleNextYearData
+            });
+            let yearData = samplingStep.yearData;
             recordMonteCarloSampledYearV1(samplingDiagnostics, {
                 yearData,
-                source: samplingSource,
-                stationaryRestartReason: stationarySample?.restartReason || null
+                source: samplingStep.source,
+                stationaryRestartReason: samplingStep.stationaryRestartReason
             });
             yearData = applyStressOverride(yearData, stressCtx, rand);
             const tailRiskOverlay = applyTailRiskOverlay(yearData, tailRiskSchedule[simulationsJahr] ?? null, {
