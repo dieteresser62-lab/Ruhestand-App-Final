@@ -4,7 +4,7 @@ Die Balance-App besteht aus 36 ES6-Modulen unter `app/balance/`. Das folgende Do
 Dateinamen werden unten kurz ohne Präfix genannt; tatsächlicher Pfad ist in der Regel `app/balance/<datei>.js`.
 Ausnahmen: Profilverbund-Module liegen unter `app/profile/`, Shared-Formatter unter `app/shared/`.
 
-**Stand:** 2026-07-14
+**Stand:** 2026-07-26
 
 ## Vollstaendige Datei-Inventur
 
@@ -360,7 +360,7 @@ Kernlogik für den Profilverbund (Multi-Profil-Modus).
 - `calculateTaxPerEuro(inputs)` – Berechnet Steuerlast pro Euro für ein Profil
 - `selectTranchesForSale(tranches, targetAmount, taxRate)` – Wählt steueroptimale Tranchen für Verkauf
 - `calculateWithdrawalDistribution(profileInputs, aggregated, mode)` – Verteilt Entnahme nach Modus (tax_optimized, proportional, runway_first)
-- `buildProfilverbundAssetSummary(profileInputs)` – Vermögenszusammenfassung aller Profile
+- `buildProfilverbundAssetSummary(profileInputs)` – Vermögenszusammenfassung aller Profile inklusive absoluter, profilbezogen diagnostizierter Goldstrategie
 - `buildProfilverbundProfileSummaries(profileInputs)` – Einzelprofil-Übersichten
 
 **Verteilungsmodi:**
@@ -383,8 +383,10 @@ Kernlogik für den Profilverbund (Multi-Profil-Modus).
 - Detailtranchen ersetzen in Asset-Summaries die aggregierten Depot-/Gold-/Geldmarktwerte, damit Werte nicht doppelt gezählt werden. Bonds behalten ihre Assetklasse und fliessen fuer Legacy-Kompatibilitaet zugleich in die Depotaggregate ein.
 - Kategorie und Typ muessen die disjunkte Matrix aus `types/tranche-contract.js` erfuellen. Schema-1- und Engine-Paare wie `money_market`/`aktien_neu` werden fail-closed abgelehnt und niemals durch eine Prioritaetsregel still umklassifiziert. Nur der Persistenz-Lesepfad migriert diesen von der frueheren Manager-UI erzeugbaren Zustand bei unversionierten Altbestaenden auf `money_market`/`geldmarkt`. Valider Geldmarkt bleibt Haushaltsliquiditaet, ist kein Aktienverkaufskandidat und eine Umschichtung zu Tagesgeld veraendert die Gesamtliquiditaet nicht.
 - Der Pflegebucket wird als Haushaltsdefinition aus dem Primary-Profil gelesen und in Balance nur diagnostisch ausgewiesen. Er ist keine zusätzliche Entnahmequelle im Verteilungsmodus.
+- Die Goldstrategie verwendet unabhaengig davon je Profil eine freie Assetbasis aus reconciliertem Depot inklusive Gold und operativer Liquiditaet; die jeweilige Pflegebucket-Reservierung wird bis zur vorhandenen operativen Liquiditaet abgezogen. Profilziele/-Floors werden absolut summiert und erst adapterseitig als Haushaltsquote an den bestehenden Balance-Vertrag uebergeben.
+- `balance-main-profilverbund.js` uebernimmt Zielbetrag, Floorbetrag, Basis und Profildiagnostik aus der Assetsummary. Dadurch koennen Goldfelder des aktuell geoeffneten DOM-Profils die Strategie einer unveraenderten Haushaltsauswahl nicht ueberschreiben.
 
-**Dependencies:** `balance-config.js`, `app/profile/profile-storage.js`
+**Dependencies:** `balance-config.js`, `app/profile/profile-storage.js`, `app/profile/profile-asset-values.js`
 
 Der vollstaendige Persistenz-, Migrations-, Quote- und Reconcile-Vertrag steht in
 [`TRANCHEN_MODULES_README.md`](./TRANCHEN_MODULES_README.md).

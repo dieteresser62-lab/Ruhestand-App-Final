@@ -2,7 +2,7 @@
 
 Die Simulator-App ist inzwischen in mehrere spezialisierte ES6-Module zerlegt. Die zentralen Abläufe (Monte-Carlo, Sweep, Backtests, Pflege-UI) leben nicht mehr als Monolith in `simulator-main.js`, sondern wurden in klar abgegrenzte Dateien ausgelagert. Dieses Dokument beschreibt Zweck, Haupt-Exports, Einbindungspunkte und die gewünschte Aufteilung neuer Features.
 
-**Stand:** 2026-07-22 (einschliesslich Langlebigkeit, Stationary Bootstrap, Tail-Risk-Overlay, Realentnahmevertrag, getrennter Pflege-KPI-Semantik sowie vollstaendigem historischen Backtest-Contract)
+**Stand:** 2026-07-26 (einschliesslich Langlebigkeit, Stationary Bootstrap, Tail-Risk-Overlay, Realentnahmevertrag, getrennter Pflege-KPI-Semantik, vollstaendigem historischen Backtest-Contract sowie verlustfreier Profilasset-/Goldzielaggregation)
 
 **Pfadkonvention:** Simulator-Module liegen unter `app/simulator/`, Profilmodule unter `app/profile/`, Shared-Utilities unter `app/shared/`, Tranchen-Status unter `app/tranches/`. Im Dokument werden Dateinamen aus Lesbarkeit meist ohne Präfix genannt.
 
@@ -589,17 +589,19 @@ Aggregiert Profildaten zu Simulator-Inputs für Multi-Profil-Setups.
 - `combineSimulatorProfiles()` – aggregiert mehrere Profile zu einem kombinierten Input-Objekt (1–2 Personen)
 
 **Besonderheiten:**
-- Gold-Validierung: `goldAktiv` nur true wenn `goldZielProzent > 0`
+- Goldstrategie: `calculateProfileGoldStrategy()` berechnet Ziel und Floor zuerst je Profil als Eurobetrag auf der reconciliierten frei investierbaren Basis aus Depot inklusive Gold und operativer Liquiditaet. Der Profil-Pflegebucket wird dabei hoechstens bis zur vorhandenen operativen Liquiditaet abgezogen.
+- Goldadapter: Absolute Profilziele werden summiert und erst danach in eine Haushaltsquote umgerechnet. `goldZielBetrag`, `goldFloorBetrag` und `goldStrategyDiagnostics` halten den Vertrag nachvollziehbar; `initializePortfolio()` priorisiert das absolute Ziel.
 - Tranchen-Aggregation: Fügt detaillierte Tranchen aller Profile zusammen, versieht IDs mit Profilpräfix und setzt `sourceProfileId`
 - Verkaufs-Herkunft: Engine-`breakdown[]` bewahrt `sourceProfileId`; Portfolio-Reduktionen laufen ueber die profilbezogene `trancheId`, damit identische Positionen aus verschiedenen Profilen nicht vermischt werden
 - Referenzisolation: Profilinputs werden vor Haushaltsmerge und Portfolioinitialisierung tiefenkopiert. Teilverkaeufe reduzieren Stueckzahl, Marktwert und Cost Basis proportional; simulierte Kaeufe erzeugen eigene `simlot:`-Lots.
-- Tranchensummen: Valide Detailtranchen bestimmen `startVermoegen` zusammen mit Liquiditaet und ersetzen ueberlappende Aggregate. Korrupte oder widerspruechliche Payloads blockieren fail-closed.
+- Tranchensummen: Valide oder explizit leere Detailtranchen bestimmen die jeweilige Profilrepraesentation. Korrupte oder widerspruechliche Payloads blockieren fail-closed.
+- Hybridprovenienz: Existiert eine Detailrepraesentation, blockiert ein weiteres Profil mit positiven Depot-/Geldmarkt-Aggregaten ohne Details mit `SIMULATOR_PROFILE_ASSET_PROVENANCE_MISSING`. Reines Tagesgeld bleibt als separat provenienzfaehige Liquiditaet zulaessig; Aggregate-only Haushalte bleiben kompatibel.
 - Pflegebucket: liest `profile_health_bucket`, normalisiert die Definition und nutzt bei Multi-Profil-Setups das Primary-Profil als Haushaltsdefinition. Abweichende sekundäre Definitionen werden als Warnung transportiert.
 - Fallback-Logik: Nutzt Balance-Werte wenn Simulator-Felder leer sind
 - Mindest-Flex bleibt profilbezogen: `minimumFlexAnnual` wird aus Profil-Simulatorwerten oder Balance-Fallbacks gelesen, im kombinierten Haushaltslauf addiert und als `minimumFlexProfiles` nachvollziehbar transportiert.
-- Gewichtete Mittelung für Steuersätze, Aktienquote und Rebalancing-Parameter
+- Gewichtete Mittelung bleibt fuer Steuersaetze und Aktienquote bestehen; das Gold-Rebalancing-Band wird zielbetragsgewichtet aus den aktiven Goldprofilen abgeleitet.
 
-**Dependencies:** `simulator-data.js`, `balance-config.js`
+**Dependencies:** `simulator-data.js`, `balance-config.js`, `app/profile/profile-asset-values.js`
 
 ---
 

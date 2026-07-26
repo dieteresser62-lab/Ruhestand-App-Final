@@ -310,7 +310,16 @@ export function initializePortfolio(inputs) {
     const flexiblesVermoegen = Math.max(0, inputs.startVermoegen - inputs.depotwertAlt);
     const investitionsKapitalNeu = Math.max(0, flexiblesVermoegen - startLiquiditaet);
     const investitionsKapitalGesamt = inputs.depotwertAlt + investitionsKapitalNeu;
-    const zielwertGold = inputs.goldAktiv ? investitionsKapitalGesamt * (inputs.goldZielProzent / 100) : 0;
+    const absoluteGoldTarget = Number(inputs.goldZielBetrag);
+    const percentageGoldTarget = investitionsKapitalGesamt * (inputs.goldZielProzent / 100);
+    const zielwertGold = inputs.goldAktiv
+        ? Math.min(
+            investitionsKapitalGesamt,
+            Number.isFinite(absoluteGoldTarget) && absoluteGoldTarget >= 0
+                ? absoluteGoldTarget
+                : percentageGoldTarget
+        )
+        : 0;
     const depotwertNeu = Math.max(0, investitionsKapitalNeu - zielwertGold);
 
     if (inputs.depotwertAlt > 1) {

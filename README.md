@@ -157,9 +157,11 @@ Die Suite kann mehrere Profile als Profilverbund gleichzeitig auswerten. Es gibt
 * Profile werden im Tab „Rahmendaten“ ausgewählt.
 * Startvermögen, Floor/Flex und Renten werden aus den Profilen gefüllt.
 * Personenanzahl und Renten ergeben sich automatisch aus der Profilwahl.
+* Sobald mindestens ein Profil valide Detailtranchen verwendet, blockiert ein weiteres Profil mit positiven Depot-/Geldmarkt-Aggregaten ohne Detailtranchen sichtbar. So werden belegte Assets weder still ausgelassen noch mit unbekannter Steuerprovenienz synthetisiert.
 
 **Wichtige Hinweise:**
-* Gold-Strategie wird pro Profil gepflegt und in Balance/Simulator übernommen.
+* Goldziel und Gold-Floor werden pro Profil als Eurobetrag auf der frei investierbaren Profilbasis berechnet. Ein Pflegebucket wird dabei bis zur vorhandenen operativen Liquidität ausgeschlossen; erst die Summe der Profilbeträge wird adapterseitig in eine Haushaltsquote umgerechnet.
+* Die Haushalts-Goldstrategie hängt nur von den ausgewählten Profilen ab, nicht vom aktuell in der UI geöffneten Profil.
 * Tranchen werden aus den aktiven Profilen zusammengeführt.
 * Kategorie und Typ folgen einer disjunkten Matrix; korrupte oder widerspruechliche Bestände blockieren fail-closed statt auf einen anderen Bestand zurueckzufallen.
 * Detaillierte Designdokumentation siehe `docs/reference/PROFILVERBUND_FEATURES.md`

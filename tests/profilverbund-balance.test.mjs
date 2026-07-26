@@ -362,6 +362,60 @@ global.localStorage = createLocalStorageMock();
     assertEqual(profileSummary.totalAssets, 250, 'Profile summary should not double-count aggregate asset fields');
 }
 
+// --- TEST 8g: Gold strategy uses per-profile euro targets and free asset bases ---
+{
+    console.log('\n📋 Test 8g: profile gold strategy is order-independent');
+    const profileInputs = [
+        {
+            profileId: 'gold',
+            name: 'Gold',
+            inputs: {
+                depotwertAlt: 60000,
+                depotwertNeu: 0,
+                goldWert: 0,
+                tagesgeld: 20000,
+                geldmarktEtf: 20000,
+                goldAktiv: true,
+                goldZielProzent: 8,
+                goldFloorProzent: 1,
+                rebalancingBand: 20,
+                goldSteuerfrei: true
+            },
+            healthBucket: { enabled: true, initialAmount: 30000 },
+            tranches: []
+        },
+        {
+            profileId: 'plain',
+            name: 'Ohne Gold',
+            inputs: {
+                depotwertAlt: 900000,
+                depotwertNeu: 0,
+                goldWert: 0,
+                tagesgeld: 0,
+                geldmarktEtf: 0,
+                goldAktiv: false,
+                goldZielProzent: 0,
+                goldFloorProzent: 0,
+                rebalancingBand: 50,
+                goldSteuerfrei: false
+            },
+            tranches: []
+        }
+    ];
+
+    const forward = buildProfilverbundAssetSummary(profileInputs).goldStrategy;
+    const reversed = buildProfilverbundAssetSummary([...profileInputs].reverse()).goldStrategy;
+    assertEqual(forward.goldBasisVermoegen, 970000, 'Balance gold base should exclude profile care liquidity');
+    assertEqual(forward.goldZielBetrag, 5600, 'Balance should sum the active profile euro target');
+    assertEqual(forward.goldFloorBetrag, 700, 'Balance should sum the active profile euro floor');
+    assertClose(forward.goldZielProzent, (5600 / 970000) * 100, 0.0000001,
+        'Balance household quote should reconcile to the absolute target');
+    assertEqual(reversed.goldZielBetrag, forward.goldZielBetrag,
+        'Profile order must not change the absolute gold target');
+    assertClose(reversed.goldZielProzent, forward.goldZielProzent, 0.0000001,
+        'Profile order must not change the household gold percentage');
+}
+
 // --- TEST 8a: Identical profile-internal tranche IDs remain unique in the household pool ---
 {
     console.log('\n📋 Test 8a: household tranche IDs are profile-scoped');

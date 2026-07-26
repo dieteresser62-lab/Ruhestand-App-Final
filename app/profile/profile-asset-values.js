@@ -42,6 +42,90 @@ export class ProfileAssetValuesValidationError extends Error {
     }
 }
 
+function nonNegativeFinite(raw) {
+    const value = Number(raw);
+    return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+/**
+ * Builds the household gold contract from per-profile euro bases.
+ *
+ * Each entry must already describe its assets exactly once. The helper only
+ * removes the supported dedicated care reserve from operative liquidity and
+ * translates the summed euro targets back into the household percentages
+ * consumed by the existing engine contract.
+ */
+export function calculateProfileGoldStrategy(profileEntries = []) {
+    const entries = Array.isArray(profileEntries) ? profileEntries : [];
+    const diagnostics = entries.map((entry, index) => {
+        const assetBase = nonNegativeFinite(entry?.assetBase);
+        const operativeLiquidity = Math.min(
+            assetBase,
+            nonNegativeFinite(entry?.operativeLiquidity)
+        );
+        const healthBucket = normalizeProfileHealthBucket(entry?.healthBucket);
+        const excludedHealthBucket = healthBucket.enabled
+            ? Math.min(operativeLiquidity, nonNegativeFinite(healthBucket.initialAmount))
+            : 0;
+        const freeAssetBase = Math.max(0, assetBase - excludedHealthBucket);
+        const goldActive = entry?.goldAktiv === true;
+        const targetPct = goldActive ? nonNegativeFinite(entry?.goldZielProzent) : 0;
+        const floorPct = goldActive ? nonNegativeFinite(entry?.goldFloorProzent) : 0;
+        const targetAmount = freeAssetBase * (targetPct / 100);
+        const floorAmount = freeAssetBase * (floorPct / 100);
+        const rebalancingBand = goldActive
+            ? nonNegativeFinite(entry?.rebalancingBand)
+            : 0;
+
+        return {
+            profileId: String(entry?.profileId || `profile_${index + 1}`),
+            name: String(entry?.name || entry?.profileId || `Profil ${index + 1}`),
+            assetBase,
+            operativeLiquidity,
+            excludedHealthBucket,
+            freeAssetBase,
+            goldAktiv: goldActive,
+            goldZielProzent: targetPct,
+            goldFloorProzent: floorPct,
+            goldZielBetrag: targetAmount,
+            goldFloorBetrag: floorAmount,
+            rebalancingBand,
+            goldSteuerfrei: goldActive && entry?.goldSteuerfrei === true
+        };
+    });
+
+    const goldBasisVermoegen = diagnostics.reduce((sum, entry) => sum + entry.freeAssetBase, 0);
+    const goldZielBetrag = diagnostics.reduce((sum, entry) => sum + entry.goldZielBetrag, 0);
+    const goldFloorBetrag = diagnostics.reduce((sum, entry) => sum + entry.goldFloorBetrag, 0);
+    const activeGoldEntries = diagnostics.filter(entry => entry.goldAktiv && entry.goldZielBetrag > 0);
+    const goldAktiv = goldZielBetrag > 0 && goldBasisVermoegen > 0;
+    const goldZielProzent = goldAktiv
+        ? (goldZielBetrag / goldBasisVermoegen) * 100
+        : 0;
+    const goldFloorProzent = goldAktiv
+        ? (goldFloorBetrag / goldBasisVermoegen) * 100
+        : 0;
+    const rebalancingBand = goldZielBetrag > 0
+        ? activeGoldEntries.reduce(
+            (sum, entry) => sum + (entry.rebalancingBand * entry.goldZielBetrag),
+            0
+        ) / goldZielBetrag
+        : 0;
+
+    return {
+        goldAktiv,
+        goldBasisVermoegen,
+        goldZielBetrag,
+        goldFloorBetrag,
+        goldZielProzent,
+        goldFloorProzent,
+        rebalancingBand,
+        goldSteuerfrei: activeGoldEntries.length > 0
+            && activeGoldEntries.every(entry => entry.goldSteuerfrei),
+        diagnostics
+    };
+}
+
 function profileFieldError(field, message, value) {
     return { code: 'PROFILE_ASSET_FIELD_INVALID', field, message, value };
 }

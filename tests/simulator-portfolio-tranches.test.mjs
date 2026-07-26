@@ -4,7 +4,7 @@ import { simulateOneYear } from '../app/simulator/simulator-engine-direct.js';
 import { initMcRunState, prepareHistoricalDataOnce } from '../app/simulator/simulator-engine-helpers.js';
 import { annualData } from '../app/simulator/simulator-data.js';
 import { runMonteCarloChunk } from '../app/simulator/monte-carlo-runner.js';
-import { initializePortfolioDetailed } from '../app/simulator/simulator-portfolio-init.js';
+import { initializePortfolio, initializePortfolioDetailed } from '../app/simulator/simulator-portfolio-init.js';
 import {
     applySaleToPortfolio,
     buyGold,
@@ -284,3 +284,24 @@ function detailedLot(overrides = {}) {
 }
 
 console.log('--- Simulator Portfolio Tranche Invariants Completed ---');
+
+{
+    const portfolio = initializePortfolio({
+        startVermoegen: 1000000,
+        depotwertAlt: 0,
+        einstandAlt: 0,
+        tagesgeld: 0,
+        geldmarktEtf: 0,
+        goldAktiv: true,
+        goldZielProzent: 1,
+        goldZielBetrag: 8000,
+        goldSteuerfrei: false,
+        simulationSourceProfileId: 'household'
+    });
+    const goldValue = portfolio.depotTranchesGold.reduce(
+        (sum, tranche) => sum + (Number(tranche.marketValue) || 0),
+        0
+    );
+    assertEqual(goldValue, 8000,
+        'Portfolio initialization should use the reconciled absolute household gold target');
+}

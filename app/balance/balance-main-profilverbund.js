@@ -280,6 +280,15 @@ export function createProfilverbundHandlers({ dom, PROFILVERBUND_STORAGE_KEYS })
             inputData.goldWert = assetSummary.totalGold;
             inputData.goldCost = assetSummary.totalGoldCost;
             inputData.detailledTranches = assetSummary.mergedTranches;
+            inputData.goldAktiv = assetSummary.goldStrategy.goldAktiv;
+            inputData.goldBasisVermoegen = assetSummary.goldStrategy.goldBasisVermoegen;
+            inputData.goldZielBetrag = assetSummary.goldStrategy.goldZielBetrag;
+            inputData.goldFloorBetrag = assetSummary.goldStrategy.goldFloorBetrag;
+            inputData.goldZielProzent = assetSummary.goldStrategy.goldZielProzent;
+            inputData.goldFloorProzent = assetSummary.goldStrategy.goldFloorProzent;
+            inputData.goldSteuerfrei = assetSummary.goldStrategy.goldSteuerfrei;
+            inputData.rebalancingBand = assetSummary.goldStrategy.rebalancingBand;
+            inputData.goldStrategyDiagnostics = assetSummary.goldStrategy.diagnostics;
             inputData.renteAktiv = totalRenteMonatlich > 0;
             inputData.renteMonatlich = totalRenteMonatlich;
             if (assetSummary.primaryHealthBucket) {

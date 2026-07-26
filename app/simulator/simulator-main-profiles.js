@@ -88,7 +88,15 @@ export function initSimulatorProfileSelection() {
         const { combined, warnings } = combineSimulatorProfiles(profileInputs, primaryId);
 
         if (!combined) {
-            updateStatus('Profil-Daten fuer Simulator fehlen.', 'error');
+            if (typeof window !== 'undefined') {
+                window.__profilverbundTranchenOverride = null;
+                window.__profilverbundPreferAggregates = true;
+                window.__profilverbundMinimumFlexProfiles = null;
+            }
+            const blockingMessage = Array.isArray(warnings) && warnings.length
+                ? warnings.join(' ')
+                : 'Profil-Daten fuer Simulator fehlen.';
+            updateStatus(blockingMessage, 'error');
             return;
         }
 

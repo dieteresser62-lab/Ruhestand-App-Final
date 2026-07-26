@@ -460,7 +460,7 @@ Die Slice-Dateien werden gemaess `SLICE_EXECUTION_RULES.md` jeweils vor Beginn d
 | 1 | [SLICE_SUITE_DATA_01_BALANCE_PREVIEW_COMMIT.md](./SLICE_SUITE_DATA_01_BALANCE_PREVIEW_COMMIT.md) | Balance Preview-/Commit-Trennung | P0 | D-02 | 5 | freigegeben |
 | 2 | [SLICE_SUITE_DATA_02_THREE_BUCKET_FINAL_ACTION.md](./SLICE_SUITE_DATA_02_THREE_BUCKET_FINAL_ACTION.md) | Transaktionsbudgets, 3-Bucket Final Action und Steuer | P0 | 1, 3, 5, D-03 | 10 | freigegeben |
 | 3 | [SLICE_SUITE_DATA_03_CANONICAL_NUMBERS.md](./SLICE_SUITE_DATA_03_CANONICAL_NUMBERS.md) | Kanonische Zahlen, Fractional Lots und Nullgrenzen | P0 | keine | 6 | freigegeben |
-| 4 | `SLICE_SUITE_DATA_04_PROFILE_ASSET_GOLD.md` | Verlustfreie Profilassets und Goldziele | P0/P1 | 3, D-04, D-05 | 6 | geplant |
+| 4 | [SLICE_SUITE_DATA_04_PROFILE_ASSET_GOLD.md](./SLICE_SUITE_DATA_04_PROFILE_ASSET_GOLD.md) | Verlustfreie Profilassets und Goldziele | P0/P1 | 3, D-04, D-05 | 6 | freigegeben |
 | 5 | [SLICE_SUITE_DATA_05_ENGINE_INVARIANTS.md](./SLICE_SUITE_DATA_05_ENGINE_INVARIANTS.md) | Engine-Spending, Floors, Flex und Rente | P1 | 3 | 7 | freigegeben |
 | 6 | `SLICE_SUITE_DATA_06_RESULT_SIGN_SEMANTICS.md` | Nullwerte, negative Renditen und wahrheitsgetreue Darstellung | P1 | 3, 5, D-06, D-19 | 7 | geplant |
 | 7 | `SLICE_SUITE_DATA_07_SWEEP_REQUEST_SAMPLING.md` | Kanonischer Sweep-Request und Sampling | P1 | 3, 5 | 6 | geplant |
@@ -722,6 +722,15 @@ Voraussichtlich betroffene Programmdateien:
 - Korrupte Details fallen nicht still auf moeglicherweise veraltete Aggregate zurueck.
 - Goldziel im 100.000/900.000-EUR-Fall betraegt 8.000 EUR.
 - Wechsel des aktiven Profils aendert bei gleicher Verbundauswahl weder Goldziel noch Action.
+
+### Umsetzungsstand 2026-07-26
+
+- D-04 ist fail-closed umgesetzt: Ein Hybrid aus vorhandener Detailrepraesentation und positivem Depot-/Geldmarkt-Aggregat ohne Detailprovenienz liefert `SIMULATOR_PROFILE_ASSET_PROVENANCE_MISSING` mit profilbezogener Warnung. Aggregate-only Haushalte und separat provenienzfaehiges Tagesgeld bleiben zulaessig.
+- D-05 ist ueber absolute Profilziele umgesetzt: `profileGoldBase` umfasst reconciliertes Depot inklusive Gold plus operative Liquiditaet abzueglich des bis zur Liquiditaet gekappten Profil-Pflegebuckets. Ziel und Floor werden je Profil in Euro summiert; die Haushaltsquote ist nur ein Adapterwert.
+- O-06 blockiert sichtbar, O-07 liefert 8.000 EUR Ziel und 0,8 Prozent Haushaltsquote. Portfolioinitialisierung und Balance-Profilverbund verwenden denselben absoluten Vertrag; ein Wechsel des aktiven UI-Profils aendert ihn nicht.
+- Es wurden exakt sechs Programmdateien geaendert. Engine-Quellen, `engine.js`, `dist/` und Release-Artefakte blieben unangetastet.
+- Fokussierte Tests, `npm test` mit 7.516 Assertions und `npm run test:browser` sind gruen. Die vollstaendigen Nachweise und offenen Restrisiken stehen in der Slice-Datei.
+- Status: technisch implementiert; unabhaengiges Review durch Gemini/Nutzer, Commit und Push stehen aus.
 
 ### Tests und Gates
 

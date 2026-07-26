@@ -17,6 +17,7 @@ import {
 } from './profile-state.js';
 import { loadTranchesFromStorage } from '../tranches/tranchen-manager-state.js';
 import { classifyTranche } from '../../types/tranche-contract.js';
+import { calculateProfileGoldStrategy } from './profile-asset-values.js';
 
 const DEFAULT_TAX_RATE = 0.25 * (1 + 0.055);
 
@@ -561,6 +562,7 @@ export function calculateWithdrawalDistribution(profileInputs, aggregated, mode 
 
 export function buildProfilverbundAssetSummary(profileInputs) {
     const list = Array.isArray(profileInputs) ? profileInputs : [];
+    const goldProfileEntries = [];
     const summary = {
         totalTagesgeld: 0,
         totalGeldmarkt: 0,
@@ -603,12 +605,37 @@ export function buildProfilverbundAssetSummary(profileInputs) {
             summary.totalGoldCost += inputs.goldCost || 0;
         }
 
+        const profileTagesgeld = Math.max(0, Number(inputs.tagesgeld) || 0);
+        const profileGeldmarkt = hasTranches
+            ? split.moneyValue
+            : Math.max(0, Number(inputs.geldmarktEtf) || 0);
+        const profileAssetBase = (hasTranches
+            ? split.altValue + split.neuValue + split.goldValue + split.moneyValue
+            : (Number(inputs.depotwertAlt) || 0)
+                + (Number(inputs.depotwertNeu) || 0)
+                + (Number(inputs.goldWert) || 0)
+                + profileGeldmarkt)
+            + profileTagesgeld;
+        goldProfileEntries.push({
+            profileId: entry.profileId,
+            name: entry.name,
+            assetBase: profileAssetBase,
+            operativeLiquidity: profileTagesgeld + profileGeldmarkt,
+            healthBucket: entry.healthBucket || inputs.healthBucket,
+            goldAktiv: inputs.goldAktiv,
+            goldZielProzent: inputs.goldZielProzent,
+            goldFloorProzent: inputs.goldFloorProzent,
+            goldSteuerfrei: inputs.goldSteuerfrei,
+            rebalancingBand: inputs.rebalancingBand
+        });
+
         summary.mergedTranches.push(...buildProfileOwnedTranches(entry));
         if (idx === 0 && entry.healthBucket) {
             summary.primaryHealthBucket = entry.healthBucket;
         }
     });
 
+    summary.goldStrategy = calculateProfileGoldStrategy(goldProfileEntries);
     return summary;
 }
 

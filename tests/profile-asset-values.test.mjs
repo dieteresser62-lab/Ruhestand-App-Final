@@ -1,6 +1,7 @@
 "use strict";
 
 import {
+    calculateProfileGoldStrategy,
     loadProfileAssetValues,
     normalizeProfileAssetValues,
     ProfileAssetValuesValidationError,
@@ -174,3 +175,43 @@ console.log('Test 5: DOM reader rejects an intermediate blank without producing 
     assert(error.errors.some(item => item.field === 'renteMonatlich'), 'Blank field should be identified');
 }
 console.log('✓ intermediate DOM input validation OK');
+
+console.log('Test 6: profile gold strategy sums euro targets and excludes care reserves');
+{
+    const result = calculateProfileGoldStrategy([
+        {
+            profileId: 'gold',
+            name: 'Gold',
+            assetBase: 100000,
+            operativeLiquidity: 40000,
+            healthBucket: { enabled: true, initialAmount: 30000 },
+            goldAktiv: true,
+            goldZielProzent: 8,
+            goldFloorProzent: 1,
+            rebalancingBand: 20,
+            goldSteuerfrei: true
+        },
+        {
+            profileId: 'plain',
+            name: 'Ohne Gold',
+            assetBase: 900000,
+            operativeLiquidity: 0,
+            goldAktiv: false,
+            goldZielProzent: 0,
+            goldFloorProzent: 0,
+            rebalancingBand: 50,
+            goldSteuerfrei: false
+        }
+    ]);
+
+    assertEqual(result.goldBasisVermoegen, 970000, 'Care reserve should be excluded from the household gold base');
+    assertEqual(result.goldZielBetrag, 5600, 'Profile euro targets should sum before percentage conversion');
+    assertEqual(result.goldFloorBetrag, 700, 'Profile euro floors should sum before percentage conversion');
+    assertClose(result.goldZielProzent, (5600 / 970000) * 100, 0.0000001,
+        'Household target percentage should reconcile to the absolute target');
+    assertEqual(result.rebalancingBand, 20, 'Inactive profiles should not influence the gold band');
+    assertEqual(result.goldSteuerfrei, true, 'Tax flag should reflect all active target profiles');
+    assertEqual(result.diagnostics[0].excludedHealthBucket, 30000,
+        'Diagnostic should expose the per-profile care exclusion');
+}
+console.log('✓ profile gold strategy euro aggregation OK');

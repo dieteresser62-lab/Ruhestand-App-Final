@@ -359,3 +359,207 @@ const profileInputs = [
     assert(corruptResult.warnings.some(message => message.includes('fehlerhaft')),
         'Corrupt tranche input should expose a blocking warning');
 }
+
+{
+    console.log('\n📋 Test 8: O-06 hybrid detail and aggregate profiles fail closed');
+    const hybridProfiles = [
+        {
+            profileId: 'detail',
+            name: 'Detail',
+            inputs: {
+                ...profileInputs[0].inputs,
+                startVermoegen: 90000,
+                depotwertAlt: 80000,
+                tagesgeld: 10000,
+                geldmarktEtf: 0,
+                detailledTranches: [
+                    {
+                        trancheId: 'detail-equity',
+                        marketValue: 80000,
+                        costBasis: 60000,
+                        type: 'aktien_alt',
+                        category: 'equity'
+                    }
+                ],
+                trancheInputState: 'valid'
+            }
+        },
+        {
+            profileId: 'aggregate',
+            name: 'Aggregat',
+            inputs: {
+                ...profileInputs[1].inputs,
+                startVermoegen: 200000,
+                depotwertAlt: 150000,
+                tagesgeld: 20000,
+                geldmarktEtf: 30000,
+                detailledTranches: null,
+                trancheInputState: 'absent'
+            }
+        }
+    ];
+
+    const result = combineSimulatorProfiles(hybridProfiles, 'detail');
+    assertEqual(result.combined, null,
+        'O-06 must block a hybrid household instead of returning 110000 or 140000 EUR');
+    assert(result.warnings.some(message => message.includes('Aggregat')),
+        'O-06 blocking message should identify the aggregate-only profile');
+    assertEqual(result.errorCode, 'SIMULATOR_PROFILE_ASSET_PROVENANCE_MISSING',
+        'O-06 should expose a stable fail-closed error code');
+}
+
+{
+    console.log('\n📋 Test 9: Detail plus explicit empty or cash-only missing profile remains lossless');
+    const detailProfile = {
+        profileId: 'detail',
+        name: 'Detail',
+        inputs: {
+            ...profileInputs[0].inputs,
+            startVermoegen: 90000,
+            depotwertAlt: 80000,
+            tagesgeld: 10000,
+            geldmarktEtf: 0,
+            detailledTranches: [
+                {
+                    trancheId: 'detail-equity',
+                    marketValue: 80000,
+                    costBasis: 60000,
+                    type: 'aktien_alt',
+                    category: 'equity'
+                }
+            ],
+            trancheInputState: 'valid'
+        }
+    };
+    const explicitEmpty = {
+        profileId: 'empty',
+        name: 'Leer',
+        inputs: {
+            ...profileInputs[1].inputs,
+            startVermoegen: 20000,
+            depotwertAlt: 0,
+            tagesgeld: 20000,
+            geldmarktEtf: 0,
+            detailledTranches: [],
+            trancheInputState: 'empty'
+        }
+    };
+    const cashOnlyMissing = {
+        profileId: 'cash',
+        name: 'Cash',
+        inputs: {
+            ...profileInputs[1].inputs,
+            startVermoegen: 15000,
+            depotwertAlt: 0,
+            tagesgeld: 15000,
+            geldmarktEtf: 0,
+            detailledTranches: null,
+            trancheInputState: 'absent'
+        }
+    };
+
+    const emptyResult = combineSimulatorProfiles([detailProfile, explicitEmpty], 'detail');
+    assertEqual(emptyResult.combined.startVermoegen, 110000,
+        'Explicit empty profile should retain separate cash exactly once');
+    const cashResult = combineSimulatorProfiles([detailProfile, cashOnlyMissing], 'detail');
+    assertEqual(cashResult.combined.startVermoegen, 105000,
+        'Missing tranche data with cash only should retain provenanced cash exactly once');
+}
+
+{
+    console.log('\n📋 Test 10: O-07 profile gold targets aggregate as euros, independent of primary profile');
+    const goldProfiles = [
+        {
+            profileId: 'gold',
+            name: 'Gold',
+            inputs: {
+                ...profileInputs[0].inputs,
+                startVermoegen: 100000,
+                depotwertAlt: 100000,
+                tagesgeld: 0,
+                geldmarktEtf: 0,
+                goldAktiv: true,
+                goldZielProzent: 8,
+                goldFloorProzent: 1
+            }
+        },
+        {
+            profileId: 'plain',
+            name: 'Ohne Gold',
+            inputs: {
+                ...profileInputs[1].inputs,
+                startVermoegen: 900000,
+                depotwertAlt: 900000,
+                tagesgeld: 0,
+                geldmarktEtf: 0,
+                goldAktiv: false,
+                goldZielProzent: 0,
+                goldFloorProzent: 0
+            }
+        }
+    ];
+
+    const goldPrimary = combineSimulatorProfiles(goldProfiles, 'gold').combined;
+    const plainPrimary = combineSimulatorProfiles(goldProfiles, 'plain').combined;
+    assertClose(goldPrimary.goldZielBetrag, 8000, 0.0001,
+        'O-07 absolute household gold target should be 8000 EUR');
+    assertClose(goldPrimary.goldFloorBetrag, 1000, 0.0001,
+        'Profile gold floor should aggregate as an absolute euro amount');
+    assertClose(goldPrimary.goldZielProzent, 0.8, 0.0000001,
+        'O-07 adapter household percentage should be 0.8 percent');
+    assertClose(plainPrimary.goldZielBetrag, goldPrimary.goldZielBetrag, 0.0001,
+        'Active primary profile must not change the absolute gold target');
+    assertClose(plainPrimary.goldZielProzent, goldPrimary.goldZielProzent, 0.0000001,
+        'Active primary profile must not change the adapter household percentage');
+    assertEqual(goldPrimary.goldStrategyDiagnostics.length, 2,
+        'Gold strategy should retain one diagnostic entry per selected profile');
+}
+
+{
+    console.log('\n📋 Test 11: Care bucket is excluded from each profile gold base');
+    const careProfiles = [
+        {
+            profileId: 'care',
+            name: 'Pflege',
+            inputs: {
+                ...profileInputs[0].inputs,
+                startVermoegen: 100000,
+                depotwertAlt: 60000,
+                tagesgeld: 20000,
+                geldmarktEtf: 20000,
+                goldAktiv: true,
+                goldZielProzent: 8,
+                goldFloorProzent: 1,
+                healthBucket: {
+                    enabled: true,
+                    initialAmount: 30000
+                }
+            }
+        },
+        {
+            profileId: 'plain',
+            name: 'Ohne Gold',
+            inputs: {
+                ...profileInputs[1].inputs,
+                startVermoegen: 900000,
+                depotwertAlt: 900000,
+                tagesgeld: 0,
+                geldmarktEtf: 0,
+                goldAktiv: false,
+                goldZielProzent: 0,
+                goldFloorProzent: 0
+            }
+        }
+    ];
+
+    const combined = combineSimulatorProfiles(careProfiles, 'care').combined;
+    assertClose(combined.goldBasisVermoegen, 970000, 0.0001,
+        'Household gold base should exclude the 30000 EUR care bucket');
+    assertClose(combined.goldZielBetrag, 5600, 0.0001,
+        'Care profile target should use its 70000 EUR free base');
+    assertClose(combined.goldZielProzent, (5600 / 970000) * 100, 0.0000001,
+        'Household quote should reconcile absolute target to the free household base');
+    const careDiagnostic = combined.goldStrategyDiagnostics.find(entry => entry.profileId === 'care');
+    assertClose(careDiagnostic.excludedHealthBucket, 30000, 0.0001,
+        'Profile diagnostic should expose the care-bucket exclusion');
+}

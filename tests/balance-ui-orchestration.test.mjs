@@ -846,6 +846,58 @@ async function runBalanceUiOrchestrationTests() {
         assert(window.__profilverbundDistribution?.items?.length === 1, 'Profilverbund-Verteilung wird gesetzt');
         assert(window.__profilverbundProfileSummaries?.length === 1, 'Profilverbund-Profilzusammenfassung wird gesetzt');
 
+        const goldProfiles = [
+            {
+                profileId: 'gold',
+                name: 'Gold',
+                inputs: {
+                    depotwertAlt: 100000,
+                    depotwertNeu: 0,
+                    goldWert: 0,
+                    tagesgeld: 0,
+                    geldmarktEtf: 0,
+                    goldAktiv: true,
+                    goldZielProzent: 8,
+                    goldFloorProzent: 1,
+                    rebalancingBand: 20,
+                    goldSteuerfrei: true
+                },
+                tranches: []
+            },
+            {
+                profileId: 'plain',
+                name: 'Ohne Gold',
+                inputs: {
+                    depotwertAlt: 900000,
+                    depotwertNeu: 0,
+                    goldWert: 0,
+                    tagesgeld: 0,
+                    geldmarktEtf: 0,
+                    goldAktiv: false,
+                    goldZielProzent: 0,
+                    goldFloorProzent: 0,
+                    rebalancingBand: 50,
+                    goldSteuerfrei: false
+                },
+                tranches: []
+            }
+        ];
+        const goldInput = {
+            floorBedarf: 0,
+            flexBedarf: 0,
+            flexBudgetAnnual: 0,
+            flexBudgetYears: 0,
+            flexBudgetRecharge: 0,
+            goldZielProzent: 99
+        };
+        handlers.updateProfilverbundGlobals(goldProfiles, goldInput);
+        assertEqual(goldInput.goldZielBetrag, 8000,
+            'Balance globals should use the selected profiles absolute gold target');
+        assertClose(goldInput.goldZielProzent, 0.8, 0.0000001,
+            'Balance globals should replace the active DOM profile quote with the household quote');
+        assertEqual(goldInput.goldStrategyDiagnostics.length, 2,
+            'Balance globals should expose one gold diagnostic per selected profile');
+
         handlers.updateProfilverbundGlobals([], inputData);
 
         assertEqual(window.__profilverbundDistribution, null, 'Leerer Profilverbund loescht alte Distribution');

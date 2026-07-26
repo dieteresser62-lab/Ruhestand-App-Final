@@ -35,8 +35,11 @@ Der Profilverbund verbindet mehrere Profile zu einer gemeinsamen Analyse. Es gib
 - Der Pflegebucket-Carve-Out erfolgt erst nach dem Profilverbund-Merge auf dem aggregierten Haushaltsportfolio. Dadurch wird der Bucket nicht faelschlich gekappt, wenn ein Einzelprofil wenig Geldmarkt/Cash hat, der Haushalt insgesamt aber ausreichend cash-nahe Mittel besitzt.
 
 ## Hinweise
-- Gold-Strategie ist pro Profil gepflegt; die Kombination nutzt nur Profile mit aktivem Gold und Ziel > 0.
+- Goldziel und Gold-Floor entstehen zuerst je aktivem Goldprofil als Eurobetrag auf dessen frei investierbarer Basis. Diese Basis umfasst das genau einmal reconciliierte Depot inklusive Gold sowie operative Liquiditaet; ein aktiver Pflegebucket wird hoechstens bis zur vorhandenen operativen Liquiditaet abgezogen.
+- Erst die Summe der Profil-Euroziele wird durch die summierte freie Haushaltsbasis geteilt und als kompatible Haushaltsquote an bestehende Rechenpfade uebergeben. Profile ohne Goldstrategie vergroessern damit nicht das absolute Ziel eines anderen Profils.
+- Die Goldstrategie-Diagnostik weist Basis, Pflegebucket-Abzug, Ziel und Floor je Profil aus. Die aktuell geoeffnete Profil-UI darf den Vertrag bei gleicher Profilauswahl nicht veraendern.
 - Ein explizit leerer Tranchebestand bleibt leer. Korrupte, doppelte oder widerspruechlich klassifizierte Bestände blockieren fail-closed; es gibt keinen Rueckfall auf den Bestand eines anderen Profils.
+- Sobald ein Profil valide oder explizit leere Detailtranchen repraesentiert, blockiert ein weiteres Profil mit positiven Depot-/Geldmarkt-Aggregaten, aber ohne Detailtranchen, mit `SIMULATOR_PROFILE_ASSET_PROVENANCE_MISSING`. Tagesgeld bleibt als separat provenienzfaehige Liquiditaet zulaessig; reine Aggregate-Haushalte bleiben kompatibel.
 - Kombinierte Simulator-Tranchen erhalten profilbezogene IDs und `sourceProfileId`, damit spaetere Steuer-/Portfolio-Pfade die Herkunft nachvollziehen koennen.
 - Der Simulator tiefenkopiert die Lots vor Merge und Portfolioinitialisierung. Simulierte Verkaeufe/Kaeufe mutieren nie den profilgebundenen Realbestand.
 - Pflegebucket-Tranchen werden nach dem Merge aus kombinierten Geldmarkt-Tranchen ausgegliedert. Sie behalten Herkunftsinformationen und werden nicht als freie operative Liquiditaet an die Engine gegeben.

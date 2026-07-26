@@ -19,6 +19,7 @@ import {
 import { LONGEVITY_DEFAULTS, normalizeLongevityMode } from './dynamic-flex-longevity-contract.js';
 import { classifyTranche } from '../../types/tranche-contract.js';
 import { normalizeCareCostDriftPercent } from './simulator-input-care.js';
+import { calculateProfileGoldStrategy } from '../profile/profile-asset-values.js';
 
 const DYNAMIC_FLEX_DEFAULTS = {
     HORIZON_METHOD: 'survival_quantile',
@@ -447,6 +448,58 @@ function profileAssetTotal(inputs) {
     return Math.max(start, components);
 }
 
+function resolveTrancheInputState(inputs) {
+    const state = String(inputs?.trancheInputState || '').trim().toLowerCase();
+    if (state === 'corrupt') return 'corrupt';
+    if (state === 'valid' || state === 'empty' || state === 'absent') return state;
+    if (Array.isArray(inputs?.detailledTranches)) {
+        return inputs.detailledTranches.length > 0 ? 'valid' : 'empty';
+    }
+    return 'absent';
+}
+
+function buildProfileAssetRecord(entry) {
+    const inputs = entry?.inputs || {};
+    const trancheState = resolveTrancheInputState(inputs);
+    const hasDetailedRepresentation = trancheState === 'valid' || trancheState === 'empty';
+    const trancheTotals = hasDetailedRepresentation
+        ? sumTrancheTotals(inputs.detailledTranches)
+        : null;
+    const tagesgeld = Math.max(0, Number(inputs.tagesgeld) || 0);
+    const depotwertAlt = hasDetailedRepresentation
+        ? trancheTotals.equity
+        : Math.max(0, Number(inputs.depotwertAlt) || 0);
+    const geldmarktEtf = hasDetailedRepresentation
+        ? trancheTotals.moneyMarket
+        : Math.max(0, Number(inputs.geldmarktEtf) || 0);
+    const einstandAlt = hasDetailedRepresentation
+        ? trancheTotals.equityCost
+        : Math.max(0, Number(inputs.einstandAlt) || 0);
+    const assetTotal = hasDetailedRepresentation
+        ? trancheTotals.equity + trancheTotals.gold + trancheTotals.moneyMarket + tagesgeld
+        : profileAssetTotal(inputs);
+    const aggregateInvestment = trancheState === 'absent'
+        ? Math.max(
+            depotwertAlt + geldmarktEtf,
+            Math.max(0, assetTotal - tagesgeld)
+        )
+        : 0;
+
+    return {
+        entry,
+        inputs,
+        trancheState,
+        hasDetailedRepresentation,
+        assetTotal,
+        depotwertAlt,
+        geldmarktEtf,
+        tagesgeld,
+        einstandAlt,
+        aggregateInvestment,
+        operativeLiquidity: tagesgeld + geldmarktEtf
+    };
+}
+
 export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
     if (!Array.isArray(profileInputs) || profileInputs.length === 0) {
         return { combined: null, warnings: ['Keine Profile fuer Simulator gefunden.'] };
@@ -454,11 +507,31 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
 
     const inputsList = profileInputs.map(entry => entry.inputs);
     const warnings = [];
-    const corruptEntry = profileInputs.find(entry => entry?.inputs?.trancheInputState === 'corrupt');
-    if (corruptEntry) {
+    const assetRecords = profileInputs.map(buildProfileAssetRecord);
+    const corruptRecord = assetRecords.find(record => record.trancheState === 'corrupt');
+    if (corruptRecord) {
         return {
             combined: null,
-            warnings: [`Tranchendaten fuer Profil ${corruptEntry.name || corruptEntry.profileId || 'unbekannt'} sind fehlerhaft.`]
+            errorCode: 'SIMULATOR_PROFILE_TRANCHES_CORRUPT',
+            warnings: [`Tranchendaten fuer Profil ${corruptRecord.entry?.name || corruptRecord.entry?.profileId || 'unbekannt'} sind fehlerhaft.`]
+        };
+    }
+
+    const hasDetailedRepresentation = assetRecords.some(record => record.hasDetailedRepresentation);
+    const unprovenancedAggregate = hasDetailedRepresentation
+        ? assetRecords.find(record => record.trancheState === 'absent' && record.aggregateInvestment > 0.01)
+        : null;
+    if (unprovenancedAggregate) {
+        const profileName = unprovenancedAggregate.entry?.name
+            || unprovenancedAggregate.entry?.profileId
+            || 'unbekannt';
+        return {
+            combined: null,
+            errorCode: 'SIMULATOR_PROFILE_ASSET_PROVENANCE_MISSING',
+            warnings: [
+                `Profil ${profileName} besitzt positive Depot- oder Geldmarkt-Aggregate ohne Detailtranchen. `
+                + 'Der Hybridhaushalt wurde blockiert, weil Cost Basis und TQF nicht verlustfrei ableitbar sind.'
+            ]
         };
     }
 
@@ -503,11 +576,11 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
         enumerable: false
     });
 
-    const sumStartVermoegen = sumNumbers(inputsList, i => profileAssetTotal(i));
-    const sumDepotwertAlt = sumNumbers(inputsList, i => i.depotwertAlt || 0);
-    const sumTagesgeld = sumNumbers(inputsList, i => i.tagesgeld || 0);
-    const sumGeldmarkt = sumNumbers(inputsList, i => Array.isArray(i.detailledTranches) ? 0 : (i.geldmarktEtf || 0));
-    const sumEinstandAlt = sumNumbers(inputsList, i => i.einstandAlt || 0);
+    const sumStartVermoegen = sumNumbers(assetRecords, record => record.assetTotal);
+    const sumDepotwertAlt = sumNumbers(assetRecords, record => record.depotwertAlt);
+    const sumTagesgeld = sumNumbers(assetRecords, record => record.tagesgeld);
+    const sumGeldmarkt = sumNumbers(assetRecords, record => record.geldmarktEtf);
+    const sumEinstandAlt = sumNumbers(assetRecords, record => record.einstandAlt);
     const sumFloor = sumNumbers(inputsList, i => i.startFloorBedarf || 0);
     const sumFlex = sumNumbers(inputsList, i => i.startFlexBedarf || 0);
     const sumMinimumFlex = sumNumbers(inputsList, i => i.minimumFlexAnnual || 0);
@@ -521,6 +594,18 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
     }, null);
 
     const totalAssets = sumStartVermoegen || (sumDepotwertAlt + sumTagesgeld + sumGeldmarkt);
+    const goldStrategy = calculateProfileGoldStrategy(assetRecords.map(record => ({
+        profileId: record.entry?.profileId,
+        name: record.entry?.name,
+        assetBase: record.assetTotal,
+        operativeLiquidity: record.operativeLiquidity,
+        healthBucket: record.inputs.healthBucket,
+        goldAktiv: record.inputs.goldAktiv,
+        goldZielProzent: record.inputs.goldZielProzent,
+        goldFloorProzent: record.inputs.goldFloorProzent,
+        goldSteuerfrei: record.inputs.goldSteuerfrei,
+        rebalancingBand: record.inputs.rebalancingBand
+    })));
 
     if (totalAssets < (sumDepotwertAlt + sumTagesgeld + sumGeldmarkt)) {
         warnings.push('Startvermoegen ist kleiner als die Summe aus Depot + Liquiditaet. Bitte Profile pruefen.');
@@ -553,21 +638,15 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
         rebalBand: Math.round(weightedAverage(inputsList, i => i.rebalBand || 0, i => i.startVermoegen || 0, primaryInputs.rebalBand || 0)),
         maxSkimPctOfEq: Math.round(weightedAverage(inputsList, i => i.maxSkimPctOfEq || 0, i => i.startVermoegen || 0, primaryInputs.maxSkimPctOfEq || 0)),
         maxBearRefillPctOfEq: Math.round(weightedAverage(inputsList, i => i.maxBearRefillPctOfEq || 0, i => i.startVermoegen || 0, primaryInputs.maxBearRefillPctOfEq || 0)),
-        goldAktiv: (() => {
-            const goldProfiles = inputsList.filter(i => i.goldAktiv && (i.goldZielProzent || 0) > 0);
-            return goldProfiles.length > 0;
-        })(),
-        goldZielProzent: (() => {
-            const goldProfiles = inputsList.filter(i => i.goldAktiv && (i.goldZielProzent || 0) > 0);
-            if (goldProfiles.length === 0) return 0;
-            return weightedAverage(goldProfiles, i => i.goldZielProzent || 0, i => i.startVermoegen || 0, primaryInputs.goldZielProzent || 0);
-        })(),
-        goldFloorProzent: (() => {
-            const goldProfiles = inputsList.filter(i => i.goldAktiv && (i.goldZielProzent || 0) > 0);
-            if (goldProfiles.length === 0) return 0;
-            return weightedAverage(goldProfiles, i => i.goldFloorProzent || 0, i => i.startVermoegen || 0, primaryInputs.goldFloorProzent || 0);
-        })(),
-        rebalancingBand: weightedAverage(inputsList, i => i.rebalancingBand || 0, i => i.startVermoegen || 0, primaryInputs.rebalancingBand || 0),
+        goldAktiv: goldStrategy.goldAktiv,
+        goldBasisVermoegen: goldStrategy.goldBasisVermoegen,
+        goldZielBetrag: goldStrategy.goldZielBetrag,
+        goldFloorBetrag: goldStrategy.goldFloorBetrag,
+        goldZielProzent: goldStrategy.goldZielProzent,
+        goldFloorProzent: goldStrategy.goldFloorProzent,
+        goldSteuerfrei: goldStrategy.goldSteuerfrei,
+        rebalancingBand: goldStrategy.rebalancingBand,
+        goldStrategyDiagnostics: goldStrategy.diagnostics,
         runwayMinMonths: maxNumber(inputsList, i => i.runwayMinMonths || 0, primaryInputs.runwayMinMonths || 0),
         runwayTargetMonths: maxNumber(inputsList, i => i.runwayTargetMonths || 0, primaryInputs.runwayTargetMonths || 0),
         accumulationPhase: {
@@ -579,15 +658,6 @@ export function combineSimulatorProfiles(profileInputs, primaryProfileId) {
         transitionYear: 0,
         transitionAge: primaryInputs.startAlter
     };
-
-    if (combined.detailledTranches) {
-        const totals = sumTrancheTotals(mergedTranches);
-        const trancheTotal = totals.equity + totals.gold + totals.moneyMarket;
-        const trancheWithCash = trancheTotal + sumTagesgeld + sumGeldmarkt;
-        combined.startVermoegen = trancheWithCash;
-        combined.geldmarktEtf = totals.moneyMarket + sumGeldmarkt;
-        combined.zielLiquiditaet = sumTagesgeld + combined.geldmarktEtf;
-    }
 
     if (!ensureValueMatch(inputsList, i => i.rentAdjMode)) {
         warnings.push('Rentenanpassung (Mode) unterscheidet sich zwischen Profilen. Es wird das Hauptprofil verwendet.');

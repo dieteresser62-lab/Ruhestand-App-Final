@@ -600,6 +600,7 @@ Profile (PersistenceFacade; Browser IndexedDB / Tauri JSON / Legacy-Fallback) �
 - Tranchen der aktiven Profile werden zusammengeführt, mit Profilpräfix eindeutig gemacht und behalten `sourceProfileId`
 - Engine-Verkaufsaufschluesselungen behalten diese Herkunft in `breakdown[].sourceProfileId`; Portfolio-Reduktion erfolgt ueber die eindeutige profilbezogene `trancheId`.
 - Valide Detailtranchen bestimmen das kombinierte Startvermögen zusammen mit Liquidität und ersetzen ueberlappende Aggregate. Korrupte, doppelte oder widerspruechlich klassifizierte Profilpayloads blockieren fail-closed.
+- Die Tranchenzustaende `absent`, explizit `empty`, `valid` und `corrupt` bleiben getrennt. Sobald irgendein Profil eine Detailrepraesentation besitzt, blockiert ein weiteres Profil mit positiven Depot-/Geldmarkt-Aggregaten ohne Details mit `SIMULATOR_PROFILE_ASSET_PROVENANCE_MISSING`; Aggregate-only Haushalte bleiben zulaessig.
 - Vor Haushaltsmerge und Portfolioinitialisierung entstehen tiefe Kopien; simulierte Verkaeufe und `simlot:`-Kaeufe schreiben nie in den profilgebundenen Realbestand zurueck.
 - Personen/Renten werden aus der Profilwahl abgeleitet (kein separater Partner-Tab)
 
@@ -616,13 +617,11 @@ Profilaktionen sind anschliessend reine Attributionen dieser Haushaltsaktion. Si
 - Die Modi beeinflussen die Quellenattribution und die reine Anzeigeaufteilung, nicht die Haushaltszwecke.
 - Entnahmen nutzen Cash/Geldmarkt vor Tranchenauswahl; Asset-Summaries verwenden Detailtranchen statt aggregierte Depotwerte, wenn Detailtranchen vorhanden sind. Synthetische Fallback-Tranchen bleiben profilmarkiert.
 
-### Gold-Validierung
+### Goldstrategie im Profilverbund
 
-**Problem:** Inkonsistente Gold-Parameter beim Kombinieren von Profilen führten zu Engine-Validierungsfehlern.
+`calculateProfileGoldStrategy()` berechnet Goldziel und Gold-Floor zuerst je Profil als Eurobetrag. Grundlage ist das genau einmal reconciliierte Profilvermoegen aus Depot inklusive Gold und operativer Liquiditaet. Ein aktiver Pflegebucket wird bis zur vorhandenen operativen Liquiditaet von dieser Basis abgezogen.
 
-**Lösung:**
-`combineSimulatorProfiles()` berücksichtigt nur Profile mit `goldAktiv` und `goldZielProzent > 0` bei der Mittelung von Ziel/Floor.
-Sind keine gültigen Gold-Profile aktiv, werden die kombinierten Goldwerte auf 0 gesetzt.
+Die absoluten Profilziele werden summiert; nur fuer bestehende Engine-/UI-Vertraege entsteht daraus adapterseitig eine Haushaltsquote. `initializePortfolio()` priorisiert den absoluten `goldZielBetrag`, damit die Portfolioinitialisierung das Ziel nicht erneut auf einer abweichenden Prozentbasis berechnet. Die Diagnostik transportiert Profilbasis, Bucket-Abzug, Ziel, Floor, Band und Steuerstatus. `buildProfilverbundAssetSummary()` liefert denselben Vertrag an Balance; `updateProfilverbundGlobals()` ueberschreibt damit Goldwerte aus dem aktuell geoeffneten DOM-Profil.
 
 ### Risiko-Budget
 
