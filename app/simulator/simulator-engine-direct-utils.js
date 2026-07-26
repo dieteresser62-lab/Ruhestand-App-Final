@@ -21,6 +21,19 @@ export function euros(x) {
 }
 
 /**
+ * Normalisiert einen signierten Euro-Flow, ohne negative Werte als fehlend zu
+ * behandeln. Bestandswerte muessen weiterhin mit `euros()` normalisiert
+ * werden.
+ *
+ * @param {*} x - Eingabewert
+ * @returns {number} Endlicher signierter Wert
+ */
+export function signedEuros(x) {
+    const value = Number(x);
+    return Number.isFinite(value) ? value : 0;
+}
+
+/**
  * Berechnet die benötigte Liquidität für den Floor-Bedarf.
  */
 export function computeLiqNeedForFloor(ctx) {

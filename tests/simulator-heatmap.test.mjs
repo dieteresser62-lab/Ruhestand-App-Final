@@ -35,7 +35,22 @@ console.log('--- Simulator Heatmap Tests ---');
     assertEqual(cellCount, 4, 'Heatmap should render one cell per year/bin');
 }
 
-// --- TEST 5: renderSweepHeatmapSVG edge cases ---
+// --- TEST 5: count/share input contract ---
+{
+    const countStats = computeHeatmapStats([new Uint32Array([1, 0])], [0, 4.5, 10], 100);
+    assertClose(countStats.shares[0][0], 0.01, 0.0001, 'One heatmap count in 100 runs should render as one percent');
+
+    const shareStats = computeHeatmapStats({
+        schemaVersion: 'SimulatorHeatmapInputV1',
+        valueKind: 'shares',
+        values: [[0.25, 0.75]],
+        denominator: null
+    }, [0, 4.5, 10], 100);
+    assertClose(shareStats.shares[0][0], 0.25, 0.0001, 'Versioned share input should preserve explicit shares');
+    assertClose(shareStats.shares[0][1], 0.75, 0.0001, 'Versioned share input should not divide by the run denominator');
+}
+
+// --- TEST 6: renderSweepHeatmapSVG edge cases ---
 {
     // Empty sweep should emit a placeholder message (no grid).
     const empty = renderSweepHeatmapSVG([], 'successProbFloor', 'targetEq', 'runwayMin', [], []);

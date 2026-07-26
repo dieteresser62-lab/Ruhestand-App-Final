@@ -102,22 +102,60 @@ function pickTextColorForBg(rgb) {
 /**
  * Berechnet Statistiken für die Heatmap
  */
-export function computeHeatmapStats(heat, bins, totalRuns) {
-    if (!heat || heat.length === 0) {
+const HEATMAP_INPUT_SCHEMA_VERSION = 'SimulatorHeatmapInputV1';
+
+function normalizeHeatmapInput(input, totalRuns) {
+    if (Array.isArray(input)) {
         return {
-            shares: [], globalP90: 0, perColP90: [], colSharesAbove45: [],
-            shareYear1In_3_to_3_5: 0, shareYear1Above_5_5: 0, criticalRowIndex: bins ? bins.findIndex(b => b === 4.5) : -1
+            schemaVersion: HEATMAP_INPUT_SCHEMA_VERSION,
+            valueKind: 'counts',
+            values: input,
+            denominator: Math.max(1, Number(totalRuns) || 0)
         };
     }
 
-    const col0 = heat[0] || [];
-    const sumCol0 = col0.reduce((a, b) => a + (Number(b) || 0), 0);
-    const looksLikeShares = sumCol0 > 0 && sumCol0 < 1.000001;
+    if (input?.schemaVersion !== HEATMAP_INPUT_SCHEMA_VERSION
+        || !Array.isArray(input.values)
+        || !['counts', 'shares'].includes(input.valueKind)) {
+        return {
+            schemaVersion: HEATMAP_INPUT_SCHEMA_VERSION,
+            valueKind: 'counts',
+            values: [],
+            denominator: Math.max(1, Number(totalRuns) || 0)
+        };
+    }
 
-    // Heatmap kann bereits Anteile enthalten (0..1) oder absolute Counts.
-    const shares = looksLikeShares
+    const hasExplicitDenominator = input.denominator !== null && input.denominator !== undefined;
+    const explicitDenominator = Number(input.denominator);
+    return {
+        schemaVersion: HEATMAP_INPUT_SCHEMA_VERSION,
+        valueKind: input.valueKind,
+        values: input.values,
+        denominator: input.valueKind === 'counts'
+            ? Math.max(
+                1,
+                hasExplicitDenominator && Number.isFinite(explicitDenominator)
+                    ? explicitDenominator
+                    : Number(totalRuns) || 0
+            )
+            : null
+    };
+}
+
+export function computeHeatmapStats(heatInput, bins, totalRuns) {
+    const heatContract = normalizeHeatmapInput(heatInput, totalRuns);
+    const heat = heatContract.values;
+    if (heat.length === 0) {
+        return {
+            shares: [], globalP90: 0, perColP90: [], colSharesAbove45: [],
+            shareYear1In_3_to_3_5: 0, shareYear1Above_5_5: 0, criticalRowIndex: bins ? bins.findIndex(b => b === 4.5) : -1,
+            inputContract: heatContract
+        };
+    }
+
+    const shares = heatContract.valueKind === 'shares'
         ? heat.map(col => Array.from(col).map(Number))
-        : heat.map(col => Array.from(col).map(count => (Number(count) || 0) / Math.max(1, totalRuns)));
+        : heat.map(col => Array.from(col).map(count => (Number(count) || 0) / heatContract.denominator));
 
     const quantileSimple = (arr, q) => {
         if (!arr || arr.length === 0) return 0;
@@ -159,7 +197,8 @@ export function computeHeatmapStats(heat, bins, totalRuns) {
         colSharesAbove45,
         shareYear1In_3_to_3_5,
         shareYear1Above_5_5,
-        criticalRowIndex: binIdx45
+        criticalRowIndex: binIdx45,
+        inputContract: heatContract
     };
 }
 
@@ -187,7 +226,9 @@ export function resolveProfileKey(raw, engine) {
 /**
  * Rendert die Heatmap als SVG
  */
-export function renderHeatmapSVG(heat, bins, totalRuns, extraKPI = {}, options = {}) {
+export function renderHeatmapSVG(heatInput, bins, totalRuns, extraKPI = {}, options = {}) {
+    const heatContract = normalizeHeatmapInput(heatInput, totalRuns);
+    const heat = heatContract.values;
     if (!heat || heat.length === 0) return '';
 
     const computeLabelStyles = (cellColor) => {
@@ -207,7 +248,7 @@ export function renderHeatmapSVG(heat, bins, totalRuns, extraKPI = {}, options =
         criticalThreshold: 4.5, showLegend: true, showFooterStats: true
     }, options);
 
-    const stats = computeHeatmapStats(heat, bins, totalRuns);
+    const stats = computeHeatmapStats(heatContract, bins, totalRuns);
     const { shares, globalP90, perColP90, colSharesAbove45, criticalRowIndex } = stats;
 
     const margin = { top: 50, right: 90, bottom: 60, left: 70 };

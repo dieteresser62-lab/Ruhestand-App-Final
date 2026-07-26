@@ -682,6 +682,32 @@ const emptyLists = {
     maxAnnualCareAdditionalNeedRealEur: []
 };
 
+// --- TEST 8a: successful terminal zero follows outcome status, not final-wealth truthiness ---
+{
+    const buffers = createMonteCarloBuffers(3);
+    buffers.finalOutcomes.set([0, 100, 0]);
+    const aggregates = buildMonteCarloAggregates({
+        inputs: { stressPreset: 'NONE' },
+        totalRuns: 3,
+        buffers,
+        heatmap: [new Uint32Array([0])],
+        bins: MC_HEATMAP_BINS,
+        totals: {
+            ...emptyTotals,
+            outcomeRuinCount: 1,
+            outcomeAllDeadCount: 1,
+            outcomeHorizonExhaustedCount: 1
+        },
+        lists: emptyLists,
+        allRealWithdrawalsSample: []
+    });
+
+    assertClose(aggregates.finalOutcomes.p50_successful, 50, 0.0001, 'Successful median should include a successful terminal zero');
+    assertEqual(aggregates.finalOutcomes.successfulCount, 2, 'Successful outcome population should come from terminal status counts');
+    assertEqual(aggregates.finalOutcomes.successfulTerminalZeroCount, 1, 'Successful terminal zeros should be inventoried separately');
+    assertEqual(aggregates.finalOutcomes.successContract, 'outcome_status_all_dead_or_horizon_exhausted', 'Successful outcome contract should be explicit');
+}
+
 // --- TEST 9: Determinism (same seed -> same results) ---
 {
     const inputs = buildBasicInputs();
@@ -818,14 +844,13 @@ const emptyLists = {
     assert(histYears.slice(0, 5).every(year => year >= 1929 && year <= 1933), 'Conditional stress bootstrap should take priority during the stress window');
 }
 
-// --- TEST 10: Ruin counting matches finalOutcomes <= 0 ---
+// --- TEST 10: Economic depletion inventory is independent of terminal wealth truthiness ---
 {
     const buffers = createMonteCarloBuffers(4);
-    buffers.finalOutcomes.set([100, 0, -1, 50]);
+    buffers.finalOutcomes.set([100, 0, 0, 50]);
     buffers.depotErschoepft.set([0, 1, 1, 0]);
-    const ruinCount = Array.from(buffers.finalOutcomes).filter(v => v <= 0).length;
     const depletedCount = Array.from(buffers.depotErschoepft).reduce((acc, v) => acc + v, 0);
-    assertEqual(depletedCount, ruinCount, 'Ruin count should match finalOutcomes <= 0');
+    assertEqual(depletedCount, 2, 'Economic depletion should remain an explicit inventory independent of zero terminal wealth');
 }
 
 // --- TEST 11: Percentiles order (P10 < P50 < P90) ---

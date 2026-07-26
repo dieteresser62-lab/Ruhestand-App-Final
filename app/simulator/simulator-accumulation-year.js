@@ -1,5 +1,9 @@
 import { buyGold, buyStocksNeu, sumDepot } from './simulator-portfolio.js';
-import { calculateTargetLiquidityBalanceLike, euros } from './simulator-engine-direct-utils.js';
+import {
+    calculateTargetLiquidityBalanceLike,
+    euros,
+    signedEuros
+} from './simulator-engine-direct-utils.js';
 import { buildNextMarketDataHist } from './simulator-year-portfolio.js';
 import { sumBondBucketValuation } from '../../engine/transactions/three-bucket-logic.mjs';
 import {
@@ -49,16 +53,29 @@ export function simulateAccumulationYear({
         cumulativeInflationFactor,
         yearData.inflation
     );
-    let cashZinsen = euros(liquiditaet * rC);
+    const portfolioActiveBeforeFlows = euros(
+        sumDepot({ depotTranchesAktien: portfolio.depotTranchesAktien })
+        + sumDepot({ depotTranchesGold: portfolio.depotTranchesGold })
+        + euros(initialLiqStart)
+    );
+    let cashZinsen = signedEuros(euros(liquiditaet) * Number(rC));
     let liqNachZins = initialLiqStart;
 
     let sparrateThisYear = inputs.accumulationPhase.sparrate * 12;
     if (inputs.accumulationPhase.sparrateIndexing === 'inflation' && currentState.accumulationState) {
-        const lastYearSparrate = currentState.accumulationState.sparrateThisYear || (inputs.accumulationPhase.sparrate * 12);
+        const priorAnnualSavings = Number(currentState.accumulationState.sparrateThisYear);
+        const lastYearSparrate = Number.isFinite(priorAnnualSavings)
+            ? priorAnnualSavings
+            : (inputs.accumulationPhase.sparrate * 12);
         sparrateThisYear = lastYearSparrate * (1 + yearData.inflation / 100);
     } else if (inputs.accumulationPhase.sparrateIndexing === 'wage' && currentState.accumulationState) {
-        const lastYearSparrate = currentState.accumulationState.sparrateThisYear || (inputs.accumulationPhase.sparrate * 12);
-        const wageGrowth = yearData.lohn || 2.0;
+        const priorAnnualSavings = Number(currentState.accumulationState.sparrateThisYear);
+        const lastYearSparrate = Number.isFinite(priorAnnualSavings)
+            ? priorAnnualSavings
+            : (inputs.accumulationPhase.sparrate * 12);
+        const hasWageGrowth = yearData.lohn !== null && yearData.lohn !== undefined;
+        const wageGrowthValue = Number(yearData.lohn);
+        const wageGrowth = hasWageGrowth && Number.isFinite(wageGrowthValue) ? wageGrowthValue : 2.0;
         sparrateThisYear = lastYearSparrate * (1 + wageGrowth / 100);
     }
 
@@ -123,6 +140,12 @@ export function simulateAccumulationYear({
     const newMarketDataHist = buildNextMarketDataHist({ marketDataHist, yearData, rA, resolvedCapeRatio });
     const wertAktien = sumDepot({ depotTranchesAktien: portfolio.depotTranchesAktien });
     const wertGold = sumDepot({ depotTranchesGold: portfolio.depotTranchesGold });
+    const portfolioActiveEnd = euros(wertAktien + wertGold + portfolio.liquiditaet);
+    const portfolioFlowDelta = portfolioActiveEnd - (
+        portfolioActiveBeforeFlows
+        + signedEuros(cashZinsen)
+        + euros(sparrateThisYear)
+    );
     const healthBucketWarnings = Array.isArray(portfolio.healthBucketMeta?.warnings)
         ? portfolio.healthBucketMeta.warnings
         : [];
@@ -177,12 +200,14 @@ export function simulateAccumulationYear({
             wertGold: euros(wertGold),
             liquiditaet: euros(portfolio.liquiditaet),
             liqStart: euros(initialLiqStart),
-            cashInterestEarned: euros(cashZinsen),
+            cashInterestEarned: signedEuros(cashZinsen),
             liqEnd: euros(liqNachZins),
-            portfolio_active_end: euros(wertAktien + wertGold + portfolio.liquiditaet),
+            portfolio_total_before_accumulation: portfolioActiveBeforeFlows,
+            portfolio_active_end: portfolioActiveEnd,
+            portfolio_flow_delta: portfolioFlowDelta,
             health_bucket_start: euros(healthBucketInterest.startAmount),
             health_bucket_used: 0,
-            health_bucket_interest: euros(healthBucketInterest.interest),
+            health_bucket_interest: signedEuros(healthBucketInterest.interest),
             health_bucket_end: euros(healthBucketDiagnostics.currentAmount),
             health_bucket_target_nominal: euros(healthBucketDiagnostics.nominalTarget),
             health_bucket_target_inflation_adjusted: euros(healthBucketDiagnostics.inflationAdjustedTarget),

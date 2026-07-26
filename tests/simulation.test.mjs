@@ -242,6 +242,63 @@ try {
     assertClose(result.newState.currentAnnualPension, 12240, 1e-9, 'Accumulation should index shadow pension P1');
     assert(result.logData.Regime === 'accumulation', 'Accumulation log should use accumulation regime');
     assert(result.logData.GuardNote === 'accumulation_phase', 'Accumulation log should mark guard note');
+
+    const negativeCashPortfolio = {
+        depotTranchesAktien: [],
+        depotTranchesGold: [],
+        liquiditaet: 100000
+    };
+    const negativeCashResult = simulateAccumulationYear({
+        currentState: {
+            portfolio: negativeCashPortfolio,
+            currentAnnualPension: 0,
+            currentAnnualPension2: 0,
+            marketDataHist: { endeVJ: 100, endeVJ_1: 90, endeVJ_2: 80, ath: 100, jahreSeitAth: 0 },
+            accumulationState: { yearsSaved: 1, totalContributed: 12000, sparrateThisYear: 12000 },
+            samplerState: { block: 1 },
+            transitionYear: 5
+        },
+        inputs: {
+            startAlter: 60,
+            rentAdjPct: 0,
+            risikoprofil: 'sicherheits-dynamisch',
+            targetEq: 60,
+            goldAktiv: false,
+            runwayTargetMonths: 24,
+            accumulationPhase: {
+                enabled: true,
+                sparrate: 1000,
+                sparrateIndexing: 'wage'
+            }
+        },
+        yearData: { jahr: 2002, inflation: 0, lohn: 0 },
+        yearIndex: 1,
+        portfolio: negativeCashPortfolio,
+        liquiditaet: 100000,
+        initialLiqStart: 100000,
+        rA: 0,
+        rG: 0,
+        rC: -0.005,
+        bondBucketBefore: 0,
+        marketDataCurrentYear: { endeVJ: 100, endeVJ_1: 100, endeVJ_2: 100, inflation: 0, capeRatio: 20 },
+        marketDataHist: { endeVJ: 100, endeVJ_1: 100, endeVJ_2: 100, ath: 100, jahreSeitAth: 0 },
+        resolvedCapeRatio: 20,
+        baseFloor: 240000,
+        baseFlex: 0,
+        baseMinimumFlexAnnual: 0,
+        baseFlexBudgetAnnual: 0,
+        baseFlexBudgetRecharge: 0,
+        effectiveBaseFloor: 240000,
+        currentAnnualPension: 0,
+        currentAnnualPension2: 0,
+        householdCtx: { p1Alive: true, p2Alive: false },
+        isBadYear: true
+    });
+    assertClose(negativeCashResult.logData.cashInterestEarned, -500, 1e-9, 'Accumulation should retain signed negative cash interest');
+    assertClose(negativeCashResult.logData.liqEnd, 99500, 1e-9, 'Accumulation should apply negative cash interest before savings');
+    assertClose(negativeCashResult.newState.accumulationState.sparrateThisYear, 12000, 1e-9, 'Zero wage growth should preserve the annual savings rate');
+    assertClose(negativeCashResult.newState.portfolio.liquiditaet, 111500, 1e-9, 'Accumulation should combine negative interest and unchanged savings');
+    assertClose(negativeCashResult.logData.portfolio_flow_delta, 0, 1e-9, 'Accumulation signed cash flow should reconcile');
     console.log('✅ Extracted accumulation year helper passed');
 } catch (e) {
     console.error('Test 0d Failed', e);
@@ -379,6 +436,48 @@ try {
     assert(result.logData.health_bucket_warning.includes('gekappt'), 'Year result should expose health bucket warnings');
     assert(result.logData.portfolio_total_end === 150000, 'Year result should expose portfolio total including health bucket at year end');
     assert(result.logData.threeBucket.bondBucketAfter === 0, 'Year result should expose three-bucket log shape');
+
+    const zeroMetricResult = buildSimulatorYearResult({
+        ...yearResultArgs,
+        spendingResult: {
+            ...yearResultArgs.spendingResult,
+            details: {
+                ...yearResultArgs.spendingResult.details,
+                flexRate: 0,
+                entnahmequoteDepot: 0
+            }
+        },
+        fullResult: {
+            ...yearResultArgs.fullResult,
+            ui: {
+                ...yearResultArgs.fullResult.ui,
+                runway: { months: 0 },
+                liquiditaet: { deckungNachher: 0 }
+            }
+        }
+    });
+    assertEqual(zeroMetricResult.logData.entscheidung.runwayMonths, 0, 'Observed runway zero should remain zero');
+    assertEqual(zeroMetricResult.logData.FlexRatePct, 0, 'Observed flex-rate zero should remain zero');
+    assertEqual(zeroMetricResult.logData.RunwayCoveragePct, 0, 'Observed runway coverage zero should remain zero');
+
+    const missingMetricResult = buildSimulatorYearResult({
+        ...yearResultArgs,
+        spendingResult: {
+            ...yearResultArgs.spendingResult,
+            details: {}
+        },
+        fullResult: {
+            ...yearResultArgs.fullResult,
+            ui: {
+                ...yearResultArgs.fullResult.ui,
+                runway: {},
+                liquiditaet: {}
+            }
+        }
+    });
+    assertEqual(missingMetricResult.logData.entscheidung.runwayMonths, null, 'Missing runway should remain missing');
+    assertEqual(missingMetricResult.logData.FlexRatePct, null, 'Missing flex rate should remain missing');
+    assertEqual(missingMetricResult.logData.RunwayCoveragePct, null, 'Missing runway coverage should remain missing');
 
     const invalidInflationResult = buildSimulatorYearResult({
         ...yearResultArgs,

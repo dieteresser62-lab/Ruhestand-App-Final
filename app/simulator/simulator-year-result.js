@@ -140,6 +140,18 @@ export function buildSimulatorYearResult({
     const vpw = fullResult.ui.vpw || null;
     const safetyDiagnosis = fullResult.diagnosis?.general || {};
     const keyParams = fullResult.diagnosis?.keyParams || {};
+    const runwayMonths = Number.isFinite(fullResult.ui.runway?.months)
+        ? fullResult.ui.runway.months
+        : null;
+    const flexRate = Number.isFinite(spendingResult.details?.flexRate)
+        ? spendingResult.details.flexRate
+        : null;
+    const runwayCoveragePct = Number.isFinite(fullResult.ui.liquiditaet?.deckungNachher)
+        ? fullResult.ui.liquiditaet.deckungNachher
+        : null;
+    const withdrawalRateEndPct = Number.isFinite(spendingResult.details?.entnahmequoteDepot)
+        ? spendingResult.details.entnahmequoteDepot * 100
+        : null;
 
     return {
         isRuin: false,
@@ -178,10 +190,10 @@ export function buildSimulatorYearResult({
                 ...spendingResult,
                 jahresEntnahme: jahresEntnahmeEffektiv,
                 jahresEntnahme_plan: jahresEntnahmePlan,
-                runwayMonths: fullResult.ui.runway?.months || Infinity,
+                runwayMonths,
                 kuerzungProzent: spendingResult.kuerzungProzent
             },
-            FlexRatePct: spendingResult.details?.flexRate || 1.0,
+            FlexRatePct: flexRate,
             MinFlexRatePct: spendingResult.details?.minFlexRatePct ?? null,
             minimumFlexAnnual: Number.isFinite(keyParams.minimumFlexAnnual) ? keyParams.minimumFlexAnnual : 0,
             minimumFlexStatus: keyParams.minimumFlexStatus || 'inactive_zero',
@@ -198,8 +210,8 @@ export function buildSimulatorYearResult({
             CutReason: spendingResult.kuerzungQuelle || 'none',
             Alarm: spendingNewState.alarmActive || false,
             Regime: spendingNewState.lastMarketSKey || 'unknown',
-            QuoteEndPct: (spendingResult.details?.entnahmequoteDepot || 0) * 100,
-            RunwayCoveragePct: fullResult.ui.liquiditaet?.deckungNachher || 100,
+            QuoteEndPct: withdrawalRateEndPct,
+            RunwayCoveragePct: runwayCoveragePct,
             RunwayTargetRawMonths: Number.isFinite(safetyDiagnosis.runwayTargetSmoothing?.rawTargetMonths) ? safetyDiagnosis.runwayTargetSmoothing.rawTargetMonths : null,
             RunwayTargetSmoothedMonths: Number.isFinite(safetyDiagnosis.runwayTargetSmoothing?.targetMonths) ? safetyDiagnosis.runwayTargetSmoothing.targetMonths : null,
             RunwayTargetSmoothingApplied: safetyDiagnosis.runwayTargetSmoothing?.smoothingApplied === true,

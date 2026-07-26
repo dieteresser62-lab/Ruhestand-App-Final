@@ -28,8 +28,7 @@ export function renderThreeBucketPortfolioChart(container, rows) {
             const gold = toNumber(entry?.wertGold ?? row.wertGold);
             const liq = toNumber(entry?.liquiditaet ?? row.liquiditaet);
             return { index, etf, bond, gold, liq, total: etf + bond + gold + liq };
-        })
-        .filter(item => item.total > 0);
+        });
     if (!series.length) return;
 
     const width = 820;
@@ -50,8 +49,8 @@ export function renderThreeBucketPortfolioChart(container, rows) {
     const liqTop = [];
     const liqBottom = [];
 
-    series.forEach((item, idx) => {
-        const x = xScale(idx);
+    series.forEach((item) => {
+        const x = xScale(item.index);
         const etfYTop = yScale(item.etf);
         const bondYTop = yScale(item.etf + item.bond);
         const goldYTop = yScale(item.etf + item.bond + item.gold);
@@ -115,4 +114,3 @@ export function renderThreeBucketPortfolioChart(container, rows) {
     legend.appendChild(createLegendItem('Liquidität', '#16a34a'));
     container.appendChild(legend);
 }
-

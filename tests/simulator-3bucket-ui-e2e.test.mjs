@@ -108,7 +108,8 @@ try {
         const createNode = () => ({
             children: [],
             style: {},
-            setAttribute() { },
+            attributes: {},
+            setAttribute(name, value) { this.attributes[name] = value; },
             appendChild(child) { this.children.push(child); }
         });
         global.document = {
@@ -136,6 +137,19 @@ try {
         const secondCount = container.children.length;
         assert(firstCount > 0, 'chart render should append chart nodes');
         assertEqual(secondCount, firstCount, 'chart rerender must clear container before drawing');
+
+        const terminalRows = [
+            { wertAktien: 100000, wertGold: 0, liquiditaet: 0, row: { bondBucketAfter: 0 } },
+            { wertAktien: 50000, wertGold: 0, liquiditaet: 0, row: { bondBucketAfter: 0 } },
+            { wertAktien: 0, wertGold: 0, liquiditaet: 0, row: { bondBucketAfter: 0 } }
+        ];
+        renderThreeBucketPortfolioChart(container, terminalRows);
+        const equityPath = container.children[0]?.children?.[0]?.attributes?.d || '';
+        assertEqual(
+            (equityPath.match(/\bL\b/g) || []).length,
+            5,
+            'Portfolio chart should retain the terminal zero point on the original three-point time axis'
+        );
     } finally {
         if (prevDoc === undefined) delete global.document;
         else global.document = prevDoc;
@@ -143,4 +157,3 @@ try {
 }
 
 console.log('✅ Simulator 3-bucket UI E2E tests passed');
-

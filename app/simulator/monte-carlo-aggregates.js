@@ -110,10 +110,21 @@ export function buildMonteCarloAggregates({
         healthBucketInterestAmounts = []
     } = lists;
 
-    const successfulOutcomes = [];
+    const positiveSuccessfulOutcomes = [];
     for (let i = 0; i < totalRuns; ++i) {
-        if (finalOutcomes[i] > 0) successfulOutcomes.push(finalOutcomes[i]);
+        if (finalOutcomes[i] > 0) positiveSuccessfulOutcomes.push(finalOutcomes[i]);
     }
+    const successfulCount = outcomeAllDeadCount + outcomeHorizonExhaustedCount;
+    const successfulPopulationIsConsistent = positiveSuccessfulOutcomes.length <= successfulCount;
+    const successfulTerminalZeroCount = successfulPopulationIsConsistent
+        ? successfulCount - positiveSuccessfulOutcomes.length
+        : null;
+    const successfulOutcomes = successfulPopulationIsConsistent
+        ? [
+            ...positiveSuccessfulOutcomes,
+            ...Array.from({ length: successfulTerminalZeroCount }, () => 0)
+        ]
+        : [];
 
     const observedCutYearSharesPct = Array.from(cutYearShareRatio)
         .filter((_value, index) => (
@@ -213,7 +224,14 @@ export function buildMonteCarloAggregates({
         },
         finalOutcomes: {
             p10: quantile(finalOutcomes, 0.1), p50: quantile(finalOutcomes, 0.5),
-            p90: quantile(finalOutcomes, 0.9), p50_successful: quantile(successfulOutcomes, 0.5)
+            p90: quantile(finalOutcomes, 0.9),
+            p50_successful: successfulOutcomes.length > 0 ? quantile(successfulOutcomes, 0.5) : null,
+            successfulCount,
+            successfulTerminalZeroCount,
+            successContract: 'outcome_status_all_dead_or_horizon_exhausted',
+            successfulMissingness: successfulPopulationIsConsistent
+                ? successfulCount > 0 ? null : NO_OBSERVATIONS
+                : 'outcome_inventory_mismatch'
         },
         taxOutcomes: { p50: quantile(taxOutcomes, 0.5) },
         kpiLebensdauer: { mean: mean(kpiLebensdauer) },

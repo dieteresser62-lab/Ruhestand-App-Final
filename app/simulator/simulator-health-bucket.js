@@ -1,7 +1,7 @@
 "use strict";
 
 import { normalizeProfileHealthBucket } from '../profile/profile-state.js';
-import { euros } from './simulator-engine-direct-utils.js';
+import { euros, signedEuros } from './simulator-engine-direct-utils.js';
 
 const DEFAULT_TRIGGER = Object.freeze({
     triggered: false,
@@ -211,8 +211,8 @@ export function applyHealthBucketCoverage({
 }
 
 function distributeInterestAcrossBucketSources(portfolio, interest) {
-    const amount = euros(interest);
-    if (amount <= 0) return;
+    const amount = signedEuros(interest);
+    if (amount === 0) return;
 
     const tranches = Array.isArray(portfolio.healthBucketTranches)
         ? portfolio.healthBucketTranches
@@ -244,8 +244,8 @@ export function applyHealthBucketInterest({
     const rate = config.enabled && config.returnMode === 'cash_return' && Number.isFinite(Number(rC))
         ? Number(rC)
         : 0;
-    const interest = euros(startAmount * rate);
-    if (interest > 0) {
+    const interest = Math.max(-startAmount, signedEuros(startAmount * rate));
+    if (interest !== 0) {
         distributeInterestAcrossBucketSources(portfolio, interest);
         portfolio.healthBucketGeldmarkt = euros(startAmount + interest);
     }
@@ -285,4 +285,3 @@ export function buildHealthBucketDiagnostics({
         targetGap: euros(inflationAdjustedTarget - currentAmount)
     };
 }
-

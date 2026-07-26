@@ -450,7 +450,7 @@
     },
     {
       "alerts": [],
-      "canonicalRowsHash": "bf041bdf1c54d450bef5b3d35d1c9cc7bccfadae328dd653bdb09d4e436eaa61",
+      "canonicalRowsHash": "410a0a116f1ed51de27cdf58453aa007bb1d78bf1e14acc2bb305e9f7d60998b",
       "expectedRowCount": 61,
       "id": "completed_1960_2020",
       "inputHash": "cb5a70552297ce10277b714a2c5fcc6878a4569571368284257ece3550b8e379",
@@ -990,7 +990,7 @@
     },
     {
       "alerts": [],
-      "canonicalRowsHash": "bc9d63550ef6b197c53eb289dae2255519c7a77dca23db049beb8b1389399265",
+      "canonicalRowsHash": "c78bb2b1d1f71ac3e552e9ff086b41ed050e9682b34b99de0e264f6488c659a9",
       "expectedRowCount": 2,
       "id": "capital_poor_ruin_2000_2005",
       "inputHash": "e576bf078df99d1bc8b779e50fc8c0ffe381bb5599f8c9b1809da292295d31fc",
@@ -1208,7 +1208,7 @@
     },
     {
       "alerts": [],
-      "canonicalRowsHash": "1ee32f18bc106e5a86da8c2a04a6af103d28166c27ca89426aa3265da6c0b71c",
+      "canonicalRowsHash": "a561830e2f5713ae0916aa278deb71dc4a7f4279417505bf05324e4c5af61403",
       "expectedRowCount": 2,
       "id": "health_bucket_nested_row_summary_positive",
       "inputHash": "a799ab677936d36be93752fa374902ad2c0421c7f199f3a8f84b01086d4bfff5",

@@ -158,8 +158,29 @@ function assertClose(actual, expected, tolerance, message) {
     assertClose(diagnostics.inflationAdjustedTarget, 110000, 1e-9, 'Diagnostics should index target by inflation');
     assertClose(diagnostics.realCoveragePct, 93.6363636364, 1e-6, 'Diagnostics should compute real coverage percent');
     assertClose(diagnostics.targetGap, 7000, 1e-9, 'Diagnostics should compute target gap');
+
+    const negativeReturnPortfolio = {
+        healthBucketConfig: {
+            enabled: true,
+            initialAmount: 100000,
+            returnMode: 'cash_return',
+            targetMode: 'nominal'
+        },
+        healthBucketGeldmarkt: 100000,
+        healthBucketTranches: [
+            { trancheId: 'hb-neg', marketValue: 60000, costBasis: 60000, type: 'geldmarkt', category: 'money_market' }
+        ],
+        healthBucketCashAmount: 40000
+    };
+    const negativeInterest = applyHealthBucketInterest({
+        portfolio: negativeReturnPortfolio,
+        rC: -0.005
+    });
+    assertClose(negativeInterest.interest, -500, 1e-9, 'Negative health-bucket cash return should remain signed');
+    assertClose(negativeReturnPortfolio.healthBucketGeldmarkt, 99500, 1e-9, 'Negative health-bucket cash return should reduce the bucket');
+    assertClose(negativeReturnPortfolio.healthBucketTranches[0].marketValue, 59700, 1e-9, 'Negative interest should reduce tranche valuation proportionally');
+    assertClose(negativeReturnPortfolio.healthBucketCashAmount, 39800, 1e-9, 'Negative interest should reduce cash valuation proportionally');
     console.log('✅ Health bucket interest and diagnostics passed');
 }
 
 console.log('--- Health Bucket Tests Completed ---');
-
