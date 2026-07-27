@@ -245,6 +245,7 @@ export function updateMonteCarloLifeEventsForYear(
     const careCostP2 = careMetaP2 ? calcCareCost(careMetaP2, null) : null;
     const totalCareFloor = careCostP1.zusatzFloor + (careCostP2 ? careCostP2.zusatzFloor : 0);
     const effectiveFlexFactor = computeHouseholdFlexFactor({
+        hasPartner: lifeState.hasPartner,
         p1Alive: lifeState.p1Alive,
         careMetaP1,
         p2Alive: lifeState.p2Alive,

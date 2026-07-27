@@ -495,11 +495,16 @@ export function calcCareCost(careMetaP1, careMetaP2 = null) {
  * Computes the effective household flex factor by splitting the flex budget across
  * all living persons and only cutting the portion that belongs to the person in care.
  */
-export function computeHouseholdFlexFactor({ p1Alive, careMetaP1, p2Alive, careMetaP2 }) {
+export function computeHouseholdFlexFactor({
+    hasPartner,
+    p1Alive,
+    careMetaP1,
+    p2Alive,
+    careMetaP2
+}) {
     const f1 = p1Alive ? resolveIndividualFlexFactor(careMetaP1) : 0.0;
-    const isCoupleProfile = (careMetaP2 !== null);
 
-    if (!isCoupleProfile) {
+    if (hasPartner !== true) {
         return f1;
     }
 

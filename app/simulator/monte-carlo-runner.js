@@ -71,6 +71,19 @@ export { MC_HEATMAP_BINS, pickWorstRun, createMonteCarloBuffers, buildMonteCarlo
 export { buildStartYearCdf, pickStartYearIndex } from './mc-year-sampling.js';
 
 const MAX_TECHNICAL_ERROR_SAMPLES = 20;
+export const MONTE_CARLO_HOUSEHOLD_LIFE_CONTRACT_VERSION = 'MonteCarloHouseholdLifeContractV2';
+
+function createMonteCarloHouseholdLifeContractV2() {
+    return {
+        schemaVersion: MONTE_CARLO_HOUSEHOLD_LIFE_CONTRACT_VERSION,
+        activePartnerSource: 'inputs.partner.aktiv',
+        partnerMortalityPolicy: 'withdrawal-phase-independent-of-care-metadata',
+        householdFlexProfilePolicy: 'partner-activation-independent-of-care-metadata',
+        widowBenefitStartPolicy: 'not-before-deceased-pension-start-offset',
+        deltaLedgerId: 'A08-2',
+        deltaLedgerIds: ['A08-2', 'A08-8']
+    };
+}
 
 export function createMonteCarloTechnicalInventory(requested = 0) {
     return {
@@ -337,6 +350,9 @@ export async function runMonteCarloChunk({
         contract: samplingResolution.contract,
         dataVersion: getDataVersion()
     });
+    samplingDiagnostics.modelContracts = {
+        householdLife: createMonteCarloHouseholdLifeContractV2()
+    };
     const { pathSummaries, pathMissingness } = createMonteCarloPathSummaryV1(runCount, {
         buffers,
         attachTransferBuffers: true
@@ -585,6 +601,7 @@ export async function runMonteCarloChunk({
             const careCostP2 = careMetaP2 ? calcCareCost(careMetaP2, null) : null;
             const totalCareFloor = careCostP1.zusatzFloor + (careCostP2 ? careCostP2.zusatzFloor : 0);
             const effectiveFlexFactor = computeHouseholdFlexFactor({
+                hasPartner,
                 p1Alive,
                 careMetaP1,
                 p2Alive,

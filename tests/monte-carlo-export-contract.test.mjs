@@ -21,7 +21,10 @@ import {
     serializeMonteCarloExportV1
 } from '../app/simulator/monte-carlo-export.js';
 import { createMonteCarloUI, triggerMonteCarloDownload } from '../app/simulator/monte-carlo-ui.js';
-import { runMonteCarloSimulation } from '../app/simulator/monte-carlo-runner.js';
+import {
+    MONTE_CARLO_HOUSEHOLD_LIFE_CONTRACT_VERSION,
+    runMonteCarloSimulation
+} from '../app/simulator/monte-carlo-runner.js';
 import {
     compileScenario,
     getDataVersion,
@@ -199,6 +202,25 @@ const schemaGolden = JSON.parse(fs.readFileSync(
     assertEqual(result.unitContract.nominalMoneyFieldSuffix, 'NominalEur', 'unit contract requires explicit nominal money suffixes');
     assertEqual(result.unitContract.realMoneyFieldSuffix, 'RealEur', 'unit contract requires explicit real money suffixes');
     assert(result.diagnostics.sampling.initialStartYearCounts, 'result includes sampling diagnostics');
+    assertEqual(
+        result.diagnostics.sampling.modelContracts?.householdLife?.schemaVersion,
+        MONTE_CARLO_HOUSEHOLD_LIFE_CONTRACT_VERSION,
+        'result contract exports the versioned household life semantics'
+    );
+    assertEqual(
+        result.diagnostics.sampling.modelContracts?.householdLife?.deltaLedgerId,
+        'A08-2',
+        'result contract links the partner-mortality correction to its delta-ledger entry'
+    );
+    assertEqual(
+        result.diagnostics.sampling.modelContracts?.householdLife?.householdFlexProfilePolicy,
+        'partner-activation-independent-of-care-metadata',
+        'result contract exports care-independent household flex membership'
+    );
+    assert(
+        result.diagnostics.sampling.modelContracts?.householdLife?.deltaLedgerIds?.includes('A08-8'),
+        'result contract links the household-flex correction to A08-8'
+    );
     assertEqual(result.diagnostics.execution.mode, 'serial', 'result includes execution diagnostics');
     assert(!Object.hasOwn(result.kpis, 'kpiKuerzungsjahre'), 'new result does not write the deprecated cut-year alias');
     assert(!Object.hasOwn(result.kpis, 'extraKPI'), 'new result does not write the deprecated extraKPI alias container');

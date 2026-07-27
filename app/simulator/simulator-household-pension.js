@@ -29,13 +29,14 @@ export function calculateHouseholdPensionForYear({
     );
     const currentAgeP1 = inputs.startAlter + yearIndex;
     const r1StartOffsetYears = Math.max(0, Number(inputs.renteStartOffsetJahre) || 0);
+    const partnerStartOffsetYears = Math.max(0, Number(inputs.partner?.startInJahren) || 0);
     let rente1BruttoEigen = 0;
     let widowBenefitP1ThisYear = 0;
 
     if (p1Alive && yearIndex >= r1StartOffsetYears) {
         rente1BruttoEigen = currentAnnualPension;
     }
-    if (p1Alive && widowBenefits.p1FromP2) {
+    if (p1Alive && widowBenefits.p1FromP2 && yearIndex >= partnerStartOffsetYears) {
         widowBenefitP1ThisYear = widowPensionP1 > 0
             ? widowPensionP1
             : Math.max(0, currentAnnualPension2 * p1FromP2Percent);
@@ -49,7 +50,6 @@ export function calculateHouseholdPensionForYear({
     let rente2 = 0;
 
     if (inputs.partner?.aktiv && p2Alive) {
-        const partnerStartOffsetYears = Math.max(0, Number(inputs.partner.startInJahren) || 0);
         if (yearIndex >= partnerStartOffsetYears) {
             rente2BruttoEigen = currentAnnualPension2;
             if (inputs.partner.steuerquotePct > 0) {
@@ -61,7 +61,7 @@ export function calculateHouseholdPensionForYear({
         }
     }
 
-    if (p2Alive && widowBenefits.p2FromP1) {
+    if (p2Alive && widowBenefits.p2FromP1 && yearIndex >= r1StartOffsetYears) {
         widowBenefitP2ThisYear = widowPensionP2 > 0
             ? widowPensionP2
             : Math.max(0, currentAnnualPension * p2FromP1Percent);

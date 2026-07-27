@@ -166,6 +166,102 @@ try {
     throw e;
 }
 
+// Test 0b3: survivor benefits cannot start before the deceased person's pension offset
+try {
+    const commonWidowBenefits = {
+        p1FromP2: true,
+        p2FromP1: true,
+        p1FromP2Percent: 0.55,
+        p2FromP1Percent: 0.55
+    };
+    const beforeP2Start = calculateHouseholdPensionForYear({
+        inputs: {
+            startAlter: 67,
+            rentAdjPct: 2,
+            renteStartOffsetJahre: 0,
+            partner: { aktiv: true, startInJahren: 10, steuerquotePct: 0 }
+        },
+        yearIndex: 5,
+        currentAnnualPension: 0,
+        currentAnnualPension2: 60000,
+        widowPensionP1: 0,
+        p1Alive: true,
+        p2Alive: false,
+        widowBenefits: commonWidowBenefits
+    });
+    assertClose(
+        beforeP2Start.widowBenefitP1ThisYear,
+        0,
+        1e-9,
+        'P1 survivor benefit must remain zero before the deceased P2 pension offset'
+    );
+    assertClose(
+        beforeP2Start.nextWidowPensionP1,
+        0,
+        1e-9,
+        'Blocked P1 survivor benefit must not accumulate before the P2 pension offset'
+    );
+    const atP2Start = calculateHouseholdPensionForYear({
+        inputs: {
+            startAlter: 67,
+            rentAdjPct: 2,
+            renteStartOffsetJahre: 0,
+            partner: { aktiv: true, startInJahren: 10, steuerquotePct: 0 }
+        },
+        yearIndex: 10,
+        currentAnnualPension: 0,
+        currentAnnualPension2: 60000,
+        widowPensionP1: beforeP2Start.nextWidowPensionP1,
+        p1Alive: true,
+        p2Alive: false,
+        widowBenefits: commonWidowBenefits
+    });
+    assertClose(atP2Start.widowBenefitP1ThisYear, 33000, 1e-9, 'P1 survivor benefit should start at the deceased P2 pension offset');
+    assertClose(atP2Start.nextWidowPensionP1, 33660, 1e-9, 'P1 survivor benefit should index once after its first eligible year');
+
+    const beforeP1Start = calculateHouseholdPensionForYear({
+        inputs: {
+            startAlter: 67,
+            rentAdjPct: 0,
+            renteStartOffsetJahre: 8,
+            partner: { aktiv: true, startInJahren: 0, steuerquotePct: 0 }
+        },
+        yearIndex: 5,
+        currentAnnualPension: 40000,
+        currentAnnualPension2: 60000,
+        widowPensionP2: 0,
+        p1Alive: false,
+        p2Alive: true,
+        widowBenefits: commonWidowBenefits
+    });
+    assertClose(
+        beforeP1Start.widowBenefitP2ThisYear,
+        0,
+        1e-9,
+        'P2 survivor benefit must remain zero before the deceased P1 pension offset'
+    );
+    const atP1Start = calculateHouseholdPensionForYear({
+        inputs: {
+            startAlter: 67,
+            rentAdjPct: 0,
+            renteStartOffsetJahre: 8,
+            partner: { aktiv: true, startInJahren: 0, steuerquotePct: 0 }
+        },
+        yearIndex: 8,
+        currentAnnualPension: 40000,
+        currentAnnualPension2: 60000,
+        widowPensionP2: beforeP1Start.nextWidowPensionP2,
+        p1Alive: false,
+        p2Alive: true,
+        widowBenefits: commonWidowBenefits
+    });
+    assertClose(atP1Start.widowBenefitP2ThisYear, 22000, 1e-9, 'P2 survivor benefit should start at the deceased P1 pension offset');
+    console.log('✅ Survivor pension offset gates passed');
+} catch (e) {
+    console.error('Test 0b3 Failed', e);
+    throw e;
+}
+
 // Test 0c: extracted EngineAPI input mapping preserves overrides and market window
 try {
     const { engineInput, detailedTranches } = buildSimulatorEngineInput({

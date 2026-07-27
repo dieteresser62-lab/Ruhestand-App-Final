@@ -42,7 +42,10 @@ import {
     SWEEP_SAMPLING_METHOD_RESOLUTION,
     normalizeSweepRequestV1
 } from '../app/simulator/monte-carlo-parameters.js';
-import { runMonteCarloChunk } from '../app/simulator/monte-carlo-runner.js';
+import {
+    MONTE_CARLO_HOUSEHOLD_LIFE_CONTRACT_VERSION,
+    runMonteCarloChunk
+} from '../app/simulator/monte-carlo-runner.js';
 import { resolveDynamicFlexRunnerHorizon } from '../app/simulator/dynamic-flex-runner-horizon.js';
 import {
     applyTailRiskOverlay,
@@ -1306,6 +1309,11 @@ console.log('Test 37: O-12 Sweep Partner-/Witwenpfad');
     );
     assertEqual(byYear.get(2)?.p2Alive, false, 'seed 4 fixes P2 death in simulation year 3');
     assertEqual(byYear.get(2)?.pensionP2Eur, 0, 'P2 pension stops in the deterministic death year');
+    assertEqual(
+        byYear.get(2)?.temporaryFlexFactor,
+        0.75,
+        'Sweep keeps the canonical couple flex factor when P1 survives P2 without care metadata'
+    );
     assertEqual(byYear.get(3)?.widowP1Active, true, 'widow path activates in the year after P2 death');
     assertEqual(byYear.get(3)?.widowPensionP1Eur, 30000, 'widow-specific diagnostic reports the configured 50 percent share');
     assertEqual(byYear.get(3)?.pensionP1Eur, 30000, 'P1 receives exactly 30,000 EUR widow pension');
@@ -1337,7 +1345,32 @@ console.log('Test 37: O-12 Sweep Partner-/Witwenpfad');
             `Sweep and MC expose the same P2 pension in year ${yearIndex + 1}`
         );
     }
+    assertClose(
+        mcRows[2]?.flex_brutto,
+        partnerInputs.startFlexBedarf * mcRows[2]?.inflation_factor_cum * 0.75,
+        1e-8,
+        'MC applies the canonical couple flex factor when P1 survives P2 without care metadata'
+    );
     assertEqual(mcRows[3]?.WidowBenefitP1, 30000, 'MC log reports the same non-zero widow benefit');
+    assertEqual(
+        mc.samplingDiagnostics.modelContracts?.householdLife?.schemaVersion,
+        MONTE_CARLO_HOUSEHOLD_LIFE_CONTRACT_VERSION,
+        'MC diagnostics version the corrected household life contract'
+    );
+    assertEqual(
+        mc.samplingDiagnostics.modelContracts?.householdLife?.partnerMortalityPolicy,
+        'withdrawal-phase-independent-of-care-metadata',
+        'MC diagnostics name partner mortality as independent from disabled care metadata'
+    );
+    assertEqual(
+        mc.samplingDiagnostics.modelContracts?.householdLife?.householdFlexProfilePolicy,
+        'partner-activation-independent-of-care-metadata',
+        'MC diagnostics name household flex membership as independent from disabled care metadata'
+    );
+    assert(
+        mc.samplingDiagnostics.modelContracts?.householdLife?.deltaLedgerIds?.includes('A08-8'),
+        'MC diagnostics link the household-flex correction to A08-8'
+    );
     console.log('✓ O-12 Sweep Partner-/Witwenpfad OK');
 }
 
@@ -1636,6 +1669,190 @@ console.log('Test 41: Single-Profile Sweep/MC Ergebnisparitaet');
         'no-tail single profile applies no tail overlay'
     );
     console.log('✓ Single-Profile Sweep/MC Ergebnisparitaet OK');
+}
+
+// Test 42: A08-1 - survivor pension starts no earlier than the deceased pension offset
+console.log('Test 42: A08-1 Sweep Witwenrenten-Offset');
+{
+    const widowOptions = {
+        mode: 'percent',
+        percent: 0.5,
+        marriageOffsetYears: 0,
+        minMarriageYears: 0
+    };
+    const runOffsetCase = partnerStartOffsetYears => {
+        const baseInputs = buildSamplingTestInputs({
+            startAlter: 50,
+            startVermoegen: 1000000,
+            depotwertAlt: 900000,
+            einstandAlt: 700000,
+            tagesgeld: 100000,
+            partner: {
+                aktiv: true,
+                geschlecht: 'w',
+                startAlter: 80,
+                startInJahren: partnerStartOffsetYears,
+                monatsrente: 5000,
+                brutto: 60000,
+                steuerquotePct: 0
+            },
+            widowOptions
+        });
+        const request = buildSweepRequest('block', {
+            anzahl: 1,
+            maxDauer: 8,
+            blockSize: 3,
+            seed: 4
+        });
+        return runSweepChunk({
+            baseInputs,
+            paramCombinations: [samplingTestCombination],
+            comboRange: { start: 0, count: 1 },
+            sweepRequest: request,
+            engine: EngineAPI
+        }).results[0].provenance.householdRiskDiagnostics.tracedRuns[0].events;
+    };
+
+    const eligibleAtWidowStart = new Map(runOffsetCase(3).map(event => [event.simulationYearIndex, event]));
+    const notYetEligible = new Map(runOffsetCase(4).map(event => [event.simulationYearIndex, event]));
+    assertEqual(eligibleAtWidowStart.get(2)?.p2Alive, false, 'reference P2 dies before receiving an own pension');
+    assertEqual(eligibleAtWidowStart.get(3)?.widowP1Active, true, 'widow state activates in the year after P2 death');
+    assertEqual(
+        eligibleAtWidowStart.get(3)?.widowPensionP1Eur,
+        30000,
+        'widow pension starts exactly when the deceased P2 pension offset is reached'
+    );
+    assertEqual(notYetEligible.get(3)?.widowP1Active, true, 'widow state remains active before the pension offset');
+    assertEqual(
+        notYetEligible.get(3)?.widowPensionP1Eur,
+        0,
+        'active widow state pays zero before the deceased P2 pension offset'
+    );
+    console.log('✓ A08-1 Sweep Witwenrenten-Offset OK');
+}
+
+// Test 43: A08-5 - an all-dead abort without an engine step is not a care/flex year
+console.log('Test 43: A08-5 Sweep Todesjahr-Diagnostik');
+{
+    const baseInputs = buildSamplingTestInputs({
+        startAlter: 110,
+        pflegefallLogikAktivieren: false,
+        partner: { aktiv: false }
+    });
+    const request = buildSweepRequest('block', {
+        anzahl: 1,
+        maxDauer: 1,
+        blockSize: 1,
+        seed: 123
+    });
+    const diagnostics = runSweepChunk({
+        baseInputs,
+        paramCombinations: [samplingTestCombination],
+        comboRange: { start: 0, count: 1 },
+        sweepRequest: request,
+        engine: EngineAPI
+    }).results[0].provenance.householdRiskDiagnostics;
+    assertEqual(diagnostics.runsEvaluated, 1, 'all-dead run remains counted as an evaluated run');
+    assertEqual(diagnostics.household.allDeadRuns, 1, 'all-dead run is diagnosed exactly once');
+    assertEqual(diagnostics.yearsEvaluated, 0, 'death before the annual engine step adds no evaluated year');
+    assertEqual(
+        diagnostics.household.minimumTemporaryFlexFactor,
+        null,
+        'death without care or engine step does not report a zero care-flex minimum'
+    );
+    assertEqual(
+        diagnostics.household.totalCareFloorNominalEur,
+        0,
+        'death without an engine step adds no care floor'
+    );
+    assertEqual(diagnostics.household.p1CareActiveYears, 0, 'aborted death year adds no P1 care year');
+    assertEqual(diagnostics.household.p2CareActiveYears, 0, 'aborted death year adds no P2 care year');
+    assertEqual(diagnostics.household.bothCareActiveYears, 0, 'aborted death year adds no dual-care year');
+    assertEqual(diagnostics.household.widowP1ActiveYears, 0, 'aborted death year adds no P1 widow year');
+    assertEqual(diagnostics.household.widowP2ActiveYears, 0, 'aborted death year adds no P2 widow year');
+
+    const widowInputs = buildSamplingTestInputs({
+        startAlter: 90,
+        pflegefallLogikAktivieren: false,
+        partner: {
+            aktiv: true,
+            geschlecht: 'w',
+            startAlter: 90,
+            startInJahren: 0,
+            monatsrente: 0,
+            brutto: 0,
+            steuerquotePct: 0
+        },
+        widowOptions: {
+            mode: 'percent',
+            percent: 0.5,
+            marriageOffsetYears: 0,
+            minMarriageYears: 0
+        }
+    });
+    const widowDiagnostics = runSweepChunk({
+        baseInputs: widowInputs,
+        paramCombinations: [samplingTestCombination],
+        comboRange: { start: 0, count: 1 },
+        sweepRequest: buildSweepRequest('block', {
+            anzahl: 1,
+            maxDauer: 12,
+            blockSize: 3,
+            seed: 1
+        }),
+        engine: EngineAPI
+    }).results[0].provenance.householdRiskDiagnostics;
+    const allDeadWidowEvent = widowDiagnostics.tracedRuns[0].events.find(
+        event => event.runEndedBecauseAllDied && event.widowP1Active
+    );
+    assert(allDeadWidowEvent, 'discriminating A08-5 fixture ends while P1 widow state is active');
+    assertEqual(
+        widowDiagnostics.household.widowP1ActiveYears,
+        2,
+        'P1 widow counter excludes the final all-dead year without an engine step'
+    );
+    assertEqual(widowDiagnostics.household.p1DeathEvents, 1, 'final P1 death event remains diagnosed');
+    assertEqual(widowDiagnostics.household.p2DeathEvents, 1, 'earlier P2 death event remains diagnosed');
+    console.log('✓ A08-5 Sweep Todesjahr-Diagnostik OK');
+}
+
+// Test 44: A08-8 - active partner membership is independent from disabled care metadata
+console.log('Test 44: A08-8 Sweep Paar-Flex ohne Pflegelogik');
+{
+    const baseInputs = buildSamplingTestInputs({
+        startAlter: 92,
+        pflegefallLogikAktivieren: false,
+        partner: {
+            aktiv: true,
+            geschlecht: 'w',
+            startAlter: 66,
+            startInJahren: 0,
+            monatsrente: 0,
+            brutto: 0,
+            steuerquotePct: 0
+        }
+    });
+    const request = buildSweepRequest('block', {
+        anzahl: 1,
+        maxDauer: 4,
+        blockSize: 3,
+        seed: 4242
+    });
+    const events = runSweepChunk({
+        baseInputs,
+        paramCombinations: [samplingTestCombination],
+        comboRange: { start: 0, count: 1 },
+        sweepRequest: request,
+        engine: EngineAPI
+    }).results[0].provenance.householdRiskDiagnostics.tracedRuns[0].events;
+    const survivorYear = events.find(event => event.p1Alive === false && event.p2Alive === true);
+    assert(survivorYear, 'deterministic A08-8 fixture reaches P1-dead/P2-alive state');
+    assertEqual(
+        survivorYear.temporaryFlexFactor,
+        0.75,
+        'surviving P2 keeps the canonical couple flex factor without care metadata'
+    );
+    console.log('✓ A08-8 Sweep Paar-Flex ohne Pflegelogik OK');
 }
 
 console.log('--- Simulator Sweep Tests Abgeschlossen ---');

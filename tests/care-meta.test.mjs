@@ -156,6 +156,7 @@ function getCareInputs() {
 
     // 1. Both Healthy -> 100%
     const fBothHealthy = computeHouseholdFlexFactor({
+        hasPartner: true,
         p1Alive: true, careMetaP1: p1Meta,
         p2Alive: true, careMetaP2: p2Meta
     });
@@ -165,6 +166,7 @@ function getCareInputs() {
     // Formula: (0.5 * 1.0) + (0.25 * 0) + (0.25 * 1.0) = 0.75
     const p1Care = { active: true, flexFactor: 0.0 };
     const fP1Care = computeHouseholdFlexFactor({
+        hasPartner: true,
         p1Alive: true, careMetaP1: p1Care,
         p2Alive: true, careMetaP2: p2Meta
     });
@@ -172,6 +174,7 @@ function getCareInputs() {
 
     // 3. P1 Dead, P2 Healthy -> 75% (Regel wie "eine Person fällt weg").
     const fP1Dead = computeHouseholdFlexFactor({
+        hasPartner: true,
         p1Alive: false, careMetaP1: p1Care, // P1 dead
         p2Alive: true, careMetaP2: p2Meta
     });
@@ -180,10 +183,36 @@ function getCareInputs() {
     // 4. Both Care (0%) -> 0%
     const p2Care = { active: true, flexFactor: 0.0 };
     const fBothCare = computeHouseholdFlexFactor({
+        hasPartner: true,
         p1Alive: true, careMetaP1: p1Care,
         p2Alive: true, careMetaP2: p2Care
     });
     assertClose(fBothCare, 0.0, 0.01, 'Both Care (0%) -> 0.0');
+
+    // 5. Partner activation, not optional care metadata, defines the couple.
+    const fP1DeadWithoutCare = computeHouseholdFlexFactor({
+        hasPartner: true,
+        p1Alive: false, careMetaP1: null,
+        p2Alive: true, careMetaP2: null
+    });
+    assertClose(
+        fP1DeadWithoutCare,
+        0.75,
+        0.01,
+        'P1 dead, P2 healthy without care metadata -> 0.75'
+    );
+
+    const fP2DeadWithoutCare = computeHouseholdFlexFactor({
+        hasPartner: true,
+        p1Alive: true, careMetaP1: null,
+        p2Alive: false, careMetaP2: null
+    });
+    assertClose(
+        fP2DeadWithoutCare,
+        0.75,
+        0.01,
+        'P2 dead, P1 healthy without care metadata -> 0.75'
+    );
 
     console.log('✅ Household Flex Logic (Dual) Passed');
 }

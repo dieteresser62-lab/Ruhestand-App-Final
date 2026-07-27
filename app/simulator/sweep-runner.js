@@ -207,7 +207,8 @@ function recordSweepHouseholdRiskYear(
         runEndedBecauseAllDied = false
     }
 ) {
-    diagnostics.yearsEvaluated += 1;
+    const engineStepExecuted = result !== null;
+    if (engineStepExecuted) diagnostics.yearsEvaluated += 1;
     const household = diagnostics.household;
     const p1Alive = lifeYear?.householdContext?.p1Alive !== false;
     const p2Alive = lifeYear?.householdContext?.p2Alive === true;
@@ -218,25 +219,27 @@ function recordSweepHouseholdRiskYear(
 
     if (previousLife?.p1Alive === true && !p1Alive) household.p1DeathEvents += 1;
     if (previousLife?.p2Alive === true && !p2Alive) household.p2DeathEvents += 1;
-    if (p1CareActive) household.p1CareActiveYears += 1;
-    if (p2CareActive) household.p2CareActiveYears += 1;
-    if (p1CareActive && p2CareActive) household.bothCareActiveYears += 1;
-    if (widowP1Active) household.widowP1ActiveYears += 1;
-    if (widowP2Active) household.widowP2ActiveYears += 1;
+    if (engineStepExecuted) {
+        if (p1CareActive) household.p1CareActiveYears += 1;
+        if (p2CareActive) household.p2CareActiveYears += 1;
+        if (p1CareActive && p2CareActive) household.bothCareActiveYears += 1;
+        if (widowP1Active) household.widowP1ActiveYears += 1;
+        if (widowP2Active) household.widowP2ActiveYears += 1;
+    }
 
     const careFloor = Number(lifeYear?.totalCareFloor);
-    if (Number.isFinite(careFloor)) {
+    if (engineStepExecuted && Number.isFinite(careFloor)) {
         household.totalCareFloorNominalEur += careFloor;
     }
     const temporaryFlexFactor = Number(lifeYear?.effectiveFlexFactor);
-    if (Number.isFinite(temporaryFlexFactor)) {
+    if (engineStepExecuted && Number.isFinite(temporaryFlexFactor)) {
         household.minimumTemporaryFlexFactor = household.minimumTemporaryFlexFactor === null
             ? temporaryFlexFactor
             : Math.min(household.minimumTemporaryFlexFactor, temporaryFlexFactor);
     }
 
     const horizonYears = Number(horizonResolution?.horizonYears);
-    if (horizonResolution) {
+    if (engineStepExecuted && horizonResolution) {
         diagnostics.horizon.resolutionCount += 1;
         if (horizonResolution.valid !== true || !Number.isFinite(horizonYears)) {
             diagnostics.horizon.invalidResolutionCount += 1;

@@ -6,7 +6,10 @@ import {
     prepareHistoricalDataOnce
 } from '../app/simulator/simulator-engine-helpers.js';
 import { annualData } from '../app/simulator/simulator-data.js';
-import { runMonteCarloChunk } from '../app/simulator/monte-carlo-runner.js';
+import {
+    MONTE_CARLO_HOUSEHOLD_LIFE_CONTRACT_VERSION,
+    runMonteCarloChunk
+} from '../app/simulator/monte-carlo-runner.js';
 import { runSweepChunk } from '../app/simulator/sweep-runner.js';
 import { SWEEP_REQUEST_VERSION } from '../app/simulator/monte-carlo-parameters.js';
 import {
@@ -282,6 +285,20 @@ console.log('Test 4: valid Monte-Carlo job');
         assert(result.buffers.finalOutcomes.buffer.byteLength > 0, 'finalOutcomes should have a transferable buffer');
         assertEqual(result.schemaVersion, MONTE_CARLO_CHUNK_RESULT_VERSION, 'worker should return the central chunk schema');
         assertMonteCarloChunkResultV1(result, { expectedStart: 0, expectedCount: monteCarloParams.anzahl });
+        assertEqual(
+            result.samplingDiagnostics.modelContracts?.householdLife?.schemaVersion,
+            MONTE_CARLO_HOUSEHOLD_LIFE_CONTRACT_VERSION,
+            'worker result preserves the versioned household life contract'
+        );
+        assertEqual(
+            result.samplingDiagnostics.modelContracts?.householdLife?.householdFlexProfilePolicy,
+            'partner-activation-independent-of-care-metadata',
+            'worker result preserves the care-independent household flex policy'
+        );
+        assert(
+            result.samplingDiagnostics.modelContracts?.householdLife?.deltaLedgerIds?.includes('A08-8'),
+            'worker result preserves the A08-8 delta-ledger reference'
+        );
         assert(result.pathSummaries?.globalRunIndex instanceof Uint32Array, 'worker should transfer indexed path summaries');
         assert(result.pathMissingness?.path instanceof Uint8Array, 'worker should transfer path missingness');
         assert(Array.isArray(result.heatmap), 'result should include heatmap rows');
