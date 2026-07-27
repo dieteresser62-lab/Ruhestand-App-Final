@@ -139,38 +139,41 @@ console.log('Test 4: empty household override wins over current-profile storage'
     assertEqual(calculateAggregatedValues(), null, 'Empty override should not aggregate the current profile lot');
 }
 
-console.log('Test 5: input synchronization replaces money market instead of adding another position');
+console.log('Test 5: input synchronization keeps hidden fields canonical and replaces money market');
 {
     const elements = new Map();
-    const field = (id, value = '0') => {
+    const field = (id, value = '0', type = 'number') => {
         const element = {
             id,
-            type: 'number',
+            type,
             value,
             dispatchEvent() {}
         };
         elements.set(id, element);
         return element;
     };
-    field('simStartVermoegen', '999');
-    field('depotwertAlt');
+    field('simStartVermoegen', '999', 'text');
+    field('depotwertAlt', '0', 'hidden');
     field('costBasisAlt');
-    field('einstandAlt');
+    field('einstandAlt', '0', 'hidden');
     field('depotwertNeu');
     field('costBasisNeu');
-    field('einstandNeu');
-    field('geldmarktEtf', '900');
+    field('einstandNeu', '0', 'hidden');
+    field('geldmarktEtf', '900', 'text');
     field('goldWert');
     field('goldCost');
     field('tagesgeld', '50');
     global.document = { getElementById: id => elements.get(id) || null };
     global.window.__profilverbundTranchenOverride = [
-        engineLot({ trancheId: 'money-only', type: 'geldmarkt', category: 'money_market', tqf: 0, marketValue: 200, costBasis: 200 })
+        engineLot({ trancheId: 'equity', type: 'aktien_alt', category: 'equity', marketValue: 1234, costBasis: 1000 }),
+        engineLot({ trancheId: 'money', type: 'geldmarkt', category: 'money_market', tqf: 0, marketValue: 1200, costBasis: 1200 })
     ];
 
     assertEqual(syncTranchenToInputs({ silent: true }), true, 'Valid override should synchronize');
-    assertEqual(elements.get('geldmarktEtf').value, '200', 'Detailed money-market lot should replace the stale aggregate field');
-    assertEqual(elements.get('simStartVermoegen').value, '250', 'Start assets should contain money market and cash exactly once');
+    assertEqual(elements.get('geldmarktEtf').value, '1.200', 'Visible money-market field should stay localized');
+    assertEqual(elements.get('simStartVermoegen').value, '2.484', 'Visible start assets should contain positions and cash exactly once');
+    assertEqual(elements.get('depotwertAlt').value, '1234', 'Hidden depot value should remain a canonical numeric string');
+    assertEqual(elements.get('einstandAlt').value, '1000', 'Hidden cost basis should remain a canonical numeric string');
 }
 
 PersistenceFacade.resetPersistenceRuntimeForTests();

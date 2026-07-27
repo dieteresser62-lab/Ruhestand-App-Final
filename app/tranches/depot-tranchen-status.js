@@ -411,7 +411,9 @@ export function syncTranchenToInputs(options = {}) {
     ];
 
     const setFieldValue = (element, value) => {
-        if (element.type === 'number') {
+        // Hidden fields are application boundaries, not localized displays.
+        // Keep them canonical so readNumber("1.234") cannot turn 1234 into 1.234.
+        if (element.type === 'number' || element.type === 'hidden') {
             element.value = String(Math.round(value));
         } else {
             element.value = formatNumber(value);

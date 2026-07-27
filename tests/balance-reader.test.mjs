@@ -199,21 +199,35 @@ const UIReader = {
         const DEFAULT_GOLD_ZIEL = 7.5;
         const DEFAULT_GOLD_FLOOR = 1;
         const DEFAULT_GOLD_BAND = 25;
+        const finiteNumber = (id, fallback = 0) => {
+            const raw = String(val(id) ?? '').trim();
+            if (!raw || (raw.includes('.') && raw.includes(','))) return fallback;
+            const normalized = raw.includes(',') ? raw.replace(',', '.') : raw;
+            if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(normalized)) return fallback;
+            const parsed = Number(normalized);
+            return Number.isFinite(parsed) ? parsed : fallback;
+        };
 
         let goldAktivFinal = (typeof profileGoldAktiv === 'boolean') ? profileGoldAktiv : checked('goldAktiv');
-        let goldZielFinal = Number.isFinite(profileGoldZiel) ? profileGoldZiel : (parseFloat(val('goldZielProzent')) || 0);
+        let goldZielFinal = Number.isFinite(profileGoldZiel)
+            ? profileGoldZiel
+            : finiteNumber('goldZielProzent', Number.NaN);
         let goldFloorFinal = Number.isFinite(profileGoldFloor) ? profileGoldFloor : (parseFloat(val('goldFloorProzent')) || 0);
         let goldSteuerfreiFinal = (typeof profileGoldSteuerfrei === 'boolean') ? profileGoldSteuerfrei : checked('goldSteuerfrei');
-        let rebalancingBandFinal = Number.isFinite(profileGoldRebalBand) ? profileGoldRebalBand : (parseFloat(val('rebalancingBand')) || 0);
+        let rebalancingBandFinal = Number.isFinite(profileGoldRebalBand)
+            ? profileGoldRebalBand
+            : finiteNumber('rebalancingBand', Number.NaN);
 
-        if (!Number.isFinite(goldZielFinal) || goldZielFinal <= 0 || goldZielFinal > 50) {
+        if (!Number.isFinite(goldZielFinal) || goldZielFinal < 0 || goldZielFinal > 50) {
             goldZielFinal = DEFAULT_GOLD_ZIEL;
         }
         if (!Number.isFinite(goldFloorFinal) || goldFloorFinal < 0 || goldFloorFinal > 50) {
             goldFloorFinal = DEFAULT_GOLD_FLOOR;
         }
-        if (goldAktivFinal && rebalancingBandFinal <= 0) {
+        if (goldAktivFinal && (!Number.isFinite(rebalancingBandFinal) || rebalancingBandFinal < 0)) {
             rebalancingBandFinal = DEFAULT_GOLD_BAND;
+        } else if (!Number.isFinite(rebalancingBandFinal)) {
+            rebalancingBandFinal = 0;
         }
 
         const hasProfileRenteSum = Number.isFinite(profileRenteMonatlich)
@@ -507,26 +521,39 @@ console.log('Test 2: Profile-Override hat Vorrang vor DOM');
     console.log('✓ Profile-Override OK');
 }
 
-// Test 3: Gold-Modul Defaults
-console.log('Test 3: Gold-Modul Defaults');
+// Test 3: Gold-Modul Nullgrenzen und Defaults
+console.log('Test 3: Gold-Modul Nullgrenzen und Defaults');
 {
     mockLocalStorage.clear();
 
     const inputs = {
         goldAktiv: new MockElement('checkbox', '', true), // Aktiv
-        goldZielProzent: new MockElement('input', '0'), // Ungültig -> Default
+        goldZielProzent: new MockElement('input', '0'), // Explizite Null bleibt bis zur Engine erhalten
         goldFloorProzent: new MockElement('input', '-5'), // Ungültig -> Default
-        rebalancingBand: new MockElement('input', '0') // 0 bei aktivem Gold -> Default
+        rebalancingBand: new MockElement('input', '0') // Nullband bleibt als kanonischer Wert erhalten
     };
 
     initUIReader({ inputs, controls: {} });
 
     const result = UIReader.readAllInputs();
 
-    assertClose(result.goldZielProzent, 7.5, 0.01, 'goldZielProzent sollte Default 7.5 sein');
+    assertEqual(result.goldZielProzent, 0, 'goldZielProzent=0 sollte bis zur Engine-Validierung erhalten bleiben');
     assertClose(result.goldFloorProzent, 1, 0.01, 'goldFloorProzent sollte Default 1 sein');
-    assertEqual(result.rebalancingBand, 25, 'rebalancingBand sollte Default 25 sein bei aktivem Gold');
-    console.log('✓ Gold-Modul Defaults OK');
+    assertEqual(result.rebalancingBand, 0, 'rebalancingBand=0 sollte als Nulltoleranz erhalten bleiben');
+
+    initUIReader({
+        inputs: {
+            goldAktiv: new MockElement('checkbox', '', true),
+            goldZielProzent: new MockElement('input', 'ungueltig'),
+            goldFloorProzent: new MockElement('input', '1'),
+            rebalancingBand: new MockElement('input', '')
+        },
+        controls: {}
+    });
+    const defaults = UIReader.readAllInputs();
+    assertClose(defaults.goldZielProzent, 7.5, 0.01, 'Ungültiges Goldziel sollte den dokumentierten Default verwenden');
+    assertEqual(defaults.rebalancingBand, 25, 'Fehlendes Goldband sollte bei aktivem Gold den Default verwenden');
+    console.log('✓ Gold-Modul Nullgrenzen und Defaults OK');
 }
 
 // Test 4: Profile-Gold-Werte überschreiben Defaults
@@ -554,6 +581,12 @@ console.log('Test 4: Profile-Gold-Werte überschreiben Defaults');
     assertEqual(result.goldZielProzent, 15, 'Profile-goldZiel sollte DOM überschreiben');
     assertEqual(result.goldFloorProzent, 3, 'Profile-goldFloor sollte DOM überschreiben');
     assertEqual(result.rebalancingBand, 30, 'Profile-rebalBand sollte DOM überschreiben');
+
+    mockLocalStorage.setItem('profile_gold_ziel_pct', '0');
+    mockLocalStorage.setItem('profile_gold_rebal_band', '0');
+    const zeroResult = UIReader.readAllInputs();
+    assertEqual(zeroResult.goldZielProzent, 0, 'Profile-goldZiel=0 sollte erhalten bleiben');
+    assertEqual(zeroResult.rebalancingBand, 0, 'Profile-rebalBand=0 sollte erhalten bleiben');
     console.log('✓ Profile-Gold-Werte OK');
 }
 
@@ -816,6 +849,43 @@ console.log('Test 13: Produktionsreader für Tranchenstatus und Aggregation');
     if (previousDocument === undefined) delete global.document;
     else global.document = previousDocument;
     console.log('✓ Produktionsreader für Tranchenstatus und Aggregation OK');
+}
+
+// Test 14: Der echte Balance-Reader erhaelt explizite Gold-Nullwerte.
+console.log('Test 14: Produktionsreader für Gold-Nullgrenzen');
+{
+    mockLocalStorage.clear();
+    PersistenceFacade.resetPersistenceRuntimeForTests();
+    const previousWindow = global.window;
+    const previousDocument = global.document;
+    const inputs = {
+        goldAktiv: new MockElement('checkbox', '', true),
+        goldZielProzent: new MockElement('input', '0'),
+        goldFloorProzent: new MockElement('input', '1'),
+        rebalancingBand: new MockElement('input', '0')
+    };
+    global.document = createDocumentMock(inputs);
+    global.window = { __profilverbundTranchenOverride: null };
+    initProductionUIReader({ inputs, controls: {} });
+
+    const domZero = ProductionUIReader.readAllInputs();
+    assertEqual(domZero.goldZielProzent, 0, 'Production reader should preserve DOM gold target zero');
+    assertEqual(domZero.rebalancingBand, 0, 'Production reader should preserve DOM gold band zero');
+
+    mockLocalStorage.setItem('profile_gold_aktiv', 'true');
+    mockLocalStorage.setItem('profile_gold_ziel_pct', '0');
+    mockLocalStorage.setItem('profile_gold_rebal_band', '0');
+    inputs.goldZielProzent.value = '10';
+    inputs.rebalancingBand.value = '25';
+    const profileZero = ProductionUIReader.readAllInputs();
+    assertEqual(profileZero.goldZielProzent, 0, 'Production reader should preserve profile gold target zero');
+    assertEqual(profileZero.rebalancingBand, 0, 'Production reader should preserve profile gold band zero');
+
+    if (previousWindow === undefined) delete global.window;
+    else global.window = previousWindow;
+    if (previousDocument === undefined) delete global.document;
+    else global.document = previousDocument;
+    console.log('✓ Produktionsreader für Gold-Nullgrenzen OK');
 }
 
 // Cleanup

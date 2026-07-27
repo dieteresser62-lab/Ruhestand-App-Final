@@ -233,19 +233,25 @@ export const UIReader = {
         const DEFAULT_GOLD_BAND = 25;
 
         let goldAktivFinal = (typeof profileGoldAktiv === 'boolean') ? profileGoldAktiv : checked('goldAktiv');
-        let goldZielFinal = Number.isFinite(profileGoldZiel) ? profileGoldZiel : (parseFloat(val('goldZielProzent')) || 0);
+        let goldZielFinal = Number.isFinite(profileGoldZiel)
+            ? profileGoldZiel
+            : finiteNumber('goldZielProzent', Number.NaN);
         let goldFloorFinal = Number.isFinite(profileGoldFloor) ? profileGoldFloor : (parseFloat(val('goldFloorProzent')) || 0);
         let goldSteuerfreiFinal = (typeof profileGoldSteuerfrei === 'boolean') ? profileGoldSteuerfrei : checked('goldSteuerfrei');
-        let rebalancingBandFinal = Number.isFinite(profileGoldRebalBand) ? profileGoldRebalBand : (parseFloat(val('rebalancingBand')) || 0);
+        let rebalancingBandFinal = Number.isFinite(profileGoldRebalBand)
+            ? profileGoldRebalBand
+            : finiteNumber('rebalancingBand', Number.NaN);
 
-        if (!Number.isFinite(goldZielFinal) || goldZielFinal <= 0 || goldZielFinal > 50) {
+        if (!Number.isFinite(goldZielFinal) || goldZielFinal < 0 || goldZielFinal > 50) {
             goldZielFinal = DEFAULT_GOLD_ZIEL;
         }
         if (!Number.isFinite(goldFloorFinal) || goldFloorFinal < 0 || goldFloorFinal > 50) {
             goldFloorFinal = DEFAULT_GOLD_FLOOR;
         }
-        if (goldAktivFinal && rebalancingBandFinal <= 0) {
+        if (goldAktivFinal && (!Number.isFinite(rebalancingBandFinal) || rebalancingBandFinal < 0)) {
             rebalancingBandFinal = DEFAULT_GOLD_BAND;
+        } else if (!Number.isFinite(rebalancingBandFinal)) {
+            rebalancingBandFinal = 0;
         }
 
         const hasProfileRenteSum = Number.isFinite(profileRenteMonatlich)
