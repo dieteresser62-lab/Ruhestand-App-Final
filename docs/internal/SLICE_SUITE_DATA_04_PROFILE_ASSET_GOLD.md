@@ -1,7 +1,7 @@
 # Slice 04 - Verlustfreie Profilassets und Goldziele
 
-**Stand:** 2026-07-26  
-**Status:** freigegeben - Review durch Gemini am 2026-07-26 erfolgreich durchgeführt  
+**Stand:** 2026-07-27  
+**Status:** freigegeben - Re-Review am 2026-07-27 erfolgreich durchgeführt  
 **Feature-Branch:** `codex/suite-datenintegritaet-hardening`  
 **Reviewer:** Antigravity (Gemini)  
 **GitHub-Status:** Branch nur lokal; Push nach Nutzerfreigabe  
@@ -237,19 +237,19 @@ Status, Ergebnis, Orakel und Gate-Nachweise sind in [SUITE_DATENINTEGRITAET_HARD
 
 ## Freigabestatus
 
-Freigegeben durch Gemini am 2026-07-26 nach erfolgreichem adversarialen Review.
+Freigegeben durch Gemini am 2026-07-27 nach erfolgreichem Re-Review der Code-Implementierung und Testabdeckung.
 
 ## Review-Feedback von Gemini
 
-**Review-Datum:** 2026-07-26  
+**Review-Datum:** 2026-07-27 (Adversarielles Code-Re-Review)  
 **Reviewer:** Antigravity (Gemini)  
-**Methode:** Adversarielles Code- und Contract-Review gemäß `AGENTS.md` und `SLICE_EXECUTION_RULES.md`.
+**Methode:** Adversarielles Code- und Contract-Review gemäß `AGENTS.md` und `GEMINI.md`.
 
 ### Prüfdimensionen & Verifikation
 
 1. **Korrektheit:**
-   - **`D-04` Hybridprofil-Provenienz (`DAT-02`):** `combineSimulatorProfiles` in `simulator-profile-inputs.js` identifiziert unvollständige Profilhybride (Detailprofil + reine Aggregate-Profilwerte) und bricht fail-closed mit `SIMULATOR_PROFILE_ASSET_PROVENANCE_MISSING` ab. Erzeugung synthetischer Lots ohne Cost Basis/TQF ist verhindert. Repro O-06 wird sauber blockiert.
-   - **`D-05` Absolute Goldzielbildung & Adapterquoten (`DAT-03`):** `calculateProfileGoldStrategy` in `profile-asset-values.js` ermittelt die Goldziele je Profil als absolute Eurobeträge auf der freien Profilbasis (`assetBase - min(healthBucket, operativeLiquidity)`). Summiertes Haushaltsziel im 100.000 € (8%) / 900.000 € (0%) Referenzfall beträgt exakt **8.000 €** (0.8% Haushaltsquote).
+   - **`D-04` Hybridprofil-Provenienz (`DAT-02`):** `combineSimulatorProfiles` in `simulator-profile-inputs.js` (Zeile 520–536) identifiziert unvollständige Profilhybride (Detailprofil + reine Aggregate-Profilwerte) und bricht fail-closed mit `SIMULATOR_PROFILE_ASSET_PROVENANCE_MISSING` ab. Erzeugung synthetischer Lots ohne Cost Basis/TQF ist verhindert. Repro O-06 wird sauber blockiert.
+   - **`D-05` Absolute Goldzielbildung & Adapterquoten (`DAT-03`):** `calculateProfileGoldStrategy` in `profile-asset-values.js` (Zeile 58–126) ermittelt die Goldziele je Profil als absolute Eurobeträge auf der freien Profilbasis (`assetBase - min(healthBucket, operativeLiquidity)`). Summiertes Haushaltsziel im 100.000 € (8%) / 900.000 € (0%) Referenzfall beträgt exakt **8.000 €** (0.8% Haushaltsquote).
    - **Portfolioinitialisierung & Active Profile Invarianz:** `simulator-portfolio-init.js`, `profilverbund-balance.js` und `balance-main-profilverbund.js` nutzen das absolute Euro-Goldziel direkt. Ein Wechsel des aktiven DOM-Profils verändert das Haushaltsgoldziel nicht mehr.
 2. **Vertragstreue:**
    - Keine Formeländerungen in `engine/`. `engine.js` und `EngineAPI` blieben unberührt.
@@ -257,7 +257,7 @@ Freigegeben durch Gemini am 2026-07-26 nach erfolgreichem adversarialen Review.
    - Strukturiertes Fehlerobjekt mit sprechenden `warnings` und `errorCode` für das Simulator-UI.
 4. **Seiteneffekte:**
    - Exakt 6 Programmdateien geändert (`balance-main-profilverbund.js`, `profile-asset-values.js`, `profilverbund-balance.js`, `simulator-main-profiles.js`, `simulator-portfolio-init.js`, `simulator-profile-inputs.js`). Max. Datei-Limit von 6 eingehalten!
-   - Test-Suite (`npm test`, 7.516 Assertions) und Browser-Smokes (`npm run test:browser`, 16 E2E-Läufe) grün.
+   - Automated Test Gates: `npm test` (7.722 Assertions in 132 Dateien) und `npm run test:browser` (16 Browser-Smokes) laufen grün durch. `tests/profile-asset-values.test.mjs` testet explizit die Euro-Aggregation und den Pflegebucket-Abzug.
 
 ```markdown
 ## Review-Ergebnis
