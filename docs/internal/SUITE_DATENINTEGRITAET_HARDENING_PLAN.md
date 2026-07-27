@@ -463,7 +463,7 @@ Die Slice-Dateien werden gemaess `SLICE_EXECUTION_RULES.md` jeweils vor Beginn d
 | 4 | [SLICE_SUITE_DATA_04_PROFILE_ASSET_GOLD.md](./SLICE_SUITE_DATA_04_PROFILE_ASSET_GOLD.md) | Verlustfreie Profilassets und Goldziele | P0/P1 | 3, D-04, D-05 | 6 | freigegeben |
 | 5 | [SLICE_SUITE_DATA_05_ENGINE_INVARIANTS.md](./SLICE_SUITE_DATA_05_ENGINE_INVARIANTS.md) | Engine-Spending, Floors, Flex und Rente | P1 | 3 | 7 | freigegeben |
 | 6 | [SLICE_SUITE_DATA_06_RESULT_SIGN_SEMANTICS.md](./SLICE_SUITE_DATA_06_RESULT_SIGN_SEMANTICS.md) | Nullwerte, negative Renditen und wahrheitsgetreue Darstellung | P1 | 3, 5, D-06, D-19 | 7 | freigegeben |
-| 7 | [SLICE_SUITE_DATA_07_SWEEP_REQUEST_SAMPLING.md](./SLICE_SUITE_DATA_07_SWEEP_REQUEST_SAMPLING.md) | Kanonischer Sweep-Request und Sampling | P1 | 3, 5 | 6 | nachgebessert - Re-Review ausstehend |
+| 7 | [SLICE_SUITE_DATA_07_SWEEP_REQUEST_SAMPLING.md](./SLICE_SUITE_DATA_07_SWEEP_REQUEST_SAMPLING.md) | Kanonischer Sweep-Request und Sampling | P1 | 3, 5 | 6 | freigegeben |
 | 8 | `SLICE_SUITE_DATA_08_SWEEP_HOUSEHOLD_RISK.md` | Partner, Pflege, Langlebigkeit und Tail Risk | P1 | 7 | 7 | geplant |
 | 9 | `SLICE_SUITE_DATA_09_SWEEP_METRICS_COMPARABILITY.md` | Drawdown, Outcomes und faire Vergleiche | P1 | 6-8, D-06, D-07 | 9 | geplant |
 | 10 | `SLICE_SUITE_DATA_10_AUTO_OPTIMIZE_FIDELITY.md` | Optimizer-Parameter und Apply-Paritaet | P1 | 6-9, D-08 | 8 | geplant |
