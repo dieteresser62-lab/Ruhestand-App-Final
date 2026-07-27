@@ -8,6 +8,7 @@ import { getCommonInputs } from '../app/simulator/simulator-portfolio.js';
 import { simulateOneYear } from '../app/simulator/simulator-engine-wrapper.js';
 import { annualData, HISTORICAL_DATA } from '../app/simulator/simulator-data.js';
 import { EngineAPI } from '../engine/index.mjs';
+import { CONFIG } from '../engine/config.mjs';
 import { formatPercentValue } from '../app/simulator/simulator-formatting.js';
 import { formatCurrency } from '../app/simulator/simulator-utils.js';
 
@@ -777,6 +778,65 @@ try {
         expectedRowCount: 61,
         notes: ['Long-horizon regression sentinel.']
     });
+    let pensionWealthOracle = null;
+    const pensionWealthProbe = runScenario({
+        id: 'active_pension_wealth_reduction_2000_2001',
+        values: {
+            simStartJahr: 2000,
+            simEndJahr: 2001,
+            simStartVermoegen: 950000,
+            depotwertAlt: 930000,
+            einstandAlt: 800000,
+            tagesgeld: 20000,
+            startFloorBedarf: 24000,
+            startFlexBedarf: 12000,
+            p1Monatsrente: 1000,
+            p1StartInJahren: 0
+        },
+        expectedRowCount: 2,
+        projectionOverride: ({ data, summaryHtml }) => {
+            const firstRow = data?.rows?.[0]?.row;
+            const depotAfterReturn = (Number(firstRow?.eq_after_return) || 0)
+                + (Number(firstRow?.gold_after_return) || 0);
+            const netNeedAnnual = (Number(firstRow?.floor_aus_depot) || 0)
+                + (Number(firstRow?.flex_brutto) || 0);
+            const pensionAnnual = Number(firstRow?.pension_annual) || 0;
+            const expectedQuotePct = depotAfterReturn > 0
+                ? (netNeedAnnual / depotAfterReturn) * 100
+                : null;
+            const doubleSubtractQuotePct = depotAfterReturn > 0
+                ? (Math.max(0, netNeedAnnual - pensionAnnual) / depotAfterReturn) * 100
+                : null;
+            const safeRate = CONFIG.SPENDING_MODEL.WEALTH_ADJUSTED_REDUCTION.SAFE_WITHDRAWAL_RATE;
+            const fullRate = CONFIG.SPENDING_MODEL.WEALTH_ADJUSTED_REDUCTION.FULL_WITHDRAWAL_RATE;
+            const linearT = Math.min(1, Math.max(0, ((expectedQuotePct / 100) - safeRate) / (fullRate - safeRate)));
+            const expectedFactorPct = linearT * linearT * (3 - (2 * linearT)) * 100;
+
+            assertEqual(pensionAnnual, 12000, 'Active-pension backtest must pass 12,000 EUR annual pension into the engine');
+            assertClose(firstRow.WealthQuoteUsedPct, expectedQuotePct, 0.000001, 'Backtest wealth quote must use the pension-netted need exactly once');
+            assertClose(firstRow.WealthRedF, expectedFactorPct, 0.000001, 'Backtest wealth factor must match the pension-netted quote');
+            assert(
+                Math.abs(firstRow.WealthQuoteUsedPct - doubleSubtractQuotePct) > 0.5,
+                'Backtest oracle must distinguish the corrected quote from the former double-pension subtraction'
+            );
+
+            pensionWealthOracle = {
+                scenarioId: 'active_pension_wealth_reduction_2000_2001',
+                firstYear: data.rows[0].jahr,
+                pensionAnnual: round(pensionAnnual),
+                netNeedAnnual: round(netNeedAnnual),
+                depotAfterReturn: round(depotAfterReturn),
+                expectedQuotePct: round(expectedQuotePct, 6),
+                observedQuotePct: round(firstRow.WealthQuoteUsedPct, 6),
+                formerDoubleSubtractQuotePct: round(doubleSubtractQuotePct, 6),
+                expectedWealthFactorPct: round(expectedFactorPct, 6),
+                observedWealthFactorPct: round(firstRow.WealthRedF, 6)
+            };
+            return { data, summaryHtml };
+        },
+        oracleClass: 'target_expected',
+        notes: ['Integrated core-to-backtest sentinel for pension netting and wealth reduction.']
+    });
     const threeBucketMinimumFlex = runScenario({
         id: 'three_bucket_minimum_flex_2005_2014',
         values: {
@@ -903,9 +963,10 @@ try {
         oracleClass: 'target_expected',
         generatedBy: 'tests/simulator-backtest-characterization.test.mjs',
         exclusions: ['timestamps', 'object identities', 'absolute local paths'],
-        approvedContractChangePaths: ['alignmentOracle', 'cases', 'negativeCases'],
+        approvedContractChangePaths: ['alignmentOracle', 'cases', 'negativeCases', 'pensionWealthOracle'],
         metricDictionary: METRIC_DICTIONARY_V1,
         alignmentOracle: buildAlignmentOracle(),
+        pensionWealthOracle,
         reductionBoundaryOracle: buildReductionBoundaryOracle(backtestSource),
         legacyGlobalSchema: buildLegacySchemaOracle(global.window.globalBacktestData),
         detailToggleOracle: {
@@ -932,6 +993,8 @@ try {
     };
 
     assertEqual(actual.cases.length, 6, 'six runtime characterization cases should be present');
+    assertEqual(pensionWealthProbe.observedRowCount, 2, 'active-pension integration probe should complete two backtest years');
+    assert(pensionWealthOracle !== null, 'active-pension integration probe should publish its explicit oracle');
     assert(actual.reductionBoundaryOracle.countedByLegacyOperator, 'exact 10% must be counted by the legacy operator');
     assert(!actual.reductionBoundaryOracle.contradictorySummaryLabelPresent, 'legacy >10% label contradiction must be removed');
     assert(actual.reductionBoundaryOracle.canonicalSummaryLabelPresent, 'summary label must expose the inclusive ten-percent contract');

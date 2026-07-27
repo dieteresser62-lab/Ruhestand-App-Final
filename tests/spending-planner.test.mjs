@@ -790,6 +790,42 @@ function clone(value) {
     console.log('✅ First-year withdrawal rate and alarm parity works');
 }
 
+// --- TEST 9d: Incomplete initialized legacy state uses the documented full-flex fallback ---
+{
+    const params = {
+        market: { sKey: 'hot_neutral', abstandVomAthProzent: 0, szenarioText: 'Test' },
+        inflatedBedarf: { floor: 12000, flex: 12000 },
+        runwayMonate: 48,
+        profil: mockProfile,
+        depotwertGesamt: 800000,
+        gesamtwert: 800000,
+        renteJahr: 0,
+        input: {
+            inflation: 0,
+            runwayTargetMonths: 36,
+            runwayMinMonths: 24,
+            floorBedarf: 12000,
+            flexBedarf: 12000
+        },
+        lastState: {
+            initialized: true,
+            alarmActive: false,
+            peakRealVermoegen: 800000,
+            cumulativeInflationFactor: 1
+        }
+    };
+    const result = SpendingPlanner.determineSpending(params);
+
+    assertClose(
+        result.spendingResult.details.entnahmequoteDepot,
+        0.03,
+        0.0001,
+        'Missing legacy flexRate should use the documented 100% fallback for the current withdrawal quote'
+    );
+    assert(Number.isFinite(result.newState.flexRate), 'Missing legacy flexRate must not propagate NaN into the next state');
+    console.log('✅ Incomplete initialized legacy state uses the full-flex fallback contract');
+}
+
 // --- TEST 10: Alarm + Flex-Budget + Final-Limits interaction ---
 {
     const decisions = [];

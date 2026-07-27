@@ -77,6 +77,14 @@ const InputValidator = {
         }
     });
 
+    if (input.renteAktiv != null) {
+        check(
+            typeof input.renteAktiv !== 'boolean',
+            'renteAktiv',
+            'Rentenaktivierung muss ein boolescher Wert sein.'
+        );
+    }
+
     if (input.renteAktiv === true) {
         check(
             !Number.isFinite(input.renteMonatlich) || input.renteMonatlich < 0,

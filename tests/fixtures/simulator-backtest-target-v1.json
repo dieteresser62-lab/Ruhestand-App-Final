@@ -148,7 +148,8 @@
   "approvedContractChangePaths": [
     "alignmentOracle",
     "cases",
-    "negativeCases"
+    "negativeCases",
+    "pensionWealthOracle"
   ],
   "cases": [
     {
@@ -3294,6 +3295,18 @@
     }
   ],
   "oracleClass": "target_expected",
+  "pensionWealthOracle": {
+    "depotAfterReturn": 798709.31,
+    "expectedQuotePct": 3.004848,
+    "expectedWealthFactorPct": 84.646811,
+    "firstYear": 2000,
+    "formerDoubleSubtractQuotePct": 1.502424,
+    "netNeedAnnual": 24000,
+    "observedQuotePct": 3.004848,
+    "observedWealthFactorPct": 84.646811,
+    "pensionAnnual": 12000,
+    "scenarioId": "active_pension_wealth_reduction_2000_2001"
+  },
   "reductionBoundaryOracle": {
     "canonicalSummaryLabelPresent": true,
     "contradictorySummaryLabelPresent": false,

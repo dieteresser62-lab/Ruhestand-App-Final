@@ -601,6 +601,100 @@ Nach der Nachbesserung sind 132 Testdateien mit 7.679 Assertions und alle 16
 Browser-Smokes gruen. Der Reviewerstatus wird dadurch nicht eigenmaechtig
 geaendert; das unabhaengige Re-Review bleibt ausstehend.
 
+## Re-Review nach Nachbesserung (Claude, 2026-07-27)
+
+**Pruefgegenstand:** Commit `0b2a5bf`, Arbeitsbaum sauber. Zwei
+Programmdateien, zwei Testdateien. Der Scope ist auf sieben Programmdateien
+erweitert und in dieser Slice-MD ausgewiesen.
+
+### Verifikation
+
+- `npm test`: 7.679/7.679 Assertions gruen (vorher 7.669), 0 offene Handles;
+- `git diff --check` sauber;
+- eigener Round-Trip-Test der Feld-zu-Reader-Kopplung;
+- vollstaendige Branchtabelle der neuen Gold-Grenzlogik;
+- Nachpruefung des Tranchen-Persistenzpfads.
+
+### Gemessene Gold-Grenzlogik
+
+```text
+rebalancingBand:  goldAktiv=true   0 -> 0   25 -> 25   -5 -> 25   NaN -> 25
+                  goldAktiv=false  0 -> 0   25 -> 25   -5 -> -5   NaN -> 0
+goldZielProzent:  0 -> 0   10 -> 10   -5 -> 7.5   60 -> 7.5   NaN -> 7.5
+```
+
+### Gemessener Round-Trip der Feldkopplung
+
+```text
+Feld                Typ      geschrieben  gelesen   Reader
+depotwertAlt        hidden   1234         1234      readNumber
+geldmarktEtf        text     1.200        1200      readDisplayNumber
+depotwertAlt (alt)  hidden   1.234        1.234     readNumber   <- Zustand vor dem Fix
+```
+
+Der Vorzustand las einen Depotwert von 1234 EUR als 1,23 EUR. S03-2 war damit
+kein latentes Risiko, sondern ein aktiver Faktor-1000-Fehler auf genau dem
+Feld, um das DAT-01 ging.
+
+### Korrektur eines eigenen Befunds
+
+**S03-5 war falsch.** Die Ablehnung durch Codex ist korrekt: `readTrancheInputs`
+in `simulator-input-tranches.js` liest `depot_tranchen` mit einem rohen
+`JSON.parse` und gibt das Ergebnis ohne `normalizeTrancheCollection` weiter.
+Ich hatte mit `loadTranchesFromStorage` einen anderen Konsumenten verfolgt.
+`SimulatorPortfolioInputError` ist erreichbar, die Absicherung ist noetig.
+
+### Findings-Lifecycle
+
+```text
+S03-1  Blocker      BEHOBEN - Nullgrenzen mit vollstaendiger Branchtabelle verifiziert
+S03-2  Restrisiko   BEHOBEN - Hidden-Felder kanonisch, Round-Trip verifiziert
+S03-3  Restrisiko   ANGENOMMEN - bewusst dokumentiertes Restrisiko
+S03-4  Restrisiko   ANGENOMMEN - bewusst dokumentiertes Restrisiko, UX-Entscheidung offen
+S03-5  Hinweis      ZURUECKGEZOGEN - Befund war falsch
+S03-6  Hinweis      GEKLAERT - Engine bleibt verbindliche Validierungsgrenze
+S03-7  Hinweis      GEKLAERT - dokumentierter Zahlenvertrag
+REV-03-F01/F02      BEHOBEN gemeinsam mit S03-1
+REV-03-F03          BEANTWORTET - Risiko lag in der Feldkopplung, mit S03-2 geschlossen
+T03-1  Restrisiko   NEU - negatives rebalancingBand passiert bei inaktivem Gold ungeprueft
+T03-2  Hinweis      NEU - goldZielProzent=0 bei goldAktiv=true neu erreichbar und undefiniert
+T03-3  Hinweis      NEU - goldZiel ausserhalb 0..50 weiterhin still auf 7,5
+```
+
+### Review-Ergebnis
+
+```markdown
+## Review-Ergebnis
+- Status: freigegeben
+- Blocker: keine. S03-1 mit vollstaendiger Branchtabelle gegengeprueft,
+  S03-2 mit gemessenem Round-Trip beider Feldklassen.
+- Restrisiken:
+  1. T03-1 - negatives rebalancingBand passiert ungeprueft, wenn Gold inaktiv
+     ist; bei aktivem Gold wird derselbe Wert auf 25 korrigiert.
+  2. T03-2 - goldZielProzent=0 bei aktivem Gold ist neu erreichbar; die Engine
+     reicht den Wert durch, kein Akzeptanzkriterium legt das Verhalten fest.
+  3. T03-3 - goldZiel ausserhalb 0..50 wird weiterhin still auf 7,5 gesetzt.
+  4. S03-3 und S03-4 - stille Ersatzwerte bleiben als bewusst angenommene
+     Restrisiken bestehen.
+  5. S03-6 und S03-7 - dokumentierte Entscheidungen.
+- Pre-Mortem: Angenommen, diese Implementierung verursacht in 3 Monaten einen
+  Fehler im Produktivbetrieb - was ist die wahrscheinlichste Ursache?
+  Ein Nutzer aktiviert Gold und setzt das Ziel auf 0 Prozent, um die Position
+  abzubauen. Der Wert kommt jetzt korrekt bis zur Engine durch, aber weder
+  Fachentscheidung noch Engine legen fest, was "aktiv mit 0 Prozent Ziel"
+  bedeutet. Je nach Auslegung entsteht ein vollstaendiger Goldverkauf, eine
+  Dauerempfehlung zum Verkauf oder gar keine Reaktion - und weil die
+  Nullgrenze als korrekt behoben gilt, wird die fehlende fachliche Definition
+  dahinter nicht vermutet.
+```
+
+### Empfehlung
+
+- T03-1 ist eine Zeile: `band < 0` auch im inaktiven Zweig pruefen.
+- T03-2 verdient eine ausdrueckliche Fachentscheidung, bevor Slice 04 die
+  Goldziele weiter anfasst; dort wurden bereits absolute Goldziele
+  eingefuehrt, was dieselbe Semantik beruehrt.
+
 ## Review-Entscheidungen
 
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
@@ -616,3 +710,6 @@ geaendert; das unabhaengige Re-Review bleibt ausstehend.
 | S03-5 | Claude 2026-07-27 | `SimulatorPortfolioInputError` sei auf dem Normalpfad unerreichbar | abgelehnt | Persistenzpfad normalisiert nicht vor Initialisierung; Erreichbarkeit getestet |
 | S03-6 | Claude 2026-07-27 | HTML-`min`/`max` erzwingen keine Grenzen | kein Defekt gemaess Nutzerentscheidung | Engine bleibt verbindliche Validierungsgrenze |
 | S03-7 | Claude 2026-07-27 | beide Parser akzeptieren Exponentialschreibweise | dokumentierter, aktuell erlaubter Zahlenvertrag | keine Codeaenderung ohne neue Fachentscheidung |
+| T03-1 | Claude Re-Review 2026-07-27 | negatives `rebalancingBand` passiert ungeprueft, wenn Gold inaktiv ist (gemessen: -5 bleibt -5); bei aktivem Gold wird derselbe Wert auf 25 korrigiert | offen - Restrisiko | ausstehend |
+| T03-2 | Claude Re-Review 2026-07-27 | `goldZielProzent=0` bei `goldAktiv=true` ist neu erreichbar; `engine/core.mjs` reicht den Wert durch, kein Akzeptanzkriterium legt das Verhalten fest | offen - Hinweis, Fachentscheidung empfohlen | ausstehend |
+| T03-3 | Claude Re-Review 2026-07-27 | `goldZiel` ausserhalb 0..50 wird weiterhin still auf 7,5 gesetzt (gemessen: -5 und 60 ergeben 7,5) | offen - Hinweis | ausstehend |

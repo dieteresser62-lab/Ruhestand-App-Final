@@ -1,7 +1,7 @@
 # Slice 05 - Engine-Spending, Floors, Flex und Rente
 
-**Stand:** 2026-07-23  
-**Status:** freigegeben - Review durch Gemini am 2026-07-23 erfolgreich durchgeführt  
+**Stand:** 2026-07-27  
+**Status:** freigegeben - Re-Review aller Nachbesserungen (U05-1..U05-5) am 2026-07-27 erfolgreich durchgeführt  
 **Feature-Branch:** `codex/suite-datenintegritaet-hardening`  
 **Reviewer:** Antigravity (Gemini)  
 **GitHub-Status:** Branch nur lokal; Push nach Nutzerfreigabe  
@@ -26,6 +26,7 @@ Der Spending-State unterscheidet fehlend von gueltigem erschoepftem Zustand `0`.
 - Eine kritische Erstjahresquote loest anhand derselben Schwellen dieselbe Alarmstufe wie dieselbe Folgelaufquote aus.
 - Ein Floor von 25.000 EUR kann durch Monatsquantisierung nicht auf 24.000 EUR sinken; der Quantisierungseingriff ist diagnostizierbar.
 - Aktive Rente mit `undefined`, `NaN`, `Infinity` oder negativem Monatswert erzeugt einen strukturierten Validierungsfehler fuer `renteMonatlich`.
+- Ein vorhandenes `renteAktiv` muss ein Boolean sein; String- und Zahlenwerte werden an der Engine-Grenze fail-closed abgewiesen.
 - `minimumFlexAnnual` wird nicht still auf eine fachliche Grenze geklemmt.
 - Snapshot-, Backtest- und FlowDelta-Ergebnisse weichen nicht unerwartet ab.
 
@@ -189,23 +190,43 @@ Es sind sechs Programmdateien erforderlich. Die Stop-Regel von mehr als zehn Pro
 - Der Backtest-Charakterisierungstest meldete nach dem ersten Implementierungsstand elf geaenderte `canonicalRowsHash`-Werte. Alle einzeln ausgewiesenen Fachmetriken und FlowDelta-Assertions blieben gruen. Ursache des globalen Hash-Deltas war zunaechst die zusaetzliche Quantisierungsdiagnose in `spendingResult.details`, die jeden kanonischen Row-Shape erweitert haette.
 - Der Nutzer hat am 2026-07-23 die Stop-Regel fuer diesen Slice ausdruecklich ausser Kraft gesetzt und damit die Fortsetzung trotz Backtest-Deltas erlaubt.
 - Die Quantisierungsdiagnose bleibt nach dieser Entscheidung auf der Helper-Grenze von `calculateFinalWithdrawal()` und wird nicht in den oeffentlichen kanonischen Backtest-Row-Contract aufgenommen. Baseline-Hashes werden fuer reine Metadaten-Erweiterungen nicht aktualisiert.
-- Nach Entfernung der Metadaten-Erweiterung verblieben exakt dieselben elf Hash-Pfade als fachlich erwartetes Delta des korrigierten Erstjahres-/Wealth-State. Keine gespeicherte Einzelmetrik, Ruinfrequenz oder FlowDelta-Assertion wich ab. Die elf Target-Hashes wurden deshalb kontrolliert aktualisiert; die unveraenderte Legacy-Baseline blieb read-only.
+- Nach Entfernung der Metadaten-Erweiterung verblieben exakt dieselben elf Hash-Pfade als Delta der korrigierten Erstjahresdiagnose `entnahmequoteDepot`. Die Renten- und Flex-Budget-Korrekturen waren in diesen sechs rentenlosen Cases inert. Keine gespeicherte Einzelmetrik, Ruinfrequenz oder FlowDelta-Assertion wich ab. Die elf Target-Hashes wurden deshalb kontrolliert aktualisiert; die unveraenderte Legacy-Baseline blieb read-only.
 - Die Vollsuite zeigte zusaetzlich einen deterministischen MC-Snapshot-Delta in zwei von acht runbasierten P10-Realentnahmen. Aggregierter P10, Outcome-Inventar, Missingness und Floor-Coverage blieben identisch. Statt die unveraenderlichen MC-Hardening-Snapshots zu ueberschreiben, wurde `post-suite-data-05-v1` mit eigener Delta-Ledger-Zeile angelegt und als aktueller Referenzpunkt im MC-Contract eingetragen.
 
 ## Offene Risiken
 
-- Die fachlich beabsichtigten Backtest- und MC-Referenzdeltas sind technisch erklaert und durch die Vollsuite abgesichert, aber noch nicht durch den vorgesehenen Reviewer freigegeben.
+- Die Nachimplementierung vom 2026-07-27 ist technisch abgesichert, aber noch nicht durch einen Reviewer gegen den neuen Diff freigegeben.
 - Die Helper-Diagnose der Quantisierung ist absichtlich kein Bestandteil des oeffentlichen kanonischen Row-Contracts. Ein spaeterer UI-Bedarf daran erfordert eine eigene Contract-Entscheidung.
 - Der neue MC-Snapshot veraendert zwei laufbasierte P10-Realentnahmen und mehrere davon abgeleitete integrierte Risikowerte; das Outcome-Inventar, Missingness, Floor-Coverage und der aggregierte P10 bleiben unveraendert.
+- `renteJahr` bleibt innerhalb des breiten Planner-Parameterobjekts fuer Ergebnis- und Guardrail-Logik erforderlich, wird vom Wealth-Helper selbst jedoch bewusst nicht ausgewertet. Eine engere Helper-Signatur bleibt ein separates Refactoring.
 
 ## Rueckdokumentation
 
-- Slice-Zeile im Hauptplan ist verlinkt und auf `implementiert - Review ausstehend` gesetzt.
-- Implementierung, Testumfang, versionierte Referenzdeltas und verbleibender Reviewbedarf sind im Hauptplan protokolliert.
+- Slice-Zeile im Hauptplan ist verlinkt und auf `Nachimplementierung - Re-Review ausstehend` gesetzt.
+- Implementierung, Nachimplementierung, Testumfang, versionierte Referenzdeltas und verbleibender Reviewbedarf sind im Hauptplan protokolliert.
+
+## Nachimplementierung auf Claude-Review vom 2026-07-27
+
+- U05-1: Ein historischer Zwei-Jahres-Backtest mit aktiver Rente prueft den vollstaendigen Pfad von Simulator-Input ueber Core-Netting bis zur Wealth-Reduction. Das versionierte Orakel belegt fuer das erste Jahr 24.000 EUR Nettoentnahmebedarf auf 798.709,31 EUR Depot: Quote 3,004848 Prozent und Wealth-Faktor 84,646811 Prozent. Der fruehere Doppelabzug haette nur 1,502424 Prozent ergeben.
+- U05-2: Kein Codeumbau. `calculateWealthAdjustedReductionFactor()` erhaelt ein breites Planner-Parameterobjekt; `renteJahr` ist nur innerhalb dieses Helpers bewusst ungenutzt, wird aber in benachbarten Planner-Schritten weiterhin benoetigt. Eine engere Signatur ist ein separates, fachlich neutrales Refactoring.
+- U05-3: Der Fallback `100` fuer einen initialisierten Legacy-State ohne `flexRate` ist als bestehender Initialzustandsvertrag bestaetigt. Ein eigener Regressionstest sichert die volle aktuelle Nettoentnahmequote und verhindert `NaN` im Folgezustand.
+- U05-4: Vorhandene nichtboolesche Werte fuer `renteAktiv` (`"true"`, `"false"`, `1`, `0`) werden nun strukturiert fuer `renteAktiv` abgewiesen. Fehlend beziehungsweise `null` bleibt aus Legacy-Kompatibilitaet inaktiv; echte Booleans behalten ihre bisherige Semantik.
+- U05-5: `effectiveFlexRate` verwendet denselben normalisierten `floorAnnual` wie Entnahme und Quantisierungsdiagnose. Ein direkter Helper-Test mit negativem Roh-Floor sichert den konsistenten Vertrag.
+
+### Tests der Nachimplementierung
+
+- Red-State vor Codeaenderung reproduziert fuer U05-4 und U05-5; U05-1 meldete ausschliesslich das noch fehlende versionierte Backtest-Orakel.
+- `node tests/run-single.mjs tests/core-negative-contracts.test.mjs` - 84/84 Assertions gruen.
+- `node tests/run-single.mjs tests/spending-quantization.test.mjs` - 25/25 Assertions gruen.
+- `node tests/run-single.mjs tests/spending-planner.test.mjs` - 126/126 Assertions gruen.
+- `node tests/run-single.mjs tests/simulator-backtest-characterization.test.mjs` - 81/81 Assertions gruen.
+- `npm run build:engine` - erfolgreich; Fallback-Build ohne `esbuild`.
+- `npm test` - 132/132 Testdateien, 7.702/7.702 Assertions, 0 fehlgeschlagene Dateien, 0 offene Handles.
+- `npm run test:browser` - 16/16 Browser-Smokes gruen.
 
 ## Freigabestatus
 
-Freigegeben durch Gemini am 2026-07-23 nach erfolgreichem adversarialen Review.
+Gemini hatte den vorherigen Stand am 2026-07-23 freigegeben; Claude gab diesen Stand am 2026-07-27 ebenfalls ohne Blocker frei. Die anschliessende Nachimplementierung ist abgeschlossen und wartet auf ein unabhaengiges Re-Review. Codex setzt den Reviewerstatus nicht eigenmaechtig.
 
 ## Review-Feedback von Gemini
 
@@ -243,14 +264,151 @@ Freigegeben durch Gemini am 2026-07-23 nach erfolgreichem adversarialen Review.
 
 ## Review-Feedback von Claude
 
-Ausstehend beziehungsweise optional.
+- **Review-Datum:** 2026-07-27 (nachgelagert, Stand nach Slice 07)
+- **Reviewer:** Claude (Opus 5)
+- **Methode:** Adversariales Code- und Contract-Review nach `CLAUDE.md` und
+  `SLICE_EXECUTION_RULES.md`.
+
+### Pruefgegenstand
+
+Commit `c47e388`, sechs Programmdateien. Keine der Engine-Dateien wurde
+spaeter erneut angefasst. Elf Golden-Hash-Pfade in
+`tests/fixtures/simulator-backtest-target-v1.json` wurden aktualisiert.
+
+### Verifikation
+
+- `npm test`: 7.679/7.679 Assertions gruen;
+- Konstruktion von `inflatedBedarf` in `engine/core.mjs` bis zur Quelle
+  verfolgt;
+- Wealth-Faktor ueber vier Depotgroessen mit den tatsaechlichen
+  Konfigurationsschwellen quantifiziert;
+- alle sechs geaenderten Backtest-Cases auf Renten- und
+  Flex-Budget-Parameter geprueft;
+- `projectRow`-Projektion gegen `stableHash(rows)` abgeglichen;
+- Verbreitung des neuen `quantization`-Objekts per Volltextsuche geprueft.
+
+### Was der Slice korrekt loest
+
+Die Rentenkorrektur in `wealth-reduction.mjs` ist an der Quelle bestaetigt,
+nicht nur am Kommentar: `engine/core.mjs` Zeile 490 bildet
+`inflatedBedarf.floor = max(0, floorBedarf - renteJahr)` und verrechnet den
+Rentenueberschuss zusaetzlich gegen den Flex-Bedarf; `SpendingPlanner.mjs`
+Zeilen 182 und 305 addieren die Rente danach wieder auf das Gesamtbudget.
+`inflatedBedarf` ist damit nachweislich netto, der alte zweite Abzug war
+echtes Doppelzaehlen.
+
+Groessenordnung des behobenen Fehlers, gemessen mit dem tatsaechlichen Band
+`safeRate = 1,5 %` / `fullRate = 3,5 %`, Rentner mit 24.000 EUR Floor,
+12.000 EUR Flex und 12.000 EUR Rente:
+
+```text
+Depot 500.000   Quote neu 4,80 %   alt 2,40 %   Faktor neu 1,000   alt 0,425
+Depot 800.000   Quote neu 3,00 %   alt 1,50 %   Faktor neu 0,844   alt 0,000
+```
+
+Bei 800.000 EUR Depot unterdrueckte der Fehler die Erstjahres-Kuerzung
+vollstaendig. Die Korrektur ist wichtig und richtig.
+
+Das neue `quantization`-Objekt bleibt nachweislich auf der Helper-Grenze; eine
+Volltextsuche findet `quantization` ausschliesslich in
+`spending-policy-helpers.mjs`. Die Aussage der Slice-MD, die
+Metadaten-Erweiterung sei aus dem kanonischen Row-Contract entfernt worden,
+haelt.
+
+### Findings
+
+1. **U05-1 (Restrisiko, Beweislage) - die elf Golden-Deltas belegen nicht,
+   was ihnen zugeschrieben wird.** Die Slice-MD fuehrt sie auf das
+   „fachlich erwartete Delta des korrigierten Erstjahres-/Wealth-State"
+   zurueck. Das trifft nur zur Haelfte zu, und die fehlende Haelfte ist die
+   wichtige:
+   - Alle sechs geaenderten Cases haben `renteMonatlich: 0` und kein
+     `renteAktiv`. Damit ist `renteJahr = 0` und die Rentenkorrektur dort
+     **beweisbar wirkungslos** - alt und neu rechnen identisch.
+   - Alle haben `flexBudgetYears: 0`; auch die Flex-Budget-Korrektur ist dort
+     inert.
+   - Ursache der Deltas ist stattdessen `SpendingPlanner.mjs`:
+     `entnahmequoteDepot: 0` wird im Erstjahreszweig zu
+     `initialWithdrawalRate`. Das erklaert jede Beobachtung exakt - der Hash
+     ueber die vollen Row-Objekte aendert sich, waehrend saemtliche
+     `rowSamples` unveraendert bleiben (`projectRow` fuehrt das Feld nicht)
+     und kein Aggregatwert (`totalWithdrawal`, `totalTax`,
+     `summaryEndWealth`, `maxReductionStreak`, FlowDelta) abweicht.
+   Folge: Die wirtschaftlich bedeutsame Korrektur - das Rentendoppelzaehlen,
+   das bei 800.000 EUR Depot die Erstjahreskuerzung von 0,844 auf 0,000
+   verfaelschte - hat **keine Integrationsabdeckung**. Kein Backtest-Case
+   aktiviert eine Rente. Ihr einziger Nachweis sind die neuen Unit-Tests in
+   `spending-planner.test.mjs`. Die Golden-Aktualisierung wirkt wie eine
+   Bestaetigung der Rentenkorrektur, belegt aber ausschliesslich eine
+   Diagnosefeld-Aenderung.
+2. **U05-2 (Hinweis) - `renteJahr` ist ein toter Parameter.**
+   `calculateWealthAdjustedReductionFactor` liest `params.renteJahr` nicht
+   mehr; vier Aufrufstellen uebergeben es weiterhin.
+3. **U05-3 (Hinweis) - der neue `previousFlexRate`-Fallback ist der
+   grosszuegigste moegliche Wert.** Fehlt `lastState.flexRate`, wird jetzt
+   100 angenommen, also volle Flex-Entnahme. Vorher entstand `NaN`. Der
+   Fallback beseitigt einen echten Defekt, waehlt dafuer aber die
+   optimistischste Auslegung.
+4. **U05-4 (Hinweis) - Rentenvalidierung nur bei striktem `true`.**
+   `input.renteAktiv === true` laesst `"true"` und `1` ungeprueft durch. Die
+   produktiven Reader liefern Booleans, Import- und Legacy-Zustaende nicht
+   zwingend.
+5. **U05-5 (Hinweis) - Inkonsistenz in `calculateFinalWithdrawal`.** Die
+   Entnahme nutzt `floorAnnual` (auf >= 0 geklemmt), die daraus abgeleitete
+   `effectiveFlexRate` dagegen das ungeklemmte `inflatedBedarf.floor`.
+
+### Review-Ergebnis
+
+```markdown
+## Review-Ergebnis
+- Status: freigegeben
+- Blocker: keine. Alle drei Engine-Korrekturen sind sachlich richtig; die
+  Rentenkorrektur wurde an der Konstruktion von inflatedBedarf in
+  engine/core.mjs verifiziert, nicht nur am Kommentar.
+- Restrisiken:
+  1. U05-1 - die elf aktualisierten Golden-Hashes belegen ausschliesslich die
+     Erstjahres-Diagnose entnahmequoteDepot. Alle geaenderten Backtest-Cases
+     haben renteMonatlich 0, die Rentenkorrektur ist dort beweisbar inert.
+     Die wirtschaftlich bedeutsamste Korrektur des Slice hat damit keine
+     Integrationsabdeckung; empfohlen ist ein Backtest-Case mit aktiver Rente.
+  2. U05-2 - renteJahr ist ein toter Parameter mit vier Aufrufstellen.
+  3. U05-3 - fehlender Vorjahres-Flexzustand wird als volle Flexrate 100
+     ausgelegt.
+  4. U05-4 - Rentenvalidierung greift nur bei striktem Boolean true.
+  5. U05-5 - geklemmter und ungeklemmter Floor in derselben Funktion gemischt.
+- Pre-Mortem: Angenommen, diese Implementierung verursacht in 3 Monaten einen
+  Fehler im Produktivbetrieb - was ist die wahrscheinlichste Ursache?
+  Nicht die Korrektur selbst, sondern ihre Rueckabwicklung. Weil kein
+  Backtest-Case eine Rente aktiviert, wuerde eine spaetere Aenderung an
+  wealth-reduction.mjs - etwa ein erneut eingefuegter renteJahr-Abzug beim
+  Aufraeumen des toten Parameters - von der gesamten Golden-Suite unbemerkt
+  bleiben. Rentner mit gut gefuelltem Depot bekaemen im ersten Jahr wieder
+  gar keine Kuerzung, und die Suite bliebe gruen.
+```
+
+### Empfehlung
+
+Ein einziger Backtest-Case mit `renteAktiv: true` und einem Depot im Bereich
+500.000 bis 800.000 EUR wuerde die Korrektur dauerhaft absichern und U05-1 wie
+das Pre-Mortem-Szenario zugleich schliessen. Das ist der guenstigste Zeitpunkt
+dafuer, weil U05-2 genau zu der Aenderung einlaedt, die ohne diesen Test
+unbemerkt bliebe.
 
 ## Review-Antworten von Codex
 
-Review-Findings berücksichtigt; Implementierung vollständig grün.
+- **U05-1 angenommen und behoben:** Der Aussageumfang der elf alten Hash-Deltas ist korrigiert. Ein separates explizites Backtest-Orakel mit aktiver Rente sichert nun Quote und Wealth-Faktor gegen erneuten Doppelabzug.
+- **U05-2 teilweise angenommen, bewusst nicht umgebaut:** Im Helper ist `renteJahr` ungenutzt; die Aufrufer uebergeben jedoch das breite, in weiteren Planner-Schritten benoetigte Parameterobjekt. Eine Signaturverengung ist kein Fehlerfix dieses Review-Zyklus.
+- **U05-3 als Contract entschieden:** Der 100-Prozent-Fallback entspricht dem Initialzustand und wird fuer unvollstaendige initialisierte Legacy-States beibehalten und getestet.
+- **U05-4 angenommen und behoben:** Nichtboolesche Aktivierungswerte scheitern fail-closed mit Feldbezug `renteAktiv`.
+- **U05-5 angenommen und behoben:** Entnahme und abgeleitete effektive Flexrate nutzen denselben normalisierten Floor.
 
 ## Review-Entscheidungen
 
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
 | --- | --- | --- | --- | --- |
 | REV-05-01 | Gemini | Backtest-Hash-Deltas durch korrigiertes Erstjahr | Fachlich beabsichtigtes Delta; Target-Fixture kontrolliert aktualisiert | erledigt |
+| U05-1 | Claude 2026-07-27 | die elf aktualisierten Golden-Hashes belegen ausschliesslich die Erstjahres-Diagnose `entnahmequoteDepot`; alle geaenderten Backtest-Cases haben `renteMonatlich: 0`, die Rentenkorrektur ist dort beweisbar inert und ohne Integrationsabdeckung | angenommen | behoben: explizites versioniertes Backtest-Orakel mit aktiver Rente, Nettoquote und Wealth-Faktor |
+| U05-2 | Claude 2026-07-27 | `renteJahr` ist ein toter Parameter von `calculateWealthAdjustedReductionFactor`; vier Aufrufstellen uebergeben ihn weiterhin | teilweise angenommen; Signaturverengung als separates Refactoring zurueckgestellt | dokumentiert; kein Codeumbau |
+| U05-3 | Claude 2026-07-27 | fehlender `lastState.flexRate` wird neu als volle Flexrate 100 ausgelegt (optimistischster Fallback) | als Initial-/Legacy-Contract bestaetigt | erledigt: Regressionstest fuer Quote und endlichen Folgezustand |
+| U05-4 | Claude 2026-07-27 | Rentenvalidierung greift nur bei striktem `renteAktiv === true`; `"true"` und `1` bleiben ungeprueft | angenommen | behoben: vorhandene Nicht-Booleans werden fail-closed fuer `renteAktiv` abgewiesen |
+| U05-5 | Claude 2026-07-27 | `calculateFinalWithdrawal` mischt geklemmten `floorAnnual` und ungeklemmten `inflatedBedarf.floor` | angenommen | behoben: konsistenter `floorAnnual` samt direktem Helper-Contract |

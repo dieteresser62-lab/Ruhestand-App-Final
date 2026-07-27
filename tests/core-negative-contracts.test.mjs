@@ -182,6 +182,14 @@ function createDocumentMock(values = {}) {
 
 // --- TEST 6: Active pension requires a finite non-negative monthly amount ---
 {
+    for (const value of ['true', 'false', 1, 0]) {
+        const result = withMutedValidationLog(() => EngineAPI.simulateSingleYear(
+            { ...baseEngineInput, renteAktiv: value, renteMonatlich: 1000 },
+            null
+        ));
+        assertValidationField(result.error, 'renteAktiv', `Non-boolean pension activation ${String(value)}`);
+    }
+
     for (const value of [undefined, Number.NaN, Number.POSITIVE_INFINITY, -1]) {
         const result = withMutedValidationLog(() => EngineAPI.simulateSingleYear(
             { ...baseEngineInput, renteAktiv: true, renteMonatlich: value },

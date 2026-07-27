@@ -1,6 +1,11 @@
 
 import { SpendingPlanner } from '../engine/planners/SpendingPlanner.mjs';
-import { calcFlexShare, quantizeMonthly, smoothstep } from '../engine/planners/spending-policy-helpers.mjs';
+import {
+    calcFlexShare,
+    calculateFinalWithdrawal,
+    quantizeMonthly,
+    smoothstep
+} from '../engine/planners/spending-policy-helpers.mjs';
 import { CONFIG } from '../engine/config.mjs';
 
 console.log('--- Spending Quantization Tests ---');
@@ -104,6 +109,16 @@ const INPUT = { inflation: 2 };
     assertEqual(direct.quantization.quantizedAnnual, 24000, 'Diagnostics should retain the pre-protection quantized annual amount');
     assertEqual(direct.quantization.finalAnnual, 25000, 'Diagnostics should expose the protected final annual amount');
     console.log('✅ Hard floor survives monthly quantization');
+}
+
+// --- TEST 4: Effective flex rate uses the same normalized floor as withdrawal ---
+{
+    const result = calculateFinalWithdrawal({ floor: -1200, flex: 12000 }, 50, false);
+
+    assertEqual(result.endgueltigeEntnahme, 6000, 'Normalized negative floor should contribute zero to withdrawal');
+    assertEqual(result.flexRate, 50, 'Effective flex rate must use the normalized floor consistently');
+    assertEqual(result.quantization.floorAnnual, 0, 'Quantization diagnostics should expose the normalized floor');
+    console.log('✅ Effective flex rate uses the normalized floor contract');
 }
 
 console.log('--- Spending Quantization Tests Completed ---');

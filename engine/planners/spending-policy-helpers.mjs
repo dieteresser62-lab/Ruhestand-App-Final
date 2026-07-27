@@ -41,7 +41,7 @@ export function calculateFinalWithdrawal(inflatedBedarf, flexRate, antiPseudoAcc
     const floorProtectionApplied = quantizedAnnual < floorAnnual;
     const endgueltigeEntnahme = Math.max(floorAnnual, quantizedAnnual);
     const effectiveFlexRate = (inflatedBedarf.flex > 0)
-        ? ((Math.max(0, endgueltigeEntnahme - inflatedBedarf.floor) / inflatedBedarf.flex) * 100)
+        ? ((Math.max(0, endgueltigeEntnahme - floorAnnual) / inflatedBedarf.flex) * 100)
         : 0;
     const quantization = {
         enabled: antiPseudoAccuracyEnabled,
