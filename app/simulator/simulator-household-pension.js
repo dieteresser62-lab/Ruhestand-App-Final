@@ -19,6 +19,14 @@ export function calculateHouseholdPensionForYear({
     temporaryFlexFactor = 1
 }) {
     const rentAdjPct = inputs.rentAdjPct || 0;
+    const p1FromP2Percent = Math.max(
+        0,
+        Math.min(1, Number(widowBenefits.p1FromP2Percent) || 0)
+    );
+    const p2FromP1Percent = Math.max(
+        0,
+        Math.min(1, Number(widowBenefits.p2FromP1Percent) || 0)
+    );
     const currentAgeP1 = inputs.startAlter + yearIndex;
     const r1StartOffsetYears = Math.max(0, Number(inputs.renteStartOffsetJahre) || 0);
     let rente1BruttoEigen = 0;
@@ -28,7 +36,9 @@ export function calculateHouseholdPensionForYear({
         rente1BruttoEigen = currentAnnualPension;
     }
     if (p1Alive && widowBenefits.p1FromP2) {
-        widowBenefitP1ThisYear = widowPensionP1;
+        widowBenefitP1ThisYear = widowPensionP1 > 0
+            ? widowPensionP1
+            : Math.max(0, currentAnnualPension2 * p1FromP2Percent);
     }
 
     const rente1_brutto = rente1BruttoEigen + widowBenefitP1ThisYear;
@@ -52,7 +62,9 @@ export function calculateHouseholdPensionForYear({
     }
 
     if (p2Alive && widowBenefits.p2FromP1) {
-        widowBenefitP2ThisYear = widowPensionP2;
+        widowBenefitP2ThisYear = widowPensionP2 > 0
+            ? widowPensionP2
+            : Math.max(0, currentAnnualPension * p2FromP1Percent);
     }
 
     const rente2_brutto = rente2BruttoEigen + widowBenefitP2ThisYear;
@@ -83,10 +95,13 @@ export function calculateHouseholdPensionForYear({
         pensionSurplus,
         inflatedFloor,
         inflatedFlex,
-        nextWidowPensionP1: widowBenefits.p1FromP2 ? Math.max(0, widowPensionP1 * widowAdjFactor) : 0,
-        nextWidowPensionP2: widowBenefits.p2FromP1 ? Math.max(0, widowPensionP2 * widowAdjFactor) : 0,
+        nextWidowPensionP1: widowBenefits.p1FromP2
+            ? Math.max(0, widowBenefitP1ThisYear * widowAdjFactor)
+            : 0,
+        nextWidowPensionP2: widowBenefits.p2FromP1
+            ? Math.max(0, widowBenefitP2ThisYear * widowAdjFactor)
+            : 0,
         nextAnnualPension: currentAnnualPension * (1 + rentAdjPct / 100),
         nextAnnualPension2: currentAnnualPension2 * (1 + rentAdjPct / 100)
     };
 }
-

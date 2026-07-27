@@ -108,6 +108,18 @@ export function getDataVersion() {
     };
 }
 
+export function resolveMonteCarloCape(yearData, inputs, marketDataHist) {
+    const yearCape = Number(yearData?.capeRatio ?? yearData?.cape);
+    if (Number.isFinite(yearCape) && yearCape > 0) return yearCape;
+    const inputCape = Number(inputs?.capeRatio);
+    if (Number.isFinite(inputCape) && inputCape > 0) return inputCape;
+    const legacyCape = Number(inputs?.marketCapeRatio);
+    if (Number.isFinite(legacyCape) && legacyCape > 0) return legacyCape;
+    const histCape = Number(marketDataHist?.capeRatio);
+    if (Number.isFinite(histCape) && histCape > 0) return histCape;
+    return 0;
+}
+
 /**
  * Hilfsfunktion für CAPE-Ratio Resolution
  */

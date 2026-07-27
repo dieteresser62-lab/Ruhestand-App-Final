@@ -246,4 +246,71 @@ function getCareInputs() {
     console.log('✅ Monte-Carlo life event mortality works');
 }
 
+// --- TEST 6: Partner existence is independent from optional care metadata ---
+{
+    const inputs = {
+        pflegefallLogikAktivieren: false,
+        startAlter: 50,
+        geschlecht: 'm',
+        partner: {
+            aktiv: true,
+            geschlecht: 'w',
+            startAlter: 200
+        },
+        accumulationPhase: { enabled: false },
+        transitionYear: 0
+    };
+    const widowOptions = {
+        mode: 'percent',
+        percent: 0.5,
+        marriageOffsetYears: 0,
+        minMarriageYears: 0
+    };
+    const rand = createForkableMockRng([0.99, 0.99, 0.99], [0.99]);
+    const lifeState = createMonteCarloLifeState(inputs, rand, widowOptions);
+    assert(lifeState.hasPartner === true, 'Active partner should exist when care logic is disabled');
+    assert(lifeState.p2Alive === true, 'Active no-care partner should start alive');
+    assert(lifeState.careMetaP2 === null, 'Disabled care should keep optional P2 care metadata null');
+    assertClose(
+        lifeState.householdContext.widowBenefits.p1FromP2Percent,
+        0.5,
+        1e-12,
+        'Life state should transport the normalized widow percentage'
+    );
+
+    const deathYear = updateMonteCarloLifeEventsForYear(
+        lifeState,
+        inputs,
+        widowOptions,
+        0,
+        { jahr: 2024, inflation: 0 },
+        0,
+        null,
+        false,
+        rand
+    );
+    assert(deathYear.householdContext.p2Alive === false, 'P2 mortality should apply without care metadata');
+    assert(
+        deathYear.householdContext.widowBenefits.p1FromP2 === false,
+        'Widow benefit should not activate inside the death year'
+    );
+
+    const widowYear = updateMonteCarloLifeEventsForYear(
+        lifeState,
+        inputs,
+        widowOptions,
+        1,
+        { jahr: 2025, inflation: 0 },
+        0,
+        null,
+        false,
+        rand
+    );
+    assert(
+        widowYear.householdContext.widowBenefits.p1FromP2 === true,
+        'Widow benefit should activate in the year after deterministic P2 death'
+    );
+    console.log('✅ Partner existence and mortality are independent from care metadata');
+}
+
 console.log('--- Care Logic Tests Completed ---');

@@ -61,7 +61,9 @@ export function normalizeHouseholdContext(context) {
         p2Alive: true,
         widowBenefits: {
             p1FromP2: false,
-            p2FromP1: false
+            p2FromP1: false,
+            p1FromP2Percent: 0,
+            p2FromP1Percent: 0
         }
     };
     if (!context) return defaultContext;
@@ -70,7 +72,15 @@ export function normalizeHouseholdContext(context) {
         p2Alive: context.p2Alive !== false,
         widowBenefits: {
             p1FromP2: !!context?.widowBenefits?.p1FromP2,
-            p2FromP1: !!context?.widowBenefits?.p2FromP1
+            p2FromP1: !!context?.widowBenefits?.p2FromP1,
+            p1FromP2Percent: Math.max(
+                0,
+                Math.min(1, Number(context?.widowBenefits?.p1FromP2Percent) || 0)
+            ),
+            p2FromP1Percent: Math.max(
+                0,
+                Math.min(1, Number(context?.widowBenefits?.p2FromP1Percent) || 0)
+            )
         },
         care: {
             p1: context?.care?.p1 ?? context?.careMetaP1 ?? null,

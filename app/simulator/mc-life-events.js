@@ -6,7 +6,10 @@ import {
     updateCareMeta
 } from './simulator-engine-wrapper.js';
 import { MORTALITY_TABLE } from './simulator-data.js';
-import { computeMarriageYearsCompleted } from './simulator-sweep-utils.js';
+import {
+    computeMarriageYearsCompleted,
+    normalizeWidowOptions
+} from './simulator-sweep-utils.js';
 
 export const MAX_SIMULATOR_COUNTER_VALUE = 0xFFFFFFFF;
 
@@ -41,13 +44,17 @@ export function assertSimulatorHorizonAgeContract(inputs, maxDauer) {
     return { duration, maxAge: MAX_SIMULATOR_COUNTER_VALUE };
 }
 
-export function createMonteCarloLifeState(inputs, rand) {
+export function createMonteCarloLifeState(inputs, rand, widowOptions = null) {
     const careMetaP1 = makeDefaultCareMeta(inputs.pflegefallLogikAktivieren, inputs.geschlecht);
     const partnerGenderFallback = inputs.geschlecht === 'm' ? 'w' : 'm';
-    const careMetaP2 = (inputs.partner?.aktiv === true)
+    const hasPartner = inputs.partner?.aktiv === true;
+    const careMetaP2 = hasPartner
         ? makeDefaultCareMeta(inputs.pflegefallLogikAktivieren, inputs.partner?.geschlecht || partnerGenderFallback)
         : null;
-    const hasPartner = careMetaP2 !== null;
+    const normalizedWidowOptions = normalizeWidowOptions(widowOptions ?? inputs?.widowOptions);
+    const widowPercent = normalizedWidowOptions.mode === 'percent'
+        ? normalizedWidowOptions.percent
+        : 0;
 
     return {
         careMetaP1,
@@ -73,7 +80,9 @@ export function createMonteCarloLifeState(inputs, rand) {
             p2Alive: hasPartner,
             widowBenefits: {
                 p1FromP2: false,
-                p2FromP1: false
+                p2FromP1: false,
+                p1FromP2Percent: widowPercent,
+                p2FromP1Percent: widowPercent
             }
         },
         year: {
@@ -101,8 +110,9 @@ export function updateMonteCarloLifeEventsForYear(
     careEverActive,
     rand
 ) {
+    const normalizedWidowOptions = normalizeWidowOptions(widowOptions ?? inputs?.widowOptions);
     const ageP1 = inputs.startAlter + simulationsJahr;
-    const isAccumulation = inputs.accumulationPhase?.enabled && simulationsJahr < effectiveTransitionYear;
+    let isAccumulation = inputs.accumulationPhase?.enabled && simulationsJahr < effectiveTransitionYear;
 
     if (lifeState.singleNoCareFastPath) {
         if (!isAccumulation && lifeState.p1Alive) {
@@ -126,6 +136,8 @@ export function updateMonteCarloLifeEventsForYear(
         householdContext.p2Alive = false;
         householdContext.widowBenefits.p1FromP2 = false;
         householdContext.widowBenefits.p2FromP1 = false;
+        householdContext.widowBenefits.p1FromP2Percent = 0;
+        householdContext.widowBenefits.p2FromP1Percent = 0;
         householdContext.care = {
             p1: lifeState.careMetaP1,
             p2: null
@@ -144,11 +156,13 @@ export function updateMonteCarloLifeEventsForYear(
         return year;
     }
 
-    const marriageYearsCompleted = computeMarriageYearsCompleted(simulationsJahr, widowOptions);
-    const widowModeEnabled = widowOptions.mode === 'percent' && widowOptions.percent > 0 && lifeState.hasPartner;
+    const marriageYearsCompleted = computeMarriageYearsCompleted(simulationsJahr, normalizedWidowOptions);
+    const widowModeEnabled = normalizedWidowOptions.mode === 'percent'
+        && normalizedWidowOptions.percent > 0
+        && lifeState.hasPartner;
     const widowEligibleThisYear = widowModeEnabled &&
         marriageYearsCompleted > 0 &&
-        marriageYearsCompleted >= widowOptions.minMarriageYears;
+        marriageYearsCompleted >= normalizedWidowOptions.minMarriageYears;
     const p1AliveAtStart = lifeState.p1Alive;
     const p2AliveAtStart = lifeState.p2Alive;
     const careMetaP1 = lifeState.careMetaP1;
@@ -176,6 +190,7 @@ export function updateMonteCarloLifeEventsForYear(
     if (inputs.accumulationPhase?.enabled && simulationsJahr < effectiveTransitionYear) {
         if ((lifeState.p1Alive && careMetaP1?.active) || (lifeState.p2Alive && careMetaP2?.active)) {
             effectiveTransitionYear = simulationsJahr;
+            isAccumulation = false;
         }
     }
 
@@ -197,7 +212,7 @@ export function updateMonteCarloLifeEventsForYear(
         }
     }
 
-    if (!isAccumulation && lifeState.p2Alive && careMetaP2) {
+    if (!isAccumulation && lifeState.p2Alive) {
         const p2Gender = inputs.partner?.geschlecht || (inputs.geschlecht === 'm' ? 'w' : 'm');
         let qx2 = resolveSimulatorMortalityProbability(p2Gender, ageP2);
         const careFactorP2 = computeCareMortalityMultiplier(careMetaP2, inputs);
@@ -240,6 +255,12 @@ export function updateMonteCarloLifeEventsForYear(
     householdContext.p2Alive = lifeState.hasPartner ? lifeState.p2Alive : false;
     householdContext.widowBenefits.p1FromP2 = lifeState.widowBenefitActiveForP1;
     householdContext.widowBenefits.p2FromP1 = lifeState.widowBenefitActiveForP2;
+    householdContext.widowBenefits.p1FromP2Percent = widowModeEnabled
+        ? normalizedWidowOptions.percent
+        : 0;
+    householdContext.widowBenefits.p2FromP1Percent = widowModeEnabled
+        ? normalizedWidowOptions.percent
+        : 0;
     householdContext.care = {
         p1: careMetaP1,
         p2: careMetaP2

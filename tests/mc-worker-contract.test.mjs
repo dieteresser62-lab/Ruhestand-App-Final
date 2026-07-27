@@ -670,6 +670,86 @@ console.log('Test 9: versioned Sweep request worker parity');
         assertEqual(invalid.message.type, 'error', 'worker rejects unsupported Sweep method');
         assertEqual(invalid.message.code, serialError?.code, 'worker and serial Sweep expose the same structured error code');
         assertEqual(invalid.message.message, serialError?.message, 'worker and serial Sweep expose the same error message');
+
+        const householdRiskInputs = {
+            ...baseInputs,
+            startAlter: 50,
+            partner: {
+                aktiv: true,
+                geschlecht: 'w',
+                startAlter: 80,
+                startInJahren: 0,
+                monatsrente: 5000,
+                brutto: 60000,
+                steuerquotePct: 0
+            },
+            widowOptions: {
+                mode: 'percent',
+                percent: 0.5,
+                marriageOffsetYears: 0,
+                minMarriageYears: 0
+            },
+            tailRiskEnabled: true,
+            tailRiskAnnualProbabilityPct: 5,
+            tailRiskReturnShockPct: -35,
+            tailRiskInflationShockPct: 6,
+            tailRiskDurationYears: 2,
+            tailRiskCooldownYears: 1
+        };
+        const householdRiskRequest = {
+            schemaVersion: SWEEP_REQUEST_VERSION,
+            monteCarloParameters: {
+                anzahl: 1,
+                maxDauer: 8,
+                blockSize: 3,
+                seed: 4,
+                methode: 'block',
+                rngMode: 'per-run-seed',
+                startYearMode: 'UNIFORM',
+                startYearHalfLife: 20,
+                excludeEstimatedHistory: false
+            },
+            useCapeSampling: false
+        };
+        const householdRiskInitialized = await postAndWait(worker, {
+            type: 'sweep-init',
+            jobId: 'sweep-init-household-risk-v1',
+            baseInputs: householdRiskInputs,
+            paramCombinations
+        });
+        assertEqual(
+            householdRiskInitialized.message.type,
+            'ready',
+            'worker accepts Sweep household/risk cache initialization'
+        );
+        const householdRiskWorker = await postAndWait(worker, {
+            type: 'sweep',
+            jobId: 'sweep-household-risk-v1',
+            sweepRequest: householdRiskRequest,
+            comboRange: { start: 0, count: 1 }
+        });
+        const householdRiskSerial = runSweepChunk({
+            baseInputs: householdRiskInputs,
+            paramCombinations,
+            comboRange: { start: 0, count: 1 },
+            sweepRequest: householdRiskRequest,
+            engine: EngineAPI
+        });
+        assertEqual(householdRiskWorker.message.type, 'result', 'worker executes Sweep household/risk request');
+        assertEqual(
+            JSON.stringify(householdRiskWorker.message.results[0].provenance.householdRiskDiagnostics),
+            JSON.stringify(householdRiskSerial.results[0].provenance.householdRiskDiagnostics),
+            'worker and serial Sweep return identical household/risk diagnostics'
+        );
+        assertEqual(
+            householdRiskWorker.message.results[0].provenance.householdRiskDiagnostics.household.p2DeathEvents,
+            1,
+            'worker/serial parity witness includes the deterministic P2 death'
+        );
+        assert(
+            householdRiskWorker.message.results[0].provenance.householdRiskDiagnostics.household.widowP1ActiveYears > 0,
+            'worker/serial parity witness includes the resulting P1 widow years'
+        );
         console.log('✓ versioned Sweep request worker parity OK');
     } finally {
         await terminateWorker(worker);

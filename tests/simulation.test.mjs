@@ -106,6 +106,66 @@ try {
     throw e;
 }
 
+// Test 0b2: widow percentage derives the initial survivor pension exactly once
+try {
+    const firstWidowYear = calculateHouseholdPensionForYear({
+        inputs: {
+            startAlter: 67,
+            rentAdjPct: 2,
+            renteStartOffsetJahre: 0,
+            partner: { aktiv: true, startInJahren: 0, steuerquotePct: 0 }
+        },
+        yearIndex: 3,
+        currentAnnualPension: 0,
+        currentAnnualPension2: 60000,
+        widowPensionP1: 0,
+        p1Alive: true,
+        p2Alive: false,
+        widowBenefits: {
+            p1FromP2: true,
+            p2FromP1: false,
+            p1FromP2Percent: 0.5,
+            p2FromP1Percent: 0.5
+        },
+        effectiveBaseFloor: 24000,
+        baseFlex: 12000,
+        temporaryFlexFactor: 1
+    });
+    assertClose(firstWidowYear.widowBenefitP1ThisYear, 30000, 1e-9, 'Initial widow benefit should be 50 percent of P2 pension');
+    assertClose(firstWidowYear.rente1, 30000, 1e-9, 'P1 pension should include the derived widow benefit');
+    assertClose(firstWidowYear.nextWidowPensionP1, 30600, 1e-9, 'Derived widow benefit should index exactly once for next year');
+
+    const secondWidowYear = calculateHouseholdPensionForYear({
+        inputs: {
+            startAlter: 67,
+            rentAdjPct: 2,
+            renteStartOffsetJahre: 0,
+            partner: { aktiv: true, startInJahren: 0, steuerquotePct: 0 }
+        },
+        yearIndex: 4,
+        currentAnnualPension: 0,
+        currentAnnualPension2: 61200,
+        widowPensionP1: firstWidowYear.nextWidowPensionP1,
+        p1Alive: true,
+        p2Alive: false,
+        widowBenefits: {
+            p1FromP2: true,
+            p2FromP1: false,
+            p1FromP2Percent: 0.5,
+            p2FromP1Percent: 0.5
+        },
+        effectiveBaseFloor: 24000,
+        baseFlex: 12000,
+        temporaryFlexFactor: 1
+    });
+    assertClose(secondWidowYear.widowBenefitP1ThisYear, 30600, 1e-9, 'Stored widow benefit should remain the indexed source of truth');
+    assertClose(secondWidowYear.nextWidowPensionP1, 31212, 1e-9, 'Stored widow benefit should index once per later year');
+    console.log('✅ Widow percentage derivation and indexation passed');
+} catch (e) {
+    console.error('Test 0b2 Failed', e);
+    throw e;
+}
+
 // Test 0c: extracted EngineAPI input mapping preserves overrides and market window
 try {
     const { engineInput, detailedTranches } = buildSimulatorEngineInput({

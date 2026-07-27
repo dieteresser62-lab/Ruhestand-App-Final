@@ -10,7 +10,7 @@
 import { rng, makeRunSeed, quantile } from './simulator-utils.js';
 import { BREAK_ON_RUIN, annualData } from './simulator-data.js';
 import { applyStressOverride, computeRentAdjRate } from './simulator-portfolio.js';
-import { simulateOneYear, initMcRunState, sampleNextYearData, computeRunStatsFromSeries, updateCareMeta, calcCareCost, computeCareMortalityMultiplier, computeHouseholdFlexFactor, getDataVersion, resolveSimulatorCumulativeInflationFactor } from './simulator-engine-wrapper.js';
+import { simulateOneYear, initMcRunState, sampleNextYearData, computeRunStatsFromSeries, updateCareMeta, calcCareCost, computeCareMortalityMultiplier, computeHouseholdFlexFactor, getDataVersion, resolveMonteCarloCape, resolveSimulatorCumulativeInflationFactor } from './simulator-engine-wrapper.js';
 import { portfolioTotal } from './simulator-results.js';
 import { sumDepot } from './simulator-portfolio.js';
 import { cloneStressContext, computeMarriageYearsCompleted } from './simulator-sweep-utils.js';
@@ -138,18 +138,6 @@ function normalizeTechnicalPathError(result, runIdx, simulationsJahr) {
             ? sourceMessage
             : `Ein Simulationspfad wurde technisch abgebrochen (${code}).`
     };
-}
-
-function resolveMonteCarloCape(yearData, inputs, marketDataHist) {
-    const yearCape = Number(yearData?.capeRatio ?? yearData?.cape);
-    if (Number.isFinite(yearCape) && yearCape > 0) return yearCape;
-    const inputCape = Number(inputs?.capeRatio);
-    if (Number.isFinite(inputCape) && inputCape > 0) return inputCape;
-    const legacyCape = Number(inputs?.marketCapeRatio);
-    if (Number.isFinite(legacyCape) && legacyCape > 0) return legacyCape;
-    const histCape = Number(marketDataHist?.capeRatio);
-    if (Number.isFinite(histCape) && histCape > 0) return histCape;
-    return 0;
 }
 
 function shouldUseStressBootstrap(stressCtx) {
@@ -443,7 +431,7 @@ export async function runMonteCarloChunk({
         // Track dynamic transition year (can be shortened by care event)
         let effectiveTransitionYear = inputs.transitionYear ?? 0;
 
-        const lifeState = createMonteCarloLifeState(inputs, rand);
+        const lifeState = createMonteCarloLifeState(inputs, rand, widowOptions);
         const { careMetaP1, careMetaP2, hasPartner } = lifeState;
         const rngCareP1 = lifeState.rngCareP1;
         const rngCareP2 = lifeState.rngCareP2;
@@ -563,7 +551,7 @@ export async function runMonteCarloChunk({
                 }
             }
 
-            if (!isAccumulation && p2Alive && careMetaP2) {
+            if (!isAccumulation && p2Alive) {
                 const p2Gender = inputs.partner?.geschlecht || (inputs.geschlecht === 'm' ? 'w' : 'm');
                 let qx2 = resolveSimulatorMortalityProbability(p2Gender, ageP2);
                 const careFactorP2 = computeCareMortalityMultiplier(careMetaP2, inputs);

@@ -305,8 +305,12 @@ export function buildSimulatorYearResult({
             pflege_grade: pflegeMeta?.grade ?? null,
             pflege_grade_label: pflegeMeta?.gradeLabel ?? '',
             pflege_delta_flex: pflegeMeta?.log_delta_flex ?? 0,
-            WidowBenefitP1: widowBenefits.p1FromP2 ? widowPensionP1 : 0,
-            WidowBenefitP2: widowBenefits.p2FromP1 ? widowPensionP2 : 0,
+            WidowBenefitP1: widowBenefits.p1FromP2
+                ? pensionResult.widowBenefitP1ThisYear
+                : 0,
+            WidowBenefitP2: widowBenefits.p2FromP1
+                ? pensionResult.widowBenefitP2ThisYear
+                : 0,
             NeedLiq: 0,
             GuardGold: 0,
             GuardEq: 0,

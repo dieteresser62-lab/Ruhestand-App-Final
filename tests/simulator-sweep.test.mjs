@@ -15,7 +15,12 @@ import {
     ESTIMATED_HISTORY_CUTOFF_YEAR,
     annualData
 } from '../app/simulator/simulator-data.js';
-import { parseRangeInput, cartesianProductLimited } from '../app/simulator/simulator-utils.js';
+import {
+    cartesianProductLimited,
+    makeRunSeed,
+    parseRangeInput,
+    quantile
+} from '../app/simulator/simulator-utils.js';
 import {
     deepClone,
     SWEEP_ALLOWED_KEYS,
@@ -28,6 +33,7 @@ import {
 import {
     SWEEP_RESULT_PROVENANCE_VERSION,
     SWEEP_SAMPLING_FINGERPRINT_VERSION,
+    SWEEP_HOUSEHOLD_RISK_DIAGNOSTICS_VERSION,
     buildSweepInputs,
     runSweepChunk
 } from '../app/simulator/sweep-runner.js';
@@ -37,6 +43,12 @@ import {
     normalizeSweepRequestV1
 } from '../app/simulator/monte-carlo-parameters.js';
 import { runMonteCarloChunk } from '../app/simulator/monte-carlo-runner.js';
+import { resolveDynamicFlexRunnerHorizon } from '../app/simulator/dynamic-flex-runner-horizon.js';
+import {
+    applyTailRiskOverlay,
+    createTailRiskSchedule,
+    summarizeTailRiskEvents
+} from '../app/simulator/tail-risk-overlay.js';
 
 if (typeof global.window === 'undefined') {
     global.window = {};
@@ -1052,13 +1064,19 @@ console.log('Test 31: Sweep Startjahrfilter und Estimated-History-Ausschluss');
         'sampling diagnostics retain estimated-history exclusion'
     );
     assertEqual(
-        result.provenance.samplingDiagnostics.tailRisk,
-        null,
-        'Sweep provenance represents its unsupported tail-risk overlay as missing instead of zero'
+        result.provenance.householdRiskDiagnostics.schemaVersion,
+        SWEEP_HOUSEHOLD_RISK_DIAGNOSTICS_VERSION,
+        'Sweep household and risk diagnostics are versioned'
     );
-    assert(
-        result.provenance.unsupportedOverlays.includes('tailRisk'),
-        'Sweep provenance explicitly names tail risk as unsupported'
+    assertEqual(
+        result.provenance.samplingDiagnostics.tailRisk.appliedYears,
+        0,
+        'disabled tail risk remains a supported, evaluated overlay with zero applied years'
+    );
+    assertEqual(
+        result.provenance.unsupportedOverlays.length,
+        0,
+        'Sweep no longer marks tail risk as unsupported'
     );
     console.log('✓ Sweep Startjahrfilter und Estimated-History-Ausschluss OK');
 }
@@ -1219,6 +1237,405 @@ console.log('Test 36: Sweep Regime-Pool Fail-Closed');
         );
     }
     console.log('✓ Sweep Regime-Pool Fail-Closed OK');
+}
+
+// Test 37: O-12 - Partner, deterministischer P2-Tod und Witwenleistung
+console.log('Test 37: O-12 Sweep Partner-/Witwenpfad');
+{
+    const widowOptions = {
+        mode: 'percent',
+        percent: 0.5,
+        marriageOffsetYears: 0,
+        minMarriageYears: 0
+    };
+    const partnerInputs = buildSamplingTestInputs({
+        startAlter: 50,
+        startVermoegen: 1000000,
+        depotwertAlt: 900000,
+        einstandAlt: 700000,
+        tagesgeld: 100000,
+        partner: {
+            aktiv: true,
+            geschlecht: 'w',
+            startAlter: 80,
+            startInJahren: 0,
+            monatsrente: 5000,
+            brutto: 60000,
+            steuerquotePct: 0
+        },
+        widowOptions
+    });
+    const request = buildSweepRequest('block', {
+        anzahl: 1,
+        maxDauer: 8,
+        blockSize: 3,
+        seed: 4
+    });
+    const activeSweep = runSweepChunk({
+        baseInputs: partnerInputs,
+        paramCombinations: [samplingTestCombination],
+        comboRange: { start: 0, count: 1 },
+        sweepRequest: request,
+        engine: EngineAPI
+    }).results[0];
+    const inactiveSweep = runSweepChunk({
+        baseInputs: {
+            ...partnerInputs,
+            partner: { ...partnerInputs.partner, aktiv: false }
+        },
+        paramCombinations: [samplingTestCombination],
+        comboRange: { start: 0, count: 1 },
+        sweepRequest: request,
+        engine: EngineAPI
+    }).results[0];
+    const activeYears = activeSweep.provenance.householdRiskDiagnostics
+        .tracedRuns[0].events
+        .filter(event => event.simulationYearIndex <= 3);
+    const inactiveYear0 = inactiveSweep.provenance.householdRiskDiagnostics
+        .tracedRuns[0].events
+        .find(event => event.simulationYearIndex === 0);
+    const byYear = new Map(activeYears.map(event => [event.simulationYearIndex, event]));
+
+    assertEqual(byYear.get(0)?.pensionP2Eur, 60000, 'active partner contributes exactly 60,000 EUR in year 1');
+    assertEqual(byYear.get(1)?.pensionP2Eur, 60000, 'active partner contributes exactly 60,000 EUR before death in year 2');
+    assertEqual(inactiveYear0?.pensionP2Eur, 0, 'inactive partner contributes no P2 pension');
+    assertEqual(
+        byYear.get(0)?.pensionAnnualEur - inactiveYear0?.pensionAnnualEur,
+        60000,
+        'partner activation changes annual household pension by exactly 60,000 EUR'
+    );
+    assertEqual(byYear.get(2)?.p2Alive, false, 'seed 4 fixes P2 death in simulation year 3');
+    assertEqual(byYear.get(2)?.pensionP2Eur, 0, 'P2 pension stops in the deterministic death year');
+    assertEqual(byYear.get(3)?.widowP1Active, true, 'widow path activates in the year after P2 death');
+    assertEqual(byYear.get(3)?.widowPensionP1Eur, 30000, 'widow-specific diagnostic reports the configured 50 percent share');
+    assertEqual(byYear.get(3)?.pensionP1Eur, 30000, 'P1 receives exactly 30,000 EUR widow pension');
+    assertEqual(
+        activeSweep.provenance.householdRiskDiagnostics.household.p2DeathEvents,
+        1,
+        'household diagnostics count the P2 death exactly once'
+    );
+
+    const mc = await runMonteCarloChunk({
+        inputs: buildSweepInputs(partnerInputs, samplingTestCombination),
+        monteCarloParams: request.monteCarloParameters,
+        widowOptions,
+        useCapeSampling: request.useCapeSampling,
+        runRange: { start: 0, count: 1 },
+        logIndices: [0],
+        engine: EngineAPI
+    });
+    const mcRows = mc.runMeta[0].logDataRows.slice(0, 4);
+    for (let yearIndex = 0; yearIndex <= 3; yearIndex++) {
+        assertEqual(
+            byYear.get(yearIndex)?.p2Alive ? 1 : 0,
+            mcRows[yearIndex]?.Person2Alive,
+            `Sweep and MC expose the same P2 life state in year ${yearIndex + 1}`
+        );
+        assertEqual(
+            byYear.get(yearIndex)?.pensionP2Eur,
+            mcRows[yearIndex]?.rente2,
+            `Sweep and MC expose the same P2 pension in year ${yearIndex + 1}`
+        );
+    }
+    assertEqual(mcRows[3]?.WidowBenefitP1, 30000, 'MC log reports the same non-zero widow benefit');
+    console.log('✓ O-12 Sweep Partner-/Witwenpfad OK');
+}
+
+// Test 38: Pflegefloor und temporaerer Flexfaktor bleiben zum MC-Pfad paritaetisch
+console.log('Test 38: Sweep Pflege-Flex-/Floor-Paritaet');
+{
+    const gradeConfigs = Object.fromEntries(
+        [1, 2, 3, 4, 5].map(grade => [
+            grade,
+            { zusatz: grade * 1000, flexCut: 0.5, mortalityFactor: 1 }
+        ])
+    );
+    const careInputs = buildSamplingTestInputs({
+        startAlter: 80,
+        startVermoegen: 1000000,
+        depotwertAlt: 900000,
+        einstandAlt: 700000,
+        tagesgeld: 100000,
+        pflegefallLogikAktivieren: true,
+        pflegeModellTyp: 'chronisch',
+        pflegeRampUp: 1,
+        pflegeKostenDrift: 0,
+        pflegeRegionalZuschlag: 0,
+        pflegeMaxFloor: 60000,
+        pflegeGradeConfigs: gradeConfigs
+    });
+    const request = buildSweepRequest('block', {
+        anzahl: 1,
+        maxDauer: 3,
+        blockSize: 3,
+        seed: 3
+    });
+    const sweep = runSweepChunk({
+        baseInputs: careInputs,
+        paramCombinations: [samplingTestCombination],
+        comboRange: { start: 0, count: 1 },
+        sweepRequest: request,
+        engine: EngineAPI
+    }).results[0];
+    const sweepCareYear = sweep.provenance.householdRiskDiagnostics
+        .tracedRuns[0].events
+        .find(event => event.p1CareActive);
+    assertEqual(sweepCareYear?.temporaryFlexFactor, 0.5, 'single-person care applies the configured temporary flex factor 0.5');
+    assert(
+        sweepCareYear?.totalCareFloorNominalEur > 0,
+        'active care passes a positive additional floor to the annual step'
+    );
+    assertEqual(
+        sweep.provenance.householdRiskDiagnostics.household.minimumTemporaryFlexFactor,
+        0.5,
+        'household diagnostics retain the minimum applied flex factor'
+    );
+
+    const mc = await runMonteCarloChunk({
+        inputs: buildSweepInputs(careInputs, samplingTestCombination),
+        monteCarloParams: request.monteCarloParameters,
+        widowOptions: normalizeWidowOptions(careInputs.widowOptions),
+        useCapeSampling: request.useCapeSampling,
+        runRange: { start: 0, count: 1 },
+        logIndices: [0],
+        engine: EngineAPI
+    });
+    const mcCareYear = mc.runMeta[0].logDataRows[sweepCareYear.simulationYearIndex];
+    assertEqual(mcCareYear?.pflege_flex_faktor, 0.5, 'MC reference applies the same care flex factor');
+    assertClose(
+        sweepCareYear.totalCareFloorNominalEur,
+        mcCareYear?.pflege_zusatz_floor,
+        1e-9,
+        'Sweep and MC pass the same care floor'
+    );
+    console.log('✓ Sweep Pflege-Flex-/Floor-Paritaet OK');
+}
+
+// Test 39: O-20 - Survival-Quantil bestimmt Sweep-Horizon und VPW wie im MC
+console.log('Test 39: O-20 Sweep Survival-Horizon-/VPW-Paritaet');
+{
+    const baseInputs = buildSamplingTestInputs({
+        startAlter: 50,
+        dynamicFlex: true,
+        horizonMethod: 'survival_quantile',
+        horizonYears: 30,
+        longevityMode: 'none'
+    });
+    const request = buildSweepRequest('block', {
+        anzahl: 1,
+        maxDauer: 4,
+        blockSize: 3,
+        seed: 4242
+    });
+    const observed = [];
+    for (const survivalQuantile of [0.5, 0.99]) {
+        const combination = {
+            ...samplingTestCombination,
+            survivalQuantile
+        };
+        const effectiveInputs = buildSweepInputs(baseInputs, combination);
+        const expected = resolveDynamicFlexRunnerHorizon(effectiveInputs, {
+            yearIndex: 0,
+            ageP1: effectiveInputs.startAlter,
+            ageP2: effectiveInputs.startAlter,
+            p1Alive: true,
+            p2Alive: false
+        });
+        const sweep = runSweepChunk({
+            baseInputs,
+            paramCombinations: [combination],
+            comboRange: { start: 0, count: 1 },
+            sweepRequest: request,
+            engine: EngineAPI
+        }).results[0];
+        const sweepYear0 = sweep.provenance.householdRiskDiagnostics
+            .tracedRuns[0].events
+            .find(event => event.simulationYearIndex === 0);
+        assertEqual(
+            sweepYear0?.horizonYears,
+            expected.horizonYears,
+            `Sweep resolves the canonical year-1 horizon for quantile ${survivalQuantile}`
+        );
+        assertEqual(
+            sweepYear0?.vpwHorizonYears,
+            expected.horizonYears,
+            `engine VPW receives the canonical horizon for quantile ${survivalQuantile}`
+        );
+        assert(
+            Number.isFinite(sweepYear0?.vpwRate),
+            `Sweep exposes a finite VPW rate for quantile ${survivalQuantile}`
+        );
+
+        const mc = await runMonteCarloChunk({
+            inputs: effectiveInputs,
+            monteCarloParams: request.monteCarloParameters,
+            widowOptions: normalizeWidowOptions(effectiveInputs.widowOptions),
+            useCapeSampling: request.useCapeSampling,
+            runRange: { start: 0, count: 1 },
+            logIndices: [0],
+            engine: EngineAPI
+        });
+        const mcVpw = mc.runMeta[0].logDataRows[0]?.vpw;
+        assertEqual(mcVpw?.horizonYears, sweepYear0?.vpwHorizonYears, 'Sweep and MC use the same VPW horizon');
+        assertClose(mcVpw?.vpwRate, sweepYear0?.vpwRate, 1e-12, 'Sweep and MC use the same VPW rate');
+        observed.push(sweepYear0);
+    }
+    assert(
+        observed[1].horizonYears > observed[0].horizonYears,
+        'quantile 0.99 produces a longer effective horizon than quantile 0.50'
+    );
+    assert(
+        observed[1].vpwRate < observed[0].vpwRate,
+        'the longer 0.99 horizon produces the lower VPW withdrawal rate'
+    );
+    console.log('✓ O-20 Sweep Survival-Horizon-/VPW-Paritaet OK');
+}
+
+// Test 40: O-13 - deterministischer Tail-Schedule, Overlay und Diagnose
+console.log('Test 40: O-13 Sweep Tail-Risk-Overlay');
+{
+    const tailInputs = buildSamplingTestInputs({
+        tailRiskEnabled: true,
+        tailRiskAnnualProbabilityPct: 5,
+        tailRiskReturnShockPct: -35,
+        tailRiskInflationShockPct: 6,
+        tailRiskDurationYears: 2,
+        tailRiskCooldownYears: 1
+    });
+    const request = buildSweepRequest('block', {
+        anzahl: 1,
+        maxDauer: 8,
+        blockSize: 3,
+        seed: 2
+    });
+    const sweep = runSweepChunk({
+        baseInputs: tailInputs,
+        paramCombinations: [samplingTestCombination],
+        comboRange: { start: 0, count: 1 },
+        sweepRequest: request,
+        engine: EngineAPI
+    }).results[0];
+    const runSeed = makeRunSeed(2, 0, 0);
+    const expectedPlan = createTailRiskSchedule(runSeed, tailInputs, 8);
+    assertEqual(expectedPlan.events.length, 1, 'reference schedule injects exactly one event');
+    assertEqual(expectedPlan.events[0].startYearIndex, 2, 'reference event starts in simulation year index 2');
+    assertEqual(expectedPlan.events[0].durationYears, 2, 'reference event spans exactly two years');
+    assertEqual(
+        JSON.stringify(sweep.provenance.householdRiskDiagnostics.tracedRuns[0].tailRiskSchedule.scheduledEvents),
+        JSON.stringify(expectedPlan.events),
+        'Sweep provenance exposes the exact canonical tail schedule'
+    );
+
+    const sampledIndices = sweep.provenance.samplingFingerprint
+        .tracedRuns[0].historicalYearIndices;
+    const referenceEntries = sampledIndices.map((historicalIndex, simulationsJahr) =>
+        applyTailRiskOverlay(
+            annualData[historicalIndex],
+            expectedPlan.schedule[simulationsJahr] ?? null,
+            {
+                runIdx: 0,
+                combinationIndex: 0,
+                simulationsJahr,
+                methode: 'block',
+                stressPreset: tailInputs.stressPreset
+            }
+        )
+    );
+    const referenceSummary = summarizeTailRiskEvents(referenceEntries);
+    const tailDiagnostics = sweep.provenance.householdRiskDiagnostics.tailRisk;
+    assertEqual(tailDiagnostics.activeYears, referenceSummary.tailRiskActiveYears, 'active tail years match the canonical overlay');
+    assertEqual(tailDiagnostics.appliedYears, referenceSummary.tailRiskAppliedYears, 'applied tail years match the canonical overlay');
+    assertEqual(
+        tailDiagnostics.skippedHistoricalCrisisYears,
+        referenceSummary.tailRiskSkippedHistoricalCrisisYears,
+        'historical-crisis skips match the canonical overlay'
+    );
+    const tracedTailYears = sweep.provenance.householdRiskDiagnostics
+        .tracedRuns[0].events
+        .filter(event => event.tailRisk);
+    for (const traced of tracedTailYears) {
+        const expected = referenceEntries[traced.simulationYearIndex];
+        assertEqual(traced.tailRisk.applied, expected.tailRiskApplied, 'traced tail application flag matches reference');
+        assertEqual(traced.tailRisk.skippedReason, expected.tailRiskSkippedReason, 'traced tail skip reason matches reference');
+        assertClose(traced.tailRisk.effectiveReturnPct, expected.effectiveReturnPct, 1e-12, 'traced effective return matches reference');
+        assertClose(traced.tailRisk.effectiveInflationPct, expected.effectiveInflationPct, 1e-12, 'traced effective inflation matches reference');
+    }
+
+    const mc = await runMonteCarloChunk({
+        inputs: buildSweepInputs(tailInputs, samplingTestCombination),
+        monteCarloParams: request.monteCarloParameters,
+        widowOptions: normalizeWidowOptions(tailInputs.widowOptions),
+        useCapeSampling: request.useCapeSampling,
+        runRange: { start: 0, count: 1 },
+        logIndices: [0],
+        engine: EngineAPI
+    });
+    assertEqual(tailDiagnostics.activeYears, mc.totals.tailRiskActiveYears, 'Sweep and MC count the same active tail years');
+    assertEqual(tailDiagnostics.appliedYears, mc.totals.tailRiskAppliedYears, 'Sweep and MC count the same applied tail years');
+    assertEqual(
+        tailDiagnostics.skippedHistoricalCrisisYears,
+        mc.totals.tailRiskSkippedHistoricalCrisisYears,
+        'Sweep and MC count the same historical-crisis skips'
+    );
+    console.log('✓ O-13 Sweep Tail-Risk-Overlay OK');
+}
+
+// Test 41: Single-Profile ohne Pflege/Tail bleibt vollstaendig zum MC-Pfad paritaetisch
+console.log('Test 41: Single-Profile Sweep/MC Ergebnisparitaet');
+{
+    const baseInputs = buildSamplingTestInputs({
+        startAlter: 30,
+        dynamicFlex: false,
+        pflegefallLogikAktivieren: false,
+        partner: { aktiv: false },
+        tailRiskEnabled: false
+    });
+    const request = buildSweepRequest('block', {
+        anzahl: 3,
+        maxDauer: 6,
+        blockSize: 3,
+        seed: 9090
+    });
+    const sweep = runSweepChunk({
+        baseInputs,
+        paramCombinations: [samplingTestCombination],
+        comboRange: { start: 0, count: 1 },
+        sweepRequest: request,
+        engine: EngineAPI
+    }).results[0];
+    const effectiveInputs = buildSweepInputs(baseInputs, samplingTestCombination);
+    const mc = await runMonteCarloChunk({
+        inputs: effectiveInputs,
+        monteCarloParams: request.monteCarloParameters,
+        widowOptions: normalizeWidowOptions(effectiveInputs.widowOptions),
+        useCapeSampling: request.useCapeSampling,
+        runRange: { start: 0, count: 3 },
+        logIndices: [],
+        engine: EngineAPI
+    });
+    const finalOutcomes = Array.from(mc.buffers.finalOutcomes);
+    const sortedOutcomes = [...finalOutcomes].sort((a, b) => a - b);
+    const expectedMean = finalOutcomes.reduce((sum, value) => sum + value, 0) / finalOutcomes.length;
+    assertClose(
+        sweep.metrics.p10EndWealth,
+        sortedOutcomes[Math.floor(sortedOutcomes.length * 0.1)],
+        1e-8,
+        'Sweep P10 matches its documented order-statistic aggregation over MC raw paths'
+    );
+    assertClose(sweep.metrics.medianEndWealth, quantile(finalOutcomes, 0.5), 1e-8, 'Sweep median matches MC raw paths');
+    assertClose(sweep.metrics.meanEndWealth, expectedMean, 1e-8, 'Sweep mean matches MC raw paths');
+    assertClose(
+        sweep.metrics.successProbFloor,
+        ((3 - mc.totals.failCount) / 3) * 100,
+        1e-12,
+        'Sweep success rate matches MC raw paths'
+    );
+    assertEqual(
+        sweep.provenance.householdRiskDiagnostics.tailRisk.appliedYears,
+        0,
+        'no-tail single profile applies no tail overlay'
+    );
+    console.log('✓ Single-Profile Sweep/MC Ergebnisparitaet OK');
 }
 
 console.log('--- Simulator Sweep Tests Abgeschlossen ---');
