@@ -318,7 +318,130 @@ Freigegeben durch Gemini am 2026-07-27 nach erfolgreichem Re-Review der Code-Imp
 
 ## Review-Feedback von Claude
 
-Ausstehend beziehungsweise optional.
+- **Review-Datum:** 2026-07-27 (nachgelagertes Re-Review, Stand nach Slice 07)
+- **Reviewer:** Claude (Opus 5)
+- **Methode:** Adversariales Code- und Contract-Review nach `CLAUDE.md` und
+  `SLICE_EXECUTION_RULES.md`.
+
+### Verifikation
+
+- `npm test`: 7.722/7.722 Assertions gruen, 0 offene Handles;
+- Heatmap-Kriterium direkt vermessen und die alte Heuristik nachgebildet;
+- Umfang der Golden-Aenderung per `numstat` geprueft;
+- nachgelagerte Konsumenten von `FlexRatePct` durchgezaehlt;
+- Nullkoerzierung in der Aggregationsbedingung verifiziert.
+
+### Was der Slice korrekt loest
+
+Der Kern ist eine Familie von Falsy-Defaults in `simulator-year-result.js`,
+die fehlende Werte als **Idealwerte** ausgab:
+
+```text
+runwayMonths:      ... || Infinity   ->  unendlicher Runway
+RunwayCoveragePct: ... || 100        ->  volle Deckung
+FlexRatePct:       ... || 1.0        ->  1 Prozent statt 0
+QuoteEndPct:       (... || 0) * 100  ->  0
+```
+
+Drei der vier defaulteten auf den optimistischsten denkbaren Wert. Die
+Ersetzung durch `Number.isFinite(...) ? ... : null` ist die richtige Loesung,
+weil sie beobachtete Null und fehlenden Wert an der Quelle trennt.
+
+Der Heatmap-Nenner ist ebenfalls sauber geloest. Die alte Heuristik
+`sumCol0 > 0 && sumCol0 < 1.000001` brach exakt beim Randfall des
+Akzeptanzkriteriums. Nachgemessen:
+
+```text
+Counts [1, 0] bei 100 Runs   neu -> 0,01 und 0        also 1 % und 0 %
+alte Heuristik: sumCol0 = 1  ->  looksLikeShares = true
+                             ->  der Count 1 waere als 100 % gelesen worden
+```
+
+Ein Faktor 100 in der Darstellung, ausgeloest durch genau einen Run in der
+ersten Spalte. Die versionierte Eingabe (`SimulatorHeatmapInputV1`) ersetzt
+die Ratemechanik durch einen expliziten Vertrag.
+
+Die Golden-Aenderung ist exakt so eng wie freigegeben: `numstat` meldet 3
+geaenderte und 3 entfernte Zeilen, also ausschliesslich die drei vom Nutzer
+freigegebenen `canonicalRowsHash`-Werte. Keine `values`, keine `rowSamples`,
+keine Metrik. Das ist konsistent damit, dass `FlexRatePct`,
+`RunwayCoveragePct` und `QuoteEndPct` nicht in der `projectRow`-Projektion
+liegen: die Aenderung ist im Vollzeilenhash sichtbar und in den Stichproben
+nicht.
+
+### Findings
+
+1. **Z06-1 (Restrisiko) - die Missingness endet an der ersten Aggregation.**
+   `monte-carlo-runner.js` prueft `if (result.logData.FlexRatePct <= 0.1)` und
+   zaehlt dann `jahreOhneFlex`. Nach der Korrektur kann das Feld `null` sein,
+   und `null <= 0.1` ergibt in JavaScript verifiziert `true`. Ein **fehlender**
+   Flexwert zaehlt damit als „Jahr ohne Flex" - genau die Verwechslung von
+   fehlend und Null, die dieser Slice beseitigen soll. Vor der Korrektur wurde
+   derselbe Fall wegen `|| 1.0` als Jahr **mit** Flex gezaehlt. Die
+   Aggregation `anteilJahreOhneFlex` hat sich also still in die
+   Gegenrichtung geaendert, ohne dass ein Akzeptanzkriterium das benennt. Das
+   Kriterium deckt nur „Flexrate 0 zaehlt als Jahr ohne Flex" ab; fuer den
+   fehlenden Wert entscheidet allein die Koerzierung.
+2. **Z06-2 (Hinweis) - unbekanntes Heatmap-Schema degradiert still.**
+   `normalizeHeatmapInput` liefert bei falschem `schemaVersion` oder
+   `valueKind` ein leeres `values: []`. Nachgemessen ergibt ein Objekt mit
+   falscher Version `shares: []` ohne jeden Hinweis. Fuer einen Slice, dessen
+   Ziel wahrheitsgetreue Darstellung ist, ist eine wortlos leere Heatmap die
+   falsche Degradation - die uebrigen Missingness-Pfade dieses Slice melden
+   ihren Zustand ausdruecklich.
+3. **Z06-3 (Hinweis) - die Konsistenzpruefung der Erfolgspopulation kann sich
+   gegenseitig aufheben.** `positiveSuccessfulOutcomes` entsteht aus
+   `finalOutcomes[i] > 0` ueber **alle** Runs, nicht nur ueber die nach Status
+   erfolgreichen. Der Waechter prueft lediglich
+   `positiveSuccessfulOutcomes.length <= successfulCount`. Ein ruinierter Run
+   mit positivem Endwert und ein erfolgreicher Run mit Endwert 0 heben sich in
+   dieser Zaehlung gegenseitig auf; die Zusammensetzung waere falsch und der
+   Waechter bliebe still. Eine Filterung nach Terminalstatus statt der
+   arithmetischen Rekonstruktion ueber die Differenz waere robuster.
+4. **Z06-4 (Hinweis) - ein einzelner Inkonsistenzfall loescht die Metrik fuer
+   den gesamten Chunk.** Bei `outcome_inventory_mismatch` werden
+   `successfulOutcomes` auf `[]` und `p50_successful` auf `null` gesetzt. Das
+   ist ehrlich, aber grobkoernig: ein Ausreisser unter mehreren tausend Runs
+   entfernt die Kennzahl vollstaendig, statt sie mit ausgewiesener
+   Einschraenkung zu liefern.
+
+### Review-Ergebnis
+
+```markdown
+## Review-Ergebnis
+- Status: freigegeben
+- Blocker: keine. Die Falsy-Default-Familie in simulator-year-result.js ist
+  korrekt durch eine explizite Endlichkeitspruefung ersetzt; der
+  Heatmap-Nenner ist versioniert statt geraten, und das Randfallkriterium
+  wurde nachgemessen. Die Golden-Aenderung bleibt exakt auf die drei
+  freigegebenen Hashes begrenzt.
+- Restrisiken:
+  1. Z06-1 - `null <= 0.1` laesst einen fehlenden Flexwert als „Jahr ohne
+     Flex" zaehlen; die an der Quelle gewonnene Missingness geht in der
+     ersten Aggregation wieder verloren.
+  2. Z06-2 - unbekanntes Heatmap-Schema liefert wortlos eine leere Heatmap.
+  3. Z06-3 - die Konsistenzpruefung der Erfolgspopulation kann sich
+     gegenseitig aufhebende Fehler nicht erkennen.
+  4. Z06-4 - ein Inkonsistenzfall entfernt p50_successful fuer den ganzen
+     Chunk.
+- Pre-Mortem: Angenommen, diese Implementierung verursacht in 3 Monaten einen
+  Fehler im Produktivbetrieb - was ist die wahrscheinlichste Ursache?
+  Nicht die Darstellung, sondern die Statistik dahinter: Ein Nutzer vergleicht
+  zwei Monte-Carlo-Laeufe und sieht einen deutlich hoeheren Anteil an Jahren
+  ohne Flex. Ursache ist nicht eine geaenderte Strategie, sondern eine
+  Konstellation, in der die Flexrate haeufiger fehlt als zuvor - `null` faellt
+  ueber die Koerzierung in denselben Zaehler wie eine echte Null. Weil der
+  Slice die Trennung von fehlend und Null als geloest ausweist, wird die
+  Ursache im Spending-Modell gesucht statt in der Aggregationsbedingung.
+```
+
+### Empfehlung
+
+Z06-1 ist eine Zeile: `Number.isFinite(result.logData.FlexRatePct) &&
+result.logData.FlexRatePct <= 0.1`. Ob ein fehlender Flexwert als eigener
+Missingness-Zaehler gefuehrt oder aus der Quote herausgerechnet wird, ist eine
+kleine Fachentscheidung - die stille Koerzierung sollte sie jedenfalls nicht
+treffen.
 
 ## Review-Antworten von Codex
 
@@ -329,3 +452,7 @@ Review-Findings berücksichtigt; Implementierung vollständig grün.
 | ID | Quelle | Finding | Entscheidung | Umsetzung |
 | --- | --- | --- | --- | --- |
 | REV-06-01 | Gemini | Backtest-Hash-Deltas durch `FlexRatePct=0` | Fachlich beabsichtigtes Delta; Target-Fixture am 2026-07-26 kontrolliert aktualisiert | erledigt |
+| Z06-1 | Claude 2026-07-27 | `monte-carlo-runner.js` prueft `FlexRatePct <= 0.1`; nach der Korrektur kann das Feld `null` sein und `null <= 0.1` ergibt `true` - ein fehlender Flexwert zaehlt als Jahr ohne Flex | offen - Restrisiko | ausstehend |
+| Z06-2 | Claude 2026-07-27 | `normalizeHeatmapInput` liefert bei unbekanntem `schemaVersion` oder `valueKind` wortlos `values: []` statt eines Hinweises | offen - Hinweis | ausstehend |
+| Z06-3 | Claude 2026-07-27 | `positiveSuccessfulOutcomes` wird ueber alle Runs statt nur ueber die nach Status erfolgreichen gebildet; sich aufhebende Fehler bleiben unerkannt | offen - Hinweis | ausstehend |
+| Z06-4 | Claude 2026-07-27 | ein einzelner `outcome_inventory_mismatch` entfernt `p50_successful` fuer den gesamten Chunk | offen - Hinweis | ausstehend |
