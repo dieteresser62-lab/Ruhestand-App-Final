@@ -14,7 +14,7 @@
  */
 
 import { ENGINE_API_VERSION, ENGINE_BUILD_ID, CONFIG } from './config.mjs';
-import { AppError, ValidationError } from './errors.mjs';
+import { AppError, FinancialCalculationError, ValidationError } from './errors.mjs';
 import InputValidator from './validators/InputValidator.mjs';
 import MarketAnalyzer from './analyzers/MarketAnalyzer.mjs';
 import SpendingPlanner from './planners/SpendingPlanner.mjs';
@@ -144,45 +144,167 @@ function _clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
-function _allocateFinalTaxToActionSources(sources, finalTax) {
+export function _allocateFinalTaxToActionSources(sources, finalTax) {
     const sourceList = Array.isArray(sources) ? sources : [];
     const assetRows = sourceList
         .map((source, index) => ({ source, index }))
         .filter(({ source }) => source?.kind && source.kind !== 'liquiditaet');
-    if (!assetRows.length) return sourceList.map(source => ({ ...source }));
+    const parsedFinalTax = Number(finalTax);
+    if (!Number.isFinite(parsedFinalTax) || parsedFinalTax < -0.01) {
+        throw new FinancialCalculationError(
+            'Die finale Steuer der Transaktion ist ungueltig. Bitte pruefen Sie die Steuerparameter und starten Sie die Berechnung erneut.',
+            { contract: 'final_source_tax', finalTax }
+        );
+    }
+    const targetTax = Math.max(0, parsedFinalTax);
+    if (!assetRows.length) {
+        if (targetTax > 0.01) {
+            throw new FinancialCalculationError(
+                'Die finale Steuer kann keiner Verkaufsquelle zugeordnet werden. Bitte pruefen Sie die Depot-Tranchen und starten Sie die Berechnung erneut.',
+                { contract: 'final_source_tax', targetTax }
+            );
+        }
+        return sourceList.map(source => ({ ...source }));
+    }
 
     const positiveTaxable = assetRows.map(({ source }) => (
         Math.max(0, Number(source?.taxableAfterTqfSigned) || 0)
     ));
     const taxableTotal = positiveTaxable.reduce((total, value) => total + value, 0);
+    const grossCaps = assetRows.map(({ source }) => Math.max(0, Number(source?.brutto) || 0));
+    const grossTotal = grossCaps.reduce((total, value) => total + value, 0);
     const weights = taxableTotal > 0
         ? positiveTaxable
-        : assetRows.map(({ source }) => Math.max(0, Number(source?.brutto) || 0));
+        : grossCaps;
     const weightTotal = weights.reduce((total, value) => total + value, 0);
-    let taxRemaining = Math.max(0, Number(finalTax) || 0);
+
+    if (targetTax > 0.000000001 && weightTotal <= 0.000000001) {
+        throw new FinancialCalculationError(
+            'Eine positive finale Steuer steht keiner positiven Brutto-Verkaufsquelle gegenueber. Bitte pruefen Sie die Depot-Tranchen und Steuerdaten.',
+            { contract: 'final_source_tax', targetTax, grossTotal, taxableTotal }
+        );
+    }
+    if (targetTax > grossTotal + 0.01) {
+        throw new FinancialCalculationError(
+            'Die finale Steuer uebersteigt den gesamten Bruttoverkauf. Bitte pruefen Sie die Steuerparameter und Verkaufsquellen.',
+            { contract: 'final_source_tax', targetTax, grossTotal }
+        );
+    }
+
+    const allocations = new Array(assetRows.length).fill(0);
+    let taxRemaining = targetTax;
+    let active = assetRows
+        .map((_, index) => index)
+        .filter(index => grossCaps[index] > 0.000000001);
+
+    while (taxRemaining > 0.000000001 && active.length) {
+        const activeWeightTotal = active.reduce((total, index) => total + weights[index], 0);
+        const useGrossCapacityWeights = activeWeightTotal <= 0.000000001;
+        const effectiveWeightTotal = active.reduce((total, index) => (
+            total + (
+                useGrossCapacityWeights
+                    ? Math.max(0, grossCaps[index] - allocations[index])
+                    : weights[index]
+            )
+        ), 0);
+        if (effectiveWeightTotal <= 0.000000001) break;
+
+        const remainingBeforeAllocation = taxRemaining;
+        const saturated = active.filter(index => {
+            const capacity = Math.max(0, grossCaps[index] - allocations[index]);
+            const weight = useGrossCapacityWeights
+                ? capacity
+                : weights[index];
+            const proportionalTax = remainingBeforeAllocation * (weight / effectiveWeightTotal);
+            return proportionalTax > capacity + 0.000000001;
+        });
+
+        if (saturated.length) {
+            saturated.forEach(index => {
+                const capacity = Math.max(0, grossCaps[index] - allocations[index]);
+                allocations[index] += capacity;
+                taxRemaining -= capacity;
+            });
+            const saturatedSet = new Set(saturated);
+            active = active.filter(index => !saturatedSet.has(index));
+            continue;
+        }
+
+        active.forEach(index => {
+            const capacity = Math.max(0, grossCaps[index] - allocations[index]);
+            const weight = useGrossCapacityWeights
+                ? capacity
+                : weights[index];
+            allocations[index] += remainingBeforeAllocation * (weight / effectiveWeightTotal);
+        });
+        taxRemaining = 0;
+    }
+
+    if (taxRemaining > 0.01) {
+        throw new FinancialCalculationError(
+            'Die finale Steuer kann nicht ohne negative Nettoquelle verteilt werden. Bitte pruefen Sie die Steuerparameter und Depot-Tranchen.',
+            { contract: 'final_source_tax', targetTax, taxRemaining, grossTotal }
+        );
+    }
+
     const allocatedByIndex = new Map();
     assetRows.forEach(({ index }, assetIndex) => {
-        const isLast = assetIndex === assetRows.length - 1;
-        const allocatedTax = isLast
-            ? taxRemaining
-            : Math.min(
-                taxRemaining,
-                Math.max(0, Number(finalTax) || 0) * (weightTotal > 0 ? weights[assetIndex] / weightTotal : 0)
-            );
-        allocatedByIndex.set(index, allocatedTax);
-        taxRemaining -= allocatedTax;
+        allocatedByIndex.set(index, allocations[assetIndex]);
     });
+
+    const allocatedTotal = allocations.reduce((total, value) => total + value, 0);
+    if (Math.abs(allocatedTotal - targetTax) > 0.01) {
+        throw new FinancialCalculationError(
+            'Die verteilte Quellensteuer stimmt nicht mit der finalen Steuer ueberein. Bitte pruefen Sie die Steuerparameter und Depot-Tranchen.',
+            { contract: 'final_source_tax', targetTax, allocatedTotal }
+        );
+    }
 
     return sourceList.map((source, index) => {
         if (!allocatedByIndex.has(index)) return { ...source };
         const allocatedTax = allocatedByIndex.get(index);
+        const gross = Math.max(0, Number(source?.brutto) || 0);
         return {
             ...source,
             steuerPlan: Number(source?.steuer) || 0,
             steuer: allocatedTax,
-            netto: Math.max(0, Number(source?.brutto) || 0) - allocatedTax
+            netto: Math.max(0, gross - allocatedTax)
         };
     });
+}
+
+function _assertFinalTaxActionReconciliation(action) {
+    const sources = Array.isArray(action?.quellen) ? action.quellen : [];
+    const invalidAssetSource = sources.find(source => (
+        source?.kind
+        && source.kind !== 'liquiditaet'
+        && (
+            !Number.isFinite(Number(source?.brutto))
+            || !Number.isFinite(Number(source?.steuer))
+            || !Number.isFinite(Number(source?.netto))
+            || Number(source.netto) < -0.01
+            || Number(source.steuer) < -0.01
+            || Number(source.steuer) > Number(source.brutto) + 0.01
+        )
+    ));
+    if (invalidAssetSource) {
+        throw new FinancialCalculationError(
+            'Eine finale Verkaufsquelle besitzt ungueltige Brutto-, Steuer- oder Nettowerte. Bitte pruefen Sie die Depot-Tranchen und Steuerparameter.',
+            { contract: 'final_action_reconciliation', source: invalidAssetSource }
+        );
+    }
+
+    const sourceNet = sources
+        .reduce((total, source) => total + (Number(source?.netto) || 0), 0);
+    const useTotal = Object.values(action?.verwendungen || {})
+        .reduce((total, value) => total + (Number(value) || 0), 0);
+    const actionNet = Number(action?.nettoErlös) || 0;
+    if (Math.abs(sourceNet - useTotal) > 0.01 || Math.abs(sourceNet - actionNet) > 0.01) {
+        throw new FinancialCalculationError(
+            `Die finale Transaktion ist nicht ausgeglichen: Quellen-Netto ${sourceNet.toFixed(2)} EUR, Verwendungen ${useTotal.toFixed(2)} EUR, Action-Netto ${actionNet.toFixed(2)} EUR. Bitte pruefen Sie die Depot-Tranchen und Transaktionsbudgets.`,
+            { contract: 'final_action_reconciliation', sourceNet, useTotal, actionNet }
+        );
+    }
 }
 
 const _berechneEntnahmeRate = (realeRendite, horizontJahre) => {
@@ -721,8 +843,9 @@ function _internal_calculateModel(input, lastState) {
         : 0;
 
     if (taxCashAdjustment < -0.01) {
-        throw new Error(
-            `Steuerreserve-Contract verletzt: finale Steuer uebersteigt Planreserve um ${Math.abs(taxCashAdjustment).toFixed(2)} EUR.`
+        throw new FinancialCalculationError(
+            `Die finale Steuer uebersteigt die eingeplante Steuerreserve um ${Math.abs(taxCashAdjustment).toFixed(2)} EUR. Bitte pruefen Sie die Steuerparameter und Depot-Tranchen.`,
+            { contract: 'tax_reserve', taxCashAdjustment, steuerPlanGesamt, finalTax: taxSettlement.taxDue }
         );
     }
     action.quellen = _allocateFinalTaxToActionSources(action?.quellen, taxSettlement.taxDue);
@@ -752,16 +875,8 @@ function _internal_calculateModel(input, lastState) {
     // NOTE: action is passed by reference to the UI payload below.
     // We intentionally override steuer with the final annual settlement tax.
     action.steuer = taxSettlement.taxDue;
-    if (normalizedInput.finalizeThreeBucketAction === true && action?.type === 'TRANSACTION') {
-        const sourceNet = (action.quellen || [])
-            .reduce((total, source) => total + (Number(source?.netto) || 0), 0);
-        const useTotal = Object.values(verwendungen)
-            .reduce((total, value) => total + (Number(value) || 0), 0);
-        if (Math.abs(sourceNet - useTotal) > 0.01 || Math.abs(sourceNet - action.nettoErlös) > 0.01) {
-            throw new Error(
-                `Final-Action-Reconciliation verletzt: Quellen-Netto ${sourceNet.toFixed(2)} EUR, Verwendungen ${useTotal.toFixed(2)} EUR, Action-Netto ${(Number(action.nettoErlös) || 0).toFixed(2)} EUR.`
-            );
-        }
+    if (hasAssetSale) {
+        _assertFinalTaxActionReconciliation(action);
     }
     diagnosis.keyParams = diagnosis.keyParams || {};
     diagnosis.keyParams.taxSettlement = taxSettlement.details;

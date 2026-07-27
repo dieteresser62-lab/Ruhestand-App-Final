@@ -41,10 +41,21 @@ function assertSaleContract(action, messagePrefix) {
     const verwendungenSumme = (action.verwendungen?.liquiditaet || 0) +
         (action.verwendungen?.gold || 0) +
         (action.verwendungen?.aktien || 0);
+    const sourceNet = (action.quellen || [])
+        .reduce((total, source) => total + (Number(source?.netto) || 0), 0);
     assertClose(action.bruttoVerkaufGesamt - action.steuer, action.nettoErlös, 0.01,
         `${messagePrefix}: gross sale minus final tax should equal final net proceeds`);
     assertClose(verwendungenSumme, action.nettoErlös, 0.01,
         `${messagePrefix}: uses should distribute final net proceeds completely`);
+    assertClose(sourceNet, action.nettoErlös, 0.01,
+        `${messagePrefix}: source net should equal final net proceeds without 3-bucket finalization`);
+    assert((action.quellen || []).every(source => (
+        source?.kind === 'liquiditaet'
+        || (
+            (Number(source?.netto) || 0) >= -0.000001
+            && (Number(source?.steuer) || 0) <= (Number(source?.brutto) || 0) + 0.000001
+        )
+    )), `${messagePrefix}: every asset source should retain nonnegative net proceeds`);
     assertClose(action.nettoErlösPlan, action.bruttoVerkaufGesamt - action.steuerPlanGesamt, 0.01,
         `${messagePrefix}: planned net proceeds should use planned tax reserve`);
     assertClose(action.taxCashAdjustment, action.steuerPlanGesamt - action.steuer, 0.01,

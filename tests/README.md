@@ -4,7 +4,7 @@
 
 This directory contains the comprehensive testing infrastructure for the Ruhestand-App-Final project. The tests are designed to be zero-dependency, using native Node.js ESM and a custom test runner, avoiding the need for heavy frameworks like Jest or Mocha.
 
-**Test-Statistik:** 132 entdeckte Testdateien, davon 131 im Node-Gate ausgefuehrt, mit 7.484 von 7.484 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (im Suite-Datenintegritaet-Slice-02-Abschlussgate mit `npm test` am 2026-07-23 verifiziert). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand mit 16/16 Einstiegspunkt-/Zusatzflows, darunter vier isolierte Monte-Carlo-Browserfaelle.
+**Test-Statistik:** 132 entdeckte Testdateien, davon 131 im Node-Gate ausgefuehrt, mit 7.722 von 7.722 erfolgreichen Assertions, 0 fehlgeschlagenen Dateien und 0 offenen Handles (in der Suite-Datenintegritaet-Slice-02-Re-Review-Nachbesserung mit `npm test` am 2026-07-27 verifiziert). `browser-smoke.test.mjs` ist als separates Pflichtgate ausgewiesen und bestand mit 16/16 Einstiegspunkt-/Zusatzflows, darunter vier isolierte Monte-Carlo-Browserfaelle.
 
 Die Zahl beschreibt nur die Node-Standardsuite. `npm run test:browser`, `npm run test:coverage` und ein echter Tauri-Build sind getrennte Gates und in den Assertions nicht enthalten.
 
@@ -237,6 +237,7 @@ Die Tests sichern Contracts, Grenzwerte, Determinismus, Nicht-Mutation, Runner-I
 - **taxState-Fortschreibung:** `lastState.taxState.lossCarry` wird korrekt propagiert
 - **action.steuer:** Enthält Settlement-Steuer (nicht Sale-Plan-Steuer)
 - **Reserve-Reconciliation:** Plansteuer, Plan-Netto, finale Steuer und einmalige Liquiditaetsgutschrift erfuellen die Cash-Invarianten
+- **Globale Quellen-Reconciliation:** Auch ohne Balance-3-Bucket-Flag entsprechen Quellen-Netto und nichtnegative Einzelquellen der finalen Action und ihren Verwendungen
 - **Golden Cases:** Kein, teilweiser und ueberdeckender LossCarry sowie No-Transaction
 - **Signierte Tranchen:** Reine Verluste und gemischte Gewinn-/Verlusttranchen bleiben endlich und vorzeichengetreu
 - **taxRawAggregate:** Roh-Aggregate in UI-Ausgabe vorhanden
@@ -828,7 +829,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `health-bucket.test.mjs` | ~160 | Pflegebucket-Trigger, Deckung, Verzinsung und Diagnose |
 | `core-engine.test.mjs` | ~150 | EngineAPI-Basisvalidierung |
 | `core-negative-contracts.test.mjs` | ~130 | Negative Kern-Contracts fuer Stop-Regel-nahe Fehlerpfade |
-| `core-tax-settlement.test.mjs` | ~70 | Core Settlement-Integration |
+| `core-tax-settlement.test.mjs` | ~85 | Core Settlement-Integration und globale Quellen-Reconciliation |
 | `coverage-inventory.test.mjs` | ~120 | Coverage-Inventar, Modulklassifikation und ungeladene/runtime-geladene Dateien |
 | `coverage-report.test.mjs` | ~220 | V8-Coverage-Report, Pfadnormalisierung, Leerreport und obligatorische Dateigates |
 | `results-renderers.test.mjs` | ~620 | DOM-freie Ergebnisrenderer fuer Outcome, KPIs, Unsicherheit, Pflege, Sampling, Missingness und Fehlerpfade |
@@ -884,7 +885,7 @@ Worker-Tests verwenden MockWorker-Klassen, da echte Web Worker in Node.js nicht 
 | `snapshot-key-policy.test.mjs` | ~130 | Snapshot-Key-Policy, Restore-Grenzen und technische Key-Ausnahmen |
 | `spending-planner.test.mjs` | ~200 | Entnahme-Logik |
 | `spending-quantization.test.mjs` | ~80 | Entnahme-Rundung |
-| `suite-data-three-bucket-final-action.test.mjs` | ~400 | Slice-02-Final-Action, Nullbudgets, Lot-/Gold-Kapazitaet, Steuer- und Profil-Reconciliation |
+| `suite-data-three-bucket-final-action.test.mjs` | ~430 | Slice-02-Final-Action, profilbezogene Lot-Reservierung, Nullbudgets, Lot-/Gold-Kapazitaet sowie kapazitaetsbegrenzte Steuer- und Profil-Reconciliation |
 | `tauri-csp.test.mjs` | ~130 | Tauri-CSP, Live-Daten-Endpunkte und Icons |
 | `transaction-engine-ath.test.mjs` | ~160 | ATH-Verhalten |
 | `transaction-engine-rebal.test.mjs` | ~105 | Gold-Rebalancing |

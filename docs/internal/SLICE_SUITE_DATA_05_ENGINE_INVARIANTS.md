@@ -394,9 +394,101 @@ das Pre-Mortem-Szenario zugleich schliessen. Das ist der guenstigste Zeitpunkt
 dafuer, weil U05-2 genau zu der Aenderung einlaedt, die ohne diesen Test
 unbemerkt bliebe.
 
-## Review-Antworten von Codex
+## Re-Review nach Nachimplementierung (Claude, 2026-07-27)
 
-- **U05-1 angenommen und behoben:** Der Aussageumfang der elf alten Hash-Deltas ist korrigiert. Ein separates explizites Backtest-Orakel mit aktiver Rente sichert nun Quote und Wealth-Faktor gegen erneuten Doppelabzug.
+**Pruefgegenstand:** Arbeitsbaum ueber `0b2a5bf`. Zwei Programmdateien
+(`spending-policy-helpers.mjs`, `InputValidator.mjs`), vier Testdateien, eine
+additive Fixture-Erweiterung.
+
+### Verifikation
+
+- `npm test`: 7.702/7.702 Assertions gruen (vorher 7.679), 0 offene Handles;
+- das neue `pensionWealthOracle` unabhaengig nachgerechnet;
+- alle bestehenden Golden-Hashes unveraendert - die Fixture-Aenderung ist rein
+  additiv (`approvedContractChangePaths` plus neuer Orakelblock);
+- die neuen Regressionstests auf Diskriminierungskraft geprueft.
+
+### Unabhaengige Nachrechnung des Orakels
+
+```text
+Quote          berechnet 3.004848    Fixture 3.004848    OK
+alte Quote     berechnet 1.502424    Fixture 1.502424    OK
+Wealth-Faktor  berechnet 84.646811   Fixture 84.646811   OK
+Verhaeltnis alt/neu = 0.5000 (exakt die Haelfte - belegt das Doppelzaehlen)
+```
+
+Das Orakel ist **nicht tautologisch**: `expectedQuotePct` wird im Test aus
+`floor_aus_depot + flex_brutto` geteilt durch `eq_after_return +
+gold_after_return` gebildet, also aus den Eingangsgroessen der
+Wealth-Rechnung, und danach gegen `WealthQuoteUsedPct` geprueft. Der
+Wealth-Faktor wird aus den CONFIG-Schwellen mit der Smoothstep-Formel
+unabhaengig nachgerechnet.
+
+Entscheidend ist die zusaetzliche Abgrenzungsassertion
+`|WealthQuoteUsedPct - doubleSubtractQuotePct| > 0.5`: ein erneut eingefuegter
+Rentenabzug wuerde sie sofort verletzen. Damit ist genau das Pre-Mortem des
+Vorreviews geschlossen - und zwar durch den Test, nicht durch die Signatur.
+
+### Findings-Lifecycle
+
+```text
+U05-1  Restrisiko   BEHOBEN - integriertes Backtest-Orakel mit aktiver Rente; additiv,
+                    kein bestehender Golden-Hash veraendert; Aussageumfang der elf
+                    alten Deltas in der Slice-MD korrigiert
+U05-2  Hinweis      BEWUSST NICHT UMGEBAUT - Begruendung akzeptiert (gemeinsames
+                    Planner-Parameterobjekt). Das Risiko ist jetzt durch die
+                    Abgrenzungsassertion des neuen Orakels abgedeckt
+U05-3  Hinweis      DOKUMENTIERT UND GETESTET - Verhalten unveraendert; Test 9d pinnt
+                    den Fallback und schliesst NaN-Propagation aus
+U05-4  Hinweis      BEHOBEN, staerker als gefordert - nichtboolesche `renteAktiv`-Werte
+                    werden jetzt strukturiert abgewiesen statt nur uebersprungen
+U05-5  Hinweis      BEHOBEN - `effectiveFlexRate` nutzt denselben normalisierten
+                    `floorAnnual`; der neue Helper-Test diskriminiert nachweislich
+                    (vorher 60, jetzt 50)
+```
+
+### Neue Findings
+
+1. **V05-1 (Restrisiko) - das einzige Rentenszenario ist zugleich das einzige
+   ohne Vollzeilen-Regressionsschutz.** Der Probe-Lauf ist bewusst nicht in
+   `cases` aufgenommen (`assertEqual(actual.cases.length, 6)`) und besitzt
+   deshalb keinen `canonicalRowsHash`. Quote und Wealth-Faktor sind eng
+   abgesichert, alle uebrigen Zeilenfelder dieses Szenarios - Steuern,
+   Entnahme, Portfolioverlauf - jedoch gar nicht. Die Entscheidung ist
+   nachvollziehbar, weil sie einen siebten Golden-Hash vermeidet; die
+   Asymmetrie sollte aber bewusst getragen werden.
+2. **V05-2 (Hinweis) - verhaltenskritische Assertions liegen in einem
+   Projektions-Callback.** Die Pruefungen des Rentenorakels stehen in
+   `projectionOverride`. Der Wachposten `assert(pensionWealthOracle !== null)`
+   faengt ein Ausbleiben des Callbacks ab, sodass der Fall abgedeckt ist; ein
+   Projektionshaken, der Verifikation ausfuehrt, bleibt aber strukturell
+   ungewoehnlich.
+
+### Review-Ergebnis
+
+```markdown
+## Review-Ergebnis
+- Status: freigegeben
+- Blocker: keine. U05-1, U05-4 und U05-5 sind behoben und nachgemessen;
+  U05-2 und U05-3 sind mit tragfaehiger Begruendung als Restrisiko
+  beziehungsweise bestehender Vertrag angenommen.
+- Restrisiken:
+  1. V05-1 - das Rentenszenario hat kein Vollzeilen-Orakel.
+  2. V05-2 - verhaltenskritische Assertions in einem Projektions-Callback.
+  3. U05-2 - `renteJahr` bleibt ein im Helper ungenutzter Parameter; das
+     daraus folgende Regressionsrisiko ist durch die Abgrenzungsassertion
+     des neuen Orakels abgedeckt, nicht durch die Signatur.
+  4. U05-3 - fehlender Vorjahres-Flexzustand wird weiterhin als volle
+     Flexrate 100 ausgelegt; jetzt dokumentiert und getestet.
+- Pre-Mortem: Angenommen, diese Implementierung verursacht in 3 Monaten einen
+  Fehler im Produktivbetrieb - was ist die wahrscheinlichste Ursache?
+  Nicht mehr das Rentennetting - dieses ist jetzt beidseitig abgesichert.
+  Wahrscheinlicher ist eine Aenderung im Rentenszenario selbst, die Steuern
+  oder Portfolioverlauf verschiebt: Weil dieses Szenario als einziges keinen
+  canonicalRowsHash besitzt, wuerde eine solche Verschiebung von der
+  Golden-Suite nicht bemerkt, waehrend das enge Quotenorakel weiterhin gruen
+  bleibt.
+``` Der Aussageumfang der elf alten Hash-Deltas ist korrigiert. Ein separates explizites Backtest-Orakel mit aktiver Rente sichert nun Quote und Wealth-Faktor gegen erneuten Doppelabzug.
 - **U05-2 teilweise angenommen, bewusst nicht umgebaut:** Im Helper ist `renteJahr` ungenutzt; die Aufrufer uebergeben jedoch das breite, in weiteren Planner-Schritten benoetigte Parameterobjekt. Eine Signaturverengung ist kein Fehlerfix dieses Review-Zyklus.
 - **U05-3 als Contract entschieden:** Der 100-Prozent-Fallback entspricht dem Initialzustand und wird fuer unvollstaendige initialisierte Legacy-States beibehalten und getestet.
 - **U05-4 angenommen und behoben:** Nichtboolesche Aktivierungswerte scheitern fail-closed mit Feldbezug `renteAktiv`.
@@ -412,3 +504,5 @@ unbemerkt bliebe.
 | U05-3 | Claude 2026-07-27 | fehlender `lastState.flexRate` wird neu als volle Flexrate 100 ausgelegt (optimistischster Fallback) | als Initial-/Legacy-Contract bestaetigt | erledigt: Regressionstest fuer Quote und endlichen Folgezustand |
 | U05-4 | Claude 2026-07-27 | Rentenvalidierung greift nur bei striktem `renteAktiv === true`; `"true"` und `1` bleiben ungeprueft | angenommen | behoben: vorhandene Nicht-Booleans werden fail-closed fuer `renteAktiv` abgewiesen |
 | U05-5 | Claude 2026-07-27 | `calculateFinalWithdrawal` mischt geklemmten `floorAnnual` und ungeklemmten `inflatedBedarf.floor` | angenommen | behoben: konsistenter `floorAnnual` samt direktem Helper-Contract |
+| V05-1 | Claude Re-Review 2026-07-27 | das Rentenszenario ist nicht in `cases` und besitzt daher keinen `canonicalRowsHash`; Quote und Wealth-Faktor sind eng abgesichert, alle uebrigen Zeilenfelder gar nicht | offen - Restrisiko | ausstehend |
+| V05-2 | Claude Re-Review 2026-07-27 | verhaltenskritische Assertions des Rentenorakels liegen in einem Projektions-Callback (durch Null-Wachposten abgedeckt) | offen - Hinweis | ausstehend |

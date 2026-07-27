@@ -1,8 +1,10 @@
 import { EngineAPI } from '../engine/index.mjs';
+import { _allocateFinalTaxToActionSources } from '../engine/core.mjs';
 import { calculateSaleAndTax } from '../engine/transactions/sale-engine.mjs';
 import {
     appendBondReplenishment,
-    applyThreeBucketLogic
+    applyThreeBucketLogic,
+    reservePlannedLotInventory
 } from '../engine/transactions/three-bucket-logic.mjs';
 import { trySurplusRebalance } from '../engine/transactions/transaction-surplus.mjs';
 import { attributeHouseholdAction } from '../app/profile/profilverbund-action-attribution.js';
@@ -202,6 +204,121 @@ function saleInput(detailledTranches, overrides = {}) {
         totalGrossForLot <= 100000.01,
         'An 80,000 EUR reservation on a 100,000 EUR lot must leave at most 20,000 EUR for refill'
     );
+}
+
+// REV-02-F01: reservations must be scoped by source profile as well as lot ID.
+// A sale from profile A must not consume the identically named lot in profile B.
+{
+    const tranches = [
+        equityLot({
+            trancheId: 'shared-lot',
+            sourceProfileId: 'profile-a',
+            marketValue: 50000,
+            costBasis: 50000
+        }),
+        equityLot({
+            trancheId: 'shared-lot',
+            sourceProfileId: 'profile-b',
+            marketValue: 50000,
+            costBasis: 50000
+        })
+    ];
+    const pendingAction = {
+        type: 'TRANSACTION',
+        anweisungKlasse: 'anweisung-gelb',
+        title: 'Profil A Verkauf',
+        nettoErlös: 40000,
+        steuer: 0,
+        quellen: [{
+            kind: 'aktien_neu',
+            category: 'equity',
+            trancheId: 'shared-lot',
+            sourceProfileId: 'profile-a',
+            brutto: 40000,
+            steuer: 0,
+            netto: 40000,
+            tqf: 0,
+            gainQuotePlan: 0,
+            gainQuoteSigned: 0,
+            realizedGainSigned: 0,
+            taxableAfterTqfSigned: 0
+        }],
+        verwendungen: { liquiditaet: 40000, gold: 0, aktien: 0 },
+        taxRawAggregate: {
+            sumRealizedGainSigned: 0,
+            sumTaxableAfterTqfSigned: 0
+        }
+    };
+    const remaining = reservePlannedLotInventory(tranches, pendingAction);
+    const remainingByProfile = new Map(
+        remaining.map(tranche => [tranche.sourceProfileId, tranche.marketValue])
+    );
+
+    assertClose(remainingByProfile.get('profile-a'), 10000, 0.01,
+        'Profile A reservation must leave only its own 10,000 EUR remainder');
+    assertClose(remainingByProfile.get('profile-b'), 50000, 0.01,
+        'Profile B identically named lot must remain fully available');
+
+    let overbookingError = null;
+    try {
+        reservePlannedLotInventory(tranches, {
+            ...pendingAction,
+            quellen: [{ ...pendingAction.quellen[0], brutto: 60000 }]
+        });
+    } catch (error) {
+        overbookingError = error;
+    }
+    assertEqual(overbookingError?.name, 'FinancialCalculationError',
+        '3-bucket overbooking must preserve an actionable engine error type');
+    assert(String(overbookingError?.message || '').includes('Bitte pruefen Sie die Depot-Tranchen'),
+        '3-bucket overbooking must tell the user how to resolve the input conflict');
+}
+
+// W02-2/W02-3: final tax allocation is capacity constrained and rejects tax
+// without any gross sale instead of producing a negative source net amount.
+{
+    const sources = _allocateFinalTaxToActionSources([{
+        kind: 'aktien_neu',
+        trancheId: 'small-taxable-lot',
+        brutto: 1,
+        steuer: 0,
+        netto: 1,
+        taxableAfterTqfSigned: 1000
+    }, {
+        kind: 'aktien_neu',
+        trancheId: 'fallback-lot',
+        brutto: 100,
+        steuer: 0,
+        netto: 100,
+        taxableAfterTqfSigned: 0
+    }], 50);
+    const allocatedTax = sources.reduce((total, source) => total + (Number(source.steuer) || 0), 0);
+
+    assertClose(allocatedTax, 50, 0.01, 'Final source tax allocation must preserve total settlement tax');
+    assert(sources.every(source => source.netto >= -0.000001),
+        'Final source tax allocation must never create a negative source net amount');
+    assert(sources.every(source => source.steuer <= source.brutto + 0.000001),
+        'Final source tax allocation must respect every source gross capacity');
+
+    let degenerateError = null;
+    try {
+        _allocateFinalTaxToActionSources([{
+            kind: 'aktien_neu',
+            trancheId: 'zero-gross-lot',
+            brutto: 0,
+            steuer: 0,
+            netto: 0,
+            taxableAfterTqfSigned: 0
+        }], 1);
+    } catch (error) {
+        degenerateError = error;
+    }
+    assert(degenerateError instanceof Error,
+        'Positive final tax without gross source capacity must fail closed');
+    assertEqual(degenerateError?.name, 'FinancialCalculationError',
+        'Degenerate source tax allocation must preserve an actionable engine error type');
+    assert(String(degenerateError?.message || '').includes('Bitte pruefen Sie'),
+        'Degenerate source tax allocation must provide a user action');
 }
 
 // ENG-09: maxSkimPctOfEq=0 disables the overflow path instead of falling

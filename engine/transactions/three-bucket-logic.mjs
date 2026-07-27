@@ -7,6 +7,7 @@
 
 import { STRATEGY_OPTIONS } from '../../types/strategy-options.js';
 import { CONFIG } from '../config.mjs';
+import { FinancialCalculationError } from '../errors.mjs';
 import { calculateSaleAndTax } from './sale-engine.mjs';
 
 const THREE_BUCKET_CFG = CONFIG.SPENDING_MODEL?.THREE_BUCKET || {};
@@ -63,29 +64,53 @@ function nonLiquidSaleSources(action) {
         .filter(source => source?.kind && !isLiquiditySource(source) && (Number(source.brutto) || 0) > 0);
 }
 
-function reservePlannedLotInventory(detailedTranches, pendingAction) {
+function lotReservationKey(entry) {
+    const trancheId = String(entry?.trancheId || '').trim();
+    if (!trancheId) return null;
+    return `${String(entry?.sourceProfileId || '').trim()}:${trancheId}`;
+}
+
+function threeBucketContractError(message, context = {}) {
+    return new FinancialCalculationError(
+        `${message} Bitte pruefen Sie die Depot-Tranchen und deren Profilzuordnung und starten Sie die Berechnung erneut.`,
+        context
+    );
+}
+
+export function reservePlannedLotInventory(detailedTranches, pendingAction) {
     const tranches = Array.isArray(detailedTranches) ? detailedTranches : [];
     if (!tranches.length) return [];
 
     const reservations = new Map();
     nonLiquidSaleSources(pendingAction).forEach(source => {
-        const trancheId = source?.trancheId;
-        if (!trancheId) {
-            throw new Error('3-Bucket-Finalisierung: Verkaufsquelle ohne eindeutige trancheId kann nicht reserviert werden.');
+        const key = lotReservationKey(source);
+        if (!key) {
+            throw threeBucketContractError(
+                'Die 3-Bucket-Finalisierung kann eine Verkaufsquelle keiner eindeutigen Tranche zuordnen.',
+                { contract: 'lot_reservation', source }
+            );
         }
         reservations.set(
-            trancheId,
-            (reservations.get(trancheId) || 0) + Math.max(0, Number(source.brutto) || 0)
+            key,
+            (reservations.get(key) || 0) + Math.max(0, Number(source.brutto) || 0)
         );
     });
 
     return tranches
         .map(tranche => {
+            const key = lotReservationKey(tranche);
+            if (!key) {
+                throw threeBucketContractError(
+                    'Die 3-Bucket-Finalisierung hat eine Depot-Tranche ohne eindeutige Tranche-ID gefunden.',
+                    { contract: 'lot_reservation', tranche }
+                );
+            }
             const marketValue = Math.max(0, Number(tranche?.marketValue) || 0);
-            const reservedGross = reservations.get(tranche?.trancheId) || 0;
+            const reservedGross = reservations.get(key) || 0;
             if (reservedGross > marketValue + 0.01) {
-                throw new Error(
-                    `3-Bucket-Finalisierung: Lot ${String(tranche?.trancheId || 'unbekannt')} ist um ${(reservedGross - marketValue).toFixed(2)} EUR ueberbucht.`
+                throw threeBucketContractError(
+                    `Die 3-Bucket-Finalisierung wuerde Lot ${key} um ${(reservedGross - marketValue).toFixed(2)} EUR ueberbuchen.`,
+                    { contract: 'lot_reservation', key, reservedGross, marketValue }
                 );
             }
             const remainingMarketValue = Math.max(0, marketValue - reservedGross);
@@ -103,9 +128,9 @@ function mergeLotSaleSources(sources) {
     const merged = [];
     const indexByLot = new Map();
     (sources || []).forEach((source, sourceIndex) => {
-        const trancheId = source?.trancheId;
-        const key = trancheId
-            ? `${String(source?.sourceProfileId || '')}:${String(trancheId)}`
+        const lotKey = lotReservationKey(source);
+        const key = lotKey
+            ? lotKey
             : `unscoped:${sourceIndex}`;
         const existingIndex = indexByLot.get(key);
         if (existingIndex === undefined) {
@@ -130,25 +155,47 @@ function mergeLotSaleSources(sources) {
 function assertFinalLotCapacities(action, detailedTranches) {
     const tranches = Array.isArray(detailedTranches) ? detailedTranches : [];
     if (!tranches.length) return;
-    const capacityByLot = new Map(tranches.map(tranche => [
-        `${String(tranche?.sourceProfileId || '')}:${String(tranche?.trancheId || '')}`,
-        Math.max(0, Number(tranche?.marketValue) || 0)
-    ]));
+    const capacityByLot = new Map();
+    tranches.forEach(tranche => {
+        const key = lotReservationKey(tranche);
+        if (!key) {
+            throw threeBucketContractError(
+                'Die finale 3-Bucket-Pruefung hat eine Depot-Tranche ohne eindeutige Tranche-ID gefunden.',
+                { contract: 'final_lot_capacity', tranche }
+            );
+        }
+        if (capacityByLot.has(key)) {
+            throw threeBucketContractError(
+                `Die finale 3-Bucket-Pruefung hat die Tranche ${key} mehrfach gefunden.`,
+                { contract: 'final_lot_capacity', key }
+            );
+        }
+        capacityByLot.set(key, Math.max(0, Number(tranche?.marketValue) || 0));
+    });
     const soldByLot = new Map();
     nonLiquidSaleSources(action).forEach(source => {
-        if (!source?.trancheId) {
-            throw new Error('3-Bucket-Finalisierung: Finale Verkaufsquelle besitzt keine eindeutige trancheId.');
+        const key = lotReservationKey(source);
+        if (!key) {
+            throw threeBucketContractError(
+                'Die finale 3-Bucket-Pruefung kann eine Verkaufsquelle keiner eindeutigen Tranche zuordnen.',
+                { contract: 'final_lot_capacity', source }
+            );
         }
-        const key = `${String(source?.sourceProfileId || '')}:${String(source.trancheId)}`;
         if (!capacityByLot.has(key)) {
-            throw new Error(`3-Bucket-Finalisierung: Finale Verkaufsquelle ${String(source.trancheId)} besitzt kein Ursprungs-Lot.`);
+            throw threeBucketContractError(
+                `Die finale 3-Bucket-Verkaufsquelle ${key} besitzt keine aktuelle Ursprungstranche.`,
+                { contract: 'final_lot_capacity', key }
+            );
         }
         soldByLot.set(key, (soldByLot.get(key) || 0) + Math.max(0, Number(source.brutto) || 0));
     });
     soldByLot.forEach((sold, key) => {
         const capacity = capacityByLot.get(key) || 0;
         if (sold > capacity + 0.01) {
-            throw new Error(`3-Bucket-Finalisierung: Lot ${key} ist um ${(sold - capacity).toFixed(2)} EUR ueberbucht.`);
+            throw threeBucketContractError(
+                `Die finale 3-Bucket-Aktion wuerde Lot ${key} um ${(sold - capacity).toFixed(2)} EUR ueberbuchen.`,
+                { contract: 'final_lot_capacity', key, sold, capacity }
+            );
         }
     });
 }
@@ -410,7 +457,10 @@ export function finalizeThreeBucketAction({
     currentBondValuation
 }) {
     if (!Number.isFinite(realReturnEq)) {
-        throw new Error('3-Bucket-Finalisierung: Reale Aktienrendite muss als endlicher Ratio-Wert vorliegen.');
+        throw new FinancialCalculationError(
+            'Die 3-Bucket-Berechnung besitzt keine gueltige reale Aktienrendite. Bitte pruefen Sie die Marktdaten und starten Sie die Berechnung erneut.',
+            { contract: 'three_bucket_real_return', realReturnEq }
+        );
     }
     const threeBucketResult = applyThreeBucketLogic(
         detailedTranches,
